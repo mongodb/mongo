@@ -27,9 +27,8 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
-#include "mongo/platform/basic.h"
+#include "mongo/util/net/sockaddr.h"
 
 #include <iterator>
 #include <memory>
@@ -37,12 +36,12 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/util/net/sockaddr.h"
-
 #if !defined(_WIN32)
-#include <arpa/inet.h>
-#include <errno.h>
+#include <cerrno>
+
 #include <netdb.h>
+
+#include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <sys/socket.h>
@@ -58,6 +57,9 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/itoa.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
+
 
 namespace mongo {
 namespace {
@@ -80,7 +82,7 @@ AddrInfoPtr resolveAddrInfo(StringData hostOrIp, int port, sa_family_t familyHin
     const auto hostString = std::string(hostOrIp);
     const auto portString = ItoA(port).toString();
 
-    auto tryResolve = [&](bool allowDns) noexcept {
+    auto tryResolve = [&](bool allowDns) {
         AddrError result;
 
         addrinfo hints;
@@ -91,14 +93,18 @@ AddrInfoPtr resolveAddrInfo(StringData hostOrIp, int port, sa_family_t familyHin
         hints.ai_family = familyHint;
 
         addrinfo* addrs = nullptr;
+        // For IPv6 link-local addresses, the scope id will be specified as part of the address,
+        // e.g. fe80::1%en0. getaddrinfo() will parse the scope id from the address string and set
+        // it in the resulting sockaddr_in6 struct in the sin6_scope_id field. We don't need to do
+        // anything special here
         result.err = getaddrinfo(hostString.c_str(), portString.c_str(), &hints, &addrs);
         result.addr = AddrInfoPtr(addrs);
         return result;
     };
 
     auto validateResolution = [](AddrError addrErr) -> AddrInfoPtr {
-        uassert(ErrorCodes::HostUnreachable, getAddrInfoStrError(addrErr.err), addrErr.err == 0);
-
+        auto ec = addrInfoError(addrErr.err);
+        uassert(ErrorCodes::HostUnreachable, errorMessage(ec), !ec);
         return std::move(addrErr.addr);
     };
 
@@ -116,15 +122,6 @@ AddrInfoPtr resolveAddrInfo(StringData hostOrIp, int port, sa_family_t familyHin
 }
 
 }  // namespace
-
-std::string getAddrInfoStrError(int code) {
-#if !defined(_WIN32)
-    return gai_strerror(code);
-#else
-    /* gai_strerrorA is not threadsafe on windows. don't use it. */
-    return errnoWithDescription(code);
-#endif
-}
 
 SockAddr::SockAddr() {
     addressSize = sizeof(sa);
@@ -149,7 +146,7 @@ void SockAddr::initUnixDomainSocket(StringData path, int port) {
     uassert(
         13079, "path to unix socket too long", path.size() < sizeof(as<sockaddr_un>().sun_path));
     as<sockaddr_un>().sun_family = AF_UNIX;
-    path.copyTo(as<sockaddr_un>().sun_path, /* includeEndingNull =*/true);
+    str::copyAsCString(as<sockaddr_un>().sun_path, path);
     addressSize = sizeof(sockaddr_un);
     _isValid = true;
 }
@@ -206,7 +203,6 @@ std::vector<SockAddr> SockAddr::createAll(StringData target, int port, sa_family
         return std::vector<SockAddr>(ret.begin(), ret.end());
     } catch (const DBException& ex) {
         LOGV2(23176,
-              "getaddrinfo(\"{host}\") failed: {error}",
               "getaddrinfo invocation failed",
               "host"_attr = target,
               "error"_attr = ex.toStatus());
@@ -221,7 +217,7 @@ SockAddr::SockAddr(const sockaddr* other, socklen_t size) : addressSize(size), _
 }
 
 SockAddr::SockAddr(const sockaddr* other, socklen_t size, StringData hostOrIp)
-    : addressSize(size), _hostOrIp(hostOrIp.toString()), sa() {
+    : addressSize(size), _hostOrIp(std::string{hostOrIp}), sa() {
     memcpy(&sa, other, size);
     _isValid = true;
 }
@@ -301,6 +297,16 @@ unsigned SockAddr::getPort() const {
     }
 }
 
+void SockAddr::setPort(int port) {
+    if (auto type = getType(); type == AF_INET) {
+        as<sockaddr_in>().sin_port = htons(port);
+    } else if (type == AF_INET6) {
+        as<sockaddr_in6>().sin6_port = htons(port);
+    } else {
+        massert(SOCK_FAMILY_UNKNOWN_ERROR, "unsupported address family", false);
+    }
+}
+
 std::string SockAddr::getAddr() const {
     switch (getType()) {
         case AF_INET:
@@ -308,8 +314,9 @@ std::string SockAddr::getAddr() const {
             const int buflen = 128;
             char buffer[buflen];
             int ret = getnameinfo(raw(), addressSize, buffer, buflen, nullptr, 0, NI_NUMERICHOST);
-            massert(
-                13082, str::stream() << "getnameinfo error " << getAddrInfoStrError(ret), ret == 0);
+            massert(13082,
+                    str::stream() << "getnameinfo error " << errorMessage(addrInfoError(ret)),
+                    ret == 0);
             return buffer;
         }
 
@@ -329,6 +336,8 @@ constexpr auto kIPField = "ip"_sd;
 constexpr auto kPortField = "port"_sd;
 constexpr auto kUnixField = "unix"_sd;
 constexpr auto kAnonymous = "anonymous"_sd;
+
+constexpr auto kOCSFInterfaceNameField = "interface_name"_sd;
 }  // namespace
 
 void SockAddr::serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {

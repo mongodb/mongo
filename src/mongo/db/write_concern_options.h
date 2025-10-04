@@ -29,15 +29,22 @@
 
 #pragma once
 
-#include <string>
-
-#include "mongo/db/jsobj.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/read_write_concern_provenance.h"
-#include "mongo/idl/basic_types_gen.h"
+#include "mongo/db/write_concern_gen.h"
+#include "mongo/db/write_concern_idl.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
+#include "mongo/util/time_support.h"
 
-namespace mongo {
+#include <cstdint>
+#include <string>
+#include <variant>
 
-class Status;
+namespace MONGO_MOD_PUB mongo {
 
 struct WriteConcernOptions {
 public:
@@ -47,8 +54,60 @@ public:
     // Users can only provide OpTime condition, the others are used internally.
     enum class CheckCondition { OpTime, Config };
 
-    static constexpr int kNoTimeout = 0;
-    static constexpr int kNoWaiting = -1;
+    class Timeout {
+    public:
+        // block forever, infinite timeout
+        static constexpr Milliseconds kNoTimeoutVal{0};
+        // don't block, timeout immediately
+        static constexpr Milliseconds kNoWaitingVal{-1};
+
+        constexpr Timeout() : _timeout(kNoTimeoutVal) {}
+        explicit constexpr Timeout(Milliseconds ms) : _timeout(ms) {}
+
+        Timeout& operator=(Milliseconds ms) {
+            _timeout = ms;
+            return *this;
+        }
+        bool operator==(Timeout t) const {
+            return _timeout == t._timeout;
+        }
+        bool operator==(Milliseconds ms) const {
+            return _timeout == ms;
+        }
+
+        // kNoTimeout is really infinite, so handle correct ordering.
+        // No reordering is needed for kNoWaiting.
+
+        auto operator<=>(Timeout t) const {
+            if (_timeout == t._timeout)
+                return 0;
+            if (_timeout == kNoTimeoutVal)
+                return 1;
+            if (t._timeout == kNoTimeoutVal)
+                return -1;
+            return (_timeout < t._timeout) ? -1 : 1;
+        }
+
+        Milliseconds duration() const {
+            if (_timeout == kNoTimeoutVal)
+                return Milliseconds::max();
+            if (_timeout == kNoWaitingVal)
+                return Milliseconds(0);
+            return _timeout;
+        }
+
+        void addToIDL(WriteConcernIdl* idl) const {
+            idl->setWtimeout(_timeout.count());
+        }
+
+    private:
+        Milliseconds _timeout;
+    };
+
+    // block forever, infinite timeout
+    static const Timeout kNoTimeout;
+    // don't block, timeout immediately
+    static const Timeout kNoWaiting;
 
     static const BSONObj Default;
     static const BSONObj Acknowledged;
@@ -59,29 +118,11 @@ public:
     static constexpr StringData kWriteConcernField = "writeConcern"_sd;
     static const char kMajority[];  // = "majority"
 
-    static constexpr Seconds kWriteConcernTimeoutSystem{15};
-    static constexpr Seconds kWriteConcernTimeoutMigration{30};
-    static constexpr Seconds kWriteConcernTimeoutSharding{60};
-    static constexpr Seconds kWriteConcernTimeoutUserCommand{60};
-
-    // It is assumed that a default-constructed WriteConcernOptions will be populated with the
-    // default options. If it is subsequently populated with non-default options, it is the caller's
-    // responsibility to set the usedDefaultConstructedWC and notExplicitWValue flag correctly.
-    WriteConcernOptions()
-        : syncMode(SyncMode::UNSET),
-          wNumNodes(1),
-          wMode(""),
-          wTimeout(0),
-          usedDefaultConstructedWC(true),
-          notExplicitWValue(true) {}
-
-    WriteConcernOptions(int numNodes, SyncMode sync, int timeout);
-
-    WriteConcernOptions(int numNodes, SyncMode sync, Milliseconds timeout);
-
-    WriteConcernOptions(const std::string& mode, SyncMode sync, int timeout);
-
-    WriteConcernOptions(const std::string& mode, SyncMode sync, Milliseconds timeout);
+    WriteConcernOptions() = default;
+    explicit WriteConcernOptions(int numNodes, SyncMode sync, Milliseconds timeout);
+    explicit WriteConcernOptions(const std::string& mode, SyncMode sync, Milliseconds timeout);
+    explicit WriteConcernOptions(int numNodes, SyncMode sync, Timeout timeout);
+    explicit WriteConcernOptions(const std::string& mode, SyncMode sync, Timeout timeout);
 
     static StatusWith<WriteConcernOptions> parse(const BSONObj& obj);
 
@@ -115,6 +156,11 @@ public:
     // Warning: does not return the same object passed on the last parse() call.
     BSONObj toBSON() const;
 
+    /**
+     * Returns the IDL-struct representation of this object's BSON serialized form.
+     */
+    WriteConcernIdl toWriteConcernIdl() const;
+
     bool operator==(const WriteConcernOptions& other) const;
 
     bool operator!=(const WriteConcernOptions& other) const {
@@ -130,18 +176,46 @@ public:
         return usedDefaultConstructedWC || _provenance.isImplicitDefault();
     }
 
-    SyncMode syncMode;
+    bool hasCustomWriteMode() const {
+        return holds_alternative<std::string>(w) &&
+            get<std::string>(w) != WriteConcernOptions::kMajority;
+    }
 
-    // The w parameter for this write concern. The wMode represents the string format and
-    // takes precedence over the numeric format wNumNodes.
-    int wNumNodes;
-    std::string wMode;
+    /**
+     * Returns whether this write concern's w parameter is the number 0.
+     */
+    bool isUnacknowledged() const {
+        return holds_alternative<int64_t>(w) && get<int64_t>(w) < 1;
+    }
 
+    /**
+     * Returns whether this write concern's w parameter is the string "majority".
+     */
+    bool isMajority() const {
+        return holds_alternative<std::string>(w) && get<std::string>(w) == kMajority;
+    }
+
+    /**
+     * Returns whether this write concern is explicitly set but missing 'w' field.
+     */
+    bool isExplicitWithoutWField() const {
+        return !usedDefaultConstructedWC && notExplicitWValue;
+    }
+
+    /**
+     * Returns whether this write concern requests acknowledgment to the write operation.
+     * Note that setting 'w' field to 0 requests no acknowledgment.
+     */
+    bool requiresWriteAcknowledgement() const {
+        return !holds_alternative<int64_t>(w) || get<int64_t>(w) != 0;
+    }
+
+    // The w parameter for this write concern.
+    WriteConcernW w{1};
+    // Corresponds to the `j` or `fsync` parameters for write concern.
+    SyncMode syncMode{SyncMode::UNSET};
     // Timeout in milliseconds.
-    int wTimeout;
-    // Deadline. If this is set to something other than Date_t::max(), this takes precedence over
-    // wTimeout.
-    Date_t wDeadline = Date_t::max();
+    Timeout wTimeout;
 
     // True if the default constructed WC ({w:1}) was used.
     //      - Implicit default WC when value of w is {w:1}.
@@ -155,7 +229,7 @@ public:
     //      - Client-supplied WC.
     //          - with (w) value set, for example ({writeConcern: {w:1}}).
     //          - without (w) value set, for example ({writeConcern: {j: true}}).
-    bool usedDefaultConstructedWC = false;
+    bool usedDefaultConstructedWC{true};
 
     // Used only for tracking opWriteConcernCounters metric.
     // True if the (w) value of the write concern used is not set explicitly by client:
@@ -166,13 +240,16 @@ public:
     //          - without (w) value set, for example ({writeConcern: {j: true}}).
     //      - Client-supplied WC without (w) value set, for example ({writeConcern: {j: true}}).
     //      - Internal commands set empty WC ({writeConcern: {}}).
-    bool notExplicitWValue = false;
+    MONGO_MOD_PRIVATE bool notExplicitWValue{true};
 
-    CheckCondition checkCondition = CheckCondition::OpTime;
+    // Used only for tracking opWriteConcernCounters metric.
+    // True if the "w" value of the write concern used is "majority" and the "j" value is true,
+    // but "j" was originally false.
+    MONGO_MOD_PRIVATE bool majorityJFalseOverridden{false};
+
+    CheckCondition checkCondition{CheckCondition::OpTime};
 
 private:
     ReadWriteConcernProvenance _provenance;
-    static StatusWith<WriteConcernOptions> convertFromIdl(const WriteConcernIdl& writeConcernIdl);
 };
-
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

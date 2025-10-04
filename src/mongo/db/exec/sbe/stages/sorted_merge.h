@@ -29,11 +29,21 @@
 
 #pragma once
 
-#include <queue>
-
-#include "mongo/db/exec/sbe/stages/stages.h"
-
+#include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/sorted_stream_merger.h"
+#include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/util/debug_print.h"
+#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
+
+#include <cstddef>
+#include <memory>
+#include <queue>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo::sbe {
 /**
@@ -61,7 +71,8 @@ public:
                      // Each element of 'inputVals' must be the same size as 'outputVals'.
                      std::vector<value::SlotVector> inputVals,
                      value::SlotVector outputVals,
-                     PlanNodeId planNodeId);
+                     PlanNodeId planNodeId,
+                     bool participateInTrialRunTracking = true);
 
     std::unique_ptr<PlanStage> clone() const final;
 
@@ -75,6 +86,11 @@ public:
     const SpecificStats* getSpecificStats() const final;
     std::vector<DebugPrinter::Block> debugPrint() const final;
     size_t estimateCompileTimeSize() const final;
+
+protected:
+    void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override {
+        return;
+    }
 
 private:
     const std::vector<value::SlotVector> _inputKeys;

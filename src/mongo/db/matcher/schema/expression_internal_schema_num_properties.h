@@ -29,10 +29,21 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-
+#include "mongo/base/clonable_ptr.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/util/assert_util.h"
+
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 
@@ -50,13 +61,17 @@ public:
           _numProperties(numProperties),
           _name(name) {}
 
-    virtual ~InternalSchemaNumPropertiesMatchExpression() {}
+    ~InternalSchemaNumPropertiesMatchExpression() override {}
 
     size_t numChildren() const final {
         return 0;
     }
 
     MatchExpression* getChild(size_t i) const final {
+        MONGO_UNREACHABLE_TASSERT(6400216);
+    }
+
+    void resetChild(size_t, MatchExpression*) override {
         MONGO_UNREACHABLE;
     }
 
@@ -66,7 +81,9 @@ public:
 
     void debugString(StringBuilder& debug, int indentationLevel) const final;
 
-    void serialize(BSONObjBuilder* out, bool includePath) const final;
+    void serialize(BSONObjBuilder* out,
+                   const SerializationOptions& opts = {},
+                   bool includePath = true) const final;
 
     bool equivalent(const MatchExpression* other) const final;
 
@@ -74,20 +91,15 @@ public:
         return MatchCategory::kOther;
     }
 
-protected:
     long long numProperties() const {
         return _numProperties;
     }
 
-    void _doAddDependencies(DepsTracker* deps) const final {
-        deps->needWholeDocument = true;
+    StringData getName() const {
+        return _name;
     }
 
 private:
-    ExpressionOptimizerFunc getOptimizer() const final {
-        return [](std::unique_ptr<MatchExpression> expression) { return expression; };
-    }
-
     long long _numProperties;
     std::string _name;
 };

@@ -6,11 +6,7 @@
  * ]
  */
 
-(function() {
-'use strict';
-
-load("jstests/libs/discover_topology.js");
-load("jstests/sharding/libs/resharding_test_fixture.js");
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 Random.setRandomSeed();
 
@@ -22,7 +18,7 @@ function generateData(length) {
     for (let i = 0; i < length; i++) {
         result.push(chars[Random.randInt(chars.length)]);
     }
-    return result.join('');
+    return result.join("");
 }
 
 const smallData = generateData(1024);
@@ -60,7 +56,7 @@ const numDocumentsPerShard = insertedDocs.length / 2;
 
 assert.commandWorked(inputCollection.insert(insertedDocs));
 
-jsTest.log('Checking estimated size reported by donors.');
+jsTest.log("Checking estimated size reported by donors.");
 const recipientShardNames = reshardingTest.recipientShardNames;
 reshardingTest.withReshardingInBackground(
     {
@@ -70,7 +66,7 @@ reshardingTest.withReshardingInBackground(
             {min: {newKey: 0}, max: {newKey: MaxKey}, shard: recipientShardNames[1]},
         ],
     },
-    (tempNs) => {
+    () => {
         const mongos = inputCollection.getMongo();
 
         const getShardEstimate = (doc, shardName) => {
@@ -81,22 +77,21 @@ reshardingTest.withReshardingInBackground(
                     return {bytesToClone, documentsToClone};
                 }
             }
-            assert(false, 'could not find ' + shardName + ' in donorShards.');
+            assert(false, "could not find " + shardName + " in donorShards.");
         };
 
         let coordinatorDoc = {};
         assert.soon(() => {
             coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({
-                ns: inputCollection.getFullName()
+                ns: inputCollection.getFullName(),
             });
             return coordinatorDoc !== null && coordinatorDoc.cloneTimestamp !== undefined;
         });
 
-        jsTest.log("Check size estimate on resharding coordinator document:\n" +
-                   tojson(coordinatorDoc));
+        jsTest.log("Check size estimate on resharding coordinator document:\n" + tojson(coordinatorDoc));
 
-        const s0Estimate = getShardEstimate(coordinatorDoc, 'shard0');
-        const s1Estimate = getShardEstimate(coordinatorDoc, 'shard1');
+        const s0Estimate = getShardEstimate(coordinatorDoc, donorShardNames[0]);
+        const s1Estimate = getShardEstimate(coordinatorDoc, "shard1");
 
         assert.gt(s0Estimate.bytesToClone, smallData.length);
         assert.lt(s0Estimate.bytesToClone, smallData.length + maxShardBytesWithoutDataField);
@@ -109,30 +104,34 @@ reshardingTest.withReshardingInBackground(
 
         const verifyApproximateCopySizeForRecipients = (doc, s0Estimate, s1Estimate) => {
             const {approxBytesToCopy, approxDocumentsToCopy} = doc;
-            assert(approxBytesToCopy !== undefined,
-                   "Unable to find 'approxBytesToCopy' in the coordinator document");
-            assert(approxDocumentsToCopy !== undefined,
-                   "Unable to find 'approxDocumentsToCopy' in the coordinator document");
+            assert(approxBytesToCopy !== undefined, "Unable to find 'approxBytesToCopy' in the coordinator document");
+            assert(
+                approxDocumentsToCopy !== undefined,
+                "Unable to find 'approxDocumentsToCopy' in the coordinator document",
+            );
 
             const numRecipients = doc.recipientShards.length;
             assert.neq(numRecipients, 0, "Unexpected number of recipients");
 
             const expectedApproxDocumentsToCopy =
                 (s0Estimate.documentsToClone + s1Estimate.documentsToClone) / numRecipients;
-            assert.eq(approxDocumentsToCopy,
-                      expectedApproxDocumentsToCopy,
-                      "Unexpected value for 'approxDocumentsToCopy' in the coordinator document");
+            assert.eq(
+                approxDocumentsToCopy,
+                expectedApproxDocumentsToCopy,
+                "Unexpected value for 'approxDocumentsToCopy' in the coordinator document",
+            );
 
-            const expectedApproxBytesToCopy =
-                (s0Estimate.bytesToClone + s1Estimate.bytesToClone) / numRecipients;
-            assert.eq(approxBytesToCopy,
-                      expectedApproxBytesToCopy,
-                      "Unexpected value for 'approxBytesToCopy' in the coordinator document");
+            const expectedApproxBytesToCopy = (s0Estimate.bytesToClone + s1Estimate.bytesToClone) / numRecipients;
+            assert.eq(
+                approxBytesToCopy,
+                expectedApproxBytesToCopy,
+                "Unexpected value for 'approxBytesToCopy' in the coordinator document",
+            );
         };
         verifyApproximateCopySizeForRecipients(coordinatorDoc, s0Estimate, s1Estimate);
 
         return true;
-    });
+    },
+);
 
 reshardingTest.teardown();
-})();

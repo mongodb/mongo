@@ -27,12 +27,25 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/client/dbclient_mockcursor.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/dbclient_cursor.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/str.h"
+
+#include <string>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -42,7 +55,7 @@ DBClientMockCursor::DBClientMockCursor(mongo::DBClientBase* client,
                                        const BSONArray& mockCollection,
                                        const bool provideResumeToken,
                                        unsigned long batchSize)
-    : mongo::DBClientCursor(client, NamespaceString(), 0, 0, 0),
+    : mongo::DBClientCursor(client, NamespaceString::kEmpty, 0 /*cursorId*/, false /*isExhaust*/),
       _collectionArray(mockCollection),
       _iter(_collectionArray),
       _provideResumeToken(provideResumeToken),

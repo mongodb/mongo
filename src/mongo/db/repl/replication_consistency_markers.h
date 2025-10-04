@@ -29,11 +29,18 @@
 
 #pragma once
 
-#include "mongo/db/namespace_string.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+#include <boost/optional/optional.hpp>
+
+namespace MONGO_MOD_PUB mongo {
 
 class BSONObj;
+
 class OperationContext;
 class Timestamp;
 
@@ -83,7 +90,7 @@ class StorageInterface;
  *      wallTime: <Date_t>
  * }
  */
-class ReplicationConsistencyMarkers {
+class MONGO_MOD_OPEN ReplicationConsistencyMarkers {
     ReplicationConsistencyMarkers(const ReplicationConsistencyMarkers&) = delete;
     ReplicationConsistencyMarkers& operator=(const ReplicationConsistencyMarkers&) = delete;
 
@@ -121,42 +128,6 @@ public:
      * journaling/checkpointing).
      */
     virtual void clearInitialSyncFlag(OperationContext* opCtx) = 0;
-
-    // -------- MinValid ----------
-
-    /**
-     * The minValid value is the earliest (minimum) OpTime that must be applied in order to
-     * consider the dataset consistent.
-     *   - This is set to the end of a batch before we begin applying a batch of oplog entries
-     *     since the oplog entries can be applied out of order.
-     *   - This is also set during rollback so we do not exit RECOVERING until we are consistent.
-     * If we crash while applying a batch, we apply from appliedThrough to minValid in order
-     * to be consistent. We may re-apply operations, but this is safe.
-     *
-     * Returns the minValid OpTime.
-     */
-    virtual OpTime getMinValid(OperationContext* opCtx) const = 0;
-
-    /**
-     * Sets the minValid OpTime to 'minValid'. This can set minValid backwards, which is necessary
-     * in rollback when the OpTimes in the oplog may move backwards. We usually only call this
-     * function in rollback via refetch, so we need to check the storage engine's rollback method to
-     * enforce that via an invariant. However, there are exceptions where we need to set the
-     * minValid document outside of rollback with an untimestamped write. In that case, we can
-     * ignore the storage engine's rollback method by setting the 'alwaysAllowUntimestampedWrite'
-     * parameter to true.
-     */
-    virtual void setMinValid(OperationContext* opCtx,
-                             const OpTime& minValid,
-                             bool alwaysAllowUntimestampedWrite = false) = 0;
-
-    /**
-     * Sets minValid only if it is not already higher than endOpTime.
-     *
-     * Warning, this compares the term and timestamp independently. Do not use if the current
-     * minValid could be from the other fork of a rollback.
-     */
-    virtual void setMinValidToAtLeast(OperationContext* opCtx, const OpTime& minValid) = 0;
 
     // -------- Oplog Truncate After Point ----------
 
@@ -248,18 +219,15 @@ public:
     /**
      * The applied through point is a persistent record of which oplog entries we've applied.
      * If we crash while applying a batch of oplog entries, this OpTime tells us where to start
-     * applying operations on startup. If 'setTimestamp' is true, the write will be timestamped with
-     * the timestamp from 'optime'.
+     * applying operations on startup.
      */
-    virtual void setAppliedThrough(OperationContext* opCtx,
-                                   const OpTime& optime,
-                                   bool setTimestamp = true) = 0;
+    virtual void setAppliedThrough(OperationContext* opCtx, const OpTime& optime) = 0;
 
     /**
-     * Unsets the applied through OpTime at the given 'writeTimestamp'.
+     * Unsets the applied through OpTime.
      * Once cleared, the applied through point is the top of the oplog.
      */
-    virtual void clearAppliedThrough(OperationContext* opCtx, const Timestamp& writeTimestamp) = 0;
+    virtual void clearAppliedThrough(OperationContext* opCtx) = 0;
 
     /**
      * You should probably be calling ReplicationCoordinator::getLastAppliedOpTime() instead.
@@ -294,4 +262,4 @@ public:
 };
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

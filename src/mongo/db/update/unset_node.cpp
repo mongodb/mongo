@@ -27,11 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/update/unset_node.h"
 
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/update/storage_validation.h"
+#include "mongo/util/assert_util.h"
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -46,7 +50,7 @@ ModifierNode::ModifyResult UnsetNode::updateExistingElement(mutablebson::Element
     auto parent = element->parent();
 
     invariant(parent.ok());
-    if (!parent.isType(BSONType::Array)) {
+    if (!parent.isType(BSONType::array)) {
         invariant(element->remove());
     } else {
         // Special case: An $unset on an array element sets it to null instead of removing it from
@@ -64,7 +68,7 @@ void UnsetNode::validateUpdate(mutablebson::ConstElement updatedElement,
                                ModifyResult modifyResult,
                                bool validateForStorage,
                                bool* containsDotsAndDollarsField) const {
-    invariant(modifyResult == ModifyResult::kNormalUpdate);
+    invariant(modifyResult.type == ModifyResult::kNormalUpdate);
 
     // We only need to check the left and right sibling to see if the removed element was part of a
     // now invalid DBRef.
@@ -77,6 +81,7 @@ void UnsetNode::validateUpdate(mutablebson::ConstElement updatedElement,
                                          recursionLevelForCheck,
                                          false, /* allowTopLevelDollarPrefixedFields */
                                          validateForStorage,
+                                         false, /* isEmbeddedInIdField */
                                          containsDotsAndDollarsField);
     }
 
@@ -86,6 +91,7 @@ void UnsetNode::validateUpdate(mutablebson::ConstElement updatedElement,
                                          recursionLevelForCheck,
                                          false, /* allowTopLevelDollarPrefixedFields */
                                          validateForStorage,
+                                         false, /* isEmbeddedInIdField */
                                          containsDotsAndDollarsField);
     }
 }
@@ -96,12 +102,12 @@ void UnsetNode::logUpdate(LogBuilderInterface* logBuilder,
                           ModifyResult modifyResult,
                           boost::optional<int> createdFieldIdx) const {
     invariant(logBuilder);
-    invariant(modifyResult == ModifyResult::kNormalUpdate);
+    invariant(modifyResult.type == ModifyResult::kNormalUpdate);
     invariant(!createdFieldIdx);
 
     if (pathTaken.types().back() == RuntimeUpdatePath::ComponentType::kArrayIndex) {
         // If $unset is applied to an array index, the value was set to null.
-        invariant(element.getType() == BSONType::jstNULL);
+        invariant(element.getType() == BSONType::null);
         uassertStatusOK(logBuilder->logUpdatedField(pathTaken, element));
     } else {
         uassertStatusOK(logBuilder->logDeletedField(pathTaken));

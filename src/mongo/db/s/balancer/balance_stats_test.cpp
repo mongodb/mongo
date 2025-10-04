@@ -27,14 +27,36 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/bson/oid.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/s/balancer/balance_stats.h"
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/global_catalog/chunk_manager.h"
+#include "mongo/db/global_catalog/type_chunk.h"
+#include "mongo/db/global_catalog/type_collection_common_types_gen.h"
+#include "mongo/db/keypattern.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/s/balancer/balancer_policy.h"
-#include "mongo/s/chunk_manager.h"
+#include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/versioning_protocol/chunk_version.h"
+#include "mongo/db/versioning_protocol/database_version.h"
+#include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/uuid.h"
+
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {
@@ -46,8 +68,8 @@ public:
         return ChunkType(_uuid, ChunkRange(minKey, maxKey), _nextVersion, shard);
     }
 
-    ShardType makeShard(const std::string& name, std::vector<std::string> tags = {}) {
-        return ShardType(name, name, tags);
+    ShardType makeShard(const std::string& name, std::vector<std::string> zones = {}) {
+        return ShardType(name, name, zones);
     }
 
     ChunkManager makeRoutingInfo(const KeyPattern& shardKeyPattern,
@@ -55,31 +77,29 @@ public:
         auto routingTableHistory = RoutingTableHistory::makeNew(_nss,
                                                                 _uuid,  // UUID
                                                                 shardKeyPattern,
+                                                                false,  /* unsplittable */
                                                                 {},     // collator
                                                                 false,  // unique
                                                                 _epoch,
                                                                 _timestamp,   // timestamp
                                                                 boost::none,  // time series fields
                                                                 boost::none,  // resharding fields
-                                                                boost::none,  // chunk size bytes
                                                                 true,         // allowMigration
                                                                 chunks);
 
-        return ChunkManager(_shardPrimary,
-                            _dbVersion,
-                            RoutingTableHistoryValueHandle(std::make_shared<RoutingTableHistory>(
+        return ChunkManager(RoutingTableHistoryValueHandle(std::make_shared<RoutingTableHistory>(
                                 std::move(routingTableHistory))),
                             boost::none);
     }
 
 private:
-    const NamespaceString _nss{"foo.bar"};
+    const NamespaceString _nss = NamespaceString::createNamespaceString_forTest("foo.bar");
     const UUID _uuid = UUID::gen();
     const OID _epoch{OID::gen()};
     const Timestamp _timestamp{Timestamp(1, 1)};
     const ShardId _shardPrimary{"dummyShardPrimary"};
     const DatabaseVersion _dbVersion{UUID::gen(), _timestamp};
-    ChunkVersion _nextVersion{1, 0, _epoch, _timestamp};
+    ChunkVersion _nextVersion{{_epoch, _timestamp}, {1, 0}};
 };
 
 TEST_F(BalanceStatsTest, SingleChunkNoZones) {

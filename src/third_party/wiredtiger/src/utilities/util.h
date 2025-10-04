@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 #include <wt_internal.h>
 
 typedef struct {
@@ -24,6 +26,7 @@ extern int __wt_opterr;   /* if error message should be printed */
 extern int __wt_optind;   /* index into parent argv vector */
 extern int __wt_optopt;   /* character checked for validity */
 extern int __wt_optreset; /* reset getopt */
+extern int __wt_optwt;    /* enable WT-specific behavior, e.g., using WT_* return codes */
 extern char *__wt_optarg; /* argument associated with option */
 
 int util_alter(WT_SESSION *, int, char *[]);
@@ -44,13 +47,18 @@ int util_loadtext(WT_SESSION *, int, char *[]);
 int util_printlog(WT_SESSION *, int, char *[]);
 int util_read(WT_SESSION *, int, char *[]);
 int util_read_line(WT_SESSION *, ULINE *, bool, bool *);
-int util_rename(WT_SESSION *, int, char *[]);
 int util_salvage(WT_SESSION *, int, char *[]);
 int util_stat(WT_SESSION *, int, char *[]);
 int util_str2num(WT_SESSION *, const char *, bool, uint64_t *);
 int util_truncate(WT_SESSION *, int, char *[]);
-int util_upgrade(WT_SESSION *, int, char *[]);
 char *util_uri(WT_SESSION *, const char *, const char *);
 void util_usage(const char *, const char *, const char *[]);
 int util_verify(WT_SESSION *, int, char *[]);
 int util_write(WT_SESSION *, int, char *[]);
+void *util_malloc(size_t);
+void *util_realloc(void *, size_t);
+void *util_calloc(size_t, size_t);
+void util_free(void *);
+char *util_strdup(const char *);
+FILE *util_open_output_file(const char *ofile);
+int util_close_output_file(FILE *fp);

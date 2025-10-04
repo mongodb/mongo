@@ -1,0 +1,13 @@
+# This file contains a set of ignored warnings from the clang static analyzer. Comments are stripped
+# from the file before it is compared against the clang output.
+wiredtiger/src/block_cache/block_io.c Called function pointer is null (null dereference) [core.CallAndMessage]
+wiredtiger/src/btree/bt_delete.c The left operand of '!=' is a garbage value [core.UndefinedBinaryOperatorResult]
+wiredtiger/src/btree/bt_sync_obsolete.c The left operand of '==' is a garbage value [core.UndefinedBinaryOperatorResult]
+wiredtiger/src/btree/bt_sync_obsolete.c The left operand of '==' is a garbage value [core.UndefinedBinaryOperatorResult]
+wiredtiger/src/btree/bt_sync_obsolete.c The left operand of '==' is a garbage value [core.UndefinedBinaryOperatorResult]
+wiredtiger/src/include/intpack_inline.h Assigned value is garbage or undefined [core.uninitialized.Assign]
+wiredtiger/src/os_posix/os_fs.c The 1st argument to 'fdatasync' is -1 but should be >= 0 [unix.StdCLibraryFunctions]
+wiredtiger/src/reconcile/rec_row.c Branch condition evaluates to a garbage value [core.uninitialized.Branch]
+wiredtiger/src/reconcile/rec_write.c 3rd function call argument is an uninitialized value [core.CallAndMessage]
+wiredtiger/src/schema/schema_create.c Null pointer passed to 1st parameter expecting 'nonnull' [core.NonNullParamChecker]
+wiredtiger/src/session/session_api.c Called function pointer is null (null dereference) [core.CallAndMessage]

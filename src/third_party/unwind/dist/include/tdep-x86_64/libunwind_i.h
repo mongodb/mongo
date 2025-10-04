@@ -31,7 +31,9 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 /* Target-dependent definitions that are internal to libunwind but need
    to be shared with target-independent code.  */
 
+#include <stdint.h>
 #include <stdlib.h>
+#include <stdatomic.h>
 #include <libunwind.h>
 
 #include "elf64.h"
@@ -63,12 +65,11 @@ unw_tdep_frame_t;
 struct unw_addr_space
   {
     struct unw_accessors acc;
-    unw_caching_policy_t caching_policy;
-#ifdef HAVE_ATOMIC_OPS_H
-    AO_t cache_generation;
-#else
-    uint32_t cache_generation;
+#ifndef UNW_REMOTE_ONLY
+    unw_iterate_phdr_func_t iterate_phdr_function;
 #endif
+    unw_caching_policy_t caching_policy;
+    _Atomic uint32_t cache_generation;
     unw_word_t dyn_generation;          /* see dyn-common.h */
     unw_word_t dyn_info_list_addr;      /* (cached) dyn_info_list_addr */
     struct dwarf_rs_cache global_cache;
@@ -93,15 +94,44 @@ struct cursor
       }
     sigcontext_format;
     unw_word_t sigcontext_addr;
-    int validate;
-    ucontext_t *uc;
   };
+
+#define AS_ARG_UCONTEXT_MASK ~0x1UL
+#define AS_ARG_VALIDATE_MASK 0x1UL
+
+#define AS_ARG_GET_UC_PTR(arg) \
+  ((ucontext_t *) ((uintptr_t) arg & AS_ARG_UCONTEXT_MASK))
+#define AS_ARG_GET_VALIDATE(arg) \
+  ((int) ((uintptr_t) arg & AS_ARG_VALIDATE_MASK))
 
 static inline ucontext_t *
 dwarf_get_uc(const struct dwarf_cursor *cursor)
 {
-  const struct cursor *c = (struct cursor *) cursor->as_arg;
-  return c->uc;
+  assert(cursor->as == unw_local_addr_space);
+  return AS_ARG_GET_UC_PTR(cursor->as_arg);
+}
+
+static inline int
+dwarf_get_validate(const struct dwarf_cursor *cursor)
+{
+  assert(cursor->as == unw_local_addr_space);
+  return AS_ARG_GET_VALIDATE(cursor->as_arg);
+}
+
+static inline void
+dwarf_set_validate(const struct dwarf_cursor *cursor, const int validate)
+{
+  assert(cursor->as == unw_local_addr_space);
+  uintptr_t *packed_args = (uintptr_t *) &cursor->as_arg;
+  *packed_args |= (AS_ARG_VALIDATE_MASK & validate);
+}
+
+static inline void *
+dwarf_build_as_arg(const ucontext_t *uc, const int validate) {
+  uintptr_t packed_args = (uintptr_t) uc;
+  assert((packed_args & AS_ARG_VALIDATE_MASK) == 0);
+  packed_args |= (AS_ARG_VALIDATE_MASK & validate);
+  return (void *) packed_args;
 }
 
 #define DWARF_GET_LOC(l)        ((l).val)
@@ -130,8 +160,14 @@ dwarf_get_uc(const struct dwarf_cursor *cursor)
 #else /* !UNW_LOCAL_ONLY */
 
 # define DWARF_NULL_LOC         DWARF_LOC (0, 0)
-# define DWARF_IS_NULL_LOC(l)                                           \
-                ({ dwarf_loc_t _l = (l); _l.val == 0 && _l.type == 0; })
+
+static inline int
+dwarf_is_null_loc(dwarf_loc_t l)
+{
+  return l.val == 0 && l.type == 0;
+}
+
+# define DWARF_IS_NULL_LOC(l)   dwarf_is_null_loc(l)
 # define DWARF_REG_LOC(c,r)     DWARF_LOC((r), DWARF_LOC_TYPE_REG)
 # define DWARF_FPREG_LOC(c,r)   DWARF_LOC((r), (DWARF_LOC_TYPE_REG      \
                                                 | DWARF_LOC_TYPE_FP))
@@ -139,7 +175,7 @@ dwarf_get_uc(const struct dwarf_cursor *cursor)
 #endif /* !UNW_LOCAL_ONLY */
 
 static inline int
-dwarf_getfp (struct dwarf_cursor *c, dwarf_loc_t loc, unw_fpreg_t *val)
+dwarf_getfp (struct dwarf_cursor *c UNUSED, dwarf_loc_t loc, unw_fpreg_t *val UNUSED)
 {
   if (DWARF_IS_NULL_LOC (loc))
     return -UNW_EBADREG;
@@ -148,7 +184,7 @@ dwarf_getfp (struct dwarf_cursor *c, dwarf_loc_t loc, unw_fpreg_t *val)
 }
 
 static inline int
-dwarf_putfp (struct dwarf_cursor *c, dwarf_loc_t loc, unw_fpreg_t val)
+dwarf_putfp (struct dwarf_cursor *c UNUSED, dwarf_loc_t loc, unw_fpreg_t val UNUSED)
 {
   if (DWARF_IS_NULL_LOC (loc))
     return -UNW_EBADREG;
@@ -191,7 +227,6 @@ dwarf_put (struct dwarf_cursor *c, dwarf_loc_t loc, unw_word_t val)
 
 #define tdep_getcontext_trace           UNW_ARCH_OBJ(getcontext_trace)
 #define tdep_init_done                  UNW_OBJ(init_done)
-#define tdep_init_mem_validate          UNW_OBJ(init_mem_validate)
 #define tdep_init                       UNW_OBJ(init)
 /* Platforms that support UNW_INFO_FORMAT_TABLE need to define
    tdep_search_unwind_table.  */
@@ -233,14 +268,9 @@ dwarf_put (struct dwarf_cursor *c, dwarf_loc_t loc, unw_word_t val)
 #define tdep_get_ip(c)                  ((c)->dwarf.ip)
 #define tdep_big_endian(as)             0
 
-#ifdef HAVE_ATOMIC_OPS_H
-extern AO_t tdep_init_done;
-#else
-extern int tdep_init_done;
-#endif
+extern atomic_bool tdep_init_done;
 
 extern void tdep_init (void);
-extern void tdep_init_mem_validate (void);
 extern int tdep_search_unwind_table (unw_addr_space_t as, unw_word_t ip,
                                      unw_dyn_info_t *di, unw_proc_info_t *pi,
                                      int need_unwind_info, void *arg);
@@ -259,9 +289,9 @@ extern void tdep_fetch_frame (struct dwarf_cursor *c, unw_word_t ip,
 extern int tdep_cache_frame (struct dwarf_cursor *c);
 extern void tdep_reuse_frame (struct dwarf_cursor *c,
                               int frame);
+#endif
 extern void tdep_stash_frame (struct dwarf_cursor *c,
                               struct dwarf_reg_state *rs);
-#endif
 
 extern int tdep_getcontext_trace (unw_tdep_context_t *);
 extern int tdep_trace (unw_cursor_t *cursor, void **addresses, int *n);

@@ -27,21 +27,52 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/scripting/mozjs/valuewriter.h"
 
-#include <js/Conversions.h>
-
 #include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/scripting/mozjs/bindata.h"
+#include "mongo/scripting/mozjs/code.h"
+#include "mongo/scripting/mozjs/dbpointer.h"
 #include "mongo/scripting/mozjs/exception.h"
 #include "mongo/scripting/mozjs/implscope.h"
+#include "mongo/scripting/mozjs/internedstring.h"
 #include "mongo/scripting/mozjs/jsstringwrapper.h"
+#include "mongo/scripting/mozjs/maxkey.h"
+#include "mongo/scripting/mozjs/minkey.h"
+#include "mongo/scripting/mozjs/nativefunction.h"
+#include "mongo/scripting/mozjs/numberdecimal.h"
+#include "mongo/scripting/mozjs/numberint.h"
+#include "mongo/scripting/mozjs/numberlong.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
-#include "mongo/scripting/mozjs/valuereader.h"
+#include "mongo/scripting/mozjs/oid.h"
+#include "mongo/scripting/mozjs/timestamp.h"
+#include "mongo/scripting/mozjs/wraptype.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/represent_as.h"
+#include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
+
+#include <new>
+
+#include <jsapi.h>
+#include <jsfriendapi.h>
+#include <jspubtd.h>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/numeric/conversion/converter_policies.hpp>
+#include <boost/optional/optional.hpp>
+#include <js/Array.h>
+#include <js/ComparisonOperators.h>
+#include <js/Conversions.h>
+#include <js/Date.h>
+#include <js/Object.h>
+#include <js/RegExp.h>
+#include <js/RootingAPI.h>
+#include <js/TypeDecls.h>
 
 namespace mongo {
 namespace mozjs {
@@ -55,44 +86,78 @@ void ValueWriter::setOriginalBSON(BSONObj* obj) {
 
 int ValueWriter::type() {
     if (_value.isNull())
-        return jstNULL;
+        return stdx::to_underlying(BSONType::null);
     if (_value.isUndefined())
-        return Undefined;
+        return stdx::to_underlying(BSONType::undefined);
     if (_value.isString())
-        return String;
+        return stdx::to_underlying(BSONType::string);
 
     bool isArray;
 
-    if (!JS_IsArrayObject(_context, _value, &isArray)) {
+    if (!JS::IsArrayObject(_context, _value, &isArray)) {
         uasserted(ErrorCodes::BadValue, "unable to check if type is an array");
     }
-    if (isArray)
-        return Array;
+    if (isArray) {
+        return stdx::to_underlying(BSONType::array);
+    }
 
-    if (_value.isBoolean())
-        return Bool;
+    if (_value.isBoolean()) {
+        return stdx::to_underlying(BSONType::boolean);
+    }
 
     // We could do something more sophisticated here by checking to see if we
     // round trip through int32_t, int64_t and double and picking a type that
     // way, for now just always come back as double for numbers though (it's
     // what we did for v8)
-    if (_value.isNumber())
-        return NumberDouble;
+    if (_value.isNumber()) {
+        return stdx::to_underlying(BSONType::numberDouble);
+    }
 
     if (_value.isObject()) {
         JS::RootedObject obj(_context, _value.toObjectOrNull());
-        bool isDate;
 
-        if (!JS_ObjectIsDate(_context, obj, &isDate)) {
+        bool isDate;
+        if (!JS::ObjectIsDate(_context, obj, &isDate)) {
             uasserted(ErrorCodes::BadValue, "unable to check if type is a date");
         }
-        if (isDate)
-            return Date;
+        if (isDate) {
+            return stdx::to_underlying(BSONType::date);
+        }
 
-        if (JS_ObjectIsFunction(_context, obj))
-            return Code;
+        bool isRegExp;
+        if (!JS::ObjectIsRegExp(_context, obj, &isRegExp)) {
+            uasserted(ErrorCodes::BadValue, "unable to check if type is a regexp");
+        }
+        if (isRegExp) {
+            return stdx::to_underlying(BSONType::regEx);
+        }
 
-        return Object;
+        if (js::IsFunctionObject(obj)) {
+            return stdx::to_underlying(BSONType::code);
+        }
+
+        if (auto jsClass = JS::GetClass(obj)) {
+            auto scope = getScope(_context);
+            if (scope->getProto<NumberIntInfo>().getJSClass() == jsClass) {
+                return stdx::to_underlying(BSONType::numberInt);
+            } else if (scope->getProto<NumberLongInfo>().getJSClass() == jsClass) {
+                return stdx::to_underlying(BSONType::numberLong);
+            } else if (scope->getProto<NumberDecimalInfo>().getJSClass() == jsClass) {
+                return stdx::to_underlying(BSONType::numberDecimal);
+            } else if (scope->getProto<OIDInfo>().getJSClass() == jsClass) {
+                return stdx::to_underlying(BSONType::oid);
+            } else if (scope->getProto<BinDataInfo>().getJSClass() == jsClass) {
+                return stdx::to_underlying(BSONType::binData);
+            } else if (scope->getProto<TimestampInfo>().getJSClass() == jsClass) {
+                return stdx::to_underlying(BSONType::timestamp);
+            } else if (scope->getProto<MinKeyInfo>().getJSClass() == jsClass) {
+                return stdx::to_underlying(BSONType::minKey);
+            } else if (scope->getProto<MaxKeyInfo>().getJSClass() == jsClass) {
+                return stdx::to_underlying(BSONType::maxKey);
+            }
+        }
+
+        return stdx::to_underlying(BSONType::object);
     }
 
     uasserted(ErrorCodes::BadValue, "unable to get type");
@@ -108,7 +173,7 @@ std::string ValueWriter::typeAsString() {
 
     bool isArray;
 
-    if (!JS_IsArrayObject(_context, _value, &isArray)) {
+    if (!JS::IsArrayObject(_context, _value, &isArray)) {
         uasserted(ErrorCodes::BadValue, "unable to check if type is an array");
     }
 
@@ -122,7 +187,7 @@ std::string ValueWriter::typeAsString() {
     if (_value.isObject()) {
         JS::RootedObject obj(_context, _value.toObjectOrNull());
 
-        if (!JS_IsArrayObject(_context, obj, &isArray)) {
+        if (!JS::IsArrayObject(_context, obj, &isArray)) {
             uasserted(ErrorCodes::BadValue, "unable to check if type is an array");
         }
         if (isArray)
@@ -130,13 +195,13 @@ std::string ValueWriter::typeAsString() {
 
         bool isDate;
 
-        if (!JS_ObjectIsDate(_context, obj, &isDate)) {
+        if (!JS::ObjectIsDate(_context, obj, &isDate)) {
             uasserted(ErrorCodes::BadValue, "unable to check if type is a date");
         }
         if (isDate)
             return "date";
 
-        if (JS_ObjectIsFunction(_context, obj))
+        if (js::IsFunctionObject(obj))
             return "function";
 
         return ObjectWrapper(_context, _value).getClassName();
@@ -156,7 +221,7 @@ BSONObj ValueWriter::toBSON() {
 
 std::string ValueWriter::toString() {
     JSStringWrapper jsstr;
-    return toStringData(&jsstr).toString();
+    return std::string{toStringData(&jsstr)};
 }
 
 StringData ValueWriter::toStringData(JSStringWrapper* jsstr) {
@@ -230,6 +295,53 @@ Decimal128 ValueWriter::toDecimal128() {
     uasserted(ErrorCodes::BadValue, str::stream() << "Unable to write Decimal128 value.");
 }
 
+OID ValueWriter::toOID() {
+    if (getScope(_context)->getProto<OIDInfo>().instanceOf(_value)) {
+        return OIDInfo::getOID(_context, _value);
+    }
+
+    throwCurrentJSException(_context, ErrorCodes::BadValue, "Unable to write ObjectId value.");
+}
+
+void ValueWriter::toBinData(std::function<void(const BSONBinData&)> withBinData) {
+    if (!getScope(_context)->getProto<BinDataInfo>().instanceOf(_value)) {
+        throwCurrentJSException(_context, ErrorCodes::BadValue, "Unable to write BinData value.");
+    }
+
+    JS::RootedObject obj(_context, _value.toObjectOrNull());
+    ObjectWrapper wrapper(_context, obj);
+    auto subType = wrapper.getNumber(InternedString::type);
+    uassert(6123400, "BinData sub type must be between 0 and 255", subType >= 0 && subType <= 255);
+
+    auto binDataStr =
+        JS::GetMaybePtrFromReservedSlot<std::string>(obj, BinDataInfo::BinDataStringSlot);
+    uassert(ErrorCodes::BadValue, "Cannot call getter on BinData prototype", binDataStr);
+
+    auto binData = base64::decode(*binDataStr);
+    withBinData(BSONBinData(binData.c_str(),
+                            binData.size(),
+                            static_cast<mongo::BinDataType>(static_cast<int>(subType))));
+}
+
+Timestamp ValueWriter::toTimestamp() {
+    JS::RootedObject obj(_context, _value.toObjectOrNull());
+
+    uassert(ErrorCodes::BadValue,
+            "Unable to write Timestamp value.",
+            getScope(_context)->getProto<TimestampInfo>().getJSClass() == JS::GetClass(obj));
+
+    return TimestampInfo::getValidatedValue(_context, obj);
+}
+
+JSRegEx ValueWriter::toRegEx() {
+    std::string regexStr = toString();
+    uassert(6123401, "Empty regular expression", regexStr.size() > 0);
+    uassert(6123402, "Invalid regular expression", regexStr[0] == '/');
+
+    return JSRegEx(regexStr.substr(1, regexStr.rfind('/')),
+                   regexStr.substr(regexStr.rfind('/') + 1));
+}
+
 void ValueWriter::writeThis(BSONObjBuilder* b,
                             StringData sd,
                             ObjectWrapper::WriteFieldRecursionFrames* frames) {
@@ -257,7 +369,7 @@ void ValueWriter::writeThis(BSONObjBuilder* b,
         if (intval && _originalParent) {
             // This makes copying an object of numbers O(n**2) :(
             BSONElement elmt = _originalParent->getField(sd);
-            if (elmt.type() == mongo::NumberInt) {
+            if (elmt.type() == BSONType::numberInt) {
                 b->append(sd, *intval);
                 return;
             }
@@ -292,7 +404,7 @@ void ValueWriter::_writeObject(BSONObjBuilder* b,
         JS::RootedObject obj(_context, _value.toObjectOrNull());
         ObjectWrapper o(_context, obj);
 
-        auto jsclass = JS_GetClass(obj);
+        auto jsclass = JS::GetClass(obj);
 
         if (jsclass) {
             if (scope->getProto<OIDInfo>().getJSClass() == jsclass) {
@@ -316,15 +428,15 @@ void ValueWriter::_writeObject(BSONObjBuilder* b,
 
             if (scope->getProto<CodeInfo>().getJSClass() == jsclass) {
                 if (o.hasOwnField(InternedString::scope)  // CodeWScope
-                    && o.type(InternedString::scope) == mongo::Object) {
-                    if (o.type(InternedString::code) != mongo::String) {
+                    && o.type(InternedString::scope) == stdx::to_underlying(BSONType::object)) {
+                    if (o.type(InternedString::code) != stdx::to_underlying(BSONType::string)) {
                         uasserted(ErrorCodes::BadValue, "code must be a string");
                     }
 
                     b->appendCodeWScope(
                         sd, o.getString(InternedString::code), o.getObject(InternedString::scope));
                 } else {  // Code
-                    if (o.type(InternedString::code) != mongo::String) {
+                    if (o.type(InternedString::code) != stdx::to_underlying(BSONType::string)) {
                         uasserted(ErrorCodes::BadValue, "code must be a string");
                     }
 
@@ -353,7 +465,8 @@ void ValueWriter::_writeObject(BSONObjBuilder* b,
             }
 
             if (scope->getProto<BinDataInfo>().getJSClass() == jsclass) {
-                auto str = static_cast<std::string*>(JS_GetPrivate(obj));
+                auto str = JS::GetMaybePtrFromReservedSlot<std::string>(
+                    obj, BinDataInfo::BinDataStringSlot);
 
                 uassert(ErrorCodes::BadValue, "Cannot call getter on BinData prototype", str);
 
@@ -373,7 +486,7 @@ void ValueWriter::_writeObject(BSONObjBuilder* b,
             }
 
             if (scope->getProto<TimestampInfo>().getJSClass() == jsclass) {
-                Timestamp ot(o.getNumber("t"), o.getNumber("i"));
+                Timestamp ot = TimestampInfo::getValidatedValue(_context, obj);
                 b->append(sd, ot);
 
                 return;

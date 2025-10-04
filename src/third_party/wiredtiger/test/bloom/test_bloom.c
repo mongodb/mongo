@@ -56,6 +56,10 @@ void usage(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 extern char *__wt_optarg;
 extern int __wt_optind;
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {
@@ -65,7 +69,7 @@ main(int argc, char *argv[])
 
     /* Set default configuration values. */
     g.c_cache = 10;
-    g.c_ops = 100000;
+    g.c_ops = 100 * WT_THOUSAND;
     g.c_key_max = 100;
     g.c_k = 8;
     g.c_factor = 16;
@@ -100,6 +104,10 @@ main(int argc, char *argv[])
     return (EXIT_SUCCESS);
 }
 
+/*
+ * setup --
+ *     TODO: Add a comment describing this function.
+ */
 void
 setup(void)
 {
@@ -110,10 +118,8 @@ setup(void)
 
     testutil_work_dir_from_path(home, HOME_SIZE, "WT_TEST");
 
-    /* Clean the test directory if it already exists. */
-    testutil_clean_work_dir(home);
-    /* Create the home test directory for the test. */
-    testutil_make_work_dir(home);
+    /* Create the home test directory for the test (delete the previous directory if it exists). */
+    testutil_recreate_dir(home);
 
     /*
      * This test doesn't test public Wired Tiger functionality, it still needs connection and
@@ -124,9 +130,9 @@ setup(void)
      * Open configuration -- put command line configuration options at the end so they can override
      * "standard" configuration.
      */
-    testutil_check(__wt_snprintf(config, sizeof(config),
-      "create,error_prefix=\"%s\",cache_size=%" PRIu32 "MB,%s", progname, g.c_cache,
-      g.config_open == NULL ? "" : g.config_open));
+    testutil_snprintf(config, sizeof(config),
+      "create,statistics=(all),error_prefix=\"%s\",cache_size=%" PRIu32 "MB,%s", progname,
+      g.c_cache, g.config_open == NULL ? "" : g.config_open);
 
     testutil_check(wiredtiger_open(home, NULL, config, &conn));
 
@@ -137,6 +143,10 @@ setup(void)
     populate_entries();
 }
 
+/*
+ * run --
+ *     TODO: Add a comment describing this function.
+ */
 void
 run(void)
 {
@@ -197,6 +207,10 @@ run(void)
     testutil_check(__wt_bloom_drop(bloomp, NULL));
 }
 
+/*
+ * cleanup --
+ *     TODO: Add a comment describing this function.
+ */
 void
 cleanup(void)
 {
@@ -210,8 +224,9 @@ cleanup(void)
 }
 
 /*
- * Create and keep all the strings used to populate the bloom filter, so that we can do validation
- * with the same set of entries.
+ * populate_entries --
+ *     Create and keep all the strings used to populate the bloom filter, so that we can do
+ *     validation with the same set of entries.
  */
 void
 populate_entries(void)
@@ -219,7 +234,7 @@ populate_entries(void)
     uint32_t i, j;
     uint8_t **entries;
 
-    __wt_random_init_seed(NULL, &g.rand);
+    __wt_random_init(NULL, &g.rand);
 
     entries = dcalloc(g.c_ops, sizeof(uint8_t *));
 

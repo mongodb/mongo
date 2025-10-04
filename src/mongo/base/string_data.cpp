@@ -31,12 +31,15 @@
 
 #include <ostream>
 
-#include <boost/utility/string_view.hpp>
+#include <boost/container_hash/hash.hpp>
 
 namespace mongo {
-
 std::ostream& operator<<(std::ostream& stream, StringData value) {
-    return stream << boost::string_view(value.rawData(), value.size());
+    return stream << toStdStringViewForInterop(value);
+}
+
+size_t hash_value(StringData sd) {
+    return boost::hash<std::string_view>{}(toStdStringViewForInterop(sd));
 }
 
 }  // namespace mongo

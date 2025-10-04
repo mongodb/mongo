@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <boost/log/attributes/attribute_value_set.hpp>
-#include <boost/log/attributes/value_extraction.hpp>
-
 #include "mongo/logv2/attributes.h"
 #include "mongo/logv2/log_domain.h"
+
+#include <boost/log/attributes/attribute_value_set.hpp>
+#include <boost/log/attributes/value_extraction.hpp>
 
 namespace mongo::logv2 {
 

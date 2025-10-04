@@ -1,0 +1,15 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/query-optimization
+  - "OWNERS.yml":
+    approvers:
+      - 10gen/query-execution-staff-leads
+      - 10gen/query-optimization-staff-leads
+  - "cluster_getmore_cmd_d.cpp":
+    approvers:
+      - 10gen/query-execution-router
+  - "cluster_write_cmd_d.cpp":
+    approvers:
+      - 10gen/query-execution-router

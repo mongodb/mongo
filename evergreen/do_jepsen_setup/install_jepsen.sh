@@ -1,10 +1,8 @@
 set -o errexit
 
 cd src
-git clone --branch=jepsen-mongodb-master --depth=1 git@github.com:10gen/jepsen.git jepsen-mongodb
+
+git clone --branch=v0.3.0-jepsen-mongodb-master --depth=1 https://x-access-token:${github_token}@github.com/10gen/jepsen.git jepsen-mongodb
 cd jepsen-mongodb
-branch=$(git symbolic-ref --short HEAD)
-commit=$(git show -s --pretty=format:"%h - %an, %ar: %s")
-echo "Git branch: $branch, commit: $commit"
 
 lein install

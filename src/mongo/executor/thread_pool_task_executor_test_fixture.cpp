@@ -27,28 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 
-#include <memory>
-
 #include "mongo/executor/thread_pool_mock.h"
+
+#include <memory>
+#include <utility>
 
 namespace mongo {
 namespace executor {
 
-std::unique_ptr<ThreadPoolTaskExecutor> makeThreadPoolTestExecutor(
+std::shared_ptr<ThreadPoolTaskExecutor> makeThreadPoolTestExecutor(
     std::unique_ptr<NetworkInterfaceMock> net, ThreadPoolMock::Options options) {
     auto netPtr = net.get();
-    return std::make_unique<ThreadPoolTaskExecutor>(
-        std::make_unique<ThreadPoolMock>(netPtr, 1, std::move(options)), std::move(net));
-}
-
-std::shared_ptr<ThreadPoolTaskExecutor> makeSharedThreadPoolTestExecutor(
-    std::unique_ptr<NetworkInterfaceMock> net, ThreadPoolMock::Options options) {
-    auto netPtr = net.get();
-    return std::make_shared<ThreadPoolTaskExecutor>(
+    return ThreadPoolTaskExecutor::create(
         std::make_unique<ThreadPoolMock>(netPtr, 1, std::move(options)), std::move(net));
 }
 
@@ -64,7 +56,7 @@ ThreadPoolMock::Options ThreadPoolExecutorTest::makeThreadPoolMockOptions() cons
 std::shared_ptr<TaskExecutor> ThreadPoolExecutorTest::makeTaskExecutor(
     std::unique_ptr<NetworkInterfaceMock> net) {
     auto options = makeThreadPoolMockOptions();
-    return makeSharedThreadPoolTestExecutor(std::move(net), std::move(options));
+    return makeThreadPoolTestExecutor(std::move(net), std::move(options));
 }
 
 }  // namespace executor

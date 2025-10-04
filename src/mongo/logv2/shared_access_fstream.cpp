@@ -27,17 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/logv2/shared_access_fstream.h"
 
 #if defined(_WIN32) && defined(_MSC_VER)
 
-#include <fcntl.h>
-#include <filesystem>
-#include <io.h>
+#include "mongo/util/text.h"  // IWYU pragma: keep
 
-#include "mongo/util/text.h"
+#include <filesystem>
+
+#include <fcntl.h>
+#include <io.h>
 
 namespace mongo {
 FILE* Win32SharedAccessFileDescriptor::_open(const wchar_t* filename,

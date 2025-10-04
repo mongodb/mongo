@@ -27,26 +27,47 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+#pragma once
 
-#include "mongo/platform/basic.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/db/global_catalog/type_chunk.h"
+#include "mongo/db/global_catalog/type_collection.h"
+#include "mongo/db/global_catalog/type_collection_common_types_gen.h"
+#include "mongo/db/global_catalog/type_shard.h"
+#include "mongo/db/global_catalog/type_tags.h"
+#include "mongo/db/keypattern.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/sharding_environment/config_server_test_fixture.h"
+#include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/versioning_protocol/chunk_version.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/string_map.h"
+#include "mongo/util/uuid.h"
 
 #include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "mongo/client/remote_command_targeter_mock.h"
-#include "mongo/db/s/balancer/type_migration.h"
-#include "mongo/db/s/config/config_server_test_fixture.h"
-#include "mongo/db/write_concern_options.h"
-#include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/catalog/type_database.h"
-#include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/catalog/type_tags.h"
-#include "mongo/s/type_collection_common_types_gen.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
 class MigrationTestFixture : public ConfigServerTestFixture {
 protected:
+    explicit MigrationTestFixture(Options options = {})
+        : ConfigServerTestFixture(std::move(options)) {}
+
     void setUp() override;
 
     /**
@@ -64,10 +85,19 @@ protected:
                                                                  ShardId shardId);
 
     /**
-     * Inserts a document into the config.databases collection to indicate that "dbName" is sharded
-     * with primary "primaryShard".
+     * Setup the config.shards collection to contain the given shards.
+     * Additionally set up dummy hosts for the targeted shards
      */
-    void setUpDatabase(const std::string& dbName, ShardId primaryShard);
+    void setupShards(const std::vector<ShardType>& shards) override {
+        ConfigServerTestFixture::setupShards(shards);
+
+        // Requests chunks to be relocated requires running commands on each shard to
+        // get shard statistics. Set up dummy hosts for the source shards.
+        for (const auto& shard : shards) {
+            shardTargeterMock(operationContext(), shard.getName())
+                ->setFindHostReturnValue(HostAndPort(shard.getHost()));
+        }
+    }
 
     /**
      * Inserts a document into the config.collections collection to indicate that "collName" is
@@ -89,16 +119,20 @@ protected:
                          const ShardId& shardId,
                          const ChunkVersion& version);
 
+    CollectionType setUpUnsplittableCollection(const NamespaceString& collName,
+                                               const ShardId& shardId,
+                                               boost::optional<const UUID> collUUID = boost::none);
+
     /**
-     * Inserts a document into the config.tags collection so that the tag defined by the
+     * Inserts a document into the config.tags collection so that the zone defined by the
      * parameters exists.
      */
-    void setUpTags(const NamespaceString& collName, const StringMap<ChunkRange>& tagChunkRanges);
+    void setUpZones(const NamespaceString& collName, const StringMap<ChunkRange>& zoneChunkRanges);
 
     /**
      * Removes all document in the config.tags for the collection.
      */
-    void removeAllTags(const NamespaceString& collName);
+    void removeAllZones(const NamespaceString& collName);
 
     /**
      * Removes all document in the config.chunks for the collection.
@@ -106,16 +140,9 @@ protected:
     void removeAllChunks(const NamespaceString& collName, const UUID& uuid);
 
     /**
-     * Inserts a document into the config.migrations collection as an active migration.
+     * Returns the ShardId by its HostAndPort
      */
-    void setUpMigration(const NamespaceString& ns, const ChunkType& chunk, const ShardId& toShard);
-
-    /**
-     * Asserts that config.migrations is empty and config.locks contains no locked documents other
-     * than the balancer's, both of which should be true if the MigrationManager is inactive and
-     * behaving properly.
-     */
-    void checkMigrationsCollectionIsEmptyAndLocksAreUnlocked();
+    ShardId getShardIdByHost(HostAndPort host);
 
     // Random static initialization order can result in X constructor running before Y constructor
     // if X and Y are defined in different source files. Defining variables here to enforce order.
@@ -129,20 +156,10 @@ protected:
     const HostAndPort kShardHost2 = HostAndPort("TestHost2", 12347);
     const HostAndPort kShardHost3 = HostAndPort("TestHost3", 12348);
 
-    const long long kMaxSizeMB = 100;
-
-    const BSONObj kShard0 =
-        BSON(ShardType::name(kShardId0.toString())
-             << ShardType::host(kShardHost0.toString()) << ShardType::maxSizeMB(kMaxSizeMB));
-    const BSONObj kShard1 =
-        BSON(ShardType::name(kShardId1.toString())
-             << ShardType::host(kShardHost1.toString()) << ShardType::maxSizeMB(kMaxSizeMB));
-    const BSONObj kShard2 =
-        BSON(ShardType::name(kShardId2.toString())
-             << ShardType::host(kShardHost2.toString()) << ShardType::maxSizeMB(kMaxSizeMB));
-    const BSONObj kShard3 =
-        BSON(ShardType::name(kShardId3.toString())
-             << ShardType::host(kShardHost3.toString()) << ShardType::maxSizeMB(kMaxSizeMB));
+    const ShardType kShard0{kShardId0.toString(), kShardHost0.toString()};
+    const ShardType kShard1{kShardId1.toString(), kShardHost1.toString()};
+    const ShardType kShard2{kShardId2.toString(), kShardHost2.toString()};
+    const ShardType kShard3{kShardId3.toString(), kShardHost3.toString()};
 
     const std::string kPattern = "_id";
     const KeyPattern kKeyPattern = KeyPattern(BSON(kPattern << 1));

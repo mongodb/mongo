@@ -29,16 +29,18 @@
 
 #pragma once
 
+#include "mongo/db/commands.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/util/modules.h"
+
 #include <string>
 
-#include "mongo/db/commands.h"
-#include "mongo/db/operation_context.h"
-
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 bool commandCanRunHere(OperationContext* opCtx,
-                       const std::string& dbname,
+                       const DatabaseName& dbName,
                        const Command* command,
                        bool inMultiDocumentTransaction);
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

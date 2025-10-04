@@ -1,29 +1,34 @@
-// Test the --sslMode parameter
-// This tests runs through the 8 possible combinations of sslMode values
+// Test the --tlsMode parameter
+// This tests runs through the 8 possible combinations of tlsMode values
 // and SSL-enabled and disabled shell respectively. For each combination
 // expected behavior is verified.
+import {TLSTest} from "jstests/libs/ssl_test.js";
+function testCombination(tlsMode, sslShell, shouldSucceed) {
+    jsTest.log(
+        "TESTING: tlsMode = " +
+            tlsMode +
+            ", sslShell = " +
+            (sslShell ? "true" : "false" + " (should " + (shouldSucceed ? "" : "not ") + "succeed)"),
+    );
 
-load("jstests/libs/ssl_test.js");
+    let serverOptionOverrides = {tlsMode: tlsMode, setParameter: {enableTestCommands: 1}};
 
-function testCombination(sslMode, sslShell, shouldSucceed) {
-    var serverOptionOverrides = {sslMode: sslMode};
+    let clientOptions = sslShell ? TLSTest.prototype.defaultTLSClientOptions : TLSTest.prototype.noTLSClientOptions;
 
-    var clientOptions =
-        sslShell ? SSLTest.prototype.defaultSSLClientOptions : SSLTest.prototype.noSSLClientOptions;
+    let fixture = new TLSTest(serverOptionOverrides, clientOptions);
 
-    var fixture = new SSLTest(serverOptionOverrides, clientOptions);
-
-    print("Trying sslMode: '" + sslMode + "' with sslShell = " + sslShell +
-          "; expect connection to " + (shouldSucceed ? "SUCCEED" : "FAIL"));
-
-    assert.eq(shouldSucceed, fixture.connectWorked());
+    if (shouldSucceed) {
+        assert(fixture.connectWorked());
+    } else {
+        assert(fixture.connectFails());
+    }
 }
 
 testCombination("disabled", false, true);
-testCombination("allowSSL", false, true);
-testCombination("preferSSL", false, true);
-testCombination("requireSSL", false, false);
+testCombination("allowTLS", false, true);
+testCombination("preferTLS", false, true);
+testCombination("requireTLS", false, false);
 testCombination("disabled", true, false);
-testCombination("allowSSL", true, true);
-testCombination("preferSSL", true, true);
-testCombination("requireSSL", true, true);
+testCombination("allowTLS", true, true);
+testCombination("preferTLS", true, true);
+testCombination("requireTLS", true, true);

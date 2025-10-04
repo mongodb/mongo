@@ -1,6 +1,9 @@
 /*
  * Copyright IBM Corp. 2015
  */
+
+#pragma once
+
 #include <sys/types.h>
 
 /* Portable implementations of CRC-32 (IEEE and Castagnoli), both

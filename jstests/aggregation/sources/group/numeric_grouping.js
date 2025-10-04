@@ -1,8 +1,6 @@
 /**
  * Tests that numbers that are equivalent but have different types are grouped together.
  */
-(function() {
-"use strict";
 const coll = db.numeric_grouping;
 
 coll.drop();
@@ -22,4 +20,3 @@ assert.eq(results.length, 2, tojson(results));
 // Both groups should sum to 30.
 assert.eq(results[0].s, 30, tojson(results));
 assert.eq(results[1].s, 30, tojson(results));
-}());

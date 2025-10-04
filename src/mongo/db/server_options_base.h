@@ -27,10 +27,13 @@
  *    it in the license file.
  */
 
-#include <string>
+#pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_section.h"
+
+#include <string>
 
 namespace mongo {
 

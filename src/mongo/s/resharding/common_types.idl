@@ -33,8 +33,8 @@ global:
 
 imports:
     - "mongo/db/keypattern.idl"
-    - "mongo/idl/basic_types.idl"
-    - "mongo/s/sharding_types.idl"
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/sharding_environment/sharding_types.idl"
 
 enums:
     CoordinatorState:
@@ -49,6 +49,7 @@ enums:
             kBlockingWrites: "blocking-writes"
             kAborting: "aborting"
             kCommitting: "committing"
+            kQuiesced: "quiesced"
             kDone: "done"
 
     DonorState:
@@ -72,6 +73,7 @@ enums:
             kAwaitingFetchTimestamp: "awaiting-fetch-timestamp"
             kCreatingCollection: "creating-collection"
             kCloning: "cloning"
+            kBuildingIndex: "building-index"
             kApplying: "applying"
             kError: "error"
             kStrictConsistency: "strict-consistency"
@@ -111,11 +113,28 @@ structs:
             tempNs:
                 cpp_name: tempReshardingNss
                 type: namespacestring
-                description: "The namespace of the temporary resharding collection that exists on
-                              recipient shards."
+                description:
+                    "The namespace of the temporary resharding collection that exists on
+                    recipient shards."
             reshardingKey:
                 type: KeyPattern
                 description: "The index specification document to use as the new shard key."
+            startTime:
+                type: date
+                description: "Operation start time."
+                optional: true
+            userReshardingUUID:
+                type: uuid
+                optional: true
+                description: >-
+                    The resharding UUID provided by the user, used to identify retries.
+            provenance:
+                type: ReshardingProvenance
+                description: "The source operation that called this resharding operation."
+                optional: true
+            performVerification:
+                type: optionalBool
+                description: "Whether to perform data comparison verification."
 
     AbortReason:
         description: "Not meant to be used directly. Only use internal fields."
@@ -127,14 +146,29 @@ structs:
         fields:
             abortReason:
                 type: object_owned
-                description: "The error that caused the node to abort the resharding operation. In
-                              this case, the node may be a donor shard, recipient shard, or the
-                              coordinator itself."
+                description:
+                    "The error that caused the node to abort the resharding operation. In
+                    this case, the node may be a donor shard, recipient shard, or the
+                    coordinator itself."
+                optional: true
+
+    ReshardingMetricsTimeInterval:
+        description: "Contains the start and stop time of a resharding operation phase."
+        strict: false
+        fields:
+            start:
+                type: date
+                description: "The start timestamp."
+                optional: true
+            stop:
+                type: date
+                description: "The stop timestamp."
                 optional: true
 
     DonorShardContext:
-        description: "Mutable state for a donor shard tracked both locally by a donor shard and
-                      remotely by the resharding coordinator."
+        description:
+            "Mutable state for a donor shard tracked both locally by a donor shard and
+            remotely by the resharding coordinator."
         inline_chained_structs: true
         chained_structs:
             AbortReason: AbortReasonStruct
@@ -149,20 +183,39 @@ structs:
                 default: kUnused
             minFetchTimestamp:
                 type: timestamp
-                description: "Timestamp after which this donor shard has guaranteed that oplog
-                              entries contain recipient shard information."
+                description:
+                    "Timestamp after which this donor shard has guaranteed that oplog
+                    entries contain recipient shard information."
                 optional: true
             bytesToClone:
                 type: long
-                description: "Number of bytes on this donor shard in the collection being
-                              resharded."
+                description:
+                    "Number of bytes on this donor shard in the collection being
+                    resharded."
                 optional: true
             documentsToClone:
                 type: long
-                description: "Number of documents on this donor shard in the collection being
-                              resharded."
+                description:
+                    "Number of documents on this donor shard in the collection being
+                    resharded."
                 optional: true
-                
+            indexCount:
+                type: long
+                description: "Number of indexes on this donor shard in the collection being resharded."
+                optional: true
+            writesDuringCriticalSection:
+                type: long
+                description: "Number of writes during critical section on this donor shard."
+                optional: true
+            phaseDurations:
+                type: object_owned
+                description: "Time spent in each phase so far."
+                optional: true
+            criticalSectionInterval:
+                type: ReshardingMetricsTimeInterval
+                description: Start and end times for the critical section.
+                optional: true
+
     DonorShardFetchTimestamp:
         description: "Used for tracking donor min fetch timestamp"
         strict: false
@@ -174,12 +227,14 @@ structs:
             minFetchTimestamp:
                 type: timestamp
                 optional: true
-                description: "Timestamp after which this donor shard has guaranteed that oplog
-                                entries contain recipient shard information."
+                description:
+                    "Timestamp after which this donor shard has guaranteed that oplog
+                    entries contain recipient shard information."
 
     RecipientShardContext:
-        description: "Mutable state for a recipient shard tracked both locally by a recipient shard
-                      and remotely by the resharding coordinator."
+        description:
+            "Mutable state for a recipient shard tracked both locally by a recipient shard
+            and remotely by the resharding coordinator."
         inline_chained_structs: true
         chained_structs:
             AbortReason: AbortReasonStruct
@@ -192,6 +247,34 @@ structs:
             state:
                 type: RecipientState
                 default: kUnused
+            bytesCopied:
+                type: long
+                description: "Number of bytes copied on this recipient shard."
+                optional: true
+            oplogFetched:
+                type: long
+                description: "Number of oplog entries fetched on this recipient shard."
+                optional: true
+            oplogApplied:
+                type: long
+                description: "Number of oplog entries applied on this recipient shard."
+                optional: true
+            totalNumDocuments:
+                type: long
+                description: "Number of documents on this recipient shard for the resharded collection."
+                optional: true
+            totalDocumentSize:
+                type: long
+                description: "Total size of all documents on this recipient shard for the resharded collection."
+                optional: true
+            numOfIndexes:
+                type: long
+                description: "Number of indexes on this recipient shard for the resharded collection."
+                optional: true
+            phaseDurations:
+                type: object_owned
+                description: "Time spent in each phase so far."
+                optional: true
 
     ReshardingApproxCopySize:
         description: "Not meant to be used directly. Only use internal fields."
@@ -231,7 +314,7 @@ structs:
                 type: string
                 description: "The zone name."
             min:
-                type: object_owned 
+                type: object_owned
                 description: "The min key of the chunk range assigned to the zone."
             max:
                 type: object_owned
@@ -250,27 +333,53 @@ structs:
                 type: object_owned
                 description: "The max key of the chunk range."
 
-    ReshardingMetricsTimeInterval:
-        description: "Contains the start and stop time of a resharding operation phase."
-        strict: false
-        fields:
-            start:
-                type: date
-                description: "The start timestamp."
-                optional: true
-            stop:
-                type: date
-                description: "The stop timestamp."
-                optional: true
-
     DocumentSourceReshardingOwnershipMatchSpec:
-        description: "A struct representing the information needed for a resharding pipeline to
-                      determine which documents belong to a particular shard."
+        description:
+            "A struct representing the information needed for a resharding pipeline to
+            determine which documents belong to a particular shard."
         strict: true
+        query_shape_component: true
         fields:
             recipientShardId:
                 type: shard_id
                 description: "The id of the recipient shard."
+                query_shape: anonymize
             reshardingKey:
                 type: KeyPattern
                 description: "The index specification document to use as the new shard key."
+                query_shape: custom
+            temporaryReshardingNamespace:
+                type: namespacestring
+                description:
+                    "The namespace of the temporary resharding collection that exists on
+                    recipient shards."
+                query_shape: custom
+                optional: true
+    ShardKeyRange:
+        description: "A struct to represent the key ranges of shards."
+        fields:
+            min:
+                type: object_owned
+                description: "The min key of this shard key range."
+                optional: true
+            max:
+                type: object_owned
+                description: "The max key of this shard key range."
+                optional: true
+            shard:
+                type: shard_id
+                description: "Id of the shard for this shard key range."
+    ChangeStreamsMonitorContext:
+        description: "Contains information about the change stream monitor's progress"
+        strict: false
+        fields:
+            startAtOperationTime:
+                type: timestamp
+            resumeToken:
+                type: object_owned
+                optional: true
+            documentsDelta:
+                type: long
+            completed:
+                type: bool
+                default: false

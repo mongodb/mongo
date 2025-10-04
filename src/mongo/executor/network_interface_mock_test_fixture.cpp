@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/executor/network_interface_mock_test_fixture.h"
 
 namespace mongo {

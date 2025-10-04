@@ -1,0 +1,22 @@
+# Golden test output of SBECodeFragmentTest/AppendMakeOwn
+==== VARIATION append code 1
+-- CODE:
+[0x0000-0x0035] stackSize: 1, maxStackSize: 6
+0x0000: pushConstVal(value: "one not too short string");
+0x000a: pushConstVal(value: "another string");
+0x0014: pushConstVal(value: Nothing);
+0x001e: pushLocalVal(arg: 2);
+0x0023: makeOwn(popParam: 1, moveFromParam: 1, offsetParam: 0);
+0x0025: pushLocalVal(arg: 2);
+0x002a: makeOwn(popParam: 1, moveFromParam: 1, offsetParam: 0);
+0x002c: functionSmall(f: concat, arity: 2);
+0x002f: swap();
+0x0030: pop();
+0x0031: swap();
+0x0032: pop();
+0x0033: swap();
+0x0034: pop();
+
+-- RESULT:
+"another stringone not too short string"
+

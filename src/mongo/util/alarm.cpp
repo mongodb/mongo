@@ -27,9 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/util/alarm.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/util/assert_util.h"
+
+#include <type_traits>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -50,7 +57,7 @@ public:
             return {ErrorCodes::ShutdownInProgress, "The alarm scheduler was shutdown"};
         }
 
-        stdx::unique_lock<Latch> lk(service->_mutex);
+        stdx::unique_lock<stdx::mutex> lk(service->_mutex);
         if (_done) {
             return {ErrorCodes::AlarmAlreadyFulfilled, "The alarm has already been canceled"};
         }
@@ -80,7 +87,7 @@ AlarmSchedulerPrecise::~AlarmSchedulerPrecise() {
 }
 
 AlarmScheduler::Alarm AlarmSchedulerPrecise::alarmAt(Date_t date) {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     if (_shutdown) {
         Alarm ret;
         ret.future = Future<void>::makeReady(
@@ -107,7 +114,7 @@ void AlarmSchedulerPrecise::processExpiredAlarms(
     std::vector<Promise<void>> toExpire;
     AlarmMapIt it;
 
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     for (it = _alarms.begin(); it != _alarms.end();) {
         if (hook && !(*hook)(processed + 1)) {
             break;
@@ -135,22 +142,22 @@ void AlarmSchedulerPrecise::processExpiredAlarms(
 }
 
 Date_t AlarmSchedulerPrecise::nextAlarm() {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return (_alarms.empty()) ? Date_t::max() : _alarms.begin()->first;
 }
 
 void AlarmSchedulerPrecise::clearAllAlarms() {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     _clearAllAlarmsImpl(lk);
 }
 
 void AlarmSchedulerPrecise::clearAllAlarmsAndShutdown() {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     _shutdown = true;
     _clearAllAlarmsImpl(lk);
 }
 
-void AlarmSchedulerPrecise::_clearAllAlarmsImpl(stdx::unique_lock<Latch>& lk) {
+void AlarmSchedulerPrecise::_clearAllAlarmsImpl(stdx::unique_lock<stdx::mutex>& lk) {
     std::vector<Promise<void>> toExpire;
     for (AlarmMapIt it = _alarms.begin(); it != _alarms.end();) {
         toExpire.push_back(std::move(it->second.promise));

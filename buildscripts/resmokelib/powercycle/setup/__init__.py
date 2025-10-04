@@ -2,8 +2,8 @@
 
 import os
 
-from buildscripts.resmokelib.powercycle.lib import PowercycleCommand
 from buildscripts.resmokelib.powercycle import powercycle_constants
+from buildscripts.resmokelib.powercycle.lib import PowercycleCommand
 from buildscripts.resmokelib.powercycle.lib.remote_operations import SSHOperation
 
 
@@ -12,7 +12,7 @@ class SetUpEC2Instance(PowercycleCommand):
 
     COMMAND = "setUpEC2Instance"
 
-    def execute(self) -> None:  # pylint: disable=too-many-instance-attributes, too-many-locals, too-many-statements
+    def execute(self) -> None:
         """:return: None."""
 
         default_retry_count = 2
@@ -38,28 +38,40 @@ class SetUpEC2Instance(PowercycleCommand):
 
         # Second operation -
         # Copy buildscripts and mongoDB executables to the remote host.
-        files = ["etc", "buildscripts", "dist-test/bin"]
+        files = [
+            "etc",
+            "buildscripts",
+            "dist-test/bin",
+            "poetry.lock",
+            "pyproject.toml",
+            "poetry_requirements.txt",
+        ]
 
         shared_libs = "dist-test/lib"
         if os.path.isdir(shared_libs):
             files.append(shared_libs)
 
-        self.remote_op.operation(SSHOperation.COPY_TO, files, remote_dir, retry=True,
-                                 retry_count=retry_count)
+        self.remote_op.operation(
+            SSHOperation.COPY_TO, files, remote_dir, retry=True, retry_count=retry_count
+        )
 
         # Third operation -
         # Set up virtualenv on remote.
         venv = powercycle_constants.VIRTUALENV_DIR
-        python = "/opt/mongodbtoolchain/v3/bin/python3" if "python" not in self.expansions else self.expansions[
-            "python"]
+        python = (
+            "/opt/mongodbtoolchain/v4/bin/python3"
+            if "python" not in self.expansions
+            else self.expansions["python"]
+        )
 
         cmds = f"python_loc=$(which {python})"
         cmds = f"{cmds}; remote_dir={remote_dir}"
-        cmds = f"{cmds}; if [ \"Windows_NT\" = \"$OS\" ]; then python_loc=$(cygpath -w $python_loc); remote_dir=$(cygpath -w $remote_dir); fi"
-        cmds = f"{cmds}; virtualenv --python $python_loc --system-site-packages {venv}"
+        cmds = f'{cmds}; if [ "Windows_NT" = "$OS" ]; then python_loc=$(cygpath -w $python_loc); remote_dir=$(cygpath -w $remote_dir); fi'
+        cmds = f"{cmds}; $python_loc -m venv --system-site-packages {venv}"
         cmds = f"{cmds}; activate=$(find {venv} -name 'activate')"
         cmds = f"{cmds}; . $activate"
-        cmds = f"{cmds}; pip3 install -r $remote_dir/etc/pip/powercycle-requirements.txt"
+        cmds = f"{cmds}; pushd $remote_dir && python3 -m pip install -r poetry_requirements.txt && popd"
+        cmds = f"{cmds}; pushd $remote_dir && python3 -m poetry install --no-root --sync --without powercycle-incompatible && popd"
 
         self.remote_op.operation(SSHOperation.SHELL, cmds, retry=True, retry_count=retry_count)
 
@@ -120,10 +132,10 @@ class SetUpEC2Instance(PowercycleCommand):
             cmds = f"{cmds}; cygrunsrv --start curator_proc"
         else:
             cmds = f"{cmds}; touch {monitor_system_file} {monitor_proc_file}"
-            cmds = f"{cmds}; cmd=\"@reboot cd $HOME && {self.sudo} ./curator stat system >> {monitor_system_file}\""
-            cmds = f"{cmds}; (crontab -l ; echo \"$cmd\") | crontab -"
-            cmds = f"{cmds}; cmd=\"@reboot cd $HOME && $sudo ./curator stat process-all >> {monitor_proc_file}\""
-            cmds = f"{cmds}; (crontab -l ; echo \"$cmd\") | crontab -"
+            cmds = f'{cmds}; cmd="@reboot cd $HOME && {self.sudo} ./curator stat system >> {monitor_system_file}"'
+            cmds = f'{cmds}; (crontab -l ; echo "$cmd") | crontab -'
+            cmds = f'{cmds}; cmd="@reboot cd $HOME && $sudo ./curator stat process-all >> {monitor_proc_file}"'
+            cmds = f'{cmds}; (crontab -l ; echo "$cmd") | crontab -'
             cmds = f"{cmds}; crontab -l"
             cmds = f"{cmds}; {{ {self.sudo} $HOME/curator stat system --file {monitor_system_file} > /dev/null 2>&1 & {self.sudo} $HOME/curator stat process-all --file {monitor_proc_file} > /dev/null 2>&1 & }} & disown"
 

@@ -1,0 +1,8 @@
+version: 1.0.0
+filters:
+  - "audit*":
+    approvers:
+      - 10gen/server-security
+  - "security_token*":
+    approvers:
+      - 10gen/server-security

@@ -27,27 +27,32 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/update/pullall_node.h"
 
-#include "mongo/bson/mutable/algorithm.h"
-#include "mongo/bson/mutable/mutable_bson_test_utils.h"
-#include "mongo/db/json.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/exec/mutable_bson/algorithm.h"
+#include "mongo/db/exec/mutable_bson/document.h"
+#include "mongo/db/exec/mutable_bson/element.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/update/update_executor.h"
 #include "mongo/db/update/update_node_test_fixture.h"
-#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+
+#include <utility>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace {
 
-using PullAllNodeTest = UpdateNodeTest;
-using mongo::mutablebson::countChildren;
-using mongo::mutablebson::Element;
+using PullAllNodeTest = UpdateTestFixture;
 
-TEST(PullAllNodeTest, InitWithIntFails) {
+TEST(SimplePullAllNodeTest, InitWithIntFails) {
     auto update = fromjson("{$pullAll: {a: 1}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PullAllNode node;
@@ -56,7 +61,7 @@ TEST(PullAllNodeTest, InitWithIntFails) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-TEST(PullAllNodeTest, InitWithStringFails) {
+TEST(SimplePullAllNodeTest, InitWithStringFails) {
     auto update = fromjson("{$pullAll: {a: 'test'}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PullAllNode node;
@@ -65,7 +70,7 @@ TEST(PullAllNodeTest, InitWithStringFails) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-TEST(PullAllNodeTest, InitWithObjectFails) {
+TEST(SimplePullAllNodeTest, InitWithObjectFails) {
     auto update = fromjson("{$pullAll: {a: {}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PullAllNode node;
@@ -74,7 +79,7 @@ TEST(PullAllNodeTest, InitWithObjectFails) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-TEST(PullAllNodeTest, InitWithBoolFails) {
+TEST(SimplePullAllNodeTest, InitWithBoolFails) {
     auto update = fromjson("{$pullAll: {a: true}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     PullAllNode node;
@@ -94,7 +99,7 @@ TEST_F(PullAllNodeTest, TargetNotFound) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
-    ASSERT_FALSE(result.indexesAffected);
+    ASSERT_FALSE(getIndexAffectedFromLogEntry());
     ASSERT_EQUALS(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
@@ -113,7 +118,7 @@ TEST_F(PullAllNodeTest, TargetArrayElementNotFound) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
-    ASSERT_FALSE(result.indexesAffected);
+    ASSERT_FALSE(getIndexAffectedFromLogEntry());
     ASSERT_EQUALS(fromjson("{a: [1, 2]}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
@@ -147,12 +152,11 @@ TEST_F(PullAllNodeTest, ApplyWithSingleNumber) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
-    ASSERT_TRUE(result.indexesAffected);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     ASSERT_EQUALS(fromjson("{a: ['a', {r: 1, b: 2}]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {a: ['a', {r: 1, b: 2}]}}"),
-                     fromjson("{$v: 2, diff: {u: {a: [\"a\", {r: 1, b: 2}]}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {u: {a: [\"a\", {r: 1, b: 2}]}}}"));
 }
 
 TEST_F(PullAllNodeTest, ApplyNoIndexDataNoLogBuilder) {
@@ -166,7 +170,6 @@ TEST_F(PullAllNodeTest, ApplyNoIndexDataNoLogBuilder) {
     setLogBuilderToNull();
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
-    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: ['a', {r: 1, b: 2}]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 }
@@ -182,7 +185,7 @@ TEST_F(PullAllNodeTest, ApplyWithElementNotPresentInArray) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
-    ASSERT_FALSE(result.indexesAffected);
+    ASSERT_FALSE(getIndexAffectedFromLogEntry());
     ASSERT_EQUALS(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
@@ -200,12 +203,11 @@ TEST_F(PullAllNodeTest, ApplyWithWithTwoElements) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
-    ASSERT_TRUE(result.indexesAffected);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     ASSERT_EQUALS(fromjson("{a: [{r: 1, b: 2}]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {a: [{r: 1, b: 2}]}}"),
-                     fromjson("{$v: 2, diff: {u: {a: [{r: 1, b: 2}]}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {u: {a: [{r: 1, b: 2}]}}}"));
 }
 
 TEST_F(PullAllNodeTest, ApplyWithAllArrayElements) {
@@ -219,11 +221,11 @@ TEST_F(PullAllNodeTest, ApplyWithAllArrayElements) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
-    ASSERT_TRUE(result.indexesAffected);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     ASSERT_EQUALS(fromjson("{a: []}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {a: []}}"), fromjson("{$v: 2, diff: {u: {a: []}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {u: {a: []}}}"));
 }
 
 TEST_F(PullAllNodeTest, ApplyWithAllArrayElementsButOutOfOrder) {
@@ -237,11 +239,11 @@ TEST_F(PullAllNodeTest, ApplyWithAllArrayElementsButOutOfOrder) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
-    ASSERT_TRUE(result.indexesAffected);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     ASSERT_EQUALS(fromjson("{a: []}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {a: []}}"), fromjson("{$v: 2, diff: {u: {a: []}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {u: {a: []}}}"));
 }
 
 TEST_F(PullAllNodeTest, ApplyWithAllArrayElementsAndThenSome) {
@@ -255,11 +257,11 @@ TEST_F(PullAllNodeTest, ApplyWithAllArrayElementsAndThenSome) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
-    ASSERT_TRUE(result.indexesAffected);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     ASSERT_EQUALS(fromjson("{a: []}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {a: []}}"), fromjson("{$v: 2, diff: {u: {a: []}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {u: {a: []}}}"));
 }
 
 TEST_F(PullAllNodeTest, ApplyWithCollator) {
@@ -276,12 +278,11 @@ TEST_F(PullAllNodeTest, ApplyWithCollator) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
-    ASSERT_TRUE(result.indexesAffected);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     ASSERT_EQUALS(fromjson("{a: ['baz']}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {a: ['baz']}}"),
-                     fromjson("{$v: 2, diff: {u: {a: ['baz']}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {u: {a: ['baz']}}}"));
 }
 
 TEST_F(PullAllNodeTest, ApplyAfterSetCollator) {
@@ -306,7 +307,6 @@ TEST_F(PullAllNodeTest, ApplyAfterSetCollator) {
     setPathTaken(makeRuntimeUpdatePathForTest("a"));
     result = node.apply(getApplyParams(doc2.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
-    ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: ['baz']}"), doc2);
     ASSERT_FALSE(doc2.isInPlaceModeEnabled());
 }

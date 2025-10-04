@@ -66,7 +66,7 @@ sample_rate=1
 
 context = Context()
 conn_config = ""
-conn_config += ",cache_size=10G,eviction=(threads_min=4,threads_max=4),file_manager=(close_idle_time=30),session_max=1000,statistics=[all,clear],statistics_log=(wait=1,json=false,on_close=true)"   # explicitly added
+conn_config += ",cache_size=10G,eviction=(threads_min=4,threads_max=4),file_manager=(close_idle_time=30),session_max=1000,statistics=[all,clear],statistics_log=(wait=1,json=true,on_close=true)"   # explicitly added
 conn = context.wiredtiger_open("create," + conn_config)
 s = conn.open_session("")
 
@@ -94,7 +94,8 @@ pop_ops = Operation(Operation.OP_INSERT, tables[0])
 pop_ops = op_populate_with_range(pop_ops, tables, icount, random_range, populate_threads)
 pop_thread = Thread(pop_ops)
 pop_workload = Workload(context, populate_threads * pop_thread)
-pop_workload.run(conn)
+ret = pop_workload.run(conn)
+assert ret == 0, ret
 
 ops = Operation(Operation.OP_INSERT, tables[0], Key(Key.KEYGEN_PARETO, 0, ParetoOptions(10)))
 # Updated the range_partition to False, because workgen has some issues with range_partition true.
@@ -121,7 +122,8 @@ workload.options.sample_interval_ms = 5000
 # Uncomment to fail instead of generating a warning
 # workload.options.max_idle_table_cycle_fatal = True
 workload.options.max_idle_table_cycle = 2
-workload.run(conn)
+ret = workload.run(conn)
+assert ret == 0, ret
 
 latency_filename = context.args.home + "/latency.out"
 latency.workload_latency(workload, latency_filename)

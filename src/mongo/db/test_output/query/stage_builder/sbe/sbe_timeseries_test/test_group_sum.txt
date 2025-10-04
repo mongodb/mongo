@@ -1,0 +1,14 @@
+# Golden test output of SbeTimeseriesTest/TestGroupSum
+[4] sort [s21] [asc] [s20] 9223372036854775807ll 
+[4] project [s21 = getSortKeyAsc(s19)] 
+[3] project [s20 = newBsonObj("_id", s18, "sum", s19)] 
+[3] project [s19 = doubleDoubleSumFinalize(s17)] 
+[3] group [s18] [s17 = aggDoubleDoubleSum(s12)] spillSlots[s16] mergingExprs[aggMergeDoubleDoubleSums(s16)] 
+[3] project [s18 = (s15 ?: null)] 
+[3] project [s15 = traverseP(s13, lambda(l4.0) { traverseP(getField(move(l4.0), "a"), lambda(l5.0) { getField(move(l5.0), "b") }, 1) }, 1)] 
+[2] block_to_row blocks[s4, s5, s6, s7] row[s11, s12, s13, s14] s9 
+[2] filter {!(valueBlockNone(s9, true))} 
+[2] project [s9 = valueBlockLogicalAnd(s3, cellFoldValues_F(valueBlockFillEmpty(valueBlockGtScalar(cellBlockGetFlatValuesBlock(s8), Date(1738785568339)), false), s8))] 
+[2] ts_bucket_to_cellblock s2 pathReqs[s4 = ProjectPath(Get(_id)/Id), s5 = ProjectPath(Get(a)/Id), s6 = ProjectPath(Get(b)/Id), s7 = ProjectPath(Get(time)/Id), s8 = FilterPath(Get(time)/Traverse/Id)] bitmap = s3 
+[1] project [s2 = getElement(s1, 0)] 
+[1] virtualscan s1 {[[{"_id" : bsonObjectId("64a5cb841ade1be79f4cc8c7"), "control" : {"version" : 1}, "data" : {"a" : {"0" : 11, "1" : 22, "2" : 33}, "b" : {"0" : {"a" : {"a" : 1, "b" : 2}}, "2" : {"a" : {...}}}, "time" : {"0" : Date(1738785568339), "1" : Date(1738785578396), "2" : Date(1738785590772)}}}], [{"_id" : bsonObjectId("64a5cb841ade1be79f4cc8c7"), "control" : {"version" : 1}, "data" : {"a" : {"0" : 1, "1" : 2, "2" : 3}, "b" : {"0" : {"a" : {...}}, "1" : {...}, ...}, "time" : {"0" : Date(1738871968339), "1" : Date(1738871978396), "2" : Date(1738871990772)}}}]]} 

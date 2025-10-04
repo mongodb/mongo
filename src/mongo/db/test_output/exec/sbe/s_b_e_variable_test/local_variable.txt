@@ -1,0 +1,22 @@
+# Golden test output of SBEVariableTest/LocalVariable
+-- INPUT EXPRESSION:
+
+    let [
+        l10.0 = "abcdeghijklmnop" 
+    ] 
+    in newArray(l10.0, l10.0) 
+
+
+-- COMPILED EXPRESSION:
+[0x0000-0x0019] stackSize: 1, maxStackSize: 4
+0x0000: pushConstVal(value: "abcdeghijklmnop");
+0x000a: pushLocalVal(arg: 0);
+0x000f: pushLocalVal(arg: 1);
+0x0014: functionSmall(f: newArray, arity: 2);
+0x0017: swap();
+0x0018: pop();
+
+
+-- EXECUTE VARIATION:
+RESULT: ["abcdeghijklmnop", "abcdeghijklmnop"]
+

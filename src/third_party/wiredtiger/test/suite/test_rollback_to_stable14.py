@@ -28,7 +28,7 @@
 
 import threading, time
 from helper import simulate_crash_restart
-from test_rollback_to_stable01 import test_rollback_to_stable_base
+from rollback_to_stable_util import test_rollback_to_stable_base
 from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
@@ -45,11 +45,10 @@ def append_val(value, char):
 # history store. Since FLCS inherently doesn't support modify, there's no need to run this on
 # FLCS. (Note that self.value_format needs to exist anyway for the base class to use.)
 class test_rollback_to_stable14(test_rollback_to_stable_base):
-    session_config = 'isolation=snapshot'
 
     key_format_values = [
         ('column', dict(key_format='r')),
-        ('integer_row', dict(key_format='i')),
+        ('row_integer', dict(key_format='i')),
     ]
     value_format='S'
 
@@ -61,18 +60,16 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
     scenarios = make_scenarios(key_format_values, prepare_values)
 
     def conn_config(self):
-        config = 'cache_size=25MB,statistics=(all),statistics_log=(json,on_close,wait=1),log=(enabled=true),timing_stress_for_test=[history_store_checkpoint_delay]'
+        config = 'cache_size=25MB,statistics=(all),statistics_log=(json,on_close,wait=1),timing_stress_for_test=[history_store_checkpoint_delay],verbose=(rts:5)'
         return config
 
     def test_rollback_to_stable(self):
         nrows = 100
 
-        # Create a table without logging.
+        # Create a table.
         self.pr("create/populate table")
         uri = "table:rollback_to_stable14"
-        ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
-            config='log=(enabled=false)')
+        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format)
         ds.populate()
 
         # Pin oldest and stable to timestamp 10.
@@ -99,11 +96,11 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         self.large_modifies(uri, 'T', ds, 3, 1, nrows, self.prepare, 60)
 
         # Verify data is visible and correct.
-        self.check(value_a, uri, nrows, None, 20)
-        self.check(value_modQ, uri, nrows, None, 30)
-        self.check(value_modR, uri, nrows, None, 40)
-        self.check(value_modS, uri, nrows, None, 50)
-        self.check(value_modT, uri, nrows, None, 60)
+        self.check(value_a, uri, nrows, None, 21 if self.prepare else 20)
+        self.check(value_modQ, uri, nrows, None, 31 if self.prepare else 30)
+        self.check(value_modR, uri, nrows, None, 41 if self.prepare else 40)
+        self.check(value_modS, uri, nrows, None, 51 if self.prepare else 50)
+        self.check(value_modT, uri, nrows, None, 61 if self.prepare else 60)
 
         # Pin stable to timestamp 60 if prepare otherwise 50.
         if self.prepare:
@@ -117,8 +114,14 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         try:
             self.pr("start checkpoint")
             ckpt.start()
-            # Sleep for sometime so that checkpoint starts.
-            time.sleep(2)
+
+            # Wait for checkpoint to start before committing.
+            ckpt_started = 0
+            while not ckpt_started:
+                stat_cursor = self.session.open_cursor('statistics:', None, None)
+                ckpt_started = stat_cursor[stat.conn.checkpoint_state][2] != 0
+                stat_cursor.close()
+                time.sleep(1)
 
             # Perform several modifies in parallel with checkpoint.
             # Rollbacks may occur when checkpoint is running, so retry as needed.
@@ -164,8 +167,7 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         else:
             self.assertEqual(upd_aborted, 0)
         self.assertGreater(pages_visited, 0)
-        self.assertGreaterEqual(hs_removed, nrows)
-        self.assertGreaterEqual(hs_sweep, 0)
+        self.assertGreaterEqual(hs_removed + hs_sweep, nrows)
 
         # Check that the correct data is seen at and after the stable timestamp.
         self.check(value_a, uri, nrows, None, 20)
@@ -173,18 +175,13 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         self.check(value_modR, uri, nrows, None, 40)
         self.check(value_modS, uri, nrows, None, 50)
 
-        # The test may output the following message in eviction under cache pressure. Ignore that.
-        self.ignoreStdoutPatternIfExists("oldest pinned transaction ID rolled back for eviction")
-
     def test_rollback_to_stable_same_ts(self):
         nrows = 100
 
-        # Create a table without logging.
+        # Create a table.
         self.pr("create/populate table")
         uri = "table:rollback_to_stable14"
-        ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
-            config='log=(enabled=false)')
+        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format)
         ds.populate()
 
         # Pin oldest and stable to timestamp 10.
@@ -217,9 +214,9 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
             self.large_modifies(uri, 'T', ds, 3, 1, nrows, self.prepare, 60)
 
         # Verify data is visible and correct.
-        self.check(value_a, uri, nrows, None, 20)
-        self.check(value_modQ, uri, nrows, None, 30)
-        self.check(value_modT, uri, nrows, None, 60)
+        self.check(value_a, uri, nrows, None, 21 if self.prepare else 20)
+        self.check(value_modQ, uri, nrows, None, 31 if self.prepare else 30)
+        self.check(value_modT, uri, nrows, None, 61 if self.prepare else 60)
 
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(50))
 
@@ -229,8 +226,14 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         try:
             self.pr("start checkpoint")
             ckpt.start()
-            # Sleep for sometime so that checkpoint starts.
-            time.sleep(2)
+
+            # Wait for checkpoint to start before committing.
+            ckpt_started = 0
+            while not ckpt_started:
+                stat_cursor = self.session.open_cursor('statistics:', None, None)
+                ckpt_started = stat_cursor[stat.conn.checkpoint_state][2] != 0
+                stat_cursor.close()
+                time.sleep(1)
 
             # Perform several modifies in parallel with checkpoint.
             # Rollbacks may occur when checkpoint is running, so retry as needed.
@@ -276,25 +279,19 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         else:
             self.assertEqual(upd_aborted, 0)
         self.assertGreater(pages_visited, 0)
-        self.assertGreaterEqual(hs_removed, nrows * 3)
-        self.assertGreaterEqual(hs_sweep, 0)
+        self.assertGreaterEqual(hs_removed + hs_sweep, nrows * 3)
 
         # Check that the correct data is seen at and after the stable timestamp.
         self.check(value_a, uri, nrows, None, 20)
         self.check(value_modQ, uri, nrows, None, 30)
 
-        # The test may output the following message in eviction under cache pressure. Ignore that.
-        self.ignoreStdoutPatternIfExists("oldest pinned transaction ID rolled back for eviction")
-
     def test_rollback_to_stable_same_ts_append(self):
         nrows = 100
 
-        # Create a table without logging.
+        # Create a table.
         self.pr("create/populate table")
         uri = "table:rollback_to_stable14"
-        ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
-            config='log=(enabled=false)')
+        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format)
         ds.populate()
 
         # Pin oldest and stable to timestamp 10.
@@ -327,9 +324,9 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
             self.large_modifies(uri, 'T', ds, len(value_modS), 1, nrows, self.prepare, 60)
 
         # Verify data is visible and correct.
-        self.check(value_a, uri, nrows, None, 20)
-        self.check(value_modQ, uri, nrows, None, 30)
-        self.check(value_modT, uri, nrows, None, 60)
+        self.check(value_a, uri, nrows, None, 21 if self.prepare else 20)
+        self.check(value_modQ, uri, nrows, None, 31 if self.prepare else 30)
+        self.check(value_modT, uri, nrows, None, 61 if self.prepare else 60)
 
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(50))
 
@@ -339,8 +336,14 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         try:
             self.pr("start checkpoint")
             ckpt.start()
-            # Sleep for sometime so that checkpoint starts.
-            time.sleep(2)
+
+            # Wait for checkpoint to start before committing.
+            ckpt_started = 0
+            while not ckpt_started:
+                stat_cursor = self.session.open_cursor('statistics:', None, None)
+                ckpt_started = stat_cursor[stat.conn.checkpoint_state][2] != 0
+                stat_cursor.close()
+                time.sleep(1)
 
             # Perform several modifies in parallel with checkpoint.
             # Rollbacks may occur when checkpoint is running, so retry as needed.
@@ -384,15 +387,8 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         else:
             self.assertEqual(upd_aborted, 0)
         self.assertGreater(pages_visited, 0)
-        self.assertGreaterEqual(hs_removed, nrows * 3)
-        self.assertGreaterEqual(hs_sweep, 0)
+        self.assertGreaterEqual(hs_removed + hs_sweep, nrows * 3)
 
         # Check that the correct data is seen at and after the stable timestamp.
         self.check(value_a, uri, nrows, None, 20)
         self.check(value_modQ, uri, nrows, None, 30)
-
-        # The test may output the following message in eviction under cache pressure. Ignore that.
-        self.ignoreStdoutPatternIfExists("oldest pinned transaction ID rolled back for eviction")
-
-if __name__ == '__main__':
-    wttest.run()

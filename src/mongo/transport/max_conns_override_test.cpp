@@ -27,19 +27,25 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include "mongo/base/string_data.h"
 #include "mongo/transport/mock_session.h"
-#include "mongo/transport/service_entry_point_impl.h"
+#include "mongo/transport/session.h"
+#include "mongo/transport/session_manager_common.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/net/cidr.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/net/sockaddr.h"
+
+#include <memory>
+#include <string>
+#include <variant>
+#include <vector>
 
 namespace mongo {
 namespace {
 
-using ExemptionVector = std::vector<stdx::variant<CIDR, std::string>>;
-
 template <typename T>
-stdx::variant<CIDR, std::string> makeExemption(T exemption) {
+std::variant<CIDR, std::string> makeExemption(T exemption) {
     auto swCIDR = CIDR::parse(exemption);
     if (swCIDR.isOK()) {
         return swCIDR.getValue();
@@ -48,44 +54,41 @@ stdx::variant<CIDR, std::string> makeExemption(T exemption) {
     }
 }
 
-transport::SessionHandle makeIPSession(StringData ip) {
-    return transport::MockSession::create(HostAndPort(ip.toString(), 27017),
-                                          HostAndPort(),
+std::shared_ptr<transport::Session> makeIPSession(StringData ip) {
+    return transport::MockSession::create(HostAndPort(std::string{ip}, 27017),
                                           SockAddr::create(ip, 27017, AF_INET),
                                           SockAddr(),
                                           nullptr);
 }
 
 #ifndef _WIN32
-transport::SessionHandle makeUNIXSession(StringData path) {
-    return transport::MockSession::create(HostAndPort(""_sd.toString(), -1),
-                                          HostAndPort(path.toString(), -1),
+std::shared_ptr<transport::Session> makeUNIXSession(StringData path) {
+    return transport::MockSession::create(HostAndPort(std::string{""_sd}, -1),
                                           SockAddr::create(""_sd, -1, AF_UNIX),
                                           SockAddr::create(path, -1, AF_UNIX),
-
                                           nullptr);
 }
 #endif
 
 TEST(MaxConnsOverride, NormalCIDR) {
-    ExemptionVector cidrOnly{makeExemption("127.0.0.1"), makeExemption("10.0.0.0/24")};
+    CIDRList cidrOnly{makeExemption("127.0.0.1"), makeExemption("10.0.0.0/24")};
 
-    ASSERT_TRUE(shouldOverrideMaxConns(makeIPSession("127.0.0.1"), cidrOnly));
-    ASSERT_TRUE(shouldOverrideMaxConns(makeIPSession("10.0.0.35"), cidrOnly));
-    ASSERT_FALSE(shouldOverrideMaxConns(makeIPSession("192.168.0.53"), cidrOnly));
+    ASSERT_TRUE(makeIPSession("127.0.0.1")->isExemptedByCIDRList(cidrOnly));
+    ASSERT_TRUE(makeIPSession("10.0.0.35")->isExemptedByCIDRList(cidrOnly));
+    ASSERT_FALSE(makeIPSession("192.168.0.53")->isExemptedByCIDRList(cidrOnly));
 }
 
 #ifndef _WIN32
 TEST(MaxConnsOverride, UNIXPaths) {
-    ExemptionVector mixed{makeExemption("127.0.0.1"),
-                          makeExemption("10.0.0.0/24"),
-                          makeExemption("/tmp/mongod.sock")};
+    CIDRList mixed{makeExemption("127.0.0.1"),
+                   makeExemption("10.0.0.0/24"),
+                   makeExemption("/tmp/mongod.sock")};
 
-    ASSERT_TRUE(shouldOverrideMaxConns(makeIPSession("127.0.0.1"), mixed));
-    ASSERT_TRUE(shouldOverrideMaxConns(makeIPSession("10.0.0.35"), mixed));
-    ASSERT_FALSE(shouldOverrideMaxConns(makeIPSession("192.168.0.53"), mixed));
-    ASSERT_TRUE(shouldOverrideMaxConns(makeUNIXSession("/tmp/mongod.sock"), mixed));
-    ASSERT_FALSE(shouldOverrideMaxConns(makeUNIXSession("/tmp/other-mongod.sock"), mixed));
+    ASSERT_TRUE(makeIPSession("127.0.0.1")->isExemptedByCIDRList(mixed));
+    ASSERT_TRUE(makeIPSession("10.0.0.35")->isExemptedByCIDRList(mixed));
+    ASSERT_FALSE(makeIPSession("192.168.0.53")->isExemptedByCIDRList(mixed));
+    ASSERT_TRUE(makeUNIXSession("/tmp/mongod.sock")->isExemptedByCIDRList(mixed));
+    ASSERT_FALSE(makeUNIXSession("/tmp/other-mongod.sock")->isExemptedByCIDRList(mixed));
 }
 #endif
 

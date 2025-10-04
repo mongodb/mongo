@@ -27,20 +27,34 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/client/mongo_uri.h"
-
-#include "mongo/client/authenticate.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/client/client_api_version_parameters_gen.h"
+#include "mongo/client/connection_string.h"
 #include "mongo/client/dbclient_base.h"
+#include "mongo/client/mongo_uri.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <exception>
+#include <map>
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
 DBClientBase* MongoURI::connect(StringData applicationName,
                                 std::string& errmsg,
                                 boost::optional<double> socketTimeoutSecs,
-                                const ClientAPIVersionParameters* apiParameters) const {
+                                const ClientAPIVersionParameters* apiParameters,
+                                const boost::optional<TransientSSLParams>& transientSSLParams,
+                                ErrorCodes::Error* errcode) const {
     OptionsMap::const_iterator it = _options.find("socketTimeoutMS");
     if (it != _options.end() && !socketTimeoutSecs) {
         try {
@@ -51,10 +65,16 @@ DBClientBase* MongoURI::connect(StringData applicationName,
         }
     }
 
-    auto swConn = _connectString.connect(
-        applicationName, socketTimeoutSecs.value_or(0.0), this, apiParameters);
+    auto swConn = _connectString.connect(applicationName,
+                                         socketTimeoutSecs.value_or(0.0),
+                                         this,
+                                         apiParameters,
+                                         transientSSLParams ? &*transientSSLParams : nullptr);
     if (!swConn.isOK()) {
         errmsg = swConn.getStatus().reason();
+        if (errcode) {
+            *errcode = swConn.getStatus().code();
+        }
         return nullptr;
     }
 
@@ -69,7 +89,7 @@ DBClientBase* MongoURI::connect(StringData applicationName,
         auto optAuthObj = makeAuthObjFromOptions(connection->getMaxWireVersion(),
                                                  connection->getIsPrimarySaslMechanisms());
         if (optAuthObj) {
-            connection->auth(optAuthObj.get());
+            connection->auth(optAuthObj.value());
         }
     }
 

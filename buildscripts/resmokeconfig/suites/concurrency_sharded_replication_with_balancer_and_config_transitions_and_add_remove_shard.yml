@@ -1,0 +1,180 @@
+# Based on the concurrency_sharded_replication_with_balancer_and_config_transitions suite. This
+# suite adds and removes shards and runs config shard transitions continuously in the background.
+test_kind: fsm_workload_test
+
+selector:
+  roots:
+    - jstests/concurrency/fsm_workloads/**/*.js
+    - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*.js
+  exclude_files:
+    # SERVER-14669 Multi-removes that use $where miscount removed documents
+
+    # Disabled due to MongoDB restrictions and/or workload restrictions
+
+    # These workloads sometimes trigger 'Could not lock auth data update lock'
+    # errors because the AuthorizationManager currently waits for only five
+    # seconds to acquire the lock for authorization documents
+
+    # uses >100MB of data, which can overwhelm test hosts
+
+    # compact can only be run against a standalone mongod
+
+    # test creates too many collections for ContinuousAddRemoveShard
+    - jstests/concurrency/fsm_workloads/ddl/create_collection/create_collection.js
+
+    # can cause OOM kills on test hosts
+
+    # cannot createIndex after dropDatabase without sharding first
+
+    # The WTWriteConflictException failpoint is not supported on mongos.
+
+    # SERVER-20361 Improve the behaviour of multi-update/delete against a sharded collection
+
+    # TODO Undenylist (SERVER-38852).
+
+    # serverStatus does not include transaction metrics on mongos.
+
+    # Uses the same transaction id across different routers, which is not allowed because when either
+    # router tries to commit, it may not know the full participant list.
+
+    # The test may spuriously fail when run against sharded clusters, due to limitations of the
+    # infrastructure. See SERVER-77039 for full details.
+
+    # TODO SERVER-89555: Timeseries collections hit movePrimaryInProgress errors and the temporary
+    # retry logic for this hook leads to breaking a test assertion.
+
+    # TODO SERVER-89841: Performs many sharding DDL operations and can time out taking the DDL lock
+    # on slower variants.
+    - jstests/concurrency/fsm_workloads/query/agg/agg_lookup.js
+    - jstests/concurrency/fsm_workloads/query/agg/agg_out.js
+    - jstests/concurrency/fsm_workloads/query/agg/agg_sort.js
+    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_interrupt.js
+    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_replace.js
+    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_replace_remove.js
+    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_replace_nonexistent.js
+    - jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_operations.js
+    - jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_check_metadata_consistency_killop.js
+    - jstests/concurrency/fsm_workloads/ddl/rename_collection/rename_sharded_collection.js
+    - jstests/concurrency/fsm_workloads/ddl/rename_collection/rename_capped_collection_chain.js
+    - jstests/concurrency/fsm_workloads/ddl/rename_collection/rename_capped_collection_droptarget.js
+    - jstests/concurrency/fsm_workloads/query/timeseries/timeseries_agg_out.js
+
+    # This test expects to catch QueryPlanKilled errors, but the config transition runCommand
+    # override retries on QueryPlanKilled errors to retain test coverage for transient errors
+    # caused by config transitions.
+
+    # TODO SERVER-50144 Removing a shard with in-progress migration coordinators can leave permanently
+    # pending config.rangeDeletions document on the recipient. Therefore, this suite removes shards without
+    # waiting for the range deleter to finish. As a result, we might decommision a shard before all
+    # open cursors can finish, such that tests using getMore must be skipped.
+
+    # Connects directly to shards that might have been decomissioned, which leads to network errors.
+    - jstests/concurrency/fsm_workloads/cleanup_orphaned_with_balancer.js
+
+    # Tests that perform shard addition, shard removal, or movePrimary operations,
+    # might interfere with the state expected during execution of the ContinuousAddRemoveShard hook.
+    - jstests/concurrency/fsm_workloads/crud/move_primary_with_crud.js
+
+    # TODO SERVER-90609: movePrimary does not synchronize with index builds.
+    - jstests/concurrency/fsm_workloads/ddl/collMod/collMod_separate_collections.js
+
+    # This test runs a large number of inserts, which can cause moveCollection to take a long time
+    # to finish. This can cause the CheckMetadataConsistency hook to hit LockBusy errors.
+    - jstests/concurrency/fsm_workloads/timeseries/timeseries_insert_idle_bucket_expiration.js
+
+    # These tests runs a large number of inserts while chunk migrations occur, which can cause the test
+    # to time out because we don't do inserts with bucket reopening.
+    - jstests/concurrency/fsm_workloads/timeseries/timeseries_reopening_respects_control_closed.js
+    - jstests/concurrency/fsm_workloads/timeseries/timeseries_crud_operations_respect_control_closed.js
+
+    # Exclude tests that run cleanupOrphaned, which can fail running on a config shard if a
+    # concurrent migration fails due to the config shard transitioning to dedicated.
+    - jstests/concurrency/fsm_workloads/cleanup_orphaned_with_balancer.js
+
+  exclude_with_any_tags:
+    - requires_standalone
+    - assumes_against_mongod_not_mongos
+    - assumes_balancer_off
+    - requires_replication
+    # mongos has no system.profile collection.
+    - requires_profiling
+    - assumes_unsharded_collection
+
+    # The following tags are excluded specifically for this suite.
+    - config_shard_incompatible
+    - assumes_stable_shard_list
+
+    # Workloads that kill random sessions might interrupt operations
+    # performed by the ContinuousAddRemoveShard hook.
+    - kills_random_sessions
+
+    # implicitly_retry_on_migration_in_progress.js alters find/aggregate commands
+    # so that the whole result set is returned through a single batch
+    - assumes_no_implicit_cursor_exhaustion
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+    tests: true
+  config:
+    shell_options:
+      eval: >-
+        await import("jstests/libs/override_methods/implicitly_retry_on_shard_transition_errors.js");
+        await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
+        await import("jstests/libs/override_methods/implicitly_retry_crud_on_no_progress_made.js");
+      global_vars:
+        TestData:
+          runningWithBalancer: true
+          shardsAddedRemoved: true
+          hasRandomShardsAddedRemoved: true
+          implicitlyShardOnCreateCollectionOnly: true
+          useActionPermittedFile: [ContinuousAddRemoveShard]
+          shardCollectionProbability: 0.5
+  hooks:
+    - class: ContinuousAddRemoveShard
+      transition_configsvr: true
+      add_remove_random_shards: true
+      is_fsm_workload: true
+    - class: CheckShardFilteringMetadata
+    # Suites that shutdown nodes are not compatible with the CheckReplDBHashInBackground hook, so
+    # this suite does not include that hook
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+      shell_options:
+        global_vars:
+          TestData:
+            shardsAddedRemoved: true
+            hasRandomShardsAddedRemoved: true
+    - class: CheckOrphansDeleted
+    - class: CheckRoutingTableConsistency
+    - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
+    - class: CleanupConcurrencyWorkloads
+  fixture:
+    class: ShardedClusterFixture
+    config_shard: "any"
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+    shard_options:
+      mongod_options:
+        oplogSize: 1024
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        roleGraphInvalidationIsFatal: 1
+        queryAnalysisWriterIntervalSecs: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+        skipDroppingHashedShardKeyIndex: true
+        reshardingMinimumOperationDurationMillis: 0
+        balancerMigrationsThrottlingMs: 250
+        featureFlagReshardingForTimeseries: true
+    num_rs_nodes_per_shard: 3
+    # Use 3 shards so there's always at least two for workloads with manual migrations, etc.
+    num_shards: 3
+    num_mongos: 2
+    enable_balancer: true
+    random_migrations: true

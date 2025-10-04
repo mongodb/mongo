@@ -27,26 +27,37 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/commands/user_management_commands_common.h"
-
-#include <string>
-#include <vector>
-
+#include <absl/container/node_hash_map.h>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/bson/mutable/algorithm.h"
-#include "mongo/config.h"
+#include "mongo/base/string_data.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/auth_name.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/parsed_privilege_gen.h"
 #include "mongo/db/auth/resource_pattern.h"
-#include "mongo/db/auth/user.h"
-#include "mongo/db/auth/user_management_commands_parser.h"
+#include "mongo/db/auth/umc_info_command_arg.h"
+#include "mongo/db/auth/user_name.h"
+#include "mongo/db/commands/user_management_commands_common.h"
 #include "mongo/db/commands/user_management_commands_gen.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/util/sequence_util.h"
+#include "mongo/db/multitenancy.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/database_name_util.h"
 #include "mongo/util/str.h"
+
+#include <cstddef>
+#include <memory>
+#include <vector>
 
 namespace mongo {
 namespace auth {
@@ -55,16 +66,18 @@ namespace {
 Status checkAuthorizedToGrantPrivilege(AuthorizationSession* authzSession,
                                        const Privilege& privilege) {
     const ResourcePattern& resource = privilege.getResourcePattern();
+    const auto& targetDb = resource.dbNameToMatch();
     if (resource.isDatabasePattern() || resource.isExactNamespacePattern()) {
         if (!authzSession->isAuthorizedForActionsOnResource(
-                ResourcePattern::forDatabaseName(resource.databaseToMatch()),
-                ActionType::grantRole)) {
+                ResourcePattern::forDatabaseName(targetDb), ActionType::grantRole)) {
             return Status(ErrorCodes::Unauthorized,
                           str::stream() << "Not authorized to grant privileges on the "
-                                        << resource.databaseToMatch() << "database");
+                                        << targetDb.toStringForErrorMsg() << "database");
         }
     } else if (!authzSession->isAuthorizedForActionsOnResource(
-                   ResourcePattern::forDatabaseName("admin"), ActionType::grantRole)) {
+                   ResourcePattern::forDatabaseName(DatabaseNameUtil::deserialize(
+                       targetDb.tenantId(), "admin"_sd, SerializationContext::stateDefault())),
+                   ActionType::grantRole)) {
         return Status(ErrorCodes::Unauthorized,
                       "To grant privileges affecting multiple databases or the cluster,"
                       " must be authorized to grant roles from the admin database");
@@ -75,7 +88,7 @@ Status checkAuthorizedToGrantPrivilege(AuthorizationSession* authzSession,
 }  // namespace
 
 std::vector<RoleName> resolveRoleNames(const std::vector<RoleNameOrString>& possibleRoles,
-                                       StringData dbname) {
+                                       const DatabaseName& dbname) {
     // De-duplicate as we resolve names by using a set.
     stdx::unordered_set<RoleName> roles;
     for (const auto& possibleRole : possibleRoles) {
@@ -88,7 +101,8 @@ Status checkAuthorizedToGrantRoles(AuthorizationSession* authzSession,
                                    const std::vector<RoleName>& roles) {
     for (size_t i = 0; i < roles.size(); ++i) {
         if (!authzSession->isAuthorizedForActionsOnResource(
-                ResourcePattern::forDatabaseName(roles[i].getDB()), ActionType::grantRole)) {
+                ResourcePattern::forDatabaseName(roles[i].getDatabaseName()),
+                ActionType::grantRole)) {
             return Status(ErrorCodes::Unauthorized,
                           str::stream() << "Not authorized to grant role: " << roles[i]);
         }
@@ -98,9 +112,11 @@ Status checkAuthorizedToGrantRoles(AuthorizationSession* authzSession,
 }
 
 Status checkAuthorizedToGrantPrivileges(AuthorizationSession* authzSession,
-                                        const PrivilegeVector& privileges) {
-    for (PrivilegeVector::const_iterator it = privileges.begin(); it != privileges.end(); ++it) {
-        Status status = checkAuthorizedToGrantPrivilege(authzSession, *it);
+                                        const boost::optional<TenantId>& tenantId,
+                                        const std::vector<auth::ParsedPrivilege>& privileges) {
+    for (const auto& pp : privileges) {
+        auto privilege = Privilege::resolvePrivilegeWithTenant(tenantId, pp);
+        auto status = checkAuthorizedToGrantPrivilege(authzSession, privilege);
         if (!status.isOK()) {
             return status;
         }
@@ -113,7 +129,8 @@ Status checkAuthorizedToRevokeRoles(AuthorizationSession* authzSession,
                                     const std::vector<RoleName>& roles) {
     for (size_t i = 0; i < roles.size(); ++i) {
         if (!authzSession->isAuthorizedForActionsOnResource(
-                ResourcePattern::forDatabaseName(roles[i].getDB()), ActionType::revokeRole)) {
+                ResourcePattern::forDatabaseName(roles[i].getDatabaseName()),
+                ActionType::revokeRole)) {
             return Status(ErrorCodes::Unauthorized,
                           str::stream() << "Not authorized to revoke role: " << roles[i]);
         }
@@ -125,16 +142,18 @@ Status checkAuthorizedToRevokeRoles(AuthorizationSession* authzSession,
 Status checkAuthorizedToRevokePrivilege(AuthorizationSession* authzSession,
                                         const Privilege& privilege) {
     const ResourcePattern& resource = privilege.getResourcePattern();
+    const auto& targetDb = resource.dbNameToMatch();
     if (resource.isDatabasePattern() || resource.isExactNamespacePattern()) {
         if (!authzSession->isAuthorizedForActionsOnResource(
-                ResourcePattern::forDatabaseName(resource.databaseToMatch()),
-                ActionType::revokeRole)) {
+                ResourcePattern::forDatabaseName(targetDb), ActionType::revokeRole)) {
             return Status(ErrorCodes::Unauthorized,
                           str::stream() << "Not authorized to revoke privileges on the "
-                                        << resource.databaseToMatch() << "database");
+                                        << targetDb.toStringForErrorMsg() << "database");
         }
     } else if (!authzSession->isAuthorizedForActionsOnResource(
-                   ResourcePattern::forDatabaseName("admin"), ActionType::revokeRole)) {
+                   ResourcePattern::forDatabaseName(DatabaseNameUtil::deserialize(
+                       targetDb.tenantId(), "admin"_sd, SerializationContext::stateDefault())),
+                   ActionType::revokeRole)) {
         return Status(ErrorCodes::Unauthorized,
                       "To revoke privileges affecting multiple databases or the cluster,"
                       " must be authorized to revoke roles from the admin database");
@@ -143,9 +162,11 @@ Status checkAuthorizedToRevokePrivilege(AuthorizationSession* authzSession,
 }
 
 Status checkAuthorizedToRevokePrivileges(AuthorizationSession* authzSession,
-                                         const PrivilegeVector& privileges) {
-    for (PrivilegeVector::const_iterator it = privileges.begin(); it != privileges.end(); ++it) {
-        Status status = checkAuthorizedToRevokePrivilege(authzSession, *it);
+                                         const boost::optional<TenantId>& tenantId,
+                                         const std::vector<auth::ParsedPrivilege>& privileges) {
+    for (const auto& pp : privileges) {
+        auto privilege = Privilege::resolvePrivilegeWithTenant(tenantId, pp);
+        auto status = checkAuthorizedToRevokePrivilege(authzSession, privilege);
         if (!status.isOK()) {
             return status;
         }
@@ -156,7 +177,7 @@ Status checkAuthorizedToRevokePrivileges(AuthorizationSession* authzSession,
 
 Status checkAuthorizedToSetRestrictions(AuthorizationSession* authzSession,
                                         bool hasAuthRestriction,
-                                        StringData dbname) {
+                                        const DatabaseName& dbname) {
     if (hasAuthRestriction) {
         if (!authzSession->isAuthorizedForActionsOnResource(
                 ResourcePattern::forDatabaseName(dbname),
@@ -178,12 +199,13 @@ bool isAuthorizedToChangeOwnCustomDataAsUser(AuthorizationSession* authzSession,
     return authzSession->isAuthorizedToChangeAsUser(userName, ActionType::changeOwnCustomData);
 }
 
-void checkAuthForTypedCommand(Client* client, const CreateUserCommand& request) {
+void checkAuthForTypedCommand(OperationContext* opCtx, const CreateUserCommand& request) {
     const auto& dbname = request.getDbName();
-    auto* as = AuthorizationSession::get(client);
+    auto* as = AuthorizationSession::get(opCtx->getClient());
 
     uassert(ErrorCodes::Unauthorized,
-            str::stream() << "Not authorized to create users on db: " << dbname,
+            str::stream() << "Not authorized to create users on db: "
+                          << dbname.toStringForErrorMsg(),
             as->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbname),
                                                  ActionType::createUser));
 
@@ -194,9 +216,9 @@ void checkAuthForTypedCommand(Client* client, const CreateUserCommand& request) 
         as, request.getAuthenticationRestrictions() != boost::none, dbname));
 }
 
-void checkAuthForTypedCommand(Client* client, const UpdateUserCommand& request) {
+void checkAuthForTypedCommand(OperationContext* opCtx, const UpdateUserCommand& request) {
     const auto& dbname = request.getDbName();
-    auto* as = AuthorizationSession::get(client);
+    auto* as = AuthorizationSession::get(opCtx->getClient());
 
     UserName userName(request.getCommandParameter(), dbname);
     uassert(ErrorCodes::Unauthorized,
@@ -216,13 +238,14 @@ void checkAuthForTypedCommand(Client* client, const UpdateUserCommand& request) 
     if (auto possibleRoles = request.getRoles()) {
         // You don't know what roles you might be revoking, so require the ability to
         // revoke any role in the system.
-        uassert(ErrorCodes::Unauthorized,
-                "In order to use updateUser to set roles array, must be "
-                "authorized to revoke any role in the system",
-                as->isAuthorizedForActionsOnResource(ResourcePattern::forAnyNormalResource(),
-                                                     ActionType::revokeRole));
+        uassert(
+            ErrorCodes::Unauthorized,
+            "In order to use updateUser to set roles array, must be "
+            "authorized to revoke any role in the system",
+            as->isAuthorizedForActionsOnResource(
+                ResourcePattern::forAnyNormalResource(dbname.tenantId()), ActionType::revokeRole));
 
-        auto resolvedRoles = resolveRoleNames(possibleRoles.get(), dbname);
+        auto resolvedRoles = resolveRoleNames(possibleRoles.value(), dbname);
         uassertStatusOK(checkAuthorizedToGrantRoles(as, resolvedRoles));
     }
 
@@ -230,156 +253,182 @@ void checkAuthForTypedCommand(Client* client, const UpdateUserCommand& request) 
         as, request.getAuthenticationRestrictions() != boost::none, dbname));
 }
 
-void checkAuthForTypedCommand(Client* client, const GrantRolesToUserCommand& request) {
+void checkAuthForTypedCommand(OperationContext* opCtx, const GrantRolesToUserCommand& request) {
     auto roles = resolveRoleNames(request.getRoles(), request.getDbName());
-    auto* as = AuthorizationSession::get(client);
+    auto* as = AuthorizationSession::get(opCtx->getClient());
     uassertStatusOK(checkAuthorizedToGrantRoles(as, roles));
 }
 
-void checkAuthForTypedCommand(Client* client, const CreateRoleCommand& request) {
-    auto* as = AuthorizationSession::get(client);
+void checkAuthForTypedCommand(OperationContext* opCtx, const CreateRoleCommand& request) {
+    auto* as = AuthorizationSession::get(opCtx->getClient());
     const auto& dbname = request.getDbName();
     RoleName roleName(request.getCommandParameter(), dbname);
 
     uassert(ErrorCodes::Unauthorized,
-            str::stream() << "Not authorized to create roles on db: " << dbname,
+            str::stream() << "Not authorized to create roles on db: "
+                          << dbname.toStringForErrorMsg(),
             as->isAuthorizedToCreateRole(roleName));
 
     uassertStatusOK(checkAuthorizedToGrantRoles(as, resolveRoleNames(request.getRoles(), dbname)));
-    uassertStatusOK(checkAuthorizedToGrantPrivileges(as, request.getPrivileges()));
+    uassertStatusOK(
+        checkAuthorizedToGrantPrivileges(as, dbname.tenantId(), request.getPrivileges()));
     uassertStatusOK(checkAuthorizedToSetRestrictions(
         as, request.getAuthenticationRestrictions() != boost::none, dbname));
 }
 
-void checkAuthForTypedCommand(Client* client, const UpdateRoleCommand& request) {
-    auto* as = AuthorizationSession::get(client);
+void checkAuthForTypedCommand(OperationContext* opCtx, const UpdateRoleCommand& request) {
+    auto* as = AuthorizationSession::get(opCtx->getClient());
     const auto& dbname = request.getDbName();
 
     // You don't know what roles or privileges you might be revoking, so require the ability
     // to revoke any role (or privilege) in the system.
     uassert(ErrorCodes::Unauthorized,
             "updateRole command required the ability to revoke any role in the system",
-            as->isAuthorizedForActionsOnResource(ResourcePattern::forAnyNormalResource(),
-                                                 ActionType::revokeRole));
+            as->isAuthorizedForActionsOnResource(
+                ResourcePattern::forAnyNormalResource(dbname.tenantId()), ActionType::revokeRole));
 
     if (auto roles = request.getRoles()) {
-        auto resolvedRoles = resolveRoleNames(roles.get(), dbname);
+        auto resolvedRoles = resolveRoleNames(roles.value(), dbname);
         uassertStatusOK(checkAuthorizedToGrantRoles(as, resolvedRoles));
     }
     if (auto privs = request.getPrivileges()) {
-        uassertStatusOK(checkAuthorizedToGrantPrivileges(as, privs.get()));
+        uassertStatusOK(checkAuthorizedToGrantPrivileges(as, dbname.tenantId(), privs.value()));
     }
     uassertStatusOK(checkAuthorizedToSetRestrictions(
         as, request.getAuthenticationRestrictions() != boost::none, dbname));
 }
 
-void checkAuthForTypedCommand(Client* client, const GrantRolesToRoleCommand& request) {
+void checkAuthForTypedCommand(OperationContext* opCtx, const GrantRolesToRoleCommand& request) {
     auto rolesToRemove = resolveRoleNames(request.getRoles(), request.getDbName());
-    auto* as = AuthorizationSession::get(client);
+    auto* as = AuthorizationSession::get(opCtx->getClient());
     uassertStatusOK(checkAuthorizedToGrantRoles(as, rolesToRemove));
 }
 
-void checkAuthForTypedCommand(Client* client, const GrantPrivilegesToRoleCommand& request) {
-    auto* as = AuthorizationSession::get(client);
-    uassertStatusOK(checkAuthorizedToGrantPrivileges(as, request.getPrivileges()));
+void checkAuthForTypedCommand(OperationContext* opCtx,
+                              const GrantPrivilegesToRoleCommand& request) {
+    auto* as = AuthorizationSession::get(opCtx->getClient());
+    uassertStatusOK(checkAuthorizedToGrantPrivileges(
+        as, request.getDbName().tenantId(), request.getPrivileges()));
 }
 
-void checkAuthForTypedCommand(Client* client, const DropUserCommand& request) {
-    auto* as = AuthorizationSession::get(client);
+void checkAuthForTypedCommand(OperationContext* opCtx, const DropUserCommand& request) {
+    auto* as = AuthorizationSession::get(opCtx->getClient());
     UserName userName(request.getCommandParameter(), request.getDbName());
 
-    uassert(ErrorCodes::Unauthorized,
-            str::stream() << "Not authorized to drop users from the " << userName.getDB()
-                          << " database",
-            as->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(userName.getDB()),
-                                                 ActionType::dropUser));
+    uassert(
+        ErrorCodes::Unauthorized,
+        str::stream() << "Not authorized to drop users from the " << userName.getDB()
+                      << " database",
+        as->isAuthorizedForActionsOnResource(
+            ResourcePattern::forDatabaseName(userName.getDatabaseName()), ActionType::dropUser));
 }
 
-void checkAuthForTypedCommand(Client* client, const DropRoleCommand& request) {
+void checkAuthForTypedCommand(OperationContext* opCtx, const DropRoleCommand& request) {
     const auto& dbname = request.getDbName();
-    auto* as = AuthorizationSession::get(client);
+    auto* as = AuthorizationSession::get(opCtx->getClient());
 
     uassert(ErrorCodes::Unauthorized,
-            str::stream() << "Not authorized to drop roles from the " << dbname << " database",
+            str::stream() << "Not authorized to drop roles from the "
+                          << dbname.toStringForErrorMsg() << " database",
             as->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbname),
                                                  ActionType::dropRole));
 }
 
-void checkAuthForTypedCommand(Client* client, const DropAllUsersFromDatabaseCommand& request) {
+void checkAuthForTypedCommand(OperationContext* opCtx,
+                              const DropAllUsersFromDatabaseCommand& request) {
     const auto& dbname = request.getDbName();
-    auto* as = AuthorizationSession::get(client);
+    auto* as = AuthorizationSession::get(opCtx->getClient());
     uassert(ErrorCodes::Unauthorized,
-            str::stream() << "Not authorized to drop users from the " << dbname << " database",
+            str::stream() << "Not authorized to drop users from the "
+                          << dbname.toStringForErrorMsg() << " database",
             as->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbname),
                                                  ActionType::dropUser));
 }
 
-void checkAuthForTypedCommand(Client* client, const RevokeRolesFromUserCommand& request) {
+void checkAuthForTypedCommand(OperationContext* opCtx, const RevokeRolesFromUserCommand& request) {
     auto roles = resolveRoleNames(request.getRoles(), request.getDbName());
-    auto* as = AuthorizationSession::get(client);
+    auto* as = AuthorizationSession::get(opCtx->getClient());
     uassertStatusOK(checkAuthorizedToRevokeRoles(as, roles));
 }
 
-void checkAuthForTypedCommand(Client* client, const RevokeRolesFromRoleCommand& request) {
+void checkAuthForTypedCommand(OperationContext* opCtx, const RevokeRolesFromRoleCommand& request) {
     auto rolesToRemove = resolveRoleNames(request.getRoles(), request.getDbName());
-    auto* as = AuthorizationSession::get(client);
+    auto* as = AuthorizationSession::get(opCtx->getClient());
     uassertStatusOK(checkAuthorizedToRevokeRoles(as, rolesToRemove));
 }
 
-void checkAuthForTypedCommand(Client* client, const UsersInfoCommand& request) {
+void checkAuthForTypedCommand(OperationContext* opCtx, const UsersInfoCommand& request) {
     const auto& dbname = request.getDbName();
     const auto& arg = request.getCommandParameter();
-    auto* as = AuthorizationSession::get(client);
+    auto* as = AuthorizationSession::get(opCtx->getClient());
 
     if (arg.isAllOnCurrentDB()) {
         uassert(ErrorCodes::Unauthorized,
-                str::stream() << "Not authorized to view users from the " << dbname << " database",
+                str::stream() << "Not authorized to view users from the "
+                              << dbname.toStringForErrorMsg() << " database",
                 as->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbname),
                                                      ActionType::viewUser));
     } else if (arg.isAllForAllDBs()) {
         uassert(ErrorCodes::Unauthorized,
                 str::stream() << "Not authorized to view users from all databases",
-                as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                     ActionType::viewUser));
+                as->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forClusterResource(dbname.tenantId()), ActionType::viewUser));
     } else {
         invariant(arg.isExact());
+        auto activeTenant = getActiveTenant(opCtx);
         for (const auto& userName : arg.getElements(dbname)) {
+            if (userName.tenantId() != boost::none) {
+                // Only connection based cluster administrators may specify tenant in query.
+                uassert(ErrorCodes::Unauthorized,
+                        "May not specify tenant in usersInfo query",
+                        !activeTenant &&
+                            as->isAuthorizedForActionsOnResource(
+                                ResourcePattern::forClusterResource(dbname.tenantId()),
+                                ActionType::internal));
+            }
+
             if (as->lookupUser(userName)) {
                 // Can always view users you are logged in as.
                 continue;
             }
             uassert(ErrorCodes::Unauthorized,
-                    str::stream() << "Not authorized to view users from the " << dbname
-                                  << " database",
+                    str::stream() << "Not authorized to view users from the "
+                                  << dbname.toStringForErrorMsg() << " database",
                     as->isAuthorizedForActionsOnResource(
-                        ResourcePattern::forDatabaseName(userName.getDB()), ActionType::viewUser));
+                        ResourcePattern::forDatabaseName(userName.getDatabaseName()),
+                        ActionType::viewUser));
         }
     }
 }
 
-void checkAuthForTypedCommand(Client* client, const RevokePrivilegesFromRoleCommand& request) {
-    auto* as = AuthorizationSession::get(client);
-    uassertStatusOK(checkAuthorizedToRevokePrivileges(as, request.getPrivileges()));
+void checkAuthForTypedCommand(OperationContext* opCtx,
+                              const RevokePrivilegesFromRoleCommand& request) {
+    auto* as = AuthorizationSession::get(opCtx->getClient());
+    uassertStatusOK(checkAuthorizedToRevokePrivileges(
+        as, request.getDbName().tenantId(), request.getPrivileges()));
 }
 
-void checkAuthForTypedCommand(Client* client, const DropAllRolesFromDatabaseCommand& request) {
+void checkAuthForTypedCommand(OperationContext* opCtx,
+                              const DropAllRolesFromDatabaseCommand& request) {
     const auto& dbname = request.getDbName();
-    auto* as = AuthorizationSession::get(client);
+    auto* as = AuthorizationSession::get(opCtx->getClient());
     uassert(ErrorCodes::Unauthorized,
-            str::stream() << "Not authorized to drop roles from the " << dbname << " database",
+            str::stream() << "Not authorized to drop roles from the "
+                          << dbname.toStringForErrorMsg() << " database",
             as->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbname),
                                                  ActionType::dropRole));
 }
 
-void checkAuthForTypedCommand(Client* client, const RolesInfoCommand& request) {
+void checkAuthForTypedCommand(OperationContext* opCtx, const RolesInfoCommand& request) {
     const auto& dbname = request.getDbName();
     const auto& arg = request.getCommandParameter();
-    auto* as = AuthorizationSession::get(client);
+    auto* as = AuthorizationSession::get(opCtx->getClient());
 
     invariant(!arg.isAllForAllDBs());
     if (arg.isAllOnCurrentDB()) {
         uassert(ErrorCodes::Unauthorized,
-                str::stream() << "Not authorized to view roles from the " << dbname << " database",
+                str::stream() << "Not authorized to view roles from the "
+                              << dbname.toStringForErrorMsg() << " database",
                 as->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbname),
                                                      ActionType::viewRole));
     } else {
@@ -394,29 +443,34 @@ void checkAuthForTypedCommand(Client* client, const RolesInfoCommand& request) {
                     str::stream() << "Not authorized to view roles from the " << role.getDB()
                                   << " database",
                     as->isAuthorizedForActionsOnResource(
-                        ResourcePattern::forDatabaseName(role.getDB()), ActionType::viewRole));
+                        ResourcePattern::forDatabaseName(role.getDatabaseName()),
+                        ActionType::viewRole));
         }
     }
 }
 
-void checkAuthForTypedCommand(Client* client, const InvalidateUserCacheCommand& request) {
-    auto* as = AuthorizationSession::get(client);
+void checkAuthForTypedCommand(OperationContext* opCtx, const InvalidateUserCacheCommand& request) {
+    auto* as = AuthorizationSession::get(opCtx->getClient());
     uassert(ErrorCodes::Unauthorized,
             "Not authorized to invalidate user cache",
-            as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                 ActionType::invalidateUserCache));
+            as->isAuthorizedForActionsOnResource(
+                ResourcePattern::forClusterResource(request.getDbName().tenantId()),
+                ActionType::invalidateUserCache));
 }
 
-void checkAuthForTypedCommand(Client* client, const GetUserCacheGenerationCommand& request) {
-    auto* as = AuthorizationSession::get(client);
+void checkAuthForTypedCommand(OperationContext* opCtx,
+                              const GetUserCacheGenerationCommand& request) {
+    auto* as = AuthorizationSession::get(opCtx->getClient());
     uassert(ErrorCodes::Unauthorized,
             "Not authorized to get cache generation",
-            as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                 ActionType::internal));
+            as->isAuthorizedForActionsOnResource(
+                ResourcePattern::forClusterResource(request.getDbName().tenantId()),
+                ActionType::internal));
 }
 
-void checkAuthForTypedCommand(Client* client, const MergeAuthzCollectionsCommand& request) {
-    auto* as = AuthorizationSession::get(client);
+void checkAuthForTypedCommand(OperationContext* opCtx,
+                              const MergeAuthzCollectionsCommand& request) {
+    auto* as = AuthorizationSession::get(opCtx->getClient());
 
     ActionSet actions;
     actions.addAction(ActionType::createUser);
@@ -427,25 +481,34 @@ void checkAuthForTypedCommand(Client* client, const MergeAuthzCollectionsCommand
         actions.addAction(ActionType::dropUser);
         actions.addAction(ActionType::dropRole);
     }
-    uassert(ErrorCodes::Unauthorized,
-            "Not authorized to update user/role data using _mergeAuthzCollections a command",
-            as->isAuthorizedForActionsOnResource(ResourcePattern::forAnyNormalResource(), actions));
 
     auto tempUsersColl = request.getTempUsersCollection();
-    uassert(ErrorCodes::Unauthorized,
-            str::stream() << "Not authorized to read " << tempUsersColl,
-            tempUsersColl.empty() ||
+    if (!tempUsersColl.empty()) {
+        auto tempUsersNS = NamespaceStringUtil::deserialize(
+            request.getDbName().tenantId(), tempUsersColl, request.getSerializationContext());
+        uassert(ErrorCodes::Unauthorized,
+                "Not authorized to update user data using _mergeAuthzCollections a command",
                 as->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forExactNamespace(NamespaceString(tempUsersColl)),
-                    ActionType::find));
+                    ResourcePattern::forAnyNormalResource(tempUsersNS.tenantId()), actions));
+        uassert(ErrorCodes::Unauthorized,
+                str::stream() << "Not authorized to read " << tempUsersColl,
+                as->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forExactNamespace(tempUsersNS), ActionType::find));
+    }
 
     auto tempRolesColl = request.getTempRolesCollection();
-    uassert(ErrorCodes::Unauthorized,
-            str::stream() << "Not authorized to read " << tempRolesColl,
-            tempRolesColl.empty() ||
+    if (!tempRolesColl.empty()) {
+        auto tempRolesNS = NamespaceStringUtil::deserialize(
+            request.getDbName().tenantId(), tempRolesColl, request.getSerializationContext());
+        uassert(ErrorCodes::Unauthorized,
+                "Not authorized to update role data using _mergeAuthzCollections a command",
                 as->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forExactNamespace(NamespaceString(tempRolesColl)),
-                    ActionType::find));
+                    ResourcePattern::forAnyNormalResource(tempRolesNS.tenantId()), actions));
+        uassert(ErrorCodes::Unauthorized,
+                str::stream() << "Not authorized to read " << tempRolesColl,
+                as->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forExactNamespace(tempRolesNS), ActionType::find));
+    }
 }
 
 }  // namespace auth

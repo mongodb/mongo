@@ -1,7 +1,12 @@
+/**
+ * @tags: [
+ *   requires_scripting
+ * ]
+ */
+
 // Confirms that JavaScript heap limits are respected in aggregation. Includes testing for mapReduce
 // and $where which use aggregation for execution.
-(function() {
-"use strict";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2});
 const mongos = st.s;
@@ -20,10 +25,18 @@ assert.commandWorked(mongosColl.insert([{x: 0}, {x: 2}]));
 const tooSmallHeapSizeMB = 10;
 const sufficentHeapSizeMB = 100;
 
-function setHeapSizeLimitMB({db, queryLimit, globalLimit}) {
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryJavaScriptHeapSizeLimitMB: queryLimit}));
+function setHeapSizeLimitMBOneNode({db, queryLimit, globalLimit}) {
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryJavaScriptHeapSizeLimitMB: queryLimit}));
     assert.commandWorked(db.adminCommand({setParameter: 1, jsHeapLimitMB: globalLimit}));
+}
+
+function setHeapSizeLimitMB({queryLimit, globalLimit}) {
+    st.forEachMongos((conn) => {
+        setHeapSizeLimitMBOneNode({db: conn.getDB("test"), queryLimit: queryLimit, globalLimit: globalLimit});
+    });
+    st.forEachConnection((conn) => {
+        setHeapSizeLimitMBOneNode({db: conn.getDB("test"), queryLimit: queryLimit, globalLimit: globalLimit});
+    });
 }
 
 function allocateLargeString() {
@@ -35,59 +48,66 @@ function allocateLargeString() {
 const mapReduce = {
     mapReduce: "coll",
     map: allocateLargeString,
-    reduce: function(k, v) {
+    reduce: function (k, v) {
         return 1;
     },
-    out: {inline: 1}
+    out: {inline: 1},
 };
 const aggregateWithJSFunction = {
     aggregate: "coll",
     cursor: {},
     pipeline: [
         {$group: {_id: "$x"}},
-        {$project: {y: {"$function": {args: [], body: allocateLargeString, lang: "js"}}}}
-    ]
+        {$project: {y: {"$function": {args: [], body: allocateLargeString, lang: "js"}}}},
+    ],
+    allowDiskUse: false,
 };
 const aggregateWithInternalJsReduce = {
     aggregate: "coll",
     cursor: {},
-    pipeline: [{
-        $group: {
-            _id: "$x",
-            value: {
-                $_internalJsReduce: {
-                    data: {k: "$x", v: "$x"},
-                    eval: allocateLargeString,
-                }
-            }
-        }
-    }]
+    pipeline: [
+        {
+            $group: {
+                _id: "$x",
+                value: {
+                    $_internalJsReduce: {
+                        data: {k: "$x", v: "$x"},
+                        eval: allocateLargeString,
+                    },
+                },
+            },
+        },
+    ],
+    allowDiskUse: false,
 };
 const aggregateWithUserDefinedAccumulator = {
     aggregate: "coll",
     cursor: {},
-    pipeline: [{
-        $group: {
-            _id: "$x",
-            value: {
-                $accumulator: {
-                    init: allocateLargeString,
-                    accumulate: allocateLargeString,
-                    accumulateArgs: [{k: "$x", v: "$x"}],
-                    merge: allocateLargeString,
-                    lang: 'js',
-                }
-            }
-        }
-    }]
+    pipeline: [
+        {
+            $group: {
+                _id: "$x",
+                value: {
+                    $accumulator: {
+                        init: allocateLargeString,
+                        accumulate: allocateLargeString,
+                        accumulateArgs: [{k: "$x", v: "$x"}],
+                        merge: allocateLargeString,
+                        lang: "js",
+                    },
+                },
+            },
+        },
+    ],
+    allowDiskUse: false,
 };
 const findWithJavaScriptFunction = {
     find: "coll",
-    filter: {$expr: {"$function": {args: [], body: allocateLargeString, lang: "js"}}}
+    filter: {$expr: {"$function": {args: [], body: allocateLargeString, lang: "js"}}},
 };
 const findWithWhere = {
     find: "coll",
-    filter: {$where: allocateLargeString}
+    filter: {$where: allocateLargeString},
 };
 
 /**
@@ -105,22 +125,16 @@ function runCommonTests(db) {
     // The aggregate command is expected to fail when the aggregation specific heap size limit is
     // too low.
     setHeapSizeLimitMB({db: db, queryLimit: tooSmallHeapSizeMB, globalLimit: sufficentHeapSizeMB});
-    assert.commandFailedWithCode(db.runCommand(aggregateWithJSFunction),
-                                 ErrorCodes.JSInterpreterFailure);
-    assert.commandFailedWithCode(db.runCommand(aggregateWithInternalJsReduce),
-                                 ErrorCodes.JSInterpreterFailure);
-    assert.commandFailedWithCode(db.runCommand(aggregateWithUserDefinedAccumulator),
-                                 ErrorCodes.JSInterpreterFailure);
+    assert.commandFailedWithCode(db.runCommand(aggregateWithJSFunction), ErrorCodes.JSInterpreterFailure);
+    assert.commandFailedWithCode(db.runCommand(aggregateWithInternalJsReduce), ErrorCodes.JSInterpreterFailure);
+    assert.commandFailedWithCode(db.runCommand(aggregateWithUserDefinedAccumulator), ErrorCodes.JSInterpreterFailure);
 
     // All commands are expected to fail when the global heap size limit is too low, regardless
     // of the aggregation limit.
     setHeapSizeLimitMB({db: db, queryLimit: sufficentHeapSizeMB, globalLimit: tooSmallHeapSizeMB});
-    assert.commandFailedWithCode(db.runCommand(aggregateWithJSFunction),
-                                 ErrorCodes.JSInterpreterFailure);
-    assert.commandFailedWithCode(db.runCommand(aggregateWithInternalJsReduce),
-                                 ErrorCodes.JSInterpreterFailure);
-    assert.commandFailedWithCode(db.runCommand(aggregateWithUserDefinedAccumulator),
-                                 ErrorCodes.JSInterpreterFailure);
+    assert.commandFailedWithCode(db.runCommand(aggregateWithJSFunction), ErrorCodes.JSInterpreterFailure);
+    assert.commandFailedWithCode(db.runCommand(aggregateWithInternalJsReduce), ErrorCodes.JSInterpreterFailure);
+    assert.commandFailedWithCode(db.runCommand(aggregateWithUserDefinedAccumulator), ErrorCodes.JSInterpreterFailure);
 }
 
 /**
@@ -138,8 +152,7 @@ function runShardTests(db) {
     // A find command with JavaScript agg expression is expected to fail when the query specific
     // heap size limit is too low.
     setHeapSizeLimitMB({db: db, queryLimit: tooSmallHeapSizeMB, globalLimit: sufficentHeapSizeMB});
-    assert.commandFailedWithCode(db.runCommand(findWithJavaScriptFunction),
-                                 ErrorCodes.JSInterpreterFailure);
+    assert.commandFailedWithCode(db.runCommand(findWithJavaScriptFunction), ErrorCodes.JSInterpreterFailure);
 
     // The mapReduce command and $where are not limited by the query heap size limit and will
     // succeed even if it is set too low.
@@ -151,8 +164,7 @@ function runShardTests(db) {
     // All commands are expected to fail when the global heap size limit is too low, regardless
     // of the aggregation limit.
     setHeapSizeLimitMB({db: db, queryLimit: sufficentHeapSizeMB, globalLimit: tooSmallHeapSizeMB});
-    assert.commandFailedWithCode(db.runCommand(findWithJavaScriptFunction),
-                                 ErrorCodes.JSInterpreterFailure);
+    assert.commandFailedWithCode(db.runCommand(findWithJavaScriptFunction), ErrorCodes.JSInterpreterFailure);
     // TODO SERVER-45454: Uncomment when $where is executed via  aggregation JavaScript expression.
     // assert.commandFailedWithCode(db.runCommand(findWithWhere), ErrorCodes.JSInterpreterFailure);
     assert.commandFailedWithCode(db.runCommand(mapReduce), ErrorCodes.JSInterpreterFailure);
@@ -167,4 +179,3 @@ runCommonTests(shardDB);
 runShardTests(shardDB);
 
 st.stop();
-}());

@@ -29,9 +29,10 @@
 
 #pragma once
 
-#include <fmt/format.h>
 #include <tuple>
 #include <type_traits>
+
+#include <fmt/format.h>
 
 namespace mongo {
 namespace logv2 {
@@ -59,6 +60,15 @@ struct NamedArg {
     const char* name;
     const T& value;
 };
+
+template <typename T>
+struct isNamedArg : public std::false_type {};
+
+template <typename T>
+struct isNamedArg<NamedArg<T>> : public std::true_type {};
+
+template <typename T>
+concept IsNamedArg = isNamedArg<T>::value;
 
 struct AttrUdl {
     const char* name;
@@ -130,7 +140,7 @@ auto multipleAttrs(Ts&&... attrs) {
 }  // namespace logv2
 
 inline namespace literals {
-constexpr logv2::detail::AttrUdl operator"" _attr(const char* name, std::size_t) {
+constexpr logv2::detail::AttrUdl operator""_attr(const char* name, std::size_t) {
     return {name};
 }
 }  // namespace literals

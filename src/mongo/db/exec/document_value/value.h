@@ -29,11 +29,35 @@
 
 #pragma once
 
+#include "mongo/base/data_range.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/document_value/value_internal.h"
-#include "mongo/util/concepts.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/stdx/utility.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/bufreader.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/safe_num.h"
+#include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
+
+#include <algorithm>
+#include <cstring>
+#include <initializer_list>
+#include <iosfwd>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 class BSONElement;
@@ -93,15 +117,15 @@ public:
      */
 
     Value() : _storage() {}  // "Missing" value
-    explicit Value(bool value) : _storage(Bool, value) {}
-    explicit Value(int value) : _storage(NumberInt, value) {}
-    explicit Value(long long value) : _storage(NumberLong, value) {}
-    explicit Value(double value) : _storage(NumberDouble, value) {}
-    explicit Value(const Decimal128& value) : _storage(NumberDecimal, value) {}
-    explicit Value(const Timestamp& value) : _storage(bsonTimestamp, value) {}
-    explicit Value(const OID& value) : _storage(jstOID, value) {}
-    explicit Value(StringData value) : _storage(String, value) {}
-    explicit Value(const std::string& value) : _storage(String, StringData(value)) {}
+    explicit Value(bool value) : _storage(BSONType::boolean, value) {}
+    explicit Value(int value) : _storage(BSONType::numberInt, value) {}
+    explicit Value(long long value) : _storage(BSONType::numberLong, value) {}
+    explicit Value(double value) : _storage(BSONType::numberDouble, value) {}
+    explicit Value(const Decimal128& value) : _storage(BSONType::numberDecimal, value) {}
+    explicit Value(const Timestamp& value) : _storage(BSONType::timestamp, value) {}
+    explicit Value(const OID& value) : _storage(BSONType::oid, value) {}
+    explicit Value(StringData value) : _storage(BSONType::string, value) {}
+    explicit Value(const std::string& value) : _storage(BSONType::string, StringData(value)) {}
     explicit Value(const Document& doc);
     explicit Value(Document&& doc);
     explicit Value(const BSONObj& obj);
@@ -109,20 +133,20 @@ public:
     explicit Value(const std::vector<BSONObj>& vec);
     explicit Value(const std::vector<Document>& vec);
     explicit Value(std::vector<Value> vec)
-        : _storage(Array, make_intrusive<RCVector>(std::move(vec))) {}
-    explicit Value(const BSONBinData& bd) : _storage(BinData, bd) {}
-    explicit Value(const BSONRegEx& re) : _storage(RegEx, re) {}
-    explicit Value(const BSONCodeWScope& cws) : _storage(CodeWScope, cws) {}
-    explicit Value(const BSONDBRef& dbref) : _storage(DBRef, dbref) {}
-    explicit Value(const BSONSymbol& sym) : _storage(Symbol, sym.symbol) {}
-    explicit Value(const BSONCode& code) : _storage(Code, code.code) {}
-    explicit Value(const NullLabeler&) : _storage(jstNULL) {}         // BSONNull
-    explicit Value(const UndefinedLabeler&) : _storage(Undefined) {}  // BSONUndefined
-    explicit Value(const MinKeyLabeler&) : _storage(MinKey) {}        // MINKEY
-    explicit Value(const MaxKeyLabeler&) : _storage(MaxKey) {}        // MAXKEY
-    explicit Value(const Date_t& date) : _storage(Date, date.toMillisSinceEpoch()) {}
+        : _storage(BSONType::array, make_intrusive<RCVector<Value>>(std::move(vec))) {}
+    explicit Value(const BSONBinData& bd) : _storage(BSONType::binData, bd) {}
+    explicit Value(const BSONRegEx& re) : _storage(BSONType::regEx, re) {}
+    explicit Value(const BSONCodeWScope& cws) : _storage(BSONType::codeWScope, cws) {}
+    explicit Value(const BSONDBRef& dbref) : _storage(BSONType::dbRef, dbref) {}
+    explicit Value(const BSONSymbol& sym) : _storage(BSONType::symbol, sym.symbol) {}
+    explicit Value(const BSONCode& code) : _storage(BSONType::code, code.code) {}
+    explicit Value(const NullLabeler&) : _storage(BSONType::null) {}            // BSONNull
+    explicit Value(const UndefinedLabeler&) : _storage(BSONType::undefined) {}  // BSONUndefined
+    explicit Value(const MinKeyLabeler&) : _storage(BSONType::minKey) {}        // MINKEY
+    explicit Value(const MaxKeyLabeler&) : _storage(BSONType::maxKey) {}        // MAXKEY
+    explicit Value(const Date_t& date) : _storage(BSONType::date, date.toMillisSinceEpoch()) {}
     explicit Value(const UUID& uuid)
-        : _storage(BinData,
+        : _storage(BSONType::binData,
                    BSONBinData(uuid.toCDR().data(), uuid.toCDR().length(), BinDataType::newUUID)) {}
 
     /**
@@ -146,6 +170,9 @@ public:
     /// Deep-convert from BSONElement to Value
     explicit Value(const BSONElement& elem);
 
+    /// Create a value from a SafeNum.
+    explicit Value(const SafeNum& value);
+
 
     /** Construct a long or integer-valued Value.
      *
@@ -160,25 +187,28 @@ public:
      *  Missing Values are returned by Document when accessing non-existent fields.
      */
     bool missing() const {
-        return _storage.type == EOO;
+        return _storage.type == stdx::to_underlying(BSONType::eoo);
     }
 
     /// true if missing() or type is jstNULL or Undefined
     bool nullish() const {
-        return missing() || _storage.type == jstNULL || _storage.type == Undefined;
+        return missing() || _storage.type == stdx::to_underlying(BSONType::null) ||
+            _storage.type == stdx::to_underlying(BSONType::undefined);
     }
 
     /// true if type represents a number
     bool numeric() const {
-        return _storage.type == NumberDouble || _storage.type == NumberLong ||
-            _storage.type == NumberInt || _storage.type == NumberDecimal;
+        return _storage.type == stdx::to_underlying(BSONType::numberDouble) ||
+            _storage.type == stdx::to_underlying(BSONType::numberLong) ||
+            _storage.type == stdx::to_underlying(BSONType::numberInt) ||
+            _storage.type == stdx::to_underlying(BSONType::numberDecimal);
     }
 
     /**
      * Return true if the Value is an array.
      */
     bool isArray() const {
-        return _storage.type == Array;
+        return _storage.type == stdx::to_underlying(BSONType::array);
     }
 
     /**
@@ -207,11 +237,12 @@ public:
      * Returns true if this value can be coerced to a Date, and false otherwise.
      */
     bool coercibleToDate() const {
-        return Date == getType() || bsonTimestamp == getType() || jstOID == getType();
+        return BSONType::date == getType() || BSONType::timestamp == getType() ||
+            BSONType::oid == getType();
     }
 
     bool isObject() const {
-        return getType() == BSONType::Object;
+        return getType() == BSONType::object;
     }
 
     /// Get the BSON type of the field.
@@ -269,9 +300,6 @@ public:
      */
     void addToBsonArray(BSONArrayBuilder* builder, size_t recursionLevel = 1) const;
 
-    // Support BSONObjBuilder and BSONArrayBuilder "stream" API
-    friend BSONObjBuilder& operator<<(BSONObjBuilderValueStream& builder, const Value& val);
-
     /** Coerce a value to a bool using BSONElement::trueValue() rules.
      */
     bool coerceToBool() const;
@@ -302,7 +330,7 @@ public:
      * Compare two Values. Most Values should prefer to use ValueComparator instead. See
      * value_comparator.h for details.
      *
-     *  Pass a non-null StringData::ComparatorInterface if special string comparison semantics are
+     *  Pass a non-null StringDataComparator if special string comparison semantics are
      *  required. If the comparator is null, then a simple binary compare is used for strings. This
      *  comparator is only used for string *values*; field names are always compared using simple
      *  binary compare.
@@ -313,7 +341,12 @@ public:
      */
     static int compare(const Value& lhs,
                        const Value& rhs,
-                       const StringData::ComparatorInterface* stringComparator);
+                       const StringDataComparator* stringComparator);
+
+    // Support BSONObjBuilder and BSONArrayBuilder "stream" API
+    friend void appendToBson(BSONObjBuilder& builder, StringData fieldName, const Value& val) {
+        val._appendToBson(builder, fieldName);
+    }
 
     friend DeferredComparison operator==(const Value& lhs, const Value& rhs) {
         return DeferredComparison(DeferredComparison::Type::kEQ, lhs, rhs);
@@ -344,9 +377,9 @@ public:
     friend std::ostream& operator<<(std::ostream& out, const Value& v);
 
     /**
-     * Populates the internal cache by recursively walking the underlying BSON.
+     * Returns a cache-only copy of the value with no backing bson.
      */
-    void fillCache() const;
+    Value shred() const;
 
     void swap(Value& rhs) {
         _storage.swap(rhs._storage);
@@ -363,6 +396,12 @@ public:
     size_t getApproximateSize() const;
 
     /**
+     * Returns object/array depth of this value. Returns -1 if the depth is at least 'maxDepth'.
+     * Returns 0 on a scalar value.
+     */
+    int32_t depth(int32_t maxDepth, int32_t curDepth = 0) const;
+
+    /**
      * Calculate a hash value.
      *
      * Meant to be used to create composite hashes suitable for hashed container classes such as
@@ -371,7 +410,7 @@ public:
      * Most callers should prefer the utilities in ValueComparator for hashing and creating function
      * objects for computing the hash. See value_comparator.h.
      */
-    void hash_combine(size_t& seed, const StringData::ComparatorInterface* stringComparator) const;
+    void hash_combine(size_t& seed, const StringDataComparator* stringComparator) const;
 
     /// Call this after memcpying to update ref counts if needed
     void memcpyed() const {
@@ -388,6 +427,7 @@ public:
     Value getOwned() const {
         return *this;
     }
+    void makeOwned() {}
 
     /// Members to support parsing/deserialization from IDL generated code.
     void serializeForIDL(StringData fieldName, BSONObjBuilder* builder) const;
@@ -403,6 +443,8 @@ private:
     // May contain embedded NUL bytes, does not check the type.
     StringData getRawData() const;
 
+    void _appendToBson(BSONObjBuilder& builder, StringData fieldName) const;
+
     ValueStorage _storage;
     friend class MutableValue;  // gets and sets _storage.genericRCPtr
 };
@@ -412,31 +454,27 @@ inline void swap(mongo::Value& lhs, mongo::Value& rhs) {
     lhs.swap(rhs);
 }
 
-MONGO_MAKE_BOOL_TRAIT(CanConstructValueFrom,
-                      (typename T),
-                      (T),
-                      (T val),
-                      //
-                      Value(std::forward<T>(val)));
-
 /**
  * This class is identical to Value, but supports implicit creation from any of the types explicitly
  * supported by Value.
  */
 class ImplicitValue : public Value {
 public:
-    TEMPLATE(typename T)
-    REQUIRES(CanConstructValueFrom<T>)
+    template <typename T>
+    requires std::is_constructible_v<Value, T>
     ImplicitValue(T&& arg) : Value(std::forward<T>(arg)) {}
 
     ImplicitValue(std::initializer_list<ImplicitValue> values) : Value(convertToValues(values)) {}
+    ImplicitValue(std::vector<ImplicitValue> values) : Value(convertToValues(values)) {}
 
-    ImplicitValue(std::vector<int> values) : Value(convertToValues(values)) {}
+    template <typename T>
+    ImplicitValue(std::vector<T> values) : Value(convertToValues(values)) {}
 
-    static std::vector<Value> convertToValues(const std::vector<int>& vec) {
+    template <typename T>
+    static std::vector<Value> convertToValues(const std::vector<T>& vec) {
         std::vector<Value> values;
         values.reserve(vec.size());
-        for_each(vec.begin(), vec.end(), ([&](const int& val) { values.emplace_back(val); }));
+        for_each(vec.begin(), vec.end(), ([&](const T& val) { values.emplace_back(val); }));
         return values;
     }
 
@@ -448,7 +486,7 @@ public:
         values.reserve(vec.size());
         for_each(
             vec.begin(), vec.end(), ([&](const ImplicitValue& val) { values.push_back(val); }));
-        return Value(values);
+        return Value(std::move(values));
     }
 
     /**
@@ -470,12 +508,12 @@ public:
 namespace mongo {
 
 inline size_t Value::getArrayLength() const {
-    verify(getType() == Array);
+    MONGO_verify(getType() == BSONType::array);
     return getArray().size();
 }
 
 inline StringData Value::getStringData() const {
-    verify(getType() == String);
+    MONGO_verify(getType() == BSONType::string);
     return getRawData();
 }
 
@@ -484,74 +522,74 @@ inline StringData Value::getRawData() const {
 }
 
 inline std::string Value::getString() const {
-    verify(getType() == String);
-    return _storage.getString().toString();
+    MONGO_verify(getType() == BSONType::string);
+    return std::string{_storage.getString()};
 }
 
 inline OID Value::getOid() const {
-    verify(getType() == jstOID);
+    MONGO_verify(getType() == BSONType::oid);
     return OID(_storage.oid);
 }
 
 inline bool Value::getBool() const {
-    verify(getType() == Bool);
+    MONGO_verify(getType() == BSONType::boolean);
     return _storage.boolValue;
 }
 
 inline Date_t Value::getDate() const {
-    verify(getType() == Date);
+    MONGO_verify(getType() == BSONType::date);
     return Date_t::fromMillisSinceEpoch(_storage.dateValue);
 }
 
 inline Timestamp Value::getTimestamp() const {
-    verify(getType() == bsonTimestamp);
+    MONGO_verify(getType() == BSONType::timestamp);
     return Timestamp(_storage.timestampValue);
 }
 
 inline const char* Value::getRegex() const {
-    verify(getType() == RegEx);
-    return _storage.getString().rawData();  // this is known to be NUL terminated
+    MONGO_verify(getType() == BSONType::regEx);
+    return _storage.getString().data();  // this is known to be NUL terminated
 }
 inline const char* Value::getRegexFlags() const {
-    verify(getType() == RegEx);
-    const char* pattern = _storage.getString().rawData();  // this is known to be NUL terminated
-    const char* flags = pattern + strlen(pattern) + 1;     // first byte after pattern's NUL
+    MONGO_verify(getType() == BSONType::regEx);
+    const char* pattern = _storage.getString().data();  // this is known to be NUL terminated
+    const char* flags = pattern + strlen(pattern) + 1;  // first byte after pattern's NUL
     dassert(flags + strlen(flags) == pattern + _storage.getString().size());
     return flags;
 }
 
 inline std::string Value::getSymbol() const {
-    verify(getType() == Symbol);
-    return _storage.getString().toString();
+    MONGO_verify(getType() == BSONType::symbol);
+    return std::string{_storage.getString()};
 }
 inline std::string Value::getCode() const {
-    verify(getType() == Code);
-    return _storage.getString().toString();
+    MONGO_verify(getType() == BSONType::code);
+    return std::string{_storage.getString()};
 }
 
 inline int Value::getInt() const {
-    verify(getType() == NumberInt);
+    MONGO_verify(getType() == BSONType::numberInt);
     return _storage.intValue;
 }
 
 inline long long Value::getLong() const {
     BSONType type = getType();
-    if (type == NumberInt)
+    if (type == BSONType::numberInt)
         return _storage.intValue;
 
-    verify(type == NumberLong);
+    MONGO_verify(type == BSONType::numberLong);
     return _storage.longValue;
 }
 
 inline UUID Value::getUuid() const {
-    verify(_storage.binDataType() == BinDataType::newUUID);
+    MONGO_verify(_storage.binDataType() == BinDataType::newUUID);
     auto stringData = _storage.getString();
-    return UUID::fromCDR({stringData.rawData(), stringData.size()});
+    return UUID::fromCDR({stringData.data(), stringData.size()});
 }
 
 inline BSONBinData Value::getBinData() const {
-    verify(getType() == BinData);
+    MONGO_verify(getType() == BSONType::binData);
     auto stringData = _storage.getString();
-    return BSONBinData(stringData.rawData(), stringData.size(), _storage.binDataType());
+    return BSONBinData(stringData.data(), stringData.size(), _storage.binDataType());
 }
 }  // namespace mongo

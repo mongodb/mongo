@@ -27,18 +27,31 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/feature_compatibility_version_documentation.h"
-#include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/commands/set_feature_compatibility_version_gen.h"
-#include "mongo/s/client/shard.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/grid.h"
-#include "mongo/util/str.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/feature_compatibility_version_documentation.h"
+#include "mongo/db/generic_argument_util.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/sharding_environment/client/shard.h"
+#include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/topology/shard_registry.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/database_name_util.h"
 #include "mongo/util/version/releases.h"
+
+#include <memory>
+#include <ostream>
+#include <string>
 
 namespace mongo {
 
@@ -83,7 +96,7 @@ public:
           << multiversion::toString(GenericFCV::kLatest)
           << "' features are enabled, and all nodes in the cluster must be binary version "
           << multiversion::toString(GenericFCV::kLatest) << ". See "
-          << feature_compatibility_version_documentation::kCompatibilityLink << ".";
+          << feature_compatibility_version_documentation::compatibilityLink() << ".";
         return h.str();
     }
 
@@ -92,39 +105,39 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            const auto& cmd = request();
+            auto cmd = request();
+            generic_argument_util::setMajorityWriteConcern(cmd, &opCtx->getWriteConcern());
 
             // Forward to config shard, which will forward to all shards.
             auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-            auto response = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
+            auto response = uassertStatusOK(configShard->runCommand(
                 opCtx,
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                std::string(cmd.getDbName()),
-                CommandHelpers::appendMajorityWriteConcern(cmd.toBSON({}),
-                                                           opCtx->getWriteConcern()),
+                cmd.getDbName(),
+                CommandHelpers::filterCommandRequestForPassthrough(cmd.toBSON()),
                 Shard::RetryPolicy::kIdempotent));
             uassertStatusOK(response.commandStatus);
         }
 
         NamespaceString ns() const override {
-            return NamespaceString();
+            return NamespaceString::kEmpty;
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
-            uassert(
-                ErrorCodes::Unauthorized,
-                "Unauthorized",
-                AuthorizationSession::get(opCtx->getClient())
-                    ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                       ActionType::setFeatureCompatibilityVersion));
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized",
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForActionsOnResource(
+                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                            ActionType::setFeatureCompatibilityVersion));
         }
 
         bool supportsWriteConcern() const override {
             return true;
         }
     };
-
-} clusterSetFeatureCompatibilityVersionCmd;
+};
+MONGO_REGISTER_COMMAND(SetFeatureCompatibilityVersionCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

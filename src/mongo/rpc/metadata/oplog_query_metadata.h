@@ -29,8 +29,13 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/repl/optime.h"
+
+#include <string>
 
 namespace mongo {
 
@@ -55,10 +60,15 @@ public:
     OplogQueryMetadata() = default;
     OplogQueryMetadata(repl::OpTimeAndWallTime lastOpCommitted,
                        repl::OpTime lastOpApplied,
+                       repl::OpTime lastOpWritten,
                        int rbid,
                        int currentPrimaryIndex,
                        int currentSyncSourceIndex,
                        std::string currentSyncSourceHost);
+    explicit OplogQueryMetadata(const OplogQueryMetadata&) = default;
+    OplogQueryMetadata(OplogQueryMetadata&&) = default;
+    OplogQueryMetadata& operator=(const OplogQueryMetadata&) = delete;
+    OplogQueryMetadata& operator=(OplogQueryMetadata&&) = default;
 
     /**
      * format:
@@ -66,6 +76,7 @@ public:
      *     lastOpCommitted: {ts: Timestamp(0, 0), term: 0},
      *     lastCommittedWall: ISODate("2018-07-25T19:21:22.449Z")
      *     lastOpApplied: {ts: Timestamp(0, 0), term: 0},
+     *     lastOpWritten: {ts: Timestamp(0, 0), term: 0},
      *     rbid: 0
      *     primaryIndex: 0,
      *     syncSourceIndex: 0
@@ -86,6 +97,13 @@ public:
      */
     repl::OpTime getLastOpApplied() const {
         return _lastOpApplied;
+    }
+
+    /**
+     * Returns the OpTime of the most recent operation to be written by the sender.
+     */
+    repl::OpTime getLastOpWritten() const {
+        return _lastOpWritten;
     }
 
     /**
@@ -129,6 +147,7 @@ public:
 private:
     repl::OpTimeAndWallTime _lastOpCommitted;
     repl::OpTime _lastOpApplied;
+    repl::OpTime _lastOpWritten;
     int _rbid = -1;
     int _currentPrimaryIndex = kNoPrimary;
     int _currentSyncSourceIndex = -1;

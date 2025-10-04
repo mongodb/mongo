@@ -1,18 +1,21 @@
 # Section that is ignored by resmoke.py.
 config_variables:
-- &keyFile jstests/libs/authTestsKey
-- &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+  - &keyFile jstests/libs/authTestsKey
+  - &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+  - &authOptions
+    authenticationDatabase: local
+    authenticationMechanism: SCRAM-SHA-256
+    password: *keyFileData
+    username: __system
 
 test_kind: js_test
 
 selector:
   roots:
-  - jstests/aggregation/**/*.js
+    - jstests/aggregation/**/*.js
   exclude_files:
-  - jstests/aggregation/extras/*.js
-  - jstests/aggregation/data/*.js
-  # Skip any tests that run with auth explicitly.
-  - jstests/aggregation/*[aA]uth*.js
+    - jstests/aggregation/extras/*.js
+    - jstests/aggregation/data/*.js
 
 executor:
   config:
@@ -20,22 +23,21 @@ executor:
       global_vars:
         TestData:
           auth: true
-          authMechanism: SCRAM-SHA-1
+          authMechanism: SCRAM-SHA-256
           keyFile: *keyFile
           keyFileData: *keyFileData
           roleGraphInvalidationIsFatal: true
       eval: jsTest.authenticate(db.getMongo())
-      authenticationDatabase: local
-      authenticationMechanism: SCRAM-SHA-1
-      password: *keyFileData
-      username: __system
+      <<: *authOptions
   hooks:
-  - class: CleanEveryN
-    n: 20
+    - class: CleanEveryN
+      shell_options:
+        <<: *authOptions
+      n: 20
   fixture:
     class: MongoDFixture
     mongod_options:
-      auth: ''
+      auth: ""
       keyFile: *keyFile
       set_parameters:
         enableTestCommands: 1

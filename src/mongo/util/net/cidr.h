@@ -32,10 +32,12 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 
 #include <stdexcept>
 #include <string>
+#include <variant>
+#include <vector>
 
 #ifndef _WIN32
 #include <sys/socket.h>
@@ -55,14 +57,14 @@ public:
      * constructs and returns the CIDR.
      * Otherwise returns an error.
      */
-    static StatusWith<CIDR> parse(BSONElement from) noexcept;
+    static StatusWith<CIDR> parse(BSONElement from);
 
     /**
      * If the given string represents a valid CIDR range,
      * constructs and returns the CIDR.
      * Otherwise returns an error.
      */
-    static StatusWith<CIDR> parse(StringData from) noexcept;
+    static StatusWith<CIDR> parse(StringData from);
 
     /**
      * Returns true if the provided address range is contained
@@ -104,6 +106,22 @@ public:
         return s.str();
     }
 
+    /**
+     * Supports use of CIDR with the BSON macro:
+     *     BSON("cidr" << cidr) -> { cidr: "..." }
+     */
+    friend void appendToBson(BSONObjBuilder& builder, StringData fieldName, const CIDR& value) {
+        builder.append(fieldName, value.toString());
+    }
+
+    bool getLinkLocal() const {
+        return _isLinkLocal;
+    }
+
+    std::string getScopeStr() const {
+        return _scopeStr;
+    }
+
 private:
 #ifdef _WIN32
     using sa_family_t = int;
@@ -111,27 +129,40 @@ private:
 
     CIDR();
 
-    auto equalityLens() const {
+    typedef struct {
+        std::string ip;
+        std::string zone;
+    } ipv6WithZone_t;
+
+    auto _equalityLens() const {
         return std::tie(_ip, _family, _len);
     }
+
+    ipv6WithZone_t _splitIPv6String(const std::string& ipv6);
+    bool _ipv6LinkLocalAddress(const std::string& ipv6string);
+    std::string _toLower(std::string s);
+    std::vector<std::string> _splitString(const std::string& s, char delimiter);
 
     std::array<std::uint8_t, 16> _ip;
     sa_family_t _family;
     std::uint8_t _len;
+    bool _isLinkLocal{false};
+    std::string _scopeStr;
 };
 
 inline bool operator==(const CIDR& lhs, const CIDR& rhs) {
-    return lhs.equalityLens() == rhs.equalityLens();
+    return lhs._equalityLens() == rhs._equalityLens();
 }
 
 std::ostream& operator<<(std::ostream& s, const CIDR& cidr);
 StringBuilder& operator<<(StringBuilder& s, const CIDR& cidr);
 
+
 /**
- * Supports use of CIDR with the BSON macro:
- *     BSON("cidr" << cidr) -> { cidr: "..." }
+ * A list of CIDR or strings. When the value is a string, it is assumed to be a unix path.
+ *
+ * The unix path string value is used to exempt anonymous unix socket.
  */
-template <>
-BSONObjBuilder& BSONObjBuilderValueStream::operator<<<CIDR>(CIDR value);
+using CIDRList = std::vector<std::variant<CIDR, std::string>>;
 
 }  // namespace mongo

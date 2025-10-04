@@ -28,10 +28,15 @@
  */
 #pragma once
 
+#include "mongo/base/status.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/periodic_runner.h"
+
+#include <memory>
+#include <variant>
 
 namespace mongo {
 
@@ -46,7 +51,7 @@ class OperationContext;
  */
 class UserCacheInvalidator {
 public:
-    using OIDorTimestamp = stdx::variant<OID, Timestamp>;
+    using OIDorTimestamp = std::variant<OID, Timestamp>;
 
     UserCacheInvalidator(AuthorizationManager* authzManager);
 
@@ -55,6 +60,11 @@ public:
      * and start the background job.
      */
     static void start(ServiceContext* serviceCtx, OperationContext* opCtx);
+
+    /**
+     * Waits for the job to complete and stops the thread.
+     */
+    static void stop(ServiceContext* serviceCtx);
 
     /**
      * Set the period of the background job. This should only be used internally (by the

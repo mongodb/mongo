@@ -1,0 +1,32 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel/config:generate_config_header.bzl", "generate_config_header")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "resource_yielders",
+    srcs = [
+        "resource_yielders.cpp",
+    ],
+    hdrs = [
+        "resource_yielders.h",
+        "//src/mongo/db/transaction:transaction_participant_resource_yielder.h",
+        "//src/mongo/s:transaction_router_resource_yielder.h",
+    ],
+    header_deps = [
+        "//src/mongo/db/pipeline/process_interface:mongo_process_interface",
+        "//src/mongo/executor:async_rpc_error_info",
+        "//src/mongo/idl:idl_parser",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/storage:damage_vector",
+    ],
+)

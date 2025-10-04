@@ -29,15 +29,16 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/db/auth/action_type_gen.h"
+
 #include <array>
 #include <cstdint>
 #include <iostream>
 #include <string>
 #include <vector>
-
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/db/auth/action_type_gen.h"
 
 namespace mongo {
 
@@ -48,7 +49,7 @@ namespace mongo {
  * also may change between versions.
  */
 using ActionType = ActionTypeEnum;
-static constexpr uint32_t kNumActionTypes = kNumActionTypeEnum;
+constexpr inline size_t kNumActionTypes = idlEnumCount<ActionTypeEnum>;
 
 StatusWith<ActionType> parseActionFromString(StringData action);
 StringData toStringData(ActionType a);

@@ -30,8 +30,7 @@
 # history_store
 # [END_TAGS]
 
-import wiredtiger, wttest
-from wiredtiger import stat
+import wttest
 from wtscenario import make_scenarios
 
 # test_hs09.py
@@ -40,7 +39,6 @@ from wtscenario import make_scenarios
 class test_hs09(wttest.WiredTigerTestCase):
     # Force a small cache.
     conn_config = 'cache_size=20MB'
-    session_config = 'isolation=snapshot'
     uri = "table:test_hs09"
     format_values = [
         ('column', dict(key_format='r', value_format='S')),
@@ -63,16 +61,11 @@ class test_hs09(wttest.WiredTigerTestCase):
         # Check the data file value.
         cursor = session.open_cursor(self.uri, None, 'checkpoint=WiredTigerCheckpoint')
 
-        # If we are expecting prepapred updates in the datastore, start an explicit transaction with
-        # ignore prepare flag to avoid getting a WT_PREPARE_CONFLICT error.
-        if expect_prepared_in_datastore:
-            session.begin_transaction("ignore_prepare=true")
+        # We no longer need to do anything special if we are expecting prepared updates
+        # in the datastore, because checkpoint cursors always set ignore_prepare.
 
         for _, value in cursor:
             self.assertEqual(value, expected_data_value)
-
-        if expect_prepared_in_datastore:
-            session.rollback_transaction()
 
         cursor.close()
         # Check the history store file value.
@@ -231,6 +224,3 @@ class test_hs09(wttest.WiredTigerTestCase):
         # records should be seen so none should be compared to 0, and if any are the
         # resulting Python type error means something's wrong.
         self.check_ckpt_hs(0, value1, 2, 3)
-
-if __name__ == '__main__':
-    wttest.run()

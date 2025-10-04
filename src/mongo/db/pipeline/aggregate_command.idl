@@ -34,13 +34,16 @@ global:
         - "mongo/db/query/explain_options.h"
 
 imports:
+    - "mongo/crypto/fle_field_schema.idl"
     - "mongo/db/auth/action_type.idl"
     - "mongo/db/auth/access_checks.idl"
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
     - "mongo/db/pipeline/exchange_spec.idl"
+    - "mongo/db/pipeline/external_data_source_option.idl"
     - "mongo/db/pipeline/legacy_runtime_constants.idl"
+    - "mongo/db/query/client_cursor/cursor_response.idl"
     - "mongo/db/query/hint.idl"
-    - "mongo/db/query/cursor_response.idl"
+    - "mongo/db/query/query_settings/query_settings.idl"
     - "mongo/db/write_concern_options.idl"
 
 types:
@@ -49,18 +52,35 @@ types:
         description: "An array of objects specifying the aggregation pipeline."
         cpp_type: "std::vector<mongo::BSONObj>"
         deserializer: ::mongo::parsePipelineFromBSON
+        # Deserializer uses getOwned.
+        is_view: false
     aggregateCursor:
         bson_serialization_type: any
         description: "A cursor type representing the cursor field of aggregate command."
         cpp_type: SimpleCursorOptions
         serializer: ::mongo::serializeAggregateCursorToBSON
         deserializer: ::mongo::parseAggregateCursorFromBSON
-    explainVerbosity:
+        # SimpleCursorOptions has only non view members.
+        is_view: false
+    explainBool:
         bson_serialization_type: any
-        description: "The Verbosity value representing explain verbosity."
-        cpp_type: "mongo::ExplainOptions::Verbosity"
+        description: "The bool value specifying the explain field."
+        cpp_type: "bool"
         serializer: ::mongo::serializeExplainToBSON
         deserializer: ::mongo::parseExplainModeFromBSON
+        # ExplainOptions::Verbosity is not a view.
+        is_view: false
+
+structs:
+    PassthroughToShardOptions:
+        description: "options for commands requesting a per shard cursor"
+        query_shape_component: true
+        fields:
+            shard:
+                description: "id of the shard to passthrough to"
+                type: string
+                stability: unstable
+                query_shape: anonymize
 
 commands:
     aggregate:
@@ -73,59 +93,121 @@ commands:
         api_version: "1"
         access_check:
             complex:
+                - check: check_cursor_session_privilege
                 - check: is_coauthorized_with_client
                 - check: is_coauthorized_with
                 - check: should_ignore_auth_checks
-                - check: get_single_user
+                - check: get_authenticated_user
                 - check: lookup_user
                 - privilege: # many commands
-                    resource_pattern: exact_namespace
-                    action_type: [find, insert, update, remove]
+                      resource_pattern: exact_namespace
+                      action_type: [find, insert, update, remove]
                 - privilege: # $planCacheStats
-                    resource_pattern: exact_namespace
-                    action_type: planCacheRead
+                      resource_pattern: exact_namespace
+                      action_type: planCacheRead
+                - privilege: # $querySettings
+                      agg_stage: querySettings
+                      resource_pattern: cluster
+                      action_type: querySettings
+                - privilege: # $queryStats
+                      agg_stage: queryStats
+                      resource_pattern: cluster
+                      action_type: queryStatsRead
+                - privilege: # $queryStats
+                      agg_stage: queryStats
+                      resource_pattern: cluster
+                      action_type: queryStatsReadTransformed
                 - privilege: # $changeStream
-                    resource_pattern: exact_namespace
-                    action_type: changeStream
+                      resource_pattern: exact_namespace
+                      action_type: changeStream
                 - privilege: # $changeStream
-                    resource_pattern: database
-                    action_type: changeStream
+                      resource_pattern: database
+                      action_type: changeStream
                 - privilege: # $changeStream
-                    resource_pattern: any_normal
-                    action_type: changeStream
+                      resource_pattern: any_normal
+                      action_type: changeStream
                 - privilege: # $changeStream
-                    resource_pattern: database
-                    action_type: find
+                      resource_pattern: database
+                      action_type: find
                 - privilege: # $changeStream
-                    resource_pattern: any_normal
-                    action_type: find
-                - privilege: # $changeStream
-                    resource_pattern: cluster
-                    action_type: internal
+                      resource_pattern: any_normal
+                      action_type: find
+                - privilege: # $changeStream, $_internalListCollections
+                      resource_pattern: cluster
+                      action_type: internal
                 - privilege: # $collstats
-                    resource_pattern: exact_namespace
-                    action_type: collStats
+                      resource_pattern: exact_namespace
+                      action_type: collStats
                 - privilege: # $currentOp
-                    resource_pattern: cluster
-                    action_type: inprog
+                      resource_pattern: cluster
+                      action_type: inprog
                 - privilege: # $indexStats
-                    resource_pattern: exact_namespace
-                    action_type: indexStats
+                      resource_pattern: exact_namespace
+                      action_type: indexStats
                 - privilege: # $listCachedAndActiveUsers
-                    resource_pattern: any_normal
-                    action_type: listCachedAndActiveUsers
+                      resource_pattern: any_normal
+                      action_type: listCachedAndActiveUsers
+                - privilege: # $listCatalog
+                      agg_stage: listCatalog
+                      resource_pattern: exact_namespace
+                      action_type: [listCollections, listIndexes]
+                - privilege: # $listCatalog
+                      agg_stage: listCatalog
+                      resource_pattern: cluster
+                      action_type: listDatabases
+                - privilege: # $listCatalog
+                      agg_stage: listCatalog
+                      resource_pattern: any_normal
+                      action_type: [listCollections, listIndexes]
+                - privilege: # $listCatalog
+                      agg_stage: listCatalog
+                      resource_pattern: collection
+                      action_type: [listCollections, listIndexes]
+                - privilege: # $listCatalog
+                      agg_stage: listCatalog
+                      resource_pattern: any_system_buckets
+                      action_type: [listCollections, listIndexes]
+                - privilege: # $listExtensions
+                      agg_stage: listExtensions
+                      resource_pattern: cluster
+                      action_type: listExtensions
+                - privilege: # $listSampledQueries
+                      agg_stage: listSampledQueries
+                      resource_pattern: cluster
+                      action_type: [listSampledQueries]
                 - privilege: # $listSessions
-                    resource_pattern: cluster
-                    action_type: listSessions
+                      resource_pattern: cluster
+                      action_type: listSessions
                 - privilege: # various
-                    resource_pattern: exact_namespace
-                    action_type: bypassDocumentValidation
-                - privilege: # $operationMetrics
-                    resource_pattern: cluster
-                    action_type: operationMetrics
+                      resource_pattern: exact_namespace
+                      action_type: bypassDocumentValidation
                 - privilege: # $backupCursorExtend, backupCursor
-                    resource_pattern: cluster
-                    action_type: fsync
+                      resource_pattern: cluster
+                      action_type: fsync
+                - privilege: # $_internalAllCollectionStats
+                      agg_stage: _internalAllCollectionStats
+                      resource_pattern: cluster
+                      action_type: allCollectionStats
+                - privilege: # $shardedDataDistribution
+                      agg_stage: shardedDataDistribution
+                      resource_pattern: cluster
+                      action_type: shardedDataDistribution
+                - privilege: # $_analyzeShardKeyReadWriteDistribution
+                      agg_stage: _analyzeShardKeyReadWriteDistribution
+                      resource_pattern: exact_namespace
+                      action_type: analyzeShardKey
+                - privilege: # $listSearchIndexes
+                      agg_stage: listSearchIndexes
+                      resource_pattern: database
+                      action_type: listSearchIndexes
+                - privilege: # $listClusterCatalog
+                      agg_stage: listClusterCatalog
+                      resource_pattern: cluster
+                      action_type: listClusterCatalog
+                - privilege: # $listClusterCatalog
+                      agg_stage: listClusterCatalog
+                      resource_pattern: database
+                      action_type: listCollections
         # Note that the 'CursorInitialReply' is not the only response that an aggregate command
         # could return. With 'explain' or 'exchange', the response would not include the fields in
         # 'CursorInitialReply'. But using 'explain' or 'exchange' is unstable, but otherwise the
@@ -135,80 +217,170 @@ commands:
             pipeline:
                 description: "An unparsed version of the pipeline."
                 type: pipeline
+                stability: stable
             explain:
                 description: "Specifies to return the information on the processing of the pipeline."
-                type: explainVerbosity
+                type: explainBool
                 optional: true
-                unstable: true
+                stability: unstable
             allowDiskUse:
                 description: "Enables writing to temporary files."
                 type: optionalBool
+                stability: stable
             cursor:
                 description: "To indicate a cursor with a non-default batch size."
                 type: aggregateCursor
                 default: SimpleCursorOptions()
-            maxTimeMS:
-                description: "Specifies a time limit in milliseconds for processing operations on a cursor. If you do not specify a value for maxTimeMS, operations will not time out."
-                type: safeInt64
-                validator: { gte: 0 }
-                optional: true
+                stability: stable
             bypassDocumentValidation:
                 description: "True if this should bypass the document validation."
                 type: safeBool
                 optional: true
-            readConcern:
-                description: "Specifies the read concern."
-                type: object_owned
-                optional: true
+                stability: stable
             collation:
                 description: "Specifies the collation to use for the operation."
                 type: object_owned
                 optional: true
+                stability: stable
             hint:
                 description: "The index name to use or the index specification document."
                 type: indexHint
                 optional: true
-            writeConcern:
-                description: "A document that expresses the write concern to use with the $out or $merge stage."
-                type: WriteConcern
+                stability: stable
+            querySettings:
+                description: "Query settings for the given query"
+                type: QuerySettings
                 optional: true
+                stability: internal
             let:
                 description: "A document containing user-specified let parameter constants; i.e. values that do not change once computed."
                 type: object_owned
                 optional: true
+                stability: stable
             needsMerge:
                 description: "True if this request represents the shards part of a split pipeline, and should produce mergeable output."
                 type: optionalBool
+                stability: internal
+            needsSortedMerge:
+                description:
+                    "True if this request requires this node to produce documents with a $sortKey populated.
+                    Set by the router when the router will be merging sorted streams from the shards."
+                type: optionalBool
+                stability: internal
             fromMongos:
                 description: "True if this request originated from a mongoS."
                 type: optionalBool
-            $queryOptions:
-                description: "The unwrapped readPreference object, if one was given to us by the mongos command processor. This object will be empty when no readPreference is specified or if the request does not originate from mongos."
-                cpp_name: unwrappedReadPref
-                type: object_owned
-                optional: true
-                unstable: true
+                stability: internal
+            fromRouter:
+                description: "True if this request originated from a router."
+                type: optionalBool
+                stability: internal
             $_requestReshardingResumeToken:
                 description: "True if this requests resharding resume token."
                 cpp_name: requestReshardingResumeToken
                 type: optionalBool
-                unstable: true
+                stability: unstable
             exchange:
                 description: "An optional exchange specification for this request. If set it means that the request represents a producer running as a part of the exchange machinery. This is an internal option; we do not expect it to be set on requests from users or drivers."
                 type: ExchangeSpec
                 optional: true
+                stability: stable
             runtimeConstants:
                 description: "A legacy way to specify constant variables available during execution. 'let' is now preferred."
                 type: LegacyRuntimeConstants
                 cpp_name: legacyRuntimeConstants
                 optional: true
-                unstable: true
+                stability: unstable
             isMapReduceCommand:
                 description: "True if an aggregation was invoked by the MapReduce command."
                 type: optionalBool
-                unstable: true
+                stability: unstable
             collectionUUID:
                 description: "The expected UUID of the namespace the aggregation executes on."
                 type: uuid
                 optional: true
-                unstable: true
+                stability: unstable
+            $_passthroughToShard:
+                description: "An optional internal parameter for this request. If a shard is specified, then that specific shard will be targeted."
+                type: PassthroughToShardOptions
+                cpp_name: passthroughToShard
+                optional: true
+                stability: unstable
+            encryptionInformation:
+                description: "Encryption Information schema and other tokens for CRUD commands"
+                type: EncryptionInformation
+                optional: true
+                stability: unstable
+            $_externalDataSources:
+                description: "Specification for external data sources."
+                type: array<ExternalDataSourceOption>
+                cpp_name: externalDataSources
+                optional: true
+                stability: unstable
+            sampleId:
+                description: "The unique sample id for the operation if it has been chosen for sampling."
+                type: uuid
+                optional: true
+                stability: unstable
+            stmtId:
+                description:
+                    "The statement id of the write in the original write batch for a write
+                    without shard key."
+                type: int
+                optional: true
+                stability: internal
+            $_isClusterQueryWithoutShardKeyCmd:
+                description: >-
+                    True if a _clusterQueryWithoutShardKey command is running a broadcast
+                    aggregate.
+                type: optionalBool
+                cpp_name: isClusterQueryWithoutShardKeyCmd
+                stability: internal
+            $_requestResumeToken:
+                description: "Internal usage only. This flag is used in natural order collection scan for the DocumentSourceCursor to start scan after the given token."
+                cpp_name: requestResumeToken
+                type: optionalBool
+                stability: unstable
+            $_resumeAfter:
+                description: >-
+                    Internal usage only. If present, the collection scan will seek to the
+                    exact RecordId, or return KeyNotFound if it does not exist. Must only be set on
+                    forward collection scans. This field cannot be used in conjunction with 'min', 'max',
+                    or '$_startAt', and is not valid on views, or on mongos.
+                cpp_name: resumeAfter
+                type: object_owned
+                optional: true
+                stability: unstable
+            $_startAt:
+                description: >-
+                    Internal usage only. If present, the collection scan will seek to the
+                    exact RecordId, or the next available RecordId if it does not exist. Must only be set
+                    on forward collection scans. This field cannot be used in conjunction with 'min',
+                    'max', or '$_resumeAfter', and is not valid on views, or on mongos.
+                cpp_name: startAt
+                type: object_owned
+                optional: true
+                stability: internal
+            includeQueryStatsMetrics:
+                description: "Determines whether or not to include query stats metrics in the response."
+                type: optionalBool
+                stability: internal
+            $_isHybridSearch:
+                description: >-
+                    Internal usage only. If present, indicates that the pipeline is the
+                    desugared representation of a user's $rankFusion or $scoreFusion pipeline.
+                cpp_name: isHybridSearch
+                type: optionalBool
+                stability: internal
+            $_translatedForViewlessTimeseries:
+                description: >-
+                    Internal usage only. If present, indicates that the pipeline has already been
+                    translated if necessary.
+                cpp_name: translatedForViewlessTimeseries
+                type: optionalBool
+                stability: internal
+            forcedPlanSolutionHash:
+                description: "Solution hash to force a execution with a given plan."
+                type: safeInt64
+                optional: true
+                stability: internal

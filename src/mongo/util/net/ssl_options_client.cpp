@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
 
 #include "mongo/base/status.h"
 #include "mongo/config.h"
@@ -64,6 +63,11 @@ MONGO_STARTUP_OPTIONS_STORE(SSLClientOptions)(InitializerContext*) {
          * We also skip logging to keep the spam away from the interactive client op.
          */
         sslGlobalParams.sslDisabledProtocols.push_back(SSLParams::Protocols::TLS1_0);
+#endif
+#if (MONGO_CONFIG_SSL_PROVIDER != MONGO_CONFIG_SSL_PROVIDER_OPENSSL) || \
+    (OPENSSL_VERSION_NUMBER >= 0x1000106f) /* 1.0.1f */
+        // Disables TLS 1.1 as well for clients which support TLS 1.2 and later.
+        sslGlobalParams.sslDisabledProtocols.push_back(SSLParams::Protocols::TLS1_1);
 #endif
     }
 

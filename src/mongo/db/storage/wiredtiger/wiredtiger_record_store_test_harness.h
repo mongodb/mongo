@@ -27,59 +27,92 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
+#include "mongo/base/string_data.h"
+#include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/record_store_test_harness.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/util/clock_source_mock.h"
+
+#include <memory>
+#include <string>
+
+#include <wiredtiger.h>
 
 namespace mongo {
 
 class WiredTigerHarnessHelper final : public RecordStoreHarnessHelper {
 public:
-    WiredTigerHarnessHelper() : WiredTigerHarnessHelper(""_sd) {}
+    WiredTigerHarnessHelper() : WiredTigerHarnessHelper(Options::ReplicationEnabled, ""_sd) {}
+    WiredTigerHarnessHelper(Options options) : WiredTigerHarnessHelper(options, ""_sd) {}
+    WiredTigerHarnessHelper(StringData extraStrings)
+        : WiredTigerHarnessHelper(Options::ReplicationEnabled, extraStrings) {}
 
-    WiredTigerHarnessHelper(StringData extraStrings);
-    ~WiredTigerHarnessHelper() {}
-
-    virtual std::unique_ptr<RecordStore> newNonCappedRecordStore() override {
-        return newNonCappedRecordStore("a.b");
+    WiredTigerHarnessHelper(Options options, StringData extraStrings);
+    ~WiredTigerHarnessHelper() override {
+#if __has_feature(address_sanitizer)
+        constexpr bool memLeakAllowed = false;
+#else
+        constexpr bool memLeakAllowed = true;
+#endif
+        _engine->cleanShutdown(memLeakAllowed);
     }
 
-    virtual std::unique_ptr<RecordStore> newNonCappedRecordStore(const std::string& ns) {
-        return newNonCappedRecordStore(ns, CollectionOptions());
+    std::unique_ptr<RecordStore> newRecordStore() override {
+        return newRecordStore("a.b");
     }
 
-    virtual std::unique_ptr<RecordStore> newNonCappedRecordStore(
-        const std::string& ns, const CollectionOptions& collOptions) override;
-
-    virtual std::unique_ptr<RecordStore> newOplogRecordStore() override;
-
-    virtual KVEngine* getEngine() override final {
-        return &_engine;
+    virtual std::unique_ptr<RecordStore> newRecordStore(const std::string& ns) {
+        return newRecordStore(ns, RecordStore::Options{});
     }
 
-    std::unique_ptr<RecoveryUnit> newRecoveryUnit();
+    std::unique_ptr<RecordStore> newRecordStore(
+        const std::string& ns, const RecordStore::Options& recordStoreOptions) override {
+        NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
+        return newRecordStore(nss, _identForNs(ns), recordStoreOptions, UUID::gen());
+    }
+
+    std::unique_ptr<RecordStore> newRecordStore(const NamespaceString& nss,
+                                                StringData ident,
+                                                const RecordStore::Options& recordStoreOptions,
+                                                boost::optional<UUID> uuid);
+
+    std::unique_ptr<RecordStore> newOplogRecordStore() override;
+
+    KVEngine* getEngine() final {
+        return _engine.get();
+    }
+
+    std::unique_ptr<RecoveryUnit> newRecoveryUnit() override;
 
     /**
-     * Create an oplog record store without calling postConstructorInit().
+     * Create an oplog record store without starting the oplog manager.
      */
     std::unique_ptr<RecordStore> newOplogRecordStoreNoInit();
 
+    WiredTigerConnection& connection() {
+        return _engine->getConnection();
+    }
+
     WT_CONNECTION* conn() {
-        return _engine.getConnection();
+        return _engine->getConn();
     }
 
 private:
+    std::string _identForNs(StringData ns) {
+        auto ident = fmt::format("collection-{}", ns);
+        std::replace(ident.begin(), ident.end(), '.', '_');
+        return ident;
+    }
+
     unittest::TempDir _dbpath;
     ClockSourceMock _cs;
-
-    // Since WTKVEngine starts threads that require the global service context, we load
-    // the client observer for LockerNoop before creating the storage engine to avoid a
-    // potential data race (that might be reported by a tool like TSAN).
-    LockerNoopClientObserverRegisterer _lockerNoopClientObserverRegisterer;
-    WiredTigerKVEngine _engine;
+    std::unique_ptr<WiredTigerKVEngine> _engine;
+    bool _isReplSet;
 };
 }  // namespace mongo

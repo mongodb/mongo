@@ -41,6 +41,7 @@
 .file "ontop_arm_aapcs_elf_gas.S"
 .text
 .globl ontop_fcontext
+.hidden ontop_fcontext
 .align 2
 .type ontop_fcontext,%function
 .syntax unified

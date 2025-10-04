@@ -29,17 +29,45 @@
 
 #pragma once
 
-#include <type_traits>
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/api_parameters.h"
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/change_stream.h"
 #include "mongo/db/pipeline/change_stream_constants.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/read_concern_support_result.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
+
+#include <list>
+#include <memory>
+#include <string>
+#include <type_traits>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -52,19 +80,21 @@ public:
     class LiteParsed : public LiteParsedDocumentSource {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
-                                                 const BSONElement& spec) {
-            return std::make_unique<LiteParsed>(spec.fieldName(), nss);
+                                                 const BSONElement& spec,
+                                                 const LiteParserOptions& options) {
+            uassert(6188500,
+                    str::stream() << "$changeStream must take a nested object but found: " << spec,
+                    spec.type() == BSONType::object);
+            return std::make_unique<LiteParsed>(spec.fieldName(), nss, spec);
         }
 
-        explicit LiteParsed(std::string parseTimeName, NamespaceString nss)
-            : LiteParsedDocumentSource(std::move(parseTimeName)), _nss(std::move(nss)) {}
+        explicit LiteParsed(std::string parseTimeName, NamespaceString nss, const BSONElement& spec)
+            : LiteParsedDocumentSource(std::move(parseTimeName)),
+              _nss(std::move(nss)),
+              _spec(spec) {}
 
         bool isChangeStream() const final {
             return true;
-        }
-
-        bool allowedToPassthroughFromMongos() const final {
-            return false;
         }
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
@@ -76,10 +106,10 @@ public:
                                            bool bypassDocumentValidation) const override {
             if (_nss.isAdminDB() && _nss.isCollectionlessAggregateNS()) {
                 // Watching a whole cluster.
-                return {Privilege(ResourcePattern::forAnyNormalResource(), actions)};
+                return {Privilege(ResourcePattern::forAnyNormalResource(_nss.tenantId()), actions)};
             } else if (_nss.isCollectionlessAggregateNS()) {
                 // Watching a whole database.
-                return {Privilege(ResourcePattern::forDatabaseName(_nss.db()), actions)};
+                return {Privilege(ResourcePattern::forDatabaseName(_nss.dbName()), actions)};
             } else {
                 // Watching a single collection. Note if this is in the admin database it will fail
                 // at parse time.
@@ -88,7 +118,7 @@ public:
         }
 
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
-                                                     bool isImplicitDefault) const {
+                                                     bool isImplicitDefault) const override {
             // Change streams require "majority" readConcern. If the client did not specify an
             // explicit readConcern, change streams will internally upconvert the readConcern to
             // majority (so clients can always send aggregations without readConcern). We therefore
@@ -97,17 +127,52 @@ public:
                 kStageName, repl::ReadConcernLevel::kMajorityReadConcern, level, isImplicitDefault);
         }
 
-        void assertSupportsMultiDocumentTransaction() const {
+        void assertSupportsMultiDocumentTransaction() const override {
             transactionNotSupported(kStageName);
         }
 
-    private:
+        void assertPermittedInAPIVersion(const APIParameters& apiParameters) const final {
+            if (apiParameters.getAPIVersion() && *apiParameters.getAPIVersion() == "1" &&
+                apiParameters.getAPIStrict().value_or(false)) {
+                uassert(ErrorCodes::APIStrictError,
+                        "The 'showExpandedEvents' parameter to $changeStream is not supported in "
+                        "API Version 1",
+                        _spec.Obj()[DocumentSourceChangeStreamSpec::kShowExpandedEventsFieldName]
+                            .eoo());
+
+                uassert(
+                    ErrorCodes::APIStrictError,
+                    "The 'showRawUpdateDescription' parameter to $changeStream is not supported in "
+                    "API Version 1",
+                    _spec.Obj()[DocumentSourceChangeStreamSpec::kShowRawUpdateDescriptionFieldName]
+                        .eoo());
+
+                uassert(
+                    ErrorCodes::APIStrictError,
+                    "The 'showSystemEvents' parameter to $changeStream is not supported in API "
+                    "Version 1",
+                    _spec.Obj()[DocumentSourceChangeStreamSpec::kShowSystemEventsFieldName].eoo());
+            }
+        }
+
+    protected:
         const NamespaceString _nss;
+
+    private:
+        BSONElement _spec;
     };
 
     // The name of the field where the document key (_id and shard key, if present) will be found
     // after the transformation.
     static constexpr StringData kDocumentKeyField = "documentKey"_sd;
+
+    // The name of the field where the operation description of the non-CRUD operations will be
+    // located. This is complementary to the 'documentKey' for CRUD operations.
+    // Note that the operation description of an event will be part of the event's resume token.
+    // Thus the operation description for an existing event should never be changed, because
+    // otherwise the changestream resumability between different versions of MongoDB may be
+    // jeopardized.
+    static constexpr StringData kOperationDescriptionField = "operationDescription"_sd;
 
     // The name of the field where the pre-image document will be found, if requested and available.
     static constexpr StringData kFullDocumentBeforeChangeField = "fullDocumentBeforeChange"_sd;
@@ -128,8 +193,18 @@ public:
     static constexpr StringData kNamespaceField = "ns"_sd;
 
     // Name of the field which stores information about updates. Only applies when OperationType
-    // is "update".
+    // is "update". Note that this field will be omitted if the 'showRawUpdateDescription' option
+    // is enabled in the change stream spec.
     static constexpr StringData kUpdateDescriptionField = "updateDescription"_sd;
+
+    // Name of the field which stores the raw update description from the oplog about updates.
+    // Only applies when OperationType is "update". Note that this field is only present when
+    // the 'showRawUpdateDescription' option is enabled in the change stream spec.
+    static constexpr StringData kRawUpdateDescriptionField = "rawUpdateDescription"_sd;
+
+    // Name of the field which stores information about the state of the collection before a
+    // 'modify' (i.e. collMod) operation.
+    static constexpr StringData kStateBeforeChangeField = "stateBeforeChange"_sd;
 
     // The name of the subfield of '_id' where the UUID of the namespace will be located after the
     // transformation.
@@ -150,6 +225,14 @@ public:
     // path to the cluster time will be kIdField + "." + kClusterTimeField.
     static constexpr StringData kClusterTimeField = "clusterTime"_sd;
 
+    // The name of the field where the commit timestamp of a prepared transaction will be located.
+    // Only shown if 'showExpandedEvents' is used.
+    static constexpr StringData kCommitTimestampField = "commitTimestamp"_sd;
+
+    // The name of the field with the nsType of a changestream create event. Will contain
+    // "collection", "view" or "timeseries". Will only be exposed if 'showExpandedEvents' is used.
+    static constexpr StringData kNsTypeField = "nsType"_sd;
+
     // The name of this stage.
     static constexpr StringData kStageName = "$changeStream"_sd;
 
@@ -157,12 +240,23 @@ public:
     static constexpr StringData kLsidField = "lsid"_sd;
     static constexpr StringData kTxnOpIndexField = "txnOpIndex"_sd;
     static constexpr StringData kApplyOpsIndexField = "applyOpsIndex"_sd;
+    static constexpr StringData kApplyOpsTsField = "applyOpsTs"_sd;
     static constexpr StringData kRawOplogUpdateSpecField = "rawOplogUpdateSpec"_sd;
 
     // The target namespace of a rename operation.
     static constexpr StringData kRenameTargetNssField = "to"_sd;
 
+    // Wall time of the corresponding oplog entry.
+    static constexpr StringData kWallTimeField = "wallTime"_sd;
+
+    // UUID of a collection corresponding to the event (if applicable).
+    static constexpr StringData kCollectionUuidField = "collectionUUID"_sd;
+
+    //
     // The different types of operations we can use for the operation type.
+    //
+
+    // The classic change events.
     static constexpr StringData kUpdateOpType = "update"_sd;
     static constexpr StringData kDeleteOpType = "delete"_sd;
     static constexpr StringData kReplaceOpType = "replace"_sd;
@@ -171,26 +265,102 @@ public:
     static constexpr StringData kRenameCollectionOpType = "rename"_sd;
     static constexpr StringData kDropDatabaseOpType = "dropDatabase"_sd;
     static constexpr StringData kInvalidateOpType = "invalidate"_sd;
-    static constexpr StringData kReshardBeginOpType = "reshardBegin"_sd;
-    static constexpr StringData kReshardDoneCatchUpOpType = "reshardDoneCatchUp"_sd;
-    // Internal op type to signal mongos to open cursors on new shards.
-    static constexpr StringData kNewShardDetectedOpType = "kNewShardDetected"_sd;
 
+    // The internal change events that are not exposed to the users.
+    static constexpr StringData kReshardBeginOpType = "reshardBegin"_sd;
+    static constexpr StringData kReshardBlockingWritesOpType = "reshardBlockingWrites"_sd;
+    static constexpr StringData kReshardDoneCatchUpOpType = "reshardDoneCatchUp"_sd;
+
+    // Internal op type to signal mongos to open cursors on new shards.
+    static constexpr StringData kNewShardDetectedOpType = "migrateChunkToNewShard"_sd;
+
+    // These events are guarded behind the 'showExpandedEvents' flag.
+    static constexpr StringData kCreateOpType = "create"_sd;
+    static constexpr StringData kCreateIndexesOpType = "createIndexes"_sd;
+    static constexpr StringData kDropIndexesOpType = "dropIndexes"_sd;
+    static constexpr StringData kShardCollectionOpType = "shardCollection"_sd;
+    static constexpr StringData kMigrateLastChunkFromShardOpType = "migrateLastChunkFromShard"_sd;
+    static constexpr StringData kRefineCollectionShardKeyOpType = "refineCollectionShardKey"_sd;
+    static constexpr StringData kReshardCollectionOpType = "reshardCollection"_sd;
+    static constexpr StringData kModifyOpType = "modify"_sd;
+    static constexpr StringData kEndOfTransactionOpType = "endOfTransaction"_sd;
+
+    // These events are guarded behind the 'showSystemEvents' flag.
+    static constexpr StringData kStartIndexBuildOpType = "startIndexBuild"_sd;
+    static constexpr StringData kAbortIndexBuildOpType = "abortIndexBuild"_sd;
+
+    // Default regex for collections match which prohibits system collections.
     static constexpr StringData kRegexAllCollections = R"((?!(\$|system\.)))"_sd;
+
+    // Regex matching all user collections plus collections exposed when 'showSystemEvents' is set.
+    // Does not match a collection named $ or a collection with 'system.' in the name.
+    // However, it will still match collection names starting with system.buckets or
+    // system.resharding, or a collection exactly named system.js
+    static constexpr StringData kRegexAllCollectionsShowSystemEvents =
+        R"((?!(\$|system\.(?!(js$|resharding\.|buckets\.|views$)))))"_sd;
+
     static constexpr StringData kRegexAllDBs = R"(^(?!(admin|config|local)\.)[^.]+)"_sd;
     static constexpr StringData kRegexCmdColl = R"(\$cmd$)"_sd;
 
-    enum class ChangeStreamType { kSingleCollection, kSingleDatabase, kAllChangesForCluster };
+    /**
+     * Helpers for determining which regex to match a change stream against.
+     */
+    static StringData resolveAllCollectionsRegex(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+    static std::string getNsRegexForChangeStream(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx);
+    static std::string getCollRegexForChangeStream(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx);
+    static std::string getViewNsRegexForChangeStream(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx);
+    static std::string getCmdNsRegexForChangeStream(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     /**
-     * Helpers for Determining which regex to match a change stream against.
+     * Helper function that creates the BSON for matching changes to a specific namespace.
+     * This will always create a 'BSONObj' with an empty field name. The first and only
+     * 'BSONElement' in the 'BSONObj' will contain either a BSON String value with the collection
+     * name in case the change stream is opened on a single database, or a BSON RegEx if the change
+     * stream is opened on the entire cluster. Callers can use 'BSON("ns" <<
+     * getViewNsMatchObjForChangeStream(expCtx).firstElement())' to use the return value.
      */
-    static ChangeStreamType getChangeStreamType(const NamespaceString& nss);
-    static std::string getNsRegexForChangeStream(const NamespaceString& nss);
-    static std::string getCollRegexForChangeStream(const NamespaceString& nss);
-    static std::string getCmdNsRegexForChangeStream(const NamespaceString& nss);
+    static BSONObj getNsMatchObjForChangeStream(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
-    static std::string regexEscapeNsForChangeStream(StringData source);
+    /**
+     * Helper function that creates the BSON for matching changes to view definitions.
+     * This will always create a 'BSONObj' with an empty field name. The first and only
+     * 'BSONElement' in the 'BSONObj' will contain either a BSON String value with the collection
+     * name in case the change stream is opened on a single database, or a BSON RegEx if the change
+     * stream is opened on the entire cluster. Callers can use 'BSON("ns" <<
+     * getViewNsMatchObjForChangeStream(expCtx).firstElement())' to use the return value.
+     */
+    static BSONObj getViewNsMatchObjForChangeStream(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+    /**
+     * Helper function that creates the BSON for matching a specific collection.
+     * This will always create a 'BSONObj' with an empty field name. The first and only
+     * 'BSONElement' in the 'BSONObj' will contain either a BSON String value with the collection
+     * name in case the change stream is opened on a single collection, and a BSON RegEx otherwise.
+     * Callers can use 'BSON("ns" << getCollMatchObjForChangeStream(expCtx).firstElement())' to use
+     * the return value.
+     */
+    static BSONObj getCollMatchObjForChangeStream(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+    /**
+     * Helper function that creates the BSON for matching the '$cmd' namespace.
+     * This will always create a 'BSONObj' with an empty field name. The first and only
+     * 'BSONElement' in the 'BSONObj' will contain either a BSON String value with the database or
+     * collection name in case the change stream is opened on a database or a collection, or a BSON
+     * RegEx if the change stream is opened on the entire cluster.
+     * Callers can use 'BSON("ns" << getCmdNsMatchObjForChangeStream(expCtx).firstElement())' to use
+     * the return value.
+     */
+    static BSONObj getCmdNsMatchObjForChangeStream(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     /**
      * Parses a $changeStream stage from 'elem' and produces the $match and transformation
@@ -206,11 +376,9 @@ public:
     static void checkValueType(Value v, StringData fieldName, BSONType expectedType);
 
     /**
-     * Extracts the resume token from the given spec. If a 'startAtOperationTime' is specified,
-     * returns the equivalent high-watermark token. This method should only ever be called on a spec
-     * where one of 'resumeAfter', 'startAfter', or 'startAtOperationTime' is populated.
+     * Same as 'checkValueType', except it tolerates the field being missing.
      */
-    static ResumeTokenData resolveResumeTokenFromSpec(const DocumentSourceChangeStreamSpec& spec);
+    static void checkValueTypeOrMissing(Value v, StringData fieldName, BSONType expectedType);
 
     /**
      * For a change stream with no resume information supplied by the user, returns the clusterTime
@@ -220,9 +388,17 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
 private:
-    // Constructs and returns a series of stages representing the full change stream pipeline.
-    static std::list<boost::intrusive_ptr<DocumentSource>> _buildPipeline(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, DocumentSourceChangeStreamSpec spec);
+    // Determines the change stream reader version (v1 or v2) from the user's change stream request
+    // ('spec') parameter. The v2 reader version will only be selected if the feature flag for
+    // precise change stream shard-targeting ('featureFlagChangeStreamPreciseShardTargeting') is
+    // enabled. In addition, the change stream must have been opened on a collection, and the user
+    // must have explicitly selected the v2 version in the request. For all other combinations, the
+    // v1 change stream reader version will be selected.
+    static ChangeStreamReaderVersionEnum _determineChangeStreamReaderVersion(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        Timestamp atClusterTime,
+        const DocumentSourceChangeStreamSpec& spec,
+        const ChangeStream& changeStream);
 
     // Helper function which throws if the $changeStream fails any of a series of semantic checks.
     // For instance, whether it is permitted to run given the current FCV, whether the namespace is
@@ -244,17 +420,53 @@ class LiteParsedDocumentSourceChangeStreamInternal final
     : public DocumentSourceChangeStream::LiteParsed {
 public:
     static std::unique_ptr<LiteParsedDocumentSourceChangeStreamInternal> parse(
-        const NamespaceString& nss, const BSONElement& spec) {
-        return std::make_unique<LiteParsedDocumentSourceChangeStreamInternal>(spec.fieldName(),
-                                                                              nss);
+        const NamespaceString& nss, const BSONElement& spec, const LiteParserOptions& options) {
+        return std::make_unique<LiteParsedDocumentSourceChangeStreamInternal>(
+            spec.fieldName(), nss, spec);
     }
 
-    LiteParsedDocumentSourceChangeStreamInternal(std::string parseTimeName, NamespaceString nss)
-        : DocumentSourceChangeStream::LiteParsed(std::move(parseTimeName), std::move(nss)) {}
+    LiteParsedDocumentSourceChangeStreamInternal(std::string parseTimeName,
+                                                 NamespaceString nss,
+                                                 const BSONElement& spec)
+        : DocumentSourceChangeStream::LiteParsed(std::move(parseTimeName), std::move(nss), spec),
+          _privileges({Privilege(ResourcePattern::forClusterResource(_nss.tenantId()),
+                                 ActionType::internal)}) {}
 
-    PrivilegeVector requiredPrivileges(bool isMongos,
-                                       bool bypassDocumentValidation) const override final {
-        return {Privilege(ResourcePattern::forClusterResource(), ActionType::internal)};
+    PrivilegeVector requiredPrivileges(bool isMongos, bool bypassDocumentValidation) const final {
+        return _privileges;
+    }
+
+private:
+    const PrivilegeVector _privileges;
+};
+
+/**
+ * A DocumentSource class for all internal change stream stages. This class is useful for
+ * shared logic between all of the internal change stream stages. For internally created match
+ * stages see 'DocumentSourceInternalChangeStreamMatch'.
+ */
+class DocumentSourceInternalChangeStreamStage : public DocumentSource {
+public:
+    DocumentSourceInternalChangeStreamStage(StringData stageName,
+                                            const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : DocumentSource(stageName, expCtx) {}
+
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const override {
+        if (opts.isSerializingForQueryStats()) {
+            // Stages made internally by 'DocumentSourceChangeStream' should not be serialized for
+            // query stats. For query stats we will serialize only the user specified $changeStream
+            // stage.
+            return Value();
+        }
+        return doSerialize(opts);
+    }
+
+    virtual Value doSerialize(const SerializationOptions& opts) const = 0;
+
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
     }
 };
 

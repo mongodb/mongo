@@ -1,0 +1,95 @@
+# copyright John Maddock 2008
+# Distributed under the Boost Software License, Version 1.0. 
+# (See accompanying file LICENSE_1_0.txt or copy at 
+# http://www.boost.org/LICENSE_1_0.txt.
+
+import modules ;
+import path ;
+import ../../config/checks/config : requires ;
+
+local gmp_path = [ modules.peek : GMP_PATH ] ;
+local mpfr_path = [ modules.peek : MPFR_PATH ] ;
+local mpfi_path = [ modules.peek : MPFI_PATH ] ;
+local tommath_path = [ modules.peek : TOMMATH_PATH ] ;
+
+project : requirements 
+   <include>$(gmp_path) 
+   <include>$(gmp_path)/mpfr 
+   <include>$(gmp_path)/gmpfrxx 
+   <include>$(mpfr_path)
+   <include>$(mpfi_path)
+   <include>$(mpfi_path)/src
+   <include>$(tommath_path)
+   <include>../../.. 
+   <search>$(gmp_path) 
+   <search>$(mpfr_path) 
+   <search>$(mpfr_path)/build.vc10/lib/Win32/Debug
+   <search>$(tommath_path) 
+   <search>$(mpfi_path) 
+   <search>$(mpfi_path)/src 
+   # We set these to make it easier to set up and test GMP and MPFR under Win32:
+   <toolset>msvc:<runtime-link>static
+   <toolset>msvc:<link>static
+   <toolset>intel-win:<runtime-link>static
+   <toolset>intel-win:<link>static
+   <toolset>msvc:<warnings>all
+   <toolset>gcc:<cxxflags>-Wall
+   <toolset>gcc:<cxxflags>-Wextra
+   ;
+
+lib gmp ;
+lib mpfr ;
+lib mpfi ;
+lib mpc ;
+lib quadmath ;
+lib tommath ;
+lib f2c ;
+
+actions mp_simple_run_action
+{
+      $(>) > $(<)
+}
+
+rule mp-run-simple ( sources + : args * : input-files * : requirements * : target-name )
+{
+   exe $(target-name)_exe : $(sources) : $(requirements) ;
+   explicit $(target-name)_exe ;
+   make $(target-name).output : $(target-name)_exe : @mp_simple_run_action ;
+   explicit $(target-name).output ;
+   alias $(target-name) : $(target-name).output ;
+}
+
+mp-run-simple has_gmp.cpp gmp : : :
+      <include>$(gmp_path) <include>$(gmp_path)/mpfr <include>$(gmp_path)/gmpfrxx : has_gmp ;
+mp-run-simple has_mpfr.cpp mpfr gmp : : :
+      <include>$(mpfr_path) <include>$(gmp_path)/mpfr <include>$(gmp_path)/gmpfrxx <include>$(gmp_path) : has_mpfr ;
+mp-run-simple has_mpfi.cpp mpfi mpfr gmp : : :
+      <include>$(mpfr_path) <include>$(gmp_path)/mpfr <include>$(gmp_path)/gmpfrxx <include>$(gmp_path) : has_mpfi ;
+mp-run-simple has_mpc.cpp mpc mpfr gmp : : :
+      <include>$(mpfr_path) <include>$(gmp_path)/mpfr <include>$(gmp_path)/gmpfrxx <include>$(gmp_path) : has_mpc ;
+mp-run-simple has_tommath.cpp tommath : : :
+      <include>$(tommath_path) : has_tommath ;
+mp-run-simple has_float128.cpp quadmath : : : : has_float128 ;
+mp-run-simple has_basic_float128.cpp quadmath : : : : has_basic_float128 ;
+exe has_intel_quad : has_intel_quad.cpp : <cxxflags>-Qoption,cpp,--extended_float_type ;
+exe has_eigen : has_eigen.cpp ;
+exe has_f2c : has_f2c.cpp f2c ;
+obj has_is_constant_evaluated : has_is_constant_evaluated.cpp ;
+obj has_constexpr_limits : has_constexpr_limits_cmd.cpp : <cxxflags>-fconstexpr-ops-limit=268435456 ;
+obj has_big_obj : has_big_obj.cpp : <cxxflags>-Wa,-mbig-obj ;
+obj is_ci_sanitizer_run : is_ci_sanitizer_run.cpp ;
+
+explicit has_gmp ;
+explicit has_mpfr ;
+explicit has_mpfi ;
+explicit has_tommath ;
+explicit has_float128 ;
+explicit has_basic_float128 ;
+explicit has_intel_quad ;
+explicit has_mpc ;
+explicit has_eigen ;
+explicit has_is_constant_evaluated ;
+explicit has_constexpr_limits ;
+explicit has_big_obj ;
+explicit has_f2c ;
+explicit is_ci_sanitizer_run ;

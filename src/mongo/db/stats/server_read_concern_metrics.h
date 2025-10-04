@@ -33,13 +33,15 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/read_concern_stats_gen.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
 /**
  * Container for server-wide statistics on readConcern levels used by operations.
  */
-class ServerReadConcernMetrics {
+class MONGO_MOD_PUB ServerReadConcernMetrics {
     ServerReadConcernMetrics(const ServerReadConcernMetrics&) = delete;
     ServerReadConcernMetrics& operator=(const ServerReadConcernMetrics&) = delete;
 

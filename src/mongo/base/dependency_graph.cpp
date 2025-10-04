@@ -29,22 +29,28 @@
 
 #include "mongo/base/dependency_graph.h"
 
-#include <algorithm>
-#include <fmt/format.h>
-#include <fmt/ranges.h>
-#include <iostream>
-#include <iterator>
-#include <random>
-#include <sstream>
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/string_map.h"
 
+#include <algorithm>
+#include <compare>
+#include <iterator>
+#include <random>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/container/node_hash_set.h>
+#include <absl/meta/type_traits.h>
+#include <fmt/format.h>
+#include <fmt/ranges.h>  // IWYU pragma: keep
+
 namespace mongo {
 
-void DependencyGraph::addNode(std::string name,
-                              std::vector<std::string> prerequisites,
-                              std::vector<std::string> dependents,
+void DependencyGraph::addNode(const std::string& name,
+                              const std::vector<std::string>& prerequisites,
+                              const std::vector<std::string>& dependents,
                               std::unique_ptr<Payload> payload) {
     if (!payload) {
         struct DummyPayload : Payload {};
@@ -61,14 +67,13 @@ void DependencyGraph::addNode(std::string name,
 
 namespace {
 
-using namespace fmt::literals;
 
 template <typename Seq>
 void strAppendJoin(std::string& out, StringData separator, const Seq& sequence) {
     StringData currSep;
     for (StringData str : sequence) {
-        out.append(currSep.rawData(), currSep.size());
-        out.append(str.rawData(), str.size());
+        out.append(currSep.data(), currSep.size());
+        out.append(str.data(), str.size());
         currSep = separator;
     }
 }
@@ -82,19 +87,20 @@ void throwGraphContainsCycle(Iter first, Iter last, std::vector<std::string>* cy
         *cycle = names;
     names.push_back((*first)->name());
     uasserted(ErrorCodes::GraphContainsCycle,
-              format(FMT_STRING("Cycle in dependency graph: {}"), fmt::join(names, " -> ")));
+              fmt::format("Cycle in dependency graph: {}", fmt::join(names, " -> ")));
 }
 
 }  // namespace
 
-std::vector<std::string> DependencyGraph::topSort(std::vector<std::string>* cycle) const {
+std::vector<std::string> DependencyGraph::topSort(unsigned randomSeed,
+                                                  std::vector<std::string>* cycle) const {
     // Topological sort via repeated depth-first traversal.
     // All nodes must have an initFn before running topSort, or we return BadValue.
     struct Element {
         const std::string& name() const {
             return nodeIter->first;
         }
-        stdx::unordered_map<std::string, Node>::const_iterator nodeIter;
+        std::map<std::string, Node>::const_iterator nodeIter;
         std::vector<Element*> children;
         std::vector<Element*>::iterator membership;  // Position of this in `elements`.
     };
@@ -105,6 +111,9 @@ std::vector<std::string> DependencyGraph::topSort(std::vector<std::string>* cycl
     // Swap the pointers in the `elements` vector that point to `a` and `b`.
     // Update their 'membership' data members to reflect the change.
     auto swapPositions = [](Element& a, Element& b) {
+        if (&a == &b) {
+            return;
+        }
         using std::swap;
         swap(*a.membership, *b.membership);
         swap(a.membership, b.membership);
@@ -113,7 +122,7 @@ std::vector<std::string> DependencyGraph::topSort(std::vector<std::string>* cycl
     elementsStore.reserve(_nodes.size());
     for (auto iter = _nodes.begin(); iter != _nodes.end(); ++iter) {
         uassert(ErrorCodes::BadValue,
-                "node {} was mentioned but never added"_format(iter->first),
+                fmt::format("node {} was mentioned but never added", iter->first),
                 iter->second.payload);
         elementsStore.push_back(Element{iter});
     }
@@ -131,8 +140,9 @@ std::vector<std::string> DependencyGraph::topSort(std::vector<std::string>* cycl
                            [&](StringData childName) {
                                auto iter = byName.find(childName);
                                uassert(ErrorCodes::BadValue,
-                                       "node {} depends on missing node {}"_format(
-                                           element.nodeIter->first, childName),
+                                       fmt::format("node {} depends on missing node {}",
+                                                   element.nodeIter->first,
+                                                   childName),
                                        iter != byName.end());
                                return iter->second;
                            });
@@ -147,8 +157,7 @@ std::vector<std::string> DependencyGraph::topSort(std::vector<std::string>* cycl
 
     // Shuffle the inputs to improve test coverage of undeclared dependencies.
     {
-        std::random_device slowSeedGen;
-        std::mt19937 generator(slowSeedGen());
+        std::mt19937 generator(randomSeed);
         std::shuffle(elements.begin(), elements.end(), generator);
         for (Element* e : elements)
             std::shuffle(e->children.begin(), e->children.end(), generator);

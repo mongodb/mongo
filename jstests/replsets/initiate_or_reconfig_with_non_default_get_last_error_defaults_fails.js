@@ -4,8 +4,7 @@
  * @tags: [
  * ]
  */
-(function() {
-"use strict";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 function testInitiate(gleDefaults) {
     const replTest = new ReplSetTest({name: jsTestName(), nodes: 1});
@@ -16,7 +15,7 @@ function testInitiate(gleDefaults) {
     const conf = replTest.getReplSetConfig();
     conf.settings = gleDefaults;
     assert.soon(
-        function() {
+        function () {
             try {
                 admin.runCommand({replSetInitiate: conf});
                 return false;
@@ -25,14 +24,16 @@ function testInitiate(gleDefaults) {
             }
         },
         "Node should fail when initiating with a non-default getLastErrorDefaults field",
-        ReplSetTest.kDefaultTimeoutMS);
+        ReplSetTest.kDefaultTimeoutMS,
+    );
 
     assert.soon(
-        function() {
-            return rawMongoProgramOutput().search(/Fatal assertion.*5624101/) >= 0;
+        function () {
+            return rawMongoProgramOutput("Fatal assertion").search(/5624101/) >= 0;
         },
         "Node should have fasserted when initiating with a non-default getLastErrorDefaults field",
-        ReplSetTest.kDefaultTimeoutMS);
+        ReplSetTest.kDefaultTimeoutMS,
+    );
 
     replTest.stop(conns[0], undefined, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
     replTest.stopSet(undefined, undefined, {skipValidation: true});
@@ -61,7 +62,7 @@ function runTest(gleDefaults) {
 }
 
 jsTestLog("Testing getLastErrorDefaults with {w: 'majority'}");
-runTest({getLastErrorDefaults: {w: 'majority', wtimeout: 0}});
+runTest({getLastErrorDefaults: {w: "majority", wtimeout: 0}});
 
 jsTestLog("Testing getLastErrorDefaults with {w:1, wtimeout: 1}");
 runTest({getLastErrorDefaults: {w: 1, wtimeout: 1}});
@@ -74,4 +75,3 @@ runTest({getLastErrorDefaults: {w: 1, wtimeout: 0, fsync: true}});
 
 jsTestLog("Testing getLastErrorDefaults with {w:1, wtimeout: 0, j: false}");
 runTest({getLastErrorDefaults: {w: 1, wtimeout: 0, j: false}});
-}());

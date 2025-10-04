@@ -1,6 +1,8 @@
 """Generate FCV constants for consumption by non-C++ integration tests."""
+
 import argparse
 
+from buildscripts.resmokelib import configure_resmoke, logging
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
 
 _COMMAND = "generate-fcv-constants"
@@ -11,6 +13,11 @@ class GenerateFCVConstants(Subcommand):
 
     def __init__(self):
         """Constructor."""
+        self._exec_logger = None
+
+    def _setup_logging(self):
+        logging.loggers.configure_loggers()
+        self._exec_logger = logging.loggers.ROOT_EXECUTOR_LOGGER
 
     def execute(self) -> None:
         """
@@ -19,8 +26,11 @@ class GenerateFCVConstants(Subcommand):
         :return: None
         """
         # This will cause multiversion constants to be generated.
-        import buildscripts.resmokelib.multiversionconstants  # pylint: disable=unused-import
-        pass
+        self._setup_logging()
+
+        import buildscripts.resmokelib.multiversionconstants
+
+        buildscripts.resmokelib.multiversionconstants.log_constants(self._exec_logger)
 
 
 class GenerateFCVConstantsPlugin(PluginInterface):
@@ -36,7 +46,7 @@ class GenerateFCVConstantsPlugin(PluginInterface):
         # Can't hide this subcommand due to a Python bug. https://bugs.python.org/issue22848.
         subparsers.add_parser(_COMMAND, help=argparse.SUPPRESS)
 
-    def parse(self, subcommand, parser, parsed_args, **kwargs):
+    def parse(self, subcommand, parser, parsed_args, should_configure_otel=True, **kwargs):
         """
         Return the FCV constants subcommand for execution.
 
@@ -49,4 +59,5 @@ class GenerateFCVConstantsPlugin(PluginInterface):
         if subcommand != _COMMAND:
             return None
 
+        configure_resmoke.validate_and_update_config(parser, parsed_args, should_configure_otel)
         return GenerateFCVConstants()

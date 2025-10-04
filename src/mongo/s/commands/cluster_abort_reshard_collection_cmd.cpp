@@ -27,16 +27,32 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
-#include "mongo/platform/basic.h"
-
+#include "mongo/base/error_codes.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/generic_argument_util.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/sharding_environment/client/shard.h"
+#include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/topology/shard_registry.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/grid.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/s/request_types/abort_reshard_collection_gen.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
+#include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <string>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
+
 
 namespace mongo {
 namespace {
@@ -52,19 +68,27 @@ public:
         void typedRun(OperationContext* opCtx) {
             const NamespaceString& nss = ns();
 
-            LOGV2(5403500, "Beginning reshard abort operation", "namespace"_attr = ns());
+            LOGV2(5403500, "Beginning reshard abort operation", logAttrs(ns()));
 
             ConfigsvrAbortReshardCollection configsvrAbortReshardCollection(nss);
             configsvrAbortReshardCollection.setDbName(request().getDbName());
+            generic_argument_util::setMajorityWriteConcern(configsvrAbortReshardCollection,
+                                                           &opCtx->getWriteConcern());
+            if (resharding::gFeatureFlagMoveCollection.isEnabled(
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
+                resharding::gFeatureFlagUnshardCollection.isEnabled(
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                configsvrAbortReshardCollection.setProvenance(
+                    ReshardingProvenanceEnum::kReshardCollection);
+            }
 
             auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-            auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
-                opCtx,
-                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                "admin",
-                CommandHelpers::appendMajorityWriteConcern(
-                    configsvrAbortReshardCollection.toBSON({}), opCtx->getWriteConcern()),
-                Shard::RetryPolicy::kIdempotent));
+            auto cmdResponse = uassertStatusOK(
+                configShard->runCommand(opCtx,
+                                        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                        DatabaseName::kAdmin,
+                                        configsvrAbortReshardCollection.toBSON(),
+                                        Shard::RetryPolicy::kIdempotent));
             uassertStatusOK(cmdResponse.commandStatus);
             uassertStatusOK(cmdResponse.writeConcernStatus);
         }
@@ -99,9 +123,7 @@ public:
         return "Abort any in-progress resharding operations for this collection.";
     }
 };
-
-MONGO_REGISTER_FEATURE_FLAGGED_COMMAND(AbortReshardCollectionCommand,
-                                       resharding::gFeatureFlagResharding);
+MONGO_REGISTER_COMMAND(AbortReshardCollectionCommand).forRouter();
 
 }  // namespace
 }  // namespace mongo

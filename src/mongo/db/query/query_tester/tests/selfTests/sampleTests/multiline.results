@@ -1,0 +1,29 @@
+multiline
+multiline
+basic.coll
+
+0
+:results {aggregate: "basic", pipeline: [{$limit:5}], cursor: {}}
+[
+{"_id":0},
+{"_id":1},
+{"_id":3},
+{"_id":2},
+{"_id":4}
+]
+
+1
+:sortResults {aggregate: "basic", pipeline: [{$limit:5}], cursor: {}}
+[
+{"_id":0},
+{"_id":1},
+{"_id":2},
+{"_id":3},
+{"_id":4}
+]
+
+2
+:results {aggregate: "basic", pipeline: [{$limit:1}], cursor: {}}
+[
+{"_id":0}
+]

@@ -30,10 +30,8 @@ global:
     cpp_includes:
         - "mongo/db/repl/read_concern_args.h"
 
-
 imports:
-    - "mongo/idl/basic_types.idl"
-
+    - "mongo/db/basic_types.idl"
 
 types:
     ReadConcern:
@@ -42,3 +40,5 @@ types:
         cpp_type: "mongo::repl::ReadConcernArgs"
         serializer: "mongo::repl::ReadConcernArgs::toBSONInner"
         deserializer: "mongo::repl::ReadConcernArgs::fromBSONThrows"
+        # repl::ReadConcernArgs has only non view members.
+        is_view: false

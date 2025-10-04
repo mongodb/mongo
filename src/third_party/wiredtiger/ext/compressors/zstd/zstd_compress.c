@@ -338,6 +338,7 @@ zstd_init_context_pool(
         if ((context = calloc(1, sizeof(ZSTD_CONTEXT))) == NULL) {
             (void)wt_api->err_printf(
               wt_api, NULL, "zstd_init_context_pool: context calloc failure");
+            free(context_pool);
             return (errno);
         }
 

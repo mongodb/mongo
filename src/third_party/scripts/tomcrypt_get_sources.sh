@@ -31,6 +31,7 @@ mv libtomcrypt-$VERSION libtomcrypt-release
 rm -rf src
 
 mkdir src
+mkdir src/ciphers
 mkdir src/hashes
 mkdir src/hashes/helper
 mkdir src/hashes/sha2
@@ -38,9 +39,13 @@ mkdir src/mac
 mkdir src/mac/hmac
 mkdir src/misc
 mkdir src/misc/crypt
+mkdir src/modes
+mkdir src/modes/ctr
+mkdir src/modes/cbc
 
 FILES=(
     hashes/helper/hash_memory.c
+    hashes/md5.c
     hashes/sha1.c
     hashes/sha2/sha256.c
     hashes/sha2/sha512.c
@@ -50,13 +55,27 @@ FILES=(
     mac/hmac/hmac_process.c
     misc/compare_testvector.c
     misc/crypt/crypt_argchk.c
+    misc/crypt/crypt_cipher_is_valid.c
+    misc/crypt/crypt_cipher_descriptor.c
+    misc/crypt/crypt_find_cipher.c
     misc/crypt/crypt_find_hash.c
     misc/crypt/crypt_hash_descriptor.c
     misc/crypt/crypt_hash_is_valid.c
+    misc/crypt/crypt_register_cipher.c
     misc/crypt/crypt_register_hash.c
-    misc/zeromem.c)
+    misc/zeromem.c
+    modes/cbc/cbc_done.c
+    modes/cbc/cbc_start.c
+    modes/cbc/cbc_encrypt.c
+    modes/cbc/cbc_decrypt.c
+    modes/ctr/ctr_done.c
+    modes/ctr/ctr_start.c
+    modes/ctr/ctr_encrypt.c
+    modes/ctr/ctr_decrypt.c
+    )
 
 cp -r libtomcrypt-release/src/headers src
+cp -r libtomcrypt-release/src/ciphers/aes src/ciphers
 
 for file in "${FILES[@]}"
     do cp libtomcrypt-release/src/$file src/$file

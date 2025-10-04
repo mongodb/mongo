@@ -1,0 +1,60 @@
+==== VARIATION: matchExpression=ComparisonMatchExpressionEq
+1 $eq 5
+
+==== VARIATION: taggedMatchExpression=ComparisonMatchExpressionEq
+1 $eq 5 || Selected Index #2 pos 0 combine 1
+
+==== VARIATION: matchExpression=ComparisonMatchExpressionGt
+ $gt 5
+
+==== VARIATION: taggedMatchExpression=ComparisonMatchExpressionGt
+ $gt 5 || Selected Index #2 pos 0 combine 1
+
+==== VARIATION: matchExpression=ComparisonMatchExpressionGte
+ $gte 5
+
+==== VARIATION: taggedMatchExpression=ComparisonMatchExpressionGte
+ $gte 5 || Selected Index #2 pos 0 combine 1
+
+==== VARIATION: matchExpression=ComparisonMatchExpressionLt
+ $lt 5
+
+==== VARIATION: taggedMatchExpression=ComparisonMatchExpressionLt
+ $lt 5 || Selected Index #2 pos 0 combine 1
+
+==== VARIATION: matchExpression=ComparisonMatchExpressionLte
+ $lte 5
+
+==== VARIATION: taggedMatchExpression=ComparisonMatchExpressionLte
+ $lte 5 || Selected Index #2 pos 0 combine 1
+
+==== VARIATION: matchExpression=RegexMatchExpression
+ regex /^ab/
+
+==== VARIATION: taggedMatchExpression=RegexMatchExpression
+ regex /^ab/ || Selected Index #2 pos 0 combine 1
+
+==== VARIATION: matchExpression=ModMatchExpression
+ mod 3 % x == 1
+
+==== VARIATION: taggedMatchExpression=ModMatchExpression
+ mod 3 % x == 1 || Selected Index #2 pos 0 combine 1
+
+==== VARIATION: matchExpression=ExistsMatchExpression
+a exists
+
+==== VARIATION: taggedMatchExpression=ExistsMatchExpression
+a exists || Selected Index #2 pos 0 combine 1
+
+==== VARIATION: matchExpression=InMatchExpression
+a $in [ ]
+
+==== VARIATION: taggedMatchExpression=InMatchExpression
+a $in [ ] || Selected Index #2 pos 0 combine 1
+
+==== VARIATION: matchExpression=BitsAllSetMatchExpression
+a $bitsAllSet: []
+
+==== VARIATION: taggedMatchExpression=BitsAllSetMatchExpression
+a $bitsAllSet: [] || Selected Index #2 pos 0 combine 1
+

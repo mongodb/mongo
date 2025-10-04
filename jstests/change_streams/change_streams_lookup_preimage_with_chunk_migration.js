@@ -3,9 +3,7 @@
  * update or delete an image comes from the chunk migration event.
  *
  *  @tags: [
- *    featureFlagChangeStreamPreAndPostImages,
- *    featureFlagClusteredIndexes,
- *    multiversion_incompatible,
+ *    requires_fcv_60,
  *    requires_sharding,
  *    uses_change_streams,
  *    change_stream_does_not_expect_txns,
@@ -13,16 +11,19 @@
  *    assumes_read_preference_unchanged,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/collection_drop_recreate.js");  // For assertDropAndRecreateCollection.
-load("jstests/libs/chunk_manipulation_util.js");   // For pauseMigrateAtStep, waitForMigrateStep and
-                                                   // unpauseMigrateAtStep.
+import {
+    migrateStepNames,
+    moveChunkParallel,
+    pauseMigrateAtStep,
+    unpauseMigrateAtStep,
+    waitForMigrateStep,
+} from "jstests/libs/chunk_manipulation_util.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({
     shards: 2,
-    rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}}
+    rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}},
 });
 
 const dbName = jsTestName();
@@ -33,34 +34,58 @@ const db = mongosConn.getDB(dbName);
 const donor = st.shard0;
 const recipient = st.shard1;
 
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: donor.shardName}));
+
 // Creates a sharded collection and enables recording of pre-images for it. Returns the sharded
 // collection.
 const coll = (() => {
     assertDropAndRecreateCollection(db, collName);
 
-    st.ensurePrimaryShard(dbName, donor.shardName);
-
     const coll = db.getCollection(collName);
 
     // Allow 'system.preimages' collection to record pre-images for the specified collection. Ensure
     // that the recording is actually enabled for the collection.
-    assert.commandWorked(
-        db.runCommand({collMod: collName, changeStreamPreAndPostImages: {enabled: true}}));
+    assert.commandWorked(db.runCommand({collMod: collName, changeStreamPreAndPostImages: {enabled: true}}));
     assert(db.getCollectionInfos({name: collName})[0].options.changeStreamPreAndPostImages.enabled);
 
     // Shard the collection based on '_id'. Split chunk at '_id: 1'.
-    st.shardColl(
-        collName, {_id: 1} /* shard key */, {_id: 1} /* split at */, false /* move */, dbName);
+    st.shardColl(collName, {_id: 1} /* shard key */, {_id: 1} /* split at */, false /* move */, dbName);
 
     return coll;
 })();
 
+// Events may be batched in an applyOps; expand them here, and filter the expanded events by docId.
+function _expandAndFilterEvents(oplogEvents, docId) {
+    let expandedEvents = Array();
+    for (let idx = 0; idx < oplogEvents.length; idx++) {
+        const event = oplogEvents[idx];
+        if (event.o.hasOwnProperty("applyOps")) {
+            for (let applyOpsIdx = 0; applyOpsIdx < event.o.applyOps.length; applyOpsIdx++) {
+                const innerEvent = event.o.applyOps[applyOpsIdx];
+                if (innerEvent.o._id == docId) {
+                    expandedEvents.push(innerEvent);
+                }
+            }
+        } else {
+            expandedEvents.push(event);
+        }
+    }
+    return expandedEvents;
+}
+
 // Verifies that expected 'fromMigrate' events are observed in the oplog for the specified shard.
 function verifyFromMigrateOplogEvents(shard, docId, ops) {
-    const oplogEvents = shard.getDB("local")
-                            .getCollection("oplog.rs")
-                            .find({"fromMigrate": true, "o._id": docId})
-                            .toArray();
+    let oplogEvents = shard
+        .getDB("local")
+        .getCollection("oplog.rs")
+        .find({
+            "$or": [
+                {"fromMigrate": true, "o._id": docId},
+                {"fromMigrate": true, "o.applyOps": {$exists: true}},
+            ],
+        })
+        .toArray();
+    oplogEvents = _expandAndFilterEvents(oplogEvents, docId);
     assert.eq(oplogEvents.length, ops.length, oplogEvents);
 
     for (let idx = 0; idx < oplogEvents.length; idx++) {
@@ -71,22 +96,22 @@ function verifyFromMigrateOplogEvents(shard, docId, ops) {
 
 // Verifies that expected pre-images are stored in the pre-image collection for the specified shard.
 function verifyPreImages(shard, docId, annotations) {
-    const foundPreImages = shard.getDB("config")
-                               .getCollection("system.preimages")
-                               .find({"preImage._id": docId})
-                               .toArray();
+    const foundPreImages = shard
+        .getDB("config")
+        .getCollection("system.preimages")
+        .find({"preImage._id": docId})
+        .toArray();
     assert.eq(foundPreImages.length, annotations.length, foundPreImages);
 
     for (let idx = 0; idx < foundPreImages.length; idx++) {
         assert.eq(foundPreImages[idx].preImage._id, docId, foundPreImages[idx].preImage);
-        assert.eq(
-            foundPreImages[idx].preImage.annotate, annotations[idx], foundPreImages[idx].preImage);
+        assert.eq(foundPreImages[idx].preImage.annotate, annotations[idx], foundPreImages[idx].preImage);
     }
 }
 
 // Verifies that the change streams cursor sees the required events.
 function verifyChangeStreamEvents(csCursor, events) {
-    events.forEach(expEvent => {
+    events.forEach((expEvent) => {
         assert.soon(() => csCursor.hasNext());
         const event = csCursor.next();
 
@@ -108,8 +133,7 @@ function verifyChangeStreamEvents(csCursor, events) {
 // Tests that pre-images are recorded correctly when run sequentially with the chunk-migration.
 (function testSerialUpdateAndMoveChunk() {
     // Open change streams here to record all events in the collection.
-    const csCursor =
-        coll.watch([], {fullDocument: "required", fullDocumentBeforeChange: "required"});
+    const csCursor = coll.watch([], {fullDocument: "required", fullDocumentBeforeChange: "required"});
 
     // Insert 1 document to the collection.
     assert.commandWorked(coll.insert({_id: 0, annotate: "before_update"}));
@@ -124,8 +148,7 @@ function verifyChangeStreamEvents(csCursor, events) {
     assert.commandWorked(coll.update({_id: 0}, {$set: {annotate: "update"}}));
 
     jsTest.log("Migrating chunk with document '{_id: 0}'");
-    st.adminCommand(
-        {moveChunk: coll.getFullName(), find: {_id: 0}, to: recipient.name, _waitForDelete: true});
+    st.adminCommand({moveChunk: coll.getFullName(), find: {_id: 0}, to: recipient.name, _waitForDelete: true});
     jsTest.log("Successfully migrated chunk with document '{_id: 0}");
 
     // Ensure that donor and recipient shard observed the expected 'fromMigrate' events. Note that
@@ -141,15 +164,14 @@ function verifyChangeStreamEvents(csCursor, events) {
     // Verify that change streams observes required events.
     verifyChangeStreamEvents(csCursor, [
         {opType: "insert", id: 0},
-        {opType: "update", id: 0, prevAnnotate: "before_update", curAnnotate: "update"}
+        {opType: "update", id: 0, prevAnnotate: "before_update", curAnnotate: "update"},
     ]);
 })();
 
 // Tests that pre-images are recorded correctly when run in-parallel with the chunk-migration.
 (function testParallelUpdateDeleteAndMoveChunk() {
     // Open change streams to record all events in the collection.
-    const csCursor =
-        coll.watch([], {fullDocument: "required", fullDocumentBeforeChange: "required"});
+    const csCursor = coll.watch([], {fullDocument: "required", fullDocumentBeforeChange: "required"});
 
     // Insert 2 documents to the collection.
     assert.commandWorked(coll.insert({_id: 1, annotate: "before_update"}));
@@ -162,15 +184,21 @@ function verifyChangeStreamEvents(csCursor, events) {
     verifyPreImages(recipient, 2, []);
 
     // Set the fail-point to pause the chunk migration after the clone stage.
-    jsTest.log('Setting fail-point at recipient shard to pause chunk-migration after cloning.');
+    jsTest.log("Setting fail-point at recipient shard to pause chunk-migration after cloning.");
     pauseMigrateAtStep(recipient, migrateStepNames.cloned);
 
     // Spin a mongoD instance and initiate chunk-migration in parallel. The mongoD instance will
     // be used as a mode of communication.
     jsTest.log("Migration chunk with documents '{_id: 1}' and '{_id: 2}'");
-    var staticMongod = MongoRunner.runMongod({});
-    var joinMoveChunk = moveChunkParallel(
-        staticMongod, st.s0.host, {_id: 1}, null, coll.getFullName(), recipient.shardName);
+    let staticMongod = MongoRunner.runMongod({});
+    let joinMoveChunk = moveChunkParallel(
+        staticMongod,
+        st.s0.host,
+        {_id: 1},
+        null,
+        coll.getFullName(),
+        recipient.shardName,
+    );
 
     // Wait until cloning of documents is done.
     waitForMigrateStep(recipient, migrateStepNames.cloned);
@@ -196,6 +224,12 @@ function verifyChangeStreamEvents(csCursor, events) {
     MongoRunner.stopMongod(staticMongod);
     jsTest.log("Successfully migrated chunk with documents '{_id: 1}' and '{_id: 2}'");
 
+    // Verify that after the chunk-migration is complete, the pre-image collection exists on the
+    // recipient shard with clustered-index enabled.
+    const preImageCollInfo = recipient.getDB("config").getCollectionInfos({name: "system.preimages"});
+    assert.eq(preImageCollInfo.length, 1, preImageCollInfo);
+    assert(preImageCollInfo[0].options.hasOwnProperty("clusteredIndex"), preImageCollInfo[0]);
+
     // Ensure that donor and recipient shard observed the expected 'fromMigrate' events for each
     // document id. Note that the "d" event for doc 1 on the donor is due to the post-migration
     // cleanup.
@@ -204,10 +238,14 @@ function verifyChangeStreamEvents(csCursor, events) {
     verifyFromMigrateOplogEvents(donor, 2, []);
     verifyFromMigrateOplogEvents(recipient, 2, ["i", "d"]);
 
-    // Ensure that the donor has expected pre-images and recipient has no pre-images.
+    // Update the document after chunk-migration is completed. This pre-image for this update should
+    // be recorded by the recipient shard.
+    assert.commandWorked(coll.update({_id: 1}, {$set: {annotate: "after_migration"}}));
+
+    // Ensure that the donor and recipient have expected pre-image after chunk-migration.
     verifyPreImages(donor, 1, ["before_update"]);
     verifyPreImages(donor, 2, ["before_update", "update"]);
-    verifyPreImages(recipient, 1, []);
+    verifyPreImages(recipient, 1, ["update"]);
     verifyPreImages(recipient, 2, []);
 
     // Verify the change streams events.
@@ -216,9 +254,8 @@ function verifyChangeStreamEvents(csCursor, events) {
         {opType: "insert", id: 2},
         {opType: "update", id: 1, prevAnnotate: "before_update", curAnnotate: "update"},
         {opType: "update", id: 2, prevAnnotate: "before_update", curAnnotate: "update"},
-        {opType: "delete", id: 2, prevAnnotate: "update"}
+        {opType: "delete", id: 2, prevAnnotate: "update"},
     ]);
 })();
 
 st.stop();
-}());

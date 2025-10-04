@@ -1,0 +1,149 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+idl_generator(
+    name = "sdam_configuration_parameters_gen",
+    src = "sdam_configuration_parameters.idl",
+)
+
+mongo_cc_library(
+    name = "sdam",
+    srcs = [
+        "sdam_configuration.cpp",
+        "sdam_datatypes.cpp",
+        "server_description.cpp",
+        "server_selector.cpp",
+        "topology_description.cpp",
+        "topology_listener.cpp",
+        "topology_manager.cpp",
+        "topology_state_machine.cpp",
+        ":sdam_configuration_parameters_gen",
+    ],
+    hdrs = [
+        "election_id_set_version_pair.h",
+        "sdam.h",
+        "sdam_configuration.h",
+        "sdam_datatypes.h",
+        "server_description.h",
+        "server_selector.h",
+        "topology_description.h",
+        "topology_listener.h",
+        "topology_manager.h",
+        "topology_state_machine.h",
+    ],
+    deps = [
+        "//src/mongo/client:read_preference",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:wire_version",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/repl:optime",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/executor:task_executor_interface",
+        "//src/mongo/rpc:metadata",
+        "//src/mongo/util:clock_sources",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+idl_generator(
+    name = "json_test_runner_cli_options_gen",
+    src = "json_test_runner_cli_options.idl",
+)
+
+mongo_cc_library(
+    name = "sdam_test_util",
+    srcs = [
+        "mock_topology_manager.cpp",
+        "server_description_builder.cpp",
+        "topology_description_builder.cpp",
+        "topology_listener_mock.cpp",
+    ],
+    hdrs = [
+        "mock_topology_manager.h",
+        "sdam_test_base.h",
+        "server_description_builder.h",
+        "topology_description_builder.h",
+        "topology_listener_mock.h",
+    ],
+    deps = [
+        ":sdam",
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "json_test",
+    srcs = [
+        "json_test_arg_parser.cpp",
+        ":json_test_runner_cli_options_gen",
+    ],
+    hdrs = [
+        "json_test_arg_parser.h",
+    ],
+    deps = [
+        ":sdam",
+        "//src/mongo:base",
+        "//src/mongo/util/options_parser",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "sdam_test",
+    srcs = [
+        "election_id_set_version_pair_test.cpp",
+        "server_description_test.cpp",
+        "server_selector_test.cpp",
+        "topology_description_test.cpp",
+        "topology_listener_test.cpp",
+        "topology_manager_test.cpp",
+        "topology_state_machine_test.cpp",
+    ],
+    tags = ["mongo_unittest_sixth_group"],
+    deps = [
+        ":sdam",
+        ":sdam_test_util",
+        "//src/mongo/client:clientdriver_network",
+        "//src/mongo/client:replica_set_monitor_protocol_test_util",
+        "//src/mongo/executor:thread_pool_task_executor_test_fixture",
+    ],
+)
+
+mongo_cc_binary(
+    name = "sdam_json_test",
+    srcs = [
+        "sdam_json_test_runner.cpp",
+    ],
+    tags = [
+        "sdam_json_test",
+    ],
+    deps = [
+        "json_test",
+        "sdam",
+        "sdam_test_util",
+        "//src/mongo/client:connection_string",
+        "//src/mongo/db/local_catalog/lock_manager",
+        "//src/mongo/util:clock_source_mock",
+    ],
+)
+
+mongo_cc_binary(
+    name = "server_selection_json_test",
+    srcs = [
+        "server_selection_json_test_runner.cpp",
+    ],
+    tags = [
+        "server_selection_json_test",
+    ],
+    deps = [
+        "json_test",
+        "sdam",
+        "sdam_test_util",
+        "//src/mongo/client:connection_string",
+        "//src/mongo/util:clock_source_mock",
+    ],
+)

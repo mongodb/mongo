@@ -3,11 +3,8 @@
  *
  * @tags: [requires_replication]
  */
-
-(function() {
-"use strict";
-
-load("jstests/replsets/rslib.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const failpointName = "forceSyncSourceCandidate";
 
@@ -16,7 +13,7 @@ const rst = new ReplSetTest({
     // Allow many initial sync attempts. Initial sync may fail if the sync source does not have
     // an oplog yet because it has not conducted its own initial sync yet.
     // We turn on the noop writer to encourage successful sync source selection.
-    nodeOptions: {setParameter: {numInitialSyncAttempts: 100, writePeriodicNoops: true}}
+    nodeOptions: {setParameter: {numInitialSyncAttempts: 100, writePeriodicNoops: true}},
 });
 const nodes = rst.startSet();
 
@@ -36,4 +33,3 @@ rst.awaitSyncSource(nodes[2], nodes[1]);
 rst.awaitSyncSource(nodes[3], nodes[2]);
 
 rst.stopSet();
-})();

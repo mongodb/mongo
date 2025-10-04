@@ -4,29 +4,30 @@
  * We intentionally target CRUD ops in this test, since we know we should be the only ones
  * issuing them. See below for details on how we simulate quickness and slowness.
  */
-
-(function() {
-"use strict";
-
-load("jstests/replsets/rslib.js");
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {setLogVerbosity} from "jstests/replsets/rslib.js";
 
 let name = "log_secondary_oplog_application";
-let rst = ReplSetTest({name: name, nodes: 2});
+let rst = new ReplSetTest({name: name, nodes: 2});
 rst.startSet();
 
 let nodes = rst.nodeList();
 rst.initiate({
     "_id": name,
-    "members": [{"_id": 0, "host": nodes[0]}, {"_id": 1, "host": nodes[1], "priority": 0}]
+    "members": [
+        {"_id": 0, "host": nodes[0]},
+        {"_id": 1, "host": nodes[1], "priority": 0},
+    ],
 });
 
 let primary = rst.getPrimary();
 let secondary = rst.getSecondary();
 
 // The default WC is majority and this test can't satisfy majority writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 /**
  * Part 1: Issue a fast op and make sure that we do *not* log it.
@@ -45,7 +46,7 @@ assert.commandWorked(primary.getDB(name)["fastOp"].insert({"fast": "cheetah"}));
 rst.awaitReplication();
 
 // The op should not have been logged.
-assert.throws(function() {
+assert.throws(function () {
     checkLog.contains(secondary, "cheetah", 1 * 1000);
 });
 
@@ -63,8 +64,10 @@ rst.awaitReplication();
 assert.commandWorked(secondary.getDB(name).setProfilingLevel(1, {sampleRate: 1, slowms: 20}));
 
 // Hang right after taking note of the start time of the application.
-let hangAfterRecordingOpApplicationsStartTimeFailPoint =
-    configureFailPoint(secondary, "hangAfterRecordingOpApplicationStartTime");
+let hangAfterRecordingOpApplicationsStartTimeFailPoint = configureFailPoint(
+    secondary,
+    "hangAfterRecordingOpApplicationStartTime",
+);
 
 // Issue a write and make sure we've hit the failpoint before moving on.
 assert.commandWorked(primary.getDB(name)["slowOp"].insert({"slow": "sloth"}));
@@ -88,8 +91,10 @@ checkLog.contains(secondary, "sloth");
 assert.commandWorked(secondary.getDB(name).setProfilingLevel(1, {sampleRate: 0, slowms: 20}));
 
 // Hang right after taking note of the start time of the application.
-hangAfterRecordingOpApplicationsStartTimeFailPoint =
-    configureFailPoint(secondary, "hangAfterRecordingOpApplicationStartTime");
+hangAfterRecordingOpApplicationsStartTimeFailPoint = configureFailPoint(
+    secondary,
+    "hangAfterRecordingOpApplicationStartTime",
+);
 
 // Issue a write and make sure we've hit the failpoint before moving on.
 assert.commandWorked(primary.getDB(name)["slowOp"].insert({"slow": "turtle"}));
@@ -105,7 +110,7 @@ hangAfterRecordingOpApplicationsStartTimeFailPoint.off();
 rst.awaitReplication();
 
 // The op should not have been logged.
-assert.throws(function() {
+assert.throws(function () {
     checkLog.contains(secondary, "turtle", 1 * 1000);
 });
 
@@ -118,8 +123,10 @@ assert.throws(function() {
 setLogVerbosity(rst.nodes, {"replication": {"verbosity": 1}});
 
 // Hang right after taking note of the start time of the application.
-hangAfterRecordingOpApplicationsStartTimeFailPoint =
-    configureFailPoint(secondary, "hangAfterRecordingOpApplicationStartTime");
+hangAfterRecordingOpApplicationsStartTimeFailPoint = configureFailPoint(
+    secondary,
+    "hangAfterRecordingOpApplicationStartTime",
+);
 
 // Issue a write and make sure we've hit the failpoint before moving on.
 assert.commandWorked(primary.getDB(name)["slowOp"].insert({"slow": "snail"}));
@@ -138,4 +145,3 @@ rst.awaitReplication();
 checkLog.contains(secondary, "snail");
 
 rst.stopSet();
-})();

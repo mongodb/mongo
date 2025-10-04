@@ -32,11 +32,12 @@
 import os, random, shutil
 from test_import01 import test_import_base
 from wtscenario import make_scenarios
+import wttest
 
+@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_import09(test_import_base):
     nrows = 100
     ntables = 1
-    session_config = 'isolation=snapshot'
 
     # To test the sodium encryptor, we use secretkey= rather than
     # setting a keyid, because for a "real" (vs. test-only) encryptor,
@@ -70,28 +71,16 @@ class test_import09(test_import_base):
     ]
     tables = [
         ('simple_table', dict(
-            is_simple = True,
             keys = [k for k in range(1, nrows+1)],
             values = random.sample(range(1000000), k=nrows),
             config = 'key_format=r,value_format=i')),
        ('table_with_named_columns', dict(
-           is_simple = False,
            keys = [k for k in range(1, 7)],
            values = [('Australia', 'Canberra', 1),('Japan', 'Tokyo', 2),('Italy', 'Rome', 3),
              ('China', 'Beijing', 4),('Germany', 'Berlin', 5),('South Korea', 'Seoul', 6)],
            config = 'columns=(id,country,capital,population),key_format=r,value_format=SSi')),
     ]
     scenarios = make_scenarios(tables, allocsizes, compressors, encryptors)
-
-    # Check to verify table projections.
-    def check_projections(self, uri, keys, values):
-        for i in range(0, len(keys)):
-            self.check_record(uri + '(country,capital)',
-                              keys[i], [values[i][0], values[i][1]])
-            self.check_record(uri + '(country,population)',
-                              keys[i], [values[i][0], values[i][2]])
-            self.check_record(uri + '(capital,population)',
-                              keys[i], [values[i][1], values[i][2]])
 
     # Load the compressor extension, skip the test if missing.
     def conn_extensions(self, extlist):
@@ -100,8 +89,7 @@ class test_import09(test_import_base):
         extlist.extension('encryptors', self.encryptor)
 
     def conn_config(self):
-        return 'cache_size=50MB,log=(enabled),encryption=(name={})'.format(
-            self.encryptor + self.encryptor_args)
+        return 'cache_size=50MB,encryption=(name={})'.format(self.encryptor + self.encryptor_args)
 
     def test_import_table_repair(self):
         # Add some tables & data and checkpoint.
@@ -111,7 +99,7 @@ class test_import09(test_import_base):
         # Create the table targeted for import.
         original_db_table = 'original_db_table'
         uri = 'table:' + original_db_table
-        create_config = ('allocation_size={},log=(enabled=true),block_compressor={},'
+        create_config = ('allocation_size={},block_compressor={},'
             'encryption=(name={}),') + self.config
         self.session.create(uri,
             create_config.format(self.allocsize, self.compressor, self.encryptor))
@@ -165,20 +153,16 @@ class test_import09(test_import_base):
         self.copy_file(original_db_table + '.wt', '.', newdir)
 
         # Construct the config string.
-        import_config = 'log=(enabled=true),import=(enabled,repair=true)'
+        import_config = 'import=(enabled,repair=true)'
 
         # Import the file.
         self.session.create(uri, import_config)
 
         # Verify object.
-        self.session.verify(uri)
+        self.verifyUntilSuccess(self.session, uri, None)
 
         # Check that the previously inserted values survived the import.
         self.check(uri, keys[:max_idx], values[:max_idx])
-
-        # Check against projections when the table is not simple.
-        if not self.is_simple:
-            self.check_projections(uri, keys[:max_idx], values[:max_idx])
 
         # Compare configuration metadata.
         c = self.session.open_cursor('metadata:', None, None)
@@ -194,8 +178,6 @@ class test_import09(test_import_base):
         for i in range(min_idx, max_idx):
             self.update(uri, keys[i], values[i], ts[i])
         self.check(uri, keys, values)
-        if not self.is_simple:
-            self.check_projections(uri, keys, values)
 
         # Perform a checkpoint.
         self.session.checkpoint()

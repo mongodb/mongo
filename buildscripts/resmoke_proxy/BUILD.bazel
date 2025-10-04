@@ -1,0 +1,11 @@
+py_binary(
+    name = "resmoke_proxy",
+    srcs = [
+        "__init__.py",
+        "resmoke_proxy.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/resmokelib",
+    ],
+)

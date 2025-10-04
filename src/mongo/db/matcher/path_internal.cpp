@@ -29,15 +29,11 @@
 
 #include "mongo/db/matcher/path_internal.h"
 
+#include "mongo/bson/bsontypes.h"
+
 #include <algorithm>
 
-#include "mongo/util/ctype.h"
-
 namespace mongo {
-
-bool isAllDigits(StringData str) {
-    return std::all_of(str.begin(), str.end(), [](char c) { return ctype::isDigit(c); });
-}
 
 BSONElement getFieldDottedOrArray(const BSONObj& doc,
                                   const FieldRef& path,
@@ -55,16 +51,16 @@ BSONElement getFieldDottedOrArray(const BSONObj& doc,
         res = curr.getField(path.getPart(partNum));
 
         switch (res.type()) {
-            case EOO:
+            case BSONType::eoo:
                 stop = true;
                 break;
 
-            case Object:
+            case BSONType::object:
                 curr = res.Obj();
                 ++partNum;
                 break;
 
-            case Array:
+            case BSONType::array:
                 stop = true;
                 break;
 

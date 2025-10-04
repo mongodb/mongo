@@ -29,13 +29,16 @@
 
 #pragma once
 
-#include <string>
-
-#include "mongo/db/clientcursor.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query.h"
-#include "mongo/rpc/message.h"
+#include "mongo/db/query/client_cursor/clientcursor.h"
+#include "mongo/db/query/plan_executor.h"
+#include "mongo/util/modules.h"
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 
@@ -49,10 +52,7 @@ class OperationContext;
  * If false, the caller should close the cursor and indicate this to the client by sending back
  * a cursor ID of 0.
  */
-bool shouldSaveCursor(OperationContext* opCtx,
-                      const CollectionPtr& collection,
-                      PlanExecutor::ExecState finalState,
-                      PlanExecutor* exec);
+bool shouldSaveCursor(OperationContext* opCtx, const CollectionPtr& collection, PlanExecutor* exec);
 
 /**
  * Similar to shouldSaveCursor(), but used in getMore to determine whether we should keep the cursor
@@ -73,6 +73,7 @@ void endQueryOp(OperationContext* opCtx,
                 const CollectionPtr& collection,
                 const PlanExecutor& exec,
                 long long numResults,
-                CursorId cursorId);
+                boost::optional<ClientCursorPin&> cursor,
+                const BSONObj& cmdObj);
 
 }  // namespace mongo

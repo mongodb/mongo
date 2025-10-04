@@ -1,6 +1,7 @@
 """Interface for creating a resmoke plugin."""
 
 import abc
+import argparse
 
 
 class Subcommand(object):
@@ -8,7 +9,7 @@ class Subcommand(object):
 
     def execute(self):
         """Execute the subcommand."""
-        raise NotImplementedError("execue must be implemented by Subcommand subclasses")
+        raise NotImplementedError("execute must be implemented by Subcommand subclasses")
 
 
 class PluginInterface(abc.ABC):
@@ -22,7 +23,14 @@ class PluginInterface(abc.ABC):
         """
         raise NotImplementedError()
 
-    def parse(self, subcommand, parser, parsed_args, **kwargs):
+    def parse(
+        self,
+        subcommand: str,
+        parser: argparse.ArgumentParser,
+        parsed_args: dict,
+        should_configure_otel: bool = True,
+        **kwargs,
+    ):
         """
         Resolve command-line options to a Subcommand or None.
 

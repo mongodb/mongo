@@ -1,0 +1,6 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - markbenvenuto
+      - 10gen/server-networking-and-observability

@@ -29,16 +29,19 @@
 
 #pragma once
 
-#include <vector>
-
-#include "mongo/db/jsobj.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/util/modules.h"
+#include "mongo/util/time_support.h"
+
+#include <vector>
 
 namespace mongo {
 
 class Status;
 
-namespace repl {
+namespace MONGO_MOD_PUB repl {
 
 /**
  * Arguments to the update position command.
@@ -49,6 +52,8 @@ public:
     static const char kUpdateArrayFieldName[];
     static const char kAppliedOpTimeFieldName[];
     static const char kAppliedWallTimeFieldName[];
+    static const char kWrittenOpTimeFieldName[];
+    static const char kWrittenWallTimeFieldName[];
     static const char kDurableOpTimeFieldName[];
     static const char kDurableWallTimeFieldName[];
     static const char kMemberIdFieldName[];
@@ -57,6 +62,8 @@ public:
     struct UpdateInfo {
         UpdateInfo(const OpTime& applied,
                    const Date_t& appliedWall,
+                   const OpTime& written,
+                   const Date_t& writtenWall,
                    const OpTime& durable,
                    const Date_t& durableWall,
                    long long aCfgver,
@@ -64,6 +71,8 @@ public:
 
         OpTime appliedOpTime;
         Date_t appliedWallTime;
+        OpTime writtenOpTime;
+        Date_t writtenWallTime;
         OpTime durableOpTime;
         Date_t durableWallTime;
         long long cfgver;
@@ -101,5 +110,5 @@ private:
     std::vector<UpdateInfo> _updates;
 };
 
-}  // namespace repl
+}  // namespace MONGO_MOD_PUB repl
 }  // namespace mongo

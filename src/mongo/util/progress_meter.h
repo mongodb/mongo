@@ -29,11 +29,15 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/db/client.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/util/concurrency/with_lock.h"
+
+#include <mutex>
 #include <string>
 #include <utility>
-
-#include "mongo/base/string_data.h"
-#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
@@ -127,13 +131,18 @@ private:
 
     std::string _units;
 
-    mutable stdx::mutex _nameMutex;  // NOLINT
-    std::string _name;               // guarded by _nameMutex
+    mutable stdx::mutex _nameMutex;
+    std::string _name;  // guarded by _nameMutex
 };
 
 /*
- * Wraps a ProgressMeter and calls finished() when destructed. This may only exist as long as the
- * underlying ProgressMeter, which is owned by CurOp.
+ * Wraps a CurOp owned ProgressMeter and calls finished() when destructed. This may only exist as
+ * long as the underlying ProgressMeter.
+ *
+ * The underlying ProgressMeter will have the same locking requirements as CurOp (see CurOp class
+ * description). Accessors and modifiers on the underlying ProgressMeter may need to be performed
+ * while holding a client lock and specifying the WithLock argument. If accessing without a client
+ * lock, then the thread must be executing the associated OperationContext.
  */
 class ProgressMeterHolder {
     ProgressMeterHolder(const ProgressMeterHolder&) = delete;
@@ -142,35 +151,26 @@ class ProgressMeterHolder {
 public:
     ProgressMeterHolder() : _pm(nullptr) {}
 
-    ProgressMeterHolder(ProgressMeter& pm) : _pm(&pm) {}
-
     ~ProgressMeterHolder() {
         if (_pm) {
-            _pm->finished();
+            {
+                stdx::unique_lock<Client> lk(*_opCtx->getClient());
+                _pm->finished();
+            }
         }
     }
 
-    void set(ProgressMeter& pm) {
+    void set(WithLock, ProgressMeter& pm, OperationContext* opCtx) {
+        _opCtx = opCtx;
         _pm = &pm;
     }
 
-    ProgressMeter* operator->() {
+    ProgressMeter* get(WithLock) {
         return _pm;
-    }
-
-    ProgressMeter* get() {
-        return _pm;
-    }
-
-    bool hit(int n = 1) {
-        return _pm->hit(n);
-    }
-
-    void finished() {
-        _pm->finished();
     }
 
 private:
     ProgressMeter* _pm;
+    OperationContext* _opCtx;
 };
 }  // namespace mongo

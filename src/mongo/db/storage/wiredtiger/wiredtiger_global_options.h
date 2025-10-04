@@ -29,43 +29,58 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/util/options_parser/environment.h"
+
+#include <cstddef>
+#include <string>
 
 namespace mongo {
 
 class WiredTigerGlobalOptions {
 public:
-    static constexpr auto kDefaultTimeseriesCollectionCompressor = "zstd"_sd;
-
     WiredTigerGlobalOptions()
         : cacheSizeGB(0),
+          cacheSizePct(0),
           statisticsLogDelaySecs(0),
           zstdCompressorLevel(0),
           directoryForIndexes(false),
           maxCacheOverflowFileSizeGBDeprecated(0),
-          useCollectionPrefixCompression(false),
-          useIndexPrefixCompression(false){};
+          liveRestoreThreads(0),
+          liveRestoreReadSizeMB(0),
+          useIndexPrefixCompression(false) {};
 
     Status store(const optionenvironment::Environment& params);
 
     double cacheSizeGB;
+    double cacheSizePct;
     size_t statisticsLogDelaySecs;
+    int32_t sessionMax{0};
+    double evictionDirtyTargetGB{0};
+    double evictionDirtyTriggerGB{0};
+    double evictionUpdatesTriggerGB{0};
     std::string journalCompressor;
     int zstdCompressorLevel;
     bool directoryForIndexes;
     double maxCacheOverflowFileSizeGBDeprecated;
     std::string engineConfig;
+    std::string liveRestoreSource;
+    int liveRestoreThreads;
+    double liveRestoreReadSizeMB;
+    int flattenLeafPageDelta;
 
     std::string collectionBlockCompressor;
-    bool useCollectionPrefixCompression;
     bool useIndexPrefixCompression;
     std::string collectionConfig;
     std::string indexConfig;
 
     static Status validateWiredTigerCompressor(const std::string&);
+    static Status validateSpillWiredTigerCompressor(const std::string&,
+                                                    const boost::optional<TenantId>&);
+    static Status validateWiredTigerLiveRestoreReadSizeMB(int);
+
 
     /**
      * Returns current history file size limit in MB.

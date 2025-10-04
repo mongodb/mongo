@@ -28,15 +28,20 @@
  */
 #pragma once
 
-#include <boost/optional.hpp>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/string_map.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/optional.hpp>
 
 namespace mongo {
 class ViewDefinition;
@@ -105,16 +110,23 @@ private:
     // This node represents a view namespace if and only if 'children' is nonempty and 'collator' is
     // set.
     struct Node {
+        Node() = default;
+        Node(const Node& other)
+            : nss(other.nss), children(other.children), parents(other.parents), size(other.size) {
+            if (other.collator) {
+                collator = CollatorInterface::cloneCollator(other.collator.get());
+            }
+        }
+
         /**
          * Returns true if this node represents a view.
          */
         bool isView() const {
-            invariant(children.empty() == !static_cast<bool>(collator));
             return !children.empty();
         }
 
         // The fully-qualified namespace that this node represents.
-        std::string ns;
+        NamespaceString nss;
 
         // Represents the namespaces depended on by this view. A view may refer to the same child
         // more than once, but we store the children as a set because each namespace need not be
@@ -124,10 +136,10 @@ private:
         // Represents the views that depend on this namespace.
         stdx::unordered_set<uint64_t> parents;
 
-        // When set, this is an unowned pointer to the view's collation, or nullptr if the view has
-        // the binary collation. When not set, this namespace is not a view and we don't care about
-        // its collator.
-        boost::optional<const CollatorInterface*> collator;
+        // When set to nullptr, the view either has the binary collation or this namespace is not a
+        // view and we don't care about its collator. Verify if view with isView. ViewGraph owns the
+        // collator in order to keep pointer alive after insertion.
+        std::unique_ptr<const CollatorInterface> collator;
 
         // The size of this view's "pipeline", in bytes.
         int size = 0;
@@ -173,7 +185,7 @@ private:
 
     // Maps namespaces to an internal node id. A mapping exists for every namespace referenced,
     // i.e. existing views, collections, and non-existing namespaces.
-    StringMap<uint64_t> _namespaceIds;
+    stdx::unordered_map<NamespaceString, uint64_t> _namespaceIds;
 
     // Maps node ids to nodes. There is a 1-1 correspondence with _namespaceIds, hence the lifetime
     // of a node is the same as the lifetime as its corresponding node id.

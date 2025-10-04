@@ -29,12 +29,28 @@
 
 #pragma once
 
-#include <boost/intrusive_ptr.hpp>
-#include <boost/optional.hpp>
-
+#include "mongo/base/string_data.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/tee_buffer.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/modules.h"
+
+#include <cstddef>
+#include <set>
+#include <string>
+
+#include <boost/intrusive_ptr.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -49,13 +65,12 @@ class Value;
  */
 class DocumentSourceTeeConsumer : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$teeConsumer"_sd;
     static boost::intrusive_ptr<DocumentSourceTeeConsumer> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         size_t facetId,
-        const boost::intrusive_ptr<TeeBuffer>& bufferSource);
+        StringData stageName);
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
+    StageConstraints constraints(PipelineSplitState pipeState) const final {
         return {StreamType::kStreaming,
                 PositionRequirement::kNone,
                 HostTypeRequirement::kNone,
@@ -77,18 +92,29 @@ public:
         return DepsTracker::State::SEE_NEXT;
     }
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final;
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
-protected:
-    GetNextResult doGetNext() final;
-    void doDispose() final;
+    const char* getSourceName() const override;
+
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
+    }
+
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
 private:
+    friend boost::intrusive_ptr<exec::agg::Stage> documentSourceTeeConsumerToStageFn(
+        const boost::intrusive_ptr<DocumentSource>&);
+
     DocumentSourceTeeConsumer(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                               size_t facetId,
-                              const boost::intrusive_ptr<TeeBuffer>& bufferSource);
+                              StringData stageName);
 
     size_t _facetId;
-    boost::intrusive_ptr<TeeBuffer> _bufferSource;
+
+    // Specific name of the tee consumer.
+    std::string _stageName;
 };
 }  // namespace mongo

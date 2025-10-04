@@ -26,9 +26,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import fnmatch, os, shutil, time
 from helper import simulate_crash_restart
-from test_rollback_to_stable01 import test_rollback_to_stable_base
+from rollback_to_stable_util import test_rollback_to_stable_base
 from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
@@ -36,7 +35,6 @@ from wtscenario import make_scenarios
 # test_rollback_to_stable12.py
 # Test the rollback to stable operation skipping subtrees in during tree walk.
 class test_rollback_to_stable12(test_rollback_to_stable_base):
-    session_config = 'isolation=snapshot'
 
     # This test is slow, and the value of running it on every access method maybe somewhat
     # questionable, since the code for skipping over subtrees during RTS is not dependent on
@@ -47,7 +45,7 @@ class test_rollback_to_stable12(test_rollback_to_stable_base):
     format_values = [
         ('column', dict(key_format='r', value_format='S')),
         ('column_fix', dict(key_format='r', value_format='8t')),
-        ('integer_row', dict(key_format='i', value_format='S')),
+        ('row_integer', dict(key_format='i', value_format='S')),
     ]
 
     prepare_values = [
@@ -58,17 +56,16 @@ class test_rollback_to_stable12(test_rollback_to_stable_base):
     scenarios = make_scenarios(format_values, prepare_values)
 
     def conn_config(self):
-        config = 'cache_size=500MB,statistics=(all),log=(enabled=true)'
+        config = 'cache_size=500MB,statistics=(all),verbose=(rts:5)'
         return config
 
     def test_rollback_to_stable(self):
         nrows = 1000000
 
-        # Create a table without logging.
+        # Create a table.
         uri = "table:rollback_to_stable12"
-        ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
-            config='split_pct=50,log=(enabled=false)')
+        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format,
+            config='split_pct=50')
         ds.populate()
 
         if self.value_format == '8t':
@@ -86,11 +83,13 @@ class test_rollback_to_stable12(test_rollback_to_stable_base):
         self.large_updates(uri, value_a, ds, nrows, self.prepare, 20)
 
         # Verify data is visible and correct.
-        self.check(value_a, uri, nrows, None, 20)
+        self.check(value_a, uri, nrows, None, 21 if self.prepare else 20)
 
-        # Pin stable to timestamp 30 if prepare otherwise 20.
+        # Pin stable to timestamp 28 if prepare otherwise 20.
+        # We prepare at commit_ts - 1 (so 29) and this is required to be strictly
+        # greater than (not >=) stable.
         if self.prepare:
-            self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(30))
+            self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(28))
         else:
             self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(20))
 
@@ -135,6 +134,3 @@ class test_rollback_to_stable12(test_rollback_to_stable_base):
         self.assertGreaterEqual(hs_removed, 0)
         self.assertEqual(hs_sweep, 0)
         self.assertGreaterEqual(pages_walk_skipped, 0)
-
-if __name__ == '__main__':
-    wttest.run()

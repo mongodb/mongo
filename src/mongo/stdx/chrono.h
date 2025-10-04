@@ -29,12 +29,14 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #include <chrono>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace stdx {
 
 namespace chrono = ::std::chrono;  // NOLINT
 
 }  // namespace stdx
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

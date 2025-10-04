@@ -35,6 +35,7 @@ namespace mongo {
 
 class BSONElement;
 class BSONObjBuilder;
+
 class CollatorInterface;
 
 /**
@@ -47,7 +48,7 @@ public:
      * Returns true if type can be affected in comparison or sort order by collation.
      */
     static bool isCollatableType(BSONType type) {
-        return type == BSONType::String || type == BSONType::Object || type == BSONType::Array;
+        return type == BSONType::string || type == BSONType::object || type == BSONType::array;
     }
 
     /**

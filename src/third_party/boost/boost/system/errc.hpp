@@ -16,6 +16,7 @@
 #include <boost/system/detail/generic_category.hpp>
 #include <boost/system/detail/error_category_impl.hpp>
 #include <boost/system/detail/config.hpp>
+#include <boost/assert/source_location.hpp>
 #include <boost/config.hpp>
 
 namespace boost
@@ -30,13 +31,19 @@ namespace errc
 {
 
 // explicit conversion:
-BOOST_SYSTEM_CONSTEXPR inline error_code make_error_code( errc_t e ) BOOST_NOEXCEPT
+BOOST_SYSTEM_CONSTEXPR inline error_code make_error_code( errc_t e ) noexcept
 {
     return error_code( e, generic_category() );
 }
 
+// explicit conversion:
+inline error_code make_error_code( errc_t e, boost::source_location const * loc ) noexcept
+{
+    return error_code( e, generic_category(), loc );
+}
+
 // implicit conversion:
-BOOST_SYSTEM_CONSTEXPR inline error_condition make_error_condition( errc_t e ) BOOST_NOEXCEPT
+BOOST_SYSTEM_CONSTEXPR inline error_condition make_error_condition( errc_t e ) noexcept
 {
     return error_condition( e, generic_category() );
 }

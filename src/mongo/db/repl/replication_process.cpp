@@ -27,23 +27,24 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
-#include "mongo/platform/basic.h"
+#include "mongo/db/repl/replication_process.h"
 
-#include "mongo/base/string_data.h"
-#include "mongo/db/catalog/collection_options.h"
+#include "mongo/base/status.h"
 #include "mongo/db/client.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_consistency_markers.h"
-#include "mongo/db/repl/replication_process.h"
-#include "mongo/db/repl/rollback_gen.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/str.h"
+#include "mongo/util/decorable.h"
+
+#include <mutex>
+#include <utility>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
+
 
 namespace mongo {
 namespace repl {
@@ -84,7 +85,7 @@ ReplicationProcess::ReplicationProcess(
       _rbid(kUninitializedRollbackId) {}
 
 Status ReplicationProcess::refreshRollbackID(OperationContext* opCtx) {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
 
     auto rbidResult = _storageInterface->getRollbackID(opCtx);
     if (!rbidResult.isOK()) {
@@ -92,13 +93,9 @@ Status ReplicationProcess::refreshRollbackID(OperationContext* opCtx) {
     }
 
     if (kUninitializedRollbackId == _rbid) {
-        LOGV2(21529,
-              "Rollback ID is {rbid}",
-              "Initializing rollback ID",
-              "rbid"_attr = rbidResult.getValue());
+        LOGV2(21529, "Initializing rollback ID", "rbid"_attr = rbidResult.getValue());
     } else {
         LOGV2(21530,
-              "Rollback ID is {rbid} (previously {previousRBID})",
               "Setting rollback ID",
               "rbid"_attr = rbidResult.getValue(),
               "previousRBID"_attr = _rbid);
@@ -109,17 +106,17 @@ Status ReplicationProcess::refreshRollbackID(OperationContext* opCtx) {
 }
 
 int ReplicationProcess::getRollbackID() const {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     if (kUninitializedRollbackId == _rbid) {
         // This may happen when serverStatus is called by an internal client before we have a chance
         // to read the rollback ID from storage.
-        LOGV2_WARNING(21533, "Rollback ID is not initialized yet");
+        LOGV2_DEBUG(21533, 3, "Rollback ID is not initialized yet");
     }
     return _rbid;
 }
 
 Status ReplicationProcess::initializeRollbackID(OperationContext* opCtx) {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
 
     invariant(kUninitializedRollbackId == _rbid);
 
@@ -129,15 +126,11 @@ Status ReplicationProcess::initializeRollbackID(OperationContext* opCtx) {
 
     auto initRbidSW = _storageInterface->initializeRollbackID(opCtx);
     if (initRbidSW.isOK()) {
-        LOGV2(21531,
-              "Initialized the rollback ID to {rbid}",
-              "Initialized the rollback ID",
-              "rbid"_attr = initRbidSW.getValue());
+        LOGV2(21531, "Initialized the rollback ID", "rbid"_attr = initRbidSW.getValue());
         _rbid = initRbidSW.getValue();
         invariant(kUninitializedRollbackId != _rbid);
     } else {
         LOGV2_WARNING(21534,
-                      "Failed to initialize the rollback ID: {error}",
                       "Failed to initialize the rollback ID",
                       "error"_attr = initRbidSW.getStatus().reason());
     }
@@ -145,22 +138,18 @@ Status ReplicationProcess::initializeRollbackID(OperationContext* opCtx) {
 }
 
 Status ReplicationProcess::incrementRollbackID(OperationContext* opCtx) {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
 
     auto status = _storageInterface->incrementRollbackID(opCtx);
 
     // If the rollback ID was incremented successfully, cache the new value in _rbid to be returned
     // the next time getRollbackID() is called.
     if (status.isOK()) {
-        LOGV2(21532,
-              "Incremented the rollback ID to {rbid}",
-              "Incremented the rollback ID",
-              "rbid"_attr = status.getValue());
+        LOGV2(21532, "Incremented the rollback ID", "rbid"_attr = status.getValue());
         _rbid = status.getValue();
         invariant(kUninitializedRollbackId != _rbid);
     } else {
         LOGV2_WARNING(21535,
-                      "Failed to increment the rollback ID: {error}",
                       "Failed to increment the rollback ID",
                       "error"_attr = status.getStatus().reason());
     }

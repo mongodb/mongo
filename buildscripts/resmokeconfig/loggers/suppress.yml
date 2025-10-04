@@ -1,10 +1,10 @@
 logging:
   executor:
     handlers:
-    - class: logging.NullHandler
+      - class: logging.NullHandler
   fixture:
     handlers:
-    - class: logging.NullHandler
+      - class: logging.NullHandler
   tests:
     handlers:
-    - class: logging.NullHandler
+      - class: logging.NullHandler

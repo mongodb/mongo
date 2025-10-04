@@ -26,17 +26,50 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/platform/basic.h"
-
+// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/connection_string.h"
+#include "mongo/client/mongo_uri.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/client/replica_set_change_notifier.h"
+#include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/replica_set_monitor_manager.h"
-#include "mongo/client/streamable_replica_set_monitor.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/wire_version.h"
+#include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/network_interface_thread_pool.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_response.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/unittest/integration_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/cancellation.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/future.h"
+#include "mongo/util/hierarchical_acquisition.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr.hpp>
 
 namespace mongo {
 namespace executor {
@@ -65,9 +98,9 @@ public:
     constexpr static Milliseconds kTimeout{5000};
 
     void resetIsInternalClient(bool isInternalClient) {
-        WireSpec::Specification newSpec = *WireSpec::instance().get();
+        WireSpec::Specification newSpec = *WireSpec::getWireSpec(getGlobalServiceContext()).get();
         newSpec.isInternalClient = isInternalClient;
-        WireSpec::instance().reset(std::move(newSpec));
+        WireSpec::getWireSpec(getGlobalServiceContext()).reset(std::move(newSpec));
     }
 
     void setUp() override {
@@ -76,7 +109,7 @@ public:
         net = makeNetworkInterface("ReplicaSetMonintorTest");
 
         auto tp = std::make_unique<NetworkInterfaceThreadPool>(net.get());
-        executor = std::make_shared<ThreadPoolTaskExecutor>(std::move(tp), net);
+        executor = ThreadPoolTaskExecutor::create(std::move(tp), net);
         executor->startup();
 
         connectionManager = std::make_unique<ReplicaSetMonitorConnectionManager>(net);
@@ -101,12 +134,7 @@ public:
      * Runs the given remote command request, and returns the response.
      */
     RemoteCommandResponse runCommand(RemoteCommandRequest request) {
-        RemoteCommandRequestOnAny rcroa{request};
-        auto deferred = net->startCommand(makeCallbackHandle(), rcroa)
-                            .then([](TaskExecutor::ResponseOnAnyStatus roa) {
-                                return RemoteCommandResponse(roa);
-                            });
-        return deferred.get();
+        return net->startCommand(makeCallbackHandle(), request).get();
     }
 
 
@@ -124,7 +152,7 @@ public:
         // this test is not running on mongos.
         const auto cmdObj = BSON("listShards" << 1);
         RemoteCommandRequest request{getFixtureConnectionString().getServers().front(),
-                                     "admin",
+                                     DatabaseName::kAdmin,
                                      cmdObj,
                                      BSONObj(),
                                      nullptr,
@@ -141,7 +169,7 @@ public:
         ASSERT_OK(cmdStatus);
         const auto shards = res.data["shards"].Array();
         ASSERT_FALSE(shards.empty());
-        return shards.front().embeddedObject().getStringField("host");
+        return std::string{shards.front().embeddedObject().getStringField("host")};
     }
 
 protected:
@@ -157,7 +185,6 @@ protected:
 TEST_F(ReplicaSetMonitorFixture, StreamableRSMWireVersion) {
     auto rsm = ReplicaSetMonitorManager::get()->getOrCreateMonitor(replSetUri, nullptr);
 
-    // Schedule isMaster requests and wait for the responses.
     auto primaryFuture =
         rsm->getHostOrRefresh(ReadPreferenceSetting(mongo::ReadPreference::PrimaryOnly),
                               CancellationToken::uncancelable());
@@ -173,7 +200,7 @@ TEST_F(ReplicaSetMonitorFixture, ReplicaSetMonitorCleanup) {
     auto sets = ReplicaSetMonitorManager::get()->getAllSetNames();
     ASSERT_TRUE(std::find(sets.begin(), sets.end(), setName) == sets.end());
 
-    auto mutex = MONGO_MAKE_LATCH("ReplicaSetMonitorCleanup");
+    stdx::mutex mutex;
     stdx::condition_variable cv;
     bool cleanupInvoked = false;
     auto rsm = ReplicaSetMonitorManager::get()->getOrCreateMonitor(replSetUri,
@@ -205,7 +232,7 @@ TEST_F(ReplicaSetMonitorFixture, LockOrderingAndGC) {
         ReplicaSetMonitorManager::get()->getGarbageCollectedMonitorsCount();
 
     {
-        auto lvl2mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(2), "lvl2mutex");
+        stdx::mutex lvl2mutex;
         stdx::unique_lock lk(lvl2mutex);
         // This invokes delayed GC that locks only lvl 1 mutex.
         monitor.reset();
@@ -224,6 +251,26 @@ TEST_F(ReplicaSetMonitorFixture, LockOrderingAndGC) {
     ASSERT_EQ(previousGCCount + 1,
               ReplicaSetMonitorManager::get()->getGarbageCollectedMonitorsCount());
     ASSERT_EQ(0, ReplicaSetMonitorManager::get()->getAllSetNames().size());
+}
+
+// Tests 1) that boost::none gets returned if you try to get pingTime for some random host and port
+// that isn't part of the RSM and 2) that the pingTime can be collected for an RSM.
+TEST_F(ReplicaSetMonitorFixture, PingTime) {
+    ReplicaSetMonitor::cleanup();
+    auto rsm = ReplicaSetMonitor::createIfNeeded(replSetUri);
+
+    rsm->getHostOrRefresh(ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                          CancellationToken::uncancelable())
+        .get();
+
+    bool foundPing = false;
+    for (const auto& server : replSetUri.getServers()) {
+        if (rsm->pingTime(server) != boost::none) {
+            foundPing = true;
+        }
+    }
+    ASSERT_TRUE(foundPing);
+    ASSERT_EQ(rsm->pingTime(HostAndPort{"not-member-host", 1234}), boost::none);
 }
 
 }  // namespace

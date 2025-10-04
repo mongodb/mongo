@@ -2,14 +2,16 @@
  * Tests that prepare conflicts for prepared transactions are retried.
  *
  * @tags: [
+ *   # The test runs commands that are not allowed with security token: prepareTransaction, profile.
+ *   not_allowed_with_signed_security_token,
  *   uses_prepare_transaction,
  *   uses_transactions,
- *   uses_parallel_shell
+ *   uses_parallel_shell,
+ *   requires_profiling,
  * ]
  */
-(function() {
-"use strict";
-load("jstests/core/txns/libs/prepare_helpers.js");
+
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 
 const dbName = "test";
 const collName = "prepare_conflict";
@@ -35,15 +37,15 @@ const assertPrepareConflict = function assertPrepareReadConflict(filter, cluster
             find: collName,
             filter: filter,
             readConcern: {afterClusterTime: clusterTime},
-            maxTimeMS: 5000
+            maxTimeMS: 5000,
         }),
-        ErrorCodes.MaxTimeMSExpired);
+        ErrorCodes.MaxTimeMSExpired,
+    );
 
     checkLog.contains(testDB, prepareConflictDurationLogMsg);
 
     let prepareConflicted = false;
-    const cur =
-        testDB.system.profile.find({"ns": testColl.getFullName(), "command.filter": filter});
+    const cur = testDB.system.profile.find({"ns": testColl.getFullName(), "command.filter": filter});
     while (cur.hasNext()) {
         const n = cur.next();
         print("op: " + JSON.stringify(n));
@@ -57,34 +59,42 @@ const assertPrepareConflict = function assertPrepareReadConflict(filter, cluster
 // Insert a document modified by the transaction.
 const txnDoc = {
     _id: 1,
-    x: 1
+    x: 1,
 };
 assert.commandWorked(testColl.insert(txnDoc));
 // Insert a document unmodified by the transaction.
 const otherDoc = {
     _id: 2,
-    y: 2
+    y: 2,
 };
 assert.commandWorked(testColl.insert(otherDoc, {writeConcern: {w: "majority"}}));
 
 // Create an index on 'y' to avoid conflicts on the field.
-assert.commandWorked(testColl.runCommand({
-    createIndexes: collName,
-    indexes: [{key: {"y": 1}, name: "y_1"}],
-    writeConcern: {w: "majority"}
-}));
+assert.commandWorked(
+    testColl.runCommand({
+        createIndexes: collName,
+        indexes: [{key: {"y": 1}, name: "y_1"}],
+        writeConcern: {w: "majority"},
+    }),
+);
 
 // Enable the profiler to log slow queries. We expect a 'find' to hang until the prepare
 // conflict is resolved.
-assert.commandWorked(testDB.runCommand({profile: 1, level: 1, slowms: 100}));
+// Don't profile the setFCV command, which could be run during this test in the
+// fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
+assert.commandWorked(
+    testDB.runCommand({profile: 1, filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}}}),
+);
 
 const session = db.getMongo().startSession({causalConsistency: false});
 const sessionDB = session.getDatabase(dbName);
 session.startTransaction({readConcern: {level: "snapshot"}});
-assert.commandWorked(sessionDB.runCommand({
-    update: collName,
-    updates: [{q: txnDoc, u: {$inc: {x: 1}}}],
-}));
+assert.commandWorked(
+    sessionDB.runCommand({
+        update: collName,
+        updates: [{q: txnDoc, u: {$inc: {x: 1}}}],
+    }),
+);
 const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
 // Conflict on _id of prepared document.
@@ -108,9 +118,10 @@ assert.eq(false, checkLog.checkContainsOnce(testDB, prepareConflictDurationLogMs
 TestData.collName = collName;
 TestData.dbName = dbName;
 TestData.txnDoc = txnDoc;
-const findAwait = startParallelShell(function() {
-    const it = db.getSiblingDB(TestData.dbName)
-                   .runCommand({find: TestData.collName, filter: {_id: TestData.txnDoc._id}});
+const findAwait = startParallelShell(function () {
+    const it = db
+        .getSiblingDB(TestData.dbName)
+        .runCommand({find: TestData.collName, filter: {_id: TestData.txnDoc._id}});
 }, db.getMongo().port);
 assert.commandWorked(session.abortTransaction_forTesting());
 
@@ -119,4 +130,3 @@ findAwait({checkExitSuccess: true});
 
 // The document should be unmodified, because we aborted.
 assert.eq(txnDoc, testColl.findOne(txnDoc));
-})();

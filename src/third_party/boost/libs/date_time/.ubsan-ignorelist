@@ -1,0 +1,4 @@
+# https://github.com/boostorg/serialization/issues/122
+vptr:/usr/include/c++/*/bits/ios_base.h
+# https://github.com/boostorg/serialization/issues/193
+# could not figure out how to suppress it

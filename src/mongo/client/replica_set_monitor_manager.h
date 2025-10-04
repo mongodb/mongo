@@ -29,19 +29,39 @@
 
 #pragma once
 
+#include "mongo/base/counter.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/connection_string.h"
+#include "mongo/client/mongo_uri.h"
+#include "mongo/client/replica_set_change_notifier.h"
+#include "mongo/client/replica_set_monitor_stats.h"
+#include "mongo/executor/egress_connection_closer.h"
+#include "mongo/executor/network_connection_hook.h"
+#include "mongo/executor/network_interface.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_response.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/transport/session.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/hierarchical_acquisition.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/string_map.h"
+
+#include <cstddef>
 #include <deque>
+#include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 
-#include "mongo/client/replica_set_change_notifier.h"
-#include "mongo/client/replica_set_monitor_stats.h"
-#include "mongo/executor/egress_tag_closer.h"
-#include "mongo/executor/network_connection_hook.h"
-#include "mongo/executor/network_interface.h"
-#include "mongo/executor/task_executor.h"
-#include "mongo/platform/mutex.h"
-#include "mongo/util/hierarchical_acquisition.h"
-#include "mongo/util/string_map.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -53,11 +73,11 @@ class MongoURI;
 class ReplicaSetMonitorManagerNetworkConnectionHook final : public executor::NetworkConnectionHook {
 public:
     ReplicaSetMonitorManagerNetworkConnectionHook() = default;
-    virtual ~ReplicaSetMonitorManagerNetworkConnectionHook() = default;
+    ~ReplicaSetMonitorManagerNetworkConnectionHook() override = default;
 
     Status validateHost(const HostAndPort& remoteHost,
-                        const BSONObj& isMasterRequest,
-                        const executor::RemoteCommandResponse& isMasterReply) override;
+                        const BSONObj& helloRequest,
+                        const executor::RemoteCommandResponse& helloReply) override;
 
     StatusWith<boost::optional<executor::RemoteCommandRequest>> makeRequest(
         const HostAndPort& remoteHost) override;
@@ -66,25 +86,23 @@ public:
                        executor::RemoteCommandResponse&& response) override;
 };
 
-class ReplicaSetMonitorConnectionManager : public executor::EgressTagCloser {
+class ReplicaSetMonitorConnectionManager : public executor::EgressConnectionCloser {
     ReplicaSetMonitorConnectionManager() = delete;
 
 public:
     ReplicaSetMonitorConnectionManager(std::shared_ptr<executor::NetworkInterface> network)
-        : _network(network) {}
+        : _network(std::move(network)) {}
 
-    void dropConnections(const HostAndPort& hostAndPort) override;
+    void dropConnections(const HostAndPort& target, const Status& status) override;
 
     // Not supported.
-    void dropConnections(transport::Session::TagMask tags) override {
+    void dropConnections(const Status& status) override {
         MONGO_UNREACHABLE;
     };
     // Not supported.
-    void mutateTags(const HostAndPort& hostAndPort,
-                    const std::function<transport::Session::TagMask(transport::Session::TagMask)>&
-                        mutateFunc) override {
+    void setKeepOpen(const HostAndPort& hostAndPort, bool keepOpen) override {
         MONGO_UNREACHABLE;
-    };
+    }
 
 private:
     std::shared_ptr<executor::NetworkInterface> _network;
@@ -176,15 +194,14 @@ public:
 
 private:
     /**
-     * Returns an EgressTagCloser controlling the executor's network interface.
+     * Returns an EgressConnectionCloser controlling the executor's network interface.
      */
-    std::shared_ptr<executor::EgressTagCloser> _getConnectionManager();
+    std::shared_ptr<executor::EgressConnectionCloser> _getConnectionManager();
 
     using ReplicaSetMonitorsMap = StringMap<std::weak_ptr<ReplicaSetMonitor>>;
 
     // Protects access to the replica set monitors and several fields.
-    mutable Mutex _mutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(6), "ReplicaSetMonitorManager::_mutex");
+    mutable stdx::mutex _mutex;
 
     // Fields guarded by _mutex:
 
@@ -203,7 +220,7 @@ private:
 
     int _numMonitorsCreated;
 
-    void _setupTaskExecutorAndStatsInLock();
+    void _setupTaskExecutorAndStats(WithLock);
 
     // Set to true when shutdown has been called.
     bool _isShutdown{false};
@@ -212,8 +229,7 @@ private:
     // It is necessary to avoid deadlock while invoking the 'registerForGarbageCollection()' while
     // already holding any lvl 2-6 mutex up the stack. The 'registerForGarbageCollection()' method
     // is not locking the lvl 6 _mutex above.
-    mutable Mutex _gcMutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(1), "ReplicaSetMonitorManager::_gcMutex");
+    mutable stdx::mutex _gcMutex;
 
     // Fields guarded by _gcMutex.
 
@@ -227,8 +243,9 @@ private:
     // Used for tests.
     Counter64 _monitorsGarbageCollected;
 
-    // Internally synchronized.
-    std::shared_ptr<ReplicaSetMonitorManagerStats> _stats;
+    // Pointee is internally synchronized.
+    const std::shared_ptr<ReplicaSetMonitorManagerStats> _stats =
+        std::make_shared<ReplicaSetMonitorManagerStats>();
 };
 
 }  // namespace mongo

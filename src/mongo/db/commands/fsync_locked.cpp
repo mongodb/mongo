@@ -27,9 +27,10 @@
  *    it in the license file.
  */
 
-#include <functional>
-
 #include "mongo/db/commands/fsync_locked.h"
+
+#include <functional>
+#include <utility>
 
 namespace mongo {
 namespace {

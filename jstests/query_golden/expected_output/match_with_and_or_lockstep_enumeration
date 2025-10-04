@@ -1,0 +1,46 @@
+
+
+[jsTest] ----
+[jsTest] Resetting collection. Inserting docs:
+[jsTest] ----
+
+{  "_id" : 0,  "x" : 2 }
+{  "_id" : 1,  "a" : 2,  "x" : 2 }
+{  "_id" : 2,  "a" : 1,  "b" : 8,  "x" : 2 }
+{  "_id" : 3,  "a" : 1,  "b" : 2,  "c" : 9,  "x" : 2 }
+{  "_id" : 4,  "a" : 1,  "b" : 2,  "c" : 3,  "x" : 2 }
+{  "_id" : 5,  "a" : 1,  "b" : 4,  "x" : 2 }
+{  "_id" : 6,  "a" : 1,  "b" : 5,  "x" : 2 }
+{  "_id" : 7,  "a" : 1,  "b" : 6,  "x" : 2 }
+{  "_id" : 8,  "a" : 1,  "b" : 7,  "x" : 2 }
+Collection count: 9
+
+
+[jsTest] ----
+[jsTest] Creating indexes:
+[jsTest] ----
+
+{  "a" : 1,  "b" : 1 }
+{  "a" : 1,  "c" : 1 }
+
+
+[jsTest] ----
+[jsTest] Boolean simplification enabled: true
+[jsTest] ----
+
+{  "_id" : 4,  "a" : 1,  "b" : 2,  "c" : 3,  "x" : 2 }
+{  "_id" : 5,  "a" : 1,  "b" : 4,  "x" : 2 }
+{  "_id" : 6,  "a" : 1,  "b" : 5,  "x" : 2 }
+{  "_id" : 7,  "a" : 1,  "b" : 6,  "x" : 2 }
+{  "_id" : 8,  "a" : 1,  "b" : 7,  "x" : 2 }
+
+
+[jsTest] ----
+[jsTest] Boolean simplification enabled: false
+[jsTest] ----
+
+{  "_id" : 4,  "a" : 1,  "b" : 2,  "c" : 3,  "x" : 2 }
+{  "_id" : 5,  "a" : 1,  "b" : 4,  "x" : 2 }
+{  "_id" : 6,  "a" : 1,  "b" : 5,  "x" : 2 }
+{  "_id" : 7,  "a" : 1,  "b" : 6,  "x" : 2 }
+{  "_id" : 8,  "a" : 1,  "b" : 7,  "x" : 2 }

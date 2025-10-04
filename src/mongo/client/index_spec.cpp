@@ -27,12 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/client/index_spec.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/client/dbclient_base.h"
-#include "mongo/client/read_preference.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -59,7 +58,7 @@ const char kDuplicateOption[] = "duplicate option added to index descriptor";
 
 IndexSpec::IndexSpec() : _dynamicName(true) {}
 
-IndexSpec& IndexSpec::addKey(const StringData& field, IndexType type) {
+IndexSpec& IndexSpec::addKey(StringData field, IndexType type) {
     uassert(ErrorCodes::InvalidOptions, kDuplicateKey, !_keys.asTempObj().hasField(field));
     if (type <= kIndexTypeDescending)
         _keys.append(field, kIndexTypeNumbers[type]);
@@ -106,8 +105,8 @@ IndexSpec& IndexSpec::unique(bool value) {
     return *this;
 }
 
-IndexSpec& IndexSpec::name(const StringData& value) {
-    _name = value.toString();
+IndexSpec& IndexSpec::name(StringData value) {
+    _name = std::string{value};
     _dynamicName = false;
     return *this;
 }
@@ -146,7 +145,7 @@ IndexSpec& IndexSpec::textWeights(const BSONObj& value) {
     return *this;
 }
 
-IndexSpec& IndexSpec::textDefaultLanguage(const StringData& value) {
+IndexSpec& IndexSpec::textDefaultLanguage(StringData value) {
     uassert(ErrorCodes::InvalidOptions,
             kDuplicateOption,
             !_options.asTempObj().hasField("default_language"));
@@ -154,7 +153,7 @@ IndexSpec& IndexSpec::textDefaultLanguage(const StringData& value) {
     return *this;
 }
 
-IndexSpec& IndexSpec::textLanguageOverride(const StringData& value) {
+IndexSpec& IndexSpec::textLanguageOverride(StringData value) {
     uassert(ErrorCodes::InvalidOptions,
             kDuplicateOption,
             !_options.asTempObj().hasField("language_override"));

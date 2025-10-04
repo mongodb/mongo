@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/repl/optime.h"
+#include <memory>
 
 namespace mongo {
 
@@ -48,9 +48,12 @@ class OperationContext;
  */
 class JournalListener {
 public:
-    using Token = repl::OpTimeAndWallTime;
+    class Token {
+    public:
+        virtual ~Token() = default;
+    };
     virtual ~JournalListener() = default;
-    virtual Token getToken(OperationContext* opCtx) = 0;
+    virtual std::unique_ptr<Token> getToken(OperationContext* opCtx) = 0;
     virtual void onDurable(const Token& token) = 0;
 };
 

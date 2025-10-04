@@ -31,26 +31,28 @@
  * This file contains tests for mongo/db/geo/hash.cpp.
  */
 
-#include <algorithm>  // For max()
-#include <bitset>
-#include <cmath>
-#include <iomanip>
-#include <sstream>
-#include <string>
-
 #include "mongo/db/geo/hash.h"
+
+#include "mongo/base/string_data.h"
 #include "mongo/db/geo/shapes.h"
 #include "mongo/platform/random.h"
+#include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>  // For max()
+#include <cmath>
+#include <cstddef>
+#include <iostream>
+#include <string>
+
+#include <s2cellid.h>
 
 namespace {
 
 using namespace mongo;
 
-using std::cout;
-using std::endl;
 using std::string;
 using std::stringstream;
 
@@ -81,30 +83,6 @@ string splitBinStr(string bin) {
     return split.substr(0, split.size() - 1);
 }
 
-bool unhash_fast_and_slow_match(string hash) {
-    GeoHash geoHash = GeoHash(hash);
-    unsigned fastX, fastY, slowX, slowY, x, y;
-
-    geoHash.unhash_fast(&x, &y);
-    fastX = x;
-    fastY = y;
-
-    geoHash.unhash_slow(&x, &y);
-    slowX = x;
-    slowY = y;
-
-    bool match = (fastX == slowX && fastY == slowY);
-    if (!match) {
-        std::bitset<32> fastXBits(fastX), fastYBits(fastY), slowXBits(slowX), slowYBits(slowY);
-        cout << "unhash_fast's x: " << splitBinStr(fastXBits.to_string()) << endl;
-        cout << "unhash_slow's x: " << splitBinStr(slowXBits.to_string()) << endl;
-        cout << "unhash_fast's y: " << splitBinStr(fastYBits.to_string()) << endl;
-        cout << "unhash_slow's y: " << splitBinStr(slowYBits.to_string()) << endl;
-    }
-
-    return match;
-}
-
 TEST(GeoHash, MakeRandomValidHashes) {
     int maxStringLength = 64;
     for (int i = 0; i < maxStringLength; i += 2) {
@@ -130,21 +108,71 @@ TEST(GeoHash, MakeOddHash) {
     ASSERT_THROWS(makeHash(a), mongo::AssertionException);
 }
 
-TEST(GeoHash, UnhashFastMatchesUnhashSlow) {
-    string hashes[12] = {"0000000000000000000000000000000000000000000000000000000000000000",
-                         "0101010110100011011100110101000000000101001101000011001011111001",
-                         "1010000000110010100110000111001111010011010100001000011110101100",
-                         "0101010110100011011101011010001111000110111011111011001010110100",
-                         "1010000000110010100111101000000000010000100010110000011111100001",
-                         "0101010100100100001011111110011110010001111100011011011110110111",
-                         "1010000010110101110001001100010001000111100101010000001011100010",
-                         "0101010100100100001010010001010001010010001010100011011111111010",
-                         "1010000010110101110000100011011110000100010011101000001010101111",
-                         "0101010110100011011100110101000000000000100111110001101101001011",
-                         "1010000000110010100110000111001111010110111110111010111000011110",
-                         "1111111111111111111111111111111111111111111111111111111111111111"};
-    for (int i = 0; i < 12; i++) {
-        ASSERT_TRUE(unhash_fast_and_slow_match(hashes[i]));
+TEST(GeoHash, HashAndUnhash) {
+    PseudoRandom random(12345);
+    for (int i = 0; i < 1'000; i++) {
+        auto x = random.nextInt32();
+        auto y = random.nextInt32();
+        auto hash = GeoHash(x, y, 32);
+        unsigned int unhashedX, unhashedY;
+        hash.unhash(&unhashedX, &unhashedY);
+        ASSERT_EQ(x, unhashedX);
+        ASSERT_EQ(y, unhashedY);
+    }
+}
+
+TEST(GeoHash, HashCropsBits) {
+    // The following numbers were generated with this code snippet on Linux and hardcoded.
+    // PseudoRandom random(12345);
+    {
+        auto x = -2067174821;
+        auto y = 1127948890;
+        auto bits = 1;
+        auto hash = GeoHash(x, y, bits);
+        ASSERT_EQ(hash.toString(), "10");
+    }
+    {
+        auto x = -847616485;
+        auto y = -2132331508;
+        auto bits = 3;
+        auto hash = GeoHash(x, y, bits);
+        ASSERT_EQ(hash.toString(), "111000");
+    }
+    {
+        auto x = -818733575;
+        auto y = -721367113;
+        auto bits = 6;
+        auto hash = GeoHash(x, y, bits);
+        ASSERT_EQ(hash.toString(), "111100011011");
+    }
+    {
+        auto x = 1272197554;
+        auto y = 1923758992;
+        auto bits = 15;
+        auto hash = GeoHash(x, y, bits);
+        ASSERT_EQ(hash.toString(), "001101011000111011100110011001");
+    }
+    {
+        auto x = -1516163863;
+        auto y = -158391651;
+        auto bits = 23;
+        auto hash = GeoHash(x, y, bits);
+        ASSERT_EQ(hash.toString(), "1101110100110110110010000101011100001100101001");
+    }
+    {
+        auto x = -1665346465;
+        auto y = 1063852771;
+        auto bits = 30;
+        auto hash = GeoHash(x, y, bits);
+        ASSERT_EQ(hash.toString(), "100001111111010110011110111000011010001101100100011101101010");
+    }
+    {
+        auto x = 327397251;
+        auto y = 471329956;
+        auto bits = 32;
+        auto hash = GeoHash(x, y, bits);
+        ASSERT_EQ(hash.toString(),
+                  "0000001101011010100000010001111111011100111110101100010000011010");
     }
 }
 

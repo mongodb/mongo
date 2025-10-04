@@ -13,17 +13,14 @@
  *   from two different primaries.
  * 6. Reconnect node0 to the rest of the set and verify that its reconfig fails.
  */
-(function() {
-"use strict";
-load("jstests/libs/parallel_shell_helpers.js");
-load('jstests/libs/test_background_ops.js');
-load("jstests/replsets/rslib.js");
-load('jstests/aggregation/extras/utils.js');
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {isConfigCommitted} from "jstests/replsets/rslib.js";
 
 let rst = new ReplSetTest({nodes: 4, useBridge: true});
 rst.startSet();
-rst.initiateWithHighElectionTimeout();
+rst.initiate();
 
 const node0 = rst.getPrimary();
 const [node1, node2, node3] = rst.getSecondaries();
@@ -37,7 +34,7 @@ configureFailPoint(rst.getPrimary(), "omitConfigQuorumCheck");
 
 // Reconfig to remove the node3. The new config, C1, is now {node0, node1, node2}.
 const C1 = Object.assign({}, rst.getReplSetConfigFromNode());
-C1.members = C1.members.slice(0, 3);  // Remove the last node.
+C1.members = C1.members.slice(0, 3); // Remove the last node.
 // Increase the C1 version by a high number to ensure the following config
 // C2 will win the propagation by having a higher term.
 C1.version = C1.version + 1000;
@@ -51,16 +48,26 @@ jsTestLog("Current replica set topology: [node0 (Primary)] [node1, node2, node3]
 // Create parallel shell to execute reconfig on partitioned primary.
 // This reconfig will not get propagated.
 const parallelShell = startParallelShell(
-    funWithArgs(function(config) {
-        assert.commandFailedWithCode(db.getMongo().adminCommand({replSetReconfig: config}),
-                                     ErrorCodes.InterruptedDueToReplStateChange,
-                                     "Reconfig C1 should fail");
-    }, C1), node0.port);
+    funWithArgs(function (config) {
+        assert.soon(() => {
+            try {
+                const res = db.getMongo().adminCommand({replSetReconfig: config});
+                return ErrorCodes.isNotPrimaryError(res.code);
+            } catch (e) {
+                if (e.toString().includes("network error while attempting to run command")) {
+                    return false;
+                }
+                throw e;
+            }
+        }, "Reconfig C1 should fail");
+    }, C1),
+    node0.port,
+);
 
 assert.commandWorked(node1.adminCommand({replSetStepUp: 1}));
-rst.awaitNodesAgreeOnPrimary(rst.kDefaultTimeoutMS, [node1, node2, node3], node1);
+rst.awaitNodesAgreeOnPrimary(rst.timeoutMS, [node1, node2, node3], node1);
 jsTestLog("Current replica set topology: [node0 (Primary)] [node1 (Primary), node2, node3]");
-assert.soon(() => node1.getDB('admin').runCommand({hello: 1}).isWritablePrimary);
+assert.soon(() => node1.getDB("admin").runCommand({hello: 1}).isWritablePrimary);
 assert.soon(() => isConfigCommitted(node1));
 
 // Reconfig to remove a secondary. We need to specify the node to get the original
@@ -76,8 +83,8 @@ assert.soon(() => isConfigCommitted(node1));
 node0.reconnect([node1, node2, node3]);
 // The newly connected node will receive a heartbeat with a higher term, and
 // step down from being primary. The reconfig command issued to this node, C1, will fail.
-rst.waitForState(node0, ReplSetTest.State.SECONDARY);
-rst.awaitNodesAgreeOnPrimary(rst.kDefaultTimeoutMS, [node0, node1, node3]);
+rst.awaitSecondaryNodes(null, [node0]);
+rst.awaitNodesAgreeOnPrimary(rst.timeoutMS, [node0, node1, node3], node1);
 rst.waitForConfigReplication(node1);
 assert.eq(C2, rst.getReplSetConfigFromNode());
 
@@ -88,7 +95,15 @@ C3.version++;
 
 assert.commandWorked(node1.adminCommand({replSetReconfig: C3}));
 assert.soon(() => isConfigCommitted(node1));
+// Make sure all nodes, including the once-removed node2, have the final config.
+rst.waitForConfigReplication(node1);
 rst.awaitNodesAgreeOnPrimary();
 parallelShell();
+// Node0 could have gone through a rollback after reconnecting with the Node1, the
+// new primary. Make sure all secondaries are out of a recovering state before
+// attempting to shutdown the replica set.
+assert.commandWorked(
+    rst.getPrimary().adminCommand({appendOplogNote: 1, data: {msg: "dummy write to the new primary"}}),
+);
+rst.awaitReplication();
 rst.stopSet();
-}());

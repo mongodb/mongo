@@ -27,18 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/commands/rwc_defaults_commands_gen.h"
-#include "mongo/db/commands/server_status.h"
+#include "mongo/db/commands/server_status/server_status.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/read_write_concern_defaults.h"
+
+#include <memory>
 
 namespace mongo {
 namespace {
 
 class ReadWriteConcernDefaultsServerStatus final : public ServerStatusSection {
 public:
-    ReadWriteConcernDefaultsServerStatus() : ServerStatusSection("defaultRWConcern") {}
+    using ServerStatusSection::ServerStatusSection;
 
     bool includeByDefault() const override {
         return true;
@@ -52,8 +55,10 @@ public:
         response.setLocalUpdateWallClockTime(rwcDefault.localUpdateWallClockTime());
         return response.toBSON();
     }
-
-} defaultRWConcernServerStatus;
+};
+auto& defaultRWConcernServerStatus =
+    *ServerStatusSectionBuilder<ReadWriteConcernDefaultsServerStatus>("defaultRWConcern")
+         .forRouter();
 
 }  // namespace
 }  // namespace mongo

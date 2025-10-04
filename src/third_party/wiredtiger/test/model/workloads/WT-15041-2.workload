@@ -1,0 +1,10 @@
+# A very basic test for abandoning checkpoints.
+config("database", "disaggregated=true")
+create_table(8, "table8", "Q", "Q")
+set_stable_timestamp(36856)
+begin_transaction(42)
+checkpoint()
+insert(8, 42, 33986, 610107)
+commit_transaction(42, 47289, 0)
+set_stable_timestamp(255822)
+checkpoint_crash(874)

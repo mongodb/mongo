@@ -27,13 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/platform/mutex.h"
 #include "mongo/util/clock_source_mock.h"
+
+#include "mongo/util/assert_util.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/static_immortal.h"
 
-#include <algorithm>
+#include <mutex>
+#include <new>
+#include <queue>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 namespace {
@@ -44,58 +48,74 @@ namespace {
  **/
 class ClockSourceMockImpl {
 public:
-    using Alarm = std::pair<Date_t, unique_function<void()>>;
-
-    static ClockSourceMockImpl* get() noexcept {
-        static auto clkSource = StaticImmortal<ClockSourceMockImpl>();
-        return &clkSource.value();
-    }
-
-    Date_t now() {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+    Date_t now() const {
+        stdx::lock_guard lk(_mutex);
         return _now;
     }
 
     void advance(Milliseconds ms) {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        stdx::unique_lock lk(_mutex);
         _now += ms;
-        _processAlarms(std::move(lk));
-    }
-    void reset(Date_t newNow) {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
-        _now = newNow;
-        _processAlarms(std::move(lk));
+        _processAlarms(lk);
     }
 
-    Status setAlarm(Date_t when, unique_function<void()> action) {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
-        if (when <= _now) {
-            lk.unlock();
-            action();
-            return Status::OK();
-        }
-        _alarms.emplace_back(when, std::move(action));
-        return Status::OK();
+    void reset(Date_t newNow) {
+        stdx::unique_lock lk(_mutex);
+        _now = newNow;
+        _processAlarms(lk);
+    }
+
+    void setAlarm(Date_t when, unique_function<void()> action) {
+        if (!action)
+            return;
+        stdx::unique_lock lk(_mutex);
+        _alarms.push({when, std::move(action)});
+        _processAlarms(lk);
     }
 
 private:
-    void _processAlarms(stdx::unique_lock<stdx::mutex> lk) {
-        invariant(lk.owns_lock());
-        std::vector<Alarm> readyAlarms;
-        auto alarmIsNotExpired = [&](const Alarm& alarm) { return alarm.first > _now; };
-        auto expiredAlarmsBegin = std::partition(_alarms.begin(), _alarms.end(), alarmIsNotExpired);
-        std::move(expiredAlarmsBegin, _alarms.end(), std::back_inserter(readyAlarms));
-        _alarms.erase(expiredAlarmsBegin, _alarms.end());
-        lk.unlock();
-        for (const auto& alarm : readyAlarms) {
-            alarm.second();
+    struct Alarm {
+        Date_t when;
+        unique_function<void()> action;
+    };
+
+    // By `when`, descending, to create a min-heap.
+    struct AlarmQueueOrder {
+        bool operator()(const Alarm& a, const Alarm& b) const {
+            return a.when > b.when;
+        }
+    };
+
+    class AlarmQueue : public std::priority_queue<Alarm, std::vector<Alarm>, AlarmQueueOrder> {
+    public:
+        unique_function<void()> consumeNextAction() {
+            invariant(!c.empty(), "Alarm queue cannot be empty");
+            // Ok because action doesn't affect heap order.
+            auto action = std::move(c.front().action);
+            pop();
+            return action;
+        }
+    };
+
+    void _processAlarms(stdx::unique_lock<stdx::mutex>& lk) {
+        while (!_alarms.empty() && _alarms.top().when <= _now) {
+            auto action = _alarms.consumeNextAction();
+            lk.unlock();
+            ScopeGuard relock([&] { lk.lock(); });
+            action();
         }
     }
 
-    stdx::mutex _mutex;  // NOLINT
+    mutable stdx::mutex _mutex;
     Date_t _now = ClockSourceMock::kInitialNow;
-    std::vector<Alarm> _alarms;
+    AlarmQueue _alarms;
 };
+
+ClockSourceMockImpl* getGlobalClockSourceMock() {
+    static StaticImmortal<ClockSourceMockImpl> clkSource;
+    return &*clkSource;
+}
+
 }  // namespace
 
 Milliseconds ClockSourceMock::getPrecision() {
@@ -103,19 +123,19 @@ Milliseconds ClockSourceMock::getPrecision() {
 }
 
 Date_t ClockSourceMock::now() {
-    return ClockSourceMockImpl::get()->now();
+    return getGlobalClockSourceMock()->now();
 }
 
 void ClockSourceMock::advance(Milliseconds ms) {
-    ClockSourceMockImpl::get()->advance(ms);
+    getGlobalClockSourceMock()->advance(ms);
 }
 
 void ClockSourceMock::reset(Date_t newNow) {
-    ClockSourceMockImpl::get()->reset(newNow);
+    getGlobalClockSourceMock()->reset(newNow);
 }
 
-Status ClockSourceMock::setAlarm(Date_t when, unique_function<void()> action) {
-    return ClockSourceMockImpl::get()->setAlarm(when, std::move(action));
+void ClockSourceMock::setAlarm(Date_t when, unique_function<void()> action) {
+    getGlobalClockSourceMock()->setAlarm(when, std::move(action));
 }
 
 }  // namespace mongo

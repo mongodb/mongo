@@ -2,14 +2,14 @@
  * Test that $unionWith works with $geoNear, $text, and $indexStats
  * Some of these stages cannot be used in facets.
  * @tags: [
+ *   # Asserts on the output of $indexStats.
+ *   assumes_no_implicit_index_creation,
  *   do_not_wrap_aggregations_in_facets,
  * ]
  */
 
-(function() {
-"use strict";
-load("jstests/aggregation/extras/utils.js");  // arrayEq
-load("jstests/libs/fixture_helpers.js");      // For FixtureHelpers
+import {arrayEq, documentEq} from "jstests/aggregation/extras/utils.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 const collA = testDB.A;
@@ -25,8 +25,10 @@ function buildErrorString(expected, found) {
 }
 function checkResults(resObj, expectedResult) {
     assert.commandWorked(resObj);
-    assert(arrayEq(resObj.cursor.firstBatch, expectedResult),
-           buildErrorString(expectedResult, resObj.cursor.firstBatch));
+    assert(
+        arrayEq(resObj.cursor.firstBatch, expectedResult),
+        buildErrorString(expectedResult, resObj.cursor.firstBatch),
+    );
 }
 
 // Test that $unionWith works with $text and $search
@@ -34,34 +36,40 @@ function checkResults(resObj, expectedResult) {
 const textColl = testDB.textColl;
 textColl.drop();
 assert.commandWorked(
-    textColl.insert([{_id: 0, str: "term"}, {_id: 1, str: "random"}, {_id: 2, str: "something"}]));
+    textColl.insert([
+        {_id: 0, str: "term"},
+        {_id: 1, str: "random"},
+        {_id: 2, str: "something"},
+    ]),
+);
 textColl.createIndex({str: "text"});
 let resSet = collAResults.concat([{_id: 1, str: "random"}]);
-checkResults(testDB.runCommand({
-    aggregate: collA.getName(),
-    pipeline: [
-        {
-            $unionWith:
-                {coll: textColl.getName(), pipeline: [{$match: {$text: {$search: "random"}}}]}
-        },
-        {$sort: {_id: 1}}
-    ],
-    cursor: {}
-}),
-             resSet);
+checkResults(
+    testDB.runCommand({
+        aggregate: collA.getName(),
+        pipeline: [
+            {
+                $unionWith: {coll: textColl.getName(), pipeline: [{$match: {$text: {$search: "random"}}}]},
+            },
+            {$sort: {_id: 1}},
+        ],
+        cursor: {},
+    }),
+    resSet,
+);
 
 // Test that $unionWith works with $indexStats
 // $match removes all real documents from the pipeline, so we can just check the index documents.
-var resObj = testDB.runCommand({
+let resObj = testDB.runCommand({
     aggregate: collA.getName(),
     pipeline: [
         {$match: {val: {$exists: false}}},
         {$unionWith: {coll: textColl.getName(), pipeline: [{$indexStats: {}}]}},
-        {$sort: {name: 1}}
+        {$sort: {name: 1}},
     ],
-    cursor: {}
+    cursor: {},
 });
-var docArray = resObj.cursor.firstBatch;
+let docArray = resObj.cursor.firstBatch;
 if (FixtureHelpers.isMongos(testDB) && FixtureHelpers.isSharded(collA)) {
     // We expect each shard to have an _id_, _id_hashed, and str_text index
     const numShards = FixtureHelpers.numberOfShardsForCollection(collA);
@@ -69,7 +77,7 @@ if (FixtureHelpers.isMongos(testDB) && FixtureHelpers.isSharded(collA)) {
     for (let i = 0; i < numShards; i++) {
         assert.eq(docArray[i].name, "_id_");
         assert.eq(docArray[i + numShards].name, "_id_hashed");
-        assert.eq(docArray[i + (numShards * 2)].name, "str_text");
+        assert.eq(docArray[i + numShards * 2].name, "str_text");
     }
 } else {
     assert.eq(docArray.length, 2);
@@ -78,16 +86,15 @@ if (FixtureHelpers.isMongos(testDB) && FixtureHelpers.isSharded(collA)) {
 }
 
 // Test that $unionWith fails if $indexStats is not first stage in the sub-pipeline.
-var resObj = testDB.runCommand({
+resObj = testDB.runCommand({
     aggregate: collA.getName(),
     pipeline: [
         {$match: {val: {$exists: false}}},
         {
-            $unionWith:
-                {coll: textColl.getName(), pipeline: [{$match: {val: "foo"}}, {$indexStats: {}}]}
+            $unionWith: {coll: textColl.getName(), pipeline: [{$match: {val: "foo"}}, {$indexStats: {}}]},
         },
     ],
-    cursor: {}
+    cursor: {},
 });
 assert.eq(resObj.code, 40602, resObj);
 
@@ -96,7 +103,12 @@ const geoColl = testDB.geoColl;
 geoColl.drop();
 assert.commandWorked(geoColl.createIndex({"locs": "2dsphere"}));
 assert.commandWorked(
-    geoColl.insert([{_id: 0, locs: [0, 0]}, {_id: 1, locs: [10, 10]}, {_id: 2, locs: [20, 20]}]));
+    geoColl.insert([
+        {_id: 0, locs: [0, 0]},
+        {_id: 1, locs: [10, 10]},
+        {_id: 2, locs: [20, 20]},
+    ]),
+);
 resSet = [{_id: 1, locs: [10, 10], dist: 0}].concat(collAResults);
 const geoNearResults = testDB.runCommand({
     aggregate: collA.getName(),
@@ -104,18 +116,20 @@ const geoNearResults = testDB.runCommand({
         {
             $unionWith: {
                 coll: geoColl.getName(),
-                pipeline: [{
-                    $geoNear: {
-                        near: {type: "Point", coordinates: [10, 10]},
-                        distanceField: "dist",
-                        maxDistance: 2
-                    }
-                }]
+                pipeline: [
+                    {
+                        $geoNear: {
+                            near: {type: "Point", coordinates: [10, 10]},
+                            distanceField: "dist",
+                            maxDistance: 2,
+                        },
+                    },
+                ],
             },
         },
-        {$sort: {_id: 1}}
+        {$sort: {_id: 1}},
     ],
-    cursor: {}
+    cursor: {},
 });
 assert.commandWorked(geoNearResults);
 const geoNearArray = geoNearResults.cursor.firstBatch;
@@ -138,22 +152,23 @@ for (let i = 1; i < geoNearArray.length; i++) {
 // Test that $unionWith fails if $geoNear is not first stage in the sub-pipeline.
 resObj = testDB.runCommand({
     aggregate: collA.getName(),
-    pipeline: [{
-        $unionWith: {
-            coll: geoColl.getName(),
-            pipeline: [
-                {$match: {val: "foo"}},
-                {
-                    $geoNear: {
-                        near: {type: "Point", coordinates: [10, 10]},
-                        distanceField: "dist",
-                        maxDistance: 2
-                    }
-                }
-            ]
-        }
-    }],
-    cursor: {}
+    pipeline: [
+        {
+            $unionWith: {
+                coll: geoColl.getName(),
+                pipeline: [
+                    {$match: {val: "foo"}},
+                    {
+                        $geoNear: {
+                            near: {type: "Point", coordinates: [10, 10]},
+                            distanceField: "dist",
+                            maxDistance: 2,
+                        },
+                    },
+                ],
+            },
+        },
+    ],
+    cursor: {},
 });
 assert.eq(resObj.code, 40603, resObj);
-})();

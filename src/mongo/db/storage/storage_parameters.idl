@@ -30,86 +30,285 @@ global:
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/bson/bson_depth.h"
+        - "mongo/db/storage/storage_options.h"
 
 server_parameters:
-    notablescan:
-        # NOT recommended for production use.
-        description: >-
-            Whether all queries must use indexes.
-            If true, MongoDB will not execute queries that require a table scan and will return an error.
-        set_at: [ startup, runtime ]
-        cpp_varname: 'storageGlobalParams.noTableScan'
+    # This is an alias for the 'storage.syncPeriodSecs' config, and the default is defined in the
+    # StorageGlobalParams struct to resolve a conflict between config parameter and set parameter evaluation.
     syncdelay:
         # In almost every situation you should not set this value and use the default setting.
         description: >-
             Interval in seconds between fsync operations where mongod flushes its
             working memory to disk. By default, mongod flushes memory to disk every 60 seconds.
-        set_at: [ startup, runtime ]
-        cpp_varname: 'storageGlobalParams.syncdelay'
+        set_at: [startup, runtime]
+        cpp_varname: "storageGlobalParams.syncdelay"
         validator:
             gte: 0.0
-            lte: { expr: 'StorageGlobalParams::kMaxSyncdelaySecs' }
+            lte: {expr: "StorageGlobalParams::kMaxSyncdelaySecs"}
+        redact: false
+
+    # This is an alias for the 'storage.journal.commitIntervalMs' config, and the default is defined in the
+    # StorageGlobalParams struct to resolve a conflict between config parameter and set parameter evaluation.
     journalCommitInterval:
-        description: 'Number of milliseconds between journal commits'
-        set_at: [ startup, runtime ]
-        cpp_varname: 'storageGlobalParams.journalCommitIntervalMs'
+        description: "Number of milliseconds between journal commits"
+        set_at: [startup, runtime]
+        cpp_varname: "storageGlobalParams.journalCommitIntervalMs"
         validator:
             gte: 1
-            lte: { expr: 'StorageGlobalParams::kMaxJournalCommitIntervalMs' }
+            lte: {expr: "StorageGlobalParams::kMaxJournalCommitIntervalMs"}
+        redact: false
+
     takeUnstableCheckpointOnShutdown:
-        description: 'Take unstable checkpoint on shutdown'
+        description: "Take unstable checkpoint on shutdown"
         cpp_vartype: bool
         cpp_varname: gTakeUnstableCheckpointOnShutdown
         set_at: startup
         default: false
+        redact: false
+
     operationMemoryPoolBlockInitialSizeKB:
-        description: 'Initial block size in KB for the per operation temporary object memory pool'
-        set_at: [ startup, runtime ]
+        description: "Initial block size in KB for the per operation temporary object memory pool"
+        set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int32_t>
         cpp_varname: gOperationMemoryPoolBlockInitialSizeKB
         default: 1
         validator:
             gte: 1
+        redact: false
+
     operationMemoryPoolBlockMaxSizeKB:
-        description: 'Maximum block size in KB for the per operation temporary object memory pool'
-        set_at: [ startup, runtime ]
+        description: "Maximum block size in KB for the per operation temporary object memory pool"
+        set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int32_t>
         cpp_varname: gOperationMemoryPoolBlockMaxSizeKB
         default: 2048
         validator:
             gte: 1
+        redact: false
+
+    indexMaxNumGeneratedKeysPerDocument:
+        description: "Maximum number of index keys a single document is allowed to generate"
+        set_at: [startup]
+        cpp_vartype: int32_t
+        cpp_varname: gIndexMaxNumGeneratedKeysPerDocument
+        default: 100000
+        validator:
+            gte: 200
+        redact: false
 
     storageGlobalParams.directoryperdb:
-        description: 'Read-only view of directory per db config parameter'
-        # Actually, never.  TODO(SERVER-59813): Use correct IDL for this once support is added.
-        set_at: startup
+        description: "Read-only view of directory per db config parameter"
+        set_at: "readonly"
         cpp_class:
             name: StorageDirectoryPerDbParameter
-            override_ctor: true
+        redact: false
+
+    timeseriesValidateCompressedBuckets:
+        description: "Validate that there is no data loss before committing compressed timeseries buckets"
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: gValidateTimeseriesCompression
+        default: true
+        redact: false
+
+    internalInsertMaxBatchSize:
+        description: "Maximum number of documents that we will insert in a single batch."
+        set_at: [startup, runtime]
+        cpp_varname: "internalInsertMaxBatchSize"
+        cpp_vartype: AtomicWord<int>
+        default: 500
+        validator:
+            gt: 0
+        redact: false
+
+    maxNumberOfBatchedOperationsInSingleOplogEntry:
+        description: >-
+            Maximum number of operations to pack into a single oplog entry, when multi-oplog
+            format for batched writes is in use. See batchedDeletesTargetBatchDocs and
+            maxNumberOfTransactionOperationsInSingleOplogEntry.
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: gMaxNumberOfBatchedOperationsInSingleOplogEntry
+        default: 2147483647 # INT_MAX
+        validator: {gte: 1}
+        redact: false
+
+    maxSizeOfBatchedOperationsInSingleOplogEntryBytes:
+        description: >-
+            Maximum size (bytes) of operations to pack into a single oplog entry, when multi-oplog
+            format for batched writes is in use.
+            See batchedDeletesTargetStagedDocBytes and BSONObjMaxUserSize.
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: gMaxSizeOfBatchedOperationsInSingleOplogEntryBytes
+        default: 16777216 # 16 MB
+        validator: {gte: 1}
+        redact: false
+
+    maxNumberOfInsertsBatchInsertsForRenameAcrossDatabases:
+        description: >-
+            Maximum number of inserts that cross-db collection renames can batch into one applyOps
+            oplog entry.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gMaxNumberOfInsertsBatchInsertsForRenameAcrossDatabases
+        default: 500
+        validator: {gte: 1, lte: 16777216}
+        redact: false
+
+    maxSizeOfBatchedInsertsForRenameAcrossDatabasesBytes:
+        description: >-
+            Maximum size (bytes) of each batched applyOps oplog entry for cross-db collection renames.
+            If any one document exceeds this limit, falls back to a plain insert oplog entry for that doc.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gMaxSizeOfBatchedInsertsForRenameAcrossDatabasesBytes
+        default:
+            4194304 # 4 MB, an arbitrary but conservative fraction of the 16 MB BSON limit. Similar
+            # in spirit to batchedDeletesTargetStagedDocBytes.
+        validator: {gte: 1, lte: 16777216}
+        redact: false
+
+    collectionSamplingLogIntervalSeconds:
+        description: "The approximate interval between log messages indicating collection sampling progress. Once interval seconds have elapsed since the last log message, a progress message will be logged after the current sample is completed. A value of zero will disable this logging."
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<int>"
+        cpp_varname: gCollectionSamplingLogIntervalSeconds
+        deprecated_name:
+            - oplogSamplingLogIntervalSeconds
+        default: 10
+        validator: {gte: 0}
+        redact: false
+
+    allowUnsafeUntimestampedWrites:
+        description: >-
+            Allows a replica set member in standalone mode to perform unsafe untimestamped writes
+        set_at: [startup]
+        cpp_varname: gAllowUnsafeUntimestampedWrites
+        cpp_vartype: bool
+        default: false
+        redact: false
+
+    skipDroppingHashedShardKeyIndex:
+        description: >-
+            Skips dropping hashed shard key supporting indexes when calling dropIndexes with the '*' parameter. Used for testing purposes.
+        set_at: [startup, runtime]
+        cpp_vartype: bool
+        cpp_varname: skipDroppingHashedShardKeyIndex
+        default: false
+        redact: false
+
+    enableAutoCompaction:
+        description: "Enable auto compact at startup."
+        cpp_vartype: bool
+        cpp_varname: gEnableAutoCompaction
+        set_at: startup
+        default: false
+        redact: false
+
+    cachePressureEvictionStallThresholdProportion:
+        description: "To adjust the thread pressure sensitivity proportion in detecting cache pressure for the storage engine."
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<double>"
+        cpp_varname: gCachePressureEvictionStallThresholdProportion
+        default: 0.95
+        validator: {gte: 0, lte: 1}
+        redact: false
+
+    cachePressureEvictionStallDetectionWindowSeconds:
+        description: "The duration of time to allow cache pressure statistics to accumulate and average."
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<int>"
+        cpp_varname: gCachePressureEvictionStallDetectionWindowSeconds
+        default: 20
+        validator: {gte: 1}
+        redact: false
+
+    cachePressureExponentiallyDecayingMovingAverageAlphaValue:
+        description: "The alpha value used to calculate the exponentially decaying moving average of total tickets."
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<double>"
+        cpp_varname: gCachePressureExponentiallyDecayingMovingAverageAlphaValue
+        default: 0.1
+        validator: {gte: 0, lte: 1}
+        redact: false
+
+    spillTableInsertBatchSizeBytes:
+        description: >-
+            The amount of data that a call to SpillTable::insertRecords will batch together into a
+            single storage transaction.
+        set_at: [startup, runtime]
+        cpp_vartype: Atomic<long long>
+        cpp_varname: gSpillTableInsertBatchSizeBytes
+        default: 16777216 # 16 MB
+        validator:
+            gte: 0
+        redact: false
+    spillPath:
+        description: "The disk path of the spill engine. Defaults to the dbpath."
+        set_at: startup
+        cpp_vartype: std::string
+        cpp_varname: gSpillPath
+        redact: false
 
 feature_flags:
-    featureFlagClusteredIndexes:
-        description: "When enabled, support non time-series collections with clustered indexes"
-        cpp_varname: feature_flags::gClusteredIndexes
-        default: false
-    featureFlagTimeseriesUpdatesAndDeletes:
-        description: "When enabled, support for updates and deletes on time-series collections"
-        cpp_varname: feature_flags::gTimeseriesUpdatesAndDeletes
+    featureFlagLargeBatchedOperations:
+        description: >-
+            Enable support for replicating batched operations over multiple applyOps oplog
+            entries. Otherwise, batched operations that do not fit within a single applyOps
+            oplog entry will fail with a TransactionTooLarge error.
+            See maxNumberOfBatchedOperationsInSingleOplogEntry and
+            maxSizeOfBatchedOperationsInSingleOplogEntryBytes.
+        cpp_varname: gFeatureFlagLargeBatchedOperations
         default: true
-        version: 5.0
-    featureFlagTimeseriesMetricIndexes:
-        description: "When enabled, support secondary indexes on time-series measurements"
-        cpp_varname: feature_flags::gTimeseriesMetricIndexes
+        version: 8.0
+        fcv_gated: true
+    featureFlagDocumentSourceListCatalog:
+        description: "When enabled, allow the use of the $listCatalog aggregation stage"
+        cpp_varname: feature_flags::gDocumentSourceListCatalog
+        default: true
+        version: 6.0
+        fcv_gated: true
+    featureFlagInternalWritesAreReplicatedTransactionally:
+        description: Feature flag to enable internal writes to use the transactionally replicated WriteUnitOfWork API by default.
+        cpp_varname: gFeatureFlagInternalWritesAreReplicatedTransactionally
         default: false
-    featureFlagTimeseriesBucketCompression:
-        description: "Enable bucket compression on time-series collections"
-        cpp_varname: feature_flags::gTimeseriesBucketCompression
+        fcv_gated: true
+    featureFlagTimeseriesDeletesSupport:
+        description: "Enable support for arbitrary deletes on time-series collections"
+        cpp_varname: feature_flags::gTimeseriesDeletesSupport
+        default: true
+        version: 7.0
+        fcv_gated: true
+    featureFlagTimeseriesUpdatesSupport:
+        description: "Enable support for arbitrary updates on time-series collections"
+        cpp_varname: feature_flags::gTimeseriesUpdatesSupport
         default: false
-    featureFlagYieldingSupportForSBE:
-        description: "Enable retaining valid cursor across query yield"
-        cpp_varname: feature_flags::gYieldingSupportForSBE
+        fcv_gated: true
+    featureFlagTSBucketingParametersUnchanged:
+        description: "Enable storing the 'timeseriesBucketingParametersHaveChanged' parameter on disk"
+        cpp_varname: feature_flags::gTSBucketingParametersUnchanged
         default: false
-    featureFlagCollModIndexUnique:
-        description: "When enabled, collMod supports making an index unique"
-        cpp_varname: feature_flags::gCollModIndexUnique
+        fcv_gated: true
+    featureFlagStorageEngineInterruptibility:
+        description: "Enable support for interrupting user operations in storage engines and rolling back transactions immediately that are targeted by the storage engine."
+        cpp_varname: feature_flags::gStorageEngineInterruptibility
+        default: true
+        fcv_gated: false
+    featureFlagCreateSpillKVEngine:
+        description: "When enabled, create a second storage engine instance that is used for creating SpillTables."
+        cpp_varname: feature_flags::gFeatureFlagCreateSpillKVEngine
+        default: true
+        fcv_gated: false
+    featureFlagReplicateLocalCatalogIdentifiers:
+        description: >-
+            Enable replication of local catalog identifiers across replica set nodes, ensuring the
+            _mdb_catalog and its associated storage table 'ident' mappings remain consistent.
+        cpp_varname: feature_flags::gFeatureFlagReplicateLocalCatalogIdentifiers
+        default: true
+        fcv_gated: false
+    featureFlagPrimaryDrivenIndexBuilds:
+        description: "Enable primary-driven index builds."
+        cpp_varname: feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds
         default: false
+        fcv_gated: true

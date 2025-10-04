@@ -24,6 +24,10 @@ __metadata_turtle(const char *key)
         if (strcmp(key, WT_METAFILE_URI) == 0)
             return (true);
         break;
+    case 'L':
+        if (strcmp(key, WT_METADATA_LIVE_RESTORE) == 0)
+            return (true);
+        break;
     case 'W':
         if (strcmp(key, WT_METADATA_VERSION) == 0)
             return (true);
@@ -43,13 +47,20 @@ __metadata_turtle(const char *key)
 int
 __wt_metadata_turtle_rewrite(WT_SESSION_IMPL *session)
 {
-    WT_DECL_RET;
-    char *value;
+    /* Require single-threading. */
+    WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_TURTLE));
+    WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->turtle_lock);
 
-    WT_RET(__wt_metadata_search(session, WT_METAFILE_URI, &value));
-    ret = __wt_metadata_update(session, WT_METAFILE_URI, value);
-    __wt_free(session, value);
-    return (ret);
+    char *existing_config;
+    WT_RET(__wt_turtle_read(session, WT_METAFILE_URI, &existing_config));
+
+    if (F_ISSET(S2C(session), WT_CONN_LIVE_RESTORE_FS))
+        WT_RET(__wt_live_restore_turtle_update(session, WT_METAFILE_URI, existing_config, false));
+    else
+        WT_RET(__wt_turtle_update(session, WT_METAFILE_URI, existing_config));
+
+    __wt_free(session, existing_config);
+    return (0);
 }
 
 /*
@@ -73,18 +84,15 @@ __wt_metadata_cursor_open(WT_SESSION_IMPL *session, const char *config, WT_CURSO
      */
     btree = CUR2BT(*cursorp);
 
-/*
- * Special settings for metadata: skew eviction so metadata almost always stays in cache and make
- * sure metadata is logged if possible.
- *
- * Test before setting so updates can't race in subsequent opens (the first update is safe because
- * it's single-threaded from wiredtiger_open).
- */
-#define WT_EVICT_META_SKEW 10000
+#define WT_EVICT_META_SKEW (10 * WT_THOUSAND)
+    /*
+     * Skew eviction so metadata almost always stays in cache.
+     *
+     * Test before setting so updates can't race in subsequent opens (the first update is safe
+     * because it's single-threaded from wiredtiger_open).
+     */
     if (btree->evict_priority == 0)
         WT_WITH_BTREE(session, btree, __wt_evict_priority_set(session, WT_EVICT_META_SKEW));
-    if (F_ISSET(btree, WT_BTREE_NO_LOGGING))
-        F_CLR(btree, WT_BTREE_NO_LOGGING);
 
     return (0);
 }
@@ -186,7 +194,7 @@ __wt_metadata_insert(WT_SESSION_IMPL *session, const char *key, const char *valu
     WT_CURSOR *cursor;
     WT_DECL_RET;
 
-    __wt_verbose(session, WT_VERB_METADATA,
+    __wt_verbose_debug3(session, WT_VERB_METADATA,
       "Insert: key: %s, value: %s, tracking: %s, %s"
       "turtle",
       key, value, WT_META_TRACKING(session) ? "true" : "false",
@@ -200,7 +208,7 @@ __wt_metadata_insert(WT_SESSION_IMPL *session, const char *key, const char *valu
     cursor->set_value(cursor, value);
     WT_ERR(cursor->insert(cursor));
     if (WT_META_TRACKING(session))
-        WT_ERR(__wt_meta_track_insert(session, key));
+        WT_ERR(__wti_meta_track_insert(session, key));
 err:
     WT_TRET(__wt_metadata_cursor_release(session, &cursor));
     return (ret);
@@ -216,19 +224,22 @@ __wt_metadata_update(WT_SESSION_IMPL *session, const char *key, const char *valu
     WT_CURSOR *cursor;
     WT_DECL_RET;
 
-    __wt_verbose(session, WT_VERB_METADATA,
+    __wt_verbose_debug3(session, WT_VERB_METADATA,
       "Update: key: %s, value: %s, tracking: %s, %s"
       "turtle",
       key, value, WT_META_TRACKING(session) ? "true" : "false",
       __metadata_turtle(key) ? "" : "not ");
 
     if (__metadata_turtle(key)) {
-        WT_WITH_TURTLE_LOCK(session, ret = __wt_turtle_update(session, key, value));
+        if (F_ISSET(S2C(session), WT_CONN_LIVE_RESTORE_FS))
+            ret = __wt_live_restore_turtle_update(session, key, value, true);
+        else
+            WT_WITH_TURTLE_LOCK(session, ret = __wt_turtle_update(session, key, value));
         return (ret);
     }
 
     if (WT_META_TRACKING(session))
-        WT_RET(__wt_meta_track_update(session, key));
+        WT_RET(__wti_meta_track_update(session, key));
 
     WT_RET(__wt_metadata_cursor(session, &cursor));
     /* This cursor needs to have overwrite semantics. */
@@ -252,7 +263,7 @@ __wt_metadata_remove(WT_SESSION_IMPL *session, const char *key)
     WT_CURSOR *cursor;
     WT_DECL_RET;
 
-    __wt_verbose(session, WT_VERB_METADATA,
+    __wt_verbose_debug3(session, WT_VERB_METADATA,
       "Remove: key: %s, tracking: %s, %s"
       "turtle",
       key, WT_META_TRACKING(session) ? "true" : "false", __metadata_turtle(key) ? "" : "not ");
@@ -271,7 +282,7 @@ __wt_metadata_remove(WT_SESSION_IMPL *session, const char *key)
     WT_ERR(__wt_metadata_cursor_release(session, &cursor));
 
     if (WT_META_TRACKING(session))
-        WT_ERR(__wt_meta_track_update(session, key));
+        WT_ERR(__wti_meta_track_update(session, key));
 
     WT_ERR(__wt_metadata_cursor(session, &cursor));
     cursor->set_key(cursor, key);
@@ -296,7 +307,7 @@ __wt_metadata_search(WT_SESSION_IMPL *session, const char *key, char **valuep)
 
     *valuep = NULL;
 
-    __wt_verbose(session, WT_VERB_METADATA,
+    __wt_verbose_debug3(session, WT_VERB_METADATA,
       "Search: key: %s, tracking: %s, %s"
       "turtle",
       key, WT_META_TRACKING(session) ? "true" : "false", __metadata_turtle(key) ? "" : "not ");
@@ -307,7 +318,11 @@ __wt_metadata_search(WT_SESSION_IMPL *session, const char *key, char **valuep)
          * otherwise. The code path is used enough that Coverity complains a lot, add an error check
          * to get some peace and quiet.
          */
-        WT_WITH_TURTLE_LOCK(session, ret = __wt_turtle_read(session, key, valuep));
+        if (F_ISSET(S2C(session), WT_CONN_LIVE_RESTORE_FS))
+            ret = __wt_live_restore_turtle_read(session, key, valuep);
+        else
+            WT_WITH_TURTLE_LOCK(session, ret = __wt_turtle_read(session, key, valuep));
+
         if (ret != 0)
             __wt_free(session, *valuep);
         return (ret);
@@ -350,7 +365,7 @@ __wt_metadata_btree_id_to_uri(WT_SESSION_IMPL *session, uint32_t btree_id, char 
     char *key, *value;
 
     *uri = NULL;
-    key = NULL;
+    key = value = NULL;
 
     WT_RET(__wt_metadata_cursor(session, &cursor));
     while ((ret = cursor->next(cursor)) == 0) {
@@ -363,6 +378,34 @@ __wt_metadata_btree_id_to_uri(WT_SESSION_IMPL *session, uint32_t btree_id, char 
         }
         WT_ERR_NOTFOUND_OK(ret, false);
     }
+
+err:
+    WT_TRET(__wt_metadata_cursor_release(session, &cursor));
+    return (ret);
+}
+
+/*
+ * __wt_verbose_dump_metadata --
+ *     Output diagnostic information about metadata contents.
+ */
+int
+__wt_verbose_dump_metadata(WT_SESSION_IMPL *session)
+{
+    WT_CURSOR *cursor;
+    WT_DECL_RET;
+    const char *config, *uri;
+
+    WT_RET(__wt_msg(session, "%s", WT_DIVIDER));
+    WT_RET(__wt_msg(session, "metadata dump"));
+
+    WT_RET(__wt_metadata_cursor(session, &cursor));
+    while ((ret = cursor->next(cursor)) == 0) {
+        WT_ERR(cursor->get_key(cursor, &uri));
+        WT_ERR(cursor->get_value(cursor, &config));
+
+        WT_ERR(__wt_msg(session, "uri: %s | config: %s", uri, config));
+    }
+    WT_ERR_NOTFOUND_OK(ret, false);
 
 err:
     WT_TRET(__wt_metadata_cursor_release(session, &cursor));

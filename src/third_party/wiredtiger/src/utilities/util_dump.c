@@ -6,53 +6,98 @@
  * See the file LICENSE for redistribution information.
  */
 
-#include <assert.h>
 #include "util.h"
 #include "util_dump.h"
 
+#define ARG_BUF_SIZE 256
+#define MAX_ARGS 20
+#define MAX_BOOKMARKS 20
 #define STRING_MATCH_CONFIG(s, item) \
     (strncmp(s, (item).str, (item).len) == 0 && (s)[(item).len] == '\0')
 
+static int dump_all_records(WT_CURSOR *, bool, bool);
 static int dump_config(WT_SESSION *, const char *, WT_CURSOR *, bool, bool, bool);
+static int dump_explore(WT_CURSOR *, const char *, bool, bool, bool, bool);
+static void dump_explore_bookmark_delete_key(WT_CURSOR *, char **, const char *);
+static int dump_explore_bookmark_save(WT_CURSOR *, char **);
+static int dump_explore_bookmark_select(WT_CURSOR *, char **, uint64_t);
+static void dump_explore_bookmarks_list(char **);
 static int dump_json_begin(WT_SESSION *);
 static int dump_json_end(WT_SESSION *);
 static int dump_json_separator(WT_SESSION *);
 static int dump_json_table_end(WT_SESSION *);
 static const char *get_dump_type(bool, bool, bool);
 static int dump_prefix(WT_SESSION *, bool, bool, bool);
-static int dump_record(WT_CURSOR *, bool, bool);
+static int dump_record(WT_CURSOR *, const char *, bool, bool, bool, uint64_t);
 static int dump_suffix(WT_SESSION *, bool);
 static int dump_table_config(WT_SESSION *, WT_CURSOR *, WT_CURSOR *, const char *, bool);
 static int dump_table_parts_config(WT_SESSION *, WT_CURSOR *, const char *, const char *, bool);
 static int dup_json_string(const char *, char **);
 static int print_config(WT_SESSION *, const char *, const char *, bool, bool);
+static int print_record(WT_CURSOR *, bool);
 static int time_pair_to_timestamp(WT_SESSION_IMPL *, char *, WT_ITEM *);
 
+/*
+ * usage --
+ *     Display a usage message for the dump command.
+ */
 static int
 usage(void)
 {
     static const char *options[] = {"-c checkpoint",
-      "dump as of the named checkpoint (the default is the most recent version of the data)",
+      "dump as of the named checkpoint (the default is the most recent version of the data)", "-e",
+      "explore a file in an interactive fashion, everything is redirected to stdout, hence "
+      "incompatible with "
+      "the -f option",
       "-f output", "dump to the specified file (the default is stdout)", "-j",
-      "dump in JSON format", "-p",
+      "dump in JSON format", "-k",
+      "specify a key to look for (if not found, then no error is displayed)", "-l lower bound",
+      "lower bound of the key range to dump", "-n",
+      "if the specified key to look for cannot be found, return the result from search_near", "-p",
       "dump in human readable format (pretty-print). The -p flag can be combined with -x. In this "
       "case, raw data elements will be formatted like -x with hexadecimal encoding.",
       "-r", "dump in reverse order", "-t timestamp",
       "dump as of the specified timestamp (the default is the most recent version of the data)",
-      "-x",
+      "-u upper bound", "upper bound of the key range to dump", "-w n",
+      "dump n records before and after the record sought", "-x",
       "dump all characters in a hexadecimal encoding (by default printable characters are not "
       "encoded). The -x flag can be combined with -p. In this case, the dump will be formatted "
       "similar to -p except for raw data elements, which will look like -x with hexadecimal "
       "encoding.",
-      NULL, NULL};
+      "-?", "show this message", NULL, NULL};
 
     util_usage(
-      "dump [-jprx] [-c checkpoint] [-f output-file] [-t timestamp] uri", "options:", options);
+      "dump [-ejnprx] [-c checkpoint] [-f output-file] [-k key] [-l lower bound] [-t timestamp] "
+      "[-u "
+      "upper bound] [-w window] uri",
+      "options:", options);
     return (1);
+}
+
+/*
+ * explore_usage --
+ *     Display a usage message for the explore functionality.
+ */
+static void
+explore_usage(void)
+{
+    static const char *options[] = {"a", "show the current cursor's position", "b",
+      "list bookmarks", "b bookmark", "jump to bookmark", "bd bookmark", "delete bookmark",
+      "bs [key]", "save cursor's position to bookmarks or the given key", "c", "reset the cursor",
+      "d key", "delete the given key", "h", "show this message", "i key value",
+      "insert the key/value pair", "m", "dump the config", "n", "call cursor next", "p",
+      "call cursor prev", "q", "exit", "rl", "set the lower bound", "ru", "set the upper bound",
+      "s key", "search for a key", "sn key", "search for a key using search_near", "u key value",
+      "update the key/value pair", "w value", "set the windowing to the given value", NULL, NULL};
+    util_usage(NULL, NULL, options);
 }
 
 static FILE *fp;
 
+/*
+ * util_dump --
+ *     The dump command.
+ */
 int
 util_dump(WT_SESSION *session, int argc, char *argv[])
 {
@@ -61,26 +106,46 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
     WT_DECL_ITEM(tmp);
     WT_DECL_RET;
     WT_SESSION_IMPL *session_impl;
+    uint64_t window;
     int ch, format_specifiers, i;
     char *checkpoint, *ofile, *p, *simpleuri, *timestamp, *uri;
-    bool hex, json, pretty, reverse;
+    const char *end_key, *key, *start_key;
+    bool explore, hex, json, pretty, reverse, search_near;
+    bool in_json_table = false;
 
     session_impl = (WT_SESSION_IMPL *)session;
-
+    window = 0;
     cursor = NULL;
     hs_dump_cursor = NULL;
+    key = NULL;
     checkpoint = ofile = simpleuri = uri = timestamp = NULL;
-    hex = json = pretty = reverse = false;
-    while ((ch = __wt_getopt(progname, argc, argv, "c:f:t:jprx")) != EOF)
+    explore = hex = json = pretty = reverse = search_near = false;
+    end_key = NULL;
+    key = NULL;
+    start_key = NULL;
+
+    while ((ch = __wt_getopt(progname, argc, argv, "c:f:k:l:t:u:w:ejnprx?")) != EOF)
         switch (ch) {
         case 'c':
             checkpoint = __wt_optarg;
+            break;
+        case 'e':
+            explore = true;
             break;
         case 'f':
             ofile = __wt_optarg;
             break;
         case 'j':
             json = true;
+            break;
+        case 'k':
+            key = __wt_optarg;
+            break;
+        case 'l':
+            start_key = __wt_optarg;
+            break;
+        case 'n':
+            search_near = true;
             break;
         case 'p':
             pretty = true;
@@ -91,10 +156,19 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
         case 't':
             timestamp = __wt_optarg;
             break;
+        case 'u':
+            end_key = __wt_optarg;
+            break;
+        case 'w':
+            if ((ret = util_str2num(session, __wt_optarg, true, &window)) != 0)
+                return (usage());
+            break;
         case 'x':
             hex = true;
             break;
         case '?':
+            usage();
+            return (0);
         default:
             return (usage());
         }
@@ -123,13 +197,19 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
         return (usage());
     }
 
-    /* Open any optional output file. */
-    if (ofile == NULL)
-        fp = stdout;
-    else if ((fp = fopen(ofile, "w")) == NULL)
+    /* -f and -e are incompatible. */
+    if (ofile != NULL && explore) {
+        fprintf(stderr, "%s: the options -e and -f are incompatible\n", progname);
+        return (usage());
+    }
+
+    /* Open an optional output file. */
+    fp = util_open_output_file(ofile);
+    if (fp == NULL)
         return (util_err(session, errno, "%s: open", ofile));
 
-    if (json && (dump_json_begin(session) != 0 || dump_prefix(session, pretty, hex, json) != 0))
+    if (!explore && json &&
+      (dump_json_begin(session) != 0 || dump_prefix(session, pretty, hex, json) != 0))
         goto err;
 
     WT_RET(__wt_scr_alloc(session_impl, 0, &tmp));
@@ -137,8 +217,12 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
         if (json && i > 0)
             if (dump_json_separator(session) != 0)
                 goto err;
-        free(uri);
-        free(simpleuri);
+
+        if (json)
+            in_json_table = true;
+
+        util_free(uri);
+        util_free(simpleuri);
         uri = simpleuri = NULL;
 
         if ((uri = util_uri(session, argv[i], "table")) == NULL)
@@ -164,7 +248,7 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
             goto err;
         }
 
-        if ((simpleuri = strdup(uri)) == NULL) {
+        if ((simpleuri = util_strdup(uri)) == NULL) {
             (void)util_err(session, errno, NULL);
             goto err;
         }
@@ -176,18 +260,43 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
          * nothing will be visible. The only exception is if we've supplied a timestamp in which
          * case, we're specifically interested in what is visible at a given read timestamp.
          */
-        if (WT_STREQ(simpleuri, WT_HS_URI) && timestamp == NULL) {
+        if (WT_IS_URI_HS(simpleuri) && timestamp == NULL) {
             hs_dump_cursor = (WT_CURSOR_DUMP *)cursor;
             /* Set the "ignore tombstone" flag on the underlying cursor. */
             F_SET(hs_dump_cursor->child, WT_CURSTD_IGNORE_TOMBSTONE);
         }
-        if (dump_config(session, simpleuri, cursor, pretty, hex, json) != 0)
-            goto err;
 
-        if (dump_record(cursor, reverse, json) != 0)
-            goto err;
+        if (explore) {
+            if (dump_explore(cursor, simpleuri, reverse, pretty, hex, json) != 0)
+                goto err;
+        } else {
+            if (dump_config(session, simpleuri, cursor, pretty, hex, json) != 0)
+                goto err;
+
+            if (key == NULL) {
+                if (start_key != NULL) {
+                    cursor->set_key(cursor, start_key);
+                    if (cursor->bound(cursor, "action=set,bound=lower") != 0)
+                        goto err;
+                }
+                if (end_key != NULL) {
+                    cursor->set_key(cursor, end_key);
+                    if (cursor->bound(cursor, "action=set,bound=upper") != 0)
+                        goto err;
+                }
+                if (dump_all_records(cursor, reverse, json) != 0)
+                    goto err;
+                if ((start_key != NULL || end_key != NULL) &&
+                  cursor->bound(cursor, "action=clear") != 0)
+                    goto err;
+            } else if (dump_record(cursor, key, reverse, search_near, json, window) != 0)
+                goto err;
+        }
+
         if (json && dump_json_table_end(session) != 0)
             goto err;
+
+        in_json_table = false;
 
         if (hs_dump_cursor != NULL)
             F_CLR(hs_dump_cursor->child, WT_CURSTD_IGNORE_TOMBSTONE);
@@ -199,13 +308,17 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
             goto err;
         }
     }
-    if (json && dump_json_end(session) != 0)
-        goto err;
 
     if (0) {
 err:
         ret = 1;
     }
+
+    if (in_json_table)
+        dump_json_table_end(session);
+
+    if (json)
+        dump_json_end(session);
 
     if (cursor != NULL) {
         if (hs_dump_cursor != NULL)
@@ -214,12 +327,12 @@ err:
             ret = util_err(session, ret, NULL);
     }
 
-    if (ofile != NULL && (ret = fclose(fp)) != 0)
+    if (util_close_output_file(fp) != 0)
         ret = util_err(session, errno, NULL);
 
     __wt_scr_free(session_impl, &tmp);
-    free(uri);
-    free(simpleuri);
+    util_free(uri);
+    util_free(simpleuri);
 
     return (ret);
 }
@@ -319,7 +432,7 @@ dump_json_end(WT_SESSION *session)
 }
 
 /*
- * dump_json_begin --
+ * dump_json_separator --
  *     Output a separator between two JSON outputs in a list.
  */
 static int
@@ -343,8 +456,8 @@ dump_json_table_end(WT_SESSION *session)
 }
 
 /*
- * dump_add_config
- *	Add a formatted config string to an output buffer.
+ * dump_add_config --
+ *     Add a formatted config string to an output buffer.
  */
 static int
 dump_add_config(WT_SESSION *session, char **bufp, size_t *leftp, const char *fmt, ...)
@@ -381,7 +494,7 @@ dump_projection(WT_SESSION *session, const char *config, WT_CURSOR *cursor, char
     const char *keyformat, *p;
 
     len = strlen(config) + strlen(cursor->value_format) + strlen(cursor->uri) + 20;
-    if ((newconfig = malloc(len)) == NULL)
+    if ((newconfig = util_malloc(len)) == NULL)
         return (util_err(session, errno, NULL));
     *newconfigp = newconfig;
     wt_api = session->connection->get_extension_api(session->connection);
@@ -414,8 +527,8 @@ dump_projection(WT_SESSION *session, const char *config, WT_CURSOR *cursor, char
 
             /* copy names of projected values */
             p = strchr(cursor->uri, '(');
-            assert(p != NULL);
-            assert(p[strlen(p) - 1] == ')');
+            WT_ASSERT((WT_SESSION_IMPL *)session, p != NULL);
+            WT_ASSERT((WT_SESSION_IMPL *)session, p[strlen(p) - 1] == ')');
             p++;
             if (*p != ')')
                 WT_RET(dump_add_config(session, &newconfig, &len, "%s", ","));
@@ -429,7 +542,7 @@ dump_projection(WT_SESSION *session, const char *config, WT_CURSOR *cursor, char
     if (ret != WT_NOTFOUND)
         return (util_err(session, ret, "WT_CONFIG_PARSER.next"));
 
-    assert(len > 0);
+    WT_ASSERT((WT_SESSION_IMPL *)session, len > 0);
     if ((ret = parser->close(parser)) != 0)
         return (util_err(session, ret, "WT_CONFIG_PARSER.close"));
 
@@ -476,7 +589,7 @@ dump_table_config(
     WT_ERR(dump_table_parts_config(session, mcursor, name, "index:", json));
 
 err:
-    free(proj_config);
+    util_free(proj_config);
     return (ret);
 }
 
@@ -512,10 +625,10 @@ dump_table_parts_config(
     }
 
     len = strlen(entry) + strlen(name) + 1;
-    if ((uriprefix = malloc(len)) == NULL)
+    if ((uriprefix = util_malloc(len)) == NULL)
         return (util_err(session, errno, NULL));
     if ((ret = __wt_snprintf(uriprefix, len, "%s%s", entry, name)) != 0) {
-        free(uriprefix);
+        util_free(uriprefix);
         return (util_err(session, ret, NULL));
     }
 
@@ -526,7 +639,7 @@ dump_table_parts_config(
      */
     cursor->set_key(cursor, uriprefix);
     ret = cursor->search_near(cursor, &exact);
-    free(uriprefix);
+    util_free(uriprefix);
     if (ret == WT_NOTFOUND)
         return (0);
     if (ret != 0)
@@ -570,7 +683,8 @@ match:
 }
 
 /*
- * Returns dump type string based on the passed format flags
+ * get_dump_type --
+ *     Returns dump type string based on the passed format flags
  */
 static const char *
 get_dump_type(bool pretty, bool hex, bool json)
@@ -611,7 +725,10 @@ dump_prefix(WT_SESSION *session, bool pretty, bool hex, bool json)
 
     if (!json &&
       (fprintf(fp, "WiredTiger Dump (WiredTiger Version %d.%d.%d)\n", vmajor, vminor, vpatch) < 0 ||
-        fprintf(fp, "Format=%s\n", (pretty && hex) ? "print hex" : hex ? "hex" : "print") < 0 ||
+        fprintf(fp, "Format=%s\n",
+          (pretty && hex) ? "print hex" :
+            hex           ? "hex" :
+                            "print") < 0 ||
         fprintf(fp, "Header\n") < 0))
         return (util_err(session, EIO, NULL));
 
@@ -619,20 +736,18 @@ dump_prefix(WT_SESSION *session, bool pretty, bool hex, bool json)
 }
 
 /*
- * dump_record --
- *     Dump a single record, advance cursor to next/prev, along with JSON formatting if needed.
+ * print_record --
+ *     Output text representation of key and value.
  */
 static int
-dump_record(WT_CURSOR *cursor, bool reverse, bool json)
+print_record(WT_CURSOR *cursor, bool json)
 {
     WT_DECL_RET;
     WT_SESSION *session;
-    const char *infix, *key, *prefix, *suffix, *value;
-    bool once;
+    const char *current_key, *infix, *prefix, *suffix, *value;
 
     session = cursor->session;
 
-    once = false;
     if (json) {
         prefix = "\n{\n";
         infix = ",\n";
@@ -642,19 +757,509 @@ dump_record(WT_CURSOR *cursor, bool reverse, bool json)
         infix = "\n";
         suffix = "\n";
     }
+
+    if ((ret = cursor->get_key(cursor, &current_key)) != 0)
+        return (util_cerr(cursor, "get_key", ret));
+    if ((ret = cursor->get_value(cursor, &value)) != 0)
+        return (util_cerr(cursor, "get_value", ret));
+    if (fprintf(fp, "%s%s%s%s%s", prefix, current_key, infix, value, suffix) < 0)
+        return (util_err(session, EIO, NULL));
+    return (0);
+}
+
+/*
+ * dump_record --
+ *     Dump the record specified by key or one near to it. If a window is specified print out up to
+ *     that many records before and after sought record. The window will be truncated if it would
+ *     move past the first or last entry.
+ */
+static int
+dump_record(
+  WT_CURSOR *cursor, const char *key, bool reverse, bool search_near, bool json, uint64_t window)
+{
+    WT_DECL_ITEM(tmp);
+    WT_DECL_RET;
+    WT_SESSION *session;
+    WT_SESSION_IMPL *session_impl;
+    uint64_t n, total_window;
+    int (*bck)(WT_CURSOR *);
+    int (*fwd)(WT_CURSOR *);
+    int exact;
+    bool once;
+
+    session = cursor->session;
+    session_impl = (WT_SESSION_IMPL *)session;
+    once = false;
+    exact = 0;
+    WT_RET(__wt_scr_alloc(session_impl, 0, &tmp));
+
+    WT_ASSERT(session_impl, key != NULL);
+
+    WT_ERR(__wt_buf_setstr(session_impl, tmp, ""));
+    if (json) {
+        WT_ERR(__wt_buf_fmt(session_impl, tmp, "\"key0\" : \"%s\"", key));
+        key = (char *)tmp->data;
+    }
+    cursor->set_key(cursor, key);
+    ret = cursor->search_near(cursor, &exact);
+
+    if (ret != 0)
+        WT_ERR(util_cerr(cursor, "search_near", ret));
+
+    /* Unable to find the exact key specified. */
+    if (exact != 0 && !search_near)
+        WT_ERR(WT_NOTFOUND);
+
+    if (window == 0)
+        WT_ERR(print_record(cursor, json));
+    else {
+        fwd = (reverse) ? cursor->prev : cursor->next;
+        bck = (reverse) ? cursor->next : cursor->prev;
+
+        /* Back up as far as possible in the window. */
+        for (n = 0; n < window; n++) {
+            if ((ret = bck(cursor)) != 0) {
+                if (ret == WT_NOTFOUND) {
+                    /* The cursor must point at the first record in the window. */
+                    fwd(cursor);
+                    break;
+                }
+                WT_ERR(util_cerr(cursor, "cursor", ret));
+            }
+        }
+
+        /*
+         * Calculate the maximum possible window size based on how far it was possible to back up in
+         * the window.
+         */
+        total_window = n + 1 + window;
+
+        for (n = 0; n < total_window; n++) {
+            if (json && once) {
+                if (fputc(',', fp) == EOF)
+                    WT_ERR(util_err(session, EIO, NULL));
+            }
+            WT_ERR(print_record(cursor, json));
+            if ((ret = fwd(cursor)) != 0) {
+                if (ret == WT_NOTFOUND)
+                    break;
+                WT_ERR(util_cerr(cursor, "cursor", ret));
+            }
+            once = true;
+        }
+    }
+
+    if (json && once && fprintf(fp, "\n") < 0)
+        WT_ERR(util_err(session, EIO, NULL));
+err:
+    __wt_scr_free(session_impl, &tmp);
+    return (ret);
+}
+
+/*
+ * dump_all_records --
+ *     Dump all the records.
+ */
+static int
+dump_all_records(WT_CURSOR *cursor, bool reverse, bool json)
+{
+    WT_DECL_RET;
+    WT_SESSION *session;
+    bool once;
+
+    session = cursor->session;
+    once = false;
     while ((ret = (reverse ? cursor->prev(cursor) : cursor->next(cursor))) == 0) {
-        if ((ret = cursor->get_key(cursor, &key)) != 0)
-            return (util_cerr(cursor, "get_key", ret));
-        if ((ret = cursor->get_value(cursor, &value)) != 0)
-            return (util_cerr(cursor, "get_value", ret));
-        if (fprintf(
-              fp, "%s%s%s%s%s%s", json && once ? "," : "", prefix, key, infix, value, suffix) < 0)
-            return (util_err(session, EIO, NULL));
+        if (json && once) {
+            if (fputc(',', fp) == EOF)
+                return (util_err(session, EIO, NULL));
+        }
+        WT_RET(print_record(cursor, json));
         once = true;
     }
+
+    if (ret != WT_NOTFOUND)
+        return (util_err(session, ret, reverse ? "WT_CURSOR.prev" : "WT_CURSOR.next"));
+
     if (json && once && fprintf(fp, "\n") < 0)
         return (util_err(session, EIO, NULL));
-    return (ret == WT_NOTFOUND ? 0 : util_cerr(cursor, (reverse ? "prev" : "next"), ret));
+    return (0);
+}
+
+/*
+ * dump_explore_bookmark_delete_key --
+ *     Delete the bookmark associated with the key.
+ */
+static void
+dump_explore_bookmark_delete_key(WT_CURSOR *cursor, char **bookmarks, const char *key)
+{
+    uint64_t i;
+
+    for (i = 0; i < MAX_BOOKMARKS; ++i) {
+        if (bookmarks[i] != NULL && strcmp(bookmarks[i], key) == 0) {
+            __wt_free((WT_SESSION_IMPL *)cursor->session, bookmarks[i]);
+            printf("Bookmark %" PRIu64 " deleted.\n", i);
+            break;
+        }
+    }
+}
+
+/*
+ * dump_explore_bookmark_save --
+ *     Save the cursor's position to bookmarks.
+ */
+static int
+dump_explore_bookmark_save(WT_CURSOR *cursor, char **bookmarks)
+{
+    WT_DECL_RET;
+    WT_SESSION *session;
+    size_t key_size;
+    uint64_t i;
+    const char *key;
+
+    session = cursor->session;
+
+    ret = cursor->get_key(cursor, &key);
+    if (ret != 0 && ret != EINVAL)
+        return (util_cerr(cursor, "get_key", ret));
+    if (ret == EINVAL) {
+        printf("Error: the cursor needs to be positioned to create a bookmark.\n");
+        return (0);
+    }
+
+    for (i = 0; i < MAX_BOOKMARKS; ++i) {
+        if (bookmarks[i] != NULL)
+            continue;
+        key_size = strlen(key) + 1;
+        if ((bookmarks[i] = util_malloc(key_size)) == NULL)
+            return (util_err(session, errno, NULL));
+        memmove(bookmarks[i], key, key_size);
+        printf("Added bookmark %" PRIu64 ": %s.\n", i, key);
+        break;
+    }
+    if (i >= MAX_BOOKMARKS)
+        printf("Error: bookmark list full.\n");
+    return (ret);
+}
+
+/*
+ * dump_explore_bookmark_select --
+ *     Set the cursor to the bookmark.
+ */
+static int
+dump_explore_bookmark_select(WT_CURSOR *cursor, char **bookmarks, uint64_t index)
+{
+    WT_DECL_RET;
+    const char *key;
+
+    if (index >= MAX_BOOKMARKS) {
+        printf("Error: please indicate a value between 0 and %d\n", MAX_BOOKMARKS);
+        return (0);
+    }
+
+    if ((key = bookmarks[index]) == NULL) {
+        printf("Error: no keys associated with bookmark %" PRIu64 ".\n", index);
+        return (0);
+    }
+
+    /* Set the cursor to the bookmark. */
+    cursor->set_key(cursor, key);
+    ret = cursor->search(cursor);
+    if (ret != 0 && ret != WT_NOTFOUND)
+        return (util_cerr(cursor, "search", ret));
+    else if (ret == WT_NOTFOUND) {
+        printf("Error: %d\n", ret);
+        ret = 0;
+    } else
+        printf("Cursor positioned on key %s.\n", key);
+    return (ret);
+}
+
+/*
+ * dump_explore_bookmarks_list --
+ *     List the existing bookmarks.
+ */
+static void
+dump_explore_bookmarks_list(char **bookmarks)
+{
+    uint64_t i;
+    printf("List of bookmarks:\n");
+    for (i = 0; i < MAX_BOOKMARKS; ++i) {
+        if (bookmarks[i] != NULL)
+            printf("#%" PRIu64 ": %s\n", i, bookmarks[i]);
+    }
+}
+
+/*
+ * dump_explore --
+ *     Dump data in an interactive fashion.
+ */
+static int
+dump_explore(WT_CURSOR *cursor, const char *uri, bool reverse, bool pretty, bool hex, bool json)
+{
+    WT_DECL_RET;
+    WT_SESSION *session;
+    WT_SESSION_IMPL *session_impl;
+    uint64_t bookmark_index, window;
+    int i, num_args;
+    char *args[MAX_ARGS], *bookmarks[MAX_BOOKMARKS];
+    char *first_arg, user_input[ARG_BUF_SIZE], *current_arg;
+    const char *key, *value;
+    bool once, search_near;
+
+    session = cursor->session;
+    session_impl = (WT_SESSION_IMPL *)session;
+    once = false;
+    bookmark_index = window = 0;
+    WT_NOT_READ(search_near, false);
+    memset(args, 0, sizeof(args));
+    memset(bookmarks, 0, sizeof(bookmarks));
+
+    printf("**************************\n");
+    printf("Explore mode for %s.\n", uri);
+    printf("**************************\n");
+    printf("Enter 'h' for help, 'q' to exit.\n\n");
+
+    while (ret == 0) {
+        i = num_args = 0;
+        if (fgets(user_input, sizeof(user_input), stdin) == NULL) {
+            if (!feof(stdin))
+                continue;
+            goto err;
+        }
+
+        /* Remove new line character. */
+        user_input[strlen(user_input) - 1] = '\0';
+        if (strlen(user_input) == 0 && !once)
+            continue;
+        once = true;
+
+        /* Parse the input. */
+        current_arg = strtok(user_input, " ");
+        if (current_arg == NULL)
+            continue;
+        while (current_arg != NULL) {
+            if ((args[i] = util_malloc(ARG_BUF_SIZE)) == NULL)
+                WT_ERR(util_err(session, errno, NULL));
+            memmove(args[i++], current_arg, strlen(current_arg) + 1);
+            ++num_args;
+            current_arg = strtok(NULL, " ");
+        }
+
+        first_arg = args[0];
+        switch (first_arg[0]) {
+        /* Cursor info. */
+        case 'a':
+            ret = cursor->get_key(cursor, &key);
+            if (ret == EINVAL) {
+                printf("Error: the cursor needs to be positioned.\n");
+                ret = 0;
+            } else
+                /* Any other error is handled in print_record(). */
+                print_record(cursor, json);
+            break;
+        /* Bookmarks. */
+        case 'b':
+            if (strcmp(first_arg, "b") == 0) {
+                /* List existing bookmarks. */
+                if (num_args < 2)
+                    dump_explore_bookmarks_list(bookmarks);
+                /* Jump to the bookmark. */
+                else if (util_str2num(session, args[1], true, &bookmark_index) == 0)
+                    WT_ERR(dump_explore_bookmark_select(cursor, bookmarks, bookmark_index));
+            }
+            /* Delete. */
+            else if (strcmp(first_arg, "bd") == 0) {
+                if (num_args < 2)
+                    printf("Error: please indicate the bookmark you want to delete.\n");
+                else if (util_str2num(session, args[1], true, &bookmark_index) == 0) {
+                    if (bookmark_index >= MAX_BOOKMARKS)
+                        printf("Error: please indicate a value between 0 and %d\n", MAX_BOOKMARKS);
+                    else {
+                        __wt_free(session_impl, bookmarks[bookmark_index]);
+                        printf("Bookmark %" PRIu64 " deleted.\n", bookmark_index);
+                    }
+                }
+            }
+            /* Save. */
+            else if (strcmp(first_arg, "bs") == 0) {
+                /* If a key is specified, save that key. */
+                if (num_args >= 2) {
+                    key = args[1];
+                    cursor->set_key(cursor, key);
+                    ret = cursor->search(cursor);
+                    if (ret != 0 && ret != WT_NOTFOUND)
+                        WT_ERR(util_cerr(cursor, "search", ret));
+                    if (ret == WT_NOTFOUND) {
+                        printf("Error: %d\n", ret);
+                        ret = 0;
+                        break;
+                    }
+                }
+                WT_ERR(dump_explore_bookmark_save(cursor, bookmarks));
+            }
+            break;
+        /* Cursor reset. */
+        case 'c':
+            if ((ret = cursor->reset(cursor)) != 0)
+                WT_ERR(util_cerr(cursor, "reset", ret));
+            printf("Cursor reset.\n");
+            break;
+        /* Cursor delete. */
+        case 'd':
+            if (num_args < 2) {
+                printf("Error: please indicate the key to delete.\n");
+                break;
+            }
+            key = args[1];
+            cursor->set_key(cursor, key);
+            ret = cursor->remove(cursor);
+
+            if (ret != 0 && ret != WT_NOTFOUND)
+                WT_ERR(util_cerr(cursor, "remove", ret));
+            if (ret == 0) {
+                printf("Removed key '%s'.\n", key);
+                dump_explore_bookmark_delete_key(cursor, bookmarks, key);
+            } else {
+                printf("Error: the key '%s' does not exist.\n", key);
+                ret = 0;
+            }
+            break;
+        /* Help. */
+        case 'h':
+            explore_usage();
+            break;
+        /* Cursor insert. */
+        case 'i':
+            if (num_args < 3) {
+                printf("Error: please indicate the key/value pair to insert.\n");
+                break;
+            }
+            key = args[1];
+            value = args[2];
+            cursor->set_key(cursor, key);
+            cursor->set_value(cursor, value);
+            if ((ret = cursor->insert(cursor)) != 0)
+                WT_ERR(util_cerr(cursor, "insert", ret));
+            printf("Inserted key '%s' and value '%s'.\n", key, value);
+            break;
+        /* Dump metadata. */
+        case 'm':
+            WT_ERR(dump_config(session, uri, cursor, pretty, hex, json));
+            break;
+        /* Cursor next. */
+        case 'n':
+        /* Cursor prev. */
+        case 'p':
+            if (first_arg[0] == 'n')
+                ret = (reverse ? cursor->prev(cursor) : cursor->next(cursor));
+            else
+                ret = (reverse ? cursor->next(cursor) : cursor->prev(cursor));
+            if (ret != 0 && ret != WT_NOTFOUND)
+                WT_ERR(util_cerr(cursor, (reverse ? "prev" : "next"), ret));
+            if (ret == WT_NOTFOUND) {
+                printf("Start/End of file reached.\n");
+                ret = 0;
+            } else
+                WT_ERR(print_record(cursor, json));
+            break;
+        /* Exit. */
+        case 'q':
+            if (strcmp(first_arg, "q") == 0)
+                goto err;
+            break;
+        /* Range cursor. */
+        case 'r':
+            if (strlen(first_arg) < 2 || strchr("luc", first_arg[1]) == NULL) {
+                printf(
+                  "Error: use 'rl' for lower range, 'ru' for upper range and 'rc' to clear "
+                  "range.\n");
+                break;
+            }
+
+            /* Clear range. */
+            if (first_arg[1] == 'c') {
+                if (cursor->bound(cursor, "action=clear") != 0)
+                    WT_ERR(util_cerr(cursor, "bound clear", ret));
+                printf("Cursor bounds cleared.\n");
+                break;
+            }
+
+            if (num_args < 2) {
+                printf("Error: please indicate the value for the range.\n");
+                break;
+            }
+
+            key = args[1];
+            cursor->set_key(cursor, key);
+
+            if (first_arg[1] == 'l')
+                ret = cursor->bound(cursor, "action=set,bound=lower");
+            else
+                ret = cursor->bound(cursor, "action=set,bound=upper");
+
+            if (ret != 0 && ret != EINVAL)
+                WT_ERR(util_cerr(cursor, "bound set", ret));
+            if (ret == EINVAL)
+                ret = 0;
+            else
+                printf("%s bound set.\n", first_arg[1] == 'l' ? "Lower" : "Upper");
+            break;
+        /* Search. */
+        case 's':
+            if (num_args < 2) {
+                printf("Error: please indicate a key to look for.\n");
+                break;
+            }
+
+            key = args[1];
+            cursor->set_key(cursor, key);
+            search_near = first_arg[1] == 'n';
+            ret = dump_record(cursor, key, reverse, search_near, json, window);
+
+            if (ret != 0) {
+                printf("Error: %d\n", ret);
+                if (ret == WT_NOTFOUND)
+                    ret = 0;
+                else
+                    WT_ERR(ret);
+            }
+            break;
+        /* Cursor update. */
+        case 'u':
+            if (num_args < 3) {
+                printf("Error: please indicate the key/value pair to update.\n");
+                break;
+            }
+            key = args[1];
+            value = args[2];
+            cursor->set_key(cursor, key);
+            cursor->set_value(cursor, value);
+            if ((ret = cursor->insert(cursor)) != 0)
+                WT_ERR(util_cerr(cursor, "update", ret));
+            printf("Updated key '%s' to value '%s'.\n", key, value);
+            break;
+        /* Window. */
+        case 'w':
+            if (num_args < 2)
+                printf("Error: please indicate the window value you want to set.\n");
+            else if (util_str2num(session, args[1], true, &window) == 0)
+                printf("Window value: %" PRIu64 ".\n", window);
+            break;
+        default:
+            break;
+        }
+
+        for (i = 0; i < MAX_ARGS; ++i)
+            __wt_free(session_impl, args[i]);
+    }
+
+err:
+    for (i = 0; i < MAX_BOOKMARKS; ++i)
+        __wt_free(session_impl, bookmarks[i]);
+    for (i = 0; i < MAX_ARGS; ++i)
+        __wt_free(session_impl, args[i]);
+    return (ret);
 }
 
 /*
@@ -685,24 +1290,15 @@ dump_suffix(WT_SESSION *session, bool json)
 static int
 dup_json_string(const char *str, char **result)
 {
-    size_t left, nchars;
+    size_t nchars;
     char *q;
-    const char *p;
 
-    nchars = 0;
-    for (p = str; *p; p++, nchars++)
-        nchars += __wt_json_unpack_char((u_char)*p, NULL, 0, false);
-    q = malloc(nchars + 1);
+    nchars = __wt_json_unpack_str(NULL, 0, (const u_char *)str, strlen(str)) + 1;
+    q = util_malloc(nchars);
     if (q == NULL)
         return (1);
+    WT_IGNORE_RET(__wt_json_unpack_str((u_char *)q, nchars, (const u_char *)str, strlen(str)));
     *result = q;
-    left = nchars;
-    for (p = str; *p; p++, nchars++) {
-        nchars = __wt_json_unpack_char((u_char)*p, (u_char *)q, left, false);
-        left -= nchars;
-        q += nchars;
-    }
-    *q = '\0';
     return (0);
 }
 
@@ -740,7 +1336,7 @@ print_config(WT_SESSION *session, const char *key, const char *cfg, bool json, b
               key, jsonconfig);
     } else
         ret = fprintf(fp, "%s\n%s\n", key, cfg);
-    free(jsonconfig);
+    util_free(jsonconfig);
     if (ret < 0)
         return (util_err(session, EIO, NULL));
     return (0);

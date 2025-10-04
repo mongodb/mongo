@@ -8,11 +8,14 @@
 
 #include "wt_internal.h"
 
+static WT_INLINE int __validate_next_stack(
+  WT_SESSION_IMPL *session, WT_INSERT *next_stack[WT_SKIP_MAXDEPTH], WT_ITEM *srch_key);
+
 /*
  * __search_insert_append --
  *     Fast append search of a row-store insert list, creating a skiplist stack as we go.
  */
-static inline int
+static WT_INLINE int
 __search_insert_append(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_INSERT_HEAD *ins_head,
   WT_ITEM *srch_key, bool *donep)
 {
@@ -34,9 +37,9 @@ __search_insert_append(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_INSERT
      * move this assignment above within the loop below if it needs to (and may read a different
      * value on each loop due to other threads mutating the skip list).
      *
-     * Place a read barrier here to avoid this issue.
+     * Place an acquire barrier here to avoid this issue.
      */
-    WT_READ_BARRIER();
+    WT_ACQUIRE_BARRIER();
     key.data = WT_INSERT_KEY(ins);
     key.size = WT_INSERT_KEY_SIZE(ins);
 
@@ -53,14 +56,24 @@ __search_insert_append(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_INSERT
          * serialized insert function.
          */
         for (i = WT_SKIP_MAXDEPTH - 1; i >= 0; i--) {
-            cbt->ins_stack[i] = (i == 0) ?
-              &ins->next[0] :
-              (ins_head->tail[i] != NULL) ? &ins_head->tail[i]->next[i] : &ins_head->head[i];
+            cbt->ins_stack[i] = (i == 0)  ? &ins->next[0] :
+              (ins_head->tail[i] != NULL) ? &ins_head->tail[i]->next[i] :
+                                            &ins_head->head[i];
             cbt->next_stack[i] = NULL;
         }
         cbt->compare = -cmp;
         cbt->ins = ins;
         cbt->ins_head = ins_head;
+
+        /*
+         * If we find an exact match, copy the key into the temporary buffer, our callers expect to
+         * find it there.
+         */
+        if (cbt->compare == 0) {
+            cbt->tmp->data = WT_INSERT_KEY(cbt->ins);
+            cbt->tmp->size = WT_INSERT_KEY_SIZE(cbt->ins);
+        }
+
         *donep = 1;
     }
     return (0);
@@ -92,7 +105,18 @@ __wt_search_insert(
     match = skiphigh = skiplow = 0;
     ins = last_ins = NULL;
     for (i = WT_SKIP_MAXDEPTH - 1, insp = &ins_head->head[i]; i >= 0;) {
-        if ((ins = *insp) == NULL) {
+        /*
+         * The algorithm requires that the skip list insert pointer is only read once within the
+         * loop. While the compiler can change the code in a way that it reads the insert pointer
+         * value from memory again in the following code.
+         *
+         * In addition, a CPU with weak memory ordering, such as ARM, may reorder the reads and read
+         * a stale value. It is not OK and the reason is explained in the following comment.
+         *
+         * Place an acquire barrier here to avoid these issues.
+         */
+        WT_ACQUIRE_READ_WITH_BARRIER(ins, *insp);
+        if (ins == NULL) {
             cbt->next_stack[i] = NULL;
             cbt->ins_stack[i--] = insp--;
             continue;
@@ -106,6 +130,46 @@ __wt_search_insert(
             last_ins = ins;
             key.data = WT_INSERT_KEY(ins);
             key.size = WT_INSERT_KEY_SIZE(ins);
+            /*
+             * We have an optimization to reduce the number of bytes we need to compare during the
+             * search if we know a prefix of the search key matches the keys we have already
+             * compared on the upper stacks. This works because we know the keys become denser down
+             * the stack.
+             *
+             * However, things become tricky if we have another key inserted concurrently next to
+             * the search key. The current search may or may not see the concurrently inserted key
+             * but it should always see a valid skip list. In other words,
+             *
+             * 1) at any level of the list, keys are in sorted order;
+             *
+             * 2) if a reader sees a key in level N, that key is also in all levels below N.
+             *
+             * Otherwise, we may wrongly skip the comparison of a prefix and land on the wrong spot.
+             * Here's an example:
+             *
+             * Suppose we have a skip list:
+             *
+             * L1: AA -> BA
+             *
+             * L0: AA -> BA
+             *
+             * and we want to search AB and a key AC is inserted concurrently. If we see the
+             * following skip list in the search:
+             *
+             * L1: AA -> AC -> BA
+             *
+             * L0: AA -> BA
+             *
+             * Since we have compared with AA and AC on level 1 before dropping down to level 0, we
+             * decide we can skip comparing the first byte of the key. However, since we don't see
+             * AC on level 0, we compare with BA and wrongly skip the comparison with prefix B.
+             *
+             * On architectures with strong memory ordering, the requirement is satisfied by
+             * inserting the new key to the skip list from lower stack to upper stack using an
+             * atomic compare and swap operation, which functions as a full barrier. However, it is
+             * not enough on the architecture that has weaker memory ordering, such as ARM.
+             * Therefore, an extra acquire barrier is needed for these platforms.
+             */
             match = WT_MIN(skiplow, skiphigh);
             WT_RET(__wt_compare_skip(session, collator, srch_key, &key, &cmp, &match));
         }
@@ -119,7 +183,11 @@ __wt_search_insert(
             skiphigh = match;
         } else
             for (; i >= 0; i--) {
-                cbt->next_stack[i] = ins->next[i];
+                /*
+                 * It is possible that we read an old value down the stack due to read reordering on
+                 * CPUs with weak memory ordering. Add an acquire barrier to avoid this issue.
+                 */
+                WT_ACQUIRE_READ_WITH_BARRIER(cbt->next_stack[i], ins->next[i]);
                 cbt->ins_stack[i] = &ins->next[i];
             }
     }
@@ -132,6 +200,84 @@ __wt_search_insert(
     cbt->compare = -cmp;
     cbt->ins = (ins != NULL) ? ins : last_ins;
     cbt->ins_head = ins_head;
+
+    /*
+     * This is an expensive call on a performance-critical path, so we only want to enable it behind
+     * the stress_skiplist session flag.
+     */
+    if (FLD_ISSET(S2C(session)->debug_flags, WT_CONN_DEBUG_STRESS_SKIPLIST))
+        WT_RET(__validate_next_stack(session, cbt->next_stack, srch_key));
+
+    return (0);
+}
+
+/*
+ * __validate_next_stack --
+ *     Verify that for each level in the provided next_stack that higher levels on the stack point
+ *     to larger inserts than lower levels, and all inserts are larger than the srch_key used in
+ *     building the next_stack.
+ */
+static WT_INLINE int
+__validate_next_stack(
+  WT_SESSION_IMPL *session, WT_INSERT *next_stack[WT_SKIP_MAXDEPTH], WT_ITEM *srch_key)
+{
+    WT_COLLATOR *collator;
+    WT_ITEM lower_key, upper_key;
+    int32_t cmp, i;
+
+    /*
+     * Hide the flag check for non-diagnostics builds, too.
+     */
+#ifndef HAVE_DIAGNOSTIC
+    return (0);
+#endif
+
+    collator = S2BT(session)->collator;
+    WT_CLEAR(upper_key);
+    WT_CLEAR(lower_key);
+    cmp = 0;
+
+    for (i = WT_SKIP_MAXDEPTH - 2; i >= 0; i--) {
+
+        /* If lower levels point to the end of the skiplist, higher levels must as well. */
+        if (next_stack[i] == NULL)
+            WT_ASSERT_ALWAYS(session, next_stack[i + 1] == NULL,
+              "Invalid next_stack: Level %d is NULL but higher level %d has pointer %p", i, i + 1,
+              (void *)next_stack[i + 1]);
+
+        /* We only need to compare when both levels point to different, non-NULL inserts. */
+        if (next_stack[i] == NULL || next_stack[i + 1] == NULL ||
+          next_stack[i] == next_stack[i + 1])
+            continue;
+
+        lower_key.data = WT_INSERT_KEY(next_stack[i]);
+        lower_key.size = WT_INSERT_KEY_SIZE(next_stack[i]);
+
+        upper_key.data = WT_INSERT_KEY(next_stack[i + 1]);
+        upper_key.size = WT_INSERT_KEY_SIZE(next_stack[i + 1]);
+
+        WT_RET(__wt_compare(session, collator, &upper_key, &lower_key, &cmp));
+        WT_ASSERT_ALWAYS(session, cmp >= 0,
+          "Invalid next_stack: Lower level points to larger key: Level %d = %s, Level %d = %s", i,
+          (char *)lower_key.data, i + 1, (char *)upper_key.data);
+    }
+
+    if (next_stack[0] != NULL) {
+        /*
+         * Finally, confirm that next_stack[0] is greater than srch_key. We've already confirmed
+         * that all keys on higher levels are larger than next_stack[0] and therefore also larger
+         * than srch_key.
+         */
+        lower_key.data = WT_INSERT_KEY(next_stack[0]);
+        lower_key.size = WT_INSERT_KEY_SIZE(next_stack[0]);
+
+        WT_RET(__wt_compare(session, collator, srch_key, &lower_key, &cmp));
+        WT_ASSERT_ALWAYS(session, cmp < 0,
+          "Invalid next_stack: Search key is larger than keys on next_stack: srch_key = %s, "
+          "next_stack[0] = %s",
+          (char *)srch_key->data, (char *)lower_key.data);
+    }
+
     return (0);
 }
 
@@ -139,7 +285,7 @@ __wt_search_insert(
  * __check_leaf_key_range --
  *     Check the search key is in the leaf page's key range.
  */
-static inline int
+static WT_INLINE int
 __check_leaf_key_range(
   WT_SESSION_IMPL *session, WT_ITEM *srch_key, WT_REF *leaf, WT_CURSOR_BTREE *cbt)
 {
@@ -215,7 +361,7 @@ __wt_row_search(WT_CURSOR_BTREE *cbt, WT_ITEM *srch_key, bool insert, WT_REF *le
     WT_INSERT_HEAD *ins_head;
     WT_ITEM *item;
     WT_PAGE *page;
-    WT_PAGE_INDEX *pindex, *parent_pindex;
+    WT_PAGE_INDEX *parent_pindex, *pindex;
     WT_REF *current, *descent;
     WT_ROW *rip;
     WT_SESSION_IMPL *session;
@@ -237,14 +383,6 @@ __wt_row_search(WT_CURSOR_BTREE *cbt, WT_ITEM *srch_key, bool insert, WT_REF *le
     WT_ASSERT(session, session->dhandle == cbt->dhandle);
 
     __cursor_pos_clear(cbt);
-
-    /*
-     * In some cases we expect we're comparing more than a few keys with matching prefixes, so it's
-     * faster to avoid the memory fetches by skipping over those prefixes. That's done by tracking
-     * the length of the prefix match for the lowest and highest keys we compare as we descend the
-     * tree. The high boundary is reset on each new page, the lower boundary is maintained.
-     */
-    skiplow = 0;
 
     /*
      * If a cursor repeatedly appends to the tree, compare the search key against the last key on
@@ -281,12 +419,16 @@ restart:
          * Discard the currently held page and restart the search from the root.
          */
         WT_RET(__wt_page_release(session, current, 0));
-        skiplow = 0;
     }
 
-    /* Search the internal pages of the tree. */
+    /*
+     * Search the internal pages of the tree.
+     *
+     * This loop starts with the root page and iterates down the tree until it has the correct leaf
+     * page. So we can track the depth of tree by counting the number of iterations.
+     */
     current = &btree->root;
-    for (depth = 2, pindex = NULL;; ++depth) {
+    for (depth = 1, pindex = NULL;; ++depth) {
         parent_pindex = pindex;
         page = current->page;
         if (page->type != WT_PAGE_ROW_INT)
@@ -345,16 +487,22 @@ restart:
             }
         else if (collator == NULL) {
             /*
-             * Reset the skipped prefix counts; we'd normally expect the parent's skipped prefix
-             * values to be larger than the child's values and so we'd only increase them as we walk
-             * down the tree (in other words, if we can skip N bytes on the parent, we can skip at
-             * least N bytes on the child). However, if a child internal page was split up into the
-             * parent, the child page's key space will have been truncated, and the values from the
-             * parent's search may be wrong for the child. We only need to reset the high count
-             * because the split-page algorithm truncates the end of the internal page's key space,
-             * the low count is still correct.
+             * In some cases we expect we're comparing more than a few keys with matching prefixes,
+             * so it's faster to avoid the memory fetches by skipping over those prefixes. That's
+             * done by tracking the length of the prefix match for the lowest and highest keys we've
+             * seen previously.
+             *
+             * Normally we'd expect every parent page's skippable prefixes to be shorter than the
+             * prefixes we can skip in the child page, and so we'd skip increasingly longer prefixes
+             * as we walk down the tree (in other words, if we can skip N bytes on the parent, we
+             * can skip at least N bytes on the child). However, if the search threads cache this
+             * skippable prefix size as they move down the tree, and if the tree structure changes
+             * in parallel - for example page splits reducing the child pages key space or a keys
+             * destined for a now-deleted sibling page being inserted into the current page - the
+             * skippable prefix can be incorrect for the page. To protect against this we reset the
+             * skippable prefix length each time we move to a new page.
              */
-            skiphigh = 0;
+            skiphigh = skiplow = 0;
 
             for (; limit != 0; limit >>= 1) {
                 indx = base + (limit >> 1);
@@ -362,7 +510,7 @@ restart:
                 __wt_ref_key(page, descent, &item->data, &item->size);
 
                 match = WT_MIN(skiplow, skiphigh);
-                cmp = __wt_lex_compare_skip(srch_key, item, &match);
+                cmp = __wt_lex_compare_skip(session, srch_key, item, &match);
                 if (cmp > 0) {
                     skiplow = match;
                     base = indx + 1;
@@ -471,7 +619,6 @@ leaf_only:
             ins_head = WT_ROW_INSERT_SMALLEST(page);
         } else {
             cbt->slot = WT_ROW_SLOT(page, page->pg_row + (page->entries - 1));
-
             ins_head = WT_ROW_INSERT_SLOT(page, cbt->slot);
         }
 
@@ -502,14 +649,22 @@ leaf_only:
         }
     else if (collator == NULL) {
         /*
-         * Reset the skipped prefix counts; we'd normally expect the parent's skipped prefix values
-         * to be larger than the child's values and so we'd only increase them as we walk down the
-         * tree (in other words, if we can skip N bytes on the parent, we can skip at least N bytes
-         * on the child). However, leaf pages at the end of the tree can be extended, causing the
-         * parent's search to be wrong for the child. We only need to reset the high count, the page
-         * can only be extended so the low count is still correct.
+         * In some cases we expect we're comparing more than a few keys with matching prefixes, so
+         * it's faster to avoid the memory fetches by skipping over those prefixes. That's done by
+         * tracking the length of the prefix match for the lowest and highest keys we've seen
+         * previously.
+         *
+         * Normally we'd expect every parent page's skippable prefixes to be shorter than the
+         * prefixes we can skip in the child page, and so we'd skip increasingly longer prefixes as
+         * we walk down the tree (in other words, if we can skip N bytes on the parent, we can skip
+         * at least N bytes on the child). However, if the search threads cache this skippable
+         * prefix size as they move down the tree, and if the tree structure changes in parallel -
+         * for example page splits reducing the child pages key space or a keys destined for a
+         * now-deleted sibling page being inserted into the current page - the skippable prefix can
+         * be incorrect for the page. To protect against this we reset the skippable prefix length
+         * each time we move to a new page.
          */
-        skiphigh = 0;
+        skiphigh = skiplow = 0;
 
         for (; limit != 0; limit >>= 1) {
             indx = base + (limit >> 1);
@@ -517,7 +672,7 @@ leaf_only:
             WT_ERR(__wt_row_leaf_key(session, page, rip, item, true));
 
             match = WT_MIN(skiplow, skiphigh);
-            cmp = __wt_lex_compare_skip(srch_key, item, &match);
+            cmp = __wt_lex_compare_skip(session, srch_key, item, &match);
             if (cmp > 0) {
                 skiplow = match;
                 base = indx + 1;
@@ -586,7 +741,8 @@ leaf_match:
 
     /*
      * Test for an append first when inserting onto an insert list, try to catch cursors repeatedly
-     * inserting at a single point.
+     * inserting at a single point, then search the insert list. If we find an exact match, copy the
+     * key into the temporary buffer, our callers expect to find it there.
      */
     if (insert) {
         WT_ERR(__search_insert_append(session, cbt, ins_head, srch_key, &done));
@@ -594,7 +750,10 @@ leaf_match:
             return (0);
     }
     WT_ERR(__wt_search_insert(session, cbt, ins_head, srch_key));
-
+    if (cbt->compare == 0) {
+        cbt->tmp->data = WT_INSERT_KEY(cbt->ins);
+        cbt->tmp->size = WT_INSERT_KEY_SIZE(cbt->ins);
+    }
     return (0);
 
 err:

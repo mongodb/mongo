@@ -27,73 +27,28 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/repl/oplog_entry_test_helpers.h"
+
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/index_builds/index_builds_common.h"
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 namespace repl {
-namespace {
-void populateTwoPhaseIndexBuildOplogEntry(BSONObjBuilder& oplogEntryBuilder,
-                                          const UUID& indexBuildUUID,
-                                          const BSONObj& keyPattern,
-                                          const std::string& indexName) {
-    indexBuildUUID.appendToBuilder(&oplogEntryBuilder, "indexBuildUUID");
-    //"indexes" : [ { "v" : 2, "key" : { "a" : 1 }, "name" : "a_1" } ] }
-    BSONArrayBuilder indexesArr(oplogEntryBuilder.subarrayStart("indexes"));
-    BSONObjBuilder indexDoc;
-    indexDoc.append("v", 2);
-    indexDoc.append("key", keyPattern);
-    indexDoc.append("name", indexName);
-    indexesArr.append(indexDoc.obj());
-    indexesArr.done();
-}
-
-}  // namespace
-repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
-                                repl::OpTypeEnum opType,
-                                NamespaceString nss,
-                                BSONObj object,
-                                boost::optional<BSONObj> object2,
-                                OperationSessionInfo sessionInfo,
-                                Date_t wallClockTime,
-                                const std::vector<StmtId>& stmtIds,
-                                boost::optional<UUID> uuid,
-                                boost::optional<OpTime> prevOpTime) {
-    return {repl::DurableOplogEntry(opTime,                           // optime
-                                    boost::none,                      // hash
-                                    opType,                           // opType
-                                    nss,                              // namespace
-                                    uuid,                             // uuid
-                                    boost::none,                      // fromMigrate
-                                    repl::OplogEntry::kOplogVersion,  // version
-                                    object,                           // o
-                                    object2,                          // o2
-                                    sessionInfo,                      // sessionInfo
-                                    boost::none,                      // upsert
-                                    wallClockTime,                    // wall clock time
-                                    stmtIds,                          // statement ids
-                                    prevOpTime,  // optime of previous write within same transaction
-                                    boost::none,    // pre-image optime
-                                    boost::none,    // post-image optime
-                                    boost::none,    // ShardId of resharding recipient
-                                    boost::none,    // _id
-                                    boost::none)};  // needsRetryImage
-}
 
 OplogEntry makeCommandOplogEntry(OpTime opTime,
                                  const NamespaceString& nss,
-                                 const BSONObj& command,
+                                 const BSONObj& object,
+                                 boost::optional<BSONObj> object2,
                                  boost::optional<UUID> uuid) {
-    return makeOplogEntry(opTime,
-                          OpTypeEnum::kCommand,
-                          nss.getCommandNS(),
-                          command,
-                          boost::none /* o2 */,
-                          {} /* sessionInfo */,
-                          Date_t() /* wallClockTime*/,
-                          {} /* stmtIds */,
-                          uuid);
+    return {DurableOplogEntry{DurableOplogEntryParams{.opTime = opTime,
+                                                      .opType = OpTypeEnum::kCommand,
+                                                      .nss = nss.getCommandNS(),
+                                                      .uuid = uuid,
+                                                      .oField = object,
+                                                      .o2Field = object2,
+                                                      .wallClockTime = Date_t()}}};
 }
 
 OplogEntry makeCommandOplogEntryWithSessionInfoAndStmtIds(OpTime opTime,
@@ -106,119 +61,176 @@ OplogEntry makeCommandOplogEntryWithSessionInfoAndStmtIds(OpTime opTime,
     OperationSessionInfo info;
     info.setSessionId(lsid);
     info.setTxnNumber(txnNum);
-    return makeOplogEntry(opTime,
-                          OpTypeEnum::kCommand,
-                          nss.getCommandNS(),
-                          command,
-                          boost::none /* o2 */,
-                          info /* sessionInfo */,
-                          Date_t::min() /* wallClockTime -- required but not checked */,
-                          stmtIds,
-                          boost::none /* uuid */,
-                          prevOpTime);
-}
 
-OplogEntry makeCreateCollectionOplogEntry(OpTime opTime,
-                                          const NamespaceString& nss,
-                                          const BSONObj& options) {
-    BSONObjBuilder bob;
-    bob.append("create", nss.coll());
-    boost::optional<UUID> optionalUUID;
-    if (options.hasField("uuid")) {
-        StatusWith<UUID> uuid = UUID::parse(options.getField("uuid"));
-        optionalUUID = uuid.getValue();
-    }
-    bob.appendElements(options);
-    return makeCommandOplogEntry(opTime, nss, bob.obj(), optionalUUID);
+    return {DurableOplogEntry{DurableOplogEntryParams{.opTime = opTime,
+                                                      .opType = OpTypeEnum::kCommand,
+                                                      .nss = nss.getCommandNS(),
+                                                      .oField = command,
+                                                      .sessionInfo = info,
+                                                      .wallClockTime = Date_t::min(),
+                                                      .statementIds = std::move(stmtIds),
+                                                      .prevWriteOpTimeInTransaction = prevOpTime}}};
 }
 
 OplogEntry makeInsertDocumentOplogEntry(OpTime opTime,
                                         const NamespaceString& nss,
                                         const BSONObj& documentToInsert) {
-    return makeOplogEntry(opTime,               // optime
-                          OpTypeEnum::kInsert,  // op type
-                          nss,                  // namespace
-                          documentToInsert,     // o
-                          boost::none,          // o2
-                          {},                   // session info
-                          Date_t::now());       // wall clock time
+    return {DurableOplogEntry{DurableOplogEntryParams{.opTime = opTime,
+                                                      .opType = OpTypeEnum::kInsert,
+                                                      .nss = nss,
+                                                      .oField = documentToInsert,
+                                                      .wallClockTime = Date_t::now()}}};
 }
 
 OplogEntry makeDeleteDocumentOplogEntry(OpTime opTime,
                                         const NamespaceString& nss,
                                         const BSONObj& documentToDelete) {
-    return makeOplogEntry(opTime,               // optime
-                          OpTypeEnum::kDelete,  // op type
-                          nss,                  // namespace
-                          documentToDelete,     // o
-                          boost::none,          // o2
-                          {},                   // session info
-                          Date_t::now());       // wall clock time
+    return {DurableOplogEntry{DurableOplogEntryParams{.opTime = opTime,
+                                                      .opType = OpTypeEnum::kDelete,
+                                                      .nss = nss,
+                                                      .oField = documentToDelete,
+                                                      .wallClockTime = Date_t::now()}}};
 }
 
 OplogEntry makeUpdateDocumentOplogEntry(OpTime opTime,
                                         const NamespaceString& nss,
                                         const BSONObj& documentToUpdate,
                                         const BSONObj& updatedDocument) {
-    return makeOplogEntry(opTime,               // optime
-                          OpTypeEnum::kUpdate,  // op type
-                          nss,                  // namespace
-                          updatedDocument,      // o
-                          documentToUpdate,     // o2
-                          {},                   // session info
-                          Date_t::now());       // wall clock time
+    return {DurableOplogEntry{DurableOplogEntryParams{.opTime = opTime,
+                                                      .opType = OpTypeEnum::kUpdate,
+                                                      .nss = nss,
+                                                      .oField = updatedDocument,
+                                                      .o2Field = documentToUpdate,
+                                                      .wallClockTime = Date_t::now()}}};
+}
+
+OplogEntry makeContainerInsertOplogEntry(OpTime opTime,
+                                         const NamespaceString& nss,
+                                         StringData containerIdent,
+                                         int64_t key,
+                                         BSONBinData value) {
+    return {DurableOplogEntry{DurableOplogEntryParams{
+        .opTime = opTime,
+        .opType = OpTypeEnum::kContainerInsert,
+        .nss = nss,
+        .container = containerIdent,
+        .oField = BSON("k" << key << "v" << value),
+        .wallClockTime = Date_t::now(),
+    }}};
+}
+
+OplogEntry makeContainerInsertOplogEntry(OpTime opTime,
+                                         const NamespaceString& nss,
+                                         StringData containerIdent,
+                                         BSONBinData key,
+                                         BSONBinData value) {
+    return {DurableOplogEntry{DurableOplogEntryParams{
+        .opTime = opTime,
+        .opType = OpTypeEnum::kContainerInsert,
+        .nss = nss,
+        .container = containerIdent,
+        .oField = BSON("k" << key << "v" << value),
+        .wallClockTime = Date_t::now(),
+    }}};
+}
+
+OplogEntry makeContainerDeleteOplogEntry(OpTime opTime,
+                                         const NamespaceString& nss,
+                                         StringData containerIdent,
+                                         int64_t key) {
+    return {DurableOplogEntry{DurableOplogEntryParams{
+        .opTime = opTime,
+        .opType = OpTypeEnum::kContainerDelete,
+        .nss = nss,
+        .container = containerIdent,
+        .oField = BSON("k" << key),
+        .wallClockTime = Date_t::now(),
+    }}};
+}
+
+OplogEntry makeContainerDeleteOplogEntry(OpTime opTime,
+                                         const NamespaceString& nss,
+                                         StringData containerIdent,
+                                         BSONBinData key) {
+    return {DurableOplogEntry{DurableOplogEntryParams{
+        .opTime = opTime,
+        .opType = OpTypeEnum::kContainerDelete,
+        .nss = nss,
+        .container = containerIdent,
+        .oField = BSON("k" << key),
+        .wallClockTime = Date_t::now(),
+    }}};
 }
 
 OplogEntry makeCreateIndexOplogEntry(OpTime opTime,
                                      const NamespaceString& nss,
                                      const std::string& indexName,
                                      const BSONObj& keyPattern,
-                                     const UUID& uuid) {
-    BSONObjBuilder indexInfoBob;
-    indexInfoBob.append("createIndexes", nss.coll());
-    indexInfoBob.append("v", 2);
-    indexInfoBob.append("key", keyPattern);
-    indexInfoBob.append("name", indexName);
-    return makeCommandOplogEntry(opTime, nss, indexInfoBob.obj(), uuid);
+                                     const UUID& uuid,
+                                     const BSONObj& options) {
+    BSONObjBuilder spec;
+    spec.append("v", 2);
+    spec.append("key", keyPattern);
+    spec.append("name", indexName);
+    spec.appendElementsUnique(options);
+
+    BSONObjBuilder oBuilder;
+    oBuilder.append("createIndexes", nss.coll());
+    oBuilder.appendElements(spec.obj());
+
+    return {DurableOplogEntry{DurableOplogEntryParams{
+        .opTime = opTime,
+        .opType = OpTypeEnum::kCommand,
+        .nss = nss.getCommandNS(),
+        .uuid = uuid,
+        .oField = oBuilder.obj(),
+        .o2Field = boost::none,
+        .wallClockTime = Date_t::now(),
+    }}};
 }
 
 OplogEntry makeStartIndexBuildOplogEntry(OpTime opTime,
                                          const NamespaceString& nss,
-                                         const std::string& indexName,
-                                         const BSONObj& keyPattern,
                                          const UUID& uuid,
-                                         const UUID& indexBuildUUID) {
+                                         const UUID& indexBuildUUID,
+                                         const IndexBuildInfo& indexBuildInfo,
+                                         StringData indexIdent) {
     BSONObjBuilder oplogEntryBuilder;
     oplogEntryBuilder.append("startIndexBuild", nss.coll());
-    populateTwoPhaseIndexBuildOplogEntry(oplogEntryBuilder, indexBuildUUID, keyPattern, indexName);
+    indexBuildUUID.appendToBuilder(&oplogEntryBuilder, "indexBuildUUID");
+    oplogEntryBuilder.append("indexes", BSON_ARRAY(indexBuildInfo.spec));
 
-    return makeCommandOplogEntry(opTime, nss, oplogEntryBuilder.obj(), uuid);
+    return makeCommandOplogEntry(opTime,
+                                 nss,
+                                 oplogEntryBuilder.obj(),
+                                 BSON("indexes" << BSON_ARRAY(BSON("indexIdent" << indexIdent))),
+                                 uuid);
 }
 
 OplogEntry makeCommitIndexBuildOplogEntry(OpTime opTime,
                                           const NamespaceString& nss,
-                                          const std::string& indexName,
-                                          const BSONObj& keyPattern,
                                           const UUID& uuid,
-                                          const UUID& indexBuildUUID) {
+                                          const UUID& indexBuildUUID,
+                                          const IndexBuildInfo& indexBuildInfo) {
     BSONObjBuilder oplogEntryBuilder;
     oplogEntryBuilder.append("commitIndexBuild", nss.coll());
-    populateTwoPhaseIndexBuildOplogEntry(oplogEntryBuilder, indexBuildUUID, keyPattern, indexName);
+    indexBuildUUID.appendToBuilder(&oplogEntryBuilder, "indexBuildUUID");
+    oplogEntryBuilder.append("indexes", BSON_ARRAY(indexBuildInfo.spec));
 
-    return makeCommandOplogEntry(opTime, nss, oplogEntryBuilder.obj(), uuid);
+    return makeCommandOplogEntry(
+        opTime, nss, oplogEntryBuilder.obj(), boost::none /* object2 */, uuid);
 }
 
 OplogEntry makeInsertDocumentOplogEntryWithSessionInfo(OpTime opTime,
                                                        const NamespaceString& nss,
                                                        const BSONObj& documentToInsert,
                                                        OperationSessionInfo info) {
-    return makeOplogEntry(opTime,               // optime
-                          OpTypeEnum::kInsert,  // op type
-                          nss,                  // namespace
-                          documentToInsert,     // o
-                          boost::none,          // o2
-                          info,                 // session info
-                          Date_t::now());       // wall clock time
+    return {DurableOplogEntry{DurableOplogEntryParams{.opTime = opTime,
+                                                      .opType = OpTypeEnum::kInsert,
+                                                      .nss = nss,
+                                                      .oField = documentToInsert,
+                                                      .sessionInfo = info,
+                                                      .wallClockTime = Date_t::now()}}};
 }
 
 OplogEntry makeInsertDocumentOplogEntryWithSessionInfoAndStmtIds(
@@ -233,16 +245,16 @@ OplogEntry makeInsertDocumentOplogEntryWithSessionInfoAndStmtIds(
     OperationSessionInfo info;
     info.setSessionId(lsid);
     info.setTxnNumber(txnNum);
-    return makeOplogEntry(opTime,               // optime
-                          OpTypeEnum::kInsert,  // op type
-                          nss,                  // namespace
-                          documentToInsert,     // o
-                          boost::none,          // o2
-                          info,                 // session info
-                          Date_t::now(),        // wall clock time
-                          stmtIds,
-                          uuid,
-                          prevOpTime);  // previous optime in same session
+
+    return {DurableOplogEntry{DurableOplogEntryParams{.opTime = opTime,
+                                                      .opType = OpTypeEnum::kInsert,
+                                                      .nss = nss,
+                                                      .uuid = uuid,
+                                                      .oField = documentToInsert,
+                                                      .sessionInfo = info,
+                                                      .wallClockTime = Date_t::now(),
+                                                      .statementIds = stmtIds,
+                                                      .prevWriteOpTimeInTransaction = prevOpTime}}};
 }
 }  // namespace repl
 }  // namespace mongo

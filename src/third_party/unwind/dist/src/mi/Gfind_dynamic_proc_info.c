@@ -63,8 +63,11 @@ local_find_proc_info (unw_addr_space_t as, unw_word_t ip, unw_proc_info_t *pi,
 #ifdef UNW_LOCAL_ONLY
 
 static inline int
-remote_find_proc_info (unw_addr_space_t as, unw_word_t ip, unw_proc_info_t *pi,
-                       int need_unwind_info, void *arg)
+remote_find_proc_info (unw_addr_space_t  as UNUSED,
+					   unw_word_t        ip UNUSED,
+					   unw_proc_info_t  *pi UNUSED,
+                       int               need_unwind_info UNUSED,
+                       void             *arg UNUSED)
 {
   return -UNW_ENOINFO;
 }

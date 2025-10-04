@@ -26,7 +26,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest
+import wttest
+from compact_util import compact_util
 from suite_subprocess import suite_subprocess
 from wtdataset import SimpleDataSet, ComplexDataSet
 from wiredtiger import stat
@@ -34,12 +35,13 @@ from wtscenario import make_scenarios
 
 # test_compact.py
 #    session level compact operation
-class test_compact(wttest.WiredTigerTestCase, suite_subprocess):
+class test_compact(compact_util, suite_subprocess):
     name = 'test_compact'
 
-    # Use a small page size because we want to create lots of pages.
-    config = 'allocation_size=512,' +\
-        'leaf_page_max=512,key_format=S'
+    # We don't want to set the page size too small as compaction doesn't work on tables with many
+    # overflow items, furthermore eviction can get very slow with overflow items. We don't want the
+    # page size to be too big either as there won't be enough pages to rewrite.
+    config = 'leaf_page_max=8KB,key_format=S'
     nentries = 50000
 
     # The table is a complex object, give it roughly 5 pages per underlying
@@ -60,25 +62,9 @@ class test_compact(wttest.WiredTigerTestCase, suite_subprocess):
     conn_config = 'cache_size=1GB,eviction_checkpoint_target=80,' +\
         'eviction_dirty_target=80,eviction_dirty_trigger=95,statistics=(all)'
 
-    # Return stats that track the progress of compaction.
-    def getCompactProgressStats(self, uri):
-        cstat = self.session.open_cursor(
-            'statistics:' + uri, None, 'statistics=(all)')
-        statDict = {}
-        statDict["pages_reviewed"] = cstat[stat.dsrc.btree_compact_pages_reviewed][2]
-        statDict["pages_skipped"] = cstat[stat.dsrc.btree_compact_pages_skipped][2]
-        statDict["pages_rewritten"] = cstat[stat.dsrc.btree_compact_pages_rewritten][2]
-        cstat.close()
-        return statDict
-
     # Test compaction.
+    @wttest.skip_for_hook("timestamp", "removing timestamped items will not free space")
     def test_compact(self):
-        # FIXME-WT-7187
-        # This test is temporarily disabled for OS/X, it fails often, but not consistently.
-        import platform
-        if platform.system() == 'Darwin':
-            self.skipTest('Compaction tests skipped, as they fail on OS/X')
-
         # Populate an object
         uri = self.type + self.name
         ds = self.dataset(self, uri, self.nentries - 1, config=self.config)
@@ -93,31 +79,33 @@ class test_compact(wttest.WiredTigerTestCase, suite_subprocess):
         stat_cursor.close()
 
         # Remove most of the object.
-        c1 = self.session.open_cursor(uri, None)
+        c1 = ds.open_cursor(uri, None)
         c1.set_key(ds.key(5))
-        c2 = self.session.open_cursor(uri, None)
+        c2 = ds.open_cursor(uri, None)
         c2.set_key(ds.key(self.nentries - 5))
-        self.session.truncate(None, c1, c2, None)
+        ds.truncate(None, c1, c2, None)
         c1.close()
         c2.close()
 
-        # Compact it, using either the session method or the utility.
+        # Compact it, using either the session method or the utility. Generated files are ~2MB, set
+        # the minimum threshold to a low value to make sure compaction can be executed.
+        compact_cfg = "free_space_target=1MB"
         if self.utility == 1:
             self.session.checkpoint(None)
             self.close_conn()
-            self.runWt(["compact", uri])
+            self.runWt(["compact", "-c", compact_cfg, uri])
         else:
             # Optionally reopen the connection so we do more on-disk tests.
             if self.reopen == 1:
                 self.session.checkpoint(None)
                 self.reopen_conn()
 
-            self.session.compact(uri, None)
+            self.session.compact(uri, compact_cfg)
 
         # Verify compact progress stats. We can't do this with utility method as reopening the
         # connection would reset the stats.
-        if self.utility == 0 and self.reopen == 0:
-            statDict = self.getCompactProgressStats(uri)
+        if self.utility == 0 and self.reopen == 0 and not self.runningHook('tiered'):
+            statDict = self.get_compact_progress_stats(uri)
             self.assertGreater(statDict["pages_reviewed"],0)
             self.assertGreater(statDict["pages_rewritten"],0)
             self.assertEqual(statDict["pages_rewritten"] + statDict["pages_skipped"],
@@ -128,6 +116,3 @@ class test_compact(wttest.WiredTigerTestCase, suite_subprocess):
         stat_cursor = self.session.open_cursor('statistics:' + uri, None, None)
         self.assertLess(stat_cursor[stat.dsrc.btree_row_leaf][2], self.maxpages)
         stat_cursor.close()
-
-if __name__ == '__main__':
-    wttest.run()

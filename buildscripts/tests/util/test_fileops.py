@@ -1,10 +1,9 @@
 """Unit tests for fileops.py."""
+
 import unittest
 from unittest.mock import patch
 
 import buildscripts.util.fileops as under_test
-
-# pylint: disable=missing-docstring,protected-access,no-self-use
 
 
 class TestWriteFileToDir(unittest.TestCase):

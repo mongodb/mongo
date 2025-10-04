@@ -25,7 +25,7 @@ __random_insert_valid(WT_CURSOR_BTREE *cbt, WT_INSERT_HEAD *ins_head, WT_INSERT 
     cbt->tmp->data = WT_INSERT_KEY(ins);
     cbt->tmp->size = WT_INSERT_KEY_SIZE(ins);
 
-    return (__wt_cursor_valid(cbt, cbt->tmp, WT_RECNO_OOB, validp));
+    return (__wti_cursor_valid(cbt, validp, false));
 }
 
 /*
@@ -41,11 +41,11 @@ __random_slot_valid(WT_CURSOR_BTREE *cbt, uint32_t slot, bool *validp)
     cbt->slot = slot;
     cbt->compare = 0;
 
-    return (__wt_cursor_valid(cbt, cbt->tmp, WT_RECNO_OOB, validp));
+    return (__wti_cursor_valid(cbt, validp, false));
 }
 
 /* Magic constant: 5000 entries in a skip list is enough to forcibly evict. */
-#define WT_RANDOM_SKIP_EVICT_SOON 5000
+#define WT_RANDOM_SKIP_EVICT_SOON (5 * WT_THOUSAND)
 /* Magic constant: 50 entries in a skip list is enough to predict the size. */
 #define WT_RANDOM_SKIP_PREDICT 50
 
@@ -88,7 +88,7 @@ __random_skip_entries(WT_CURSOR_BTREE *cbt, WT_INSERT_HEAD *ins_head)
      * traversing the skip list each time accumulates to real time.
      */
     if (entries > WT_RANDOM_SKIP_EVICT_SOON)
-        __wt_page_evict_soon(session, cbt->ref);
+        __wt_evict_page_soon(session, cbt->ref);
 
     return (entries);
 }
@@ -106,13 +106,10 @@ static int
 __random_leaf_skip(WT_CURSOR_BTREE *cbt, WT_INSERT_HEAD *ins_head, uint32_t entries, bool *validp)
 {
     WT_INSERT *ins, *saved_ins;
-    WT_SESSION_IMPL *session;
     uint32_t i;
     int retry;
 
     *validp = false;
-
-    session = CUR2S(cbt);
 
     /* This is a relatively expensive test, try a few times then quit. */
     for (retry = 0; retry < WT_RANDOM_SKIP_RETRY; ++retry) {
@@ -121,7 +118,7 @@ __random_leaf_skip(WT_CURSOR_BTREE *cbt, WT_INSERT_HEAD *ins_head, uint32_t entr
          * records before our target so we can look around in case our chosen record isn't valid.
          */
         saved_ins = NULL;
-        i = __wt_random(&session->rnd) % entries;
+        i = __wt_random(&cbt->rnd) % entries;
         for (ins = WT_SKIP_FIRST(ins_head); ins != NULL; ins = WT_SKIP_NEXT(ins)) {
             if (--i == 0)
                 break;
@@ -154,7 +151,7 @@ __random_leaf_skip(WT_CURSOR_BTREE *cbt, WT_INSERT_HEAD *ins_head, uint32_t entr
 /* Magic constant: 100 entries in any randomly chosen skip list is enough to select from it. */
 #define WT_RANDOM_SKIP_INSERT_ENOUGH 100
 /* Magic constant: 1000 entries in an initial skip list is enough to always select from it. */
-#define WT_RANDOM_SKIP_INSERT_SMALLEST_ENOUGH 1000
+#define WT_RANDOM_SKIP_INSERT_SMALLEST_ENOUGH WT_THOUSAND
 
 /*
  * __random_leaf_insert --
@@ -165,13 +162,11 @@ __random_leaf_insert(WT_CURSOR_BTREE *cbt, bool *validp)
 {
     WT_INSERT_HEAD *ins_head;
     WT_PAGE *page;
-    WT_SESSION_IMPL *session;
     uint32_t entries, slot, start;
 
     *validp = false;
 
     page = cbt->ref->page;
-    session = CUR2S(cbt);
 
     /* Check for a large insert list with no items, that's common when tables are newly created. */
     ins_head = WT_ROW_INSERT_SMALLEST(page);
@@ -188,7 +183,7 @@ __random_leaf_insert(WT_CURSOR_BTREE *cbt, bool *validp)
      * decrease the required number of records required to select from the list.
      */
     if (page->entries > 0) {
-        start = __wt_random(&session->rnd) % page->entries;
+        start = __wt_random(&cbt->rnd) % page->entries;
         for (slot = start; slot < page->entries; ++slot) {
             ins_head = WT_ROW_INSERT(page, &page->pg_row[slot]);
             entries = __random_skip_entries(cbt, ins_head);
@@ -243,7 +238,7 @@ __random_leaf_disk(WT_CURSOR_BTREE *cbt, bool *validp)
 
     /* This is a relatively cheap test, so try several times. */
     for (retry = 0; retry < WT_RANDOM_DISK_RETRY; ++retry) {
-        slot = __wt_random(&session->rnd) % entries;
+        slot = __wt_random(&cbt->rnd) % entries;
         WT_RET(__wt_row_leaf_key(session, page, page->pg_row + slot, cbt->tmp, false));
         WT_RET(__random_slot_valid(cbt, slot, validp));
         if (*validp)
@@ -255,7 +250,7 @@ __random_leaf_disk(WT_CURSOR_BTREE *cbt, bool *validp)
 /* Magic constant: cursor up to 250 next/previous records before selecting a key. */
 #define WT_RANDOM_CURSOR_MOVE 250
 /* Magic constant: 1000 disk-based entries in a page is enough to always select from them. */
-#define WT_RANDOM_DISK_ENOUGH 1000
+#define WT_RANDOM_DISK_ENOUGH WT_THOUSAND
 
 /*
  * __random_leaf --
@@ -315,7 +310,7 @@ __random_leaf(WT_CURSOR_BTREE *cbt)
     __cursor_pos_clear(cbt);
     cbt->slot = 0;
     next = true; /* Forward from the beginning of the page. */
-    for (i = __wt_random(&session->rnd) % WT_RANDOM_CURSOR_MOVE;;) {
+    for (i = __wt_random(&cbt->rnd) % WT_RANDOM_CURSOR_MOVE;;) {
         ret = next ? __wt_btcur_next(cbt, false) : __wt_btcur_prev(cbt, false);
         if (ret == WT_NOTFOUND) {
             next = !next; /* Reverse direction. */
@@ -339,7 +334,7 @@ __random_leaf(WT_CURSOR_BTREE *cbt)
             if (WT_DATA_IN_ITEM(cbt->tmp) && cursor->key.size == cbt->tmp->size &&
               memcmp(cursor->key.data, cbt->tmp->data, cbt->tmp->size) == 0) {
                 cbt->tmp->size = 0;
-                i = __wt_random(&session->rnd) % WT_RANDOM_CURSOR_MOVE;
+                i = __wt_random(&cbt->rnd) % WT_RANDOM_CURSOR_MOVE;
             } else {
                 WT_RET(__wt_buf_set(session, cbt->tmp, cursor->key.data, cursor->key.size));
                 break;
@@ -351,25 +346,59 @@ __random_leaf(WT_CURSOR_BTREE *cbt)
 }
 
 /*
+ * __random_root_inmem_ref --
+ *     Return a random in-mem ref from a root page by applying reservoir sampling.
+ */
+static void
+__random_root_inmem_ref(
+  WT_SESSION_IMPL *session, WT_REF *current, WT_REF **refp, WT_RAND_STATE *rnd)
+{
+    WT_REF *ref, *ref_inmem;
+    uint64_t cnt;
+
+    cnt = 0;
+    ref_inmem = NULL;
+
+    WT_ASSERT(session, __wt_ref_is_root(current));
+
+    WT_STAT_CONN_INCR(session, cache_eviction_random_sample_inmem_root);
+    WT_STAT_DSRC_INCR(session, cache_eviction_random_sample_inmem_root);
+
+    WT_INTL_FOREACH_BEGIN (session, current->page, ref)
+        if (WT_REF_GET_STATE(ref) == WT_REF_MEM) {
+            cnt++;
+            if ((__wt_random(rnd) % cnt) == 0)
+                ref_inmem = ref;
+        }
+    WT_INTL_FOREACH_END;
+
+    if (cnt != 0)
+        *refp = ref_inmem;
+}
+
+/*
  * __wt_random_descent --
  *     Find a random page in a tree for either sampling or eviction.
  */
 int
-__wt_random_descent(WT_SESSION_IMPL *session, WT_REF **refp, uint32_t flags)
+__wt_random_descent(WT_SESSION_IMPL *session, WT_REF **refp, uint32_t flags, WT_RAND_STATE *rnd)
 {
     WT_BTREE *btree;
     WT_DECL_RET;
     WT_PAGE *page;
     WT_PAGE_INDEX *pindex;
     WT_REF *current, *descent;
-    uint32_t i, entries, retry;
-    bool eviction;
+    WT_REF_STATE descent_state;
+    uint32_t entries, i;
+    int retry;
+    bool eviction, sample_inmem_page;
 
     *refp = NULL;
 
     btree = S2BT(session);
     current = NULL;
     retry = 100;
+    sample_inmem_page = false;
     /*
      * This function is called by eviction to find a random page in the cache. That case is
      * indicated by the WT_READ_CACHE flag. Ordinary lookups in a tree will read pages into cache as
@@ -397,7 +426,9 @@ restart:
 
         /* Eviction just wants any random child. */
         if (eviction) {
-            descent = pindex->index[__wt_random(&session->rnd) % entries];
+            descent = pindex->index[__wt_random(rnd) % entries];
+            if (sample_inmem_page && __wt_ref_is_root(current))
+                __random_root_inmem_ref(session, current, &descent, rnd);
             goto descend;
         }
 
@@ -412,14 +443,16 @@ restart:
          */
         descent = NULL;
         for (i = 0; i < entries; ++i) {
-            descent = pindex->index[__wt_random(&session->rnd) % entries];
-            if (descent->state == WT_REF_DISK || descent->state == WT_REF_MEM)
+            descent = pindex->index[__wt_random(rnd) % entries];
+            descent_state = WT_REF_GET_STATE(descent);
+            if (descent_state == WT_REF_DISK || descent_state == WT_REF_MEM)
                 break;
         }
         if (i == entries)
             for (i = 0; i < entries; ++i) {
                 descent = pindex->index[i];
-                if (descent->state == WT_REF_DISK || descent->state == WT_REF_MEM)
+                descent_state = WT_REF_GET_STATE(descent);
+                if (descent_state == WT_REF_DISK || descent_state == WT_REF_MEM)
                     break;
             }
         if (i == entries || descent == NULL) {
@@ -449,10 +482,17 @@ descend:
     }
 
     /*
-     * There is no point starting with the root page: the walk will exit immediately. In that case
-     * we aren't holding a hazard pointer so there is nothing to release.
+     * There is no point starting with the root page: continue attempting the process until we
+     * encounter a non-root page.
      */
-    if (!eviction || !__wt_ref_is_root(current))
+    if (eviction && __wt_ref_is_root(current)) {
+        if (--retry > 0)
+            goto restart;
+        else if (S2C(session)->evict_sample_inmem && !sample_inmem_page) {
+            sample_inmem_page = true;
+            goto restart;
+        }
+    } else
         *refp = current;
     return (0);
 }
@@ -490,7 +530,7 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
     if (btree->type != BTREE_ROW)
         WT_RET_MSG(session, ENOTSUP, "WT_CURSOR.next_random only supported by row-store tables");
 
-    WT_STAT_CONN_DATA_INCR(session, cursor_next);
+    WT_STAT_CONN_DSRC_INCR(session, cursor_next);
 
     F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
@@ -507,7 +547,8 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
      */
     if (cbt->ref == NULL || cbt->next_random_sample_size == 0) {
         WT_ERR(__wt_cursor_func_init(cbt, true));
-        WT_WITH_PAGE_INDEX(session, ret = __wt_random_descent(session, &cbt->ref, read_flags));
+        WT_WITH_PAGE_INDEX(
+          session, ret = __wt_random_descent(session, &cbt->ref, read_flags, &cbt->rnd));
         if (ret == 0) {
             WT_ERR(__random_leaf(cbt));
             return (0);
@@ -567,7 +608,7 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
      */
     for (skip = cbt->next_random_leaf_skip; cbt->ref == NULL || skip > 0;) {
         n = skip;
-        WT_ERR(__wt_tree_walk_skip(session, &cbt->ref, &skip));
+        WT_ERR(__wti_tree_walk_skip(session, &cbt->ref, &skip));
         if (n == skip) {
             if (skip == 0)
                 break;

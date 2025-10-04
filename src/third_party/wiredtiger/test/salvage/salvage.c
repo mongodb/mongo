@@ -28,12 +28,11 @@
 
 #include "test_util.h"
 
-#include <assert.h>
-
 #define HOME "WT_TEST"
 #define DUMP "WT_TEST/__slvg.dump"   /* Dump file */
 #define LOAD "WT_TEST/__slvg.load"   /* Build file */
 #define LOAD_URI "file:__slvg.load"  /* Build URI */
+#define PREP "WT_TEST/__slvg.prep"   /* Prepare file */
 #define RSLT "WT_TEST/__slvg.result" /* Result file */
 #define SLVG "WT_TEST/__slvg.slvg"   /* Salvage file */
 #define SLVG_URI "file:__slvg.slvg"  /* Salvage URI */
@@ -58,6 +57,10 @@ static int verbose;      /* -v flag */
 extern int __wt_optind;
 extern char *__wt_optarg;
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {
@@ -105,6 +108,10 @@ main(int argc, char *argv[])
     return (EXIT_SUCCESS);
 }
 
+/*
+ * t --
+ *     TODO: Add a comment describing this function.
+ */
 void
 t(int r, u_int ptype, int unique)
 {
@@ -143,6 +150,10 @@ t(int r, u_int ptype, int unique)
     }
 }
 
+/*
+ * usage --
+ *     TODO: Add a comment describing this function.
+ */
 int
 usage(void)
 {
@@ -150,21 +161,24 @@ usage(void)
     return (EXIT_FAILURE);
 }
 
+/*
+ * run --
+ *     TODO: Add a comment describing this function.
+ */
 void
 run(int r)
 {
-    char buf[128];
-
     printf("\t%s: run %d\n", __wt_page_type_string(page_type), r);
 
-    testutil_make_work_dir(HOME);
+    testutil_recreate_dir(HOME);
 
-    testutil_checksys((res_fp = fopen(RSLT, "w")) == NULL);
+    testutil_assert_errno((res_fp = fopen(RSLT, "w")) != NULL);
 
     /*
-     * Each run builds the LOAD file, and then appends the first page of the LOAD file into the SLVG
-     * file. The SLVG file is then salvaged, verified, and dumped into the DUMP file, which is
-     * compared to the results file, which are the expected results.
+     * Each run builds the LOAD file, and then appends the first page of the LOAD file into the PREP
+     * file. The PREP file is then copied to the SLVG file, which is salvaged, verified, and dumped
+     * into the DUMP file. The DUMP file is in turn compared to the results file, which are the
+     * expected results.
      */
     switch (r) {
     case 1:
@@ -465,13 +479,9 @@ run(int r)
 
     process();
 
-    testutil_check(__wt_snprintf(buf, sizeof(buf), "cmp %s %s > /dev/null", DUMP, RSLT));
-    if (system(buf)) {
-        fprintf(stderr, "check failed, salvage results were incorrect\n");
-        exit(EXIT_FAILURE);
-    }
+    testutil_system("cmp %s %s > /dev/null", DUMP, RSLT);
 
-    testutil_clean_work_dir(HOME);
+    testutil_remove(HOME);
 }
 
 /*
@@ -503,31 +513,32 @@ build(int ikey, int ivalue, int cnt)
     /*
      * Disable logging: we're modifying files directly, we don't want to run recovery.
      */
-    testutil_check(wiredtiger_open(HOME, NULL, "create,log=(enabled=false)", &conn));
+    testutil_check(wiredtiger_open(HOME, NULL,
+      "create,log=(enabled=false),statistics=(all),statistics_log=(json,on_close,wait=1)", &conn));
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
     testutil_check(session->drop(session, LOAD_URI, "force"));
 
     switch (page_type) {
     case WT_PAGE_COL_FIX:
-        testutil_check(__wt_snprintf(config, sizeof(config),
-          "key_format=r,value_format=7t,allocation_size=%d,internal_page_max=%d,internal_item_max=%"
-          "d,leaf_page_max=%d,leaf_item_max=%d",
-          PSIZE, PSIZE, OSIZE, PSIZE, OSIZE));
+        testutil_snprintf(config, sizeof(config),
+          "key_format=r,value_format=7t,allocation_size=%d,internal_page_max=%d,leaf_page_max=%d,"
+          "leaf_key_max=%d,leaf_value_max=%d",
+          PSIZE, PSIZE, PSIZE, OSIZE, OSIZE);
         break;
     case WT_PAGE_COL_VAR:
-        testutil_check(__wt_snprintf(config, sizeof(config),
-          "key_format=r,allocation_size=%d,internal_page_max=%d,internal_item_max=%d,leaf_page_max="
-          "%d,leaf_item_max=%d",
-          PSIZE, PSIZE, OSIZE, PSIZE, OSIZE));
+        testutil_snprintf(config, sizeof(config),
+          "key_format=r,allocation_size=%d,internal_page_max=%d,leaf_page_max=%d,leaf_key_max=%d,"
+          "leaf_value_max=%d",
+          PSIZE, PSIZE, PSIZE, OSIZE, OSIZE);
         break;
     case WT_PAGE_ROW_LEAF:
-        testutil_check(__wt_snprintf(config, sizeof(config),
-          "key_format=u,allocation_size=%d,internal_page_max=%d,internal_item_max=%d,leaf_page_max="
-          "%d,leaf_item_max=%d",
-          PSIZE, PSIZE, OSIZE, PSIZE, OSIZE));
+        testutil_snprintf(config, sizeof(config),
+          "key_format=u,allocation_size=%d,internal_page_max=%d,leaf_page_max=%d,leaf_key_max=%d,"
+          "leaf_value_max=%d",
+          PSIZE, PSIZE, PSIZE, OSIZE, OSIZE);
         break;
     default:
-        assert(0);
+        testutil_assert(0);
     }
     testutil_check(session->create(session, LOAD_URI, config));
     testutil_check(session->open_cursor(session, LOAD_URI, NULL, "bulk,append", &cursor));
@@ -537,7 +548,7 @@ build(int ikey, int ivalue, int cnt)
         case WT_PAGE_COL_VAR:
             break;
         case WT_PAGE_ROW_LEAF:
-            testutil_check(__wt_snprintf(kbuf, sizeof(kbuf), "%010d KEY------", ikey));
+            testutil_snprintf(kbuf, sizeof(kbuf), "%010d KEY------", ikey);
             key.data = kbuf;
             key.size = 20;
             cursor->set_key(cursor, &key);
@@ -550,8 +561,7 @@ build(int ikey, int ivalue, int cnt)
             break;
         case WT_PAGE_COL_VAR:
         case WT_PAGE_ROW_LEAF:
-            testutil_check(
-              __wt_snprintf(vbuf, sizeof(vbuf), "%010d VALUE----", value_unique ? ivalue : 37));
+            testutil_snprintf(vbuf, sizeof(vbuf), "%010d VALUE----", value_unique ? ivalue : 37);
             value.data = vbuf;
             value.size = 20;
             cursor->set_value(cursor, &value);
@@ -560,8 +570,8 @@ build(int ikey, int ivalue, int cnt)
     }
 
     /*
-     * The first time through this routine we create the salvage file and then remove it (all we
-     * want is the appropriate schema entry, we're creating the salvage file itself by hand).
+     * The first time through this routine we create the salvage file, sharing the config with the
+     * load file. This creates the schema entry; we don't care about the file contents.
      */
     new_slvg = !file_exists(SLVG);
     if (new_slvg) {
@@ -569,8 +579,6 @@ build(int ikey, int ivalue, int cnt)
         testutil_check(session->create(session, SLVG_URI, config));
     }
     testutil_check(conn->close(conn, 0));
-    if (new_slvg)
-        (void)remove(SLVG);
 }
 
 /*
@@ -587,16 +595,16 @@ copy(u_int gen, u_int recno)
     uint32_t cksum32, gen32;
     char buf[PSIZE];
 
-    testutil_checksys((ifp = fopen(LOAD, "r")) == NULL);
+    testutil_assert_errno((ifp = fopen(LOAD, "r")) != NULL);
 
     /*
      * If the salvage file doesn't exist, then we're creating it: copy the first sector (the file
      * description). Otherwise, we are appending to an existing file.
      */
-    if (file_exists(SLVG))
-        testutil_checksys((ofp = fopen(SLVG, "a")) == NULL);
+    if (file_exists(PREP))
+        testutil_assert_errno((ofp = fopen(PREP, "a")) != NULL);
     else {
-        testutil_checksys((ofp = fopen(SLVG, "w")) == NULL);
+        testutil_assert_errno((ofp = fopen(PREP, "w")) != NULL);
         testutil_assert(fread(buf, 1, PSIZE, ifp) == PSIZE);
         testutil_assert(fwrite(buf, 1, PSIZE, ofp) == PSIZE);
     }
@@ -638,6 +646,30 @@ copy(u_int gen, u_int recno)
 }
 
 /*
+ * copy_file --
+ *     Copy one file over another.
+ */
+static void
+copy_file(const char *src, const char *dst)
+{
+    FILE *srcfp, *dstfp;
+    size_t rsz, wsz;
+    char buf[PSIZE];
+
+    testutil_assert_errno((srcfp = fopen(src, "r")) != NULL);
+    testutil_assert_errno((dstfp = fopen(dst, "w")) != NULL);
+    while ((rsz = fread(buf, 1, sizeof(buf), srcfp)) != 0) {
+        testutil_check(ferror(srcfp));
+        wsz = fwrite(buf, 1, rsz, dstfp);
+        testutil_check(ferror(dstfp));
+        testutil_assert(wsz == rsz);
+    }
+    testutil_check(ferror(srcfp));
+    testutil_check(fclose(srcfp));
+    testutil_check(fclose(dstfp));
+}
+
+/*
  * process --
  *     Salvage, verify and dump the created file.
  */
@@ -651,11 +683,22 @@ process(void)
     char config[100];
     const char *key, *value;
 
+    /*
+     * Remove the salvage file and replace it with the file we've built. It would be simpler to just
+     * rename the prep file over the salvage file, but this way the original unchanged file is
+     * available for reference if things go south, and we might want to run on a platform where a
+     * suitable rename isn't available.
+     */
+    (void)remove(SLVG);
+    copy_file(PREP, SLVG);
+
     /* Salvage. */
     config[0] = '\0';
     if (verbose)
-        testutil_check(__wt_snprintf(
-          config, sizeof(config), "error_prefix=\"%s\",verbose=[salvage,verify],", progname));
+        testutil_snprintf(config, sizeof(config),
+          "error_prefix=\"%s\",verbose=[salvage,verify],statistics=(all),statistics_log=(json,on_"
+          "close,wait=1),",
+          progname);
     strcat(config, "log=(enabled=false),");
 
     testutil_check(wiredtiger_open(HOME, NULL, config, &conn));
@@ -670,7 +713,7 @@ process(void)
     testutil_check(conn->close(conn, 0));
 
     /* Dump. */
-    testutil_checksys((fp = fopen(DUMP, "w")) == NULL);
+    testutil_assert_errno((fp = fopen(DUMP, "w")) != NULL);
     testutil_check(wiredtiger_open(HOME, NULL, config, &conn));
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
     testutil_check(session->open_cursor(session, SLVG_URI, NULL, "dump=print", &cursor));

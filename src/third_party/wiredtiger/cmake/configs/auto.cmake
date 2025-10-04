@@ -1,118 +1,6 @@
-#
-# Public Domain 2014-present MongoDB, Inc.
-# Public Domain 2008-2014 WiredTiger, Inc.
-#  All rights reserved.
-#
-#  See the file LICENSE for redistribution information
-#
-
 include(cmake/helpers.cmake)
 
 ### Auto configure options and checks that we can infer from our toolchain environment.
-
-## Assert type sizes.
-assert_type_size("size_t" 8)
-assert_type_size("ssize_t" 8)
-assert_type_size("time_t" 8)
-assert_type_size("off_t" 0)
-assert_type_size("uintptr_t" 0)
-test_type_size("uintmax_t" u_intmax_size)
-test_type_size("unsigned long long" u_long_long_size)
-set(default_uintmax_def " ")
-if(${u_intmax_size} STREQUAL "")
-    if(${unsigned long long} STREQUAL "")
-        set(default_uintmax_def "typedef unsigned long uintmax_t\\;")
-    else()
-        set(default_uintmax_def "typedef unsigned long long uintmax_t\\;")
-    endif()
-endif()
-
-set(default_offt_def)
-if("${WT_OS}" STREQUAL "windows")
-    set(default_offt_def "typedef int64_t wt_off_t\\;")
-else()
-    set(default_offt_def "typedef off_t wt_off_t\\;")
-endif()
-
-config_string(
-    off_t_decl
-    "off_t type declaration."
-    DEFAULT "${default_offt_def}"
-    INTERNAL
-)
-
-config_string(
-    uintprt_t_decl
-    "uintptr_t type declaration."
-    DEFAULT "${default_uintmax_def}"
-    INTERNAL
-)
-
-config_include(
-    HAVE_SYS_TYPES_H
-    "Include header sys/types.h exists."
-    FILE "sys/types.h"
-)
-
-config_include(
-    HAVE_INTTYPES_H
-    "Include header inttypes.h exists."
-    FILE "inttypes.h"
-)
-
-config_include(
-    HAVE_STDARG_H
-    "Include header stdarg.h exists."
-    FILE "stdarg.h"
-)
-
-config_include(
-    HAVE_STDBOOL_H
-    "Include header stdbool.h exists."
-    FILE "stdbool.h"
-)
-
-config_include(
-    HAVE_STDINT_H
-    "Include header stdint.h exists."
-    FILE "stdint.h"
-)
-
-config_include(
-    HAVE_STDLIB_H
-    "Include header stdlib.h exists."
-    FILE "stdlib.h"
-)
-
-config_include(
-    HAVE_STDIO_H
-    "Include header stdio.h exists."
-    FILE "stdio.h"
-)
-
-config_include(
-    HAVE_STRINGS_H
-    "Include header strings.h exists."
-    FILE "strings.h"
-)
-
-config_include(
-    HAVE_STRING_H
-    "Include header string.h exists."
-    FILE "string.h"
-)
-
-config_include(
-    HAVE_SYS_STAT_H
-    "Include header sys/stat.h exists."
-    FILE "sys/stat.h"
-)
-
-config_include(
-    HAVE_UNISTD_H
-    "Include header unistd.h exists."
-    FILE "unistd.h"
-)
 
 config_include(
     HAVE_X86INTRIN_H
@@ -121,22 +9,9 @@ config_include(
 )
 
 config_include(
-    HAVE_DLFCN_H
-    "Include header dlfcn.h exists."
-    FILE "dlfcn.h"
-)
-
-config_include(
-    HAVE_MEMORY_H
-    "Include header memory.h exists."
-    FILE "memory.h"
-)
-
-config_func(
-    HAVE_CLOCK_GETTIME
-    "Function clock_gettime exists."
-    FUNC "clock_gettime"
-    FILES "time.h"
+    HAVE_ARM_NEON_INTRIN_H
+    "Include header arm_neon.h exists."
+    FILE "arm_neon.h"
 )
 
 config_func(
@@ -155,10 +30,10 @@ config_func(
 )
 
 config_func(
-    HAVE_FTRUNCATE
-    "Function ftruncate exists."
-    FUNC "ftruncate"
-    FILES "unistd.h;sys/types.h"
+    HAVE_CLOCK_GETTIME
+    "Function clock_gettime exists."
+    FUNC "clock_gettime"
+    FILES "time.h"
 )
 
 config_func(
@@ -204,13 +79,6 @@ config_func(
 )
 
 config_func(
-    HAVE_STRTOUQ
-    "Function strtouq exists."
-    FUNC "strtouq"
-    FILES "stdlib.h"
-)
-
-config_func(
     HAVE_SYNC_FILE_RANGE
     "Function sync_file_range exists."
     FUNC "sync_file_range"
@@ -223,6 +91,13 @@ config_func(
     FUNC "timer_create"
     FILES "signal.h;time.h"
     LIBS "rt"
+)
+
+config_lib(
+    HAVE_LIBMEMKIND
+    "memkind library exists."
+    LIB "memkind"
+    HEADER "memkind.h"
 )
 
 config_lib(
@@ -241,6 +116,18 @@ config_lib(
     HAVE_LIBDL
     "dl library exists."
     LIB "dl"
+)
+
+config_lib(
+    HAVE_LIBCXX
+    "stdc++ library exists."
+    LIB "stdc++"
+)
+
+config_lib(
+    HAVE_LIBACCEL_CONFIG
+    "accel-config library exists."
+    LIB "accel-config"
 )
 
 config_lib(
@@ -272,17 +159,17 @@ config_lib(
 )
 
 config_lib(
+    HAVE_LIBQPL
+    "qpl library exists."
+    LIB "qpl"
+    HEADER "qpl/qpl.h"
+)
+
+config_lib(
     HAVE_LIBSODIUM
     "sodium library exists."
     LIB "sodium"
     HEADER "sodium.h"
-)
-
-config_lib(
-    HAVE_LIBTCMALLOC
-    "tcmalloc library exists."
-    LIB "tcmalloc"
-    HEADER "gperftools/tcmalloc.h"
 )
 
 config_compile(
@@ -293,34 +180,7 @@ config_compile(
     DEPENDS "HAVE_LIBPTHREAD"
 )
 
-include(TestBigEndian)
-test_big_endian(is_big_endian)
-if(NOT is_big_endian)
-    set(is_big_endian FALSE)
+set(WORDS_BIGENDIAN FALSE)
+if(${CMAKE_C_BYTE_ORDER} STREQUAL "BIG_ENDIAN")
+    set(WORDS_BIGENDIAN TRUE)
 endif()
-config_bool(
-    WORDS_BIGENDIAN
-    "If the target system is big endian"
-    DEFAULT ${is_big_endian}
-)
-
-set(wiredtiger_includes_decl)
-if(HAVE_SYS_TYPES_H)
-    list(APPEND wiredtiger_includes_decl "#include <sys/types.h>")
-endif()
-if(HAVE_INTTYPES_H AND (NOT "${WT_OS}" STREQUAL "windows"))
-    list(APPEND wiredtiger_includes_decl "#include <inttypes.h>")
-endif()
-if(HAVE_STDARG_H)
-    list(APPEND wiredtiger_includes_decl "#include <stdarg.h>")
-endif()
-if(HAVE_STDBOOL_H)
-    list(APPEND wiredtiger_includes_decl "#include <stdbool.h>")
-endif()
-if(HAVE_STDINT_H)
-    list(APPEND wiredtiger_includes_decl "#include <stdint.h>")
-endif()
-if(HAVE_STDIO_H)
-    list(APPEND wiredtiger_includes_decl "#include <stdio.h>")
-endif()
-string(REGEX REPLACE ";" "\n" wiredtiger_includes_decl "${wiredtiger_includes_decl}")

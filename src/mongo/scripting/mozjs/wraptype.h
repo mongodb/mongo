@@ -29,14 +29,20 @@
 
 #pragma once
 
-#include <cstddef>
-#include <jsapi.h>
-#include <type_traits>
-
 #include "mongo/scripting/mozjs/base.h"
 #include "mongo/scripting/mozjs/exception.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
+
+#include <cstddef>
+#include <type_traits>
+
+#include <jsapi.h>
+
+#include <js/PropertyAndElement.h>
+#include <js/ValueArray.h>
+#include <js/Wrapper.h>
 
 // The purpose of this class is to take in specially crafted types and generate
 // a wrapper which installs the type, along with any useful life cycle methods
@@ -65,25 +71,25 @@
 #define MONGO_ATTACH_JS_FUNCTION_WITH_FLAGS(name, flags) \
     JS_FN(#name, smUtils::wrapFunction<Functions::name>, 0, flags)
 
+#define MONGO_ATTACH_JS_FUNCTION_SYM_WITH_FLAGS(symbol, name) \
+    JS_SYM_FN(symbol, smUtils::wrapFunction<Functions::name>, 0, 0)
+
 #define MONGO_ATTACH_JS_FUNCTION(name) MONGO_ATTACH_JS_FUNCTION_WITH_FLAGS(name, 0)
 
-#define MONGO_ATTACH_JS_CONSTRAINED_METHOD(name, ...)                                          \
-    {                                                                                          \
-#name,                                                                                 \
-            {smUtils::wrapConstrainedMethod < Functions::name, false, __VA_ARGS__>, nullptr }, \
-             0,                                                                                \
-             0,                                                                                \
-             nullptr                                                                           \
-    }
+#define MONGO_ATTACH_JS_CONSTRAINED_METHOD(name, ...)                                     \
+    {JSFunctionSpec::Name(#name),                                                         \
+     JSNativeWrapper(smUtils::wrapConstrainedMethod<Functions::name, false, __VA_ARGS__>, \
+                     nullptr),                                                            \
+     0,                                                                                   \
+     0,                                                                                   \
+     nullptr}
 
-#define MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(name, ...)                                \
-    {                                                                                         \
-#name,                                                                                \
-            {smUtils::wrapConstrainedMethod < Functions::name, true, __VA_ARGS__>, nullptr }, \
-             0,                                                                               \
-             0,                                                                               \
-             nullptr                                                                          \
-    }
+#define MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(name, ...)                                     \
+    {JSFunctionSpec::Name(#name),                                                                  \
+     JSNativeWrapper(smUtils::wrapConstrainedMethod<Functions::name, true, __VA_ARGS__>, nullptr), \
+     0,                                                                                            \
+     0,                                                                                            \
+     nullptr}
 
 namespace mongo {
 namespace mozjs {
@@ -150,7 +156,7 @@ bool delProperty(JSContext* cx, JS::HandleObject obj, JS::HandleId id, JS::Objec
 template <typename T>
 bool enumerate(JSContext* cx,
                JS::HandleObject obj,
-               JS::AutoIdVector& properties,
+               JS::MutableHandleIdVector properties,
                bool enumerableOnly) {
     try {
         T::enumerate(cx, obj, properties, enumerableOnly);
@@ -167,7 +173,7 @@ bool getProperty(JSContext* cx,
                  JS::HandleValue receiver,
                  JS::HandleId id,
                  JS::MutableHandleValue vp) {
-    if (JSID_IS_SYMBOL(id)) {
+    if (id.isSymbol()) {
         // Just default to the SpiderMonkey's standard implementations for Symbol methods
         vp.setUndefined();
         return true;
@@ -175,17 +181,6 @@ bool getProperty(JSContext* cx,
 
     try {
         T::getProperty(cx, obj, id, receiver, vp);
-        return true;
-    } catch (...) {
-        mongoToJSException(cx);
-        return false;
-    }
-};
-
-template <typename T>
-bool hasInstance(JSContext* cx, JS::HandleObject obj, JS::MutableHandleValue vp, bool* bp) {
-    try {
-        T::hasInstance(cx, obj, vp, bp);
         return true;
     } catch (...) {
         mongoToJSException(cx);
@@ -211,7 +206,7 @@ bool setProperty(JSContext* cx,
 
 template <typename T>
 bool resolve(JSContext* cx, JS::HandleObject obj, JS::HandleId id, bool* resolvedp) {
-    if (JSID_IS_SYMBOL(id)) {
+    if (id.isSymbol()) {
         // Just default to the SpiderMonkey's standard implementations for Symbol methods
         *resolvedp = false;
         return true;
@@ -238,7 +233,7 @@ void trace(JSTracer* trc, JSObject* obj) {
 }  // namespace smUtils
 
 template <typename T>
-class WrapType : public T {
+class MONGO_MOD_PUB WrapType : public T {
 public:
     WrapType(JSContext* context)
         : _context(context),
@@ -259,7 +254,6 @@ public:
                        T::mayResolve != BaseInfo::mayResolve ? T::mayResolve : nullptr,
                        T::finalize != BaseInfo::finalize ? T::finalize : nullptr,
                        T::call != BaseInfo::call ? smUtils::call<T> : nullptr,
-                       T::hasInstance != BaseInfo::hasInstance ? smUtils::hasInstance<T> : nullptr,
                        T::construct != BaseInfo::construct ? smUtils::construct<T> : nullptr,
                        T::trace != BaseInfo::trace ? smUtils::trace<T> : nullptr}),
           _jsoOps({
@@ -284,17 +278,12 @@ public:
 
             JS::RootedObject proto(_context);
 
-            JSAutoRequest ar(_context);
-
-            JS::CompartmentOptions options;
+            JS::RealmOptions options;
             _proto.init(_context,
-                        _assertPtr(JS_NewGlobalObject(_context,
-                                                      js::Jsvalify(&_jsclass),
-                                                      nullptr,
-                                                      JS::DontFireOnNewGlobalHook,
-                                                      options)));
+                        _assertPtr(JS_NewGlobalObject(
+                            _context, &_jsclass, nullptr, JS::DontFireOnNewGlobalHook, options)));
 
-            JSAutoCompartment ac(_context, _proto);
+            JSAutoRealm ac(_context, _proto);
             _installFunctions(_proto, T::freeFunctions);
         }
     }
@@ -324,7 +313,7 @@ public:
      * types without a constructor or inside the constructor
      */
     void newObject(JS::MutableHandleObject out) {
-        out.set(_assertPtr(JS_NewObjectWithGivenProto(_context, js::Jsvalify(&_jsclass), _proto)));
+        out.set(_assertPtr(JS_NewObjectWithGivenProto(_context, &_jsclass, _proto)));
     }
 
     void newObject(JS::MutableHandleValue out) {
@@ -335,7 +324,7 @@ public:
     }
 
     void newObjectWithProto(JS::MutableHandleObject out, JS::HandleObject proto) {
-        out.set(_assertPtr(JS_NewObjectWithGivenProto(_context, js::Jsvalify(&_jsclass), proto)));
+        out.set(_assertPtr(JS_NewObjectWithGivenProto(_context, &_jsclass, proto)));
     }
 
     void newObjectWithProto(JS::MutableHandleValue out, JS::HandleObject proto) {
@@ -349,38 +338,59 @@ public:
      * newInstance calls the constructor, a la new Type() in js
      */
     void newInstance(JS::MutableHandleObject out) {
-        dassert(T::installType == InstallType::OverNative || T::construct != BaseInfo::construct);
+        invariant(T::installType == InstallType::OverNative || T::construct != BaseInfo::construct);
 
-        JS::AutoValueVector args(_context);
+        JS::RootedValueVector args(_context);
 
         newInstance(args, out);
     }
 
     void newInstance(const JS::HandleValueArray& args, JS::MutableHandleObject out) {
-        dassert(T::installType == InstallType::OverNative || T::construct != BaseInfo::construct);
+        invariant(T::installType == InstallType::OverNative || T::construct != BaseInfo::construct);
 
-        out.set(_assertPtr(JS_New(
-            _context, T::installType == InstallType::OverNative ? _constructor : _proto, args)));
+        JS::RootedValue fVal(
+            _context,
+            JS::ObjectValue(T::installType == InstallType::OverNative ? *_constructor : *_proto));
+        JS::RootedObject result(_context);
+
+        bool success = JS::Construct(_context, fVal, args, &result);
+        if (success) {
+            out.set(result.get());
+        } else {
+            throwCurrentJSException(_context,
+                                    ErrorCodes::JSInterpreterFailure,
+                                    "Failed to JS::Construct (to set on JS::MutableHandleObject)");
+        }
     }
 
     void newInstance(JS::MutableHandleValue out) {
-        dassert(T::installType == InstallType::OverNative || T::construct != BaseInfo::construct);
+        invariant(T::installType == InstallType::OverNative || T::construct != BaseInfo::construct);
 
-        JS::AutoValueVector args(_context);
+        JS::RootedValueVector args(_context);
 
         newInstance(args, out);
     }
 
     void newInstance(const JS::HandleValueArray& args, JS::MutableHandleValue out) {
-        dassert(T::installType == InstallType::OverNative || T::construct != BaseInfo::construct);
+        invariant(T::installType == InstallType::OverNative || T::construct != BaseInfo::construct);
+        JS::RootedValue fVal(
+            _context,
+            JS::ObjectValue(T::installType == InstallType::OverNative ? *_constructor : *_proto));
+        JS::RootedObject result(_context);
 
-        out.setObjectOrNull(_assertPtr(JS_New(
-            _context, T::installType == InstallType::OverNative ? _constructor : _proto, args)));
+        bool success = JS::Construct(_context, fVal, args, &result);
+        if (success) {
+            out.setObjectOrNull(result.get());
+        } else {
+            throwCurrentJSException(_context,
+                                    ErrorCodes::JSInterpreterFailure,
+                                    "Failed to JS::Construct (to set on JS::MutableHandleValue)");
+        }
     }
 
     // instanceOf doesn't go up the prototype tree.  It's a lower level more specific match
     bool instanceOf(JS::HandleObject obj) {
-        return JS_InstanceOf(_context, obj, js::Jsvalify(&_jsclass), nullptr);
+        return JS_InstanceOf(_context, obj, &_jsclass, nullptr);
     }
 
     bool instanceOf(JS::HandleValue value) {
@@ -393,7 +403,7 @@ public:
     }
 
     const JSClass* getJSClass() const {
-        return js::Jsvalify(&_jsclass);
+        return &_jsclass;
     }
 
     JS::HandleObject getProto() const {
@@ -416,8 +426,9 @@ private:
                     _assertPtr(JS_InitClass(
                         _context,
                         global,
+                        &_jsclass,
                         parent,
-                        js::Jsvalify(&_jsclass),
+                        _jsclass.name,
                         T::construct != BaseInfo::construct ? smUtils::construct<T> : nullptr,
                         0,
                         nullptr,
@@ -427,25 +438,27 @@ private:
 
         _installFunctions(global, T::freeFunctions);
         _postInstall(global, T::postInstall);
+        _installProperties();
     }
 
     // Use this if you want your types installed, but not visible in the
     // global scope
     void _installPrivate(JS::HandleObject global) {
-        dassert(T::construct == BaseInfo::construct);
+        invariant(T::construct == BaseInfo::construct);
 
         JS::RootedObject parent(_context);
         _inheritFrom(T::inheritFrom, global, &parent);
 
         // See newObject() for why we have to do this dance with the explicit
         // SetPrototype
-        _proto.init(_context, _assertPtr(JS_NewObject(_context, js::Jsvalify(&_jsclass))));
+        _proto.init(_context, _assertPtr(JS_NewObject(_context, &_jsclass)));
         if (parent.get() && !JS_SetPrototype(_context, _proto, parent))
             throwCurrentJSException(
                 _context, ErrorCodes::JSInterpreterFailure, "Failed to set prototype");
 
         _installFunctions(_proto, T::methods);
         _installFunctions(global, T::freeFunctions);
+        _installProperties();
 
         _installConstructor(T::construct != BaseInfo::construct ? smUtils::construct<T> : nullptr);
 
@@ -455,16 +468,15 @@ private:
     // Use this to attach things to types that we don't provide like
     // Object, or Array
     void _installOverNative(JS::HandleObject global) {
-        dassert(T::addProperty == BaseInfo::addProperty);
-        dassert(T::call == BaseInfo::call);
-        dassert(T::construct == BaseInfo::construct);
-        dassert(T::delProperty == BaseInfo::delProperty);
-        dassert(T::enumerate == BaseInfo::enumerate);
-        dassert(T::finalize == BaseInfo::finalize);
-        dassert(T::getProperty == BaseInfo::getProperty);
-        dassert(T::hasInstance == BaseInfo::hasInstance);
-        dassert(T::resolve == BaseInfo::resolve);
-        dassert(T::setProperty == BaseInfo::setProperty);
+        invariant(T::addProperty == BaseInfo::addProperty);
+        invariant(T::call == BaseInfo::call);
+        invariant(T::construct == BaseInfo::construct);
+        invariant(T::delProperty == BaseInfo::delProperty);
+        invariant(T::enumerate == BaseInfo::enumerate);
+        invariant(T::finalize == BaseInfo::finalize);
+        invariant(T::getProperty == BaseInfo::getProperty);
+        invariant(T::resolve == BaseInfo::resolve);
+        invariant(T::setProperty == BaseInfo::setProperty);
 
         JS::RootedValue value(_context);
         if (!JS_GetProperty(_context, global, T::className, &value))
@@ -507,6 +519,18 @@ private:
 
         throwCurrentJSException(
             _context, ErrorCodes::JSInterpreterFailure, "Failed to define functions");
+    }
+
+    void _installProperties() {
+        static const JSPropertySpec properties[2] = {
+            JS_STRING_SYM_PS(toStringTag, T::className, JSPROP_READONLY), JS_PS_END};
+
+        if (JS_DefineProperties(_context, _proto, properties)) {
+            return;
+        }
+
+        throwCurrentJSException(
+            _context, ErrorCodes::JSInterpreterFailure, "Failed to define properties");
     }
 
     // This is for inheriting from something other than Object
@@ -565,8 +589,8 @@ private:
     JSContext* _context;
     JS::PersistentRootedObject _proto;
     JS::PersistentRootedObject _constructor;
-    js::Class _jsclass;
-    js::ClassOps _jsclassOps;
+    JSClass _jsclass;
+    JSClassOps _jsclassOps;
     js::ObjectOps _jsoOps;
 };
 

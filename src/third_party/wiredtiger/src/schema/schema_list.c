@@ -28,11 +28,11 @@ err:
     return (ret);
 }
 /*
- * __wt_schema_get_tiered_uri --
+ * __wti_schema_get_tiered_uri --
  *     Get the tiered handle for the named table.
  */
 int
-__wt_schema_get_tiered_uri(
+__wti_schema_get_tiered_uri(
   WT_SESSION_IMPL *session, const char *uri, uint32_t flags, WT_TIERED **tieredp)
 {
     WT_DECL_RET;
@@ -42,11 +42,11 @@ __wt_schema_get_tiered_uri(
 }
 
 /*
- * __wt_schema_release_tiered --
+ * __wti_schema_release_tiered --
  *     Release a tiered handle.
  */
 int
-__wt_schema_release_tiered(WT_SESSION_IMPL *session, WT_TIERED **tieredp)
+__wti_schema_release_tiered(WT_SESSION_IMPL *session, WT_TIERED **tieredp)
 {
     WT_DECL_RET;
     WT_TIERED *tiered;
@@ -113,11 +113,11 @@ err:
 }
 
 /*
- * __wt_schema_release_table --
+ * __wti_schema_release_table_gen --
  *     Release a table handle.
  */
 int
-__wt_schema_release_table(WT_SESSION_IMPL *session, WT_TABLE **tablep)
+__wti_schema_release_table_gen(WT_SESSION_IMPL *session, WT_TABLE **tablep, bool check_visibility)
 {
     WT_DECL_RET;
     WT_TABLE *table;
@@ -126,17 +126,28 @@ __wt_schema_release_table(WT_SESSION_IMPL *session, WT_TABLE **tablep)
         return (0);
     *tablep = NULL;
 
-    WT_WITH_DHANDLE(session, &table->iface, ret = __wt_session_release_dhandle(session));
+    WT_WITH_DHANDLE(
+      session, &table->iface, ret = __wt_session_release_dhandle_v2(session, check_visibility));
 
     return (ret);
 }
 
 /*
- * __wt_schema_destroy_colgroup --
+ * __wt_schema_release_table --
+ *     Release a table handle.
+ */
+int
+__wt_schema_release_table(WT_SESSION_IMPL *session, WT_TABLE **tablep)
+{
+    return (__wti_schema_release_table_gen(session, tablep, false));
+}
+
+/*
+ * __wti_schema_destroy_colgroup --
  *     Free a column group handle.
  */
 void
-__wt_schema_destroy_colgroup(WT_SESSION_IMPL *session, WT_COLGROUP **colgroupp)
+__wti_schema_destroy_colgroup(WT_SESSION_IMPL *session, WT_COLGROUP **colgroupp)
 {
     WT_COLGROUP *colgroup;
 
@@ -151,11 +162,11 @@ __wt_schema_destroy_colgroup(WT_SESSION_IMPL *session, WT_COLGROUP **colgroupp)
 }
 
 /*
- * __wt_schema_destroy_index --
+ * __wti_schema_destroy_index --
  *     Free an index handle.
  */
 int
-__wt_schema_destroy_index(WT_SESSION_IMPL *session, WT_INDEX **idxp)
+__wti_schema_destroy_index(WT_SESSION_IMPL *session, WT_INDEX **idxp)
 {
     WT_DECL_RET;
     WT_INDEX *idx;
@@ -171,13 +182,6 @@ __wt_schema_destroy_index(WT_SESSION_IMPL *session, WT_INDEX **idxp)
         idx->collator_owned = 0;
     }
 
-    /* If there is a custom extractor configured, terminate it. */
-    if (idx->extractor != NULL && idx->extractor_owned && idx->extractor->terminate != NULL) {
-        WT_TRET(idx->extractor->terminate(idx->extractor, &session->iface));
-        idx->extractor = NULL;
-        idx->extractor_owned = 0;
-    }
-
     __wt_free(session, idx->name);
     __wt_free(session, idx->source);
     __wt_free(session, idx->config);
@@ -185,7 +189,6 @@ __wt_schema_destroy_index(WT_SESSION_IMPL *session, WT_INDEX **idxp)
     __wt_free(session, idx->key_plan);
     __wt_free(session, idx->value_plan);
     __wt_free(session, idx->idxkey_format);
-    __wt_free(session, idx->exkey_format);
     __wt_free(session, idx);
 
     return (ret);
@@ -206,20 +209,37 @@ __wt_schema_close_table(WT_SESSION_IMPL *session, WT_TABLE *table)
     __wt_free(session, table->value_format);
     if (table->cgroups != NULL) {
         for (i = 0; i < WT_COLGROUPS(table); i++)
-            __wt_schema_destroy_colgroup(session, &table->cgroups[i]);
+            __wti_schema_destroy_colgroup(session, &table->cgroups[i]);
         __wt_free(session, table->cgroups);
     }
     if (table->indices != NULL) {
         for (i = 0; i < table->nindices; i++)
-            WT_TRET(__wt_schema_destroy_index(session, &table->indices[i]));
+            WT_TRET(__wti_schema_destroy_index(session, &table->indices[i]));
         __wt_free(session, table->indices);
     }
     table->idx_alloc = 0;
 
     WT_ASSERT(session,
       FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_TABLE_WRITE) ||
-        F_ISSET(S2C(session), WT_CONN_CLOSING));
+        F_ISSET_ATOMIC_32(S2C(session), WT_CONN_CLOSING));
     table->cg_complete = table->idx_complete = false;
 
     return (ret);
+}
+
+/*
+ * __wt_schema_close_layered --
+ *     Close a layered handle.
+ */
+void
+__wt_schema_close_layered(WT_SESSION_IMPL *session, WT_LAYERED_TABLE *layered)
+{
+    /* Free copies of copied configuration items. */
+    __wt_free(session, layered->key_format);
+    __wt_free(session, layered->value_format);
+    __wt_free(session, layered->ingest_uri);
+    __wt_free(session, layered->stable_uri);
+
+    /* Remove the ingest handle from layered table manager list */
+    __wt_layered_table_manager_remove_table(session, layered->ingest_btree_id);
 }

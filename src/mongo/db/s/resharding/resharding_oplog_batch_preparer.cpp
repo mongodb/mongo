@@ -27,20 +27,33 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/resharding/resharding_oplog_batch_preparer.h"
 
-#include <third_party/murmurhash3/MurmurHash3.h>
-
+#include "mongo/base/data_range.h"
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement_comparator.h"
-#include "mongo/db/logical_session_id.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/repl/apply_ops.h"
+#include "mongo/db/query/write_ops/write_ops_retryability.h"
+#include "mongo/db/repl/apply_ops_command_info.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
+#include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_helpers.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/redaction.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <cstddef>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -50,8 +63,7 @@ namespace {
  * Return true if we need to update config.transactions collection for this oplog entry.
  */
 bool shouldUpdateTxnTable(const repl::OplogEntry& op) {
-    if (op.getCommandType() == repl::OplogEntry::CommandType::kCommitTransaction ||
-        op.getCommandType() == repl::OplogEntry::CommandType::kAbortTransaction) {
+    if (op.getCommandType() == repl::OplogEntry::CommandType::kAbortTransaction) {
         return true;
     }
 
@@ -64,8 +76,21 @@ bool shouldUpdateTxnTable(const repl::OplogEntry& op) {
     }
 
     if (op.getCommandType() == repl::OplogEntry::CommandType::kApplyOps) {
-        auto applyOpsInfo = repl::ApplyOpsCommandInfo::parse(op.getObject());
-        return !applyOpsInfo.getPrepare() && !applyOpsInfo.getPartialTxn();
+        // This applyOps oplog entry is guaranteed to correspond to a committed transaction since
+        // the resharding aggregation pipeline does not output applyOps oplog entries for aborted
+        // transactions (i.e. it only outputs the abortTransaction oplog entry).
+
+        if (isInternalSessionForRetryableWrite(*op.getSessionId())) {
+            // For a retryable internal transaction, we need to update the config.transactions
+            // collection upon writing the noop oplog entries for retryable operations contained
+            // within each applyOps oplog entry.
+            return true;
+        }
+
+        // The resharding aggregation pipeline also does not output the commitTransaction oplog
+        // entry so for a non-retryable transaction, we need to the update to the
+        // config.transactions collection upon seeing the final applyOps oplog entry.
+        return !op.isPartialTransaction();
     }
 
     return false;
@@ -76,8 +101,12 @@ bool shouldUpdateTxnTable(const repl::OplogEntry& op) {
 using WriterVectors = ReshardingOplogBatchPreparer::WriterVectors;
 
 ReshardingOplogBatchPreparer::ReshardingOplogBatchPreparer(
-    std::unique_ptr<CollatorInterface> defaultCollator)
-    : _defaultCollator(std::move(defaultCollator)) {}
+    std::size_t oplogBatchTaskCount,
+    std::unique_ptr<CollatorInterface> defaultCollator,
+    bool isCapped)
+    : _oplogBatchTaskCount(oplogBatchTaskCount),
+      _defaultCollator(std::move(defaultCollator)),
+      _isCapped(isCapped) {}
 
 void ReshardingOplogBatchPreparer::throwIfUnsupportedCommandOp(const OplogEntry& op) {
     invariant(op.isCommand());
@@ -127,7 +156,13 @@ WriterVectors ReshardingOplogBatchPreparer::makeCrudOpWriterVectors(
 
             for (const auto& innerOp : applyOpsInfo.getOperations()) {
                 unrolledOp.setDurableReplOperation(repl::DurableReplOperation::parse(
-                    {"ReshardingOplogBatchPreparer::makeCrudOpWriterVectors innerOp"}, innerOp));
+                    innerOp,
+                    IDLParserContext{
+                        "ReshardingOplogBatchPreparer::makeCrudOpWriterVectors innerOp"}));
+
+                if (isWouldChangeOwningShardSentinelOplogEntry(unrolledOp)) {
+                    continue;
+                }
 
                 // There isn't a direct way to convert from a MutableOplogEntry to a
                 // DurableOplogEntry or OplogEntry. We serialize the unrolledOp to have it get
@@ -139,6 +174,15 @@ WriterVectors ReshardingOplogBatchPreparer::makeCrudOpWriterVectors(
                 // entries because `derivedOps` is a std::list.
                 _appendCrudOpToWriterVector(&derivedOp, writerVectors);
             }
+        } else if (resharding::isProgressMarkOplogAfterOplogApplicationStarted(op)) {
+            // This is a progress mark oplog entry created after resharding oplog application has
+            // started. The oplog entry does not need to be applied but is used for calculating the
+            // average time to apply oplog entries. So if
+            // 'reshardingRemainingTimeEstimateBasedOnMovingAverage' is enabled, add the oplog entry
+            // to a random writer.
+            if (resharding::gReshardingRemainingTimeEstimateBasedOnMovingAverage.load()) {
+                _appendOpToWriterVector(absl::HashOf(UUID::gen()), &op, writerVectors);
+            }
         } else {
             invariant(repl::OpTypeEnum::kNoop == op.getOpType());
         }
@@ -147,49 +191,109 @@ WriterVectors ReshardingOplogBatchPreparer::makeCrudOpWriterVectors(
     return writerVectors;
 }
 
-WriterVectors ReshardingOplogBatchPreparer::makeSessionOpWriterVectors(
-    const OplogBatchToPrepare& batch) const {
-    auto writerVectors = _makeEmptyWriterVectors();
+struct SessionOpsList {
+    TxnNumber txnNum = kUninitializedTxnNumber;
+    std::vector<const repl::OplogEntry*> ops;
+};
 
-    struct SessionOpsList {
-        TxnNumber txnNum = kUninitializedTxnNumber;
-        std::vector<const OplogEntry*> ops;
-    };
+void updateSessionTracker(LogicalSessionIdMap<SessionOpsList>& sessionTracker,
+                          const repl::OplogEntry* op) {
+    uassert(9572401,
+            str::stream() << "Missing sessionId for oplog entry: "
+                          << redact(op->toBSONForLogging()),
+            op->getSessionId());
+    uassert(4990700,
+            str::stream() << "Missing txnNumber for oplog entry with lsid: "
+                          << redact(op->toBSONForLogging()),
+            op->getTxnNumber());
+
+    const auto& lsid = *op->getSessionId();
+    auto txnNumber = *op->getTxnNumber();
+
+    auto& retryableOpList = sessionTracker[lsid];
+    if (txnNumber == retryableOpList.txnNum) {
+        retryableOpList.ops.emplace_back(op);
+    } else if (txnNumber > retryableOpList.txnNum) {
+        retryableOpList.ops = {op};
+        retryableOpList.txnNum = txnNumber;
+    } else {
+        uasserted(4990401,
+                  str::stream() << "Encountered out of order txnNumbers; batch had "
+                                << redact(op->toBSONForLogging()) << " after "
+                                << redact(retryableOpList.ops.back()->toBSONForLogging()));
+    }
+}
+
+void unrollApplyOpsAndUpdateSessionTracker(LogicalSessionIdMap<SessionOpsList>& sessionTracker,
+                                           std::list<repl::OplogEntry>& derivedOps,
+                                           const repl::OplogEntry& op,
+                                           const LogicalSessionId& lsid,
+                                           TxnNumber txnNumber) {
+    auto applyOpsInfo = repl::ApplyOpsCommandInfo::parse(op.getObject());
+    uassert(ErrorCodes::OplogOperationUnsupported,
+            str::stream() << "Commands within applyOps are not supported during resharding: "
+                          << redact(op.toBSONForLogging()),
+            applyOpsInfo.areOpsCrudOnly());
+
+    auto unrolledOp = uassertStatusOK(repl::MutableOplogEntry::parse(op.getEntry().toBSON()));
+    unrolledOp.setSessionId(lsid);
+    unrolledOp.setTxnNumber(txnNumber);
+    unrolledOp.setMultiOpType(boost::none);
+
+    for (const auto& innerOp : applyOpsInfo.getOperations()) {
+        auto replOp = repl::ReplOperation::parse(
+            innerOp, IDLParserContext{"unrollApplyOpsAndUpdateSessionTracker innerOp"});
+        if (replOp.getStatementIds().empty()) {
+            // Skip this operation since it is not retryable.
+            continue;
+        }
+        unrolledOp.setDurableReplOperation(replOp);
+
+        // There isn't a direct way to convert from a MutableOplogEntry to a
+        // DurableOplogEntry or OplogEntry. We serialize the unrolledOp to have it get
+        // re-parsed into an OplogEntry.
+        auto& derivedOp = derivedOps.emplace_back(unrolledOp.toBSON());
+        invariant(derivedOp.isCrudOpType() ||
+                  isWouldChangeOwningShardSentinelOplogEntry(unrolledOp));
+
+        // `&derivedOp` is guaranteed to remain stable while we append more derived
+        // oplog entries because `derivedOps` is a std::list.
+        updateSessionTracker(sessionTracker, &derivedOp);
+    }
+}
+
+WriterVectors ReshardingOplogBatchPreparer::makeSessionOpWriterVectors(
+    const OplogBatchToPrepare& batch, std::list<OplogEntry>& derivedOps) const {
+    auto writerVectors = _makeEmptyWriterVectors();
 
     LogicalSessionIdMap<SessionOpsList> sessionTracker;
 
-    auto updateSessionTracker = [&](const OplogEntry* op) {
-        if (const auto& lsid = op->getSessionId()) {
-            uassert(4990700,
-                    str::stream() << "Missing txnNumber for oplog entry with lsid: "
-                                  << redact(op->toBSONForLogging()),
-                    op->getTxnNumber());
-
-            auto txnNumber = *op->getTxnNumber();
-
-            auto& retryableOpList = sessionTracker[*lsid];
-            if (txnNumber == retryableOpList.txnNum) {
-                retryableOpList.ops.emplace_back(op);
-            } else if (txnNumber > retryableOpList.txnNum) {
-                retryableOpList.ops = {op};
-                retryableOpList.txnNum = txnNumber;
-            } else {
-                uasserted(4990401,
-                          str::stream() << "Encountered out of order txnNumbers; batch had "
-                                        << redact(op->toBSONForLogging()) << " after "
-                                        << redact(retryableOpList.ops.back()->toBSONForLogging()));
-            }
-        }
-    };
-
     for (auto& op : batch) {
         if (op.isCrudOpType()) {
-            updateSessionTracker(&op);
+            if (op.getSessionId()) {
+                updateSessionTracker(sessionTracker, &op);
+            }
         } else if (op.isCommand()) {
             throwIfUnsupportedCommandOp(op);
 
-            if (shouldUpdateTxnTable(op)) {
-                updateSessionTracker(&op);
+            if (!shouldUpdateTxnTable(op)) {
+                continue;
+            }
+
+            const auto& sessionId = *op.getSessionId();
+
+            if (op.getMultiOpType() == repl::MultiOplogEntryType::kApplyOpsAppliedSeparately) {
+                unrollApplyOpsAndUpdateSessionTracker(
+                    sessionTracker, derivedOps, op, sessionId, *op.getTxnNumber());
+            } else if (isInternalSessionForRetryableWrite(sessionId) &&
+                       op.getCommandType() == OplogEntry::CommandType::kApplyOps) {
+                unrollApplyOpsAndUpdateSessionTracker(sessionTracker,
+                                                      derivedOps,
+                                                      op,
+                                                      *getParentSessionId(sessionId),
+                                                      *sessionId.getTxnNumber());
+            } else {
+                updateSessionTracker(sessionTracker, &op);
             }
         } else {
             invariant(repl::OpTypeEnum::kNoop == op.getOpType());
@@ -206,20 +310,19 @@ WriterVectors ReshardingOplogBatchPreparer::makeSessionOpWriterVectors(
 }
 
 WriterVectors ReshardingOplogBatchPreparer::_makeEmptyWriterVectors() const {
-    return WriterVectors(size_t(resharding::gReshardingOplogBatchTaskCount.load()));
+    return WriterVectors(_oplogBatchTaskCount);
 }
 
 void ReshardingOplogBatchPreparer::_appendCrudOpToWriterVector(const OplogEntry* op,
                                                                WriterVectors& writerVectors) const {
     BSONElementComparator elementHasher{BSONElementComparator::FieldNamesMode::kIgnore,
                                         _defaultCollator.get()};
-
-    const size_t idHash = elementHasher.hash(op->getIdElement());
-
-    uint32_t hash = 0;
-    MurmurHash3_x86_32(&idHash, sizeof(idHash), hash, &hash);
-
-    _appendOpToWriterVector(hash, op, writerVectors);
+    if (_isCapped) {
+        _appendOpToWriterVector(absl::HashOf(op->getNss()), op, writerVectors);
+    } else {
+        const auto idHash = elementHasher.hash(op->getIdElement());
+        _appendOpToWriterVector(absl::HashOf(idHash), op, writerVectors);
+    }
 }
 
 void ReshardingOplogBatchPreparer::_appendSessionOpToWriterVector(
@@ -228,7 +331,7 @@ void ReshardingOplogBatchPreparer::_appendSessionOpToWriterVector(
     _appendOpToWriterVector(lsidHasher(lsid), op, writerVectors);
 }
 
-void ReshardingOplogBatchPreparer::_appendOpToWriterVector(std::uint32_t hash,
+void ReshardingOplogBatchPreparer::_appendOpToWriterVector(size_t hash,
                                                            const OplogEntry* op,
                                                            WriterVectors& writerVectors) const {
     auto& writer = writerVectors[hash % writerVectors.size()];

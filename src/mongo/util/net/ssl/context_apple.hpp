@@ -30,11 +30,13 @@
 
 #pragma once
 
-#include "asio/detail/config.hpp"
-#include "asio/detail/noncopyable.hpp"
 #include "mongo/util/net/ssl/apple.hpp"
 #include "mongo/util/net/ssl/context_base.hpp"
 
+#include "asio/detail/config.hpp"
+#include "asio/detail/noncopyable.hpp"
+
+// This must be after all other includes
 #include "asio/detail/push_options.hpp"
 
 namespace asio {

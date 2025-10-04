@@ -29,9 +29,11 @@
 
 #pragma once
 
+#include "mongo/base/error_extra_info.h"
 #include "mongo/base/status_with.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 class BSONObj;
 class BSONObjBuilder;
@@ -57,4 +59,4 @@ private:
 };
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

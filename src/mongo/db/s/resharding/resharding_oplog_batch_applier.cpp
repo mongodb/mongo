@@ -27,20 +27,43 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/s/resharding/resharding_oplog_batch_applier.h"
 
-#include <memory>
-
-#include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/base/status.h"
+#include "mongo/db/client.h"
+#include "mongo/db/global_catalog/catalog_cache/catalog_cache.h"
+#include "mongo/db/local_catalog/shard_role_catalog/operation_sharding_state.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/intent_guard.h"
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_future_util.h"
 #include "mongo/db/s/resharding/resharding_oplog_application.h"
 #include "mongo/db/s/resharding/resharding_oplog_session_application.h"
+#include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/versioning_protocol/chunk_version.h"
+#include "mongo/db/versioning_protocol/database_version.h"
+#include "mongo/db/versioning_protocol/shard_version.h"
+#include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/functional.h"
+#include "mongo/util/future_util.h"
+
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
+
 
 namespace mongo {
 
@@ -71,27 +94,36 @@ SemiFuture<void> ReshardingOplogBatchApplier::applyBatch(
                        const auto& oplogEntry = *chainCtx->batch[i];
                        auto opCtx = factory.makeOperationContext(&cc());
 
+                       boost::optional<rss::consensus::WriteIntentGuard> writeGuard;
+                       if (gFeatureFlagIntentRegistration.isEnabled()) {
+                           writeGuard.emplace(opCtx.get());
+                       }
+
                        if constexpr (IsForSessionApplication) {
-                           auto hitPreparedTxn =
+                           auto conflictingTxnCompletionFuture =
                                _sessionApplication.tryApplyOperation(opCtx.get(), oplogEntry);
 
-                           if (hitPreparedTxn) {
-                               return future_util::withCancellation(std::move(*hitPreparedTxn),
-                                                                    cancelToken);
+                           if (conflictingTxnCompletionFuture) {
+                               return future_util::withCancellation(
+                                   std::move(*conflictingTxnCompletionFuture), cancelToken);
                            }
                        } else {
-                           // ReshardingOpObserver depends on the collection metadata being known
-                           // when processing writes to the temporary resharding collection. We
-                           // attach shard version IGNORED to the write operations and retry once
-                           // on a StaleConfig exception to allow the collection metadata
-                           // information to be recovered.
-                           auto& oss = OperationShardingState::get(opCtx.get());
-                           oss.initializeClientRoutingVersions(
-                               _crudApplication.getOutputNss(),
-                               ChunkVersion::IGNORED() /* shardVersion */,
-                               boost::none /* dbVersion */);
+                           if (resharding::isProgressMarkOplogAfterOplogApplicationStarted(
+                                   oplogEntry)) {
+                               continue;
+                           }
 
-                           resharding::data_copy::withOneStaleConfigRetry(opCtx.get(), [&] {
+                           resharding::data_copy::staleConfigShardLoop(opCtx.get(), [&] {
+                               // ReshardingOpObserver depends on the collection metadata being
+                               // known when processing writes to the temporary resharding
+                               // collection. We attach placement version IGNORED to the write
+                               // operations and retry once on a StaleConfig error to allow the
+                               // collection metadata information to be recovered.
+                               ScopedSetShardRole scopedSetShardRole(
+                                   opCtx.get(),
+                                   _crudApplication.getOutputNss(),
+                                   ShardVersionFactory::make(ChunkVersion::IGNORED()),
+                                   boost::none /* databaseVersion */);
                                uassertStatusOK(
                                    _crudApplication.applyOperation(opCtx.get(), oplogEntry));
                            });

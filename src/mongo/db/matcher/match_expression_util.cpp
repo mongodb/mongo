@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/matcher/match_expression_util.h"
 
 namespace mongo::match_expression_util {

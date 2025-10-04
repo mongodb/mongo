@@ -27,18 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <vector>
-
 #include "mongo/db/pipeline/document_path_support.h"
 
-#include "mongo/base/parse_number.h"
+#include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/field_ref.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <cstddef>
+
 
 namespace mongo {
 namespace document_path_support {
@@ -61,7 +63,7 @@ void invokeCallbackOnTrailingValue(const Value& value, std::function<void(const 
     }
 }
 
-void visitAllValuesAtPathHelper(Document doc,
+void visitAllValuesAtPathHelper(const Document& doc,
                                 const FieldPath& path,
                                 size_t fieldPathIndex,
                                 std::function<void(const Value&)> callback) {
@@ -80,7 +82,11 @@ void visitAllValuesAtPathHelper(Document doc,
     // positional specifications, if applicable. For example, it will consume "0" and "1" from the
     // path "a.0.1.b" if the value at "a" is an array with arrays inside it.
     while (fieldPathIndex < path.getPathLength() && nextValue.isArray()) {
-        if (auto index = str::parseUnsignedBase10Integer(path.getFieldName(fieldPathIndex))) {
+        const StringData field = path.getFieldName(fieldPathIndex);
+        // Check for a numeric component that is not prefixed by 0 (for example "1" rather than
+        // "01"). These should act as field names, not as an index into an array.
+        if (auto index = str::parseUnsignedBase10Integer(field);
+            index && FieldRef::isNumericPathComponentStrict(field)) {
             nextValue = nextValue[*index];
             ++fieldPathIndex;
         } else {
@@ -102,11 +108,11 @@ void visitAllValuesAtPathHelper(Document doc,
         // Note we do not expand arrays within arrays this way. For example, {a: [[{b: 1}]]} has no
         // values on the path "a.b", but {a: [{b: 1}]} does.
         for (auto&& subValue : nextValue.getArray()) {
-            if (subValue.getType() == BSONType::Object) {
+            if (subValue.getType() == BSONType::object) {
                 visitAllValuesAtPathHelper(subValue.getDocument(), path, fieldPathIndex, callback);
             }
         }
-    } else if (nextValue.getType() == BSONType::Object) {
+    } else if (nextValue.getType() == BSONType::object) {
         visitAllValuesAtPathHelper(nextValue.getDocument(), path, fieldPathIndex, callback);
     }
 }
@@ -117,38 +123,6 @@ void visitAllValuesAtPath(const Document& doc,
                           const FieldPath& path,
                           std::function<void(const Value&)> callback) {
     visitAllValuesAtPathHelper(doc, path, 0, callback);
-}
-
-StatusWith<Value> extractElementAlongNonArrayPath(const Document& doc, const FieldPath& path) {
-    invariant(path.getPathLength() > 0);
-    Value curValue = doc.getField(path.getFieldName(0));
-    if (curValue.getType() == BSONType::Array) {
-        return {ErrorCodes::InternalError, "array along path"};
-    }
-
-    for (size_t i = 1; i < path.getPathLength(); i++) {
-        curValue = curValue[path.getFieldName(i)];
-        if (curValue.getType() == BSONType::Array) {
-            return {ErrorCodes::InternalError, "array along path"};
-        }
-    }
-
-    return curValue;
-}
-
-BSONObj documentToBsonWithPaths(const Document& input, const std::set<std::string>& paths) {
-    BSONObjBuilder outputBuilder;
-    for (auto&& path : paths) {
-        // getNestedField does not handle dotted paths correctly, so instead of retrieving the
-        // entire path, we just extract the first element of the path.
-        const auto prefix = FieldPath::extractFirstFieldFromDottedPath(path);
-        if (!outputBuilder.hasField(prefix)) {
-            // Avoid adding the same prefix twice.
-            input.getField(prefix).addToBsonObj(&outputBuilder, prefix);
-        }
-    }
-
-    return outputBuilder.obj();
 }
 
 }  // namespace document_path_support

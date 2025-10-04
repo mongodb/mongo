@@ -641,9 +641,15 @@ namespace boost
                 timer_handle=CreateWaitableTimer(NULL,false,NULL);
                 if(timer_handle!=0)
                 {
-                    ULONG tolerable=32; // Empirical testing shows Windows ignores this when <= 26
+                    ULONG const min_tolerable=32; // Empirical testing shows Windows ignores this when <= 26
+                    ULONG const max_tolerable=1000;
+                    ULONG tolerable=min_tolerable;
                     if(time_left_msec/20>tolerable)  // 5%
+                    {
                         tolerable=static_cast<ULONG>(time_left_msec/20);
+                        if(tolerable>max_tolerable)
+                            tolerable=max_tolerable;
+                    }
                     LARGE_INTEGER due_time={{0,0}};
                     if(time_left_msec>0)
                     {
@@ -733,9 +739,15 @@ namespace boost
                 timer_handle=CreateWaitableTimer(NULL,false,NULL);
                 if(timer_handle!=0)
                 {
-                    ULONG tolerable=32; // Empirical testing shows Windows ignores this when <= 26
+                    ULONG const min_tolerable=32; // Empirical testing shows Windows ignores this when <= 26
+                    ULONG const max_tolerable=1000;
+                    ULONG tolerable=min_tolerable;
                     if(time_left_msec/20>tolerable)  // 5%
+                    {
                         tolerable=static_cast<ULONG>(time_left_msec/20);
+                        if(tolerable>max_tolerable)
+                            tolerable=max_tolerable;
+                    }
                     LARGE_INTEGER due_time={{0,0}};
                     if(time_left_msec>0)
                     {

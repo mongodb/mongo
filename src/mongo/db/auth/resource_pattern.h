@@ -29,12 +29,22 @@
 
 #pragma once
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/db/auth/action_type_gen.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/util/assert_util.h"
+
 #include <iosfwd>
 #include <string>
 
-#include "mongo/base/string_data.h"
-#include "mongo/db/auth/action_type_gen.h"
-#include "mongo/db/namespace_string.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 
@@ -55,40 +65,44 @@ public:
     /**
      * Returns a pattern that matches absolutely any resource.
      */
-    static ResourcePattern forAnyResource() {
-        return ResourcePattern(MatchTypeEnum::kMatchAnyResource);
+    static ResourcePattern forAnyResource(const boost::optional<TenantId>& tenantId) {
+        return ResourcePattern(MatchTypeEnum::kMatchAnyResource, tenantId);
     }
 
     /**
      * Returns a pattern that matches any database or collection resource except collections for
      * which ns.isSystem().
      */
-    static ResourcePattern forAnyNormalResource() {
-        return ResourcePattern(MatchTypeEnum::kMatchAnyNormalResource);
+    static ResourcePattern forAnyNormalResource(const boost::optional<TenantId>& tenantId) {
+        return ResourcePattern(MatchTypeEnum::kMatchAnyNormalResource, tenantId);
     }
 
     /**
      * Returns a pattern that matches the "cluster" resource.
      */
-    static ResourcePattern forClusterResource() {
-        return ResourcePattern(MatchTypeEnum::kMatchClusterResource);
+    static ResourcePattern forClusterResource(const boost::optional<TenantId>& tenantId) {
+        return ResourcePattern(MatchTypeEnum::kMatchClusterResource, tenantId);
     }
 
     /**
      * Returns a pattern that matches the named database, and NamespaceStrings
      * "ns" for which ns.isSystem() is false and ns.db() == dbname.
      */
-    static ResourcePattern forDatabaseName(StringData dbName) {
-        return ResourcePattern(MatchTypeEnum::kMatchDatabaseName, NamespaceString(dbName, ""));
+    static ResourcePattern forDatabaseName(const DatabaseName& dbName) {
+        return ResourcePattern(MatchTypeEnum::kMatchDatabaseName,
+                               NamespaceStringUtil::deserialize(dbName, ""_sd));
     }
 
     /**
      * Returns a pattern that matches NamespaceStrings "ns" for which ns.coll() ==
      * collectionName.
      */
-    static ResourcePattern forCollectionName(StringData collectionName) {
+    static ResourcePattern forCollectionName(const boost::optional<TenantId>& tenantId,
+                                             StringData collectionName) {
+        // While the namespace we create for here is not valid for use in commands/storage layer
+        // since it has an empty DB, it is valid for the ResourcePattern use-case.
         return ResourcePattern(MatchTypeEnum::kMatchCollectionName,
-                               NamespaceString("", collectionName));
+                               AuthNamespaceStringUtil::deserialize(tenantId, "", collectionName));
     }
 
     /**
@@ -102,37 +116,40 @@ public:
      * Returns a pattern that matches any collection with the prefix "system.buckets." in any
      * database.
      */
-    static ResourcePattern forAnySystemBuckets() {
-        return ResourcePattern(MatchTypeEnum::kMatchAnySystemBucketResource);
+    static ResourcePattern forAnySystemBuckets(const boost::optional<TenantId>& tenantId) {
+        return ResourcePattern(MatchTypeEnum::kMatchAnySystemBucketResource, tenantId);
     }
 
     /**
      * Returns a pattern that matches any collection with the prefix "system.buckets." in database
      * "db".
      */
-    static ResourcePattern forAnySystemBucketsInDatabase(StringData dbName) {
+    static ResourcePattern forAnySystemBucketsInDatabase(const DatabaseName& dbName) {
         return ResourcePattern(MatchTypeEnum::kMatchAnySystemBucketInDBResource,
-                               NamespaceString(dbName, ""));
+                               NamespaceString(dbName));
     }
 
     /**
      * Returns a pattern that matches any collection with the prefix "system.buckets.<collection>"
      * in any database.
      */
-    static ResourcePattern forAnySystemBucketsInAnyDatabase(StringData collectionName) {
+    static ResourcePattern forAnySystemBucketsInAnyDatabase(
+        const boost::optional<TenantId>& tenantId, StringData collectionName) {
         return ResourcePattern(MatchTypeEnum::kMatchSystemBucketInAnyDBResource,
-                               NamespaceString("", collectionName));
+                               AuthNamespaceStringUtil::deserialize(tenantId, "", collectionName));
     }
 
     /**
      * Returns a pattern that matches a collection with the name
      * "<dbName>.system.buckets.<collectionName>"
      */
-    static ResourcePattern forExactSystemBucketsCollection(StringData dbName,
-                                                           StringData collectionName) {
-        invariant(!collectionName.startsWith("system.buckets."));
-        return ResourcePattern(MatchTypeEnum::kMatchExactSystemBucketResource,
-                               NamespaceString(dbName, collectionName));
+    static ResourcePattern forExactSystemBucketsCollection(const NamespaceString& nss) {
+        uassert(ErrorCodes::InvalidNamespace,
+                fmt::format("Invalid namespace '{}.system.buckets.{}'",
+                            nss.dbName().toStringForErrorMsg(),
+                            nss.coll()),
+                !nss.coll().starts_with("system.buckets."));
+        return ResourcePattern(MatchTypeEnum::kMatchExactSystemBucketResource, nss);
     }
 
     /**
@@ -220,13 +237,20 @@ public:
     }
 
     /**
+     * Returns the tenantId that this pattern matches.
+     */
+    boost::optional<TenantId> tenantId() const {
+        return _ns.tenantId();
+    }
+
+    /**
      * Returns the database that this pattern matches.
      *
      * Behavior is undefined unless the pattern is of type matchDatabaseName or
      * matchExactNamespace or matchExactSystemBucketResource or matchAnySystemBucketInDBResource
      */
-    StringData databaseToMatch() const {
-        return _ns.db();
+    DatabaseName dbNameToMatch() const {
+        return _ns.dbName();
     }
 
     /**
@@ -241,12 +265,17 @@ public:
 
     std::string toString() const;
 
+    std::string serialize(const SerializationContext& context = SerializationContext()) const;
+
     bool operator==(const ResourcePattern& other) const {
-        if (_matchType != other._matchType)
-            return false;
-        if (_ns != other._ns)
-            return false;
-        return true;
+        return (_matchType == other._matchType) && (_ns == other._ns);
+    }
+
+    bool operator<(const ResourcePattern& other) const {
+        if (_matchType < other._matchType) {
+            return true;
+        }
+        return (_matchType == other._matchType) && (_ns < other._ns);
     }
 
     template <typename H>
@@ -258,10 +287,9 @@ public:
      * Returns a pattern for IDL generated code to use.
      */
     static ResourcePattern forAuthorizationContract(MatchTypeEnum e) {
-        return ResourcePattern(e);
+        return ResourcePattern(e, boost::none);
     }
 
-private:
     // AuthorizationContract works directly with MatchTypeEnum. Users should not be concerned with
     // how a ResourcePattern was constructed.
     MatchTypeEnum matchType() const {
@@ -269,7 +297,7 @@ private:
     }
 
 private:
-    explicit ResourcePattern(MatchTypeEnum type) : _matchType(type) {}
+    ResourcePattern(MatchTypeEnum type, const boost::optional<TenantId>& tenantId);
     ResourcePattern(MatchTypeEnum type, const NamespaceString& ns) : _matchType(type), _ns(ns) {}
 
     MatchTypeEnum _matchType;

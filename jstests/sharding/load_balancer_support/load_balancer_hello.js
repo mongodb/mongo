@@ -1,22 +1,23 @@
 /**
- * @tags: [requires_fcv_51, featureFlagLoadBalancer]
- *
  * Test the extension to the mongos `hello` command by which clients
  * that have arrived through a load balancer affirm that they are
  * compatible with the way mongos handles load-balanced clients.
  * See `src/mongo/s/load_balancing_support.h`.
+ *
+ * @tags: [
+ *    requires_fcv_81,
+ * ]
+ *
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 (() => {
-    "use strict";
-
-    load('jstests/libs/fail_point_util.js');
-
     /**
      * The whole ShardingTest is restarted just to get a fresh connection.
      * Obviously this could be accomplished much more efficiently.
      */
-    var runInShardingTest = (func) => {
-        var st = new ShardingTest({shards: 1, mongos: 1});
+    let runInShardingTest = (func) => {
+        let st = new ShardingTest({shards: 1, mongos: 1});
         try {
             func(st.s0.getDB("admin"));
         } finally {
@@ -24,29 +25,29 @@
         }
     };
 
-    var doHello = (admin, {lbConnection, lbHello, expectServiceId}) => {
+    let doHello = (admin, {lbConnection, lbHello}) => {
         if (lbConnection)
-            assert.commandWorked(admin.adminCommand(
-                {configureFailPoint: 'clientIsFromLoadBalancer', mode: 'alwaysOn'}));
+            assert.commandWorked(
+                admin.adminCommand({configureFailPoint: "clientIsConnectedToLoadBalancerPort", mode: "alwaysOn"}),
+            );
         try {
-            var helloDoc = {};
-            if (lbHello)
-                helloDoc['loadBalanced'] = true;
+            let helloDoc = {};
+            if (lbHello) helloDoc["loadBalanced"] = true;
             return admin.runCommand("hello", helloDoc);
         } finally {
             assert.commandWorked(
-                admin.adminCommand({configureFailPoint: 'clientIsFromLoadBalancer', mode: 'off'}));
+                admin.adminCommand({configureFailPoint: "clientIsConnectedToLoadBalancerPort", mode: "off"}),
+            );
         }
     };
 
-    var assertServiceId = (res) => {
+    let assertServiceId = (res) => {
         assert.commandWorked(res);
-        assert(res.hasOwnProperty("serviceId"),
-               "serviceId missing from hello response:" + tojson(res));
+        assert(res.hasOwnProperty("serviceId"), "serviceId missing from hello response:" + tojson(res));
         assert(res.serviceId.isObjectId, "res.serviceId = " + tojson(res.serviceId));
     };
 
-    var assertNoServiceId = (res) => {
+    let assertNoServiceId = (res) => {
         assert.commandWorked(res);
         assert(!res.hasOwnProperty("serviceId"), "res.serviceId = " + tojson(res.serviceId));
     };
@@ -55,11 +56,6 @@
      * The ordinary baseline non-load-balanced case.
      */
     runInShardingTest((admin) => {
-        // Before getting started, confirm that the feature is enabled.
-        assert(admin.adminCommand({getParameter: 1, featureFlagLoadBalancer: 1})
-                   .featureFlagLoadBalancer.value,
-               'featureFlagLoadBalancer should be enabled for this test');
-
         jsTestLog("Initial hello command");
         assertNoServiceId(doHello(admin, {}));
         jsTestLog("Non-initial hello command");
@@ -89,7 +85,6 @@
      * This is an error that should result in a disconnection.
      */
     runInShardingTest((admin) => {
-        var res = doHello(admin, {lbConnection: true});
-        assert.commandFailedWithCode(res, ErrorCodes.LoadBalancerSupportMismatch);
+        assertNoServiceId(doHello(admin, {lbConnection: true}));
     });
 })();

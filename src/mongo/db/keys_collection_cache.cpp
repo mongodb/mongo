@@ -27,13 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/keys_collection_cache.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/db/keys_collection_client.h"
+#include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/util/str.h"
+
+#include <iterator>
+#include <mutex>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 
@@ -50,6 +56,13 @@ StatusWith<KeysCollectionDocument> KeysCollectionCache::refresh(OperationContext
                 "Cannot refresh keys collection cache during initial sync"};
     }
 
+    // Don't allow this to read during rollback as the storage engine requires exclusive access.
+    if (repl::ReplicationCoordinator::get(opCtx) &&
+        repl::ReplicationCoordinator::get(opCtx)->getMemberState().rollback()) {
+        return {ErrorCodes::InterruptedDueToReplStateChange,
+                "Cannot refresh keys collection cache during rollback"};
+    }
+
     auto refreshStatus = _refreshExternalKeys(opCtx);
 
     if (!refreshStatus.isOK()) {
@@ -59,14 +72,13 @@ StatusWith<KeysCollectionDocument> KeysCollectionCache::refresh(OperationContext
     return _refreshInternalKeys(opCtx);
 }
 
-
 StatusWith<KeysCollectionDocument> KeysCollectionCache::_refreshInternalKeys(
     OperationContext* opCtx) {
     LogicalTime newerThanThis;
     decltype(_internalKeysCache)::size_type originalSize = 0;
 
     {
-        stdx::lock_guard<Latch> lk(_cacheMutex);
+        stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
         auto iter = _internalKeysCache.crbegin();
         if (iter != _internalKeysCache.crend()) {
             newerThanThis = iter->second.getExpiresAt();
@@ -75,7 +87,8 @@ StatusWith<KeysCollectionDocument> KeysCollectionCache::_refreshInternalKeys(
         originalSize = _internalKeysCache.size();
     }
 
-    auto refreshStatus = _client->getNewInternalKeys(opCtx, _purpose, newerThanThis, true);
+    auto refreshStatus =
+        _client->getNewInternalKeys(opCtx, _purpose, newerThanThis, true /* tryUseMajority */);
 
     if (!refreshStatus.isOK()) {
         return refreshStatus.getStatus();
@@ -83,7 +96,7 @@ StatusWith<KeysCollectionDocument> KeysCollectionCache::_refreshInternalKeys(
 
     auto& newKeys = refreshStatus.getValue();
 
-    stdx::lock_guard<Latch> lk(_cacheMutex);
+    stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
     if (originalSize > _internalKeysCache.size()) {
         // _internalKeysCache cleared while we were getting the new keys, just return the newest key
         // without touching the _internalKeysCache so the next refresh will populate it properly.
@@ -108,7 +121,7 @@ Status KeysCollectionCache::_refreshExternalKeys(OperationContext* opCtx) {
     decltype(_externalKeysCache)::size_type originalSize = 0;
 
     {
-        stdx::lock_guard<Latch> lk(_cacheMutex);
+        stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
         originalSize = _externalKeysCache.size();
     }
 
@@ -125,7 +138,7 @@ Status KeysCollectionCache::_refreshExternalKeys(OperationContext* opCtx) {
         newExternalKeysCache.emplace(key.getKeyId(), std::move(key));
     }
 
-    stdx::lock_guard<Latch> lk(_cacheMutex);
+    stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
     if (originalSize > _externalKeysCache.size()) {
         // _externalKeysCache cleared while we were getting the new keys, just return so the next
         // refresh will populate it properly.
@@ -141,7 +154,7 @@ Status KeysCollectionCache::_refreshExternalKeys(OperationContext* opCtx) {
 
 StatusWith<KeysCollectionDocument> KeysCollectionCache::getInternalKeyById(
     long long keyId, const LogicalTime& forThisTime) {
-    stdx::lock_guard<Latch> lk(_cacheMutex);
+    stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
 
     for (auto iter = _internalKeysCache.lower_bound(forThisTime); iter != _internalKeysCache.cend();
          ++iter) {
@@ -158,7 +171,7 @@ StatusWith<KeysCollectionDocument> KeysCollectionCache::getInternalKeyById(
 
 StatusWith<std::vector<ExternalKeysCollectionDocument>> KeysCollectionCache::getExternalKeysById(
     long long keyId, const LogicalTime& forThisTime) {
-    stdx::lock_guard<Latch> lk(_cacheMutex);
+    stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
     std::vector<ExternalKeysCollectionDocument> keys;
 
     if (_externalKeysCache.empty()) {
@@ -187,7 +200,7 @@ StatusWith<std::vector<ExternalKeysCollectionDocument>> KeysCollectionCache::get
 
 StatusWith<KeysCollectionDocument> KeysCollectionCache::getInternalKey(
     const LogicalTime& forThisTime) {
-    stdx::lock_guard<Latch> lk(_cacheMutex);
+    stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
 
     auto iter = _internalKeysCache.upper_bound(forThisTime);
 
@@ -200,16 +213,17 @@ StatusWith<KeysCollectionDocument> KeysCollectionCache::getInternalKey(
 }
 
 void KeysCollectionCache::resetCache() {
-    // keys that read with non majority readConcern level can be rolled back.
-    if (!_client->supportsMajorityReads()) {
-        stdx::lock_guard<Latch> lk(_cacheMutex);
+    // Refreshes try to use majority read concern, but if the client can't support that then any
+    // cached keys may have been rolled back and should be cleared.
+    if (_client->mustUseLocalReads()) {
+        stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
         _internalKeysCache.clear();
         _externalKeysCache.clear();
     }
 }
 
 void KeysCollectionCache::cacheExternalKey(ExternalKeysCollectionDocument key) {
-    stdx::lock_guard<Latch> lk(_cacheMutex);
+    stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
     _externalKeysCache.emplace(key.getKeyId(), std::move(key));
 }
 

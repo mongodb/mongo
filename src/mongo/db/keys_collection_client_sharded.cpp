@@ -27,38 +27,38 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/keys_collection_client_sharded.h"
 
-#include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/db/generic_argument_util.h"
+#include "mongo/db/global_catalog/sharding_catalog_client.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/read_concern_level.h"
 
 namespace mongo {
 
 KeysCollectionClientSharded::KeysCollectionClientSharded(ShardingCatalogClient* client)
     : _catalogClient(client) {}
 
-
 StatusWith<std::vector<KeysCollectionDocument>> KeysCollectionClientSharded::getNewInternalKeys(
     OperationContext* opCtx,
     StringData purpose,
     const LogicalTime& newerThanThis,
-    bool useMajority) {
-
-    return _catalogClient->getNewKeys(
+    bool tryUseMajority) {
+    return _catalogClient->getNewInternalKeys(
         opCtx, purpose, newerThanThis, repl::ReadConcernLevel::kMajorityReadConcern);
 }
 
 StatusWith<std::vector<ExternalKeysCollectionDocument>>
 KeysCollectionClientSharded::getAllExternalKeys(OperationContext* opCtx, StringData purpose) {
-    return std::vector<ExternalKeysCollectionDocument>{};
+    return _catalogClient->getAllExternalKeys(
+        opCtx, purpose, repl::ReadConcernLevel::kMajorityReadConcern);
 }
 
 Status KeysCollectionClientSharded::insertNewKey(OperationContext* opCtx, const BSONObj& doc) {
     return _catalogClient->insertConfigDocument(opCtx,
                                                 NamespaceString::kKeysCollectionNamespace,
                                                 doc,
-                                                ShardingCatalogClient::kMajorityWriteConcern);
+                                                defaultMajorityWriteConcernDoNotUse());
 }
 
 }  // namespace mongo

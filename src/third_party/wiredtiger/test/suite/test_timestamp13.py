@@ -30,7 +30,6 @@
 #   Timestamps: session query_timestamp
 #
 
-import random
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 from wtscenario import make_scenarios
@@ -42,23 +41,17 @@ class test_timestamp13(wttest.WiredTigerTestCase, suite_subprocess):
     scenarios = make_scenarios([
         ('col', dict(extra_config=',key_format=r')),
         ('col-fix', dict(extra_config=',key_format=r,value_format=8t')),
-        ('lsm', dict(extra_config=',type=lsm')),
         ('row', dict(extra_config='')),
     ])
-
-    conn_config = 'log=(enabled)'
-    session_config = 'isolation=snapshot'
 
     def test_degenerate_timestamps(self):
         self.session.create(self.uri,
             'key_format=i,value_format=i' + self.extra_config)
 
         query_choices = ['commit', 'first_commit', 'prepare', 'read']
-        # Querying a session's timestamps will error when not in a transaction.
+        # Querying a session's timestamps when not in a transaction returns not-set values.
         for query in query_choices:
-            self.assertRaises(
-                wiredtiger.WiredTigerError,
-                lambda: self.session.query_timestamp('get=' + query))
+            self.assertEqual(self.session.query_timestamp('get=' + query), "0")
 
         self.session.begin_transaction()
         # Nothing has been set, all queries will return timestamp 0.
@@ -72,17 +65,15 @@ class test_timestamp13(wttest.WiredTigerTestCase, suite_subprocess):
             '/not a permitted choice for key/')
 
         self.session.rollback_transaction()
-        # Querying a session's timestamps will error when not in a transaction.
+        # Querying a session's timestamps when not in a transaction will return 0.
         for query in query_choices:
-            self.assertRaises(
-                wiredtiger.WiredTigerError,
-                lambda: self.session.query_timestamp('get=' + query))
+            self.assertEqual(self.session.query_timestamp('get=' + query), '0')
 
     def test_query_read_commit_timestamps(self):
         self.session.create(self.uri,
             'key_format=i,value_format=i' + self.extra_config)
 
-        self.session.begin_transaction('isolation=snapshot')
+        self.session.begin_transaction()
         self.session.timestamp_transaction('read_timestamp=10')
         self.assertTimestampsEqual(
             self.session.query_timestamp('get=read'), '10')
@@ -112,7 +103,7 @@ class test_timestamp13(wttest.WiredTigerTestCase, suite_subprocess):
         # Rounding to the oldest timestamp will allow the stale read_timestamp
         # to succeed. The follow-up call to get the read timestamp returns the
         # chosen read timestamp.
-        self.session.begin_transaction('isolation=snapshot,roundup_timestamps=(read=true)')
+        self.session.begin_transaction('roundup_timestamps=(read=true)')
         self.session.timestamp_transaction('read_timestamp=5')
         self.assertTimestampsEqual(
             self.session.query_timestamp('get=read'), '10')

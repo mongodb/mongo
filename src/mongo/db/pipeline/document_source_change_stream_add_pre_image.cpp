@@ -27,27 +27,37 @@
  *    it in the license file.
  */
 
-#include "mongo/util/assert_util.h"
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/pipeline/document_source_change_stream_add_pre_image.h"
 
-#include "mongo/bson/simple_bsonelement_comparator.h"
-#include "mongo/db/pipeline/change_stream_helpers_legacy.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/change_stream_serverless_helpers.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
-#include "mongo/db/transaction_history_iterator.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/db/version_context.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
+
+#include <memory>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
+
 
 namespace mongo {
 
-namespace {
 REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalChangeStreamAddPreImage,
                                   LiteParsedDocumentSourceChangeStreamInternal::parse,
                                   DocumentSourceChangeStreamAddPreImage::createFromBson,
                                   true);
-}  // namespace
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalChangeStreamAddPreImage,
+                            DocumentSourceChangeStreamAddPreImage::id)
 
 constexpr StringData DocumentSourceChangeStreamAddPreImage::kStageName;
 constexpr StringData DocumentSourceChangeStreamAddPreImage::kFullDocumentBeforeChangeFieldName;
@@ -65,108 +75,15 @@ DocumentSourceChangeStreamAddPreImage::createFromBson(
     const BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(5467610,
             str::stream() << "the '" << kStageName << "' stage spec must be an object",
-            elem.type() == BSONType::Object);
+            elem.type() == BSONType::object);
     auto parsedSpec = DocumentSourceChangeStreamAddPreImageSpec::parse(
-        IDLParserErrorContext("DocumentSourceChangeStreamAddPreImageSpec"), elem.Obj());
+        elem.Obj(), IDLParserContext("DocumentSourceChangeStreamAddPreImageSpec"));
     return make_intrusive<DocumentSourceChangeStreamAddPreImage>(
         expCtx, parsedSpec.getFullDocumentBeforeChange());
 }
 
-DocumentSource::GetNextResult DocumentSourceChangeStreamAddPreImage::doGetNext() {
-    auto input = pSource->getNext();
-    if (!input.isAdvanced()) {
-        return input;
-    }
-
-    // If this is not an update, replace or delete, then just pass along the result.
-    const auto kOpTypeField = DocumentSourceChangeStream::kOperationTypeField;
-    const auto opType = input.getDocument()[kOpTypeField];
-    DocumentSourceChangeStream::checkValueType(opType, kOpTypeField, BSONType::String);
-    if (opType.getStringData() != DocumentSourceChangeStream::kUpdateOpType &&
-        opType.getStringData() != DocumentSourceChangeStream::kReplaceOpType &&
-        opType.getStringData() != DocumentSourceChangeStream::kDeleteOpType) {
-        return input;
-    }
-
-    // If a pre-image is available, the transform stage will have populated it in the event's
-    // 'fullDocumentBeforeChange' field. If this field is missing and the pre-imaging mode is
-    // 'required', we throw an exception. Otherwise, we pass along the document unmodified.
-    auto preImageId = input.getDocument()[kPreImageIdFieldName];
-    if (preImageId.missing()) {
-        uassert(51770,
-                str::stream()
-                    << "Change stream was configured to require a pre-image for all update, delete "
-                       "and replace events, but pre-image id was not available for event: "
-                    << input.getDocument().toString(),
-                _fullDocumentBeforeChangeMode != FullDocumentBeforeChangeModeEnum::kRequired);
-        return input;
-    }
-    tassert(5868900,
-            "Expected pre-image id field to be a document",
-            preImageId.getType() == BSONType::Object);
-
-    // Obtain the pre-image document, if available, given the specified preImageId.
-    auto preImageDoc = lookupPreImage(pExpCtx, preImageId.getDocument());
-    uassert(
-        ErrorCodes::NoMatchingDocument,
-        str::stream() << "Change stream was configured to require a pre-image for all update, "
-                         "delete and replace events, but the pre-image was not found for event: "
-                      << input.getDocument().toString(),
-        preImageDoc ||
-            _fullDocumentBeforeChangeMode != FullDocumentBeforeChangeModeEnum::kRequired);
-
-    // Even if no pre-image was found, we have to populate the 'fullDocumentBeforeChange' field.
-    MutableDocument outputDoc(input.releaseDocument());
-    outputDoc[kFullDocumentBeforeChangeFieldName] =
-        (preImageDoc ? Value(*preImageDoc) : Value(BSONNULL));
-
-    // Do not propagate preImageId field further through the pipeline.
-    outputDoc.remove(kPreImageIdFieldName);
-
-    return outputDoc.freeze();
-}
-
-boost::optional<Document> DocumentSourceChangeStreamAddPreImage::lookupPreImage(
-    boost::intrusive_ptr<ExpressionContext> pExpCtx, const Document& preImageId) {
-    // If the pre-image id does not contain the nsUUID field, then it is in legacy format. Look
-    // up the pre-image in the oplog.
-    if (preImageId[ChangeStreamPreImageId::kNsUUIDFieldName].missing()) {
-        return change_stream_legacy::legacyLookupPreImage(pExpCtx, preImageId);
-    }
-
-    // We need the pre-images UUID for lookup, so obtain the collection info via
-    // MongoProcessInterface.
-    auto preImagesCollectionInfo = pExpCtx->mongoProcessInterface->getCollectionOptions(
-        pExpCtx->opCtx, NamespaceString::kChangeStreamPreImagesNamespace);
-
-    // Return boost::none if pre-images collection doesn't exist.
-    if (preImagesCollectionInfo.isEmpty()) {
-        return boost::none;
-    }
-
-    // Extract the UUID from the collection information. We should always have a valid uuid here.
-    auto preImagesCollectionUUID = invariantStatusOK(UUID::parse(preImagesCollectionInfo["uuid"]));
-
-    // Look up the pre-image using the pre-image id as the query filter.
-    auto lookedUpDoc = pExpCtx->mongoProcessInterface->lookupSingleDocument(
-        pExpCtx,
-        NamespaceString::kChangeStreamPreImagesNamespace,
-        preImagesCollectionUUID,
-        Document{{"_id", Value(preImageId)}},
-        boost::none);
-
-    // Return boost::none to signify that we failed to find the pre-image.
-    if (!lookedUpDoc) {
-        return boost::none;
-    }
-
-    // Return preImage field from the document.
-    return lookedUpDoc->getField(ChangeStreamPreImage::kPreImageFieldName).getDocument().getOwned();
-}
-
-Value DocumentSourceChangeStreamAddPreImage::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
-    return explain
+Value DocumentSourceChangeStreamAddPreImage::doSerialize(const SerializationOptions& opts) const {
+    return opts.isSerializingForExplain()
         ? Value(Document{
               {DocumentSourceChangeStream::kStageName,
                Document{{"stage"_sd, "internalAddPreImage"_sd},

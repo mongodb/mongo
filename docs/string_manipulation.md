@@ -7,6 +7,7 @@ For string manipulation, use the util/mongoutils/str.h library.
 `util/mongoutils/str.h` provides string helper functions for each manipulation.
 
 `str::stream()` is quite useful for assembling strings inline:
+
 ```
 uassert(12345, str::stream() << "bad ns:" << ns, isOk);
 ```
@@ -26,6 +27,5 @@ class StringData {
 ```
 
 See also [`bson/string_data.h`][1].
-
 
 [1]: ../src/mongo/base/string_data.h

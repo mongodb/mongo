@@ -1,7 +1,7 @@
-# Stores all FCVs and all LTS release versions since v4.0. 
-# This information is used to generate the FCV constants in 
-# multiversion_constants.h. Please consult the STAR team before 
-# modifying this file. 
+# Stores all FCVs and all LTS release versions since v4.0.
+# This information is used to generate the FCV constants in
+# multiversion_constants.h. Please consult the STAR team before
+# modifying this file.
 
 # All FCVs starting with 4.0.
 featureCompatibilityVersions:
@@ -14,9 +14,60 @@ featureCompatibilityVersions:
   - "5.0"
   - "5.1"
   - "5.2"
+  - "5.3"
+  - "6.0"
+  - "6.1"
+  - "6.2"
+  - "6.3"
+  - "7.0"
+  - "7.1"
+  - "7.2"
+  - "7.3"
+  - "8.0"
+  - "8.1"
+  - "8.2"
+  - "8.3"
+  - "100.0" # This version is not an actual version and used for testing only
 # All LTS releases starting with 4.0.
 longTermSupportReleases:
   - "4.0"
   - "4.2"
   - "4.4"
   - "5.0"
+  - "6.0"
+  - "7.0"
+  - "8.0"
+
+# List of stable MongoDB versions since 2.0 that have been EOL'd.
+# Entries to this section will also stop them from running as "old" versions in
+# multiversion testing across all branches. This is because there is no need to
+# run multiversion testing against EOL versions.
+eolVersions:
+  - "2.0"
+  - "2.2"
+  - "2.4"
+  - "2.6"
+  - "3.0" # 2018-02
+  - "3.2" # 2018-09
+  - "3.4" # 2020-01
+  - "3.6" # 2021-04
+  - "4.0" # 2022-04
+  - "4.2" # 2023-04
+  - "4.4" # 2024-02
+  - "5.0" # 2024-10
+  - "5.1" # 2022-01
+  - "5.2" # 2022-04
+  - "5.3" # 2022-07
+  - "6.1" # 2023-01
+  - "6.2" # 2023-03
+  - "6.3" # 2023-08
+  - "7.1" # 2024-01
+  - "7.2" # 2024-04
+  - "7.3" # 2024-10
+
+# Optional.
+# Using this special override extends FCV constant generation down to the previous value of
+# lastLTS. This is intended to ease the transition to a new lastLTS by extending the lifetime
+# of those older constants, so that they can be removed at a more convenient time.
+# For example, we can set this to "5.0" when releasing "6.0".
+generateFCVLowerBoundOverride: "6.0"

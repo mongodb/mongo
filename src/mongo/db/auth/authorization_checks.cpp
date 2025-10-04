@@ -27,14 +27,36 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/auth/authorization_checks.h"
 
-#include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/commands/create_gen.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/local_catalog/ddl/coll_mod_gen.h"
+#include "mongo/db/local_catalog/ddl/create_gen.h"
+#include "mongo/db/local_catalog/document_validation.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
-#include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/str.h"
+
+#include <memory>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace auth {
@@ -43,22 +65,25 @@ namespace {
 // Checks if this connection has the privileges necessary to create or modify the view 'viewNs'
 // to be a view on 'viewOnNs' with pipeline 'viewPipeline'. Call this function after verifying
 // that the user has the 'createCollection' or 'collMod' action, respectively.
-Status checkAuthForCreateOrModifyView(AuthorizationSession* authzSession,
+Status checkAuthForCreateOrModifyView(OperationContext* opCtx,
+                                      AuthorizationSession* authzSession,
                                       const NamespaceString& viewNs,
                                       const NamespaceString& viewOnNs,
                                       const BSONArray& viewPipeline,
-                                      bool isMongos) {
+                                      bool isMongos,
+                                      const SerializationContext& serializationContext) {
     // It's safe to allow a user to create or modify a view if they can't read it anyway.
     if (!authzSession->isAuthorizedForActionsOnNamespace(viewNs, ActionType::find)) {
         return Status::OK();
     }
 
     auto request = aggregation_request_helper::parseFromBSON(
-        viewNs,
         BSON("aggregate" << viewOnNs.coll() << "pipeline" << viewPipeline << "cursor" << BSONObj()
-                         << "$db" << viewOnNs.db()),
+                         << "$db"
+                         << DatabaseNameUtil::serialize(viewOnNs.dbName(), serializationContext)),
+        auth::ValidatedTenancyScope::get(opCtx),
         boost::none,
-        false);
+        serializationContext);
 
     auto statusWithPrivs = getPrivilegesForAggregate(authzSession, viewOnNs, request, isMongos);
     PrivilegeVector privileges = uassertStatusOK(statusWithPrivs);
@@ -75,21 +100,23 @@ Status checkAuthForFind(AuthorizationSession* authSession,
                         bool hasTerm) {
     if (MONGO_unlikely(ns.isCommand())) {
         return Status(ErrorCodes::InternalError,
-                      str::stream() << "Checking query auth on command namespace " << ns.ns());
+                      str::stream() << "Checking query auth on command namespace "
+                                    << ns.toStringForErrorMsg());
     }
     if (!authSession->isAuthorizedForActionsOnNamespace(ns, ActionType::find)) {
         return Status(ErrorCodes::Unauthorized,
-                      str::stream() << "not authorized for query on " << ns.ns());
+                      str::stream() << "not authorized for query on " << ns.toStringForErrorMsg());
     }
 
     // Only internal clients (such as other nodes in a replica set) are allowed to use
     // the 'term' field in a find operation. Use of this field could trigger changes
     // in the receiving server's replication state and should be protected.
     if (hasTerm &&
-        !authSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                       ActionType::internal)) {
+        !authSession->isAuthorizedForActionsOnResource(
+            ResourcePattern::forClusterResource(ns.tenantId()), ActionType::internal)) {
         return Status(ErrorCodes::Unauthorized,
-                      str::stream() << "not authorized for query with term on " << ns.ns());
+                      str::stream()
+                          << "not authorized for query with term on " << ns.toStringForErrorMsg());
     }
 
     return Status::OK();
@@ -103,17 +130,19 @@ Status checkAuthForGetMore(AuthorizationSession* authSession,
     // or does not need to be.
     if (!authSession->shouldIgnoreAuthChecks() && !authSession->isAuthenticated()) {
         return Status(ErrorCodes::Unauthorized,
-                      str::stream() << "not authorized for getMore on " << ns.db());
+                      str::stream()
+                          << "not authorized for getMore on " << ns.dbName().toStringForErrorMsg());
     }
 
     // Only internal clients (such as other nodes in a replica set) are allowed to use
     // the 'term' field in a getMore operation. Use of this field could trigger changes
     // in the receiving server's replication state and should be protected.
     if (hasTerm &&
-        !authSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                       ActionType::internal)) {
+        !authSession->isAuthorizedForActionsOnResource(
+            ResourcePattern::forClusterResource(ns.tenantId()), ActionType::internal)) {
         return Status(ErrorCodes::Unauthorized,
-                      str::stream() << "not authorized for getMore with term on " << ns.ns());
+                      str::stream() << "not authorized for getMore with term on "
+                                    << ns.toStringForErrorMsg());
     }
 
     return Status::OK();
@@ -128,7 +157,7 @@ Status checkAuthForInsert(AuthorizationSession* authSession,
     }
     if (!authSession->isAuthorizedForActionsOnNamespace(ns, required)) {
         return Status(ErrorCodes::Unauthorized,
-                      str::stream() << "not authorized for insert on " << ns.ns());
+                      str::stream() << "not authorized for insert on " << ns.toStringForErrorMsg());
     }
 
     return Status::OK();
@@ -154,7 +183,8 @@ Status checkAuthForUpdate(AuthorizationSession* authSession,
 
     if (!authSession->isAuthorizedForActionsOnNamespace(ns, required)) {
         return Status(ErrorCodes::Unauthorized,
-                      str::stream() << "not authorized for " << operationType << " on " << ns.ns());
+                      str::stream() << "not authorized for " << operationType << " on "
+                                    << ns.toStringForErrorMsg());
     }
 
     return Status::OK();
@@ -166,16 +196,17 @@ Status checkAuthForDelete(AuthorizationSession* authSession,
                           const BSONObj& query) {
     if (!authSession->isAuthorizedForActionsOnNamespace(ns, ActionType::remove)) {
         return Status(ErrorCodes::Unauthorized,
-                      str::stream() << "not authorized to remove from " << ns.ns());
+                      str::stream()
+                          << "not authorized to remove from " << ns.toStringForErrorMsg());
     }
     return Status::OK();
 }
 
 Status checkAuthForKillCursors(AuthorizationSession* authSession,
                                const NamespaceString& ns,
-                               UserNameIterator cursorOwner) {
-    if (authSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                      ActionType::killAnyCursor)) {
+                               const boost::optional<UserName>& cursorOwner) {
+    if (authSession->isAuthorizedForActionsOnResource(
+            ResourcePattern::forClusterResource(ns.tenantId()), ActionType::killAnyCursor)) {
         return Status::OK();
     }
 
@@ -185,7 +216,7 @@ Status checkAuthForKillCursors(AuthorizationSession* authSession,
 
     ResourcePattern target;
     if (ns.isListCollectionsCursorNS()) {
-        target = ResourcePattern::forDatabaseName(ns.db());
+        target = ResourcePattern::forDatabaseName(ns.dbName());
     } else {
         target = ResourcePattern::forExactNamespace(ns);
     }
@@ -195,10 +226,30 @@ Status checkAuthForKillCursors(AuthorizationSession* authSession,
     }
 
     return Status(ErrorCodes::Unauthorized,
-                  str::stream() << "not authorized to kill cursor on " << ns.ns());
+                  str::stream() << "not authorized to kill cursor on " << ns.toStringForErrorMsg());
 }
 
-Status checkAuthForCreate(AuthorizationSession* authSession,
+Status checkAuthForReleaseMemory(AuthorizationSession* authSession, const NamespaceString& ns) {
+    // Check whether the user is authorised to release memory in the cluster level.
+    if (authSession->isAuthorizedForActionsOnResource(
+            ResourcePattern::forClusterResource(ns.tenantId()),
+            ActionType::releaseMemoryAnyCursor)) {
+        return Status::OK();
+    }
+
+    // Check whether the user is authorised to release memory in the database or collection level.
+    if (authSession->isAuthorizedForActionsOnResource(
+            CommandHelpers::resourcePatternForNamespace(ns), ActionType::releaseMemoryAnyCursor)) {
+        return Status::OK();
+    }
+
+    return Status(ErrorCodes::Unauthorized,
+                  str::stream() << "not authorized to release cursor memory on "
+                                << ns.toStringForErrorMsg());
+}
+
+Status checkAuthForCreate(OperationContext* opCtx,
+                          AuthorizationSession* authSession,
                           const CreateCommand& cmd,
                           bool isMongos) {
     auto ns = cmd.getNamespace();
@@ -222,14 +273,19 @@ Status checkAuthForCreate(AuthorizationSession* authSession,
 
         // Parse the viewOn namespace and the pipeline. If no pipeline was specified, use the empty
         // pipeline.
-        NamespaceString viewOnNs(ns.db(), optViewOn.get());
+        NamespaceString viewOnNs(NamespaceStringUtil::deserialize(ns.dbName(), optViewOn.value()));
         auto pipeline = cmd.getPipeline().get_value_or(std::vector<BSONObj>());
         BSONArrayBuilder pipelineArray;
         for (const auto& stage : pipeline) {
             pipelineArray.append(stage);
         }
-        return checkAuthForCreateOrModifyView(
-            authSession, ns, viewOnNs, pipelineArray.arr(), isMongos);
+        return checkAuthForCreateOrModifyView(opCtx,
+                                              authSession,
+                                              ns,
+                                              viewOnNs,
+                                              pipelineArray.arr(),
+                                              isMongos,
+                                              cmd.getSerializationContext());
     }
 
     // To create a regular collection, ActionType::createCollection or ActionType::insert are
@@ -242,10 +298,12 @@ Status checkAuthForCreate(AuthorizationSession* authSession,
     return Status(ErrorCodes::Unauthorized, "unauthorized");
 }
 
-Status checkAuthForCollMod(AuthorizationSession* authSession,
+Status checkAuthForCollMod(OperationContext* opCtx,
+                           AuthorizationSession* authSession,
                            const NamespaceString& ns,
                            const BSONObj& cmdObj,
-                           bool isMongos) {
+                           bool isMongos,
+                           const SerializationContext& serializationContext) {
     if (!authSession->isAuthorizedForActionsOnNamespace(ns, ActionType::collMod)) {
         return Status(ErrorCodes::Unauthorized, "unauthorized");
     }
@@ -254,17 +312,29 @@ Status checkAuthForCollMod(AuthorizationSession* authSession,
     // enabled, users must specify both "viewOn" and "pipeline" together. This prevents a user from
     // exposing more information in the original underlying namespace by only changing "pipeline",
     // or looking up more information via the original pipeline by only changing "viewOn".
-    const bool hasViewOn = cmdObj.hasField("viewOn");
-    const bool hasPipeline = cmdObj.hasField("pipeline");
+    const bool hasViewOn = cmdObj.hasField(CollMod::kViewOnFieldName);
+    const bool hasPipeline = cmdObj.hasField(CollMod::kPipelineFieldName);
     if (hasViewOn != hasPipeline) {
         return Status(
             ErrorCodes::InvalidOptions,
             "Must specify both 'viewOn' and 'pipeline' when modifying a view and auth is enabled");
     }
     if (hasViewOn) {
-        NamespaceString viewOnNs(ns.db(), cmdObj["viewOn"].checkAndGetStringData());
-        auto viewPipeline = BSONArray(cmdObj["pipeline"].Obj());
-        return checkAuthForCreateOrModifyView(authSession, ns, viewOnNs, viewPipeline, isMongos);
+        NamespaceString viewOnNs(NamespaceStringUtil::deserialize(
+            ns.dbName(), cmdObj[CollMod::kViewOnFieldName].checkAndGetStringData()));
+        auto viewPipeline = BSONArray(cmdObj[CollMod::kPipelineFieldName].Obj());
+        return checkAuthForCreateOrModifyView(
+            opCtx, authSession, ns, viewOnNs, viewPipeline, isMongos, serializationContext);
+    }
+
+    // This parameter is only for internal use on FCV upgrade. Reject user-initiated commands, as
+    // they are problematic, e.g. by creating incompatible oplog entries in mixed-version clusters.
+    if (cmdObj.hasField(CollMod::k_removeLegacyTimeseriesBucketingParametersHaveChangedFieldName)) {
+        return Status(
+            ErrorCodes::Unauthorized,
+            str::stream()
+                << CollMod::k_removeLegacyTimeseriesBucketingParametersHaveChangedFieldName
+                << " is an invalid collMod parameter");
     }
 
     return Status::OK();
@@ -276,7 +346,7 @@ StatusWith<PrivilegeVector> getPrivilegesForAggregate(AuthorizationSession* auth
                                                       bool isMongos) {
     if (!nss.isValid()) {
         return Status(ErrorCodes::InvalidNamespace,
-                      str::stream() << "Invalid input namespace, " << nss.ns());
+                      str::stream() << "Invalid input namespace, " << nss.toStringForErrorMsg());
     }
 
     PrivilegeVector privileges;
@@ -312,6 +382,12 @@ StatusWith<PrivilegeVector> getPrivilegesForAggregate(AuthorizationSession* auth
         PrivilegeVector currentPrivs = liteParsedDocSource->requiredPrivileges(
             isMongos, request.getBypassDocumentValidation().value_or(false));
         Privilege::addPrivilegesToPrivilegeVector(&privileges, currentPrivs);
+        if (MONGO_unlikely(gFeatureFlagMandatoryAuthzChecks.isEnabled())) {
+            invariant((!(liteParsedDocSource->requiresAuthzChecks() && currentPrivs.empty())),
+                      "Must specify authorization checks for this stage: " +
+                          pipelineStage.firstElementFieldNameStringData() +
+                          " or manually opt out by overriding requiresAuthzChecks to false");
+        }
     }
     return privileges;
 }

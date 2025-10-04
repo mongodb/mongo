@@ -6,13 +6,12 @@
  *   requires_libunwind
  * ]
  */
-(function() {
 clearRawMongoProgramOutput();
 const conn = MongoRunner.runMongod();
-runMongoProgram('/bin/kill', '-s', 'SIGUSR2', conn.pid);
+// convert the float to a string to make sure it's correctly represented.
+runNonMongoProgram("/bin/kill", "-s", "SIGUSR2", conn.pid.valueOf().toString());
 MongoRunner.stopMongod(conn);
-const output = rawMongoProgramOutput();
+const output = rawMongoProgramOutput("(processInfo|backtrace)");
 assert(output.search(/"processInfo":/) >= 0, output);
 // Will be several of these
 assert(output.search(/"backtrace":/) >= 0, output);
-})();

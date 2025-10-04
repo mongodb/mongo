@@ -31,6 +31,10 @@
  * JIRA ticket reference: WT-4117 Test case description: Smoke-test the CRC32C external API.
  */
 
+/*
+ * check --
+ *     TODO: Add a comment describing this function.
+ */
 static inline void
 check(uint32_t crc32c, uint32_t expected, size_t len, const char *msg)
 {
@@ -39,6 +43,10 @@ check(uint32_t crc32c, uint32_t expected, size_t len, const char *msg)
       expected);
 }
 
+/*
+ * run --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 run(void)
 {
@@ -84,6 +92,10 @@ run(void)
     free(data);
 }
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(void)
 {

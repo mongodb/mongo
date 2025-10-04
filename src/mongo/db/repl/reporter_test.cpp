@@ -27,41 +27,44 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <memory>
-
 #include "mongo/db/repl/reporter.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/baton.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/update_position_args.h"
+#include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_response.h"
+#include "mongo/executor/task_executor_test_fixture.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
+#include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/task_executor_proxy.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+
+#include <map>
+#include <memory>
+#include <ratio>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
 
 namespace {
 
 using namespace mongo;
 using namespace mongo::repl;
-using executor::NetworkInterfaceMock;
-using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
 
 class MockProgressManager {
 public:
     void updateMap(int memberId, const OpTime& lastDurableOpTime, const OpTime& lastAppliedOpTime) {
         _progressMap[memberId] = ProgressInfo(lastDurableOpTime, lastAppliedOpTime);
-    }
-
-    void clear() {
-        _progressMap.clear();
-    }
-
-    long long getConfigVersion() const {
-        return _configVersion;
-    }
-
-    void setConfigVersion(long long configVersion) {
-        _configVersion = configVersion;
     }
 
     StatusWith<BSONObj> prepareReplSetUpdatePositionCommand() {
@@ -71,12 +74,12 @@ public:
             cmdBuilder.subarrayStart(UpdatePositionArgs::kUpdateArrayFieldName));
         for (auto&& itr : _progressMap) {
             BSONObjBuilder entry(arrayBuilder.subobjStart());
-            itr.second.lastDurableOpTime.append(&entry,
-                                                UpdatePositionArgs::kDurableOpTimeFieldName);
+            itr.second.lastDurableOpTime.append(UpdatePositionArgs::kDurableOpTimeFieldName,
+                                                &entry);
             entry.appendDate(UpdatePositionArgs::kDurableWallTimeFieldName,
                              Date_t() + Seconds(itr.second.lastDurableOpTime.getSecs()));
-            itr.second.lastAppliedOpTime.append(&entry,
-                                                UpdatePositionArgs::kAppliedOpTimeFieldName);
+            itr.second.lastAppliedOpTime.append(UpdatePositionArgs::kAppliedOpTimeFieldName,
+                                                &entry);
             entry.appendDate(UpdatePositionArgs::kAppliedWallTimeFieldName,
                              Date_t() + Seconds(itr.second.lastAppliedOpTime.getSecs()));
             entry.append(UpdatePositionArgs::kMemberIdFieldName, itr.first);
@@ -139,7 +142,7 @@ protected:
 
 class ReporterTestNoTriggerAtSetUp : public ReporterTest {
 private:
-    virtual bool triggerAtSetUp() const override;
+    bool triggerAtSetUp() const override;
 };
 
 ReporterTest::ReporterTest() {}
@@ -156,12 +159,12 @@ void ReporterTest::setUp() {
         return updater->prepareReplSetUpdatePositionCommand();
     };
 
-    reporter =
-        std::make_unique<Reporter>(_executorProxy.get(),
-                                   [this]() { return prepareReplSetUpdatePositionCommandFn(); },
-                                   HostAndPort("h1"),
-                                   Milliseconds(1000),
-                                   Milliseconds(5000));
+    reporter = std::make_unique<Reporter>(
+        _executorProxy.get(),
+        [this]() { return prepareReplSetUpdatePositionCommandFn(); },
+        HostAndPort("h1"),
+        Milliseconds(1000),
+        Milliseconds(5000));
     launchExecutorThread();
 
     if (triggerAtSetUp()) {
@@ -174,8 +177,8 @@ void ReporterTest::setUp() {
 }
 
 void ReporterTest::tearDown() {
-    getExecutor().shutdown();
-    getExecutor().join();
+    shutdownExecutorThread();
+    joinExecutorThread();
     // Executor may still invoke reporter's callback before shutting down.
     reporter.reset();
     posUpdater.reset();
@@ -251,9 +254,11 @@ TEST(UpdatePositionArgs, AcceptsUnknownFieldInUpdateInfo) {
     auto updateInfo =
         BSON(UpdatePositionArgs::kConfigVersionFieldName
              << 1 << UpdatePositionArgs::kMemberIdFieldName << 1
-             << UpdatePositionArgs::kDurableOpTimeFieldName << OpTime()
              << UpdatePositionArgs::kAppliedOpTimeFieldName << OpTime()
+             << UpdatePositionArgs::kWrittenOpTimeFieldName << OpTime()
+             << UpdatePositionArgs::kDurableOpTimeFieldName << OpTime()
              << UpdatePositionArgs::kAppliedWallTimeFieldName << now
+             << UpdatePositionArgs::kWrittenWallTimeFieldName << now
              << UpdatePositionArgs::kDurableWallTimeFieldName << now << "unknownField" << 1);
     bob.append(UpdatePositionArgs::kUpdateArrayFieldName, BSON_ARRAY(updateInfo));
     BSONObj cmdObj = bob.obj();
@@ -267,6 +272,7 @@ TEST(UpdatePositionArgs, AcceptsUnknownFieldInUpdateInfo) {
     ASSERT_EQ(updatesArr.nFields(), 1);
     bob2.appendElements(updatesArr[0].Obj());
     bob2.append(UpdatePositionArgs::kAppliedWallTimeFieldName, now);
+    bob2.append(UpdatePositionArgs::kWrittenWallTimeFieldName, now);
     bob2.append(UpdatePositionArgs::kDurableWallTimeFieldName, now);
     bob2.append("unknownField", 1);
     ASSERT_EQ(bob2.obj().woCompare(updateInfo), 0);
@@ -375,7 +381,8 @@ TEST_F(ReporterTestNoTriggerAtSetUp, IsNotActiveAfterUpdatePositionTimeoutExpire
     // Schedule a response to the updatePosition command at a time that exceeds the timeout. Then
     // make sure the reporter shut down due to a remote command timeout.
     auto updatePosRequest = net->getNextReadyRequest();
-    RemoteCommandResponse response(BSON("ok" << 1), Milliseconds(0));
+    RemoteCommandResponse response =
+        RemoteCommandResponse::make_forTest(BSON("ok" << 1), Milliseconds(0));
     executor::TaskExecutor::ResponseStatus responseStatus(response);
     net->scheduleResponse(
         updatePosRequest, net->now() + updatePositionTimeout + Milliseconds(1), responseStatus);
@@ -395,7 +402,8 @@ TEST_F(ReporterTest, TaskExecutorAndNetworkErrorsStopTheReporter) {
     ASSERT_TRUE(reporter->isActive());
     ASSERT_TRUE(reporter->isWaitingToSendReport());
 
-    processNetworkResponse({ErrorCodes::NoSuchKey, "waaaah", Milliseconds(0)});
+    processNetworkResponse(RemoteCommandResponse::make_forTest(
+        Status(ErrorCodes::NoSuchKey, "waaaah"), Milliseconds(0)));
 
     ASSERT_EQUALS(ErrorCodes::NoSuchKey, reporter->join());
     assertReporterDone();
@@ -526,7 +534,8 @@ TEST_F(ReporterTest, CommandPreparationFailureDuringRescheduleStopsTheReporter) 
 }
 
 TEST_F(ReporterTest, FailedUpdateShouldNotRescheduleUpdate) {
-    processNetworkResponse({ErrorCodes::OperationFailed, "update failed", Milliseconds(0)});
+    processNetworkResponse(RemoteCommandResponse::make_forTest(
+        Status(ErrorCodes::OperationFailed, "update failed"), Milliseconds(0)));
 
     ASSERT_EQUALS(ErrorCodes::OperationFailed, reporter->join());
     assertReporterDone();
@@ -541,7 +550,8 @@ TEST_F(ReporterTest, SuccessfulUpdateShouldRescheduleUpdate) {
 
     runUntil(until, true);
 
-    processNetworkResponse({ErrorCodes::OperationFailed, "update failed", Milliseconds(0)});
+    processNetworkResponse(RemoteCommandResponse::make_forTest(
+        Status(ErrorCodes::OperationFailed, "update failed"), Milliseconds(0)));
 
     ASSERT_EQUALS(ErrorCodes::OperationFailed, reporter->join());
     assertReporterDone();
@@ -555,6 +565,7 @@ TEST_F(ReporterTest, ShutdownWhileKeepAliveTimeoutIsScheduledShouldMakeReporterI
     ASSERT_TRUE(reporter->isActive());
 
     reporter->shutdown();
+    runReadyNetworkOperations();
 
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, reporter->join());
     ASSERT_FALSE(reporter->isActive());
@@ -566,16 +577,16 @@ TEST_F(ReporterTestNoTriggerAtSetUp,
        FailingToSchedulePrepareCommandTaskShouldMakeReporterInactive) {
     class TaskExecutorWithFailureInScheduleWork : public unittest::TaskExecutorProxy {
     public:
-        TaskExecutorWithFailureInScheduleWork(executor::TaskExecutor* executor)
-            : unittest::TaskExecutorProxy(executor) {}
-        virtual StatusWith<executor::TaskExecutor::CallbackHandle> scheduleWork(
-            CallbackFn&& override) {
+        using unittest::TaskExecutorProxy::TaskExecutorProxy;
+
+        StatusWith<executor::TaskExecutor::CallbackHandle> scheduleWork(
+            CallbackFn&& override) override {
             return Status(ErrorCodes::OperationFailed, "failed to schedule work");
         }
     };
 
-    TaskExecutorWithFailureInScheduleWork badExecutor(&getExecutor());
-    _executorProxy->setExecutor(&badExecutor);
+    auto badExecutor = std::make_shared<TaskExecutorWithFailureInScheduleWork>(&getExecutor());
+    _executorProxy->setExecutor(badExecutor.get());
 
     auto status = reporter->trigger();
 
@@ -589,11 +600,11 @@ TEST_F(ReporterTestNoTriggerAtSetUp,
 TEST_F(ReporterTestNoTriggerAtSetUp, FailingToScheduleRemoteCommandTaskShouldMakeReporterInactive) {
     class TaskExecutorWithFailureInScheduleRemoteCommand : public unittest::TaskExecutorProxy {
     public:
-        TaskExecutorWithFailureInScheduleRemoteCommand(executor::TaskExecutor* executor)
-            : unittest::TaskExecutorProxy(executor) {}
-        virtual StatusWith<executor::TaskExecutor::CallbackHandle> scheduleRemoteCommandOnAny(
-            const executor::RemoteCommandRequestOnAny& request,
-            const RemoteCommandOnAnyCallbackFn& cb,
+        using unittest::TaskExecutorProxy::TaskExecutorProxy;
+
+        StatusWith<executor::TaskExecutor::CallbackHandle> scheduleRemoteCommand(
+            const executor::RemoteCommandRequest& request,
+            const RemoteCommandCallbackFn& cb,
             const BatonHandle& baton = nullptr) override {
             // Any error status other than ShutdownInProgress will cause the reporter to fassert.
             return Status(ErrorCodes::ShutdownInProgress,
@@ -601,8 +612,9 @@ TEST_F(ReporterTestNoTriggerAtSetUp, FailingToScheduleRemoteCommandTaskShouldMak
         }
     };
 
-    TaskExecutorWithFailureInScheduleRemoteCommand badExecutor(&getExecutor());
-    _executorProxy->setExecutor(&badExecutor);
+    auto badExecutor =
+        std::make_shared<TaskExecutorWithFailureInScheduleRemoteCommand>(&getExecutor());
+    _executorProxy->setExecutor(badExecutor.get());
 
     ASSERT_OK(reporter->trigger());
 
@@ -618,16 +630,16 @@ TEST_F(ReporterTestNoTriggerAtSetUp, FailingToScheduleRemoteCommandTaskShouldMak
 TEST_F(ReporterTest, FailingToScheduleTimeoutShouldMakeReporterInactive) {
     class TaskExecutorWithFailureInScheduleWorkAt : public unittest::TaskExecutorProxy {
     public:
-        TaskExecutorWithFailureInScheduleWorkAt(executor::TaskExecutor* executor)
-            : unittest::TaskExecutorProxy(executor) {}
-        virtual StatusWith<executor::TaskExecutor::CallbackHandle> scheduleWorkAt(
-            Date_t when, CallbackFn&&) override {
+        using unittest::TaskExecutorProxy::TaskExecutorProxy;
+
+        StatusWith<executor::TaskExecutor::CallbackHandle> scheduleWorkAt(Date_t when,
+                                                                          CallbackFn&&) override {
             return Status(ErrorCodes::OperationFailed, "failed to schedule work");
         }
     };
 
-    TaskExecutorWithFailureInScheduleWorkAt badExecutor(&getExecutor());
-    _executorProxy->setExecutor(&badExecutor);
+    auto badExecutor = std::make_shared<TaskExecutorWithFailureInScheduleWorkAt>(&getExecutor());
+    _executorProxy->setExecutor(badExecutor.get());
 
     processNetworkResponse(BSON("ok" << 1));
 
@@ -682,6 +694,7 @@ TEST_F(ReporterTest,
     ASSERT_TRUE(reporter->isActive());
 
     reporter->shutdown();
+    runReadyNetworkOperations();
 
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, reporter->join());
     assertReporterDone();
@@ -704,9 +717,6 @@ TEST_F(ReporterTest, ShutdownImmediatelyAfterTriggerWhileKeepAliveTimeoutIsSched
     ASSERT_TRUE(reporter->isActive());
 
     auto net = getNet();
-    net->enterNetwork();
-    ASSERT_TRUE(net->hasReadyRequests());
-    net->exitNetwork();
 
     reporter->shutdown();
 
@@ -716,6 +726,77 @@ TEST_F(ReporterTest, ShutdownImmediatelyAfterTriggerWhileKeepAliveTimeoutIsSched
     net->runReadyNetworkOperations();
     net->exitNetwork();
 
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, reporter->join());
+    assertReporterDone();
+}
+
+TEST_F(ReporterTest, AllowUsingBackupChannel) {
+    ASSERT_FALSE(reporter->isBackupActive());
+    ASSERT_OK(reporter->trigger());
+    ASSERT_FALSE(reporter->isBackupActive());
+    ASSERT_OK(reporter->trigger(true /*allowOneMore*/));
+    ASSERT_TRUE(reporter->isBackupActive());
+
+    processNetworkResponse(BSON("ok" << 1), true);
+    processNetworkResponse(BSON("ok" << 1), true);
+    processNetworkResponse(BSON("ok" << 1), false);
+    ASSERT_FALSE(reporter->isBackupActive());
+    ASSERT_TRUE(reporter->isActive());
+
+    reporter->shutdown();
+    runReadyNetworkOperations();
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, reporter->join());
+    assertReporterDone();
+}
+
+TEST_F(ReporterTest, BackupChannelFailureAlsoCauseReporterFailure) {
+    ASSERT_FALSE(reporter->isBackupActive());
+    ASSERT_OK(reporter->trigger(true /*allowOneMore*/));
+    ASSERT_TRUE(reporter->isBackupActive());
+
+    processNetworkResponse(BSON("ok" << 1), true);
+    processNetworkResponse(
+        RemoteCommandResponse::make_forTest(Status(ErrorCodes::OperationFailed, "update failed"),
+                                            Milliseconds(0)),
+        false);
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, reporter->getStatus_forTest().code());
+
+    reporter->shutdown();
+    runReadyNetworkOperations();
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, reporter->join());
+    assertReporterDone();
+}
+
+TEST_F(ReporterTest, BackupChannelSendAnotherOneAfterResponseIfReceiveTwo) {
+    ASSERT_FALSE(reporter->isBackupActive());
+    ASSERT_OK(reporter->trigger(true /*allowOneMore*/));
+    ASSERT_TRUE(reporter->isBackupActive());
+    // Trigger on the backup channel one more time so reporter will send another request immediately
+    // after one channel becomes free.
+    ASSERT_OK(reporter->trigger(true /*allowOneMore*/));
+    ASSERT_TRUE(reporter->isWaitingToSendReport());
+    processNetworkResponse(BSON("ok" << 1), true);
+    processNetworkResponse(BSON("ok" << 1), true);
+    ASSERT_TRUE(reporter->isActive() || reporter->isBackupActive());
+    ASSERT_FALSE(reporter->isWaitingToSendReport());
+
+    processNetworkResponse(BSON("ok" << 1), false);
+
+    reporter->shutdown();
+    runReadyNetworkOperations();
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, reporter->join());
+    assertReporterDone();
+}
+
+TEST_F(ReporterTestNoTriggerAtSetUp, NotUsingBackupChannelWhenFree) {
+    ASSERT_FALSE(reporter->isBackupActive());
+    ASSERT_FALSE(reporter->isActive());
+    ASSERT_OK(reporter->trigger(true /*allowOneMore*/));
+    ASSERT_FALSE(reporter->isBackupActive());
+    ASSERT_TRUE(reporter->isActive());
+
+    reporter->shutdown();
+    runReadyNetworkOperations();
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, reporter->join());
     assertReporterDone();
 }

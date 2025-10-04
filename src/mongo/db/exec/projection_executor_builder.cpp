@@ -27,23 +27,35 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/exec/projection_executor_builder.h"
 
 #include "mongo/base/exact_cast.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/exec/exclusion_projection_executor.h"
 #include "mongo/db/exec/inclusion_projection_executor.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_find_internal.h"
-#include "mongo/db/query/projection_ast_path_tracking_visitor.h"
+#include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection_ast.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection_ast_path_tracking_visitor.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection_ast_visitor.h"
 #include "mongo/db/query/tree_walker.h"
-#include "mongo/db/query/util/make_data_structure.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::projection_executor {
 namespace {
 constexpr auto kInclusion = projection_ast::ProjectType::kInclusion;
 constexpr auto kExclusion = projection_ast::ProjectType::kExclusion;
 constexpr auto kProjectionPostImageVarName = ProjectionExecutor::kProjectionPostImageVarName;
+const auto kIdFieldPath = FieldPath("_id");
 
 /**
  * Holds data used to built a projection executor while walking an AST tree. This struct is attached
@@ -99,14 +111,16 @@ template <typename Executor>
 auto createFindPositionalExpression(const projection_ast::ProjectionPositionalASTNode* node,
                                     const ProjectionExecutorVisitorData<Executor>& data,
                                     const FieldPath& path) {
-    invariant(node);
+    tassert(7241711, "the parameter node cannot be null for a positional expression", node);
 
     const auto& children = node->children();
-    invariant(children.size() == 1UL);
+    tassert(7241712,
+            "positional operator '.$' operator only takes in one object",
+            children.size() == 1UL);
 
     auto matchExprNode =
         exact_pointer_cast<projection_ast::MatchExpressionASTNode*>(children[0].get());
-    invariant(matchExprNode);
+    tassert(7241713, "positional operator '.$' must have a condition to match on.", matchExprNode);
 
     return make_intrusive<ExpressionInternalFindPositional>(data.expCtx.get(),
                                                             makeProjectionPreImageExpression(data),
@@ -125,7 +139,7 @@ template <typename Executor>
 auto createFindSliceExpression(const projection_ast::ProjectionSliceASTNode* node,
                                const ProjectionExecutorVisitorData<Executor>& data,
                                const FieldPath& path) {
-    invariant(node);
+    tassert(7241714, "the parameter node cannot be null for a slice expression", node);
 
     return make_intrusive<ExpressionInternalFindSlice>(data.expCtx.get(),
                                                        makeProjectionPostImageExpression(data),
@@ -142,14 +156,17 @@ template <typename Executor>
 auto createFindElemMatchExpression(const projection_ast::ProjectionElemMatchASTNode* node,
                                    const ProjectionExecutorVisitorData<Executor>& data,
                                    const FieldPath& path) {
-    invariant(node);
+    tassert(7241715, "the parameter node cannot be null for an elemMatch expression", node);
 
     const auto& children = node->children();
-    invariant(children.size() == 1UL);
+    tassert(
+        7241716, "$elemMatch projection operator only takes in one object", children.size() == 1UL);
 
     auto matchExprNode =
         exact_pointer_cast<projection_ast::MatchExpressionASTNode*>(children[0].get());
-    invariant(matchExprNode);
+    tassert(7241717,
+            "$elemMatch projection operator must have a condition to match on.",
+            matchExprNode);
 
     return make_intrusive<ExpressionInternalFindElemMatch>(data.expCtx.get(),
                                                            makeProjectionPreImageExpression(data),
@@ -172,17 +189,19 @@ class ProjectionExecutorVisitor final : public projection_ast::ProjectionASTCons
 public:
     ProjectionExecutorVisitor(ProjectionExecutorVisitorContext<Executor>* context)
         : _context{context} {
-        invariant(_context);
+        tassert(7241718, "context cannot be null for Projection Executor", _context);
     }
 
     void visit(const projection_ast::ProjectionPositionalASTNode* node) final {
         constexpr auto isInclusion = std::is_same_v<Executor, InclusionProjectionExecutor>;
-        invariant(isInclusion);
+        tassert(7241719,
+                "a positional expression cannot be applied to an exclusion projection.",
+                isInclusion);
 
         const auto& path = _context->fullPath();
         auto& userData = _context->data();
 
-        userData.rootNode()->addProjectionForPath(path.fullPath());
+        userData.rootNode()->addProjectionForPath(path);
         userData.setRootReplacementExpression(createFindPositionalExpression(node, userData, path));
     }
 
@@ -194,7 +213,7 @@ public:
         // to project out the path to which $slice is applied, since it will already be included
         // into the output document.
         if constexpr (std::is_same_v<Executor, InclusionProjectionExecutor>) {
-            userData.rootNode()->addProjectionForPath(path.fullPath());
+            userData.rootNode()->addProjectionForPath(path);
         }
 
         userData.setRootReplacementExpression(createFindSliceExpression(node, userData, path));
@@ -205,14 +224,14 @@ public:
         const auto& userData = _context->data();
 
         userData.rootNode()->addExpressionForPath(
-            path.fullPath(), createFindElemMatchExpression(node, userData, path));
+            path, createFindElemMatchExpression(node, userData, path));
     }
 
     void visit(const projection_ast::ExpressionASTNode* node) final {
         const auto& path = _context->fullPath();
         const auto& userData = _context->data();
 
-        userData.rootNode()->addExpressionForPath(path.fullPath(), node->expression());
+        userData.rootNode()->addExpressionForPath(path, node->expression());
     }
 
     void visit(const projection_ast::BooleanConstantASTNode* node) final {
@@ -222,15 +241,18 @@ public:
         // In an inclusion projection only the _id field can be excluded from the result document.
         // If this is the case, then we don't need to include the field into the projection.
         if constexpr (std::is_same_v<Executor, InclusionProjectionExecutor>) {
-            const auto isIdField = path == "_id";
+            const auto isIdField = path == kIdFieldPath;
             if (isIdField && !node->value()) {
                 return;
             }
             // In inclusion projection only _id field can be excluded, make sure this is the case.
-            invariant(!isIdField || node->value());
+            tassert(
+                7241720,
+                "inclusion projections do not support excluding fields other than the _id field",
+                !isIdField || node->value());
         }
 
-        userData.rootNode()->addProjectionForPath(path.fullPath());
+        userData.rootNode()->addProjectionForPath(path);
     }
 
     void visit(const projection_ast::ProjectionPathASTNode* node) final {}
@@ -258,6 +280,14 @@ auto buildProjectionExecutor(boost::intrusive_ptr<ExpressionContext> expCtx,
     if (params[kOptimizeExecutor]) {
         context.data().executor->optimize();
     }
+    if (!params[kNotInclusionOnly]) {
+        auto executorPtr =
+            dynamic_cast<InclusionProjectionExecutor*>(context.data().executor.get());
+        tassert(8058001,
+                "Only 'InclusionProjectionExecutor' can have an InclusionOnly attribute",
+                executorPtr);
+        executorPtr->setIsInclusionOnly(true);
+    }
     return std::move(context.data().executor);
 }
 }  // namespace
@@ -267,21 +297,25 @@ std::unique_ptr<ProjectionExecutor> buildProjectionExecutor(
     const projection_ast::Projection* projection,
     const ProjectionPolicies policies,
     BuilderParamsBitSet params) {
-    invariant(projection);
-
-    // Fast-path can only be used with inclusion-only projections, so we need to reset the
-    // fast-path flag.
-    if (!projection->isInclusionOnly()) {
-        params.reset(kAllowFastPath);
-    }
+    tassert(7241721, "the parameter projection cannot be null for Projection Executor", projection);
 
     switch (projection->type()) {
-        case kInclusion:
+        case kInclusion: {
+            if (!projection->isInclusionOnly()) {
+                params.reset(kAllowFastPath);
+            } else {
+                params.reset(kNotInclusionOnly);
+            }
             return buildProjectionExecutor<InclusionProjectionExecutor>(
                 expCtx, projection->root(), policies, params);
-        case kExclusion:
+        }
+        case kExclusion: {
+            if (!projection->isExclusionOnly()) {
+                params.reset(kAllowFastPath);
+            }
             return buildProjectionExecutor<ExclusionProjectionExecutor>(
                 expCtx, projection->root(), policies, params);
+        }
         default:
             MONGO_UNREACHABLE;
     }

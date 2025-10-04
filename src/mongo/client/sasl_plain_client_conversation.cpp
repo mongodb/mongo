@@ -27,29 +27,29 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/client/sasl_plain_client_conversation.h"
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/client/sasl_client_session.h"
-#include "mongo/util/password_digest.h"
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 
 SaslPLAINClientConversation::SaslPLAINClientConversation(SaslClientSession* saslClientSession)
     : SaslClientConversation(saslClientSession) {}
 
-SaslPLAINClientConversation::~SaslPLAINClientConversation(){};
+SaslPLAINClientConversation::~SaslPLAINClientConversation() {};
 
 StatusWith<bool> SaslPLAINClientConversation::step(StringData inputData, std::string* outputData) {
     // Create PLAIN message on the form: user\0user\0pwd
 
     StringBuilder sb;
-    sb << _saslClientSession->getParameter(SaslClientSession::parameterUser).toString() << '\0'
-       << _saslClientSession->getParameter(SaslClientSession::parameterUser).toString() << '\0'
-       << _saslClientSession->getParameter(SaslClientSession::parameterPassword).toString();
+    sb << std::string{_saslClientSession->getParameter(SaslClientSession::parameterUser)} << '\0'
+       << std::string{_saslClientSession->getParameter(SaslClientSession::parameterUser)} << '\0'
+       << std::string{_saslClientSession->getParameter(SaslClientSession::parameterPassword)};
 
     *outputData = sb.str();
 

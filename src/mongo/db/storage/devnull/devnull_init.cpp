@@ -27,42 +27,52 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/base/init.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/devnull/devnull_kv_engine.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_impl.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_engine_lock_file.h"
 #include "mongo/db/storage/storage_options.h"
+
+#include <memory>
+#include <string>
 
 namespace mongo {
 
 namespace {
 class DevNullStorageEngineFactory : public StorageEngine::Factory {
 public:
-    virtual std::unique_ptr<StorageEngine> create(OperationContext* opCtx,
-                                                  const StorageGlobalParams& params,
-                                                  const StorageEngineLockFile* lockFile) const {
+    std::unique_ptr<StorageEngine> create(OperationContext* opCtx,
+                                          const StorageGlobalParams& params,
+                                          const StorageEngineLockFile* lockFile,
+                                          bool isReplSet,
+                                          bool shouldRecoverFromOplogAsStandalone,
+                                          bool inStandaloneMode) const override {
         StorageEngineOptions options;
         options.directoryPerDB = params.directoryperdb;
         options.forRepair = params.repair;
+        options.forRestore = params.restore;
         options.lockFileCreatedByUncleanShutdown = lockFile && lockFile->createdByUncleanShutdown();
         return std::make_unique<StorageEngineImpl>(
-            opCtx, std::make_unique<DevNullKVEngine>(), options);
+            opCtx, std::make_unique<DevNullKVEngine>(), std::unique_ptr<KVEngine>(), options);
     }
 
-    virtual StringData getCanonicalName() const {
+    StringData getCanonicalName() const override {
         return "devnull";
     }
 
-    virtual Status validateMetadata(const StorageEngineMetadata& metadata,
-                                    const StorageGlobalParams& params) const {
+    Status validateMetadata(const StorageEngineMetadata& metadata,
+                            const StorageGlobalParams& params) const override {
         return Status::OK();
     }
 
-    virtual BSONObj createMetadataOptions(const StorageGlobalParams& params) const {
+    BSONObj createMetadataOptions(const StorageGlobalParams& params) const override {
         return BSONObj();
     }
 };

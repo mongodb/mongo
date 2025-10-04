@@ -27,20 +27,27 @@
  *    it in the license file.
  */
 
-#include <kms_message/kms_message.h>
-
-#include <stdlib.h>
-
-#include "mongo/base/init.h"
+#include "mongo/base/data_range.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
 #include "mongo/base/secure_allocator.h"
-#include "mongo/base/status_with.h"
-#include "mongo/bson/json.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/crypto/aead_encryption.h"
+#include "mongo/crypto/fle_data_frames.h"
 #include "mongo/crypto/symmetric_crypto.h"
 #include "mongo/crypto/symmetric_key.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/shell/kms.h"
 #include "mongo/shell/kms_gen.h"
-#include "mongo/util/base64.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
+#include <cstdint>
+#include <memory>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 namespace {
@@ -54,7 +61,7 @@ class LocalKMSService final : public KMSService {
 public:
     LocalKMSService(SymmetricKey key) : _key(std::move(key)) {}
 
-    StringData name() const {
+    StringData name() const override {
         return kLocalKms;
     }
 
@@ -63,6 +70,10 @@ public:
     SecureVector<uint8_t> decrypt(ConstDataRange cdr, BSONObj masterKey) final;
 
     BSONObj encryptDataKeyByString(ConstDataRange cdr, StringData keyId) final;
+
+    SymmetricKey& getMasterKey() final {
+        return _key;
+    }
 
 private:
     std::vector<uint8_t> encrypt(ConstDataRange cdr, StringData kmsKeyId);
@@ -75,7 +86,7 @@ private:
 std::vector<uint8_t> LocalKMSService::encrypt(ConstDataRange cdr, StringData kmsKeyId) {
     std::vector<std::uint8_t> ciphertext(crypto::aeadCipherOutputLength(cdr.length()));
 
-    uassertStatusOK(crypto::aeadEncryptLocalKMS(_key, cdr, ciphertext.data(), ciphertext.size()));
+    uassertStatusOK(crypto::aeadEncryptLocalKMS(_key, cdr, {ciphertext}));
 
     return ciphertext;
 }
@@ -95,9 +106,7 @@ BSONObj LocalKMSService::encryptDataKeyByString(ConstDataRange cdr, StringData k
 SecureVector<uint8_t> LocalKMSService::decrypt(ConstDataRange cdr, BSONObj masterKey) {
     SecureVector<uint8_t> plaintext(uassertStatusOK(aeadGetMaximumPlainTextLength(cdr.length())));
 
-    size_t outLen = plaintext->size();
-    uassertStatusOK(crypto::aeadDecryptLocalKMS(_key, cdr, plaintext->data(), &outLen));
-    plaintext->resize(outLen);
+    plaintext->resize(uassertStatusOK(crypto::aeadDecryptLocalKMS(_key, cdr, {*plaintext})));
 
     return plaintext;
 }
@@ -123,7 +132,7 @@ std::unique_ptr<KMSService> LocalKMSService::create(const LocalKMS& config) {
 class LocalKMSServiceFactory final : public KMSServiceFactory {
 public:
     LocalKMSServiceFactory() = default;
-    ~LocalKMSServiceFactory() = default;
+    ~LocalKMSServiceFactory() override = default;
 
     std::unique_ptr<KMSService> create(const BSONObj& config) final {
         auto field = config[KmsProviders::kLocalFieldName];
@@ -132,7 +141,7 @@ public:
         }
 
         auto obj = field.Obj();
-        return LocalKMSService::create(LocalKMS::parse(IDLParserErrorContext("root"), obj));
+        return LocalKMSService::create(LocalKMS::parse(obj, IDLParserContext("root")));
     }
 };
 

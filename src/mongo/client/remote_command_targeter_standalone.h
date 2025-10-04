@@ -29,8 +29,17 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/client/connection_string.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/util/cancellation.h"
+#include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <vector>
 
 namespace mongo {
 
@@ -45,10 +54,12 @@ public:
     ConnectionString connectionString() override;
 
     StatusWith<HostAndPort> findHost(OperationContext* opCtx,
-                                     const ReadPreferenceSetting& readPref) override;
+                                     const ReadPreferenceSetting& readPref,
+                                     const TargetingMetadata& targetingMetadata) override;
 
     SemiFuture<HostAndPort> findHost(const ReadPreferenceSetting& readPref,
-                                     const CancellationToken& cancelToken) override;
+                                     const CancellationToken& cancelToken,
+                                     const TargetingMetadata& targetingMetadata) override;
 
 
     SemiFuture<std::vector<HostAndPort>> findHosts(const ReadPreferenceSetting& readPref,

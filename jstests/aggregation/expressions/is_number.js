@@ -1,17 +1,13 @@
 /**
  * Tests for the $isNumber aggregation expression.
  */
-(function() {
-'use strict';
 const coll = db.isNumber_expr;
 coll.drop();
 
 function testIsNumber(inputExprPath, expectedOutput, inputId) {
-    const result = coll.aggregate([
-                           {"$match": {_id: inputId}},
-                           {"$project": {_id: 0, "isNum": {"$isNumber": inputExprPath}}},
-                       ])
-                       .toArray();
+    const result = coll
+        .aggregate([{"$match": {_id: inputId}}, {"$project": {_id: 0, "isNum": {"$isNumber": inputExprPath}}}])
+        .toArray();
     assert.eq(result, expectedOutput);
 }
 
@@ -115,4 +111,3 @@ testIsNumber(new Date(), [{"isNum": false}], 21);
 
 // Test when $isNumber's input expression is a literal BinData.
 testIsNumber(UUID(), [{"isNum": false}], 21);
-}());

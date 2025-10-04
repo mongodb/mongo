@@ -29,10 +29,27 @@
 
 #include "mongo/db/pipeline/document_source_bucket.h"
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/allowed_contexts.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
+
+#include <cstddef>
+#include <vector>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -41,7 +58,7 @@ using std::list;
 using std::vector;
 
 REGISTER_DOCUMENT_SOURCE(bucket,
-                         LiteParsedDocumentSourceDefault::parse,
+                         DocumentSourceBucket::LiteParsed::parse,
                          DocumentSourceBucket::createFromBson,
                          AllowedWithApiStrict::kAlways);
 
@@ -59,7 +76,7 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceBucket::createFromBson(
     uassert(40201,
             str::stream() << "Argument to $bucket stage must be an object, but found type: "
                           << typeName(elem.type()) << ".",
-            elem.type() == BSONType::Object);
+            elem.type() == BSONType::object);
 
     const BSONObj bucketObj = elem.embeddedObject();
     BSONObjBuilder groupObjBuilder;
@@ -71,18 +88,17 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceBucket::createFromBson(
     BSONElement groupByField;
     Value defaultValue;
 
-    pExpCtx->sbeCompatible = false;
     bool outputFieldSpecified = false;
     for (auto&& argument : bucketObj) {
         const auto argName = argument.fieldNameStringData();
         if ("groupBy" == argName) {
             groupByField = argument;
 
-            const bool groupByIsExpressionInObject = groupByField.type() == BSONType::Object &&
-                groupByField.embeddedObject().firstElementFieldName()[0] == '$';
+            const bool groupByIsExpressionInObject = groupByField.type() == BSONType::object &&
+                groupByField.embeddedObject().firstElementFieldNameStringData().starts_with('$');
 
-            const bool groupByIsPrefixedPath =
-                groupByField.type() == BSONType::String && groupByField.valueStringData()[0] == '$';
+            const bool groupByIsPrefixedPath = groupByField.type() == BSONType::string &&
+                groupByField.valueStringData().starts_with('$');
             uassert(40202,
                     str::stream() << "The $bucket 'groupBy' field must be defined as a $-prefixed "
                                      "path or an expression, but found: "
@@ -93,7 +109,7 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceBucket::createFromBson(
                 40200,
                 str::stream() << "The $bucket 'boundaries' field must be an array, but found type: "
                               << typeName(argument.type()) << ".",
-                argument.type() == BSONType::Array);
+                argument.type() == BSONType::array);
 
             for (auto&& boundaryElem : argument.embeddedObject()) {
                 auto exprConst = getExpressionConstant(pExpCtx.get(), boundaryElem, vps);
@@ -150,7 +166,7 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceBucket::createFromBson(
                 40196,
                 str::stream() << "The $bucket 'output' field must be an object, but found type: "
                               << typeName(argument.type()) << ".",
-                argument.type() == BSONType::Object);
+                argument.type() == BSONType::object);
 
             for (auto&& outputElem : argument.embeddedObject()) {
                 groupObjBuilder.append(outputElem);

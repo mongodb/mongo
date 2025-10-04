@@ -1,13 +1,15 @@
 /**
  * Tests prepared transaction commit support.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * @tags: [
+ *   # The test runs commands that are not allowed with security token: prepareTransaction.
+ *   not_allowed_with_signed_security_token,
+ *   uses_transactions,
+ *   uses_prepare_transaction
+ * ]
  */
 
-load("jstests/core/txns/libs/prepare_helpers.js");
-
-(function() {
-"use strict";
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 
 const dbName = "test";
 const collName = "commit_prepared_transaction";
@@ -23,7 +25,7 @@ const sessionColl = sessionDB.getCollection(collName);
 
 const doc1 = {
     _id: 1,
-    x: 1
+    x: 1,
 };
 
 // ---- Test 1. Insert a single document and run prepare. ----
@@ -43,12 +45,11 @@ let prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 // This portion of the test needs to run on a connection without implicit sessions, because
 // writes to `config.transactions` are disallowed under sessions.
 {
-    var conn = new Mongo(db.getMongo().host);
+    let conn = new Mongo(db.getMongo().host);
     conn._setDummyDefaultSession();
-    var configDB = conn.getDB('config');
+    let configDB = conn.getDB("config");
     assert.commandFailed(configDB.transactions.remove({"_id.id": session.getSessionId().id}));
-    assert.commandFailed(configDB.transactions.update({"_id.id": session.getSessionId().id},
-                                                      {$set: {extraField: 1}}));
+    assert.commandFailed(configDB.transactions.update({"_id.id": session.getSessionId().id}, {$set: {extraField: 1}}));
 }
 
 assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
@@ -63,7 +64,7 @@ assert.commandWorked(sessionColl.update(doc1, {$inc: {x: 1}}));
 
 const doc2 = {
     _id: 1,
-    x: 2
+    x: 2,
 };
 
 // Update should not be visible outside the session.
@@ -94,4 +95,3 @@ assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp)
 
 // After commit the delete persists.
 assert.eq(null, testColl.findOne(doc2));
-}());

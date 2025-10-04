@@ -39,7 +39,7 @@ __wt_row_leaf_key_work(
     WT_CELL_UNPACK_KV *unpack, _unpack;
     WT_DECL_RET;
     WT_IKEY *ikey;
-    WT_ROW *rip, *jump_rip;
+    WT_ROW *jump_rip, *rip;
     size_t group_size, key_size;
     uint32_t slot;
     u_int jump_slot_offset, slot_offset;
@@ -184,7 +184,7 @@ overflow_retry:
                     __wt_readunlock(session, &btree->ovfl_lock);
                     goto overflow_retry;
                 }
-                ret = __wt_dsk_cell_data_ref(session, WT_PAGE_ROW_LEAF, unpack, keyb);
+                ret = __wt_dsk_cell_data_ref_kv(session, unpack, keyb);
                 __wt_readunlock(session, &btree->ovfl_lock);
                 WT_RET(ret);
                 break;
@@ -220,7 +220,7 @@ overflow_retry:
              *
              * The key doesn't need to be instantiated, just return.
              */
-            WT_RET(__wt_dsk_cell_data_ref(session, WT_PAGE_ROW_LEAF, unpack, keyb));
+            WT_RET(__wt_dsk_cell_data_ref_kv(session, unpack, keyb));
             if (slot_offset == 0)
                 return (0);
             goto switch_and_jump;
@@ -350,7 +350,7 @@ next:
          * on failure, free the allocated memory.
          */
         if (__wt_atomic_cas_ptr((void *)&WT_ROW_KEY_COPY(rip), copy, ikey))
-            __wt_cache_page_inmem_incr(session, page, sizeof(WT_IKEY) + ikey->size);
+            __wt_cache_page_inmem_incr(session, page, sizeof(WT_IKEY) + ikey->size, false);
         else
             __wt_free(session, ikey);
     }
@@ -381,26 +381,26 @@ __wt_row_ikey_alloc(
 }
 
 /*
- * __wt_row_ikey_incr --
+ * __wti_row_ikey_incr --
  *     Instantiate a key in a WT_IKEY structure and increment the page's memory footprint.
  */
 int
-__wt_row_ikey_incr(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t cell_offset, const void *key,
+__wti_row_ikey_incr(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t cell_offset, const void *key,
   size_t size, WT_REF *ref)
 {
-    WT_RET(__wt_row_ikey(session, cell_offset, key, size, ref));
+    WT_RET(__wti_row_ikey(session, cell_offset, key, size, ref));
 
-    __wt_cache_page_inmem_incr(session, page, sizeof(WT_IKEY) + size);
+    __wt_cache_page_inmem_incr(session, page, sizeof(WT_IKEY) + size, false);
 
     return (0);
 }
 
 /*
- * __wt_row_ikey --
+ * __wti_row_ikey --
  *     Instantiate a key in a WT_IKEY structure.
  */
 int
-__wt_row_ikey(
+__wti_row_ikey(
   WT_SESSION_IMPL *session, uint32_t cell_offset, const void *key, size_t size, WT_REF *ref)
 {
     WT_IKEY *ikey;
@@ -419,8 +419,9 @@ __wt_row_ikey(
          * after a split.
          */
         WT_ASSERT(session, oldv == 0 || (oldv & WT_IK_FLAG) != 0);
-        WT_ASSERT(session, ref->state != WT_REF_SPLIT);
-        WT_ASSERT(session, __wt_atomic_cas_ptr(&ref->ref_ikey, (WT_IKEY *)oldv, ikey));
+        WT_ASSERT(session, WT_REF_GET_STATE(ref) != WT_REF_SPLIT);
+        bool cas_success = __wt_atomic_cas_ptr(&ref->ref_ikey, (WT_IKEY *)oldv, ikey);
+        WT_ASSERT(session, cas_success);
     }
 #else
     ref->ref_ikey = ikey;

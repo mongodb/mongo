@@ -1,0 +1,223 @@
+# vi: ft=tcl sw=2 ts=2 et
+
+# https://bsonspec.org/spec.html
+
+package require cmdline
+include "WT/_Utils.tcl-inc"
+
+enum BSON_TYPE {
+    BSON_ENDOFDOC
+  { BSON_DOUBLE 1 }
+    BSON_UTF8STRING
+    BSON_EMBEDDED_DOCUMENT
+    BSON_ARRAY
+    BSON_BINARY
+    BSON_UNDEFINED
+    BSON_OBJECTID
+    BSON_BOOLEAN
+    BSON_UTCDATETIME
+    BSON_NULL
+    BSON_REGEX
+    BSON_DBPOINTER
+    BSON_JAVASCRIPT
+    BSON_SYMBOL
+    BSON_JAVASCRIPT_WITH_SCOPE
+    BSON_INT32
+    BSON_TIMESTAMP
+    BSON_INT64
+    BSON_DECIMAL128
+  { BSON_MIN_KEY 0XFF }
+  { BSON_MAX_KEY 0X7F }
+}
+
+enum BSON_SUBTYPE {
+    BSON_GENERIC_BINARY_SUBTYPE
+    BSON_FUNCTION
+    BSON_BINARY_OLD
+    BSON_UUID_OLD
+    BSON_UUID
+    BSON_MD5
+    BSON_ENCRYPTED_BSON_VALUE
+    BSON_COMPRESSED_BSON_COLUMN
+  { BSON_USER_DEFINED 0X80 }
+}
+
+proc bson_utf8string_terse {} { str [uint32] utf8 }
+proc bson_utf8string {name {type UTF8STRING}} {
+  ssection -collapsed $name {
+    xentry len { xd [set len [uint32]] }
+    sectionvalue "[set ret [str $len utf8 string]] ($type)"
+  }
+  return $ret
+}
+
+proc bson_binary_terse {name} {
+  set len [uint32]
+  uint8 ; # subtype
+  bytes $len {*}$name
+  return ""
+}
+proc bson_binary {name} {
+  ssection -collapsed $name {
+    xentry len { xd [set len [uint32]] }
+    xentry subtype { format_BSON_SUBTYPE [uint8] }
+    bytes $len data
+    sectionvalue "[xd $len] (BINARY)"
+  }
+  return "(BINARY)"
+}
+
+proc bson_objectid_terse {} {
+  #https://wiki.tcl-lang.org/page/Dump+a+file+in+hex+and+ASCII
+  binary scan [bytes 12] H* hex
+  regsub -all -- {..} $hex {& }
+}
+
+proc bson_objectid {name} {
+  xentry $name {
+    #https://wiki.tcl-lang.org/page/Dump+a+file+in+hex+and+ASCII
+    binary scan [bytes 12] H* hex
+    set ret [regsub -all -- {..} $hex {& }]
+    join [list $ret "(OBJECTID)"] ""
+  }
+  return $ret
+}
+
+proc bson_element_detailed {{name element}} {
+  section -collapsed $name {
+    globals BSON_*
+    set type_fmt [xentry type { strcut [format_BSON_TYPE [set type [uint8]]] BSON_ }]
+    xentry -var name { cstr utf8 }
+    sectionname $name
+    sectionvalue [nswitch $type {
+      $BSON_DOUBLE            { xentry $name { join "[double] ($type_fmt)" } }
+      $BSON_UTF8STRING        { bson_utf8string $name }
+      $BSON_EMBEDDED_DOCUMENT { bson_document_detailed $name "{...}" }
+      $BSON_ARRAY             { bson_document_detailed $name {[...]} }
+      $BSON_BINARY            { bson_binary $name }
+      $BSON_UNDEFINED         { entry $name "undefined (UNDEFINED)" }
+      $BSON_OBJECTID          { bson_objectid $name }
+      $BSON_BOOLEAN           { xentry $name { join "[expr {[uint8] ? "true" : "false"}] (BOOLEAN)" } }
+      $BSON_UTCDATETIME       { xentry $name {
+        set t [uint64]
+        join "[clock format [expr {$t/1000}] -timezone :UTC] +[expr {$t % 1000}]ms (UTCDATETIME)"
+      }}
+      $BSON_NULL              { entry $name "null (NULL)" }
+      $BSON_REGEX             { ssection -collapsed $name { sectionvalue "[cstr utf8 regex] / [cstr utf8 options] (REGEX)" } }
+      $BSON_OBJECTID          { ssection -collapsed $name { sectionvalue "[bson_utf8string name]: [bson_objectid objectid]" } }
+      $BSON_JAVASCRIPT        { bson_utf8string $name JAVASCRIPT }
+      $BSON_SYMBOL            { bson_utf8string $name SYMBOL }
+      $BSON_JAVASCRIPT_WITH_SCOPE {
+        set size [len]
+        ssection $name {
+          set pos0 [pos]
+          xentry size { xd [set size [uint32]] }
+          bson_utf8string code
+          bson_document_detailed mapping
+        } || {}
+        gotoend $pos0 $size
+      }
+      $BSON_INT32             { xentry $name { join "[int32] (INT32)" } }
+      $BSON_TIMESTAMP         { xentry $name { join "[uint64] (TIMESTAMP)" } }
+      $BSON_INT64             { xentry $name { join "[int64] (INT64)" } }
+      $BSON_DECIMAL128        { bytes 16 $name }
+      $BSON_MIN_KEY           { entry $name "min key (MIN_KEY)" }
+      $BSON_MAX_KEY           { entry $name "max key (MAX_KEY)" }
+      default { error "$name ERROR: Unknown element type: $type_fmt" }
+    }]
+  }
+}
+
+proc bson_element_terse {{name element}} {
+    globals BSON_*
+    set pos0 [pos]
+    set type_fmt [strcut [format_BSON_TYPE [set type [uint8]]] BSON_]
+    set name [cstr utf8]
+    nswitch $type {
+      $BSON_DOUBLE            { xentry -from $pos0 $name { join "[double] ($type_fmt)" } }
+      $BSON_UTF8STRING        { xentry -from $pos0 $name bson_utf8string_terse }
+      $BSON_EMBEDDED_DOCUMENT { bson_document_terse $name "{...}" }
+      $BSON_ARRAY             { bson_document_terse $name {[...]} }
+      $BSON_BINARY            { bson_binary_terse $name }
+      $BSON_UNDEFINED         { entry $name "undefined" }
+      $BSON_OBJECTID          { xentry -from $pos0 $name bson_objectid_terse }
+      $BSON_BOOLEAN           { xentry -from $pos0 $name { expr {[uint8] ? "true" : "false"} } }
+      $BSON_UTCDATETIME       { xentry -from $pos0 $name {
+        set t [uint64]
+        join "[clock format [expr {$t/1000}] -timezone :UTC] +[expr {$t % 1000}]ms"
+      }}
+      $BSON_NULL              { entry $name "null" }
+      $BSON_REGEX             { ssection -collapsed $name { sectionvalue "[cstr utf8 regex] / [cstr utf8 options]" } }
+      $BSON_OBJECTID          { ssection -collapsed $name { sectionvalue "[bson_utf8string_terse]: [bson_objectid_terse]" } }
+      $BSON_JAVASCRIPT        { xentry -from $pos0 $name bson_utf8string_terse }
+      $BSON_SYMBOL            { xentry -from $pos0 $name bson_utf8string_terse }
+      $BSON_JAVASCRIPT_WITH_SCOPE {
+        set size [len]
+        ssection $name {
+          set pos2 [pos]
+          xentry size { xd [set size [uint32]] }
+          xentry code bson_utf8string_terse
+          bson_document_terse mapping
+        } || {}
+        gotoend $pos2 $size
+      }
+      $BSON_INT32             { xentry -from $pos0 $name int32 }
+      $BSON_TIMESTAMP         { xentry -from $pos0 $name uint64 }
+      $BSON_INT64             { xentry -from $pos0 $name int64 }
+      $BSON_DECIMAL128        { bytes 16 $name }
+      $BSON_MIN_KEY           { entry $name "min key (MIN_KEY)" }
+      $BSON_MAX_KEY           { entry $name "max key (MAX_KEY)" }
+      default { error "$name ERROR: Unknown element type: $type_fmt" }
+    }
+}
+
+proc bson_document_detailed {{name Document} {val "{...}"}} {
+  set size [len]
+  ssection -collapsed $name {
+    set pos0 [pos]
+    xentry "(size)" { xd [set size [uint32]] }
+    #sectionvalue "$val \[[xd $size]\]"
+    sectionvalue $val
+    set posNext [set posEnd [endpos $pos0 $size]]
+    incr posEnd -1
+    if {$posEnd > [len]} { entry "--ERROR--" "Document size exceeds the file size by [expr {$posEnd - [len]}]" 4 [expr {[pos] - 4}] }
+
+    while {[pos] < $posEnd} {
+      bson_element_detailed
+      if {[pos] > $posEnd} { entry "--ERROR--" "Element overrun by [expr {[pos] - $posEnd}] bytes" [expr {[pos] - $posEnd}] $posEnd }
+    }
+  } && {
+    if {[pos] > $posEnd} { entry "--ERROR--" "Document overrun by [expr {[pos] - $posEnd}] bytes" [expr {[pos] - $posEnd}] $posEnd }
+  } || {
+    global errorInfo
+    entry "---ERROR---" $errorInfo
+  }
+  goto $posNext
+  return $val
+}
+
+proc bson_document_terse {{name Document} {val "{...}"}} {
+  set size [len]
+  ssection -collapsed $name {
+    set pos0 [pos]
+    set size [uint32]
+    #sectionvalue "$val \[[xd $size]\]"
+    sectionvalue $val
+    set posNext [set posEnd [endpos $pos0 $size]]
+    incr posEnd -1
+    if {$posEnd > [len]} { entry "--ERROR--" "Document size exceeds the file size by [expr {$posEnd - [len]}]" 4 [expr {[pos] - 4}] }
+
+    while {[pos] < $posEnd} {
+      bson_element_terse
+      if {[pos] > $posEnd} { entry "--ERROR--" "Element overrun by [expr {[pos] - $posEnd}] bytes" [expr {[pos] - $posEnd}] $posEnd }
+    }
+  } && {
+    if {[pos] > $posEnd} { entry "--ERROR--" "Document overrun by [expr {[pos] - $posEnd}] bytes" [expr {[pos] - $posEnd}] $posEnd }
+  } || {
+    global errorInfo
+    entry "---ERROR---" $errorInfo
+  }
+  goto $posNext
+  return $val
+}
+

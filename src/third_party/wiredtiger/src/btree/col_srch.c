@@ -12,7 +12,7 @@
  * __check_leaf_key_range --
  *     Check the search key is in the leaf page's key range.
  */
-static inline int
+static WT_INLINE int
 __check_leaf_key_range(WT_SESSION_IMPL *session, uint64_t recno, WT_REF *leaf, WT_CURSOR_BTREE *cbt)
 {
     WT_PAGE_INDEX *pindex;
@@ -73,10 +73,13 @@ __wt_col_search(
     uint64_t recno;
     uint32_t base, indx, limit, read_flags;
     int depth;
+    /* Whenever there is a greater record in the tree, FLCS should return the requested record. */
+    bool greater_recno_exists_flcs;
 
     session = CUR2S(cbt);
     btree = S2BT(session);
     current = NULL;
+    greater_recno_exists_flcs = false;
 
     /*
      * Assert the session and cursor have the right relationship (not search specific, but search is
@@ -122,9 +125,14 @@ restart:
         WT_RET(__wt_page_release(session, current, 0));
     }
 
-    /* Search the internal pages of the tree. */
+    /*
+     * Search the internal pages of the tree.
+     *
+     * This loop starts with the root page and iterates down the tree until it has the correct leaf
+     * page. So we can track the depth of tree by counting the number of iterations.
+     */
     current = &btree->root;
-    for (depth = 2, pindex = NULL;; ++depth) {
+    for (depth = 1, pindex = NULL;; ++depth) {
         parent_pindex = pindex;
         page = current->page;
         if (page->type != WT_PAGE_COL_INT)
@@ -133,6 +141,11 @@ restart:
         WT_INTL_INDEX_GET(session, page, pindex);
         base = pindex->entries;
         descent = pindex->index[base - 1];
+
+        /* For FLCS, save if we have encountered a record number greater than the requested one. */
+        if (btree->type == BTREE_COL_FIX && !greater_recno_exists_flcs &&
+          descent->ref_recno > recno)
+            greater_recno_exists_flcs = true;
 
         /* Fast path appends. */
         if (recno >= descent->ref_recno) {
@@ -279,6 +292,10 @@ leaf_only:
     return (0);
 
 past_end:
+    /* We don't always set these below, add a catch-all. */
+    cbt->ins_head = NULL;
+    cbt->ins = NULL;
+
     /*
      * A record past the end of the page's standard information. Check the append list; by
      * definition, any record on the append list is closer than the last record on the page, so it's
@@ -286,15 +303,49 @@ past_end:
      * because column-store files are dense, but in this case the caller searched past the end of
      * the table.
      */
-    cbt->ins_head = WT_COL_APPEND(page);
-    if ((cbt->ins = __col_insert_search(cbt->ins_head, cbt->ins_stack, cbt->next_stack, recno)) ==
-      NULL)
+    ins_head = WT_COL_APPEND(page);
+    ins = __col_insert_search(ins_head, cbt->ins_stack, cbt->next_stack, recno);
+    if (ins == NULL) {
+        /*
+         * There is nothing on the append list, so search the insert list. (The append list would
+         * have been closer to the search record).
+         */
+        if (cbt->recno != WT_RECNO_OOB) {
+            if (page->type == WT_PAGE_COL_FIX)
+                ins_head = WT_COL_UPDATE_SINGLE(page);
+            else {
+                ins_head = WT_COL_UPDATE_SLOT(page, cbt->slot);
+
+                /*
+                 * Set this, otherwise the code in cursor_valid will assume there's no on-disk value
+                 * underneath ins_head.
+                 */
+                F_SET(cbt, WT_CBT_VAR_ONPAGE_MATCH);
+            }
+
+            ins = WT_SKIP_LAST(ins_head);
+            if (ins != NULL && cbt->recno == WT_INSERT_RECNO(ins)) {
+                cbt->ins_head = ins_head;
+                cbt->ins = ins;
+            }
+        }
+
         cbt->compare = -1;
-    else {
+    } else {
+        WT_ASSERT(session, page->type == WT_PAGE_COL_FIX || !F_ISSET(cbt, WT_CBT_VAR_ONPAGE_MATCH));
+
+        cbt->ins_head = ins_head;
+        cbt->ins = ins;
         cbt->recno = WT_INSERT_RECNO(cbt->ins);
         if (recno == cbt->recno)
             cbt->compare = 0;
         else if (recno < cbt->recno)
+            cbt->compare = 1;
+        /*
+         * Special case for FLCS: the requested record number is greater than the record the cursor
+         * is positioned on but a greater record number exists.
+         */
+        else if (greater_recno_exists_flcs)
             cbt->compare = 1;
         else
             cbt->compare = -1;

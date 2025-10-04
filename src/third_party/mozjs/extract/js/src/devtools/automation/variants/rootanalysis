@@ -1,0 +1,10 @@
+{
+    "configure-args": "--enable-ctypes --enable-rust-simd",
+    "optimize": true,
+    "debug": true,
+    "env": {
+        "JS_GC_ZEAL": "GenerationalGC",
+        "JITTEST_EXTRA_ARGS": "--args='--gc-param=semispaceNurseryEnabled=1'",
+        "JSTESTS_EXTRA_ARGS": "--jitflags=debug --args='--gc-param=semispaceNurseryEnabled=1'"
+    }
+}

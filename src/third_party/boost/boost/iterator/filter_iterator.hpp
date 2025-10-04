@@ -7,124 +7,145 @@
 #ifndef BOOST_FILTER_ITERATOR_23022003THW_HPP
 #define BOOST_FILTER_ITERATOR_23022003THW_HPP
 
+#include <type_traits>
+
+#include <boost/core/use_default.hpp>
+#include <boost/core/empty_value.hpp>
 #include <boost/iterator/iterator_adaptor.hpp>
 #include <boost/iterator/iterator_categories.hpp>
-
-#include <boost/type_traits/is_class.hpp>
-#include <boost/static_assert.hpp>
+#include <boost/iterator/enable_if_convertible.hpp>
 
 namespace boost {
 namespace iterators {
 
-  template <class Predicate, class Iterator>
-  class filter_iterator;
+template< typename Predicate, typename Iterator >
+class filter_iterator;
 
-  namespace detail
-  {
-    template <class Predicate, class Iterator>
-    struct filter_iterator_base
+namespace detail {
+
+template< typename Predicate, typename Iterator >
+using filter_iterator_base_t = iterator_adaptor<
+    filter_iterator< Predicate, Iterator >,
+    Iterator,
+    use_default,
+    typename std::conditional<
+        std::is_convertible<
+            iterator_traversal_t< Iterator >,
+            random_access_traversal_tag
+        >::value,
+        bidirectional_traversal_tag,
+        use_default
+    >::type
+>;
+
+} // namespace detail
+
+template< typename Predicate, typename Iterator >
+class filter_iterator :
+    public detail::filter_iterator_base_t< Predicate, Iterator >
+{
+    friend class iterator_core_access;
+
+    template< typename, typename >
+    friend class filter_iterator;
+
+private:
+    using super_t = detail::filter_iterator_base_t< Predicate, Iterator >;
+
+    // Storage class to leverage EBO, when possible
+    struct storage :
+        private boost::empty_value< Predicate >
     {
-        typedef iterator_adaptor<
-            filter_iterator<Predicate, Iterator>
-          , Iterator
-          , use_default
-          , typename mpl::if_<
-                is_convertible<
-                    typename iterator_traversal<Iterator>::type
-                  , random_access_traversal_tag
-                >
-              , bidirectional_traversal_tag
-              , use_default
-            >::type
-        > type;
+        using predicate_base = boost::empty_value< Predicate >;
+
+        Iterator m_end;
+
+        storage() = default;
+
+        template<
+            typename Iter,
+            typename = typename std::enable_if<
+                !std::is_same<
+                    typename std::remove_cv< typename std::remove_reference< Iter >::type >::type,
+                    storage
+                >::value
+            >
+        >
+        explicit storage(Iter&& end) :
+            predicate_base(boost::empty_init_t{}), m_end(static_cast< Iterator&& >(end))
+        {
+        }
+
+        template< typename Pred, typename Iter >
+        storage(Pred&& pred, Iter&& end) :
+            predicate_base(boost::empty_init_t{}, static_cast< Pred&& >(pred)), m_end(static_cast< Iter&& >(end))
+        {
+        }
+
+        Predicate& predicate() noexcept { return predicate_base::get(); }
+        Predicate const& predicate() const noexcept { return predicate_base::get(); }
     };
-  }
 
-  template <class Predicate, class Iterator>
-  class filter_iterator
-    : public detail::filter_iterator_base<Predicate, Iterator>::type
-  {
-      typedef typename detail::filter_iterator_base<
-          Predicate, Iterator
-      >::type super_t;
+public:
+    filter_iterator() = default;
 
-      friend class iterator_core_access;
+    filter_iterator(Predicate f, Iterator x, Iterator end = Iterator()) :
+        super_t(static_cast< Iterator&& >(x)), m_storage(static_cast< Predicate&& >(f), static_cast< Iterator&& >(end))
+    {
+        satisfy_predicate();
+    }
 
-   public:
-      filter_iterator() { }
+    template< bool Requires = std::is_class< Predicate >::value, typename = typename std::enable_if< Requires >::type >
+    filter_iterator(Iterator x, Iterator end = Iterator()) :
+        super_t(static_cast< Iterator&& >(x)), m_storage(static_cast< Iterator&& >(end))
+    {
+        satisfy_predicate();
+    }
 
-      filter_iterator(Predicate f, Iterator x, Iterator end_ = Iterator())
-          : super_t(x), m_predicate(f), m_end(end_)
-      {
-          satisfy_predicate();
-      }
+    template< typename OtherIterator, typename = enable_if_convertible_t< OtherIterator, Iterator > >
+    filter_iterator(filter_iterator< Predicate, OtherIterator > const& t) :
+        super_t(t.base()), m_storage(t.m_storage.predicate(), m_storage.m_end)
+    {}
 
-      filter_iterator(Iterator x, Iterator end_ = Iterator())
-        : super_t(x), m_predicate(), m_end(end_)
-      {
-        // Pro8 is a little too aggressive about instantiating the
-        // body of this function.
-#if !BOOST_WORKAROUND(__MWERKS__, BOOST_TESTED_AT(0x3003))
-          // Don't allow use of this constructor if Predicate is a
-          // function pointer type, since it will be 0.
-          BOOST_STATIC_ASSERT(is_class<Predicate>::value);
-#endif
-          satisfy_predicate();
-      }
+    Predicate predicate() const { return m_storage.predicate(); }
+    Iterator end() const { return m_storage.m_end; }
 
-      template<class OtherIterator>
-      filter_iterator(
-          filter_iterator<Predicate, OtherIterator> const& t
-          , typename enable_if_convertible<OtherIterator, Iterator>::type* = 0
-          )
-          : super_t(t.base()), m_predicate(t.predicate()), m_end(t.end()) {}
+private:
+    void increment()
+    {
+        ++(this->base_reference());
+        satisfy_predicate();
+    }
 
-      Predicate predicate() const { return m_predicate; }
+    void decrement()
+    {
+        while (!m_storage.predicate()(*--(this->base_reference()))) {}
+    }
 
-      Iterator end() const { return m_end; }
+    void satisfy_predicate()
+    {
+        while (this->base() != m_storage.m_end && !m_storage.predicate()(*this->base()))
+            ++(this->base_reference());
+    }
 
-   private:
-      void increment()
-      {
-          ++(this->base_reference());
-          satisfy_predicate();
-      }
+private:
+    storage m_storage;
+};
 
-      void decrement()
-      {
-        while(!this->m_predicate(*--(this->base_reference()))){};
-      }
+template< typename Predicate, typename Iterator >
+inline filter_iterator< Predicate, Iterator > make_filter_iterator(Predicate f, Iterator x, Iterator end = Iterator())
+{
+    return filter_iterator< Predicate, Iterator >(static_cast< Predicate&& >(f), static_cast< Iterator&& >(x), static_cast< Iterator&& >(end));
+}
 
-      void satisfy_predicate()
-      {
-          while (this->base() != this->m_end && !this->m_predicate(*this->base()))
-              ++(this->base_reference());
-      }
-
-      // Probably should be the initial base class so it can be
-      // optimized away via EBO if it is an empty class.
-      Predicate m_predicate;
-      Iterator m_end;
-  };
-
-  template <class Predicate, class Iterator>
-  inline filter_iterator<Predicate,Iterator>
-  make_filter_iterator(Predicate f, Iterator x, Iterator end = Iterator())
-  {
-      return filter_iterator<Predicate,Iterator>(f,x,end);
-  }
-
-  template <class Predicate, class Iterator>
-  inline filter_iterator<Predicate,Iterator>
-  make_filter_iterator(
-      typename iterators::enable_if<
-          is_class<Predicate>
-        , Iterator
-      >::type x
-    , Iterator end = Iterator())
-  {
-      return filter_iterator<Predicate,Iterator>(x,end);
-  }
+template< typename Predicate, typename Iterator >
+inline typename std::enable_if<
+    std::is_class< Predicate >::value,
+    filter_iterator< Predicate, Iterator >
+>::type make_filter_iterator(Iterator x, Iterator end = Iterator())
+{
+    return filter_iterator< Predicate, Iterator >(static_cast< Iterator&& >(x), static_cast< Iterator&& >(end));
+}
 
 } // namespace iterators
 

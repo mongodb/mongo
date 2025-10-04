@@ -27,16 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
 
-#include <initializer_list>
-
+#include "mongo/config.h"
 #include "mongo/crypto/sha1_block.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/crypto/sha512_block.h"
-
-#include "mongo/config.h"
 #include "mongo/util/assert_util.h"
+
+#include <initializer_list>
 
 namespace mongo {
 
@@ -221,12 +219,28 @@ void SHA1BlockTraits::computeHmac(const uint8_t* key,
         getBCryptHashLoader().getAlgoSHA1Hmac(), key, keyLen, input, output);
 }
 
+void SHA1BlockTraits::computeHmacWithCtx(HmacContext*,
+                                         const uint8_t* key,
+                                         size_t keyLen,
+                                         std::initializer_list<ConstDataRange> input,
+                                         HashType* const output) {
+    return SHA1BlockTraits::computeHmac(key, keyLen, input, output);
+}
+
 void SHA256BlockTraits::computeHmac(const uint8_t* key,
                                     size_t keyLen,
                                     std::initializer_list<ConstDataRange> input,
                                     HashType* const output) {
     return computeHmacImpl<HashType>(
         getBCryptHashLoader().getAlgoSHA256Hmac(), key, keyLen, input, output);
+}
+
+void SHA256BlockTraits::computeHmacWithCtx(HmacContext*,
+                                           const uint8_t* key,
+                                           size_t keyLen,
+                                           std::initializer_list<ConstDataRange> input,
+                                           HashType* const output) {
+    return SHA256BlockTraits::computeHmac(key, keyLen, input, output);
 }
 
 void SHA512BlockTraits::computeHmac(const uint8_t* key,
@@ -237,4 +251,11 @@ void SHA512BlockTraits::computeHmac(const uint8_t* key,
         getBCryptHashLoader().getAlgoSHA512Hmac(), key, keyLen, input, output);
 }
 
+void SHA512BlockTraits::computeHmacWithCtx(HmacContext*,
+                                           const uint8_t* key,
+                                           size_t keyLen,
+                                           std::initializer_list<ConstDataRange> input,
+                                           HashType* const output) {
+    return SHA512BlockTraits::computeHmac(key, keyLen, input, output);
+}
 }  // namespace mongo

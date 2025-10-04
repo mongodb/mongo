@@ -26,6 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
+from rollback_to_stable_util import verify_rts_logs
 import wiredtiger, wttest
 from wtscenario import make_scenarios, filter_scenarios
 
@@ -64,8 +65,13 @@ def keys_of_write(write):
         return [2 + my_rle_size - 1]
 
 class test_rollback_to_stable25(wttest.WiredTigerTestCase):
-    session_config = 'isolation=snapshot'
-    conn_config = 'in_memory=false'
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.ignoreStdoutPattern('WT_VERB_RTS')
+        self.addTearDownAction(verify_rts_logs)
+
+    def conn_config(self):
+        return 'in_memory=false,verbose=(rts:5)'
 
     write_10_values = [
         ('10u', dict(write_10='u')),
@@ -228,14 +234,13 @@ class test_rollback_to_stable25(wttest.WiredTigerTestCase):
     def test_rollback_to_stable25(self):
         # Create a table without logging.
         uri = "table:rollback_to_stable25"
-        format = 'key_format=r,value_format=S'
-        self.session.create(uri, format + ', log=(enabled=false)')
+        self.session.create(uri, 'key_format=r,value_format=S')
 
-        # Pin oldest timestamp to 5.
-        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(5))
+        # Pin oldest timestamp to 2.
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(2))
 
-        # Start stable timestamp at 5.
-        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(5))
+        # Start stable timestamp at 2.
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(2))
 
         value_a = "aaaaa" * 10
         value_b = "bbbbb" * 10

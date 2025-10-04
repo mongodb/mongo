@@ -29,18 +29,41 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
-
-#include <boost/optional.hpp>
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/sasl_mechanism_registry.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/db/client.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/timer.h"
+
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
 class Client;
+
+class AuthMetricsRecorder {
+public:
+    void restart();
+    BSONObj capture();
+    void appendMetric(const BSONObj& metric);
+
+private:
+    Timer _timer;
+    BSONArrayBuilder _appendedMetrics;
+};
 
 /**
  * Type representing an ongoing authentication session.
@@ -133,6 +156,13 @@ public:
     }
 
     /**
+     * This returns the last processed step of this session.
+     */
+    boost::optional<StepType> getLastStep() const {
+        return _lastStep;
+    }
+
+    /**
      * Set the mechanism name for this session.
      *
      * If the mechanism name is not recognized, this will throw.
@@ -144,8 +174,8 @@ public:
      *
      * The database will be validated against the current database for this session.
      */
-    void updateDatabase(StringData database) {
-        updateUserName(UserName("", database.toString()));
+    void updateDatabase(StringData database, bool isMechX509) {
+        updateUserName(UserName("", std::string{database}), isMechX509);
     }
 
     /**
@@ -153,7 +183,7 @@ public:
      *
      * The user name will be validated against the current user name for this session.
      */
-    void updateUserName(UserName userName);
+    void updateUserName(UserName userName, bool isMechX509);
 
     /**
      * Set the last user name used with `saslSupportedMechs` for this session.
@@ -185,7 +215,15 @@ public:
     /**
      * Mark the session as unable to authenticate.
      */
-    void markFailed(const Status& status);
+    void markFailed(const Status& status, boost::optional<StepType> currentStep = boost::none);
+
+    /**
+     * Returns the metrics recorder for this Authentication Session.
+     * The session retains ownership of this pointer.
+     */
+    AuthMetricsRecorder* metrics() {
+        return &_metricsRecorder;
+    }
 
     /**
      * This function invokes a functor with a StepGuard on the stack and observes any exceptions
@@ -199,12 +237,19 @@ public:
         try {
             return std::forward<F>(f)(session);
         } catch (const DBException& ex) {
-            session->markFailed(ex.toStatus());
+            bool specAuthFailed = ex.toStatus().code() == ErrorCodes::Error::AuthenticationFailed &&
+                (state == StepType::kSpeculativeAuthenticate ||
+                 state == StepType::kSpeculativeSaslStart);
+            // If speculative authentication failed, then we do not want to mark the session as
+            // failed in order to allow the session to persist into another authentication
+            // attempt. If we ran into an exception for another reason, mark the session as failed.
+            if (!specAuthFailed) {
+                session->markFailed(ex.toStatus(), state);
+            }
             throw;
         } catch (...) {
-            // Swallow other errors.
             session->markFailed(
-                Status(ErrorCodes::InternalError, "Encountered an unhandleable error"));
+                Status(ErrorCodes::InternalError, "Encountered an unhandleable error"), state);
             throw;
         }
     }
@@ -235,7 +280,7 @@ private:
     static boost::optional<AuthenticationSession>& _get(Client* client);
 
     void _finish();
-    void _verifyUserNameFromSaslSupportedMechanisms(const UserName& user);
+    void _verifyUserNameFromSaslSupportedMechanisms(const UserName& user, bool isMechX509);
 
     Client* const _client;
 
@@ -255,6 +300,7 @@ private:
     // certificate. If we have a authN mechanism, we use its principal name instead.
     UserName _userName;
     std::unique_ptr<ServerMechanismBase> _mech;
+    AuthMetricsRecorder _metricsRecorder;
 };
 
 }  // namespace mongo

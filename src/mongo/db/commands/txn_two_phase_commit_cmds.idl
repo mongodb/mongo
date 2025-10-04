@@ -29,8 +29,8 @@ global:
     cpp_namespace: "mongo"
 
 imports:
-    - "mongo/idl/basic_types.idl"
-    - "mongo/s/sharding_types.idl"
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/sharding_environment/sharding_types.idl"
 
 structs:
     CommitParticipant:
@@ -40,6 +40,19 @@ structs:
                 description: "The id of the shard"
                 type: shard_id
 
+    PrepareReply:
+        description: "Reply to prepareTransactionCommand"
+        is_command_reply: true
+        fields:
+            prepareTimestamp:
+                description: "Timestamp of prepare transaction operation. Optional for backward compatibility only."
+                type: timestamp
+                optional: true
+            affectedNamespaces:
+                description: "List of namespaces, affected by the transaction. Optional for backward compatibility only."
+                type: array<namespacestring>
+                optional: true
+
 commands:
     prepareTransaction:
         description: "Parser for the 'prepareTransaction' command."
@@ -47,6 +60,7 @@ commands:
         strict: true
         namespace: ignored
         api_version: ""
+        reply_type: PrepareReply
 
     coordinateCommitTransaction:
         description: "Parser for the 'coordinateCommitTransaction' command."

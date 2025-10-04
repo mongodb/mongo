@@ -27,14 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/repl/replication_coordinator_mock.h"
+// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/db/storage/snapshot_manager.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/cancellation.h"
+#include "mongo/util/duration.h"
+
+#include <mutex>
 
 namespace mongo {
 namespace {
@@ -67,17 +77,26 @@ public:
     }
 
     void finishWaitingOneOpTime() {
-        stdx::unique_lock<Latch> lk(_mutex);
-        _isTestReady = true;
-        _isTestReadyCV.notify_one();
+        // There is a safe race condition in WaitForMajorityService where
+        // _periodicallyWaitForMajority can grab the mutex after the request has been marked as
+        // processed, but before it is removed from the queue. In this case, _isTestReady will
+        // flip without actually progressing through an OpTime, so we do the additional OpTime
+        // check.
+        auto opTimeBefore = _lastOpTimeWaited;
 
-        while (_isTestReady) {
-            _finishWaitingOneOpTimeCV.wait(lk);
-        }
+        do {
+            stdx::unique_lock<stdx::mutex> lk(_mutex);
+            _isTestReady = true;
+            _isTestReadyCV.notify_one();
+
+            while (_isTestReady) {
+                _finishWaitingOneOpTimeCV.wait(lk);
+            }
+        } while (_lastOpTimeWaited == opTimeBefore);
     }
 
     Status waitForWriteConcernStub(OperationContext* opCtx, const repl::OpTime& opTime) {
-        stdx::unique_lock<Latch> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
 
         _waitForMajorityCallCount++;
         _callCountChangedCV.notify_one();
@@ -99,7 +118,7 @@ public:
     }
 
     const repl::OpTime& getLastOpTimeWaited() {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         return _lastOpTimeWaited;
     }
 
@@ -114,7 +133,7 @@ public:
 private:
     WaitForMajorityService _waitForMajorityService;
 
-    Mutex _mutex = MONGO_MAKE_LATCH("WaitForMajorityServiceTest::_mutex");
+    stdx::mutex _mutex;
     stdx::condition_variable _isTestReadyCV;
     stdx::condition_variable _finishWaitingOneOpTimeCV;
     stdx::condition_variable _callCountChangedCV;
@@ -153,7 +172,7 @@ TEST_F(WaitForMajorityServiceNoStartupTest, ShutdownBeforeStartupDoesNotCrashOrH
 TEST_F(WaitForMajorityServiceTest, WaitOneOpTime) {
     repl::OpTime t1(Timestamp(1, 0), 2);
 
-    auto future = waitService()->waitUntilMajority(t1, CancellationToken::uncancelable());
+    auto future = waitService()->waitUntilMajorityForWrite(t1, CancellationToken::uncancelable());
 
     ASSERT_FALSE(future.isReady());
 
@@ -163,11 +182,29 @@ TEST_F(WaitForMajorityServiceTest, WaitOneOpTime) {
     ASSERT_EQ(t1, getLastOpTimeWaited());
 }
 
+TEST_F(WaitForMajorityServiceTest, WaitOneOpTimeForRead) {
+    // Note the code for read and the code for write is the same except the part we stub out for
+    // unit tests, so there is no gain in duplicating every unit test for read and for write.  We
+    // have just this one as a basic check of the shim.  The mock repl coordinator does not wait
+    // for read concern or for the majority snapshot to advance, so the only wait is for there
+    // to be a snapshot available.
+    repl::OpTime t1(Timestamp(1, 0), 2);
+
+    auto future = waitService()->waitUntilMajorityForRead(t1, CancellationToken::uncancelable());
+
+    ASSERT_FALSE(future.isReady());
+    // Setting the committed snapshot allows read concern to continue.
+    getServiceContext()->getStorageEngine()->getSnapshotManager()->setCommittedSnapshot(
+        t1.getTimestamp());
+
+    future.get();
+}
+
 TEST_F(WaitForMajorityServiceTest, WaitWithSameOpTime) {
     repl::OpTime t1(Timestamp(1, 0), 2);
 
-    auto future1 = waitService()->waitUntilMajority(t1, CancellationToken::uncancelable());
-    auto future1b = waitService()->waitUntilMajority(t1, CancellationToken::uncancelable());
+    auto future1 = waitService()->waitUntilMajorityForWrite(t1, CancellationToken::uncancelable());
+    auto future1b = waitService()->waitUntilMajorityForWrite(t1, CancellationToken::uncancelable());
 
     ASSERT_FALSE(future1.isReady());
     ASSERT_FALSE(future1b.isReady());
@@ -185,14 +222,14 @@ TEST_F(WaitForMajorityServiceTest, WaitWithOpTimeEarlierThanLowestQueued) {
     repl::OpTime earlierOpTime(Timestamp(1, 0), 2);
 
     auto laterFuture =
-        waitService()->waitUntilMajority(laterOpTime, CancellationToken::uncancelable());
+        waitService()->waitUntilMajorityForWrite(laterOpTime, CancellationToken::uncancelable());
 
     // Wait until the background thread picks up the queued opTime.
     waitForMajorityCallCountGreaterThan(0);
 
     // The 2nd request has an earlier time, so it will interrupt 'laterOpTime' and skip the line.
     auto earlierFuture =
-        waitService()->waitUntilMajority(earlierOpTime, CancellationToken::uncancelable());
+        waitService()->waitUntilMajorityForWrite(earlierOpTime, CancellationToken::uncancelable());
 
     // Wait for background thread to finish transitioning from waiting on laterOpTime to
     // earlierOpTime.
@@ -218,8 +255,8 @@ TEST_F(WaitForMajorityServiceTest, WaitWithDifferentOpTime) {
     repl::OpTime t1(Timestamp(1, 0), 2);
     repl::OpTime t2(Timestamp(14, 0), 2);
 
-    auto future1 = waitService()->waitUntilMajority(t1, CancellationToken::uncancelable());
-    auto future2 = waitService()->waitUntilMajority(t2, CancellationToken::uncancelable());
+    auto future1 = waitService()->waitUntilMajorityForWrite(t1, CancellationToken::uncancelable());
+    auto future2 = waitService()->waitUntilMajorityForWrite(t2, CancellationToken::uncancelable());
 
     ASSERT_FALSE(future1.isReady());
     ASSERT_FALSE(future2.isReady());
@@ -241,8 +278,8 @@ TEST_F(WaitForMajorityServiceTest, WaitWithOpTimeEarlierThanOpTimeAlreadyWaited)
     repl::OpTime t1(Timestamp(5, 0), 2);
     repl::OpTime t2(Timestamp(14, 0), 2);
 
-    auto future1 = waitService()->waitUntilMajority(t1, CancellationToken::uncancelable());
-    auto future2 = waitService()->waitUntilMajority(t2, CancellationToken::uncancelable());
+    auto future1 = waitService()->waitUntilMajorityForWrite(t1, CancellationToken::uncancelable());
+    auto future2 = waitService()->waitUntilMajorityForWrite(t2, CancellationToken::uncancelable());
 
     ASSERT_FALSE(future1.isReady());
     ASSERT_FALSE(future2.isReady());
@@ -255,9 +292,10 @@ TEST_F(WaitForMajorityServiceTest, WaitWithOpTimeEarlierThanOpTimeAlreadyWaited)
     ASSERT_EQ(t1, getLastOpTimeWaited());
 
     repl::OpTime oldTs(Timestamp(4, 0), 2);
-    auto oldFuture = waitService()->waitUntilMajority(oldTs, CancellationToken::uncancelable());
+    auto oldFuture =
+        waitService()->waitUntilMajorityForWrite(oldTs, CancellationToken::uncancelable());
     auto alreadyWaitedFuture =
-        waitService()->waitUntilMajority(t1, CancellationToken::uncancelable());
+        waitService()->waitUntilMajorityForWrite(t1, CancellationToken::uncancelable());
 
     ASSERT_FALSE(future2.isReady());
 
@@ -276,8 +314,8 @@ TEST_F(WaitForMajorityServiceTest, ShutdownShouldCancelQueuedRequests) {
     repl::OpTime t1(Timestamp(5, 0), 2);
     repl::OpTime t2(Timestamp(14, 0), 2);
 
-    auto future1 = waitService()->waitUntilMajority(t1, CancellationToken::uncancelable());
-    auto future2 = waitService()->waitUntilMajority(t2, CancellationToken::uncancelable());
+    auto future1 = waitService()->waitUntilMajorityForWrite(t1, CancellationToken::uncancelable());
+    auto future2 = waitService()->waitUntilMajorityForWrite(t2, CancellationToken::uncancelable());
 
     ASSERT_FALSE(future1.isReady());
     ASSERT_FALSE(future2.isReady());
@@ -299,14 +337,14 @@ TEST_F(WaitForMajorityServiceTest, WriteConcernErrorGetsPropagatedCorrectly) {
                 {ErrorCodes::PrimarySteppedDown, "test stepdown"}, Milliseconds(0));
         });
 
-    auto future = waitService()->waitUntilMajority(t, CancellationToken::uncancelable());
+    auto future = waitService()->waitUntilMajorityForWrite(t, CancellationToken::uncancelable());
     ASSERT_THROWS_CODE(future.get(), AssertionException, ErrorCodes::PrimarySteppedDown);
 }
 
 TEST_F(WaitForMajorityServiceTest, CanCancelWaitOnOneOptime) {
     repl::OpTime t(Timestamp(1, 2), 4);
     CancellationSource source;
-    auto future = waitService()->waitUntilMajority(t, source.token());
+    auto future = waitService()->waitUntilMajorityForWrite(t, source.token());
     ASSERT_FALSE(future.isReady());
     source.cancel();
     // The future should now become ready without having to wait for any opTime.
@@ -317,9 +355,9 @@ TEST_F(WaitForMajorityServiceTest, CancelingEarlierOpTimeRequestDoesNotAffectLat
     repl::OpTime earlier(Timestamp(1, 2), 4);
     repl::OpTime later(Timestamp(5, 2), 5);
     CancellationSource source;
-    auto cancelFuture = waitService()->waitUntilMajority(earlier, source.token());
+    auto cancelFuture = waitService()->waitUntilMajorityForWrite(earlier, source.token());
     auto uncancelableFuture =
-        waitService()->waitUntilMajority(later, CancellationToken::uncancelable());
+        waitService()->waitUntilMajorityForWrite(later, CancellationToken::uncancelable());
     ASSERT_FALSE(cancelFuture.isReady());
     ASSERT_FALSE(uncancelableFuture.isReady());
     // Wait until the background thread picks up the initial request. Otherwise, there is a race
@@ -341,9 +379,9 @@ TEST_F(WaitForMajorityServiceTest, CancelingOneRequestOnOpTimeDoesNotAffectOther
     repl::OpTime t1(Timestamp(1, 2), 4);
     repl::OpTime t1Dupe(Timestamp(1, 2), 4);
     CancellationSource source;
-    auto cancelFuture = waitService()->waitUntilMajority(t1, source.token());
+    auto cancelFuture = waitService()->waitUntilMajorityForWrite(t1, source.token());
     auto uncancelableFuture =
-        waitService()->waitUntilMajority(t1Dupe, CancellationToken::uncancelable());
+        waitService()->waitUntilMajorityForWrite(t1Dupe, CancellationToken::uncancelable());
     ASSERT_FALSE(cancelFuture.isReady());
     ASSERT_FALSE(uncancelableFuture.isReady());
     source.cancel();
@@ -359,11 +397,11 @@ TEST_F(WaitForMajorityServiceTest, CancelingLaterOpTimeRequestDoesNotAffectEarli
     repl::OpTime t1(Timestamp(1, 2), 4);
     repl::OpTime smallerOpTime(Timestamp(1, 2), 1);
     CancellationSource source;
-    auto cancelFuture = waitService()->waitUntilMajority(t1, source.token());
+    auto cancelFuture = waitService()->waitUntilMajorityForWrite(t1, source.token());
     // Wait until the background thread picks up the queued opTime.
     waitForMajorityCallCountGreaterThan(0);
     auto earlierFuture =
-        waitService()->waitUntilMajority(smallerOpTime, CancellationToken::uncancelable());
+        waitService()->waitUntilMajorityForWrite(smallerOpTime, CancellationToken::uncancelable());
     // Wait for background thread to finish transitioning from waiting on t1 to smallerOpTime.
     waitForMajorityCallCountGreaterThan(1);
     ASSERT_FALSE(cancelFuture.isReady());
@@ -380,7 +418,7 @@ TEST_F(WaitForMajorityServiceTest, CancelingLaterOpTimeRequestDoesNotAffectEarli
 TEST_F(WaitForMajorityServiceTest, SafeToCallCancelOnRequestAlreadyCompletedByShutdown) {
     repl::OpTime t(Timestamp(1, 2), 4);
     CancellationSource source;
-    auto deadFuture = waitService()->waitUntilMajority(t, source.token());
+    auto deadFuture = waitService()->waitUntilMajorityForWrite(t, source.token());
     ASSERT_FALSE(deadFuture.isReady());
     waitService()->shutDown();
     ASSERT(deadFuture.isReady());
@@ -391,7 +429,7 @@ TEST_F(WaitForMajorityServiceTest, SafeToCallCancelOnRequestAlreadyCompletedBySh
 TEST_F(WaitForMajorityServiceTest, SafeToCallCancelOnRequestAlreadyCompletedByWaiting) {
     repl::OpTime t(Timestamp(1, 2), 4);
     CancellationSource source;
-    auto future = waitService()->waitUntilMajority(t, source.token());
+    auto future = waitService()->waitUntilMajorityForWrite(t, source.token());
     ASSERT_FALSE(future.isReady());
     waitForMajorityCallCountGreaterThan(0);
     finishWaitingOneOpTime();
@@ -404,7 +442,7 @@ TEST_F(WaitForMajorityServiceTest, PassingAlreadyCanceledTokenCompletesFutureWit
     repl::OpTime t(Timestamp(1, 2), 4);
     CancellationSource source;
     source.cancel();
-    auto future = waitService()->waitUntilMajority(t, source.token());
+    auto future = waitService()->waitUntilMajorityForWrite(t, source.token());
     ASSERT_EQ(future.getNoThrow(), kCanceledStatus);
 }
 }  // namespace

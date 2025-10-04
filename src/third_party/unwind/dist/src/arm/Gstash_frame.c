@@ -58,16 +58,19 @@ tdep_stash_frame (struct dwarf_cursor *d, struct dwarf_reg_state *rs)
       && rs->ret_addr_column == LR
       && (rs->reg.where[R7] == DWARF_WHERE_UNDEF
           || rs->reg.where[R7] == DWARF_WHERE_SAME
+          || rs->reg.where[R7] == DWARF_WHERE_CFA
           || (rs->reg.where[R7] == DWARF_WHERE_CFAREL
               && labs(rs->reg.val[R7]) < (1 << 29)
               && rs->reg.val[R7]+1 != 0))
       && (rs->reg.where[LR] == DWARF_WHERE_UNDEF
           || rs->reg.where[LR] == DWARF_WHERE_SAME
+          || rs->reg.where[R7] == DWARF_WHERE_CFA
           || (rs->reg.where[LR] == DWARF_WHERE_CFAREL
               && labs(rs->reg.val[LR]) < (1 << 29)
               && rs->reg.val[LR]+1 != 0))
       && (rs->reg.where[SP] == DWARF_WHERE_UNDEF
           || rs->reg.where[SP] == DWARF_WHERE_SAME
+          || rs->reg.where[SP] == DWARF_WHERE_CFA
           || (rs->reg.where[SP] == DWARF_WHERE_CFAREL
               && labs(rs->reg.val[SP]) < (1 << 29)
               && rs->reg.val[SP]+1 != 0)))
@@ -82,6 +85,12 @@ tdep_stash_frame (struct dwarf_cursor *d, struct dwarf_reg_state *rs)
       f->lr_cfa_offset = rs->reg.val[LR];
     if (rs->reg.where[SP] == DWARF_WHERE_CFAREL)
       f->sp_cfa_offset = rs->reg.val[SP];
+    if (rs->reg.where[R7] == DWARF_WHERE_CFA)
+      f->r7_cfa_offset = 0;
+    if (rs->reg.where[LR] == DWARF_WHERE_CFA)
+      f->lr_cfa_offset = 0;
+    if (rs->reg.where[SP] == DWARF_WHERE_CFA)
+      f->sp_cfa_offset = 0;
     Debug (4, " standard frame\n");
   }
   else

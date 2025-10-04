@@ -1,0 +1,184 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+idl_generator(
+    name = "coll_mod_gen",
+    src = "coll_mod.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/auth:access_checks_gen",
+        "//src/mongo/db/auth:action_type_gen",
+        "//src/mongo/db/local_catalog:collection_options_gen",
+        "//src/mongo/db/pipeline:change_stream_pre_and_post_images_options_gen",
+        "//src/mongo/db/timeseries:timeseries_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "create_gen",
+    src = "create.idl",
+    deps = [
+        "//src/mongo/crypto:encryption_fields_gen",
+        "//src/mongo/db/auth:access_checks_gen",
+        "//src/mongo/db/auth:action_type_gen",
+        "//src/mongo/db/local_catalog:clustered_collection_options_gen",
+        "//src/mongo/db/local_catalog:collection_options_gen",
+        "//src/mongo/db/pipeline:change_stream_pre_and_post_images_options_gen",
+        "//src/mongo/db/timeseries:timeseries_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "internal_rename_if_options_and_indexes_match_gen",
+    src = "internal_rename_if_options_and_indexes_match.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "list_databases_gen",
+    src = "list_databases.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/auth:access_checks_gen",
+        "//src/mongo/db/auth:action_type_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "list_databases_for_all_tenants_gen",
+    src = "list_databases_for_all_tenants.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/auth:access_checks_gen",
+        "//src/mongo/db/auth:action_type_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "rename_collection_gen",
+    src = "rename_collection.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/auth:access_checks_gen",
+        "//src/mongo/db/auth:action_type_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "create_indexes_gen",
+    src = "create_indexes.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/auth:action_type_gen",
+        "//src/mongo/db/index_builds:commit_quorum_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "drop_gen",
+    src = "drop.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/auth:action_type_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "drop_database_gen",
+    src = "drop_database.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/auth:action_type_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "drop_indexes_gen",
+    src = "drop_indexes.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/auth:action_type_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "list_collections_gen",
+    src = "list_collections.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/auth:access_checks_gen",
+        "//src/mongo/db/auth:action_type_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "list_indexes_gen",
+    src = "list_indexes.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/auth:access_checks_gen",
+        "//src/mongo/db/auth:action_type_gen",
+        "//src/mongo/db/local_catalog/ddl:create_indexes_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "clone_catalog_data_gen",
+    src = "clone_catalog_data.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "rename_collection_idl",
+    srcs = [
+        ":rename_collection_gen",
+    ],
+    header_deps = [
+        "//src/mongo/db/user_write_block:set_user_write_block_mode_idl",
+    ],
+    deps = [
+        "//src/mongo/db:commands",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/auth:authprivilege",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "direct_connection_ddl_hook_test",
+    srcs = [
+        "direct_connection_ddl_hook_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_seventh_group",
+    ],
+    deps = [
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/auth:authorization_session_test_fixture",
+        "//src/mongo/db/s:shard_server_test_fixture",
+    ],
+)

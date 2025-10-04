@@ -29,12 +29,14 @@
 
 #pragma once
 
-#include <fmt/format.h>
+#include "mongo/base/string_data.h"
+#include "mongo/bson/util/builder.h"
+
+#include <cstddef>
 #include <string>
 #include <type_traits>
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/util/builder.h"
+#include <fmt/format.h>
 
 namespace mongo {
 
@@ -98,9 +100,11 @@ std::string decode(StringData s);
 
 }  // namespace hexblob
 
+static const size_t kHexDumpMaxSize = 1000000;
+
 /**
  * Returns a dump of the buffer as lower case hex digit pairs separated by spaces.
- * Requires `len < 1000000`.
+ * Requires `len < kHexDumpMaxSize`.
  */
 std::string hexdump(StringData data);
 
@@ -112,13 +116,38 @@ inline std::string hexdump(const void* data, size_t len) {
 /** Render `val` in upper case hex, zero-padded to its full width. */
 template <typename T, std::enable_if_t<std::is_integral_v<T>, int> = 0>
 std::string zeroPaddedHex(T val) {
-    return format(FMT_STRING("{:0{}X}"), std::make_unsigned_t<T>(val), 2 * sizeof(val));
+    return fmt::format("{:0{}X}", std::make_unsigned_t<T>(val), 2 * sizeof(val));
 }
 
 /** Render the unsigned equivalent of `val` in upper case hex. */
 template <typename T, std::enable_if_t<std::is_integral_v<T>, int> = 0>
 std::string unsignedHex(T val) {
-    return format(FMT_STRING("{:X}"), std::make_unsigned_t<T>(val));
+    return fmt::format("{:X}", std::make_unsigned_t<T>(val));
+}
+
+/**
+ * Wraps a buffer of known size so its hex dump can be written to a stream without dynamic
+ * allocation.
+ */
+class StreamableHexdump {
+public:
+    StreamableHexdump(const void* data, size_t size)
+        : _data{reinterpret_cast<const unsigned char*>(data)}, _size(size) {}
+
+    friend std::ostream& operator<<(std::ostream& os, const StreamableHexdump& dump) {
+        return dump._streamTo(os);
+    }
+
+private:
+    std::ostream& _streamTo(std::ostream& os) const;
+
+    const unsigned char* _data;
+    size_t _size;
+};
+
+template <typename T>
+StreamableHexdump streamableHexdump(const T& data) {
+    return {&data, sizeof(data)};
 }
 
 }  // namespace mongo

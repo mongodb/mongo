@@ -1,0 +1,13 @@
+# Golden test output of GoldenSbeStageBuilderTest/TestTextMatch
+[3] filter {
+    if isObject(s6) 
+    then ftsMatch(FtsMatcher({"terms" : ["test"], "negatedTerms" : [], "phrases" : [], "negatedPhrases" : []}), s6) 
+    else fail(4623400, "textmatch requires input to be an object") 
+} 
+[2] nlj inner [] [s1, s4, s2, s3, s5] 
+    left 
+        [1] ixseek KS(3C610001) KS(3C7A00FE) s3 s1 s4 s2 [] @"UUID" @"a_text" true 
+    right 
+        [2] limit 1ll 
+        [2] seek s1 s6 s7 s4 s2 s3 s5 none none [] @"UUID" true 
+

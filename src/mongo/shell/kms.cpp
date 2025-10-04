@@ -29,27 +29,18 @@
 
 #include "kms.h"
 
-#include "mongo/platform/random.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/shell/kms_gen.h"
-#include "mongo/util/net/hostandport.h"
-#include "mongo/util/text.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+#include "mongo/util/text.h"  // IWYU pragma: keep
+
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
 
 
 namespace mongo {
-
-HostAndPort parseUrl(StringData url) {
-    // Treat the URL as a host and port
-    // URL: https://(host):(port)
-    //
-    constexpr StringData urlPrefix = "https://"_sd;
-    uassert(51140,
-            str::stream() << "KMS URL must start with https://, URL: " << url,
-            url.startsWith(urlPrefix));
-
-    StringData hostAndPort = url.substr(urlPrefix.size());
-
-    return HostAndPort(hostAndPort);
-}
 
 BSONObj KMSService::encryptDataKeyByString(ConstDataRange cdr, StringData keyId) {
     uasserted(5380101,
@@ -75,7 +66,7 @@ void KMSServiceController::registerFactory(KMSProviderEnum provider,
 std::unique_ptr<KMSService> KMSServiceController::createFromClient(StringData kmsProvider,
                                                                    const BSONObj& config) {
     KMSProviderEnum provider =
-        KMSProvider_parse(IDLParserErrorContext("client fle options"), kmsProvider);
+        KMSProvider_parse(kmsProvider, IDLParserContext("client fle options"));
 
     auto service = _factories.at(provider)->create(config);
     uassert(51192, str::stream() << "Cannot find client kms provider " << kmsProvider, service);
@@ -85,7 +76,7 @@ std::unique_ptr<KMSService> KMSServiceController::createFromClient(StringData km
 std::unique_ptr<KMSService> KMSServiceController::createFromDisk(const BSONObj& config,
                                                                  const BSONObj& masterKey) {
     auto providerObj = masterKey.getStringField("provider"_sd);
-    auto provider = KMSProvider_parse(IDLParserErrorContext("root"), providerObj);
+    auto provider = KMSProvider_parse(providerObj, IDLParserContext("root"));
     auto service = _factories.at(provider)->create(config);
     uassert(51193, str::stream() << "Cannot find disk kms provider " << providerObj, service);
     return service;

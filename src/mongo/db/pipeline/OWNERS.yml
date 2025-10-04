@@ -1,0 +1,320 @@
+version: 1.0.0
+filters:
+  # The files implementing DocumentSource each contain code related to pipeline parsing,
+  # validation, and optimization (QO concerns). Therefore, we give default ownership of files
+  # in this directory to the entire query-optimization team. The special-purpose or special-feature
+  # stages are owned by the dedicated teams.
+  - "*":
+    approvers:
+      - 10gen/query-optimization
+  - "OWNERS.yml":
+    approvers:
+      - 10gen/query-execution-staff-leads
+      - 10gen/query-optimization-staff-leads
+      - 10gen/query-integration-staff-leads
+  # The IDL files in this directory are generally related to DocumentSource parsing, so they are
+  # owned by QO by default.
+  - "*.idl":
+    approvers:
+      - 10gen/query-optimization
+  # This file deals primarily with parsing for accumulators, and is therefore owned by QO.
+  - "accumulation_statement*":
+    approvers:
+      - 10gen/query-optimization
+  - "accumulator*":
+    approvers:
+      - 10gen/query-execution-classic
+  - "accumulator_covariance.cpp":
+    approvers:
+      - 10gen/query-integration-features
+  - "accumulator_exp_moving_avg.cpp":
+    approvers:
+      - 10gen/query-integration-features
+  - "accumulator_for_window_functions.h":
+    approvers:
+      - 10gen/query-integration-features
+  - "accumulator_integral.cpp":
+    approvers:
+      - 10gen/query-integration-features
+  - "accumulator_js_*":
+    approvers:
+      - 10gen/query-integration-features
+  - "accumulator_locf.cpp":
+    approvers:
+      - 10gen/query-integration-features
+  - "accumulator_percentile*":
+    approvers:
+      - 10gen/query-integration-features
+  - "accumulator_test.cpp":
+    approvers:
+      - 10gen/query-integration-features
+      - 10gen/query-execution-classic
+  - "accumulator_internal_construct_stats.cpp":
+    approvers:
+      - 10gen/query-optimization
+  - "aggregation_hint_translation.h":
+    approvers:
+      - 10gen/query-integration-timeseries
+  - "aggregation_request*":
+    approvers:
+      - 10gen/query-optimization
+  - "aggregation_context_fixture.h":
+    approvers:
+      - 10gen/query-optimization
+  - "aggregation_mongod_context_fixture.h":
+    approvers:
+      - 10gen/query-optimization
+  - "aggregation.cpp":
+    approvers:
+      - 10gen/query-optimization
+  - "*change_stream*":
+    approvers:
+      - 10gen/query-execution-change-streams
+  - "common_sort_key_optimization_test.cpp":
+    approvers:
+      - 10gen/query-optimization
+  - "dependencies*":
+    approvers:
+      - 10gen/query-optimization
+  - "dispatch_shard_pipeline_test.cpp":
+    approvers:
+      - 10gen/query-optimization
+  - "document_source_check_resume_token_test.cpp":
+    approvers:
+      - 10gen/query-execution-change-streams
+  - "document_source_current_op*":
+    approvers:
+      - 10gen/query-integration-observability
+  - "document_source_densify*":
+    approvers:
+      - 10gen/query-integration-features
+  - "document_source_fill*":
+    approvers:
+      - 10gen/query-integration-features
+  - "document_source*geo*":
+    approvers:
+      - 10gen/query-integration-features
+  - "document_source_hybrid_scoring*":
+    approvers:
+      - 10gen/query-integration-search
+  - "document_source_index_stats*":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "document_source_internal_unpack_bucket*":
+    approvers:
+      - 10gen/query-integration-timeseries
+  - "document_source_internal_convert_bucket_index_stats*":
+    approvers:
+      - 10gen/query-integration-timeseries
+  - "document_source_parsing_validators*":
+    approvers:
+      - 10gen/query-optimization
+  - "document_source_query_stats*":
+    approvers:
+      - 10gen/query-integration-observability
+  - "document_source_rank_fusion*":
+    approvers:
+      - 10gen/query-integration-search
+  - "document_source_score*":
+    approvers:
+      - 10gen/query-integration-search
+  - "document_source_score_fusion*":
+    approvers:
+      - 10gen/query-integration-search
+  - "document_source_set_window_fields*":
+    approvers:
+      - 10gen/query-integration-features
+  - "document_source_merge_spec*":
+    approvers:
+      - 10gen/query-optimization
+  - "document_source_plan_cache_stats*":
+    approvers:
+      - 10gen/query-optimization
+  - "document_source_query_settings*":
+    approvers:
+      - 10gen/query-execution-query-settings
+  - "document_source_sequential_document_cache*":
+    approvers:
+      - 10gen/query-execution-classic
+  - "document_source_set_variable_from_subpipeline*":
+    approvers:
+      - 10gen/query-integration-search
+  - "document_source_sort_by_count*":
+    approvers:
+      - 10gen/query-optimization
+  - "expression*":
+    approvers:
+      - 10gen/query-optimization
+  - "expression_find_internal*":
+    approvers:
+      - 10gen/query-execution-classic
+  - "expression_from_accumulator_quantile.h":
+    approvers:
+      - 10gen/query-integration-features
+  - "expression_function*":
+    approvers:
+      - 10gen/query-integration-features
+  - "expression_hasher*":
+    approvers:
+      - 10gen/query-optimization
+  - "expression_test_api_version*":
+    approvers:
+      - 10gen/query-optimization
+  - "expression_javascript*":
+    approvers:
+      - 10gen/query-integration-features
+  - "expression_js*":
+    approvers:
+      - 10gen/query-integration-features
+  - "expression_visitor*":
+    approvers:
+      - 10gen/query-optimization
+  - "expression_walker*":
+    approvers:
+      - 10gen/query-optimization
+  - "field_path*":
+    approvers:
+      - 10gen/query-optimization
+  - "granularity_rounder*":
+    approvers:
+      - 10gen/query-execution-classic
+  - "javascript_execution*":
+    approvers:
+      - 10gen/query-integration-features
+  - "initialize_auto_get_helper.h":
+    approvers:
+      - 10gen/query-execution-classic
+  - "lookup_set_cache*":
+    approvers:
+      - 10gen/query-execution-classic
+  - "memory_token_container_util.h":
+    approvers:
+      - 10gen/query-execution-classic
+  - "monotonic_expression*":
+    approvers:
+      - 10gen/query-optimization
+  - "name_expression*":
+    approvers:
+      - 10gen/streams-engine
+  - "make_js_function*":
+    approvers:
+      - 10gen/query-integration-features
+  - "*_processor*":
+    approvers:
+      - 10gen/query-execution-classic
+  - "group_processor*":
+    approvers:
+      - 10gen/query-execution-classic
+  - "lite_parsed*":
+    approvers:
+      - 10gen/query-optimization
+  - "partition_key_comparator*":
+    approvers:
+      - 10gen/query-integration-features
+  - "pipeline_d*":
+    approvers:
+      - 10gen/query-optimization
+  - "pipeline_test.cpp":
+    approvers:
+      - 10gen/query-optimization
+  - "query_request_conversion*":
+    approvers:
+      - 10gen/query-optimization
+  - "serverless_aggregation_context_fixture*":
+    approvers:
+      - 10gen/query-optimization
+  - "skip_and_limit*":
+    approvers:
+      - 10gen/query-optimization
+  - "sort_reorder_helpers*":
+    approvers:
+      - 10gen/query-optimization
+  - "stage_constraints.h":
+    approvers:
+      - 10gen/query-optimization
+  - "variable_validation*":
+    approvers:
+      - 10gen/query-optimization
+  - "docs_needed_bounds*":
+    approvers:
+      - 10gen/query-integration-search
+  - "document_source_visitor_docs_needed_bounds*":
+    approvers:
+      - 10gen/query-integration-search
+  - "document_source_visitor_registry*":
+    approvers:
+      - 10gen/query-integration-search
+  - "document_source_walker*":
+    approvers:
+      - 10gen/query-integration-search
+  - "writer_util*":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "split_pipeline*":
+    approvers:
+      - 10gen/query-optimization
+  - "sharded_agg_helpers*":
+    approvers:
+      - 10gen/query-optimization
+  - "merge_processor*":
+    approvers:
+      - 10gen/query-execution-classic
+  # Percentile calculations fall under the umbrella of "analytical extensions" which are owned by
+  # QI.
+  - "percentile_algo*":
+    approvers:
+      - 10gen/query-integration-features
+  - "pipeline_metadata_tree*":
+    approvers:
+      - 10gen/query-integration-features
+  - "plan_explainer*":
+    approvers:
+      - 10gen/query-optimization
+  - "plan_executor_pipeline*":
+    approvers:
+      - 10gen/query-execution-classic
+  - "resume_token*":
+    approvers:
+      - 10gen/query-execution-change-streams
+  - "sbe_pushdown*":
+    approvers:
+      - 10gen/query-optimization
+  - "semantic_analysis*":
+    approvers:
+      - 10gen/query-optimization
+  - "sequential_document_cache*":
+    approvers:
+      - 10gen/query-execution-classic
+  - "tee_buffer*":
+    approvers:
+      - 10gen/query-execution-classic
+  - "timeseries_index_conversion_options.h":
+    approvers:
+      - 10gen/query-integration-timeseries
+  - "value.idl":
+    approvers:
+      - 10gen/query-execution-classic
+  - "document_source_coll_stats*":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
+  - "document_source_internal_all_collection_stats*":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
+  - "document_source_internal_list_collections*":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
+  - "document_source_list_cluster_catalog*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "*list_catalog*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "*sharded_data_distribution*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "document_source_list_catalog*":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
+  - "document_source_list_extensions*":
+    approvers:
+      - 10gen/query-integration-extensions-api

@@ -29,14 +29,30 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_array.h"
-#include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/index_entry.h"
-#include "mongo/stdx/unordered_set.h"
+#include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/compiler/metadata/index_entry.h"
+#include "mongo/stdx/unordered_map.h"
+
+#include <cstddef>
+#include <string>
+#include <vector>
 
 namespace mongo {
 
 class CollatorInterface;
+
+struct IndexProperties {
+    bool isSparse = false;  // 'true' if a sparse index can answer the field.
+};
+
+// A relevant field to index requirement map.
+using RelevantFieldIndexMap = stdx::unordered_map<std::string, IndexProperties>;
 
 /**
  * Methods for determining what fields and predicates can use indices.
@@ -44,10 +60,34 @@ class CollatorInterface;
 class QueryPlannerIXSelect {
 public:
     /**
-     * Return all the fields in the tree rooted at 'node' that we can use an index on
-     * in order to answer the query.
+     * Used to keep track of if any $elemMatch predicates were encountered when walking a
+     * MatchExpression tree. The presence of an outer $elemMatch can impact whether an index is
+     * applicable for an inner MatchExpression. For example, the NOT expression in
+     * {a: {$elemMatch: {b: {$ne: null}}} can only use an "a.b" index if that path is not multikey
+     * on "a.b". Because of the $elemMatch, it's okay to use the "a.b" index if the path is multikey
+     * on "a".
      */
-    static void getFields(const MatchExpression* node, stdx::unordered_set<std::string>* out);
+    struct ElemMatchContext {
+        ArrayMatchingMatchExpression* innermostParentElemMatch{nullptr};
+        StringData fullPathToParentElemMatch{""_sd};
+    };
+
+    /**
+     * This struct works as a container to hold all the query contextual information needed to make
+     * the right indexing decisions.
+     */
+    struct QueryContext {
+        ElemMatchContext elemMatchContext;
+        const CollatorInterface* collator = nullptr;
+        // Query will require an indexed plan if contains TEXT or GEO predicates
+        bool mustUseIndexedPlan = false;
+    };
+    /**
+     * Return all the fields in the tree rooted at 'node' that we can use an index to answer the
+     * query. The output, 'RelevantFieldIndexMap', contains the requirements of the index that can
+     * answer the field. e.g. Some fields can be supported only by a non-sparse index.
+     */
+    static void getFields(const MatchExpression* node, RelevantFieldIndexMap* out);
 
     /**
      * Similar to other getFields() method, but with 'prefix' argument which is a path prefix to be
@@ -57,7 +97,7 @@ public:
      */
     static void getFields(const MatchExpression* node,
                           std::string prefix,
-                          stdx::unordered_set<std::string>* out);
+                          RelevantFieldIndexMap* out);
 
     /**
      * Finds all indices that correspond to the hinted index. Matches the index both by name and by
@@ -70,8 +110,8 @@ public:
      * Finds all indices prefixed by fields we have predicates over.  Only these indices are
      * useful in answering the query.
      */
-    static std::vector<IndexEntry> findRelevantIndices(
-        const stdx::unordered_set<std::string>& fields, const std::vector<IndexEntry>& allIndices);
+    static std::vector<IndexEntry> findRelevantIndices(const RelevantFieldIndexMap& fields,
+                                                       const std::vector<IndexEntry>& allIndices);
 
     /**
      * Determine how useful all of our relevant 'indices' are to all predicates in the subtree
@@ -85,11 +125,15 @@ public:
      * If an index is compound but not prefixed by a predicate's path, it's only useful if
      * there exists another predicate that 1. will use that index and 2. is related to the
      * original predicate by having an AND as a parent.
+     *
+     * 'nodeIsNotChild' passes information if a node is an indirect child of a '$not' node. Some
+     * types of nodes can use index by themselves, but cannot use it if they are under a $not.
      */
     static void rateIndices(MatchExpression* node,
                             std::string prefix,
                             const std::vector<IndexEntry>& indices,
-                            const CollatorInterface* collator);
+                            const QueryContext& queryContext,
+                            bool nodeIsNotChild = false);
 
     /**
      * Amend the RelevantTag lists for all predicates in the subtree rooted at 'node' to remove
@@ -130,19 +174,19 @@ public:
     /**
      * Given a list of IndexEntries and fields used by a query's match expression, return a list
      * "expanded" indexes (where the $** indexes in the given list have been expanded).
+     * 'hintedIndexBson' indicates that the indexes in 'relevantIndices' are the results of the
+     * user's hint. 'inLookip' indicates that this query is for the inner side of a $lookup or
+     * $graphLookup.
      */
-    static std::vector<IndexEntry> expandIndexes(const stdx::unordered_set<std::string>& fields,
-                                                 std::vector<IndexEntry> relevantIndices);
+    static std::vector<IndexEntry> expandIndexes(const RelevantFieldIndexMap& fields,
+                                                 std::vector<IndexEntry> relevantIndices,
+                                                 bool hintedIndexBson = false,
+                                                 bool inLookup = false);
 
     /**
      * Check if this match expression is a leaf and is supported by a wildcard index.
      */
     static bool nodeIsSupportedByWildcardIndex(const MatchExpression* queryExpr);
-
-    /**
-     * Check if this match expression is a leaf and is supported by a hashed index.
-     */
-    static bool nodeIsSupportedByHashedIndex(const MatchExpression* queryExpr);
 
     /*
      * Return true if the given match expression can use a sparse index, false otherwise. This will
@@ -159,19 +203,6 @@ public:
 
 private:
     /**
-     * Used to keep track of if any $elemMatch predicates were encountered when walking a
-     * MatchExpression tree. The presence of an outer $elemMatch can impact whether an index is
-     * applicable for an inner MatchExpression. For example, the NOT expression in
-     * {a: {$elemMatch: {b: {$ne: null}}} can only use an "a.b" index if that path is not multikey
-     * on "a.b". Because of the $elemMatch, it's okay to use the "a.b" index if the path is multikey
-     * on "a".
-     */
-    struct ElemMatchContext {
-        ArrayMatchingMatchExpression* innermostParentElemMatch{nullptr};
-        StringData fullPathToParentElemMatch{""_sd};
-    };
-
-    /**
      * Return true if the index key pattern field 'keyPatternElt' (which belongs to 'index' and is
      * at position 'keyPatternIndex' in the index's keyPattern) can be used to answer the predicate
      * 'node'. When 'node' is a sub-tree of a larger MatchExpression, 'fullPathToNode' is the path
@@ -186,14 +217,8 @@ private:
                             std::size_t keyPatternIndex,
                             MatchExpression* node,
                             StringData fullPathToNode,
-                            const CollatorInterface* collator,
-                            const ElemMatchContext& elemMatchContext);
-
-    static void _rateIndices(MatchExpression* node,
-                             std::string prefix,
-                             const std::vector<IndexEntry>& indices,
-                             const CollatorInterface* collator,
-                             const ElemMatchContext& elemMatchContext);
+                            const QueryContext& queryContext,
+                            bool nodeIsNotChild);
 
     /**
      * Amend the RelevantTag lists for all predicates in the subtree rooted at 'node' to remove
@@ -259,6 +284,51 @@ private:
      */
     static void stripInvalidAssignmentsToWildcardIndexes(MatchExpression* root,
                                                          const std::vector<IndexEntry>& indices);
+
+    /**
+     * This function removes invalid compound wildcard index (CWI) assignments within an expression.
+     *
+     * Background: In the function expandWildcardIndexEntry(), there are two ways to expand a CWI.
+     * In the following explanation, let's take a CWI {a: 1, $**: 1} as an example.
+     * - Non-$_path expansion: The wildcard field expands by resolving to one specific field, e.g.,
+     *   {a: 1, b: 1}, where the wildcard field expands to "b".
+     * - $_path expansion: The wildcard field expands without resolving to a specific field,
+     *   indicated by the placeholder $_path, e.g., {a: 1, $_path: 1}.
+     * In the following, we are interested in non-$_path expansion as their assignments have the
+     * potential to become invalid.
+     *
+     * An assignment to a non-$_path CWI (e.g., {a: 1, b: 1}) is considered invalid if its wildcard
+     * field is unassigned, i.e., the field "b" remains unassigned. If the wildcard field is
+     * unassigned, the assignment becomes redundant. This is because the index bounds would be
+     * effectively the same as those derived from a $_path expanded CWI (i.e., {a: 1, $_path: 1}).
+     * This can lead to redundant enumeration of query plans and also difficulty in building correct
+     * index bounds, thus we need to remove such cases.
+     *
+     * This function first checks if an index is a non-$_path expanded CWI. If found, then it
+     * proceeds as follows:
+     * - Traverses each node in the tree, checking nodes that are conjunctive, which means they
+     *   consist of a set of predicates suitable for logical conjunction (such as $and and
+     *   $elemMatch nodes).
+     * - For nodes that are not conjunctive, it checks the current assignment (if any) and strips if
+     *   invalid.
+     * - When there are several AND-related leaf predicates, in post-traversal, if none of the
+     *   predicates are assigned to the wildcard field, then the assignments are stripped from all
+     *   predicates.
+     *
+     * Example 1:
+     * For a query {$and: [{a: {$gt: 10}}, {$and: [{b: 1}, {a: {$lt: 20}}]}]}, all the 3 AND-related
+     * leaf predicates may have been assigned with index {a: 1, b: 1} where "b" is the wildcard
+     * field. Because the root $and is a conjunctive node, we need to evaluate them collectively in
+     * post-traversal at the root $and. Given that the assignment for {b: 1} is valid, no
+     * assignments are stripped.
+     *
+     * Example 2:
+     * Conversely, for a query {$and: [{a: {$gt: 10}}, {$and: [{c: 1}, {a: {$lt: 20}}]}]}, the
+     * wildcard field "b" is unassigned. In this case, at the root $and, all the 3 assignments
+     * are stripped in post-traversal as no valid assignments involving the wildcard field exist.
+     */
+    static void stripInvalidAssignmentsToCompoundWildcardIndexes(
+        MatchExpression* root, const std::vector<IndexEntry>& indices);
 
     /**
      * This function strips RelevantTag assignments to partial indices, where the assignment is

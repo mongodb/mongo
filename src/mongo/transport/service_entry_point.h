@@ -29,89 +29,35 @@
 
 #pragma once
 
-#include <limits>
-
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/client.h"
-#include "mongo/db/dbmessage.h"
-#include "mongo/transport/session.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/logv2/log_severity_suppressor.h"
+#include "mongo/rpc/message.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/future.h"
 
 namespace mongo {
+class OperationContext;
+struct DbResponse;
 
 /**
  * This is the entrypoint from the transport layer into mongod or mongos.
- *
- * The ServiceEntryPoint accepts new Sessions from the TransportLayer, and is
- * responsible for running these Sessions in a get-Message, run-Message,
- * reply-with-Message loop.  It may not do this on the TransportLayer’s thread.
  */
 class ServiceEntryPoint {
+private:
     ServiceEntryPoint(const ServiceEntryPoint&) = delete;
     ServiceEntryPoint& operator=(const ServiceEntryPoint&) = delete;
+
+protected:
+    ServiceEntryPoint() = default;
 
 public:
     virtual ~ServiceEntryPoint() = default;
 
     /**
-     * Begin running a new Session. This method returns immediately.
-     */
-    virtual void startSession(transport::SessionHandle session) = 0;
-
-    /**
-     * End all sessions that do not match the mask in tags.
-     */
-    virtual void endAllSessions(transport::Session::TagMask tags) = 0;
-
-    /**
-     * Starts the service entry point
-     */
-    virtual Status start() = 0;
-
-    /**
-     * Shuts down the service entry point.
-     */
-    virtual bool shutdown(Milliseconds timeout) = 0;
-
-    /**
-     * Append high-level stats to a BSONObjBuilder for serverStatus
-     */
-    virtual void appendStats(BSONObjBuilder* bob) const = 0;
-
-    /**
-     * Returns the number of sessions currently open.
-     */
-    virtual size_t numOpenSessions() const = 0;
-
-    /**
-     * Returns the maximum number of sessions that can be open.
-     */
-    virtual size_t maxOpenSessions() const {
-        return std::numeric_limits<size_t>::max();
-    }
-
-    /**
      * Processes a request and fills out a DbResponse.
      */
     virtual Future<DbResponse> handleRequest(OperationContext* opCtx,
-                                             const Message& request) noexcept = 0;
-
-    /**
-     * Optional handler which is invoked after a session ends.
-     *
-     * This function implies that the Session itself will soon be destructed.
-     */
-    virtual void onEndSession(const transport::SessionHandle&) {}
-
-    /**
-     * Optional handler which is invoked after a client disconnect. A client disconnect occurs when
-     * the connection between the mongo process and client is closed for any reason, and is defined
-     * by the destruction and cleanup of the ServiceStateMachine that manages the client.
-     */
-    virtual void onClientDisconnect(Client* client) {}
-
-protected:
-    ServiceEntryPoint() = default;
+                                             const Message& request,
+                                             Date_t started) = 0;
 };
-
 }  // namespace mongo

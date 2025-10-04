@@ -7,28 +7,23 @@
 // not see the secondaries. Either the primary connection gets reset, or the primary could change.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
-(function() {
-'use strict';
-load("jstests/replsets/rslib.js");
+import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var shardTest =
-    new ShardingTest({name: "recovering_secondaryok", shards: 2, mongos: 2, other: {rs: true}});
+let shardTest = new ShardingTest({name: "recovering_secondaryok", shards: 2, mongos: 2, other: {rs: true}});
 
-var mongos = shardTest.s0;
-var mongosSOK = shardTest.s1;
+let mongos = shardTest.s0;
+let mongosSOK = shardTest.s1;
 mongosSOK.setSecondaryOk();
 
-var admin = mongos.getDB("admin");
-var config = mongos.getDB("config");
-
 const dbName = "test";
-var dbase = mongos.getDB(dbName);
-var coll = dbase.getCollection("foo");
-var dbaseSOk = mongosSOK.getDB("" + dbase);
-var collSOk = mongosSOK.getCollection("" + coll);
+let dbase = mongos.getDB(dbName);
+let coll = dbase.getCollection("foo");
+let collSOk = mongosSOK.getCollection("" + coll);
 
-var rsA = shardTest.rs0;
-var rsB = shardTest.rs1;
+let rsA = shardTest.rs0;
+let rsB = shardTest.rs1;
 
 assert.commandWorked(rsA.getPrimary().getDB("test_a").dummy.insert({x: 1}));
 assert.commandWorked(rsB.getPrimary().getDB("test_b").dummy.insert({x: 1}));
@@ -43,22 +38,23 @@ assert.commandWorked(coll.save({_id: 1, b: "b", date: new Date()}));
 
 print("2: shard collection");
 
-shardTest.shardColl(coll,
-                    /* shardBy */ {_id: 1},
-                    /* splitAt */ {_id: 0},
-                    /* move chunk */ {_id: 0},
-                    /* dbname */ null,
-                    /* waitForDelete */ true);
+shardTest.shardColl(
+    coll,
+    /* shardBy */ {_id: 1},
+    /* splitAt */ {_id: 0},
+    /* move chunk */ {_id: 0},
+    /* dbname */ null,
+    /* waitForDelete */ true,
+);
 
 print("3: test normal and secondaryOk queries");
 
 // Make shardA and rsA the same
-var shardA = shardTest.getShard(coll, {_id: -1});
-var shardAColl = shardA.getCollection("" + coll);
-var shardB = shardTest.getShard(coll, {_id: 1});
+let shardA = shardTest.getShard(coll, {_id: -1});
+let shardAColl = shardA.getCollection("" + coll);
 
 if (shardA.name == rsB.getURL()) {
-    var swap = rsB;
+    let swap = rsB;
     rsB = rsA;
     rsA = swap;
 }
@@ -67,7 +63,7 @@ rsA.awaitReplication();
 rsB.awaitReplication();
 
 // Because of async migration cleanup, we need to wait for this condition to be true
-assert.soon(function() {
+assert.soon(function () {
     return coll.find().itcount() == collSOk.find().itcount();
 });
 
@@ -76,9 +72,9 @@ assert.eq(shardAColl.findOne()._id, -1);
 
 print("5: make one of the secondaries RECOVERING");
 
-var secs = rsA.getSecondaries();
-var goodSec = secs[0];
-var badSec = secs[1];
+let secs = rsA.getSecondaries();
+let goodSec = secs[0];
+let badSec = secs[1];
 
 assert.commandWorked(badSec.adminCommand("replSetMaintenance"));
 rsA.waitForState(badSec, ReplSetTest.State.RECOVERING);
@@ -94,11 +90,13 @@ assert.eq(2, collSOk.find().itcount());
 
 print("8: restart both our secondaries clean");
 
-rsA.restart(rsA.getSecondaries(), {remember: true, startClean: true}, undefined, 5 * 60 * 1000);
+rsA.getSecondaries().forEach((secondary) =>
+    rsA.restart(secondary, {remember: true, startClean: true}, undefined, 5 * 60 * 1000),
+);
 
 print("9: wait for recovery");
 
-rsA.waitForState(rsA.getSecondaries(), ReplSetTest.State.SECONDARY, 5 * 60 * 1000);
+rsA.awaitSecondaryNodes(5 * 60 * 1000);
 
 print("10: check our regular and secondaryOk query");
 
@@ -113,9 +111,9 @@ awaitRSClientHosts(collSOk.getMongo(), [rsA.getSecondaries()[0]], {secondary: tr
 awaitRSClientHosts(collSOk.getMongo(), [rsB.getSecondaries()[0]], {secondary: true, ok: true});
 
 print("SecondaryOk Query...");
-var sOKCount = collSOk.find().itcount();
+let sOKCount = collSOk.find().itcount();
 
-var collCount = null;
+let collCount = null;
 try {
     print("Normal query...");
     collCount = coll.find().itcount();
@@ -131,4 +129,3 @@ try {
 assert.eq(collCount, sOKCount);
 
 shardTest.stop();
-})();

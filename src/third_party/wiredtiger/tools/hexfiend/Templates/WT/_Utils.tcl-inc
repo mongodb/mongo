@@ -1,0 +1,294 @@
+# vi: ft=tcl sw=2 ts=2 et
+
+package require cmdline
+
+###############################
+# Global Helpers
+
+proc globals {args} {
+  foreach pat $args {
+    foreach sym [info globals $pat] {
+      uplevel 1 [list global $sym]
+    }
+  }
+}
+
+proc main_guard {body} {
+    global errorInfo
+    set errorInfo "(no error)"
+    if [catch {
+        uplevel 1 $body
+    }] {
+        uplevel 1 { entry "FATAL" $errorInfo }
+    }
+}
+
+proc main_guard2 {body args} {
+  global errorInfo
+  set errorInfo "(no error)"
+  parseIfOkErrArgs "" default
+  set err [catch { uplevel 1 $body; return 1 }]
+  if {$err eq "" || $err != 1} {
+    if {$ifOk ne ""} { return [uplevel 1 $ifOk] } else { return 1 }
+  } else {
+    if {$ifErr eq "default"} {
+      uplevel 1 {
+        global errorInfo
+        entry "ERROR(g) \[[dx [pos]]\]" $errorInfo 1 [expr {[pos] < [len] ? [pos]-1 : [len]-1}]
+      }
+      return 0
+    } else { return [uplevel 1 $ifErr] }
+  }
+}
+
+set ssOk 1
+proc ssection {args} {
+  globals ssOk errorInfo
+  set ssOk 1
+  parseIfOkErrArgs "" default
+  if {[llength $args] < 2} { error "ssection needs at least 2 args: name, body" }
+  set sectionName "?:"
+  foreach arg $args {
+    if {![string match "-*" $arg]} {
+      set sectionName "$arg:";
+      if {$ifErr eq "default"} { set ifErr "global errorInfo; error \"$sectionName\$errorInfo\"" }
+      break
+    }
+  }
+
+  set catchCode [join [list {
+    global errorInfo
+    entry "ERROR \[[dx [pos]]\]" "} $sectionName {$errorInfo" 1 [expr {[pos] < [len] ? [pos]-1 : [len]-1}]
+    expr 0
+  }] ""]
+  set body [lindex $args end]
+  set body [list if "\[[list catch "$body\nexpr 1"]\]" $catchCode]
+  set sectionCall [list section {*}[lreplace $args end end $body]]
+  set sectionCallWrap [join [list $sectionCall {expr 1}] "\n"]
+  set callRes [uplevel 1 $sectionCall]
+  if {$callRes eq "" || $callRes} {
+    if {$ifOk ne ""} { return [uplevel 1 $ifOk] } else { return 1 }
+  } else {
+    set ssOk 0
+    #error $errorInfo
+    if {$ifErr ne ""} { return [uplevel 1 $ifErr] } else { return 0 }
+  }
+}
+
+proc parseIfOkErrArgs {{ifOk ""} {ifErr ""}} {
+  uplevel 1 [list lassign [list $ifOk $ifErr] ifOk ifErr]
+  uplevel 1 {
+    while {1} {
+      switch -- [lindex $args end-1] {
+        && { set ifOk [lindex $args end]; set args [lrange $args 0 end-2] }
+        || { set ifErr [lindex $args end]; set args [lrange $args 0 end-2] }
+        default break
+      }
+    }
+  }
+}
+
+proc splitcmd {str {lst 1}} {
+  lassign {0 {} ""} len ret cmd
+  foreach s [split $str "\r\n;"] {
+    append cmd $s
+    incr len [string length $s]
+    if {[info complete $cmd]} {
+      if {$cmd ne ""} {
+        if {$lst} { set cmd [list {*}$cmd] }
+        if {[llength $cmd] && [string range [lindex $cmd 0] 0 0] ne "#"} { lappend ret $cmd }
+      }
+      set cmd ""
+    } else {
+      append cmd [string range $str $len $len]
+    }
+    incr len
+  }
+  return $ret
+}
+
+proc iscompound {val} {
+  set l [llength $val]
+  if {!$l} { return 0 }
+  if {$l > 1} { return 1 }
+  set val2 [lindex $val 0]
+  if {$val2 eq $val} { return 0 }
+  iscompound $val2
+}
+proc printcmd {str {indent ""}} {
+  set i 0
+  foreach cmd [splitcmd $str 1] {
+    incr i
+    set ii 0
+    foreach cmdarg $cmd {
+      set subcmd [splitcmd $cmdarg 1]
+      if {![iscompound $subcmd]} {
+        puts "${indent}cmd$i arg[incr ii] <$cmdarg>"
+      } else {
+        printcmd $cmdarg "${indent}cmd$i arg[incr ii] "
+      }
+    }
+  }
+}
+
+proc nswitch {val cases} {
+  set val [uplevel 1 [list expr $val]]
+  set carryover 0
+  foreach {cmp body} $cases {
+    if {$carryover || $cmp eq "default" || $val == [uplevel 1 [list expr $cmp]]} {
+      if {$body eq "|" || $body eq "-"} { set carryover 1; continue }
+      return [uplevel 1 $body]
+    }
+  }
+  error "switch $val fallthrough"
+}
+
+proc _enum_base {_up _init _incr _fmt args} {
+  switch [llength $args] {
+    0 { return }
+    1 { set name ""; lassign $args enums; }
+    2 { lassign $args name enums }
+    default { error "enum accepts 1 or 2 arguments" }
+  }
+  set index [expr $_init]
+  set ret {}
+  foreach var $enums {
+    if {[llength $var] == 2} {
+      set index [lindex $var 1]
+      set index [uplevel $_up [list expr $index]]
+      set var [lindex $var 0]
+    }
+    if {$var ne ""} {
+      upvar $_up $var v
+      set v $index
+      lappend ret $var
+    }
+    set index [expr $_incr]
+  }
+  if {$name ne ""} {
+    upvar $_up $name v
+    set v $ret
+    set glbls "global $name;"
+    foreach x $ret { append glbls "global $ret;" }
+    uplevel 1 "proc format_$name {val} { $glbls $_fmt \$val \$$name }"
+  }
+}
+
+proc enum {args} { _enum_base 2 0 {$index + 1} format_enum {*}$args }
+
+proc enum_bits {args} { _enum_base 2 1 {$index + $index} format_bits {*}$args }
+
+proc format_enum {val vals} {
+  foreach var $vals {
+    if {$var ne ""} {
+      if {[uplevel [list info vars $var]] eq ""} { return "ERROR: $var doesn't exist in the scope" }
+      upvar 1 $var v
+      if {$val == $v} {
+        return "$var ($val)"
+      }
+    }
+  }
+  return $val
+}
+
+proc format_bits {val vals} {
+  set ret {}
+  foreach var $vals {
+    if {$var ne ""} {
+      if {[uplevel [list info vars $var]] eq ""} { return "ERROR: $var doesn't exist in the scope" }
+      upvar 1 $var v
+      if {$val & $v} {
+        lappend ret $var
+      }
+    }
+  }
+  return "[join $ret " | "] ([hx $val])"
+}
+
+proc strcut {str args} {
+  if {[llength $args] == 1} { set args [lindex $args 0] }
+  set m {}
+  foreach x $args {lappend m $x ""}
+  string map $m $str
+}
+
+###############################
+
+proc hx {x} { format "0x%X" $x }
+proc xd {x} { format "0x%X (%d)" $x $x }
+proc dx {x} { format "%d (0x%X)" $x $x }
+
+proc npos {delta} { return [expr {[pos] - $delta}] }
+
+# Remaining size
+proc endpos {start maxlen} { expr {$start + $maxlen} }
+#proc endpos {args} { set ret 0; foreach arg $args { incr ret $arg } }
+proc gotoend {start maxlen} { goto [endpos $start $maxlen] }
+proc remaining {start maxlen} { expr {$start + $maxlen - [pos]} }
+proc ifrem {start maxlen szvar args} {
+  # args parsing:
+  # https://wiki.tcl-lang.org/page/Argument+Parsing%2C+a+discussion
+  # https://wiki.tcl-lang.org/page/Named+arguments
+  # array set opt $args; $opt(arg) ...
+  # foreach {name val} $args {set $name $val}
+  # https://core.tcl-lang.org/tcllib/doc/tcllib-1-18/embedded/www/tcllib/files/modules/cmdline/cmdline.html
+
+  foreach {name val} [::cmdline::getoptions args {{align} {ok.arg ""} {fail.arg ""} {0.arg ""}}] { set $name $val }
+
+  upvar 1 $szvar sz
+  set sz [remaining $start $maxlen]
+
+  if {$sz > 0} { set ret [uplevel 1 $ok] } \
+  elseif {$sz < 0} { set ret [uplevel 1 $fail] } \
+  else { set ret [uplevel 1 [expr {${0} ne "" ? ${0} : $fail}]] }
+  if {[llength $args]} { set ret [uplevel 1 $args] }
+
+  if {$align} { goto [endpos $start $maxlen]}
+
+  return $ret
+}
+proc pad {start maxlen args} {
+  ifrem $start $maxlen sz -align -ok {
+    bytes $sz "pad \[[dx $sz]\]"
+  } {*}$args
+}
+
+###############################
+
+# xentry [-sub] [-var] [-varname name] [-from offset] [-to offset] name fn
+proc xentry {args} {
+  foreach {name val} [::cmdline::getoptions args {{sub} {var} {varname.arg ""} {from.arg ""} {to.arg ""}}] { set $name $val }
+  if {[llength $args] != 2} { error "xentry expects 2 args: name and fn; given: $args" }
+  lassign $args name fn
+
+  set pos0 [expr {$from eq "" ? [pos] : $from}]
+  set val [if {!$sub} { uplevel 1 $fn } else { eval $fn }]
+  set pos1 [expr {$to eq "" ? [pos] : $to}]
+  set sz [expr {$pos1 - $pos0}]
+  if {$sz > 0} { entry $name $val $sz $pos0 } else { entry $name $val }
+
+  if {$var && $varname eq ""} { set varname $name }
+  if {$varname ne ""} { upvar 1 $varname _; set _ $val; }
+
+  return $val
+}
+
+proc union {entries} {
+  set pos0 [pos]
+  set len 0
+  foreach body $entries {
+    uplevel 1 $body
+    set len [expr {max($len, [pos] - $pos0)}]
+    goto $pos0
+  }
+  gotoend $pos0 $len
+}
+
+proc peek {fn} {
+  set pos0 [pos]
+  set val [uplevel 1 $fn]
+  #set val [eval $fn]
+  goto $pos0
+  return $val
+}
+

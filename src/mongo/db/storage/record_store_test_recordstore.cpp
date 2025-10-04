@@ -27,13 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/storage/record_store_test_harness.h"
-
-
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/record_store_test_harness.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
+#include <string>
 
 namespace mongo {
 namespace {
@@ -42,24 +41,13 @@ using std::string;
 using std::unique_ptr;
 
 // Verify that the name of the record store is not NULL and nonempty.
-TEST(RecordStoreTestHarness, RecordStoreName) {
+TEST(RecordStoreTest, RecordStoreName) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         const char* name = rs->name();
         ASSERT(name != nullptr && name[0] != '\0');
-    }
-}
-
-// Verify that the namespace of the record store is nonempty.
-TEST(RecordStoreTestHarness, Namespace) {
-    const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
-
-    {
-        string ns = rs->ns();
-        ASSERT(ns[0] != '\0');
     }
 }
 

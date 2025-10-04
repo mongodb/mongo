@@ -27,14 +27,28 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/client/connection_string.h"
+#include "mongo/client/dbclient_base.h"
 #include "mongo/client/dbclient_connection.h"
-
-#include "mongo/base/checked_cast.h"
+#include "mongo/db/database_name.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/unittest/integration_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/time_support.h"
+
+#include <memory>
 
 namespace mongo {
 namespace {
@@ -58,7 +72,7 @@ public:
         auto conn = makeConn(kAppName + "-cleanup");
 
         BSONObj currOp;
-        if (!conn->runCommand("admin", BSON("currentOp" << 1), currOp))
+        if (!conn->runCommand(DatabaseName::kAdmin, BSON("currentOp" << 1), currOp))
             uassertStatusOK(getStatusFromCommandResult(currOp));
 
         for (auto&& op : currOp["inprog"].Obj()) {
@@ -74,7 +88,8 @@ public:
 
             // Ignore failures to clean up.
             BSONObj ignored;
-            (void)conn->runCommand("admin", BSON("killOp" << 1 << "op" << op["opid"]), ignored);
+            (void)conn->runCommand(
+                DatabaseName::kAdmin, BSON("killOp" << 1 << "op" << op["opid"]), ignored);
         }
     }
 };
@@ -85,8 +100,8 @@ TEST_F(DBClientConnectionFixture, shutdownWorksIfCalledFirst) {
     conn->shutdownAndDisallowReconnect();
 
     BSONObj reply;
-    ASSERT_THROWS(conn->runCommand("admin", sleepCmd, reply),
-                  ExceptionForCat<ErrorCategory::NetworkError>);  // Currently SocketException.
+    ASSERT_THROWS(conn->runCommand(DatabaseName::kAdmin, sleepCmd, reply),
+                  ExceptionFor<ErrorCategory::NetworkError>);  // Currently SocketException.
 }
 
 TEST_F(DBClientConnectionFixture, shutdownWorksIfRunCommandInProgress) {
@@ -100,8 +115,8 @@ TEST_F(DBClientConnectionFixture, shutdownWorksIfRunCommandInProgress) {
     ON_BLOCK_EXIT([&] { shutdownThread.join(); });
 
     BSONObj reply;
-    ASSERT_THROWS(conn->runCommand("admin", sleepCmd, reply),
-                  ExceptionForCat<ErrorCategory::NetworkError>);  // Currently HostUnreachable.
+    ASSERT_THROWS(conn->runCommand(DatabaseName::kAdmin, sleepCmd, reply),
+                  ExceptionFor<ErrorCategory::NetworkError>);  // Currently HostUnreachable.
 }
 
 }  // namespace

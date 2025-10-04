@@ -26,36 +26,56 @@
 # it in the license file.
 #
 
-# This file defines structures used to represent change events that occur 
-# during a resharding operation. The ReshardingChangeEventO2Field struct is 
+# This file defines structures used to represent change events that occur
+# during a resharding operation. The ReshardingChangeEventO2Field struct is
 # stored in the o2 field in oplog entries.
-
 
 global:
     cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/s/resharding/resharding_util.h"
 
 imports:
-    - "mongo/idl/basic_types.idl"
-
-enums:
-    ReshardingChangeEvent:
-        description: "Types of possible change events during a resharding operation."
-        type: string
-        values:
-            kReshardBegin: "reshardBegin"
-            kReshardDoneCatchUp: "reshardDoneCatchUp"
+    - "mongo/db/basic_types.idl"
 
 structs:
-    ReshardingChangeEventO2Field:
+    ReshardBeginChangeEventO2Field:
         description: >-
-            Represents a change that occurs during a resharding operation.
-            Stored in the o2 field of an oplog entry.
+            Represents a change event which signifies the beginning of a resharding operation on a donor shard.
         generate_comparison_operators: true
         strict: false
         fields:
+            reshardBegin:
+                type: namespacestring
+            reshardingUUID:
+                type: uuid
+                description: "The UUID for this resharding operation."
+
+    ReshardBlockingWritesChangeEventO2Field:
+        description: >-
+            Represents a change event which signifies the start of the critical section of a resharding operation on a donor shard.
+        generate_comparison_operators: true
+        strict: false
+        fields:
+            reshardBlockingWrites:
+                type: namespacestring
             reshardingUUID:
                 type: uuid
                 description: "The UUID for this resharding operation."
             type:
-                type: ReshardingChangeEvent
-                description: "The type of change that occured during the resharding operation."
+                type: string
+                description: "Used to mark this change event as the final oplog entry from this donor shard."
+                validator:
+                    callback: resharding::validateReshardBlockingWritesO2FieldType
+
+    ReshardDoneCatchUpChangeEventO2Field:
+        description: >-
+            Represents a change event which signifies the end of the catchup phase of a resharding operation on a recipient shard.
+        generate_comparison_operators: true
+        strict: false
+        fields:
+            reshardDoneCatchUp:
+                type: namespacestring
+            reshardingUUID:
+                type: uuid
+                description: "The UUID for this resharding operation."

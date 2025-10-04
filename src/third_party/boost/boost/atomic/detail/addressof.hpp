@@ -38,7 +38,11 @@ namespace atomics {
 namespace detail {
 
 template< typename T >
-BOOST_FORCEINLINE T* addressof(T& value) BOOST_NOEXCEPT
+BOOST_FORCEINLINE
+#if defined(BOOST_ATOMIC_DETAIL_HAS_BUILTIN_ADDRESSOF)
+BOOST_CONSTEXPR
+#endif
+T* addressof(T& value) BOOST_NOEXCEPT
 {
 #if defined(BOOST_ATOMIC_DETAIL_HAS_BUILTIN_ADDRESSOF)
     return __builtin_addressof(value);

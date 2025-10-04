@@ -1,0 +1,63 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/replica_sets_jscore_pqs_index_filters.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
+##########################################################
+description:
+  Test the correctness of query settings application by replacing index
+  filter commands with query settings ones. This suite runs a select subset of jscore
+  tests on a replica set fixture. For testing purposes, SetQuerySettingsCommand and
+  RemoveQuerySettingsCommand clear the plan cache upon successful command exectution.
+  However, since only the SBE plan cache is cleared (classic cache is untouched),
+  this suite can only be run with 'internalQueryFrameworkControl' server parameter
+  set to 'trySbeEngine'.
+executor:
+  archive:
+    hooks:
+      - RunDBCheckInBackground
+      - CheckReplDBHashInBackground
+      - ValidateCollectionsInBackground
+      - CheckReplDBHash
+      - CheckReplOplogs
+      - ValidateCollections
+  config:
+    shell_options:
+      eval:
+        'globalThis.testingReplication = true;; await import("jstests/libs/override_methods/make_index_filters_into_query_settings.js");
+        db.adminCommand({configureFailPoint: ''querySettingsPlanCacheInvalidation'',
+        mode: ''alwaysOn''});'
+      global_vars:
+        TestData:
+          isIndexFiltersToQuerySettings: true
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+    num_nodes: 2
+  hooks:
+    - class: RunDBCheckInBackground
+    - class: CheckReplDBHashInBackground
+    - class: ValidateCollectionsInBackground
+    - class: CheckReplOplogs
+    - class: CheckReplDBHash
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
+matrix_suite: true
+selector:
+  exclude_files: []
+  exclude_with_any_tags:
+    - assumes_standalone_mongod
+    - requires_profiling
+  roots:
+    - jstests/core/index/index_filter_catalog_independent.js
+    - jstests/core/index/index_filter_collation.js
+    - jstests/core/index/index_filter_commands.js
+    - jstests/core/index/index_filter_on_hidden_index.js
+    - jstests/core/index/wildcard/wildcard_index_filter.js
+    - jstests/core/index/wildcard/compound_wildcard_index_filter.js
+test_kind: js_test

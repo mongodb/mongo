@@ -21,42 +21,6 @@ extern "C" {
  * @addtogroup wt_ext
  * @{
  */
-
-/*!
- * Read-committed isolation level, returned by
- * WT_EXTENSION_API::transaction_isolation_level.
- */
-#define WT_TXN_ISO_READ_COMMITTED 1
-/*!
- * Read-uncommitted isolation level, returned by
- * WT_EXTENSION_API::transaction_isolation_level.
- */
-#define WT_TXN_ISO_READ_UNCOMMITTED 2
-/*!
- * Snapshot isolation level, returned by
- * WT_EXTENSION_API::transaction_isolation_level.
- */
-#define WT_TXN_ISO_SNAPSHOT 3
-
-typedef struct __wt_txn_notify WT_TXN_NOTIFY;
-/*!
- * Snapshot isolation level, returned by
- * WT_EXTENSION_API::transaction_isolation_level.
- */
-struct __wt_txn_notify {
-    /*!
-     * A method called when the session's current transaction is committed
-     * or rolled back.
-     *
-     * @param notify a pointer to the event handler
-     * @param session the current session handle
-     * @param txnid the transaction ID
-     * @param committed an integer value which is non-zero if the
-     * transaction is being committed.
-     */
-    int (*notify)(WT_TXN_NOTIFY *notify, WT_SESSION *session, uint64_t txnid, int committed);
-};
-
 typedef struct __wt_extension_spinlock WT_EXTENSION_SPINLOCK;
 /*!
  * A placeholder data structure that allows for using the WiredTiger
@@ -104,7 +68,7 @@ struct __wt_extension_api {
      *
      * @param wt_api the extension handle
      * @param session the session handle (or NULL if none available)
-     * @param fmt a printf-like format specification
+     * @param fmt a printf-style format specification
      * @errors
      *
      * @snippet ex_data_source.c WT_EXTENSION_API err_printf
@@ -116,7 +80,7 @@ struct __wt_extension_api {
      *
      * @param wt_api the extension handle
      * @param session the session handle (or NULL if none available)
-     * @param fmt a printf-like format specification
+     * @param fmt a printf-style format specification
      * @errors
      *
      * @snippet ex_data_source.c WT_EXTENSION_API msg_printf
@@ -141,7 +105,7 @@ struct __wt_extension_api {
      * @param wt_api the extension handle
      * @param session the session handle (or NULL if none available)
      * @param windows_error a Windows system error code
-     * @returns a string representation of the error
+     * @returns a Unix-style error code
      *
      * @snippet ex_data_source.c WT_EXTENSION_API map_windows_error
      */
@@ -236,13 +200,27 @@ struct __wt_extension_api {
       const char *key, WT_CONFIG_ITEM *value);
 
     /*!
-     * @copydoc wiredtiger_config_parser_open
+     * Create a handle that can be used to parse or create configuration strings
+     * compatible with the WiredTiger API.
+     * @param wt_api the extension handle
+     * @param session the session handle to be used for error reporting
+     * @param config the configuration string being parsed. The string must
+     *     remain valid for the lifetime of the parser handle.
+     * @param len the number of valid bytes in \c config
+     * @param[out] config_parserp A pointer to the newly opened handle
+     * @errors
      */
     int (*config_parser_open)(WT_EXTENSION_API *wt_api, WT_SESSION *session, const char *config,
       size_t len, WT_CONFIG_PARSER **config_parserp);
 
     /*!
-     * @copydoc wiredtiger_config_parser_open
+     * Create a handle that can be used to parse or create configuration strings
+     * compatible with the WiredTiger API.
+     * @param wt_api the extension handle
+     * @param session the session handle to be used for error reporting
+     * @param config the configuration argument passed to the extension
+     * @param[out] config_parserp A pointer to the newly opened handle
+     * @errors
      */
     int (*config_parser_open_arg)(WT_EXTENSION_API *wt_api, WT_SESSION *session,
       WT_CONFIG_ARG *config, WT_CONFIG_PARSER **config_parserp);
@@ -475,73 +453,6 @@ struct __wt_extension_api {
     int (*unpack_uint)(WT_EXTENSION_API *wt_api, WT_PACK_STREAM *ps, uint64_t *up);
 
     /*!
-     * Return the current transaction ID.
-     *
-     * @param wt_api the extension handle
-     * @param session the session handle
-     * @returns the current transaction ID.
-     *
-     * @snippet ex_data_source.c WT_EXTENSION transaction ID
-     */
-    uint64_t (*transaction_id)(WT_EXTENSION_API *wt_api, WT_SESSION *session);
-
-    /*!
-     * Return the current transaction's isolation level; returns one of
-     * ::WT_TXN_ISO_READ_COMMITTED, ::WT_TXN_ISO_READ_UNCOMMITTED, or
-     * ::WT_TXN_ISO_SNAPSHOT.
-     *
-     * @param wt_api the extension handle
-     * @param session the session handle
-     * @returns the current transaction's isolation level.
-     *
-     * @snippet ex_data_source.c WT_EXTENSION transaction isolation level
-     */
-    int (*transaction_isolation_level)(WT_EXTENSION_API *wt_api, WT_SESSION *session);
-
-    /*!
-     * Request notification of transaction resolution by specifying a
-     * function to be called when the session's current transaction is
-     * either committed or rolled back.  If the transaction is being
-     * committed, but the notification function returns an error, the
-     * transaction will be rolled back.
-     *
-     * @param wt_api the extension handle
-     * @param session the session handle
-     * @param notify a handler for commit or rollback events
-     * @errors
-     *
-     * @snippet ex_data_source.c WT_EXTENSION transaction notify
-     */
-    int (*transaction_notify)(WT_EXTENSION_API *wt_api, WT_SESSION *session, WT_TXN_NOTIFY *notify);
-
-    /*!
-     * Return the oldest transaction ID not yet visible to a running
-     * transaction.
-     *
-     * @param wt_api the extension handle
-     * @param session the session handle
-     * @returns the oldest transaction ID not yet visible to a running
-     * transaction.
-     *
-     * @snippet ex_data_source.c WT_EXTENSION transaction oldest
-     */
-    uint64_t (*transaction_oldest)(WT_EXTENSION_API *wt_api);
-
-    /*!
-     * Return if the current transaction can see the given transaction ID.
-     *
-     * @param wt_api the extension handle
-     * @param session the session handle
-     * @param transaction_id the transaction ID
-     * @returns true (non-zero) if the transaction ID is visible to the
-     * current transaction.
-     *
-     * @snippet ex_data_source.c WT_EXTENSION transaction visible
-     */
-    int (*transaction_visible)(
-      WT_EXTENSION_API *wt_api, WT_SESSION *session, uint64_t transaction_id);
-
-    /*!
      * @copydoc wiredtiger_version
      */
     const char *(*version)(int *majorp, int *minorp, int *patchp);
@@ -595,7 +506,7 @@ struct __wt_extension_api {
  *
  * A configuration object passed to some extension interfaces.  This is an
  * opaque type: configuration values can be queried using
- * WT_EXTENSION_API::config_get
+ * WT_EXTENSION_API::config_get.
  */
 
 /*! @} */

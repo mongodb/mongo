@@ -1,0 +1,147 @@
+/*! @page durability_log Commit-level durability
+
+The next level of WiredTiger transactional application involves adding
+commit-level durability for data modifications. As described in
+@ref durability_checkpoint, WiredTiger supports checkpoint durability
+by default. Commit-level durability requires additional configuration.
+
+@section commit_durability_enable Enabling commit-level durability
+
+To enable commit-level durability, pass the <tt>log=(enabled)</tt>
+configuration string to ::wiredtiger_open. This causes WiredTiger to write
+records into the log for each transaction, giving all objects opened in the
+database commit-level durability. The operational transactional API does
+not otherwise change.
+
+\warning
+By default, log records are written to an in-memory buffer before
+WT_SESSION::commit_transaction returns, giving the highest performance but
+not ensuring immediate durability. The database can be configured to flush
+log records to the operating system buffer cache (ensuring durability over
+application failure), or to stable storage (ensuring durability over system
+failure), but that will impact performance.
+See @ref commit_durability_flush_config for more information.
+
+It is possible to enable commit-level durability for some database
+objects and not others.
+To do this, one must pass \c "log=(enabled)" to ::wiredtiger_open and
+then pass \c "log=(enabled=false)" to WT_SESSION::create for the objects
+that should continue to use checkpoint durability.
+(Doing the converse is not supported, that is,
+enabling logging on some tables while leaving the global switch turned
+off.)
+
+\warning
+Making commits to both checkpoint-durable and commit-durable objects in the same
+transaction requires caution: if the system crashes before another checkpoint is
+taken, any such transaction will be torn, only the commit-durable part of it
+will remain and the rest will be lost. In most cases this is undesirable,
+however, this combination can be usefully leveraged to create application-level
+write-ahead logs and is therefore explicitly supported.
+
+While this is rarely useful, object logging can be toggled during application restart
+(in other words, logging can be enabled for a table previously created or used
+with logging disabled, and vice-versa). Log records found during recovery are
+applied to the table, regardless of whether logging is currently configured for
+the table.
+
+@section commit_durability_logs Commit-level durability and logs
+
+Commit-level durability is implemented using a write-ahead log.
+When logging is enabled for an object, WiredTiger writes a record to
+the log for each update operating on the object.
+Transactions group updates, and in keeping with the principle of
+atomicity each transaction's updates become durable when the
+transaction is committed.
+
+By default, log records are buffered in memory and not flushed to disk
+immediately, even when committed; groups of transactions are flushed
+together.
+(See @ref commit_durability_group_commit.)
+It is possible to flush transactions to disk more aggressively if
+desired.
+See @ref commit_durability_flush_config.
+
+@section commit_durability_recovery Recovery
+
+When the transactional log is enabled, calling ::wiredtiger_open
+automatically performs a recovery step when opening the database.
+This rolls the log forward; that is, it
+reapplies whatever changes from the log are required to bring the database
+up to date with the most recent transactional state.
+
+This recovery step
+may require extensions be available when it runs (for example, collators
+and compression).
+Therefore, applications using commit-level durability must configure
+extensions with the \c extensions keyword to ::wiredtiger_open consistently
+whenever re-opening the database.
+
+@section commit_durability_checkpoint Checkpoints
+
+When using commit-level durability one should still perform
+checkpoints of the database.
+Database checkpoints are necessary for two reasons: First, log files can
+only be removed after a checkpoint completes, and so the frequency of
+checkpoints determines the disk space required by log files.  Second,
+checkpoints bound the time required for recovery to complete after
+application or system failure by limiting the log records that need to
+be processed.
+
+@section commit_durability_backup Backups
+
+Backups are done using backup cursors (see @ref backup for more information).
+
+With logging enabled, partial backups (backups where not all of the database
+objects are copied) may result in error messages during recovery, because data
+files referenced in the logs might not be found.  Applications should either
+copy all objects and log files if commit-level durability of the copied database
+is required, or alternatively, copy only selected objects when backing up and
+not copy log files at all, then fall back to checkpoint durability when
+activating the backup.
+
+@section commit_durability_archiving Log file archival and removal
+
+WiredTiger log files are named "WiredTigerLog.[number]" where "[number]"
+is a 10-digit value, for example <tt>WiredTigerLog.0000000001</tt>.
+The log file with the largest number in its name is the most recent log
+file written. The log file size can be set using the \c log configuration
+to ::wiredtiger_open.
+
+By default, WiredTiger automatically removes log files no longer required for
+recovery. Applications wanting to archive log files instead (for example, to
+support catastrophic recovery), must disable log file removal using the
+::wiredtiger_open \c "log=(remove=false)" configuration.
+
+Log files may be removed or archived after a checkpoint has completed,
+as long as there is no backup in progress.
+
+Immediately after the checkpoint has completed, only the most recent log file
+is needed for recovery, and all other log files can be removed or archived.
+Note that there must always be at least one log file for the database.
+
+@section commit_log_cursors Log cursors
+
+Applications can independently read and write WiredTiger log files for their own
+purposes (for example, inserting debugging records), using the standard
+WiredTiger cursor interfaces. See @ref cursor_log for more information.
+
+Open log cursors prevent WiredTiger from automatically removing log files.
+Therefore, we recommend proactively closing log cursors when done with them.
+Applications manually removing log files should take care that no log cursors
+are opened in the log when removing files or errors may occur when trying to
+read a log record in a file that was removed.
+
+@section commit_durability_bulk Bulk loads
+
+@copydoc doc_bulk_durability
+
+@section commit_durability_tuning Tuning commit-level durability
+
+@subsection commit_durability_group_commit Group commit
+@copydoc doc_tune_durability_group_commit
+
+@subsection commit_durability_flush_config Flush call configuration
+@copydoc doc_tune_durability_flush_config
+
+ */

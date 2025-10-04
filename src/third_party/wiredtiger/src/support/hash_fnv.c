@@ -123,7 +123,7 @@
  * NOTE: To use the recommended 64 bit FNV-1a hash, use FNV1A_64_INIT as the
  * 	 hval arg on the first call to either fnv_64a_buf() or fnv_64a_str().
  */
-static inline uint64_t
+static WT_INLINE uint64_t
 fnv_64a_buf(const void *buf, size_t len, uint64_t hval)
 {
 	const unsigned char *bp = buf;		/* start of buffer */

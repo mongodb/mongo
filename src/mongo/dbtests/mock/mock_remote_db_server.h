@@ -29,23 +29,33 @@
 
 #pragma once
 
-#include <string>
-#include <vector>
-
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bson_field.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/client/connection_string.h"
-#include "mongo/client/query.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/query/find_command_gen.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/unique_message.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/spin_lock.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/uuid.h"
+
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace projection_executor {
 class ProjectionExecutor;
 }  // namespace projection_executor
 
-const std::string IdentityNS("local.me");
+const NamespaceString IdentityNS = NamespaceString::createNamespaceString_forTest("local.me");
 const BSONField<std::string> HostField("host");
 
 /**
@@ -137,18 +147,18 @@ public:
     /**
      * Inserts a single document to this server.
      *
-     * @param ns the namespace to insert the document to.
+     * @param nss the namespace to insert the document to.
      * @param obj the document to insert.
      */
-    void insert(const std::string& ns, BSONObj obj);
+    void insert(const NamespaceString& nss, BSONObj obj);
 
     /**
      * Removes documents from this server.
      *
-     * @param ns the namespace to remove documents from.
+     * @param nss the namespace to remove documents from.
      * @param filter ignored.
      */
-    void remove(const std::string& ns, const BSONObj& filter);
+    void remove(const NamespaceString& nss, const BSONObj& filter);
 
     /**
      * Assign a UUID to a collection
@@ -156,7 +166,7 @@ public:
      * @param ns the namespace to be associated with the uuid.
      * @param uuid the uuid to associate with the namespace.
      */
-    void assignCollectionUuid(const std::string& ns, const mongo::UUID& uuid);
+    void assignCollectionUuid(StringData ns, const mongo::UUID& uuid);
 
     //
     // DBClientBase methods
@@ -167,20 +177,6 @@ public:
      * Finds documents from this mock server according to 'findRequest'.
      */
     mongo::BSONArray find(InstanceID id, const FindCommandRequest& findRequest);
-
-    /**
-     * Legacy query API: New callers should use 'find()' rather than this method.
-     */
-    mongo::BSONArray query(InstanceID id,
-                           const NamespaceStringOrUUID& nsOrUuid,
-                           const BSONObj& filter,
-                           const Query& querySettings,
-                           int limit = 0,
-                           int nToSkip = 0,
-                           const mongo::BSONObj* fieldsToReturn = nullptr,
-                           int queryOptions = 0,
-                           int batchSize = 0,
-                           boost::optional<BSONObj> readConcernObj = boost::none);
 
     //
     // Getters
@@ -278,6 +274,7 @@ private:
     InstanceID _instanceID;
 
     // protects this entire instance
-    mutable mongo::SpinLock _lock;
+    mutable SpinLock _lock;
 };
+
 }  // namespace mongo

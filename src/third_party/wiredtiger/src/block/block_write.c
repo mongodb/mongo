@@ -9,18 +9,19 @@
 #include "wt_internal.h"
 
 /*
- * __wt_block_truncate --
+ * __wti_block_truncate --
  *     Truncate the file.
  */
 int
-__wt_block_truncate(WT_SESSION_IMPL *session, WT_BLOCK *block, wt_off_t len)
+__wti_block_truncate(WT_SESSION_IMPL *session, WT_BLOCK *block, wt_off_t len)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
 
     conn = S2C(session);
 
-    __wt_verbose(session, WT_VERB_BLOCK, "truncate file to %" PRIuMAX, (uintmax_t)len);
+    __wt_verbose(
+      session, WT_VERB_BLOCK, "truncate file %s to %" PRIuMAX, block->name, (uintmax_t)len);
 
     /*
      * Truncate requires serialization, we depend on our caller for that.
@@ -39,9 +40,8 @@ __wt_block_truncate(WT_SESSION_IMPL *session, WT_BLOCK *block, wt_off_t len)
      * backups, which only copies log files, or targeted backups, stops all block truncation
      * unnecessarily). We may want a more targeted solution at some point.
      */
-    if (conn->hot_backup_start == 0) {
+    if (__wt_atomic_load64(&conn->hot_backup_start) == 0)
         WT_WITH_HOTBACKUP_READ_LOCK(session, ret = __wt_ftruncate(session, block->fh, len), NULL);
-    }
 
     /*
      * The truncate may fail temporarily or permanently (for example, there may be a file mapping if
@@ -52,11 +52,11 @@ __wt_block_truncate(WT_SESSION_IMPL *session, WT_BLOCK *block, wt_off_t len)
 }
 
 /*
- * __wt_block_discard --
+ * __wti_block_discard --
  *     Discard blocks from the system buffer cache.
  */
 int
-__wt_block_discard(WT_SESSION_IMPL *session, WT_BLOCK *block, size_t added_size)
+__wti_block_discard(WT_SESSION_IMPL *session, WT_BLOCK *block, size_t added_size)
 {
     WT_DECL_RET;
     WT_FILE_HANDLE *handle;
@@ -84,15 +84,17 @@ __wt_block_discard(WT_SESSION_IMPL *session, WT_BLOCK *block, size_t added_size)
 }
 
 /*
- * __wt_block_extend --
+ * __block_extend --
  *     Extend the file.
  */
-static inline int
-__wt_block_extend(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_FH *fh, wt_off_t offset,
+static WT_INLINE int
+__block_extend(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_FH *fh, wt_off_t offset,
   size_t align_size, bool *release_lockp)
 {
     WT_DECL_RET;
     WT_FILE_HANDLE *handle;
+
+    WT_ASSERT_SPINLOCK_OWNED(session, &block->live_lock);
 
     /*
      * The locking in this function is messy: by definition, the live system is locked when we're
@@ -151,10 +153,12 @@ __wt_block_extend(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_FH *fh, wt_off_t
     }
 
     /*
-     * The extend might fail (for example, the file is mapped into memory), or discover file
-     * extension isn't supported; both are OK.
+     * The extend might fail (for example, the file is mapped into memory or a backup is in
+     * progress), or discover file extension isn't supported; both are OK.
      */
-    ret = __wt_fextend(session, fh, block->extend_size);
+    if (__wt_atomic_load64(&S2C(session)->hot_backup_start) == 0)
+        WT_WITH_HOTBACKUP_READ_LOCK(
+          session, ret = __wt_fextend(session, fh, block->extend_size), NULL);
     return (ret == EBUSY || ret == ENOTSUP ? 0 : ret);
 }
 
@@ -177,7 +181,9 @@ __wt_block_write_size(WT_SESSION_IMPL *session, WT_BLOCK *block, size_t *sizep)
      * interested in debugging corner cases anyway.
      */
     *sizep = (size_t)WT_ALIGN(*sizep + WT_BLOCK_HEADER_BYTE_SIZE, block->allocsize);
-    return (*sizep > UINT32_MAX - 1024 ? EINVAL : 0);
+    if (*sizep > UINT32_MAX - 1024)
+        WT_RET_MSG(session, EINVAL, "requested block size is too large");
+    return (0);
 }
 
 /*
@@ -185,18 +191,21 @@ __wt_block_write_size(WT_SESSION_IMPL *session, WT_BLOCK *block, size_t *sizep)
  *     Write a buffer into a block, returning the block's address cookie.
  */
 int
-__wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uint8_t *addr,
-  size_t *addr_sizep, bool data_checksum, bool checkpoint_io)
+__wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf,
+  WT_PAGE_BLOCK_META *block_meta, uint8_t *addr, size_t *addr_sizep, bool data_checksum,
+  bool checkpoint_io)
 {
     wt_off_t offset;
-    uint32_t checksum, objectid, size;
+    uint32_t checksum, size;
     uint8_t *endp;
 
-    WT_RET(__wt_block_write_off(session, block, buf, &objectid, &offset, &size, &checksum,
-      data_checksum, checkpoint_io, false));
+    WT_UNUSED(block_meta);
+
+    WT_RET(__wti_block_write_off(
+      session, block, buf, &offset, &size, &checksum, data_checksum, checkpoint_io, false));
 
     endp = addr;
-    WT_RET(__wt_block_addr_pack(block, &endp, objectid, offset, size, checksum));
+    WT_RET(__wt_block_addr_pack(block, &endp, block->objectid, offset, size, checksum));
     *addr_sizep = WT_PTRDIFF(endp, addr);
 
     return (0);
@@ -207,37 +216,32 @@ __wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uint8_
  *     Write a buffer into a block, returning the block's offset, size and checksum.
  */
 static int
-__block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uint32_t *objectidp,
-  wt_off_t *offsetp, uint32_t *sizep, uint32_t *checksump, bool data_checksum, bool checkpoint_io,
-  bool caller_locked)
+__block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, wt_off_t *offsetp,
+  uint32_t *sizep, uint32_t *checksump, bool data_checksum, bool checkpoint_io, bool caller_locked)
 {
     WT_BLOCK_HEADER *blk;
     WT_DECL_RET;
     WT_FH *fh;
     wt_off_t offset;
     size_t align_size;
-    uint32_t checksum, objectid;
+    uint64_t time_start, time_stop;
+    uint32_t checksum;
     uint8_t *file_sizep;
     bool local_locked;
+
+    time_start = __wt_clock(session);
 
     *offsetp = 0;   /* -Werror=maybe-uninitialized */
     *sizep = 0;     /* -Werror=maybe-uninitialized */
     *checksump = 0; /* -Werror=maybe-uninitialized */
 
     fh = block->fh;
-    objectid = block->objectid;
-
-    /* Buffers should be aligned for writing. */
-    if (!F_ISSET(buf, WT_ITEM_ALIGNED)) {
-        WT_ASSERT(session, F_ISSET(buf, WT_ITEM_ALIGNED));
-        WT_RET_MSG(session, EINVAL, "direct I/O check: write buffer incorrectly allocated");
-    }
 
     /*
      * File checkpoint/recovery magic: done before sizing the buffer as it may grow the buffer.
      */
     if (block->final_ckpt != NULL)
-        WT_RET(__wt_block_checkpoint_final(session, block, buf, &file_sizep));
+        WT_RET(__wti_block_checkpoint_final(session, block, buf, &file_sizep));
 
     /*
      * Align the size to an allocation unit.
@@ -257,7 +261,7 @@ __block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uint3
     }
 
     /* Pre-allocate some number of extension structures. */
-    WT_RET(__wt_block_ext_prealloc(session, 5));
+    WT_RET(__wti_block_ext_prealloc(session, 5));
 
     /*
      * Acquire a lock, if we don't already hold one. Allocate space for the write, and optionally
@@ -269,9 +273,9 @@ __block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uint3
         __wt_spin_lock(session, &block->live_lock);
         local_locked = true;
     }
-    ret = __wt_block_alloc(session, block, &offset, (wt_off_t)align_size);
+    ret = __wti_block_alloc(session, block, &offset, (wt_off_t)align_size);
     if (ret == 0)
-        ret = __wt_block_extend(session, block, fh, offset, align_size, &local_locked);
+        ret = __block_extend(session, block, fh, offset, align_size, &local_locked);
     if (local_locked)
         __wt_spin_unlock(session, &block->live_lock);
     WT_RET(ret);
@@ -327,17 +331,13 @@ __block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uint3
     if ((ret = __wt_write(session, fh, offset, align_size, buf->mem)) != 0) {
         if (!caller_locked)
             __wt_spin_lock(session, &block->live_lock);
-        WT_TRET(__wt_block_off_free(session, block, objectid, offset, (wt_off_t)align_size));
+        WT_TRET(
+          __wti_block_off_free(session, block, block->objectid, offset, (wt_off_t)align_size));
         if (!caller_locked)
             __wt_spin_unlock(session, &block->live_lock);
         WT_RET(ret);
     }
 
-    if (block->fh->file_type == WT_FS_OPEN_FILE_TYPE_DATA) {
-        WT_TRET_ERROR_OK(
-          __wt_blkcache_put(session, offset, align_size, checksum, buf->mem, checkpoint_io, true),
-          WT_BLKCACHE_FULL);
-    }
     /*
      * Optionally schedule writes for dirty pages in the system buffer cache, but only if the
      * current session can wait.
@@ -356,17 +356,19 @@ __block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uint3
     }
 
     /* Optionally discard blocks from the buffer cache. */
-    WT_RET(__wt_block_discard(session, block, align_size));
+    WT_RET(__wti_block_discard(session, block, align_size));
 
     WT_STAT_CONN_INCR(session, block_write);
     WT_STAT_CONN_INCRV(session, block_byte_write, align_size);
     if (checkpoint_io)
         WT_STAT_CONN_INCRV(session, block_byte_write_checkpoint, align_size);
+    time_stop = __wt_clock(session);
+    __wt_stat_msecs_hist_incr_bmwrite(session, WT_CLOCKDIFF_MS(time_stop, time_start));
 
-    __wt_verbose(session, WT_VERB_WRITE, "off %" PRIuMAX ", size %" PRIuMAX ", checksum %#" PRIx32,
-      (uintmax_t)offset, (uintmax_t)align_size, checksum);
+    __wt_verbose_debug2(session, WT_VERB_WRITE,
+      "off %" PRIuMAX ", size %" PRIuMAX ", checksum %#" PRIx32, (uintmax_t)offset,
+      (uintmax_t)align_size, checksum);
 
-    *objectidp = objectid;
     *offsetp = offset;
     *sizep = WT_STORE_SIZE(align_size);
     *checksump = checksum;
@@ -375,13 +377,12 @@ __block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uint3
 }
 
 /*
- * __wt_block_write_off --
+ * __wti_block_write_off --
  *     Write a buffer into a block, returning the block's offset, size and checksum.
  */
 int
-__wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uint32_t *objectidp,
-  wt_off_t *offsetp, uint32_t *sizep, uint32_t *checksump, bool data_checksum, bool checkpoint_io,
-  bool caller_locked)
+__wti_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, wt_off_t *offsetp,
+  uint32_t *sizep, uint32_t *checksump, bool data_checksum, bool checkpoint_io, bool caller_locked)
 {
     WT_DECL_RET;
 
@@ -391,8 +392,8 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, ui
      * never see anything other than their original content.
      */
     __wt_page_header_byteswap(buf->mem);
-    ret = __block_write_off(session, block, buf, objectidp, offsetp, sizep, checksump,
-      data_checksum, checkpoint_io, caller_locked);
+    ret = __block_write_off(
+      session, block, buf, offsetp, sizep, checksump, data_checksum, checkpoint_io, caller_locked);
     __wt_page_header_byteswap(buf->mem);
     return (ret);
 }

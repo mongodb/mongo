@@ -1,93 +1,66 @@
-/*
-  Copyright (C) 1999, 2002 Aladdin Enterprises.  All rights reserved.
-
-  This software is provided 'as-is', without any express or implied
-  warranty.  In no event will the authors be held liable for any damages
-  arising from the use of this software.
-
-  Permission is granted to anyone to use this software for any purpose,
-  including commercial applications, and to alter it and redistribute it
-  freely, subject to the following restrictions:
-
-  1. The origin of this software must not be misrepresented; you must not
-     claim that you wrote the original software. If you use this software
-     in a product, an acknowledgment in the product documentation would be
-     appreciated but is not required.
-  2. Altered source versions must be plainly marked as such, and must not be
-     misrepresented as being the original software.
-  3. This notice may not be removed or altered from any source distribution.
-
-  L. Peter Deutsch
-  ghost@aladdin.com
-
- */
-/* $Id: md5.h,v 1.4 2002/04/13 19:20:28 lpd Exp $ */
-/*
-  Independent implementation of MD5 (RFC 1321).
-
-  This code implements the MD5 Algorithm defined in RFC 1321, whose
-  text is available at
-    http://www.ietf.org/rfc/rfc1321.txt
-  The code is derived from the text of the RFC, including the test suite
-  (section A.5) but excluding the rest of Appendix A.  It does not include
-  any code or documentation that is identified in the RFC as being
-  copyrighted.
-
-  The original and principal author of md5.h is L. Peter Deutsch
-  <ghost@aladdin.com>.  Other authors are noted in the change history
-  that follows (in reverse chronological order):
-
-  2002-04-13 lpd Removed support for non-ANSI compilers; removed
-    references to Ghostscript; clarified derivation from RFC 1321;
-    now handles byte order either statically or dynamically.
-  1999-11-04 lpd Edited comments slightly for automatic TOC extraction.
-  1999-10-18 lpd Fixed typo in header comment (ansi2knr rather than md5);
-    added conditionalization for C++ compilation from Martin
-    Purschke <purschke@bnl.gov>.
-  1999-05-03 lpd Original version.
+/**
+ *    Copyright (C) 2024-present MongoDB, Inc.
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the Server Side Public License, version 1,
+ *    as published by MongoDB, Inc.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    Server Side Public License for more details.
+ *
+ *    You should have received a copy of the Server Side Public License
+ *    along with this program. If not, see
+ *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the Server Side Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
  */
 
-#ifndef md5_INCLUDED
-#define md5_INCLUDED
+#pragma once
 
-/*
- * This package supports both compile-time and run-time determination of CPU
- * byte order.  If ARCH_IS_BIG_ENDIAN is defined as 0, the code will be
- * compiled to run only on little-endian CPUs; if ARCH_IS_BIG_ENDIAN is
- * defined as non-zero, the code will be compiled to run only on big-endian
- * CPUs; if ARCH_IS_BIG_ENDIAN is not defined, the code will be compiled to
- * run on either big- or little-endian CPUs, but will run slightly less
- * efficiently on either one than if ARCH_IS_BIG_ENDIAN is defined.
- */
+#include <string>
 
-// Don't do this. Turns out its actually slower...
-// #define ARCH_IS_BIG_ENDIAN 0
+#include <tomcrypt.h>
 
-typedef unsigned char md5_byte_t; /* 8-bit byte */
-typedef unsigned int md5_word_t;  /* 32-bit word */
+namespace mongo {
 
-/* Define the state of the MD5 Algorithm. */
-typedef struct md5_state_s {
-    md5_word_t count[2]; /* message length in bits, lsw first */
-    md5_word_t abcd[4];  /* digest buffer */
-    md5_byte_t buf[64];  /* accumulate block */
-} md5_state_t;
+using md5digest = unsigned char[16];
+using md5_byte_t = unsigned char; /* 8-bit byte */
+using md5_word_t = unsigned int;  /* 32-bit word */
+using md5_state_t = hash_state;
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/* Initialize the algorithm. */
-void md5_init(md5_state_t* pms);
+void md5_init_state(md5_state_t* pms);
 
 /* Append a std::string to the message. */
 void md5_append(md5_state_t* pms, const md5_byte_t* data, int nbytes);
 
-/* Finish the message and return the digest. */
+/* Finish the message and store the result in the digest. */
 void md5_finish(md5_state_t* pms, md5_byte_t digest[16]);
 
-#ifdef __cplusplus
-} /* end extern "C" */
-#endif
+// Calculate the MD5 digest for the given buffer and store the result in the specified digest array.
+void md5(const void* buf, int nbytes, md5digest digest);
 
-#endif /* md5_INCLUDED */
+// Calculate the MD5 digest for the input string and store the result in the specified digest array.
+void md5(const char* str, md5digest digest);
+
+// Convert the MD5 digest array into a hexadecimal string representation.
+std::string digestToString(md5digest digest);
+
+// Calculate the MD5 digest for the given buffer and return the result as a hexadecimal string.
+std::string md5simpledigest(const void* buf, int nbytes);
+
+// Calculate the MD5 digest for the input string and return the result as a hexadecimal string.
+std::string md5simpledigest(const std::string& s);
+
+}  // namespace mongo

@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/platform/shared_library.h"
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 

@@ -29,9 +29,15 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_consistency_markers.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -39,7 +45,7 @@ class BSONObj;
 class OperationContext;
 class Timestamp;
 
-namespace repl {
+namespace MONGO_MOD_PUB repl {
 
 /**
  * A mock ReplicationConsistencyMarkers implementation that stores everything in memory.
@@ -57,12 +63,6 @@ public:
     void setInitialSyncFlag(OperationContext* opCtx) override;
     void clearInitialSyncFlag(OperationContext* opCtx) override;
 
-    OpTime getMinValid(OperationContext* opCtx) const override;
-    void setMinValid(OperationContext* opCtx,
-                     const OpTime& minValid,
-                     bool alwaysAllowUntimestampedWrite = false) override;
-    void setMinValidToAtLeast(OperationContext* opCtx, const OpTime& minValid) override;
-
     void ensureFastCountOnOplogTruncateAfterPoint(OperationContext* opCtx) override;
 
     void setOplogTruncateAfterPoint(OperationContext* opCtx, const Timestamp& timestamp) override;
@@ -77,10 +77,8 @@ public:
     boost::optional<OpTimeAndWallTime> refreshOplogTruncateAfterPointIfPrimary(
         OperationContext* opCtx) override;
 
-    void setAppliedThrough(OperationContext* opCtx,
-                           const OpTime& optime,
-                           bool setTimestamp = true) override;
-    void clearAppliedThrough(OperationContext* opCtx, const Timestamp& writeTimestamp) override;
+    void setAppliedThrough(OperationContext* opCtx, const OpTime& optime) override;
+    void clearAppliedThrough(OperationContext* opCtx) override;
     OpTime getAppliedThrough(OperationContext* opCtx) const override;
 
     Status createInternalCollections(OperationContext* opCtx) override;
@@ -90,17 +88,15 @@ public:
     BSONObj getInitialSyncId(OperationContext* opCtx) override;
 
 private:
-    mutable Mutex _initialSyncFlagMutex =
-        MONGO_MAKE_LATCH("ReplicationConsistencyMarkersMock::_initialSyncFlagMutex");
+    mutable stdx::mutex _initialSyncFlagMutex;
     bool _initialSyncFlag = false;
 
-    mutable Mutex _minValidBoundariesMutex =
-        MONGO_MAKE_LATCH("ReplicationConsistencyMarkersMock::_minValidBoundariesMutex");
+    mutable stdx::mutex _minValidBoundariesMutex;
     OpTime _appliedThrough;
     OpTime _minValid;
     Timestamp _oplogTruncateAfterPoint;
     BSONObj _initialSyncId;
 };
 
-}  // namespace repl
+}  // namespace MONGO_MOD_PUB repl
 }  // namespace mongo

@@ -27,16 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/scripting/mozjs/cursor.h"
 
-#include "mongo/scripting/mozjs/bson.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/internedstring.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
-#include "mongo/scripting/mozjs/wrapconstrainedmethod.h"
+#include "mongo/scripting/mozjs/wrapconstrainedmethod.h"  // IWYU pragma: keep
+
+#include <js/CallArgs.h>
+#include <js/Object.h>
+#include <js/PropertySpec.h>
+#include <js/RootingAPI.h>
+#include <js/TypeDecls.h>
 
 namespace mongo {
 namespace mozjs {
@@ -58,7 +62,9 @@ const char* const CursorInfo::className = "Cursor";
 namespace {
 
 DBClientCursor* getCursor(JSObject* thisv) {
-    return static_cast<CursorInfo::CursorHolder*>(JS_GetPrivate(thisv))->cursor.get();
+    auto cursorHolder = JS::GetMaybePtrFromReservedSlot<CursorInfo::CursorHolder>(
+        thisv, CursorInfo::CursorHolderSlot);
+    return cursorHolder ? cursorHolder->cursor.get() : nullptr;
 }
 
 DBClientCursor* getCursor(JS::CallArgs& args) {
@@ -67,11 +73,11 @@ DBClientCursor* getCursor(JS::CallArgs& args) {
 
 }  // namespace
 
-void CursorInfo::finalize(js::FreeOp* fop, JSObject* obj) {
-    auto cursor = static_cast<CursorInfo::CursorHolder*>(JS_GetPrivate(obj));
+void CursorInfo::finalize(JS::GCContext* gcCtx, JSObject* obj) {
+    auto cursor = JS::GetMaybePtrFromReservedSlot<CursorInfo::CursorHolder>(obj, CursorHolderSlot);
 
     if (cursor) {
-        getScope(fop)->trackedDelete(cursor);
+        getScope(gcCtx)->trackedDelete(cursor);
     }
 }
 
@@ -82,6 +88,8 @@ void CursorInfo::Functions::next::call(JSContext* cx, JS::CallArgs args) {
         args.rval().setUndefined();
         return;
     }
+
+    uassert(9279715, "Cursor is not initialized", cursor->isInitialized());
 
     ObjectWrapper o(cx, args.thisv());
 
@@ -101,6 +109,8 @@ void CursorInfo::Functions::hasNext::call(JSContext* cx, JS::CallArgs args) {
         return;
     }
 
+    uassert(9279716, "Cursor is not initialized", cursor->isInitialized());
+
     args.rval().setBoolean(cursor->more());
 }
 
@@ -111,6 +121,8 @@ void CursorInfo::Functions::objsLeftInBatch::call(JSContext* cx, JS::CallArgs ar
         args.rval().setInt32(0);
         return;
     }
+
+    uassert(9279717, "Cursor is not initialized", cursor->isInitialized());
 
     args.rval().setInt32(cursor->objsLeftInBatch());
 }
@@ -159,6 +171,8 @@ void CursorInfo::Functions::hasMoreToCome::call(JSContext* cx, JS::CallArgs args
         args.rval().setBoolean(false);
         return;
     }
+
+    uassert(9279718, "Cursor is not initialized", cursor->isInitialized());
 
     args.rval().setBoolean(cursor->hasMoreToCome());
 }

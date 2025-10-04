@@ -3,7 +3,7 @@
  * (See accompanying file LICENSE_1_0.txt or copy at
  * http://www.boost.org/LICENSE_1_0.txt)
  *
- * Copyright (c) 2020 Andrey Semashev
+ * Copyright (c) 2020-2021 Andrey Semashev
  */
 /*!
  * \file   atomic/ipc_atomic_ref.hpp
@@ -15,7 +15,6 @@
 #define BOOST_ATOMIC_IPC_ATOMIC_REF_HPP_INCLUDED_
 
 #include <boost/assert.hpp>
-#include <boost/static_assert.hpp>
 #include <boost/memory_order.hpp>
 #include <boost/atomic/capabilities.hpp>
 #include <boost/atomic/detail/config.hpp>
@@ -44,9 +43,9 @@ private:
 public:
     typedef typename base_type::value_type value_type;
 
-    BOOST_STATIC_ASSERT_MSG(sizeof(value_type) > 0u, "boost::ipc_atomic_ref<T> requires T to be a complete type");
+    static_assert(sizeof(value_type) > 0u, "boost::ipc_atomic_ref<T> requires T to be a complete type");
 #if !defined(BOOST_ATOMIC_DETAIL_NO_CXX11_IS_TRIVIALLY_COPYABLE)
-    BOOST_STATIC_ASSERT_MSG(atomics::detail::is_trivially_copyable< value_type >::value, "boost::ipc_atomic_ref<T> requires T to be a trivially copyable type");
+    static_assert(atomics::detail::is_trivially_copyable< value_type >::value, "boost::ipc_atomic_ref<T> requires T to be a trivially copyable type");
 #endif
 
 private:
@@ -74,9 +73,22 @@ public:
     BOOST_DELETED_FUNCTION(ipc_atomic_ref& operator= (ipc_atomic_ref const&))
 };
 
+#if !defined(BOOST_NO_CXX17_DEDUCTION_GUIDES)
+template< typename T >
+ipc_atomic_ref(T&) -> ipc_atomic_ref< T >;
+#endif // !defined(BOOST_NO_CXX17_DEDUCTION_GUIDES)
+
+//! IPC atomic reference factory function
+template< typename T >
+BOOST_FORCEINLINE ipc_atomic_ref< T > make_ipc_atomic_ref(T& value) BOOST_NOEXCEPT
+{
+    return ipc_atomic_ref< T >(value);
+}
+
 } // namespace atomics
 
 using atomics::ipc_atomic_ref;
+using atomics::make_ipc_atomic_ref;
 
 } // namespace boost
 

@@ -1,0 +1,16 @@
+# Golden test output of SBESetWindowFieldsTest/LastTestConstantValueNegativeWindow
+[2] project [s11 = makeBsonObj(MakeObjSpec([last = Set(0)], Open, NewObj, 0), s2, s10)] 
+[2] project [s10 = 
+    if exists(s5) 
+    then 
+        if (s5 > 0ll) 
+        then 1000 
+        else null 
+    
+    else null 
+] 
+[2] window [s2, s7] [frameFirst[], frameLast[s6, s9], lowBound{((s8 <=> (s7 + -2)) >= 0)}, highBound{((s8 <=> (s7 + -1)) <= 0)}] [s5 = {init{}, add{sum(1ll)}, remove{sum(-1ll)}}] 
+[2] agg_project [s7 = sum(1)] 
+[1] project [s3 = getField(s2, "a")] 
+[1] project [s2 = getElement(s1, 0)] 
+[1] virtualscan s1 {[[{"a" : 1, "b" : 1}], [{"a" : 2, "b" : 3}], [{"a" : 3, "b" : 5}], [{"a" : 4, "b" : 7}]]} 

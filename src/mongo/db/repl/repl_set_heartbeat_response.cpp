@@ -27,22 +27,23 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 
-#include <string>
-
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/repl/bson_extract_optime.h"
-#include "mongo/db/server_options.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <string>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
+
 
 namespace mongo {
 namespace repl {
@@ -54,10 +55,12 @@ const std::string kConfigTermFieldName = "configTerm";
 const std::string kElectionTimeFieldName = "electionTime";
 const std::string kMemberStateFieldName = "state";
 const std::string kOkFieldName = "ok";
-const std::string kDurableOpTimeFieldName = "durableOpTime";
-const std::string kDurableWallTimeFieldName = "durableWallTime";
 const std::string kAppliedOpTimeFieldName = "opTime";
 const std::string kAppliedWallTimeFieldName = "wallTime";
+const std::string kWrittenOpTimeFieldName = "writtenOpTime";
+const std::string kWrittenWallTimeFieldName = "writtenWallTime";
+const std::string kDurableOpTimeFieldName = "durableOpTime";
+const std::string kDurableWallTimeFieldName = "durableWallTime";
 const std::string kPrimaryIdFieldName = "primaryId";
 const std::string kReplSetFieldName = "set";
 const std::string kSyncSourceFieldName = "syncingTo";
@@ -70,6 +73,14 @@ const std::string kIsElectableFieldName = "electable";
 void ReplSetHeartbeatResponse::addToBSON(BSONObjBuilder* builder) const {
     builder->append(kOkFieldName, 1.0);
     if (_electionTimeSet) {
+        // TODO: SERVER-108961
+        // We currently set the electionTime using Timestamp.toLL() which forms the 64b integer
+        // value with the seconds-since-unix-epoch value in the high 32b and the increment in the
+        // low 32b. this is notably *NOT* the number of milliseconds since the unix epoch, and is
+        // only correct on accident, since during `initialize` we reverse this same incorrect
+        // conversion. The only time this value is *wrong* is when stored in the BSON document as a
+        // Date - it is not an equivalent value when interpreted as msec since the epoch. However,
+        // we believe it is correct on both ends before/after performing the conversions.
         builder->appendDate(kElectionTimeFieldName,
                             Date_t::fromMillisSinceEpoch(_electionTime.asLL()));
     }
@@ -95,13 +106,17 @@ void ReplSetHeartbeatResponse::addToBSON(BSONObjBuilder* builder) const {
     if (_primaryIdSet) {
         builder->append(kPrimaryIdFieldName, _primaryId);
     }
-    if (_durableOpTimeSet) {
-        _durableOpTime.append(builder, kDurableOpTimeFieldName);
-        builder->appendDate(kDurableWallTimeFieldName, _durableWallTime);
-    }
     if (_appliedOpTimeSet) {
-        _appliedOpTime.append(builder, kAppliedOpTimeFieldName);
+        _appliedOpTime.append(kAppliedOpTimeFieldName, builder);
         builder->appendDate(kAppliedWallTimeFieldName, _appliedWallTime);
+    }
+    if (_writtenOpTimeSet) {
+        _writtenOpTime.append(kWrittenOpTimeFieldName, builder);
+        builder->appendDate(kWrittenWallTimeFieldName, _writtenWallTime);
+    }
+    if (_durableOpTimeSet) {
+        _durableOpTime.append(kDurableOpTimeFieldName, builder);
+        builder->appendDate(kDurableWallTimeFieldName, _durableWallTime);
     }
     if (_electableSet) {
         *builder << kIsElectableFieldName << _electable;
@@ -123,7 +138,7 @@ Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc, long long term) 
     const BSONElement replSetNameElement = doc[kReplSetFieldName];
     if (replSetNameElement.eoo()) {
         _setName.clear();
-    } else if (replSetNameElement.type() != String) {
+    } else if (replSetNameElement.type() != BSONType::string) {
         return Status(ErrorCodes::TypeMismatch,
                       str::stream() << "Expected \"" << kReplSetFieldName
                                     << "\" field in response to replSetHeartbeat to have "
@@ -136,8 +151,12 @@ Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc, long long term) 
     const BSONElement electionTimeElement = doc[kElectionTimeFieldName];
     if (electionTimeElement.eoo()) {
         _electionTimeSet = false;
-    } else if (electionTimeElement.type() == Date) {
+    } else if (electionTimeElement.type() == BSONType::date) {
         _electionTimeSet = true;
+        // TODO: SERVER-108961
+        // This explicit conversion from date to Timestamp is not correct in general, and a longer
+        // explanation of why is in the `addToBSON` method. This needs to be changed to only
+        // serialize timestamps into BSON, not the `Date_t` type.
         _electionTime = Timestamp(electionTimeElement.date());
     } else {
         return Status(ErrorCodes::TypeMismatch,
@@ -160,13 +179,19 @@ Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc, long long term) 
     BSONElement durableWallTimeElement;
     _durableWallTime = Date_t();
     status = bsonExtractTypedField(
-        doc, kDurableWallTimeFieldName, BSONType::Date, &durableWallTimeElement);
+        doc, kDurableWallTimeFieldName, BSONType::date, &durableWallTimeElement);
     if (!status.isOK()) {
         return status;
     }
     _durableWallTime = durableWallTimeElement.Date();
     _durableOpTimeSet = true;
 
+    status = bsonExtractBooleanField(doc, kIsElectableFieldName, &_electable);
+    if (!status.isOK()) {
+        _electableSet = false;
+    } else {
+        _electableSet = true;
+    }
 
     // In V1, heartbeats OpTime is type Object and we construct an OpTime out of its nested fields.
     status = bsonExtractOpTimeField(doc, kAppliedOpTimeFieldName, &_appliedOpTime);
@@ -177,24 +202,42 @@ Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc, long long term) 
     BSONElement appliedWallTimeElement;
     _appliedWallTime = Date_t();
     status = bsonExtractTypedField(
-        doc, kAppliedWallTimeFieldName, BSONType::Date, &appliedWallTimeElement);
+        doc, kAppliedWallTimeFieldName, BSONType::date, &appliedWallTimeElement);
     if (!status.isOK()) {
         return status;
     }
     _appliedWallTime = appliedWallTimeElement.Date();
     _appliedOpTimeSet = true;
 
-    status = bsonExtractBooleanField(doc, kIsElectableFieldName, &_electable);
+    status = bsonExtractOpTimeField(doc, kWrittenOpTimeFieldName, &_writtenOpTime);
     if (!status.isOK()) {
-        _electableSet = false;
-    } else {
-        _electableSet = true;
+        if (status.code() == ErrorCodes::NoSuchKey) {
+            _writtenOpTime = _appliedOpTime;
+        } else {
+            return status;
+        }
     }
+
+    BSONElement writtenWallTimeElement;
+    _writtenWallTime = Date_t();
+    status = bsonExtractTypedField(
+        doc, kWrittenWallTimeFieldName, BSONType::date, &writtenWallTimeElement);
+    if (!status.isOK()) {
+        if (status.code() == ErrorCodes::NoSuchKey) {
+            _writtenWallTime = _appliedWallTime;
+        } else {
+            return status;
+        }
+    } else {
+        _writtenWallTime = writtenWallTimeElement.Date();
+    }
+    _writtenOpTimeSet = true;
 
     const BSONElement memberStateElement = doc[kMemberStateFieldName];
     if (memberStateElement.eoo()) {
         _stateSet = false;
-    } else if (memberStateElement.type() != NumberInt && memberStateElement.type() != NumberLong) {
+    } else if (memberStateElement.type() != BSONType::numberInt &&
+               memberStateElement.type() != BSONType::numberLong) {
         return Status(ErrorCodes::TypeMismatch,
                       str::stream()
                           << "Expected \"" << kMemberStateFieldName
@@ -221,7 +264,7 @@ Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc, long long term) 
                       str::stream() << "Response to replSetHeartbeat missing required \""
                                     << kConfigVersionFieldName << "\" field");
     }
-    if (configVersionElement.type() != NumberInt) {
+    if (configVersionElement.type() != BSONType::numberInt) {
         return Status(ErrorCodes::TypeMismatch,
                       str::stream() << "Expected \"" << kConfigVersionFieldName
                                     << "\" field in response to replSetHeartbeat to have "
@@ -232,14 +275,14 @@ Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc, long long term) 
 
     // Allow a missing term field for backward compatibility.
     const BSONElement configTermElement = doc[kConfigTermFieldName];
-    if (!configTermElement.eoo() && configVersionElement.type() == NumberInt) {
+    if (!configTermElement.eoo() && configVersionElement.type() == BSONType::numberInt) {
         _configTerm = configTermElement.numberInt();
     }
 
     const BSONElement syncingToElement = doc[kSyncSourceFieldName];
     if (syncingToElement.eoo()) {
         _syncingTo = HostAndPort();
-    } else if (syncingToElement.type() != String) {
+    } else if (syncingToElement.type() != BSONType::string) {
         return Status(ErrorCodes::TypeMismatch,
                       str::stream() << "Expected \"" << kSyncSourceFieldName
                                     << "\" field in response to replSetHeartbeat to "
@@ -254,7 +297,7 @@ Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc, long long term) 
         _configSet = false;
         _config = ReplSetConfig();
         return Status::OK();
-    } else if (rsConfigElement.type() != Object) {
+    } else if (rsConfigElement.type() != BSONType::object) {
         return Status(ErrorCodes::TypeMismatch,
                       str::stream() << "Expected \"" << kConfigFieldName
                                     << "\" in response to replSetHeartbeat to have type "
@@ -299,6 +342,16 @@ OpTime ReplSetHeartbeatResponse::getAppliedOpTime() const {
 OpTimeAndWallTime ReplSetHeartbeatResponse::getAppliedOpTimeAndWallTime() const {
     invariant(_appliedOpTimeSet);
     return {_appliedOpTime, _appliedWallTime};
+}
+
+OpTime ReplSetHeartbeatResponse::getWrittenOpTime() const {
+    invariant(_writtenOpTimeSet);
+    return _writtenOpTime;
+}
+
+OpTimeAndWallTime ReplSetHeartbeatResponse::getWrittenOpTimeAndWallTime() const {
+    invariant(_writtenOpTimeSet);
+    return {_writtenOpTime, _writtenWallTime};
 }
 
 OpTime ReplSetHeartbeatResponse::getDurableOpTime() const {

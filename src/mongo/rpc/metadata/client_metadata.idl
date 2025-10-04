@@ -32,7 +32,7 @@ global:
         - "mongo/rpc/metadata/client_metadata.h"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 types:
     ClientMetadata:
@@ -41,4 +41,5 @@ types:
         cpp_type: ClientMetadata
         serializer: "mongo::ClientMetadata::getDocument"
         deserializer: "mongo::ClientMetadata::parseFromBSON"
-
+        # Deserializer uses getOwned.
+        is_view: false

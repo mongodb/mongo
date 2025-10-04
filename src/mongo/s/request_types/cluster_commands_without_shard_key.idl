@@ -1,0 +1,133 @@
+# Copyright (C) 2022-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+    mod_visibility: private
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/sharding_environment/sharding_types.idl"
+structs:
+    clusterQueryWithoutShardKeyResponse:
+        description: "The response for the '_clusterQueryWithoutShardKeyFind' command."
+        is_command_reply: true
+        strict: false
+        fields:
+            targetDoc:
+                description: >-
+                    "Contains _id or the constructed upsert document if upsert:true and no matches were
+                    found."
+                type: object
+                optional: true
+                stability: internal
+            userUpsertDocForTimeseries:
+                description: >-
+                    "Contains the user-level document if we upsert the document into a timeseries
+                    collection."
+                type: object
+                optional: true
+                stability: internal
+            shardId:
+                description: "The shard id of the target shard."
+                type: string
+                optional: true
+                stability: internal
+            upsertRequired:
+                description: "True if the targetDoc should be upserted."
+                type: bool
+                default: false
+                stability: internal
+    clusterWriteWithoutShardKeyResponse:
+        description: "The response for the '_clusterWriteWithoutShardKeyFind' command."
+        is_command_reply: true
+        strict: false
+        fields:
+            response:
+                description: "Response of the write command."
+                type: object
+                stability: internal
+            shardId:
+                description: "The shard id of the target shard for the write."
+                type: string
+                stability: internal
+commands:
+    _clusterQueryWithoutShardKey:
+        command_name: _clusterQueryWithoutShardKey
+        cpp_name: ClusterQueryWithoutShardKey
+        description: >-
+            "An internal command used to broadcast a query to all shards for updates/deletes
+            /findAndModifies that do not provide a shard key."
+        namespace: ignored
+        api_version:
+            "1" # This is an internal command that is run as a sub-operation to an
+            # update/delete/findAndModify without shard key. In the current implementation
+            # of the Stable API, sub-operations run under a command in the Stable API where
+            # a client specifies {apiStrict: true} are expected to also be Stable API
+            # compliant, when they technically should not be. To satisfy this requirement,
+            # this command is marked as part of the Stable API, but is not truly a part of
+            # it, since it is an internal-only command.
+        access_check:
+            none: true
+        reply_type: clusterQueryWithoutShardKeyResponse
+        fields:
+            writeCmd:
+                description: "The original write command."
+                type: object
+                stability: internal
+    _clusterWriteWithoutShardKey:
+        command_name: _clusterWriteWithoutShardKey
+        cpp_name: ClusterWriteWithoutShardKey
+        description: >-
+            "An internal command used to target an update/delete/findAndModify command to a
+            specific shard using a shardId."
+        namespace: ignored
+        api_version:
+            "1" # This is an internal command that is run as a sub-operation to an
+            # update/delete/findAndModify without shard key. In the current implementation
+            # of the Stable API, sub-operations run under a command in the Stable API where
+            # a client specifies {apiStrict: true} are expected to also be Stable API
+            # compliant, when they technically should not be. To satisfy this requirement,
+            # this command is marked as part of the Stable API, but is not truly a part of
+            # it, since it is an internal-only command.
+        access_check:
+            none: true
+        reply_type: clusterWriteWithoutShardKeyResponse
+        fields:
+            writeCmd:
+                description: "The original write command."
+                type: object
+                stability: internal
+            shardId:
+                description: "The shard id of the target shard for the write."
+                type: string
+                stability: internal
+            targetDocId:
+                description: "The _id value of the target document"
+                type: object
+                stability: internal

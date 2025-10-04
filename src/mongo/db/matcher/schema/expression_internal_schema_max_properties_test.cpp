@@ -27,44 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_properties.h"
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_min_properties.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
 namespace {
-
-TEST(InternalSchemaMaxPropertiesMatchExpression, RejectsObjectsWithTooManyElements) {
-    InternalSchemaMaxPropertiesMatchExpression maxProperties(0);
-
-    ASSERT_FALSE(maxProperties.matchesBSON(BSON("b" << 21)));
-    ASSERT_FALSE(maxProperties.matchesBSON(BSON("b" << 21 << "c" << 3)));
-}
-
-TEST(InternalSchemaMaxPropertiesMatchExpression, AcceptsObjectWithLessThanOrEqualToMaxElements) {
-    InternalSchemaMaxPropertiesMatchExpression maxProperties(2);
-
-    ASSERT_TRUE(maxProperties.matchesBSON(BSONObj()));
-    ASSERT_TRUE(maxProperties.matchesBSON(BSON("b" << BSONNULL)));
-    ASSERT_TRUE(maxProperties.matchesBSON(BSON("b" << 21)));
-    ASSERT_TRUE(maxProperties.matchesBSON(BSON("b" << 21 << "c" << 3)));
-}
-
-TEST(InternalSchemaMaxPropertiesMatchExpression, MaxPropertiesZeroAllowsEmptyObjects) {
-    InternalSchemaMaxPropertiesMatchExpression maxProperties(0);
-
-    ASSERT_TRUE(maxProperties.matchesBSON(BSONObj()));
-}
-
-TEST(InternalSchemaMaxPropertiesMatchExpression, NestedObjectsAreNotUnwound) {
-    InternalSchemaMaxPropertiesMatchExpression maxProperties(1);
-
-    ASSERT_TRUE(maxProperties.matchesBSON(BSON("b" << BSON("c" << 2 << "d" << 3))));
-}
 
 TEST(InternalSchemaMaxPropertiesMatchExpression, EquivalentFunctionIsAccurate) {
     InternalSchemaMaxPropertiesMatchExpression maxProperties1(1);
@@ -76,17 +51,20 @@ TEST(InternalSchemaMaxPropertiesMatchExpression, EquivalentFunctionIsAccurate) {
     ASSERT_FALSE(maxProperties1.equivalent(&maxProperties3));
 }
 
-TEST(InternalSchemaMaxPropertiesMatchExpression, NestedArraysAreNotUnwound) {
-    InternalSchemaMaxPropertiesMatchExpression maxProperties(2);
-
-    ASSERT_TRUE(maxProperties.matchesBSON(BSON("a" << (BSON("b" << 2 << "c" << 3 << "d" << 4)))));
-}
-
 TEST(InternalSchemaMaxPropertiesMatchExpression, MinPropertiesNotEquivalentToMaxProperties) {
     InternalSchemaMaxPropertiesMatchExpression maxProperties(5);
     InternalSchemaMinPropertiesMatchExpression minProperties(5);
 
     ASSERT_FALSE(maxProperties.equivalent(&minProperties));
+}
+
+DEATH_TEST_REGEX(InternalSchemaMaxPropertiesMatchExpression,
+                 GetChildFailsIndexGreaterThanZero,
+                 "Tripwire assertion.*6400216") {
+    InternalSchemaMaxPropertiesMatchExpression maxProperties(5);
+
+    ASSERT_EQ(maxProperties.numChildren(), 0);
+    ASSERT_THROWS_CODE(maxProperties.getChild(0), AssertionException, 6400216);
 }
 
 }  // namespace

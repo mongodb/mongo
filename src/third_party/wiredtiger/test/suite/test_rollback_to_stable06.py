@@ -29,18 +29,17 @@
 from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
-from test_rollback_to_stable01 import test_rollback_to_stable_base
+from rollback_to_stable_util import test_rollback_to_stable_base
 
 # test_rollback_to_stable06.py
 # Test that rollback to stable removes all keys when the stable timestamp is earlier than
 # all commit timestamps.
 class test_rollback_to_stable06(test_rollback_to_stable_base):
-    session_config = 'isolation=snapshot'
 
     format_values = [
         ('column', dict(key_format='r', value_format='S')),
         ('column_fix', dict(key_format='r', value_format='8t')),
-        ('integer_row', dict(key_format='i', value_format='S')),
+        ('row_integer', dict(key_format='i', value_format='S')),
     ]
 
     in_memory_values = [
@@ -53,24 +52,32 @@ class test_rollback_to_stable06(test_rollback_to_stable_base):
         ('prepare', dict(prepare=True))
     ]
 
-    scenarios = make_scenarios(format_values, in_memory_values, prepare_values)
+    evict = [
+        ('no_evict', dict(evict=False)),
+        ('evict', dict(evict=True))
+    ]
 
+    worker_thread_values = [
+        ('0', dict(threads=0)),
+        ('4', dict(threads=4)),
+        ('8', dict(threads=8))
+    ]
+
+    scenarios = make_scenarios(format_values, in_memory_values, prepare_values, evict, worker_thread_values)
     def conn_config(self):
-        config = 'cache_size=50MB,statistics=(all)'
+        config = 'cache_size=50MB,statistics=(all),verbose=(rts:5)'
         if self.in_memory:
             config += ',in_memory=true'
-        else:
-            config += ',log=(enabled),in_memory=false'
         return config
 
     def test_rollback_to_stable(self):
         nrows = 1000
 
-        # Create a table without logging.
+        # Create a table.
         uri = "table:rollback_to_stable06"
-        ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
-            config='log=(enabled=false)')
+        ds_config = ',log=(enabled=false)' if self.in_memory else ''
+        ds = SimpleDataSet(self, uri, 0,
+            key_format=self.key_format, value_format=self.value_format, config=ds_config)
         ds.populate()
 
         if self.value_format == '8t':
@@ -95,15 +102,15 @@ class test_rollback_to_stable06(test_rollback_to_stable_base):
         self.large_updates(uri, value_d, ds, nrows, self.prepare, 50)
 
         # Verify data is visible and correct.
-        self.check(value_a, uri, nrows, None, 20)
-        self.check(value_b, uri, nrows, None, 30)
-        self.check(value_c, uri, nrows, None, 40)
-        self.check(value_d, uri, nrows, None, 50)
+        self.check(value_a, uri, nrows, None, 21 if self.prepare else 20)
+        self.check(value_b, uri, nrows, None, 31 if self.prepare else 30)
+        self.check(value_c, uri, nrows, None, 41 if self.prepare else 40)
+        self.check(value_d, uri, nrows, None, 51 if self.prepare else 50)
 
         # Checkpoint to ensure the data is flushed, then rollback to the stable timestamp.
         if not self.in_memory:
             self.session.checkpoint()
-        self.conn.rollback_to_stable()
+        self.conn.rollback_to_stable('threads=' + str(self.threads))
 
         # Check that all keys are removed.
         # (For FLCS, at least for now, they will read back as 0, meaning deleted, rather
@@ -132,5 +139,18 @@ class test_rollback_to_stable06(test_rollback_to_stable_base):
         else:
             self.assertGreaterEqual(upd_aborted + hs_removed + keys_removed, nrows * 4)
 
-if __name__ == '__main__':
-    wttest.run()
+        # Reinsert the same updates with the same timestamps and flush to disk.
+        # If the updates have not been correctly removed by RTS WiredTiger will
+        # see the key already exists in the history store and abort.
+        self.large_updates(uri, value_a, ds, nrows, self.prepare, 20)
+        self.large_updates(uri, value_b, ds, nrows, self.prepare, 30)
+        self.large_updates(uri, value_c, ds, nrows, self.prepare, 40)
+        self.large_updates(uri, value_d, ds, nrows, self.prepare, 50)
+
+        # Do a checkpoint before shutdown
+        if not self.in_memory:
+            self.session.checkpoint()
+
+        # Evict the pages to disk
+        if self.evict:
+            self.evict_cursor(uri, nrows, value_d)

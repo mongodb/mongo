@@ -1,0 +1,19 @@
+{a: 1}
+{b: 1}
+{_id: 1, a: 1}
+
+{_id: 0, a: "\""}
+{_id: 1, a: "\"\""}
+{_id: 2, a: "\"Yippee!\""}
+{_id: 3, a: "\"Yippee!\" she said"}
+{_id: 4, a: "\"Yippee!\" she said. \"That's the right attitude.\" he chuckled."}
+{_id: 5, a: '\''}
+{_id: 6, a: '\'\''}
+{_id: 7, a: '\'Yippee!\''}
+{_id: 8, a: ""}
+{_id: 9, a: "\\"}
+{_id: 10, a: "\n"}
+{_id: 11, a: "\b"}
+{_id: 12, a: "\f"}
+{_id: 13, a: "\r"}
+{_id: 14, a: "\t"}

@@ -1,0 +1,175 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_test", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob(["*.h"]) + glob(["*.cpp"]),
+)
+
+mongo_cc_library(
+    name = "throw_hook",
+    srcs = ["throw_hook.cpp"],
+    hdrs = ["throw_hook.h"],
+    # Link all calls to __cxa_throw to __wrap___cxa_throw instead. Link
+    # calls to __real___cxa_throw to __cxa_throw. This needs to be included
+    # in every link operation where we want to install our hook, so it
+    # needs to be specified very early in our dependency tree. Fortunately,
+    # Bazel will propagate this option to all targets that depend on this
+    # target.
+    linkopts = ["-Wl,--wrap=__cxa_throw"],
+    target_compatible_with = select({
+        "@platforms//os:linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+)
+
+mongo_cc_library(
+    name = "visibility_test_libcommon",
+    srcs = [
+        "visibility_test_libcommon.cpp",
+    ],
+    hdrs = [
+        "visibility.h",
+        "visibility_test_libcommon.h",
+    ],
+    mongo_api_name = "visibility_test_libcommon",
+)
+
+mongo_cc_library(
+    name = "visibility_test_lib1",
+    srcs = [
+        "visibility_test_lib1.cpp",
+    ],
+    hdrs = [
+        "visibility_test_lib1.h",
+    ],
+    mongo_api_name = "visibility_test_lib1",
+    deps = [
+        ":visibility_test_libcommon",
+    ],
+)
+
+mongo_cc_library(
+    name = "visibility_test_lib2",
+    srcs = [
+        "visibility_test_lib2.cpp",
+    ],
+    hdrs = [
+        "visibility_test_lib2.h",
+    ],
+    mongo_api_name = "visibility_test_lib2",
+    deps = [
+        ":visibility_test_lib1",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "visibility1_test",
+    srcs = [
+        "visibility_test1.cpp",
+        "//src/mongo/util:exit_code.h",
+    ],
+    has_custom_mainline = True,
+    tags = [
+        "mongo_unittest_third_group",
+        "server-programmability",
+    ],
+    deps = [
+        ":visibility_test_lib1",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "visibility2_test",
+    srcs = [
+        "visibility_test2.cpp",
+        "//src/mongo/util:exit_code.h",
+    ],
+    has_custom_mainline = True,
+    tags = [
+        "mongo_unittest_first_group",
+        "server-programmability",
+    ],
+    deps = [
+        ":visibility_test_lib2",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "platform_test",
+    srcs = [
+        "atomic_test.cpp",
+        "bits_test.cpp",
+        "decimal128_bson_test.cpp",
+        "decimal128_test.cpp",
+        "endian_test.cpp",
+        "int128_test.cpp",
+        "overflow_arithmetic_test.cpp",
+        "process_id_test.cpp",
+        "random_test.cpp",
+        "source_location_test.cpp",
+        "stack_locator_test.cpp",
+        "waitable_atomic_test.cpp",
+        "//src/mongo/unittest:join_thread.h",
+    ],
+    tags = [
+        "mongo_unittest_fourth_group",
+        "server-programmability",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "rwmutex_test",
+    srcs = [
+        "rwmutex_test.cpp",
+        "//src/mongo/unittest:join_thread.h",
+    ],
+    minimum_test_resources = {
+        "cpu_cores": 2,
+    },
+    tags = [
+        "mongo_unittest_sixth_group",
+        "server-programmability",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "throw_hook_test",
+    srcs = ["throw_hook_test.cpp"],
+    tags = [
+        "mongo_unittest_seventh_group",
+        "server-programmability",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":throw_hook",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "endian_bm",
+    srcs = [
+        "endian_bm.cpp",
+    ],
+    tags = ["first_half_bm"],
+    deps = [],
+)
+
+mongo_cc_benchmark(
+    name = "rwmutex_bm",
+    srcs = [
+        "rwmutex_bm.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db/local_catalog/lock_manager",
+        "//src/mongo/util:processinfo",
+    ],
+)

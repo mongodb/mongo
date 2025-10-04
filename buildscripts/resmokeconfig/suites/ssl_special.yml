@@ -2,10 +2,10 @@ test_kind: js_test
 
 selector:
   roots:
-  - jstests/sslSpecial/*.js
+    - jstests/sslSpecial/*.js
 
 # ssl tests start their own mongod's.
 executor:
   config:
     shell_options:
-      nodb: ''
+      nodb: ""

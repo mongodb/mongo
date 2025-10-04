@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <vector>
-
 #include "mongo/base/data_range.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+
+#include <vector>
 
 namespace mongo {
 
@@ -78,7 +78,7 @@ public:
         return object;
     }
 
-    const BSONObj serializeToBSON() const {
+    BSONObj serializeToBSON() const {
         return _obj;
     }
 
@@ -134,7 +134,7 @@ public:
         return _str;
     }
     void setField1(StringData value) {
-        _str = value.toString();
+        _str = std::string{value};
     }
 
 private:
@@ -162,6 +162,29 @@ public:
 
 private:
     std::int64_t _num;
+};
+
+class ViewChainedType {
+public:
+    static ViewChainedType parseFromBSON(const BSONObj& obj) {
+        ViewChainedType object;
+        object._obj = obj;
+        return object;
+    }
+
+    void serializeToBSON(BSONObjBuilder* builder) const {
+        builder->append("view_type", _obj);
+    }
+
+    BSONObj getView_type() const {
+        return _obj;
+    }
+    void setView_type(BSONObj obj) {
+        _obj = obj;
+    }
+
+private:
+    BSONObj _obj;
 };
 
 }  // namespace mongo

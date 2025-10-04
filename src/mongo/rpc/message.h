@@ -29,13 +29,19 @@
 
 #pragma once
 
-#include <cstdint>
-
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/encoded_value_storage.h"
 #include "mongo/base/static_assert.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/shared_buffer.h"
 #include "mongo/util/str.h"
+
+#include <cstdint>
+#include <cstring>
+#include <string>
+#include <utility>
 
 namespace mongo {
 
@@ -83,6 +89,7 @@ inline bool isSupportedRequestNetworkOp(NetworkOp op) {
 
 enum class LogicalOp {
     opInvalid,
+    opBulkWrite,
     opUpdate,
     opInsert,
     opQuery,
@@ -150,6 +157,8 @@ inline const char* logicalOpToString(LogicalOp logicalOp) {
     switch (logicalOp) {
         case LogicalOp::opInvalid:
             return "none";
+        case LogicalOp::opBulkWrite:
+            return "bulkWrite";
         case LogicalOp::opUpdate:
             return "update";
         case LogicalOp::opInsert:
@@ -389,7 +398,7 @@ public:
     explicit Message(SharedBuffer data) : _buf(std::move(data)) {}
 
     MsgData::View header() const {
-        verify(!empty());
+        MONGO_verify(!empty());
         return _buf.get();
     }
 
@@ -431,7 +440,7 @@ public:
 
     // use to set first buffer if empty
     void setData(SharedBuffer buf) {
-        verify(empty());
+        MONGO_verify(empty());
         _buf = std::move(buf);
     }
 

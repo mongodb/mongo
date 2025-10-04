@@ -1,0 +1,6 @@
+# We define a custom diff attribute for files ending *.actual and *.results. Before we call git diff,
+# diff.query.xfuncname will be set to a custom regex pattern that matches the test number line, which
+# will appear at the end of the hunk header.
+# TODO DEVPROD-12446: Move this .gitattributes file into the repo(s) where generated tests live.
+*.actual diff=query
+*.results diff=query

@@ -28,25 +28,33 @@
  */
 #pragma once
 
-#include <boost/optional.hpp>
-
 #include "mongo/base/status_with.h"
 #include "mongo/client/dbclient_base.h"
 #include "mongo/db/cancelable_operation_context.h"
+#include "mongo/db/client.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
 #include "mongo/db/s/resharding/resharding_donor_oplog_iterator.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/mutex.h"
-#include "mongo/s/client/shard.h"
-#include "mongo/s/shard_id.h"
+#include "mongo/db/sharding_environment/client/shard.h"
+#include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/background.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
+
+#include <memory>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
 
 namespace mongo {
 
@@ -61,6 +69,7 @@ public:
         ServiceContext* service() const {
             return _service;
         }
+
         ReshardingMetrics* metrics() const {
             return _metrics;
         }
@@ -80,9 +89,10 @@ public:
                            ReshardingDonorOplogId startAt,
                            ShardId donorShard,
                            ShardId recipientShard,
-                           NamespaceString toWriteInto);
+                           NamespaceString oplogBufferNss,
+                           bool storeProgress);
 
-    ~ReshardingOplogFetcher();
+    ~ReshardingOplogFetcher() override;
 
     Future<void> awaitInsert(const ReshardingDonorOplogId& lastSeen) override;
 
@@ -101,8 +111,7 @@ public:
      * will be rescheduled in a way that resumes where it had left off from.
      */
     ExecutorFuture<void> schedule(std::shared_ptr<executor::TaskExecutor> executor,
-                                  const CancellationToken& cancelToken,
-                                  CancelableOperationContextFactory factory);
+                                  const CancellationToken& cancelToken);
 
     /**
      * Given a shard, fetches and copies oplog entries until
@@ -116,6 +125,23 @@ public:
     bool consume(Client* client, CancelableOperationContextFactory factory, Shard* shard);
 
     bool iterate(Client* client, CancelableOperationContextFactory factory);
+
+    /**
+     * Notifies the fetcher that oplog application has started.
+     */
+    void onStartingOplogApplication();
+
+    /**
+     * Makes the oplog fetcher prepare for the critical section. Currently, this makes the fetcher
+     * start doing the following to reduce the likelihood of not finishing oplog fetching within the
+     * critical section timeout:
+     * - Start fetching oplog entries from the primary node instead of the "nearest" node which
+     *   could be a lagged secondary.
+     * - Sleep for reshardingOplogFetcherSleepMillisDuringCriticalSection instead of
+     *   reshardingOplogFetcherSleepMillisBeforeCriticalSection after exhausting the oplog entries
+     *   returned by the previous cursor.
+     */
+    void prepareForCriticalSection();
 
     int getNumOplogEntriesCopied() const {
         return _numOplogEntriesCopied;
@@ -144,11 +170,39 @@ private:
     void _ensureCollection(Client* client,
                            CancelableOperationContextFactory factory,
                            NamespaceString nss);
+
     AggregateCommandRequest _makeAggregateCommandRequest(Client* client,
                                                          CancelableOperationContextFactory factory);
+
     ExecutorFuture<void> _reschedule(std::shared_ptr<executor::TaskExecutor> executor,
-                                     const CancellationToken& cancelToken,
-                                     CancelableOperationContextFactory factory);
+                                     const CancellationToken& cancelToken);
+
+    /**
+     * Returns true if the recipient has been configured to estimate the remaining time based on
+     * the exponential moving average of the time it takes to fetch and apply oplog entries.
+     */
+    bool _needToEstimateRemainingTimeBasedOnMovingAverage(OperationContext* opCtx);
+
+    /**
+     * Returns true if the average for time to apply oplog entries needs to be updated, i.e. if the
+     * recipient is in the 'apply' state and it has been more than
+     * 'reshardingExponentialMovingAverageTimeToFetchAndApplyIntervalMillis' since the last update
+     * which is when the last progress mark oplog entry was inserted.
+     */
+    bool _needToUpdateAverageTimeToApply(WithLock, OperationContext* opCtx) const;
+
+    /**
+     * If a progress mark oplog entry with the given timestamp needs to be inserted, returns an
+     * oplog id for it. Otherwise, returns none.
+     */
+    boost::optional<ReshardingDonorOplogId> _makeProgressMarkOplogIdIfNeedToInsert(
+        OperationContext* opCtx, const Timestamp& currBatchLastOplogTs);
+
+    /**
+     * Returns a progress mark noop oplog entry with the given oplog id.
+     */
+    repl::MutableOplogEntry _makeProgressMarkOplog(OperationContext* opCtx,
+                                                   const ReshardingDonorOplogId& oplogId) const;
 
     ServiceContext* _service() const {
         return _env->service();
@@ -158,16 +212,24 @@ private:
 
     const UUID _reshardingUUID;
     const UUID _collUUID;
-    ReshardingDonorOplogId _startAt;
     const ShardId _donorShard;
     const ShardId _recipientShard;
-    const NamespaceString _toWriteInto;
+    const NamespaceString _oplogBufferNss;
+    const bool _storeProgress;
+    boost::optional<bool> _supportEstimatingRemainingTimeBasedOnMovingAverage;
 
     int _numOplogEntriesCopied = 0;
+    AtomicWord<bool> _oplogApplicationStarted{false};
 
-    Mutex _mutex = MONGO_MAKE_LATCH("ReshardingOplogFetcher::_mutex");
+    // The mutex that protects all the members below.
+    mutable stdx::mutex _mutex;
+    ReshardingDonorOplogId _startAt;
+    boost::optional<Date_t> _lastUpdatedProgressMarkAt;
     Promise<void> _onInsertPromise;
     Future<void> _onInsertFuture;
+    AtomicWord<bool> _isPreparingForCriticalSection;
+    // The cancellation source for the current aggregation.
+    boost::optional<CancellationSource> _aggCancelSource;
 
     // For testing to control behavior.
 

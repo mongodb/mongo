@@ -38,7 +38,7 @@ get_unwind_info (struct elf_dyn_info *edi, pid_t pid, unw_addr_space_t as, unw_w
   unsigned long segbase, mapoff;
   char path[PATH_MAX];
 
-#if UNW_TARGET_IA64 && defined(__linux)
+#if UNW_TARGET_IA64 && defined(__linux__)
   if (!edi->ktab.start_ip && _Uia64_get_kernel_table (&edi->ktab) < 0)
     return -UNW_ENOINFO;
 

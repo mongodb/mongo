@@ -52,7 +52,7 @@ static bool use_columns = false;
 #define ROW_KEY_FORMAT ("%010" PRIu64)
 
 #define MAX_CKPT_INVL 5 /* Maximum interval between checkpoints */
-#define MAX_DATA 1000
+#define MAX_DATA WT_THOUSAND
 #define MAX_TIME 40
 #define MIN_TIME 10
 
@@ -64,14 +64,17 @@ static const char *const ckpt_file = "checkpoint_done";
     "cache_size=50M,"                                         \
     "create,"                                                 \
     "eviction_updates_target=20,eviction_updates_trigger=90," \
-    "log=(archive=true,file_max=10M,enabled),"                \
-    "statistics=(fast),statistics_log=(wait=1,json=true),"    \
+    "log=(enabled,file_max=10M,remove=true),"                 \
+    "statistics=(all),statistics_log=(json,on_close,wait=1)," \
     "timing_stress_for_test=[checkpoint_slow]"
-
-#define ENV_CONFIG_REC "log=(archive=false,recover=on)"
 
 static void handler(int) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static void usage(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+
+/*
+ * usage --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 usage(void)
 {
@@ -86,7 +89,6 @@ usage(void)
 static WT_THREAD_RET
 thread_ckpt_run(void *arg)
 {
-    FILE *fp;
     WT_CONNECTION *conn;
     WT_RAND_STATE rnd;
     WT_SESSION *session;
@@ -96,7 +98,7 @@ thread_ckpt_run(void *arg)
     char ts_string[WT_TS_HEX_STRING_SIZE];
     bool first_ckpt;
 
-    __wt_random_init(&rnd);
+    __wt_random_init_default(&rnd);
 
     conn = (WT_CONNECTION *)arg;
     /* Keep a separate file with the records we wrote for checking. */
@@ -114,12 +116,11 @@ thread_ckpt_run(void *arg)
         fflush(stdout);
         /*
          * Create the checkpoint file so that the parent process knows at least one checkpoint has
-         * finished and can start its timer.
+         * finished with the oldest timestamp set so it can start its timer.
          */
-        if (first_ckpt) {
-            testutil_checksys((fp = fopen(ckpt_file, "w")) == NULL);
+        if (first_ckpt && stable > MAX_DATA) {
+            testutil_sentinel(NULL, ckpt_file);
             first_ckpt = false;
-            testutil_checksys(fclose(fp) != 0);
         }
     }
     /* NOTREACHED */
@@ -148,7 +149,7 @@ thread_run(void *arg)
     /* Insert and then delete the keys until we're killed. */
     printf("Worker thread started.\n");
     for (oldest_ts = 0, ts = 1;; ++ts) {
-        testutil_check(__wt_snprintf(kname, sizeof(kname), ROW_KEY_FORMAT, ts));
+        testutil_snprintf(kname, sizeof(kname), ROW_KEY_FORMAT, ts);
 
         /* Insert the same value for key and value. */
         testutil_check(session->begin_transaction(session, NULL));
@@ -160,36 +161,37 @@ thread_run(void *arg)
         data.size = sizeof(kname);
         cursor->set_value(cursor, &data);
         testutil_check(cursor->insert(cursor));
-        testutil_check(__wt_snprintf(tscfg, sizeof(tscfg), "commit_timestamp=%" PRIx64, ts));
+        testutil_snprintf(tscfg, sizeof(tscfg), "commit_timestamp=%" PRIx64, ts);
         testutil_check(session->commit_transaction(session, tscfg));
 
         /* Update stable timestamp to the current timestamp. */
-        testutil_check(__wt_snprintf(tscfg, sizeof(tscfg), "stable_timestamp=%" PRIx64, ts));
+        testutil_snprintf(tscfg, sizeof(tscfg), "stable_timestamp=%" PRIx64, ts);
         testutil_check(conn->set_timestamp(conn, tscfg));
 
         /* Remove the key using a higher timestamp. */
         testutil_check(session->begin_transaction(session, NULL));
         cursor->set_key(cursor, kname);
-        testutil_check(cursor->remove(cursor));
-        testutil_check(__wt_snprintf(tscfg, sizeof(tscfg), "commit_timestamp=%" PRIx64, ts + 1));
+        testutil_check_error_ok(cursor->remove(cursor), WT_NOTFOUND);
+        testutil_snprintf(tscfg, sizeof(tscfg), "commit_timestamp=%" PRIx64, ts + 1);
         testutil_check(session->commit_transaction(session, tscfg));
 
         /* Set the oldest timestamp to make half of the data obsolete. */
         if (ts - oldest_ts > MAX_DATA) {
             oldest_ts = ts - MAX_DATA / 2;
-            testutil_check(
-              __wt_snprintf(tscfg, sizeof(tscfg), "oldest_timestamp=%" PRIx64, oldest_ts));
+            testutil_snprintf(tscfg, sizeof(tscfg), "oldest_timestamp=%" PRIx64, oldest_ts);
             testutil_check(conn->set_timestamp(conn, tscfg));
         }
     }
     /* NOTREACHED */
 }
 
-/*
- * Child process creates the database and table, and then creates the worker thread to add data
- * until it is killed by the parent.
- */
 static void run_workload(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+
+/*
+ * run_workload --
+ *     Child process creates the database and table, and then creates the worker thread to add data
+ *     until it is killed by the parent.
+ */
 static void
 run_workload(void)
 {
@@ -203,15 +205,15 @@ run_workload(void)
 
     if (chdir(home) != 0)
         testutil_die(errno, "Child chdir: %s", home);
-    testutil_check(__wt_snprintf(envconf, sizeof(envconf), ENV_CONFIG));
+    testutil_snprintf(envconf, sizeof(envconf), ENV_CONFIG);
 
     printf("wiredtiger_open configuration: %s\n", envconf);
     testutil_check(wiredtiger_open(NULL, NULL, envconf, &conn));
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
     /* Create the table. */
-    testutil_check(__wt_snprintf(tableconf, sizeof(tableconf),
-      "key_format=%s,value_format=u,log=(enabled=false)", use_columns ? "r" : "S"));
+    testutil_snprintf(tableconf, sizeof(tableconf),
+      "key_format=%s,value_format=u,log=(enabled=false)", use_columns ? "r" : "S");
     testutil_check(session->create(session, uri, tableconf));
     testutil_check(session->close(session, NULL));
 
@@ -232,7 +234,8 @@ run_workload(void)
 }
 
 /*
- * Signal handler to catch if the child died unexpectedly.
+ * handler --
+ *     Signal handler to catch if the child died unexpectedly.
  */
 static void
 handler(int sig)
@@ -248,11 +251,14 @@ handler(int sig)
 extern int __wt_optind;
 extern char *__wt_optarg;
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {
     struct sigaction sa;
-    struct stat sb;
     WT_CONNECTION *conn;
     WT_CURSOR *cursor;
     WT_DECL_RET;
@@ -262,18 +268,20 @@ main(int argc, char *argv[])
     uint64_t oldest_ts, stable_ts, ts;
     uint32_t timeout;
     int ch, status;
-    char kname[64], statname[1024], tscfg[64];
+    char cwd_start[PATH_MAX];
+    char kname[64], tscfg[64];
     char ts_string[WT_TS_HEX_STRING_SIZE];
     const char *working_dir;
-    bool fatal, rand_time;
+    bool fatal, preserve, rand_time;
 
     (void)testutil_set_progname(argv);
 
+    preserve = false;
     rand_time = true;
     timeout = MIN_TIME;
     working_dir = "WT_TEST.wt6616-checkpoint-oldest-ts";
 
-    while ((ch = __wt_getopt(progname, argc, argv, "ch:t:")) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "ch:pt:")) != EOF)
         switch (ch) {
         case 'c':
             /* Variable-length columns only (for now) */
@@ -281,6 +289,9 @@ main(int argc, char *argv[])
             break;
         case 'h':
             working_dir = __wt_optarg;
+            break;
+        case 'p':
+            preserve = true;
             break;
         case 't':
             rand_time = false;
@@ -294,9 +305,12 @@ main(int argc, char *argv[])
         usage();
 
     testutil_work_dir_from_path(home, sizeof(home), working_dir);
-    testutil_make_work_dir(home);
+    testutil_recreate_dir(home);
 
-    __wt_random_init_seed(NULL, &rnd);
+    /* Remember the current working directory. */
+    testutil_assert_errno(getcwd(cwd_start, sizeof(cwd_start)) != NULL);
+
+    __wt_random_init(NULL, &rnd);
     if (rand_time) {
         timeout = __wt_random(&rnd) % MAX_TIME;
         if (timeout < MIN_TIME)
@@ -311,8 +325,8 @@ main(int argc, char *argv[])
      */
     memset(&sa, 0, sizeof(sa));
     sa.sa_handler = handler;
-    testutil_checksys(sigaction(SIGCHLD, &sa, NULL));
-    testutil_checksys((pid = fork()) < 0);
+    testutil_assert_errno(sigaction(SIGCHLD, &sa, NULL) == 0);
+    testutil_assert_errno((pid = fork()) >= 0);
 
     if (pid == 0) { /* child */
         run_workload();
@@ -325,16 +339,15 @@ main(int argc, char *argv[])
      * time we notice that the file has been created. That allows the test to run correctly on
      * really slow machines.
      */
-    testutil_check(__wt_snprintf(statname, sizeof(statname), "%s/%s", home, ckpt_file));
-    while (stat(statname, &sb) != 0)
+    while (!testutil_exists(home, ckpt_file))
         testutil_sleep_wait(1, pid);
     sleep(timeout);
     sa.sa_handler = SIG_DFL;
-    testutil_checksys(sigaction(SIGCHLD, &sa, NULL));
+    testutil_assert_errno(sigaction(SIGCHLD, &sa, NULL) == 0);
 
     printf("Kill child\n");
-    testutil_checksys(kill(pid, SIGKILL) != 0);
-    testutil_checksys(waitpid(pid, &status, 0) == -1);
+    testutil_assert_errno(kill(pid, SIGKILL) == 0);
+    testutil_assert_errno(waitpid(pid, &status, 0) != -1);
 
     /*
      * !!! If we wanted to take a copy of the directory before recovery,
@@ -342,25 +355,27 @@ main(int argc, char *argv[])
      * it can use a lot of disk space, which can cause test machine
      * issues.
      */
+
+    /* Go inside the home directory (typically WT_TEST). */
     if (chdir(home) != 0)
         testutil_die(errno, "parent chdir: %s", home);
 
     /* Copy the data to a separate folder for debugging purpose. */
-    testutil_copy_data(home);
+    testutil_copy_data();
 
     printf("Open database and run recovery\n");
 
     /* Open the connection which forces recovery to be run. */
-    testutil_check(wiredtiger_open(NULL, NULL, ENV_CONFIG_REC, &conn));
+    testutil_check(wiredtiger_open(NULL, NULL, TESTUTIL_ENV_CONFIG_REC, &conn));
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
     /* Get the stable timestamp from the stable timestamp of the last successful checkpoint. */
-    testutil_check(conn->query_timestamp(conn, ts_string, "get=stable"));
-    testutil_timestamp_parse(ts_string, &stable_ts);
+    testutil_check(conn->query_timestamp(conn, ts_string, "get=stable_timestamp"));
+    stable_ts = testutil_timestamp_parse(ts_string);
 
     /* Get the oldest timestamp from the oldest timestamp of the last successful checkpoint. */
-    testutil_check(conn->query_timestamp(conn, ts_string, "get=oldest"));
-    testutil_timestamp_parse(ts_string, &oldest_ts);
+    testutil_check(conn->query_timestamp(conn, ts_string, "get=oldest_timestamp"));
+    oldest_ts = testutil_timestamp_parse(ts_string);
 
     printf("Verify data from oldest timestamp %" PRIu64 " to stable timestamp %" PRIu64 "\n",
       oldest_ts, stable_ts);
@@ -370,9 +385,9 @@ main(int argc, char *argv[])
 
     fatal = false;
     for (ts = oldest_ts; ts <= stable_ts; ++ts) {
-        testutil_check(__wt_snprintf(tscfg, sizeof(tscfg), "read_timestamp=%" PRIx64, ts));
+        testutil_snprintf(tscfg, sizeof(tscfg), "read_timestamp=%" PRIx64, ts);
         testutil_check(session->begin_transaction(session, tscfg));
-        testutil_check(__wt_snprintf(kname, sizeof(kname), ROW_KEY_FORMAT, ts));
+        testutil_snprintf(kname, sizeof(kname), ROW_KEY_FORMAT, ts);
         if (use_columns)
             cursor->set_key(cursor, ts);
         else
@@ -389,5 +404,19 @@ main(int argc, char *argv[])
     if (fatal)
         return (EXIT_FAILURE);
     printf("Verification successful\n");
+    if (!preserve) {
+        testutil_clean_test_artifacts();
+
+        /*
+         * We are in the home directory (typically WT_TEST), which we intend to delete. Go to the
+         * start directory. We do this to avoid deleting the current directory, which is disallowed
+         * on some platforms.
+         */
+        if (chdir(cwd_start) != 0)
+            testutil_die(errno, "root chdir: %s", home);
+
+        /* Delete the work directory. */
+        testutil_remove(home);
+    }
     return (EXIT_SUCCESS);
 }

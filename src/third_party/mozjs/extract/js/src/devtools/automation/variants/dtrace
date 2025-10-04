@@ -1,0 +1,5 @@
+{
+    "configure-args": "--enable-dtrace --enable-debug-symbols --enable-rust-simd",
+    "optimize": true,
+    "debug": true,
+}

@@ -26,41 +26,56 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/keys_collection_manager.h"
 
-#include <memory>
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/client.h"
 #include "mongo/db/key_generator.h"
 #include "mongo/db/keys_collection_cache.h"
 #include "mongo/db/keys_collection_client.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/vector_clock.h"
+#include "mongo/db/vector_clock/vector_clock.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
-#include "mongo/util/time_support.h"
+
+#include <algorithm>
+#include <memory>
+#include <mutex>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 
 namespace mongo {
 
+const unsigned KeysCollectionManager::kReadConcernMajorityNotAvailableYetMaxTries = 10;
+const Milliseconds KeysCollectionManager::kRefreshIntervalIfErrored(200);
 const std::string KeysCollectionManager::kKeyManagerPurposeString = "HMAC";
 
 namespace {
 
 Milliseconds kDefaultRefreshWaitTime(30 * 1000);
-Milliseconds kRefreshIntervalIfErrored(200);
 Milliseconds kMaxRefreshWaitTimeIfErrored(5 * 60 * 1000);
 // Never wait more than the number of milliseconds in 20 days to avoid sleeping for a number greater
 // than can fit in a signed 32 bit integer.
 // 20 days = 1000 * 60 * 60 * 24 * 20 = 1,728,000,000 vs signed integer max of 2,147,483,648.
 Milliseconds kMaxRefreshWaitTimeOnSuccess(Days(20));
 
+MONGO_FAIL_POINT_DEFINE(keyRefreshFailWithReadConcernMajorityNotAvailableYet);
 // Prevents the refresher thread from waiting longer than the given number of milliseconds, even on
 // a successful refresh.
 MONGO_FAIL_POINT_DEFINE(maxKeyRefreshWaitTimeOverrideMS);
@@ -78,7 +93,7 @@ Milliseconds howMuchSleepNeedFor(const LogicalTime& currentTime,
     if (currentSecs >= expiredSecs) {
         // This means that the last round didn't generate a usable key for the current time.
         // However, we don't want to poll too hard as well, so use a low interval.
-        return kRefreshIntervalIfErrored;
+        return KeysCollectionManager::kRefreshIntervalIfErrored;
     }
 
     Milliseconds millisBeforeExpire = Milliseconds(expiredSecs) - Milliseconds(currentSecs);
@@ -102,7 +117,7 @@ StatusWith<std::vector<KeysCollectionDocument>> KeysCollectionManager::getKeysFo
     auto swInternalKey = _keysCache.getInternalKeyById(keyId, forThisTime);
 
     if (swInternalKey == ErrorCodes::KeyNotFound) {
-        _refresher.refreshNow(opCtx);
+        refreshNow(opCtx);
         swInternalKey = _keysCache.getInternalKeyById(keyId, forThisTime);
     }
 
@@ -151,12 +166,27 @@ StatusWith<KeysCollectionDocument> KeysCollectionManager::getKeyForSigning(
 }
 
 void KeysCollectionManager::refreshNow(OperationContext* opCtx) {
-    _refresher.refreshNow(opCtx);
+    auto refreshRequest = _refresher.requestRefreshAsync(opCtx);
+    // note: waitFor waits min(maxTimeMS, kDefaultRefreshWaitTime).
+    // waitFor also throws if timeout, so also throw when notification was not satisfied after
+    // waiting.
+    if (!refreshRequest->waitFor(opCtx, kDefaultRefreshWaitTime)) {
+        uasserted(ErrorCodes::ExceededTimeLimit, "timed out waiting for refresh");
+    }
+}
+
+void KeysCollectionManager::requestRefreshAsync(OperationContext* opCtx) {
+    _refresher.requestRefreshAsync(opCtx);
 }
 
 void KeysCollectionManager::startMonitoring(ServiceContext* service) {
     _keysCache.resetCache();
-    _refresher.setFunc([this](OperationContext* opCtx) { return _keysCache.refresh(opCtx); });
+    _refresher.setFunc([this](OperationContext* opCtx) -> StatusWith<KeysCollectionDocument> {
+        if (MONGO_unlikely(keyRefreshFailWithReadConcernMajorityNotAvailableYet.shouldFail())) {
+            return {ErrorCodes::ReadConcernMajorityNotAvailableYet, "Failing keys cache refresh"};
+        }
+        return _keysCache.refresh(opCtx);
+    });
     _refresher.start(
         service, str::stream() << "monitoring-keys-for-" << _purpose, _keyValidForInterval);
 }
@@ -188,7 +218,7 @@ void KeysCollectionManager::enableKeyGenerator(OperationContext* opCtx, bool doE
         _refresher.switchFunc(
             opCtx, [this](OperationContext* opCtx) { return _keysCache.refresh(opCtx); });
     }
-} catch (const ExceptionForCat<ErrorCategory::ShutdownError>& ex) {
+} catch (const ExceptionFor<ErrorCategory::ShutdownError>& ex) {
     LOGV2(518091, "Exception during key generation", "error"_attr = ex, "enable"_attr = doEnable);
     return;
 }
@@ -210,9 +240,10 @@ void KeysCollectionManager::cacheExternalKey(ExternalKeysCollectionDocument key)
     }
 }
 
-void KeysCollectionManager::PeriodicRunner::refreshNow(OperationContext* opCtx) {
+std::shared_ptr<Notification<void>> KeysCollectionManager::PeriodicRunner::requestRefreshAsync(
+    OperationContext* opCtx) {
     auto refreshRequest = [this]() {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         if (_inShutdown) {
             uasserted(ErrorCodes::ShutdownInProgress,
@@ -225,28 +256,51 @@ void KeysCollectionManager::PeriodicRunner::refreshNow(OperationContext* opCtx) 
         _refreshNeededCV.notify_all();
         return _refreshRequest;
     }();
-
-    // note: waitFor waits min(maxTimeMS, kDefaultRefreshWaitTime).
-    // waitFor also throws if timeout, so also throw when notification was not satisfied after
-    // waiting.
-    if (!refreshRequest->waitFor(opCtx, kDefaultRefreshWaitTime)) {
-        uasserted(ErrorCodes::ExceededTimeLimit, "timed out waiting for refresh");
-    }
+    return refreshRequest;
 }
 
 void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* service,
                                                                std::string threadName,
                                                                Milliseconds refreshInterval) {
-    ThreadClient tc(threadName, service);
-
+    ThreadClient tc(threadName, service->getService());
     ON_BLOCK_EXIT([this]() mutable { _hasSeenKeys.store(false); });
 
-    unsigned errorCount = 0;
+    // The helper for sleeping for the specified duration or until this node shuts down or there is
+    // a new refresh request. Returns true if there is a shutdown error during the sleep.
+    auto waitUntilShutDownOrNextRequest = [&](stdx::unique_lock<stdx::mutex>& lock,
+                                              Milliseconds duration) {
+        maxKeyRefreshWaitTimeOverrideMS.execute([&](const BSONObj& data) {
+            duration = std::min(duration, Milliseconds(data["overrideMS"].numberInt()));
+        });
+
+        // Use a new opCtx so we won't be holding any RecoveryUnit while this thread goes to sleep.
+        auto opCtx = cc().makeOperationContext();
+
+        MONGO_IDLE_THREAD_BLOCK;
+        try {
+            opCtx->waitForConditionOrInterruptFor(_refreshNeededCV, lock, duration, [&]() -> bool {
+                return _inShutdown || _refreshRequest;
+            });
+        } catch (const DBException& e) {
+            LOGV2_DEBUG(20705, 1, "Unable to wait for refresh request due to: {e}", "e"_attr = e);
+            if (ErrorCodes::isShutdownError(e)) {
+                return true;
+            }
+        }
+        // Possible that we were signaled by condvar in the shutdown of this class without the opCtx
+        // being killed.
+        return _inShutdown;
+    };
+
+    unsigned totalErrorCount = 0;
+    unsigned readConcernMajorityNotAvailableYetErrorCount = 0;
+    // Track all unfulfilled refresh requests.
+    std::vector<decltype(_refreshRequest)> requests;
+
     while (true) {
-        decltype(_refreshRequest) request;
         std::shared_ptr<RefreshFunc> doRefresh;
         {
-            stdx::lock_guard<Latch> lock(_mutex);
+            stdx::lock_guard<stdx::mutex> lock(_mutex);
 
             if (_inShutdown) {
                 break;
@@ -254,77 +308,85 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
 
             invariant(_doRefresh.get() != nullptr);
             doRefresh = _doRefresh;
-            request = std::move(_refreshRequest);
+            if (_refreshRequest) {
+                requests.push_back(std::move(_refreshRequest));
+            }
         }
 
-        Milliseconds nextWakeup = kRefreshIntervalIfErrored;
+        Status latestKeyStatus = Status::OK();
+        Milliseconds nextRefreshInterval = kRefreshIntervalIfErrored;
 
         {
             auto opCtx = cc().makeOperationContext();
 
             auto latestKeyStatusWith = (*doRefresh)(opCtx.get());
-            if (latestKeyStatusWith.getStatus().isOK()) {
-                errorCount = 0;
+            latestKeyStatus = latestKeyStatusWith.getStatus();
+            if (latestKeyStatus.isOK()) {
+                totalErrorCount = 0;
+                readConcernMajorityNotAvailableYetErrorCount = 0;
                 const auto& latestKey = latestKeyStatusWith.getValue();
                 const auto currentTime = VectorClock::get(service)->getTime();
 
                 _hasSeenKeys.store(true);
-
-                nextWakeup = keys_collection_manager_util::howMuchSleepNeedFor(
+                nextRefreshInterval = keys_collection_manager_util::howMuchSleepNeedFor(
                     currentTime.clusterTime(), latestKey.getExpiresAt(), refreshInterval);
             } else {
-                errorCount += 1;
-                nextWakeup = Milliseconds(kRefreshIntervalIfErrored.count() * errorCount);
-                if (nextWakeup > kMaxRefreshWaitTimeIfErrored) {
-                    nextWakeup = kMaxRefreshWaitTimeIfErrored;
+                totalErrorCount += 1;
+
+                if (latestKeyStatus != ErrorCodes::NotWritablePrimary) {
+                    nextRefreshInterval =
+                        Milliseconds(kRefreshIntervalIfErrored.count() * totalErrorCount);
+                    if (nextRefreshInterval > kMaxRefreshWaitTimeIfErrored) {
+                        nextRefreshInterval = kMaxRefreshWaitTimeIfErrored;
+                    }
                 }
                 LOGV2(4939300,
                       "Failed to refresh key cache",
-                      "error"_attr = redact(latestKeyStatusWith.getStatus()),
-                      "nextWakeup"_attr = nextWakeup);
+                      "error"_attr = redact(latestKeyStatus),
+                      "nextRefreshInterval"_attr = nextRefreshInterval);
             }
+        }
 
-            // Notify all waiters that the refresh has finished and they can move on
+        if (latestKeyStatus == ErrorCodes::ReadConcernMajorityNotAvailableYet &&
+            readConcernMajorityNotAvailableYetErrorCount++ <
+                kReadConcernMajorityNotAvailableYetMaxTries) {
+            // This error means that this mongod has just restarted and no majority committed
+            // snapshot is available yet. To avoid returning a KeyNotFound error to the waiters, try
+            // refreshing again if the number of tries has not been exhausted.
+            stdx::unique_lock<stdx::mutex> lock(_mutex);
+            if (auto inShutdown = waitUntilShutDownOrNextRequest(lock, nextRefreshInterval);
+                inShutdown) {
+                return;
+            }
+            continue;
+        }
+
+        // Notify the waiters of all unfulfilled refresh requests the refresh has finished and they
+        // can move on.
+        for (auto& request : requests) {
             if (request) {
                 request->set();
             }
         }
+        requests.clear();
 
-        maxKeyRefreshWaitTimeOverrideMS.execute([&](const BSONObj& data) {
-            nextWakeup = std::min(nextWakeup, Milliseconds(data["overrideMS"].numberInt()));
-        });
-
-        stdx::unique_lock<Latch> lock(_mutex);
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
         if (_refreshRequest) {
             // A fresh request came in, fulfill the request before going to sleep.
             continue;
         }
-
         if (_inShutdown) {
             break;
         }
-
-        // Use a new opCtx so we won't be holding any RecoveryUnit while this thread goes to sleep.
-        auto opCtx = cc().makeOperationContext();
-
-        MONGO_IDLE_THREAD_BLOCK;
-        try {
-            opCtx->waitForConditionOrInterruptFor(
-                _refreshNeededCV, lock, nextWakeup, [&]() -> bool {
-                    return _inShutdown || _refreshRequest;
-                });
-        } catch (const DBException& e) {
-            LOGV2_DEBUG(20705, 1, "Unable to wait for refresh request due to: {e}", "e"_attr = e);
-
-            if (ErrorCodes::isShutdownError(e)) {
-                return;
-            }
+        if (auto inShutdown = waitUntilShutDownOrNextRequest(lock, nextRefreshInterval);
+            inShutdown) {
+            return;
         }
     }
 }
 
 void KeysCollectionManager::PeriodicRunner::setFunc(RefreshFunc newRefreshStrategy) {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     if (_inShutdown) {
         uasserted(ErrorCodes::ShutdownInProgress,
                   "aborting KeysCollectionManager::PeriodicRunner::setFunc because node is "
@@ -346,7 +408,7 @@ void KeysCollectionManager::PeriodicRunner::switchFunc(OperationContext* opCtx,
 void KeysCollectionManager::PeriodicRunner::start(ServiceContext* service,
                                                   const std::string& threadName,
                                                   Milliseconds refreshInterval) {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     invariant(!_backgroundThread.joinable());
     invariant(!_inShutdown);
 
@@ -357,7 +419,7 @@ void KeysCollectionManager::PeriodicRunner::start(ServiceContext* service,
 
 void KeysCollectionManager::PeriodicRunner::stop() {
     {
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         if (!_backgroundThread.joinable()) {
             return;
         }
@@ -369,12 +431,12 @@ void KeysCollectionManager::PeriodicRunner::stop() {
     _backgroundThread.join();
 }
 
-bool KeysCollectionManager::PeriodicRunner::hasSeenKeys() const noexcept {
+bool KeysCollectionManager::PeriodicRunner::hasSeenKeys() const {
     return _hasSeenKeys.load();
 }
 
 bool KeysCollectionManager::PeriodicRunner::isInShutdown() const {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     return _inShutdown;
 }
 

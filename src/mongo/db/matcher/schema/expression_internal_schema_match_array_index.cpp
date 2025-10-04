@@ -27,15 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/matcher/schema/expression_internal_schema_match_array_index.h"
+
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/document_value/value.h"
+
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 constexpr StringData InternalSchemaMatchArrayIndexMatchExpression::kName;
 
 InternalSchemaMatchArrayIndexMatchExpression::InternalSchemaMatchArrayIndexMatchExpression(
-    StringData path,
+    boost::optional<StringData> path,
     long long index,
     std::unique_ptr<ExpressionWithPlaceholder> expression,
     clonable_ptr<ErrorAnnotation> annotation)
@@ -51,15 +58,9 @@ void InternalSchemaMatchArrayIndexMatchExpression::debugString(StringBuilder& de
     _debugAddSpace(debug, indentationLevel);
 
     BSONObjBuilder builder;
-    serialize(&builder, true);
-    debug << builder.obj().toString() << "\n";
-
-    const auto* tag = getTag();
-    if (tag) {
-        debug << " ";
-        tag->debugString(&debug);
-    }
-    debug << "\n";
+    serialize(&builder, {});
+    debug << builder.obj().toString();
+    _debugStringAttachTagInfo(&debug);
 }
 
 bool InternalSchemaMatchArrayIndexMatchExpression::equivalent(const MatchExpression* expr) const {
@@ -72,38 +73,23 @@ bool InternalSchemaMatchArrayIndexMatchExpression::equivalent(const MatchExpress
         _expression->equivalent(other->_expression.get());
 }
 
-BSONObj InternalSchemaMatchArrayIndexMatchExpression::getSerializedRightHandSide() const {
-    BSONObjBuilder objBuilder;
-    {
-        BSONObjBuilder matchArrayElemSubobj(objBuilder.subobjStart(kName));
-        matchArrayElemSubobj.append("index", _index);
-        matchArrayElemSubobj.append("namePlaceholder", _expression->getPlaceholder().value_or(""));
-        {
-            BSONObjBuilder subexprSubObj(matchArrayElemSubobj.subobjStart("expression"));
-            _expression->getFilter()->serialize(&subexprSubObj, true);
-            subexprSubObj.doneFast();
-        }
-        matchArrayElemSubobj.doneFast();
-    }
-    return objBuilder.obj();
+void InternalSchemaMatchArrayIndexMatchExpression::appendSerializedRightHandSide(
+    BSONObjBuilder* bob, const SerializationOptions& opts, bool includePath) const {
+    bob->append(
+        kName,
+        BSON(
+            "index" << opts.serializeLiteral(_index) << "namePlaceholder"
+                    << opts.serializeFieldPathFromString(_expression->getPlaceholder().value_or(""))
+                    << "expression" << _expression->getFilter()->serialize(opts, includePath)));
 }
 
-std::unique_ptr<MatchExpression> InternalSchemaMatchArrayIndexMatchExpression::shallowClone()
-    const {
+std::unique_ptr<MatchExpression> InternalSchemaMatchArrayIndexMatchExpression::clone() const {
     auto clone = std::make_unique<InternalSchemaMatchArrayIndexMatchExpression>(
-        path(), _index, _expression->shallowClone(), _errorAnnotation);
+        path(), _index, _expression->clone(), _errorAnnotation);
     if (getTag()) {
         clone->setTag(getTag()->clone());
     }
     return clone;
 }
 
-MatchExpression::ExpressionOptimizerFunc
-InternalSchemaMatchArrayIndexMatchExpression::getOptimizer() const {
-    return [](std::unique_ptr<MatchExpression> expression) {
-        static_cast<InternalSchemaMatchArrayIndexMatchExpression&>(*expression)
-            ._expression->optimizeFilter();
-        return expression;
-    };
-}
 }  // namespace mongo

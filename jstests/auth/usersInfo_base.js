@@ -1,7 +1,5 @@
-'use strict';
-
 // Test behavior and edge cases in usersInfo
-function runTest(conn) {
+export function runTest(conn) {
     let db = conn.getDB("test");
     let emptyDB = conn.getDB("test2");
     let otherDB = conn.getDB("other");
@@ -18,12 +16,8 @@ function runTest(conn) {
 
     // Check we can find a particular user on the "test" database.
     assert.eq(1, assert.commandWorked(db.runCommand({usersInfo: "user12"})).users.length);
-    assert.eq(1,
-              assert.commandWorked(db.runCommand({usersInfo: {user: "user12", db: "test"}}))
-                  .users.length);
-    assert.eq(0,
-              assert.commandWorked(db.runCommand({usersInfo: {user: "user12", db: "test2"}}))
-                  .users.length);
+    assert.eq(1, assert.commandWorked(db.runCommand({usersInfo: {user: "user12", db: "test"}})).users.length);
+    assert.eq(0, assert.commandWorked(db.runCommand({usersInfo: {user: "user12", db: "test2"}})).users.length);
     assert.eq(0, assert.commandWorked(emptyDB.runCommand({usersInfo: "user12"})).users.length);
 
     // No users are found on a database without users.

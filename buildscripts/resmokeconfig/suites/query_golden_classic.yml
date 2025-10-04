@@ -1,0 +1,38 @@
+test_kind: js_test
+
+selector:
+  roots:
+    - jstests/query_golden/**/*.js
+  exclude_files:
+    - jstests/query_golden/libs/**/*.js
+    - jstests/query_golden/test_inputs/**/*.js
+executor:
+  archive:
+    hooks:
+      - ValidateCollections
+  config:
+    shell_options:
+      crashOnInvalidBSONError: ""
+      objcheck: ""
+      eval: |
+        // Keep in sync with query_golden_*.yml.
+        await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");
+        await import("jstests/libs/override_methods/golden_overrides.js");
+        import {beginGoldenTest} from "jstests/libs/begin_golden_test.js";
+        beginGoldenTest("jstests/query_golden/expected_output");
+        // Enforce plain log format until json format is the default.
+        TestData.logFormat = "plain";
+  hooks:
+    - class: ValidateCollections
+      shell_options:
+        global_vars:
+          TestData:
+            skipValidationOnNamespaceNotFound: false
+    - class: CleanEveryN
+      n: 20
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        featureFlagExtendedAutoSpilling: true

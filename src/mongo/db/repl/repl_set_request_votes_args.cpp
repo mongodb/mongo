@@ -29,11 +29,8 @@
 
 #include "mongo/db/repl/repl_set_request_votes_args.h"
 
-#include "mongo/bson/util/bson_check.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/repl/bson_extract_optime.h"
-#include "mongo/db/server_options.h"
 
 namespace mongo {
 namespace repl {
@@ -44,6 +41,7 @@ const std::string kCommandName = "replSetRequestVotes";
 const std::string kConfigVersionFieldName = "configVersion";
 const std::string kConfigTermFieldName = "configTerm";
 const std::string kDryRunFieldName = "dryRun";
+const std::string kLastWrittenOpTimeFieldName = "lastWrittenOpTime";
 const std::string kLastAppliedOpTimeFieldName = "lastAppliedOpTime";
 const std::string kOkFieldName = "ok";
 const std::string kReasonFieldName = "reason";
@@ -85,6 +83,14 @@ Status ReplSetRequestVotesArgs::initialize(const BSONObj& argsObj) {
         return status;
     }
 
+    status = bsonExtractOpTimeField(argsObj, kLastWrittenOpTimeFieldName, &_lastWrittenOpTime);
+    if (status.code() == ErrorCodes::NoSuchKey) {
+        _lastWrittenOpTime = _lastAppliedOpTime;
+        status = Status::OK();
+    } else if (!status.isOK()) {
+        return status;
+    }
+
     return Status::OK();
 }
 
@@ -112,6 +118,10 @@ ConfigVersionAndTerm ReplSetRequestVotesArgs::getConfigVersionAndTerm() const {
     return ConfigVersionAndTerm(_cfgVer, _cfgTerm);
 }
 
+OpTime ReplSetRequestVotesArgs::getLastWrittenOpTime() const {
+    return _lastWrittenOpTime;
+}
+
 OpTime ReplSetRequestVotesArgs::getLastAppliedOpTime() const {
     return _lastAppliedOpTime;
 }
@@ -128,7 +138,8 @@ void ReplSetRequestVotesArgs::addToBSON(BSONObjBuilder* builder) const {
     builder->appendNumber(kCandidateIndexFieldName, _candidateIndex);
     builder->appendNumber(kConfigVersionFieldName, _cfgVer);
     builder->appendNumber(kConfigTermFieldName, _cfgTerm);
-    _lastAppliedOpTime.append(builder, kLastAppliedOpTimeFieldName);
+    _lastWrittenOpTime.append(kLastWrittenOpTimeFieldName, builder);
+    _lastAppliedOpTime.append(kLastAppliedOpTimeFieldName, builder);
 }
 
 std::string ReplSetRequestVotesArgs::toString() const {

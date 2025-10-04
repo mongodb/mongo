@@ -27,14 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/logical_time.h"
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -48,7 +51,7 @@ LogicalTime LogicalTime::fromOperationTime(const BSONObj& obj) {
     uassert(ErrorCodes::BadValue,
             str::stream() << kOperationTimeFieldName << " is of the wrong type '"
                           << typeName(opTimeElem.type()) << "'",
-            opTimeElem.type() == bsonTimestamp);
+            opTimeElem.type() == BSONType::timestamp);
     return LogicalTime(opTimeElem.timestamp());
 }
 

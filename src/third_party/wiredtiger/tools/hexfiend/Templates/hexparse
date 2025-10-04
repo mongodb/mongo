@@ -1,0 +1,273 @@
+#!/usr/bin/tclsh
+
+# https://github.com/HexFiend/HexFiend/blob/master/templates/Reference.md
+# https://github.com/HexFiend/HexFiend/blob/master/templates/Tutorial.md
+
+package require cmdline
+
+set __f {}
+set __fs 0
+set __fpos 0
+
+set __flag_hexdump 0       ;# 0: none   1: separate line   2: same line   3: separate line, on the right   4: indented
+
+proc __globals {args} {
+  foreach pat $args {
+    foreach sym [info globals $pat] {
+      uplevel 1 [list global $sym]
+    }
+  }
+}
+
+proc __args {opts {vars ""}} {
+  upvar 1 args upargs
+  foreach {name val} [::cmdline::getoptions upargs $opts] {
+    uplevel 1 [list set $name $val]
+  }
+  if {$vars ne "" } { uplevel 1 "set args \[lassign \$args $vars\]" }
+}
+
+proc __unpack {sel sz} {
+  global __f
+  if {![binary scan [read $__f $sz] $sel ret]} {
+    error "Reading beyond EOF"
+  }
+  return $ret
+}
+proc __unpack_entry {sel sz args} {
+  __args {{hex}} name
+  set val [__unpack $sel $sz]
+  if {$hex} { set val [format "0x%X" $val] }
+  if {$name ne ""} { entry $name $val $sz [expr {[pos] - $sz}] }
+  return $val
+}
+
+proc little_endian {} {}
+proc big_endian {} { error Unimplemented }
+proc requires {offset pattern} {}
+proc hf_min_version_required {ver} {}
+
+proc     uint64 {args} { __unpack_entry wu 8 {*}$args }
+proc      int64 {args} { __unpack_entry w  8 {*}$args }
+proc     uint32 {args} { __unpack_entry iu 4 {*}$args }
+proc      int32 {args} { __unpack_entry i  4 {*}$args }
+proc     uint24 {args} { error Unimplemented }
+proc     uint16 {args} { __unpack_entry su 2 {*}$args }
+proc      int16 {args} { __unpack_entry s  2 {*}$args }
+proc      uint8 {args} { __unpack_entry cu 1 {*}$args }
+proc       int8 {args} { __unpack_entry c  1 {*}$args }
+proc      float {args} { error Unimplemented }
+proc     double {args} { error Unimplemented }
+proc       uuid {args} { error Unimplemented }
+proc    macdate {args} { error Unimplemented }
+proc    fatdate {args} { error Unimplemented }
+proc    fattime {args} { error Unimplemented }
+proc unixtime32 {args} { error Unimplemented }
+proc unixtime64 {args} { error Unimplemented }
+
+proc  uint8_bits {args} { error Unimplemented }
+proc uint16_bits {args} { error Unimplemented }
+proc uint32_bits {args} { error Unimplemented }
+proc uint64_bits {args} { error Unimplemented }
+
+# TODO: support size 'eof'
+proc bytes {size {name ""}} { global __f; read $__f $size; set val "<$size bytes>"; if {$name ne ""} { entry $name $val $size [expr {[pos] - $size}] }; return $val }
+proc hex {size {name ""}} { error Unimplemented }
+proc ascii {size {name ""}} { global __f; set val [read $__f $size]; if {$name ne ""} { entry $name $val $size [expr {[pos] - $size}] }; return $val }
+proc utf16 {size {name ""}} { error Unimplemented }
+proc str {size enc {name ""}} {
+  # TODO: apply encoding
+  ascii $size
+}
+proc cstr {enc {name ""}} {
+  # TODO: apply encoding
+  global __f
+  lassign [list [pos] "" 1] pos0 val ch
+  while {$ch ne "\x000"} {
+    set ch [read $__f 1]
+    append val $ch
+  }
+  if {$name ne ""} { entry $name $val [expr {[pos] - $pos0}] $pos0 }
+  return $val
+}
+
+proc __safeStr {str} {
+  #subst [regsub -all {[\x000-\x01f]} [regsub -all {[$\[\]\\]} $str {\\&}] {[format "\\\\x%02X" [scan "\\&" %c]]}]
+  #regsub -all {[\x000-\x01f]} [regsub -all {[$\[\]\\]} $str {\\&}] "·"
+  regsub -all {[\x000-\x01f\x080-\xfff]} $str "·"
+  #regsub -all {[\x000-\x01f]} $str "·"
+}
+
+set __indentlevel 0
+set __indentstr ""
+proc __ii {incr} {
+  globals __indentlevel __indentstr __flag_hexdump __indent_dump
+  incr __indentlevel $incr
+  set __indentstr $__indent_dump[string repeat "  " $__indentlevel]
+}
+proc __i {} { global __indentstr; return $__indentstr }
+set __output ""
+set __secname ""
+set __secval ""
+proc say {str} {
+  globals __indentstr __indentlevel __output
+  #puts "$__indentstr$str"
+  if {$__indentlevel} {
+    append __output $__indentstr $str "\n"
+  } else {
+    # Use catch to eliminate complaints about broken pipe
+    if {[catch {puts $str}]} { exit }
+  }
+}
+proc entry {name val args} {
+  globals __flag_hexdump __indent_nodump
+  set isPad [string match pad* $name]
+  set padIndent [expr {$isPad ? $__indent_nodump : ""}]
+  if {!$isPad && $__flag_hexdump == 2} { __hexdump {*}$args; }
+  say "$padIndent$name = [__safeStr $val] ($args)";
+  if {!$isPad && ($__flag_hexdump == 1 || $__flag_hexdump == 3 || $__flag_hexdump == 4)} { __hexdump {*}$args; }
+  return $val;
+}
+proc section {args} {
+  globals __output __sec* __indent*
+  __args {{collapsed}}
+  if {[llength $args] != 2} { error "section [-collapsed] name body" }
+  lassign $args name body
+  set pos0 [pos]
+  set tmp_output $__output;   set __output ""
+  set tmp_secname $__secname; set __secname $name
+  set tmp_secval $__secval;   set __secval ""
+  __ii 2
+  uplevel 1 $body
+  __ii -2
+  set len [expr {[pos] - $pos0}]
+  if {$__secval ne ""} { set __secval " # $__secval" }
+  set __output "$tmp_output$__indent_nodump$__indentstr$__secname {$__secval ($len $pos0)\n$__output$__indent_nodump$__indentstr}\n"
+  set __secname $tmp_secname
+  set __secval $tmp_secval
+  if {!$__indentlevel} {
+    puts -nonewline $__output
+    set __output ""
+    set __secname ""
+    set __secval ""
+  }
+}
+proc endsection {args} { error Unimplemented }
+proc sectionname {name} { global __secname; set __secname $name }
+proc sectionvalue {val} { global __secval; set __secval [__safeStr $val] }
+
+proc goto {pos} { global __f; seek $__f $pos start }
+proc move {pos} { global __f; seek $__f $pos current }
+proc pos {} { global __f; tell $__f }
+proc len {} { global __fs; return $__fs }
+proc end {} { global __fs; expr {[pos] >= $__fs} }
+
+proc __hexdump {{len 0} {offset -1}} {
+  globals __f __output __flag_hexdump __indentstr
+  if {$len < 1 || $__flag_hexdump == 0} { return }
+  if {$offset < 0} { set offset [pos] }
+  set savedpos [pos]
+  set prefix [expr {$__flag_hexdump == 3 ? [string repeat " " 79] : $__flag_hexdump == 4 ? $__indentstr : ""}]
+  goto $offset
+  set pos [expr {$offset & ~0xF}]
+  set end [expr {$offset + $len}]
+  append __output [format "${prefix}0x%08X:" $offset]
+  set dumpstr ""
+  for {} {$pos < $offset} {incr pos} { append __output "   "; append dumpstr " "; }
+  for {} {$pos < $end || $dumpstr ne ""} {incr pos} {
+    if {($pos & 0xF) == 0 && $pos > $offset} {
+      append __output "  $dumpstr"
+      if {$pos < $end || $__flag_hexdump != 2} { append __output "\n" }
+      set dumpstr ""
+      if {$pos >= $end} { break }
+      append __output [format "${prefix}0x%08X:" $pos]
+    }
+
+    if {$pos >= $end} {
+      append __output "   ";
+      if {$__flag_hexdump == 2} { append dumpstr " " }
+      continue;
+    }
+
+    set ret 0
+    set ch [read $__f 1]
+    binary scan $ch cu chcode
+    append __output [format " %02X" $chcode]
+    append dumpstr [expr {$chcode >= 32 && $chcode < 127 ? $ch : "·"}]
+  }
+  goto $savedpos
+}
+
+#proc __scriptrelpath {{path ""}} { file join [file dirname [ file normalize [ info script ] ] ] $path }
+proc __scriptrelpath {{path ""}} { file join $::env(HOME) "Library/Application Support/com.ridiculousfish.HexFiend/Templates" $path }
+
+#proc include {args} { source {*}$args }
+proc include {fname} {
+  set fh [open [__scriptrelpath $fname] r]
+  set contents [read $fh]
+  close $fh
+  uplevel 1 $contents
+}
+
+proc __find_template_path {template} {
+  set templatepath [__scriptrelpath $template]
+  if {[file isfile $templatepath]} { return $templatepath }
+  if {[file isfile "$templatepath.tcl"]} { return "$templatepath.tcl" }
+  set templates [glob -nocomplain -type f -directory [__scriptrelpath] "$template.tcl" "*/$template.tcl"]
+  if {[llength $templates] == 1} { return [lindex $templates 0] }
+  if {[llength $templates] > 1} {
+    puts "Ambiguous template name: $template"
+    foreach f $templates {
+      set name [file rootname]
+      puts "[file join [lindex [file split $name] end-1 end]]"
+    }
+    exit 1
+  }
+  puts "Can't find template: $template. Available templates:"
+  foreach f [glob -nocomplain -type f -directory [__scriptrelpath] *.tcl */*.tcl] {
+    puts "  [file rootname [file tail $f]]"
+  }
+  exit 1
+}
+
+#  TODO:
+#-allocsize    4096        Specify alloc size
+#-start        #           Start offset in file
+#-end          #           End offset in file (conflicts with -size)
+#-size         #           Data size in file (conflicts with -end)
+#-template     {template}  Template name (conflicts with first argument)}
+#-dump                     Print hex dump of the values
+
+set __cmdline_opts {
+  {hexdump1 "Print a hex dump of values on a separate line"}
+  {hexdump2 "Print a hex dump of values on the same line"}
+  {hexdump3 "Print a hex dump of values on a separate line on the right"}
+  {hexdump4 "Print a hex dump of values indented"}
+}
+
+if {[catch {
+  foreach {name val} [::cmdline::getoptions argv $__cmdline_opts] {
+    set __flag_$name $val
+  }
+  set argv [lassign $argv template]
+  set __flag_hexdump [expr {$__flag_hexdump4 ? 4 : $__flag_hexdump3 ? 3 : $__flag_hexdump2 ? 2 : $__flag_hexdump1 ? 1 : 0 }]
+}]} {
+  puts [cmdline::usage $__cmdline_opts {usage: $ hexparse [options] {TEMPLATE} {file ...}}]
+  exit
+}
+
+set __indent_dump [string repeat " " [expr {$__flag_hexdump == 1 ? 79 : $__flag_hexdump == 2 ? 2 : 0}]]
+set __indent_nodump [expr {$__flag_hexdump == 2 ? [string repeat " " 77] : ""}]
+
+set template [__find_template_path $template]
+
+foreach fname $argv {
+  puts "--- File: $fname ([file size $fname] bytes)"
+  set __fs [file size $fname]
+  set __f [open $fname r]
+  fconfigure $__f -buffering full -buffersize 1048576 -encoding binary -translation binary
+  #source WT/WT.tcl
+  source $template
+  close $__f
+}
+

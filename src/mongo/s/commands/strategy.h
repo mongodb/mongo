@@ -29,21 +29,10 @@
 
 #pragma once
 
-#include <atomic>
-
-#include "mongo/client/connection_string.h"
-#include "mongo/db/query/explain_options.h"
+#include "mongo/db/dbmessage.h"
 #include "mongo/db/request_execution_context.h"
-#include "mongo/s/client/shard.h"
 
 namespace mongo {
-
-class DbMessage;
-struct DbResponse;
-class Message;
-class NamespaceString;
-class OperationContext;
-class FindCommandRequest;
 
 /**
  * Legacy interface for processing client read/write/cmd requests.
@@ -53,10 +42,10 @@ public:
     /**
      * Executes a command from either OP_QUERY or OP_MSG wire protocols.
      *
-     * Catches StaleConfigException errors and retries the command automatically after refreshing
-     * the metadata for the failing namespace.
+     * Catches StaleConfig errors and retries the command automatically after refreshing the
+     * metadata for the failing namespace.
      */
-    static Future<DbResponse> clientCommand(std::shared_ptr<RequestExecutionContext> rec);
+    static DbResponse clientCommand(RequestExecutionContext* rec);
 };
 
 }  // namespace mongo

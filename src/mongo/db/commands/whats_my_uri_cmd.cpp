@@ -27,9 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+
+#include <string>
 
 namespace mongo {
 namespace {
@@ -39,15 +48,11 @@ class CmdWhatsMyUri : public BasicCommand {
 public:
     CmdWhatsMyUri() : BasicCommand("whatsmyuri") {}
 
-    bool requiresAuth() const override {
-        return false;
-    }
-
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
@@ -55,19 +60,22 @@ public:
         return "{whatsmyuri:1}";
     }
 
-    void addRequiredPrivileges(const std::string& dbname,
-                               const BSONObj& cmdObj,
-                               std::vector<Privilege>* out) const override {}  // No auth required
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
+        // No explicit privileges required.  Any authenticated user may call.
+        return Status::OK();
+    }
 
     bool run(OperationContext* opCtx,
-             const std::string& dbname,
+             const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         result << "you" << opCtx->getClient()->clientAddress(true /*includePort*/);
         return true;
     }
-
-} cmdWhatsMyUri;
+};
+MONGO_REGISTER_COMMAND(CmdWhatsMyUri).forShard();
 
 }  // namespace
 }  // namespace mongo

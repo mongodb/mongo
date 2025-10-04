@@ -29,8 +29,9 @@
 
 #pragma once
 
-#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
+#include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
+#include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
 
 namespace mongo {
 
@@ -62,10 +63,13 @@ public:
         StatusWithMatchExpression parseResult =
             MatchExpressionParser::parse(_matchAST, expCtx, *_extensionsCallback, allowedFeatures);
         uassertStatusOK(parseResult.getStatus());
-        _matchExpr = optimizeExpression
-            ? MatchExpression::optimize(std::move(parseResult.getValue()))
-            : std::move(parseResult.getValue());
+        _matchExpr = optimizeExpression ? optimizeMatchExpression(std::move(parseResult.getValue()),
+                                                                  /* enableSimplification */ true)
+                                        : std::move(parseResult.getValue());
     }
+
+    CopyableMatchExpression(BSONObj matchAST, std::unique_ptr<MatchExpression> matchExpr)
+        : _matchAST(matchAST), _matchExpr(std::move(matchExpr)) {}
 
     /**
      * Sets the collator on the underlying MatchExpression and all clones(!).

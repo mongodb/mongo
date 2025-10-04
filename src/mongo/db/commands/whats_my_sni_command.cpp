@@ -27,7 +27,19 @@
  *    it in the license file.
  */
 
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+
+#include <string>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -42,7 +54,7 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const std::string& ns,
+             const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         auto sniName = opCtx->getClient()->getSniNameForSession();
@@ -70,10 +82,12 @@ public:
         return AllowedOnSecondary::kAlways;
     }
 
-    void addRequiredPrivileges(const std::string& dbname,
-                               const BSONObj& cmdObj,
-                               std::vector<Privilege>* out) const override {}
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
+        return Status::OK();
+    }
 };
 
-MONGO_REGISTER_TEST_COMMAND(CmdWhatsMySNI)
+MONGO_REGISTER_COMMAND(CmdWhatsMySNI).testOnly().forShard();
 }  // namespace mongo

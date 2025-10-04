@@ -50,6 +50,10 @@ static void wt_shutdown(void);
 extern int __wt_optind;
 extern char *__wt_optarg;
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {
@@ -57,12 +61,7 @@ main(int argc, char *argv[])
         const char *uri;
         const char *desc;
         const char *config;
-    } * cp,
-      configs[] = {{"file:wt", NULL, NULL}, {"table:wt", NULL, NULL},
-/* Configure for a modest cache size. */
-#define LSM_CONFIG "lsm=(chunk_size=1m,merge_max=2),leaf_page_max=4k"
-        {"lsm:wt", NULL, LSM_CONFIG}, {"table:wt", " [lsm]", "type=lsm," LSM_CONFIG},
-        {NULL, NULL, NULL}};
+    } * cp, configs[] = {{"file:wt", NULL, NULL}, {"table:wt", NULL, NULL}, {NULL, NULL, NULL}};
     u_int nthreads;
     int ch, cnt, runs;
     char *config_open, *working_dir;
@@ -71,7 +70,7 @@ main(int argc, char *argv[])
 
     testutil_check(pthread_rwlock_init(&single, NULL));
 
-    nops = 1000;
+    nops = WT_THOUSAND;
     nthreads = 10;
     runs = 1;
     use_txn = false;
@@ -143,16 +142,15 @@ main(int argc, char *argv[])
 static void
 wt_startup(char *config_open)
 {
-    static WT_EVENT_HANDLER event_handler = {
-      handle_error, handle_message, NULL, NULL /* Close handler. */
-    };
-    char config_buf[128];
+    static WT_EVENT_HANDLER event_handler = {handle_error, handle_message, NULL, NULL, NULL};
+    char config_buf[512];
 
-    testutil_make_work_dir(home);
+    testutil_recreate_dir(home);
 
-    testutil_check(__wt_snprintf(config_buf, sizeof(config_buf),
-      "create,error_prefix=\"%s\",cache_size=5MB%s%s,operation_tracking=(enabled=false)", progname,
-      config_open == NULL ? "" : ",", config_open == NULL ? "" : config_open));
+    testutil_snprintf(config_buf, sizeof(config_buf),
+      "create,error_prefix=\"%s\",cache_size=5MB%s%s,operation_tracking=(enabled=false),statistics="
+      "(all),statistics_log=(json,on_close,wait=1)",
+      progname, config_open == NULL ? "" : ",", config_open == NULL ? "" : config_open);
     testutil_check(wiredtiger_open(home, &event_handler, config_buf, &conn));
 }
 
@@ -173,9 +171,13 @@ wt_shutdown(void)
 static void
 shutdown(void)
 {
-    testutil_clean_work_dir(home);
+    testutil_remove(home);
 }
 
+/*
+ * handle_error --
+ *     TODO: Add a comment describing this function.
+ */
 static int
 handle_error(WT_EVENT_HANDLER *handler, WT_SESSION *session, int error, const char *errmsg)
 {
@@ -194,6 +196,10 @@ handle_error(WT_EVENT_HANDLER *handler, WT_SESSION *session, int error, const ch
     return (fprintf(stderr, "%s\n", errmsg) < 0 ? -1 : 0);
 }
 
+/*
+ * handle_message --
+ *     TODO: Add a comment describing this function.
+ */
 static int
 handle_message(WT_EVENT_HANDLER *handler, WT_SESSION *session, const char *message)
 {

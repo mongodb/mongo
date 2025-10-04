@@ -27,19 +27,17 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <cctype>  // NOLINT
-#include <functional>
-#include <iomanip>
-#include <sstream>
-#include <string>
-#include <vector>
-
-#include <benchmark/benchmark.h>
-
-#include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/base/string_data.h"
 #include "mongo/util/ctype.h"
+#include "mongo/util/str.h"
+
+#include <algorithm>
+#include <cctype>  // NOLINT
+#include <cstddef>
+#include <cstdint>
+#include <string>
+
+#include <benchmark/benchmark.h>
 
 // Verify the performance of our string processing algorithms.
 // This can include StringData, util/str utilities, etc.
@@ -64,7 +62,7 @@ void BM_StringDataEqualCaseInsensitive(benchmark::State& state) {
     std::string s2 = s1;
     StringData sd1 = s1;
     for (auto _ : state) {
-        benchmark::DoNotOptimize(sd1.equalCaseInsensitive(s2));
+        benchmark::DoNotOptimize(str::equalCaseInsensitive(sd1, s2));
         ++items;
     }
     state.SetItemsProcessed(items);

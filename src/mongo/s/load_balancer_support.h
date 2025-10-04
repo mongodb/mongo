@@ -27,10 +27,15 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
-#include "mongo/db/logical_session_id.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo::load_balancer_support {
 
@@ -54,7 +59,7 @@ boost::optional<int> getLoadBalancerPort();
  */
 void handleHello(OperationContext* opCtx, BSONObjBuilder* result, bool helloHasLoadBalancedOption);
 
-bool isFromLoadBalancer(Client* client);
+bool isLoadBalancerPeer(Client* client);
 
 /**
  * Returns whether the feature flag for load balancer support is enabled.

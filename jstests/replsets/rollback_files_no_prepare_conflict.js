@@ -7,10 +7,8 @@
  *
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
-(function() {
-"use strict";
-load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/replsets/libs/rollback_test.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 const name = "rollback_files_no_prepare_conflicts";
 const dbName = "test";
@@ -50,7 +48,6 @@ jsTestLog("Verify that the document is in the same state as it was at the common
 primary = rollbackTest.getPrimary();
 testDB = primary.getDB(dbName);
 testColl = testDB.getCollection(collName);
-assert.docEq(testColl.findOne({_id: 42}), {_id: 42, a: "one"});
+assert.docEq({_id: 42, a: "one"}, testColl.findOne({_id: 42}));
 
 rollbackTest.stop();
-})();

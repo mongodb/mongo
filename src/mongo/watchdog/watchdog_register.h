@@ -29,9 +29,10 @@
 
 #pragma once
 
-#include <vector>
-
 #include "mongo/base/string_data.h"
+
+#include <string>
+#include <vector>
 
 namespace mongo {
 

@@ -39,7 +39,7 @@ struct node_slist_helper
 struct fake_segment_manager
 {
    typedef void * void_pointer;
-   static const std::size_t PayloadPerAllocation = BOOST_CONTAINER_ALLOCATION_PAYLOAD;
+   BOOST_STATIC_CONSTEXPR std::size_t PayloadPerAllocation = BOOST_CONTAINER_ALLOCATION_PAYLOAD;
 
    typedef boost::container::dtl::
       basic_multiallocation_chain<void*>              multiallocation_chain;
@@ -90,7 +90,7 @@ template<>
 struct is_stateless_segment_manager
    <boost::container::dtl::fake_segment_manager>
 {
-   static const bool value = true;
+   BOOST_STATIC_CONSTEXPR bool value = true;
 };
 
 }  //namespace dtl {

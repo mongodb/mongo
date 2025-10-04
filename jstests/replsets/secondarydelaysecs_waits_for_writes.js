@@ -10,33 +10,35 @@
 //
 // @tags: [
 // ]
-load("jstests/replsets/rslib.js");
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {reconfig, waitForAllMembers} from "jstests/replsets/rslib.js";
 
-doTest = function(signal) {
-    var name = "secondaryDelaySecs";
-    var host = getHostName();
+let doTest = function (signal) {
+    let name = "secondaryDelaySecs";
+    let host = getHostName();
 
-    var replTest = new ReplSetTest({name: name, nodes: 3});
+    let replTest = new ReplSetTest({name: name, nodes: 3});
 
-    var nodes = replTest.startSet();
+    let nodes = replTest.startSet();
     /* set secondaryDelaySecs to 30 seconds */
-    var config = replTest.getReplSetConfig();
+    let config = replTest.getReplSetConfig();
     config.members[2].priority = 0;
     config.members[2].secondaryDelaySecs = 30;
 
     replTest.initiate(config);
 
-    var primary = replTest.getPrimary().getDB(name);
+    let primary = replTest.getPrimary().getDB(name);
 
     // The default WC is majority and this test can't satisfy majority writes.
-    assert.commandWorked(primary.adminCommand(
-        {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+    assert.commandWorked(
+        primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    );
     replTest.awaitReplication();
 
-    var secondaryConns = replTest.getSecondaries();
-    var secondaries = [];
+    let secondaryConns = replTest.getSecondaries();
+    let secondaries = [];
     for (var i in secondaryConns) {
-        var d = secondaryConns[i].getDB(name);
+        let d = secondaryConns[i].getDB(name);
         secondaries.push(d);
     }
 
@@ -59,15 +61,19 @@ doTest = function(signal) {
     }
 
     // within 120 seconds delayed secondary should have it
-    assert.soon(function() {
-        var z = secondaries[1].foo.findOne();
-        return z && z.x == 1;
-    }, 'waiting for inserted document ' + tojson(doc) + ' on delayed secondary', 120 * 1000);
+    assert.soon(
+        function () {
+            let z = secondaries[1].foo.findOne();
+            return z && z.x == 1;
+        },
+        "waiting for inserted document " + tojson(doc) + " on delayed secondary",
+        120 * 1000,
+    );
 
     /************* Part 2 *******************/
 
     // how about if we add a new server?  will it sync correctly?
-    conn = replTest.add();
+    let conn = replTest.add();
 
     config = primary.getSiblingDB("local").system.replset.findOne();
     printjson(config);
@@ -76,22 +82,23 @@ doTest = function(signal) {
         _id: 3,
         host: host + ":" + replTest.ports[replTest.ports.length - 1],
         priority: 0,
-        secondaryDelaySecs: 30
+        secondaryDelaySecs: 30,
     });
 
     primary = reconfig(replTest, config);
     primary = primary.getSiblingDB(name);
 
-    assert.commandWorked(primary.foo.insert(
-        {_id: 123, x: 'foo'}, {writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
+    assert.commandWorked(
+        primary.foo.insert({_id: 123, x: "foo"}, {writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}}),
+    );
 
     for (var i = 0; i < 8; i++) {
         assert.eq(conn.getDB(name).foo.findOne({_id: 123}), null);
         sleep(1000);
     }
 
-    assert.soon(function() {
-        var z = conn.getDB(name).foo.findOne({_id: 123});
+    assert.soon(function () {
+        let z = conn.getDB(name).foo.findOne({_id: 123});
         return z != null && z.x == "foo";
     });
 
@@ -104,13 +111,13 @@ doTest = function(signal) {
 
     reconfig(replTest, config);
     primary = replTest.getPrimary().getDB(name);
-    assert.soon(function() {
+    assert.soon(function () {
         return conn.getDB("local").system.replset.findOne().version == config.version;
     });
 
     // wait for node to become secondary
-    assert.soon(function() {
-        var result = conn.getDB("admin").hello();
+    assert.soon(function () {
+        let result = conn.getDB("admin").hello();
         printjson(result);
         return result.secondary;
     });
@@ -124,7 +131,7 @@ doTest = function(signal) {
         sleep(1000);
     }
 
-    assert.soon(function() {
+    assert.soon(function () {
         return conn.getDB(name).foo.findOne({_id: 124}) != null;
     }, "findOne should complete within default timeout");
 

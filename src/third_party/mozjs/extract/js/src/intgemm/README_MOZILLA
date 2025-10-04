@@ -1,0 +1,18 @@
+This directory contains build files for the gemmology reference implementation.
+The actual library source is in $TOPSRCDIR/third_party/gemmology/
+
+Any patches or additional configuration to be applied to the
+upstream source should be kept in $TOPSRCDIR/third_party/gemmology/.
+
+To update the library source and build config files, execute
+
+  ./mach vendor third_party/gemmology/moz.yaml
+
+To update to a specific upstream git tag or commit, use
+
+  ./mach vendor third_party/gemmology/moz.yaml -r <commit>
+
+The upstream git repository is https://github.com/mozilla/gemmology
+
+To view the information about the current version, check the
+'origin' section of moz.yaml.

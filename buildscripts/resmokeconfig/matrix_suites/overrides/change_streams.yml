@@ -1,0 +1,121 @@
+### Overrides for some suites with change_streams ###
+- name: base_eval
+  value:
+    executor:
+      config:
+        shell_options:
+          # We do not always want all of the eval statements from the base suite so we override
+          # the ones we always want
+          eval: >-
+            globalThis.testingReplication = true;
+            await import('jstests/libs/override_methods/set_read_and_write_concerns.js');
+
+- name: causal_consistency
+  value:
+    eval: await import('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');
+
+- name: base_eval
+  value:
+    executor:
+      config:
+        shell_options:
+          # this is not under the eval section on purpose, we want to override this
+          # to get rid of causal consistency
+          eval: >-
+            globalThis.testingReplication = true;
+            await import('jstests/libs/override_methods/set_read_and_write_concerns.js');
+
+- name: mongos_passthrough
+  value:
+    executor:
+      archive:
+        hooks:
+          - CheckReplDBHash
+          - ValidateCollections
+      hooks:
+        - class: CheckReplDBHash
+        - class: ValidateCollections
+        - class: CleanEveryN
+          n: 20
+      fixture:
+        class: ShardedClusterFixture
+        # Use two shards to make sure we will only talk to the primary shard for the database and will
+        # not delay changes to wait for notifications or a clock advancement from other shards.
+        num_shards: 2
+        mongos_options:
+          bind_ip_all: ""
+          set_parameters:
+            enableTestCommands: 1
+        mongod_options:
+          set_parameters:
+            periodicNoopIntervalSecs: 1
+            writePeriodicNoops: true
+        num_nodes: null
+
+- name: mongos_passthrough_excludes
+  value:
+    exclude_with_any_tags:
+      # Exclude any that assume sharding is disabled
+      - assumes_against_mongod_not_mongos
+
+- name: sharded_collections_passthrough_excludes
+  value:
+    exclude_with_any_tags:
+      - assumes_unsharded_collection
+      - assumes_no_implicit_collection_creation_on_get_collection
+
+- name: sharded_collections_passthrough_eval
+  value:
+    eval: "await import('jstests/libs/override_methods/implicitly_shard_accessed_collections.js');"
+
+- name: secondary_reads
+  value:
+    executor:
+      fixture:
+        mongos_options:
+          set_parameters:
+            logComponentVerbosity:
+              verbosity: 0
+              command: 1
+              network:
+                verbosity: 1
+                asio: 2
+        mongod_options:
+          set_parameters:
+            logComponentVerbosity:
+              verbosity: 0
+              command: 1
+              query: 1
+              replication: 3
+        num_shards: null
+        # This suite requires w:"majority" writes to be applied on all shard secondaries.
+        # By setting shards to two node replsets, the majority is all voting nodes.
+        num_rs_nodes_per_shard: 2
+
+- name: secondary_reads_excludes
+  value:
+    exclude_with_any_tags:
+      - assumes_read_preference_unchanged
+    exclude_files:
+      - jstests/change_streams/only_wake_getmore_for_relevant_changes.js
+
+- name: secondary_reads_eval
+  value:
+    eval: await import('jstests/libs/override_methods/set_read_preference_secondary.js');
+
+- name: disable_write_noops
+  value:
+    executor:
+      fixture:
+        mongod_options:
+          set_parameters:
+            periodicNoopIntervalSecs: null
+            writePeriodicNoops: null
+
+- name: whole_db_eval
+  value:
+    eval: "await import('jstests/libs/override_methods/implicit_whole_db_changestreams.js');"
+
+- name: whole_cluster_eval
+  value:
+    eval: "await import('jstests/libs/override_methods/implicit_whole_cluster_changestreams.js');"

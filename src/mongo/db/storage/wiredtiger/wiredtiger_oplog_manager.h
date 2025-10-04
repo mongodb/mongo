@@ -29,22 +29,23 @@
 
 #pragma once
 
-#include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/thread.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 
-namespace mongo {
+#include <cstdint>
 
-class WiredTigerRecordStore;
-class WiredTigerSessionCache;
+namespace mongo {
 
 /**
  * Manages oplog visibility.
  *
  * On demand, queries WiredTiger's all_durable timestamp value and updates the oplog read timestamp.
- * This is done asynchronously on a thread that startVisibilityThread() will set up.
+ * This is done synchronously when calls to triggerOplogVisibilityUpdate() provide a timestamp
+ * greater than the current visibility timestamp.
  *
  * The WT all_durable timestamp is the in-memory timestamp behind which there are no oplog holes
  * in-memory. Note, all_durable is the timestamp that has no holes in-memory, which may NOT be
@@ -60,22 +61,27 @@ class WiredTigerOplogManager {
     WiredTigerOplogManager& operator=(const WiredTigerOplogManager&) = delete;
 
 public:
-    WiredTigerOplogManager() {}
-    ~WiredTigerOplogManager() {}
-
-    /*
-     * Initializes the oplog read timestamp and start the update visibility thread.
-     */
-    void startVisibilityThread(OperationContext* opCtx, WiredTigerRecordStore* oplogRecordStore);
-    void haltVisibilityThread();
-
-    bool isRunning() {
-        stdx::lock_guard<Latch> lk(_oplogVisibilityStateMutex);
-        return _isRunning && !_shuttingDown;
-    }
+    WiredTigerOplogManager() = default;
+    ~WiredTigerOplogManager() = default;
 
     /**
-     * Signals the oplog visibility thread to update the oplog read timestamp.
+     * Starts the oplog manager, initializing the oplog read timestamp with the highest oplog
+     * timestamp.
+     */
+    void start(OperationContext*, const KVEngine&, RecordStore& oplog, bool isReplSet);
+
+    /**
+     * Stops the oplog manager.
+     */
+    void stop();
+
+    /**
+     * Updates the oplog read timestamp if the visibility timestamp is behind the provided
+     * `commitTimestamp`, and notifies any capped waiters on the oplog if the visibility point is
+     * advanced.
+     *
+     * Callers must ensure this call is not concurrent with a call to `initialize`, as this is not
+     * thread-safe.
      */
     void triggerOplogVisibilityUpdate();
 
@@ -83,7 +89,7 @@ public:
      * Waits for all committed writes at this time to become visible (that is, until no holes exist
      * in the oplog up to the time we start waiting.)
      */
-    void waitForAllEarlierOplogWritesToBeVisible(const WiredTigerRecordStore* oplogRecordStore,
+    void waitForAllEarlierOplogWritesToBeVisible(const RecordStore* oplogRecordStore,
                                                  OperationContext* opCtx);
 
     /**
@@ -94,19 +100,30 @@ public:
      *
      * Holes in the oplog occur due to out-of-order primary writes, where a write with a later
      * assigned timestamp can commit before a write assigned an earlier timestamp.
+     *
+     * This is a thread-safe call at any point.
      */
     std::uint64_t getOplogReadTimestamp() const;
     void setOplogReadTimestamp(Timestamp ts);
 
-private:
     /**
-     * Runs the oplog visibility updates when signaled by triggerOplogVisibilityUpdate() until
-     * _shuttingDown is set to true.
+     * Returns an empty string if `initialize` hasn't been called.
      */
-    void _updateOplogVisibilityLoop(WiredTigerSessionCache* sessionCache,
-                                    WiredTigerRecordStore* oplogRecordStore);
+    StringData getIdent() const;
+
+private:
+    enum class VisibilityUpdateResult {
+        NotUpdated,
+        Updated,
+        Stopped,
+    };
+    VisibilityUpdateResult _updateVisibility(stdx::unique_lock<stdx::mutex>&,
+                                             const KVEngine&,
+                                             const RecordStore::Capped& oplog);
 
     void _setOplogReadTimestamp(WithLock, uint64_t newTimestamp);
+
+    std::string _oplogIdent;
 
     AtomicWord<unsigned long long> _oplogReadTimestamp{0};
 
@@ -119,17 +136,15 @@ private:
     mutable stdx::condition_variable _oplogEntriesBecameVisibleCV;
 
     // Protects the state below.
-    mutable Mutex _oplogVisibilityStateMutex =
-        MONGO_MAKE_LATCH("WiredTigerOplogManager::_oplogVisibilityStateMutex");
+    mutable stdx::mutex _oplogVisibilityStateMutex;
 
-    bool _isRunning = false;
-    bool _shuttingDown = false;
+    // Whether this oplog manager is currently running.
+    bool _running = false;
 
-    // Triggers an oplog visibility update -- can be delayed if no callers are waiting for an
-    // update, per the _opsWaitingForOplogVisibility counter.
+    // Whether an oplog to oplog visibility is being triggered.
     bool _triggerOplogVisibilityUpdate = false;
 
-    // Incremented when a caller is waiting for more of the oplog to become visible, to avoid update
+    // The number of operations waiting for more of the oplog to become visible, to avoid update
     // delays for batching.
     int64_t _opsWaitingForOplogVisibilityUpdate = 0;
 };

@@ -1,0 +1,12 @@
+# Temorary suites to assists the development of new viewless timeseries collection.
+# Run all jstests/core/timeseries/* tests in sharding jscore pasthrough suite with
+# CreateViewlessTimeseriesCollection feature flag enabled.
+#
+# TODO SERVER-101590: remove this temorary suite and all its usages.
+base_suite: unsplittable_collections_created_on_any_shard_jscore_passthrough
+overrides:
+  - "viewless_timeseries.enable_viewless_timeseries_feature_flag_mongod"
+  - "viewless_timeseries.enable_viewless_timeseries_feature_flag_mongos"
+
+excludes:
+  - "viewless_timeseries.exclude_viewless_timeseries_incompabile_tag"

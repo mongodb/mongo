@@ -27,102 +27,104 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/collection_index_usage_tracker.h"
 
-#include <atomic>
-
-#include "mongo/base/counter.h"
-#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 
+#include <utility>
+
+#include <absl/container/flat_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
+
+
 namespace mongo {
-namespace {
-Counter64 collectionScansCounter;
-Counter64 collectionScansNonTailableCounter;
 
-ServerStatusMetricField<Counter64> displayCollectionScans("queryExecutor.collectionScans.total",
-                                                          &collectionScansCounter);
-ServerStatusMetricField<Counter64> displayCollectionScansNonTailable(
-    "queryExecutor.collectionScans.nonTailable", &collectionScansNonTailableCounter);
-}  // namespace
-
-CollectionIndexUsageTracker::CollectionIndexUsageTracker(ClockSource* clockSource)
-    : _indexUsageStatsMap(std::make_shared<CollectionIndexUsageMap>()), _clockSource(clockSource) {
+CollectionIndexUsageTracker::CollectionIndexUsageTracker(
+    AggregatedIndexUsageTracker* aggregatedIndexUsageTracker, ClockSource* clockSource)
+    : _clockSource(clockSource),
+      _aggregatedIndexUsageTracker(aggregatedIndexUsageTracker),
+      _sharedStats(new CollectionScanStatsStorage()) {
     invariant(_clockSource);
 }
 
-void CollectionIndexUsageTracker::recordIndexAccess(StringData indexName) {
+void CollectionIndexUsageTracker::recordIndexAccess(StringData indexName) const {
     invariant(!indexName.empty());
 
-    // The following update after fetching the map can race with the removal of this index entry
-    // from the map. However, that race is inconsequential and remains memory safe.
-    auto mapSharedPtr = atomic_load(&_indexUsageStatsMap);
+    auto it = _indexUsageStatsMap.find(indexName);
 
-    auto it = mapSharedPtr->find(indexName);
-    if (it == mapSharedPtr->end()) {
-        // We are using an index that has been removed from the catalog, no need to track usage
-        return;
-    }
+    // The index is guaranteed to be tracked
+    invariant(it != _indexUsageStatsMap.end());
+
+    _aggregatedIndexUsageTracker->onAccess(it->second->features);
 
     // Increment the index usage atomic counter.
     it->second->accesses.fetchAndAdd(1);
 }
 
-void CollectionIndexUsageTracker::recordCollectionScans(unsigned long long collectionScans) {
-    _collectionScans.fetchAndAdd(collectionScans);
-    collectionScansCounter.increment(collectionScans);
+void CollectionIndexUsageTracker::recordCollectionScans(unsigned long long collectionScans) const {
+    _sharedStats->_collectionScans.fetchAndAdd(collectionScans);
 }
 
 void CollectionIndexUsageTracker::recordCollectionScansNonTailable(
-    unsigned long long collectionScansNonTailable) {
-    _collectionScansNonTailable.fetchAndAdd(collectionScansNonTailable);
-    collectionScansNonTailableCounter.increment(collectionScansNonTailable);
+    unsigned long long collectionScansNonTailable) const {
+    _sharedStats->_collectionScansNonTailable.fetchAndAdd(collectionScansNonTailable);
 }
 
-void CollectionIndexUsageTracker::registerIndex(StringData indexName, const BSONObj& indexKey) {
+void CollectionIndexUsageTracker::registerIndex(StringData indexName,
+                                                const BSONObj& indexKey,
+                                                const IndexFeatures& features) {
     invariant(!indexName.empty());
 
-    // Create a copy of the map to modify.
-    auto mapSharedPtr = atomic_load(&_indexUsageStatsMap);
-    auto mapCopy = std::make_shared<CollectionIndexUsageMap>(*mapSharedPtr);
-
-    dassert(mapCopy->find(indexName) == mapCopy->end());
-
     // Create the map entry.
-    auto inserted = mapCopy->try_emplace(
-        indexName, make_intrusive<IndexUsageStats>(_clockSource->now(), indexKey));
+    auto inserted = _indexUsageStatsMap.try_emplace(
+        indexName, make_intrusive<IndexUsageStats>(_clockSource->now(), indexKey, features));
     invariant(inserted.second);
 
-    // Swap the modified map into place atomically.
-    atomic_store(&_indexUsageStatsMap, std::move(mapCopy));
+    _aggregatedIndexUsageTracker->onRegister(inserted.first->second->features);
 }
 
 void CollectionIndexUsageTracker::unregisterIndex(StringData indexName) {
     invariant(!indexName.empty());
 
-    // Create a copy of the map to modify.
-    auto mapSharedPtr = atomic_load(&_indexUsageStatsMap);
-    auto mapCopy = std::make_shared<CollectionIndexUsageMap>(*mapSharedPtr);
+    auto it = _indexUsageStatsMap.find(indexName);
+    // Only finished/ready indexes are tracked and this function may be called for an unfinished
+    // index. When that happens there is nothing we need to do.
+    if (it == _indexUsageStatsMap.end()) {
+        return;
+    }
+
+    _aggregatedIndexUsageTracker->onUnregister(it->second->features);
 
     // Remove the map entry.
-    mapCopy->erase(indexName);
-
-    // Swap the modified map into place atomically.
-    atomic_store(&_indexUsageStatsMap, std::move(mapCopy));
+    _indexUsageStatsMap.erase(it);
 }
 
-std::shared_ptr<CollectionIndexUsageTracker::CollectionIndexUsageMap>
+void CollectionIndexUsageTracker::recordCollectionIndexUsage(
+    long long collectionScans,
+    long long collectionScansNonTailable,
+    const std::set<std::string>& indexesUsed) const {
+    recordCollectionScans(collectionScans);
+    recordCollectionScansNonTailable(collectionScansNonTailable);
+
+    // Record indexes used to fulfill query.
+    for (auto it = indexesUsed.begin(); it != indexesUsed.end(); ++it) {
+        recordIndexAccess(*it);
+    }
+}
+
+const CollectionIndexUsageTracker::CollectionIndexUsageMap&
 CollectionIndexUsageTracker::getUsageStats() const {
-    return atomic_load(&_indexUsageStatsMap);
+    return _indexUsageStatsMap;
 }
 
 CollectionIndexUsageTracker::CollectionScanStats
 CollectionIndexUsageTracker::getCollectionScanStats() const {
-    return {_collectionScans.load(), _collectionScansNonTailable.load()};
+    return {_sharedStats->_collectionScans.load(),
+            _sharedStats->_collectionScansNonTailable.load()};
 }
 }  // namespace mongo

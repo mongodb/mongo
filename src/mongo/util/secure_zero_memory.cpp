@@ -27,17 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 
 #if defined(MONGO_CONFIG_HAVE_MEMSET_S)
 #define __STDC_WANT_LIB_EXT1__ 1
 #endif
 
-#include "mongo/platform/basic.h"
+#include "mongo/util/assert_util.h"
 
 #include <cstring>
-
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

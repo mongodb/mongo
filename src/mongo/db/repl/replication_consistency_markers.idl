@@ -30,9 +30,10 @@
 
 global:
     cpp_namespace: "mongo::repl"
+    mod_visibility: pub_for_technical_reasons
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
     - "mongo/db/repl/replication_types.idl"
 
 structs:

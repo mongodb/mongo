@@ -6,10 +6,7 @@
  *   uses_atclustertime
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/sharding/libs/resharding_test_fixture.js");
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 const reshardingTest = new ReshardingTest({numDonors: 3, numRecipients: 3, reshardInPlace: true});
 
@@ -31,9 +28,9 @@ lsidList.push(UUID());
 lsidList.push(UUID());
 lsidList.push(UUID());
 
-let execRetryableInsert = function(lsid, doc) {
-    return inputCollection.getDB('reshardingDb').runCommand({
-        insert: 'coll',
+let execRetryableInsert = function (lsid, doc) {
+    return inputCollection.getDB("reshardingDb").runCommand({
+        insert: "coll",
         documents: [doc],
         ordered: false,
         lsid: {id: lsid},
@@ -63,12 +60,17 @@ reshardingTest.withReshardingInBackground({
 const mongos = inputCollection.getMongo();
 assert.commandWorked(mongos.adminCommand({flushRouterConfig: 1}));
 
-assert.commandFailedWithCode(execRetryableInsert(lsidList[0], {oldKey: -10, newKey: 0}),
-                             ErrorCodes.IncompleteTransactionHistory);
-assert.commandFailedWithCode(execRetryableInsert(lsidList[1], {oldKey: 0, newKey: 100}),
-                             ErrorCodes.IncompleteTransactionHistory);
-assert.commandFailedWithCode(execRetryableInsert(lsidList[2], {oldKey: 100, newKey: -10}),
-                             ErrorCodes.IncompleteTransactionHistory);
+assert.commandFailedWithCode(
+    execRetryableInsert(lsidList[0], {oldKey: -10, newKey: 0}),
+    ErrorCodes.IncompleteTransactionHistory,
+);
+assert.commandFailedWithCode(
+    execRetryableInsert(lsidList[1], {oldKey: 0, newKey: 100}),
+    ErrorCodes.IncompleteTransactionHistory,
+);
+assert.commandFailedWithCode(
+    execRetryableInsert(lsidList[2], {oldKey: 100, newKey: -10}),
+    ErrorCodes.IncompleteTransactionHistory,
+);
 
 reshardingTest.teardown();
-})();

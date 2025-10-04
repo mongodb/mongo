@@ -1,0 +1,12 @@
+# Golden test output of SBEVM/CodeFragmentPrintStable
+[0x0000-0x004b] stackSize: -1, maxStackSize: 0
+0x0000: fillEmptyImm(k: Null);
+0x0002: fillEmptyImm(k: False);
+0x0004: fillEmptyImm(k: True);
+0x0006: traversePImm(providePosition: False, k: Nothing, target: 0x00aa);
+0x000d: traversePImm(providePosition: False, k: 1, target: 0x00aa);
+0x0014: traverseFImm(providePosition: False, k: True, target: 0x00bb);
+0x001b: getFieldImm(popParam: 1, moveFromParam: 1, offsetParam: 0, value: "Hello world!");
+0x002a: add(popLhs: 1, moveFromLhs: 1, offsetLhs: 0, popRhs: 1, moveFromRhs: 1, offsetRhs: 0);
+0x002d: dateTruncImm(unit: 4, binSize: 1, timezone: TimeZone(name=America/New_York), startOfWeek: 1);
+

@@ -1,0 +1,126 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "query_plan_cache",
+    srcs = [
+        "classic_plan_cache.cpp",
+        "plan_cache_invalidator.cpp",
+        "plan_cache_log_utils.cpp",
+        "sbe_plan_cache.cpp",
+        "//src/mongo/db/query/stage_builder/sbe:builder_data.h",
+    ],
+    hdrs = [
+        "classic_plan_cache.h",
+        "plan_cache_callbacks.h",
+        "plan_cache_invalidator.h",
+        "plan_cache_log_utils.h",
+        "sbe_plan_cache.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db/exec/sbe:query_sbe",
+        "//src/mongo/db/query:canonical_query_base",
+        "//src/mongo/db/query:memory_util",
+        "//src/mongo/db/query/query_settings",
+    ],
+)
+
+mongo_cc_library(
+    name = "plan_cache_test_util",
+    srcs = [
+        "plan_cache_test_util.cpp",
+    ],
+    hdrs = [
+        "plan_cache_test_util.h",
+    ],
+    deps = [
+        "//src/mongo/db:query_exec",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "plan_cache_key_encoding_bm",
+    srcs = [
+        "plan_cache_bm_fixture.cpp",
+        "plan_cache_bm_fixture.h",
+        "plan_cache_key_encoding_agg_bm.cpp",
+        "plan_cache_key_encoding_find_bm.cpp",
+        "plan_cache_parse_encode_bm.cpp",
+        "plan_cache_parse_encode_pipeline_bm.cpp",
+    ],
+    tags = ["query_bm"],
+    deps = [
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db/pipeline",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/query:canonical_query_base",
+        "//src/mongo/db/query:query_fcv_environment_for_test",
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/third_party/benchmark",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "plan_cache_classic_bm",
+    srcs = [
+        "plan_cache_classic_bm.cpp",
+        "//src/mongo/db/local_catalog:index_catalog_entry_mock.h",
+        "//src/mongo/db/local_catalog:index_catalog_mock.h",
+        "//src/mongo/db/query:query_planner_test_fixture.h",
+    ],
+    tags = ["query_bm"],
+    deps = [
+        "plan_cache_test_util",
+        "//src/mongo/db:service_context_d",
+        "//src/mongo/db/local_catalog:catalog_impl",
+        "//src/mongo/db/local_catalog:collection_mock",
+        "//src/mongo/db/query:canonical_query_base",
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/s:sharding_router_api",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "plan_cache_test",
+    srcs = [
+        "plan_cache_indexability_test.cpp",
+        "plan_cache_key_info_test.cpp",
+        "plan_cache_test.cpp",
+    ],
+    data = [
+        "//src/mongo/db/query/test_output/query_planner_i_x_select_test:test_data",
+        "//src/mongo/db/test_output/query/canonical_query_encoder_test:test_data",
+        "//src/mongo/db/test_output/query/stage_builder/sbe/golden_gen_expression_test:test_data",
+        "//src/mongo/db/test_output/query/stage_builder/sbe/golden_gen_filtern_test:test_data",
+        "//src/mongo/db/test_output/query/stage_builder/sbe/golden_sbe_stage_builder_test:test_data",
+        "//src/mongo/db/test_output/query/stage_builder/sbe/s_b_e_set_window_fields_test:test_data",
+        "//src/mongo/db/test_output/query/stage_builder/sbe/sbe_timeseries_test:test_data",
+        "//src/mongo/db/test_output/query/stage_builder/sbe/search_sbe_stage_builder_test:test_data",
+    ],
+    tags = [
+        "mongo_unittest_fifth_group",
+    ],
+    deps = [
+        "plan_cache_test_util",
+        "//src/mongo/db:service_context_d",
+        "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/local_catalog:collection_mock",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/query:canonical_query_test_util",
+        "//src/mongo/db/query:query_planner_test_lib",
+        "//src/mongo/idl:server_parameter_test_util",
+    ],
+)

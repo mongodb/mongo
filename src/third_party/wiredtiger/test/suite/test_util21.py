@@ -34,7 +34,6 @@ from helper import compare_files
 # Ensure that wt dump can dump obsolete data in the history store.
 class test_util21(wttest.WiredTigerTestCase, suite_subprocess):
     conn_config = 'cache_size=50MB'
-    session_config = 'isolation=snapshot'
 
     def add_data_with_timestamp(self, uri, value, ts):
         # Apply a series of updates with commit timestamp.
@@ -77,6 +76,3 @@ class test_util21(wttest.WiredTigerTestCase, suite_subprocess):
         self.runWt(['dump', 'file:WiredTigerHS.wt'], outfilename="after_oldest")
 
         self.assertEqual(True, compare_files(self, "before_oldest", "after_oldest"))
-
-if __name__ == '__main__':
-    wttest.run()

@@ -29,8 +29,27 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/client.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/session/logical_session_id.h"
 #include "mongo/rpc/metadata/client_metadata.h"
+#include "mongo/util/concurrency/ticketholder_queue_stats.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/tick_source.h"
+#include "mongo/util/time_support.h"
+
+#include <string>
+
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -57,13 +76,15 @@ public:
             connectionId = client->getConnectionId();
             if (auto metadata = ClientMetadata::get(client)) {
                 clientMetadata = metadata->getDocument();
-                appName = metadata->getApplicationName().toString();
+                appName = std::string{metadata->getApplicationName()};
             }
         }
     };
 
-    SingleTransactionStats() : _txnNumber(kUninitializedTxnNumber){};
-    SingleTransactionStats(TxnNumber txnNumber) : _txnNumber(txnNumber){};
+    SingleTransactionStats()
+        : _txnNumberAndRetryCounter(kUninitializedTxnNumber, kUninitializedTxnRetryCounter) {};
+    SingleTransactionStats(TxnNumberAndRetryCounter txnNumberAndRetryCounter)
+        : _txnNumberAndRetryCounter(txnNumberAndRetryCounter) {};
 
     /**
      * Sets the transaction's start time, only if it hasn't already been set.
@@ -176,6 +197,20 @@ public:
         return &_opDebug;
     }
 
+    void incrementPrepareReadConflicts(long long n) {
+        _prepareReadConflicts.inc(n);
+    }
+
+    long long getPrepareReadConflicts() const {
+        return _prepareReadConflicts.get();
+    }
+
+    AtomicStorageMetrics& getTransactionStorageMetrics() {
+        return _storageMetrics;
+    }
+    const AtomicStorageMetrics& getTransactionStorageMetrics() const {
+        return _storageMetrics;
+    }
     /**
      * Returns the LastClientInfo object stored in this SingleTransactionStats instance.
      */
@@ -189,6 +224,21 @@ public:
      */
     void updateLastClientInfo(Client* client) {
         _lastClientInfo.update(client);
+    }
+
+
+    /**
+     * Returns the TicketHolderQueueStats object stored in this SingleTransactionStats.
+     */
+    const TicketHolderQueueStats& getQueueStats() const {
+        return _queueStats;
+    }
+    /**
+     * Updates the TicketHolderQueueStats to include the latest operation's queueing stats.
+     */
+    void updateQueueStats(OperationContext* opCtx) {
+        TicketHolderQueueStats newOpQueueStat(opCtx);
+        _queueStats.add(newOpQueueStat);
     }
 
     /**
@@ -226,8 +276,27 @@ public:
                 TickSource::Tick curTick) const;
 
 private:
-    // The transaction number of the transaction.
-    TxnNumber _txnNumber;
+    class AtomicPrepareReadConflicts {
+    public:
+        long long get() const {
+            return _prepareReadConflicts.loadRelaxed();
+        }
+
+        void inc(long long n) {
+            _prepareReadConflicts.fetchAndAddRelaxed(n);
+        }
+
+        AtomicPrepareReadConflicts& operator=(const AtomicPrepareReadConflicts& other) {
+            _prepareReadConflicts.storeRelaxed(other.get());
+            return *this;
+        }
+
+    private:
+        AtomicWord<long long> _prepareReadConflicts{0};
+    };
+
+    // The struct containing the transaction number and transaction retry counter.
+    TxnNumberAndRetryCounter _txnNumberAndRetryCounter;
 
     // Unset for retryable write, 'false' for multi-document transaction.  Value 'true' is
     // for future use.
@@ -260,6 +329,10 @@ private:
     // Tracks and accumulates stats from all operations that run inside the transaction.
     OpDebug _opDebug;
 
+    AtomicPrepareReadConflicts _prepareReadConflicts;
+
+    AtomicStorageMetrics _storageMetrics;
+
     // Holds information about the last client to run a transaction operation.
     LastClientInfo _lastClientInfo;
 
@@ -267,6 +340,10 @@ private:
     // not be set in a transaction that is in state kPrepared if an exception is thrown after the
     // transaction transitions to the prepared state but before setPreparedStartTime is called.
     boost::optional<TickSource::Tick> _preparedStartTime{boost::none};
+
+    // Tracks and aggregates statistics for admission and execution control queueing across all
+    // operations within a transaction.
+    TicketHolderQueueStats _queueStats;
 };
 
 }  // namespace mongo

@@ -27,9 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/repl/task_executor_mock.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/str.h"
+
+#include <utility>
 
 namespace mongo {
 namespace repl {
@@ -40,7 +45,7 @@ TaskExecutorMock::TaskExecutorMock(executor::TaskExecutor* executor)
 StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorMock::scheduleWork(
     CallbackFn&& work) {
     if (shouldFailScheduleWorkRequest()) {
-        return Status(ErrorCodes::OperationFailed, "failed to schedule work");
+        return Status(failureCode, "failed to schedule work");
     }
     if (shouldDeferScheduleWorkRequestByOneSecond()) {
         auto when = now() + Seconds(1);
@@ -52,31 +57,30 @@ StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorMock::scheduleWor
 StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorMock::scheduleWorkAt(
     Date_t when, CallbackFn&& work) {
     if (shouldFailScheduleWorkAtRequest()) {
-        return Status(ErrorCodes::OperationFailed,
+        return Status(failureCode,
                       str::stream() << "failed to schedule work at " << when.toString());
     }
     return getExecutor()->scheduleWorkAt(when, std::move(work));
 }
 
-StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorMock::scheduleRemoteCommandOnAny(
-    const executor::RemoteCommandRequestOnAny& request,
-    const RemoteCommandOnAnyCallbackFn& cb,
+StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorMock::scheduleRemoteCommand(
+    const executor::RemoteCommandRequest& request,
+    const RemoteCommandCallbackFn& cb,
     const BatonHandle& baton) {
     if (shouldFailScheduleRemoteCommandRequest(request)) {
-        return Status(ErrorCodes::OperationFailed, "failed to schedule remote command");
+        return Status(failureCode, "failed to schedule remote command");
     }
-    return getExecutor()->scheduleRemoteCommandOnAny(request, cb, baton);
+    return getExecutor()->scheduleRemoteCommand(request, cb, baton);
 }
 
-StatusWith<executor::TaskExecutor::CallbackHandle>
-TaskExecutorMock::scheduleExhaustRemoteCommandOnAny(
-    const executor::RemoteCommandRequestOnAny& request,
-    const RemoteCommandOnAnyCallbackFn& cb,
+StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorMock::scheduleExhaustRemoteCommand(
+    const executor::RemoteCommandRequest& request,
+    const RemoteCommandCallbackFn& cb,
     const BatonHandle& baton) {
     if (shouldFailScheduleRemoteCommandRequest(request)) {
-        return Status(ErrorCodes::OperationFailed, "failed to schedule remote command");
+        return Status(failureCode, "failed to schedule remote command");
     }
-    return getExecutor()->scheduleExhaustRemoteCommandOnAny(request, cb, baton);
+    return getExecutor()->scheduleExhaustRemoteCommand(request, cb, baton);
 }
 
 bool TaskExecutorMock::hasTasks() {

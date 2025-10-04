@@ -28,12 +28,22 @@
  */
 #include "mongo/client/sdam/topology_state_machine.h"
 
-#include <boost/optional/optional_io.hpp>
-
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/oid.h"
+#include "mongo/client/sdam/election_id_set_version_pair.h"
 #include "mongo/client/sdam/sdam_test_base.h"
 #include "mongo/client/sdam/server_description.h"
 #include "mongo/client/sdam/server_description_builder.h"
 #include "mongo/client/sdam/topology_description.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/duration.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <iostream>
 
 namespace mongo::sdam {
 class TopologyStateMachineTestFixture : public SdamTestFixture {
@@ -47,21 +57,22 @@ protected:
     static inline const auto kNotUsedMs = Milliseconds(100);
     static inline const auto kFiveHundredMs = Milliseconds(500);
 
-    static inline const auto kTwoSeedConfig =
-        SdamConfiguration(std::vector<HostAndPort>{kLocalServer, kLocalServer2},
-                          TopologyType::kUnknown,
-                          kFiveHundredMs);
-
-    static inline const auto kTwoSeedReplicaSetNoPrimaryConfig =
-        SdamConfiguration(std::vector<HostAndPort>{kLocalServer, kLocalServer2},
-                          TopologyType::kReplicaSetNoPrimary,
-                          kFiveHundredMs,
-                          kNotUsedMs,
-                          kNotUsedMs,
-                          std::string("setName"));
-
-    static inline const auto kSingleConfig =
-        SdamConfiguration(std::vector<HostAndPort>{kLocalServer}, TopologyType::kSingle);
+    const SdamConfiguration kTwoSeedConfig;
+    const SdamConfiguration kTwoSeedReplicaSetNoPrimaryConfig;
+    const SdamConfiguration kSingleConfig;
+    TopologyStateMachineTestFixture()
+        : kTwoSeedConfig(SdamConfiguration(std::vector<HostAndPort>{kLocalServer, kLocalServer2},
+                                           TopologyType::kUnknown,
+                                           kFiveHundredMs)),
+          kTwoSeedReplicaSetNoPrimaryConfig(
+              SdamConfiguration(std::vector<HostAndPort>{kLocalServer, kLocalServer2},
+                                TopologyType::kReplicaSetNoPrimary,
+                                kFiveHundredMs,
+                                kNotUsedMs,
+                                kNotUsedMs,
+                                std::string("setName"))),
+          kSingleConfig(
+              SdamConfiguration(std::vector<HostAndPort>{kLocalServer}, TopologyType::kSingle)) {}
 
     // Given we are in 'starting' state with initial config 'initialConfig'. We receive a
     // ServerDescription with type 'incoming', and expected the ending topology state to be
@@ -89,7 +100,7 @@ protected:
 
         // update the known hosts in the ServerDescription
         if (testCase.initialConfig.getSeedList()) {
-            for (auto address : *testCase.initialConfig.getSeedList()) {
+            for (const auto& address : *testCase.initialConfig.getSeedList()) {
                 serverDescriptionBuilder.withHost(address);
             }
         }
@@ -462,7 +473,7 @@ TEST_F(TopologyStateMachineTestFixture, ShouldNotUpdateToplogyType) {
     }
 
     int count = 0;
-    for (auto testCase : testCases) {
+    for (const auto& testCase : testCases) {
         std::cout << "case " << ++count << " starting TopologyType: " << toString(testCase.starting)
                   << "; incoming ServerType: " << toString(testCase.incoming)
                   << "; expect ending TopologyType: " << toString(testCase.ending) << std::endl;
@@ -531,7 +542,7 @@ TEST_F(TopologyStateMachineTestFixture, ShouldUpdateToCorrectToplogyType) {
           TopologyType::kReplicaSetNoPrimary}};
 
     int count = 0;
-    for (auto testCase : testCases) {
+    for (const auto& testCase : testCases) {
         std::cout << "case " << ++count << " starting TopologyType: " << toString(testCase.starting)
                   << "; incoming ServerType: " << toString(testCase.incoming)
                   << "; expect ending TopologyType: " << toString(testCase.ending) << std::endl;

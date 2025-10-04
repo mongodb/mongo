@@ -2,104 +2,408 @@
 
 cd $HOME # workaround EVG-12829
 
-# Communicate to users that logged in before the script started that nothing is ready.
-wall "The setup_spawnhost_coredump script has just started setting up the debugging environment."
+unameOut=$(uname -s)
+case "${unameOut}" in
+    Linux*)     machine=Linux;;
+    Darwin*)    machine=Mac;;
+    CYGWIN*)    machine=Cygwin;;
+    *)          machine="UNKNOWN:${unameOut}"
+esac
 
-# Write this file that gets cat'ed on login to communicate to users logging in if this setup script is still running.
-echo '+-----------------------------------------------------------------+' > ~/.setup_spawnhost_coredump_progress
-echo '| The setup script is still setting up data files for inspection. |' >> ~/.setup_spawnhost_coredump_progress
-echo '+-----------------------------------------------------------------+' >> ~/.setup_spawnhost_coredump_progress
+HOME_DIR=$(pwd)
 
-cat >> ~/.profile <<EOF
+# needed for the python install to be successful on windows
+if [[ "${machine}" = "Cygwin" ]]; then
+    # We want everything to be in the Administrator home directory because that is what user they
+    # log in with
+    export USERPROFILE=$(cygpath -w ~Administrator)
+    HOME_DIR=$(cygpath -u $USERPROFILE)
+
+    # the evergreen yml file is only added to the Administrator user on windows and not the actual
+    # user currently running
+    cp ${HOME_DIR}/.evergreen.yml ~/.evergreen.yml
+    cd $HOME_DIR
+fi
+
+TOOLCHAIN_ROOT=/opt/mongodbtoolchain/v5
+
+SRC_DIR=$(ls -d /data/mci/source-* 2>/dev/null)
+ln -s $SRC_DIR src
+
+pushd src
+git remote set-url origin git@github.com:10gen/mongo.git
+popd
+
+echo "# This is a fake expansions file to allow our setup scripts to function correctly." > "/data/mci/expansions.yml"
+echo "spawn_host: \"true\"" >> "/data/mci/expansions.yml"
+
+# On some RHEL distros TMPDIR was not being set on the spawnhost.
+# This does not show up during evergreen tasks because evergreen sets this var.
+if [ -z "$TMPDIR" ]; then
+    mkdir -p tmp
+    export TMPDIR=tmp
+fi
+
+bash $HOME_DIR/src/evergreen/functions/venv_setup.sh
+. $HOME_DIR/src/evergreen/prelude.sh
+activate_venv
+
+# download archive_dist_test_debug if evergreen did not do so automatically.
+# Evergreen will not automatically download artifacts if it is not in the dep chain
+DOWNLOAD_SCRIPT="${SRC_DIR}/evergreen/spawnhost/download_archive_dist_test_debug.py"
+if [ -f $DOWNLOAD_SCRIPT ]; then
+    $python $DOWNLOAD_SCRIPT
+fi
+
+ARTIFACTS_SCRIPT="${SRC_DIR}/evergreen/spawnhost/extract_artifacts.py"
+if [ -f $ARTIFACTS_SCRIPT ]; then
+    $python $ARTIFACTS_SCRIPT
+fi
+
+RBE_SYSROOT_SCRIPT="${SRC_DIR}/buildscripts/create_rbe_sysroot.py"
+if [[ -f "${RBE_SYSROOT_SCRIPT}" ]]; then
+    echo "Setting up RBE sysroot for unit test debugging..."
+    $python $RBE_SYSROOT_SCRIPT
+else
+    echo "Failed to find RBE sysroot setup script."
+fi
+
+archive_fail() {
+    echo "Error: archive [${1}] not found." >&2
+}
+
+if [[ "${machine}" = "Cygwin" ]]; then
+    echo "source $(pwd)/venv/Scripts/activate" >> $HOME_DIR/.bashrc
+    out_dir="/cygdrive/c/setup_script_output.txt"
+    desktop_dir="/cygdrive/c/Users/Administrator/Desktop"
+
+    {
+        date
+        env
+
+        echo "----------------------"
+        echo -e "\n=> Setting _NT_SOURCE_PATH environment variable for debuggers to pick up source files."
+        SRC_DIR_HASH=$(find /cygdrive/z/data/mci -name 'source-*' | head -n 1 | xargs -I% basename %)
+        SRC_DIR="Z:\data\mci\\${SRC_DIR_HASH}\src"
+        echo "Source Path: [${SRC_DIR}]"
+        set -x;
+        setx _NT_SOURCE_PATH "${SRC_DIR}"
+        { set +x; } 2>/dev/null
+
+        echo -e "\n=> Setting _NT_SYMBOL_PATH environment variable for debuggers to pick up the symbols."
+        DBG_SYMBOLS_HASH=$(find /cygdrive/z/data/mci -name 'artifacts-*dist_test_debug' | head -n 1 | xargs -I% basename %)
+        DBG_SYMBOLS_WINPATH="\"Z:\data\mci\\${DBG_SYMBOLS_HASH}\extracted_symbols\dist-test\bin;srv*;\""
+        DBG_ARCHIVE_PARENT=$(readlink -f /cygdrive/z/data/mci/artifacts-*dist_test_debug)
+        DBG_ARCHIVE=$(readlink -f ${DBG_ARCHIVE_PARENT}/debugsymbols-*.zip)
+        DBG_ARCHIVE_TARGET_PARENT="${DBG_ARCHIVE_PARENT}/extracted_symbols"
+        DBG_ARCHIVE_TARGET="${DBG_ARCHIVE_TARGET_PARENT}/dist-test/bin"
+        echo "Symbols Dir: [${DBG_ARCHIVE_TARGET}]"
+
+        echo -e "\n=> Copying .natvis file to Visual Studio's expected directories (System for 2017/2019 and User)."
+        set -x;
+        cp "/cygdrive/z/data/mci/${SRC_DIR_HASH}/buildscripts/win/mongodb.natvis" /cygdrive/c/Program\ Files\ \(x86\)/Microsoft\ Visual\ Studio/2017/Professional/Common7/Packages/Debugger/Visualizers
+        cp "/cygdrive/z/data/mci/${SRC_DIR_HASH}/buildscripts/win/mongodb.natvis" /cygdrive/c/Program\ Files\ \(x86\)/Microsoft\ Visual\ Studio/2019/Professional/Common7/Packages/Debugger/Visualizers
+        mkdir "${USERPROFILE}/Documents/Visual Studio 2022/Visualizers"
+        cp "/cygdrive/z/data/mci/${SRC_DIR_HASH}/buildscripts/win/mongodb.natvis" "${USERPROFILE}/Documents/Visual Studio 2022/Visualizers"
+        { set +x; } 2>/dev/null
+
+        echo -e "\n=> Extracting Symbol files."
+        set -x;
+        mkdir -p ${DBG_ARCHIVE_TARGET_PARENT}
+        unzip -n ${DBG_ARCHIVE} -d ${DBG_ARCHIVE_TARGET_PARENT}
+        setx _NT_SYMBOL_PATH "${DBG_SYMBOLS_WINPATH}"
+        { set +x; } 2>/dev/null
+
+        echo -e "\n=> Extracting Core Dumps to Desktop."
+        set -x
+
+        # logic for core dumps uploaded together in a .tar.gz file
+        COREDUMP_ARCHIVE=$(readlink -f /cygdrive/z/data/mci/artifacts-*/mongo-coredumps*.tgz 2>/dev/null)
+        if [[ -f "${COREDUMP_ARCHIVE}" ]]; then
+            COREDUMP_ARCHIVE_PARENT=$(dirname ${COREDUMP_ARCHIVE})
+            COREDUMP_ARCHIVE_TARGET="${COREDUMP_ARCHIVE_PARENT}/extracted_dump"
+            set -x;
+            mkdir -p ${COREDUMP_ARCHIVE_TARGET}
+            tar -xzvf ${COREDUMP_ARCHIVE} -C ${COREDUMP_ARCHIVE_TARGET}
+            cp -r ${COREDUMP_ARCHIVE_TARGET}/* ${desktop_dir}
+        else
+            archive_fail "core dump"
+        fi
+
+        # logic for core dumps individually uploaded and gzipped
+        filenames=$(find /cygdrive/z/data/mci/artifacts-* -name 'dump_*.mdmp.gz' -o -name 'mongod.*.mdmp.gz')
+        for filename in ${filenames[@]};
+        do
+            COREDUMP_ARCHIVE=$(readlink -f ${filename} 2>/dev/null)
+            COREDUMP_ARCHIVE_BASENAME=$(basename ${COREDUMP_ARCHIVE})
+            COREDUMP_ARCHIVE_PARENT=$(dirname ${COREDUMP_ARCHIVE})
+            COREDUMP_ARCHIVE_TARGET="${COREDUMP_ARCHIVE_PARENT}/extracted_dump"
+            mkdir -p ${COREDUMP_ARCHIVE_TARGET}
+            mv ${COREDUMP_ARCHIVE} ${COREDUMP_ARCHIVE_TARGET}
+            gunzip ${COREDUMP_ARCHIVE_TARGET}/${COREDUMP_ARCHIVE_BASENAME}
+            DECOMPRESSED_NAME=$(basename ${COREDUMP_ARCHIVE_BASENAME} .gz)
+            cp ${COREDUMP_ARCHIVE_TARGET}/${DECOMPRESSED_NAME} ${desktop_dir}
+        done
+
+        echo -e "\n=> Extracting Binaries and symbols to Desktop."
+        BIN_ARCHIVE=$(ls /cygdrive/z/data/mci/artifacts-*archive_dist_test*/mongo-*.zip 2>/dev/null)
+        if [[ -f $BIN_ARCHIVE ]]; then
+            BIN_ARCHIVE_PARENT=$(dirname ${BIN_ARCHIVE})
+            BIN_ARCHIVE_TARGET=${BIN_ARCHIVE_PARENT}/extracted_binaries
+            unzip -n ${BIN_ARCHIVE} -d ${BIN_ARCHIVE_TARGET}
+            cp ${BIN_ARCHIVE_TARGET}/dist-test/bin/mongo{,d,s}.pdb ${desktop_dir}
+            cp ${BIN_ARCHIVE_TARGET}/dist-test/bin/mongo{,d,s}.exe ${desktop_dir}
+        else
+            archive_fail "bin"
+        fi
+
+        if [[ -z $(ls ${COREDUMP_ARCHIVE_TARGET}/dump* 2>/dev/null) ]]; then
+            echo "No core dumps found."
+        fi
+
+        { set +x; } 2>/dev/null
+        echo "Copied to Desktop."
+    } &> ${out_dir}
+
+    cp ${out_dir} ${desktop_dir}
+else
+    # Communicate to users that logged in before the script started that nothing is ready.
+    wall "The setup_spawnhost_coredump script has just started setting up the debugging environment."
+    echo "source $(pwd)/venv/bin/activate" >> ~/.bashrc
+
+    # Write this file that gets cat'ed on login to communicate to users logging in if this setup script is still running.
+    echo '+-----------------------------------------------------------------------------------+' > ~/.setup_spawnhost_coredump_progress
+    echo "| The setup script is still setting up data files for inspection on a [${machine}] host. |" >> ~/.setup_spawnhost_coredump_progress
+    echo '+-----------------------------------------------------------------------------------+' >> ~/.setup_spawnhost_coredump_progress
+
+    cat >> ~/.profile <<EOF
 cat ~/.setup_spawnhost_coredump_progress
 # Coredumps generated by a toolchain built mongodb can be problematic when examined with the system
 # gdb.
-export PATH=/opt/mongodbtoolchain/gdb/bin:$PATH
+alias gdb='${TOOLCHAIN_ROOT}/bin/gdb'
 # As per below, put the user into the appropriate directory. This is where gdb is expected to be
 # invoked from.
 cd debug
 echo "Debuggable binaries:"
-ls -l mongo* | grep -v debug$
+ls -l mongo* 2>/dev/null | grep -v debug$
+ls -l bin/ 2>/dev/null
+( ls -l mongo* &>/dev/null | grep -v debug$ || ls -l bin/ &>/dev/null ) || echo " [none]"
+
 for item in "mongo" "mongod" "mongos"; do
     echo "\${item} core dumps:"
-    ls -l dump_\${item}.*
+    ls -l dump_\${item}.* 2>/dev/null || echo " [none]"
 done
 
 echo "Core dumps from unknown processes (crashed processes typically found here):"
-ls -l dump_* | grep -v mongo
+ls -l dump_* 2>/dev/null | grep -v mongo || echo " [none]"
 
 echo
 echo "To examine a core dump, type 'gdb ./<binary> ./<core file>'"
 cat ~/.setup_spawnhost_coredump_progress
 EOF
 
-export PATH=/opt/mongodbtoolchain/gdb/bin:$PATH
-echo 'if [ -f ~/.profile ]; then
+    echo 'if [ -f ~/.profile ]; then
     . ~/.profile
 fi' >> .bash_profile
 
-# Make a directory on the larger EBS volume. Soft-link it under the home directory. The smaller home
-# volume can have trouble particularly with coredumps from sharded timeouts.
-mkdir /data/debug
-ln -s /data/debug .
-cd debug
+    # Make a directory on the larger EBS volume. Soft-link it under the home directory. The smaller home
+    # volume can have trouble particularly with coredumps from sharded timeouts.
+    mkdir -p /data/debug
+    ln -s /data/debug .
+    cd debug
 
-# As the name suggests, pretty printers. Primarily for boost::optional<T>
-git clone git@github.com:ruediger/Boost-Pretty-Printer.git &
+    # As the name suggests, pretty printers. Primarily for boost::optional<T>
+    git clone https://github.com/mongodb-forks/Boost-Pretty-Printer.git --branch mongodb-stable &
 
-# Discover and unarchive necessary files and source code. This will put mongo binaries and their
-# partner .debug files in the same `debug/bin` directory. The `bin` directory will later be symbolic
-# linked into the top-level (`debug`) directory. Shared library files and their debug symbols will
-# be dumped into a `debug/lib` directory for tidiness. The mongo `<reporoot>/src/` directory is soft
-# linked as `debug/src`. The .gdbinit file assumes gdb is being run from the `debug` directory.
-BIN_ARCHIVE=`ls /data/mci/artifacts-*archive_dist_test*/mongo-*.tgz`
-tar --wildcards --strip-components=1 -xzf $BIN_ARCHIVE '*/bin/mongod' '*/bin/mongos' '*/bin/mongo' '*/bin/mongobridge' &
-tar --wildcards --strip-components=1 -xzf $BIN_ARCHIVE '*/lib/*' &
-DBG_ARCHIVE=`ls /data/mci/artifacts-*archive_dist_test_debug/debugsymbols-*.tgz`
-tar --wildcards --strip-components=1 -xzf $DBG_ARCHIVE '*/bin/mongod.debug' '*/bin/mongos.debug' '*/bin/mongo.debug' '*/bin/mongobridge.debug' &
-tar --wildcards --strip-components=1 -xzf $DBG_ARCHIVE '*/lib/*' &
-UNITTEST_ARCHIVE=`ls /data/mci/artifacts-*run_unittests/mongo-unittests-*.tgz`
-tar --wildcards --strip-components=0 -xzf $UNITTEST_ARCHIVE 'bin/*' &
-tar --wildcards -xzf $UNITTEST_ARCHIVE 'lib/*' &
+    # Discover and unarchive necessary files and source code. This will put mongo binaries and their
+    # partner .debug files in the same `debug/bin` directory. The `bin` directory will later be symbolic
+    # linked into the top-level (`debug`) directory. Shared library files and their debug symbols will
+    # be dumped into a `debug/lib` directory for tidiness. The mongo `<reporoot>/src/` directory is soft
+    # linked as `debug/src`. The .gdbinit file assumes gdb is being run from the `debug` directory.
+    BIN_ARCHIVE=$(ls /data/mci/artifacts-*archive_dist_test*/mongo-*.tgz 2>/dev/null)
+    if [[ -n $BIN_ARCHIVE ]]; then
+        # Have shell expand braces before passing the wildcard to tar.
+        bin_files_pattern=(\*/bin/mongo{d,s,,bridge})
+        tar --wildcards --strip-components=1 -xzf $BIN_ARCHIVE "${bin_files_pattern[@]}"
+        tar --wildcards --strip-components=1 -xzf $BIN_ARCHIVE '*/lib/*' &
+    else
+        archive_fail "bin"
+    fi
 
-SRC_DIR=`find /data/mci/ -maxdepth 1 | grep source`
-ln -s $SRC_DIR/.gdbinit .
-ln -s $SRC_DIR/src src
-ln -s $SRC_DIR/buildscripts buildscripts
+    DBG_ARCHIVE=$(ls /data/mci/artifacts-*archive_dist_test_debug/debugsymbols-*.tgz 2>/dev/null)
+    if [[ -n $DBG_ARCHIVE ]]; then
+        # Support discovering split-dwarf files. Specifically, capture both <file>.debug and <file>.dwp
+        # files.
+        # Have shell expand braces before passing the wildcard to tar.
+        dbg_files_pattern=(\*/bin/mongo{d,s,,bridge}.{debug,dwp})
+        tar --wildcards --strip-components=1 -xzf $DBG_ARCHIVE "${dbg_files_pattern[@]}" &
+        tar --wildcards --strip-components=1 -xzf $DBG_ARCHIVE '*/lib/*' &
+    else
+        archive_fail "debug"
+    fi
 
-# Install pymongo to get the bson library for pretty-printers.
-/opt/mongodbtoolchain/v3/bin/pip3 install -r $SRC_DIR/etc/pip/dev-requirements.txt &
+    UNITTEST_ARCHIVE=$(ls /data/mci/artifacts-*unit_test*/mongo-unittests-*.tgz 2>/dev/null)
+    if [[ -n $UNITTEST_ARCHIVE ]]; then
+        tar --wildcards --strip-components=0 -xzf $UNITTEST_ARCHIVE 'bin/*' &
+        tar --wildcards -xzf $UNITTEST_ARCHIVE 'lib/*' &
+    else
+        archive_fail "unit_test"
+    fi
 
-COREDUMP_ARCHIVE=`ls /data/mci/artifacts-*/mongo-coredumps-*.tgz`
-tar -xzf $COREDUMP_ARCHIVE &
-echo "Waiting for background processes to complete."
-wait
+    BENCHMARK_ARCHIVE=$(ls /data/mci/artifacts-*compile_upload_benchmarks/benchmarks-*.tgz 2>/dev/null)
+    if [[ -n $BENCHMARK_ARCHIVE ]]; then
+        tar --wildcards --strip-components=0 -xzf $BENCHMARK_ARCHIVE 'bin/*' &
+        tar --wildcards -xzf $BENCHMARK_ARCHIVE 'lib/*' &
+    else
+        archive_fail "benchmark"
+    fi
 
-# Symbolic linking all of the executable files is sufficient for `gdb ./mongod ./dump_mongod.core`
-# to succeed. This inadvertantly also links in the ".debug" files which is unnecessary, but
-# harmless. gdb expects the .debug files to live adjacent to the physical binary.
-ln -s bin/* ./
+    SRC_DIR=$(ls -d /data/mci/source-* 2>/dev/null)
+    if [[ -n $SRC_DIR ]]; then
+        ln -s ${SRC_DIR}/.gdbinit .
+        ln -s ${SRC_DIR}/src src
+        ln -s ${SRC_DIR}/buildscripts buildscripts
+    else
+        archive_fail "src"
+    fi
 
-cat >> ~/.gdbinit <<EOF
+    set -x
+
+    # logic for core dumps uploaded together in a .tar.gz file
+    COREDUMP_ARCHIVE=$(ls /data/mci/artifacts-*/mongo-coredumps-*.tgz 2>/dev/null)
+    if [[ -n $COREDUMP_ARCHIVE ]]; then
+        tar -xzf $COREDUMP_ARCHIVE &
+    fi
+
+    # logic for core dumps individually uploaded and gzipped
+    COREDUMP_ARCHIVE_TARGET="./"
+    for filename in /data/mci/artifacts-*/dump_*.core.gz;
+    do
+        COREDUMP_ARCHIVE=$(readlink -f ${filename} 2>/dev/null)
+        COREDUMP_ARCHIVE_BASENAME=$(basename ${COREDUMP_ARCHIVE})
+        mv ${COREDUMP_ARCHIVE} ${COREDUMP_ARCHIVE_TARGET}
+        gunzip ${COREDUMP_ARCHIVE_TARGET}/${COREDUMP_ARCHIVE_BASENAME}
+    done
+
+    if [[ -z $(ls ${COREDUMP_ARCHIVE_TARGET}/dump* 2>/dev/null) ]]; then
+        archive_fail "coredump"
+    fi
+    set +x
+
+    echo "Waiting for background processes to complete."
+    wait
+
+    # Symbolic linking all of the executable files is sufficient for `gdb ./mongod ./dump_mongod.core`
+    # to succeed. This inadvertantly also links in the ".debug" files which is unnecessary, but
+    # harmless. gdb expects the .debug files to live adjacent to the physical binary.
+    find bin -type f -perm -o=x -exec ln -s {} . \;
+
+    # This script checks a bin for the dwarf version and then generates an index if the bin does not already have an index. eu-readelf is used in place of readelf as it is much faster.
+    cat > create_index.sh <<EOF
+#!/bin/bash
+
+set -o pipefail
+
+$TOOLCHAIN_ROOT/bin/gdb --batch-silent --quiet -nx --init-eval-command "set index-cache enabled on" \$1
+EOF
+
+# this script creates a symlink in the toolchain lib/debug directory which is in the
+# build-id format. This allows gdb to load the separate debug file and skip CRC
+# checking.
+cat > create_build_id_links.sh <<EOF
+#!/bin/bash
+
+set -o pipefail
+
+build_id="\$($TOOLCHAIN_ROOT/bin/eu-readelf -n \$1 | grep 'Build ID:' | awk -F: '{print \$2}' | sed 's/ *//')"
+gdb_debug_dir="\$(readlink $TOOLCHAIN_ROOT/bin/gdb)"
+gdb_debug_dir="\$(dirname \$gdb_debug_dir)"
+gdb_debug_dir="\$(dirname \$gdb_debug_dir)/lib/debug/.build-id/\${build_id:0:2}"
+gdb_debug_file="\${build_id:2}.debug"
+mkdir -p \$gdb_debug_dir
+ln -s \$PWD/\$1 \$gdb_debug_dir/\$gdb_debug_file
+EOF
+
+    chmod +x ./create_index.sh
+    chmod +x ./create_build_id_links.sh
+    cpus=$(getconf _NPROCESSORS_ONLN)
+
+    # pre-create the index to the index cache so it is available when the user goes to use gdb
+    find bin lib -type f -perm -o=x | xargs --max-args=1 --max-procs=$cpus ./create_index.sh
+
+    # This script constructs symblinks based off the build-id so GDB can skip the crc check
+    # normally performed during .gnu_debuglink loading.
+    find bin lib -name "*.debug" -type f -perm -o=x | xargs --max-args=1 --max-procs=$cpus ./create_build_id_links.sh
+
+    # Boost-Pretty-Printer supports auto-detection for the boost version but relies on the system
+    # installed version of boost. To avoid this behavior we explicitly specify the boost_version.
+    # Moreover, the most recent version of boost that Boost-Pretty-Printer verifies it supports is
+    # version 1.73.0. While 1.73.0 is older than the version in the src/third_party/boost/
+    # directory, the pretty printer in Boost-Pretty-Printer will display boost::optional values
+    # correctly.
+    cat >> ~/.gdbinit <<EOF
 set auto-load safe-path /
 set solib-search-path ./lib/
 set pagination off
 set print object on
 set print static-members off
 set print pretty on
+set index-cache enabled on
 
 python
 import sys
 sys.path.insert(0, './Boost-Pretty-Printer')
 import boost
-boost.register_printers()
+boost.register_printers(boost_version=(1, 73, 0))
 end
+dir $HOME/debug
 EOF
 
-echo "dir $HOME/debug" >> ~/.gdbinit
+    # Empty out the progress script that warns users about the set script still running when users log in.
+    echo "" > ~/.setup_spawnhost_coredump_progress
+    # Alert currently logged in users that this setup script has completed. Logging back in will ensure any
+    # paths/environment variables will be set as intended.
+    wall "The setup_spawnhost_coredump script has completed, please relogin to ensure the right environment variables are set."
+fi
 
-# Empty out the progress script that warns users about the set script still running when users log in.
-echo "" > ~/.setup_spawnhost_coredump_progress
-# Alert currently logged in users that this setup script has completed. Logging back in will ensure any
-# paths/environment variables will be set as intended.
-wall "The setup_spawnhost_coredump script has completed, please relogin to ensure the right environment variables are set."
+# Send a Slack notification as the very last thing the setup_spawnhost_coredump script does.
+# This way a Server engineer can temporarily forget about the Evergreen host they spawned until the
+# paths and environment variables are configured as intended for when they first connect.
+if [[ "${machine}" = "Cygwin" ]]; then
+    # The setup_spawnhost_coredump script runs as the mci-exec user on Windows hosts. However,
+    # Server engineers log in as the Administrator user.
+    ssh_user="Administrator"
+    # The Evergreen binary only expects a Windows path. The rest of Cygwin is flexible about it
+    # being a Cygwin path or a Windows path so we do the conversion here.
+    evg_credentials_pathname=$(cygpath -w ~Administrator/.evergreen.yml)
+    evg_binary_pathname=~Administrator/cli_bin/evergreen
+else
+    ssh_user=$(whoami)
+    evg_credentials_pathname=~/.evergreen.yml
+    evg_binary_pathname=evergreen
+fi
+
+slack_user=$(awk '{if ($1 == "user:") print $2}' "$evg_credentials_pathname")
+# Refer to the https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instancedata-data-retrieval.html
+# documentation for more information on the AWS instance metadata endpoints.
+aws_metadata_svc="http://169.254.169.254"
+aws_token=$(curl -s -X PUT "$aws_metadata_svc/latest/api/token" -H 'X-aws-ec2-metadata-token-ttl-seconds: 60')
+ssh_host=$(curl -s -H "X-aws-ec2-metadata-token: $aws_token" "$aws_metadata_svc/latest/meta-data/public-hostname")
+if [[ "${machine}" = "Cygwin" ]]; then
+    slack_message=$(printf "The setup_spawnhost_coredump script has finished setting things up. \
+Please use Windows Remote Desktop with\n\
+1. PC name: $ssh_host\n\
+2. User account: $ssh_user\n\
+3. The RDP password configured under the edit dialog at https://spruce.mongodb.com/spawn/host\n\
+to log in.")
+else
+    slack_message="The setup_spawnhost_coredump script has finished setting things up. Please run "'```'"ssh $ssh_user@$ssh_host"'```'" to log in."
+fi
+
+# The Evergreen spawn host is expected to be provisioned with the user's .evergreen.yml credentials.
+# But in case something unexpected happens we don't want the setup_spawnhost_coredump script itself
+# to error.
+if [[ -n "${slack_user}" ]]; then
+    "$evg_binary_pathname" --config "$evg_credentials_pathname" notify slack -t "@$slack_user" -m "$slack_message"
+    "$evg_binary_pathname" --config "$evg_credentials_pathname" notify slack -t "@$slack_user" -m "If you run into unresolved system library symbols when debugging unit tests, please add -ex 'set sysroot $HOME_DIR/rbe_sysroot/' to your gdb command."
+fi

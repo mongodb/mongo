@@ -27,24 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/util/dns_query.h"
 
-#include <array>
-#include <cassert>
-#include <cstdint>
-#include <exception>
-#include <iostream>
-#include <memory>
-#include <sstream>
-#include <stdexcept>
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/util/assert_util.h"
+
+#include <iterator>
 #include <string>
 #include <vector>
-
-#include <boost/noncopyable.hpp>
-
-#include "mongo/bson/util/builder.h"
 
 // It is safe to include the implementation "headers" in an anonymous namespace, as the code is
 // meant to live in a single TU -- this one.  Include one of these headers last.
@@ -66,8 +58,8 @@ namespace mongo {
  * Returns a string with the IP address or domain name listed...
  */
 std::vector<std::pair<std::string, Seconds>> dns::lookupARecords(const std::string& service) {
-    DNSQueryState dnsQuery;
-    auto response = dnsQuery.lookup(service, DNSQueryClass::kInternet, DNSQueryType::kAddress);
+    auto response =
+        DNSQueryState().lookup(service, DNSQueryClass::kInternet, DNSQueryType::kAddress);
 
     std::vector<std::pair<std::string, Seconds>> res;
 

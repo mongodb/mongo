@@ -1,0 +1,133 @@
+# Copyright (C) 2021-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/db/basic_types.idl"
+
+structs:
+    ClusterServerParameter:
+        # Users of CSP (Cluster-wide Server Parameters) must create
+        # a document definition for the values used by their setting
+        # which inherits from this struct via inlined chaining.
+        description: Abstract baseclass for all cluster-wide server parameters
+        fields:
+            _id:
+                description: Unique per-feature name of this CSP
+                type: string
+                # Always present on disk, but provided as optional for command processing.
+                optional: true
+            clusterParameterTime:
+                description: >
+                    LogicalTime representing the time at which the current version of the CSP was
+                    updated. Newer versions of the CSP will have later clusterParameterTimes than older ones.
+                    In normal operation, the clusterParameterTime will increase as the CSP is updated via 
+                    setClusterParameter, but may decrease to a previously-seen value on rollback.
+                type: logicalTime
+                default: LogicalTime::kUninitialized
+
+    TestIntClusterParameterStorage:
+        description: "Storage used for testIntClusterParameter"
+        inline_chained_structs: true
+        chained_structs:
+            ClusterServerParameter: ClusterServerParameter
+        fields:
+            intData:
+                description: "Some int parameter"
+                type: safeInt64
+                default: 16
+
+    TestStrClusterParameterStorage:
+        description: "Storage used for testStrClusterParameter"
+        inline_chained_structs: true
+        chained_structs:
+            ClusterServerParameter: ClusterServerParameter
+        fields:
+            strData:
+                description: "Some string parameter"
+                type: string
+                default: '"off"'
+
+    TestBoolClusterParameterStorage:
+        description: "Storage used for testBoolClusterParameter"
+        inline_chained_structs: true
+        chained_structs:
+            ClusterServerParameter: ClusterServerParameter
+        fields:
+            boolData:
+                description: "Some bool parameter"
+                type: bool
+                default: 0
+
+feature_flags:
+    featureFlagClusterWideToaster:
+        description: Feature flag for testing use of feature flags with CW server params
+        cpp_varname: gFeatureFlagClusterWideToaster
+        default: false
+        fcv_gated: true
+
+server_parameters:
+    testIntClusterParameter:
+        set_at: cluster
+        description: "Test cluster parameter that is only usable if enableTestCommands=true"
+        cpp_vartype: TestIntClusterParameterStorage
+        cpp_varname: intStorage
+        test_only: true
+        redact: false
+        omit_in_ftdc: false
+
+    testStrClusterParameter:
+        set_at: cluster
+        description: "Test cluster parameter that is only usable if enableTestCommands=true"
+        cpp_vartype: TestStrClusterParameterStorage
+        cpp_varname: strStorage
+        test_only: true
+        redact: false
+        omit_in_ftdc: false
+
+    testBoolClusterParameter:
+        set_at: cluster
+        description: "Test cluster parameter that is only usable if enableTestCommands=true"
+        cpp_vartype: TestBoolClusterParameterStorage
+        cpp_varname: boolStorage
+        omit_in_ftdc: true
+        test_only: true
+        redact: false
+
+    cwspTestNeedsFeatureFlagClusterWideToaster:
+        description: "Server Parameter gated on featureFlagClusterWideToaster"
+        set_at: cluster
+        cpp_varname: gCWSPTestFeatureFlagClusterWideToaster
+        cpp_vartype: TestIntClusterParameterStorage
+        test_only: true
+        condition:
+            feature_flag: gFeatureFlagClusterWideToaster
+        redact: false
+        omit_in_ftdc: false

@@ -1,0 +1,11 @@
+// The purpose of this test is to ensure that $geoNear and $text queries still run correctly when
+// the --minimal-index flag is set.
+minimalIndices
+test
+minimalIndices.coll as coll
+
+:sortResults {aggregate: "coll", pipeline: [{ "$geoNear" : { "distanceField" : "count", "near" : [ -28, 60 ], "minDistance" : 0, "spherical" : false } } ], cursor: {}, maxTimeMS: 30000}
+
+:sortResults {aggregate: "coll", pipeline: [{ "$geoNear" : { "distanceField" : "count", "near" : [ 60, 58 ], "minDistance" : 0, "spherical" : true } } ], cursor: {}, maxTimeMS: 30000}
+
+:sortResults {aggregate: "coll", pipeline: [{ "$match": { "$text" : { "$search": "mumbo" } }}], cursor: {}, maxTimeMS: 30000}

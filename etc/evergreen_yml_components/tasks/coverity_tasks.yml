@@ -1,0 +1,94 @@
+functions:
+  f_clone_source:
+    - &clone_source
+      display_name: "Cloning source to analyze"
+      command: git.get_project
+      params:
+        directory: src
+        clone_depth: 1
+        recurse_submodules: true
+
+    - &check
+      display_name: "Checking if project has needed Coverity config"
+      command: subprocess.exec
+      params:
+        add_expansions_to_env: true
+        redirect_standard_error_to_output: true
+        binary: "${module_prefix}/${module_name}/evergreen/coverity.sh"
+        args:
+          - "check"
+
+  f_download_and_extract_coverity:
+    - &assume_role
+      display_name: "Assuming IAM role"
+      command: ec2.assume_role
+      params:
+        role_arn: arn:aws:iam::557821124784:role/evergreen.evergreen.coverity
+
+    - &download_coverity_license
+      display_name: "downloading Coverity license file"
+      command: s3.get
+      params:
+        aws_key: ${AWS_ACCESS_KEY_ID}
+        aws_secret: ${AWS_SECRET_ACCESS_KEY}
+        aws_session_token: ${AWS_SESSION_TOKEN}
+        remote_file: license.dat
+        bucket: evergreen.coverity
+        local_file: license.dat
+
+    - &download_coverity_binary
+      display_name: "downloading Coverity binary"
+      command: s3.get
+      params:
+        aws_key: ${AWS_ACCESS_KEY_ID}
+        aws_secret: ${AWS_SECRET_ACCESS_KEY}
+        aws_session_token: ${AWS_SESSION_TOKEN}
+        remote_file: linux/x86_64/latest/coverity.tar.gz
+        bucket: evergreen.coverity
+        local_file: coverity.tar.gz
+
+    - &extract_coverity_binary
+      display_name: "Extracting Coverity binary tarball"
+      command: subprocess.exec
+      params:
+        add_expansions_to_env: true
+        redirect_standard_error_to_output: true
+        binary: "${module_prefix}/${module_name}/evergreen/coverity.sh"
+        args:
+          - "extract"
+
+  # Analyzes after build
+  f_analyze:
+    - command: subprocess.exec
+      params:
+        add_expansions_to_env: true
+        redirect_standard_error_to_output: true
+        binary: "${module_prefix}/${module_name}/evergreen/coverity.sh"
+        args:
+          - "analyze"
+
+  # Pushes results to Coverity server after a successful analysis
+  f_commit:
+    - command: subprocess.exec
+      params:
+        add_expansions_to_env: true
+        redirect_standard_error_to_output: true
+        binary: "${module_prefix}/${module_name}/evergreen/coverity.sh"
+        args:
+          - "commit"
+
+  # All in one function, from cloning to pushing results to Coverity server
+  f_run_coverity:
+    - *clone_source
+    - *check
+    - *assume_role
+    - *download_coverity_license
+    - *download_coverity_binary
+    - *extract_coverity_binary
+    - command: subprocess.exec
+      params:
+        add_expansions_to_env: true
+        redirect_standard_error_to_output: true
+        binary: "${module_prefix}/${module_name}/evergreen/coverity.sh"
+        args:
+          - "scan"

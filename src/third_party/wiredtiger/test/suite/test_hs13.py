@@ -33,7 +33,6 @@ from wtscenario import make_scenarios
 # Verify reverse modify traversal after eviction.
 class test_hs13(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=2MB,eviction=(threads_max=1)'
-    session_config = 'isolation=snapshot'
     key_format_values = [
         ('column', dict(key_format='r')),
         ('integer-row', dict(key_format='i'))
@@ -67,7 +66,7 @@ class test_hs13(wttest.WiredTigerTestCase):
         session2.begin_transaction()
         cursor2.set_key(1)
         cursor2.search()
-        self.assertEquals(cursor2.get_value(),  'A' + value1)
+        self.assertEqual(cursor2.get_value(),  'A' + value1)
         session2.commit_transaction()
 
         # Reset the cursor.
@@ -93,13 +92,10 @@ class test_hs13(wttest.WiredTigerTestCase):
         # and evict the page.
         evict_cursor = self.session.open_cursor(uri, None, "debug=(release_evict)")
         evict_cursor.set_key(1)
-        self.assertEquals(evict_cursor.search(), 0)
+        self.assertEqual(evict_cursor.search(), 0)
         evict_cursor.reset()
 
         # Try to find the value we saw earlier.
         cursor2.set_key(1)
         cursor2.search()
-        self.assertEquals(cursor2.get_value(), 'A' + value1)
-
-if __name__ == '__main__':
-    wttest.run()
+        self.assertEqual(cursor2.get_value(), 'A' + value1)

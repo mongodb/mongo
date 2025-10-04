@@ -27,11 +27,20 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/replica_set_aware_service.h"
+
+#include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/logv2/log.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/timer.h"
+
+#include <algorithm>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 
 namespace mongo {
 
@@ -56,6 +65,20 @@ void ReplicaSetAwareServiceRegistry::onStartup(OperationContext* opCtx) {
     });
 }
 
+void ReplicaSetAwareServiceRegistry::onSetCurrentConfig(OperationContext* opCtx) {
+    std::for_each(_services.begin(), _services.end(), [&](ReplicaSetAwareInterface* service) {
+        service->onSetCurrentConfig(opCtx);
+    });
+}
+
+void ReplicaSetAwareServiceRegistry::onConsistentDataAvailable(OperationContext* opCtx,
+                                                               bool isMajority,
+                                                               bool isRollback) {
+    std::for_each(_services.begin(), _services.end(), [&](ReplicaSetAwareInterface* service) {
+        service->onConsistentDataAvailable(opCtx, isMajority, isRollback);
+    });
+}
+
 void ReplicaSetAwareServiceRegistry::onShutdown() {
     std::for_each(_services.begin(), _services.end(), [&](ReplicaSetAwareInterface* service) {
         service->onShutdown();
@@ -63,20 +86,102 @@ void ReplicaSetAwareServiceRegistry::onShutdown() {
 }
 
 void ReplicaSetAwareServiceRegistry::onStepUpBegin(OperationContext* opCtx, long long term) {
+    // Since this method is run during drain mode and can block state transition, generate a warning
+    // if we are spending too long here.
+    Timer totalTime{};
+    ON_BLOCK_EXIT([&] {
+        auto timeSpent = totalTime.millis();
+        auto threshold = repl::slowTotalOnStepUpBeginThresholdMS.load();
+        if (timeSpent > threshold) {
+            LOGV2(
+                6699600,
+                "Duration spent in ReplicaSetAwareServiceRegistry::onStepUpBegin for all services "
+                "exceeded slowTotalOnStepUpBeginThresholdMS",
+                "thresholdMillis"_attr = threshold,
+                "durationMillis"_attr = timeSpent);
+        }
+    });
+
     std::for_each(_services.begin(), _services.end(), [&](ReplicaSetAwareInterface* service) {
+        // Additionally, generate a warning if any individual service is taking too long.
+        Timer t{};
+        ON_BLOCK_EXIT([&] {
+            auto timeSpent = t.millis();
+            auto threshold = repl::slowServiceOnStepUpBeginThresholdMS.load();
+            if (timeSpent > threshold) {
+                LOGV2(6699601,
+                      "Duration spent in ReplicaSetAwareServiceRegistry::onStepUpBegin "
+                      "for service exceeded slowServiceOnStepUpBeginThresholdMS",
+                      "thresholdMillis"_attr = threshold,
+                      "durationMillis"_attr = timeSpent,
+                      "serviceName"_attr = service->getServiceName());
+            }
+        });
         service->onStepUpBegin(opCtx, term);
     });
 }
 
 void ReplicaSetAwareServiceRegistry::onStepUpComplete(OperationContext* opCtx, long long term) {
+    // Since this method is called before we mark the node writable in
+    // ReplicationCoordinatorImpl::signalApplierDrainComplete and therefore can block the new
+    // primary from starting to receive writes, generate a warning if we are spending too long here.
+    Timer totalTime{};
+    ON_BLOCK_EXIT([&] {
+        auto timeSpent = totalTime.millis();
+        auto threshold = repl::slowTotalOnStepUpCompleteThresholdMS.load();
+        if (timeSpent > threshold) {
+            LOGV2(6699602,
+                  "Duration spent in ReplicaSetAwareServiceRegistry::onStepUpComplete "
+                  "for all services exceeded slowTotalOnStepUpCompleteThresholdMS",
+                  "thresholdMillis"_attr = threshold,
+                  "durationMillis"_attr = timeSpent);
+        }
+    });
+
+    LOGV2(8025900, "ReplicaSetAwareServiceRegistry::onStepUpComplete stepping up all services");
+
     std::for_each(_services.begin(), _services.end(), [&](ReplicaSetAwareInterface* service) {
+        // Additionally, generate a warning if any individual service is taking too long.
+        Timer t{};
+        ON_BLOCK_EXIT([&] {
+            auto timeSpent = t.millis();
+            auto threshold = repl::slowServiceOnStepUpCompleteThresholdMS.load();
+            if (timeSpent > threshold) {
+                LOGV2(6699603,
+                      "Duration spent in ReplicaSetAwareServiceRegistry::onStepUpComplete "
+                      "for service exceeded slowServiceOnStepUpCompleteThresholdMS",
+                      "thresholdMillis"_attr = threshold,
+                      "durationMillis"_attr = timeSpent,
+                      "serviceName"_attr = service->getServiceName());
+            }
+        });
+        LOGV2_DEBUG(
+            8025901, 1, "Stepping up service", "serviceName"_attr = service->getServiceName());
         service->onStepUpComplete(opCtx, term);
     });
 }
 
 void ReplicaSetAwareServiceRegistry::onStepDown() {
     std::for_each(_services.begin(), _services.end(), [](ReplicaSetAwareInterface* service) {
+        Timer t{};
         service->onStepDown();
+
+        auto timeSpent = t.millis();
+        auto threshold = repl::slowServiceOnStepDownThresholdMS.load();
+        if (timeSpent > threshold) {
+            LOGV2(10594201,
+                  "Duration spent in ReplicaSetAwareServiceRegistry::onStepDown "
+                  "for service exceeded slowServiceOnStepDownThresholdMS",
+                  "thresholdMillis"_attr = threshold,
+                  "durationMillis"_attr = timeSpent,
+                  "serviceName"_attr = service->getServiceName());
+        }
+    });
+}
+
+void ReplicaSetAwareServiceRegistry::onRollbackBegin() {
+    std::for_each(_services.begin(), _services.end(), [](ReplicaSetAwareInterface* service) {
+        service->onRollbackBegin();
     });
 }
 

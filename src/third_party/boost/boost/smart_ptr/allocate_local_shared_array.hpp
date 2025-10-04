@@ -10,6 +10,8 @@ Distributed under the Boost Software License, Version 1.0.
 
 #include <boost/smart_ptr/allocate_shared_array.hpp>
 #include <boost/smart_ptr/local_shared_ptr.hpp>
+#include <boost/smart_ptr/detail/sp_type_traits.hpp>
+#include <type_traits>
 
 namespace boost {
 namespace detail {
@@ -17,16 +19,16 @@ namespace detail {
 class BOOST_SYMBOL_VISIBLE lsp_array_base
     : public local_counted_base {
 public:
-    void set(sp_counted_base* base) BOOST_SP_NOEXCEPT {
+    void set(sp_counted_base* base) noexcept {
         count_ = shared_count(base);
     }
 
-    void local_cb_destroy() BOOST_SP_NOEXCEPT BOOST_OVERRIDE {
+    void local_cb_destroy() noexcept override {
         shared_count().swap(count_);
     }
 
     shared_count local_cb_get_shared_count() const
-        BOOST_SP_NOEXCEPT BOOST_OVERRIDE {
+        noexcept override {
         return count_;
     }
 
@@ -39,10 +41,10 @@ class lsp_array_state
     : public sp_array_state<A> {
 public:
     template<class U>
-    lsp_array_state(const U& other, std::size_t size) BOOST_SP_NOEXCEPT
+    lsp_array_state(const U& other, std::size_t size) noexcept
         : sp_array_state<A>(other, size) { }
 
-    lsp_array_base& base() BOOST_SP_NOEXCEPT {
+    lsp_array_base& base() noexcept {
         return base_;
     }
 
@@ -55,10 +57,10 @@ class lsp_size_array_state
     : public sp_size_array_state<A, N> {
 public:
     template<class U>
-    lsp_size_array_state(const U& other, std::size_t size) BOOST_SP_NOEXCEPT
+    lsp_size_array_state(const U& other, std::size_t size) noexcept
         : sp_size_array_state<A, N>(other, size) { }
 
-    lsp_array_base& base() BOOST_SP_NOEXCEPT {
+    lsp_array_base& base() noexcept {
         return base_;
     }
 
@@ -69,7 +71,7 @@ private:
 } /* detail */
 
 template<class T, class A>
-inline typename enable_if_<is_unbounded_array<T>::value,
+inline typename std::enable_if<detail::sp_is_unbounded_array<T>::value,
     local_shared_ptr<T> >::type
 allocate_local_shared(const A& allocator, std::size_t count)
 {
@@ -89,12 +91,12 @@ allocate_local_shared(const A& allocator, std::size_t count)
 }
 
 template<class T, class A>
-inline typename enable_if_<is_bounded_array<T>::value,
+inline typename std::enable_if<detail::sp_is_bounded_array<T>::value,
     local_shared_ptr<T> >::type
 allocate_local_shared(const A& allocator)
 {
     enum {
-        count = extent<T>::value
+        count = std::extent<T>::value
     };
     typedef typename detail::sp_array_element<T>::type element;
     typedef typename allocator_rebind<A, element>::type other;
@@ -112,10 +114,10 @@ allocate_local_shared(const A& allocator)
 }
 
 template<class T, class A>
-inline typename enable_if_<is_unbounded_array<T>::value,
+inline typename std::enable_if<detail::sp_is_unbounded_array<T>::value,
     local_shared_ptr<T> >::type
 allocate_local_shared(const A& allocator, std::size_t count,
-    const typename remove_extent<T>::type& value)
+    const typename std::remove_extent<T>::type& value)
 {
     typedef typename detail::sp_array_element<T>::type element;
     typedef typename allocator_rebind<A, element>::type other;
@@ -133,13 +135,13 @@ allocate_local_shared(const A& allocator, std::size_t count,
 }
 
 template<class T, class A>
-inline typename enable_if_<is_bounded_array<T>::value,
+inline typename std::enable_if<detail::sp_is_bounded_array<T>::value,
     local_shared_ptr<T> >::type
 allocate_local_shared(const A& allocator,
-    const typename remove_extent<T>::type& value)
+    const typename std::remove_extent<T>::type& value)
 {
     enum {
-        count = extent<T>::value
+        count = std::extent<T>::value
     };
     typedef typename detail::sp_array_element<T>::type element;
     typedef typename allocator_rebind<A, element>::type other;
@@ -157,7 +159,7 @@ allocate_local_shared(const A& allocator,
 }
 
 template<class T, class A>
-inline typename enable_if_<is_unbounded_array<T>::value,
+inline typename std::enable_if<detail::sp_is_unbounded_array<T>::value,
     local_shared_ptr<T> >::type
 allocate_local_shared_noinit(const A& allocator, std::size_t count)
 {
@@ -166,7 +168,7 @@ allocate_local_shared_noinit(const A& allocator, std::size_t count)
 }
 
 template<class T, class A>
-inline typename enable_if_<is_bounded_array<T>::value,
+inline typename std::enable_if<detail::sp_is_bounded_array<T>::value,
     local_shared_ptr<T> >::type
 allocate_local_shared_noinit(const A& allocator)
 {

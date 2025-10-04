@@ -1,0 +1,125 @@
+# Replication Smoke Tests
+# THIS FILE IS GENERATED - DO NOT MODIFY
+suites:
+  streams:
+    # failed 268/12593 times, success p90 => 2.827s, score => 94.785
+    - src/mongo/db/modules/enterprise/jstests/streams/infinite_loop.js
+    # failed 139/12565 times, success p90 => 0.405s, score => 343.136
+    - src/mongo/db/modules/enterprise/jstests/streams/parse_only.js
+    # failed 20/12575 times, success p90 => 0.318s, score => 62.934
+    - src/mongo/db/modules/enterprise/jstests/streams/bad_source.js
+    # failed 37/12586 times, success p90 => 0.627s, score => 58.973
+    - src/mongo/db/modules/enterprise/jstests/streams/documents.js
+    # failed 32/12575 times, success p90 => 0.914s, score => 35.029
+    - src/mongo/db/modules/enterprise/jstests/streams/sample.js
+    # failed 33/12576 times, success p90 => 0.983s, score => 33.585
+    - src/mongo/db/modules/enterprise/jstests/streams/validate.js
+    # failed 32/12586 times, success p90 => 1.495s, score => 21.408
+    - src/mongo/db/modules/enterprise/jstests/streams/documents_data_source.js
+    # failed 30/12587 times, success p90 => 1.724s, score => 17.397
+    - src/mongo/db/modules/enterprise/jstests/streams/stop_reason.js
+    # failed 39/13999 times, success p90 => 2.497s, score => 15.619
+    - src/mongo/db/modules/enterprise/jstests/streams/simple_merge.js
+    # failed 30/12552 times, success p90 => 1.958s, score => 15.320
+    - src/mongo/db/modules/enterprise/jstests/streams/start_list.js
+    # failed 35/12566 times, success p90 => 2.328s, score => 15.032
+    - src/mongo/db/modules/enterprise/jstests/streams/sample_dlq.js
+    # failed 44/12579 times, success p90 => 3.040s, score => 14.473
+    - src/mongo/db/modules/enterprise/jstests/streams/dlq.js
+    # failed 31/14013 times, success p90 => 2.154s, score => 14.391
+    - src/mongo/db/modules/enterprise/jstests/streams/duplicate_fields.js
+    # failed 40/12583 times, success p90 => 2.882s, score => 13.878
+    - src/mongo/db/modules/enterprise/jstests/streams/group_dlq.js
+    # failed 41/14003 times, success p90 => 3.019s, score => 13.582
+    - src/mongo/db/modules/enterprise/jstests/streams/replace_root.js
+    # failed 51/12570 times, success p90 => 4.249s, score => 12.004
+    - src/mongo/db/modules/enterprise/jstests/streams/merge_pipeline.js
+    # failed 3/12577 times, success p90 => 0.262s, score => 11.438
+    - src/mongo/db/modules/enterprise/jstests/streams/checkpoint_helper.js
+    # failed 29/14016 times, success p90 => 2.594s, score => 11.178
+    - src/mongo/db/modules/enterprise/jstests/streams/checkpoint_backwards_compat.js
+    # failed 31/12566 times, success p90 => 2.779s, score => 11.156
+    - src/mongo/db/modules/enterprise/jstests/streams/sample_data_source.js
+    # failed 33/14008 times, success p90 => 3.034s, score => 10.876
+    - src/mongo/db/modules/enterprise/jstests/streams/set.js
+    # failed 39/14004 times, success p90 => 3.712s, score => 10.507
+    - src/mongo/db/modules/enterprise/jstests/streams/replace_with.js
+    # failed 20/10824 times, success p90 => 2.040s, score => 9.803
+    - src/mongo/db/modules/enterprise/jstests/streams/stack_trace.js
+    # failed 30/14004 times, success p90 => 3.540s, score => 8.474
+    - src/mongo/db/modules/enterprise/jstests/streams/redact.js
+    # failed 38/12580 times, success p90 => 4.915s, score => 7.731
+    - src/mongo/db/modules/enterprise/jstests/streams/late_events.js
+    # failed 34/14007 times, success p90 => 4.499s, score => 7.557
+    - src/mongo/db/modules/enterprise/jstests/streams/unwind.js
+    # failed 48/12575 times, success p90 => 6.484s, score => 7.403
+    - src/mongo/db/modules/enterprise/jstests/streams/stream_meta.js
+    # failed 2/12566 times, success p90 => 0.277s, score => 7.215
+    - src/mongo/db/modules/enterprise/jstests/streams/fake_client.js
+    # failed 29/14007 times, success p90 => 4.077s, score => 7.114
+    - src/mongo/db/modules/enterprise/jstests/streams/unset.js
+    # failed 37/12569 times, success p90 => 5.477s, score => 6.756
+    - src/mongo/db/modules/enterprise/jstests/streams/geospatial.js
+    # failed 38/14004 times, success p90 => 7.363s, score => 5.161
+    - src/mongo/db/modules/enterprise/jstests/streams/window_group.js
+    # failed 34/13998 times, success p90 => 7.354s, score => 4.624
+    - src/mongo/db/modules/enterprise/jstests/streams/feature_flag.js
+    # failed 217/14020 times, success p90 => 47.916s, score => 4.529
+    - src/mongo/db/modules/enterprise/jstests/streams/merge_requires_unique_index.js
+    # failed 34/12572 times, success p90 => 9.179s, score => 3.704
+    - src/mongo/db/modules/enterprise/jstests/streams/lookup_pipeline.js
+  replica_sets_initsync_static_jscore_passthrough:
+    # failed 53.0/13023 times, success p90 => 1.660s, score => 31.919
+    - jstests/core/timeseries/query/timeseries_ixscan_clusteredidxscan_union.js
+    # failed 10.0/10821 times, success p90 => 0.399s, score => 25.077
+    - jstests/core/replicate_record_ids/disallow_capped.js
+    # failed 19.0/13032 times, success p90 => 0.766s, score => 24.791
+    - jstests/core/shell/shelltypes.js
+    # failed 22.0/13021 times, success p90 => 0.902s, score => 24.393
+    - jstests/core/txns/disallow_operations_on_prepared_transaction.js
+    # failed 40.0/3348 times, success p90 => 1.777s, score => 22.513
+    - jstests/core/query/find_and_modify/find_and_modify_metrics.js
+    # failed 7.0/10821 times, success p90 => 0.316s, score => 22.119
+    - jstests/core/replicate_record_ids/replicate_record_ids_collection_creation.js
+    # failed 19.0/13037 times, success p90 => 0.863s, score => 22.020
+    - jstests/core/txns/no_writes_to_config_transactions_with_prepared_transaction.js
+    # failed 7.0/10817 times, success p90 => 0.324s, score => 21.612
+    - jstests/core/replicate_record_ids/collmod_removes_replicate_record_ids.js
+    # failed 18.0/13026 times, success p90 => 0.876s, score => 20.547
+    - jstests/core/txns/commit_prepared_transaction.js
+    # failed 12.0/10795 times, success p90 => 0.588s, score => 20.420
+    - src/mongo/db/modules/enterprise/jstests/fle2/basic_create_collection_text.js
+    # failed 17.0/8699 times, success p90 => 0.838s, score => 20.280
+    - jstests/core/shell/role_management_helpers.js
+    # failed 16.0/8696 times, success p90 => 0.796s, score => 20.099
+    - jstests/core/administrative/roles_info.js
+    # failed 19.0/13031 times, success p90 => 0.947s, score => 20.060
+    - jstests/core/index/fts/fts_proj.js
+    # failed 18.0/13026 times, success p90 => 0.901s, score => 19.971
+    - jstests/core/write/bulk/bulk_write_timeseries_basic.js
+    # failed 19.0/13030 times, success p90 => 0.970s, score => 19.590
+    - jstests/core/timeseries/geo/timeseries_geonear_mindistance_and_maxdistance.js
+    # failed 19.0/13039 times, success p90 => 0.976s, score => 19.461
+    - jstests/core/index/fts/fts_score_sort.js
+    # failed 18.0/13025 times, success p90 => 0.963s, score => 18.687
+    - jstests/core/index/geo/geo_update_btree2.js
+    # failed 10.0/7115 times, success p90 => 0.583s, score => 17.164
+    - src/mongo/db/modules/enterprise/jstests/fle2/bulk_write_insert_text.js
+    # failed 10.0/10821 times, success p90 => 0.596s, score => 16.767
+    - jstests/core/timeseries/write/timeseries_update_compressed_buckets.js
+    # failed 13.0/13022 times, success p90 => 0.792s, score => 16.419
+    - jstests/core/txns/prepare_prepared_transaction.js
+    # failed 19.0/2582 times, success p90 => 1.199s, score => 15.849
+    - jstests/core/catalog/db_stats.js
+    # failed 14.0/13047 times, success p90 => 0.894s, score => 15.667
+    - jstests/core/txns/aggregation_in_transaction.js
+    # failed 12.0/13033 times, success p90 => 0.811s, score => 14.790
+    - jstests/core/txns/transaction_error_handling.js
+    # failed 12.0/13046 times, success p90 => 0.815s, score => 14.722
+    - jstests/core/txns/prepare_nonexistent_transaction.js
+    # failed 10.0/8692 times, success p90 => 0.706s, score => 14.171
+    - jstests/core/shell/connection_string_validation.js
+    # failed 11.0/13036 times, success p90 => 0.793s, score => 13.868
+    - jstests/core/txns/list_collections_not_blocked_by_txn.js
+    # failed 11.0/13026 times, success p90 => 0.802s, score => 13.723
+    - jstests/core/txns/prepare_transaction_fails_on_temp_collections.js

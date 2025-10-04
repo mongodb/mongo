@@ -1,0 +1,221 @@
+# This suite is intended to exercise transaction behavior with failovers by running existing
+# concurrency workloads with state functions wrapped in transactions while shard and config
+# primaries are being killed. State functions that use operations not supported in a transaction
+# are not wrapped in one.
+
+test_kind: fsm_workload_test
+
+selector:
+  roots:
+    - jstests/concurrency/fsm_workloads/**/*.js
+  exclude_files:
+    # Disabled because MapReduce can lose cursors if the primary goes down during the operation.
+
+    # Disabled due to MongoDB restrictions and/or workload restrictions
+
+    # These workloads sometimes trigger 'Could not lock auth data update lock'
+    # errors because the AuthorizationManager currently waits for only five
+    # seconds to acquire the lock for authorization documents
+
+    # uses >100MB of data, which can overwhelm test hosts
+
+    # compact can only be run against a standalone mongod
+
+    # can cause OOM kills on test hosts
+
+    # cannot createIndex after dropDatabase without sharding first
+
+    # The WTWriteConflictException failpoint is not supported on mongos.
+
+    # TODO Undenylist (SERVER-38852).
+
+    # serverStatus does not include transaction metrics on mongos.
+
+    # Uses the same transaction id across different routers, which is not allowed because when either
+    # router tries to commit, it may not know the full participant list.
+
+    ##
+    # Denylists from concurrency_replication_multi_stmt_txn
+    ##
+
+    # Relies on having one thread observe writes from the other threads, which won't become visible
+    # once a transaction in the thread is started because it'll keep reading from the same snapshot.
+    - jstests/concurrency/fsm_workloads/ddl/create_index_background/create_index_background.js
+    - jstests/concurrency/fsm_workloads/ddl/create_index_background/create_index_background_partial_filter.js
+    - jstests/concurrency/fsm_workloads/ddl/create_index_background/create_index_background_wildcard.js
+
+    # Expects reads to die with a particular error, but other errors are possible if the read is part
+    # of a transaction (e.g. ErrorCodes.LockTimeout).
+    - jstests/concurrency/fsm_workloads/query/drop_index_during_replan.js
+    - jstests/concurrency/fsm_workloads/query/drop_index_during_lookup.js
+
+    ##
+    # Denylists from concurrency_sharded_multi_stmt_txn
+    ##
+
+    # Use updates that do not contain the shard key, so they are rejected before any commands are
+    # sent to participant shards, but these workloads do not fail, so the auto retry transaction logic
+    # attempts to commit, which fails because no participants have been contacted.
+    - jstests/concurrency/fsm_workloads/query/update/update_rename.js
+    - jstests/concurrency/fsm_workloads/query/update/update_rename_noindex.js
+
+    # Expects DocumentValidationFailure which causes transaction to abort and retry indefinitely.
+
+    ##
+    # Denylists from concurrency_sharded_with_stepdowns
+    ##
+
+    # ChunkHelper directly talks to the config servers and doesn't support retries for network errors
+    - jstests/concurrency/fsm_workloads/sharded_partitioned/sharded_mergeChunks_partitioned.js
+    - jstests/concurrency/fsm_workloads/sharded_partitioned/sharded_splitChunk_partitioned.js
+
+    # These workloads frequently time out waiting for the distributed lock to drop a sharded
+    # collection.
+    - jstests/concurrency/fsm_workloads/query/kill_aggregation.js
+    - jstests/concurrency/fsm_workloads/query/kill_rooted_or.js
+
+    # Uses non retryable commands.
+    - jstests/concurrency/fsm_workloads/query/agg/agg_sort.js
+    - jstests/concurrency/fsm_workloads/ddl/collMod/collMod.js
+    - jstests/concurrency/fsm_workloads/ddl/collMod/collMod_separate_collections.js
+    - jstests/concurrency/fsm_workloads/view_catalog/view_catalog.js
+    - jstests/concurrency/fsm_workloads/view_catalog/view_catalog_cycle_with_drop.js
+
+    ##
+    # Denylists specific to this suite
+    ##
+
+    # Uses getMore. If a kill node happens between the time of creation of cursor (usually by calling
+    # find or aggregate) and calling getMore(), server will throw CursortNotFound exception.
+    # We currently do not retry the transaction on this exception.
+
+    # Uses non-retryable commands in the same state function as a command not supported in a
+    # transaction.
+    - jstests/concurrency/fsm_workloads/query/agg/agg_merge_when_not_matched_insert.js
+    - jstests/concurrency/fsm_workloads/query/agg/agg_merge_when_matched_replace_with_new.js
+
+    # JS engine interruptions on mongos return ErrorCodes::Interrupted, which isn't
+    # considered a retryable or transient transaction error.
+    - jstests/concurrency/fsm_workloads/crud/indexed_insert/indexed_insert_where.js
+    - jstests/concurrency/fsm_workloads/query/remove/remove_where.js
+    - jstests/concurrency/fsm_workloads/query/update/update_where.js
+
+  exclude_with_any_tags:
+    - requires_standalone
+    - requires_replication
+    - assumes_against_mongod_not_mongos
+    - assumes_balancer_on
+    # Snapshot reads in transactions are banned on capped collections.
+    - requires_capped
+    # Sharing cursors between state functions will fail in this suite because it will attempt to use
+    # the same cursor in multiple transactions.
+    - state_functions_share_cursor
+    # These start a transaction in one state function and use it in other state functions. This suite
+    # would instead execute each state function as its own transaction.
+    - state_functions_share_transaction
+    # Tests which expect commands to fail and catch the error can cause transactions to abort and
+    # retry indefinitely.
+    - catches_command_failures
+    # This tag corresponds to operations which are run long enough to exceed the stepdown interval
+    # when grouped into transactions.
+    - operations_longer_than_stepdown_interval_in_txns
+    # mongos has no system.profile collection.
+    - requires_profiling
+    - does_not_support_transactions
+    - does_not_support_stepdowns
+    - assumes_unsharded_collection
+    # Time-series collections do not support write transactions
+    - requires_timeseries
+    # We do NOT exclude all tests tagged with 'requires_getmore', but we do exclude tests tagged with
+    # the more specific 'uses_getmore_outside_of_transaction'. Tests that use a getMore are generally
+    # incompatible with suites that kill / terminate nodes. However in this suite because all operations
+    # are wrapped within a txn, if a getMore fails due to the node being killed the entire txn will be
+    # retried, including the getMore, on a new node.
+    # A very small number of tests run a getMore in the same state function as an operation that is
+    # incompatible with txns (such as dropDatabase or $out). When this happens, the entire state function is run
+    # outside a txn. Therefore, because the getMore will also be run outside a txn, it once again becomes
+    # incompatible with killing / terminating nodes and the test must be excluded.
+    - uses_getmore_outside_of_transaction
+
+  # Note that "requires_non_retryable_writes" does not need to be denylisted because some writes
+  # that are not individually retryable can be retried if they are part of a transaction.
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+    tests: true
+  config:
+    shell_options:
+      eval: >-
+        await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
+      global_vars:
+        TestData:
+          runInsideTransaction: true
+          runningWithBalancer: false
+          runningWithConfigStepdowns: true
+          runningWithSessions: true
+          runningWithShardStepdowns: true
+          killShards: true
+          traceExceptions: false
+          implicitlyShardOnCreateCollectionOnly: true
+          useActionPermittedFile: [ContinuousStepdown]
+  hooks:
+    # We use a stepdown interval of 15 seconds because we will retry all commands in a transaction
+    # so we need to allow time for at most 10 operations to be re-run and then re-committed. If
+    # too many network errors occur when re-running a transaction we will run out of retries.
+    - class: ContinuousStepdown
+      config_stepdown: true
+      randomize_kill: true
+      shard_stepdown: true
+      stepdown_interval_ms: 15000
+      is_fsm_workload: true
+    - class: CheckShardFilteringMetadata
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: CheckOrphansDeleted
+    - class: CheckRoutingTableConsistency
+    - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
+      shell_options:
+        global_vars:
+          TestData:
+            skipEnforceFastCountOnValidate: true
+    - class: CleanupConcurrencyWorkloads
+  fixture:
+    class: ShardedClusterFixture
+    enable_balancer: false
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+    configsvr_options:
+      num_nodes: 3
+      all_nodes_electable: true
+      replset_config_options:
+        settings:
+          catchUpTimeoutMillis: 0
+      mongod_options:
+        set_parameters:
+          reshardingMinimumOperationDurationMillis: 30000 # 30 seconds
+    shard_options:
+      all_nodes_electable: true
+      mongod_options:
+        oplogSize: 1024
+      replset_config_options:
+        settings:
+          catchUpTimeoutMillis: 0
+    mongod_options:
+      wiredTigerEngineConfigString: "debug_mode=(table_logging=true)"
+      set_parameters:
+        enableTestCommands: 1
+        enableElectionHandoff: 0
+        roleGraphInvalidationIsFatal: 1
+        queryAnalysisWriterIntervalSecs: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+        reshardingVerificationChangeStreamsEventsBatchSizeLimit: 25
+        reshardingVerificationChangeStreamsEventsBatchTimeLimitSeconds: 5
+    num_rs_nodes_per_shard: 3
+    num_shards: 2
+    num_mongos: 2

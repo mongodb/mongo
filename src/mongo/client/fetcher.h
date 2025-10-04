@@ -29,22 +29,38 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/client/remote_command_retry_scheduler.h"
+#include "mongo/client/retry_strategy.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/query/client_cursor/clientcursor.h"
+#include "mongo/db/query/client_cursor/cursor_id.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/transport/transport_layer.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/interruptible.h"
+#include "mongo/util/net/hostandport.h"
+
 #include <functional>
 #include <iosfwd>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/client/remote_command_retry_scheduler.h"
-#include "mongo/db/clientcursor.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/executor/task_executor.h"
-#include "mongo/platform/mutex.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/util/net/hostandport.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -75,7 +91,7 @@ public:
         bool first = false;
     };
 
-    using QueryResponseStatus = StatusWith<Fetcher::QueryResponse>;
+    using QueryResponseStatus = RetryStrategy::Result<QueryResponse>;
 
     /**
      * Represents next steps of fetcher.
@@ -90,7 +106,7 @@ public:
     /**
      * Type of a fetcher callback function.
      */
-    typedef std::function<void(const StatusWith<QueryResponse>&, NextAction*, BSONObjBuilder*)>
+    typedef std::function<void(const QueryResponseStatus&, NextAction*, BSONObjBuilder*)>
         CallbackFn;
 
     /**
@@ -125,19 +141,19 @@ public:
      * The callback function 'work' is not allowed to call into the Fetcher instance. This
      * behavior is undefined and may result in a deadlock.
      *
-     * An optional retry policy may be provided for the first remote command request so that
+     * An optional retry strategy may be provided for the first remote command request so that
      * the remote command scheduler will re-send the command in case of transient network errors.
      */
     Fetcher(executor::TaskExecutor* executor,
             const HostAndPort& source,
-            const std::string& dbname,
+            const DatabaseName& dbname,
             const BSONObj& cmdObj,
             CallbackFn work,
             const BSONObj& metadata = ReadPreferenceSetting::secondaryPreferredMetadata(),
             Milliseconds findNetworkTimeout = RemoteCommandRequest::kNoTimeout,
             Milliseconds getMoreNetworkTimeout = RemoteCommandRequest::kNoTimeout,
-            std::unique_ptr<RemoteCommandRetryScheduler::RetryPolicy> firstCommandRetryPolicy =
-                RemoteCommandRetryScheduler::makeNoRetryPolicy(),
+            std::unique_ptr<mongo::RetryStrategy> firstCommandRetryStrategy =
+                std::make_unique<NoRetryStrategy>(),
             transport::ConnectSSLMode sslMode = transport::kGlobalSSLMode);
 
     virtual ~Fetcher();
@@ -185,10 +201,13 @@ public:
     void shutdown();
 
     /**
-     * Waits for remote command requests to complete.
+     * Waits for remote command requests to complete subject to the Interruptible being interrupted.
      * Returns immediately if fetcher is not active.
+     *
+     * Returns an OK Status if the wait completed successfully without interruption.
+     * Returns a non-OK Status if the Interruptible had been interrupted.
      */
-    void join();
+    Status join(Interruptible* interruptible);
 
     // State transitions:
     // PreStart --> Running --> ShuttingDown --> Complete
@@ -212,7 +231,7 @@ public:
     }
 
 private:
-    bool _isActive_inlock() const;
+    bool _isActive(WithLock lk) const;
 
     /**
      * Schedules getMore command to be run by the executor
@@ -243,17 +262,23 @@ private:
     bool _isShuttingDown() const;
     bool _isShuttingDown_inlock() const;
 
+    /**
+     * Waits for remote command requests to complete.
+     * Returns immediately if fetcher is not active.
+     */
+    void _join();
+
     // Not owned by us.
     executor::TaskExecutor* _executor;
 
     HostAndPort _source;
-    std::string _dbname;
+    DatabaseName _dbname;
     BSONObj _cmdObj;
     BSONObj _metadata;
     CallbackFn _work;
 
     // Protects member data of this Fetcher.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("Fetcher::_mutex");
+    mutable stdx::mutex _mutex;
 
     mutable stdx::condition_variable _condition;
 

@@ -29,9 +29,11 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #include <future>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace stdx {
 
 using ::std::async;          // NOLINT
@@ -43,4 +45,4 @@ using ::std::promise;        // NOLINT
 using ::std::shared_future;  // NOLINT
 
 }  // namespace stdx
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

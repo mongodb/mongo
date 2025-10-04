@@ -29,13 +29,20 @@
 
 #include "mongo/db/update/v2_log_builder.h"
 
-#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/mutable/mutable_bson_test_utils.h"
-#include "mongo/db/json.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/exec/mutable_bson/document.h"
+#include "mongo/db/field_ref.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/safe_num.h"
+
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace mongo::v2_log_builder {
 namespace {
@@ -73,10 +80,8 @@ TEST(V2LogBuilder, UpdateFieldWithTopLevelMutableBsonElement) {
     // Element is an array. Modifying a sub-element of mmb::Element does not store the data
     // serialized. So we need to call Element::writeToArray() in those cases to serialize the array.
     // We explicity modify the sub-element so that this logic can be tested.
-    const mmb::Element eltArr = doc.makeElementArray("",
-                                                     BSON_ARRAY(1 << BSON("sub"
-                                                                          << "obj")
-                                                                  << 3));
+    const mmb::Element eltArr =
+        doc.makeElementArray("", BSON_ARRAY(1 << BSON("sub" << "obj") << 3));
     ASSERT_OK(eltArr.leftChild().setValueString("val"));
 
     // Element is an obj. Modifying a sub-element of mmb::Element does not store the data

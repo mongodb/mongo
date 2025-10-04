@@ -64,6 +64,9 @@ s390x_handle_signal_frame (unw_cursor_t *cursor)
 
   c->sigcontext_addr = sc_addr;
 
+  for (i = 0; i < DWARF_NUM_PRESERVED_REGS; ++i)
+    c->dwarf.loc[i] = DWARF_NULL_LOC;
+
   /* Update the dwarf cursor.
      Set the location of the registers to the corresponding addresses of the
      uc_mcontext / sigcontext structure contents.  */

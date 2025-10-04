@@ -9,11 +9,9 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/libs/fail_point_util.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const replTest = new ReplSetTest({nodes: 2});
 replTest.startSet();
@@ -22,7 +20,7 @@ const config = replTest.getReplSetConfig();
 // Increase the election timeout so that we do not accidentally trigger an election while the
 // secondary is restarting.
 config.settings = {
-    "electionTimeoutMillis": 12 * 60 * 60 * 1000
+    "electionTimeoutMillis": 12 * 60 * 60 * 1000,
 };
 replTest.initiate(config);
 
@@ -30,8 +28,9 @@ const primary = replTest.getPrimary();
 let secondary = replTest.getSecondary();
 
 // The default WC is majority and this test can't satisfy majority writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 const dbName = "test";
 const collName = "initial_sync_commit_prepared_transaction";
@@ -62,29 +61,36 @@ jsTestLog("Restarting the secondary");
 // has copied {_id: 1} and {_id: 3}. This way we can try to commit the prepared transaction
 // while initial sync is paused and know that its operations won't be copied during collection
 // cloning. Instead, the commitTransaction oplog entry must be applied during oplog application.
-replTest.stop(secondary,
-              // signal
-              undefined,
-              // Validation would encounter a prepare conflict on the open transaction.
-              {skipValidation: true});
+replTest.stop(
+    secondary,
+    // signal
+    undefined,
+    // Validation would encounter a prepare conflict on the open transaction.
+    {skipValidation: true},
+);
 secondary = replTest.start(
     secondary,
     {
         startClean: true,
         setParameter: {
-            'failpoint.initialSyncHangDuringCollectionClone': tojson(
-                {mode: 'alwaysOn', data: {namespace: testColl.getFullName(), numDocsToClone: 2}}),
-            'numInitialSyncAttempts': 1
-        }
+            "failpoint.initialSyncHangDuringCollectionClone": tojson({
+                mode: "alwaysOn",
+                data: {namespace: testColl.getFullName(), numDocsToClone: 2},
+            }),
+            "numInitialSyncAttempts": 1,
+        },
     },
-    true /* wait */);
+    true /* wait */,
+);
 
 // Wait for failpoint to be reached so we know that collection cloning is paused.
-assert.commandWorked(secondary.adminCommand({
-    waitForFailPoint: "initialSyncHangDuringCollectionClone",
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+assert.commandWorked(
+    secondary.adminCommand({
+        waitForFailPoint: "initialSyncHangDuringCollectionClone",
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout,
+    }),
+);
 
 jsTestLog("Running operations while collection cloning is paused");
 
@@ -95,17 +101,16 @@ assert.commandWorked(PrepareHelpers.commitTransaction(session1, prepareTimestamp
 jsTestLog("Resuming initial sync");
 
 // Resume initial sync.
-assert.commandWorked(secondary.adminCommand(
-    {configureFailPoint: "initialSyncHangDuringCollectionClone", mode: "off"}));
+assert.commandWorked(secondary.adminCommand({configureFailPoint: "initialSyncHangDuringCollectionClone", mode: "off"}));
 
 // Wait for the secondary to complete initial sync.
-replTest.waitForState(secondary, ReplSetTest.State.SECONDARY);
+replTest.awaitSecondaryNodes(null, [secondary]);
 
 jsTestLog("Initial sync completed");
 
 // Make sure the transaction committed properly and is reflected after the initial sync.
 let res = secondary.getDB(dbName).getCollection(collName).findOne({_id: 2});
-assert.docEq(res, {_id: 2}, res);
+assert.docEq({_id: 2}, res);
 
 // Step up the secondary after initial sync is done and make sure we can successfully run
 // another transaction.
@@ -120,7 +125,6 @@ assert.commandWorked(sessionColl2.insert({_id: 4}));
 let prepareTimestamp2 = PrepareHelpers.prepareTransaction(session2);
 assert.commandWorked(PrepareHelpers.commitTransaction(session2, prepareTimestamp2));
 res = newPrimary.getDB(dbName).getCollection(collName).findOne({_id: 4});
-assert.docEq(res, {_id: 4}, res);
+assert.docEq({_id: 4}, res);
 
 replTest.stopSet();
-})();

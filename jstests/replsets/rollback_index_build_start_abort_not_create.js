@@ -1,15 +1,17 @@
 /**
  * Test that rolling back an index build, but not collection creation, behaves correctly even when
  * the index build is aborted.
+ * @tags: [
+ *   # We don't need to handle rollbacks in primary-driven index builds.
+ *   primary_driven_index_builds_incompatible,
+ * ]
  */
-(function() {
-"use strict";
+import {RollbackIndexBuildsTest} from "jstests/replsets/libs/rollback_index_builds_test.js";
 
-// For RollbackIndexBuildsTest
-load('jstests/replsets/libs/rollback_index_builds_test.js');
-
-const rollbackIndexTest = new RollbackIndexBuildsTest(
-    [ErrorCodes.InterruptedDueToReplStateChange, ErrorCodes.Interrupted]);
+const rollbackIndexTest = new RollbackIndexBuildsTest([
+    ErrorCodes.InterruptedDueToReplStateChange,
+    ErrorCodes.Interrupted,
+]);
 
 const schedule = [
     // Create the collection
@@ -26,4 +28,3 @@ const schedule = [
 
 rollbackIndexTest.runSchedules([schedule]);
 rollbackIndexTest.stop();
-})();

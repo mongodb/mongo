@@ -1,10 +1,9 @@
 // Confirms basic killOp execution via mongos.
 // @tags: [requires_replication, requires_sharding]
 
-(function() {
-"use strict";
-
-load("jstests/libs/curop_helpers.js");  // For waitForCurOpByFailPoint().
+import {waitForCurOpByFailPointNoNS} from "jstests/libs/curop_helpers.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2});
 const conn = st.s;
@@ -15,15 +14,16 @@ const coll = db.test;
 assert.commandWorked(db.getCollection(coll.getName()).insert({x: 1}));
 
 const kFailPointName = "waitInFindBeforeMakingBatch";
-assert.commandWorked(conn.adminCommand({"configureFailPoint": kFailPointName, "mode": "alwaysOn"}));
+const fp = configureFailPoint(conn, kFailPointName);
 
-const queryToKill = `assert.commandFailedWithCode(db.getSiblingDB('${db.getName()}')` +
+const queryToKill =
+    `assert.commandFailedWithCode(db.getSiblingDB('${db.getName()}')` +
     `.runCommand({find: '${coll.getName()}', filter: {x: 1}}), ErrorCodes.Interrupted);`;
 const awaitShell = startParallelShell(queryToKill, conn.port);
 
 const curOpFilter = {
     ns: coll.getFullName(),
-    "command.filter": {x: 1}
+    "command.filter": {x: 1},
 };
 
 // Wait for the operation to start.
@@ -40,7 +40,7 @@ assert(result[0].hasOwnProperty("killPending"));
 assert.eq(true, result[0].killPending);
 
 // Release the failpoint. The operation should check for interrupt and then finish.
-assert.commandWorked(conn.adminCommand({"configureFailPoint": kFailPointName, "mode": "off"}));
+fp.off();
 
 awaitShell();
 
@@ -48,4 +48,3 @@ result = adminDB.aggregate([{$currentOp: {localOps: true}}, {$match: curOpFilter
 assert(result.length === 0, tojson(result));
 
 st.stop();
-})();

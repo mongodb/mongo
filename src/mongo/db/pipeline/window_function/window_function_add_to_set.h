@@ -29,7 +29,18 @@
 
 #pragma once
 
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/document_value/value_comparator.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/memory_token_container_util.h"
 #include "mongo/db/pipeline/window_function/window_function.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
+
+#include <map>
+#include <memory>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 
@@ -42,14 +53,20 @@ public:
     }
 
     explicit WindowFunctionAddToSet(ExpressionContext* const expCtx)
-        : WindowFunctionState(expCtx),
-          _values(_expCtx->getValueComparator().makeOrderedValueMultiset()) {
-        _memUsageBytes = sizeof(*this);
+        : WindowFunctionState(expCtx, internalQueryMaxAddToSetBytes.load()),
+          _values(MemoryTokenValueComparator(&_expCtx->getValueComparator())) {
+        _memUsageTracker.set(sizeof(*this));
     }
 
     void add(Value value) override {
-        _memUsageBytes += value.getApproximateSize();
-        _values.insert(std::move(value));
+        _values.emplace(SimpleMemoryUsageToken{value.getApproximateSize(), &_memUsageTracker},
+                        std::move(value));
+        uassert(ErrorCodes::ExceededMemoryLimit,
+                str::stream() << "$addToSet used too much memory and cannot spill to disk. Used: "
+                              << _memUsageTracker.inUseTrackedMemoryBytes()
+                              << " bytes. Memory limit: "
+                              << _memUsageTracker.maxAllowedMemoryUsageBytes() << " bytes",
+                _memUsageTracker.withinMemoryLimit());
     }
 
     /**
@@ -59,28 +76,27 @@ public:
         auto iter = _values.find(std::move(value));
         tassert(
             5423800, "Can't remove from an empty WindowFunctionAddToSet", iter != _values.end());
-        _memUsageBytes -= iter->getApproximateSize();
         _values.erase(iter);
     }
 
     void reset() override {
         _values.clear();
-        _memUsageBytes = sizeof(*this);
+        _memUsageTracker.set(sizeof(*this));
     }
 
-    Value getValue() const override {
+    Value getValue(boost::optional<Value> current = boost::none) const override {
         std::vector<Value> output;
         if (_values.empty())
             return kDefault;
         for (auto it = _values.begin(); it != _values.end(); it = _values.upper_bound(*it)) {
-            output.push_back(*it);
+            output.push_back(it->value());
         }
 
-        return Value(output);
+        return Value(std::move(output));
     }
 
 private:
-    ValueMultiset _values;
+    std::multiset<SimpleMemoryUsageTokenWith<Value>, MemoryTokenValueComparator> _values;
 };
 
 }  // namespace mongo

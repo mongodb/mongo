@@ -29,8 +29,10 @@
 
 #pragma once
 
+#include "mongo/logv2/constants.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_manager.h"
+#include "mongo/logv2/log_service.h"
 #include "mongo/logv2/log_tag.h"
 #include "mongo/logv2/log_truncation.h"
 
@@ -52,12 +54,23 @@ public:
         if (options._component == LogComponent::kAutomaticDetermination) {
             options._component = component;
         }
+        if (options._service == LogService::defer) {
+            options._service = getLogService();
+        }
         return options;
     }
 
     LogOptions(LogComponent component) : _component(component) {}
 
     LogOptions(LogComponent component, FatalMode mode) : _component(component), _fatalMode(mode) {}
+
+    LogOptions(LogComponent component, LogService service)
+        : _component(component), _service(service) {}
+
+    LogOptions(LogComponent component, LogService service, FatalMode mode)
+        : _component(component), _service(service), _fatalMode(mode) {}
+
+    LogOptions(LogService service) : _service(service) {}
 
     LogOptions(LogDomain* domain) : _domain(domain) {}
 
@@ -77,6 +90,9 @@ public:
 
     LogOptions(LogComponent component, LogDomain* domain, LogTag tags)
         : _domain(domain), _tags(tags), _component(component) {}
+
+    LogOptions(LogTruncation truncation, UserAssertAfterLog uassertAfterLog)
+        : _truncation(truncation), _userAssertErrorCode(uassertAfterLog.errorCode) {}
 
     LogOptions(LogComponent component,
                LogDomain* domain,
@@ -113,10 +129,15 @@ public:
         return _fatalMode;
     }
 
+    LogService service() const {
+        return _service;
+    }
+
 private:
     LogDomain* _domain = &LogManager::global().getGlobalDomain();
     LogTag _tags;
     LogComponent _component = LogComponent::kAutomaticDetermination;
+    LogService _service = LogService::defer;
     LogTruncation _truncation = constants::kDefaultTruncation;
     int32_t _userAssertErrorCode = ErrorCodes::OK;
     FatalMode _fatalMode = FatalMode::kAssert;

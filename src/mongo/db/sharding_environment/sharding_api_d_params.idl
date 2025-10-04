@@ -1,0 +1,75 @@
+# Copyright (C) 2022-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+
+global:
+    cpp_namespace: mongo
+
+server_parameters:
+    metadataRefreshInTransactionMaxWaitMS:
+        description: >-
+            Maximum time in milliseconds to wait on a blocking operation when refreshing the filtering 
+            metadata within a transaction.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: metadataRefreshInTransactionMaxWaitMS
+        deprecated_name: metadataRefreshInTransactionMaxWaitBehindCritSecMS
+        validator:
+            gte: 0
+        default: 500
+        redact: false
+
+    directConnectionChecksWithSingleShard:
+        description: >-
+            Controls whether warnings should be emitted for direct connection operations when there is
+            only a single shard in the cluster. Will have no effect on the behavior in clusters with
+            two or more shards.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: directConnectionChecksWithSingleShard
+        default: true
+        redact: false
+
+    enableDirectShardDDLOperations:
+        description: >-
+            Enables the user to run direct shard DDL operations on a sharded cluster, bypassing the
+            direct shard DDL checks. This should only be used in extreme cases, e.g., restore a
+            sharded cluster backup to a replica set.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: enableDirectShardDDLOperations
+        default: false
+        redact: false
+
+    disableTransitionFromLastLTSToLastContinuousWithUserData:
+        description: >-
+            Prohibits upgrading from last LTS FCV to last continuous FCV if the replica set contains
+            user data during addShard. **Not a supported feature**. For emergency use only.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: disableTransitionFromLastLTSToLastContinuousWithUserData
+        default: true
+        redact: false

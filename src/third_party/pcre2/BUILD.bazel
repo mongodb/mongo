@@ -1,0 +1,102 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+# Directories that include generated config.h for various platforms
+#
+# Generated via
+# AutoTools (non-Windows)
+#  ./configure --disable-jit --with-match-limit-recursion=4000 --with-link-size=2 -enable-newline-is-lf --with-match-limit=200000 --with-parens-nest-limit=250 --enable-shared=no
+
+# CMake (Windows)
+#  -DPCRE_SUPPORT_PCREGREP_JIT:BOOL="0" -DPCRE_BUILD_TESTS:BOOL="0"
+#  -DPCRE_POSIX_MALLOC_THRESHOLD:STRING="10" -DPCRE_MATCH_LIMIT_RECURSION:STRING="4000"
+#  -DPCRE_NO_RECURSE:BOOL="1" -DPCRE_LINK_SIZE:STRING="2" -DPCRE_NEWLINE:STRING="LF"
+#  -DPCRE_SUPPORT_UNICODE_PROPERTIES:BOOL="1" -DPCREGREP_BUFSIZE:STRING="20480"
+#  -DPCRE_MATCH_LIMIT:STRING="200000" -DPCRE_PARENS_NEST_LIMIT:STRING="250"
+#  -DPCRE_SUPPORT_UTF:BOOL="1"
+
+mongo_cc_library(
+    name = "pcre2",
+    srcs = [
+        "src/pcre2_auto_possess.c",
+        "src/pcre2_chartables.c",
+        "src/pcre2_compile.c",
+        "src/pcre2_config.c",
+        "src/pcre2_context.c",
+        "src/pcre2_convert.c",
+        "src/pcre2_dfa_match.c",
+        "src/pcre2_error.c",
+        "src/pcre2_extuni.c",
+        "src/pcre2_find_bracket.c",
+        "src/pcre2_jit_compile.c",
+        "src/pcre2_maketables.c",
+        "src/pcre2_match.c",
+        "src/pcre2_match_data.c",
+        "src/pcre2_newline.c",
+        "src/pcre2_ord2utf.c",
+        "src/pcre2_pattern_info.c",
+        "src/pcre2_script_run.c",
+        "src/pcre2_serialize.c",
+        "src/pcre2_string_utils.c",
+        "src/pcre2_study.c",
+        "src/pcre2_substitute.c",
+        "src/pcre2_substring.c",
+        "src/pcre2_tables.c",
+        "src/pcre2_ucd.c",
+        "src/pcre2_valid_utf.c",
+        "src/pcre2_xclass.c",
+    ] + [
+        # internal headers
+        "src/pcre2_internal.h",
+        "src/pcre2_intmodedep.h",
+        "src/pcre2_jit_neon_inc.h",
+        "src/pcre2_jit_simd_inc.h",
+        "src/pcre2_ucp.h",
+        "src/pcre2posix.h",
+        "src/sljit/sljitConfig.h",
+        "src/sljit/sljitConfigInternal.h",
+        "src/sljit/sljitLir.h",
+    ] + select({
+        # internal platform-specific headers
+        "@platforms//os:windows": [
+            "build_windows/config.h",
+        ],
+        "//conditions:default": [
+            "build_posix/config.h",
+        ],
+    }),
+    hdrs = [
+        "src/pcre2.h",
+    ] + [
+        # C files compiled only as includes
+        "src/pcre2_jit_match.c",
+        "src/pcre2_jit_misc.c",
+        "src/pcre2_ucptables.c",
+    ],
+    copts = select({
+        "@platforms//os:windows": [
+            "-Isrc/third_party/pcre2/build_windows",
+        ],
+        "//conditions:default": [
+            "-Isrc/third_party/pcre2/build_posix",
+            "-Wno-implicit-fallthrough",
+        ],
+    }) + select({
+        "//bazel/config:compiler_type_clang": [
+            "-Wno-dangling",
+        ],
+        "//bazel/config:compiler_type_gcc": [
+            "-Wno-dangling-pointer",
+        ],
+        "//conditions:default": [],
+    }),
+    defines = [
+        "PCRE2_STATIC",
+    ],
+    includes = ["src"],
+    local_defines = [
+        "PCRE2_CODE_UNIT_WIDTH=8",
+        "HAVE_CONFIG_H",
+    ],
+)

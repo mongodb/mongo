@@ -27,27 +27,38 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/pipeline/document_source_queue.h"
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/stage_constraints.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
 namespace mongo {
 
 REGISTER_INTERNAL_DOCUMENT_SOURCE(queue,
                                   LiteParsedDocumentSourceDefault::parse,
                                   DocumentSourceQueue::createFromBson,
                                   true);
+ALLOCATE_DOCUMENT_SOURCE_ID(queue, DocumentSourceQueue::id)
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceQueue::createFromBson(
     BSONElement arrayElem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(5858201,
             "literal documents specification must be an array",
-            arrayElem.type() == BSONType::Array);
+            arrayElem.type() == BSONType::array);
     auto queue = DocumentSourceQueue::create(expCtx);
     // arrayElem is an Array and can be iterated through by using .Obj() method
-    for (auto elem : arrayElem.Obj()) {
+    for (const auto& elem : arrayElem.Obj()) {
         uassert(5858202,
                 "literal documents specification must be an array of objects",
-                elem.type() == BSONType::Object);
+                elem.type() == BSONType::object);
         queue->emplace_back(Document{elem.Obj()}.getOwned());
     }
     return queue;
@@ -55,37 +66,38 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceQueue::createFromBson(
 
 boost::intrusive_ptr<DocumentSourceQueue> DocumentSourceQueue::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    boost::optional<StringData> aliasStageName) {
-    return new DocumentSourceQueue({}, expCtx, aliasStageName);
+    boost::optional<StringData> stageNameOverride) {
+    return new DocumentSourceQueue(std::deque<GetNextResult>{}, expCtx, stageNameOverride);
 }
 
-DocumentSourceQueue::DocumentSourceQueue(std::deque<GetNextResult> results,
+DocumentSourceQueue::DocumentSourceQueue(DocumentSourceQueue::DeferredQueue results,
                                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                         boost::optional<StringData> aliasStageName)
+                                         boost::optional<StringData> stageNameOverride,
+                                         boost::optional<Value> serializeOverride,
+                                         boost::optional<StageConstraints> constraintsOverride)
     : DocumentSource(kStageName /* pass the real stage name here for execution stats */, expCtx),
       _queue(std::move(results)),
-      _aliasStageName(std::move(aliasStageName)) {}
+      _stageNameOverride(std::move(stageNameOverride)),
+      _serializeOverride(std::move(serializeOverride)),
+      _constraintsOverride(std::move(constraintsOverride)) {}
 
 const char* DocumentSourceQueue::getSourceName() const {
-    return _aliasStageName.value_or(kStageName).rawData();
+    return _stageNameOverride.value_or(kStageName).data();
 }
 
-DocumentSource::GetNextResult DocumentSourceQueue::doGetNext() {
-    if (_queue.empty()) {
-        return GetNextResult::makeEOF();
+Value DocumentSourceQueue::serialize(const SerializationOptions& opts) const {
+    // Early exit with the pre-defined serialization override if it exists.
+    if (_serializeOverride.has_value()) {
+        return *_serializeOverride;
     }
 
-    auto next = std::move(_queue.front());
-    _queue.pop_front();
-    return next;
-}
-
-Value DocumentSourceQueue::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
+    // Initialize the deferred queue if needed, and serialize its documents as one literal in the
+    // context of redaction.
     ValueArrayStream vals;
-    for (auto elem : _queue) {
+    for (const auto& elem : _queue.get()) {
         vals << elem.getDocument().getOwned();
     }
-    return Value(DOC(kStageName << vals.done()));
+    return Value(DOC(kStageName << opts.serializeLiteral(vals.done())));
 }
 
 }  // namespace mongo

@@ -17,8 +17,7 @@
  *   uses_transactions,
  * ]
  */
-(function() {
-"use strict";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const replTest = new ReplSetTest({nodes: 2});
 replTest.startSet();
@@ -30,9 +29,8 @@ const collName = "coll";
 
 assert.commandWorked(primary.getDB(dbName)[collName].createIndexes([{x: 1}]));
 
-const transactionShell = startParallelShell(function() {
-    load("jstests/core/txns/libs/prepare_helpers.js");  // For PrepareHelpers.
-
+const transactionShell = startParallelShell(async function () {
+    const {PrepareHelpers} = await import("jstests/core/txns/libs/prepare_helpers.js");
     while (db.getSiblingDB("query_with_txn_prepared")["stopQueries"].find().count() == 0) {
         for (let i = 0; i < 100; ++i) {
             const session = db.getMongo().startSession();
@@ -53,11 +51,13 @@ const transactionShell = startParallelShell(function() {
 
 for (let i = 0; i < 2000; ++i) {
     const result = primary.getDB(dbName)[collName].find({x: 1}).toArray();
-    assert([0, 1].includes(result.length), result);
+    // Although there are either 0 or 1 documents in the collection at all times, it's possible
+    // for more than 1 document to show up in the query due to yielding mechanics. See
+    // SERVER-101381 for more information.
+    assert.gte(result.length, 0, result);
 }
 
 assert.commandWorked(primary.getDB(dbName)["stopQueries"].insert({stop: 1}));
 transactionShell();
 
 replTest.stopSet();
-}());

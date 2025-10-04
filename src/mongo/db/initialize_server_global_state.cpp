@@ -27,46 +27,70 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/initialize_server_global_state.h"
-#include "mongo/db/initialize_server_global_state_gen.h"
+#include <cerrno>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <iostream>
+#include <string>
+#include <system_error>
 
 #include <boost/filesystem/operations.hpp>
 #include <fmt/format.h>
-#include <iostream>
-#include <memory>
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
 #ifndef _WIN32
 #include <sys/stat.h>
 #include <sys/wait.h>
-#include <syslog.h>
-#include <unistd.h>
 #endif
-
-#include "mongo/base/init.h"
-#include "mongo/config.h"
-#include "mongo/db/server_options.h"
-#include "mongo/logv2/log.h"
-#include "mongo/logv2/log_domain_global.h"
-#include "mongo/platform/process_id.h"
-#include "mongo/util/exit_code.h"
-#include "mongo/util/processinfo.h"
-#include "mongo/util/quick_exit.h"
-#include "mongo/util/str.h"
 
 #if defined(__APPLE__)
 #include <TargetConditionals.h>
 #endif
 
-namespace mongo {
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/auth/validated_tenancy_scope.h"
+#include "mongo/db/initialize_server_global_state.h"
+#include "mongo/db/initialize_server_global_state_gen.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/logv2/log.h"
+#include "mongo/logv2/log_domain_global.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/errno_util.h"
+#include "mongo/util/exit_code.h"
+#include "mongo/util/processinfo.h"
+#include "mongo/util/quick_exit.h"
+#include "mongo/util/str.h"
+#include "mongo/util/testing_proctor.h"
+#include "mongo/util/time_support.h"
+
+#include <boost/filesystem/exception.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
+
+
+namespace mongo::initialize_server_global_state {
 
 #ifndef _WIN32
 static void croak(StringData prefix, int savedErr = errno) {
-    std::cout << prefix << ": " << errnoWithDescription(savedErr) << std::endl;
-    quickExit(EXIT_ABRUPT);
+    std::cout << prefix << ": " << errorMessage(posixError(savedErr)) << std::endl;
+    quickExit(ExitCode::abrupt);
 }
 
 void signalForkSuccess() {
@@ -84,11 +108,12 @@ void signalForkSuccess() {
             if (savedErr == EPIPE)
                 break;  // The pipe read side has closed.
             else {
+                auto ec = posixError(savedErr);
                 LOGV2_WARNING(4656300,
                               "Write to child pipe failed",
-                              "errno"_attr = savedErr,
-                              "errnoDesc"_attr = errnoWithDescription(savedErr));
-                quickExit(1);
+                              "errno"_attr = ec.value(),
+                              "errnoDesc"_attr = errorMessage(ec));
+                quickExit(ExitCode::fail);
             }
         } else if (nw == 0) {
             continue;
@@ -97,11 +122,11 @@ void signalForkSuccess() {
         }
     }
     if (close(*f) == -1) {
-        int savedErr = errno;
+        auto ec = lastPosixError();
         LOGV2_WARNING(4656301,
                       "Closing write pipe failed",
-                      "errno"_attr = savedErr,
-                      "errnoDesc"_attr = errnoWithDescription(savedErr));
+                      "errno"_attr = ec.value(),
+                      "errnoDesc"_attr = errorMessage(ec));
     }
     *f = -1;
 }
@@ -186,22 +211,22 @@ static bool forkServer() {
     std::cout << "about to fork child process, waiting until server is ready for connections."
               << std::endl;
 
-    auto waitAndPropagate = [&](pid_t pid, int signalCode, bool verbose) {
+    auto waitAndPropagate = [&](pid_t pid, ExitCode signalCode, bool verbose) {
         int pstat;
         if (waitpid(pid, &pstat, 0) == -1)
             croak("waitpid");
         if (!WIFEXITED(pstat))
-            quickExit(signalCode);  // child died from a signal
+            quickExit(signalCode);
         if (int ec = WEXITSTATUS(pstat)) {
             if (verbose)
                 std::cout << "ERROR: child process failed, exited with " << ec << std::endl
                           << "To see additional information in this output, start without "
                           << "the \"--fork\" option." << std::endl;
-            quickExit(ec);
+            quickExit(ExitCode::fail);
         }
         if (verbose)
             std::cout << "child process started successfully, parent exiting" << std::endl;
-        quickExit(0);
+        quickExit(ExitCode::clean);
     };
 
     // Start in the <launcher> process.
@@ -211,7 +236,7 @@ static bool forkServer() {
             break;
         default:
             // In the <launcher> process
-            waitAndPropagate(middle, 50, true);
+            waitAndPropagate(middle, ExitCode::launcherMiddleError, true);
             break;
         case 0:
             break;
@@ -246,8 +271,8 @@ static bool forkServer() {
             if (nr == 0)
                 // pipe reached eof without the daemon signalling readiness.
                 // Wait for <daemon> to exit, and exit with its exit code.
-                waitAndPropagate(daemon, 51, false);
-            quickExit(0);
+                waitAndPropagate(daemon, ExitCode::launcherError, false);
+            quickExit(ExitCode::clean);
         } break;
         case 0:
             break;
@@ -258,14 +283,14 @@ static bool forkServer() {
         croak("closing read side of pipe failed");
     serverGlobalParams.forkReadyFd = readyPipe[1];
 
-    std::cout << format(FMT_STRING("forked process: {}"), getpid()) << std::endl;
+    std::cout << fmt::format("forked process: {}", getpid()) << std::endl;
 
     auto stdioDetach = [](FILE* fp, const char* mode, StringData name) {
         if (!freopen("/dev/null", mode, fp)) {
             int saved = errno;
-            std::cout << format(FMT_STRING("Cannot reassign {} while forking server process: {}"),
-                                name,
-                                strerror(saved))
+            std::cout << fmt::format("Cannot reassign {} while forking server process: {}",
+                                     name,
+                                     strerror(saved))
                       << std::endl;
             return false;
         }
@@ -283,11 +308,53 @@ static bool forkServer() {
 
 void forkServerOrDie() {
     if (!forkServer())
-        quickExit(EXIT_FAILURE);
+        quickExit(ExitCode::fail);
 }
 
+namespace {
+
+bool checkAndMoveLogFile(const std::string& absoluteLogpath) {
+    bool exists;
+
+    try {
+        exists = boost::filesystem::exists(absoluteLogpath);
+    } catch (boost::filesystem::filesystem_error& e) {
+        uasserted(ErrorCodes::FileNotOpen,
+                  str::stream() << "Failed probe for \"" << absoluteLogpath
+                                << "\": " << e.code().message());
+    }
+
+    if (exists) {
+        if (boost::filesystem::is_directory(absoluteLogpath)) {
+            uasserted(ErrorCodes::FileNotOpen,
+                      str::stream() << "logpath \"" << absoluteLogpath
+                                    << "\" should name a file, not a directory.");
+        }
+
+        if (!serverGlobalParams.logAppend && boost::filesystem::is_regular_file(absoluteLogpath)) {
+            std::string renameTarget = absoluteLogpath + "." + terseCurrentTimeForFilename();
+            boost::system::error_code ec;
+            boost::filesystem::rename(absoluteLogpath, renameTarget, ec);
+            if (!ec) {
+                LOGV2(20697,
+                      "Renamed existing log file",
+                      "oldLogPath"_attr = absoluteLogpath,
+                      "newLogPath"_attr = renameTarget);
+            } else {
+                uasserted(ErrorCodes::FileRenameFailed,
+                          str::stream() << "Could not rename preexisting log file \""
+                                        << absoluteLogpath << "\" to \"" << renameTarget
+                                        << "\"; run with --logappend or manually remove file: "
+                                        << ec.message());
+            }
+        }
+    }
+    return exists;
+}
+}  // namespace
+
 MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
-                          ("EndStartupOptionHandling", "ForkServer"),
+                          ("EndStartupOptionHandling", "ForkServer", "TestingDiagnostics"),
                           ("default"))
 (InitializerContext*) {
     // Hook up this global into our logging encoder
@@ -307,46 +374,18 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
 #endif  // defined(_WIN32)
     } else if (!serverGlobalParams.logpath.empty()) {
         fassert(16448, !serverGlobalParams.logWithSyslog);
-        std::string absoluteLogpath =
-            boost::filesystem::absolute(serverGlobalParams.logpath, serverGlobalParams.cwd)
-                .string();
-
-        bool exists;
-
-        try {
-            exists = boost::filesystem::exists(absoluteLogpath);
-        } catch (boost::filesystem::filesystem_error& e) {
-            uasserted(ErrorCodes::FileNotOpen,
-                      str::stream() << "Failed probe for \"" << absoluteLogpath
-                                    << "\": " << e.code().message());
-        }
-
-        if (exists) {
-            if (boost::filesystem::is_directory(absoluteLogpath)) {
-                uasserted(ErrorCodes::FileNotOpen,
-                          str::stream() << "logpath \"" << absoluteLogpath
-                                        << "\" should name a file, not a directory.");
+        auto [absoluteLogpath, exists] = [&] {
+#ifdef _WIN32
+            constexpr auto kWindowsNUL = "NUL"_sd;
+            if (serverGlobalParams.logpath == kWindowsNUL) {
+                return std::make_tuple(std::string(kWindowsNUL), true);
             }
-
-            if (!serverGlobalParams.logAppend && boost::filesystem::is_regular(absoluteLogpath)) {
-                std::string renameTarget = absoluteLogpath + "." + terseCurrentTimeForFilename();
-                boost::system::error_code ec;
-                boost::filesystem::rename(absoluteLogpath, renameTarget, ec);
-                if (!ec) {
-                    LOGV2(20697,
-                          "Moving existing log file \"{oldLogPath}\" to \"{newLogPath}\"",
-                          "Renamed existing log file",
-                          "oldLogPath"_attr = absoluteLogpath,
-                          "newLogPath"_attr = renameTarget);
-                } else {
-                    uasserted(ErrorCodes::FileRenameFailed,
-                              str::stream() << "Could not rename preexisting log file \""
-                                            << absoluteLogpath << "\" to \"" << renameTarget
-                                            << "\"; run with --logappend or manually remove file: "
-                                            << ec.message());
-                }
-            }
-        }
+#endif  // defined(_WIN32)
+            std::string absolutePath =
+                boost::filesystem::absolute(serverGlobalParams.logpath, serverGlobalParams.cwd)
+                    .string();
+            return std::make_tuple(absolutePath, checkAndMoveLogFile(absolutePath));
+        }();
 
         lv2Config.consoleEnabled = false;
         lv2Config.fileEnabled = true;
@@ -363,6 +402,15 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
         }
     }
 
+    if (TestingProctor::instance().isEnabled() && !gBacktraceLogFile.empty()) {
+        std::string absoluteLogpath =
+            boost::filesystem::absolute(gBacktraceLogFile, serverGlobalParams.cwd).string();
+
+        /* ignore */ checkAndMoveLogFile(absoluteLogpath);
+
+        lv2Config.backtraceFilePath = absoluteLogpath;
+    }
+
     lv2Config.timestampFormat = serverGlobalParams.logTimestampFormat;
     Status result = lv2Manager.getGlobalDomainInternal().configure(lv2Config);
     if (result.isOK() && writeServerRestartedAfterLogConfig) {
@@ -377,12 +425,12 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
  * Mongo server processes cannot safely call ::exit() or std::exit(), but
  * some third-party libraries may call one of those functions.  In that
  * case, to avoid static-destructor problems in the server, this exits the
- * process immediately with code EXIT_FAILURE.
+ * process immediately with code ExitCode::fail.
  *
  * TODO: Remove once exit() executes safely in mongo server processes.
  */
 static void shortCircuitExit() {
-    quickExit(EXIT_FAILURE);
+    quickExit(ExitCode::fail);
 }
 
 MONGO_INITIALIZER(RegisterShortCircuitExitHandler)(InitializerContext*) {
@@ -390,7 +438,7 @@ MONGO_INITIALIZER(RegisterShortCircuitExitHandler)(InitializerContext*) {
         uasserted(ErrorCodes::InternalError, "Failed setting short-circuit exit handler.");
 }
 
-bool initializeServerGlobalState(ServiceContext* service, PidFileWrite pidWrite) {
+bool checkSocketPath() {
 #ifndef _WIN32
     if (!serverGlobalParams.noUnixSocket &&
         !boost::filesystem::is_directory(serverGlobalParams.socket)) {
@@ -399,14 +447,12 @@ bool initializeServerGlobalState(ServiceContext* service, PidFileWrite pidWrite)
     }
 #endif
 
-    if (!serverGlobalParams.pidFile.empty() && pidWrite == PidFileWrite::kWrite) {
-        if (!writePidFile(serverGlobalParams.pidFile)) {
-            // error message logged in writePidFile
-            return false;
-        }
-    }
-
     return true;
+}
+
+bool writePidFile() {
+    return serverGlobalParams.pidFile.empty() ? true
+                                              : mongo::writePidFile(serverGlobalParams.pidFile);
 }
 
 #ifndef _WIN32
@@ -449,7 +495,8 @@ MONGO_INITIALIZER_GENERAL(MungeUmask, ("EndStartupOptionHandling"), ("ServerLogR
 #endif
 
 // --setParameter honorSystemUmask
-Status HonorSystemUMaskServerParameter::setFromString(const std::string& value) {
+Status HonorSystemUMaskServerParameter::setFromString(StringData value,
+                                                      const boost::optional<TenantId>&) {
 #ifndef _WIN32
     if ((value == "0") || (value == "false")) {
         // false may be specified with processUmask
@@ -475,15 +522,17 @@ Status HonorSystemUMaskServerParameter::setFromString(const std::string& value) 
 }
 
 void HonorSystemUMaskServerParameter::append(OperationContext*,
-                                             BSONObjBuilder& b,
-                                             const std::string& name) {
+                                             BSONObjBuilder* b,
+                                             StringData name,
+                                             const boost::optional<TenantId>&) {
 #ifndef _WIN32
-    b << name << honorSystemUmask;
+    *b << name << honorSystemUmask;
 #endif
 }
 
 // --setParameter processUmask
-Status ProcessUMaskServerParameter::setFromString(const std::string& value) {
+Status ProcessUMaskServerParameter::setFromString(StringData value,
+                                                  const boost::optional<TenantId>&) {
 #ifndef _WIN32
     if (honorSystemUmask) {
         return {ErrorCodes::BadValue,
@@ -491,7 +540,8 @@ Status ProcessUMaskServerParameter::setFromString(const std::string& value) {
     }
 
     // Convert base from octal
-    const char* val = value.c_str();
+    auto vstr = std::string{value};
+    const char* val = vstr.c_str();
     char* end = nullptr;
 
     auto mask = std::strtoul(val, &end, 8);
@@ -513,11 +563,12 @@ Status ProcessUMaskServerParameter::setFromString(const std::string& value) {
 }
 
 void ProcessUMaskServerParameter::append(OperationContext*,
-                                         BSONObjBuilder& b,
-                                         const std::string& name) {
+                                         BSONObjBuilder* b,
+                                         StringData name,
+                                         const boost::optional<TenantId>&) {
 #ifndef _WIN32
-    b << name << static_cast<int>(getUmaskOverride());
+    *b << name << static_cast<int>(getUmaskOverride());
 #endif
 }
 
-}  // namespace mongo
+}  // namespace mongo::initialize_server_global_state

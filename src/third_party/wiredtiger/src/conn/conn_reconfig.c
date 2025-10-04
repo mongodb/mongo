@@ -35,41 +35,37 @@ __conn_compat_parse(
 }
 
 /*
- * __wt_conn_compat_config --
+ * __wti_conn_compat_config --
  *     Configure compatibility version.
  */
 int
-__wt_conn_compat_config(WT_SESSION_IMPL *session, const char **cfg, bool reconfig)
+__wti_conn_compat_config(WT_SESSION_IMPL *session, const char **cfg, bool reconfig)
 {
     WT_CONFIG_ITEM cval;
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
-    uint16_t max_major, max_minor, min_major, min_minor;
-    uint16_t rel_major, rel_minor;
+    WT_VERSION max_compat, min_compat, new_compat;
     char *value;
     bool txn_active, unchg;
 
     conn = S2C(session);
     value = NULL;
-    max_major = WT_CONN_COMPAT_NONE;
-    max_minor = WT_CONN_COMPAT_NONE;
-    min_major = WT_CONN_COMPAT_NONE;
-    min_minor = WT_CONN_COMPAT_NONE;
+    max_compat = min_compat = new_compat = WT_NO_VERSION;
     unchg = false;
 
     WT_RET(__wt_config_gets(session, cfg, "compatibility.release", &cval));
     if (cval.len == 0) {
-        rel_major = WIREDTIGER_VERSION_MAJOR;
-        rel_minor = WIREDTIGER_VERSION_MINOR;
-        F_CLR(conn, WT_CONN_COMPATIBILITY);
+        new_compat.major = WIREDTIGER_VERSION_MAJOR;
+        new_compat.minor = WIREDTIGER_VERSION_MINOR;
+        F_CLR_ATOMIC_32(conn, WT_CONN_COMPATIBILITY);
     } else {
-        WT_RET(__conn_compat_parse(session, &cval, &rel_major, &rel_minor));
+        WT_RET(__conn_compat_parse(session, &cval, &new_compat.major, &new_compat.minor));
 
         /*
          * If the user is running downgraded, then the compatibility string is part of the
          * configuration string. Determine if the user is actually changing the compatibility.
          */
-        if (reconfig && rel_major == conn->compat_major && rel_minor == conn->compat_minor)
+        if (reconfig && __wt_version_eq(new_compat, conn->compat_version))
             unchg = true;
         else {
             /*
@@ -79,13 +75,13 @@ __wt_conn_compat_config(WT_SESSION_IMPL *session, const char **cfg, bool reconfi
             if (txn_active)
                 WT_RET_MSG(session, ENOTSUP, "system must be quiescent for upgrade or downgrade");
         }
-        F_SET(conn, WT_CONN_COMPATIBILITY);
+        F_SET_ATOMIC_32(conn, WT_CONN_COMPATIBILITY);
     }
     /*
      * If we're a reconfigure and the user did not set any compatibility or did not change the
      * setting, we're done.
      */
-    if (reconfig && (!F_ISSET(conn, WT_CONN_COMPATIBILITY) || unchg))
+    if (reconfig && (!F_ISSET_ATOMIC_32(conn, WT_CONN_COMPATIBILITY) || unchg))
         goto done;
 
     /*
@@ -94,112 +90,110 @@ __wt_conn_compat_config(WT_SESSION_IMPL *session, const char **cfg, bool reconfi
      */
     WT_RET(__wt_config_gets(session, cfg, "compatibility.require_min", &cval));
     if (cval.len != 0)
-        WT_RET(__conn_compat_parse(session, &cval, &min_major, &min_minor));
+        WT_RET(__conn_compat_parse(session, &cval, &min_compat.major, &min_compat.minor));
 
     WT_RET(__wt_config_gets(session, cfg, "compatibility.require_max", &cval));
     if (cval.len != 0)
-        WT_RET(__conn_compat_parse(session, &cval, &max_major, &max_minor));
+        WT_RET(__conn_compat_parse(session, &cval, &max_compat.major, &max_compat.minor));
 
     /*
      * The maximum required must be greater than or equal to the compatibility release we're using
      * now. This is on an open and we're checking the two against each other. We'll check against
      * what was saved on a restart later.
      */
-    if (!reconfig && max_major != WT_CONN_COMPAT_NONE &&
-      (max_major < rel_major || (max_major == rel_major && max_minor < rel_minor)))
+    if (!reconfig && __wt_version_defined(max_compat) && __wt_version_lt(max_compat, new_compat))
         WT_RET_MSG(session, ENOTSUP,
           WT_COMPAT_MSG_PREFIX "required max of %" PRIu16 ".%" PRIu16
                                "cannot be smaller than compatibility release %" PRIu16 ".%" PRIu16,
-          max_major, max_minor, rel_major, rel_minor);
+          max_compat.major, max_compat.minor, new_compat.major, new_compat.minor);
 
     /*
      * The minimum required must be less than or equal to the compatibility release we're using now.
      * This is on an open and we're checking the two against each other. We'll check against what
      * was saved on a restart later.
      */
-    if (!reconfig && min_major != WT_CONN_COMPAT_NONE &&
-      (min_major > rel_major || (min_major == rel_major && min_minor > rel_minor)))
+    if (!reconfig && __wt_version_defined(min_compat) && __wt_version_gt(min_compat, new_compat))
         WT_RET_MSG(session, ENOTSUP,
           WT_COMPAT_MSG_PREFIX "required min of %" PRIu16 ".%" PRIu16
                                "cannot be larger than compatibility release %" PRIu16 ".%" PRIu16,
-          min_major, min_minor, rel_major, rel_minor);
+          min_compat.major, min_compat.minor, new_compat.major, new_compat.minor);
 
     /*
      * On a reconfigure, check the new release version against any required maximum version set on
      * open.
      */
-    if (reconfig && conn->req_max_major != WT_CONN_COMPAT_NONE &&
-      (conn->req_max_major < rel_major ||
-        (conn->req_max_major == rel_major && conn->req_max_minor < rel_minor)))
+    if (reconfig && __wt_version_defined(conn->compat_req_max) &&
+      __wt_version_lt(conn->compat_req_max, new_compat))
         WT_RET_MSG(session, ENOTSUP,
           WT_COMPAT_MSG_PREFIX "required max of %" PRIu16 ".%" PRIu16
                                "cannot be smaller than requested compatibility release %" PRIu16
                                ".%" PRIu16,
-          conn->req_max_major, conn->req_max_minor, rel_major, rel_minor);
+          conn->compat_req_max.major, conn->compat_req_max.minor, new_compat.major,
+          new_compat.minor);
 
     /*
      * On a reconfigure, check the new release version against any required minimum version set on
      * open.
      */
-    if (reconfig && conn->req_min_major != WT_CONN_COMPAT_NONE &&
-      (conn->req_min_major > rel_major ||
-        (conn->req_min_major == rel_major && conn->req_min_minor > rel_minor)))
+    if (reconfig && __wt_version_defined(conn->compat_req_min) &&
+      __wt_version_gt(conn->compat_req_min, new_compat))
         WT_RET_MSG(session, ENOTSUP,
           WT_COMPAT_MSG_PREFIX "required min of %" PRIu16 ".%" PRIu16
                                "cannot be larger than requested compatibility release %" PRIu16
                                ".%" PRIu16,
-          conn->req_min_major, conn->req_min_minor, rel_major, rel_minor);
+          conn->compat_req_min.major, conn->compat_req_min.minor, new_compat.major,
+          new_compat.minor);
 
-    conn->compat_major = rel_major;
-    conn->compat_minor = rel_minor;
+    conn->compat_version = new_compat;
 
     /*
      * Only rewrite the turtle file if this is a reconfig. On startup it will get written as part of
      * creating the connection. We do this after checking the required minimum version so that we
      * don't rewrite the turtle file if there is an error.
      */
-    if (reconfig)
-        WT_RET(__wt_metadata_turtle_rewrite(session));
+    if (reconfig) {
+        if (F_ISSET(conn, WT_CONN_LIVE_RESTORE_FS))
+            ret = __wt_live_restore_turtle_rewrite(session);
+        else
+            WT_WITH_TURTLE_LOCK(session, ret = __wt_metadata_turtle_rewrite(session));
+        WT_RET(ret);
+    }
 
     /*
      * The required maximum and minimum cannot be set via reconfigure and they are meaningless on a
      * newly created database. We're done in those cases.
      */
     if (reconfig || conn->is_new ||
-      (min_major == WT_CONN_COMPAT_NONE && max_major == WT_CONN_COMPAT_NONE))
+      (!__wt_version_defined(min_compat) && !__wt_version_defined(max_compat)))
         goto done;
 
     /*
      * Check the minimum required against any saved compatibility version in the turtle file saved
      * from an earlier run.
      */
-    rel_major = rel_minor = WT_CONN_COMPAT_NONE;
+    new_compat = WT_NO_VERSION;
     WT_ERR_NOTFOUND_OK(__wt_metadata_search(session, WT_METADATA_COMPAT, &value), true);
     if (ret == 0) {
         WT_ERR(__wt_config_getones(session, value, "major", &cval));
-        rel_major = (uint16_t)cval.val;
+        new_compat.major = (uint16_t)cval.val;
         WT_ERR(__wt_config_getones(session, value, "minor", &cval));
-        rel_minor = (uint16_t)cval.val;
-        if (max_major != WT_CONN_COMPAT_NONE &&
-          (max_major < rel_major || (max_major == rel_major && max_minor < rel_minor)))
+        new_compat.minor = (uint16_t)cval.val;
+        if (__wt_version_defined(max_compat) && __wt_version_lt(max_compat, new_compat))
             WT_ERR_MSG(session, ENOTSUP,
               WT_COMPAT_MSG_PREFIX "required max of %" PRIu16 ".%" PRIu16
                                    "cannot be larger than saved release %" PRIu16 ".%" PRIu16,
-              max_major, max_minor, rel_major, rel_minor);
-        if (min_major != WT_CONN_COMPAT_NONE &&
-          (min_major > rel_major || (min_major == rel_major && min_minor > rel_minor)))
+              max_compat.major, max_compat.minor, new_compat.major, new_compat.minor);
+        if (__wt_version_defined(min_compat) && __wt_version_gt(min_compat, new_compat))
             WT_ERR_MSG(session, ENOTSUP,
               WT_COMPAT_MSG_PREFIX "required min of %" PRIu16 ".%" PRIu16
                                    "cannot be larger than saved release %" PRIu16 ".%" PRIu16,
-              min_major, min_minor, rel_major, rel_minor);
+              min_compat.major, min_compat.minor, new_compat.major, new_compat.minor);
     } else if (ret == WT_NOTFOUND)
         ret = 0;
 
 done:
-    conn->req_max_major = max_major;
-    conn->req_max_minor = max_minor;
-    conn->req_min_major = min_major;
-    conn->req_min_minor = min_minor;
+    conn->compat_req_max = max_compat;
+    conn->compat_req_min = min_compat;
 err:
     __wt_free(session, value);
 
@@ -207,11 +201,11 @@ err:
 }
 
 /*
- * __wt_conn_optrack_setup --
+ * __wti_conn_optrack_setup --
  *     Set up operation logging.
  */
 int
-__wt_conn_optrack_setup(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
+__wti_conn_optrack_setup(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
 {
     WT_CONFIG_ITEM cval;
     WT_CONNECTION_IMPL *conn;
@@ -228,9 +222,9 @@ __wt_conn_optrack_setup(WT_SESSION_IMPL *session, const char *cfg[], bool reconf
 
     WT_RET(__wt_config_gets(session, cfg, "operation_tracking.enabled", &cval));
     if (cval.val == 0) {
-        if (F_ISSET(conn, WT_CONN_OPTRACK)) {
-            WT_RET(__wt_conn_optrack_teardown(session, reconfig));
-            F_CLR(conn, WT_CONN_OPTRACK);
+        if (F_ISSET_ATOMIC_32(conn, WT_CONN_OPTRACK)) {
+            WT_RET(__wti_conn_optrack_teardown(session, reconfig));
+            F_CLR_ATOMIC_32(conn, WT_CONN_OPTRACK);
         }
         return (0);
     }
@@ -238,7 +232,7 @@ __wt_conn_optrack_setup(WT_SESSION_IMPL *session, const char *cfg[], bool reconf
         /* Operation tracking isn't supported in read-only mode */
         WT_RET_MSG(
           session, EINVAL, "Operation tracking is incompatible with read only configuration");
-    if (F_ISSET(conn, WT_CONN_OPTRACK))
+    if (F_ISSET_ATOMIC_32(conn, WT_CONN_OPTRACK))
         /* Already enabled, nothing else to do */
         return (0);
 
@@ -264,7 +258,7 @@ __wt_conn_optrack_setup(WT_SESSION_IMPL *session, const char *cfg[], bool reconf
     WT_ERR(__wt_malloc(session, WT_OPTRACK_BUFSIZE, &conn->dummy_session.optrack_buf));
 
     /* Set operation tracking on */
-    F_SET(conn, WT_CONN_OPTRACK);
+    F_SET_ATOMIC_32(conn, WT_CONN_OPTRACK);
 
 err:
     __wt_scr_free(session, &buf);
@@ -272,11 +266,11 @@ err:
 }
 
 /*
- * __wt_conn_optrack_teardown --
+ * __wti_conn_optrack_teardown --
  *     Clean up connection-wide resources used for operation logging.
  */
 int
-__wt_conn_optrack_teardown(WT_SESSION_IMPL *session, bool reconfig)
+__wti_conn_optrack_teardown(WT_SESSION_IMPL *session, bool reconfig)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
@@ -287,7 +281,7 @@ __wt_conn_optrack_teardown(WT_SESSION_IMPL *session, bool reconfig)
         /* Looks like we are shutting down */
         __wt_free(session, conn->optrack_path);
 
-    if (!F_ISSET(conn, WT_CONN_OPTRACK))
+    if (!F_ISSET_ATOMIC_32(conn, WT_CONN_OPTRACK))
         return (0);
 
     __wt_spin_destroy(session, &conn->optrack_map_spinlock);
@@ -299,11 +293,11 @@ __wt_conn_optrack_teardown(WT_SESSION_IMPL *session, bool reconfig)
 }
 
 /*
- * __wt_conn_statistics_config --
+ * __wti_conn_statistics_config --
  *     Set statistics configuration.
  */
 int
-__wt_conn_statistics_config(WT_SESSION_IMPL *session, const char *cfg[])
+__wti_conn_statistics_config(WT_SESSION_IMPL *session, const char *cfg[])
 {
     WT_CONFIG_ITEM cval, sval;
     WT_CONNECTION_IMPL *conn;
@@ -318,6 +312,12 @@ __wt_conn_statistics_config(WT_SESSION_IMPL *session, const char *cfg[])
     flags = 0;
     set = 0;
     if ((ret = __wt_config_subgets(session, &cval, "none", &sval)) == 0 && sval.val != 0) {
+        if (F_ISSET(conn, WT_CONN_LIVE_RESTORE_FS))
+            /*
+             * Live restore uses statistics to inform the user when migration has completed. They
+             * must be enabled.
+             */
+            WT_RET_MSG(session, EINVAL, "Statistics must be enabled when live restore is active.");
         flags = 0;
         ++set;
     }
@@ -375,21 +375,25 @@ __wt_conn_statistics_config(WT_SESSION_IMPL *session, const char *cfg[])
 }
 
 /*
- * __wt_conn_reconfig --
+ * __wti_conn_reconfig --
  *     Reconfigure a connection (internal version).
  */
 int
-__wt_conn_reconfig(WT_SESSION_IMPL *session, const char **cfg)
+__wti_conn_reconfig(WT_SESSION_IMPL *session, const char **cfg)
 {
+    WT_CONFIG cparser, cparser_inner;
+    WT_CONFIG_ITEM k, v;
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
+    int count, count_inner;
     const char *p;
+    bool has_disagg, has_disagg_last_materialized_lsn;
 
     conn = S2C(session);
 
     /* Serialize reconfiguration. */
     __wt_spin_lock(session, &conn->reconfig_lock);
-    F_SET(conn, WT_CONN_RECONFIGURING);
+    F_SET_ATOMIC_32(conn, WT_CONN_RECONFIGURING);
 
     /*
      * The configuration argument has been checked for validity, update the previous connection
@@ -407,6 +411,56 @@ __wt_conn_reconfig(WT_SESSION_IMPL *session, const char **cfg)
     cfg[0] = conn->cfg;
 
     /*
+     * Fast path for disaggregated storage. We mostly need this given the frequency this is being
+     * called to pick up new checkpoints and to advance the page materialization frontier.
+     */
+    has_disagg = has_disagg_last_materialized_lsn = false;
+    if (cfg[1] != NULL && cfg[2] == NULL) {
+        count = count_inner = 0;
+
+        /*
+         * We can take the fast path if "disaggregated" is the first and only top level item in the
+         * configuration.
+         */
+        __wt_config_init(session, &cparser, cfg[1] /* Just the caller-supplied config. */);
+        while ((ret = __wt_config_next(&cparser, &k, &v)) == 0) {
+            count++;
+            if (WT_STRING_LIT_MATCH("disaggregated", k.str, k.len))
+                has_disagg = true;
+            if (count > 1 || !has_disagg)
+                break;
+
+            /*
+             * We get here only if "disaggregated" is the first top level item. Now check if
+             * "last_materialized_lsn" is the only option inside "disaggregated".
+             */
+            __wt_config_initn(session, &cparser_inner, v.str, v.len);
+            while ((ret = __wt_config_next(&cparser_inner, &k, &v)) == 0) {
+                count_inner++;
+                if (WT_STRING_LIT_MATCH("last_materialized_lsn", k.str, k.len))
+                    has_disagg_last_materialized_lsn = true;
+                if (count_inner > 1 || !has_disagg_last_materialized_lsn)
+                    break;
+            }
+            WT_RET_NOTFOUND_OK(ret);
+        }
+        WT_RET_NOTFOUND_OK(ret);
+
+        if (count == 1 && has_disagg) {
+            WT_ERR(__wti_disagg_conn_config(session, cfg, true));
+
+            /*
+             * Some HS settings depend on disaggregated storage configuration. But if we are setting
+             * only "last_materialized_lsn", we can skip over reconfiguring the HS.
+             */
+            if (!(count_inner == 1 && has_disagg_last_materialized_lsn))
+                WT_ERR(__wt_hs_config(session, cfg));
+
+            goto done;
+        }
+    }
+
+    /*
      * Reconfigure the system.
      *
      * The compatibility version check is special: upgrade / downgrade cannot be done with
@@ -414,31 +468,45 @@ __wt_conn_reconfig(WT_SESSION_IMPL *session, const char **cfg)
      * to avoid conflicts with WiredTiger's checkpoint thread, and rely on the documentation
      * specifying that no new operations can start until the upgrade / downgrade completes.
      */
-    WT_WITH_CHECKPOINT_LOCK(session, ret = __wt_conn_compat_config(session, cfg, true));
+    WT_WITH_CHECKPOINT_LOCK(session, ret = __wti_conn_compat_config(session, cfg, true));
     WT_ERR(ret);
-    WT_ERR(__wt_block_cache_setup(session, cfg, true));
-    WT_ERR(__wt_conn_optrack_setup(session, cfg, true));
-    WT_ERR(__wt_conn_statistics_config(session, cfg));
+    WT_ERR(__wt_blkcache_setup(session, cfg, true));
+    WT_ERR(__wt_chunkcache_reconfig(session, cfg));
+    WT_ERR(__wti_conn_optrack_setup(session, cfg, true));
+    WT_ERR(__wti_conn_page_history_config(session, cfg, true));
+    WT_ERR(__wti_conn_statistics_config(session, cfg));
     WT_ERR(__wt_cache_config(session, cfg, true));
-    WT_ERR(__wt_capacity_server_create(session, cfg));
+    WT_ERR(__wt_evict_config(session, cfg, true));
+    WT_ERR(__wt_cache_pool_create(session, cfg));
+    WT_ERR(__wti_capacity_server_create(session, cfg));
     WT_ERR(__wt_checkpoint_server_create(session, cfg));
-    WT_ERR(__wt_debug_mode_config(session, cfg));
+    WT_ERR(__wti_debug_mode_config(session, cfg));
+    WT_ERR(__wti_disagg_conn_config(session, cfg, true));
+    WT_ERR(__wti_heuristic_controls_config(session, cfg));
+    WT_ERR(__wti_cache_eviction_controls_config(session, cfg));
+    WT_ERR(__wti_extra_diagnostics_config(session, cfg));
     WT_ERR(__wt_hs_config(session, cfg));
     WT_ERR(__wt_logmgr_reconfig(session, cfg));
-    WT_ERR(__wt_lsm_manager_reconfig(session, cfg));
-    WT_ERR(__wt_statlog_create(session, cfg));
+    WT_ERR(__wti_statlog_create(session, cfg));
     WT_ERR(__wt_tiered_conn_config(session, cfg, true));
-    WT_ERR(__wt_sweep_config(session, cfg));
-    WT_ERR(__wt_timing_stress_config(session, cfg));
-    WT_ERR(__wt_verbose_config(session, cfg));
+    WT_ERR(__wti_sweep_config(session, cfg));
+    WT_ERR(__wti_timing_stress_config(session, cfg));
+    WT_ERR(__wti_json_config(session, cfg, true));
+    WT_ERR(__wt_verbose_config(session, cfg, true));
+    WT_ERR(__wt_rollback_to_stable_reconfig(session, cfg));
 
-    /* Third, merge everything together, creating a new connection state. */
-    WT_ERR(__wt_config_merge(session, cfg, NULL, &p));
+done:
+    /*
+     * Third, merge everything together, creating a new connection state. Exclude any configuration
+     * parameters that should not be preserved across calls to reconfigure.
+     */
+    WT_ERR(__wt_config_merge(
+      session, cfg, "disaggregated=(checkpoint_meta=,last_materialized_lsn=)", &p));
     __wt_free(session, conn->cfg);
     conn->cfg = p;
 
 err:
-    F_CLR(conn, WT_CONN_RECONFIGURING);
+    F_CLR_ATOMIC_32(conn, WT_CONN_RECONFIGURING);
     __wt_spin_unlock(session, &conn->reconfig_lock);
 
     return (ret);

@@ -28,11 +28,14 @@
  */
 
 #include "mongo/util/clock_source.h"
-#include "mongo/platform/basic.h"
-#include "mongo/platform/mutex.h"
-#include "mongo/stdx/thread.h"
+
+// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/util/system_clock_source.h"
 #include "mongo/util/waitable.h"
+
+#include <memory>
+#include <mutex>
+#include <utility>
 
 namespace mongo {
 stdx::cv_status ClockSource::waitForConditionUntil(stdx::condition_variable& cv,
@@ -57,7 +60,7 @@ stdx::cv_status ClockSource::waitForConditionUntil(stdx::condition_variable& cv,
     }
 
     struct AlarmInfo {
-        stdx::mutex mutex;  // NOLINT
+        stdx::mutex mutex;
 
         stdx::condition_variable* cv;
         stdx::cv_status result = stdx::cv_status::no_timeout;
@@ -65,7 +68,7 @@ stdx::cv_status ClockSource::waitForConditionUntil(stdx::condition_variable& cv,
     auto alarmInfo = std::make_shared<AlarmInfo>();
     alarmInfo->cv = &cv;
 
-    invariant(setAlarm(deadline, [alarmInfo] {
+    setAlarm(deadline, [alarmInfo] {
         // Set an alarm to hit our virtualized deadline
         stdx::lock_guard infoLk(alarmInfo->mutex);
         auto cv = std::exchange(alarmInfo->cv, nullptr);
@@ -75,7 +78,7 @@ stdx::cv_status ClockSource::waitForConditionUntil(stdx::condition_variable& cv,
 
         alarmInfo->result = stdx::cv_status::timeout;
         cv->notify_all();
-    }));
+    });
 
     if (stdx::lock_guard infoLk(alarmInfo->mutex); !alarmInfo->cv) {
         // If setAlarm() ran inline, then we've timed out
@@ -99,6 +102,6 @@ stdx::cv_status ClockSource::waitForConditionUntil(stdx::condition_variable& cv,
     return alarmInfo->result;
 }
 
-ClockSource::StopWatch::StopWatch() : StopWatch(SystemClockSource::get()){};
+ClockSource::StopWatch::StopWatch() : StopWatch(SystemClockSource::get()) {};
 
 }  // namespace mongo

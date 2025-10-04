@@ -1,0 +1,132 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "validate_idl",
+    srcs = [
+        ":validate_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "validate_options",
+    srcs = [
+        "validate_options.cpp",
+    ],
+    hdrs = [
+        "validate_options.h",
+    ],
+    deps = [
+        "//src/mongo/bson:bson_validate",
+    ],
+)
+
+mongo_cc_library(
+    name = "validate_results",
+    srcs = [
+        "validate_results.cpp",
+    ],
+    hdrs = [
+        "validate_results.h",
+    ],
+    deps = [
+        ":validate_options",
+    ],
+)
+
+mongo_cc_library(
+    name = "validate_state",
+    srcs = [
+        "validate_state.cpp",
+    ],
+    hdrs = [
+        "validate_state.h",
+    ],
+    deps = [
+        ":validate_idl",
+        ":validate_options",
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/local_catalog:collection_catalog",
+        "//src/mongo/db/local_catalog:database_holder",
+        "//src/mongo/db/local_catalog:index_catalog",
+        "//src/mongo/db/local_catalog:throttle_cursor",
+        "//src/mongo/db/repl:repl_coordinator_interface",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/db/timeseries:catalog_helper",
+        "//src/mongo/db/views",
+    ],
+)
+
+idl_generator(
+    name = "validate_gen",
+    src = "validate.idl",
+)
+
+mongo_cc_library(
+    name = "collection_validation",
+    srcs = [
+        "collection_validation.cpp",
+        "index_consistency.cpp",
+        "index_consistency.h",
+        "validate_adaptor.cpp",
+        "validate_adaptor.h",
+    ],
+    hdrs = [
+        "collection_validation.h",
+    ],
+    deps = [
+        ":validate_results",
+        ":validate_state",
+        "//src/mongo/bson/column",
+        "//src/mongo/db:multi_key_path_tracker",
+        "//src/mongo/db:record_id_helpers",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/index:preallocated_container_pool",
+        "//src/mongo/db/local_catalog:catalog_impl",
+        "//src/mongo/db/local_catalog:collection_options",
+        "//src/mongo/db/local_catalog:index_catalog",
+        "//src/mongo/db/local_catalog:index_key_validate",
+        "//src/mongo/db/local_catalog:throttle_cursor",
+        "//src/mongo/db/local_catalog/lock_manager:exception_util",
+        "//src/mongo/db/query/query_stats",
+        "//src/mongo/db/storage:record_store_base",
+        "//src/mongo/db/storage/key_string",
+        "//src/mongo/db/timeseries:timeseries_options",
+        "//src/mongo/db/timeseries/bucket_catalog",
+        "//src/mongo/util:progress_meter",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_validate_test",
+    srcs = [
+        "collection_validation_test.cpp",
+        "index_consistency_test.cpp",
+        "validate_results_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_first_group",
+        "server-integration-smoke",
+    ],
+    deps = [
+        ":collection_validation",
+        "//src/mongo/db/local_catalog:catalog_test_fixture",
+        "//src/mongo/db/storage:sorted_data_interface_test_assert",
+    ],
+)

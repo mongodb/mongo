@@ -28,6 +28,10 @@
 
 #include "test_util.h"
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(void)
 {
@@ -45,7 +49,7 @@ main(void)
      */
     testutil_check(__wt_library_init());
 
-    for (ncalls = 0, i = 0; i < 10000000; i++) {
+    for (ncalls = 0, i = 0; i < 10 * WT_MILLION; i++) {
         for (s = 0; s < 50; s += 5) {
             ++ncalls;
             r = 1ULL << s;

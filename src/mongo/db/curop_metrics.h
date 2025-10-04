@@ -29,10 +29,18 @@
 
 #pragma once
 
-namespace mongo {
+#include "mongo/util/modules.h"
+
+namespace MONGO_MOD_PUB mongo {
 
 class OperationContext;
 
+// Updates the global counter metrics from the CurOp of an OperationContext.
+// This is mainly used on primaries or secondaries during requests handling.
 void recordCurOpMetrics(OperationContext* opCtx);
 
-}  // namespace mongo
+// Similar to recordCurOpMetrics, but mainly used on secondaries to collect
+// metrics during oplog application.
+void recordCurOpMetricsOplogApplication(OperationContext* opCtx);
+
+}  // namespace MONGO_MOD_PUB mongo

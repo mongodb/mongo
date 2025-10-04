@@ -1,0 +1,5 @@
+py_binary(
+    name = "generate_coverity_targets",
+    srcs = ["generate_coverity_targets.py"],
+    visibility = ["//visibility:public"],
+)

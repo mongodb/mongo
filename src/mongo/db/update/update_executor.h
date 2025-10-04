@@ -29,8 +29,8 @@
 
 #pragma once
 
-#include "mongo/bson/mutable/element.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/mutable_bson/element.h"
 #include "mongo/db/field_ref_set.h"
 #include "mongo/db/update/update_node_visitor.h"
 #include "mongo/db/update_index_data.h"
@@ -56,10 +56,6 @@ public:
         enum class LogMode {
             // Indicates that no oplog entry should be produced.
             kDoNotGenerateOplogEntry,
-
-            // Indicates that the update executor should produce an oplog entry. Only the $v: 1
-            // format or replacement-style format may be used, however.
-            kGenerateOnlyV1OplogEntry,
 
             // Indicates that the update executor should produce an oplog entry, and may use any
             // format.
@@ -94,9 +90,6 @@ public:
         // constraints.
         bool validateForStorage = true;
 
-        // Used to determine whether indexes are affected.
-        const UpdateIndexData* indexData = nullptr;
-
         // Indicates whether/what type of oplog entry should be produced by the update executor.
         // If 'logMode' indicates an oplog entry should be produced but the update turns out to be
         // a noop, an oplog entry may not be produced.
@@ -112,13 +105,11 @@ public:
     struct ApplyResult {
         static ApplyResult noopResult() {
             ApplyResult applyResult;
-            applyResult.indexesAffected = false;
             applyResult.noop = true;
             applyResult.containsDotsAndDollarsField = false;
             return applyResult;
         }
 
-        bool indexesAffected = true;
         bool noop = false;
         bool containsDotsAndDollarsField = false;
 
@@ -134,7 +125,11 @@ public:
 
     virtual Value serialize() const = 0;
 
-    virtual void setCollator(const CollatorInterface* collator){};
+    virtual void setCollator(const CollatorInterface* collator) {};
+
+    virtual bool getCheckExistenceForDiffInsertOperations() const {
+        return false;
+    }
 
     /**
      * Applies the update to 'applyParams.element'. Returns an ApplyResult specifying whether the

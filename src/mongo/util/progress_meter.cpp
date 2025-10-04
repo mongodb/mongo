@@ -27,13 +27,17 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/util/progress_meter.h"
 
+#include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log.h"
+
+#include <ctime>
+#include <ostream>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 
 namespace mongo {
 

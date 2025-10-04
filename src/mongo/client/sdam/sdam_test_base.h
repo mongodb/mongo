@@ -28,18 +28,22 @@
  */
 #pragma once
 
+#include "mongo/client/sdam/sdam_datatypes.h"
+#include "mongo/client/sdam/server_description.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/optional_util.h"
+
 #include <array>
 #include <iterator>
 #include <map>
+#include <optional>
 #include <ostream>
 #include <set>
 #include <string>
 #include <type_traits>
 #include <vector>
 
-#include "mongo/client/sdam/sdam_datatypes.h"
-#include "mongo/client/sdam/server_description.h"
-#include "mongo/unittest/unittest.h"
+#include <boost/optional.hpp>
 
 /**
  * The following facilitates writing tests in the Server Discovery And Monitoring (sdam) namespace.
@@ -67,11 +71,6 @@ template <typename T>
 struct IsStdPair : std::false_type {};
 template <typename... Ts>
 struct IsStdPair<std::pair<Ts...>> : std::true_type {};
-
-template <typename T>
-struct IsBoostOptional : std::false_type {};
-template <typename... Ts>
-struct IsBoostOptional<boost::optional<Ts...>> : std::true_type {};
 
 template <typename T>
 std::ostream& stream(std::ostream& os, const T& v);
@@ -141,10 +140,12 @@ std::ostream& stream(std::ostream& os, const T& v) {
         os << ": ";
         stream(os, v.second);
         return os;
-    } else if constexpr (IsBoostOptional<T>{}) {
+    } else if constexpr (std::is_same_v<T, std::nullopt_t> || std::is_same_v<T, boost::none_t>) {
+        return stream(os, "--");
+    } else if constexpr (isStdOptional<T> || isBoostOptional<T>) {
         if (!v)
-            return os << boost::optional<Extension<T>>{};
-        return os << boost::optional<Extension<T>>{Extension<T>{*v}};
+            return stream(os, std::nullopt);
+        return stream(os << " ", *v);
     } else {
         return os << v;
     }

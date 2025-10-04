@@ -1,0 +1,20 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/server-programmability
+  - "*.bazel":
+    approvers:
+      - 10gen/devprod-build
+  - "compatibility_rules.yml":
+    approvers:
+      - 10gen/query-optimization
+  - "idl_check_compatibility.py":
+    approvers:
+      - 10gen/query-optimization
+  - "idl_compatibility_errors.py":
+    approvers:
+      - 10gen/query-optimization
+  - "test_compatibility.py":
+    approvers:
+      - 10gen/query-optimization

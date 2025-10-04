@@ -33,6 +33,7 @@
 #include <boost/container/detail/placement_new.hpp>
 #include <boost/container/detail/mpl.hpp>
 #include <boost/move/detail/to_raw_pointer.hpp>
+#include <boost/move/detail/force_ptr.hpp>
 #include <boost/container/detail/type_traits.hpp>
 // intrusive
 #include <boost/intrusive/pointer_traits.hpp>
@@ -41,7 +42,6 @@
 #include <boost/intrusive/slist.hpp>
 // other
 #include <boost/assert.hpp>
-#include <boost/core/no_exceptions_support.hpp>
 #include <cstddef>
 
 namespace boost {
@@ -49,10 +49,10 @@ namespace container {
 
 namespace adaptive_pool_flag {
 
-static const unsigned int none            = 0u;
-static const unsigned int align_only      = 1u << 0u;
-static const unsigned int size_ordered    = 1u << 1u;
-static const unsigned int address_ordered = 1u << 2u;
+BOOST_CONTAINER_CONSTANT_VAR unsigned int none            = 0u;
+BOOST_CONTAINER_CONSTANT_VAR unsigned int align_only      = 1u << 0u;
+BOOST_CONTAINER_CONSTANT_VAR unsigned int size_ordered    = 1u << 1u;
+BOOST_CONTAINER_CONSTANT_VAR unsigned int address_ordered = 1u << 2u;
 
 }  //namespace adaptive_pool_flag{
 
@@ -213,11 +213,11 @@ template<class MultiallocationChain, class VoidPointer, class SizeType, unsigned
 struct adaptive_pool_types
 {
    typedef VoidPointer void_pointer;
-   static const unsigned ordered = (Flags & (adaptive_pool_flag::size_ordered | adaptive_pool_flag::address_ordered));
+   BOOST_STATIC_CONSTEXPR unsigned ordered = (Flags & (adaptive_pool_flag::size_ordered | adaptive_pool_flag::address_ordered));
    typedef block_container_traits<VoidPointer, SizeType, ordered> block_container_traits_t;
    typedef typename block_container_traits_t::hook_t hook_t;
    typedef hdr_offset_holder_t<SizeType> hdr_offset_holder;
-   static const unsigned int order_flags = Flags & (adaptive_pool_flag::size_ordered | adaptive_pool_flag::address_ordered);
+   BOOST_STATIC_CONSTEXPR unsigned int order_flags = Flags & (adaptive_pool_flag::size_ordered | adaptive_pool_flag::address_ordered);
    typedef MultiallocationChain free_nodes_t;
 
    struct block_info_t
@@ -253,11 +253,11 @@ template< std::size_t alignment
         , std::size_t overhead_percent>
 struct candidate_power_of_2_ct_helper
 {
-   static const std::size_t hdr_subblock_elements_alone = (alignment - hdr_size - payload_per_allocation)/real_node_size;
-   static const std::size_t hdr_subblock_elements_first = (alignment - hdr_size - payload_per_allocation)/real_node_size;
-   static const std::size_t elements_per_b_subblock_mid = (alignment - hdr_offset_size)/real_node_size;
-   static const std::size_t elements_per_b_subblock_end = (alignment - hdr_offset_size - payload_per_allocation)/real_node_size;
-   static const std::size_t num_b_subblock =
+   BOOST_STATIC_CONSTEXPR std::size_t hdr_subblock_elements_alone = (alignment - hdr_size - payload_per_allocation)/real_node_size;
+   BOOST_STATIC_CONSTEXPR std::size_t hdr_subblock_elements_first = (alignment - hdr_size - payload_per_allocation)/real_node_size;
+   BOOST_STATIC_CONSTEXPR std::size_t elements_per_b_subblock_mid = (alignment - hdr_offset_size)/real_node_size;
+   BOOST_STATIC_CONSTEXPR std::size_t elements_per_b_subblock_end = (alignment - hdr_offset_size - payload_per_allocation)/real_node_size;
+   BOOST_STATIC_CONSTEXPR std::size_t num_b_subblock =
       hdr_subblock_elements_alone >= min_elements_per_block
          ? 0
          : (   ((hdr_subblock_elements_first + elements_per_b_subblock_end) >= min_elements_per_block)
@@ -266,18 +266,18 @@ struct candidate_power_of_2_ct_helper
             )
          ;
 
-   static const std::size_t num_b_subblock_mid = (num_b_subblock > 1) ? (num_b_subblock - 1) : 0;
+   BOOST_STATIC_CONSTEXPR std::size_t num_b_subblock_mid = (num_b_subblock > 1) ? (num_b_subblock - 1) : 0;
 
-   static const std::size_t total_nodes = (num_b_subblock == 0)
+   BOOST_STATIC_CONSTEXPR std::size_t total_nodes = (num_b_subblock == 0)
                                          ? hdr_subblock_elements_alone
                                          : ( (num_b_subblock == 1)
                                            ? (hdr_subblock_elements_first + elements_per_b_subblock_end)
                                            : (hdr_subblock_elements_first + num_b_subblock_mid*elements_per_b_subblock_mid + elements_per_b_subblock_end)
                                            )
                                          ;
-   static const std::size_t total_data = total_nodes*real_node_size;
-   static const std::size_t total_size = alignment*(num_b_subblock+1);
-   static const bool overhead_satisfied = (total_size - total_data)*100/total_size < overhead_percent;
+   BOOST_STATIC_CONSTEXPR std::size_t total_data = total_nodes*real_node_size;
+   BOOST_STATIC_CONSTEXPR std::size_t total_size = alignment*(num_b_subblock+1);
+   BOOST_STATIC_CONSTEXPR bool overhead_satisfied = (total_size - total_data)*100/total_size < overhead_percent;
 };
 
 template< std::size_t initial_alignment
@@ -299,7 +299,7 @@ struct candidate_power_of_2_ct
         , hdr_offset_size
         , overhead_percent> helper_t;
 
-   static const std::size_t candidate_power_of_2 = initial_alignment << std::size_t(!helper_t::overhead_satisfied);
+   BOOST_STATIC_CONSTEXPR std::size_t candidate_power_of_2 = initial_alignment << std::size_t(!helper_t::overhead_satisfied);
 
    typedef typename candidate_power_of_2_ct
       < candidate_power_of_2
@@ -312,9 +312,9 @@ struct candidate_power_of_2_ct
       , !helper_t::overhead_satisfied
       >::type type;
 
-   static const std::size_t alignment     = type::alignment;
-   static const std::size_t num_subblocks = type::num_subblocks;
-   static const std::size_t real_num_node = type::real_num_node;
+   BOOST_STATIC_CONSTEXPR std::size_t alignment     = type::alignment;
+   BOOST_STATIC_CONSTEXPR std::size_t num_subblocks = type::num_subblocks;
+   BOOST_STATIC_CONSTEXPR std::size_t real_num_node = type::real_num_node;
 };
 
 template< std::size_t initial_alignment
@@ -354,9 +354,9 @@ struct candidate_power_of_2_ct
         , hdr_offset_size
         , overhead_percent> helper_t;
 
-   static const std::size_t alignment = initial_alignment;
-   static const std::size_t num_subblocks = helper_t::num_b_subblock+1;
-   static const std::size_t real_num_node = helper_t::total_nodes;
+   BOOST_STATIC_CONSTEXPR std::size_t alignment = initial_alignment;
+   BOOST_STATIC_CONSTEXPR std::size_t num_subblocks = helper_t::num_b_subblock+1;
+   BOOST_STATIC_CONSTEXPR std::size_t real_num_node = helper_t::total_nodes;
 };
 
 /////////////////////////////////////////////
@@ -429,13 +429,13 @@ class private_adaptive_node_pool_impl_common
    typedef typename SegmentManagerBase::size_type                    size_type;
    //Flags
    //align_only
-   static const bool AlignOnly      = (Flags & adaptive_pool_flag::align_only) != 0;
+   BOOST_STATIC_CONSTEXPR bool AlignOnly      = (Flags & adaptive_pool_flag::align_only) != 0;
    typedef bool_<AlignOnly>            IsAlignOnly;
    typedef true_                       AlignOnlyTrue;
    typedef false_                      AlignOnlyFalse;
 
    typedef typename SegmentManagerBase::void_pointer void_pointer;
-   static const typename SegmentManagerBase::
+   BOOST_STATIC_CONSTEXPR typename SegmentManagerBase::
       size_type PayloadPerAllocation = SegmentManagerBase::PayloadPerAllocation;
 
    typedef typename boost::intrusive::pointer_traits
@@ -453,9 +453,9 @@ class private_adaptive_node_pool_impl_common
    typedef typename adaptive_pool_types_t::hdr_offset_holder         hdr_offset_holder;
    typedef private_adaptive_node_pool_impl_common                    this_type;
 
-   static const size_type MaxAlign = alignment_of<void_pointer>::value;
-   static const size_type HdrSize  = ((sizeof(block_info_t)-1)/MaxAlign+1)*MaxAlign;
-   static const size_type HdrOffsetSize = ((sizeof(hdr_offset_holder)-1)/MaxAlign+1)*MaxAlign;
+   BOOST_STATIC_CONSTEXPR size_type MaxAlign = alignment_of<void_pointer>::value;
+   BOOST_STATIC_CONSTEXPR size_type HdrSize  = ((sizeof(block_info_t)-1)/MaxAlign+1)*MaxAlign;
+   BOOST_STATIC_CONSTEXPR size_type HdrOffsetSize = ((sizeof(hdr_offset_holder)-1)/MaxAlign+1)*MaxAlign;
 
    segment_mngr_base_ptr_t             mp_segment_mngr_base;   //Segment manager
    block_container_t                   m_block_container;      //Intrusive block list
@@ -535,12 +535,12 @@ class private_adaptive_node_pool_impl_common
                //Check that header offsets are correct
                hdr_offset_holder *hdr_off_holder = this->priv_first_subblock_from_block(const_cast<block_info_t *>(&*it), num_subblocks, real_block_alignment);
                for (size_type i = 0, max = num_subblocks; i < max; ++i) {
-                  const size_type offset = reinterpret_cast<char*>(const_cast<block_info_t *>(&*it)) - reinterpret_cast<char*>(hdr_off_holder);
+                  const size_type offset = size_type(reinterpret_cast<char*>(const_cast<block_info_t *>(&*it)) - reinterpret_cast<char*>(hdr_off_holder));
                   (void)offset;
                   BOOST_ASSERT(hdr_off_holder->hdr_offset == offset);
                   BOOST_ASSERT(0 == (reinterpret_cast<std::size_t>(hdr_off_holder) & (real_block_alignment - 1)));
                   BOOST_ASSERT(0 == (hdr_off_holder->hdr_offset & (real_block_alignment - 1)));
-                  hdr_off_holder = reinterpret_cast<hdr_offset_holder *>(reinterpret_cast<char*>(hdr_off_holder) + real_block_alignment);
+                  hdr_off_holder = move_detail::force_ptr<hdr_offset_holder *>(reinterpret_cast<char*>(hdr_off_holder) + real_block_alignment);
                }
             }
          }
@@ -563,7 +563,7 @@ class private_adaptive_node_pool_impl_common
 
    hdr_offset_holder *priv_first_subblock_from_block(block_info_t *block, const size_type num_subblocks, const size_type real_block_alignment, AlignOnlyFalse) const
    {
-      hdr_offset_holder *const hdr_off_holder = reinterpret_cast<hdr_offset_holder*>
+      hdr_offset_holder *const hdr_off_holder = move_detail::force_ptr<hdr_offset_holder*>
             (reinterpret_cast<char*>(block) - (num_subblocks-1)*real_block_alignment);
       BOOST_ASSERT(hdr_off_holder->hdr_offset == size_type(reinterpret_cast<char*>(block) - reinterpret_cast<char*>(hdr_off_holder)));
       BOOST_ASSERT(0 == ((std::size_t)hdr_off_holder & (real_block_alignment - 1)));
@@ -574,7 +574,7 @@ class private_adaptive_node_pool_impl_common
    hdr_offset_holder *priv_first_subblock_from_block(block_info_t *block, const size_type num_subblocks, const size_type real_block_alignment, AlignOnlyTrue) const
    {
       (void)num_subblocks; (void)real_block_alignment;
-      return reinterpret_cast<hdr_offset_holder*>(block);
+      return move_detail::force_ptr<hdr_offset_holder*>(block);
    }
 
    void priv_deallocate_free_blocks_impl( const size_type max_free_blocks, const size_type real_num_node
@@ -759,7 +759,7 @@ class private_adaptive_node_pool_impl_common
                            , const size_type real_num_node, const size_type num_subblocks)
    {
       size_type i = 0;
-      BOOST_TRY{
+      BOOST_CONTAINER_TRY{
          this->priv_invariants(real_num_node, num_subblocks, real_block_alignment);
          while(i != n){
             //If there are no free nodes we allocate all needed blocks
@@ -799,12 +799,12 @@ class private_adaptive_node_pool_impl_common
             i += num_elems;
          }
       }
-      BOOST_CATCH(...){
+      BOOST_CONTAINER_CATCH(...){
          this->priv_deallocate_nodes(chain, max_free_blocks, real_num_node, num_subblocks, real_block_alignment);
          this->priv_invariants(real_num_node, num_subblocks, real_block_alignment);
-         BOOST_RETHROW
+         BOOST_CONTAINER_RETHROW
       }
-      BOOST_CATCH_END
+      BOOST_CONTAINER_CATCH_END
       this->priv_invariants(real_num_node, num_subblocks, real_block_alignment);
    }
 
@@ -903,7 +903,7 @@ class private_adaptive_node_pool_impl_common
          reinterpret_cast<hdr_offset_holder*>((std::size_t)node & size_type(~(real_block_alignment - 1)));
       BOOST_ASSERT(0 == ((std::size_t)hdr_off_holder & (real_block_alignment - 1)));
       BOOST_ASSERT(0 == (hdr_off_holder->hdr_offset & (real_block_alignment - 1)));
-      block_info_t *block = reinterpret_cast<block_info_t *>
+      block_info_t *block = move_detail::force_ptr<block_info_t *>
          (reinterpret_cast<char*>(hdr_off_holder) + hdr_off_holder->hdr_offset);
       BOOST_ASSERT(block->hdr_offset == 0);
       return block;
@@ -981,9 +981,9 @@ template< class SizeType
         , bool AlignOnly>
 struct calculate_alignment_ct
 {
-   static const std::size_t alignment     = upper_power_of_2_ct<SizeType, HdrSize + RealNodeSize*NodesPerBlock>::value;
-   static const std::size_t num_subblocks = 0;
-   static const std::size_t real_num_node = (alignment - PayloadPerAllocation - HdrSize)/RealNodeSize;
+   BOOST_STATIC_CONSTEXPR std::size_t alignment     = upper_power_of_2_ct<SizeType, HdrSize + RealNodeSize*NodesPerBlock>::value;
+   BOOST_STATIC_CONSTEXPR std::size_t num_subblocks = 0;
+   BOOST_STATIC_CONSTEXPR std::size_t real_num_node = (alignment - PayloadPerAllocation - HdrSize)/RealNodeSize;
 };
 
 template< class SizeType
@@ -1013,9 +1013,9 @@ struct calculate_alignment_ct
       , OverheadPercent
       >::type type;
 
-   static const std::size_t alignment     = type::alignment;
-   static const std::size_t num_subblocks = type::num_subblocks;
-   static const std::size_t real_num_node = type::real_num_node;
+   BOOST_STATIC_CONSTEXPR std::size_t alignment     = type::alignment;
+   BOOST_STATIC_CONSTEXPR std::size_t num_subblocks = type::num_subblocks;
+   BOOST_STATIC_CONSTEXPR std::size_t real_num_node = type::real_num_node;
 };
 
 
@@ -1046,17 +1046,17 @@ class private_adaptive_node_pool_impl_ct
    typedef typename base_t::multiallocation_chain     multiallocation_chain;
    typedef typename base_t::segment_manager_base_type segment_manager_base_type;
 
-   static const typename base_t::size_type PayloadPerAllocation = base_t::PayloadPerAllocation;
+   BOOST_STATIC_CONSTEXPR typename base_t::size_type PayloadPerAllocation = base_t::PayloadPerAllocation;
 
    //align_only
-   static const bool AlignOnly      = base_t::AlignOnly;
+   BOOST_STATIC_CONSTEXPR bool AlignOnly      = base_t::AlignOnly;
 
    private:
-   static const size_type MaxAlign = base_t::MaxAlign;
-   static const size_type HdrSize  = base_t::HdrSize;
-   static const size_type HdrOffsetSize = base_t::HdrOffsetSize;
+   BOOST_STATIC_CONSTEXPR size_type MaxAlign = base_t::MaxAlign;
+   BOOST_STATIC_CONSTEXPR size_type HdrSize  = base_t::HdrSize;
+   BOOST_STATIC_CONSTEXPR size_type HdrOffsetSize = base_t::HdrOffsetSize;
 
-   static const size_type RealNodeSize = lcm_ct<NodeSize, alignment_of<void_pointer>::value>::value;
+   BOOST_STATIC_CONSTEXPR size_type RealNodeSize = lcm_ct<NodeSize, alignment_of<void_pointer>::value>::value;
 
    typedef calculate_alignment_ct
       < size_type, HdrSize, PayloadPerAllocation
@@ -1065,9 +1065,9 @@ class private_adaptive_node_pool_impl_ct
    //Round the size to a power of two value.
    //This is the total memory size (including payload) that we want to
    //allocate from the general-purpose allocator
-   static const size_type NumSubBlocks       = data_t::num_subblocks;
-   static const size_type RealNumNode        = data_t::real_num_node;
-   static const size_type RealBlockAlignment = data_t::alignment;
+   BOOST_STATIC_CONSTEXPR size_type NumSubBlocks       = data_t::num_subblocks;
+   BOOST_STATIC_CONSTEXPR size_type RealNumNode        = data_t::real_num_node;
+   BOOST_STATIC_CONSTEXPR size_type RealBlockAlignment = data_t::alignment;
 
    public:
 
@@ -1165,14 +1165,14 @@ class private_adaptive_node_pool_impl_rt
    typedef typename impl_t::size_type              size_type;
    typedef typename impl_t::multiallocation_chain  multiallocation_chain;
 
-   static const typename impl_t::size_type PayloadPerAllocation = impl_t::PayloadPerAllocation;
+   BOOST_STATIC_CONSTEXPR typename impl_t::size_type PayloadPerAllocation = impl_t::PayloadPerAllocation;
 
    //Flags
    //align_only
-   static const bool AlignOnly      = impl_t::AlignOnly;
+   BOOST_STATIC_CONSTEXPR bool AlignOnly      = impl_t::AlignOnly;
 
-   static const size_type HdrSize  = impl_t::HdrSize;
-   static const size_type HdrOffsetSize = impl_t::HdrOffsetSize;
+   BOOST_STATIC_CONSTEXPR size_type HdrSize  = impl_t::HdrSize;
+   BOOST_STATIC_CONSTEXPR size_type HdrOffsetSize = impl_t::HdrOffsetSize;
 
    public:
 

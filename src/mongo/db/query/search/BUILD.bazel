@@ -1,0 +1,274 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_integration_test", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+idl_generator(
+    name = "internal_search_cluster_parameters_gen",
+    src = "internal_search_cluster_parameters.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/cluster_parameters:cluster_server_parameter_gen",
+        "//src/mongo/db/query:query_feature_flags_gen",
+    ],
+)
+
+idl_generator(
+    name = "internal_search_mongot_remote_spec_gen",
+    src = "internal_search_mongot_remote_spec.idl",
+    deps = [
+        ":search_query_view_spec_gen",
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/pipeline/visitors:docs_needed_bounds_gen",
+    ],
+)
+
+idl_generator(
+    name = "mongot_options_gen",
+    src = "mongot_options.idl",
+)
+
+idl_generator(
+    name = "search_index_options_gen",
+    src = "search_index_options.idl",
+)
+
+idl_generator(
+    name = "manage_search_index_request_gen",
+    src = "manage_search_index_request.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/query/search:search_query_view_spec_gen",
+    ],
+)
+
+idl_generator(
+    name = "search_query_view_spec_gen",
+    src = "search_query_view_spec.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "mongot_options",
+    srcs = [
+        "mongot_options.cpp",
+        ":mongot_options_gen",
+    ],
+    hdrs = [
+        "mongot_options.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/util/net:network",
+        "//src/mongo/util/net:ssl_options",
+    ],
+)
+
+mongo_cc_library(
+    name = "mongot_cursor",
+    srcs = [
+        "mongot_cursor.cpp",
+        "mongot_cursor_getmore_strategy.cpp",
+        ":internal_search_cluster_parameters_gen",
+        ":internal_search_mongot_remote_spec_gen",
+        ":search_query_view_spec_gen",
+        "//src/mongo/db/exec/agg:exec_pipeline.h",
+        "//src/mongo/db/exec/agg:pipeline_builder.h",
+        "//src/mongo/db/pipeline:document_source_set_variable_from_subpipeline.h",
+        "//src/mongo/db/pipeline/search:document_source_internal_search_id_lookup.h",
+        "//src/mongo/db/pipeline/search:document_source_internal_search_mongot_remote.h",
+    ],
+    hdrs = [
+        "mongot_cursor.h",
+        "mongot_cursor_getmore_strategy.h",
+    ],
+    deps = [
+        ":mongot_options",  # TODO(SERVER-93876): Remove.
+        ":search_task_executors",
+        "//src/mongo/db/pipeline:docs_needed_bounds",
+        "//src/mongo/db/query:common_query_enums_and_helpers",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query:plan_yield_policy",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/executor:task_executor_cursor",
+        "//src/mongo/idl:cluster_server_parameter",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "search_index_options",
+    srcs = [
+        "search_index_options.cpp",
+        ":search_index_options_gen",
+    ],
+    hdrs = [
+        "search_index_options.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/util/net:network",
+    ],
+)
+
+mongo_cc_library(
+    name = "search_task_executors",
+    srcs = [
+        "search_task_executors.cpp",
+    ],
+    hdrs = [
+        "search_task_executors.h",
+    ],
+    deps = [
+        ":mongot_options",
+        ":search_index_options",
+        "//src/mongo/executor:connection_pool_controllers",
+        "//src/mongo/executor:network_interface_factory",
+        "//src/mongo/executor:network_interface_thread_pool",
+        "//src/mongo/executor:pinned_connection_task_executor_registry",
+        "//src/mongo/executor:task_executor_interface",
+        "//src/mongo/executor:thread_pool_task_executor",
+        "//src/mongo/util/concurrency:thread_pool",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "search_index_process_interface",
+    srcs = [
+        "search_index_process_interface.cpp",
+    ],
+    hdrs = [
+        "search_index_process_interface.h",
+    ],
+    deps = [
+        "//src/mongo/db:commands",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/views:resolved_view",
+    ],
+)
+
+# This target holds the shared logic for dispatching search index requests to a
+# mongot, whereas the search_index_process targets below hold the logic for
+# fetching collection metadata, either as a mongos router or mongod shard.
+mongo_cc_library(
+    name = "search_index_common",
+    srcs = [
+        "search_index_common.cpp",
+        ":manage_search_index_request_gen",
+    ],
+    hdrs = [
+        "search_index_common.h",
+    ],
+    deps = [
+        "search_index_options",
+        "search_index_process_interface",
+        "search_task_executors",
+        ":mongot_cursor",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/rpc:command_status",
+        "//src/mongo/util/net:network",
+    ],
+)
+
+mongo_cc_library(
+    name = "search_index_process_shard",
+    srcs = [
+        "search_index_process_shard.cpp",
+    ],
+    hdrs = [
+        "search_index_process_shard.h",
+    ],
+    deps = [
+        ":search_index_process_interface",
+        "//src/mongo/db/local_catalog:collection_catalog",
+        "//src/mongo/db/views:view_catalog_helpers",
+    ],
+)
+
+mongo_cc_library(
+    name = "search_index_process_router",
+    srcs = [
+        "search_index_process_router.cpp",
+    ],
+    hdrs = [
+        "search_index_process_router.h",
+    ],
+    deps = [
+        ":search_index_process_interface",
+        "//src/mongo/db/global_catalog:sharding_catalog_client",
+        "//src/mongo/s:sharding_router_api",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "auth_search_test",
+    srcs = [
+        "list_search_indexes_authorization_session_test.cpp",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        "//src/mongo/db/auth:auth_checks",
+        "//src/mongo/db/auth:authorization_session_test_fixture",
+        "//src/mongo/db/pipeline",
+    ],
+)
+
+mongo_cc_library(
+    name = "search_index_command_testing_helper",
+    hdrs = [
+        "mongot_options.h",
+        "search_index_command_testing_helper.h",
+        "//src/mongo/db/query/client_cursor:clientcursor.h",
+        "//src/mongo/db/query/client_cursor:cursor_response.h",
+    ],
+    deps = [
+        ":search_index_common",
+        ":search_index_options",
+        "//src/mongo/db/commands:shardsvr_run_search_index_command_idl",
+        "//src/mongo/db/commands/query_cmd:search_index_commands",
+        "//src/mongo/executor:async_multicaster",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "mongot_cursor_test",
+    srcs = [
+        "mongot_cursor_helpers_test.cpp",
+        "mongot_cursor_test.cpp",
+        "//src/mongo/executor:pinned_connection_task_executor_test_fixture.h",
+        "//src/mongo/executor:task_executor_cursor_test_fixture.h",
+        "//src/mongo/transport:test_fixtures.h",
+        "//src/mongo/unittest:join_thread.h",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":mongot_cursor",
+        "//src/mongo/executor:network_interface_mock",
+        "//src/mongo/executor:network_interface_tl",
+        "//src/mongo/executor:thread_pool_task_executor_test_fixture",
+        "//src/mongo/idl:server_parameter_test_controller",
+        "//src/mongo/transport:transport_layer_mock",
+    ],
+)
+
+mongo_cc_integration_test(
+    name = "search_task_executors_integration_test",
+    srcs = [
+        "search_task_executors_integration_test.cpp",
+    ],
+    deps = [
+        "search_task_executors",
+        "//src/mongo/db:wire_version",
+        "//src/mongo/executor:network_interface",
+        "//src/mongo/executor:pinned_connection_task_executor_factory",
+        "//src/mongo/transport:transport_layer_egress_init",
+        "//src/mongo/util:version_impl",
+    ],
+)

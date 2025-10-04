@@ -1,0 +1,51 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_sharded_collections_passthrough.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
+##########################################################
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - ValidateCollections
+  config:
+    shell_options:
+      eval:
+        globalThis.testingReplication = true; await import('jstests/libs/override_methods/set_read_and_write_concerns.js');;
+        await import('jstests/libs/override_methods/implicitly_shard_accessed_collections.js');;
+        await import('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');
+      global_vars:
+        TestData:
+          defaultReadConcernLevel: null
+      setShellParameter: defaultFindReplicaSetHostTimeoutMS=120000
+  fixture:
+    class: ShardedClusterFixture
+    mongod_options:
+      bind_ip_all: ""
+      set_parameters:
+        enableTestCommands: 1
+        periodicNoopIntervalSecs: 1
+        writePeriodicNoops: true
+    mongos_options:
+      bind_ip_all: ""
+      set_parameters:
+        enableTestCommands: 1
+    num_shards: 2
+  hooks:
+    - class: CheckReplDBHash
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
+matrix_suite: true
+selector:
+  exclude_with_any_tags:
+    - assumes_write_concern_unchanged
+    - assumes_against_mongod_not_mongos
+    - assumes_unsharded_collection
+    - assumes_no_implicit_collection_creation_on_get_collection
+  roots:
+    - jstests/change_streams/**/*.js
+test_kind: js_test

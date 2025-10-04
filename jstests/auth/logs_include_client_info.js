@@ -1,8 +1,10 @@
 // This test just checks that the success/failure messages for authentication include the IP
 // address of the client attempting to authenticate.
-load("jstests/libs/logv2_helpers.js");
 
-(function() {
+const kAuthenticationSucceeded = 5286306;
+const kAuthenticationFailed = 5286307;
+const kIpAndPortRegex = /(?:\d{1,3}\.){3}\d{1,3}:\d+/;
+const kScramShaRegex = /SCRAM-SHA-\d+/;
 const conn = MongoRunner.runMongod({auth: ""});
 const admin = conn.getDB("admin");
 
@@ -17,36 +19,26 @@ assert(admin.auth("root", "root"));
 const failConn = new Mongo(conn.host);
 failConn.getDB("admin").auth("root", "toot");
 
-const log = assert.commandWorked(admin.runCommand({getLog: "global"})).log;
+assert(
+    checkLog.checkContainsWithCountJson(
+        conn,
+        kAuthenticationSucceeded,
+        {user: "root", db: "admin", client: kIpAndPortRegex},
+        1,
+        null,
+        true,
+    ),
+);
 
-if (isJsonLog(conn)) {
-    function checkAuthSuccess(element, index, array) {
-        const log = JSON.parse(element);
-
-        return log.id === 20250 && log.attr.principalName === "root" &&
-            log.attr.authenticationDatabase === "admin" &&
-            /(?:\d{1,3}\.){3}\d{1,3}:\d+/.test(log.attr.remote);
-    }
-
-    function checkSCRAMfail(element, index, array) {
-        const log = JSON.parse(element);
-
-        return log.id === 20249 && /SCRAM-SHA-\d+/.test(log.attr.mechanism) &&
-            log.attr.principalName === "root" && log.attr.authenticationDatabase === "admin" &&
-            /(?:\d{1,3}\.){3}\d{1,3}:\d+/.test(log.attr.remote);
-    }
-
-    assert(log.some(checkAuthSuccess));
-    assert(log.some(checkSCRAMfail));
-} else {
-    const successRegex =
-        /Successfully authenticated as principal root on admin from client (?:\d{1,3}\.){3}\d{1,3}:\d+/;
-    const failRegex =
-        /SASL SCRAM-SHA-\d+ authentication failed for root on admin from client (?:\d{1,3}\.){3}\d{1,3}:\d+/;
-
-    assert(log.some((line) => successRegex.test(line)));
-    assert(log.some((line) => failRegex.test(line)));
-}
+assert(
+    checkLog.checkContainsWithCountJson(
+        conn,
+        kAuthenticationFailed,
+        {user: "root", db: "admin", mechanism: kScramShaRegex, client: kIpAndPortRegex},
+        1,
+        null,
+        true,
+    ),
+);
 
 MongoRunner.stopMongod(conn);
-})();

@@ -27,15 +27,20 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
-#include "mongo/platform/basic.h"
-
 #include "mongo/util/stacktrace_somap.h"
 
-#include <climits>
+#include "mongo/base/initializer.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+
+#include <cstdint>
 #include <cstdlib>
-#include <fmt/format.h>
+#include <cstring>
+#include <filesystem>
 #include <string>
+#include <utility>
+
+#include <fmt/format.h>
 
 #if defined(__linux__)
 #include <elf.h>
@@ -50,13 +55,14 @@
 #include <sys/utsname.h>
 #endif
 
-#include "mongo/base/init.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/hex.h"
-#include "mongo/util/str.h"
 #include "mongo/util/version.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
+
 
 // Given `#define A aaa` and `#define B bbb`, `TOKEN_CAT(A, B)` evaluates to `aaabbb`.
 #define TOKEN_CAT(a, b) TOKEN_CAT_PRIMITIVE(a, b)
@@ -100,7 +106,6 @@ void processNoteSegment(const dl_phdr_info& info, const ElfW(Phdr) & phdr, BSONO
 #ifdef NT_GNU_BUILD_ID
     const char* const notesBegin = reinterpret_cast<const char*>(info.dlpi_addr) + phdr.p_vaddr;
     const char* const notesEnd = notesBegin + phdr.p_memsz;
-    ElfW(Nhdr) noteHeader;
     // Returns the size in bytes of an ELF note entry with the given header.
     auto roundUpToElfWordAlignment = [](size_t offset) -> size_t {
         static const size_t elfWordSizeBytes = sizeof(ElfW(Word));
@@ -110,6 +115,7 @@ void processNoteSegment(const dl_phdr_info& info, const ElfW(Phdr) & phdr, BSONO
         return sizeof(noteHeader) + roundUpToElfWordAlignment(noteHeader.n_namesz) +
             roundUpToElfWordAlignment(noteHeader.n_descsz);
     };
+    ElfW(Nhdr) noteHeader;
     for (const char* notesCurr = notesBegin; (notesCurr + sizeof(noteHeader)) < notesEnd;
          notesCurr += getNoteSizeBytes(noteHeader)) {
         memcpy(&noteHeader, notesCurr, sizeof(noteHeader));
@@ -147,7 +153,7 @@ void processLoadSegment(const dl_phdr_info& info, const ElfW(Phdr) & phdr, BSONO
 
     const char* filename = info.dlpi_name;
 
-    if (memcmp(&eHeader.e_ident[EI_MAG0], ELFMAG, SELFMAG)) {
+    if (memcmp(&eHeader.e_ident[EI_MAG0], ELFMAG, SELFMAG) != 0) {
         LOGV2_WARNING(23842,
                       "Bad ELF magic number",
                       "filename"_attr = filename,
@@ -164,7 +170,7 @@ void processLoadSegment(const dl_phdr_info& info, const ElfW(Phdr) & phdr, BSONO
                 case ELFCLASS64:
                     return "ELFCLASS64";
             }
-            return format(FMT_STRING("[elfClass unknown: {}]"), c);
+            return fmt::format("[elfClass unknown: {}]", c);
         };
         LOGV2_WARNING(23843,
                       "Unexpected ELF class (i.e. bit width)",
@@ -201,27 +207,56 @@ void processLoadSegment(const dl_phdr_info& info, const ElfW(Phdr) & phdr, BSONO
 }
 
 /**
+ * Reads the name of the running binary from /proc/self/exe, and returns it.
+ * Logs a warning and returns an empty string if anything goes wrong.
+ */
+std::string readProcSelfExe() {
+    constexpr auto exePath = "/proc/self/exe";
+    std::error_code ec;
+    auto resolvedPath = std::filesystem::read_symlink(exePath, ec);
+    if (ec) {
+        LOGV2_WARNING(9450300,
+                      "Failed to read symlink",
+                      "path"_attr = exePath,
+                      "error"_attr = errorMessage(ec));
+        return {};
+    }
+    return resolvedPath;
+}
+
+/**
  * Callback that processes an ELF object linked into the current address space.
  *
  * Used by dl_iterate_phdr in ExtractSOMap, below, to build up the list of linked
  * objects.
  *
- * Each entry built by an invocation of ths function may have the following fields:
+ * Each entry built by an invocation of this function may have the following fields:
  * * "b", the base address at which an object is loaded.
  * * "path", the path on the file system to the object.
  * * "buildId", the GNU Build ID of the object.
  * * "elfType", the ELF type of the object, typically 2 or 3 (executable or SO).
  *
  * At post-processing time, the buildId field can be used to identify the file containing
- * debug symbols for objects loaded at the given "laodAddr", which in turn can be used with
+ * debug symbols for objects loaded at the given "loadAddr", which in turn can be used with
  * the "backtrace" displayed in printStackTrace to get detailed unwind information.
  */
 int outputSOInfo(dl_phdr_info* info, size_t sz, void* data) {
-    BSONObjBuilder soInfo(reinterpret_cast<BSONArrayBuilder*>(data)->subobjStart());
+    auto arrayBuilder = reinterpret_cast<BSONArrayBuilder*>(data);
+    const auto arrayIndex = arrayBuilder->arrSize();
+    BSONObjBuilder soInfo(arrayBuilder->subobjStart());
     if (info->dlpi_addr)
         soInfo.append("b", unsignedHex(ElfW(Addr)(info->dlpi_addr)));
-    if (info->dlpi_name && *info->dlpi_name)
-        soInfo.append("path", info->dlpi_name);
+    const auto path = [&]() -> std::string {
+        if (info->dlpi_name && *info->dlpi_name) {
+            return info->dlpi_name;
+        }
+        if (arrayIndex == 0) {  // Main binary is always index 0.
+            return readProcSelfExe();
+        }
+        return {};
+    }();
+    if (!path.empty())
+        soInfo.append("path", path);
 
     for (ElfW(Half) i = 0; i < info->dlpi_phnum; ++i) {
         const ElfW(Phdr) & phdr(info->dlpi_phdr[i]);

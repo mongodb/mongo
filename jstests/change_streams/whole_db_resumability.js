@@ -2,12 +2,9 @@
 // Do not run in whole-cluster passthrough since this test assumes that the change stream will be
 // invalidated by a database drop.
 // @tags: [do_not_run_in_whole_cluster_passthrough]
-(function() {
-"use strict";
-
-load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
-load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest.
-load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
+import {assertDropAndRecreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 
 // Drop and recreate the collections to be used in this set of tests.
 const testDB = db.getSiblingDB(jsTestName());
@@ -21,7 +18,7 @@ let resumeCursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], co
 assert.commandWorked(coll.insert({_id: 1}));
 assert.commandWorked(otherColl.insert({_id: 2}));
 const firstInsertChangeDoc = cst.getOneChange(resumeCursor);
-assert.docEq(firstInsertChangeDoc.fullDocument, {_id: 1});
+assert.docEq({_id: 1}, firstInsertChangeDoc.fullDocument);
 assert.eq(firstInsertChangeDoc.ns, {db: testDB.getName(), coll: coll.getName()});
 
 // Test resuming the change stream after the first insert should pick up the insert on the
@@ -33,13 +30,13 @@ resumeCursor = cst.startWatchingChanges({
 });
 
 const secondInsertChangeDoc = cst.getOneChange(resumeCursor);
-assert.docEq(secondInsertChangeDoc.fullDocument, {_id: 2});
+assert.docEq({_id: 2}, secondInsertChangeDoc.fullDocument);
 assert.eq(secondInsertChangeDoc.ns, {db: testDB.getName(), coll: otherColl.getName()});
 
 // Insert a third document to the first collection and test that the change stream picks it up.
 assert.commandWorked(coll.insert({_id: 3}));
 const thirdInsertChangeDoc = cst.getOneChange(resumeCursor);
-assert.docEq(thirdInsertChangeDoc.fullDocument, {_id: 3});
+assert.docEq({_id: 3}, thirdInsertChangeDoc.fullDocument);
 assert.eq(thirdInsertChangeDoc.ns, {db: testDB.getName(), coll: coll.getName()});
 
 // Test resuming after the first insert again.
@@ -48,8 +45,8 @@ resumeCursor = cst.startWatchingChanges({
     collection: 1,
     aggregateOptions: {cursor: {batchSize: 0}},
 });
-assert.docEq(cst.getOneChange(resumeCursor), secondInsertChangeDoc);
-assert.docEq(cst.getOneChange(resumeCursor), thirdInsertChangeDoc);
+assert.docEq(secondInsertChangeDoc, cst.getOneChange(resumeCursor));
+assert.docEq(thirdInsertChangeDoc, cst.getOneChange(resumeCursor));
 
 // Test resume after second insert.
 resumeCursor = cst.startWatchingChanges({
@@ -57,7 +54,7 @@ resumeCursor = cst.startWatchingChanges({
     collection: 1,
     aggregateOptions: {cursor: {batchSize: 0}},
 });
-assert.docEq(cst.getOneChange(resumeCursor), thirdInsertChangeDoc);
+assert.docEq(thirdInsertChangeDoc, cst.getOneChange(resumeCursor));
 
 // Rename the collection and attempt to resume from the 'rename' notification. Skip this
 // test when running on a sharded collection, since these cannot be renamed.
@@ -75,9 +72,9 @@ if (!FixtureHelpers.isSharded(coll)) {
             {
                 operationType: "rename",
                 ns: {db: coll.getDB().getName(), coll: coll.getName()},
-                to: {db: renameColl.getDB().getName(), coll: renameColl.getName()}
+                to: {db: renameColl.getDB().getName(), coll: renameColl.getName()},
             },
-        ]
+        ],
     });
     const resumeTokenRename = renameChanges[0]._id;
 
@@ -90,10 +87,12 @@ if (!FixtureHelpers.isSharded(coll)) {
         operationType: "insert",
         ns: {db: renameColl.getDB().getName(), coll: renameColl.getName()},
         fullDocument: {_id: "after rename"},
-        documentKey: {_id: "after rename"}
+        documentKey: {_id: "after rename"},
     };
-    resumeCursor = cst.startWatchingChanges(
-        {collection: 1, pipeline: [{$changeStream: {resumeAfter: resumeTokenRename}}]});
+    resumeCursor = cst.startWatchingChanges({
+        collection: 1,
+        pipeline: [{$changeStream: {resumeAfter: resumeTokenRename}}],
+    });
     cst.assertNextChangesEqual({cursor: resumeCursor, expectedChanges: expectedInsert});
 
     // Resume from the rename notification using 'startAfter' and verify that the change stream
@@ -102,10 +101,12 @@ if (!FixtureHelpers.isSharded(coll)) {
         operationType: "insert",
         ns: {db: renameColl.getDB().getName(), coll: renameColl.getName()},
         fullDocument: {_id: "after rename"},
-        documentKey: {_id: "after rename"}
+        documentKey: {_id: "after rename"},
     };
-    resumeCursor = cst.startWatchingChanges(
-        {collection: 1, pipeline: [{$changeStream: {startAfter: resumeTokenRename}}]});
+    resumeCursor = cst.startWatchingChanges({
+        collection: 1,
+        pipeline: [{$changeStream: {startAfter: resumeTokenRename}}],
+    });
     cst.assertNextChangesEqual({cursor: resumeCursor, expectedChanges: expectedInsert});
 
     // Rename back to the original collection for reliability of the collection drops when
@@ -130,22 +131,21 @@ const secondCollDrop = dropDbChanges[0];
 // there may be multiple collection drops in 'dropDbChanges' depending on the number of involved
 // shards.
 const resumeTokenDropDb = dropDbChanges[dropDbChanges.length - 1]._id;
-const resumeTokenInvalidate =
-    cst.assertNextChangesEqual(
-           {cursor: resumeCursor, expectedChanges: [{operationType: "invalidate"}]})[0]
-        ._id;
+const resumeTokenInvalidate = cst.assertNextChangesEqual({
+    cursor: resumeCursor,
+    expectedChanges: [{operationType: "invalidate"}],
+})[0]._id;
 
 // Test resuming from the first collection drop and the second collection drop as a result of
 // dropping the database.
-[firstCollDrop, secondCollDrop].forEach(token => {
+[firstCollDrop, secondCollDrop].forEach((token) => {
     resumeCursor = cst.startWatchingChanges({
         pipeline: [{$changeStream: {resumeAfter: token._id}}],
         collection: 1,
         aggregateOptions: {cursor: {batchSize: 0}},
     });
     cst.assertDatabaseDrop({cursor: resumeCursor, db: testDB});
-    cst.assertNextChangesEqual(
-        {cursor: resumeCursor, expectedChanges: [{operationType: "invalidate"}]});
+    cst.assertNextChangesEqual({cursor: resumeCursor, expectedChanges: [{operationType: "invalidate"}]});
 });
 
 // Recreate the test collection.
@@ -157,17 +157,18 @@ resumeCursor = cst.startWatchingChanges({
     collection: 1,
     aggregateOptions: {cursor: {batchSize: 0}},
 });
-cst.assertNextChangesEqual(
-    {cursor: resumeCursor, expectedChanges: [{operationType: "invalidate"}]});
+cst.assertNextChangesEqual({cursor: resumeCursor, expectedChanges: [{operationType: "invalidate"}]});
 
 // Test resuming from the 'invalidate' entry using 'resumeAfter'.
-assert.commandFailedWithCode(db.runCommand({
-    aggregate: 1,
-    pipeline: [{$changeStream: {resumeAfter: resumeTokenInvalidate}}],
-    cursor: {},
-    collation: {locale: "simple"},
-}),
-                             ErrorCodes.InvalidResumeToken);
+assert.commandFailedWithCode(
+    db.runCommand({
+        aggregate: 1,
+        pipeline: [{$changeStream: {resumeAfter: resumeTokenInvalidate}}],
+        cursor: {},
+        collation: {locale: "simple"},
+    }),
+    ErrorCodes.InvalidResumeToken,
+);
 
 // Test resuming from the 'dropDatabase' entry using 'startAfter'.
 resumeCursor = cst.startWatchingChanges({
@@ -175,8 +176,7 @@ resumeCursor = cst.startWatchingChanges({
     collection: 1,
     aggregateOptions: {cursor: {batchSize: 0}},
 });
-cst.assertNextChangesEqual(
-    {cursor: resumeCursor, expectedChanges: [{operationType: "invalidate"}]});
+cst.assertNextChangesEqual({cursor: resumeCursor, expectedChanges: [{operationType: "invalidate"}]});
 
 // Test resuming from the 'invalidate' entry using 'startAfter' and verifies it picks up the
 // insert after recreating the db/collection.
@@ -184,7 +184,7 @@ const expectedInsert = {
     operationType: "insert",
     ns: {db: testDB.getName(), coll: coll.getName()},
     fullDocument: {_id: "after recreate"},
-    documentKey: {_id: "after recreate"}
+    documentKey: {_id: "after recreate"},
 };
 resumeCursor = cst.startWatchingChanges({
     pipeline: [{$changeStream: {startAfter: resumeTokenInvalidate}}],
@@ -198,4 +198,3 @@ cst.consumeDropUpTo({
 });
 
 cst.cleanUp();
-})();

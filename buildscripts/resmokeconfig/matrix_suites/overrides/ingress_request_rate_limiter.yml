@@ -1,0 +1,9 @@
+- name: enable_override
+  value:
+    executor:
+      fixture:
+        mongod_options:
+          set_parameters:
+            featureFlagIngressRateLimiting: true
+            # Defaults are to admit all requests.
+            ingressRequestRateLimiterEnabled: true

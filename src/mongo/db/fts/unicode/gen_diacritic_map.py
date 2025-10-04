@@ -1,31 +1,30 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import sys
-from unicodedata import normalize, category, unidata_version
+from unicodedata import normalize, unidata_version
 
-from gen_helper import getCopyrightNotice, openNamespaces, closeNamespaces, \
-    include
+from gen_helper import closeNamespaces, getCopyrightNotice, include, openNamespaces
 
 diacritics = set()
 
 
 def load_diacritics(unicode_proplist_file):
-    proplist_file = open(unicode_proplist_file, 'r')
+    proplist_file = open(unicode_proplist_file, "r")
 
     for line in proplist_file:
         # Filter out blank lines and lines that start with #
-        data = line[:line.find('#')]
-        if (data == ""):
+        data = line[: line.find("#")]
+        if data == "":
             continue
 
         # Parse the data on the line
         values = data.split("; ")
-        assert (len(values) == 2)
+        assert len(values) == 2
 
         uproperty = values[1].strip()
         if uproperty == "Diacritic":
-            if len(values[0].split('..')) == 2:
-                codepoint_range = values[0].split('..')
+            if len(values[0].split("..")) == 2:
+                codepoint_range = values[0].split("..")
 
                 start = int(codepoint_range[0], 16)
                 end = int(codepoint_range[1], 16) + 1
@@ -47,18 +46,18 @@ def add_diacritic_mapping(codepoint):
     # r : decomposed unicode character with diacritics removed
     # c : recomposed unicode character with diacritics removed
     a = chr(codepoint)
-    d = normalize('NFD', a)
-    r = ''
+    d = normalize("NFD", a)
+    r = ""
 
     for i in range(len(d)):
         if ord(d[i]) not in diacritics:
             r += d[i]
 
-    c = normalize('NFC', r)
+    c = normalize("NFC", r)
 
     # Only use mappings where the final recomposed form is a single codepoint
-    if (a != c and len(c) == 1):
-        assert c != '\0'  # This is used to indicate the codepoint is a pure diacritic.
+    if a != c and len(c) == 1:
+        assert c != "\0"  # This is used to indicate the codepoint is a pure diacritic.
         assert ord(c) not in diacritics
         diacritic_mappings[codepoint] = ord(c[0])
 
@@ -99,8 +98,7 @@ def generate(target):
     sorted_mappings = sorted(mappings_list, key=lambda mapping: mapping[0])
 
     for mapping in sorted_mappings:
-        out.write("    case " + str(hex(mapping[0])) + ": return " + \
-            str(hex(mapping[1])) +";\n")
+        out.write("    case " + str(hex(mapping[0])) + ": return " + str(hex(mapping[1])) + ";\n")
 
     out.write("    default: return codepoint;\n    }\n}")
 
@@ -108,7 +106,7 @@ def generate(target):
 
 
 if __name__ == "__main__":
-    if (unidata_version != '8.0.0'):
+    if unidata_version != "8.0.0":
         print("""ERROR: This script must be run with a version of Python that \
             contains the Unicode 8.0.0 Character Database.""")
         sys.exit(1)

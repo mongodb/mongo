@@ -4,23 +4,23 @@
  * sync operation.
  *
  * @tags: [
+ *     requires_fcv_71,
  *     requires_replication,
  * ]
  */
-(function() {
-'use strict';
-
-load('jstests/noPassthrough/libs/index_build.js');
-load("jstests/replsets/rslib.js");
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
+import {waitForState} from "jstests/replsets/rslib.js";
 
 const dbName = "test";
 const collName = "coll";
+const timeseriesCollName = "tscoll";
 
-function addTestDocuments(db) {
+function addTestDocuments(coll) {
     let size = 100;
     jsTest.log("Creating " + size + " test documents.");
-    var bulk = db.getCollection(collName).initializeUnorderedBulkOp();
-    for (var i = 0; i < size; ++i) {
+    let bulk = coll.initializeUnorderedBulkOp();
+    for (let i = 0; i < size; ++i) {
         bulk.insert({i: i});
     }
     assert.commandWorked(bulk.execute());
@@ -35,7 +35,7 @@ const replSet = new ReplSetTest({
                 priority: 0,
                 votes: 0,
             },
-            slowms: 30000,  // Don't log slow operations on secondary. See SERVER-44821.
+            slowms: 30000, // Don't log slow operations on secondary. See SERVER-44821.
         },
     ],
     useBridge: true,
@@ -49,20 +49,29 @@ let primaryDB = primary.getDB(dbName);
 let secondary = replSet.getSecondary();
 let secondaryDB = secondary.getDB(dbName);
 
-addTestDocuments(primaryDB);
+const coll = primaryDB.getCollection(collName);
+addTestDocuments(coll);
+
+// Create time-series collection with a single measurement.
+// We need a non-empty collection to use two-phase index builds.
+assert.commandWorked(primaryDB.createCollection(timeseriesCollName, {timeseries: {timeField: "time"}}));
+const timeseriesColl = primaryDB.getCollection(timeseriesCollName);
+assert.commandWorked(timeseriesColl.insert({time: ISODate(), x: 1}));
 
 // Used to wait for two-phase builds to complete.
 let awaitIndex;
+let awaitIndexTimeseries;
 
 jsTest.log("Hanging index build on the primary node");
 IndexBuildTest.pauseIndexBuilds(primary);
 
 jsTest.log("Beginning index build");
-const coll = primaryDB.getCollection(collName);
 awaitIndex = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {i: 1});
+awaitIndexTimeseries = IndexBuildTest.startIndexBuild(primary, timeseriesColl.getFullName(), {x: 1});
 
 jsTest.log("Waiting for index build to start on secondary");
-IndexBuildTest.waitForIndexBuildToStart(secondaryDB);
+IndexBuildTest.waitForIndexBuildToStart(secondaryDB, collName, "i_1");
+IndexBuildTest.waitForIndexBuildToStart(secondaryDB, timeseriesCollName, "x_1");
 
 jsTest.log("Adding a new node to the replica set");
 let newNode = replSet.add({
@@ -71,7 +80,7 @@ let newNode = replSet.add({
         priority: 0,
         votes: 0,
     },
-    slowms: 30000,  // Don't log slow operations on secondary.
+    slowms: 30000, // Don't log slow operations on secondary.
 });
 
 // Ensure that the new node and primary cannot communicate to each other.
@@ -85,6 +94,7 @@ waitForState(newNode, ReplSetTest.State.SECONDARY);
 jsTest.log("Removing index build hang to allow it to finish");
 IndexBuildTest.resumeIndexBuilds(primary);
 awaitIndex();
+awaitIndexTimeseries();
 
 // Wait for the index builds to finish.
 replSet.awaitReplication();
@@ -96,8 +106,19 @@ printjson(newNodeDB.getCollection(collName).getIndexes());
 jsTest.log("Secondary nodes indexes:");
 printjson(secondaryDB.getCollection(collName).getIndexes());
 
-assert.eq(newNodeDB.getCollection(collName).getIndexes().length,
-          secondaryDB.getCollection(collName).getIndexes().length);
+assert.eq(
+    newNodeDB.getCollection(collName).getIndexes().length,
+    secondaryDB.getCollection(collName).getIndexes().length,
+);
+
+jsTest.log("New nodes indexes for time-series collection:");
+printjson(newNodeDB.getCollection(timeseriesCollName).getIndexes());
+jsTest.log("Secondary nodes indexes for time-series collection:");
+printjson(secondaryDB.getCollection(timeseriesCollName).getIndexes());
+
+assert.eq(
+    newNodeDB.getCollection(timeseriesCollName).getIndexes().length,
+    secondaryDB.getCollection(timeseriesCollName).getIndexes().length,
+);
 
 replSet.stopSet();
-})();

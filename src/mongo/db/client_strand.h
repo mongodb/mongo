@@ -28,15 +28,24 @@
  */
 #pragma once
 
-#include <string>
-
+#include "mongo/base/status.h"
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/functional.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/out_of_line_executor.h"
+
+#include <memory>
+#include <mutex>
+#include <string>
+#include <type_traits>
+#include <utility>
+
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -68,7 +77,10 @@ public:
             // Hold the lock for as long as the Guard is around. This forces other consumers to
             // queue behind the Guard.
             _strand->_mutex.lock();
+            MONGO_COMPILER_DIAGNOSTIC_PUSH
+            MONGO_COMPILER_DIAGNOSTIC_WORKAROUND_ATOMIC_WRITE
             _strand->_isBound.store(true);
+            MONGO_COMPILER_DIAGNOSTIC_POP
 
             _strand->_setCurrent();
         }
@@ -133,7 +145,7 @@ public:
     ClientStrand(ServiceContext::UniqueClient client)
         : _clientPtr(client.get()),
           _client(std::move(client)),
-          _threadName(make_intrusive<ThreadName>(_client->desc())) {}
+          _threadName(ThreadNameRef{_client->desc()}) {}
 
     /**
      * Get a pointer to the underlying Client.
@@ -185,7 +197,7 @@ private:
      *
      * This is only valid to call if no other thread has the Client bound.
      */
-    void _setCurrent() noexcept;
+    void _setCurrent();
 
     /**
      * Release the Client from the current thread.
@@ -193,19 +205,19 @@ private:
      * This is valid to call multiple times on the same thread. It is not valid to mix this with
      * Client::releaseCurrent().
      */
-    void _releaseCurrent() noexcept;
+    void _releaseCurrent();
 
     Client* const _clientPtr;
 
-    stdx::mutex _mutex;  // NOLINT
+    stdx::mutex _mutex;
 
     // Once we have stdx::atomic::wait(), we can get rid of the mutex in favor of this variable.
     AtomicWord<bool> _isBound{false};
 
     ServiceContext::UniqueClient _client;
 
-    boost::intrusive_ptr<ThreadName> _threadName;
-    boost::intrusive_ptr<ThreadName> _oldThreadName;
+    ThreadNameRef _threadName;
+    ThreadNameRef _oldThreadName;
 };
 
 inline void ClientStrand::Executor::schedule(Task task) {

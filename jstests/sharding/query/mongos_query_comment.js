@@ -4,11 +4,8 @@
  * and query operator are passed to the shards correctly, and that an attempt to attach a non-string
  * comment to the find command fails.
  */
-(function() {
-"use strict";
-
-// For profilerHasSingleMatchingEntryOrThrow.
-load("jstests/libs/profiler.js");
+import {profilerHasSingleMatchingEntryOrThrow} from "jstests/libs/profiler.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({name: "mongos_comment_test", mongos: 1, shards: 1});
 
@@ -23,7 +20,6 @@ const shardDB = shard.getDB("mongos_comment");
 assert.commandWorked(mongosDB.dropDatabase());
 
 const mongosColl = mongosDB.test;
-const shardColl = shardDB.test;
 
 const collNS = mongosColl.getFullName();
 
@@ -33,24 +29,28 @@ for (let i = 0; i < 5; ++i) {
 
 // The profiler will be used to verify that comments are present on the shard.
 assert.commandWorked(shardDB.setProfilingLevel(2));
-const profiler = shardDB.system.profile;
 
 // TEST CASE: Verify that find.comment and non-string find.filter.$comment propagate.
-assert.eq(mongosColl.find({a: 1, $comment: {b: "TEST"}}).comment("TEST").itcount(), 1);
+assert.eq(
+    mongosColl
+        .find({a: 1, $comment: {b: "TEST"}})
+        .comment("TEST")
+        .itcount(),
+    1,
+);
 profilerHasSingleMatchingEntryOrThrow({
     profileDB: shardDB,
-    filter:
-        {op: "query", ns: collNS, "command.comment": "TEST", "command.filter.$comment": {b: "TEST"}}
+    filter: {op: "query", ns: collNS, "command.comment": "TEST", "command.filter.$comment": {b: "TEST"}},
 });
 
 // TEST CASE: Verify that find command with a non-string comment parameter gets propagated.
-assert.commandWorked(mongosDB.runCommand(
-    {"find": mongosColl.getName(), "filter": {a: 1}, "comment": {b: "TEST_BSONOBJ"}}));
+assert.commandWorked(
+    mongosDB.runCommand({"find": mongosColl.getName(), "filter": {a: 1}, "comment": {b: "TEST_BSONOBJ"}}),
+);
 
 profilerHasSingleMatchingEntryOrThrow({
     profileDB: shardDB,
-    filter: {op: "query", ns: collNS, "command.comment": {b: "TEST_BSONOBJ"}}
+    filter: {op: "query", ns: collNS, "command.comment": {b: "TEST_BSONOBJ"}},
 });
 
 st.stop();
-})();

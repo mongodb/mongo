@@ -1,8 +1,11 @@
 // Tests that it is illegal to write to system collections within a transaction.
-// @tags: [uses_transactions, uses_snapshot_read_concern]
-(function() {
-"use strict";
-
+// @tags: [
+//   uses_transactions,
+//   uses_snapshot_read_concern,
+//   # system.js stored functions only work for collections that live on the db-primary shard so
+//   # we have to make sure it wont be moved anywhere by the balancer
+//   assumes_balancer_off
+// ]
 const session = db.getMongo().startSession();
 
 // Use a custom database, to avoid conflict with other tests that use the system.js collection.
@@ -16,16 +19,14 @@ const systemDotViews = testDB.getCollection("system.views");
 // readConcern.
 // TODO(SERVER-46971) Replace "local" with "snapshot".
 session.startTransaction({readConcern: {level: "local"}});
-assert.commandFailedWithCode(testDB.createCollection(systemCollName),
-                             ErrorCodes.OperationNotSupportedInTransaction);
+assert.commandFailedWithCode(testDB.createCollection(systemCollName), ErrorCodes.OperationNotSupportedInTransaction);
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
 // createIndexes is not presently allowed to run in transactions that have a non-local
 // readConcern.
 // TODO(SERVER-46971) Replace "local" with "snapshot".
 session.startTransaction({readConcern: {level: "local"}});
-assert.commandFailedWithCode(systemColl.createIndex({name: 1}),
-                             ErrorCodes.OperationNotSupportedInTransaction);
+assert.commandFailedWithCode(systemColl.createIndex({name: 1}), ErrorCodes.OperationNotSupportedInTransaction);
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
 // Ensure that a collection exists with at least one document.
@@ -33,12 +34,12 @@ assert.commandWorked(systemColl.insert({name: 0}, {writeConcern: {w: "majority"}
 
 session.startTransaction({readConcern: {level: "snapshot"}});
 let error = assert.throws(() => systemColl.findAndModify({query: {}, update: {}}));
-assert.commandFailedWithCode(error, 50781);
+assert.commandFailedWithCode(error, 50791);
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
 session.startTransaction({readConcern: {level: "snapshot"}});
 error = assert.throws(() => systemColl.findAndModify({query: {}, remove: true}));
-assert.commandFailedWithCode(error, 50781);
+assert.commandFailedWithCode(error, 50791);
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
 session.startTransaction({readConcern: {level: "snapshot"}});
@@ -46,13 +47,17 @@ assert.commandFailedWithCode(systemColl.insert({name: "new"}), 50791);
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
 session.startTransaction({readConcern: {level: "snapshot"}});
-assert.commandFailedWithCode(testDB.getCollection("system.profile").insert({name: "new"}),
-                             ErrorCodes.OperationNotSupportedInTransaction);
+assert.commandFailedWithCode(
+    testDB.getCollection("system.profile").insert({name: "new"}),
+    ErrorCodes.OperationNotSupportedInTransaction,
+);
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
 session.startTransaction({readConcern: {level: "snapshot"}});
-assert.commandFailedWithCode(systemDotViews.insert({_id: "new.view", viewOn: "bar", pipeline: []}),
-                             50791);
+assert.commandFailedWithCode(systemDotViews.insert({_id: "new.view", viewOn: "bar", pipeline: []}), [
+    ErrorCodes.OperationNotSupportedInTransaction,
+    50791,
+]);
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
 session.startTransaction({readConcern: {level: "snapshot"}});
@@ -61,7 +66,9 @@ assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.N
 
 session.startTransaction({readConcern: {level: "snapshot"}});
 assert.commandFailedWithCode(
-    systemColl.update({name: "nonexistent"}, {$set: {name: "jungsoo"}}, {upsert: true}), 50791);
+    systemColl.update({name: "nonexistent"}, {$set: {name: "jungsoo"}}, {upsert: true}),
+    50791,
+);
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
 session.startTransaction({readConcern: {level: "snapshot"}});
@@ -70,4 +77,3 @@ assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.N
 
 assert.commandWorked(systemColl.remove({_id: {$exists: true}}));
 assert.eq(systemColl.find().itcount(), 0);
-}());

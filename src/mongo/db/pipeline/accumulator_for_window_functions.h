@@ -29,9 +29,11 @@
 
 #pragma once
 
+#include "mongo/db/index/sort_key_generator.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/window_function/window_function_covariance.h"
 #include "mongo/db/pipeline/window_function/window_function_integral.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -45,9 +47,11 @@ class AccumulatorForWindowFunctions : public AccumulatorState {
 public:
     AccumulatorForWindowFunctions(ExpressionContext* const expCtx) : AccumulatorState(expCtx) {}
 
-    bool isAssociative() const final {
+    ExpressionNary::Associativity getAssociativity() const final {
         tasserted(5424002,
-                  str::stream() << "Invalid call to isAssociative in accumulator " << getOpName());
+                  str::stream() << "Invalid call to getAssociativity() in accumulator "
+                                << getOpName());
+        return ExpressionNary::Associativity::kNone;
     }
 
     bool isCommutative() const final {
@@ -78,7 +82,6 @@ public:
 
     explicit AccumulatorCovarianceSamp(ExpressionContext* const expCtx)
         : AccumulatorCovariance(expCtx, true) {}
-    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx);
 };
 
 class AccumulatorCovariancePop final : public AccumulatorCovariance {
@@ -87,21 +90,29 @@ public:
 
     explicit AccumulatorCovariancePop(ExpressionContext* const expCtx)
         : AccumulatorCovariance(expCtx, false) {}
-    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx);
 };
 
 class AccumulatorRankBase : public AccumulatorForWindowFunctions {
 public:
+    // The modern constrcutor. When constructed this way, we'll interpret the input values as
+    // directly comparable sort keys, which is simpler.
     explicit AccumulatorRankBase(ExpressionContext* expCtx);
-    void reset();
+    // Legacy constructor. If constructed this way, we'll interpret the input values as raw inputs
+    // which need to be compared carefully (using the comparator to respect collations, and
+    // traversing arrays, etc.).
+    explicit AccumulatorRankBase(ExpressionContext* expCtx, bool isAscending);
+    void reset() override;
 
     Value getValue(bool toBeMerged) final {
         return Value::createIntOrLong(_lastRank);
     }
 
 protected:
+    bool isNewValue(Value thisInput);
+
     long long _lastRank = 0;
     boost::optional<Value> _lastInput = boost::none;
+    boost::optional<SortKeyGenerator> _legacySortKeyGen;
 };
 
 class AccumulatorRank : public AccumulatorRankBase {
@@ -109,12 +120,16 @@ public:
     static constexpr auto kName = "$rank"_sd;
 
     const char* getOpName() const final {
-        return kName.rawData();
+        return kName.data();
     }
-
+    // Modern constructor.
     explicit AccumulatorRank(ExpressionContext* const expCtx) : AccumulatorRankBase(expCtx) {}
+
+    // Legacy constructor
+    explicit AccumulatorRank(ExpressionContext* const expCtx, bool isAscending)
+        : AccumulatorRankBase(expCtx, isAscending) {}
+
     void processInternal(const Value& input, bool merging) final;
-    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx);
     void reset() final;
 
 private:
@@ -126,13 +141,17 @@ public:
     static constexpr auto kName = "$documentNumber"_sd;
 
     const char* getOpName() const final {
-        return kName.rawData();
+        return kName.data();
     }
 
+    // Modern constructor.
     explicit AccumulatorDocumentNumber(ExpressionContext* const expCtx)
         : AccumulatorRankBase(expCtx) {}
+
+    // Legacy constructor
+    explicit AccumulatorDocumentNumber(ExpressionContext* const expCtx, bool isAscending)
+        : AccumulatorRankBase(expCtx, isAscending) {}
     void processInternal(const Value& input, bool merging) final;
-    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx);
 };
 
 class AccumulatorDenseRank : public AccumulatorRankBase {
@@ -140,12 +159,17 @@ public:
     static constexpr auto kName = "$denseRank"_sd;
 
     const char* getOpName() const final {
-        return kName.rawData();
+        return kName.data();
     }
 
+    // Modern constructor.
     explicit AccumulatorDenseRank(ExpressionContext* const expCtx) : AccumulatorRankBase(expCtx) {}
+
+    // Legacy constructor
+    explicit AccumulatorDenseRank(ExpressionContext* const expCtx, bool isAscending)
+        : AccumulatorRankBase(expCtx, isAscending) {}
+
     void processInternal(const Value& input, bool merging) final;
-    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx);
 };
 
 class AccumulatorIntegral : public AccumulatorForWindowFunctions {
@@ -153,7 +177,7 @@ public:
     static constexpr auto kName = "$integral"_sd;
 
     const char* getOpName() const final {
-        return kName.rawData();
+        return kName.data();
     }
 
     explicit AccumulatorIntegral(ExpressionContext* expCtx,
@@ -162,9 +186,6 @@ public:
     void processInternal(const Value& input, bool merging) final;
     Value getValue(bool toBeMerged) final;
     void reset() final;
-
-    static boost::intrusive_ptr<AccumulatorState> create(
-        ExpressionContext* expCtx, boost::optional<long long> unitMillis = boost::none);
 
 private:
     WindowFunctionIntegral _integralWF;
@@ -175,7 +196,7 @@ public:
     static constexpr auto kName = "$locf"_sd;
 
     const char* getOpName() const final {
-        return kName.rawData();
+        return kName.data();
     }
 
     explicit AccumulatorLocf(ExpressionContext* expCtx);
@@ -183,10 +204,9 @@ public:
     void processInternal(const Value& input, bool merging) final;
     Value getValue(bool toBeMerged) final;
     void reset() final;
-    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx);
 
 private:
-    Value _lastNonNull;
+    Value _lastNonNull{BSONNULL};
 };
 
 }  // namespace mongo

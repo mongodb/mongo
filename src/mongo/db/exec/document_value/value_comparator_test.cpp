@@ -27,15 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/exec/document_value/value_comparator.h"
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/unittest/unittest.h"
+
+#include <string>
+#include <utility>
+#include <vector>
+
 
 namespace mongo {
 namespace {
@@ -251,7 +256,7 @@ TEST(ValueComparatorTest, ValueHasherRespectsCollatorWithNestedArrays) {
 TEST(ValueComparatorTest, UnorderedSetOfValueRespectsCollation) {
     CollatorInterfaceMock toLowerCollator(CollatorInterfaceMock::MockType::kToLowerString);
     ValueComparator valueCmp(&toLowerCollator);
-    auto set = valueCmp.makeUnorderedValueSet();
+    auto set = valueCmp.makeFlatUnorderedValueSet();
     ASSERT_TRUE(set.insert(Value("foo"_sd)).second);
     ASSERT_FALSE(set.insert(Value("FOO"_sd)).second);
     ASSERT_TRUE(set.insert(Value("FOOz"_sd)).second);
@@ -275,24 +280,16 @@ TEST(ValueComparatorTest, UnorderedMapOfValueRespectsCollation) {
 TEST(ValueComparatorTest, ComparingCodeWScopeShouldNotRespectCollation) {
     const CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
     const ValueComparator comparator(&collator);
-    const Value val1{BSONCodeWScope("js code",
-                                    BSON("foo"
-                                         << "bar"))};
-    const Value val2{BSONCodeWScope("js code",
-                                    BSON("foo"
-                                         << "not bar"))};
+    const Value val1{BSONCodeWScope("js code", BSON("foo" << "bar"))};
+    const Value val2{BSONCodeWScope("js code", BSON("foo" << "not bar"))};
     ASSERT_TRUE(comparator.evaluate(val1 != val2));
 }
 
 TEST(ValueComparatorTest, HashingCodeWScopeShouldNotRespectCollation) {
     const CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
     const ValueComparator comparator(&collator);
-    const Value val1{BSONCodeWScope("js code",
-                                    BSON("foo"
-                                         << "bar"))};
-    const Value val2{BSONCodeWScope("js code",
-                                    BSON("foo"
-                                         << "not bar"))};
+    const Value val1{BSONCodeWScope("js code", BSON("foo" << "bar"))};
+    const Value val2{BSONCodeWScope("js code", BSON("foo" << "not bar"))};
     ASSERT_NE(comparator.hash(val1), comparator.hash(val2));
 }
 
@@ -309,6 +306,34 @@ TEST(ValueComparatorTest, HashingCodeShouldNotRespectCollation) {
     const ValueComparator comparator(&collator);
     const Value val1{BSONCode("js code")};
     const Value val2{BSONCode("other js code")};
+    ASSERT_NE(comparator.hash(val1), comparator.hash(val2));
+}
+
+// This test was originally designed to reproduce SERVER-78126.
+TEST(ValueComparatorTest, ArraysDifferingByOneStringShouldHaveDifferentHashes) {
+    const ValueComparator comparator{};
+    const Value val1{std::vector<Value>{Value{std::string{"a"}}, Value{std::string{"x"}}}};
+    const Value val2{std::vector<Value>{Value{std::string{"b"}}, Value{std::string{"x"}}}};
+    ASSERT_NE(comparator.compare(val1, val2), 0);
+    ASSERT_NE(comparator.hash(val1), comparator.hash(val2));
+}
+
+TEST(ValueComparatorTest, ArraysDifferingByOneStringShouldHaveDifferentHashesWithCollation) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    const ValueComparator comparator{&collator};
+    const Value val1{std::vector<Value>{Value{std::string{"abc"}}, Value{std::string{"xyz"}}}};
+    const Value val2{std::vector<Value>{Value{std::string{"bcd"}}, Value{std::string{"xyz"}}}};
+    ASSERT_NE(comparator.compare(val1, val2), 0);
+    ASSERT_NE(comparator.hash(val1), comparator.hash(val2));
+}
+
+TEST(ValueComparatorTest, ObjectsDifferingByOneStringShouldHaveDifferentHashes) {
+    const ValueComparator comparator{};
+    const Value val1(
+        Document({{"foo"_sd, Value{std::string{"abc"}}}, {"bar"_sd, Value{std::string{"xyz"}}}}));
+    const Value val2(
+        Document({{"foo"_sd, Value{std::string{"def"}}}, {"bar"_sd, Value{std::string{"xyz"}}}}));
+    ASSERT_NE(comparator.compare(val1, val2), 0);
     ASSERT_NE(comparator.hash(val1), comparator.hash(val2));
 }
 

@@ -1,0 +1,23 @@
+test_kind: js_test
+description: |
+  "Suite that runs a queryable HTTP server in the background allowing WiredTiger snapshots to be
+  restored using queryable WT."
+
+selector:
+  roots:
+    - src/mongo/db/modules/*/jstests/queryable_wt/*.js
+
+# Tests start their own mongod's.
+executor:
+  hooks:
+    - class: QueryableServerHook
+      queryable_dbpath: "/data/db/queryable_wt"
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          queryable_dbpath: "/data/db/queryable_wt"
+      nodb: ""
+      process_kwargs:
+        env_vars:
+          SECRET_KEY: "fake"

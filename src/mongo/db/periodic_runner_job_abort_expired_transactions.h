@@ -29,12 +29,15 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/db/service_context.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/periodic_runner.h"
+
+#include <memory>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 
@@ -56,8 +59,7 @@ private:
     inline static const auto _serviceDecoration =
         ServiceContext::declareDecoration<PeriodicThreadToAbortExpiredTransactions>();
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(1),
-                                            "PeriodicThreadToAbortExpiredTransactions::_mutex");
+    mutable stdx::mutex _mutex;
     std::shared_ptr<PeriodicJobAnchor> _anchor;
 };
 

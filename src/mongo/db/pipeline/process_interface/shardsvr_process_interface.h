@@ -29,8 +29,38 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/oid.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/common_mongod_process_interface.h"
+#include "mongo/db/pipeline/process_interface/common_process_interface.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
+#include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/write_ops/write_ops_gen.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/db/versioning_protocol/chunk_version.h"
+#include "mongo/db/versioning_protocol/database_version.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/uuid.h"
+
+#include <list>
+#include <memory>
+#include <vector>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -49,15 +79,25 @@ public:
      */
     bool isSharded(OperationContext* opCtx, const NamespaceString& nss) final;
 
+
+    boost::optional<ShardId> determineSpecificMergeShard(OperationContext* opCtx,
+                                                         const NamespaceString& ns) const final {
+        return CommonProcessInterface::findOwningShard(opCtx, ns);
+    }
+
     void checkRoutingInfoEpochOrThrow(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                       const NamespaceString& nss,
-                                      ChunkVersion targetCollectionVersion) const final;
+                                      ChunkVersion targetCollectionPlacementVersion) const final;
 
-    std::pair<std::vector<FieldPath>, bool> collectDocumentKeyFieldsForHostedCollection(
-        OperationContext* opCtx, const NamespaceString&, UUID) const final;
+    std::unique_ptr<WriteSizeEstimator> getWriteSizeEstimator(
+        OperationContext* opCtx, const NamespaceString& ns) const final {
+        return std::make_unique<TargetPrimaryWriteSizeEstimator>();
+    }
 
     std::vector<FieldPath> collectDocumentKeyFieldsActingAsRouter(
-        OperationContext*, const NamespaceString&) const final {
+        OperationContext*,
+        const NamespaceString&,
+        RoutingContext* routingCtx = nullptr) const final {
         // We don't expect anyone to use this method on the shard itself (yet). This is currently
         // only used for $merge. For $out in a sharded cluster, the mongos is responsible for
         // collecting the document key fields before serializing them and sending them to the
@@ -70,27 +110,19 @@ public:
     boost::optional<Document> lookupSingleDocument(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const NamespaceString& nss,
-        UUID collectionUUID,
+        boost::optional<UUID> collectionUUID,
         const Document& documentKey,
         boost::optional<BSONObj> readConcern) final;
 
-    /**
-     * Inserts the documents 'objs' into the namespace 'ns' using the ClusterWriter for locking,
-     * routing, stale config handling, etc.
-     */
     Status insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                   const NamespaceString& ns,
-                  std::vector<BSONObj>&& objs,
+                  std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
                   const WriteConcernOptions& wc,
                   boost::optional<OID> targetEpoch) final;
 
-    /**
-     * Replaces the documents matching 'queries' with 'updates' using the ClusterWriter for locking,
-     * routing, stale config handling, etc.
-     */
     StatusWith<UpdateResult> update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                     const NamespaceString& ns,
-                                    BatchedObjects&& batch,
+                                    std::unique_ptr<write_ops::UpdateCommandRequest> updateCommand,
                                     const WriteConcernOptions& wc,
                                     UpsertType upsert,
                                     bool multi,
@@ -99,26 +131,36 @@ public:
     BSONObj preparePipelineAndExplain(Pipeline* ownedPipeline,
                                       ExplainOptions::Verbosity verbosity) final;
 
-    std::unique_ptr<ShardFilterer> getShardFilterer(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx) const override final;
-
     BSONObj getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) final;
 
-    std::list<BSONObj> getIndexSpecs(OperationContext* opCtx,
-                                     const NamespaceString& ns,
-                                     bool includeBuildUUIDs) final;
+    UUID fetchCollectionUUIDFromPrimary(OperationContext* opCtx, const NamespaceString& nss) final;
+
+    query_shape::CollectionType getCollectionType(OperationContext* opCtx,
+                                                  const NamespaceString& nss) final;
+
+    std::vector<BSONObj> getIndexSpecs(OperationContext* opCtx,
+                                       const NamespaceString& ns,
+                                       bool includeBuildUUIDs) final;
     void renameIfOptionsAndIndexesHaveNotChanged(OperationContext* opCtx,
-                                                 const BSONObj& renameCommandObj,
+                                                 const NamespaceString& sourceNs,
                                                  const NamespaceString& targetNs,
+                                                 bool dropTarget,
+                                                 bool stayTemp,
                                                  const BSONObj& originalCollectionOptions,
-                                                 const std::list<BSONObj>& originalIndexes) final;
+                                                 const std::vector<BSONObj>& originalIndexes) final;
     void createCollection(OperationContext* opCtx,
-                          const std::string& dbName,
+                          const DatabaseName& dbName,
                           const BSONObj& cmdObj) final;
+    void createTempCollection(OperationContext* opCtx,
+                              const NamespaceString& nss,
+                              const BSONObj& collectionOptions,
+                              boost::optional<ShardId> dataShard) final;
     void createIndexesOnEmptyCollection(OperationContext* opCtx,
                                         const NamespaceString& ns,
                                         const std::vector<BSONObj>& indexSpecs) final;
     void dropCollection(OperationContext* opCtx, const NamespaceString& collection) final;
+
+    void dropTempCollection(OperationContext* opCtx, const NamespaceString& nss) final;
 
     /**
      * If 'allowTargetingShards' is true, splits the pipeline and dispatch half to the shards,
@@ -126,22 +168,70 @@ public:
      * retry on network errors and also on StaleConfig errors to avoid restarting the entire
      * operation.
      */
-    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
+    std::unique_ptr<Pipeline> finalizeAndMaybePreparePipelineForExecution(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        Pipeline* ownedPipeline,
+        bool attachCursorAfterOptimizing,
+        std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                           Pipeline* pipeline,
+                           CollectionMetadata collData)> finalizePipeline = nullptr,
+        ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
+        boost::optional<BSONObj> readConcern = boost::none,
+        bool shouldUseCollectionDefaultCollator = false) final;
+
+    std::unique_ptr<Pipeline> preparePipelineForExecution(
         Pipeline* pipeline,
         ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
         boost::optional<BSONObj> readConcern = boost::none) final;
 
-    void setExpectedShardVersion(OperationContext* opCtx,
-                                 const NamespaceString& nss,
-                                 boost::optional<ChunkVersion> chunkVersion) final;
+    std::unique_ptr<Pipeline> preparePipelineForExecution(
+        const boost::intrusive_ptr<mongo::ExpressionContext>& expCtx,
+        const AggregateCommandRequest& aggRequest,
+        Pipeline* pipeline,
+        boost::optional<BSONObj> shardCursorsSortSpec = boost::none,
+        ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
+        boost::optional<BSONObj> readConcern = boost::none,
+        bool shouldUseCollectionDefaultCollator = false) final;
 
-    bool setExpectedDbVersion(OperationContext* opCtx,
-                              const NamespaceString& nss,
-                              DatabaseVersion dbVersion) final;
+    std::unique_ptr<ScopedExpectUnshardedCollection> expectUnshardedCollectionInScope(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const boost::optional<DatabaseVersion>& dbVersion) override;
 
-    void unsetExpectedDbVersion(OperationContext* opCtx, const NamespaceString& nss) final;
+    void createTimeseriesView(OperationContext* opCtx,
+                              const NamespaceString& ns,
+                              const BSONObj& cmdObj,
+                              const TimeseriesOptions& userOpts) final;
 
-    void checkOnPrimaryShardForDb(OperationContext* opCtx, const NamespaceString& nss) final;
+    Status insertTimeseries(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                            const NamespaceString& ns,
+                            std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
+                            const WriteConcernOptions& wc,
+                            boost::optional<OID> targetEpoch) final;
+
+    std::vector<DatabaseName> getAllDatabases(OperationContext* opCtx,
+                                              boost::optional<TenantId> tenantId) final;
+
+    std::vector<BSONObj> runListCollections(OperationContext* opCtx,
+                                            const DatabaseName& db,
+                                            bool addPrimaryShard) final;
+
+protected:
+    /**
+     * Utility to share a common collection creation implementation.
+     */
+    void _createCollectionCommon(OperationContext* opCtx,
+                                 const DatabaseName& dbName,
+                                 const BSONObj& cmdObj,
+                                 boost::optional<ShardId> dataShard = boost::none);
+
+private:
+    boost::optional<TimeseriesOptions> _getTimeseriesOptions(OperationContext* opCtx,
+                                                             const NamespaceString& ns) final;
+
+    BSONObj _getCollectionOptions(OperationContext* opCtx,
+                                  const NamespaceString& nss,
+                                  bool runOnPrimary = false);
 };
 
 }  // namespace mongo

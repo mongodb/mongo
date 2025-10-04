@@ -1,0 +1,7 @@
+base_suite: sharding_jscore_passthrough
+
+overrides:
+  - "injected_catalog_metadata.sharded_cluster_fixture_options"
+
+excludes:
+  - "injected_catalog_metadata.exclude_injected_catalog_metadata_tag"

@@ -1,0 +1,23 @@
+# This set of tests exercises the limits of the product by running workloads that
+# are stretching it in various dimensions, e.g. many collections, many $match predicates
+# and so on.
+test_kind: js_test
+
+selector:
+  roots:
+    - jstests/product_limits/**/*.js
+executor:
+  archive:
+    hooks:
+      - ValidateCollections
+  hooks:
+    - class: ValidateCollections
+      shell_options:
+        global_vars:
+          TestData:
+            skipValidationOnNamespaceNotFound: false
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1

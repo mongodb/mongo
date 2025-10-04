@@ -27,75 +27,127 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
-
-#include "mongo/platform/basic.h"
-
-#include "mongo/shell/mongo_main.h"
+#include <algorithm>
+#include <array>
+#include <csignal>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <ctime>
+#include <exception>
+#include <fstream>  // IWYU pragma: keep
+#include <iostream>
+#include <iterator>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include <boost/core/null_deleter.hpp>
+#include <boost/exception/exception.hpp>
 #include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
 #include <boost/log/attributes/value_extraction.hpp>
-#include <boost/log/core.hpp>
-#include <boost/log/sinks.hpp>
-#include <fstream>
-#include <iostream>
-#include <pcrecpp.h>
-#include <signal.h>
-#include <stdio.h>
-#include <string.h>
-
-#include "mongo/base/init.h"
+#include <boost/log/core/core.hpp>
+#include <boost/log/core/record_view.hpp>
+// IWYU pragma: no_include "boost/log/detail/attachable_sstream_buf.hpp"
+// IWYU pragma: no_include "boost/log/detail/locking_ptr.hpp"
+#include <boost/log/sinks/sync_frontend.hpp>
+#include <boost/log/sinks/text_ostream_backend.hpp>
+#include <boost/log/utility/formatting_ostream_fwd.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/make_shared_object.hpp>
+#include <boost/smart_ptr/shared_ptr.hpp>
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
+#include "mongo/base/error_extra_info.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/client/authenticate.h"
+#include "mongo/client/dbclient_session.h"
 #include "mongo/client/mongo_uri.h"
 #include "mongo/client/sasl_aws_client_options.h"
-#include "mongo/config.h"
-#include "mongo/db/auth/sasl_command_constants.h"
-#include "mongo/db/client.h"
-#include "mongo/db/concurrency/locker_noop_client_observer.h"
-#include "mongo/db/log_process_details.h"
+#include "mongo/client/sasl_oidc_client_params.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/logv2/attributes.h"
 #include "mongo/logv2/component_settings_filter.h"
 #include "mongo/logv2/console.h"
 #include "mongo/logv2/json_formatter.h"
+#include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_domain_global.h"
 #include "mongo/logv2/log_manager.h"
-#include "mongo/logv2/text_formatter.h"
+#include "mongo/logv2/log_tag.h"
+#include "mongo/logv2/plain_formatter.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/platform/process_id.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/linenoise.h"
+#include "mongo/shell/mongo_main.h"
+#include "mongo/shell/program_runner.h"
 #include "mongo/shell/shell_options.h"
 #include "mongo/shell/shell_utils.h"
+#include "mongo/shell/shell_utils_extended.h"
 #include "mongo/shell/shell_utils_launcher.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/utility.h"
-#include "mongo/transport/transport_layer_asio.h"
+#include "mongo/transport/asio/asio_transport_layer.h"
+#include "mongo/transport/transport_layer.h"
+#include "mongo/transport/transport_layer_manager_impl.h"
+#include "mongo/util/allocator_thread.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/exit.h"
+#include "mongo/util/exit_code.h"
 #include "mongo/util/file.h"
 #include "mongo/util/net/ocsp/ocsp_manager.h"
-#include "mongo/util/net/ssl_options.h"
 #include "mongo/util/password.h"
+#include "mongo/util/pcre.h"
+#include "mongo/util/periodic_runner_factory.h"
 #include "mongo/util/quick_exit.h"
-#include "mongo/util/scopeguard.h"
 #include "mongo/util/signal_handlers.h"
-#include "mongo/util/stacktrace.h"
 #include "mongo/util/str.h"
-#include "mongo/util/text.h"
+#include "mongo/util/text.h"  // IWYU pragma: keep
+#include "mongo/util/time_support.h"
 #include "mongo/util/version.h"
+#include "mongo/util/version/releases.h"
+
+#include <boost/thread/exceptions.hpp>
+
+#ifdef MONGO_CONFIG_GRPC
+#include "mongo/transport/grpc/grpc_transport_layer.h"
+#include "mongo/transport/grpc/grpc_transport_layer_impl.h"
+#endif
 
 #ifdef _WIN32
 #include <io.h>
 #include <shlobj.h>
+
+#define SIGKILL 9
 #define isatty _isatty
 #define fileno _fileno
 #else
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
 #endif
+#endif
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 
 using namespace std::literals::string_literals;
 
@@ -106,9 +158,6 @@ bool gotInterrupted = false;
 bool inMultiLine = false;
 static AtomicWord<bool> atPrompt(false);  // can eval before getting to prompt
 
-const std::string kDefaultMongoHost = "127.0.0.1"s;
-const std::string kDefaultMongoPort = "27017"s;
-const std::string kDefaultMongoURL = "mongodb://"s + kDefaultMongoHost + ":"s + kDefaultMongoPort;
 
 // Initialize the featureCompatibilityVersion server parameter since the mongo shell does not have a
 // featureCompatibilityVersion document from which to initialize the parameter. The parameter is set
@@ -116,16 +165,18 @@ const std::string kDefaultMongoURL = "mongodb://"s + kDefaultMongoHost + ":"s + 
 // level. The server is responsible for rejecting usages of new features if its
 // featureCompatibilityVersion is lower.
 MONGO_INITIALIZER_WITH_PREREQUISITES(SetFeatureCompatibilityVersionLatest,
-                                     ("EndStartupOptionSetup"))
+                                     ("EndStartupOptionStorage"))
 // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
 (InitializerContext* context) {
-    mongo::serverGlobalParams.mutableFeatureCompatibility.setVersion(
-        multiversion::GenericFCV::kLatest);
+    mongo::serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
 }
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(WireSpec, ("EndStartupOptionSetup"))(InitializerContext*) {
-    WireSpec::instance().initialize(WireSpec::Specification{});
-}
+namespace {
+ServiceContext::ConstructorActionRegisterer registerWireSpec{
+    "RegisterWireSpec", [](ServiceContext* service) {
+        WireSpec::getWireSpec(service).initialize(WireSpec::Specification{});
+    }};
+}  // namespace
 
 const auto kAuthParam = "authSource"s;
 
@@ -172,7 +223,7 @@ private:
 
     // This needs to use a mutex rather than an atomic bool because we need to ensure that no more
     // logging will happen once we return from disable().
-    static inline Mutex mx = MONGO_MAKE_LATCH("ShellBackend::mx");
+    static inline stdx::mutex mx;
     static inline bool loggingEnabled = true;
 };
 
@@ -200,6 +251,7 @@ enum ShellExitCode : int {
     kMongorcError = -5,
     kUnterminatedProcess = -6,
     kProcessTerminationError = -7,
+    kUnexpectedCoreDumpFound = -8,
 };
 
 Scope* shellMainScope;
@@ -276,22 +328,22 @@ void shellHistoryAdd(const char* line) {
     // be able to add things like `.author`, so be smart about how this is
     // detected by using regular expresions. This is so we can avoid storing passwords
     // in the history file in plaintext.
-    static pcrecpp::RE hiddenHelpers(
+    static pcre::Regex hiddenHelpers(
         "\\.\\s*(auth|createUser|updateUser|changeUserPassword)\\s*\\(");
     // Also don't want the raw user management commands to show in the shell when run directly
     // via runCommand.
-    static pcrecpp::RE hiddenCommands(
+    static pcre::Regex hiddenCommands(
         "(run|admin)Command\\s*\\(\\s*{\\s*(createUser|updateUser)\\s*:");
 
-    static pcrecpp::RE hiddenFLEConstructor(".*Mongo\\(([\\s\\S]*)secretAccessKey([\\s\\S]*)");
-    if (!hiddenHelpers.PartialMatch(line) && !hiddenCommands.PartialMatch(line) &&
-        !hiddenFLEConstructor.PartialMatch(line)) {
+    static pcre::Regex hiddenFLEConstructor(".*Mongo\\(([\\s\\S]*)secretAccessKey([\\s\\S]*)");
+    if (!hiddenHelpers.matchView(line) && !hiddenCommands.matchView(line) &&
+        !hiddenFLEConstructor.matchView(line)) {
         linenoiseHistoryAdd(line);
     }
 }
 
 void killOps() {
-    if (shellGlobalParams.nokillop)
+    if (shellGlobalParams.nokillop.load())
         return;
 
     if (atPrompt.load())
@@ -304,7 +356,7 @@ void killOps() {
 }
 
 extern "C" void quitNicely(int sig) {
-    shutdown(EXIT_CLEAN);
+    shutdown(ExitCode::clean);
 }
 
 // the returned string is allocated with strdup() or malloc() and must be freed by calling free()
@@ -328,158 +380,6 @@ void setupSignals() {
     signal(SIGINT, quitNicely);
 }
 
-std::string getURIFromArgs(const std::string& arg,
-                           const std::string& host,
-                           const std::string& port) {
-    if (host.empty() && arg.empty() && port.empty()) {
-        // Nothing provided, just play the default.
-        return kDefaultMongoURL;
-    }
-
-    if ((str::startsWith(arg, "mongodb://") || str::startsWith(arg, "mongodb+srv://")) &&
-        host.empty() && port.empty()) {
-        // mongo mongodb://blah
-        return arg;
-    }
-    if ((str::startsWith(host, "mongodb://") || str::startsWith(host, "mongodb+srv://")) &&
-        arg.empty() && port.empty()) {
-        // mongo --host mongodb://blah
-        return host;
-    }
-
-    // We expect a positional arg to be a plain dbname or plain hostname at this point
-    // since we have separate host/port args.
-    if ((arg.find('/') != std::string::npos) && (host.size() || port.size())) {
-        std::cerr << "If a full URI is provided, you cannot also specify --host or --port"
-                  << std::endl;
-        quickExit(-1);
-    }
-
-    const auto parseDbHost = [port](const std::string& db, const std::string& host) -> std::string {
-        // Parse --host as a connection string.
-        // e.g. rs0/host0:27000,host1:27001
-        const auto slashPos = host.find('/');
-        const auto hasReplSet = (slashPos > 0) && (slashPos != std::string::npos);
-
-        std::ostringstream ss;
-        ss << "mongodb://";
-
-        // Handle each sub-element of the connection string individually.
-        // Comma separated list of host elements.
-        // Each host element may be:
-        // * /unix/domain.sock
-        // * hostname
-        // * hostname:port
-        // If --port is specified and port is included in connection string,
-        // then they must match exactly.
-        auto start = hasReplSet ? slashPos + 1 : 0;
-        while (start < host.size()) {
-            // Encode each host component.
-            auto end = host.find(',', start);
-            if (end == std::string::npos) {
-                end = host.size();
-            }
-            if ((end - start) == 0) {
-                // Ignore empty components.
-                start = end + 1;
-                continue;
-            }
-
-            const auto hostElem = host.substr(start, end - start);
-            if ((hostElem.find('/') != std::string::npos) && str::endsWith(hostElem, ".sock")) {
-                // Unix domain socket, ignore --port.
-                ss << uriEncode(hostElem);
-
-            } else {
-                auto colon = hostElem.find(':');
-                if ((colon != std::string::npos) &&
-                    (hostElem.find(':', colon + 1) != std::string::npos)) {
-                    // Looks like an IPv6 numeric address.
-                    const auto close = hostElem.find(']');
-                    if ((hostElem[0] == '[') && (close != std::string::npos)) {
-                        // Encapsulated already.
-                        ss << '[' << uriEncode(hostElem.substr(1, close - 1), ":") << ']';
-                        colon = hostElem.find(':', close + 1);
-                    } else {
-                        // Not encapsulated yet.
-                        ss << '[' << uriEncode(hostElem, ":") << ']';
-                        colon = std::string::npos;
-                    }
-                } else if (colon != std::string::npos) {
-                    // Not IPv6 numeric, but does have a port.
-                    ss << uriEncode(hostElem.substr(0, colon));
-                } else {
-                    // Raw hostname/IPv4 without port.
-                    ss << uriEncode(hostElem);
-                }
-
-                if (colon != std::string::npos) {
-                    // Have a port in our host element, verify it.
-                    const auto myport = hostElem.substr(colon + 1);
-                    if (port.size() && (port != myport)) {
-                        std::cerr
-                            << "connection string bears different port than provided by --port"
-                            << std::endl;
-                        quickExit(-1);
-                    }
-                    ss << ':' << uriEncode(myport);
-                } else if (port.size()) {
-                    ss << ':' << uriEncode(port);
-                } else {
-                    ss << ":27017";
-                }
-            }
-            start = end + 1;
-            if (start < host.size()) {
-                ss << ',';
-            }
-        }
-
-        ss << '/' << uriEncode(db);
-
-        if (hasReplSet) {
-            // Remap included replica set name to URI option
-            ss << "?replicaSet=" << uriEncode(host.substr(0, slashPos));
-        }
-
-        return ss.str();
-    };
-
-    if (host.size()) {
-        // --host provided, treat it as the connect string and get db from positional arg.
-        return parseDbHost(arg, host);
-    } else if (arg.size()) {
-        // --host missing, but we have a potential host/db positional arg.
-        const auto slashPos = arg.find('/');
-        if (slashPos != std::string::npos) {
-            // host/db pair.
-            return parseDbHost(arg.substr(slashPos + 1), arg.substr(0, slashPos));
-        }
-
-        // Compatability formats.
-        // * Any arg with a dot is assumed to be a hostname or IPv4 numeric address.
-        // * Any arg with a colon followed by a digit assumed to be host or IP followed by port.
-        // * Anything else is assumed to be a db.
-
-        if (arg.find('.') != std::string::npos) {
-            // Assume IPv4 or hostnameish.
-            return parseDbHost("test", arg);
-        }
-
-        const auto colonPos = arg.find(':');
-        if ((colonPos != std::string::npos) && ((colonPos + 1) < arg.size()) &&
-            ctype::isDigit(arg[colonPos + 1])) {
-            // Assume IPv4 or hostname with port.
-            return parseDbHost("test", arg);
-        }
-
-        // db, assume localhost.
-        return parseDbHost(arg, "127.0.0.1");
-    }
-
-    // --host empty, position arg empty, fallback on localhost without a dbname.
-    return parseDbHost("", "127.0.0.1");
-}
 
 std::string finishCode(std::string code) {
     while (!shell_utils::isBalanced(code)) {
@@ -511,7 +411,7 @@ bool execPrompt(mongo::Scope& scope, const char* promptFunction, std::string& pr
     std::string execStatement = std::string("__promptWrapper__(") + promptFunction + ");";
     scope.exec("delete __prompt__;", "", false, false, false, 0);
     scope.exec(execStatement, "", false, false, false, 0);
-    if (scope.type("__prompt__") == String) {
+    if (scope.type("__prompt__") == stdx::to_underlying(BSONType::string)) {
         prompt = scope.getString("__prompt__");
         return true;
     }
@@ -526,7 +426,7 @@ bool execPrompt(mongo::Scope& scope, const char* promptFunction, std::string& pr
 static void edit(const std::string& whatToEdit) {
     // EDITOR may be defined in the JavaScript scope or in the environment
     std::string editor;
-    if (shellMainScope->type("EDITOR") == String) {
+    if (shellMainScope->type("EDITOR") == stdx::to_underlying(BSONType::string)) {
         editor = shellMainScope->getString("EDITOR");
     } else {
         static const char* editorFromEnv = getenv("EDITOR");
@@ -553,7 +453,7 @@ static void edit(const std::string& whatToEdit) {
     if (editingVariable) {
         // If "whatToEdit" is undeclared or uninitialized, declare
         int varType = shellMainScope->type(whatToEdit.c_str());
-        if (varType == Undefined) {
+        if (varType == stdx::to_underlying(BSONType::undefined)) {
             shellMainScope->exec("var " + whatToEdit, "(shell)", false, true, false);
         }
 
@@ -599,7 +499,8 @@ static void edit(const std::string& whatToEdit) {
     FILE* tempFileStream;
     tempFileStream = fopen(filename.c_str(), "wt");
     if (!tempFileStream) {
-        std::cout << "couldn't create temp file (" << filename << "): " << errnoWithDescription()
+        auto ec = lastPosixError();
+        std::cout << "couldn't create temp file (" << filename << "): " << errorMessage(ec)
                   << std::endl;
         return;
     }
@@ -607,9 +508,8 @@ static void edit(const std::string& whatToEdit) {
     // Write JSON into the temp file
     size_t fileSize = js.size();
     if (fwrite(js.data(), sizeof(char), fileSize, tempFileStream) != fileSize) {
-        int systemErrno = errno;
-        std::cout << "failed to write to temp file: " << errnoWithDescription(systemErrno)
-                  << std::endl;
+        auto ec = lastPosixError();
+        std::cout << "failed to write to temp file: " << errorMessage(ec) << std::endl;
         fclose(tempFileStream);
         remove(filename.c_str());
         return;
@@ -625,9 +525,9 @@ static void edit(const std::string& whatToEdit) {
     }();
     if (ret) {
         if (ret == -1) {
-            int systemErrno = errno;
-            std::cout << "failed to launch $EDITOR (" << editor
-                      << "): " << errnoWithDescription(systemErrno) << std::endl;
+            auto ec = lastPosixError();
+            std::cout << "failed to launch $EDITOR (" << editor << "): " << errorMessage(ec)
+                      << std::endl;
         } else
             std::cout << "editor exited with error (" << ret << "), not applying changes"
                       << std::endl;
@@ -638,7 +538,8 @@ static void edit(const std::string& whatToEdit) {
     // The editor gave return code zero, so read the file back in
     tempFileStream = fopen(filename.c_str(), "rt");
     if (!tempFileStream) {
-        std::cout << "couldn't open temp file on return from editor: " << errnoWithDescription()
+        auto ec = lastPosixError();
+        std::cout << "couldn't open temp file on return from editor: " << errorMessage(ec)
                   << std::endl;
         remove(filename.c_str());
         return;
@@ -649,7 +550,8 @@ static void edit(const std::string& whatToEdit) {
         char buf[1024];
         bytes = fread(buf, sizeof(char), sizeof buf, tempFileStream);
         if (ferror(tempFileStream)) {
-            std::cout << "failed to read temp file: " << errnoWithDescription() << std::endl;
+            auto ec = lastPosixError();
+            std::cout << "failed to read temp file: " << errorMessage(ec) << std::endl;
             fclose(tempFileStream);
             remove(filename.c_str());
             return;
@@ -674,11 +576,11 @@ static void edit(const std::string& whatToEdit) {
 
 bool mechanismRequiresPassword(const MongoURI& uri) {
     if (const auto authMechanisms = uri.getOption("authMechanism")) {
-        constexpr std::array<StringData, 2> passwordlessMechanisms{auth::kMechanismGSSAPI,
-                                                                   auth::kMechanismMongoX509};
-        const std::string& authMechanism = authMechanisms.get();
+        constexpr std::array<StringData, 3> passwordlessMechanisms{
+            auth::kMechanismGSSAPI, auth::kMechanismMongoX509, auth::kMechanismMongoOIDC};
+        const std::string& authMechanism = authMechanisms.value();
         for (const auto& mechanism : passwordlessMechanisms) {
-            if (mechanism.toString() == authMechanism) {
+            if (mechanism == authMechanism) {
                 return false;
             }
         }
@@ -689,7 +591,6 @@ bool mechanismRequiresPassword(const MongoURI& uri) {
 }  // namespace
 
 int mongo_main(int argc, char* argv[]) {
-
     try {
 
         registerShutdownTask([] {
@@ -711,25 +612,24 @@ int mongo_main(int argc, char* argv[]) {
         mongo::shell_utils::RecordMyLocation(argv[0]);
 
         mongo::runGlobalInitializersOrDie(std::vector<std::string>(argv, argv + argc));
-        auto serviceContextHolder = ServiceContext::make();
-        serviceContextHolder->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
-        setGlobalServiceContext(std::move(serviceContextHolder));
+        setGlobalServiceContext(ServiceContext::make());
+
         // TODO This should use a TransportLayerManager or TransportLayerFactory
         auto serviceContext = getGlobalServiceContext();
+
+        startAllocatorThread();
+
+        // Set up the periodic runner for background job execution. This is required to be running
+        // before the transport layer is initialized.
+        auto runner = makePeriodicRunner(serviceContext);
+        serviceContext->setPeriodicRunner(std::move(runner));
+
+        ShardingState::create(serviceContext);
 
 #ifdef MONGO_CONFIG_SSL
         OCSPManager::start(serviceContext);
 #endif
-
-        transport::TransportLayerASIO::Options opts;
-        opts.enableIPv6 = shellGlobalParams.enableIPv6;
-        opts.mode = transport::TransportLayerASIO::Options::kEgress;
-
-        serviceContext->setTransportLayer(
-            std::make_unique<transport::TransportLayerASIO>(opts, nullptr));
-        auto tlPtr = serviceContext->getTransportLayer();
-        uassertStatusOK(tlPtr->setup());
-        uassertStatusOK(tlPtr->start());
+        shell_utils::ProgramRegistry::create(serviceContext);
 
         // hide password from ps output
         redactPasswordOptions(argc, argv);
@@ -761,10 +661,10 @@ int mongo_main(int argc, char* argv[]) {
 
         // Parse the output of getURIFromArgs which will determine if --host passed in a URI
         MongoURI parsedURI;
-        parsedURI =
-            uassertStatusOK(MongoURI::parse(getURIFromArgs(cmdlineURI,
-                                                           str::escape(shellGlobalParams.dbhost),
-                                                           str::escape(shellGlobalParams.port))));
+        parsedURI = uassertStatusOK(MongoURI::parse(
+            mongo::shell_utils::getURIFromArgs(cmdlineURI,
+                                               str::escape(shellGlobalParams.dbhost),
+                                               str::escape(shellGlobalParams.port))));
 
         // TODO: add in all of the relevant shellGlobalParams to parsedURI
         parsedURI.setOptionIfNecessary("compressors"s, shellGlobalParams.networkMessageCompressors);
@@ -772,6 +672,47 @@ int mongo_main(int argc, char* argv[]) {
         parsedURI.setOptionIfNecessary("authSource"s, shellGlobalParams.authenticationDatabase);
         parsedURI.setOptionIfNecessary("gssapiServiceName"s, shellGlobalParams.gssapiServiceName);
         parsedURI.setOptionIfNecessary("gssapiHostName"s, shellGlobalParams.gssapiHostName);
+#ifdef MONGO_CONFIG_GRPC
+        parsedURI.setOptionIfNecessary("gRPC"s, shellGlobalParams.gRPC ? "true" : "false");
+#endif
+
+        std::vector<std::unique_ptr<transport::TransportLayer>> tls;
+
+        // Create the ASIO transport layer.
+        transport::AsioTransportLayer::Options opts;
+        opts.enableIPv6 = shellGlobalParams.enableIPv6;
+        opts.mode = transport::AsioTransportLayer::Options::kEgress;
+        tls.push_back(std::make_unique<transport::AsioTransportLayer>(opts, nullptr));
+        auto asioLayer = tls[0].get();
+
+#ifdef MONGO_CONFIG_GRPC
+        // The shell will start an egress gRPC layer in addition to the asio one if it was
+        // configured to communicate with gRPC. It will decide at runtime during Mongo construction
+        // which layer to use based on the options/URI provided to it.
+        if (shellGlobalParams.gRPC) {
+            // Create the gRPC client metadata.
+            boost::optional<std::string> appname = parsedURI.getAppName();
+            BSONObjBuilder bob;
+            uassertStatusOK(DBClientSession::appendClientMetadata(
+                appname.value_or(MongoURI::kDefaultTestRunnerAppName), &bob));
+            auto metadataDoc = bob.obj();
+
+            // Create the gRPC transport layer.
+            transport::grpc::GRPCTransportLayer::Options grpcOpts;
+            grpcOpts.enableEgress = true;
+            grpcOpts.clientMetadata = metadataDoc.getObjectField(kMetadataDocumentName).getOwned();
+            tls.push_back(std::make_unique<transport::grpc::GRPCTransportLayerImpl>(
+                serviceContext, grpcOpts, nullptr));
+        }
+#endif
+
+        serviceContext->setTransportLayerManager(
+            std::make_unique<transport::TransportLayerManagerImpl>(std::move(tls), asioLayer));
+
+        auto tlPtr = serviceContext->getTransportLayerManager();
+        uassertStatusOK(tlPtr->setup());
+        uassertStatusOK(tlPtr->start());
+
 #ifdef MONGO_CONFIG_SSL
         if (!awsIam::saslAwsClientGlobalParams.awsSessionToken.empty()) {
             parsedURI.setOptionIfNecessary("authmechanismproperties"s,
@@ -779,18 +720,23 @@ int mongo_main(int argc, char* argv[]) {
                                                awsIam::saslAwsClientGlobalParams.awsSessionToken);
         }
 #endif
+        if (!oidcClientGlobalParams.oidcAccessToken.empty()) {
+            parsedURI.setOptionIfNecessary("authmechanismproperties"s,
+                                           str::stream() << "OIDC_ACCESS_TOKEN:"
+                                                         << oidcClientGlobalParams.oidcAccessToken);
+        }
 
         if (const auto authMechanisms = parsedURI.getOption("authMechanism")) {
             std::stringstream ss;
             ss << "DB.prototype._defaultAuthenticationMechanism = \""
-               << str::escape(authMechanisms.get()) << "\";" << std::endl;
+               << str::escape(authMechanisms.value()) << "\";" << std::endl;
             mongo::shell_utils::dbConnect += ss.str();
         }
 
         if (const auto gssapiServiveName = parsedURI.getOption("gssapiServiceName")) {
             std::stringstream ss;
             ss << "DB.prototype._defaultGssapiServiceName = \""
-               << str::escape(gssapiServiveName.get()) << "\";" << std::endl;
+               << str::escape(gssapiServiveName.value()) << "\";" << std::endl;
             mongo::shell_utils::dbConnect += ss.str();
         }
 
@@ -833,12 +779,20 @@ int mongo_main(int argc, char* argv[]) {
         }
 
         mongo::ScriptEngine::setConnectCallback(mongo::shell_utils::onConnect);
-        mongo::ScriptEngine::setup();
+        mongo::ScriptEngine::setup(ExecutionEnvironment::TestRunner);
         mongo::getGlobalScriptEngine()->setJSHeapLimitMB(shellGlobalParams.jsHeapLimitMB);
         mongo::getGlobalScriptEngine()->setScopeInitCallback(mongo::shell_utils::initScope);
-        mongo::getGlobalScriptEngine()->enableJIT(!shellGlobalParams.nojit);
         mongo::getGlobalScriptEngine()->enableJavaScriptProtection(
             shellGlobalParams.javascriptProtection);
+
+        if (shellGlobalParams.files.size() > 0) {
+            boost::system::error_code ec;
+            auto loadPath =
+                boost::filesystem::canonical(shellGlobalParams.files[0], ec).parent_path().string();
+            if (!ec) {
+                mongo::getGlobalScriptEngine()->setLoadPath(loadPath);
+            }
+        }
 
         ScopeGuard poolGuard([] { ScriptEngine::dropScopeCache(); });
 
@@ -884,6 +838,28 @@ int mongo_main(int argc, char* argv[]) {
             if (!scope->execFile(shellGlobalParams.files[i], false, true)) {
                 std::cout << "failed to load: " << shellGlobalParams.files[i] << std::endl;
                 std::cout << "exiting with code " << static_cast<int>(kInputFileError) << std::endl;
+                mongo::shell_utils::KillMongoProgramInstances(SIGKILL);
+                return kInputFileError;
+            }
+
+            // If the test is using the mochalite framework, invoke the runner
+            try {
+                shell_utils::closeMochaStyleTestContext(*shellMainScope);
+            } catch (std::exception&) {
+                std::cout << "Failure detected from Mocha test runner" << std::endl;
+                return kInputFileError;
+            }
+
+            // If the test began a GoldenTestContext, end it and compare actual/expected results.
+            // NOTE: putting this in ~MongoProgramScope would call it at the end of each load(),
+            // but we only want to call it once the original test file finishes.
+            try {
+                shell_utils::closeGoldenTestContext();
+            } catch (const shell_utils::GoldenTestContextShellFailure& exn) {
+                std::cout << "failed to load: " << shellGlobalParams.files[i] << std::endl;
+                std::cout << exn.toString() << std::endl;
+                exn.diff();
+                std::cout << "exiting with code " << static_cast<int>(kInputFileError) << std::endl;
                 return kInputFileError;
             }
 
@@ -897,23 +873,61 @@ int mongo_main(int argc, char* argv[]) {
                     pids.begin(), pids.end(), std::ostream_iterator<ProcessId>(std::cout, " "));
                 std::cout << std::endl;
 
-                if (mongo::shell_utils::KillMongoProgramInstances() != EXIT_SUCCESS) {
-                    std::cout << "one more more child processes exited with an error during "
-                              << shellGlobalParams.files[i] << std::endl;
-                    std::cout << "exiting with code " << static_cast<int>(kProcessTerminationError)
+                // Some tests spawn child server processes that are expected to crash or otherwise
+                // terminate uncleanly. These tests should set the
+                // TestData.ignoreChildProcessErrorCode flag to true so that any nonzero error
+                // codes do not cause the test to fail.
+                //
+                // The shell checks this flag here by executing a bit of JS to inspect
+                // TestData.ignoreChildProcessErrorCode and return its value. If TestData is null or
+                // does not have the ignoreChildProcessErrorCode field, then the JS returns false.
+                // If TestData.ignoreChildProcessErrorCode has been explicitly set to true, then it
+                // returns true; otherwise it returns false.
+                //
+                // TestData.ignoreChildProcessErrorCode is set to false by default.
+                bool ignoreChildProcessErrorCode = false;
+                StringData code =
+                    "function() { return typeof TestData === 'object' && TestData !== null && "
+                    "TestData.hasOwnProperty('ignoreChildProcessErrorCode') && "
+                    "TestData.ignoreChildProcessErrorCode === true; }"_sd;
+                shellMainScope->invokeSafe(code.data(), nullptr, nullptr);
+                ignoreChildProcessErrorCode = shellMainScope->getBoolean("__returnValue");
+                auto childProcessErrorCode = mongo::shell_utils::KillMongoProgramInstances();
+
+                if (!ignoreChildProcessErrorCode) {
+                    if (childProcessErrorCode != static_cast<int>(ExitCode::clean)) {
+                        std::cout << "one or more child processes exited with an error during "
+                                  << shellGlobalParams.files[i] << std::endl;
+                        std::cout << "exiting with code "
+                                  << static_cast<int>(kProcessTerminationError) << std::endl;
+                        return kProcessTerminationError;
+                    }
+                } else {
+                    std::cout << "Ignoring child process exit codes since "
+                                 "TestData.ignoreChildProcessErrorCode is true"
                               << std::endl;
-                    return kProcessTerminationError;
                 }
 
-                bool failIfUnterminatedProcesses = false;
-                const StringData code =
+                // Similarly, some tests spawn child server processes that are expected to not
+                // terminate at all. These tests should set the TestData.ignoreUnterminatedProcesses
+                // flag to true so that zombie processes do not cause the test to fail.
+                //
+                // The shell checks this flag here by executing a bit of JS to inspect
+                // TestData.ignoreUnterminatedProcesses and return its value. If TestData is null or
+                // does not have the ignoreUnterminatedProcesses field, then the JS returns false.
+                // If TestData.ignoreUnterminatedProcesses has been explicitly set to true, then it
+                // returns true; otherwise it returns false.
+                //
+                // TestData.ignoreUnterminatedProcesses is set to false by default.
+                bool ignoreUnterminatedProcesses = false;
+                code =
                     "function() { return typeof TestData === 'object' && TestData !== null && "
-                    "TestData.hasOwnProperty('failIfUnterminatedProcesses') && "
-                    "TestData.failIfUnterminatedProcesses; }"_sd;
-                shellMainScope->invokeSafe(code.rawData(), nullptr, nullptr);
-                failIfUnterminatedProcesses = shellMainScope->getBoolean("__returnValue");
+                    "TestData.hasOwnProperty('ignoreUnterminatedProcesses') && "
+                    "TestData.ignoreUnterminatedProcesses === true; }"_sd;
+                shellMainScope->invokeSafe(code.data(), nullptr, nullptr);
+                ignoreUnterminatedProcesses = shellMainScope->getBoolean("__returnValue");
 
-                if (failIfUnterminatedProcesses) {
+                if (!ignoreUnterminatedProcesses) {
                     std::cout << "exiting with a failure due to unterminated processes, "
                                  "a call to MongoRunner.stopMongod(), ReplSetTest#stopSet(), or "
                                  "ShardingTest#stop() may be missing from the test"
@@ -921,13 +935,71 @@ int mongo_main(int argc, char* argv[]) {
                     std::cout << "exiting with code " << static_cast<int>(kUnterminatedProcess)
                               << std::endl;
                     return kUnterminatedProcess;
+                } else {
+                    std::cout << "Ignoring unterminated processes since "
+                                 "TestData.ignoreUnterminatedProcesses is true"
+                              << std::endl;
+                }
+            }
+
+            // If any core dumps exist from the test that ran, then that means the test unexpectedly
+            // left a core dump behind.
+            pids = mongo::shell_utils::getRegisteredPidsHistory();
+            std::cout << "All pids dead / alive (" << pids.size() << "): ";
+            for (const auto pid : pids) {
+                std::cout << pid << ", ";
+            }
+            std::cout << std::endl;
+
+            // Iterate through files to see if we find a dump file containing a pid of a program
+            // belonging to the test that ran.
+            std::cout << "Searching for files in: " << shellMainScope->getBaseURL() << std::endl;
+            auto files = mongo::shell_utils::ls(BSON("" << shellMainScope->getBaseURL()), nullptr);
+            std::vector<std::string> coreDumpsFound;
+            for (const auto& elem : files[""].Array()) {
+                auto fileName = elem.String();
+                for (const auto& pid : pids) {
+                    if (fileName.find("dump_") != std::string::npos &&
+                        fileName.find("." + pid.toString() + ".core") != std::string::npos) {
+                        std::cout << "Found a core dump '" << fileName << "'" << std::endl;
+                        coreDumpsFound.push_back(fileName);
+                    }
+                }
+            }
+
+            if (!coreDumpsFound.empty()) {
+                auto code =
+                    "function() { return typeof TestData === 'object' && TestData !== null && "
+                    "TestData.hasOwnProperty('cleanUpCoreDumpsFromExpectedCrash') && "
+                    "TestData.cleanUpCoreDumpsFromExpectedCrash === true; }"_sd;
+                shellMainScope->invokeSafe(code.data(), nullptr, nullptr);
+                bool cleanUpCoreDumpsFromExpectedCrash =
+                    shellMainScope->getBoolean("__returnValue");
+
+                if (!cleanUpCoreDumpsFromExpectedCrash) {
+                    // We unexpectedly found core dumps for this test.
+                    std::cout << "exiting with a failure due to finding core dumps unexpectedly, "
+                                 "the variable TestData.cleanUpCoreDumpsFromExpectedCrash may be "
+                                 "missing from the test."
+                              << std::endl;
+                    std::cout << "exiting with code " << static_cast<int>(kUnexpectedCoreDumpFound)
+                              << std::endl;
+                    return kUnexpectedCoreDumpFound;
+                } else {
+                    // If we expected to find core dumps, then clean the core dumps up.
+                    for (const auto& dumpFile : coreDumpsFound) {
+                        std::cout << "TestData.cleanUpCoreDumpsFromExpectedCrash is set; deleting "
+                                     "core dump '"
+                                  << dumpFile << "'" << std::endl;
+                        mongo::shell_utils::removeFile(BSON("" << dumpFile), nullptr);
+                    }
                 }
             }
         }
 
         {
             const StringData parallelShellCode = "uncheckedParallelShellPidsString();"_sd;
-            shellMainScope->invokeSafe(parallelShellCode.rawData(), nullptr, nullptr);
+            shellMainScope->invokeSafe(parallelShellCode.data(), nullptr, nullptr);
             std::string ret = shellMainScope->getString("__returnValue");
             if (!ret.empty()) {
                 std::cout << "exiting due to parallel shells with unchecked return values. "
@@ -1006,12 +1078,6 @@ int mongo_main(int argc, char* argv[]) {
                             true,
                             false);
 
-                scope->exec("shellHelper( 'show', 'freeMonitoring' )",
-                            "(freeMonitoring)",
-                            false,
-                            true,
-                            false);
-
                 scope->exec("shellHelper( 'show', 'automationNotices' )",
                             "(automationnotices)",
                             false,
@@ -1027,6 +1093,9 @@ int mongo_main(int argc, char* argv[]) {
 
             shellHistoryInit();
 
+            // Only run the prelude in interactive mode
+            scope->execPrelude();
+
             std::string prompt;
             int promptType;
 
@@ -1035,9 +1104,10 @@ int mongo_main(int argc, char* argv[]) {
                 gotInterrupted = false;
 
                 promptType = scope->type("prompt");
-                if (promptType == String) {
+                if (promptType == stdx::to_underlying(BSONType::string)) {
                     prompt = scope->getString("prompt");
-                } else if ((promptType == Code) && execPrompt(*scope, "prompt", prompt)) {
+                } else if ((promptType == stdx::to_underlying(BSONType::code)) &&
+                           execPrompt(*scope, "prompt", prompt)) {
                 } else if (execPrompt(*scope, "defaultPrompt", prompt)) {
                 } else {
                     prompt = "> ";
@@ -1116,10 +1186,10 @@ int mongo_main(int argc, char* argv[]) {
                 {
                     std::string cmd = linePtr;
                     std::string::size_type firstSpace;
-                    if ((firstSpace = cmd.find(" ")) != std::string::npos)
+                    if ((firstSpace = cmd.find(' ')) != std::string::npos)
                         cmd = cmd.substr(0, firstSpace);
 
-                    if (cmd.find("\"") == std::string::npos) {
+                    if (cmd.find('\"') == std::string::npos) {
                         try {
                             lastLineSuccessful = scope->exec(
                                 std::string("__iscmd__ = shellHelper[\"") + cmd + "\"];",

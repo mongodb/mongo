@@ -1,9 +1,7 @@
 // Tests that the $merge aggregation stage is resilient to chunk migrations in both the source and
 // output collection during execution.
-(function() {
-'use strict';
-
-load("jstests/aggregation/extras/merge_helpers.js");  // For withEachMergeMode.
+import {withEachMergeMode} from "jstests/aggregation/extras/merge_helpers.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 
@@ -12,10 +10,22 @@ const sourceColl = mongosDB["source"];
 const targetColl = mongosDB["target"];
 
 function setAggHang(mode) {
-    assert.commandWorked(st.shard0.adminCommand(
-        {configureFailPoint: "hangBeforeDocumentSourceCursorLoadBatch", mode: mode}));
-    assert.commandWorked(st.shard1.adminCommand(
-        {configureFailPoint: "hangBeforeDocumentSourceCursorLoadBatch", mode: mode}));
+    // Match on the output namespace to avoid hanging the sharding metadata refresh aggregation when
+    // shard0 is a config shard.
+    assert.commandWorked(
+        st.shard0.adminCommand({
+            configureFailPoint: "hangBeforeDocumentSourceCursorLoadBatch",
+            mode: mode,
+            data: {nss: "merge_with_chunk_migrations.source"},
+        }),
+    );
+    assert.commandWorked(
+        st.shard1.adminCommand({
+            configureFailPoint: "hangBeforeDocumentSourceCursorLoadBatch",
+            mode: mode,
+            data: {nss: "merge_with_chunk_migrations.source"},
+        }),
+    );
 }
 
 function runMergeWithMode(whenMatchedMode, whenNotMatchedMode, shardedColl) {
@@ -37,7 +47,7 @@ function runMergeWithMode(whenMatchedMode, whenNotMatchedMode, shardedColl) {
     const mergeSpec = {
         into: targetColl.getName(),
         whenMatched: whenMatchedMode,
-        whenNotMatched: whenNotMatchedMode
+        whenNotMatched: whenNotMatchedMode,
     };
     // The $_internalInhibitOptimization stage is added to the pipeline to prevent the pipeline
     // from being optimized away after it's been split. Otherwise, we won't hit the failpoint.
@@ -57,11 +67,13 @@ function runMergeWithMode(whenMatchedMode, whenNotMatchedMode, shardedColl) {
     // Wait for the parallel shell to hit the failpoint.
     assert.soon(
         () => mongosDB.currentOp({op: "command", "command.comment": comment}).inprog.length == 1,
-        () => tojson(mongosDB.currentOp().inprog));
+        () => tojson(mongosDB.currentOp().inprog),
+    );
 
     // Migrate the chunk on shard1 to shard0.
-    assert.commandWorked(st.s.adminCommand(
-        {moveChunk: shardedColl.getFullName(), find: {shardKey: 1}, to: st.shard0.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: shardedColl.getFullName(), find: {shardKey: 1}, to: st.shard0.shardName}),
+    );
 
     // Unset the failpoint to unblock the $merge and join with the parallel shell.
     setAggHang("off");
@@ -100,12 +112,15 @@ function runMergeWithMode(whenMatchedMode, whenNotMatchedMode, shardedColl) {
     // Wait for the parallel shell to hit the failpoint.
     assert.soon(
         () => mongosDB.currentOp({op: "command", "command.comment": comment}).inprog.length == 1,
-        () => tojson(mongosDB.currentOp().inprog));
+        () => tojson(mongosDB.currentOp().inprog),
+    );
 
-    assert.commandWorked(st.s.adminCommand(
-        {moveChunk: shardedColl.getFullName(), find: {shardKey: -1}, to: st.shard1.shardName}));
-    assert.commandWorked(st.s.adminCommand(
-        {moveChunk: shardedColl.getFullName(), find: {shardKey: 1}, to: st.shard1.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: shardedColl.getFullName(), find: {shardKey: -1}, to: st.shard1.shardName}),
+    );
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: shardedColl.getFullName(), find: {shardKey: 1}, to: st.shard1.shardName}),
+    );
 
     // Unset the failpoint to unblock the $merge and join with the parallel shell.
     setAggHang("off");
@@ -115,8 +130,9 @@ function runMergeWithMode(whenMatchedMode, whenNotMatchedMode, shardedColl) {
     assert.eq(2, targetColl.find().itcount());
 
     // Reset the chunk distribution.
-    assert.commandWorked(st.s.adminCommand(
-        {moveChunk: shardedColl.getFullName(), find: {shardKey: -1}, to: st.shard0.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: shardedColl.getFullName(), find: {shardKey: -1}, to: st.shard0.shardName}),
+    );
 }
 
 // Shard the source collection with shard key {shardKey: 1} and split into 2 chunks.
@@ -146,4 +162,3 @@ withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
 });
 
 st.stop();
-})();

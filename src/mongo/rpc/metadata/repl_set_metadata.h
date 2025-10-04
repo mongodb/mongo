@@ -29,8 +29,13 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/repl/optime.h"
+
+#include <string>
 
 namespace mongo {
 
@@ -55,6 +60,10 @@ public:
                     OID id,
                     int currentSyncSourceIndex,
                     bool isPrimary);
+    explicit ReplSetMetadata(const ReplSetMetadata&) = default;
+    ReplSetMetadata(ReplSetMetadata&&) = default;
+    ReplSetMetadata& operator=(const ReplSetMetadata&) = delete;
+    ReplSetMetadata& operator=(ReplSetMetadata&&) = default;
 
     /**
      * format:

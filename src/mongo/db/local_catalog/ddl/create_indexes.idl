@@ -1,0 +1,248 @@
+# Copyright (C) 2019-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/db/auth/action_type.idl"
+    - "mongo/db/index_builds/commit_quorum.idl"
+    - "mongo/db/basic_types.idl"
+
+structs:
+    CreateIndexesReply:
+        description: "Reply to 'createIndexes' command"
+        strict: true
+        is_command_reply: true
+        fields:
+            numIndexesBefore:
+                description: "Index count before create"
+                type: int
+                optional: true
+                stability: stable
+            numIndexesAfter:
+                description: "Index count after create"
+                type: int
+                optional: true
+                stability: stable
+            createdCollectionAutomatically:
+                description: >-
+                    Whether or not this createIndexes command resulted
+                    in a newly created collection.
+                type: bool
+                optional: true
+                stability: stable
+            commitQuorum:
+                description: "Commit Quorum options used"
+                type: CommitQuorum
+                optional: true
+                stability: stable
+            note:
+                description: "Optional warning/error related to createIndex"
+                type: string
+                optional: true
+                stability: stable
+
+    # A built index appears with these fields, which must be the same as ListIndexesReplyItem's
+    # fields in list_indexes.idl.
+    NewIndexSpec:
+        description: "A type representing a spec for a new index"
+        strict: true
+        fields:
+            v:
+                description: "Index spec version"
+                type: safeInt
+                optional: true
+                stability: stable
+            key:
+                description: "Key to index on"
+                type: object_owned
+                stability: stable
+            name:
+                description: "Descriptive name for the index"
+                type: string
+                stability: stable
+            ns:
+                # MongoDB 4.2 and older generate this field, see SERVER-41696.
+                type: string
+                ignore: true
+                stability: stable
+            background:
+                type: safeBool
+                optional: true
+                stability: unstable
+            unique:
+                type: safeBool
+                optional: true
+                stability: stable
+            hidden:
+                type: safeBool
+                optional: true
+                stability: stable
+            partialFilterExpression:
+                type: object_owned
+                optional: true
+                stability: stable
+            sparse:
+                type: safeBool
+                optional: true
+                stability: unstable
+            expireAfterSeconds:
+                type: safeInt
+                optional: true
+                stability: stable
+            storageEngine:
+                type: object_owned
+                optional: true
+                stability: unstable
+            weights:
+                type:
+                    variant: [string, object_owned]
+                optional: true
+                stability: stable
+            default_language:
+                type: string
+                optional: true
+                stability: stable
+            language_override:
+                type: string
+                optional: true
+                stability: stable
+            textIndexVersion:
+                type: safeInt
+                optional: true
+                stability: stable
+            2dsphereIndexVersion:
+                type: safeInt
+                optional: true
+                stability: stable
+            bits:
+                type: safeInt
+                optional: true
+                stability: stable
+            min:
+                type: safeDouble
+                optional: true
+                stability: stable
+            max:
+                type: safeDouble
+                optional: true
+                stability: stable
+            bucketSize:
+                type: safeDouble
+                optional: true
+                stability: unstable
+            collation:
+                type: object_owned
+                optional: true
+                stability: stable
+            wildcardProjection:
+                type: object_owned
+                optional: true
+                stability: stable
+            coarsestIndexedLevel:
+                type: safeInt
+                optional: true
+                stability: stable
+            finestIndexedLevel:
+                type: safeInt
+                optional: true
+                stability: stable
+            dropDups:
+                type: safeBool
+                optional: true
+                stability: unstable
+            originalSpec:
+                type: object_owned
+                optional: true
+                stability: unstable
+            clustered:
+                type: safeBool
+                optional: true
+                stability: stable
+            prepareUnique:
+                type: safeBool
+                optional: true
+                stability: unstable
+commands:
+    createIndexes:
+        description: "Command for creating indexes on a collection"
+        command_name: createIndexes
+        namespace: concatenate_with_db
+        cpp_name: CreateIndexesCommand
+        api_version: "1"
+        access_check:
+            simple:
+                privilege:
+                    resource_pattern: exact_namespace
+                    action_type: createIndex
+        reply_type: CreateIndexesReply
+        strict: true
+        fields:
+            v:
+                description: "Index schema version"
+                type: safeInt
+                default: 2
+                stability: stable
+            indexes:
+                description: "Indexes to be created"
+                # array<NewIndexSpec> but respect ignoreUnknownIndexOptions
+                type: array<object>
+                stability: stable
+            ignoreUnknownIndexOptions:
+                description: "Ignore unknown options in index spec"
+                type: safeBool
+                default: false
+                stability: unstable
+            commitQuorum:
+                description:
+                    "Dictates which or how many replica set members must be ready to commit
+                    the index build before the primary will proceed to commit the index.
+                    This minimizes replication lag by ensuring secondaries are ready for
+                    commit and can quickly apply the commit on a finished index build"
+                type: CommitQuorum
+                optional: true
+                stability: stable
+            returnOnStart:
+                description:
+                    "For a two-phase index build, whether the command should return upon
+                    the index build starting rather than upon it committing/aborting."
+                type: optionalBool
+                stability: unstable
+            isTimeseriesNamespace:
+                description:
+                    "This flag is set to true when the command was originally sent to
+                    mongos on the time-series view, but got rewritten to target
+                    time-series buckets namespace before being sent to shards."
+                type: optionalBool
+                stability: internal
+            collectionUUID:
+                type: uuid
+                description: "The expected UUID of the collection."
+                optional: true
+                stability: unstable

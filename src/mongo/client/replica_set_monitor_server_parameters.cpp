@@ -29,18 +29,23 @@
 
 #include "mongo/client/replica_set_monitor_server_parameters.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/replica_set_monitor_server_parameters_gen.h"
+#include "mongo/db/server_parameter.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/util/str.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
 ReplicaSetMonitorProtocol gReplicaSetMonitorProtocol{ReplicaSetMonitorProtocol::kStreamable};
 
 std::string toString(ReplicaSetMonitorProtocol protocol) {
-    if (protocol == ReplicaSetMonitorProtocol::kScanning) {
-        return "scanning";
-    } else if (protocol == ReplicaSetMonitorProtocol::kStreamable) {
+    if (protocol == ReplicaSetMonitorProtocol::kStreamable) {
         return "streamable";
     } else {
         return "sdam";
@@ -48,15 +53,15 @@ std::string toString(ReplicaSetMonitorProtocol protocol) {
 }
 
 void RSMProtocolServerParameter::append(OperationContext*,
-                                        BSONObjBuilder& builder,
-                                        const std::string& name) {
-    builder.append(name, toString(gReplicaSetMonitorProtocol));
+                                        BSONObjBuilder* builder,
+                                        StringData name,
+                                        const boost::optional<TenantId>&) {
+    builder->append(name, toString(gReplicaSetMonitorProtocol));
 }
 
-Status RSMProtocolServerParameter::setFromString(const std::string& protocolStr) {
-    if (protocolStr == toString(ReplicaSetMonitorProtocol::kScanning)) {
-        gReplicaSetMonitorProtocol = ReplicaSetMonitorProtocol::kScanning;
-    } else if (protocolStr == toString(ReplicaSetMonitorProtocol::kStreamable)) {
+Status RSMProtocolServerParameter::setFromString(StringData protocolStr,
+                                                 const boost::optional<TenantId>&) {
+    if (protocolStr == toString(ReplicaSetMonitorProtocol::kStreamable)) {
         gReplicaSetMonitorProtocol = ReplicaSetMonitorProtocol::kStreamable;
     } else if (protocolStr == toString(ReplicaSetMonitorProtocol::kSdam)) {
         gReplicaSetMonitorProtocol = ReplicaSetMonitorProtocol::kSdam;

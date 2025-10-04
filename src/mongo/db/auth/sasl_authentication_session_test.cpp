@@ -27,26 +27,48 @@
  *    it in the license file.
  */
 
-#include <string>
-#include <vector>
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/sasl_client_session.h"
 #include "mongo/crypto/mechanism_scram.h"
+#include "mongo/crypto/sha1_block.h"
+#include "mongo/crypto/sha256_block.h"
+#include "mongo/db/auth/authorization_backend_interface.h"
+#include "mongo/db/auth/authorization_backend_local.h"
+#include "mongo/db/auth/authorization_backend_mock.h"
+#include "mongo/db/auth/authorization_client_handle_shard.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_manager_factory_mock.h"
 #include "mongo/db/auth/authorization_manager_impl.h"
+#include "mongo/db/auth/authorization_router_impl.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/authz_manager_external_state_mock.h"
-#include "mongo/db/auth/authz_session_external_state_mock.h"
 #include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/auth/sasl_mechanism_registry.h"
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/sasl_plain_server_conversation.h"
 #include "mongo/db/auth/sasl_scram_server_conversation.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/operation_context.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/service_entry_point_shard_role.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/password_digest.h"
+
+#include <cstddef>
+#include <functional>
+#include <initializer_list>
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace {
@@ -63,9 +85,7 @@ public:
     void testSCRAMSkipEmptyExchange();
 
     ServiceContext::UniqueOperationContext opCtx;
-    AuthzManagerExternalStateMock* authManagerExternalState;
-    AuthorizationManager* authManager;
-    std::unique_ptr<AuthorizationSession> authSession;
+    auth::AuthorizationBackendMock* authzBackend;
     SASLServerMechanismRegistry registry;
     std::string mechanism;
     std::unique_ptr<SaslClientSession> client;
@@ -85,16 +105,25 @@ const std::string mockHostName = "host.mockery.com";
 
 SaslConversation::SaslConversation(std::string mech)
     : opCtx(makeOperationContext()),
-      authManagerExternalState(new AuthzManagerExternalStateMock),
-      authManager(new AuthorizationManagerImpl(
-          getServiceContext(),
-          std::unique_ptr<AuthzManagerExternalState>(authManagerExternalState))),
-      authSession(authManager->makeAuthorizationSession()),
-      registry(getServiceContext(), {"SCRAM-SHA-1", "SCRAM-SHA-256", "PLAIN"}),
+      registry(getService(), {"SCRAM-SHA-1", "SCRAM-SHA-256", "PLAIN"}),
       mechanism(mech) {
 
-    AuthorizationManager::set(getServiceContext(),
-                              std::unique_ptr<AuthorizationManager>(authManager));
+    // Initialize the serviceEntryPoint so that DBDirectClient can function.
+    getService()->setServiceEntryPoint(std::make_unique<ServiceEntryPointShardRole>());
+
+    // Setup the repl coordinator in standalone mode so we don't need an oplog etc.
+    repl::ReplicationCoordinator::set(getServiceContext(),
+                                      std::make_unique<repl::ReplicationCoordinatorMock>(
+                                          getServiceContext(), repl::ReplSettings()));
+
+    auto globalAuthzManagerFactory = std::make_unique<AuthorizationManagerFactoryMock>();
+
+    AuthorizationManager::set(getService(), globalAuthzManagerFactory->createShard(getService()));
+
+    auth::AuthorizationBackendInterface::set(
+        getService(), globalAuthzManagerFactory->createBackendInterface(getService()));
+    authzBackend = reinterpret_cast<auth::AuthorizationBackendMock*>(
+        auth::AuthorizationBackendInterface::get(getService()));
 
     client.reset(SaslClientSession::create(mechanism));
 
@@ -104,15 +133,6 @@ SaslConversation::SaslConversation(std::string mech)
         SASLServerMechanismRegistry::kNoValidateGlobalMechanisms);
     registry.registerFactory<SCRAMSHA256ServerFactory>(
         SASLServerMechanismRegistry::kNoValidateGlobalMechanisms);
-
-    ASSERT_OK(authManagerExternalState->updateOne(
-        opCtx.get(),
-        AuthorizationManager::versionCollectionNamespace,
-        AuthorizationManager::versionDocumentQuery,
-        BSON("$set" << BSON(AuthorizationManager::schemaVersionFieldName
-                            << AuthorizationManager::schemaVersion26Final)),
-        true,
-        BSONObj()));
 
     // PLAIN mechanism uses the same hashed password as SCRAM-SHA-1,
     // but SCRAM-SHA-1's implementation makes the assumption the hashing has already
@@ -127,16 +147,15 @@ SaslConversation::SaslConversation(std::string mech)
                                   "frim", saslGlobalParams.scramSHA256IterationCount.load()));
 
     ASSERT_OK(
-        authManagerExternalState->insert(opCtx.get(),
-                                         NamespaceString("admin.system.users"),
-                                         BSON("_id"
-                                              << "test.andy"
-                                              << "user"
-                                              << "andy"
-                                              << "db"
-                                              << "test"
-                                              << "credentials" << creds << "roles" << BSONArray()),
-                                         BSONObj()));
+        authzBackend->insert(opCtx.get(),
+                             NamespaceString::createNamespaceString_forTest("admin.system.users"),
+                             BSON("_id" << "test.andy"
+                                        << "user"
+                                        << "andy"
+                                        << "db"
+                                        << "test"
+                                        << "credentials" << creds << "roles" << BSONArray()),
+                             BSONObj()));
 }
 
 void SaslConversation::assertConversationFailure() {

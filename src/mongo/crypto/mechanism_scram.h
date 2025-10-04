@@ -29,17 +29,28 @@
 
 #pragma once
 
-#include <array>
-#include <memory>
-#include <string>
-#include <vector>
-
+#include "mongo/base/error_codes.h"
 #include "mongo/base/secure_allocator.h"
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/crypto/sha1_block.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/base64.h"
+#include "mongo/util/secure_compare_memory.h"
+
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 namespace scram {
@@ -115,6 +126,8 @@ private:
         return std::tie(_password, _salt, _iterationCount);
     }
 
+    // clang-tidy flags this return type as readability-const-return-type
+    // NOLINTNEXTLINE(readability-const-return-type)
     static constexpr auto saltLength() -> decltype(HashBlock::kHashLength) {
         return HashBlock::kHashLength - 4;
     }
@@ -189,30 +202,30 @@ public:
         : _ptr(std::make_shared<MemoryPolicy<HashBlock>>()) {
         if (!client.empty()) {
             (*_ptr)->clientKey = uassertStatusOK(HashBlock::fromBuffer(
-                reinterpret_cast<const unsigned char*>(client.rawData()), client.size()));
+                reinterpret_cast<const unsigned char*>(client.data()), client.size()));
         }
         (*_ptr)->storedKey = uassertStatusOK(HashBlock::fromBuffer(
-            reinterpret_cast<const unsigned char*>(stored.rawData()), stored.size()));
+            reinterpret_cast<const unsigned char*>(stored.data()), stored.size()));
         (*_ptr)->serverKey = uassertStatusOK(HashBlock::fromBuffer(
-            reinterpret_cast<const unsigned char*>(server.rawData()), stored.size()));
+            reinterpret_cast<const unsigned char*>(server.data()), stored.size()));
     }
 
     Secrets(const HashBlock& saltedPassword) : _ptr(std::make_shared<MemoryPolicy<HashBlock>>()) {
         // ClientKey := HMAC(saltedPassword, "Client Key")
-        (*_ptr)->clientKey = (HashBlock::computeHmac(
-            saltedPassword.data(),
-            saltedPassword.size(),
-            reinterpret_cast<const unsigned char*>(kClientKeyConst.rawData()),
-            kClientKeyConst.size()));
+        (*_ptr)->clientKey =
+            (HashBlock::computeHmac(saltedPassword.data(),
+                                    saltedPassword.size(),
+                                    reinterpret_cast<const unsigned char*>(kClientKeyConst.data()),
+                                    kClientKeyConst.size()));
         // StoredKey := H(clientKey)
         (*_ptr)->storedKey = HashBlock::computeHash(clientKey().data(), clientKey().size());
 
         // ServerKey := HMAC(SaltedPassword, "Server Key")
-        (*_ptr)->serverKey = HashBlock::computeHmac(
-            saltedPassword.data(),
-            saltedPassword.size(),
-            reinterpret_cast<const unsigned char*>(kServerKeyConst.rawData()),
-            kServerKeyConst.size());
+        (*_ptr)->serverKey =
+            HashBlock::computeHmac(saltedPassword.data(),
+                                   saltedPassword.size(),
+                                   reinterpret_cast<const unsigned char*>(kServerKeyConst.data()),
+                                   kServerKeyConst.size());
     }
     Secrets(const Presecrets<HashBlock>& presecrets)
         : Secrets(presecrets.generateSaltedPassword()) {}
@@ -222,7 +235,7 @@ public:
         auto proof =
             HashBlock::computeHmac(storedKey().data(),
                                    storedKey().size(),
-                                   reinterpret_cast<const unsigned char*>(authMessage.rawData()),
+                                   reinterpret_cast<const unsigned char*>(authMessage.data()),
                                    authMessage.size());
         proof.xorInline(clientKey());
         return proof.toString();
@@ -232,10 +245,10 @@ public:
         auto key =
             HashBlock::computeHmac(storedKey().data(),
                                    storedKey().size(),
-                                   reinterpret_cast<const unsigned char*>(authMessage.rawData()),
+                                   reinterpret_cast<const unsigned char*>(authMessage.data()),
                                    authMessage.size());
-        key.xorInline(uassertStatusOK(HashBlock::fromBuffer(
-            reinterpret_cast<const uint8_t*>(proof.rawData()), proof.size())));
+        key.xorInline(uassertStatusOK(
+            HashBlock::fromBuffer(reinterpret_cast<const uint8_t*>(proof.data()), proof.size())));
 
         // StoredKey := H(ClientKey)
         auto exp = HashBlock::computeHash(key.data(), key.size());
@@ -253,7 +266,7 @@ public:
         // ServerSignature := HMAC(ServerKey, AuthMessage)
         return HashBlock::computeHmac(serverKey().data(),
                                       serverKey().size(),
-                                      reinterpret_cast<const unsigned char*>(authMessage.rawData()),
+                                      reinterpret_cast<const unsigned char*>(authMessage.data()),
                                       authMessage.size())
             .toString();
     }
@@ -262,13 +275,13 @@ public:
         const auto exp =
             HashBlock::computeHmac(serverKey().data(),
                                    serverKey().size(),
-                                   reinterpret_cast<const unsigned char*>(authMessage.rawData()),
+                                   reinterpret_cast<const unsigned char*>(authMessage.data()),
                                    authMessage.size());
 
         if ((sig.size() != HashBlock::kHashLength) || (exp.size() != HashBlock::kHashLength)) {
             return false;
         }
-        return consttimeMemEqual(reinterpret_cast<const unsigned char*>(sig.rawData()),
+        return consttimeMemEqual(reinterpret_cast<const unsigned char*>(sig.data()),
                                  reinterpret_cast<const unsigned char*>(exp.data()),
                                  HashBlock::kHashLength);
     }

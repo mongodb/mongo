@@ -27,11 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/update/update_leaf_node.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
 
 namespace mongo {
 
@@ -40,10 +42,10 @@ void UpdateLeafNode::checkViability(mutablebson::Element element,
                                     const FieldRef& pathTaken) {
     invariant(!pathToCreate.empty());
 
-    if (element.getType() == BSONType::Object) {
+    if (element.getType() == BSONType::object) {
         // 'pathTaken' leads to an object, so we know it will be possible to create 'pathToCreate'
         // at that path.
-    } else if (element.getType() == BSONType::Array &&
+    } else if (element.getType() == BSONType::array &&
                str::parseUnsignedBase10Integer(pathToCreate.getPart(0))) {
         // 'pathTaken' leads to an array, so we know we can add elements at that path so long as the
         // next component is a valid array index. We don't check, but we expect that the index will

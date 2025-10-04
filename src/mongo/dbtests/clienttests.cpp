@@ -27,31 +27,54 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/connection_string.h"
 #include "mongo/client/dbclient_cursor.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/index_catalog.h"
+#include "mongo/client/index_spec.h"
 #include "mongo/db/client.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/db/local_catalog/collection.h"
+#include "mongo/db/local_catalog/index_catalog.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/query_settings/query_settings_service.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/net/hostandport.h"
 
+#include <list>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+
+namespace mongo {
 namespace ClientTests {
-
-using std::string;
-using std::unique_ptr;
-using std::vector;
 
 class Base {
 public:
-    Base(string coll) : _ns("test." + coll) {
+    Base(std::string coll) : _nss(NamespaceString::createNamespaceString_forTest("test." + coll)) {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient db(&opCtx);
 
-        db.dropDatabase("test");
+        db.dropDatabase(DatabaseName::createDatabaseName_forTest(boost::none, "test"));
+
+        // Initialize the query settings.
+        query_settings::QuerySettingsService::initializeForTest(opCtx.getServiceContext());
     }
 
     virtual ~Base() {
@@ -59,18 +82,18 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient db(&opCtx);
 
-        db.dropCollection(_ns);
+        db.dropCollection(nss());
     }
 
-    const NamespaceString nss() {
-        return NamespaceString(_ns);
+    const NamespaceString& nss() {
+        return _nss;
     }
 
-    const char* ns() {
-        return _ns.c_str();
+    StringData ns() {
+        return _nss.ns_forTest();
     }
 
-    const string _ns;
+    const NamespaceString _nss;
 };
 
 
@@ -85,19 +108,19 @@ public:
         const bool includeBuildUUIDs = false;
         const int options = 0;
 
-        db.insert(ns(), BSON("x" << 2));
+        db.insert(nss(), BSON("x" << 2));
         ASSERT_EQUALS(1u, db.getIndexSpecs(nss(), includeBuildUUIDs, options).size());
 
         ASSERT_OK(dbtests::createIndex(&opCtx, ns(), BSON("x" << 1)));
         ASSERT_EQUALS(2u, db.getIndexSpecs(nss(), includeBuildUUIDs, options).size());
 
-        db.dropIndex(ns(), BSON("x" << 1));
+        db.dropIndex(nss(), BSON("x" << 1));
         ASSERT_EQUALS(1u, db.getIndexSpecs(nss(), includeBuildUUIDs, options).size());
 
         ASSERT_OK(dbtests::createIndex(&opCtx, ns(), BSON("x" << 1)));
         ASSERT_EQUALS(2u, db.getIndexSpecs(nss(), includeBuildUUIDs, options).size());
 
-        db.dropIndexes(ns());
+        db.dropIndexes(nss());
         ASSERT_EQUALS(1u, db.getIndexSpecs(nss(), includeBuildUUIDs, options).size());
     }
 };
@@ -116,29 +139,32 @@ public:
         dbtests::WriteContextForTests ctx(&opCtx, ns());
         DBDirectClient db(&opCtx);
 
-        db.insert(ns(), BSON("x" << 1 << "y" << 2));
-        db.insert(ns(), BSON("x" << 2 << "y" << 2));
+        db.insert(nss(), BSON("x" << 1 << "y" << 2));
+        db.insert(nss(), BSON("x" << 2 << "y" << 2));
 
-        const auto& collection = ctx.getCollection();
-        ASSERT(collection);
-        const IndexCatalog* indexCatalog = collection->getIndexCatalog();
+        ASSERT(ctx.getCollection().exists());
+        // Helper to refetch the IndexCatalog from the catalog in order to see any changes made to
+        // it after a Collection write inside 'createIndex'.
+        auto indexCatalog = [&ctx]() -> const IndexCatalog* {
+            return ctx.getCollection().getCollectionPtr()->getIndexCatalog();
+        };
 
         const bool includeBuildUUIDs = false;
         const int options = 0;
 
-        ASSERT_EQUALS(1, indexCatalog->numIndexesReady(&opCtx));
+        ASSERT_EQUALS(1, indexCatalog()->numIndexesReady());
         // _id index
         ASSERT_EQUALS(1U, db.getIndexSpecs(nss(), includeBuildUUIDs, options).size());
 
         ASSERT_EQUALS(ErrorCodes::DuplicateKey,
                       dbtests::createIndex(&opCtx, ns(), BSON("y" << 1), true));
 
-        ASSERT_EQUALS(1, indexCatalog->numIndexesReady(&opCtx));
+        ASSERT_EQUALS(1, indexCatalog()->numIndexesReady());
         ASSERT_EQUALS(1U, db.getIndexSpecs(nss(), includeBuildUUIDs, options).size());
 
         ASSERT_OK(dbtests::createIndex(&opCtx, ns(), BSON("x" << 1), true));
 
-        ASSERT_EQUALS(2, indexCatalog->numIndexesReady(&opCtx));
+        ASSERT_EQUALS(2, indexCatalog()->numIndexesReady());
         ASSERT_EQUALS(2U, db.getIndexSpecs(nss(), includeBuildUUIDs, options).size());
     }
 };
@@ -151,63 +177,17 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient db(&opCtx);
 
-        const string longs(770, 'c');
+        const std::string longs(770, 'c');
         for (int i = 0; i < 1111; ++i) {
-            db.insert(ns(), BSON("a" << i << "b" << longs));
+            db.insert(nss(), BSON("a" << i << "b" << longs));
         }
 
         ASSERT_OK(dbtests::createIndex(&opCtx, ns(), BSON("a" << 1 << "b" << 1)));
 
-        unique_ptr<DBClientCursor> c =
-            db.query(NamespaceString(ns()), BSONObj{}, Query().sort(BSON("a" << 1 << "b" << 1)));
+        FindCommandRequest findRequest{NamespaceString::createNamespaceString_forTest(ns())};
+        findRequest.setSort(BSON("a" << 1 << "b" << 1));
+        std::unique_ptr<DBClientCursor> c = db.find(std::move(findRequest));
         ASSERT_EQUALS(1111, c->itcount());
-    }
-};
-
-class PushBack : public Base {
-public:
-    PushBack() : Base("PushBack") {}
-    void run() {
-        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
-        OperationContext& opCtx = *opCtxPtr;
-        DBDirectClient db(&opCtx);
-
-        for (int i = 0; i < 10; ++i) {
-            db.insert(ns(), BSON("i" << i));
-        }
-
-        unique_ptr<DBClientCursor> c =
-            db.query(NamespaceString(ns()), BSONObj{}, Query().sort(BSON("i" << 1)));
-
-        BSONObj o = c->next();
-        ASSERT(c->more());
-        ASSERT_EQUALS(9, c->objsLeftInBatch());
-        ASSERT(c->moreInCurrentBatch());
-
-        c->putBack(o);
-        ASSERT(c->more());
-        ASSERT_EQUALS(10, c->objsLeftInBatch());
-        ASSERT(c->moreInCurrentBatch());
-
-        o = c->next();
-        BSONObj o2 = c->next();
-        BSONObj o3 = c->next();
-        c->putBack(o3);
-        c->putBack(o2);
-        c->putBack(o);
-        for (int i = 0; i < 10; ++i) {
-            o = c->next();
-            ASSERT_EQUALS(i, o["i"].number());
-        }
-        ASSERT(!c->more());
-        ASSERT_EQUALS(0, c->objsLeftInBatch());
-        ASSERT(!c->moreInCurrentBatch());
-
-        c->putBack(o);
-        ASSERT(c->more());
-        ASSERT_EQUALS(1, c->objsLeftInBatch());
-        ASSERT(c->moreInCurrentBatch());
-        ASSERT_EQUALS(1, c->itcount());
     }
 };
 
@@ -218,13 +198,11 @@ public:
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient db(&opCtx);
-
-        db.createCollection("unittests.clienttests.create");
+        const NamespaceString nss =
+            NamespaceString::createNamespaceString_forTest("unittests.clienttests.create");
+        db.createCollection(nss);
         BSONObj info;
-        ASSERT(db.runCommand("unittests",
-                             BSON("collstats"
-                                  << "clienttests.create"),
-                             info));
+        ASSERT(db.runCommand(nss.dbName(), BSON("collstats" << "clienttests.create"), info));
     }
 };
 
@@ -235,7 +213,7 @@ public:
             ConnectionString s("a/b,c,d", ConnectionString::ConnectionType::kReplicaSet);
             ASSERT_EQUALS(ConnectionString::ConnectionType::kReplicaSet, s.type());
             ASSERT_EQUALS("a", s.getSetName());
-            vector<HostAndPort> v = s.getServers();
+            std::vector<HostAndPort> v = s.getServers();
             ASSERT_EQUALS(3U, v.size());
             ASSERT_EQUALS("b", v[0].host());
             ASSERT_EQUALS("c", v[1].host());
@@ -252,7 +230,7 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient db(&opCtx);
 
-        db.createIndex(ns(), IndexSpec().addKey("aField").version(1));
+        db.createIndex(nss(), IndexSpec().addKey("aField").version(1));
     }
 };
 
@@ -264,7 +242,7 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient db(&opCtx);
 
-        db.createIndex(ns(), IndexSpec().addKey("aField").version(1).name("aFieldV1Index"));
+        db.createIndex(nss(), IndexSpec().addKey("aField").version(1).name("aFieldV1Index"));
     }
 };
 
@@ -276,7 +254,7 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient db(&opCtx);
 
-        db.createIndex(ns(),
+        db.createIndex(nss(),
                        IndexSpec()
                            .addKey("aField")
                            .addKey("bField", IndexSpec::kIndexTypeDescending)
@@ -295,7 +273,7 @@ public:
         DBDirectClient db(&opCtx);
 
         db.createIndex(
-            ns(), IndexSpec().addKey("aField").background().unique().sparse().dropDuplicates());
+            nss(), IndexSpec().addKey("aField").background().unique().sparse().dropDuplicates());
     }
 };
 
@@ -307,7 +285,7 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient db(&opCtx);
 
-        db.createIndex(ns(),
+        db.createIndex(nss(),
                        IndexSpec()
                            .addKey("aField", IndexSpec::kIndexTypeText)
                            .addKey("bField", IndexSpec::kIndexTypeText)
@@ -326,7 +304,7 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient db(&opCtx);
 
-        db.createIndex(ns(),
+        db.createIndex(nss(),
                        IndexSpec()
                            .addKey("aField", IndexSpec::kIndexTypeGeo2D)
                            .geo2DBits(20)
@@ -343,7 +321,7 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient db(&opCtx);
 
-        db.createIndex(ns(),
+        db.createIndex(nss(),
                        IndexSpec()
                            .addKey("aField", IndexSpec::kIndexTypeGeo2DSphere)
                            .geo2DSphereIndexVersion(2));
@@ -358,7 +336,7 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient db(&opCtx);
 
-        db.createIndex(ns(), IndexSpec().addKey("aField", IndexSpec::kIndexTypeHashed));
+        db.createIndex(nss(), IndexSpec().addKey("aField", IndexSpec::kIndexTypeHashed));
     }
 };
 
@@ -370,21 +348,20 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient db(&opCtx);
 
-        db.createIndex(ns(), IndexSpec().addKey("aField"));
-        ASSERT_THROWS(db.createIndex(ns(), IndexSpec().addKey("aField").unique()),
+        db.createIndex(nss(), IndexSpec().addKey("aField"));
+        ASSERT_THROWS(db.createIndex(nss(), IndexSpec().addKey("aField").unique()),
                       AssertionException);
     }
 };
 
-class All : public OldStyleSuiteSpecification {
+class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("client") {}
 
-    void setupTests() {
+    void setupTests() override {
         add<DropIndex>();
         add<BuildIndex>();
         add<CS_10>();
-        add<PushBack>();
         add<Create>();
         add<ConnectionStringTests>();
         add<CreateSimpleV1Index>();
@@ -399,5 +376,7 @@ public:
     }
 };
 
-OldStyleSuiteInitializer<All> all;
+unittest::OldStyleSuiteInitializer<All> all;
+
 }  // namespace ClientTests
+}  // namespace mongo

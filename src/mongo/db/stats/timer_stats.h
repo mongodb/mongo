@@ -29,7 +29,8 @@
 
 #pragma once
 
-#include "mongo/db/jsobj.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {

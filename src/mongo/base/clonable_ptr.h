@@ -33,6 +33,7 @@
 #include <memory>
 #include <tuple>
 #include <type_traits>
+#include <utility>
 
 namespace mongo {
 namespace clonable_ptr_detail {
@@ -171,7 +172,7 @@ private:
 
 public:
     /*! Destroys this pointer.  Functions like `std::unique_ptr`. */
-    inline ~clonable_ptr() noexcept = default;
+    inline ~clonable_ptr() = default;
 
     /*! Moves a value, by pointer.  Functions like `std::unique_ptr`. */
     inline clonable_ptr(clonable_ptr&&) noexcept(
@@ -179,9 +180,9 @@ public:
         noexcept(UniquePtr<T>{std::declval<UniquePtr<T>>()})) = default;
 
     /*! Moves a value, by pointer.  Functions like `std::unique_ptr`. */
-    inline clonable_ptr& operator=(clonable_ptr&&) &
-        noexcept(noexcept(std::declval<CloneFactory>() = std::declval<CloneFactory>()) &&
-                 noexcept(std::declval<UniquePtr<T>>() = std::declval<UniquePtr<T>>())) = default;
+    inline clonable_ptr& operator=(clonable_ptr&&) & noexcept(
+        noexcept(std::declval<CloneFactory>() = std::declval<CloneFactory>()) &&
+        noexcept(std::declval<UniquePtr<T>>() = std::declval<UniquePtr<T>>())) = default;
 
     /*!
      * Constructs a pointer referring to a new copy of an original value.  The old object owned by
@@ -366,9 +367,8 @@ public:
      *                                            [](const T& p){ return p; }}; // GOOD IDEA!!!
      * ~~~
      */
-    template <typename CloneFactory_ = CloneFactory,
-              typename Derived,
-              typename = typename std::enable_if<std::is_empty<CloneFactory_>::value>::type>
+    template <typename CloneFactory_ = CloneFactory, typename Derived>
+    requires std::is_base_of_v<T, Derived> && std::is_empty_v<CloneFactory_>
     inline clonable_ptr(UniquePtr<Derived> p) : data{CloneFactory{}, std::move(p)} {}
 
     /*!
@@ -439,7 +439,7 @@ public:
      * NOTE: The behavior is undefined if `this->get() == nullptr`.
      * RETURNS: A pointer to the object owned by `*this`, equivalent to `get()`.
      */
-    inline auto* operator-> () const {
+    inline auto* operator->() const {
         return this->ptr().operator->();
     }
 

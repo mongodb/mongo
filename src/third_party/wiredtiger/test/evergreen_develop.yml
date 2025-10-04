@@ -1,0 +1,169 @@
+# This config file is expected to be only used by the WiredTiger (develop) Evergreen project.
+
+include:
+- filename: test/evergreen.yml
+
+variables:
+# Template for perf-tasks
+- &perf-tasks-template
+  batchtime: 1440 # 1 day
+  expansions: &perf-tests-expansions-template
+    additional_env_vars: export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$WT_BUILDDIR/test/utility/"
+    ENABLE_TCMALLOC: 1
+    CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=Release
+    num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
+    database: WTPerformanceDataDB
+  tasks:
+    - name: compile
+    - ".btree-perf"
+    - ".stress-perf"
+    - ".checkpoint-perf"
+    - ".evict-perf"
+    - ".log-perf"
+    - ".chunk-cache-perf"
+    - ".long-perf"
+    - ".oplog-perf"
+    - ".wt2853-perf"
+    - name: many-collection-test
+      distros: ubuntu2004-wt-large
+    - name: ".cppsuite-perf-test"
+    - name: many-dhandle-stress
+    - name: prefetch-off-verify
+    - name: prefetch-on-verify
+
+# Build variants that need to be run only on the develop branch.
+buildvariants:
+- <<: *perf-tasks-template
+  name: ubuntu2004-perf-tests
+  display_name: Ubuntu 20.04 Performance tests
+  run_on:
+    - ubuntu2004-perf-testing
+  expansions:
+    <<: *perf-tests-expansions-template
+    collection: AllPerfTests
+
+- <<: *perf-tasks-template
+  name: amazon2023-perf-tests-arm64
+  display_name: (ARMV9) Amazon Linux 2023 Performance tests (ARM64)
+  run_on:
+   - amazon2023-arm64-large-m8g-wt
+  expansions:
+    <<: *perf-tests-expansions-template
+    collection: AllPerfTestsARM64_v9
+
+- <<: *perf-tasks-template
+  name: amazon2023-perf-tests-arm64-only
+  display_name: (ARMV9) Amazon Linux 2023 Performance tests (ARM64 only)
+  run_on:
+    - amazon2023-arm64-large-m8g-wt
+  expansions:
+    <<: *perf-tests-expansions-template
+    collection: AllPerfTestsARM64_v9
+  tasks:
+    - name: compile
+    - ".cppsuite-perf-test-arm"
+
+- name: documentation-update
+  display_name: "~ Documentation update"
+  batchtime: 10080 # 7 days
+  run_on:
+  - ubuntu2004-test
+  expansions:
+    ENABLE_TCMALLOC: 0
+    doc_update_branches: develop,mongodb-8.0,mongodb-7.0,mongodb-6.0,mongodb-5.0,mongodb-4.4,mongodb-4.2
+    num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
+  tasks:
+    - name: doc-update
+
+- name: code-statistics
+  display_name: "Code statistics (ARM64)"
+  run_on:
+  - ubuntu2004-arm64-small
+  expansions:
+    ENABLE_TCMALLOC: 0
+    database: WTCodeStatisticsDB
+    num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
+  tasks:
+    - name: coverage-report-python
+      distros: ubuntu2004-arm64-large
+    - name: coverage-report-other
+      distros: ubuntu2004-arm64-large
+    - name: coverage-report-per-test
+      distros: ubuntu2004-arm64-large
+      activate: false # Launch only manually for now
+    - name: coverage-report-catch2
+    - name: generate-coverage-report
+    - name: cyclomatic-complexity
+    - name: code-change-report
+    - name: modularity_metrics
+
+- name: compatibility-tests-less-frequent
+  display_name: Compatibility tests (less frequent)
+  batchtime: 10080 # 7 days
+  run_on:
+  - ubuntu2004-test
+  expansions:
+    ENABLE_TCMALLOC: 0
+    num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
+  tasks:
+    - name: compatibility-test-for-older-releases
+    - name: compatibility-test-for-wt-standalone-releases
+
+- name: compatibility-tests-daily
+  display_name: Compatibility tests (daily)
+  batchtime: 1440 # 1 day
+  run_on:
+  - ubuntu2004-test
+  expansions:
+    ENABLE_TCMALLOC: 0
+    num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
+  tasks:
+    - name: compatibility-test-suite
+    - name: compatibility-test-upgrade-to-latest
+
+- name: compatibility-tests
+  display_name: Compatibility tests
+  run_on:
+  - ubuntu2004-test
+  expansions:
+    ENABLE_TCMALLOC: 0
+    num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
+  tasks:
+    - name: compatibility-test-for-newer-releases
+    - name: compatibility-test-for-patch-releases
+    - name: import-compatibility-test
+    - name: compatibility-test-dirty-restart
+
+- name: infrequent-checks
+  display_name: "~ Infrequent checks"
+  run_on:
+  - ubuntu2004-test
+  expansions:
+    cmake_generator: Ninja
+    num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
+  # As these tests run infrequently by the time they fail we may have had
+  # a lot of prior commits that would also fail for the same test. This is acceptable
+  # as our infrequent tests aren't tracking critical failures, but we don't want
+  # to perform stepback as evergreen will run the same test on all of these older commits
+  # and generate a lot of redundant BFGs.
+  stepback: false
+  tasks:
+    - name: memory-model-test
+      batchtime: 40320 # 28 days
+    - name: s-outdated-fixmes
+      batchtime: 10080 # 7 days
+
+- name: lazyfs-tests
+  display_name: "~ LazyFS tests"
+  run_on:
+  - ubuntu2004-libfuse-small
+  batchtime: 1440 # 1 day
+  expansions:
+    ENABLE_LAZYFS: -DENABLE_LAZYFS=1
+    cmake_generator: Ninja
+    num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
+  stepback: false
+  tasks:
+    - name: csuite-random-abort-lazyfs
+    - name: csuite-schema-abort-lazyfs
+    - name: csuite-timestamp-abort-lazyfs

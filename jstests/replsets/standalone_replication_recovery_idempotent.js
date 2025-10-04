@@ -3,22 +3,21 @@
  * idempotent.
  *
  * This test only makes sense for storage engines that support recover to stable timestamp.
- * @tags: [requires_wiredtiger, requires_persistence, requires_journaling, requires_replication,
+ * @tags: [requires_persistence, requires_replication,
  * requires_majority_read_concern, uses_transactions, uses_prepare_transaction,
  * # Restarting as a standalone is not supported in multiversion tests.
  * multiversion_incompatible]
  */
 
-(function() {
-"use strict";
-load("jstests/replsets/rslib.js");
-load("jstests/libs/write_concern_util.js");
-load("jstests/core/txns/libs/prepare_helpers.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
+import {reconnect} from "jstests/replsets/rslib.js";
 
 const name = jsTestName();
 const dbName = name;
-const collName1 = 'srri_coll1';
-const collName2 = 'srri_coll2';
+const collName1 = "srri_coll1";
+const collName2 = "srri_coll2";
 
 const logLevel = tojson({storage: {recovery: 2}});
 
@@ -46,9 +45,11 @@ function assertDocsInColl1(node, nums) {
 function assertPrepareConflictColl2(node, id) {
     assert.sameMembers(getColl2(node).find().toArray(), [{_id: id}]);
     assert.commandFailedWithCode(
-        node.getDB(dbName).runCommand(
-            {update: collName2, updates: [{q: {_id: id}, u: {$inc: {x: 1}}}], maxTimeMS: 1000}),
-        ErrorCodes.MaxTimeMSExpired);
+        node
+            .getDB(dbName)
+            .runCommand({update: collName2, updates: [{q: {_id: id}, u: {$inc: {x: 1}}}], maxTimeMS: 1000}),
+        ErrorCodes.MaxTimeMSExpired,
+    );
 }
 
 jsTestLog("Initiating as a replica set.");
@@ -56,11 +57,21 @@ let nodes = rst.startSet({setParameter: {logComponentVerbosity: logLevel}});
 let node = nodes[0];
 let secondary = nodes[1];
 rst.initiate(
-    {_id: name, members: [{_id: 0, host: node.host}, {_id: 1, host: secondary.host, priority: 0}]});
+    {
+        _id: name,
+        members: [
+            {_id: 0, host: node.host},
+            {_id: 1, host: secondary.host, priority: 0},
+        ],
+    },
+    null,
+    {initiateWithDefaultElectionTimeout: true},
+);
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
-assert.commandWorked(rst.getPrimary().adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    rst.getPrimary().adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 // Create two collections with w:majority and then perform a clean restart to ensure that
 // the collections are in a stable checkpoint.
@@ -91,18 +102,17 @@ assertPrepareConflictColl2(node, 1);
 jsTestLog("Test that on restart with just 'recoverFromOplogAsStandalone' set we play recovery.");
 node = rst.restart(node, {
     noReplSet: true,
-    setParameter: {recoverFromOplogAsStandalone: true, logComponentVerbosity: logLevel}
+    setParameter: {recoverFromOplogAsStandalone: true, logComponentVerbosity: logLevel},
 });
 reconnect(node);
 assertDocsInColl1(node, [3, 4]);
 assertPrepareConflictColl2(node, 1);
 assert.commandFailedWithCode(getColl1(node).insert({_id: 7}), ErrorCodes.IllegalOperation);
 
-jsTestLog("Test that on restart with just 'recoverFromOplogAsStandalone' we succeed" +
-          " idempotently.");
+jsTestLog("Test that on restart with just 'recoverFromOplogAsStandalone' we succeed" + " idempotently.");
 node = rst.restart(node, {
     noReplSet: true,
-    setParameter: {recoverFromOplogAsStandalone: true, logComponentVerbosity: logLevel}
+    setParameter: {recoverFromOplogAsStandalone: true, logComponentVerbosity: logLevel},
 });
 reconnect(node);
 assertDocsInColl1(node, [3, 4]);
@@ -115,8 +125,8 @@ node = rst.restart(node, {
     setParameter: {
         recoverFromOplogAsStandalone: true,
         takeUnstableCheckpointOnShutdown: true,
-        logComponentVerbosity: logLevel
-    }
+        logComponentVerbosity: logLevel,
+    },
 });
 reconnect(node);
 assertDocsInColl1(node, [3, 4]);
@@ -129,8 +139,8 @@ node = rst.restart(node, {
     setParameter: {
         recoverFromOplogAsStandalone: true,
         takeUnstableCheckpointOnShutdown: true,
-        logComponentVerbosity: logLevel
-    }
+        logComponentVerbosity: logLevel,
+    },
 });
 reconnect(node);
 assertDocsInColl1(node, [3, 4]);
@@ -143,8 +153,8 @@ node = rst.restart(node, {
     setParameter: {
         recoverFromOplogAsStandalone: false,
         takeUnstableCheckpointOnShutdown: false,
-        logComponentVerbosity: logLevel
-    }
+        logComponentVerbosity: logLevel,
+    },
 });
 reconnect(node);
 assert.eq(rst.getPrimary(), node);
@@ -157,14 +167,15 @@ PrepareHelpers.awaitMajorityCommitted(rst, prepareTimestamp);
 assertDocsInColl1(node, [3, 4]);
 assertPrepareConflictColl2(node, 1);
 
-assert.commandWorked(node.adminCommand({
-    commitTransaction: 1,
-    commitTimestamp: prepareTimestamp,
-    lsid: session.getSessionId(),
-    txnNumber: NumberLong(txnNumber),
-    autocommit: false
-}));
+assert.commandWorked(
+    node.adminCommand({
+        commitTransaction: 1,
+        commitTimestamp: prepareTimestamp,
+        lsid: session.getSessionId(),
+        txnNumber: NumberLong(txnNumber),
+        autocommit: false,
+    }),
+);
 assert.sameMembers(getColl2(node).find().toArray(), [{_id: 1, a: 1}]);
 
 rst.stopSet();
-})();

@@ -1,0 +1,216 @@
+# Copyright (C) 2022-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+global:
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/db/local_catalog/collection_options.idl"
+    - "mongo/db/pipeline/storage_stats_spec.idl"
+    - "mongo/db/basic_types.idl"
+
+structs:
+    DataSizeReply:
+        description: Reply from the dataSize command.
+        strict: false
+        is_command_reply: true
+        fields:
+            size:
+                description: Total, possibly estimated size of data.
+                type: safeInt64
+            numObjects:
+                description: Total number of records in collection.
+                type: safeInt64
+            millis:
+                description: Time taken, in milliseconds.
+                type: safeInt64
+            estimate:
+                description: Is this computation an estimate?
+                type: bool
+                optional: true
+            maxReached:
+                description: Was a limit reached while couting records?
+                type: bool
+                optional: true
+
+    DBStats:
+        description: "Reply from {dbStats: 1, scale: 1} command. Size fields are reduced by scale field."
+        strict: false
+        is_command_reply: true
+        fields:
+            db:
+                description: Name of database being examined.
+                cpp_name: DB
+                type: string
+            collections:
+                description: Number of collections in the database.
+                type: safeInt64
+            views:
+                description: Number of views in the database.
+                type: safeInt64
+            objects:
+                description: Total number of records across all collections in the database.
+                type: safeInt64
+            avgObjSize:
+                # Note: This is NOT scaled by scaling factor.
+                description: Average record size across all collections in the database.
+                type: safeDouble
+            dataSize:
+                description: Size of all collection data.
+                type: safeDouble
+            storageSize:
+                description: Primary data storage size across all collections.
+                type: safeDouble
+            freeStorageSize:
+                # Only included with {freeStorage: 1}
+                description: Allocated but unused space in the data store.
+                type: safeDouble
+                optional: true
+            indexes:
+                description: Number of indexes in the database.
+                type: safeInt64
+            indexSize:
+                description: Index data storage size across all collections.
+                type: safeDouble
+            indexFreeStorageSize:
+                # Only included with {freeStorage: 1}
+                description: Allocated but unused space in the index store.
+                type: safeDouble
+                optional: true
+            totalSize:
+                description: Total data storage size (data + index).
+                type: safeDouble
+            totalFreeStorageSize:
+                # Only included with {freeStorage: 1}
+                description: Allocated but unused space in all stores.
+                type: safeDouble
+                optional: true
+            scaleFactor:
+                description: Scaling applies to size fields.
+                type: safeInt64
+            fsUsedSize:
+                # Not included when storage subsystem is ephemeral.
+                description: Filesystem storage space used, excludes allocated but unused space.
+                type: safeDouble
+                optional: true
+            fsTotalSize:
+                # Not included when storage subsystem is ephemeral.
+                description: Actual filesystem storage space allocated.
+                type: safeDouble
+                optional: true
+
+commands:
+    collStats:
+        description: |-
+            { collStats:"blog.posts" , scale : 1 } scale divides sizes e.g. for KB use 1024.
+            avgObjSize - in bytes
+        command_name: collStats
+        command_alias: collstats
+        cpp_name: CollStatsCommand
+        api_version: ""
+        namespace: concatenate_with_db
+        inline_chained_structs: true
+        chained_structs:
+            StorageStatsSpec: StorageStatsSpec
+        fields:
+            validationLevel:
+                description: "Strictness of validation rules application."
+                type: ValidationLevel
+                optional: true
+
+    dataSize:
+        description: |-
+            Determine data size for a set of data in a certain range.
+            Example: { dataSize:"blog.posts", keyPattern:{x:1}, min:{x:10}, max:{x:55} }
+            {min} and {max} parameters are optional. They must either both be included or both omitted.
+            {keyPattern} is an optional parameter indicating an index pattern that would be useful for iterating over the min/max bounds.
+            If keyPattern is omitted, it is inferred from the structure of min.
+            Note: This command may take a while to run.
+        command_name: dataSize
+        command_alias: datasize
+        cpp_name: DataSizeCommand
+        api_version: ""
+        namespace: type
+        type: namespacestring
+        reply_type: DataSizeReply
+        fields:
+            min:
+                description: The lower bound of the key range to be examined.
+                type: object
+                optional: true
+            max:
+                description: The upper bound of the key range to be examined.
+                type: object
+                optional: true
+            keyPattern:
+                description: |-
+                    The collection's key pattern to examine.
+                    The collection must have an index with the corresponding pattern.
+                    Otherwise dataSize returns an error message.
+                type: object
+                optional: true
+            estimate:
+                description: |-
+                    When true, estimate the data size by assuming that all documents in the
+                    specified range are uniformly sized as per the collection's average object size.
+                type: safeBool
+                default: false
+            maxSize:
+                description: |-
+                    Maximum size to count to.
+                    Beyond this size, the operation will halt and return the size so far.
+                type: safeInt64
+                default: 0
+            maxObjects:
+                description: |-
+                    Maximum number of records to count.
+                    Beyond this number, the operation will halt and return the size so far.
+                type: safeInt64
+                default: 0
+
+    dbStats:
+        description: |-
+            Get stats on a database. Not instantaneous.
+            Slower for databases with large .ns files.
+            Example: { dbStats:1, scale:1 }
+        command_name: dbStats
+        command_alias: dbstats
+        cpp_name: DBStatsCommand
+        api_version: ""
+        namespace: ignored
+        reply_type: DBStats
+        fields:
+            scale:
+                description: |-
+                    Divisor to apply to all size fields reducing the answer by that factor.
+                    i.e. To return sizes in KB, specify a scale of 1024.
+                type: safeInt64
+                default: 1
+            freeStorage:
+                description: Include additional stats about allocated but unused space.
+                type: safeBool
+                default: false

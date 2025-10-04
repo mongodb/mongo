@@ -1,0 +1,200 @@
+# Based on the concurrency_sharded_replication_with_balancer_and_config_transitions.
+# This suite runs continuous config transitions and chunk migrations in the background.
+config_variables:
+  - &movePrimaryComment continuousConfigShardTransitionMovePrimary
+
+test_kind: fsm_workload_test
+
+selector:
+  roots:
+    - jstests/concurrency/fsm_workloads/**/*.js
+    - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*.js
+  exclude_files:
+    # SERVER-14669 Multi-removes that use $where miscount removed documents
+
+    # Disabled due to MongoDB restrictions and/or workload restrictions
+
+    # These workloads sometimes trigger 'Could not lock auth data update lock'
+    # errors because the AuthorizationManager currently waits for only five
+    # seconds to acquire the lock for authorization documents
+
+    # uses >100MB of data, which can overwhelm test hosts
+
+    # compact can only be run against a standalone mongod
+
+    # test creates too many collections for ContinuousAddRemoveShard
+    - jstests/concurrency/fsm_workloads/ddl/create_collection/create_collection.js
+
+    # can cause OOM kills on test hosts
+
+    # cannot createIndex after dropDatabase without sharding first
+
+    # The WTWriteConflictException failpoint is not supported on mongos.
+
+    # SERVER-20361 Improve the behaviour of multi-update/delete against a sharded collection
+
+    # TODO Undenylist (SERVER-38852).
+
+    # serverStatus does not include transaction metrics on mongos.
+
+    # Uses the same transaction id across different routers, which is not allowed because when either
+    # router tries to commit, it may not know the full participant list.
+
+    ##
+    # Denylists from concurrency_sharded_kill_primary_with_balancer
+    ##
+
+    # Disabled because MapReduce can lose cursors if the primary goes down during the operation.
+
+    # ChunkHelper directly talks to the config servers and doesn't support retries for network errors
+
+    # These workloads frequently time out waiting for the distributed lock to drop a sharded
+    # collection.
+
+    # Uses non retryable writes.
+
+    # Uses non retryable commands.
+    - jstests/concurrency/fsm_workloads/ddl/collMod/collMod.js
+    - jstests/concurrency/fsm_workloads/ddl/collMod/collMod_separate_collections.js
+    - jstests/concurrency/fsm_workloads/view_catalog/view_catalog.js
+    - jstests/concurrency/fsm_workloads/view_catalog/view_catalog_cycle_lookup.js
+    - jstests/concurrency/fsm_workloads/view_catalog/view_catalog_cycle_with_drop.js
+
+    # The aggregation stage $currentOp cannot run with a readConcern other than 'local'.
+
+    # The auto_retry_on_network_error.js override needs to overwrite the response from drop on
+    # NamespaceNotFound, and since this workload only creates and drops collections there isn't
+    # much value in running it.
+    - jstests/concurrency/fsm_workloads/ddl/drop_collection/drop_collection.js
+
+    # Use non-retryable commands not allowed by the network retry helper.
+
+    # This test runs a large number of inserts, which can cause moveCollection to take a long time
+    # to finish. This can cause the CheckMetadataConsistency hook to hit LockBusy errors.
+    - jstests/concurrency/fsm_workloads/timeseries/timeseries_insert_idle_bucket_expiration.js
+
+  exclude_with_any_tags:
+    - assumes_against_mongod_not_mongos
+    - assumes_balancer_off
+    - requires_replication
+    - requires_standalone
+    - requires_non_retryable_writes
+    # Curop requires readConcern local.
+    - uses_curop_agg_stage
+    # mongos has no system.profile collection.
+    - requires_profiling
+    - does_not_support_stepdowns
+    - assumes_unsharded_collection
+    # implicitly_retry_on_migration_in_progress.js alters find/aggregate commands
+    # so that the whole result set is returned through a single batch
+    - assumes_no_implicit_cursor_exhaustion
+
+    # The following tags are excluded specifically for this suite.
+    - config_shard_incompatible
+    - assumes_stable_shard_list
+
+    # This suite executes random moveCollections in the background that cause open cursors on the
+    # collection to be killed.
+    - requires_getmore
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+    tests: true
+  config:
+    shell_options:
+      eval: >-
+        await import("jstests/libs/override_methods/implicitly_retry_on_shard_transition_errors.js");
+        await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
+        await import("jstests/libs/override_methods/implicitly_retry_crud_on_no_progress_made.js");
+      global_vars:
+        TestData:
+          runningWithConfigStepdowns: true
+          runningWithShardStepdowns: true
+          killShards: true
+          useActionPermittedFile: [ContinuousStepdown, ContinuousAddRemoveShard]
+          runningWithBalancer: true
+          shardsAddedRemoved: true
+          hasRandomShardsAddedRemoved: true
+          implicitlyShardOnCreateCollectionOnly: true
+          shardCollectionProbability: 0.5
+  hooks:
+    - class: ContinuousStepdown
+      config_stepdown: true
+      shard_stepdown: true
+      is_fsm_workload: true
+      kill: true
+      randomize_kill: true
+    - class: ContinuousAddRemoveShard
+      transition_configsvr: true
+      add_remove_random_shards: true
+      move_primary_comment: *movePrimaryComment
+      is_fsm_workload: true
+    - class: CheckShardFilteringMetadata
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+      shell_options:
+        global_vars:
+          TestData:
+            shardsAddedRemoved: true
+            hasRandomShardsAddedRemoved: true
+    - class: CheckOrphansDeleted
+    - class: CheckRoutingTableConsistency
+    - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
+      shell_options:
+        global_vars:
+          TestData:
+            skipEnforceFastCountOnValidate: true
+    - class: CleanupConcurrencyWorkloads
+  fixture:
+    class: ShardedClusterFixture
+    config_shard: "any"
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+    configsvr_options:
+      num_nodes: 3
+      all_nodes_electable: true
+      replset_config_options:
+        settings:
+          catchUpTimeoutMillis: 0
+      mongod_options:
+        set_parameters:
+          reshardingMinimumOperationDurationMillis: 15000 # 15 seconds
+    shard_options:
+      all_nodes_electable: true
+      mongod_options:
+        oplogSize: 1024
+      replset_config_options:
+        settings:
+          catchUpTimeoutMillis: 0
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        enableElectionHandoff: 0
+        roleGraphInvalidationIsFatal: 1
+        queryAnalysisWriterIntervalSecs: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+        skipDroppingHashedShardKeyIndex: true
+        reshardingMinimumOperationDurationMillis: 0
+        # Manually set the random migration fail point so we can set a threshold for skipping
+        # moveCollection to prevent "starving" random chunk migrations.
+        failpoint.balancerShouldReturnRandomMigrations:
+          data:
+            skipMoveCollectionThreshold: 0.5
+          mode: alwaysOn
+        balancerMigrationsThrottlingMs: 250
+        featureFlagReshardingForTimeseries: true
+        failpoint.movePrimaryFailIfNeedToCloneMovableCollections:
+          data:
+            comment: *movePrimaryComment
+          mode: alwaysOn
+    num_rs_nodes_per_shard: 3
+    # Use 3 shards so there's always at least two for workloads with manual migrations, etc.
+    num_shards: 3
+    num_mongos: 2
+    enable_balancer: true

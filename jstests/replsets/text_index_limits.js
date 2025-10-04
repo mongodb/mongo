@@ -5,15 +5,14 @@
  * killed by a stepdown before any attempt can finish on slower variants.
  * @tags: [does_not_support_stepdowns]
  */
-(function() {
-"use strict";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const replTest = new ReplSetTest({nodes: 3});
 replTest.startSet();
 replTest.initiate();
 
 const db = replTest.getPrimary().getDB("test");
-var t = db.text_index_limits;
+let t = db.text_index_limits;
 t.drop();
 
 assert.commandWorked(t.createIndex({comments: "text"}));
@@ -32,8 +31,9 @@ for (let ch1 = 97; ch1 < 123; ch1++) {
         }
     }
 }
-assert.commandWorked(db.runCommand(
-    {insert: t.getName(), documents: [{_id: 1, comments: commentsWithALotOfUniqueWords}]}));
+assert.commandWorked(
+    db.runCommand({insert: t.getName(), documents: [{_id: 1, comments: commentsWithALotOfUniqueWords}]}),
+);
 
 // 2. Test total size of index keys for unique terms exceeds 4MB
 
@@ -49,8 +49,8 @@ for (let ch1 = 97; ch1 < 123; ch1++) {
     }
 }
 
-assert.commandWorked(db.runCommand(
-    {insert: t.getName(), documents: [{_id: 2, comments: commentsWithWordsOfLargeSize}]}));
+assert.commandWorked(
+    db.runCommand({insert: t.getName(), documents: [{_id: 2, comments: commentsWithWordsOfLargeSize}]}),
+);
 
 replTest.stopSet();
-})();

@@ -1,0 +1,38 @@
+### Overrides for some suites with encryption ###
+- name: testdata_ese
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              enableEncryption: ""
+              encryptionKeyFile: "src/mongo/db/modules/enterprise/jstests/encryptdb/libs/ekf2"
+
+- name: testdata_gcm
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              encryptionCipherMode: "AES256-GCM"
+
+- name: mongodfixture_ese
+  value:
+    executor:
+      fixture:
+        mongod_options:
+          enableEncryption: ""
+          encryptionKeyFile: "src/mongo/db/modules/enterprise/jstests/encryptdb/libs/ekf2"
+
+- name: mongodfixture_gcm
+  value:
+    executor:
+      fixture:
+        mongod_options:
+          encryptionCipherMode: "AES256-GCM"
+
+- name: excluded_files
+  value:
+    exclude_with_any_tags: []

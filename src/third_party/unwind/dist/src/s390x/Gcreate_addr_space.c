@@ -31,10 +31,6 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 
 #include "unwind_i.h"
 
-#if defined(_BIG_ENDIAN) && !defined(__BIG_ENDIAN)
-#define __BIG_ENDIAN _BIG_ENDIAN
-#endif
-
 unw_addr_space_t
 unw_create_addr_space (unw_accessors_t *a, int byte_order)
 {
@@ -46,7 +42,7 @@ unw_create_addr_space (unw_accessors_t *a, int byte_order)
   /*
    * s390x supports only big-endian.
    */
-  if (byte_order != 0 && byte_order != __BIG_ENDIAN)
+  if (byte_order != 0 && byte_order != UNW_BIG_ENDIAN)
     return NULL;
 
   as = malloc (sizeof (*as));

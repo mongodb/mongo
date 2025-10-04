@@ -30,11 +30,12 @@
 
 global:
     cpp_namespace: "mongo::repl"
+    mod_visibility: pub
     cpp_includes:
         - "mongo/db/repl/optime.h"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
     - "mongo/db/repl/replication_types.idl"
 
 structs:

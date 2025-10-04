@@ -27,36 +27,91 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
-#include "mongo/platform/basic.h"
-
-#include <memory>
-#include <vector>
-
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/logical_session_cache_noop.h"
-#include "mongo/db/op_observer_registry.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/crypto/encryption_fields_gen.h"
+#include "mongo/db/collection_crud/collection_write_path.h"
+#include "mongo/db/global_catalog/chunk_manager.h"
+#include "mongo/db/global_catalog/type_chunk.h"
+#include "mongo/db/global_catalog/type_collection_common_types_gen.h"
+#include "mongo/db/local_catalog/clustered_collection_options_gen.h"
+#include "mongo/db/local_catalog/collection_options.h"
+#include "mongo/db/local_catalog/index_catalog.h"
+#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
+#include "mongo/db/local_catalog/shard_role_catalog/collection_metadata.h"
+#include "mongo/db/local_catalog/shard_role_catalog/collection_sharding_runtime.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer/op_observer.h"
+#include "mongo/db/op_observer/op_observer_impl.h"
+#include "mongo/db/op_observer/op_observer_registry.h"
+#include "mongo/db/op_observer/operation_logger_impl.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/persistent_task_store.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/internal_plans.h"
-#include "mongo/db/repl/apply_ops.h"
+#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/repl/apply_ops_command_info.h"
+#include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
-#include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/op_observer_sharding_impl.h"
+#include "mongo/db/s/migration_chunk_cloner_source_op_observer.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_oplog_application.h"
-#include "mongo/db/s/resharding_util.h"
-#include "mongo/db/s/sharding_state.h"
+#include "mongo/db/s/resharding/resharding_oplog_applier_metrics.h"
+#include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/db/session_catalog_mongod.h"
-#include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/chunk_manager.h"
+#include "mongo/db/session/logical_session_cache.h"
+#include "mongo/db/session/logical_session_cache_noop.h"
+#include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/db/topology/cluster_role.h"
+#include "mongo/db/topology/sharding_state.h"
+#include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
+#include "mongo/db/update/document_diff_serialization.h"
+#include "mongo/db/update/update_oplog_entry_serialization.h"
+#include "mongo/db/versioning_protocol/chunk_version.h"
+#include "mongo/db/versioning_protocol/database_version.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/uuid.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <initializer_list>
+#include <limits>
+#include <memory>
+#include <ostream>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
 namespace {
@@ -66,11 +121,14 @@ public:
     void setUp() override {
         ServiceContextMongoDTest::setUp();
 
-        // Initialize sharding components as a shard server.
-        serverGlobalParams.clusterRole = ClusterRole::ShardServer;
-
         auto serviceContext = getServiceContext();
-        ShardingState::get(serviceContext)->setInitialized(_myDonorId.toString(), OID::gen());
+
+        const HostAndPort kConfigHostAndPort{"DummyConfig", 12345};
+        ShardingState::get(serviceContext)
+            ->setRecoveryCompleted({OID::gen(),
+                                    ClusterRole::ShardServer,
+                                    ConnectionString(kConfigHostAndPort),
+                                    _myDonorId});
         {
             auto opCtx = makeOperationContext();
             auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(serviceContext);
@@ -82,16 +140,24 @@ public:
             auto storageImpl = std::make_unique<repl::StorageInterfaceImpl>();
             repl::StorageInterface::set(serviceContext, std::move(storageImpl));
 
-            MongoDSessionCatalog::onStepUp(opCtx.get());
+            MongoDSessionCatalog::set(
+                serviceContext,
+                std::make_unique<MongoDSessionCatalog>(
+                    std::make_unique<MongoDSessionCatalogTransactionInterfaceImpl>()));
+            auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx.get());
+            mongoDSessionCatalog->onStepUp(opCtx.get());
             LogicalSessionCache::set(serviceContext, std::make_unique<LogicalSessionCacheNoop>());
 
-            // OpObserverShardingImpl is required for timestamping the writes from
+            // OpObserverImpl is required for timestamping the writes from
             // ReshardingOplogApplicationRules.
             auto opObserverRegistry =
                 dynamic_cast<OpObserverRegistry*>(serviceContext->getOpObserver());
             invariant(opObserverRegistry);
 
-            opObserverRegistry->addObserver(std::make_unique<OpObserverShardingImpl>());
+            opObserverRegistry->addObserver(
+                std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
+            opObserverRegistry->addObserver(
+                std::make_unique<MigrationChunkClonerSourceOpObserver>());
         }
 
         {
@@ -103,21 +169,36 @@ public:
             }
 
             {
-                AutoGetCollection autoColl(opCtx.get(), _outputNss, MODE_X);
-                CollectionShardingRuntime::get(opCtx.get(), _outputNss)
+                auto coll = acquireCollection(
+                    opCtx.get(),
+                    CollectionAcquisitionRequest{_outputNss,
+                                                 PlacementConcern::kPretendUnsharded,
+                                                 repl::ReadConcernArgs::get(opCtx.get()),
+                                                 AcquisitionPrerequisites::kWrite},
+                    MODE_X);
+                CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx.get(),
+                                                                                     _outputNss)
                     ->setFilteringMetadata(
                         opCtx.get(),
                         CollectionMetadata(makeChunkManagerForOutputCollection(), _myDonorId));
             }
 
-            _metrics = std::make_unique<ReshardingMetrics>(getServiceContext());
+            _metrics =
+                ReshardingMetrics::makeInstance_forTest(_sourceUUID,
+                                                        BSON(_newShardKey << 1),
+                                                        _outputNss,
+                                                        ReshardingMetricsCommon::Role::kRecipient,
+                                                        serviceContext->getFastClockSource()->now(),
+                                                        serviceContext);
+            _oplogApplierMetrics = std::make_unique<ReshardingOplogApplierMetrics>(
+                _myDonorId, _metrics.get(), boost::none);
             _applier = std::make_unique<ReshardingOplogApplicationRules>(
                 _outputNss,
                 std::vector<NamespaceString>{_myStashNss, _otherStashNss},
                 0U,
                 _myDonorId,
                 makeChunkManagerForSourceCollection(),
-                _metrics.get());
+                _oplogApplierMetrics.get());
         }
     }
 
@@ -184,30 +265,37 @@ public:
     void checkCollectionContents(OperationContext* opCtx,
                                  const NamespaceString& nss,
                                  const std::vector<BSONObj>& documents) {
-        AutoGetCollection coll(opCtx, nss, MODE_IS);
-        ASSERT_TRUE(bool(coll)) << "Collection '" << nss << "' does not exist";
+        auto coll = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead),
+            MODE_IS);
+        ASSERT_TRUE(coll.exists())
+            << "Collection '" << nss.toStringForErrorMsg() << "' does not exist";
 
-        auto exec = InternalPlanner::indexScan(opCtx,
-                                               &*coll,
-                                               coll->getIndexCatalog()->findIdIndex(opCtx),
-                                               BSONObj(),
-                                               BSONObj(),
-                                               BoundInclusion::kIncludeStartKeyOnly,
-                                               PlanYieldPolicy::YieldPolicy::NO_YIELD,
-                                               InternalPlanner::FORWARD,
-                                               InternalPlanner::IXSCAN_FETCH);
+        auto exec = InternalPlanner::indexScan(
+            opCtx,
+            coll,
+            coll.getCollectionPtr()->getIndexCatalog()->findIdIndex(opCtx),
+            BSONObj(),
+            BSONObj(),
+            BoundInclusion::kIncludeStartKeyOnly,
+            PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+            InternalPlanner::FORWARD,
+            InternalPlanner::IXSCAN_FETCH);
 
         size_t i = 0;
         BSONObj obj;
         while (exec->getNext(&obj, nullptr) == PlanExecutor::ADVANCED) {
             ASSERT_LT(i, documents.size())
-                << "Found extra document in collection: " << nss << ": " << obj;
+                << "Found extra document in collection: " << nss.toStringForErrorMsg() << ": "
+                << obj;
             ASSERT_BSONOBJ_BINARY_EQ(obj, documents[i]);
             ++i;
         }
 
         if (i < documents.size()) {
-            FAIL("Didn't find document in collection: ") << nss << ": " << documents[i];
+            FAIL("Didn't find document in collection: ")
+                << nss.toStringForErrorMsg() << ": " << documents[i];
         }
     }
 
@@ -221,9 +309,9 @@ public:
 
         PersistentTaskStore<repl::OplogEntryBase> store(NamespaceString::kRsOplogNamespace);
         store.forEach(opCtx,
-                      BSON("op"
-                           << "c"
-                           << "o.applyOps" << BSON("$exists" << true) << "ts" << BSON("$gt" << ts)),
+                      BSON("op" << "c"
+                                << "o.applyOps" << BSON("$exists" << true) << "ts"
+                                << BSON("$gt" << ts)),
                       [&](const auto& oplogEntry) {
                           auto applyOpsCmd = oplogEntry.getObject().getOwned();
                           auto applyOpsInfo = repl::ApplyOpsCommandInfo::parse(applyOpsCmd);
@@ -233,7 +321,7 @@ public:
 
                           for (const auto& innerOp : applyOpsInfo.getOperations()) {
                               operations.emplace_back(repl::DurableReplOperation::parse(
-                                  {"findApplyOpsNewerThan"}, innerOp));
+                                  innerOp, IDLParserContext{"findApplyOpsNewerThan"}));
                           }
 
                           result.emplace_back(
@@ -246,7 +334,6 @@ public:
 
 private:
     ChunkManager makeChunkManager(const OID& epoch,
-                                  const ShardId& shardId,
                                   const NamespaceString& nss,
                                   const UUID& uuid,
                                   const BSONObj& shardKey,
@@ -254,18 +341,16 @@ private:
         auto rt = RoutingTableHistory::makeNew(nss,
                                                uuid,
                                                shardKey,
+                                               false, /* unsplittable */
                                                nullptr /* defaultCollator */,
                                                false /* unique */,
                                                epoch,
                                                Timestamp(1, 1),
                                                boost::none /* timeseriesFields */,
                                                boost::none /* reshardingFields */,
-                                               boost::none /* chunkSizeBytes */,
                                                true /* allowMigrations */,
                                                chunks);
-        return ChunkManager(shardId,
-                            DatabaseVersion(UUID::gen(), Timestamp(1, 1)),
-                            makeStandaloneRoutingTableHistory(std::move(rt)),
+        return ChunkManager(makeStandaloneRoutingTableHistory(std::move(rt)),
                             boost::none /* clusterTime */);
     }
 
@@ -279,33 +364,32 @@ private:
                 _sourceUUID,
                 ChunkRange{BSON(_currentShardKey << MINKEY),
                            BSON(_currentShardKey << -std::numeric_limits<double>::infinity())},
-                ChunkVersion(100, 0, epoch, Timestamp(1, 1)),
+                ChunkVersion({epoch, Timestamp(1, 1)}, {100, 0}),
                 _myDonorId},
             ChunkType{_sourceUUID,
                       ChunkRange{BSON(_currentShardKey << -std::numeric_limits<double>::infinity()),
                                  BSON(_currentShardKey << 0)},
-                      ChunkVersion(100, 1, epoch, Timestamp(1, 1)),
+                      ChunkVersion({epoch, Timestamp(1, 1)}, {100, 1}),
                       _otherDonorId},
             ChunkType{_sourceUUID,
                       ChunkRange{BSON(_currentShardKey << 0), BSON(_currentShardKey << MAXKEY)},
-                      ChunkVersion(100, 2, epoch, Timestamp(1, 1)),
+                      ChunkVersion({epoch, Timestamp(1, 1)}, {100, 2}),
                       _myDonorId}};
 
         return makeChunkManager(
-            epoch, _myDonorId, _sourceNss, _sourceUUID, BSON(_currentShardKey << 1), chunks);
+            epoch, _sourceNss, _sourceUUID, BSON(_currentShardKey << 1), chunks);
     }
 
     ChunkManager makeChunkManagerForOutputCollection() {
         const OID epoch = OID::gen();
-        const CollectionUUID outputUuid = UUID::gen();
+        const UUID outputUuid = UUID::gen();
         std::vector<ChunkType> chunks = {
             ChunkType{outputUuid,
                       ChunkRange{BSON(_newShardKey << MINKEY), BSON(_newShardKey << MAXKEY)},
-                      ChunkVersion(100, 0, epoch, Timestamp(1, 1)),
+                      ChunkVersion({epoch, Timestamp(1, 1)}, {100, 0}),
                       _myDonorId}};
 
-        return makeChunkManager(
-            epoch, _myDonorId, _outputNss, outputUuid, BSON(_newShardKey << 1), chunks);
+        return makeChunkManager(epoch, _outputNss, outputUuid, BSON(_newShardKey << 1), chunks);
     }
 
     RoutingTableHistoryValueHandle makeStandaloneRoutingTableHistory(RoutingTableHistory rt) {
@@ -318,20 +402,25 @@ private:
     const StringData _currentShardKey = "sk";
     const StringData _newShardKey = "new_sk";
 
-    const NamespaceString _sourceNss{"test_crud", "collection_being_resharded"};
-    const CollectionUUID _sourceUUID = UUID::gen();
+    const NamespaceString _sourceNss =
+        NamespaceString::createNamespaceString_forTest("test_crud", "collection_being_resharded");
+    const UUID _sourceUUID = UUID::gen();
 
     const ShardId _myDonorId{"myDonorId"};
     const ShardId _otherDonorId{"otherDonorId"};
 
     const NamespaceString _outputNss =
-        constructTemporaryReshardingNss(_sourceNss.db(), _sourceUUID);
-    const NamespaceString _myStashNss = getLocalConflictStashNamespace(_sourceUUID, _myDonorId);
+        resharding::constructTemporaryReshardingNss(_sourceNss, _sourceUUID);
+    const NamespaceString _myStashNss =
+        resharding::getLocalConflictStashNamespace(_sourceUUID, _myDonorId);
     const NamespaceString _otherStashNss =
-        getLocalConflictStashNamespace(_sourceUUID, _otherDonorId);
+        resharding::getLocalConflictStashNamespace(_sourceUUID, _otherDonorId);
+
+    service_context_test::ShardRoleOverride _shardRole;
 
     std::unique_ptr<ReshardingOplogApplicationRules> _applier;
     std::unique_ptr<ReshardingMetrics> _metrics;
+    std::unique_ptr<ReshardingOplogApplierMetrics> _oplogApplierMetrics;
 };
 
 TEST_F(ReshardingOplogCrudApplicationTest, InsertOpInsertsIntoOuputCollection) {
@@ -450,7 +539,10 @@ TEST_F(ReshardingOplogCrudApplicationTest, UpdateOpModifiesStashCollectionAfterI
     {
         auto opCtx = makeOperationContext();
         ASSERT_OK(applier()->applyOperation(
-            opCtx.get(), makeUpdateOp(BSON("_id" << 0), BSON("$set" << BSON("x" << 1)))));
+            opCtx.get(),
+            makeUpdateOp(BSON("_id" << 0),
+                         update_oplog_entry::makeDeltaOplogEntry(
+                             BSON(doc_diff::kUpdateSectionFieldName << BSON("x" << 1))))));
     }
 
     // We should have applied rule #1 and updated the document with {_id: 0} in the stash collection
@@ -482,7 +574,10 @@ TEST_F(ReshardingOplogCrudApplicationTest, UpdateOpIsNoopWhenDifferentOwningDono
     {
         auto opCtx = makeOperationContext();
         ASSERT_OK(applier()->applyOperation(
-            opCtx.get(), makeUpdateOp(BSON("_id" << 0), BSON("$set" << BSON("x" << 1)))));
+            opCtx.get(),
+            makeUpdateOp(BSON("_id" << 0),
+                         update_oplog_entry::makeDeltaOplogEntry(
+                             BSON(doc_diff::kUpdateSectionFieldName << BSON("x" << 1))))));
     }
 
     // The document {_id: 0, sk: -1} that exists in the output collection does not belong to this
@@ -498,7 +593,10 @@ TEST_F(ReshardingOplogCrudApplicationTest, UpdateOpIsNoopWhenDifferentOwningDono
     {
         auto opCtx = makeOperationContext();
         ASSERT_OK(applier()->applyOperation(
-            opCtx.get(), makeUpdateOp(BSON("_id" << 2), BSON("$set" << BSON("x" << 1)))));
+            opCtx.get(),
+            makeUpdateOp(BSON("_id" << 2),
+                         update_oplog_entry::makeDeltaOplogEntry(
+                             BSON(doc_diff::kUpdateSectionFieldName << BSON("x" << 1))))));
     }
 
     // There does not exist a document with {_id: 2} in the output collection, so we should have
@@ -529,9 +627,15 @@ TEST_F(ReshardingOplogCrudApplicationTest, UpdateOpModifiesOutputCollection) {
     {
         auto opCtx = makeOperationContext();
         ASSERT_OK(applier()->applyOperation(
-            opCtx.get(), makeUpdateOp(BSON("_id" << 1), BSON("$set" << BSON("x" << 1)))));
+            opCtx.get(),
+            makeUpdateOp(BSON("_id" << 1),
+                         update_oplog_entry::makeDeltaOplogEntry(
+                             BSON(doc_diff::kUpdateSectionFieldName << BSON("x" << 1))))));
         ASSERT_OK(applier()->applyOperation(
-            opCtx.get(), makeUpdateOp(BSON("_id" << 2), BSON("$set" << BSON("x" << 2)))));
+            opCtx.get(),
+            makeUpdateOp(BSON("_id" << 2),
+                         update_oplog_entry::makeDeltaOplogEntry(
+                             BSON(doc_diff::kUpdateSectionFieldName << BSON("x" << 2))))));
     }
 
     // We should have updated both documents in the output collection to include the new field "x".
@@ -684,12 +788,17 @@ TEST_F(ReshardingOplogCrudApplicationTest, DeleteOpAtomicallyMovesFromOtherStash
             applier()->applyOperation(opCtx.get(), makeInsertOp(BSON("_id" << 0 << sk() << 2))));
 
         {
-            AutoGetCollection otherStashColl(opCtx.get(), otherStashNss(), MODE_IX);
+            auto otherStashColl = acquireCollection(
+                opCtx.get(),
+                CollectionAcquisitionRequest::fromOpCtx(
+                    opCtx.get(), otherStashNss(), AcquisitionPrerequisites::kWrite),
+                MODE_IX);
             WriteUnitOfWork wuow(opCtx.get());
             ASSERT_OK(
-                otherStashColl->insertDocument(opCtx.get(),
-                                               InsertStatement{BSON("_id" << 0 << sk() << -3)},
-                                               nullptr /* opDebug */));
+                collection_internal::insertDocument(opCtx.get(),
+                                                    otherStashColl.getCollectionPtr(),
+                                                    InsertStatement{BSON("_id" << 0 << sk() << -3)},
+                                                    nullptr /* opDebug */));
             wuow.commit();
         }
 

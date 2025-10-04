@@ -1,0 +1,10 @@
+storage:
+  engine: inMemory
+  dbPath: /home/ubuntu/data/inmemorydb
+systemLog:
+  path: /home/ubuntu/data/logs/mongod-inmemory.log
+  destination: file
+  logAppend: false
+setParameter:
+  internalMeasureQueryExecutionTimeInNanoseconds: true
+  enableTestCommands: 1

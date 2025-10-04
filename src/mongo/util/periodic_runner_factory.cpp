@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/util/periodic_runner_factory.h"
 
 #include "mongo/db/service_context.h"

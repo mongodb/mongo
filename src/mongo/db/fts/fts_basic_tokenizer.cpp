@@ -27,18 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/fts/fts_basic_tokenizer.h"
 
-#include <memory>
-
-#include "mongo/db/fts/fts_query_impl.h"
-#include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/fts/stemmer.h"
 #include "mongo/db/fts/stop_words.h"
 #include "mongo/db/fts/tokenizer.h"
 #include "mongo/util/str.h"
+
+#include <memory>
 
 namespace mongo {
 namespace fts {
@@ -50,7 +46,7 @@ BasicFTSTokenizer::BasicFTSTokenizer(const FTSLanguage* language)
 
 void BasicFTSTokenizer::reset(StringData document, Options options) {
     _options = options;
-    _document = document.toString();
+    _document = std::string{document};
     _tokenizer = std::make_unique<Tokenizer>(_language, _document);
 }
 
@@ -78,10 +74,10 @@ bool BasicFTSTokenizer::moveNext() {
         }
 
         if (_options & FTSTokenizer::kGenerateCaseSensitiveTokens) {
-            word = token.data.toString();
+            word = std::string{token.data};
         }
 
-        _stem = _stemmer.stem(word).toString();
+        _stem = std::string{_stemmer.stem(word)};
         return true;
     }
 }

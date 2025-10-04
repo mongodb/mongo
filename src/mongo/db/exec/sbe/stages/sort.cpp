@@ -27,220 +27,83 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/exec/sbe/stages/sort.h"
 
-#include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
-#include "mongo/db/exec/trial_run_tracker.h"
-#include "mongo/db/stats/resource_consumption_metrics.h"
+#include "mongo/db/exec/sbe/values/row.h"
+#include "mongo/db/storage/storage_options.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
-namespace {
-std::string nextFileName() {
-    static mongo::AtomicWord<unsigned> sortExecutorFileCounter;
-    return "extsort-sort-sbe." + std::to_string(sortExecutorFileCounter.fetchAndAdd(1));
-}
-}  // namespace
+#include <cstdint>
+#include <limits>
+#include <string>
 
-#include "mongo/db/sorter/sorter.cpp"
 
-namespace mongo {
-namespace sbe {
+namespace mongo::sbe {
 SortStage::SortStage(std::unique_ptr<PlanStage> input,
                      value::SlotVector obs,
                      std::vector<value::SortDirection> dirs,
                      value::SlotVector vals,
-                     size_t limit,
+                     std::unique_ptr<EExpression> limit,
                      size_t memoryLimit,
                      bool allowDiskUse,
-                     PlanNodeId planNodeId)
-    : PlanStage("sort"_sd, planNodeId),
+                     PlanYieldPolicy* yieldPolicy,
+                     PlanNodeId planNodeId,
+                     bool participateInTrialRunTracking)
+    : PlanStage("sort"_sd, yieldPolicy, planNodeId, participateInTrialRunTracking),
       _obs(std::move(obs)),
       _dirs(std::move(dirs)),
       _vals(std::move(vals)),
       _allowDiskUse(allowDiskUse),
-      _mergeData({0, 0}) {
+      _limitExpr(std::move(limit)) {
     _children.emplace_back(std::move(input));
 
-    invariant(_obs.size() == _dirs.size());
+    tassert(11094711,
+            "Expect the number of order-by slots to match the number of sort directions",
+            _obs.size() == _dirs.size());
 
-    _specificStats.limit = limit;
     _specificStats.maxMemoryUsageBytes = memoryLimit;
 }
 
 SortStage::~SortStage() {}
+
+void SortStage::prepare(CompileCtx& ctx) {
+    _stageImpl = _makeStageImpl();
+    _stageImpl->prepare(ctx);
+}
+
+value::SlotAccessor* SortStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
+    return _stageImpl->getAccessor(ctx, slot);
+}
+
+void SortStage::open(bool reOpen) {
+    _stageImpl->open(reOpen);
+}
+
+PlanState SortStage::getNext() {
+    return _stageImpl->getNext();
+}
+
+void SortStage::close() {
+    return _stageImpl->close();
+}
 
 std::unique_ptr<PlanStage> SortStage::clone() const {
     return std::make_unique<SortStage>(_children[0]->clone(),
                                        _obs,
                                        _dirs,
                                        _vals,
-                                       _specificStats.limit,
+                                       _limitExpr ? _limitExpr->clone() : nullptr,
                                        _specificStats.maxMemoryUsageBytes,
                                        _allowDiskUse,
-                                       _commonStats.nodeId);
-}
-
-void SortStage::prepare(CompileCtx& ctx) {
-    _children[0]->prepare(ctx);
-
-    size_t counter = 0;
-    // Process order by fields.
-    for (auto& slot : _obs) {
-        _inKeyAccessors.emplace_back(_children[0]->getAccessor(ctx, slot));
-        auto [it, inserted] =
-            _outAccessors.emplace(slot,
-                                  std::make_unique<value::MaterializedRowKeyAccessor<SorterData*>>(
-                                      _mergeDataIt, counter));
-        ++counter;
-        uassert(4822812, str::stream() << "duplicate field: " << slot, inserted);
-    }
-
-    counter = 0;
-    // Process value fields.
-    for (auto& slot : _vals) {
-        _inValueAccessors.emplace_back(_children[0]->getAccessor(ctx, slot));
-        auto [it, inserted] = _outAccessors.emplace(
-            slot,
-            std::make_unique<value::MaterializedRowValueAccessor<SorterData*>>(_mergeDataIt,
-                                                                               counter));
-        ++counter;
-        uassert(4822813, str::stream() << "duplicate field: " << slot, inserted);
-    }
-}
-
-value::SlotAccessor* SortStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
-    if (auto it = _outAccessors.find(slot); it != _outAccessors.end()) {
-        return it->second.get();
-    }
-
-    return ctx.getAccessor(slot);
-}
-
-void SortStage::makeSorter() {
-    SortOptions opts;
-    opts.tempDir = storageGlobalParams.dbpath + "/_tmp";
-    opts.maxMemoryUsageBytes = _specificStats.maxMemoryUsageBytes;
-    opts.extSortAllowed = _allowDiskUse;
-    opts.limit =
-        _specificStats.limit != std::numeric_limits<size_t>::max() ? _specificStats.limit : 0;
-    opts.moveSortedDataIntoIterator = true;
-
-    auto comp = [&](const SorterData& lhs, const SorterData& rhs) {
-        auto size = lhs.first.size();
-        auto& left = lhs.first;
-        auto& right = rhs.first;
-        for (size_t idx = 0; idx < size; ++idx) {
-            auto [lhsTag, lhsVal] = left.getViewOfValue(idx);
-            auto [rhsTag, rhsVal] = right.getViewOfValue(idx);
-            auto [tag, val] = value::compareValue(lhsTag, lhsVal, rhsTag, rhsVal);
-
-            auto result = value::bitcastTo<int32_t>(val);
-            if (result) {
-                return _dirs[idx] == value::SortDirection::Descending ? -result : result;
-            }
-        }
-
-        return 0;
-    };
-
-    _sorter.reset(Sorter<value::MaterializedRow, value::MaterializedRow>::make(opts, comp, {}));
-    _mergeIt.reset();
-}
-
-void SortStage::doDetachFromTrialRunTracker() {
-    _tracker = nullptr;
-}
-
-PlanStage::TrialRunTrackerAttachResultMask SortStage::doAttachToTrialRunTracker(
-    TrialRunTracker* tracker, TrialRunTrackerAttachResultMask childrenAttachResult) {
-    // The SortStage only tracks the "numResults" metric when it is the most deeply nested blocking
-    // stage.
-    if (!(childrenAttachResult & TrialRunTrackerAttachResultFlags::AttachedToBlockingStage)) {
-        _tracker = tracker;
-    }
-
-    // Return true to indicate that the tracker is attached to a blocking stage: either this stage
-    // or one of its descendent stages.
-    return childrenAttachResult | TrialRunTrackerAttachResultFlags::AttachedToBlockingStage;
-}
-
-void SortStage::open(bool reOpen) {
-    auto optTimer(getOptTimer(_opCtx));
-
-    invariant(_opCtx);
-    _commonStats.opens++;
-    _children[0]->open(reOpen);
-
-    makeSorter();
-
-    while (_children[0]->getNext() == PlanState::ADVANCED) {
-        value::MaterializedRow keys{_inKeyAccessors.size()};
-        value::MaterializedRow vals{_inValueAccessors.size()};
-
-        size_t idx = 0;
-        for (auto accessor : _inKeyAccessors) {
-            auto [tag, val] = accessor->getViewOfValue();
-            auto [cTag, cVal] = copyValue(tag, val);
-            keys.reset(idx++, true, cTag, cVal);
-        }
-
-        idx = 0;
-        for (auto accessor : _inValueAccessors) {
-            auto [tag, val] = accessor->getViewOfValue();
-            auto [cTag, cVal] = copyValue(tag, val);
-            vals.reset(idx++, true, cTag, cVal);
-        }
-
-        _sorter->emplace(std::move(keys), std::move(vals));
-
-        if (_tracker && _tracker->trackProgress<TrialRunTracker::kNumResults>(1)) {
-            // If we either hit the maximum number of document to return during the trial run, or
-            // if we've performed enough physical reads, stop populating the sort heap and bail out
-            // from the trial run by raising a special exception to signal a runtime planner that
-            // this candidate plan has completed its trial run early. Note that the sort stage is a
-            // blocking operation and until all documents are loaded from the child stage and
-            // sorted, the control is not returned to the runtime planner, so an raising this
-            // special is mechanism to stop the trial run without affecting the plan stats of the
-            // higher level stages.
-            _tracker = nullptr;
-            _children[0]->close();
-            uasserted(ErrorCodes::QueryTrialRunCompleted, "Trial run early exit in sort");
-        }
-    }
-
-    _specificStats.totalDataSizeBytes += _sorter->totalDataSizeSorted();
-    _mergeIt.reset(_sorter->done());
-    _specificStats.spills += _sorter->numSpills();
-    _specificStats.keysSorted += _sorter->numSorted();
-    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
-    metricsCollector.incrementKeysSorted(_sorter->numSorted());
-    metricsCollector.incrementSorterSpills(_sorter->numSpills());
-
-    _children[0]->close();
-}
-
-PlanState SortStage::getNext() {
-    auto optTimer(getOptTimer(_opCtx));
-
-    // When the sort spilled data to disk then read back the sorted runs.
-    if (_mergeIt && _mergeIt->more()) {
-        _mergeData = _mergeIt->next();
-
-        return trackPlanState(PlanState::ADVANCED);
-    } else {
-        return trackPlanState(PlanState::IS_EOF);
-    }
-}
-
-void SortStage::close() {
-    auto optTimer(getOptTimer(_opCtx));
-
-    trackClose();
-    _mergeIt.reset();
-    _sorter.reset();
+                                       _yieldPolicy,
+                                       _commonStats.nodeId,
+                                       participateInTrialRunTracking());
 }
 
 std::unique_ptr<PlanStageStats> SortStage::getStats(bool includeDebugInfo) const {
@@ -252,8 +115,20 @@ std::unique_ptr<PlanStageStats> SortStage::getStats(bool includeDebugInfo) const
         bob.appendNumber("memLimit", static_cast<long long>(_specificStats.maxMemoryUsageBytes));
         bob.appendNumber("totalDataSizeSorted",
                          static_cast<long long>(_specificStats.totalDataSizeBytes));
-        bob.appendBool("usedDisk", _specificStats.spills > 0);
-        bob.appendNumber("spills", static_cast<long long>(_specificStats.spills));
+        bob.appendBool("usedDisk", _specificStats.spillingStats.getSpills() > 0);
+        bob.appendNumber("spills",
+                         static_cast<long long>(_specificStats.spillingStats.getSpills()));
+        bob.appendNumber(
+            "spilledDataStorageSize",
+            static_cast<long long>(_specificStats.spillingStats.getSpilledDataStorageSize()));
+        bob.appendNumber("spilledBytes",
+                         static_cast<long long>(_specificStats.spillingStats.getSpilledBytes()));
+        bob.appendNumber("spilledRecords",
+                         static_cast<long long>(_specificStats.spillingStats.getSpilledRecords()));
+        if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
+            bob.appendNumber("peakTrackedMemBytes",
+                             static_cast<long long>(_specificStats.peakTrackedMemBytes));
+        }
 
         BSONObjBuilder childrenBob(bob.subobjStart("orderBySlots"));
         for (size_t idx = 0; idx < _obs.size(); ++idx) {
@@ -306,8 +181,8 @@ std::vector<DebugPrinter::Block> SortStage::debugPrint() const {
     }
     ret.emplace_back("`]");
 
-    if (_specificStats.limit != std::numeric_limits<size_t>::max()) {
-        ret.emplace_back(std::to_string(_specificStats.limit));
+    if (_limitExpr) {
+        DebugPrinter::addBlocks(ret, _limitExpr->debugPrint());
     }
 
     DebugPrinter::addNewLine(ret);
@@ -323,7 +198,8 @@ size_t SortStage::estimateCompileTimeSize() const {
     size += size_estimator::estimate(_dirs);
     size += size_estimator::estimate(_vals);
     size += size_estimator::estimate(_specificStats);
+    size += _limitExpr ? _limitExpr->estimateSize() : 0;
     return size;
 }
-}  // namespace sbe
-}  // namespace mongo
+
+}  // namespace mongo::sbe

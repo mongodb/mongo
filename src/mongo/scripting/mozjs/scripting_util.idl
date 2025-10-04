@@ -31,23 +31,24 @@
 # for that class.
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
+    mod_visibility: private
 
 imports:
-  - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 structs:
-
-  EndSessions:
-    description: "A struct representing an endSessions command"
-    strict: true
-    fields:
-      endSessions: array<object>
+    EndSessions:
+        description: "A struct representing an endSessions command"
+        strict: true
+        fields:
+            endSessions: array<object>
 
 server_parameters:
-  skipShellCursorFinalize:
-    description: 'Skip finalizing cursors during garbage collection in shell'
-    set_at: startup
-    cpp_vartype: bool
-    cpp_varname: 'skipShellCursorFinalize'
-    default: false
+    skipShellCursorFinalize:
+        description: "Skip finalizing cursors during garbage collection in shell"
+        set_at: startup
+        cpp_vartype: bool
+        cpp_varname: "skipShellCursorFinalize"
+        default: false
+        redact: false

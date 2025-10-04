@@ -1,0 +1,43 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "sort_pattern",
+    srcs = [
+        "sort_pattern.cpp",
+    ],
+    hdrs = [
+        "sort_pattern.h",
+    ],
+    header_deps = [
+        "//src/mongo/db/exec/document_value",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:query_expressions",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query/compiler/dependency_analysis",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "sort_pattern_test",
+    srcs = [
+        "sort_pattern_test.cpp",
+    ],
+    tags = ["mongo_unittest_sixth_group"],
+    deps = [
+        ":sort_pattern",
+        "//src/mongo/db/exec/document_value:document_value_test_util",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/idl:server_parameter_test_controller",
+        "//src/mongo/util:clock_source_mock",
+    ],
+)

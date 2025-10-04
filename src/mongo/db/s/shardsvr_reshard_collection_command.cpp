@@ -27,19 +27,43 @@
  *    it in the license file.
  */
 
+
+#include "mongo/base/checked_cast.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/cluster_parameters/sharding_cluster_parameters_gen.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/global_catalog/ddl/cluster_ddl.h"
+#include "mongo/db/global_catalog/ddl/reshard_collection_coordinator.h"
+#include "mongo/db/global_catalog/ddl/reshard_collection_coordinator_document_gen.h"
+#include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
+#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_gen.h"
+#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_service.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/topology/sharding_state.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/future.h"
+
+#include <memory>
+#include <string>
+#include <utility>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/s/dist_lock_manager.h"
-#include "mongo/db/s/reshard_collection_coordinator.h"
-#include "mongo/db/s/sharding_state.h"
-#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
 namespace mongo {
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(shardsvrReshardCollectionJoinedExistingOperation);
 
 class ShardsvrReshardCollectionCommand final
     : public TypedCommand<ShardsvrReshardCollectionCommand> {
@@ -68,30 +92,81 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
+            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+            ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
+            uassert(ErrorCodes::IllegalOperation,
+                    "Can't reshard a collection in the config database",
+                    !ns().isConfigDB());
 
-            uassert(ErrorCodes::InvalidOptions,
-                    str::stream() << Request::kCommandName
-                                  << " must be called with majority writeConcern, got "
-                                  << opCtx->getWriteConcern().wMode,
-                    opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
-            // (Generic FCV reference): To run this command and ensure the consistency of the
-            // metadata we need to make sure we are on a stable state.
-            uassert(
-                ErrorCodes::CommandNotSupported,
-                "Resharding is not supported for this version, please update the FCV to latest.",
-                !serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
+            CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
+                                                          opCtx->getWriteConcern());
+            resharding::validatePerformVerification(VersionContext::getDecoration(opCtx),
+                                                    request().getPerformVerification());
 
-            DistLockManager::ScopedDistLock dbDistLock(
-                uassertStatusOK(DistLockManager::get(opCtx)->lock(
-                    opCtx, ns().db(), "reshardCollection", DistLockManager::kDefaultLockTimeout)));
-            DistLockManager::ScopedDistLock collDistLock(
-                uassertStatusOK(DistLockManager::get(opCtx)->lock(
-                    opCtx, ns().ns(), "reshardCollection", DistLockManager::kDefaultLockTimeout)));
+            if (resharding::isMoveCollection(request().getProvenance())) {
+                bool clusterHasTwoOrMoreShards = [&]() {
+                    auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
+                    auto* clusterCardinalityParam =
+                        clusterParameters
+                            ->get<ClusterParameterWithStorage<ShardedClusterCardinalityParam>>(
+                                "shardedClusterCardinalityForDirectConns");
+                    return clusterCardinalityParam->getValue(boost::none).getHasTwoOrMoreShards();
+                }();
 
-            auto reshardCollectionCoordinator =
-                std::make_shared<ReshardCollectionCoordinator>(opCtx, request());
-            reshardCollectionCoordinator->run(opCtx).get(opCtx);
+                uassert(ErrorCodes::IllegalOperation,
+                        "Cannot move a collection until a second shard has been successfully added",
+                        clusterHasTwoOrMoreShards);
+
+                uassert(ErrorCodes::IllegalOperation,
+                        "Can't move an internal resharding collection",
+                        !ns().isTemporaryReshardingCollection());
+
+                // TODO (SERVER-88623): re-evalutate the need to track the collection before calling
+                // into moveCollection
+                ShardsvrCreateCollectionRequest trackCollectionRequest;
+                trackCollectionRequest.setUnsplittable(true);
+                trackCollectionRequest.setRegisterExistingCollectionInGlobalCatalog(true);
+                ShardsvrCreateCollection shardsvrCollCommand(ns());
+                shardsvrCollCommand.setShardsvrCreateCollectionRequest(trackCollectionRequest);
+                try {
+                    cluster::createCollectionWithRouterLoop(opCtx, shardsvrCollCommand);
+                } catch (const ExceptionFor<ErrorCodes::LockBusy>& ex) {
+                    // If we encounter a lock timeout while trying to track a collection for a
+                    // resharding operation, it may indicate that resharding is already running for
+                    // this collection. Check if the collection is already tracked and attempt to
+                    // join the resharding command if so.
+                    try {
+                        auto coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, ns());
+                    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                        // If the collection isn't tracked, then moveCollection cannot possibly be
+                        // ongoing, so we just surface the LockBusy error.
+                        throw ex;
+                    }
+                } catch (const ExceptionFor<ErrorCodes::NamespaceExists>&) {
+                    // The registration may throw NamespaceExists when the namespace is a view.
+                    // Proceed and let resharding return the proper error in that case.
+                }
+            }
+
+            const auto reshardCollectionCoordinatorCompletionFuture =
+                [&]() -> SharedSemiFuture<void> {
+                ReshardCollectionRequest reshardCollectionRequest =
+                    request().getReshardCollectionRequest();
+                auto coordinatorDoc = ReshardCollectionCoordinatorDocument();
+                coordinatorDoc.setReshardCollectionRequest(std::move(reshardCollectionRequest));
+                coordinatorDoc.setShardingDDLCoordinatorMetadata(
+                    {{ns(), DDLCoordinatorTypeEnum::kReshardCollection}});
+
+                auto service = ShardingDDLCoordinatorService::getService(opCtx);
+                auto reshardCollectionCoordinator =
+                    checked_pointer_cast<ReshardCollectionCoordinator>(service->getOrCreateInstance(
+                        opCtx, coordinatorDoc.toBSON(), FixedFCVRegion{opCtx}));
+                return reshardCollectionCoordinator->getCompletionFuture();
+            }();
+
+            shardsvrReshardCollectionJoinedExistingOperation.pauseWhileSet();
+
+            reshardCollectionCoordinatorCompletionFuture.get(opCtx);
         }
 
     private:
@@ -107,12 +182,13 @@ public:
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",
                     AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                           ActionType::internal));
+                        ->isAuthorizedForActionsOnResource(
+                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                            ActionType::internal));
         }
     };
-
-} shardsvrReshardCollectionCommand;
+};
+MONGO_REGISTER_COMMAND(ShardsvrReshardCollectionCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

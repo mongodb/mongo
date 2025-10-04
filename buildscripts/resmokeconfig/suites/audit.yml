@@ -2,10 +2,10 @@ test_kind: js_test
 
 selector:
   roots:
-  - src/mongo/db/modules/*/jstests/audit/*.js
+    - src/mongo/db/modules/*/jstests/audit/*.js
 
 # audit tests start their own mongod's.
 executor:
   config:
     shell_options:
-      nodb: ''
+      nodb: ""

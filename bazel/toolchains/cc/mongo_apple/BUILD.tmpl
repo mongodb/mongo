@@ -1,0 +1,94 @@
+package(default_visibility = ["//visibility:public"])
+
+load("@//bazel/config:configs.bzl", "sdkroot")
+load("@//bazel/toolchains/cc/mongo_apple:mongo_apple_toolchain.bzl", "get_supported_apple_archs")
+load("@//bazel/toolchains/cc/mongo_apple:mongo_apple_llvm_cc_toolchain_config.bzl", "mongo_apple_llvm_cc_toolchain_config")
+load(
+    "@//bazel/toolchains/cc:mongo_custom_features.bzl",
+    "FEATURES_ATTR_NAMES",
+    "get_common_features_attrs")
+
+# Helper target for the toolchain (see below):
+filegroup(
+    name = "all_files",
+    srcs = glob(["**/*"]),
+)
+
+DEBUG_LEVEL = select({
+    "@//bazel/config:gcc_or_clang_dbg_level_0": 0,
+    "@//bazel/config:gcc_or_clang_dbg_level_1": 1,
+    "@//bazel/config:gcc_or_clang_dbg_level_2": 2,
+    "@//bazel/config:gcc_or_clang_dbg_level_3": 3,
+})
+
+[
+    cc_toolchain(
+        name = "cc-compiler-" + arch,
+        all_files = ":all_files",
+        ar_files = ":all_files",
+        as_files = ":all_files",
+        compiler_files = ":all_files",
+        dwp_files = ":empty",
+        linker_files = ":all_files",
+        objcopy_files = ":empty",
+        strip_files = ":all_files",
+        supports_header_parsing = 1,
+        supports_param_files = 1,
+        toolchain_config = "llvm_" + arch,
+        toolchain_identifier = "apple_llvm_clang_toolchain_" + arch,
+    )
+    for arch, cpu in get_supported_apple_archs().items()
+]
+
+feature_attrs = get_common_features_attrs()
+
+[
+    mongo_apple_llvm_cc_toolchain_config(
+        name = "llvm_" + arch,
+        cpu = "darwin",
+        compiler = "clang",
+        toolchain_identifier = "apple_llvm_clang_toolchain_" + arch,
+        target_libc = "macosx",
+        abi_version = "darwin_" + arch,
+        abi_libc_version = "darwin_" + arch,
+        cxx_builtin_include_directories = [
+            %{cxx_builtin_include_directories}
+        ],
+        tool_paths = {
+            "ar": "%{llvm_path}/bin/llvm-ar",
+            "cpp": "%{llvm_path}/bin/clang-cpp",
+            "ld":  "%{lld_path}/bin/ld.lld",
+            "dwp": "%{llvm_path}/bin/llvm-dwp",
+            "gcc": "%{llvm_path}/bin/clang",
+            "g++": "%{llvm_path}/bin/clang++",
+            "gcov": "%{llvm_path}/bin/llvm-profdata",
+            "llvm-cov": "%{llvm_path}/bin/llvm-cov",
+            "llvm-profdata": "%{llvm_path}/bin/llvm-profdata",
+            "nm": "%{llvm_path}/bin/llvm-nm",
+            "objcopy": "%{llvm_path}/bin/llvm-objcopy",
+            "objdump": "%{llvm_path}/bin/llvm-objdump",
+            "strip": "%{llvm_path}/bin/llvm-strip",
+        },
+        builtin_sysroot = "@//bazel/config:sdkroot",
+        optimization_level = feature_attrs[FEATURES_ATTR_NAMES.OPT_LEVEL],
+        debug_level = DEBUG_LEVEL,
+    )
+    for arch, cpu in get_supported_apple_archs().items()
+]
+
+[
+    toolchain(
+        name = "mongo_apple_" + arch + "_toolchain",
+        exec_compatible_with = [
+            "@platforms//os:macos",
+            "@platforms//cpu:" + cpu,
+        ],
+        target_compatible_with = [
+            "@platforms//os:macos",
+            "@platforms//cpu:" + cpu,
+        ],
+        toolchain = "@mongo_apple_toolchain//:cc-compiler-" + arch,
+        toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
+    )
+    for arch, cpu in get_supported_apple_archs().items()
+]

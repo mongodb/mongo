@@ -47,7 +47,6 @@
                       <Directory Id="BIN" Name="bin" />
                         <Directory Id="MONGO_DATA_PATH" Name="data" />
                         <Directory Id="MONGO_LOG_PATH" Name="log" />
-                      <Directory Id="SNMP" Name="snmp" />
                     </Directory>
                 </Directory>
             </Directory>

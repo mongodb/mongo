@@ -22,8 +22,7 @@
 #include <boost/assert.hpp>
 #include <boost/cstdint.hpp>
 #if !defined(BOOST_LOG_NO_THREADS)
-#include <boost/log/detail/locks.hpp>
-#include <boost/thread/mutex.hpp>
+#include <mutex>
 #endif
 #include <windows.h>
 #include <boost/log/detail/header.hpp>
@@ -41,7 +40,7 @@ class BOOST_SYMBOL_VISIBLE timer::impl :
 private:
 #if !defined(BOOST_LOG_NO_THREADS)
     //! Synchronization mutex type
-    typedef boost::mutex mutex_type;
+    typedef std::mutex mutex_type;
     //! Synchronization mutex
     mutex_type m_Mutex;
 #endif
@@ -70,7 +69,7 @@ public:
     {
         uint64_t duration;
         {
-            BOOST_LOG_EXPR_IF_MT(log::aux::exclusive_lock_guard< mutex_type > lock(m_Mutex);)
+            BOOST_LOG_EXPR_IF_MT(std::lock_guard< mutex_type > lock(m_Mutex);)
 
             LARGE_INTEGER li;
             QueryPerformanceCounter(&li);

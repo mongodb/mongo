@@ -27,9 +27,11 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include <algorithm>
+#include <cstring>
 #include <memory>
-#include <string.h>
 
 namespace linenoise_utf8 {
 

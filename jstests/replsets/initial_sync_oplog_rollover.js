@@ -7,47 +7,42 @@
  * are there.
  */
 
-(function() {
-"use strict";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {getFirstOplogEntry} from "jstests/replsets/rslib.js";
 
-load("jstests/libs/fail_point_util.js");
-load("jstests/replsets/rslib.js");
-
-var name = 'initial_sync_oplog_rollover';
-var replSet = new ReplSetTest({
+let name = "initial_sync_oplog_rollover";
+let replSet = new ReplSetTest({
     name: name,
     // This test requires a third node (added later) to be syncing when the oplog rolls
     // over. Rolling over the oplog requires a majority of nodes to have confirmed and
     // persisted those writes. Set the syncdelay to one to speed up checkpointing.
     nodeOptions: {syncdelay: 1},
-    nodes: [
-        {rsConfig: {priority: 1}},
-        {rsConfig: {priority: 0}},
-    ],
+    nodes: [{rsConfig: {priority: 1}}, {rsConfig: {priority: 0}}],
 });
 
-var oplogSizeOnPrimary = 1;  // size in MB
+let oplogSizeOnPrimary = 1; // size in MB
 replSet.startSet({oplogSize: oplogSizeOnPrimary});
 replSet.initiate();
-var primary = replSet.getPrimary();
+let primary = replSet.getPrimary();
 
-var coll = primary.getDB('test').foo;
+let coll = primary.getDB("test").foo;
 assert.commandWorked(coll.insert({a: 1}));
 
-var firstOplogEntry = getFirstOplogEntry(primary);
+let firstOplogEntry = getFirstOplogEntry(primary);
 
 // Add a secondary node but make it hang before copying databases.
-var secondary = replSet.add();
+let secondary = replSet.add();
 secondary.setSecondaryOk();
 
-var failPoint = configureFailPoint(secondary, 'initialSyncHangBeforeCopyingDatabases');
+let failPoint = configureFailPoint(secondary, "initialSyncHangBeforeCopyingDatabases");
 replSet.reInitiate();
 
 failPoint.wait();
 
 // Keep inserting large documents until they roll over the oplog.
-const largeStr = new Array(4 * 1024 * oplogSizeOnPrimary).join('aaaaaaaa');
-var i = 0;
+const largeStr = "aaaaaaaa".repeat(4 * 1024 * oplogSizeOnPrimary);
+let i = 0;
 while (bsonWoCompare(getFirstOplogEntry(primary), firstOplogEntry) === 0) {
     assert.commandWorked(coll.insert({a: 2, x: i++, long_str: largeStr}));
     sleep(100);
@@ -57,11 +52,11 @@ failPoint.off();
 
 replSet.awaitSecondaryNodes(200 * 1000);
 
-assert.eq(
-    i, secondary.getDB('test').foo.count({a: 2}), 'collection successfully synced to secondary');
+assert.eq(i, secondary.getDB("test").foo.count({a: 2}), "collection successfully synced to secondary");
 
-assert.eq(0,
-          secondary.getDB('local')['temp_oplog_buffer'].find().itcount(),
-          "Oplog buffer was not dropped after initial sync");
+assert.eq(
+    0,
+    secondary.getDB("local")["temp_oplog_buffer"].find().itcount(),
+    "Oplog buffer was not dropped after initial sync",
+);
 replSet.stopSet();
-})();

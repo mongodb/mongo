@@ -29,31 +29,29 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_test_fixture.h"
 #include "mongo/executor/thread_pool_mock.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+#include <memory>
+
+namespace MONGO_MOD_PUB mongo {
 namespace executor {
 
 /**
  * Makes a new ThreadPoolTaskExecutor for use in unit tests.
  */
-std::unique_ptr<ThreadPoolTaskExecutor> makeThreadPoolTestExecutor(
-    std::unique_ptr<NetworkInterfaceMock> net,
-    executor::ThreadPoolMock::Options options = executor::ThreadPoolMock::Options());
-
-std::shared_ptr<ThreadPoolTaskExecutor> makeSharedThreadPoolTestExecutor(
+std::shared_ptr<ThreadPoolTaskExecutor> makeThreadPoolTestExecutor(
     std::unique_ptr<NetworkInterfaceMock> net,
     executor::ThreadPoolMock::Options options = executor::ThreadPoolMock::Options());
 
 /**
  * Useful fixture class for tests that use a ThreadPoolTaskExecutor.
  */
-class ThreadPoolExecutorTest : public TaskExecutorTest {
+class MONGO_MOD_OPEN ThreadPoolExecutorTest : public TaskExecutorTest {
 public:
     /**
      * This default constructor supports the use of this class as a base class for a test fixture.
@@ -77,4 +75,4 @@ private:
 };
 
 }  // namespace executor
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

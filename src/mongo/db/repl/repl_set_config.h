@@ -29,18 +29,38 @@
 
 #pragma once
 
-#include <string>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/oid.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/db/repl/member_config.h"
+#include "mongo/db/repl/member_id.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_set_config_gen.h"
 #include "mongo/db/repl/repl_set_tag.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
-#include "mongo/util/time_support.h"
+
+#include <compare>
+#include <cstddef>
+#include <iosfwd>
+#include <memory>
+#include <string>
+#include <tuple>
+#include <vector>
+
+#include <absl/container/flat_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -53,10 +73,10 @@ namespace repl {
  *
  * This can be used to compare two ReplSetConfig objects to determine which is logically newer.
  */
-class ConfigVersionAndTerm {
+class MONGO_MOD_PUB ConfigVersionAndTerm {
 public:
     ConfigVersionAndTerm() : _version(0), _term(OpTime::kUninitializedTerm) {}
-    ConfigVersionAndTerm(int version, long long term) : _version(version), _term(term) {}
+    ConfigVersionAndTerm(long long version, long long term) : _version(version), _term(term) {}
 
     inline bool operator==(const ConfigVersionAndTerm& rhs) const {
         // If term of either item is uninitialized (-1), then we ignore terms entirely and only
@@ -108,12 +128,15 @@ private:
     long long _term;
 };
 
+class ReplSetConfig;
+using ReplSetConfigPtr = std::shared_ptr<ReplSetConfig>;
+
 /**
  * This class is used for mutating the ReplicaSetConfig.  Call ReplSetConfig::getMutable()
  * to get a mutable copy, mutate it, and use the ReplSetConfig(MutableReplSetConfig&&) constructor
  * to get a usable immutable config from it.
  */
-class MutableReplSetConfig : public ReplSetConfigBase {
+class MONGO_MOD_PUB MutableReplSetConfig : public ReplSetConfigBase {
 public:
     ReplSetConfigSettings& getMutableSettings() {
         invariant(ReplSetConfigBase::getSettings());
@@ -148,11 +171,11 @@ protected:
 /**
  * Representation of the configuration information about a particular replica set.
  */
-class ReplSetConfig : private MutableReplSetConfig {
+class MONGO_MOD_PUB ReplSetConfig : private MutableReplSetConfig {
 public:
     typedef std::vector<MemberConfig>::const_iterator MemberIterator;
 
-    using ReplSetConfigBase::kConfigServerFieldName;
+    using ReplSetConfigBase::kConfigServer_deprecatedFieldName;
     using ReplSetConfigBase::kConfigTermFieldName;
     static constexpr char kMajorityWriteConcernModeName[] = "$majority";
     static constexpr char kVotingMembersWriteConcernModeName[] = "$votingMembers";
@@ -164,11 +187,11 @@ public:
     using ReplSetConfigBase::kRepairedFieldName;
 
     /**
-     * Inline `kMaxMembers` to allow others (e.g, `WriteConcernOptions`) use
+     * Inline `kMaxMembers` and `kMaxVotingMembers` to allow others (e.g, `WriteConcernOptions`) use
      * the constant without linking to `repl_set_config.cpp`.
      */
     inline static const size_t kMaxMembers = 50;
-    static const size_t kMaxVotingMembers = 7;
+    inline static const size_t kMaxVotingMembers = 7;
     static const Milliseconds kInfiniteCatchUpTimeout;
     static const Milliseconds kCatchUpDisabled;
     static const Milliseconds kCatchUpTakeoverDisabled;
@@ -181,14 +204,13 @@ public:
     static const Milliseconds kDefaultCatchUpTakeoverDelay;
 
     // Methods inherited from the base IDL class.  Do not include any setters here.
-    using ReplSetConfigBase::getConfigServer;
+    using ReplSetConfigBase::getConfigServer_deprecated;
     using ReplSetConfigBase::getConfigTerm;
     using ReplSetConfigBase::getConfigVersion;
     using ReplSetConfigBase::getProtocolVersion;
     using ReplSetConfigBase::getReplSetName;
     using ReplSetConfigBase::getWriteConcernMajorityShouldJournal;
     using ReplSetConfigBase::serialize;
-    using ReplSetConfigBase::toBSON;
 
     /**
      * Constructor used for converting a mutable config to an immutable one.
@@ -221,6 +243,11 @@ public:
      * Sets replicaSetId to "newReplicaSetId", which must be set.
      */
     static ReplSetConfig parseForInitiate(const BSONObj& cfg, OID newReplicaSetId);
+
+    /**
+     * Override ReplSetConfigBase::toBSON to conditionally include the recipient config.
+     */
+    BSONObj toBSON() const;
 
     /**
      * Returns true if this object has been successfully initialized or copied from
@@ -309,6 +336,13 @@ public:
     };
 
     /**
+     * Returns a count voting members in this ReplSetConfig.
+     */
+    size_t getCountOfVotingMembers() const {
+        return _votingMemberCount;
+    };
+
+    /**
      * Access a MemberConfig element by index.
      */
     const MemberConfig& getMemberAt(size_t i) const;
@@ -330,12 +364,6 @@ public:
      * HostAndPort in the config, or -1 if there is no member with that address.
      */
     int findMemberIndexByHostAndPort(const HostAndPort& hap) const;
-
-    /**
-     * Returns a MemberConfig index position corresponding to the member with the given
-     * _id in the config, or -1 if there is no member with that address.
-     */
-    int findMemberIndexByConfigId(int configId) const;
 
     /**
      * Gets the default write concern for the replica set described by this configuration.
@@ -421,6 +449,15 @@ public:
      * ErrorCodes::NoSuchKey.
      */
     StatusWith<ReplSetTagPattern> findCustomWriteMode(StringData patternName) const;
+
+    /**
+     * Returns a pattern constructed from a raw set of tags provided as the `w` value
+     * of a write concern.
+     *
+     * @returns `ErrorCodes::NoSuchKey` if a tag was provided which is not found in
+     * the local tag config.
+     */
+    StatusWith<ReplSetTagPattern> makeCustomWriteMode(const WTags& wTags) const;
 
     /**
      * Returns the "tags configuration" for this replicaset.
@@ -519,6 +556,18 @@ public:
      */
     bool containsCustomizedGetLastErrorDefaults() const;
 
+    /**
+     * Returns Status::OK if write concern is valid for this config, or appropriate status
+     * otherwise.
+     */
+    Status validateWriteConcern(const WriteConcernOptions& writeConcern) const;
+
+    /**
+     * Compares the write concern modes with another config and returns 'true' if they are
+     * identical.
+     */
+    bool areWriteConcernModesTheSame(ReplSetConfig* otherConfig) const;
+
 private:
     /**
      * Sets replica set ID to 'defaultReplicaSetId' if 'cfg' does not contain an ID.
@@ -567,6 +616,7 @@ private:
     int _writableVotingMembersCount = 0;
     int _writeMajority = 0;
     int _totalVotingMembers = 0;
+    int _votingMemberCount = 0;
     ReplSetTagConfig _tagConfig;
     StringMap<ReplSetTagPattern> _customWriteConcernModes;
     ConnectionString _connectionString;

@@ -1,9 +1,13 @@
 // Tests that it is illegal to read from system.views and system.profile within a transaction.
-// @tags: [uses_transactions, uses_snapshot_read_concern]
-(function() {
-"use strict";
+//
+// @tags: [
+//   # The test runs commands that are not allowed with security token: profile.
+//   not_allowed_with_signed_security_token,
+//   uses_transactions,
+//   uses_snapshot_read_concern
+// ]
 
-load("jstests/libs/fixture_helpers.js");  // For 'FixtureHelpers'.
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const session = db.getMongo().startSession();
 
@@ -14,22 +18,26 @@ assert.commandWorked(testDB.dropDatabase());
 testDB.runCommand({create: "foo", viewOn: "bar", pipeline: []});
 
 session.startTransaction({readConcern: {level: "snapshot"}});
-assert.commandFailedWithCode(testDB.runCommand({find: "system.views", filter: {}}), 51071);
+assert.commandFailedWithCode(testDB.runCommand({find: "system.views", filter: {}}), [
+    ErrorCodes.OperationNotSupportedInTransaction,
+    51071,
+]);
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
 session.startTransaction({readConcern: {level: "snapshot"}});
-assert.commandFailedWithCode(testDB.runCommand({find: "system.profile", filter: {}}),
-                             ErrorCodes.OperationNotSupportedInTransaction);
+assert.commandFailedWithCode(
+    testDB.runCommand({find: "system.profile", filter: {}}),
+    ErrorCodes.OperationNotSupportedInTransaction,
+);
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
-if (FixtureHelpers.isMongos(testDB)) {
-    // The rest of the test is concerned with a find by UUID which is not supported against
-    // mongos.
-    return;
+// The following tests a {find: uuid} command which is not supported on mongos or with replica set
+// endpoints.
+if (FixtureHelpers.isMongos(testDB) || TestData.testingReplicaSetEndpoint) {
+    quit();
 }
 
-const collectionInfos =
-    new DBCommandCursor(testDB, assert.commandWorked(testDB.runCommand({listCollections: 1})));
+const collectionInfos = new DBCommandCursor(testDB, assert.commandWorked(testDB.runCommand({listCollections: 1})));
 let systemViewsUUID = null;
 while (collectionInfos.hasNext()) {
     const next = collectionInfos.next();
@@ -40,6 +48,9 @@ while (collectionInfos.hasNext()) {
 assert.neq(null, systemViewsUUID, "did not find UUID for system.views");
 
 session.startTransaction({readConcern: {level: "snapshot"}});
-assert.commandFailedWithCode(testDB.runCommand({find: systemViewsUUID, filter: {}}), 51070);
+assert.commandFailedWithCode(testDB.runCommand({find: systemViewsUUID, filter: {}}), [
+    ErrorCodes.OperationNotSupportedInTransaction,
+    51070,
+    7195700,
+]);
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
-}());

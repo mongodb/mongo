@@ -29,14 +29,15 @@
 
 #pragma once
 
+#include "mongo/config.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/modules.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <new>
 
-#include "mongo/config.h"
-#include "mongo/platform/compiler.h"
-
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace stdx {
 
 // libc++ 8.0 and later define __cpp_lib_hardware_interference_size but don't actually implement it
@@ -64,10 +65,10 @@ using std::hardware_destructive_interference_size;
 using std::launder;
 #else
 template <typename T>
-MONGO_WARN_UNUSED_RESULT_FUNCTION constexpr T* launder(T* p) noexcept {
+[[nodiscard]] constexpr T* launder(T* p) noexcept {
     return p;
 }
 #endif  // launder
 
 }  // namespace stdx
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

@@ -27,16 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/repl/multiapplier.h"
-
-#include <utility>
-
+#include <boost/move/utility_core.hpp>
+// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/base/error_codes.h"
 #include "mongo/db/client.h"
-#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/multiapplier.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/util/destructor_guard.h"
+#include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <mutex>
+#include <ostream>
+#include <utility>
 
 namespace mongo {
 namespace repl {
@@ -56,20 +58,25 @@ MultiApplier::MultiApplier(executor::TaskExecutor* executor,
 }
 
 MultiApplier::~MultiApplier() {
-    DESTRUCTOR_GUARD(shutdown(); join(););
+    try {
+        shutdown();
+        join();
+    } catch (...) {
+        reportFailedDestructor(MONGO_SOURCE_LOCATION());
+    }
 }
 
 bool MultiApplier::isActive() const {
-    stdx::lock_guard<Latch> lk(_mutex);
-    return _isActive_inlock();
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _isActive(lk);
 }
 
-bool MultiApplier::_isActive_inlock() const {
+bool MultiApplier::_isActive(WithLock lk) const {
     return State::kRunning == _state || State::kShuttingDown == _state;
 }
 
 Status MultiApplier::startup() noexcept {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     switch (_state) {
         case State::kPreStart:
@@ -84,7 +91,7 @@ Status MultiApplier::startup() noexcept {
     }
 
     auto scheduleResult = _executor->scheduleWork(
-        [=](const executor::TaskExecutor::CallbackArgs& cbd) { return _callback(cbd); });
+        [=, this](const executor::TaskExecutor::CallbackArgs& cbd) { return _callback(cbd); });
     if (!scheduleResult.isOK()) {
         _state = State::kComplete;
         return scheduleResult.getStatus();
@@ -96,7 +103,7 @@ Status MultiApplier::startup() noexcept {
 }
 
 void MultiApplier::shutdown() {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     switch (_state) {
         case State::kPreStart:
             // Transition directly from PreStart to Complete if not started yet.
@@ -117,12 +124,12 @@ void MultiApplier::shutdown() {
 }
 
 void MultiApplier::join() {
-    stdx::unique_lock<Latch> lk(_mutex);
-    _condition.wait(lk, [this]() { return !_isActive_inlock(); });
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    _condition.wait(lk, [&]() { return !_isActive(lk); });
 }
 
 MultiApplier::State MultiApplier::getState_forTest() const {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _state;
 }
 
@@ -153,14 +160,14 @@ void MultiApplier::_finishCallback(const Status& result) {
     // destroyed outside the lock.
     decltype(_onCompletion) onCompletion;
     {
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         invariant(_onCompletion);
         std::swap(_onCompletion, onCompletion);
     }
 
     onCompletion(result);
 
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(State::kComplete != _state);
     _state = State::kComplete;
     _condition.notify_all();

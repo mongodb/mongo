@@ -29,21 +29,21 @@
 
 #pragma once
 
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/hierarchical_acquisition.h"
 
 namespace mongo {
 
 template <int level = 0>
 struct LeveledSynchronizedValueMutexPolicy {
-    using mutex_type = Mutex;
+    using mutex_type = stdx::mutex;
     static mutex_type construct() {
-        return MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(level), "synchronized_value::_mutex");
+        return stdx::mutex();
     }
 };
 
 struct RawSynchronizedValueMutexPolicy {
-    using mutex_type = stdx::mutex;  // NOLINT
+    using mutex_type = stdx::mutex;
     static mutex_type construct() {
         return {};
     }
@@ -132,7 +132,7 @@ public:
     }
 
     /** Lock and return a holder to the value and lock. Const or non-const. */
-    auto operator-> () const {
+    auto operator->() const {
         return synchronize();
     }
     auto operator*() const {
@@ -144,7 +144,7 @@ public:
     }
 
     /** Mutators */
-    auto operator-> () {
+    auto operator->() {
         return synchronize();
     }
     auto operator*() {

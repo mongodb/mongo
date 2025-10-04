@@ -29,11 +29,20 @@
 
 #pragma once
 
-#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/window_function/partition_iterator.h"
 #include "mongo/db/pipeline/window_function/window_bounds.h"
+#include "mongo/db/pipeline/window_function/window_function.h"
 #include "mongo/db/pipeline/window_function/window_function_exec.h"
+#include "mongo/util/modules.h"
+
+#include <memory>
+#include <queue>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -53,7 +62,7 @@ public:
                                         boost::intrusive_ptr<Expression> input,
                                         std::unique_ptr<WindowFunctionState> function,
                                         WindowBounds::DocumentBased bounds,
-                                        MemoryUsageTracker::PerFunctionMemoryTracker* memTracker);
+                                        SimpleMemoryUsageTracker* memTracker);
 
 private:
     void update() final;
@@ -61,9 +70,7 @@ private:
 
     void doReset() final {
         _initialized = false;
-        _memTracker->set(sizeof(*this));
     }
-
 
     void removeFirstValueIfExists() {
         if (_values.size() == 0) {

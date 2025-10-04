@@ -1,0 +1,79 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/mongo-default-approvers
+  - "OWNERS.yml":
+    approvers:
+      - 10gen/server-root-ownership
+    metadata:
+      emeritus_approvers:
+        - visemet # TODO: add back to approvers once project work is finished
+  - ".bazel*":
+    approvers:
+      - 10gen/devprod-build
+  - ".clang-format":
+    approvers:
+      - 10gen/server-programmability
+  - ".clang-tidy.in":
+    approvers:
+      - 10gen/server-programmability
+  - "**/.clang-tidy":
+    approvers:
+      - 10gen/server-programmability
+  - "/.editorconfig":
+    approvers:
+      - 10gen/devprod-build
+  - ".git*":
+    approvers:
+      - 10gen/devprod-build
+  - ".mypy.ini":
+    approvers:
+      - 10gen/devprod-correctness
+      - 10gen/devprod-build
+  - ".prettierignore":
+    approvers:
+      - 10gen/devprod-correctness
+  - ".prettierrc":
+    approvers:
+      - 10gen/devprod-correctness
+  - "BUILD.bazel":
+    approvers:
+      - 10gen/devprod-build
+  - "copy.bara.sky":
+    approvers:
+      - IamXander
+      - smcclure15
+  - "eslint.config.mjs":
+    approvers:
+      - 10gen/devprod-correctness
+  - "jsconfig.json":
+    approvers:
+      - 10gen/devprod-correctness
+  - "package.json":
+    approvers:
+      - 10gen/devprod-correctness
+  - "pnpm-lock.yaml":
+    approvers:
+      - 10gen/devprod-correctness
+  - "poetry.lock":
+    approvers:
+      - 10gen/devprod-correctness
+      - 10gen/devprod-build
+  - "pyproject.toml":
+    approvers:
+      - 10gen/devprod-correctness
+      - 10gen/devprod-build
+  - "poetry_requirements.txt":
+    approvers:
+      - 10gen/devprod-correctness
+      - 10gen/devprod-build
+  - "sbom.json":
+    approvers:
+      - 10gen/server-security
+  - "MODULE.bazel*":
+    approvers:
+      - 10gen/devprod-build
+  - "WORKSPACE.bazel":
+    approvers:
+      - 10gen/devprod-build

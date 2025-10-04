@@ -4,17 +4,8 @@
  *
  * @tags: [multiversion_incompatible]
  */
-(function() {
-
-"use strict";
-
-load("jstests/libs/retryable_writes_util.js");
-load("jstests/libs/write_concern_util.js");
-
-if (!RetryableWritesUtil.storageEngineSupportsRetryableWrites(jsTest.options().storageEngine)) {
-    jsTestLog("Retryable writes are not supported, skipping test");
-    return;
-}
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {runWriteConcernRetryabilityTest} from "jstests/libs/write_concern_util.js";
 
 const kNodes = 2;
 
@@ -27,30 +18,34 @@ let secConn = replTest.getSecondary();
 
 // Stopping replication on secondaries can take up to 5 seconds normally. Set a small oplog
 // getMore timeout so the test runs faster.
-assert.commandWorked(
-    secConn.adminCommand({configureFailPoint: 'setSmallOplogGetMoreMaxTimeMS', mode: 'alwaysOn'}));
+assert.commandWorked(secConn.adminCommand({configureFailPoint: "setSmallOplogGetMoreMaxTimeMS", mode: "alwaysOn"}));
 
-runWriteConcernRetryabilityTest(priConn,
-                                secConn,
-                                {
-                                    setFeatureCompatibilityVersion: lastLTSFCV,
-                                    writeConcern: {w: 'majority', wtimeout: 200},
-                                },
-                                kNodes,
-                                'admin');
-assert.commandWorked(priConn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
-checkFCV(priConn.getDB('admin'), lastLTSFCV);
+runWriteConcernRetryabilityTest(
+    priConn,
+    secConn,
+    {
+        setFeatureCompatibilityVersion: lastLTSFCV,
+        confirm: true,
+        writeConcern: {w: "majority", wtimeout: 200},
+    },
+    kNodes,
+    "admin",
+);
+assert.commandWorked(priConn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+checkFCV(priConn.getDB("admin"), lastLTSFCV);
 
-runWriteConcernRetryabilityTest(priConn,
-                                secConn,
-                                {
-                                    setFeatureCompatibilityVersion: latestFCV,
-                                    writeConcern: {w: 'majority', wtimeout: 200},
-                                },
-                                kNodes,
-                                'admin');
-assert.commandWorked(priConn.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
-checkFCV(priConn.getDB('admin'), latestFCV);
+runWriteConcernRetryabilityTest(
+    priConn,
+    secConn,
+    {
+        setFeatureCompatibilityVersion: latestFCV,
+        confirm: true,
+        writeConcern: {w: "majority", wtimeout: 200},
+    },
+    kNodes,
+    "admin",
+);
+assert.commandWorked(priConn.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+checkFCV(priConn.getDB("admin"), latestFCV);
 
 replTest.stopSet();
-})();

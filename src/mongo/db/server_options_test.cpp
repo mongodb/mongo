@@ -27,17 +27,21 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-#include "mongo/platform/basic.h"
+#include <ostream>
+#include <utility>
 
-#include "mongo/config.h"
+#include <boost/algorithm/string/join.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
+#include <fmt/format.h>
 
-#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
-#include <unistd.h>
-#endif
 #ifndef _WIN32
-#include <sys/types.h>
+#include <cstdlib>
+
 #include <sys/wait.h>
 #endif
 
@@ -45,25 +49,46 @@
 #include <TargetConditionals.h>
 #endif
 
-#include <boost/filesystem.hpp>
-
-#include "mongo/base/init.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/parse_number.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_options_base.h"
+#include "mongo/db/server_options_helpers.h"
 #include "mongo/db/server_options_nongeneral_gen.h"
 #include "mongo/db/server_options_server_helpers.h"
+#include "mongo/db/server_parameter.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_severity.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/options_parser.h"
+#include "mongo/util/options_parser/value.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
+namespace mongo {
 namespace {
 
+using mongo::ClusterRole;
 using mongo::ErrorCodes;
 using mongo::Status;
 
@@ -79,7 +104,9 @@ MONGO_INITIALIZER(ServerLogRedirection)(mongo::InitializerContext*) {
 
 class OptionsParserTester : public moe::OptionsParser {
 public:
-    Status readConfigFile(const std::string& filename, std::string* config, ConfigExpand) {
+    Status readConfigFile(const std::string& filename,
+                          std::string* config,
+                          moe::ConfigExpand) override {
         if (filename != _filename) {
             ::mongo::StringBuilder sb;
             sb << "Parser using filename: " << filename
@@ -103,6 +130,89 @@ class Verbosity : public mongo::unittest::Test {
     /** Reset the log level before we test */
     mongo::unittest::MinimumLoggedSeverityGuard _severityGuard{mongo::logv2::LogComponent::kDefault,
                                                                mongo::logv2::LogSeverity::Info()};
+};
+
+class SetupOptionsTestConfig {
+public:
+    SetupOptionsTestConfig() : binaryArgs_{}, configFileName_{}, configOpts_{}, envVars_{} {}
+
+    SetupOptionsTestConfig(std::vector<std::string> binaryArgs,
+                           std::string configFileName,
+                           std::vector<std::pair<std::string, std::string>> configOpts,
+                           std::vector<std::pair<std::string, std::string>> envVars)
+        : binaryArgs_{binaryArgs},
+          configFileName_{configFileName},
+          configOpts_{configOpts},
+          envVars_{envVars} {}
+
+    std::vector<std::string> binaryArgs() const {
+        std::vector<std::string> args = {"binaryname"};
+        args.insert(args.end(), binaryArgs_.cbegin(), binaryArgs_.cend());
+
+        if (!configFileName_.empty()) {
+            args.push_back("--config");
+            args.push_back(configFileName_);
+        }
+
+        return args;
+    }
+
+    std::vector<std::pair<std::string, std::string>> envVars() const {
+        return envVars_;
+    }
+
+    bool hasEnvVars() const {
+        return !envVars_.empty();
+    }
+
+    std::string configFileName() const {
+        return configFileName_;
+    }
+
+    bool hasConfigFile() const {
+        return !configFileName_.empty();
+    }
+
+    std::string configFileContents() const {
+        std::string fileContents;
+        for (auto&& [key, value] : configOpts_) {
+            std::vector<std::string> splitKeys;
+            str::splitStringDelim(key, &splitKeys, '.');
+
+            // Split up the configuration key by '.' into separate sections.
+            int indent = 0;
+            for (auto&& splitKey : splitKeys) {
+                if (indent > 0) {
+                    fileContents += "\n";
+                }
+                fileContents += std::string(indent, ' ') + splitKey + ":";
+                indent += 4;
+            }
+            fileContents += " " + value + "\n";
+        }
+        return fileContents;
+    }
+
+    std::string toString() const {
+        std::string str = fmt::format("argv=[{}],", boost::algorithm::join(binaryArgs(), ", "));
+        if (hasConfigFile()) {
+            str += fmt::format("confFile=[\n{}],", configFileContents());
+        }
+        if (hasEnvVars()) {
+            std::vector<std::string> envs;
+            for (auto&& [k, v] : envVars_) {
+                envs.push_back(fmt::format("{}={}", k, v));
+            }
+            str += fmt::format("env=[{}],", boost::algorithm::join(envs, ", "));
+        }
+        return fmt::format("SetupOptionsTestConfig({})", str);
+    }
+
+private:
+    std::vector<std::string> binaryArgs_;
+    std::string configFileName_;
+    std::vector<std::pair<std::string, std::string>> configOpts_;
+    std::vector<std::pair<std::string, std::string>> envVars_;
 };
 
 TEST_F(Verbosity, Default) {
@@ -507,7 +617,7 @@ TEST(SetupOptions, SlowMsCommandLineParamParsesSuccessfully) {
     ASSERT_OK(::mongo::setupServerOptions(argv));
     ASSERT_OK(::mongo::storeServerOptions(environment));
 
-    ASSERT_EQ(::mongo::serverGlobalParams.slowMS, 300);
+    ASSERT_EQ(::mongo::serverGlobalParams.slowMS.load(), 300);
 }
 
 TEST(SetupOptions, SlowMsParamInitializedSuccessfullyFromINIConfigFile) {
@@ -532,7 +642,7 @@ TEST(SetupOptions, SlowMsParamInitializedSuccessfullyFromINIConfigFile) {
     ASSERT_OK(::mongo::setupServerOptions(argv));
     ASSERT_OK(::mongo::storeServerOptions(environment));
 
-    ASSERT_EQ(::mongo::serverGlobalParams.slowMS, 300);
+    ASSERT_EQ(::mongo::serverGlobalParams.slowMS.load(), 300);
 }
 
 TEST(SetupOptions, SlowMsParamInitializedSuccessfullyFromYAMLConfigFile) {
@@ -559,7 +669,7 @@ TEST(SetupOptions, SlowMsParamInitializedSuccessfullyFromYAMLConfigFile) {
     ASSERT_OK(::mongo::setupServerOptions(argv));
     ASSERT_OK(::mongo::storeServerOptions(environment));
 
-    ASSERT_EQ(::mongo::serverGlobalParams.slowMS, 300);
+    ASSERT_EQ(::mongo::serverGlobalParams.slowMS.load(), 300);
 }
 
 TEST(SetupOptions, NonNumericSlowMsCommandLineOptionFailsToParse) {
@@ -615,7 +725,7 @@ TEST(SetupOptions, SampleRateCommandLineParamParsesSuccessfully) {
     ASSERT_OK(::mongo::setupServerOptions(argv));
     ASSERT_OK(::mongo::storeServerOptions(environment));
 
-    ASSERT_EQ(::mongo::serverGlobalParams.sampleRate, 0.5);
+    ASSERT_EQ(::mongo::serverGlobalParams.sampleRate.load(), 0.5);
 }
 
 TEST(SetupOptions, SampleRateParamInitializedSuccessfullyFromINIConfigFile) {
@@ -640,7 +750,7 @@ TEST(SetupOptions, SampleRateParamInitializedSuccessfullyFromINIConfigFile) {
     ASSERT_OK(::mongo::setupServerOptions(argv));
     ASSERT_OK(::mongo::storeServerOptions(environment));
 
-    ASSERT_EQ(::mongo::serverGlobalParams.sampleRate, 0.5);
+    ASSERT_EQ(::mongo::serverGlobalParams.sampleRate.load(), 0.5);
 }
 
 TEST(SetupOptions, SampleRateParamInitializedSuccessfullyFromYAMLConfigFile) {
@@ -667,7 +777,7 @@ TEST(SetupOptions, SampleRateParamInitializedSuccessfullyFromYAMLConfigFile) {
     ASSERT_OK(::mongo::setupServerOptions(argv));
     ASSERT_OK(::mongo::storeServerOptions(environment));
 
-    ASSERT_EQ(::mongo::serverGlobalParams.sampleRate, 0.5);
+    ASSERT_EQ(::mongo::serverGlobalParams.sampleRate.load(), 0.5);
 }
 
 TEST(SetupOptions, NonNumericSampleRateCommandLineOptionFailsToParse) {
@@ -703,6 +813,335 @@ TEST(SetupOptions, NonNumericSampleRateYAMLConfigOptionFailsToParse) {
                      "    slowOpSampleRate: invalid\n");
 
     ASSERT_NOT_OK(parser.run(options, argv, &environment));
+}
+
+TEST(SetupOptions, SlowTaskExecutorWaitTimeProfilingMsCommandLineParamParsesSuccessfully) {
+    OptionsParserTester parser;
+    moe::Environment environment;
+    moe::OptionSection options;
+
+    ASSERT_OK(addNonGeneralServerOptions(&options));
+
+    std::vector<std::string> argv;
+    argv.push_back("binaryname");
+    argv.push_back("--slowTaskWaitTimeProfilingMs");
+    argv.push_back("200");
+
+    ASSERT_OK(parser.run(options, argv, &environment));
+
+    ASSERT_OK(validateServerOptions(environment));
+    ASSERT_OK(canonicalizeServerOptions(&environment));
+    ASSERT_OK(setupServerOptions(argv));
+    ASSERT_OK(storeServerOptions(environment));
+
+    ASSERT_EQ(serverGlobalParams.slowTaskExecutorWaitTimeProfilingMs.load(), 200);
+}
+
+TEST(SetupOptions,
+     SlowTaskExecutorWaitTimeProfilingMsParamInitializedSuccessfullyFromINIConfigFile) {
+    OptionsParserTester parser;
+    moe::Environment environment;
+    moe::OptionSection options;
+
+    ASSERT_OK(addGeneralServerOptions(&options));
+    ASSERT_OK(addNonGeneralServerOptions(&options));
+
+    std::vector<std::string> argv;
+    argv.push_back("binaryname");
+    argv.push_back("--config");
+    argv.push_back("config.ini");
+
+    parser.setConfig("config.ini", "slowTaskWaitTimeProfilingMs=200");
+
+    ASSERT_OK(parser.run(options, argv, &environment));
+
+    ASSERT_OK(validateServerOptions(environment));
+    ASSERT_OK(canonicalizeServerOptions(&environment));
+    ASSERT_OK(setupServerOptions(argv));
+    ASSERT_OK(storeServerOptions(environment));
+
+    ASSERT_EQ(serverGlobalParams.slowTaskExecutorWaitTimeProfilingMs.load(), 200);
+}
+
+TEST(SetupOptions,
+     SlowTaskExecutorWaitTimeProfilingMsParamInitializedSuccessfullyFromYAMLConfigFile) {
+    OptionsParserTester parser;
+    moe::Environment environment;
+    moe::OptionSection options;
+
+    ASSERT_OK(addGeneralServerOptions(&options));
+    ASSERT_OK(addNonGeneralServerOptions(&options));
+
+    std::vector<std::string> argv;
+    argv.push_back("binaryname");
+    argv.push_back("--config");
+    argv.push_back("config.yaml");
+
+    parser.setConfig("config.yaml",
+                     "taskExecutorProfiling:\n"
+                     "    slowTaskWaitTimeProfilingMs: 200\n");
+
+    ASSERT_OK(parser.run(options, argv, &environment));
+
+    ASSERT_OK(validateServerOptions(environment));
+    ASSERT_OK(canonicalizeServerOptions(&environment));
+    ASSERT_OK(setupServerOptions(argv));
+    ASSERT_OK(storeServerOptions(environment));
+
+    ASSERT_EQ(serverGlobalParams.slowTaskExecutorWaitTimeProfilingMs.load(), 200);
+}
+
+TEST(SetupOptions, NonNumericSlowTaskExecutorWaitTimeProfilingMsCommandLineOptionFailsToParse) {
+    OptionsParserTester parser;
+    moe::Environment environment;
+    moe::OptionSection options;
+
+    ASSERT_OK(addNonGeneralServerOptions(&options));
+
+    std::vector<std::string> argv;
+    argv.push_back("binaryname");
+    argv.push_back("--slowTaskWaitTimeProfilingMs");
+    argv.push_back("invalid");
+
+    ASSERT_NOT_OK(parser.run(options, argv, &environment));
+}
+
+TEST(SetupOptions, NonNumericlowTaskExecutorWaitTimeProfilingMsYAMLConfigOptionFailsToParse) {
+    OptionsParserTester parser;
+    moe::Environment environment;
+    moe::OptionSection options;
+
+    ASSERT_OK(addNonGeneralServerOptions(&options));
+
+    std::vector<std::string> argv;
+    argv.push_back("binaryname");
+    argv.push_back("--config");
+    argv.push_back("config.yaml");
+
+    parser.setConfig("config.yaml",
+                     "taskExecutorProfiling:\n"
+                     "    slowTaskWaitTimeProfilingMs: invalid\n");
+
+    ASSERT_NOT_OK(parser.run(options, argv, &environment));
+}
+
+#if !defined(_WIN32) && !defined(__APPLE__)
+class ForkTestSpec {
+public:
+    enum Value {
+        NO_OPTIONS,
+        COMMANDLINE_ONLY,
+        CONFIG_ONLY,
+        BOTH,
+        COMMANDLINE_WITH_ENV,
+        CONFIG_WITH_ENV,
+        BOTH_WITH_ENV,
+    };
+
+    ForkTestSpec() = default;
+    constexpr operator Value() const {
+        return value_;
+    }
+    explicit operator bool() = delete;
+
+    ForkTestSpec(Value value) : value_{value} {
+        std::vector<std::string> args = {"--fork", "--syslog"};
+        std::vector<std::pair<std::string, std::string>> envVars{
+            {"MONGODB_CONFIG_OVERRIDE_NOFORK", "1"}};
+        std::string confFileName = "config.yaml";
+        std::vector<std::pair<std::string, std::string>> opts = {
+            {"systemLog.destination", "syslog"}, {"processManagement.fork", "true"}};
+
+        switch (value) {
+            case NO_OPTIONS: {
+                config_ = SetupOptionsTestConfig();
+                name_ = "NO_OPTIONS";
+                break;
+            }
+            case COMMANDLINE_ONLY: {
+                config_ = SetupOptionsTestConfig(args, "", {}, {});
+                name_ = "COMMANDLINE_ONLY";
+                break;
+            }
+            case CONFIG_ONLY: {
+                config_ = SetupOptionsTestConfig({}, confFileName, opts, {});
+                name_ = "CONFIG_ONLY";
+                break;
+            }
+            case BOTH: {
+                config_ = SetupOptionsTestConfig(args, confFileName, opts, {});
+                name_ = "BOTH";
+                break;
+            }
+            case COMMANDLINE_WITH_ENV: {
+                config_ = SetupOptionsTestConfig(args, "", {}, envVars);
+                name_ = "COMMANDLINE_WITH_ENV";
+                break;
+            }
+            case CONFIG_WITH_ENV: {
+                config_ = SetupOptionsTestConfig({}, confFileName, opts, envVars);
+                name_ = "CONFIG_WITH_ENV";
+                break;
+            }
+            case BOTH_WITH_ENV: {
+                config_ = SetupOptionsTestConfig(args, confFileName, opts, envVars);
+                name_ = "BOTH_WITH_ENV";
+                break;
+            }
+        }
+    }
+
+    SetupOptionsTestConfig config() const {
+        return config_;
+    }
+
+    std::string toString() const {
+        return fmt::format(
+            "SetupOptionsTestConfig(specName={}, config={})", name_, config_.toString());
+    }
+
+private:
+    Value value_;
+    std::string name_;
+    SetupOptionsTestConfig config_;
+};
+
+class ForkTest {
+public:
+    ForkTest(const ForkTestSpec spec, bool doForkValue)
+        : spec_{spec}, doForkValue_{doForkValue}, parser_{}, environment_{}, options_{} {
+        ASSERT_OK(addGeneralServerOptions(&options_));
+        ASSERT_OK(addNonGeneralServerOptions(&options_));
+
+        if (spec.config().hasConfigFile()) {
+            parser_.setConfig(spec.config().configFileName(), spec.config().configFileContents());
+        }
+    }
+
+    void run() {
+        auto&& argv = spec_.config().binaryArgs();
+
+        for (auto&& [envKey, envValue] : spec_.config().envVars()) {
+            setenv(envKey.c_str(), envValue.c_str(), 1);
+        }
+
+        ScopeGuard sg = [&] {
+            serverGlobalParams.doFork = false;
+            for (auto&& [envKey, envValue] : spec_.config().envVars()) {
+                unsetenv(envKey.c_str());
+            }
+        };
+
+        ASSERT_OK(parser_.run(options_, argv, &environment_)) << spec_.toString();
+
+        ASSERT_OK(validateServerOptions(environment_)) << spec_.toString();
+        ASSERT_OK(canonicalizeServerOptions(&environment_)) << spec_.toString();
+        ASSERT_OK(setupServerOptions(argv)) << spec_.toString();
+        ASSERT_OK(storeServerOptions(environment_)) << spec_.toString();
+
+        ASSERT_EQ(serverGlobalParams.doFork, doForkValue_) << spec_.toString();
+    }
+
+private:
+    ForkTestSpec spec_;
+    bool doForkValue_;
+    OptionsParserTester parser_;
+    moe::Environment environment_;
+    moe::OptionSection options_;
+};
+
+TEST(SetupOptions, ForkCommandLineParamParsesSuccessfully) {
+    ForkTest{ForkTestSpec::NO_OPTIONS, false}.run();
+    ForkTest{ForkTestSpec::COMMANDLINE_ONLY, true}.run();
+}
+
+TEST(SetupOptions, ForkYAMLConfigOptionParsesSuccessfully) {
+    ForkTest{ForkTestSpec::NO_OPTIONS, false}.run();
+    ForkTest{ForkTestSpec::CONFIG_ONLY, true}.run();
+}
+
+TEST(SetupOptions, ForkOptionAlwaysFalseWithNoforkEnvVar) {
+    ForkTest{ForkTestSpec::COMMANDLINE_WITH_ENV, false}.run();
+    ForkTest{ForkTestSpec::CONFIG_WITH_ENV, false}.run();
+    ForkTest{ForkTestSpec::BOTH_WITH_ENV, false}.run();
+}
+#endif
+
+TEST(ClusterRole, MonoRole) {
+    const ClusterRole noRole{ClusterRole::None};
+    ASSERT_TRUE(noRole.has(ClusterRole::None));
+    ASSERT_FALSE(noRole.has(ClusterRole::ShardServer));
+    ASSERT_FALSE(noRole.has(ClusterRole::ConfigServer));
+    ASSERT_FALSE(noRole.has(ClusterRole::RouterServer));
+    ASSERT_TRUE(noRole.hasExclusively(ClusterRole::None));
+    ASSERT_FALSE(noRole.hasExclusively(ClusterRole::ShardServer));
+    ASSERT_FALSE(noRole.hasExclusively(ClusterRole::ConfigServer));
+    ASSERT_FALSE(noRole.hasExclusively(ClusterRole::RouterServer));
+
+    const ClusterRole shardRole{ClusterRole::ShardServer};
+    ASSERT_FALSE(shardRole.has(ClusterRole::None));
+    ASSERT_TRUE(shardRole.has(ClusterRole::ShardServer));
+    ASSERT_FALSE(shardRole.has(ClusterRole::ConfigServer));
+    ASSERT_FALSE(shardRole.has(ClusterRole::RouterServer));
+    ASSERT_FALSE(shardRole.hasExclusively(ClusterRole::None));
+    ASSERT_TRUE(shardRole.hasExclusively(ClusterRole::ShardServer));
+    ASSERT_FALSE(shardRole.hasExclusively(ClusterRole::ConfigServer));
+    ASSERT_FALSE(shardRole.hasExclusively(ClusterRole::RouterServer));
+
+    // Role cannot be set to config server only.
+
+    const ClusterRole routerRole{ClusterRole::RouterServer};
+    ASSERT_FALSE(routerRole.has(ClusterRole::None));
+    ASSERT_FALSE(routerRole.has(ClusterRole::ShardServer));
+    ASSERT_FALSE(routerRole.has(ClusterRole::ConfigServer));
+    ASSERT_TRUE(routerRole.has(ClusterRole::RouterServer));
+    ASSERT_FALSE(routerRole.hasExclusively(ClusterRole::None));
+    ASSERT_FALSE(routerRole.hasExclusively(ClusterRole::ShardServer));
+    ASSERT_FALSE(routerRole.hasExclusively(ClusterRole::ConfigServer));
+    ASSERT_TRUE(routerRole.hasExclusively(ClusterRole::RouterServer));
+}
+
+TEST(ClusterRole, MultiRole) {
+    const ClusterRole shardAndConfigRole{ClusterRole::ShardServer, ClusterRole::ConfigServer};
+    ASSERT_FALSE(shardAndConfigRole.has(ClusterRole::None));
+    ASSERT_TRUE(shardAndConfigRole.has(ClusterRole::ShardServer));
+    ASSERT_TRUE(shardAndConfigRole.has(ClusterRole::ConfigServer));
+    ASSERT_FALSE(shardAndConfigRole.has(ClusterRole::RouterServer));
+    ASSERT_FALSE(shardAndConfigRole.hasExclusively(ClusterRole::None));
+    ASSERT_FALSE(shardAndConfigRole.hasExclusively(ClusterRole::ShardServer));
+    ASSERT_FALSE(shardAndConfigRole.hasExclusively(ClusterRole::ConfigServer));
+    ASSERT_FALSE(shardAndConfigRole.hasExclusively(ClusterRole::RouterServer));
+}
+
+TEST(ClusterRole, ToBson) {
+    using R = ClusterRole;
+    const auto s = R::ShardServer;
+    const auto c = R::ConfigServer;
+    const auto r = R::RouterServer;
+
+    struct Case {
+        R actual;
+        std::vector<std::string> expected;
+    };
+
+    const std::vector<Case> allCases{
+        {R{}, {}},
+        {R{s}, {"shard"}},
+        // {R{c}, {"config"}}, // Role cannot be set to config server only.
+        {R{s, c}, {"shard", "config"}},
+        {R{r}, {"router"}},
+        {R{s, r}, {"shard", "router"}},
+        {R{c, r}, {"config", "router"}},
+        {R{s, c, r}, {"shard", "config", "router"}},
+    };
+
+    for (auto&& [actual, expected] : allCases) {
+        BSONArrayBuilder bab;
+        for (auto&& roleStr : expected) {
+            bab.append(roleStr);
+        }
+        ASSERT_BSONOBJ_EQ(bab.arr(), toBSON(actual));
+    }
 }
 
 #if !defined(_WIN32) && !(defined(__APPLE__) && TARGET_OS_TV)
@@ -811,7 +1250,10 @@ TEST(SetupOptions, UnlinkedCwd) {
     // Naive rmdir of cwd doesn't work on Solaris doesn't work (no matter how it's specified).
     // So we use a subprocess to unlink the dir.
     pid_t pid = fork();
-    ASSERT_NOT_EQUALS(pid, -1) << "unable to fork: " << ::mongo::errnoWithDescription();
+    if (pid == -1) {
+        auto ec = lastSystemError();
+        FAIL("unable to fork") << errorMessage(ec);
+    }
     if (pid == 0) {
         // Subprocess
         // No exceptions, ASSERT(), FAIL() or logging.
@@ -857,4 +1299,53 @@ TEST(SetupOptions, UnlinkedCwd) {
 
 #endif  // !defined(_WIN32)
 
-}  // unnamed namespace
+class SetParameterOptionTest : public unittest::Test {
+public:
+    class TestServerParameter : public ServerParameter {
+    public:
+        TestServerParameter(StringData name, ServerParameterType spt, int x)
+            : ServerParameter(name, spt), val{x} {}
+
+        void append(OperationContext*,
+                    BSONObjBuilder* bob,
+                    StringData name,
+                    const boost::optional<TenantId>&) final {
+            bob->append(name, val);
+        }
+
+        Status setFromString(StringData str, const boost::optional<TenantId>&) final {
+            int value;
+            Status status = NumberParser{}(str, &value);
+            if (!status.isOK())
+                return status;
+            val = value;
+            return Status::OK();
+        }
+
+        int val;
+    };
+};
+
+TEST_F(SetParameterOptionTest, ApplySetParameters) {
+    auto param1 =
+        std::make_unique<TestServerParameter>("p1", ServerParameterType::kStartupOnly, 123);
+    auto param2 =
+        std::make_unique<TestServerParameter>("p2", ServerParameterType::kStartupOnly, 234);
+    auto p1 = param1.get();
+    auto p2 = param2.get();
+    ServerParameterSet paramSet;
+    paramSet.add(std::move(param1));
+    paramSet.add(std::move(param2));
+
+    auto swObj =
+        server_options_detail::applySetParameterOptions({{"p1", "555"}, {"p2", "666"}}, paramSet);
+    ASSERT_OK(swObj);
+    ASSERT_BSONOBJ_EQ(swObj.getValue(),
+                      BSON("p1" << BSON("default" << 123 << "value" << 555) << "p2"
+                                << BSON("default" << 234 << "value" << 666)));
+    ASSERT_EQ(p1->val, 555);
+    ASSERT_EQ(p2->val, 666);
+}
+
+}  // namespace
+}  // namespace mongo

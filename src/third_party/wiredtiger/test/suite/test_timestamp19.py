@@ -33,8 +33,7 @@ from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
 class test_timestamp19(wttest.WiredTigerTestCase):
-    conn_config = 'cache_size=50MB,log=(enabled)'
-    session_config = 'isolation=snapshot'
+    conn_config = 'cache_size=50MB'
 
     format_values = [
         ('integer-row', dict(key_format='i', value_format='S')),
@@ -57,8 +56,7 @@ class test_timestamp19(wttest.WiredTigerTestCase):
         create_params = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(uri, create_params)
 
-        ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format="S", config='log=(enabled=false)')
+        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format="S")
         ds.populate()
 
         nrows = 1000
@@ -100,15 +98,17 @@ class test_timestamp19(wttest.WiredTigerTestCase):
         self.conn = self.setUpConnectionOpen('.')
         self.session = self.setUpSessionOpen(self.conn)
 
-        # The oldest timestamp on recovery is 40. Trying to set it earlier is a no-op.
-        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))
-        self.assertTimestampsEqual(self.conn.query_timestamp('get=oldest'), self.timestamp_str(40))
+        # The oldest timestamp on recovery is 40. Trying to set it earlier generates an error.
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10)),
+                '/oldest timestamp \(0, 10\) must not be older than current oldest timestamp \(0, 40\)/')
+        self.assertTimestampsEqual(\
+            self.conn.query_timestamp('get=oldest_timestamp'), self.timestamp_str(40))
 
         # Move the oldest and stable timestamps to 70.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(70) +
           ', stable_timestamp=' + self.timestamp_str(70))
-        self.assertTimestampsEqual(self.conn.query_timestamp('get=oldest'), self.timestamp_str(70))
-        self.assertTimestampsEqual(self.conn.query_timestamp('get=stable'), self.timestamp_str(70))
-
-if __name__ == '__main__':
-    wttest.run()
+        self.assertTimestampsEqual(\
+            self.conn.query_timestamp('get=oldest_timestamp'), self.timestamp_str(70))
+        self.assertTimestampsEqual(\
+            self.conn.query_timestamp('get=stable_timestamp'), self.timestamp_str(70))

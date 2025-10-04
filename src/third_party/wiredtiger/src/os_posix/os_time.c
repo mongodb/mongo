@@ -44,7 +44,7 @@ __wt_epoch_raw(WT_SESSION_IMPL *session, struct timespec *tsp)
         WT_IGNORE_RET(__wt_panic(session, ret, "gettimeofday"));
     }
 #else
-    NO TIME - OF - DAY IMPLEMENTATION : see src / os_posix / os_time.c
+#error "No clock_gettime or gettimeofday available"
 #endif
 }
 

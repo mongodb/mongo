@@ -29,13 +29,26 @@
 
 #pragma once
 
-#include <memory>
-
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/index_bounds_builder.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/compiler/metadata/index_entry.h"
+#include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
+#include "mongo/db/query/compiler/optimizer/index_bounds_builder/interval_evaluation_tree.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/query_planner_params.h"
-#include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/record_id_range.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
+
+#include <cstddef>
+#include <memory>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -99,18 +112,23 @@ namespace mongo {
 class QueryPlannerAccess {
 public:
     /**
-     * Return a CollectionScanNode that scans as requested in 'query'.
+     * Return a CollectionScanNode that scans as requested in 'query'. The function will return a
+     * collection scan with 'root' as the filter. This was needed to support rooted $OR queries that
+     * use this helper to build clustered collection scans. In this case, the 'root' will be the
+     * child branch of the $OR expression. In all other cases 'root' should be the 'root' of
+     * 'query'.
      */
     static std::unique_ptr<QuerySolutionNode> makeCollectionScan(const CanonicalQuery& query,
                                                                  bool tailable,
-                                                                 const QueryPlannerParams& params);
+                                                                 const QueryPlannerParams& params,
+                                                                 int direction,
+                                                                 const MatchExpression* root);
 
     /**
      * Return a plan that uses the provided index as a proxy for a collection scan.
      */
     static std::unique_ptr<QuerySolutionNode> scanWholeIndex(const IndexEntry& index,
                                                              const CanonicalQuery& query,
-                                                             const QueryPlannerParams& params,
                                                              int direction = 1);
 
     /**
@@ -123,7 +141,7 @@ public:
                                                             const BSONObj& endKey);
 
     /**
-     * Consructs a data access plan for 'query' which answers the predicate contained in 'root'.
+     * Constructs a data access plan for 'query' which answers the predicate contained in 'root'.
      * Assumes the presence of the passed in indices. Planning behavior is controlled by the
      * settings in 'params'.
      */
@@ -132,6 +150,74 @@ public:
         std::unique_ptr<MatchExpression> root,
         const std::vector<IndexEntry>& indices,
         const QueryPlannerParams& params);
+
+    /**
+     * Helper method that checks to see if min() or max() were provided along with the query. If so,
+     * adjusts the collection scan bounds to fit the constraints.
+     *
+     * This method is shared by QO planner and QE SBE cached plan variable bind, which must get the
+     * same answers for the output args (hence sharing one implementation instead of creating a
+     * separate parallel one).
+     *
+     * Arguments
+     *   (in) query - current query
+     *   (in) direction - 'query's scan direction: 1: forward; -1: reverse
+     *   (in) queryCollator - 'query's collator
+     *   (in) ccCollator - clustered collection's collator
+     *   (out) recordRange - scan start/end bounds
+     */
+    static void handleRIDRangeMinMax(const CanonicalQuery& query,
+                                     int direction,
+                                     const CollatorInterface* queryCollator,
+                                     const CollatorInterface* ccCollator,
+                                     RecordIdRange& recordRange);
+
+    /**
+     * Helper method to add an RID range to collection scans. If the query solution tree contains a
+     * collection scan node with a suitable comparison predicate on '_id', we add a minRecord and
+     * maxRecord on the collection node.
+     *
+     * This method is shared by QO planner and QE SBE cached plan variable bind, which must get the
+     * same answers for the output args (hence sharing one implementation instead of creating a
+     * separate parallel one).
+     *
+     * Returns true if the MatchExpression is a comparison against the cluster key which either:
+     * 1) is guaranteed to exclude values of the cluster key which are affected by collation or
+     * 2) may return values of the cluster key which are affected by collation, but the query and
+     *    collection collations match.
+     * Otherwise, returns false.
+     *
+     * For example, assuming the cluster key is "_id":
+     * Given {a: {$eq: 2}}, we return false, because the comparison is not against the cluster key.
+     * Given {_id: {$gte: 5}}, we return true, because this comparison against the cluster key
+     *    excludes keys which are affected by collations.
+     * Given {_id: {$eq: "str"}}, we return true only if the query and collection collations match.
+     *
+     * Arguments
+     *   (in) conjunct - current query's match expression (or subexpression in recursive calls)
+     *   (in) queryCollator - current query's collator
+     *   (in) ccCollator - clustered collection's collator
+     *   (in) clusterKeyFieldName - only "_id" is officially supported, but this may change someday
+     *   (out) recordRange - scan start/end bounds
+     *   (out) redundant - if provided, will be called with pointers to expressions which
+     *                     do not require a filter, _if_ the collection scan can enforce
+     *                     recordRange
+     */
+    [[nodiscard]] static bool handleRIDRangeScan(
+        const MatchExpression* conjunct,
+        const CollatorInterface* queryCollator,
+        const CollatorInterface* ccCollator,
+        StringData clusterKeyFieldName,
+        RecordIdRange& recordRange,
+        const std::function<void(const MatchExpression*)>& redundant = [](auto) {});
+
+    /**
+     * Removes elements from a MatchExpression tree, recursively.
+     *
+     * Only descends into AndMatchExpressions.
+     */
+    static void simplifyFilter(std::unique_ptr<MatchExpression>& expr,
+                               const std::set<const MatchExpression*>& toRemove);
 
 private:
     /**
@@ -142,11 +228,9 @@ private:
     struct ScanBuildingState {
         ScanBuildingState(MatchExpression* theRoot,
                           const std::vector<IndexEntry>& indexList,
-                          bool inArrayOp,
-                          bool isCoveredNull = false)
+                          bool inArrayOp)
             : root(theRoot),
               inArrayOperator(inArrayOp),
-              isCoveredNullQuery(isCoveredNull),
               indices(indexList),
               currentScan(nullptr),
               curChild(0),
@@ -160,15 +244,21 @@ private:
          * Reset the scan building state in preparation for building a new scan.
          *
          * This always should be called prior to allocating a new 'currentScan'.
+         *
+         * If `isQueryParameterized` is true an Interval Evaluation Tree will be built for every key
+         * element.
          */
-        void resetForNextScan(IndexTag* newTag) {
-            currentScan.reset(nullptr);
-            currentIndexNumber = newTag->index;
-            tightness = IndexBoundsBuilder::INEXACT_FETCH;
-            loosestBounds = IndexBoundsBuilder::EXACT;
+        void resetForNextScan(IndexTag* newTag, bool isQueryParameterized);
 
-            if (MatchExpression::OR == root->matchType()) {
-                curOr = std::make_unique<OrMatchExpression>();
+        interval_evaluation_tree::Builder* getCurrentIETBuilder() {
+            if (ietBuilders.empty()) {
+                return nullptr;
+            } else {
+                tassert(6334910,
+                        "IET Builder list size must be equal to the number of fields in the key "
+                        "pattern",
+                        ixtag->pos < ietBuilders.size());
+                return &ietBuilders[ixtag->pos];
             }
         }
 
@@ -178,9 +268,6 @@ private:
 
         // Are we inside an array operator such as $elemMatch or $all?
         bool inArrayOperator;
-
-        // Is this a covered null query?
-        bool isCoveredNullQuery;
 
         // A list of relevant indices which 'root' may be tagged to use.
         const std::vector<IndexEntry>& indices;
@@ -221,6 +308,11 @@ private:
         // the child predicates assigned to the current index is INEXACT_COVERED but none are
         // INEXACT_FETCH, then 'loosestBounds' is INEXACT_COVERED.
         IndexBoundsBuilder::BoundsTightness loosestBounds;
+
+        // The list of Interval Evaluation Tree builders used to build IETs for SBE. Every
+        // iet::Builder in the list corresponds to the corresponding element in the key pattern. The
+        // vector is empty if the query has no parameter markers.
+        std::vector<interval_evaluation_tree::Builder> ietBuilders;
 
     private:
         // Default constructor is not allowed.
@@ -306,6 +398,10 @@ private:
      * of index scans.  As such, the processing for AND and OR is almost identical.
      *
      * Does not take ownership of 'root' but may remove children from it.
+     *
+     * If 'inArrayOperator' is true, then 'root' will be left unmodified.
+     * If 'inArrayOperator' is false, then the children of 'root' that are processed will be removed
+     * from 'root'.
      */
     static bool processIndexScans(const CanonicalQuery& query,
                                   MatchExpression* root,
@@ -354,7 +450,8 @@ private:
         const IndexEntry& index,
         size_t pos,
         const MatchExpression* expr,
-        IndexBoundsBuilder::BoundsTightness* tightnessOut);
+        IndexBoundsBuilder::BoundsTightness* tightnessOut,
+        interval_evaluation_tree::Builder* ietBuilder);
 
     /**
      * Merge the predicate 'expr' with the leaf node 'node'.
@@ -377,7 +474,9 @@ private:
      * If geo, do nothing.
      * If text, punt to finishTextNode.
      */
-    static void finishLeafNode(QuerySolutionNode* node, const IndexEntry& index);
+    static void finishLeafNode(QuerySolutionNode* node,
+                               const IndexEntry& index,
+                               std::vector<interval_evaluation_tree::Builder> ietBuilders);
 
     /**
      * Fills in any missing bounds by calling finishLeafNode(...) for the scan contained in
@@ -426,12 +525,12 @@ private:
     static void handleFilter(ScanBuildingState* scanState);
 
     /**
-     * Implements handleFilter(...) for OR queries.
+     * Implements handleFilter(...) for AND queries.
      */
     static void handleFilterAnd(ScanBuildingState* scanState);
 
     /**
-     * Implements handleFilter(...) for AND queries.
+     * Implements handleFilter(...) for OR queries.
      */
     static void handleFilterOr(ScanBuildingState* scanState);
 };

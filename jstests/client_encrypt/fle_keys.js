@@ -1,56 +1,46 @@
 /**
  * Check functionality of KeyVault.js
  */
-
-load("jstests/client_encrypt/lib/mock_kms.js");
-load('jstests/ssl/libs/ssl_helpers.js');
-
-(function() {
-"use strict";
-
-const mock_kms = new MockKMSServerAWS();
-mock_kms.start();
+import {CA_CERT, SERVER_CERT} from "jstests/ssl/libs/ssl_helpers.js";
 
 const x509_options = {
     sslMode: "requireSSL",
     sslPEMKeyFile: SERVER_CERT,
-    sslCAFile: CA_CERT
+    sslCAFile: CA_CERT,
 };
 
 const conn = MongoRunner.runMongod(x509_options);
-const test = conn.getDB("test");
-const collection = test.coll;
-
-const awsKMS = {
-    accessKeyId: "access",
-    secretAccessKey: "secret",
-    url: mock_kms.getURL(),
+const localKMS = {
+    key: BinData(
+        0,
+        "tu9jUCBqZdwCelwE/EAm/4WqdxrSMi04B8e9uAV+m30rI1J2nhKZZtQjdvsSCwuI4erR6IEcEK+5eGUAODv43NDNIR9QheT2edWFewUfHKsl9cnzTc86meIzOmYl6drp",
+    ),
 };
 
 const clientSideFLEOptions = {
     kmsProviders: {
-        aws: awsKMS,
+        local: localKMS,
     },
     keyVaultNamespace: "test.coll",
-    schemaMap: {}
+    schemaMap: {},
 };
 
 const conn_str = "mongodb://" + conn.host + "/?ssl=true";
 const shell = Mongo(conn_str, clientSideFLEOptions);
 const keyVault = shell.getKeyVault();
 
-keyVault.createKey("aws", "arn:aws:kms:us-east-1:fake:fake:fake", ['mongoKey']);
+keyVault.createKey("local", ["mongoKey"]);
 assert.eq(1, keyVault.getKeys().itcount());
 
-var result = keyVault.createKey("aws", "arn:aws:kms:us-east-4:fake:fake:fake", {});
+let result = keyVault.createKey("local", "fake", {});
 assert.eq("TypeError: key alternate names must be of Array type.", result);
 
-result = keyVault.createKey("aws", "arn:aws:kms:us-east-5:fake:fake:fake", [1]);
+result = keyVault.createKey("local", [1]);
 assert.eq("TypeError: items in key alternate names must be of String type.", result);
 
 assert.eq(1, keyVault.getKeyByAltName("mongoKey").itcount());
 
-var keyId = keyVault.getKeyByAltName("mongoKey").toArray()[0]._id;
+let keyId = keyVault.getKeyByAltName("mongoKey").toArray()[0]._id;
 
 keyVault.addKeyAlternateName(keyId, "mongoKey2");
 
@@ -72,12 +62,10 @@ result = keyVault.deleteKey(keyId);
 assert.eq(0, keyVault.getKey(keyId).itcount());
 assert.eq(0, keyVault.getKeys().itcount());
 
-keyVault.createKey("aws", "arn:aws:kms:us-east-1:fake:fake:fake1");
-keyVault.createKey("aws", "arn:aws:kms:us-east-2:fake:fake:fake2");
-keyVault.createKey("aws", "arn:aws:kms:us-east-3:fake:fake:fake3");
+keyVault.createKey("local", ["mongoKey1"]);
+keyVault.createKey("local", ["mongoKey2"]);
+keyVault.createKey("local", ["mongoKey3"]);
 
 assert.eq(3, keyVault.getKeys().itcount());
 
 MongoRunner.stopMongod(conn);
-mock_kms.stop();
-}());

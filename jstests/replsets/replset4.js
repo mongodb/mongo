@@ -1,25 +1,27 @@
-doTest = function(signal) {
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
+let doTest = function (signal) {
     // Test orphaned primary steps down
-    var replTest = new ReplSetTest({name: 'testSet', nodes: 3});
+    let replTest = new ReplSetTest({name: "testSet", nodes: 3});
 
     replTest.startSet();
-    replTest.initiate();
+    replTest.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
-    var primary = replTest.getPrimary();
+    let primary = replTest.getPrimary();
 
     // Kill both secondaries, simulating a network partition
-    var secondaries = replTest.getSecondaries();
-    for (var i = 0; i < secondaries.length; i++) {
-        var secondary_id = replTest.getNodeId(secondaries[i]);
+    let secondaries = replTest.getSecondaries();
+    for (let i = 0; i < secondaries.length; i++) {
+        let secondary_id = replTest.getNodeId(secondaries[i]);
         replTest.stop(secondary_id);
     }
 
     print("replset4.js 1");
 
-    assert.soon(function() {
+    assert.soon(function () {
         try {
-            var result = primary.getDB("admin").runCommand({hello: 1});
-            return (result['ok'] == 1 && result['isWritablePrimary'] == false);
+            let result = primary.getDB("admin").runCommand({hello: 1});
+            return result["ok"] == 1 && result["isWritablePrimary"] == false;
         } catch (e) {
             print("replset4.js caught " + e);
             return false;

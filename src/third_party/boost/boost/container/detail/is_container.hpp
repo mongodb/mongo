@@ -51,7 +51,7 @@ namespace dtl {
 template <class Container>
 struct is_container
 {
-   static const bool value =
+   BOOST_STATIC_CONSTEXPR bool value =
       boost::container::is_container_detail::
          has_member_function_callable_with_size <const Container>::value &&
       boost::container::is_container_detail::
@@ -61,7 +61,7 @@ struct is_container
 template <>
 struct is_container<void>
 {
-   static const bool value = false;
+   BOOST_STATIC_CONSTEXPR bool value = false;
 };
 
 

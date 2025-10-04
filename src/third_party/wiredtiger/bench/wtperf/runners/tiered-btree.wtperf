@@ -1,0 +1,17 @@
+conn_config="cache_size=20G,log=(enabled=true),tiered_storage=(bucket=../bucket,bucket_prefix=pfx,local_retention=2,name=dir_store)"
+checkpoint_interval=10
+checkpoint_threads=1
+table_config="type=file"
+tiered="dir_store"
+tiered_flush_interval=22
+key_sz=100
+value_sz=1024
+icount=800000
+reopen_connection=false
+run_time=360
+#threads=((count=5,reads=1),(count=5,inserts=1),(count=5,updates=1))
+threads=((count=1,updates=1))
+warmup=10
+sample_interval=5
+populate_threads=8
+report_interval=5

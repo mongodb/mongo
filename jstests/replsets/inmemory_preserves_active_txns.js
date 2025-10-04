@@ -10,17 +10,16 @@
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
 
-(function() {
-"use strict";
-load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/libs/storage_helpers.js");  // getOldestRequiredTimestampForCrashRecovery()
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {getOldestRequiredTimestampForCrashRecovery} from "jstests/libs/storage_engine/storage_helpers.js";
 
 // If the test runner passed --storageEngine=inMemory then we know inMemory is compiled into the
 // server. We'll actually use both inMemory and wiredTiger storage engines.
 const storageEngine = jsTest.options().storageEngine;
-if (storageEngine !== 'inMemory') {
+if (storageEngine !== "inMemory") {
     jsTestLog(`Skip test: storageEngine == "${storageEngine}", not "inMemory"`);
-    return;
+    quit();
 }
 
 // A new replica set for both the commit and abort tests to ensure the same clean state.
@@ -33,12 +32,11 @@ function doTest(commitOrAbort) {
             // inMemory node must not be a voter, otherwise lastCommitted never advances
             {storageEngine: "inMemory", rsConfig: {priority: 0, votes: 0}},
         ],
-        waitForKeys: false
+        waitForKeys: false,
     });
 
     replSet.startSet(PrepareHelpers.replSetStartSetOptions);
-    replSet.initiateWithAnyNodeAsPrimary(
-        null, "replSetInitiate", {doNotWaitForStableRecoveryTimestamp: true});
+    replSet.initiate(null, "replSetInitiate", {doNotWaitForStableRecoveryTimestamp: true});
 
     const primary = replSet.getPrimary();
     const secondary = replSet.getSecondary();
@@ -57,8 +55,7 @@ function doTest(commitOrAbort) {
     assert.commandWorked(session.getDatabase("test").test.insert({myTransaction: 1}));
     const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
-    const oldestRequiredTimestampForCrashRecovery =
-        getOldestRequiredTimestampForCrashRecovery(primary.getDB("test"));
+    const oldestRequiredTimestampForCrashRecovery = getOldestRequiredTimestampForCrashRecovery(primary.getDB("test"));
     assert.lte(oldestRequiredTimestampForCrashRecovery, prepareTimestamp);
 
     jsTestLog("Get transaction entry from config.transactions");
@@ -112,4 +109,3 @@ function doTest(commitOrAbort) {
 
 doTest("commit");
 doTest("abort");
-})();

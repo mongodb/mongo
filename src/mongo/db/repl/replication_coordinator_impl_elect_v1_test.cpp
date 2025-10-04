@@ -27,32 +27,64 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/operation_context_noop.h"
-#include "mongo/db/repl/hello_response.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
+#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/hello/hello_response.h"
+#include "mongo/db/repl/last_vote.h"
+#include "mongo/db/repl/member_config.h"
+#include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
+#include "mongo/db/repl/repl_set_request_votes_args.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_external_state_mock.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replication_coordinator_test_fixture.h"
 #include "mongo/db/repl/replication_metrics.h"
+#include "mongo/db/repl/replication_metrics_gen.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/vote_requester.h"
+#include "mongo/db/replication_state_transition_lock_guard.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/executor/mock_network_fixture.h"
+#include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_response.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
-#include "mongo/unittest/death_test.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/time_support.h"
 
-#include <boost/optional/optional_io.hpp>
+#include <functional>
+#include <memory>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
 namespace repl {
@@ -63,29 +95,27 @@ using namespace mongo::test::mock;
 using executor::NetworkInterfaceMock;
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
-using ApplierState = ReplicationCoordinator::ApplierState;
+using OplogSyncState = ReplicationCoordinator::OplogSyncState;
 
 class ReplCoordMockTest : public ReplCoordTest {
 public:
     void setUp() override {
         ReplCoordTest::setUp();
-        BSONObj configObj = BSON("_id"
-                                 << "mySet"
-                                 << "version" << 1 << "members"
-                                 << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                          << "node1:12345")
-                                               << BSON("_id" << 2 << "host"
-                                                             << "node2:12345")
-                                               << BSON("_id" << 3 << "host"
-                                                             << "node3:12345"))
-                                 << "protocolVersion" << 1);
+        BSONObj configObj = BSON("_id" << "mySet"
+                                       << "version" << 1 << "members"
+                                       << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                << "node1:12345")
+                                                     << BSON("_id" << 2 << "host"
+                                                                   << "node2:12345")
+                                                     << BSON("_id" << 3 << "host"
+                                                                   << "node3:12345"))
+                                       << "protocolVersion" << 1);
         assertStartSuccess(configObj, HostAndPort("node1", 12345));
         ReplSetConfig config = assertMakeRSConfig(configObj);
 
-        OperationContextNoop opCtx;
         OpTime time1(Timestamp(100, 1), 0);
-        replCoordSetMyLastAppliedOpTime(time1, Date_t() + Seconds(time1.getSecs()));
-        replCoordSetMyLastDurableOpTime(time1, Date_t() + Seconds(time1.getSecs()));
+        replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(time1,
+                                                            Date_t() + Seconds(time1.getSecs()));
         ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
         simulateEnoughHeartbeatsForAllNodesUp();
@@ -102,6 +132,8 @@ public:
         hbResp.setConfigTerm(rsConfig.getConfigTerm());
         hbResp.setAppliedOpTimeAndWallTime(
             {lastApplied, Date_t() + Seconds(lastApplied.getSecs())});
+        hbResp.setWrittenOpTimeAndWallTime(
+            {lastApplied, Date_t() + Seconds(lastApplied.getSecs())});
         hbResp.setDurableOpTimeAndWallTime(
             {lastApplied, Date_t() + Seconds(lastApplied.getSecs())});
 
@@ -116,6 +148,23 @@ protected:
     std::unique_ptr<MockNetwork> _mock;
 };
 
+BSONObj generateConfigObj(int numNodes, int version, boost::optional<BSONObj> settings) {
+    BSONObjBuilder configObjB;
+    configObjB.append(BSON("_id" << "mySet").getField("_id"));
+    configObjB.append(BSON("version" << version).getField("version"));
+    configObjB.append(BSON("protocolVersion" << 1).getField("protocolVersion"));
+    BSONArrayBuilder arrayBuilder(configObjB.subarrayStart("members"));
+    for (int i = 1; i <= numNodes; ++i) {
+        arrayBuilder.append(BSON("_id" << i << "host"
+                                       << "node" + std::to_string(i) + ":12345"));
+    }
+    arrayBuilder.done();
+    if (settings) {
+        configObjB.append(BSON("settings" << settings.get()).getField("settings"));
+    }
+    return configObjB.obj();
+}
+
 TEST(LastVote, LastVoteAcceptsUnknownField) {
     auto lastVoteBSON =
         BSON("candidateIndex" << 1 << "term" << 2 << "_id" << 3 << "unknownField" << 1);
@@ -125,15 +174,7 @@ TEST(LastVote, LastVoteAcceptsUnknownField) {
 }
 
 TEST_F(ReplCoordTest, RandomizedElectionOffsetWithinProperBounds) {
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "protocolVersion" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345")));
+    auto configObj = generateConfigObj(3, 1, boost::none);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
@@ -152,17 +193,7 @@ TEST_F(ReplCoordTest, RandomizedElectionOffsetWithinProperBounds) {
 }
 
 TEST_F(ReplCoordTest, RandomizedElectionOffsetAvoidsDivideByZero) {
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
-                             << "protocolVersion" << 1 << "settings"
-                             << BSON("electionTimeoutMillis" << 1));
+    auto configObj = generateConfigObj(3, 1, BSON("electionTimeoutMillis" << 1));
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
 
     // Make sure that an election timeout of 1ms doesn't make the random number
@@ -172,25 +203,25 @@ TEST_F(ReplCoordTest, RandomizedElectionOffsetAvoidsDivideByZero) {
 }
 
 TEST_F(ReplCoordTest, ElectionSucceedsWhenNodeIsTheOnlyElectableNode) {
-    assertStartSuccess(
-        BSON("_id"
-             << "mySet"
-             << "version" << 1 << "members"
-             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                      << "node1:12345")
-                           << BSON("_id" << 2 << "host"
-                                         << "node2:12345"
-                                         << "votes" << 0 << "hidden" << true << "priority" << 0))
-             << "protocolVersion" << 1),
-        HostAndPort("node1", 12345));
+    RAIIServerParameterControllerForTest controller("featureFlagReduceMajorityWriteLatency", true);
+    assertStartSuccess(BSON("_id" << "mySet"
+                                  << "version" << 1 << "members"
+                                  << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                           << "node1:12345")
+                                                << BSON("_id" << 2 << "host"
+                                                              << "node2:12345"
+                                                              << "votes" << 0 << "hidden" << true
+                                                              << "priority" << 0))
+                                  << "protocolVersion" << 1),
+                       HostAndPort("node1", 12345));
 
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
     ASSERT(getReplCoord()->getMemberState().secondary())
         << getReplCoord()->getMemberState().toString();
 
-    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(10, 1), 0), Date_t() + Seconds(10));
-    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(10, 1), 0), Date_t() + Seconds(10));
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(OpTime(Timestamp(10, 1), 0),
+                                                        Date_t() + Seconds(10));
 
     auto electionTimeoutWhen = getReplCoord()->getElectionTimeout_forTest();
     ASSERT_NOT_EQUALS(Date_t(), electionTimeoutWhen);
@@ -222,17 +253,19 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenNodeIsTheOnlyElectableNode) {
     ASSERT(getReplCoord()->getMemberState().primary())
         << getReplCoord()->getMemberState().toString();
     simulateCatchUpAbort();
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::WriterDraining);
 
     const auto opCtxPtr = makeOperationContext();
     auto& opCtx = *opCtxPtr;
 
-    // Since we're still in drain mode, expect that we report ismaster: false, issecondary:true.
+    // Since we're still in drain mode, expect that we report isWritablePrimary:false,
+    // issecondary:true.
     auto helloResponse =
         getReplCoord()->awaitHelloResponse(opCtxPtr.get(), {}, boost::none, boost::none);
     ASSERT_FALSE(helloResponse->isWritablePrimary()) << helloResponse->toBSON().toString();
     ASSERT_TRUE(helloResponse->isSecondary()) << helloResponse->toBSON().toString();
-    signalDrainComplete(&opCtx);
+    signalWriterDrainComplete(&opCtx);
+    signalApplierDrainComplete(&opCtx);
     helloResponse =
         getReplCoord()->awaitHelloResponse(opCtxPtr.get(), {}, boost::none, boost::none);
     ASSERT_TRUE(helloResponse->isWritablePrimary()) << helloResponse->toBSON().toString();
@@ -240,23 +273,15 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenNodeIsTheOnlyElectableNode) {
 }
 
 TEST_F(ReplCoordTest, StartElectionDoesNotStartAnElectionWhenNodeIsRecovering) {
-    assertStartSuccess(BSON("_id"
-                            << "mySet"
-                            << "version" << 1 << "members"
-                            << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                     << "node1:12345")
-                                          << BSON("_id" << 2 << "host"
-                                                        << "node2:12345"))
-                            << "protocolVersion" << 1),
-                       HostAndPort("node1", 12345));
+    assertStartSuccess(generateConfigObj(2, 1, boost::none), HostAndPort("node1", 12345));
 
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_RECOVERING));
 
     ASSERT(getReplCoord()->getMemberState().recovering())
         << getReplCoord()->getMemberState().toString();
 
-    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(10, 1), 0), Date_t() + Seconds(10));
-    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(10, 1), 0), Date_t() + Seconds(10));
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(OpTime(Timestamp(10, 1), 0),
+                                                        Date_t() + Seconds(10));
     simulateEnoughHeartbeatsForAllNodesUp();
 
     auto electionTimeoutWhen = getReplCoord()->getElectionTimeout_forTest();
@@ -264,32 +289,28 @@ TEST_F(ReplCoordTest, StartElectionDoesNotStartAnElectionWhenNodeIsRecovering) {
 }
 
 TEST_F(ReplCoordTest, ElectionSucceedsWhenNodeIsTheOnlyNode) {
-    startCapturingLogMessages();
-    assertStartSuccess(BSON("_id"
-                            << "mySet"
-                            << "version" << 1 << "members"
-                            << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                     << "node1:12345"))
-                            << "protocolVersion" << 1),
-                       HostAndPort("node1", 12345));
+    RAIIServerParameterControllerForTest controller("featureFlagReduceMajorityWriteLatency", true);
+    assertStartSuccess(generateConfigObj(1, 1, boost::none), HostAndPort("node1", 12345));
 
-    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(10, 1), 0), Date_t() + Seconds(10));
-    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(10, 1), 0), Date_t() + Seconds(10));
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(OpTime(Timestamp(10, 1), 0),
+                                                        Date_t() + Seconds(10));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     getReplCoord()->waitForElectionFinish_forTest();
     ASSERT(getReplCoord()->getMemberState().primary())
         << getReplCoord()->getMemberState().toString();
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::WriterDraining);
 
     const auto opCtxPtr = makeOperationContext();
     auto& opCtx = *opCtxPtr;
 
-    // Since we're still in drain mode, expect that we report ismaster: false, issecondary:true.
+    // Since we're still in drain mode, expect that we report isWritablePrimary:false,
+    // issecondary:true.
     auto helloResponse =
         getReplCoord()->awaitHelloResponse(opCtxPtr.get(), {}, boost::none, boost::none);
     ASSERT_FALSE(helloResponse->isWritablePrimary()) << helloResponse->toBSON().toString();
     ASSERT_TRUE(helloResponse->isSecondary()) << helloResponse->toBSON().toString();
-    signalDrainComplete(&opCtx);
+    signalWriterDrainComplete(&opCtx);
+    signalApplierDrainComplete(&opCtx);
     helloResponse =
         getReplCoord()->awaitHelloResponse(opCtxPtr.get(), {}, boost::none, boost::none);
     ASSERT_TRUE(helloResponse->isWritablePrimary()) << helloResponse->toBSON().toString();
@@ -311,33 +332,27 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenNodeIsTheOnlyNode) {
 }
 
 TEST_F(ReplCoordTest, ElectionSucceedsWhenAllNodesVoteYea) {
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
-                             << "protocolVersion" << 1);
+    auto configObj = generateConfigObj(3, 1, boost::none);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
-    OperationContextNoop opCtx;
-    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
-    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(OpTime(Timestamp(100, 1), 0),
+                                                        Date_t() + Seconds(100));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     simulateSuccessfulV1Election();
     getReplCoord()->waitForElectionFinish_forTest();
 
+    auto opCtxHolder{makeOperationContext()};
+    auto* const opCtx{opCtxHolder.get()};
+
     // Check last vote
-    auto lastVote = getExternalState()->loadLocalLastVoteDocument(nullptr);
+    auto lastVote = getExternalState()->loadLocalLastVoteDocument(opCtx);
     ASSERT(lastVote.isOK());
     ASSERT_EQ(0, lastVote.getValue().getCandidateIndex());
     ASSERT_EQ(1, lastVote.getValue().getTerm());
 
-    stopCapturingLogMessages();
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("Election succeeded"));
+    logs.stop();
+    ASSERT_EQUALS(1, logs.countTextContaining("Election succeeded"));
 
     // Check that the numElectionTimeoutsCalled and the numElectionTimeoutsSuccessful election
     // metrics have been incremented, and that none of the metrics that track the number of
@@ -357,47 +372,32 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenAllNodesVoteYea) {
 }
 
 TEST_F(ReplCoordTest, ElectionSucceedsWhenMaxSevenNodesVoteYea) {
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345")
-                                           << BSON("_id" << 4 << "host"
-                                                         << "node4:12345")
-                                           << BSON("_id" << 5 << "host"
-                                                         << "node5:12345")
-                                           << BSON("_id" << 6 << "host"
-                                                         << "node6:12345")
-                                           << BSON("_id" << 7 << "host"
-                                                         << "node7:12345"))
-                             << "protocolVersion" << 1);
+    auto configObj = generateConfigObj(7, 1, boost::none);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
-    OperationContextNoop opCtx;
-    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
-    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(OpTime(Timestamp(100, 1), 0),
+                                                        Date_t() + Seconds(100));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     simulateSuccessfulV1Election();
     getReplCoord()->waitForElectionFinish_forTest();
 
+    auto opCtxHolder{makeOperationContext()};
+    auto* const opCtx{opCtxHolder.get()};
+
     // Check last vote
-    auto lastVote = getExternalState()->loadLocalLastVoteDocument(nullptr);
+    auto lastVote = getExternalState()->loadLocalLastVoteDocument(opCtx);
     ASSERT(lastVote.isOK());
     ASSERT_EQ(0, lastVote.getValue().getCandidateIndex());
     ASSERT_EQ(1, lastVote.getValue().getTerm());
 
-    stopCapturingLogMessages();
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("Election succeeded"));
+    logs.stop();
+    ASSERT_EQUALS(1, logs.countTextContaining("Election succeeded"));
 }
 
 // This is to demonstrate the unit testing mock framework. The logic is the same as the original
 // test.
 TEST_F(ReplCoordMockTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringDryRun_Mock) {
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
 
     // Check that the node's election candidate metrics are unset before it becomes primary.
     ASSERT_BSONOBJ_EQ(
@@ -417,13 +417,11 @@ TEST_F(ReplCoordMockTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringDry
 
     // Trigger election.
     _mock->runUntil(electionTimeoutWhen);
-
     _mock->runUntilExpectationsSatisfied();
 
-    stopCapturingLogMessages();
-    ASSERT_EQUALS(1,
-                  countTextFormatLogLinesContaining(
-                      "Not running for primary, we received insufficient votes"));
+    logs.stop();
+    ASSERT_EQUALS(
+        1, logs.countTextContaining("Not running for primary, we received insufficient votes"));
 
     // Check that the node's election candidate metrics have been cleared, since it lost the dry-run
     // election and will not become primary.
@@ -434,7 +432,7 @@ TEST_F(ReplCoordMockTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringDry
 // This is to showcase the mock's behavior when we have extraneous, unsatisfied expectations.
 TEST_F(ReplCoordMockTest,
        ElectionFailsWhenInsufficientVotesAreReceivedDuringDryRun_MockExtraExpectation) {
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
 
     // Check that the node's election candidate metrics are unset before it becomes primary.
     ASSERT_BSONOBJ_EQ(
@@ -470,10 +468,9 @@ TEST_F(ReplCoordMockTest,
     // In our case, this will trivially succeed as we cleared all expectations above.
     _mock->runUntilExpectationsSatisfied();
 
-    stopCapturingLogMessages();
-    ASSERT_EQUALS(1,
-                  countTextFormatLogLinesContaining(
-                      "Not running for primary, we received insufficient votes"));
+    logs.stop();
+    ASSERT_EQUALS(
+        1, logs.countTextContaining("Not running for primary, we received insufficient votes"));
 
     // Check that the node's election candidate metrics have been cleared, since it lost the dry-run
     // election and will not become primary.
@@ -482,24 +479,13 @@ TEST_F(ReplCoordMockTest,
 }
 
 TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringDryRun) {
-    startCapturingLogMessages();
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
-                             << "protocolVersion" << 1);
+    unittest::LogCaptureGuard logs;
+    auto configObj = generateConfigObj(3, 1, boost::none);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
-    OperationContextNoop opCtx;
     OpTime time1(Timestamp(100, 1), 0);
-    replCoordSetMyLastAppliedOpTime(time1, Date_t() + Seconds(time1.getSecs()));
-    replCoordSetMyLastDurableOpTime(time1, Date_t() + Seconds(time1.getSecs()));
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(time1, Date_t() + Seconds(time1.getSecs()));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
     simulateEnoughHeartbeatsForAllNodesUp();
@@ -548,10 +534,9 @@ TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringDryRun)
         net->runReadyNetworkOperations();
     }
     net->exitNetwork();
-    stopCapturingLogMessages();
-    ASSERT_EQUALS(1,
-                  countTextFormatLogLinesContaining(
-                      "Not running for primary, we received insufficient votes"));
+    logs.stop();
+    ASSERT_EQUALS(
+        1, logs.countTextContaining("Not running for primary, we received insufficient votes"));
 
     // Check that the node's election candidate metrics have been cleared, since it lost the dry-run
     // election and will not become primary.
@@ -560,24 +545,13 @@ TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringDryRun)
 }
 
 TEST_F(ReplCoordTest, ElectionFailsWhenDryRunResponseContainsANewerTerm) {
-    startCapturingLogMessages();
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
-                             << "protocolVersion" << 1);
+    unittest::LogCaptureGuard logs;
+    auto configObj = generateConfigObj(3, 1, boost::none);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
-    OperationContextNoop opCtx;
     OpTime time1(Timestamp(100, 1), 0);
-    replCoordSetMyLastAppliedOpTime(time1, Date_t() + Seconds(time1.getSecs()));
-    replCoordSetMyLastDurableOpTime(time1, Date_t() + Seconds(time1.getSecs()));
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(time1, Date_t() + Seconds(time1.getSecs()));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
     simulateEnoughHeartbeatsForAllNodesUp();
@@ -619,23 +593,14 @@ TEST_F(ReplCoordTest, ElectionFailsWhenDryRunResponseContainsANewerTerm) {
     }
     net->exitNetwork();
     getReplCoord()->waitForElectionFinish_forTest();
-    stopCapturingLogMessages();
-    ASSERT_EQUALS(1,
-                  countTextFormatLogLinesContaining(
-                      "Not running for primary, we have been superseded already"));
+    logs.stop();
+    ASSERT_EQUALS(
+        1, logs.countTextContaining("Not running for primary, we have been superseded already"));
 }
 
 TEST_F(ReplCoordTest, ElectionParticipantMetricsAreCollected) {
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345"))
-                             << "protocolVersion" << 1);
+    auto configObj = generateConfigObj(2, 1, boost::none);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
-    OperationContextNoop opCtx;
     OpTime lastOplogEntry = OpTime(Timestamp(999, 0), 1);
 
     auto metricsAfterVoteRequestWithDryRun = [&](bool dryRun) {
@@ -644,15 +609,19 @@ TEST_F(ReplCoordTest, ElectionParticipantMetricsAreCollected) {
                                                  1 /* term */,
                                                  dryRun,
                                                  lastOplogEntry,
+                                                 lastOplogEntry,
                                                  -1 /* primaryIndex */
         );
+
+        auto opCtxHolder{makeOperationContext()};
+        auto* const opCtx{opCtxHolder.get()};
 
         auto voteRequest = requester.getRequests()[0];
         ReplSetRequestVotesArgs requestVotesArgs;
         ASSERT_OK(requestVotesArgs.initialize(voteRequest.cmdObj));
         ReplSetRequestVotesResponse requestVotesResponse;
         ASSERT_OK(getReplCoord()->processReplSetRequestVotes(
-            &opCtx, requestVotesArgs, &requestVotesResponse));
+            opCtx, requestVotesArgs, &requestVotesResponse));
 
         auto electionParticipantMetrics =
             ReplicationMetrics::get(getServiceContext()).getElectionParticipantMetricsBSON();
@@ -674,25 +643,10 @@ TEST_F(ReplCoordTest, ElectionParticipantMetricsAreCollected) {
 TEST_F(ReplCoordTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
     // start up, receive reconfig via heartbeat while at the same time, become candidate.
     // candidate state should be cleared.
-    OperationContextNoop opCtx;
-    assertStartSuccess(BSON("_id"
-                            << "mySet"
-                            << "version" << 2 << "members"
-                            << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                     << "node1:12345")
-                                          << BSON("_id" << 2 << "host"
-                                                        << "node2:12345")
-                                          << BSON("_id" << 3 << "host"
-                                                        << "node3:12345")
-                                          << BSON("_id" << 4 << "host"
-                                                        << "node4:12345")
-                                          << BSON("_id" << 5 << "host"
-                                                        << "node5:12345"))
-                            << "protocolVersion" << 1),
-                       HostAndPort("node1", 12345));
+    assertStartSuccess(generateConfigObj(5, 2, boost::none), HostAndPort("node1", 12345));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
-    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(OpTime(Timestamp(100, 1), 0),
+                                                        Date_t() + Seconds(100));
 
     globalFailPointRegistry().find("blockHeartbeatReconfigFinish")->setMode(FailPoint::alwaysOn);
 
@@ -700,19 +654,13 @@ TEST_F(ReplCoordTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
     NetworkInterfaceMock* net = getNet();
     net->enterNetwork();
     ReplSetHeartbeatResponse hbResp2;
-    auto config = ReplSetConfig::parse(BSON("_id"
-                                            << "mySet"
-                                            << "version" << 3 << "members"
-                                            << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                     << "node1:12345")
-                                                          << BSON("_id" << 2 << "host"
-                                                                        << "node2:12345"))
-                                            << "protocolVersion" << 1));
+    auto config = ReplSetConfig::parse(generateConfigObj(2, 3, boost::none));
     hbResp2.setConfig(config);
     hbResp2.setConfigVersion(3);
     hbResp2.setSetName("mySet");
     hbResp2.setState(MemberState::RS_SECONDARY);
     hbResp2.setAppliedOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
+    hbResp2.setWrittenOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
     hbResp2.setDurableOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
     net->runUntil(net->now() + Seconds(10));  // run until we've sent a heartbeat request
     const NetworkInterfaceMock::NetworkOperationIterator noi2 = net->getNextReadyRequest();
@@ -721,16 +669,21 @@ TEST_F(ReplCoordTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
     getNet()->exitNetwork();
 
     // prepare candidacy
-    BSONObjBuilder result;
-    ReplicationCoordinator::ReplSetReconfigArgs args;
-    args.force = false;
-    args.newConfigObj = config.toBSON();
-    ASSERT_EQUALS(ErrorCodes::ConfigurationInProgress,
-                  getReplCoord()->processReplSetReconfig(&opCtx, args, &result));
+    {
+        auto opCtxHolder{makeOperationContext()};
+        auto* const opCtx{opCtxHolder.get()};
+
+        BSONObjBuilder result;
+        ReplicationCoordinator::ReplSetReconfigArgs args;
+        args.force = false;
+        args.newConfigObj = config.toBSON();
+        ASSERT_EQUALS(ErrorCodes::ConfigurationInProgress,
+                      getReplCoord()->processReplSetReconfig(opCtx, args, &result));
+    }
 
     auto severityGuard = unittest::MinimumLoggedSeverityGuard{logv2::LogComponent::kDefault,
                                                               logv2::LogSeverity::Debug(2)};
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
 
     // receive sufficient heartbeats to allow the node to see a majority.
     ReplicationCoordinatorImpl* replCoord = getReplCoord();
@@ -750,6 +703,8 @@ TEST_F(ReplCoordTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
             hbResp.setState(MemberState::RS_SECONDARY);
             hbResp.setConfigVersion(rsConfig.getConfigVersion());
             hbResp.setAppliedOpTimeAndWallTime(
+                {OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
+            hbResp.setWrittenOpTimeAndWallTime(
                 {OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
             hbResp.setDurableOpTimeAndWallTime(
                 {OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
@@ -787,33 +742,22 @@ TEST_F(ReplCoordTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
     }
     net->exitNetwork();
 
-    stopCapturingLogMessages();
+    logs.stop();
     // ensure node does not stand for election
     ASSERT_EQUALS(1,
-                  countTextFormatLogLinesContaining("Not standing for election; processing "
-                                                    "a configuration change"));
+                  logs.countTextContaining("Not standing for election; processing "
+                                           "a configuration change"));
     globalFailPointRegistry().find("blockHeartbeatReconfigFinish")->setMode(FailPoint::off);
 }
 
 TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringRequestVotes) {
-    startCapturingLogMessages();
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
-                             << "protocolVersion" << 1);
+    unittest::LogCaptureGuard logs;
+    auto configObj = generateConfigObj(3, 1, boost::none);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
-    OperationContextNoop opCtx;
     OpTime time1(Timestamp(100, 1), 0);
-    replCoordSetMyLastAppliedOpTime(time1, Date_t() + Seconds(time1.getSecs()));
-    replCoordSetMyLastDurableOpTime(time1, Date_t() + Seconds(time1.getSecs()));
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(time1, Date_t() + Seconds(time1.getSecs()));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
     simulateEnoughHeartbeatsForAllNodesUp();
@@ -842,29 +786,18 @@ TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringRequest
     net->exitNetwork();
 
     getReplCoord()->waitForElectionFinish_forTest();
-    stopCapturingLogMessages();
-    ASSERT_EQUALS(
-        1,
-        countTextFormatLogLinesContaining("Not becoming primary, we received insufficient votes"));
+    logs.stop();
+    ASSERT_EQUALS(1,
+                  logs.countTextContaining("Not becoming primary, we received insufficient votes"));
 }
 
 TEST_F(ReplCoordTest, TransitionToRollbackFailsWhenElectionInProgress) {
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
-                             << "protocolVersion" << 1);
+    auto configObj = generateConfigObj(3, 1, boost::none);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
     OpTime time1(Timestamp(100, 1), 0);
-    replCoordSetMyLastAppliedOpTime(time1, Date_t() + Seconds(time1.getSecs()));
-    replCoordSetMyLastDurableOpTime(time1, Date_t() + Seconds(time1.getSecs()));
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(time1, Date_t() + Seconds(time1.getSecs()));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
     simulateEnoughHeartbeatsForAllNodesUp();
@@ -884,24 +817,13 @@ TEST_F(ReplCoordTest, TransitionToRollbackFailsWhenElectionInProgress) {
 }
 
 TEST_F(ReplCoordTest, ElectionFailsWhenVoteRequestResponseContainsANewerTerm) {
-    startCapturingLogMessages();
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
-                             << "protocolVersion" << 1);
+    unittest::LogCaptureGuard logs;
+    auto configObj = generateConfigObj(3, 1, boost::none);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
-    OperationContextNoop opCtx;
     OpTime time1(Timestamp(100, 1), 0);
-    replCoordSetMyLastAppliedOpTime(time1, Date_t() + Seconds(time1.getSecs()));
-    replCoordSetMyLastDurableOpTime(time1, Date_t() + Seconds(time1.getSecs()));
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(time1, Date_t() + Seconds(time1.getSecs()));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
     // Check that the node's election candidate metrics are unset before it becomes primary.
@@ -939,10 +861,9 @@ TEST_F(ReplCoordTest, ElectionFailsWhenVoteRequestResponseContainsANewerTerm) {
     net->exitNetwork();
 
     getReplCoord()->waitForElectionFinish_forTest();
-    stopCapturingLogMessages();
+    logs.stop();
     ASSERT_EQUALS(
-        1,
-        countTextFormatLogLinesContaining("Not becoming primary, we have been superseded already"));
+        1, logs.countTextContaining("Not becoming primary, we have been superseded already"));
 
     // Check that the node's election candidate metrics have been cleared, since it lost the actual
     // election and will not become primary.
@@ -951,25 +872,13 @@ TEST_F(ReplCoordTest, ElectionFailsWhenVoteRequestResponseContainsANewerTerm) {
 }
 
 TEST_F(ReplCoordTest, ElectionFailsWhenTermChangesDuringDryRun) {
-    startCapturingLogMessages();
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
-                             << "protocolVersion" << 1);
-
+    unittest::LogCaptureGuard logs;
+    auto configObj = generateConfigObj(3, 1, boost::none);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
-    OperationContextNoop opCtx;
     OpTime time1(Timestamp(100, 1), 0);
-    replCoordSetMyLastAppliedOpTime(time1, Date_t() + Seconds(time1.getSecs()));
-    replCoordSetMyLastDurableOpTime(time1, Date_t() + Seconds(time1.getSecs()));
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(time1, Date_t() + Seconds(time1.getSecs()));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
     simulateEnoughHeartbeatsForAllNodesUp();
@@ -982,37 +891,30 @@ TEST_F(ReplCoordTest, ElectionFailsWhenTermChangesDuringDryRun) {
     };
     simulateSuccessfulDryRun(onDryRunRequest);
 
-    stopCapturingLogMessages();
+    logs.stop();
     ASSERT_EQUALS(1,
-                  countTextFormatLogLinesContaining(
+                  logs.countTextContaining(
                       "Not running for primary, we have been superseded already during dry run"));
 }
 
 TEST_F(ReplCoordTest, ElectionFailsWhenTermChangesDuringActualElection) {
-    startCapturingLogMessages();
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
-                             << "protocolVersion" << 1);
+    unittest::LogCaptureGuard logs;
+    auto configObj = generateConfigObj(3, 1, boost::none);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
-    OperationContextNoop opCtx;
     OpTime time1(Timestamp(100, 1), 0);
-    replCoordSetMyLastAppliedOpTime(time1, Date_t() + Seconds(time1.getSecs()));
-    replCoordSetMyLastDurableOpTime(time1, Date_t() + Seconds(time1.getSecs()));
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(time1, Date_t() + Seconds(time1.getSecs()));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
     simulateEnoughHeartbeatsForAllNodesUp();
     simulateSuccessfulDryRun();
-    // update to a future term before the election completes
-    getReplCoord()->updateTerm(&opCtx, 1000).transitional_ignore();
+    {
+        auto opCtxHolder{makeOperationContext()};
+        auto* const opCtx{opCtxHolder.get()};
+        // update to a future term before the election completes
+        getReplCoord()->updateTerm(opCtx, 1000).transitional_ignore();
+    }
 
     NetworkInterfaceMock* net = getNet();
     net->enterNetwork();
@@ -1037,10 +939,9 @@ TEST_F(ReplCoordTest, ElectionFailsWhenTermChangesDuringActualElection) {
     }
     net->exitNetwork();
     getReplCoord()->waitForElectionFinish_forTest();
-    stopCapturingLogMessages();
+    logs.stop();
     ASSERT_EQUALS(
-        1,
-        countTextFormatLogLinesContaining("Not becoming primary, we have been superseded already"));
+        1, logs.countTextContaining("Not becoming primary, we have been superseded already"));
 }
 
 TEST_F(ReplCoordTest, StartElectionOnSingleNodeInitiate) {
@@ -1050,14 +951,16 @@ TEST_F(ReplCoordTest, StartElectionOnSingleNodeInitiate) {
     BSONObj configObj = configWithMembers(1, 0, BSON_ARRAY(member(1, "node1:12345")));
 
     // Initialize my last applied, so that the node is electable.
-    replCoordSetMyLastAppliedAndDurableOpTime({Timestamp(100, 1), 0});
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime({Timestamp(100, 1), 0});
 
     BSONObjBuilder result;
+    // processReplSetInitiate will (through a series of steps) transition the
+    // state to secondary, which triggers election on single node. It's possible
+    // that after reaching secondary, we quickly move to primary, so we check
+    // that we are in either state below.
     ASSERT_OK(getReplCoord()->processReplSetInitiate(opCtx.get(), configObj, &result));
-    ASSERT_EQUALS(MemberState::RS_RECOVERING, getReplCoord()->getMemberState().s);
-    // Oplog applier attempts to transition the state to Secondary, which triggers
-    // election on single node.
-    getReplCoord()->finishRecoveryIfEligible(opCtx.get());
+    auto memberState = getReplCoord()->getMemberState().s;
+    ASSERT_TRUE(MemberState::RS_SECONDARY == memberState || MemberState::RS_PRIMARY == memberState);
     // Run pending election operations on executor.
     getNet()->enterNetwork();
     getNet()->runReadyNetworkOperations();
@@ -1070,12 +973,13 @@ TEST_F(ReplCoordTest, StartElectionOnSingleNodeStartup) {
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
 
     // Initialize my last applied, so that the node is electable.
-    replCoordSetMyLastAppliedAndDurableOpTime({Timestamp(100, 1), 0});
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime({Timestamp(100, 1), 0});
 
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_RECOVERING));
     // Oplog applier attempts to transition the state to Secondary, which triggers
     // election on single node.
     auto opCtx = makeOperationContext();
+    getReplCoord()->setConsistentDataAvailable_forTest();
     getReplCoord()->finishRecoveryIfEligible(opCtx.get());
     // Run pending election operations on executor.
     getNet()->enterNetwork();
@@ -1152,28 +1056,28 @@ public:
         return net->now();
     }
 
-    void performSuccessfulTakeover(Date_t takeoverTime,
+    void performSuccessfulTakeover(OperationContext* opCtx,
+                                   Date_t takeoverTime,
                                    StartElectionReasonEnum reason,
                                    const LastVote& lastVoteExpected) {
-        startCapturingLogMessages();
-        simulateSuccessfulV1ElectionAt(takeoverTime);
+        unittest::LogCaptureGuard logs;
+        simulateSuccessfulV1ElectionAt(opCtx, takeoverTime);
         getReplCoord()->waitForElectionFinish_forTest();
-        stopCapturingLogMessages();
+        logs.stop();
 
         ASSERT(getReplCoord()->getMemberState().primary());
 
         // Check last vote
-        auto lastVote = getExternalState()->loadLocalLastVoteDocument(nullptr);
+        auto lastVote = getExternalState()->loadLocalLastVoteDocument(opCtx);
         ASSERT(lastVote.isOK());
         ASSERT_EQ(lastVoteExpected.getCandidateIndex(), lastVote.getValue().getCandidateIndex());
         ASSERT_EQ(lastVoteExpected.getTerm(), lastVote.getValue().getTerm());
 
         if (reason == StartElectionReasonEnum::kPriorityTakeover) {
-            ASSERT_EQUALS(
-                1,
-                countTextFormatLogLinesContaining("Starting an election for a priority takeover"));
+            ASSERT_EQUALS(1,
+                          logs.countTextContaining("Starting an election for a priority takeover"));
         }
-        ASSERT_EQUALS(1, countTextFormatLogLinesContaining("Election succeeded"));
+        ASSERT_EQUALS(1, logs.countTextContaining("Election succeeded"));
     }
 
 private:
@@ -1199,7 +1103,7 @@ private:
             // right up until another event happens (like an election). This is
             // particularly important for simulating a catchup takeover because
             // we need to know specific info about the primary.
-            auto noi = net->getFrontOfUnscheduledQueue();
+            auto noi = net->getFrontOfReadyQueue();
             auto&& nextRequest = noi->getRequest();
             if (nextRequest.cmdObj.firstElement().fieldNameStringData() != "replSetHeartbeat") {
                 return;
@@ -1230,6 +1134,8 @@ private:
             hbResp.setTerm(replCoord->getTerm());
             hbResp.setAppliedOpTimeAndWallTime(
                 {otherNodesOpTime, Date_t() + Seconds(otherNodesOpTime.getSecs())});
+            hbResp.setWrittenOpTimeAndWallTime(
+                {otherNodesOpTime, Date_t() + Seconds(otherNodesOpTime.getSecs())});
             hbResp.setDurableOpTimeAndWallTime(
                 {otherNodesOpTime, Date_t() + Seconds(otherNodesOpTime.getSecs())});
             auto response = makeResponseStatus(hbResp.toBSON());
@@ -1239,30 +1145,24 @@ private:
 };
 
 TEST_F(TakeoverTest, DoesntScheduleCatchupTakeoverIfCatchupDisabledButTakeoverDelaySet) {
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
-                             << "protocolVersion" << 1 << "settings"
-                             << BSON("catchUpTimeoutMillis" << 0 << "catchUpTakeoverDelay"
-                                                            << 10000));
+    auto configObj = generateConfigObj(
+        3, 1, BSON("catchUpTimeoutMillis" << 0 << "catchUpTakeoverDelay" << 10000));
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
     auto replCoord = getReplCoord();
     auto now = getNet()->now();
 
-    OperationContextNoop opCtx;
     OpTime currentOptime(Timestamp(200, 1), 0);
-    replCoordSetMyLastAppliedOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
-    replCoordSetMyLastDurableOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(
+        currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
     OpTime behindOptime(Timestamp(100, 1), 0);
-    ASSERT_EQUALS(ErrorCodes::StaleTerm, replCoord->updateTerm(&opCtx, 1));
+    {
+        auto opCtxHolder{makeOperationContext()};
+        auto* const opCtx{opCtxHolder.get()};
+
+        ASSERT_EQUALS(ErrorCodes::StaleTerm, replCoord->updateTerm(opCtx, 1));
+    }
 
     // Make sure we're secondary and that no catchup takeover has been scheduled yet.
     ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
@@ -1277,30 +1177,20 @@ TEST_F(TakeoverTest, DoesntScheduleCatchupTakeoverIfCatchupDisabledButTakeoverDe
 }
 
 TEST_F(TakeoverTest, SchedulesCatchupTakeoverIfNodeIsFresherThanCurrentPrimary) {
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
-                             << "protocolVersion" << 1);
+    auto configObj = generateConfigObj(3, 1, boost::none);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
     auto replCoord = getReplCoord();
     auto now = getNet()->now();
 
-    OperationContextNoop opCtx;
     OpTime currentOptime(Timestamp(200, 1), 0);
     // Update the current term to simulate a scenario where an election has occured
     // and some other node became the new primary. Once you hear about a primary election
     // in term 1, your term will be increased.
     replCoord->updateTerm_forTest(1, nullptr);
-    replCoordSetMyLastAppliedOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
-    replCoordSetMyLastDurableOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(
+        currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
     OpTime behindOptime(Timestamp(100, 1), 0);
 
     // Make sure we're secondary and that no catchup takeover has been scheduled yet.
@@ -1315,38 +1205,36 @@ TEST_F(TakeoverTest, SchedulesCatchupTakeoverIfNodeIsFresherThanCurrentPrimary) 
     // Make sure that the catchup takeover has actually been scheduled and at the
     // correct time.
     ASSERT(replCoord->getCatchupTakeover_forTest());
-    auto catchupTakeoverTime = replCoord->getCatchupTakeover_forTest().get();
+    auto catchupTakeoverTime = replCoord->getCatchupTakeover_forTest().value();
     Milliseconds catchupTakeoverDelay = catchupTakeoverTime - now;
     ASSERT_EQUALS(config.getCatchUpTakeoverDelay(), catchupTakeoverDelay);
 }
 
 TEST_F(TakeoverTest, SchedulesCatchupTakeoverIfBothTakeoversAnOption) {
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345"
-                                                      << "priority" << 2)
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"
-                                                         << "priority" << 3))
-                             << "protocolVersion" << 1);
+    BSONObj configObj = BSON("_id" << "mySet"
+                                   << "version" << 1 << "members"
+                                   << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                            << "node1:12345"
+                                                            << "priority" << 2)
+                                                 << BSON("_id" << 2 << "host"
+                                                               << "node2:12345")
+                                                 << BSON("_id" << 3 << "host"
+                                                               << "node3:12345"
+                                                               << "priority" << 3))
+                                   << "protocolVersion" << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
     auto replCoord = getReplCoord();
     auto now = getNet()->now();
 
-    OperationContextNoop opCtx;
     OpTime currentOptime(Timestamp(200, 1), 0);
     // Update the current term to simulate a scenario where an election has occured
     // and some other node became the new primary. Once you hear about a primary election
     // in term 1, your term will be increased.
     replCoord->updateTerm_forTest(1, nullptr);
-    replCoordSetMyLastAppliedOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
-    replCoordSetMyLastDurableOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(
+        currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
     OpTime behindOptime(Timestamp(100, 1), 0);
 
     // Make sure we're secondary and that no catchup takeover has been scheduled.
@@ -1362,27 +1250,26 @@ TEST_F(TakeoverTest, SchedulesCatchupTakeoverIfBothTakeoversAnOption) {
     // correct time and that a priority takeover has not been scheduled.
     ASSERT(replCoord->getCatchupTakeover_forTest());
     ASSERT_FALSE(replCoord->getPriorityTakeover_forTest());
-    auto catchupTakeoverTime = replCoord->getCatchupTakeover_forTest().get();
+    auto catchupTakeoverTime = replCoord->getCatchupTakeover_forTest().value();
     Milliseconds catchupTakeoverDelay = catchupTakeoverTime - now;
     ASSERT_EQUALS(config.getCatchUpTakeoverDelay(), catchupTakeoverDelay);
 }
 
 TEST_F(TakeoverTest, PrefersPriorityToCatchupTakeoverIfNodeHasHighestPriority) {
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345"
-                                                      << "priority" << 2)
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
-                             << "protocolVersion" << 1);
+    BSONObj configObj = BSON("_id" << "mySet"
+                                   << "version" << 1 << "members"
+                                   << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                            << "node1:12345"
+                                                            << "priority" << 2)
+                                                 << BSON("_id" << 2 << "host"
+                                                               << "node2:12345")
+                                                 << BSON("_id" << 3 << "host"
+                                                               << "node3:12345"))
+                                   << "protocolVersion" << 1);
 
     auto severityGuard = unittest::MinimumLoggedSeverityGuard{logv2::LogComponent::kDefault,
                                                               logv2::LogSeverity::Debug(2)};
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
 
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
@@ -1390,14 +1277,13 @@ TEST_F(TakeoverTest, PrefersPriorityToCatchupTakeoverIfNodeHasHighestPriority) {
     auto replCoord = getReplCoord();
     auto now = getNet()->now();
 
-    OperationContextNoop opCtx;
     OpTime currentOptime(Timestamp(200, 1), 0);
     // Update the current term to simulate a scenario where an election has occured
     // and some other node became the new primary. Once you hear about a primary election
     // in term 1, your term will be increased.
     replCoord->updateTerm_forTest(1, nullptr);
-    replCoordSetMyLastAppliedOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
-    replCoordSetMyLastDurableOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(
+        currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
     OpTime behindOptime(Timestamp(100, 1), 0);
 
     // Make sure we're secondary and that no catchup takeover has been scheduled.
@@ -1413,38 +1299,28 @@ TEST_F(TakeoverTest, PrefersPriorityToCatchupTakeoverIfNodeHasHighestPriority) {
     ASSERT(replCoord->getPriorityTakeover_forTest());
     ASSERT_FALSE(replCoord->getCatchupTakeover_forTest());
 
-    stopCapturingLogMessages();
-    ASSERT_EQUALS(1,
-                  countTextFormatLogLinesContaining(
-                      "I can take over the primary because I have a higher priority, "
-                      "the highest priority in the replica set, and fresher data"));
+    logs.stop();
+    ASSERT_EQUALS(
+        1,
+        logs.countTextContaining("I can take over the primary because I have a higher priority, "
+                                 "the highest priority in the replica set, and fresher data"));
 }
 
 TEST_F(TakeoverTest, CatchupTakeoverNotScheduledTwice) {
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
-                             << "protocolVersion" << 1);
+    auto configObj = generateConfigObj(3, 1, boost::none);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
     auto replCoord = getReplCoord();
     auto now = getNet()->now();
 
-    OperationContextNoop opCtx;
     OpTime currentOptime(Timestamp(200, 1), 0);
     // Update the current term to simulate a scenario where an election has occured
     // and some other node became the new primary. Once you hear about a primary election
     // in term 1, your term will be increased.
     replCoord->updateTerm_forTest(1, nullptr);
-    replCoordSetMyLastAppliedOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
-    replCoordSetMyLastDurableOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(
+        currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
     OpTime behindOptime(Timestamp(100, 1), 0);
 
     // Make sure we're secondary and that no catchup takeover has been scheduled.
@@ -1461,7 +1337,7 @@ TEST_F(TakeoverTest, CatchupTakeoverNotScheduledTwice) {
     ASSERT(replCoord->getCatchupTakeover_forTest());
     executor::TaskExecutor::CallbackHandle catchupTakeoverCbh =
         replCoord->getCatchupTakeoverCbh_forTest();
-    auto catchupTakeoverTime = replCoord->getCatchupTakeover_forTest().get();
+    auto catchupTakeoverTime = replCoord->getCatchupTakeover_forTest().value();
     Milliseconds catchupTakeoverDelay = catchupTakeoverTime - now;
     ASSERT_EQUALS(config.getCatchUpTakeoverDelay(), catchupTakeoverDelay);
 
@@ -1470,23 +1346,22 @@ TEST_F(TakeoverTest, CatchupTakeoverNotScheduledTwice) {
         config, now + config.getHeartbeatInterval(), HostAndPort("node2", 12345), behindOptime);
 
     // Make sure another catchup takeover wasn't scheduled
-    ASSERT_EQUALS(catchupTakeoverTime, replCoord->getCatchupTakeover_forTest().get());
+    ASSERT_EQUALS(catchupTakeoverTime, replCoord->getCatchupTakeover_forTest().value());
     ASSERT_TRUE(catchupTakeoverCbh == replCoord->getCatchupTakeoverCbh_forTest());
 }
 
 TEST_F(TakeoverTest, CatchupAndPriorityTakeoverNotScheduledAtSameTime) {
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345"
-                                                      << "priority" << 2)
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"
-                                                         << "priority" << 3))
-                             << "protocolVersion" << 1);
+    BSONObj configObj = BSON("_id" << "mySet"
+                                   << "version" << 1 << "members"
+                                   << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                            << "node1:12345"
+                                                            << "priority" << 2)
+                                                 << BSON("_id" << 2 << "host"
+                                                               << "node2:12345")
+                                                 << BSON("_id" << 3 << "host"
+                                                               << "node3:12345"
+                                                               << "priority" << 3))
+                                   << "protocolVersion" << 1);
     // In order for node 1 to first schedule a catchup takeover, then a priority takeover
     // once the first gets canceled, it must have a higher priority than the current primary
     // (node 2). But, it must not have the highest priority in the replica set. Otherwise,
@@ -1497,14 +1372,13 @@ TEST_F(TakeoverTest, CatchupAndPriorityTakeoverNotScheduledAtSameTime) {
     auto replCoord = getReplCoord();
     auto now = getNet()->now();
 
-    OperationContextNoop opCtx;
     OpTime currentOptime(Timestamp(200, 1), 0);
     // Update the current term to simulate a scenario where an election has occured
     // and some other node became the new primary. Once you hear about a primary election
     // in term 1, your term will be increased.
     replCoord->updateTerm_forTest(1, nullptr);
-    replCoordSetMyLastAppliedOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
-    replCoordSetMyLastDurableOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(
+        currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
     OpTime behindOptime(Timestamp(100, 1), 0);
 
     // Make sure we're secondary and that no catchup takeover has been scheduled.
@@ -1519,7 +1393,7 @@ TEST_F(TakeoverTest, CatchupAndPriorityTakeoverNotScheduledAtSameTime) {
     // Make sure that the catchup takeover has actually been scheduled and at the
     // correct time.
     ASSERT(replCoord->getCatchupTakeover_forTest());
-    auto catchupTakeoverTime = replCoord->getCatchupTakeover_forTest().get();
+    auto catchupTakeoverTime = replCoord->getCatchupTakeover_forTest().value();
     Milliseconds catchupTakeoverDelay = catchupTakeoverTime - now;
     ASSERT_EQUALS(config.getCatchUpTakeoverDelay(), catchupTakeoverDelay);
 
@@ -1536,16 +1410,7 @@ TEST_F(TakeoverTest, CatchupAndPriorityTakeoverNotScheduledAtSameTime) {
 }
 
 TEST_F(TakeoverTest, CatchupTakeoverCallbackCanceledIfElectionTimeoutRuns) {
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
-                             << "protocolVersion" << 1);
+    auto configObj = generateConfigObj(3, 1, boost::none);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
     // Force election timeouts to be exact, with no randomized offset, so that when the election
@@ -1555,21 +1420,20 @@ TEST_F(TakeoverTest, CatchupTakeoverCallbackCanceledIfElectionTimeoutRuns) {
     auto replCoord = getReplCoord();
     auto now = getNet()->now();
 
-    OperationContextNoop opCtx;
     OpTime currentOptime(Timestamp(200, 1), 0);
     // Update the current term to simulate a scenario where an election has occured
     // and some other node became the new primary. Once you hear about a primary election
     // in term 1, your term will be increased.
     replCoord->updateTerm_forTest(1, nullptr);
-    replCoordSetMyLastAppliedOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
-    replCoordSetMyLastDurableOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(
+        currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
     OpTime behindOptime(Timestamp(100, 1), 0);
 
     // Make sure we're secondary and that no catchup takeover has been scheduled.
     ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
     ASSERT_FALSE(replCoord->getCatchupTakeover_forTest());
 
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
 
     // Mock a first round of heartbeat responses, which should give us enough information to know
     // that we are fresher than the current primary, prompting the scheduling of a catchup
@@ -1579,7 +1443,7 @@ TEST_F(TakeoverTest, CatchupTakeoverCallbackCanceledIfElectionTimeoutRuns) {
     // Make sure that the catchup takeover has actually been scheduled and at the
     // correct time.
     ASSERT(replCoord->getCatchupTakeover_forTest());
-    auto catchupTakeoverTime = replCoord->getCatchupTakeover_forTest().get();
+    auto catchupTakeoverTime = replCoord->getCatchupTakeover_forTest().value();
     Milliseconds catchupTakeoverDelay = catchupTakeoverTime - now;
     ASSERT_EQUALS(config.getCatchUpTakeoverDelay(), catchupTakeoverDelay);
 
@@ -1598,30 +1462,19 @@ TEST_F(TakeoverTest, CatchupTakeoverCallbackCanceledIfElectionTimeoutRuns) {
     ASSERT_EQUALS(electionTimeout, net->now());
     net->exitNetwork();
 
-    stopCapturingLogMessages();
+    logs.stop();
 
-    ASSERT_EQUALS(
-        1, countTextFormatLogLinesContaining("Starting an election, since we've seen no PRIMARY"));
+    ASSERT_EQUALS(1, logs.countTextContaining("Starting an election, since we've seen no PRIMARY"));
 
     // Make sure catchup takeover never happend and CatchupTakeover callback was canceled.
     ASSERT_FALSE(replCoord->getCatchupTakeover_forTest());
     ASSERT(replCoord->getMemberState().secondary());
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("Canceling catchup takeover callback"));
-    ASSERT_EQUALS(0,
-                  countTextFormatLogLinesContaining("Starting an election for a catchup takeover"));
+    ASSERT_EQUALS(1, logs.countTextContaining("Canceling catchup takeover callback"));
+    ASSERT_EQUALS(0, logs.countTextContaining("Starting an election for a catchup takeover"));
 }
 
 TEST_F(TakeoverTest, CatchupTakeoverCanceledIfTransitionToRollback) {
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
-                             << "protocolVersion" << 1);
+    auto configObj = generateConfigObj(3, 1, boost::none);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
@@ -1633,15 +1486,15 @@ TEST_F(TakeoverTest, CatchupTakeoverCanceledIfTransitionToRollback) {
     // and some other node became the new primary. Once you hear about a primary election
     // in term 1, your term will be increased.
     replCoord->updateTerm_forTest(1, nullptr);
-    replCoordSetMyLastAppliedOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
-    replCoordSetMyLastDurableOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(
+        currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
     OpTime behindOptime(Timestamp(100, 1), 0);
 
     // Make sure we're secondary and that no catchup takeover has been scheduled.
     ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
     ASSERT_FALSE(replCoord->getCatchupTakeover_forTest());
 
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
 
     // Mock a first round of heartbeat responses, which should give us enough information to know
     // that we are fresher than the current primary, prompting the scheduling of a catchup
@@ -1651,7 +1504,7 @@ TEST_F(TakeoverTest, CatchupTakeoverCanceledIfTransitionToRollback) {
     // Make sure that the catchup takeover has actually been scheduled and at the
     // correct time.
     ASSERT(replCoord->getCatchupTakeover_forTest());
-    auto catchupTakeoverTime = replCoord->getCatchupTakeover_forTest().get();
+    auto catchupTakeoverTime = replCoord->getCatchupTakeover_forTest().value();
     Milliseconds catchupTakeoverDelay = catchupTakeoverTime - now;
     ASSERT_EQUALS(config.getCatchUpTakeoverDelay(), catchupTakeoverDelay);
 
@@ -1663,26 +1516,16 @@ TEST_F(TakeoverTest, CatchupTakeoverCanceledIfTransitionToRollback) {
     ASSERT_OK(replCoord->setFollowerModeRollback(opCtx.get()));
     ASSERT_TRUE(replCoord->getMemberState().rollback());
 
-    stopCapturingLogMessages();
+    logs.stop();
 
     // Make sure catchup takeover never happend and CatchupTakeover callback was canceled.
     ASSERT_FALSE(replCoord->getCatchupTakeover_forTest());
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("Canceling catchup takeover callback"));
-    ASSERT_EQUALS(0,
-                  countTextFormatLogLinesContaining("Starting an election for a catchup takeover"));
+    ASSERT_EQUALS(1, logs.countTextContaining("Canceling catchup takeover callback"));
+    ASSERT_EQUALS(0, logs.countTextContaining("Starting an election for a catchup takeover"));
 }
 
 TEST_F(TakeoverTest, SuccessfulCatchupTakeover) {
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
-                             << "protocolVersion" << 1);
+    auto configObj = generateConfigObj(3, 1, boost::none);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
     HostAndPort primaryHostAndPort("node2", 12345);
@@ -1690,17 +1533,22 @@ TEST_F(TakeoverTest, SuccessfulCatchupTakeover) {
     auto replCoord = getReplCoord();
     auto now = getNet()->now();
 
-    OperationContextNoop opCtx;
     OpTime currentOptime(Timestamp(100, 5000), 0);
     OpTime behindOptime(Timestamp(100, 4000), 0);
 
-    replCoordSetMyLastAppliedOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
-    replCoordSetMyLastDurableOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(
+        currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
 
     // Update the term so that the current term is ahead of the term of
     // the last applied op time. This means that the primary is still in
     // catchup mode since it hasn't written anything this term.
-    ASSERT_EQUALS(ErrorCodes::StaleTerm, replCoord->updateTerm(&opCtx, replCoord->getTerm() + 1));
+    {
+        auto opCtxHolder{makeOperationContext()};
+        auto* const opCtx{opCtxHolder.get()};
+
+        ASSERT_EQUALS(ErrorCodes::StaleTerm,
+                      replCoord->updateTerm(opCtx, replCoord->getTerm() + 1));
+    }
 
     // Make sure we're secondary and that no takeover has been scheduled.
     ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
@@ -1712,27 +1560,33 @@ TEST_F(TakeoverTest, SuccessfulCatchupTakeover) {
     // Make sure that the catchup takeover has actually been scheduled and at the
     // correct time.
     ASSERT(replCoord->getCatchupTakeover_forTest());
-    auto catchupTakeoverTime = replCoord->getCatchupTakeover_forTest().get();
+    auto catchupTakeoverTime = replCoord->getCatchupTakeover_forTest().value();
     Milliseconds catchupTakeoverDelay = catchupTakeoverTime - now;
     ASSERT_EQUALS(config.getCatchUpTakeoverDelay(), catchupTakeoverDelay);
 
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
 
     // The catchup takeover will be scheduled at a time later than one election
     // timeout after our initial heartbeat responses, so mock a few rounds of
     // heartbeat responses to prevent a normal election timeout.
     now = respondToHeartbeatsUntil(
         config, catchupTakeoverTime, HostAndPort("node2", 12345), behindOptime);
-    stopCapturingLogMessages();
+    logs.stop();
 
     // Since the heartbeats go through the catchupTakeoverTimeout, this log
     // message happens already (otherwise it would happen in performSuccessfulTakeover).
-    ASSERT_EQUALS(1,
-                  countTextFormatLogLinesContaining("Starting an election for a catchup takeover"));
+    ASSERT_EQUALS(1, logs.countTextContaining("Starting an election for a catchup takeover"));
 
-    LastVote lastVoteExpected = LastVote(replCoord->getTerm() + 1, 0);
-    performSuccessfulTakeover(
-        catchupTakeoverTime, StartElectionReasonEnum::kCatchupTakeover, lastVoteExpected);
+    {
+        auto opCtxHolder{makeOperationContext()};
+        auto* const opCtx{opCtxHolder.get()};
+
+        LastVote lastVoteExpected = LastVote(replCoord->getTerm() + 1, 0);
+        performSuccessfulTakeover(opCtx,
+                                  catchupTakeoverTime,
+                                  StartElectionReasonEnum::kCatchupTakeover,
+                                  lastVoteExpected);
+    }
 
     // Check that the numCatchUpTakeoversCalled and the numCatchUpTakeoversSuccessful election
     // metrics have been incremented, and that none of the metrics that track the number of
@@ -1752,21 +1606,8 @@ TEST_F(TakeoverTest, SuccessfulCatchupTakeover) {
 }
 
 TEST_F(TakeoverTest, CatchupTakeoverDryRunFailsPrimarySaysNo) {
-    startCapturingLogMessages();
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345")
-                                           << BSON("_id" << 4 << "host"
-                                                         << "node4:12345")
-                                           << BSON("_id" << 5 << "host"
-                                                         << "node5:12345"))
-                             << "protocolVersion" << 1);
+    unittest::LogCaptureGuard logs;
+    auto configObj = generateConfigObj(5, 1, boost::none);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
     HostAndPort primaryHostAndPort("node2", 12345);
@@ -1774,17 +1615,22 @@ TEST_F(TakeoverTest, CatchupTakeoverDryRunFailsPrimarySaysNo) {
     auto replCoord = getReplCoord();
     auto now = getNet()->now();
 
-    OperationContextNoop opCtx;
     OpTime currentOptime(Timestamp(100, 5000), 0);
     OpTime behindOptime(Timestamp(100, 4000), 0);
 
-    replCoordSetMyLastAppliedOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
-    replCoordSetMyLastDurableOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(
+        currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
 
     // Update the term so that the current term is ahead of the term of
     // the last applied op time. This means that the primary is still in
     // catchup mode since it hasn't written anything this term.
-    ASSERT_EQUALS(ErrorCodes::StaleTerm, replCoord->updateTerm(&opCtx, replCoord->getTerm() + 1));
+    {
+        auto opCtxHolder{makeOperationContext()};
+        auto* const opCtx{opCtxHolder.get()};
+
+        ASSERT_EQUALS(ErrorCodes::StaleTerm,
+                      replCoord->updateTerm(opCtx, replCoord->getTerm() + 1));
+    }
 
     // Make sure we're secondary and that no takeover has been scheduled.
     ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
@@ -1796,7 +1642,7 @@ TEST_F(TakeoverTest, CatchupTakeoverDryRunFailsPrimarySaysNo) {
     // Make sure that the catchup takeover has actually been scheduled and at the
     // correct time.
     ASSERT(replCoord->getCatchupTakeover_forTest());
-    auto catchupTakeoverTime = replCoord->getCatchupTakeover_forTest().get();
+    auto catchupTakeoverTime = replCoord->getCatchupTakeover_forTest().value();
     Milliseconds catchupTakeoverDelay = catchupTakeoverTime - now;
     ASSERT_EQUALS(config.getCatchUpTakeoverDelay(), catchupTakeoverDelay);
 
@@ -1806,8 +1652,7 @@ TEST_F(TakeoverTest, CatchupTakeoverDryRunFailsPrimarySaysNo) {
     now = respondToHeartbeatsUntil(
         config, catchupTakeoverTime, HostAndPort("node2", 12345), behindOptime);
 
-    ASSERT_EQUALS(1,
-                  countTextFormatLogLinesContaining("Starting an election for a catchup takeover"));
+    ASSERT_EQUALS(1, logs.countTextContaining("Starting an election for a catchup takeover"));
 
     // Simulate a dry run where the primary has caught up and is now ahead of the
     // node trying to do the catchup takeover. All the secondary nodes respond
@@ -1855,47 +1700,43 @@ TEST_F(TakeoverTest, CatchupTakeoverDryRunFailsPrimarySaysNo) {
     net->exitNetwork();
 
     getReplCoord()->waitForElectionDryRunFinish_forTest();
-    stopCapturingLogMessages();
+    logs.stop();
 
     // Make sure an election wasn't called for and that we are still secondary.
     ASSERT_EQUALS(1,
-                  countTextFormatLogLinesContaining(
+                  logs.countTextContaining(
                       "Not running for primary, the current primary responded no in the dry run"));
     ASSERT(replCoord->getMemberState().secondary());
 }
 
 TEST_F(TakeoverTest, PrimaryCatchesUpBeforeCatchupTakeover) {
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
-                             << "protocolVersion" << 1);
+    auto configObj = generateConfigObj(3, 1, boost::none);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
     auto replCoord = getReplCoord();
     auto now = getNet()->now();
 
-    OperationContextNoop opCtx;
     OpTime currentOptime(Timestamp(200, 1), 0);
-    replCoordSetMyLastAppliedOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
-    replCoordSetMyLastDurableOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(
+        currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
     OpTime behindOptime(Timestamp(100, 1), 0);
 
     // Update the term so that the current term is ahead of the term of
     // the last applied op time.
-    ASSERT_EQUALS(ErrorCodes::StaleTerm, replCoord->updateTerm(&opCtx, replCoord->getTerm() + 1));
+    {
+        auto opCtxHolder{makeOperationContext()};
+        auto* const opCtx{opCtxHolder.get()};
+
+        ASSERT_EQUALS(ErrorCodes::StaleTerm,
+                      replCoord->updateTerm(opCtx, replCoord->getTerm() + 1));
+    }
 
     // Make sure we're secondary and that no catchup takeover has been scheduled.
     ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
     ASSERT_FALSE(replCoord->getCatchupTakeover_forTest());
 
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
 
     // Mock a first round of heartbeat responses, which should give us enough information to know
     // that we are fresher than the current primary, prompting the scheduling of a catchup
@@ -1905,7 +1746,7 @@ TEST_F(TakeoverTest, PrimaryCatchesUpBeforeCatchupTakeover) {
     // Make sure that the catchup takeover has actually been scheduled and at the
     // correct time.
     ASSERT(replCoord->getCatchupTakeover_forTest());
-    auto catchupTakeoverTime = replCoord->getCatchupTakeover_forTest().get();
+    auto catchupTakeoverTime = replCoord->getCatchupTakeover_forTest().value();
     Milliseconds catchupTakeoverDelay = catchupTakeoverTime - now;
     ASSERT_EQUALS(config.getCatchUpTakeoverDelay(), catchupTakeoverDelay);
 
@@ -1914,49 +1755,52 @@ TEST_F(TakeoverTest, PrimaryCatchesUpBeforeCatchupTakeover) {
     now = respondToHeartbeatsUntil(
         config, now + catchupTakeoverDelay, HostAndPort("node2", 12345), currentOptime);
 
-    stopCapturingLogMessages();
+    logs.stop();
 
     // Make sure we're secondary and that no catchup takeover election happened.
     ASSERT(replCoord->getMemberState().secondary());
     ASSERT_FALSE(replCoord->getCatchupTakeover_forTest());
-    ASSERT_EQUALS(
-        1, countTextFormatLogLinesContaining("Not starting an election for a catchup takeover"));
+    ASSERT_EQUALS(1, logs.countTextContaining("Not starting an election for a catchup takeover"));
 }
 
 TEST_F(TakeoverTest, PrimaryCatchesUpBeforeHighPriorityNodeCatchupTakeover) {
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345"
-                                                      << "priority" << 2)
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"
-                                                         << "priority" << 3))
-                             << "protocolVersion" << 1);
+    BSONObj configObj = BSON("_id" << "mySet"
+                                   << "version" << 1 << "members"
+                                   << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                            << "node1:12345"
+                                                            << "priority" << 2)
+                                                 << BSON("_id" << 2 << "host"
+                                                               << "node2:12345")
+                                                 << BSON("_id" << 3 << "host"
+                                                               << "node3:12345"
+                                                               << "priority" << 3))
+                                   << "protocolVersion" << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
     auto replCoord = getReplCoord();
     auto now = getNet()->now();
 
-    OperationContextNoop opCtx;
     OpTime currentOptime(Timestamp(200, 1), 0);
-    replCoordSetMyLastAppliedOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
-    replCoordSetMyLastDurableOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(
+        currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
     OpTime behindOptime(Timestamp(100, 1), 0);
 
     // Update the term so that the current term is ahead of the term of
     // the last applied op time.
-    ASSERT_EQUALS(ErrorCodes::StaleTerm, replCoord->updateTerm(&opCtx, replCoord->getTerm() + 1));
+    {
+        auto opCtxHolder{makeOperationContext()};
+        auto* const opCtx{opCtxHolder.get()};
+
+        ASSERT_EQUALS(ErrorCodes::StaleTerm,
+                      replCoord->updateTerm(opCtx, replCoord->getTerm() + 1));
+    }
 
     // Make sure we're secondary and that no catchup takeover has been scheduled.
     ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
     ASSERT_FALSE(replCoord->getCatchupTakeover_forTest());
 
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
 
     // Mock a first round of heartbeat responses, which should give us enough information to know
     // that we are fresher than the current primary, prompting the scheduling of a catchup
@@ -1966,7 +1810,7 @@ TEST_F(TakeoverTest, PrimaryCatchesUpBeforeHighPriorityNodeCatchupTakeover) {
     // Make sure that the catchup takeover has actually been scheduled and at the
     // correct time.
     ASSERT(replCoord->getCatchupTakeover_forTest());
-    auto catchupTakeoverTime = replCoord->getCatchupTakeover_forTest().get();
+    auto catchupTakeoverTime = replCoord->getCatchupTakeover_forTest().value();
     Milliseconds catchupTakeoverDelay = catchupTakeoverTime - now;
     ASSERT_EQUALS(config.getCatchUpTakeoverDelay(), catchupTakeoverDelay);
 
@@ -1975,18 +1819,17 @@ TEST_F(TakeoverTest, PrimaryCatchesUpBeforeHighPriorityNodeCatchupTakeover) {
     now = respondToHeartbeatsUntil(
         config, now + catchupTakeoverDelay, HostAndPort("node2", 12345), currentOptime);
 
-    stopCapturingLogMessages();
+    logs.stop();
 
     // Make sure we're secondary and that no catchup takeover election happens.
     ASSERT(replCoord->getMemberState().secondary());
     ASSERT_FALSE(replCoord->getCatchupTakeover_forTest());
-    ASSERT_EQUALS(
-        1, countTextFormatLogLinesContaining("Not starting an election for a catchup takeover"));
+    ASSERT_EQUALS(1, logs.countTextContaining("Not starting an election for a catchup takeover"));
 
     // Make sure that the priority takeover has now been scheduled and at the
     // correct time.
     ASSERT(replCoord->getPriorityTakeover_forTest());
-    auto priorityTakeoverTime = replCoord->getPriorityTakeover_forTest().get();
+    auto priorityTakeoverTime = replCoord->getPriorityTakeover_forTest().value();
     assertValidPriorityTakeoverDelay(config, now, priorityTakeoverTime, 0);
 
     // Node 1 schedules the priority takeover, and since it has the second highest
@@ -1997,33 +1840,38 @@ TEST_F(TakeoverTest, PrimaryCatchesUpBeforeHighPriorityNodeCatchupTakeover) {
     now = respondToHeartbeatsUntil(
         config, now + longElectionTimeout, HostAndPort("node2", 12345), currentOptime);
 
-    LastVote lastVoteExpected = LastVote(replCoord->getTerm() + 1, 0);
-    performSuccessfulTakeover(
-        priorityTakeoverTime, StartElectionReasonEnum::kPriorityTakeover, lastVoteExpected);
+    {
+        auto opCtxHolder{makeOperationContext()};
+        auto* const opCtx{opCtxHolder.get()};
+
+        LastVote lastVoteExpected = LastVote(replCoord->getTerm() + 1, 0);
+        performSuccessfulTakeover(opCtx,
+                                  priorityTakeoverTime,
+                                  StartElectionReasonEnum::kPriorityTakeover,
+                                  lastVoteExpected);
+    }
 }
 
 TEST_F(TakeoverTest, SchedulesPriorityTakeoverIfNodeHasHigherPriorityThanCurrentPrimary) {
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345"
-                                                      << "priority" << 2)
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
-                             << "protocolVersion" << 1);
+    BSONObj configObj = BSON("_id" << "mySet"
+                                   << "version" << 1 << "members"
+                                   << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                            << "node1:12345"
+                                                            << "priority" << 2)
+                                                 << BSON("_id" << 2 << "host"
+                                                               << "node2:12345")
+                                                 << BSON("_id" << 3 << "host"
+                                                               << "node3:12345"))
+                                   << "protocolVersion" << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
     auto replCoord = getReplCoord();
     auto now = getNet()->now();
 
-    OperationContextNoop opCtx;
     OpTime myOptime(Timestamp(100, 1), 0);
-    replCoordSetMyLastAppliedOpTime(myOptime, Date_t() + Seconds(myOptime.getSecs()));
-    replCoordSetMyLastDurableOpTime(myOptime, Date_t() + Seconds(myOptime.getSecs()));
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(myOptime,
+                                                        Date_t() + Seconds(myOptime.getSecs()));
 
     // Make sure we're secondary and that no priority takeover has been scheduled.
     ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
@@ -2037,36 +1885,40 @@ TEST_F(TakeoverTest, SchedulesPriorityTakeoverIfNodeHasHigherPriorityThanCurrent
     // Make sure that the priority takeover has actually been scheduled and at the
     // correct time.
     ASSERT(replCoord->getPriorityTakeover_forTest());
-    auto priorityTakeoverTime = replCoord->getPriorityTakeover_forTest().get();
+    auto priorityTakeoverTime = replCoord->getPriorityTakeover_forTest().value();
     assertValidPriorityTakeoverDelay(config, now, priorityTakeoverTime, 0);
 
     // Also make sure that updating the term cancels the scheduled priority takeover.
-    ASSERT_EQUALS(ErrorCodes::StaleTerm, replCoord->updateTerm(&opCtx, replCoord->getTerm() + 1));
+    {
+        const auto opCtxPtr = makeOperationContext();
+        auto& opCtx = *opCtxPtr;
+
+        ASSERT_EQUALS(ErrorCodes::StaleTerm,
+                      replCoord->updateTerm(&opCtx, replCoord->getTerm() + 1));
+    }
     ASSERT_FALSE(replCoord->getPriorityTakeover_forTest());
 }
 
 TEST_F(TakeoverTest, SuccessfulPriorityTakeover) {
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345"
-                                                      << "priority" << 2)
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
-                             << "protocolVersion" << 1);
+    BSONObj configObj = BSON("_id" << "mySet"
+                                   << "version" << 1 << "members"
+                                   << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                            << "node1:12345"
+                                                            << "priority" << 2)
+                                                 << BSON("_id" << 2 << "host"
+                                                               << "node2:12345")
+                                                 << BSON("_id" << 3 << "host"
+                                                               << "node3:12345"))
+                                   << "protocolVersion" << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
     auto replCoord = getReplCoord();
     auto now = getNet()->now();
 
-    OperationContextNoop opCtx;
     OpTime myOptime(Timestamp(100, 1), 0);
-    replCoordSetMyLastAppliedOpTime(myOptime, Date_t() + Seconds(myOptime.getSecs()));
-    replCoordSetMyLastDurableOpTime(myOptime, Date_t() + Seconds(myOptime.getSecs()));
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(myOptime,
+                                                        Date_t() + Seconds(myOptime.getSecs()));
 
     // Make sure we're secondary and that no priority takeover has been scheduled.
     ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
@@ -2080,7 +1932,7 @@ TEST_F(TakeoverTest, SuccessfulPriorityTakeover) {
     // Make sure that the priority takeover has actually been scheduled and at the
     // correct time.
     ASSERT(replCoord->getPriorityTakeover_forTest());
-    auto priorityTakeoverTime = replCoord->getPriorityTakeover_forTest().get();
+    auto priorityTakeoverTime = replCoord->getPriorityTakeover_forTest().value();
     assertValidPriorityTakeoverDelay(config, now, priorityTakeoverTime, 0);
 
     // The priority takeover might be scheduled at a time later than one election
@@ -2090,9 +1942,16 @@ TEST_F(TakeoverTest, SuccessfulPriorityTakeover) {
     now = respondToHeartbeatsUntil(
         config, now + halfElectionTimeout, HostAndPort("node2", 12345), myOptime);
 
-    LastVote lastVoteExpected = LastVote(replCoord->getTerm() + 1, 0);
-    performSuccessfulTakeover(
-        priorityTakeoverTime, StartElectionReasonEnum::kPriorityTakeover, lastVoteExpected);
+    {
+        const auto opCtxPtr = makeOperationContext();
+        auto& opCtx = *opCtxPtr;
+
+        LastVote lastVoteExpected = LastVote(replCoord->getTerm() + 1, 0);
+        performSuccessfulTakeover(&opCtx,
+                                  priorityTakeoverTime,
+                                  StartElectionReasonEnum::kPriorityTakeover,
+                                  lastVoteExpected);
+    }
 
     // Check that the numPriorityTakeoversCalled and the numPriorityTakeoversSuccessful election
     // metrics have been incremented, and that none of the metrics that track the number of
@@ -2112,17 +1971,16 @@ TEST_F(TakeoverTest, SuccessfulPriorityTakeover) {
 }
 
 TEST_F(TakeoverTest, DontCallForPriorityTakeoverWhenLaggedSameSecond) {
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345"
-                                                      << "priority" << 2)
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
-                             << "protocolVersion" << 1);
+    BSONObj configObj = BSON("_id" << "mySet"
+                                   << "version" << 1 << "members"
+                                   << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                            << "node1:12345"
+                                                            << "priority" << 2)
+                                                 << BSON("_id" << 2 << "host"
+                                                               << "node2:12345")
+                                                 << BSON("_id" << 3 << "host"
+                                                               << "node3:12345"))
+                                   << "protocolVersion" << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
     HostAndPort primaryHostAndPort("node2", 12345);
@@ -2130,13 +1988,12 @@ TEST_F(TakeoverTest, DontCallForPriorityTakeoverWhenLaggedSameSecond) {
     auto replCoord = getReplCoord();
     auto now = getNet()->now();
 
-    OperationContextNoop opCtx;
     OpTime currentOpTime(Timestamp(100, 5000), 0);
     OpTime behindOpTime(Timestamp(100, 3999), 0);
     OpTime closeEnoughOpTime(Timestamp(100, 4000), 0);
 
-    replCoordSetMyLastAppliedOpTime(behindOpTime, Date_t() + Seconds(behindOpTime.getSecs()));
-    replCoordSetMyLastDurableOpTime(behindOpTime, Date_t() + Seconds(behindOpTime.getSecs()));
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(behindOpTime,
+                                                        Date_t() + Seconds(behindOpTime.getSecs()));
 
     // Make sure we're secondary and that no priority takeover has been scheduled.
     ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
@@ -2148,24 +2005,23 @@ TEST_F(TakeoverTest, DontCallForPriorityTakeoverWhenLaggedSameSecond) {
     // Make sure that the priority takeover has actually been scheduled and at the
     // correct time.
     ASSERT(replCoord->getPriorityTakeover_forTest());
-    auto priorityTakeoverTime = replCoord->getPriorityTakeover_forTest().get();
+    auto priorityTakeoverTime = replCoord->getPriorityTakeover_forTest().value();
     assertValidPriorityTakeoverDelay(config, now, priorityTakeoverTime, 0);
 
     // At this point the other nodes are all ahead of the current node, so it can't call for
     // priority takeover.
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     now = respondToHeartbeatsUntil(config, priorityTakeoverTime, primaryHostAndPort, currentOpTime);
-    stopCapturingLogMessages();
+    logs.stop();
 
     ASSERT(replCoord->getMemberState().secondary());
     ASSERT_EQUALS(
         1,
-        countBSONFormatLogLinesIsSubset(
-            BSON("attr" << BSON(
-                     "reason"
-                     << "Not standing for election because member is not "
-                        "caught up enough to the most up-to-date member to "
-                        "call for priority takeover - must be within 2 seconds (mask 0x80)"))));
+        logs.countBSONContainingSubset(BSON(
+            "attr" << BSON(
+                "reason" << "Not standing for election because member is not "
+                            "caught up enough to the most up-to-date member to "
+                            "call for priority takeover - must be within 2 seconds (mask 0x80)"))));
 
     // Mock another round of heartbeat responses that occur after the previous
     // 'priorityTakeoverTime', which should schedule a new priority takeover
@@ -2179,14 +2035,12 @@ TEST_F(TakeoverTest, DontCallForPriorityTakeoverWhenLaggedSameSecond) {
     // Make sure that a new priority takeover has been scheduled and at the
     // correct time.
     ASSERT(replCoord->getPriorityTakeover_forTest());
-    priorityTakeoverTime = replCoord->getPriorityTakeover_forTest().get();
+    priorityTakeoverTime = replCoord->getPriorityTakeover_forTest().value();
     assertValidPriorityTakeoverDelay(config, now, priorityTakeoverTime, 0);
 
     // Now make us caught up enough to call for priority takeover to succeed.
-    replCoordSetMyLastAppliedOpTime(closeEnoughOpTime,
-                                    Date_t() + Seconds(closeEnoughOpTime.getSecs()));
-    replCoordSetMyLastDurableOpTime(closeEnoughOpTime,
-                                    Date_t() + Seconds(closeEnoughOpTime.getSecs()));
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(
+        closeEnoughOpTime, Date_t() + Seconds(closeEnoughOpTime.getSecs()));
 
     // The priority takeover might have been scheduled at a time later than one election
     // timeout after our initial heartbeat responses, so mock another round of
@@ -2195,23 +2049,29 @@ TEST_F(TakeoverTest, DontCallForPriorityTakeoverWhenLaggedSameSecond) {
     now = respondToHeartbeatsUntil(
         config, now + halfElectionTimeout, primaryHostAndPort, currentOpTime);
 
-    LastVote lastVoteExpected = LastVote(replCoord->getTerm() + 1, 0);
-    performSuccessfulTakeover(
-        priorityTakeoverTime, StartElectionReasonEnum::kPriorityTakeover, lastVoteExpected);
+    {
+        auto opCtxHolder{makeOperationContext()};
+        auto* const opCtx{opCtxHolder.get()};
+
+        LastVote lastVoteExpected = LastVote(replCoord->getTerm() + 1, 0);
+        performSuccessfulTakeover(opCtx,
+                                  priorityTakeoverTime,
+                                  StartElectionReasonEnum::kPriorityTakeover,
+                                  lastVoteExpected);
+    }
 }
 
 TEST_F(TakeoverTest, DontCallForPriorityTakeoverWhenLaggedDifferentSecond) {
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345"
-                                                      << "priority" << 2)
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
-                             << "protocolVersion" << 1);
+    BSONObj configObj = BSON("_id" << "mySet"
+                                   << "version" << 1 << "members"
+                                   << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                            << "node1:12345"
+                                                            << "priority" << 2)
+                                                 << BSON("_id" << 2 << "host"
+                                                               << "node2:12345")
+                                                 << BSON("_id" << 3 << "host"
+                                                               << "node3:12345"))
+                                   << "protocolVersion" << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
     HostAndPort primaryHostAndPort("node2", 12345);
@@ -2219,12 +2079,11 @@ TEST_F(TakeoverTest, DontCallForPriorityTakeoverWhenLaggedDifferentSecond) {
     auto replCoord = getReplCoord();
     auto now = getNet()->now();
 
-    OperationContextNoop opCtx;
     OpTime currentOpTime(Timestamp(100, 1), 0);
     OpTime behindOpTime(Timestamp(97, 1), 0);
     OpTime closeEnoughOpTime(Timestamp(98, 1), 0);
-    replCoordSetMyLastAppliedOpTime(behindOpTime, Date_t() + Seconds(behindOpTime.getSecs()));
-    replCoordSetMyLastDurableOpTime(behindOpTime, Date_t() + Seconds(behindOpTime.getSecs()));
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(behindOpTime,
+                                                        Date_t() + Seconds(behindOpTime.getSecs()));
 
     // Make sure we're secondary and that no priority takeover has been scheduled.
     ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
@@ -2236,24 +2095,23 @@ TEST_F(TakeoverTest, DontCallForPriorityTakeoverWhenLaggedDifferentSecond) {
     // Make sure that the priority takeover has actually been scheduled and at the
     // correct time.
     ASSERT(replCoord->getPriorityTakeover_forTest());
-    auto priorityTakeoverTime = replCoord->getPriorityTakeover_forTest().get();
+    auto priorityTakeoverTime = replCoord->getPriorityTakeover_forTest().value();
     assertValidPriorityTakeoverDelay(config, now, priorityTakeoverTime, 0);
 
     // At this point the other nodes are all ahead of the current node, so it can't call for
     // priority takeover.
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     now = respondToHeartbeatsUntil(config, priorityTakeoverTime, primaryHostAndPort, currentOpTime);
-    stopCapturingLogMessages();
+    logs.stop();
 
     ASSERT(replCoord->getMemberState().secondary());
     ASSERT_EQUALS(
         1,
-        countBSONFormatLogLinesIsSubset(
-            BSON("attr" << BSON(
-                     "reason"
-                     << "Not standing for election because member is not "
-                        "caught up enough to the most up-to-date member to "
-                        "call for priority takeover - must be within 2 seconds (mask 0x80)"))));
+        logs.countBSONContainingSubset(BSON(
+            "attr" << BSON(
+                "reason" << "Not standing for election because member is not "
+                            "caught up enough to the most up-to-date member to "
+                            "call for priority takeover - must be within 2 seconds (mask 0x80)"))));
 
     // Mock another round of heartbeat responses that occur after the previous
     // 'priorityTakeoverTime', which should schedule a new priority takeover
@@ -2267,14 +2125,12 @@ TEST_F(TakeoverTest, DontCallForPriorityTakeoverWhenLaggedDifferentSecond) {
     // Make sure that a new priority takeover has been scheduled and at the
     // correct time.
     ASSERT(replCoord->getPriorityTakeover_forTest());
-    priorityTakeoverTime = replCoord->getPriorityTakeover_forTest().get();
+    priorityTakeoverTime = replCoord->getPriorityTakeover_forTest().value();
     assertValidPriorityTakeoverDelay(config, now, priorityTakeoverTime, 0);
 
     // Now make us caught up enough to call for priority takeover to succeed.
-    replCoordSetMyLastAppliedOpTime(closeEnoughOpTime,
-                                    Date_t() + Seconds(closeEnoughOpTime.getSecs()));
-    replCoordSetMyLastDurableOpTime(closeEnoughOpTime,
-                                    Date_t() + Seconds(closeEnoughOpTime.getSecs()));
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(
+        closeEnoughOpTime, Date_t() + Seconds(closeEnoughOpTime.getSecs()));
 
     // The priority takeover might have been scheduled at a time later than one election
     // timeout after our initial heartbeat responses, so mock another round of
@@ -2283,27 +2139,25 @@ TEST_F(TakeoverTest, DontCallForPriorityTakeoverWhenLaggedDifferentSecond) {
     now = respondToHeartbeatsUntil(
         config, now + halfElectionTimeout, primaryHostAndPort, currentOpTime);
 
-    LastVote lastVoteExpected = LastVote(replCoord->getTerm() + 1, 0);
-    performSuccessfulTakeover(
-        priorityTakeoverTime, StartElectionReasonEnum::kPriorityTakeover, lastVoteExpected);
+    {
+        auto opCtxHolder{makeOperationContext()};
+        auto* const opCtx{opCtxHolder.get()};
+
+        LastVote lastVoteExpected = LastVote(replCoord->getTerm() + 1, 0);
+        performSuccessfulTakeover(opCtx,
+                                  priorityTakeoverTime,
+                                  StartElectionReasonEnum::kPriorityTakeover,
+                                  lastVoteExpected);
+    }
 }
 
 TEST_F(ReplCoordTest, NodeCancelsElectionUponReceivingANewConfigDuringDryRun) {
     // Start up and become electable.
-    assertStartSuccess(BSON("_id"
-                            << "mySet"
-                            << "version" << 2 << "protocolVersion" << 1 << "members"
-                            << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                     << "node1:12345")
-                                          << BSON("_id" << 3 << "host"
-                                                        << "node3:12345")
-                                          << BSON("_id" << 2 << "host"
-                                                        << "node2:12345"))
-                            << "settings" << BSON("heartbeatIntervalMillis" << 100)),
+    assertStartSuccess(generateConfigObj(3, 2, BSON("heartbeatIntervalMillis" << 100)),
                        HostAndPort("node1", 12345));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
-    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(OpTime(Timestamp(100, 1), 0),
+                                                        Date_t() + Seconds(100));
     simulateEnoughHeartbeatsForAllNodesUp();
 
     // Advance to dry run vote request phase.
@@ -2324,15 +2178,8 @@ TEST_F(ReplCoordTest, NodeCancelsElectionUponReceivingANewConfigDuringDryRun) {
     ASSERT(TopologyCoordinator::Role::kCandidate == getTopoCoord().getRole());
 
     // Submit a reconfig and confirm it cancels the election.
-    ReplicationCoordinatorImpl::ReplSetReconfigArgs config = {
-        BSON("_id"
-             << "mySet"
-             << "version" << 4 << "protocolVersion" << 1 << "members"
-             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                      << "node1:12345")
-                           << BSON("_id" << 2 << "host"
-                                         << "node2:12345"))),
-        true};
+    ReplicationCoordinatorImpl::ReplSetReconfigArgs config = {generateConfigObj(2, 4, boost::none),
+                                                              true};
 
     BSONObjBuilder result;
     const auto opCtx = makeOperationContext();
@@ -2346,34 +2193,18 @@ TEST_F(ReplCoordTest, NodeCancelsElectionUponReceivingANewConfigDuringDryRun) {
 
 TEST_F(ReplCoordTest, NodeCancelsElectionUponReceivingANewConfigDuringVotePhase) {
     // Start up and become electable.
-    assertStartSuccess(BSON("_id"
-                            << "mySet"
-                            << "version" << 2 << "protocolVersion" << 1 << "members"
-                            << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                     << "node1:12345")
-                                          << BSON("_id" << 3 << "host"
-                                                        << "node3:12345")
-                                          << BSON("_id" << 2 << "host"
-                                                        << "node2:12345"))
-                            << "settings" << BSON("heartbeatIntervalMillis" << 100)),
+    assertStartSuccess(generateConfigObj(3, 2, BSON("heartbeatIntervalMillis" << 100)),
                        HostAndPort("node1", 12345));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
-    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(OpTime(Timestamp(100, 1), 0),
+                                                        Date_t() + Seconds(100));
     simulateEnoughHeartbeatsForAllNodesUp();
     simulateSuccessfulDryRun();
     ASSERT(TopologyCoordinator::Role::kCandidate == getTopoCoord().getRole());
 
     // Submit a reconfig and confirm it cancels the election.
-    ReplicationCoordinatorImpl::ReplSetReconfigArgs config = {
-        BSON("_id"
-             << "mySet"
-             << "version" << 4 << "protocolVersion" << 1 << "members"
-             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                      << "node1:12345")
-                           << BSON("_id" << 2 << "host"
-                                         << "node2:12345"))),
-        true};
+    ReplicationCoordinatorImpl::ReplSetReconfigArgs config = {generateConfigObj(2, 4, boost::none),
+                                                              true};
 
     BSONObjBuilder result;
     const auto opCtx = makeOperationContext();
@@ -2387,20 +2218,11 @@ TEST_F(ReplCoordTest, NodeCancelsElectionUponReceivingANewConfigDuringVotePhase)
 
 TEST_F(ReplCoordTest, NodeCancelsElectionWhenWritingLastVoteInDryRun) {
     // Start up and become electable.
-    assertStartSuccess(BSON("_id"
-                            << "mySet"
-                            << "version" << 2 << "protocolVersion" << 1 << "members"
-                            << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                     << "node1:12345")
-                                          << BSON("_id" << 3 << "host"
-                                                        << "node3:12345")
-                                          << BSON("_id" << 2 << "host"
-                                                        << "node2:12345"))
-                            << "settings" << BSON("heartbeatIntervalMillis" << 100)),
+    assertStartSuccess(generateConfigObj(3, 2, BSON("heartbeatIntervalMillis" << 100)),
                        HostAndPort("node1", 12345));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
-    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(OpTime(Timestamp(100, 1), 0),
+                                                        Date_t() + Seconds(100));
     simulateEnoughHeartbeatsForAllNodesUp();
     // Set a failpoint to hang after checking the results for the dry run but before we initiate the
     // vote request for the real election.
@@ -2414,7 +2236,7 @@ TEST_F(ReplCoordTest, NodeCancelsElectionWhenWritingLastVoteInDryRun) {
 
     // Cancel the election after the dry-run has already completed but before we create a new
     // VoteRequester.
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     getReplCoord()->cancelElection_forTest();
     hangInWritingLastVoteForDryRun->setMode(FailPoint::off, 0);
     electionThread.join();
@@ -2445,9 +2267,8 @@ TEST_F(ReplCoordTest, NodeCancelsElectionWhenWritingLastVoteInDryRun) {
     net->exitNetwork();
 
     getReplCoord()->waitForElectionFinish_forTest();
-    stopCapturingLogMessages();
-    ASSERT_EQUALS(
-        1, countTextFormatLogLinesContaining("Not becoming primary, election has been cancelled"));
+    logs.stop();
+    ASSERT_EQUALS(1, logs.countTextContaining("Not becoming primary, election has been cancelled"));
     ASSERT(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
 }
 
@@ -2455,20 +2276,11 @@ TEST_F(ReplCoordTest, MemberHbDataIsRestartedUponWinningElection) {
     auto replAllSeverityGuard = unittest::MinimumLoggedSeverityGuard{
         logv2::LogComponent::kReplication, logv2::LogSeverity::Debug(3)};
 
-    auto replConfigBson = BSON("_id"
-                               << "mySet"
-                               << "protocolVersion" << 1 << "version" << 1 << "members"
-                               << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                        << "node1:12345")
-                                             << BSON("_id" << 2 << "host"
-                                                           << "node2:12345")
-                                             << BSON("_id" << 3 << "host"
-                                                           << "node3:12345")));
-
+    auto replConfigBson = generateConfigObj(3, 1, boost::none);
     auto myHostAndPort = HostAndPort("node1", 12345);
     assertStartSuccess(replConfigBson, myHostAndPort);
-    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
-    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(OpTime(Timestamp(100, 1), 0),
+                                                        Date_t() + Seconds(100));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
     // Respond to heartbeat requests. This should update memberData for all nodes.
@@ -2540,6 +2352,7 @@ protected:
         hbResp.setState(MemberState::RS_SECONDARY);
         hbResp.setConfigVersion(rsConfig.getConfigVersion());
         hbResp.setAppliedOpTimeAndWallTime({opTime, Date_t() + Seconds(opTime.getSecs())});
+        hbResp.setWrittenOpTimeAndWallTime({opTime, Date_t() + Seconds(opTime.getSecs())});
         hbResp.setDurableOpTimeAndWallTime({opTime, Date_t() + Seconds(opTime.getSecs())});
         return makeResponseStatus(hbResp.toBSON());
     }
@@ -2566,7 +2379,7 @@ protected:
                 net->runUntil(electionTimeoutWhen);
             }
             // Peek the next request, don't consume it yet.
-            const NetworkOpIter noi = net->getFrontOfUnscheduledQueue();
+            const NetworkOpIter noi = net->getFrontOfReadyQueue();
             const RemoteCommandRequest& request = noi->getRequest();
             LOGV2(21468,
                   "{request_target} processing {request_cmdObj}",
@@ -2596,23 +2409,13 @@ protected:
     }
 
     ReplSetConfig setUp3NodeReplSetAndRunForElection(OpTime opTime, long long timeout = 5000) {
-        BSONObj configObj = BSON("_id"
-                                 << "mySet"
-                                 << "version" << 1 << "members"
-                                 << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                          << "node1:12345")
-                                               << BSON("_id" << 2 << "host"
-                                                             << "node2:12345")
-                                               << BSON("_id" << 3 << "host"
-                                                             << "node3:12345"))
-                                 << "protocolVersion" << 1 << "settings"
-                                 << BSON("heartbeatTimeoutSecs" << 1 << "catchUpTimeoutMillis"
-                                                                << timeout));
+        auto configObj = generateConfigObj(
+            3, 1, BSON("heartbeatTimeoutSecs" << 1 << "catchUpTimeoutMillis" << timeout));
         assertStartSuccess(configObj, HostAndPort("node1", 12345));
         ReplSetConfig config = assertMakeRSConfig(configObj);
 
-        replCoordSetMyLastAppliedOpTime(opTime, Date_t() + Seconds(opTime.getSecs()));
-        replCoordSetMyLastDurableOpTime(opTime, Date_t() + Seconds(opTime.getSecs()));
+        replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(opTime,
+                                                            Date_t() + Seconds(opTime.getSecs()));
         ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
         simulateSuccessfulV1Voting();
@@ -2623,11 +2426,6 @@ protected:
         ASSERT_TRUE(helloResponse->isSecondary()) << helloResponse->toBSON().toString();
 
         return config;
-    }
-
-    executor::RemoteCommandResponse makeFreshnessScanResponse(OpTime opTime) {
-        // OpTime part of replSetGetStatus.
-        return makeResponseStatus(BSON("optimes" << BSON("appliedOpTime" << opTime)));
     }
 
     void processHeartbeatRequests(NetworkRequestFn onHeartbeatRequest) {
@@ -2662,7 +2460,7 @@ protected:
         while (net->now() < until) {
             while (net->hasReadyRequests()) {
                 // Peek the next request
-                auto noi = net->getFrontOfUnscheduledQueue();
+                auto noi = net->getFrontOfReadyQueue();
                 auto& request = noi->getRequest();
                 LOGV2(21471,
                       "{request_target} at {net_now} processing {request_cmdObj}",
@@ -2685,7 +2483,8 @@ protected:
 
     // Simulate the work done by bgsync and applier threads. setMyLastAppliedOpTime() will signal
     // the optime waiter.
-    void advanceMyLastAppliedOpTime(OpTime opTime, Date_t wallTime = Date_t()) {
+    void advanceMyLastWrittenAndAppliedOpTime(OpTime opTime, Date_t wallTime = Date_t()) {
+        replCoordSetMyLastWrittenOpTime(opTime, wallTime);
         replCoordSetMyLastAppliedOpTime(opTime, wallTime);
         getNet()->enterNetwork();
         getNet()->runReadyNetworkOperations();
@@ -2695,7 +2494,8 @@ protected:
 
 // The first round of heartbeats indicates we are the most up-to-date.
 TEST_F(PrimaryCatchUpTest, PrimaryDoesNotNeedToCatchUp) {
-    startCapturingLogMessages();
+    RAIIServerParameterControllerForTest controller("featureFlagReduceMajorityWriteLatency", true);
+    unittest::LogCaptureGuard logs;
     OpTime time1(Timestamp(100, 1), 0);
     ReplSetConfig config = setUp3NodeReplSetAndRunForElection(time1);
 
@@ -2709,15 +2509,15 @@ TEST_F(PrimaryCatchUpTest, PrimaryDoesNotNeedToCatchUp) {
 
     // Get 2 heartbeats from secondaries.
     ASSERT_EQUALS(2, count);
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
-    stopCapturingLogMessages();
-    ASSERT_EQ(
-        1,
-        countTextFormatLogLinesContaining("Caught up to the latest optime known via heartbeats"));
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::WriterDraining);
+    logs.stop();
+    ASSERT_EQ(1, logs.countTextContaining("Caught up to the latest optime known via heartbeats"));
     auto opCtx = makeOperationContext();
-    signalDrainComplete(opCtx.get());
+    signalWriterDrainComplete(opCtx.get());
+    signalApplierDrainComplete(opCtx.get());
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
-    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
+    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(
+        opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "test")));
 
     // Check that the number of elections requiring primary catchup was not incremented.
     ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUps_forTesting());
@@ -2741,7 +2541,8 @@ TEST_F(PrimaryCatchUpTest, PrimaryDoesNotNeedToCatchUp) {
 
 // Heartbeats set a future target OpTime and we reached that successfully.
 TEST_F(PrimaryCatchUpTest, CatchupSucceeds) {
-    startCapturingLogMessages();
+    RAIIServerParameterControllerForTest controller("featureFlagReduceMajorityWriteLatency", true);
+    unittest::LogCaptureGuard logs;
 
     OpTime time1(Timestamp(100, 1), 0);
     OpTime time2(Timestamp(100, 2), 0);
@@ -2763,16 +2564,17 @@ TEST_F(PrimaryCatchUpTest, CatchupSucceeds) {
     ASSERT_EQUALS(time2,
                   ReplicationMetrics::get(getServiceContext()).getTargetCatchupOpTime_forTesting());
 
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
-    advanceMyLastAppliedOpTime(time2, Date_t() + Seconds(time2.getSecs()));
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
-    stopCapturingLogMessages();
-    ASSERT_EQUALS(
-        1, countTextFormatLogLinesContaining("Caught up to the latest known optime successfully"));
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::Running);
+    advanceMyLastWrittenAndAppliedOpTime(time2, Date_t() + Seconds(time2.getSecs()));
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::WriterDraining);
+    logs.stop();
+    ASSERT_EQUALS(1, logs.countTextContaining("Caught up to the latest known optime successfully"));
     auto opCtx = makeOperationContext();
-    signalDrainComplete(opCtx.get());
+    signalWriterDrainComplete(opCtx.get());
+    signalApplierDrainComplete(opCtx.get());
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
-    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
+    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(
+        opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "test")));
 
     // Check that the number of elections requiring primary catchup was incremented.
     ASSERT_EQ(1, ReplicationMetrics::get(opCtx.get()).getNumCatchUps_forTesting());
@@ -2790,7 +2592,8 @@ TEST_F(PrimaryCatchUpTest, CatchupSucceeds) {
 }
 
 TEST_F(PrimaryCatchUpTest, CatchupTimeout) {
-    startCapturingLogMessages();
+    RAIIServerParameterControllerForTest controller("featureFlagReduceMajorityWriteLatency", true);
+    unittest::LogCaptureGuard logs;
 
     OpTime time1(Timestamp(100, 1), 0);
     OpTime time2(Timestamp(100, 2), 0);
@@ -2800,13 +2603,15 @@ TEST_F(PrimaryCatchUpTest, CatchupTimeout) {
         // Other nodes are ahead of me.
         getNet()->scheduleResponse(noi, getNet()->now(), makeHeartbeatResponse(time2));
     });
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
-    stopCapturingLogMessages();
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("Catchup timed out"));
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::WriterDraining);
+    logs.stop();
+    ASSERT_EQUALS(1, logs.countTextContaining("Catchup timed out"));
     auto opCtx = makeOperationContext();
-    signalDrainComplete(opCtx.get());
+    signalWriterDrainComplete(opCtx.get());
+    signalApplierDrainComplete(opCtx.get());
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
-    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
+    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(
+        opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "test")));
 
     // Check that the number of elections requiring primary catchup was incremented.
     ASSERT_EQ(1, ReplicationMetrics::get(opCtx.get()).getNumCatchUps_forTesting());
@@ -2824,7 +2629,8 @@ TEST_F(PrimaryCatchUpTest, CatchupTimeout) {
 }
 
 TEST_F(PrimaryCatchUpTest, CannotSeeAllNodes) {
-    startCapturingLogMessages();
+    RAIIServerParameterControllerForTest controller("featureFlagReduceMajorityWriteLatency", true);
+    unittest::LogCaptureGuard logs;
 
     OpTime time1(Timestamp(100, 1), 0);
     ReplSetConfig config = setUp3NodeReplSetAndRunForElection(time1);
@@ -2834,20 +2640,21 @@ TEST_F(PrimaryCatchUpTest, CannotSeeAllNodes) {
         const RemoteCommandRequest& request = noi->getRequest();
         if (request.target.host() == "node2") {
             auto status = Status(ErrorCodes::HostUnreachable, "Can't reach remote host");
-            getNet()->scheduleResponse(noi, getNet()->now(), status);
+            getNet()->scheduleResponse(
+                noi, getNet()->now(), RemoteCommandResponse::make_forTest(status));
         } else {
             getNet()->scheduleResponse(noi, getNet()->now(), makeHeartbeatResponse(time1));
         }
     });
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
-    stopCapturingLogMessages();
-    ASSERT_EQ(
-        1,
-        countTextFormatLogLinesContaining("Caught up to the latest optime known via heartbeats"));
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::WriterDraining);
+    logs.stop();
+    ASSERT_EQ(1, logs.countTextContaining("Caught up to the latest optime known via heartbeats"));
     auto opCtx = makeOperationContext();
-    signalDrainComplete(opCtx.get());
+    signalWriterDrainComplete(opCtx.get());
+    signalApplierDrainComplete(opCtx.get());
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
-    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
+    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(
+        opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "test")));
 
     // Check that the number of elections requiring primary catchup was not incremented.
     ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUps_forTesting());
@@ -2866,7 +2673,8 @@ TEST_F(PrimaryCatchUpTest, CannotSeeAllNodes) {
 }
 
 TEST_F(PrimaryCatchUpTest, HeartbeatTimeout) {
-    startCapturingLogMessages();
+    RAIIServerParameterControllerForTest controller("featureFlagReduceMajorityWriteLatency", true);
+    unittest::LogCaptureGuard logs;
 
     OpTime time1(Timestamp(100, 1), 0);
     ReplSetConfig config = setUp3NodeReplSetAndRunForElection(time1);
@@ -2883,15 +2691,15 @@ TEST_F(PrimaryCatchUpTest, HeartbeatTimeout) {
             getNet()->scheduleResponse(noi, getNet()->now(), makeHeartbeatResponse(time1));
         }
     });
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
-    stopCapturingLogMessages();
-    ASSERT_EQ(
-        1,
-        countTextFormatLogLinesContaining("Caught up to the latest optime known via heartbeats"));
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::WriterDraining);
+    logs.stop();
+    ASSERT_EQ(1, logs.countTextContaining("Caught up to the latest optime known via heartbeats"));
     auto opCtx = makeOperationContext();
-    signalDrainComplete(opCtx.get());
+    signalWriterDrainComplete(opCtx.get());
+    signalApplierDrainComplete(opCtx.get());
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
-    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
+    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(
+        opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "test")));
 
     // Check that the number of elections requiring primary catchup was not incremented.
     ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUps_forTesting());
@@ -2910,26 +2718,27 @@ TEST_F(PrimaryCatchUpTest, HeartbeatTimeout) {
 }
 
 TEST_F(PrimaryCatchUpTest, PrimaryStepsDownBeforeHeartbeatRefreshing) {
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
 
     OpTime time1(Timestamp(100, 1), 0);
     OpTime time2(Timestamp(100, 2), 0);
     ReplSetConfig config = setUp3NodeReplSetAndRunForElection(time1);
     // Step down immediately.
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::Running);
     TopologyCoordinator::UpdateTermResult updateTermResult;
     auto evh = getReplCoord()->updateTerm_forTest(2, &updateTermResult);
     ASSERT_TRUE(evh.isValid());
     getReplExec()->waitForEvent(evh);
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
-    stopCapturingLogMessages();
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("Exited primary catch-up mode"));
-    ASSERT_EQUALS(0, countTextFormatLogLinesContaining("Caught up to the latest"));
-    ASSERT_EQUALS(0, countTextFormatLogLinesContaining("Catchup timed out"));
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::Running);
+    logs.stop();
+    ASSERT_EQUALS(1, logs.countTextContaining("Exited primary catch-up mode"));
+    ASSERT_EQUALS(0, logs.countTextContaining("Caught up to the latest"));
+    ASSERT_EQUALS(0, logs.countTextContaining("Catchup timed out"));
     auto opCtx = makeOperationContext();
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
-    ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
+    ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase(
+        opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "test")));
 
     // Check that the number of elections requiring primary catchup was not incremented.
     ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUps_forTesting());
@@ -2948,7 +2757,7 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownBeforeHeartbeatRefreshing) {
 }
 
 TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringCatchUp) {
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
 
     OpTime time1(Timestamp(100, 1), 0);
     OpTime time2(Timestamp(100, 2), 0);
@@ -2963,21 +2772,22 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringCatchUp) {
     ASSERT_EQUALS(time2,
                   ReplicationMetrics::get(getServiceContext()).getTargetCatchupOpTime_forTesting());
 
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::Running);
     TopologyCoordinator::UpdateTermResult updateTermResult;
     auto evh = getReplCoord()->updateTerm_forTest(2, &updateTermResult);
     ASSERT_TRUE(evh.isValid());
     getReplExec()->waitForEvent(evh);
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
     //    replyHeartbeatsAndRunUntil(getNet()->now() + config.getCatchUpTimeoutPeriod());
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
-    stopCapturingLogMessages();
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("Exited primary catch-up mode"));
-    ASSERT_EQUALS(0, countTextFormatLogLinesContaining("Caught up to the latest"));
-    ASSERT_EQUALS(0, countTextFormatLogLinesContaining("Catchup timed out"));
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::Running);
+    logs.stop();
+    ASSERT_EQUALS(1, logs.countTextContaining("Exited primary catch-up mode"));
+    ASSERT_EQUALS(0, logs.countTextContaining("Caught up to the latest"));
+    ASSERT_EQUALS(0, logs.countTextContaining("Catchup timed out"));
     auto opCtx = makeOperationContext();
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
-    ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
+    ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase(
+        opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "test")));
 
     // Check that the number of elections requiring primary catchup was incremented.
     ASSERT_EQ(1, ReplicationMetrics::get(opCtx.get()).getNumCatchUps_forTesting());
@@ -3000,7 +2810,8 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringCatchUp) {
 }
 
 TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringDrainMode) {
-    startCapturingLogMessages();
+    RAIIServerParameterControllerForTest controller("featureFlagReduceMajorityWriteLatency", true);
+    unittest::LogCaptureGuard logs;
 
     OpTime time1(Timestamp(100, 1), 0);
     OpTime time2(Timestamp(100, 2), 0);
@@ -3012,11 +2823,11 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringDrainMode) {
         net->scheduleResponse(noi, net->now(), makeHeartbeatResponse(time2));
     });
     ReplicationCoordinatorImpl* replCoord = getReplCoord();
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
-    advanceMyLastAppliedOpTime(time2, Date_t() + Seconds(time2.getSecs()));
-    ASSERT(replCoord->getApplierState() == ApplierState::Draining);
-    stopCapturingLogMessages();
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("Caught up to the latest"));
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::Running);
+    advanceMyLastWrittenAndAppliedOpTime(time2, Date_t() + Seconds(time2.getSecs()));
+    ASSERT(replCoord->getOplogSyncState() == OplogSyncState::WriterDraining);
+    logs.stop();
+    ASSERT_EQUALS(1, logs.countTextContaining("Caught up to the latest"));
 
     // Check that the number of elections requiring primary catchup was incremented.
     auto opCtx = makeOperationContext();
@@ -3041,7 +2852,7 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringDrainMode) {
     ASSERT_TRUE(replCoord->getMemberState().secondary());
 
     // Step up again
-    ASSERT(replCoord->getApplierState() == ApplierState::Running);
+    ASSERT(replCoord->getOplogSyncState() == OplogSyncState::Running);
     simulateSuccessfulV1Voting();
     ASSERT_TRUE(replCoord->getMemberState().primary());
 
@@ -3050,15 +2861,18 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringDrainMode) {
         auto net = getNet();
         net->scheduleResponse(noi, net->now(), makeHeartbeatResponse(time2));
     });
-    ASSERT(replCoord->getApplierState() == ApplierState::Draining);
+    ASSERT(replCoord->getOplogSyncState() == OplogSyncState::WriterDraining);
     {
         Lock::GlobalLock lock(opCtx.get(), MODE_IX);
-        ASSERT_FALSE(replCoord->canAcceptWritesForDatabase(opCtx.get(), "test"));
+        ASSERT_FALSE(replCoord->canAcceptWritesForDatabase(
+            opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "test")));
     }
-    signalDrainComplete(opCtx.get());
+    signalWriterDrainComplete(opCtx.get());
+    signalApplierDrainComplete(opCtx.get());
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
-    ASSERT(replCoord->getApplierState() == ApplierState::Stopped);
-    ASSERT_TRUE(replCoord->canAcceptWritesForDatabase(opCtx.get(), "test"));
+    ASSERT(replCoord->getOplogSyncState() == OplogSyncState::Stopped);
+    ASSERT_TRUE(replCoord->canAcceptWritesForDatabase(
+        opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "test")));
 
     // Check that the number of elections requiring primary catchup was not incremented again.
     ASSERT_EQ(1, ReplicationMetrics::get(opCtx.get()).getNumCatchUps_forTesting());
@@ -3077,6 +2891,7 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringDrainMode) {
 }
 
 TEST_F(PrimaryCatchUpTest, FreshestNodeBecomesAvailableLater) {
+    RAIIServerParameterControllerForTest controller("featureFlagReduceMajorityWriteLatency", true);
     OpTime time1(Timestamp(100, 1), 0);
     OpTime time2(Timestamp(200, 1), 0);
     OpTime time3(Timestamp(300, 1), 0);
@@ -3087,30 +2902,31 @@ TEST_F(PrimaryCatchUpTest, FreshestNodeBecomesAvailableLater) {
 
     // 2) It cannot see all nodes. It learns of time 3 from one node, but the other isn't available.
     //    So the target optime is time 3.
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
     auto oneThirdOfTimeout = getNet()->now() + config.getCatchUpTimeoutPeriod() / 3;
     replyHeartbeatsAndRunUntil(oneThirdOfTimeout, [this, time3](const NetworkOpIter noi) {
         const RemoteCommandRequest& request = noi->getRequest();
         if (request.target.host() == "node2") {
             auto status = Status(ErrorCodes::HostUnreachable, "Can't reach remote host");
-            getNet()->scheduleResponse(noi, getNet()->now(), status);
+            getNet()->scheduleResponse(
+                noi, getNet()->now(), RemoteCommandResponse::make_forTest(status));
         } else {
             getNet()->scheduleResponse(noi, getNet()->now(), makeHeartbeatResponse(time3));
         }
     });
     // The node is still in catchup mode, but the target optime has been set.
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
-    stopCapturingLogMessages();
-    ASSERT_EQ(1, countTextFormatLogLinesContaining("Heartbeats updated catchup target optime"));
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::Running);
+    logs.stop();
+    ASSERT_EQ(1, logs.countTextContaining("Heartbeats updated catchup target optime"));
     ASSERT_EQUALS(time3,
                   ReplicationMetrics::get(getServiceContext()).getTargetCatchupOpTime_forTesting());
 
     // 3) Advancing its applied optime to time 2 isn't enough.
-    advanceMyLastAppliedOpTime(time2, Date_t() + Seconds(time2.getSecs()));
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
+    advanceMyLastWrittenAndAppliedOpTime(time2, Date_t() + Seconds(time2.getSecs()));
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::Running);
 
     // 4) After a while, the other node at time 4 becomes available. Time 4 becomes the new target.
-    startCapturingLogMessages();
+    logs.start();
     auto twoThirdsOfTimeout = getNet()->now() + config.getCatchUpTimeoutPeriod() * 2 / 3;
     replyHeartbeatsAndRunUntil(twoThirdsOfTimeout, [this, time3, time4](const NetworkOpIter noi) {
         const RemoteCommandRequest& request = noi->getRequest();
@@ -3121,26 +2937,28 @@ TEST_F(PrimaryCatchUpTest, FreshestNodeBecomesAvailableLater) {
         }
     });
     // The node is still in catchup mode, but the target optime has been updated.
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
-    stopCapturingLogMessages();
-    ASSERT_EQ(1, countTextFormatLogLinesContaining("Heartbeats updated catchup target optime"));
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::Running);
+    logs.stop();
+    ASSERT_EQ(1, logs.countTextContaining("Heartbeats updated catchup target optime"));
     ASSERT_EQUALS(time4,
                   ReplicationMetrics::get(getServiceContext()).getTargetCatchupOpTime_forTesting());
 
     // 5) Advancing to time 3 isn't enough now.
-    advanceMyLastAppliedOpTime(time3, Date_t() + Seconds(time3.getSecs()));
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
+    advanceMyLastWrittenAndAppliedOpTime(time3, Date_t() + Seconds(time3.getSecs()));
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::Running);
 
     // 6) The node catches up time 4 eventually.
-    startCapturingLogMessages();
-    advanceMyLastAppliedOpTime(time4, Date_t() + Seconds(time4.getSecs()));
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
-    stopCapturingLogMessages();
-    ASSERT_EQ(1, countTextFormatLogLinesContaining("Caught up to the latest"));
+    logs.start();
+    advanceMyLastWrittenAndAppliedOpTime(time4, Date_t() + Seconds(time4.getSecs()));
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::WriterDraining);
+    logs.stop();
+    ASSERT_EQ(1, logs.countTextContaining("Caught up to the latest"));
     auto opCtx = makeOperationContext();
-    signalDrainComplete(opCtx.get());
+    signalWriterDrainComplete(opCtx.get());
+    signalApplierDrainComplete(opCtx.get());
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
-    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
+    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(
+        opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "test")));
 
     // Check that the number of elections requiring primary catchup was incremented.
     ASSERT_EQ(1, ReplicationMetrics::get(opCtx.get()).getNumCatchUps_forTesting());
@@ -3158,7 +2976,8 @@ TEST_F(PrimaryCatchUpTest, FreshestNodeBecomesAvailableLater) {
 }
 
 TEST_F(PrimaryCatchUpTest, InfiniteTimeoutAndAbort) {
-    startCapturingLogMessages();
+    RAIIServerParameterControllerForTest controller("featureFlagReduceMajorityWriteLatency", true);
+    unittest::LogCaptureGuard logs;
 
     OpTime time1(Timestamp(100, 1), 0);
     OpTime time2(Timestamp(100, 2), 0);
@@ -3186,22 +3005,24 @@ TEST_F(PrimaryCatchUpTest, InfiniteTimeoutAndAbort) {
         ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &response));
     });
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::Running);
 
     // Simulate a user initiated abort.
     ASSERT_OK(getReplCoord()->abortCatchupIfNeeded(
         ReplicationCoordinator::PrimaryCatchUpConclusionReason::
             kFailedWithReplSetAbortPrimaryCatchUpCmd));
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::WriterDraining);
 
-    stopCapturingLogMessages();
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("Exited primary catch-up mode"));
-    ASSERT_EQUALS(0, countTextFormatLogLinesContaining("Caught up to the latest"));
-    ASSERT_EQUALS(0, countTextFormatLogLinesContaining("Catchup timed out"));
+    logs.stop();
+    ASSERT_EQUALS(1, logs.countTextContaining("Exited primary catch-up mode"));
+    ASSERT_EQUALS(0, logs.countTextContaining("Caught up to the latest"));
+    ASSERT_EQUALS(0, logs.countTextContaining("Catchup timed out"));
     auto opCtx = makeOperationContext();
-    signalDrainComplete(opCtx.get());
+    signalWriterDrainComplete(opCtx.get());
+    signalApplierDrainComplete(opCtx.get());
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
-    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
+    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(
+        opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "test")));
 
     // Check that the number of elections requiring primary catchup was incremented.
     ASSERT_EQ(1, ReplicationMetrics::get(opCtx.get()).getNumCatchUps_forTesting());
@@ -3220,17 +3041,20 @@ TEST_F(PrimaryCatchUpTest, InfiniteTimeoutAndAbort) {
 }
 
 TEST_F(PrimaryCatchUpTest, ZeroTimeout) {
-    startCapturingLogMessages();
+    RAIIServerParameterControllerForTest controller("featureFlagReduceMajorityWriteLatency", true);
+    unittest::LogCaptureGuard logs;
 
     OpTime time1(Timestamp(100, 1), 0);
     ReplSetConfig config = setUp3NodeReplSetAndRunForElection(time1, 0);
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
-    stopCapturingLogMessages();
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("Skipping primary catchup"));
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::WriterDraining);
+    logs.stop();
+    ASSERT_EQUALS(1, logs.countTextContaining("Skipping primary catchup"));
     auto opCtx = makeOperationContext();
-    signalDrainComplete(opCtx.get());
+    signalWriterDrainComplete(opCtx.get());
+    signalApplierDrainComplete(opCtx.get());
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
-    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
+    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(
+        opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "test")));
 
     // Check that the number of elections requiring primary catchup was not incremented.
     ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUps_forTesting());
@@ -3248,7 +3072,7 @@ TEST_F(PrimaryCatchUpTest, ZeroTimeout) {
 }
 
 TEST_F(PrimaryCatchUpTest, CatchUpFailsDueToPrimaryStepDown) {
-    startCapturingLogMessages();
+    unittest::LogCaptureGuard logs;
 
     OpTime time1(Timestamp(100, 1), 0);
     OpTime time2(Timestamp(100, 2), 0);
@@ -3259,17 +3083,17 @@ TEST_F(PrimaryCatchUpTest, CatchUpFailsDueToPrimaryStepDown) {
         // Other nodes are ahead of me.
         getNet()->scheduleResponse(noi, getNet()->now(), makeHeartbeatResponse(time2));
     });
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::Running);
 
     auto opCtx = makeOperationContext();
     getReplCoord()->stepDown(opCtx.get(), true, Milliseconds(0), Milliseconds(1000));
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
-    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
+    ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::Running);
 
-    stopCapturingLogMessages();
-    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("Exited primary catch-up mode"));
-    ASSERT_EQUALS(0, countTextFormatLogLinesContaining("Caught up to the latest"));
-    ASSERT_EQUALS(0, countTextFormatLogLinesContaining("Catchup timed out"));
+    logs.stop();
+    ASSERT_EQUALS(1, logs.countTextContaining("Exited primary catch-up mode"));
+    ASSERT_EQUALS(0, logs.countTextContaining("Caught up to the latest"));
+    ASSERT_EQUALS(0, logs.countTextContaining("Catchup timed out"));
 
     // Check that the number of elections requiring primary catchup was incremented.
     ASSERT_EQ(1, ReplicationMetrics::get(opCtx.get()).getNumCatchUps_forTesting());

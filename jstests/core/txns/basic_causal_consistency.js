@@ -1,11 +1,14 @@
 // Test that the shell helper supports causal consistency.
-// @tags: [uses_transactions, uses_snapshot_read_concern]
-(function() {
-"use strict";
+//
+// @tags: [
+//   # The test runs commands that are not allowed with security token: endSession.
+//   not_allowed_with_signed_security_token,
+//   uses_transactions,
+//   uses_snapshot_read_concern
+// ]
 
-// TODO (SERVER-39704): Remove the following load after SERVER-397074 is completed
-// For withTxnAndAutoRetryOnMongos.
-load('jstests/libs/auto_retry_transaction_in_sharding.js');
+// TODO (SERVER-39704): Remove the following load after SERVER-39704 is completed
+import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 
 const dbName = "test";
 const collName = "basic_causal_consistency";
@@ -16,7 +19,7 @@ testDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
 assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
 
 const sessionOptions = {
-    causalConsistency: true
+    causalConsistency: true,
 };
 const session = testDB.getMongo().startSession(sessionOptions);
 const sessionDb = session.getDatabase(dbName);
@@ -38,4 +41,3 @@ withTxnAndAutoRetryOnMongos(session, () => {
 });
 
 session.endSession();
-}());

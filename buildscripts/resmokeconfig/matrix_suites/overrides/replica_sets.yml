@@ -1,0 +1,5 @@
+- name: non_enterprise_root
+  value:
+    selector:
+      roots:
+        - jstests/replsets/*.js

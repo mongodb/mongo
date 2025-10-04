@@ -27,17 +27,34 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/member_data.h"
 #include "mongo/db/repl/repl_set_test_egress_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/service_context.h"
+#include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_interface_factory.h"
-#include "mongo/executor/network_interface_tl.h"
 #include "mongo/logv2/log.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/transport/transport_layer.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/str.h"
+
+#include <memory>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
+
 
 namespace mongo {
 namespace repl {
@@ -81,7 +98,7 @@ HostAndPort validateTarget(OperationContext* opCtx, StringData targetStr) {
 constexpr auto kReplSetTestEgress = "replSetTestEgress"_sd;
 auto getNetworkInterface() {
     static auto uniqueNI = ([] {
-        auto ret = executor::makeNetworkInterface(kReplSetTestEgress.toString());
+        auto ret = executor::makeNetworkInterface(std::string{kReplSetTestEgress});
         ret->startup();
         return ret;
     })();
@@ -103,7 +120,7 @@ public:
 
             HostAndPort target;
             if (auto optTarget = cmd.getTarget()) {
-                target = validateTarget(opCtx, optTarget.get());
+                target = validateTarget(opCtx, optTarget.value());
             } else {
                 target = selectTarget(opCtx);
             }
@@ -115,7 +132,8 @@ public:
             auto net = getNetworkInterface();
             LOGV2_DEBUG(
                 4697203, 4, "Dropping any existing connections", "target"_attr = target.toString());
-            net->dropConnections(target);
+            net->dropConnections(
+                target, Status(ErrorCodes::PooledConnectionsDropped, kDisconnectStatus.reason()));
             LOGV2_DEBUG(4697204,
                         4,
                         "Opening test egress connection",
@@ -137,7 +155,7 @@ public:
         void doCheckAuthorization(OperationContext*) const final {}
 
         NamespaceString ns() const final {
-            return NamespaceString(request().getDbName(), "");
+            return NamespaceString(request().getDbName());
         }
     };
 
@@ -150,7 +168,7 @@ public:
     }
 };
 
-MONGO_REGISTER_TEST_COMMAND(CmdReplSetTestEgress);
+MONGO_REGISTER_COMMAND(CmdReplSetTestEgress).testOnly().forShard();
 
 }  // namespace
 }  // namespace repl

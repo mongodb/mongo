@@ -1,0 +1,70 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "collection_crud",
+    srcs = [
+        "capped_collection_maintenance.cpp",
+        "collection_write_path.cpp",
+    ],
+    hdrs = [
+        "capped_collection_maintenance.h",
+        "collection_write_path.h",
+    ],
+    deps = [
+        "//src/mongo/db:record_id_helpers",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:shard_role_api",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:write_stage_common",
+        "//src/mongo/db/local_catalog:document_validation",
+        "//src/mongo/db/local_catalog:local_oplog_info",
+        "//src/mongo/db/op_observer:op_observer_util",
+        "//src/mongo/db/query/query_stats",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/repl:repl_coordinator_interface",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/storage:index_entry_comparison",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/storage:record_store_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/storage:storage_options",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "container_write",
+    srcs = [
+        "container_write.cpp",
+    ],
+    hdrs = [
+        "container_write.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:shard_role_api_stor_ex",
+        "//src/mongo/db/op_observer",
+        "//src/mongo/db/storage:container",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_capped_test",
+    srcs = [
+        "capped_collection_test.cpp",
+        "capped_utils_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_first_group",
+        "server-collection-write-path",
+    ],
+    deps = [
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db/local_catalog:catalog_control",
+        "//src/mongo/db/repl:oplog",
+        "//src/mongo/db/repl:replmocks",
+        "//src/mongo/db/repl:storage_interface_impl",
+    ],
+)

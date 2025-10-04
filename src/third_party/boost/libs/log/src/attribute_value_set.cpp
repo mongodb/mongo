@@ -14,9 +14,9 @@
  */
 
 #include <boost/log/detail/config.hpp>
+#include <cstddef>
 #include <new>
 #include <memory>
-#include <boost/array.hpp>
 #include <boost/intrusive/options.hpp>
 #include <boost/intrusive/list.hpp>
 #include <boost/intrusive/link_mode.hpp>
@@ -94,9 +94,6 @@ private:
         bucket() : first(NULL), last(NULL) {}
     };
 
-    //! A list of buckets
-    typedef boost::array< bucket, 1u << BOOST_LOG_HASH_TABLE_SIZE_LOG > buckets;
-
     //! Element disposer
     struct disposer
     {
@@ -127,8 +124,10 @@ private:
     //! The pointer to the end of storage
     node* m_pEOS;
 
+    //! Number of buckets in the hash table
+    static BOOST_CONSTEXPR_OR_CONST std::size_t bucket_count = static_cast< std::size_t >(1u) << BOOST_LOG_HASH_TABLE_SIZE_LOG;
     //! Hash table buckets
-    buckets m_Buckets;
+    bucket m_Buckets[bucket_count];
 
 private:
     //! Constructor
@@ -360,7 +359,7 @@ private:
     //! The function returns a bucket for the specified element
     bucket& get_bucket(id_type id)
     {
-        return m_Buckets[id & (buckets::static_size - 1u)];
+        return m_Buckets[id & (bucket_count - 1u)];
     }
 
     //! Attempts to find an element with the specified key in the bucket

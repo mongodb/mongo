@@ -1,0 +1,49 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel/config:render_template.bzl", "render_template")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+        "*.defs",
+    ]),
+)
+
+idl_generator(
+    name = "engine_gen",
+    src = "engine.idl",
+)
+
+idl_generator(
+    name = "scripting_util_gen",
+    src = "scripting_util.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+render_template(
+    name = "mongohelpers_js_cpp",
+    srcs = [
+        "mongohelpers.js",
+        "//buildscripts:jstoh.py",
+    ],
+    cmd = [
+        "$(location //buildscripts:jstoh.py)",
+        "$(location mongohelpers_js.cpp)",
+        "$(location mongohelpers.js)",
+    ],
+    output = "mongohelpers_js.cpp",
+)
+
+load("//bazel:mongo_js_rules.bzl", "mongo_js_library")
+
+mongo_js_library(
+    name = "all",
+    srcs = glob([
+        "*.js",
+    ]),
+    visibility = ["//visibility:public"],
+)

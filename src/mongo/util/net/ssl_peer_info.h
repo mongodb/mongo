@@ -32,36 +32,68 @@
 #include "mongo/transport/session.h"
 #include "mongo/util/net/ssl_types.h"
 
+#include <boost/optional.hpp>
+
 namespace mongo {
 /**
  * Contains information extracted from the peer certificate which is consumed by subsystems
  * outside of the networking stack.
  */
-struct SSLPeerInfo {
+class SSLPeerInfo {
+public:
     explicit SSLPeerInfo(SSLX509Name subjectName,
                          boost::optional<std::string> sniName = {},
                          stdx::unordered_set<RoleName> roles = {})
-        : isTLS(true),
-          subjectName(std::move(subjectName)),
-          sniName(std::move(sniName)),
-          roles(std::move(roles)) {}
+        : _isTLS(true),
+          _subjectName(std::move(subjectName)),
+          _sniName(std::move(sniName)),
+          _roles(std::move(roles)) {}
     SSLPeerInfo() = default;
 
     explicit SSLPeerInfo(boost::optional<std::string> sniName)
-        : isTLS(true), sniName(std::move(sniName)) {}
+        : _isTLS(true), _sniName(std::move(sniName)) {}
 
+    bool isTLS() const {
+        return _isTLS;
+    }
+
+    const SSLX509Name& subjectName() const {
+        return _subjectName;
+    }
+
+    const boost::optional<std::string>& sniName() const {
+        return _sniName;
+    }
+
+    const stdx::unordered_set<RoleName>& roles() const {
+        return _roles;
+    }
+
+    static std::shared_ptr<const SSLPeerInfo>& forSession(
+        const std::shared_ptr<transport::Session>& session);
+    static std::shared_ptr<const SSLPeerInfo> forSession(
+        const std::shared_ptr<const transport::Session>& session);
+
+    const boost::optional<std::string>& getClusterMembership() const {
+        return _clusterMembership;
+    }
+
+    void setClusterMembership(boost::optional<std::string> clusterMembership) {
+        _clusterMembership = std::move(clusterMembership);
+    }
+
+    void appendPeerInfoToVector(std::vector<std::string>& elements) const;
+
+private:
     /**
      * This flag is used to indicate if the underlying socket is using TLS or not. A default
      * constructor of SSLPeerInfo indicates that TLS is not being used, and the other
      * constructors set its value to true.
      */
-    bool isTLS = false;
-
-    SSLX509Name subjectName;
-    boost::optional<std::string> sniName;
-    stdx::unordered_set<RoleName> roles;
-
-    static SSLPeerInfo& forSession(const transport::SessionHandle& session);
-    static const SSLPeerInfo& forSession(const transport::ConstSessionHandle& session);
+    bool _isTLS = false;
+    SSLX509Name _subjectName;
+    boost::optional<std::string> _sniName;
+    stdx::unordered_set<RoleName> _roles;
+    boost::optional<std::string> _clusterMembership;
 };
 }  // namespace mongo

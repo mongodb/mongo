@@ -1,0 +1,23 @@
+version: 1.0.0
+filters:
+  - "batched_multi_deletes*":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "bulk_write*":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "bulk_write_currentop.js":
+    approvers:
+      - 10gen/query-integration-observability
+  - "*capped_deletes*":
+    approvers:
+      - 10gen/server-collection-write-path
+  - "replset_writes_during_restarts_keep_fast_count_correct.js":
+    approvers:
+      - 10gen/server-storage-engine-integration
+  - "insert_docs_larger_than_max_user_size_standalone.js":
+    approvers:
+      - 10gen/query-optimization-parsers
+  - "vectored_insert_no_oplog_hole.js":
+    approvers:
+      - 10gen/server-replication-reviewers

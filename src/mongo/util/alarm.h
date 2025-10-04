@@ -28,14 +28,25 @@
  */
 #pragma once
 
-#include <map>
-#include <memory>
-
 #include "mongo/base/status.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/time_support.h"
+
+#include <cstdint>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
 
 namespace mongo {
 
@@ -159,7 +170,7 @@ class AlarmSchedulerPrecise : public AlarmScheduler,
 public:
     explicit AlarmSchedulerPrecise(ClockSource* clockSource) : AlarmScheduler(clockSource) {}
 
-    ~AlarmSchedulerPrecise();
+    ~AlarmSchedulerPrecise() override;
 
     void clearAllAlarms() override;
 
@@ -185,9 +196,9 @@ private:
     using AlarmMap = std::multimap<Date_t, AlarmData>;
     using AlarmMapIt = AlarmMap::iterator;
 
-    void _clearAllAlarmsImpl(stdx::unique_lock<Latch>& lk);
+    void _clearAllAlarmsImpl(stdx::unique_lock<stdx::mutex>& lk);
 
-    Mutex _mutex = MONGO_MAKE_LATCH("AlarmSchedulerPrecise::_mutex");
+    stdx::mutex _mutex;
     bool _shutdown = false;
     AlarmMap _alarms;
 };

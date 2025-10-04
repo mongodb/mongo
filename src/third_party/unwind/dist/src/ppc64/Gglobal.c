@@ -29,7 +29,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 #include "dwarf_i.h"
 
 HIDDEN define_lock (ppc64_lock);
-HIDDEN int tdep_init_done;
+HIDDEN atomic_bool tdep_init_done = 0;
 
 /* The API register numbers are exactly the same as the .eh_frame
    registers, for now at least.  */
@@ -164,7 +164,7 @@ tdep_init (void)
 
   lock_acquire (&ppc64_lock, saved_mask);
   {
-    if (tdep_init_done)
+    if (atomic_load(&tdep_init_done))
       /* another thread else beat us to it... */
       goto out;
 
@@ -175,7 +175,7 @@ tdep_init (void)
 #ifndef UNW_REMOTE_ONLY
     ppc64_local_addr_space_init ();
 #endif
-    tdep_init_done = 1; /* signal that we're initialized... */
+    atomic_store(&tdep_init_done, 1); /* signal that we're initialized... */
   }
  out:
   lock_release (&ppc64_lock, saved_mask);

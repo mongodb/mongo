@@ -27,20 +27,42 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/scripting/mozjs/objectwrapper.h"
-
-#include <js/Conversions.h>
-#include <jsapi.h>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/scripting/mozjs/bson.h"
+#include "mongo/scripting/mozjs/dbref.h"
 #include "mongo/scripting/mozjs/idwrapper.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
+#include "mongo/scripting/mozjs/wraptype.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
+#include <new>
+#include <tuple>
+#include <utility>
+
+#include <jsapi.h>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <js/AllocPolicy.h>
+#include <js/Array.h>
+#include <js/CallAndConstruct.h>
+#include <js/CallArgs.h>
+#include <js/Class.h>
+#include <js/GCVector.h>
+#include <js/Id.h>
+#include <js/Object.h>
+#include <js/PropertySpec.h>
+#include <js/RootingAPI.h>
+#include <js/TypeDecls.h>
+#include <js/ValueArray.h>
 
 namespace mongo {
 namespace mozjs {
@@ -58,9 +80,9 @@ void ObjectWrapper::Key::get(JSContext* cx, JS::HandleObject o, JS::MutableHandl
                 return;
             break;
         case Type::Id: {
-            JS::RootedId id(cx, _id);
+            JS::RootedId rid(cx, _id);
 
-            if (JS_GetPropertyById(cx, o, id, value))
+            if (JS_GetPropertyById(cx, o, rid, value))
                 return;
             break;
         }
@@ -137,6 +159,17 @@ void ObjectWrapper::Key::define(JSContext* cx,
     throwCurrentJSException(cx, ErrorCodes::InternalError, "Failed to define value on a JSObject");
 }
 
+/*
+ * Wrapper functions to create wrappers with no corresponding JSJitInfo from API
+ * function arguments.
+ */
+static JSNativeWrapper NativeOpWrapper(JSNative native) {
+    JSNativeWrapper ret;
+    ret.op = native;
+    ret.info = nullptr;
+    return ret;
+}
+
 void ObjectWrapper::Key::define(
     JSContext* cx, JS::HandleObject o, unsigned attrs, JSNative getter, JSNative setter) {
     switch (_type) {
@@ -144,14 +177,18 @@ void ObjectWrapper::Key::define(
             if (JS_DefineProperty(cx, o, _field, getter, setter, attrs))
                 return;
             break;
-        case Type::Index:
-            if (JS_DefineElement(cx, o, _idx, getter, setter, attrs))
+        case Type::Index: {
+            JS::RootedId rid1(cx);
+            if (!JS_IndexToId(cx, _idx, &rid1)) {
+                break;
+            }
+            if (JS_DefinePropertyById(cx, o, rid1, getter, setter, attrs))
                 return;
             break;
+        }
         case Type::Id: {
-            JS::RootedId id(cx, _id);
-
-            if (JS_DefinePropertyById(cx, o, id, getter, setter, attrs))
+            JS::RootedId rid2(cx, _id);
+            if (JS_DefinePropertyById(cx, o, rid2, getter, setter, attrs))
                 return;
             break;
         }
@@ -296,7 +333,7 @@ void ObjectWrapper::Key::del(JSContext* cx, JS::HandleObject o) {
 
 std::string ObjectWrapper::Key::toString(JSContext* cx) {
     JSStringWrapper jsstr;
-    return toStringData(cx, &jsstr).toString();
+    return std::string{toStringData(cx, &jsstr)};
 }
 
 StringData ObjectWrapper::Key::toStringData(JSContext* cx, JSStringWrapper* jsstr) {
@@ -318,13 +355,13 @@ StringData ObjectWrapper::Key::toStringData(JSContext* cx, JSStringWrapper* jsst
         rid.set(id);
     }
 
-    if (JSID_IS_INT(rid)) {
-        *jsstr = JSStringWrapper(JSID_TO_INT(rid));
+    if (rid.isInt()) {
+        *jsstr = JSStringWrapper(rid.toInt());
         return jsstr->toStringData();
     }
 
-    if (JSID_IS_STRING(rid)) {
-        *jsstr = JSStringWrapper(cx, JSID_TO_STRING(rid));
+    if (rid.isString()) {
+        *jsstr = JSStringWrapper(cx, rid.toString());
         return jsstr->toStringData();
     }
 
@@ -388,6 +425,34 @@ BSONObj ObjectWrapper::getObject(Key key) {
 
 void ObjectWrapper::getValue(Key key, JS::MutableHandleValue value) {
     key.get(_context, _object, value);
+}
+
+OID ObjectWrapper::getOID(Key key) {
+    JS::RootedValue x(_context);
+    getValue(key, &x);
+
+    return ValueWriter(_context, x).toOID();
+}
+
+void ObjectWrapper::getBinData(Key key, std::function<void(const BSONBinData&)> withBinData) {
+    JS::RootedValue x(_context);
+    getValue(key, &x);
+
+    ValueWriter(_context, x).toBinData(std::move(withBinData));
+}
+
+Timestamp ObjectWrapper::getTimestamp(Key key) {
+    JS::RootedValue x(_context);
+    getValue(key, &x);
+
+    return ValueWriter(_context, x).toTimestamp();
+}
+
+JSRegEx ObjectWrapper::getRegEx(Key key) {
+    JS::RootedValue x(_context);
+    getValue(key, &x);
+
+    return ValueWriter(_context, x).toRegEx();
 }
 
 void ObjectWrapper::setNumber(Key key, double val) {
@@ -484,6 +549,13 @@ void ObjectWrapper::rename(Key from, const char* to) {
     setValue(from, undefValue);
 }
 
+void ObjectWrapper::renameAndDeleteProperty(Key from, const char* to) {
+    JS::RootedValue value(_context);
+    getValue(from, &value);
+    setValue(to, value);
+    from.del(_context, _object);
+}
+
 bool ObjectWrapper::hasField(Key key) {
     return key.has(_context, _object);
 }
@@ -506,7 +578,7 @@ void ObjectWrapper::callMethod(const char* field,
 }
 
 void ObjectWrapper::callMethod(const char* field, JS::MutableHandleValue out) {
-    JS::AutoValueVector args(_context);
+    JS::RootedValueVector args(_context);
 
     callMethod(field, args, out);
 }
@@ -521,7 +593,7 @@ void ObjectWrapper::callMethod(JS::HandleValue fun,
 }
 
 void ObjectWrapper::callMethod(JS::HandleValue fun, JS::MutableHandleValue out) {
-    JS::AutoValueVector args(_context);
+    JS::RootedValueVector args(_context);
 
     callMethod(fun, args, out);
 }
@@ -629,7 +701,7 @@ ObjectWrapper::WriteFieldRecursionFrame::WriteFieldRecursionFrame(JSContext* cx,
     : thisv(cx, obj), ids(cx, JS::IdVector(cx)) {
     bool isArray = false;
     if (parent) {
-        if (!JS_IsArrayObject(cx, thisv, &isArray)) {
+        if (!JS::IsArrayObject(cx, thisv, &isArray)) {
             throwCurrentJSException(
                 cx, ErrorCodes::JSInterpreterFailure, "Failure to check object is an array");
         }
@@ -639,7 +711,7 @@ ObjectWrapper::WriteFieldRecursionFrame::WriteFieldRecursionFrame(JSContext* cx,
 
     if (isArray) {
         uint32_t length;
-        if (!JS_GetArrayLength(cx, thisv, &length)) {
+        if (!JS::GetArrayLength(cx, thisv, &length)) {
             throwCurrentJSException(
                 cx, ErrorCodes::JSInterpreterFailure, "Failure to get array length");
         }
@@ -651,7 +723,7 @@ ObjectWrapper::WriteFieldRecursionFrame::WriteFieldRecursionFrame(JSContext* cx,
 
         JS::RootedId rid(cx);
         for (uint32_t i = 0; i < length; i++) {
-            rid.set(INT_TO_JSID(i));
+            rid.set(JS::PropertyKey::Int(i));
             ids.infallibleAppend(rid);
         }
     } else {
@@ -683,7 +755,7 @@ void ObjectWrapper::_writeField(BSONObjBuilder* b,
 }
 
 std::string ObjectWrapper::getClassName() {
-    auto jsclass = JS_GetClass(_object);
+    auto jsclass = JS::GetClass(_object);
 
     if (jsclass)
         return jsclass->name;

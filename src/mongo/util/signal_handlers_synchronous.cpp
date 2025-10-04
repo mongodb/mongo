@@ -27,41 +27,55 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/util/signal_handlers_synchronous.h"
+
+#include <cerrno>
+#include <csignal>
+#include <cstring>
+#include <exception>
+#include <iostream>
+#include <mutex>
+#include <new>
+#include <sstream>
+#include <streambuf>
+#include <string>
+#include <typeinfo>
+
+#include "signal_handlers_synchronous.h"
 
 #include <boost/exception/diagnostic_information.hpp>
 #include <boost/exception/exception.hpp>
-#include <csignal>
-#include <exception>
 #include <fmt/format.h>
-#include <iostream>
-#include <memory>
-#include <streambuf>
-#include <typeinfo>
+// IWYU pragma: no_include "bits/types/siginfo_t.h"
+
+#ifdef __linux__
+#include <ucontext.h>
+#endif
+
+#ifdef _WIN32
+#include "mongo/util/exception_filter_win32.h"
+#endif
 
 #include "mongo/base/string_data.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/compiler.h"
 #include "mongo/stdx/exception.h"
-#include "mongo/stdx/thread.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/thread_name.h"
-#include "mongo/util/debug_util.h"
 #include "mongo/util/debugger.h"
-#include "mongo/util/dynamic_catch.h"
-#include "mongo/util/exception_filter_win32.h"
 #include "mongo/util/exit_code.h"
+#include "mongo/util/hex.h"
 #include "mongo/util/quick_exit.h"
-#include "mongo/util/signal_handlers.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/static_immortal.h"
-#include "mongo/util/text.h"
+#include "mongo/util/text.h"  // IWYU pragma: keep
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
+
 
 namespace mongo {
+
+// Used by `dumpScopedDebugInfo` below to determine if we should log anything.
+Atomic<bool> shouldLogScopedDebugInfoInSignalHandlers{true};
 
 namespace {
 
@@ -87,35 +101,6 @@ int sehExceptionFilter(unsigned int code, struct _EXCEPTION_POINTERS* excPointer
 // Bit 29:     1 = Client bit, i.e. a user-defined code
 #define STATUS_EXIT_ABRUPT 0xE0000001
 
-// Historically we relied on raising SEH exception and letting the unhandled exception handler then
-// handle it to that we can dump the process. This works in all but one case.
-// The C++ terminate handler runs the terminate handler in a SEH __try/__catch. Therefore, any SEH
-// exceptions we raise become handled. Now, we setup our own SEH handler to quick catch the SEH
-// exception and take the dump bypassing the unhandled exception handler.
-//
-void endProcessWithSignal(int signalNum) {
-
-    __try {
-        RaiseException(STATUS_EXIT_ABRUPT, EXCEPTION_NONCONTINUABLE, 0, nullptr);
-    } __except (sehExceptionFilter(GetExceptionCode(), GetExceptionInformation())) {
-        // The exception filter exits the process
-        quickExit(EXIT_ABRUPT);
-    }
-}
-
-#else
-
-void endProcessWithSignal(int signalNum) {
-    // This works by restoring the system-default handler for the given signal and re-raising it, in
-    // order to get the system default termination behavior (i.e., dumping core, or just exiting).
-    struct sigaction defaultedSignals;
-    memset(&defaultedSignals, 0, sizeof(defaultedSignals));
-    defaultedSignals.sa_handler = SIG_DFL;
-    sigemptyset(&defaultedSignals.sa_mask);
-    invariant(sigaction(signalNum, &defaultedSignals, nullptr) == 0);
-    raise(signalNum);
-}
-
 #endif
 
 // This should only be used with MallocFreeOSteam
@@ -140,22 +125,14 @@ private:
     char _buffer[maxLogLineSize];
 };
 
-class MallocFreeOStream : public std::ostream {
+class MallocFreeOStream : private MallocFreeStreambuf, public std::ostream {
+public:
+    MallocFreeOStream() : std::ostream{static_cast<MallocFreeStreambuf*>(this)} {}
     MallocFreeOStream(const MallocFreeOStream&) = delete;
     MallocFreeOStream& operator=(const MallocFreeOStream&) = delete;
 
-public:
-    MallocFreeOStream() : std::ostream(&_buf) {}
-
-    StringData str() const {
-        return _buf.str();
-    }
-    void rewind() {
-        _buf.rewind();
-    }
-
-private:
-    MallocFreeStreambuf _buf;
+    using MallocFreeStreambuf::rewind;
+    using MallocFreeStreambuf::str;
 };
 
 MallocFreeOStream mallocFreeOStream;
@@ -175,44 +152,93 @@ MallocFreeOStream mallocFreeOStream;
  */
 class MallocFreeOStreamGuard {
 public:
-    explicit MallocFreeOStreamGuard() : _lk(_streamMutex, stdx::defer_lock) {
+    /**
+     * If we detect that we've been signaled while handling another signal, we'll fall back to
+     * the default handler for the given signum. In that case, it's important that we kill
+     * the process in a timely manner so the user has a chance to detect that and restart it.
+     */
+    explicit MallocFreeOStreamGuard(int signum) : _lk(_streamMutex, stdx::defer_lock) {
         if (terminateDepth++) {
-            quickExit(EXIT_ABRUPT);
+            if (_onDeadlock)
+                _onDeadlock(signum);
+            endProcessWithSignal(signum);
         }
         _lk.lock();
     }
 
+    static void setGlobalDeadlockCallback_forTest(std::function<void(int)> cb) {
+        _onDeadlock = std::move(cb);
+    }
+
 private:
-    static stdx::mutex _streamMutex;  // NOLINT
-    static thread_local int terminateDepth;
+    static inline stdx::mutex _streamMutex;
+    static inline thread_local int terminateDepth = 0;
+    static inline std::function<void(int)> _onDeadlock;
+
     stdx::unique_lock<stdx::mutex> _lk;
 };
 
-stdx::mutex MallocFreeOStreamGuard::_streamMutex;  // NOLINT
-thread_local int MallocFreeOStreamGuard::terminateDepth = 0;
+void logNoRecursion(StringData message) {
+    // If we were within a log call when we hit a signal, don't call back into the logging
+    // subsystem.
+    if (logv2::loggingInProgress()) {
+        logv2::signalSafeWriteToStderr(message);
+    } else {
+        LOGV2_FATAL_CONTINUE(6384300, "Writing fatal message", "message"_attr = message);
+    }
+}
 
 // must hold MallocFreeOStreamGuard to call
 void writeMallocFreeStreamToLog() {
-    LOGV2_FATAL_OPTIONS(
-        4757800,
-        logv2::LogOptions(logv2::FatalMode::kContinue, logv2::LogTruncation::Disabled),
-        "{message}",
-        "Writing fatal message",
-        "message"_attr = mallocFreeOStream.str());
+    mallocFreeOStream << "\n";
+    logNoRecursion(mallocFreeOStream.str());
     mallocFreeOStream.rewind();
 }
 
 // must hold MallocFreeOStreamGuard to call
-void printSignalAndBacktrace(int signalNum) {
-    mallocFreeOStream << "Got signal: " << signalNum << " (" << strsignal(signalNum) << ").\n";
+void printStackTraceNoRecursion() {
+    if (logv2::loggingInProgress()) {
+        printStackTrace(mallocFreeOStream);
+        writeMallocFreeStreamToLog();
+    } else {
+        printStackTrace();
+    }
+}
+
+// must hold MallocFreeOStreamGuard to call
+void printSignal(int signalNum) {
+    mallocFreeOStream << "Got signal: " << signalNum << " (" << strsignal(signalNum) << ").";
     writeMallocFreeStreamToLog();
-    printStackTrace();
+}
+
+void dumpScopedDebugInfo(std::ostream& os) {
+    if (!shouldLogScopedDebugInfoInSignalHandlers.load()) {
+        return;
+    }
+    auto diagStack = scopedDebugInfoStack().getAll();
+    if (diagStack.empty())
+        return;
+    os << "ScopedDebugInfo: [";
+    StringData sep;
+    for (const auto& s : diagStack) {
+        os << sep << '"' << s << '"';
+        sep = ", "_sd;
+    }
+    os << "]\n";
+}
+
+// must hold MallocFreeOStreamGuard to call
+void printErrorBlock() {
+    printStackTraceNoRecursion();
+    writeMallocFreeStreamToLog();
+    dumpScopedDebugInfo(mallocFreeOStream);
+    writeMallocFreeStreamToLog();
 }
 
 // this will be called in certain c++ error cases, for example if there are two active
 // exceptions
 void myTerminate() {
-    MallocFreeOStreamGuard lk{};
+    MallocFreeOStreamGuard lk(SIGABRT);
     mallocFreeOStream << "terminate() called.";
     if (std::current_exception()) {
         mallocFreeOStream << " An exception is active; attempting to gather more information";
@@ -222,14 +248,15 @@ void myTerminate() {
         mallocFreeOStream << " No exception is active";
     }
     writeMallocFreeStreamToLog();
-    printStackTrace();
+    printErrorBlock();
     breakpoint();
     endProcessWithSignal(SIGABRT);
 }
 
 extern "C" void abruptQuit(int signalNum) {
-    MallocFreeOStreamGuard lk{};
-    printSignalAndBacktrace(signalNum);
+    MallocFreeOStreamGuard lk(signalNum);
+    printSignal(signalNum);
+    printErrorBlock();
     breakpoint();
     endProcessWithSignal(signalNum);
 }
@@ -241,22 +268,19 @@ void myInvalidParameterHandler(const wchar_t* expression,
                                const wchar_t* file,
                                unsigned int line,
                                uintptr_t pReserved) {
-    LOGV2_FATAL_CONTINUE(
-        23815,
-        "Invalid parameter detected in function {function} in {file} at line {line} "
-        "with expression '{expression}'",
-        "Invalid parameter detected",
-        "function"_attr = toUtf8String(function),
-        "file"_attr = toUtf8String(file),
-        "line"_attr = line,
-        "expression"_attr = toUtf8String(expression));
+
+    logNoRecursion(fmt::format(
+        "Invalid parameter detected in function {} in {} at line {} with expression '{}'\n",
+        toUtf8String(function),
+        toUtf8String(file),
+        line,
+        toUtf8String(expression)));
 
     abruptQuit(SIGABRT);
 }
 
 void myPureCallHandler() {
-    LOGV2_FATAL_CONTINUE(23818,
-                         "Pure call handler invoked. Immediate exit due to invalid pure call");
+    logNoRecursion("Pure call handler invoked. Immediate exit due to invalid pure call\n");
     abruptQuit(SIGABRT);
 }
 
@@ -266,11 +290,23 @@ extern "C" void abruptQuitAction(int signalNum, siginfo_t*, void*) {
     abruptQuit(signalNum);
 };
 
+// Must hold MallocFreeOStreamGuard to call
+void printSigInfo(const siginfo_t* siginfo) {
+    if (siginfo == nullptr) {
+        return;
+    }
+
+    mallocFreeOStream << "Dumping siginfo (si_code=" << siginfo->si_code
+                      << "): " << streamableHexdump(*siginfo);
+
+    writeMallocFreeStreamToLog();
+}
+
 extern "C" void abruptQuitWithAddrSignal(int signalNum, siginfo_t* siginfo, void* ucontext_erased) {
     // For convenient debugger access.
     [[maybe_unused]] auto ucontext = static_cast<const ucontext_t*>(ucontext_erased);
 
-    MallocFreeOStreamGuard lk{};
+    MallocFreeOStreamGuard lk(signalNum);
 
     const char* action = (signalNum == SIGSEGV || signalNum == SIGBUS) ? "access" : "operation";
     mallocFreeOStream << "Invalid " << action << " at address: " << siginfo->si_addr;
@@ -280,18 +316,82 @@ extern "C" void abruptQuitWithAddrSignal(int signalNum, siginfo_t* siginfo, void
     // could cause unwinding the stack to break.
     writeMallocFreeStreamToLog();
 
-    printSignalAndBacktrace(signalNum);
+    printSigInfo(siginfo);
+    printSignal(signalNum);
+    printErrorBlock();
+
     breakpoint();
     endProcessWithSignal(signalNum);
+}
+
+extern "C" void noopSignalHandler(int signalNum, siginfo_t*, void*) {}
+
+extern "C" typedef void(sigAction_t)(int signum, siginfo_t* info, void* context);
+
+void installSignalHandler(int signal, sigAction_t handler) {
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sigemptyset(&sa.sa_mask);
+    if (handler == nullptr) {
+        sa.sa_handler = SIG_IGN;
+    } else {
+        sa.sa_sigaction = handler;
+        sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
+    }
+    if (sigaction(signal, &sa, nullptr) != 0) {
+        int savedErr = errno;
+        LOGV2_FATAL(31334,
+                    "Failed to install sigaction for signal",
+                    "signal"_attr = signal,
+                    "error"_attr = strerror(savedErr));
+    }
+}
+
+void setupSignalTestingHandler() {
+#ifdef __linux__
+    installSignalHandler(interruptResilienceTestingSignal(), noopSignalHandler);
+#endif
 }
 
 #endif
 
 }  // namespace
 
-#if !defined(_WIN32)
-extern "C" typedef void(sigAction_t)(int signum, siginfo_t* info, void* context);
+void setDiagnosticLoggingInSignalHandlers(bool newVal) {
+    shouldLogScopedDebugInfoInSignalHandlers.store(newVal);
+}
+
+void endProcessWithSignal(int signalNum) {
+#if defined(_WIN32)
+    // Historically we relied on raising SEH exception and letting the unhandled exception handler
+    // then handle it to that we can dump the process. This works in all but one case. The C++
+    // terminate handler runs the terminate handler in a SEH __try/__catch. Therefore, any SEH
+    // exceptions we raise become handled. Now, we setup our own SEH handler to quick catch the SEH
+    // exception and take the dump bypassing the unhandled exception handler.
+    __try {
+        RaiseException(STATUS_EXIT_ABRUPT, EXCEPTION_NONCONTINUABLE, 0, nullptr);
+    } __except (sehExceptionFilter(GetExceptionCode(), GetExceptionInformation())) {
+        // The exception filter exits the process
+        quickExit(ExitCode::abrupt);
+    }
+#else
+    // This works by restoring the system-default handler for the given signal, unblocking the
+    // signal, and re-raising it, in order to get the system default termination behavior (i.e.,
+    // dumping core, or just exiting).
+    struct sigaction defaultedSignals;
+    memset(&defaultedSignals, 0, sizeof(defaultedSignals));
+    defaultedSignals.sa_handler = SIG_DFL;
+    sigemptyset(&defaultedSignals.sa_mask);
+    invariant(sigaction(signalNum, &defaultedSignals, nullptr) == 0);
+
+    sigset_t unblockSignalMask;
+    invariant(sigemptyset(&unblockSignalMask) == 0);
+    invariant(sigaddset(&unblockSignalMask, signalNum) == 0);
+    invariant(sigprocmask(SIG_UNBLOCK, &unblockSignalMask, nullptr) == 0);
+
+    raise(signalNum);
 #endif
+}
 
 void setupSynchronousSignalHandlers() {
     stdx::set_terminate(myTerminate);
@@ -317,25 +417,12 @@ void setupSynchronousSignalHandlers() {
         {SIGILL, &abruptQuitWithAddrSignal},
         {SIGFPE, &abruptQuitWithAddrSignal},
     };
+
     for (const auto& spec : kSignalSpecs) {
-        struct sigaction sa;
-        memset(&sa, 0, sizeof(sa));
-        sigemptyset(&sa.sa_mask);
-        if (spec.function == nullptr) {
-            sa.sa_handler = SIG_IGN;
-        } else {
-            sa.sa_sigaction = spec.function;
-            sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
-        }
-        if (sigaction(spec.signal, &sa, nullptr) != 0) {
-            int savedErr = errno;
-            LOGV2_FATAL(31334,
-                        "Failed to install sigaction for signal {signal}: {error}",
-                        "Failed to install sigaction for signal",
-                        "signal"_attr = spec.signal,
-                        "error"_attr = strerror(savedErr));
-        }
+        installSignalHandler(spec.signal, spec.function);
     }
+
+    setupSignalTestingHandler();
     setupSIGTRAPforDebugger();
 #if defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
     setupStackTraceSignalAction(stackTraceSignal());
@@ -344,11 +431,11 @@ void setupSynchronousSignalHandlers() {
 }
 
 void reportOutOfMemoryErrorAndExit() {
-    MallocFreeOStreamGuard lk{};
-    mallocFreeOStream << "out of memory.\n";
+    MallocFreeOStreamGuard lk(SIGABRT);
+    mallocFreeOStream << "out of memory.";
     writeMallocFreeStreamToLog();
-    printStackTrace();
-    quickExit(EXIT_ABRUPT);
+    printStackTraceNoRecursion();
+    quickExit(ExitCode::abrupt);
 }
 
 void clearSignalMask() {
@@ -365,6 +452,14 @@ int stackTraceSignal() {
     return SIGUSR2;
 }
 #endif
+
+int interruptResilienceTestingSignal() {
+#ifdef __linux__
+    return SIGRTMIN;
+#else
+    return 0;
+#endif
+}
 
 ActiveExceptionWitness::ActiveExceptionWitness() {
     // Later entries in the catch chain will become the innermost catch blocks, so
@@ -400,6 +495,20 @@ void ActiveExceptionWitness::_exceptionTypeBlurb(const std::type_info& ex, std::
 ActiveExceptionWitness& globalActiveExceptionWitness() {
     static StaticImmortal<ActiveExceptionWitness> v;
     return *v;
+}
+
+std::string describeActiveException() {
+    std::ostringstream oss;
+    globalActiveExceptionWitness().describe(oss);
+    return oss.str();
+}
+
+std::shared_ptr<void> makeMallocFreeOStreamGuard_forTest(int sig) {
+    return std::make_shared<MallocFreeOStreamGuard>(sig);
+}
+
+void setMallocFreeOStreamGuardDeadlockCallback_forTest(std::function<void(int)> cb) {
+    MallocFreeOStreamGuard::setGlobalDeadlockCallback_forTest(std::move(cb));
 }
 
 }  // namespace mongo

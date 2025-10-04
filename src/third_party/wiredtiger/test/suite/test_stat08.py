@@ -27,19 +27,35 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import os
+from unittest import skip
 import wiredtiger, wttest
 
 # test_stat08.py
 #    Session statistics for bytes read into the cache.
 class test_stat08(wttest.WiredTigerTestCase):
 
-    nentries = 350000
-    conn_config = 'cache_size=10MB,statistics=(all)'
-    entry_value = "abcde" * 40
+    nentries = 100000
+    # Leave the cache size on the default setting to avoid filling up the cache
+    # too much and triggering unnecessary rollbacks. But make the value fairly
+    # large to make obvious change to the statistics.
+    conn_config = 'statistics=(all)'
+    entry_value = "abcde" * 400
     BYTES_READ = wiredtiger.stat.session.bytes_read
     READ_TIME = wiredtiger.stat.session.read_time
     session_stats = { BYTES_READ : "session: bytes read into cache",           \
         READ_TIME : "session: page read from disk to cache time (usecs)"}
+
+    def get_stat(self, stat):
+        statc =  self.session.open_cursor('statistics:session', None, None)
+        val = statc[stat][2]
+        statc.close()
+        return val
+
+    def get_cstat(self, stat):
+        statc =  self.session.open_cursor('statistics:', None, None)
+        val = statc[stat][2]
+        statc.close()
+        return val
 
     def check_stats(self, cur, k):
         #
@@ -54,18 +70,38 @@ class test_stat08(wttest.WiredTigerTestCase):
         cur.search()
         [desc, pvalue, value] = cur.get_values()
         self.pr('  stat: \'%s\', \'%s\', \'%s\'' % (desc, pvalue, str(value)))
-        self.assertEqual(desc, exp_desc )
+        self.assertEqual(desc, exp_desc)
         if k is self.BYTES_READ or k is self.READ_TIME:
             self.assertTrue(value > 0)
 
     def test_session_stats(self):
-        self.session = self.conn.open_session()
-        self.session.create("table:test_stat08",
-                            "key_format=i,value_format=S")
+        # We want to configure for pages to be explicitly evicted when we are done with them so
+        # that we can correctly verify the statistic measuring bytes read from cache.
+        self.session = self.conn.open_session("debug=(release_evict_page=true)")
+        self.session.create("table:test_stat08", "key_format=i,value_format=S")
         cursor =  self.session.open_cursor('table:test_stat08', None, None)
+        self.session.begin_transaction()
+        txn_dirty = self.get_stat(wiredtiger.stat.session.txn_bytes_dirty)
+        cache_dirty = self.get_cstat(wiredtiger.stat.conn.cache_bytes_dirty)
+        self.assertEqual(txn_dirty, 0)
+        self.assertLessEqual(txn_dirty, cache_dirty)
         # Write the entries.
-        for i in range(0, self.nentries):
+        for i in range(1, self.nentries):
+            txn_dirty_before = self.get_stat(wiredtiger.stat.session.txn_bytes_dirty)
             cursor[i] = self.entry_value
+            txn_dirty_after = self.get_stat(wiredtiger.stat.session.txn_bytes_dirty)
+            self.assertLess(txn_dirty_before, txn_dirty_after)
+            # Since we're using an explicit transaction, we need to resolve somewhat frequently.
+            # So check the statistics and restart the transaction every 200 operations.
+            if i % 200 == 0:
+                cache_dirty_txn = self.get_cstat(wiredtiger.stat.conn.cache_bytes_dirty)
+                # Make sure the txn's dirty bytes doesn't exceed the cache.
+                self.assertLessEqual(txn_dirty_after, cache_dirty_txn)
+                self.session.rollback_transaction()
+                self.session.begin_transaction()
+                txn_dirty = self.get_stat(wiredtiger.stat.session.txn_bytes_dirty)
+                self.assertEqual(txn_dirty, 0)
+        self.session.commit_transaction()
         cursor.reset()
 
         # Read the entries.
@@ -84,6 +120,3 @@ class test_stat08(wttest.WiredTigerTestCase):
         while stat_cur.next() == 0:
             [desc, pvalue, value] = stat_cur.get_values()
             self.assertTrue(value == 0)
-
-if __name__ == '__main__':
-    wttest.run()

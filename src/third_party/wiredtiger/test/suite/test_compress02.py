@@ -26,13 +26,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import fnmatch, os, shutil, threading, time
-from wtthread import checkpoint_thread, op_thread
 from helper import copy_wiredtiger_home
-import wiredtiger, wttest
+import wttest
 from wtdataset import SimpleDataSet
-from wtscenario import make_scenarios
-from wiredtiger import stat
 
 # test_compress02.py
 #   This test checks that the compression level can be reconfigured after restart if
@@ -45,7 +41,7 @@ class test_compress02(wttest.WiredTigerTestCase):
     nrows = 1000
 
     def conn_config(self):
-        config = 'builtin_extension_config={zstd={compression_level=6}},cache_size=10MB,log=(enabled=true)'
+        config = 'builtin_extension_config={zstd={compression_level=6}},cache_size=10MB'
         return config
 
     def large_updates(self, uri, value, ds, nrows):
@@ -76,8 +72,7 @@ class test_compress02(wttest.WiredTigerTestCase):
 
     @wttest.zstdtest('Skip zstd on pcc and zseries machines')
     def test_compress02(self):
-
-        ds = SimpleDataSet(self, self.uri, 0, key_format="S", value_format="S",config='block_compressor=zstd,log=(enabled=false)')
+        ds = SimpleDataSet(self, self.uri, 0, key_format="S", value_format="S",config='block_compressor=zstd')
         ds.populate()
         valuea = "aaaaa" * 100
 
@@ -91,7 +86,7 @@ class test_compress02(wttest.WiredTigerTestCase):
         copy_wiredtiger_home(self, ".", "RESTART")
 
         # Close the connection and reopen it with a different zstd compression level configuration.
-        restart_config = 'builtin_extension_config={zstd={compression_level=9}},cache_size=10MB,log=(enabled=true)'
+        restart_config = 'builtin_extension_config={zstd={compression_level=9}},cache_size=10MB'
         self.close_conn()
         self.reopen_conn("RESTART", restart_config)
 
@@ -100,6 +95,3 @@ class test_compress02(wttest.WiredTigerTestCase):
 
         # Check the table contains the last checkpointed value.
         self.check(valuea, self.uri, self.nrows)
-
-if __name__ == '__main__':
-    wttest.run()

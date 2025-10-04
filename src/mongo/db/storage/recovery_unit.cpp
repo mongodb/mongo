@@ -27,15 +27,21 @@
  *    it in the license file.
  */
 
+#include "mongo/db/storage/recovery_unit.h"
+
+#include "mongo/logv2/log.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/scopeguard.h"
+
+#include <exception>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/storage/recovery_unit.h"
-#include "mongo/logv2/log.h"
-#include "mongo/util/fail_point.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace {
@@ -43,15 +49,19 @@ namespace {
 // determine if documents changed, but a different recovery unit may be used across a getMore,
 // so there is a chance the snapshot ID will be reused.
 AtomicWord<unsigned long long> nextSnapshotId{1};
-MONGO_FAIL_POINT_DEFINE(widenWUOWChangesWindow);
+
+SnapshotId getNextSnapshotId() {
+    return SnapshotId(nextSnapshotId.fetchAndAdd(1));
+}
 }  // namespace
 
-RecoveryUnit::RecoveryUnit() {
-    assignNextSnapshotId();
-}
+const RecoveryUnit::OpenSnapshotOptions RecoveryUnit::kDefaultOpenSnapshotOptions =
+    RecoveryUnit::OpenSnapshotOptions();
 
-void RecoveryUnit::assignNextSnapshotId() {
-    _mySnapshotId = nextSnapshotId.fetchAndAdd(1);
+void RecoveryUnit::ensureSnapshot() {
+    if (!_snapshot) {
+        _snapshot.emplace(getNextSnapshotId());
+    }
 }
 
 void RecoveryUnit::registerPreCommitHook(std::function<void(OperationContext*)> callback) {
@@ -70,94 +80,215 @@ void RecoveryUnit::registerChange(std::unique_ptr<Change> change) {
     _changes.push_back(std::move(change));
 }
 
-void RecoveryUnit::registerChangeForCatalogVisibility(std::unique_ptr<Change> change) {
+void RecoveryUnit::registerChangeForTwoPhaseDrop(std::unique_ptr<Change> change) {
     validateInUnitOfWork();
-    invariant(!_changeForCatalogVisibility);
-    _changeForCatalogVisibility = std::move(change);
+    _changesForTwoPhaseDrop.push_back(std::move(change));
 }
 
-bool RecoveryUnit::hasRegisteredChangeForCatalogVisibility() {
+void RecoveryUnit::registerChangeForCatalogVisibility(std::unique_ptr<Change> change) {
     validateInUnitOfWork();
-    return _changeForCatalogVisibility.get();
+    _changesForCatalogVisibility.push_back(std::move(change));
 }
 
 void RecoveryUnit::commitRegisteredChanges(boost::optional<Timestamp> commitTimestamp) {
     // Getting to this method implies `runPreCommitHooks` completed successfully, resulting in
     // having its contents cleared.
     invariant(_preCommitHooks.empty());
-    if (MONGO_unlikely(widenWUOWChangesWindow.shouldFail())) {
-        sleepmillis(1000);
-    }
     _executeCommitHandlers(commitTimestamp);
 }
 
+void RecoveryUnit::beginUnitOfWork(bool readOnly) {
+    _readOnly = readOnly;
+    if (!_readOnly) {
+        doBeginUnitOfWork();
+    }
+}
+
+void RecoveryUnit::commitUnitOfWork() {
+    if (_readOnly) {
+        _readOnly = false;
+        commitRegisteredChanges(boost::none);
+        return;
+    }
+
+    runPreCommitHooks(_opCtx);
+
+    doCommitUnitOfWork();
+    resetSnapshot();
+}
+
+void RecoveryUnit::abortUnitOfWork() {
+    if (_readOnly) {
+        _readOnly = false;
+        abortRegisteredChanges();
+        return;
+    }
+
+    doAbortUnitOfWork();
+    resetSnapshot();
+}
+
+void RecoveryUnit::abandonSnapshot() {
+    doAbandonSnapshot();
+    resetSnapshot();
+}
+
+void RecoveryUnit::setOperationContext(OperationContext* opCtx) {
+    _opCtx = opCtx;
+}
+
 void RecoveryUnit::_executeCommitHandlers(boost::optional<Timestamp> commitTimestamp) {
+    invariant(_opCtx ||
+              (_changes.empty() && _changesForCatalogVisibility.empty() &&
+               _changesForTwoPhaseDrop.empty()));
+    bool debugLoggingThreeEnabled =
+        logv2::shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, logv2::LogSeverity::Debug(3));
+    for (auto& change : _changesForTwoPhaseDrop) {
+        // Log at higher level because commits occur far more frequently than rollbacks.
+        if (debugLoggingThreeEnabled) {
+            LOGV2_DEBUG(7789501,
+                        3,
+                        "Custom commit",
+                        "changeName"_attr = redact(demangleName(typeid(*change))));
+        }
+        change->commit(_opCtx, commitTimestamp);
+    }
+    for (auto& change : _changesForCatalogVisibility) {
+        // Log at higher level because commits occur far more frequently than rollbacks.
+        if (debugLoggingThreeEnabled) {
+            LOGV2_DEBUG(5255701,
+                        3,
+                        "Custom commit.",
+                        "changeName"_attr = redact(demangleName(typeid(*change))));
+        }
+        change->commit(_opCtx, commitTimestamp);
+    }
     for (auto& change : _changes) {
-        try {
-            // Log at higher level because commits occur far more frequently than rollbacks.
+        // Log at higher level because commits occur far more frequently than rollbacks.
+        if (debugLoggingThreeEnabled) {
             LOGV2_DEBUG(22244,
                         3,
-                        "CUSTOM COMMIT {demangleName_typeid_change}",
-                        "demangleName_typeid_change"_attr = redact(demangleName(typeid(*change))));
-            change->commit(commitTimestamp);
-        } catch (...) {
-            std::terminate();
+                        "Custom commit.",
+                        "changeName"_attr = redact(demangleName(typeid(*change))));
         }
-    }
-    try {
-        if (_changeForCatalogVisibility) {
-            // Log at higher level because commits occur far more frequently than rollbacks.
-            LOGV2_DEBUG(5255701,
-                        2,
-                        "CUSTOM COMMIT {demangleName_typeid_change}",
-                        "demangleName_typeid_change"_attr =
-                            redact(demangleName(typeid(*_changeForCatalogVisibility))));
-            _changeForCatalogVisibility->commit(commitTimestamp);
-        }
-    } catch (...) {
-        std::terminate();
+        change->commit(_opCtx, commitTimestamp);
     }
     _changes.clear();
-    _changeForCatalogVisibility.reset();
+    _changesForCatalogVisibility.clear();
+    _changesForTwoPhaseDrop.clear();
 }
 
 void RecoveryUnit::abortRegisteredChanges() {
     _preCommitHooks.clear();
-    if (MONGO_unlikely(widenWUOWChangesWindow.shouldFail())) {
-        sleepmillis(1000);
-    }
     _executeRollbackHandlers();
 }
 void RecoveryUnit::_executeRollbackHandlers() {
-    try {
-        if (_changeForCatalogVisibility) {
-
-            LOGV2_DEBUG(5255702,
-                        2,
-                        "CUSTOM ROLLBACK {demangleName_typeid_change}",
-                        "demangleName_typeid_change"_attr =
-                            redact(demangleName(typeid(*_changeForCatalogVisibility))));
-            _changeForCatalogVisibility->rollback();
-        }
-        for (Changes::const_reverse_iterator it = _changes.rbegin(), end = _changes.rend();
-             it != end;
-             ++it) {
-            Change* change = it->get();
+    // Make sure we have an OperationContext when executing rollback handlers. Unless we have no
+    // handlers to run, which might be the case in unit tests.
+    invariant(_opCtx ||
+              (_changes.empty() && _changesForCatalogVisibility.empty() &&
+               _changesForTwoPhaseDrop.empty()));
+    bool debugLoggingTwoEnabled =
+        logv2::shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, logv2::LogSeverity::Debug(2));
+    for (Changes::const_reverse_iterator it = _changes.rbegin(), end = _changes.rend(); it != end;
+         ++it) {
+        Change* change = it->get();
+        if (debugLoggingTwoEnabled) {
             LOGV2_DEBUG(22245,
                         2,
-                        "CUSTOM ROLLBACK {demangleName_typeid_change}",
-                        "demangleName_typeid_change"_attr = redact(demangleName(typeid(*change))));
-            change->rollback();
+                        "Custom rollback",
+                        "changeName"_attr = redact(demangleName(typeid(*change))));
         }
-        _changeForCatalogVisibility.reset();
-        _changes.clear();
-    } catch (...) {
-        std::terminate();
+        change->rollback(_opCtx);
     }
+
+    for (Changes::const_reverse_iterator it = _changesForTwoPhaseDrop.rbegin(),
+                                         end = _changesForTwoPhaseDrop.rend();
+         it != end;
+         ++it) {
+        Change* change = it->get();
+        if (debugLoggingTwoEnabled) {
+            LOGV2_DEBUG(7789502,
+                        2,
+                        "Custom rollback",
+                        "changeName"_attr = redact(demangleName(typeid(*change))));
+        }
+        change->rollback(_opCtx);
+    }
+
+    for (Changes::const_reverse_iterator it = _changesForCatalogVisibility.rbegin(),
+                                         end = _changesForCatalogVisibility.rend();
+         it != end;
+         ++it) {
+        Change* change = it->get();
+        if (debugLoggingTwoEnabled) {
+            LOGV2_DEBUG(5255702,
+                        2,
+                        "Custom rollback",
+                        "changeName"_attr = redact(demangleName(typeid(*change))));
+        }
+        change->rollback(_opCtx);
+    }
+
+    _changesForTwoPhaseDrop.clear();
+    _changesForCatalogVisibility.clear();
+    _changes.clear();
+}
+
+void RecoveryUnit::_setState(State newState) {
+    _state = newState;
 }
 
 void RecoveryUnit::validateInUnitOfWork() const {
-    invariant(_inUnitOfWork(), toString(_getState()));
+    invariant(_inUnitOfWork() || _readOnly,
+              fmt::format("state: {}, readOnly: {}", toString(_getState()), _readOnly));
+}
+
+void RecoveryUnit::setIsolation(Isolation isolation) {
+    if (isolation == _isolation) {
+        return;
+    }
+
+    tassert(10775301, "Cannot change isolation level on an active recovery unit", !isActive());
+    _setIsolation(isolation);
+    _isolation = isolation;
+}
+
+StorageWriteTransaction::StorageWriteTransaction(RecoveryUnit& ru, bool readOnly) : _ru(ru) {
+    // Cannot nest
+    invariant(!_ru.inUnitOfWork());
+    _ru.beginUnitOfWork(readOnly);
+}
+
+StorageWriteTransaction::~StorageWriteTransaction() {
+    if (!_committed && !_aborted) {
+        abort();
+    }
+}
+
+void StorageWriteTransaction::prepare() {
+    invariant(!_aborted);
+    invariant(!_committed);
+    invariant(!_prepared);
+
+    _ru.prepareUnitOfWork();
+    _prepared = true;
+}
+
+void StorageWriteTransaction::commit() {
+    invariant(!_aborted);
+    invariant(!_committed);
+
+    _ru.commitUnitOfWork();
+    _committed = true;
+}
+
+void StorageWriteTransaction::abort() {
+    invariant(!_aborted);
+    invariant(!_committed);
+
+    _ru.abortUnitOfWork();
+    _aborted = true;
 }
 
 }  // namespace mongo

@@ -1,0 +1,73 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "sbe_builder_test_fixture",
+    srcs = [
+        "sbe_builder_test_fixture.cpp",
+    ],
+    hdrs = [
+        "sbe_builder_test_fixture.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/collection_crud",
+        "//src/mongo/db/exec/sbe:sbe_plan_stage_test",
+        "//src/mongo/db/local_catalog:collection_mock",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/query:query_test_service_context",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "stage_builder_test",
+    srcs = [
+        "and_hash_test.cpp",
+        "and_sorted_test.cpp",
+        "expression_const_eval_test.cpp",
+        "field_effects_test.cpp",
+        "field_set_test.cpp",
+        "gen_accumulator_test.cpp",
+        "gen_expression_test.cpp",
+        "gen_filter_test.cpp",
+        "gen_lookup_test.cpp",
+        "gen_window_function_test.cpp",
+        "sbe_builder_test.cpp",
+        "sbe_builder_ts_test.cpp",
+        "shard_filter_test.cpp",
+        "type_checker_test.cpp",
+        "value_lifetime_test.cpp",
+        "vectorizer_test.cpp",
+        "//src/mongo/db/exec:shard_filterer_mock.h",
+        "//src/mongo/db/query/stage_builder:classic_stage_builder_test.cpp",
+    ],
+    data = [
+        "//src/mongo/db/test_output/query/stage_builder/sbe/golden_gen_expression_test:test_data",
+        "//src/mongo/db/test_output/query/stage_builder/sbe/golden_gen_filtern_test:test_data",
+        "//src/mongo/db/test_output/query/stage_builder/sbe/golden_sbe_stage_builder_test:test_data",
+        "//src/mongo/db/test_output/query/stage_builder/sbe/s_b_e_set_window_fields_test:test_data",
+        "//src/mongo/db/test_output/query/stage_builder/sbe/sbe_timeseries_test:test_data",
+        "//src/mongo/db/test_output/query/stage_builder/sbe/search_sbe_stage_builder_test:test_data",
+    ],
+    tags = [
+        "mongo_unittest_fourth_group",
+    ],
+    deps = [
+        ":sbe_builder_test_fixture",
+        "//src/mongo/db/exec/sbe:sbe_unittest_base",
+        "//src/mongo/db/local_catalog:index_catalog_mock",
+        "//src/mongo/db/query:shard_filterer_factory_mock",
+        "//src/mongo/db/query/compiler/stats:stats_histograms",
+        "//src/mongo/db/query/stage_builder/sbe:abt_unit_test_utils",
+        "//src/mongo/idl:server_parameter_test_controller",
+    ],
+)

@@ -29,18 +29,22 @@
 
 #pragma once
 
-#include <algorithm>
-#include <iostream>
-#include <iterator>
-#include <sstream>
-#include <tuple>
-#include <vector>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/ctype.h"
+#include "mongo/util/str.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <iostream>
+#include <iterator>
+#include <sstream>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 namespace dns {
@@ -95,9 +99,7 @@ public:
         ParserState parserState = kFirstLetter;
 
         std::string name;
-        int idx = -1;
         for (const char& ch : dnsName) {
-            ++idx;
             if (ch == '.') {
                 if (parserState == kPeriod) {
                     uasserted(ErrorCodes::DNSRecordTypeMismatch,
@@ -315,7 +317,9 @@ public:
      * case.
      */
     friend bool operator==(const HostName& lhs, const HostName& rhs) {
-        auto lens = [](const auto& h) { return std::tie(h._fullyQualified, h._nameComponents); };
+        auto lens = [](const auto& h) {
+            return std::tie(h._fullyQualified, h._nameComponents);
+        };
         return lens(lhs) == lens(rhs);
     }
 
@@ -366,9 +370,7 @@ private:
     // and consists solely of digits.
     bool isEquivalentToIPv4DottedDecimal() const {
         return !_fullyQualified && _nameComponents.size() == 4 &&
-            std::all_of(begin(_nameComponents), end(_nameComponents), [](const auto& s) {
-                return std::all_of(begin(s), end(s), [](char c) { return ctype::isDigit(c); });
-            });
+            std::all_of(begin(_nameComponents), end(_nameComponents), str::isAllDigits);
     }
 
     // Hostname components are stored top-first (e.g. "com","mongodb","www").

@@ -29,14 +29,21 @@
 
 #pragma once
 
-#include <algorithm>
-
 #include "mongo/base/data_type_validated.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_validate.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/redaction.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/hex.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <string>
 
 // We do not use the rpc namespace here so we can specialize Validator.
 namespace mongo {
@@ -64,7 +71,7 @@ struct Validator<BSONObj> {
                 ", length: " + std::to_string(length) +
                 // Using std::min with hex dump length, too, to ensure we do not throw in hexdump()
                 // because of exceeded length and miss out on the core dump of the fassert below.
-                ", hex dump: " + hexdump(ptr, std::min(length, (size_t)(1000000 - 1)));
+                ", hex dump: " + hexdump(ptr, std::min(length, kHexDumpMaxSize - 1));
             Status builtStatus(ErrorCodes::InvalidBSON, redact(msg));
             fassertFailedWithStatus(50761, builtStatus);
         }

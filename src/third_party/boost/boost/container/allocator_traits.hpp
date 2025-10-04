@@ -32,6 +32,8 @@
 #include <boost/container/detail/mpl.hpp>
 #include <boost/container/detail/type_traits.hpp>  //is_empty
 #include <boost/container/detail/placement_new.hpp>
+#include <boost/container/detail/is_pair.hpp>
+#include <boost/container/detail/addressof.hpp>
 #ifndef BOOST_CONTAINER_DETAIL_STD_FWD_HPP
 #include <boost/container/detail/std_fwd.hpp>
 #endif
@@ -44,14 +46,13 @@
 #if defined(BOOST_NO_CXX11_VARIADIC_TEMPLATES)
 #include <boost/move/detail/fwd_macros.hpp>
 #endif
-// other boost
-#include <boost/static_assert.hpp>
 
 #ifndef BOOST_CONTAINER_DOXYGEN_INVOKED
 
-#if defined(BOOST_GCC) && (BOOST_GCC >= 40600)
+#if defined(BOOST_CONTAINER_GCC_COMPATIBLE_HAS_DIAGNOSTIC_IGNORED)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-result"
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #endif
 
 #define BOOST_INTRUSIVE_HAS_MEMBER_FUNCTION_CALLABLE_WITH_FUNCNAME allocate
@@ -75,7 +76,7 @@
 #define BOOST_INTRUSIVE_HAS_MEMBER_FUNCTION_CALLABLE_WITH_MAX 9
 #include <boost/intrusive/detail/has_member_function_callable_with.hpp>
 
-#if defined(BOOST_GCC) && (BOOST_GCC >= 40600)
+#if defined(BOOST_CONTAINER_GCC_COMPATIBLE_HAS_DIAGNOSTIC_IGNORED)
 #pragma GCC diagnostic pop
 #endif
 
@@ -83,6 +84,144 @@
 
 namespace boost {
 namespace container {
+namespace dtl {
+
+#if !defined(BOOST_NO_CXX11_VARIADIC_TEMPLATES)
+
+template<class T, class ...Args>
+BOOST_CONTAINER_FORCEINLINE void construct_type(T *p, BOOST_FWD_REF(Args) ...args)
+{
+   ::new((void*)p, boost_container_new_t()) T(::boost::forward<Args>(args)...);
+}
+
+template < class Pair, class KeyType, class ... Args>
+typename dtl::enable_if< dtl::is_pair<Pair>, void >::type
+construct_type
+   (Pair* p, try_emplace_t, BOOST_FWD_REF(KeyType) k, BOOST_FWD_REF(Args) ...args)
+{
+   construct_type(dtl::addressof(p->first), ::boost::forward<KeyType>(k));
+   BOOST_CONTAINER_TRY{
+      construct_type(dtl::addressof(p->second), ::boost::forward<Args>(args)...);
+   }
+   BOOST_CONTAINER_CATCH(...) {
+      typedef typename Pair::first_type first_type;
+      dtl::addressof(p->first)->~first_type();
+      BOOST_CONTAINER_RETHROW
+   }
+   BOOST_CONTAINER_CATCH_END
+}
+
+#else
+
+#define BOOST_CONTAINER_ALLOCATOR_TRAITS_CONSTRUCT_TYPEJ(N) \
+template<class T BOOST_MOVE_I##N BOOST_MOVE_CLASS##N>\
+BOOST_CONTAINER_FORCEINLINE \
+   typename dtl::disable_if_c<dtl::is_pair<T>::value, void >::type \
+construct_type(T *p BOOST_MOVE_I##N BOOST_MOVE_UREF##N)\
+{\
+   ::new((void*)p, boost_container_new_t()) T( BOOST_MOVE_FWD##N );\
+}\
+//
+BOOST_MOVE_ITERATE_0TO8(BOOST_CONTAINER_ALLOCATOR_TRAITS_CONSTRUCT_TYPEJ)
+#undef BOOST_CONTAINER_ALLOCATOR_TRAITS_CONSTRUCT_TYPEJ
+
+#define BOOST_CONTAINER_ALLOCATOR_TRAITS_CONSTRUCT_TYPE(N) \
+template < class Pair, class KeyType BOOST_MOVE_I##N BOOST_MOVE_CLASS##N>\
+typename dtl::enable_if< dtl::is_pair<Pair>, void >::type construct_type\
+   (Pair* p, try_emplace_t, BOOST_FWD_REF(KeyType) k BOOST_MOVE_I##N BOOST_MOVE_UREF##N)\
+{\
+   construct_type(dtl::addressof(p->first), ::boost::forward<KeyType>(k));\
+   BOOST_CONTAINER_TRY{\
+      construct_type(dtl::addressof(p->second) BOOST_MOVE_I##N BOOST_MOVE_FWD##N);\
+   }\
+   BOOST_CONTAINER_CATCH(...) {\
+      typedef typename Pair::first_type first_type;\
+      dtl::addressof(p->first)->~first_type();\
+      BOOST_CONTAINER_RETHROW\
+   }\
+   BOOST_CONTAINER_CATCH_END\
+}\
+//
+BOOST_MOVE_ITERATE_0TO8(BOOST_CONTAINER_ALLOCATOR_TRAITS_CONSTRUCT_TYPE)
+#undef BOOST_CONTAINER_ALLOCATOR_TRAITS_CONSTRUCT_TYPE
+
+#endif
+
+template<class T>
+inline
+typename dtl::enable_if<dtl::is_pair<T>, void >::type
+construct_type(T* p)
+{
+   dtl::construct_type(dtl::addressof(p->first));
+   BOOST_CONTAINER_TRY{
+      dtl::construct_type(dtl::addressof(p->second));
+   }
+   BOOST_CONTAINER_CATCH(...) {
+      typedef typename T::first_type first_type;
+      dtl::addressof(p->first)->~first_type();
+      BOOST_CONTAINER_RETHROW
+   }
+   BOOST_CONTAINER_CATCH_END
+}
+
+
+template<class T, class U>
+inline
+typename dtl::enable_if_c
+   <  dtl::is_pair<T>::value
+   , void >::type
+construct_type(T* p, U &u)
+{
+   dtl::construct_type(dtl::addressof(p->first), u.first);
+   BOOST_CONTAINER_TRY{
+      dtl::construct_type(dtl::addressof(p->second), u.second);
+   }
+   BOOST_CONTAINER_CATCH(...) {
+      typedef typename T::first_type first_type;
+      dtl::addressof(p->first)->~first_type();
+      BOOST_CONTAINER_RETHROW
+   }
+   BOOST_CONTAINER_CATCH_END
+}
+
+template<class T, class U>
+inline
+typename dtl::enable_if_c
+   <  dtl::is_pair<typename dtl::remove_reference<T>::type>::value &&
+      !boost::move_detail::is_reference<U>::value  //This is needed for MSVC10 and ambiguous overloads
+   , void >::type
+construct_type(T* p, BOOST_RV_REF(U) u)
+{
+   dtl::construct_type(dtl::addressof(p->first), ::boost::move(u.first));
+   BOOST_CONTAINER_TRY{
+      dtl::construct_type(dtl::addressof(p->second), ::boost::move(u.second));
+   }
+   BOOST_CONTAINER_CATCH(...) {
+      typedef typename T::first_type first_type;
+      dtl::addressof(p->first)->~first_type();
+      BOOST_CONTAINER_RETHROW
+   }
+   BOOST_CONTAINER_CATCH_END
+}
+
+template<class T, class U, class V>
+inline
+typename dtl::enable_if<dtl::is_pair<T>, void >::type
+construct_type(T* p, BOOST_FWD_REF(U) x, BOOST_FWD_REF(V) y)
+{
+   dtl::construct_type(dtl::addressof(p->first), ::boost::forward<U>(x));
+   BOOST_CONTAINER_TRY{
+      dtl::construct_type(dtl::addressof(p->second), ::boost::forward<V>(y));
+   }
+   BOOST_CONTAINER_CATCH(...) {
+      typedef typename T::first_type first_type;
+      dtl::addressof(p->first)->~first_type();
+      BOOST_CONTAINER_RETHROW
+   }
+   BOOST_CONTAINER_CATCH_END
+}
+
+}  //namespace dtl
 
 #ifndef BOOST_CONTAINER_DOXYGEN_INVOKED
 
@@ -102,19 +241,19 @@ namespace dtl {
 //supporting rvalue references
 template<class Allocator>
 struct is_std_allocator
-{  static const bool value = false; };
+{  BOOST_STATIC_CONSTEXPR bool value = false; };
 
 template<class T>
 struct is_std_allocator< std::allocator<T> >
-{  static const bool value = true; };
+{  BOOST_STATIC_CONSTEXPR bool value = true; };
 
 template<class T, class Options>
 struct is_std_allocator< small_vector_allocator<T, std::allocator<T>, Options > >
-{  static const bool value = true; };
+{  BOOST_STATIC_CONSTEXPR bool value = true; };
 
 template<class Allocator>
 struct is_not_std_allocator
-{  static const bool value = !is_std_allocator<Allocator>::value; };
+{  BOOST_STATIC_CONSTEXPR bool value = !is_std_allocator<Allocator>::value; };
 
 BOOST_INTRUSIVE_INSTANTIATE_DEFAULT_TYPE_TMPLT(pointer)
 BOOST_INTRUSIVE_INSTANTIATE_EVAL_DEFAULT_TYPE_TMPLT(const_pointer)
@@ -298,18 +437,18 @@ struct allocator_traits
 
    //! <b>Returns</b>: <code>a.allocate(n)</code>
    //!
-   BOOST_CONTAINER_FORCEINLINE static pointer allocate(Allocator &a, size_type n)
+   inline static pointer allocate(Allocator &a, size_type n)
    {  return a.allocate(n);  }
 
    //! <b>Returns</b>: <code>a.deallocate(p, n)</code>
    //!
    //! <b>Throws</b>: Nothing
-   BOOST_CONTAINER_FORCEINLINE static void deallocate(Allocator &a, pointer p, size_type n)
+   inline static void deallocate(Allocator &a, pointer p, size_type n)
    {  a.deallocate(p, n);  }
 
    //! <b>Effects</b>: calls <code>a.allocate(n, p)</code> if that call is well-formed;
    //! otherwise, invokes <code>a.allocate(n)</code>
-   BOOST_CONTAINER_FORCEINLINE static pointer allocate(Allocator &a, size_type n, const_void_pointer p)
+   inline static pointer allocate(Allocator &a, size_type n, const_void_pointer p)
    {
       const bool value = boost::container::dtl::
          has_member_function_callable_with_allocate
@@ -321,7 +460,7 @@ struct allocator_traits
    //! <b>Effects</b>: calls <code>a.destroy(p)</code> if that call is well-formed;
    //! otherwise, invokes <code>p->~T()</code>.
    template<class T>
-   BOOST_CONTAINER_FORCEINLINE static void destroy(Allocator &a, T*p) BOOST_NOEXCEPT_OR_NOTHROW
+   inline static void destroy(Allocator &a, T*p) BOOST_NOEXCEPT_OR_NOTHROW
    {
       typedef T* destroy_pointer;
       const bool value = boost::container::dtl::
@@ -333,7 +472,7 @@ struct allocator_traits
 
    //! <b>Returns</b>: <code>a.max_size()</code> if that expression is well-formed; otherwise,
    //! <code>numeric_limits<size_type>::max()</code>.
-   BOOST_CONTAINER_FORCEINLINE static size_type max_size(const Allocator &a) BOOST_NOEXCEPT_OR_NOTHROW
+   inline static size_type max_size(const Allocator &a) BOOST_NOEXCEPT_OR_NOTHROW
    {
       const bool value = allocator_traits_detail::has_max_size<Allocator, size_type (Allocator::*)() const>::value;
       dtl::bool_<value> flag;
@@ -342,7 +481,7 @@ struct allocator_traits
 
    //! <b>Returns</b>: <code>a.select_on_container_copy_construction()</code> if that expression is well-formed;
    //! otherwise, a.
-   BOOST_CONTAINER_FORCEINLINE static BOOST_CONTAINER_DOC1ST(Allocator,
+   inline static BOOST_CONTAINER_DOC1ST(Allocator,
       typename dtl::if_c
          < allocator_traits_detail::has_select_on_container_copy_construction<Allocator BOOST_MOVE_I Allocator (Allocator::*)() const>::value
          BOOST_MOVE_I Allocator BOOST_MOVE_I const Allocator & >::type)
@@ -358,9 +497,9 @@ struct allocator_traits
       //! <b>Effects</b>: calls <code>a.construct(p, std::forward<Args>(args)...)</code> if that call is well-formed;
       //! otherwise, invokes <code>`placement new` (static_cast<void*>(p)) T(std::forward<Args>(args)...)</code>
       template <class T, class ...Args>
-      BOOST_CONTAINER_FORCEINLINE static void construct(Allocator & a, T* p, BOOST_FWD_REF(Args)... args)
+      inline static void construct(Allocator & a, T* p, BOOST_FWD_REF(Args)... args)
       {
-         static const bool value = ::boost::move_detail::and_
+         BOOST_STATIC_CONSTEXPR bool value = ::boost::move_detail::and_
             < dtl::is_not_std_allocator<Allocator>
             , boost::container::dtl::has_member_function_callable_with_construct
                   < Allocator, T*, Args... >
@@ -372,7 +511,7 @@ struct allocator_traits
 
    //! <b>Returns</b>: <code>a.storage_is_unpropagable(p)</code> if is_partially_propagable::value is true; otherwise,
    //! <code>false</code>.
-   BOOST_CONTAINER_FORCEINLINE static bool storage_is_unpropagable(const Allocator &a, pointer p) BOOST_NOEXCEPT_OR_NOTHROW
+   inline static bool storage_is_unpropagable(const Allocator &a, pointer p) BOOST_NOEXCEPT_OR_NOTHROW
    {
       dtl::bool_<is_partially_propagable::value> flag;
       return allocator_traits::priv_storage_is_unpropagable(flag, a, p);
@@ -380,7 +519,7 @@ struct allocator_traits
 
    //! <b>Returns</b>: <code>true</code> if <code>is_always_equal::value == true</code>, otherwise,
    //! <code>a == b</code>.
-   BOOST_CONTAINER_FORCEINLINE static bool equal(const Allocator &a, const Allocator &b) BOOST_NOEXCEPT_OR_NOTHROW
+   inline static bool equal(const Allocator &a, const Allocator &b) BOOST_NOEXCEPT_OR_NOTHROW
    {
       dtl::bool_<is_always_equal::value> flag;
       return allocator_traits::priv_equal(flag, a, b);
@@ -388,48 +527,48 @@ struct allocator_traits
 
    #if !defined(BOOST_CONTAINER_DOXYGEN_INVOKED)
    private:
-   BOOST_CONTAINER_FORCEINLINE static pointer priv_allocate(dtl::true_type, Allocator &a, size_type n, const_void_pointer p)
+   inline static pointer priv_allocate(dtl::true_type, Allocator &a, size_type n, const_void_pointer p)
    {  return a.allocate(n, p);  }
 
-   BOOST_CONTAINER_FORCEINLINE static pointer priv_allocate(dtl::false_type, Allocator &a, size_type n, const_void_pointer)
+   inline static pointer priv_allocate(dtl::false_type, Allocator &a, size_type n, const_void_pointer)
    {  return a.allocate(n);  }
 
    template<class T>
-   BOOST_CONTAINER_FORCEINLINE static void priv_destroy(dtl::true_type, Allocator &a, T* p) BOOST_NOEXCEPT_OR_NOTHROW
+   inline static void priv_destroy(dtl::true_type, Allocator &a, T* p) BOOST_NOEXCEPT_OR_NOTHROW
    {  a.destroy(p);  }
 
    template<class T>
-   BOOST_CONTAINER_FORCEINLINE static void priv_destroy(dtl::false_type, Allocator &, T* p) BOOST_NOEXCEPT_OR_NOTHROW
+   inline static void priv_destroy(dtl::false_type, Allocator &, T* p) BOOST_NOEXCEPT_OR_NOTHROW
    {  p->~T(); (void)p;  }
 
-   BOOST_CONTAINER_FORCEINLINE static size_type priv_max_size(dtl::true_type, const Allocator &a) BOOST_NOEXCEPT_OR_NOTHROW
+   inline static size_type priv_max_size(dtl::true_type, const Allocator &a) BOOST_NOEXCEPT_OR_NOTHROW
    {  return a.max_size();  }
 
-   BOOST_CONTAINER_FORCEINLINE static size_type priv_max_size(dtl::false_type, const Allocator &) BOOST_NOEXCEPT_OR_NOTHROW
+   inline static size_type priv_max_size(dtl::false_type, const Allocator &) BOOST_NOEXCEPT_OR_NOTHROW
    {  return size_type(-1)/sizeof(value_type);  }
 
-   BOOST_CONTAINER_FORCEINLINE static Allocator priv_select_on_container_copy_construction(dtl::true_type, const Allocator &a)
+   inline static Allocator priv_select_on_container_copy_construction(dtl::true_type, const Allocator &a)
    {  return a.select_on_container_copy_construction();  }
 
-   BOOST_CONTAINER_FORCEINLINE static const Allocator &priv_select_on_container_copy_construction(dtl::false_type, const Allocator &a) BOOST_NOEXCEPT_OR_NOTHROW
+   inline static const Allocator &priv_select_on_container_copy_construction(dtl::false_type, const Allocator &a) BOOST_NOEXCEPT_OR_NOTHROW
    {  return a;  }
 
    #if !defined(BOOST_NO_CXX11_VARIADIC_TEMPLATES)
       template<class T, class ...Args>
-      BOOST_CONTAINER_FORCEINLINE static void priv_construct(dtl::true_type, Allocator &a, T *p, BOOST_FWD_REF(Args) ...args)
+      inline static void priv_construct(dtl::true_type, Allocator &a, T *p, BOOST_FWD_REF(Args) ...args)
       {  a.construct( p, ::boost::forward<Args>(args)...);  }
 
       template<class T, class ...Args>
-      BOOST_CONTAINER_FORCEINLINE static void priv_construct(dtl::false_type, Allocator &, T *p, BOOST_FWD_REF(Args) ...args)
-      {  ::new((void*)p, boost_container_new_t()) T(::boost::forward<Args>(args)...); }
+      inline static void priv_construct(dtl::false_type, Allocator &, T *p, BOOST_FWD_REF(Args) ...args)
+      {  dtl::construct_type(p, ::boost::forward<Args>(args)...); }
    #else // #if !defined(BOOST_NO_CXX11_VARIADIC_TEMPLATES)
       public:
 
       #define BOOST_CONTAINER_ALLOCATOR_TRAITS_CONSTRUCT_IMPL(N) \
       template<class T BOOST_MOVE_I##N BOOST_MOVE_CLASS##N >\
-      BOOST_CONTAINER_FORCEINLINE static void construct(Allocator &a, T *p BOOST_MOVE_I##N BOOST_MOVE_UREF##N)\
+      inline static void construct(Allocator &a, T *p BOOST_MOVE_I##N BOOST_MOVE_UREF##N)\
       {\
-         static const bool value = ::boost::move_detail::and_ \
+         BOOST_STATIC_CONSTEXPR bool value = ::boost::move_detail::and_ \
             < dtl::is_not_std_allocator<Allocator> \
             , boost::container::dtl::has_member_function_callable_with_construct \
                   < Allocator, T* BOOST_MOVE_I##N BOOST_MOVE_FWD_T##N > \
@@ -447,12 +586,12 @@ struct allocator_traits
       /////////////////////////////////
       #define BOOST_CONTAINER_ALLOCATOR_TRAITS_PRIV_CONSTRUCT_IMPL(N) \
       template<class T BOOST_MOVE_I##N BOOST_MOVE_CLASS##N >\
-      BOOST_CONTAINER_FORCEINLINE static void priv_construct(dtl::true_type, Allocator &a, T *p BOOST_MOVE_I##N BOOST_MOVE_UREF##N)\
+      inline static void priv_construct(dtl::true_type, Allocator &a, T *p BOOST_MOVE_I##N BOOST_MOVE_UREF##N)\
       {  a.construct( p BOOST_MOVE_I##N BOOST_MOVE_FWD##N );  }\
       \
       template<class T BOOST_MOVE_I##N BOOST_MOVE_CLASS##N >\
-      BOOST_CONTAINER_FORCEINLINE static void priv_construct(dtl::false_type, Allocator &, T *p BOOST_MOVE_I##N BOOST_MOVE_UREF##N)\
-      {  ::new((void*)p, boost_container_new_t()) T(BOOST_MOVE_FWD##N); }\
+      inline static void priv_construct(dtl::false_type, Allocator &, T *p BOOST_MOVE_I##N BOOST_MOVE_UREF##N)\
+      {  dtl::construct_type(p BOOST_MOVE_I##N BOOST_MOVE_FWD##N); }\
       //
       BOOST_MOVE_ITERATE_0TO8(BOOST_CONTAINER_ALLOCATOR_TRAITS_PRIV_CONSTRUCT_IMPL)
       #undef BOOST_CONTAINER_ALLOCATOR_TRAITS_PRIV_CONSTRUCT_IMPL
@@ -460,19 +599,19 @@ struct allocator_traits
    #endif   // #if !defined(BOOST_NO_CXX11_VARIADIC_TEMPLATES)
 
    template<class T>
-   BOOST_CONTAINER_FORCEINLINE static void priv_construct(dtl::false_type, Allocator &, T *p, const ::boost::container::default_init_t&)
+   inline static void priv_construct(dtl::false_type, Allocator &, T *p, const ::boost::container::default_init_t&)
    {  ::new((void*)p, boost_container_new_t()) T; }
 
-   BOOST_CONTAINER_FORCEINLINE static bool priv_storage_is_unpropagable(dtl::true_type, const Allocator &a, pointer p)
+   inline static bool priv_storage_is_unpropagable(dtl::true_type, const Allocator &a, pointer p)
    {  return a.storage_is_unpropagable(p);  }
 
-   BOOST_CONTAINER_FORCEINLINE static bool priv_storage_is_unpropagable(dtl::false_type, const Allocator &, pointer)
+   inline static bool priv_storage_is_unpropagable(dtl::false_type, const Allocator &, pointer)
    {  return false;  }
 
-   BOOST_CONTAINER_FORCEINLINE static bool priv_equal(dtl::true_type,  const Allocator &, const Allocator &)
+   inline static bool priv_equal(dtl::true_type,  const Allocator &, const Allocator &)
    {  return true;  }
 
-   BOOST_CONTAINER_FORCEINLINE static bool priv_equal(dtl::false_type, const Allocator &a, const Allocator &b)
+   inline static bool priv_equal(dtl::false_type, const Allocator &a, const Allocator &b)
    {  return a == b;  }
 
    #endif   //#if defined(BOOST_CONTAINER_DOXYGEN_INVOKED)

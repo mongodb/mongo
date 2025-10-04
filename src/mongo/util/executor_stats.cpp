@@ -27,13 +27,25 @@
  *    it in the license file.
  */
 
-#include <fmt/format.h>
-#include <string>
-
 #include "mongo/util/executor_stats.h"
 
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/db/server_options.h"
+#include "mongo/logv2/log.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/functional.h"
+#include "mongo/util/time_support.h"
 
+#include <atomic>
+#include <cstddef>
+#include <ratio>
+#include <string>
+#include <utility>
+
+#include <fmt/format.h>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kExecutor
 namespace mongo {
 
 namespace {
@@ -77,8 +89,17 @@ ExecutorStats::Task ExecutorStats::wrapTask(ExecutorStats::Task&& task) {
     _scheduled.increment(1);
     return [this, task = std::move(task), scheduledAt = _clkSource->now()](Status status) {
         const auto startedAt = _clkSource->now();
-        recordDuration(_waitingBuckets, startedAt - scheduledAt);
-
+        Milliseconds waitTime = startedAt - scheduledAt;
+        recordDuration(_waitingBuckets, waitTime);
+        Milliseconds waitTimeThreshold =
+            Milliseconds{serverGlobalParams.slowTaskExecutorWaitTimeProfilingMs.loadRelaxed()};
+        if (waitTime > waitTimeThreshold) {
+            LOGV2_DEBUG(9757000,
+                        severitySuppressor().toInt(),
+                        "Task exceeded the slow wait time threshold",
+                        "slowWaitTimeThreshold"_attr = waitTimeThreshold,
+                        "duration"_attr = waitTime);
+        }
         task(std::move(status));
 
         recordDuration(_runningBuckets, _clkSource->now() - startedAt);

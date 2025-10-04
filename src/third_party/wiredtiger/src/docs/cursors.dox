@@ -19,60 +19,6 @@ See the following for more details:
 - @subpage data_sources
 - @ref metadata
 - @ref cursor_log
-- @ref cursor_join
-
-@section cursor_projections Projections
-
-Cursors on tables and indices can return a subset of columns.  This is done by
-listing the column names in parenthesis in the <code>uri</code> parameter to
-WT_SESSION::open_cursor.  Only the fields from the listed columns are returned
-by WT_CURSOR::get_value.
-
-The @ex_ref{ex_schema.c} example creates a table where the value format is
-\c "5sHq", where the initial string is the country, the short is a year,
-and the long is a population.  The following example lists just the country
-and year columns from the table record values:
-
-@snippet ex_schema.c Return a subset of values from the table
-
-This is particularly useful with index cursors, because if all columns in
-the projection are available in the index (including primary key columns,
-which are the values of the index), the data can be read from the index
-without accessing any column groups.  See @ref schema_index_projections for
-more information.
-
-@section cursors_transactions Cursors and Transactions
-
-If there is a transaction active in a session, cursors operate in the
-context of that transaction.  Reads performed while a transaction is
-active inherit the isolation level of the transaction, and updates
-performed within a transaction are made durable by calling
-WT_SESSION::commit_transaction, or discarded by calling
-WT_SESSION::rollback_transaction.
-
-If no transaction is active, cursor reads are performed at the isolation
-level of the session, set with the \c isolation configuration key to
-WT_CONNECTION::open_session and successful updates are automatically
-committed before the update operation completes.
-
-Any operation that consists of multiple related updates should be
-enclosed in an explicit transaction to ensure that the updates are
-applied atomically.
-
-At \c snapshot (the default) or \c read-committed isolation levels,
-committed changes from concurrent transactions become visible when no
-cursor is positioned.  In other words, at these isolation levels, all
-cursors in a session read from a stable snapshot while any cursor in the
-session remains positioned. A call to WT_CURSOR::next or WT_CURSOR::prev
-on a positioned cursor will not update the snapshot.
-
-Cursor positions survive transaction boundaries, unless a transaction
-is rolled back. When a transaction is rolled-back either implicitly
-or explicitly, all cursors in the session are reset as if the
-WT_CURSOR::reset method was called, discarding any cursor position as
-well as any key and value.
-
-See @ref transactions for more information.
 
 @section cursors_eviction Cursors and Eviction
 
@@ -103,6 +49,9 @@ WT_CURSOR::set_key and WT_CURSOR::set_value in raw mode, the WT_ITEM
 should be equivalent to calling WT_EXTENSION_API::struct_pack for the
 cursor's \c key_format or \c value_format, respectively.
 
+WT_CURSOR::get_raw_key_value can be used to obtain both the key and value
+in raw format in a single function call.
+
 The @ex_ref{ex_schema.c} example creates a table where the value format is
 \c "5sHq", where the initial string is the country, the short is a year,
 and the long is a population.
@@ -110,12 +59,6 @@ The following example lists the table record
 values, using raw mode:
 
 @snippet ex_schema.c List the records in the table using raw mode.
-
-Raw mode can be used in combination with projections.  The following
-example lists just the country and year columns from the table record
-values, using raw mode:
-
-@snippet ex_schema.c Return a subset of values from the table using raw mode
 
 @section metadata Reading WiredTiger Metadata
 

@@ -1,0 +1,20 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "*transaction*":
+    approvers:
+      - 10gen/server-transactions
+  - "*txn*":
+    approvers:
+      - 10gen/server-transactions
+  - "shardsvr_resolve_view_command_test.cpp":
+    approvers:
+      - 10gen/query-integration-search
+  - "document_source_visitor_docs_needed_bounds.cpp":
+    approvers:
+      - 10gen/query-integration-search
+  - "forwardable_operation_metadata*":
+    approvers:
+      - 10gen/server-programmability

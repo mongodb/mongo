@@ -31,14 +31,16 @@
 
 global:
     cpp_namespace: "mongo::repl"
+    mod_visibility: private
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 structs:
     ElectionReasonCounterBase:
-        description: "Stores the total number of elections a node has called for a given reason and
-                      the number of those elections that were successful"
+        description:
+            "Stores the total number of elections a node has called for a given reason and
+            the number of those elections that were successful"
         strict: true
         fields:
             called:

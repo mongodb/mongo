@@ -27,14 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "kms.h"
 
 #include "mongo/base/data_range.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+
+#include <algorithm>
+#include <array>
+#include <vector>
 
 namespace mongo {
 namespace {
@@ -72,17 +79,16 @@ TEST(KmsTest, TestGoodKey) {
 
     auto myKey = "My Secret Key"_sd;
 
-    auto material =
-        service->encryptDataKeyByString(ConstDataRange(myKey.rawData(), myKey.size()), "");
+    auto material = service->encryptDataKeyByString(ConstDataRange(myKey.data(), myKey.size()), "");
 
     LocalMasterKeyAndMaterial glob =
-        LocalMasterKeyAndMaterial::parse(IDLParserErrorContext("root"), material);
+        LocalMasterKeyAndMaterial::parse(material, IDLParserContext("root"));
 
     auto keyMaterial = glob.getKeyMaterial();
 
     auto plaintext = service->decrypt(keyMaterial, BSONObj());
 
-    ASSERT_TRUE(isEquals(myKey.toString(), *plaintext));
+    ASSERT_TRUE(isEquals(std::string{myKey}, *plaintext));
 }
 
 }  // namespace

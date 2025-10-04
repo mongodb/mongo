@@ -1,0 +1,27 @@
+# Copyright 2012 Karsten Ahnert
+# Copyright 2013 Mario Mulansky
+# Distributed under the Boost Software License, Version 1.0. (See
+# accompanying file LICENSE_1_0.txt or copy at
+# http://www.boost.org/LICENSE_1_0.txt)
+
+import testing ;
+import boost ;
+
+# set your MTL4 directory here
+MTL4_INCLUDE = /home/mario/MTL4/usr/include ;
+
+project
+    : requirements 
+      <library>/boost/test//boost_unit_test_framework
+      <include>$(MTL4_INCLUDE)
+      <define>BOOST_ALL_NO_LIB=1
+      <link>static
+    : 
+    : default-build release
+    ;
+    
+test-suite "odeint-mtl4"
+    :
+    [ run mtl4_resize.cpp ]
+    : <testing.launcher>valgrind
+    ;

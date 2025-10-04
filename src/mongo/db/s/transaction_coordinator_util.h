@@ -29,11 +29,30 @@
 
 #pragma once
 
-#include <vector>
-
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/api_parameters.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/s/transaction_coordinator_document_gen.h"
 #include "mongo/db/s/transaction_coordinator_futures_util.h"
+#include "mongo/db/s/transaction_coordinator_structures.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/util/future.h"
+
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <absl/container/flat_hash_set.h>
+#include <absl/hash/hash.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace txn {
@@ -73,6 +92,10 @@ public:
      */
     CoordinatorCommitDecision decision() const;
 
+    absl::flat_hash_set<NamespaceString> releaseAffectedNamespaces() {
+        return std::move(_affectedNamespaces);
+    }
+
 private:
     int _numShards;
 
@@ -81,7 +104,7 @@ private:
     int _numNoVotes{0};
 
     Timestamp _maxPrepareTimestamp;
-
+    absl::flat_hash_set<NamespaceString> _affectedNamespaces;
     boost::optional<Status> _abortStatus;
 };
 
@@ -135,7 +158,8 @@ Future<repl::OpTime> persistDecision(txn::AsyncWorkScheduler& scheduler,
                                      const LogicalSessionId& lsid,
                                      const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
                                      const txn::ParticipantsList& participants,
-                                     const txn::CoordinatorCommitDecision& decision);
+                                     const txn::CoordinatorCommitDecision& decision,
+                                     const std::vector<NamespaceString>& affectedNamespaces);
 
 /**
  * Sends commit to all shards and returns a future that will be resolved when all participants have
@@ -203,17 +227,20 @@ struct PrepareResponse {
     // Will only be set if the vote was kCommit
     boost::optional<Timestamp> prepareTimestamp;
 
+    // Will only be set if the vote was kCommit
+    std::vector<NamespaceString> affectedNamespaces;
+
     // Will only be set if the vote was kAbort or no value
     boost::optional<Status> abortReason;
 };
-Future<PrepareResponse> sendPrepareToShard(ServiceContext* service,
-                                           txn::AsyncWorkScheduler& scheduler,
-                                           const LogicalSessionId& lsid,
-                                           const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
-                                           const ShardId& shardId,
-                                           const BSONObj& prepareCommandObj,
-                                           OperationContextFn operationContextFn =
-                                               [](OperationContext*) {});
+Future<PrepareResponse> sendPrepareToShard(
+    ServiceContext* service,
+    txn::AsyncWorkScheduler& scheduler,
+    const LogicalSessionId& lsid,
+    const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
+    const ShardId& shardId,
+    const BSONObj& prepareCommandObj,
+    OperationContextFn operationContextFn = [](OperationContext*) {});
 
 /**
  * Sends a command corresponding to a commit decision (i.e. commitTransaction or*
@@ -226,13 +253,19 @@ Future<PrepareResponse> sendPrepareToShard(ServiceContext* service,
  * running is shut down. Because of this it can return only the following error code(s):
  *   - TransactionCoordinatorSteppingDown
  */
-Future<void> sendDecisionToShard(ServiceContext* service,
-                                 txn::AsyncWorkScheduler& scheduler,
-                                 const LogicalSessionId& lsid,
-                                 const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
-                                 const ShardId& shardId,
-                                 const BSONObj& commandObj,
-                                 OperationContextFn operationContextFn = [](OperationContext*) {});
+Future<void> sendDecisionToShard(
+    ServiceContext* service,
+    txn::AsyncWorkScheduler& scheduler,
+    const LogicalSessionId& lsid,
+    const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
+    const ShardId& shardId,
+    const BSONObj& commandObj,
+    OperationContextFn operationContextFn = [](OperationContext*) {});
+
+Future<void> writeEndOfTransaction(txn::AsyncWorkScheduler& scheduler,
+                                   const LogicalSessionId& lsid,
+                                   const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
+                                   const std::vector<NamespaceString>& affectedNamespaces);
 
 /**
  * Returns a string representation of the transaction id represented by the given session id and

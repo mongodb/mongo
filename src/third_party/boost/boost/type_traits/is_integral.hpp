@@ -81,6 +81,9 @@ template<> struct is_integral<char16_t> : public true_type{};
 #ifndef BOOST_NO_CXX11_CHAR32_T
 template<> struct is_integral<char32_t> : public true_type{};
 #endif
+#if defined(__cpp_char8_t) && __cpp_char8_t >= 201811L
+template<> struct is_integral<char8_t> : public true_type{};
+#endif
 
 #endif  // non-CodeGear implementation
 

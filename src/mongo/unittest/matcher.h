@@ -29,18 +29,32 @@
 
 #pragma once
 
-#include <algorithm>
-#include <fmt/format.h>
-#include <memory>
-#include <string>
-#include <tuple>
-#include <utility>
+// IWYU pragma: private, include "mongo/unittest/unittest.h"
+// IWYU pragma: friend "mongo/unittest/.*"
 
+#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/matcher_core.h"
+#include "mongo/unittest/stringify.h"
+#include "mongo/util/assert_util.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <functional>
+#include <iterator>
+#include <memory>
+#include <string>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include <fmt/format.h>
 
 /**
  * Defines a basic set of matchers to be used with the ASSERT_THAT macro (see
@@ -97,8 +111,7 @@ private:
         MatchResult match(const T& v) const override {
             if constexpr (!stdx::is_detected_v<CanMatchOp, T>) {
                 return MatchResult{
-                    false,
-                    format(FMT_STRING("Matcher does not accept {}"), demangleName(typeid(T)))};
+                    false, fmt::format("Matcher does not accept {}", demangleName(typeid(T)))};
             } else {
                 return _m->match(v);
             }
@@ -151,7 +164,7 @@ public:
     explicit RelOpBase(T v) : _v{std::move(v)} {}
 
     std::string describe() const {
-        return format(FMT_STRING("{}({})"), self().name, stringifyForAssert(_v));
+        return fmt::format("{}({})", self().name, stringify::invoke(_v));
     }
 
     template <typename X, std::enable_if_t<stdx::is_detected_v<CanMatchOp, X>, int> = 0>
@@ -172,7 +185,7 @@ struct Eq : detail::RelOpBase<Eq, T, std::equal_to<>> {
     static constexpr auto name = "Eq"_sd;
 };
 template <typename T>
-Eq(T v)->Eq<T>;
+Eq(T v) -> Eq<T>;
 
 /** Not equal. */
 template <typename T>
@@ -181,7 +194,7 @@ struct Ne : detail::RelOpBase<Ne, T, std::not_equal_to<>> {
     static constexpr auto name = "Ne"_sd;
 };
 template <typename T>
-Ne(T v)->Ne<T>;
+Ne(T v) -> Ne<T>;
 
 /** Less than. */
 template <typename T>
@@ -190,7 +203,7 @@ struct Lt : detail::RelOpBase<Lt, T, std::less<>> {
     static constexpr auto name = "Lt"_sd;
 };
 template <typename T>
-Lt(T v)->Lt<T>;
+Lt(T v) -> Lt<T>;
 
 /** Greater than. */
 template <typename T>
@@ -199,7 +212,7 @@ struct Gt : detail::RelOpBase<Gt, T, std::greater<>> {
     static constexpr auto name = "Gt"_sd;
 };
 template <typename T>
-Gt(T v)->Gt<T>;
+Gt(T v) -> Gt<T>;
 
 /** Less than or equal to. */
 template <typename T>
@@ -208,7 +221,7 @@ struct Le : detail::RelOpBase<Le, T, std::less_equal<>> {
     static constexpr auto name = "Le"_sd;
 };
 template <typename T>
-Le(T v)->Le<T>;
+Le(T v) -> Le<T>;
 
 /** Greater than or equal to. */
 template <typename T>
@@ -217,7 +230,7 @@ struct Ge : detail::RelOpBase<Ge, T, std::greater_equal<>> {
     static constexpr auto name = "Ge"_sd;
 };
 template <typename T>
-Ge(T v)->Ge<T>;
+Ge(T v) -> Ge<T>;
 
 /**
  * Wrapper that inverts the sense of a matcher.
@@ -230,7 +243,7 @@ public:
     explicit Not(M m) : _m(std::move(m)) {}
 
     std::string describe() const {
-        return format(FMT_STRING("Not({})"), _m.describe());
+        return fmt::format("Not({})", _m.describe());
     }
 
     template <typename X>
@@ -256,7 +269,7 @@ public:
     explicit AllOf(Ms... ms) : _ms(std::move(ms)...) {}
 
     std::string describe() const {
-        return format(FMT_STRING("AllOf({})"), detail::describeTupleOfMatchers(_ms));
+        return fmt::format("AllOf({})", detail::describeTupleOfMatchers(_ms));
     }
 
     template <typename X>
@@ -289,7 +302,7 @@ public:
     explicit AnyOf(Ms... ms) : _ms(std::move(ms)...) {}
 
     std::string describe() const {
-        return format(FMT_STRING("AnyOf({})"), detail::describeTupleOfMatchers(_ms));
+        return fmt::format("AnyOf({})", detail::describeTupleOfMatchers(_ms));
     }
 
     template <typename X>
@@ -323,7 +336,7 @@ public:
     explicit Pointee(M m) : _m(std::move(m)) {}
 
     std::string describe() const {
-        return format(FMT_STRING("Pointee({})"), _m.describe());
+        return fmt::format("Pointee({})", _m.describe());
     }
 
     template <typename X>
@@ -333,7 +346,7 @@ public:
         MatchResult res = _m.match(*x);
         if (res)
             return MatchResult{true};
-        return MatchResult{false, format(FMT_STRING("{}"), res.message())};
+        return MatchResult{false, fmt::format("{}", res.message())};
     }
 
 private:
@@ -376,15 +389,14 @@ public:
     explicit ElementsAre(const Ms&... ms) : _ms(std::move(ms)...) {}
 
     std::string describe() const {
-        return format(FMT_STRING("ElementsAre({})"), detail::describeTupleOfMatchers(_ms));
+        return fmt::format("ElementsAre({})", detail::describeTupleOfMatchers(_ms));
     }
 
     template <typename X>
     MatchResult match(X&& x) const {
         if (x.size() != sizeof...(Ms)) {
             return MatchResult{
-                false,
-                format(FMT_STRING("failed: size {} != expected size {}"), x.size(), sizeof...(Ms))};
+                false, fmt::format("failed: size {} != expected size {}", x.size(), sizeof...(Ms))};
         }
         return _match(x, std::make_index_sequence<sizeof...(Ms)>{});
     }
@@ -396,22 +408,40 @@ private:
         auto it = begin(x);
         std::array arr{std::get<Is>(_ms).match(*it++)...};
         bool allOk = true;
-        detail::Joiner joiner;
+        stringify::Joiner joiner;
         for (size_t i = 0; i != sizeof...(Ms); ++i) {
             if (!arr[i]) {
                 allOk = false;
                 std::string m;
                 if (!arr[i].message().empty())
-                    m = format(FMT_STRING(":{}"), arr[i].message());
-                joiner(format(FMT_STRING("{}{}"), i, m));
+                    m = fmt::format(":{}", arr[i].message());
+                joiner(fmt::format("{}{}", i, m));
             }
         }
         if (!allOk)
-            return MatchResult{false, format(FMT_STRING("failed: [{}]"), std::string{joiner})};
+            return MatchResult{false, fmt::format("failed: [{}]", std::string{joiner})};
         return MatchResult{true};
     }
 
     std::tuple<Ms...> _ms;
+};
+
+/**
+ * Matches a container `x` when `x.empty()` is true.
+ * Example:
+ *     std::vector<int> vec{};
+ *     ASSERT_THAT(vec, IsEmpty());
+ */
+class IsEmpty : public Matcher {
+public:
+    std::string describe() const {
+        return "IsEmpty()";
+    }
+
+    template <typename X>
+    MatchResult match(X&& x) const {
+        return x.empty();
+    }
 };
 
 /**
@@ -427,7 +457,7 @@ public:
     explicit TupleElementsAre(const Ms&... ms) : _ms(std::move(ms)...) {}
 
     std::string describe() const {
-        return format(FMT_STRING("TupleElementsAre({})"), detail::describeTupleOfMatchers(_ms));
+        return fmt::format("TupleElementsAre({})", detail::describeTupleOfMatchers(_ms));
     }
 
     template <typename X>
@@ -435,8 +465,7 @@ public:
         size_t xSize = std::tuple_size_v<std::decay_t<X>>;
         if (xSize != sizeof...(Ms))
             return MatchResult{
-                false,
-                format(FMT_STRING("failed: size {} != expected size {}"), xSize, sizeof...(Ms))};
+                false, fmt::format("failed: size {} != expected size {}", xSize, sizeof...(Ms))};
         return _match(x, std::make_index_sequence<sizeof...(Ms)>{});
     }
 
@@ -465,8 +494,7 @@ public:
     explicit StructuredBindingsAre(const Ms&... ms) : _ms(std::move(ms)...) {}
 
     std::string describe() const {
-        return format(FMT_STRING("StructuredBindingsAre({})"),
-                      detail::describeTupleOfMatchers(_ms));
+        return fmt::format("StructuredBindingsAre({})", detail::describeTupleOfMatchers(_ms));
     }
 
     template <typename X>
@@ -551,16 +579,16 @@ class StatusIs : public Matcher {
 public:
     StatusIs(CodeM code, ReasonM reason) : _code{std::move(code)}, _reason{std::move(reason)} {}
     std::string describe() const {
-        return format(FMT_STRING("StatusIs({}, {})"), _code.describe(), _reason.describe());
+        return fmt::format("StatusIs({}, {})", _code.describe(), _reason.describe());
     }
     MatchResult match(const Status& st) const {
         MatchResult cr = _code.match(st.code());
         MatchResult rr = _reason.match(st.reason());
-        detail::Joiner joiner;
+        stringify::Joiner joiner;
         if (!cr.message().empty())
-            joiner(format(FMT_STRING("code:{}"), cr.message()));
+            joiner(fmt::format("code:{}", cr.message()));
         if (!rr.message().empty()) {
-            joiner(format(FMT_STRING("reason:{}"), rr.message()));
+            joiner(fmt::format("reason:{}", rr.message()));
         }
         return MatchResult{cr && rr, std::string{joiner}};
     }
@@ -585,34 +613,33 @@ public:
         : _name{std::move(nameM)}, _type{std::move(typeM)}, _value{std::move(valueM)} {}
 
     std::string describe() const {
-        return format(FMT_STRING("BSONElementIs(name:{}, type:{}, value:{})"),
-                      _name.describe(),
-                      _type.describe(),
-                      _value.describe());
+        return fmt::format("BSONElementIs(name:{}, type:{}, value:{})",
+                           _name.describe(),
+                           _type.describe(),
+                           _value.describe());
     }
 
     MatchResult match(const BSONElement& x) const {
         auto nr = _name.match(std::string{x.fieldNameStringData()});
         if (!nr)
             return MatchResult{
-                false,
-                format(FMT_STRING("name failed: {} {}"), x.fieldNameStringData(), nr.message())};
+                false, fmt::format("name failed: {} {}", x.fieldNameStringData(), nr.message())};
         auto t = x.type();
         auto tr = _type.match(t);
         if (!tr)
-            return MatchResult{
-                false, format(FMT_STRING("type failed: {} {}"), typeName(x.type()), tr.message())};
-        if (t == NumberInt)
+            return MatchResult{false,
+                               fmt::format("type failed: {} {}", typeName(x.type()), tr.message())};
+        if (t == BSONType::numberInt)
             return detail::typeTolerantMatch(_value, x.Int());
-        if (t == NumberLong)
+        if (t == BSONType::numberLong)
             return detail::typeTolerantMatch(_value, x.Long());
-        if (t == NumberDouble)
+        if (t == BSONType::numberDouble)
             return detail::typeTolerantMatch(_value, x.Double());
-        if (t == String)
+        if (t == BSONType::string)
             return detail::typeTolerantMatch(_value, x.String());
         // need to support more BSON element types.
-        return MatchResult{
-            false, format(FMT_STRING("Cannot match BSON Elements holding type {}"), typeName(t))};
+        return MatchResult{false,
+                           fmt::format("Cannot match BSON Elements holding type {}", typeName(t))};
     }
 
 private:
@@ -630,7 +657,7 @@ public:
     explicit BSONObjHas(M m) : _m{std::move(m)} {}
 
     std::string describe() const {
-        return format(FMT_STRING("BSONObjHas({})"), _m.describe());
+        return fmt::format("BSONObjHas({})", _m.describe());
     }
 
     MatchResult match(const BSONObj& x) const {

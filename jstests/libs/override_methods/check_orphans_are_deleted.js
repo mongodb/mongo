@@ -1,5 +1,5 @@
-load('jstests/libs/check_orphans_are_deleted_helpers.js');  // For CheckOrphansAreDeletedHelpers.
-load('jstests/sharding/autosplit_include.js');              // For waitForOngoingChunkSplits
+import {CheckOrphansAreDeletedHelpers} from "jstests/libs/check_orphans_are_deleted_helpers.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 /**
  * Asserts that all shards in the sharded cluster doesn't own any orphan documents.
@@ -8,19 +8,19 @@ load('jstests/sharding/autosplit_include.js');              // For waitForOngoin
  * Note: Doesn't catch documents in the shard that doesn't have the full shard key.
  * Assumes that all shards have the index that matches the shard key.
  */
-ShardingTest.prototype.checkOrphansAreDeleted = function() {
+ShardingTest.prototype.checkOrphansAreDeleted = function () {
     if (jsTest.options().skipCheckOrphans) {
-        print("Skipping orphan check across the cluster");
+        jsTest.log.info("Skipping orphan check across the cluster");
         return;
     }
 
-    print('Running check orphans against cluster with mongos: ' + this.s.host);
+    jsTest.log.info("Running check orphans against cluster with mongos: " + this.s.host);
 
-    let getConn = function(connStr) {
+    let getConn = function (connStr) {
         try {
             return new Mongo(connStr);
         } catch (exp) {
-            jsTest.log('Unable to connect to ' + connStr + ' while trying to check for orphans');
+            jsTest.log("Unable to connect to " + connStr + " while trying to check for orphans");
             return null;
         }
     };
@@ -31,40 +31,41 @@ ShardingTest.prototype.checkOrphansAreDeleted = function() {
     mongosConn.fullOptions = Object.merge(this.s.fullOptions, {});
 
     const keyFile = this.keyFile;
-    if (keyFile || mongosConn.fullOptions.clusterAuthMode == 'x509') {
+    if (keyFile || mongosConn.fullOptions.clusterAuthMode == "x509") {
         authutil.asCluster(mongosConn, keyFile, () => {
             assert.commandWorked(mongosConn.adminCommand({balancerStop: 1}));
 
             // Use config.shards so we will not miss shards added outside of ShardingTest.
-            mongosConn.getDB('config').shards.find().forEach(shardDoc => {
-                let shardConn = getConn(shardDoc.host);
+            mongosConn
+                .getDB("config")
+                .shards.find()
+                .forEach((shardDoc) => {
+                    let shardConn = getConn(shardDoc.host);
 
-                // Inherit connection options from mongos connection.
-                shardConn.fullOptions = Object.merge(this.s.fullOptions, {});
+                    // Inherit connection options from mongos connection.
+                    shardConn.fullOptions = Object.merge(this.s.fullOptions, {});
 
-                if (shardConn != null) {
-                    authutil.asCluster(shardConn, keyFile, () => {
-                        CheckOrphansAreDeletedHelpers.runCheck(mongosConn, shardConn, shardDoc._id);
-                    });
-                }
-            });
+                    if (shardConn != null) {
+                        authutil.asCluster(shardConn, keyFile, () => {
+                            CheckOrphansAreDeletedHelpers.runCheck(mongosConn, shardConn, shardDoc._id);
+                        });
+                    }
+                });
         });
     } else {
         assert.commandWorked(mongosConn.adminCommand({balancerStop: 1}));
-        try {
-            waitForOngoingChunkSplits(this);
-        } catch (e) {
-            print("Unable to wait for ongoing chunk splits: " + e);
-        }
 
         // Use config.shards so we will not miss shards added outside of ShardingTest.
-        mongosConn.getDB('config').shards.find().forEach(shardDoc => {
-            let shardConn = getConn(shardDoc.host);
+        mongosConn
+            .getDB("config")
+            .shards.find()
+            .forEach((shardDoc) => {
+                let shardConn = getConn(shardDoc.host);
 
-            if (shardConn != null) {
-                shardConn.host = shardDoc.host;
-                CheckOrphansAreDeletedHelpers.runCheck(mongosConn, shardConn, shardDoc._id);
-            }
-        });
+                if (shardConn != null) {
+                    shardConn.host = shardDoc.host;
+                    CheckOrphansAreDeletedHelpers.runCheck(mongosConn, shardConn, shardDoc._id);
+                }
+            });
     }
 };

@@ -35,19 +35,12 @@ import io
 import logging
 import os
 import platform
-from typing import Any, List
 
-from . import binder
-from . import errors
-from . import generator
-from . import parser
-from . import syntax
+from . import binder, errors, generator, parser, syntax
 
 
 class CompilerArgs(object):
     """Set of compiler arguments."""
-
-    # pylint: disable=too-many-instance-attributes
 
     def __init__(self):
         # type: () -> None
@@ -82,26 +75,42 @@ class CompilerImportResolver(parser.ImportResolverBase):
         logging.debug("Resolving imported file '%s' for file '%s'", imported_file_name, base_file)
 
         # Check for fully-qualified paths
-        logging.debug("Checking for imported file '%s' for file '%s' at '%s'", imported_file_name,
-                      base_file, imported_file_name)
+        logging.debug(
+            "Checking for imported file '%s' for file '%s' at '%s'",
+            imported_file_name,
+            base_file,
+            imported_file_name,
+        )
         if os.path.isabs(imported_file_name) and os.path.exists(imported_file_name):
-            logging.debug("Found imported file '%s' for file '%s' at '%s'", imported_file_name,
-                          base_file, imported_file_name)
+            logging.debug(
+                "Found imported file '%s' for file '%s' at '%s'",
+                imported_file_name,
+                base_file,
+                imported_file_name,
+            )
             return imported_file_name
 
         for candidate_dir in self._import_directories or []:
             base_dir = os.path.abspath(candidate_dir)
             resolved_file_name = os.path.normpath(os.path.join(base_dir, imported_file_name))
 
-            logging.debug("Checking for imported file '%s' for file '%s' at '%s'",
-                          imported_file_name, base_file, resolved_file_name)
+            logging.debug(
+                "Checking for imported file '%s' for file '%s' at '%s'",
+                imported_file_name,
+                base_file,
+                resolved_file_name,
+            )
 
             if os.path.exists(resolved_file_name):
-                logging.debug("Found imported file '%s' for file '%s' at '%s'", imported_file_name,
-                              base_file, resolved_file_name)
+                logging.debug(
+                    "Found imported file '%s' for file '%s' at '%s'",
+                    imported_file_name,
+                    base_file,
+                    resolved_file_name,
+                )
                 return resolved_file_name
 
-        msg = ("Cannot find imported file '%s' for file '%s'" % (imported_file_name, base_file))
+        msg = "Cannot find imported file '%s' for file '%s'" % (imported_file_name, base_file)
         logging.error(msg)
 
         raise errors.IDLError(msg)
@@ -109,7 +118,7 @@ class CompilerImportResolver(parser.ImportResolverBase):
     def open(self, resolved_file_name):
         # type: (str) -> Any
         """Return an io.Stream for the requested file."""
-        return io.open(resolved_file_name, encoding='utf-8')
+        return io.open(resolved_file_name, encoding="utf-8")
 
 
 def _write_dependencies(spec, write_dependencies_inline):
@@ -140,7 +149,8 @@ def _update_import_includes(args, spec, header_file_name):
 
     if args.output_base_dir:
         base_include_h_file_name = os.path.relpath(
-            os.path.normpath(header_file_name), os.path.normpath(args.output_base_dir))
+            os.path.normpath(header_file_name), os.path.normpath(args.output_base_dir)
+        )
     else:
         base_include_h_file_name = os.path.abspath(header_file_name)
 
@@ -151,7 +161,7 @@ def _update_import_includes(args, spec, header_file_name):
     if not spec.globals:
         spec.globals = syntax.Global(args.input_file, -1, -1)
 
-    first_dir = base_include_h_file_name.split('/')[0]
+    first_dir = base_include_h_file_name.split("/")[0]
 
     for resolved_file_name in spec.imports.resolved_imports:
         # Guess: the file naming rules are consistent across IDL invocations
@@ -163,9 +173,10 @@ def _update_import_includes(args, spec, header_file_name):
 
             if os.path.isabs(base_dir):
                 include_h_file_name = os.path.join(
-                    base_dir, include_h_file_name[include_h_file_name.rfind(first_dir):])
+                    base_dir, include_h_file_name[include_h_file_name.rfind(first_dir) :]
+                )
             else:
-                include_h_file_name = include_h_file_name[include_h_file_name.find(first_dir):]
+                include_h_file_name = include_h_file_name[include_h_file_name.find(first_dir) :]
         else:
             include_h_file_name = os.path.abspath(include_h_file_name)
 
@@ -183,9 +194,12 @@ def compile_idl(args):
         logging.error("File '%s' not found", args.input_file)
 
     if args.output_source is None:
-        if not '.' in args.input_file:
-            logging.error("File name '%s' must be end with a filename extension, such as '%s.idl'",
-                          args.input_file, args.input_file)
+        if "." not in args.input_file:
+            logging.error(
+                "File name '%s' must be end with a filename extension, such as '%s.idl'",
+                args.input_file,
+                args.input_file,
+            )
             return False
 
         file_name_prefix = os.path.splitext(args.input_file)[0]
@@ -201,9 +215,10 @@ def compile_idl(args):
         args.target_arch = platform.machine()
 
     # Compile the IDL through the 3 passes
-    with io.open(args.input_file, encoding='utf-8') as file_stream:
-        parsed_doc = parser.parse(file_stream, args.input_file,
-                                  CompilerImportResolver(args.import_directories))
+    with io.open(args.input_file, encoding="utf-8") as file_stream:
+        parsed_doc = parser.parse(
+            file_stream, args.input_file, CompilerImportResolver(args.import_directories)
+        )
 
         if not parsed_doc.errors:
             if args.write_dependencies or args.write_dependencies_inline:
@@ -217,8 +232,13 @@ def compile_idl(args):
 
             bound_doc = binder.bind(parsed_doc.spec)
             if not bound_doc.errors:
-                generator.generate_code(bound_doc.spec, args.target_arch, args.output_base_dir,
-                                        header_file_name, source_file_name)
+                generator.generate_code(
+                    bound_doc.spec,
+                    args.target_arch,
+                    args.output_base_dir,
+                    header_file_name,
+                    source_file_name,
+                )
 
                 return True
             else:

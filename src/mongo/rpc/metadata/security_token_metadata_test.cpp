@@ -27,16 +27,32 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
-#include "mongo/db/auth/security_token.h"
-#include "mongo/db/auth/security_token_gen.h"
-#include "mongo/db/client.h"
-#include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
-#include "mongo/db/multitenancy_gen.h"
+#include "mongo/db/auth/user_name.h"
+#include "mongo/db/auth/validated_tenancy_scope_factory.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/op_msg_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace rpc {
@@ -44,15 +60,31 @@ namespace test {
 namespace {
 
 constexpr auto kPingFieldName = "ping"_sd;
-constexpr auto kTenantFieldName = "tenant"_sd;
 
-class SecurityTokenMetadataTest : public LockerNoopServiceContextTest {};
+std::string makeSecurityToken(const UserName& userName) {
+    return std::string{auth::ValidatedTenancyScopeFactory::create(
+                           userName,
+                           "secret"_sd,
+                           auth::ValidatedTenancyScope::TenantProtocol::kDefault,
+                           auth::ValidatedTenancyScopeFactory::TokenForTestingTag{})
+                           .getOriginalToken()};
+}
 
-TEST_F(SecurityTokenMetadataTest, SecurityTokenNotAccepted) {
+class SecurityTokenMetadataTest : public ServiceContextTest {
+protected:
+    void setUp() final {
+        client = getServiceContext()->getService()->makeClient("test");
+    }
+
+    ServiceContext::UniqueClient client;
+};
+
+TEST_F(SecurityTokenMetadataTest, SecurityTokenSingletenancy) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", false);
+
     const auto kPingBody = BSON(kPingFieldName << 1);
-    const auto kTokenBody = BSON(kTenantFieldName << OID::gen());
+    const auto kTokenBody = makeSecurityToken(UserName("user", "admin", TenantId(OID::gen())));
 
-    gMultitenancySupport = false;
     auto msgBytes = OpMsgBytes{0, kBodySection, kPingBody, kSecurityTokenSection, kTokenBody};
     ASSERT_THROWS_CODE_AND_WHAT(msgBytes.parse(),
                                 DBException,
@@ -60,24 +92,66 @@ TEST_F(SecurityTokenMetadataTest, SecurityTokenNotAccepted) {
                                 "Unsupported Security Token provided");
 }
 
-TEST_F(SecurityTokenMetadataTest, BasicSuccess) {
-    const auto kOid = OID::gen();
-    const auto kPingBody = BSON(kPingFieldName << 1);
-    const auto kTokenBody = BSON(kTenantFieldName << kOid);
+TEST_F(SecurityTokenMetadataTest, SecurityTokenNotAccepted) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest securityTokenController("featureFlagSecurityToken", false);
 
-    gMultitenancySupport = true;
+    const auto kPingBody = BSON(kPingFieldName << 1);
+    const auto kTokenBody = makeSecurityToken(UserName("user", "admin", TenantId(OID::gen())));
+
+    auto msgBytes = OpMsgBytes{0, kBodySection, kPingBody, kSecurityTokenSection, kTokenBody};
+    ASSERT_THROWS_CODE_AND_WHAT(
+        msgBytes.parse(),
+        DBException,
+        ErrorCodes::Unauthorized,
+        "Signed authentication tokens are not accepted without feature flag opt-in");
+}
+
+TEST_F(SecurityTokenMetadataTest, SecurityTokenTestTokensNotAvailable) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest securityTokenController("featureFlagSecurityToken", true);
+
+    const auto kPingBody = BSON(kPingFieldName << 1);
+    const auto kTokenBody = makeSecurityToken(UserName("user", "admin", TenantId(OID::gen())));
+
+    auto msgBytes = OpMsgBytes{0, kBodySection, kPingBody, kSecurityTokenSection, kTokenBody};
+    ASSERT_THROWS_CODE_AND_WHAT(
+        msgBytes.parse(),
+        DBException,
+        ErrorCodes::OperationFailed,
+        "Unable to validate test tokens when testOnlyValidatedTenancyScopeKey is not provided");
+}
+
+TEST_F(SecurityTokenMetadataTest, BasicSuccess) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest securityTokenController("featureFlagSecurityToken", true);
+    RAIIServerParameterControllerForTest secretController("testOnlyValidatedTenancyScopeKey",
+                                                          "secret");
+
+    const auto kTenantId = TenantId(OID::gen());
+    const auto kPingBody = BSON(kPingFieldName << 1);
+    const auto kTokenBody = makeSecurityToken(UserName("user", "admin", kTenantId));
+
     auto msg = OpMsgBytes{0, kBodySection, kPingBody, kSecurityTokenSection, kTokenBody}.parse();
     ASSERT_BSONOBJ_EQ(msg.body, kPingBody);
     ASSERT_EQ(msg.sequences.size(), 0u);
-    ASSERT_BSONOBJ_EQ(msg.securityToken, kTokenBody);
+    ASSERT_TRUE(msg.validatedTenancyScope != boost::none);
+    ASSERT_EQ(msg.validatedTenancyScope->getOriginalToken(), kTokenBody);
+    ASSERT_EQ(msg.validatedTenancyScope->tenantId(), kTenantId);
 
     auto opCtx = makeOperationContext();
-    ASSERT(auth::getSecurityToken(opCtx.get()) == boost::none);
+    ASSERT(auth::ValidatedTenancyScope::get(opCtx.get()) == boost::none);
 
-    auth::readSecurityTokenMetadata(opCtx.get(), msg.securityToken);
-    auto token = auth::getSecurityToken(opCtx.get());
+    auth::ValidatedTenancyScope::set(opCtx.get(), msg.validatedTenancyScope);
+    auto token = auth::ValidatedTenancyScope::get(opCtx.get());
     ASSERT(token != boost::none);
-    ASSERT_EQ(token->getTenant(), kOid);
+
+    ASSERT_TRUE(token->hasAuthenticatedUser());
+    auto authedUser = token->authenticatedUser();
+    ASSERT_EQ(authedUser.getUser(), "user");
+    ASSERT_EQ(authedUser.getDB(), "admin");
+    ASSERT_TRUE(authedUser.tenantId() != boost::none);
+    ASSERT_EQ(authedUser.tenantId().value(), kTenantId);
 }
 
 }  // namespace

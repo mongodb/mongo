@@ -1,8 +1,5 @@
 // Tests basic use cases for all $merge modes.
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 
 const source = db.all_modes_source;
 const target = db.all_modes_target;
@@ -13,24 +10,35 @@ const target = db.all_modes_target;
 
     // All tests use the same data in the source collection.
     assert.commandWorked(
-        source.insert([{_id: 1, a: 1, b: "a"}, {_id: 2, a: 2, b: "b"}, {_id: 3, a: 3, b: "c"}]));
+        source.insert([
+            {_id: 1, a: 1, b: "a"},
+            {_id: 2, a: 2, b: "b"},
+            {_id: 3, a: 3, b: "c"},
+        ]),
+    );
 })();
 
 // Test 'whenMatched=replace whenNotMatched=insert' mode. This is an equivalent of a
 // replacement-style update with upsert=true.
 (function testWhenMatchedReplaceWhenNotMatchedInsert() {
-    assert.commandWorked(target.insert([{_id: 1, a: 10}, {_id: 3, a: 30}, {_id: 4, a: 40}]));
-    assert.doesNotThrow(() => source.aggregate([
-        {$merge: {into: target.getName(), whenMatched: "replace", whenNotMatched: "insert"}}
-    ]));
+    assert.commandWorked(
+        target.insert([
+            {_id: 1, a: 10},
+            {_id: 3, a: 30},
+            {_id: 4, a: 40},
+        ]),
+    );
+    assert.doesNotThrow(() =>
+        source.aggregate([{$merge: {into: target.getName(), whenMatched: "replace", whenNotMatched: "insert"}}]),
+    );
     assertArrayEq({
         actual: target.find().toArray(),
         expected: [
             {_id: 1, a: 1, b: "a"},
             {_id: 2, a: 2, b: "b"},
             {_id: 3, a: 3, b: "c"},
-            {_id: 4, a: 40}
-        ]
+            {_id: 4, a: 40},
+        ],
     });
 })();
 
@@ -39,16 +47,28 @@ const target = db.all_modes_target;
 // processed, it will not fail as soon as we hit the first document without a match.
 (function testWhenMatchedReplaceWhenNotMatchedFail() {
     assert(target.drop());
-    assert.commandWorked(target.insert([{_id: 1, a: 10}, {_id: 3, a: 30}, {_id: 4, a: 40}]));
-    const error = assert.throws(() => source.aggregate([
-        {$sort: {_id: 1}},
-        {$_internalInhibitOptimization: {}},
-        {$merge: {into: target.getName(), whenMatched: "replace", whenNotMatched: "fail"}}
-    ]));
+    assert.commandWorked(
+        target.insert([
+            {_id: 1, a: 10},
+            {_id: 3, a: 30},
+            {_id: 4, a: 40},
+        ]),
+    );
+    const error = assert.throws(() =>
+        source.aggregate([
+            {$sort: {_id: 1}},
+            {$_internalInhibitOptimization: {}},
+            {$merge: {into: target.getName(), whenMatched: "replace", whenNotMatched: "fail"}},
+        ]),
+    );
     assert.commandFailedWithCode(error, ErrorCodes.MergeStageNoMatchingDocument);
     assertArrayEq({
         actual: target.find().toArray(),
-        expected: [{_id: 1, a: 1, b: "a"}, {_id: 3, a: 3, b: "c"}, {_id: 4, a: 40}]
+        expected: [
+            {_id: 1, a: 1, b: "a"},
+            {_id: 3, a: 3, b: "c"},
+            {_id: 4, a: 40},
+        ],
     });
 })();
 
@@ -57,13 +77,23 @@ const target = db.all_modes_target;
 // of the merge operation.
 (function testWhenMatchedReplaceWhenNotMatchedDiscard() {
     assert(target.drop());
-    assert.commandWorked(target.insert([{_id: 1, a: 10}, {_id: 3, a: 30}, {_id: 4, a: 40}]));
-    assert.doesNotThrow(() => source.aggregate([
-        {$merge: {into: target.getName(), whenMatched: "replace", whenNotMatched: "discard"}}
-    ]));
+    assert.commandWorked(
+        target.insert([
+            {_id: 1, a: 10},
+            {_id: 3, a: 30},
+            {_id: 4, a: 40},
+        ]),
+    );
+    assert.doesNotThrow(() =>
+        source.aggregate([{$merge: {into: target.getName(), whenMatched: "replace", whenNotMatched: "discard"}}]),
+    );
     assertArrayEq({
         actual: target.find().toArray(),
-        expected: [{_id: 1, a: 1, b: "a"}, {_id: 3, a: 3, b: "c"}, {_id: 4, a: 40}]
+        expected: [
+            {_id: 1, a: 1, b: "a"},
+            {_id: 3, a: 3, b: "c"},
+            {_id: 4, a: 40},
+        ],
     });
 })();
 
@@ -72,8 +102,13 @@ const target = db.all_modes_target;
 // processed, it will not fail as soon as we hit the first document with a match.
 (function testWhenMatchedFailWhenNotMatchedInsert() {
     assert(target.drop());
-    assert.commandWorked(target.insert(
-        [{_id: 10, a: 10, c: "x"}, {_id: 3, a: 30, c: "y"}, {_id: 4, a: 40, c: "z"}]));
+    assert.commandWorked(
+        target.insert([
+            {_id: 10, a: 10, c: "x"},
+            {_id: 3, a: 30, c: "y"},
+            {_id: 4, a: 40, c: "z"},
+        ]),
+    );
     // Besides ensuring that a DuplicateKey error is raised when we find a matching document,
     // this test also verifies that this $merge mode does perform an unordered insert and all
     // documents in the batch without a matching document get inserted into the target
@@ -93,11 +128,13 @@ const target = db.all_modes_target;
     // pipeline will be split and we will pull everything to mongos before doing the $merge.
     // This also ensures that documents with {_id: 1 } and {_id: 2} will be inserted first
     // before the DuplicateKey error is raised.
-    const error = assert.throws(() => source.aggregate([
-        {$sort: {_id: 1}},
-        {$_internalInhibitOptimization: {}},
-        {$merge: {into: target.getName(), whenMatched: "fail", whenNotMatched: "insert"}}
-    ]));
+    const error = assert.throws(() =>
+        source.aggregate([
+            {$sort: {_id: 1}},
+            {$_internalInhibitOptimization: {}},
+            {$merge: {into: target.getName(), whenMatched: "fail", whenNotMatched: "insert"}},
+        ]),
+    );
     assert.commandFailedWithCode(error, ErrorCodes.DuplicateKey);
     assertArrayEq({
         actual: target.find().toArray(),
@@ -106,8 +143,8 @@ const target = db.all_modes_target;
             {_id: 2, a: 2, b: "b"},
             {_id: 3, a: 30, c: "y"},
             {_id: 4, a: 40, c: "z"},
-            {_id: 10, a: 10, c: "x"}
-        ]
+            {_id: 10, a: 10, c: "x"},
+        ],
     });
 })();
 
@@ -115,9 +152,9 @@ const target = db.all_modes_target;
 (function testWhenMatchedFailWhenNotMatchedFail() {
     assert(target.drop());
     assert.commandWorked(target.insert({_id: 1, a: 10}));
-    const error = assert.throws(
-        () => source.aggregate(
-            [{$merge: {into: target.getName(), whenMatched: "fail", whenNotMatched: "fail"}}]));
+    const error = assert.throws(() =>
+        source.aggregate([{$merge: {into: target.getName(), whenMatched: "fail", whenNotMatched: "fail"}}]),
+    );
     assert.commandFailedWithCode(error, 51181);
     // Ensure the target collection has not been modified.
     assertArrayEq({actual: target.find().toArray(), expected: [{_id: 1, a: 10}]});
@@ -128,9 +165,9 @@ const target = db.all_modes_target;
 (function testWhenMatchedFailWhenNotMatchedDiscard() {
     assert(target.drop());
     assert.commandWorked(target.insert({_id: 1, a: 10}));
-    const error = assert.throws(
-        () => source.aggregate(
-            [{$merge: {into: target.getName(), whenMatched: "fail", whenNotMatched: "discard"}}]));
+    const error = assert.throws(() =>
+        source.aggregate([{$merge: {into: target.getName(), whenMatched: "fail", whenNotMatched: "discard"}}]),
+    );
     assert.commandFailedWithCode(error, 51181);
     // Ensure the target collection has not been modified.
     assertArrayEq({actual: target.find().toArray(), expected: [{_id: 1, a: 10}]});
@@ -141,18 +178,23 @@ const target = db.all_modes_target;
 (function testWhenMatchedMergeWhenNotMatchedInsert() {
     assert(target.drop());
     assert.commandWorked(
-        target.insert([{_id: 1, a: 10, c: "z"}, {_id: 3, a: 30}, {_id: 4, a: 40}]));
-    assert.doesNotThrow(
-        () => source.aggregate(
-            [{$merge: {into: target.getName(), whenMatched: "merge", whenNotMatched: "insert"}}]));
+        target.insert([
+            {_id: 1, a: 10, c: "z"},
+            {_id: 3, a: 30},
+            {_id: 4, a: 40},
+        ]),
+    );
+    assert.doesNotThrow(() =>
+        source.aggregate([{$merge: {into: target.getName(), whenMatched: "merge", whenNotMatched: "insert"}}]),
+    );
     assertArrayEq({
         actual: target.find().toArray(),
         expected: [
             {_id: 1, a: 1, c: "z", b: "a"},
             {_id: 2, a: 2, b: "b"},
             {_id: 3, a: 3, b: "c"},
-            {_id: 4, a: 40}
-        ]
+            {_id: 4, a: 40},
+        ],
     });
 })();
 
@@ -162,20 +204,27 @@ const target = db.all_modes_target;
 (function testWhenMatchedMergeWhenNotMatchedFail() {
     assert(target.drop());
     assert.commandWorked(
-        target.insert([{_id: 1, a: 10, c: "x"}, {_id: 3, a: 30, c: "y"}, {_id: 4, a: 40, c: "z"}]));
-    const error = assert.throws(() => source.aggregate([
-        {$sort: {_id: 1}},
-        {$_internalInhibitOptimization: {}},
-        {$merge: {into: target.getName(), whenMatched: "merge", whenNotMatched: "fail"}}
-    ]));
+        target.insert([
+            {_id: 1, a: 10, c: "x"},
+            {_id: 3, a: 30, c: "y"},
+            {_id: 4, a: 40, c: "z"},
+        ]),
+    );
+    const error = assert.throws(() =>
+        source.aggregate([
+            {$sort: {_id: 1}},
+            {$_internalInhibitOptimization: {}},
+            {$merge: {into: target.getName(), whenMatched: "merge", whenNotMatched: "fail"}},
+        ]),
+    );
     assert.commandFailedWithCode(error, ErrorCodes.MergeStageNoMatchingDocument);
     assertArrayEq({
         actual: target.find().toArray(),
         expected: [
             {_id: 1, a: 1, b: "a", c: "x"},
             {_id: 3, a: 3, b: "c", c: "y"},
-            {_id: 4, a: 40, c: "z"}
-        ]
+            {_id: 4, a: 40, c: "z"},
+        ],
     });
 })();
 
@@ -185,17 +234,22 @@ const target = db.all_modes_target;
 (function testWhenMatchedMergeWhenNotMatchedDiscard() {
     assert(target.drop());
     assert.commandWorked(
-        target.insert([{_id: 1, a: 10, c: "x"}, {_id: 3, a: 30, c: "y"}, {_id: 4, a: 40, c: "z"}]));
-    assert.doesNotThrow(
-        () => source.aggregate(
-            [{$merge: {into: target.getName(), whenMatched: "merge", whenNotMatched: "discard"}}]));
+        target.insert([
+            {_id: 1, a: 10, c: "x"},
+            {_id: 3, a: 30, c: "y"},
+            {_id: 4, a: 40, c: "z"},
+        ]),
+    );
+    assert.doesNotThrow(() =>
+        source.aggregate([{$merge: {into: target.getName(), whenMatched: "merge", whenNotMatched: "discard"}}]),
+    );
     assertArrayEq({
         actual: target.find().toArray(),
         expected: [
             {_id: 1, a: 1, b: "a", c: "x"},
             {_id: 3, a: 3, b: "c", c: "y"},
-            {_id: 4, a: 40, c: "z"}
-        ]
+            {_id: 4, a: 40, c: "z"},
+        ],
     });
 })();
 
@@ -204,15 +258,22 @@ const target = db.all_modes_target;
 (function testWhenMatchedPipelineUpdateWhenNotMatchedInsert() {
     assert(target.drop());
     assert.commandWorked(target.insert({_id: 1, b: 1}));
-    assert.doesNotThrow(() => source.aggregate([{
-        $merge:
-            {into: target.getName(), whenMatched: [{$addFields: {x: 2}}], whenNotMatched: "insert"}
-    }]));
+    assert.doesNotThrow(() =>
+        source.aggregate([
+            {
+                $merge: {into: target.getName(), whenMatched: [{$addFields: {x: 2}}], whenNotMatched: "insert"},
+            },
+        ]),
+    );
     // We match {_id: 1} and apply the pipeline to add the field {x: 2}. The other source collection
     // documents are copied directly into the target collection.
     assertArrayEq({
         actual: target.find().toArray(),
-        expected: [{_id: 1, b: 1, x: 2}, {_id: 2, a: 2, b: "b"}, {_id: 3, a: 3, b: "c"}]
+        expected: [
+            {_id: 1, b: 1, x: 2},
+            {_id: 2, a: 2, b: "b"},
+            {_id: 3, a: 3, b: "c"},
+        ],
     });
 })();
 
@@ -222,23 +283,33 @@ const target = db.all_modes_target;
 (function testWhenMatchedPipelineUpdateWhenNotMatchedFail() {
     assert(target.drop());
     assert.commandWorked(
-        target.insert([{_id: 1, a: 10, c: "x"}, {_id: 3, a: 30, c: "y"}, {_id: 4, a: 40, c: "z"}]));
-    const error = assert.throws(() => source.aggregate([
-        {$sort: {_id: 1}},
-        {$_internalInhibitOptimization: {}},
-        {
-            $merge: {
-                into: target.getName(),
-                whenMatched: [{$addFields: {x: 2}}],
-                whenNotMatched: "fail"
-            }
-        }
-    ]));
+        target.insert([
+            {_id: 1, a: 10, c: "x"},
+            {_id: 3, a: 30, c: "y"},
+            {_id: 4, a: 40, c: "z"},
+        ]),
+    );
+    const error = assert.throws(() =>
+        source.aggregate([
+            {$sort: {_id: 1}},
+            {$_internalInhibitOptimization: {}},
+            {
+                $merge: {
+                    into: target.getName(),
+                    whenMatched: [{$addFields: {x: 2}}],
+                    whenNotMatched: "fail",
+                },
+            },
+        ]),
+    );
     assert.commandFailedWithCode(error, ErrorCodes.MergeStageNoMatchingDocument);
     assertArrayEq({
         actual: target.find().toArray(),
-        expected:
-            [{_id: 1, a: 10, c: "x", x: 2}, {_id: 3, a: 30, c: "y", x: 2}, {_id: 4, a: 40, c: "z"}]
+        expected: [
+            {_id: 1, a: 10, c: "x", x: 2},
+            {_id: 3, a: 30, c: "y", x: 2},
+            {_id: 4, a: 40, c: "z"},
+        ],
     });
 })();
 
@@ -248,15 +319,26 @@ const target = db.all_modes_target;
 (function testWhenMatchedPipelineUpdateWhenNotMatchedDiscard() {
     assert(target.drop());
     assert.commandWorked(
-        target.insert([{_id: 1, a: 10, c: "x"}, {_id: 3, a: 30, c: "y"}, {_id: 4, a: 40, c: "z"}]));
-    assert.doesNotThrow(() => source.aggregate([{
-        $merge:
-            {into: target.getName(), whenMatched: [{$addFields: {x: 2}}], whenNotMatched: "discard"}
-    }]));
+        target.insert([
+            {_id: 1, a: 10, c: "x"},
+            {_id: 3, a: 30, c: "y"},
+            {_id: 4, a: 40, c: "z"},
+        ]),
+    );
+    assert.doesNotThrow(() =>
+        source.aggregate([
+            {
+                $merge: {into: target.getName(), whenMatched: [{$addFields: {x: 2}}], whenNotMatched: "discard"},
+            },
+        ]),
+    );
     assertArrayEq({
         actual: target.find().toArray(),
-        expected:
-            [{_id: 1, a: 10, c: "x", x: 2}, {_id: 3, a: 30, c: "y", x: 2}, {_id: 4, a: 40, c: "z"}]
+        expected: [
+            {_id: 1, a: 10, c: "x", x: 2},
+            {_id: 3, a: 30, c: "y", x: 2},
+            {_id: 4, a: 40, c: "z"},
+        ],
     });
 })();
 
@@ -265,13 +347,24 @@ const target = db.all_modes_target;
 // documents without a match must be inserted into the target collection.
 (function testWhenMatchedKeepExistingWhenNotMatchedInsert() {
     assert(target.drop());
-    assert.commandWorked(target.insert([{_id: 1, a: 10}, {_id: 3, a: 30}, {_id: 4, a: 40}]));
-    assert.doesNotThrow(() => source.aggregate([
-        {$merge: {into: target.getName(), whenMatched: "keepExisting", whenNotMatched: "insert"}}
-    ]));
+    assert.commandWorked(
+        target.insert([
+            {_id: 1, a: 10},
+            {_id: 3, a: 30},
+            {_id: 4, a: 40},
+        ]),
+    );
+    assert.doesNotThrow(() =>
+        source.aggregate([{$merge: {into: target.getName(), whenMatched: "keepExisting", whenNotMatched: "insert"}}]),
+    );
     assertArrayEq({
         actual: target.find().toArray(),
-        expected: [{_id: 1, a: 10}, {_id: 2, a: 2, b: "b"}, {_id: 3, a: 30}, {_id: 4, a: 40}]
+        expected: [
+            {_id: 1, a: 10},
+            {_id: 2, a: 2, b: "b"},
+            {_id: 3, a: 30},
+            {_id: 4, a: 40},
+        ],
     });
 })();
 
@@ -280,9 +373,9 @@ const target = db.all_modes_target;
 (function testWhenMatchedKeepExistingWhenNotMatchedFail() {
     assert(target.drop());
     assert.commandWorked(target.insert({_id: 1, a: 10}));
-    const error = assert.throws(() => source.aggregate([
-        {$merge: {into: target.getName(), whenMatched: "keepExisting", whenNotMatched: "fail"}}
-    ]));
+    const error = assert.throws(() =>
+        source.aggregate([{$merge: {into: target.getName(), whenMatched: "keepExisting", whenNotMatched: "fail"}}]),
+    );
     assert.commandFailedWithCode(error, 51181);
     // Ensure the target collection has not been modified.
     assertArrayEq({actual: target.find().toArray(), expected: [{_id: 1, a: 10}]});
@@ -293,11 +386,10 @@ const target = db.all_modes_target;
 (function testWhenMatchedKeepExistingWhenNotMatchedDiscard() {
     assert(target.drop());
     assert.commandWorked(target.insert({_id: 1, a: 10}));
-    const error = assert.throws(() => source.aggregate([
-        {$merge: {into: target.getName(), whenMatched: "keepExisting", whenNotMatched: "discard"}}
-    ]));
+    const error = assert.throws(() =>
+        source.aggregate([{$merge: {into: target.getName(), whenMatched: "keepExisting", whenNotMatched: "discard"}}]),
+    );
     assert.commandFailedWithCode(error, 51181);
     // Ensure the target collection has not been modified.
     assertArrayEq({actual: target.find().toArray(), expected: [{_id: 1, a: 10}]});
 })();
-}());

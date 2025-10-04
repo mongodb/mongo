@@ -1,0 +1,63 @@
+# Copyright 2022 The TCMalloc Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+name: ci
+
+on:
+  push:
+    branches:
+    - master
+
+  pull_request:
+
+jobs:
+  Linux:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler:
+          - g++
+          - clang++
+
+    name: "Build/Test ${{matrix.compiler}}"
+    steps:
+    - name: Cancel previous
+      uses: styfle/cancel-workflow-action@0.8.0
+      with:
+        access_token: ${{ github.token }}
+
+    - name: Prepare
+      run: |
+        sudo apt-get update -qq
+        sudo apt install -y g++ clang
+
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+
+    - name: Create Cache Timestamp
+      id: cache_timestamp
+      uses: nanzm/get-time-action@v1.1
+      with:
+        format: 'YYYY-MM-DD-HH-mm-ss'
+
+    - name: Mount bazel cache
+      uses: actions/cache@v2
+      with:
+        path: "/home/runner/.cache/bazel"
+        key: bazelcache_${{matrix.compiler}}_${{ steps.cache_timestamp.outputs.time }}
+        restore-keys: bazelcache_${{matrix.compiler}}_
+
+    - name: Tests
+      run: CXX=${{matrix.compiler}} bazel test --test_output=errors //...

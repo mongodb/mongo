@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import os
 import sys
 from dist import compare_srcfile
@@ -46,7 +48,7 @@ def format_tag(tag):
 ##### PROCESS ARGS #####
 for arg in sys.argv:
     if arg == "-h":
-        print("Usage: python test_tag.py [options]")
+        print("Usage: python3 test_tag.py [options]")
         print("Options:")
         print("\t-i\tShow info")
         print("\t-p\tShow files with no test tags")
@@ -175,8 +177,8 @@ for filename in test_files:
 #####
 
 ##### GENERATE TEST COVERAGE MD #####
-tmp_filename = '__tmp'
-tfile = open('__tmp', 'w')
+tmp_filename = '__tmp_test_tag' + str(os.getpid())
+tfile = open(tmp_filename, 'w')
 
 # Sort tags
 sorted_tags = list(tagged_files.keys())
@@ -229,4 +231,4 @@ if show_info == True:
 #if nb_missing_files > 0:
 #    print("Files missing a tag: " + str(nb_missing_files))
 #    if show_missing_files == False:
-#        print("Call \'python test_tag.py -p\' to list all files with no tags")
+#        print("Call \'python3 test_tag.py -p\' to list all files with no tags")

@@ -1,0 +1,107 @@
+version: 1.0.0
+filters:
+  - "directclienttests.cpp":
+    approvers:
+      - 10gen/server-programmability
+  - "framework*":
+    approvers:
+      - 10gen/server-programmability
+  - "threadedtests.cpp":
+    approvers:
+      - 10gen/server-programmability
+  - "mock_dbclient_conn_test.cpp":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "indexupdatetests.cpp":
+    approvers:
+      - 10gen/server-index-builds
+  - "insert_test.cpp":
+    approvers:
+      - 10gen/query-optimization
+  - "jsobjtests.cpp":
+    approvers:
+      - 10gen/server-programmability
+  - "jsontests.cpp":
+    approvers:
+      - 10gen/server-programmability
+  - "basictests.cpp":
+    approvers:
+      - 10gen/server-programmability
+  - "storage_debug_util*":
+    approvers:
+      - 10gen/server-storage-engine-integration
+  - "dbhelper_tests.cpp":
+    approvers:
+      - 10gen/server-storage-engine-integration
+  - "validate_tests.cpp":
+    approvers:
+      - 10gen/server-validate
+  - "extended_validate_tests.cpp":
+    approvers:
+      - 10gen/server-replication-reviewers
+      - 10gen/server-validate
+  - "deferred_writer.cpp":
+    approvers:
+      - 10gen/server-dbcheck
+  - "pdfiletests.cpp":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "wildcard_access_method_test.cpp":
+    approvers:
+      - 10gen/query-optimization
+  - "wildcard_multikey_persistence_test.cpp":
+    approvers:
+      - 10gen/server-index-builds
+  - "commandtests.cpp":
+    approvers:
+      - 10gen/query-execution
+      - 10gen/query-optimization
+      - 10gen/server-catalog-and-routing-shard-catalog
+  - "*plan_executor*":
+    approvers:
+      - 10gen/query-execution
+  - "query_stage*":
+    approvers:
+      - 10gen/query-execution
+  - "querytests.cpp":
+    approvers:
+      - 10gen/query-execution
+  - "counttests.cpp":
+    approvers:
+      - 10gen/query-execution
+  - "documentsourcetests.cpp":
+    approvers:
+      - 10gen/query-execution-classic
+  - "extensions_callback_real_test.cpp":
+    approvers:
+      - 10gen/query-integration-search
+  - "matchertests.cpp":
+    approvers:
+      - 10gen/query-execution
+  - "updatetests.cpp":
+    approvers:
+      - 10gen/query-execution
+  - "plan_ranking.cpp":
+    approvers:
+      - 10gen/query-optimization
+  - "query_stage_multiplan.cpp":
+    approvers:
+      - 10gen/query-optimization
+  - "socktests.cpp":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "mock_replica_set*":
+    approvers:
+      - 10gen/server-replication-reviewers
+  - "replica_set_tests.cpp":
+    approvers:
+      - 10gen/server-replication-reviewers
+  - "repltests.cpp":
+    approvers:
+      - 10gen/server-replication-reviewers
+  - "rollbacktests.cpp":
+    approvers:
+      - 10gen/server-recovery
+  - "dbtests*":
+    approvers:
+      - 10gen/server-storage-engine-integration

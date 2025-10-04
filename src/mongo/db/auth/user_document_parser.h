@@ -30,9 +30,14 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/db/auth/action_set.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/user.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/tenant_id.h"
+
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -42,29 +47,30 @@ class V2UserDocumentParser {
 
 public:
     V2UserDocumentParser() {}
-    Status checkValidUserDocument(const BSONObj& doc) const;
 
     /**
-     * Returns Status::OK() iff the given BSONObj describes a valid element from a roles array.
+     * Apply a tenant identifier to every tenant aware object during parsing.
      */
-    static Status checkValidRoleObject(const BSONObj& roleObject);
+    void setTenantId(boost::optional<TenantId> tenant) {
+        _tenant = std::move(tenant);
+    }
 
-    static Status parseRoleName(const BSONObj& roleObject, RoleName* result);
+    Status checkValidUserDocument(const BSONObj& doc) const;
+    Status initializeUserFromUserDocument(const BSONObj& privDoc, User* user) const;
 
-    static Status parseRoleVector(const BSONArray& rolesArray, std::vector<RoleName>* result);
-
-    std::string extractUserNameFromUserDocument(const BSONObj& doc) const;
-    User::UserId extractUserIDFromUserDocument(const BSONObj& doc) const;
-
-    Status initializeUserCredentialsFromUserDocument(User* user, const BSONObj& privDoc) const;
-
-    Status initializeUserRolesFromUserDocument(const BSONObj& doc, User* user) const;
+private:
     Status initializeUserIndirectRolesFromUserDocument(const BSONObj& doc, User* user) const;
     Status initializeUserPrivilegesFromUserDocument(const BSONObj& doc, User* user) const;
+
+public:
+    // public for unit testing only.
+    Status initializeUserCredentialsFromUserDocument(User* user, const BSONObj& privDoc) const;
+    Status initializeUserRolesFromUserDocument(const BSONObj& doc, User* user) const;
     Status initializeAuthenticationRestrictionsFromUserDocument(const BSONObj& doc,
                                                                 User* user) const;
 
-    Status initializeUserFromUserDocument(const BSONObj& privDoc, User* user) const;
+private:
+    boost::optional<TenantId> _tenant;
 };
 
 }  // namespace mongo

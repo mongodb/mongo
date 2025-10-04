@@ -29,7 +29,7 @@ global:
     cpp_namespace: "mongo"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 structs:
     featuresReplyJS:
@@ -42,6 +42,7 @@ structs:
 
     featuresReply:
         description: "Reply to the features command"
+        is_command_reply: true
         fields:
             js:
                 description: "Status of the scription engine"
@@ -64,8 +65,12 @@ structs:
             memSizeMB: long
             memLimitMB: long
             numCores: int
+            numCoresAvailableToProcess: int
+            numPhysicalCores: int
+            numCpuSockets: int
             cpuArch: string
             numaEnabled: bool
+            numNumaNodes: int
 
     hostInfoOsReply:
         description: "hostInfo.os reply fields"
@@ -76,6 +81,7 @@ structs:
 
     hostInfoReply:
         description: "Reply to hostInfo command"
+        is_command_reply: true
         fields:
             system: hostInfoSystemReply
             os: hostInfoOsReply
@@ -87,6 +93,7 @@ structs:
 
     getCmdLineOptsReply:
         description: "Command line options as passed to the server executable on startup"
+        is_command_reply: true
         fields:
             argv: array
             parsed: object

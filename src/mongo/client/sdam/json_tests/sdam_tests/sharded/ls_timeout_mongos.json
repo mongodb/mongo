@@ -8,7 +8,7 @@
           "a:27017",
           {
             "ok": 1,
-            "ismaster": true,
+            "isWritablePrimary": true,
             "msg": "isdbgrid",
             "logicalSessionTimeoutMinutes": 1,
             "minWireVersion": 0,
@@ -19,7 +19,7 @@
           "b:27017",
           {
             "ok": 1,
-            "ismaster": true,
+            "isWritablePrimary": true,
             "msg": "isdbgrid",
             "logicalSessionTimeoutMinutes": 2,
             "minWireVersion": 0,
@@ -49,7 +49,7 @@
           "a:27017",
           {
             "ok": 1,
-            "ismaster": true,
+            "isWritablePrimary": true,
             "msg": "isdbgrid",
             "logicalSessionTimeoutMinutes": 1,
             "minWireVersion": 0,
@@ -60,7 +60,7 @@
           "b:27017",
           {
             "ok": 1,
-            "ismaster": true,
+            "isWritablePrimary": true,
             "msg": "isdbgrid",
             "minWireVersion": 0,
             "maxWireVersion": 6

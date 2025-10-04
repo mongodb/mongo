@@ -32,7 +32,7 @@
 # - The source database and destination database are the same.
 
 import os, random, re, shutil, string
-import wiredtiger, wttest
+import wttest
 
 # Shared base class used by import tests.
 class test_import_base(wttest.WiredTigerTestCase):
@@ -74,16 +74,42 @@ class test_import_base(wttest.WiredTigerTestCase):
             else:
                 self.check_record(uri, keys[i], values[i])
 
-    # We know the ID can be different between configs, so just remove it from comparison.
-    # Everything else should be the same.
+    # Compare two given configurations, excluding unique data.
     def config_compare(self, aconf, bconf):
-        a = re.sub('id=\d+,?', '', aconf)
-        a = (re.sub('\w+=\(.*?\)+,?', '', a).strip(',').split(',') +
-             re.findall('\w+=\(.*?\)+', a))
-        b = re.sub('id=\d+,?', '', bconf)
-        b = (re.sub('\w+=\(.*?\)+,?', '', b).strip(',').split(',') +
-             re.findall('\w+=\(.*?\)+', b))
-        self.assertTrue(a.sort() == b.sort())
+        # Retrieve the data that can be compared.
+        stripped_aconf = self.strip_subconfig(aconf)
+        stripped_bconf = self.strip_subconfig(bconf)
+
+        self.assertTrue(sorted(stripped_aconf) == sorted(stripped_bconf))
+
+    # Remove information related to the ID and checkpoints from a config.
+    def strip_subconfig(self, conf):
+        subconfigs = []
+        curr_subconfig = ''
+        depth = 0
+
+        for char in conf:
+            if char == '(':
+                depth += 1
+            elif char == ')':
+                depth -= 1
+
+           # If end of one subconfig, append it to subconfigs list.
+            if char == ',' and depth == 0:
+                subconfigs.append(curr_subconfig)
+                curr_subconfig = ''
+            else:
+                # Append the character to the current subconfiguration.
+                curr_subconfig += char
+
+        # Append any subconfig left.
+        if curr_subconfig:
+            subconfigs.append(curr_subconfig)
+
+        # The ID and checkpoint information can be different between configs, remove it.
+        stripped_subconfigs = [con for con in subconfigs if not con.startswith("id=") and not con.startswith("checkpoint")]
+
+        return stripped_subconfigs
 
     # Populate a database with N tables, each having M rows.
     def populate(self, ntables, nrows):
@@ -99,15 +125,12 @@ class test_import_base(wttest.WiredTigerTestCase):
     # Copy a file from a source directory to a destination directory.
     def copy_file(self, file_name, src_dir, dest_dir):
         src_path = os.path.join(src_dir, file_name)
-        if os.path.isfile(src_path) and "WiredTiger.lock" not in file_name and \
-            "Tmplog" not in file_name and "Preplog" not in file_name:
+        if os.path.isfile(src_path) and "WiredTiger.lock" not in file_name:
             shutil.copy(src_path, dest_dir)
 
 # test_import01
 class test_import01(test_import_base):
-
-    conn_config = 'cache_size=50MB,log=(enabled)'
-    session_config = 'isolation=snapshot'
+    conn_config = 'cache_size=50MB'
 
     original_db_file = 'original_db_file'
     uri = 'file:' + original_db_file
@@ -118,7 +141,7 @@ class test_import01(test_import_base):
     values = [b'\x01\x02aaa\x03\x04', b'\x01\x02bbb\x03\x04', b'\x01\x02ccc\x03\x04',
               b'\x01\x02ddd\x03\x04', b'\x01\x02eee\x03\x04', b'\x01\x02fff\x03\x04']
     ts = [10*k for k in range(1, len(keys)+1)]
-    create_config = 'allocation_size=512,key_format=u,log=(enabled=true),value_format=u'
+    create_config = 'allocation_size=512,key_format=u,value_format=u'
 
     def test_file_import(self):
         self.session.create(self.uri, self.create_config)
@@ -164,15 +187,19 @@ class test_import01(test_import_base):
         # Copy over the datafiles for the object we want to import.
         self.copy_file(self.original_db_file, '.', newdir)
 
-        # Contruct the config string.
+        # Construct the config string.
         import_config = 'import=(enabled,repair=false,file_metadata=(' + \
             original_db_file_config + '))'
 
         # Import the file.
         self.session.create(self.uri, import_config)
 
+        # Create a named checkpoint so it appears in the configuration of the imported table.
+        # This should not be relevant when comparing the original configuration and the new one.
+        self.session.checkpoint("name=abc")
+
         # Verify object.
-        self.session.verify(self.uri)
+        self.verifyUntilSuccess(self.session, self.uri, None)
 
         # Check that the previously inserted values survived the import.
         self.check(self.uri, self.keys[:max_idx], self.values[:max_idx])
@@ -227,7 +254,7 @@ class test_import01(test_import_base):
         # Now copy it back to our database directory.
         self.copy_file(self.original_db_file, backup_dir, '.')
 
-        # Contruct the config string.
+        # Construct the config string.
         import_config = 'import=(enabled,repair=false,file_metadata=(' + \
             original_db_file_config + '))'
 
@@ -235,7 +262,7 @@ class test_import01(test_import_base):
         self.session.create(self.uri, import_config)
 
         # Verify object.
-        self.session.verify(self.uri)
+        self.verifyUntilSuccess(self.session, self.uri, None)
 
         # Check that the previously inserted values survived the import.
         self.check(self.uri, self.keys, self.values)
@@ -245,6 +272,3 @@ class test_import01(test_import_base):
         current_db_file_config = c[self.uri]
         c.close()
         self.config_compare(original_db_file_config, current_db_file_config)
-
-if __name__ == '__main__':
-    wttest.run()

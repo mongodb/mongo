@@ -27,19 +27,25 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/bson/bson_depth.h"
-#include "mongo/bson/json.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/db/update/document_diff_test_helpers.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
-#include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/unittest.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <random>
+#include <vector>
+
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 
 namespace mongo::doc_diff {
 namespace {
@@ -83,18 +89,18 @@ std::vector<BSONObj> getDocumentsRepo() {
                                  "{level1Field1: {}}, field3: {level1Field3: ['val']}}"),
         createObjWithLargePrefix(
             "{field3: {level1Field1: [{level1Field1: [1, 2]}]}, field1: "
-            "{level1Field1: {}}, field2: {level1Field3: ['val']}}, field4: [[]]"),
+            "{level1Field1: {}}, field2: {level1Field3: ['val']}, field4: [[]]}"),
 
         // Unrelated documents.
         createObjWithLargePrefix(
             "{newField1: {level1Field1: [{level1Field1: [1, 2]}]}, newField2: {level1Field1: {}}, "
-            "newField4: {level1Field3: ['val']}}, newField3: [[]]"),
+            "newField4: {level1Field3: ['val']}, newField3: [[]]}"),
         createObjWithLargePrefix(
             "{newField2: {level1Field1: {}}, newField1: {level1Field1: [{level1Field1: [1, 2]}]},"
-            "newField4: {level1Field3: ['val']}}, newField3: [[]]"),
+            "newField4: {level1Field3: ['val']}, newField3: [[]]}"),
         createObjWithLargePrefix(
             "{newField3: {level1Field1: [{level1Field1: [1, 2]}]}, newField2: {level1Field1: {}}, "
-            "newField4: {level1Field3: ['val']}}, newField1: [[]]"),
+            "newField4: {level1Field3: ['val']}, newField1: [[]]}"),
     };
     return documents;
 }
@@ -111,8 +117,8 @@ std::vector<BSONObj> getDocumentsRepoAppendOnly() {
         createObjWithLargePrefix(
             "{field1: {level1Field1: {level1Field1: 1}, level1Field2: 'val2'}, field2: "
             "{level1Field1: {level2Field1: {}}}, field3: {level1Field3: 'va2', level1Field4: "
-            "'va4'}, field4: ['arrayVal1', 'arrayVal2', 'arrayVal3', 'arrayVal4', 'arrayVal5']}, "
-            "field5: {}, field6: 'va6'"),
+            "'va4'}, field4: ['arrayVal1', 'arrayVal2', 'arrayVal3', 'arrayVal4', 'arrayVal5'], "
+            "field5: {}, field6: 'va6'}"),
     };
     return documents;
 }
@@ -139,15 +145,13 @@ void runTest(TestOptions* options) {
         std::vector<BSONObj> diffs;
         diffs.reserve(options->documents.size() - 1);
         for (size_t i = 1; i < options->documents.size(); ++i) {
-            const auto diffOutput = computeDiff(preDoc,
-                                                options->documents[i],
-                                                update_oplog_entry::kSizeOfDeltaOplogEntryMetadata,
-                                                nullptr);
+            const auto diffOutput = computeOplogDiff(
+                preDoc, options->documents[i], update_oplog_entry::kSizeOfDeltaOplogEntryMetadata);
 
             ASSERT(diffOutput);
-            diffs.push_back(diffOutput->diff);
+            diffs.push_back(*diffOutput);
             const auto postObj = applyDiffTestHelper(
-                preDoc, diffOutput->diff, options->mustCheckExistenceForInsertOperations);
+                preDoc, *diffOutput, options->mustCheckExistenceForInsertOperations);
             ASSERT_BSONOBJ_BINARY_EQ(options->documents[i], postObj);
 
             if (options->mustCheckExistenceForInsertOperations) {
@@ -155,7 +159,7 @@ void runTest(TestOptions* options) {
                 ASSERT_BSONOBJ_BINARY_EQ(
                     postObj,
                     applyDiffTestHelper(
-                        postObj, diffOutput->diff, options->mustCheckExistenceForInsertOperations));
+                        postObj, *diffOutput, options->mustCheckExistenceForInsertOperations));
             }
 
             preDoc = options->documents[i];

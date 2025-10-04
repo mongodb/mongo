@@ -37,7 +37,6 @@
 static const char *home;
 
 static void add_collator(WT_CONNECTION *conn);
-static void add_extractor(WT_CONNECTION *conn);
 static void backup(WT_SESSION *session);
 static void checkpoint_ops(WT_SESSION *session);
 static void connection_ops(WT_CONNECTION *conn);
@@ -192,6 +191,14 @@ cursor_ops(WT_SESSION *session)
     }
 
     {
+        /*! [Get the raw key and value for the current record.] */
+        WT_ITEM key;   /* Get the raw key and value for the current record. */
+        WT_ITEM value; /* Get the raw key and value for the current record. */
+        error_check(cursor->get_raw_key_value(cursor, &key, &value));
+        /*! [Get the raw key and value for the current record.] */
+    }
+
+    {
         /*! [Set the cursor's raw value] */
         WT_ITEM value; /* Set the cursor's raw value. */
         value.data = "another value";
@@ -213,6 +220,14 @@ cursor_ops(WT_SESSION *session)
     /*! [Return the previous record] */
     error_check(cursor->prev(cursor));
     /*! [Return the previous record] */
+
+    {
+        /*! [Get the table's largest key] */
+        const char *largest_key;
+        error_check(cursor->largest_key(cursor));
+        error_check(cursor->get_key(cursor, &largest_key));
+        /*! [Get the table's largest key] */
+    }
 
     {
         WT_CURSOR *other = NULL;
@@ -371,16 +386,6 @@ cursor_ops(WT_SESSION *session)
     }
 
     {
-        /*! [Remove a record and fail if DNE] */
-        const char *key = "some key";
-        error_check(
-          session->open_cursor(session, "table:mytable", NULL, "overwrite=false", &cursor));
-        cursor->set_key(cursor, key);
-        error_check(cursor->remove(cursor));
-        /*! [Remove a record and fail if DNE] */
-    }
-
-    {
         /*! [Remove a record] */
         const char *key = "some key";
         error_check(session->open_cursor(session, "table:mytable", NULL, NULL, &cursor));
@@ -390,13 +395,24 @@ cursor_ops(WT_SESSION *session)
     }
 
     {
+        /*! [Remove a record and fail if DNE] */
+        const char *key = "non-existent key";
+        error_check(session->open_cursor(session, "table:mytable", NULL, NULL, &cursor));
+        cursor->set_key(cursor, key);
+        /* We expect to get a WT_NOTFOUND error if we try to remove a record that does not exist. */
+        if ((ret = cursor->remove(cursor)) == WT_NOTFOUND)
+            fprintf(stderr, "cursor.remove: key doesn't exist %s\n", wiredtiger_strerror(ret));
+        else
+            error_check(ret);
+        /*! [Remove a record and fail if DNE] */
+    }
+
+    {
         /*! [Display an error] */
         const char *key = "non-existent key";
         cursor->set_key(cursor, key);
-        if ((ret = cursor->remove(cursor)) != 0) {
+        if ((ret = cursor->remove(cursor)) != 0)
             fprintf(stderr, "cursor.remove: %s\n", wiredtiger_strerror(ret));
-            return (ret);
-        }
         /*! [Display an error] */
     }
 
@@ -404,10 +420,8 @@ cursor_ops(WT_SESSION *session)
         /*! [Display an error thread safe] */
         const char *key = "non-existent key";
         cursor->set_key(cursor, key);
-        if ((ret = cursor->remove(cursor)) != 0) {
+        if ((ret = cursor->remove(cursor)) != 0)
             fprintf(stderr, "cursor.remove: %s\n", cursor->session->strerror(cursor->session, ret));
-            return (ret);
-        }
         /*! [Display an error thread safe] */
     }
 
@@ -476,17 +490,6 @@ checkpoint_ops(WT_SESSION *session)
     /* Checkpoint of the database, creating a named snapshot. */
     error_check(session->checkpoint(session, "name=June01"));
 
-    /*
-     * Checkpoint a list of objects. JSON parsing requires quoting the list of target URIs.
-     */
-    error_check(session->checkpoint(session, "target=(\"table:table1\",\"table:table2\")"));
-
-    /*
-     * Checkpoint a list of objects, creating a named snapshot. JSON parsing requires quoting the
-     * list of target URIs.
-     */
-    error_check(session->checkpoint(session, "target=(\"table:mytable\"),name=midnight"));
-
     /* Checkpoint the database, discarding all previous snapshots. */
     error_check(session->checkpoint(session, "drop=(from=all)"));
 
@@ -502,27 +505,15 @@ checkpoint_ops(WT_SESSION *session)
      * Checkpoint the database, discarding all snapshots before and including "midnight".
      */
     error_check(session->checkpoint(session, "drop=(to=midnight)"));
-
-    /*
-     * Create a checkpoint of a table, creating the "July01" snapshot and discarding the "May01" and
-     * "June01" snapshots. JSON parsing requires quoting the list of target URIs.
-     */
-    error_check(
-      session->checkpoint(session, "target=(\"table:mytable\"),name=July01,drop=(May01,June01)"));
     /*! [Checkpoint examples] */
-
-    /*! [JSON quoting example] */
-    /*
-     * Checkpoint a list of objects. JSON parsing requires quoting the list of target URIs.
-     */
-    error_check(session->checkpoint(session, "target=(\"table:table1\",\"table:table2\")"));
-    /*! [JSON quoting example] */
 }
 
 static void
 cursor_statistics(WT_SESSION *session)
 {
     WT_CURSOR *cursor;
+    uint64_t stat_value;
+    int ret, stat_key;
 
     /*! [Statistics cursor database] */
     error_check(session->open_cursor(session, "statistics:", NULL, NULL, &cursor));
@@ -550,6 +541,18 @@ cursor_statistics(WT_SESSION *session)
     /*! [Statistics cursor session] */
     error_check(session->open_cursor(session, "statistics:session", NULL, NULL, &cursor));
     /*! [Statistics cursor session] */
+
+    /*! [Statistics cursor ignore column] */
+    error_check(session->open_cursor(session, "statistics:", NULL, NULL, &cursor));
+    while ((ret = cursor->next(cursor)) == 0) {
+        error_check(cursor->get_key(cursor, &stat_key));
+
+        /* Ignore the first two columns, only retrieve the statistics value. */
+        error_check(cursor->get_value(cursor, NULL, NULL, &stat_value));
+    }
+    scan_end_check(ret == WT_NOTFOUND);
+    error_check(cursor->close(cursor));
+    /*! [Statistics cursor ignore column] */
 }
 
 static void
@@ -615,6 +618,13 @@ session_ops_create(WT_SESSION *session)
       session, "table:mytable", "block_compressor=zstd,key_format=S,value_format=S"));
     /*! [Create a zstd compressed table] */
     error_check(session->drop(session, "table:mytable", NULL));
+
+    /*! [Create a iaa compressed table] */
+    error_check(session->create(
+      session, "table:mytable", "block_compressor=iaa,key_format=S,value_format=S"));
+    /*! [Create a iaa compressed table] */
+    error_check(session->drop(session, "table:mytable", NULL));
+
 #endif
 
     /*! [Configure checksums to uncompressed] */
@@ -686,12 +696,6 @@ session_ops(WT_SESSION *session)
         error_check(session->compact(session, "table:mytable", NULL));
         /*! [Compact a table] */
 
-        error_check(
-          session->create(session, "table:old", "key_format=r,value_format=S,cache_resident=true"));
-        /*! [Rename a table] */
-        error_check(session->rename(session, "table:old", "table:new", NULL));
-        /*! [Rename a table] */
-
         /*! [Salvage a table] */
         error_check(session->salvage(session, "table:mytable", NULL));
         /*! [Salvage a table] */
@@ -737,9 +741,7 @@ session_ops(WT_SESSION *session)
             }
         }
 
-        /*! [Upgrade a table] */
-        error_check(session->upgrade(session, "table:mytable", NULL));
-        /*! [Upgrade a table] */
+        error_check(session->checkpoint(session, NULL));
 
         /*! [Verify a table] */
         error_check(session->verify(session, "table:mytable", NULL));
@@ -836,6 +838,9 @@ transaction_ops(WT_SESSION *session_arg)
         error_check(session->begin_transaction(session, NULL));
         cursor->set_key(cursor, "key");
         cursor->set_value(cursor, "value");
+        /*! [transaction prepared_id] */
+        error_check(session->prepared_id_transaction(session, "prepared_id=a"));
+        /*! [transaction prepared_id] */
         error_check(session->prepare_transaction(session, "prepare_timestamp=2a"));
         error_check(
           session->commit_transaction(session, "commit_timestamp=2b,durable_timestamp=2b"));
@@ -845,15 +850,17 @@ transaction_ops(WT_SESSION *session_arg)
     {
         /*! [reset snapshot] */
         /*
-         * Resets snapshots for snapshot isolation transactions to update their existing snapshot.
-         * It raises an error when this API is used for isolation other than snapshot isolation
-         * mode.
+         * Get a new read snapshot for the current transaction. This is only permitted for
+         * transactions running with snapshot isolation.
          */
+        const char *value1, *value2; /* For the cursor's string value. */
         error_check(session->open_cursor(session, "table:mytable", NULL, NULL, &cursor));
         error_check(session->begin_transaction(session, "isolation=snapshot"));
         cursor->set_key(cursor, "some-key");
         error_check(cursor->search(cursor));
+        error_check(cursor->get_value(cursor, &value1));
         error_check(session->reset_snapshot(session));
+        error_check(cursor->get_value(cursor, &value2)); /* May be different. */
         error_check(session->commit_transaction(session, NULL));
         /*! [reset snapshot] */
     }
@@ -883,6 +890,22 @@ transaction_ops(WT_SESSION *session_arg)
     error_check(session->begin_transaction(session, NULL));
 
     {
+        /*! [hexadecimal timestamp] */
+        uint64_t ts;
+
+        /* 2 bytes for each byte converted to hexadecimal; sizeof includes the trailing nul byte */
+        char timestamp_buf[sizeof("commit_timestamp=") + 2 * sizeof(uint64_t)];
+
+        (void)snprintf(timestamp_buf, sizeof(timestamp_buf), "commit_timestamp=%x", 20u);
+        error_check(session->timestamp_transaction(session, timestamp_buf));
+
+        error_check(conn->query_timestamp(conn, timestamp_buf, "get=all_durable"));
+        ts = strtoull(timestamp_buf, NULL, 16);
+        /*! [hexadecimal timestamp] */
+        (void)ts;
+    }
+
+    {
         /*! [query timestamp] */
         char timestamp_buf[2 * sizeof(uint64_t) + 1];
 
@@ -894,11 +917,23 @@ transaction_ops(WT_SESSION *session_arg)
 
         error_check(conn->query_timestamp(conn, timestamp_buf, "get=all_durable"));
         /*! [query timestamp] */
+
+        error_check(session->begin_transaction(session, NULL));
+        /*! [transaction timestamp_uint] */
+        error_check(session->timestamp_transaction_uint(session, WT_TS_TXN_TYPE_PREPARE, 40));
+        /*! [transaction prepared_id_uint] */
+        error_check(session->prepared_id_transaction_uint(session, 10));
+        error_check(session->prepare_transaction(session, NULL));
+        /*! [transaction prepared_id_uint] */
+        error_check(session->timestamp_transaction_uint(session, WT_TS_TXN_TYPE_COMMIT, 42));
+        error_check(session->timestamp_transaction_uint(session, WT_TS_TXN_TYPE_DURABLE, 45));
+        /*! [transaction timestamp_uint] */
+        error_check(session->commit_transaction(session, NULL));
     }
 
-    /*! [set commit timestamp] */
-    error_check(conn->set_timestamp(conn, "commit_timestamp=2a"));
-    /*! [set commit timestamp] */
+    /*! [set durable timestamp] */
+    error_check(conn->set_timestamp(conn, "durable_timestamp=2a"));
+    /*! [set durable timestamp] */
 
     /*! [set oldest timestamp] */
     error_check(conn->set_timestamp(conn, "oldest_timestamp=2a"));
@@ -948,31 +983,6 @@ add_collator(WT_CONNECTION *conn)
     /*! [WT_COLLATOR register] */
 }
 
-/*! [WT_EXTRACTOR] */
-static int
-my_extract(WT_EXTRACTOR *extractor, WT_SESSION *session, const WT_ITEM *key, const WT_ITEM *value,
-  WT_CURSOR *result_cursor)
-{
-    /* Unused parameters */
-    (void)extractor;
-    (void)session;
-    (void)key;
-
-    result_cursor->set_key(result_cursor, value);
-    return (result_cursor->insert(result_cursor));
-}
-/*! [WT_EXTRACTOR] */
-
-static void
-add_extractor(WT_CONNECTION *conn)
-{
-    /*! [WT_EXTRACTOR register] */
-    static WT_EXTRACTOR my_extractor = {my_extract, NULL, NULL};
-
-    error_check(conn->add_extractor(conn, "my_extractor", &my_extractor, NULL));
-    /*! [WT_EXTRACTOR register] */
-}
-
 static void
 connection_ops(WT_CONNECTION *conn)
 {
@@ -986,7 +996,6 @@ connection_ops(WT_CONNECTION *conn)
 #endif
 
     add_collator(conn);
-    add_extractor(conn);
 
     /*! [Reconfigure a connection] */
     error_check(conn->reconfigure(conn, "eviction_target=75"));
@@ -1045,6 +1054,10 @@ connection_ops(WT_CONNECTION *conn)
       conn->configure_method(conn, "WT_SESSION.open_cursor", "my_data:", "devices", "list", NULL));
     /*! [Configure method configuration] */
 
+    /*! [Set the last materialized LSN by the page log service] */
+    error_check(conn->set_context_uint(conn, WT_CONTEXT_TYPE_LAST_MATERIALIZED_LSN, 100));
+    /*! [Set the last materialized LSN by the page log service] */
+
     /*! [Close a connection] */
     error_check(conn->close(conn, NULL));
     /*! [Close a connection] */
@@ -1080,8 +1093,6 @@ pack_ops(WT_SESSION *session)
 static void
 backup(WT_SESSION *session)
 {
-    char buf[1024];
-
     WT_CURSOR *dup_cursor;
     /*! [backup]*/
     WT_CURSOR *cursor;
@@ -1097,9 +1108,7 @@ backup(WT_SESSION *session)
     /* Copy the list of files. */
     while ((ret = cursor->next(cursor)) == 0) {
         error_check(cursor->get_key(cursor, &filename));
-        (void)snprintf(
-          buf, sizeof(buf), "cp /path/database/%s /path/database.backup/%s", filename, filename);
-        error_check(system(buf));
+        testutil_system("cp /path/database/%s /path/database.backup/%s", filename, filename);
     }
     scan_end_check(ret == WT_NOTFOUND);
 
@@ -1109,15 +1118,14 @@ backup(WT_SESSION *session)
     /*! [backup log duplicate]*/
     /* Open the backup data source. */
     error_check(session->open_cursor(session, "backup:", NULL, NULL, &cursor));
+    /*! [JSON quoting example] */
     /* Open a duplicate cursor for additional log files. */
+    /*
+     * JSON parsing requires quoting a URI that contains a colon.
+     */
     error_check(session->open_cursor(session, NULL, cursor, "target=(\"log:\")", &dup_cursor));
+    /*! [JSON quoting example] */
     /*! [backup log duplicate]*/
-
-    /*! [incremental backup]*/
-    /* Open the backup data source for log-based incremental backup. */
-    error_check(session->open_cursor(session, "backup:", NULL, "target=(\"log:\")", &cursor));
-    /*! [incremental backup]*/
-    error_check(cursor->close(cursor));
 
     /*! [incremental block backup]*/
     /* Open the backup data source for block-based incremental backup. */
@@ -1125,10 +1133,6 @@ backup(WT_SESSION *session)
       session, "backup:", NULL, "incremental=(enabled,src_id=ID0,this_id=ID1)", &cursor));
     /*! [incremental block backup]*/
     error_check(cursor->close(cursor));
-
-    /*! [backup of a checkpoint]*/
-    error_check(session->checkpoint(session, "drop=(from=June01),name=June01"));
-    /*! [backup of a checkpoint]*/
 }
 
 int
@@ -1191,6 +1195,12 @@ main(int argc, char *argv[])
     /*! [Configure zstd extension with compression level] */
     error_check(conn->close(conn, NULL));
 
+    /*! [Configure iaa extension] */
+    error_check(wiredtiger_open(
+      home, NULL, "create,extensions=[/usr/local/lib/libwiredtiger_iaa.so]", &conn));
+    /*! [Configure iaa extension] */
+    error_check(conn->close(conn, NULL));
+
     /* this is outside the example snippet on purpose; don't encourage compiling in keys */
     const char *secretkey = "abcdef";
     /*! [Configure sodium extension] */
@@ -1201,16 +1211,6 @@ main(int argc, char *argv[])
       secretkey);
     error_check(wiredtiger_open(home, NULL, conf, &conn));
     /*! [Configure sodium extension] */
-    error_check(conn->close(conn, NULL));
-
-    /*
-     * This example code gets run, and direct I/O might not be available, causing the open to fail.
-     * The documentation requires code snippets, use #ifdef's to avoid running it.
-     */
-    /* Might Not Run: direct I/O may not be available. */
-    /*! [Configure direct_io for data files] */
-    error_check(wiredtiger_open(home, NULL, "create,direct_io=[data]", &conn));
-    /*! [Configure direct_io for data files] */
     error_check(conn->close(conn, NULL));
 #endif
 
@@ -1320,6 +1320,24 @@ main(int argc, char *argv[])
         func = wiredtiger_crc32c_func();
         crc32c = func(buffer, len);
         /*! [Checksum a buffer] */
+        (void)crc32c;
+    }
+
+    {
+        size_t chunk1, chunk2, chunk3;
+        /*! [Checksum a large buffer in smaller pieces] */
+        uint32_t crc32c, (*func_with_seed)(uint32_t, const void *, size_t);
+        const char *buffer = "some other larger string";
+
+        func_with_seed = wiredtiger_crc32c_with_seed_func();
+        chunk1 = strlen("some ");
+        chunk2 = strlen("other larger ");
+        chunk3 = strlen("string");
+        crc32c = 0;
+        crc32c = func_with_seed(crc32c, buffer, chunk1);
+        crc32c = func_with_seed(crc32c, buffer + chunk1, chunk2);
+        crc32c = func_with_seed(crc32c, buffer + chunk1 + chunk2, chunk3);
+        /*! [Checksum a large buffer in smaller pieces] */
         (void)crc32c;
     }
 

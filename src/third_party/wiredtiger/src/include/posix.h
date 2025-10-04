@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 /* Some systems don't configure 64-bit MIN/MAX by default. */
 #ifndef ULLONG_MAX
 #define ULLONG_MAX 0xffffffffffffffffULL
@@ -27,6 +29,7 @@ typedef pthread_cond_t wt_cond_t;
 typedef pthread_mutex_t wt_mutex_t;
 typedef struct {
     bool created;
+    uint16_t name_index;
     pthread_t id;
 } wt_thread_t;
 
@@ -37,6 +40,14 @@ typedef struct {
 #define WT_THREAD_CALLBACK(x) void *(x)
 #define WT_THREAD_RET void *
 #define WT_THREAD_RET_VALUE NULL
+
+#ifdef __linux__
+/*
+ * pthread_setname_np(3) length restriction
+ */
+#define WT_THREAD_NAME_MAX_LEN 16
+
+#endif
 
 /*
  * WT declaration for calling convention type

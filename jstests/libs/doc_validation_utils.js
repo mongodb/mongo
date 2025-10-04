@@ -6,7 +6,7 @@
  * Assert that a command fails with a DocumentValidationFailure, and verify that the
  * 'errInfo' field is propogated as a part of the doc validation failure.
  */
-function assertDocumentValidationFailure(res, coll) {
+export function assertDocumentValidationFailure(res, coll) {
     assert.commandFailedWithCode(res, ErrorCodes.DocumentValidationFailure, tojson(res));
     if (res instanceof BulkWriteResult) {
         const errors = res.getWriteErrors();
@@ -19,4 +19,19 @@ function assertDocumentValidationFailure(res, coll) {
         assert(error.hasOwnProperty("errInfo"), tojson(error));
         assert.eq(typeof error["errInfo"], "object", tojson(error));
     }
+}
+
+/**
+ * Verifies that the logs contain DocumentValidationFailure.
+ */
+export function assertDocumentValidationFailureCheckLogs(db) {
+    checkLog.contains(db, '"codeName":"DocumentValidationFailure"');
+}
+
+/**
+ * Verifies that validation failed.
+ */
+export function assertFailsValidation(res) {
+    assert.writeError(res);
+    assert.eq(res.getWriteError().code, ErrorCodes.DocumentValidationFailure);
 }

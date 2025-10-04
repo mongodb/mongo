@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/unittest/task_executor_proxy.h"
+
+#include <utility>
 
 namespace mongo {
 namespace unittest {
@@ -107,19 +107,18 @@ StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorProxy::scheduleWo
     return _executor.load()->scheduleWorkAt(when, std::move(work));
 }
 
-StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorProxy::scheduleRemoteCommandOnAny(
-    const executor::RemoteCommandRequestOnAny& request,
-    const RemoteCommandOnAnyCallbackFn& cb,
+StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorProxy::scheduleRemoteCommand(
+    const executor::RemoteCommandRequest& request,
+    const RemoteCommandCallbackFn& cb,
     const BatonHandle& baton) {
-    return _executor.load()->scheduleRemoteCommandOnAny(request, cb, baton);
+    return _executor.load()->scheduleRemoteCommand(request, cb, baton);
 }
 
-StatusWith<executor::TaskExecutor::CallbackHandle>
-TaskExecutorProxy::scheduleExhaustRemoteCommandOnAny(
-    const executor::RemoteCommandRequestOnAny& request,
-    const RemoteCommandOnAnyCallbackFn& cb,
+StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorProxy::scheduleExhaustRemoteCommand(
+    const executor::RemoteCommandRequest& request,
+    const RemoteCommandCallbackFn& cb,
     const BatonHandle& baton) {
-    return _executor.load()->scheduleExhaustRemoteCommandOnAny(request, cb, baton);
+    return _executor.load()->scheduleExhaustRemoteCommand(request, cb, baton);
 }
 
 bool TaskExecutorProxy::hasTasks() {
@@ -138,8 +137,8 @@ void TaskExecutorProxy::appendConnectionStats(executor::ConnectionPoolStats* sta
     _executor.load()->appendConnectionStats(stats);
 }
 
-void TaskExecutorProxy::dropConnections(const HostAndPort& hostAndPort) {
-    _executor.load()->dropConnections(hostAndPort);
+void TaskExecutorProxy::dropConnections(const HostAndPort& target, const Status& status) {
+    _executor.load()->dropConnections(target, status);
 }
 
 void TaskExecutorProxy::appendNetworkInterfaceStats(BSONObjBuilder& bob) const {

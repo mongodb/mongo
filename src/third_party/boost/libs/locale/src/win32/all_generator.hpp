@@ -1,45 +1,27 @@
 //
-//  Copyright (c) 2009-2011 Artyom Beilis (Tonkikh)
+// Copyright (c) 2009-2011 Artyom Beilis (Tonkikh)
 //
-//  Distributed under the Boost Software License, Version 1.0. (See
-//  accompanying file LICENSE_1_0.txt or copy at
-//  http://www.boost.org/LICENSE_1_0.txt)
-//
+// Distributed under the Boost Software License, Version 1.0.
+// https://www.boost.org/LICENSE_1_0.txt
+
 #ifndef BOOST_LOCALE_IMPL_WIN32_ALL_GENERATOR_HPP
 #define BOOST_LOCALE_IMPL_WIN32_ALL_GENERATOR_HPP
 
 #include <boost/locale/generator.hpp>
-#include <vector>
-#include <locale.h>
+#include <locale>
 
-namespace boost {
-    namespace locale {
-        namespace impl_win {
+namespace boost { namespace locale { namespace impl_win {
 
-            class winlocale;
+    struct winlocale;
 
-            std::locale create_convert( std::locale const &in,
-                                        winlocale const &lc,
-                                        character_facet_type type);
+    std::locale create_convert(const std::locale& in, const winlocale& lc, char_facet_t type);
 
-            std::locale create_collate( std::locale const &in,
-                                        winlocale const &lc,
-                                        character_facet_type type);
+    std::locale create_collate(const std::locale& in, const winlocale& lc, char_facet_t type);
 
-            std::locale create_formatting(  std::locale const &in,
-                                            winlocale const &lc,
-                                            character_facet_type type);
+    std::locale create_formatting(const std::locale& in, const winlocale& lc, char_facet_t type);
 
-            std::locale create_parsing( std::locale const &in,
-                                        winlocale const &lc,
-                                        character_facet_type type);
+    std::locale create_parsing(const std::locale& in, const winlocale& lc, char_facet_t type);
 
-            std::locale create_codecvt( std::locale const &in,
-                                        character_facet_type type);
-
-        }
-    }
-}
+}}} // namespace boost::locale::impl_win
 
 #endif
-// vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4

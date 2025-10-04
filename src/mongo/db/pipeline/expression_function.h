@@ -29,8 +29,22 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/javascript_execution.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_visitor.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/modules.h"
+
+#include <string>
+#include <utility>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 /**
@@ -69,7 +83,7 @@ public:
 
     Value evaluate(const Document& root, Variables* variables) const final;
 
-    Value serialize(bool explain) const final;
+    Value serialize(const SerializationOptions& options) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -79,8 +93,25 @@ public:
         return visitor->visit(this);
     }
 
+    const Expression* getPassedArgs() const {
+        return _passedArgs.get();
+    }
+
+    bool getAssignFirstArgToThis() const {
+        return _assignFirstArgToThis;
+    }
+
+    const std::string& getFuncSource() const {
+        return _funcSource;
+    }
+
     static constexpr auto kExpressionName = "$function"_sd;
     static constexpr auto kJavaScript = "js";
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return ExpressionFunction::create(
+            getExpressionContext(), cloneChild(0), _funcSource, _lang);
+    }
 
 private:
     ExpressionFunction(ExpressionContext* expCtx,
@@ -88,11 +119,13 @@ private:
                        bool assignFirstArgToThis,
                        std::string funcSourceString,
                        std::string lang);
-    void _doAddDependencies(DepsTracker* deps) const final override;
 
     const boost::intrusive_ptr<Expression>& _passedArgs;
     bool _assignFirstArgToThis;
     std::string _funcSource;
     std::string _lang;
+
+    template <typename H>
+    friend class ExpressionHashVisitor;
 };
 }  // namespace mongo

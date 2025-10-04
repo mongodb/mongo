@@ -27,44 +27,42 @@
  *    it in the license file.
  */
 
+
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/commands/kill_op_cmd_base.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/logv2/log.h"
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
-#include "mongo/platform/basic.h"
-
-#include <limits>
-
-#include "mongo/base/init.h"
-#include "mongo/base/status.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/audit.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/kill_op_cmd_base.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/service_context.h"
-#include "mongo/logv2/log.h"
-#include "mongo/util/str.h"
 
 namespace mongo {
 
 class KillOpCommand : public KillOpCmdBase {
 public:
     bool run(OperationContext* opCtx,
-             const std::string& db,
+             const DatabaseName& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) final {
         long long opId = KillOpCmdBase::parseOpId(cmdObj);
 
         // Used by tests to check if auth checks passed.
         result.append("info", "attempting to kill op");
-        LOGV2(20482, "Going to kill op: {opId}", "Going to kill op", "opId"_attr = opId);
+        LOGV2(20482, "Going to kill op", "opId"_attr = opId);
         KillOpCmdBase::killLocalOperation(opCtx, opId);
-        reportSuccessfulCompletion(opCtx, db, cmdObj);
+        reportSuccessfulCompletion(opCtx, dbName, cmdObj);
 
         // killOp always reports success once past the auth check.
         return true;
     }
-} killOpCmd;
+
+    bool allowedWithSecurityToken() const final {
+        return true;
+    }
+};
+MONGO_REGISTER_COMMAND(KillOpCommand).forShard();
 
 }  // namespace mongo

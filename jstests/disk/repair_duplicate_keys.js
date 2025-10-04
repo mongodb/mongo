@@ -2,13 +2,17 @@
  * Tests that --repair deletes documents containing duplicate unique keys and inserts them into a
  * local lost and found collection.
  *
- * @tags: [requires_wiredtiger]
+ * @tags: [
+ *   requires_wiredtiger,
+ * ]
  */
 
-(function() {
-
-load('jstests/disk/libs/wt_file_helper.js');
-load("jstests/libs/uuid_util.js");
+import {
+    assertQueryUsesIndex,
+    assertRepairSucceeds,
+    startMongodOnExistingPath,
+} from "jstests/disk/libs/wt_file_helper.js";
+import {extractUUIDFromObject, getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 
 const baseName = "repair_duplicate_keys";
 const localBaseName = "local";
@@ -28,18 +32,18 @@ const doc3 = {
 };
 const docWithId = {
     a: 1,
-    _id: 1
+    _id: 1,
 };
 const dupDocWithId = {
     a: 1,
-    _id: 1
+    _id: 1,
 };
 
 resetDbpath(dbpath);
 let port;
 
 // Initializes test collection for tests 1-3.
-let createIndexedCollWithDocs = function(coll) {
+let createIndexedCollWithDocs = function (coll) {
     assert.commandWorked(coll.insert(doc1));
     assert.commandWorked(coll.createIndex({a: 1}, {name: indexName, unique: true}));
     assert.commandWorked(coll.insert(doc2));
@@ -52,10 +56,9 @@ let createIndexedCollWithDocs = function(coll) {
 };
 
 // Bypasses DuplicateKey insertion error for testing via failpoint.
-let addDuplicateDocumentToCol = function(db, coll, doc) {
+let addDuplicateDocumentToCol = function (db, coll, doc) {
     jsTestLog("Insert document without index entries.");
-    assert.commandWorked(
-        db.adminCommand({configureFailPoint: "skipIndexNewRecords", mode: "alwaysOn"}));
+    assert.commandWorked(db.adminCommand({configureFailPoint: "skipIndexNewRecords", mode: "alwaysOn"}));
 
     assert.commandWorked(coll.insert(doc));
 
@@ -64,7 +67,7 @@ let addDuplicateDocumentToCol = function(db, coll, doc) {
 
 // Runs repair on collection with possible duplicate keys and verifies original documents in
 // collection initialized with "createIndexedCollWithDocs" are still present.
-let runRepairAndVerifyCollectionDocs = function() {
+let runRepairAndVerifyCollectionDocs = function () {
     jsTestLog("Entering runRepairAndVerifyCollectionDocs...");
 
     assertRepairSucceeds(dbpath, port);
@@ -255,5 +258,4 @@ runRepairAndVerifyCollectionDocs();
 
     MongoRunner.stopMongod(mongod);
     jsTestLog("Exiting checkLostAndFoundCollForDoubleDup.");
-})();
 })();

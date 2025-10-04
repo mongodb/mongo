@@ -6,12 +6,8 @@
  *  - failure in subsequent batches
  *  - multiple resumable failures during the same clone
  */
-(function() {
-"use strict";
-
-load("jstests/replsets/rslib.js");  // For setLogVerbosity()
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/logv2_helpers.js");
+import {configureFailPoint, kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Verify the 'find' command received by the primary includes a resume token request.
 function checkHasRequestResumeToken() {
@@ -20,18 +16,14 @@ function checkHasRequestResumeToken() {
 
 // Verify the 'find' command received by the primary has no resumeAfter (yet).
 function checkNoResumeAfter() {
-    assert.throws(function() {
+    assert.throws(function () {
         checkLog.contains(primary, /\$_resumeAfter/, 3 * 1000);
     });
 }
 
 // Verify the 'find' command received by the primary has resumeAfter set with the given recordId.
 function checkHasResumeAfter(recordId) {
-    if (isJsonLogNoConn()) {
-        checkLog.contains(primary, `"$_resumeAfter":{"$recordId":${recordId}}`);
-    } else {
-        checkLog.contains(primary, "$_resumeAfter: { $recordId: " + recordId + " }");
-    }
+    checkLog.contains(primary, new RegExp(`"\\$_resumeAfter":\\{.*"\\$recordId":${recordId}.*\\}`));
 }
 
 const beforeRetryFailPointName = "hangBeforeRetryingClonerStage";
@@ -46,45 +38,46 @@ const primary = rst.getPrimary();
 const primaryDb = primary.getDB("test");
 
 // The default WC is majority and this test can't satisfy majority writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 // Add some data to be cloned.
-assert.commandWorked(primaryDb.test.insert([
-    /* first network error here */
-    {a: 1},
-    {b: 2}, /* batch 1 - second network error here */
-    {c: 3},
-    {d: 4}, /* batch 2 - third network error here */
-    {e: 5},
-    {f: 6},
-    {g: 7} /* batches 3 and 4, finish cloning */
-]));
+assert.commandWorked(
+    primaryDb.test.insert([
+        /* first network error here */
+        {a: 1},
+        {b: 2} /* batch 1 - second network error here */,
+        {c: 3},
+        {d: 4} /* batch 2 - third network error here */,
+        {e: 5},
+        {f: 6},
+        {g: 7} /* batches 3 and 4, finish cloning */,
+    ]),
+);
 
 jsTest.log("Adding a new node to the replica set");
 const secondary = rst.add({
     rsConfig: {priority: 0, votes: 0},
     setParameter: {
-        'failpoint.initialSyncHangBeforeCopyingDatabases': tojson({mode: 'alwaysOn'}),
+        "failpoint.initialSyncHangBeforeCopyingDatabases": tojson({mode: "alwaysOn"}),
         // Hang right after cloning the last document.
-        'failpoint.initialSyncHangDuringCollectionClone':
-            tojson({mode: 'alwaysOn', data: {namespace: "test.test", numDocsToClone: 7}}),
+        "failpoint.initialSyncHangDuringCollectionClone": tojson({
+            mode: "alwaysOn",
+            data: {namespace: "test.test", numDocsToClone: 7},
+        }),
         // This test is specifically testing that the cloners stop, so we turn off the
         // oplog fetcher to ensure that we don't inadvertently test that instead.
-        'failpoint.hangBeforeStartingOplogFetcher': tojson({mode: 'alwaysOn'}),
-        // MongoBridge does not support 'exhaust'.
-        // TODO(SERVER-44644): remove this setting
-        'collectionClonerUsesExhaust': false,
-        'collectionClonerBatchSize': 2,
-        'numInitialSyncAttempts': 1,
-    }
+        "failpoint.hangBeforeStartingOplogFetcher": tojson({mode: "alwaysOn"}),
+        "collectionClonerBatchSize": 2,
+        "numInitialSyncAttempts": 1,
+    },
 });
 rst.reInitiate();
 rst.waitForState(secondary, ReplSetTest.State.STARTUP_2);
 
 // Enable command logging on the primary so we can verify what commands we send over.
-assert.commandWorked(primary.adminCommand(
-    {"setParameter": 1, "logComponentVerbosity": {"command": {"verbosity": 1}}}));
+assert.commandWorked(primary.adminCommand({"setParameter": 1, "logComponentVerbosity": {"command": {"verbosity": 1}}}));
 
 jsTestLog("Beginning tests for collection cloner stage query");
 
@@ -93,15 +86,15 @@ const secondaryDb = secondary.getDB("test");
 const failPointData = {
     cloner: "CollectionCloner",
     stage: "query",
-    nss: "test.test"
+    nss: "test.test",
 };
-const beforeStageFailPoint =
-    configureFailPoint(secondaryDb, "hangBeforeClonerStage", failPointData);
+const beforeStageFailPoint = configureFailPoint(secondaryDb, "hangBeforeClonerStage", failPointData);
 let beforeRetryFailPoint = configureFailPoint(secondaryDb, beforeRetryFailPointName, failPointData);
 
 // Release the initial failpoint. We won't be needing it anymore.
-assert.commandWorked(secondaryDb.adminCommand(
-    {configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}));
+assert.commandWorked(
+    secondaryDb.adminCommand({configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}),
+);
 
 // We are still waiting to begin the query stage.
 beforeStageFailPoint.wait();
@@ -117,7 +110,7 @@ jsTestLog("Now testing: network error before first batch");
 primary.disconnect(secondary);
 beforeStageFailPoint.off();
 beforeRetryFailPoint.wait();
-checkHasRequestResumeToken();  // check params of first query
+checkHasRequestResumeToken(); // check params of first query
 checkNoResumeAfter();
 assert.commandWorked(secondaryDb.adminCommand({clearLog: "global"}));
 
@@ -126,7 +119,7 @@ primary.reconnect(secondary);
 let afterBatchFailPoint = configureFailPoint(secondaryDb, afterBatchFailPointName);
 beforeRetryFailPoint.off();
 afterBatchFailPoint.wait();
-checkHasRequestResumeToken();  // check params of first query retry
+checkHasRequestResumeToken(); // check params of first query retry
 checkNoResumeAfter();
 assert.commandWorked(secondaryDb.adminCommand({clearLog: "global"}));
 
@@ -148,7 +141,7 @@ primary.reconnect(secondary);
 afterBatchFailPoint = configureFailPoint(secondaryDb, afterBatchFailPointName);
 beforeRetryFailPoint.off();
 afterBatchFailPoint.wait();
-checkHasRequestResumeToken();  // check params of first query resume
+checkHasRequestResumeToken(); // check params of first query resume
 checkHasResumeAfter(2 /* recordId */);
 checkHasRequestResumeToken();
 assert.commandWorked(secondaryDb.adminCommand({clearLog: "global"}));
@@ -171,7 +164,7 @@ primary.reconnect(secondary);
 afterBatchFailPoint = configureFailPoint(secondaryDb, afterBatchFailPointName);
 beforeRetryFailPoint.off();
 afterBatchFailPoint.wait();
-checkHasRequestResumeToken();  // check params of second query resume
+checkHasRequestResumeToken(); // check params of second query resume
 checkHasResumeAfter(4 /* recordId */);
 assert.commandWorked(secondaryDb.adminCommand({clearLog: "global"}));
 
@@ -181,30 +174,30 @@ beforeRetryFailPoint.off();
 afterBatchFailPoint.off();
 
 // Make sure we have cloned all documents.
-assert.commandWorked(secondary.adminCommand({
-    waitForFailPoint: "initialSyncHangDuringCollectionClone",
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+assert.commandWorked(
+    secondary.adminCommand({
+        waitForFailPoint: "initialSyncHangDuringCollectionClone",
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout,
+    }),
+);
 
 // Make sure we have cloned exactly four batches and have never requested the same batch more
 // than once.
 const res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1, initialSync: 1}));
-assert(res.initialSyncStatus,
-       () => "Response should have an 'initialSyncStatus' field: " + tojson(res));
+assert(res.initialSyncStatus, () => "Response should have an 'initialSyncStatus' field: " + tojson(res));
 assert.eq(res.initialSyncStatus.databases.test["test.test"].fetchedBatches, 4);
 
 // Release the last cloner failpoint.
-assert.commandWorked(secondaryDb.adminCommand(
-    {configureFailPoint: "initialSyncHangDuringCollectionClone", mode: "off"}));
+assert.commandWorked(
+    secondaryDb.adminCommand({configureFailPoint: "initialSyncHangDuringCollectionClone", mode: "off"}),
+);
 
 // Also let the oplog fetcher run so we can complete initial sync.
 jsTestLog("Releasing the oplog fetcher failpoint.");
-assert.commandWorked(
-    secondaryDb.adminCommand({configureFailPoint: "hangBeforeStartingOplogFetcher", mode: "off"}));
+assert.commandWorked(secondaryDb.adminCommand({configureFailPoint: "hangBeforeStartingOplogFetcher", mode: "off"}));
 
 jsTestLog("Waiting for initial sync to complete.");
-rst.waitForState(secondary, ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [secondary]);
 
 rst.stopSet();
-})();

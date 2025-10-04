@@ -134,18 +134,18 @@ class BOOST_CONTAINER_DECL unsynchronized_pool_resource
    //!   using `upstream_resource()->allocate()`.
    //!
    //! <b>Throws</b>: Nothing unless `upstream_resource()->allocate()` throws.
-   void* do_allocate(std::size_t bytes, std::size_t alignment) BOOST_OVERRIDE;
+   virtual void* do_allocate(std::size_t bytes, std::size_t alignment) BOOST_OVERRIDE;
 
    //! <b>Effects</b>: Return the memory at p to the pool. It is unspecified if or under
    //!   what circumstances this operation will result in a call to
    //!   `upstream_resource()->deallocate()`.
    //!
    //! <b>Throws</b>: Nothing.
-   void do_deallocate(void* p, std::size_t bytes, std::size_t alignment) BOOST_OVERRIDE;
+   virtual void do_deallocate(void* p, std::size_t bytes, std::size_t alignment) BOOST_OVERRIDE;
 
    //! <b>Returns</b>:
    //!   `this == dynamic_cast<const unsynchronized_pool_resource*>(&other)`.
-   bool do_is_equal(const memory_resource& other) const BOOST_NOEXCEPT BOOST_OVERRIDE;
+   virtual bool do_is_equal(const memory_resource& other) const BOOST_NOEXCEPT BOOST_OVERRIDE;
 
    //Non-standard observers
    public:

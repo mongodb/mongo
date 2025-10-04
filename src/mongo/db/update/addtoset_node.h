@@ -29,12 +29,25 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/mutable_bson/algorithm.h"
+#include "mongo/db/exec/mutable_bson/element.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/update/modifier_node.h"
+#include "mongo/db/update/update_node.h"
+#include "mongo/db/update/update_node_visitor.h"
+
 #include <memory>
 #include <vector>
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/update/modifier_node.h"
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -59,6 +72,11 @@ protected:
     ModifyResult updateExistingElement(mutablebson::Element* element,
                                        const FieldRef& elementPath) const final;
     void setValueForNewElement(mutablebson::Element* element) const final;
+    void logUpdate(LogBuilderInterface* logBuilder,
+                   const RuntimeUpdatePath& pathTaken,
+                   mutablebson::Element element,
+                   ModifyResult modifyResult,
+                   boost::optional<int> createdFieldIdx) const final;
 
     bool allowCreation() const final {
         return true;

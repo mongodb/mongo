@@ -1,4 +1,5 @@
 """Helper functions to interact with github."""
+
 from github import Github, GithubException
 
 

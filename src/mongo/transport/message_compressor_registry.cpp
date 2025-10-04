@@ -27,20 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <algorithm>
+#include <memory>
+#include <ostream>
+#include <utility>
 
-#include "mongo/transport/message_compressor_registry.h"
-
+#include <absl/container/flat_hash_map.h>
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
-#include <memory>
-
-#include "mongo/base/init.h"
+// IWYU pragma: no_include "boost/algorithm/string/detail/classification.hpp"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
 #include "mongo/transport/message_compressor_noop.h"
-#include "mongo/transport/message_compressor_snappy.h"
-#include "mongo/transport/message_compressor_zlib.h"
-#include "mongo/transport/message_compressor_zstd.h"
-#include "mongo/util/options_parser/option_section.h"
+#include "mongo/transport/message_compressor_registry.h"
+#include "mongo/util/assert_util.h"
+
+#include <boost/core/addressof.hpp>
+#include <boost/function/function_base.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/type_index/type_index_facade.hpp>
 
 namespace mongo {
 namespace {
@@ -58,7 +64,7 @@ StringData getMessageCompressorName(MessageCompressor id) {
         case MessageCompressor::kZstd:
             return "zstd"_sd;
         default:
-            fassert(40269, "Invalid message compressor ID");
+            fasserted(40269);  // Invalid message compressor ID
     }
     MONGO_UNREACHABLE;
 }
@@ -104,7 +110,7 @@ MessageCompressorBase* MessageCompressorRegistry::getCompressor(MessageCompresso
 }
 
 MessageCompressorBase* MessageCompressorRegistry::getCompressor(StringData name) const {
-    auto it = _compressorsByName.find(name.toString());
+    auto it = _compressorsByName.find(std::string{name});
     if (it == _compressorsByName.end())
         return nullptr;
     return it->second;

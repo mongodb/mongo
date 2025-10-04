@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include "mongo/db/query/plan_yield_policy.h"
-
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/plan_yield_policy.h"
 
 namespace mongo {
 
@@ -44,10 +44,9 @@ public:
      */
     explicit YieldPolicyCallbacksImpl(NamespaceString nssForFailpoints);
 
-    virtual ~YieldPolicyCallbacksImpl() = default;
+    ~YieldPolicyCallbacksImpl() override = default;
 
     void duringYield(OperationContext*) const override;
-    void handledWriteConflict(OperationContext*) const override;
     void preCheckInterruptOnly(OperationContext*) const override;
 
 private:

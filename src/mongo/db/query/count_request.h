@@ -32,6 +32,7 @@
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 namespace count_request {
@@ -40,18 +41,5 @@ namespace count_request {
  * Throws on invalid values.
  */
 long long countParseLimit(const BSONElement& element);
-
-/**
- * Parses a skip for a CountCommandRequest. Errors if the value passed is negative.
- * Throws on invalid values.
- */
-long long countParseSkip(const BSONElement& element);
-
-/**
- * Parses a maxTimeMS for a CountCommandRequest. Errors if the value passed is negative.
- * Throws on invalid values.
- */
-long long countParseMaxTime(const BSONElement& element);
-
 }  // namespace count_request
 }  // namespace mongo

@@ -17,6 +17,11 @@
 #include <unistd.h>
 #include <fcntl.h>
 
+#if defined(__ANDROID__) && (__ANDROID_API__ < 30)
+// Even though statx syscall number is defined, it is blacklisted by seccomp in runtime until Android 11
+#error "statx syscall is not supported until Android 11"
+#endif
+
 #if !defined(__NR_statx)
 #error "No statx syscall"
 #endif

@@ -1,0 +1,704 @@
+# Copyright (C) 2018-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+    cpp_namespace: "mongo::write_ops"
+    cpp_includes:
+        - "mongo/db/query/write_ops/write_ops_parsers.h"
+        - "mongo/db/repl/optime.h"
+
+imports:
+    - "mongo/crypto/fle_field_schema.idl"
+    - "mongo/db/auth/access_checks.idl"
+    - "mongo/db/auth/action_type.idl"
+    - "mongo/db/session/logical_session_id.idl"
+    - "mongo/db/pipeline/legacy_runtime_constants.idl"
+    - "mongo/db/query/hint.idl"
+    - "mongo/db/basic_types.idl"
+
+types:
+    multi_delete_bool:
+        bson_serialization_type: any
+        description:
+            "An inverted boolean type used to parse the 'limit' property of the delete
+            command, which has a mandatory value of either 0 or 1, where 0 means multi
+            delete and 1 means delete just one."
+        cpp_type: "bool"
+        serializer: "::mongo::write_ops::writeMultiDeleteProperty"
+        deserializer: "::mongo::write_ops::readMultiDeleteProperty"
+        is_view: false
+
+    update_modification:
+        bson_serialization_type: any
+        description:
+            "Holds the contents of the update command 'u' field, describing the
+            modifications to apply on update."
+        cpp_type: "mongo::write_ops::UpdateModification"
+        serializer: "mongo::write_ops::UpdateModification::serializeToBSON"
+        deserializer: "mongo::write_ops::UpdateModification::parseFromBSON"
+        is_view: true
+
+    write_cmd_optime:
+        bson_serialization_type: any
+        description: "Holds the operation-time for write commands."
+        cpp_type: "mongo::repl::OpTime"
+        serializer: "::mongo::write_ops::opTimeSerializerWithTermCheck"
+        deserializer: "::mongo::write_ops::opTimeParser"
+        # repl::OpTime has only non view members.
+        is_view: false
+
+    write_error:
+        bson_serialization_type: object
+        description:
+            "Structure used to report a single error entry resulting from a batch write
+            command."
+        cpp_type: "mongo::write_ops::WriteError"
+        serializer: "mongo::write_ops::WriteError::serialize"
+        deserializer: "mongo::write_ops::WriteError::parse"
+        is_view: false
+
+structs:
+    # Note that all fields in this struct must be owned to prevent memory problems during parsing
+    # via write_ops.cpp helpers. See SERVER-103148 for more information.
+    WriteCommandReplyBase:
+        description: "Contains fields that is common in all the write commands reply."
+        fields:
+            n:
+                description: "For insert: number of documents inserted.
+                    For update: number of documents that matched the query predicate.
+                    For delete: number of documents deleted."
+                type: int
+                default: 0
+                stability: stable
+            electionId:
+                description: "Replication coordinator election id."
+                type: objectid
+                optional: true
+                stability: stable
+            opTime:
+                description: "Operation time for the command."
+                type: write_cmd_optime
+                optional: true
+                stability: stable
+            writeErrors:
+                description: "Contains all the errors encountered."
+                type: array<write_error>
+                optional: true
+                stability: stable
+            retriedStmtIds:
+                description:
+                    "The statement numbers for the write statements that had already been
+                    executed, thus were not executed by this command."
+                type: array<int>
+                optional: true
+                stability: unstable
+            writeConcernError:
+                description: "Contains a write concern error encountered."
+                type: object_owned
+                optional: true
+                stability: unstable
+
+    # Note that all fields in this struct must be owned to prevent memory problems during parsing
+    # via write_ops.cpp helpers. See SERVER-103148 for more information.
+    InsertCommandReply:
+        description: "Contains information related to insert command reply."
+        strict: false
+        is_command_reply: true
+        chained_structs:
+            WriteCommandReplyBase: writeCommandReplyBase
+
+    Upserted:
+        description: "Contains documents that have been upserted."
+        fields:
+            index:
+                description: "Index of the document."
+                type: int
+                stability: stable
+            _id:
+                description: "ID of the document."
+                type: IDLAnyTypeOwned
+                stability: stable
+
+    # Note that all fields in this struct must be owned to prevent memory problems during parsing
+    # via write_ops.cpp helpers. See SERVER-103148 for more information.
+    UpdateCommandReply:
+        description: "Contains information related to update command reply."
+        strict: false
+        is_command_reply: true
+        chained_structs:
+            WriteCommandReplyBase: writeCommandReplyBase
+        fields:
+            upserted:
+                description: "An array contains information about upserted documents."
+                type: array<Upserted>
+                optional: true
+                stability: stable
+            nModified:
+                description: "Number of updated documents."
+                type: int
+                default: 0
+                stability: stable
+
+    # Note that all fields in this struct must be owned to prevent memory problems during parsing
+    # via write_ops.cpp helpers. See SERVER-103148 for more information.
+    DeleteCommandReply:
+        description: "Contains information related to delete command reply."
+        strict: false
+        is_command_reply: true
+        chained_structs:
+            WriteCommandReplyBase: writeCommandReplyBase
+
+    # IMPORTANT: If any changes are made to the fields here, please update the corresponding size
+    # estimation functions in 'write_ops.cpp'.
+    WriteCommandRequestBase:
+        description: "Contains basic information included by all write commands"
+        strict: false
+        fields:
+            bypassDocumentValidation:
+                description:
+                    "Enables the operation to bypass document validation. This lets you
+                    write documents that do not meet the validation requirements."
+                type: safeBool
+                default: false
+                stability: stable
+            ordered:
+                description:
+                    "If true, then when an write statement fails, the command returns
+                    without executing the remaining statements. If false, then statements
+                    are allowed to be executed in parallel and if a statement fails,
+                    continue with the remaining statements, if any."
+                type: bool
+                default: true
+                stability: stable
+            stmtId:
+                description:
+                    "A statement number relative to the transaction. If this field
+                    is set, the statement ids of the contained operation will be
+                    implicitly generated based on their offset, starting from the value
+                    given. This field is mutually exclusive with 'stmtIds'."
+                type: int
+                optional: true
+                stability: stable
+
+            stmtIds:
+                description:
+                    "An array of statement numbers relative to the transaction. If this
+                    field is set, its size must be exactly the same as the number of
+                    entries in the corresponding insert/update/delete request. If it is
+                    not set, the statement ids of the contained operation will be
+                    implicitly generated based on their offset, starting from 'stmtId' or
+                    0 if 'stmtId' is not specified. This field is mutually exclusive
+                    with 'stmtId'."
+                type: array<int>
+                optional: true
+                stability: stable
+            isTimeseriesNamespace:
+                description:
+                    "This flag is set to true when the write command was originally sent
+                    to the time-series view, but got rewritten to target time-series
+                    buckets namespace."
+                type: optionalBool
+                stability: internal
+            collectionUUID:
+                description: "The expected UUID of the collection."
+                type: uuid
+                optional: true
+                stability: unstable
+            encryptionInformation:
+                description: "Encryption Information schema and other tokens for CRUD commands"
+                type: EncryptionInformation
+                optional: true
+                stability: unstable
+            bypassEmptyTsReplacement:
+                description:
+                    "Only applicable for inserts and replacement updates. If set to true,
+                    any empty timestamps (Timestamp(0,0)) in 'documents' or 'u' will not
+                    be replaced by the current time and instead will be preserved as-is."
+                type: optionalBool
+                stability: unstable
+            $_originalQuery:
+                description:
+                    "The original write query. This is used for updateOne/deleteOne
+                    without shard key during the write phase of the two phase protocol in
+                    order to make sure the shard key query analysis stores the correct
+                    client query."
+                type: object
+                optional: true
+                cpp_name: originalQuery
+                stability: internal
+            $_originalCollation:
+                description:
+                    "The original write query. This is used for updateOne/deleteOne
+                    without shard key during the write phase of the two phase protocol in
+                    order to make sure the shard key query analysis stores the correct
+                    client collation."
+                type: object
+                optional: true
+                cpp_name: originalCollation
+                stability: internal
+
+    UpdateOpEntry:
+        description: "Parser for the entries in the 'updates' array of an update command."
+        strict: true
+        fields:
+            q:
+                description:
+                    "The query that matches documents to update. Uses the same query
+                    selectors as used in the 'find' operation."
+                type: object
+                stability: stable
+            u:
+                description: "Set of modifications to apply."
+                type: update_modification
+                stability: stable
+            c:
+                description:
+                    "Specifies constant values that can be referred to in the pipeline
+                    performing a custom update."
+                type: object
+                optional: true
+                stability: stable
+            sort:
+                description:
+                    "Determines which document the operation modifies if the query selects
+                    multiple documents."
+                type: object
+                optional: true
+                stability: unstable
+            arrayFilters:
+                description: "Specifies which array elements an update modifier should apply to."
+                type: array<object>
+                optional: true
+                stability: stable
+            hint:
+                description: "Specifies the hint to use for the operation."
+                type: indexHint
+                default: mongo::BSONObj()
+                stability: stable
+            multi:
+                description:
+                    "If true, updates all documents that meet the query criteria. If false,
+                    limits the update to one document which meets the query criteria."
+                type: bool
+                default: false
+                stability: stable
+            upsert:
+                description:
+                    "If true, perform an insert if no documents match the query. If both
+                    upsert and multi are true and no documents match the query, the update
+                    operation inserts only a single document."
+                type: bool
+                default: false
+                stability: stable
+            upsertSupplied:
+                description:
+                    "Only applicable when upsert is true. If set, and if no documents match
+                    the query, the update subsystem will insert the document supplied as
+                    'c.new' rather than generating a new document from the update spec."
+                type: optionalBool
+                stability: internal
+            collation:
+                description: "Specifies the collation to use for the operation."
+                type: object
+                optional: true
+                stability: stable
+            sampleId:
+                description: "The unique sample id for the operation if it has been chosen for sampling."
+                type: uuid
+                optional: true
+                stability: unstable
+            $_allowShardKeyUpdatesWithoutFullShardKeyInQuery:
+                description:
+                    "Set to true if shard key updates should always be allowed, set to false if
+                    shard key updates should be disallowed, or omit to allow the shard to decide
+                    on its own (based on whether the command is retryable or in a transaction)."
+                type: optionalBool
+                cpp_name: allowShardKeyUpdatesWithoutFullShardKeyInQuery
+                stability: internal
+
+    DeleteOpEntry:
+        description: "Parser for the entries in the 'deletes' array of a delete command."
+        strict: true
+        fields:
+            q:
+                description:
+                    "The query that matches documents to delete. Uses the same query
+                    selectors as used in the 'find' operation."
+                type: object
+                stability: stable
+            limit:
+                description:
+                    "The number of matching documents to delete. Value of 0 deletes all
+                    matching documents and 1 deletes a single document."
+                type: multi_delete_bool
+                cpp_name: multi
+                stability: stable
+            hint:
+                description: "Specifies the hint to use for the operation."
+                type: indexHint
+                default: mongo::BSONObj()
+                stability: stable
+            collation:
+                description: "Specifies the collation to use for the operation."
+                type: object
+                optional: true
+                stability: stable
+            sampleId:
+                description: "The unique sample id for the operation if it has been chosen for sampling."
+                type: uuid
+                optional: true
+                stability: unstable
+
+    FindAndModifyLastError:
+        description: "Contains execution details for the findAndModify command"
+        fields:
+            n:
+                type: int
+                cpp_name: numDocs
+                stability: stable
+                description:
+                    "The number of documents that were inserted/deleted or matched the
+                    update predicate."
+            updatedExisting:
+                type: bool
+                description: "Whether an existing document was updated."
+                optional: true
+                stability: stable
+            upserted:
+                type: IDLAnyTypeOwned
+                description: "The _id of the inserted document."
+                optional: true
+                stability: stable
+
+    # Note that all fields in this struct must be owned to prevent memory problems during parsing
+    # via write_ops.cpp helpers. See SERVER-103148 for more information.
+    FindAndModifyCommandReply:
+        description: "Parser for the response from a `findAndModify` command"
+        strict: false
+        is_command_reply: true
+        fields:
+            lastErrorObject:
+                type: FindAndModifyLastError
+                stability: stable
+            value:
+                type: object_owned
+                optional: true
+                always_serialize: true
+                description:
+                    "The document after the write, if the 'new' field of the request is
+                    true. Otherwise, the document before the write."
+                stability: stable
+            retriedStmtId:
+                description:
+                    "The statement number for this findAndModify statement if it had
+                    already been executed, thus was not executed by this command."
+                type: int
+                optional: true
+                stability: unstable
+            writeConcernError:
+                description: "Contains a write concern error encountered."
+                type: object_owned
+                optional: true
+                stability: unstable
+
+commands:
+    # IMPORTANT: If any changes are made to the fields here, please update the corresponding insert
+    # size estimation functions in 'write_ops.cpp'.
+    insert:
+        description: "Parser for the 'insert' command."
+        command_name: insert
+        cpp_name: InsertCommandRequest
+        strict: true
+        namespace: concatenate_with_db
+        api_version: "1"
+        access_check:
+            simple:
+                privilege:
+                    resource_pattern: exact_namespace
+                    action_type: [bypassDocumentValidation, insert]
+        reply_type: InsertCommandReply
+        chained_structs:
+            WriteCommandRequestBase: writeCommandRequestBase
+        fields:
+            documents:
+                description: "An array of one or more documents to insert."
+                type: array<object>
+                supports_doc_sequence: true
+                stability: stable
+
+    # IMPORTANT: If any changes are made to the fields here, please update the corresponding update
+    # size estimation functions in 'write_ops.cpp'.
+    update:
+        description: "Parser for the 'update' command."
+        command_name: update
+        cpp_name: UpdateCommandRequest
+        strict: true
+        namespace: concatenate_with_db
+        api_version: "1"
+        access_check:
+            complex:
+                # Updates with $where clause may read into system.js collection and issue getMore commands
+                # that require cursor checks.
+                - check: check_cursor_session_privilege
+                - check: is_coauthorized_with
+                - privilege:
+                      resource_pattern: exact_namespace
+                      action_type: [bypassDocumentValidation, insert, update]
+        reply_type: UpdateCommandReply
+        chained_structs:
+            WriteCommandRequestBase: writeCommandRequestBase
+        fields:
+            updates:
+                description: "An array of one or more update statements to perform."
+                type: array<UpdateOpEntry>
+                supports_doc_sequence: true
+                stability: stable
+            let:
+                description:
+                    "A set of user-specified constants used by pipeline-style update
+                    operations and $expr."
+                type: object
+                optional: true
+                stability: stable
+            runtimeConstants:
+                description:
+                    "A legacy way to specify constant variables available during execution.
+                    'let' is now preferred."
+                cpp_name: legacyRuntimeConstants
+                type: LegacyRuntimeConstants
+                optional: true
+                stability: stable
+
+    # IMPORTANT: If any changes are made to the fields here, please update the corresponding delete
+    # size estimation functions in 'write_ops.cpp'.
+    delete:
+        description: "Parser for the 'delete' command."
+        command_name: delete
+        cpp_name: DeleteCommandRequest
+        strict: true
+        namespace: concatenate_with_db
+        api_version: "1"
+        access_check:
+            simple:
+                privilege:
+                    resource_pattern: exact_namespace
+                    action_type: [bypassDocumentValidation, remove]
+        reply_type: DeleteCommandReply
+        chained_structs:
+            WriteCommandRequestBase: writeCommandRequestBase
+        fields:
+            deletes:
+                description: "An array of one or more delete statements to perform."
+                type: array<DeleteOpEntry>
+                supports_doc_sequence: true
+                stability: stable
+            let:
+                description: "A set of user-specified constants used by $expr."
+                type: object
+                optional: true
+                stability: stable
+            runtimeConstants:
+                description:
+                    "A legacy way to specify constant variables available during execution.
+                    'let' is now preferred."
+                cpp_name: legacyRuntimeConstants
+                type: LegacyRuntimeConstants
+                optional: true
+                stability: unstable
+
+    findAndModify:
+        description: "Parser for the 'findAndModify' command."
+        command_name: findAndModify
+        command_alias: findandmodify
+        cpp_name: FindAndModifyCommandRequest
+        strict: true
+        namespace: concatenate_with_db
+        api_version: "1"
+        access_check:
+            simple:
+                privilege:
+                    resource_pattern: exact_namespace
+                    action_type:
+                        [bypassDocumentValidation, find, insert, update, remove]
+        reply_type: FindAndModifyCommandReply
+        fields:
+            query:
+                description:
+                    "The query that matches documents to update. Uses the same query
+                    selectors as used in the 'find' operation."
+                type: object_owned
+                default: mongo::BSONObj()
+                stability: stable
+            fields:
+                description: "A subset of fields to return."
+                type: object_owned
+                optional: true
+                stability: stable
+            sort:
+                description:
+                    "Determines which document the operation modifies if the query selects
+                    multiple documents."
+                type: object_owned
+                optional: true
+                stability: stable
+            batchSize:
+                description: "Determines the batch size."
+                type: int
+                optional: true
+                stability: stable
+            singleBatch:
+                description: "Determines if the batch is single."
+                type: bool
+                optional: true
+                stability: stable
+            hint:
+                description: "Specifies the hint to use for the operation."
+                type: indexHint
+                default: mongo::BSONObj()
+                stability: stable
+            collation:
+                description: "Specifies the collation to use for the operation."
+                type: object
+                optional: true
+                stability: stable
+            arrayFilters:
+                description: "Specifies which array elements an update modifier should apply to."
+                type: array<object>
+                optional: true
+                stability: stable
+            remove:
+                description: "Removes the document specified in the query field."
+                # We use 'safeBool' here since the field also allows numeric values.
+                type: safeBool
+                optional: true
+                stability: stable
+            update:
+                description: "Modification to apply."
+                type: update_modification
+                optional: true
+                stability: stable
+            upsert:
+                description:
+                    "If true, perform an insert if no documents match the query. If both
+                    upsert and multi are true and no documents match the query, the update
+                    operation inserts only a single document."
+                type: safeBool
+                optional: true
+                stability: stable
+            new:
+                description: "When true, returns the modified document rather than the original."
+                type: safeBool
+                optional: true
+                stability: stable
+            stmtId:
+                description: "The statement number for this findAndModify operation."
+                type: int
+                optional: true
+                stability: internal
+            bypassDocumentValidation:
+                description:
+                    "Enables the operation to bypass document validation. This lets you
+                    write documents that do not meet the validation requirements."
+                type: safeBool
+                optional: true
+                stability: stable
+            let:
+                description:
+                    "A set of user-specified constants used by pipeline-style update
+                    operations and $expr."
+                type: object
+                optional: true
+                stability: stable
+            runtimeConstants:
+                description:
+                    "A collection of values that do not change once computed. These are
+                    used by pipeline-style update operations."
+                cpp_name: legacyRuntimeConstants
+                type: LegacyRuntimeConstants
+                optional: true
+                stability: stable
+            encryptionInformation:
+                description: "Encryption Information schema and other tokens for CRUD commands"
+                type: EncryptionInformation
+                optional: true
+                stability: unstable
+            bypassEmptyTsReplacement:
+                description:
+                    "Only applicable when 'update' is a replacement update. If set, any
+                    empty timestamps (Timestamp(0, 0)) in the update will not be replaced
+                    by the current time and instead will be preserved as-is."
+                type: optionalBool
+                stability: unstable
+            sampleId:
+                description: "The unique sample id for the operation if it has been chosen for sampling."
+                type: uuid
+                optional: true
+                stability: unstable
+            $_originalQuery:
+                description:
+                    "The original write query. This is used for findAndModify without shard
+                    key during the write phase of the two phase protocol in order to make
+                    sure the shard key query analysis stores the correct client
+                    query."
+                type: object
+                optional: true
+                cpp_name: originalQuery
+                stability: internal
+            $_originalCollation:
+                description:
+                    "The original collation. This is used for findAndModify without shard
+                    key during the write phase of the two phase protocol in order to make
+                    sure the shard key query analysis stores the correct client
+                    collation."
+                type: object
+                optional: true
+                cpp_name: originalCollation
+                stability: internal
+            $_allowShardKeyUpdatesWithoutFullShardKeyInQuery:
+                description:
+                    "Set to true if shard key updates are allowed without the full shard
+                    key in the query."
+                type: optionalBool
+                cpp_name: allowShardKeyUpdatesWithoutFullShardKeyInQuery
+                stability: internal
+            isTimeseriesNamespace:
+                description:
+                    "This flag is set to true when the write command was originally sent
+                    to the time-series view, but got rewritten to target time-series
+                    buckets namespace."
+                type: optionalBool
+                stability: internal
+
+server_parameters:
+    upsertMaxRetryAttemptsOnDuplicateKeyError:
+        description: "Maximum number of retry attempts upsert will make on a duplicate key error."
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gUpsertMaxRetryAttemptsOnDuplicateKeyError
+        default: 100
+        redact: false

@@ -8,19 +8,12 @@
  * to run for primary again. Since the other secondary is disconnected, the primary must receive a
  * vote from the initial sync node to get elected again.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/replsets/rslib.js");
+import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {reconfig, waitForState} from "jstests/replsets/rslib.js";
 
 const name = jsTestName();
-const rst = new ReplSetTest({
-    name,
-    nodes: [{}, {rsConfig: {priority: 0}}],
-    settings: {electionTimeoutMillis: 3000, heartbeatIntervalMillis: 250},
-    useBridge: true
-});
+const rst = new ReplSetTest({name, nodes: [{}, {rsConfig: {priority: 0}}], useBridge: true});
 rst.startSet();
 rst.initiate();
 
@@ -29,7 +22,7 @@ const secondary = rst.getSecondaries()[0];
 
 const initialSyncSecondary = rst.add({
     rsConfig: {priority: 0, votes: 0},
-    setParameter: {'failpoint.initialSyncHangBeforeFinish': tojson({mode: 'alwaysOn'})},
+    setParameter: {"failpoint.initialSyncHangBeforeFinish": tojson({mode: "alwaysOn"})},
 });
 
 rst.reInitiate();
@@ -38,13 +31,17 @@ rst.reInitiate();
 // where a node is in initial sync with 1 vote.
 let nextConfig = rst.getReplSetConfigFromNode(0);
 nextConfig.members[2].votes = 1;
+nextConfig.settings.electionTimeoutMillis = 3000;
+nextConfig.settings.heartbeatIntervalMillis = 250;
 reconfig(rst, nextConfig, false /* force */, true /* wait */);
 
-assert.commandWorked(initialSyncSecondary.adminCommand({
-    waitForFailPoint: "initialSyncHangBeforeFinish",
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+assert.commandWorked(
+    initialSyncSecondary.adminCommand({
+        waitForFailPoint: "initialSyncHangBeforeFinish",
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout,
+    }),
+);
 
 secondary.disconnect(primary);
 
@@ -60,8 +57,7 @@ let primaryReplSetStatus = assert.commandWorked(primary.adminCommand({replSetGet
 assert.eq(1, primaryReplSetStatus.term);
 
 // Step down the primary and prevent it from running for elections with a high freeze timeout.
-assert.commandWorked(
-    primary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+assert.commandWorked(primary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
 waitForState(primary, ReplSetTest.State.SECONDARY);
 
 // Unfreeze the primary so that it can run for election. It should immediately run for election as
@@ -77,23 +73,23 @@ assert.gt(primaryReplSetStatus.term, 1);
 
 // Verify that initial sync node voted in the election and sets the correct term in its
 // electionParticipantMetrics field.
-const initialSyncSecondaryReplSetStatus =
-    assert.commandWorked(initialSyncSecondary.adminCommand({replSetGetStatus: 1}));
+const initialSyncSecondaryReplSetStatus = assert.commandWorked(
+    initialSyncSecondary.adminCommand({replSetGetStatus: 1}),
+);
 assert.eq(2, initialSyncSecondaryReplSetStatus.electionParticipantMetrics.electionTerm);
 
 // The disconnected secondary did not vote in the last election, so its electionParticipantMetrics
 // field should not be set.
-const disconnectedSecondaryReplSetStatus =
-    assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
+const disconnectedSecondaryReplSetStatus = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
 assert.eq(undefined, disconnectedSecondaryReplSetStatus.electionParticipantMetrics);
 
 // Since the primary sends a shut down command to all secondaries in `rst.stopSet()`, we reconnect
 // the disconnected secondary to the primary to allow it to be shut down.
 secondary.reconnect(primary);
 
-assert.commandWorked(initialSyncSecondary.adminCommand(
-    {configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
+assert.commandWorked(
+    initialSyncSecondary.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}),
+);
 waitForState(initialSyncSecondary, ReplSetTest.State.SECONDARY);
 
 rst.stopSet();
-})();

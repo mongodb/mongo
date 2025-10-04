@@ -29,21 +29,25 @@
 
 #pragma once
 
-#include <functional>
-#include <string>
-#include <type_traits>
-
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
-#include "mongo/stdx/unordered_map.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/interruptible.h"
 #include "mongo/util/string_map.h"
+
+#include <concepts>
+#include <cstdint>
+#include <string>
+#include <type_traits>
+#include <utility>
 
 namespace mongo {
 
@@ -52,6 +56,10 @@ namespace mongo {
  * A FailPoint is a hook mechanism allowing testing behavior to occur at prearranged
  * execution points in the server code. They can be activated and deactivated, and
  * configured to hold data.
+ *
+ * Failpoints are only available when set on the command line with
+ * '--setParameter enableTestCommands=1'.
+ * See FailPointRegistry::registerAllFailPointsAsServerParameters & docs/test_commands.md.
  *
  * A FailPoint is usually defined by the MONGO_FAIL_POINT_DEFINE(name) macro,
  * which arranges for it to be added to the global failpoint registry.
@@ -130,9 +138,16 @@ public:
     // please make sure that the new type is also BSON-compatible.
     using EntryCountT = long long;
 
-    using PredicateFunction = std::function<bool(const BSONObj&)>;
-
 private:
+    // Equivalent to a lambda like `[](const BSONObj&) { return true; }`, but only
+    // requires a single template instantiation.
+    struct AlwaysRun {
+        bool operator()(const BSONObj&) const {
+            return true;
+        }
+    };
+    static constexpr AlwaysRun alwaysRun = {};
+
     class Impl {
     private:
         enum class AlreadyCounted : bool {};
@@ -177,7 +192,7 @@ private:
              *   "times".
              */
             bool isStillEnabled() const {
-                return _impl->_shouldFail(AlreadyCounted{true}, PredicateFunction{});
+                return _impl->_shouldFail(AlreadyCounted{true}, alwaysRun);
             }
 
             /** May only be called if isActive() is true. */
@@ -193,8 +208,8 @@ private:
 
         Impl(std::string name) : _name(std::move(name)) {}
 
-        template <typename Pred>
-        bool shouldFail(Pred&& pred) {
+        template <std::predicate<const BSONObj&> Pred>
+        bool shouldFail(const Pred& pred) {
             return _shouldFail(AlreadyCounted{false}, pred);
         }
 
@@ -205,15 +220,15 @@ private:
 
         BSONObj toBSON() const;
 
-        template <typename Pred>
-        LockHandle tryLock(Pred&& pred) {
+        template <std::predicate<const BSONObj&> Pred>
+        LockHandle tryLock(const Pred& pred) {
             return _tryLock(AlreadyCounted{false}, pred);
         }
 
         /** See `FailPoint::pauseWhileSet`. */
         void pauseWhileSet(Interruptible* interruptible) {
             auto alreadyCounted = AlreadyCounted{false};
-            while (MONGO_unlikely(_shouldFail(alreadyCounted, nullptr))) {
+            while (MONGO_unlikely(_shouldFail(alreadyCounted, alwaysRun))) {
                 interruptible->sleepFor(_kWaitGranularity);
                 alreadyCounted = AlreadyCounted{true};
             }
@@ -223,7 +238,7 @@ private:
         void pauseWhileSetAndNotCanceled(Interruptible* interruptible,
                                          const CancellationToken& token) {
             auto alreadyCounted = AlreadyCounted{false};
-            while (MONGO_unlikely(_shouldFail(alreadyCounted, nullptr))) {
+            while (MONGO_unlikely(_shouldFail(alreadyCounted, alwaysRun))) {
                 uassert(
                     ErrorCodes::Interrupted, "Failpoint has been canceled", !token.isCanceled());
                 interruptible->sleepFor(_kWaitGranularity);
@@ -245,8 +260,8 @@ private:
         }
 
         /** No default parameters. No-Frills shouldFail implementation. */
-        template <typename Pred>
-        bool _shouldFail(AlreadyCounted alreadyCounted, Pred&& pred) {
+        template <std::predicate<const BSONObj&> Pred>
+        bool _shouldFail(AlreadyCounted alreadyCounted, const Pred& pred) {
             return _tryLock(alreadyCounted, pred).isActive();
         }
 
@@ -281,26 +296,24 @@ private:
          * `pauseWhileSet` loop to evaluate the failpoint multiple times while
          * only counting the first of those hits in terms of the `_hitCount`.
          */
-        template <typename Pred>
-        LockHandle _tryLock(AlreadyCounted alreadyCounted, Pred&& pred) {
+        template <std::predicate<const BSONObj&> Pred>
+        LockHandle _tryLock(AlreadyCounted alreadyCounted, const Pred& pred) {
             if (MONGO_likely((_fpInfo.loadRelaxed() & _kActiveBit) == 0))
                 return LockHandle{nullptr, false};  // Fast path
 
             if ((_fpInfo.addAndFetch(1) & _kActiveBit) == 0)
                 return LockHandle{this, false};  // Took a reference to disabled in data race.
 
-            // Slow path. Wrap in `std::function` to deal with nullptr_t
-            // or other predicates that are not bool-convertible.
-            auto predWrap = PredicateFunction(std::move(pred));
+            // Slow path.
 
-            // The caller-supplied predicate, if provided, can force a miss that
-            // bypasses the `_evaluateByMode()` call.
-            bool bypass = predWrap && !predWrap(_data);
-            bool hit = bypass ? false : _evaluateByMode();
+            if (!pred(_data))
+                return LockHandle{this, false};
 
-            if (hit && alreadyCounted == AlreadyCounted{false})
+            if (!_evaluateByMode())
+                return LockHandle{this, false};
+            if (alreadyCounted == AlreadyCounted{false})
                 _hitCount.addAndFetch(1);
-            return LockHandle{this, hit};
+            return LockHandle{this, true};
         }
 
         /**
@@ -325,7 +338,7 @@ private:
         const std::string _name;
 
         // protects _mode, _modeValue, _data
-        mutable Mutex _modMutex = MONGO_MAKE_LATCH("FailPoint::_modMutex");
+        mutable stdx::mutex _modMutex;
     };
 
 public:
@@ -404,13 +417,13 @@ public:
      * Calls to `shouldFail` should be placed inside MONGO_unlikely for performance.
      *    if (MONGO_unlikely(failpoint.shouldFail())) ...
      */
-    template <typename Pred>
-    bool shouldFail(Pred&& pred) {
+    template <std::predicate<const BSONObj&> Pred>
+    bool shouldFail(const Pred& pred) {
         return _impl()->shouldFail(pred);
     }
 
     bool shouldFail() {
-        return shouldFail(nullptr);
+        return shouldFail(alwaysRun);
     }
 
     /**
@@ -450,7 +463,7 @@ public:
      *
      * @returns the number of times the fail point has been entered so far.
      */
-    EntryCountT waitForTimesEntered(EntryCountT targetTimesEntered) const noexcept {
+    EntryCountT waitForTimesEntered(EntryCountT targetTimesEntered) const {
         return waitForTimesEntered(Interruptible::notInterruptible(), targetTimesEntered);
     }
 
@@ -476,7 +489,7 @@ public:
      * If it's active, the returned object can be used to access FailPoint data.
      */
     LockHandle scoped() {
-        return scopedIf(nullptr);
+        return scopedIf(alwaysRun);
     }
 
     /**
@@ -488,14 +501,14 @@ public:
      * If it's active, the returned object can be used to access FailPoint data.
      * The `pred` should be callable like a `bool pred(const BSONObj&)`.
      */
-    template <typename Pred>
-    LockHandle scopedIf(Pred&& pred) {
+    template <std::predicate<const BSONObj&> Pred>
+    LockHandle scopedIf(const Pred& pred) {
         return _impl()->tryLock(pred);
     }
 
-    template <typename F>
-    void execute(F&& f) {
-        return executeIf(f, nullptr);
+    template <std::invocable<const BSONObj&> F>
+    void execute(const F& f) {
+        return executeIf(f, alwaysRun);
     }
 
     /**
@@ -505,11 +518,11 @@ public:
      * consumed).
      * The `pred` should be callable like a `bool pred(const BSONObj&)`.
      */
-    template <typename F, typename Pred>
-    void executeIf(F&& f, Pred&& pred) {
+    template <std::invocable<const BSONObj&> F, std::predicate<const BSONObj&> Pred>
+    void executeIf(const F& f, const Pred& pred) {
         auto sfp = scopedIf(pred);
         if (MONGO_unlikely(sfp.isActive())) {
-            std::forward<F>(f)(sfp.getData());
+            f(sfp.getData());
         }
     }
 
@@ -619,8 +632,10 @@ class FailPointEnableBlock {
 public:
     explicit FailPointEnableBlock(StringData failPointName);
     FailPointEnableBlock(StringData failPointName, BSONObj data);
+    FailPointEnableBlock(StringData failPointName, FailPoint::ModeOptions mode);
     explicit FailPointEnableBlock(FailPoint* failPoint);
     FailPointEnableBlock(FailPoint* failPoint, BSONObj data);
+    FailPointEnableBlock(FailPoint* failPoint, FailPoint::ModeOptions mode);
     ~FailPointEnableBlock();
 
     FailPointEnableBlock(const FailPointEnableBlock&) = delete;

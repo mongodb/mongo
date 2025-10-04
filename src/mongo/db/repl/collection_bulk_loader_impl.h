@@ -27,17 +27,21 @@
  *    it in the license file.
  */
 
-
 #pragma once
-
 #include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/catalog/multi_index_block.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/index_builds/multi_index_block.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/repl/collection_bulk_loader.h"
-#include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/service_context.h"
+#include "mongo/util/modules.h"
+#include "mongo/util/time_support.h"
+
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace mongo {
 namespace repl {
@@ -60,22 +64,17 @@ public:
         BSONObj toBSON() const;
     };
 
-    CollectionBulkLoaderImpl(ServiceContext::UniqueClient&& client,
-                             ServiceContext::UniqueOperationContext&& opCtx,
-                             std::unique_ptr<AutoGetCollection>&& autoColl,
-                             const BSONObj& idIndexSpec);
-    virtual ~CollectionBulkLoaderImpl();
+    CollectionBulkLoaderImpl(ServiceContext::UniqueClient client,
+                             ServiceContext::UniqueOperationContext opCtx,
+                             const NamespaceString& nss);
+    ~CollectionBulkLoaderImpl() override;
 
-    virtual Status init(const std::vector<BSONObj>& secondaryIndexSpecs) override;
+    Status init(const BSONObj& idIndexSpec, const std::vector<BSONObj>& secondaryIndexSpecs);
 
-    virtual Status insertDocuments(std::vector<BSONObj>::const_iterator begin,
-                                   std::vector<BSONObj>::const_iterator end) override;
-    virtual Status commit() override;
+    Status insertDocuments(std::span<BSONObj> objs, ParseRecordIdAndDocFunc fn) override;
+    Status commit() override;
 
     CollectionBulkLoaderImpl::Stats getStats() const;
-
-    virtual std::string toString() const override;
-    virtual BSONObj toBSON() const override;
 
 private:
     void _releaseResources();
@@ -84,31 +83,16 @@ private:
     Status _runTaskReleaseResourcesOnFailure(const F& task) noexcept;
 
     /**
-     * For capped collections, each document will be inserted in its own WriteUnitOfWork.
-     */
-    Status _insertDocumentsForCappedCollection(std::vector<BSONObj>::const_iterator begin,
-                                               std::vector<BSONObj>::const_iterator end);
-
-    /**
-     * For uncapped collections, we will insert documents in batches of size
-     * collectionBulkLoaderBatchSizeInBytes or up to one document size greater. All insertions in a
-     * given batch will be inserted in one WriteUnitOfWork.
-     */
-    Status _insertDocumentsForUncappedCollection(std::vector<BSONObj>::const_iterator begin,
-                                                 std::vector<BSONObj>::const_iterator end);
-
-    /**
      * Adds document and associated RecordId to index blocks after inserting into RecordStore.
      */
     Status _addDocumentToIndexBlocks(const BSONObj& doc, const RecordId& loc);
 
     ServiceContext::UniqueClient _client;
     ServiceContext::UniqueOperationContext _opCtx;
-    std::unique_ptr<AutoGetCollection> _collection;
+    CollectionAcquisition _acquisition;
     NamespaceString _nss;
     std::unique_ptr<MultiIndexBlock> _idIndexBlock;
     std::unique_ptr<MultiIndexBlock> _secondaryIndexesBlock;
-    BSONObj _idIndexSpec;
     Stats _stats;
 };
 

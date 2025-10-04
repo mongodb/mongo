@@ -15,14 +15,15 @@
 #pragma once
 #endif  // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
-#include "asio/detail/config.hpp"
-
-#include "asio/write.hpp"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/net/ssl/detail/engine.hpp"
 #include "mongo/util/net/ssl/detail/stream_core.hpp"
 
-#include "asio/detail/push_options.hpp"
+#include <asio/detail/config.hpp>
+#include <asio/write.hpp>
+
+// This must be after all other includes
+#include <asio/detail/push_options.hpp>
 
 namespace asio {
 namespace ssl {
@@ -86,6 +87,31 @@ std::size_t io(Stream& next_layer, stream_core& core, const Operation& op, asio:
 
                 // Operation is complete. Return result to caller.
                 core.engine_.map_error_code(ec);
+
+                // If an error is encountered, continue to flush the BIO to the ASIO socket so
+                // that any protocol_version Alert messages will be sent to the client
+                if (ec) {
+                    // We want to retain the original error code, so we use a temporary error
+                    // code here
+                    asio::error_code myEC;
+                    size_t orig_core_output_size = core.output_.size();
+                    while (core.output_.size()) {
+                        core.output_ += asio::write(next_layer, core.output_, myEC);
+                        // Some operating systems like Linux (running various flavors of OpenSSL
+                        // including OSSL 1.0.2, 1.1.1 and 3.0) will allow flushing of the BIO when
+                        // an error has occurred, and then emit any alerts like a protocol version
+                        // alert when the BIO is flushed. However, other operating systems like
+                        // Windows (running SChannel) will not - they will no longer read any input
+                        // when an error is encountered, but will emit alerts as soon as the error
+                        // is encountered. Attempting to read the input within the while loop will
+                        // cause mongod to get into an infinite loop. For a general solution,
+                        // therefore, we need to break out of this loop as soon as we detect that
+                        // no progress is being made
+                        if (core.output_.size() == orig_core_output_size) {
+                            break;
+                        }
+                    }
+                }
                 return bytes_transferred;
 
             default:
@@ -214,6 +240,7 @@ public:
                                 break;
                             }
                     }
+                    [[fallthrough]];
 
                     default:
                         if (bytes_transferred == ~std::size_t(0))
@@ -248,7 +275,7 @@ public:
                                 core_.pending_write_.expires_at(core_.neg_infin());
 
                                 // Fall through to call handler.
-
+                                [[fallthrough]];
                             default:
 
                                 // Pass the result to the handler.
@@ -278,35 +305,10 @@ public:
 };
 
 template <typename Stream, typename Operation, typename Handler>
-inline void* asio_handler_allocate(std::size_t size,
-                                   io_op<Stream, Operation, Handler>* this_handler) {
-    return asio_handler_alloc_helpers::allocate(size, this_handler->handler_);
-}
-
-template <typename Stream, typename Operation, typename Handler>
-inline void asio_handler_deallocate(void* pointer,
-                                    std::size_t size,
-                                    io_op<Stream, Operation, Handler>* this_handler) {
-    asio_handler_alloc_helpers::deallocate(pointer, size, this_handler->handler_);
-}
-
-template <typename Stream, typename Operation, typename Handler>
 inline bool asio_handler_is_continuation(io_op<Stream, Operation, Handler>* this_handler) {
     return this_handler->start_ == 0
         ? true
         : asio_handler_cont_helpers::is_continuation(this_handler->handler_);
-}
-
-template <typename Function, typename Stream, typename Operation, typename Handler>
-inline void asio_handler_invoke(Function& function,
-                                io_op<Stream, Operation, Handler>* this_handler) {
-    asio_handler_invoke_helpers::invoke(function, this_handler->handler_);
-}
-
-template <typename Function, typename Stream, typename Operation, typename Handler>
-inline void asio_handler_invoke(const Function& function,
-                                io_op<Stream, Operation, Handler>* this_handler) {
-    asio_handler_invoke_helpers::invoke(function, this_handler->handler_);
 }
 
 template <typename Stream, typename Operation, typename Handler>
@@ -316,29 +318,8 @@ inline void async_io(Stream& next_layer, stream_core& core, const Operation& op,
 
 }  // namespace detail
 }  // namespace ssl
-
-template <typename Stream, typename Operation, typename Handler, typename Allocator>
-struct associated_allocator<ssl::detail::io_op<Stream, Operation, Handler>, Allocator> {
-    typedef typename associated_allocator<Handler, Allocator>::type type;
-
-    static type get(const ssl::detail::io_op<Stream, Operation, Handler>& h,
-                    const Allocator& a = Allocator()) ASIO_NOEXCEPT {
-        return associated_allocator<Handler, Allocator>::get(h.handler_, a);
-    }
-};
-
-template <typename Stream, typename Operation, typename Handler, typename Executor>
-struct associated_executor<ssl::detail::io_op<Stream, Operation, Handler>, Executor> {
-    typedef typename associated_executor<Handler, Executor>::type type;
-
-    static type get(const ssl::detail::io_op<Stream, Operation, Handler>& h,
-                    const Executor& ex = Executor()) ASIO_NOEXCEPT {
-        return associated_executor<Handler, Executor>::get(h.handler_, ex);
-    }
-};
-
 }  // namespace asio
 
-#include "asio/detail/pop_options.hpp"
+#include <asio/detail/pop_options.hpp>
 
 #endif  // ASIO_SSL_DETAIL_IO_HPP

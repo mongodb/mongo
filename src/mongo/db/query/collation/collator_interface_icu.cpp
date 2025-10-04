@@ -27,16 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/query/collation/collator_interface_icu.h"
 
+#include "mongo/util/assert_util.h"
+
+#include <cstdint>
 #include <memory>
+#include <string>
+#include <utility>
 
 #include <unicode/coll.h>
 #include <unicode/sortkey.h>
-
-#include "mongo/util/assert_util.h"
+#include <unicode/stringpiece.h>
+#include <unicode/ucol.h>
+#include <unicode/unistr.h>
+#include <unicode/utypes.h>
 
 namespace mongo {
 
@@ -44,15 +49,19 @@ CollatorInterfaceICU::CollatorInterfaceICU(Collation spec, std::unique_ptr<icu::
     : CollatorInterface(std::move(spec)), _collator(std::move(collator)) {}
 
 std::unique_ptr<CollatorInterface> CollatorInterfaceICU::clone() const {
-    auto clone = std::make_unique<CollatorInterfaceICU>(
+    return std::make_unique<CollatorInterfaceICU>(
         getSpec(), std::unique_ptr<icu::Collator>(_collator->clone()));
-    return {std::move(clone)};
+}
+
+std::shared_ptr<CollatorInterface> CollatorInterfaceICU::cloneShared() const {
+    return std::make_shared<CollatorInterfaceICU>(
+        getSpec(), std::unique_ptr<icu::Collator>(_collator->clone()));
 }
 
 int CollatorInterfaceICU::compare(StringData left, StringData right) const {
     UErrorCode status = U_ZERO_ERROR;
-    auto compareResult = _collator->compareUTF8(icu::StringPiece(left.rawData(), left.size()),
-                                                icu::StringPiece(right.rawData(), right.size()),
+    auto compareResult = _collator->compareUTF8(icu::StringPiece(left.data(), left.size()),
+                                                icu::StringPiece(right.data(), right.size()),
                                                 status);
 
     // Any sequence of bytes, even invalid UTF-8, has defined comparison behavior in ICU (invalid
@@ -75,7 +84,7 @@ int CollatorInterfaceICU::compare(StringData left, StringData right) const {
 CollatorInterface::ComparisonKey CollatorInterfaceICU::getComparisonKey(
     StringData stringData) const {
     // A StringPiece is ICU's StringData. They are logically the same abstraction.
-    const icu::StringPiece stringPiece(stringData.rawData(), stringData.size());
+    const icu::StringPiece stringPiece(stringData.data(), stringData.size());
 
     UErrorCode status = U_ZERO_ERROR;
     icu::CollationKey icuKey;

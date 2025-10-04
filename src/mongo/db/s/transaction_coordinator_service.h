@@ -29,7 +29,28 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/s/transaction_coordinator_catalog.h"
+#include "mongo/db/s/transaction_coordinator_futures_util.h"
+#include "mongo/db/s/transaction_coordinator_structures.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/future.h"
+#include "mongo/util/observable_mutex.h"
+#include "mongo/util/time_support.h"
+
+#include <memory>
+#include <set>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -39,7 +60,7 @@ class TransactionCoordinatorService {
 
 public:
     TransactionCoordinatorService();
-    ~TransactionCoordinatorService();
+    virtual ~TransactionCoordinatorService();
 
     /**
      * Retrieves the TransactionCoordinatorService associated with the service or operation context.
@@ -89,32 +110,6 @@ public:
         TxnNumberAndRetryCounter txnNumberAndRetryCounter);
 
     /**
-     * Marks the coordinator catalog as stepping up, which blocks all incoming requests for
-     * coordinators, and launches an async task to:
-     * 1. Wait for the coordinators in the catalog to complete (successfully or with an error) and
-     *    be removed from the catalog.
-     * 2. Read all pending commit tasks from the config.transactionCoordinators collection.
-     * 3. Create TransactionCoordinator objects in memory for each pending commit and launch an
-     *    async task to continue coordinating its commit.
-     *
-     * The 'recoveryDelay' argument is only used for testing in order to simulate recovery taking
-     * long time.
-     */
-    void onStepUp(OperationContext* opCtx, Milliseconds recoveryDelayForTesting = Milliseconds(0));
-    void onStepDown();
-
-    /**
-     * Shuts down this service. This will no longer be usable once shutdown is called.
-     */
-    void shutdown();
-
-    /**
-     * Called when an already established replica set is added as a shard to a cluster. Ensures that
-     * the TransactionCoordinator service is started up if the replica set is currently primary.
-     */
-    void onShardingInitialization(OperationContext* opCtx, bool isPrimary);
-
-    /**
      * Cancel commit on the coordinator for the given transaction only if it has not started yet.
      */
     void cancelIfCommitNotYetStarted(OperationContext* opCtx,
@@ -122,16 +117,38 @@ public:
                                      TxnNumberAndRetryCounter txnNumberAndRetryCounter);
 
     /**
-     * Blocking call which waits for the previous stepUp/stepDown round to join and ensures all
-     * tasks scheduled by that round have completed.
+     * Initializes the CatalogAndScheduler if needed and launches a recovery async
+     * task. Must be called on the primary.
+     *
+     * The 'recoveryDelay' argument is only used for testing in order to simulate recovery taking
+     * long time.
      */
-    void joinPreviousRound();
+    void initializeIfNeeded(OperationContext* opCtx,
+                            long long term,
+                            Milliseconds recoveryDelay = Milliseconds(0));
 
-private:
+    /**
+     * Interrupts the scheduler and marks the coordinator catalog as stepping down, which triggers
+     * all the coordinators to stop.
+     */
+    void interrupt();
+
+    /**
+     * Shuts down this service. This will no longer be usable once shutdown is called.
+     */
+    void shutdown();
+
+    /**
+     * Notifies this service that the provided TransactionCoordinator is finished and no longer
+     * needs to be interrupted when the service is interrupted.
+     */
+    void notifyCoordinatorFinished(std::shared_ptr<TransactionCoordinator>);
+
+protected:
     struct CatalogAndScheduler {
         CatalogAndScheduler(ServiceContext* service) : scheduler(service) {}
 
-        void onStepDown();
+        void interrupt();
         void join();
 
         txn::AsyncWorkScheduler scheduler;
@@ -141,25 +158,70 @@ private:
     };
 
     /**
-     * Returns the current catalog + scheduler if stepUp has started, otherwise throws a
+     * Returns the current catalog + scheduler if initialized, otherwise throws a
      * NotWritablePrimary exception.
      */
-    std::shared_ptr<CatalogAndScheduler> _getCatalogAndScheduler(OperationContext* opCtx);
+    std::shared_ptr<CatalogAndScheduler> getCatalogAndScheduler(OperationContext* opCtx);
 
-    // Contains the catalog + scheduler, which was active at the last step-down attempt (if any).
-    // Set at onStepDown and destroyed at onStepUp, which are always invoked sequentially by the
-    // replication machinery, so there is no need to explicitly synchronize it
+    virtual long long getInitTerm() const {
+        stdx::lock_guard lg(_mutex);
+        return _initTerm;
+    };
+
+    virtual bool pendingCleanup() const {
+        stdx::lock_guard lg(_mutex);
+        return _catalogAndSchedulerToCleanup != NULL;
+    };
+
+private:
+    /**
+     * Blocking call which waits for the old instance of _catalogAndScheduler to join and ensures
+     * all tasks scheduled by that instance have completed.
+     */
+    void _joinAndCleanup();
+
+    /**
+     * Marks the coordinator catalog as stepping up, which blocks all incoming requests for
+     * coordinators, and launches an async task after initializing to:
+     * 1. Wait for the coordinators in the catalog to complete (successfully or with an error) and
+     *    be removed from the catalog.
+     * 2. Read all pending commit tasks from the config.transactionCoordinators collection.
+     * 3. Create TransactionCoordinator objects in memory for each pending commit and launch an
+     *    async task to continue coordinating its commit.
+     */
+    void _scheduleRecoveryTask(OperationContext* opCtx, Milliseconds recoveryDelay);
+
+    // Contains the catalog + scheduler, which was last active before service got interrupted (if
+    // any). Set when interrupted and destroyed at intialization, which are always invoked
+    // sequentially by the replication stepup/stepdown machinery, so there is no need to explicitly
+    // synchronize it.
     std::shared_ptr<CatalogAndScheduler> _catalogAndSchedulerToCleanup;
 
     // Protects the state below
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("TransactionCoordinatorService::_mutex");
+    mutable ObservableMutex<stdx::mutex> _mutex;
 
-    // The catalog + scheduler instantiated at the last step-up attempt. When nullptr, it means
-    // onStepUp has not been called yet after the last stepDown (or construction).
+    // The catalog + scheduler instantiated at the last initialization attempt. When nullptr, it
+    // means initializeIfNeeded() has not been called yet after the last interruption (or
+    // construction).
     std::shared_ptr<CatalogAndScheduler> _catalogAndScheduler;
 
-    // Sets to false once shutdown was called at least once.
+    // Sets to true once shutdown was called at least once.
     bool _isShuttingDown{false};
+
+    // Idenifies the term for which the catalog + scheduler is initialized.
+    long long _initTerm{0};
+
+    // Set to true during initialization to avoid multiple thread attempting to initialize at once.
+    bool _isInitializing{false};
+
+    // tracks active transactionCoordinators to be interrupted on step-down. previously they were
+    // tracked implicitly through futures associated with the above CancellationSource, but that
+    // does not provide a way to deregister those futures when sub sources complete.
+    // NOTE: this must be an ordered container because std::weak_ptr only exposes an ordering
+    // operator, it does not expose an address or other control block information that would allow
+    // storage in a hash-based container.
+    std::set<std::weak_ptr<TransactionCoordinator>, std::owner_less<>>
+        _activeTransactionCoordinators;
 };
 
 }  // namespace mongo

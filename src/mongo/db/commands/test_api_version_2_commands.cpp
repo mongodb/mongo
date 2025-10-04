@@ -27,8 +27,19 @@
  *    it in the license file.
  */
 
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/util/decorable.h"
+
+#include <set>
+#include <string>
 
 namespace mongo {
 
@@ -39,7 +50,7 @@ class TestVersion2Cmd : public BasicCommand {
 public:
     TestVersion2Cmd() : BasicCommand("testVersion2") {}
 
-    const std::set<std::string>& apiVersions() const {
+    const std::set<std::string>& apiVersions() const override {
         return kApiVersion2;
     }
 
@@ -51,8 +62,14 @@ public:
         return false;
     }
 
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
+        return Status::OK();  // No auth required
+    }
+
     bool run(OperationContext* opCtx,
-             const std::string& dbname,
+             const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         auto apiParameters = APIParameters::get(opCtx);
@@ -65,7 +82,7 @@ class TestVersions1And2Cmd : public BasicCommand {
 public:
     TestVersions1And2Cmd() : BasicCommand("testVersions1And2") {}
 
-    const std::set<std::string>& apiVersions() const {
+    const std::set<std::string>& apiVersions() const override {
         return kApiVersion1And2;
     }
 
@@ -77,8 +94,14 @@ public:
         return false;
     }
 
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
+        return Status::OK();  // No auth required
+    }
+
     bool run(OperationContext* opCtx,
-             const std::string& dbname,
+             const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         auto apiParameters = APIParameters::get(opCtx);
@@ -91,11 +114,11 @@ class TestDeprecationInVersion2Cmd : public BasicCommand {
 public:
     TestDeprecationInVersion2Cmd() : BasicCommand("testDeprecationInVersion2") {}
 
-    const std::set<std::string>& apiVersions() const {
+    const std::set<std::string>& apiVersions() const override {
         return kApiVersion1And2;
     }
 
-    const std::set<std::string>& deprecatedApiVersions() const {
+    const std::set<std::string>& deprecatedApiVersions() const override {
         return kApiVersion2;
     }
 
@@ -107,8 +130,14 @@ public:
         return false;
     }
 
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
+        return Status::OK();  // No auth required
+    }
+
     bool run(OperationContext* opCtx,
-             const std::string& dbname,
+             const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         auto apiParameters = APIParameters::get(opCtx);
@@ -121,7 +150,7 @@ class TestRemovalCmd : public BasicCommand {
 public:
     TestRemovalCmd() : BasicCommand("testRemoval") {}
 
-    const std::set<std::string>& apiVersions() const {
+    const std::set<std::string>& apiVersions() const override {
         return kApiVersions1;
     }
 
@@ -133,8 +162,14 @@ public:
         return false;
     }
 
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
+        return Status::OK();  // No auth required
+    }
+
     bool run(OperationContext* opCtx,
-             const std::string& dbname,
+             const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         auto apiParameters = APIParameters::get(opCtx);
@@ -143,9 +178,9 @@ public:
     }
 };
 
-MONGO_REGISTER_TEST_COMMAND(TestVersion2Cmd);
-MONGO_REGISTER_TEST_COMMAND(TestVersions1And2Cmd);
-MONGO_REGISTER_TEST_COMMAND(TestDeprecationInVersion2Cmd);
-MONGO_REGISTER_TEST_COMMAND(TestRemovalCmd);
+MONGO_REGISTER_COMMAND(TestVersion2Cmd).testOnly().forRouter().forShard();
+MONGO_REGISTER_COMMAND(TestVersions1And2Cmd).testOnly().forRouter().forShard();
+MONGO_REGISTER_COMMAND(TestDeprecationInVersion2Cmd).testOnly().forRouter().forShard();
+MONGO_REGISTER_COMMAND(TestRemovalCmd).testOnly().forRouter().forShard();
 
 }  // namespace mongo

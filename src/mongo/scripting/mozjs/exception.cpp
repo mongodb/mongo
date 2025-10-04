@@ -27,21 +27,25 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/scripting/mozjs/exception.h"
 
-#include <jsfriendapi.h>
-#include <limits>
-
-
-#include "mongo/base/static_assert.h"
+#include "mongo/scripting/mozjs/error.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/jsstringwrapper.h"
-#include "mongo/scripting/mozjs/mongoErrorReportToString.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
+#include "mongo/scripting/mozjs/status.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
+#include "mongo/scripting/mozjs/wraptype.h"
 #include "mongo/util/assert_util.h"
+
+#include <utility>
+
+#include <js/ErrorReport.h>
+#include <js/Exception.h>
+#include <js/RootingAPI.h>
+#include <js/TypeDecls.h>
+#include <js/friend/ErrorMessages.h>
+#include <mongo/scripting/mozjs/mongoErrorReportToString.h>
 
 namespace mongo {
 namespace mozjs {
@@ -50,10 +54,12 @@ void mongoToJSException(JSContext* cx) {
     auto status = exceptionToStatus();
 
     if (status.code() != ErrorCodes::JSUncatchableError) {
-        JS::RootedValue val(cx);
-        statusToJSException(cx, status, &val);
+        if (!JS_IsExceptionPending(cx)) {
+            JS::RootedValue val(cx);
+            statusToJSException(cx, status, &val);
 
-        JS_SetPendingException(cx, val);
+            JS_SetPendingException(cx, val);
+        }
     } else {
         // If a JSAPI callback returns false without setting a pending exception, SpiderMonkey will
         // treat it as an uncatchable error.
@@ -98,7 +104,7 @@ Status JSErrorReportToStatus(JSContext* cx,
         }
     }
 
-    return Status(error, jsstr.toStringData().toString());
+    return Status(error, std::string{jsstr.toStringData()});
 }
 
 void throwCurrentJSException(JSContext* cx, ErrorCodes::Error altCode, StringData altReason) {
@@ -121,6 +127,14 @@ Status jsExceptionToStatus(JSContext* cx,
                            ErrorCodes::Error altCode,
                            StringData altReason) {
     auto scope = getScope(cx);
+
+    // It's possible that we have an uncaught exception for OOM, which is reported on the
+    // exception status of the JSContext. We must check for this OOM exception first to ensure
+    // we return the correct error code and message (i.e JSInterpreterFailure). This is consistent
+    // with MozJSImplScope::_checkForPendingException().
+    if (JS_IsThrowingOutOfMemoryException(cx, excn)) {
+        return Status(ErrorCodes::JSInterpreterFailure, ErrorMessage::kOutOfMemory);
+    }
 
     if (!excn.isObject()) {
         return Status(altCode, ValueWriter(cx, excn).toString());

@@ -46,7 +46,7 @@ public:
     }
 
     void writeString(fmt::memory_buffer& buffer, StringData str) const {
-        fmt::format_to(buffer, R"("{}")", str::escape(str));
+        fmt::format_to(std::back_inserter(buffer), R"("{}")", str::escape(str));
     }
 
     void writeSymbol(fmt::memory_buffer& buffer, StringData symbol) const {
@@ -58,13 +58,13 @@ public:
     }
 
     void writeInt64(fmt::memory_buffer& buffer, int64_t val) const {
-        fmt::format_to(buffer, R"({{ "$numberLong" : "{}" }})", val);
+        fmt::format_to(std::back_inserter(buffer), R"({{ "$numberLong" : "{}" }})", val);
     }
 
     void writeDouble(fmt::memory_buffer& buffer, double val) const {
         if (val >= std::numeric_limits<double>::lowest() &&
             val <= std::numeric_limits<double>::max())
-            fmt::format_to(buffer, R"({:.16g})", val);
+            fmt::format_to(std::back_inserter(buffer), R"({:.16g})", val);
         else if (std::isnan(val))
             appendTo(buffer, "NaN"_sd);
         else if (std::isinf(val)) {
@@ -83,11 +83,12 @@ public:
         if (val.isNaN())
             appendTo(buffer, R"({ "$numberDecimal" : "NaN" })"_sd);
         else if (val.isInfinite())
-            fmt::format_to(buffer,
+            fmt::format_to(std::back_inserter(buffer),
                            R"({{ "$numberDecimal" : "{}" }})",
                            val.isNegative() ? "-Infinity"_sd : "Infinity"_sd);
         else {
-            fmt::format_to(buffer, R"({{ "$numberDecimal" : "{}" }})", val.toString());
+            fmt::format_to(
+                std::back_inserter(buffer), R"({{ "$numberDecimal" : "{}" }})", val.toString());
         }
     }
 
@@ -99,46 +100,52 @@ public:
         // handles both the case where Date_t::millis is too large, and the case where
         // Date_t::millis is negative (before the epoch).
         if (val.isFormattable()) {
-            fmt::format_to(buffer, R"({{ "$date" : "{}" }})", dateToISOStringLocal(val));
-        } else {
             fmt::format_to(
-                buffer, R"({{ "$date" : {{ "$numberLong" : "{}" }} }})", val.toMillisSinceEpoch());
+                std::back_inserter(buffer), R"({{ "$date" : "{}" }})", dateToISOStringLocal(val));
+        } else {
+            fmt::format_to(std::back_inserter(buffer),
+                           R"({{ "$date" : {{ "$numberLong" : "{}" }} }})",
+                           val.toMillisSinceEpoch());
         }
     }
 
     void writeDBRef(fmt::memory_buffer& buffer, StringData ref, OID id) const {
-        fmt::format_to(buffer, R"({{ "$ref" : "{}", "$id" : "{}" }})", ref, id.toString());
+        fmt::format_to(
+            std::back_inserter(buffer), R"({{ "$ref" : "{}", "$id" : "{}" }})", ref, id.toString());
     }
 
     void writeOID(fmt::memory_buffer& buffer, OID val) const {
-        fmt::format_to(buffer, R"({{ "$oid" : "{}" }})", val.toString());
+        fmt::format_to(std::back_inserter(buffer), R"({{ "$oid" : "{}" }})", val.toString());
     }
 
     void writeBinData(fmt::memory_buffer& buffer, StringData data, BinDataType type) const {
         appendTo(buffer, R"({ "$binary" : ")");
         base64::encode(buffer, data);
-        fmt::format_to(buffer, R"(", "$type" : "{:02x}" }})", type);
+        fmt::format_to(std::back_inserter(buffer), R"(", "$type" : "{:02x}" }})", type);
     }
 
     void writeRegex(fmt::memory_buffer& buffer, StringData pattern, StringData options) const {
-        fmt::format_to(
-            buffer, R"({{ "$regex" : "{}", "$options" : "{}" }})", str::escape(pattern), options);
+        fmt::format_to(std::back_inserter(buffer),
+                       R"({{ "$regex" : "{}", "$options" : "{}" }})",
+                       str::escape(pattern),
+                       options);
     }
 
     void writeCode(fmt::memory_buffer& buffer, StringData code) const {
-        fmt::format_to(buffer, R"({{ "$code" : "{}" }})", str::escape(code));
+        fmt::format_to(std::back_inserter(buffer), R"({{ "$code" : "{}" }})", str::escape(code));
     }
 
     void writeCodeWithScope(fmt::memory_buffer& buffer,
                             StringData code,
                             BSONObj const& scope) const {
-        fmt::format_to(buffer, R"({{ "$code" : "{}", "$scope" : )", str::escape(code));
+        fmt::format_to(
+            std::back_inserter(buffer), R"({{ "$code" : "{}", "$scope" : )", str::escape(code));
         scope.jsonStringGenerator(*this, 0, false, buffer);
         appendTo(buffer, R"( })");
     }
 
     void writeTimestamp(fmt::memory_buffer& buffer, Timestamp val) const {
-        fmt::format_to(buffer,
+        fmt::format_to(std::back_inserter(buffer),
                        R"({{ "$timestamp" : {{ "t" : {}, "i" : {} }} }})",
                        val.getSecs(),
                        val.getInc());

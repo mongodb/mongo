@@ -29,13 +29,16 @@
 
 #pragma once
 
-#include <functional>
-#include <memory>
-
 #include "mongo/base/counter.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/timer.h"
+
+#include <functional>
+#include <memory>
+#include <mutex>
+#include <utility>
 
 namespace mongo {
 
@@ -61,7 +64,7 @@ public:
 private:
     const Microseconds _resetTimeout;
 
-    mutable stdx::mutex _mutex;  // NOLINT.
+    mutable stdx::mutex _mutex;
 
     // Stats for the outer loop of getHostAndRefresh().
 

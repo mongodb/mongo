@@ -37,7 +37,9 @@
 #include <unistd.h>
 #endif
 
-namespace mongo {
+#include "mongo/util/modules.h"
+
+namespace MONGO_MOD_PUB mongo {
 
 #ifdef _WIN32
 typedef DWORD NativeProcessId;
@@ -142,4 +144,4 @@ private:
 
 std::ostream& operator<<(std::ostream& os, ProcessId pid);
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

@@ -13,13 +13,12 @@
 #include <boost/system/detail/config.hpp>
 #include <boost/cstdint.hpp>
 #include <boost/config.hpp>
+#include <boost/config/workaround.hpp>
 #include <string>
 #include <functional>
 #include <cstddef>
-
-#if defined(BOOST_SYSTEM_HAS_SYSTEM_ERROR)
-# include <system_error>
-#endif
+#include <system_error>
+#include <atomic>
 
 namespace boost
 {
@@ -38,17 +37,18 @@ namespace detail
 
 BOOST_SYSTEM_CONSTEXPR bool failed_impl( int ev, error_category const & cat );
 
-#if defined(BOOST_SYSTEM_HAS_SYSTEM_ERROR)
-
-std::error_category const & to_std_category( error_category const & cat );
-
-#endif
+class std_category;
 
 } // namespace detail
 
 #if ( defined( BOOST_GCC ) && BOOST_GCC >= 40600 ) || defined( BOOST_CLANG )
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wnon-virtual-dtor"
+#endif
+
+#if defined(BOOST_MSVC) && BOOST_MSVC < 1900
+#pragma warning(push)
+#pragma warning(disable: 4351) //  new behavior: elements of array will be default initialized
 #endif
 
 class BOOST_SYMBOL_VISIBLE error_category
@@ -58,87 +58,74 @@ private:
     friend std::size_t hash_value( error_code const & ec );
     friend BOOST_SYSTEM_CONSTEXPR bool detail::failed_impl( int ev, error_category const & cat );
 
-#if defined(BOOST_SYSTEM_HAS_SYSTEM_ERROR)
-    friend std::error_category const & detail::to_std_category( error_category const & cat );
-#endif
+    friend class error_code;
+    friend class error_condition;
 
-#if !defined(BOOST_NO_CXX11_DELETED_FUNCTIONS)
 public:
 
     error_category( error_category const & ) = delete;
     error_category& operator=( error_category const & ) = delete;
 
-#else
-private:
-
-    error_category( error_category const & );
-    error_category& operator=( error_category const & );
-
-#endif
-
 private:
 
     boost::ulong_long_type id_;
 
-protected:
+    static std::size_t const stdcat_size_ = 4 * sizeof( void const* );
 
-#if !defined(BOOST_NO_CXX11_DEFAULTED_FUNCTIONS) && !defined(BOOST_NO_CXX11_NON_PUBLIC_DEFAULTED_FUNCTIONS)
+    union
+    {
+        mutable unsigned char stdcat_[ stdcat_size_ ];
+        void const* stdcat_align_;
+    };
+
+    mutable std::atomic< unsigned > sc_init_;
+
+protected:
 
     ~error_category() = default;
 
-#else
-
-    // We'd like to make the destructor protected, to make code that deletes
-    // an error_category* not compile; unfortunately, doing the below makes
-    // the destructor user-provided and hence breaks use after main, as the
-    // categories may get destroyed before code that uses them
-
-    // ~error_category() {}
-
-#endif
-
-    BOOST_SYSTEM_CONSTEXPR error_category() BOOST_NOEXCEPT: id_( 0 )
+    constexpr error_category() noexcept: id_( 0 ), stdcat_(), sc_init_()
     {
     }
 
-    explicit BOOST_SYSTEM_CONSTEXPR error_category( boost::ulong_long_type id ) BOOST_NOEXCEPT: id_( id )
+    explicit constexpr error_category( boost::ulong_long_type id ) noexcept: id_( id ), stdcat_(), sc_init_()
     {
     }
 
 public:
 
-    virtual const char * name() const BOOST_NOEXCEPT = 0;
+    virtual const char * name() const noexcept = 0;
 
-    virtual error_condition default_error_condition( int ev ) const BOOST_NOEXCEPT;
-    virtual bool equivalent( int code, const error_condition & condition ) const BOOST_NOEXCEPT;
-    virtual bool equivalent( const error_code & code, int condition ) const BOOST_NOEXCEPT;
+    virtual error_condition default_error_condition( int ev ) const noexcept;
+    virtual bool equivalent( int code, const error_condition & condition ) const noexcept;
+    virtual bool equivalent( const error_code & code, int condition ) const noexcept;
 
     virtual std::string message( int ev ) const = 0;
-    virtual char const * message( int ev, char * buffer, std::size_t len ) const BOOST_NOEXCEPT;
+    virtual char const * message( int ev, char * buffer, std::size_t len ) const noexcept;
 
-    virtual bool failed( int ev ) const BOOST_NOEXCEPT
+    virtual bool failed( int ev ) const noexcept
     {
         return ev != 0;
     }
 
-    BOOST_SYSTEM_CONSTEXPR bool operator==( const error_category & rhs ) const BOOST_NOEXCEPT
+    friend BOOST_SYSTEM_CONSTEXPR bool operator==( error_category const & lhs, error_category const & rhs ) noexcept
     {
-        return rhs.id_ == 0? this == &rhs: id_ == rhs.id_;
+        return rhs.id_ == 0? &lhs == &rhs: lhs.id_ == rhs.id_;
     }
 
-    BOOST_SYSTEM_CONSTEXPR bool operator!=( const error_category & rhs ) const BOOST_NOEXCEPT
+    friend BOOST_SYSTEM_CONSTEXPR bool operator!=( error_category const & lhs, error_category const & rhs ) noexcept
     {
-        return !( *this == rhs );
+        return !( lhs == rhs );
     }
 
-    BOOST_SYSTEM_CONSTEXPR bool operator<( const error_category & rhs ) const BOOST_NOEXCEPT
+    friend BOOST_SYSTEM_CONSTEXPR bool operator<( error_category const & lhs, error_category const & rhs ) noexcept
     {
-        if( id_ < rhs.id_ )
+        if( lhs.id_ < rhs.id_ )
         {
             return true;
         }
 
-        if( id_ > rhs.id_ )
+        if( lhs.id_ > rhs.id_ )
         {
             return false;
         }
@@ -148,15 +135,21 @@ public:
             return false; // equal
         }
 
-        return std::less<error_category const *>()( this, &rhs );
+        return std::less<error_category const *>()( &lhs, &rhs );
     }
 
-#if defined(BOOST_SYSTEM_HAS_SYSTEM_ERROR)
+    void init_stdcat() const;
 
+# if defined(__SUNPRO_CC) // trailing __global is not supported
     operator std::error_category const & () const;
-
-#endif
+# else
+    operator std::error_category const & () const BOOST_SYMBOL_VISIBLE;
+# endif
 };
+
+#if defined(BOOST_MSVC) && BOOST_MSVC < 1900
+#pragma warning(pop)
+#endif
 
 #if ( defined( BOOST_GCC ) && BOOST_GCC >= 40600 ) || defined( BOOST_CLANG )
 #pragma GCC diagnostic pop
@@ -165,8 +158,9 @@ public:
 namespace detail
 {
 
-static const boost::ulong_long_type generic_category_id = ( boost::ulong_long_type( 0xB2AB117A ) << 32 ) + 0x257EDF0D;
-static const boost::ulong_long_type system_category_id = ( boost::ulong_long_type( 0x8FAFD21E ) << 32 ) + 0x25C5E09B;
+static const boost::ulong_long_type generic_category_id = ( boost::ulong_long_type( 0xB2AB117A ) << 32 ) + 0x257EDFD0;
+static const boost::ulong_long_type system_category_id = generic_category_id + 1;
+static const boost::ulong_long_type interop_category_id = generic_category_id + 2;
 
 BOOST_SYSTEM_CONSTEXPR inline bool failed_impl( int ev, error_category const & cat )
 {

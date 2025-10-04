@@ -29,14 +29,27 @@
 
 #pragma once
 
+#include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/exec/sbe/expressions/compile_ctx.h"
+#include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/stages/plan_stats.h"
+#include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/util/debug_print.h"
+#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/exec/sbe/vm/vm.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/future.h"
+
+#include <cstddef>
+#include <memory>
+#include <utility>
 #include <vector>
 
-#include "mongo/db/exec/sbe/expressions/expression.h"
-#include "mongo/db/exec/sbe/stages/stages.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/future.h"
-#include "mongo/util/concurrency/thread_pool.h"
-#include "mongo/util/future.h"
 
 namespace mongo::sbe {
 class ExchangeConsumer;
@@ -128,7 +141,7 @@ public:
     void putFullBuffer(std::unique_ptr<ExchangeBuffer>);
 
 private:
-    Mutex _mutex = MONGO_MAKE_LATCH("ExchangePipe::_mutex");
+    stdx::mutex _mutex;
     stdx::condition_variable _cond;
 
     std::vector<std::unique_ptr<ExchangeBuffer>> _fullBuffers;
@@ -244,11 +257,11 @@ private:
 
     // This is verbose and heavyweight. Recondsider something lighter
     // at minimum try to share a single mutex (i.e. _stateMutex) if safe
-    mongo::Mutex _consumerOpenMutex;
+    stdx::mutex _consumerOpenMutex;
     stdx::condition_variable _consumerOpenCond;
     size_t _consumerOpen{0};
 
-    mongo::Mutex _consumerCloseMutex;
+    stdx::mutex _consumerCloseMutex;
     stdx::condition_variable _consumerCloseCond;
     size_t _consumerClose{0};
 };
@@ -261,9 +274,12 @@ public:
                      ExchangePolicy policy,
                      std::unique_ptr<EExpression> partition,
                      std::unique_ptr<EExpression> orderLess,
-                     PlanNodeId planNodeId);
+                     PlanNodeId planNodeId,
+                     bool participateInTrialRunTracking = true);
 
-    ExchangeConsumer(std::shared_ptr<ExchangeState> state, PlanNodeId planNodeId);
+    ExchangeConsumer(std::shared_ptr<ExchangeState> state,
+                     PlanNodeId planNodeId,
+                     bool participateInTrialRunTracking = true);
 
     std::unique_ptr<PlanStage> clone() const final;
 
@@ -279,6 +295,11 @@ public:
 
     ExchangePipe* pipe(size_t producerTid);
     size_t estimateCompileTimeSize() const final;
+
+protected:
+    void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override {
+        return;
+    }
 
 private:
     ExchangeBuffer* getBuffer(size_t producerId);
@@ -311,7 +332,8 @@ class ExchangeProducer final : public PlanStage {
 public:
     ExchangeProducer(std::unique_ptr<PlanStage> input,
                      std::shared_ptr<ExchangeState> state,
-                     PlanNodeId planNodeId);
+                     PlanNodeId planNodeId,
+                     bool participateInTrialRunTracking = true);
 
     static void start(OperationContext* opCtx,
                       CompileCtx& ctx,
@@ -331,7 +353,12 @@ public:
     // This function should never be executed
     // since ExchangeProducer is not created in compile time.
     size_t estimateCompileTimeSize() const final {
-        MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE_TASSERT(11122908);
+    }
+
+protected:
+    void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override {
+        return;
     }
 
 private:

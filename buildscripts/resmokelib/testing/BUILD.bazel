@@ -1,0 +1,6 @@
+py_library(
+    name = "testing",
+    srcs = glob(["**/*.py"]),  # TODO: narrow this down
+    visibility = ["//visibility:public"],
+    deps = [],
+)

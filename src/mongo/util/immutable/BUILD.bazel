@@ -1,0 +1,64 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_unit_test(
+    name = "immutable_test",
+    srcs = [
+        "immutable_ordered_test.cpp",
+        "immutable_unordered_test.cpp",
+        "immutable_vector_test.cpp",
+        "//src/mongo/util/immutable:map.h",
+        "//src/mongo/util/immutable:set.h",
+        "//src/mongo/util/immutable:unordered_map.h",
+        "//src/mongo/util/immutable:unordered_set.h",
+        "//src/mongo/util/immutable:vector.h",
+        "//src/mongo/util/immutable/details:map.h",
+        "//src/mongo/util/immutable/details:memory_policy.h",
+        "//src/mongo/util/immutable/details:set.h",
+    ],
+    tags = ["mongo_unittest_seventh_group"],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "immutable_absl_comparison_bm",
+    srcs = [
+        "immutable_absl_comparison_bm.cpp",
+        "//src/mongo/util/immutable:map.h",
+        "//src/mongo/util/immutable:set.h",
+        "//src/mongo/util/immutable:unordered_map.h",
+        "//src/mongo/util/immutable:unordered_set.h",
+        "//src/mongo/util/immutable:vector.h",
+        "//src/mongo/util/immutable/details:map.h",
+        "//src/mongo/util/immutable/details:memory_policy.h",
+        "//src/mongo/util/immutable/details:set.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "immutable_std_comparison_bm",
+    srcs = [
+        "immutable_std_comparison_bm.cpp",
+        "//src/mongo/util/immutable:map.h",
+        "//src/mongo/util/immutable:unordered_map.h",
+        "//src/mongo/util/immutable:unordered_set.h",
+        "//src/mongo/util/immutable/details:map.h",
+        "//src/mongo/util/immutable/details:memory_policy.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)

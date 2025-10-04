@@ -1,0 +1,1367 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_unit_test")
+load("//bazel/config:generate_config_header.bzl", "generate_config_header")
+load("//bazel/config:render_template.bzl", "render_template")
+load("//bazel/toolchains/cc:mongo_compiler_flags.bzl", "MONGO_GLOBAL_COPTS", "MONGO_GLOBAL_LINKFLAGS")
+load("//bazel/toolchains/cc:mongo_defines.bzl", "MONGO_GLOBAL_DEFINES")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+        "*.py",
+        "*.in",
+    ]),
+)
+
+# Headers designed to be used without source code. Split these out
+# into targets if they're meant to be used with source code.
+filegroup(
+    name = "headers",
+    srcs = [
+        "cancellation.h",
+        "concurrent_shared_values_map.h",
+        "fail_point.h",
+        "inline_memory.h",
+        "log_with_sampling.h",
+        "make_array_type.h",
+        "moving_average.h",
+        "moving_average_metric.h",
+        "overloaded_visitor.h",
+        "periodic_runner.h",
+        "safe_num.h",
+        "scoped_unlock.h",
+        "serialization_context.h",
+        "//src/mongo/util:database_name_util.h",
+        "//src/mongo/util:namespace_string_util.h",
+    ],
+)
+
+idl_generator(
+    name = "buildinfo_gen",
+    src = "buildinfo.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "buildinfo",
+    srcs = [
+        "buildinfo.cpp",
+        ":buildinfo_gen",
+    ],
+    hdrs = ["buildinfo.h"],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/idl:idl_parser",
+    ],
+)
+
+idl_generator(
+    name = "fail_point_server_parameter_gen",
+    src = "fail_point_server_parameter.idl",
+)
+
+idl_generator(
+    name = "testing_options_gen",
+    src = "testing_options.idl",
+)
+
+mongo_cc_library(
+    name = "caching",
+    srcs = [
+        "read_through_cache.cpp",
+    ],
+    hdrs = [
+        "read_through_cache.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+idl_generator(
+    name = "tcmalloc_parameters_gen",
+    src = "tcmalloc_parameters.idl",
+)
+
+idl_generator(
+    name = "password_params_gen",
+    src = "password_params.idl",
+)
+
+idl_generator(
+    name = "pin_code_segments_params_gen",
+    src = "pin_code_segments_params.idl",
+)
+
+mongo_cc_library(
+    name = "boost_assert_shim",
+    srcs = [
+        "boost_assert_shim.cpp",
+    ],
+    hdrs = [
+        "boost_assert_shim.h",
+        "//src/third_party/boost:headers",
+    ],
+    copts = [
+        "-Isrc/third_party/boost",
+    ],
+)
+
+mongo_cc_library(
+    name = "debugger",
+    srcs = [
+        "debugger.cpp",
+    ],
+    hdrs = [
+        "debugger.h",
+    ],
+    local_defines = select({
+        "//bazel/config:use_gdbserver_enabled": ["USE_GDBSERVER"],
+        "//bazel/config:use_lldbserver_enabled": ["USE_LLDB_SERVER"],
+        "//bazel/config:use_wait_for_debugger_enabled": ["WAIT_FOR_DEBUGGER"],
+        "//conditions:default": [],
+    }),
+)
+
+mongo_cc_library(
+    name = "winutil",
+    srcs = [
+        "winutil.cpp",
+    ],
+    hdrs = [
+        "winutil.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "secure_compare_memory",
+    srcs = [
+        "secure_compare_memory.cpp",
+    ],
+    hdrs = [
+        "secure_compare_memory.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "secure_zero_memory",
+    srcs = [
+        "secure_zero_memory.cpp",
+    ],
+    hdrs = [
+        "secure_zero_memory.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "background_job",
+    srcs = [
+        "background.cpp",
+    ],
+    hdrs = [
+        "background.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/util/concurrency:spin_lock",
+    ],
+)
+
+mongo_cc_library(
+    name = "clock_sources",
+    srcs = [
+        "background_thread_clock_source.cpp",
+        "clock_source.cpp",
+        "fast_clock_source_factory.cpp",
+    ],
+    hdrs = [
+        "background_thread_clock_source.h",
+        "clock_source.h",
+        "fast_clock_source_factory.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "alarm",
+    srcs = [
+        "alarm.cpp",
+        "alarm_runner_background_thread.cpp",
+    ],
+    hdrs = [
+        "alarm.h",
+        "alarm_runner_background_thread.h",
+    ],
+    deps = [
+        ":clock_sources",
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "executor_stats",
+    srcs = [
+        "executor_stats.cpp",
+    ],
+    hdrs = [
+        "executor_stats.h",
+        "//src/mongo/logv2:log_severity_suppressor.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:server_options",
+    ],
+)
+
+mongo_cc_library(
+    name = "field_set",
+    srcs = [
+        "field_set.cpp",
+    ],
+    hdrs = [
+        "field_set.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "string_listset",
+    srcs = [
+        "string_listset.cpp",
+    ],
+    hdrs = [
+        "string_listset.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+render_template(
+    name = "icu_init_cpp",
+    srcs = [
+        "generate_icu_init_cpp.py",
+    ] + select({
+        "@platforms//cpu:s390x": ["//src/third_party/icu4c-57.1/source:mongo_sources/icudt57b.dat"],
+        "//conditions:default": ["//src/third_party/icu4c-57.1/source:mongo_sources/icudt57l.dat"],
+    }),
+    cmd = [
+        "$(location generate_icu_init_cpp.py)",
+        "-o",
+        "$(location icu_init.cpp)",
+        "-i",
+    ] + select({
+        "@platforms//cpu:s390x": ["$(location //src/third_party/icu4c-57.1/source:mongo_sources/icudt57b.dat)"],
+        "//conditions:default": ["$(location //src/third_party/icu4c-57.1/source:mongo_sources/icudt57l.dat)"],
+    }),
+    output = "icu_init.cpp",
+)
+
+# When using ICU from third_party, icu_init.cpp will load a subset of
+# ICU's data files using udata_setCommonData() in an initializer.
+mongo_cc_library(
+    name = "icu_init",
+    srcs = [
+        ":icu_init_cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/third_party/icu4c-57.1/source:icu_i18n",
+    ],
+)
+
+mongo_cc_library(
+    name = "icu",
+    srcs = [
+        "icu.cpp",
+        "//src/third_party/node:icu_get_string_width.cpp",
+    ],
+    hdrs = [
+        "icu.h",
+    ],
+    deps = [
+        ":icu_init",
+        "//src/mongo:base",
+        "//src/third_party/icu4c-57.1/source:icu_i18n",
+    ],
+)
+
+mongo_cc_library(
+    name = "log_and_backoff",
+    srcs = [
+        "log_and_backoff.cpp",
+    ],
+    hdrs = [
+        "log_and_backoff.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "summation",
+    srcs = [
+        "summation.cpp",
+    ],
+    hdrs = [
+        "summation.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "progress_meter",
+    srcs = [
+        "progress_meter.cpp",
+    ],
+    hdrs = [
+        "progress_meter.h",
+    ],
+    header_deps = [
+        "//src/mongo/db/local_catalog/lock_manager:flow_control_ticketholder",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "periodic_runner",
+    srcs = [
+        "periodic_runner.cpp",
+    ],
+    hdrs = [
+        "periodic_runner.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "periodic_runner_impl",
+    srcs = [
+        "periodic_runner_impl.cpp",
+    ],
+    hdrs = [
+        "periodic_runner_impl.h",
+    ],
+    deps = [
+        ":periodic_runner",  # TODO(SERVER-93876): Remove.
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "periodic_runner_factory",
+    srcs = [
+        "periodic_runner_factory.cpp",
+    ],
+    hdrs = [
+        "periodic_runner_factory.h",
+    ],
+    deps = [
+        ":periodic_runner_impl",
+        "//src/mongo:base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "safe_num",
+    srcs = [
+        "safe_num.cpp",
+    ],
+    hdrs = [
+        "safe_num.h",
+    ],
+    header_deps = [
+        "//src/mongo/db/local_catalog/lock_manager:flow_control_ticketholder",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "dns_query",
+    srcs = [
+        "dns_query.cpp",
+    ],
+    hdrs = [
+        "dns_query.h",
+    ] + select({
+        "@platforms//os:windows": ["dns_query_windows-impl.h"],
+        "//bazel/config:posix": ["dns_query_posix-impl.h"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "password",
+    srcs = [
+        "password.cpp",
+        ":password_params_gen",
+    ],
+    hdrs = [
+        "password.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "pin_code_segments",
+    srcs = select({
+        "@platforms//os:linux": [
+            "pin_code_segments.cpp",
+            ":pin_code_segments_params_gen",
+        ],
+    } | {
+        "//conditions:default": ["pin_code_segments_noop.cpp"],
+    }),
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "testing_options",
+    srcs = [
+        "testing_options.cpp",
+        ":testing_options_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "md5",
+    srcs = [
+        "md5.cpp",
+        "password_digest.cpp",
+    ],
+    hdrs = [
+        "md5.h",
+        "password_digest.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/third_party/tomcrypt-1.18.2:tomcrypt_md5",
+    ],
+)
+
+mongo_cc_library(
+    name = "clock_source_mock",
+    srcs = [
+        "clock_source_mock.cpp",
+    ],
+    hdrs = [
+        "clock_source_mock.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "future_util",
+    srcs = [
+        "future_util.cpp",
+    ],
+    hdrs = [
+        "future_util.h",
+    ],
+    deps = [
+        "//src/mongo/executor:task_executor_interface",
+    ],
+)
+
+mongo_cc_library(
+    name = "tick_source_mock",
+    srcs = [],
+    hdrs = [
+        "tick_source_mock.h",
+    ],
+)
+
+mongo_cc_library(
+    name = "mock_periodic_runner",
+    srcs = [
+        "mock_periodic_runner.cpp",
+    ],
+    hdrs = [
+        "mock_periodic_runner.h",
+    ],
+    deps = [
+        ":periodic_runner",
+        ":tick_source_mock",
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "tracing_support",
+    srcs = [
+        "tracing_support.cpp",
+    ],
+    hdrs = [
+        "tracing_support.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "elapsed_tracker",
+    srcs = [
+        "elapsed_tracker.cpp",
+    ],
+    hdrs = [
+        "elapsed_tracker.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/util/net:network",  # this is for using listener to check elapsed time
+    ],
+)
+
+mongo_cc_library(
+    name = "pcre_wrapper",
+    srcs = [
+        "pcre.cpp",
+        "pcre.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/third_party/pcre2",
+    ],
+)
+
+mongo_cc_library(
+    name = "pcre_util",
+    srcs = [
+        "pcre_util.cpp",
+        "pcre_util.h",
+    ],
+    deps = [
+        ":pcre_wrapper",
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "procparser",
+    srcs = [
+        "procparser.cpp",
+        "procparser.h",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":pcre_wrapper",
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "processinfo",
+    srcs = [
+        "processinfo.cpp",
+        "processinfo.h",
+    ] + select({
+        "@platforms//os:{}".format(os): ["processinfo_{}.cpp".format(os)]
+        for os in [
+            "freebsd",
+            "linux",
+            "openbsd",
+            "osx",
+            "windows",
+        ]
+    } | {
+        "//conditions:default": ["processinfo_unknown.cpp"],
+    }),
+    deps = [
+        ":pcre_wrapper",
+        "//src/mongo:base",
+    ] + select({
+        "@platforms//os:linux": ["procparser"],
+        "//conditions:default": [],
+    }),
+)
+
+mongo_cc_library(
+    name = "perfctr_collect",
+    srcs = [
+        "perfctr_collect.cpp",
+    ],
+    hdrs = [
+        "perfctr_collect.h",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:windows": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+idl_generator(
+    name = "assert_util_parameters_gen",
+    src = "assert_util_parameters.idl",
+)
+
+mongo_cc_library(
+    name = "assert_util_params",
+    srcs = [
+        "assert_util_parameters.cpp",
+        ":assert_util_parameters_gen",
+    ],
+    hdrs = [
+        "assert_util_parameters.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "signal_handlers",
+    srcs = [
+        "signal_handlers.cpp",
+    ] + select({
+        "@platforms//os:windows": [
+            "signal_win32.cpp",
+        ],
+        "//conditions:default": [],
+    }),
+    hdrs = [
+        "signal_handlers.h",
+        "signal_win32.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:log_process_details",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+    ],
+)
+
+mongo_cc_library(
+    name = "ntservice",
+    srcs = [
+        "ntservice.cpp",
+    ],
+    hdrs = [
+        "ntservice.h",
+    ],
+    deps = [
+        ":signal_handlers",
+        "//src/mongo/util/options_parser",
+    ],
+)
+
+mongo_cc_library(
+    name = "version_impl",
+    srcs = [
+        "version_impl.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "tcmalloc_set_parameter",
+    srcs = [
+        "tcmalloc_parameters_gen",
+        "tcmalloc_set_parameter.cpp",
+    ],
+    hdrs = [
+        "tcmalloc_set_parameter.h",
+    ],
+    local_defines = select({
+        "//bazel/config:tcmalloc_gperf_enabled": ["MONGO_HAVE_GPERFTOOLS_SIZE_CLASS_STATS"],
+        "//conditions:default": [],
+    }),
+    target_compatible_with = select({
+        "//bazel/config:tcmalloc_gperf_enabled": [],
+        "//bazel/config:tcmalloc_google_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "processinfo",
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "tcmalloc_server_status",
+    srcs = [
+        "heap_profiler.cpp",
+        "tcmalloc_server_status_section.cpp",
+    ],
+    local_defines = select({
+        "//bazel/config:tcmalloc_gperf_enabled": ["MONGO_HAVE_GPERFTOOLS_SIZE_CLASS_STATS"],
+        "//conditions:default": [],
+    }),
+    target_compatible_with = select({
+        "//bazel/config:tcmalloc_gperf_enabled": [],
+        "//bazel/config:tcmalloc_google_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "processinfo",
+        "tcmalloc_set_parameter",
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/commands/server_status:server_status_core",
+        "//src/mongo/db/exec/document_value",
+    ],
+)
+
+mongo_cc_library(
+    name = "allocator_thread",
+    srcs = select({
+        "//bazel/config:tcmalloc_gperf_enabled": ["allocator_tcmalloc_thread.cpp"],
+        "//bazel/config:tcmalloc_google_enabled": ["allocator_tcmalloc_thread.cpp"],
+        "//conditions:default": ["allocator_system_thread.cpp"],
+    }),
+    hdrs = [
+        "allocator_thread.h",
+    ],
+    copts = select({
+        "//bazel/config:gcc_or_clang": ["-Wno-sign-compare"],
+        "//conditions:default": [],
+    }),
+    local_defines = select({
+        "//bazel/config:tcmalloc_gperf_enabled": ["MONGO_HAVE_GPERFTOOLS_SIZE_CLASS_STATS"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:server_base",
+    ] + select({
+        "//bazel/config:system_allocator_enabled": [],
+        "//conditions:default": [
+            "tcmalloc_server_status",
+            "tcmalloc_set_parameter",
+            "//src/mongo/db:service_context",
+        ],
+    }),
+)
+
+generate_config_header(
+    name = "version_constants_gen",
+    checks = ":version_constants_gen.py",
+    cpp_defines = MONGO_GLOBAL_DEFINES,
+    cpp_linkflags = MONGO_GLOBAL_LINKFLAGS,
+    cpp_opts = MONGO_GLOBAL_COPTS,
+    extra_definitions = {
+        "MONGO_DISTMOD": "$(MONGO_DISTMOD)",
+        "MONGO_VERSION": "$(MONGO_VERSION)",
+        "GIT_COMMIT_HASH": "$(GIT_COMMIT_HASH)",
+    } | select({
+        "//bazel/config:js_engine_mozjs": {"js_engine_ver": "mozjs"},
+        "//conditions:default": {"js_engine_ver": "none"},
+    }) | select({
+        "//bazel/config:tcmalloc_google_enabled": {"MONGO_ALLOCATOR": "tcmalloc-google"},
+        "//bazel/config:tcmalloc_gperf_enabled": {"MONGO_ALLOCATOR": "tcmalloc-gperf"},
+        "//conditions:default": {"MONGO_ALLOCATOR": "system"},
+    }) | select({
+        "//bazel/config:build_enterprise_enabled": {"build_enterprise_enabled": "1"},
+        "//conditions:default": {},
+    }),
+    logfile = "version_constants_gen.log",
+    output = "version_impl.cpp",
+    template = "version_impl.tpl.cpp",
+)
+
+mongo_cc_unit_test(
+    name = "concurrent_shared_values_map_test",
+    srcs = ["concurrent_shared_values_map_test.cpp"],
+    tags = [
+        "mongo_unittest_eighth_group",
+        "server-programmability",
+    ],
+    deps = ["//src/mongo:base"],
+)
+
+mongo_cc_unit_test(
+    name = "tracing_support_test",
+    srcs = [
+        "tracing_support_test.cpp",
+    ],
+    tags = ["mongo_unittest_seventh_group"],
+    deps = [
+        ":tick_source_mock",
+        "//src/mongo/util:clock_source_mock",
+        "//src/mongo/util:tracing_support",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "thread_safety_context_test",
+    srcs = [
+        "thread_safety_context_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_eighth_group",
+        "server-programmability",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_binary(
+    name = "pretty_printer_test_program",
+    srcs = [
+        "pretty_printer_test_program.cpp",
+        "//src/mongo/db:database_name.h",
+        "//src/mongo/db:database_name_reserved.h",
+        "//src/mongo/db:namespace_string.h",
+        "//src/mongo/db:namespace_string_reserved.h",
+        "//src/mongo/db:server_options.h",
+        "//src/mongo/db:tenant_id.h",
+        "//src/mongo/db/auth:cluster_auth_mode.h",
+        "//src/mongo/db/repl:optime.h",
+        "//src/mongo/util/net:cidr.h",
+        "//src/mongo/util/version:releases.h",
+    ],
+    tags = [
+        "dist_test",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:cluster_role",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "versioned_value_test",
+    srcs = [
+        "versioned_value_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_second_group",
+        "server-programmability",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "executor_stats_test",
+    srcs = [
+        "executor_stats_test.cpp",
+    ],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        "//src/mongo/util:clock_source_mock",
+        "//src/mongo/util:executor_stats",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "tcmalloc_set_parameters_test",
+    srcs = [
+        "tcmalloc_set_parameter_test.cpp",
+    ],
+    copts = select({
+        "//bazel/config:gcc_or_clang": ["-Wno-sign-compare"],
+        "//conditions:default": [],
+    }),
+    local_defines = select({
+        "//bazel/config:tcmalloc_gperf_enabled": ["MONGO_HAVE_GPERFTOOLS_SIZE_CLASS_STATS"],
+        "//conditions:default": [],
+    }),
+    tags = ["mongo_unittest_third_group"],
+    target_compatible_with = select({
+        "//bazel/config:tcmalloc_gperf_enabled": [],
+        "//bazel/config:tcmalloc_google_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "processinfo",
+        "tcmalloc_server_status",
+        "tcmalloc_set_parameter",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/commands/server_status:server_status_core",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "util_test",
+    srcs = [
+        "alarm_test.cpp",
+        "aligned_test.cpp",
+        "assert_util_test.cpp",
+        "background_job_test.cpp",
+        "background_thread_clock_source_test.cpp",
+        "base64_test.cpp",
+        "cancellation_test.cpp",
+        "clock_source_mock_test.cpp",
+        "container_size_helper_test.cpp",
+        "ctype_test.cpp",
+        "decimal_counter_test.cpp",
+        "decorable_test.cpp",
+        "dns_name_test.cpp",
+        "dns_query_test.cpp",
+        "duration_test.cpp",
+        "dynamic_bitset_test.cpp",
+        "dynamic_catch_test.cpp",
+        "errno_util_test.cpp",
+        "executor_test_util.h",
+        "fail_point_test.cpp",
+        "fixed_string_test.cpp",
+        "functional_test.cpp",
+        "future_test_edge_cases.cpp",
+        "future_test_executor_future.cpp",
+        "future_test_future_int.cpp",
+        "future_test_future_move_only.cpp",
+        "future_test_future_void.cpp",
+        "future_test_promise_int.cpp",
+        "future_test_promise_void.cpp",
+        "future_test_shared_future.cpp",
+        "future_test_utils.h",
+        "future_test_valid.cpp",
+        "future_util_test.cpp",
+        "hierarchical_acquisition_test.cpp",
+        "histogram_test.cpp",
+        "icu_test.cpp",
+        "inline_memory_test.cpp",
+        "inlined_storage_test.cpp",
+        "interruptible_test.cpp",
+        "invalidating_lru_cache_test.cpp",
+        "itoa_test.cpp",
+        "latency_distribution.h",
+        "latency_distribution_test.cpp",
+        "lockable_adapter_test.cpp",
+        "log_with_sampling_test.cpp",
+        "lru_cache_test.cpp",
+        "md5_test.cpp",
+        "optional_util_test.cpp",
+        "out_of_line_executor_test.cpp",
+        "overloaded_visitor_test.cpp",
+        "packaged_task_test.cpp",
+        "parking_lot_test.cpp",
+        "pcre_test.cpp",
+        "pcre_util_test.cpp",
+        "periodic_runner_impl_test.cpp",
+        "processinfo_test.cpp",
+        "producer_consumer_queue_test.cpp",
+        "progress_meter_test.cpp",
+        "read_through_cache_test.cpp",
+        "registry_list_test.cpp",
+        "represent_as_test.cpp",
+        "roaring_bitmaps_test.cpp",
+        "safe_num_test.cpp",
+        "scoped_unlock_test.cpp",
+        "secure_zero_memory_test.cpp",
+        "shared_buffer_test.cpp",
+        "sort.h",
+        "static_immortal_test.cpp",
+        "str_test.cpp",
+        "string_map_test.cpp",
+        "strong_weak_finish_line_test.cpp",
+        "summation_test.cpp",
+        "text_test.cpp",
+        "tick_source_test.cpp",
+        "time_support_test.cpp",
+        "timer_test.cpp",
+        "util_sort_test.cpp",
+        "//src/mongo/unittest:join_thread.h",
+    ] + select({
+        "@platforms//os:linux": ["procparser_test.cpp"],
+        "//conditions:default": [],
+    }),
+    tags = [
+        "mongo_unittest_fourth_group",
+        "server-programmability",
+    ],
+    deps = [
+        "packaged_task",
+        ":alarm",
+        ":assert_util_params",
+        ":background_job",
+        ":caching",
+        ":clock_source_mock",
+        ":clock_sources",
+        ":dns_query",
+        ":future_util",
+        ":icu",
+        ":pcre_util",
+        ":pcre_wrapper",
+        ":periodic_runner_impl",
+        ":processinfo",
+        ":progress_meter",
+        ":safe_num",
+        ":secure_zero_memory",
+        ":summation",
+        ":version_impl",
+        "//src/mongo:base",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/executor:thread_pool_task_executor_test_fixture",
+        "//src/mongo/idl:server_parameter_test_controller",
+        "//src/mongo/util/concurrency:thread_pool",
+        "//src/third_party/tomcrypt-1.18.2:tomcrypt_md5",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "signal_handlers_test",
+    srcs = [
+        "fixed_string.h",
+        "signal_handlers_asynchronous_test.cpp",
+        "signal_handlers_synchronous_test.cpp",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    target_compatible_with = select({
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":signal_handlers",
+        ":version_impl",
+        "//src/mongo:base",
+        "//src/mongo/db:service_context_non_d",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "observable_mutex_test",
+    srcs = ["observable_mutex_test.cpp"],
+    tags = [
+        "mongo_unittest_eighth_group",
+        "networking-and-observability",
+    ],
+    # TODO(SERVER-110898): Remove once TSAN works with ObservableMutex.
+    target_compatible_with = select({
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)
+
+mongo_cc_library(
+    name = "observable_mutex_registry",
+    srcs = [
+        "observable_mutex_registry.cpp",
+    ],
+    hdrs = ["observable_mutex_registry.h"],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/commands/server_status:server_status_core",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "observable_mutex_registry_test",
+    srcs = ["observable_mutex_registry_test.cpp"],
+    tags = [
+        "mongo_unittest_fifth_group",
+        "networking-and-observability",
+    ],
+    # TODO(SERVER-110898): Remove once TSAN works with ObservableMutex.
+    target_compatible_with = select({
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":observable_mutex_registry",
+        "//src/mongo/util:clock_source_mock",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "moving_average_test",
+    srcs = [
+        "moving_average_test.cpp",
+    ],
+    tags = ["mongo_unittest_seventh_group"],
+)
+
+mongo_cc_unit_test(
+    name = "moving_average_metric_test",
+    srcs = [
+        "moving_average_metric_test.cpp",
+    ],
+    tags = ["mongo_unittest_sixth_group"],
+    deps = [
+        "//src/mongo/db/commands/server_status:server_status_core",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "string_bm",
+    srcs = [
+        "string_bm.cpp",
+    ],
+    tags = [
+        "first_half_bm",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "cancellation_bm",
+    srcs = [
+        "cancellation_bm.cpp",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "inline_memory_bm",
+    srcs = [
+        "inline_memory_bm.cpp",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "uuid_bm",
+    srcs = [
+        "uuid_bm.cpp",
+    ],
+    tags = [
+        "first_half_bm",
+    ],
+    deps = [
+        ":processinfo",
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "fail_point_bm",
+    srcs = [
+        "fail_point_bm.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "clock_source_bm",
+    srcs = [
+        "clock_source_bm.cpp",
+    ],
+    tags = [
+        "first_half_bm",
+    ],
+    deps = [
+        ":clock_sources",
+        ":processinfo",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "decimal_counter_bm",
+    srcs = [
+        "decimal_counter_bm.cpp",
+    ],
+    tags = [
+        "first_half_bm",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "itoa_bm",
+    srcs = [
+        "itoa_bm.cpp",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "future_bm",
+    srcs = [
+        "future_bm.cpp",
+    ],
+    tags = [
+        "first_half_bm",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "tick_source_bm",
+    srcs = [
+        "tick_source_bm.cpp",
+    ],
+    tags = [
+        "first_half_bm",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "hash_table_bm",
+    srcs = [
+        "hash_table_bm.cpp",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "base64_bm",
+    srcs = [
+        "base64_bm.cpp",
+    ],
+    tags = [
+        "first_half_bm",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "stacktrace_bm",
+    srcs = [
+        "stacktrace_bm.cpp",
+    ],
+    tags = [
+        "first_half_bm",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "util_windows_test",
+    srcs = [
+        "ntservice_test.cpp",
+        "perfctr_collect_test.cpp",
+    ],
+    tags = ["mongo_unittest_fifth_group"],
+    target_compatible_with = select({
+        "@platforms//os:windows": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":ntservice",
+        ":perfctr_collect",
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "stacktrace_test_helpers",
+    srcs = [
+        "stacktrace_test_helpers.h",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "stacktrace_libunwind_test",
+    srcs = [
+        "stacktrace_libunwind_deadlock_test.cpp",
+        "stacktrace_libunwind_test.cpp",
+        "stacktrace_libunwind_test_functions.cpp",
+        "stacktrace_libunwind_test_functions.h",
+    ],
+    tags = [
+        "mongo_unittest_fourth_group",
+        "server-programmability",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:libunwind_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = ["stacktrace_test_helpers"],
+)
+
+mongo_cc_unit_test(
+    name = "stacktrace_test",
+    srcs = [
+        "stacktrace_test.cpp",
+    ],
+    # deps=stacktrace_test_LIBDEPS,
+    # From SCons, unclear if necessary:
+    # EXPORT_SYMBOLS=[
+    #     "mongo_stacktrace_test_detail_testFunctionWithLinkage",
+    # ],
+    tags = [
+        "mongo_unittest_eighth_group",
+        "server-programmability",
+    ],
+    deps = ["stacktrace_test_helpers"],
+)
+
+mongo_cc_library(
+    name = "packaged_task",
+    srcs = [
+        "packaged_task.h",
+    ],
+)
+
+py_binary(
+    name = "pretty_printer_test",
+    srcs = ["pretty_printer_test.py"],
+    visibility = ["//visibility:public"],
+)
+
+mongo_cc_library(
+    name = "varint",
+    srcs = [
+        "varint.cpp",
+        "varint_details.cpp",
+        "varint_details.h",
+    ],
+    hdrs = ["varint.h"],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "varint_test",
+    srcs = [
+        "varint_test.cpp",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        "varint",
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "observable_mutex_bm",
+    srcs = [
+        "observable_mutex_bm.cpp",
+    ],
+    tags = [
+        "first_half_bm",
+    ],
+    deps = [
+        "processinfo",
+        "//src/mongo/unittest:benchmark_util",
+    ],
+)

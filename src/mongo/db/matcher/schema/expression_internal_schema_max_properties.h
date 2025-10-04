@@ -29,7 +29,17 @@
 
 #pragma once
 
+#include "mongo/base/clonable_ptr.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_num_properties.h"
+
+#include <memory>
+#include <string>
+#include <utility>
 
 namespace mongo {
 
@@ -47,20 +57,7 @@ public:
                                                      "$_internalSchemaMaxProperties",
                                                      std::move(annotation)) {}
 
-    bool matches(const MatchableDocument* doc, MatchDetails* details) const final {
-        BSONObj obj = doc->toBSON();
-        return (obj.nFields() <= numProperties());
-    }
-
-    bool matchesSingleElement(const BSONElement& elem,
-                              MatchDetails* details = nullptr) const final {
-        if (elem.type() != BSONType::Object) {
-            return false;
-        }
-        return (elem.embeddedObject().nFields() <= numProperties());
-    }
-
-    virtual std::unique_ptr<MatchExpression> shallowClone() const final {
+    std::unique_ptr<MatchExpression> clone() const final {
         auto maxProperties = std::make_unique<InternalSchemaMaxPropertiesMatchExpression>(
             numProperties(), _errorAnnotation);
         if (getTag()) {

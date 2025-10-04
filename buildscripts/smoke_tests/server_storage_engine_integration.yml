@@ -1,0 +1,53 @@
+# This is a smoke test suite for the server-storage-engine-integration component. It is meant to be run locally
+# in a relatively short period of time and is meant to give feedback on whether a given change
+# broke any major feature functionality of the server-storage-engine-integration component.
+# It is not meant to replace a full patch build, but rather to provide a means to receive
+# feedback during iterative development.
+#
+# The unit tests and integration tests can be run with the following:
+# bazel test --test_tag_filters=server-storage-engine-integration --test_output=summary //src/mongo/...
+# bazel build install-dist-test && python buildscripts/run_smoke_tests.py --suites=server_storage_engine_integration
+
+suites:
+  core:
+    - jstests/core/administrative/fsync/fsync.js
+    - jstests/core/catalog/collstats/collStats_numericOnly.js
+    - jstests/core/catalog/collstats/views_coll_stats.js
+    - jstests/core/diagnostics/datasize/datasize2.js
+    - jstests/core/diagnostics/datasize/datasize_validation.js
+    - jstests/core/replicate_record_ids/collmod_removes_replicate_record_ids.js
+    - jstests/core/replicate_record_ids/disallow_capped.js
+    - jstests/core/replicate_record_ids/replicate_record_ids_collection_creation.js
+  no_passthrough:
+    - jstests/noPassthrough/compression/compression_options.js
+    - jstests/noPassthrough/compression/exhaust_compression.js
+    - jstests/noPassthrough/killOp/datasize_killOp.js
+    - jstests/noPassthrough/killOp/killOp_against_journal_flusher_thread.js
+    - jstests/noPassthrough/killOp/killOp_against_user_write_waiting_on_journal_flusher_thread.js
+    - jstests/noPassthrough/lock_file/lock_file.js
+    - jstests/noPassthrough/lock_file/lock_file_fail_to_open.js
+    - jstests/noPassthrough/recordid/prepare_recordid_initialization.js
+    - jstests/noPassthrough/shutdown/shutdown_while_fsync_locked.js
+    - jstests/noPassthrough/shutdown/shutdown_with_fsync.js
+    - jstests/noPassthrough/txns_retryable_writes_sessions/skip_write_conflict_retries_failpoint.js
+    - jstests/noPassthrough/txns_cache_errors/transaction_aborted_under_cache_pressure.js
+    - jstests/noPassthrough/txns_cache_errors/temporarily_unavailable_error.js
+    - jstests/noPassthrough/wt_integration/block_compressor_options.js
+    - jstests/noPassthrough/wt_integration/configure_with_type_lsm.js
+    - jstests/noPassthrough/wt_integration/devnull.js
+    - jstests/noPassthrough/wt_integration/inmem_config_str.js
+    - jstests/noPassthrough/wt_integration/inmem_full.js
+    - jstests/noPassthrough/wt_integration/server_status_history_storage_stats.js
+    - jstests/noPassthrough/wt_integration/wt_change_log_compressor.js
+    - jstests/noPassthrough/wt_integration/wt_delayed_secondary_read_concern_majority.js
+    - jstests/noPassthrough/wt_integration/wt_index_option_defaults.js
+    - jstests/noPassthrough/wt_integration/wt_malformed_creation_string.js
+    - jstests/noPassthrough/wt_integration/wt_operation_stats.js
+    - jstests/noPassthrough/wt_integration/wt_skip_prepare_conflicts_retries_failpoint.js
+  no_passthrough_with_mongod:
+    - jstests/noPassthroughWithMongod/collStats/collStats_conflicts_with_global_lock_but_does_not_wait.js
+    - jstests/noPassthroughWithMongod/collStats/collStats_does_not_conflict_with_collection_lock.js
+    - jstests/noPassthroughWithMongod/collStats/collStats_does_not_conflict_with_rstl.js
+    - jstests/noPassthroughWithMongod/collStats/collStats_shows_ready_and_in_progress_indexes.js
+    - jstests/noPassthroughWithMongod/collStats/free_storage_size.js
+    - jstests/noPassthroughWithMongod/collStats/wt_roundtrip_creation_string.js

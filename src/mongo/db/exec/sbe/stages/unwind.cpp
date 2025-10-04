@@ -27,12 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/exec/sbe/stages/unwind.h"
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <utility>
+
 
 namespace mongo::sbe {
 UnwindStage::UnwindStage(std::unique_ptr<PlanStage> input,
@@ -40,8 +48,10 @@ UnwindStage::UnwindStage(std::unique_ptr<PlanStage> input,
                          value::SlotId outField,
                          value::SlotId outIndex,
                          bool preserveNullAndEmptyArrays,
-                         PlanNodeId planNodeId)
-    : PlanStage("unwind"_sd, planNodeId),
+                         PlanNodeId planNodeId,
+                         PlanYieldPolicy* yieldPolicy,
+                         bool participateInTrialRunTracking)
+    : PlanStage("unwind"_sd, yieldPolicy, planNodeId, participateInTrialRunTracking),
       _inField(inField),
       _outField(outField),
       _outIndex(outIndex),
@@ -59,7 +69,9 @@ std::unique_ptr<PlanStage> UnwindStage::clone() const {
                                          _outField,
                                          _outIndex,
                                          _preserveNullAndEmptyArrays,
-                                         _commonStats.nodeId);
+                                         _commonStats.nodeId,
+                                         _yieldPolicy,
+                                         participateInTrialRunTracking());
 }
 
 void UnwindStage::prepare(CompileCtx& ctx) {
@@ -100,48 +112,59 @@ void UnwindStage::open(bool reOpen) {
 PlanState UnwindStage::getNext() {
     auto optTimer(getOptTimer(_opCtx));
 
-    if (!_inArray) {
-        do {
-            // We are about to call getNext() on our child so do not bother saving our internal
-            // state in case it yields as the state will be completely overwritten after the
-            // getNext() call.
-            disableSlotAccess();
-            auto state = _children[0]->getNext();
-            if (state != PlanState::ADVANCED) {
-                return trackPlanState(state);
-            }
+    // For performance, we intentionally do not yield while '_inArray' is true. When it is false, we
+    // unconditionally call our child's getNext() so are not required to yield here.
+    checkForInterruptNoYield(_opCtx);
 
-            // Get the value.
-            auto [tag, val] = _inFieldAccessor->getViewOfValue();
+#if defined(MONGO_CONFIG_DEBUG_BUILD)
+    // If we are iterating over the array, then we are not going to advance the child.
+    // In such case, we expect that child slots are accessible, as otherwise our enumerator state is
+    // not valid.
+    tassert(7200405,
+            "Child stage slots must be accessible while iterating over array elements",
+            !_inArray || _children[0]->slotsAccessible());
+#endif
 
-            if (value::isArray(tag)) {
-                _inArrayAccessor.reset(_inFieldAccessor);
-                _index = 0;
-                _inArray = true;
+    while (!_inArray) {
+        // We are about to call getNext() on our child so do not bother saving our internal
+        // state in case it yields as the state will be completely overwritten after the
+        // getNext() call.
+        disableSlotAccess();
+        auto state = _children[0]->getNext();
+        if (state != PlanState::ADVANCED) {
+            return trackPlanState(state);
+        }
 
-                // Empty input array.
-                if (_inArrayAccessor.atEnd()) {
-                    _inArray = false;
-                    if (_preserveNullAndEmptyArrays) {
-                        _outFieldOutputAccessor->reset(false, value::TypeTags::Nothing, 0);
-                        _outIndexOutputAccessor->reset(false,
-                                                       value::TypeTags::NumberInt64,
-                                                       value::bitcastFrom<int64_t>(_index));
-                        return trackPlanState(PlanState::ADVANCED);
-                    }
-                }
-            } else {
-                bool nullOrNothing =
-                    tag == value::TypeTags::Null || tag == value::TypeTags::Nothing;
+        // Get the value.
+        auto [tag, val] = _inFieldAccessor->getViewOfValue();
 
-                if (!nullOrNothing || _preserveNullAndEmptyArrays) {
-                    _outFieldOutputAccessor->reset(false, tag, val);
-                    _outIndexOutputAccessor->reset(false, value::TypeTags::Nothing, 0);
+        if (value::isArray(tag)) {
+            _inArrayAccessor.reset(_inFieldAccessor);
+            _index = 0;
+            _inArray = true;
+
+            // Empty input array.
+            if (_inArrayAccessor.atEnd()) {
+                _inArray = false;
+                if (_preserveNullAndEmptyArrays) {
+                    _outFieldOutputAccessor->reset(false, value::TypeTags::Nothing, 0);
+                    // -1 array index indicates the unwind field was an array, but it was empty.
+                    _outIndexOutputAccessor->reset(
+                        false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(-1));
                     return trackPlanState(PlanState::ADVANCED);
                 }
             }
-        } while (!_inArray);
-    }
+        } else {
+            bool nullOrNothing = tag == value::TypeTags::Null || tag == value::TypeTags::Nothing;
+
+            if (!nullOrNothing || _preserveNullAndEmptyArrays) {
+                _outFieldOutputAccessor->reset(false, tag, val);
+                // Null array index indicates the unwind field was not an array.
+                _outIndexOutputAccessor->reset(false, value::TypeTags::Null, 0);
+                return trackPlanState(PlanState::ADVANCED);
+            }
+        }
+    }  // while (!_inArray)
 
     // We are inside the array so pull out the current element and advance.
     auto [tagElem, valElem] = _inArrayAccessor.getViewOfValue();
@@ -165,6 +188,8 @@ void UnwindStage::close() {
 
     trackClose();
     _children[0]->close();
+    _index = 0;
+    _inArray = false;
 }
 
 std::unique_ptr<PlanStageStats> UnwindStage::getStats(bool includeDebugInfo) const {
@@ -201,24 +226,25 @@ std::vector<DebugPrinter::Block> UnwindStage::debugPrint() const {
     return ret;
 }
 
-void UnwindStage::doSaveState(bool fullSave) {
-    if (!slotsAccessible() || !fullSave) {
-        return;
-    }
-
+void UnwindStage::doSaveState() {
     if (_outFieldOutputAccessor) {
-        _outFieldOutputAccessor->makeOwned();
+        prepareForYielding(*_outFieldOutputAccessor, slotsAccessible());
     }
     if (_outIndexOutputAccessor) {
-        _outIndexOutputAccessor->makeOwned();
+        prepareForYielding(*_outIndexOutputAccessor, slotsAccessible());
     }
 }
 
-void UnwindStage::doRestoreState(bool fullSave) {
-    if (!slotsAccessible()) {
+void UnwindStage::doRestoreState() {
+    if (!_inArray) {
+        // If we were once in an array but no longer are, this saves us from doing a refresh() on
+        // obsolete slot contents.
         return;
     }
 
+    // The child stage will have copied the in-flight contents of this slot because WiredTiger
+    // will free the memory owned by the cursor it points to, so on restore we must update the
+    // embedded array iterator to point to the new memory location.
     _inArrayAccessor.refresh();
 }
 

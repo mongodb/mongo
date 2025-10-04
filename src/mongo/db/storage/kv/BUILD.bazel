@@ -1,0 +1,53 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "kv_drop_pending_ident_reaper",
+    srcs = [
+        "kv_drop_pending_ident_reaper.cpp",
+    ],
+    hdrs = [
+        "kv_drop_pending_ident_reaper.h",
+        "kv_engine.h",
+    ],
+    deps = [
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/local_catalog/lock_manager",
+        "//src/mongo/db/local_catalog/lock_manager:exception_util",
+    ],
+)
+
+mongo_cc_library(
+    name = "kv_engine_test_harness",
+    srcs = [
+        "kv_engine_test_harness.cpp",
+        "kv_engine_timestamps_test.cpp",
+    ],
+    hdrs = [
+        "kv_engine_test_harness.h",
+    ],
+    deps = [
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db:service_context_d",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/local_catalog:catalog_impl",
+        "//src/mongo/db/local_catalog:durable_catalog",
+        "//src/mongo/db/local_catalog/lock_manager",
+        "//src/mongo/db/storage:mdb_catalog",
+        "//src/mongo/db/storage:record_store_base",
+        "//src/mongo/db/storage:sorted_data_interface_test_assert",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/db/storage/key_string",
+        "//src/mongo/unittest",
+        "//src/mongo/util:clock_source_mock",
+    ],
+)

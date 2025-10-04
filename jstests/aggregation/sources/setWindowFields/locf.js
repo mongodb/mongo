@@ -5,33 +5,27 @@
  *   requires_fcv_52,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/window_function_helpers.js");
-load("jstests/aggregation/extras/utils.js");  // For arrayEq.
-load("jstests/libs/feature_flag_util.js");    // For isEnabled.
-
-if (!FeatureFlagUtil.isEnabled(db, "Fill")) {
-    jsTestLog("Skipping as featureFlagFill is not enabled");
-    return;
-}
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db[jsTestName()];
 coll.drop();
 
 // Test that $locf doesn't parse with a window.
-assert.commandFailedWithCode(coll.runCommand({
-    aggregate: coll.getName(),
-    pipeline: [{
-        $setWindowFields: {
-            sortBy: {_id: 1},
-            output: {val: {$locf: {}, window: []}},
-        }
-    }],
-    cursor: {}
-}),
-                             ErrorCodes.FailedToParse);
+assert.commandFailedWithCode(
+    coll.runCommand({
+        aggregate: coll.getName(),
+        pipeline: [
+            {
+                $setWindowFields: {
+                    sortBy: {_id: 1},
+                    output: {val: {$locf: {}, window: []}},
+                },
+            },
+        ],
+        cursor: {},
+    }),
+    ErrorCodes.FailedToParse,
+);
 
 // Create some documents.
 let collection = [
@@ -46,14 +40,16 @@ let collection = [
 ];
 assert.commandWorked(coll.insert(collection));
 
-let result = coll.aggregate([{
-                     $setWindowFields: {
-                         sortBy: {_id: 1},
-                         output: {val: {$locf: "$val"}},
-                     }
-                 }])
-                 .toArray();
-
+let result = coll
+    .aggregate([
+        {
+            $setWindowFields: {
+                sortBy: {_id: 1},
+                output: {val: {$locf: "$val"}},
+            },
+        },
+    ])
+    .toArray();
 let expected = [
     {_id: 0, val: null},
     {_id: 1, val: 0},
@@ -63,6 +59,30 @@ let expected = [
     {_id: 5, val: "str"},
     {_id: 6, val: "str"},
     {_id: 7, rand: "rand", val: "str"},
+];
+assertArrayEq({actual: result, expected: expected});
+
+// Test projecting to a different field.
+result = coll
+    .aggregate([
+        {
+            $setWindowFields: {
+                sortBy: {_id: 1},
+                output: {newVal: {$locf: "$val"}},
+            },
+        },
+    ])
+    .toArray();
+
+expected = [
+    {_id: 0, val: null, newVal: null},
+    {_id: 1, val: 0, newVal: 0},
+    {_id: 2, val: 2, newVal: 2},
+    {_id: 3, val: null, newVal: 2},
+    {_id: 4, newVal: 2},
+    {_id: 5, val: "str", newVal: "str"},
+    {_id: 6, val: null, newVal: "str"},
+    {_id: 7, rand: "rand", newVal: "str"},
 ];
 assertArrayEq({actual: result, expected: expected});
 
@@ -76,14 +96,17 @@ collection = [
 coll.drop();
 assert.commandWorked(coll.insert(collection));
 
-result = coll.aggregate([{
-                 $setWindowFields: {
-                     sortBy: {_id: 1},
-                     output: {val: {$locf: "$val"}},
-                     partitionBy: "$part",
-                 }
-             }])
-             .toArray();
+result = coll
+    .aggregate([
+        {
+            $setWindowFields: {
+                sortBy: {_id: 1},
+                output: {val: {$locf: "$val"}},
+                partitionBy: "$part",
+            },
+        },
+    ])
+    .toArray();
 
 expected = [
     {_id: 1, val: 0, part: 1},
@@ -93,44 +116,43 @@ expected = [
 ];
 assertArrayEq({actual: result, expected: expected});
 
-// Values stay missing if all values are missing.
-collection = [
-    {_id: 1},
-    {_id: 2},
+// Defaults to null even with missing values.
+collection = [{_id: 1}, {_id: 2}, {_id: 3, val: null}, {_id: 4, val: null}];
+coll.drop();
+assert.commandWorked(coll.insert(collection));
+expected = [
+    {_id: 1, val: null},
+    {_id: 2, val: null},
     {_id: 3, val: null},
     {_id: 4, val: null},
 ];
-coll.drop();
-assert.commandWorked(coll.insert(collection));
-expected = collection;
 
-result = coll.aggregate([{
-                 $setWindowFields: {
-                     sortBy: {_id: 1},
-                     output: {val: {$locf: "$val"}},
-                 }
-             }])
-             .toArray();
-
-assertArrayEq({actual: result, expected: expected});
-
-collection = [
-    {_id: 1, val: null},
-    {_id: 2},
-    {_id: 3, val: null},
-    {_id: 4},
-];
-coll.drop();
-assert.commandWorked(coll.insert(collection));
-expected = collection;
-
-result = coll.aggregate([{
-                 $setWindowFields: {
-                     sortBy: {_id: 1},
-                     output: {val: {$locf: "$val"}},
-                 }
-             }])
-             .toArray();
+result = coll
+    .aggregate([
+        {
+            $setWindowFields: {
+                sortBy: {_id: 1},
+                output: {val: {$locf: "$val"}},
+            },
+        },
+    ])
+    .toArray();
 
 assertArrayEq({actual: result, expected: expected});
-})();
+
+collection = [{_id: 1, val: null}, {_id: 2}, {_id: 3, val: null}, {_id: 4}];
+coll.drop();
+assert.commandWorked(coll.insert(collection));
+
+result = coll
+    .aggregate([
+        {
+            $setWindowFields: {
+                sortBy: {_id: 1},
+                output: {val: {$locf: "$val"}},
+            },
+        },
+    ])
+    .toArray();
+
+assertArrayEq({actual: result, expected: expected});

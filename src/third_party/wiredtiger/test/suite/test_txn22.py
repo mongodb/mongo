@@ -29,25 +29,12 @@
 # test_txn22.py
 #   Transactions: test salvage with removed
 
-import fnmatch, os, shutil, time
+import os
 from wtscenario import make_scenarios
 from suite_subprocess import suite_subprocess
-import wiredtiger, wttest
+import helper, wiredtiger, wttest
 
-def copy_for_crash_restart(olddir, newdir):
-    ''' Simulate a crash from olddir and restart in newdir. '''
-    # with the connection still open, copy files to new directory
-    shutil.rmtree(newdir, ignore_errors=True)
-    os.mkdir(newdir)
-    for fname in os.listdir(olddir):
-        fullname = os.path.join(olddir, fname)
-        # Skip lock file on Windows since it is locked
-        if os.path.isfile(fullname) and \
-            "WiredTiger.lock" not in fullname and \
-            "Tmplog" not in fullname and \
-            "Preplog" not in fullname:
-            shutil.copy(fullname, newdir)
-
+@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_txn22(wttest.WiredTigerTestCase, suite_subprocess):
     base_config = 'cache_size=1GB'
     conn_config = base_config
@@ -141,10 +128,10 @@ class test_txn22(wttest.WiredTigerTestCase, suite_subprocess):
         # The second directory will be used to run:
         #    wiredtiger_open with salvage flag first.
 
-        copy_for_crash_restart(self.home, newdir)
+        helper.copy_wiredtiger_home(self, self.home, newdir)
         self.close_conn()
         self.corrupt_meta(newdir)
-        copy_for_crash_restart(newdir, newdir2)
+        helper.copy_wiredtiger_home(self, newdir, newdir2)
 
         for salvagedir in [ newdir, newdir2 ]:
             # Removing the 'WiredTiger.turtle' file has weird behavior:
@@ -153,7 +140,7 @@ class test_txn22(wttest.WiredTigerTestCase, suite_subprocess):
             #
             #  But, immediately after the corruption, if we run
             #  wiredtiger_open with salvage, it will fail.
-            # This anomoly should be fixed or explained.
+            # This anomaly should be fixed or explained.
             if self.filename == 'WiredTiger.turtle':
                 continue
 
@@ -181,6 +168,3 @@ class test_txn22(wttest.WiredTigerTestCase, suite_subprocess):
         # The test may output the following error message while opening a file that
         # does not exist. Ignore that.
         self.ignoreStderrPatternIfExists('No such file or directory')
-
-if __name__ == '__main__':
-    wttest.run()

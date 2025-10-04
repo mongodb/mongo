@@ -29,19 +29,33 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <vector>
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
+#include "mongo/db/basic_types_gen.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/exchange_spec_gen.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
-#include "mongo/db/pipeline/plan_executor_pipeline.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/db/version_context.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/idl/basic_types_gen.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/serialization_context.h"
+
+#include <vector>
+
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -67,52 +81,27 @@ static constexpr long long kDefaultBatchSize = 101;
  * If we are parsing a request for an explained aggregation with an explain verbosity provided,
  * then 'explainVerbosity' contains this information. In this case, 'cmdObj' may not itself
  * contain the explain specifier. Otherwise, 'explainVerbosity' should be boost::none.
- */
-AggregateCommandRequest parseFromBSON(NamespaceString nss,
-                                      const BSONObj& cmdObj,
-                                      boost::optional<ExplainOptions::Verbosity> explainVerbosity,
-                                      bool apiStrict);
-
-StatusWith<AggregateCommandRequest> parseFromBSONForTests(
-    NamespaceString nss,
-    const BSONObj& cmdObj,
-    boost::optional<ExplainOptions::Verbosity> explainVerbosity = boost::none,
-    bool apiStrict = false);
-
-/**
- * Convenience overload which constructs the request's NamespaceString from the given database
- * name and command object.
- */
-AggregateCommandRequest parseFromBSON(const std::string& dbName,
-                                      const BSONObj& cmdObj,
-                                      boost::optional<ExplainOptions::Verbosity> explainVerbosity,
-                                      bool apiStrict);
-
-StatusWith<AggregateCommandRequest> parseFromBSONForTests(
-    const std::string& dbName,
-    const BSONObj& cmdObj,
-    boost::optional<ExplainOptions::Verbosity> explainVerbosity = boost::none,
-    bool apiStrict = false);
-
-/*
- * The first field in 'cmdObj' must be a string representing a valid collection name, or the
- * number 1. In the latter case, returns a reserved namespace that does not represent a user
- * collection. See 'NamespaceString::makeCollectionlessAggregateNSS()'.
- */
-NamespaceString parseNs(const std::string& dbname, const BSONObj& cmdObj);
-
-/**
- * Serializes the options to a Document. Note that this serialization includes the original
- * pipeline object, as specified. Callers will likely want to override this field with a
- * serialization of a parsed and optimized Pipeline object.
  *
- * The explain option is not serialized. The preferred way to send an explain is with the explain
- * command, like: {explain: {aggregate: ...}, ...}, explain options are not part of the aggregate
- * command object.
+ * Callers must provide the validated tenancy scope (if any) to ensure that any namespaces
+ * deserialized from the aggregation request properly account for the tenant ID.
  */
-Document serializeToCommandDoc(const AggregateCommandRequest& request);
+AggregateCommandRequest parseFromBSON(
+    const BSONObj& cmdObj,
+    const boost::optional<auth::ValidatedTenancyScope>& vts,
+    boost::optional<ExplainOptions::Verbosity> explainVerbosity,
+    const SerializationContext& serializationContext = SerializationContext());
 
-BSONObj serializeToCommandObj(const AggregateCommandRequest& request);
+StatusWith<AggregateCommandRequest> parseFromBSONForTests(
+    const BSONObj& cmdObj,
+    const boost::optional<auth::ValidatedTenancyScope>& vts = boost::none,
+    boost::optional<ExplainOptions::Verbosity> explainVerbosity = boost::none);
+
+/**
+ * Retrieves the query settings from 'expCtx' and if they are not empty, attaches them to the
+ * request object.
+ */
+void addQuerySettingsToRequest(AggregateCommandRequest& request,
+                               const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
 /**
  * Validates if 'AggregateCommandRequest' specs complies with API versioning. Throws uassert in case
@@ -120,13 +109,22 @@ BSONObj serializeToCommandObj(const AggregateCommandRequest& request);
  */
 void validateRequestForAPIVersion(const OperationContext* opCtx,
                                   const AggregateCommandRequest& request);
-
 /**
- * Returns the type of resumable scan required by this aggregation, if applicable. Otherwise returns
- * ResumableScanType::kNone.
+ * Validates if 'AggregateCommandRequest' sets the "isClusterQueryWithoutShardKeyCmd" field then the
+ * request must have been fromRouter.
  */
-PlanExecutorPipeline::ResumableScanType getResumableScanType(const AggregateCommandRequest& request,
-                                                             bool isChangeStream);
+void validateRequestFromClusterQueryWithoutShardKey(const AggregateCommandRequest& request);
+
+// TODO SERVER-95358 remove once 9.0 becomes last LTS.
+const mongo::OptionalBool& getFromRouter(const AggregateCommandRequest& request);
+
+// TODO SERVER-95358 remove once 9.0 becomes last LTS.
+void setFromRouter(const VersionContext& vCtx,
+                   AggregateCommandRequest& request,
+                   mongo::OptionalBool value);
+
+// TODO SERVER-95358 remove once 9.0 becomes last LTS.
+void setFromRouter(const VersionContext& vCtx, MutableDocument& doc, mongo::Value value);
 }  // namespace aggregation_request_helper
 
 /**
@@ -135,16 +133,13 @@ PlanExecutorPipeline::ResumableScanType getResumableScanType(const AggregateComm
  * IMPORTANT: The method should not be modified, as API version input/output guarantees could
  * break because of it.
  */
-boost::optional<mongo::ExplainOptions::Verbosity> parseExplainModeFromBSON(
-    const BSONElement& explainElem);
+boost::optional<bool> parseExplainModeFromBSON(const BSONElement& explainElem);
 
 /**
  * IMPORTANT: The method should not be modified, as API version input/output guarantees could
  * break because of it.
  */
-void serializeExplainToBSON(const mongo::ExplainOptions::Verbosity& explain,
-                            StringData fieldName,
-                            BSONObjBuilder* builder);
+void serializeExplainToBSON(const bool& explain, StringData fieldName, BSONObjBuilder* builder);
 
 /**
  * IMPORTANT: The method should not be modified, as API version input/output guarantees could
@@ -166,20 +161,30 @@ void serializeAggregateCursorToBSON(const SimpleCursorOptions& cursor,
  * IMPORTANT: The method should not be modified, as API version input/output guarantees could
  * break because of it.
  */
-static std::vector<BSONObj> parsePipelineFromBSON(const BSONElement& pipelineElem) {
+static StatusWith<std::vector<BSONObj>> attemptToParsePipelineFromBSON(
+    const BSONElement& pipelineElem) {
     std::vector<BSONObj> pipeline;
 
-    uassert(ErrorCodes::TypeMismatch,
-            "'pipeline' option must be specified as an array",
-            !pipelineElem.eoo() && pipelineElem.type() == BSONType::Array);
+    if (pipelineElem.eoo() || pipelineElem.type() != BSONType::array) {
+        return {ErrorCodes::TypeMismatch, "A pipeline must be an array of objects"};
+    }
 
     for (auto elem : pipelineElem.Obj()) {
-        uassert(ErrorCodes::TypeMismatch,
-                "Each element of the 'pipeline' array must be an object",
-                elem.type() == BSONType::Object);
+        if (elem.type() != BSONType::object) {
+            return {ErrorCodes::TypeMismatch,
+                    "Each element of the 'pipeline' array must be an object"};
+        }
         pipeline.push_back(elem.embeddedObject().getOwned());
     }
 
     return pipeline;
 }
+
+/**
+ * A throwing version of the above.
+ */
+static std::vector<BSONObj> parsePipelineFromBSON(const BSONElement& pipelineElem) {
+    return uassertStatusOK(attemptToParsePipelineFromBSON(pipelineElem));
+}
+
 }  // namespace mongo

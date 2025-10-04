@@ -2,24 +2,25 @@
 test_kind: cpp_integration_test
 
 selector:
-  root: build/integration_tests.txt
+  root: bazel-bin/install/install-mongo_integration_test_test_list.txt
   include_files:
-  - build/**/network_interface_ssl_test
-  - build/install/bin/network_interface_ssl_test
+    - bazel-bin/**/network_interface_ssl_test
+  exclude_files:
+    - bazel-bin/**/grpc_transport_integration_test # Must be run with parameters in the integration_tests_standalone_grpc variant
 
 config_variables:
-- &keyFile jstests/libs/authTestsKey
-- &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
-- &authOptions
-  authenticationDatabase: admin
-  authenticationMechanism: SCRAM-SHA-1
-  password: *keyFileData
-  username: __system
-- TestData: &TestData
-    auth: true
-    authMechanism: SCRAM-SHA-1
-    keyFile: *keyFile
-    keyFileData: *keyFileData
+  - &keyFile jstests/libs/authTestsKey
+  - &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+  - &authOptions
+    authenticationDatabase: admin
+    authenticationMechanism: SCRAM-SHA-256
+    password: *keyFileData
+    username: __system
+  - TestData: &TestData
+      auth: true
+      authMechanism: SCRAM-SHA-256
+      keyFile: *keyFile
+      keyFileData: *keyFileData
 
 executor:
   archive:
@@ -27,27 +28,27 @@ executor:
       - ValidateCollections
   config: {}
   hooks:
-  # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
-  # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
-  # validating the entire contents of the collection.
-  - class: CheckReplOplogs
-    shell_options:
-      global_vars:
-        TestData: *TestData
+    # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+    # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+    # validating the entire contents of the collection.
+    - class: CheckReplOplogs
+      shell_options:
+        global_vars:
+          TestData: *TestData
         eval: jsTest.authenticate(db.getMongo())
-      <<: *authOptions
-  - class: CheckReplDBHash
-    shell_options:
-      global_vars:
-        TestData: *TestData
+        <<: *authOptions
+    - class: CheckReplDBHash
+      shell_options:
+        global_vars:
+          TestData: *TestData
         eval: jsTest.authenticate(db.getMongo())
-      <<: *authOptions
-  - class: ValidateCollections
-    shell_options:
-      global_vars:
-        TestData: *TestData
+        <<: *authOptions
+    - class: ValidateCollections
+      shell_options:
+        global_vars:
+          TestData: *TestData
         eval: jsTest.authenticate(db.getMongo())
-      <<: *authOptions
+        <<: *authOptions
   fixture:
     class: ReplicaSetFixture
     mongod_options:
@@ -60,7 +61,7 @@ executor:
       tlsCertificateKeyFile: jstests/libs/server.pem
       keyFile: *keyFile
       clusterAuthMode: sendX509
-      auth: ''
+      auth: ""
     num_nodes: 2
     auth_options:
       <<: *authOptions

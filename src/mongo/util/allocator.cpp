@@ -27,15 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/util/signal_handlers_synchronous.h"
 
 #include <cstdlib>
 
-#include "mongo/util/signal_handlers_synchronous.h"
-
 namespace mongo {
 
-void* mongoMalloc(size_t size) noexcept {
+void* mongoMalloc(size_t size) {
     void* x = std::malloc(size);
     if (x == nullptr) {
         reportOutOfMemoryErrorAndExit();
@@ -43,7 +41,7 @@ void* mongoMalloc(size_t size) noexcept {
     return x;
 }
 
-void* mongoRealloc(void* ptr, size_t size) noexcept {
+void* mongoRealloc(void* ptr, size_t size) {
     void* x = std::realloc(ptr, size);
     if (x == nullptr) {
         reportOutOfMemoryErrorAndExit();

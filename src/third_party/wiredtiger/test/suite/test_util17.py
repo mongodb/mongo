@@ -28,7 +28,7 @@
 
 import os
 from suite_subprocess import suite_subprocess
-import wiredtiger, wttest
+import wttest
 
 # test_util17.py
 #    Utilities: wt stat
@@ -45,13 +45,10 @@ class test_util17(wttest.WiredTigerTestCase, suite_subprocess):
         outfile = "wt-stat.out"
         expected_string = "cursor: cursor create calls="
         self.session.create('table:' + self.tablename, params)
-        self.assertTrue(os.path.exists(self.tablename + ".wt"))
+        self.assertTrue(self.tableExists(self.tablename))
         self.runWt(["stat"], outfilename=outfile)
         self.check_file_contains(outfile, expected_string)
 
         expected_string = "cache_walk: Entries in the root page=1"
         self.runWt(["stat", "table:" + self.tablename ], outfilename=outfile)
         self.check_file_contains(outfile, expected_string)
-
-if __name__ == '__main__':
-    wttest.run()

@@ -9,3 +9,4 @@ Requires:
 Version: @VERSION_MAJOR@.@VERSION_MINOR@.@VERSION_PATCH@
 Libs: -L${libdir} -lwiredtiger
 Cflags: -I${includedir}
+Libs.private: @PRIVATE_PKG_LIBS@

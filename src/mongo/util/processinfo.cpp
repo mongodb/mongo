@@ -27,19 +27,23 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
-#include "mongo/platform/basic.h"
+#include <fstream>  // IWYU pragma: keep
+#include <system_error>
 
-#include "mongo/base/init.h"
-#include "mongo/util/processinfo.h"
-
+#include <boost/filesystem/file_status.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
-#include <fstream>
-#include <iostream>
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/errno_util.h"
+#include "mongo/util/processinfo.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
+
 
 namespace mongo {
 
@@ -65,8 +69,8 @@ public:
         std::ofstream out(path.c_str(), std::ios_base::out);
         out << ProcessId::getCurrent() << std::endl;
         if (!out.good()) {
-            auto errAndStr = errnoAndDescription();
-            if (errAndStr.first == 0) {
+            auto ec = lastSystemError();
+            if (!ec) {
                 LOGV2(23329,
                       "ERROR: Cannot write pid file to {path_string}: Unable to determine OS error",
                       "path_string"_attr = path.string());
@@ -74,7 +78,7 @@ public:
                 LOGV2(23330,
                       "ERROR: Cannot write pid file to {path_string}: {errAndStr_second}",
                       "path_string"_attr = path.string(),
-                      "errAndStr_second"_attr = errAndStr.second);
+                      "errAndStr_second"_attr = errorMessage(ec));
             }
         } else {
             boost::system::error_code ec;

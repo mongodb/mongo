@@ -27,31 +27,62 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/index_names.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/local_catalog/index_catalog_entry.h"
+#include "mongo/db/local_catalog/index_descriptor.h"
+#include "mongo/db/matcher/expression_algo.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
-#include "mongo/logv2/log.h"
 #include "mongo/logv2/redaction.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <tuple>
+#include <utility>
+
+#include "src/mongo/db/local_catalog/index_descriptor.h"
+#include <boost/container/small_vector.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
+
 
 namespace mongo::timeseries {
 
 namespace {
 
-bool isIndexOnControl(const StringData& field) {
-    return field.startsWith(timeseries::kControlMinFieldNamePrefix) ||
-        field.startsWith(timeseries::kControlMaxFieldNamePrefix);
+bool isIndexOnControl(StringData field) {
+    return field.starts_with(timeseries::kControlMinFieldNamePrefix) ||
+        field.starts_with(timeseries::kControlMaxFieldNamePrefix);
 }
 
 /**
  * Takes the index specification field name, such as 'control.max.x.y', or 'control.min.z' and
  * returns a pair of the prefix ('control.min.' or 'control.max.') and key ('x.y' or 'z').
  */
-std::pair<std::string, std::string> extractControlPrefixAndKey(const StringData& field) {
+std::pair<std::string, std::string> extractControlPrefixAndKey(StringData field) {
     // Can't use rfind() due to dotted fields such as 'control.max.x.y'.
     size_t numDotsFound = 0;
     auto fieldIt = std::find_if(field.begin(), field.end(), [&numDotsFound](const char c) {
@@ -66,9 +97,28 @@ std::pair<std::string, std::string> extractControlPrefixAndKey(const StringData&
     return {std::string(field.begin(), fieldIt + 1), std::string(fieldIt + 1, field.end())};
 }
 
+/**
+ * Converts an event-level index spec to a bucket-level index spec.
+ *
+ * If the input is not a valid index spec, this function must either:
+ *  - return an error Status
+ *  - return an invalid index spec
+ */
 StatusWith<BSONObj> createBucketsSpecFromTimeseriesSpec(const TimeseriesOptions& timeseriesOptions,
                                                         const BSONObj& timeseriesIndexSpecBSON,
                                                         bool isShardKeySpec) {
+    if (timeseriesIndexSpecBSON.isEmpty()) {
+        return {ErrorCodes::BadValue, "Empty object is not a valid index spec"_sd};
+    }
+    if (timeseriesIndexSpecBSON.firstElement().fieldNameStringData() == "$hint"_sd ||
+        timeseriesIndexSpecBSON.firstElement().fieldNameStringData() == "$natural"_sd) {
+        return {
+            ErrorCodes::BadValue,
+            str::stream() << "Invalid index spec (perhaps it's a valid hint, that was incorrectly "
+                          << "passed to createBucketsSpecFromTimeseriesSpec): "
+                          << timeseriesIndexSpecBSON};
+    }
+
     auto timeField = timeseriesOptions.getTimeField();
     auto metaField = timeseriesOptions.getMetaField();
 
@@ -81,9 +131,10 @@ StatusWith<BSONObj> createBucketsSpecFromTimeseriesSpec(const TimeseriesOptions&
             if (!elem.isNumber()) {
                 return {ErrorCodes::BadValue,
                         str::stream()
-                            << "Invalid index spec for time-series collection: "
-                            << redact(timeseriesIndexSpecBSON)
-                            << ". Indexes on the time field must be ascending or descending "
+                            << "Invalid " << (isShardKeySpec ? "shard key" : "index spec")
+                            << " for time-series collection: " << redact(timeseriesIndexSpecBSON)
+                            << ". " << (isShardKeySpec ? "Shard keys" : "Indexes")
+                            << " on the time field must be ascending or descending "
                                "(numbers only): "
                             << elem};
             }
@@ -115,7 +166,7 @@ StatusWith<BSONObj> createBucketsSpecFromTimeseriesSpec(const TimeseriesOptions&
             }
 
             // Time-series indexes on sub-documents of the 'metaField' are allowed.
-            if (elem.fieldNameStringData().startsWith(*metaField + ".")) {
+            if (elem.fieldNameStringData().starts_with(*metaField + ".")) {
                 builder.appendAs(elem,
                                  str::stream()
                                      << timeseries::kBucketMetaFieldName << "."
@@ -124,25 +175,9 @@ StatusWith<BSONObj> createBucketsSpecFromTimeseriesSpec(const TimeseriesOptions&
             }
         }
 
-        // Indexes on measurement fields are only supported when the 'gTimeseriesMetricIndexes'
-        // feature flag is enabled.
-        if (!feature_flags::gTimeseriesMetricIndexes.isEnabledAndIgnoreFCV()) {
-            auto reason = str::stream();
-            reason << "Invalid index spec for time-series collection: "
-                   << redact(timeseriesIndexSpecBSON) << ". ";
-            reason << "Indexes are only supported on the '" << timeField << "' ";
-            if (metaField) {
-                reason << "and '" << *metaField << "' fields. ";
-            } else {
-                reason << "field. ";
-            }
-            reason << "Attempted to create an index on the field '" << elem.fieldName() << "'.";
-            return {ErrorCodes::BadValue, reason};
-        }
-
         // 2dsphere indexes on measurements are allowed, but need to be re-written to
         // point to the data field and use the special 2dsphere_bucket index type.
-        if (elem.valueStringData() == IndexNames::GEO_2DSPHERE) {
+        if (elem.valueStringDataSafe() == IndexNames::GEO_2DSPHERE) {
             builder.append(str::stream() << timeseries::kBucketDataFieldName << "."
                                          << elem.fieldNameStringData(),
                            IndexNames::GEO_2DSPHERE_BUCKET);
@@ -202,9 +237,7 @@ StatusWith<BSONObj> createBucketsSpecFromTimeseriesSpec(const TimeseriesOptions&
  * }
  */
 boost::optional<BSONObj> createTimeseriesIndexSpecFromBucketsIndexSpec(
-    const TimeseriesOptions& timeseriesOptions,
-    const BSONObj& bucketsIndexSpecBSON,
-    bool timeseriesMetricIndexesFeatureFlagEnabled) {
+    const TimeseriesOptions& timeseriesOptions, const BSONObj& bucketsIndexSpecBSON) {
     auto timeField = timeseriesOptions.getTimeField();
     auto metaField = timeseriesOptions.getMetaField();
 
@@ -240,7 +273,7 @@ boost::optional<BSONObj> createTimeseriesIndexSpecFromBucketsIndexSpec(
                 continue;
             }
 
-            if (elem.fieldNameStringData().startsWith(timeseries::kBucketMetaFieldName + ".")) {
+            if (elem.fieldNameStringData().starts_with(timeseries::kBucketMetaFieldName + ".")) {
                 builder.appendAs(elem,
                                  str::stream() << *metaField << "."
                                                << elem.fieldNameStringData().substr(
@@ -249,15 +282,8 @@ boost::optional<BSONObj> createTimeseriesIndexSpecFromBucketsIndexSpec(
             }
         }
 
-        if (!timeseriesMetricIndexesFeatureFlagEnabled) {
-            // 'elem' is an invalid index spec field for this time-series collection. It matches
-            // neither the time field nor the metaField field. Therefore, we will not convert the
-            // index spec.
-            return {};
-        }
-
-        if (elem.fieldNameStringData().startsWith(timeseries::kBucketDataFieldName + ".") &&
-            elem.valueStringData() == IndexNames::GEO_2DSPHERE_BUCKET) {
+        if (elem.fieldNameStringData().starts_with(timeseries::kBucketDataFieldName + ".") &&
+            elem.valueStringDataSafe() == IndexNames::GEO_2DSPHERE_BUCKET) {
             builder.append(
                 elem.fieldNameStringData().substr(timeseries::kBucketDataFieldName.size() + 1),
                 IndexNames::GEO_2DSPHERE);
@@ -328,6 +354,97 @@ boost::optional<BSONObj> createTimeseriesIndexSpecFromBucketsIndexSpec(
     return builder.obj();
 }
 
+/**
+ * Maps a buckets shard key spec to a spec for the index backing the shard key on the buckets
+ * collection using the information provided in 'timeseriesOptions'. The shard key on the buckets
+ * collection should already be rewritten to use bucket collection field names and should be valid.
+ *
+ * If 'bucketShardKeySpecBSON' does not match a valid time-series shard key format, then boost::none
+ * is returned.
+ *
+ * Conversion Example:
+ * On a time-series collection with 'tm' time field and 'mm' metadata field,
+ * we may see a compound shard key on the underlying bucket collection mapped from:
+ * {
+ *     'meta.tag1': 1,
+ *     'control.min.tm': 1,
+ * }
+ * to an index on the buckets collection:
+ * {
+ *     'meta.tag1': 1,
+ *     'control.min.tm': 1,
+ *     'control.max.tm': 1
+ * }
+ */
+boost::optional<BSONObj> createBucketsIndexSpecFromBucketsShardKeySpec(
+    const TimeseriesOptions& timeseriesOptions, const BSONObj& bucketShardKeySpecBSON) {
+
+    // The shard key has already been validated. Therefore, the index backing the shard key must be
+    // valid. If not, this means  we have passed shard key validation, but have created an
+    // invalid index backing the shard key. We will return boost::none if the index is invalid and
+    // the caller of the function will verify an index was returned.
+    if (bucketShardKeySpecBSON.isEmpty()) {
+        return {};
+    }
+
+    if (bucketShardKeySpecBSON.firstElement().fieldNameStringData() == "$hint"_sd ||
+        bucketShardKeySpecBSON.firstElement().fieldNameStringData() == "$natural"_sd) {
+        return {};
+    }
+
+    auto timeField = timeseriesOptions.getTimeField();
+    auto metaField = timeseriesOptions.getMetaField();
+    const std::string controlMinTimeField = str::stream()
+        << timeseries::kControlMinFieldNamePrefix << timeField;
+
+    BSONObjBuilder builder;
+    for (const auto& elem : bucketShardKeySpecBSON) {
+        // Unsharded collections can appear with the key '{_id:1}'. We will return the key as is in
+        // that case.
+        if (elem.fieldNameStringData() == timeseries::kBucketIdFieldName) {
+            if (!elem.isNumber() || elem.number() != 1 || bucketShardKeySpecBSON.nFields() != 1) {
+                return {};
+            }
+            return builder.append(elem).obj();
+        }
+
+        // We expect the index backing the shard key to already be "buckets-encoded". This means
+        // that indexSpecBSON should be "{control.min.time:1}".
+        if (elem.fieldNameStringData() == controlMinTimeField) {
+            if (!elem.isNumber() || elem.number() < 0) {
+                // Shard keys on the time field must be ascending.
+                return {};
+            }
+
+            // Append the 'control.min.time' element and add the 'control.max.time' element.
+            builder.append(elem);
+            builder.appendAs(elem,
+                             str::stream() << timeseries::kControlMaxFieldNamePrefix << timeField);
+            continue;
+        }
+
+        // If the index is on the meta field, the index should already be buckets-encoded and thus
+        // be rewritten as "meta".
+        if (metaField) {
+            if (elem.fieldNameStringData() == timeseries::kBucketMetaFieldName) {
+                builder.append(elem);
+                continue;
+            }
+
+            // Time-series indexes on sub-documents of the 'metaField' are allowed.
+            if (elem.fieldNameStringData().starts_with(timeseries::kBucketMetaFieldName + ".")) {
+                builder.append(elem);
+                continue;
+            }
+        }
+
+        // Shard keys are only allowed on the meta field or time field.
+        return {};
+    }
+
+    return builder.obj();
+}
+
 }  // namespace
 
 StatusWith<BSONObj> createBucketsIndexSpecFromTimeseriesIndexSpec(
@@ -340,39 +457,58 @@ StatusWith<BSONObj> createBucketsShardKeySpecFromTimeseriesShardKeySpec(
     return createBucketsSpecFromTimeseriesSpec(timeseriesOptions, timeseriesShardKeySpecBSON, true);
 }
 
+boost::optional<BSONObj> createBucketsShardKeyIndexFromBucketsShardKeySpec(
+    const TimeseriesOptions& timeseriesOptions, const BSONObj& timeseriesShardKeySpecBSON) {
+    return createBucketsIndexSpecFromBucketsShardKeySpec(timeseriesOptions,
+                                                         timeseriesShardKeySpecBSON);
+}
+
+boost::optional<BSONObj> createTimeseriesIndexFromBucketsIndexSpec(
+    const TimeseriesOptions& timeseriesOptions, const BSONObj& bucketsIndexSpecBSON) {
+    return createTimeseriesIndexSpecFromBucketsIndexSpec(timeseriesOptions, bucketsIndexSpecBSON);
+}
+
 boost::optional<BSONObj> createTimeseriesIndexFromBucketsIndex(
     const TimeseriesOptions& timeseriesOptions, const BSONObj& bucketsIndex) {
-    bool timeseriesMetricIndexesFeatureFlagEnabled =
-        feature_flags::gTimeseriesMetricIndexes.isEnabledAndIgnoreFCV();
 
-    if (bucketsIndex.hasField(kOriginalSpecFieldName) &&
-        timeseriesMetricIndexesFeatureFlagEnabled) {
-        // This buckets index has the original user index definition available, return it if the
-        // time-series metric indexes feature flag is enabled. If the feature flag isn't enabled,
-        // the reverse mapping mechanism will be used. This is necessary to skip returning any
-        // incompatible indexes created when the feature flag was enabled.
-        return bucketsIndex.getObjectField(kOriginalSpecFieldName);
-    }
-    if (bucketsIndex.hasField(kKeyFieldName)) {
-        auto timeseriesKeyValue = createTimeseriesIndexSpecFromBucketsIndexSpec(
-            timeseriesOptions,
-            bucketsIndex.getField(kKeyFieldName).Obj(),
-            timeseriesMetricIndexesFeatureFlagEnabled);
-        if (timeseriesKeyValue) {
-            // This creates a BSONObj copy with the kOriginalSpecFieldName field removed, if it
-            // exists, and modifies the kKeyFieldName field to timeseriesKeyValue.
-            BSONObj intermediateObj =
-                bucketsIndex.removeFields(StringDataSet{kOriginalSpecFieldName});
-            return intermediateObj.addFields(BSON(kKeyFieldName << timeseriesKeyValue.get()),
-                                             StringDataSet{kKeyFieldName});
+    if (const auto originalSpecObj =
+            bucketsIndex.getField(IndexDescriptor::kOriginalSpecFieldName)) {
+        // The raw bucket index spec contains the `originalSpec` object.
+        // This object contains some properties of the index spec already in logical format.
+
+        // Create a copy of the raw bucket index spec without the `originalSpec` field.
+        BSONObj logicalSpec =
+            bucketsIndex.removeFields(StringDataSet{IndexDescriptor::kOriginalSpecFieldName});
+
+        // Extract only specific fields from `originalSpec` and substitute these fields in the top
+        // level index spec object
+        static const StringDataSet fieldsToExtractFromOriginalSpecs = {
+            IndexDescriptor::kKeyPatternFieldName, IndexDescriptor::kPartialFilterExprFieldName};
+
+        logicalSpec = logicalSpec.addFields(originalSpecObj.embeddedObject(),
+                                            fieldsToExtractFromOriginalSpecs);
+        return logicalSpec;
+    } else if (const auto rawKeyPattern =
+                   bucketsIndex.getField(IndexDescriptor::kKeyPatternFieldName)) {
+        // The raw bucket index spec does not contains the `originalSpec` object but contains the
+        // `key` field with key pattern in raw bucket format.
+
+        // Translate the raw key pattern to logical key pattern.
+        auto logicalKeyPattern = createTimeseriesIndexSpecFromBucketsIndexSpec(
+            timeseriesOptions, rawKeyPattern.embeddedObject());
+        if (logicalKeyPattern) {
+            // Substitute the raw key pattern with logical key pattern
+            return bucketsIndex.addFields(
+                BSON(IndexDescriptor::kKeyPatternFieldName << logicalKeyPattern.value()));
         }
     }
+
     return boost::none;
 }
 
-std::list<BSONObj> createTimeseriesIndexesFromBucketsIndexes(
-    const TimeseriesOptions& timeseriesOptions, const std::list<BSONObj>& bucketsIndexes) {
-    std::list<BSONObj> indexSpecs;
+std::vector<BSONObj> createTimeseriesIndexesFromBucketsIndexes(
+    const TimeseriesOptions& timeseriesOptions, const std::vector<BSONObj>& bucketsIndexes) {
+    std::vector<BSONObj> indexSpecs;
     for (const auto& bucketsIndex : bucketsIndexes) {
         auto timeseriesIndex =
             createTimeseriesIndexFromBucketsIndex(timeseriesOptions, bucketsIndex);
@@ -383,25 +519,8 @@ std::list<BSONObj> createTimeseriesIndexesFromBucketsIndexes(
     return indexSpecs;
 }
 
-bool isBucketsIndexSpecCompatibleForDowngrade(const TimeseriesOptions& timeseriesOptions,
-                                              const BSONObj& bucketsIndex) {
-    if (!bucketsIndex.hasField(kKeyFieldName)) {
-        return false;
-    }
-
-    if (bucketsIndex.hasField(kPartialFilterExpressionFieldName)) {
-        // Partial indexes are not supported in FCV < 5.2.
-        return false;
-    }
-
-    return createTimeseriesIndexSpecFromBucketsIndexSpec(
-               timeseriesOptions,
-               bucketsIndex.getField(kKeyFieldName).Obj(),
-               /*timeseriesMetricIndexesFeatureFlagEnabled=*/false) != boost::none;
-}
-
-bool doesBucketsIndexIncludeKeyOnMeasurement(const TimeseriesOptions& timeseriesOptions,
-                                             const BSONObj& bucketsIndex) {
+bool shouldIncludeOriginalSpec(const TimeseriesOptions& timeseriesOptions,
+                               const BSONObj& bucketsIndex) {
     if (!bucketsIndex.hasField(kKeyFieldName)) {
         return false;
     }
@@ -414,24 +533,164 @@ bool doesBucketsIndexIncludeKeyOnMeasurement(const TimeseriesOptions& timeseries
     const std::string controlMaxTimeField = str::stream()
         << timeseries::kControlMaxFieldNamePrefix << timeField;
 
-    const BSONObj keyObj = bucketsIndex.getField(kKeyFieldName).Obj();
-    for (const auto& elem : keyObj) {
-        if (elem.fieldNameStringData() == controlMinTimeField ||
-            elem.fieldNameStringData() == controlMaxTimeField) {
+    const auto& bucketsIndexSpecBSON = bucketsIndex.getField(kKeyFieldName).Obj();
+    for (const auto& elem : bucketsIndexSpecBSON) {
+        // 'control.min.time' and 'control.max.time' are both ok.
+        if (elem.fieldNameStringData() == controlMinTimeField) {
+            continue;
+        } else if (elem.fieldNameStringData() == controlMaxTimeField) {
             continue;
         }
 
+        // Metadata, and subfields of metadata, are both ok.
         if (metaField) {
-            if (elem.fieldNameStringData() == timeseries::kBucketMetaFieldName ||
-                elem.fieldNameStringData().startsWith(timeseries::kBucketMetaFieldName + ".")) {
+            if (elem.fieldNameStringData() == timeseries::kBucketMetaFieldName) {
+                continue;
+            }
+
+            if (elem.fieldNameStringData().starts_with(timeseries::kBucketMetaFieldName + ".")) {
                 continue;
             }
         }
 
+        // Found a non-time, non-metadata field, which means a 5.0 server would not understand this
+        // index. That means it's fine to also include 'originalSpec', because this index would have
+        // to be dropped before downgrading to 5.0 anyway.
         return true;
     }
 
+    // All fields are either time or metadata. That means a 5.0 server will understand this index.
+    // Since 5.0 does not know about the 'originalSpec' field, don't include it: we don't want to
+    // complicate downgrade for this index.
     return false;
+}
+
+bool doesBucketsIndexIncludeMeasurement(OperationContext* opCtx,
+                                        const NamespaceString& bucketNs,
+                                        const TimeseriesOptions& timeseriesOptions,
+                                        const BSONObj& bucketsIndex) {
+    tassert(5916306,
+            str::stream() << "Index spec has no 'key': " << bucketsIndex.toString(),
+            bucketsIndex.hasField(kKeyFieldName));
+
+    auto timeField = timeseriesOptions.getTimeField();
+    auto metaField = timeseriesOptions.getMetaField();
+
+    const std::string controlMinTimeField = str::stream()
+        << timeseries::kControlMinFieldNamePrefix << timeField;
+    const std::string controlMaxTimeField = str::stream()
+        << timeseries::kControlMaxFieldNamePrefix << timeField;
+    static const std::string idField = "_id";
+
+    auto isMeasurementField = [&](StringData name) -> bool {
+        if (name == controlMinTimeField || name == controlMaxTimeField) {
+            return false;
+        }
+
+        if (metaField) {
+            if (name == timeseries::kBucketMetaFieldName ||
+                name.starts_with(timeseries::kBucketMetaFieldName + ".")) {
+                return false;
+            }
+        }
+
+        return true;
+    };
+
+    // Check index key.
+    const BSONObj keyObj = bucketsIndex.getField(kKeyFieldName).Obj();
+    for (const auto& elem : keyObj) {
+        if (isMeasurementField(elem.fieldNameStringData()))
+            return true;
+    }
+
+    // Check partial filter expression.
+    if (auto filterElem = bucketsIndex[kPartialFilterExpressionFieldName]) {
+        tassert(5916302,
+                str::stream() << "Partial filter expression is not an object: " << filterElem,
+                filterElem.type() == BSONType::object);
+
+        auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx).ns(bucketNs).build();
+
+        MatchExpressionParser::AllowedFeatureSet allowedFeatures =
+            MatchExpressionParser::kDefaultSpecialFeatures;
+
+        // TODO SERVER-53380 convert to tassertStatusOK.
+        auto statusWithFilter = MatchExpressionParser::parse(
+            filterElem.Obj(), expCtx, ExtensionsCallbackNoop{}, allowedFeatures);
+        tassert(5916303,
+                str::stream() << "Partial filter expression failed to parse: "
+                              << statusWithFilter.getStatus(),
+                statusWithFilter.isOK());
+        auto filter = std::move(statusWithFilter.getValue());
+
+        if (!expression::isOnlyDependentOnConst(*filter,
+                                                {std::string{timeseries::kBucketMetaFieldName},
+                                                 controlMinTimeField,
+                                                 controlMaxTimeField,
+                                                 idField})) {
+            // Partial filter expression depends on a non-time, non-metadata field.
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool isHintIndexKey(const BSONObj& obj) {
+    if (obj.isEmpty())
+        return false;
+    StringData fieldName = obj.firstElement().fieldNameStringData();
+    if (fieldName == "$hint"_sd)
+        return false;
+    if (fieldName == "$natural"_sd)
+        return false;
+
+    return true;
+}
+
+boost::optional<BSONObj> getIndexSupportingReopeningQuery(OperationContext* opCtx,
+                                                          const IndexCatalog* indexCatalog,
+                                                          const TimeseriesOptions& tsOptions) {
+    const std::string controlTimeField =
+        std::string{timeseries::kControlMinFieldNamePrefix} + tsOptions.getTimeField();
+
+    // Populate a vector of index key fields which we check against existing indexes.
+    boost::container::small_vector<std::string, 2> expectedPrefix;
+    if (tsOptions.getMetaField().has_value()) {
+        expectedPrefix.push_back(std::string{kBucketMetaFieldName});
+    }
+    expectedPrefix.push_back(controlTimeField);
+
+    auto indexIt = indexCatalog->getIndexIterator(IndexCatalog::InclusionPolicy::kReady);
+    while (indexIt->more()) {
+        auto indexEntry = indexIt->next();
+        auto indexDesc = indexEntry->descriptor();
+
+        // We cannot use a partial index when querying buckets to reopen.
+        if (indexDesc->isPartial()) {
+            continue;
+        }
+
+        auto indexKey = indexDesc->keyPattern();
+        size_t index = 0;
+        for (auto& elem : indexKey) {
+            // The index must include the meta and time field (in that order), but may have
+            // additional fields included.
+            //
+            // In cases where there collections do not have a meta field specified, an index on time
+            // suffices.
+            if (elem.fieldName() != expectedPrefix.at(index)) {
+                break;
+            }
+            index++;
+            if (index == expectedPrefix.size()) {
+                return BSON("$hint" << indexDesc->indexName());
+            }
+        }
+    }
+
+    return boost::none;
 }
 
 }  // namespace mongo::timeseries

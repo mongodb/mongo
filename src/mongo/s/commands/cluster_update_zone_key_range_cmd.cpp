@@ -27,124 +27,135 @@
  *    it in the license file.
  */
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/generic_argument_util.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/sharding_environment/client/shard.h"
+#include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/topology/shard_registry.h"
+#include "mongo/s/request_types/update_zone_key_range_gen.h"
+#include "mongo/util/assert_util.h"
+
+#include <string>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
-#include "mongo/platform/basic.h"
-
-#include <vector>
-
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/write_concern_options.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
-#include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/catalog/type_tags.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/request_types/update_zone_key_range_request_type.h"
 
 namespace mongo {
-
-using std::string;
-
 namespace {
 
 const ReadPreferenceSetting kPrimaryOnlyReadPreference{ReadPreference::PrimaryOnly};
-const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
-                                                // Note: Even though we're setting UNSET here,
-                                                // kMajority implies JOURNAL if journaling is
-                                                // supported by mongod and
-                                                // writeConcernMajorityJournalDefault is set to true
-                                                // in the ReplSetConfig.
-                                                WriteConcernOptions::SyncMode::UNSET,
-                                                WriteConcernOptions::kWriteConcernTimeoutSharding);
 
-/**
- * {
- *   updateZoneKeyRange: <string namespace>,
- *   min: <BSONObj min>,
- *   max: <BSONObj max>,
- *   zone: <string zone|null>,
- * }
- */
-class UpdateZoneKeyRangeCmd : public BasicCommand {
+class UpdateZoneKeyRangeCmd : public TypedCommand<UpdateZoneKeyRangeCmd> {
 public:
-    UpdateZoneKeyRangeCmd() : BasicCommand("updateZoneKeyRange", "updatezonekeyRange") {}
+    using Request = UpdateZoneKeyRange;
+
+    class Invocation final : public InvocationBase {
+    public:
+        using InvocationBase::InvocationBase;
+
+        void typedRun(OperationContext* opCtx) {
+            uassert(ErrorCodes::InvalidNamespace,
+                    "invalid namespace specified for request",
+                    ns().isValid());
+
+            BSONObjBuilder cmdBuilder;
+            ConfigsvrUpdateZoneKeyRange cmd(
+                ns(), request().getMin(), request().getMax(), request().getZone());
+            generic_argument_util::setMajorityWriteConcern(cmd);
+            cmd.serialize(&cmdBuilder);
+
+            auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+            auto cmdResponseStatus =
+                uassertStatusOK(configShard->runCommand(opCtx,
+                                                        kPrimaryOnlyReadPreference,
+                                                        DatabaseName::kAdmin,
+                                                        cmdBuilder.obj(),
+                                                        Shard::RetryPolicy::kIdempotent));
+            uassertStatusOK(cmdResponseStatus.commandStatus);
+        }
+
+    private:
+        bool isRemove() const {
+            if (request().getZone()) {
+                return false;
+            }
+            return true;
+        }
+
+        ChunkRange getRange() const {
+            BSONObj minKey = request().getMin();
+            BSONObj maxKey = request().getMax();
+
+            uassertStatusOK(ChunkRange::validate(minKey, maxKey));
+            return ChunkRange(minKey, maxKey);
+        }
+
+        NamespaceString ns() const override {
+            return request().getCommandParameter();
+        }
+
+        bool supportsWriteConcern() const override {
+            return false;
+        }
+
+        void doCheckAuthorization(OperationContext* opCtx) const override {
+            auto* as = AuthorizationSession::get(opCtx->getClient());
+
+            if (as->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                    ActionType::enableSharding)) {
+                return;
+            }
+
+            // Fallback on permissions to directly modify the shard config.
+            uassert(
+                ErrorCodes::Unauthorized,
+                "Unauthorized",
+                as->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forExactNamespace(NamespaceString::kConfigsvrShardsNamespace),
+                    ActionType::find));
+
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized",
+                    as->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forExactNamespace(TagsType::ConfigNS), ActionType::find));
+
+            uassert(
+                ErrorCodes::Unauthorized,
+                "Unauthorized",
+                as->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forExactNamespace(TagsType::ConfigNS), ActionType::update));
+            uassert(
+                ErrorCodes::Unauthorized,
+                "Unauthorized",
+                as->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forExactNamespace(TagsType::ConfigNS), ActionType::remove));
+        }
+    };
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
 
-    virtual bool adminOnly() const {
+    bool adminOnly() const override {
         return true;
-    }
-
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
     }
 
     std::string help() const override {
-        return "assigns/remove a range of a sharded collection to a zone";
+        return "Assigns/removes a range of a sharded collection to a zone.";
     }
-
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) const final {
-        auto* as = AuthorizationSession::get(client);
-
-        if (as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                 ActionType::enableSharding)) {
-            return Status::OK();
-        }
-
-        // Fallback on permissions to directly modify the shard config.
-        if (!as->isAuthorizedForActionsOnResource(
-                ResourcePattern::forExactNamespace(ShardType::ConfigNS), ActionType::find)) {
-            return {ErrorCodes::Unauthorized, "Unauthorized"};
-        }
-
-        if (!as->isAuthorizedForActionsOnResource(
-                ResourcePattern::forExactNamespace(TagsType::ConfigNS), ActionType::find)) {
-            return {ErrorCodes::Unauthorized, "Unauthorized"};
-        }
-
-        if (!as->isAuthorizedForActionsOnResource(
-                ResourcePattern::forExactNamespace(TagsType::ConfigNS), ActionType::update)) {
-            return {ErrorCodes::Unauthorized, "Unauthorized"};
-        }
-
-        if (!as->isAuthorizedForActionsOnResource(
-                ResourcePattern::forExactNamespace(TagsType::ConfigNS), ActionType::remove)) {
-            return {ErrorCodes::Unauthorized, "Unauthorized"};
-        }
-
-        return Status::OK();
-    }
-
-    virtual bool run(OperationContext* opCtx,
-                     const std::string& dbname,
-                     const BSONObj& cmdObj,
-                     BSONObjBuilder& result) {
-        auto parsedRequest =
-            uassertStatusOK(UpdateZoneKeyRangeRequest::parseFromMongosCommand(cmdObj));
-
-        BSONObjBuilder cmdBuilder;
-        parsedRequest.appendAsConfigCommand(&cmdBuilder);
-        cmdBuilder.append("writeConcern", kMajorityWriteConcern.toBSON());
-
-        auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-        auto cmdResponseStatus = uassertStatusOK(
-            configShard->runCommandWithFixedRetryAttempts(opCtx,
-                                                          kPrimaryOnlyReadPreference,
-                                                          "admin",
-                                                          cmdBuilder.obj(),
-                                                          Shard::RetryPolicy::kIdempotent));
-        uassertStatusOK(cmdResponseStatus.commandStatus);
-        return true;
-    }
-
-} updateZoneKeyRangeCmd;
+};
+MONGO_REGISTER_COMMAND(UpdateZoneKeyRangeCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

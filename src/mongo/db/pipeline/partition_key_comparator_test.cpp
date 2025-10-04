@@ -27,12 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/db/exec/document_value/document_value_test_util.h"
-#include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/partition_key_comparator.h"
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
+#include <string>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace {
@@ -92,17 +99,12 @@ DEATH_TEST_F(PartitionKeyComparatorTest,
              "Null expression context") {
     boost::intrusive_ptr<ExpressionFieldPath> expr =
         ExpressionFieldPath::parse(getExpCtx().get(), "$a", getExpCtx()->variablesParseState);
-    ASSERT_THROWS_CODE(_keyComparator =
-                           std::make_unique<PartitionKeyComparator>(nullptr, expr, Document{{}}),
-                       AssertionException,
-                       5733800);
+    _keyComparator = std::make_unique<PartitionKeyComparator>(nullptr, expr, Document{{}});
 }
 
 DEATH_TEST_F(PartitionKeyComparatorTest, FailsWithNullExpression, "Null expression passed") {
-    ASSERT_THROWS_CODE(_keyComparator = std::make_unique<PartitionKeyComparator>(
-                           getExpCtx().get(), nullptr, Document{{}}),
-                       AssertionException,
-                       5733801);
+    _keyComparator =
+        std::make_unique<PartitionKeyComparator>(getExpCtx().get(), nullptr, Document{{}});
 }
 }  // namespace
 

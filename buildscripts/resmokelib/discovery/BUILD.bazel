@@ -1,0 +1,20 @@
+load("@poetry//:dependencies.bzl", "dependency")
+
+py_library(
+    name = "discovery",
+    srcs = [
+        "__init__.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/resmokelib/multiversion",
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+        dependency(
+            "pydantic",
+            group = "evergreen",
+        ),
+    ],
+)

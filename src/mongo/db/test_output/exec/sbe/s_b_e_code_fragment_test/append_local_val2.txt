@@ -1,0 +1,115 @@
+# Golden test output of SBECodeFragmentTest/AppendLocalVal2
+==== VARIATION append code 1
+-- CODE:
+[0x0000-0x0031] stackSize: 1, maxStackSize: 5
+0x0000: pushConstVal(value: 10);
+0x000a: pushConstVal(value: 20);
+0x0014: pushConstVal(value: Nothing);
+0x001e: pushLocalVal(arg: 2);
+0x0023: pushLocalVal(arg: 2);
+0x0028: sub(popLhs: 1, moveFromLhs: 1, offsetLhs: 0, popRhs: 1, moveFromRhs: 1, offsetRhs: 0);
+0x002b: swap();
+0x002c: pop();
+0x002d: swap();
+0x002e: pop();
+0x002f: swap();
+0x0030: pop();
+
+-- RESULT:
+-10
+
+==== VARIATION append code 2
+-- CODE:
+[0x0000-0x0031] stackSize: 1, maxStackSize: 5
+0x0000: pushConstVal(value: 10);
+0x000a: pushConstVal(value: 20);
+0x0014: pushConstVal(value: Nothing);
+0x001e: pushLocalVal(arg: 2);
+0x0023: pushLocalVal(arg: 2);
+0x0028: sub(popLhs: 1, moveFromLhs: 1, offsetLhs: 0, popRhs: 1, moveFromRhs: 1, offsetRhs: 0);
+0x002b: swap();
+0x002c: pop();
+0x002d: swap();
+0x002e: pop();
+0x002f: swap();
+0x0030: pop();
+
+-- RESULT:
+-10
+
+==== VARIATION append code 3
+-- CODE:
+[0x0000-0x0031] stackSize: 1, maxStackSize: 5
+0x0000: pushConstVal(value: 10);
+0x000a: pushConstVal(value: 20);
+0x0014: pushConstVal(value: Nothing);
+0x001e: pushLocalVal(arg: 2);
+0x0023: pushLocalVal(arg: 2);
+0x0028: sub(popLhs: 1, moveFromLhs: 1, offsetLhs: 0, popRhs: 1, moveFromRhs: 1, offsetRhs: 0);
+0x002b: swap();
+0x002c: pop();
+0x002d: swap();
+0x002e: pop();
+0x002f: swap();
+0x0030: pop();
+
+-- RESULT:
+-10
+
+==== VARIATION append code 4
+-- CODE:
+[0x0000-0x0031] stackSize: 1, maxStackSize: 5
+0x0000: pushConstVal(value: 10);
+0x000a: pushConstVal(value: 20);
+0x0014: pushConstVal(value: Nothing);
+0x001e: pushLocalVal(arg: 2);
+0x0023: pushLocalVal(arg: 2);
+0x0028: sub(popLhs: 1, moveFromLhs: 1, offsetLhs: 0, popRhs: 1, moveFromRhs: 1, offsetRhs: 0);
+0x002b: swap();
+0x002c: pop();
+0x002d: swap();
+0x002e: pop();
+0x002f: swap();
+0x0030: pop();
+
+-- RESULT:
+-10
+
+==== VARIATION append code 5
+-- CODE:
+[0x0000-0x0031] stackSize: 1, maxStackSize: 5
+0x0000: pushConstVal(value: 10);
+0x000a: pushConstVal(value: 20);
+0x0014: pushConstVal(value: Nothing);
+0x001e: pushLocalVal(arg: 2);
+0x0023: pushLocalVal(arg: 2);
+0x0028: sub(popLhs: 1, moveFromLhs: 1, offsetLhs: 0, popRhs: 1, moveFromRhs: 1, offsetRhs: 0);
+0x002b: swap();
+0x002c: pop();
+0x002d: swap();
+0x002e: pop();
+0x002f: swap();
+0x0030: pop();
+
+-- RESULT:
+-10
+
+==== VARIATION append instr
+-- CODE:
+[0x0000-0x0031] stackSize: 1, maxStackSize: 5
+0x0000: pushConstVal(value: 10);
+0x000a: pushConstVal(value: 20);
+0x0014: pushConstVal(value: Nothing);
+0x001e: pushLocalVal(arg: 2);
+0x0023: pushLocalVal(arg: 2);
+0x0028: sub(popLhs: 1, moveFromLhs: 1, offsetLhs: 0, popRhs: 1, moveFromRhs: 1, offsetRhs: 0);
+0x002b: swap();
+0x002c: pop();
+0x002d: swap();
+0x002e: pop();
+0x002f: swap();
+0x0030: pop();
+
+-- RESULT:
+-10
+

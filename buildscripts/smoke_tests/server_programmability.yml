@@ -1,0 +1,27 @@
+# This suite defines the jstest portion of the server programmability smoke tests.
+# Running the full set, including both C++ unit tests and jstests can be accomplished by running
+# the following commands:
+# bazel test --test_tag_filters=server-programmability //...
+# bazel build install-devcore && python buildscripts/run_smoke_tests.py --suites=server_programmability
+
+suites:
+  core:
+    - jstests/core/testing/failcommand_failpoint.js
+
+  failpoints:
+    - jstests/fail_point/*.js
+
+  no_passthrough:
+    - jstests/noPassthrough/reproducible_initializer_order.js
+    - jstests/noPassthrough/version.js
+    - jstests/noPassthrough/exit_logging.js
+    - jstests/noPassthrough/tassert_failpoint.js
+    # The test below can fail depending on the host's configured ulimits, so it's not included.
+    # - jstests/noPassthrough/pin_code_segments_on_startup.js
+    - jstests/noPassthrough/utf8_paths.js
+    - jstests/noPassthrough/bson/*.js
+    - jstests/noPassthrough/interruption/*.js
+    - jstests/noPassthrough/server_parameters/*.js
+    - jstests/noPassthrough/startup_shutdown/*.js
+    - jstests/noPassthrough/architecture/failcommand_failpoint_maxtimems.js
+    - jstests/noPassthrough/architecture/failcommand_failpoint_not_parallel.js

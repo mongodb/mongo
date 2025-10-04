@@ -29,11 +29,27 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/keys_collection_client.h"
+#include "mongo/db/keys_collection_document_gen.h"
+#include "mongo/db/logical_time.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/aggregation_request_helper.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/rs_local_client.h"
+#include "mongo/db/sharding_environment/client/shard.h"
+#include "mongo/db/write_concern_options.h"
+
 #include <memory>
 #include <string>
+#include <vector>
 
-#include "mongo/db/keys_collection_client.h"
-#include "mongo/db/rs_local_client.h"
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -43,19 +59,20 @@ class BSONObj;
 
 class KeysCollectionClientDirect : public KeysCollectionClient {
 public:
-    KeysCollectionClientDirect();
+    KeysCollectionClientDirect(bool mustUseLocalReads);
+
     /**
-     * Returns keys in admin.system.keys that match the given purpose and have an expiresAt value
-     * greater than newerThanThis. Uses readConcern level majority if possible.
+     * Returns internal keys for the given purpose and have an expiresAt value greater than
+     * newerThanThis. Uses readConcern level majority if possible.
      */
     StatusWith<std::vector<KeysCollectionDocument>> getNewInternalKeys(
         OperationContext* opCtx,
         StringData purpose,
         const LogicalTime& newerThanThis,
-        bool useMajority) override;
+        bool tryUseMajority) override;
 
     /**
-     * Returns all keys in config.external_validation_keys that match the given purpose.
+     * Returns all external (i.e. validation-only) keys for the given purpose.
      */
     StatusWith<std::vector<ExternalKeysCollectionDocument>> getAllExternalKeys(
         OperationContext* opCtx, StringData purpose) override;
@@ -66,16 +83,16 @@ public:
     Status insertNewKey(OperationContext* opCtx, const BSONObj& doc) override;
 
     /**
-     * Returns false if getNewKeys uses readConcern level:local, so the documents returned can be
-     * rolled back.
+     * Returns true if getNewKeys always uses readConcern level:local, so the documents returned can
+     * be rolled back.
      */
-    bool supportsMajorityReads() const final {
-        return false;
+    bool mustUseLocalReads() const final {
+        return _mustUseLocalReads;
     }
 
 private:
     /**
-     * Returns keys in the given collection that match the given purpose and have an expiresAt value
+     * Returns keys in the given collection for the given purpose and have an expiresAt value
      * greater than newerThanThis, using readConcern level majority if possible.
      */
     template <typename KeyDocumentType>
@@ -83,7 +100,7 @@ private:
                                                          const NamespaceString& nss,
                                                          StringData purpose,
                                                          const LogicalTime& newerThanThis,
-                                                         bool useMajority);
+                                                         bool tryUseMajority);
 
     StatusWith<Shard::QueryResponse> _query(OperationContext* opCtx,
                                             const ReadPreferenceSetting& readPref,
@@ -94,10 +111,10 @@ private:
                                             boost::optional<long long> limit);
 
     Status _insert(OperationContext* opCtx,
-                   const NamespaceString& nss,
                    const BSONObj& doc,
                    const WriteConcernOptions& writeConcern);
 
     RSLocalClient _rsLocalClient;
+    bool _mustUseLocalReads{false};
 };
 }  // namespace mongo

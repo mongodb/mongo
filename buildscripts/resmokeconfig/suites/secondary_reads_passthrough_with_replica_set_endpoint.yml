@@ -1,0 +1,183 @@
+# This suite is based on the secondary_reads passthrough suite. It is used for testing that
+# there is no feature parity issue between secondary reads on a replica set before and after it
+# has been bootstrapped as a single-shard cluster as long as the replica set endpoint is enabled.
+# It is also used for testing that the replica set endpoint skips readPreference re-targeting. It
+# does that by running read commands against each secondary directly rather than letting the
+# shell do the readPreference targeting, and then at the end it checks the profiler collections
+# to verify each secondary only ran the commands it got directly from the shell, i.e. the replica
+# set endpoint does not route the command to the primary or a different secondary.
+#
+# When feature parity is achieved, the set of tests disabled in this suite should be the same as
+# the set of tests disabled in the secondary_reads passthrough suite.
+
+test_kind: js_test
+
+selector:
+  roots:
+    - jstests/core/**/*.js
+    - jstests/fle2/**/*.js
+    - src/mongo/db/modules/*/jstests/fle2/**/*.js
+  exclude_files:
+    # Operations within a transaction do not support write concern.
+    - jstests/core/txns/**/*.js
+
+    # Parallel shell is not causally consistent
+    - jstests/core/**/benchrun_pipeline_updates.js
+    - jstests/core/**/crud_ops_do_not_throw_locktimeout.js
+    - jstests/core/**/cursora.js
+    - jstests/core/**/find_and_modify_concurrent_update.js
+    - jstests/core/**/shellstartparallel.js
+    - jstests/core/**/loadserverscripts.js
+    - jstests/core/**/fsync.js
+    # benchRun cannot be overridden to be causally consistent
+    - jstests/core/**/bench_test*.js
+    - jstests/core/**/benchrun_pipeline_updates.js
+    # getMore is not causal consistent because afterClusterTime has been specified
+    # by the preceding find command which establishes the cursor. Therefore,
+    # getMore cannot be guaranteed to get executed after commands in between find
+    # and getMore.
+    - jstests/core/ddl/drop_collection_cursors.js
+    - jstests/core/**/ord.js
+    - jstests/core/**/tailable_cursor_invalidation.js
+    - jstests/core/**/tailable_skip_limit.js
+    - jstests/core/**/query/collation/collation.js
+
+    # The tests below are disabled because of sharding auto-bootstrap and replica set endpoint.
+    # Cannot specify "$_requestResumeToken" option to a mongos since it is internal-only.
+    - jstests/core/query/find_with_resume_after_param.js
+    - jstests/core/query/resume_query_from_non_existent_record.js
+    - jstests/core/query/resume_query.js
+    - jstests/core/timeseries/query/timeseries_resume_after.js
+    - jstests/core/query/start_at_blocked_in_sbe.js
+    # This test creates collections directly using applyOps commands. So those collections are not
+    # tracked by sharding and therefore not discoverable by listCollections commands that go through
+    # the router. TODO (SERVER-84342): listCollections command doesn't return collections created
+    # directly through applyOps commands.
+    - jstests/core/ddl/rename_collection_staytemp.js
+    # TODO (SERVER-84342): applyOps doesn't work on sharded clusters. Re-enable these tests once we
+    # agree on a solution to support applyOps.
+    - jstests/core/administrative/apply_ops/*.js
+    # This test runs the internal internalRenameIfOptionsAndIndexeMatch command without attaching
+    # database version, so cannot be against a shardsvr mongod.
+    - jstests/core/query/internal_rename_if_options_and_indexes_match.js
+    # The tests below drop a collection in the config database, which is not allowed via a router
+    # on a sharded cluster.
+    # TODO (SERVER-87512): Support role-aware serverStatus on mongod with router role.
+    - jstests/core/query/find_and_modify/find_and_modify_metrics.js
+    - jstests/core/query/update/update_metrics.js
+    # TODO(SERVER-18047): Remove once explain behavior is unified between replica sets and sharded
+    # clusters for non-existent dbs.
+    - jstests/core/query/explain/explain_missing_database.js
+    # This test runs {find: uuid} commands which are not supported for replica set endpoints.
+    - jstests/core/query/commands_with_uuid.js
+    # TODO (SERVER-80416): cloneCollectionAsCapped command stops working after a replica set
+    # is bootstrapped as a sharded cluster.
+    - jstests/core/query/collation/collation.js
+    - jstests/core/ddl/clone_collection_as_capped.js
+    - jstests/core/replicate_record_ids/disallow_capped.js
+    # A renameCollection command against a collection with invalid views fails on sharded cluster
+    # but succeeds on replica set.
+    - jstests/core/catalog/views/invalid_system_views.js
+    # TODO (SERVER-86364): Secondary reads assertion fails.
+    - jstests/core/clustered/clustered_collection_creation.js
+
+    # The tests below are disabled because they assert that if there have not been any successful
+    # writes the test database, it should remain empty or non-existent. This suite breaks this
+    # assumption since it enables profiling which creates the system.profile collection.
+    - jstests/core/ddl/clone_collection_as_capped_non_existent.js
+    - jstests/core/write/no_db_created.js
+    - jstests/core/query/explain/explain_find_and_modify.js
+    # The test below expects the listCollections command that it runs to not validate the views
+    # that the collection has since the command uses the special filter used by initial sync which
+    # is by design allowed to bypass the views validation. This suite implicitly enables profiling
+    # for every accessed database. To avoid breaking tests that check what collections a database
+    # has, it overrides runCommand to hide the system.profile collection from listCollections
+    # response by modifying the original filter. This causes the command to not bypass the views
+    # validation and fail.
+    - jstests/core/catalog/list_collections_no_views.js
+    # The following test requires query settings / cluster parameter modification.
+    - jstests/core/query/query_settings/query_settings_size_limits.js
+    # Test expects changes in metrics (rejected command count), but these are
+    # per-ClusterRole. This suite changes which role's metrics are updated.
+    - jstests/core/query/query_settings/query_settings_reject_application.js
+    # Some TS rewrites cannot be done on mongos.
+    - jstests/core/timeseries/query/bucket_unpacking_group_reorder_fixed_buckets.js
+    # SERVER-99720 Remove the following exclusion rule once solved.
+    - jstests/core/ddl/drop_database.js
+    # This test expects to see an unsharded collection as untracked
+    - jstests/core/catalog/agg_list_cluster_catalog_sharding_fields.js
+
+  exclude_with_any_tags:
+    - assumes_standalone_mongod
+    ##
+    # The next tag corresponds to the special error thrown by the set_read_preference_secondary.js
+    # override when it refuses to replace the readPreference of a particular command. Above each tag
+    # are the message(s) that cause the tag to be warranted.
+    ##
+    # "Cowardly refusing to override read preference of command: ..."
+    # "Cowardly refusing to run test with overridden read preference when it reads from a
+    #  non-replicated collection: ..."
+    - assumes_read_preference_unchanged
+    - does_not_support_causal_consistency
+    ##
+    # collStats and dbStats are not causally consistent
+    - requires_collstats
+    - requires_dbstats
+    # These tests attempt to read from the "system.profile" collection, which may be missing entries
+    # if a write was performed on the primary of the replica set instead.
+    - requires_profiling
+
+executor:
+  archive:
+    hooks:
+      # TODO (SERVER-83433): Add back the test coverage for running db hash check on replica set
+      # that is fsync locked and has replica set endpoint enabled.
+      # - CheckReplDBHash
+      - CheckReplOplogs
+      - ValidateCollections
+      - ValidateDirectSecondaryReads
+  config:
+    shell_options:
+      eval: >-
+        globalThis.testingReplication = true;
+        await import('jstests/libs/override_methods/implicitly_enable_profiler.js');
+        await import('jstests/libs/override_methods/set_read_preference_secondary.js');
+        await import('jstests/libs/override_methods/enable_causal_consistency.js');
+      global_vars:
+        TestData: &TestData
+          testingReplicaSetEndpoint: true
+          # Make the set_read_preference_secondary.js override run read commands directly against
+          # the secondaries. Additionally, exclude some secondaries so that we can verify that the
+          # those secondaries did not run any read commands from the shell.
+          connectDirectlyToRandomSubsetOfSecondaries: true
+  hooks:
+    # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+    # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+    # validating the entire contents of the collection.
+    - class: CheckReplOplogs
+    # TODO (SERVER-83433): Add back the test coverage for running db hash check on replica set that
+    # is fsync locked and has replica set endpoint enabled.
+    # - class: CheckReplDBHash
+    - class: ValidateCollections
+    - class: ValidateDirectSecondaryReads
+      shell_options:
+        global_vars:
+          TestData: *TestData
+    - class: CleanEveryN
+      n: 20
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        featureFlagAllMongodsAreSharded: true
+        # Allow many initial sync attempts. Initial sync may fail if the sync source does not have
+        # an oplog yet because it has not conducted its own initial sync yet.
+        numInitialSyncAttempts: 10000000
+    linear_chain: true
+    num_nodes: 5
+    use_replica_set_connection_string: true
+    use_auto_bootstrap_procedure: 1
+    # Make only one node electable to allow this suite to definitively determine which nodes are
+    # secondaries.
+    all_nodes_electable: false

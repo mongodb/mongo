@@ -29,7 +29,48 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/client/connection_string.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/member_config.h"
+#include "mongo/db/repl/member_data.h"
+#include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/repl_set_config.h"
+#include "mongo/db/repl/repl_set_heartbeat_response.h"
+#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/split_horizon/split_horizon.h"
+#include "mongo/db/repl/split_prepare_session_manager.h"
+#include "mongo/db/repl/sync_source_selector.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/rpc/metadata/oplog_query_metadata.h"
+#include "mongo/rpc/topology_version_gen.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/future.h"
+#include "mongo/util/interruptible.h"
+#include "mongo/util/modules.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace repl {
@@ -38,11 +79,11 @@ namespace repl {
  * Stub implementation for tests, or programs like mongocryptd, that want a non-null
  * ReplicationCoordinator but don't need any replication logic.
  */
-class ReplicationCoordinatorNoOp final : public ReplicationCoordinator {
+class MONGO_MOD_PUB ReplicationCoordinatorNoOp final : public ReplicationCoordinator {
 
 public:
     ReplicationCoordinatorNoOp(ServiceContext* serviceContext);
-    ~ReplicationCoordinatorNoOp() = default;
+    ~ReplicationCoordinatorNoOp() override = default;
 
     ReplicationCoordinatorNoOp(ReplicationCoordinatorNoOp&) = delete;
     ReplicationCoordinatorNoOp& operator=(ReplicationCoordinatorNoOp&) = delete;
@@ -55,9 +96,7 @@ public:
 
     bool inQuiesceMode() const final;
 
-    void shutdown(OperationContext* opCtx) final;
-
-    void markAsCleanShutdownIfPossible(OperationContext* opCtx) final;
+    void shutdown(OperationContext* opCtx, BSONObjBuilder* shutdownTimeElapsedBuilder) final;
 
     ServiceContext* getServiceContext() final {
         return _service;
@@ -65,24 +104,27 @@ public:
 
     const ReplSettings& getSettings() const final;
 
-    Mode getReplicationMode() const final;
     bool getMaintenanceMode() final;
 
-    bool isReplEnabled() const final;
     bool isWritablePrimaryForReportingPurposes() final;
     bool isInPrimaryOrSecondaryState(OperationContext* opCtx) const final;
+    MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinatorNoOp::isInPrimaryOrSecondaryState)
     bool isInPrimaryOrSecondaryState_UNSAFE() const final;
 
-    bool canAcceptWritesForDatabase(OperationContext* opCtx, StringData dbName) final;
-    bool canAcceptWritesForDatabase_UNSAFE(OperationContext* opCtx, StringData dbName) final;
+    bool canAcceptWritesForDatabase(OperationContext* opCtx, const DatabaseName& dbName) final;
+    MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinatorNoOp::canAcceptWritesForDatabase)
+    bool canAcceptWritesForDatabase_UNSAFE(OperationContext* opCtx,
+                                           const DatabaseName& dbName) final;
 
     bool canAcceptWritesFor(OperationContext* opCtx, const NamespaceStringOrUUID& nsOrUUID) final;
+    MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinatorNoOp::canAcceptWritesFor)
     bool canAcceptWritesFor_UNSAFE(OperationContext* opCtx,
                                    const NamespaceStringOrUUID& nsOrUUID) final;
 
     Status checkCanServeReadsFor(OperationContext* opCtx,
                                  const NamespaceString& ns,
                                  bool secondaryOk) final;
+    MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinatorNoOp::checkCanServeReadsFor)
     Status checkCanServeReadsFor_UNSAFE(OperationContext* opCtx,
                                         const NamespaceString& ns,
                                         bool secondaryOk) final;
@@ -123,17 +165,23 @@ public:
     bool isCommitQuorumSatisfied(const CommitQuorumOptions& commitQuorum,
                                  const std::vector<mongo::HostAndPort>& members) const final;
 
-    void setMyLastAppliedOpTimeAndWallTime(const OpTimeAndWallTime& opTimeAndWallTime) final;
-    void setMyLastDurableOpTimeAndWallTime(const OpTimeAndWallTime& opTimeAndWallTime) final;
+    void setMyLastWrittenOpTimeAndWallTimeForward(const OpTimeAndWallTime& opTimeAndWallTime) final;
     void setMyLastAppliedOpTimeAndWallTimeForward(const OpTimeAndWallTime& opTimeAndWallTime) final;
     void setMyLastDurableOpTimeAndWallTimeForward(const OpTimeAndWallTime& opTimeAndWallTime) final;
+    void setMyLastAppliedAndLastWrittenOpTimeAndWallTimeForward(
+        const OpTimeAndWallTime& opTimeAndWallTime) final;
+    void setMyLastDurableAndLastWrittenOpTimeAndWallTimeForward(
+        const OpTimeAndWallTime& opTimeAndWallTime) final;
 
     void resetMyLastOpTimes() final;
 
     void setMyHeartbeatMessage(const std::string&) final;
 
+    OpTime getMyLastWrittenOpTime() const final;
+    OpTimeAndWallTime getMyLastWrittenOpTimeAndWallTime(bool rollbackSafe = false) const final;
+
     OpTime getMyLastAppliedOpTime() const final;
-    OpTimeAndWallTime getMyLastAppliedOpTimeAndWallTime(bool rollbackSafe = false) const final;
+    OpTimeAndWallTime getMyLastAppliedOpTimeAndWallTime() const final;
 
     OpTime getMyLastDurableOpTime() const final;
     OpTimeAndWallTime getMyLastDurableOpTimeAndWallTime() const final;
@@ -144,6 +192,9 @@ public:
 
     Status waitUntilOpTimeForReadUntil(OperationContext*,
                                        const ReadConcernArgs&,
+                                       boost::optional<Date_t>) final;
+    Status waitUntilOpTimeWrittenUntil(OperationContext*,
+                                       LogicalTime,
                                        boost::optional<Date_t>) final;
 
     Status waitUntilOpTimeForRead(OperationContext*, const ReadConcernArgs&) final;
@@ -159,9 +210,11 @@ public:
 
     Status setFollowerModeRollback(OperationContext* opCtx) final;
 
-    ApplierState getApplierState() final;
+    OplogSyncState getOplogSyncState() final;
 
-    void signalDrainComplete(OperationContext*, long long) noexcept final;
+    void signalWriterDrainComplete(OperationContext*, long long) noexcept final;
+
+    void signalApplierDrainComplete(OperationContext*, long long) noexcept final;
 
     void signalUpstreamUpdater() final;
 
@@ -177,27 +230,16 @@ public:
 
     ConnectionString getConfigConnectionString() const final;
 
-    Milliseconds getConfigElectionTimeoutPeriod() const final;
-
-    std::vector<MemberConfig> getConfigVotingMembers() const final;
-
     std::int64_t getConfigTerm() const final;
 
     std::int64_t getConfigVersion() const final;
 
     ConfigVersionAndTerm getConfigVersionAndTerm() const final;
 
-    int getConfigNumMembers() const final;
+    boost::optional<MemberConfig> findConfigMemberByHostAndPort_deprecated(
+        const HostAndPort& hap) const final;
 
-    Milliseconds getConfigHeartbeatTimeoutPeriodMillis() const final;
-
-    BSONObj getConfigBSON() const final;
-
-    const MemberConfig* findConfigMemberByHostAndPort(const HostAndPort& hap) const final;
-
-    bool isConfigLocalHostAllowed() const final;
-
-    Milliseconds getConfigHeartbeatInterval() const final;
+    Status validateWriteConcern(const WriteConcernOptions& writeConcern) const final;
 
     void processReplSetGetConfig(BSONObjBuilder*,
                                  bool commitmentStatus = false,
@@ -226,7 +268,9 @@ public:
 
     Status doOptimizedReconfig(OperationContext* opCtx, GetNewConfigFn) final;
 
-    Status awaitConfigCommitment(OperationContext* opCtx, bool waitForOplogCommitment) final;
+    Status awaitConfigCommitment(OperationContext* opCtx,
+                                 bool waitForOplogCommitment,
+                                 long long term) final;
 
     Status processReplSetInitiate(OperationContext*, const BSONObj&, BSONObjBuilder*) final;
 
@@ -246,7 +290,10 @@ public:
                                                   const rpc::ReplSetMetadata&,
                                                   const rpc::OplogQueryMetadata&,
                                                   const OpTime&,
-                                                  const OpTime&) final;
+                                                  const OpTime&) const final;
+
+    ChangeSyncSourceAction shouldChangeSyncSourceOnError(const HostAndPort&,
+                                                         const OpTime&) const final;
 
     OpTime getLastCommittedOpTime() const final;
 
@@ -256,7 +303,7 @@ public:
                                       const ReplSetRequestVotesArgs&,
                                       ReplSetRequestVotesResponse*) final;
 
-    void prepareReplMetadata(const BSONObj&, const OpTime&, BSONObjBuilder*) const final;
+    void prepareReplMetadata(const GenericArguments&, const OpTime&, BSONObjBuilder*) const final;
 
     Status processHeartbeatV1(const ReplSetHeartbeatArgsV1&, ReplSetHeartbeatResponse*) final;
 
@@ -272,19 +319,19 @@ public:
 
     void waitUntilSnapshotCommitted(OperationContext*, const Timestamp&) final;
 
-    void appendDiagnosticBSON(BSONObjBuilder*) final;
+    void appendDiagnosticBSON(BSONObjBuilder*, StringData) final;
 
     void appendConnectionStats(executor::ConnectionPoolStats* stats) const final;
 
-    virtual void createWMajorityWriteAvailabilityDateWaiter(OpTime opTime) final;
+    void createWMajorityWriteAvailabilityDateWaiter(OpTime opTime) final;
+
+    Status waitForPrimaryMajorityReadsAvailable(OperationContext* opCtx) const final;
 
     Status stepUpIfEligible(bool skipDryRun) final;
 
     Status abortCatchupIfNeeded(PrimaryCatchUpConclusionReason reason) final;
 
     void incrementNumCatchUpOpsIfCatchingUp(long numOps) final;
-
-    void signalDropPendingCollectionsRemovedFromStorage() final;
 
     boost::optional<Timestamp> getRecoveryTimestamp() final;
 
@@ -320,17 +367,44 @@ public:
     void cancelCbkHandle(executor::TaskExecutor::CallbackHandle activeHandle) override;
 
     BSONObj runCmdOnPrimaryAndAwaitResponse(OperationContext* opCtx,
-                                            const std::string& dbName,
+                                            const DatabaseName& dbName,
                                             const BSONObj& cmdObj,
                                             OnRemoteCmdScheduledFn onRemoteCmdScheduled,
                                             OnRemoteCmdCompleteFn onRemoteCmdComplete) override;
 
-    virtual void restartScheduledHeartbeats_forTest() final;
+    void restartScheduledHeartbeats_forTest() final;
 
-    virtual void recordIfCWWCIsSetOnConfigServerOnStartup(OperationContext* opCtx) final;
+    void recordIfCWWCIsSetOnConfigServerOnStartup(OperationContext* opCtx) final;
+
+    class WriteConcernTagChangesNoOp : public WriteConcernTagChanges {
+        ~WriteConcernTagChangesNoOp() override = default;
+        bool reserveDefaultWriteConcernChange() override {
+            return false;
+        };
+        void releaseDefaultWriteConcernChange() override {}
+
+        bool reserveConfigWriteConcernTagChange() override {
+            return false;
+        };
+        void releaseConfigWriteConcernTagChange() override {}
+    };
+
+    WriteConcernTagChanges* getWriteConcernTagChanges() override;
+
+    SplitPrepareSessionManager* getSplitPrepareSessionManager() override;
+
+    bool isRetryableWrite(OperationContext* opCtx) const override;
+
+    boost::optional<UUID> getInitialSyncId(OperationContext* opCtx) override;
+
+    void setConsistentDataAvailable(OperationContext* opCtx,
+                                    bool isDataMajorityCommitted) override {}
+    bool isDataConsistent() const override;
+    void clearSyncSource() override;
 
 private:
     ServiceContext* const _service;
+    ReplSettings const _settings;
 };
 
 }  // namespace repl

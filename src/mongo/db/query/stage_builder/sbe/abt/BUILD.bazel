@@ -1,0 +1,62 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+        "*.py",
+    ]),
+)
+
+# Core definitions: ABT, Logical and physical properties, Metadata, and core
+# utilities.
+mongo_cc_library(
+    name = "abt_base",
+    srcs = [
+        "explain.cpp",
+        "reference_tracker.cpp",
+    ],
+    hdrs = [
+        "explain.h",
+        "reference_tracker.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/query/stage_builder/sbe/abt/syntax:syntax_expr",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "reference_tracker_test",
+    srcs = [
+        "reference_tracker_test.cpp",
+    ],
+    tags = ["mongo_unittest_seventh_group"],
+    deps = [
+        ":abt_base",
+        "//src/mongo/db:sbe_values",
+        "//src/mongo/db/query/stage_builder/sbe:abt_unit_test_utils",
+    ],
+)
+
+mongo_cc_binary(
+    name = "optimizer_gdb_test_program",
+    srcs = [
+        "optimizer_gdb_test_program.cpp",
+    ],
+    tags = [
+        "dist_test",
+    ],
+    deps = [
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/query/stage_builder/sbe:abt_unit_test_utils",
+    ],
+)
+
+py_binary(
+    name = "optimizer_gdb_test",
+    srcs = ["optimizer_gdb_test.py"],
+)

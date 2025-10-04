@@ -1,14 +1,15 @@
 /**
  * Tests the format of 'electionMetrics' serverStatus section.
  */
-(function() {
-"use strict";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Verifies that the 'electionMetrics' serverStatus section has the given field.
 function verifyElectionMetricsField(serverStatusResponse, fieldName) {
-    assert(serverStatusResponse.electionMetrics.hasOwnProperty(fieldName),
-           () => (`The 'electionMetrics' serverStatus section did not have the '${fieldName}' \
-field: \n${tojson(serverStatusResponse.electionMetrics)}`));
+    assert(
+        serverStatusResponse.electionMetrics.hasOwnProperty(fieldName),
+        () => `The 'electionMetrics' serverStatus section did not have the '${fieldName}' \
+field: \n${tojson(serverStatusResponse.electionMetrics)}`,
+    );
     return serverStatusResponse.electionMetrics[fieldName];
 }
 
@@ -16,19 +17,25 @@ field: \n${tojson(serverStatusResponse.electionMetrics)}`));
 // reason counter and that it has the subfields 'called' and 'successful'.
 function verifyElectionReasonCounterFields(serverStatusResponse, fieldName) {
     const field = verifyElectionMetricsField(serverStatusResponse, fieldName);
-    assert(field.hasOwnProperty("called"),
-           () => (`The '${fieldName}' field in the 'electionMetrics' serverStatus section did \
-not have the 'called' field: \n${tojson(field)}`));
-    assert(field.hasOwnProperty("successful"),
-           () => (`The '${fieldName}' field in the 'electionMetrics' serverStatus section did \
-not have the 'successful' field: \n${tojson(field)}`));
+    assert(
+        field.hasOwnProperty("called"),
+        () => `The '${fieldName}' field in the 'electionMetrics' serverStatus section did \
+not have the 'called' field: \n${tojson(field)}`,
+    );
+    assert(
+        field.hasOwnProperty("successful"),
+        () => `The '${fieldName}' field in the 'electionMetrics' serverStatus section did \
+not have the 'successful' field: \n${tojson(field)}`,
+    );
 }
 
 // Verifies the format of the 'electionMetrics' serverStatus section.
 function verifyElectionMetricsSSS(serverStatusResponse) {
-    assert(serverStatusResponse.hasOwnProperty("electionMetrics"),
-           () => (`Expected the serverStatus response to have an 'electionMetrics' field:
-${tojson(serverStatusResponse)}`));
+    assert(
+        serverStatusResponse.hasOwnProperty("electionMetrics"),
+        () => `Expected the serverStatus response to have an 'electionMetrics' field:
+${tojson(serverStatusResponse)}`,
+    );
     verifyElectionReasonCounterFields(serverStatusResponse, "stepUpCmd");
     verifyElectionReasonCounterFields(serverStatusResponse, "priorityTakeover");
     verifyElectionReasonCounterFields(serverStatusResponse, "catchUpTakeover");
@@ -42,8 +49,7 @@ ${tojson(serverStatusResponse)}`));
     verifyElectionMetricsField(serverStatusResponse, "numCatchUpsTimedOut");
     verifyElectionMetricsField(serverStatusResponse, "numCatchUpsFailedWithError");
     verifyElectionMetricsField(serverStatusResponse, "numCatchUpsFailedWithNewTerm");
-    verifyElectionMetricsField(serverStatusResponse,
-                               "numCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd");
+    verifyElectionMetricsField(serverStatusResponse, "numCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd");
 }
 
 // Set up the replica set.
@@ -57,4 +63,3 @@ verifyElectionMetricsSSS(serverStatusResponse);
 
 // Stop the replica set.
 rst.stopSet();
-}());

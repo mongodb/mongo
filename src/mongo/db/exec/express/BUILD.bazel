@@ -1,0 +1,31 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_unit_test(
+    name = "express_execution_test",
+    srcs = [
+        "express_plan_test.cpp",
+        "plan_executor_express_test.cpp",
+    ],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db:record_id_helpers",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db:write_stage_common",
+        "//src/mongo/db/collection_crud",
+        "//src/mongo/db/local_catalog:catalog_test_fixture",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/query:query_planner",
+        "//src/mongo/db/query/collation:collator_interface_mock",
+        "//src/mongo/db/query/compiler/logical_model/projection:projection_ast",
+    ],
+)

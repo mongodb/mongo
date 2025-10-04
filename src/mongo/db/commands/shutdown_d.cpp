@@ -27,17 +27,28 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
-#include "mongo/platform/basic.h"
-
-#include <string>
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/commands/shutdown.h"
-#include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/index_builds/index_builds_coordinator.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/str.h"
+
+#include <memory>
+#include <string>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
+
 
 namespace mongo {
 
@@ -52,7 +63,7 @@ Status stepDownForShutdown(OperationContext* opCtx,
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     // If this is a single node replica set, then we don't have to wait
     // for any secondaries. Ignore stepdown.
-    if (replCoord->getConfigNumMembers() != 1) {
+    if (replCoord->getConfig().getNumMembers() != 1) {
         try {
             if (MONGO_unlikely(hangInShutdownBeforeStepdown.shouldFail())) {
                 LOGV2(5436600, "hangInShutdownBeforeStepdown failpoint enabled");
@@ -61,7 +72,10 @@ Status stepDownForShutdown(OperationContext* opCtx,
 
             // Specify a high freeze time, so that if there is a stall during shut down, the node
             // does not run for election.
-            replCoord->stepDown(opCtx, false /* force */, waitTime, Days(1));
+            auto& rss = rss::ReplicatedStorageService::get(opCtx);
+            if (rss.getPersistenceProvider().shouldStepDownForShutdown()) {
+                replCoord->stepDown(opCtx, false /* force */, waitTime, Days(1));
+            }
 
             if (MONGO_unlikely(hangInShutdownAfterStepdown.shouldFail())) {
                 LOGV2(4695100, "hangInShutdownAfterStepdown failpoint enabled");
@@ -77,9 +91,9 @@ Status stepDownForShutdown(OperationContext* opCtx,
             LOGV2_WARNING(4719000, "Error stepping down during force shutdown", "error"_attr = e);
         }
 
-        // Even if the ReplicationCoordinator failed to step down, ensure we still shut down the
-        // TransactionCoordinatorService (see SERVER-45009)
-        TransactionCoordinatorService::get(opCtx)->onStepDown();
+        // Even if the ReplicationCoordinator failed to step down, ensure we still interrupt the
+        // TransactionCoordinatorService (see SERVER-45009).
+        TransactionCoordinatorService::get(opCtx)->interrupt();
     }
     return Status::OK();
 }
@@ -94,12 +108,12 @@ public:
                "node is the primary of a replica set, waits up to 'timeoutSecs' for an electable "
                "node to be caught up before stepping down. If 'force' is false and no electable "
                "node was able to catch up, does not shut down. If the node is in state SECONDARY "
-               "after the attempted stepdown, any remaining time in 'timeoutSecs' is used for "
+               "after the attempted stepdown, any remaining time in 'timeout' is used for "
                "quiesce mode, where the database continues to allow operations to run, but directs "
                "clients to route new operations to other replica set members.";
     }
 
-    static void beginShutdown(OperationContext* opCtx, bool force, long long timeoutSecs) {
+    static void beginShutdown(OperationContext* opCtx, bool force, Milliseconds timeout) {
         // This code may race with a new index build starting up. We may get 0 active index builds
         // from the IndexBuildsCoordinator shutdown to proceed, but there is nothing to prevent a
         // new index build from starting after that check.
@@ -113,10 +127,10 @@ public:
                     numIndexBuilds == 0U);
         }
 
-        uassertStatusOK(stepDownForShutdown(opCtx, Seconds(timeoutSecs), force));
+        uassertStatusOK(stepDownForShutdown(opCtx, timeout, force));
     }
-
-} cmdShutdownMongoD;
+};
+MONGO_REGISTER_COMMAND(CmdShutdownMongoD).forShard();
 
 }  // namespace
 }  // namespace mongo

@@ -29,16 +29,21 @@
 
 #pragma once
 
-#include <cstdint>
-#include <string>
-
 #include "mongo/base/status.h"
-#include "mongo/bson/mutable/element.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/db/exec/mutable_bson/element.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/field_ref_set.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/util/ctype.h"
+#include "mongo/util/string_map.h"
+
+#include <compare>
+#include <cstddef>
+#include <cstdint>
+#include <string>
 
 namespace mongo {
 
@@ -49,7 +54,7 @@ namespace pathsupport {
 static const size_t kMaxPaddingAllowed = 1500000;
 
 // Convenience type to hold equality matches at particular paths from a MatchExpression
-typedef std::map<StringData, const EqualityMatchExpression*> EqualityMatches;
+using EqualityMatches = StringDataMap<const EqualityMatchExpression*>;
 
 struct cmpPathsAndArrayIndexes {
     // While there is a string to number parser in the codebase, we use this for performance
@@ -122,10 +127,10 @@ struct cmpPathsAndArrayIndexes {
  *   'a.0.b' is NOT a viable path in {a: 1}, because a would have changed types
  *   'a.5.b' is a viable path in in {a: []} (padding would occur)
  */
-Status findLongestPrefix(const FieldRef& prefix,
-                         mutablebson::Element root,
-                         FieldIndex* idxFound,
-                         mutablebson::Element* elemFound);
+StatusWith<bool> findLongestPrefix(const FieldRef& prefix,
+                                   mutablebson::Element root,
+                                   FieldIndex* idxFound,
+                                   mutablebson::Element* elemFound);
 
 /**
  * Creates the parts 'prefix[idxRoot]', 'prefix[idxRoot+1]', ..., 'prefix[<numParts>-1]' under

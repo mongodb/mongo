@@ -41,31 +41,28 @@ def timestamp_str(t):
 class test_prepare04(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_prepare_cursor'
     uri = 'table:' + tablename
-    session_config = 'isolation=snapshot'
 
     before_ts = timestamp_str(150)
     prepare_ts = timestamp_str(200)
     after_ts = timestamp_str(250)
 
     types = [
-        ('col', dict(extra_config=',log=(enabled=false),key_format=r')),
-        ('col-fix', dict(extra_config=',log=(enabled=false),key_format=r,value_format=8t')),
-        ('lsm', dict(extra_config=',log=(enabled=false),type=lsm')),
-        ('row', dict(extra_config=',log=(enabled=false)')),
+        ('col', dict(extra_config=',key_format=r')),
+        ('col-fix', dict(extra_config=',key_format=r,value_format=8t')),
+        ('row', dict(extra_config='')),
     ]
 
     # Various begin_transaction config
     txncfg = [
-        ('before_ts', dict(txn_config='isolation=snapshot,read_timestamp=' + before_ts, after_ts=False)),
-        ('after_ts', dict(txn_config='isolation=snapshot,read_timestamp=' + after_ts, after_ts=True)),
-        ('no_ts', dict(txn_config='isolation=snapshot', after_ts=True)),
+        ('before_ts', dict(txn_config='read_timestamp=' + before_ts, after_ts=False)),
+        ('after_ts', dict(txn_config='read_timestamp=' + after_ts, after_ts=True)),
+        ('no_ts', dict(txn_config='', after_ts=True)),
     ]
 
     preparecfg = [
         ('ignore_false', dict(ignore_config=',ignore_prepare=false', ignore=False)),
         ('ignore_true', dict(ignore_config=',ignore_prepare=true', ignore=True)),
     ]
-    conn_config = 'log=(enabled)'
 
     scenarios = make_scenarios(types, txncfg, preparecfg)
 
@@ -92,7 +89,7 @@ class test_prepare04(wttest.WiredTigerTestCase, suite_subprocess):
 
         # make prepared updates.
         k = 1
-        self.session.begin_transaction('isolation=snapshot')
+        self.session.begin_transaction()
         c.set_key(1)
         c.set_value(2)
         c.update()
@@ -122,6 +119,3 @@ class test_prepare04(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.timestamp_transaction('commit_timestamp=' + timestamp_str(300))
         self.session.timestamp_transaction('durable_timestamp=' + timestamp_str(300))
         self.session.commit_transaction()
-
-if __name__ == '__main__':
-    wttest.run()

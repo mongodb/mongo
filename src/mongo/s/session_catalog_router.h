@@ -29,7 +29,9 @@
 
 #pragma once
 
-#include "mongo/db/session_catalog.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/session/session_catalog.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -60,6 +62,16 @@ class RouterOperationContextSession {
 public:
     RouterOperationContextSession(OperationContext* opCtx);
     ~RouterOperationContextSession();
+
+    /**
+     * These methods take an operation context with a checked-out session and allow it to be
+     * temporarily or permanently checked back in, in order to allow other operations to use it.
+     *
+     * Check-in may only be called if the session has actually been checked out previously and
+     * similarly check-out may only be called if the session is not checked out already.
+     */
+    static void checkIn(OperationContext* opCtx, OperationContextSession::CheckInReason reason);
+    static void checkOut(OperationContext* opCtx);
 
 private:
     OperationContext* _opCtx;

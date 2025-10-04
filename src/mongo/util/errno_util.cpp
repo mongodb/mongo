@@ -27,102 +27,65 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/util/errno_util.h"
 
-#include <sstream>
+#include <system_error>
 
-#ifndef _WIN32
-#include <cstring>  // For strerror_r
-#include <errno.h>  // For errno
+#include <fmt/format.h>
+
+#ifdef _WIN32
+#include <errhandlingapi.h>
+#include <winsock2.h>
 #endif
 
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/str.h"
-#include "mongo/util/text.h"
+#ifndef _WIN32
+#include <netdb.h>
+#endif
 
 namespace mongo {
 
-namespace {
-const char kUnknownMsg[] = "Unknown error ";
-const int kBuflen = 256;  // strerror strings in non-English locales can be large.
-}  // namespace
+#ifdef _WIN32
+namespace errno_util_win32_detail {
+int gle() {
+    return GetLastError();
+}
+int wsaGle() {
+    return WSAGetLastError();
+}
+}  // namespace errno_util_win32_detail
+#endif
 
-std::string errnoWithDescription(int errNumber) {
-#if defined(_WIN32)
-    if (errNumber == -1)
-        errNumber = GetLastError();
+class AddrInfoErrorCategory : public std::error_category {
+public:
+    const char* name() const noexcept override {
+        return "getaddrinfo";
+    }
+
+    std::string message(int e) const override {
+#ifdef _WIN32
+        return systemError(e).message();
 #else
-    if (errNumber < 0)
-        errNumber = errno;
+        return gai_strerror(e);
 #endif
-
-    char buf[kBuflen];
-    char* msg{nullptr};
-
-#if defined(__GNUC__) && defined(_GNU_SOURCE) && \
-    (!defined(__ANDROID_API__) || !(__ANDROID_API__ <= 22)) && !defined(EMSCRIPTEN)
-    msg = strerror_r(errNumber, buf, kBuflen);
-#elif defined(_WIN32)
-
-    LPWSTR errorText = nullptr;
-    FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER |
-                       FORMAT_MESSAGE_IGNORE_INSERTS,
-                   nullptr,
-                   errNumber,
-                   0,
-                   reinterpret_cast<LPWSTR>(&errorText),  // output
-                   0,                                     // minimum size for output buffer
-                   nullptr);
-
-    if (errorText) {
-        ON_BLOCK_EXIT([&errorText] { LocalFree(errorText); });
-        std::string utf8ErrorText = toUtf8String(errorText);
-        auto size = utf8ErrorText.find_first_of("\r\n");
-        if (size == std::string::npos) {  // not found
-            size = utf8ErrorText.length();
-        }
-
-        if (size >= kBuflen) {
-            size = kBuflen - 1;
-        }
-
-        memcpy(buf, utf8ErrorText.c_str(), size);
-        buf[size] = '\0';
-        msg = buf;
-    } else if (strerror_s(buf, kBuflen, errNumber) != 0) {
-        msg = buf;
     }
-#else /* XSI strerror_r */
-    if (strerror_r(errNumber, buf, kBuflen) == 0) {
-        msg = buf;
-    }
-#endif
+};
 
-    if (!msg) {
-        return str::stream() << kUnknownMsg << errNumber;
-    }
-
-    return {msg};
+const std::error_category& addrInfoCategory() {
+    static auto p = new AddrInfoErrorCategory;
+    return *p;
 }
 
-std::pair<int, std::string> errnoAndDescription() {
+std::string errorMessage(std::error_code ec) {
+    std::string r = ec.message();
+    bool vague = false;
 #if defined(_WIN32)
-    int errNumber = GetLastError();
-#else
-    int errNumber = errno;
+    vague = (r == "unknown error"_sd);
+#elif defined(_LIBCPP_VERSION)
+    vague = StringData{r}.starts_with("unspecified"_sd);
 #endif
-    return {errNumber, errnoWithDescription(errNumber)};
-}
-
-std::string errnoWithPrefix(StringData prefix) {
-    const auto suffix = errnoWithDescription();
-    std::stringstream ss;
-    if (!prefix.empty())
-        ss << prefix << ": ";
-    ss << suffix;
-    return ss.str();
+    if (vague)
+        return fmt::format("Unknown error {}", ec.value());
+    return r;
 }
 
 }  // namespace mongo

@@ -27,17 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/auth/action_type.h"
 
-#include <fmt/format.h>
-#include <iostream>
-#include <string>
-
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/util/assert_util.h"
+
+#include <iostream>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {
@@ -47,7 +50,7 @@ constexpr StringData kAction = "action"_sd;
 
 StatusWith<ActionType> parseActionFromString(StringData action) {
     try {
-        return {ActionType_parse(IDLParserErrorContext(kAction), action)};
+        return {ActionType_parse(action, IDLParserContext(kAction))};
     } catch (DBException&) {
         // ignore
     }

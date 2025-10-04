@@ -1,0 +1,58 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob(["*.h"]) + glob(["*.cpp"]),
+)
+
+idl_generator(
+    name = "logv2_options_gen",
+    src = "logv2_options.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "logv2_options",
+    srcs = [
+        "logv2_options.cpp",
+        "logv2_options_gen",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/bson:bson_validate",
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "logv2_test",
+    srcs = [
+        "log_severity_suppressor_test.cpp",
+        "logv2_component_test.cpp",
+        "logv2_test.cpp",
+        "redaction_test.cpp",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        "//src/mongo/db/auth:security_token",
+        "//src/mongo/db/commands:core",
+        "//src/mongo/db/local_catalog/lock_manager",
+        "//src/mongo/idl:server_parameter_test_controller",
+        "//src/mongo/transport:transport_layer_common",
+        "//src/mongo/util:clock_source_mock",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "logv2_bm",
+    srcs = [
+        "logv2_bm.cpp",
+    ],
+    tags = ["first_half_bm"],
+    deps = [
+        "//src/mongo:base",
+    ],
+)

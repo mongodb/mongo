@@ -2,19 +2,20 @@
  * Tests that initial sync does not fail if it inserts documents which don't validate.
  */
 
-(function() {
-var name = 'initial_sync_document_validation';
-var replSet = new ReplSetTest({
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
+let name = "initial_sync_document_validation";
+let replSet = new ReplSetTest({
     name: name,
     nodes: 2,
 });
 
 replSet.startSet();
 replSet.initiate();
-var primary = replSet.getPrimary();
-var secondary = replSet.getSecondary();
+let primary = replSet.getPrimary();
+let secondary = replSet.getSecondary();
 
-var coll = primary.getDB('test').getCollection(name);
+let coll = primary.getDB("test").getCollection(name);
 assert.commandWorked(coll.insert({_id: 0, x: 1}));
 assert.commandWorked(coll.runCommand("collMod", {"validator": {a: {$exists: true}}}));
 
@@ -26,4 +27,3 @@ assert.eq(1, secondary.getDB("test")[name].count());
 assert.docEq({_id: 0, x: 1}, secondary.getDB("test")[name].findOne());
 
 replSet.stopSet();
-})();

@@ -9,7 +9,10 @@ import os.path
 
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing.hooks import jsfile
-from buildscripts.resmokelib.testing.hooks.background_job import _BackgroundJob, _ContinuousDynamicJSTestCase
+from buildscripts.resmokelib.testing.hooks.background_job import (
+    _BackgroundJob,
+    _ContinuousDynamicJSTestCase,
+)
 
 
 class ValidateCollectionsInBackground(jsfile.JSHook):
@@ -19,10 +22,13 @@ class ValidateCollectionsInBackground(jsfile.JSHook):
 
     def __init__(self, hook_logger, fixture, shell_options=None):
         """Initialize ValidateCollectionsInBackground."""
-        description = "Run background collection validation against all mongods while a test is running"
+        description = (
+            "Run background collection validation against all mongods while a test is running"
+        )
         js_filename = os.path.join("jstests", "hooks", "run_validate_collections_background.js")
-        jsfile.JSHook.__init__(self, hook_logger, fixture, js_filename, description,
-                               shell_options=shell_options)
+        jsfile.JSHook.__init__(
+            self, hook_logger, fixture, js_filename, description, shell_options=shell_options
+        )
 
         self._background_job = None
 
@@ -46,7 +52,8 @@ class ValidateCollectionsInBackground(jsfile.JSHook):
             return
 
         hook_test_case = _ContinuousDynamicJSTestCase.create_before_test(
-            test.logger, test, self, self._js_filename, self._shell_options)
+            test.logger, test, self, self._js_filename, self._shell_options
+        )
         hook_test_case.configure(self.fixture)
 
         self.logger.info("Resuming the background collection validation thread.")
@@ -71,5 +78,6 @@ class ValidateCollectionsInBackground(jsfile.JSHook):
             else:
                 self.logger.error(
                     "Encountered an error inside the background collection validation thread.",
-                    exc_info=self._background_job.exc_info)
+                    exc_info=self._background_job.exc_info,
+                )
                 raise self._background_job.exc_info[1]

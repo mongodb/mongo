@@ -27,7 +27,15 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 
 /* FIXME for AArch64  */
 
+#if defined __FreeBSD__
+#define JB_SP           1
+#define JB_RP           13
+#define JB_MASK_SAVED   0
+#define JB_MASK         22
+#define	_JB_STK_SHIFT	0
+#else
 #define JB_SP           13
 #define JB_RP           14
 #define JB_MASK_SAVED   15
 #define JB_MASK         16
+#endif

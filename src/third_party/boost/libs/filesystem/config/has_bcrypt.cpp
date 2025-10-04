@@ -26,9 +26,9 @@
 
 int main()
 {
-  unsigned char buf[16] = {};
-  boost::winapi::BCRYPT_ALG_HANDLE_ handle;
-  boost::winapi::NTSTATUS_ status = boost::winapi::BCryptOpenAlgorithmProvider(&handle, boost::winapi::BCRYPT_RNG_ALGORITHM_, NULL, 0);
-  status = boost::winapi::BCryptGenRandom(handle, reinterpret_cast<boost::winapi::PUCHAR_>(static_cast<unsigned char*>(buf)), static_cast<boost::winapi::ULONG_>(sizeof(buf)), 0);
-  boost::winapi::BCryptCloseAlgorithmProvider(handle, 0);
+    unsigned char buf[16] = {};
+    boost::winapi::BCRYPT_ALG_HANDLE_ handle;
+    boost::winapi::NTSTATUS_ status = boost::winapi::BCryptOpenAlgorithmProvider(&handle, boost::winapi::BCRYPT_RNG_ALGORITHM_, NULL, 0);
+    status = boost::winapi::BCryptGenRandom(handle, reinterpret_cast< boost::winapi::PUCHAR_ >(static_cast< unsigned char* >(buf)), static_cast< boost::winapi::ULONG_ >(sizeof(buf)), 0);
+    boost::winapi::BCryptCloseAlgorithmProvider(handle, 0);
 }

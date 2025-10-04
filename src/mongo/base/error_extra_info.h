@@ -30,13 +30,15 @@
 #pragma once
 
 #include <memory>
+#include <type_traits>
 
 // This file is included by many low-level headers including status.h, so it isn't able to include
 // much without creating a cycle.
 #include "mongo/base/error_codes.h"
 #include "mongo/base/static_assert.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 class BSONObj;
 class BSONObjBuilder;
@@ -50,7 +52,7 @@ class BSONObjBuilder;
  * You must call the MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(type) macro in the cpp file that contains
  * the implementation for your subtype.
  */
-class ErrorExtraInfo {
+class MONGO_MOD_OPEN ErrorExtraInfo {
 public:
     using Parser = std::shared_ptr<const ErrorExtraInfo>(const BSONObj&);
 
@@ -201,4 +203,4 @@ private:
 
 }  // namespace nested::twice
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

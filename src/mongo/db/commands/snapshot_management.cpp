@@ -27,18 +27,27 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/base/init.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
+#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/snapshot_manager.h"
-#include "mongo/db/vector_clock.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/util/assert_util.h"
+
+#include <string>
 
 namespace mongo {
 class CmdMakeSnapshot final : public BasicCommand {
@@ -48,17 +57,17 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
-    virtual bool adminOnly() const {
+    bool adminOnly() const override {
         return true;
     }
 
     // No auth needed because it only works when enabled via command line.
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) const {
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
         return Status::OK();
     }
 
@@ -67,24 +76,23 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const std::string& dbname,
+             const DatabaseName&,
              const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
-        auto snapshotManager = getGlobalServiceContext()->getStorageEngine()->getSnapshotManager();
-        if (!snapshotManager) {
-            uasserted(ErrorCodes::CommandNotSupported, "");
-        }
+             BSONObjBuilder& result) override {
+        const auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+        uassert(ErrorCodes::CommandNotSupported,
+                "makeSnapshot requires a persistent storage engine and a snapshot manager",
+                !storageEngine->isEphemeral() && storageEngine->getSnapshotManager());
 
         Lock::GlobalLock lk(opCtx, MODE_IX);
 
-        const auto currentTime = VectorClock::get(opCtx)->getTime();
-        const auto name = currentTime.clusterTime().asTimestamp();
-        result.append("name", static_cast<long long>(name.asULL()));
+        const auto latestTs = repl::StorageInterface::get(opCtx)->getLatestOplogTimestamp(opCtx);
+        result.append("name", static_cast<long long>(latestTs.asULL()));
 
         return true;
     }
 };
-MONGO_REGISTER_TEST_COMMAND(CmdMakeSnapshot);
+MONGO_REGISTER_COMMAND(CmdMakeSnapshot).testOnly().forShard();
 
 class CmdSetCommittedSnapshot final : public BasicCommand {
 public:
@@ -93,17 +101,17 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
-    virtual bool adminOnly() const {
+    bool adminOnly() const override {
         return true;
     }
 
     // No auth needed because it only works when enabled via command line.
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) const {
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
         return Status::OK();
     }
 
@@ -112,9 +120,9 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const std::string& dbname,
+             const DatabaseName&,
              const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
+             BSONObjBuilder& result) override {
         auto snapshotManager = getGlobalServiceContext()->getStorageEngine()->getSnapshotManager();
         if (!snapshotManager) {
             uasserted(ErrorCodes::CommandNotSupported, "");
@@ -126,5 +134,5 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_TEST_COMMAND(CmdSetCommittedSnapshot);
+MONGO_REGISTER_COMMAND(CmdSetCommittedSnapshot).testOnly().forShard();
 }  // namespace mongo

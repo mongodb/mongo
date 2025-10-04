@@ -1,0 +1,17 @@
+# Golden test output of GoldenSbeStageBuilderTest/TestUnwindIndexPath
+[2] project [s6 = 
+    if isNull(s5) 
+    then 
+        if exists(s4) 
+        then makeBsonObj(MakeObjSpec([a = Set(0), idx = Set(1)], Open, NewObj, 0), s2, s4, null) 
+        else makeBsonObj(MakeObjSpec([idx = Set(0)], Open, NewObj, 0), s2, null) 
+    
+    else 
+        if (s5 >= 0ll) 
+        then makeBsonObj(MakeObjSpec([a = Set(0), idx = Set(1)], Open, NewObj, 0), s2, s4, s5) 
+        else makeBsonObj(MakeObjSpec([a = Set(0), idx = Set(1)], Open, NewObj, 0), s2, s4, null) 
+] 
+[2] unwind s4 s5 s3 true 
+[2] project [s3 = getField(s2, "a")] 
+[1] project [s2 = getElement(s1, 0)] 
+[1] virtualscan s1 {[[{"a" : [1, 2, 3]}]]} 

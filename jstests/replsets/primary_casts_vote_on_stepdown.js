@@ -5,8 +5,7 @@
  * from a higher term than its own. This test verifies that an old primary is able to do this
  * successfully.
  */
-(function() {
-"use strict";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 let name = "primary_casts_vote_on_stepdown";
 let replTest = new ReplSetTest({name: name, nodes: 2});
@@ -31,4 +30,3 @@ res = assert.commandWorked(nodes[1].adminCommand("replSetGetStatus"));
 assert.eq(firstPrimaryTerm + 1, res.term);
 
 replTest.stopSet();
-})();

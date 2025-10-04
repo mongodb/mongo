@@ -27,16 +27,15 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import os
-import wiredtiger
-from wtdataset import SimpleDataSet
+import wiredtiger, wttest
 from wtscenario import make_scenarios
-from test_rollback_to_stable01 import test_rollback_to_stable_base
+from rollback_to_stable_util import test_rollback_to_stable_base
 
 # test_rollback_to_stable09.py
 # Test that rollback to stable does not abort schema operations that are done
 # as they don't have transaction support
+@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_rollback_to_stable09(test_rollback_to_stable_base):
-    session_config = 'isolation=snapshot'
 
     # Don't bother testing FLCS tables as well as they're highly unlikely to
     # behave differently at this level.
@@ -55,18 +54,22 @@ class test_rollback_to_stable09(test_rollback_to_stable_base):
         ('prepare', dict(prepare=True))
     ]
 
+    worker_thread_values = [
+        ('0', dict(threads=0)),
+        ('4', dict(threads=4)),
+        ('8', dict(threads=8))
+    ]
+
     tablename = "test_rollback_stable09"
     uri = "table:" + tablename
     index_uri = "index:test_rollback_stable09:country"
 
-    scenarios = make_scenarios(colstore_values, in_memory_values, prepare_values)
+    scenarios = make_scenarios(colstore_values, in_memory_values, prepare_values, worker_thread_values)
 
     def conn_config(self):
-        config = 'cache_size=250MB'
+        config = 'cache_size=250MB,verbose=(rts:5)'
         if self.in_memory:
             config += ',in_memory=true'
-        else:
-            config += ',log=(enabled),in_memory=false'
         return config
 
     def create_table(self, commit_ts):
@@ -127,7 +130,7 @@ class test_rollback_to_stable09(test_rollback_to_stable_base):
         self.create_index(30)
 
         #perform rollback to stable, still the table and index must exist
-        self.conn.rollback_to_stable()
+        self.conn.rollback_to_stable('threads=' + str(self.threads))
 
         if not self.in_memory:
             self.assertTrue(os.path.exists(self.tablename + ".wt"))
@@ -146,7 +149,7 @@ class test_rollback_to_stable09(test_rollback_to_stable_base):
         self.drop_table(40)
 
         #perform rollback to stable, the table and index must not exist
-        self.conn.rollback_to_stable()
+        self.conn.rollback_to_stable('threads=' + str(self.threads))
 
         if not self.in_memory:
             self.assertFalse(os.path.exists(self.tablename + ".wt"))
@@ -157,6 +160,3 @@ class test_rollback_to_stable09(test_rollback_to_stable_base):
             self.session.open_cursor(self.uri, None, None))
         self.assertRaises(wiredtiger.WiredTigerError, lambda:
             self.session.open_cursor(self.index_uri, None, None))
-
-if __name__ == '__main__':
-    wttest.run()

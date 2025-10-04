@@ -1,0 +1,217 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_binary", "mongo_cc_fuzzer_test", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "column",
+    srcs = [
+        "bsoncolumn.cpp",
+        "bsoncolumn_interleaved.cpp",
+        "bsoncolumnbuilder.cpp",
+        "simple8b_type_util.cpp",
+    ],
+    hdrs = [
+        "bsoncolumn.h",
+        "bsoncolumn.inl",
+        "bsoncolumn_helpers.h",
+        "bsoncolumn_interleaved.h",
+        "bsoncolumn_util.h",
+        "bsoncolumnbuilder.h",
+        "simple8b.h",
+        "simple8b.inl",
+        "simple8b_builder.h",
+        "simple8b_helpers.h",
+        "simple8b_type_util.h",
+        "//src/mongo/util:overloaded_visitor.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "bson_column_fuzzer_impl",
+    srcs = [
+        "bsoncolumn_fuzzer_impl.cpp",
+    ],
+    hdrs = [
+        "bsoncolumn_fuzzer_impl.h",
+    ],
+    deps = [
+        ":column",
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "bsoncolumn_fuzzer_util",
+    srcs = [
+        "bsoncolumn_fuzzer_util.cpp",
+    ],
+    hdrs = [
+        "bsoncolumn_expressions.h",
+        "bsoncolumn_expressions_internal.h",
+        "bsoncolumn_fuzzer_util.h",
+    ],
+    deps = [
+        ":column",
+        "//src/mongo:base",
+        "//src/mongo/db:sbe_values",
+    ],
+)
+
+mongo_cc_library(
+    name = "bsoncolumn_test_util",
+    srcs = [
+        "bsoncolumn_test_util.cpp",
+    ],
+    hdrs = [
+        "bsoncolumn_expressions.h",
+        "bsoncolumn_expressions_internal.h",
+        "bsoncolumn_test_util.h",
+    ],
+    deps = [
+        ":column",
+        "//src/mongo:base",
+        "//src/mongo/db:sbe_values",
+    ],
+)
+
+mongo_cc_binary(
+    name = "bson_column_encoder",
+    srcs = [
+        "bson_column_encoder.cpp",
+    ],
+    deps = [
+        ":column",
+        "//src/mongo:base",
+        "//src/mongo/bson/util:bson_extract",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "bsoncolumn_test",
+    srcs = [
+        "bson_column_compressed_data.inl",
+        "bsoncolumn_blockbased_test.cpp",
+        "bsoncolumn_test.cpp",
+        "simple8b_test.cpp",
+        "simple8b_type_util_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_fourth_group",
+        "server-bsoncolumn",
+    ],
+    deps = [
+        ":bson_column_fuzzer_impl",
+        ":bsoncolumn_fuzzer_util",
+        ":bsoncolumn_test_util",
+        "//src/mongo/util:safe_num",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "simple8b_bm",
+    srcs = [
+        "simple8b_bm.cpp",
+    ],
+    tags = ["bsoncolumn_bm"],
+    deps = [
+        ":column",
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "bson_column_bm",
+    srcs = [
+        "bsoncolumn_bm.cpp",
+    ],
+    tags = ["bsoncolumn_bm"],
+    deps = [
+        ":column",
+        "//src/mongo:base",
+        "//src/mongo/db:sbe_values",
+    ],
+)
+
+mongo_cc_fuzzer_test(
+    name = "simple8b_fuzzer",
+    srcs = [
+        "simple8b_fuzzer.cpp",
+    ],
+    deps = [
+        "column",
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_fuzzer_test(
+    name = "bson_column_validate_fuzzer",
+    srcs = [
+        "bson_column_validate_fuzzer.cpp",
+    ],
+    deps = [
+        "column",
+        "//src/mongo:base",
+        "//src/mongo/bson:bson_validate",
+    ],
+)
+
+mongo_cc_fuzzer_test(
+    name = "bsoncolumn_decompress_fuzzer",
+    srcs = [
+        "bsoncolumn_decompress_fuzzer.cpp",
+    ],
+    deps = [
+        "column",
+        "//src/mongo:base",
+        "//src/mongo/bson:bson_validate",
+    ],
+)
+
+mongo_cc_fuzzer_test(
+    name = "bsoncolumn_builder_fuzzer",
+    srcs = [
+        "bsoncolumn_builder_fuzzer.cpp",
+    ],
+    deps = [
+        "bsoncolumn_fuzzer_util",
+        "column",
+        "//src/mongo:base",
+        "//src/mongo/bson:bson_validate",
+    ],
+)
+
+mongo_cc_fuzzer_test(
+    name = "bsoncolumn_decompress_paths_fuzzer",
+    srcs = [
+        "bsoncolumn_decompress_paths_fuzzer.cpp",
+    ],
+    deps = [
+        "bsoncolumn_test_util",
+        "column",
+        "//src/mongo:base",
+        "//src/mongo/bson:bson_validate",
+        "//src/mongo/db:service_context_d_test_fixture",
+    ],
+)
+
+mongo_cc_fuzzer_test(
+    name = "bsoncolumnbuilder_reopen_fuzzer",
+    srcs = [
+        "bsoncolumnbuilder_reopen_fuzzer.cpp",
+    ],
+    deps = [
+        "bson_column_fuzzer_impl",
+        "//src/mongo:base",
+        "//src/mongo/bson:bson_validate",
+    ],
+)

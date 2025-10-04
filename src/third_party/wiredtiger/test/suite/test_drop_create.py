@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest
+import wttest
 
 # test_drop_create.py
 #    Test dropping and creating
@@ -66,6 +66,3 @@ class test_drop_create(wttest.WiredTigerTestCase):
         c2["Hi"] = 1
         self.assertEqual(s.close(), 0)
         self.assertEqual(s2.close(), 0)
-
-if __name__ == '__main__':
-    wttest.run()

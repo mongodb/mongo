@@ -43,6 +43,8 @@ uc_addr (unw_tdep_context_t *uc, int reg)
 {
   if (reg >= UNW_ARM_R0 && reg < UNW_ARM_R0 + 16)
     return &uc->regs[reg - UNW_ARM_R0];
+  else if (reg >= UNW_ARM_D0 && reg <= UNW_ARM_D15)
+    return &uc->fpregs[reg - UNW_ARM_D0];
   else
     return NULL;
 }
@@ -71,74 +73,28 @@ get_dyn_info_list_addr (unw_addr_space_t as, unw_word_t *dyn_info_list_addr,
   return 0;
 }
 
-#define PAGE_SIZE 4096
-#define PAGE_START(a)	((a) & ~(PAGE_SIZE-1))
-
-/* Cache of already validated addresses */
-#define NLGA 4
-static unw_word_t last_good_addr[NLGA];
-static int lga_victim;
-
-static int
-validate_mem (unw_word_t addr)
-{
-  int i, victim;
-  size_t len;
-
-  if (PAGE_START(addr + sizeof (unw_word_t) - 1) == PAGE_START(addr))
-    len = PAGE_SIZE;
-  else
-    len = PAGE_SIZE * 2;
-
-  addr = PAGE_START(addr);
-
-  if (addr == 0)
-    return -1;
-
-  for (i = 0; i < NLGA; i++)
-    {
-      if (last_good_addr[i] && (addr == last_good_addr[i]))
-      return 0;
-    }
-
-  if (msync ((void *) addr, len, MS_ASYNC) == -1)
-    return -1;
-
-  victim = lga_victim;
-  for (i = 0; i < NLGA; i++) {
-    if (!last_good_addr[victim]) {
-      last_good_addr[victim++] = addr;
-      return 0;
-    }
-    victim = (victim + 1) % NLGA;
-  }
-
-  /* All slots full. Evict the victim. */
-  last_good_addr[victim] = addr;
-  victim = (victim + 1) % NLGA;
-  lga_victim = victim;
-
-  return 0;
-}
 
 static int
 access_mem (unw_addr_space_t as, unw_word_t addr, unw_word_t *val, int write,
             void *arg)
 {
-  /* validate address */
-    const struct cursor *c = (const struct cursor *) arg;
-    if (c && validate_mem(addr))
-      return -1;
+  const struct cursor *c = (const struct cursor *) arg;
 
   if (write)
     {
       Debug (16, "mem[%x] <- %x\n", addr, *val);
-      *(unw_word_t *) addr = *val;
+      memcpy ((void *) addr, val, sizeof(unw_word_t));
     }
   else
     {
-      *val = *(unw_word_t *) addr;
-      Debug (16, "mem[%x] -> %x\n", addr, *val);
+      if (likely (c!= NULL) && unlikely (c->validate)
+          && unlikely (!unw_address_is_valid (addr, sizeof(unw_word_t))))
+        {
+          Debug (16, "mem[%#010lx] -> invalid\n", (long)addr);
+          return -1;
+        }
+      memcpy (val, (void *) addr, sizeof(unw_word_t));
+      Debug (16, "mem[%#010lx] -> %#010lx\n", (long)addr, (long)*val);
     }
   return 0;
 }
@@ -153,18 +109,17 @@ access_reg (unw_addr_space_t as, unw_regnum_t reg, unw_word_t *val, int write,
   if (unw_is_fpreg (reg))
     goto badreg;
 
-Debug (16, "reg = %s\n", unw_regname (reg));
   if (!(addr = uc_addr (uc, reg)))
     goto badreg;
 
   if (write)
     {
-      *(unw_word_t *) addr = *val;
+      memcpy ((void *) addr, val, sizeof(unw_word_t));
       Debug (12, "%s <- %x\n", unw_regname (reg), *val);
     }
   else
     {
-      *val = *(unw_word_t *) addr;
+      memcpy (val, (void *) addr, sizeof(unw_word_t));
       Debug (12, "%s -> %x\n", unw_regname (reg), *val);
     }
   return 0;
@@ -215,10 +170,23 @@ get_static_proc_name (unw_addr_space_t as, unw_word_t ip,
   return _Uelf32_get_proc_name (as, getpid (), ip, buf, buf_len, offp);
 }
 
+static int
+get_static_elf_filename (unw_addr_space_t as, unw_word_t ip,
+                         char *buf, size_t buf_len, unw_word_t *offp,
+                         void *arg)
+{
+  return _Uelf32_get_elf_filename (as, getpid (), ip, buf, buf_len, offp);
+}
+
 HIDDEN void
 arm_local_addr_space_init (void)
 {
   memset (&local_addr_space, 0, sizeof (local_addr_space));
+#ifndef UNW_REMOTE_ONLY
+# if defined(HAVE_DL_ITERATE_PHDR)
+  local_addr_space.iterate_phdr_function = dl_iterate_phdr;
+# endif
+#endif
   local_addr_space.caching_policy = UNWI_DEFAULT_CACHING_POLICY;
   local_addr_space.acc.find_proc_info = arm_find_proc_info;
   local_addr_space.acc.put_unwind_info = arm_put_unwind_info;
@@ -228,6 +196,7 @@ arm_local_addr_space_init (void)
   local_addr_space.acc.access_fpreg = access_fpreg;
   local_addr_space.acc.resume = arm_local_resume;
   local_addr_space.acc.get_proc_name = get_static_proc_name;
+  local_addr_space.acc.get_elf_filename = get_static_elf_filename;
   unw_flush_cache (&local_addr_space, 0, 0);
 }
 

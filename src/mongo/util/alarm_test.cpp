@@ -26,16 +26,25 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
+#include "mongo/util/alarm.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/logv2/log.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/alarm_runner_background_thread.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source_mock.h"
+
+#include <type_traits>
+
+#include <boost/move/utility_core.hpp>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/logv2/log.h"
-#include "mongo/stdx/chrono.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/alarm.h"
-#include "mongo/util/alarm_runner_background_thread.h"
-#include "mongo/util/clock_source_mock.h"
 
 namespace mongo {
 namespace {
@@ -49,22 +58,21 @@ TEST(AlarmScheduler, BasicSingleThread) {
     auto alarm = scheduler->alarmAt(testStart + Milliseconds(10));
     bool firstTimerExpired = false;
     std::move(alarm.future).getAsync([&](Status status) {
-        LOGV2(23071, "First timer expired: {error}", "First timer expired", "error"_attr = status);
+        LOGV2(23071, "First timer expired", "error"_attr = status);
         firstTimerExpired = true;
     });
 
     alarm = scheduler->alarmAt(testStart + Milliseconds(500));
     bool secondTimerExpired = false;
     std::move(alarm.future).getAsync([&](Status status) {
-        LOGV2(
-            23072, "Second timer expired: {error}", "Second timer expired", "error"_attr = status);
+        LOGV2(23072, "Second timer expired", "error"_attr = status);
         secondTimerExpired = true;
     });
 
     alarm = scheduler->alarmAt(testStart + Milliseconds(515));
     bool thirdTimerExpired = false;
     std::move(alarm.future).getAsync([&](Status status) {
-        LOGV2(23073, "Third timer expired: {error}", "Third timer expired", "error"_attr = status);
+        LOGV2(23073, "Third timer expired", "error"_attr = status);
         thirdTimerExpired = true;
     });
     auto missingEvent = alarm.handle;

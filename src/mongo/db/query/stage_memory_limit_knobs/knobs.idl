@@ -1,0 +1,216 @@
+# Copyright (C) 2025-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/query/plan_cache/sbe_plan_cache_on_parameter_change.h"
+        - "mongo/platform/atomic_word.h"
+        - "mongo/db/query/stage_memory_limit_knobs/knobs_protector.h"
+
+server_parameters:
+    internalDocumentSourceLookupCacheSizeBytes:
+        description: >-
+            Maximum amount of non-correlated foreign-collection data that the $lookup stage
+            will cache before abandoning the cache and executing the full pipeline on each iteration."
+        set_at: [startup, runtime]
+        cpp_varname: "internalDocumentSourceLookupCacheSizeBytes"
+        cpp_vartype: AtomicWord<long long>
+        default:
+            expr: 100 * 1024 * 1024
+        validator:
+            gte: 0
+        redact: false
+
+    internalDocumentSourceGraphLookupMaxMemoryBytes:
+        description: >-
+            Maximum size of the data that the $graphLookup aggregation stage will cache
+            in-memory before spilling.
+        set_at: [startup, runtime]
+        cpp_varname: "internalDocumentSourceGraphLookupMaxMemoryBytes"
+        cpp_vartype: AtomicWord<long long>
+        default:
+            expr: 100 * 1024 * 1024
+        validator:
+            gt: 0
+        redact: false
+
+    internalDocumentSourceGroupMaxMemoryBytes:
+        description: >-
+            Maximum size of the data that the $group aggregation stage will cache in-memory
+            before spilling to disk.
+        set_at: [startup, runtime]
+        cpp_varname: "internalDocumentSourceGroupMaxMemoryBytes"
+        cpp_vartype: AtomicWord<long long>
+        default:
+            expr: 100 * 1024 * 1024
+        validator:
+            gt: 0
+        redact: false
+
+    internalDocumentSourceSetWindowFieldsMaxMemoryBytes:
+        description: >-
+            Maximum size of the data that the $setWindowFields aggregation stage will cache
+            in-memory before throwing an error.
+        set_at: [startup, runtime]
+        cpp_varname: "internalDocumentSourceSetWindowFieldsMaxMemoryBytes"
+        cpp_vartype: AtomicWord<long long>
+        default:
+            expr: 100 * 1024 * 1024
+        validator:
+            gt: 0
+        redact: false
+
+    internalDocumentSourceBucketAutoMaxMemoryBytes:
+        description: >-
+            Maximum size of the data that the $bucketAuto aggregation stage will cache in-memory
+            before spilling to disk.
+        set_at: [startup, runtime]
+        cpp_varname: "internalDocumentSourceBucketAutoMaxMemoryBytes"
+        cpp_vartype: AtomicWord<long long>
+        default:
+            expr: 100 * 1024 * 1024
+        validator:
+            gt: 0
+        redact: false
+
+    internalDocumentSourceDensifyMaxMemoryBytes:
+        description: "Limits the number of bytes densification can use to store partition information."
+        set_at: [startup, runtime]
+        cpp_varname: "internalDocumentSourceDensifyMaxMemoryBytes"
+        cpp_vartype: AtomicWord<long long>
+        default:
+            expr: 100 * 1024 * 1024
+        validator:
+            gt: 0
+        redact: false
+
+    internalQueryFacetBufferSizeBytes:
+        description: "The number of bytes to buffer at once during a $facet stage."
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryFacetBufferSizeBytes"
+        cpp_vartype: AtomicWord<long long>
+        default:
+            expr: 100 * 1024 * 1024
+        validator:
+            gt: 0
+        redact: false
+
+    internalTextOrStageMaxMemoryBytes:
+        description: >-
+            Maximum size of the data that the TextOrStage stage will cache in-memory before
+            spilling to disk.
+        set_at: [startup, runtime]
+        cpp_varname: "internalTextOrStageMaxMemoryBytes"
+        cpp_vartype: AtomicWord<long long>
+        default:
+            expr: 100 * 1024 * 1024
+        validator:
+            gt: 0
+        redact: false
+
+    internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill:
+        description: >-
+            The max size in bytes that the hash table in a HashLookup stage can be estimated to
+            be before we spill to disk.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQuerySBELookupApproxMemoryUseInBytesBeforeSpill"
+        cpp_vartype: AtomicWord<long long>
+        default:
+            expr: 100 * 1024 * 1024
+        validator:
+            gt: 0
+        redact: false
+
+    internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill:
+        description: >-
+            The max size in bytes that the hash table in a HashAgg stage can be estimated to
+            be before we spill to disk.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill"
+        cpp_vartype: AtomicWord<long long>
+        default:
+            expr: 100 * 1024 * 1024
+        validator:
+            gt: 0
+        redact: false
+
+    internalQueryMaxSpoolMemoryUsageBytes:
+        description: >-
+            The maximum amount of memory a query or command is willing to use to execute a
+            spool, measured in bytes. If disk use is allowed, then it may be possible to spool more data,
+            but this limit will still constrain the memory consumption.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryMaxSpoolMemoryUsageBytes"
+        cpp_vartype: AtomicWord<long long>
+        default:
+            expr: 100 * 1024 * 1024
+        validator:
+            gt: 0
+        redact: false
+
+    internalQueryMaxBlockingSortMemoryUsageBytes:
+        description: >-
+            The maximum amount of memory a query (e.g. a find or aggregate command) is willing
+            to use to execute a blocking sort, measured in bytes. If disk use is allowed, then it may be
+            possible to sort more data, but this limit will still constrain the memory consumption.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryMaxBlockingSortMemoryUsageBytes"
+        cpp_vartype: AtomicWord<long long>
+        default:
+            expr: 100 * 1024 * 1024
+        validator:
+            gte: 0
+        on_update: plan_cache_util::clearSbeCacheOnParameterChange
+        redact: false
+
+    internalOrStageMaxMemoryBytes:
+        description: >-
+            Maximum size of the data that the OrStage stage will cache in-memory before
+            spilling to disk.
+        set_at: [startup, runtime]
+        cpp_varname: "internalOrStageMaxMemoryBytes"
+        cpp_vartype: AtomicWord<long long>
+        default:
+            expr: 100 * 1024 * 1024
+        validator:
+            gt: 0
+        redact: false
+
+    internalNearStageMaxMemoryBytes:
+        description: >-
+            Maximum size of the data that the NearStage stage will cache in-memory before
+            spilling to disk.
+        set_at: [startup, runtime]
+        cpp_varname: "internalNearStageMaxMemoryBytes"
+        cpp_vartype: AtomicWord<long long>
+        default:
+            expr: 100 * 1024 * 1024
+        validator:
+            gt: 0
+        redact: false

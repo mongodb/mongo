@@ -37,4 +37,6 @@ void setupSIGTRAPforDebugger();
 
 void breakpoint();
 
+void waitForDebugger();
+
 }  // namespace mongo

@@ -27,26 +27,63 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/initialize_operation_session_info.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/internal_transactions_feature_flag_gen.h"
-#include "mongo/db/logical_session_cache.h"
-#include "mongo/db/logical_session_id_helpers.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/s/is_mongos.h"
+#include "mongo/db/session/logical_session_cache.h"
+#include "mongo/db/session/logical_session_id_helpers.h"
+#include "mongo/db/stats/counters.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
+#include <cstdint>
+#include <mutex>
+#include <utility>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
-OperationSessionInfoFromClient initializeOperationSessionInfo(OperationContext* opCtx,
-                                                              const BSONObj& requestBody,
-                                                              bool requiresAuth,
-                                                              bool attachToOpCtx,
-                                                              bool isReplSetMemberOrMongos) {
-    auto osi = OperationSessionInfoFromClient::parse("OperationSessionInfo"_sd, requestBody);
+namespace {
+bool isAuthorizedForInternalClusterAction(OperationContext* opCtx,
+                                          const boost::optional<TenantId>& validatedTenantId,
+                                          boost::optional<bool>& cachedResult) {
+    if (!cachedResult.has_value()) {
+        cachedResult =
+            AuthorizationSession::get(opCtx->getClient())
+                ->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forClusterResource(validatedTenantId), ActionType::internal);
+    }
+    return *cachedResult;
+}
+}  // namespace
 
+/**
+ * A client is internal if the connection is a self connection, a connection from a mongos or
+ * different mongod or a direct client connection.
+ */
+bool isInternalClient(OperationContext* opCtx) {
+    return !opCtx->getClient()->session() || opCtx->getClient()->isInternalClient() ||
+        opCtx->getClient()->isInDirectClient();
+}
+
+OperationSessionInfoFromClient initializeOperationSessionInfo(
+    OperationContext* opCtx,
+    const boost::optional<TenantId>& validatedTenantId,
+    const OperationSessionInfoFromClientBase& osi,
+    bool requiresAuth,
+    bool attachToOpCtx,
+    bool isReplSetMemberOrMongos) {
     if (opCtx->getClient()->isInDirectClient()) {
         uassert(50891,
                 "Invalid to set operation session info in a direct client",
@@ -67,17 +104,18 @@ OperationSessionInfoFromClient initializeOperationSessionInfo(OperationContext* 
         // logical sessions are disabled. A client may authenticate as the __sytem user,
         // or as an externally authorized user.
         if (authSession->isUsingLocalhostBypass() && !authSession->isAuthenticated()) {
-            return {};
+            return OperationSessionInfoFromClient();
         }
 
         // Do not initialize lsid when auth is enabled and no user is logged in since
         // there is no sensible uid that can be assigned to it.
-        if (AuthorizationManager::get(opCtx->getServiceContext())->isAuthEnabled() &&
+        if (AuthorizationManager::get(opCtx->getService())->isAuthEnabled() &&
             !authSession->isAuthenticated() && !requiresAuth) {
-            return {};
+            return OperationSessionInfoFromClient();
         }
     }
 
+    boost::optional<bool> cachedIsAuthorizedForInternalClusterAction;
     if (osi.getSessionId()) {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
 
@@ -85,32 +123,29 @@ OperationSessionInfoFromClient initializeOperationSessionInfo(OperationContext* 
         if (!lsc) {
             // Ignore session information if the logical session cache has not been set up, e.g. on
             // the embedded version of mongod.
-            return {};
+            return OperationSessionInfoFromClient();
         }
 
         // If osi lsid includes the uid, makeLogicalSessionId will also verify that the hash
         // matches with the current user logged in.
-        auto lsid = makeLogicalSessionId(osi.getSessionId().get(), opCtx);
+        auto lsid = makeLogicalSessionId(osi.getSessionId().value(), opCtx);
 
         if (!attachToOpCtx) {
-            return {};
+            return OperationSessionInfoFromClient();
         }
 
-        if (getParentSessionId(lsid)) {
-            uassert(ErrorCodes::InternalTransactionNotSupported,
-                    "Internal sessions are not enabled",
-                    feature_flags::gFeatureFlagInternalTransactions.isEnabled(
-                        serverGlobalParams.featureCompatibility));
+        if (isChildSession(lsid)) {
+            uassert(ErrorCodes::InvalidOptions,
+                    "Internal sessions are only allowed for internal clients",
+                    isAuthorizedForInternalClusterAction(
+                        opCtx, validatedTenantId, cachedIsAuthorizedForInternalClusterAction));
             uassert(ErrorCodes::InvalidOptions,
                     "Internal sessions are not supported outside of transactions",
                     osi.getTxnNumber() && osi.getAutocommit() && !osi.getAutocommit().value());
-            uassert(ErrorCodes::InvalidOptions,
-                    "Internal sessions are only supported in sharded clusters",
-                    isMongos() || serverGlobalParams.clusterRole != ClusterRole::None);
         }
 
         opCtx->setLogicalSessionId(std::move(lsid));
-        uassertStatusOK(lsc->vivify(opCtx, opCtx->getLogicalSessionId().get()));
+        uassertStatusOK(lsc->vivify(opCtx, opCtx->getLogicalSessionId().value()));
     } else {
         uassert(ErrorCodes::InvalidOptions,
                 "Transaction number requires a session ID to also be specified",
@@ -131,11 +166,10 @@ OperationSessionInfoFromClient initializeOperationSessionInfo(OperationContext* 
         opCtx->setTxnNumber(*osi.getTxnNumber());
 
         if (auto txnRetryCounter = osi.getTxnRetryCounter()) {
-            // TODO (SERVER-58759): Add a uassert that the client is internal.
             uassert(ErrorCodes::InvalidOptions,
-                    "txnRetryCounter is not enabled",
-                    feature_flags::gFeatureFlagInternalTransactions.isEnabled(
-                        serverGlobalParams.featureCompatibility));
+                    "txnRetryCounter is only allowed for internal clients",
+                    isAuthorizedForInternalClusterAction(
+                        opCtx, validatedTenantId, cachedIsAuthorizedForInternalClusterAction));
             uassert(ErrorCodes::InvalidOptions,
                     str::stream() << "Cannot specify txnRetryCounter for a retryable write",
                     osi.getAutocommit().has_value());
@@ -169,7 +203,21 @@ OperationSessionInfoFromClient initializeOperationSessionInfo(OperationContext* 
                 osi.getStartTransaction().value());
     }
 
-    return osi;
+    if (osi.getTxnNumber()) {
+        if (!osi.getAutocommit()) {
+            if (isInternalClient(opCtx)) {
+                getQueryCounters(opCtx).internalRetryableWriteCount.increment(1);
+            } else {
+                getQueryCounters(opCtx).externalRetryableWriteCount.increment(1);
+            }
+        } else {
+            if (osi.getSessionId()->getTxnNumber() && osi.getSessionId()->getTxnUUID()) {
+                getQueryCounters(opCtx).retryableInternalTransactionCount.increment(1);
+            }
+        }
+    }
+
+    return OperationSessionInfoFromClient(std::move(osi));
 }
 
 }  // namespace mongo

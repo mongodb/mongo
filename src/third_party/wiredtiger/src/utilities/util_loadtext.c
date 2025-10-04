@@ -11,16 +11,25 @@
 static int insert(WT_CURSOR *, const char *, bool);
 static int text(WT_SESSION *, const char *);
 
+/*
+ * usage --
+ *     Display a usage message for the loadtext command.
+ */
 static int
 usage(void)
 {
-    static const char *options[] = {
-      "-f", "read from the specified file (by default rows are read from stdin)", NULL, NULL};
+    static const char *options[] = {"-f",
+      "read from the specified file (by default rows are read from stdin)", "-?",
+      "show this message", NULL, NULL};
 
     util_usage("loadtext [-f input-file] uri", "options:", options);
     return (1);
 }
 
+/*
+ * util_loadtext --
+ *     The loadtext command.
+ */
 int
 util_loadtext(WT_SESSION *session, int argc, char *argv[])
 {
@@ -29,13 +38,15 @@ util_loadtext(WT_SESSION *session, int argc, char *argv[])
     char *uri;
 
     uri = NULL;
-    while ((ch = __wt_getopt(progname, argc, argv, "f:")) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "f:?")) != EOF)
         switch (ch) {
         case 'f': /* input file */
             if (freopen(__wt_optarg, "r", stdin) == NULL)
                 return (util_err(session, errno, "%s: reopen", __wt_optarg));
             break;
         case '?':
+            usage();
+            return (0);
         default:
             return (usage());
         }
@@ -50,7 +61,7 @@ util_loadtext(WT_SESSION *session, int argc, char *argv[])
 
     ret = text(session, uri);
 
-    free(uri);
+    util_free(uri);
     return (ret);
 }
 
@@ -152,8 +163,8 @@ insert(WT_CURSOR *cursor, const char *name, bool readkey)
             fflush(stdout);
         }
     }
-    free(key.mem);
-    free(value.mem);
+    util_free(key.mem);
+    util_free(value.mem);
 
     if (verbose)
         printf("\r\t%s: %" PRIu64 "\n", name, insert_count);

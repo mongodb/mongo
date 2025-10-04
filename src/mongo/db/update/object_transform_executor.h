@@ -29,9 +29,13 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/update/update_executor.h"
+
 #include <functional>
 
-#include "mongo/db/update/update_executor.h"
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

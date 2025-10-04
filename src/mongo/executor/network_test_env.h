@@ -29,17 +29,28 @@
 
 #pragma once
 
-#include <functional>
-#include <tuple>
-#include <type_traits>
-#include <vector>
-
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
+
+#include <chrono>
+#include <functional>
+#include <future>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace executor {
@@ -84,7 +95,7 @@ public:
     template <class T>
     class FutureHandle {
     public:
-        FutureHandle(stdx::future<T> future,
+        FutureHandle(std::future<T> future,  // NOLINT
                      executor::TaskExecutor* executor,
                      executor::NetworkInterfaceMock* network)
             : _future(std::move(future)), _executor(executor), _network(network) {}
@@ -129,7 +140,7 @@ public:
         }
 
     private:
-        stdx::future<T> _future;
+        std::future<T> _future;  // NOLINT
         executor::TaskExecutor* _executor;
         executor::NetworkInterfaceMock* _network;
     };

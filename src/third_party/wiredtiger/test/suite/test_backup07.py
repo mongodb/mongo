@@ -26,11 +26,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest
-import os, shutil
-from helper import compare_files
+import wttest
+import os
 from wtbackup import backup_base
-from wtdataset import simple_key
 from wtscenario import make_scenarios
 
 # test_backup07.py
@@ -47,7 +45,7 @@ class test_backup07(backup_base):
 
     # Create a large cache, otherwise this test runs quite slowly.
     def conn_config(self):
-        return 'cache_size=1G,log=(archive=false,enabled,file_max=%s)' % \
+        return 'cache_size=1G,log=(enabled,file_max=%s,remove=false)' % \
             self.logmax
 
     # Run background inserts while running checkpoints repeatedly.
@@ -65,9 +63,11 @@ class test_backup07(backup_base):
         # We allow creates during backup because the file doesn't exist
         # when the backup metadata is created on cursor open and the newly
         # created file is not in the cursor list.
-
-        # Create and add data to a new table and then copy the files with a full backup.
         os.mkdir(self.dir)
+
+        # Open up the backup cursor, create and add data to a new table
+        # and then copy the files.
+        bkup_c = self.session.open_cursor('backup:', None, None)
 
         # Now create and populate the new table. Make sure the log records
         # are on disk and will be copied to the backup.
@@ -77,13 +77,16 @@ class test_backup07(backup_base):
 
         # Now copy the files using full backup. This should not include the newly
         # created table.
-        self.take_full_backup(self.dir)
+        all_files = self.take_full_backup(self.dir, bkup_c)
+        orig_logs = [file for file in all_files if "WiredTigerLog" in file]
+        self.assertFalse(self.newuri in all_files)
+
+        # Now open a duplicate backup cursor and copy all the logs into the backup directory.
+        dup_logs = self.take_log_backup(bkup_c, self.dir, orig_logs)
+        bkup_c.close()
 
         # After the full backup, open and recover the backup database.
         # Make sure we properly recover even though the log file will have
         # records for the newly created table file id.
         backup_conn = self.wiredtiger_open(self.dir)
         backup_conn.close()
-
-if __name__ == '__main__':
-    wttest.run()

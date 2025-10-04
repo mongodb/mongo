@@ -29,10 +29,17 @@
 
 #pragma once
 
-#include "mongo/db/commands/server_status.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/commands/server_status/server_status.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/s/transaction_coordinator.h"
 #include "mongo/db/s/transaction_coordinators_stats_gen.h"
 #include "mongo/db/service_context.h"
+#include "mongo/platform/atomic_word.h"
+
+#include <cstdint>
+#include <memory>
 
 namespace mongo {
 
@@ -45,7 +52,7 @@ class ServerTransactionCoordinatorsMetrics {
         delete;
 
 public:
-    ServerTransactionCoordinatorsMetrics() = default;
+    ServerTransactionCoordinatorsMetrics();
 
     static ServerTransactionCoordinatorsMetrics* get(ServiceContext* service);
     static ServerTransactionCoordinatorsMetrics* get(OperationContext* opCtx);
@@ -56,25 +63,9 @@ public:
     std::int64_t getTotalStartedTwoPhaseCommit();
     void incrementTotalStartedTwoPhaseCommit();
 
-    std::int64_t getCurrentWritingParticipantList();
-    void incrementCurrentWritingParticipantList();
-    void decrementCurrentWritingParticipantList();
-
-    std::int64_t getCurrentWaitingForVotes();
-    void incrementCurrentWaitingForVotes();
-    void decrementCurrentWaitingForVotes();
-
-    std::int64_t getCurrentWritingDecision();
-    void incrementCurrentWritingDecision();
-    void decrementCurrentWritingDecision();
-
-    std::int64_t getCurrentWaitingForDecisionAcks();
-    void incrementCurrentWaitingForDecisionAcks();
-    void decrementCurrentWaitingForDecisionAcks();
-
-    std::int64_t getCurrentDeletingCoordinatorDoc();
-    void incrementCurrentDeletingCoordinatorDoc();
-    void decrementCurrentDeletingCoordinatorDoc();
+    std::int64_t getCurrentInStep(TransactionCoordinator::Step step);
+    void incrementCurrentInStep(TransactionCoordinator::Step step);
+    void decrementCurrentInStep(TransactionCoordinator::Step step);
 
     std::int64_t getTotalAbortedTwoPhaseCommit();
     void incrementTotalAbortedTwoPhaseCommit();
@@ -104,25 +95,15 @@ private:
     // commit since the process's inception.
     AtomicWord<std::int64_t> _totalSuccessfulTwoPhaseCommit{0};
 
-    // The number of transaction coordinators currently in the "writing participant list" phase.
-    AtomicWord<std::int64_t> _totalWritingParticipantList{0};
-
-    // The number of transaction coordinators currently in the "waiting for votes" phase.
-    AtomicWord<std::int64_t> _totalWaitingForVotes{0};
-
-    // The number of transaction coordinators currently in the "writing decision" phase.
-    AtomicWord<std::int64_t> _totalWritingDecision{0};
-
-    // The number of transaction coordinators currently in the "waiting for decision acks" phase.
-    AtomicWord<std::int64_t> _totalWaitingForDecisionAcks{0};
-
-    // The number of transaction coordinators currently in the "deleting coordinator doc" phase.
-    AtomicWord<std::int64_t> _totalDeletingCoordinatorDoc{0};
+    // The number of transaction coordinators currently in the given step
+    std::array<AtomicWord<std::int64_t>,
+               static_cast<size_t>(TransactionCoordinator::Step::kLastStep) + 1>
+        _totalInStep;
 };
 
 class TransactionCoordinatorsSSS final : public ServerStatusSection {
 public:
-    TransactionCoordinatorsSSS() : ServerStatusSection("twoPhaseCommitCoordinator") {}
+    using ServerStatusSection::ServerStatusSection;
 
     bool includeByDefault() const override {
         return true;

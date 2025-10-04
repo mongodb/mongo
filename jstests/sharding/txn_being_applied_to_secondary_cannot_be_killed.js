@@ -5,10 +5,10 @@
  * @tags: [uses_transactions, uses_prepare_transaction, uses_multi_shard_transaction]
  */
 
-(function() {
-'use strict';
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {checkDecisionIs} from "jstests/sharding/libs/txn_two_phase_commit_util.js";
 
 const dbName = "test";
 const collName = "foo";
@@ -23,7 +23,7 @@ TestData.transactionLifetimeLimitSeconds = 30;
 const rsOpts = {
     // Make secondaries unelectable.
     nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}],
-    settings: {chainingAllowed: false, electionTimeoutMillis: ReplSetTest.kForeverMillis}
+    settings: {chainingAllowed: false, electionTimeoutMillis: ReplSetTest.kForeverMillis},
 };
 let st = new ShardingTest({mongos: 2, shards: {rs0: rsOpts, rs1: rsOpts, rs2: rsOpts}});
 
@@ -35,15 +35,12 @@ const participant2 = st.shard2;
 // shard0: [-inf, 0)
 // shard1: [0, 10)
 // shard2: [10, +inf)
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: coordinator.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: coordinator.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 10}}));
-assert.commandWorked(
-    st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: participant1.shardName}));
-assert.commandWorked(
-    st.s.adminCommand({moveChunk: ns, find: {_id: 10}, to: participant2.shardName}));
+assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: participant1.shardName}));
+assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 10}, to: participant2.shardName}));
 st.refreshCatalogCacheForNs(st.s, ns);
 
 // These forced refreshes are not strictly necessary; they just prevent extra TXN log lines
@@ -58,28 +55,45 @@ const session = st.s.startSession();
 session.startTransaction();
 
 // Insert a document onto each shard to make this a cross-shard transaction.
-assert.commandWorked(session.getDatabase(dbName).runCommand({
-    insert: collName,
-    documents: [{_id: -5}, {_id: 5}, {_id: 15}],
-}));
+let res = assert.commandWorked(
+    session.getDatabase(dbName).runCommand({
+        insert: collName,
+        documents: [{_id: -5}, {_id: 5}, {_id: 15}],
+    }),
+);
+const lsid = session.getSessionId();
+const txnNumber = session.getTxnNumber_forTesting();
 
 // Set a failpoint to make oplog application hang on one secondary after applying the
 // operations in the transaction but before preparing the TransactionParticipant.
 const applyOpsHangBeforePreparingTransaction = "applyOpsHangBeforePreparingTransaction";
 const firstSecondary = st.rs0.getSecondary();
-let failPoint = configureFailPoint(firstSecondary, applyOpsHangBeforePreparingTransaction);
+const failPoint = configureFailPoint(firstSecondary, applyOpsHangBeforePreparingTransaction);
+
+const coordinatorPrimary = coordinator.rs.getPrimary();
+const hangBeforeDeletingCoordinatorDocFp = configureFailPoint(
+    coordinatorPrimary,
+    "hangBeforeDeletingCoordinatorDoc",
+    {},
+    "alwaysOn",
+);
 
 // Commit the transaction, which will execute two-phase commit.
 assert.commandWorked(session.commitTransaction_forTesting());
 
+hangBeforeDeletingCoordinatorDocFp.wait();
+const commitTimestamp = checkDecisionIs(coordinator, lsid, txnNumber, "commit");
+hangBeforeDeletingCoordinatorDocFp.off();
+
 jsTest.log("Verify that the transaction was committed on all shards.");
-// Use assert.soon(), because although coordinateCommitTransaction currently blocks
-// until the commit process is fully complete, it will eventually be changed to only
-// block until the decision is *written*, so the documents may not be visible
-// immediately.
-assert.soon(function() {
-    return 3 === st.s.getDB(dbName).getCollection(collName).find().itcount();
-});
+res = assert.commandWorked(
+    st.s.getDB(dbName).runCommand({
+        find: collName,
+        readConcern: {level: "majority", afterClusterTime: commitTimestamp},
+        maxTimeMS: 10000,
+    }),
+);
+assert.eq(3, res.cursor.firstBatch.length);
 
 jsTest.log("Waiting for secondary to apply the prepare oplog entry.");
 failPoint.wait();
@@ -101,4 +115,3 @@ failPoint.off();
 jsTest.log("Turned off " + applyOpsHangBeforePreparingTransaction + " failpoint.");
 
 st.stop();
-})();

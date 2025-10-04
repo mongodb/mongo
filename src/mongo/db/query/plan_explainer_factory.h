@@ -29,23 +29,47 @@
 
 #pragma once
 
-#include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
-#include "mongo/db/query/plan_enumerator_explain_info.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
+#include "mongo/db/query/plan_cache/plan_cache_debug_info.h"
+#include "mongo/db/query/plan_enumerator/plan_enumerator_explain_info.h"
 #include "mongo/db/query/plan_explainer.h"
-#include "mongo/db/query/query_solution.h"
-#include "mongo/db/query/sbe_plan_ranker.h"
+#include "mongo/db/query/query_planner.h"
+#include "mongo/db/query/stage_builder/classic_stage_builder.h"
+#include "mongo/db/query/stage_builder/sbe/builder_data.h"
+#include "mongo/util/modules.h"
+
+#include <memory>
+#include <vector>
 
 namespace mongo::plan_explainer_factory {
-std::unique_ptr<PlanExplainer> make(PlanStage* root);
+
+std::unique_ptr<PlanExplainer> make(PlanStage* root,
+                                    boost::optional<size_t> cachedPlanHash = boost::none);
+
+std::unique_ptr<PlanExplainer> make(PlanStage* root,
+                                    boost::optional<size_t> cachedPlanHash,
+                                    QueryPlanner::CostBasedRankerResult cbrResult,
+                                    stage_builder::PlanStageToQsnMap planStageQsnMap,
+                                    std::vector<std::unique_ptr<PlanStage>> cbrRejectedPlanStages);
+
 std::unique_ptr<PlanExplainer> make(PlanStage* root,
                                     const PlanEnumeratorExplainInfo& enumeratorInfo);
-std::unique_ptr<PlanExplainer> make(sbe::PlanStage* root,
-                                    const stage_builder::PlanStageData* data,
-                                    const QuerySolution* solution);
-std::unique_ptr<PlanExplainer> make(sbe::PlanStage* root,
-                                    const stage_builder::PlanStageData* data,
-                                    const QuerySolution* solution,
-                                    std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
-                                    bool isMultiPlan);
+
+/**
+ * Factory function used to create a PlanExplainer for classic multiplanner + SBE execution. It
+ * requires a pointer to a classic multiplanner stage from which a classic PlanExplainer can be
+ * created.
+ */
+std::unique_ptr<PlanExplainer> make(
+    sbe::PlanStage* root,
+    const stage_builder::PlanStageData* data,
+    const QuerySolution* solution,
+    bool isMultiPlan,
+    bool isFromPlanCache,
+    boost::optional<size_t> cachedPlanHash,
+    std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo,
+    std::unique_ptr<PlanStage> classicRuntimePlannerStage,
+    RemoteExplainVector* remoteExplains = nullptr);
 }  // namespace mongo::plan_explainer_factory

@@ -29,15 +29,20 @@
 
 #pragma once
 
-#include <vector>
-
 #include "mongo/db/cancelable_operation_context.h"
+#include "mongo/db/exec/agg/exec_pipeline.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
+
+#include <memory>
+#include <vector>
 
 namespace mongo {
 
@@ -97,11 +102,8 @@ public:
 
     /**
      * Returns a pipeline for iterating the buffered copy of the donor's oplog.
-     *
-     * The documents returned by the pipeline have the oplog entries linked together with their
-     * preImage/postImage entries.
      */
-    std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(
+    std::unique_ptr<Pipeline> makePipeline(
         OperationContext* opCtx, std::shared_ptr<MongoProcessInterface> mongoProcessInterface);
 
     ExecutorFuture<std::vector<repl::OplogEntry>> getNextBatch(
@@ -111,12 +113,8 @@ public:
 
     void dispose(OperationContext* opCtx) override;
 
-    static constexpr auto kActualOpFieldName = "actualOp"_sd;
-    static constexpr auto kPreImageOpFieldName = "preImageOp"_sd;
-    static constexpr auto kPostImageOpFieldName = "postImageOp"_sd;
-
 private:
-    std::vector<repl::OplogEntry> _fillBatch(Pipeline& pipeline);
+    std::vector<repl::OplogEntry> _fillBatch();
 
     const NamespaceString _oplogBufferNss;
 
@@ -127,7 +125,8 @@ private:
     // oplog entry hasn't been reached yet.
     resharding::OnInsertAwaitable* const _insertNotifier;
 
-    std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
+    std::unique_ptr<Pipeline> _pipeline;
+    std::unique_ptr<exec::agg::Pipeline> _execPipeline;
     bool _hasSeenFinalOplogEntry{false};
 };
 

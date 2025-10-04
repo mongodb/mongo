@@ -1,0 +1,5 @@
+base_suite: change_streams
+overrides:
+  - "change_streams.mongos_passthrough"
+excludes:
+  - "change_streams.mongos_passthrough_excludes"

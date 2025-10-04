@@ -27,17 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/db/pipeline/document_source_internal_shard_filter.h"
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/mock_stage.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/shard_filterer.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/document_source_internal_shard_filter.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+
+#include <cstddef>
+#include <list>
+
 
 namespace mongo {
 namespace {
@@ -50,7 +59,7 @@ using DocumentSourceInternalShardFilterTest = AggregationContextFixture;
  */
 class ShardFiltererBaseForTest : public ShardFilterer {
 public:
-    std::unique_ptr<ShardFilterer> clone() const {
+    std::unique_ptr<ShardFilterer> clone() const override {
         MONGO_UNREACHABLE;
     }
 
@@ -86,7 +95,7 @@ public:
 };
 
 TEST_F(DocumentSourceInternalShardFilterTest, ShouldOptimizeAwayIfUnshardedCollection) {
-    Pipeline::SourceContainer container;
+    DocumentSourceContainer container;
     auto mock = DocumentSourceMock::createForTest({"{a: 1}", "{a: 2}"}, getExpCtx());
 
     container.push_back(mock);
@@ -104,7 +113,7 @@ TEST_F(DocumentSourceInternalShardFilterTest, ShouldOptimizeAwayIfUnshardedColle
 
 TEST_F(DocumentSourceInternalShardFilterTest,
        ShouldOptimizeAwayIfUnshardedCollectionAndFirstInPipeline) {
-    Pipeline::SourceContainer container;
+    DocumentSourceContainer container;
 
     container.push_back(new DocumentSourceInternalShardFilter(
         getExpCtx(), std::make_unique<UnshardedShardFilterer>()));
@@ -141,20 +150,21 @@ private:
 };
 
 TEST_F(DocumentSourceInternalShardFilterTest, FiltersDocuments) {
-    Pipeline::SourceContainer container;
-    auto mock = DocumentSourceMock::createForTest({"{a: 1}", "{a: 2}", "{a: 3}"}, getExpCtx());
+    DocumentSourceContainer container;
+    auto mock = exec::agg::MockStage::createForTest({"{a: 1}", "{a: 2}", "{a: 3}"}, getExpCtx());
 
     const auto nToFilter = 2;
-    DocumentSourceInternalShardFilter filter(getExpCtx(),
-                                             std::make_unique<FirstNShardFilterer>(nToFilter));
-    filter.setSource(mock.get());
+    auto filterSource = make_intrusive<DocumentSourceInternalShardFilter>(
+        getExpCtx(), std::make_unique<FirstNShardFilterer>(nToFilter));
+    auto filterStage = exec::agg::buildStage(filterSource);
+    filterStage->setSource(mock.get());
 
     // The first two documents should get filtered out.
-    auto next = filter.getNext();
+    auto next = filterStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     ASSERT_VALUE_EQ(Value(3), next.getDocument().getField("a"));
 
-    ASSERT_TRUE(filter.getNext().isEOF());
+    ASSERT_TRUE(filterStage->getNext().isEOF());
 }
 
 /**
@@ -181,15 +191,16 @@ private:
 };
 
 TEST_F(DocumentSourceInternalShardFilterTest, SkipDocumentsWithoutShardKey) {
-    Pipeline::SourceContainer container;
-    auto mock = DocumentSourceMock::createForTest({"{a: 1}", "{a: 2}", "{a: 3}"}, getExpCtx());
+    DocumentSourceContainer container;
+    auto mock = exec::agg::MockStage::createForTest({"{a: 1}", "{a: 2}", "{a: 3}"}, getExpCtx());
 
-    DocumentSourceInternalShardFilter filter(getExpCtx(),
-                                             std::make_unique<ShardFiltererNoShardKey>());
-    filter.setSource(mock.get());
+    auto filterSource = make_intrusive<DocumentSourceInternalShardFilter>(
+        getExpCtx(), std::make_unique<ShardFiltererNoShardKey>());
+    auto filterStage = exec::agg::buildStage(filterSource);
+    filterStage->setSource(mock.get());
 
     // The call to getNext() return nothing.
-    ASSERT_TRUE(filter.getNext().isEOF());
+    ASSERT_TRUE(filterStage->getNext().isEOF());
 }
 
 }  // namespace

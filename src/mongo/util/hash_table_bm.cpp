@@ -27,18 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/base/string_data.h"
 
-#include "mongo/util/string_map.h"
+#include <algorithm>
+#include <cstdint>
+#include <cstdio>
+#include <map>
+#include <memory>
+#include <random>
+#include <string>
+#include <type_traits>
+#include <unordered_map>
+#include <utility>
+#include <vector>
 
 #include <absl/container/flat_hash_map.h>
 #include <absl/container/node_hash_map.h>
 #include <absl/strings/string_view.h>
-#include <algorithm>
 #include <benchmark/benchmark.h>
-#include <memory>
-#include <random>
-#include <unordered_map>
 
 
 namespace mongo {
@@ -116,12 +122,12 @@ StringData BaseGenerator::generate<StringData>() {
 template <>
 absl::string_view BaseGenerator::generate<absl::string_view>() {
     StringData sd = generateStringData(generate<uint32_t>());
-    return absl::string_view(sd.rawData(), sd.size());
+    return absl::string_view(sd.data(), sd.size());
 }
 
 template <>
 std::string BaseGenerator::generate<std::string>() {
-    return generate<StringData>().toString();
+    return std::string{generate<StringData>()};
 }
 
 class Sequence : public BaseGenerator {

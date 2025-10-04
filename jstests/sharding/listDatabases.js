@@ -1,30 +1,29 @@
-(function() {
-'use strict';
-var test = new ShardingTest({shards: 1, mongos: 1, other: {chunkSize: 1}});
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var mongos = test.s0;
-var mongod = test.shard0;
+let test = new ShardingTest({shards: 1, mongos: 1, other: {chunkSize: 1}});
 
-var res;
-var dbArray;
+let mongos = test.s0;
+let mongod = test.shard0;
+
+let res;
+let dbArray;
 
 // grab the config db instance by name
-var getDBSection = function(dbsArray, dbToFind) {
-    for (var pos in dbsArray) {
-        if (dbsArray[pos].name && dbsArray[pos].name === dbToFind)
-            return dbsArray[pos];
+let getDBSection = function (dbsArray, dbToFind) {
+    for (let pos in dbsArray) {
+        if (dbsArray[pos].name && dbsArray[pos].name === dbToFind) return dbsArray[pos];
     }
     return null;
 };
 
 // Function to verify information for a database entry in listDatabases.
-var dbEntryCheck = function(dbEntry, onConfig) {
+let dbEntryCheck = function (dbEntry, onConfig) {
     assert.neq(null, dbEntry);
     assert.neq(null, dbEntry.sizeOnDisk);
     assert.eq(false, dbEntry.empty);
 
     // Check against shards
-    var shards = dbEntry.shards;
+    let shards = dbEntry.shards;
     assert(shards);
     assert((shards["config"] && onConfig) || (!shards["config"] && !onConfig));
 };
@@ -38,9 +37,9 @@ var dbEntryCheck = function(dbEntry, onConfig) {
     res = mongos.adminCommand("listDatabases");
     dbArray = res.databases;
 
-    dbEntryCheck(getDBSection(dbArray, "blah"), false);
-    dbEntryCheck(getDBSection(dbArray, "foo"), false);
-    dbEntryCheck(getDBSection(dbArray, "raw"), false);
+    dbEntryCheck(getDBSection(dbArray, "blah"), TestData.configShard);
+    dbEntryCheck(getDBSection(dbArray, "foo"), TestData.configShard);
+    dbEntryCheck(getDBSection(dbArray, "raw"), TestData.configShard);
 }
 
 // Local db is never returned.
@@ -48,7 +47,7 @@ var dbEntryCheck = function(dbEntry, onConfig) {
     res = mongos.adminCommand("listDatabases");
     dbArray = res.databases;
 
-    assert(!getDBSection(dbArray, 'local'));
+    assert(!getDBSection(dbArray, "local"));
 }
 
 // Admin and config are always reported on the config shard.
@@ -73,7 +72,8 @@ var dbEntryCheck = function(dbEntry, onConfig) {
     var entry = getDBSection(dbArray, "config");
     dbEntryCheck(entry, true);
     assert(entry["shards"]);
-    assert.eq(Object.keys(entry["shards"]).length, 2);
+    // There's only the "config" shard in config shard mode.
+    assert.eq(Object.keys(entry["shards"]).length, TestData.configShard ? 1 : 2);
 }
 
 // Admin db is only reported on the config shard, never on other shards.
@@ -90,4 +90,3 @@ var dbEntryCheck = function(dbEntry, onConfig) {
 }
 
 test.stop();
-})();

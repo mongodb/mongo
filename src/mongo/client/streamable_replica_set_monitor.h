@@ -29,27 +29,50 @@
 
 #pragma once
 
-#include <functional>
-#include <memory>
-#include <set>
-#include <string>
-
+#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/connection_string.h"
 #include "mongo/client/mongo_uri.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/client/replica_set_change_notifier.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/replica_set_monitor_stats.h"
 #include "mongo/client/sdam/sdam.h"
+#include "mongo/client/sdam/sdam_configuration.h"
+#include "mongo/client/sdam/sdam_datatypes.h"
+#include "mongo/client/sdam/server_selector.h"
+#include "mongo/client/sdam/topology_listener.h"
 #include "mongo/client/server_discovery_monitor.h"
 #include "mongo/client/server_ping_monitor.h"
 #include "mongo/client/streamable_replica_set_monitor_error_handler.h"
-#include "mongo/executor/egress_tag_closer.h"
+#include "mongo/executor/egress_connection_closer.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
+
+#include <functional>
+#include <list>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
 
 namespace mongo {
 
@@ -57,6 +80,7 @@ class BSONObj;
 class ReplicaSetMonitor;
 class ReplicaSetMonitorTest;
 struct ReadPreferenceSetting;
+
 using ReplicaSetMonitorPtr = std::shared_ptr<ReplicaSetMonitor>;
 
 /**
@@ -80,7 +104,7 @@ public:
 
     StreamableReplicaSetMonitor(const MongoURI& uri,
                                 std::shared_ptr<executor::TaskExecutor> executor,
-                                std::shared_ptr<executor::EgressTagCloser> connectionManager,
+                                std::shared_ptr<executor::EgressConnectionCloser> connectionManager,
                                 std::function<void()> cleanupCallback,
                                 std::shared_ptr<ReplicaSetMonitorManagerStats> managerStats);
 
@@ -92,15 +116,21 @@ public:
 
     void drop() override;
 
-    static ReplicaSetMonitorPtr make(const MongoURI& uri,
-                                     std::shared_ptr<executor::TaskExecutor> executor,
-                                     std::shared_ptr<executor::EgressTagCloser> connectionCloser,
-                                     std::function<void()> cleanupCallback,
-                                     std::shared_ptr<ReplicaSetMonitorManagerStats> managerStats);
+    static ReplicaSetMonitorPtr make(
+        const MongoURI& uri,
+        std::shared_ptr<executor::TaskExecutor> executor,
+        std::shared_ptr<executor::EgressConnectionCloser> egressConnectionCloser,
+        std::function<void()> cleanupCallback,
+        std::shared_ptr<ReplicaSetMonitorManagerStats> managerStats);
 
     SemiFuture<HostAndPort> getHostOrRefresh(const ReadPreferenceSetting& readPref,
                                              const std::vector<HostAndPort>& excludedHosts,
                                              const CancellationToken& cancelToken) override;
+
+    SemiFuture<HostAndPort> getAtLeastOneHostOrRefresh(
+        const ReadPreferenceSetting& readPref,
+        const stdx::unordered_set<HostAndPort>& deprioritizedServers,
+        const CancellationToken& cancelToken) override;
 
     SemiFuture<std::vector<HostAndPort>> getHostsOrRefresh(
         const ReadPreferenceSetting& readPref,
@@ -140,10 +170,17 @@ public:
     bool isKnownToHaveGoodPrimary() const override;
     void runScanForMockReplicaSet() override;
 
+    boost::optional<Microseconds> pingTime(const HostAndPort& server) const override;
+
+    class StreamableReplicaSetMonitorDiscoveryTimeProcessor;
+
 private:
     class StreamableReplicaSetMonitorQueryProcessor;
     using StreamableReplicaSetMontiorQueryProcessorPtr =
         std::shared_ptr<StreamableReplicaSetMonitor::StreamableReplicaSetMonitorQueryProcessor>;
+
+    using StreamableReplicaSetMonitorDiscoveryTimeProcessorPtr = std::shared_ptr<
+        StreamableReplicaSetMonitor::StreamableReplicaSetMonitorDiscoveryTimeProcessor>;
 
     struct HostQuery {
         HostQuery(std::shared_ptr<ReplicaSetMonitorStats> stats)
@@ -218,14 +255,17 @@ private:
         const Date_t& deadline);
 
     // Removes the query pointed to by iter and returns an iterator to the next item in the list.
-    std::list<HostQueryPtr>::iterator _eraseQueryFromOutstandingQueries(
+    std::list<HostQueryPtr>::iterator _eraseQueryIterFromOutstandingQueries(
         WithLock, std::list<HostQueryPtr>::iterator iter);
+
+    // Removes the given query from the list, if it is there.
+    void _eraseQueryFromOutstandingQueries(WithLock, const HostQueryPtr& query);
 
     std::vector<HostAndPort> _extractHosts(
         const std::vector<sdam::ServerDescriptionPtr>& serverDescriptions);
 
     boost::optional<std::vector<HostAndPort>> _getHosts(
-        const TopologyDescriptionPtr& topology,
+        const sdam::TopologyDescriptionPtr& topology,
         const ReadPreferenceSetting& criteria,
         const std::vector<HostAndPort>& excludedHosts = std::vector<HostAndPort>());
     boost::optional<std::vector<HostAndPort>> _getHosts(
@@ -269,14 +309,15 @@ private:
 
     void _failOutstandingWithStatus(WithLock, Status status);
 
-    void _setConfirmedNotifierState(WithLock, const ServerDescriptionPtr& primaryDescription);
+    void _setConfirmedNotifierState(WithLock, const sdam::ServerDescriptionPtr& primaryDescription);
 
     // Try to satisfy the outstanding queries for this instance with the given topology information.
-    void _processOutstanding(const TopologyDescriptionPtr& topologyDescription);
+    void _processOutstanding(const sdam::TopologyDescriptionPtr& topologyDescription);
 
     // Take action on error for the given host.
     void _doErrorActions(
         const HostAndPort& host,
+        StringData reason,
         const StreamableReplicaSetMonitorErrorHandler::ErrorActions& errorActions) const;
 
     void _failedHost(const HostAndPort& host,
@@ -290,24 +331,24 @@ private:
     sdam::ServerSelectorPtr _serverSelector;
     sdam::TopologyEventsPublisherPtr _eventsPublisher;
     std::unique_ptr<StreamableReplicaSetMonitorErrorHandler> _errorHandler;
-    ServerDiscoveryMonitorPtr _serverDiscoveryMonitor;
+    sdam::ServerDiscoveryMonitorPtr _serverDiscoveryMonitor;
     std::shared_ptr<ServerPingMonitor> _pingMonitor;
 
     // This object will be registered as a TopologyListener if there are
     // any outstanding queries for this RSM instance.
     StreamableReplicaSetMontiorQueryProcessorPtr _queryProcessor;
 
+    StreamableReplicaSetMonitorDiscoveryTimeProcessorPtr _primaryDiscoveryTimeProcessor;
     const MongoURI _uri;
 
-    std::shared_ptr<executor::EgressTagCloser> _connectionManager;
+    std::shared_ptr<executor::EgressConnectionCloser> _connectionManager;
     std::shared_ptr<executor::TaskExecutor> _executor;
 
     AtomicWord<bool> _isDropped{true};
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ReplicaSetMonitor");
+    mutable stdx::mutex _mutex;
     std::list<HostQueryPtr> _outstandingQueries;
     boost::optional<ChangeNotifierState> _confirmedNotifierState;
-    mutable PseudoRandom _random;
     std::shared_ptr<ReplicaSetMonitorStats> _stats;
 
     static constexpr auto kDefaultLogLevel = 0;

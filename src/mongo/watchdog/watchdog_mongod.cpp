@@ -27,29 +27,41 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/watchdog/watchdog_mongod.h"
 
-#include <boost/filesystem.hpp>
-#include <memory>
-
-#include "mongo/base/init.h"
-#include "mongo/config.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands/server_status.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/commands/server_status/server_status.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/clock_source.h"
-#include "mongo/util/clock_source_mock.h"
-#include "mongo/util/tick_source_mock.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/testing_proctor.h"
 #include "mongo/watchdog/watchdog.h"
 #include "mongo/watchdog/watchdog_mongod_gen.h"
 #include "mongo/watchdog/watchdog_register.h"
+
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 
 namespace mongo {
 namespace {
@@ -57,26 +69,16 @@ namespace {
 // Run the watchdog checks at a fixed interval regardless of user choice for monitoring period.
 constexpr Seconds watchdogCheckPeriod = Seconds{10};
 
-const auto getWatchdogMonitor =
-    ServiceContext::declareDecoration<std::unique_ptr<WatchdogMonitor>>();
-
 // A boolean variable to track whether the watchdog was enabled at startup.
 // Defaults to true because set parameters are handled before we start the watchdog if needed.
 bool watchdogEnabled{true};
 
-WatchdogMonitor* getGlobalWatchdogMonitor() {
-    if (!hasGlobalServiceContext()) {
-        return nullptr;
-    }
-
-    return getWatchdogMonitor(getGlobalServiceContext()).get();
-}
-
 }  // namespace
 
-Status validateWatchdogPeriodSeconds(const int& value) {
-    if (value < 60 && value != -1) {
-
+Status validateWatchdogPeriodSeconds(const int& value, const boost::optional<TenantId>&) {
+    const bool shouldSkipValidateForTest =
+        TestingProctor::instance().isInitialized() && TestingProctor::instance().isEnabled();
+    if (!shouldSkipValidateForTest && value < 60 && value != -1) {
         return {ErrorCodes::BadValue, "watchdogPeriodSeconds must be greater than or equal to 60s"};
     }
 
@@ -90,7 +92,7 @@ Status validateWatchdogPeriodSeconds(const int& value) {
 }
 
 Status onUpdateWatchdogPeriodSeconds(const int& value) {
-    auto monitor = getGlobalWatchdogMonitor();
+    auto monitor = WatchdogMonitorInterface::getGlobalWatchdogMonitorInterface();
     if (monitor) {
         monitor->setPeriod(Seconds(value));
     }
@@ -109,16 +111,22 @@ Status onUpdateWatchdogPeriodSeconds(const int& value) {
  */
 class WatchdogServerStatusSection : public ServerStatusSection {
 public:
-    WatchdogServerStatusSection() : ServerStatusSection("watchdog") {}
-    bool includeByDefault() const {
+    using ServerStatusSection::ServerStatusSection;
+    bool includeByDefault() const override {
         // Only include this by default if the watchdog is on
         return watchdogEnabled;
     }
 
-    BSONObj generateSection(OperationContext* opCtx, const BSONElement& configElement) const {
-        BSONObjBuilder result;
+    BSONObj generateSection(OperationContext* opCtx,
+                            const BSONElement& configElement) const override {
+        if (!watchdogEnabled) {
+            return BSONObj();
+        }
 
-        WatchdogMonitor* watchdog = getWatchdogMonitor(opCtx->getServiceContext()).get();
+        BSONObjBuilder result;
+        WatchdogMonitorInterface* watchdog =
+            WatchdogMonitorInterface::get(opCtx->getServiceContext());
+        invariant(watchdog);
 
         result.append("checkGeneration", watchdog->getCheckGeneration());
         result.append("monitorGeneration", watchdog->getMonitorGeneration());
@@ -126,7 +134,9 @@ public:
 
         return result.obj();
     }
-} watchdogServerStatusSection;
+};
+auto& watchdogServerStatusSection =
+    *ServerStatusSectionBuilder<WatchdogServerStatusSection>("watchdog").forShard();
 
 void startWatchdog(ServiceContext* service) {
     // Check three paths if set
@@ -150,22 +160,19 @@ void startWatchdog(ServiceContext* service) {
 
     checks.push_back(std::move(dataCheck));
 
-    // Add a check for the journal if it is not disabled
-    if (storageGlobalParams.dur) {
-        auto journalDirectory = boost::filesystem::path(storageGlobalParams.dbpath);
-        journalDirectory /= "journal";
+    // Check for the journal.
+    auto journalDirectory = boost::filesystem::path(storageGlobalParams.dbpath);
+    journalDirectory /= "journal";
 
-        if (boost::filesystem::exists(journalDirectory)) {
-            auto journalCheck = std::make_unique<DirectoryCheck>(journalDirectory);
+    if (boost::filesystem::exists(journalDirectory)) {
+        auto journalCheck = std::make_unique<DirectoryCheck>(journalDirectory);
 
-            checks.push_back(std::move(journalCheck));
-        } else {
-            LOGV2_WARNING(23835,
-                          "Watchdog is skipping check for journal directory since it does not "
-                          "exist: '{journalDirectory_generic_string}'",
-                          "journalDirectory_generic_string"_attr =
-                              journalDirectory.generic_string());
-        }
+        checks.push_back(std::move(journalCheck));
+    } else {
+        LOGV2_WARNING(23835,
+                      "Watchdog is skipping check for journal directory since it does not "
+                      "exist: '{journalDirectory_generic_string}'",
+                      "journalDirectory_generic_string"_attr = journalDirectory.generic_string());
     }
 
     // If the user specified a log path, also monitor that directory.
@@ -187,14 +194,13 @@ void startWatchdog(ServiceContext* service) {
         checks.push_back(std::move(auditCheck));
     }
 
-    auto monitor = std::make_unique<WatchdogMonitor>(
-        std::move(checks), watchdogCheckPeriod, period, watchdogTerminate);
+    WatchdogMonitorInterface::set(
+        service,
+        std::make_unique<WatchdogMonitor>(
+            std::move(checks), watchdogCheckPeriod, period, watchdogTerminate));
 
     // Install the new WatchdogMonitor
-    auto& staticMonitor = getWatchdogMonitor(service);
-
-    staticMonitor = std::move(monitor);
-
+    auto staticMonitor = WatchdogMonitorInterface::get(service);
     staticMonitor->start();
 }
 

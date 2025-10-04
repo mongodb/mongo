@@ -18,19 +18,19 @@
 
 #define BOOST_REGEX_SOURCE
 
-#include <boost/config.hpp>
 #include <boost/regex.hpp>
 #include <boost/cregex.hpp>
 #include <cstdio>
 
-#if defined(BOOST_NO_STDC_NAMESPACE)
-namespace std{
-   using ::sprintf;
-   using ::strcpy;
-   using ::strcmp;
-}
+#ifndef BOOST_WORKAROUND
+#define BOOST_WORKAROUND(x, y) false
 #endif
 
+#ifndef BOOST_REGEX_STANDALONE
+#include <boost/core/snprintf.hpp>
+#else
+namespace boost { namespace core { using std::snprintf; } }
+#endif
 
 namespace boost{
 
@@ -87,7 +87,7 @@ BOOST_REGEX_DECL int BOOST_REGEX_CCALL regcompA(regex_tA* expression, const char
       return REG_E_MEMORY;
 #endif
    // set default flags:
-   boost::uint_fast32_t flags = (f & REG_PERLEX) ? 0 : ((f & REG_EXTENDED) ? regex::extended : regex::basic);
+   unsigned flags = (f & REG_PERLEX) ? 0 : ((f & REG_EXTENDED) ? regex::extended : regex::basic);
    expression->eflags = (f & REG_NEWLINE) ? match_not_dot_newline : match_default;
    // and translate those that are actually set:
 
@@ -176,11 +176,7 @@ BOOST_REGEX_DECL regsize_t BOOST_REGEX_CCALL regerrorA(int code, const regex_tA*
             // We're converting an integer i to a string, and since i <= REG_E_UNKNOWN
             // a five character string is *always* large enough:
             //
-#if BOOST_WORKAROUND(BOOST_MSVC, >= 1400) && !defined(_WIN32_WCE) && !defined(UNDER_CE)
-            int r = (::sprintf_s)(localbuf, 5, "%d", i);
-#else
-            int r = (std::sprintf)(localbuf, "%d", i);
-#endif
+            int r = (boost::core::snprintf)(localbuf, 5, "%d", i);
             if(r < 0)
                return 0; // sprintf failed
             if(std::strlen(localbuf) < buf_size)
@@ -188,11 +184,7 @@ BOOST_REGEX_DECL regsize_t BOOST_REGEX_CCALL regerrorA(int code, const regex_tA*
             return std::strlen(localbuf) + 1;
          }
       }
-#if BOOST_WORKAROUND(BOOST_MSVC, >= 1400) && !defined(_WIN32_WCE) && !defined(UNDER_CE)
-      int r = (::sprintf_s)(localbuf, 5, "%d", 0);
-#else
-      int r = (std::sprintf)(localbuf, "%d", 0);
-#endif
+      int r = (boost::core::snprintf)(localbuf, 5, "%d", 0);
       if(r < 0)
          return 0; // sprintf failed
       if(std::strlen(localbuf) < buf_size)

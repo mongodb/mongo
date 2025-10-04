@@ -27,20 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/ftdc/file_writer.h"
-
-#include <boost/filesystem.hpp>
-#include <fstream>
+#include <fstream>  // IWYU pragma: keep
 #include <string>
+#include <tuple>
 
-#include "mongo/base/string_data.h"
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
 #include "mongo/db/ftdc/compressor.h"
 #include "mongo/db/ftdc/config.h"
+#include "mongo/db/ftdc/file_writer.h"
 #include "mongo/db/ftdc/util.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -74,6 +77,7 @@ Status FTDCFileWriter::open(const boost::filesystem::path& file) {
     _interimTempFile = FTDCUtil::getInterimTempFile(file);
 
     _compressor.reset();
+    _metadataCompressor.reset();
 
     return Status::OK();
 }
@@ -156,8 +160,8 @@ Status FTDCFileWriter::writeSample(const BSONObj& sample, Date_t date) {
         return ret.getStatus();
     }
 
-    if (ret.getValue().is_initialized()) {
-        return flush(std::get<0>(ret.getValue().get()), std::get<2>(ret.getValue().get()));
+    if (ret.getValue().has_value()) {
+        return flush(std::get<0>(ret.getValue().value()), std::get<2>(ret.getValue().value()));
     }
 
     if (_compressor.getSampleCount() != 0 &&
@@ -176,8 +180,19 @@ Status FTDCFileWriter::writeSample(const BSONObj& sample, Date_t date) {
     return Status::OK();
 }
 
+Status FTDCFileWriter::writePeriodicMetadataSample(const BSONObj& sample, Date_t date) {
+    auto ret = _metadataCompressor.addSample(sample);
+    if (!ret.has_value()) {
+        return Status::OK();
+    }
+
+    auto o = FTDCBSONUtil::createBSONPeriodicMetadataDocument(
+        ret.value(), _metadataCompressor.getDeltaCount(), date);
+    return writeArchiveFileBuffer({o.objdata(), static_cast<size_t>(o.objsize())});
+}
+
 Status FTDCFileWriter::flush(const boost::optional<ConstDataRange>& range, Date_t date) {
-    if (!range.is_initialized()) {
+    if (!range.has_value()) {
         if (_compressor.hasDataToFlush()) {
             auto swBuf = _compressor.getCompressedSamples();
 
@@ -194,7 +209,7 @@ Status FTDCFileWriter::flush(const boost::optional<ConstDataRange>& range, Date_
             }
         }
     } else {
-        BSONObj o = FTDCBSONUtil::createBSONMetricChunkDocument(range.get(), date);
+        BSONObj o = FTDCBSONUtil::createBSONMetricChunkDocument(range.value(), date);
         Status s = writeArchiveFileBuffer({o.objdata(), static_cast<size_t>(o.objsize())});
 
         if (!s.isOK()) {

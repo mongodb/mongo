@@ -29,19 +29,19 @@
 
 #include "mongo/util/hex.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/ctype.h"
+
 #include <algorithm>
-#include <fmt/format.h>
-#include <iterator>
+#include <cstddef>
 #include <string>
 
-#include "mongo/base/error_codes.h"
-#include "mongo/util/ctype.h"
+#include <fmt/format.h>
 
 namespace mongo {
 
 namespace {
-
-using namespace fmt::literals;
 
 constexpr StringData kHexUpper = "0123456789ABCDEF"_sd;
 constexpr StringData kHexLower = "0123456789abcdef"_sd;
@@ -74,7 +74,7 @@ unsigned char decodeDigit(unsigned char c) {
     if (c >= 'A' && c <= 'F')
         return c - 'A' + 10;
     uasserted(ErrorCodes::FailedToParse,
-              "The character \\x{:02x} failed to parse from hex."_format(c));
+              fmt::format("The character \\x{:02x} failed to parse from hex.", c));
 }
 
 unsigned char decodePair(StringData c) {
@@ -110,7 +110,7 @@ std::string decode(StringData s) {
 }  // namespace hexblob
 
 std::string hexdump(StringData data) {
-    verify(data.size() < 1000000);
+    tassert(7781000, "Data length exceeds maximum buffer size", data.size() < kHexDumpMaxSize);
     std::string out;
     out.reserve(3 * data.size());
     char sep = 0;
@@ -121,6 +121,15 @@ std::string hexdump(StringData data) {
         sep = ' ';
     }
     return out;
+}
+
+std::ostream& StreamableHexdump::_streamTo(std::ostream& os) const {
+    StringData sep;
+    for (auto p = _data; p != _data + _size; ++p) {
+        os << sep << kHexLower[(*p >> 4) & 0x0f] << kHexLower[*p & 0x0f];
+        sep = " "_sd;
+    }
+    return os;
 }
 
 }  // namespace mongo

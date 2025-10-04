@@ -29,12 +29,14 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #include <mutex>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace stdx {
 
-using ::std::mutex;            // NOLINT
+using ::std::mutex;
 using ::std::recursive_mutex;  // NOLINT
 using ::std::timed_mutex;      // NOLINT
 
@@ -50,4 +52,4 @@ constexpr defer_lock_t defer_lock{};
 constexpr try_to_lock_t try_to_lock{};
 
 }  // namespace stdx
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

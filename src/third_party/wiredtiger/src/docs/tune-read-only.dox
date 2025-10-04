@@ -19,8 +19,4 @@ string "checkpoint" with the name "WiredTigerCheckpoint" to the
 WT_SESSION::open_cursor method:
 @snippet ex_all.c open the default checkpoint
 
-Reading from checkpoints is only supported on row- and column-store
-objects, LSM cursors cannot be opened with a non-empty \c "checkpoint"
-configuration.
-
  */

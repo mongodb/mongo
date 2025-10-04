@@ -27,155 +27,80 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/s/balancer/cluster_statistics_impl.h"
 
-#include <algorithm>
-
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/db/client.h"
+#include "mongo/db/global_catalog/ddl/shard_util.h"
+#include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
+#include "mongo/db/global_catalog/sharding_catalog_client.h"
+#include "mongo/db/global_catalog/type_shard.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/optime_with.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/sharding_environment/client/shard.h"
+#include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/topology/shard_registry.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/shard_util.h"
+#include "mongo/platform/random.h"
 #include "mongo/util/str.h"
 
+#include <algorithm>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
+
 namespace mongo {
-namespace {
-
-const char kVersionField[] = "version";
-
-/**
- * Executes the serverStatus command against the specified shard and obtains the version of the
- * running MongoD service.
- *
- * Returns the MongoD version in strig format or an error. Known error codes are:
- *  ShardNotFound if shard by that id is not available on the registry
- *  NoSuchKey if the version could not be retrieved
- */
-StatusWith<std::string> retrieveShardMongoDVersion(OperationContext* opCtx, ShardId shardId) {
-    auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-    auto shardStatus = shardRegistry->getShard(opCtx, shardId);
-    if (!shardStatus.isOK()) {
-        return shardStatus.getStatus();
-    }
-    auto shard = shardStatus.getValue();
-
-    auto commandResponse =
-        shard->runCommandWithFixedRetryAttempts(opCtx,
-                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                                "admin",
-                                                BSON("serverStatus" << 1),
-                                                Shard::RetryPolicy::kIdempotent);
-    if (!commandResponse.isOK()) {
-        return commandResponse.getStatus();
-    }
-    if (!commandResponse.getValue().commandStatus.isOK()) {
-        return commandResponse.getValue().commandStatus;
-    }
-
-    BSONObj serverStatus = std::move(commandResponse.getValue().response);
-
-    std::string version;
-    Status status = bsonExtractStringField(serverStatus, kVersionField, &version);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    return version;
-}
-}  // namespace
 
 using ShardStatistics = ClusterStatistics::ShardStatistics;
-
-ClusterStatisticsImpl::ClusterStatisticsImpl(BalancerRandomSource& random) : _random(random) {}
 
 ClusterStatisticsImpl::~ClusterStatisticsImpl() = default;
 
 StatusWith<std::vector<ShardStatistics>> ClusterStatisticsImpl::getStats(OperationContext* opCtx) {
-    return _getStats(opCtx, boost::none);
-}
-
-StatusWith<std::vector<ShardStatistics>> ClusterStatisticsImpl::getCollStats(
-    OperationContext* opCtx, NamespaceString const& ns) {
-    return _getStats(opCtx, ns);
-}
-
-StatusWith<std::vector<ShardStatistics>> ClusterStatisticsImpl::_getStats(
-    OperationContext* opCtx, boost::optional<NamespaceString> ns) {
     // Get a list of all the shards that are participating in this balance round along with any
     // maximum allowed quotas and current utilization. We get the latter by issuing
     // db.serverStatus() (mem.mapped) to all shards.
     //
     // TODO: skip unresponsive shards and mark information as stale.
-    auto shardsStatus = Grid::get(opCtx)->catalogClient()->getAllShards(
-        opCtx, repl::ReadConcernLevel::kMajorityReadConcern);
-    if (!shardsStatus.isOK()) {
-        return shardsStatus.getStatus();
+    const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
+    std::vector<ShardType> shards;
+    try {
+        shards =
+            catalogClient->getAllShards(opCtx, repl::ReadConcernLevel::kMajorityReadConcern).value;
+    } catch (const DBException& ex) {
+        return ex.toStatus();
     }
 
-    auto& shards = shardsStatus.getValue().value;
-
-    std::shuffle(shards.begin(), shards.end(), _random);
+    auto client = opCtx->getClient();
+    std::shuffle(shards.begin(), shards.end(), client->getPrng().urbg());
 
     std::vector<ShardStatistics> stats;
 
     for (const auto& shard : shards) {
-        const auto shardSizeStatus = [&]() -> StatusWith<long long> {
-            if (ns) {
-                return shardutil::retrieveCollectionShardSize(opCtx, shard.getName(), *ns);
-            }
-            // optimization for the case where the balancer does not care about the dataSize
-            if (!shard.getMaxSizeMB()) {
-                return 0;
-            }
-            return shardutil::retrieveTotalShardSize(opCtx, shard.getName());
-        }();
-
-        if (!shardSizeStatus.isOK()) {
-            const auto& status = shardSizeStatus.getStatus();
-
-            return status.withContext(str::stream()
-                                      << "Unable to obtain shard utilization information for "
-                                      << shard.getName());
+        std::set<std::string> shardZones;
+        for (const auto& shardZone : shard.getTags()) {
+            shardZones.insert(shardZone);
         }
 
-        std::string mongoDVersion;
-
-        auto mongoDVersionStatus = retrieveShardMongoDVersion(opCtx, shard.getName());
-        if (mongoDVersionStatus.isOK()) {
-            mongoDVersion = std::move(mongoDVersionStatus.getValue());
-        } else {
-            // Since the mongod version is only used for reporting, there is no need to fail the
-            // entire round if it cannot be retrieved, so just leave it empty
-            LOGV2(21895,
-                  "Unable to obtain shard version for {shardId}: {error}",
-                  "Unable to obtain shard version",
-                  "shardId"_attr = shard.getName(),
-                  "error"_attr = mongoDVersionStatus.getStatus());
-        }
-
-        std::set<std::string> shardTags;
-
-        for (const auto& shardTag : shard.getTags()) {
-            shardTags.insert(shardTag);
-        }
-
-        stats.emplace_back(shard.getName(),
-                           shard.getMaxSizeMB() * 1024 * 1024,
-                           shardSizeStatus.getValue(),
-                           shard.getDraining(),
-                           std::move(shardTags),
-                           std::move(mongoDVersion),
-                           ShardStatistics::use_bytes_t{});
+        stats.emplace_back(shard.getName(), shard.getDraining(), std::move(shardZones));
     }
 
     return stats;
 }
-
 }  // namespace mongo

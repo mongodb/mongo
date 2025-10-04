@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest, time
+import wiredtiger, wttest
 from wiredtiger import stat
 from wtscenario import make_scenarios
 
@@ -34,7 +34,6 @@ from wtscenario import make_scenarios
 # Verify modify insert into history store logic.
 class test_hs08(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=100MB,statistics=(all)'
-    session_config = 'isolation=snapshot'
     key_format_values = [
         ('column', dict(key_format='r')),
         ('integer-row', dict(key_format='i')),
@@ -198,6 +197,3 @@ class test_hs08(wttest.WiredTigerTestCase):
         squashed_write = self.get_stat(stat.conn.cache_hs_write_squash)
         self.assertGreaterEqual(hs_writes, 5)
         self.assertEqual(squashed_write, 5)
-
-if __name__ == '__main__':
-    wttest.run()

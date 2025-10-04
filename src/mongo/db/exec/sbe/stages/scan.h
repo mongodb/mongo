@@ -29,43 +29,146 @@
 
 #pragma once
 
-#include "mongo/config.h"
+#include "mongo/base/string_data.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/admission/execution_admission_context.h"
+#include "mongo/db/exec/field_name_bloom_filter.h"
+#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/stages/collection_helpers.h"
+#include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/exec/sbe/values/bson.h"
+#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/local_catalog/collection.h"
+#include "mongo/db/local_catalog/index_catalog_entry.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
+#include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/util/string_listset.h"
+#include "mongo/util/string_map.h"
+#include "mongo/util/uuid.h"
+
+#include <cstddef>
+#include <limits>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <absl/container/inlined_vector.h>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace sbe {
-using ScanOpenCallback = std::function<void(OperationContext*, const CollectionPtr&, bool)>;
+using ScanOpenCallback = void (*)(OperationContext*, const CollectionPtr&);
 
 struct ScanCallbacks {
-    ScanCallbacks(IndexKeyCorruptionCheckCallback indexKeyCorruptionCheck = {},
-                  IndexKeyConsistencyCheckCallback indexKeyConsistencyCheck = {},
-                  ScanOpenCallback scanOpen = {})
+    ScanCallbacks(IndexKeyCorruptionCheckCallback indexKeyCorruptionCheck = nullptr,
+                  IndexKeyConsistencyCheckCallback indexKeyConsistencyCheck = nullptr,
+                  ScanOpenCallback scanOpen = nullptr)
         : indexKeyCorruptionCheckCallback(std::move(indexKeyCorruptionCheck)),
-          indexKeyConsistencyCheckCallBack(std::move(indexKeyConsistencyCheck)),
+          indexKeyConsistencyCheckCallback(std::move(indexKeyConsistencyCheck)),
           scanOpenCallback(std::move(scanOpen)) {}
 
-    IndexKeyCorruptionCheckCallback indexKeyCorruptionCheckCallback;
-    IndexKeyConsistencyCheckCallback indexKeyConsistencyCheckCallBack;
-    ScanOpenCallback scanOpenCallback;
+    IndexKeyCorruptionCheckCallback indexKeyCorruptionCheckCallback = nullptr;
+    IndexKeyConsistencyCheckCallback indexKeyConsistencyCheckCallback = nullptr;
+    ScanOpenCallback scanOpenCallback = nullptr;
 };
 
 /**
- * Retrieves documents from the collection with the given 'collectionUuid' using the storage API.
- * Can be used as either a full scan of the collection, or as a seek. In the latter case, this stage
- * is given a 'seekKeySlot' from which to read a 'RecordId'. We seek to this 'RecordId' and then
- * scan from that point to the end of the collection.
+ * Contains static state info that can be shared across all cloned copies of a ScanStage.
+ */
+class ScanStageState {
+public:
+    ScanStageState(UUID inCollUuid,
+                   DatabaseName dbName,
+                   boost::optional<value::SlotId> inRecordSlot,
+                   boost::optional<value::SlotId> inRecordIdSlot,
+                   boost::optional<value::SlotId> inSnapshotIdSlot,
+                   boost::optional<value::SlotId> inIndexIdentSlot,
+                   boost::optional<value::SlotId> inIndexKeySlot,
+                   boost::optional<value::SlotId> inIndexKeyPatternSlot,
+                   std::vector<std::string> inScanFieldNames,
+                   value::SlotVector inScanFieldSlots,
+                   boost::optional<value::SlotId> inSeekRecordIdSlot,
+                   boost::optional<value::SlotId> inMinRecordIdSlot,
+                   boost::optional<value::SlotId> inMaxRecordIdSlot,
+                   bool inForward,
+                   ScanCallbacks inScanCallbacks,
+                   bool inUseRandomCursor)
+        : collUuid(inCollUuid),
+          dbName(dbName),
+          recordSlot(inRecordSlot),
+          recordIdSlot(inRecordIdSlot),
+          snapshotIdSlot(inSnapshotIdSlot),
+          indexIdentSlot(inIndexIdentSlot),
+          indexKeySlot(inIndexKeySlot),
+          indexKeyPatternSlot(inIndexKeyPatternSlot),
+          scanFieldNames(inScanFieldNames),
+          scanFieldSlots(inScanFieldSlots),
+          seekRecordIdSlot(inSeekRecordIdSlot),
+          minRecordIdSlot(inMinRecordIdSlot),
+          maxRecordIdSlot(inMaxRecordIdSlot),
+          forward(inForward),
+          scanCallbacks(inScanCallbacks),
+          useRandomCursor(inUseRandomCursor) {
+        tassert(11094712,
+                "Expecting number of scan fields to match the number of scan slots",
+                scanFieldNames.size() == scanFieldSlots.size());
+    }
+
+    inline size_t getNumScanFields() {
+        return scanFieldNames.size();
+    }
+
+    const UUID collUuid;
+    const DatabaseName dbName;
+
+    const boost::optional<value::SlotId> recordSlot;
+    const boost::optional<value::SlotId> recordIdSlot;
+    const boost::optional<value::SlotId> snapshotIdSlot;
+    const boost::optional<value::SlotId> indexIdentSlot;
+    const boost::optional<value::SlotId> indexKeySlot;
+    const boost::optional<value::SlotId> indexKeyPatternSlot;
+
+    // 'scanFieldNames' - names of the fields being scanned from the doc
+    // 'scanFieldSlots' - slot IDs for the fields being scanned from the doc
+    const StringListSet scanFieldNames;
+    const value::SlotVector scanFieldSlots;
+
+    const boost::optional<value::SlotId> seekRecordIdSlot;
+    const boost::optional<value::SlotId> minRecordIdSlot;
+    const boost::optional<value::SlotId> maxRecordIdSlot;
+
+    // Tells if this is a forward (as opposed to reverse) scan.
+    const bool forward;
+
+    const ScanCallbacks scanCallbacks;
+
+    // Used to return a random sample of the collection.
+    const bool useRandomCursor;
+};  // class ScanStageState
+
+/**
+ * Retrieves documents from the collection with the given 'collUuid' using the storage API.
  *
  * If the 'recordSlot' is provided, then each of the records returned from the scan is placed into
  * an output slot with this slot id. Similarly, if 'recordIdSlot' is provided, then this slot is
  * populated with the record id on each advance.
  *
  * In addition, the scan/seek can extract a set of top-level fields from each document. The caller
- * asks for this by passing a vector of 'fields', along with a corresponding slot vector 'vars' into
- * which the resulting values should be stored. These vectors must have the same length.
+ * asks for this by passing a vector of 'scanFieldNames', along with a corresponding slot vector
+ * 'scanFieldSlots' into which the resulting values should be stored. These vectors must have the
+ * same length.
  *
  * The direction of the scan is controlled by the 'forward' parameter.
  *
@@ -76,38 +179,56 @@ struct ScanCallbacks {
  * we must verify at runtime that no such inconsistency exists. This requires the scan to know the
  * value of the index key, the identity of the index from which it was obtained, and the id of the
  * storage snapshot from which it was obtained. This information is made available to the seek stage
- * via 'snapshotIdSlot', 'indexIdSlot', 'indexKeySlot', and 'indexKeyPatternSlot'.
- *
- * If this is an oplog scan, then the 'oplogTsSlot' will be populated with the "ts" field from each
- * oplog entry.
+ * via 'snapshotIdSlot', 'indexIdentSlot', 'indexKeySlot', and 'indexKeyPatternSlot'.
  *
  * Debug string representations:
  *
- *  scan recordSlot|none recordIdSlot|none snapshotIdSlot|none indexIdSlot|none indexKeySlot|none
- *       indexKeyPatternSlot|none [slot1 = fieldName1, ... slot_n = fieldName_n] collectionUuid
- *       forward needOplogSlotForTs
+ *  scan recordSlot? recordIdSlot? snapshotIdSlot? indexIdentSlot? indexKeySlot?
+ *       indexKeyPatternSlot? minRecordIdSlot? maxRecordIdSlot? [slot1 = fieldName1, ...
+ *       slot_n = fieldName_n] collUuid forward
  *
- *  seek seekKeySlot recordSlot|none recordIdSlot|none snapshotIdSlot|none indexIdSlot|none
- *       indexKeySlot|none indexKeyPatternSlot|none [slot1 = fieldName1, ... slot_n = fieldName_n]
- *       collectionUuid forward needOplogSlotForTs
+ *  seek seekKeySlot recordSlot? recordIdSlot? snapshotIdSlot? indexIdentSlot? indexKeySlot?
+ *       indexKeyPatternSlot? minRecordIdSlot? maxRecordIdSlot? [slot1 = fieldName1, ...
+ *       slot_n = fieldName_n] collUuid forward
  */
 class ScanStage final : public PlanStage {
 public:
-    ScanStage(CollectionUUID collectionUuid,
+    /**
+     * Regular constructor. Initializes static '_state' managed by a shared_ptr.
+     */
+    ScanStage(UUID collUuid,
+              DatabaseName dbName,
               boost::optional<value::SlotId> recordSlot,
               boost::optional<value::SlotId> recordIdSlot,
               boost::optional<value::SlotId> snapshotIdSlot,
-              boost::optional<value::SlotId> indexIdSlot,
+              boost::optional<value::SlotId> indexIdentSlot,
               boost::optional<value::SlotId> indexKeySlot,
               boost::optional<value::SlotId> indexKeyPatternSlot,
-              boost::optional<value::SlotId> oplogTsSlot,
-              std::vector<std::string> fields,
-              value::SlotVector vars,
-              boost::optional<value::SlotId> seekKeySlot,
+              std::vector<std::string> scanFieldNames,
+              value::SlotVector scanFieldSlots,
+              boost::optional<value::SlotId> seekRecordIdSlot,
+              boost::optional<value::SlotId> minRecordIdSlot,
+              boost::optional<value::SlotId> maxRecordIdSlot,
               bool forward,
               PlanYieldPolicy* yieldPolicy,
               PlanNodeId nodeId,
-              ScanCallbacks scanCallbacks);
+              ScanCallbacks scanCallbacks,
+              // Optional arguments:
+              bool useRandomCursor = false,
+              bool participateInTrialRunTracking = true,
+              bool includeScanStartRecordId = true,
+              bool includeScanEndRecordId = true);
+
+
+    /**
+     * Constructor for clone(). Copies '_state' shared_ptr.
+     */
+    ScanStage(const std::shared_ptr<ScanStageState>& state,
+              PlanYieldPolicy* yieldPolicy,
+              PlanNodeId nodeId,
+              bool participateInTrialRunTracking,
+              bool includeScanStartRecordId,
+              bool includeScanEndRecordId);
 
     std::unique_ptr<PlanStage> clone() const final;
 
@@ -123,73 +244,109 @@ public:
     size_t estimateCompileTimeSize() const final;
 
 protected:
-    void doSaveState(bool relinquishCursor) override;
-    void doRestoreState(bool relinquishCursor) override;
+    void doSaveState() override;
+    void doRestoreState() override;
     void doDetachFromOperationContext() override;
     void doAttachToOperationContext(OperationContext* opCtx) override;
-    void doDetachFromTrialRunTracker() override;
-    TrialRunTrackerAttachResultMask doAttachToTrialRunTracker(
-        TrialRunTracker* tracker, TrialRunTrackerAttachResultMask childrenAttachResult) override;
+    void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override;
 
 private:
-    const CollectionUUID _collUuid;
-    const boost::optional<value::SlotId> _recordSlot;
-    const boost::optional<value::SlotId> _recordIdSlot;
-    const boost::optional<value::SlotId> _snapshotIdSlot;
-    const boost::optional<value::SlotId> _indexIdSlot;
-    const boost::optional<value::SlotId> _indexKeySlot;
-    const boost::optional<value::SlotId> _indexKeyPatternSlot;
-    const boost::optional<value::SlotId> _oplogTsSlot;
+    // Returns the primary cursor or the random cursor depending on whether _useRandomCursor is set.
+    RecordCursor* getActiveCursor() const;
 
-    const std::vector<std::string> _fields;
-    const value::SlotVector _vars;
+    /**
+     * Resets the state data members for starting the scan in the 'reOpen' case, i.e. skipping state
+     * that would be correct after a prior open() call that was NOT followed by a close() call. This
+     * is also called by the initial open() to set the same subset of state for the first time to
+     * avoid duplicating this code.
+     */
+    void scanResetState(bool reOpen);
 
-    const boost::optional<value::SlotId> _seekKeySlot;
-    const bool _forward;
+    // Only for a resumed scan ("seek"), this sets '_seekRecordId' to the resume point at runtime.
+    void setSeekRecordId();
 
-    // These members are default constructed to boost::none and are initialized when 'prepare()'
-    // is called. Once they are set, they are never modified again.
-    boost::optional<NamespaceString> _collName;
-    boost::optional<uint64_t> _catalogEpoch;
+    // Only for a clustered collection scan, this sets '_minRecordId' to the lower scan bound.
+    void setMinRecordId();
 
-    CollectionPtr _coll;
+    // Only for a clustered collection scan, this sets '_maxRecordId' to the upper scan bound.
+    void setMaxRecordId();
 
-    // If provided, used during a trial run to accumulate certain execution stats. Once the trial
-    // run is complete, this pointer is reset to nullptr.
-    TrialRunTracker* _tracker{nullptr};
+    MONGO_COMPILER_ALWAYS_INLINE
+    value::OwnedValueAccessor* getFieldAccessor(StringData name) {
+        if (size_t pos = _state->scanFieldNames.findPos(name); pos != StringListSet::npos) {
+            return &_scanFieldAccessors[pos];
+        }
+        return nullptr;
+    }
 
-    const ScanCallbacks _scanCallbacks;
+    // Contains unchanging state that will be shared across clones instead of copied.
+    const std::shared_ptr<ScanStageState> _state;
 
-    std::unique_ptr<value::OwnedValueAccessor> _recordAccessor;
-    std::unique_ptr<value::OwnedValueAccessor> _recordIdAccessor;
+    // Holds the current record.
+    value::OwnedValueAccessor _recordAccessor;
+
+    // Holds the RecordId of the current record as a TypeTags::RecordId.
+    value::OwnedValueAccessor _recordIdAccessor;
+    RecordId _recordId;
+
     value::SlotAccessor* _snapshotIdAccessor{nullptr};
-    value::SlotAccessor* _indexIdAccessor{nullptr};
+    value::SlotAccessor* _indexIdentAccessor{nullptr};
     value::SlotAccessor* _indexKeyAccessor{nullptr};
     value::SlotAccessor* _indexKeyPatternAccessor{nullptr};
-    RuntimeEnvironment::Accessor* _oplogTsAccessor{nullptr};
 
-    value::FieldAccessorMap _fieldAccessors;
-    value::SlotAccessorMap _varAccessors;
-    value::SlotAccessor* _seekKeyAccessor{nullptr};
+    // These members hold info about the target fields being scanned from the record.
+    //     '_scanFieldAccessors' - slot accessors corresponding, by index, to _state->scanFieldNames
+    //     '_scanFieldAccessorsMap' - a map from vector index to pointer to the corresponding
+    //         accessor in '_scanFieldAccessors'
+    absl::InlinedVector<value::OwnedValueAccessor, 4> _scanFieldAccessors;
+    value::SlotAccessorMap _scanFieldAccessorsMap;
+
+    // Only for a resumed scan ("seek"). Slot holding the TypeTags::RecordId of the record to resume
+    // the scan from. '_seekRecordId' is the RecordId value, initialized from the slot at runtime.
+    value::SlotAccessor* _seekRecordIdAccessor{nullptr};
+    RecordId _seekRecordId;
+
+    // Only for clustered collection scans, holds the minimum record ID of the scan, if applicable.
+    value::SlotAccessor* _minRecordIdAccessor{nullptr};
+    RecordId _minRecordId;
+
+    // Only for clustered collection scans, holds the maximum record ID of the scan, if applicable.
+    value::SlotAccessor* _maxRecordIdAccessor{nullptr};
+    RecordId _maxRecordId;
+
+    // Only for clustered collection scans: must ScanStage::getNext() include the starting bound?
+    bool _includeScanStartRecordId = true;
+
+    // Only for clustered collection scans: must ScanStage::getNext() include the ending bound?
+    bool _includeScanEndRecordId = true;
+
+    // Only for clustered collection scans: does the scan have an end bound?
+    bool _hasScanEndRecordId = false;
+
+    // Only for clustered collection scans: have we crossed the scan end bound if there is one?
+    bool _havePassedScanEndRecordId = false;
+
+    CollectionRef _coll;
 
     bool _open{false};
-
     std::unique_ptr<SeekableRecordCursor> _cursor;
-    RecordId _key;
+
+    // TODO: SERVER-62647. Consider removing random cursor when no longer needed.
+    std::unique_ptr<RecordCursor> _randomCursor;
+
+    // Tells whether this is the first getNext() call of the scan or after restarting.
     bool _firstGetNext{false};
 
     ScanStats _specificStats;
 
-    // Flag set upon restoring the stage that indicates whether the cursor's position in the
-    // collection is still valid. Only relevant to capped collections.
-    bool _needsToCheckCappedPositionLost = false;
+    StringMap<const IndexCatalogEntry*> _indexCatalogEntryMap;
 
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
     // Debug-only buffer used to track the last thing returned from the stage. Between
     // saves/restores this is used to check that the storage cursor has not changed position.
     std::vector<char> _lastReturned;
 #endif
-};
+};  // class ScanStage
 
 class ParallelScanStage final : public PlanStage {
     struct Range {
@@ -197,40 +354,47 @@ class ParallelScanStage final : public PlanStage {
         RecordId end;
     };
     struct ParallelState {
-        Mutex mutex = MONGO_MAKE_LATCH("ParallelScanStage::ParallelState::mutex");
+        stdx::mutex mutex;
         std::vector<Range> ranges;
         AtomicWord<size_t> currentRange{0};
     };
 
 public:
-    ParallelScanStage(CollectionUUID collectionUuid,
+    ParallelScanStage(UUID collUuid,
+                      DatabaseName dbName,
                       boost::optional<value::SlotId> recordSlot,
                       boost::optional<value::SlotId> recordIdSlot,
                       boost::optional<value::SlotId> snapshotIdSlot,
-                      boost::optional<value::SlotId> indexIdSlot,
+                      boost::optional<value::SlotId> indexIdentSlot,
                       boost::optional<value::SlotId> indexKeySlot,
                       boost::optional<value::SlotId> indexKeyPatternSlot,
-                      std::vector<std::string> fields,
-                      value::SlotVector vars,
+                      std::vector<std::string> scanFieldNames,
+                      value::SlotVector scanFieldSlots,
                       PlanYieldPolicy* yieldPolicy,
                       PlanNodeId nodeId,
-                      ScanCallbacks callbacks);
+                      ScanCallbacks callbacks,
+                      // Optional arguments:
+                      bool participateInTrialRunTracking = true);
 
     ParallelScanStage(const std::shared_ptr<ParallelState>& state,
-                      CollectionUUID collectionUuid,
+                      UUID collUuid,
+                      DatabaseName dbName,
                       boost::optional<value::SlotId> recordSlot,
                       boost::optional<value::SlotId> recordIdSlot,
                       boost::optional<value::SlotId> snapshotIdSlot,
-                      boost::optional<value::SlotId> indexIdSlot,
+                      boost::optional<value::SlotId> indexIdentSlot,
                       boost::optional<value::SlotId> indexKeySlot,
                       boost::optional<value::SlotId> indexKeyPatternSlot,
-                      std::vector<std::string> fields,
-                      value::SlotVector vars,
+                      std::vector<std::string> scanFieldNames,
+                      value::SlotVector scanFieldSlots,
                       PlanYieldPolicy* yieldPolicy,
                       PlanNodeId nodeId,
-                      ScanCallbacks callbacks);
+                      ScanCallbacks callbacks,
+                      // Optional arguments:
+                      bool participateInTrialRunTracking = true);
 
     std::unique_ptr<PlanStage> clone() const final;
+
 
     void prepare(CompileCtx& ctx) final;
     value::SlotAccessor* getAccessor(CompileCtx& ctx, value::SlotId slot) final;
@@ -244,10 +408,11 @@ public:
     size_t estimateCompileTimeSize() const final;
 
 protected:
-    void doSaveState(bool fullSave) final;
-    void doRestoreState(bool fullSave) final;
+    void doSaveState() final;
+    void doRestoreState() final;
     void doDetachFromOperationContext() final;
     void doAttachToOperationContext(OperationContext* opCtx) final;
+    void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override;
 
 private:
     boost::optional<Record> nextRange();
@@ -258,36 +423,47 @@ private:
         _currentRange = std::numeric_limits<std::size_t>::max();
     }
 
-    const CollectionUUID _collUuid;
+    value::OwnedValueAccessor* getFieldAccessor(StringData name);
+
+    const std::shared_ptr<ParallelState> _state;
+
+    const UUID _collUuid;
+    const DatabaseName _dbName;
+
     const boost::optional<value::SlotId> _recordSlot;
     const boost::optional<value::SlotId> _recordIdSlot;
     const boost::optional<value::SlotId> _snapshotIdSlot;
-    const boost::optional<value::SlotId> _indexIdSlot;
+    const boost::optional<value::SlotId> _indexIdentSlot;
     const boost::optional<value::SlotId> _indexKeySlot;
     const boost::optional<value::SlotId> _indexKeyPatternSlot;
-    const std::vector<std::string> _fields;
-    const value::SlotVector _vars;
 
-    // These members are default constructed to boost::none and are initialized when 'prepare()'
-    // is called. Once they are set, they are never modified again.
-    boost::optional<NamespaceString> _collName;
-    boost::optional<uint64_t> _catalogEpoch;
-
-    CollectionPtr _coll;
-
-    std::shared_ptr<ParallelState> _state;
+    // '_scanFieldNames' - names of the fields being scanned from the doc
+    // '_scanFieldSlots' - slot IDs corresponding, by index, to _scanFieldAccessors
+    const StringListSet _scanFieldNames;
+    const value::SlotVector _scanFieldSlots;
 
     const ScanCallbacks _scanCallbacks;
 
-    std::unique_ptr<value::OwnedValueAccessor> _recordAccessor;
-    std::unique_ptr<value::OwnedValueAccessor> _recordIdAccessor;
+    // Holds the current record.
+    value::OwnedValueAccessor _recordAccessor;
+
+    // Holds the RecordId of the current record as a TypeTags::RecordId.
+    value::OwnedValueAccessor _recordIdAccessor;
+    RecordId _recordId;
+
     value::SlotAccessor* _snapshotIdAccessor{nullptr};
-    value::SlotAccessor* _indexIdAccessor{nullptr};
+    value::SlotAccessor* _indexIdentAccessor{nullptr};
     value::SlotAccessor* _indexKeyAccessor{nullptr};
     value::SlotAccessor* _indexKeyPatternAccessor{nullptr};
 
-    value::FieldAccessorMap _fieldAccessors;
-    value::SlotAccessorMap _varAccessors;
+    // These members hold info about the target fields being scanned from the record.
+    //     '_scanFieldAccessors' - slot accessors corresponding, by index, to _scanFieldNames
+    //     '_scanFieldAccessorsMap' - a map from vector index to pointer to the corresponding
+    //         accessor in '_scanFieldAccessors'
+    absl::InlinedVector<value::OwnedValueAccessor, 4> _scanFieldAccessors;
+    value::SlotAccessorMap _scanFieldAccessorsMap;
+
+    CollectionRef _coll;
 
     size_t _currentRange{std::numeric_limits<std::size_t>::max()};
     Range _range;
@@ -296,11 +472,13 @@ private:
 
     std::unique_ptr<SeekableRecordCursor> _cursor;
 
+    StringMap<const IndexCatalogEntry*> _indexCatalogEntryMap;
+
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
     // Debug-only buffer used to track the last thing returned from the stage. Between
     // saves/restores this is used to check that the storage cursor has not changed position.
     std::vector<char> _lastReturned;
 #endif
-};
+};  // class ParallelScanStage
 }  // namespace sbe
 }  // namespace mongo

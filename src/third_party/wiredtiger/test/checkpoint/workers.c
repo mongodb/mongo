@@ -31,7 +31,7 @@
 #define MAX_MODIFY_ENTRIES 5
 
 static char modify_repl[256];
-static int real_worker(void);
+static int real_worker(THREAD_DATA *);
 static WT_THREAD_RET worker(void *);
 
 /*
@@ -43,19 +43,24 @@ create_table(WT_SESSION *session, COOKIE *cookie)
 {
     int ret;
     char config[256];
+    const char *kf, *vf;
+
+    kf = cookie->type == COL || cookie->type == FIX ? "r" : "q";
+    vf = cookie->type == FIX ? "8t" : "S";
 
     /*
      * If we're using timestamps, turn off logging for the table.
      */
-    if (g.use_timestamps)
-        testutil_check(__wt_snprintf(config, sizeof(config),
-          "key_format=%s,value_format=S,allocation_size=512,"
+    if (g.use_timestamps) {
+        testutil_snprintf(config, sizeof(config),
+          "key_format=%s,value_format=%s,allocation_size=512,"
           "leaf_page_max=1KB,internal_page_max=1KB,"
-          "memory_page_max=64KB,log=(enabled=false),%s",
-          cookie->type == COL ? "r" : "q", cookie->type == LSM ? ",type=lsm" : ""));
-    else
-        testutil_check(__wt_snprintf(config, sizeof(config), "key_format=%s,value_format=S,%s",
-          cookie->type == COL ? "r" : "q", cookie->type == LSM ? ",type=lsm" : ""));
+          "memory_page_max=64KB,log=(enabled=false)",
+          kf, vf);
+        if (g.opts.disagg_storage)
+            testutil_strcat(config, sizeof(config), ",type=layered,block_manager=disagg");
+    } else
+        testutil_snprintf(config, sizeof(config), "key_format=%s,value_format=%s", kf, vf);
 
     if ((ret = session->create(session, cookie->uri, config)) != 0)
         if (ret != EEXIST)
@@ -115,9 +120,9 @@ start_workers(void)
 
     (void)gettimeofday(&start, NULL);
 
-    /* Create threads. */
+    /* Create threads. The N workers have ID 0 to N - 1. */
     for (i = 0; i < g.nworkers; ++i)
-        testutil_check(__wt_thread_create(NULL, &tids[i], worker, &g.cookies[i]));
+        testutil_check(__wt_thread_create(NULL, &tids[i], worker, &g.td[i]));
 
     /* Wait for the threads. */
     for (i = 0; i < g.nworkers; ++i)
@@ -126,6 +131,7 @@ start_workers(void)
     (void)gettimeofday(&stop, NULL);
     seconds = (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) * 1e-6;
     printf("Ran workers for: %f seconds\n", seconds);
+    fflush(stdout);
 
 err:
     free(tids);
@@ -155,11 +161,11 @@ modify_build(WT_MODIFY *entries, int *nentriesp, u_int seed)
 }
 
 /*
- * worker_mm_delete --
- *     Delete a key with a mixed mode timestamp.
+ * worker_no_ts_delete --
+ *     Delete a key without setting a timestamp.
  */
 static inline int
-worker_mm_delete(WT_CURSOR *cursor, uint64_t keyno)
+worker_no_ts_delete(WT_CURSOR *cursor, uint64_t keyno)
 {
     int ret;
 
@@ -167,10 +173,23 @@ worker_mm_delete(WT_CURSOR *cursor, uint64_t keyno)
     ret = cursor->search(cursor);
     if (ret == 0)
         ret = cursor->remove(cursor);
-    else if (ret == WT_NOTFOUND)
+    if (ret == WT_NOTFOUND)
         ret = 0;
 
     return (ret);
+}
+
+/*
+ * cursor_fix_at_zero --
+ *     Check if we're on a zero (deleted) value. FLCS only.
+ */
+static bool
+cursor_fix_at_zero(WT_CURSOR *cursor)
+{
+    uint8_t val;
+
+    testutil_check(cursor->get_value(cursor, &val));
+    return (val == 0);
 }
 
 /*
@@ -178,9 +197,10 @@ worker_mm_delete(WT_CURSOR *cursor, uint64_t keyno)
  *     Write operation.
  */
 static inline int
-worker_op(WT_CURSOR *cursor, uint64_t keyno, u_int new_val)
+worker_op(WT_CURSOR *cursor, table_type type, uint64_t keyno, u_int new_val)
 {
     WT_MODIFY entries[MAX_MODIFY_ENTRIES];
+    uint8_t val8;
     int cmp, ret;
     int nentries;
     char valuebuf[64];
@@ -195,7 +215,18 @@ worker_op(WT_CURSOR *cursor, uint64_t keyno, u_int new_val)
                 return (WT_ROLLBACK);
             return (log_print_err("cursor.search_near", ret, 1));
         }
+
+        /* Retry the result of search_near again to confirm the result. */
+        if (new_val % 2 == 0) {
+            if ((ret = cursor->search(cursor)) != 0) {
+                if (ret == WT_ROLLBACK)
+                    return (WT_ROLLBACK);
+                return (log_print_err("cursor.search", ret, 1));
+            }
+        }
+
         if (cmp < 0) {
+            /* Advance to the next key that exists. */
             if ((ret = cursor->next(cursor)) != 0) {
                 if (ret == WT_NOTFOUND)
                     return (0);
@@ -203,9 +234,22 @@ worker_op(WT_CURSOR *cursor, uint64_t keyno, u_int new_val)
                     return (WT_ROLLBACK);
                 return (log_print_err("cursor.next", ret, 1));
             }
+        } else if (type == FIX) {
+            /* To match what happens in VAR and ROW, advance to the next nonzero key. */
+            while (cursor_fix_at_zero(cursor))
+                if ((ret = cursor->next(cursor)) != 0) {
+                    if (ret == WT_NOTFOUND)
+                        return (0);
+                    if (ret == WT_ROLLBACK)
+                        return (WT_ROLLBACK);
+                    return (log_print_err("cursor.next", ret, 1));
+                }
         }
+
         for (int i = 10; i > 0; i--) {
             if ((ret = cursor->remove(cursor)) != 0) {
+                if (ret == WT_NOTFOUND)
+                    return (0);
                 if (ret == WT_ROLLBACK)
                     return (WT_ROLLBACK);
                 return (log_print_err("cursor.remove", ret, 1));
@@ -216,6 +260,17 @@ worker_op(WT_CURSOR *cursor, uint64_t keyno, u_int new_val)
                 if (ret == WT_ROLLBACK)
                     return (WT_ROLLBACK);
                 return (log_print_err("cursor.next", ret, 1));
+            }
+            if (type == FIX) {
+                /* To match what happens in VAR and ROW, advance to the next nonzero key. */
+                while (cursor_fix_at_zero(cursor))
+                    if ((ret = cursor->next(cursor)) != 0) {
+                        if (ret == WT_NOTFOUND)
+                            return (0);
+                        if (ret == WT_ROLLBACK)
+                            return (WT_ROLLBACK);
+                        return (log_print_err("cursor.next", ret, 1));
+                    }
             }
         }
         if (g.sweep_stress)
@@ -229,27 +284,40 @@ worker_op(WT_CURSOR *cursor, uint64_t keyno, u_int new_val)
         if (g.sweep_stress)
             testutil_check(cursor->reset(cursor));
     } else {
-        if (new_val % 39 < 30) {
-            // Do modify
+        /* FIXME-WT-14467 should fix cursor->modify for layered tables. */
+        if (new_val % 39 < 30 && !g.opts.disagg_storage) {
+            /* Do modify. */
             ret = cursor->search(cursor);
-            if (ret == 0) {
+            if (ret == 0 && (type != FIX || !cursor_fix_at_zero(cursor))) {
                 modify_build(entries, &nentries, new_val);
-                if ((ret = cursor->modify(cursor, entries, nentries)) != 0) {
+                if (type == FIX) {
+                    /* Deleted (including not-yet-written) values read back as 0; accommodate. */
+                    ret = cursor->get_value(cursor, &val8);
+                    if (ret != 0)
+                        return (log_print_err("cursor.get_value", ret, 1));
+                    cursor->set_value(cursor, flcs_modify(entries, nentries, val8));
+                    ret = cursor->update(cursor);
+                } else
+                    ret = cursor->modify(cursor, entries, nentries);
+                if (ret != 0) {
                     if (ret == WT_ROLLBACK)
                         return (WT_ROLLBACK);
                     return (log_print_err("cursor.modify", ret, 1));
                 }
                 return (0);
-            } else if (ret != WT_NOTFOUND) {
+            } else if (ret != 0 && ret != WT_NOTFOUND) {
                 if (ret == WT_ROLLBACK || ret == WT_PREPARE_CONFLICT)
                     return (WT_ROLLBACK);
                 return (log_print_err("cursor.search", ret, 1));
             }
         }
 
-        // If key doesn't exist, turn modify into an insert.
-        testutil_check(__wt_snprintf(valuebuf, sizeof(valuebuf), "%052u", new_val));
-        cursor->set_value(cursor, valuebuf);
+        /* If key doesn't exist, turn modify into an insert. */
+        testutil_snprintf(valuebuf, sizeof(valuebuf), "%052u", new_val);
+        if (type == FIX)
+            cursor->set_value(cursor, flcs_encode(valuebuf));
+        else
+            cursor->set_value(cursor, valuebuf);
         if ((ret = cursor->insert(cursor)) != 0) {
             if (ret == WT_ROLLBACK)
                 return (WT_ROLLBACK);
@@ -267,14 +335,17 @@ worker_op(WT_CURSOR *cursor, uint64_t keyno, u_int new_val)
 static WT_THREAD_RET
 worker(void *arg)
 {
+    THREAD_DATA *td;
     char tid[128];
 
-    WT_UNUSED(arg);
+    td = (THREAD_DATA *)arg;
 
     testutil_check(__wt_thread_str(tid, sizeof(tid)));
-    printf("worker thread starting: tid: %s\n", tid);
+    printf("worker thread starting: tid: %s key-range: %" PRIu32 " - %" PRIu32 "\n", tid,
+      td->start_key, td->start_key + td->key_range);
+    fflush(stdout);
 
-    (void)real_worker();
+    (void)real_worker(td);
     return (WT_THREAD_RET_VALUE);
 }
 
@@ -283,21 +354,22 @@ worker(void *arg)
  *     A single worker thread that transactionally updates all tables with consistent values.
  */
 static int
-real_worker(void)
+real_worker(THREAD_DATA *td)
 {
     WT_CURSOR **cursors;
-    WT_RAND_STATE rnd;
     WT_SESSION *session;
+    uint64_t base_ts, prepared_id;
     u_int i, keyno, next_rnd;
     int j, ret, t_ret;
     char buf[128];
-    const char *begin_cfg;
-    bool reopen_cursors, new_txn, start_txn;
+    const char *begin_cfg, *rollback_cfg;
+    bool prepared, reopen_cursors, new_txn, start_txn;
 
     ret = t_ret = 0;
     reopen_cursors = false;
     start_txn = true;
     new_txn = false;
+    prepared = false;
 
     if ((cursors = calloc((size_t)(g.ntables), sizeof(WT_CURSOR *))) == NULL)
         return (log_print_err("malloc", ENOMEM, 1));
@@ -307,12 +379,19 @@ real_worker(void)
         goto err;
     }
 
-    if (g.use_timestamps)
-        begin_cfg = "read_timestamp=1,roundup_timestamps=(read=true)";
-    else
-        begin_cfg = NULL;
-
-    __wt_random_init_seed((WT_SESSION_IMPL *)session, &rnd);
+    begin_cfg = NULL;
+    if (g.use_timestamps) {
+        if (g.no_ts_deletes)
+            begin_cfg = "no_timestamp=true,read_timestamp=1,roundup_timestamps=(read=true)";
+        else if (!g.predictable_replay)
+            begin_cfg = "read_timestamp=1,roundup_timestamps=(read=true)";
+        /*
+         * Note: For predictable replays we do not specify a read timestamp, hence reading the
+         * latest committed values. This is important for a predictable outcome as reading at the
+         * oldest timestamp depends on where the clock and the checkpoint threads have placed the
+         * oldest at this moment.
+         */
+    }
 
     for (j = 0; j < g.ntables; j++)
         if ((ret = session->open_cursor(session, g.cookies[j].uri, NULL, NULL, &cursors[j])) != 0) {
@@ -320,7 +399,17 @@ real_worker(void)
             goto err;
         }
 
-    for (i = 0; i < g.nops && g.running; ++i, __wt_yield()) {
+    for (i = 0; g.opts.running; ++i, __wt_yield()) {
+        /*
+         * If a stop timestamp has been provided, the workers will continue to run until the clock
+         * thread reaches a stable equal to the stop timestamp. Ignore the provided operation count
+         * in such a case.
+         */
+        if (g.stop_ts == 0 && i >= g.nops)
+            break;
+
+        if (i > 0 && i % (5 * WT_THOUSAND) == 0)
+            printf("Worker %u of %u ops\n", i, g.nops);
         if (start_txn) {
             if ((ret = session->begin_transaction(session, begin_cfg)) != 0) {
                 (void)log_print_err("real_worker:begin_transaction", ret, 1);
@@ -328,13 +417,15 @@ real_worker(void)
             }
             new_txn = true;
             start_txn = false;
+            prepared = false;
         }
-        keyno = __wt_random(&rnd) % g.nkeys + 1;
+        keyno = __wt_random(&td->data_rnd) % td->key_range + td->start_key;
         /* If we have specified to run with mix mode deletes we need to do it in it's own txn. */
-        if (g.use_timestamps && g.mixed_mode_deletes && new_txn && __wt_random(&rnd) % 72 == 0) {
+        if (g.use_timestamps && g.no_ts_deletes && new_txn &&
+          __wt_random(&td->data_rnd) % 72 == 0) {
             new_txn = false;
             for (j = 0; j < g.ntables; j++) {
-                ret = worker_mm_delete(cursors[j], keyno);
+                ret = worker_no_ts_delete(cursors[j], keyno);
                 if (ret == WT_ROLLBACK || ret == WT_PREPARE_CONFLICT)
                     break;
                 else if (ret != 0)
@@ -343,12 +434,12 @@ real_worker(void)
 
             if (ret == 0) {
                 if ((ret = session->commit_transaction(session, NULL)) != 0) {
-                    (void)log_print_err("real_worker:commit_mm_transaction", ret, 1);
+                    (void)log_print_err("real_worker:commit_no_ts_transaction", ret, 1);
                     goto err;
                 }
             } else {
                 if ((ret = session->rollback_transaction(session, NULL)) != 0) {
-                    (void)log_print_err("real_worker:rollback_transaction", ret, 1);
+                    (void)log_print_err("real_worker:rollback_no_ts_transaction", ret, 1);
                     goto err;
                 }
             }
@@ -358,53 +449,81 @@ real_worker(void)
             new_txn = false;
 
         for (j = 0; ret == 0 && j < g.ntables; j++)
-            ret = worker_op(cursors[j], keyno, i);
+            ret = worker_op(cursors[j], g.cookies[j].type, keyno, i);
         if (ret != 0 && ret != WT_ROLLBACK) {
             (void)log_print_err("worker op failed", ret, 1);
             goto err;
         } else if (ret == 0) {
-            next_rnd = __wt_random(&rnd);
+            next_rnd = __wt_random(&td->data_rnd);
             if (next_rnd % 7 == 0) {
                 if (g.use_timestamps) {
-                    if (__wt_try_readlock((WT_SESSION_IMPL *)session, &g.clock_lock) == 0) {
-                        next_rnd = __wt_random(&rnd);
+                    /*
+                     * For a predictable run, the timestamps for worker's operations are managed by
+                     * reserving them across the threads and the iterations, such that they don't
+                     * overlap. For a regular run, the timestamp thread manages the advance of the
+                     * global clock. The workers synchronize with the clock using a reader - writer
+                     * lock, and decide the operation timestamp based on the global clock.
+                     */
+                    if (g.predictable_replay ||
+                      (__wt_try_readlock((WT_SESSION_IMPL *)session, &g.clock_lock) == 0)) {
+                        if (g.predictable_replay)
+                            /* i + 1 because we don't want a thread to start with commit-ts of 1 */
+                            base_ts = RESERVED_TIMESTAMPS_FOR_ITERATION(g.nworkers, td, i + 1);
+                        else
+                            base_ts = g.ts_stable + 1;
+                        next_rnd = __wt_random(&td->data_rnd);
                         if (g.prepare && next_rnd % 2 == 0) {
-                            testutil_check(__wt_snprintf(
-                              buf, sizeof(buf), "prepare_timestamp=%x", g.ts_stable + 1));
+                            prepared_id = __wt_atomic_addv64(&g.prepared_id, 1);
+                            testutil_snprintf(buf, sizeof(buf),
+                              "prepare_timestamp=%" PRIx64 ",prepared_id=%" PRIx64, base_ts,
+                              prepared_id);
                             if ((ret = session->prepare_transaction(session, buf)) != 0) {
-                                __wt_readunlock((WT_SESSION_IMPL *)session, &g.clock_lock);
+                                if (!g.predictable_replay)
+                                    __wt_readunlock((WT_SESSION_IMPL *)session, &g.clock_lock);
                                 (void)log_print_err("real_worker:prepare_transaction", ret, 1);
                                 goto err;
                             }
-                            testutil_check(__wt_snprintf(buf, sizeof(buf),
-                              "durable_timestamp=%x,commit_timestamp=%x", g.ts_stable + 3,
-                              g.ts_stable + 1));
+                            testutil_snprintf(buf, sizeof(buf),
+                              "durable_timestamp=%" PRIx64 ",commit_timestamp=%" PRIx64,
+                              base_ts + 2, base_ts);
+                            prepared = true;
                         } else
-                            testutil_check(__wt_snprintf(
-                              buf, sizeof(buf), "commit_timestamp=%x", g.ts_stable + 1));
+                            testutil_snprintf(
+                              buf, sizeof(buf), "commit_timestamp=%" PRIx64, base_ts);
 
-                        // Commit majority of times
+                        /* Commit majority of times. */
                         if (next_rnd % 49 != 0) {
                             if ((ret = session->commit_transaction(session, buf)) != 0) {
-                                __wt_readunlock((WT_SESSION_IMPL *)session, &g.clock_lock);
+                                if (!g.predictable_replay)
+                                    __wt_readunlock((WT_SESSION_IMPL *)session, &g.clock_lock);
                                 (void)log_print_err("real_worker:commit_transaction", ret, 1);
                                 goto err;
                             }
+                            if (g.predictable_replay)
+                                WT_RELEASE_WRITE_WITH_BARRIER(td->ts, base_ts);
                         } else {
-                            if ((ret = session->rollback_transaction(session, NULL)) != 0) {
-                                __wt_readunlock((WT_SESSION_IMPL *)session, &g.clock_lock);
+                            if (prepared) {
+                                testutil_snprintf(
+                                  buf, sizeof(buf), "rollback_timestamp=%" PRIx64, base_ts + 2);
+                                rollback_cfg = buf;
+                            } else
+                                rollback_cfg = NULL;
+                            if ((ret = session->rollback_transaction(session, rollback_cfg)) != 0) {
+                                if (!g.predictable_replay)
+                                    __wt_readunlock((WT_SESSION_IMPL *)session, &g.clock_lock);
                                 (void)log_print_err("real_worker:rollback_transaction", ret, 1);
                                 goto err;
                             }
                         }
-                        __wt_readunlock((WT_SESSION_IMPL *)session, &g.clock_lock);
+                        if (!g.predictable_replay)
+                            __wt_readunlock((WT_SESSION_IMPL *)session, &g.clock_lock);
                         start_txn = true;
                         /* Occasionally reopen cursors after transaction finish. */
                         if (next_rnd % 13 == 0)
                             reopen_cursors = true;
                     }
                 } else {
-                    // Commit majority of times
+                    /* Commit majority of times. */
                     if (next_rnd % 49 != 0) {
                         if ((ret = session->commit_transaction(session, NULL)) != 0) {
                             (void)log_print_err("real_worker:commit_transaction", ret, 1);

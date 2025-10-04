@@ -27,11 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/logv2/log_severity.h"
-
-#include <iostream>
 
 namespace mongo::logv2 {
 

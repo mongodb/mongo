@@ -32,6 +32,7 @@ types:
         description: "A BSON UTF-8 string"
         cpp_type: "std::string"
         deserializer: "mongo::BSONElement::str"
+        is_view: false
 
 structs:
     ErrorReply:
@@ -40,11 +41,13 @@ structs:
         fields:
             errorLabels:
                 type: StructType
-    
+                stability: stable
+
     StructType:
         description: "This struct contains a field that is optional in the old
-                      command and non-optional in the new command."
+            command and non-optional in the new command."
         fields:
             structField:
                 type: string
                 optional: true
+                stability: stable

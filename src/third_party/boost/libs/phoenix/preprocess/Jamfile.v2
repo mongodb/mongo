@@ -1,0 +1,41 @@
+# (C) Copyright 2012: Eric Niebler
+# Distributed under the Boost Software License, Version 1.0.
+# (See accompanying file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
+
+# Generates preprocessed files with wave.
+
+project : requirements <link>static <variant>release ;
+
+import feature ;
+import toolset ;
+
+feature.feature phoenix-limit : : free ;
+toolset.flags wave PHOENIX-LIMIT <phoenix-limit> ;
+
+actions wave bind PHOENIX-LIMIT
+{
+  echo Preprocessing with BOOST_PHOENIX_LIMIT=$(PHOENIX-LIMIT)...
+  $(>[2]) -o- -DBOOST_PHOENIX_LIMIT=$(PHOENIX-LIMIT) --config-file wave.cfg $(>[1])
+}
+
+W = /boost/libs/wave/tool//wave ;
+
+make preprocess_phoenix_10
+  : preprocess_phoenix.cpp $(W) : wave : <phoenix-limit>10
+  ;
+
+make preprocess_phoenix_20
+  : preprocess_phoenix.cpp $(W) : wave : <phoenix-limit>20
+  ;
+
+make preprocess_phoenix_30
+  : preprocess_phoenix.cpp $(W) : wave : <phoenix-limit>30
+  ;
+
+make preprocess_phoenix_40
+  : preprocess_phoenix.cpp $(W) : wave : <phoenix-limit>40
+  ;
+
+make preprocess_phoenix_50
+  : preprocess_phoenix.cpp $(W) : wave : <phoenix-limit>50
+  ;

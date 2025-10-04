@@ -27,26 +27,27 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/util/net/ssl_options.h"
-
-#include <boost/filesystem/operations.hpp>
-
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/config.h"
 #include "mongo/db/auth/auth_options_gen.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/net/ssl_options.h"
 #include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/options_parser/startup_options.h"
-#include "mongo/util/text.h"
+
+#include <absl/strings/str_split.h>
+#include <boost/filesystem/operations.hpp>
 
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
 #include <openssl/ssl.h>
 #endif
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
+
 
 namespace moe = mongo::optionenvironment;
 using std::string;
@@ -57,7 +58,7 @@ namespace mongo {
 Status storeTLSLogVersion(const std::string& loggedProtocols) {
     // The tlsLogVersion field is composed of a comma separated list of protocols to
     // log. First, tokenize the field.
-    const auto tokens = StringSplitter::split(loggedProtocols, ",");
+    const auto tokens = absl::StrSplit(loggedProtocols, ",", absl::SkipEmpty());
 
     // All universally accepted tokens, and their corresponding enum representation.
     const std::map<std::string, SSLParams::Protocols> validConfigs{
@@ -68,7 +69,8 @@ Status storeTLSLogVersion(const std::string& loggedProtocols) {
     };
 
     // Map the tokens to their enum values, and push them onto the list of logged protocols.
-    for (const std::string& token : tokens) {
+    for (const auto& t : tokens) {
+        std::string token(t);
         auto mappedToken = validConfigs.find(token);
         if (mappedToken != validConfigs.end()) {
             sslGlobalParams.tlsLogVersions.push_back(mappedToken->second);
@@ -84,6 +86,7 @@ Status storeTLSLogVersion(const std::string& loggedProtocols) {
 namespace {
 
 bool gImplicitDisableTLS10 = false;
+bool gImplicitDisableTLS11 = false;
 
 // storeSSLServerOptions depends on serverGlobalParams.clusterAuthMode
 // and IDL based storage actions, and therefore must run later.
@@ -166,6 +169,12 @@ MONGO_STARTUP_OPTIONS_POST(SSLServerOptions)(InitializerContext*) {
         gImplicitDisableTLS10 = true;
         sslGlobalParams.sslDisabledProtocols.push_back(SSLParams::Protocols::TLS1_0);
 #endif
+#if (MONGO_CONFIG_SSL_PROVIDER != MONGO_CONFIG_SSL_PROVIDER_OPENSSL) || \
+    (OPENSSL_VERSION_NUMBER >= 0x1000106f) /* 1.0.1f */
+        // Disables TLS 1.1 as well for platforms which support TLS 1.2 and later.
+        gImplicitDisableTLS11 = true;
+        sslGlobalParams.sslDisabledProtocols.push_back(SSLParams::Protocols::TLS1_1);
+#endif
     }
 
     if (params.count("net.tls.logVersions")) {
@@ -192,13 +201,26 @@ MONGO_STARTUP_OPTIONS_POST(SSLServerOptions)(InitializerContext*) {
 
     const auto clusterAuthMode = serverGlobalParams.startupClusterAuthMode;
     if (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled) {
+        uassert(ErrorCodes::InvalidOptions,
+                "Specifying a tlsClusterCAFile requires a tlsCAFile also be specified. See  "
+                "https://dochub.mongodb.org/core/mongod"
+                "#std-option-mongod.--tlsClusterCAFile for details.",
+                sslGlobalParams.sslClusterCAFile.empty() || !sslGlobalParams.sslCAFile.empty());
+        uassert(ErrorCodes::InvalidOptions,
+                "The use of both a CA File and the System Certificate store is not supported.",
+                !sslGlobalParams.sslUseSystemCA || sslGlobalParams.sslCAFile.empty());
+        uassert(ErrorCodes::InvalidOptions,
+                "The use of TLS without specifying a chain of trust is no longer supported. See "
+                "https://jira.mongodb.org/browse/SERVER-72839 for details.",
+                sslGlobalParams.sslUseSystemCA || !sslGlobalParams.sslCAFile.empty());
+        if (!sslGlobalParams.sslCRLFile.empty() && sslGlobalParams.sslCAFile.empty()) {
+            uasserted(ErrorCodes::BadValue,
+                      "Specifying a tlsCRLFile requires a tlsCAFile also be specified.");
+        }
         bool usingCertifiateSelectors = params.count("net.tls.certificateSelector");
         if (sslGlobalParams.sslPEMKeyFile.size() == 0 && !usingCertifiateSelectors) {
             uasserted(ErrorCodes::BadValue,
                       "need tlsCertificateKeyFile or certificateSelector when TLS is enabled");
-        }
-        if (!sslGlobalParams.sslCRLFile.empty() && sslGlobalParams.sslCAFile.empty()) {
-            uasserted(ErrorCodes::BadValue, "need tlsCAFile with tlsCRLFile");
         }
 
         std::string sslCANotFoundError(
@@ -239,6 +261,23 @@ MONGO_STARTUP_OPTIONS_POST(SSLServerOptions)(InitializerContext*) {
         }
     }
 
+    if (params.count("net.tls.clusterAuthX509.extensionValue")) {
+        uassert(ErrorCodes::BadValue,
+                "net.tls.clusterAuthX509.extensionValue requires "
+                "a clusterAuthMode which allows for usage of X509",
+                clusterAuthMode.allowsX509());
+        sslGlobalParams.clusterAuthX509ExtensionValue =
+            params["net.tls.clusterAuthX509.extensionValue"].as<std::string>();
+    }
+
+    if (params.count("net.tls.clusterAuthX509.attributes")) {
+        uassert(ErrorCodes::BadValue,
+                "Cannot set clusterAuthX509.attributes when clusterAuthMode does not allow X.509",
+                clusterAuthMode.allowsX509());
+        sslGlobalParams.clusterAuthX509Attributes =
+            params["net.tls.clusterAuthX509.attributes"].as<std::string>();
+    }
+
     if (sslGlobalParams.sslMode.load() == SSLParams::SSLMode_allowSSL) {
         // allowSSL and x509 is valid only when we are transitioning to auth.
         if (clusterAuthMode.sendsX509() && !serverGlobalParams.transitionToAuth) {
@@ -272,7 +311,7 @@ Status canonicalizeSSLServerOptions(moe::Environment* params) {
             return ret;
         }
 
-        if (StringData(mode).endsWith("SSL")) {
+        if (StringData(mode).ends_with("SSL")) {
             mode.replace(mode.size() - 3, 3, "TLS");
         }
 
@@ -326,10 +365,16 @@ MONGO_STARTUP_OPTIONS_VALIDATE(SSLServerOptions)(InitializerContext*) {
 // it goes to the right place.
 MONGO_INITIALIZER_WITH_PREREQUISITES(ImplicitDisableTLS10Warning, ("ServerLogRedirection"))
 (InitializerContext*) {
-    if (gImplicitDisableTLS10) {
+
+    if (gImplicitDisableTLS11) {
+        LOGV2(97374,
+              "Automatically disabling TLS 1.0 and TLS 1.1, "
+              "to force-enable TLS 1.1 specify --sslDisabledProtocols 'TLS1_0'; "
+              "to force-enable TLS 1.0 specify --sslDisabledProtocols 'none'");
+    } else if (gImplicitDisableTLS10) {
         LOGV2(23285,
-              "Automatically disabling TLS 1.0, to force-enable TLS 1.0 "
-              "specify --sslDisabledProtocols 'none'");
+              "Automatically disabling TLS 1.0, "
+              "to force-enable TLS 1.0 specify --sslDisabledProtocols 'none'");
     }
 }
 

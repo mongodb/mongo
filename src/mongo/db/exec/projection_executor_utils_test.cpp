@@ -27,14 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/projection_executor_utils.h"
-#include "mongo/db/matcher/expression_parser.h"
+
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+
+#include <limits>
+#include <memory>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::projection_executor_utils {
 namespace positional_projection_tests {
@@ -205,28 +217,30 @@ TEST(ElemMatchProjection, CanMergeWithExistingFieldsInInputDocument) {
                                          "{bar: 6, z: 6}, {bar: 10, z: 10}]}")}));
 }
 
-TEST(ElemMatchProjection, RertursEmptyValuefItContainsNumericSubfield) {
-    ASSERT_VALUE_EQ(
-        {}, applyElemMatch(fromjson("{$gt: 2}"), "foo", Document{BSON("foo" << BSON(0 << 3))}));
+TEST(ElemMatchProjection, ReturnsEmptyValueIfItContainsNumericSubfield) {
+    ASSERT_VALUE_EQ({},
+                    applyElemMatch(fromjson("{$gt: 2}"),
+                                   "foo",
+                                   Document{BSON("foo" << BSON(StringData{} << 3))}));
 
     ASSERT_VALUE_EQ({},
                     applyElemMatch(fromjson("{$gt: 2}"),
                                    "foo",
-                                   Document{BSON("bar" << 1 << "foo" << BSON(0 << 3))}));
+                                   Document{BSON("bar" << 1 << "foo" << BSON(StringData{} << 3))}));
 }
 }  // namespace elem_match_projection_tests
 
 namespace slice_projection_tests {
 DEATH_TEST_REGEX(SliceProjection,
                  ShouldFailIfNegativeLimitSpecifiedWithPositiveSkip,
-                 "Invariant failure.*limit >= 0") {
+                 "Tripwire assertion.*7241701") {
     auto doc = Document{fromjson("{a: [1,2,3,4]}")};
     projection_executor_utils::applyFindSliceProjection(doc, "a", 1, -1);
 }
 
 DEATH_TEST_REGEX(SliceProjection,
                  ShouldFailIfNegativeLimitSpecifiedWithNegativeSkip,
-                 "Invariant failure.*limit >= 0") {
+                 "Tripwire assertion.*7241701") {
     auto doc = Document{fromjson("{a: [1,2,3,4]}")};
     projection_executor_utils::applyFindSliceProjection(doc, "a", -1, -1);
 }

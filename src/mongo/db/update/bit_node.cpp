@@ -27,18 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/update/bit_node.h"
 
-#include "mongo/bson/mutable/algorithm.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/mutable_bson/algorithm.h"
+#include "mongo/db/exec/mutable_bson/document.h"
+#include "mongo/util/str.h"
+
+#include <cstdint>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
 Status BitNode::init(BSONElement modExpr, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     invariant(modExpr.ok());
 
-    if (modExpr.type() != mongo::Object) {
+    if (modExpr.type() != BSONType::object) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "The $bit modifier is not compatible with a "
                                     << typeName(modExpr.type())
@@ -64,7 +70,7 @@ Status BitNode::init(BSONElement modExpr, const boost::intrusive_ptr<ExpressionC
                               << "}");
         }
 
-        if ((curOp.type() != mongo::NumberInt) && (curOp.type() != mongo::NumberLong)) {
+        if ((curOp.type() != BSONType::numberInt) && (curOp.type() != BSONType::numberLong)) {
             return Status(ErrorCodes::BadValue,
                           str::stream()
                               << "The $bit modifier field must be an Integer(32/64 bit); a '"

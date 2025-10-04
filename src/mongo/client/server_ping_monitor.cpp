@@ -27,30 +27,47 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
-
-#include <iterator>
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/client/server_ping_monitor.h"
 
-#include "mongo/client/sdam/sdam.h"
-#include "mongo/executor/network_interface_factory.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/sdam/topology_description.h"
 #include "mongo/executor/network_interface_thread_pool.h"
+#include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/metadata/egress_metadata_hook_list.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/str.h"
+#include "mongo/util/timer.h"
+
+#include <cstddef>
+#include <iterator>
+#include <mutex>
+#include <string>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
+
 
 namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(serverPingMonitorFailWithHostUnreachable);
+MONGO_FAIL_POINT_DEFINE(serverPingMonitorSetRTT);
 
-using executor::NetworkInterface;
-using executor::NetworkInterfaceThreadPool;
 using executor::TaskExecutor;
-using executor::ThreadPoolTaskExecutor;
 using CallbackArgs = TaskExecutor::CallbackArgs;
 using CallbackHandle = TaskExecutor::CallbackHandle;
 
@@ -84,11 +101,18 @@ auto SingleServerPingMonitor::_scheduleWorkAt(Date_t when, Callback&& cb) const 
     auto wrappedCallback = [cb = std::forward<Callback>(cb),
                             anchor = shared_from_this()](const CallbackArgs& cbArgs) mutable {
         if (ErrorCodes::isCancellationError(cbArgs.status)) {
+            LOGV2(7926101,
+                  "ServerPingMonitor stopping pings to host because request was cancelled",
+                  "host"_attr = anchor->_hostAndPort,
+                  "status"_attr = cbArgs.status);
             return;
         }
 
         stdx::lock_guard lk(anchor->_mutex);
         if (anchor->_isDropped) {
+            LOGV2(7926102,
+                  "ServerPingMonitor stopping pings to host because the component was shutdown",
+                  "host"_attr = anchor->_hostAndPort);
             return;
         }
         cb(cbArgs);
@@ -110,7 +134,6 @@ void SingleServerPingMonitor::_scheduleServerPing() {
     if (ErrorCodes::isShutdownError(schedulePingHandle.getStatus().code())) {
         LOGV2_DEBUG(23727,
                     kLogLevel,
-                    "Can't schedule ping for {host}. Executor shutdown in progress",
                     "Can't schedule ping for host. Executor shutdown in progress",
                     "host"_attr = _hostAndPort,
                     "replicaSet"_attr = _setUri.getSetName());
@@ -119,7 +142,6 @@ void SingleServerPingMonitor::_scheduleServerPing() {
 
     if (!schedulePingHandle.isOK()) {
         LOGV2_FATAL(23732,
-                    "Can't continue scheduling pings to {host} due to {error}",
                     "Can't continue scheduling pings to host",
                     "host"_attr = _hostAndPort,
                     "error"_attr = redact(schedulePingHandle.getStatus()),
@@ -137,22 +159,35 @@ void SingleServerPingMonitor::_doServerPing() {
     _nextPingStartDate = now() + _pingFrequency;
 
     // Ensure the ping request will timeout if it exceeds _pingFrequency time to complete.
-    auto request = executor::RemoteCommandRequest(
-        HostAndPort(_hostAndPort), "admin", BSON("ping" << 1), nullptr, _pingFrequency);
+    auto request = executor::RemoteCommandRequest(HostAndPort(_hostAndPort),
+                                                  DatabaseName::kAdmin,
+                                                  BSON("ping" << 1),
+                                                  nullptr,
+                                                  _pingFrequency);
     request.sslMode = _setUri.getSSLMode();
 
     auto remotePingHandle = _executor->scheduleRemoteCommand(
-        std::move(request),
+        request,
         [anchor = shared_from_this(),
          timer = Timer()](const executor::TaskExecutor::RemoteCommandCallbackArgs& result) mutable {
             if (ErrorCodes::isCancellationError(result.response.status)) {
                 // Do no more work if the SingleServerPingMonitor is removed or the request is
                 // canceled.
+                LOGV2(7926103,
+                      "ServerPingMonitor stopping pings to host because monitor was removed or "
+                      "request was cancelled",
+                      "host"_attr = anchor->_hostAndPort,
+                      "status"_attr = result.response.status);
                 return;
             }
             {
                 stdx::lock_guard lk(anchor->_mutex);
+                int rttValue = 0;
                 if (anchor->_isDropped) {
+                    LOGV2(7926104,
+                          "ServerPingMonitor stopping pings to host because the component was "
+                          "shutdown",
+                          "host"_attr = anchor->_hostAndPort);
                     return;
                 }
 
@@ -165,6 +200,16 @@ void SingleServerPingMonitor::_doServerPing() {
                         << "Failing the ping command to " << (anchor->_hostAndPort);
                     anchor->_rttListener->onServerPingFailedEvent(
                         anchor->_hostAndPort, {ErrorCodes::HostUnreachable, reason});
+                } else if (MONGO_unlikely(
+                               serverPingMonitorSetRTT.shouldFail([&](const BSONObj& data) {
+                                   if (data.hasField(anchor->_hostAndPort.toString())) {
+                                       rttValue = data.getIntField(anchor->_hostAndPort.toString());
+                                       return true;
+                                   }
+                                   return false;
+                               }))) {
+                    anchor->_rttListener->onServerPingSucceededEvent(Microseconds(rttValue),
+                                                                     anchor->_hostAndPort);
                 } else if (!result.response.isOK()) {
                     anchor->_rttListener->onServerPingFailedEvent(anchor->_hostAndPort,
                                                                   result.response.status);
@@ -179,7 +224,6 @@ void SingleServerPingMonitor::_doServerPing() {
     if (ErrorCodes::isShutdownError(remotePingHandle.getStatus().code())) {
         LOGV2_DEBUG(23728,
                     kLogLevel,
-                    "Can't ping {host}. Executor shutdown in progress",
                     "Can't ping host. Executor shutdown in progress",
                     "host"_attr = _hostAndPort,
                     "replicaSet"_attr = _setUri.getSetName());
@@ -188,7 +232,6 @@ void SingleServerPingMonitor::_doServerPing() {
 
     if (!remotePingHandle.isOK()) {
         LOGV2_FATAL(23733,
-                    "Can't continue pinging {host} due to {error}",
                     "Can't continue pinging host",
                     "host"_attr = _hostAndPort,
                     "error"_attr = redact(remotePingHandle.getStatus()),
@@ -218,7 +261,7 @@ void ServerPingMonitor::shutdown() {
     decltype(_serverPingMonitorMap) serverPingMonitorMap;
     decltype(_executor) executor;
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         if (std::exchange(_isShutdown, true)) {
             return;
         }
@@ -245,7 +288,6 @@ void ServerPingMonitor::onServerHandshakeCompleteEvent(sdam::HelloRTT durationMs
     if (_serverPingMonitorMap.find(address) != _serverPingMonitorMap.end()) {
         LOGV2_DEBUG(466811,
                     kLogLevel + 1,
-                    "ServerPingMonitor already monitoring {host}",
                     "ServerPingMonitor already monitoring host",
                     "host"_attr = address,
                     "replicaSet"_attr = _setUri.getSetName());
@@ -257,7 +299,6 @@ void ServerPingMonitor::onServerHandshakeCompleteEvent(sdam::HelloRTT durationMs
     newSingleMonitor->init();
     LOGV2_DEBUG(23729,
                 kLogLevel,
-                "ServerPingMonitor is now monitoring {host}",
                 "ServerPingMonitor is now monitoring host",
                 "host"_attr = address,
                 "replicaSet"_attr = _setUri.getSetName());
@@ -282,7 +323,6 @@ void ServerPingMonitor::onTopologyDescriptionChangedEvent(
             singleMonitor->drop();
             LOGV2_DEBUG(462899,
                         kLogLevel,
-                        "ServerPingMonitor for host {host} was removed from being monitored",
                         "ServerPingMonitor for host was removed from being monitored",
                         "host"_attr = serverAddress,
                         "replicaSet"_attr = _setUri.getSetName());

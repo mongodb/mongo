@@ -27,28 +27,55 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
-#include "mongo/platform/basic.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
+#include "mongo/db/global_catalog/sharding_catalog_client.h"
+#include "mongo/db/global_catalog/type_collection.h"
+#include "mongo/db/global_catalog/type_collection_gen.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/s/resharding/resharding_manual_cleanup.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/topology/cluster_role.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/s/request_types/cleanup_reshard_collection_gen.h"
+#include "mongo/s/resharding/type_collection_fields_gen.h"
+#include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/namespace_string_util.h"
 
+#include <memory>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/s/config/sharding_catalog_manager.h"
-#include "mongo/db/s/resharding/resharding_manual_cleanup.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/request_types/cleanup_reshard_collection_gen.h"
-#include "mongo/s/resharding/resharding_feature_flag_gen.h"
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
+
 
 namespace mongo {
 namespace {
 
-using namespace fmt::literals;
-
 auto constructFinalMetadataRemovalUpdateOperation(OperationContext* opCtx,
                                                   const NamespaceString& nss) {
-    auto query = BSON(CollectionType::kNssFieldName << nss.toString());
+    auto query = BSON(CollectionType::kNssFieldName
+                      << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
 
     auto collEntryFieldsToUnset = BSON(CollectionType::kReshardingFieldsFieldName
                                        << 1 << CollectionType::kAllowMigrationsFieldName << 1);
@@ -76,19 +103,14 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            uassert(ErrorCodes::CommandNotSupported,
-                    "cleanupReshardCollection command not enabled",
-                    resharding::gFeatureFlagResharding.isEnabled(
-                        serverGlobalParams.featureCompatibility));
-
             uassert(ErrorCodes::IllegalOperation,
                     "_configsvrCleanupReshardCollection can only be run on config servers",
-                    serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+                    serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
 
             repl::ReadConcernArgs::get(opCtx) =
                 repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
-            const auto catalogClient = Grid::get(opCtx)->catalogClient();
+            const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
             auto collEntry = catalogClient->getCollection(opCtx, ns());
             if (!collEntry.getReshardingFields()) {
                 // If the collection entry doesn't have resharding fields, we assume that the
@@ -100,20 +122,24 @@ public:
                 ns(), collEntry.getReshardingFields()->getReshardingUUID());
             cleaner.clean(opCtx);
 
-            ShardingCatalogManager::get(opCtx)->bumpCollectionVersionAndChangeMetadataInTxn(
-                opCtx, ns(), [&](OperationContext* opCtx, TxnNumber txnNumber) {
-                    auto update = constructFinalMetadataRemovalUpdateOperation(opCtx, ns());
-                    auto res = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
-                        opCtx, CollectionType::ConfigNS, update, txnNumber);
-                });
+            ShardingCatalogManager::get(opCtx)
+                ->bumpCollectionPlacementVersionAndChangeMetadataInTxn(
+                    opCtx, ns(), [&](OperationContext* opCtx, TxnNumber txnNumber) {
+                        auto update = constructFinalMetadataRemovalUpdateOperation(opCtx, ns());
+                        auto res = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
+                            opCtx, CollectionType::ConfigNS, update, txnNumber);
+                    });
 
             collEntry = catalogClient->getCollection(opCtx, ns());
 
-            uassert(5403504,
+            uassert(
+                5403504,
+                fmt::format(
                     "Expected collection entry for {} to no longer have resharding metadata, but "
                     "metadata documents still exist; please rerun the cleanupReshardCollection "
-                    "command"_format(ns().toString()),
-                    !collEntry.getReshardingFields());
+                    "command",
+                    ns().toStringForErrorMsg()),
+                !collEntry.getReshardingFields());
         }
 
     private:
@@ -129,8 +155,9 @@ public:
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",
                     AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                           ActionType::internal));
+                        ->isAuthorizedForActionsOnResource(
+                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                            ActionType::internal));
         }
     };
 
@@ -152,7 +179,8 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
-} configsvrCleanupReshardCollectionCmd;
+};
+MONGO_REGISTER_COMMAND(ConfigsvrCleanupReshardCollectionCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

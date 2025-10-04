@@ -60,24 +60,6 @@ class test_reconfig01(wttest.WiredTigerTestCase):
         # Set eviction checkpoint target with an absolute value
         self.conn.reconfigure("eviction_checkpoint_target=50M")
 
-    def test_reconfig_lsm_manager(self):
-        # We create and populate a tiny LSM so that we can start off with
-        # the LSM threads running and change the numbers of threads.
-        # Take all the defaults.
-        uri = "lsm:test_reconfig"
-        nrecs = 10
-        SimpleDataSet(self, uri, nrecs).populate()
-        # Sleep to make sure all threads are started.
-        time.sleep(2)
-        # Now that an LSM tree exists, reconfigure LSM manager threads.
-        # We start with the default, which is 4.  Configure more threads.
-        self.conn.reconfigure("lsm_manager=(worker_thread_max=10)")
-        # Generate some work
-        nrecs = 20
-        SimpleDataSet(self, uri, nrecs).populate()
-        # Now reconfigure fewer threads.
-        self.conn.reconfigure("lsm_manager=(worker_thread_max=3)")
-
     def test_reconfig_statistics(self):
         self.conn.reconfigure("statistics=(all)")
         self.conn.reconfigure("statistics=(fast)")
@@ -104,8 +86,6 @@ class test_reconfig01(wttest.WiredTigerTestCase):
         self.conn.reconfigure("statistics_log=(wait=0)")
         self.conn.reconfigure("statistics_log=(wait=2,on_close=true)")
         self.conn.reconfigure("statistics_log=(wait=0)")
-        self.conn.reconfigure("statistics_log=(wait=2,sources=[lsm:])")
-        self.conn.reconfigure("statistics_log=(wait=0)")
         self.conn.reconfigure("statistics_log=(wait=2,timestamp=\"t%b %d\")")
         self.conn.reconfigure("statistics_log=(wait=0)")
 
@@ -120,6 +100,3 @@ class test_reconfig01(wttest.WiredTigerTestCase):
         self.conn.reconfigure("file_manager=(close_idle_time=4)")
         self.conn.reconfigure(
             "file_manager=(close_idle_time=4,close_scan_interval=100)")
-
-if __name__ == '__main__':
-    wttest.run()

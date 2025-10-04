@@ -29,7 +29,37 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_current_op_gen.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/db/pipeline/stage_constraints.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/db/read_concern_support_result.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/modules.h"
+
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -41,19 +71,31 @@ public:
     using SessionMode = MongoProcessInterface::CurrentOpSessionsMode;
     using UserMode = MongoProcessInterface::CurrentOpUserMode;
     using CursorMode = MongoProcessInterface::CurrentOpCursorMode;
-    using BacktraceMode = MongoProcessInterface::CurrentOpBacktraceMode;
 
     static constexpr StringData kStageName = "$currentOp"_sd;
+
+    static constexpr ConnMode kDefaultConnMode = ConnMode::kExcludeIdle;
+    static constexpr SessionMode kDefaultSessionMode = SessionMode::kIncludeIdle;
+    static constexpr UserMode kDefaultUserMode = UserMode::kExcludeOthers;
+    static constexpr LocalOpsMode kDefaultLocalOpsMode = LocalOpsMode::kRemoteShardOps;
+    static constexpr TruncationMode kDefaultTruncationMode = TruncationMode::kNoTruncation;
+    static constexpr CursorMode kDefaultCursorMode = CursorMode::kExcludeCursors;
 
     class LiteParsed final : public LiteParsedDocumentSource {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
-                                                 const BSONElement& spec);
+                                                 const BSONElement& spec,
+                                                 const LiteParserOptions& options);
 
-        LiteParsed(std::string parseTimeName, UserMode allUsers, LocalOpsMode localOps)
+        LiteParsed(std::string parseTimeName,
+                   const boost::optional<TenantId>& tenantId,
+                   UserMode allUsers,
+                   LocalOpsMode localOps)
             : LiteParsedDocumentSource(std::move(parseTimeName)),
               _allUsers(allUsers),
-              _localOps(localOps) {}
+              _localOps(localOps),
+              _privileges(
+                  {Privilege(ResourcePattern::forClusterResource(tenantId), ActionType::inprog)}) {}
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
             return stdx::unordered_set<NamespaceString>();
@@ -61,69 +103,85 @@ public:
 
         PrivilegeVector requiredPrivileges(bool isMongos,
                                            bool bypassDocumentValidation) const final {
-            PrivilegeVector privileges;
-
             // In a sharded cluster, we always need the inprog privilege to run $currentOp on the
             // shards. If we are only looking up local mongoS operations, we do not need inprog to
             // view our own ops but *do* require it to view other users' ops.
             if (_allUsers == UserMode::kIncludeAll ||
                 (isMongos && _localOps == LocalOpsMode::kRemoteShardOps)) {
-                privileges.push_back({ResourcePattern::forClusterResource(), ActionType::inprog});
+                return _privileges;
             }
 
-            return privileges;
+            return PrivilegeVector();
         }
 
-        bool allowedToPassthroughFromMongos() const final {
-            return _localOps == LocalOpsMode::kRemoteShardOps;
+        bool requiresAuthzChecks() const override {
+            return false;
         }
 
         bool isInitialSource() const final {
             return true;
         }
 
+        bool isExemptFromIngressAdmissionControl() const final {
+            return true;
+        }
+
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
-                                                     bool isImplicitDefault) const {
+                                                     bool isImplicitDefault) const override {
             return onlyReadConcernLocalSupported(kStageName, level, isImplicitDefault);
         }
 
-        void assertSupportsMultiDocumentTransaction() const {
+        void assertSupportsMultiDocumentTransaction() const override {
             transactionNotSupported(kStageName);
         }
 
     private:
         const UserMode _allUsers;
         const LocalOpsMode _localOps;
+        const PrivilegeVector _privileges;
     };
 
     static boost::intrusive_ptr<DocumentSourceCurrentOp> create(
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-        ConnMode includeIdleConnections = ConnMode::kExcludeIdle,
-        SessionMode includeIdleSessions = SessionMode::kIncludeIdle,
-        UserMode includeOpsFromAllUsers = UserMode::kExcludeOthers,
-        LocalOpsMode showLocalOpsOnMongoS = LocalOpsMode::kRemoteShardOps,
-        TruncationMode truncateOps = TruncationMode::kNoTruncation,
-        CursorMode idleCursors = CursorMode::kExcludeCursors,
-        BacktraceMode backtrace = BacktraceMode::kExcludeBacktrace);
+        boost::optional<ConnMode> includeIdleConnections = boost::none,
+        boost::optional<SessionMode> includeIdleSessions = boost::none,
+        boost::optional<UserMode> includeOpsFromAllUsers = boost::none,
+        boost::optional<LocalOpsMode> showLocalOpsOnMongoS = boost::none,
+        boost::optional<TruncationMode> truncateOps = boost::none,
+        boost::optional<CursorMode> idleCursors = boost::none,
+        boost::optional<bool> targetAllNodes = boost::none);
 
     const char* getSourceName() const final;
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
-        StageConstraints constraints(StreamType::kStreaming,
-                                     PositionRequirement::kFirst,
-                                     (_showLocalOpsOnMongoS == LocalOpsMode::kLocalMongosOps
-                                          ? HostTypeRequirement::kLocalOnly
-                                          : HostTypeRequirement::kAnyShard),
-                                     DiskUseRequirement::kNoDiskUse,
-                                     FacetRequirement::kNotAllowed,
-                                     TransactionRequirement::kNotAllowed,
-                                     LookupRequirement::kAllowed,
-                                     (_showLocalOpsOnMongoS == LocalOpsMode::kLocalMongosOps
-                                          ? UnionRequirement::kNotAllowed
-                                          : UnionRequirement::kAllowed));
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
+    }
+
+    StageConstraints constraints(PipelineSplitState pipeState) const final {
+        bool showLocalOps =
+            _showLocalOpsOnMongoS.value_or(kDefaultLocalOpsMode) == LocalOpsMode::kLocalMongosOps;
+        HostTypeRequirement hostTypeRequirement;
+        if (showLocalOps) {
+            hostTypeRequirement = HostTypeRequirement::kLocalOnly;
+        } else if (_targetAllNodes.value_or(false)) {
+            hostTypeRequirement = HostTypeRequirement::kAllShardHosts;
+        } else {
+            hostTypeRequirement = HostTypeRequirement::kAnyShard;
+        }
+        StageConstraints constraints(
+            StreamType::kStreaming,
+            PositionRequirement::kFirst,
+            hostTypeRequirement,
+            DiskUseRequirement::kNoDiskUse,
+            FacetRequirement::kNotAllowed,
+            TransactionRequirement::kNotAllowed,
+            LookupRequirement::kAllowed,
+            (showLocalOps ? UnionRequirement::kNotAllowed : UnionRequirement::kAllowed));
 
         constraints.isIndependentOfAnyCollection = true;
-        constraints.requiresInputDocSource = false;
+        constraints.setConstraintsForNoInputSources();
         return constraints;
     }
 
@@ -134,40 +192,40 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
 private:
+    friend boost::intrusive_ptr<exec::agg::Stage> documentSourceCurrentOpToStageFn(
+        const boost::intrusive_ptr<const DocumentSource>& documentSource);
+
     DocumentSourceCurrentOp(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-                            ConnMode includeIdleConnections,
-                            SessionMode includeIdleSessions,
-                            UserMode includeOpsFromAllUsers,
-                            LocalOpsMode showLocalOpsOnMongoS,
-                            TruncationMode truncateOps,
-                            CursorMode idleCursors,
-                            BacktraceMode backtrace)
+                            boost::optional<ConnMode> includeIdleConnections,
+                            boost::optional<SessionMode> includeIdleSessions,
+                            boost::optional<UserMode> includeOpsFromAllUsers,
+                            boost::optional<LocalOpsMode> showLocalOpsOnMongoS,
+                            boost::optional<TruncationMode> truncateOps,
+                            boost::optional<CursorMode> idleCursors,
+                            boost::optional<bool> targetAllNodes)
         : DocumentSource(kStageName, pExpCtx),
           _includeIdleConnections(includeIdleConnections),
           _includeIdleSessions(includeIdleSessions),
           _includeOpsFromAllUsers(includeOpsFromAllUsers),
-          _showLocalOpsOnMongoS(showLocalOpsOnMongoS),
           _truncateOps(truncateOps),
           _idleCursors(idleCursors),
-          _backtrace(backtrace) {}
+          _showLocalOpsOnMongoS(showLocalOpsOnMongoS),
+          _targetAllNodes(targetAllNodes) {}
 
-    GetNextResult doGetNext() final;
+    // shared with exec::agg::CurrentOpStage
+    boost::optional<ConnMode> _includeIdleConnections;
+    boost::optional<SessionMode> _includeIdleSessions;
+    boost::optional<UserMode> _includeOpsFromAllUsers;
+    boost::optional<TruncationMode> _truncateOps;
+    boost::optional<CursorMode> _idleCursors;
 
-    ConnMode _includeIdleConnections = ConnMode::kExcludeIdle;
-    SessionMode _includeIdleSessions = SessionMode::kIncludeIdle;
-    UserMode _includeOpsFromAllUsers = UserMode::kExcludeOthers;
-    LocalOpsMode _showLocalOpsOnMongoS = LocalOpsMode::kRemoteShardOps;
-    TruncationMode _truncateOps = TruncationMode::kNoTruncation;
-    CursorMode _idleCursors = CursorMode::kExcludeCursors;
-    BacktraceMode _backtrace = BacktraceMode::kExcludeBacktrace;
-
-    std::string _shardName;
-
-    std::vector<BSONObj> _ops;
-    std::vector<BSONObj>::iterator _opsIter;
+    boost::optional<LocalOpsMode> _showLocalOpsOnMongoS;
+    boost::optional<bool> _targetAllNodes;
 };
 
 }  // namespace mongo

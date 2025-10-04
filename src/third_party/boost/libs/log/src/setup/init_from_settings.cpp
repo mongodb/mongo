@@ -37,7 +37,6 @@
 #include <boost/type.hpp>
 #include <boost/limits.hpp>
 #include <boost/cstdint.hpp>
-#include <boost/bind/bind.hpp>
 #include <boost/smart_ptr/make_shared_object.hpp>
 #include <boost/core/null_deleter.hpp>
 #include <boost/optional/optional.hpp>
@@ -841,7 +840,8 @@ BOOST_LOG_SETUP_API void init_from_settings(basic_settings_section< CharT > cons
     if (section sink_params = setts["Sinks"])
     {
         sinks_repo_t& sinks_repo = sinks_repo_t::get();
-        std::vector< shared_ptr< sinks::sink > > new_sinks;
+        typedef std::vector< shared_ptr< sinks::sink > > sink_list_t;
+        sink_list_t new_sinks;
 
         for (typename section::const_iterator it = sink_params.begin(), end = sink_params.end(); it != end; ++it)
         {
@@ -854,7 +854,9 @@ BOOST_LOG_SETUP_API void init_from_settings(basic_settings_section< CharT > cons
             }
         }
 
-        std::for_each(new_sinks.begin(), new_sinks.end(), boost::bind(&core::add_sink, core::get(), boost::placeholders::_1));
+        core_ptr core = boost::log::core::get();
+        for (sink_list_t::const_iterator it = new_sinks.begin(), end = new_sinks.end(); it != end; ++it)
+            core->add_sink(*it);
     }
 }
 
@@ -864,7 +866,7 @@ template< typename CharT >
 BOOST_LOG_SETUP_API void register_sink_factory(const char* sink_name, shared_ptr< sink_factory< CharT > > const& factory)
 {
     sinks_repository< CharT >& repo = sinks_repository< CharT >::get();
-    BOOST_LOG_EXPR_IF_MT(lock_guard< log::aux::light_rw_mutex > lock(repo.m_Mutex);)
+    BOOST_LOG_EXPR_IF_MT(log::aux::exclusive_lock_guard< log::aux::light_rw_mutex > lock(repo.m_Mutex);)
     repo.m_Factories[sink_name] = factory;
 }
 

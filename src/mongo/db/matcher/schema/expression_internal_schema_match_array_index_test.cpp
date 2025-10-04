@@ -27,83 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/bson/json.h"
-#include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/expression_with_placeholder.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_match_array_index.h"
+
+#include "mongo/base/status_with.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/intrusive_counter.h"
+
+#include <string>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace {
-
-TEST(InternalSchemaMatchArrayIndexMatchExpression, RejectsNonArrays) {
-    auto filter = fromjson(
-        "{foo: {$_internalSchemaMatchArrayIndex:"
-        "{index: 0, namePlaceholder: 'i', expression: {i: {$gt: 7}}}}}");
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto expr = MatchExpressionParser::parse(filter, expCtx);
-    ASSERT_OK(expr.getStatus());
-    ASSERT_FALSE(expr.getValue()->matchesBSON(fromjson("{foo: 'blah'}")));
-    ASSERT_FALSE(expr.getValue()->matchesBSON(fromjson("{foo: 7}")));
-    ASSERT_FALSE(expr.getValue()->matchesBSON(fromjson("{foo: {i: []}}")));
-}
-
-TEST(InternalSchemaMatchArrayIndexMatchExpression, MatchesArraysWithMatchingElement) {
-    auto filter = fromjson(
-        "{foo: {$_internalSchemaMatchArrayIndex:"
-        "{index: 0, namePlaceholder: 'i', expression: {i: {$elemMatch: {'bar': 7}}}}}}");
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto expr = MatchExpressionParser::parse(filter, expCtx);
-    ASSERT_OK(expr.getStatus());
-    ASSERT_TRUE(expr.getValue()->matchesBSON(fromjson("{foo: [[{bar: 7}], [{bar: 5}]]}")));
-    ASSERT_TRUE(expr.getValue()->matchesBSON(fromjson("{foo: [[{bar: [3, 5, 7]}], [{bar: 5}]]}")));
-
-    filter = fromjson(
-        "{baz: {$_internalSchemaMatchArrayIndex:"
-        "{index: 2, namePlaceholder: 'i', expression: {i: {$type: 'string'}}}}}");
-    expr = MatchExpressionParser::parse(filter, expCtx);
-    ASSERT_OK(expr.getStatus());
-    ASSERT_TRUE(expr.getValue()->matchesBSON(fromjson("{baz: [0, 1, '2']}")));
-}
-
-TEST(InternalSchemaMatchArrayIndexMatchExpression, DoesNotMatchArrayIfMatchingElementNotAtIndex) {
-    auto filter = fromjson(
-        "{foo: {$_internalSchemaMatchArrayIndex:"
-        "{index: 0, namePlaceholder: 'i', expression: {i: {$lte: 7}}}}}");
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto expr = MatchExpressionParser::parse(filter, expCtx);
-    ASSERT_OK(expr.getStatus());
-    ASSERT_FALSE(expr.getValue()->matchesBSON(fromjson("{foo: [33, 0, 1, 2]}")));
-
-    filter = fromjson(
-        "{foo: {$_internalSchemaMatchArrayIndex:"
-        "{index: 1, namePlaceholder: 'i', expression: {i: {$lte: 7}}}}}");
-    expr = MatchExpressionParser::parse(filter, expCtx);
-    ASSERT_OK(expr.getStatus());
-    ASSERT_FALSE(expr.getValue()->matchesBSON(fromjson("{foo: [0, 99, 1, 2]}")));
-}
-
-TEST(InternalSchemaMatchArrayIndexMatchExpression, MatchesIfNotEnoughArrayElements) {
-    auto filter = fromjson(
-        "{foo: {$_internalSchemaMatchArrayIndex:"
-        "{index: 0, namePlaceholder: 'i', expression: {i: 1}}}}");
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto expr = MatchExpressionParser::parse(filter, expCtx);
-    ASSERT_OK(expr.getStatus());
-    ASSERT_TRUE(expr.getValue()->matchesBSON(fromjson("{foo: []}")));
-
-    filter = fromjson(
-        "{foo: {$_internalSchemaMatchArrayIndex:"
-        "{index: 4, namePlaceholder: 'i', expression: {i: 1}}}}");
-    expr = MatchExpressionParser::parse(filter, expCtx);
-    ASSERT_OK(expr.getStatus());
-    ASSERT_TRUE(expr.getValue()->matchesBSON(fromjson("{foo: ['no', 'no', 'no', 'no']}")));
-}
 
 TEST(InternalSchemaMatchArrayIndexMatchExpression, EquivalentToClone) {
     auto filter = fromjson(
@@ -112,7 +52,7 @@ TEST(InternalSchemaMatchArrayIndexMatchExpression, EquivalentToClone) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto expr = MatchExpressionParser::parse(filter, expCtx);
     ASSERT_OK(expr.getStatus());
-    auto clone = expr.getValue()->shallowClone();
+    auto clone = expr.getValue()->clone();
     ASSERT_TRUE(expr.getValue()->equivalent(clone.get()));
 }
 
@@ -129,8 +69,8 @@ TEST(InternalSchemaMatchArrayIndexMatchExpression, HasSingleChild) {
 }
 
 DEATH_TEST_REGEX(InternalSchemaMatchArrayIndexMatchExpression,
-                 GetChildFailsIndexGreaterThanZero,
-                 "Invariant failure.*i == 0") {
+                 GetChildFailsIndexGreaterThanOne,
+                 "Tripwire assertion.*6400214") {
     auto query = fromjson(
         "{foo: {$_internalSchemaMatchArrayIndex:"
         "{index: 0, namePlaceholder: 'i', expression: {i: {$type: 'number'}}}}}");
@@ -138,7 +78,8 @@ DEATH_TEST_REGEX(InternalSchemaMatchArrayIndexMatchExpression,
     auto objMatch = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(objMatch.getStatus());
 
-    objMatch.getValue()->getChild(1);
+    ASSERT_EQ(objMatch.getValue()->numChildren(), 1);
+    ASSERT_THROWS_CODE(objMatch.getValue()->getChild(1), AssertionException, 6400214);
 }
 }  // namespace
 }  // namespace mongo

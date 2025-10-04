@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include <cstring>
-#include <type_traits>
-
 #include "mongo/base/data_type.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/platform/endian.h"
+
+#include <cstring>
+#include <type_traits>
 
 namespace mongo {
 
@@ -124,5 +124,12 @@ struct DataType::Handler<T, typename std::enable_if<IsEndian<T>::value>::type> {
         return DataType::defaultConstruct<typename T::value_type>();
     }
 };
+
+// XXX should likely also fail for trivially copyable types
+// for which DataType::Handler hasn't been overridden
+template <typename T>
+constexpr bool isEndiannessSpecified() {
+    return !std::is_integral_v<T> || sizeof(T) == 1;
+}
 
 }  // namespace mongo

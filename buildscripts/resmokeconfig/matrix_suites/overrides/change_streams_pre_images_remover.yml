@@ -1,0 +1,30 @@
+# Overrides for enabling pre-images.
+
+###
+# Fixture options.
+###
+- name: replica_sets_fixture
+  value:
+    executor:
+      fixture:
+        mongod_options:
+          set_parameters:
+            preImagesCollectionTruncateMarkersMinBytes: 4096 # 4KiB
+            expiredChangeStreamPreImageRemovalJobSleepSecs: 1
+            failpoint.preImagesEnabledOnAllCollectionsByDefault: "{mode: 'alwaysOn'}"
+
+- name: enable_pre_images_hook
+  value:
+    executor:
+      hooks:
+        - class: ClusterParameter
+          key: changeStreamOptions
+          value:
+            preAndPostImages:
+              expireAfterSeconds: 10
+
+# Exclude incompatible tests
+- name: exclusion_tags
+  value:
+    exclude_with_any_tags:
+      - incompatible_with_preimages_by_default

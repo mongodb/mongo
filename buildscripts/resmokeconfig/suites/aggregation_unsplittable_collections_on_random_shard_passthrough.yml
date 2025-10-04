@@ -1,0 +1,66 @@
+test_kind: js_test
+
+selector:
+  roots:
+    - jstests/aggregation/**/*.js
+    - jstests/libs/random_data_shard_suite_selftest.js
+  exclude_files:
+    - jstests/aggregation/extras/*.js
+    - jstests/aggregation/data/*.js
+    # TODO SERVER-32311: These tests use getAggPlanStage(), which can't handle sharded explain output.
+    - jstests/aggregation/optimization/match_swapping_renamed_fields.js
+    - jstests/aggregation/optimization/use_query_project_and_sort.js
+    - jstests/aggregation/optimization/use_query_projection.js
+    - jstests/aggregation/optimization/use_query_sort.js
+
+    # These tests are written such that, after we check the engine being used and the colocation of
+    # the involved collections, we drop and recreate our collections for each test case. Given that
+    # this suite creates unsplittable collections on random shards and we cannot reliably check the
+    # colocation of collections in these tests, this means that these tests are incompatible with
+    # this suite as written.
+    - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_inlj.js
+    - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_nlj.js
+    - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_hj.js
+
+    # Includes expectations on failpoints being hit on specific shards.
+    - jstests/aggregation/sources/indexStats/verify_index_stats_output.js
+
+  exclude_with_any_tags:
+    - assumes_against_mongod_not_mongos
+    - requires_profiling
+    - assumes_no_track_upon_creation
+    # These tests run many aggregations, and the override slows them down enough to hit the evergreen timeout.
+    - query_intensive_pbt
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          implicitlyTrackUnshardedCollectionOnCreation: true
+          createsUnsplittableCollectionsOnRandomShards: true
+  hooks:
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: ValidateCollections
+    - class: CheckOrphansDeleted
+    - class: CleanEveryN
+      n: 20
+  fixture:
+    class: ShardedClusterFixture
+    num_shards: 2
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+        failpoint.createUnshardedCollectionRandomizeDataShard:
+          mode: alwaysOn
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        failpoint.createUnshardedCollectionRandomizeDataShard:
+          mode: alwaysOn

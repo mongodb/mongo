@@ -1,0 +1,66 @@
+test_kind: js_test
+
+selector:
+  roots:
+    - jstests/core/**/*.js
+    - jstests/core_sharding/**/*.js
+    - jstests/fle2/**/*.js
+    - src/mongo/db/modules/*/jstests/fle2/**/*.js
+  exclude_files:
+    # These tests are run in sharded_jscore_txns.
+    - jstests/core/txns/**/*.js
+    # The following tests fail because a certain command or functionality is not supported on
+    # mongos. This command or functionality is placed in a comment next to the failing test.
+    - jstests/core/**/apitest_db.js # serverStatus output doesn't have storageEngine.
+    - jstests/core/**/check_shard_index.js # checkShardingIndex.
+    - jstests/core/**/compact_keeps_indexes.js # compact.
+    - jstests/core/**/currentop.js # uses fsync.
+    - jstests/core/**/dbhash.js # dbhash.
+    - jstests/core/**/fsync.js # uses fsync.
+    - jstests/core/**/geo_s2cursorlimitskip.js # profiling.
+    - jstests/core/**/geo_update_btree2.js # notablescan.
+    - jstests/core/**/queryoptimizera.js # "local" database.
+    - jstests/core/**/startup_log.js # "local" database.
+    - jstests/core/**/query/top/top.js # top.
+    # The following tests fail because mongos behaves differently from mongod when testing certain
+    # functionality. The differences are in a comment next to the failing test.
+    - jstests/core/**/geo_2d_explain.js # executionSuccess in different spot in explain().
+    - jstests/core/**/geo_s2explain.js # inputStage in different spot in explain().
+    - jstests/core/**/geo_s2sparse.js # keysPerIndex in different spot in validate().
+    - jstests/core/**/operation_latency_histogram.js # Stats are counted differently on mongos, SERVER-24880.
+
+  exclude_with_any_tags:
+    - assumes_standalone_mongod
+    - assumes_against_mongod_not_mongos
+    # system.profile collection doesn't exist on mongos.
+    - requires_profiling
+    - config_shard_incompatible
+    - requires_2_or_more_shards
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+  config: {}
+  hooks:
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: ValidateCollections
+    - class: CheckOrphansDeleted
+    - class: CleanEveryN
+      n: 20
+  fixture:
+    class: ShardedClusterFixture
+    config_shard: "any"
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        # TODO SERVER-89498 Re-enable.
+        # featureFlagAllMongodsAreSharded: 1
+    num_rs_nodes_per_shard: 1
+    # TODO SERVER-89498 Re-enable.
+    # use_auto_bootstrap_procedure: 1

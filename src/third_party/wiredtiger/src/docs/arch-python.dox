@@ -12,7 +12,6 @@ and from it creates the classes and C support files needed to allow
 Python to import the WiredTiger library.
 
 Not every facility that is present in the C API is available in Python.
-In particular, setting up custom collators, extractors, compressors,
-encryptors and file system implementations must all be done within
-the C framework.
+In particular, setting up custom collators, compressors, encryptors and
+file system implementations must all be done within the C framework.
 */

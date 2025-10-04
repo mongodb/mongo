@@ -29,13 +29,19 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/query/util/deferred.h"
+
+#include <string>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -103,7 +109,7 @@ public:
      * - You hold the Client lock.
      * - You are on the Client's thread.
      */
-    static const ClientMetadata* getForClient(Client* client) noexcept;
+    static const ClientMetadata* getForClient(Client* client);
 
     /**
      * Get the ClientMetadata for the OperationContext.
@@ -115,7 +121,7 @@ public:
      * - You hold the Client lock.
      * - You are on the Client's thread.
      */
-    static const ClientMetadata* getForOperation(OperationContext* opCtx) noexcept;
+    static const ClientMetadata* getForOperation(OperationContext* opCtx);
 
     /**
      * Get the prioritized ClientMetadata for the Client.
@@ -127,7 +133,7 @@ public:
      * - You hold the Client lock.
      * - You are on the Client's thread.
      */
-    static const ClientMetadata* get(Client* client) noexcept;
+    static const ClientMetadata* get(Client* client);
 
     /**
      * Set the ClientMetadata for the Client directly.
@@ -230,30 +236,30 @@ public:
      * This function is only valid to invoke if you are on the Client's thread. This function takes
      * the Client lock.
      */
-    static void setFromMetadata(Client* client, BSONElement& elem);
+    static void setFromMetadata(Client* client, BSONElement& elem, bool isInternalClient);
 
     /**
-     * Set the ClientMetadata for the OperationContext by reading it from the given BSONElement.
+     * Set the ClientMetadata for the OperationContext by reading it from the given BSONObj.
      *
      * This function throws if called more than once for the same OperationContext.
      *
      * This function is only valid to invoke if you are on the Client's thread. This function takes
      * the Client lock.
      */
-    static void setFromMetadataForOperation(OperationContext* opCtx, BSONElement& elem);
+    static void setFromMetadataForOperation(OperationContext* opCtx, const BSONObj& obj);
 
     /**
      * Read from the $client field in requests.
      *
      * Throws an error if the $client section is not valid. It is valid for it to not exist though.
      */
-    static boost::optional<ClientMetadata> readFromMetadata(BSONElement& elem);
+    static boost::optional<ClientMetadata> readFromMetadata(const BSONElement& elem);
 
     /**
      * Write the $client section to request bodies if there is a non-empty client metadata
      * connection with the current client.
      */
-    void writeToMetadata(BSONObjBuilder* builder) const noexcept;
+    void writeToMetadata(BSONObjBuilder* builder) const;
 
     /**
      * Modify the existing client metadata document to include a mongos section.
@@ -285,6 +291,21 @@ public:
      * Return: May be empty.
      */
     const BSONObj& getDocument() const;
+
+    /**
+     * A lazily computed (and subsequently cached) copy of the metadata with the mongos info
+     * removed. This is useful for collecting query stats where we want to scrub out this
+     * high-cardinality field, and we don't want to re-do this computation over and over again.
+     */
+    const BSONObj& documentWithoutMongosInfo() const;
+
+    /**
+     * Get the simple hash of the client metadata document (simple meaning no collation).
+     *
+     * The hash is generated on the first call to this method. Future calls will return the cached
+     * hash rather than recomputing.
+     */
+    unsigned long hashWithoutMongosInfo() const;
 
     /**
      * Log client and client metadata information to disk.
@@ -326,7 +347,7 @@ private:
 
     static Status validateDriverDocument(const BSONObj& doc);
     static Status validateOperatingSystemDocument(const BSONObj& doc);
-    static StatusWith<StringData> parseApplicationDocument(const BSONObj& doc);
+    static StatusWith<std::string> parseApplicationDocument(const BSONObj& doc);
 
 private:
     // Parsed Client Metadata document
@@ -336,7 +357,16 @@ private:
 
     // Application Name extracted from the client metadata document.
     // May be empty
-    StringData _appName;
+    std::string _appName;
+
+    // See documentWithoutMongosInfo().
+    Deferred<BSONObj (*)(const BSONObj&)> _documentWithoutMongosInfo{
+        [](const BSONObj& fullDocument) {
+            return fullDocument.removeField("mongos");
+        }};
+
+    // See hashWithoutMongosInfo().
+    Deferred<size_t (*)(const BSONObj&)> _hashWithoutMongos{simpleHash};
 };
 
 }  // namespace mongo

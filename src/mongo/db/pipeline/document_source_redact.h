@@ -29,8 +29,25 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/redact_processor.h"
+#include "mongo/db/pipeline/stage_constraints.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/compiler/dependency_analysis/expression_dependencies.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+
+#include <memory>
+#include <set>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -40,7 +57,13 @@ public:
     const char* getSourceName() const final;
     boost::intrusive_ptr<DocumentSource> optimize() final;
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
+    }
+
+    StageConstraints constraints(PipelineSplitState pipeState) const final {
         return {StreamType::kStreaming,
                 PositionRequirement::kNone,
                 HostTypeRequirement::kNone,
@@ -60,30 +83,32 @@ public:
      * Attempts to duplicate the redact-safe portion of a subsequent $match before the $redact
      * stage.
      */
-    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                     Pipeline::SourceContainer* container) final;
+    DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
+                                                   DocumentSourceContainer* container) final;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+
+    const std::shared_ptr<RedactProcessor>& getRedactProcessor() const {
+        return _redactProcessor;
+    }
 
     boost::intrusive_ptr<Expression> getExpression() {
-        return _expression;
+        return _redactProcessor->getExpression();
+    }
+
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {
+        expression::addVariableRefs(_redactProcessor->getExpression().get(), refs);
     }
 
 private:
     DocumentSourceRedact(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                         const boost::intrusive_ptr<Expression>& previsit);
+                         const boost::intrusive_ptr<Expression>& previsit,
+                         Variables::Id currentId);
 
-    GetNextResult doGetNext() final;
-
-    // These both work over pExpCtx->variables.
-    boost::optional<Document> redactObject(const Document& root);  // redacts CURRENT
-    Value redactValue(const Value& in, const Document& root);
-
-    Variables::Id _currentId;
-    boost::intrusive_ptr<Expression> _expression;
+    std::shared_ptr<RedactProcessor> _redactProcessor;
 };
 
 }  // namespace mongo

@@ -1,0 +1,107 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/bulk_write_sharded_collections_jscore_passthrough.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
+##########################################################
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+  config:
+    shell_options:
+      eval:
+        await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");;
+        await import('jstests/libs/override_methods/single_crud_op_as_bulk_write.js');
+  fixture:
+    class: ShardedClusterFixture
+    enable_balancer: false
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+    num_shards: 2
+  hooks:
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: ValidateCollections
+    - class: CheckOrphansDeleted
+    - class: CleanEveryN
+      n: 20
+matrix_suite: true
+selector:
+  exclude_files:
+    - jstests/core/txns/**/*.js
+    - jstests/core/**/apitest_db.js
+    - jstests/core/**/awaitdata_getmore_cmd.js
+    - jstests/core/**/bypass_doc_validation.js
+    - jstests/core/**/check_shard_index.js
+    - jstests/core/**/compact_keeps_indexes.js
+    - jstests/core/**/currentop.js
+    - jstests/core/**/dbhash.js
+    - jstests/core/**/fsync.js
+    - jstests/core/**/geo_s2cursorlimitskip.js
+    - jstests/core/**/geo_update_btree2.js
+    - jstests/core/**/queryoptimizera.js
+    - jstests/core/**/startup_log.js
+    - jstests/core/**/tailable_cursor_invalidation.js
+    - jstests/core/**/tailable_getmore_batch_size.js
+    - jstests/core/**/tailable_skip_limit.js
+    - jstests/core/**/query/top/top.js
+    - jstests/core/**/geo_2d_explain.js
+    - jstests/core/**/geo_s2explain.js
+    - jstests/core/**/geo_s2sparse.js
+    - jstests/core/**/operation_latency_histogram.js
+    - jstests/core/**/apitest_dbcollection.js
+    - jstests/core/**/bad_index_plugin.js
+    - jstests/core/**/create_indexes.js
+    - jstests/core/**/list_indexes_non_existent_ns.js
+    - jstests/core/**/mr_preserve_indexes.js
+    - jstests/core/**/distinct_index1.js
+    - jstests/core/**/expr_index_use.js
+    - jstests/core/**/index_multikey.js
+    - jstests/core/**/query/explain/optimized_match_explain.js
+    - jstests/core/**/sort_array.js
+    - jstests/core/timeseries/write/timeseries_delete_hint.js
+    - jstests/core/**/set_param1.js
+    - jstests/core/**/profile*.js
+    - jstests/core/query/comment_field.js
+    - jstests/core/administrative/fsync/fsync.js
+    - jstests/core/write/insert/batch_write_command_insert.js
+    - jstests/core/query/batch_write/batch_write_command_update.js
+    - jstests/core/query/batch_write/batch_write_command_delete.js
+    - jstests/core/testing/failcommand_failpoint.js
+    - jstests/core/query/parsing/write_commands_reject_unknown_fields.js
+    - jstests/core/query/explain/explain_uuid.js
+    - jstests/core/query/explain/explain_includes_command.js
+    - jstests/core/query/distinct/distinct_collator.js
+    - jstests/core/txns/transactions_profiling.js
+    - jstests/core/txns/currentop_blocked_operations.js
+    - jstests/core/txns/transactions_profiling_with_drops.js
+    - jstests/core/txns/multi_statement_transaction_write_error.js
+    - src/mongo/db/modules/enterprise/jstests/fle2/basic_update.js
+    - src/mongo/db/modules/enterprise/jstests/fle2/basic_delete.js
+    - src/mongo/db/modules/enterprise/jstests/fle2/query/explain*.js
+    - src/mongo/db/modules/enterprise/jstests/fle2/query/aggregate_lookupMultiSchema.js
+  exclude_with_any_tags:
+    - assumes_standalone_mongod
+    - assumes_against_mongod_not_mongos
+    - assumes_no_implicit_collection_creation_on_get_collection
+    - assumes_no_implicit_collection_creation_after_drop
+    - assumes_no_implicit_index_creation
+    - assumes_unsharded_collection
+    - cannot_create_unique_index_when_using_hashed_shard_key
+    - requires_profiling
+    - requires_capped
+  roots:
+    - jstests/core/**/*.js
+    - jstests/core_sharding/**/*.js
+    - jstests/fle2/**/*.js
+    - src/mongo/db/modules/*/jstests/fle2/**/*.js
+test_kind: js_test

@@ -27,14 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/db/repl/repl_set_write_concern_mode_definitions.h"
 
-#include <algorithm>
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
-#include "mongo/db/repl/repl_set_write_concern_mode_definitions.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+
+#include <algorithm>
+#include <iterator>
+#include <ostream>
+
+#include <absl/container/flat_hash_map.h>
 
 namespace mongo {
 namespace repl {
@@ -185,8 +193,7 @@ TEST(ReplSetWriteConcernModeDefinitions, NegativeConstraint) {
 }
 
 TEST(ReplSetWriteConcernModeDefinitions, ModesMustBeObject) {
-    auto writeConcernModes = BSON("modes"
-                                  << "stringIsBad");
+    auto writeConcernModes = BSON("modes" << "stringIsBad");
     ASSERT_THROWS(
         ReplSetWriteConcernModeDefinitions::parseFromBSON(writeConcernModes.firstElement()),
         ExceptionFor<ErrorCodes::TypeMismatch>);
@@ -196,18 +203,16 @@ TEST(ReplSetWriteConcernModeDefinitions, ModesMustBeObject) {
         ReplSetWriteConcernModeDefinitions::parseFromBSON(writeConcernModes.firstElement()),
         ExceptionFor<ErrorCodes::TypeMismatch>);
 
-    writeConcernModes = BSON("modes" << BSON_ARRAY("a"
-                                                   << "b"
-                                                   << "c"));
+    writeConcernModes = BSON("modes" << BSON_ARRAY("a" << "b"
+                                                       << "c"));
     ASSERT_THROWS(
         ReplSetWriteConcernModeDefinitions::parseFromBSON(writeConcernModes.firstElement()),
         ExceptionFor<ErrorCodes::TypeMismatch>);
 }
 
 TEST(ReplSetWriteConcernModeDefinitions, ConstraintsMustBeNumbers) {
-    auto writeConcernModes = BSON("modes" << BSON("wc1" << BSON("tag1"
-                                                                << "1"
-                                                                << "tag2" << 2)
+    auto writeConcernModes = BSON("modes" << BSON("wc1" << BSON("tag1" << "1"
+                                                                       << "tag2" << 2)
                                                         << "wc2" << BSON("tag3" << 3)));
     ASSERT_THROWS(
         ReplSetWriteConcernModeDefinitions::parseFromBSON(writeConcernModes.firstElement()),

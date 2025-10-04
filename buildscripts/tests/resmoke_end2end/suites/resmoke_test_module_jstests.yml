@@ -1,0 +1,10 @@
+test_kind: js_test
+
+selector:
+  roots:
+    - jstests/**/*.js
+    - buildscripts/tests/resmoke_end2end/testfiles/**/*.js
+
+executor:
+  fixture:
+    class: MongoDFixture

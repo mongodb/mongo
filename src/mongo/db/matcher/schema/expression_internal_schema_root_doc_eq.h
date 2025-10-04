@@ -29,10 +29,24 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-
+#include "mongo/base/clonable_ptr.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_visitor.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/util/assert_util.h"
+
+#include <cstddef>
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 
@@ -56,22 +70,13 @@ public:
         : MatchExpression(MatchExpression::INTERNAL_SCHEMA_ROOT_DOC_EQ, std::move(annotation)),
           _rhsObj(std::move(rhs)) {}
 
-    bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const final;
-
-    /**
-     * This expression should only be used to match full documents, not objects within an array
-     * in the case of $elemMatch.
-     */
-    bool matchesSingleElement(const BSONElement& elem,
-                              MatchDetails* details = nullptr) const final {
-        MONGO_UNREACHABLE;
-    }
-
-    std::unique_ptr<MatchExpression> shallowClone() const final;
+    std::unique_ptr<MatchExpression> clone() const final;
 
     void debugString(StringBuilder& debug, int indentationLevel = 0) const final;
 
-    void serialize(BSONObjBuilder* out, bool includePath) const final;
+    void serialize(BSONObjBuilder* out,
+                   const SerializationOptions& opts = {},
+                   bool includePath = true) const final;
 
     bool equivalent(const MatchExpression* other) const final;
 
@@ -80,6 +85,10 @@ public:
     }
 
     MatchExpression* getChild(size_t i) const final {
+        MONGO_UNREACHABLE_TASSERT(6400218);
+    }
+
+    void resetChild(size_t i, MatchExpression*) final {
         MONGO_UNREACHABLE;
     }
 
@@ -99,16 +108,15 @@ public:
         visitor->visit(this);
     }
 
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final {
-        deps->needWholeDocument = true;
+    BSONObj getRhsObj() const {
+        return _rhsObj;
+    }
+
+    const BSONObj::ComparatorInterface* getObjCmp() const {
+        return &_objCmp;
     }
 
 private:
-    ExpressionOptimizerFunc getOptimizer() const final {
-        return [](std::unique_ptr<MatchExpression> expression) { return expression; };
-    }
-
     UnorderedFieldsBSONObjComparator _objCmp;
     BSONObj _rhsObj;
 };

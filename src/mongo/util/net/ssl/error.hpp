@@ -15,14 +15,15 @@
 #pragma once
 #endif  // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
-#include "asio/detail/config.hpp"
-#include "asio/error_code.hpp"
+#include <asio/detail/config.hpp>
+#include <asio/error_code.hpp>
 
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
 #include "mongo/util/net/ssl/detail/openssl_types.hpp"
 #endif
 
-#include "asio/detail/push_options.hpp"
+// This must be after all other includes
+#include <asio/detail/push_options.hpp>
 
 namespace asio {
 namespace error {
@@ -43,15 +44,27 @@ namespace error {
 enum stream_errors {
 #if defined(GENERATING_DOCUMENTATION)
     /// The underlying stream closed before the ssl stream gracefully shut down.
-    stream_truncated,
-    no_renegotiation
-#elif (OPENSSL_VERSION_NUMBER < 0x10100000L) && !defined(OPENSSL_IS_BORINGSSL) && \
+    stream_truncated = 0,
+
+    /// The underlying SSL library returned a system error without providing
+    /// further information.
+    unspecified_system_error = 1,
+
+    /// The underlying SSL library generated an unexpected result from a function
+    /// call.
+    unexpected_result = 2,
+    no_renegotiation = 8,
+#else  // defined(GENERATING_DOCUMENTATION)
+#if (OPENSSL_VERSION_NUMBER < 0x10100000L) && !defined(OPENSSL_IS_BORINGSSL) && \
     MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
-    stream_truncated = ERR_PACK(ERR_LIB_SSL, 0, SSL_R_SHORT_READ)
+    stream_truncated = ERR_PACK(ERR_LIB_SSL, 0, SSL_R_SHORT_READ),
 #else
     stream_truncated = 1,
-    no_renegotiation
+    no_renegotiation = 8,
 #endif
+    unspecified_system_error = 2,
+    unexpected_result = 3
+#endif  // defined(GENERATING_DOCUMENTATION)
 };
 
 extern ASIO_DECL const asio::error_category& get_stream_category();
@@ -98,7 +111,7 @@ inline asio::error_code make_error_code(stream_errors e) {
 }  // namespace ssl
 }  // namespace asio
 
-#include "asio/detail/pop_options.hpp"
+#include <asio/detail/pop_options.hpp>
 
 #if defined(ASIO_HEADER_ONLY)
 #include "mongo/util/net/ssl/impl/error.ipp"

@@ -29,20 +29,28 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <cstdint>
-#include <string>
-
-#include "mongo/db/jsobj.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/platform/process_id.h"
-#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/static_immortal.h"
+
+#include <cstdint>
+#include <new>
+#include <string>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
 class ProcessInfo {
 public:
+    static auto constexpr kTranparentHugepageDirectory = "/sys/kernel/mm/transparent_hugepage";
+    static auto constexpr kGlibcTunableEnvVar = "GLIBC_TUNABLES";
+    static auto constexpr kRseqKey = "glibc.pthread.rseq";
+
     ProcessInfo(ProcessId pid = ProcessId::getCurrent());
     ~ProcessInfo();
 
@@ -85,6 +93,13 @@ public:
     }
 
     /**
+     * Get the size of total memory available to the process in bytes
+     */
+    static unsigned long long getMemSizeBytes() {
+        return sysInfo().memLimit;
+    }
+
+    /**
      * Get the size of total memory available to the process in MB
      */
     static unsigned long long getMemSizeMB() {
@@ -101,7 +116,7 @@ public:
     /**
      * Get the number of (logical) CPUs
      */
-    static unsigned getNumCores() {
+    static unsigned getNumLogicalCores() {
         return sysInfo().numCores;
     }
 
@@ -113,11 +128,25 @@ public:
     }
 
     /**
+     * Get the number of CPU sockets
+     */
+    static unsigned getNumCpuSockets() {
+        return sysInfo().numCpuSockets;
+    }
+
+    /**
      * Get the number of cores available. Make a best effort to get the cores for this process.
      * If that information is not available, get the total number of CPUs.
      */
     static unsigned long getNumAvailableCores() {
-        return ProcessInfo::getNumCoresForProcess().value_or(ProcessInfo::getNumCores());
+        return ProcessInfo::getNumCoresForProcess().value_or(ProcessInfo::getNumLogicalCores());
+    }
+
+    /**
+     * Get the number of cores available for process or return the errorValue.
+     */
+    static long getNumCoresAvailableToProcess(long errorValue = -1) {
+        return ProcessInfo::getNumCoresForProcess().value_or(errorValue);
     }
 
     /**
@@ -142,6 +171,16 @@ public:
     }
 
     /**
+     * Get the number of NUMA nodes if NUMA is enabled, or 1 otherwise.
+     */
+    static unsigned long getNumNumaNodes() {
+        if (sysInfo().hasNuma) {
+            return sysInfo().numNumaNodes;
+        }
+        return 1;
+    }
+
+    /**
      * Determine if we need to workaround slow msync performance on Illumos/Solaris
      */
     static bool preferMsyncOverFSync() {
@@ -149,10 +188,24 @@ public:
     }
 
     /**
+     * Transparent hugepage files display settings like so, with the selected setting in brackets:
+     *      always defer [defer+madvise] madvise never
+     *
+     * This function parses out the selected setting from this file format.
+     */
+    static StatusWith<std::string> readTransparentHugePagesParameter(
+        StringData parameter, StringData directory = kTranparentHugepageDirectory);
+
+    /**
+     * Check whether the environment variable GLIBC_TUNABLES=glibc.pthread.rseq=0 is correctly set.
+     */
+    static bool checkGlibcRseqTunable();
+
+    /**
      * Get extra system stats
      */
     void appendSystemDetails(BSONObjBuilder& details) const {
-        details.append(StringData("extra"), sysInfo()._extraStats.copy());
+        details.appendElements(sysInfo()._extraStats);
     }
 
     /**
@@ -164,6 +217,10 @@ public:
 
     static const std::string& getProcessName() {
         return appInfo().getProcessName();
+    }
+
+    static int getDefaultListenBacklog() {
+        return sysInfo().defaultListenBacklog;
     }
 
 private:
@@ -180,9 +237,11 @@ private:
         unsigned long long memLimit;
         unsigned numCores;
         unsigned numPhysicalCores;
+        unsigned numCpuSockets;
         unsigned long long pageSize;
         std::string cpuArch;
         bool hasNuma;
+        unsigned numNumaNodes;
         BSONObj _extraStats;
 
         // On non-Solaris (ie, Linux, Darwin, *BSD) kernels, prefer msync.
@@ -192,15 +251,20 @@ private:
         //  18658199 Speed up msync() on ZFS by 90000x with this one weird trick
         bool preferMsyncOverFSync;
 
+        int defaultListenBacklog;
+
         SystemInfo()
             : addrSize(0),
               memSize(0),
               memLimit(0),
               numCores(0),
               numPhysicalCores(0),
+              numCpuSockets(0),
               pageSize(0),
               hasNuma(false),
-              preferMsyncOverFSync(true) {
+              numNumaNodes(0),
+              preferMsyncOverFSync(true),
+              defaultListenBacklog(0) {
             // populate SystemInfo during construction
             collectSystemInfo();
         }
@@ -229,8 +293,6 @@ private:
     };
 
     ProcessId _pid;
-
-    static bool checkNumaEnabled();
 
     static const SystemInfo& sysInfo() {
         static ProcessInfo::SystemInfo systemInfo;

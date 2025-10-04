@@ -5,25 +5,23 @@
  * 2. Make sure that one of the highest priority nodes becomes PRIMARY.
  * 3. Step down the PRIMARY and confirm that the other high priority node becomes PRIMARY.
  */
-load('jstests/replsets/rslib.js');
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-(function() {
-'use strict';
-
-var name = 'priority_takeover_two_nodes_equal_priority';
-var replTest = new ReplSetTest(
-    {name: name, nodes: [{rsConfig: {priority: 3}}, {rsConfig: {priority: 3}}, {}]});
+let name = "priority_takeover_two_nodes_equal_priority";
+let replTest = new ReplSetTest({name: name, nodes: [{rsConfig: {priority: 3}}, {rsConfig: {priority: 3}}, {}]});
 replTest.startSet();
-replTest.initiate();
+// We use the default electionTimeoutMillis to allow a priority takeover to occur in
+// case a lower priority node gets elected.
+replTest.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 jsTestLog("Waiting for one of the high priority nodes to become PRIMARY.");
-var primary;
-var primaryIndex = -1;
-var defaultPriorityNodeIndex = 2;
+let primary;
+let primaryIndex = -1;
+let defaultPriorityNodeIndex = 2;
 assert.soon(
-    function() {
+    function () {
         primary = replTest.getPrimary();
-        replTest.nodes.find(function(node, index, array) {
+        replTest.nodes.find(function (node, index, array) {
             if (primary.host == node.host) {
                 primaryIndex = index;
                 return true;
@@ -32,23 +30,21 @@ assert.soon(
         });
         return primaryIndex !== defaultPriorityNodeIndex;
     },
-    'Neither of the high priority nodes was elected primary.',
-    replTest.kDefaultTimeoutMS,  // timeout
-    1000                         // interval
+    "Neither of the high priority nodes was elected primary.",
+    replTest.timeoutMS, // timeout
+    1000, // interval
 );
 
 jsTestLog("Stepping down the current primary.");
-assert.commandWorked(
-    primary.adminCommand({replSetStepDown: 10 * 60 * 3, secondaryCatchUpPeriodSecs: 10 * 60}));
+assert.commandWorked(primary.adminCommand({replSetStepDown: 10 * 60 * 3, secondaryCatchUpPeriodSecs: 10 * 60}));
 
 // Make sure the primary has stepped down.
 assert.neq(primary, replTest.getPrimary());
 
 // We expect the other high priority node to eventually become primary.
-var expectedNewPrimaryIndex = (primaryIndex === 0) ? 1 : 0;
+let expectedNewPrimaryIndex = primaryIndex === 0 ? 1 : 0;
 
 jsTestLog("Waiting for the other high priority node to become PRIMARY.");
-var expectedNewPrimary = replTest.nodes[expectedNewPrimaryIndex];
+let expectedNewPrimary = replTest.nodes[expectedNewPrimaryIndex];
 replTest.waitForState(expectedNewPrimary, ReplSetTest.State.PRIMARY);
 replTest.stopSet();
-})();

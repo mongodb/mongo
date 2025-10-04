@@ -27,26 +27,31 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
-#include "mongo/platform/basic.h"
-
-#include "mongo/watchdog/watchdog.h"
-
-#include <memory>
-
-#include "mongo/db/client.h"
-#include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
-#include "mongo/db/service_context.h"
+#include <boost/filesystem/path.hpp>
+// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/clock_source.h"
-#include "mongo/util/clock_source_mock.h"
-#include "mongo/util/tick_source_mock.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/time_support.h"
+#include "mongo/watchdog/watchdog.h"
+
+#include <mutex>
+#include <utility>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
+namespace {
+
+#ifdef _WIN32
+const auto sleepDelay = 250;
+#else
+const auto sleepDelay = 100;
+#endif
 
 class TestPeriodicThread : public WatchdogPeriodicThread {
 public:
@@ -54,7 +59,7 @@ public:
 
     void run(OperationContext* opCtx) final {
         {
-            stdx::lock_guard<Latch> lock(_mutex);
+            stdx::lock_guard<stdx::mutex> lock(_mutex);
             ++_counter;
         }
 
@@ -70,7 +75,7 @@ public:
     void waitForCount() {
         invariant(_wait != 0);
 
-        stdx::unique_lock<Latch> lock(_mutex);
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
         while (_counter < _wait) {
             _condvar.wait(lock);
         }
@@ -80,7 +85,7 @@ public:
 
     std::uint32_t getCounter() {
         {
-            stdx::lock_guard<Latch> lock(_mutex);
+            stdx::lock_guard<stdx::mutex> lock(_mutex);
             return _counter;
         }
     }
@@ -88,12 +93,12 @@ public:
 private:
     std::uint32_t _counter{0};
 
-    Mutex _mutex = MONGO_MAKE_LATCH("TestPeriodicThread::_mutex");
+    stdx::mutex _mutex;
     stdx::condition_variable _condvar;
     std::uint32_t _wait{0};
 };
 
-class PeriodicThreadTest : public LockerNoopServiceContextTest {};
+class PeriodicThreadTest : public ServiceContextTest {};
 
 // Tests:
 // 1. Make sure it runs at least N times
@@ -118,7 +123,7 @@ TEST_F(PeriodicThreadTest, Basic) {
     std::uint32_t lastCounter = testThread.getCounter();
 
     // This is racey but it should only produce false negatives
-    sleepmillis(100);
+    sleepmillis(sleepDelay);
 
     ASSERT_EQ(lastCounter, testThread.getCounter());
 }
@@ -140,7 +145,7 @@ TEST_F(PeriodicThreadTest, PauseAndStop) {
     std::uint32_t pauseCounter = testThread.getCounter();
 
     // This is racey but it should only produce false negatives
-    sleepmillis(100);
+    sleepmillis(sleepDelay);
 
     // We could have had one more run of the loop as we paused - allow for that case
     // but no other runs of the thread.
@@ -152,7 +157,7 @@ TEST_F(PeriodicThreadTest, PauseAndStop) {
     std::uint32_t stopCounter = testThread.getCounter();
 
     // This is racey but it should only produce false negatives
-    sleepmillis(100);
+    sleepmillis(sleepDelay);
 
     ASSERT_EQ(stopCounter, testThread.getCounter());
 }
@@ -174,7 +179,7 @@ TEST_F(PeriodicThreadTest, PauseAndResume) {
     std::uint32_t pauseCounter = testThread.getCounter();
 
     // This is racey but it should only produce false negatives
-    sleepmillis(100);
+    sleepmillis(sleepDelay);
 
     // We could have had one more run of the loop as we paused - allow for that case
     // but no other runs of the thread.
@@ -198,7 +203,7 @@ class TestCounterCheck : public WatchdogCheck {
 public:
     void run(OperationContext* opCtx) final {
         {
-            stdx::lock_guard<Latch> lock(_mutex);
+            stdx::lock_guard<stdx::mutex> lock(_mutex);
             ++_counter;
         }
 
@@ -212,10 +217,8 @@ public:
     }
 
 // Ignore data races in this function when running with TSAN, races are acceptable here
-#if defined(__has_feature)
 #if __has_feature(thread_sanitizer)
     __attribute__((no_sanitize("thread")))
-#endif
 #endif
     void
     setSignalOnCount(int c) {
@@ -225,7 +228,7 @@ public:
     void waitForCount() {
         invariant(_wait != 0);
 
-        stdx::unique_lock<Latch> lock(_mutex);
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
         while (_counter < _wait) {
             _condvar.wait(lock);
         }
@@ -233,7 +236,7 @@ public:
 
     std::uint32_t getCounter() {
         {
-            stdx::lock_guard<Latch> lock(_mutex);
+            stdx::lock_guard<stdx::mutex> lock(_mutex);
             return _counter;
         }
     }
@@ -241,12 +244,12 @@ public:
 private:
     std::uint32_t _counter{0};
 
-    Mutex _mutex = MONGO_MAKE_LATCH("TestCounterCheck::_mutex");
+    stdx::mutex _mutex;
     stdx::condition_variable _condvar;
     std::uint32_t _wait{0};
 };
 
-class WatchdogCheckThreadTest : public LockerNoopServiceContextTest {};
+class WatchdogCheckThreadTest : public ServiceContextTest {};
 
 // Positive: Make sure check thread runs at least N times and stops correctly
 TEST_F(WatchdogCheckThreadTest, Basic) {
@@ -270,7 +273,7 @@ TEST_F(WatchdogCheckThreadTest, Basic) {
     std::uint32_t lastCounter = counterCheckPtr->getCounter();
 
     // This is racey but it should only produce false negatives
-    sleepmillis(100);
+    sleepmillis(sleepDelay);
 
     ASSERT_EQ(lastCounter, counterCheckPtr->getCounter());
 }
@@ -281,14 +284,14 @@ TEST_F(WatchdogCheckThreadTest, Basic) {
 class ManualResetEvent {
 public:
     void set() {
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
 
         _set = true;
         _condvar.notify_one();
     }
 
     void wait() {
-        stdx::unique_lock<Latch> lock(_mutex);
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
 
         _condvar.wait(lock, [this]() { return _set; });
     }
@@ -296,12 +299,12 @@ public:
 private:
     bool _set{false};
 
-    Mutex _mutex = MONGO_MAKE_LATCH("ManualResetEvent::_mutex");
+    stdx::mutex _mutex;
     stdx::condition_variable _condvar;
 };
 
 
-class WatchdogMonitorThreadTest : public LockerNoopServiceContextTest {};
+class WatchdogMonitorThreadTest : public ServiceContextTest {};
 
 // Positive: Make sure monitor thread signals death if the check thread never starts
 TEST_F(WatchdogMonitorThreadTest, Basic) {
@@ -320,11 +323,19 @@ TEST_F(WatchdogMonitorThreadTest, Basic) {
 
     WatchdogMonitorThread monitorThread(&checkThread, deathCallback, Milliseconds(5));
 
+    // Check and monitor thread should not have run yet.
+    ASSERT_EQ(checkThread.getGeneration(), 0);
+    ASSERT_EQ(monitorThread.getGeneration(), 0);
+
     monitorThread.start();
 
     deathEvent.wait();
 
     monitorThread.shutdown();
+    // Check generation should be 0 since check thread never started.
+    // Monitor thread should have run at least once in order to call the deathCallback.
+    ASSERT_EQ(checkThread.getGeneration(), 0);
+    ASSERT_GTE(monitorThread.getGeneration(), 1);
 }
 
 /**
@@ -333,11 +344,21 @@ TEST_F(WatchdogMonitorThreadTest, Basic) {
 class SleepyCheck : public WatchdogCheck {
 public:
     void run(OperationContext* opCtx) final {
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
         ++_counter;
 
+        _condvar.notify_all();
+
         if (_counter >= 6) {
+            lock.unlock();
             sleepFor(Seconds(5));
         }
+    }
+
+    // Test only method to ensure SleepyCheck runs at least once.
+    void waitForRun() {
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
+        _condvar.wait(lock, [this]() { return _counter > 0; });
     }
 
     std::string getDescriptionForLogging() final {
@@ -345,6 +366,8 @@ public:
     }
 
 private:
+    stdx::mutex _mutex;
+    stdx::condition_variable _condvar;
     std::uint32_t _counter{0};
 };
 
@@ -357,6 +380,7 @@ TEST_F(WatchdogMonitorThreadTest, SleepyHungCheck) {
     };
 
     auto sleepyCheck = std::make_unique<SleepyCheck>();
+    auto sleepyCheckPtr = sleepyCheck.get();
 
     std::vector<std::unique_ptr<WatchdogCheck>> checks;
     checks.push_back(std::move(sleepyCheck));
@@ -365,18 +389,31 @@ TEST_F(WatchdogMonitorThreadTest, SleepyHungCheck) {
 
     WatchdogMonitorThread monitorThread(&checkThread, deathCallback, Milliseconds(100));
 
+    // Check and monitor thread should not have run yet.
+    ASSERT_EQ(checkThread.getGeneration(), 0);
+    ASSERT_EQ(monitorThread.getGeneration(), 0);
+
     checkThread.start();
 
+    sleepyCheckPtr->waitForRun();
+
     monitorThread.start();
+
+    sleepmillis(sleepDelay);
 
     deathEvent.wait();
 
     monitorThread.shutdown();
 
     checkThread.shutdown();
+
+    // Check generation should have run and hung.
+    // Monitor thread should have run at least once in order to call the deathCallback.
+    ASSERT_GTE(checkThread.getGeneration(), 1);
+    ASSERT_GTE(monitorThread.getGeneration(), 1);
 }
 
-class WatchdogMonitorTest : public LockerNoopServiceContextTest {};
+class WatchdogMonitorTest : public ServiceContextTest {};
 
 // Positive: Make sure watchdog monitor signals death if a check is unresponsive
 TEST_F(WatchdogMonitorTest, SleepyHungCheck) {
@@ -392,12 +429,19 @@ TEST_F(WatchdogMonitorTest, SleepyHungCheck) {
     checks.push_back(std::move(sleepyCheck));
 
     WatchdogMonitor monitor(std::move(checks), Milliseconds(1), Milliseconds(5), deathCallback);
+    // Check and monitor thread should not have run yet.
+    ASSERT_EQ(monitor.getCheckGeneration(), 0);
+    ASSERT_EQ(monitor.getMonitorGeneration(), 0);
 
     monitor.start();
+
+    sleepmillis(sleepDelay);
 
     deathEvent.wait();
 
     monitor.shutdown();
+    // Monitor thread should have run at least once in order to call the deathCallback.
+    ASSERT_GTE(monitor.getMonitorGeneration(), 1);
 }
 
 // Positive: Make sure watchdog monitor terminates the process if a check is unresponsive
@@ -432,7 +476,10 @@ TEST_F(WatchdogMonitorTest, PauseAndResume) {
 
     WatchdogMonitor monitor(std::move(checks), Milliseconds(1), Milliseconds(1001), deathCallback);
 
-    counterCheckPtr->setSignalOnCount(5);
+    ASSERT_EQ(0, monitor.getCheckGeneration());
+    ASSERT_EQ(0, monitor.getMonitorGeneration());
+    auto counterCheckCount = 5;
+    counterCheckPtr->setSignalOnCount(counterCheckCount);
 
     monitor.start();
 
@@ -441,37 +488,95 @@ TEST_F(WatchdogMonitorTest, PauseAndResume) {
     // Pause the monitor
     monitor.setPeriod(Milliseconds(-1));
 
+    // Check generation should have increased.
+    auto lastCheckGeneration = monitor.getCheckGeneration();
+    ASSERT_GTE(lastCheckGeneration, 1);
+
     // Check the counter after it is shutdown and make sure it does not change.
     std::uint32_t pauseCounter = counterCheckPtr->getCounter();
 
     // This is racey but it should only produce false negatives
-    sleepmillis(100);
+    sleepmillis(sleepDelay);
 
     // We could have had one more run of the loop as we paused - allow for that case
     // but no other runs of the thread.
     ASSERT_GTE(pauseCounter + 1, counterCheckPtr->getCounter());
+    ASSERT_GTE(lastCheckGeneration + 1, monitor.getCheckGeneration());
 
     // Resume the monitor
     std::uint32_t baseCounter = counterCheckPtr->getCounter();
-    counterCheckPtr->setSignalOnCount(baseCounter + 5);
+    counterCheckCount = baseCounter + 5;
+    counterCheckPtr->setSignalOnCount(counterCheckCount);
 
     // Restart the monitor with a different interval.
     monitor.setPeriod(Milliseconds(1007));
 
     counterCheckPtr->waitForCount();
+    // Wait for monitor to run at least once.
+    while (monitor.getMonitorGeneration() < 1) {
+        sleepmillis(100);
+    }
 
     monitor.shutdown();
 
+    // Check generation and monitor generation should have both increased.
+    auto lastMonitorGeneration = monitor.getMonitorGeneration();
+    ASSERT_GT(monitor.getCheckGeneration(), lastCheckGeneration);
+    ASSERT_GTE(lastMonitorGeneration, 1);
+
     // Check the counter after it is shutdown and make sure it does not change.
     std::uint32_t lastCounter = counterCheckPtr->getCounter();
+    lastCheckGeneration = monitor.getCheckGeneration();
+
 
     // This is racey but it should only produce false negatives
-    sleepmillis(100);
+    sleepmillis(sleepDelay);
 
     ASSERT_EQ(lastCounter, counterCheckPtr->getCounter());
+    ASSERT_EQ(lastCheckGeneration, monitor.getCheckGeneration());
+    ASSERT_EQ(lastMonitorGeneration, monitor.getMonitorGeneration());
 }
 
-class DirectoryCheckTest : public LockerNoopServiceContextTest {};
+// Make sure we can reduce the monitor period and that it takes effect immediately, i.e., we
+// don't wait until the old period has expired.
+TEST_F(WatchdogMonitorTest, ReduceMonitorPeriod) {
+    WatchdogDeathCallback deathCallback = []() {
+        LOGV2_FATAL(8961000, "Death signalled, it should not have been");
+    };
+
+    auto counterCheck = std::make_unique<TestCounterCheck>();
+    auto counterCheckPtr = counterCheck.get();
+
+    std::vector<std::unique_ptr<WatchdogCheck>> checks;
+    checks.push_back(std::move(counterCheck));
+
+    // Initial monitor period of 30 minutes.
+    WatchdogMonitor monitor(std::move(checks), Milliseconds(1), Minutes(30), deathCallback);
+
+    monitor.start();
+
+    // Wait for the checker to run a number of times, and ensure the monitor hasn't.
+    counterCheckPtr->setSignalOnCount(10);
+    counterCheckPtr->waitForCount();
+    ASSERT_EQ(monitor.getMonitorGeneration(), 0);
+
+    // Reduce the monitor period significantly. We're trying to check that the monitor thread
+    // waits using the new period (set here) rather than the old one. The new period shouldn't
+    // be so short that the monitor can immediately return due to the time between monitor.start()
+    // and now exceeding the new period - we want to cover the case where it goes back to sleep.
+    monitor.setPeriod(Milliseconds(250));
+
+    // Wait until the monitor generation reaches 1, up to a timeout.
+    int tries = 0;
+    while (monitor.getMonitorGeneration() < 1) {
+        sleepmillis(100);
+        ASSERT_LT(++tries, 100) << "Took too long to observe monitor running";
+    }
+
+    monitor.shutdown();
+}
+
+class DirectoryCheckTest : public ServiceContextTest {};
 
 // Positive: Do a sanity check that directory check passes
 TEST_F(DirectoryCheckTest, Basic) {
@@ -483,4 +588,5 @@ TEST_F(DirectoryCheckTest, Basic) {
     check.run(opCtx.get());
 }
 
+}  // namespace
 }  // namespace mongo

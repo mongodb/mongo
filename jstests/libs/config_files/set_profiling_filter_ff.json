@@ -1,0 +1,5 @@
+{
+    "operationProfiling" : {
+        "filter" : "{$expr: {$lt: [{$_testFeatureFlagLastLTS: 1}, 0.01]}}"
+    }
+}

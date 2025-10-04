@@ -29,14 +29,15 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user_name.h"
-#include "mongo/stdx/variant.h"
+#include "mongo/db/database_name.h"
+
+#include <string>
+#include <variant>
 
 namespace mongo {
 namespace auth {
@@ -62,35 +63,46 @@ public:
     static_assert(std::is_same<UserName, T>::value || std::is_same<RoleName, T>::value,
                   "UMCInfoCommandArg only valid with T = UserName | RoleName");
 
-    static UMCInfoCommandArg parseFromBSON(const BSONElement& elem) {
+    using Single = std::variant<T, std::string>;
+    using Multiple = std::vector<Single>;
+
+    explicit UMCInfoCommandArg(Single value) : _value(std::move(value)) {}
+    explicit UMCInfoCommandArg(Multiple values) : _value(std::move(values)) {}
+
+    static UMCInfoCommandArg parseFromBSON(const boost::optional<TenantId> tenantId,
+                                           const BSONElement& elem,
+                                           const SerializationContext&) {
         if (elem.isNumber() && (elem.safeNumberLong() == 1)) {
             return UMCInfoCommandArg(AllOnCurrentDB{});
         }
-        if (enableForAllDBs && (elem.type() == Object) && (elem.Obj()[kForAllDBs].trueValue())) {
+        if (enableForAllDBs && (elem.type() == BSONType::object) &&
+            (elem.Obj()[kForAllDBs].trueValue())) {
             return UMCInfoCommandArg(AllForAllDBs{});
         }
 
-        if (elem.type() == Array) {
+        if (elem.type() == BSONType::array) {
             Multiple values;
             for (const auto& v : elem.Obj()) {
-                values.push_back(parseNamedElement(v));
+                values.push_back(parseNamedElement(v, tenantId));
             }
             return UMCInfoCommandArg(std::move(values));
         }
 
-        return UMCInfoCommandArg(parseNamedElement(elem));
+        return UMCInfoCommandArg(parseNamedElement(elem, tenantId));
     }
 
-    void serializeToBSON(StringData fieldName, BSONObjBuilder* bob) const {
-        if (stdx::holds_alternative<AllOnCurrentDB>(_value)) {
+    void serializeToBSON(StringData fieldName,
+                         BSONObjBuilder* bob,
+                         const SerializationContext&) const {
+        if (holds_alternative<AllOnCurrentDB>(_value)) {
             bob->append(fieldName, 1);
-        } else if (stdx::holds_alternative<AllForAllDBs>(_value)) {
+        } else if (holds_alternative<AllForAllDBs>(_value)) {
             bob->append(fieldName, BSON(kForAllDBs << 1));
-        } else if (stdx::holds_alternative<Single>(_value)) {
-            serializeSingle(fieldName, bob, stdx::get<Single>(_value));
+        } else if (holds_alternative<Single>(_value)) {
+            serializeSingle(fieldName, bob, get<Single>(_value));
         } else {
-            invariant(stdx::holds_alternative<Multiple>(_value));
-            const auto& elems = stdx::get<Multiple>(_value);
+            invariant(holds_alternative<Multiple>(_value));
+            const auto& elems = get<Multiple>(_value);
             BSONArrayBuilder setBuilder(bob->subarrayStart(fieldName));
             for (const auto& elem : elems) {
                 serializeSingle(&setBuilder, elem);
@@ -99,11 +111,12 @@ public:
         }
     }
 
-    void serializeToBSON(BSONArrayBuilder* bob) const {
+    void serializeToBSON(BSONArrayBuilder* bob,
+                         const SerializationContext& serializationContext) const {
         // Minimize code duplication by using object serialization path.
         // In practice, we don't use this API, it only exists for IDL completeness.
         BSONObjBuilder tmp;
-        serializeToBSON("", &tmp);
+        serializeToBSON("", &tmp, serializationContext);
         auto elem = tmp.obj();
         bob->append(elem.firstElement());
     }
@@ -112,37 +125,37 @@ public:
      * {usersInfo: 1}
      */
     bool isAllOnCurrentDB() const {
-        return stdx::holds_alternative<AllOnCurrentDB>(_value);
+        return holds_alternative<AllOnCurrentDB>(_value);
     }
 
     /**
      * {usersInfo: {forrAllDBs: 1}}
      */
     bool isAllForAllDBs() const {
-        return stdx::holds_alternative<AllForAllDBs>(_value);
+        return holds_alternative<AllForAllDBs>(_value);
     }
 
     /**
      * {usersInfo: 'string' | {db,user|role} | [...] }
      */
     bool isExact() const {
-        return stdx::holds_alternative<Single>(_value) || stdx::holds_alternative<Multiple>(_value);
+        return holds_alternative<Single>(_value) || holds_alternative<Multiple>(_value);
     }
 
     /**
      * For isExact() commands, returns a set of T with unspecified DB names resolved with $dbname.
      */
-    std::vector<T> getElements(StringData dbname) const {
+    std::vector<T> getElements(const DatabaseName& dbname) const {
         if (!isExact()) {
             dassert(false);
             uasserted(ErrorCodes::InternalError, "Unable to get exact match for wildcard query");
         }
 
-        if (stdx::holds_alternative<Single>(_value)) {
-            return {getElement(stdx::get<Single>(_value), dbname)};
+        if (holds_alternative<Single>(_value)) {
+            return {getElement(get<Single>(_value), dbname)};
         } else {
-            invariant(stdx::holds_alternative<Multiple>(_value));
-            const auto& values = stdx::get<Multiple>(_value);
+            invariant(holds_alternative<Multiple>(_value));
+            const auto& values = get<Multiple>(_value);
             std::vector<T> ret;
             std::transform(values.cbegin(),
                            values.cend(),
@@ -157,51 +170,48 @@ private:
 
     struct AllOnCurrentDB {};
     struct AllForAllDBs {};
-    using Single = stdx::variant<T, std::string>;
-    using Multiple = std::vector<Single>;
 
     explicit UMCInfoCommandArg(AllOnCurrentDB opt) : _value(std::move(opt)) {}
     explicit UMCInfoCommandArg(AllForAllDBs opt) : _value(std::move(opt)) {}
-    explicit UMCInfoCommandArg(Single value) : _value(std::move(value)) {}
-    explicit UMCInfoCommandArg(Multiple values) : _value(std::move(values)) {}
 
-    static Single parseNamedElement(const BSONElement& elem) {
-        if (elem.type() == String) {
+    static Single parseNamedElement(const BSONElement& elem,
+                                    const boost::optional<TenantId> tenantId) {
+        if (elem.type() == BSONType::string) {
             return elem.String();
         }
-        return T::parseFromBSON(elem);
+        return T::parseFromBSON(elem, tenantId);
     }
 
     static void serializeSingle(StringData fieldName, BSONObjBuilder* builder, Single elem) {
-        if (stdx::holds_alternative<T>(elem)) {
-            builder->append(fieldName, stdx::get<T>(elem).toBSON());
+        if (holds_alternative<T>(elem)) {
+            builder->append(fieldName, get<T>(elem).toBSON());
         } else {
-            invariant(stdx::holds_alternative<std::string>(elem));
-            builder->append(fieldName, stdx::get<std::string>(elem));
+            invariant(holds_alternative<std::string>(elem));
+            builder->append(fieldName, get<std::string>(elem));
         }
     }
 
     static void serializeSingle(BSONArrayBuilder* builder, Single elem) {
-        if (stdx::holds_alternative<T>(elem)) {
-            builder->append(stdx::get<T>(elem).toBSON());
+        if (holds_alternative<T>(elem)) {
+            builder->append(get<T>(elem).toBSON());
         } else {
-            invariant(stdx::holds_alternative<std::string>(elem));
-            builder->append(stdx::get<std::string>(elem));
+            invariant(holds_alternative<std::string>(elem));
+            builder->append(get<std::string>(elem));
         }
     }
 
-    static T getElement(Single elem, StringData dbname) {
-        if (stdx::holds_alternative<T>(elem)) {
-            return stdx::get<T>(elem);
+    static T getElement(Single elem, const DatabaseName& dbname) {
+        if (holds_alternative<T>(elem)) {
+            return get<T>(elem);
         } else {
-            invariant(stdx::holds_alternative<std::string>(elem));
-            return T(stdx::get<std::string>(elem), dbname);
+            invariant(holds_alternative<std::string>(elem));
+            return T(get<std::string>(elem), dbname);
         }
     }
 
     // Single is stored as a distinct type from Multiple
     // to ensure that reserialization maintains the same level of nesting.
-    stdx::variant<AllOnCurrentDB, AllForAllDBs, Single, Multiple> _value;
+    std::variant<AllOnCurrentDB, AllForAllDBs, Single, Multiple> _value;
 };
 
 using UsersInfoCommandArg = UMCInfoCommandArg<UserName, true>;

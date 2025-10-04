@@ -29,9 +29,20 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/logv2/constants.h"
+#include "mongo/logv2/log_component_settings.h"
+#include "mongo/logv2/log_domain.h"
 #include "mongo/logv2/log_domain_internal.h"
 #include "mongo/logv2/log_format.h"
+#include "mongo/logv2/log_source.h"
+#include "mongo/platform/atomic_word.h"
+
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <string>
 
 namespace mongo::logv2 {
 class LogDomainGlobal : public LogDomain::Internal {
@@ -45,17 +56,19 @@ public:
         std::string filePath;
         RotationMode fileRotationMode{RotationMode::kRename};
         OpenMode fileOpenMode{OpenMode::kTruncate};
-        LogTimestampFormat timestampFormat{LogTimestampFormat::kISO8601UTC};
+        LogTimestampFormat timestampFormat{LogTimestampFormat::kISO8601Local};
         bool syslogEnabled{false};
         int syslogFacility{-1};  // invalid facility by default, must be set
         LogFormat format{LogFormat::kDefault};
         const AtomicWord<int32_t>* maxAttributeSizeKB = nullptr;
 
+        std::string backtraceFilePath;
+
         void makeDisabled();
     };
 
     LogDomainGlobal();
-    ~LogDomainGlobal();
+    ~LogDomainGlobal() override;
 
     LogSource& source() override;
 

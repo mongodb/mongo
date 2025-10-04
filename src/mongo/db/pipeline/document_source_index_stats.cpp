@@ -27,13 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/pipeline/document_source_index_stats.h"
 
-#include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/pipeline/document_source_queue.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/topology/cluster_role.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/net/socket_utils.h"
+
+#include <iterator>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -44,39 +53,37 @@ REGISTER_DOCUMENT_SOURCE(indexStats,
                          DocumentSourceIndexStats::createFromBson,
                          AllowedWithApiStrict::kNeverInVersion1);
 
-const char* DocumentSourceIndexStats::getSourceName() const {
-    return kStageName.rawData();
-}
 
-DocumentSource::GetNextResult DocumentSourceIndexStats::doGetNext() {
-    if (_indexStats.empty()) {
-        _indexStats = pExpCtx->mongoProcessInterface->getIndexStats(
-            pExpCtx->opCtx, pExpCtx->ns, _processName, pExpCtx->fromMongos);
-        _indexStatsIter = _indexStats.cbegin();
-    }
-
-    if (_indexStatsIter != _indexStats.cend()) {
-        Document doc{std::move(*_indexStatsIter)};
-        ++_indexStatsIter;
-        return doc;
-    }
-
-    return GetNextResult::makeEOF();
-}
-
-DocumentSourceIndexStats::DocumentSourceIndexStats(const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(kStageName, pExpCtx), _processName(getHostNameCachedAndPort()) {}
-
+// Implements 'DocumentSourceIndexStats' based on a shard-only 'DocumentSourceQueue' stage.
 intrusive_ptr<DocumentSource> DocumentSourceIndexStats::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
     uassert(28803,
             "The $indexStats stage specification must be an empty object",
-            elem.type() == Object && elem.Obj().isEmpty());
-    return new DocumentSourceIndexStats(pExpCtx);
-}
+            elem.type() == BSONType::object && elem.Obj().isEmpty());
 
-Value DocumentSourceIndexStats::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
-    return Value(DOC(getSourceName() << Document()));
+    // Get the index stats for the current shard and map them over a deferred queue. The queue won't
+    // be populated until reaching the shards due to the host type requirement.
+    DocumentSourceQueue::DeferredQueue deferredQueue{[pExpCtx]() {
+        auto indexStats = pExpCtx->getMongoProcessInterface()->getIndexStats(
+            pExpCtx->getOperationContext(),
+            pExpCtx->getNamespaceString(),
+            prettyHostNameAndPort(pExpCtx->getOperationContext()->getClient()->getLocalPort()),
+            !serverGlobalParams.clusterRole.has(ClusterRole::None));
+        std::deque<DocumentSource::GetNextResult> queue;
+        std::copy(std::make_move_iterator(indexStats.begin()),
+                  std::make_move_iterator(indexStats.end()),
+                  std::back_inserter(queue));
+        return queue;
+    }};
+
+    // Since the deferred queue needs to be initialized only on shards, the default
+    // 'DocumentSourceQueue::serialize()' method needs to be avoided, so a 'serializeOverride' is
+    // provided. Without this, 'DocumentSourceQueue::serialize()' will trigger the deferred queue
+    // initialization on 'mongos' instances, leading to 'MONGO_UNREACHEABLE'.
+    return make_intrusive<DocumentSourceQueue>(std::move(deferredQueue),
+                                               pExpCtx,
+                                               /* stageNameOverride */ kStageName,
+                                               /* serializeOverride*/ Value{elem.wrap()},
+                                               /* constraintsOverride */ constraints());
 }
 }  // namespace mongo

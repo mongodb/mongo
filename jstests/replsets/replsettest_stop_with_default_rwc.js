@@ -2,8 +2,7 @@
  * Tests that none of the operations in the ReplSetTest consistency checks are affected by
  * changing the default read or write concern during the test itself.
  */
-(function() {
-"use strict";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const name = jsTestName();
 
@@ -16,13 +15,14 @@ rst.initiate();
 // local values.
 // The write concern is unsatisfiable, so any operations run in the shutdown hooks will fail if
 // they inherit it.
-assert.commandWorked(rst.getPrimary().adminCommand({
-    setDefaultRWConcern: 1,
-    defaultWriteConcern: {w: 42},
-    defaultReadConcern: {level: "majority"}
-}));
+assert.commandWorked(
+    rst.getPrimary().adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 42},
+        defaultReadConcern: {level: "majority"},
+    }),
+);
 
 // It should always be possible to successfully stop the replset (including running consistency
 // checks) even when the default write concern is unsatisfiable.
 rst.stopSet();
-})();

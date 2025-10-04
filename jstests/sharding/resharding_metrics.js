@@ -1,165 +1,32 @@
-/**
- * Tests the basic functionality of the resharding metrics section in server status.
- *
- * @tags: [
- *   uses_atclustertime,
- * ]
- */
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
-(function() {
-'use strict';
-
-load("jstests/libs/discover_topology.js");
-load("jstests/sharding/libs/resharding_test_fixture.js");
-
-const kNamespace = "reshardingDb.coll";
-
-function verifyMetrics(metrics, expected) {
-    for (var key in expected) {
-        assert(metrics.hasOwnProperty(key), `Missing ${key} in ${tojson(metrics)}`);
-        const expectedValue = expected[key];
-        // The contract for this method is to treat `undefined` as an indication for non-important
-        // or non-deterministic values.
-        if (expectedValue === undefined)
-            continue;
-        assert.eq(metrics[key],
-                  expectedValue,
-                  `Expected the value for ${key} to be ${expectedValue}: ${tojson(metrics)}`);
-    }
-}
-
-function testMetricsArePresent(mongo, expectedMetrics, minOplogEntriesFetchedAndApplied) {
-    const stats = mongo.getDB('admin').serverStatus({});
-    assert(stats.hasOwnProperty('shardingStatistics'), stats);
-    const shardingStats = stats.shardingStatistics;
-    assert(shardingStats.hasOwnProperty('resharding'),
-           `Missing resharding section in ${tojson(shardingStats)}`);
-
-    const metrics = shardingStats.resharding;
-    verifyMetrics(metrics, expectedMetrics);
-
-    if (minOplogEntriesFetchedAndApplied !== undefined) {
-        // The fetcher writes no-op entries for each getMore that returns an empty batch. We won't
-        // know how many getMores it called however, so we can only check that the metrics are gte
-        // the number of writes we're aware of.
-        assert.eq(metrics["oplogEntriesFetched"], metrics["oplogEntriesApplied"]);
-        assert.gte(metrics["oplogEntriesFetched"], minOplogEntriesFetchedAndApplied);
-        assert.gte(metrics["oplogEntriesApplied"], minOplogEntriesFetchedAndApplied);
-    }
-}
-
-function verifyParticipantServerStatusOutput(
-    reshardingTest, inputCollection, expectedMetrics, minOplogEntriesFetchedAndApplied) {
-    const donorShardNames = reshardingTest.donorShardNames;
-    const recipientShardNames = reshardingTest.recipientShardNames;
-
-    const mongos = inputCollection.getMongo();
-    const topology = DiscoverTopology.findConnectedNodes(mongos);
-
-    testMetricsArePresent(new Mongo(topology.shards[donorShardNames[0]].primary),
-                          expectedMetrics,
-                          minOplogEntriesFetchedAndApplied);
-    testMetricsArePresent(new Mongo(topology.shards[donorShardNames[1]].primary),
-                          expectedMetrics,
-                          minOplogEntriesFetchedAndApplied);
-    testMetricsArePresent(new Mongo(topology.shards[recipientShardNames[0]].primary),
-                          expectedMetrics,
-                          minOplogEntriesFetchedAndApplied);
-    testMetricsArePresent(new Mongo(topology.shards[recipientShardNames[1]].primary),
-                          expectedMetrics,
-                          minOplogEntriesFetchedAndApplied);
-}
-
-function verifyCoordinatorServerStatusOutput(inputCollection, expectedMetrics) {
-    const mongos = inputCollection.getMongo();
-    const topology = DiscoverTopology.findConnectedNodes(mongos);
-
-    testMetricsArePresent(new Mongo(topology.configsvr.primary), expectedMetrics);
-}
-
-// Tests the currentOp output for each donor, each recipient, and the coordinator.
-function checkCurrentOp(mongo, clusterName, role, expected) {
-    function getCurrentOpReport(mongo, role) {
-        return mongo.getDB("admin").currentOp(
-            {ns: kNamespace, desc: {$regex: 'Resharding' + role + 'Service.*'}});
-    }
-
-    jsTest.log(`Testing currentOp output for ${role}s on ${clusterName}`);
+const kNamespace = "test.resharding";
+function getCurrentOpSection(mongo, role) {
+    let curOpSection = {};
     assert.soon(() => {
-        const report = getCurrentOpReport(mongo, role);
-        if (report.inprog.length === 1)
+        const report = mongo
+            .getDB("admin")
+            .currentOp({ns: kNamespace, desc: {$regex: "ReshardingMetrics" + role + "Service"}});
+
+        if (report.inprog.length === 1) {
+            curOpSection = report.inprog[0];
             return true;
+        }
 
         jsTest.log(tojson(report));
         return false;
-    }, () => `: was unable to find resharding ${role} service in currentOp output`);
-
-    verifyMetrics(getCurrentOpReport(mongo, role).inprog[0], expected);
+    }, `: was unable to find resharding ${role} service in currentOp output from ${mongo.host}`);
+    return curOpSection;
 }
 
-function verifyCurrentOpOutput(reshardingTest, inputCollection) {
-    // Wait for the resharding operation and the donor services to start.
-    const mongos = inputCollection.getMongo();
-    assert.soon(() => {
-        const coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({
-            ns: inputCollection.getFullName()
-        });
-        return coordinatorDoc !== null && coordinatorDoc.cloneTimestamp !== undefined;
-    });
+function getServerStatusSection(mongo) {
+    const stats = mongo.getDB("admin").serverStatus({});
+    assert(stats.hasOwnProperty("shardingStatistics"), stats);
+    const shardingStats = stats.shardingStatistics;
+    assert(shardingStats.hasOwnProperty("resharding"), `Missing resharding section in ${tojson(shardingStats)}`);
 
-    const topology = DiscoverTopology.findConnectedNodes(mongos);
-
-    reshardingTest.donorShardNames.forEach(function(shardName) {
-        checkCurrentOp(new Mongo(topology.shards[shardName].primary), shardName, "Donor", {
-            "type": "op",
-            "op": "command",
-            "ns": kNamespace,
-            "originatingCommand": undefined,
-            "totalOperationTimeElapsedSecs": undefined,
-            "countWritesDuringCriticalSection": 0,
-            "totalCriticalSectionTimeElapsedSecs": undefined,
-            "donorState": undefined,
-            "opStatus": "running",
-        });
-    });
-
-    let expectedRecipientMetrics = {
-        "type": "op",
-        "op": "command",
-        "ns": kNamespace,
-        "originatingCommand": undefined,
-        "totalOperationTimeElapsedSecs": undefined,
-        "remainingOperationTimeEstimatedSecs": undefined,
-        "approxDocumentsToCopy": undefined,
-        "approxBytesToCopy": undefined,
-        "documentsCopied": undefined,
-        "bytesCopied": undefined,
-        "totalCopyTimeElapsedSecs": undefined,
-        "oplogEntriesFetched": undefined,
-        "oplogEntriesApplied": undefined,
-        "totalApplyTimeElapsedSecs": undefined,
-        "recipientState": undefined,
-        "opStatus": "running",
-        "oplogApplierApplyBatchLatencyMillis": undefined,
-        "collClonerFillBatchForInsertLatencyMillis": undefined,
-    };
-
-    reshardingTest.recipientShardNames.forEach(function(shardName) {
-        checkCurrentOp(new Mongo(topology.shards[shardName].primary),
-                       shardName,
-                       "Recipient",
-                       expectedRecipientMetrics);
-    });
-
-    checkCurrentOp(new Mongo(topology.configsvr.nodes[0]), "configsvr", "Coordinator", {
-        "type": "op",
-        "op": "command",
-        "ns": kNamespace,
-        "originatingCommand": undefined,
-        "totalOperationTimeElapsedSecs": undefined,
-        "coordinatorState": undefined,
-        "opStatus": "running",
-    });
+    return shardingStats.resharding;
 }
 
 const reshardingTest = new ReshardingTest({numDonors: 2, numRecipients: 2, reshardInPlace: true});
@@ -175,77 +42,76 @@ const inputCollection = reshardingTest.createShardedCollection({
     ],
 });
 
-var initialServerStatusMetrics = {
-    "countReshardingOperations": 0,
-    "countReshardingSuccessful": 0,
-    "countReshardingFailures": 0,
-    "countReshardingCanceled": 0,
-    "documentsCopied": 0,
-    "bytesCopied": 0,
-    "oplogEntriesApplied": 0,
-    "countWritesDuringCriticalSection": 0,
-    "lastOpEndingChunkImbalance": 0,
-};
-
-verifyParticipantServerStatusOutput(reshardingTest, inputCollection, initialServerStatusMetrics);
-
-// Min and max remaining times should be 0 because the resharding operation hasn't yet started.
-var expected = {
-    lastOpEndingChunkImbalance: 0,
-    minShardRemainingOperationTimeEstimatedMillis: 0,
-    maxShardRemainingOperationTimeEstimatedMillis: 0,
-};
-verifyCoordinatorServerStatusOutput(inputCollection, expected);
-
-var documentsInserted = [
-    {_id: "stays on shard0", oldKey: -10, newKey: -10},
-    {_id: "moves to shard0", oldKey: 10, newKey: -10},
-    {_id: "moves to shard1", oldKey: -10, newKey: 10},
-    {_id: "stays on shard1", oldKey: 10, newKey: 10},
-];
-
-assert.commandWorked(inputCollection.insert(documentsInserted));
-
 const recipientShardNames = reshardingTest.recipientShardNames;
-reshardingTest.withReshardingInBackground(  //
+const topology = DiscoverTopology.findConnectedNodes(inputCollection.getMongo());
+let allNodes = [];
+for (let [_, shardReplSet] of Object.entries(topology.shards)) {
+    allNodes.push(shardReplSet.primary);
+}
+allNodes.push(topology.configsvr.primary);
+allNodes.forEach((hostName) => {
+    const status = new Mongo(hostName).getDB("admin").serverStatus({});
+    const shardingStats = status.shardingStatistics;
+    assert(!shardingStats.hasOwnProperty("resharding"));
+});
+
+reshardingTest.withReshardingInBackground(
     {
         newShardKeyPattern: {newKey: 1},
         newChunks: [
             {min: {newKey: MinKey}, max: {newKey: 0}, shard: recipientShardNames[0]},
-            {min: {newKey: 0}, max: {newKey: 10}, shard: recipientShardNames[1]},
-            {min: {newKey: 10}, max: {newKey: 20}, shard: recipientShardNames[1]},
-            {min: {newKey: 20}, max: {newKey: 30}, shard: recipientShardNames[1]},
-            {min: {newKey: 30}, max: {newKey: MaxKey}, shard: recipientShardNames[1]},
+            {min: {newKey: 0}, max: {newKey: MaxKey}, shard: recipientShardNames[1]},
         ],
     },
-    (tempNs) => {
-        verifyCurrentOpOutput(reshardingTest, inputCollection);
-    });
+    () => {
+        // Wait for the resharding operation and the donor services to start.
+        const mongos = inputCollection.getMongo();
+        assert.soon(() => {
+            const coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({
+                ns: inputCollection.getFullName(),
+            });
+            return coordinatorDoc !== null && coordinatorDoc.cloneTimestamp !== undefined;
+        });
 
-var finalServerStatusMetrics = {
-    "countReshardingOperations": 1,
-    "countReshardingSuccessful": 1,
-    "countReshardingFailures": 0,
-    "countReshardingCanceled": 0,
-    "documentsCopied": 2,
-    "bytesCopied": Object.bsonsize(documentsInserted[1]) + Object.bsonsize(documentsInserted[2]),
-    "countWritesDuringCriticalSection": 0,
-    "lastOpEndingChunkImbalance": 0,
-};
+        donorShardNames.forEach(function (shardName) {
+            const curOpSection = getCurrentOpSection(new Mongo(topology.shards[shardName].primary), "Donor");
+            assert(curOpSection.hasOwnProperty("donorState"), tojson(curOpSection));
+            assert(curOpSection.hasOwnProperty("totalCriticalSectionTimeElapsedSecs"), tojson(curOpSection));
+        });
 
-verifyParticipantServerStatusOutput(reshardingTest,
-                                    inputCollection,
-                                    finalServerStatusMetrics,
-                                    2 /* minOplogEntriesFetchedAndApplied */);
+        recipientShardNames.forEach(function (shardName) {
+            const curOpSection = getCurrentOpSection(new Mongo(topology.shards[shardName].primary), "Recipient");
+            assert(curOpSection.hasOwnProperty("recipientState"), tojson(curOpSection));
+            assert(curOpSection.hasOwnProperty("documentsCopied"), tojson(curOpSection));
+            assert(curOpSection.hasOwnProperty("oplogEntriesApplied"), tojson(curOpSection));
+        });
 
-// Min and max remaining times should be 0 because they are reset at the end of every resharding
-// operation.
-var expected = {
-    lastOpEndingChunkImbalance: 3,
-    minShardRemainingOperationTimeEstimatedMillis: 0,
-    maxShardRemainingOperationTimeEstimatedMillis: 0,
-};
-verifyCoordinatorServerStatusOutput(inputCollection, expected);
+        const curOpSection = getCurrentOpSection(new Mongo(topology.configsvr.nodes[0]), "Coordinator");
+        assert(curOpSection.hasOwnProperty("coordinatorState"), tojson(curOpSection));
+        assert(curOpSection.hasOwnProperty("totalCriticalSectionTimeElapsedSecs"), tojson(curOpSection));
+    },
+);
+
+allNodes.forEach((hostName) => {
+    const serverStatus = getServerStatusSection(new Mongo(hostName));
+
+    let debugStr = () => {
+        return "server: " + tojson(hostName) + ", serverStatusSection: " + tojson(serverStatus);
+    };
+    assert(serverStatus.hasOwnProperty("countSucceeded"), debugStr());
+    assert(serverStatus.hasOwnProperty("countFailed"), debugStr());
+
+    assert(serverStatus.hasOwnProperty("active"), debugStr());
+    assert(serverStatus.active.hasOwnProperty("documentsCopied"), debugStr());
+
+    assert(serverStatus.hasOwnProperty("oldestActive"), debugStr());
+    assert(serverStatus.oldestActive.hasOwnProperty("recipientRemainingOperationTimeEstimatedMillis"), debugStr());
+
+    assert(serverStatus.hasOwnProperty("latencies"), debugStr());
+    assert(serverStatus.latencies.hasOwnProperty("collectionCloningTotalLocalInsertTimeMillis"), debugStr());
+
+    assert(serverStatus.hasOwnProperty("currentInSteps"), debugStr());
+    assert(serverStatus.currentInSteps.hasOwnProperty("countInstancesInRecipientState2CreatingCollection"), debugStr());
+});
 
 reshardingTest.teardown();
-})();

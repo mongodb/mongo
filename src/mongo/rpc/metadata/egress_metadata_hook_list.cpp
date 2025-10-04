@@ -27,12 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+
+#include <utility>
 
 namespace mongo {
 namespace rpc {
@@ -54,10 +56,9 @@ Status EgressMetadataHookList::writeRequestMetadata(OperationContext* opCtx,
 }
 
 Status EgressMetadataHookList::readReplyMetadata(OperationContext* opCtx,
-                                                 StringData replySource,
                                                  const BSONObj& metadataObj) {
     for (auto&& hook : _hooks) {
-        auto status = hook->readReplyMetadata(opCtx, replySource, metadataObj);
+        auto status = hook->readReplyMetadata(opCtx, metadataObj);
         if (!status.isOK()) {
             return status;
         }

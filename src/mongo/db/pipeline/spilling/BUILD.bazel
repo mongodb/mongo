@@ -1,0 +1,73 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "spilling_stats",
+    srcs = ["//src/mongo/db/pipeline/spilling:spilling_stats.cpp"],
+    hdrs = ["//src/mongo/db/pipeline/spilling:spilling_stats.h"],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "spilling",
+    srcs = [
+        "//src/mongo/db/pipeline/spilling:spill_table_batch_writer.cpp",
+        "//src/mongo/db/pipeline/spilling:spillable_deque.cpp",
+        "//src/mongo/db/pipeline/spilling:spillable_map.cpp",
+    ],
+    hdrs = [
+        "//src/mongo/db/pipeline/spilling:spill_table_batch_writer.h",
+        "//src/mongo/db/pipeline/spilling:spillable_deque.h",
+        "//src/mongo/db/pipeline/spilling:spillable_map.h",
+    ],
+    deps = [
+        ":spilling_stats",
+        "//src/mongo:base",
+        "//src/mongo/db/exec/document_value",
+        "//src/mongo/db/query:spill_util",
+        "//src/mongo/db/storage:spill_table",
+        "//src/mongo/db/storage/key_string",
+    ],
+)
+
+mongo_cc_library(
+    name = "spilling_test_utils",
+    srcs = [
+        "spilling_test_fixture.cpp",
+    ],
+    hdrs = [
+        "spilling_test_fixture.h",
+    ],
+    deps = [
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db/local_catalog/lock_manager:exception_util",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/pipeline/process_interface:mongod_process_interface_factory",
+        "//src/mongo/db/query:query_test_service_context",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_spilling_test",
+    srcs = [
+        "spill_table_batch_writer_test.cpp",
+        "spillable_deque_test.cpp",
+        "spillable_map_test.cpp",
+        "spilling_stats_test.cpp",
+    ],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        ":spilling_test_utils",
+        "//src/mongo/db/exec/document_value:document_value_test_util",
+    ],
+)

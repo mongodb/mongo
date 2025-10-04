@@ -30,7 +30,175 @@ global:
     cpp_namespace: "mongo"
 
 feature_flags:
-    featureFlagMongoStore:
-        description: "Enable mongod operation in MongoStore mode"
-        cpp_varname: gFeatureFlagMongoStore
+    featureFlagSecurityToken:
+        description: "Enable parsing and handling of SecurityTokens in multitenancy mode"
+        cpp_varname: gFeatureFlagSecurityToken
         default: false
+        fcv_gated: true
+        fcv_context_unaware: true
+    featureFlagAllowAdditionalParticipants:
+        description: "Enable adding additional participants to active transaction"
+        cpp_varname: gFeatureFlagAllowAdditionalParticipants
+        default: true
+        version: 8.0
+        fcv_gated: true
+        fcv_context_unaware: true
+    featureFlagBulkWriteCommand:
+        description: "Support for bulkWrite command and one-shot transactions"
+        cpp_varname: gFeatureFlagBulkWriteCommand
+        default: true
+        fcv_gated: false
+    featureFlagRecordIdsReplicated:
+        description: "Enable creating collections with the RecordIdsReplicated option."
+        cpp_varname: gFeatureFlagRecordIdsReplicated
+        default: false
+        fcv_gated: true
+    featureFlagStreams:
+        description: "Enable support for streams"
+        cpp_varname: gFeatureFlagStreams
+        default: false
+        fcv_gated: true
+    featureFlagUseReplicatedTruncatesForDeletions:
+        description: >-
+            Feature flag to enable pre-image collection and change collection maintenance
+            using replicated truncates instead of unreplicated truncates.
+        cpp_varname: feature_flags::gFeatureFlagUseReplicatedTruncatesForDeletions
+        default: false
+        fcv_gated: true
+    featureFlagEndOfTransactionChangeEvent:
+        description: "Feature flag to enable endOfTransaction oplog entry and change stream event"
+        cpp_varname: feature_flags::gFeatureFlagEndOfTransactionChangeEvent
+        default: false
+        fcv_gated: true
+        fcv_context_unaware: true
+    featureFlagAllMongodsAreSharded:
+        description: "Feature flag to enable and autobootstrap sharding for all mongods"
+        cpp_varname: gFeatureFlagAllMongodsAreSharded
+        default: false
+        fcv_gated: true
+    featureFlagBanEncryptionOptionsInCollectionCreation:
+        description: >-
+            Feature flag that bans encryption options from being used in createCollection
+            commands
+        cpp_varname: gFeatureFlagBanEncryptionOptionsInCollectionCreation
+        default: true
+        version: 7.2
+        fcv_gated: true
+        fcv_context_unaware: true
+    featureFlagRearchitectUserAcquisition:
+        description: "Enable new flow for authentication and authorization"
+        cpp_varname: gFeatureFlagRearchitectUserAcquisition
+        default: true
+        fcv_gated: false
+    featureFlagAutoCompact:
+        description: "Feature flag to execute background compaction"
+        cpp_varname: gFeatureFlagAutoCompact
+        default: true
+        fcv_gated: false
+    featureFlagCompactOptions:
+        description: "Feature flag to execute compaction with more options"
+        cpp_varname: gFeatureFlagCompactOptions
+        default: true
+        fcv_gated: false
+    # TODO(SERVER-101423): Remove once 9.0 becomes last LTS.
+    featureFlagRemoveLegacyTimeseriesBucketingParametersHaveChanged:
+        description: "Remove the legacy 'md.timeseriesBucketingParametersHaveChanged' flag from the collection metadata"
+        cpp_varname: feature_flags::gRemoveLegacyTimeseriesBucketingParametersHaveChanged
+        default: true
+        version: 8.2
+        fcv_gated: true
+    featureFlagPrefetch:
+        description: "Feature flag to make pre-fetching available"
+        cpp_varname: gFeatureFlagPrefetch
+        default: true
+        fcv_gated: false
+    featureFlagErrorAndLogValidationAction:
+        description: "Feature flag to enable errorAndLog validatio action in collection options"
+        cpp_varname: gFeatureFlagErrorAndLogValidationAction
+        default: true
+        version: 8.1
+        fcv_gated: true
+    featureFlagDistinguishMetadataInconsistencyFromConflictingOperation:
+        description: "Feature flag to distinguish ChunkMetadataInconsistency from ConflictingOperationInProgress error"
+        cpp_varname: gDistinguishMetadataInconsistencyFromConflictingOperation
+        default: true
+        version: 8.1
+        fcv_gated: true
+    featureFlagQETextSearchPreview:
+        description: "Queryable Encryption text search"
+        cpp_varname: gFeatureFlagQETextSearchPreview
+        default: true
+        version: 8.2
+        fcv_gated: true
+    featureFlagExposeClientIpInAuditLogs:
+        description: "Expose client IP in audit logs for load-balanced connections"
+        cpp_varname: gFeatureFlagExposeClientIpInAuditLogs
+        default: true
+        version: 8.1
+        fcv_gated: true
+        fcv_context_unaware: true
+    featureFlagCreateViewlessTimeseriesCollections:
+        description: >-
+            Enables the creation of viewless timeseries collections.
+            Viewless timeseries collections have only one associated namespace,
+            instead of a view namespace and a system.buckets namespace.
+        cpp_varname: gFeatureFlagCreateViewlessTimeseriesCollections
+        default: false
+        fcv_gated: true
+    featureFlagMongodProxyProtocolSupport:
+        description: "Enables non-OCS proxy protocol connections on Mongos and Mongod"
+        cpp_varname: gFeatureFlagMongodProxyProtocolSupport
+        default: true
+        version: 8.1
+        fcv_gated: true
+    featureFlagRawDataCrudOperations:
+        description: "Feature flag for rawData CRUD operations"
+        cpp_varname: gFeatureFlagRawDataCrudOperations
+        default: true
+        fcv_gated: false
+    featureFlagAllBinariesSupportRawDataOperations:
+        description: >-
+            Feature flag which is only enabled once an upgrade to FCV v8.2 or higher is initiated,
+            which guarantees that all binaries in the cluster support rawData operations.
+
+            (Enable on transitional FCV): This feature flag persists no data, and is only used to
+            determine if the `rawData` generic command argument can be used to clone viewless
+            timeseries collections (see featureFlagCreateViewlessTimeseriesCollections).
+            If this feature flag is disabled by a FCV downgrade, all users of this flag must either
+            finish before setFCV does, or fail gracefully they if older binaries not supporting
+            rawData are swapped in (causing commands to fail with an IDLUnknownField error).
+        cpp_varname: gFeatureFlagAllBinariesSupportRawDataOperations
+        default: true
+        version: 8.2
+        fcv_gated: true
+        enable_on_transitional_fcv_UNSAFE: true
+    featureFlagIntentRegistration:
+        description: "Enables intent registration in place of RSTL acquisitions"
+        cpp_varname: gFeatureFlagIntentRegistration
+        default: false
+        fcv_gated: false
+    featureFlagRecordDelinquentMetrics:
+        description: "Enables delinquent metrics recording"
+        cpp_varname: gFeatureFlagRecordDelinquentMetrics
+        default: true
+        fcv_gated: false
+    featureFlagRateLimitIngressConnectionEstablishment:
+        description: "Queues connection establishment after exceeding the maximum rate"
+        cpp_varname: gFeatureFlagRateLimitIngressConnectionEstablishment
+        default: true
+        fcv_gated: false
+    featureFlagIngressRateLimiting:
+        description: "Limit the rate of operation going through ingress admission"
+        cpp_varname: gFeatureFlagIngressRateLimiting
+        default: true
+        fcv_gated: false
+    featureFlagMandatoryAuthzChecks:
+        description: "Feature flag to enable mandatory authorization checks on command and agg stages"
+        cpp_varname: gFeatureFlagMandatoryAuthzChecks
+        default: false
+        fcv_gated: false
+    featureFlagSupportOverloadRetryability:
+        description: "Feature flag to enable support overload retryability in server-based clients"
+        cpp_varname: gFeatureFlagSupportOverloadRetryability
+        default: false
+        fcv_gated: false

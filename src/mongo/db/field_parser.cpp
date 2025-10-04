@@ -27,9 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/field_parser.h"
+
+#include <algorithm>
+#include <limits>
 
 namespace mongo {
 
@@ -55,7 +56,7 @@ FieldParser::FieldState FieldParser::extract(BSONElement elem,
         }
     }
 
-    if (elem.type() == Bool) {
+    if (elem.type() == BSONType::boolean) {
         *out = elem.boolean();
         return FIELD_SET;
     }
@@ -85,7 +86,7 @@ FieldParser::FieldState FieldParser::extract(BSONElement elem,
         }
     }
 
-    if (elem.type() == Array) {
+    if (elem.type() == BSONType::array) {
         *out = BSONArray(elem.embeddedObject().getOwned());
         return FIELD_SET;
     }
@@ -115,7 +116,7 @@ FieldParser::FieldState FieldParser::extract(BSONElement elem,
         }
     }
 
-    if (elem.type() == Object) {
+    if (elem.type() == BSONType::object) {
         *out = elem.embeddedObject().getOwned();
         return FIELD_SET;
     }
@@ -145,7 +146,7 @@ FieldParser::FieldState FieldParser::extract(BSONElement elem,
         }
     }
 
-    if (elem.type() == Date) {
+    if (elem.type() == BSONType::date) {
         *out = elem.date();
         return FIELD_SET;
     }
@@ -175,7 +176,7 @@ FieldParser::FieldState FieldParser::extract(BSONElement elem,
         }
     }
 
-    if (elem.type() == bsonTimestamp) {
+    if (elem.type() == BSONType::timestamp) {
         *out = elem.timestamp();
         return FIELD_SET;
     }
@@ -204,9 +205,9 @@ FieldParser::FieldState FieldParser::extract(BSONElement elem,
         }
     }
 
-    if (elem.type() == String) {
+    if (elem.type() == BSONType::string) {
         // Extract everything, including embedded null characters.
-        *out = string(elem.valuestr(), elem.valuestrsize() - 1);
+        *out = elem.str();
         return FIELD_SET;
     }
 
@@ -235,7 +236,7 @@ FieldParser::FieldState FieldParser::extract(BSONElement elem,
         }
     }
 
-    if (elem.type() == jstOID) {
+    if (elem.type() == BSONType::oid) {
         *out = elem.__oid();
         return FIELD_SET;
     }
@@ -264,7 +265,7 @@ FieldParser::FieldState FieldParser::extract(BSONElement elem,
         }
     }
 
-    if (elem.type() == NumberInt) {
+    if (elem.type() == BSONType::numberInt) {
         *out = elem.numberInt();
         return FIELD_SET;
     }
@@ -325,7 +326,7 @@ FieldParser::FieldState FieldParser::extract(BSONElement elem,
         }
     }
 
-    if (elem.type() == NumberLong) {
+    if (elem.type() == BSONType::numberLong) {
         *out = elem.numberLong();
         return FIELD_SET;
     }
@@ -383,7 +384,7 @@ FieldParser::FieldState FieldParser::extract(BSONElement elem,
         }
     }
 
-    if (elem.type() == NumberDouble) {
+    if (elem.type() == BSONType::numberDouble) {
         *out = elem.numberDouble();
         return FIELD_SET;
     }
@@ -441,7 +442,7 @@ FieldParser::FieldState FieldParser::extractID(BSONElement elem,
         }
     }
 
-    if (elem.type() != Array) {
+    if (elem.type() != BSONType::array) {
         *out = elem.wrap("").getOwned();
         return FIELD_SET;
     }

@@ -1,0 +1,9 @@
+testA
+test
+basic.coll as fuzzer_coll
+
+:results {aggregate: "fuzzer_coll", pipeline: [{$limit:5}], cursor: {}}
+
+:sortResults {aggregate: "fuzzer_coll", pipeline: [{$limit:5}], cursor: {}}
+
+:results {aggregate: "fuzzer_coll", pipeline: [{$limit:1}], cursor: {}}

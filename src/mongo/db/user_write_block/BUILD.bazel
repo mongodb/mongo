@@ -1,0 +1,70 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+idl_generator(
+    name = "set_user_write_block_mode_gen",
+    src = "set_user_write_block_mode.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/user_write_block:user_writes_block_reason_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "set_user_write_block_mode_coordinator_document_gen",
+    src = "set_user_write_block_mode_coordinator_document.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/global_catalog/ddl:configsvr_coordinator_gen",
+        "//src/mongo/db/global_catalog/ddl:sharded_ddl_commands_gen",
+    ],
+)
+
+idl_generator(
+    name = "user_writes_block_reason_gen",
+    src = "user_writes_block_reason.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "user_writes_critical_section_document_gen",
+    src = "user_writes_critical_section_document.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/user_write_block:user_writes_block_reason_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "user_writes_block_reason_idl",
+    srcs = ["user_writes_block_reason_gen"],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "set_user_write_block_mode_idl",
+    srcs = [
+        ":set_user_write_block_mode_gen",
+    ],
+    hdrs = [
+        "//src/mongo/db/auth:authorization_contract.h",
+        "//src/mongo/db/global_catalog/ddl:notify_sharding_event_utils.h",
+    ],
+    deps = [
+        ":user_writes_block_reason_idl",
+        "//src/mongo/db:server_base",
+    ],
+)

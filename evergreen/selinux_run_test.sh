@@ -3,76 +3,139 @@
 # Notes on how to run this manually:
 # - repo must be unpacked into source tree
 #
-# export ssh_key=$HOME/.ssh/id_rsa
-# export hostname=ec2-3-91-230-150.compute-1.amazonaws.com
-# export user=ec2-user
-# export bypass_prelude=yes
+# export SSH_KEY=$HOME/.ssh/id_rsa
+# export SELINUX_HOSTNAME=ec2-3-91-230-150.compute-1.amazonaws.com
+# export SELINUX_USER=ec2-user
+# export BYPASS_PRELUDE=yes
+# export SRC="$(basename $(pwd) | tee /dev/stderr)"
+# export TEST_LIST='jstests/selinux/*.js'
 # export workdir="$(dirname $(pwd) | tee /dev/stderr)"
-# export src="$(basename $(pwd) | tee /dev/stderr)"
-# export test_list='jstests/selinux/*.js'
-# export pkg_variant=mongodb-enterprise
 # evergreen/selinux_run_test.sh
 
 set -o errexit
 
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
-if [ "$bypass_prelude" != "yes" ]; then
-  . "$DIR/prelude.sh"
-  activate_venv
-  src="src"
+readonly k_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+
+if [ "$BYPASS_PRELUDE" != "yes" ]; then
+    . "$k_dir/prelude.sh"
+    activate_venv
+    readonly k_src="src"
+else
+    readonly k_src="$SRC"
 fi
 
-set -o xtrace
-
-if [ "$hostname" == "" ]; then
-  hostname="$(tr -d '"[]{}' < "$workdir"/$src/hosts.yml | cut -d , -f 1 | awk -F : '{print $2}')"
+# If no selinux hostname is defined by external env, then we are running through evergreen, which has dumped spawn host
+# properties about this host into hosts.yml via host.list
+# (https://github.com/evergreen-ci/evergreen/blob/main/docs/Project-Configuration/Project-Commands.md#hostlist),
+# from which we can derive the hostname of the remote host
+# Also note that $workdir here is a built-in expansion from evergreen: see more info at
+# https://github.com/evergreen-ci/evergreen/blob/main/docs/Project-Configuration/Project-Configuration-Files.md#default-expansions
+if [ "$SELINUX_HOSTNAME" == "" ]; then
+    readonly k_selinux_hostname="$(tr -d '"[]{}' <"$workdir"/$k_src/hosts.yml | cut -d , -f 1 | awk -F : '{print $2}')"
+    cat "$workdir"/$k_src/hosts.yml
+else
+    readonly k_selinux_hostname="$SELINUX_HOSTNAME"
 fi
 
-if [ "$user" == "" ]; then
-  user=$USER
+# SELINUX_USER injected from evergreen config, do not change
+readonly k_host="${SELINUX_USER}@${k_selinux_hostname}"
+
+# Obtain the ssh key and properties from expansions.yml, output from evergreen via the expansions.write command
+# (https://github.com/evergreen-ci/evergreen/blob/main/docs/Project-Configuration/Project-Commands.md#expansionswrite)
+if [ "$SSH_KEY" == "" ]; then
+    readonly k_ssh_key="$workdir/selinux.pem"
+
+    "$workdir"/$k_src/buildscripts/yaml_key_value.py --yamlFile="$workdir"/expansions.yml \
+        --yamlKey=__project_aws_ssh_key_value >"$k_ssh_key"
+
+    chmod 600 "$k_ssh_key"
+
+    result="$(openssl rsa -in "$k_ssh_key" -check -noout | tee /dev/stderr)"
+
+    if [ "$result" != "RSA key ok" ]; then
+        exit 1
+    fi
+else
+    readonly k_ssh_key="$SSH_KEY"
 fi
 
-host="${user}@${hostname}"
-python="${python:-python3}"
+readonly k_ssh_options="-i $k_ssh_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=no"
 
-if [ "$ssh_key" == "" ]; then
-  ssh_key="$workdir/selinux.pem"
-  "$workdir"/$src/buildscripts/yaml_key_value.py --yamlFile="$workdir"/expansions.yml \
-    --yamlKey=__project_aws_ssh_key_value > "$ssh_key"
-  chmod 600 "$ssh_key"
-  result="$(openssl rsa -in "$ssh_key" -check -noout | tee /dev/stderr)"
-  if [ "$result" != "RSA key ok" ]; then
-    exit 1
-  fi
-fi
+function copy_sources_to_target() {
 
-attempts=0
-connection_attempts=50
+    rsync -ar -e "ssh $k_ssh_options" \
+        --exclude 'tmp' --exclude 'build' --exclude '.*' \
+        "$workdir"/$k_src/* "$k_host":
 
-# Check for remote connectivity
-set +o errexit
-ssh_options="-i $ssh_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=no"
-while ! ssh $ssh_options -o ConnectTimeout=10 "$host" echo "I am working"; do
-  if [ "$attempts" -ge "$connection_attempts" ]; then exit 1; fi
-  ((attempts++))
-  printf "SSH connection attempt %d/%d failed. Retrying...\n" "$attempts" "$connection_attempts"
-  sleep 10
-done
+    return $?
+}
 
-set -o errexit
+function configure_target_machine() {
+    ssh $k_ssh_options "$k_host" evergreen/selinux_test_setup.sh
+    return $?
+}
+
+function execute_tests_on_target() {
+    ssh $k_ssh_options "$k_host" evergreen/selinux_test_executor.sh "$1"
+    return $?
+}
+
+function check_remote_connectivity() {
+    ssh -q $k_ssh_options -o ConnectTimeout=10 "$k_host" echo "I am working"
+    return $?
+}
+
+function retry_command() {
+
+    local connection_attempts=$1
+    local cmd="$2"
+    shift 2 #eat the first 2 parameters to pass on any remaining to the calling function
+
+    local attempts=0
+    set +o errexit
+
+    while true; do
+        "$cmd" "$@"
+
+        local result=$?
+
+        if [[ $result -eq 0 ]]; then
+            set -o errexit
+            return $result
+        fi
+
+        if [[ $attempts -ge $connection_attempts ]]; then
+            printf "%s failed after %d attempts with final error code %s.\n" "$cmd" "$attempts" "$result"
+            exit 1
+        fi
+
+        sleep 10
+        ((attempts++))
+
+    done
+}
+
+echo "===> Checking for remote connectivity..."
+retry_command 20 check_remote_connectivity
+
 echo "===> Copying sources to target..."
-rsync -ar -e "ssh $ssh_options" \
-  --exclude 'tmp' --exclude 'build' --exclude '.*' \
-  "$workdir"/$src/* "$host":
+retry_command 5 copy_sources_to_target
 
 echo "===> Configuring target machine..."
-ssh $ssh_options "$host" evergreen/selinux_test_setup.sh
+retry_command 5 configure_target_machine
 
 echo "===> Executing tests..."
-list="$(
-  cd src
-  for x in $test_list; do echo "$x"; done
+readonly list="$(
+    cd src
+
+    # $TEST_LIST defined in evegreen "run selinux tests" function, do not change
+    for x in $TEST_LIST; do echo "$x"; done
 )"
+
 for test in $list; do
-  ssh $ssh_options "$host" evergreen/selinux_test_executor.sh "$test"
+    execute_tests_on_target "$test"
+    res="$?"
+    if [[ $res -ne 0 ]]; then
+        exit "$res"
+    fi
 done

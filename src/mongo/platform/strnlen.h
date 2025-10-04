@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 
 #include <cstddef>
 #include <cstring>

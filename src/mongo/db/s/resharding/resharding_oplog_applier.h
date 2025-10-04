@@ -29,25 +29,38 @@
 
 #pragma once
 
-#include <list>
-#include <memory>
-
 #include "mongo/db/cancelable_operation_context.h"
+#include "mongo/db/global_catalog/chunk_manager.h"
+#include "mongo/db/local_catalog/collection_options.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
 #include "mongo/db/s/resharding/resharding_donor_oplog_iterator.h"
+#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_oplog_application.h"
+#include "mongo/db/s/resharding/resharding_oplog_applier_metrics.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_progress_gen.h"
 #include "mongo/db/s/resharding/resharding_oplog_batch_applier.h"
 #include "mongo/db/s/resharding/resharding_oplog_batch_preparer.h"
 #include "mongo/db/s/resharding/resharding_oplog_session_application.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/s/chunk_manager.h"
+#include "mongo/s/resharding/common_types_gen.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
+#include "mongo/util/uuid.h"
+
+#include <cstddef>
+#include <list>
+#include <memory>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
-class ReshardingMetrics;
 class ServiceContext;
 
 /**
@@ -66,27 +79,32 @@ class ReshardingOplogApplier {
 public:
     class Env {
     public:
-        Env(ServiceContext* service, ReshardingMetrics* metrics)
-            : _service(service), _metrics(metrics) {}
+        Env(ServiceContext* service, ReshardingOplogApplierMetrics* applierMetrics)
+            : _service(service), _applierMetrics(applierMetrics) {}
+
         ServiceContext* service() const {
             return _service;
         }
-        ReshardingMetrics* metrics() const {
-            return _metrics;
+
+        ReshardingOplogApplierMetrics* applierMetrics() {
+            return _applierMetrics;
         }
 
     private:
         ServiceContext* _service;
-        ReshardingMetrics* _metrics;
+        ReshardingOplogApplierMetrics* _applierMetrics;
     };
 
     ReshardingOplogApplier(std::unique_ptr<Env> env,
+                           std::size_t oplogBatchTaskCount,
                            ReshardingSourceId sourceId,
+                           NamespaceString oplogBufferNss,
                            NamespaceString outputNss,
                            std::vector<NamespaceString> allStashNss,
                            size_t myStashIdx,
                            ChunkManager sourceChunkMgr,
-                           std::unique_ptr<ReshardingDonorOplogIteratorInterface> oplogIterator);
+                           std::unique_ptr<ReshardingDonorOplogIteratorInterface> oplogIterator,
+                           bool isCapped = false);
 
     /**
      * Schedules work to repeatedly apply batches of oplog entries from a donor shard.
@@ -124,6 +142,18 @@ private:
      */
     void _clearAppliedOpsAndStoreProgress(OperationContext* opCtx);
 
+    /**
+     * Returns true if the recipient has been configured to estimate the remaining time based on
+     * the exponential moving average of the time it takes to fetch and apply oplog entries.
+     */
+    bool _needToEstimateRemainingTimeBasedOnMovingAverage(OperationContext* opCtx);
+
+    /**
+     * Updates the average time to apply oplog entries based on the last oplog entry in the current
+     * batch if it is not empty.
+     */
+    void _updateAverageTimeToApplyOplogEntries(OperationContext* opCtx);
+
     std::unique_ptr<Env> _env;
 
     // Identifier for the oplog source.
@@ -139,10 +169,13 @@ private:
     OplogBatch _currentBatchToApply;
 
     // Buffer for internally generated oplog entries that needs to be processed for this batch.
-    std::list<repl::OplogEntry> _currentDerivedOps;
+    std::list<repl::OplogEntry> _currentDerivedOpsForCrudWriters;
+    std::list<repl::OplogEntry> _currentDerivedOpsForSessionWriters;
 
     // The source of the oplog entries to be applied.
     std::unique_ptr<ReshardingDonorOplogIteratorInterface> _oplogIter;
+
+    boost::optional<bool> _supportEstimatingRemainingTimeBasedOnMovingAverage;
 };
 
 }  // namespace mongo

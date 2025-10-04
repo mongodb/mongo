@@ -27,17 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/repl/repl_set_tag.h"
 
-#include <algorithm>
-#include <functional>
-
+#include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/sequence_util.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <memory>
 
 namespace mongo {
 namespace repl {
@@ -99,7 +100,7 @@ bool ReplSetTagMatch::BoundTagValue::isSatisfied() const {
 ReplSetTag ReplSetTagConfig::makeTag(StringData key, StringData value) {
     int32_t keyIndex = _findKeyIndex(key);
     if (size_t(keyIndex) == _tagData.size()) {
-        _tagData.push_back(make_pair(key.toString(), ValueVector()));
+        _tagData.push_back(make_pair(std::string{key}, ValueVector()));
     }
     ValueVector& values = _tagData[keyIndex].second;
     for (size_t valueIndex = 0; valueIndex < values.size(); ++valueIndex) {
@@ -107,7 +108,7 @@ ReplSetTag ReplSetTagConfig::makeTag(StringData key, StringData value) {
             continue;
         return ReplSetTag(keyIndex, int32_t(valueIndex));
     }
-    values.push_back(value.toString());
+    values.push_back(std::string{value});
     return ReplSetTag(keyIndex, int32_t(values.size()) - 1);
 }
 
@@ -151,14 +152,17 @@ int32_t ReplSetTagConfig::_findKeyIndex(StringData key) const {
 }
 
 std::string ReplSetTagConfig::getTagKey(const ReplSetTag& tag) const {
-    invariant(tag.isValid() && size_t(tag.getKeyIndex()) < _tagData.size());
+    invariant(tag.isValid());
+    invariant(size_t(tag.getKeyIndex()) < _tagData.size());
     return _tagData[tag.getKeyIndex()].first;
 }
 
 std::string ReplSetTagConfig::getTagValue(const ReplSetTag& tag) const {
-    invariant(tag.isValid() && size_t(tag.getKeyIndex()) < _tagData.size());
+    invariant(tag.isValid());
+    invariant(size_t(tag.getKeyIndex()) < _tagData.size());
     const ValueVector& values = _tagData[tag.getKeyIndex()].second;
-    invariant(tag.getValueIndex() >= 0 && size_t(tag.getValueIndex()) < values.size());
+    invariant(tag.getValueIndex() >= 0);
+    invariant(size_t(tag.getValueIndex()) < values.size());
     return values[tag.getValueIndex()];
 }
 

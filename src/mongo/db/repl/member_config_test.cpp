@@ -27,15 +27,30 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <vector>
-
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/repl/member_config.h"
-#include "mongo/db/repl/repl_server_parameters_gen.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/repl/member_id.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/time_support.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <iterator>
+#include <map>
+#include <ostream>
+#include <utility>
+
+#include <absl/container/flat_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace repl {
@@ -66,16 +81,14 @@ TEST(MemberConfig, ParseFailsWithIllegalFieldName) {
                                                << "frim" << 1),
                                     &tagConfig),
                        AssertionException,
-                       40415);
+                       ErrorCodes::IDLUnknownField);
 }
 
 TEST(MemberConfig, ParseFailsWithMissingIdField) {
     ReplSetTagConfig tagConfig;
-    ASSERT_THROWS_CODE(MemberConfig(BSON("host"
-                                         << "localhost:12345"),
-                                    &tagConfig),
+    ASSERT_THROWS_CODE(MemberConfig(BSON("host" << "localhost:12345"), &tagConfig),
                        AssertionException,
-                       40414);
+                       ErrorCodes::IDLFailedToParse);
 }
 
 TEST(MemberConfig, ParseMemberConfigId) {
@@ -110,15 +123,12 @@ TEST(MemberConfig, ParseMemberConfigId) {
 
 TEST(MemberConfig, ParseFailsWithBadIdField) {
     ReplSetTagConfig tagConfig;
-    ASSERT_THROWS_CODE(MemberConfig(BSON("host"
-                                         << "localhost:12345"),
-                                    &tagConfig),
+    ASSERT_THROWS_CODE(MemberConfig(BSON("host" << "localhost:12345"), &tagConfig),
                        AssertionException,
-                       40414);
-    ASSERT_THROWS(MemberConfig(BSON("_id"
-                                    << "0"
-                                    << "host"
-                                    << "localhost:12345"),
+                       ErrorCodes::IDLFailedToParse);
+    ASSERT_THROWS(MemberConfig(BSON("_id" << "0"
+                                          << "host"
+                                          << "localhost:12345"),
                                &tagConfig),
                   ExceptionFor<ErrorCodes::TypeMismatch>);
     ASSERT_THROWS(MemberConfig(BSON("_id" << Date_t() << "host"
@@ -175,7 +185,9 @@ TEST(MemberConfig, ParseAcceptsAnyNumberId) {
 
 TEST(MemberConfig, ParseFailsWithMissingHostField) {
     ReplSetTagConfig tagConfig;
-    ASSERT_THROWS_CODE(MemberConfig(BSON("_id" << 0), &tagConfig), AssertionException, 40414);
+    ASSERT_THROWS_CODE(MemberConfig(BSON("_id" << 0), &tagConfig),
+                       AssertionException,
+                       ErrorCodes::IDLFailedToParse);
 }
 
 TEST(MemberConfig, ParseFailsWithBadHostField) {
@@ -229,7 +241,7 @@ TEST(MemberConfig, ParseArbiterOnly) {
 }
 }  // namespace
 
-void setNewlyAdded_ForTest(MemberConfig* mc, boost::optional<bool> newlyAdded) {
+void setNewlyAdded_forTest(MemberConfig* mc, boost::optional<bool> newlyAdded) {
     mc->setNewlyAdded(newlyAdded);
 }
 
@@ -243,7 +255,7 @@ TEST(MemberConfig, ParseAndSetNewlyAddedField) {
         // Verify that the 'newlyAdded' field is not added by default.
         ASSERT_FALSE(mc.isNewlyAdded());
 
-        setNewlyAdded_ForTest(&mc, true);
+        setNewlyAdded_forTest(&mc, true);
         ASSERT_TRUE(mc.isNewlyAdded());
     }
     {
@@ -587,7 +599,7 @@ TEST(MemberConfig, ParseVotes) {
                                                    << "votes" << 2 << "priority" << 0),
                                         &tagConfig),
                            AssertionException,
-                           51024);
+                           ErrorCodes::BadValue);
     }
     {
         ASSERT_THROWS(MemberConfig(BSON("_id" << 0 << "host"
@@ -609,7 +621,7 @@ TEST(MemberConfig, ParseVotes) {
                                                    << "votes" << -1 << "priority" << 0),
                                         &tagConfig),
                            AssertionException,
-                           51024);
+                           ErrorCodes::BadValue);
     }
 }
 
@@ -656,7 +668,7 @@ TEST(MemberConfig, ParsePriority) {
                                                    << "priority" << -1),
                                         &tagConfig),
                            AssertionException,
-                           51024);
+                           ErrorCodes::BadValue);
     }
     {
         ASSERT_THROWS_CODE(MemberConfig(BSON("_id" << 0 << "host"
@@ -664,7 +676,7 @@ TEST(MemberConfig, ParsePriority) {
                                                    << "priority" << 1001),
                                         &tagConfig),
                            AssertionException,
-                           51024);
+                           ErrorCodes::BadValue);
     }
 }
 
@@ -703,7 +715,7 @@ TEST(MemberConfig, ParseSecondaryDelay) {
                                     << "priority" << 0 << "secondaryDelaySecs" << -1),
                          &tagConfig),
             AssertionException,
-            51024);
+            ErrorCodes::BadValue);
     }
     {
         ASSERT_THROWS_CODE(
@@ -712,7 +724,7 @@ TEST(MemberConfig, ParseSecondaryDelay) {
                                     << "priority" << 0 << "secondaryDelaySecs" << 3600 * 24 * 400),
                          &tagConfig),
             AssertionException,
-            51024);
+            ErrorCodes::BadValue);
     }
 }
 
@@ -753,7 +765,7 @@ TEST(MemberConfig, ParseAcceptsAnyNumberSecondaryDelay) {
                                     << "priority" << 0 << "secondaryDelaySecs" << -1.5),
                          &tagConfig),
             AssertionException,
-            51024);
+            ErrorCodes::BadValue);
     }
     {
         MemberConfig mc(BSON("_id" << 0 << "host"
@@ -776,10 +788,9 @@ TEST(MemberConfig, ParseTags) {
     MemberConfig mc(BSON("_id" << 0 << "host"
                                << "h"
                                << "tags"
-                               << BSON("k1"
-                                       << "v1"
-                                       << "k2"
-                                       << "v2")),
+                               << BSON("k1" << "v1"
+                                            << "k2"
+                                            << "v2")),
                     &tagConfig);
     ASSERT_TRUE(mc.hasTags());
     ASSERT_EQUALS(7U, mc.getNumTags());
@@ -806,7 +817,7 @@ TEST(MemberConfig, ParseEmptyTags) {
     ASSERT_FALSE(mc.hasTags());
     BSONObj obj = mc.toBSON();
     BSONElement tagField = obj.getField("tags");
-    ASSERT_TRUE(tagField.type() == Object);
+    ASSERT_TRUE(tagField.type() == BSONType::object);
     ASSERT_TRUE(tagField.Obj().isEmpty());
 }
 
@@ -817,7 +828,7 @@ TEST(MemberConfig, TagsSerializedWhenMissing) {
                     &tagConfig);
     BSONObj obj = mc.toBSON();
     BSONElement tagField = obj.getField("tags");
-    ASSERT_TRUE(tagField.type() == Object);
+    ASSERT_TRUE(tagField.type() == BSONType::object);
     ASSERT_TRUE(tagField.Obj().isEmpty());
 }
 
@@ -826,10 +837,9 @@ TEST(MemberConfig, ParseHorizonFields) {
     MemberConfig mc(BSON("_id" << 0 << "host"
                                << "h"
                                << "horizons"
-                               << BSON("alpha"
-                                       << "a.host:43"
-                                       << "beta"
-                                       << "b.host:256")),
+                               << BSON("alpha" << "a.host:43"
+                                               << "beta"
+                                               << "b.host:256")),
                     &tagConfig);
 
     ASSERT_EQUALS(std::size_t{1}, mc.getHorizonMappings().count("alpha"));
@@ -853,11 +863,10 @@ TEST(MemberConfig, DuplicateHorizonNames) {
         MemberConfig mem(BSON("_id" << 0 << "host"
                                     << "h"
                                     << "horizons"
-                                    << BSON("goofyRepeatedHorizonName"
-                                            << "a.host:43"
-                                            << "goofyRepeatedHorizonName"
+                                    << BSON("goofyRepeatedHorizonName" << "a.host:43"
+                                                                       << "goofyRepeatedHorizonName"
 
-                                            << "b.host:256")),
+                                                                       << "b.host:256")),
                          &tagConfig);
         ASSERT_TRUE(false);  // Should not succeed.
     } catch (const ExceptionFor<ErrorCodes::BadValue>& ex) {
@@ -889,10 +898,9 @@ TEST(MemberConfig, DuplicateHorizonHostAndPort) {
         MemberConfig mem(BSON("_id" << 0 << "host"
                                     << "uniquehostname.example.com:42"
                                     << "horizons"
-                                    << BSON("alpha"
-                                            << "duplicatedhostname.example.com:42"
-                                            << "beta"
-                                            << "duplicatedhostname.example.com:42")),
+                                    << BSON("alpha" << "duplicatedhostname.example.com:42"
+                                                    << "beta"
+                                                    << "duplicatedhostname.example.com:42")),
                          &tagConfig);
         ASSERT_TRUE(false);  // Should not succeed.
     } catch (const ExceptionFor<ErrorCodes::BadValue>& ex) {
@@ -907,10 +915,9 @@ TEST(MemberConfig, DuplicateHorizonHostAndPort) {
         MemberConfig mem(BSON("_id" << 0 << "host"
                                     << "duplicatedhostname.example.com:42"
                                     << "horizons"
-                                    << BSON("alpha"
-                                            << "uniquehostname.example.com:42"
-                                            << "beta"
-                                            << "duplicatedhostname.example.com:42")),
+                                    << BSON("alpha" << "uniquehostname.example.com:42"
+                                                    << "beta"
+                                                    << "duplicatedhostname.example.com:42")),
                          &tagConfig);
         ASSERT_TRUE(false);  // Should not succeed.
     } catch (const ExceptionFor<ErrorCodes::BadValue>& ex) {
@@ -924,10 +931,9 @@ TEST(MemberConfig, DuplicateHorizonHostAndPort) {
         MemberConfig mem(BSON("_id" << 0 << "host"
                                     << "duplicatedhostname.example.com:42"
                                     << "horizons"
-                                    << BSON("alpha"
-                                            << "uniquehostname.example.com:43"
-                                            << "beta"
-                                            << "duplicatedhostname.example.com:43")),
+                                    << BSON("alpha" << "uniquehostname.example.com:43"
+                                                    << "beta"
+                                                    << "duplicatedhostname.example.com:43")),
                          &tagConfig);
         ASSERT_TRUE(false);  // Should not succeed.
     } catch (const ExceptionFor<ErrorCodes::BadValue>& ex) {
@@ -941,10 +947,9 @@ TEST(MemberConfig, DuplicateHorizonHostAndPort) {
         MemberConfig mem(BSON("_id" << 0 << "host"
                                     << "uniquehostname.example.com:42"
                                     << "horizons"
-                                    << BSON("alpha"
-                                            << "duplicatedhostname.example.com:42"
-                                            << "beta"
-                                            << "duplicatedhostname.example.com:43")),
+                                    << BSON("alpha" << "duplicatedhostname.example.com:42"
+                                                    << "beta"
+                                                    << "duplicatedhostname.example.com:43")),
                          &tagConfig);
         ASSERT_TRUE(false);  // Should not succeed.
     } catch (const ExceptionFor<ErrorCodes::BadValue>& ex) {
@@ -972,9 +977,7 @@ TEST(MemberConfig, HorizonFieldWithEmptyStringIsRejected) {
     try {
         MemberConfig mem(BSON("_id" << 0 << "host"
                                     << "h"
-                                    << "horizons"
-                                    << BSON(""
-                                            << "example.com:42")),
+                                    << "horizons" << BSON("" << "example.com:42")),
                          &tagConfig);
         ASSERT_TRUE(false);  // Never should get here
     } catch (const ExceptionFor<ErrorCodes::BadValue>& ex) {

@@ -27,45 +27,56 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/pipeline/variables.h"
 #include "mongo/s/write_ops/batched_command_request.h"
-#include "mongo/util/visit_helper.h"
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/oid.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/query/compiler/dependency_analysis/expression_dependencies.h"
+#include "mongo/db/query/write_ops/write_ops.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {
-
-const auto kWriteConcern = "writeConcern"_sd;
 
 template <class T>
 BatchedCommandRequest constructBatchedCommandRequest(const OpMsgRequest& request) {
     auto batchRequest = BatchedCommandRequest{T::parse(request)};
 
-    auto chunkVersion = ChunkVersion::parseFromCommand(request.body);
-    if (chunkVersion != ErrorCodes::NoSuchKey) {
-        if (chunkVersion == ChunkVersion::UNSHARDED()) {
-            batchRequest.setDbVersion(DatabaseVersion(request.body));
-        }
-        batchRequest.setShardVersion(uassertStatusOK(std::move(chunkVersion)));
-    }
-
-    auto writeConcernField = request.body[kWriteConcern];
-    if (!writeConcernField.eoo()) {
-        batchRequest.setWriteConcern(writeConcernField.Obj());
-    }
-
     // The 'isTimeseriesNamespace' is an internal parameter used for communication between mongos
     // and mongod.
-    auto isTimeseriesNamespace =
-        request.body[write_ops::WriteCommandRequestBase::kIsTimeseriesNamespaceFieldName];
     uassert(5916401,
             "the 'isTimeseriesNamespace' parameter cannot be used on mongos",
-            !isTimeseriesNamespace.trueValue());
+            !batchRequest.getWriteCommandRequestBase().getIsTimeseriesNamespace().value_or(false));
 
     return batchRequest;
+}
+
+// Utility that parses and evaluates 'let'. It returns the result as a serialized object.
+BSONObj freezeLet(OperationContext* opCtx,
+                  const mongo::BSONObj& let,
+                  const boost::optional<mongo::LegacyRuntimeConstants>& legacyRuntimeConstants,
+                  const NamespaceString& nss) {
+    // Evaluate the let parameters.
+    auto expCtx = ExpressionContextBuilder{}
+                      .opCtx(opCtx)
+                      .ns(nss)
+                      .runtimeConstants(legacyRuntimeConstants)
+                      .letParameters(let)
+                      .build();
+    expCtx->variables.seedVariablesWithLetParameters(expCtx.get(), let, [](const Expression* expr) {
+        return expression::getDependencies(expr).hasNoRequirements();
+    });
+    return expCtx->variables.toBSON(expCtx->variablesParseState, let);
 }
 
 }  // namespace
@@ -86,12 +97,25 @@ BatchedCommandRequest BatchedCommandRequest::parseDelete(const OpMsgRequest& req
     return constructBatchedCommandRequest<DeleteOp>(request);
 }
 
+bool BatchedCommandRequest::getOrdered() const {
+    return _visit([](auto&& op) -> decltype(auto) { return op.getOrdered(); });
+}
+
 bool BatchedCommandRequest::getBypassDocumentValidation() const {
     return _visit([](auto&& op) -> decltype(auto) { return op.getBypassDocumentValidation(); });
 }
 
 const NamespaceString& BatchedCommandRequest::getNS() const {
     return _visit([](auto&& op) -> decltype(auto) { return op.getNamespace(); });
+}
+
+const boost::optional<UUID>& BatchedCommandRequest::getCollectionUUID() const {
+    return _visit([](auto&& op) -> decltype(auto) { return op.getCollectionUUID(); });
+}
+
+bool BatchedCommandRequest::hasEncryptionInformation() const {
+    return _visit(
+        [](auto&& op) -> decltype(auto) { return op.getEncryptionInformation().has_value(); });
 }
 
 std::size_t BatchedCommandRequest::sizeWriteOps() const {
@@ -110,23 +134,32 @@ std::size_t BatchedCommandRequest::sizeWriteOps() const {
 }
 
 bool BatchedCommandRequest::hasLegacyRuntimeConstants() const {
-    return _visit(visit_helper::Overloaded{[](write_ops::InsertCommandRequest&) { return false; },
-                                           [&](write_ops::UpdateCommandRequest& op) {
-                                               return op.getLegacyRuntimeConstants().has_value();
-                                           },
-                                           [&](write_ops::DeleteCommandRequest& op) {
-                                               return op.getLegacyRuntimeConstants().has_value();
-                                           }});
+    return _visit(OverloadedVisitor{[](write_ops::InsertCommandRequest&) { return false; },
+                                    [&](write_ops::UpdateCommandRequest& op) {
+                                        return op.getLegacyRuntimeConstants().has_value();
+                                    },
+                                    [&](write_ops::DeleteCommandRequest& op) {
+                                        return op.getLegacyRuntimeConstants().has_value();
+                                    }});
 }
 
 void BatchedCommandRequest::setLegacyRuntimeConstants(LegacyRuntimeConstants runtimeConstants) {
-    _visit(visit_helper::Overloaded{[](write_ops::InsertCommandRequest&) {},
-                                    [&](write_ops::UpdateCommandRequest& op) {
-                                        op.setLegacyRuntimeConstants(std::move(runtimeConstants));
-                                    },
-                                    [&](write_ops::DeleteCommandRequest& op) {
-                                        op.setLegacyRuntimeConstants(std::move(runtimeConstants));
-                                    }});
+    _visit(OverloadedVisitor{[](write_ops::InsertCommandRequest&) {},
+                             [&](write_ops::UpdateCommandRequest& op) {
+                                 op.setLegacyRuntimeConstants(std::move(runtimeConstants));
+                             },
+                             [&](write_ops::DeleteCommandRequest& op) {
+                                 op.setLegacyRuntimeConstants(std::move(runtimeConstants));
+                             }});
+}
+
+void BatchedCommandRequest::unsetLegacyRuntimeConstants() {
+    _visit(OverloadedVisitor{
+        [](write_ops::InsertCommandRequest&) {},
+        [&](write_ops::UpdateCommandRequest& op) { op.setLegacyRuntimeConstants(boost::none); },
+        [&](write_ops::DeleteCommandRequest& op) {
+            op.setLegacyRuntimeConstants(boost::none);
+        }});
 }
 
 const boost::optional<LegacyRuntimeConstants>& BatchedCommandRequest::getLegacyRuntimeConstants()
@@ -160,19 +193,36 @@ const boost::optional<BSONObj>& BatchedCommandRequest::getLet() const {
     return _visit(Visitor{});
 };
 
-bool BatchedCommandRequest::isVerboseWC() const {
-    if (!hasWriteConcern()) {
-        return true;
-    }
-
-    BSONObj writeConcern = getWriteConcern();
-    BSONElement wElem = writeConcern["w"];
-    if (!wElem.isNumber() || wElem.Number() != 0) {
-        return true;
-    }
-
-    return false;
+void BatchedCommandRequest::setLet(boost::optional<mongo::BSONObj> value) {
+    _visit(OverloadedVisitor{[&](write_ops::InsertCommandRequest& op) {},
+                             [&](write_ops::UpdateCommandRequest& op) { op.setLet(value); },
+                             [&](write_ops::DeleteCommandRequest& op) {
+                                 op.setLet(value);
+                             }});
 }
+
+void BatchedCommandRequest::evaluateAndReplaceLetParams(OperationContext* opCtx) {
+    switch (_batchType) {
+        case BatchedCommandRequest::BatchType_Insert:
+            break;
+        case BatchedCommandRequest::BatchType_Update:
+            if (const auto& let = _updateReq->getLet()) {
+                _updateReq->setLet(
+                    freezeLet(opCtx, *let, _updateReq->getLegacyRuntimeConstants(), getNS()));
+            }
+            break;
+        case BatchedCommandRequest::BatchType_Delete:
+            if (const auto& let = _deleteReq->getLet()) {
+                _deleteReq->setLet(
+                    freezeLet(opCtx, *let, _deleteReq->getLegacyRuntimeConstants(), getNS()));
+            }
+            break;
+    }
+}
+
+const OptionalBool& BatchedCommandRequest::getBypassEmptyTsReplacement() const {
+    return _visit([](auto&& op) -> decltype(auto) { return op.getBypassEmptyTsReplacement(); });
+};
 
 const write_ops::WriteCommandRequestBase& BatchedCommandRequest::getWriteCommandRequestBase()
     const {
@@ -181,22 +231,49 @@ const write_ops::WriteCommandRequestBase& BatchedCommandRequest::getWriteCommand
 
 void BatchedCommandRequest::setWriteCommandRequestBase(
     write_ops::WriteCommandRequestBase writeCommandBase) {
-    return _visit([&](auto&& op) { op.setWriteCommandRequestBase(std::move(writeCommandBase)); });
+    _visit([&](auto&& op) { op.setWriteCommandRequestBase(std::move(writeCommandBase)); });
 }
 
 void BatchedCommandRequest::serialize(BSONObjBuilder* builder) const {
-    _visit([&](auto&& op) { op.serialize({}, builder); });
-    if (_shardVersion) {
-        _shardVersion->appendToCommand(builder);
-    }
+    _visit([&](auto&& op) { op.serialize(builder); });
+}
 
-    if (_dbVersion) {
-        builder->append("databaseVersion", _dbVersion->toBSON());
-    }
+void BatchedCommandRequest::setShardVersion(ShardVersion shardVersion) {
+    _visit([sv = std::move(shardVersion)](auto&& op) { op.setShardVersion(std::move(sv)); });
+}
 
-    if (_writeConcern) {
-        builder->append(kWriteConcern, *_writeConcern);
-    }
+bool BatchedCommandRequest::hasShardVersion() const {
+    return _visit([](auto&& op) { return op.getShardVersion().has_value(); });
+}
+
+const ShardVersion& BatchedCommandRequest::getShardVersion() const {
+    return _visit([](auto&& op) -> const ShardVersion& {
+        invariant(op.getShardVersion());
+        return *op.getShardVersion();
+    });
+}
+
+void BatchedCommandRequest::setDbVersion(DatabaseVersion dbVersion) {
+    _visit([dbv = std::move(dbVersion)](auto&& op) { op.setDatabaseVersion(std::move(dbv)); });
+}
+
+bool BatchedCommandRequest::hasDbVersion() const {
+    return false;
+}
+
+const DatabaseVersion& BatchedCommandRequest::getDbVersion() const {
+    return _visit([](auto&& op) -> const DatabaseVersion& {
+        invariant(op.getDatabaseVersion());
+        return *op.getDatabaseVersion();
+    });
+}
+
+GenericArguments& BatchedCommandRequest::getGenericArguments() {
+    return _visit([&](auto&& op) -> GenericArguments& { return op.getGenericArguments(); });
+}
+
+const GenericArguments& BatchedCommandRequest::getGenericArguments() const {
+    return _visit([&](auto&& op) -> const GenericArguments& { return op.getGenericArguments(); });
 }
 
 BSONObj BatchedCommandRequest::toBSON() const {
@@ -250,7 +327,7 @@ BatchedCommandRequest BatchedCommandRequest::buildDeleteOp(const NamespaceString
             entry.setMulti(multiDelete);
 
             if (hint) {
-                entry.setHint(hint.get());
+                entry.setHint(hint.value());
             }
             return entry;
         }()});
@@ -282,7 +359,7 @@ BatchedCommandRequest BatchedCommandRequest::buildUpdateOp(const NamespaceString
             entry.setUpsert(upsert);
             entry.setMulti(multi);
             if (hint) {
-                entry.setHint(hint.get());
+                entry.setHint(hint.value());
             }
             return entry;
         }()});
@@ -310,9 +387,60 @@ BatchedCommandRequest BatchedCommandRequest::buildPipelineUpdateOp(
     }());
 }
 
-BatchItemRef::BatchItemRef(const BatchedCommandRequest* request, int index)
-    : _request(*request), _index(index) {
-    invariant(index < int(request->sizeWriteOps()));
+int BatchedCommandRequest::getBaseCommandSizeEstimate(OperationContext* opCtx) const {
+    // For simplicity, we build a dummy batched write command request that contains all the common
+    // fields and serialize it to get the base command size.
+    // We only bother to copy over variable-size and/or optional fields, since the value of fields
+    // that are fixed-size and always present (e.g. 'ordered') won't affect the size calculation.
+    auto nss = getNS();
+    auto request =
+        _visit(OverloadedVisitor{[&](const write_ops::InsertCommandRequest& op) {
+                                     return BatchedCommandRequest(write_ops::InsertCommandRequest{
+                                         nss, std::vector<BSONObj>{}});
+                                 },
+                                 [&](const write_ops::UpdateCommandRequest& op) {
+                                     return BatchedCommandRequest(write_ops::UpdateCommandRequest{
+                                         nss, std::vector<mongo::write_ops::UpdateOpEntry>{}});
+                                 },
+                                 [&](const write_ops::DeleteCommandRequest& op) {
+                                     return BatchedCommandRequest(write_ops::DeleteCommandRequest{
+                                         nss, std::vector<mongo::write_ops::DeleteOpEntry>{}});
+                                 }});
+
+    write_ops::WriteCommandRequestBase baseRequest;
+    if (opCtx->isRetryableWrite()) {
+        // We'll account for the size to store each individual stmtId as we add ops, so similar to
+        // above with ops, we just put an empty vector as a placeholder for now.
+        baseRequest.setStmtIds({});
+    }
+    baseRequest.setEncryptionInformation(
+        request.getWriteCommandRequestBase().getEncryptionInformation());
+    request.setWriteCommandRequestBase(std::move(baseRequest));
+
+    request.setLet(getLet());
+    if (hasLegacyRuntimeConstants()) {
+        request.setLegacyRuntimeConstants(*getLegacyRuntimeConstants());
+    }
+
+    BSONObjBuilder builder;
+    request.serialize(&builder);
+    // Add writeConcern and lsid/txnNumber to ensure we save space for them.
+    logical_session_id_helpers::serializeLsidAndTxnNumber(opCtx, &builder);
+    builder.append(WriteConcernOptions::kWriteConcernField, opCtx->getWriteConcern().toBSON());
+    return builder.obj().objsize();
+}
+
+BatchedCommandRequest::BatchType convertOpType(BulkWriteCRUDOp::OpType opType) {
+    switch (opType) {
+        case BulkWriteCRUDOp::OpType::kInsert:
+            return BatchedCommandRequest::BatchType_Insert;
+        case BulkWriteCRUDOp::OpType::kUpdate:
+            return BatchedCommandRequest::BatchType_Update;
+        case BulkWriteCRUDOp::OpType::kDelete:
+            return BatchedCommandRequest::BatchType_Delete;
+        default:
+            MONGO_UNREACHABLE;
+    }
 }
 
 }  // namespace mongo

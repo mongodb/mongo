@@ -2,24 +2,26 @@
  * This test ensures that the hello command and its aliases, ismaster and isMaster, are all
  * accepted by mongos.
  */
-"use strict";
-var st = new ShardingTest({shards: 1, mongos: 1});
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
+let st = new ShardingTest({shards: 1, mongos: 1});
 
 function checkResponseFields(commandString) {
     jsTestLog("Running the " + commandString + " command");
-    var res = st.s0.getDB("admin").runCommand(commandString);
+    let res = st.s0.getDB("admin").runCommand(commandString);
 
     // check that the fields that should be there are there and have proper values
-    assert(res.maxBsonObjectSize && isNumber(res.maxBsonObjectSize) && res.maxBsonObjectSize > 0,
-           "maxBsonObjectSize possibly missing:" + tojson(res));
+    assert(
+        res.maxBsonObjectSize && isNumber(res.maxBsonObjectSize) && res.maxBsonObjectSize > 0,
+        "maxBsonObjectSize possibly missing:" + tojson(res),
+    );
     assert(
         res.maxMessageSizeBytes && isNumber(res.maxMessageSizeBytes) && res.maxBsonObjectSize > 0,
-        "maxMessageSizeBytes possibly missing:" + tojson(res));
+        "maxMessageSizeBytes possibly missing:" + tojson(res),
+    );
 
     if (commandString === "hello") {
-        assert.eq("boolean",
-                  typeof res.isWritablePrimary,
-                  "isWritablePrimary field is not a boolean" + tojson(res));
+        assert.eq("boolean", typeof res.isWritablePrimary, "isWritablePrimary field is not a boolean" + tojson(res));
         assert(res.isWritablePrimary === true, "isWritablePrimary field is false" + tojson(res));
     } else {
         assert.eq("boolean", typeof res.ismaster, "ismaster field is not a boolean" + tojson(res));
@@ -29,7 +31,7 @@ function checkResponseFields(commandString) {
     assert(res.localTime, "localTime possibly missing:" + tojson(res));
     assert(res.msg && res.msg == "isdbgrid", "msg possibly missing or wrong:" + tojson(res));
 
-    var unwantedFields = [
+    let unwantedFields = [
         "setName",
         "setVersion",
         "secondary",
@@ -43,11 +45,11 @@ function checkResponseFields(commandString) {
         "hidden",
         "tags",
         "buildIndexes",
-        "me"
+        "me",
     ];
     // check that the fields that shouldn't be there are not there
-    var badFields = [];
-    var field;
+    let badFields = [];
+    let field;
     for (field in res) {
         if (!res.hasOwnProperty(field)) {
             continue;
@@ -56,8 +58,10 @@ function checkResponseFields(commandString) {
             badFields.push(field);
         }
     }
-    assert(badFields.length === 0,
-           "\nthe result:\n" + tojson(res) + "\ncontained fields it shouldn't have: " + badFields);
+    assert(
+        badFields.length === 0,
+        "\nthe result:\n" + tojson(res) + "\ncontained fields it shouldn't have: " + badFields,
+    );
 }
 
 checkResponseFields("hello");

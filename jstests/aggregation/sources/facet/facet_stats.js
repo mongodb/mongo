@@ -6,25 +6,29 @@
 //  do_not_wrap_aggregations_in_facets,
 //  assumes_read_preference_unchanged,
 //  assumes_read_concern_unchanged,
-//  assumes_against_mongod_not_mongos
+//  assumes_against_mongod_not_mongos,
+//  does_not_support_repeated_reads,
+//  # Multi clients run concurrently and may modify the serverStatus metrices read in this test.
+//  multi_clients_incompatible,
+//  # oplog queries could affect the statistics
+//  assumes_standalone_mongod,
+//  # Test asserts on serverStatus().metrics, which requires a completely undisturbed mongod
+//  does_not_support_config_fuzzer
 // ]
-
-(function() {
-"use strict";
 
 const testDB = db.getSiblingDB("facet_stats");
 const local = testDB.facetLookupLocal;
 const foreign = testDB.facetLookupForeign;
 testDB.dropDatabase();
 
-let runFacetPipeline = function() {
+let runFacetPipeline = function () {
     const lookup = {
         $lookup: {
             from: foreign.getName(),
             let: {id1: "$_id"},
             pipeline: [{$match: {$expr: {$eq: ["$$id1", "$foreignKey"]}}}],
-            as: "joined"
-        }
+            as: "joined",
+        },
     };
 
     return local.aggregate([{$facet: {nested: [lookup]}}]).itcount();
@@ -53,4 +57,3 @@ curScannedKeys = queryExecutor.scanned - curScannedKeys;
 assert.eq(12, curScannedObjects);
 // $facet sub-pipelines cannot make use of indexes. Hence scanned keys should be 0.
 assert.eq(0, curScannedKeys);
-})();

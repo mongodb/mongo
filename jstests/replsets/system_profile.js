@@ -1,25 +1,32 @@
 // This tests that metadata commands run against the system.profile collection are not replicated
 // to the secondary.
+//
+// @tags: [
+//   # The test queries the system.profile collection so it is not compatible with initial sync
+//   # since an initial sync may insert unexpected operations into the profile collection.
+//   queries_system_profile_collection
+// ]
 
-(function() {
-"use strict";
-var rst = new ReplSetTest({nodes: 2});
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
+let rst = new ReplSetTest({nodes: 2});
 rst.startSet();
 rst.initiate();
 rst.awaitReplication();
 
 // filter out noop writes
-var getLatestOp = function() {
-    return primaryDB.getSiblingDB('local')
-        .oplog.rs.find({op: {$ne: 'n'}})
+let getLatestOp = function () {
+    return primaryDB
+        .getSiblingDB("local")
+        .oplog.rs.find({op: {$ne: "n"}})
         .sort({$natural: -1})
         .limit(1)
         .next();
 };
 
-var primaryDB = rst.getPrimary().getDB('test');
+var primaryDB = rst.getPrimary().getDB("test");
 assert.commandWorked(primaryDB.foo.insert({}));
-var op = getLatestOp();
+let op = getLatestOp();
 
 // Enable profiling on the primary
 assert.commandWorked(primaryDB.runCommand({profile: 2}));
@@ -40,9 +47,5 @@ assert.commandWorked(primaryDB.foo.insert({}));
 op = getLatestOp();
 assert.commandWorked(primaryDB.runCommand({profile: 0}));
 
-// emptycapped the collection
-assert.commandWorked(primaryDB.runCommand({emptycapped: "system.profile"}));
-assert.eq(op, getLatestOp(), "oplog entry created when system.profile was emptied via emptycapped");
 assert(primaryDB.system.profile.drop());
 rst.stopSet();
-})();

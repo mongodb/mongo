@@ -27,14 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/logical_session_id_helpers.h"
-#include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/document_source_list_sessions.h"
+
+#include "mongo/base/data_range.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/crypto/hash_block.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source_list_sessions_gen.h"
+#include "mongo/db/query/allowed_contexts.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -42,14 +52,15 @@ REGISTER_DOCUMENT_SOURCE(listSessions,
                          DocumentSourceListSessions::LiteParsed::parse,
                          DocumentSourceListSessions::createFromBson,
                          AllowedWithApiStrict::kNeverInVersion1);
+ALLOCATE_DOCUMENT_SOURCE_ID(listSessions, DocumentSourceListSessions::id)
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceListSessions::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
-    const NamespaceString& nss = pExpCtx->ns;
+    const NamespaceString& nss = pExpCtx->getNamespaceString();
 
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << kStageName << " may only be run against "
-                          << NamespaceString::kLogicalSessionsNamespace.ns(),
+                          << NamespaceString::kLogicalSessionsNamespace.toStringForErrorMsg(),
             nss == NamespaceString::kLogicalSessionsNamespace);
 
     const auto& spec = listSessionsParseSpec(kStageName, elem);
@@ -66,7 +77,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceListSessions::createFromBson(
     invariant(spec.getUsers() && !spec.getUsers()->empty());
 
     BSONArrayBuilder builder;
-    for (const auto& uid : listSessionsUsersToDigests(spec.getUsers().get())) {
+    for (const auto& uid : listSessionsUsersToDigests(spec.getUsers().value())) {
         ConstDataRange cdr = uid.toCDR();
         builder.append(BSONBinData(cdr.data(), cdr.length(), BinDataGeneral));
     }
@@ -74,13 +85,12 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceListSessions::createFromBson(
     return new DocumentSourceListSessions(query, pExpCtx, spec.getAllUsers(), spec.getUsers());
 }
 
-Value DocumentSourceListSessions::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceListSessions::serialize(const SerializationOptions& opts) const {
     ListSessionsSpec spec;
     spec.setAllUsers(_allUsers);
     spec.setUsers(_users);
-    spec.setPredicate(_predicate);
-    return Value(Document{{getSourceName(), spec.toBSON()}});
+    spec.setPredicate(getPredicate());
+    return Value(Document{{getSourceName(), spec.toBSON(opts)}});
 }
 
 }  // namespace mongo

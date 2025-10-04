@@ -27,20 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/client/read_preference.h"
 
-#include <string>
-
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/client/read_preference_gen.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {
@@ -49,6 +55,7 @@ const char kModeFieldName[] = "mode";
 const char kTagsFieldName[] = "tags";
 const char kMaxStalenessSecondsFieldName[] = "maxStalenessSeconds";
 const char kHedgeFieldName[] = "hedge";
+const char kIsPretargetedFieldName[] = "$_isPretargeted";
 
 // Slight kludge here: if we weren't passed a TagSet, we default to the empty
 // TagSet if ReadPreference is Primary, or the default (wildcard) TagSet otherwise.
@@ -65,22 +72,16 @@ TagSet defaultTagSetForMode(ReadPreference mode) {
 
 }  // namespace
 
-Status validateReadPreferenceMode(const std::string& prefStr) {
+const BSONArray TagSet::kMatchAny = BSON_ARRAY(BSONObj());
+
+Status validateReadPreferenceMode(const std::string& prefStr, const boost::optional<TenantId>&) {
     try {
-        ReadPreference_parse(IDLParserErrorContext(kModeFieldName), prefStr);
+        ReadPreference_parse(prefStr, IDLParserContext(kModeFieldName));
     } catch (DBException& e) {
         return e.toStatus();
     }
     return Status::OK();
 }
-
-/**
- * Replica set refresh period on the task executor.
- */
-const Seconds ReadPreferenceSetting::kMinimalMaxStalenessValue(90);
-
-const OperationContext::Decoration<ReadPreferenceSetting> ReadPreferenceSetting::get =
-    OperationContext::declareDecoration<ReadPreferenceSetting>();
 
 const BSONObj& ReadPreferenceSetting::secondaryPreferredMetadata() {
     // This is a static method rather than a static member only because it is used by another TU
@@ -99,134 +100,103 @@ TagSet TagSet::primaryOnly() {
 ReadPreferenceSetting::ReadPreferenceSetting(ReadPreference pref,
                                              TagSet tags,
                                              Seconds maxStalenessSeconds,
-                                             boost::optional<HedgingMode> hedgingMode)
+                                             boost::optional<HedgingMode> hedgingMode,
+                                             bool isPretargeted)
     : pref(std::move(pref)),
       tags(std::move(tags)),
       maxStalenessSeconds(std::move(maxStalenessSeconds)),
-      hedgingMode(std::move(hedgingMode)) {}
+      hedgingMode(std::move(hedgingMode)),
+      isPretargeted(isPretargeted) {}
 
 ReadPreferenceSetting::ReadPreferenceSetting(ReadPreference pref, Seconds maxStalenessSeconds)
-    : ReadPreferenceSetting(pref, defaultTagSetForMode(pref), maxStalenessSeconds) {}
+    : ReadPreferenceSetting(pref, defaultTagSetForMode(pref), maxStalenessSeconds) {
+    _usedDefaultReadPrefValue = true;
+}
 
 ReadPreferenceSetting::ReadPreferenceSetting(ReadPreference pref, TagSet tags)
     : pref(std::move(pref)), tags(std::move(tags)) {}
 
 ReadPreferenceSetting::ReadPreferenceSetting(ReadPreference pref)
-    : ReadPreferenceSetting(pref, defaultTagSetForMode(pref)) {}
+    : ReadPreferenceSetting(pref, defaultTagSetForMode(pref)) {
+    _usedDefaultReadPrefValue = true;
+}
 
-StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromInnerBSON(const BSONObj& readPrefObj) {
-    std::string modeStr;
-    auto modeExtractStatus = bsonExtractStringField(readPrefObj, kModeFieldName, &modeStr);
-    if (!modeExtractStatus.isOK()) {
-        return modeExtractStatus;
-    }
-
-    ReadPreference mode;
-    try {
-        mode = ReadPreference_parse(IDLParserErrorContext(kModeFieldName), modeStr);
-    } catch (DBException& e) {
-        return e.toStatus().withContext(
-            str::stream() << "Could not parse $readPreference mode '" << modeStr
-                          << "'. Only the modes '"
-                          << ReadPreference_serializer(ReadPreference::PrimaryOnly) << "', '"
-                          << ReadPreference_serializer(ReadPreference::PrimaryPreferred) << "', '"
-                          << ReadPreference_serializer(ReadPreference::SecondaryOnly) << "', '"
-                          << ReadPreference_serializer(ReadPreference::SecondaryPreferred)
-                          << "', and '" << ReadPreference_serializer(ReadPreference::Nearest)
-                          << "' are supported.");
-    }
-
+StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromReadPreferenceIdl(
+    const ReadPreferenceIdl& rp) {
     boost::optional<HedgingMode> hedgingMode;
-    if (auto hedgingModeEl = readPrefObj[kHedgeFieldName]) {
-        if (hedgingModeEl.type() != BSONType::Object) {
-            return Status(ErrorCodes::TypeMismatch,
-                          str::stream() << kHedgeFieldName
-                                        << " field must be of type object if provided; found "
-                                        << hedgingModeEl);
-        }
-        hedgingMode = HedgingMode::parse(IDLParserErrorContext(kHedgeFieldName),
-                                         hedgingModeEl.embeddedObject());
-        if (hedgingMode->getEnabled() && mode == ReadPreference::PrimaryOnly) {
+    if (rp.getHedge()) {
+        hedgingMode = rp.getHedge();
+        if (hedgingMode->getEnabled() && rp.getMode() == ReadPreference::PrimaryOnly) {
             return {
                 ErrorCodes::InvalidOptions,
                 str::stream() << "cannot enable hedging for $readPreference mode \"primaryOnly\""};
         }
     }
 
-    if (!hedgingMode && mode == ReadPreference::Nearest) {
-        hedgingMode = HedgingMode();
-    }
-
     TagSet tags;
-    BSONElement tagsElem;
-    auto tagExtractStatus =
-        bsonExtractTypedField(readPrefObj, kTagsFieldName, mongo::Array, &tagsElem);
-    if (tagExtractStatus.isOK()) {
-        tags = TagSet{BSONArray(tagsElem.Obj().getOwned())};
+
+    if (rp.getTags()) {
+        tags = TagSet{static_cast<BSONArray>(rp.getTags()->getOwned())};
 
         // In accordance with the read preference spec, passing the default wildcard tagset
         // '[{}]' is the same as not passing a TagSet at all. Furthermore, passing an empty
         // TagSet with a non-primary ReadPreference is equivalent to passing the wildcard
         // ReadPreference.
-        if (tags == TagSet() || tags == TagSet::primaryOnly()) {
-            tags = defaultTagSetForMode(mode);
+        if (tags.isMatchAnyNode() || tags.isPrimaryOnly()) {
+            tags = defaultTagSetForMode(rp.getMode());
         }
 
         // If we are using a user supplied TagSet, check that it is compatible with
         // the readPreference mode.
-        else if (ReadPreference::PrimaryOnly == mode && (tags != TagSet::primaryOnly())) {
+        else if (ReadPreference::PrimaryOnly == rp.getMode() && (!tags.isPrimaryOnly())) {
             return Status(ErrorCodes::BadValue,
                           "Only empty tags are allowed with primary read preference");
         }
-    }
-
-    else if (ErrorCodes::NoSuchKey == tagExtractStatus) {
-        tags = defaultTagSetForMode(mode);
     } else {
-        return tagExtractStatus;
+        tags = defaultTagSetForMode(rp.getMode());
     }
 
-    long long maxStalenessSecondsValue;
-    auto maxStalenessSecondsExtractStatus = bsonExtractIntegerFieldWithDefault(
-        readPrefObj, kMaxStalenessSecondsFieldName, 0, &maxStalenessSecondsValue);
+    auto maxStalenessSecondsValue = rp.getMaxStalenessSeconds().value_or(0);
 
-    if (!maxStalenessSecondsExtractStatus.isOK()) {
-        return maxStalenessSecondsExtractStatus;
-    }
-
-    if (maxStalenessSecondsValue && maxStalenessSecondsValue < 0) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream()
-                          << kMaxStalenessSecondsFieldName << " must be a non-negative integer");
-    }
-
-    if (maxStalenessSecondsValue && maxStalenessSecondsValue >= Seconds::max().count()) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << kMaxStalenessSecondsFieldName << " value can not exceed "
-                                    << Seconds::max().count());
-    }
-
-    if (maxStalenessSecondsValue && maxStalenessSecondsValue < kMinimalMaxStalenessValue.count()) {
-        return Status(ErrorCodes::MaxStalenessOutOfRange,
-                      str::stream()
-                          << kMaxStalenessSecondsFieldName << " value can not be less than "
-                          << kMinimalMaxStalenessValue.count());
-    }
-
-    if ((mode == ReadPreference::PrimaryOnly) && maxStalenessSecondsValue) {
+    if ((rp.getMode() == ReadPreference::PrimaryOnly) && maxStalenessSecondsValue) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << kMaxStalenessSecondsFieldName
                                     << " can not be set for the primary mode");
     }
 
-    return ReadPreferenceSetting(mode, tags, Seconds(maxStalenessSecondsValue), hedgingMode);
+    bool isPretargetedValue = false;
+    if (auto isPretargeted = rp.getIsPretargeted()) {
+        if (!isPretargeted.value()) {
+            return Status(ErrorCodes::InvalidOptions,
+                          str::stream() << kIsPretargetedFieldName
+                                        << " field must be true if provided; found "
+                                        << isPretargeted.value());
+        }
+        isPretargetedValue = true;
+    }
+
+    return ReadPreferenceSetting(
+        rp.getMode(), tags, Seconds(maxStalenessSecondsValue), hedgingMode, isPretargetedValue);
+}
+
+StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromInnerBSON(const BSONObj& readPrefObj) {
+    ReadPreferenceIdl rp;
+
+    // Translate any parsing related exceptions to status.
+    try {
+        rp = ReadPreferenceIdl::parse(readPrefObj, IDLParserContext("readPreference"));
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
+
+    return ReadPreferenceSetting::fromReadPreferenceIdl(rp);
 }
 
 StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromInnerBSON(const BSONElement& elem) {
-    if (elem.type() != mongo::Object) {
+    if (elem.type() != BSONType::object) {
         return Status(ErrorCodes::TypeMismatch,
                       str::stream() << "$readPreference has incorrect type: expected "
-                                    << mongo::Object << " but got " << elem.type());
+                                    << BSONType::object << " but got " << elem.type());
     }
     return fromInnerBSON(elem.Obj());
 }
@@ -246,17 +216,24 @@ StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromContainingBSON(
     return ReadPreferenceSetting(defaultReadPref);
 }
 
-void ReadPreferenceSetting::toInnerBSON(BSONObjBuilder* bob) const {
-    bob->append(kModeFieldName, ReadPreference_serializer(pref));
+ReadPreferenceIdl ReadPreferenceSetting::toReadPreferenceIdl() const {
+    ReadPreferenceIdl rp;
+    rp.setMode(pref);
     if (tags != defaultTagSetForMode(pref)) {
-        bob->append(kTagsFieldName, tags.getTagBSON());
+        rp.setTags(tags.getTagBSON());
     }
     if (maxStalenessSeconds.count() > 0) {
-        bob->append(kMaxStalenessSecondsFieldName, maxStalenessSeconds.count());
+        rp.setMaxStalenessSeconds(maxStalenessSeconds.count());
     }
-    if (hedgingMode) {
-        bob->append(kHedgeFieldName, hedgingMode.get().toBSON());
+    rp.setHedge(hedgingMode);
+    if (isPretargeted) {
+        rp.setIsPretargeted(true);
     }
+    return rp;
+}
+
+void ReadPreferenceSetting::toInnerBSON(BSONObjBuilder* bob) const {
+    toReadPreferenceIdl().serialize(bob);
 }
 
 std::string ReadPreferenceSetting::toString() const {

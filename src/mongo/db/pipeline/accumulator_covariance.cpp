@@ -27,26 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <cmath>
-
-#include "mongo/db/pipeline/accumulator_for_window_functions.h"
-
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/pipeline/accumulation_statement.h"
-#include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/accumulator_for_window_functions.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/window_function/window_function_covariance.h"
 #include "mongo/db/pipeline/window_function/window_function_expression.h"
+#include "mongo/util/assert_util.h"
+
 
 namespace mongo {
 
-REGISTER_REMOVABLE_WINDOW_FUNCTION(covarianceSamp,
-                                   AccumulatorCovarianceSamp,
-                                   WindowFunctionCovarianceSamp);
+REGISTER_STABLE_REMOVABLE_WINDOW_FUNCTION(covarianceSamp,
+                                          AccumulatorCovarianceSamp,
+                                          WindowFunctionCovarianceSamp);
 
-REGISTER_REMOVABLE_WINDOW_FUNCTION(covariancePop,
-                                   AccumulatorCovariancePop,
-                                   WindowFunctionCovariancePop);
+REGISTER_STABLE_REMOVABLE_WINDOW_FUNCTION(covariancePop,
+                                          AccumulatorCovariancePop,
+                                          WindowFunctionCovariancePop);
 
 void AccumulatorCovariance::processInternal(const Value& input, bool merging) {
     tassert(5424000, "$covariance can't be merged", !merging);
@@ -56,17 +53,7 @@ void AccumulatorCovariance::processInternal(const Value& input, bool merging) {
 
 AccumulatorCovariance::AccumulatorCovariance(ExpressionContext* const expCtx, bool isSamp)
     : AccumulatorForWindowFunctions(expCtx), _covarianceWF(expCtx, isSamp) {
-    _memUsageBytes = sizeof(*this);
-}
-
-boost::intrusive_ptr<AccumulatorState> AccumulatorCovarianceSamp::create(
-    ExpressionContext* const expCtx) {
-    return new AccumulatorCovarianceSamp(expCtx);
-}
-
-boost::intrusive_ptr<AccumulatorState> AccumulatorCovariancePop::create(
-    ExpressionContext* const expCtx) {
-    return new AccumulatorCovariancePop(expCtx);
+    _memUsageTracker.set(sizeof(*this));
 }
 
 void AccumulatorCovariance::reset() {

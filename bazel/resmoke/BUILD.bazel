@@ -1,0 +1,138 @@
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
+load("@poetry//:dependencies.bzl", "dependency")
+
+genrule(
+    name = "resmoke_mongo_version",
+    srcs = [],
+    outs = [".resmoke_mongo_version.yml"],
+    cmd = """
+    echo mongo_version: $(MONGO_VERSION) > $@
+    """,
+    visibility = ["//visibility:public"],
+)
+
+genrule(
+    name = "on_feature_flags",
+    srcs = [],
+    outs = ["on_feature_flags.txt"],
+    cmd = """
+    awk '/^on_feature_flags/ { for (i=2; i<=NF; i++) print $$i }' bazel-out/volatile-status.txt > $@
+    """,
+    stamp = True,
+    tags = ["external"],  # Consuming the feature flag information from volatile-status, so this should always execute.
+    visibility = ["//visibility:public"],
+)
+
+genrule(
+    name = "off_feature_flags",
+    srcs = [],
+    outs = ["off_feature_flags.txt"],
+    cmd = """
+    awk '/^off_feature_flags/ { for (i=2; i<=NF; i++) print $$i }' bazel-out/volatile-status.txt > $@
+    """,
+    stamp = True,
+    tags = ["external"],  # Consuming the feature flag information from volatile-status, so this should always execute.
+    visibility = ["//visibility:public"],
+)
+
+genrule(
+    name = "unreleased_ifr_flags",
+    srcs = [],
+    outs = ["unreleased_ifr_flags.txt"],
+    cmd = """
+    awk '/^unreleased_ifr_flags/ { for (i=2; i<=NF; i++) print $$i }' bazel-out/volatile-status.txt > $@
+    """,
+    stamp = True,
+    tags = ["external"],  # Consuming the feature flag information from volatile-status, so this should always execute.
+    visibility = ["//visibility:public"],
+)
+
+# We want to use keys from volatile-status in the resmoke `py_test`, so this creates a file that
+# it can depend on.
+genrule(
+    name = "volatile_status",
+    srcs = [],
+    outs = ["volatile-status.txt"],
+    cmd = """
+    cat bazel-out/volatile-status.txt  > $@
+    """,
+    stamp = True,
+    tags = ["external"],  # Consuming information from volatile-status, so this should always execute.
+    visibility = ["//visibility:public"],
+)
+
+genrule(
+    name = "test_runtimes",
+    srcs = [],
+    outs = ["test_runtimes.json"],
+    cmd = """
+    awk '/^STABLE_TEST_RUNTIMES/ { for (i=2; i<=NF; i++) print $$i }' bazel-out/stable-status.txt > $@
+    """,
+    stamp = True,
+    tags = [
+        "external",
+        "local",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "in_evergreen",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "in_evergreen_enabled",
+    flag_values = {
+        "//bazel/resmoke:in_evergreen": "True",
+    },
+)
+
+py_binary(
+    name = "resmoke_config_generator",
+    srcs = ["resmoke_config_generator.py"],
+    main = "resmoke_config_generator.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "typer",
+            group = "core",
+        ),
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+    ],
+)
+
+py_binary(
+    name = "get_historic_runtimes",
+    srcs = ["get_historic_runtimes.py"],
+    main = "get_historic_runtimes.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "typer",
+            group = "core",
+        ),
+        dependency(
+            "boto3",
+            group = "aws",
+        ),
+        dependency(
+            "botocore",
+            group = "aws",
+        ),
+    ],
+)
+
+py_binary(
+    name = "resmoke_shim",
+    srcs = ["resmoke_shim.py"],
+    main = "resmoke_shim.py",
+    visibility = ["//visibility:public"],
+)
+
+exports_files([
+    "resmoke_shim.py",
+])

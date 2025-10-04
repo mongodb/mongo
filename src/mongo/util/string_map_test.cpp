@@ -27,13 +27,19 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
+#include "mongo/util/string_map.h"
+
+#include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
 
-#include "mongo/platform/random.h"
-#include "mongo/util/string_map.h"
-#include "mongo/util/timer.h"
+#include <cstdio>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 
 namespace {
 using namespace mongo;

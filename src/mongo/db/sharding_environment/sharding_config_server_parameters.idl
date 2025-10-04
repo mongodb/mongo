@@ -1,0 +1,136 @@
+# Copyright (C) 2019-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+
+global:
+    cpp_namespace: mongo
+
+server_parameters:
+    minNumChunksForSessionsCollection:
+        description: >-
+            Deprecated. Has no effect on the number of chunks for config.system.sessions collection.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int32_t>
+        cpp_varname: minNumChunksForSessionsCollection
+        default: 1024
+        validator: {gte: 1, lte: 1000000}
+        redact: false
+
+    chunkDefragmentationThrottlingMS:
+        description: >-
+            The minimum amount of time between two consecutive mergeChunks/splitChunk commands
+            issued by the balancer when 'configureCollectionBalancing' is invoked on a collection.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int32_t>
+        cpp_varname: chunkDefragmentationThrottlingMS
+        validator:
+            gte: 0
+        default: 1000
+        redact: false
+
+    autoMergerIntervalSecs:
+        description: Time interval in seconds between subsequent auto-merging rounds
+        set_at: [startup, runtime]
+        cpp_vartype: int
+        cpp_varname: autoMergerIntervalSecs
+        default: 3600 # 1 hour
+        redact: false
+
+    autoMergerThrottlingMS:
+        description: >-
+            The minimum amount of time between two consecutive auto-merge commands for the same collection.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int32_t>
+        cpp_varname: autoMergerThrottlingMS
+        validator:
+            gte: 0
+        default: 15000 # 15 seconds
+        redact: false
+
+    balancerMigrationsThrottlingMs:
+        # Sleep between balancer rounds in the case where the last round found some chunks which needed to
+        # be balanced. This value should be set sufficiently low so that imbalanced clusters will quickly
+        # reach balanced state, but setting it too low may cause CRUD operations to start failing due to
+        # not being able to establish a stable shard version.
+        description: The minimum amount of time between two consecutive balancing rounds
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int32_t>
+        cpp_varname: balancerMigrationsThrottlingMs
+        default: 1000 # 1 sec
+        redact: false
+
+    balancerChunksSelectionTimeoutMs:
+        description: >-
+            Maximum time in milliseconds the balancer will spend deciding which ranges to move in
+            the current balancing round.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int32_t>
+        cpp_varname: balancerChunksSelectionTimeoutMs
+        default: 5000 # 5 seconds
+        redact: false
+
+    newShardExistingClusterTimeKeysExpirationSecs:
+        description: >-
+            The amount of time in seconds that the config server should wait before removing the
+            key documents fetched from a replica set when it gets added to the cluster
+            as a shard.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gNewShardExistingClusterTimeKeysExpirationSecs
+        default:
+            expr: 7 * 24 * 3600 # 1 week
+        validator:
+            gte: 1
+        redact: false
+
+    enableShardedIndexConsistencyCheck:
+        description: >-
+            Enable the periodic sharded index consistency check on the config server's primary.
+            The count of sharded collections with inconsistent indexes is exposed via the
+            'shardedIndexConsistency' section in the serverStatus output.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: enableShardedIndexConsistencyCheck
+        default: true
+        redact: false
+
+    shardedIndexConsistencyCheckIntervalMS:
+        description: "Time interval in milliseconds between subsequent index checks."
+        set_at: [startup]
+        cpp_vartype: int
+        cpp_varname: shardedIndexConsistencyCheckIntervalMS
+        default: 600000
+        redact: false
+
+    autoMergerMaxTimeProcessingChunksMS:
+        description: >-
+            Maximum time in milliseconds the command mergeAllChunksOnShard scheduled by the 
+            autoMerger will spend looking for mergeable chunks.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int32_t>
+        cpp_varname: autoMergerMaxTimeProcessingChunksMS
+        default: 500 # 500 milliseconds
+        redact: false

@@ -29,14 +29,29 @@
 
 #pragma once
 
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/util/assert_util.h"
+
+#include <utility>
+#include <vector>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
 /**
  * Given a chunk, determines whether it satisfies the requisites to be auto-splitted and - if so -
- * returns the split points (shard keys representing the lower bounds of the new chunks to create).
+ * returns the split points (shard keys representing the lower bounds of the new chunks to create)
+ * along with a bool representing whether or not the max bson size for the vector of split points
+ * was reached. If the bool returns true, this function should be called on the same range again to
+ * retrieve the rest of the split points.
  *
  * The logic implemented can be summarized as follows: given a `maxChunkSize` of `x` MB, the
  * algorithm aims to choose the split points so that the resulting chunks' size would be around
@@ -74,6 +89,7 @@ namespace mongo {
  * (2.1) `S >= 80% maxChunkSize`, so keep the current split points.
  *
  * Returned split points: [99].
+ * Returned continuation flag: false.
  *
  * ========= EXAMPLE (CASE 2.2) ========
  * `maxChunkSize` = 100MB
@@ -89,6 +105,7 @@ namespace mongo {
  * 67% maxChunkSize. Recalculate.
  *
  * Returned split points: [69].
+ * Returned continuation flag: false.
  *
  * ========= EXAMPLE (CASE 2.3) ========
  * `maxChunkSize` = 100MB
@@ -104,13 +121,16 @@ namespace mongo {
  * >= 67% maxChunkSize. So remove the last split point.
  *
  * Returned split points: [].
+ * Returned continuation flag: false.
  */
-std::vector<BSONObj> autoSplitVector(OperationContext* opCtx,
-                                     const NamespaceString& nss,
-                                     const BSONObj& keyPattern,
-                                     const BSONObj& min,
-                                     const BSONObj& max,
-                                     long long maxChunkSizeBytes);
+std::pair<std::vector<BSONObj>, bool> autoSplitVector(OperationContext* opCtx,
+                                                      const CollectionAcquisition& acquisition,
+                                                      const BSONObj& keyPattern,
+                                                      const BSONObj& min,
+                                                      const BSONObj& max,
+                                                      long long maxChunkSizeBytes,
+                                                      boost::optional<int> limit = boost::none,
+                                                      bool forward = true);
 
 /*
  * Utility function for deserializing autoSplitVector/splitVector responses.
@@ -118,13 +138,13 @@ std::vector<BSONObj> autoSplitVector(OperationContext* opCtx,
 static std::vector<BSONObj> parseSplitKeys(const BSONElement& splitKeysArray) {
     uassert(ErrorCodes::TypeMismatch,
             "The split keys vector must be represented as a BSON array",
-            !splitKeysArray.eoo() && splitKeysArray.type() == BSONType::Array);
+            !splitKeysArray.eoo() && splitKeysArray.type() == BSONType::array);
 
     std::vector<BSONObj> splitKeys;
     for (const auto& elem : splitKeysArray.Obj()) {
         uassert(ErrorCodes::TypeMismatch,
                 "Each element of the split keys array must be an object",
-                elem.type() == BSONType::Object);
+                elem.type() == BSONType::object);
         splitKeys.push_back(elem.embeddedObject().getOwned());
     }
 

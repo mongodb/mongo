@@ -36,16 +36,27 @@
  */
 
 #include <algorithm>
-#include <boost/optional.hpp>
+#include <cstdint>
+#include <cstring>
+#include <iterator>
 #include <memory>
 #include <sstream>
 #include <string>
 #include <vector>
 
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+
+#ifndef _WIN32
+#include <strings.h>
+#endif
+
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/platform/bits.h"
 #include "mongo/util/ctype.h"
+#include "mongo/util/str_basic.h"  // IWYU pragma: export
 
 namespace mongo {
 namespace str {
@@ -64,7 +75,7 @@ namespace str {
 */
 class stream {
 public:
-    mongo::StringBuilder ss;
+    StringBuilder ss;
     template <class T>
     stream& operator<<(const T& v) {
         ss << v;
@@ -73,10 +84,7 @@ public:
     operator std::string() const {
         return ss.str();
     }
-    operator std::string_view() const {
-        return ss.stringView();
-    }
-    operator mongo::StringData() const {
+    operator StringData() const {
         return ss.stringData();
     }
 
@@ -87,6 +95,14 @@ public:
      */
     template <typename R, typename... Args>
     stream& operator<<(R (*val)(Args...)) = delete;
+
+    bool operator==(StringData s) const {
+        return ss.stringData() == s;
+    }
+
+    auto operator<=>(StringData s) const {
+        return ss.stringData() <=> s;
+    }
 };
 
 inline bool startsWith(const char* str, const char* prefix) {
@@ -259,11 +275,11 @@ inline unsigned count(const std::string& s, char c) {
 
 /** trim leading spaces. spaces only, not tabs etc. */
 inline mongo::StringData ltrim(mongo::StringData s) {
-    auto i = s.rawData();
-    auto end = s.rawData() + s.size();
+    auto i = s.data();
+    auto end = s.data() + s.size();
     for (; i != end && *i == ' '; ++i) {
     }
-    return s.substr(i - s.rawData());
+    return s.substr(i - s.data());
 }
 
 /**
@@ -354,7 +370,7 @@ Iterator UTF8SafeTruncation(Iterator begin, Iterator end, std::size_t maximum) {
 
 inline StringData UTF8SafeTruncation(StringData input, std::size_t maximum) {
     auto truncatedEnd = UTF8SafeTruncation(input.begin(), input.end(), maximum);
-    return StringData(input.rawData(), truncatedEnd - input.begin());
+    return StringData(input.data(), truncatedEnd - input.begin());
 }
 
 inline int caseInsensitiveCompare(const char* s1, const char* s2) {
@@ -363,6 +379,14 @@ inline int caseInsensitiveCompare(const char* s1, const char* s2) {
 #else
     return strcasecmp(s1, s2);
 #endif
+}
+
+/** Uses tolower, and therefore does not handle some languages correctly. */
+constexpr bool equalCaseInsensitive(StringData a, StringData b) {
+    return a.size() == b.size() &&
+        std::equal(a.begin(), a.end(), b.begin(), b.end(), [](char ac, char bc) {
+               return ctype::toLower(ac) == ctype::toLower(bc);
+           });
 }
 
 void splitStringDelim(const std::string& str, std::vector<std::string>* res, char delim);
@@ -394,10 +418,6 @@ public:
 private:
     bool _lexOnly;
 };
-
-// TODO: Sane-ify core std::string functionality
-// For now, this needs to be near the LexNumCmp or else
-int versionCmp(StringData rhs, StringData lhs);
 
 /**
  * A method to escape whitespace and control characters in strings. For example, the string "\t"
@@ -433,11 +453,11 @@ inline namespace literals {
  * encoding. In C++17 mode, there is nothing to do.
  */
 #if defined(__cpp_char8_t) && (__cpp_char8_t >= 201811L)
-inline auto operator"" _as_char_ptr(const char8_t* p, std::size_t s) {
+inline auto operator""_as_char_ptr(const char8_t* p, std::size_t s) {
     return static_cast<const char*>(static_cast<const void*>(p));
 }
 #else
-inline auto operator"" _as_char_ptr(const char* p, std::size_t s) {
+inline auto operator""_as_char_ptr(const char* p, std::size_t s) {
     return p;
 }
 #endif

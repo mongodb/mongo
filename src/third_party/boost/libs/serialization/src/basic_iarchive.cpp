@@ -167,7 +167,7 @@ class basic_iarchive_impl {
     cobject_id_vector_type cobject_id_vector;
 
     //////////////////////////////////////////////////////////////////////
-    // address of the most recent object serialized as a poiner
+    // address of the most recent object serialized as a pointer
     // whose data itself is now pending serialization
     struct pending {
         void * object;
@@ -262,7 +262,7 @@ basic_iarchive_impl::reset_object_address(
             continue;
         void const * const this_address = ao.address;
         // calculate displacement from this level
-        // warning - pointer arithmetic on void * is in herently non-portable
+        // warning - pointer arithmetic on void * is inherently non-portable
         // but expected to work on all platforms in current usage
         if(this_address > old_address){
             std::size_t member_displacement
@@ -402,7 +402,7 @@ basic_iarchive_impl::load_object(
         if(!track(ar, t))
             // we're done
             return;
-        // add a new enty into the tracking list
+        // add a new entry into the tracking list
         object_id_vector.push_back(aobject(t, cid));
         // and add an entry for this object
         m_moveable_objects.end = object_id_type(object_id_vector.size());
@@ -501,7 +501,7 @@ basic_iarchive_impl::load_pointer(
         serialization::state_saver<object_id_type> w_end(m_moveable_objects.end);
 
         // add to list of serialized objects so that we can properly handle
-        // cyclic strucures
+        // cyclic structures
         object_id_vector.push_back(aobject(t, cid));
 
         // remember that that the address of these elements could change

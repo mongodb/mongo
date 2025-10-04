@@ -1,21 +1,25 @@
 /*
  * This test ensures that dbstats does not conflict with multi-statement transactions as a result of
  * taking MODE_S locks that are incompatible with MODE_IX needed for writes.
- * @tags: [uses_transactions]
+ *
+ * @tags: [
+ *   # The test runs commands that are not allowed with security token: endSession.
+ *   not_allowed_with_signed_security_token,
+ *   uses_transactions
+ * ]
  */
-(function() {
-"use strict";
-var dbName = 'dbstats_not_blocked_by_txn';
-var mydb = db.getSiblingDB(dbName);
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+
+let dbName = "dbstats_not_blocked_by_txn";
+let mydb = db.getSiblingDB(dbName);
 
 mydb.foo.drop({writeConcern: {w: "majority"}});
 mydb.createCollection("foo", {writeConcern: {w: "majority"}});
 
-var session = db.getMongo().startSession();
-var sessionDb = session.getDatabase(dbName);
+let session = db.getMongo().startSession();
+let sessionDb = session.getDatabase(dbName);
 
-const isMongos = assert.commandWorked(db.runCommand("hello")).msg === "isdbgrid";
-if (isMongos) {
+if (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
     // Before starting the transaction below, access the collection so it can be implicitly
     // sharded and force all shards to refresh their database versions because the refresh
     // requires an exclusive lock and would block behind the transaction.
@@ -31,4 +35,3 @@ assert.commandWorked(res, "dbstats should have succeeded and not timed out");
 
 assert.commandWorked(session.commitTransaction_forTesting());
 session.endSession();
-}());

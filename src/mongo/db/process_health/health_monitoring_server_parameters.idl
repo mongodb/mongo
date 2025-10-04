@@ -31,7 +31,7 @@ global:
     cpp_namespace: "mongo"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 enums:
     HealthObserverIntensity:
@@ -42,25 +42,130 @@ enums:
             kCritical: "critical"
             kNonCritical: "non-critical"
 
+    HealthObserverType:
+        description: "Enum representing available health observer types"
+        type: string
+        values:
+            kLdap: "ldap"
+            kDns: "dns"
+            kTest: "test"
+            kConfigServer: "configServer"
+
 structs:
-    HealthObserverIntensities:
-        description: "A struct representing the health observer intensities."
+    HealthObserverIntensitySetting:
+        description: "One health observer intensity setting"
         strict: true
         fields:
-            dns:
-                description: "Intensity of DNS fault facet"
+            type:
+                type: HealthObserverType
+                optional: false
+            intensity:
                 type: HealthObserverIntensity
-                default: kNonCritical
-            ldap:
-                description: "Intensity of LDAP fault facet"
-                type: HealthObserverIntensity
-                default: kNonCritical
+                optional: false
+                default: kOff
+
+    HealthObserverIntensities:
+        description: "A struct representing the health observer intensities."
+        strict: false
+        fields:
+            values:
+                description: "Array of health observer intensity settings"
+                type: array<HealthObserverIntensitySetting>
+                optional: true
+
+    HealthObserverIntervalSetting:
+        description: "One health observer check interval setting, in milliseconds"
+        strict: true
+        fields:
+            type:
+                type: HealthObserverType
+                optional: false
+            interval:
+                type: int
+                optional: false
+                validator: {gt: 0}
+
+    HealthObserverIntervals:
+        description: "A struct representing the interval in milliseconds for each health observer."
+        strict: true
+        fields:
+            values:
+                description: "Array of health observer intervals settings"
+                type: array<HealthObserverIntervalSetting>
+                optional: true
+
+    HealthObserverProgressMonitorConfig:
+        description: "A struct representing configuration for health observer liveness checks."
+        strict: true
+        fields:
+            interval:
+                description: "Interval between liveness checks in milliseconds."
+                type: int
+                default: 1000
+                validator: {gt: 0}
+            deadline:
+                description: "Deadline for liveness checks, after which process should exit, in seconds."
+                type: int
+                default: 300
+                validator: {gt: 0}
 
 server_parameters:
-    healthMonitoring:
+    healthMonitoringIntensities:
         set_at: ["startup", "runtime"]
         description: "A server parameter for specifying the intensity of fault facets."
         cpp_class:
             name: "HealthMonitoringIntensitiesServerParameter"
             data: "synchronized_value<HealthObserverIntensities>"
             override_set: true
+        redact: false
+
+    progressMonitor:
+        set_at: ["startup", "runtime"]
+        description: "A server parameter for specifying intervals for health monitoring."
+        cpp_class:
+            name: "HealthMonitoringProgressMonitorServerParameter"
+            data: "synchronized_value<HealthObserverProgressMonitorConfig>"
+            override_set: true
+        redact: false
+
+    healthMonitoringIntervals:
+        set_at: [startup, runtime]
+        description: "A server parameter for specifying the interval in milliseconds between health checks."
+        cpp_class:
+            name: "PeriodicHealthCheckIntervalsServerParameter"
+            data: "synchronized_value<HealthObserverIntervals>"
+            override_set: true
+        redact: false
+
+    activeFaultDurationSecs:
+        description: "A server parameter for specifying the duration after which we transition to active fault."
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gActiveFaultDurationSecs
+        default:
+            expr: 120
+        validator:
+            gte: 0
+        redact: false
+
+    reachableConfigReplicasRequiredByHealthMonitoring:
+        description: "Minimal count of reachable Config server replicas required to pass the health check"
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gReachableConfigReplicasRequired
+        default:
+            expr: 1
+        validator:
+            gt: 0
+        redact: false
+
+    configReplicasProbedByHealthMonitoring:
+        description: "Count of Config server replicas probed by the health check"
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gConfigReplicasProbed
+        default:
+            expr: 2
+        validator:
+            gt: 0
+        redact: false

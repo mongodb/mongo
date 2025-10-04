@@ -10,51 +10,67 @@
 // sequence), idle (connection is connected but not used before a shard change), and new
 // (connection connected after shard change).
 
-// Checking UUID and index consistency involves talking to shard primaries, but by the end of this
-// test, one shard does not have a primary.
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
+// The following checks involve talking to shard primaries, as by the end of this test, one shard
+// does not have a primary.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
+TestData.skipCheckShardFilteringMetadata = true;
+TestData.skipCheckMetadataConsistency = true;
 
-(function() {
-'use strict';
+// The routing table consistency check runs with 'snapshot' level readConcern. This readConcern
+// level cannot be satisfied without a replica set primary, which we won't have because this test
+// removes the replica set primary from a shard.
+TestData.skipCheckRoutingTableConsistency = true;
 
-var st = new ShardingTest({shards: 3, mongos: 1, other: {rs: true, rsOptions: {nodes: 2}}});
+let st = new ShardingTest({
+    shards: 3,
+    other: {
+        rs: true,
+        // Disables elections to avoid secondaries becoming primaries after stepdowns. The test
+        // relies on specific topology changes done explicitly.
+        rsOptions: {nodes: 2, settings: {electionTimeoutMillis: ReplSetTest.kForeverMillis}},
+        // ShardingTest use a high config command timeout to avoid spurious failures but this test
+        // may require a timeout to complete, so we restore the default value to avoid failures.
+        mongosOptions: {setParameter: {defaultConfigCommandTimeoutMS: 30000}},
+    },
+});
 
-var mongos = st.s0;
-var admin = mongos.getDB("admin");
+let mongos = st.s0;
+let admin = mongos.getDB("admin");
 
 assert.commandWorked(admin.runCommand({setParameter: 1, traceExceptions: true}));
 
-var collSharded = mongos.getCollection("fooSharded.barSharded");
-var collUnsharded = mongos.getCollection("fooUnsharded.barUnsharded");
+let collSharded = mongos.getCollection("fooSharded.barSharded");
+let collUnsharded = mongos.getCollection("fooUnsharded.barUnsharded");
 
-// Create the unsharded database
+// Create the database for the unsharded collection
+assert.commandWorked(
+    admin.runCommand({enableSharding: collUnsharded.getDB().toString(), primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(collUnsharded.insert({some: "doc"}));
 assert.commandWorked(collUnsharded.remove({}));
-assert.commandWorked(
-    admin.runCommand({movePrimary: collUnsharded.getDB().toString(), to: st.shard0.shardName}));
 
-// Create the sharded database
-assert.commandWorked(admin.runCommand({enableSharding: collSharded.getDB().toString()}));
+// Create the database for the sharded collection
 assert.commandWorked(
-    admin.runCommand({movePrimary: collSharded.getDB().toString(), to: st.shard0.shardName}));
+    admin.runCommand({enableSharding: collSharded.getDB().toString(), primaryShard: st.shard0.shardName}),
+);
 assert.commandWorked(admin.runCommand({shardCollection: collSharded.toString(), key: {_id: 1}}));
 assert.commandWorked(admin.runCommand({split: collSharded.toString(), middle: {_id: 0}}));
-assert.commandWorked(
-    admin.runCommand({moveChunk: collSharded.toString(), find: {_id: 0}, to: st.shard1.shardName}));
+assert.commandWorked(admin.runCommand({moveChunk: collSharded.toString(), find: {_id: 0}, to: st.shard1.shardName}));
 
 // Secondaries do not refresh their in-memory routing table until a request with a higher
 // version is received, and refreshing requires communication with the primary to obtain the
 // newest version. Read from the secondaries once before taking down primaries to ensure they
 // have loaded the routing table into memory.
-// TODO SERVER-30148: replace this with calls to awaitReplication() on each shard owning data
-// for the sharded collection once secondaries refresh proactively.
-var mongosSetupConn = new Mongo(mongos.host);
+let mongosSetupConn = new Mongo(mongos.host);
 mongosSetupConn.setReadPref("secondary");
 assert(!mongosSetupConn.getCollection(collSharded.toString()).find({}).hasNext());
 
-gc();  // Clean up connections
+gc(); // Clean up connections
 
 st.printShardingStatus();
 
@@ -64,11 +80,11 @@ st.printShardingStatus();
 
 jsTest.log("Inserting initial data...");
 
-var mongosConnActive = new Mongo(mongos.host);
-var mongosConnIdle = null;
-var mongosConnNew = null;
+let mongosConnActive = new Mongo(mongos.host);
+let mongosConnIdle = null;
+let mongosConnNew = null;
 
-var wc = {writeConcern: {w: 2, wtimeout: 60000}};
+let wc = {writeConcern: {w: 2, wtimeout: 60000}};
 
 assert.commandWorked(mongosConnActive.getCollection(collSharded.toString()).insert({_id: -1}, wc));
 assert.commandWorked(mongosConnActive.getCollection(collSharded.toString()).insert({_id: 1}, wc));
@@ -116,14 +132,14 @@ assert.commandWorked(mongosConnNew.getCollection(collSharded.toString()).insert(
 mongosConnNew = new Mongo(mongos.host);
 assert.commandWorked(mongosConnNew.getCollection(collUnsharded.toString()).insert({_id: 4}, wc));
 
-gc();  // Clean up new connections
+gc(); // Clean up new connections
 
 jsTest.log("Stopping primary of second shard...");
 
 mongosConnIdle = new Mongo(mongos.host);
 
 // Need to save this node for later
-var rs1Secondary = st.rs1.getSecondary();
+let rs1Secondary = st.rs1.getSecondary();
 
 st.rs1.stop(st.rs1.getPrimary());
 
@@ -138,7 +154,7 @@ mongosConnActive.setSecondaryOk(false);
 
 mongosConnActive.setReadPref("primary");
 assert.neq(null, mongosConnActive.getCollection(collSharded.toString()).findOne({_id: -1}));
-assert.throws(function() {
+assert.throws(function () {
     mongosConnActive.getCollection(collSharded.toString()).findOne({_id: 1});
 });
 assert.neq(null, mongosConnActive.getCollection(collUnsharded.toString()).findOne({_id: 1}));
@@ -147,7 +163,7 @@ assert.neq(null, mongosConnActive.getCollection(collUnsharded.toString()).findOn
 mongosConnActive.setSecondaryOk();
 mongosConnActive.setReadPref("primary");
 assert.neq(null, mongosConnActive.getCollection(collSharded.toString()).findOne({_id: -1}));
-assert.throws(function() {
+assert.throws(function () {
     mongosConnActive.getCollection(collSharded.toString()).findOne({_id: 1});
 });
 assert.neq(null, mongosConnActive.getCollection(collUnsharded.toString()).findOne({_id: 1}));
@@ -194,7 +210,7 @@ mongosConnIdle.setSecondaryOk(false);
 
 mongosConnIdle.setReadPref("primary");
 assert.neq(null, mongosConnIdle.getCollection(collSharded.toString()).findOne({_id: -1}));
-assert.throws(function() {
+assert.throws(function () {
     mongosConnIdle.getCollection(collSharded.toString()).findOne({_id: 1});
 });
 assert.neq(null, mongosConnIdle.getCollection(collUnsharded.toString()).findOne({_id: 1}));
@@ -203,7 +219,7 @@ assert.neq(null, mongosConnIdle.getCollection(collUnsharded.toString()).findOne(
 mongosConnIdle.setSecondaryOk();
 mongosConnIdle.setReadPref("primary");
 assert.neq(null, mongosConnIdle.getCollection(collSharded.toString()).findOne({_id: -1}));
-assert.throws(function() {
+assert.throws(function () {
     mongosConnIdle.getCollection(collSharded.toString()).findOne({_id: 1});
 });
 assert.neq(null, mongosConnIdle.getCollection(collUnsharded.toString()).findOne({_id: 1}));
@@ -242,21 +258,21 @@ mongosConnNew = new Mongo(mongos.host);
 mongosConnNew.setSecondaryOk();
 assert.neq(null, mongosConnNew.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
-gc();  // Clean up new connections incrementally to compensate for slow win32 machine.
+gc(); // Clean up new connections incrementally to compensate for slow win32 machine.
 
 mongosConnNew = new Mongo(mongos.host);
 mongosConnNew.setReadPref("primary");
 assert.neq(null, mongosConnNew.getCollection(collSharded.toString()).findOne({_id: -1}));
 mongosConnNew = new Mongo(mongos.host);
 mongosConnNew.setReadPref("primary");
-assert.throws(function() {
+assert.throws(function () {
     mongosConnNew.getCollection(collSharded.toString()).findOne({_id: 1});
 });
 mongosConnNew = new Mongo(mongos.host);
 mongosConnNew.setReadPref("primary");
 assert.neq(null, mongosConnNew.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
-gc();  // Clean up new connections incrementally to compensate for slow win32 machine.
+gc(); // Clean up new connections incrementally to compensate for slow win32 machine.
 
 // Ensure read prefs override slaveok
 mongosConnNew = new Mongo(mongos.host);
@@ -266,7 +282,7 @@ assert.neq(null, mongosConnNew.getCollection(collSharded.toString()).findOne({_i
 mongosConnNew = new Mongo(mongos.host);
 mongosConnNew.setSecondaryOk();
 mongosConnNew.setReadPref("primary");
-assert.throws(function() {
+assert.throws(function () {
     mongosConnNew.getCollection(collSharded.toString()).findOne({_id: 1});
 });
 mongosConnNew = new Mongo(mongos.host);
@@ -274,7 +290,7 @@ mongosConnNew.setSecondaryOk();
 mongosConnNew.setReadPref("primary");
 assert.neq(null, mongosConnNew.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
-gc();  // Clean up new connections incrementally to compensate for slow win32 machine.
+gc(); // Clean up new connections incrementally to compensate for slow win32 machine.
 
 mongosConnNew = new Mongo(mongos.host);
 mongosConnNew.setReadPref("secondary");
@@ -286,7 +302,7 @@ mongosConnNew = new Mongo(mongos.host);
 mongosConnNew.setReadPref("secondary");
 assert.neq(null, mongosConnNew.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
-gc();  // Clean up new connections incrementally to compensate for slow win32 machine.
+gc(); // Clean up new connections incrementally to compensate for slow win32 machine.
 
 mongosConnNew = new Mongo(mongos.host);
 mongosConnNew.setReadPref("primaryPreferred");
@@ -298,7 +314,7 @@ mongosConnNew = new Mongo(mongos.host);
 mongosConnNew.setReadPref("primaryPreferred");
 assert.neq(null, mongosConnNew.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
-gc();  // Clean up new connections incrementally to compensate for slow win32 machine.
+gc(); // Clean up new connections incrementally to compensate for slow win32 machine.
 
 mongosConnNew = new Mongo(mongos.host);
 mongosConnNew.setReadPref("secondaryPreferred");
@@ -310,7 +326,7 @@ mongosConnNew = new Mongo(mongos.host);
 mongosConnNew.setReadPref("secondaryPreferred");
 assert.neq(null, mongosConnNew.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
-gc();  // Clean up new connections incrementally to compensate for slow win32 machine.
+gc(); // Clean up new connections incrementally to compensate for slow win32 machine.
 
 mongosConnNew = new Mongo(mongos.host);
 mongosConnNew.setReadPref("nearest");
@@ -322,7 +338,7 @@ mongosConnNew = new Mongo(mongos.host);
 mongosConnNew.setReadPref("nearest");
 assert.neq(null, mongosConnNew.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
-gc();  // Clean up new connections incrementally to compensate for slow win32 machine.
+gc(); // Clean up new connections incrementally to compensate for slow win32 machine.
 
 // Writes
 mongosConnNew = new Mongo(mongos.host);
@@ -332,7 +348,7 @@ assert.writeError(mongosConnNew.getCollection(collSharded.toString()).insert({_i
 mongosConnNew = new Mongo(mongos.host);
 assert.commandWorked(mongosConnNew.getCollection(collUnsharded.toString()).insert({_id: 7}, wc));
 
-gc();  // Clean up new connections
+gc(); // Clean up new connections
 
 jsTest.log("Stopping primary of first shard...");
 
@@ -381,7 +397,7 @@ assert.writeError(mongosConnNew.getCollection(collSharded.toString()).insert({_i
 mongosConnNew = new Mongo(mongos.host);
 assert.writeError(mongosConnNew.getCollection(collUnsharded.toString()).insert({_id: 10}));
 
-gc();  // Clean up new connections
+gc(); // Clean up new connections
 
 jsTest.log("Stopping second shard...");
 
@@ -425,7 +441,6 @@ assert.writeError(mongosConnNew.getCollection(collSharded.toString()).insert({_i
 mongosConnNew = new Mongo(mongos.host);
 assert.writeError(mongosConnNew.getCollection(collUnsharded.toString()).insert({_id: 13}));
 
-gc();  // Clean up new connections
+gc(); // Clean up new connections
 
 st.stop();
-})();

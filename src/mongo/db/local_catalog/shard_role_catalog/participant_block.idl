@@ -1,0 +1,84 @@
+# Copyright (C) 2018-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+global:
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/db/basic_types.idl"
+
+enums:
+    CriticalSectionBlockType:
+        description: "Type of block to be used in the critical section."
+        type: string
+        values:
+            kWrites: "Writes"
+            kReadsAndWrites: "ReadsAndWrites"
+            kUnblock: "Unblock"
+
+commands:
+    _shardsvrParticipantBlock:
+        command_name: _shardsvrParticipantBlock
+        cpp_name: ShardsvrParticipantBlock
+        description: "Internal command sent to shards to block CRUD operations"
+        strict: false
+        api_version: ""
+        namespace: concatenate_with_db
+        fields:
+            blockType:
+                type: CriticalSectionBlockType
+                optional: true
+            reason:
+                type: object
+                optional: true
+            throwIfReasonDiffers:
+                type: bool
+                description: >-
+                    If true, throw an invariant in case the collection critical section is already
+                    taken by another operation with a different reason.
+                optional: true
+            clearDbInfo:
+                type: safeBool
+                description: >-
+                    If true, and this collection critical section is acting on a database level, the
+                    filtering database metadata will be cleared, forcing a refresh the next time
+                    this metadata is needed. When the shard is database authoritative, it is no
+                    longer necessary to clear the filtering metadata.
+                default: true
+            # TODO SERVER-79600: Remove once the release of the critical section clears the
+            # filtering metaddata. WARNING: new parameter, do not use in DDLCoordinators unless
+            # it's drained.
+            clearFilteringMetadata:
+                type: bool
+                description: >-
+                    (NOTE: this field has been deprecated in 8.0:
+                     - starting from such a release, filtering metadata are always cleared when blockType == kUnblock;
+                     - requestors should still specify a value to maintain operability with remote nodes running a legacy binary)
+                    If true the filtering metadata will be cleared, forcing a refresh the next time
+                    the collection metadata is needed.
+                optional: true
+        reply_type: OkReply

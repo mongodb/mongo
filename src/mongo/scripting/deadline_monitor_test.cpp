@@ -29,12 +29,14 @@
 
 // DeadlineMonitor unit tests
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/scripting/deadline_monitor.h"
 
-
+#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
+
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
 
 namespace mongo {
 
@@ -45,20 +47,20 @@ class TaskGroup {
 public:
     TaskGroup() : _c(), _killCount(0), _targetKillCount(0) {}
     void noteKill() {
-        stdx::lock_guard<Latch> lk(_m);
+        stdx::lock_guard<stdx::mutex> lk(_m);
         ++_killCount;
         if (_killCount >= _targetKillCount)
             _c.notify_one();
     }
     void waitForKillCount(uint64_t target) {
-        stdx::unique_lock<Latch> lk(_m);
+        stdx::unique_lock<stdx::mutex> lk(_m);
         _targetKillCount = target;
         while (_killCount < _targetKillCount)
             _c.wait(lk);
     }
 
 private:
-    Mutex _m = MONGO_MAKE_LATCH("TaskGroup::_m");
+    stdx::mutex _m;
     stdx::condition_variable _c;
     uint64_t _killCount;
     uint64_t _targetKillCount;
@@ -74,7 +76,7 @@ public:
             _group->noteKill();
     }
     void interrupt() {}
-    const bool isKillPending() {
+    bool isKillPending() {
         return killPending;
     }
     TaskGroup* _group;

@@ -21,6 +21,7 @@
 
 #include "crc32-s390x.h"
 #include "slicing-consts.h"
+#include "wt_internal.h"
 
 #define VX_MIN_LEN 64
 #define VX_ALIGNMENT 16UL
@@ -51,53 +52,45 @@ __wt_crc32c_le(unsigned int crc, const unsigned char *buf, size_t len)
  * aligned to improve fetch operations of VECTOR LOAD MULTIPLE instructions.
  *
  */
-#define DEFINE_CRC32_VX(___fname, ___crc32_vx, ___crc32_sw)                            \
-    unsigned int ___fname(unsigned int crc, const unsigned char *data, size_t datalen) \
-    {                                                                                  \
-        unsigned long prealign, aligned, remaining;                                    \
-                                                                                       \
-        if ((unsigned long)data & VX_ALIGN_MASK) {                                     \
-            prealign = VX_ALIGNMENT - ((unsigned long)data & VX_ALIGN_MASK);           \
-            datalen -= prealign;                                                       \
-            crc = ___crc32_sw(crc, data, prealign);                                    \
-            data = data + prealign;                                                    \
-        }                                                                              \
-                                                                                       \
-        if (datalen < VX_MIN_LEN)                                                      \
-            return ___crc32_sw(crc, data, datalen);                                    \
-                                                                                       \
-        aligned = datalen & ~VX_ALIGN_MASK;                                            \
-        remaining = datalen & VX_ALIGN_MASK;                                           \
-                                                                                       \
-        crc = ___crc32_vx(crc, data, aligned);                                         \
-        data = data + aligned;                                                         \
-                                                                                       \
-        if (remaining)                                                                 \
-            crc = ___crc32_sw(crc, data, remaining);                                   \
-                                                                                       \
-        return crc;                                                                    \
+#define DEFINE_CRC32_VX(___fname, ___crc32_vx, ___crc32_sw)                                   \
+    unsigned int ___fname(unsigned int crc, const unsigned char *data, size_t datalen)        \
+    {                                                                                         \
+        unsigned long prealign, aligned, remaining;                                           \
+                                                                                              \
+        if ((unsigned long)data & VX_ALIGN_MASK) {                                            \
+            prealign = WT_MIN(datalen, VX_ALIGNMENT - ((unsigned long)data & VX_ALIGN_MASK)); \
+            datalen -= prealign;                                                              \
+            crc = ___crc32_sw(crc, data, prealign);                                           \
+            data = data + prealign;                                                           \
+        }                                                                                     \
+                                                                                              \
+        if (datalen < VX_MIN_LEN)                                                             \
+            return ___crc32_sw(crc, data, datalen);                                           \
+                                                                                              \
+        aligned = datalen & ~VX_ALIGN_MASK;                                                   \
+        remaining = datalen & VX_ALIGN_MASK;                                                  \
+                                                                                              \
+        crc = ___crc32_vx(crc, data, aligned);                                                \
+        data = data + aligned;                                                                \
+                                                                                              \
+        if (remaining)                                                                        \
+            crc = ___crc32_sw(crc, data, remaining);                                          \
+                                                                                              \
+        return crc;                                                                           \
     }
 
 /* Main CRC-32 functions */
 DEFINE_CRC32_VX(__wt_crc32c_le_vx, __wt_crc32c_le_vgfm_16, __wt_crc32c_le)
 
 /*
- * __wt_checksum_hw --
+ * __checksum_hw --
  *     WiredTiger: return a checksum for a chunk of memory.
  */
 static uint32_t
-__wt_checksum_hw(const void *chunk, size_t len)
+__checksum_hw(const void *chunk, size_t len)
 {
     return (~__wt_crc32c_le_vx(0xffffffff, chunk, len));
 }
-#endif
-
-extern uint32_t __wt_checksum_sw(const void *chunk, size_t len);
-#if defined(__GNUC__)
-extern uint32_t (*wiredtiger_crc32c_func(void))(const void *, size_t)
-  __attribute__((visibility("default")));
-#else
-extern uint32_t (*wiredtiger_crc32c_func(void))(const void *, size_t);
 #endif
 
 /*
@@ -106,14 +99,45 @@ extern uint32_t (*wiredtiger_crc32c_func(void))(const void *, size_t);
  */
 uint32_t (*wiredtiger_crc32c_func(void))(const void *, size_t)
 {
+    static uint32_t (*crc32c_func)(const void *, size_t);
 #if defined(__linux__) && !defined(HAVE_NO_CRC32_HARDWARE)
-    unsigned long caps = getauxval(AT_HWCAP);
-
-    if (caps & HWCAP_S390_VX)
-        return (__wt_checksum_hw);
-    else
-        return (__wt_checksum_sw);
-#else
-    return (__wt_checksum_sw);
+    unsigned long caps;
 #endif
+
+    /*
+     * This function calls slow hardware functions; if the application doesn't realize that, they
+     * may call it on every request.
+     */
+    if (crc32c_func != NULL)
+        return (crc32c_func);
+
+#if defined(__linux__) && !defined(HAVE_NO_CRC32_HARDWARE)
+    caps = getauxval(AT_HWCAP);
+    if (caps & HWCAP_S390_VX)
+        return (crc32c_func = __checksum_hw);
+    else
+        return (crc32c_func = __wt_checksum_sw);
+#else
+    return (crc32c_func = __wt_checksum_sw);
+#endif
+}
+
+/*
+ * __crc32c_le_wrapper --
+ *     Wrapper function for CRC in software in the little endian format.
+ */
+static uint32_t
+__crc32c_le_wrapper(uint32_t seed, const void *chunk, size_t len)
+{
+    return (~__wt_crc32c_le(~seed, chunk, len));
+}
+
+/*
+ * wiredtiger_crc32c_with_seed_func --
+ *     WiredTiger: Doesn't support hardware CRC calculation over multiple chunks on the big-endian
+ *     platform - fall back to software implementation.
+ */
+uint32_t (*wiredtiger_crc32c_with_seed_func(void))(uint32_t, const void *, size_t)
+{
+    return (__crc32c_le_wrapper);
 }

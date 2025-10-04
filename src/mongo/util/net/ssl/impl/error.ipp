@@ -15,15 +15,17 @@
 #pragma once
 #endif  // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
-#include <string>
-
-#include "asio/detail/assert.hpp"
-#include "asio/detail/config.hpp"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/net/ssl/apple.hpp"
 #include "mongo/util/net/ssl/error.hpp"
 
-#include "asio/detail/push_options.hpp"
+#include <string>
+
+#include <asio/detail/assert.hpp>
+#include <asio/detail/config.hpp>
+
+// This must be after all other includes
+#include <asio/detail/push_options.hpp>
 
 namespace asio {
 namespace error {
@@ -31,24 +33,24 @@ namespace detail {
 
 class ssl_category : public asio::error_category {
 public:
-    const char* name() const ASIO_ERROR_CATEGORY_NOEXCEPT {
+    const char* name() const ASIO_ERROR_CATEGORY_NOEXCEPT override {
         return "asio.ssl";
     }
 
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_WINDOWS
-    std::string message(int value) const {
+    std::string message(int value) const override {
         if (value == asio::ssl::error::no_renegotiation) {
             return "peer requested renegotiation, which is not supported";
         }
-        return mongo::errnoWithDescription(value);
+        return std::system_category().message(value);
     }
 #elif MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
-    std::string message(int value) const {
+    std::string message(int value) const override {
         const char* s = ::ERR_reason_error_string(value);
         return s ? s : "asio.ssl error";
     }
 #elif MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_APPLE
-    std::string message(int value) const {
+    std::string message(int value) const override {
         // engine_apple produces osstatus_errorcategory messages except for stream_truncated
         if (value == asio::ssl::error::stream_truncated) {
             return "asio.ssl stream truncated";
@@ -83,14 +85,18 @@ namespace detail {
 
 class stream_category : public asio::error_category {
 public:
-    const char* name() const ASIO_ERROR_CATEGORY_NOEXCEPT {
+    const char* name() const ASIO_ERROR_CATEGORY_NOEXCEPT override {
         return "asio.ssl.stream";
     }
 
-    std::string message(int value) const {
+    std::string message(int value) const override {
         switch (value) {
             case stream_truncated:
                 return "stream truncated";
+            case unspecified_system_error:
+                return "unspecified system error";
+            case unexpected_result:
+                return "unexpected result";
             default:
                 return "asio.ssl.stream error";
         }
@@ -110,6 +116,6 @@ const asio::error_category& get_stream_category() {
 }  // namespace ssl
 }  // namespace asio
 
-#include "asio/detail/pop_options.hpp"
+#include <asio/detail/pop_options.hpp>
 
 #endif  // ASIO_SSL_IMPL_ERROR_IPP

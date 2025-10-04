@@ -27,18 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/ftdc/decompressor.h"
 
 #include "mongo/base/data_range_cursor.h"
+#include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_type_validated.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/db/ftdc/compressor.h"
 #include "mongo/db/ftdc/util.h"
-#include "mongo/db/ftdc/varint.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/rpc/object_check.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/rpc/object_check.h"  // IWYU pragma: keep
+#include "mongo/util/varint.h"
+
+#include <cstdint>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 
@@ -139,14 +142,14 @@ StatusWith<std::vector<BSONObj>> FTDCDecompressor::uncompress(ConstDataRange buf
                 continue;
             }
 
-            auto swDelta = cdrc.readAndAdvanceNoThrow<FTDCVarInt>();
+            auto swDelta = cdrc.readAndAdvanceNoThrow<VarInt>();
 
             if (!swDelta.isOK()) {
                 return swDelta.getStatus();
             }
 
             if (swDelta.getValue() == 0) {
-                auto swZero = cdrc.readAndAdvanceNoThrow<FTDCVarInt>();
+                auto swZero = cdrc.readAndAdvanceNoThrow<VarInt>();
 
                 if (!swZero.isOK()) {
                     return swZero.getStatus();

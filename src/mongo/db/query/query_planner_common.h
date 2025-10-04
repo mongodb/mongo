@@ -29,10 +29,18 @@
 
 #pragma once
 
-#include "mongo/db/jsobj.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/query/projection.h"
-#include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
+#include "mongo/db/query/find_command.h"
+
+#include <cstddef>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -65,6 +73,20 @@ public:
     }
 
     /**
+     * Returns a count of 'type' nodes in expression tree.
+     */
+    static size_t countNodes(const MatchExpression* root, MatchExpression::MatchType type) {
+        size_t sum = 0;
+        if (type == root->matchType()) {
+            sum = 1;
+        }
+        for (size_t i = 0; i < root->numChildren(); ++i) {
+            sum += countNodes(root->getChild(i), type);
+        }
+        return sum;
+    }
+
+    /**
      * Assumes the provided BSONObj is of the form {field1: -+1, ..., field2: -+1}
      * Returns a BSONObj with the values negated.
      */
@@ -79,19 +101,39 @@ public:
     }
 
     /**
-     * Traverses the tree rooted at 'node'.  For every STAGE_IXSCAN encountered, reverse
-     * the scan direction and index bounds.
+     * Traverses the tree rooted at 'node'. Tests scan directions recursively to see if they are
+     * equal to the given direction argument. Returns true if they are and false otherwise.
      */
-    static void reverseScans(QuerySolutionNode* node);
+    static bool scanDirectionsEqual(QuerySolutionNode* node, int direction);
 
     /**
-     * Extracts all field names for the sortKey meta-projection and stores them in the returned
-     * array. Returns an empty array if there were no sortKey meta-projection specified in the
-     * given projection 'proj'. For example, given a projection {a:1, b: {$meta: "sortKey"},
-     * c: {$meta: "sortKey"}}, the returned vector will contain two elements ["b", "c"].
+     * Traverses the tree rooted at 'node'.  For every STAGE_IXSCAN encountered, reverse
+     * the scan direction and index bounds, unless reverseCollScans equals true, in which case
+     * STAGE_COLLSCAN is reversed as well.
      */
-    static std::vector<FieldPath> extractSortKeyMetaFieldsFromProjection(
-        const projection_ast::Projection& proj);
+    static void reverseScans(QuerySolutionNode* node, bool reverseCollScans = false);
+
+    static bool providesSort(const CanonicalQuery& query, const BSONObj& kp) {
+        return query.getFindCommandRequest().getSort().isPrefixOf(
+            kp, SimpleBSONElementComparator::kInstance);
+    }
+
+    static bool providesSortRequirementForDistinct(
+        const boost::optional<CanonicalDistinct>& distinct, const BSONObj& kp) {
+        return distinct && distinct->getSortRequirement() &&
+            distinct->getSerializedSortRequirement().isPrefixOf(
+                kp, SimpleBSONElementComparator::kInstance);
+    }
+
+    /**
+     * Determine whether this query has a sort that can be provided by the collection's clustering
+     * index, if so, which direction the scan should be. If the collection is not clustered, or the
+     * sort cannot be provided, returns 'boost::none'.
+     */
+    static boost::optional<int> determineClusteredScanDirection(
+        const CanonicalQuery& query,
+        const boost::optional<ClusteredCollectionInfo>& clusteredInfo,
+        const CollatorInterface* clusteredCollectionCollator);
 };
 
 }  // namespace mongo

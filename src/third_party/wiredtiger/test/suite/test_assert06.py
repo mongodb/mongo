@@ -27,425 +27,198 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # test_assert06.py
-#   Timestamps: verify key consistent setting for durable timestamps
+#   Timestamps: verify ordered setting for durable timestamps
 #
 
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 from wtscenario import make_scenarios
+from wtdataset import SimpleDataSet
 
 class test_assert06(wttest.WiredTigerTestCase, suite_subprocess):
-    session_config = 'isolation=snapshot'
-
     key_format_values = [
-        ('column', dict(key_format='r', usestrings=False)),
-        ('string-row', dict(key_format='S', usestrings=True))
+        ('fix', dict(key_format='r', value_format='8t')),
+        ('row', dict(key_format='S', value_format='S')),
+        ('var', dict(key_format='r', value_format='S')),
     ]
     scenarios = make_scenarios(key_format_values)
 
-    def apply_timestamps(self, timestamp):
-        self.session.prepare_transaction(
-            'prepare_timestamp=' + self.timestamp_str(timestamp))
+    msg_usage='/use timestamps once they are first used/'
+
+    def apply_timestamps(self, timestamp, prepare):
+        if prepare:
+            self.session.prepare_transaction(
+                'prepare_timestamp=' + self.timestamp_str(timestamp))
         self.session.timestamp_transaction(
             'commit_timestamp=' + self.timestamp_str(timestamp))
-        self.session.timestamp_transaction(
-            'durable_timestamp=' + self.timestamp_str(timestamp))
+        if prepare:
+            self.session.timestamp_transaction(
+                'durable_timestamp=' + self.timestamp_str(timestamp))
 
     def test_timestamp_alter(self):
-        base = 'assert06'
-        uri = 'file:' + base
-        cfg_on = 'write_timestamp_usage=key_consistent,assert=(write_timestamp=on)'
-        cfg_off = 'write_timestamp_usage=never,assert=(write_timestamp=off)'
-        msg_ooo='/out of order/'
-        msg_usage='/used inconsistently/'
+        if wiredtiger.diagnostic_build():
+            self.skipTest('requires a non-diagnostic build')
 
-        key_nots = 'key_nots' if self.usestrings else 5
-        key_ts1 = 'key_ts1' if self.usestrings else 16
+        # Create an object that's never written, it's just used to generate valid k/v pairs.
+        ds = SimpleDataSet(
+            self, 'file:notused', 10, key_format=self.key_format, value_format=self.value_format)
 
-        # Create the table without the key consistency checking turned on.
-        # Create a few items breaking the rules. Then alter the setting and
-        # verify the inconsistent usage is detected.
-        self.session.create(uri, 'key_format={},value_format=S'.format(self.key_format))
+        # Create a few items with and without timestamps.
+        # Then alter the setting and verify the inconsistent usage is detected.
+        uri = 'file:assert06'
+        self.session.create(uri,
+            'key_format={},value_format={}'.format(self.key_format, self.value_format))
+        c = self.session.open_cursor(uri)
+
         # Insert a data item at timestamp 2.
-        c = self.session.open_cursor(uri)
+        key = ds.key(1)
         self.session.begin_transaction()
-        c[key_ts1] = 'value2'
-        self.apply_timestamps(2)
+        c[key] = ds.value(1)
+        self.apply_timestamps(2, True)
         self.session.commit_transaction()
-        c.close()
 
-        # Modify the data item at timestamp 1.
-        c = self.session.open_cursor(uri)
+        # Modify the data item without a timestamp.
+        self.session.begin_transaction('no_timestamp=true')
+        c[key] = ds.value(2)
+        self.session.commit_transaction()
+
+        # Insert an item without a timestamp.
+        # Then modify with a timestamp.
+        # Then modify without a timestamp.
+        key = ds.key(2)
+        self.session.begin_transaction('no_timestamp=true')
+        c[key] = ds.value(3)
+        self.session.commit_transaction()
         self.session.begin_transaction()
-        c[key_ts1] = 'value1'
-        self.apply_timestamps(1)
+        c[key] = ds.value(4)
+        self.apply_timestamps(2, True)
         self.session.commit_transaction()
-        c.close()
-
-        # Insert a non-timestamped item. Then modify with a timestamp. And
-        # again modify without a timestamp.
-        c = self.session.open_cursor(uri)
-        self.session.begin_transaction()
-        c[key_nots] = 'value_nots'
+        self.session.begin_transaction('no_timestamp=true')
+        c[key] = ds.value(5)
         self.session.commit_transaction()
-        c.close()
-
-        c = self.session.open_cursor(uri)
-        self.session.begin_transaction()
-        c[key_nots] = 'value2'
-        self.apply_timestamps(2)
-        self.session.commit_transaction()
-        c.close()
-
-        c = self.session.open_cursor(uri)
-        self.session.begin_transaction()
-        c[key_nots] = 'value_nots2'
-        self.session.commit_transaction()
-        c.close()
-
-        # We must move the oldest timestamp forward in order to alter.
-        # Otherwise alter closing the file will fail with EBUSY.
-        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(2))
 
         # Now alter the setting and make sure we detect incorrect usage.
-        self.session.alter(uri, cfg_on)
-
-        # Detect decreasing timestamp.
-        c = self.session.open_cursor(uri)
-        self.session.begin_transaction()
-        c[key_ts1] = 'value5'
-        self.apply_timestamps(5)
-        self.session.commit_transaction()
+        # We must move the oldest timestamp forward in order to alter, otherwise alter closing the
+        # file will fail with EBUSY.
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(2))
         c.close()
-
-        '''
-        Commented out for now: the system panics if we fail after preparing a transaction.
-
+        self.session.alter(uri, 'write_timestamp_usage=ordered')
         c = self.session.open_cursor(uri)
+
+        # Update at timestamp 5, then detect not using a timestamp.
+        key = ds.key(3)
         self.session.begin_transaction()
-        c[key_ts1] = 'value4'
-        self.apply_timestamps(4)
+        c[key] = ds.value(6)
+        self.apply_timestamps(5, True)
+        self.session.commit_transaction()
+        self.session.begin_transaction()
+        c[key] = ds.value(6)
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.session.commit_transaction(), msg_ooo)
-        c.close()
-        '''
+            lambda: self.session.commit_transaction(), self.msg_usage)
 
-        # Detect not using a timestamp.
-        c = self.session.open_cursor(uri)
-        self.session.begin_transaction()
-        c[key_ts1] = 'value_nots3'
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.session.commit_transaction(), msg_usage)
-        c.close()
-
-        # Detect using a timestamp on the non-timestamp key.
-        # We must first use a non timestamped operation on the key
-        # in order to violate the key consistency condition in the
-        # following transaction.
-        c = self.session.open_cursor(uri)
-        self.session.begin_transaction()
-        c[key_nots] = 'value_nots3'
-        self.session.commit_transaction()
-        c.close()
-
-        '''
-        Commented out for now: the system panics if we fail after preparing a transaction.
-
-        c = self.session.open_cursor(uri)
-        self.session.begin_transaction()
-        c[key_nots] = 'value3'
-        self.apply_timestamps(3)
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.session.commit_transaction(), msg_usage)
-        c.close()
-        self.session.checkpoint()
-        '''
-
-        c = self.session.open_cursor(uri)
-        self.assertEquals(c[key_ts1], 'value5')
-        self.assertEquals(c[key_nots], 'value_nots3')
-        c.close()
-
-        # Test to make sure that key consistency can be turned off
-        # after turning it on.
-        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(5))
-        self.session.alter(uri, cfg_off)
-
-        # Detection is off we can successfully change the same key with and
-        # without a timestamp.
-        c = self.session.open_cursor(uri)
-        self.session.begin_transaction()
-        c[key_nots] = 'value_nots4'
-        self.session.commit_transaction()
-        c.close()
-
-        c = self.session.open_cursor(uri)
-        self.session.begin_transaction()
-        c[key_nots] = 'value6'
-        self.apply_timestamps(6)
-        self.session.commit_transaction()
-        c.close()
+        self.ignoreStdoutPatternIfExists(self.msg_usage)
 
     def test_timestamp_usage(self):
-        base = 'assert06'
-        uri = 'file:' + base
-        msg_ooo='/out of order/'
-        msg_usage='/used inconsistently/'
+        if wiredtiger.diagnostic_build():
+            self.skipTest('requires a non-diagnostic build')
 
-        key_nots = 'key_nots' if self.usestrings else 5
-        key_ts1 = 'key_ts1' if self.usestrings else 16
-        key_ts2 = 'key_ts2' if self.usestrings else 17
-        key_ts3 = 'key_ts3' if self.usestrings else 18
-        key_ts4 = 'key_ts4' if self.usestrings else 19
-        key_ts5 = 'key_ts5' if self.usestrings else 20
-        key_ts6 = 'key_ts6' if self.usestrings else 21
+        # Create an object that's never written, it's just used to generate valid k/v pairs.
+        ds = SimpleDataSet(
+            self, 'file:notused', 10, key_format=self.key_format, value_format=self.value_format)
 
-        # Create the table with the key consistency checking turned on.
-        # That checking will verify any individual key is always or never
-        # used with a timestamp. And if it is used with a timestamp that
-        # the timestamps are in increasing order for that key.
-        self.session.create(uri, 'key_format={},value_format=S,verbose=(write_timestamp),write_timestamp_usage=key_consistent,assert=(write_timestamp=on)'.format(self.key_format))
+        # Create the table with the key consistency checking turned on. That checking will verify
+        # any individual key is always or never used with a timestamp. And if it is used with a
+        # timestamp that the timestamps are in increasing order for that key.
+        uri = 'file:assert06'
+        self.session.create(uri,
+            'key_format={},value_format={},'.format(self.key_format, self.value_format) +
+            'write_timestamp_usage=ordered,assert=(write_timestamp=on)')
+        c = self.session.open_cursor(uri)
 
         # Insert a data item at timestamp 2.
-        c = self.session.open_cursor(uri)
         self.session.begin_transaction()
-        c[key_ts1] = 'value2'
-        self.apply_timestamps(2)
+        c[ds.key(1)] = ds.value(1)
+        self.apply_timestamps(2, True)
         self.session.commit_transaction()
-        c.close()
-
-        '''
-        Commented out for now: the system panics if we fail after preparing a transaction.
-
-        # Modify the data item at timestamp 1. We should detect it is wrong.
-        c = self.session.open_cursor(uri)
-        self.session.begin_transaction()
-        c[key_ts1] = 'value1'
-        self.apply_timestamps(1)
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.session.commit_transaction(), msg_ooo)
-        c.close()
-        '''
 
         # Make sure we can successfully add a different key at timestamp 1.
-        c = self.session.open_cursor(uri)
         self.session.begin_transaction()
-        c[key_ts2] = 'value1'
-        self.apply_timestamps(1)
-        self.session.commit_transaction()
-        c.close()
-
-        #
-        # Insert key_ts3 at timestamp 10 and key_ts4 at 15.
-        # Then modify both keys in one transaction at timestamp 13.
-        # We should not be allowed to modify the one from 15.
-        # So the whole transaction should fail.
-        #
-        c = self.session.open_cursor(uri)
-        self.session.begin_transaction()
-        c[key_ts3] = 'value10'
-        self.apply_timestamps(10)
-        self.session.commit_transaction()
-        self.session.begin_transaction()
-        c[key_ts4] = 'value15'
-        self.apply_timestamps(15)
+        c[ds.key(2)] = ds.value(2)
+        self.apply_timestamps(1, True)
         self.session.commit_transaction()
 
-        '''
-        Commented out for now: the system panics if we fail after preparing a transaction.
-
+        # Insert key_ts3 at timestamp 10 and key_ts4 at 15, then modify both keys in one transaction
+        # at timestamp 13, which should result in an error message.
         c = self.session.open_cursor(uri)
         self.session.begin_transaction()
-        c[key_ts3] = 'value13'
-        c[key_ts4] = 'value13'
-        self.apply_timestamps(13)
+        c[ds.key(3)] = ds.value(3)
+        self.apply_timestamps(10, True)
+        self.session.commit_transaction()
+        self.session.begin_transaction()
+        c[ds.key(4)] = ds.value(4)
+        self.apply_timestamps(15, True)
+        self.session.commit_transaction()
+        self.session.begin_transaction()
+        c[ds.key(3)] = ds.value(5)
+        c[ds.key(4)] = ds.value(6)
+        self.apply_timestamps(13, False)
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.session.commit_transaction(), msg_ooo)
-        c.close()
-        '''
+            lambda: self.session.commit_transaction(), '/unexpected timestamp usage/')
+        self.assertEqual(c[ds.key(3)], ds.value(3))
+        self.assertEqual(c[ds.key(4)], ds.value(4))
 
-        c = self.session.open_cursor(uri)
-        self.assertEquals(c[key_ts3], 'value10')
-        self.assertEquals(c[key_ts4], 'value15')
-        c.close()
-
-        #
-        # Separately, we should be able to update key_ts3 at timestamp 10
-        # but not update key_ts4 inserted at timestamp 15.
-        #
-        c = self.session.open_cursor(uri)
+        # Modify a key previously used with timestamps without one. We should get the inconsistent
+        # usage message.
+        key = ds.key(5)
         self.session.begin_transaction()
-        c[key_ts3] = 'value13'
-        self.apply_timestamps(13)
+        c[key] = ds.value(7)
+        self.apply_timestamps(14, True)
         self.session.commit_transaction()
-
-        '''
-        Commented out for now: the system panics if we fail after preparing a transaction.
-
-        c = self.session.open_cursor(uri)
         self.session.begin_transaction()
-        c[key_ts4] = 'value13'
-        self.apply_timestamps(13)
+        c[key] = ds.value(8)
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.session.commit_transaction(), msg_ooo)
-        c.close()
-        '''
+            lambda: self.session.commit_transaction(), self.msg_usage)
 
-        '''
-        Commented out for now: the system panics if we fail after preparing a transaction.
-
-        # Make sure multiple update attempts still fail and eventually
-        # succeed with a later timestamp. This tests that aborted entries
-        # in the update chain are not considered for the timestamp check.
-        c = self.session.open_cursor(uri)
+        # Set the timestamp in the beginning, middle or end of the transaction.
+        key = ds.key(6)
         self.session.begin_transaction()
-        c[key_ts4] = 'value14'
-        self.apply_timestamps(14)
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.session.commit_transaction(), msg_ooo)
-        c.close()
-        c = self.session.open_cursor(uri)
-        self.assertEquals(c[key_ts4], 'value15')
-        c.close()
-        '''
-
-        c = self.session.open_cursor(uri)
-        self.session.begin_transaction()
-        c[key_ts4] = 'value16'
-        self.apply_timestamps(16)
+        self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(16))
+        c[key] = ds.value(9)
         self.session.commit_transaction()
-        c.close()
-        c = self.session.open_cursor(uri)
-        self.assertEquals(c[key_ts4], 'value16')
-        c.close()
+        self.assertEqual(c[key], ds.value(9))
 
-        # Now try to modify a key previously used with timestamps without
-        # one. We should get the inconsistent usage message.
-        c = self.session.open_cursor(uri)
+        key = ds.key(7)
         self.session.begin_transaction()
-        c[key_ts4] = 'value_nots'
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.session.commit_transaction(), msg_usage)
-        c.close()
-
-        c = self.session.open_cursor(uri)
-        self.session.begin_transaction()
-        c[key_ts4] = 'value_nots'
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.session.commit_transaction(), msg_usage)
-        c.close()
-        c = self.session.open_cursor(uri)
-        self.assertEquals(c[key_ts4], 'value16')
-        c.close()
-
-        # Now confirm the other way. Create a key without a timestamp and then
-        # attempt to modify it with a timestamp. The only error checking that
-        # makes sense here is the inconsistent usage.
-        c = self.session.open_cursor(uri)
-        self.session.begin_transaction()
-        c[key_nots] = 'value_nots'
+        c[key] = ds.value(10)
+        c[key] = ds.value(11)
+        self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(17))
+        c[key] = ds.value(12)
+        c[key] = ds.value(13)
         self.session.commit_transaction()
-        c.close()
+        self.assertEqual(c[key], ds.value(13))
 
-        '''
-        Commented out for now: the system panics if we fail after preparing a transaction.
-
-        c = self.session.open_cursor(uri)
+        key = ds.key(8)
         self.session.begin_transaction()
-        c[key_nots] = 'value16'
-        self.apply_timestamps(16)
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.session.commit_transaction(), msg_usage)
-        c.close()
-        '''
-
-        c = self.session.open_cursor(uri)
-        self.session.begin_transaction()
-        c[key_nots] = 'value_nots1'
+        c[key] = ds.value(14)
+        self.apply_timestamps(18, True)
         self.session.commit_transaction()
-        c.close()
-
-        '''
-        Commented out for now: the system panics if we fail after preparing a transaction.
-
-        c = self.session.open_cursor(uri)
-        self.session.begin_transaction()
-        c[key_nots] = 'value17'
-        self.apply_timestamps(17)
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.session.commit_transaction(), msg_usage)
-        c.close()
-        '''
-
-        c = self.session.open_cursor(uri)
-        self.assertEquals(c[key_nots], 'value_nots1')
-        c.close()
-
-        # Confirm it is okay to set the timestamp in the middle or end of the
-        # transaction. That should set the timestamp for the whole thing.
-        c = self.session.open_cursor(uri)
-        self.session.begin_transaction()
-        c[key_ts5] = 'value_notsyet'
-        c[key_ts5] = 'value20'
-        self.apply_timestamps(20)
-        self.session.commit_transaction()
-        c.close()
-
-        c = self.session.open_cursor(uri)
-        self.assertEquals(c[key_ts5], 'value20')
-        c.close()
-
-        c = self.session.open_cursor(uri)
-        self.session.begin_transaction()
-        c[key_ts6] = 'value_notsyet'
-        c[key_ts6] = 'value21_after'
-        self.apply_timestamps(21)
-        self.session.commit_transaction()
-        c.close()
-
-        c = self.session.open_cursor(uri)
-        self.assertEquals(c[key_ts6], 'value21_after')
-        c.close()
+        self.assertEqual(c[key], ds.value(14))
 
         # Confirm it is okay to set the durable timestamp on the commit call.
-        # That should set the timestamp for the whole thing.
-        c = self.session.open_cursor(uri)
+        key = ds.key(9)
         self.session.begin_transaction()
-        c[key_ts6] = 'value_committs1'
-        c[key_ts6] = 'value22'
-        self.session.prepare_transaction(
-            'prepare_timestamp=' + self.timestamp_str(22))
-        self.session.timestamp_transaction(
-            'commit_timestamp=' + self.timestamp_str(22))
-        self.session.timestamp_transaction(
-            'durable_timestamp=' + self.timestamp_str(22))
+        c[key] = ds.value(15)
+        c[key] = ds.value(16)
+        self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(22))
+        self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(22))
+        self.session.timestamp_transaction('durable_timestamp=' + self.timestamp_str(22))
         self.session.commit_transaction()
-        c.close()
-
-        '''
-        Commented out for now: the system panics if we fail after preparing a transaction.
-
-        c = self.session.open_cursor(uri)
-        self.session.begin_transaction()
-        c[key_nots] = 'value23'
-        self.session.prepare_transaction(
-            'prepare_timestamp=' + self.timestamp_str(23))
-        self.session.timestamp_transaction(
-            'commit_timestamp=' + self.timestamp_str(23))
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.session.commit_transaction(
-            'durable_timestamp=' + self.timestamp_str(23)), msg_usage)
-        c.close()
-        '''
 
         # Confirm that rolling back after preparing doesn't fire an assertion.
-        c = self.session.open_cursor(uri)
+        key = ds.key(10)
         self.session.begin_transaction()
-        c[key_ts6] = 'value24'
-        self.session.prepare_transaction(
-            'prepare_timestamp=' + self.timestamp_str(24))
+        c[key] = ds.value(17)
+        self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(30))
         self.session.rollback_transaction()
-        c.close()
 
-if __name__ == '__main__':
-    wttest.run()
+        self.ignoreStdoutPatternIfExists('/unexpected timestamp usage/')

@@ -18,8 +18,6 @@
 #include <boost/log/sources/severity_feature.hpp>
 
 #if !defined(BOOST_LOG_NO_THREADS) && !defined(BOOST_LOG_USE_COMPILER_TLS)
-#include <boost/bind/bind.hpp>
-#include <boost/checked_delete.hpp>
 #include <boost/thread/thread.hpp> // at_thread_exit
 #include <boost/log/detail/singleton.hpp>
 #include <boost/log/detail/thread_specific.hpp>
@@ -66,7 +64,7 @@ BOOST_LOG_API uintmax_t& get_severity_level()
         log::aux::unique_ptr< uintmax_t > ptr(new uintmax_t(0));
         tss.set(ptr.get());
         p = ptr.release();
-        boost::this_thread::at_thread_exit(boost::bind(checked_deleter< uintmax_t >(), p));
+        boost::this_thread::at_thread_exit([p]() { delete p; });
     }
     return *p;
 }

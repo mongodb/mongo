@@ -65,21 +65,106 @@
         old_bin_version: last_continuous
         mixed_bin_versions: new_old_old_new
 
+- name: sharded_fixture_last_lts_3_nodes
+  value:
+    executor:
+      fixture:
+        num_shards: 2
+        num_rs_nodes_per_shard: 3
+        old_bin_version: last_lts
+        mixed_bin_versions: new_old_old_old_old_new
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              nonClusteredConfigTransactions: true
+
+- name: sharded_fixture_last_continuous_3_nodes
+  value:
+    executor:
+      fixture:
+        num_shards: 2
+        num_rs_nodes_per_shard: 3
+        old_bin_version: last_continuous
+        mixed_bin_versions: new_old_old_old_old_new
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              nonClusteredConfigTransactions: true
 
 ### Suite-specific overrides ###
+- name: replica_sets_temporarily_disable_due_to_fcv_upgrade
+  value:
+    selector:
+      exclude_with_any_tags:
+        - assumes_standalone_mongod
+        - requires_profiling
+        - DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE
+
+- name: sharded_collections_temporarily_disable_due_to_fcv_upgrade
+  value:
+    selector:
+      exclude_with_any_tags:
+        - assumes_standalone_mongod
+        - assumes_against_mongod_not_mongos
+        - assumes_no_implicit_collection_creation_on_get_collection
+        - assumes_no_implicit_collection_creation_after_drop
+        - assumes_no_implicit_index_creation
+        - assumes_unsharded_collection
+        - cannot_create_unique_index_when_using_hashed_shard_key
+        - requires_profiling
+        - requires_capped
+        - DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE
+
+- name: sharding_temporarily_disable_due_to_fcv_upgrade
+  value:
+    selector:
+      exclude_with_any_tags:
+        - assumes_standalone_mongod
+        - assumes_against_mongod_not_mongos
+        - requires_profiling
+        - DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE
+
+- name: multiversion_future_git_tag_exclude_files
+  value:
+    exclude_files:
+      # Do not execute files with helper functions.
+      - jstests/multiVersion/libs/*.js
+
+      # TODO: SERVER-28104
+      - jstests/multiVersion/genericBinVersion/minor_version_tags_new_old_new.js
+
+      # TODO SERVER-42919: recent work on the ReplicaSetMonitor means that mongoS no longer crashes when
+      # it attempts to connect to an upgraded mongoD. Un-denylist when SERVER-42919 fixes this issue.
+      - jstests/multiVersion/genericSetFCVUsage/crash_mongos_against_upgraded_cluster.js
+    exclude_with_any_tags:
+      - DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE
+
+- name: multiversion_auth_future_git_tag_exclude_files
+  value:
+    exclude_files:
+      # Do not execute files with helper functions.
+      - jstests/multiVersion/libs/*.js
+
+      # TODO: SERVER-28104
+      - jstests/multiVersion/genericBinVersion/minor_version_tags_new_old_new.js
+
+      # TODO SERVER-42919: recent work on the ReplicaSetMonitor means that mongoS no longer crashes when
+      # it attempts to connect to an upgraded mongoD. Un-denylist when SERVER-42919 fixes this issue.
+      - jstests/multiVersion/genericSetFCVUsage/crash_mongos_against_upgraded_cluster.js
+
+      # Skip any tests that run with auth explicitly.
+      - jstests/multiVersion/genericBinVersion/load_keys_on_upgrade.js
+      - jstests/multiVersion/genericBinVersion/server-security/dollar_audit_mixed_version_mongods.js
+    exclude_with_any_tags:
+      - DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE
+
 - name: multiversion_sanity_check_selector
   value:
     selector:
       include_with_any_tags:
         - multiversion_sanity_check
-
-- name: concurrency_sharded_replication_multiversion_mongod_options
-  value:
-    executor:
-      fixture:
-        mongod_options:
-          set_parameters:
-            receiveChunkWaitForRangeDeleterTimeoutMS:
 
 - name: replica_sets_multiversion_selector
   value:
@@ -90,13 +175,20 @@
         - multiversion_incompatible
         - backport_required_multiversion
         - replica_sets_multiversion_backport_required_multiversion
-        - disabled_due_to_server_60490
+        - DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE
       exclude_files:
         - jstests/replsets/initial_sync_rename_collection.js
         - jstests/replsets/initial_sync_drop_collection.js
         - jstests/replsets/apply_prepare_txn_write_conflict_robustness.js
         - jstests/replsets/invalidate_sessions_on_stepdown.js
         - jstests/replsets/initial_sync_fails_unclean_restart.js
+
+- name: replica_sets_multiversion_last_continuous_selector
+  value:
+    exclude_files:
+      - jstests/replsets/test_only_repl_commands.js
+      - jstests/replsets/transactions_only_allowed_on_primaries.js
+      - jstests/replsets/prepare_conflict_read_concern_behavior.js
 
 - name: replica_sets_multiversion_testdata_last_lts
   value:
@@ -105,7 +197,10 @@
         shell_options:
           global_vars:
             TestData:
-              useRandomBinVersionsWithinReplicaSet: 'last-lts'
+              useRandomBinVersionsWithinReplicaSet: "last-lts"
+              # Since a test in replica_sets could start up a sharded cluster, we
+              # need to set this variable so that the right version of mongos is chosen.
+              mongosBinVersion: "last-lts"
 
 - name: replica_sets_multiversion_testdata_last_continuous
   value:
@@ -114,7 +209,10 @@
         shell_options:
           global_vars:
             TestData:
-              useRandomBinVersionsWithinReplicaSet: 'last-continuous'
+              useRandomBinVersionsWithinReplicaSet: "last-continuous"
+              # Since a test in replica_sets could start up a sharded cluster, we
+              # need to set this variable so that the right version of mongos is chosen.
+              mongosBinVersion: "last-continuous"
 
 - name: rollback_multiversion_fuzzer_testdata_last_lts
   value:
@@ -132,7 +230,7 @@
                 storage:
                   verbosity: 1
               rollbackShutdowns: true
-              useRandomBinVersionsWithinReplicaSet: 'last-lts'
+              useRandomBinVersionsWithinReplicaSet: "last-lts"
 
 - name: rollback_multiversion_fuzzer_testdata_last_continuous
   value:
@@ -150,7 +248,7 @@
                 storage:
                   verbosity: 1
               rollbackShutdowns: true
-              useRandomBinVersionsWithinReplicaSet: 'last-continuous'
+              useRandomBinVersionsWithinReplicaSet: "last-continuous"
 
 - name: sharding_multiversion_selector
   value:
@@ -159,14 +257,15 @@
         - multiversion_incompatible
         - backport_required_multiversion
         - replica_sets_multiversion_backport_required_multiversion
-        - disabled_due_to_server_60490
+        - DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE
       exclude_files:
+        - jstests/sharding/**/libs/**/*.js
         # Enable when 4.6 becomes last stable
-        - jstests/sharding/query/merge_command_options.js
+        - jstests/sharding/query/out_merge/merge_command_options.js
         - jstests/sharding/max_time_ms_enforced_on_shard.js
         # TODO SERVER-46040: Enable when SERVER-46040 is backported
         - jstests/sharding/drop_indexes_with_stale_config_error.js
-        - jstests/sharding/query/merge_write_concern.js
+        - jstests/sharding/query/out_merge/merge_write_concern.js
 
 - name: sharding_multiversion_testdata_last_lts
   value:
@@ -175,8 +274,8 @@
         shell_options:
           global_vars:
             TestData:
-              useRandomBinVersionsWithinReplicaSet: 'last-lts'
-              mongosBinVersion: 'last-lts'
+              useRandomBinVersionsWithinReplicaSet: "last-lts"
+              mongosBinVersion: "last-lts"
 
 - name: sharding_multiversion_testdata_last_continuous
   value:
@@ -185,14 +284,35 @@
         shell_options:
           global_vars:
             TestData:
-              useRandomBinVersionsWithinReplicaSet: 'last-continuous'
-              mongosBinVersion: 'last-continuous'
+              useRandomBinVersionsWithinReplicaSet: "last-continuous"
+              mongosBinVersion: "last-continuous"
+
+- name: sharding_multiversion_mongos_testdata_last_lts
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              mongosBinVersion: "last-lts"
+
+- name: sharding_multiversion_mongos_testdata_last_continuous
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              mongosBinVersion: "last-continuous"
 
 - name: jstestfuzz_replication_multiversion_hooks
   value:
     executor:
       hooks:
         - class: FuzzerRestoreSettings
+        - class: LagOplogApplicationInBackground
+          shell_options:
+            nodb: ""
         - class: CheckReplOplogs
         - class: CheckReplDBHash
           shell_options:
@@ -209,6 +329,11 @@
   value:
     executor:
       hooks:
+        - class: CheckRoutingTableConsistency
+          shell_options:
+            global_vars:
+              TestData:
+                mayForgeReshardingTempCollections: true
         - class: FuzzerRestoreSettings
         - class: CheckReplDBHash
           shell_options:

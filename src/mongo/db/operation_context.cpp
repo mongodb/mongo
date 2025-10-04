@@ -27,24 +27,34 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/operation_context.h"
 
+#include "mongo/base/error_extra_info.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
+#include "mongo/db/local_catalog/lock_manager/locker.h"
+#include "mongo/db/operation_context_options_gen.h"
 #include "mongo/db/operation_key_manager.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/platform/random.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/transport/baton.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/scopeguard.h"
 #include "mongo/util/system_tick_source.h"
+#include "mongo/util/waitable.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo {
 
@@ -69,16 +79,14 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(checkForInterruptFail);
 
 const auto kNoWaiterThread = stdx::thread::id();
+
+Milliseconds interruptCheckPeriod() {
+    return Milliseconds{gOverdueInterruptCheckIntervalMillis.loadRelaxed()};
+}
 }  // namespace
 
 OperationContext::OperationContext(Client* client, OperationId opId)
-    : OperationContext(client, OperationIdSlot(opId)) {}
-
-OperationContext::OperationContext(Client* client, OperationIdSlot&& opIdSlot)
-    : _client(client),
-      _opId(std::move(opIdSlot)),
-      _elapsedTime(client ? client->getServiceContext()->getTickSource()
-                          : SystemTickSource::get()) {}
+    : _client(client), _opId(opId) {}
 
 OperationContext::~OperationContext() {
     releaseOperationKey();
@@ -105,7 +113,7 @@ Microseconds OperationContext::computeMaxTimeFromDeadline(Date_t when) {
     if (when == Date_t::max()) {
         maxTime = Microseconds::max();
     } else {
-        maxTime = when - getServiceContext()->getFastClockSource()->now();
+        maxTime = when - fastClockSource().now();
         if (maxTime < Microseconds::zero()) {
             maxTime = Microseconds::zero();
         }
@@ -125,10 +133,10 @@ void OperationContext::setDeadlineAfterNowBy(Microseconds maxTime, ErrorCodes::E
     if (maxTime == Microseconds::max()) {
         when = Date_t::max();
     } else {
-        auto clock = getServiceContext()->getFastClockSource();
-        when = clock->now();
+        auto& clock = fastClockSource();
+        when = clock.now();
         if (maxTime > Microseconds::zero()) {
-            when += clock->getPrecision() + maxTime;
+            when += clock.getPrecision() + maxTime;
         }
     }
     setDeadlineAndMaxTime(when, maxTime, timeoutError);
@@ -145,13 +153,7 @@ bool OperationContext::hasDeadlineExpired() const {
         return true;
     }
 
-    // TODO: Remove once all OperationContexts are properly connected to Clients and ServiceContexts
-    // in tests.
-    if (MONGO_unlikely(!getClient() || !getServiceContext())) {
-        return false;
-    }
-
-    const auto now = getServiceContext()->getFastClockSource()->now();
+    const auto now = fastClockSource().now();
     return now >= getDeadline();
 }
 
@@ -164,8 +166,7 @@ Milliseconds OperationContext::getRemainingMaxTimeMillis() const {
         return Milliseconds::max();
     }
 
-    return std::max(Milliseconds{0},
-                    getDeadline() - getServiceContext()->getFastClockSource()->now());
+    return std::max(Milliseconds{0}, getDeadline() - fastClockSource().now());
 }
 
 Microseconds OperationContext::getRemainingMaxTimeMicros() const {
@@ -190,8 +191,8 @@ void OperationContext::restoreMaxTimeMS() {
     if (maxTime == Microseconds::max()) {
         _deadline = Date_t::max();
     } else {
-        auto clock = getServiceContext()->getFastClockSource();
-        _deadline = clock->now() + clock->getPrecision() + maxTime - _elapsedTime.elapsed();
+        auto& clock = fastClockSource();
+        _deadline = clock.now() + clock.getPrecision() + maxTime - _elapsedTime.elapsed();
     }
     _maxTime = maxTime;
 }
@@ -203,7 +204,7 @@ namespace {
 // specified in the fail point info.
 bool opShouldFail(Client* client, const BSONObj& failPointInfo) {
     // Only target the client with the specified connection number.
-    if (client->desc() != failPointInfo["threadName"].valuestrsafe()) {
+    if (client->desc() != failPointInfo.getStringField("threadName")) {
         return false;
     }
 
@@ -218,25 +219,16 @@ bool opShouldFail(Client* client, const BSONObj& failPointInfo) {
 }  // namespace
 
 Status OperationContext::checkForInterruptNoAssert() noexcept {
-    const auto killStatus = getKillStatus();
-
-    if (_ignoreInterruptsExceptForReplStateChange &&
-        killStatus != ErrorCodes::InterruptedDueToReplStateChange &&
-        !_killRequestedForReplStateChange.loadRelaxed()) {
-        return Status::OK();
+    _numInterruptChecks.fetchAndAddRelaxed(1);
+    if (_overdueInterruptCheckStats) {
+        updateInterruptCheckCounters();
     }
 
-    // TODO: Remove the MONGO_likely(hasClientAndServiceContext) once all operation contexts are
-    // constructed with clients.
-    const auto hasClientAndServiceContext = getClient() && getServiceContext();
-
-    if (MONGO_likely(hasClientAndServiceContext) && getClient()->getKilled() &&
-        !_isExecutingShutdown) {
+    if (getClient()->getKilled() && !_isExecutingShutdown) {
         return Status(ErrorCodes::ClientMarkedKilled, "client has been killed");
     }
 
-    if (MONGO_likely(hasClientAndServiceContext) && getServiceContext()->getKillAllOperations() &&
-        !_isExecutingShutdown) {
+    if (getServiceContext()->getKillAllOperations() && !_isExecutingShutdown) {
         return Status(ErrorCodes::InterruptedAtShutdown, "interrupted at shutdown");
     }
 
@@ -258,6 +250,7 @@ Status OperationContext::checkForInterruptNoAssert() noexcept {
         },
         [&](auto&& data) { return opShouldFail(getClient(), data); });
 
+    const auto killStatus = getKillStatus();
     if (killStatus != ErrorCodes::OK) {
         if (killStatus == ErrorCodes::TransactionExceededLifetimeLimitSeconds)
             return Status(
@@ -269,16 +262,69 @@ Status OperationContext::checkForInterruptNoAssert() noexcept {
     }
 
     if (_markKillOnClientDisconnect) {
-        const auto now = getServiceContext()->getFastClockSource()->now();
+        if (auto status = _checkClientConnected(); !status.isOK()) {
+            return status;
+        }
+    }
 
-        if (now > _lastClientCheck + Milliseconds(500)) {
-            _lastClientCheck = now;
+    return Status::OK();
+}
 
-            if (!getClient()->session()->isConnected()) {
-                markKilled(ErrorCodes::ClientDisconnect);
-                return Status(ErrorCodes::ClientDisconnect,
-                              "operation was interrupted because a client disconnected");
-            }
+void OperationContext::trackOverdueInterruptChecks(TickSource::Tick startTime) {
+    tassert(10988600,
+            "OperationContext::trackOverdueInterruptChecks may be called at most once",
+            !_overdueInterruptCheckStats);
+    _overdueInterruptCheckStats = std::make_unique<OverdueInterruptCheckStats>(startTime);
+}
+
+void OperationContext::updateInterruptCheckCounters() {
+    const TickSource::Tick now = tickSource().getTicks();
+    const TickSource::Tick prevStart =
+        std::exchange(_overdueInterruptCheckStats->interruptCheckWindowStartTime, now);
+
+    if (_ignoreInterrupts || isWaitingForConditionOrInterrupt()) {
+        // If we're ignoring interrupts or we're in an interruptible wait, we update the time of
+        // the last interrupt check, but we do not bump the overdue counters.
+        return;
+    }
+
+    if (auto overdue = tickSource().ticksTo<Milliseconds>(now - prevStart) - interruptCheckPeriod();
+        overdue > Milliseconds{0}) {
+        auto& stats = *_overdueInterruptCheckStats;
+        stats.overdueInterruptChecks.fetchAndAddRelaxed(1);
+        stats.overdueAccumulator.storeRelaxed(stats.overdueAccumulator.loadRelaxed() + overdue);
+        stats.overdueMaxTime.storeRelaxed(std::max(stats.overdueMaxTime.loadRelaxed(), overdue));
+    }
+}
+
+void OperationContext::_schedulePeriodicClientConnectedCheck() {
+    if (!_baton) {
+        return;
+    }
+
+    auto nextCheck = _lastClientCheck + Seconds(1);
+    _baton->waitUntil(nextCheck, getCancellationToken()).getAsync([&](auto waitStatus) {
+        if (!waitStatus.isOK()) {
+            return;
+        }
+        if (!_checkClientConnected().isOK()) {
+            return;
+        }
+        _schedulePeriodicClientConnectedCheck();
+    });
+}
+
+Status OperationContext::_checkClientConnected() {
+    const auto now = fastClockSource().now();
+
+    if (now > _lastClientCheck + Milliseconds(500)) {
+        _lastClientCheck = now;
+
+        auto client = getClient();
+        if (!client->session()->isConnected()) {
+            markKilled(client->getDisconnectErrorCode());
+            return Status(client->getDisconnectErrorCode(),
+                          "operation was interrupted because a client disconnected");
         }
     }
 
@@ -320,27 +366,36 @@ StatusWith<stdx::cv_status> OperationContext::waitForConditionOrInterruptNoAsser
         deadline = std::min(deadline, getDeadline());
     }
 
-    const auto waitStatus = [&] {
-        if (Date_t::max() == deadline) {
-            Waitable::wait(_baton.get(), getServiceContext()->getPreciseClockSource(), cv, m);
-            return stdx::cv_status::no_timeout;
-        }
-        return getServiceContext()->getPreciseClockSource()->waitForConditionUntil(
-            cv, m, deadline, _baton.get());
-    }();
+    try {
+        const auto waitStatus = [&] {
+            if (Date_t::max() == deadline) {
+                Waitable::wait(_baton.get(), getServiceContext()->getPreciseClockSource(), cv, m);
+                return stdx::cv_status::no_timeout;
+            }
+            return getServiceContext()->getPreciseClockSource()->waitForConditionUntil(
+                cv, m, deadline, _baton.get());
+        }();
 
-    if (opHasDeadline && waitStatus == stdx::cv_status::timeout && deadline == getDeadline()) {
-        // It's possible that the system clock used in stdx::condition_variable::wait_until
-        // is slightly ahead of the FastClock used in checkForInterrupt. In this case,
-        // we treat the operation as though it has exceeded its time limit, just as if the
-        // FastClock and system clock had agreed.
-        if (!_hasArtificialDeadline) {
-            interruptible_detail::doWithoutLock(m, [&] { markKilled(_timeoutError); });
+        if (opHasDeadline && waitStatus == stdx::cv_status::timeout && deadline == getDeadline()) {
+            // It's possible that the system clock used in stdx::condition_variable::wait_until
+            // is slightly ahead of the FastClock used in checkForInterrupt. In this case,
+            // we treat the operation as though it has exceeded its time limit, just as if the
+            // FastClock and system clock had agreed.
+            if (!_hasArtificialDeadline) {
+                interruptible_detail::doWithoutLock(m, [&] { markKilled(_timeoutError); });
+            }
+            return Status(_timeoutError, "operation exceeded time limit");
         }
-        return Status(_timeoutError, "operation exceeded time limit");
+
+        return waitStatus;
+    } catch (const ExceptionFor<ErrorCodes::DurationOverflow>& ex) {
+        // Inside waitForConditionUntil() is a conversion from deadline's Date_t type to the system
+        // clock's time_point type. If the time_point's compiler-dependent resolution is higher
+        // than Date_t's milliseconds, it's possible for the conversion from Date_t to time_point
+        // to overflow and trigger an exception. We catch that here to maintain the noexcept
+        // contract.
+        return ex.toStatus();
     }
-
-    return waitStatus;
 }
 
 void OperationContext::markKilled(ErrorCodes::Error killCode) {
@@ -349,15 +404,23 @@ void OperationContext::markKilled(ErrorCodes::Error killCode) {
         invariant(!ErrorExtraInfo::parserFor(killCode));
     }
 
-    if (killCode == ErrorCodes::ClientDisconnect) {
+    if (killCode == getClient()->getDisconnectErrorCode()) {
         LOGV2(20883, "Interrupted operation as its client disconnected", "opId"_attr = getOpID());
     }
 
-    // Record that a kill was requested on this operationContext due to replication state change
-    // since it is possible to call markKilled() multiple times but only the first killCode will
-    // be preserved.
-    if (killCode == ErrorCodes::InterruptedDueToReplStateChange) {
-        _killRequestedForReplStateChange.store(true);
+    // Set this before assigning the _killCode to ensure that any thread that observes the interrupt
+    // is guaranteed to see the write. If multiple threads race here, the first one to execute will
+    // win. While it isn't guaranteed to be the same thread that wins the _killCode race, it is
+    // conceptually a better kill time anyway. In theory, we could do better with atomicMin,
+    // however it is probably better to preserve the rule that this is written to exactly once, and
+    // only prior to the store to _killCode.
+    {
+        auto setIfZero = TickSource::Tick(0);
+        auto ticks = tickSource().getTicks();
+        if (!ticks) {
+            ticks = TickSource::Tick(-1);
+        }
+        _killTime.compareAndSwap(&setIfZero, ticks);
     }
 
     if (auto status = ErrorCodes::OK; _killCode.compareAndSwap(&status, killCode)) {
@@ -369,6 +432,10 @@ void OperationContext::markKilled(ErrorCodes::Error killCode) {
 }
 
 void OperationContext::markKillOnClientDisconnect() {
+    if (!getClient()) {
+        return;
+    }
+
     if (getClient()->isInDirectClient()) {
         return;
     }
@@ -377,13 +444,18 @@ void OperationContext::markKillOnClientDisconnect() {
         return;
     }
 
-    if (getClient() && getClient()->session()) {
-        _lastClientCheck = getServiceContext()->getFastClockSource()->now();
+    if (auto session = getClient()->session()) {
+        _lastClientCheck = fastClockSource().now();
 
         _markKillOnClientDisconnect = true;
 
         if (_baton) {
-            _baton->markKillOnClientDisconnect();
+            if (auto networkingBaton = _baton->networking(); networkingBaton &&
+                networkingBaton->getTransportLayer() == session->getTransportLayer()) {
+                networkingBaton->markKillOnClientDisconnect();
+            } else {
+                _schedulePeriodicClientConnectedCheck();
+            }
         }
     }
 }
@@ -393,7 +465,10 @@ void OperationContext::setIsExecutingShutdown() {
 
     _isExecutingShutdown = true;
 
-    pushIgnoreInterrupts();
+    // The OperationContext executing shutdown is immune from interruption.
+    _hasArtificialDeadline = true;
+    setDeadlineByDate(Date_t::max(), ErrorCodes::ExceededTimeLimit);
+    _ignoreInterrupts = true;
 }
 
 void OperationContext::setLogicalSessionId(LogicalSessionId lsid) {
@@ -405,7 +480,7 @@ void OperationContext::setOperationKey(OperationKey opKey) {
     invariant(!_opKey);
 
     _opKey.emplace(std::move(opKey));
-    OperationKeyManager::get(_client).add(*_opKey, _opId.getId());
+    OperationKeyManager::get(_client).add(*_opKey, _opId);
 }
 
 void OperationContext::releaseOperationKey() {
@@ -427,33 +502,49 @@ void OperationContext::setTxnRetryCounter(TxnRetryCounter txnRetryCounter) {
     _txnRetryCounter = txnRetryCounter;
 }
 
-std::unique_ptr<RecoveryUnit> OperationContext::releaseRecoveryUnit() {
+std::unique_ptr<RecoveryUnit> OperationContext::releaseRecoveryUnit_DO_NOT_USE(ClientLock&) {
+    if (_recoveryUnit) {
+        _recoveryUnit->setOperationContext(nullptr);
+    }
+
     return std::move(_recoveryUnit);
 }
 
-std::unique_ptr<RecoveryUnit> OperationContext::releaseAndReplaceRecoveryUnit() {
-    auto ru = releaseRecoveryUnit();
-    setRecoveryUnit(
-        std::unique_ptr<RecoveryUnit>(getServiceContext()->getStorageEngine()->newRecoveryUnit()),
-        WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+std::unique_ptr<RecoveryUnit> OperationContext::releaseAndReplaceRecoveryUnit_DO_NOT_USE(
+    ClientLock& clientLock) {
+    auto ru = releaseRecoveryUnit_DO_NOT_USE(clientLock);
+    setRecoveryUnit_DO_NOT_USE(getServiceContext()->getStorageEngine()->newRecoveryUnit(),
+                               WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork,
+                               clientLock);
     return ru;
 }
 
-WriteUnitOfWork::RecoveryUnitState OperationContext::setRecoveryUnit(
-    std::unique_ptr<RecoveryUnit> unit, WriteUnitOfWork::RecoveryUnitState state) {
+void OperationContext::replaceRecoveryUnit_DO_NOT_USE(ClientLock& clientLock) {
+    setRecoveryUnit_DO_NOT_USE(getServiceContext()->getStorageEngine()->newRecoveryUnit(),
+                               WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork,
+                               clientLock);
+}
+
+WriteUnitOfWork::RecoveryUnitState OperationContext::setRecoveryUnit_DO_NOT_USE(
+    std::unique_ptr<RecoveryUnit> unit, WriteUnitOfWork::RecoveryUnitState state, ClientLock&) {
     _recoveryUnit = std::move(unit);
+    if (_recoveryUnit) {
+        _recoveryUnit->setOperationContext(this);
+    }
+
     WriteUnitOfWork::RecoveryUnitState oldState = _ruState;
     _ruState = state;
     return oldState;
 }
 
-void OperationContext::setLockState(std::unique_ptr<Locker> locker) {
+void OperationContext::setLockState_DO_NOT_USE(std::unique_ptr<Locker> locker) {
     invariant(!_locker);
     invariant(locker);
     _locker = std::move(locker);
 }
 
-std::unique_ptr<Locker> OperationContext::swapLockState(std::unique_ptr<Locker> locker, WithLock) {
+std::unique_ptr<Locker> OperationContext::swapLockState_DO_NOT_USE(std::unique_ptr<Locker> locker,
+                                                                   ClientLock& clientLock) {
     invariant(_locker);
     invariant(locker);
     _locker.swap(locker);
@@ -467,5 +558,4 @@ Date_t OperationContext::getExpirationDateForWaitForValue(Milliseconds waitFor) 
 bool OperationContext::isIgnoringInterrupts() const {
     return _ignoreInterrupts;
 }
-
 }  // namespace mongo

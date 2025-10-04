@@ -38,7 +38,7 @@ Distributed under the Boost Software License, Version 1.0.
 #include <boost/align/detail/aligned_alloc_posix.hpp>
 #elif defined(sun) || defined(__sun)
 #include <boost/align/detail/aligned_alloc_sunos.hpp>
-#elif (_POSIX_C_SOURCE >= 200112L) || (_XOPEN_SOURCE >= 600)
+#elif defined(_POSIX_VERSION)
 #include <boost/align/detail/aligned_alloc_posix.hpp>
 #else
 #include <boost/align/detail/aligned_alloc.hpp>

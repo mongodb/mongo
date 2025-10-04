@@ -27,27 +27,28 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/util/read_through_cache.h"
 
-#include "mongo/stdx/condition_variable.h"
+#include "mongo/db/client.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/scopeguard.h"
+
+#include <utility>
 
 namespace mongo {
 
-ReadThroughCacheBase::ReadThroughCacheBase(Mutex& mutex,
-                                           ServiceContext* service,
-                                           ThreadPoolInterface& threadPool)
-    : _serviceContext(service), _threadPool(threadPool), _mutex(mutex) {}
+ReadThroughCacheBase::ReadThroughCacheBase(Service* service, ThreadPoolInterface& threadPool)
+    : _service(service), _threadPool(threadPool) {}
 
 ReadThroughCacheBase::~ReadThroughCacheBase() = default;
 
 struct ReadThroughCacheBase::CancelToken::TaskInfo {
-    TaskInfo(ServiceContext* service, Mutex& mutex) : service(service), mutex(mutex) {}
+    TaskInfo(Service* service, stdx::mutex& cancelTokenMutex)
+        : service(service), cancelTokenMutex(cancelTokenMutex) {}
 
-    ServiceContext* const service;
+    Service* const service;
 
-    Mutex& mutex;
+    stdx::mutex& cancelTokenMutex;
     Status cancelStatus{Status::OK()};
     OperationContext* opCtxToCancel{nullptr};
 };
@@ -60,47 +61,50 @@ ReadThroughCacheBase::CancelToken::CancelToken(CancelToken&&) = default;
 ReadThroughCacheBase::CancelToken::~CancelToken() = default;
 
 void ReadThroughCacheBase::CancelToken::tryCancel() {
-    stdx::lock_guard lg(_info->mutex);
+    stdx::lock_guard lg(_info->cancelTokenMutex);
     _info->cancelStatus =
         Status(ErrorCodes::ReadThroughCacheLookupCanceled, "Internal only: task canceled");
     if (_info->opCtxToCancel) {
-        stdx::lock_guard clientLock(*_info->opCtxToCancel->getClient());
-        _info->service->killOperation(clientLock, _info->opCtxToCancel, _info->cancelStatus.code());
+        ClientLock clientLock(_info->opCtxToCancel->getClient());
+        _info->service->getServiceContext()->killOperation(
+            clientLock, _info->opCtxToCancel, _info->cancelStatus.code());
     }
 }
 
 ReadThroughCacheBase::CancelToken ReadThroughCacheBase::_asyncWork(
     WorkWithOpContext work) noexcept {
-    auto taskInfo = std::make_shared<CancelToken::TaskInfo>(_serviceContext, _cancelTokenMutex);
+    auto taskInfo = std::make_shared<CancelToken::TaskInfo>(_service, _cancelTokensMutex);
 
-    _threadPool.schedule([work = std::move(work), taskInfo](Status status) mutable {
-        if (!status.isOK()) {
-            work(nullptr, status);
-            return;
-        }
+    _threadPool.schedule(
+        [work = std::move(work), taskInfo](Status cancelStatusAtTaskBegin) mutable {
+            if (!cancelStatusAtTaskBegin.isOK()) {
+                work(nullptr, cancelStatusAtTaskBegin);
+                return;
+            }
 
-        ThreadClient tc(taskInfo->service);
-        auto opCtxHolder = tc->makeOperationContext();
+            // TODO(SERVER-74659): Please revisit if this thread could be made killable.
+            ThreadClient tc(taskInfo->service, ClientOperationKillableByStepdown{false});
+            auto opCtxHolder = tc->makeOperationContext();
 
-        const auto cancelStatusAtTaskBegin = [&] {
-            stdx::lock_guard lg(taskInfo->mutex);
-            taskInfo->opCtxToCancel = opCtxHolder.get();
-            return taskInfo->cancelStatus;
-        }();
+            cancelStatusAtTaskBegin = [&] {
+                stdx::lock_guard lg(taskInfo->cancelTokenMutex);
+                taskInfo->opCtxToCancel = opCtxHolder.get();
+                return taskInfo->cancelStatus;
+            }();
 
-        ON_BLOCK_EXIT([&] {
-            stdx::lock_guard lg(taskInfo->mutex);
-            taskInfo->opCtxToCancel = nullptr;
+            ON_BLOCK_EXIT([&] {
+                stdx::lock_guard lg(taskInfo->cancelTokenMutex);
+                taskInfo->opCtxToCancel = nullptr;
+            });
+
+            work(taskInfo->opCtxToCancel, cancelStatusAtTaskBegin);
         });
-
-        work(taskInfo->opCtxToCancel, cancelStatusAtTaskBegin);
-    });
 
     return CancelToken(std::move(taskInfo));
 }
 
 Date_t ReadThroughCacheBase::_now() {
-    return _serviceContext->getFastClockSource()->now();
+    return _service->getServiceContext()->getFastClockSource()->now();
 }
 
 }  // namespace mongo

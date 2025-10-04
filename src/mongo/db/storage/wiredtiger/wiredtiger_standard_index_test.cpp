@@ -27,277 +27,190 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <memory>
-
-#include "mongo/base/init.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/catalog/collection_mock.h"
-#include "mongo/db/catalog/index_catalog_entry.h"
-#include "mongo/db/concurrency/locker_noop_client_observer.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/json.h"
-#include "mongo/db/operation_context_noop.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/storage/sorted_data_interface_test_assert.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
-#include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/system_clock_source.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {
 
-using std::string;
+class WiredTigerStandardIndexText : public SortedDataInterfaceTest {};
 
-class WiredTigerIndexHarnessHelper final : public SortedDataInterfaceHarnessHelper {
-public:
-    WiredTigerIndexHarnessHelper() : _dbpath("wt_test"), _conn(nullptr) {
-        auto service = getServiceContext();
-        service->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
-
-        const char* config = "create,cache_size=1G,";
-        int ret = wiredtiger_open(_dbpath.path().c_str(), nullptr, config, &_conn);
-        invariantWTOK(ret);
-
-        _fastClockSource = std::make_unique<SystemClockSource>();
-        _sessionCache = new WiredTigerSessionCache(_conn, _fastClockSource.get());
-
-        WiredTigerUtil::notifyStartupComplete();
-    }
-
-    ~WiredTigerIndexHarnessHelper() final {
-        delete _sessionCache;
-        _conn->close(_conn, nullptr);
-
-        WiredTigerUtil::resetTableLoggingInfo();
-    }
-
-    std::unique_ptr<SortedDataInterface> newIdIndexSortedDataInterface() final {
-        std::string ns = "test.wt";
-        OperationContextNoop opCtx(newRecoveryUnit().release());
-
-        BSONObj spec = BSON("key" << BSON("_id" << 1) << "name"
-                                  << "_id_"
-                                  << "v" << static_cast<int>(IndexDescriptor::kLatestIndexVersion)
-                                  << "unique" << true);
-
-        auto collection = std::make_unique<CollectionMock>(NamespaceString(ns));
-        IndexDescriptor desc("", spec);
-        invariant(desc.isIdIndex());
-
-        StatusWith<std::string> result = WiredTigerIndex::generateCreateString(
-            kWiredTigerEngineName, "", "", NamespaceString(ns), desc);
-        ASSERT_OK(result.getStatus());
-
-        string uri = "table:" + ns;
-        invariantWTOK(WiredTigerIndex::Create(&opCtx, uri, result.getValue()));
-
-        return std::make_unique<WiredTigerIdIndex>(&opCtx, uri, "" /* ident */, &desc);
-    }
-
-    std::unique_ptr<mongo::SortedDataInterface> newSortedDataInterface(bool unique,
-                                                                       bool partial,
-                                                                       KeyFormat keyFormat) final {
-        std::string ns = "test.wt";
-        OperationContextNoop opCtx(newRecoveryUnit().release());
-
-        BSONObj spec = BSON("key" << BSON("a" << 1) << "name"
-                                  << "testIndex"
-                                  << "v" << static_cast<int>(IndexDescriptor::kLatestIndexVersion)
-                                  << "unique" << unique);
-
-        if (partial) {
-            auto partialBSON =
-                BSON(IndexDescriptor::kPartialFilterExprFieldName.toString() << BSON(""
-                                                                                     << ""));
-            spec = spec.addField(partialBSON.firstElement());
-        }
-
-        auto collection = std::make_unique<CollectionMock>(NamespaceString(ns));
-
-        IndexDescriptor& desc = _descriptors.emplace_back("", spec);
-
-        StatusWith<std::string> result = WiredTigerIndex::generateCreateString(
-            kWiredTigerEngineName, "", "", NamespaceString(ns), desc);
-        ASSERT_OK(result.getStatus());
-
-        string uri = "table:" + ns;
-        invariantWTOK(WiredTigerIndex::Create(&opCtx, uri, result.getValue()));
-
-        if (unique) {
-            return std::make_unique<WiredTigerIndexUnique>(
-                &opCtx, uri, "" /* ident */, keyFormat, &desc);
-        }
-        return std::make_unique<WiredTigerIndexStandard>(
-            &opCtx, uri, "" /* ident */, keyFormat, &desc);
-    }
-
-    std::unique_ptr<RecoveryUnit> newRecoveryUnit() final {
-        return std::make_unique<WiredTigerRecoveryUnit>(_sessionCache, &_oplogManager);
-    }
-
-private:
-    unittest::TempDir _dbpath;
-    std::unique_ptr<ClockSource> _fastClockSource;
-    std::vector<IndexDescriptor> _descriptors;
-    WT_CONNECTION* _conn;
-    WiredTigerSessionCache* _sessionCache;
-    WiredTigerOplogManager _oplogManager;
-};
-
-std::unique_ptr<SortedDataInterfaceHarnessHelper> makeWTIndexHarnessHelper() {
-    return std::make_unique<WiredTigerIndexHarnessHelper>();
-}
-
-MONGO_INITIALIZER(RegisterSortedDataInterfaceHarnessFactory)(InitializerContext* const) {
-    mongo::registerSortedDataInterfaceHarnessHelperFactory(makeWTIndexHarnessHelper);
-}
-
-TEST(WiredTigerStandardIndexText, CursorInActiveTxnAfterNext) {
-    auto harnessHelper = makeWTIndexHarnessHelper();
+TEST_F(WiredTigerStandardIndexText, CursorInActiveTxnAfterNext) {
     bool unique = false;
     bool partial = false;
-    auto sdi = harnessHelper->newSortedDataInterface(unique, partial);
+    auto sdi = harnessHelper()->newSortedDataInterface(opCtx(), unique, partial);
 
     // Populate data.
     {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-
-        WriteUnitOfWork uow(opCtx.get());
+        StorageWriteTransaction txn(recoveryUnit());
         auto ks = makeKeyString(sdi.get(), BSON("" << 1), RecordId(1));
-        auto res = sdi->insert(opCtx.get(), ks, true);
-        ASSERT_OK(res);
+        ASSERT_SDI_INSERT_OK(sdi->insert(opCtx(), recoveryUnit(), ks, true));
 
         ks = makeKeyString(sdi.get(), BSON("" << 2), RecordId(2));
-        res = sdi->insert(opCtx.get(), ks, true);
-        ASSERT_OK(res);
+        ASSERT_SDI_INSERT_OK(sdi->insert(opCtx(), recoveryUnit(), ks, true));
 
-        uow.commit();
+        txn.commit();
     }
 
     // Cursors should always ensure they are in an active transaction when next() is called.
     {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        auto ru = WiredTigerRecoveryUnit::get(opCtx.get());
-
-        auto cursor = sdi->newCursor(opCtx.get());
-        auto res = cursor->seek(makeKeyStringForSeek(sdi.get(), BSONObj(), true, true));
+        auto cursor = sdi->newCursor(opCtx(), recoveryUnit());
+        auto res = cursor->seek(
+            recoveryUnit(),
+            makeKeyStringForSeek(sdi.get(), BSONObj(), true, true).finishAndGetBuffer());
         ASSERT(res);
 
-        ASSERT_TRUE(ru->isActive());
+        ASSERT_TRUE(recoveryUnit().isActive());
 
-        // Committing a WriteUnitOfWork will end the current transaction.
-        WriteUnitOfWork wuow(opCtx.get());
-        ASSERT_TRUE(ru->isActive());
-        wuow.commit();
-        ASSERT_FALSE(ru->isActive());
+        // Committing a transaction will end the current transaction.
+        StorageWriteTransaction txn(recoveryUnit());
+        ASSERT_TRUE(recoveryUnit().isActive());
+        txn.commit();
+        ASSERT_FALSE(recoveryUnit().isActive());
 
         // If a cursor is used after a WUOW commits, it should implicitly start a new transaction.
-        ASSERT(cursor->next());
-        ASSERT_TRUE(ru->isActive());
+        ASSERT(cursor->next(recoveryUnit()));
+        ASSERT_TRUE(recoveryUnit().isActive());
     }
 }
 
-TEST(WiredTigerStandardIndexText, CursorInActiveTxnAfterSeek) {
-    auto harnessHelper = makeWTIndexHarnessHelper();
+TEST_F(WiredTigerStandardIndexText, CursorInActiveTxnAfterSeek) {
     bool unique = false;
     bool partial = false;
-    auto sdi = harnessHelper->newSortedDataInterface(unique, partial);
+    auto sdi = harnessHelper()->newSortedDataInterface(opCtx(), unique, partial);
 
     // Populate data.
     {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-
-        WriteUnitOfWork uow(opCtx.get());
+        StorageWriteTransaction txn(recoveryUnit());
         auto ks = makeKeyString(sdi.get(), BSON("" << 1), RecordId(1));
-        auto res = sdi->insert(opCtx.get(), ks, true);
-        ASSERT_OK(res);
+        ASSERT_SDI_INSERT_OK(sdi->insert(opCtx(), recoveryUnit(), ks, true));
 
         ks = makeKeyString(sdi.get(), BSON("" << 2), RecordId(2));
-        res = sdi->insert(opCtx.get(), ks, true);
-        ASSERT_OK(res);
+        ASSERT_SDI_INSERT_OK(sdi->insert(opCtx(), recoveryUnit(), ks, true));
 
-        uow.commit();
+        txn.commit();
     }
 
     // Cursors should always ensure they are in an active transaction when seek() is called.
     {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        auto ru = WiredTigerRecoveryUnit::get(opCtx.get());
-
-        auto cursor = sdi->newCursor(opCtx.get());
+        auto cursor = sdi->newCursor(opCtx(), recoveryUnit());
 
         bool forward = true;
         bool inclusive = true;
         auto seekKs = makeKeyStringForSeek(sdi.get(), BSON("" << 1), forward, inclusive);
-        ASSERT(cursor->seek(seekKs));
-        ASSERT_TRUE(ru->isActive());
+        ASSERT(cursor->seek(recoveryUnit(), seekKs.finishAndGetBuffer()));
+        ASSERT_TRUE(recoveryUnit().isActive());
 
-        // Committing a WriteUnitOfWork will end the current transaction.
-        WriteUnitOfWork wuow(opCtx.get());
-        ASSERT_TRUE(ru->isActive());
-        wuow.commit();
-        ASSERT_FALSE(ru->isActive());
+        // Committing a transaction will end the current transaction.
+        StorageWriteTransaction txn(recoveryUnit());
+        ASSERT_TRUE(recoveryUnit().isActive());
+        txn.commit();
+        ASSERT_FALSE(recoveryUnit().isActive());
 
         // If a cursor is used after a WUOW commits, it should implicitly start a new
         // transaction.
-        ASSERT(cursor->seek(seekKs));
-        ASSERT_TRUE(ru->isActive());
+        ASSERT(cursor->seek(recoveryUnit(), seekKs.finishAndGetBuffer()));
+        ASSERT_TRUE(recoveryUnit().isActive());
     }
 }
 
-TEST(WiredTigerStandardIndexText, CursorInActiveTxnAfterSeekExact) {
-    auto harnessHelper = makeWTIndexHarnessHelper();
-    bool unique = false;
-    bool partial = false;
-    auto sdi = harnessHelper->newSortedDataInterface(unique, partial);
+class WiredTigerUniqueIndexTest : public SortedDataInterfaceTest {};
 
-    // Populate data.
+TEST_F(WiredTigerUniqueIndexTest, OldFormatKeys) {
+    FailPointEnableBlock createOldFormatIndex("WTIndexCreateUniqueIndexesInOldFormat");
+
+    const bool unique = true;
+    const bool partial = false;
+    auto sdi = harnessHelper()->newSortedDataInterface(opCtx(), unique, partial);
+
+    const bool dupsAllowed = false;
+
+    // Populate index with all old format keys.
     {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-
-        WriteUnitOfWork uow(opCtx.get());
+        FailPointEnableBlock insertOldFormatKeys("WTIndexInsertUniqueKeysInOldFormat");
+        StorageWriteTransaction txn(recoveryUnit());
         auto ks = makeKeyString(sdi.get(), BSON("" << 1), RecordId(1));
-        auto res = sdi->insert(opCtx.get(), ks, true);
-        ASSERT_OK(res);
+        ASSERT_SDI_INSERT_OK(sdi->insert(opCtx(), recoveryUnit(), ks, dupsAllowed));
 
         ks = makeKeyString(sdi.get(), BSON("" << 2), RecordId(2));
-        res = sdi->insert(opCtx.get(), ks, true);
-        ASSERT_OK(res);
+        ASSERT_SDI_INSERT_OK(sdi->insert(opCtx(), recoveryUnit(), ks, dupsAllowed));
 
-        uow.commit();
+        ks = makeKeyString(sdi.get(), BSON("" << 3), RecordId(3));
+        ASSERT_SDI_INSERT_OK(sdi->insert(opCtx(), recoveryUnit(), ks, dupsAllowed));
+
+        txn.commit();
     }
 
-    // Cursors should always ensure they are in an active transaction when seekExact() is
-    // called.
+    // Ensure cursors return the correct data
     {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        auto ru = WiredTigerRecoveryUnit::get(opCtx.get());
+        auto cursor = sdi->newCursor(opCtx(), recoveryUnit());
 
-        auto cursor = sdi->newCursor(opCtx.get());
+        bool forward = true;
+        bool inclusive = true;
+        auto seekKs = makeKeyStringForSeek(sdi.get(), BSON("" << 1), forward, inclusive);
+        auto record = cursor->seek(recoveryUnit(), seekKs.finishAndGetBuffer());
+        ASSERT(record);
+        ASSERT_EQ(RecordId(1), record->loc);
 
-        auto seekKs = makeKeyString(sdi.get(), BSON("" << 1));
+        record = cursor->next(recoveryUnit());
+        ASSERT(record);
+        ASSERT_EQ(RecordId(2), record->loc);
 
-        ASSERT(cursor->seekExact(seekKs));
-        ASSERT_TRUE(ru->isActive());
+        record = cursor->next(recoveryUnit());
+        ASSERT(record);
+        ASSERT_EQ(RecordId(3), record->loc);
+    }
 
-        // Committing a WriteUnitOfWork will end the current transaction.
-        WriteUnitOfWork wuow(opCtx.get());
-        ASSERT_TRUE(ru->isActive());
-        wuow.commit();
-        ASSERT_FALSE(ru->isActive());
+    // Ensure we can't insert duplicate keys in the new format
+    {
+        StorageWriteTransaction txn(recoveryUnit());
+        auto ks = makeKeyString(sdi.get(), BSON("" << 1), RecordId(1));
+        ASSERT_SDI_INSERT_DUPLICATE_KEY(
+            sdi->insert(opCtx(), recoveryUnit(), ks, dupsAllowed), BSON("" << 1), boost::none);
 
-        // If a cursor is used after a WUOW commits, it should implicitly start a new
-        // transaction.
-        ASSERT(cursor->seekExact(seekKs));
-        ASSERT_TRUE(ru->isActive());
+        ks = makeKeyString(sdi.get(), BSON("" << 2), RecordId(2));
+        ASSERT_SDI_INSERT_DUPLICATE_KEY(
+            sdi->insert(opCtx(), recoveryUnit(), ks, dupsAllowed), BSON("" << 2), boost::none);
+
+        ks = makeKeyString(sdi.get(), BSON("" << 3), RecordId(3));
+        ASSERT_SDI_INSERT_DUPLICATE_KEY(
+            sdi->insert(opCtx(), recoveryUnit(), ks, dupsAllowed), BSON("" << 3), boost::none);
+    }
+
+    // Ensure that it is not possible to remove a key with a mismatched RecordId.
+    {
+        StorageWriteTransaction txn(recoveryUnit());
+        // The key "1" exists, but with RecordId 1, so this should not remove anything.
+        auto ks = makeKeyString(sdi.get(), BSON("" << 1), RecordId(2));
+        sdi->unindex(opCtx(), recoveryUnit(), ks, dupsAllowed);
+        txn.commit();
+
+        auto cur = sdi->newCursor(opCtx(), recoveryUnit());
+        auto seekKs = makeKeyStringForSeek(sdi.get(), BSON("" << 1), true, true);
+        auto result = cur->seek(recoveryUnit(), seekKs.finishAndGetBuffer());
+        ASSERT(result);
+        ASSERT_EQ(result->loc, RecordId(1));
+    }
+
+    // Ensure we can remove an old format key and replace it with a new one.
+    {
+        StorageWriteTransaction txn(recoveryUnit());
+        auto ks = makeKeyString(sdi.get(), BSON("" << 1), RecordId(1));
+        sdi->unindex(opCtx(), recoveryUnit(), ks, dupsAllowed);
+
+        auto res = sdi->insert(opCtx(), recoveryUnit(), ks, dupsAllowed);
+        ASSERT_SDI_INSERT_OK(sdi->insert(opCtx(), recoveryUnit(), ks, dupsAllowed));
+        txn.commit();
     }
 }
-
 }  // namespace
 }  // namespace mongo

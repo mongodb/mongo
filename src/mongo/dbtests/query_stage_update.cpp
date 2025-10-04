@@ -31,79 +31,94 @@
  * This file tests the UpdateStage class
  */
 
-#include "mongo/platform/basic.h"
-
-#include <memory>
-
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/exec/collection_scan.h"
-#include "mongo/db/exec/eof.h"
-#include "mongo/db/exec/queued_data_stage.h"
-#include "mongo/db/exec/update_stage.h"
-#include "mongo/db/exec/upsert_stage.h"
-#include "mongo/db/exec/working_set.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
+#include "mongo/db/exec/classic/collection_scan.h"
+#include "mongo/db/exec/classic/eof.h"
+#include "mongo/db/exec/classic/plan_stage.h"
+#include "mongo/db/exec/classic/queued_data_stage.h"
+#include "mongo/db/exec/classic/update_stage.h"
+#include "mongo/db/exec/classic/upsert_stage.h"
+#include "mongo/db/exec/classic/working_set.h"
+#include "mongo/db/exec/collection_scan_common.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
+#include "mongo/db/matcher/expression_with_placeholder.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/ops/update_request.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/eof_node_type.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/write_ops/update_request.h"
+#include "mongo/db/query/write_ops/write_ops_parsers.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/snapshot.h"
 #include "mongo/db/update/update_driver.h"
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
 
-#define ASSERT_DOES_NOT_THROW(EXPRESSION)                                          \
-    try {                                                                          \
-        EXPRESSION;                                                                \
-    } catch (const AssertionException& e) {                                        \
-        ::str::stream err;                                                         \
-        err << "Threw an exception incorrectly: " << e.toString();                 \
-        ::mongo::unittest::TestAssertionFailure(__FILE__, __LINE__, err).stream(); \
-    }
+#include <cstddef>
+#include <map>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+namespace mongo {
 namespace QueryStageUpdate {
 
-using std::make_unique;
-using std::unique_ptr;
-using std::vector;
-
-static const NamespaceString nss("unittests.QueryStageUpdate");
+static const NamespaceString nss =
+    NamespaceString::createNamespaceString_forTest("unittests.QueryStageUpdate");
 
 class QueryStageUpdateBase {
 public:
     QueryStageUpdateBase() : _client(&_opCtx) {
-        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
-        _client.dropCollection(nss.ns());
-        _client.createCollection(nss.ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns_forTest());
+        _client.dropCollection(nss);
+        _client.createCollection(nss);
     }
 
     virtual ~QueryStageUpdateBase() {
-        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
-        _client.dropCollection(nss.ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns_forTest());
+        _client.dropCollection(nss);
     }
 
     void insert(const BSONObj& doc) {
-        _client.insert(nss.ns(), doc);
+        _client.insert(nss, doc);
     }
 
     void remove(const BSONObj& obj) {
-        _client.remove(nss.ns(), obj);
+        _client.remove(nss, obj);
     }
 
     size_t count(const BSONObj& query) {
         return _client.count(nss, query, 0, 0, 0);
     }
 
-    unique_ptr<CanonicalQuery> canonicalize(const BSONObj& query) {
+    std::unique_ptr<CanonicalQuery> canonicalize(const BSONObj& query) {
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(query);
-        auto statusWithCQ = CanonicalQuery::canonicalize(&_opCtx, std::move(findCommand));
-        ASSERT_OK(statusWithCQ.getStatus());
-        return std::move(statusWithCQ.getValue());
+        return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+            .expCtx = ExpressionContextBuilder{}.fromRequest(&_opCtx, *findCommand).build(),
+            .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
     }
 
     /**
@@ -125,43 +140,43 @@ public:
      * Uses a forward collection scan stage to get the docs, and populates 'out' with
      * the results.
      */
-    void getCollContents(const CollectionPtr& collection, vector<BSONObj>* out) {
+    void getCollContents(const CollectionAcquisition& collection, std::vector<BSONObj>* out) {
         WorkingSet ws;
 
         CollectionScanParams params;
         params.direction = CollectionScanParams::FORWARD;
         params.tailable = false;
 
-        unique_ptr<CollectionScan> scan(
+        std::unique_ptr<CollectionScan> scan(
             new CollectionScan(_expCtx.get(), collection, params, &ws, nullptr));
         while (!scan->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state = scan->work(&id);
             if (PlanStage::ADVANCED == state) {
                 WorkingSetMember* member = ws.get(id);
-                verify(member->hasObj());
+                MONGO_verify(member->hasObj());
                 out->push_back(member->doc.value().toBson().getOwned());
             }
         }
     }
 
-    void getRecordIds(const CollectionPtr& collection,
+    void getRecordIds(const CollectionAcquisition& collection,
                       CollectionScanParams::Direction direction,
-                      vector<RecordId>* out) {
+                      std::vector<RecordId>* out) {
         WorkingSet ws;
 
         CollectionScanParams params;
         params.direction = direction;
         params.tailable = false;
 
-        unique_ptr<CollectionScan> scan(
+        std::unique_ptr<CollectionScan> scan(
             new CollectionScan(_expCtx.get(), collection, params, &ws, nullptr));
         while (!scan->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state = scan->work(&id);
             if (PlanStage::ADVANCED == state) {
                 WorkingSetMember* member = ws.get(id);
-                verify(member->hasRecordId());
+                MONGO_verify(member->hasRecordId());
                 out->push_back(member->recordId);
             }
         }
@@ -170,7 +185,7 @@ public:
     /**
      * Asserts that 'objs' contains 'expectedDoc'.
      */
-    void assertHasDoc(const vector<BSONObj>& objs, const BSONObj& expectedDoc) {
+    void assertHasDoc(const std::vector<BSONObj>& objs, const BSONObj& expectedDoc) {
         bool foundDoc = false;
         for (size_t i = 0; i < objs.size(); i++) {
             if (0 == objs[i].woCompare(expectedDoc)) {
@@ -186,7 +201,7 @@ protected:
     OperationContext& _opCtx = *_txnPtr;
 
     boost::intrusive_ptr<ExpressionContext> _expCtx =
-        make_intrusive<ExpressionContext>(&_opCtx, nullptr, nss);
+        ExpressionContextBuilder{}.opCtx(&_opCtx).ns(nss).build();
 
 private:
     DBDirectClient _client;
@@ -200,12 +215,15 @@ public:
     void run() {
         // Run the update.
         {
-            dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+            const auto collection =
+                acquireCollection(&_opCtx,
+                                  CollectionAcquisitionRequest::fromOpCtx(
+                                      &_opCtx, nss, AcquisitionPrerequisites::kWrite),
+                                  MODE_IX);
+            ASSERT(collection.exists());
             CurOp& curOp = *CurOp::get(_opCtx);
             OpDebug* opDebug = &curOp.debug();
             UpdateDriver driver(_expCtx);
-            CollectionPtr collection = ctx.getCollection();
-            ASSERT(collection);
 
             // Collection should be empty.
             ASSERT_EQUALS(0U, count(BSONObj()));
@@ -221,6 +239,7 @@ public:
             request.setQuery(query);
             request.setUpdateModification(
                 write_ops::UpdateModification::parseFromClassicUpdate(updates));
+            request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
 
             const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
             const auto constants = boost::none;
@@ -230,13 +249,14 @@ public:
 
             // Setup update params.
             UpdateStageParams params(&request, &driver, opDebug);
-            unique_ptr<CanonicalQuery> cq(canonicalize(query));
+            std::unique_ptr<CanonicalQuery> cq(canonicalize(query));
             params.canonicalQuery = cq.get();
 
-            auto ws = make_unique<WorkingSet>();
-            auto eofStage = make_unique<EOFStage>(_expCtx.get());
+            auto ws = std::make_unique<WorkingSet>();
+            auto eofStage =
+                std::make_unique<EOFStage>(_expCtx.get(), eof_node::EOFType::NonExistentNamespace);
 
-            auto updateStage = make_unique<UpsertStage>(
+            auto updateStage = std::make_unique<UpsertStage>(
                 _expCtx.get(), params, ws.get(), collection, eofStage.release());
 
             runUpdate(updateStage.get());
@@ -244,10 +264,14 @@ public:
 
         // Verify the contents of the resulting collection.
         {
-            AutoGetCollectionForReadCommand collection(&_opCtx, nss);
+            const auto collection =
+                acquireCollection(&_opCtx,
+                                  CollectionAcquisitionRequest::fromOpCtx(
+                                      &_opCtx, nss, AcquisitionPrerequisites::kRead),
+                                  MODE_IS);
 
-            vector<BSONObj> objs;
-            getCollContents(collection.getCollection(), &objs);
+            std::vector<BSONObj> objs;
+            getCollContents(collection, &objs);
 
             // Expect a single document, {_id: 0, x: 1, y: 2}.
             ASSERT_EQUALS(1U, objs.size());
@@ -264,7 +288,12 @@ public:
     void run() {
         // Run the update.
         {
-            dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+            const auto collection =
+                acquireCollection(&_opCtx,
+                                  CollectionAcquisitionRequest::fromOpCtx(
+                                      &_opCtx, nss, AcquisitionPrerequisites::kWrite),
+                                  MODE_IX);
+            ASSERT(collection.exists());
 
             // Populate the collection.
             for (int i = 0; i < 10; ++i) {
@@ -275,13 +304,10 @@ public:
             CurOp& curOp = *CurOp::get(_opCtx);
             OpDebug* opDebug = &curOp.debug();
             UpdateDriver driver(_expCtx);
-            CollectionPtr coll =
-                CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss);
-            ASSERT(coll);
 
             // Get the RecordIds that would be returned by an in-order scan.
-            vector<RecordId> recordIds;
-            getRecordIds(coll, CollectionScanParams::FORWARD, &recordIds);
+            std::vector<RecordId> recordIds;
+            getRecordIds(collection, CollectionScanParams::FORWARD, &recordIds);
 
             auto request = UpdateRequest();
             request.setNamespaceString(nss);
@@ -295,6 +321,7 @@ public:
             request.setQuery(query);
             request.setUpdateModification(
                 write_ops::UpdateModification::parseFromClassicUpdate(updates));
+            request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
 
             const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
             const auto constants = boost::none;
@@ -309,15 +336,18 @@ public:
 
             // Configure the update.
             UpdateStageParams updateParams(&request, &driver, opDebug);
-            unique_ptr<CanonicalQuery> cq(canonicalize(query));
+            std::unique_ptr<CanonicalQuery> cq(canonicalize(query));
             updateParams.canonicalQuery = cq.get();
 
-            auto ws = make_unique<WorkingSet>();
-            auto cs = make_unique<CollectionScan>(
-                _expCtx.get(), coll, collScanParams, ws.get(), cq->root());
+            auto ws = std::make_unique<WorkingSet>();
+            auto cs = std::make_unique<CollectionScan>(_expCtx.get(),
+                                                       collection,
+                                                       collScanParams,
+                                                       ws.get(),
+                                                       cq->getPrimaryMatchExpression());
 
-            auto updateStage =
-                make_unique<UpdateStage>(_expCtx.get(), updateParams, ws.get(), coll, cs.release());
+            auto updateStage = std::make_unique<UpdateStage>(
+                _expCtx.get(), updateParams, ws.get(), collection, cs.release());
 
             const UpdateStats* stats =
                 static_cast<const UpdateStats*>(updateStage->getSpecificStats());
@@ -332,10 +362,12 @@ public:
 
             // Remove recordIds[targetDocIndex];
             static_cast<PlanStage*>(updateStage.get())->saveState();
-            BSONObj targetDoc = coll->docFor(&_opCtx, recordIds[targetDocIndex]).value();
+            BSONObj targetDoc =
+                collection.getCollectionPtr()->docFor(&_opCtx, recordIds[targetDocIndex]).value();
             ASSERT(!targetDoc.isEmpty());
             remove(targetDoc);
-            static_cast<PlanStage*>(updateStage.get())->restoreState(&coll);
+            static_cast<PlanStage*>(updateStage.get())
+                ->restoreState(&collection.getCollectionPtr());
 
             // Do the remaining updates.
             while (!updateStage->isEOF()) {
@@ -351,10 +383,14 @@ public:
 
         // Check the contents of the collection.
         {
-            AutoGetCollectionForReadCommand collection(&_opCtx, nss);
+            const auto collection =
+                acquireCollection(&_opCtx,
+                                  CollectionAcquisitionRequest::fromOpCtx(
+                                      &_opCtx, nss, AcquisitionPrerequisites::kRead),
+                                  MODE_IS);
 
-            vector<BSONObj> objs;
-            getCollContents(collection.getCollection(), &objs);
+            std::vector<BSONObj> objs;
+            getCollContents(collection, &objs);
 
             // Verify that the collection now has 9 docs (one was deleted).
             ASSERT_EQUALS(9U, objs.size());
@@ -384,21 +420,23 @@ public:
         ASSERT_EQUALS(10U, count(BSONObj()));
 
         // Various variables we'll need.
-        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+        const auto collection = acquireCollection(
+            &_opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(&_opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        ASSERT(collection.exists());
         OpDebug* opDebug = &CurOp::get(_opCtx)->debug();
-        const CollectionPtr& coll = ctx.getCollection();
-        ASSERT(coll);
         auto request = UpdateRequest();
         request.setNamespaceString(nss);
         UpdateDriver driver(_expCtx);
         const int targetDocIndex = 0;  // We'll be working with the first doc in the collection.
         const BSONObj query = BSON("foo" << BSON("$gte" << targetDocIndex));
-        const auto ws = make_unique<WorkingSet>();
-        const unique_ptr<CanonicalQuery> cq(canonicalize(query));
+        const auto ws = std::make_unique<WorkingSet>();
+        const std::unique_ptr<CanonicalQuery> cq(canonicalize(query));
 
         // Get the RecordIds that would be returned by an in-order scan.
-        vector<RecordId> recordIds;
-        getRecordIds(coll, CollectionScanParams::FORWARD, &recordIds);
+        std::vector<RecordId> recordIds;
+        getRecordIds(collection, CollectionScanParams::FORWARD, &recordIds);
 
         // Populate the request.
         request.setQuery(query);
@@ -407,6 +445,7 @@ public:
         request.setSort(BSONObj());
         request.setMulti(false);
         request.setReturnDocs(UpdateRequest::RETURN_OLD);
+        request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
 
         const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
         const auto constants = boost::none;
@@ -416,7 +455,7 @@ public:
 
         // Configure a QueuedDataStage to pass the first object in the collection back in a
         // RID_AND_OBJ state.
-        auto qds = make_unique<QueuedDataStage>(_expCtx.get(), ws.get());
+        auto qds = std::make_unique<QueuedDataStage>(_expCtx.get(), ws.get());
         WorkingSetID id = ws->allocate();
         WorkingSetMember* member = ws->get(id);
         member->recordId = recordIds[targetDocIndex];
@@ -429,8 +468,8 @@ public:
         UpdateStageParams updateParams(&request, &driver, opDebug);
         updateParams.canonicalQuery = cq.get();
 
-        const auto updateStage =
-            make_unique<UpdateStage>(_expCtx.get(), updateParams, ws.get(), coll, qds.release());
+        const auto updateStage = std::make_unique<UpdateStage>(
+            _expCtx.get(), updateParams, ws.get(), collection, qds.release());
 
         // Should return advanced.
         id = WorkingSet::INVALID_ID;
@@ -453,8 +492,8 @@ public:
 
         // Should have done the update.
         BSONObj newDoc = BSON("_id" << targetDocIndex << "foo" << targetDocIndex << "x" << 0);
-        vector<BSONObj> objs;
-        getCollContents(coll, &objs);
+        std::vector<BSONObj> objs;
+        getCollContents(collection, &objs);
         ASSERT_BSONOBJ_EQ(objs[targetDocIndex], newDoc);
 
         // That should be it.
@@ -477,21 +516,23 @@ public:
         ASSERT_EQUALS(50U, count(BSONObj()));
 
         // Various variables we'll need.
-        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+        const auto collection = acquireCollection(
+            &_opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(&_opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        ASSERT(collection.exists());
         OpDebug* opDebug = &CurOp::get(_opCtx)->debug();
-        const CollectionPtr& coll = ctx.getCollection();
-        ASSERT(coll);
         auto request = UpdateRequest();
         request.setNamespaceString(nss);
         UpdateDriver driver(_expCtx);
         const int targetDocIndex = 10;
         const BSONObj query = BSON("foo" << BSON("$gte" << targetDocIndex));
-        const auto ws = make_unique<WorkingSet>();
-        const unique_ptr<CanonicalQuery> cq(canonicalize(query));
+        const auto ws = std::make_unique<WorkingSet>();
+        const std::unique_ptr<CanonicalQuery> cq(canonicalize(query));
 
         // Get the RecordIds that would be returned by an in-order scan.
-        vector<RecordId> recordIds;
-        getRecordIds(coll, CollectionScanParams::FORWARD, &recordIds);
+        std::vector<RecordId> recordIds;
+        getRecordIds(collection, CollectionScanParams::FORWARD, &recordIds);
 
         // Populate the request.
         request.setQuery(query);
@@ -500,6 +541,7 @@ public:
         request.setSort(BSONObj());
         request.setMulti(false);
         request.setReturnDocs(UpdateRequest::RETURN_NEW);
+        request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
 
         const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
         const auto constants = boost::none;
@@ -509,7 +551,7 @@ public:
 
         // Configure a QueuedDataStage to pass the first object in the collection back in a
         // RID_AND_OBJ state.
-        auto qds = make_unique<QueuedDataStage>(_expCtx.get(), ws.get());
+        auto qds = std::make_unique<QueuedDataStage>(_expCtx.get(), ws.get());
         WorkingSetID id = ws->allocate();
         WorkingSetMember* member = ws->get(id);
         member->recordId = recordIds[targetDocIndex];
@@ -522,8 +564,8 @@ public:
         UpdateStageParams updateParams(&request, &driver, opDebug);
         updateParams.canonicalQuery = cq.get();
 
-        auto updateStage =
-            make_unique<UpdateStage>(_expCtx.get(), updateParams, ws.get(), coll, qds.release());
+        auto updateStage = std::make_unique<UpdateStage>(
+            _expCtx.get(), updateParams, ws.get(), collection, qds.release());
 
         // Should return advanced.
         id = WorkingSet::INVALID_ID;
@@ -546,8 +588,8 @@ public:
         ASSERT_BSONOBJ_EQ(resultMember->doc.value().toBson(), newDoc);
 
         // Should have done the update.
-        vector<BSONObj> objs;
-        getCollContents(coll, &objs);
+        std::vector<BSONObj> objs;
+        getCollContents(collection, &objs);
         ASSERT_BSONOBJ_EQ(objs[targetDocIndex], newDoc);
 
         // That should be it.
@@ -556,11 +598,11 @@ public:
     }
 };
 
-class All : public OldStyleSuiteSpecification {
+class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("query_stage_update") {}
 
-    void setupTests() {
+    void setupTests() override {
         // Stage-specific tests below.
         add<QueryStageUpdateUpsertEmptyColl>();
         add<QueryStageUpdateSkipDeletedDoc>();
@@ -569,6 +611,7 @@ public:
     }
 };
 
-OldStyleSuiteInitializer<All> all;
+unittest::OldStyleSuiteInitializer<All> all;
 
 }  // namespace QueryStageUpdate
+}  // namespace mongo

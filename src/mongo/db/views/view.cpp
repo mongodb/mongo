@@ -27,22 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/views/view.h"
 
-#include <memory>
-
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/namespace_string_util.h"
+
+#include <memory>
+#include <utility>
 
 namespace mongo {
 
-ViewDefinition::ViewDefinition(StringData dbName,
+ViewDefinition::ViewDefinition(const DatabaseName& dbName,
                                StringData viewName,
                                StringData viewOnName,
                                const BSONObj& pipeline,
                                std::unique_ptr<CollatorInterface> collator)
-    : _viewNss(dbName, viewName), _viewOnNss(dbName, viewOnName), _collator(std::move(collator)) {
+    : _viewNss(NamespaceStringUtil::deserialize(dbName, viewName)),
+      _viewOnNss(NamespaceStringUtil::deserialize(dbName, viewOnName)),
+      _collator(std::move(collator)) {
     for (BSONElement e : pipeline) {
         _pipeline.push_back(e.Obj().getOwned());
     }
@@ -64,16 +68,14 @@ ViewDefinition& ViewDefinition::operator=(const ViewDefinition& other) {
 }
 
 void ViewDefinition::setViewOn(const NamespaceString& viewOnNss) {
-    invariant(_viewNss.db() == viewOnNss.db());
+    invariant(_viewNss.isEqualDb(viewOnNss));
     _viewOnNss = viewOnNss;
 }
 
-void ViewDefinition::setPipeline(const BSONElement& pipeline) {
-    invariant(pipeline.type() == Array);
-    _pipeline.clear();
-    for (BSONElement e : pipeline.Obj()) {
-        BSONObj value = e.Obj();
-        _pipeline.push_back(value.copy());
+void ViewDefinition::setPipeline(std::vector<mongo::BSONObj> pipeline) {
+    for (auto& stage : pipeline) {
+        stage = stage.copy();
     }
+    _pipeline.swap(pipeline);
 }
 }  // namespace mongo

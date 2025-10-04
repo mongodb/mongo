@@ -31,7 +31,14 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/repl/scatter_gather_algorithm.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/util/modules.h"
+#include "mongo/util/net/hostandport.h"
+
+#include <utility>
+#include <vector>
 
 namespace mongo {
 namespace repl {
@@ -60,13 +67,13 @@ public:
      * "rsConfig" must stay in scope until QuorumChecker's destructor completes.
      */
     QuorumChecker(const ReplSetConfig* rsConfig, int myIndex, long long term);
-    virtual ~QuorumChecker();
+    ~QuorumChecker() override;
 
-    virtual std::vector<executor::RemoteCommandRequest> getRequests() const;
-    virtual void processResponse(const executor::RemoteCommandRequest& request,
-                                 const executor::RemoteCommandResponse& response);
+    std::vector<executor::RemoteCommandRequest> getRequests() const override;
+    void processResponse(const executor::RemoteCommandRequest& request,
+                         const executor::RemoteCommandResponse& response) override;
 
-    virtual bool hasReceivedSufficientResponses() const;
+    bool hasReceivedSufficientResponses() const override;
 
     Status getFinalStatus() const {
         return _finalStatus;

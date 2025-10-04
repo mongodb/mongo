@@ -6,23 +6,24 @@ import signal
 import subprocess
 import sys
 import time
-from distutils import spawn  # pylint: disable=no-name-in-module
 from datetime import datetime
+from distutils import spawn
 
 import psutil
 
 from buildscripts.resmokelib import core
 
-_IS_WINDOWS = (sys.platform == "win32")
+_IS_WINDOWS = sys.platform == "win32"
 
 if _IS_WINDOWS:
-    import win32event
     import win32api
+    import win32event
 
 PROCS_TIMEOUT_SECS = 60
+TYPICAL_MONGOD_DUMP_SECS = 5  # How long a mongod usually takes to core dump.
 
 
-def call(args, logger):
+def call(args, logger, timeout_seconds=None, pinfo=None, check=True) -> int:
     """Call subprocess on args list."""
     logger.info(str(args))
 
@@ -31,12 +32,26 @@ def call(args, logger):
     logger_pipe = core.pipe.LoggerPipe(logger, logging.INFO, process.stdout)
     logger_pipe.wait_until_started()
 
-    ret = process.wait()
+    try:
+        ret = process.wait(timeout=timeout_seconds)
+    except subprocess.TimeoutExpired:
+        logger.error(
+            "Killing %s processes with PIDs %s because time limit expired",
+            pinfo.name,
+            str(pinfo.pidv),
+        )
+        process.kill()
+        process.wait()
+        logger_pipe.wait_until_finished()
+        return -1
+
     logger_pipe.wait_until_finished()
 
-    if ret != 0:
+    if check and ret:
         logger.error("Bad exit code %d", ret)
         raise Exception("Bad exit code %d from %s" % (ret, " ".join(args)))
+
+    return ret
 
 
 def find_program(prog, paths):
@@ -52,7 +67,7 @@ def find_program(prog, paths):
 def callo(args, logger):
     """Call subprocess on args string."""
     logger.info("%s", str(args))
-    return subprocess.check_output(args).decode('utf-8', 'replace')
+    return subprocess.check_output(args).decode("utf-8", "replace")
 
 
 def signal_python(logger, pname, pid):
@@ -72,6 +87,9 @@ def signal_python(logger, pname, pid):
     else:
         logger.info("Sending signal SIGUSR1 to python process %s with PID %d", pname, pid)
         signal_process(logger, pid, signal.SIGUSR1)
+
+    logger.info("Waiting for process to report")
+    time.sleep(5)
 
 
 def signal_event_object(logger, pid):
@@ -95,17 +113,11 @@ def signal_event_object(logger, pid):
     finally:
         win32api.CloseHandle(task_timeout_handle)
 
-    logger.info("Waiting for process to report")
-    time.sleep(5)
-
 
 def signal_process(logger, pid, signalnum):
     """Signal process with signal, N/A on Windows."""
     try:
         os.kill(pid, signalnum)
-
-        logger.info("Waiting for process to report")
-        time.sleep(5)
     except OSError as err:
         logger.error("Hit OS error trying to signal process: %s", err)
 
@@ -158,7 +170,7 @@ def _await_cores(dump_pids, logger):
     start_time = datetime.now()
     for pid in dump_pids:
         while not os.path.exists(dump_pids[pid]):
-            time.sleep(5)  # How long a mongod usually takes to core dump.
+            time.sleep(TYPICAL_MONGOD_DUMP_SECS)
             if (datetime.now() - start_time).total_seconds() > PROCS_TIMEOUT_SECS:
                 logger.error("Timed out while awaiting process.")
                 return

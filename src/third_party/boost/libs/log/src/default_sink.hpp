@@ -25,7 +25,7 @@
 #include <boost/log/expressions/message.hpp>
 #include <boost/log/trivial.hpp>
 #if !defined(BOOST_LOG_NO_THREADS)
-#include <boost/thread/mutex.hpp>
+#include <mutex>
 #endif
 #include <boost/log/detail/header.hpp>
 
@@ -47,7 +47,7 @@ class default_sink :
 {
 private:
 #if !defined(BOOST_LOG_NO_THREADS)
-    typedef mutex mutex_type;
+    typedef std::mutex mutex_type;
     mutex_type m_mutex;
 #endif
     attribute_name const m_severity_name, m_message_name;

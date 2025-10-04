@@ -1,0 +1,20 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/server-programmability
+  - "test_MongoFCVConstantCheck.*":
+    approvers:
+      - 10gen/server-fcv
+  - "test_MongoMacroDefinitionLeaksCheck.*":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "test_MongoTraceCheck.*":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "test_MongoUnstructuredLogCheck.*":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "test_MongoBannedAutoGetUsageCheck.*":
+    approvers:
+      - 10gen/server-catalog-and-routing

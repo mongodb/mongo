@@ -2,9 +2,7 @@
  * Helper functions for analyzing server errors.
  */
 
-"use strict";
-
-function includesErrorCode(serverReply, code) {
+export function includesErrorCode(serverReply, code) {
     if (serverReply.code === code) {
         return true;
     } else if (serverReply.writeErrors) {

@@ -1,0 +1,32 @@
+version: 1.0.0
+filters:
+  - "building.md":
+    approvers:
+      - 10gen/devprod-build
+  - "cpp_style.md":
+    approvers:
+      - 10gen/server-programmability
+  - "devcontainer-setup.md":
+    approvers:
+      - 10gen/devprod-correctness
+  - "exception_architecture.md":
+    approvers:
+      - 10gen/server-programmability
+  - "golden_data_test_framework.md":
+    approvers:
+      - 10gen/query-optimization
+  - "idl.md":
+    approvers:
+      - 10gen/server-programmability
+  - "linting.md":
+    approvers:
+      - 10gen/devprod-build
+  - "owners/**":
+    approvers:
+      - 10gen/devprod-correctness
+  - "poetry_execution.md":
+    approvers:
+      - 10gen/devprod-correctness
+  - "server_parameters.md":
+    approvers:
+      - 10gen/server-programmability

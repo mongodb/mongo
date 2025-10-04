@@ -26,37 +26,20 @@
 # it in the license file.
 
 global:
-  cpp_namespace: mongo
-  cpp_includes:
-    - mongo/db/auth/authorization_manager_impl.h
+    cpp_namespace: mongo
+    cpp_includes:
+        - mongo/db/auth/authorization_manager_impl.h
+        - mongo/db/auth/authorization_router_impl.h
 
 imports:
-  - mongo/idl/basic_types.idl
+    - mongo/db/basic_types.idl
 
 server_parameters:
-  authorizationManagerCacheSize:
-    description: >
-      Element count limit on the AuthorizationManager's user handle cache.
-    set_at:
-      - startup
-    cpp_varname: authorizationManagerCacheSize
-    default: 100
-
-  authorizationManagerPinnedUsers:
-    description: >
-      A comma-separated sequence of user names.
-    set_at:
-      - startup
-      - runtime
-    cpp_class:
-      name: AuthorizationManagerPinnedUsersServerParameter
-      override_set: true
-
-  authorizationManagerPinnedUsersRefreshIntervalMillis:
-    description: The number of milliseconds between refreshing pinned users.
-    set_at:
-      - startup
-      - runtime
-    cpp_vartype: AtomicWord<long long>
-    cpp_varname: authorizationManagerPinnedUsersRefreshIntervalMillis
-    default: 1000
+    authorizationManagerCacheSize:
+        description: >
+            Element count limit on the AuthorizationManager's user handle cache, stored within its AuthorizationRouter.
+        set_at:
+            - startup
+        cpp_varname: authorizationRouterCacheSize
+        default: 100
+        redact: false

@@ -1,0 +1,32 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/query
+  - "analyze_plan.js":
+    approvers:
+      - 10gen/query-optimization
+  - "aggregation_pipeline_utils.js":
+    approvers:
+      - 10gen/query
+  - "change_stream*.js":
+    approvers:
+      - 10gen/query-execution-change-streams
+  - "geo*.js":
+    approvers:
+      - 10gen/query-integration-features
+  - "group_to_distinct_scan_utils.js":
+    approvers:
+      - 10gen/query-optimization
+  - "query_settings*.js":
+    approvers:
+      - 10gen/query-execution-query-settings
+  - "sbe*.js":
+    approvers:
+      - 10gen/query-execution-sbe
+  - "wildcard_index_helpers.js":
+    approvers:
+      - 10gen/query-optimization
+  - "convert_shared.js":
+    approvers:
+      - 10gen/query-optimization

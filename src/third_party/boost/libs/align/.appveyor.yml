@@ -1,0 +1,66 @@
+# Copyright 2017 Glen Joseph Fernandes
+# (glenjofe@gmail.com)
+#
+# Distributed under the Boost Software License, Version 1.0.
+# (http://www.boost.org/LICENSE_1_0.txt)
+
+version: 1.0.{build}-{branch}
+
+shallow_clone: true
+
+branches:
+  only:
+    - master
+    - develop
+
+environment:
+  matrix:
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+      TOOLSET: msvc-9.0
+      TARGET: 32
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+      TOOLSET: msvc-10.0
+      TARGET: 32
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+      TOOLSET: msvc-11.0
+      TARGET: 32
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+      TOOLSET: msvc-12.0
+      TARGET: 32,64
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+      TOOLSET: msvc-14.0
+      TARGET: 32,64
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+      TOOLSET: msvc-14.1
+      TARGET: 32,64
+      STANDARD: 14,17
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+      TOOLSET: msvc-14.2
+      TARGET: 32,64
+      STANDARD: 14,17
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+      TOOLSET: clang-win
+      TARGET: 32,64
+      STANDARD: 14,17
+
+install:
+  - cd ..
+  - git clone -b %APPVEYOR_REPO_BRANCH% https://github.com/boostorg/boost
+  - cd boost
+  - git submodule init libs/assert
+  - git submodule init libs/config
+  - git submodule init libs/core
+  - git submodule init libs/static_assert
+  - git submodule init libs/headers
+  - git submodule init tools/build
+  - git submodule init tools/boost_install
+  - git submodule update
+  - xcopy /s /e /q %APPVEYOR_BUILD_FOLDER% libs\align
+  - cmd /c bootstrap
+  - b2 headers
+
+build: off
+
+test_script:
+  - if not "%STANDARD%" == "" set STANDARD=cxxstd=%STANDARD%
+  - b2 libs/align/test toolset=%TOOLSET% address-model=%TARGET% %STANDARD%

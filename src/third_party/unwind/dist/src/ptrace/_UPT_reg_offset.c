@@ -28,8 +28,57 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 
 #include <stddef.h>
 
+#ifdef HAVE_ASM_PTRACE_H
+# include <asm/ptrace.h>
+#endif
+
 #ifdef HAVE_ASM_PTRACE_OFFSETS_H
 # include <asm/ptrace_offsets.h>
+#endif
+
+#if defined(__powerpc__) && defined(__FreeBSD__)
+#define PT_R0   0
+#define PT_R1   1
+#define PT_R2   2
+#define PT_R3   3
+#define PT_R4   4
+#define PT_R5   5
+#define PT_R6   6
+#define PT_R7   7
+#define PT_R8   8
+#define PT_R9   9
+#define PT_R10  10
+#define PT_R11  11
+#define PT_R12  12
+#define PT_R13  13
+#define PT_R14  14
+#define PT_R15  15
+#define PT_R16  16
+#define PT_R17  17
+#define PT_R18  18
+#define PT_R19  19
+#define PT_R20  20
+#define PT_R21  21
+#define PT_R22  22
+#define PT_R23  23
+#define PT_R24  24
+#define PT_R25  25
+#define PT_R26  26
+#define PT_R27  27
+#define PT_R28  28
+#define PT_R29  29
+#define PT_R30  30
+#define PT_R31  31
+#define PT_NIP  32
+#define PT_CCR  33
+#define PT_CTR  35
+#define PT_LNK  36
+#define PT_XER  37
+#define PT_FPR0  48
+#define PT_FPSCR (PT_FPR0 + 2*32 + 1)
+#define PT_VR0  82
+#define PT_VSCR (PT_VR0 + 32*2 + 1)
+#define PT_VRSAVE (PT_VR0 + 33*2)
 #endif
 
 const int _UPT_reg_offset[UNW_REG_LAST + 1] =
@@ -574,64 +623,6 @@ const int _UPT_reg_offset[UNW_REG_LAST + 1] =
     [UNW_AARCH64_SP]       = 0xf8,
     [UNW_AARCH64_PC]       = 0x100,
     [UNW_AARCH64_PSTATE]   = 0x108
-#elif defined(UNW_TARGET_TILEGX)
-    [UNW_TILEGX_R0]    = 0x00,
-    [UNW_TILEGX_R1]    = 0x08,
-    [UNW_TILEGX_R2]    = 0x10,
-    [UNW_TILEGX_R3]    = 0x08,
-    [UNW_TILEGX_R4]    = 0x20,
-    [UNW_TILEGX_R5]    = 0x28,
-    [UNW_TILEGX_R6]    = 0x30,
-    [UNW_TILEGX_R7]    = 0x38,
-    [UNW_TILEGX_R8]    = 0x40,
-    [UNW_TILEGX_R9]    = 0x48,
-    [UNW_TILEGX_R10]    = 0x50,
-    [UNW_TILEGX_R11]    = 0x58,
-    [UNW_TILEGX_R12]    = 0x60,
-    [UNW_TILEGX_R13]    = 0x68,
-    [UNW_TILEGX_R14]    = 0x70,
-    [UNW_TILEGX_R15]    = 0x78,
-    [UNW_TILEGX_R16]    = 0x80,
-    [UNW_TILEGX_R17]    = 0x88,
-    [UNW_TILEGX_R18]    = 0x90,
-    [UNW_TILEGX_R19]    = 0x98,
-    [UNW_TILEGX_R20]    = 0xa0,
-    [UNW_TILEGX_R21]    = 0xa8,
-    [UNW_TILEGX_R22]    = 0xb0,
-    [UNW_TILEGX_R23]    = 0xb8,
-    [UNW_TILEGX_R24]    = 0xc0,
-    [UNW_TILEGX_R25]    = 0xc8,
-    [UNW_TILEGX_R26]    = 0xd0,
-    [UNW_TILEGX_R27]    = 0xd8,
-    [UNW_TILEGX_R28]    = 0xe0,
-    [UNW_TILEGX_R29]    = 0xe8,
-    [UNW_TILEGX_R30]    = 0xf0,
-    [UNW_TILEGX_R31]    = 0xf8,
-    [UNW_TILEGX_R32]    = 0x100,
-    [UNW_TILEGX_R33]    = 0x108,
-    [UNW_TILEGX_R34]    = 0x110,
-    [UNW_TILEGX_R35]    = 0x118,
-    [UNW_TILEGX_R36]    = 0x120,
-    [UNW_TILEGX_R37]    = 0x128,
-    [UNW_TILEGX_R38]    = 0x130,
-    [UNW_TILEGX_R39]    = 0x138,
-    [UNW_TILEGX_R40]    = 0x140,
-    [UNW_TILEGX_R41]    = 0x148,
-    [UNW_TILEGX_R42]    = 0x150,
-    [UNW_TILEGX_R43]    = 0x158,
-    [UNW_TILEGX_R44]    = 0x160,
-    [UNW_TILEGX_R45]    = 0x168,
-    [UNW_TILEGX_R46]    = 0x170,
-    [UNW_TILEGX_R47]    = 0x178,
-    [UNW_TILEGX_R48]    = 0x180,
-    [UNW_TILEGX_R49]    = 0x188,
-    [UNW_TILEGX_R50]    = 0x190,
-    [UNW_TILEGX_R51]    = 0x198,
-    [UNW_TILEGX_R52]    = 0x1a0,
-    [UNW_TILEGX_R53]    = 0x1a8,
-    [UNW_TILEGX_R54]    = 0x1b0,
-    [UNW_TILEGX_R55]    = 0x1b8,
-    [UNW_TILEGX_PC]     = 0x1a0
 #elif defined(UNW_TARGET_S390X)
     [UNW_S390X_R0]      = 0x10,
     [UNW_S390X_R1]      = 0x18,
@@ -666,6 +657,83 @@ const int _UPT_reg_offset[UNW_REG_LAST + 1] =
     [UNW_S390X_F14]     = 0x150,
     [UNW_S390X_F15]     = 0x150,
     [UNW_S390X_IP]      = 0x08
+#elif defined(UNW_TARGET_RISCV)
+
+#if __riscv_xlen == 64
+# define RISCV_REG_OFFSET(x) (8*x)
+#elif __riscv_xlen == 32
+# define RISCV_REG_OFFSET(x) (4*x)
+#else
+# error "Unsupported address size"
+#endif
+    [UNW_RISCV_PC]  = RISCV_REG_OFFSET(0),
+    [UNW_RISCV_X1]  = RISCV_REG_OFFSET(1),
+    [UNW_RISCV_X2]  = RISCV_REG_OFFSET(2),
+    [UNW_RISCV_X3]  = RISCV_REG_OFFSET(3),
+    [UNW_RISCV_X4]  = RISCV_REG_OFFSET(4),
+    [UNW_RISCV_X5]  = RISCV_REG_OFFSET(5),
+    [UNW_RISCV_X6]  = RISCV_REG_OFFSET(6),
+    [UNW_RISCV_X7]  = RISCV_REG_OFFSET(7),
+    [UNW_RISCV_X8]  = RISCV_REG_OFFSET(8),
+    [UNW_RISCV_X9]  = RISCV_REG_OFFSET(9),
+    [UNW_RISCV_X10] = RISCV_REG_OFFSET(10),
+    [UNW_RISCV_X11] = RISCV_REG_OFFSET(11),
+    [UNW_RISCV_X12] = RISCV_REG_OFFSET(12),
+    [UNW_RISCV_X13] = RISCV_REG_OFFSET(13),
+    [UNW_RISCV_X14] = RISCV_REG_OFFSET(14),
+    [UNW_RISCV_X15] = RISCV_REG_OFFSET(15),
+    [UNW_RISCV_X16] = RISCV_REG_OFFSET(16),
+    [UNW_RISCV_X17] = RISCV_REG_OFFSET(17),
+    [UNW_RISCV_X18] = RISCV_REG_OFFSET(18),
+    [UNW_RISCV_X19] = RISCV_REG_OFFSET(19),
+    [UNW_RISCV_X20] = RISCV_REG_OFFSET(20),
+    [UNW_RISCV_X21] = RISCV_REG_OFFSET(21),
+    [UNW_RISCV_X22] = RISCV_REG_OFFSET(22),
+    [UNW_RISCV_X23] = RISCV_REG_OFFSET(23),
+    [UNW_RISCV_X24] = RISCV_REG_OFFSET(24),
+    [UNW_RISCV_X25] = RISCV_REG_OFFSET(25),
+    [UNW_RISCV_X26] = RISCV_REG_OFFSET(26),
+    [UNW_RISCV_X27] = RISCV_REG_OFFSET(27),
+    [UNW_RISCV_X28] = RISCV_REG_OFFSET(28),
+    [UNW_RISCV_X29] = RISCV_REG_OFFSET(29),
+    [UNW_RISCV_X30] = RISCV_REG_OFFSET(30),
+    [UNW_RISCV_X31] = RISCV_REG_OFFSET(31),
+#elif defined(UNW_TARGET_LOONGARCH64)
+# include <asm/reg.h>
+
+    [UNW_LOONGARCH64_R0]  = LOONGARCH_EF_R0,
+    [UNW_LOONGARCH64_R1]  = LOONGARCH_EF_R1,
+    [UNW_LOONGARCH64_R2]  = LOONGARCH_EF_R2,
+    [UNW_LOONGARCH64_R3]  = LOONGARCH_EF_R3,
+    [UNW_LOONGARCH64_R4]  = LOONGARCH_EF_R4,
+    [UNW_LOONGARCH64_R5]  = LOONGARCH_EF_R5,
+    [UNW_LOONGARCH64_R6]  = LOONGARCH_EF_R6,
+    [UNW_LOONGARCH64_R7]  = LOONGARCH_EF_R7,
+    [UNW_LOONGARCH64_R8]  = LOONGARCH_EF_R8,
+    [UNW_LOONGARCH64_R9]  = LOONGARCH_EF_R9,
+    [UNW_LOONGARCH64_R10] = LOONGARCH_EF_R10,
+    [UNW_LOONGARCH64_R11] = LOONGARCH_EF_R11,
+    [UNW_LOONGARCH64_R12] = LOONGARCH_EF_R12,
+    [UNW_LOONGARCH64_R13] = LOONGARCH_EF_R13,
+    [UNW_LOONGARCH64_R14] = LOONGARCH_EF_R14,
+    [UNW_LOONGARCH64_R15] = LOONGARCH_EF_R15,
+    [UNW_LOONGARCH64_R16] = LOONGARCH_EF_R16,
+    [UNW_LOONGARCH64_R17] = LOONGARCH_EF_R17,
+    [UNW_LOONGARCH64_R18] = LOONGARCH_EF_R18,
+    [UNW_LOONGARCH64_R19] = LOONGARCH_EF_R19,
+    [UNW_LOONGARCH64_R20] = LOONGARCH_EF_R20,
+    [UNW_LOONGARCH64_R21] = LOONGARCH_EF_R21,
+    [UNW_LOONGARCH64_R22] = LOONGARCH_EF_R22,
+    [UNW_LOONGARCH64_R23] = LOONGARCH_EF_R23,
+    [UNW_LOONGARCH64_R24] = LOONGARCH_EF_R24,
+    [UNW_LOONGARCH64_R25] = LOONGARCH_EF_R25,
+    [UNW_LOONGARCH64_R26] = LOONGARCH_EF_R26,
+    [UNW_LOONGARCH64_R27] = LOONGARCH_EF_R27,
+    [UNW_LOONGARCH64_R28] = LOONGARCH_EF_R28,
+    [UNW_LOONGARCH64_R29] = LOONGARCH_EF_R29,
+    [UNW_LOONGARCH64_R30] = LOONGARCH_EF_R30,
+    [UNW_LOONGARCH64_R31] = LOONGARCH_EF_R31,
+    [UNW_LOONGARCH64_PC]  = LOONGARCH_EF_CSR_ERA
 #else
 # error Fix me.
 #endif

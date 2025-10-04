@@ -1,0 +1,267 @@
+# Golden test output of GoldenGenExpressionTest/TestExprStr
+ExpressionConcat
+
+    let [
+        l2.0 = getField(s1, "pattern") 
+    ] 
+    in 
+        if (typeMatch(l2.0, 1088) ?: true) 
+        then null 
+        elif isString(l2.0) 
+        then concat("This is", " a ", move(l2.0)) 
+        else fail(7158201, "$concat supports only strings") 
+
+# Golden test output of GoldenGenExpressionTest/TestExprStr
+ExpressionSplit
+
+    let [
+        l4.0 = getField(s1, "str") 
+    ] 
+    in 
+        if (typeMatch(l4.0, 1088) ?: true) 
+        then null 
+        elif !(isString(l4.0)) 
+        then fail(7158202, "$split string expression must be a string") 
+        elif (l4.0 == "") 
+        then [""] 
+        else split(move(l4.0), " ") 
+
+# Golden test output of GoldenGenExpressionTest/TestExprStr
+ExpressionStrcasecmp
+(toUpper(coerceToString("this IS a TEST.")) <=> 
+    let [
+        l7.0 = getField(s1, "str") 
+    ] 
+    in 
+        if (typeMatch(l7.0, 1088) ?: true) 
+        then "" 
+        elif typeMatch(l7.0, 999942) 
+        then toUpper(coerceToString(move(l7.0))) 
+        else fail(7158200, "$toUpper input type is not supported") 
+) 
+# Golden test output of GoldenGenExpressionTest/TestExprStr
+ExpressionSubstrBytes
+
+    let [
+        l9.0 = getField(s1, "str") 
+    ] 
+    in substrBytes(
+        if (typeMatch(l9.0, 1088) ?: true) 
+        then "" 
+        elif (coerceToString(l9.0) ?: true) 
+        then fail(5155608, "$substrBytes: string expression could not be resolved to a string") 
+        else coerceToString(move(l9.0)) 
+   , 10ll, 4ll) 
+
+# Golden test output of GoldenGenExpressionTest/TestExprStr
+ExpressionSubstrCP
+
+    let [
+        l11.0 = getField(s1, "str") 
+    ] 
+    in substrCP(
+        if (typeMatch(l11.0, 1088) ?: true) 
+        then "" 
+        elif (coerceToString(l11.0) ?: true) 
+        then fail(5155708, "$substrCP: string expression could not be resolved to a string") 
+        else coerceToString(move(l11.0)) 
+   , 10, 4) 
+
+# Golden test output of GoldenGenExpressionTest/TestExprStr
+ExpressionStrLenBytes
+
+    let [
+        l13.0 = getField(s1, "str") 
+    ] 
+    in 
+        if (isString(l13.0) ?: false) 
+        then strLenBytes(move(l13.0)) 
+        else fail(5155800, "$strLenBytes requires a string argument") 
+
+# Golden test output of GoldenGenExpressionTest/TestExprStr
+ExpressionStrLenCP
+
+    let [
+        l15.0 = getField(s1, "str") 
+    ] 
+    in 
+        if (isString(l15.0) ?: false) 
+        then strLenCP(move(l15.0)) 
+        else fail(5155900, "$strLenCP requires a string argument") 
+
+# Golden test output of GoldenGenExpressionTest/TestExprStr
+ExpressionToLower
+
+    let [
+        l17.0 = getField(s1, "str") 
+    ] 
+    in 
+        if (typeMatch(l17.0, 1088) ?: true) 
+        then "" 
+        elif typeMatch(l17.0, 999942) 
+        then toLower(coerceToString(move(l17.0))) 
+        else fail(7158200, "$toLower input type is not supported") 
+
+# Golden test output of GoldenGenExpressionTest/TestExprStr
+ExpressionToUpper
+
+    let [
+        l19.0 = getField(s1, "str") 
+    ] 
+    in 
+        if (typeMatch(l19.0, 1088) ?: true) 
+        then "" 
+        elif typeMatch(l19.0, 999942) 
+        then toUpper(coerceToString(move(l19.0))) 
+        else fail(7158200, "$toUpper input type is not supported") 
+
+# Golden test output of GoldenGenExpressionTest/TestExprStr
+ExpressionTrim
+
+    let [
+        l21.0 = getField(s1, "str") 
+    ] 
+    in 
+        if (typeMatch(l21.0, 1088) ?: true) 
+        then null 
+        elif isString(l21.0) 
+        then trim(move(l21.0), ".") 
+        else fail(5156302, "$trim input expression must be a string") 
+
+# Golden test output of GoldenGenExpressionTest/TestExprStr
+ExpressionIndexOfBytes
+
+    let [
+        l23.0 = getField(s1, "str") 
+    ] 
+    in 
+        if (typeMatch(l23.0, 1088) ?: true) 
+        then null 
+        elif isString(l23.0) 
+        then indexOfBytes(move(l23.0), "is", 
+            if (!(isNaN(0ll)) && false) 
+            then fail(7158004, "$indexOfBytes start index must be positive") 
+            else 0ll 
+       ) 
+        else fail(7158007, "$indexOfBytes string must resolve to a string or null") 
+
+# Golden test output of GoldenGenExpressionTest/TestExprStr
+ExpressionIndexOfCP
+
+    let [
+        l25.0 = getField(s1, "str") 
+    ] 
+    in 
+        if (typeMatch(l25.0, 1088) ?: true) 
+        then null 
+        elif isString(l25.0) 
+        then indexOfCP(move(l25.0), "is", 
+            if (!(isNaN(4)) && false) 
+            then fail(7158004, "$indexOfCP start index must be positive") 
+            else 4ll 
+       ) 
+        else fail(7158007, "$indexOfCP string must resolve to a string or null") 
+
+# Golden test output of GoldenGenExpressionTest/TestExprStr
+ExpressionIndexOfCP
+
+    let [
+        l27.0 = getField(s1, "str") 
+    ] 
+    in 
+        if (typeMatch(l27.0, 1088) ?: true) 
+        then null 
+        elif isString(l27.0) 
+        then indexOfCP(move(l27.0), " ", 
+            if (!(isNaN(1)) && false) 
+            then fail(7158004, "$indexOfCP start index must be positive") 
+            else 1ll 
+       , 
+            if (!(isNaN(3)) && false) 
+            then fail(7158006, "$indexOfCP end index must be positive") 
+            else 3ll 
+       ) 
+        else fail(7158007, "$indexOfCP string must resolve to a string or null") 
+
+# Golden test output of GoldenGenExpressionTest/TestExprStr
+ExpressionRegexFind
+
+    let [
+        l30.0 = getField(s1, "str") 
+    ] 
+    in 
+        if (typeMatch(l30.0, 1088) ?: true) 
+        then null 
+        elif isString(l30.0) 
+        then 
+            let [
+                l31.0 = regexFind(PcreRegex(/test/), move(l30.0)) 
+            ] 
+            in 
+                if exists(l31.0) 
+                then makeOwn(move(l31.0)) 
+                else fail(5073403, "$regexFind: error occurred while executing the regular expression") 
+        
+        else fail(5073401, "$regexFind: input must be of type string") 
+
+# Golden test output of GoldenGenExpressionTest/TestExprStr
+ExpressionRegexFindAll
+
+    let [
+        l34.0 = getField(s1, "str") 
+        l34.1 = getField(s1, "pattern") 
+    ] 
+    in 
+        if (typeMatch(l34.0, 1088) ?: true) 
+        then [] 
+        elif isString(l34.0) 
+        then 
+            if isNull(l34.1) 
+            then [] 
+            else 
+                let [
+                    l35.0 = regexFindAll(regexCompile(
+                        if isString(l34.1) 
+                        then 
+                            if hasNullBytes(l34.1) 
+                            then fail(5126602, "$regexFindAll: regex pattern must not have embedded null bytes") 
+                            else l34.1 
+                        
+                        else 
+                            if typeMatch(l34.1, 2048) 
+                            then getRegexPattern(l34.1) 
+                            else fail(5126601, "$regexFindAll: regex pattern must have either string or BSON RegEx type") 
+                   , 
+                        if typeMatch(l34.1, 2048) 
+                        then getRegexFlags(l34.1) 
+                        else "" 
+                   ), move(l34.0)) 
+                ] 
+                in 
+                    if exists(l35.0) 
+                    then makeOwn(move(l35.0)) 
+                    else fail(5073403, "$regexFindAll: error occurred while executing the regular expression") 
+        
+        else fail(5073401, "$regexFindAll: input must be of type string") 
+
+# Golden test output of GoldenGenExpressionTest/TestExprStr
+ExpressionRegexMatch
+
+    let [
+        l38.0 = getField(s1, "str") 
+    ] 
+    in 
+        if (typeMatch(l38.0, 1088) ?: true) 
+        then false 
+        elif isString(l38.0) 
+        then 
+            let [
+                l39.0 = regexMatch(PcreRegex(/test/), move(l38.0)) 
+            ] 
+            in 
+                if exists(l39.0) 
+                then makeOwn(move(l39.0)) 
+                else fail(5073403, "$regexMatch: error occurred while executing the regular expression") 
+        
+        else fail(5073401, "$regexMatch: input must be of type string") 
+

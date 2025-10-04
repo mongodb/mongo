@@ -26,26 +26,48 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/base/initializer.h"
 
-#include <fmt/format.h>
+#include "mongo/base/dependency_graph.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/logv2/log.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/exit_code.h"
+#include "mongo/util/quick_exit.h"
+
 #include <iostream>
+#include <random>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include "mongo/base/dependency_graph.h"
-#include "mongo/base/status.h"
-#include "mongo/logv2/log.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/quick_exit.h"
-#include "mongo/util/str.h"
+#include <fmt/format.h>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 
 namespace mongo {
+
+namespace {
+/**
+ * If certain args are present, we cannot print anything.
+ */
+bool mustRunSilently(const auto& args) {
+    static constexpr std::array q{
+        "--quiet"_sd,
+        "--list"_sd,  // Avoid crosstalk with unit test names
+        "--version"_sd,
+        "--sysInfo"_sd,
+        "--help"_sd,
+        "-h"_sd,
+    };
+    return std::any_of(args.begin(), args.end(), [&](StringData a) {
+        return std::any_of(q.begin(), q.end(), [&](StringData s) { return a.starts_with(s); });
+    });
+}
+}  // namespace
 
 class Initializer::Graph {
 public:
@@ -88,8 +110,8 @@ public:
      * - Throws with `ErrorCodes::BadValue` if the graph is incomplete.
      *   That is, a node named in a dependency edge was never added.
      */
-    std::vector<std::string> topSort() const {
-        return _graph.topSort();
+    std::vector<std::string> topSort(unsigned randomSeed) const {
+        return _graph.topSort(randomSeed);
     }
 
 private:
@@ -108,12 +130,11 @@ void Initializer::_transition(State expected, State next) {
     if (_lifecycleState != expected)
         uasserted(
             ErrorCodes::IllegalOperation,
-            format(
-                FMT_STRING(
-                    "Invalid initializer state transition. Expected {} -> {}, but currently at {}"),
-                expected,
-                next,
-                _lifecycleState));
+            fmt::format(
+                "Invalid initializer state transition. Expected {} -> {}, but currently at {}",
+                fmt::underlying(expected),
+                fmt::underlying(next),
+                fmt::underlying(_lifecycleState)));
     _lifecycleState = next;
 }
 
@@ -139,8 +160,12 @@ void Initializer::executeInitializers(const std::vector<std::string>& args) {
         _transition(State::kNeverInitialized, State::kUninitialized);  // freeze
     _transition(State::kUninitialized, State::kInitializing);
 
-    if (_sortedNodes.empty())
-        _sortedNodes = _graph->topSort();
+    if (_sortedNodes.empty()) {
+        auto seed = extractRandomSeedFromOptions(args);
+        if (!mustRunSilently(args))
+            LOGV2(8991200, "Shuffling initializers", "seed"_attr = seed);
+        _sortedNodes = _graph->topSort(seed);
+    }
 
     InitializerContext context(args);
 
@@ -151,7 +176,7 @@ void Initializer::executeInitializers(const std::vector<std::string>& args) {
             continue;  // Legacy initializer without re-initialization support.
 
         uassert(ErrorCodes::InternalError,
-                format(FMT_STRING("node has no init function: \"{}\""), nodeName),
+                fmt::format("node has no init function: \"{}\"", nodeName),
                 node->initFn);
         node->initFn(&context);
 
@@ -191,6 +216,34 @@ InitializerFunction Initializer::getInitializerFunctionForTesting(const std::str
     return node ? node->initFn : nullptr;
 }
 
+unsigned extractRandomSeedFromOptions(const std::vector<std::string>& args) {
+    const std::string targetArg{"--initializerShuffleSeed"};
+    const auto errMsg = fmt::format("Value must be specified for {}", targetArg);
+
+    for (size_t i = 0; i < args.size(); i++) {
+        StringData arg = args[i];
+        std::string val;
+        if (!arg.starts_with(targetArg))
+            continue;
+        arg.remove_prefix(targetArg.size());
+        if (arg.empty()) {
+            // --initializerShuffleSeed 123456
+            uassert(ErrorCodes::InvalidOptions, errMsg, i + 1 < args.size());
+            val = args[i + 1];
+        } else {
+            // --initializerShuffleSeed=123456
+            uassert(ErrorCodes::InvalidOptions, errMsg, arg.starts_with("="));
+            arg.remove_prefix(1);
+            val = std::string{arg};
+        }
+
+        unsigned seed;
+        uassertStatusOK(NumberParser{}(val, &seed));
+        return seed;
+    }
+
+    return std::random_device{}();
+}
 
 Initializer& getGlobalInitializer() {
     static auto g = new Initializer;
@@ -218,7 +271,7 @@ Status runGlobalDeinitializers() {
 void runGlobalInitializersOrDie(const std::vector<std::string>& argv) {
     if (Status status = runGlobalInitializers(argv); !status.isOK()) {
         std::cerr << "Failed global initialization: " << status << std::endl;
-        quickExit(1);
+        quickExit(ExitCode::fail);
     }
 }
 

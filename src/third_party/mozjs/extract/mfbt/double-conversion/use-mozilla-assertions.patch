@@ -1,0 +1,60 @@
+diff --git a/double-conversion/utils.h b/double-conversion/utils.h
+--- a/double-conversion/utils.h
++++ b/double-conversion/utils.h
+@@ -36,27 +36,29 @@
+ 
+ // For pre-C++11 compatibility
+ #if __cplusplus >= 201103L
+ #define DOUBLE_CONVERSION_NULLPTR nullptr
+ #else
+ #define DOUBLE_CONVERSION_NULLPTR NULL
+ #endif
+ 
+-#include <cassert>
++#include "mozilla/Assertions.h"
++
+ #ifndef DOUBLE_CONVERSION_ASSERT
+ #define DOUBLE_CONVERSION_ASSERT(condition)         \
+-    assert(condition)
++    MOZ_ASSERT(condition)
+ #endif
+ #if defined(DOUBLE_CONVERSION_NON_PREFIXED_MACROS) && !defined(ASSERT)
+ #define ASSERT DOUBLE_CONVERSION_ASSERT
+ #endif
+ 
+ #ifndef DOUBLE_CONVERSION_UNIMPLEMENTED
+-#define DOUBLE_CONVERSION_UNIMPLEMENTED() (abort())
++#define DOUBLE_CONVERSION_UNIMPLEMENTED() \
++    MOZ_CRASH("DOUBLE_CONVERSION_UNIMPLEMENTED")
+ #endif
+ #if defined(DOUBLE_CONVERSION_NON_PREFIXED_MACROS) && !defined(UNIMPLEMENTED)
+ #define UNIMPLEMENTED DOUBLE_CONVERSION_UNIMPLEMENTED
+ #endif
+ 
+ #ifndef DOUBLE_CONVERSION_NO_RETURN
+ #ifdef _MSC_VER
+ #define DOUBLE_CONVERSION_NO_RETURN __declspec(noreturn)
+@@ -66,20 +68,21 @@
+ #endif
+ #if defined(DOUBLE_CONVERSION_NON_PREFIXED_MACROS) && !defined(NO_RETURN)
+ #define NO_RETURN DOUBLE_CONVERSION_NO_RETURN
+ #endif
+ 
+ #ifndef DOUBLE_CONVERSION_UNREACHABLE
+ #ifdef _MSC_VER
+ void DOUBLE_CONVERSION_NO_RETURN abort_noreturn();
+-inline void abort_noreturn() { abort(); }
++inline void abort_noreturn() { MOZ_CRASH("abort_noreturn"); }
+ #define DOUBLE_CONVERSION_UNREACHABLE()   (abort_noreturn())
+ #else
+-#define DOUBLE_CONVERSION_UNREACHABLE()   (abort())
++#define DOUBLE_CONVERSION_UNREACHABLE()   \
++    MOZ_CRASH("DOUBLE_CONVERSION_UNREACHABLE")
+ #endif
+ #endif
+ #if defined(DOUBLE_CONVERSION_NON_PREFIXED_MACROS) && !defined(UNREACHABLE)
+ #define UNREACHABLE DOUBLE_CONVERSION_UNREACHABLE
+ #endif
+ 
+ // Not all compilers support __has_attribute and combining a check for both
+ // ifdef and __has_attribute on the same preprocessor line isn't portable.

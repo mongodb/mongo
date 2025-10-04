@@ -71,12 +71,12 @@
 #define BIG_SIZE (1024 * 10)
 #define BIG_CONTENTS "<Big String Contents>"
 #define MAX_ARGS 20
-#define MAX_OP_RANGE 1000
+#define MAX_OP_RANGE WT_THOUSAND
 #define STDERR_FILE "stderr.txt"
 #define STDOUT_FILE "stdout.txt"
 #define TESTS_PER_CALIBRATION 2
 #define TESTS_WITH_RECALIBRATION 5
-#define VERBOSE_PRINT 10000
+#define VERBOSE_PRINT (10 * WT_THOUSAND)
 
 static int check_results(TEST_OPTS *, uint64_t *);
 static void check_values(WT_CURSOR *, int, int, int, char *);
@@ -111,7 +111,8 @@ check_results(TEST_OPTS *opts, uint64_t *foundp)
 
     testutil_check(create_big_string(&bigref));
     nrecords = opts->nrecords;
-    testutil_check(wiredtiger_open(opts->home, NULL, "create,log=(enabled)", &opts->conn));
+    testutil_check(wiredtiger_open(opts->home, NULL,
+      "create,log=(enabled),statistics=(all),statistics_log=(json,on_close,wait=1)", &opts->conn));
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
 
     testutil_check(session->open_cursor(session, "table:subtest", NULL, NULL, &maincur));
@@ -259,9 +260,9 @@ enable_failures(uint64_t allow_writes, uint64_t allow_reads)
     char value[100];
 
     testutil_check(setenv("WT_FAIL_FS_ENABLE", "1", 1));
-    testutil_check(__wt_snprintf(value, sizeof(value), "%" PRIu64, allow_writes));
+    testutil_snprintf(value, sizeof(value), "%" PRIu64, allow_writes);
     testutil_check(setenv("WT_FAIL_FS_WRITE_ALLOW", value, 1));
-    testutil_check(__wt_snprintf(value, sizeof(value), "%" PRIu64, allow_reads));
+    testutil_snprintf(value, sizeof(value), "%" PRIu64, allow_reads);
     testutil_check(setenv("WT_FAIL_FS_READ_ALLOW", value, 1));
 }
 
@@ -320,10 +321,10 @@ run_check_subtest(
     subtest_args[narg++] = (char *)"-v"; /* subtest is always verbose */
     subtest_args[narg++] = (char *)"-p";
     subtest_args[narg++] = (char *)"-o";
-    testutil_check(__wt_snprintf(sarg, sizeof(sarg), "%" PRIu64, nops));
+    testutil_snprintf(sarg, sizeof(sarg), "%" PRIu64, nops);
     subtest_args[narg++] = sarg; /* number of operations */
     subtest_args[narg++] = (char *)"-n";
-    testutil_check(__wt_snprintf(rarg, sizeof(rarg), "%" PRIu64, opts->nrecords));
+    testutil_snprintf(rarg, sizeof(rarg), "%" PRIu64, opts->nrecords);
     subtest_args[narg++] = rarg; /* number of records */
     subtest_args[narg++] = (char *)"-t";
     subtest_args[narg++] = (char *)(opts->table_type == TABLE_ROW ? "r" : "c");
@@ -331,7 +332,7 @@ run_check_subtest(
     testutil_assert(narg <= MAX_ARGS);
     if (opts->verbose)
         printf("running a separate process with %" PRIu64 " operations until fail...\n", nops);
-    testutil_clean_work_dir(opts->home);
+    testutil_remove(opts->home);
     run_process(opts, debugger != NULL ? debugger : opts->argv0, subtest_args, &estatus);
     if (opts->verbose)
         printf("process exited %d\n", estatus);
@@ -454,13 +455,13 @@ run_process(TEST_OPTS *opts, const char *prog, char *argv[], int *statusp)
             printf("%s ", *arg);
         printf("\n");
     }
-    testutil_checksys((pid = fork()) < 0);
+    testutil_assert_errno((pid = fork()) >= 0);
     if (pid == 0) {
         (void)execv(prog, argv);
         _exit(EXIT_FAILURE);
     }
 
-    testutil_checksys(waitpid(pid, statusp, 0) == -1);
+    testutil_assert_errno(waitpid(pid, statusp, 0) != -1);
 }
 
 /*
@@ -484,7 +485,8 @@ subtest_error_handler(
 static WT_EVENT_HANDLER event_handler = {
   subtest_error_handler, NULL, /* Message handler */
   NULL,                        /* Progress handler */
-  NULL                         /* Close handler */
+  NULL,                        /* Close handler */
+  NULL                         /* General handler */
 };
 
 /*
@@ -507,32 +509,33 @@ subtest_main(int argc, char *argv[], bool close_test)
     /* No core files during fault injection tests. */
     testutil_check(setrlimit(RLIMIT_CORE, &rlim));
     testutil_check(testutil_parse_opts(argc, argv, opts));
-    testutil_make_work_dir(opts->home);
+    testutil_recreate_dir(opts->home);
 
     /* Redirect stderr, stdout. */
-    testutil_check(__wt_snprintf(filename, sizeof(filename), "%s/%s", opts->home, STDERR_FILE));
+    testutil_snprintf(filename, sizeof(filename), "%s/%s", opts->home, STDERR_FILE);
     testutil_assert(freopen(filename, "a", stderr) != NULL);
-    testutil_check(__wt_snprintf(filename, sizeof(filename), "%s/%s", opts->home, STDOUT_FILE));
+    testutil_snprintf(filename, sizeof(filename), "%s/%s", opts->home, STDOUT_FILE);
     testutil_assert(freopen(filename, "a", stdout) != NULL);
 
 #ifndef WT_FAIL_FS_LIB
 #define WT_FAIL_FS_LIB "ext/test/fail_fs/.libs/libwiredtiger_fail_fs.so"
 #endif
     testutil_build_dir(opts, buf, 1024);
-    testutil_check(__wt_snprintf(config, sizeof(config),
+    testutil_snprintf(config, sizeof(config),
       "create,cache_size=250M,log=(enabled),transaction_sync=(enabled,method=none),extensions=(%s/"
-      "%s=(early_load,config={environment=true,verbose=true}))",
-      buf, WT_FAIL_FS_LIB));
+      "%s=(early_load,config={environment=true,verbose=true})),statistics=(all),statistics_log=("
+      "json,on_close,wait=1)",
+      buf, WT_FAIL_FS_LIB);
     testutil_check(wiredtiger_open(opts->home, &event_handler, config, &opts->conn));
 
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
-    testutil_check(__wt_snprintf(tableconf, sizeof(tableconf),
+    testutil_snprintf(tableconf, sizeof(tableconf),
       "key_format=%s,value_format=iiiS,columns=(id,v0,v1,v2,big)",
-      opts->table_type == TABLE_ROW ? "i" : "r"));
+      opts->table_type == TABLE_ROW ? "i" : "r");
     testutil_check(session->create(session, "table:subtest", tableconf));
 
-    testutil_check(__wt_snprintf(tableconf, sizeof(tableconf), "key_format=%s,value_format=i",
-      opts->table_type == TABLE_ROW ? "i" : "r"));
+    testutil_snprintf(tableconf, sizeof(tableconf), "key_format=%s,value_format=i",
+      opts->table_type == TABLE_ROW ? "i" : "r");
     testutil_check(session->create(session, "table:subtest2", tableconf));
 
     testutil_check(session->create(session, "index:subtest:v0", "columns=(v0)"));
@@ -581,7 +584,7 @@ subtest_populate(TEST_OPTS *opts, bool close_test)
     bool failed;
 
     failed = false;
-    __wt_random_init_seed(NULL, &rnd);
+    __wt_random_init(NULL, &rnd);
     CHECK(create_big_string(&bigref), false);
     nrecords = opts->nrecords;
 
@@ -622,7 +625,7 @@ subtest_populate(TEST_OPTS *opts, bool close_test)
             printf("  %" PRIu64 "/%" PRIu64 "\n", (i + 1), nrecords);
         /* Attempt to isolate the failures to checkpointing. */
         if (i == (nrecords / 100)) {
-            enable_failures(opts->nops, 1000000);
+            enable_failures(opts->nops, WT_MILLION);
             /* CHECK should expect failures. */
             CHECK(session->checkpoint(session, NULL), true);
             disable_failures();
@@ -671,7 +674,7 @@ main(int argc, char *argv[])
     argc -= __wt_optind;
     argv += __wt_optind;
     if (opts->nrecords == 0)
-        opts->nrecords = 50000;
+        opts->nrecords = 50 * WT_THOUSAND;
     if (opts->table_type == TABLE_FIX)
         testutil_die(ENOTSUP, "Fixed-length column store not supported");
 
@@ -699,7 +702,7 @@ main(int argc, char *argv[])
     } else
         run_check_subtest(opts, debugger, opts->nops, opts->nrecords, &nresults);
 
-    testutil_clean_work_dir(opts->home);
+    testutil_remove(opts->home);
     testutil_cleanup(opts);
 
     return (0);

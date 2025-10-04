@@ -1,0 +1,185 @@
+config_variables:
+  - &movePrimaryComment continuousConfigShardTransitionMovePrimary
+
+test_kind: js_test
+
+selector:
+  roots:
+    - jstests/aggregation/**/*.js
+    - jstests/libs/random_data_shard_suite_selftest.js
+  exclude_files:
+    - jstests/aggregation/extras/*.js
+    - jstests/aggregation/data/*.js
+    # TODO SERVER-32311: These tests use getAggPlanStage(), which can't handle sharded explain output.
+    - jstests/aggregation/optimization/match_swapping_renamed_fields.js
+    - jstests/aggregation/optimization/use_query_project_and_sort.js
+    - jstests/aggregation/optimization/use_query_projection.js
+    - jstests/aggregation/optimization/use_query_sort.js
+
+    # These tests are written such that, after we check the engine being used and the colocation of
+    # the involved collections, we drop and recreate our collections for each test case. Given that
+    # this suite creates unsplittable collections on random shards and we cannot reliably check the
+    # colocation of collections in these tests, this means that these tests are incompatible with
+    # this suite as written.
+    - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_inlj.js
+    - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_nlj.js
+    - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_hj.js
+
+    # Includes expectations on failpoints being hit on specific shards.
+    - jstests/aggregation/sources/indexStats/verify_index_stats_output.js
+
+    # Runs getMores which can be interrupted by a config transition.
+    - jstests/aggregation/expressions/in.js
+    - jstests/aggregation/sources/densify/densify_sort_opt_comparison.js
+    - jstests/aggregation/sources/sample/sample_optimization.js
+    - jstests/aggregation/expressions/extract_missing_date.js
+    - jstests/aggregation/sources/merge/mode_replace_fail.js
+    - jstests/aggregation/sources/collStats/query_exec_stats.js
+    - jstests/aggregation/sources/out/replace_collection.js
+    - jstests/aggregation/expressions/date_from_parts.js
+    - jstests/aggregation/sources/merge/batch_writes.js
+    - jstests/aggregation/expressions/expression_trigonometric.js
+    - jstests/aggregation/expressions/reverseArray.js
+    - jstests/aggregation/expressions/set.js
+    - jstests/aggregation/expressions/filter.js
+    - jstests/aggregation/expressions/trim.js
+    - jstests/aggregation/sources/merge/mode_merge_fail.js
+    - jstests/aggregation/expressions/regex_limits.js
+    - jstests/aggregation/sources/out/unsharded_out.js
+    - jstests/aggregation/expressions/zip.js
+    - jstests/aggregation/sources/merge/batch_writes.js
+    - jstests/aggregation/expressions/arrayToObject.js
+    - jstests/aggregation/expressions/ifnull.js
+    - jstests/aggregation/sources/facet/facet_memory_consumption.js
+    - jstests/aggregation/expressions/strlen.js
+    - jstests/aggregation/exec/agg_cursor.js
+    - jstests/aggregation/expressions/binarySize.js
+    - jstests/aggregation/expressions/divide.js
+    - jstests/aggregation/sources/merge/mode_fail_insert.js
+    - jstests/aggregation/sources/geonear/geonear.js
+    - jstests/aggregation/expressions/abs.js
+    - jstests/aggregation/expressions/unary_numeric.js
+    - jstests/aggregation/expressions/date_to_string2.js
+    - jstests/aggregation/expressions/map.js
+    - jstests/aggregation/expressions/date_to_parts.js
+    - jstests/aggregation/sources/geonear/requires_geo_index.js
+    - jstests/aggregation/expressions/expression_function.js
+    - jstests/aggregation/expressions/add_error_on_str.js
+    - jstests/aggregation/expressions/merge_objects.js
+    - jstests/aggregation/expressions/add_subtract_dates.js
+    - jstests/aggregation/expressions/multiply.js
+    - jstests/aggregation/sources/merge/mode_replace_insert.js
+    - jstests/aggregation/expressions/regex.js
+    - jstests/aggregation/expressions/objectToArray.js
+    - jstests/aggregation/expressions/concat_arrays2.js
+    - jstests/aggregation/parsing/aggregation_with_uuids.js
+    - jstests/aggregation/sources/collStats/count.js
+    - jstests/aggregation/expressions/size.js
+    - jstests/aggregation/sources/graphLookup/error.js
+    - jstests/aggregation/sources/match/text_search_requires_index.js
+    - jstests/aggregation/sources/lookup/lookup_contains_text.js
+    - jstests/aggregation/expressions/switch_errors.js
+    - jstests/aggregation/exec/spill_to_disk.js
+    - jstests/aggregation/expressions/internal_js_emit.js
+    - jstests/aggregation/sources/unionWith/unionWith.js
+    - jstests/aggregation/sources/merge/on_fields_validation.js
+    - jstests/aggregation/exec/agg_split_large_objs_across_batches.js
+    - jstests/aggregation/expressions/range.js
+    - jstests/aggregation/sources/setWindowFields/concat_arrays.js
+    - jstests/aggregation/accumulators/concat_arrays.js
+    - jstests/aggregation/expressions/substrCP.js
+    - jstests/aggregation/expressions/substrbytes.js
+    - jstests/aggregation/sources/setWindowFields/set_union.js
+    - jstests/aggregation/accumulators/set_union.js
+    - jstests/aggregation/sources/graphLookup/spilling.js
+    - jstests/aggregation/expressions/current_date.js
+
+    # These tests run larger aggregations that can take a long time and can repeatedly get interrupted by config transitions.
+    - jstests/aggregation/exec/query_limits_test.js
+    - jstests/aggregation/accumulators/accumulator_js_size_limits.js
+    - jstests/aggregation/accumulators/min_n_max_n.js
+
+    # This test can partially insert documents before a retry due to shard transitions, resulting in duplicate inserts.
+    - jstests/aggregation/sources/merge/mode_keep_existing_insert.js
+
+    # This test sets an index filter on a particular shard which is only in memory and thus not copied over to a new shard
+    # after a config transition moves the collection.
+    - jstests/aggregation/optimization/group_conversion_to_distinct_scan.js
+
+    # This test expects a stable collection UUID, which isn't true with background moveCollections.
+    - jstests/aggregation/sources/collection_uuid_coll_stats_index_stats.js
+
+  exclude_with_any_tags:
+    - assumes_against_mongod_not_mongos
+    - requires_profiling
+    # The following tags are excluded specifically for this suite.
+    - config_shard_incompatible
+    # Currently this passthrough enables the balancer to allow the config transition to successfully complete.
+    - assumes_balancer_off
+    - assumes_no_track_upon_creation
+    - assumes_stable_shard_list
+    # implicitly_retry_on_migration_in_progress.js alters find/aggregate commands
+    # so that the whole result set is returned through a single batch
+    - assumes_no_implicit_cursor_exhaustion
+    # These tests run many aggregations, and the override slows them down enough to hit the evergreen timeout.
+    - query_intensive_pbt
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          runningWithBalancer: true
+          shardsAddedRemoved: true
+          hasRandomShardsAddedRemoved: true
+          implicitlyTrackUnshardedCollectionOnCreation: true
+      eval: await import("jstests/libs/override_methods/implicitly_retry_on_shard_transition_errors.js");
+  hooks:
+    - class: ContinuousAddRemoveShard
+      transition_configsvr: true
+      add_remove_random_shards: true
+      move_primary_comment: *movePrimaryComment
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+      shell_options:
+        global_vars:
+          TestData:
+            shardsAddedRemoved: true
+            hasRandomShardsAddedRemoved: true
+    - class: ValidateCollections
+    - class: CheckOrphansDeleted
+    - class: CleanEveryN
+      n: 20
+  fixture:
+    class: ShardedClusterFixture
+    config_shard: "any"
+    num_shards: 3
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+        failpoint.createUnshardedCollectionRandomizeDataShard:
+          mode: alwaysOn
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        skipDroppingHashedShardKeyIndex: true
+        reshardingMinimumOperationDurationMillis: 0
+        # Manually set the random migration fail point so we can set a threshold for skipping
+        # moveCollection to prevent "starving" random chunk migrations.
+        failpoint.balancerShouldReturnRandomMigrations:
+          data:
+            skipMoveCollectionThreshold: 0.5
+          mode: alwaysOn
+        balancerMigrationsThrottlingMs: 250
+        failpoint.movePrimaryFailIfNeedToCloneMovableCollections:
+          data:
+            comment: *movePrimaryComment
+          mode: alwaysOn
+        failpoint.createUnshardedCollectionRandomizeDataShard:
+          mode: alwaysOn
+    enable_balancer: true

@@ -2,19 +2,15 @@
 //
 // Cannot implicitly shard accessed collections because a collection can be implictly created and
 // exists when none is expected.
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/merge_helpers.js");  // For dropWithoutImplicitRecreate.
-load("jstests/aggregation/extras/utils.js");          // For assertArrayEq.
-load("jstests/libs/fixture_helpers.js");              // For FixtureHelpers.isMongos.
+import {dropWithoutImplicitRecreate} from "jstests/aggregation/extras/merge_helpers.js";
+import {assertArrayEq, generateCollection} from "jstests/aggregation/extras/utils.js";
 
 const source = db[`${jsTest.name()}_source`];
 source.drop();
 const target = db[`${jsTest.name()}_target`];
 target.drop();
 const mergeStage = {
-    $merge: {into: target.getName(), whenMatched: "merge", whenNotMatched: "fail"}
+    $merge: {into: target.getName(), whenMatched: "merge", whenNotMatched: "fail"},
 };
 const pipeline = [mergeStage];
 
@@ -22,8 +18,19 @@ const pipeline = [mergeStage];
 // the target collection.
 (function testMergeFailsIfMatchingDocumentNotFound() {
     // Single document without a match.
-    assert.commandWorked(source.insert([{_id: 1, a: 1}, {_id: 2, a: 2}, {_id: 3, a: 3}]));
-    assert.commandWorked(target.insert([{_id: 1, b: 1}, {_id: 3, b: 3}]));
+    assert.commandWorked(
+        source.insert([
+            {_id: 1, a: 1},
+            {_id: 2, a: 2},
+            {_id: 3, a: 3},
+        ]),
+    );
+    assert.commandWorked(
+        target.insert([
+            {_id: 1, b: 1},
+            {_id: 3, b: 3},
+        ]),
+    );
     let error = assert.throws(() => source.aggregate(pipeline));
     assert.commandFailedWithCode(error, ErrorCodes.MergeStageNoMatchingDocument);
     // Since there is no way to guarantee the ordering of the writes performed by $merge, it
@@ -32,7 +39,7 @@ const pipeline = [mergeStage];
     // target collection contains some combination of its original documents and expected
     // updates. In particular, it should be the case that each document has fields '_id' and
     // 'b', but may or not have field 'a'. All present fields must share the same value as _id.
-    let checkOutputDocument = function(document) {
+    let checkOutputDocument = function (document) {
         const hasB = document.hasOwnProperty("b");
         const hasA = document.hasOwnProperty("a");
         assert(hasB, document);
@@ -66,19 +73,44 @@ const pipeline = [mergeStage];
     assert(source.drop());
     assert(target.drop());
     assert.commandWorked(source.insert({_id: 3, a: 3}));
-    assert.commandWorked(target.insert([{_id: 1, b: 1}, {_id: 3, b: 3}]));
-    assert.doesNotThrow(() => source.aggregate(pipeline));
-    assertArrayEq(
-        {actual: target.find().toArray(), expected: [{_id: 1, b: 1}, {_id: 3, a: 3, b: 3}]});
-
-    // Source has multiple documents with matches in the target.
-    assert(target.drop());
-    assert.commandWorked(source.insert([{_id: 1, a: 1}, {_id: 2, a: 2}]));
-    assert.commandWorked(target.insert([{_id: 1, b: 1}, {_id: 2, b: 2}, {_id: 3, b: 3}]));
+    assert.commandWorked(
+        target.insert([
+            {_id: 1, b: 1},
+            {_id: 3, b: 3},
+        ]),
+    );
     assert.doesNotThrow(() => source.aggregate(pipeline));
     assertArrayEq({
         actual: target.find().toArray(),
-        expected: [{_id: 1, a: 1, b: 1}, {_id: 2, a: 2, b: 2}, {_id: 3, a: 3, b: 3}]
+        expected: [
+            {_id: 1, b: 1},
+            {_id: 3, a: 3, b: 3},
+        ],
+    });
+
+    // Source has multiple documents with matches in the target.
+    assert(target.drop());
+    assert.commandWorked(
+        source.insert([
+            {_id: 1, a: 1},
+            {_id: 2, a: 2},
+        ]),
+    );
+    assert.commandWorked(
+        target.insert([
+            {_id: 1, b: 1},
+            {_id: 2, b: 2},
+            {_id: 3, b: 3},
+        ]),
+    );
+    assert.doesNotThrow(() => source.aggregate(pipeline));
+    assertArrayEq({
+        actual: target.find().toArray(),
+        expected: [
+            {_id: 1, a: 1, b: 1},
+            {_id: 2, a: 2, b: 2},
+            {_id: 3, a: 3, b: 3},
+        ],
     });
 })();
 
@@ -87,19 +119,34 @@ const pipeline = [mergeStage];
 (function testMergeWhenSourceIsEmpty() {
     assert.commandWorked(source.deleteMany({}));
     assert(target.drop());
-    assert.commandWorked(target.insert([{_id: 1, b: 1}, {_id: 2, b: 2}]));
+    assert.commandWorked(
+        target.insert([
+            {_id: 1, b: 1},
+            {_id: 2, b: 2},
+        ]),
+    );
     assert.doesNotThrow(() => source.aggregate(pipeline));
-    assertArrayEq({actual: target.find().toArray(), expected: [{_id: 1, b: 1}, {_id: 2, b: 2}]});
+    assertArrayEq({
+        actual: target.find().toArray(),
+        expected: [
+            {_id: 1, b: 1},
+            {_id: 2, b: 2},
+        ],
+    });
 })();
 
 // Test $merge uses unorderded batch update. When a mismatch is detected in a batch, the error
 // should be returned once the batch is processed and no further documents should be processed
 // and updated.
 (function testMergeUnorderedBatchUpdate() {
-    const maxBatchSize = 16 * 1024 * 1024;  // 16MB
-    const docSize = 1024 * 1024;            // 1MB
+    const maxBatchSize = 16 * 1024 * 1024; // 16MB
+
+    // Each document is just under 1MB in order to allow for some extra space for writes that need
+    // to be serialized over the wire in certain cluster configurations. Otherwise, the number of
+    // modified/unmodified documents would be off by one depending on how our cluster is configured.
+    const docSize = 1024 * 1023;
     const numDocs = 20;
-    const maxDocsInBatch = maxBatchSize / docSize;
+    const maxDocsInBatch = Math.floor(maxBatchSize / docSize);
 
     assert(source.drop());
     dropWithoutImplicitRecreate(target.getName());
@@ -109,8 +156,7 @@ const pipeline = [mergeStage];
     // Copy over documents from the source collection into the target and remove the 'padding'
     // field from the projection, so we can distinguish which documents have been modified by
     // the $merge stage.
-    assert.doesNotThrow(() =>
-                            source.aggregate([{$project: {padding: 0}}, {$out: target.getName()}]));
+    assert.doesNotThrow(() => source.aggregate([{$project: {padding: 0}}, {$out: target.getName()}]));
 
     // Remove one document from the target collection so that $merge fails. This document should
     // be in the first batch of the aggregation pipeline below, which sorts documents by the _id
@@ -134,4 +180,3 @@ const pipeline = [mergeStage];
     assert.eq(numDocsModified, target.find({padding: {$exists: true}}).itcount());
     assert.eq(numDocsUnmodified, target.find({padding: {$exists: false}}).itcount());
 })();
-}());

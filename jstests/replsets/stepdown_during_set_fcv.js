@@ -8,27 +8,25 @@
  *
  */
 
-(function() {
-'use strict';
-
-load("jstests/libs/fail_point_util.js");
-load('jstests/libs/parallel_shell_helpers.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 function runTest(downgradeFCV) {
     const rst = new ReplSetTest({name: jsTestName(), nodes: 2});
     rst.startSet();
-    rst.initiate();
+    rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
     let primary = rst.getPrimary();
 
-    const failpoint = configureFailPoint(primary, 'hangBeforeUpdatingFcvDoc');
+    const failpoint = configureFailPoint(primary, "hangBeforeUpdatingFcvDoc");
 
-    jsTestLog("Issue a setFeatureCompatibilityVersion command that will wait on the " +
-              "hangBeforeUpdatingFcvDoc failpoint");
+    jsTestLog(
+        "Issue a setFeatureCompatibilityVersion command that will wait on the " + "hangBeforeUpdatingFcvDoc failpoint",
+    );
 
     const parallelFn = `
     assert.commandFailedWithCode(
-        db.adminCommand({setFeatureCompatibilityVersion: "${downgradeFCV}"}),
+        db.adminCommand({setFeatureCompatibilityVersion: "${downgradeFCV}", confirm: true}),
         ErrorCodes.InterruptedDueToReplStateChange); `;
 
     const awaitShell = startParallelShell(parallelFn, primary.port);
@@ -37,18 +35,17 @@ function runTest(downgradeFCV) {
 
     jsTestLog("Stepping down the primary");
     assert.commandWorked(primary.adminCommand({replSetStepDown: 10 * 60, force: 1}));
-    rst.waitForState(primary, ReplSetTest.State.SECONDARY);
+    rst.awaitSecondaryNodes(null, [primary]);
     rst.awaitNodesAgreeOnPrimary();
 
     primary = rst.getPrimary();
     const secondary = rst.getSecondaries()[0];
 
     jsTestLog("Issue a setFeatureCompatibilityVersion command on the new primary");
-    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: downgradeFCV}));
+    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}));
     rst.awaitReplication();
 
-    jsTestLog("Unset the failpoint on the former primary so it finishes running " +
-              "setFeatureCompatibilityVersion");
+    jsTestLog("Unset the failpoint on the former primary so it finishes running " + "setFeatureCompatibilityVersion");
     failpoint.off();
     awaitShell();
 
@@ -66,4 +63,3 @@ if (lastLTSFCV !== lastContinuousFCV) {
     jsTestLog("Running test against lastContinuousFCV");
     runTest(lastContinuousFCV);
 }
-})();

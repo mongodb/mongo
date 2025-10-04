@@ -29,7 +29,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 
 #ifndef UNW_REMOTE_ONLY
 
-#if defined(__linux)
+#if defined(__linux__)
 
 # include <sys/syscall.h>
 
@@ -48,12 +48,12 @@ my_rt_sigreturn (void *new_sp, int in_syscall)
   abort ();
 }
 
-#endif /* __linux */
+#endif /* __linux__ */
 
 HIDDEN inline int
 hppa_local_resume (unw_addr_space_t as, unw_cursor_t *cursor, void *arg)
 {
-#if defined(__linux)
+#if defined(__linux__)
   struct cursor *c = (struct cursor *) cursor;
   ucontext_t *uc = c->dwarf.as_arg;
 

@@ -1,0 +1,50 @@
+version: 2.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/devprod-correctness
+  - "/bazel*":
+    approvers:
+      - 10gen/devprod-build
+  - "/compile*":
+    approvers:
+      - 10gen/devprod-build
+  - "/failed_unittests_gather.sh":
+    approvers:
+      - 10gen/devprod-build
+  - "/generate_clang_tidy_report.py":
+    approvers:
+      - 10gen/devprod-build
+  - "/generate_evergreen_bazelrc.sh":
+    approvers:
+      - 10gen/devprod-build
+  - "get_custom_build_promotion_expansions.sh":
+    approvers:
+      - 10gen/devprod-release-infrastructure
+  - "get_custom_build_promotion_expansions_debug.sh":
+    approvers:
+      - 10gen/devprod-release-infrastructure
+  - "upload_custom_build_to_cloud_env.sh":
+    approvers:
+      - 10gen/devprod-release-infrastructure
+  - "/package*":
+    approvers:
+      - 10gen/devprod-build
+  - "validate_compile_commands.py":
+    approvers:
+      - 10gen/devprod-build
+  - "packager_crypt_py_run.sh":
+    approvers:
+      - 10gen/devprod-build
+  - "perf-submission.sh":
+    approvers:
+      - 10gen/devprod-performance-analysis
+  - "streams*":
+    approvers:
+      - 10gen/streams-engine
+  - "generate_sast_report.sh":
+    approvers:
+      - 10gen/devprod-release-infrastructure
+  - "write_sast_report_env_file.sh":
+    approvers:
+      - 10gen/devprod-release-infrastructure

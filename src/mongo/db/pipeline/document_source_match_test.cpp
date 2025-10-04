@@ -27,25 +27,40 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-#include "mongo/platform/basic.h"
+#include "mongo/db/pipeline/document_source_match.h"
 
-#include <string>
-
+#include "mongo/base/status.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_project.h"
+#include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
+#include "mongo/db/query/explain_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+
+#include <cstddef>
+#include <iterator>
+#include <list>
+#include <string>
+#include <vector>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 
 namespace mongo {
 namespace {
@@ -54,7 +69,6 @@ using std::string;
 // This provides access to getExpCtx(), but we'll use a different name for this test suite.
 using DocumentSourceMatchTest = AggregationContextFixture;
 
-constexpr auto kExplain = ExplainOptions::Verbosity::kQueryPlanner;
 
 TEST_F(DocumentSourceMatchTest, RedactSafePortion) {
     auto expCtx = getExpCtx();
@@ -243,7 +257,7 @@ TEST_F(DocumentSourceMatchTest, ShouldNotAddPotentialArrayIndexToDependencies) {
 
 TEST_F(DocumentSourceMatchTest, TextSearchShouldRequireWholeDocumentAndTextScore) {
     auto match = DocumentSourceMatch::create(fromjson("{$text: {$search: 'hello'} }"), getExpCtx());
-    DepsTracker dependencies(DepsTracker::kAllMetadata & ~DepsTracker::kOnlyTextScore);
+    DepsTracker dependencies(DepsTracker::kOnlyTextScore);
     ASSERT_EQUALS(DepsTracker::State::EXHAUSTIVE_FIELDS, match->getDependencies(&dependencies));
     ASSERT_EQUALS(true, dependencies.needWholeDocument);
     ASSERT_EQUALS(true, dependencies.getNeedsMetadata(DocumentMetadataFields::kTextScore));
@@ -278,7 +292,7 @@ TEST_F(DocumentSourceMatchTest,
         "       b: {$_internalSchemaObjectMatch: {"
         "           $or: [{c: {$type: 'string'}}, {c: {$gt: 0}}]"
         "       }}}"
-        "    }}}");
+        "    }}");
     auto match = DocumentSourceMatch::create(query, getExpCtx());
     DepsTracker dependencies;
     ASSERT_EQUALS(DepsTracker::State::SEE_NEXT, match->getDependencies(&dependencies));
@@ -425,7 +439,7 @@ TEST_F(DocumentSourceMatchTest, ShouldAddOuterFieldToDependenciesIfElemMatchCont
 }
 
 TEST_F(DocumentSourceMatchTest, ShouldAddNotClausesFieldAsDependency) {
-    auto match = DocumentSourceMatch::create(fromjson("{b: {$not: {$gte: 4}}}}"), getExpCtx());
+    auto match = DocumentSourceMatch::create(fromjson("{b: {$not: {$gte: 4}}}"), getExpCtx());
     DepsTracker dependencies;
     ASSERT_EQUALS(DepsTracker::State::SEE_NEXT, match->getDependencies(&dependencies));
     ASSERT_EQUALS(1U, dependencies.fields.count("b"));
@@ -471,7 +485,7 @@ TEST_F(DocumentSourceMatchTest, MultipleMatchStagesShouldCombineIntoOne) {
     auto match2 = DocumentSourceMatch::create(BSON("b" << 1), getExpCtx());
     auto match3 = DocumentSourceMatch::create(BSON("c" << 1), getExpCtx());
 
-    Pipeline::SourceContainer container;
+    DocumentSourceContainer container;
 
     // Check initial state
     ASSERT_BSONOBJ_EQ(match1->getQuery(), BSON("a" << 1));
@@ -483,16 +497,16 @@ TEST_F(DocumentSourceMatchTest, MultipleMatchStagesShouldCombineIntoOne) {
     match1->optimizeAt(container.begin(), &container);
 
     ASSERT_EQUALS(container.size(), 1U);
-    ASSERT_BSONOBJ_EQ(match1->getQuery(), fromjson("{'$and': [{a:1}, {b:1}]}"));
+    ASSERT_BSONOBJ_EQ(match1->getQuery(), fromjson("{'$and': [{a: 1}, {b: 1}]}"));
 
     container.push_back(match3);
     match1->optimizeAt(container.begin(), &container);
     ASSERT_EQUALS(container.size(), 1U);
-    ASSERT_BSONOBJ_EQ(match1->getQuery(), fromjson("{'$and': [{a:1}, {b:1}, {c:1}]}"));
+    ASSERT_BSONOBJ_EQ(match1->getQuery(), fromjson("{'$and': [{a: 1}, {b: 1}, {c: 1}]}"));
 }
 
 TEST_F(DocumentSourceMatchTest, DoesNotPushProjectBeforeSelf) {
-    Pipeline::SourceContainer container;
+    DocumentSourceContainer container;
     auto match = DocumentSourceMatch::create(BSON("_id" << 1), getExpCtx());
     auto project =
         DocumentSourceProject::create(BSON("fullDocument" << true), getExpCtx(), "$project"_sd);
@@ -519,25 +533,29 @@ TEST_F(DocumentSourceMatchTest, ShouldPropagatePauses) {
                                            DocumentSource::GetNextResult::makePauseExecution(),
                                            Document{{"a", 1}}},
                                           getExpCtx());
-    match->setSource(mock.get());
 
-    ASSERT_TRUE(match->getNext().isPaused());
-    ASSERT_TRUE(match->getNext().isAdvanced());
-    ASSERT_TRUE(match->getNext().isPaused());
+    auto matchStage = exec::agg::buildStage(match);
+    auto mockStage = exec::agg::buildStage(mock);
+
+    matchStage->setSource(mockStage.get());
+
+    ASSERT_TRUE(matchStage->getNext().isPaused());
+    ASSERT_TRUE(matchStage->getNext().isAdvanced());
+    ASSERT_TRUE(matchStage->getNext().isPaused());
 
     // {a: 2} doesn't match, should go directly to the next pause.
-    ASSERT_TRUE(match->getNext().isPaused());
-    ASSERT_TRUE(match->getNext().isAdvanced());
-    ASSERT_TRUE(match->getNext().isEOF());
-    ASSERT_TRUE(match->getNext().isEOF());
-    ASSERT_TRUE(match->getNext().isEOF());
+    ASSERT_TRUE(matchStage->getNext().isPaused());
+    ASSERT_TRUE(matchStage->getNext().isAdvanced());
+    ASSERT_TRUE(matchStage->getNext().isEOF());
+    ASSERT_TRUE(matchStage->getNext().isEOF());
+    ASSERT_TRUE(matchStage->getNext().isEOF());
 }
 
 TEST_F(DocumentSourceMatchTest, ShouldCorrectlyJoinWithSubsequentMatch) {
     const auto match = DocumentSourceMatch::create(BSON("a" << 1), getExpCtx());
     const auto secondMatch = DocumentSourceMatch::create(BSON("b" << 1), getExpCtx());
 
-    match->joinMatchWith(secondMatch);
+    match->joinMatchWith(secondMatch, MatchExpression::MatchType::AND);
 
     const auto mock = DocumentSourceMock::createForTest({Document{{"a", 1}, {"b", 1}},
                                                          Document{{"a", 2}, {"b", 1}},
@@ -545,22 +563,25 @@ TEST_F(DocumentSourceMatchTest, ShouldCorrectlyJoinWithSubsequentMatch) {
                                                          Document{{"a", 2}, {"b", 2}}},
                                                         getExpCtx());
 
-    match->setSource(mock.get());
+    auto matchStage = exec::agg::buildStage(match);
+    auto mockStage = exec::agg::buildStage(mock);
+
+    matchStage->setSource(mockStage.get());
 
     // The first result should match.
-    auto next = match->getNext();
+    auto next = matchStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     ASSERT_DOCUMENT_EQ(next.releaseDocument(), (Document{{"a", 1}, {"b", 1}}));
 
     // The rest should not match.
-    ASSERT_TRUE(match->getNext().isEOF());
-    ASSERT_TRUE(match->getNext().isEOF());
-    ASSERT_TRUE(match->getNext().isEOF());
+    ASSERT_TRUE(matchStage->getNext().isEOF());
+    ASSERT_TRUE(matchStage->getNext().isEOF());
+    ASSERT_TRUE(matchStage->getNext().isEOF());
 }
 
 TEST_F(DocumentSourceMatchTest, RepeatedJoinWithShouldNotNestAnds) {
     auto match1 = DocumentSourceMatch::create(fromjson("{}"), getExpCtx());
-    Pipeline::SourceContainer container{
+    DocumentSourceContainer container{
         match1,
         DocumentSourceMatch::create(fromjson("{}"), getExpCtx()),
         DocumentSourceMatch::create(fromjson("{a: 1}"), getExpCtx()),
@@ -589,7 +610,7 @@ TEST_F(DocumentSourceMatchTest, RepeatedJoinWithShouldNotNestAnds) {
 
 DEATH_TEST_REGEX_F(DocumentSourceMatchTest,
                    ShouldFailToDescendExpressionOnPathThatIsNotACommonPrefix,
-                   "Invariant failure.*expression::isPathPrefixOf") {
+                   "Tripwire assertion.*Expected 'a' to be a prefix of 'b.c', but it is not.") {
     const auto expCtx = getExpCtx();
     const auto matchSpec = BSON("a.b" << 1 << "b.c" << 1);
     const auto matchExpression =
@@ -597,25 +618,23 @@ DEATH_TEST_REGEX_F(DocumentSourceMatchTest,
     DocumentSourceMatch::descendMatchOnPath(matchExpression.get(), "a", expCtx);
 }
 
-DEATH_TEST_REGEX_F(DocumentSourceMatchTest,
-                   ShouldFailToDescendExpressionOnPathThatContainsElemMatchWithObject,
-                   R"#(Invariant failure.*node->matchType\(\))#") {
+DEATH_TEST_REGEX_F(
+    DocumentSourceMatchTest,
+    ShouldFailToDescendExpressionOnPathThatContainsElemMatchWithObject,
+    "Tripwire assertion.*The given match expression has a node that represents a partial path.") {
     const auto expCtx = getExpCtx();
     const auto matchSpec = BSON("a" << BSON("$elemMatch" << BSON("a.b" << 1)));
     const auto matchExpression =
         unittest::assertGet(MatchExpressionParser::parse(matchSpec, expCtx));
-    BSONObjBuilder out;
-    matchExpression->serialize(&out);
     DocumentSourceMatch::descendMatchOnPath(matchExpression.get(), "a", expCtx);
 }
 
-// Due to the order of traversal of the MatchExpression tree, this test may actually trigger the
-// invariant failure that the path being descended is not a prefix of the path of the
-// MatchExpression node corresponding to the '$gt' expression, which will report an empty path.
-DEATH_TEST_F(DocumentSourceMatchTest,
-             ShouldFailToDescendExpressionOnPathThatContainsElemMatchWithValue,
-             "Invariant failure") {
+DEATH_TEST_REGEX_F(DocumentSourceMatchTest,
+                   ShouldFailToDescendExpressionOnPathThatContainsElemMatchWithValue,
+                   "Tripwire assertion.") {
     const auto expCtx = getExpCtx();
+    // We will either hit the assertion that $elemMatch is not allowed to be descended on or the
+    // assertion that the path of the '$gt' expression (empty path) is not prefixed by 'a'
     const auto matchSpec = BSON("a" << BSON("$elemMatch" << BSON("$gt" << 0)));
     const auto matchExpression =
         unittest::assertGet(MatchExpressionParser::parse(matchSpec, expCtx));
@@ -636,15 +655,19 @@ TEST_F(DocumentSourceMatchTest, ShouldMatchCorrectlyAfterDescendingMatch) {
          Document{{"a", Document{{"b", 1}}}, {"a", Document{{"c", 1}}}, {"d", 1}},
          Document{{"a", Document{{"b", 1}}}, {"a", Document{{"c", 1}}}, {"a", Document{{"d", 1}}}}},
         getExpCtx());
-    descendedMatch->setSource(mock.get());
 
-    auto next = descendedMatch->getNext();
+    auto descendedMatchStage = exec::agg::buildStage(descendedMatch);
+    auto mockStage = exec::agg::buildStage(mock);
+
+    descendedMatchStage->setSource(mockStage.get());
+
+    auto next = descendedMatchStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     ASSERT_DOCUMENT_EQ(next.releaseDocument(), (Document{{"b", 1}, {"c", 1}, {"d", 1}}));
 
-    ASSERT_TRUE(descendedMatch->getNext().isEOF());
-    ASSERT_TRUE(descendedMatch->getNext().isEOF());
-    ASSERT_TRUE(descendedMatch->getNext().isEOF());
+    ASSERT_TRUE(descendedMatchStage->getNext().isEOF());
+    ASSERT_TRUE(descendedMatchStage->getNext().isEOF());
+    ASSERT_TRUE(descendedMatchStage->getNext().isEOF());
 }
 
 TEST_F(DocumentSourceMatchTest, ShouldCorrectlyEvaluateElemMatchPredicate) {
@@ -657,17 +680,20 @@ TEST_F(DocumentSourceMatchTest, ShouldCorrectlyEvaluateElemMatchPredicate) {
         {Document{{"a", matchingVector}}, Document{{"a", nonMatchingVector}}, Document{{"a", 1}}},
         getExpCtx());
 
-    match->setSource(mock.get());
+    auto matchStage = exec::agg::buildStage(match);
+    auto mockStage = exec::agg::buildStage(mock);
+
+    matchStage->setSource(mockStage.get());
 
     // The first result should match.
-    auto next = match->getNext();
+    auto next = matchStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     ASSERT_DOCUMENT_EQ(next.releaseDocument(), (Document{{"a", matchingVector}}));
 
     // The rest should not match.
-    ASSERT_TRUE(match->getNext().isEOF());
-    ASSERT_TRUE(match->getNext().isEOF());
-    ASSERT_TRUE(match->getNext().isEOF());
+    ASSERT_TRUE(matchStage->getNext().isEOF());
+    ASSERT_TRUE(matchStage->getNext().isEOF());
+    ASSERT_TRUE(matchStage->getNext().isEOF());
 }
 
 TEST_F(DocumentSourceMatchTest, ShouldCorrectlyEvaluateJSONSchemaPredicate) {
@@ -675,20 +701,23 @@ TEST_F(DocumentSourceMatchTest, ShouldCorrectlyEvaluateJSONSchemaPredicate) {
         fromjson("{$jsonSchema: {properties: {a: {type: 'number'}}}}"), getExpCtx());
 
     const auto mock = DocumentSourceMock::createForTest(
-        {Document{{"a", 1}}, Document{{"a", "str"_sd}}, Document{{"a", {Document{{nullptr, 1}}}}}},
+        {Document{{"a", 1}}, Document{{"a", "str"_sd}}, Document{{"a", {Document{{{}, 1}}}}}},
         getExpCtx());
 
-    match->setSource(mock.get());
+    auto matchStage = exec::agg::buildStage(match);
+    auto mockStage = exec::agg::buildStage(mock);
+
+    matchStage->setSource(mockStage.get());
 
     // The first result should match.
-    auto next = match->getNext();
+    auto next = matchStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     ASSERT_DOCUMENT_EQ(next.releaseDocument(), (Document{{"a", 1}}));
 
     // The rest should not match.
-    ASSERT_TRUE(match->getNext().isEOF());
-    ASSERT_TRUE(match->getNext().isEOF());
-    ASSERT_TRUE(match->getNext().isEOF());
+    ASSERT_TRUE(matchStage->getNext().isEOF());
+    ASSERT_TRUE(matchStage->getNext().isEOF());
+    ASSERT_TRUE(matchStage->getNext().isEOF());
 }
 
 TEST_F(DocumentSourceMatchTest, ShouldShowOptimizationsInExplainOutputWhenOptimized) {
@@ -699,8 +728,71 @@ TEST_F(DocumentSourceMatchTest, ShouldShowOptimizationsInExplainOutputWhenOptimi
     auto expectedMatch = fromjson("{$match: {a:{$eq: 1}}}");
 
     ASSERT_VALUE_EQ(
-        Value((static_cast<DocumentSourceMatch*>(optimizedMatch.get()))->serialize(kExplain)),
+        Value((static_cast<DocumentSourceMatch*>(optimizedMatch.get()))
+                  ->serialize(SerializationOptions{.verbosity = boost::make_optional(
+                                                       ExplainOptions::Verbosity::kQueryPlanner)})),
         Value(expectedMatch));
+}
+
+TEST_F(DocumentSourceMatchTest, RedactionWithAnd) {
+    auto spec = fromjson(R"({
+        $match: {
+            $and: [
+                {
+                    "a.c": "abc"
+                },
+                {
+                    "b": {
+                        $gt: 10
+                    }
+                }
+            ]
+        }})");
+    auto docSource = DocumentSourceMatch::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$match": {
+                "$and": [
+                    {
+                        "HASH<a>.HASH<c>": {
+                            "$eq": "?string"
+                        }
+                    },
+                    {
+                        "HASH<b>": {
+                            "$gt": "?number"
+                        }
+                    }
+                ]
+            }
+        })",
+        redact(*docSource));
+}
+
+TEST_F(DocumentSourceMatchTest, RedactionWithExprPipeline) {
+    auto spec = fromjson(R"({
+        $match: {
+            $expr: {
+                $eq: [
+                    '$foo',
+                    '$bar'
+                ]
+            }
+        }
+    })");
+    auto docSource = DocumentSourceMatch::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$match": {
+                "$expr": {
+                    "$eq": [
+                        "$HASH<foo>",
+                        "$HASH<bar>"
+                    ]
+                }
+            }
+        })",
+        redact(*docSource));
 }
 
 }  // namespace

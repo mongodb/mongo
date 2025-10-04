@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <utility>
-
 #include "mongo/base/string_data.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_detail.h"
+
+#include <utility>
 
 namespace mongo {
 namespace logv2 {
@@ -46,7 +46,7 @@ inline constexpr const char attrName[4] = {'_', digit<(N / 10) % 10>, digit<N % 
 
 template <std::size_t... Is, typename... Args>
 auto argAttrs_(std::index_sequence<Is...>, const Args&... args) {
-    return makeAttributeStorage((AttrUdl{attrName<Is>} = args)...);
+    return AttributeStorage((AttrUdl{attrName<Is>} = args)...);
 }
 
 template <typename... Args>

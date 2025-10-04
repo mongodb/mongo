@@ -35,7 +35,7 @@
 #
 
 import json
-import wiredtiger, wttest
+import wttest
 from wtscenario import make_scenarios
 
 # Test configuration strings.
@@ -46,8 +46,6 @@ class test_base02(wttest.WiredTigerTestCase):
     scenarios = make_scenarios([
         ('file', dict(uri='file:')),
         ('table', dict(uri='table:')),
-        ('lsm', dict(uri='lsm:')),
-        ('table-lsm', dict(uri='table:', extra_config=',type=lsm')),
     ])
 
     def create_and_drop(self, confstr):
@@ -64,9 +62,9 @@ class test_base02(wttest.WiredTigerTestCase):
         conf_confsize = [
             None,
             'allocation_size=1024',
-            'internal_page_max=64k,internal_item_max=1k',
-            'leaf_page_max=128k,leaf_item_max=512',
-            'leaf_page_max=256k,leaf_item_max=256,internal_page_max=8k,internal_item_max=128',
+            'internal_page_max=64k',
+            'leaf_page_max=128k,leaf_key_max=512,leaf_value_max=512',
+            'leaf_page_max=256k,leaf_key_max=256,leaf_value_max=256,internal_page_max=8k',
             ]
         conf_col = [
             'columns=(first,second)',
@@ -75,16 +73,11 @@ class test_base02(wttest.WiredTigerTestCase):
             ',,columns=(first=S,second="4u"),,',
             'columns=(/path/key,   /other/path/value,,,)',
             ]
-        conf_encoding = [
-            None,
-            'huffman_value=english',
-            ]
         for size in conf_confsize:
             for col in conf_col:
-                for enc in conf_encoding:
-                    conflist = [size, col, enc]
-                    confstr = ",".join([c for c in conflist if c != None])
-                    self.create_and_drop(confstr)
+                conflist = [size, col]
+                confstr = ",".join([c for c in conflist if c != None])
+                self.create_and_drop(confstr)
 
     def test_config_json(self):
         """
@@ -100,6 +93,3 @@ class test_base02(wttest.WiredTigerTestCase):
                     })]
         for confstr in conf_jsonstr:
             self.create_and_drop(confstr)
-
-if __name__ == '__main__':
-    wttest.run()

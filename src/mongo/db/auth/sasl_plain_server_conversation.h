@@ -29,8 +29,22 @@
 
 #pragma once
 
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/crypto/sha1_block.h"
+#include "mongo/crypto/sha256_block.h"
 #include "mongo/db/auth/sasl_mechanism_policies.h"
 #include "mongo/db/auth/sasl_mechanism_registry.h"
+#include "mongo/db/auth/user.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+
+#include <string>
+#include <tuple>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -38,6 +52,14 @@ class SASLPlainServerMechanism : public MakeServerMechanism<PLAINPolicy> {
 public:
     explicit SASLPlainServerMechanism(std::string authenticationDatabase)
         : MakeServerMechanism<PLAINPolicy>(std::move(authenticationDatabase)) {}
+
+    boost::optional<unsigned int> currentStep() const override {
+        return (unsigned int)1;
+    }
+
+    boost::optional<unsigned int> totalSteps() const override {
+        return (unsigned int)1;
+    }
 
 private:
     StatusWith<std::tuple<bool, std::string>> stepImpl(OperationContext* opCtx,

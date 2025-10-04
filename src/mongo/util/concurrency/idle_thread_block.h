@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <boost/preprocessor/stringize.hpp>
-
-
 namespace mongo {
 
 /**
@@ -43,9 +40,6 @@ namespace mongo {
  * idle.
  */
 class IdleThreadBlock {
-    IdleThreadBlock(const IdleThreadBlock&) = delete;
-    IdleThreadBlock& operator=(const IdleThreadBlock&) = delete;
-
 public:
     IdleThreadBlock(const char* location) {
         beginIdleThreadBlock(location);
@@ -53,6 +47,8 @@ public:
     ~IdleThreadBlock() {
         endIdleThreadBlock();
     }
+    IdleThreadBlock(const IdleThreadBlock&) = delete;
+    IdleThreadBlock& operator=(const IdleThreadBlock&) = delete;
 
     // These should not be called by mongo C++ code. They are only public to allow exposing this
     // functionality to a C api.
@@ -60,9 +56,14 @@ public:
     static void endIdleThreadBlock();
 };
 
+#define MONGO_IDLE_THREAD_BLOCK_STR1_(x) #x
+#define MONGO_IDLE_THREAD_BLOCK_STR_(x) MONGO_IDLE_THREAD_BLOCK_STR1_(x)
+
 /**
  * Marks a thread idle for the rest of the current scope and passes file:line as the location.
  */
-#define MONGO_IDLE_THREAD_BLOCK IdleThreadBlock markIdle(__FILE__ ":" BOOST_PP_STRINGIZE(__LINE__))
+#define MONGO_IDLE_THREAD_BLOCK \
+    IdleThreadBlock markIdle(__FILE__ ":" MONGO_IDLE_THREAD_BLOCK_STR_(__LINE__))
+
 
 }  // namespace mongo

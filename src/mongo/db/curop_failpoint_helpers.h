@@ -27,11 +27,21 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+#include <functional>
+#include <string>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+namespace MONGO_MOD_PUB mongo {
 
 class CurOpFailpointHelpers {
 public:
@@ -62,6 +72,6 @@ public:
                                           OperationContext* opCtx,
                                           const std::string& failpointMsg,
                                           const std::function<void()>& whileWaiting = nullptr,
-                                          boost::optional<NamespaceString> nss = boost::none);
+                                          const NamespaceString& nss = {});
 };
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

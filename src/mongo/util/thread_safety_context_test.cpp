@@ -26,13 +26,19 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include <vector>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/util/thread_safety_context.h"
 
+#include "mongo/base/string_data.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/thread_safety_context.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
+
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace mongo {
 
@@ -106,9 +112,9 @@ TEST_F(ThreadSafetyContextTest, CreateThreadsAfterSafetyContext) {
 
 TEST_F(ThreadSafetyContextTest, SingleThreadedContext) {
     ASSERT(ThreadSafetyContext::getThreadSafetyContext()->isSingleThreaded());
-    stdx::thread(
-        []() { ASSERT(!ThreadSafetyContext::getThreadSafetyContext()->isSingleThreaded()); })
-        .join();
+    stdx::thread([]() {
+        ASSERT(!ThreadSafetyContext::getThreadSafetyContext()->isSingleThreaded());
+    }).join();
     ASSERT(!ThreadSafetyContext::getThreadSafetyContext()->isSingleThreaded());
 }
 

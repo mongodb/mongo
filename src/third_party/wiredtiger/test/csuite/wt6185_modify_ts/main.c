@@ -34,6 +34,7 @@ extern char *__wt_optarg;
 #define KEYNO 50
 #define MAX_MODIFY_ENTRIES 5
 #define MAX_OPS 25
+#define MAX_STR 8 * 1024
 #define RUNS 250
 #define VALUE_SIZE 80
 
@@ -50,7 +51,7 @@ static u_int tnext;
 
 static uint64_t ts; /* Current timestamp. */
 
-static char keystr[100], modify_repl[256], tmp[4 * 1024];
+static char keystr[100], modify_repl[256], tmp[MAX_STR];
 static uint64_t keyrecno;
 
 static bool use_columns = false;
@@ -59,20 +60,21 @@ static bool use_columns = false;
  * trace --
  *     Trace an operation.
  */
-#define trace(fmt, ...)                                                    \
-    do {                                                                   \
-        testutil_assert(tnext < WT_ELEMENTS(tlist));                       \
-        testutil_check(__wt_snprintf(tmp, sizeof(tmp), fmt, __VA_ARGS__)); \
-        free(tlist[tnext]);                                                \
-        tlist[tnext] = dstrdup(tmp);                                       \
-        ++tnext;                                                           \
+#define trace(fmt, ...)                                        \
+    do {                                                       \
+        testutil_assert(tnext < WT_ELEMENTS(tlist));           \
+        testutil_snprintf(tmp, sizeof(tmp), fmt, __VA_ARGS__); \
+        free(tlist[tnext]);                                    \
+        tlist[tnext] = dstrdup(tmp);                           \
+        ++tnext;                                               \
     } while (0)
+
+static void usage(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 
 /*
  * usage --
  *     Print usage message and exit.
  */
-static void usage(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static void
 usage(void)
 {
@@ -129,7 +131,7 @@ change_key(u_int n)
     if (use_columns)
         keyrecno = n + 1;
     else
-        testutil_check(__wt_snprintf(keystr, sizeof(keystr), "%010u.key", n));
+        testutil_snprintf(keystr, sizeof(keystr), "%010u.key", n);
 }
 
 /*
@@ -202,7 +204,7 @@ modify(WT_SESSION *session, WT_CURSOR *c)
 
     /* Set a read timestamp 90% of the time. */
     if (mmrand(1, 10) != 1) {
-        testutil_check(__wt_snprintf(tmp, sizeof(tmp), "read_timestamp=%" PRIx64, ts));
+        testutil_snprintf(tmp, sizeof(tmp), "read_timestamp=%" PRIx64, ts);
         testutil_check(session->timestamp_transaction(session, tmp));
     }
 
@@ -223,9 +225,17 @@ modify(WT_SESSION *session, WT_CURSOR *c)
         list[lnext].v = dstrdup(v);
 
         trace("modify read-ts=%" PRIu64 ", commit-ts=%" PRIu64, ts, ts + 1);
+        /*
+         * NOTE: the modify algorithm generally keeps the string length stable since there is an
+         * equal chance of increasing or decreasing the length. But if the RNG hits an unlucky
+         * streak that biases in favor of increasing the length then it may eventually exceed the
+         * maximum size of the trace buffer. This is exceedingly rare but possible so assert before
+         * calling the trace function where it can be a problem.
+         */
+        testutil_assert(strlen(v) < MAX_STR - strlen("returned {}"));
         trace("returned {%s}", v);
 
-        testutil_check(__wt_snprintf(tmp, sizeof(tmp), "commit_timestamp=%" PRIx64, ts + 1));
+        testutil_snprintf(tmp, sizeof(tmp), "commit_timestamp=%" PRIx64, ts + 1);
         testutil_check(session->timestamp_transaction(session, tmp));
         testutil_check(session->commit_transaction(session, NULL));
 
@@ -249,7 +259,7 @@ repeat(WT_SESSION *session, WT_CURSOR *c)
 
     for (i = 0; i < lnext; ++i) {
         testutil_check(session->begin_transaction(session, "isolation=snapshot"));
-        testutil_check(__wt_snprintf(tmp, sizeof(tmp), "read_timestamp=%" PRIx64, list[i].ts));
+        testutil_snprintf(tmp, sizeof(tmp), "read_timestamp=%" PRIx64, list[i].ts);
         testutil_check(session->timestamp_transaction(session, tmp));
 
         set_key(c);
@@ -267,7 +277,7 @@ repeat(WT_SESSION *session, WT_CURSOR *c)
 }
 
 /*
- * reset --
+ * evict --
  *     Force eviction of the underlying page.
  */
 static void
@@ -296,17 +306,21 @@ trace_die(void)
         fprintf(stderr, "%s\n", tlist[i]);
 }
 
-#define SET_VALUE(key, value)                                                           \
-    do {                                                                                \
-        char *__p;                                                                      \
-        memset(value, '.', sizeof(value));                                              \
-        value[sizeof(value) - 1] = '\0';                                                \
-        testutil_check(__wt_snprintf(value, sizeof(value), "%010u.value", (u_int)key)); \
-        for (__p = value; *__p != '\0'; ++__p)                                          \
-            ;                                                                           \
-        *__p = '.';                                                                     \
+#define SET_VALUE(key, value)                                               \
+    do {                                                                    \
+        char *__p;                                                          \
+        memset(value, '.', sizeof(value));                                  \
+        value[sizeof(value) - 1] = '\0';                                    \
+        testutil_snprintf(value, sizeof(value), "%010u.value", (u_int)key); \
+        for (__p = value; *__p != '\0'; ++__p)                              \
+            ;                                                               \
+        *__p = '.';                                                         \
     } while (0)
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {
@@ -317,15 +331,15 @@ main(int argc, char *argv[])
     int ch;
     char path[1024], table_config[128], value[VALUE_SIZE];
     const char *home, *v;
-    bool no_checkpoint, no_eviction;
+    bool no_checkpoint, no_eviction, preserve;
 
     (void)testutil_set_progname(argv);
     custom_die = trace_die;
 
-    __wt_random_init_seed(NULL, &rnd);
+    __wt_random_init(NULL, &rnd);
     modify_repl_init();
 
-    no_checkpoint = no_eviction = false;
+    no_checkpoint = no_eviction = preserve = false;
     home = "WT_TEST.wt6185_modify_ts";
     while ((ch = __wt_getopt(progname, argc, argv, "Cceh:S:")) != EOF)
         switch (ch) {
@@ -342,6 +356,9 @@ main(int argc, char *argv[])
         case 'h':
             home = __wt_optarg;
             break;
+        case 'p':
+            preserve = true;
+            break;
         case 'S':
             rnd.v = strtoul(__wt_optarg, NULL, 10);
             break;
@@ -353,13 +370,14 @@ main(int argc, char *argv[])
         usage();
 
     testutil_work_dir_from_path(path, sizeof(path), home);
-    testutil_make_work_dir(path);
+    testutil_recreate_dir(path);
 
-    testutil_check(__wt_snprintf(
-      table_config, sizeof(table_config), "key_format=%s,value_format=S", use_columns ? "r" : "S"));
+    testutil_snprintf(
+      table_config, sizeof(table_config), "key_format=%s,value_format=S", use_columns ? "r" : "S");
 
     /* Load 100 records. */
-    testutil_check(wiredtiger_open(path, NULL, "create", &conn));
+    testutil_check(wiredtiger_open(
+      path, NULL, "create,statistics=(all),statistics_log=(json,on_close,wait=1)", &conn));
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
     testutil_check(session->create(session, "file:xxx", table_config));
     testutil_check(session->open_cursor(session, "file:xxx", NULL, NULL, &c));
@@ -373,7 +391,8 @@ main(int argc, char *argv[])
 
     /* Flush, reopen and verify a record. */
     testutil_check(conn->close(conn, NULL));
-    testutil_check(wiredtiger_open(path, NULL, NULL, &conn));
+    testutil_check(
+      wiredtiger_open(path, NULL, "statistics=(all),statistics_log=(json,on_close,wait=1)", &conn));
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
     testutil_check(session->create(session, "file:xxx", NULL));
     testutil_check(session->open_cursor(session, "file:xxx", NULL, NULL, &c));
@@ -415,5 +434,8 @@ main(int argc, char *argv[])
     testutil_check(conn->close(conn, NULL));
 
     cleanup();
+
+    if (!preserve)
+        testutil_remove(home);
     return (EXIT_SUCCESS);
 }

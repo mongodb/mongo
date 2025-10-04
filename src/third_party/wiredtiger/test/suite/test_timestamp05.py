@@ -30,14 +30,12 @@
 #   Timestamps: make sure they don't end up in metadata
 #
 
-import random
 from suite_subprocess import suite_subprocess
-import wiredtiger, wttest
+import wttest
 from wtscenario import make_scenarios
 
 class test_timestamp05(wttest.WiredTigerTestCase, suite_subprocess):
     uri = 'table:ts05'
-    session_config = 'isolation=snapshot'
 
     format_values = [
         ('integer-row', dict(key_format='i', value_format='S')),
@@ -67,6 +65,8 @@ class test_timestamp05(wttest.WiredTigerTestCase, suite_subprocess):
         # Checkpoint at 50
         s.checkpoint('use_timestamp=true')
 
+    # FIXME-WT-14563
+    @wttest.skip_for_hook("disagg", "bulk load is not currently supported for layered cursors")
     def test_bulk(self):
         s = self.session
         conn = self.conn
@@ -96,6 +96,3 @@ class test_timestamp05(wttest.WiredTigerTestCase, suite_subprocess):
 
         # Checkpoint at 50
         s.checkpoint('use_timestamp=true')
-
-if __name__ == '__main__':
-    wttest.run()

@@ -29,8 +29,35 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_match.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/stage_constraints.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/db/read_concern_support_result.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
+
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -41,7 +68,8 @@ public:
     class LiteParsed final : public LiteParsedDocumentSource {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
-                                                 const BSONElement& spec) {
+                                                 const BSONElement& spec,
+                                                 const LiteParserOptions& options) {
             return std::make_unique<LiteParsed>(spec.fieldName(), nss);
         }
 
@@ -62,17 +90,12 @@ public:
             return true;
         }
 
-        bool allowedToPassthroughFromMongos() const override {
-            // $planCacheStats must be run locally on a mongod.
-            return false;
-        }
-
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
-                                                     bool isImplicitDefault) const {
+                                                     bool isImplicitDefault) const override {
             return onlyReadConcernLocalSupported(kStageName, level, isImplicitDefault);
         }
 
-        void assertSupportsMultiDocumentTransaction() const {
+        void assertSupportsMultiDocumentTransaction() const override {
             transactionNotSupported(DocumentSourcePlanCacheStats::kStageName);
         }
 
@@ -83,20 +106,20 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-    virtual ~DocumentSourcePlanCacheStats() = default;
+    ~DocumentSourcePlanCacheStats() override = default;
 
-    StageConstraints constraints(
-        Pipeline::SplitState = Pipeline::SplitState::kUnsplit) const override {
+    StageConstraints constraints(PipelineSplitState = PipelineSplitState::kUnsplit) const override {
         StageConstraints constraints{StreamType::kStreaming,
                                      PositionRequirement::kFirst,
-                                     HostTypeRequirement::kAnyShard,
+                                     _allHosts ? HostTypeRequirement::kAllShardHosts
+                                               : HostTypeRequirement::kAnyShard,
                                      DiskUseRequirement::kNoDiskUse,
                                      FacetRequirement::kNotAllowed,
                                      TransactionRequirement::kNotAllowed,
                                      LookupRequirement::kAllowed,
                                      UnionRequirement::kAllowed};
 
-        constraints.requiresInputDocSource = false;
+        constraints.setConstraintsForNoInputSources();
         return constraints;
     }
 
@@ -105,47 +128,41 @@ public:
     }
 
     const char* getSourceName() const override {
-        return DocumentSourcePlanCacheStats::kStageName.rawData();
+        return DocumentSourcePlanCacheStats::kStageName.data();
+    }
+
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
     }
 
     /**
      * Absorbs a subsequent $match, in order to avoid copying the entire contents of the plan cache
      * prior to filtering.
      */
-    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                     Pipeline::SourceContainer* container) override;
+    DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
+                                                   DocumentSourceContainer* container) override;
 
-    void serializeToArray(
-        std::vector<Value>& array,
-        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const override;
+    void serializeToArray(std::vector<Value>& array,
+                          const SerializationOptions& opts = SerializationOptions{}) const final;
+
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
 private:
-    DocumentSourcePlanCacheStats(const boost::intrusive_ptr<ExpressionContext>& expCtx);
+    friend boost::intrusive_ptr<exec::agg::Stage> documentSourcePlanCacheStatsToStageFn(
+        const boost::intrusive_ptr<DocumentSource>&);
 
-    GetNextResult doGetNext() final;
+    DocumentSourcePlanCacheStats(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                 bool allHosts);
 
-    Value serialize(
-        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const override {
-        MONGO_UNREACHABLE;  // Should call serializeToArray instead.
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final {
+        MONGO_UNREACHABLE_TASSERT(7484303);  // Should call serializeToArray instead.
     }
 
-    // If running through mongos in a sharded cluster, stores the shard name so that it can be
-    // appended to each plan cache entry document.
-    std::string _shardName;
-
-    // If running through mongos in a sharded cluster, stores the "host:port" string so that it can
-    // be appended to each plan cache entry document.
-    std::string _hostAndPort;
-
-    // The result set for this change is produced through the mongo process interface on the first
-    // call to getNext(), and then held by this data member.
-    std::vector<BSONObj> _results;
-
-    // Whether '_results' has been populated yet.
-    bool _haveRetrievedStats = false;
-
-    // Used to spool out '_results' as calls to getNext() are made.
-    std::vector<BSONObj>::iterator _resultsIter;
+    // If true, requests plan cache stats from all data-bearing nodes, primary and secondary.
+    // Otherwise, follows read preference.
+    const bool _allHosts;
 
     // $planCacheStats can push a match down into the plan cache layer, in order to avoid copying
     // the entire contents of the cache.

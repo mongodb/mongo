@@ -27,18 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/start_chunk_clone_request.h"
 
-#include "mongo/base/status_with.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/service_context.h"
-#include "mongo/s/shard_id.h"
+#include "mongo/db/session/logical_session_id_helpers.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
+#include <string>
+
+#include <fmt/format.h>
 
 namespace mongo {
 
@@ -48,7 +52,7 @@ namespace {
 
 TEST(StartChunkCloneRequest, CreateAsCommandComplete) {
     auto serviceContext = ServiceContext::make();
-    auto client = serviceContext->makeClient("TestClient");
+    auto client = serviceContext->getService()->makeClient("TestClient");
     auto opCtx = client->makeOperationContext();
 
     MigrationSessionId sessionId = MigrationSessionId::generate("shard0001", "shard0002");
@@ -59,7 +63,7 @@ TEST(StartChunkCloneRequest, CreateAsCommandComplete) {
     BSONObjBuilder builder;
     StartChunkCloneRequest::appendAsCommand(
         &builder,
-        NamespaceString("TestDB.TestColl"),
+        NamespaceString::createNamespaceString_forTest("TestDB.TestColl"),
         migrationId,
         lsid,
         txnNumber,
@@ -75,9 +79,10 @@ TEST(StartChunkCloneRequest, CreateAsCommandComplete) {
     BSONObj cmdObj = builder.obj();
 
     auto request = assertGet(StartChunkCloneRequest::createFromCommand(
-        NamespaceString(cmdObj["_recvChunkStart"].String()), cmdObj));
+        NamespaceString::createNamespaceString_forTest(cmdObj["_recvChunkStart"].String()),
+        cmdObj));
 
-    ASSERT_EQ("TestDB.TestColl", request.getNss().ns());
+    ASSERT_EQ("TestDB.TestColl", request.getNss().ns_forTest());
     ASSERT_EQ(sessionId.toString(), request.getSessionId().toString());
     ASSERT_EQ(migrationId, request.getMigrationId());
     ASSERT_EQ(lsid, request.getLsid());

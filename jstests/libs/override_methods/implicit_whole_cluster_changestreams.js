@@ -9,45 +9,47 @@
 
 // For the whole_cluster passthrough, we simply override the necessary methods in the whole_db
 // passthrough's ChangeStreamPassthroughHelpers.
-load("jstests/libs/override_methods/implicit_whole_db_changestreams.js");
+import "jstests/libs/override_methods/implicit_whole_db_changestreams.js";
+
+import {ChangeStreamWatchMode} from "jstests/libs/query/change_stream_util.js";
 
 // Any valid single-collection or single-database request is upconvertable to cluster-wide.
-ChangeStreamPassthroughHelpers.isUpconvertableChangeStreamRequest =
-    ChangeStreamPassthroughHelpers.isValidChangeStreamRequest;
+globalThis.ChangeStreamPassthroughHelpers.isUpconvertableChangeStreamRequest =
+    globalThis.ChangeStreamPassthroughHelpers.isValidChangeStreamRequest;
 
-ChangeStreamPassthroughHelpers.nsMatchFilter = function(db, collName) {
+globalThis.ChangeStreamPassthroughHelpers.nsMatchFilter = function (db, collName) {
     // The $match filter we inject into the pipeline will depend on whether this is a
     // single-collection or whole-db stream.
-    const isSingleCollectionStream = (typeof collName === 'string');
+    const isSingleCollectionStream = typeof collName === "string";
 
-    return {
-        $match: {
-            $or: [
-                {
-                    "ns.db": db.getName(),
-                    "ns.coll": (isSingleCollectionStream ? collName : {$exists: true})
-                },
-                // Add a clause to detect if the collection being watched is the target of a
-                // renameCollection command, since that is expected to return a "rename" entry.
-                {
-                    "to.db": db.getName(),
-                    "to.coll": (isSingleCollectionStream ? collName : {$exists: true})
-                },
-                {operationType: "invalidate"}
-            ]
-        }
-    };
+    const orBranches = [
+        {"ns.db": db.getName(), "ns.coll": isSingleCollectionStream ? collName : {$exists: true}},
+        // Add a clause to detect if the collection being watched is the target of a
+        // renameCollection command, since that is expected to return a "rename" entry.
+        {"to.db": db.getName(), "to.coll": isSingleCollectionStream ? collName : {$exists: true}},
+        {operationType: "endOfTransaction"},
+        {operationType: "invalidate"},
+    ];
+
+    if (!isSingleCollectionStream) {
+        orBranches.push({
+            operationType: "dropDatabase",
+            "ns.db": db.getName(),
+        });
+    }
+
+    return {$match: {$or: orBranches}};
 };
 
-ChangeStreamPassthroughHelpers.execDBName = function(db) {
+globalThis.ChangeStreamPassthroughHelpers.execDBName = function () {
     return "admin";
 };
 
-ChangeStreamPassthroughHelpers.changeStreamSpec = function() {
+globalThis.ChangeStreamPassthroughHelpers.changeStreamSpec = function () {
     return {allChangesForCluster: true};
 };
 
-ChangeStreamPassthroughHelpers.passthroughType = function() {
+globalThis.ChangeStreamPassthroughHelpers.passthroughType = function () {
     return ChangeStreamWatchMode.kCluster;
 };
 
@@ -58,12 +60,12 @@ ChangeStreamPassthroughHelpers.passthroughType = function() {
 // we need to override the helper to ensure that the Mongo.watch function itself is exercised by the
 // passthrough wherever Collection.watch or DB.watch is called.
 const originalDbWatchImpl = DB.prototype.watch;
-DB.prototype.watch = function(pipeline, options) {
+DB.prototype.watch = function (pipeline, options) {
     // If the database being watched is 'admin', don't attempt to upconvert.
     if (this.getName() === "admin") {
         return originalDbWatchImpl.apply(this, [pipeline, options]);
     }
     pipeline = Object.assign([], pipeline);
-    pipeline.unshift(ChangeStreamPassthroughHelpers.nsMatchFilter(this, 1));
+    pipeline.unshift(globalThis.ChangeStreamPassthroughHelpers.nsMatchFilter(this, 1));
     return this.getMongo().watch(pipeline, options);
 };

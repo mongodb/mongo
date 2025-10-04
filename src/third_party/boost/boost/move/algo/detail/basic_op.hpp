@@ -22,6 +22,7 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/move/adl_move_swap.hpp>
 #include <boost/move/detail/iterator_traits.hpp>
+#include <boost/move/algo/move.hpp>
 
 namespace boost {
 namespace movelib {
@@ -35,19 +36,19 @@ struct four_way_t{};
 struct move_op
 {
    template <class SourceIt, class DestinationIt>
-   BOOST_MOVE_FORCEINLINE void operator()(SourceIt source, DestinationIt dest)
+   inline void operator()(SourceIt source, DestinationIt dest)
    {  *dest = ::boost::move(*source);  }
 
    template <class SourceIt, class DestinationIt>
-   BOOST_MOVE_FORCEINLINE DestinationIt operator()(forward_t, SourceIt first, SourceIt last, DestinationIt dest_begin)
+   inline DestinationIt operator()(forward_t, SourceIt first, SourceIt last, DestinationIt dest_begin)
    {  return ::boost::move(first, last, dest_begin);  }
 
    template <class SourceIt, class DestinationIt>
-   BOOST_MOVE_FORCEINLINE DestinationIt operator()(backward_t, SourceIt first, SourceIt last, DestinationIt dest_last)
+   inline DestinationIt operator()(backward_t, SourceIt first, SourceIt last, DestinationIt dest_last)
    {  return ::boost::move_backward(first, last, dest_last);  }
 
    template <class SourceIt, class DestinationIt1, class DestinationIt2>
-   BOOST_MOVE_FORCEINLINE void operator()(three_way_t, SourceIt srcit, DestinationIt1 dest1it, DestinationIt2 dest2it)
+   inline void operator()(three_way_t, SourceIt srcit, DestinationIt1 dest1it, DestinationIt2 dest2it)
    {
       *dest2it = boost::move(*dest1it);
       *dest1it = boost::move(*srcit);
@@ -64,7 +65,7 @@ struct move_op
    }
 
    template <class SourceIt, class DestinationIt1, class DestinationIt2, class DestinationIt3>
-   BOOST_MOVE_FORCEINLINE void operator()(four_way_t, SourceIt srcit, DestinationIt1 dest1it, DestinationIt2 dest2it, DestinationIt3 dest3it)
+   inline void operator()(four_way_t, SourceIt srcit, DestinationIt1 dest1it, DestinationIt2 dest2it, DestinationIt3 dest3it)
    {
       *dest3it = boost::move(*dest2it);
       *dest2it = boost::move(*dest1it);
@@ -75,19 +76,19 @@ struct move_op
 struct swap_op
 {
    template <class SourceIt, class DestinationIt>
-   BOOST_MOVE_FORCEINLINE void operator()(SourceIt source, DestinationIt dest)
+   inline void operator()(SourceIt source, DestinationIt dest)
    {  boost::adl_move_swap(*dest, *source);  }
 
    template <class SourceIt, class DestinationIt>
-   BOOST_MOVE_FORCEINLINE DestinationIt operator()(forward_t, SourceIt first, SourceIt last, DestinationIt dest_begin)
+   inline DestinationIt operator()(forward_t, SourceIt first, SourceIt last, DestinationIt dest_begin)
    {  return boost::adl_move_swap_ranges(first, last, dest_begin);  }
 
    template <class SourceIt, class DestinationIt>
-   BOOST_MOVE_FORCEINLINE DestinationIt operator()(backward_t, SourceIt first, SourceIt last, DestinationIt dest_begin)
+   inline DestinationIt operator()(backward_t, SourceIt first, SourceIt last, DestinationIt dest_begin)
    {  return boost::adl_move_swap_ranges_backward(first, last, dest_begin);  }
 
    template <class SourceIt, class DestinationIt1, class DestinationIt2>
-   BOOST_MOVE_FORCEINLINE void operator()(three_way_t, SourceIt srcit, DestinationIt1 dest1it, DestinationIt2 dest2it)
+   inline void operator()(three_way_t, SourceIt srcit, DestinationIt1 dest1it, DestinationIt2 dest2it)
    {
       typename ::boost::movelib::iterator_traits<SourceIt>::value_type tmp(boost::move(*dest2it));
       *dest2it = boost::move(*dest1it);
@@ -105,7 +106,7 @@ struct swap_op
    }
 
    template <class SourceIt, class DestinationIt1, class DestinationIt2, class DestinationIt3>
-   BOOST_MOVE_FORCEINLINE void operator()(four_way_t, SourceIt srcit, DestinationIt1 dest1it, DestinationIt2 dest2it, DestinationIt3 dest3it)
+   inline void operator()(four_way_t, SourceIt srcit, DestinationIt1 dest1it, DestinationIt2 dest2it, DestinationIt3 dest3it)
    {
       typename ::boost::movelib::iterator_traits<SourceIt>::value_type tmp(boost::move(*dest3it));
       *dest3it = boost::move(*dest2it);

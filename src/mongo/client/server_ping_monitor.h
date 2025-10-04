@@ -29,11 +29,18 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/client/mongo_uri.h"
 #include "mongo/client/sdam/sdam_datatypes.h"
 #include "mongo/client/sdam/topology_listener.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/time_support.h"
+
+#include <memory>
 
 namespace mongo {
 
@@ -116,7 +123,7 @@ private:
     /**
      * Must be held to access any of the member variables below.
      */
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("SingleServerPingMonitor::mutex");
+    mutable stdx::mutex _mutex;
 
     /**
      * Enables a scheduled or outgoing ping to be cancelled upon drop().
@@ -142,7 +149,7 @@ public:
                       sdam::TopologyListener* rttListener,
                       Milliseconds pingFrequency,
                       std::shared_ptr<executor::TaskExecutor> executor);
-    ~ServerPingMonitor();
+    ~ServerPingMonitor() override;
 
     /**
      * Drops all SingleServerMonitors and shuts down the task executor.
@@ -150,19 +157,19 @@ public:
     void shutdown();
 
     /**
-     * The first isMaster exchange for a connection to the server succeeded. Creates a new
+     * The first "hello" exchange for a connection to the server succeeded. Creates a new
      * SingleServerPingMonitor to monitor the new replica set member.
      */
     void onServerHandshakeCompleteEvent(sdam::HelloRTT durationMs,
                                         const HostAndPort& address,
-                                        BSONObj reply = BSONObj());
+                                        BSONObj reply = BSONObj()) override;
 
     /**
      * Drop corresponding SingleServerPingMonitors if the server is not included in the
      * newDescritpion.
      */
     void onTopologyDescriptionChangedEvent(sdam::TopologyDescriptionPtr previousDescription,
-                                           sdam::TopologyDescriptionPtr newDescription);
+                                           sdam::TopologyDescriptionPtr newDescription) override;
 
 private:
     MongoURI _setUri;
@@ -184,7 +191,7 @@ private:
 
     static constexpr auto kLogLevel = 0;
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ServerPingMonitor::mutex");
+    mutable stdx::mutex _mutex;
 
     /**
      * Maps each server to a SingleServerPingMonitor.

@@ -27,44 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/matcher/schema/encrypt_schema_types.h"
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/util/str.h"
+
 namespace mongo {
-
-EncryptSchemaKeyId EncryptSchemaKeyId::parseFromBSON(const BSONElement& element) {
-    if (element.type() == BSONType::String) {
-        return EncryptSchemaKeyId(element.String());
-    } else if (element.type() == BSONType::Array) {
-        std::vector<UUID> keys;
-
-        for (auto&& arrayElement : element.embeddedObject()) {
-            if (arrayElement.type() != BSONType::BinData) {
-                uasserted(51088,
-                          str::stream() << "Encryption schema 'keyId' array elements must "
-                                        << "have type BinData, found " << arrayElement.type());
-            }
-            if (arrayElement.binDataType() == BinDataType::newUUID) {
-                const auto uuid = uassertStatusOK(UUID::parse(arrayElement));
-
-                keys.emplace_back(uuid);
-            } else {
-                uasserted(51084,
-                          str::stream()
-                              << "Encryption schema 'keyId' array elements must "
-                              << "have BinData type UUID, found " << arrayElement.binDataType());
-            }
-        }
-        return EncryptSchemaKeyId(keys);
-    } else {
-        uasserted(51085,
-                  str::stream()
-                      << "Expected either string or array of UUID for EncryptSchemaKeyId, found "
-                      << element.type());
-    }
-    MONGO_UNREACHABLE;
-}
 
 void EncryptSchemaKeyId::serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {
     if (_type == Type::kUUIDs) {
@@ -77,4 +46,9 @@ void EncryptSchemaKeyId::serializeToBSON(StringData fieldName, BSONObjBuilder* b
         builder->append(fieldName, _pointer.toString());
     }
 }
+
+void BSONTypeSet::serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {
+    builder->appendArray(fieldName, _typeSet.toBSONArray());
+}
+
 }  // namespace mongo

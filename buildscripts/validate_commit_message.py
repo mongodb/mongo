@@ -27,160 +27,191 @@
 # it in the license file.
 #
 """Validate that the commit message is ok."""
-import argparse
-import os
+
+import pathlib
 import re
-import sys
-import logging
-from evergreen import RetryingEvergreenApi, EvergreenApi
+import subprocess
 
-EVG_CONFIG_FILE = "~/.evergreen.yml"
-LOGGER = logging.getLogger(__name__)
+import requests
+import structlog
+import typer
+from git import Commit, Repo
+from typing_extensions import Annotated
 
-ERROR_MSG = """
-################################################################################
-Encountered an invalid commit message. Please correct to the commit message to
-continue. 
-
-Commit message should start with a Public Jira ticket, an "Import" for wiredtiger
-or tools, or a "Revert" message.
-
-{error_msg} on '{branch}':
-'{commit_message}'
-################################################################################
-"""
-
-COMMON_PUBLIC_PATTERN = r'''
-    ((?P<revert>Revert)\s+[\"\']?)?                         # Revert (optional)
-    ((?P<ticket>(?:EVG|SERVER|WT)-[0-9]+)[\"\']?\s*)               # ticket identifier
-    (?P<body>(?:(?!\(cherry\spicked\sfrom).)*)?             # To also capture the body
-    (?P<backport>\(cherry\spicked\sfrom.*)?                 # back port (optional)
-    '''
-"""Common Public pattern format."""
-
-COMMON_LINT_PATTERN = r'(?P<lint>Fix\slint)'
-"""Common Lint pattern format."""
-
-COMMON_IMPORT_PATTERN = r'(?P<imported>Import\s(wiredtiger|tools):\s.*)'
-"""Common Import pattern format."""
-
-COMMON_REVERT_IMPORT_PATTERN = r'Revert\s+[\"\']?(?P<imported>Import\s(wiredtiger|tools):\s.*)'
-"""Common revert Import pattern format."""
-
-COMMON_PRIVATE_PATTERN = r'''
-    ((?P<revert>Revert)\s+[\"\']?)?                                     # Revert (optional)
-    ((?P<ticket>[A-Z]+-[0-9]+)[\"\']?\s*)                               # ticket identifier
-    (?P<body>(?:(?!('\s(into\s'(([^/]+))/(([^:]+)):(([^']+))'))).)*)?   # To also capture the body
-'''
-"""Common Private pattern format."""
+LOGGER = structlog.get_logger(__name__)
 
 STATUS_OK = 0
 STATUS_ERROR = 1
 
-GIT_SHOW_COMMAND = ["git", "show", "-1", "-s", "--format=%s"]
+repo_root = pathlib.Path(
+    subprocess.run(
+        "git rev-parse --show-toplevel", shell=True, text=True, capture_output=True
+    ).stdout.strip()
+)
+
+pr_template = ""
+with open(repo_root / ".github" / "pull_request_template.md", "r") as r:
+    pr_template = r.read().strip()
+
+BANNED_STRINGS = ["https://spruce.mongodb.com", "https://evergreen.mongodb.com", pr_template]
+
+VALID_SUMMARY = re.compile(r'(Revert ")?(SERVER-[0-9]+|Import wiredtiger)')
 
 
-def new_patch_description(pattern: str) -> str:
-    """
-    Wrap the pattern to conform to the new commit queue patch description format.
+def is_valid_commit(commit: Commit) -> bool:
+    # Valid values look like:
+    # 1. SERVER-\d+
+    # 2. Revert "SERVER-\d+
+    # 3. Import wiredtiger
+    # 4. Revert "Import wiredtiger
+    if not VALID_SUMMARY.match(commit.summary):
+        LOGGER.error(
+            f"""PR summary is not valid; it must match the regular expression: {VALID_SUMMARY}
+Current summary: {commit.summary}
+Please update the PR title and description to match the expected format.
+If you are seeing this on a PR, after changing the title/description, you will need to rerun this check before being able to submit your PR.
+The decision to add this check was made in SERVER-101443, please feel free to leave comments/feedback on that ticket.""",
+        )
+        return False
 
-    Add the commit queue prefix and suffix to the pattern. The format looks like:
-
-    Commit Queue Merge: '<commit message>' into '<owner>/<repo>:<branch>'
-
-    :param pattern: The pattern to wrap.
-    :return: A pattern to match the new format for the patch description.
-    """
-    return (r"""^((?P<commitqueue>Commit\sQueue\sMerge:)\s')"""
-            f'{pattern}'
-            # r"""('\s(?P<into>into\s'((?P<owner>[^/]+))/((?P<repo>[^:]+)):((?P<branch>[^']+))'))"""
+    # Remove all whitespace from comparisons. GitHub line-wraps commit messages, which adds
+    # newline characters that otherwise would not match verbatim such banned strings.
+    stripped_message = "".join(commit.message.split())
+    for banned_string in BANNED_STRINGS:
+        if "".join(banned_string.split()) in stripped_message:
+            LOGGER.error(
+                """PR title/description contains a banned string (ignoring whitespace).
+Please update the PR title and description to not contain the following banned string.
+If you are seeing this on a PR, after changing the title/description, you will need to rerun this check before being able to submit your PR.
+The decision to add this check was made in SERVER-101443, please feel free to leave comments/feedback on that ticket.""",
+                banned_string=banned_string,
+                commit_message=commit.message,
             )
+            return False
+
+    return True
 
 
-def old_patch_description(pattern: str) -> str:
-    """
-    Wrap the pattern to conform to the new commit queue patch description format.
+def get_non_merge_queue_squashed_commits(
+    github_org: str,
+    github_repo: str,
+    pr_number: int,
+    github_token: str,
+) -> list[Commit]:
+    assert github_org
+    assert github_repo
+    assert pr_number >= 0
+    assert github_token
 
-    Just add a start anchor. The format looks like:
+    pr_merge_info_query = {
+        "query": f"""{{
+            repository(owner: "{github_org}", name: "{github_repo}") {{
+                pullRequest(number: {pr_number}) {{
+                    viewerMergeHeadlineText(mergeType: SQUASH)
+                    viewerMergeBodyText(mergeType: SQUASH)
+                }}
+            }}
+         }}"""
+    }
+    headers = {"Authorization": f"token {github_token}"}
 
-    <commit message>
-
-    :param pattern: The pattern to wrap.
-    :return: A pattern to match the old format for the patch description.
-    """
-    return r'^' f'{pattern}'
-
-
-# NOTE: re.VERBOSE is for visibility / debugging. As such significant white space must be
-# escaped (e.g ' ' to \s).
-VALID_PATTERNS = [
-    re.compile(new_patch_description(COMMON_PUBLIC_PATTERN), re.MULTILINE | re.DOTALL | re.VERBOSE),
-    re.compile(old_patch_description(COMMON_PUBLIC_PATTERN), re.MULTILINE | re.DOTALL | re.VERBOSE),
-    re.compile(new_patch_description(COMMON_LINT_PATTERN), re.MULTILINE | re.DOTALL | re.VERBOSE),
-    re.compile(old_patch_description(COMMON_LINT_PATTERN), re.MULTILINE | re.DOTALL | re.VERBOSE),
-    re.compile(new_patch_description(COMMON_IMPORT_PATTERN), re.MULTILINE | re.DOTALL | re.VERBOSE),
-    re.compile(old_patch_description(COMMON_IMPORT_PATTERN), re.MULTILINE | re.DOTALL | re.VERBOSE),
-    re.compile(
-        new_patch_description(COMMON_REVERT_IMPORT_PATTERN), re.MULTILINE | re.DOTALL | re.VERBOSE),
-    re.compile(
-        old_patch_description(COMMON_REVERT_IMPORT_PATTERN), re.MULTILINE | re.DOTALL | re.VERBOSE),
-]
-"""valid public patterns."""
-
-PRIVATE_PATTERNS = [
-    re.compile(
-        new_patch_description(COMMON_PRIVATE_PATTERN), re.MULTILINE | re.DOTALL | re.VERBOSE),
-    re.compile(
-        old_patch_description(COMMON_PRIVATE_PATTERN), re.MULTILINE | re.DOTALL | re.VERBOSE),
-]
-"""private patterns."""
-
-
-def validate_commit_messages(version_id: str, evg_api: EvergreenApi) -> int:
-    """
-    Validate the commit messages for the given build.
-
-    :param version_id: ID of version to validate.
-    :param evg_api: Evergreen API client.
-    :return: True if all commit messages were valid.
-    """
-    found_error = False
-    code_changes = evg_api.patch_by_id(version_id).module_code_changes
-    for change in code_changes:
-        for message in change.commit_messages:
-            if any(valid_pattern.match(message) for valid_pattern in VALID_PATTERNS):
-                continue
-            elif any(private_pattern.match(message) for private_pattern in PRIVATE_PATTERNS):
-                print(
-                    ERROR_MSG.format(error_msg="Reference to a private project",
-                                     branch=change.branch_name, commit_message=message))
-                found_error = True
-            else:
-                print(
-                    ERROR_MSG.format(error_msg="Commit without a ticket", branch=change.branch_name,
-                                     commit_message=message))
-                found_error = True
-
-    return STATUS_ERROR if found_error else STATUS_OK
-
-
-def main(argv=None):
-    """Execute Main function to validate commit messages."""
-    parser = argparse.ArgumentParser(
-        usage="Validate the commit message. "
-        "It validates the latest message when no arguments are provided.")
-    parser.add_argument(
-        "version_id",
-        metavar="version id",
-        help="The id of the version to validate",
+    LOGGER.info("Sending request", request=pr_merge_info_query)
+    req = requests.post(
+        url="https://api.github.com/graphql",
+        json=pr_merge_info_query,
+        headers=headers,
+        timeout=60,  # 60s
     )
-    parser.add_argument("--evg-config-file", default=EVG_CONFIG_FILE,
-                        help="Path to evergreen configuration file containing auth information.")
-    args = parser.parse_args(argv)
-    evg_api = RetryingEvergreenApi.get_api(config_file=os.path.expanduser(args.evg_config_file))
+    resp = req.json()
+    # Response will look like
+    # {'data': {'repository': {'pullRequest':
+    # {
+    #   'viewerMergeHeadlineText': 'SERVER-1234 Add a ton of great support (#32823)',
+    #   'viewerMergeBodyText': 'This PR adds back support for a lot of things\nMany great things!'
+    # }}}}
+    LOGGER.info("Squashed content", content=resp)
+    pr_info = resp["data"]["repository"]["pullRequest"]
+    fake_repo = Repo()
+    return [
+        Commit(
+            message="\n".join([pr_info["viewerMergeHeadlineText"], pr_info["viewerMergeBodyText"]]),
+            # required fields, but faked out - these aren't helpful in user-facing logs
+            repo=fake_repo,
+            binsha=b"00000000000000000000",
+        )
+    ]
 
-    return validate_commit_messages(args.version_id, evg_api)
+
+def get_merge_queue_commits(branch_name: str) -> list[Commit]:
+    assert branch_name
+
+    diff_commits = subprocess.run(
+        ["git", "log", '--pretty=format:"%H"', f"{branch_name}...HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    # Comes back like "hash1"\n"hash2"\n...
+    commit_hashs: list[str] = diff_commits.stdout.replace('"', "").splitlines()
+    LOGGER.info("Diff commit hashes", commit_hashs=commit_hashs)
+    repo = Repo(repo_root)
+
+    return [repo.commit(commit_hash) for commit_hash in commit_hashs]
+
+
+def main(
+    github_org: Annotated[
+        str,
+        typer.Option(envvar="GITHUB_ORG", help="Name of the github organization (e.g. 10gen)"),
+    ] = "",
+    github_repo: Annotated[
+        str,
+        typer.Option(envvar="GITHUB_REPO", help="Name of the repo (e.g. mongo)"),
+    ] = "",
+    branch_name: Annotated[
+        str,
+        typer.Option(envvar="BRANCH_NAME", help="Name of the branch to compare against HEAD"),
+    ] = "",
+    pr_number: Annotated[
+        int,
+        typer.Option(envvar="PR_NUMBER", help="PR Number to compare with"),
+    ] = -1,
+    github_token: Annotated[
+        str,
+        typer.Option(envvar="GITHUB_TOKEN", help="Github token with pr read access"),
+    ] = "",
+    requester: Annotated[
+        str,
+        typer.Option(
+            envvar="REQUESTER",
+            help="What is requested this task. Defined https://docs.devprod.prod.corp.mongodb.com/evergreen/Project-Configuration/Project-Configuration-Files#expansions.",
+        ),
+    ] = "",
+):
+    """
+    Validate the commit message.
+
+    It validates the latest message when no arguments are provided.
+    """
+
+    commits: list[Commit] = []
+    if requester == "github_merge_queue":
+        commits = get_merge_queue_commits(branch_name)
+    elif requester == "github_pr":
+        commits = get_non_merge_queue_squashed_commits(
+            github_org, github_repo, pr_number, github_token
+        )
+    else:
+        LOGGER.error("Running with an invalid requester", requester=requester)
+        raise typer.Exit(code=STATUS_ERROR)
+
+    for commit in commits:
+        if not is_valid_commit(commit):
+            LOGGER.error("Invalid commit, unable to merge")
+            raise typer.Exit(code=STATUS_ERROR)
+
+    return
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    typer.run(main)

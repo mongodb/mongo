@@ -83,7 +83,7 @@
 //
 #if !defined(BOOST_NO_CXX11_VARIADIC_TEMPLATES) && !BOOST_WORKAROUND(BOOST_GCC, < 40805)\
       && !BOOST_WORKAROUND(BOOST_MSVC, < 1900) && !BOOST_WORKAROUND(__clang_major__, <= 4)
-#  define BOOST_TT_HAS_ASCCURATE_IS_FUNCTION
+#  define BOOST_TT_HAS_ACCURATE_IS_FUNCTION
 #endif
 
 #if defined(_MSVC_LANG) && (_MSVC_LANG >= 201703) 
@@ -105,6 +105,9 @@
 // if the SD6 macros *are* available as it appears to be undocumented.
 //
 #if defined(BOOST_MSVC) && !defined(__cpp_rvalue_references) && !defined(BOOST_TT_NO_NOEXCEPT_SEPARATE_TYPE) && !defined(_NOEXCEPT_TYPES_SUPPORTED)
+#  define BOOST_TT_NO_NOEXCEPT_SEPARATE_TYPE
+#endif
+#if defined(__cpp_rvalue_references) && defined(__NVCC__) && defined(__CUDACC__) && !defined(BOOST_TT_NO_NOEXCEPT_SEPARATE_TYPE)
 #  define BOOST_TT_NO_NOEXCEPT_SEPARATE_TYPE
 #endif
 

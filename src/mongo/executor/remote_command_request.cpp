@@ -27,20 +27,29 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/executor/remote_command_request.h"
 
-#include <fmt/format.h>
-
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/query_request_helper.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 
-using namespace fmt::literals;
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 namespace executor {
@@ -52,39 +61,42 @@ AtomicWord<unsigned long long> requestIdCounter(0);
 
 }  // namespace
 
-constexpr Milliseconds RemoteCommandRequestBase::kNoTimeout;
+constexpr Milliseconds RemoteCommandRequest::kNoTimeout;
 
-RemoteCommandRequestBase::RemoteCommandRequestBase(RequestId requestId,
-                                                   const std::string& theDbName,
-                                                   const BSONObj& theCmdObj,
-                                                   const BSONObj& metadataObj,
-                                                   OperationContext* opCtx,
-                                                   Milliseconds timeoutMillis,
-                                                   boost::optional<HedgeOptions> hedgeOptions,
-                                                   FireAndForgetMode fireAndForgetMode)
-    : id(requestId),
-      dbname(theDbName),
-      metadata(metadataObj),
-      opCtx(opCtx),
-      hedgeOptions(hedgeOptions),
-      fireAndForgetMode(fireAndForgetMode),
-      timeout(timeoutMillis) {
+RemoteCommandRequest::RemoteCommandRequest()
+    : id(requestIdCounter.addAndFetch(1)), operationKey(UUID::gen()) {}
+
+RemoteCommandRequest::RemoteCommandRequest(RequestId requestId_,
+                                           const HostAndPort& target_,
+                                           const DatabaseName& dbName_,
+                                           const BSONObj& cmdObj_,
+                                           const BSONObj& metadataObj_,
+                                           OperationContext* opCtx_,
+                                           Milliseconds timeoutMillis_,
+                                           bool fireAndForget_,
+                                           boost::optional<UUID> opKey_)
+    : id(requestId_),
+      target(target_),
+      dbname(dbName_),
+      cmdObj(cmdObj_),
+      metadata(metadataObj_),
+      opCtx(opCtx_),
+      timeout(timeoutMillis_),
+      fireAndForget(fireAndForget_),
+      operationKey(opKey_) {
+
     // If there is a comment associated with the current operation, append it to the command that we
     // are about to dispatch to the shards.
-    cmdObj = opCtx && opCtx->getComment() && !theCmdObj["comment"]
-        ? theCmdObj.addField(*opCtx->getComment())
-        : cmdObj = theCmdObj;
+    if (opCtx && opCtx->getComment() && !cmdObj["comment"]) {
+        cmdObj = cmdObj.addField(*opCtx->getComment());
+    }
 
-    // maxTimeMSOpOnly is set in the network interface based on the remaining max time attached to
-    // the OpCtx.  It should never be specified explicitly.
-    uassert(4924403,
-            str::stream() << "Command request object should not manually specify "
-                          << query_request_helper::kMaxTimeMSOpOnlyField,
-            !cmdObj.hasField(query_request_helper::kMaxTimeMSOpOnlyField));
-
-    if (hedgeOptions) {
-        operationKey.emplace(UUID::gen());
-        cmdObj = cmdObj.addField(BSON("clientOperationKey" << operationKey.get()).firstElement());
+    if (cmdObj.hasField("maxTimeMSOpOnly")) {
+        int maxTimeField = cmdObj["maxTimeMSOpOnly"].Number();
+        if (auto maxTimeMSOpOnly = Milliseconds(maxTimeField);
+            timeout == executor::RemoteCommandRequest::kNoTimeout || maxTimeMSOpOnly < timeout) {
+            timeout = maxTimeMSOpOnly;
+        }
     }
 
     if (opCtx && APIParameters::get(opCtx).getParamsPassed()) {
@@ -96,10 +108,35 @@ RemoteCommandRequestBase::RemoteCommandRequestBase(RequestId requestId,
     _updateTimeoutFromOpCtxDeadline(opCtx);
 }
 
-RemoteCommandRequestBase::RemoteCommandRequestBase()
-    : id(requestIdCounter.addAndFetch(1)), operationKey(UUID::gen()) {}
+RemoteCommandRequest::RemoteCommandRequest(const HostAndPort& target_,
+                                           const DatabaseName& dbName_,
+                                           const BSONObj& cmdObj_,
+                                           const BSONObj& metadataObj_,
+                                           OperationContext* opCtx_,
+                                           Milliseconds timeoutMillis_,
+                                           bool fireAndForget_,
+                                           boost::optional<UUID> operationKey_)
+    : RemoteCommandRequest(requestIdCounter.addAndFetch(1),
+                           target_,
+                           dbName_,
+                           cmdObj_,
+                           metadataObj_,
+                           opCtx_,
+                           timeoutMillis_,
+                           fireAndForget_,
+                           operationKey_) {}
 
-void RemoteCommandRequestBase::_updateTimeoutFromOpCtxDeadline(const OperationContext* opCtx) {
+RemoteCommandRequest::operator OpMsgRequest() const {
+    const auto& tenantId = this->dbname.tenantId();
+    const auto vts = tenantId
+        ? auth::ValidatedTenancyScopeFactory::create(
+              *tenantId, auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{})
+        : auth::ValidatedTenancyScope::kNotRequired;
+
+    return OpMsgRequestBuilder::create(vts, this->dbname, std::move(this->cmdObj), this->metadata);
+}
+
+void RemoteCommandRequest::_updateTimeoutFromOpCtxDeadline(const OperationContext* opCtx) {
     if (!opCtx || !opCtx->hasDeadline()) {
         return;
     }
@@ -119,79 +156,26 @@ void RemoteCommandRequestBase::_updateTimeoutFromOpCtxDeadline(const OperationCo
     }
 }
 
-template <typename T>
-RemoteCommandRequestImpl<T>::RemoteCommandRequestImpl() = default;
-
-template <typename T>
-RemoteCommandRequestImpl<T>::RemoteCommandRequestImpl(RequestId requestId,
-                                                      const T& theTarget,
-                                                      const std::string& theDbName,
-                                                      const BSONObj& theCmdObj,
-                                                      const BSONObj& metadataObj,
-                                                      OperationContext* opCtx,
-                                                      Milliseconds timeoutMillis,
-                                                      boost::optional<HedgeOptions> hedgeOptions,
-                                                      FireAndForgetMode fireAndForgetMode)
-    : RemoteCommandRequestBase(requestId,
-                               theDbName,
-                               theCmdObj,
-                               metadataObj,
-                               opCtx,
-                               timeoutMillis,
-                               hedgeOptions,
-                               fireAndForgetMode),
-      target(theTarget) {
-    if constexpr (std::is_same_v<T, std::vector<HostAndPort>>) {
-        invariant(!theTarget.empty());
-    }
-}
-
-template <typename T>
-RemoteCommandRequestImpl<T>::RemoteCommandRequestImpl(const T& theTarget,
-                                                      const std::string& theDbName,
-                                                      const BSONObj& theCmdObj,
-                                                      const BSONObj& metadataObj,
-                                                      OperationContext* opCtx,
-                                                      Milliseconds timeoutMillis,
-                                                      boost::optional<HedgeOptions> hedgeOptions,
-                                                      FireAndForgetMode fireAndForgetMode)
-    : RemoteCommandRequestImpl(requestIdCounter.addAndFetch(1),
-                               theTarget,
-                               theDbName,
-                               theCmdObj,
-                               metadataObj,
-                               opCtx,
-                               timeoutMillis,
-                               hedgeOptions,
-                               fireAndForgetMode) {}
-
-template <typename T>
-std::string RemoteCommandRequestImpl<T>::toString() const {
+std::string RemoteCommandRequest::toString() const {
     str::stream out;
     out << "RemoteCommand " << id << " -- target:";
-    if constexpr (std::is_same_v<HostAndPort, T>) {
-        out << target.toString();
-    } else {
-        out << "[{}]"_format(fmt::join(target, ", "));
-    }
-    out << " db:" << dbname;
+    out << target.toString();
+    out << " db:" << toStringForLogging(dbname);
+    out << " fireAndForget:" << fireAndForget;
 
     if (dateScheduled && timeout != kNoTimeout) {
         out << " expDate:" << (*dateScheduled + timeout).toString();
     }
 
-    if (hedgeOptions) {
-        invariant(operationKey);
-        out << " hedgeOptions.count: " << hedgeOptions->count;
-        out << " operationKey: " << operationKey.get();
+    if (operationKey) {
+        out << " operationKey:" << *operationKey;
     }
 
     out << " cmd:" << cmdObj.toString();
     return out;
 }
 
-template <typename T>
-bool RemoteCommandRequestImpl<T>::operator==(const RemoteCommandRequestImpl& rhs) const {
+bool RemoteCommandRequest::operator==(const RemoteCommandRequest& rhs) const {
     if (this == &rhs) {
         return true;
     }
@@ -201,13 +185,8 @@ bool RemoteCommandRequestImpl<T>::operator==(const RemoteCommandRequestImpl& rhs
         timeout == rhs.timeout;
 }
 
-template <typename T>
-bool RemoteCommandRequestImpl<T>::operator!=(const RemoteCommandRequestImpl& rhs) const {
+bool RemoteCommandRequest::operator!=(const RemoteCommandRequest& rhs) const {
     return !(*this == rhs);
 }
-
-template struct RemoteCommandRequestImpl<HostAndPort>;
-template struct RemoteCommandRequestImpl<std::vector<HostAndPort>>;
-
 }  // namespace executor
 }  // namespace mongo

@@ -36,6 +36,8 @@
 
 #include "mongo/bson/bsonelement.h"
 
+#include <cstdint>
+
 namespace mongo {
 
 typedef int32_t HashSeed;

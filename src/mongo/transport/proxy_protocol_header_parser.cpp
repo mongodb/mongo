@@ -27,13 +27,16 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 #include "mongo/transport/proxy_protocol_header_parser.h"
 
-#include <boost/optional.hpp>
+#include <cstdint>
 #include <cstring>
-#include <exception>
+#include <stdexcept>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 
 #ifndef _WIN32
@@ -42,20 +45,21 @@
 #endif
 
 #include "mongo/base/parse_number.h"
+#include "mongo/base/static_assert.h"
 #include "mongo/base/string_data.h"
-#include "mongo/logv2/log.h"
 #include "mongo/platform/endian.h"
 #include "mongo/util/assert_util.h"
 
-namespace mongo::transport {
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
-using namespace fmt::literals;
+
+namespace mongo::transport {
 
 namespace {
 StringData parseToken(StringData& s, const char c) {
     size_t pos = s.find(c);
     uassert(ErrorCodes::FailedToParse,
-            "Proxy Protocol Version 1 address string malformed: {}"_format(s),
+            fmt::format("Proxy Protocol Version 1 address string malformed: {}", s),
             pos != std::string::npos);
     StringData result = s.substr(0, pos);
     s = s.substr(pos + 1);
@@ -79,14 +83,16 @@ void validateIpv4Address(StringData addr) {
             }
             uassert(
                 ErrorCodes::FailedToParse,
-                "Proxy Protocol Version 1 address string specified malformed IPv4 address: {}"_format(
+                fmt::format(
+                    "Proxy Protocol Version 1 address string specified malformed IPv4 address: {}",
                     addr),
                 octet <= 255);
         }
     } catch (const ExceptionFor<ErrorCodes::FailedToParse>&) {
         uasserted(
             ErrorCodes::FailedToParse,
-            "Proxy Protocol Version 1 address string specified malformed IPv4 address: {}"_format(
+            fmt::format(
+                "Proxy Protocol Version 1 address string specified malformed IPv4 address: {}",
                 addr));
     }
 }
@@ -100,11 +106,11 @@ void validateIpv6Address(StringData addr) {
                 NumberParser().skipWhitespace(false).base(16).allowTrailingText(false);
             unsigned value = 0;
             uassertStatusOK(hexadectetParser(hexadectet, &value));
-            uassert(
-                ErrorCodes::FailedToParse,
-                "Proxy Protocol Version 1 address string contains malformed IPv6 hexadectet: {}"_format(
-                    hexadectet),
-                hexadectet.size() == 4);
+            uassert(ErrorCodes::FailedToParse,
+                    fmt::format("Proxy Protocol Version 1 address string contains malformed IPv6 "
+                                "hexadectet: {}",
+                                hexadectet),
+                    hexadectet.size() == 4);
         };
 
         if (buffer.empty())
@@ -112,7 +118,8 @@ void validateIpv6Address(StringData addr) {
 
         uassert(
             ErrorCodes::FailedToParse,
-            "Proxy Protocol Version 1 address string contains malformed IPv6 hexadectet: {}"_format(
+            fmt::format(
+                "Proxy Protocol Version 1 address string contains malformed IPv6 hexadectet: {}",
                 buffer),
             buffer.find(doubleColon) == std::string::npos);
 
@@ -129,7 +136,8 @@ void validateIpv6Address(StringData addr) {
         }
         uasserted(
             ErrorCodes::FailedToParse,
-            "Proxy Protocol Version 1 address string contains malformed IPv6 hexadectet: {}"_format(
+            fmt::format(
+                "Proxy Protocol Version 1 address string contains malformed IPv6 hexadectet: {}",
                 buffer));
     };
 
@@ -141,21 +149,24 @@ void validateIpv6Address(StringData addr) {
                 validateHexadectets(addr.substr(pos + doubleColon.size()));
             uassert(
                 ErrorCodes::FailedToParse,
-                "Proxy Protocol Version 1 address string specified malformed IPv6 address: {}"_format(
+                fmt::format(
+                    "Proxy Protocol Version 1 address string specified malformed IPv6 address: {}",
                     addr),
                 numHexadectets < 8);
         } else {
             const size_t numHexadectets = validateHexadectets(addr);
             uassert(
                 ErrorCodes::FailedToParse,
-                "Proxy Protocol Version 1 address string specified malformed IPv6 address: {}"_format(
+                fmt::format(
+                    "Proxy Protocol Version 1 address string specified malformed IPv6 address: {}",
                     addr),
                 numHexadectets == 8);
         }
     } catch (const ExceptionFor<ErrorCodes::FailedToParse>&) {
         uasserted(
             ErrorCodes::FailedToParse,
-            "Proxy Protocol Version 1 address string specified malformed IPv6 address: {}"_format(
+            fmt::format(
+                "Proxy Protocol Version 1 address string specified malformed IPv6 address: {}",
                 addr));
     }
 }
@@ -171,11 +182,12 @@ T extract(StringData& data) {
     MONGO_STATIC_ASSERT(std::is_trivially_copyable_v<T>);
     static constexpr size_t numBytes = sizeof(T);
     if (data.size() < numBytes) {
-        throw std::out_of_range("Not enough space to extract object of size {}"_format(numBytes));
+        throw std::out_of_range(
+            fmt::format("Not enough space to extract object of size {}", numBytes));
     }
 
     T result;
-    memcpy(&result, data.rawData(), numBytes);
+    memcpy(&result, data.data(), numBytes);
     data = data.substr(numBytes);
     return result;
 }
@@ -198,13 +210,13 @@ bool parseV1Buffer(StringData& buffer, boost::optional<ProxiedEndpoints>& endpoi
         // If we couldn't find a newline sequence, then fail if there cannot be enough room
         // for one to appear in the future.
         uassert(ErrorCodes::FailedToParse,
-                "No terminating newline found in Proxy Protocol header V1: {}"_format(buffer),
+                fmt::format("No terminating newline found in Proxy Protocol header V1: {}", buffer),
                 buffer.size() <= kMaximumV1InetLineSize);
         return false;
     } else {
         // If we could, then fail if the sequence doesn't occur within the maximum line length.
         uassert(ErrorCodes::FailedToParse,
-                "No terminating newline found in Proxy Protocol header V1: {}"_format(buffer),
+                fmt::format("No terminating newline found in Proxy Protocol header V1: {}", buffer),
                 crlfPos + crlf.size() <= kMaximumV1InetLineSize);
     }
 
@@ -214,19 +226,19 @@ bool parseV1Buffer(StringData& buffer, boost::optional<ProxiedEndpoints>& endpoi
     static constexpr StringData kTcp4Prefix = " TCP4 "_sd;
     static constexpr StringData kTcp6Prefix = " TCP6 "_sd;
     int aFamily = AF_UNSPEC;
-    if (buffer.startsWith(kTcp4Prefix)) {
+    if (buffer.starts_with(kTcp4Prefix)) {
         aFamily = AF_INET;
         buffer = buffer.substr(kTcp4Prefix.size());
-    } else if (buffer.startsWith(kTcp6Prefix)) {
+    } else if (buffer.starts_with(kTcp6Prefix)) {
         aFamily = AF_INET6;
         buffer = buffer.substr(kTcp6Prefix.size());
-    } else if (buffer.startsWith(" UNKNOWN"_sd)) {
+    } else if (buffer.starts_with(" UNKNOWN"_sd)) {
         buffer = resultBuffer;
         endpoints = {};
         return true;
     } else {
         uasserted(ErrorCodes::FailedToParse,
-                  "Proxy Protocol Version 1 address string malformed: {}"_format(buffer));
+                  fmt::format("Proxy Protocol Version 1 address string malformed: {}", buffer));
     }
 
     // The remainder of the string should now tokenize into four substrings:
@@ -253,9 +265,10 @@ bool parseV1Buffer(StringData& buffer, boost::optional<ProxiedEndpoints>& endpoi
     uassertStatusOK(portParser(dstPortStr, &dstPort));
 
     auto validatePort = [](int port) {
-        uassert(ErrorCodes::FailedToParse,
-                "Proxy Protocol Version 1 address string specified invalid port: {}"_format(port),
-                port <= 65535);
+        uassert(
+            ErrorCodes::FailedToParse,
+            fmt::format("Proxy Protocol Version 1 address string specified invalid port: {}", port),
+            port <= 65535);
     };
     validatePort(srcPort);
     validatePort(dstPort);
@@ -267,9 +280,10 @@ bool parseV1Buffer(StringData& buffer, boost::optional<ProxiedEndpoints>& endpoi
         return true;
     } catch (const ExceptionFor<ErrorCodes::HostUnreachable>&) {
         // SockAddr can throw on construction if the address passed in is malformed.
-        uasserted(ErrorCodes::FailedToParse,
-                  "Proxy Protocol Version 1 address string specified unreachable host: {}"_format(
-                      buffer));
+        uasserted(
+            ErrorCodes::FailedToParse,
+            fmt::format("Proxy Protocol Version 1 address string specified unreachable host: {}",
+                        buffer));
     }
 }
 
@@ -292,8 +306,8 @@ bool parseV2Buffer(StringData& buffer, boost::optional<ProxiedEndpoints>& endpoi
         } else if (protocolVersionAndCommandByte != '\x21') {
             uasserted(
                 ErrorCodes::FailedToParse,
-                "Invalid version or command byte given in Proxy Protocol header V2: {}"_format(
-                    protocolVersionAndCommandByte));
+                fmt::format("Invalid version or command byte given in Proxy Protocol header V2: {}",
+                            protocolVersionAndCommandByte));
         }
 
         if (buffer.empty())
@@ -319,15 +333,16 @@ bool parseV2Buffer(StringData& buffer, boost::optional<ProxiedEndpoints>& endpoi
                     aFamily = AF_UNIX;
                     break;
                 default:
-                    uasserted(ErrorCodes::FailedToParse,
-                              "Invalid address family given in Proxy Protocol header V2: {}"_format(
-                                  aFamilyByte));
+                    uasserted(
+                        ErrorCodes::FailedToParse,
+                        fmt::format("Invalid address family given in Proxy Protocol header V2: {}",
+                                    aFamilyByte));
             }
         }
 
         uint8_t protocol = (transportProtocolAndAddressFamilyByte & 0xF);
         uassert(ErrorCodes::FailedToParse,
-                "Invalid protocol given in Proxy Protocol header V2: {}"_format(protocol),
+                fmt::format("Invalid protocol given in Proxy Protocol header V2: {}", protocol),
                 protocol <= 0x2);
 
         // If protocol is unspecified, we should also ignore address information.
@@ -355,9 +370,10 @@ bool parseV2Buffer(StringData& buffer, boost::optional<ProxiedEndpoints>& endpoi
                 static constexpr size_t kIPv4ProxyProtocolSize = 12;
                 MONGO_STATIC_ASSERT(2 * (sizeof(in_addr) + sizeof(uint16_t)) ==
                                     kIPv4ProxyProtocolSize);
-                uassert(ErrorCodes::FailedToParse,
-                        "Proxy Protocol Version 2 address string too short: {}"_format(buffer),
-                        length >= kIPv4ProxyProtocolSize);
+                uassert(
+                    ErrorCodes::FailedToParse,
+                    fmt::format("Proxy Protocol Version 2 address string too short: {}", buffer),
+                    length >= kIPv4ProxyProtocolSize);
                 sockaddr_in src_addr{};
                 sockaddr_in dst_addr{};
                 src_addr.sin_family = dst_addr.sin_family = AF_INET;
@@ -377,9 +393,10 @@ bool parseV2Buffer(StringData& buffer, boost::optional<ProxiedEndpoints>& endpoi
                 static constexpr size_t kIPv6ProxyProtocolSize = 36;
                 MONGO_STATIC_ASSERT(2 * (sizeof(in6_addr) + sizeof(uint16_t)) ==
                                     kIPv6ProxyProtocolSize);
-                uassert(ErrorCodes::FailedToParse,
-                        "Proxy Protocol Version 2 address string too short: {}"_format(buffer),
-                        length >= kIPv6ProxyProtocolSize);
+                uassert(
+                    ErrorCodes::FailedToParse,
+                    fmt::format("Proxy Protocol Version 2 address string too short: {}", buffer),
+                    length >= kIPv6ProxyProtocolSize);
                 sockaddr_in6 src_addr{};
                 sockaddr_in6 dst_addr{};
                 src_addr.sin6_family = dst_addr.sin6_family = AF_INET6;
@@ -398,9 +415,10 @@ bool parseV2Buffer(StringData& buffer, boost::optional<ProxiedEndpoints>& endpoi
                 // but we don't assert type sizes here because some platforms don't support
                 // UNIX addresses of this length - they are checked in parseSockAddrUn.
                 static constexpr size_t kUnixProxyProtocolSize = 216;
-                uassert(ErrorCodes::FailedToParse,
-                        "Proxy Protocol Version 2 address string too short: {}"_format(buffer),
-                        length >= kUnixProxyProtocolSize);
+                uassert(
+                    ErrorCodes::FailedToParse,
+                    fmt::format("Proxy Protocol Version 2 address string too short: {}", buffer),
+                    length >= kUnixProxyProtocolSize);
                 const auto src_addr = proxy_protocol_details::parseSockAddrUn(
                     buffer.substr(0, proxy_protocol_details::kMaxUnixPathLength));
                 const auto dst_addr = proxy_protocol_details::parseSockAddrUn(
@@ -429,16 +447,16 @@ boost::optional<ParserResults> parseProxyProtocolHeader(StringData buffer) {
 
     ParserResults results;
     bool complete = false;
-    if (buffer.startsWith(kV1Start)) {
+    if (buffer.starts_with(kV1Start)) {
         complete = parseV1Buffer(buffer, results.endpoints);
-    } else if (buffer.startsWith(kV2Start)) {
+    } else if (buffer.starts_with(kV2Start)) {
         complete = parseV2Buffer(buffer, results.endpoints);
     } else {
         uassert(ErrorCodes::FailedToParse,
-                "Initial Proxy Protocol header bytes invalid: {}"
-                "; Make sure your proxy is configured to emit a Proxy "
-                "Protocol header"_format(buffer),
-                kV1Start.startsWith(buffer) || kV2Start.startsWith(buffer));
+                fmt::format("Initial Proxy Protocol header bytes invalid: {}; "
+                            "Make sure your proxy is configured to emit a Proxy Protocol header",
+                            buffer),
+                kV1Start.starts_with(buffer) || kV2Start.starts_with(buffer));
     }
 
     if (complete) {
@@ -449,5 +467,8 @@ boost::optional<ParserResults> parseProxyProtocolHeader(StringData buffer) {
     }
 }
 
+bool maybeProxyProtocolHeader(StringData buffer) {
+    return buffer.starts_with(kV1Start) || buffer.starts_with(kV2Start);
+}
 
 }  // namespace mongo::transport

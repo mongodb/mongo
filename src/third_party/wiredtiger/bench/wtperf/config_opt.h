@@ -26,6 +26,8 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#pragma once
+
 typedef enum { BOOL_TYPE, CONFIG_STRING_TYPE, INT_TYPE, STRING_TYPE, UINT32_TYPE } CONFIG_OPT_TYPE;
 
 typedef struct {
@@ -43,7 +45,7 @@ typedef struct __config_queue_entry {
 
 typedef struct { /* Option structure */
 #define OPT_DECLARE_STRUCT
-#include "wtperf_opt.i"
+#include "wtperf_opt_inline.h"
 #undef OPT_DECLARE_STRUCT
 
     /* Queue head to save a copy of the config to be output */

@@ -27,9 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/db/matcher/expression.h"
-
 #pragma once
+
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -52,6 +54,45 @@ public:
         }
 
         return isIndexOnOwnFieldTypeNode(me);
+    }
+
+    /**
+     * Type bracketing does not apply to internal Expressions. This could cause the use of a sparse
+     * index return incomplete results. For example, a query {$expr: {$lt: ["$missing", "r"]}} would
+     * expect a document like, {a: 1}, with field "missing" missing be returned. However, a sparse
+     * index, {missing: 1} does not index the document. Therefore, we should ban use of any sparse
+     * index on following expression types.
+     */
+    static bool nodeSupportedBySparseIndex(const MatchExpression* me) {
+        switch (me->matchType()) {
+            case MatchExpression::INTERNAL_EXPR_EQ:
+            case MatchExpression::INTERNAL_EXPR_GT:
+            case MatchExpression::INTERNAL_EXPR_GTE:
+            case MatchExpression::INTERNAL_EXPR_LT:
+            case MatchExpression::INTERNAL_EXPR_LTE:
+                return false;
+            default:
+                return true;
+        }
+    }
+
+    /**
+     * Some node types, such as MOD, REGEX, TYPE_OPERATOR, or ELEM_MATCH_VALUE, cannot use index if
+     * they are under negation.
+     */
+    static bool nodeCannotUseIndexUnderNot(const MatchExpression* me) {
+        switch (me->matchType()) {
+            case MatchExpression::REGEX:
+            case MatchExpression::MOD:
+            case MatchExpression::TYPE_OPERATOR:
+            case MatchExpression::ELEM_MATCH_VALUE:
+            case MatchExpression::GEO:
+            case MatchExpression::GEO_NEAR:
+            case MatchExpression::INTERNAL_BUCKET_GEO_WITHIN:
+                return true;
+            default:
+                return false;
+        }
     }
 
     /**
@@ -116,6 +157,20 @@ public:
     }
 
     /**
+     * Returns true if 'me' is ELEM_MATCH_OBJECT and has non-empty path component.
+     *
+     * Note: we skip empty path components since they are not allowed in index key patterns.
+     * Therefore, $elemMatch with an empty path component can never use an index.
+     *
+     * Example: {"": {$elemMatch: {a: "hi", b: "bye"}}.
+     * In this case the predicate cannot use any indexes since the $elemMatch is with an empty path
+     * component.
+     */
+    static bool isBoundsGeneratingElemMatchObject(const MatchExpression* me) {
+        return arrayUsesIndexOnChildren(me) && !me->path().empty();
+    }
+
+    /**
      * Returns true if 'me' is a NOT, and the child of the NOT can use
      * an index on its own field.
      */
@@ -137,25 +192,60 @@ public:
      */
     static bool isExactBoundsGenerating(BSONElement elt) {
         switch (elt.type()) {
-            case BSONType::NumberLong:
-            case BSONType::NumberDouble:
-            case BSONType::NumberInt:
-            case BSONType::NumberDecimal:
-            case BSONType::String:
-            case BSONType::Bool:
-            case BSONType::Date:
-            case BSONType::bsonTimestamp:
-            case BSONType::jstOID:
-            case BSONType::BinData:
-            case BSONType::Object:
-            case BSONType::Code:
-            case BSONType::CodeWScope:
-            case BSONType::MinKey:
-            case BSONType::MaxKey:
+            case BSONType::numberLong:
+            case BSONType::numberDouble:
+            case BSONType::numberInt:
+            case BSONType::numberDecimal:
+            case BSONType::string:
+            case BSONType::boolean:
+            case BSONType::date:
+            case BSONType::timestamp:
+            case BSONType::oid:
+            case BSONType::binData:
+            case BSONType::object:
+            case BSONType::code:
+            case BSONType::codeWScope:
+            case BSONType::minKey:
+            case BSONType::maxKey:
                 return true;
             default:
                 return false;
         }
+    }
+
+    /**
+     * Check if this match expression is a leaf and is supported by a hashed index.
+     */
+    static bool nodeIsSupportedByHashedIndex(const MatchExpression* queryExpr) {
+        // Hashed fields can answer simple equality predicates.
+        if (ComparisonMatchExpressionBase::isEquality(queryExpr->matchType())) {
+            return true;
+        }
+        if (queryExpr->matchType() == MatchExpression::INTERNAL_EQ_HASHED_KEY) {
+            return true;
+        }
+        // An $in can be answered so long as its operand contains only simple equalities.
+        if (queryExpr->matchType() == MatchExpression::MATCH_IN) {
+            const InMatchExpression* expr = static_cast<const InMatchExpression*>(queryExpr);
+            return expr->getRegexes().empty();
+        }
+        // {$exists:false} produces a single point-interval index bound on [null,null].
+        if (queryExpr->matchType() == MatchExpression::NOT) {
+            return queryExpr->getChild(0)->matchType() == MatchExpression::EXISTS;
+        }
+        // {$exists:true} can be answered using [MinKey, MaxKey] bounds.
+        return (queryExpr->matchType() == MatchExpression::EXISTS);
+    }
+
+    static bool canUseIndexForNin(const InMatchExpression* ime) {
+        return !ime->hasRegex() && ime->getEqualities().size() == 2 && ime->hasNull() &&
+            ime->hasEmptyArray();
+    }
+
+    static bool nodeIsNegationOrElemMatchObj(const MatchExpression* node) {
+        return (node->matchType() == MatchExpression::NOT ||
+                node->matchType() == MatchExpression::NOR ||
+                node->matchType() == MatchExpression::ELEM_MATCH_OBJECT);
     }
 
 private:
@@ -166,22 +256,31 @@ private:
      * Used as a helper for nodeCanUseIndexOnOwnField().
      */
     static bool isIndexOnOwnFieldTypeNode(const MatchExpression* me) {
-        return me->matchType() == MatchExpression::LTE || me->matchType() == MatchExpression::LT ||
-            me->matchType() == MatchExpression::EQ || me->matchType() == MatchExpression::GT ||
-            me->matchType() == MatchExpression::GTE || me->matchType() == MatchExpression::REGEX ||
-            me->matchType() == MatchExpression::MOD ||
-            me->matchType() == MatchExpression::MATCH_IN ||
-            me->matchType() == MatchExpression::TYPE_OPERATOR ||
-            me->matchType() == MatchExpression::GEO ||
-            me->matchType() == MatchExpression::INTERNAL_BUCKET_GEO_WITHIN ||
-            me->matchType() == MatchExpression::GEO_NEAR ||
-            me->matchType() == MatchExpression::EXISTS ||
-            me->matchType() == MatchExpression::TEXT ||
-            me->matchType() == MatchExpression::INTERNAL_EXPR_EQ ||
-            me->matchType() == MatchExpression::INTERNAL_EXPR_GT ||
-            me->matchType() == MatchExpression::INTERNAL_EXPR_GTE ||
-            me->matchType() == MatchExpression::INTERNAL_EXPR_LT ||
-            me->matchType() == MatchExpression::INTERNAL_EXPR_LTE;
+        switch (me->matchType()) {
+            case MatchExpression::LTE:
+            case MatchExpression::LT:
+            case MatchExpression::EQ:
+            case MatchExpression::GT:
+            case MatchExpression::GTE:
+            case MatchExpression::REGEX:
+            case MatchExpression::MOD:
+            case MatchExpression::MATCH_IN:
+            case MatchExpression::TYPE_OPERATOR:
+            case MatchExpression::GEO:
+            case MatchExpression::INTERNAL_BUCKET_GEO_WITHIN:
+            case MatchExpression::GEO_NEAR:
+            case MatchExpression::EXISTS:
+            case MatchExpression::TEXT:
+            case MatchExpression::INTERNAL_EXPR_EQ:
+            case MatchExpression::INTERNAL_EXPR_GT:
+            case MatchExpression::INTERNAL_EXPR_GTE:
+            case MatchExpression::INTERNAL_EXPR_LT:
+            case MatchExpression::INTERNAL_EXPR_LTE:
+            case MatchExpression::INTERNAL_EQ_HASHED_KEY:
+                return true;
+            default:
+                return false;
+        }
     }
 };
 

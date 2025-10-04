@@ -29,6 +29,11 @@
 
 #pragma once
 
+#include "mongo/stdx/exception.h"
+#include "mongo/util/modules.h"
+#include "mongo/util/thread_safety_context.h"
+
+#include <algorithm>
 #include <chrono>
 #include <csignal>
 #include <cstddef>
@@ -39,16 +44,13 @@
 #include <thread>
 #include <type_traits>
 
-#include "mongo/stdx/exception.h"
-#include "mongo/util/thread_safety_context.h"
-
 #if defined(__linux__) || defined(__FreeBSD__)
 #define MONGO_HAS_SIGALTSTACK 1
 #else
 #define MONGO_HAS_SIGALTSTACK 0
 #endif
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace stdx {
 namespace support {
 
@@ -170,17 +172,19 @@ public:
      * NOTE: The `Function f` parameter must be taken by value, not reference or forwarding
      * reference, as it is used on the far side of the thread launch, and this ctor has to properly
      * transfer ownership to the far side's thread.
+     *
+     * Marked noexcept to ensure that the server eagerly crashes when we reach resource limits.
+     * Otherwise, the server will continue to operate in a degraded state and prevent failovers to
+     * healthier nodes.
      */
     template <class Function,
               class... Args,
               std::enable_if_t<!std::is_same_v<thread, std::decay_t<Function>>, int> = 0>
     explicit thread(Function f, Args&&... args) noexcept
         : ::std::thread::thread(  // NOLINT
-              [
-                  sigAltStackController = support::SigAltStackController(),
-                  f = std::move(f),
-                  pack = std::make_tuple(std::forward<Args>(args)...)
-              ]() mutable noexcept {
+              [sigAltStackController = support::SigAltStackController(),
+               f = std::move(f),
+               pack = std::make_tuple(std::forward<Args>(args)...)]() mutable noexcept {
 #if defined(_WIN32)
                   // On Win32 we have to set the terminate handler per thread.
                   // We set it to our universal terminate handler, which people can register via the
@@ -213,40 +217,14 @@ inline void swap(thread& lhs, thread& rhs) noexcept {
 }
 
 namespace this_thread {
-using std::this_thread::get_id;  // NOLINT
-using std::this_thread::yield;   // NOLINT
-
-#ifdef _WIN32
+using std::this_thread::get_id;       // NOLINT
 using std::this_thread::sleep_for;    // NOLINT
 using std::this_thread::sleep_until;  // NOLINT
-#else
-template <class Rep, class Period>
-inline void sleep_for(const std::chrono::duration<Rep, Period>& sleep_duration) {  // NOLINT
-    if (sleep_duration <= sleep_duration.zero())
-        return;
-
-    const auto seconds =
-        std::chrono::duration_cast<std::chrono::seconds>(sleep_duration);  // NOLINT
-    const auto nanoseconds =
-        std::chrono::duration_cast<std::chrono::nanoseconds>(sleep_duration - seconds);  // NOLINT
-    struct timespec sleepVal = {static_cast<std::time_t>(seconds.count()),
-                                static_cast<long>(nanoseconds.count())};
-    struct timespec remainVal;
-    while (nanosleep(&sleepVal, &remainVal) == -1 && errno == EINTR) {
-        sleepVal = remainVal;
-    }
-}
-
-template <class Clock, class Duration>
-void sleep_until(const std::chrono::time_point<Clock, Duration>& sleep_time) {  // NOLINT
-    const auto now = Clock::now();
-    sleep_for(sleep_time - now);
-}
-#endif
+using std::this_thread::yield;        // NOLINT
 }  // namespace this_thread
 
 }  // namespace stdx
 
 static_assert(std::is_move_constructible_v<stdx::thread>);
 static_assert(std::is_move_assignable_v<stdx::thread>);
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

@@ -6,71 +6,68 @@
 //  uses_multi_shard_transaction,
 //  assumes_balancer_off
 // ]
-(function() {
-"use strict";
+import "jstests/multiVersion/libs/verify_versions.js";
 
-load("jstests/libs/fail_point_util.js");
-load("jstests/sharding/libs/sharded_transactions_helpers.js");
-load("jstests/multiVersion/libs/verify_versions.js");
-load("jstests/sharding/libs/find_chunks_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
+import {
+    assertNoSuchTransactionOnAllShards,
+    disableStaleVersionAndSnapshotRetriesWithinTransactions,
+    enableStaleVersionAndSnapshotRetriesWithinTransactions,
+    kShardOptionsForDisabledStaleShardVersionRetries,
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 function expectChunks(st, ns, chunks) {
     for (let i = 0; i < chunks.length; i++) {
-        assert.eq(chunks[i],
-                  findChunksUtil.countChunksForNs(
-                      st.s.getDB("config"), ns, {shard: st["shard" + i].shardName}),
-                  "unexpected number of chunks on shard " + i);
+        assert.eq(
+            chunks[i],
+            findChunksUtil.countChunksForNs(st.s.getDB("config"), ns, {shard: st["shard" + i].shardName}),
+            "unexpected number of chunks on shard " + i,
+        );
     }
 }
 
 const dbName = "test";
 const collName = "foo";
-const ns = dbName + '.' + collName;
+const ns = dbName + "." + collName;
 
 // Disable checking for index consistency to ensure that the config server doesn't trigger a
 // StaleShardVersion exception on shards and cause them to refresh their sharding metadata.
-const nodeOptions = {
-    setParameter: {enableShardedIndexConsistencyCheck: false}
+const configOptions = {
+    setParameter: {enableShardedIndexConsistencyCheck: false},
 };
 
-const st = new ShardingTest(
-    {shards: 3, mongos: 2, other: {configOptions: nodeOptions, enableBalancer: false}});
+const st = new ShardingTest({
+    shards: 3,
+    mongos: 2,
+    other: {
+        rsOptions: kShardOptionsForDisabledStaleShardVersionRetries,
+        configOptions: configOptions,
+        enableBalancer: false,
+    },
+});
 
 enableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 
 // Disable the best-effort recipient metadata refresh after migrations to simplify simulating
 // stale shard version errors.
-assert.commandWorked(st.rs0.getPrimary().adminCommand(
-    {configureFailPoint: "doNotRefreshRecipientAfterCommit", mode: "alwaysOn"}));
-assert.commandWorked(st.rs1.getPrimary().adminCommand(
-    {configureFailPoint: "doNotRefreshRecipientAfterCommit", mode: "alwaysOn"}));
-assert.commandWorked(st.rs2.getPrimary().adminCommand(
-    {configureFailPoint: "doNotRefreshRecipientAfterCommit", mode: "alwaysOn"}));
-
-// TODO SERVER-60415: After 6.0 is released, no longer accept FailPointSetFailed errors
-assert.commandWorkedOrFailedWithCode(
-    st.rs0.getPrimary().adminCommand(
-        {configureFailPoint: "migrationRecipientFailPostCommitRefresh", mode: "alwaysOn"}),
-    ErrorCodes.FailPointSetFailed);
-assert.commandWorkedOrFailedWithCode(
-    st.rs1.getPrimary().adminCommand(
-        {configureFailPoint: "migrationRecipientFailPostCommitRefresh", mode: "alwaysOn"}),
-    ErrorCodes.FailPointSetFailed);
-assert.commandWorkedOrFailedWithCode(
-    st.rs2.getPrimary().adminCommand(
-        {configureFailPoint: "migrationRecipientFailPostCommitRefresh", mode: "alwaysOn"}),
-    ErrorCodes.FailPointSetFailed);
+assert.commandWorked(
+    st.rs0.getPrimary().adminCommand({configureFailPoint: "migrationRecipientFailPostCommitRefresh", mode: "alwaysOn"}),
+);
+assert.commandWorked(
+    st.rs1.getPrimary().adminCommand({configureFailPoint: "migrationRecipientFailPostCommitRefresh", mode: "alwaysOn"}),
+);
+assert.commandWorked(
+    st.rs2.getPrimary().adminCommand({configureFailPoint: "migrationRecipientFailPostCommitRefresh", mode: "alwaysOn"}),
+);
 
 // Shard two collections in the same database, each with 2 chunks, [minKey, 0), [0, maxKey),
 // with one document each, all on Shard0.
 
-assert.commandWorked(
-    st.s.getDB(dbName)[collName].insert({_id: -5}, {writeConcern: {w: "majority"}}));
-assert.commandWorked(
-    st.s.getDB(dbName)[collName].insert({_id: 5}, {writeConcern: {w: "majority"}}));
-
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.getDB(dbName)[collName].insert({_id: -5}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(st.s.getDB(dbName)[collName].insert({_id: 5}, {writeConcern: {w: "majority"}}));
 
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
@@ -80,10 +77,8 @@ expectChunks(st, ns, [2, 0, 0]);
 const otherCollName = "bar";
 const otherNs = dbName + "." + otherCollName;
 
-assert.commandWorked(
-    st.s.getDB(dbName)[otherCollName].insert({_id: -5}, {writeConcern: {w: "majority"}}));
-assert.commandWorked(
-    st.s.getDB(dbName)[otherCollName].insert({_id: 5}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(st.s.getDB(dbName)[otherCollName].insert({_id: -5}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(st.s.getDB(dbName)[otherCollName].insert({_id: 5}, {writeConcern: {w: "majority"}}));
 
 assert.commandWorked(st.s.adminCommand({shardCollection: otherNs, key: {_id: 1}}));
 assert.commandWorked(st.s.adminCommand({split: otherNs, middle: {_id: 0}}));
@@ -103,7 +98,6 @@ assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 5}, to: st.sh
 expectChunks(st, ns, [1, 1, 0]);
 
 session.startTransaction();
-
 // Targets Shard1, which is stale.
 assert.commandWorked(sessionDB.runCommand({find: collName, filter: {_id: 5}}));
 
@@ -117,8 +111,7 @@ expectChunks(st, ns, [1, 1, 0]);
 
 // Move a chunk in the other collection from Shard0 to Shard1 through the main mongos, so Shard1
 // is stale for the other collection but not the router.
-assert.commandWorked(
-    st.s.adminCommand({moveChunk: otherNs, find: {_id: 5}, to: st.shard1.shardName}));
+assert.commandWorked(st.s.adminCommand({moveChunk: otherNs, find: {_id: 5}, to: st.shard1.shardName}));
 expectChunks(st, otherNs, [1, 1, 0]);
 
 session.startTransaction();
@@ -130,7 +123,9 @@ assert.commandWorked(sessionDB.runCommand({find: collName, filter: {_id: 5}}));
 // has executed on Shard1, the retry will not restart the transaction, and will fail when it
 // finds the transaction has aborted because of the stale shard version.
 let res = assert.commandFailedWithCode(
-    sessionDB.runCommand({find: otherCollName, filter: {_id: 5}}), ErrorCodes.NoSuchTransaction);
+    sessionDB.runCommand({find: otherCollName, filter: {_id: 5}}),
+    ErrorCodes.NoSuchTransaction,
+);
 assert.eq(res.errorLabels, ["TransientTransactionError"]);
 
 assertNoSuchTransactionOnAllShards(st, session.getSessionId(), session.getTxnNumber_forTesting());
@@ -144,8 +139,7 @@ expectChunks(st, ns, [1, 1, 0]);
 
 // Move a chunk for the other collection from Shard1 to Shard0 through the main mongos, so
 // Shard0 is stale for it and the router is not.
-assert.commandWorked(
-    st.s.adminCommand({moveChunk: otherNs, find: {_id: 5}, to: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({moveChunk: otherNs, find: {_id: 5}, to: st.shard0.shardName}));
 expectChunks(st, otherNs, [2, 0, 0]);
 
 session.startTransaction();
@@ -165,8 +159,7 @@ assert.commandWorked(session.commitTransaction_forTesting());
 // Move a chunk in the first collection from Shard1 to Shard0 through the other mongos, so
 // Shard1 and the main mongos are stale for it.
 const otherMongos = st.s1;
-assert.commandWorked(
-    otherMongos.adminCommand({moveChunk: ns, find: {_id: 5}, to: st.shard0.shardName}));
+assert.commandWorked(otherMongos.adminCommand({moveChunk: ns, find: {_id: 5}, to: st.shard0.shardName}));
 expectChunks(st, ns, [2, 0, 0]);
 
 session.startTransaction();
@@ -178,13 +171,18 @@ assert.commandWorked(sessionDB.runCommand({find: collName, filter: {_id: 5}}));
 assert.commandWorked(session.commitTransaction_forTesting());
 
 // Verify there is no in-progress transaction on Shard1.
-res = assert.commandFailedWithCode(st.rs1.getPrimary().getDB(dbName).runCommand({
-    find: collName,
-    lsid: session.getSessionId(),
-    txnNumber: NumberLong(session.getTxnNumber_forTesting()),
-    autocommit: false,
-}),
-                                   ErrorCodes.NoSuchTransaction);
+res = assert.commandFailedWithCode(
+    st.rs1
+        .getPrimary()
+        .getDB(dbName)
+        .runCommand({
+            find: collName,
+            lsid: session.getSessionId(),
+            txnNumber: NumberLong(session.getTxnNumber_forTesting()),
+            autocommit: false,
+        }),
+    ErrorCodes.NoSuchTransaction,
+);
 assert.eq(res.errorLabels, ["TransientTransactionError"]);
 
 //
@@ -251,15 +249,13 @@ assert.commandWorked(session.commitTransaction_forTesting());
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: -5}, to: st.shard0.shardName}));
 expectChunks(st, ns, [1, 0, 1]);
 
-// Disable metadata refreshes on the stale shard so it will indefinitely return a stale version
-// error.
-assert.commandWorked(st.rs0.getPrimary().adminCommand(
-    {configureFailPoint: "skipShardFilteringMetadataRefresh", mode: "alwaysOn"}));
-
 session.startTransaction();
 
 // Target Shard2, to verify the transaction on it is aborted implicitly later.
 assert.commandWorked(sessionDB.runCommand({find: collName, filter: {_id: 5}}));
+
+// Make metadata refreshes on the stale shard indefinitely return StaleConfig.
+const fp = configureFailPoint(st.rs0.getPrimary(), "alwaysThrowStaleConfigInfo");
 
 // Targets all shards. Shard0 is stale and won't refresh its metadata, so mongos should exhaust
 // its retries and implicitly abort the transaction.
@@ -270,10 +266,8 @@ assert.eq(res.errorLabels, ["TransientTransactionError"]);
 assertNoSuchTransactionOnAllShards(st, session.getSessionId(), session.getTxnNumber_forTesting());
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
-assert.commandWorked(st.rs0.getPrimary().adminCommand(
-    {configureFailPoint: "skipShardFilteringMetadataRefresh", mode: "off"}));
+fp.off();
 
 disableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 
 st.stop();
-})();

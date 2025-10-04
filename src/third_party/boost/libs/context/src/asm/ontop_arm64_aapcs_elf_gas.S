@@ -55,6 +55,7 @@
 .text
 .align  2
 .global ontop_fcontext
+.hidden ontop_fcontext
 .type   ontop_fcontext, %function
 ontop_fcontext:
     # prepare stack for GP + FPU

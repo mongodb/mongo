@@ -2,19 +2,17 @@
 // because of stepping down. In a two node replset, this rejection will prevent
 // smooth priority takeover.
 
-(function() {
-"use strict";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {setLogVerbosity} from "jstests/replsets/rslib.js";
 
-load("jstests/replsets/rslib.js");
-
-var name = "two_nodes_priority_take_over";
-var rst = new ReplSetTest({name: name, nodes: 2});
+let name = "two_nodes_priority_take_over";
+let rst = new ReplSetTest({name: name, nodes: 2});
 
 rst.startSet();
 var conf = rst.getReplSetConfig();
 conf.members[0].priority = 2;
 conf.members[1].priority = 1;
-rst.initiate(conf);
+rst.initiate(conf, null, {initiateWithDefaultElectionTimeout: true});
 rst.awaitSecondaryNodes();
 
 // Increase the verbosity for everything except storage on all nodes.
@@ -24,9 +22,9 @@ setLogVerbosity(rst.nodes, {"verbosity": 4, "storage": {"verbosity": 1}});
 rst.waitForState(rst.nodes[0], ReplSetTest.State.PRIMARY);
 
 // Get the term when replset is stable.
-var res = rst.getPrimary().adminCommand("replSetGetStatus");
+let res = rst.getPrimary().adminCommand("replSetGetStatus");
 assert.commandWorked(res);
-var stableTerm = res.term;
+let stableTerm = res.term;
 
 // Reconfig to change priorities. The current primary remains the same until
 // the higher priority node takes over.
@@ -41,7 +39,7 @@ rst.waitForState(rst.nodes[1], ReplSetTest.State.PRIMARY, 60 * 1000);
 
 res = rst.getPrimary().adminCommand("replSetGetStatus");
 assert.commandWorked(res);
-var newTerm = res.term;
+let newTerm = res.term;
 
 // Priority takeover should happen smoothly without failed election as there is
 // no current candidate. If vote requests failed (wrongly) for some reason,
@@ -49,4 +47,3 @@ var newTerm = res.term;
 assert.eq(newTerm, stableTerm + 1);
 
 rst.stopSet();
-})();

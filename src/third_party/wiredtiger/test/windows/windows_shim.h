@@ -25,8 +25,12 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+
+#pragma once
+
 #include "wt_internal.h"
 
+#include <sys/utime.h>
 #include <direct.h> /* _mkdir */
 
 /* Windows does not define constants for access() */
@@ -41,9 +45,17 @@
 #define strcasecmp stricmp
 
 /*
+ * Emulate <linux/limits.h>
+ */
+#ifndef PATH_MAX
+#define PATH_MAX 1024
+#endif
+
+/*
  * Emulate <sys/stat.h>
  */
 #define mkdir(path, mode) _mkdir(path)
+#define S_ISDIR(mode) ((mode & _S_IFDIR) == _S_IFDIR)
 
 /*
  * Emulate <sys/time.h>
@@ -56,6 +68,26 @@ struct timeval {
 int gettimeofday(struct timeval *tp, void *tzp);
 
 /*
+ * Emulate <sys/types.h>
+ */
+typedef int pid_t;
+
+/*
+ * Emulate <glob.h>
+ */
+#define GLOB_NOSPACE 1 /* Ran out of memory. */
+#define GLOB_ABORTED 2 /* Read error. */
+#define GLOB_NOMATCH 3 /* No matches found. */
+
+typedef struct {
+    size_t gl_pathc;
+    char **gl_pathv;
+} glob_t;
+
+int glob(const char *pattern, int flags, int (*error_func)(const char *, int), glob_t *buffer);
+int globfree(glob_t *buffer);
+
+/*
  * Emulate <unistd.h>
  */
 typedef uint32_t useconds_t;
@@ -64,6 +96,7 @@ int sleep(int seconds);
 int usleep(useconds_t useconds);
 
 #define lseek(fd, offset, origin) _lseek(fd, (long)(offset), origin)
+#define read(fd, buffer, count) _read(fd, buffer, (unsigned int)(count))
 #define write(fd, buffer, count) _write(fd, buffer, (unsigned int)(count))
 
 /*
@@ -94,3 +127,8 @@ int pthread_rwlock_tryrdlock(pthread_rwlock_t *);
 int pthread_rwlock_trywrlock(pthread_rwlock_t *);
 int pthread_rwlock_unlock(pthread_rwlock_t *);
 int pthread_rwlock_wrlock(pthread_rwlock_t *);
+
+/*
+ * Other useful Windows-specific functionality.
+ */
+const char *last_windows_error_message(void);

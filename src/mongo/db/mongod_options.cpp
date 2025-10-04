@@ -27,20 +27,20 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
 #include "mongo/db/mongod_options.h"
 
-#include <boost/filesystem.hpp>
-#include <iostream>
-#include <string>
-#include <vector>
-
-#include "mongo/base/init.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/bson/oid.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/config.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/auth/cluster_auth_mode.h"
 #include "mongo/db/cluster_auth_mode_option_gen.h"
 #include "mongo/db/global_settings.h"
@@ -50,23 +50,50 @@
 #include "mongo/db/mongod_options_replication_gen.h"
 #include "mongo/db/mongod_options_sharding_gen.h"
 #include "mongo/db/mongod_options_storage_gen.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/db/repl/repl_set_config_params_gen.h"
 #include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_options_base.h"
 #include "mongo/db/server_options_nongeneral_gen.h"
 #include "mongo/db/server_options_server_helpers.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
+#include "mongo/db/storage/storage_options.h"
+#include "mongo/db/topology/cluster_role.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_domain_global.h"
-#include "mongo/logv2/log_manager.h"
-#include "mongo/util/net/ssl_options.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/str.h"
 #include "mongo/util/version.h"
 
+#include <algorithm>
+#include <initializer_list>
+#include <iostream>
+#include <iterator>
+#include <map>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/filesystem.hpp>  // IWYU pragma: keep
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
+
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
+
+
 namespace mongo {
 
-using std::endl;
 
 std::string storageDBPathDescription() {
     StringBuilder sb;
@@ -118,6 +145,48 @@ void appendSysInfo(BSONObjBuilder* obj) {
 #endif
 }
 
+StatusWith<repl::ReplSettings> populateReplSettings(const moe::Environment& params) {
+    repl::ReplSettings replSettings;
+
+    if (params.count("replication.replSet")) {
+        /* seed list of hosts for the repl set */
+        replSettings.setReplSetString(params["replication.replSet"].as<std::string>().c_str());
+    } else if (params.count("replication.replSetName")) {
+        // "replSetName" is previously removed if "replSet" and "replSetName" are both found to be
+        // set by the user. Therefore, we only need to check for it if "replSet" in not found.
+        replSettings.setReplSetString(params["replication.replSetName"].as<std::string>().c_str());
+    } else if (gFeatureFlagAllMongodsAreSharded.isEnabledUseLatestFCVWhenUninitialized(
+                   kNoVersionContext,
+                   serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+               serverGlobalParams.maintenanceMode != ServerGlobalParams::StandaloneMode) {
+        replSettings.setShouldAutoInitiate();
+        // Empty `replSet` in replSettings means that the replica set name will be auto-generated
+        // in `processReplSetInitiate` after auto-initiation occurs or loaded from the
+        // local replica set configuration document if already part of a replica set.
+    }
+
+    if (params.count("replication.oplogSizeMB")) {
+        long long x = params["replication.oplogSizeMB"].as<int>();
+        if (x <= 0) {
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "bad --oplogSize, arg must be greater than 0,"
+                                           "found: "
+                                        << x);
+        }
+        // note a small size such as x==1 is ok for an arbiter.
+        if (x > 1000 && sizeof(void*) == 4) {
+            StringBuilder sb;
+            sb << "--oplogSize of " << x
+               << "MB is too big for 32 bit version. Use 64 bit build instead.";
+            return Status(ErrorCodes::BadValue, sb.str());
+        }
+        replSettings.setOplogSizeBytes(x * 1024 * 1024);
+        invariant(replSettings.getOplogSizeBytes() > 0);
+    }
+
+    return replSettings;
+}
+
 }  // namespace
 
 bool handlePreValidationMongodOptions(const moe::Environment& params,
@@ -144,12 +213,6 @@ bool handlePreValidationMongodOptions(const moe::Environment& params,
         return false;
     }
 
-    if (params.count("replication.enableMajorityReadConcern") &&
-        params["replication.enableMajorityReadConcern"].as<bool>() == false) {
-        LOGV2_FATAL_CONTINUE(5324700, "enableMajorityReadConcern:false is no longer supported");
-        return false;
-    }
-
     return true;
 }
 
@@ -157,11 +220,6 @@ Status validateMongodOptions(const moe::Environment& params) {
     Status ret = validateServerOptions(params);
     if (!ret.isOK()) {
         return ret;
-    }
-
-    if (params.count("nojournal") && params.count("storage.journal.enabled")) {
-        return Status(ErrorCodes::BadValue,
-                      "Can't specify both --journal and --nojournal options.");
     }
 
 #ifdef _WIN32
@@ -174,10 +232,36 @@ Status validateMongodOptions(const moe::Environment& params) {
     }
 #endif
 
+    bool setConfigRole = params.count("configsvr");
+    bool setShardRole = params.count("shardsvr");
+    if (params.count("sharding.clusterRole")) {
+        auto clusterRole = params["sharding.clusterRole"].as<std::string>();
+        setConfigRole = setConfigRole || clusterRole == "configsvr";
+        setShardRole = setShardRole || clusterRole == "shardsvr";
+    }
+
+    if (params.count("maintenanceMode")) {
+        auto maintenanceMode = params["maintenanceMode"].as<std::string>();
+        if (maintenanceMode == "standalone" &&
+            (params.count("replSet") || params.count("replication.replSetName"))) {
+            return Status(ErrorCodes::BadValue,
+                          "Cannot specify both standalone maintenance mode and replica set name");
+        }
+    }
+
+    if (params.count("replicaSetConfigShardMaintenanceMode")) {
+        bool isReplSet = params.count("replSet") || params.count("replication.replSet");
+        if (!isReplSet && !setConfigRole) {
+            return Status(ErrorCodes::BadValue,
+                          "replicaSetConfigShardMaintenanceMode can only be used on replicasets or "
+                          "configservers");
+        }
+    }
+
     if (params.count("storage.queryableBackupMode")) {
         // Command line options that are disallowed when --queryableBackupMode is specified.
         for (const auto& disallowedOption :
-             {"replication.replSet", "configsvr", "upgrade", "repair", "profile"}) {
+             {"replication.replSet", "configsvr", "upgrade", "repair", "profile", "restore"}) {
             if (params.count(disallowedOption)) {
                 return Status(ErrorCodes::BadValue,
                               str::stream() << "Cannot specify both queryable backup mode and "
@@ -185,13 +269,7 @@ Status validateMongodOptions(const moe::Environment& params) {
             }
         }
 
-        bool isClusterRoleShard = params.count("shardsvr");
-        if (params.count("sharding.clusterRole")) {
-            auto clusterRole = params["sharding.clusterRole"].as<std::string>();
-            isClusterRoleShard = isClusterRoleShard || (clusterRole == "shardsvr");
-        }
-
-        if (isClusterRoleShard && !params.count("sharding._overrideShardIdentity")) {
+        if (setShardRole && !params.count("sharding._overrideShardIdentity")) {
             return Status(
                 ErrorCodes::BadValue,
                 "shardsvr cluster role with queryableBackupMode requires _overrideShardIdentity");
@@ -202,22 +280,9 @@ Status validateMongodOptions(const moe::Environment& params) {
 }
 
 Status canonicalizeMongodOptions(moe::Environment* params) {
-
     Status ret = canonicalizeServerOptions(params);
     if (!ret.isOK()) {
         return ret;
-    }
-
-    if (params->count("nojournal")) {
-        Status ret =
-            params->set("storage.journal.enabled", moe::Value(!(*params)["nojournal"].as<bool>()));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = params->remove("nojournal");
-        if (!ret.isOK()) {
-            return ret;
-        }
     }
 
     // "security.authorization" comes from the config file, so override it if "auth" is
@@ -231,31 +296,6 @@ Status canonicalizeMongodOptions(moe::Environment* params) {
             return ret;
         }
         ret = params->remove("auth");
-        if (!ret.isOK()) {
-            return ret;
-        }
-    }
-
-    // "sharding.archiveMovedChunks" comes from the config file, so override it if
-    // "noMoveParanoia" or "moveParanoia" are set since those come from the command line.
-    if (params->count("noMoveParanoia")) {
-        Status ret = params->set("sharding.archiveMovedChunks",
-                                 moe::Value(!(*params)["noMoveParanoia"].as<bool>()));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = params->remove("noMoveParanoia");
-        if (!ret.isOK()) {
-            return ret;
-        }
-    }
-    if (params->count("moveParanoia")) {
-        Status ret = params->set("sharding.archiveMovedChunks",
-                                 moe::Value((*params)["moveParanoia"].as<bool>()));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = params->remove("moveParanoia");
         if (!ret.isOK()) {
             return ret;
         }
@@ -353,11 +393,45 @@ Status canonicalizeMongodOptions(moe::Environment* params) {
     return Status::OK();
 }
 
+namespace {
+constexpr char getPathSeparator() {
+#ifdef _WIN32
+    return '\\';
+#else
+    return '/';
+#endif
+}
+
+void removeTrailingPathSeparator(std::string& path, char separator) {
+    while (path.size() > 1 && path.ends_with(separator)) {
+        // size() check is for the unlikely possibility of --dbpath "/"
+        path.pop_back();
+    }
+}
+}  // namespace
+
 Status storeMongodOptions(const moe::Environment& params) {
     Status ret = storeServerOptions(params);
     if (!ret.isOK()) {
         return ret;
     }
+
+    boost::optional<std::map<std::string, std::string>> setParameterMap;
+    if (params.count("setParameter")) {
+        setParameterMap.emplace(params["setParameter"].as<std::map<std::string, std::string>>());
+    }
+
+    auto checkConflictWithSetParameter = [&setParameterMap](const std::string& configName,
+                                                            const std::string& parameterName) {
+        if (setParameterMap && setParameterMap->find(parameterName) != setParameterMap->end()) {
+            return Status(ErrorCodes::BadValue,
+                          fmt::format("Conflicting server setting and setParameter, only one of "
+                                      "the two should be used: config={}, setParameter={}",
+                                      configName,
+                                      parameterName));
+        }
+        return Status::OK();
+    };
 
     // TODO: Integrate these options with their setParameter counterparts
     if (params.count("security.authSchemaVersion")) {
@@ -386,16 +460,11 @@ Status storeMongodOptions(const moe::Environment& params) {
             storageGlobalParams.dbpath = serverGlobalParams.cwd + "/" + storageGlobalParams.dbpath;
         }
     }
-#ifdef _WIN32
-    if (storageGlobalParams.dbpath.size() > 1 &&
-        storageGlobalParams.dbpath[storageGlobalParams.dbpath.size() - 1] == '/') {
-        // size() check is for the unlikely possibility of --dbpath "/"
-        storageGlobalParams.dbpath =
-            storageGlobalParams.dbpath.erase(storageGlobalParams.dbpath.size() - 1);
-    }
+    removeTrailingPathSeparator(storageGlobalParams.dbpath, getPathSeparator());
 
+#ifdef _WIN32
     StringData dbpath(storageGlobalParams.dbpath);
-    if (dbpath.size() >= 2 && dbpath.startsWith("\\\\")) {
+    if (dbpath.size() >= 2 && dbpath.starts_with("\\\\")) {
         // Check if the dbpath is on a Windows network share (eg. \\myserver\myshare)
         LOGV2_WARNING_OPTIONS(5808500,
                               {logv2::LogTag::kStartupWarnings},
@@ -420,15 +489,11 @@ Status storeMongodOptions(const moe::Environment& params) {
     }
 
     if (params.count("storage.syncPeriodSecs")) {
-        storageGlobalParams.syncdelay = params["storage.syncPeriodSecs"].as<double>();
-        storageGlobalParams.checkpointDelaySecs =
-            static_cast<size_t>(params["storage.syncPeriodSecs"].as<double>());
-
-        if (storageGlobalParams.syncdelay < 0 ||
-            storageGlobalParams.syncdelay > StorageGlobalParams::kMaxSyncdelaySecs) {
-            return Status(ErrorCodes::BadValue,
-                          str::stream() << "syncdelay out of allowed range (0-"
-                                        << StorageGlobalParams::kMaxSyncdelaySecs << "s)");
+        storageGlobalParams.syncdelay.store(params["storage.syncPeriodSecs"].as<double>());
+        Status conflictStatus =
+            checkConflictWithSetParameter("storage.syncPeriodSecs", "syncdelay");
+        if (!conflictStatus.isOK()) {
+            return conflictStatus;
         }
     }
 
@@ -438,29 +503,20 @@ Status storeMongodOptions(const moe::Environment& params) {
 
     if (params.count("storage.queryableBackupMode") &&
         params["storage.queryableBackupMode"].as<bool>()) {
-        storageGlobalParams.readOnly = true;
+        storageGlobalParams.queryableBackupMode = true;
     }
 
     if (params.count("storage.groupCollections")) {
         storageGlobalParams.groupCollections = params["storage.groupCollections"].as<bool>();
     }
 
-    if (params.count("storage.journal.enabled")) {
-        storageGlobalParams.dur = params["storage.journal.enabled"].as<bool>();
-    }
-
     if (params.count("storage.journal.commitIntervalMs")) {
-        // don't check if dur is false here as many will just use the default, and will default
-        // to off on win32.  ie no point making life a little more complex by giving an error on
-        // a dev environment.
         auto journalCommitIntervalMs = params["storage.journal.commitIntervalMs"].as<int>();
         storageGlobalParams.journalCommitIntervalMs.store(journalCommitIntervalMs);
-        if (journalCommitIntervalMs < 1 ||
-            journalCommitIntervalMs > StorageGlobalParams::kMaxJournalCommitIntervalMs) {
-            return Status(ErrorCodes::BadValue,
-                          str::stream()
-                              << "--journalCommitInterval out of allowed range (1-"
-                              << StorageGlobalParams::kMaxJournalCommitIntervalMs << "ms)");
+        Status conflictStatus = checkConflictWithSetParameter("storage.journal.commitIntervalMs",
+                                                              "journalCommitInterval");
+        if (!conflictStatus.isOK()) {
+            return conflictStatus;
         }
     }
 
@@ -485,24 +541,64 @@ Status storeMongodOptions(const moe::Environment& params) {
         storageGlobalParams.upgrade = 1;  // --repair implies --upgrade
         storageGlobalParams.repair = 1;
     }
+    if (params.count("validate") && params["validate"].as<bool>() == true) {
+        storageGlobalParams.validate = 1;
+        if (params.count("validateDbName")) {
+            gValidateDbName = params["validateDbName"].as<std::string>();
+            if (params.count("validateCollectionName")) {
+                gValidateCollectionName = params["validateCollectionName"].as<std::string>();
+            }
+        } else if (params.count("validateCollectionName")) {
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "Cannot specify collection name without DB name");
+        }
+    }
     if (params.count("upgrade") && params["upgrade"].as<bool>() == true) {
         storageGlobalParams.upgrade = 1;
     }
     if (params.count("notablescan")) {
         storageGlobalParams.noTableScan.store(params["notablescan"].as<bool>());
     }
+    if (params.count("restore") && params["restore"].as<bool>() == true) {
+        storageGlobalParams.restore = 1;
 
-    repl::ReplSettings replSettings;
-    if (params.count("replication.replSet")) {
-        /* seed list of hosts for the repl set */
-        replSettings.setReplSetString(params["replication.replSet"].as<std::string>().c_str());
-    } else if (params.count("replication.replSetName")) {
-        // "replSetName" is previously removed if "replSet" and "replSetName" are both found to be
-        // set by the user. Therefore, we only need to check for it if "replSet" in not found.
-        replSettings.setReplSetString(params["replication.replSetName"].as<std::string>().c_str());
+        if (storageGlobalParams.repair) {
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "Cannot specify both --repair and --restore");
+        }
+    }
+
+    if (params.count("maintenanceMode") &&
+        gFeatureFlagAllMongodsAreSharded.isEnabledUseLatestFCVWhenUninitialized(
+            kNoVersionContext, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        // Setting maintenanceMode will disable sharding by setting 'clusterRole' to
+        // 'ClusterRole::None'. If maintenanceMode is set to 'standalone', replication will be
+        // disabled as well.
+        std::string value = params["maintenanceMode"].as<std::string>();
+        serverGlobalParams.maintenanceMode = (value == "replicaSet")
+            ? ServerGlobalParams::ReplicaSetMode
+            : ServerGlobalParams::StandaloneMode;
+    }
+    if (params.count("replicaSetConfigShardMaintenanceMode")) {
+        serverGlobalParams.replicaSetConfigShardMaintenanceMode = true;
+    }
+
+    const auto replSettingsWithStatus = populateReplSettings(params);
+    if (!replSettingsWithStatus.isOK())
+        return replSettingsWithStatus.getStatus();
+    const repl::ReplSettings& replSettings(replSettingsWithStatus.getValue());
+
+    if (replSettings.isReplSet()) {
+        if ((params.count("security.authorization") &&
+             params["security.authorization"].as<std::string>() == "enabled") &&
+            !serverGlobalParams.startupClusterAuthMode.x509Only() &&
+            serverGlobalParams.keyFile.empty()) {
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "security.keyFile is required when authorization is "
+                                           "enabled with replica sets");
+        }
     } else {
-        // If neither "replication.replSet" nor "replication.replSetName" is set, then we are in
-        // standalone mode.
+        // If we are not using a replica set, then we are in standalone mode.
         //
         // A standalone node does not use the oplog collection, so special truncation handling for
         // the capped collection is unnecessary.
@@ -512,62 +608,31 @@ Status storeMongodOptions(const moe::Environment& params) {
         // a replica set member could be deleted. Replication can need history older than the last
         // checkpoint to support transactions.
         //
-        // Note: we only use this to defer oplog collection truncation via OplogStones in WT. Non-WT
-        // storage engines will continue to perform regular capped collection handling for the oplog
-        // collection, regardless of this parameter setting.
+        // Note: we only use this to defer oplog collection truncation via OplogTruncateMarkers in
+        // WT. Non-WT storage engines will continue to perform regular capped collection handling
+        // for the oplog collection, regardless of this parameter setting.
         storageGlobalParams.allowOplogTruncation = false;
     }
 
-    if (!replSettings.getReplSetString().empty() &&
-        (params.count("security.authorization") &&
-         params["security.authorization"].as<std::string>() == "enabled") &&
-        !serverGlobalParams.startupClusterAuthMode.x509Only() &&
-        serverGlobalParams.keyFile.empty()) {
-        return Status(
-            ErrorCodes::BadValue,
-            str::stream()
-                << "security.keyFile is required when authorization is enabled with replica sets");
-    }
-
-    serverGlobalParams.enableMajorityReadConcern = true;
-
-    if (storageGlobalParams.engineSetByUser &&
-        (storageGlobalParams.engine == "ephemeralForTest" ||
-         storageGlobalParams.engine == "devnull")) {
-        LOGV2(5324701,
-              "Test storage engine does not support enableMajorityReadConcern=true, forcibly "
-              "setting to false",
-              "storageEngine"_attr = storageGlobalParams.engine);
-        serverGlobalParams.enableMajorityReadConcern = false;
-    }
-
-    if (!serverGlobalParams.enableMajorityReadConcern) {
-        // Lock-free reads is not supported with enableMajorityReadConcern=false, so we disable it.
-        if (!storageGlobalParams.disableLockFreeReads) {
-            LOGV2_WARNING(4788401,
-                          "Lock-free reads is not compatible with "
-                          "enableMajorityReadConcern=false: disabling lock-free reads.");
-            storageGlobalParams.disableLockFreeReads = true;
-        }
-    }
-
-    if (params.count("replication.oplogSizeMB")) {
-        long long x = params["replication.oplogSizeMB"].as<int>();
-        if (x <= 0) {
+    if (params.count("magicRestore") && params["magicRestore"].as<bool>() == true) {
+        if (!replSettings.isReplSet()) {
             return Status(ErrorCodes::BadValue,
-                          str::stream() << "bad --oplogSize, arg must be greater than 0,"
-                                           "found: "
-                                        << x);
+                          str::stream() << "Cannot start magic restore without --replSet.");
         }
-        // note a small size such as x==1 is ok for an arbiter.
-        if (x > 1000 && sizeof(void*) == 4) {
-            StringBuilder sb;
-            sb << "--oplogSize of " << x
-               << "MB is too big for 32 bit version. Use 64 bit build instead.";
-            return Status(ErrorCodes::BadValue, sb.str());
+
+        if (params.count("sharding.clusterRole")) {
+            return Status(ErrorCodes::BadValue,
+                          str::stream()
+                              << "Cannot start magic restore with --shardsvr or --configsvr. Magic "
+                                 "restore performs the restore procedure as a replica set node.");
         }
-        replSettings.setOplogSizeBytes(x * 1024 * 1024);
-        invariant(replSettings.getOplogSizeBytes() > 0);
+
+        storageGlobalParams.magicRestore = 1;
+
+        // Use an ephemeral port so that users don't connect to a node that is being restored.
+        if (!params.count("net.port")) {
+            serverGlobalParams.port = ServerGlobalParams::DefaultMagicRestorePort;
+        }
     }
 
     if (params.count("storage.oplogMinRetentionHours")) {
@@ -587,62 +652,57 @@ Status storeMongodOptions(const moe::Environment& params) {
         }
         return Status(ErrorCodes::BadValue, "--cacheSize option not currently supported");
     }
-    if (!params.count("net.port")) {
-        if (params.count("sharding.clusterRole")) {
-            std::string clusterRole = params["sharding.clusterRole"].as<std::string>();
-            if (clusterRole == "configsvr") {
-                serverGlobalParams.port = ServerGlobalParams::ConfigServerPort;
-            } else if (clusterRole == "shardsvr") {
-                serverGlobalParams.port = ServerGlobalParams::ShardServerPort;
-            } else {
-                StringBuilder sb;
-                sb << "Bad value for sharding.clusterRole: " << clusterRole
-                   << ".  Supported modes are: (configsvr|shardsvr)";
-                return Status(ErrorCodes::BadValue, sb.str());
-            }
-        }
-    } else {
-        if (serverGlobalParams.port < 0 || serverGlobalParams.port > 65535) {
-            return Status(ErrorCodes::BadValue, "bad --port number");
-        }
-    }
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     if (params.count("sharding.clusterRole")) {
         auto clusterRoleParam = params["sharding.clusterRole"].as<std::string>();
-        const bool replicationEnabled =
-            params.count("replication.replSet") || params.count("replication.replSetName");
         // Force to set up the node as a replica set, unless we're a shard and we're using queryable
         // backup mode.
         if ((clusterRoleParam == "configsvr" || !params.count("storage.queryableBackupMode")) &&
-            !replicationEnabled) {
+            !replSettings.isReplSet()) {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "Cannot start a " << clusterRoleParam
                                         << " as a standalone server. Please use the option "
-                                           "--replset to start the node as a replica set.");
+                                           "--replSet to start the node as a replica set.");
         }
         if (clusterRoleParam == "configsvr") {
-            serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
-            // Config server requires majority read concern.
-            uassert(5324702,
-                    str::stream() << "Cannot initialize config server with "
-                                  << "enableMajorityReadConcern=false",
-                    serverGlobalParams.enableMajorityReadConcern);
-
-            // If we haven't explicitly specified a journal option, default journaling to true for
-            // the config server role
-            if (!params.count("storage.journal.enabled")) {
-                storageGlobalParams.dur = true;
-            }
+            serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
 
             if (!params.count("storage.dbPath")) {
                 storageGlobalParams.dbpath = storageGlobalParams.kDefaultConfigDbPath;
             }
         } else if (clusterRoleParam == "shardsvr") {
             serverGlobalParams.clusterRole = ClusterRole::ShardServer;
+        } else {
+            return Status(ErrorCodes::BadValue,
+                          fmt::format("Bad value for sharding.clusterRole: {}. Supported modes "
+                                      "are: (configsvr|shardsvr)",
+                                      clusterRoleParam));
         }
+
+        // Every node in a sharded cluster will have by default the RouterServer role. As a
+        // consequence, the only possible combinations are:
+        // - { ShardServer, RouterServer }
+        // - { ShardServer, ConfigServer, RouterServer }
+        // - { RouterServer }
+        serverGlobalParams.clusterRole += ClusterRole::RouterServer;
+    } else if (gFeatureFlagAllMongodsAreSharded.isEnabledUseLatestFCVWhenUninitialized(
+                   kNoVersionContext, fcvSnapshot) &&
+               serverGlobalParams.maintenanceMode == ServerGlobalParams::MaintenanceMode::None) {
+        serverGlobalParams.doAutoBootstrapSharding = true;
+        serverGlobalParams.clusterRole = {
+            ClusterRole::ShardServer, ClusterRole::ConfigServer, ClusterRole::RouterServer};
     }
 
-    if (params.count("sharding.archiveMovedChunks")) {
-        serverGlobalParams.moveParanoia = params["sharding.archiveMovedChunks"].as<bool>();
+    if (params.count("net.proxyPort")) {
+        serverGlobalParams.proxyPort = params["net.proxyPort"].as<int>();
+    }
+
+    if (!params.count("net.port")) {
+        if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
+            serverGlobalParams.port = ServerGlobalParams::ConfigServerPort;
+        } else if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
+            serverGlobalParams.port = ServerGlobalParams::ShardServerPort;
+        }
     }
 
     if (params.count("sharding._overrideShardIdentity")) {
@@ -674,13 +734,6 @@ Status storeMongodOptions(const moe::Environment& params) {
         storageGlobalParams.dbpath = currentPath.root_name().string() + storageGlobalParams.dbpath;
     }
 #endif
-
-    // Check if we are 32 bit and have not explicitly specified any journaling options
-    if (sizeof(void*) == 4 && !params.count("storage.journal.enabled")) {
-        LOGV2_WARNING(20880,
-                      "32-bit servers don't have journaling enabled by default. Please use "
-                      "--journal if you want durability");
-    }
 
     bool isClusterRoleShard = params.count("shardsvr");
     bool isClusterRoleConfig = params.count("configsvr");
@@ -720,5 +773,4 @@ Status storeMongodOptions(const moe::Environment& params) {
     setGlobalReplSettings(replSettings);
     return Status::OK();
 }
-
 }  // namespace mongo

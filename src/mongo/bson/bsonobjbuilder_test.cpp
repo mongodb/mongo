@@ -27,13 +27,36 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <initializer_list>
+#include <limits>
+#include <list>
+#include <ostream>
+#include <set>
+#include <string>
 #include <type_traits>
+#include <utility>
+#include <vector>
 
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
+#include <boost/container/small_vector.hpp>
+#include <boost/container/vector.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+#include "mongo/base/data_range.h"
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/static_assert.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/shared_buffer.h"
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace {
@@ -66,8 +89,8 @@ void assertBSONTypeEquals(BSONType actual, BSONType expected, T value, int i) {
 
 TEST(BSONObjBuilderTest, AppendInt64T) {
     auto obj = BSON("a" << int64_t{5} << "b" << int64_t{1ll << 40});
-    ASSERT_EQ(obj["a"].type(), NumberLong);
-    ASSERT_EQ(obj["b"].type(), NumberLong);
+    ASSERT_EQ(obj["a"].type(), BSONType::numberLong);
+    ASSERT_EQ(obj["b"].type(), BSONType::numberLong);
     ASSERT_EQ(obj["a"].Long(), 5);
     ASSERT_EQ(obj["b"].Long(), 1ll << 40);
 }
@@ -99,32 +122,32 @@ TEST(BSONObjBuilderTest, AppendNumberLongLong) {
     struct {
         long long v;
         BSONType t;
-    } data[] = {{0, mongo::NumberInt},
-                {-100, mongo::NumberInt},
-                {100, mongo::NumberInt},
-                {minInt, mongo::NumberInt},
-                {maxInt, mongo::NumberInt},
-                {minInt - 1, mongo::NumberLong},
-                {maxInt + 1, mongo::NumberLong},
-                {minEncodableDouble, mongo::NumberLong},
-                {maxEncodableDouble, mongo::NumberLong},
-                {minEncodableDouble - 1, mongo::NumberLong},
-                {maxEncodableDouble + 1, mongo::NumberLong},
-                {minDouble, mongo::NumberLong},
-                {maxDouble, mongo::NumberLong},
-                {minDouble - 1, mongo::NumberLong},
-                {maxDouble + 1, mongo::NumberLong},
-                {minLongLong, mongo::NumberLong},
-                {maxLongLong, mongo::NumberLong},
-                {0, mongo::Undefined}};
-    for (int i = 0; data[i].t != mongo::Undefined; i++) {
+    } data[] = {{0, BSONType::numberInt},
+                {-100, BSONType::numberInt},
+                {100, BSONType::numberInt},
+                {minInt, BSONType::numberInt},
+                {maxInt, BSONType::numberInt},
+                {minInt - 1, BSONType::numberLong},
+                {maxInt + 1, BSONType::numberLong},
+                {minEncodableDouble, BSONType::numberLong},
+                {maxEncodableDouble, BSONType::numberLong},
+                {minEncodableDouble - 1, BSONType::numberLong},
+                {maxEncodableDouble + 1, BSONType::numberLong},
+                {minDouble, BSONType::numberLong},
+                {maxDouble, BSONType::numberLong},
+                {minDouble - 1, BSONType::numberLong},
+                {maxDouble + 1, BSONType::numberLong},
+                {minLongLong, BSONType::numberLong},
+                {maxLongLong, BSONType::numberLong},
+                {0, BSONType::undefined}};
+    for (int i = 0; data[i].t != BSONType::undefined; i++) {
         long long v = data[i].v;
         BSONObjBuilder b;
         b.appendNumber("a", v);
         BSONObj o = b.obj();
         ASSERT_EQUALS(o.nFields(), 1);
         BSONElement e = o.getField("a");
-        if (data[i].t != mongo::NumberDouble) {
+        if (data[i].t != BSONType::numberDouble) {
             long long n = e.numberLong();
             ASSERT_EQUALS(n, v);
         } else {
@@ -155,7 +178,7 @@ TEST(BSONObjBuilderTest, AppendNumberLongLongMinCompareObject) {
 
 TEST(BSONObjBuilderTest, AppendMaxTimestampConversion) {
     BSONObjBuilder b;
-    b.appendMaxForType("a", mongo::bsonTimestamp);
+    b.appendMaxForType("a", stdx::to_underlying(BSONType::timestamp));
     BSONObj o1 = b.obj();
 
     BSONElement e = o1.getField("a");
@@ -177,10 +200,9 @@ TEST(BSONObjBuilderTest, ResumeBuilding) {
     }
     auto obj = BSONObj(b.buf());
     ASSERT_BSONOBJ_EQ(obj,
-                      BSON("a"
-                           << "b"
-                           << "c"
-                           << "d"));
+                      BSON("a" << "b"
+                               << "c"
+                               << "d"));
 }
 
 TEST(BSONObjBuilderTest, ResumeBuildingWithNesting) {
@@ -188,9 +210,7 @@ TEST(BSONObjBuilderTest, ResumeBuildingWithNesting) {
     // build a trivial object.
     {
         BSONObjBuilder firstBuilder(b);
-        firstBuilder.append("ll",
-                            BSON("f" << BSON("cc"
-                                             << "dd")));
+        firstBuilder.append("ll", BSON("f" << BSON("cc" << "dd")));
     }
     // add a complex field
     {
@@ -198,10 +218,7 @@ TEST(BSONObjBuilderTest, ResumeBuildingWithNesting) {
         secondBuilder.append("a", BSON("c" << 3));
     }
     auto obj = BSONObj(b.buf());
-    ASSERT_BSONOBJ_EQ(obj,
-                      BSON("ll" << BSON("f" << BSON("cc"
-                                                    << "dd"))
-                                << "a" << BSON("c" << 3)));
+    ASSERT_BSONOBJ_EQ(obj, BSON("ll" << BSON("f" << BSON("cc" << "dd")) << "a" << BSON("c" << 3)));
 }
 
 TEST(BSONObjBuilderTest, ResetToEmptyResultsInEmptyObj) {
@@ -479,7 +496,7 @@ TEST(BSONObjBuilderTest, SizeChecks) {
     // Large buffers cause an exception to be thrown.
     ASSERT_THROWS_CODE(
         [&] {
-            auto largeBuffer = generateBuffer(17 * 1024 * 1024);
+            auto largeBuffer = generateBuffer(126 * 1024 * 1024);
             BSONObj obj(largeBuffer.data(), BSONObj::LargeSizeTrait{});
 
             BSONObjBuilder builder;
@@ -488,32 +505,6 @@ TEST(BSONObjBuilderTest, SizeChecks) {
         }(),
         DBException,
         ErrorCodes::BSONObjectTooLarge);
-
-
-    // Assert that the max size can be increased by passing BSONObj a tag type.
-    {
-        auto largeBuffer = generateBuffer(17 * 1024 * 1024);
-        BSONObj obj(largeBuffer.data(), BSONObj::LargeSizeTrait{});
-
-        BSONObjBuilder builder;
-        builder.append("a", obj);
-        BSONObj finalObj = builder.obj<BSONObj::LargeSizeTrait>();
-    }
-
-    // But a size is in fact being enforced.
-    {
-        auto largeBuffer = generateBuffer(40 * 1024 * 1024);
-        BSONObj obj(largeBuffer.data(), BSONObj::LargeSizeTrait{});
-        BSONObjBuilder builder;
-        ASSERT_THROWS(
-            [&]() {
-                for (StringData character : {"a", "b", "c"}) {
-                    builder.append(character, obj);
-                }
-                BSONObj finalObj = builder.obj<BSONObj::LargeSizeTrait>();
-            }(),
-            DBException);
-    }
 }
 
 TEST(BSONObjBuilderTest, UniqueBuilderNoop) {
@@ -604,5 +595,63 @@ TEST(BSONObjBuilderTest, UniqueArrayBuilderReleaseToBuffer) {
         auto tmp = UniqueBuffer::reclaim(rawData);
     }
 }
+
+TEST(BSONObjBuilderTest, QueryConstraintLabelSingle) {
+    ASSERT_BSONOBJ_EQ(BSON("ts" << GTE << 123), BSON("ts" << BSON("$gte" << 123)));
+}
+
+TEST(BSONObjBuilderTest, QueryConstraintLabelCompound) {
+    ASSERT_BSONOBJ_EQ(BSON("ts" << GTE << 123 << LTE << 456),
+                      BSON("ts" << BSON("$gte" << 123 << "$lte" << 456)));
+}
+
+TEST(BSONObjBuilderTest, AppendRenamed) {
+    auto docWithSingleChild = BSON("ts" << GTE << 123 << LTE << 456);
+    auto docWithTwoChildren = BSONObjBuilder{docWithSingleChild}.append("extra", 2).obj();
+
+    auto shapeWithSingleName = BSON("timestamp" << 1);
+    auto shapeWithTwoNames = BSONObjBuilder{shapeWithSingleName}.append("missing", 2).obj();
+
+    auto reshaped = BSON("timestamp" << GTE << 123 << LTE << 456);
+    auto reshapedWithExtra = BSONObjBuilder{reshaped}.append("extra", 2).obj();
+
+    // Rename a single element.
+    ASSERT_BSONOBJ_EQ(
+        reshaped,
+        BSONObjBuilder().appendElementsRenamed(docWithSingleChild, shapeWithSingleName).obj());
+
+    ASSERT_BSONOBJ_EQ(reshaped,
+                      BSONObjBuilder()
+                          .appendElementsRenamed(docWithSingleChild, shapeWithSingleName, false)
+                          .obj());
+
+    // Rename multiple elements on a single element object.
+    ASSERT_BSONOBJ_EQ(
+        reshaped,
+        BSONObjBuilder().appendElementsRenamed(docWithSingleChild, shapeWithTwoNames).obj());
+
+    ASSERT_BSONOBJ_EQ(
+        reshaped,
+        BSONObjBuilder().appendElementsRenamed(docWithSingleChild, shapeWithTwoNames, false).obj());
+
+    // Rename a single element on a two-element doc.
+    ASSERT_BSONOBJ_EQ(
+        reshapedWithExtra,
+        BSONObjBuilder().appendElementsRenamed(docWithTwoChildren, shapeWithSingleName).obj());
+
+    ASSERT_BSONOBJ_EQ(reshaped,
+                      BSONObjBuilder()
+                          .appendElementsRenamed(docWithTwoChildren, shapeWithSingleName, false)
+                          .obj());
+
+    // Rename an empty element.
+    ASSERT_BSONOBJ_EQ(BSONObj(),
+                      BSONObjBuilder().appendElementsRenamed(BSONObj(), shapeWithSingleName).obj());
+
+    ASSERT_BSONOBJ_EQ(
+        BSONObj(),
+        BSONObjBuilder().appendElementsRenamed(BSONObj(), shapeWithSingleName, false).obj());
+}
+
 }  // namespace
 }  // namespace mongo

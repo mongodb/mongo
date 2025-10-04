@@ -29,13 +29,17 @@
 
 #pragma once
 
-#include <vector>
-
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+#include <cstddef>
+#include <memory>
+#include <vector>
+
+namespace MONGO_MOD_PUB mongo {
 namespace executor {
 
 /**
@@ -71,6 +75,9 @@ public:
      * called after startup().
      */
     void shutdownAndJoin();
+
+    MONGO_MOD_PUB void shutdown_forTest();
+    MONGO_MOD_PUB void join_forTest();
 
     /**
      * Adds 'executors' and 'fixedExecutor' to the pool. May be called at most once to initialize an
@@ -126,4 +133,4 @@ private:
 };
 
 }  // namespace executor
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

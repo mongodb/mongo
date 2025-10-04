@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import string, os, sys, random
+import string, random
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 
@@ -44,7 +44,6 @@ class test_util01(wttest.WiredTigerTestCase, suite_subprocess):
 
     tablename = 'test_util01.a'
     nentries = 1000
-    session_config = 'isolation=snapshot'
     stringclass = ''.__class__
 
     def compare_config(self, expected_cfg, actual_cfg):
@@ -241,6 +240,3 @@ class test_util01(wttest.WiredTigerTestCase, suite_subprocess):
 
     def test_dump_process_timestamp_new(self):
         self.dump(False, False, 5, 7)
-
-if __name__ == '__main__':
-    wttest.run()

@@ -22,6 +22,7 @@
 #include <stdexcept>
 #include <boost/limits.hpp>
 #include <boost/assert.hpp>
+#include <boost/core/snprintf.hpp>
 #include <boost/smart_ptr/weak_ptr.hpp>
 #include <boost/smart_ptr/shared_ptr.hpp>
 #include <boost/smart_ptr/make_shared_object.hpp>
@@ -40,11 +41,9 @@
 #include <boost/log/sinks/syslog_backend.hpp>
 #include <boost/log/sinks/syslog_constants.hpp>
 #include <boost/log/detail/singleton.hpp>
-#include <boost/log/detail/snprintf.hpp>
 #include <boost/log/exceptions.hpp>
 #if !defined(BOOST_LOG_NO_THREADS)
-#include <boost/thread/locks.hpp>
-#include <boost/thread/mutex.hpp>
+#include <mutex>
 #endif
 #include "unique_ptr.hpp"
 
@@ -125,14 +124,14 @@ BOOST_LOG_ANONYMOUS_NAMESPACE {
     //! Syslog service initializer (implemented as a weak singleton)
 #if !defined(BOOST_LOG_NO_THREADS)
     class native_syslog_initializer :
-        private log::aux::lazy_singleton< native_syslog_initializer, mutex >
+        private log::aux::lazy_singleton< native_syslog_initializer, std::mutex >
 #else
     class native_syslog_initializer
 #endif
     {
 #if !defined(BOOST_LOG_NO_THREADS)
-        friend class log::aux::lazy_singleton< native_syslog_initializer, mutex >;
-        typedef log::aux::lazy_singleton< native_syslog_initializer, mutex > mutex_holder;
+        friend class log::aux::lazy_singleton< native_syslog_initializer, std::mutex >;
+        typedef log::aux::lazy_singleton< native_syslog_initializer, std::mutex > mutex_holder;
 #endif
 
     private:
@@ -163,7 +162,7 @@ BOOST_LOG_ANONYMOUS_NAMESPACE {
         static shared_ptr< native_syslog_initializer > get_instance(std::string const& ident, int facility)
         {
 #if !defined(BOOST_LOG_NO_THREADS)
-            lock_guard< mutex > lock(mutex_holder::get());
+            std::lock_guard< std::mutex > lock(mutex_holder::get());
 #endif
             static weak_ptr< native_syslog_initializer > instance;
             shared_ptr< native_syslog_initializer > p(instance.lock());
@@ -354,7 +353,7 @@ BOOST_LOG_ANONYMOUS_NAMESPACE {
 
 #if !defined(BOOST_LOG_NO_THREADS)
         //! A synchronization primitive to protect the host name resolver
-        mutex m_Mutex;
+        std::mutex m_Mutex;
         //! The resolver is used to acquire connection endpoints
         asio::ip::udp::resolver m_HostNameResolver;
 #endif // !defined(BOOST_LOG_NO_THREADS)
@@ -392,7 +391,7 @@ BOOST_LOG_ANONYMOUS_NAMESPACE {
 
         // The packet size is mandated in RFC3164, plus one for the terminating zero
         char packet[1025];
-        int n = boost::log::aux::snprintf
+        int n = boost::core::snprintf
         (
             packet,
             sizeof(packet),
@@ -452,7 +451,7 @@ struct syslog_backend::implementation::udp_socket_based :
     {
         if (!m_pSocket.get())
         {
-            asio::ip::udp::endpoint any_local_address;
+            asio::ip::udp::endpoint any_local_address(m_Protocol, 0u);
             m_pSocket.reset(new syslog_udp_socket(m_pService->m_IOContext, m_Protocol, any_local_address));
         }
 
@@ -535,11 +534,11 @@ BOOST_LOG_API void syslog_backend::set_local_address(std::string const& addr, un
     if (udp_socket_based_impl* impl = dynamic_cast< udp_socket_based_impl* >(m_pImpl))
     {
         char service_name[std::numeric_limits< unsigned int >::digits10 + 3];
-        boost::log::aux::snprintf(service_name, sizeof(service_name), "%u", static_cast< unsigned int >(port));
+        boost::core::snprintf(service_name, sizeof(service_name), "%u", static_cast< unsigned int >(port));
 
         asio::ip::udp::endpoint local_address;
         {
-            lock_guard< mutex > lock(impl->m_pService->m_Mutex);
+            std::lock_guard< std::mutex > lock(impl->m_pService->m_Mutex);
             asio::ip::udp::resolver::results_type results = impl->m_pService->m_HostNameResolver.resolve
             (
                 impl->m_Protocol,
@@ -555,8 +554,8 @@ BOOST_LOG_API void syslog_backend::set_local_address(std::string const& addr, un
     }
 #else
     // Boost.ASIO requires threads for the host name resolver,
-    // so without threads we simply assume the string already contains IP address
-    set_local_address(boost::asio::ip::address::from_string(addr), port);
+    // so without threads we simply assume the string already contains an IP address
+    set_local_address(asio::ip::make_address(addr), port);
 #endif // !defined(BOOST_LOG_NO_THREADS)
 }
 //! The method sets the local address which log records will be sent from.
@@ -581,11 +580,11 @@ BOOST_LOG_API void syslog_backend::set_target_address(std::string const& addr, u
     if (udp_socket_based_impl* impl = dynamic_cast< udp_socket_based_impl* >(m_pImpl))
     {
         char service_name[std::numeric_limits< unsigned int >::digits10 + 3];
-        boost::log::aux::snprintf(service_name, sizeof(service_name), "%u", static_cast< unsigned int >(port));
+        boost::core::snprintf(service_name, sizeof(service_name), "%u", static_cast< unsigned int >(port));
 
         asio::ip::udp::endpoint remote_address;
         {
-            lock_guard< mutex > lock(impl->m_pService->m_Mutex);
+            std::lock_guard< std::mutex > lock(impl->m_pService->m_Mutex);
             asio::ip::udp::resolver::results_type results = impl->m_pService->m_HostNameResolver.resolve
             (
                 impl->m_Protocol,
@@ -601,8 +600,8 @@ BOOST_LOG_API void syslog_backend::set_target_address(std::string const& addr, u
     }
 #else
     // Boost.ASIO requires threads for the host name resolver,
-    // so without threads we simply assume the string already contains IP address
-    set_target_address(boost::asio::ip::address::from_string(addr), port);
+    // so without threads we simply assume the string already contains an IP address
+    set_target_address(asio::ip::make_address(addr), port);
 #endif // !defined(BOOST_LOG_NO_THREADS)
 }
 //! The method sets the address of the remote host where log records will be sent to.

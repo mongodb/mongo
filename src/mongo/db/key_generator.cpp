@@ -27,17 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/key_generator.h"
 
-#include "mongo/client/read_preference.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/keys_collection_client.h"
+#include "mongo/db/keys_collection_document_gen.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/time_proof_service.h"
-#include "mongo/db/vector_clock.h"
-#include "mongo/s/client/shard_registry.h"
+#include "mongo/db/vector_clock/vector_clock.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/util/fail_point.h"
+
+#include <utility>
+#include <vector>
 
 namespace mongo {
 
@@ -84,7 +89,8 @@ Status KeyGenerator::generateNewKeysIfNeeded(OperationContext* opCtx) {
     }
 
     const auto currentTime = VectorClock::get(opCtx)->getTime();
-    auto keyStatus = _client->getNewInternalKeys(opCtx, _purpose, currentTime.clusterTime(), false);
+    auto keyStatus = _client->getNewInternalKeys(
+        opCtx, _purpose, currentTime.clusterTime(), false /* tryUseMajority */);
 
     if (!keyStatus.isOK()) {
         return keyStatus.getStatus();

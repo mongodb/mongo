@@ -29,13 +29,17 @@
 
 #pragma once
 
-#include <boost/filesystem/path.hpp>
-#include <boost/optional.hpp>
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+
 #include <memory>
 #include <string>
 
-#include "mongo/base/status.h"
-#include "mongo/db/jsobj.h"
+#include <boost/filesystem/path.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

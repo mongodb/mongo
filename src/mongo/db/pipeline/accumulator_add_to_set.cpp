@@ -27,36 +27,44 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/pipeline/accumulator.h"
-
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
+#include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/window_function/window_function_add_to_set.h"
 #include "mongo/db/pipeline/window_function/window_function_expression.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
-using boost::intrusive_ptr;
 using std::vector;
 
-REGISTER_ACCUMULATOR(addToSet,
-                     genericParseSBEUnsupportedSingleExpressionAccumulator<AccumulatorAddToSet>);
-REGISTER_REMOVABLE_WINDOW_FUNCTION(addToSet, AccumulatorAddToSet, WindowFunctionAddToSet);
+REGISTER_ACCUMULATOR(addToSet, genericParseSingleExpressionAccumulator<AccumulatorAddToSet>);
+REGISTER_STABLE_REMOVABLE_WINDOW_FUNCTION(addToSet, AccumulatorAddToSet, WindowFunctionAddToSet);
 
 void AccumulatorAddToSet::processInternal(const Value& input, bool merging) {
     auto addValue = [this](auto&& val) {
         bool inserted = _set.insert(val).second;
         if (inserted) {
-            _memUsageBytes += val.getApproximateSize();
-            uassert(ErrorCodes::ExceededMemoryLimit,
-                    str::stream()
-                        << "$addToSet used too much memory and cannot spill to disk. Memory limit: "
-                        << _maxMemUsageBytes << " bytes",
-                    _memUsageBytes < _maxMemUsageBytes);
+            _memUsageTracker.add(val.getApproximateSize());
+            uassert(
+                ErrorCodes::ExceededMemoryLimit,
+                str::stream() << "$addToSet used too much memory and cannot spill to disk. Used: "
+                              << _memUsageTracker.inUseTrackedMemoryBytes()
+                              << " bytes. Memory limit: "
+                              << _memUsageTracker.maxAllowedMemoryUsageBytes() << " bytes",
+                _memUsageTracker.withinMemoryLimit());
         }
     };
     if (!merging) {
@@ -67,7 +75,7 @@ void AccumulatorAddToSet::processInternal(const Value& input, bool merging) {
         // If we're merging, we need to take apart the arrays we receive and put their elements into
         // the array we are collecting.  If we didn't, then we'd get an array of arrays, with one
         // array from each merge source.
-        invariant(input.getType() == Array);
+        assertMergingInputType(input, BSONType::array);
 
         for (auto&& val : input.getArray()) {
             addValue(val);
@@ -81,19 +89,13 @@ Value AccumulatorAddToSet::getValue(bool toBeMerged) {
 
 AccumulatorAddToSet::AccumulatorAddToSet(ExpressionContext* const expCtx,
                                          boost::optional<int> maxMemoryUsageBytes)
-    : AccumulatorState(expCtx),
-      _set(expCtx->getValueComparator().makeUnorderedValueSet()),
-      _maxMemUsageBytes(maxMemoryUsageBytes.value_or(internalQueryMaxAddToSetBytes.load())) {
-    _memUsageBytes = sizeof(*this);
+    : AccumulatorState(expCtx, maxMemoryUsageBytes.value_or(internalQueryMaxAddToSetBytes.load())),
+      _set(expCtx->getValueComparator().makeFlatUnorderedValueSet()) {
+    _memUsageTracker.set(sizeof(*this));
 }
 
 void AccumulatorAddToSet::reset() {
-    _set = getExpressionContext()->getValueComparator().makeUnorderedValueSet();
-    _memUsageBytes = sizeof(*this);
+    _set = getExpressionContext()->getValueComparator().makeFlatUnorderedValueSet();
+    _memUsageTracker.set(sizeof(*this));
 }
-
-intrusive_ptr<AccumulatorState> AccumulatorAddToSet::create(ExpressionContext* const expCtx) {
-    return new AccumulatorAddToSet(expCtx, boost::none);
-}
-
 }  // namespace mongo

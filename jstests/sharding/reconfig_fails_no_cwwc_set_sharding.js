@@ -2,21 +2,28 @@
  * Test that a reconfig for a shard that would change the implicit default write concern to w:1
  * fails if CWWC is not set.
  *
- * @tags: [requires_majority_read_concern, requires_persistence, requires_fcv_51]
+ * @tags: [
+ *   requires_majority_read_concern,
+ *   requires_persistence,
+ *   requires_fcv_51,
+ * ]
  */
 
-(function() {
-'use strict';
+// Adds a shard near the end of the test that won't have metadata for the sessions collection during
+// test shutdown. This is only a problem with a config shard because otherwise there are no shards
+// so the sessions collection can't be created.
+TestData.skipCheckShardFilteringMetadata = TestData.configShard;
 
-load("jstests/replsets/rslib.js");  // For reconfig, isConfigCommitted and
-                                    // safeReconfigShouldFail.
+import {reconfig, safeReconfigShouldFail, isConfigCommitted} from "jstests/replsets/rslib.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const configurationIncompatibleMsg =
     "config that would change the implicit default write concern on the shard to {w: 1}.";
 
 const configServerUnreachableMsg = "the request to the config server is failing with error:";
 
-let addNodeConfig = function(rst, nodeId, conn, arbiter) {
+let addNodeConfig = function (rst, nodeId, conn, arbiter) {
     const config = rst.getReplSetConfigFromNode();
     if (arbiter) {
         config.members.push({_id: nodeId, host: conn.host, arbiterOnly: true});
@@ -27,9 +34,9 @@ let addNodeConfig = function(rst, nodeId, conn, arbiter) {
     return config;
 };
 
-let removeNodeConfig = function(rst, conn) {
+let removeNodeConfig = function (rst, conn) {
     const config = rst.getReplSetConfigFromNode();
-    for (var i = 0; i < config.members.length; i++) {
+    for (let i = 0; i < config.members.length; i++) {
         if (config.members[i].host == conn.host) {
             config.members.splice(i, 1);
             break;
@@ -55,19 +62,19 @@ function testReconfig(rst, config, shouldSucceed, errCode, errMsg) {
 
 jsTestLog("Testing to reconfig a shard that is not yet added to a sharded cluster.");
 let logPrefix = "While the shard is not part of a sharded cluster: ";
-let shardServer = new ReplSetTest(
-    {name: "shardServer", nodes: 1, nodeOptions: {shardsvr: ""}, useHostName: true});
+let shardServer = new ReplSetTest({name: "shardServer", nodes: 1, nodeOptions: {shardsvr: ""}, useHostName: true});
 shardServer.startSet();
 shardServer.initiate();
 
 jsTestLog(logPrefix + "Adding an arbiter node that will change IDWC to (w:1) should succeed.");
-let arbiter = shardServer.add();
-testReconfig(shardServer,
-             addNodeConfig(shardServer, 1 /* nodeId */, arbiter /* conn */, true /* arbiter */),
-             true /* shouldSucceed */);
+let arbiter = shardServer.add({shardsvr: ""});
+testReconfig(
+    shardServer,
+    addNodeConfig(shardServer, 1 /* nodeId */, arbiter /* conn */, true /* arbiter */),
+    true /* shouldSucceed */,
+);
 
-jsTestLog(logPrefix +
-          "Removing an arbiter node that will change IDWC to (w: 'Majority') should succeed.");
+jsTestLog(logPrefix + "Removing an arbiter node that will change IDWC to (w: 'Majority') should succeed.");
 shardServer.remove(arbiter);
 testReconfig(shardServer, removeNodeConfig(shardServer, arbiter), true /* shouldSucceed */);
 
@@ -75,67 +82,78 @@ shardServer.stopSet();
 
 jsTestLog("Testing to reconfig a shard that is part of a sharded cluster.");
 logPrefix = "While the shard is part of a sharded cluster: ";
-shardServer = new ReplSetTest(
-    {name: "shardServer", nodes: 1, nodeOptions: {shardsvr: ""}, useHostName: true});
+shardServer = new ReplSetTest({name: "shardServer", nodes: 1, nodeOptions: {shardsvr: ""}, useHostName: true});
 shardServer.startSet();
-shardServer.initiate();
+shardServer.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
-const st = new ShardingTest({shards: 0, mongos: 1});
-var admin = st.getDB('admin');
+const st = new ShardingTest({
+    shards: TestData.configShard ? 1 : 0,
+    mongos: 1,
+    // By default, our test infrastructure sets the election timeout to a very high value (24
+    // hours). For this test, we need a shorter election timeout because it relies on nodes running
+    // an election when they do not detect an active primary. Therefore, we are setting the
+    // electionTimeoutMillis to its default value.
+    initiateWithDefaultElectionTimeout: true,
+});
+let admin = st.getDB("admin");
 
 jsTestLog("Adding the shard to the cluster should succeed.");
 assert.commandWorked(admin.runCommand({addshard: shardServer.getURL()}));
 
-jsTestLog(logPrefix +
-          "Adding an non-arbiter node that will keep IDWC set to (w: 'Majority') should succeed.");
+jsTestLog(logPrefix + "Adding an non-arbiter node that will keep IDWC set to (w: 'Majority') should succeed.");
 testReconfig(
     shardServer,
-    addNodeConfig(shardServer, 1 /* nodeId */, shardServer.add() /* conn */, false /* arbiter */),
-    true /* shouldSucceed */);
+    addNodeConfig(shardServer, 1 /* nodeId */, shardServer.add({shardsvr: ""}) /* conn */, false /* arbiter */),
+    true /* shouldSucceed */,
+);
 
 jsTestLog(logPrefix + "Adding an arbiter node that will change IDWC to (w:1) should fail.");
-arbiter = shardServer.add();
-testReconfig(shardServer,
-             addNodeConfig(shardServer, 2 /* nodeId */, arbiter /* conn */, true /* arbiter */),
-             false /* shouldSucceed */,
-             ErrorCodes.NewReplicaSetConfigurationIncompatible,
-             configurationIncompatibleMsg);
+arbiter = shardServer.add({shardsvr: ""});
+testReconfig(
+    shardServer,
+    addNodeConfig(shardServer, 2 /* nodeId */, arbiter /* conn */, true /* arbiter */),
+    false /* shouldSucceed */,
+    ErrorCodes.NewReplicaSetConfigurationIncompatible,
+    configurationIncompatibleMsg,
+);
 
 jsTestLog("Setting the CWWC on the cluster.");
 logPrefix = "While CWWC is set on the sharded cluster: ";
-assert.commandWorked(
-    st.s.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: "majority", wtimeout: 0}}));
+assert.commandWorked(st.s.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: "majority", wtimeout: 0}}));
 
 jsTestLog(logPrefix + "Adding an arbiter node that will change IDWC to (w:1) should succeed.");
-testReconfig(shardServer,
-             addNodeConfig(shardServer, 2 /* nodeId */, arbiter /* conn */, true /* arbiter */),
-             true /* shouldSucceed */);
+testReconfig(
+    shardServer,
+    addNodeConfig(shardServer, 2 /* nodeId */, arbiter /* conn */, true /* arbiter */),
+    true /* shouldSucceed */,
+);
 
 jsTestLog("Testing when the config server is unreachable.");
 logPrefix = "While config server is unreachable: ";
 jsTestLog("Shutting down all config servers");
-for (var i = 0; i < st.configRS.nodes.length; i++) {
+for (let i = 0; i < st.configRS.nodes.length; i++) {
     st.stopConfigServer(i);
 }
 st.configRS.awaitNoPrimary();
 
 // The reason why this is okay is because CWWC had to have been set for the cluster to get to this
 // point, even if we can't check the config servers for it.
-jsTestLog(logPrefix +
-          "Removing an arbiter node that will change IDWC to (w: 'Majority') should succeed.");
+jsTestLog(logPrefix + "Removing an arbiter node that will change IDWC to (w: 'Majority') should succeed.");
 shardServer.remove(arbiter);
 testReconfig(shardServer, removeNodeConfig(shardServer, arbiter), true /* shouldSucceed */);
 
 jsTestLog(logPrefix + "Adding an arbiter node that will change IDWC to (w: 1) should fail.");
-testReconfig(shardServer,
-             addNodeConfig(shardServer, 2 /* nodeId */, arbiter /* conn */, true /* arbiter */),
-             false /* shouldSucceed */,
-             ErrorCodes.ConfigServerUnreachable,
-             configServerUnreachableMsg);
+testReconfig(
+    shardServer,
+    addNodeConfig(shardServer, 2 /* nodeId */, arbiter /* conn */, true /* arbiter */),
+    false /* shouldSucceed */,
+    ErrorCodes.ConfigServerUnreachable,
+    configServerUnreachableMsg,
+);
 
 jsTestLog("Restarting the config servers.");
 logPrefix = "While the config server is reachable: ";
-for (var i = 0; i < st.configRS.nodes.length; i++) {
+for (let i = 0; i < st.configRS.nodes.length; i++) {
     st.restartConfigServer(i, undefined, undefined, true /* wait */);
 }
 st.configRS.awaitNodesAgreeOnPrimary();
@@ -143,14 +161,15 @@ print("Sleeping for 60 seconds to let the other shards restart their ReplicaSetM
 sleep(60000);
 
 jsTestLog(logPrefix + "Adding an arbiter node will change IDWC to (w:1) should succeed.");
-arbiter = shardServer.add();
-testReconfig(shardServer,
-             addNodeConfig(shardServer, 2 /* nodeId */, arbiter /* conn */, true /* arbiter */),
-             true /* shouldSucceed */);
+arbiter = shardServer.add({shardsvr: ""});
+testReconfig(
+    shardServer,
+    addNodeConfig(shardServer, 2 /* nodeId */, arbiter /* conn */, true /* arbiter */),
+    true /* shouldSucceed */,
+);
 
 jsTestLog("Stopping the cluster.");
 st.stop();
 
 jsTestLog("Stopping the shard.");
 shardServer.stopSet();
-})();

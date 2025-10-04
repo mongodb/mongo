@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
 
 namespace mongo {
 
@@ -59,50 +59,55 @@ public:
     RequestExecutionContext(RequestExecutionContext&&) = delete;
     RequestExecutionContext& operator=(RequestExecutionContext&&) = delete;
 
-    RequestExecutionContext(OperationContext* opCtx, Message message)
+    RequestExecutionContext(OperationContext* opCtx, Message message, Date_t started)
         : _opCtx(opCtx),
           _message(std::move(message)),
-          _dbmsg(std::make_unique<DbMessage>(_message.get())) {}
+          _dbmsg(std::make_unique<DbMessage>(_message.get())),
+          _started(started) {}
 
     auto getOpCtx() const {
-        invariant(_isOnClientThread());
+        dassert(_isOnClientThread());
         return _opCtx;
     }
 
+    Date_t getStarted() const {
+        return _started;
+    }
+
     const Message& getMessage() const {
-        invariant(_isOnClientThread() && _message);
+        dassert(_isOnClientThread() && _message);
         return _message.get();
     }
 
     DbMessage& getDbMessage() const {
-        invariant(_isOnClientThread() && _dbmsg);
+        dassert(_isOnClientThread() && _dbmsg);
         return *_dbmsg.get();
     }
 
     void setRequest(OpMsgRequest request) {
-        invariant(_isOnClientThread() && !_request);
+        dassert(_isOnClientThread() && !_request);
         _request = std::move(request);
     }
     const OpMsgRequest& getRequest() const {
-        invariant(_isOnClientThread() && _request);
+        dassert(_isOnClientThread() && _request);
         return _request.get();
     }
 
     void setCommand(Command* command) {
-        invariant(_isOnClientThread() && !_command);
+        dassert(_isOnClientThread() && !_command);
         _command = command;
     }
     Command* getCommand() const {
-        invariant(_isOnClientThread());
+        dassert(_isOnClientThread());
         return _command;
     }
 
     void setReplyBuilder(std::unique_ptr<rpc::ReplyBuilderInterface> replyBuilder) {
-        invariant(_isOnClientThread() && !_replyBuilder);
+        dassert(_isOnClientThread() && !_replyBuilder);
         _replyBuilder = std::move(replyBuilder);
     }
     auto getReplyBuilder() const {
-        invariant(_isOnClientThread() && _replyBuilder);
+        dassert(_isOnClientThread() && _replyBuilder);
         return _replyBuilder.get();
     }
 
@@ -114,6 +119,7 @@ private:
     OperationContext* const _opCtx;
     boost::optional<Message> _message;
     std::unique_ptr<DbMessage> _dbmsg;
+    const Date_t _started;
     boost::optional<OpMsgRequest> _request;
     Command* _command = nullptr;
     std::unique_ptr<rpc::ReplyBuilderInterface> _replyBuilder;

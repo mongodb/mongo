@@ -27,7 +27,9 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 #include "_UCD_internal.h"
 
 void
-_UCD_put_unwind_info (unw_addr_space_t as, unw_proc_info_t *pi, void *arg)
+_UCD_put_unwind_info (unw_addr_space_t  as UNUSED,
+					  unw_proc_info_t  *pi,
+                      void             *arg UNUSED)
 {
   if (!pi->unwind_info)
     return;

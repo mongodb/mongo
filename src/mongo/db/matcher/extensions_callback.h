@@ -29,12 +29,19 @@
 
 #pragma once
 
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_text_base.h"
 #include "mongo/db/matcher/expression_where_base.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+#include <memory>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * Certain match clauses (the "extension" clauses, namely $text and $where) require context in
@@ -79,4 +86,4 @@ protected:
         BSONElement where);
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

@@ -1,40 +1,37 @@
 """Modules for find which files should be linted."""
+
 import os
 import sys
-from typing import Tuple, List, Dict, Callable
+from typing import Callable, Dict, List, Tuple
 
-from git import Repo
 import structlog
+from git import Repo
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__file__)))))
 
-# pylint: disable=wrong-import-position
 from buildscripts.linter import git
-from buildscripts.patch_builds.change_data import generate_revision_map, \
-    RevisionMap, find_changed_files_in_repos
-
-# pylint: enable=wrong-import-position
+from buildscripts.patch_builds.change_data import (
+    RevisionMap,
+    find_changed_files_in_repos,
+    find_modified_lines_for_files_in_repos,
+    generate_revision_map,
+)
 
 LOGGER = structlog.get_logger(__name__)
 MONGO_REVISION_ENV_VAR = "REVISION"
-ENTERPRISE_REVISION_ENV_VAR = "ENTERPRISE_REV"
 
 
 def _get_repos_and_revisions() -> Tuple[List[Repo], RevisionMap]:
     """Get the repo object and a map of revisions to compare against."""
-    modules = git.get_module_paths()
-    repos = [Repo(path) for path in modules]
-    revision_map = generate_revision_map(
-        repos, {
-            "mongo": os.environ.get(MONGO_REVISION_ENV_VAR),
-            "enterprise": os.environ.get(ENTERPRISE_REVISION_ENV_VAR)
-        })
+
+    repos = [Repo(git.get_base_dir())]
+    revision_map = generate_revision_map(repos, {"mongo": os.environ.get(MONGO_REVISION_ENV_VAR)})
     return repos, revision_map
 
 
-def _filter_file(filename: str, is_interesting_file: Callable) -> bool:
+def _filter_file(filename: str, is_interesting_file: Callable[[str], bool]) -> bool:
     """
     Determine if file should be included based on existence and passed in method.
 
@@ -45,7 +42,7 @@ def _filter_file(filename: str, is_interesting_file: Callable) -> bool:
     return os.path.exists(filename) and is_interesting_file(filename)
 
 
-def gather_changed_files_for_lint(is_interesting_file: Callable) -> List[str]:
+def gather_changed_files_for_lint(is_interesting_file: Callable[[str], bool]) -> List[str]:
     """
     Get the files that have changes since the last git commit.
 
@@ -62,3 +59,19 @@ def gather_changed_files_for_lint(is_interesting_file: Callable) -> List[str]:
 
     LOGGER.info("Found files to lint", files=files)
     return files
+
+
+def gather_changed_files_with_lines(
+    is_interesting_file: Callable[[str], bool],
+) -> Dict[str, List[Tuple[int, str]]]:
+    """
+    Get the files that have changes since the last git commit, along with details of the specific lines that have changed.
+
+    :param is_interesting_file: Filter for whether a file should be returned.
+    :return: Dictionary mapping each changed file to a list of tuples, where each tuple contains the modified line number and its content.
+    """
+    repos, revision_map = _get_repos_and_revisions()
+    changed_files = find_changed_files_in_repos(repos, revision_map)
+
+    filtered_files = [f for f in changed_files if is_interesting_file(f)]
+    return find_modified_lines_for_files_in_repos(repos, filtered_files, revision_map)

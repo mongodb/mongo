@@ -1,11 +1,6 @@
-// Test that a change stream is able to survive an upgrade. This is the most basic test to
-// demonstrate the survival of a stream, presuming the driver will attempt to retry and resume the
-// stream after network errors.
-// @tags: [uses_change_streams, requires_majority_read_concern]
-(function() {
-"use strict";
+import "jstests/multiVersion/libs/multi_rs.js";
 
-load("jstests/multiVersion/libs/multi_rs.js");  // For upgradeSet.
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 function runTest(downgradeVersion) {
     jsTestLog("Running test with 'downgradeVersion': " + downgradeVersion);
@@ -15,7 +10,7 @@ function runTest(downgradeVersion) {
     });
 
     rst.startSet();
-    rst.initiate();
+    rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
     let testDB = rst.getPrimary().getDB(jsTestName());
     let coll = testDB.change_stream_upgrade;
@@ -50,12 +45,11 @@ function runTest(downgradeVersion) {
     assert.commandWorked(coll.insert({_id: "after binary upgrade, before fcv switch"}));
 
     let resumeTokenFromNewVersionOldFCV;
-    [streamStartedOnOldVersion, streamStartedOnNewVersionOldFCV].forEach(stream => {
+    [streamStartedOnOldVersion, streamStartedOnNewVersionOldFCV].forEach((stream) => {
         assert.soon(() => stream.hasNext());
         change = stream.next();
         assert.eq(change.operationType, "insert", tojson(change));
-        assert.eq(
-            change.documentKey._id, "after binary upgrade, before fcv switch", tojson(change));
+        assert.eq(change.documentKey._id, "after binary upgrade, before fcv switch", tojson(change));
         if (resumeTokenFromNewVersionOldFCV === undefined) {
             resumeTokenFromNewVersionOldFCV = change._id;
         } else {
@@ -64,7 +58,7 @@ function runTest(downgradeVersion) {
     });
 
     // Explicitly set feature compatibility version to the latest FCV.
-    assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+    assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 
     const streamStartedOnNewVersion = coll.watch();
 
@@ -82,15 +76,16 @@ function runTest(downgradeVersion) {
     assert.eq(change.documentKey._id, "after binary upgrade, before fcv switch", tojson(change));
 
     assert.commandWorked(coll.insert({_id: "after fcv upgrade"}));
-    const resumedStreamOnNewVersion =
-        coll.watch([], {resumeAfter: resumeTokenFromNewVersionOldFCV});
+    const resumedStreamOnNewVersion = coll.watch([], {resumeAfter: resumeTokenFromNewVersionOldFCV});
 
     // Test that all open streams continue to produce change events, and that the newly resumed
     // stream sees the write that just happened since it comes after the resume token used.
-    for (let stream of [streamStartedOnOldVersion,
-                        streamStartedOnNewVersionOldFCV,
-                        streamStartedOnNewVersion,
-                        resumedStreamOnNewVersion]) {
+    for (let stream of [
+        streamStartedOnOldVersion,
+        streamStartedOnNewVersionOldFCV,
+        streamStartedOnNewVersion,
+        resumedStreamOnNewVersion,
+    ]) {
         assert.soon(() => stream.hasNext());
         change = stream.next();
         assert.eq(change.operationType, "insert", tojson(change));
@@ -103,4 +98,3 @@ function runTest(downgradeVersion) {
 
 runTest("last-continuous");
 runTest("last-lts");
-}());

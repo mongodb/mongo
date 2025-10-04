@@ -37,4 +37,4 @@ types:
         cpp_type: HostAndPort
         serializer: HostAndPort::toString
         deserializer: HostAndPort::parseThrowing
-
+        is_view: false

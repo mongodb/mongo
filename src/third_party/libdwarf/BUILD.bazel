@@ -1,0 +1,30 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+mongo_cc_library(
+    name = "libdwarf",
+    srcs = glob([
+        "dist/src/lib/libdwarf/*.c",
+    ]),
+    hdrs = glob([
+        "config.h",
+        "dist/src/lib/libdwarf/*.h",
+    ]),
+    copts = [
+        "-Wno-implicit-fallthrough",
+    ],
+    includes = [
+        ".",
+        "dist/src/lib/libdwarf",
+    ],
+    target_compatible_with = ["@platforms//os:linux"] + select({
+        "//bazel/config:release_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    visibility = ["//visibility:public"],
+    deps = [
+        "//src/third_party/zlib",
+        "//src/third_party/zstandard:zstd",
+    ],
+)

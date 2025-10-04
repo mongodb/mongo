@@ -1,0 +1,12 @@
+base_suite: replica_sets_jscore_passthrough
+overrides:
+  - "kill_primary.replica_sets_shell_options_mixed_binary"
+  - "kill_primary.replica_sets_oplog_application_lag_hooks"
+  - "kill_primary.replica_sets_oplog_application_lag_archive"
+  - "kill_primary.replica_sets_fixture_last_lts_new_old_old"
+  - "replica_sets_stepdown_selector.kill_primary_jscore_passthrough_exclude_files_base"
+  - "replica_sets_stepdown_selector.kill_primary_jscore_passthrough_exclude_with_any_tags"
+
+excludes:
+  - "replica_sets_stepdown_selector.kill_primary_jscore_passthrough_exclude_files_fle"
+  - "replica_sets_stepdown_selector.kill_primary_multiversion_jscore_passthrough_exclude_with_any_tags"

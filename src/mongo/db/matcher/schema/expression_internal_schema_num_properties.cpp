@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/matcher/schema/expression_internal_schema_num_properties.h"
+
+#include "mongo/bson/bsonobj.h"
 
 namespace mongo {
 
@@ -37,13 +37,15 @@ void InternalSchemaNumPropertiesMatchExpression::debugString(StringBuilder& debu
                                                              int indentationLevel) const {
     _debugAddSpace(debug, indentationLevel);
     BSONObjBuilder builder;
-    serialize(&builder, true);
-    debug << builder.obj().toString() << "\n";
+    serialize(&builder, {});
+    debug << builder.obj().toString();
+    _debugStringAttachTagInfo(&debug);
 }
 
 void InternalSchemaNumPropertiesMatchExpression::serialize(BSONObjBuilder* out,
+                                                           const SerializationOptions& opts,
                                                            bool includePath) const {
-    out->append(_name, _numProperties);
+    opts.appendLiteral(out, _name, _numProperties);
 }
 
 bool InternalSchemaNumPropertiesMatchExpression::equivalent(const MatchExpression* other) const {

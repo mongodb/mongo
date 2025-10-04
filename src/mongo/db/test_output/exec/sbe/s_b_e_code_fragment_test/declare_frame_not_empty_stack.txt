@@ -1,0 +1,47 @@
+# Golden test output of SBECodeFragmentTest/DeclareFrameNotEmptyStack
+==== VARIATION append code
+-- CODE:
+[0x0000-0x0041] stackSize: 1, maxStackSize: 6
+0x0000: pushConstVal(value: Nothing);
+0x000a: pushConstVal(value: Nothing);
+0x0014: pushConstVal(value: Nothing);
+0x001e: pushConstVal(value: 10);
+0x0028: pushConstVal(value: Nothing);
+0x0032: pushLocalVal(arg: 1);
+0x0037: swap();
+0x0038: pop();
+0x0039: swap();
+0x003a: pop();
+0x003b: swap();
+0x003c: pop();
+0x003d: swap();
+0x003e: pop();
+0x003f: swap();
+0x0040: pop();
+
+-- RESULT:
+10
+
+==== VARIATION append instr
+-- CODE:
+[0x0000-0x0041] stackSize: 1, maxStackSize: 6
+0x0000: pushConstVal(value: Nothing);
+0x000a: pushConstVal(value: Nothing);
+0x0014: pushConstVal(value: Nothing);
+0x001e: pushConstVal(value: 10);
+0x0028: pushConstVal(value: Nothing);
+0x0032: pushLocalVal(arg: 1);
+0x0037: swap();
+0x0038: pop();
+0x0039: swap();
+0x003a: pop();
+0x003b: swap();
+0x003c: pop();
+0x003d: swap();
+0x003e: pop();
+0x003f: swap();
+0x0040: pop();
+
+-- RESULT:
+10
+

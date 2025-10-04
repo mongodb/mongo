@@ -29,18 +29,17 @@
 
 #include "mongo/stdx/unordered_map.h"
 
+#include "mongo/base/string_data.h"
+#include "mongo/unittest/unittest.h"
+
 #include <algorithm>
-#include <iterator>
 #include <stdexcept>
 #include <string>
 
+#include <absl/container/node_hash_map.h>
 #include <fmt/format.h>
 
-#include "mongo/unittest/unittest.h"
-
 namespace {
-
-using namespace fmt::literals;
 
 template <typename Map>
 std::string dumpMap(const Map& m) {
@@ -48,7 +47,7 @@ std::string dumpMap(const Map& m) {
     r += "{";
     const char* comma = "";
     for (auto&& [k, v] : m) {
-        r += "{}{}:{}"_format(comma, k, v);
+        r += fmt::format("{}{}:{}", comma, k, v);
         comma = ", ";
     }
     r += "}";
@@ -72,7 +71,9 @@ TEST(StdxUnorderedMapTest, EraseIf) {
         {106, 6},
         {107, 7},
     };
-    auto pred = [](auto&& e) { return e.second < 0; };
+    auto pred = [](auto&& e) {
+        return e.second < 0;
+    };
     size_t predCount = std::count_if(pre.begin(), pre.end(), pred);
 
     auto map = pre;

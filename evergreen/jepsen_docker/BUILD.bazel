@@ -1,0 +1,26 @@
+package(default_visibility = ["//visibility:public"])
+
+sh_binary(
+    name = "cleanup",
+    srcs = ["cleanup.sh"],
+)
+
+sh_binary(
+    name = "docker-up",
+    srcs = ["docker-up.sh"],
+)
+
+sh_binary(
+    name = "list-append",
+    srcs = ["list-append.sh"],
+)
+
+sh_binary(
+    name = "setup",
+    srcs = ["setup.sh"],
+)
+
+sh_binary(
+    name = "setup_config_fuzzer",
+    srcs = ["setup_config_fuzzer.sh"],
+)

@@ -29,11 +29,18 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/stdx/trusted_hasher.h"
+#include "mongo/util/assert_util.h"
+
+#include <cstddef>
+#include <string>
+#include <type_traits>
+
 #include <absl/container/flat_hash_map.h>
 #include <absl/container/flat_hash_set.h>
-
-#include "mongo/base/string_data.h"
-#include "mongo/util/assert_util.h"
+#include <absl/hash/hash.h>
+#include <absl/strings/string_view.h>
 
 namespace mongo {
 
@@ -44,7 +51,7 @@ public:
     explicit StringMapHashedKey(StringData sd, std::size_t hash) : _sd(sd), _hash(hash) {}
 
     explicit operator std::string() const {
-        return _sd.toString();
+        return std::string{_sd};
     }
 
     StringData key() const {
@@ -67,7 +74,7 @@ struct StringMapHasher {
 
     std::size_t operator()(StringData sd) const {
         // Use the default absl string hasher.
-        return absl::Hash<absl::string_view>{}(absl::string_view(sd.rawData(), sd.size()));
+        return absl::Hash<absl::string_view>{}(absl::string_view(sd.data(), sd.size()));
     }
 
     std::size_t operator()(const std::string& s) const {
@@ -117,5 +124,12 @@ template <typename V>
 using StringDataMap = absl::flat_hash_map<StringData, V, StringMapHasher, StringMapEq>;
 
 using StringDataSet = absl::flat_hash_set<StringData, StringMapHasher, StringMapEq>;
+
+// StringMapHasher is a trusted hasher, no need to wrap in a secondary layer of hashing when used in
+// stdx unordered containers.
+template <>
+struct IsTrustedHasher<StringMapHasher, std::string> : std::true_type {};
+template <>
+struct IsTrustedHasher<StringMapHasher, StringData> : std::true_type {};
 
 }  // namespace mongo

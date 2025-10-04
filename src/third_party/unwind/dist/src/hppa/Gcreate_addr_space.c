@@ -38,7 +38,7 @@ unw_create_addr_space (unw_accessors_t *a, int byte_order)
   /*
    * hppa supports only big-endian.
    */
-  if (byte_order != 0 && byte_order != __BIG_ENDIAN)
+  if (byte_order != 0 && byte_order != UNW_BIG_ENDIAN)
     return NULL;
 
   as = malloc (sizeof (*as));

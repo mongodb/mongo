@@ -1,0 +1,187 @@
+/* WiredTiger-specific styling. */
+
+@media (prefers-color-scheme: dark) {
+  body {
+    --page-foreground-color: #CCC;
+    --page-link-color: #00F;
+    --page-visited-link-color: #88F;
+  }
+  img, .image object {
+    filter: invert(100%) hue-rotate(180deg);
+  }
+}
+
+@media (prefers-color-scheme: light) {
+  body {
+    --page-foreground-color: #373737;
+    --page-link-color: #00F;
+    --page-visited-link-color: #88F;
+  }
+}
+
+html {
+    font-size: small;
+}
+
+body, table, div, p, dl {
+	font-family: "Calibri","Helvetica Neue", Helvetica, Arial, sans-serif;
+	line-height: 1.5;
+}
+
+h1 {
+	font-size: 120%;
+}
+
+h2 {
+	font-size: 110%;
+}
+
+table.lock-hierarchy {
+    border: 1px solid #8886;
+    border-radius: 0.2em;
+    white-space: nowrap;
+    margin: 2em auto;         /* align=center */
+    border-spacing: 0.3em 0.5em;  /* table cellspacing */
+    padding: 1em;
+}
+
+table.lock-hierarchy td {
+    border: none;  /* table border=0 */
+    padding: 1px;  /* table cellpadding */
+}
+
+table.lock-hierarchy td:nth-of-type(2n+1) {
+    border: 1px solid #888;
+    border-radius: 1em;
+    padding: 0.2em 0.8em;
+    background-color: #8882;
+}
+
+/* Architecture guide TOC styling. */
+div.arch_toc ul, ol {
+    line-height: 1.2;
+}
+
+div.arch_toc li {
+    margin-top: 5px;
+    margin-bottom: 5px;
+}
+
+div.arch_toc ul li:first-child {
+    margin-top:0;
+}
+
+div.arch_toc li li {
+    margin-top: 0px;
+    margin-bottom: 0px;
+    line-height: 1.2;
+}
+
+div.arch_toc li li a {
+    font-weight: normal !important;
+}
+
+div.arch_toc h1 {
+    font-weight: bold;
+    font-size: 110%;
+}
+
+/* @group Link Styling */
+
+img {
+	display: block;
+	max-width: 100%;
+	height: auto;
+}
+
+div.arch_diagram {
+    display: block;
+    background: radial-gradient(var(--header-separator-color),var(--page-background-color));
+    margin-top: 2em;
+    margin-bottom: 2em;
+}
+
+/* match just one image */
+img[src="wt_diagram.png"] {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.arch_head table {
+    color: #000;
+    background-color: #FFDDAA;
+    border-color: #624D32;
+    /*border: solid 1px;*/
+    border-spacing: 5px;
+}
+
+.arch_head td {
+    border-color: #FFFFFF;
+    /*border: solid 1px;*/
+    vertical-align: top;
+    text-align: left;
+}
+
+.arch_head th {
+    border-color: #624D32;
+    vertical-align: top;
+    text-align: left;
+}
+
+.arch_thumbnail {
+    padding: 0px 0px 0px 0px;
+    border: 3px solid #fff;
+    outline: 1px solid #000;
+    margin: 3px;
+    width: 70px;
+    height: 70px;
+    display: block;
+    text-align: center;
+}
+
+.tablist {
+	width: 800px;
+}
+
+.tablist a[href="pages.html"] {
+	display: none;
+}
+
+#projectlogo {
+	vertical-align: middle;
+}
+
+.banner {
+	position: absolute; top: -2px; right: 1em;
+	overflow: hidden;
+	background-color: #e57504;
+	background-image: -webkit-linear-gradient(top, #dc7202, #ee7906);
+	background-image: -moz-linear-gradient(top, #dc7202, #ee7906);
+	background-image: -ms-linear-gradient(top, #dc7202, #ee7906);
+	border-radius: 0 0 8px 8px;
+	-moz-border-radius: 0 0 8px 8px;
+	box-shadow: 0 0 1em #888;
+}
+
+.banner a {
+	border: 1px solid #ebaa65;
+	border-top-style: none;
+	color: #fff;
+	display: block;
+	font: bold 9pt sans-serif;
+	margin: 0.05em 0 0.05em 0;
+	padding: 0.5em 2em;
+	text-align: center;
+	text-decoration: none;
+	text-shadow: 0 0 0.5em #444;
+}
+
+.banner a.last {
+	border: none;
+}
+
+@media print
+{
+  .banner { display: none; }
+}

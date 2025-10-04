@@ -29,26 +29,40 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/compiler/metadata/index_entry.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
+#include "mongo/db/query/query_planner_params.h"
+#include "mongo/db/query/query_test_service_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
+#include "mongo/util/str.h"
+
+#include <cstddef>
 #include <memory>
-#include <ostream>
 #include <string>
+#include <tuple>
+#include <utility>
 #include <vector>
 
-#include "mongo/base/owned_pointer_vector.h"
-#include "mongo/db/index/multikey_paths.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
-#include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/query/query_planner_params.h"
-#include "mongo/db/query/query_solution.h"
-#include "mongo/db/query/query_test_service_context.h"
-#include "mongo/unittest/unittest.h"
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
 class QueryPlannerTest : public mongo::unittest::Test {
 protected:
-    void setUp();
+    void setUp() override;
 
     /**
      * Clean up any previous state from a call to runQuery*()
@@ -58,6 +72,79 @@ protected:
     //
     // Build up test.
     //
+
+    /**
+     * Adds the N provided indexes, invokes the callback, then removes the indexes.
+     *
+     * E.g., to run a snippet with an indexes "{one:1}" and "{two:1}":
+     *  withIndexes(
+     *      [](){ <do some test behaviour> },
+     *      std::forward_as_tuple(BSON("one" << 1)),
+     *      std::forward_as_tuple(BSON("two" << 1)),
+     *  );
+     *
+     * The arguments forwarded as tuples will be passed to addIndex; see overloads
+     * of addIndex for behaviour.
+     */
+    void withIndexes(const auto& callback, auto&&... indexArgTuples) {
+        auto& indexes = params.mainCollectionInfo.indexes;
+        auto origSize = indexes.size();
+        (std::apply([&](auto&&... args) { addIndex(args...); }, indexArgTuples), ...);
+        callback();
+        // Can't resize back to old size, as resize requires default construction.
+        while (indexes.size() > origSize) {
+            indexes.pop_back();
+        }
+    }
+
+    /**
+     * Adds the single provided index, invokes the callback, then removes the index.
+     *
+     * E.g., to run a snippet with an index "{one:1}":
+     *  withIndex(
+     *      [](){ <do some test behaviour> },
+     *      BSON("one" << 1),
+     *  );
+     *
+     * The arguments following the callback will be passed to addIndex; see overloads
+     * of addIndex for behaviour.
+     */
+    void withIndex(const auto& callback, auto&&... indexArgs) {
+        withIndexes(callback, std::forward_as_tuple(indexArgs...));
+    }
+
+    /**
+     * Invoke the provided callback with every combination of the provided indexes.
+     *
+     * E.g.,
+     *  withIndexCombinations(
+     *      [](){ <do some test behaviour>},
+     *      std::forward_as_tuple(BSON("one" << 1)),
+     *      std::forward_as_tuple(BSON("two" << 1)),
+     * );
+     *
+     * Will invoke the callback with indexes on:
+     *  * none
+     *  * one
+     *  * two
+     *  * one, two
+     *
+     * The arguments forwarded as tuples will be passed to addIndex; see overloads
+     * of addIndex for behaviour.
+     */
+    void withIndexCombinations(const auto& callback,
+                               auto&& firstIndexArgs,
+                               auto&&... indexArgTuples) {
+        // First, make recursive call _without_ adding the current index.
+        withIndexCombinations(callback, indexArgTuples...);
+        // Second, make recursive call _with_ the current index added.
+        withIndexes([&]() { withIndexCombinations(callback, indexArgTuples...); }, firstIndexArgs);
+    }
+
+    void withIndexCombinations(const auto& callback) {
+        // Base case; no indexes to vary between present/absent, so just invoke the callback.
+        callback();
+    }
 
     void addIndex(BSONObj keyPattern, bool multikey = false);
 
@@ -90,9 +177,13 @@ protected:
 
     void runQuery(BSONObj query);
 
+    void runQueryWithPipeline(BSONObj query,
+                              BSONObj proj,
+                              std::vector<boost::intrusive_ptr<DocumentSource>> queryLayerPipeline);
     void runQueryWithPipeline(
-        BSONObj query,
-        std::vector<std::unique_ptr<InnerPipelineStageInterface>> queryLayerPipeline);
+        BSONObj query, std::vector<boost::intrusive_ptr<DocumentSource>> queryLayerPipeline) {
+        runQueryWithPipeline(query, BSONObj(), std::move(queryLayerPipeline));
+    }
 
     void runQuerySortProj(const BSONObj& query, const BSONObj& sort, const BSONObj& proj);
 
@@ -120,16 +211,15 @@ protected:
                                        long long limit,
                                        const BSONObj& hint);
 
-    void runQueryFull(
-        const BSONObj& query,
-        const BSONObj& sort,
-        const BSONObj& proj,
-        long long skip,
-        long long limit,
-        const BSONObj& hint,
-        const BSONObj& minObj,
-        const BSONObj& maxObj,
-        std::vector<std::unique_ptr<InnerPipelineStageInterface>> queryLayerPipeline = {});
+    void runQueryFull(const BSONObj& query,
+                      const BSONObj& sort,
+                      const BSONObj& proj,
+                      long long skip,
+                      long long limit,
+                      const BSONObj& hint,
+                      const BSONObj& minObj,
+                      const BSONObj& maxObj,
+                      std::vector<boost::intrusive_ptr<DocumentSource>> queryLayerPipeline = {});
 
     //
     // Same as runQuery* functions except we expect a failed status from the planning stage.
@@ -215,6 +305,12 @@ protected:
     void assertSolutionExists(const std::string& solnJson, size_t numMatches = 1) const;
 
     /**
+     * Verifies that the solution tree represented in json by 'solnJson' is
+     * _not_ one of the solutions generated by QueryPlanner.
+     */
+    void assertSolutionDoesntExist(const std::string& solnJson) const;
+
+    /**
      * Given a vector of string-based solution tree representations 'solnStrs',
      * verifies that the query planner generated exactly one of these solutions.
      */
@@ -243,23 +339,43 @@ protected:
     std::unique_ptr<MatchExpression> parseMatchExpression(
         const BSONObj& obj, const boost::intrusive_ptr<ExpressionContext>& expCtx = nullptr);
 
+    void setMarkQueriesSbeCompatible(bool sbeCompatible) {
+        markQueriesSbeCompatible = sbeCompatible;
+    }
+
+    void setIsCountLike() {
+        isCountLike = true;
+    }
+
     //
     // Data members.
     //
 
-    static const NamespaceString nss;
-
+    NamespaceString nss;
     QueryTestServiceContext serviceContext;
     ServiceContext::UniqueOperationContext opCtx;
     boost::intrusive_ptr<ExpressionContext> expCtx;
 
+    RAIIServerParameterControllerForTest enableHashIntersection{
+        "internalQueryPlannerEnableHashIntersection", true};
+    RAIIServerParameterControllerForTest enableSortIntersection{
+        "internalQueryPlannerEnableSortIndexIntersection", true};
+
     BSONObj queryObj;
     std::unique_ptr<CanonicalQuery> cq;
-    QueryPlannerParams params;
+    QueryPlannerParams params{QueryPlannerParams::ArgsForTest{}};
     Status plannerStatus = Status::OK();
     std::vector<std::unique_ptr<QuerySolution>> solns;
 
     bool relaxBoundsCheck = false;
+    // Value used for the sbeCompatible flag in the CanonicalQuery objects created by the
+    // test.
+    bool markQueriesSbeCompatible = false;
+    // Value used for the forceGenerateRecordId flag in the CanonicalQuery objects created by the
+    // test.
+    bool forceRecordId = false;
+    // Value used for the 'isCountLike' flag in the CanonicalQuery objects created by the test.
+    bool isCountLike = false;
 };
 
 }  // namespace mongo

@@ -27,15 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/util/summation.h"
 
-#include <cmath>
-#include <limits>
-#include <vector>
-
+#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 
-#include "mongo/util/summation.h"
+#include <cmath>
+#include <cstdint>
+#include <cstdlib>
+#include <limits>
+#include <vector>
 
 namespace mongo {
 
@@ -101,11 +102,9 @@ std::vector<double> specialValues = {-std::numeric_limits<double>::infinity(),
 }  // namespace
 
 TEST(Summation, AddLongs) {
-    int iter = 0;
     for (auto x : longValues) {
         for (auto y : longValues) {
             for (auto z : longValues) {
-                iter++;
                 DoubleDoubleSummation sum;
 
                 // This checks for correct results mod 2**64, which helps with checking correctness

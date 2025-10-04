@@ -1,0 +1,8 @@
+==== VARIATION: matchExpression=WhereMatchExpression
+$where
+    code: function() {print(where);}
+
+==== VARIATION: taggedMatchExpression=WhereMatchExpression
+$where || Selected Index #2 pos 0 combine 1
+    code: function() {print(where);}
+

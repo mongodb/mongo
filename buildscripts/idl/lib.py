@@ -27,23 +27,19 @@
 """Library functions and utility methods used across user-facing IDL scripts."""
 
 import os
+from typing import List, Set
 
-from typing import Set, List
-
-from buildscripts.idl.idl import syntax, parser
+from buildscripts.idl.idl import parser, syntax
 from buildscripts.idl.idl.compiler import CompilerImportResolver
-
-# List of feature flags that are disabled by default. The file name is repeated in
-# evergreen.yml
-ALL_FEATURE_FLAG_FILE = "all_feature_flags.txt"
 
 
 def list_idls(directory: str) -> Set[str]:
     """Find all IDL files in the current directory."""
     return {
         os.path.join(dirpath, filename)
-        for dirpath, dirnames, filenames in os.walk(directory) for filename in filenames
-        if filename.endswith('.idl')
+        for dirpath, dirnames, filenames in os.walk(directory)
+        for filename in filenames
+        if not filename.startswith(".") and filename.endswith(".idl")
     }
 
 
@@ -56,3 +52,14 @@ def parse_idl(idl_path: str, import_directories: List[str]) -> syntax.IDLParsedS
         raise ValueError(f"Cannot parse {idl_path}")
 
     return parsed_doc
+
+
+def is_third_party_idl(idl_path: str) -> bool:
+    """Check if an IDL file is under a third party directory."""
+    third_party_idl_subpaths = [os.path.join("third_party", "mozjs"), "win32com"]
+
+    for file_name in third_party_idl_subpaths:
+        if file_name in idl_path:
+            return True
+
+    return False

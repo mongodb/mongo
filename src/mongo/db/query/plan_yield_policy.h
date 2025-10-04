@@ -29,16 +29,28 @@
 
 #pragma once
 
-#include <functional>
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/restore_context.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/elapsed_tracker.h"
+#include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
+
+#include <functional>
+#include <memory>
+#include <string>
+#include <variant>
 
 namespace mongo {
 
 class ClockSource;
+
 class Yieldable;
 
 class YieldPolicyCallbacks {
@@ -50,12 +62,6 @@ public:
      * the storage engine snapshot has been abandoned.
      */
     virtual void duringYield(OperationContext*) const = 0;
-
-    /**
-     * Called if the PlanYieldPolicy observes a WriteConflictException while attempting to restore
-     * an execution plan.
-     */
-    virtual void handledWriteConflict(OperationContext*) const = 0;
 
     /**
      * If the yield policy is INTERRUPT_ONLY, this is called prior to checking for interrupt.
@@ -90,15 +96,14 @@ public:
         // (e.g. collection drop) during yield.
         YIELD_MANUAL,
 
-        // Can be used in one of the following scenarios:
-        //  - The caller will hold a lock continuously for the lifetime of this PlanExecutor.
-        //  - This PlanExecutor doesn't logically belong to a Collection, and so does not need to be
-        //    locked during execution. For example, this yield policy is used for PlanExecutors
-        //    which unspool queued metadata ("virtual collection scans") for listCollections and
-        //    listIndexes.
-        NO_YIELD,
-
-        // Will not yield locks or storage engine resources, but will check for interrupt.
+        // Will not yield locks or storage engine resources, either because the caller intends to
+        // hold the lock continuously for the lifetime of this PlanExecutor, or because this
+        // PlanExecutor doesn't logically belong to a Collection, and so does not need to be
+        // locked during execution. For example, this yield policy is used for PlanExecutors
+        // which unspool queued metadata ("virtual collection scans") for listCollections and
+        // listIndexes.
+        //
+        // Will still check for interrupt.
         INTERRUPT_ONLY,
 
         // Used for testing, this yield policy will cause the PlanExecutor to time out on the first
@@ -120,8 +125,6 @@ public:
                 return "WRITE_CONFLICT_RETRY_ONLY";
             case YieldPolicy::YIELD_MANUAL:
                 return "YIELD_MANUAL";
-            case YieldPolicy::NO_YIELD:
-                return "NO_YIELD";
             case YieldPolicy::INTERRUPT_ONLY:
                 return "INTERRUPT_ONLY";
             case YieldPolicy::ALWAYS_TIME_OUT:
@@ -132,8 +135,8 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    static YieldPolicy parseFromBSON(const StringData& element) {
-        const std::string& yieldPolicy = element.toString();
+    static YieldPolicy parseFromBSON(StringData element) {
+        const std::string& yieldPolicy = std::string{element};
         if (yieldPolicy == "YIELD_AUTO") {
             return YieldPolicy::YIELD_AUTO;
         }
@@ -142,9 +145,6 @@ public:
         }
         if (yieldPolicy == "YIELD_MANUAL") {
             return YieldPolicy::YIELD_MANUAL;
-        }
-        if (yieldPolicy == "NO_YIELD") {
-            return YieldPolicy::NO_YIELD;
         }
         if (yieldPolicy == "INTERRUPT_ONLY") {
             return YieldPolicy::INTERRUPT_ONLY;
@@ -167,9 +167,16 @@ public:
                                             const NamespaceString& newNss,
                                             UUID collUuid) {
         uasserted(ErrorCodes::QueryPlanKilled,
-                  str::stream() << "collection renamed from '" << oldNss << "' to '" << newNss
-                                << "'. UUID " << collUuid);
+                  str::stream() << "collection renamed from '" << oldNss.toStringForErrorMsg()
+                                << "' to '" << newNss.toStringForErrorMsg() << "'. UUID "
+                                << collUuid);
     }
+
+    /**
+     * Returns the policy that this operation should use, accounting for any special circumstances,
+     * and otherwise the desired policy. Should always be used when constructing a PlanYieldPolicy.
+     */
+    static YieldPolicy getPolicyOverrideForOperation(OperationContext* opCtx, YieldPolicy desired);
 
     /**
      * Constructs a PlanYieldPolicy of the given 'policy' type. This class uses an ElapsedTracker
@@ -177,13 +184,16 @@ public:
      * 'yieldIterations' and 'yieldPeriod'.
      *
      * If provided, the given 'yieldable' is released and restored by the 'PlanYieldPolicy' (in
-     * addition to releasing/restoring locks and the storage engine snapshot).
+     * addition to releasing/restoring locks and the storage engine snapshot). The provided 'policy'
+     * will be overridden depending on the nature of this operation. For example, multi-document
+     * transactions will always downgrade to INTERRUPT_ONLY, and operations with recursively held
+     * locks will downgrade to INTERRUPT_ONLY.
      */
-    PlanYieldPolicy(YieldPolicy policy,
+    PlanYieldPolicy(OperationContext* opCtx,
+                    YieldPolicy policy,
                     ClockSource* cs,
                     int yieldIterations,
                     Milliseconds yieldPeriod,
-                    const Yieldable* yieldable,
                     std::unique_ptr<const YieldPolicyCallbacks> callbacks);
 
     virtual ~PlanYieldPolicy() = default;
@@ -193,7 +203,14 @@ public:
      * YIELD_AUTO and INTERRUPT_ONLY) or release locks or storage engine state (in the case of
      * auto-yielding plans).
      */
-    virtual bool shouldYieldOrInterrupt(OperationContext* opCtx);
+    inline bool shouldYieldOrInterrupt(OperationContext* opCtx) {
+        if (auto t = _fastClock->now().toMillisSinceEpoch();
+            MONGO_unlikely(_forceYield || t > _nextYieldCheckpoint)) {
+            _nextYieldCheckpoint = t + _yieldIntervalMs;
+            return doShouldYieldOrInterrupt(opCtx);
+        }
+        return false;
+    }
 
     /**
      * Resets the yield timer so that we wait for a while before yielding/interrupting again.
@@ -214,14 +231,16 @@ public:
      * been relinquished.
      */
     virtual Status yieldOrInterrupt(OperationContext* opCtx,
-                                    std::function<void()> whileYieldingFn = nullptr);
+                                    const std::function<void()>& whileYieldingFn,
+                                    RestoreContext::RestoreType restoreType,
+                                    const std::function<void()>& afterSnapshotAbandonFn = nullptr);
 
     /**
      * All calls to shouldYieldOrInterrupt() will return true until the next call to
      * yieldOrInterrupt(). This must only be called for auto-yielding plans, to force a yield. It
      * cannot be used to force an interrupt for INTERRUPT_ONLY plans.
      */
-    void forceYield() {
+    MONGO_COMPILER_ALWAYS_INLINE void forceYield() {
         dassert(canAutoYield());
         _forceYield = true;
     }
@@ -238,7 +257,6 @@ public:
             case YieldPolicy::ALWAYS_MARK_KILLED: {
                 return true;
             }
-            case YieldPolicy::NO_YIELD:
             case YieldPolicy::WRITE_CONFLICT_RETRY_ONLY:
             case YieldPolicy::INTERRUPT_ONLY: {
                 return false;
@@ -252,7 +270,7 @@ public:
      * either releasing storage engine resources via abandonSnapshot() OR yielding LockManager
      * locks.
      */
-    bool canAutoYield() const {
+    MONGO_COMPILER_ALWAYS_INLINE bool canAutoYield() const {
         switch (_policy) {
             case YieldPolicy::YIELD_AUTO:
             case YieldPolicy::WRITE_CONFLICT_RETRY_ONLY:
@@ -260,7 +278,6 @@ public:
             case YieldPolicy::ALWAYS_MARK_KILLED: {
                 return true;
             }
-            case YieldPolicy::NO_YIELD:
             case YieldPolicy::YIELD_MANUAL:
             case YieldPolicy::INTERRUPT_ONLY:
                 return false;
@@ -272,9 +289,11 @@ public:
         return _policy;
     }
 
-    void setYieldable(const Yieldable* yieldable) {
-        _yieldable = yieldable;
-    }
+protected:
+    /**
+     * The function that actually do check for interrupt or release locks or storage engine state.
+     */
+    MONGO_COMPILER_NOINLINE virtual bool doShouldYieldOrInterrupt(OperationContext* opCtx);
 
 private:
     /**
@@ -283,17 +302,10 @@ private:
      * specific query execution engines.
      */
     virtual void saveState(OperationContext* opCtx) = 0;
-    virtual void restoreState(OperationContext* opCtx, const Yieldable* yieldable) = 0;
+    virtual void restoreState(OperationContext* opCtx,
+                              const Yieldable* yieldable,
+                              RestoreContext::RestoreType restoreType) = 0;
 
-    /**
-     * TODO SERVER-59620: Remove this.
-     *
-     * Indicates whether we should use the feature-flag-guarded behavior for
-     * keeping data pinned across yields.
-     */
-    virtual bool useExperimentalCommitTxnBehavior() const {
-        return false;
-    }
 
     /**
      * Relinquishes and reacquires lock manager locks and catalog state. Also responsible for
@@ -301,15 +313,21 @@ private:
      * storage engine snapshot.
      */
     void performYield(OperationContext* opCtx,
-                      const Yieldable* yieldable,
-                      std::function<void()> whileYieldingFn);
+                      const Yieldable& yieldable,
+                      std::function<void()> whileYieldingFn,
+                      std::function<void()> afterSnapshotAbandonFn);
+    void performYieldWithAcquisitions(OperationContext* opCtx,
+                                      std::function<void()> whileYieldingFn,
+                                      std::function<void()> afterSnapshotAbandonFn);
 
     const YieldPolicy _policy;
-    const Yieldable* _yieldable;
     std::unique_ptr<const YieldPolicyCallbacks> _callbacks;
 
-    bool _forceYield = false;
     ElapsedTracker _elapsedTracker;
+    int64_t _yieldIntervalMs;
+    ClockSource* _fastClock;
+    int64_t _nextYieldCheckpoint{0};
+    bool _forceYield = false;
 };
 
 }  // namespace mongo

@@ -30,9 +30,8 @@
 # Printlog: test Unicode output
 #
 
-import fnmatch, os, shutil, run, time
 from suite_subprocess import suite_subprocess
-from wiredtiger import stat
+import json
 import wttest
 from wtscenario import make_scenarios
 
@@ -49,7 +48,7 @@ class test_txn08(wttest.WiredTigerTestCase, suite_subprocess):
 
     # Turn on logging for this test.
     def conn_config(self):
-        return 'log=(archive=false,enabled,file_max=%s),' % self.logmax + \
+        return 'log=(enabled,file_max=%s,remove=false),' % self.logmax + \
             'transaction_sync="(method=dsync,enabled)"'
 
     def test_printlog_unicode(self):
@@ -74,6 +73,9 @@ class test_txn08(wttest.WiredTigerTestCase, suite_subprocess):
         self.runWt(['printlog', '-u'], outfilename='printlog.out')
         self.check_file_contains('printlog.out',
             '\\u0001\\u0002abcd\\u0003\\u0004')
+        # Verify that the file is a valid JSON
+        with open('printlog.out') as f:
+            log_records = json.load(f)
         self.runWt(['printlog', '-u','-x'], outfilename='printlog-hex.out')
         self.check_file_contains('printlog-hex.out',
             '\\u0001\\u0002abcd\\u0003\\u0004')
@@ -120,6 +122,3 @@ class test_txn08(wttest.WiredTigerTestCase, suite_subprocess):
             '"lsn" : [1,128],')
         self.check_file_not_contains('printlog-range07.out',
             '"lsn" : [1,384],')
-
-if __name__ == '__main__':
-    wttest.run()

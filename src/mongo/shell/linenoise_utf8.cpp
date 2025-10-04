@@ -31,11 +31,17 @@
 
 #ifdef _WIN32
 #include "mongo/platform/windows_basic.h"
-#include "mongo/util/text.h"
+#include "mongo/util/text.h"  // IWYU pragma: keep
+
 #include <io.h>
 #else
+#include "mongo/config.h"  // IWYU pragma: keep
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
 #endif
+#endif
+
 
 namespace linenoise_utf8 {
 

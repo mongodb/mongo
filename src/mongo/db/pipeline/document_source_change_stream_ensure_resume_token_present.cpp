@@ -27,14 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/pipeline/document_source_change_stream_ensure_resume_token_present.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/change_stream_start_after_invalidate_info.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/pipeline/document_source_change_stream.h"
+#include "mongo/util/assert_util.h"
+
+#include <utility>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalChangeStreamEnsureResumeTokenPresent,
+                            DocumentSourceChangeStreamEnsureResumeTokenPresent::id)
 
 DocumentSourceChangeStreamEnsureResumeTokenPresent::
     DocumentSourceChangeStreamEnsureResumeTokenPresent(
@@ -45,7 +54,7 @@ boost::intrusive_ptr<DocumentSourceChangeStreamEnsureResumeTokenPresent>
 DocumentSourceChangeStreamEnsureResumeTokenPresent::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const DocumentSourceChangeStreamSpec& spec) {
-    auto resumeToken = DocumentSourceChangeStream::resolveResumeTokenFromSpec(spec);
+    auto resumeToken = change_stream::resolveResumeTokenFromSpec(expCtx, spec);
     tassert(5666902,
             "Expected non-high-water-mark resume token",
             !ResumeToken::isHighWaterMarkToken(resumeToken));
@@ -53,12 +62,11 @@ DocumentSourceChangeStreamEnsureResumeTokenPresent::create(
 }
 
 const char* DocumentSourceChangeStreamEnsureResumeTokenPresent::getSourceName() const {
-    return kStageName.rawData();
+    return kStageName.data();
 }
 
-
 StageConstraints DocumentSourceChangeStreamEnsureResumeTokenPresent::constraints(
-    Pipeline::SplitState) const {
+    PipelineSplitState) const {
     StageConstraints constraints{StreamType::kStreaming,
                                  PositionRequirement::kNone,
                                  // If this is parsed on mongos it should stay on mongos. If we're
@@ -71,95 +79,33 @@ StageConstraints DocumentSourceChangeStreamEnsureResumeTokenPresent::constraints
                                  UnionRequirement::kNotAllowed,
                                  ChangeStreamRequirement::kChangeStreamStage};
 
-    // The '$match' and 'DocumentSourceSingleDocumentTransformation' stages can swap with this
-    // stage, allowing filtering and reshaping to occur earlier in the pipeline. For sharded cluster
-    // pipelines, swaps can allow $match and 'DocumentSourceSingleDocumentTransformation' stages to
-    // execute on the shards, providing inter-node parallelism and potentially reducing the amount
-    // of data sent form each shard to the mongoS.
+    // The '$match', '$redact', and 'DocumentSourceSingleDocumentTransformation' stages can swap
+    // with this stage, allowing filtering and reshaping to occur earlier in the pipeline. For
+    // sharded cluster pipelines, swaps can allow $match, $redact and
+    // 'DocumentSourceSingleDocumentTransformation' stages to execute on the shards, providing
+    // inter-node parallelism and potentially reducing the amount of data sent form each shard to
+    // the mongoS.
     constraints.canSwapWithMatch = true;
-    constraints.canSwapWithSingleDocTransform = true;
+    constraints.canSwapWithSingleDocTransformOrRedact = true;
+    constraints.consumesLogicalCollectionData = false;
 
     return constraints;
 }
 
-DocumentSource::GetNextResult DocumentSourceChangeStreamEnsureResumeTokenPresent::doGetNext() {
-    // If we have already verified the resume token is present, return the next doc immediately.
-    if (_resumeStatus == ResumeStatus::kSurpassedToken) {
-        return pSource->getNext();
+Value DocumentSourceChangeStreamEnsureResumeTokenPresent::doSerialize(
+    const SerializationOptions& opts) const {
+    BSONObjBuilder builder;
+    if (opts.isSerializingForExplain()) {
+        BSONObjBuilder sub(builder.subobjStart(DocumentSourceChangeStream::kStageName));
+        sub.append("stage"_sd, kStageName);
+        sub << "resumeToken"_sd << Value(ResumeToken(_tokenFromClient).toDocument(opts));
+        sub.done();
+    } else {
+        BSONObjBuilder sub(builder.subobjStart(kStageName));
+        sub << "resumeToken"_sd << Value(ResumeToken(_tokenFromClient).toDocument(opts));
+        sub.done();
     }
-
-    auto nextInput = GetNextResult::makeEOF();
-
-    // If we are starting after an 'invalidate' and the invalidating command (e.g. collection drop)
-    // occurred at the same clusterTime on more than one shard, then we may see multiple identical
-    // resume tokens here. We swallow all of them until the resume status becomes kSurpassedToken.
-    while (_resumeStatus != ResumeStatus::kSurpassedToken) {
-        // Delegate to DocumentSourceChangeStreamCheckResumability to consume all events up to the
-        // token. This will also set '_resumeStatus' to indicate whether we have seen or surpassed
-        // the token.
-        nextInput = _tryGetNext();
-
-        // If there are no more results, return EOF. We will continue checking for the resume token
-        // the next time the getNext method is called. If we hit EOF, then we cannot have surpassed
-        // the resume token on this iteration.
-        if (!nextInput.isAdvanced()) {
-            invariant(_resumeStatus != ResumeStatus::kSurpassedToken);
-            return nextInput;
-        }
-
-        // When we reach here, we have either found the resume token or surpassed it.
-        invariant(_resumeStatus != ResumeStatus::kCheckNextDoc);
-
-        // If the resume status is kFoundToken, record the fact that we have seen the token. When we
-        // have surpassed the resume token, we will assert that we saw the token before doing so. We
-        // cannot simply assert once and then assume we have surpassed the token, because in certain
-        // cases we may see 1..N identical tokens and must swallow them all before proceeding.
-        _hasSeenResumeToken = (_hasSeenResumeToken || _resumeStatus == ResumeStatus::kFoundToken);
-    }
-
-    // Assert that before surpassing the resume token, we observed the token itself in the stream.
-    uassert(ErrorCodes::ChangeStreamFatalError,
-            str::stream() << "cannot resume stream; the resume token was not found. "
-                          << nextInput.getDocument()["_id"].getDocument().toString(),
-            _hasSeenResumeToken);
-
-    // At this point, we have seen the token and swallowed it. Return the next event to the client.
-    invariant(_hasSeenResumeToken && _resumeStatus == ResumeStatus::kSurpassedToken);
-    return nextInput;
-}
-
-DocumentSource::GetNextResult DocumentSourceChangeStreamEnsureResumeTokenPresent::_tryGetNext() {
-    try {
-        return DocumentSourceChangeStreamCheckResumability::doGetNext();
-    } catch (const ExceptionFor<ErrorCodes::ChangeStreamStartAfterInvalidate>& ex) {
-        const auto extraInfo = ex.extraInfo<ChangeStreamStartAfterInvalidateInfo>();
-        tassert(5779200, "Missing ChangeStreamStartAfterInvalidationInfo on exception", extraInfo);
-
-        const DocumentSource::GetNextResult nextInput =
-            Document::fromBsonWithMetaData(extraInfo->getStartAfterInvalidateEvent());
-        _resumeStatus =
-            DocumentSourceChangeStreamCheckResumability::compareAgainstClientResumeToken(
-                pExpCtx, nextInput.getDocument(), _tokenFromClient);
-
-        // This exception should always contain the client-provided resume token.
-        tassert(5779201,
-                "Client resume token did not match with the resume token on the invalidate event",
-                _resumeStatus == ResumeStatus::kFoundToken);
-
-        return nextInput;
-    }
-}
-
-Value DocumentSourceChangeStreamEnsureResumeTokenPresent::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
-    // We only serialize this stage in the context of explain.
-    if (explain) {
-        return Value(DOC(DocumentSourceChangeStream::kStageName
-                         << DOC("stage"
-                                << "internalEnsureResumeTokenPresent"_sd
-                                << "resumeToken" << ResumeToken(_tokenFromClient).toDocument())));
-    }
-    MONGO_UNREACHABLE_TASSERT(5467611);
+    return Value(builder.obj());
 }
 
 }  // namespace mongo

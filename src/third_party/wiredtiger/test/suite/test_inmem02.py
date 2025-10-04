@@ -27,7 +27,6 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
-from time import sleep
 from wtdataset import SimpleDataSet
 
 # test_inmem02.py
@@ -58,6 +57,3 @@ class test_inmem02(wttest.WiredTigerTestCase):
         for i in range(1, 1000):
             cursor[str('%015d' % i)] = str(i) + ': abcdefghijklmnopqrstuvwxyz'
         cursor.close()
-
-if __name__ == '__main__':
-    wttest.run()

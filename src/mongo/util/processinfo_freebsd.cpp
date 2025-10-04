@@ -27,25 +27,36 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
 #include <cstdlib>
 #include <string>
 
+#ifndef _WIN32
 #include <kvm.h>
+
 #include <sys/file.h>
 #include <sys/mman.h>
 #include <sys/param.h>
+#include <sys/socket.h>
 #include <sys/sysctl.h>
 #include <sys/types.h>
 #include <sys/user.h>
 #include <sys/vmmeter.h>
-#include <unistd.h>
 #include <vm/vm_param.h>
+#endif
 
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
+#include "mongo/util/processinfo.h"
 #include "mongo/util/scopeguard.h"
-#include "processinfo.h"
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
+
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
+
 
 namespace mongo {
 
@@ -92,10 +103,6 @@ int getSysctlByNameWithDefault<std::string>(const char* sysctlName,
     return 0;
 }
 
-bool ProcessInfo::checkNumaEnabled() {
-    return false;
-}
-
 int ProcessInfo::getVirtualMemorySize() {
     kvm_t* kd = NULL;
     int cnt = 0;
@@ -127,7 +134,6 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     int status = getSysctlByNameWithDefault("kern.version", std::string("unknown"), &osVersion);
     if (status != 0)
         LOGV2(23332,
-              "Unable to collect OS Version. (errno: {errno} msg: {msg})",
               "Unable to collect OS Version.",
               "errno"_attr = status,
               "msg"_attr = strerror(status));
@@ -135,7 +141,6 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     status = getSysctlByNameWithDefault("hw.machine_arch", std::string("unknown"), &cpuArch);
     if (status != 0)
         LOGV2(23333,
-              "Unable to collect Machine Architecture. (errno: {errno} msg: {msg})",
               "Unable to collect Machine Architecture.",
               "errno"_attr = status,
               "msg"_attr = strerror(status));
@@ -148,7 +153,6 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     memLimit = memSize;
     if (status != 0)
         LOGV2(23334,
-              "Unable to collect Physical Memory. (errno: {errno} msg: {msg})",
               "Unable to collect Physical Memory.",
               "errno"_attr = status,
               "msg"_attr = strerror(status));
@@ -157,14 +161,18 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     numCores = numBuffer;
     if (status != 0)
         LOGV2(23335,
-              "Unable to collect Number of CPUs. (errno: {errno} msg: {msg})",
               "Unable to collect Number of CPUs.",
               "errno"_attr = status,
               "msg"_attr = strerror(status));
 
     pageSize = static_cast<unsigned long long>(sysconf(_SC_PAGESIZE));
 
-    hasNuma = checkNumaEnabled();
+    hasNuma = false;
+
+    // The appropriate system parameter is "kern.ipc.soacceptqueue" (or
+    // "kern.ipc.somaxconn" before FreeBSD 10.0), but to simplify testing we
+    // hardcode to `SOMAXCONN`.
+    defaultListenBacklog = SOMAXCONN;
 }
 
 void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {}

@@ -27,32 +27,39 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 #include "mongo/rpc/rewrite_state_change_errors.h"
 
-#include "mongo/platform/basic.h"
-
-#include <array>
-#include <string>
-
-#include <boost/optional.hpp>
-#include <fmt/format.h>
-#include <pcrecpp.h>
-
-#include "mongo/bson/mutable/document.h"
-#include "mongo/bson/mutable/element.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/exec/mutable_bson/document.h"
+#include "mongo/db/exec/mutable_bson/element.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/rpc/message.h"
-#include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/rewrite_state_change_errors_server_parameter_gen.h"
-#include "mongo/s/is_mongos.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/pcre.h"
 #include "mongo/util/static_immortal.h"
+
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <iterator>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
+
 
 namespace mongo::rpc {
 namespace {
@@ -78,12 +85,13 @@ auto enabledForOperation = OperationContext::declareDecoration<RewriteEnabled>()
  */
 boost::optional<std::string> scrubErrmsg(StringData val) {
     struct Scrub {
-        pcrecpp::RE pat;
+        Scrub(std::string pat, std::string sub) : pat(std::move(pat)), sub(std::move(sub)) {}
+        pcre::Regex pat;
         std::string sub;
     };
     static const StaticImmortal scrubs = std::array{
-        Scrub{pcrecpp::RE("not master"), "(NOT_PRIMARY)"},
-        Scrub{pcrecpp::RE("node is recovering"), "(NODE_IS_RECOVERING)"},
+        Scrub{"not master", "(NOT_PRIMARY)"},
+        Scrub{"node is recovering", "(NODE_IS_RECOVERING)"},
     };
     // Fast scan for the common case that no key phrase is present.
     static const StaticImmortal fastScan = [] {
@@ -91,19 +99,17 @@ boost::optional<std::string> scrubErrmsg(StringData val) {
         StringData sep;
         auto out = std::back_inserter(pat);
         for (const auto& scrub : *scrubs) {
-            out = format_to(out, FMT_STRING("{}({})"), sep, scrub.pat.pattern());
+            out = fmt::format_to(out, "{}({})", sep, scrub.pat.pattern());
             sep = "|"_sd;
         }
-        return pcrecpp::RE(pat);
+        return pcre::Regex(pat);
     }();
 
-    pcrecpp::StringPiece pcreVal(val.rawData(), val.size());
-
-    if (fastScan->PartialMatch(pcreVal)) {
+    if (fastScan->matchView(val)) {
         std::string s{val};
         bool didSub = false;
         for (auto&& scrub : *scrubs) {
-            bool subOk = scrub.pat.GlobalReplace(scrub.sub, &s);
+            bool subOk = scrub.pat.substitute(scrub.sub, &s, pcre::SUBSTITUTE_GLOBAL);
             didSub = (didSub || subOk);
         }
         if (didSub)
@@ -125,7 +131,7 @@ void editErrorNode(mutablebson::Element&& node) {
         if (auto codeName = node["codeName"]; codeName.ok())
             uassertStatusOK(codeName.setValueString(ErrorCodes::errorString(newCode)));
     }
-    if (auto errmsg = node["errmsg"]; errmsg.ok() && errmsg.isType(String))
+    if (auto errmsg = node["errmsg"]; errmsg.ok() && errmsg.isType(BSONType::string))
         if (auto scrubbed = scrubErrmsg(errmsg.getValueString()))
             uassertStatusOK(errmsg.setValueString(*scrubbed));
 }
@@ -186,22 +192,22 @@ boost::optional<BSONObj> rewriteDocument(const BSONObj& doc, OperationContext* o
 
     // The `writeErrors` and `writeConcernError` nodes might need editing.
     // `writeErrors` is an array of error-bearing nodes like the doc root.
-    if (const auto& we = doc["writeErrors"]; we.type() == Array) {
+    if (const auto& we = doc["writeErrors"]; we.type() == BSONType::array) {
         size_t idx = 0;
         BSONObj bArr = we.Obj();
         for (auto ai = bArr.begin(); ai != bArr.end(); ++ai, ++idx)
-            if (ai->type() == Object && (oldCode = needsRewrite(sc, ai->Obj())))
+            if (ai->type() == BSONType::object && (oldCode = needsRewrite(sc, ai->Obj())))
                 editErrorNode(lazyMutableRoot()["writeErrors"][idx]);
     }
 
     // `writeConcernError` is a single error-bearing node.
-    if (const auto& wce = doc["writeConcernError"]; wce.type() == Object) {
+    if (const auto& wce = doc["writeConcernError"]; wce.type() == BSONType::object) {
         if ((oldCode = needsRewrite(sc, wce.Obj())))
             editErrorNode(lazyMutableRoot()["writeConcernError"]);
     }
 
     if (mutableDoc) {
-        LOGV2_DEBUG(1, 5054900, "Rewrote state change error", "code"_attr = oldCode);
+        LOGV2_DEBUG(5054900, 1, "Rewrote state change error", "code"_attr = oldCode);
         return mutableDoc->getObject();
     }
     return {};
@@ -234,7 +240,8 @@ void RewriteStateChangeErrors::onActiveFailCommand(OperationContext* opCtx, cons
 
 boost::optional<BSONObj> RewriteStateChangeErrors::rewrite(BSONObj doc, OperationContext* opCtx) {
     auto sc = opCtx->getServiceContext();
-    if (!isMongos() || (sc && !getEnabled(sc)) || !getEnabled(opCtx))
+    if (!serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer) ||
+        (sc && !getEnabled(sc)) || !getEnabled(opCtx))
         return {};
     return rewriteDocument(doc, opCtx);
 }

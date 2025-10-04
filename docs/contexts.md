@@ -55,7 +55,7 @@ All `Client`s have an associated lock which protects their internal state includ
 associated `OperationContext` from concurrent access. Any mutation to a `Client`’s associated
 `OperationContext` (or other protected internal state) _must_ take the `Client` lock before being
 performed, as an `OperationContext` can otherwise be killed and destroyed at any time. A `Client`
-thread may read its own internal state  without taking the `Client` lock, but _must_ take the
+thread may read its own internal state without taking the `Client` lock, but _must_ take the
 `Client` lock when reading another `Client` thread's internal state. Only a `Client`'s owning thread
 may write to its `Client`'s internal state, and must take the lock when doing so. `Client`s
 implement the standard lockable interface (`lock()`, `unlock()`, and `try_lock()`) to support these
@@ -68,7 +68,7 @@ operations. The semantics of the `Client` lock are summarized in the table below
 
 ### `Client` thread manipulation
 
- [`Client::cc()`][client-cc-url] may be used to get the `Client` object associated with the currently
+[`Client::cc()`][client-cc-url] may be used to get the `Client` object associated with the currently
 executing thread. Prefer passing `Client` objects as parameters over calls to `Client::cc()` when
 possible. A [`ThreadClient`][thread-client-url] is an RAII-style class which may be used to construct
 and bind a `Client` to the current running thread and automatically unbind it once the `ThreadClient`

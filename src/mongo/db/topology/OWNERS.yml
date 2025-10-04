@@ -1,0 +1,9 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
+  - "*coordinator*":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
+      - 10gen/server-catalog-and-routing-routing-and-topology

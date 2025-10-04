@@ -29,15 +29,19 @@
 
 #pragma once
 
-#include <string>
-#include <vector>
-
+#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/mutable/element.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/role_name.h"
+#include "mongo/db/auth/role_name_or_string.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands/user_management_commands_gen.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/exec/mutable_bson/element.h"
+
+#include <string>
+#include <vector>
 
 namespace mongo {
 
@@ -57,7 +61,7 @@ namespace auth {
  * and normalizes them to a vector of RoleNames using a passed dbname fallback.
  */
 std::vector<RoleName> resolveRoleNames(const std::vector<RoleNameOrString>& possibleRoles,
-                                       StringData dbname);
+                                       const DatabaseName& dbname);
 
 //
 // checkAuthorizedTo* methods
@@ -79,25 +83,25 @@ Status checkAuthorizedToRevokePrivileges(AuthorizationSession* authzSession,
 // checkAuthFor*Command methods
 //
 
-void checkAuthForTypedCommand(Client*, const CreateUserCommand&);
-void checkAuthForTypedCommand(Client*, const UpdateUserCommand&);
-void checkAuthForTypedCommand(Client*, const GrantRolesToUserCommand&);
-void checkAuthForTypedCommand(Client*, const CreateRoleCommand&);
-void checkAuthForTypedCommand(Client*, const UpdateRoleCommand&);
-void checkAuthForTypedCommand(Client*, const GrantRolesToRoleCommand&);
-void checkAuthForTypedCommand(Client*, const GrantPrivilegesToRoleCommand&);
-void checkAuthForTypedCommand(Client*, const DropAllUsersFromDatabaseCommand&);
-void checkAuthForTypedCommand(Client*, const RevokeRolesFromUserCommand&);
-void checkAuthForTypedCommand(Client*, const RevokeRolesFromRoleCommand&);
-void checkAuthForTypedCommand(Client*, const DropUserCommand&);
-void checkAuthForTypedCommand(Client*, const DropRoleCommand&);
-void checkAuthForTypedCommand(Client*, const RevokePrivilegesFromRoleCommand&);
-void checkAuthForTypedCommand(Client*, const DropAllRolesFromDatabaseCommand&);
-void checkAuthForTypedCommand(Client*, const UsersInfoCommand&);
-void checkAuthForTypedCommand(Client*, const RolesInfoCommand&);
-void checkAuthForTypedCommand(Client*, const InvalidateUserCacheCommand&);
-void checkAuthForTypedCommand(Client*, const GetUserCacheGenerationCommand&);
-void checkAuthForTypedCommand(Client*, const MergeAuthzCollectionsCommand&);
+void checkAuthForTypedCommand(OperationContext*, const CreateUserCommand&);
+void checkAuthForTypedCommand(OperationContext*, const UpdateUserCommand&);
+void checkAuthForTypedCommand(OperationContext*, const GrantRolesToUserCommand&);
+void checkAuthForTypedCommand(OperationContext*, const CreateRoleCommand&);
+void checkAuthForTypedCommand(OperationContext*, const UpdateRoleCommand&);
+void checkAuthForTypedCommand(OperationContext*, const GrantRolesToRoleCommand&);
+void checkAuthForTypedCommand(OperationContext*, const GrantPrivilegesToRoleCommand&);
+void checkAuthForTypedCommand(OperationContext*, const DropAllUsersFromDatabaseCommand&);
+void checkAuthForTypedCommand(OperationContext*, const RevokeRolesFromUserCommand&);
+void checkAuthForTypedCommand(OperationContext*, const RevokeRolesFromRoleCommand&);
+void checkAuthForTypedCommand(OperationContext*, const DropUserCommand&);
+void checkAuthForTypedCommand(OperationContext*, const DropRoleCommand&);
+void checkAuthForTypedCommand(OperationContext*, const RevokePrivilegesFromRoleCommand&);
+void checkAuthForTypedCommand(OperationContext*, const DropAllRolesFromDatabaseCommand&);
+void checkAuthForTypedCommand(OperationContext*, const UsersInfoCommand&);
+void checkAuthForTypedCommand(OperationContext*, const RolesInfoCommand&);
+void checkAuthForTypedCommand(OperationContext*, const InvalidateUserCacheCommand&);
+void checkAuthForTypedCommand(OperationContext*, const GetUserCacheGenerationCommand&);
+void checkAuthForTypedCommand(OperationContext*, const MergeAuthzCollectionsCommand&);
 
 }  // namespace auth
 }  // namespace mongo

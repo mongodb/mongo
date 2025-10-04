@@ -26,39 +26,70 @@
 # it in the license file.
 
 global:
-  cpp_namespace: mongo
-  cpp_includes:
-  - "mongo/db/mirror_maestro.h"
+    cpp_namespace: mongo
 
 imports:
-  - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 structs:
-  MirroredReadsParameters:
-    description: "A struct representing how to mirror read command requests"
-    strict: true
-    fields:
-      samplingRate:
-        description: >-
-            A floating-point value within [0.0,1.0] specifying what fraction of reads to sample
-        type: safeDouble
-        default: 0.01
-        validator:
-          gte: 0.0
-          lte: 1.0
-      maxTimeMS:
-        description: >-
-            The maxTimeMS to apply to mirrored reads
-        type: safeInt
-        default: 1000
-        validator:
-          gt: 0
+    CommonMirroredReadsParameters:
+        description: "Options for mirroring reads shared across mirrored read types"
+        strict: true
+        fields:
+            samplingRate:
+                description: >-
+                    A floating-point value within [0.0,1.0] specifying what fraction of reads to sample
+                type: safeDouble
+                default: 0.01
+                validator:
+                    gte: 0.0
+                    lte: 1.0
+            maxTimeMS:
+                description: >-
+                    The maxTimeMS to apply to mirrored reads
+                type: safeInt
+                default: 1000
+                validator:
+                    gt: 0
+
+    TargetedMirroredReadsOptions:
+        description: "Options specific to targeted mirrored reads"
+        inline_chained_structs: true
+        chained_structs:
+            CommonMirroredReadsParameters: CommonMirroredReadsParameters
+        strict: true
+        fields:
+            tag:
+                description: The replica set tag used to identify the nodes to target
+                type: object_owned
+                default: "BSONObj()"
+
+    MirroredReadsParameters:
+        description: "A struct representing how to mirror read command requests"
+        inline_chained_structs: true
+        chained_structs:
+            CommonMirroredReadsParameters: CommonMirroredReadsParameters
+        fields:
+            targetedMirroring:
+                description: "Options to use for targeted mirrored reads"
+                type: TargetedMirroredReadsOptions
+                default: true
 
 server_parameters:
-  mirrorReads:
-    description: "How to mirror read command requests"
-    set_at: [ startup, runtime ]
-    cpp_class:
-        name: "MirroredReadsServerParameter"
-        data: "synchronized_value<MirroredReadsParameters>"
-        override_set: true
+    mirrorReads:
+        description: "How to mirror read command requests"
+        set_at: [startup, runtime]
+        cpp_class:
+            name: "MirroredReadsServerParameter"
+            data: "synchronized_value<MirroredReadsParameters>"
+            override_set: true
+        redact: false
+    mirrorReadsMaxConnPoolSize:
+        description: "The maximum number of connections that the MirrorMaestro connection pool can keep open"
+        set_at: [startup, runtime]
+        cpp_varname: "gMirrorMaestroConnPoolMaxSize"
+        cpp_vartype: AtomicWord<int>
+        validator:
+            gte: 1
+        default: 4
+        redact: false

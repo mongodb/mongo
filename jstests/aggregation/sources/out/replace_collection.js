@@ -4,12 +4,9 @@
  * This test assumes that collections are not implicitly sharded, since $out is prohibited if the
  * output collection is sharded.
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/merge_helpers.js");  // For dropWithoutImplicitRecreate.
-load("jstests/aggregation/extras/utils.js");          // For assertErrorCode.
-load("jstests/libs/fixture_helpers.js");              // For FixtureHelpers.isMongos.
+import {dropWithoutImplicitRecreate} from "jstests/aggregation/extras/merge_helpers.js";
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const coll = db.source;
 const targetCollName = "target";
@@ -26,18 +23,11 @@ coll.aggregate(pipeline);
 const targetColl = db.target;
 assert.eq(1, targetColl.find().itcount());
 
-// Test $out with a non-existent database. This is only expected to work in a
-// non-sharded environment.
+// Test $out with a non-existent database. Sharded pass throughs will implicitly shard accessed
+// collections so we skip this test here cause you can't out to a sharded collecti
 const destDB = db.getSiblingDB("outDifferentDB");
 destDB.dropDatabase();
-if (FixtureHelpers.isMongos(db)) {
-    assert.commandFailedWithCode(db.runCommand({
-        aggregate: coll.getName(),
-        cursor: {},
-        pipeline: [{$out: {db: destDB.getName(), coll: 'outDifferentColl'}}]
-    }),
-                                 ErrorCodes.NamespaceNotFound);
-} else {
+if (!FixtureHelpers.isMongos(db)) {
     coll.aggregate({$out: {db: destDB.getName(), coll: destDB.outDifferentColl.getName()}});
     assert.eq(1, destDB.outDifferentColl.find().itcount());
 }
@@ -70,7 +60,12 @@ assert.eq({a: {$gt: 0}}, listColl.cursor.firstBatch[0].options["validator"]);
 // Test that $out fails if it violates a unique index constraint.
 //
 coll.drop();
-assert.commandWorked(coll.insert([{_id: 0, a: 0}, {_id: 1, a: 0}]));
+assert.commandWorked(
+    coll.insert([
+        {_id: 0, a: 0},
+        {_id: 1, a: 0},
+    ]),
+);
 dropWithoutImplicitRecreate(targetCollName);
 assert.commandWorked(targetColl.createIndex({a: 1}, {unique: true}));
 
@@ -87,4 +82,3 @@ assert.commandWorked(targetColl.insert({_id: 1, a: 0}));
 coll.aggregate(pipeline);
 assert.eq(1, targetColl.find().itcount());
 assert.eq(2, targetColl.getIndexes().length);
-}());

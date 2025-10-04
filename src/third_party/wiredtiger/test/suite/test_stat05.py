@@ -26,11 +26,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import itertools, wiredtiger, wttest
-from suite_subprocess import suite_subprocess
+import wttest
 from wtscenario import make_scenarios
-from wiredtiger import stat
-from wtdataset import SimpleDataSet, ComplexDataSet, ComplexLSMDataSet
+from wtdataset import SimpleDataSet, ComplexDataSet
 
 # test_stat05.py
 #    Statistics cursor using size only
@@ -51,15 +49,8 @@ class test_stat_cursor_config(wttest.WiredTigerTestCase):
             conn_config = 'in_memory,statistics=(fast)')),
         ('inmem-fix', dict(uri='table:' + pfx, dataset=SimpleDataSet, type='fix', cfg='',
             conn_config = 'in_memory,statistics=(fast)')),
-        ('table-lsm', dict(uri='table:' + pfx, dataset=SimpleDataSet, type='lsm',
-            cfg='lsm=(chunk_size=1MB,merge_min=2)',
-            conn_config = 'statistics=(fast)')),
         ('complex-row', dict(uri='table:' + pfx, dataset=ComplexDataSet, type='row', cfg='')),
         ('complex-var', dict(uri='table:' + pfx, dataset=ComplexDataSet, type='fix', cfg='')),
-        ('complex-lsm',
-            dict(uri='table:' + pfx, dataset=ComplexLSMDataSet, type='lsm',
-            cfg='lsm=(chunk_size=1MB,merge_min=2)',
-            conn_config = 'statistics=(fast)')),
     ]
 
     scenarios = make_scenarios(uri)
@@ -73,20 +64,16 @@ class test_stat_cursor_config(wttest.WiredTigerTestCase):
         c.close()
 
     # Open a size-only statistics cursor on various table types. Ensure that
-    # the cursor open succeeds. Insert enough data that LSM tables to need to
-    # switch and merge.
+    # the cursor open succeeds.
     def test_stat_cursor_size(self):
-        if self.type == 'row':
-            key_format = 'S'
-            value_format = 'S'
-        elif self.type == 'var':
+        if self.type == 'var':
             key_format = 'r'
             value_format = 'S'
         elif self.type == 'fix':
             key_format = 'r'
             value_format = '8t'
         else:
-            self.assertEqual(self.type, 'lsm')
+            self.assertEqual(self.type, 'row')
             key_format = 'S'
             value_format = 'S'
 
@@ -94,13 +81,10 @@ class test_stat_cursor_config(wttest.WiredTigerTestCase):
            self, self.uri, 100, key_format=key_format, value_format=value_format, config=self.cfg)
         ds.populate()
         self.openAndWalkStatCursor()
-        cursor = self.session.open_cursor(self.uri, None)
+        cursor = ds.open_cursor(self.uri, None)
         for i in range(100, 40000 + 1):
             if i % 100 == 0:
                 self.openAndWalkStatCursor()
             cursor[ds.key(i)] = ds.value(i)
         cursor.close()
         self.openAndWalkStatCursor()
-
-if __name__ == '__main__':
-    wttest.run()

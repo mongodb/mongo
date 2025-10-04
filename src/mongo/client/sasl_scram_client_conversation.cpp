@@ -27,24 +27,29 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/client/sasl_scram_client_conversation.h"
 
-#include <boost/algorithm/string/replace.hpp>
-
+#include "mongo/base/error_codes.h"
 #include "mongo/base/parse_number.h"
-#include "mongo/client/scram_client_cache.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/base64.h"
-#include "mongo/util/password_digest.h"
 #include "mongo/util/str.h"
-#include "mongo/util/text.h"
+
+#include <cstdint>
+#include <deque>
+#include <memory>
+
+#include <absl/strings/str_split.h>
+#include <boost/algorithm/string/replace.hpp>
+#include <boost/iterator/iterator_traits.hpp>
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 
 using std::string;
-using std::unique_ptr;
 
 StatusWith<bool> SaslSCRAMClientConversation::step(StringData inputData, std::string* outputData) {
     _step++;
@@ -88,7 +93,7 @@ StatusWith<bool> SaslSCRAMClientConversation::_firstStep(std::string* outputData
     SecureRandom().fill(binaryNonce, sizeof(binaryNonce));
 
     std::string user =
-        _saslClientSession->getParameter(SaslClientSession::parameterUser).toString();
+        std::string{_saslClientSession->getParameter(SaslClientSession::parameterUser)};
 
     encodeSCRAMUsername(user);
     _clientNonce =
@@ -114,10 +119,11 @@ StatusWith<bool> SaslSCRAMClientConversation::_firstStep(std::string* outputData
  **/
 StatusWith<bool> SaslSCRAMClientConversation::_secondStep(StringData inputData,
                                                           std::string* outputData) {
-    if (inputData.startsWith("m=")) {
+    if (inputData.starts_with("m=")) {
         return Status(ErrorCodes::BadValue, "SCRAM required extensions not supported");
     }
-    const auto input = StringSplitter::split(inputData.toString(), ",");
+    const std::vector<std::string> input =
+        absl::StrSplit(toStdStringViewForInterop(inputData), ",", absl::SkipEmpty());
 
     if (input.size() < 3) {
         return Status(ErrorCodes::BadValue,
@@ -154,7 +160,7 @@ StatusWith<bool> SaslSCRAMClientConversation::_secondStep(StringData inputData,
     }
 
     // Append server-first-message and client-final-message-without-proof.
-    _authMessage += "," + inputData.toString() + ",c=biws,r=" + nonce;
+    _authMessage += "," + std::string{inputData} + ",c=biws,r=" + nonce;
 
     std::string decodedSalt, clientProof;
     try {
@@ -181,7 +187,8 @@ StatusWith<bool> SaslSCRAMClientConversation::_secondStep(StringData inputData,
  **/
 StatusWith<bool> SaslSCRAMClientConversation::_thirdStep(StringData inputData,
                                                          std::string* outputData) {
-    const auto input = StringSplitter::split(inputData.toString(), ",");
+    const std::vector<std::string> input =
+        absl::StrSplit(toStdStringViewForInterop(inputData), ",", absl::SkipEmpty());
 
     if (input.empty()) {
         return Status(

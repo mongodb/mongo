@@ -4,20 +4,22 @@
  * @tags: [multiversion_incompatible]
  */
 
-var InvalidReplicaSetConfig = 93;
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var replTest = new ReplSetTest({name: 'prohibit_w0', nodes: 1});
-var nodes = replTest.nodeList();
-var conns = replTest.startSet();
-var admin = conns[0].getDB("admin");
+let InvalidReplicaSetConfig = 93;
+
+let replTest = new ReplSetTest({name: "prohibit_w0", nodes: 1});
+let nodes = replTest.nodeList();
+let conns = replTest.startSet();
+let admin = conns[0].getDB("admin");
 
 function testInitiate(gleDefaults) {
-    var conf = replTest.getReplSetConfig();
-    jsTestLog('conf');
+    let conf = replTest.getReplSetConfig();
+    jsTestLog("conf");
     printjson(conf);
     conf.settings = gleDefaults;
 
-    var response = admin.runCommand({replSetInitiate: conf});
+    let response = admin.runCommand({replSetInitiate: conf});
     assert.commandFailedWithCode(response, InvalidReplicaSetConfig);
 }
 

@@ -29,37 +29,20 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
+#include "mongo/base/string_data.h"
+#include "mongo/db/repl/read_concern_gen.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace repl {
 
-enum class ReadConcernLevel {
-    kLocalReadConcern,
-    kMajorityReadConcern,
-    kLinearizableReadConcern,
-    kAvailableReadConcern,
-    kSnapshotReadConcern
-};
+using ReadConcernLevel = ReadConcernLevelEnum;
 
 namespace readConcernLevels {
 
-constexpr std::initializer_list<ReadConcernLevel> all = {ReadConcernLevel::kLocalReadConcern,
-                                                         ReadConcernLevel::kMajorityReadConcern,
-                                                         ReadConcernLevel::kLinearizableReadConcern,
-                                                         ReadConcernLevel::kAvailableReadConcern,
-                                                         ReadConcernLevel::kSnapshotReadConcern};
-
-constexpr StringData kLocalName = "local"_sd;
-constexpr StringData kMajorityName = "majority"_sd;
-constexpr StringData kLinearizableName = "linearizable"_sd;
-constexpr StringData kAvailableName = "available"_sd;
-constexpr StringData kSnapshotName = "snapshot"_sd;
-
-boost::optional<ReadConcernLevel> fromString(StringData levelString);
 StringData toString(ReadConcernLevel level);
 
 }  // namespace readConcernLevels
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

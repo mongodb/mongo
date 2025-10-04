@@ -46,7 +46,7 @@ class test_base04(wttest.WiredTigerTestCase):
 
     def drop_table(self):
         self.pr('drop table')
-        self.session.drop(self.tablename, None)
+        self.dropUntilSuccess(self.session, self.tablename)
 
     def cursor(self):
         self.pr('open cursor')
@@ -100,6 +100,3 @@ class test_base04(wttest.WiredTigerTestCase):
             self.remove('key1')
             self.check_exists('key1', wiredtiger.WT_NOTFOUND)
             self.drop_table()
-
-if __name__ == '__main__':
-    wttest.run()

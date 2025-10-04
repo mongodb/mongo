@@ -51,6 +51,11 @@ const boost::log::attribute_name& component() {
     return attr;
 }
 
+const boost::log::attribute_name& service() {
+    static const boost::log::attribute_name attr("service");
+    return attr;
+}
+
 const boost::log::attribute_name& timeStamp() {
     static const boost::log::attribute_name attr("time_stamp");
     return attr;

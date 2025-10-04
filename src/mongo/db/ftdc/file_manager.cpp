@@ -27,26 +27,35 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/ftdc/file_manager.h"
-
-#include <boost/filesystem.hpp>
+#include <algorithm>
+#include <cstdio>
+#include <cstring>
 #include <memory>
 #include <string>
+#include <utility>
 
+#include <boost/filesystem/directory.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/move/utility_core.hpp>
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
 #include "mongo/db/ftdc/config.h"
 #include "mongo/db/ftdc/constants.h"
+#include "mongo/db/ftdc/file_manager.h"
 #include "mongo/db/ftdc/file_reader.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
+
 
 namespace mongo {
 
@@ -135,11 +144,11 @@ StatusWith<boost::filesystem::path> FTDCFileManager::generateArchiveFileName(
     auto fileName = path;
     fileName /= std::string(kFTDCArchiveFile);
     fileName += std::string(".");
-    fileName += suffix.toString();
+    fileName += std::string{suffix};
 
     if (_previousArchiveFileSuffix != suffix) {
         // If the suffix has changed, reset the uniquifier counter to zero
-        _previousArchiveFileSuffix = suffix.toString();
+        _previousArchiveFileSuffix = std::string{suffix};
         _fileNameUniquifier = 0;
     }
 
@@ -321,6 +330,21 @@ Status FTDCFileManager::rotate(Client* client) {
     }
 
     return openArchiveFile(client, swFile.getValue(), {});
+}
+
+Status FTDCFileManager::writePeriodicMetadataSampleAndRotateIfNeeded(Client* client,
+                                                                     const BSONObj& sample,
+                                                                     Date_t date) {
+    auto status = _writer.writePeriodicMetadataSample(sample, date);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    if (_writer.getSize() > _config->maxFileSizeBytes) {
+        return rotate(client);
+    }
+
+    return Status::OK();
 }
 
 Status FTDCFileManager::writeSampleAndRotateIfNeeded(Client* client,

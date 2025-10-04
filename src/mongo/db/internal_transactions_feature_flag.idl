@@ -32,10 +32,23 @@ global:
     cpp_namespace: "mongo::feature_flags"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 feature_flags:
-    featureFlagInternalTransactions:
-        description: Feature flag for enabling internal transactions.
-        cpp_varname: gFeatureFlagInternalTransactions
+    featureFlagAlwaysCreateConfigTransactionsPartialIndexOnStepUp:
+        description: Feature flag to enable always creating the config.transactions partial index on step up to primary even if the collection is not empty.
+        cpp_varname: gFeatureFlagAlwaysCreateConfigTransactionsPartialIndexOnStepUp
         default: false
+        fcv_gated: true
+
+    featureFlagUpdateDocumentShardKeyUsingTransactionApi:
+        description: Feature flag to enable usage of the transaction api for update findAndModify and update commands that change a document's shard key.
+        cpp_varname: gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi
+        default: false
+        fcv_gated: true
+
+    featureFlagClusteredConfigTransactions:
+        description: "Create config.transactions as a clustered collection"
+        cpp_varname: gFeatureFlagClusteredConfigTransactions
+        default: false
+        fcv_gated: true

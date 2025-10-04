@@ -27,22 +27,38 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/wait_for_majority_service.h"
 
-#include <utility>
-
+#include "mongo/base/error_codes.h"
+#include "mongo/db/client.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/read_concern.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/write_concern.h"
-#include "mongo/executor/network_interface_factory.h"
-#include "mongo/executor/thread_pool_task_executor.h"
-#include "mongo/logv2/log.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/future_util.h"
 #include "mongo/util/static_immortal.h"
+
+#include <algorithm>
+#include <iterator>
+#include <mutex>
+#include <string>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
+
 
 namespace mongo {
 
@@ -56,9 +72,9 @@ const auto waitForMajorityServiceDecoration =
 constexpr static auto kWaitClientName = "WaitForMajorityServiceWaiter";
 constexpr static auto kCancelClientName = "WaitForMajorityServiceCanceler";
 
-std::unique_ptr<ThreadPool> makeThreadPool() {
+std::unique_ptr<ThreadPool> makeThreadPool(StringData readOrWrite) {
     ThreadPool::Options options;
-    options.poolName = "WaitForMajorityServiceThreadPool";
+    options.poolName = "WaitForMajorityService" + readOrWrite + "ThreadPool";
     options.minThreads = 0;
     // This service must have the ability to use at least two background threads. If it is limited
     // to one, than if that thread is blocking waiting on an opTime, any cancellations cannot be
@@ -77,22 +93,49 @@ WaitForMajorityService::~WaitForMajorityService() {
     shutDown();
 }
 
+WaitForMajorityServiceImplBase::~WaitForMajorityServiceImplBase() {
+    shutDown();
+}
+
 WaitForMajorityService& WaitForMajorityService::get(ServiceContext* service) {
     return waitForMajorityServiceDecoration(service);
 }
 
 void WaitForMajorityService::startup(ServiceContext* ctx) {
+    _readService.startup(ctx);
+    _writeService.startup(ctx);
+}
+
+void WaitForMajorityService::shutDown() {
+    _writeService.shutDown();
+    _readService.shutDown();
+}
+
+void WaitForMajorityServiceImplBase::startup(ServiceContext* ctx) {
     stdx::lock_guard lk(_mutex);
     invariant(_state == State::kNotStarted);
-    _pool = makeThreadPool();
-    _waitForMajorityClient = ClientStrand::make(ctx->makeClient(kWaitClientName));
-    _waitForMajorityCancellationClient = ClientStrand::make(ctx->makeClient(kCancelClientName));
+    _pool = makeThreadPool(_getReadOrWrite());
+    _waitForMajorityClient = ClientStrand::make(
+        ctx->getService(ClusterRole::ShardServer)->makeClient(kWaitClientName + _getReadOrWrite()));
+    _waitForMajorityCancellationClient =
+        ClientStrand::make(ctx->getService(ClusterRole::ShardServer)
+                               ->makeClient(kCancelClientName + _getReadOrWrite()));
     _backgroundWorkComplete = _periodicallyWaitForMajority();
     _pool->startup();
     _state = State::kRunning;
 }
 
-void WaitForMajorityService::shutDown() {
+SemiFuture<void> WaitForMajorityService::waitUntilMajorityForRead(
+    const repl::OpTime& opTime, const CancellationToken& cancelToken) {
+    return _readService.waitUntilMajority(opTime, cancelToken);
+}
+
+SemiFuture<void> WaitForMajorityService::waitUntilMajorityForWrite(
+    const repl::OpTime& opTime, const CancellationToken& cancelToken) {
+    return _writeService.waitUntilMajority(opTime, cancelToken);
+}
+
+void WaitForMajorityServiceImplBase::shutDown() {
     {
         stdx::lock_guard lk(_mutex);
 
@@ -122,8 +165,8 @@ void WaitForMajorityService::shutDown() {
     _waitForMajorityCancellationClient.reset();
 }
 
-SemiFuture<void> WaitForMajorityService::waitUntilMajority(const repl::OpTime& opTime,
-                                                           const CancellationToken& cancelToken) {
+SemiFuture<void> WaitForMajorityServiceImplBase::waitUntilMajority(
+    const repl::OpTime& opTime, const CancellationToken& cancelToken) {
 
     auto [promise, future] = makePromiseFuture<void>();
     auto request = std::make_shared<Request>(std::move(promise));
@@ -153,13 +196,13 @@ SemiFuture<void> WaitForMajorityService::waitUntilMajority(const repl::OpTime& o
     if (!wasEmpty && opTime < _queuedOpTimes.begin()->first) {
         // Background thread could already be actively waiting on a later time, so tell it to stop
         // and wait for the newly requested opTime instead.
-        stdx::lock_guard scopedClientLock(*_waitForMajorityClient->getClientPointer());
+        ClientLock clientLock(_waitForMajorityClient->getClientPointer());
         if (auto opCtx = _waitForMajorityClient->getClientPointer()->getOperationContext())
             opCtx->getServiceContext()->killOperation(
-                scopedClientLock, opCtx, ErrorCodes::WaitForMajorityServiceEarlierOpTimeAvailable);
+                clientLock, opCtx, ErrorCodes::WaitForMajorityServiceEarlierOpTimeAvailable);
     }
 
-    auto resultIter = _queuedOpTimes.emplace(
+    _queuedOpTimes.emplace(
         std::piecewise_construct, std::forward_as_tuple(opTime), std::forward_as_tuple(request));
 
 
@@ -168,7 +211,7 @@ SemiFuture<void> WaitForMajorityService::waitUntilMajority(const repl::OpTime& o
         _hasNewOpTimeCV.notifyAllAndReset();
     }
 
-    cancelToken.onCancel().thenRunOn(_pool).getAsync([this, resultIter, request](Status s) {
+    cancelToken.onCancel().thenRunOn(_pool).getAsync([this, request](Status s) {
         if (!s.isOK()) {
             return;
         }
@@ -176,16 +219,40 @@ SemiFuture<void> WaitForMajorityService::waitUntilMajority(const repl::OpTime& o
         if (!request->hasBeenProcessed.swap(true)) {
             request->result.setError(waitUntilMajorityCanceledStatus());
             stdx::lock_guard lk(_mutex);
-            _queuedOpTimes.erase(resultIter);
+            auto it = std::find_if(
+                std::begin(_queuedOpTimes),
+                std::end(_queuedOpTimes),
+                [&request](auto&& requestIter) { return request == requestIter.second; });
+            invariant(it != _queuedOpTimes.end());
+            _queuedOpTimes.erase(it);
         }
     });
     return std::move(future).semi();
 }
 
-SemiFuture<void> WaitForMajorityService::_periodicallyWaitForMajority() {
+Status WaitForMajorityServiceForWriteImpl::_waitForOpTime(OperationContext* opCtx,
+                                                          const repl::OpTime& opTime) {
+    WriteConcernResult ignoreResult;
+    return waitForWriteConcern(opCtx, opTime, kMajorityWriteConcern, &ignoreResult);
+}
+
+Status WaitForMajorityServiceForReadImpl::_waitForOpTime(OperationContext* opCtx,
+                                                         const repl::OpTime& opTime) {
+    repl::ReadConcernArgs readConcernArgs(opTime, repl::ReadConcernLevel::kMajorityReadConcern);
+
+    auto status = waitForReadConcern(
+        opCtx, readConcernArgs, DatabaseName(), false /* allow afterClusterTime */);
+
+    return status;
+}
+
+SemiFuture<void> WaitForMajorityServiceImplBase::_periodicallyWaitForMajority() {
+    /**
+     * Enqueue a request to wait for the given opTime to be majority committed.
+     */
     return AsyncTry([this] {
                auto clientGuard = _waitForMajorityClient->bind();
-               stdx::unique_lock<Latch> lk(_mutex);
+               stdx::unique_lock<stdx::mutex> lk(_mutex);
                if (_queuedOpTimes.empty()) {
                    return _hasNewOpTimeCV.onNotify();
                }
@@ -197,9 +264,7 @@ SemiFuture<void> WaitForMajorityService::_periodicallyWaitForMajority() {
 
                lk.unlock();
 
-               WriteConcernResult ignoreResult;
-               auto status = waitForWriteConcern(
-                   opCtx.get(), lowestOpTime, kMajorityWriteConcern, &ignoreResult);
+               auto status = _waitForOpTime(opCtx.get(), lowestOpTime);
 
                lk.lock();
 

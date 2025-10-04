@@ -41,11 +41,11 @@
 
 #pragma once
 
-#include <string>
-#include <vector>
-
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
+
+#include <string>
+#include <vector>
 
 /**
  * Macro to define an initializer function named "NAME" with the default

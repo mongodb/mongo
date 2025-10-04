@@ -27,11 +27,33 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/window_function/window_function_expression.h"
+#include "mongo/db/pipeline/window_function/window_bounds.h"
 
-using boost::intrusive_ptr;
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/document_value/value_comparator.h"
+#include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
+#include "mongo/db/query/datetime/date_time_support.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
+#include <functional>
+#include <utility>
+#include <variant>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
 using boost::optional;
 
 namespace mongo {
@@ -41,7 +63,7 @@ template <class T>
 WindowBounds::Bound<T> parseBound(ExpressionContext* expCtx,
                                   BSONElement elem,
                                   std::function<T(Value)> handleExpression) {
-    if (elem.type() == BSONType::String) {
+    if (elem.type() == BSONType::string) {
         auto s = elem.str();
         if (s == WindowBounds::kValUnbounded) {
             return WindowBounds::Unbounded{};
@@ -63,12 +85,19 @@ WindowBounds::Bound<T> parseBound(ExpressionContext* expCtx,
 }
 
 template <class T>
-Value serializeBound(const WindowBounds::Bound<T>& bound) {
-    return stdx::visit(
-        visit_helper::Overloaded{
-            [](const WindowBounds::Unbounded&) { return Value(WindowBounds::kValUnbounded); },
-            [](const WindowBounds::Current&) { return Value(WindowBounds::kValCurrent); },
-            [](const T& n) { return Value(n); },
+Value serializeBound(const WindowBounds::Bound<T>& bound,
+                     const SerializationOptions& opts,
+                     const Value& representativeValue) {
+    return visit(
+        OverloadedVisitor{
+            [&](const WindowBounds::Unbounded&) { return Value(WindowBounds::kValUnbounded); },
+            [&](const WindowBounds::Current&) { return Value(WindowBounds::kValCurrent); },
+            [&](const T& n) {
+                // If not "unbounded" or "current", n must be a literal constant
+                // The upper bound must be greater than the lower bound. We override the
+                // representative value to meet this constraint.
+                return opts.serializeLiteral(n, representativeValue);
+            },
         },
         bound);
 }
@@ -81,15 +110,15 @@ void checkBoundsForward(WindowBounds::Bound<T> lower, WindowBounds::Bound<T> upp
     // First normalize by treating 'current' as 0.
     // Then, if both bounds are numeric, require lower <= upper.
     auto normalize = [](WindowBounds::Bound<T>& bound) {
-        if (stdx::holds_alternative<WindowBounds::Current>(bound)) {
+        if (holds_alternative<WindowBounds::Current>(bound)) {
             bound = T(0);
         }
     };
     normalize(lower);
     normalize(upper);
-    if (stdx::holds_alternative<T>(lower) && stdx::holds_alternative<T>(upper)) {
-        T lowerVal = stdx::get<T>(lower);
-        T upperVal = stdx::get<T>(upper);
+    if (holds_alternative<T>(lower) && holds_alternative<T>(upper)) {
+        T lowerVal = get<T>(lower);
+        T upperVal = get<T>(upper);
         uassert(5339900,
                 str::stream() << "Lower bound must not exceed upper bound: ["
                               << Value(lowerVal).toString() << ", " << Value(upperVal).toString()
@@ -108,18 +137,22 @@ void checkBoundsForward(WindowBounds::Bound<Value> lower, WindowBounds::Bound<Va
 
 bool WindowBounds::isUnbounded() const {
     auto unbounded = [](const auto& bounds) {
-        return stdx::holds_alternative<WindowBounds::Unbounded>(bounds.lower) &&
-            stdx::holds_alternative<WindowBounds::Unbounded>(bounds.upper);
+        return holds_alternative<WindowBounds::Unbounded>(bounds.lower) &&
+            holds_alternative<WindowBounds::Unbounded>(bounds.upper);
     };
-    return stdx::visit(unbounded, bounds);
+    return visit(unbounded, bounds);
 }
 
-WindowBounds WindowBounds::parse(BSONObj args,
+WindowBounds WindowBounds::parse(BSONElement args,
                                  const boost::optional<SortPattern>& sortBy,
                                  ExpressionContext* expCtx) {
-    auto documents = args[kArgDocuments];
-    auto range = args[kArgRange];
-    auto unit = args[kArgUnit];
+    uassert(ErrorCodes::FailedToParse,
+            "'window' field must be an object",
+            args.type() == BSONType::object);
+    auto argObj = args.embeddedObject();
+    auto documents = argObj[kArgDocuments];
+    auto range = argObj[kArgRange];
+    auto unit = argObj[kArgUnit];
 
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "Window bounds can specify either '" << kArgDocuments << "' or '"
@@ -137,14 +170,14 @@ WindowBounds WindowBounds::parse(BSONObj args,
                 str::stream() << "'window' field can only contain '" << kArgDocuments
                               << "' as the only argument or '" << kArgRange
                               << "' with an optional '" << kArgUnit << "' field",
-                args.nFields() == 0);
+                argObj.nFields() == 0);
         return defaultBounds();
     }
 
     auto unpack = [](BSONElement e) -> std::pair<BSONElement, BSONElement> {
         uassert(ErrorCodes::FailedToParse,
                 str::stream() << "Window bounds must be a 2-element array: " << e,
-                e.type() == BSONType::Array && e.Obj().nFields() == 2);
+                e.type() == BSONType::array && e.Obj().nFields() == 2);
         auto lower = e.Obj()[0];
         auto upper = e.Obj()[1];
         return {lower, upper};
@@ -154,7 +187,7 @@ WindowBounds WindowBounds::parse(BSONObj args,
         uassert(ErrorCodes::FailedToParse,
                 str::stream() << "'window' field that specifies " << kArgDocuments
                               << " cannot have other fields",
-                args.nFields() == 1);
+                argObj.nFields() == 1);
         // Parse document-based bounds.
         auto [lowerElem, upperElem] = unpack(documents);
 
@@ -178,10 +211,10 @@ WindowBounds WindowBounds::parse(BSONObj args,
             uassert(ErrorCodes::FailedToParse,
                     str::stream() << "'window' field that specifies " << kArgUnit
                                   << " cannot have other fields besides 'range'",
-                    args.nFields() == 2);
+                    argObj.nFields() == 2);
             uassert(ErrorCodes::FailedToParse,
                     str::stream() << "'" << kArgUnit << "' must be a string",
-                    unit.type() == BSONType::String);
+                    unit.type() == BSONType::string);
 
             auto parseInt = [](Value v) -> Value {
                 uassert(ErrorCodes::FailedToParse,
@@ -200,7 +233,7 @@ WindowBounds WindowBounds::parse(BSONObj args,
             uassert(ErrorCodes::FailedToParse,
                     str::stream() << "'window' field that specifies " << kArgRange
                                   << " cannot have other fields besides 'unit'",
-                    args.nFields() == 1);
+                    argObj.nFields() == 1);
             auto parseNumber = [](Value v) -> Value {
                 uassert(ErrorCodes::FailedToParse,
                         "Range-based bounds expression must be a number",
@@ -215,25 +248,34 @@ WindowBounds WindowBounds::parse(BSONObj args,
         uassert(5339902,
                 "Range-based bounds require sortBy a single field",
                 sortBy && sortBy->size() == 1);
+        const SortPattern::SortPatternPart& part = *sortBy->begin();
+        uassert(8947400,
+                "Range-based bounds require a non-expression sortBy",
+                part.fieldPath && !part.expression);
+        uassert(8947401, "Range-based bounds require an ascending sortBy", part.isAscending);
         return bounds;
     }
 }
-void WindowBounds::serialize(MutableDocument& args) const {
-    stdx::visit(
-        visit_helper::Overloaded{
+void WindowBounds::serialize(MutableDocument& args, const SerializationOptions& opts) const {
+    visit(
+        OverloadedVisitor{
             [&](const DocumentBased& docBounds) {
                 args[kArgDocuments] = Value{std::vector<Value>{
-                    serializeBound(docBounds.lower),
-                    serializeBound(docBounds.upper),
+                    serializeBound(
+                        docBounds.lower, opts, /* representative value, if needed */ Value(0LL)),
+                    serializeBound(
+                        docBounds.upper, opts, /* representative value, if needed */ Value(1LL)),
                 }};
             },
             [&](const RangeBased& rangeBounds) {
                 args[kArgRange] = Value{std::vector<Value>{
-                    serializeBound(rangeBounds.lower),
-                    serializeBound(rangeBounds.upper),
+                    serializeBound(
+                        rangeBounds.lower, opts, /* representative value, if needed */ Value(0LL)),
+                    serializeBound(
+                        rangeBounds.upper, opts, /* representative value, if needed */ Value(1LL)),
                 }};
                 if (rangeBounds.unit) {
-                    args[kArgUnit] = Value{serializeTimeUnit(*rangeBounds.unit)};
+                    args[kArgUnit] = Value(serializeTimeUnit(*rangeBounds.unit));
                 }
             },
         },

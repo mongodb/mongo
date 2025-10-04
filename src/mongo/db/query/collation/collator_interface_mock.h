@@ -29,7 +29,10 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/query/collation/collator_interface.h"
+
+#include <memory>
 
 namespace mongo {
 
@@ -63,6 +66,7 @@ public:
     CollatorInterfaceMock(MockType mockType);
 
     std::unique_ptr<CollatorInterface> clone() const final;
+    std::shared_ptr<CollatorInterface> cloneShared() const final;
 
     int compare(StringData left, StringData right) const final;
 

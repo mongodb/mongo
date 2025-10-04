@@ -3,9 +3,7 @@
  *
  * @tags: [uses_atclustertime]
  */
-(function() {
-"use strict";
-load("jstests/sharding/libs/resharding_test_fixture.js");
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 const sourceNs = "reshardingDb.coll";
 
@@ -41,7 +39,7 @@ reshardingTest.withReshardingInBackground(
         const mongos = inputCollection.getMongo();
         reshardingTest.awaitCloneTimestampChosen();
         assert.commandWorked(mongos.adminCommand({commitReshardCollection: sourceNs}));
-    });
+    },
+);
 
 reshardingTest.teardown();
-})();

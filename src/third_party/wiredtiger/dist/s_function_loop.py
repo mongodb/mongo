@@ -1,8 +1,10 @@
+#!/usr/bin/env python3
+
 # Mark outer loop boundaries with {@ and }@ .  Nested loops are not marked.
 # Each input line is the content of a C function.
 import re, sys
 
-p = re.compile('((for |while |_FOREACH|FOREACH_BEGIN)\([^{)]*\)|do) {')
+p = re.compile(r'((for |while |_FOREACH|FOREACH_BEGIN)\([^{)]*\)|do) {')
 for line in sys.stdin:
     matched = 0
     m = p.search(line)

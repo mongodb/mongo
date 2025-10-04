@@ -1,0 +1,45 @@
+// Defines Version Information to include in DLL on Windows.
+// Refer: https://learn.microsoft.com/en-us/windows/win32/menurc/versioninfo-resource
+#include <winver.h> // Defines VS_VERSION_INFO
+
+#include <bson/bson-version.h> // Defines BSON_MAJOR_VERSION and other version macros.
+
+#define BSON_OUTPUT_BASENAME "@BSON_OUTPUT_BASENAME@"
+#define BSON_API_VERSION "@BSON_API_VERSION@"
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION BSON_MAJOR_VERSION,BSON_MINOR_VERSION,BSON_MICRO_VERSION,0
+ PRODUCTVERSION BSON_MAJOR_VERSION,BSON_MINOR_VERSION,BSON_MICRO_VERSION,0
+ FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
+#ifdef _DEBUG
+ FILEFLAGS VS_FF_DEBUG
+#else
+ FILEFLAGS 0L
+#endif
+ // Set FILEOS to VOS_UNKNOWN. There is no documented value for 64-bit builds.
+ FILEOS VOS_UNKNOWN
+ FILETYPE VFT_DLL
+ // Set FILESUBTYPE to VFT2_UNKNOWN. There is no applicable value.
+ FILESUBTYPE VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        // Use langID `0409` for "US English". Use charsetID `04b0` for "Unicode"
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "CompanyName", "MongoDB, Inc"
+            VALUE "FileDescription", "A BSON Library for C"
+            VALUE "FileVersion", BSON_VERSION_S
+            VALUE "InternalName", BSON_OUTPUT_BASENAME "-" BSON_API_VERSION
+            VALUE "OriginalFilename", BSON_OUTPUT_BASENAME "-" BSON_API_VERSION ".dll"
+            VALUE "ProductName", "MongoDB C Driver"
+            VALUE "ProductVersion", BSON_VERSION_S
+            VALUE "LegalCopyright", "Copyright 2009-present MongoDB, Inc."
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        // Use langID `0x0409` for "U.S. English". Use charsetID `1200` for "Unicode".
+        VALUE "Translation", 0x409, 1200
+    END
+END

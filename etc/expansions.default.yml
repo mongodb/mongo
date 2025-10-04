@@ -19,24 +19,21 @@ skip_tests: /dev/null
 resmoke_jobs: "1"
 should_shuffle: "true"
 continue_on_failure: "true"
+skip_symbolization: "false"
 install_dir: dist-test/bin
 is_patch: "false"
 is_commit_queue: "false"
-use_scons_cache: "false"
 npm_command: jstestfuzz
 tar: tar
 cmake_path: /opt/cmake/bin/cmake
 content_type: application/x-gzip
+mciuploads_binary_permissions: public-read
+mciuploads_binary_visibility: public
 jstestfuzz_concurrent_num_files: "10"
 curator_release: "latest"
 ext: tgz
-spawn_resmoke_using: "python"
 
-# SCons compile expansions.
+# Bazel compile expansions.
 compiling_for_test: "false"
 install_directory: /data/mongo-install-directory
-num_scons_link_jobs_available: "0.25"
-scons_cache_mode: nolinked
-show_scons_timings: "true"
-task_install_action: hardlink
-separate_debug: "on"
+skip_archive: "off"

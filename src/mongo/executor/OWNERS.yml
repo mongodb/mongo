@@ -1,0 +1,20 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "cancelable_executor*":
+    approvers:
+      - 10gen/server-programmability
+  - "inline_executor*":
+    approvers:
+      - 10gen/server-programmability
+  - "scoped_task_executor*":
+    approvers:
+      - 10gen/server-programmability
+  - "task_executor*":
+    approvers:
+      - 10gen/server-programmability
+  - "thread_pool*":
+    approvers:
+      - 10gen/server-programmability

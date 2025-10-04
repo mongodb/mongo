@@ -30,20 +30,35 @@
 
 #pragma once
 
-#include <cstdlib>
-#include <functional>
-#include <memory>
-#include <string>
-#include <vector>
-
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/local_catalog/collection.h"
+#include "mongo/db/local_catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/collection_bulk_loader.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/storage_interface.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/key_string/key_string.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
+#include "mongo/util/uuid.h"
+
+#include <cstdlib>
+#include <functional>
+#include <memory>
+#include <span>
+#include <string>
+#include <utility>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 namespace repl {
@@ -60,33 +75,29 @@ class CollectionBulkLoaderMock : public CollectionBulkLoader {
 
 public:
     explicit CollectionBulkLoaderMock(std::shared_ptr<CollectionMockStats> collStats)
-        : stats(std::move(collStats)){};
-    virtual ~CollectionBulkLoaderMock() = default;
-    Status init(const std::vector<BSONObj>& secondaryIndexSpecs) override;
+        : stats(std::move(collStats)) {}
+    ~CollectionBulkLoaderMock() override = default;
+    Status init(const std::vector<BSONObj>& secondaryIndexSpecs);
 
-    Status insertDocuments(std::vector<BSONObj>::const_iterator begin,
-                           std::vector<BSONObj>::const_iterator end) override;
+    Status insertDocuments(std::span<BSONObj> docs, ParseRecordIdAndDocFunc fn) override;
     Status commit() override;
-
-    std::string toString() const override {
-        return toBSON().toString();
-    };
-    BSONObj toBSON() const override {
-        return BSONObj();
-    };
 
     std::shared_ptr<CollectionMockStats> stats;
 
     // Override functions.
-    std::function<Status(std::vector<BSONObj>::const_iterator,
-                         std::vector<BSONObj>::const_iterator)>
-        insertDocsFn = [](const std::vector<BSONObj>::const_iterator,
-                          const std::vector<BSONObj>::const_iterator) { return Status::OK(); };
-    std::function<Status()> abortFn = []() { return Status::OK(); };
-    std::function<Status()> commitFn = []() { return Status::OK(); };
+    std::function<Status(std::span<BSONObj>, ParseRecordIdAndDocFunc fn)> insertDocsFn =
+        [](std::span<BSONObj>, ParseRecordIdAndDocFunc fn) {
+            return Status::OK();
+        };
+    std::function<Status()> abortFn = []() {
+        return Status::OK();
+    };
+    std::function<Status()> commitFn = []() {
+        return Status::OK();
+    };
 };
 
-class StorageInterfaceMock : public StorageInterface {
+class MONGO_MOD_PUB StorageInterfaceMock : public StorageInterface {
     StorageInterfaceMock(const StorageInterfaceMock&) = delete;
     StorageInterfaceMock& operator=(const StorageInterfaceMock&) = delete;
 
@@ -127,7 +138,6 @@ public:
                                                        std::size_t)>;
     using PutSingletonFn =
         std::function<Status(OperationContext*, const NamespaceString&, const TimestampedBSONObj&)>;
-    using IsAdminDbValidFn = std::function<Status(OperationContext*)>;
     using GetCollectionUUIDFn =
         std::function<StatusWith<UUID>(OperationContext*, const NamespaceString&)>;
 
@@ -193,6 +203,12 @@ public:
         return truncateCollFn(opCtx, nss);
     }
 
+    Status dropCollectionsWithPrefix(OperationContext* opCtx,
+                                     const DatabaseName& dbName,
+                                     const std::string& collectionNamePrefix) override {
+        return Status{ErrorCodes::IllegalOperation, "dropCollections not implemented."};
+    }
+
     Status renameCollection(OperationContext* opCtx,
                             const NamespaceString& fromNS,
                             const NamespaceString& toNS,
@@ -245,11 +261,27 @@ public:
         return putSingletonFn(opCtx, nss, update);
     }
 
+    Status putSingleton(OperationContext* opCtx,
+                        const NamespaceString& nss,
+                        const BSONObj& query,
+                        const TimestampedBSONObj& update) override {
+        return Status{ErrorCodes::IllegalOperation, "putSingleton with query not implemented."};
+    }
+
     Status updateSingleton(OperationContext* opCtx,
                            const NamespaceString& nss,
                            const BSONObj& query,
                            const TimestampedBSONObj& update) override {
         return Status{ErrorCodes::IllegalOperation, "updateSingleton not implemented."};
+    }
+
+    Status updateDocuments(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const BSONObj& query,
+        const TimestampedBSONObj& update,
+        const boost::optional<std::vector<BSONObj>>& arrayFilters = boost::none) override {
+        return Status{ErrorCodes::IllegalOperation, "updateDocuments not implemented."};
     }
 
     StatusWith<BSONObj> findById(OperationContext* opCtx,
@@ -277,18 +309,18 @@ public:
         return Status{ErrorCodes::IllegalOperation, "deleteByFilter not implemented."};
     }
 
-    boost::optional<BSONObj> findOplogEntryLessThanOrEqualToTimestamp(
+    boost::optional<OpTimeAndWallTime> findOplogOpTimeLessThanOrEqualToTimestamp(
         OperationContext* opCtx, const CollectionPtr& oplog, const Timestamp& timestamp) override {
         return boost::none;
     }
 
-    boost::optional<BSONObj> findOplogEntryLessThanOrEqualToTimestampRetryOnWCE(
+    boost::optional<OpTimeAndWallTime> findOplogOpTimeLessThanOrEqualToTimestampRetryOnWCE(
         OperationContext* opCtx, const CollectionPtr& oplog, const Timestamp& timestamp) override {
         return boost::none;
     }
 
     Timestamp getEarliestOplogTimestamp(OperationContext* opCtx) override {
-        return Timestamp();
+        return earliestOplogTimestamp;
     }
 
     Timestamp getLatestOplogTimestamp(OperationContext* opCtx) override {
@@ -324,7 +356,7 @@ public:
 
     Timestamp getStableTimestamp() const;
 
-    Timestamp getInitialDataTimestamp() const;
+    Timestamp getInitialDataTimestamp(ServiceContext* serviceCtx) const override;
 
     Timestamp recoverToStableTimestamp(OperationContext* opCtx) override {
         return Timestamp();
@@ -338,17 +370,11 @@ public:
         return false;
     }
 
-    void initializeStorageControlsForReplication(ServiceContext* serviceCtx) const override {}
-
     boost::optional<Timestamp> getRecoveryTimestamp(ServiceContext* serviceCtx) const override {
         return boost::none;
     }
 
     Timestamp getAllDurableTimestamp(ServiceContext* serviceCtx) const override;
-
-    Status isAdminDbValid(OperationContext* opCtx) override {
-        return isAdminDbValidFn(opCtx);
-    };
 
     void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx,
                                                  bool primaryOnly) override {
@@ -403,12 +429,13 @@ public:
         [](OperationContext* opCtx, const NamespaceString& nss, const CollectionOptions& options) {
             return Status{ErrorCodes::IllegalOperation, "CreateCollectionFn not implemented."};
         };
-    CreateIndexesOnEmptyCollectionFn createIndexesOnEmptyCollFn = [](OperationContext* opCtx,
-                                                                     const NamespaceString& nss,
-                                                                     const std::vector<BSONObj>&
-                                                                         secondaryIndexSpecs) {
-        return Status{ErrorCodes::IllegalOperation, "createIndexesOnEmptyCollFn not implemented."};
-    };
+    CreateIndexesOnEmptyCollectionFn createIndexesOnEmptyCollFn =
+        [](OperationContext* opCtx,
+           const NamespaceString& nss,
+           const std::vector<BSONObj>& secondaryIndexSpecs) {
+            return Status{ErrorCodes::IllegalOperation,
+                          "createIndexesOnEmptyCollFn not implemented."};
+        };
     TruncateCollectionFn truncateCollFn = [](OperationContext* opCtx, const NamespaceString& nss) {
         return Status{ErrorCodes::IllegalOperation, "TruncateCollectionFn not implemented."};
     };
@@ -437,9 +464,7 @@ public:
         [](OperationContext* opCtx, const NamespaceString& nss, const TimestampedBSONObj& update) {
             return Status{ErrorCodes::IllegalOperation, "PutSingletonFn not implemented."};
         };
-    IsAdminDbValidFn isAdminDbValidFn = [](OperationContext*) {
-        return Status{ErrorCodes::IllegalOperation, "IsAdminDbValidFn not implemented."};
-    };
+
     GetCollectionUUIDFn getCollectionUUIDFn = [](OperationContext* opCtx,
                                                  const NamespaceString& nss) -> StatusWith<UUID> {
         return Status{ErrorCodes::IllegalOperation, "GetCollectionUUIDFn not implemented."};
@@ -447,9 +472,10 @@ public:
 
     Timestamp allDurableTimestamp = Timestamp::min();
     Timestamp oldestOpenReadTimestamp = Timestamp::min();
+    Timestamp earliestOplogTimestamp = Timestamp::min();
 
 private:
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("StorageInterfaceMock::_mutex");
+    mutable stdx::mutex _mutex;
     int _rbid;
     bool _rbidInitialized = false;
     Timestamp _stableTimestamp = Timestamp::min();

@@ -29,13 +29,70 @@
 
 #pragma once
 
-#include "mongo/util/concurrency/mutex.h"
+#include "mongo/db/service_context.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/util/background.h"
+
+#include <memory>
+#include <string>
 
 namespace mongo {
 
 /**
- * Allows holders to block on an active fsyncLock.
+ * Maintains a global read lock while mongod is fsyncLocked.
  */
-extern SimpleMutex filesLockedFsync;
+class FSyncLockThread : public BackgroundJob {
+public:
+    FSyncLockThread(ServiceContext* serviceContext,
+                    bool allowFsyncFailure,
+                    const Milliseconds deadline)
+        : BackgroundJob(false),
+          _serviceContext(serviceContext),
+          _allowFsyncFailure(allowFsyncFailure),
+          _deadline(deadline) {}
+
+    std::string name() const override {
+        return "FSyncLockThread";
+    }
+
+    void run() override;
+
+    /**
+     * Releases the fsync lock for shutdown.
+     */
+    void shutdown(stdx::unique_lock<stdx::mutex>& lk);
+
+private:
+    /**
+     * Wait lastApplied to catch lastWritten so we won't write/apply any oplog when fsync locked.
+     */
+    void _waitUntilLastAppliedCatchupLastWritten();
+
+private:
+    ServiceContext* const _serviceContext;
+    bool _allowFsyncFailure;
+    const Milliseconds _deadline;
+};
+
+/**
+ * This is used to block oplogWriter and should never be acquired by others.
+ */
+extern stdx::mutex oplogWriterLockedFsync;
+
+/**
+ * This is used to block oplogApplier and should never be acquired by others.
+ */
+extern stdx::mutex oplogApplierLockedFsync;
+
+/**
+ * Must be taken before accessing globalFsyncLockThread below.
+ */
+extern stdx::mutex fsyncStateMutex;
+
+/**
+ * The FSyncLockThread must be external available for interruption during shutdown.
+ * Must lock the 'fsyncStateMutex' before accessing.
+ */
+extern std::unique_ptr<FSyncLockThread> globalFsyncLockThread;
 
 }  // namespace mongo

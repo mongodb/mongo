@@ -1,9 +1,7 @@
-"use strict";
-
 /**
  * Helpers for generating test dates for aggregations
  */
-var DateUtil = (function() {
+export var DateUtil = (function () {
     /**
      * local function to add leading 0 to month or day if needed.
      */
@@ -16,11 +14,11 @@ var DateUtil = (function() {
     }
 
     function getEndOfFirstWeekInYear(year, day) {
-        return new Date("" + year + "-01-" + (padded(7 - day + 1)) + "T23:59:59Z");
+        return new Date("" + year + "-01-" + padded(7 - day + 1) + "T23:59:59Z");
     }
 
     function getStartOfSecondWeekInYear(year, day) {
-        return new Date("" + year + "-01-" + (padded(7 - day + 2)) + "T00:00:00Z");
+        return new Date("" + year + "-01-" + padded(7 - day + 2) + "T00:00:00Z");
     }
 
     function getBirthday(year) {
@@ -28,7 +26,7 @@ var DateUtil = (function() {
     }
 
     function getEndOfSecondToLastWeekInYear(year, day, type) {
-        if (type === 'leap') {
+        if (type === "leap") {
             return new Date("" + year + "-12-" + padded(31 - day - 1) + "T23:59:59Z");
         } else {
             return new Date("" + year + "-12-" + padded(31 - day) + "T23:59:59Z");
@@ -36,7 +34,7 @@ var DateUtil = (function() {
     }
 
     function getStartOfLastWeekInYear(year, day, type) {
-        if (type === 'leap') {
+        if (type === "leap") {
             return new Date("" + year + "-12-" + padded(31 - day) + "T00:00:00Z");
         } else {
             return new Date("" + year + "-12-" + padded(31 - day + 1) + "T00:00:00Z");
@@ -59,6 +57,6 @@ var DateUtil = (function() {
         getEndOfSecondToLastWeekInYear: getEndOfSecondToLastWeekInYear,
         getStartOfLastWeekInYear: getStartOfLastWeekInYear,
         getNewYearsEve: getNewYearsEve,
-        shiftWeekday: shiftWeekday
+        shiftWeekday: shiftWeekday,
     };
 })();

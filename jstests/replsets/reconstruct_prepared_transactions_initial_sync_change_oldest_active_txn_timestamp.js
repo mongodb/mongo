@@ -16,21 +16,20 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/libs/fail_point_util.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const replTest = new ReplSetTest({nodes: 3});
 replTest.startSet();
-replTest.initiateWithHighElectionTimeout();
+replTest.initiate();
 
 const primary = replTest.getPrimary();
 let secondary = replTest.getSecondary();
 // The default WC is majority and this test can't satisfy majority writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 replTest.awaitReplication();
 const dbName = "test";
 const collName = jsTestName();
@@ -52,24 +51,27 @@ jsTestLog("Restarting the secondary and pausing initial sync");
 // transaction timestamp before getting the top of the sync source's oplog and make sure the node
 // fetches all the oplog entries it needs to reconstruct the prepared transaction.
 replTest.stop(secondary);
-secondary = replTest.start(secondary,
-                           {
-                               startClean: true,
-                               setParameter: {
-                                   'failpoint.initialSyncHangAfterGettingBeginFetchingTimestamp':
-                                       tojson({mode: 'alwaysOn'}),
-                                   'numInitialSyncAttempts': 1
-                               }
-                           },
-                           true /* wait */);
+secondary = replTest.start(
+    secondary,
+    {
+        startClean: true,
+        setParameter: {
+            "failpoint.initialSyncHangAfterGettingBeginFetchingTimestamp": tojson({mode: "alwaysOn"}),
+            "numInitialSyncAttempts": 1,
+        },
+    },
+    true /* wait */,
+);
 
 // Wait for failpoint to be reached so we know that the node is paused. At this point, the
 // the beginFetchingTimestamp is Timestamp(0, 0) because there were no open transactions.
-assert.commandWorked(secondary.adminCommand({
-    waitForFailPoint: "initialSyncHangAfterGettingBeginFetchingTimestamp",
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+assert.commandWorked(
+    secondary.adminCommand({
+        waitForFailPoint: "initialSyncHangAfterGettingBeginFetchingTimestamp",
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout,
+    }),
+);
 
 jsTestLog("Preparing a transaction after the initial syncing node fetched the beginFetchingOptime");
 
@@ -85,8 +87,9 @@ assert.commandWorked(testColl.insert({_id: 2}));
 
 jsTestLog("Resuming initial sync");
 
-assert.commandWorked(secondary.adminCommand(
-    {configureFailPoint: "initialSyncHangAfterGettingBeginFetchingTimestamp", mode: "off"}));
+assert.commandWorked(
+    secondary.adminCommand({configureFailPoint: "initialSyncHangAfterGettingBeginFetchingTimestamp", mode: "off"}),
+);
 
 // Wait for the secondary to complete initial sync.
 replTest.awaitSecondaryNodes();
@@ -99,7 +102,7 @@ jsTestLog("Checking that the first transaction is properly prepared");
 
 // Make sure that we can't read changes to the document from the first prepared transaction
 // after initial sync.
-assert.docEq(secondaryColl.findOne({_id: 1}), {_id: 1});
+assert.docEq({_id: 1}, secondaryColl.findOne({_id: 1}));
 
 jsTestLog("Committing the transaction");
 
@@ -108,7 +111,6 @@ replTest.awaitReplication();
 
 // Make sure that we can see the data from a committed transaction on the secondary if it was
 // applied during secondary oplog application.
-assert.docEq(secondaryColl.findOne({_id: 1}), {_id: 1, a: 1});
+assert.docEq({_id: 1, a: 1}, secondaryColl.findOne({_id: 1}));
 
 replTest.stopSet();
-})();

@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -42,7 +42,7 @@ class OperationContext;
 
 namespace repl {
 
-class ReplClientInfo {
+class MONGO_MOD_PUB ReplClientInfo {
 public:
     static const Client::Decoration<ReplClientInfo> forClient;
 
@@ -94,6 +94,12 @@ public:
     }
 
     /**
+     * Resets the last op set explicitly flag on this client.
+     * Used for tests only.
+     */
+    MONGO_MOD_NEEDS_REPLACEMENT void clearLastOpSetFlag_forTest(OperationContext* opCtx);
+
+    /**
      * Use this to set the LastOp to the latest known OpTime in the oplog. On primary, The OpTime
      * used consists of the timestamp of the latest oplog entry on disk and the current term. On
      * secondaries, lastAppliedOpTime is used. Using lastAppliedOpTime on secondaries is the desired
@@ -101,13 +107,17 @@ public:
      *
      * Setting the lastOp to the latest OpTime is necessary when doing no-op writes, as we need to
      * set the client's lastOp to a proper value for write concern wait to work.
+     *
+     * An exception to this are multi-document transactions, which do a noop write at commit time
+     * and advance the client's lastOp in case the transaction resulted in a no-op.
      */
     void setLastOpToSystemLastOpTime(OperationContext* opCtx);
 
     /**
-     * Same as setLastOpToSystemLastOpTime but ignores interruption errors.
+     * Same as setLastOpToSystemLastOpTime but ignores errors if the OperationContext is
+     * interrupted.
      */
-    void setLastOpToSystemLastOpTimeIgnoringInterrupt(OperationContext* opCtx);
+    void setLastOpToSystemLastOpTimeIgnoringCtxInterrupted(OperationContext* opCtx);
 
 private:
     static const long long kUninitializedTerm = -1;

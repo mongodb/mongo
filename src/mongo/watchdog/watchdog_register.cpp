@@ -39,7 +39,7 @@ std::vector<std::string> watchdogPaths;
 
 void registerWatchdogPath(StringData path) {
     if (!path.empty()) {
-        watchdogPaths.push_back(path.toString());
+        watchdogPaths.push_back(std::string{path});
     }
 }
 

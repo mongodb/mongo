@@ -27,19 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <cmath>
-#include <cstdint>
-#include <limits>
-#include <type_traits>
-#include <typeinfo>
-#include <vector>
-
 #include "mongo/base/parse_number.h"
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"  // for str::stream()!
+
+#include <algorithm>
+#include <cmath>
+#include <iterator>
+#include <limits>
+#include <memory>
+#include <string>
+#include <typeinfo>
+#include <vector>
+
+#include <fmt/format.h>
 
 #define ASSERT_PARSES_WITH_PARSER(type, input_string, parser, expected_value) \
     do {                                                                      \
@@ -286,7 +290,7 @@ PARSE_TEST(TestSkipLeadingWhitespace) {
         }
 
         for (StringData ws : whitespaces) {
-            std::string withWhitespace = ws.toString() + numStr;
+            std::string withWhitespace = std::string{ws} + numStr;
             if (shouldParse) {
                 ASSERT_PARSES_WITH_PARSER(NumberType, withWhitespace, skipWs, expected);
             } else {
@@ -334,7 +338,7 @@ PARSE_TEST(TestEndOfNum) {
             ASSERT_EQ(ErrorCodes::FailedToParse, parsed);
         }
         for (StringData& suffix : suffixes) {
-            std::string spec = numStr.toString() + suffix;
+            std::string spec = std::string{numStr} + suffix;
             char* numEnd = nullptr;
             NumberType actual;
             parsed = NumberParser().allowTrailingText()(spec, &actual, &numEnd);
@@ -396,7 +400,7 @@ PARSE_TEST(TestSkipLeadingWsAndEndptr) {
             ASSERT_EQ(ErrorCodes::FailedToParse, parsed);
         }
         for (StringData& prefix : whitespaces) {
-            std::string spec = prefix.toString() + numStr;
+            std::string spec = std::string{prefix} + numStr;
             char* numEnd = nullptr;
             NumberType actual;
             parsed = NumberParser().skipWhitespace()(spec, &actual, &numEnd);
@@ -476,7 +480,7 @@ PARSE_TEST(DoubleNormalParse) {
     ASSERT_PARSES(NumberType, "12e-8", 12e-8);
     ASSERT_PARSES(NumberType, "-485.381e-8", -485.381e-8);
 
-#if !(defined(_WIN32) || defined(__sun))
+#if !defined(_WIN32)
     // Parse hexadecimal representations of a double.  Hex literals not supported by MSVC, and
     // not parseable by the Windows SDK libc or the Solaris libc in the mode we build.
     // See SERVER-14131.
@@ -532,7 +536,7 @@ TEST(Double, TestParsingNormal) {
     ASSERT_PARSES(double, "12e-8", 12e-8);
     ASSERT_PARSES(double, "-485.381e-8", -485.381e-8);
 
-#if !(defined(_WIN32) || defined(__sun))
+#if !defined(_WIN32)
     // Parse hexadecimal representations of a double.  Hex literals not supported by MSVC, and
     // not parseable by the Windows SDK libc or the Solaris libc in the mode we build.
     // See SERVER-14131.

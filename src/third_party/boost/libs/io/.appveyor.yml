@@ -1,0 +1,62 @@
+# Copyright 2019 Glen Fernandes
+# Distributed under the Boost Software License, Version 1.0.
+
+version: 1.0.{build}-{branch}
+
+shallow_clone: true
+
+branches:
+  only:
+    - master
+    - develop
+
+environment:
+  matrix:
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+      TOOLSET: msvc-9.0
+      ADDRMD: 32
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+      TOOLSET: msvc-10.0
+      ADDRMD: 32
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+      TOOLSET: msvc-11.0
+      ADDRMD: 32
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+      TOOLSET: msvc-12.0
+      ADDRMD: 32,64
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+      TOOLSET: msvc-14.0
+      ADDRMD: 32,64
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+      TOOLSET: msvc-14.1
+      ADDRMD: 32,64
+      CXXSTD: 14,17
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+      TOOLSET: clang-win
+      ADDRMD: 32,64
+      CXXSTD: 14,17
+
+install:
+  - set BOOST_BRANCH=develop
+  - if "%APPVEYOR_REPO_BRANCH%" == "master" set BOOST_BRANCH=master
+  - cd ..
+  - git clone -b %BOOST_BRANCH% https://github.com/boostorg/boost.git boost
+  - cd boost
+  - git submodule init libs/assert
+  - git submodule init libs/config
+  - git submodule init libs/core
+  - git submodule init libs/headers
+  - git submodule init libs/type_traits
+  - git submodule init tools/build
+  - git submodule init tools/boost_install
+  - git submodule update
+  - xcopy /s /e /q %APPVEYOR_BUILD_FOLDER% libs\io\
+  - cmd /c bootstrap
+  - b2 headers
+
+build: off
+
+test_script:
+  - if not "%CXXSTD%" == "" set CXXSTD=cxxstd=%CXXSTD%
+  - if not "%ADDRMD%" == "" set ADDRMD=address-model=%ADDRMD%
+  - b2 libs/io/test toolset=%TOOLSET% %CXXSTD% %ADDRMD%

@@ -3,20 +3,18 @@
  * 'enableOverrideClusterChainingSetting' will allow the node to chain anyway.
  */
 
-(function() {
-"use strict";
-load("jstests/replsets/rslib.js");
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 let rst = new ReplSetTest({
     nodes: {
         n0: {},
         n1: {rsConfig: {priority: 0}},
-        n2: {rsConfig: {priority: 0}, setParameter: {enableOverrideClusterChainingSetting: true}}
+        n2: {rsConfig: {priority: 0}, setParameter: {enableOverrideClusterChainingSetting: true}},
     },
     // Enable the periodic noop writer to aid sync source selection.
     nodeOptions: {setParameter: {writePeriodicNoops: true}},
     settings: {chainingAllowed: false},
-    useBridge: true
+    useBridge: true,
 });
 rst.startSet();
 rst.initiate();
@@ -33,8 +31,7 @@ n2.disconnect(primary);
 rst.awaitSyncSource(n2, n1);
 
 // A write with write concern {w:3} should still reach n2.
-var options = {writeConcern: {w: 3, wtimeout: ReplSetTest.kDefaultTimeoutMS}};
+let options = {writeConcern: {w: 3, wtimeout: ReplSetTest.kDefaultTimeoutMS}};
 assert.commandWorked(primary.getDB("admin").foo.insert({x: 1}, options));
 
 rst.stopSet();
-}());

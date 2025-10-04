@@ -1,0 +1,10 @@
+buildvariants:
+  - name: release
+    display_name: Release
+    allowed_requesters: ["github_tag"]
+    tags: ["release", "assigned_to_jira_team_devprod_release_infrastructure"]
+    run_on: ubuntu2404-small
+    modules:
+      - devprod_coverity
+    tasks:
+      - name: publish-sast-report

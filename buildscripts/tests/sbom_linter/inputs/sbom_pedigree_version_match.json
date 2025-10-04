@@ -1,0 +1,51 @@
+{
+  "properties": [
+    {
+      "name": "comment",
+      "value": "SBOM for MDB server product; this file should comply with the format specified here: https://cyclonedx.org/docs/1.5/json/#components_items_publisher; This file is still in development; see https://jira.mongodb.org/browse/DEVPROD-2623 for details."
+    }
+  ],
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "version": 1,
+  "components": [
+    {
+      "type": "library",
+      "name": "kafka",
+      "version": "v2.0.0",
+      "scope": "required",
+      "licenses": [
+        {
+          "expression": "BSD-3-Clause"
+        }
+      ],
+      "cpe": "test_cpe",
+      "pedigree": {
+        "descendants": [
+          {
+            "type": "library",
+            "name": "kafka-fork",
+            "version": "v2.0.2"
+          }
+        ]
+      },
+      "properties": [
+        {
+          "name": "internal:team_responsible",
+          "value": "server_security"
+        },
+        {
+          "name": "import_script_path",
+          "value": "buildscripts/tests/sbom_linter/inputs/kafka_valid_import.sh"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/kafka"
+          }
+        ]
+      }
+    }
+  ]
+}

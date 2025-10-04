@@ -1,24 +1,22 @@
 // Tests that executing splitChunk directly against a shard, with an invalid split point will not
 // corrupt the chunks metadata
-(function() {
-'use strict';
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({shards: 1});
+let st = new ShardingTest({shards: 1});
 
-var testDB = st.s.getDB('TestSplitDB');
-assert.commandWorked(testDB.adminCommand({enableSharding: 'TestSplitDB'}));
-st.ensurePrimaryShard('TestSplitDB', st.shard0.shardName);
+let testDB = st.s.getDB("TestSplitDB");
+assert.commandWorked(testDB.adminCommand({enableSharding: "TestSplitDB", primaryShard: st.shard0.shardName}));
 
-assert.commandWorked(testDB.adminCommand({shardCollection: 'TestSplitDB.Coll', key: {x: 1}}));
-assert.commandWorked(testDB.adminCommand({split: 'TestSplitDB.Coll', middle: {x: 0}}));
+assert.commandWorked(testDB.adminCommand({shardCollection: "TestSplitDB.Coll", key: {x: 1}}));
+assert.commandWorked(testDB.adminCommand({split: "TestSplitDB.Coll", middle: {x: 0}}));
 
-var chunksBefore = st.s.getDB('config').chunks.find().toArray();
+let chunksBefore = st.s.getDB("config").chunks.find().toArray();
 
 // Try to do a split with invalid parameters through mongod
-var callSplit = function(db, minKey, maxKey, splitPoints) {
-    var res = assert.commandWorked(st.s.adminCommand({getShardVersion: 'TestSplitDB.Coll'}));
+let callSplit = function (db, minKey, maxKey, splitPoints) {
+    let res = assert.commandWorked(st.s.adminCommand({getShardVersion: "TestSplitDB.Coll"}));
     return db.runCommand({
-        splitChunk: 'TestSplitDB.Coll',
+        splitChunk: "TestSplitDB.Coll",
         from: st.shard0.shardName,
         min: minKey,
         max: maxKey,
@@ -29,13 +27,11 @@ var callSplit = function(db, minKey, maxKey, splitPoints) {
 };
 
 assert.commandFailedWithCode(
-    callSplit(st.rs0.getPrimary().getDB('admin'), {x: MinKey}, {x: 0}, [{x: 2}]),
-    ErrorCodes.InvalidOptions);
+    callSplit(st.rs0.getPrimary().getDB("admin"), {x: MinKey}, {x: 0}, [{x: 2}]),
+    ErrorCodes.InvalidOptions,
+);
 
-var chunksAfter = st.s.getDB('config').chunks.find().toArray();
-assert.eq(chunksBefore,
-          chunksAfter,
-          'Split chunks failed, but the chunks were updated in the config database');
+let chunksAfter = st.s.getDB("config").chunks.find().toArray();
+assert.eq(chunksBefore, chunksAfter, "Split chunks failed, but the chunks were updated in the config database");
 
 st.stop();
-})();

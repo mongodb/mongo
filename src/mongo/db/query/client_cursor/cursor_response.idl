@@ -1,0 +1,329 @@
+# Copyright(C) 2021 - present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+# This IDL file describes the BSON format for cursor response object.
+
+global:
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/namespace_string.h"
+        - "mongo/db/query/client_cursor/cursor_idl_validator.h"
+
+imports:
+    - "mongo/db/basic_types.idl"
+
+enums:
+    CursorType:
+        description: "The type of a single cursor if a response has multiple cursors"
+        type: string
+        values:
+            SearchMetaResult: "meta"
+            DocumentResult: "results"
+
+structs:
+    CursorMetrics:
+        description: "A struct representing all of the metrics a cursor response can return."
+        strict: false
+        fields:
+            keysExamined:
+                description: "Number of index keys examined by the query."
+                type: long
+                stability: unstable
+            docsExamined:
+                description: "Number of documents examined by the query."
+                type: long
+                stability: unstable
+            bytesRead:
+                description: "Number of bytes of storage read by the query."
+                type: long
+                stability: unstable
+            readingTimeMicros:
+                description: "Amount of time spent reading data from storage."
+                type: long
+                stability: unstable
+            workingTimeMillis:
+                description: "Amount of time spent executing the query, not including time spent blocked."
+                type: long
+                stability: unstable
+            hasSortStage:
+                description: "Boolean value that is true if the query plan involves an in-memory sort."
+                type: bool
+                stability: unstable
+            usedDisk:
+                description: "Boolean value that is if the given query used disk."
+                type: bool
+                stability: unstable
+            fromMultiPlanner:
+                description: "Boolean value that is true if the plan came from the multi-planner."
+                type: bool
+                stability: unstable
+            fromPlanCache:
+                description: "Boolean value that is true if the plan came from the plan cache."
+                type: bool
+                stability: unstable
+            cpuNanos:
+                description: "Amount of CPU time spent by a query operation."
+                type: long
+                stability: unstable
+            delinquentAcquisitions:
+                description: "Number of times that execution ticket acquisition was overdue by a query operation."
+                type: long
+                stability: unstable
+                default: 0
+            totalAcquisitionDelinquencyMillis:
+                description: "Total time in milliseconds that execution ticket acquisition was overdue by a query operation."
+                type: long
+                stability: unstable
+                default: 0
+            maxAcquisitionDelinquencyMillis:
+                description: "Maximum time in milliseconds that execution ticket acquisition was overdue by a query operation."
+                type: long
+                stability: unstable
+                default: 0
+            numInterruptChecks:
+                description: "Number of checkForInterrupt is call by a query operation."
+                type: long
+                stability: unstable
+            overdueInterruptApproxMaxMillis:
+                description: "Maximum time in milliseconds that checkForInterrupt was delayed for a sampled query operation."
+                type: long
+                stability: unstable
+                default: 0
+
+    ResponseCursorBase:
+        description: "Common fields of initial and subsequent cursor responses."
+        fields:
+            id:
+                cpp_name: "cursorId"
+                description: "The cursor id of the cursor."
+                type: long
+                stability: stable
+            ns:
+                description: "The namespace of the cursor."
+                type: namespacestring
+                stability: stable
+            postBatchResumeToken:
+                description: "An optional resume token object."
+                type: object
+                optional: true
+                stability: stable
+            atClusterTime:
+                description: "The time stamp at which the response is being returned."
+                type: timestamp
+                optional: true
+                stability: stable
+            partialResultsReturned:
+                description: "Boolean represents whether partial results are being returned."
+                type: optionalBool
+                stability: stable
+            invalidated:
+                description: "Boolean represents if the cursor has been invalidated."
+                type: optionalBool
+                stability: stable
+            $_wasStatementExecuted:
+                description:
+                    "An optional field set to true if a write without shard key had already
+                    applied the write. To provide some context, this internal field is
+                    used by the two phase write without shard key protocol introduced in
+                    PM-1632 to support retryable writes for updateOne without shard key,
+                    deleteOne without shard key, and findAndModify without shard key."
+                type: optionalBool
+                cpp_name: wasStatementExecuted
+                stability: internal
+
+    InitialResponseCursor:
+        description: "A struct representing an initial response cursor."
+        inline_chained_structs: true
+        chained_structs:
+            ResponseCursorBase: ResponseCursorBase
+        fields:
+            firstBatch:
+                description: "The first batch of the cursor."
+                type: array<object>
+                stability: stable
+            metrics:
+                description: "An optional field containing metrics about the query's execution."
+                type: CursorMetrics
+                optional: true
+                stability: unstable
+
+    MultiResponseInitialResponseCursor:
+        description: "A struct representing an initial response cursor if multiple cursors are returned."
+        inline_chained_structs: true
+        chained_structs:
+            ResponseCursorBase: ResponseCursorBase
+        fields:
+            firstBatch:
+                description: "The first batch of the cursor."
+                type: array<object>
+                stability: stable
+            type:
+                description: "Optional disambiguation string of a cursor."
+                type: CursorType
+                cpp_name: cursorType
+                stability: unstable
+                optional: true
+            metrics:
+                description: "An optional field containing metrics about the query's execution."
+                type: CursorMetrics
+                optional: true
+                stability: unstable
+
+    MultiResponseCursor:
+        description: "A struct representing a cursor object inside an array of cursors"
+        fields:
+            cursor:
+                description: "The actual cursor object."
+                type: MultiResponseInitialResponseCursor
+                stability: unstable
+            ok:
+                type: bool
+                stability: unstable
+
+    CursorInitialReply:
+        description: "A struct representing a initial cursor reply."
+        cpp_validator_func: "validateIDLParsedCursorResponse"
+        is_command_reply: true
+        fields:
+            cursor:
+                description: "A response cursor object."
+                type: InitialResponseCursor
+                stability: stable
+                optional: true
+            cursors:
+                description: "An array of cursor objects."
+                type: array<MultiResponseCursor>
+                stability: unstable
+                optional: true
+            vars:
+                description: "An optional field containing additional response information for the query."
+                type: object
+                optional: true
+                stability: unstable
+            type:
+                description: "An optional field containing disambiguation information if a reply contains multiple cursors."
+                type: CursorType
+                cpp_name: cursorType
+                optional: true
+                stability: unstable
+            explain:
+                description: "An optional field containing explain info."
+                type: object
+                optional: true
+                stability: unstable
+
+    GetMoreResponseCursor:
+        description: "A struct representing a subsequent response cursor."
+        inline_chained_structs: true
+        chained_structs:
+            ResponseCursorBase: ResponseCursorBase
+        fields:
+            nextBatch:
+                description: "The subsequent batch of the cursor."
+                type: array<object>
+                stability: stable
+            metrics:
+                description: "An optional field containing metrics about the query's execution."
+                type: CursorMetrics
+                optional: true
+                stability: unstable
+
+    CursorGetMoreReply:
+        description: "A struct representing a getMore cursor reply."
+        is_command_reply: true
+        fields:
+            cursor:
+                description: "A response cursor object."
+                type: GetMoreResponseCursor
+                stability: stable
+            explain:
+                description: "An optional field containing updated explain info."
+                type: object
+                optional: true
+                stability: unstable
+
+    # This type could be naturally expressed as a variant of InitialResponseCursor and
+    # GetMoreResponseCursor, but the IDL parser can't handle multi-struct variants in general.
+    # It needs to be able to identify the type of the struct based on the first element of the
+    # BSON object, which imposes a constraint on the order of fields in the BSON.
+    AnyCursor:
+        description: "A struct representing either an initial or subsequent cursor"
+        inline_chained_structs: true
+        cpp_validator_func: "validateIDLParsedAnyCursor"
+        chained_structs:
+            ResponseCursorBase: ResponseCursorBase
+        fields:
+            firstBatch:
+                description: "The first batch of the cursor."
+                type: array<object>
+                stability: stable
+                optional: true
+                # Non-const getter is needed here so we can avoid copying the batch of BSONObjs in the batch.
+                non_const_getter: true
+            nextBatch:
+                description: "The subsequent batch of the cursor."
+                type: array<object>
+                stability: stable
+                optional: true
+                # Non-const getter is needed here so we can avoid copying the batch of BSONObjs in the batch.
+                non_const_getter: true
+            type:
+                description: "An optional field containing disambiguation information if a reply contains multiple cursors."
+                type: CursorType
+                cpp_name: cursorType
+                optional: true
+                stability: unstable
+            metrics:
+                description: "An optional field containing metrics about the query's execution."
+                type: CursorMetrics
+                optional: true
+                stability: unstable
+
+    AnyCursorResponse:
+        description: "A struct representing a cursor response, which can contain either an initial or a subsequent cursor."
+        strict: false
+        fields:
+            writeConcernError:
+                description: "An optional field containing any write concern errors returned when the command was run."
+                type: object
+                optional: true
+                stability: unstable
+            vars:
+                description: "An optional field containing additional response information for the query."
+                type: object
+                optional: true
+                stability: unstable
+            cursor:
+                description: "A response cursor object."
+                type: AnyCursor
+                stability: unstable
+            explain:
+                description: "An optional field containing initial or updated explain info."
+                type: object
+                optional: true
+                stability: unstable

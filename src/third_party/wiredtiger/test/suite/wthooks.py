@@ -35,10 +35,9 @@
 #
 from __future__ import print_function
 
-import os, sys
 from importlib import import_module
 from abc import ABC, abstractmethod
-import wiredtiger
+import wiredtiger, os
 
 # Three kinds of hooks available:
 HOOK_REPLACE = 1     # replace the call with the hook function
@@ -58,13 +57,13 @@ def tty(message):
 #
 #   API functions
 #      potentially any WiredTiger API functions that a hook creator wishes to modify (like
-#      Session.rename).  In Python most everything is an object.  Of course an instance of
-#      "Session" is an object, but also the "Session" class itself is an object.  The Session.rename
-#      function is also an object (of a certain form that can be called).  Also in Python,
+#      Session.remove). In Python most everything is an object.  Of course an instance of
+#      "Session" is an object, but also the "Session" class itself is an object. The Session.remove
+#      function is also an object (of a certain form that can be called). Also in Python,
 #      attributes on an object don't have to be "pre-declared", they can be created at any time.
-#      So it's easy to imagine assigning Session._rename_orig to be (the original value of)
-#      Session.rename, and then assigning Session.rename to be some other function object, that
-#      knows how to do something and then perhaps calls Session._rename_orig .  This is the
+#      So it's easy to imagine assigning Session._remove_orig to be (the original value of)
+#      Session.remove, and then assigning Session.remove to be some other function object, that
+#      knows how to do something and then perhaps calls Session._remove_orig .  This is the
 #      essence of the hook concept.
 #
 #  Hook Creator:
@@ -83,6 +82,14 @@ def tty(message):
 #      A hook function that replaces an API function will have the same args as the function
 #      it replaces (but there is a trick to give it additional context if needed -
 #      see session_create_replace in hook_demo.py).
+#
+#  Hook Platform API:
+#      A set of utility functions used by WiredTigerTestCase or other parts of the test framework
+#      that may differ according to platform.  Rather than have hook specific implementations in the
+#      test framework, the "platform API" is implemented by any hook that wants to override it.
+#      Currently the hook specific implementation is all or nothing, in the future we may allow
+#      subsets of the hook platform API to be implemented.
+
 
 # For every API function altered, there is one of these objects
 # stashed in the <class>._<api_name>_hooks attribute.
@@ -136,6 +143,7 @@ def hooked_function(self, orig_func, hook_info_name, *args):
 class WiredTigerHookManager(object):
     def __init__(self, hooknames = []):
         self.hooks = []
+        self.platform_apis = []
         names_seen = []
         for name in hooknames:
             # The hooks are indicated as "somename=arg" or simply "somename".
@@ -160,8 +168,12 @@ class WiredTigerHookManager(object):
             except:
                 print('Cannot import hook: ' + name + ', check file ' + modname + '.py')
                 raise
+        self.hook_names = tuple(names_seen)
         for hook in self.hooks:
             hook.setup_hooks()
+            api = hook.get_platform_api()   # can return None
+            self.platform_apis.append(api)
+        self.platform_apis.append(DefaultPlatformAPI())
 
     def add_hook(self, clazz, method_name, hook_type, hook_func):
         if not hasattr(clazz, method_name):
@@ -215,10 +227,23 @@ class WiredTigerHookManager(object):
             orig_func = getattr(clazz, method_name)
         return orig_func
 
-    def filter_tests(self, tests):
+    def register_skipped_tests(self, tests):
         for hook in self.hooks:
-            tests = hook.filter_tests(tests)
-        return tests
+            hook.register_skipped_tests(tests)
+
+    def get_hook_names(self):
+        return self.hook_names
+
+    def get_platform_api(self):
+        return MultiPlatformAPI(self.platform_apis)
+
+    # Returns a list of hook names that use something on the list
+    def hooks_using(self, use_list):
+        ret = []
+        for hook in self.hooks:
+            if hook.uses(use_list):
+                ret.append(hook.name)
+        return ret
 
 class HookCreatorProxy(object):
     def __init__(self, hookmgr, clazz):
@@ -249,11 +274,187 @@ class WiredTigerHookCreator(ABC):
         self.Session = HookCreatorProxy(self.hookmgr, wiredtiger.Session)
         self.Cursor = HookCreatorProxy(self.hookmgr, wiredtiger.Cursor)
 
-    # default version of filter_tests, can be overridden
-    def filter_tests(self, tests):
-        return tests
+    # Default version of register_skipped_tests, can be overridden.
+    # Walks the lists of tests in-place, modifying the tests that should be skipped
+    def register_skipped_tests(self, tests):
+        pass
 
     @abstractmethod
     def setup_hooks(self):
         """Set up all hooks using add_*_hook methods."""
         return
+
+    # default version of uses, can be overridden.  If the hook uses or provides
+    # a capability on the list, it should return True.
+    def uses(self, use_list):
+        return False
+
+# Used by hooks to encapsulate all disagg parameters
+class DisaggParameters(object):
+    def __init__(self):
+        self.config = None
+        self.role = 'leader'
+        self.page_log = 'palm'
+
+class WiredTigerHookPlatformAPI(object):
+    def setUp(self, testcase):
+        """Called at the beginning of a test case"""
+        pass
+
+    def tearDown(self, testcase):
+        """Called at the termination of a test case"""
+        pass
+
+    def tableExists(self, name):
+        """Return boolean if local files exist for the table with the given base name"""
+        raise NotImplementedError('tableExists method not implemented')
+
+    def initialFileName(self, uri):
+        """The first local backing file name created for this URI."""
+        raise NotImplementedError('initialFileName method not implemented')
+
+    def getDisaggParameters(self):
+        """The disaggregated parameters for this test case."""
+        raise NotImplementedError('getDisaggParameters method not implemented')
+
+    def getTimestamp(self):
+        """The timestamp generator for this test case."""
+        raise NotImplementedError('getTimestamp method not implemented')
+
+    def getTierSharePercent(self):
+        """The tier share percentage generator for this test case."""
+        raise NotImplementedError('getTierSharePercent method not implemented')
+
+    def getTierCachePercent(self):
+        """The tier cache percentage generator for this test case."""
+        raise NotImplementedError('getTierCachePercent method not implemented')
+
+    def getTierStorageSource(self):
+        """The tiered storage source for this test case."""
+        raise NotImplementedError('getTierStorageSource method not implemented')
+
+    def getTierStorageSourceConfig(self):
+        """The tiered storage source configuration for this test case."""
+        raise NotImplementedError('getTierStorageSourceConfig method not implemented')
+
+class DefaultPlatformAPI(WiredTigerHookPlatformAPI):
+    def tableExists(self, name):
+        tablename = name + ".wt"
+        return os.path.exists(tablename)
+
+    def initialFileName(self, uri):
+        if uri.startswith('table:'):
+            return uri[6:] + '.wt'
+        elif uri.startswith('file:'):
+            return uri[5:]
+        else:
+            raise Exception('bad uri')
+
+    def getDisaggParameters(self):
+        return DisaggParameters()
+
+    # By default, there is no automatic timestamping by test infrastructure classes.
+    def getTimestamp(self):
+        return None
+
+    # By default, all the populated data lies in the local storage.
+    def getTierSharePercent(self):
+        return 0
+
+    # By default, all the populated data lies in the cache.
+    def getTierCachePercent(self):
+        return 0
+
+    # By default, dir_store is the storage source.
+    def getTierStorageSource(self):
+        return ('dir_store')
+
+    # By default, there is no extra configuration for the storage source.
+    def getTierStorageSourceConfig(self):
+        return None
+
+class MultiPlatformAPI(WiredTigerHookPlatformAPI):
+    def __init__(self, platform_apis):
+        self.apis = platform_apis
+
+    def setUp(self, testcase):
+        """Called at the beginning of a test case"""
+        for api in self.apis:
+            api.setUp(testcase)
+
+    def tearDown(self, testcase):
+        """Called at the termination of a test case"""
+        for api in self.apis:
+            api.tearDown(testcase)
+
+    def tableExists(self, name):
+        """Return boolean if local files exist for the table with the given base name"""
+        for api in self.apis:
+            try:
+                return api.tableExists(name)
+            except NotImplementedError:
+                pass
+        raise Exception('tableExists: no implementation')  # should never happen
+
+    def initialFileName(self, uri):
+        """The first local backing file name created for this URI."""
+        for api in self.apis:
+            try:
+                return api.initialFileName(uri)
+            except NotImplementedError:
+                pass
+        raise Exception('initialFileName: no implementation')  # should never happen
+
+    def getDisaggParameters(self):
+        """The disaggregated parameters for this test case."""
+        for api in self.apis:
+            try:
+                return api.getDisaggParameters()
+            except NotImplementedError:
+                pass
+        raise Exception('getDisaggParameters: no implementation')  # should never happen
+
+    def getTimestamp(self):
+        """The timestamp generator for this test case."""
+        for api in self.apis:
+            try:
+                return api.getTimestamp()
+            except NotImplementedError:
+                pass
+        raise Exception('getTimestamp: no implementation')  # should never happen
+
+    def getTierSharePercent(self):
+        """The tier share value for this test case."""
+        for api in self.apis:
+            try:
+                return api.getTierSharePercent()
+            except NotImplementedError:
+                pass
+        raise Exception('getTierSharePercent: no implementation')  # should never happen
+
+    def getTierCachePercent(self):
+        """The tier cache value for this test case."""
+        for api in self.apis:
+            try:
+                return api.getTierCachePercent()
+            except NotImplementedError:
+                pass
+        raise Exception('getTierCachePercent: no implementation')  # should never happen
+
+    def getTierStorageSource(self):
+        """The tier storage source for this test case."""
+        for api in self.apis:
+            try:
+                return api.getTierStorageSource()
+            except NotImplementedError:
+                pass
+        raise Exception('getTierStorageSource: no implementation')  # should never happen
+
+    def getTierStorageSourceConfig(self):
+        """The tier storage source configuration for this test case."""
+        for api in self.apis:
+            try:
+                return api.getTierStorageSourceConfig()
+            except NotImplementedError:
+                pass
+        raise Exception('getTierStorageSourceCOnfig: no implementation')  # should never happen

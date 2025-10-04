@@ -27,10 +27,21 @@
 #
 global:
     cpp_namespace: "mongo"
-
+    mod_visibility: pub
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
+
+enums:
+    ReadWriteConcernProvenanceSource:
+        description: "Provenance sources"
+        type: string
+        values:
+            clientSupplied: "clientSupplied"
+            implicitDefault: "implicitDefault"
+            customDefault: "customDefault"
+            getLastErrorDefaults: "getLastErrorDefaults"
+            internalWriteDefault: "internalWriteDefault"
 
 structs:
     ReadWriteConcernProvenanceBase:

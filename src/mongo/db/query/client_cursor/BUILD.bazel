@@ -1,0 +1,170 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "client_cursor",
+    srcs = [
+        "clientcursor.cpp",
+        "collect_query_stats_mongod.cpp",
+        "cursor_manager.cpp",
+    ],
+    hdrs = [
+        "clientcursor.h",
+        "collect_query_stats_mongod.h",
+        "cursor_manager.h",
+        "//src/mongo/db/local_catalog:external_data_source_scope_guard.h",  # TODO(SERVER-95100): Remove
+        "//src/mongo/db/memory_tracking:operation_memory_usage_tracker.h",
+    ],
+    deps = [
+        ":cursor_server_params",
+        "//src/mongo/db:commands",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/auth:auth_checks",
+        "//src/mongo/db/memory_tracking",
+        "//src/mongo/db/repl:optime",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+idl_generator(
+    name = "cursor_response_gen",
+    src = "cursor_response.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "cursor_response_idl",
+    srcs = [
+        "cursor_idl_validator.cpp",
+        ":cursor_response_gen",
+    ],
+    hdrs = [
+        "cursor_idl_validator.h",
+        "//src/mongo/db/memory_tracking:operation_memory_usage_tracker.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
+idl_generator(
+    name = "cursor_server_params_gen",
+    src = "cursor_server_params.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "cursor_server_params",
+    srcs = [
+        "cursor_server_params.cpp",
+        ":cursor_server_params_gen",
+    ],
+    hdrs = [
+        "cursor_server_params.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
+idl_generator(
+    name = "generic_cursor_gen",
+    src = "generic_cursor.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/repl:replication_types_gen",
+        "//src/mongo/db/session:logical_session_id_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "generic_cursor",
+    srcs = [
+        "generic_cursor_utils.cpp",
+        ":generic_cursor_gen",
+    ],
+    hdrs = [
+        "cursor_id.h",
+        "generic_cursor_utils.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+idl_generator(
+    name = "kill_cursors_gen",
+    src = "kill_cursors.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/auth:access_checks_gen",
+        "//src/mongo/db/auth:action_type_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "release_memory_util",
+    srcs = [
+        "release_memory_util.cpp",
+    ],
+    hdrs = [
+        "release_memory_util.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
+idl_generator(
+    name = "release_memory_gen",
+    src = "release_memory.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/auth:access_checks_gen",
+        "//src/mongo/db/auth:action_type_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "cursor_manager_test",
+    srcs = [
+        "cursor_manager_test.cpp",
+    ],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        ":client_cursor",
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/util:clock_source_mock",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "cursors_test",
+    srcs = [
+        "cursor_response_test.cpp",
+        "killcursors_request_test.cpp",
+    ],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        ":client_cursor",
+        "//src/mongo/idl:server_parameter_test_controller",
+    ],
+)

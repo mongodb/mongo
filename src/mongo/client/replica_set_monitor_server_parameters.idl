@@ -32,8 +32,20 @@ server_parameters:
     replicaSetMonitorProtocol:
         description: >-
             Select which replica set monitor protocol to use - the new 'streamable' protocol that is
-            both SDAM compliant and allows for awaitable isMaster with exhaust, the 'sdam' compliant
+            both SDAM compliant and allows for awaitable "hello" with exhaust, the 'sdam' compliant
             protocol or the old 'scanning' protocol.
         set_at: startup
         cpp_class:
             name: RSMProtocolServerParameter
+        redact: false
+
+    defaultFindReplicaSetHostTimeoutMS:
+        description: >-
+            The timeout used for finding a replica set host.
+
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<int>"
+        cpp_varname: gDefaultFindReplicaSetHostTimeoutMS
+        default: 15000
+        test_only: true
+        redact: false

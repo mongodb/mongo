@@ -1,0 +1,177 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "transaction_operations",
+    srcs = [
+        "transaction_operations.cpp",
+    ],
+    hdrs = [
+        "transaction_operations.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/repl:oplog_entry",
+    ],
+)
+
+idl_generator(
+    name = "transaction_participant_gen",
+    src = "transaction_participant.idl",
+)
+
+idl_generator(
+    name = "transactions_stats_gen",
+    src = "transactions_stats.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/repl:replication_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "transaction_api",
+    srcs = [
+        "internal_transaction_metrics.cpp",
+        "sep_transaction_client.cpp",
+        "transaction_api.cpp",
+        "transaction_with_retries_api.cpp",
+    ],
+    hdrs = [
+        "internal_transaction_metrics.h",
+        "transaction_api.h",
+    ],
+    deps = [
+        "//src/mongo/db:operation_time_tracker",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db:shared_request_handling",
+        "//src/mongo/db/auth",
+        "//src/mongo/db/query:command_request_response",
+        "//src/mongo/db/query:query_request",
+        "//src/mongo/db/repl:repl_coordinator_interface",
+        "//src/mongo/db/session:logical_session_id",
+        "//src/mongo/db/session:logical_session_id_helpers",
+        "//src/mongo/db/session:session_catalog",
+        "//src/mongo/executor:inline_executor",
+        "//src/mongo/executor:task_executor_interface",
+        "//src/mongo/rpc",
+        "//src/mongo/rpc:command_status",
+    ],
+)
+
+mongo_cc_library(
+    name = "transaction",
+    srcs = [
+        "retryable_writes_stats.cpp",
+        "server_transactions_metrics.cpp",
+        "session_catalog_mongod_transaction_interface_impl.cpp",
+        "transaction_history_iterator.cpp",
+        "transaction_metrics_observer.cpp",
+        "transaction_participant.cpp",
+        "transaction_participant_resource_yielder.cpp",
+        ":transaction_participant_gen",
+        ":transactions_stats_gen",
+    ],
+    hdrs = [
+        "retryable_writes_stats.h",
+        "server_transactions_metrics.h",
+        "session_catalog_mongod_transaction_interface_impl.h",
+        "transaction_history_iterator.h",
+        "transaction_metrics_observer.h",
+        "transaction_participant.h",
+        "transaction_participant_resource_yielder.h",
+    ],
+    deps = [
+        ":transaction_operations",
+        "//src/mongo/db:coll_mod_command_idl",
+        "//src/mongo/db:curop_failpoint_helpers",
+        "//src/mongo/db:dbdirectclient",
+        "//src/mongo/db:dbhelpers",
+        "//src/mongo/db:index_commands_idl",
+        "//src/mongo/db:internal_transactions_feature_flag",
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db:not_primary_error_tracker",
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db:record_id_helpers",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/collection_crud",
+        "//src/mongo/db/commands:test_commands_enabled",
+        "//src/mongo/db/commands:txn_cmd_request",
+        "//src/mongo/db/commands/server_status:server_status_core",
+        "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/index_builds:index_builds_coordinator",
+        "//src/mongo/db/local_catalog:local_oplog_info",
+        "//src/mongo/db/local_catalog/lock_manager:exception_util",
+        "//src/mongo/db/repl:apply_ops_command_info",
+        "//src/mongo/db/repl:repl_server_parameters",
+        "//src/mongo/db/repl:replica_set_aware_service",
+        "//src/mongo/db/rss:replicated_storage_service",
+        "//src/mongo/db/session:session_catalog_mongod",
+        "//src/mongo/db/stats:top",
+        "//src/mongo/db/stats:transaction_stats",
+        "//src/mongo/db/update:update_driver",
+        "//src/mongo/s:sharding_router_api",
+        "//src/mongo/util/concurrency:thread_pool",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_transaction_test",
+    srcs = [
+        "integer_interval_set_test.cpp",
+        "transaction_api_test.cpp",
+        "transaction_history_iterator_test.cpp",
+        "transaction_operations_test.cpp",
+        "transaction_participant_retryable_writes_test.cpp",
+        "transaction_participant_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_eighth_group",
+    ],
+    deps = [
+        ":transaction",
+        ":transaction_api",
+        ":transaction_operations",
+        "//src/mongo/db:dbhelpers",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/op_observer",
+        "//src/mongo/db/op_observer:op_observer_impl",
+        "//src/mongo/db/op_observer:operation_logger_impl",
+        "//src/mongo/db/repl:image_collection_entry",
+        "//src/mongo/db/repl:mock_repl_coord_server_fixture",
+        "//src/mongo/db/repl:replica_set_aware_service",
+        "//src/mongo/db/repl:storage_interface_impl",
+        "//src/mongo/db/session:session_catalog_mongod",
+        "//src/mongo/db/stats:transaction_stats",
+        "//src/mongo/db/storage:storage_control",
+        "//src/mongo/executor:inline_executor",
+        "//src/mongo/idl:server_parameter_test_controller",
+        "//src/mongo/s:sharding_router_api",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "transaction_operations_bm",
+    srcs = [
+        "transaction_operations_bm.cpp",
+    ],
+    deps = [
+        ":transaction_operations",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/local_catalog/lock_manager",
+        "//src/mongo/db/op_observer:batched_write_context",
+        "//src/mongo/db/repl:oplog_entry",
+    ],
+)

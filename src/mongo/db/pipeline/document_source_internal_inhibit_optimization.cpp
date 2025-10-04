@@ -27,9 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/pipeline/document_source_internal_inhibit_optimization.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/query/allowed_contexts.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -37,6 +47,8 @@ REGISTER_DOCUMENT_SOURCE(_internalInhibitOptimization,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceInternalInhibitOptimization::createFromBson,
                          AllowedWithApiStrict::kNeverInVersion1);
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalInhibitOptimization,
+                            DocumentSourceInternalInhibitOptimization::id)
 
 constexpr StringData DocumentSourceInternalInhibitOptimization::kStageName;
 
@@ -45,7 +57,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalInhibitOptimization::
     uassert(ErrorCodes::TypeMismatch,
             str::stream() << "$_internalInhibitOptimization must take a nested object but found: "
                           << elem,
-            elem.type() == BSONType::Object);
+            elem.type() == BSONType::object);
 
     auto specObj = elem.embeddedObject();
     uassert(ErrorCodes::FailedToParse,
@@ -56,12 +68,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalInhibitOptimization::
     return new DocumentSourceInternalInhibitOptimization(expCtx);
 }
 
-DocumentSource::GetNextResult DocumentSourceInternalInhibitOptimization::doGetNext() {
-    return pSource->getNext();
-}
-
-Value DocumentSourceInternalInhibitOptimization::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceInternalInhibitOptimization::serialize(const SerializationOptions& opts) const {
     return Value(Document{{getSourceName(), Value{Document{}}}});
 }
 

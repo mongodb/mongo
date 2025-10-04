@@ -28,18 +28,29 @@
  */
 
 #include "mongo/client/sdam/server_description.h"
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
-#include <algorithm>
-#include <boost/algorithm/string.hpp>
-#include <boost/optional.hpp>
-#include <set>
-
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
 #include "mongo/client/sdam/sdam_datatypes.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+
+#include <algorithm>
+#include <iterator>
+#include <set>
+#include <tuple>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 
 namespace mongo::sdam {
@@ -74,22 +85,22 @@ ServerDescription::ServerDescription(ClockSource* clockSource,
         saveElectionId(response.getField("electionId"));
 
         auto lsTimeoutField = response.getField("logicalSessionTimeoutMinutes");
-        if (lsTimeoutField.type() == BSONType::NumberInt) {
+        if (lsTimeoutField.type() == BSONType::numberInt) {
             _logicalSessionTimeoutMinutes = lsTimeoutField.numberInt();
         }
 
         auto setVersionField = response.getField("setVersion");
-        if (setVersionField.type() == BSONType::NumberInt) {
+        if (setVersionField.type() == BSONType::numberInt) {
             _setVersion = response["setVersion"].numberInt();
         }
 
         auto setNameField = response.getField("setName");
-        if (setNameField.type() == BSONType::String) {
+        if (setNameField.type() == BSONType::string) {
             _setName = response["setName"].str();
         }
 
         auto primaryField = response.getField("primary");
-        if (primaryField.type() == BSONType::String) {
+        if (primaryField.type() == BSONType::string) {
             _primary = HostAndPort(response.getStringField("primary"));
         }
     } else {
@@ -129,7 +140,7 @@ void ServerDescription::saveHosts(const BSONObj response) {
 void ServerDescription::saveTags(BSONObj tagsObj) {
     const auto keys = tagsObj.getFieldNames<std::set<std::string>>();
     for (const auto& key : keys) {
-        _tags[key] = tagsObj.getStringField(key);
+        _tags[key] = std::string{tagsObj.getStringField(key)};
     }
 }
 
@@ -142,7 +153,7 @@ void ServerDescription::appendBsonTags(BSONObjBuilder& builder) const {
 }
 
 void ServerDescription::saveElectionId(BSONElement electionId) {
-    if (electionId.type() == jstOID) {
+    if (electionId.type() == BSONType::oid) {
         _electionId = electionId.OID();
     }
 }
@@ -185,7 +196,7 @@ void ServerDescription::calculateRtt(const boost::optional<HelloRTT> currentRtt,
 
 void ServerDescription::saveLastWriteInfo(BSONObj lastWriteBson) {
     const auto lastWriteDateField = lastWriteBson.getField("lastWriteDate");
-    if (lastWriteDateField.type() == BSONType::Date) {
+    if (lastWriteDateField.type() == BSONType::date) {
         _lastWriteDate = lastWriteDateField.date();
     }
 
@@ -209,7 +220,7 @@ void ServerDescription::parseTypeFromHelloReply(const BSONObj helloReply) {
         t = ServerType::kMongos;
     } else if (hasSetName && helloReply.getBoolField("hidden")) {
         t = ServerType::kRSOther;
-    } else if (hasSetName && helloReply.getBoolField("ismaster")) {
+    } else if (hasSetName && helloReply.getBoolField("isWritablePrimary")) {
         t = ServerType::kRSPrimary;
     } else if (hasSetName && helloReply.getBoolField("secondary")) {
         t = ServerType::kRSSecondary;
@@ -221,7 +232,6 @@ void ServerDescription::parseTypeFromHelloReply(const BSONObj helloReply) {
         t = ServerType::kRSGhost;
     } else {
         LOGV2_ERROR(23931,
-                    "Unknown server type from successful hello reply: {helloReply}",
                     "Unknown server type from successful hello reply",
                     "helloReply"_attr = helloReply);
         t = ServerType::kUnknown;
@@ -277,7 +287,7 @@ const boost::optional<std::string>& ServerDescription::getSetName() const {
     return _setName;
 }
 
-const ElectionIdSetVersionPair ServerDescription::getElectionIdSetVersionPair() const {
+ElectionIdSetVersionPair ServerDescription::getElectionIdSetVersionPair() const {
     return ElectionIdSetVersionPair{_electionId, _setVersion};
 }
 
@@ -285,7 +295,7 @@ const boost::optional<HostAndPort>& ServerDescription::getPrimary() const {
     return _primary;
 }
 
-const mongo::Date_t ServerDescription::getLastUpdateTime() const {
+mongo::Date_t ServerDescription::getLastUpdateTime() const {
     return *_lastUpdateTime;
 }
 
@@ -436,7 +446,7 @@ ServerDescriptionPtr ServerDescription::cloneWithRTT(HelloRTT rtt) {
     return newServerDescription;
 }
 
-const boost::optional<TopologyDescriptionPtr> ServerDescription::getTopologyDescription() {
+boost::optional<TopologyDescriptionPtr> ServerDescription::getTopologyDescription() {
     if (_topologyDescription) {
         const auto result = _topologyDescription->lock();
         invariant(result);

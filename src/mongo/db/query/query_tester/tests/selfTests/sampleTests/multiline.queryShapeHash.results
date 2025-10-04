@@ -1,0 +1,21 @@
+multiline
+multiline
+basic.coll
+
+0
+:queryShapeHash {aggregate: "basic", pipeline: [{$limit:5}], cursor: {}}
+[
+{"queryShapeHash":"97E61F8C689B7155274446F84F65A5F68AC68314285B6DAE74D02316EBCAEB6E"}
+]
+
+1
+:queryShapeHash {aggregate: "basic", pipeline: [{$limit:5}], cursor: {}}
+[
+{"queryShapeHash":"97E61F8C689B7155274446F84F65A5F68AC68314285B6DAE74D02316EBCAEB6E"}
+]
+
+2
+:queryShapeHash {aggregate: "basic", pipeline: [{$limit:1}], cursor: {}}
+[
+{"queryShapeHash":"97E61F8C689B7155274446F84F65A5F68AC68314285B6DAE74D02316EBCAEB6E"}
+]

@@ -4,15 +4,13 @@
  * committed across a majority of nodes.
  */
 
-(function() {
-"use strict";
-load("jstests/replsets/rslib.js");
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const replTest = new ReplSetTest({nodes: 2, useBridge: true});
 const nodes = replTest.startSet();
 // Initiating with a high election timeout prevents unnecessary elections and also prevents
 // the primary from stepping down if it cannot communicate with the secondary.
-replTest.initiateWithHighElectionTimeout();
+replTest.initiate();
 const primary = replTest.getPrimary();
 const secondary = replTest.getSecondary();
 
@@ -29,7 +27,7 @@ assert.commandWorked(primary.getDB("admin").runCommand({replSetReconfig: C2, for
 secondary.reconnect(primary);
 
 // Wait until the config has propagated to the secondary.
-assert.soon(function() {
+assert.soon(function () {
     const res = primary.adminCommand({replSetGetStatus: 1});
     return res.members[1].configVersion === replTest.getReplSetConfigFromNode().version;
 });
@@ -48,4 +46,3 @@ secondary.reconnect(primary);
 
 replTest.awaitNodesAgreeOnConfigVersion();
 replTest.stopSet();
-}());

@@ -27,42 +27,36 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/update/current_date_node.h"
 
-#include "mongo/bson/mutable/algorithm.h"
-#include "mongo/bson/mutable/mutable_bson_test_utils.h"
-#include "mongo/db/json.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/update/update_executor.h"
 #include "mongo/db/update/update_node_test_fixture.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/intrusive_counter.h"
+
+#include <string>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace {
 
 void assertOplogEntryIsUpdateOfExpectedType(const BSONObj& obj,
-                                            bool v2LogBuilderUsed,
                                             StringData fieldName,
-                                            BSONType expectedType = BSONType::Date) {
-    if (v2LogBuilderUsed) {
-        ASSERT_EQUALS(obj.nFields(), 2);
-        ASSERT_EQUALS(obj["$v"].numberInt(), 2);
-        ASSERT_EQUALS(obj["diff"]["u"][fieldName].type(), expectedType);
-    } else {
-        ASSERT_EQUALS(obj.nFields(), 1);
-        ASSERT_TRUE(obj["$set"].type() == BSONType::Object);
-        ASSERT_EQUALS(obj["$set"].embeddedObject().nFields(), 1U);
-        ASSERT_EQUALS(obj["$set"][fieldName].type(), expectedType);
-    }
+                                            BSONType expectedType = BSONType::date) {
+    ASSERT_EQUALS(obj.nFields(), 2);
+    ASSERT_EQUALS(obj["$v"].numberInt(), 2);
+    ASSERT_EQUALS(obj["diff"]["u"][fieldName].type(), expectedType);
 }
 
-using CurrentDateNodeTest = UpdateNodeTest;
-using mongo::mutablebson::countChildren;
-using mongo::mutablebson::Element;
+using CurrentDateNodeTest = UpdateTestFixture;
 
-DEATH_TEST_REGEX(CurrentDateNodeTest,
+DEATH_TEST_REGEX(CurrentDateNodeDeathTest,
                  InitFailsForEmptyElement,
                  R"#(Invariant failure.*modExpr.ok\(\))#") {
     auto update = fromjson("{$currentDate: {}}");
@@ -71,70 +65,70 @@ DEATH_TEST_REGEX(CurrentDateNodeTest,
     node.init(update["$currentDate"].embeddedObject().firstElement(), expCtx).ignore();
 }
 
-TEST(CurrentDateNodeTest, InitWithNonBoolNonObjectFails) {
+TEST(SimpleCurrentDateNodeTest, InitWithNonBoolNonObjectFails) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$currentDate: {a: 0}}");
     CurrentDateNode node;
     ASSERT_NOT_OK(node.init(update["$currentDate"]["a"], expCtx));
 }
 
-TEST(CurrentDateNodeTest, InitWithTrueSucceeds) {
+TEST(SimpleCurrentDateNodeTest, InitWithTrueSucceeds) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$currentDate: {a: true}}");
     CurrentDateNode node;
     ASSERT_OK(node.init(update["$currentDate"]["a"], expCtx));
 }
 
-TEST(CurrentDateNodeTest, InitWithFalseSucceeds) {
+TEST(SimpleCurrentDateNodeTest, InitWithFalseSucceeds) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$currentDate: {a: false}}");
     CurrentDateNode node;
     ASSERT_OK(node.init(update["$currentDate"]["a"], expCtx));
 }
 
-TEST(CurrentDateNodeTest, InitWithoutTypeFails) {
+TEST(SimpleCurrentDateNodeTest, InitWithoutTypeFails) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$currentDate: {a: {}}}");
     CurrentDateNode node;
     ASSERT_NOT_OK(node.init(update["$currentDate"]["a"], expCtx));
 }
 
-TEST(CurrentDateNodeTest, InitWithNonStringTypeFails) {
+TEST(SimpleCurrentDateNodeTest, InitWithNonStringTypeFails) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$currentDate: {a: {$type: 1}}}");
     CurrentDateNode node;
     ASSERT_NOT_OK(node.init(update["$currentDate"]["a"], expCtx));
 }
 
-TEST(CurrentDateNodeTest, InitWithBadValueTypeFails) {
+TEST(SimpleCurrentDateNodeTest, InitWithBadValueTypeFails) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$currentDate: {a: {$type: 'bad'}}}");
     CurrentDateNode node;
     ASSERT_NOT_OK(node.init(update["$currentDate"]["a"], expCtx));
 }
 
-TEST(CurrentDateNodeTest, InitWithTypeDateSucceeds) {
+TEST(SimpleCurrentDateNodeTest, InitWithTypeDateSucceeds) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$currentDate: {a: {$type: 'date'}}}");
     CurrentDateNode node;
     ASSERT_OK(node.init(update["$currentDate"]["a"], expCtx));
 }
 
-TEST(CurrentDateNodeTest, InitWithTypeTimestampSucceeds) {
+TEST(SimpleCurrentDateNodeTest, InitWithTypeTimestampSucceeds) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$currentDate: {a: {$type: 'timestamp'}}}");
     CurrentDateNode node;
     ASSERT_OK(node.init(update["$currentDate"]["a"], expCtx));
 }
 
-TEST(CurrentDateNodeTest, InitWithExtraFieldBeforeFails) {
+TEST(SimpleCurrentDateNodeTest, InitWithExtraFieldBeforeFails) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$currentDate: {a: {$bad: 1, $type: 'date'}}}");
     CurrentDateNode node;
     ASSERT_NOT_OK(node.init(update["$currentDate"]["a"], expCtx));
 }
 
-TEST(CurrentDateNodeTest, InitWithExtraFieldAfterFails) {
+TEST(SimpleCurrentDateNodeTest, InitWithExtraFieldAfterFails) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$currentDate: {a: {$type: 'date', $bad: 1}}}");
     CurrentDateNode node;
@@ -152,13 +146,13 @@ TEST_F(CurrentDateNodeTest, ApplyTrue) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
-    ASSERT_TRUE(result.indexesAffected);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
 
     ASSERT_EQUALS(doc.root().countChildren(), 1U);
     ASSERT_TRUE(doc.root()["a"].ok());
-    ASSERT_EQUALS(doc.root()["a"].getType(), BSONType::Date);
+    ASSERT_EQUALS(doc.root()["a"].getType(), BSONType::date);
 
-    assertOplogEntryIsUpdateOfExpectedType(getOplogEntry(), v2LogBuilderUsed(), "a");
+    assertOplogEntryIsUpdateOfExpectedType(getOplogEntry(), "a");
 }
 
 TEST_F(CurrentDateNodeTest, ApplyFalse) {
@@ -172,13 +166,13 @@ TEST_F(CurrentDateNodeTest, ApplyFalse) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
-    ASSERT_TRUE(result.indexesAffected);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
 
     ASSERT_EQUALS(doc.root().countChildren(), 1U);
     ASSERT_TRUE(doc.root()["a"].ok());
-    ASSERT_EQUALS(doc.root()["a"].getType(), BSONType::Date);
+    ASSERT_EQUALS(doc.root()["a"].getType(), BSONType::date);
 
-    assertOplogEntryIsUpdateOfExpectedType(getOplogEntry(), v2LogBuilderUsed(), "a");
+    assertOplogEntryIsUpdateOfExpectedType(getOplogEntry(), "a");
 }
 
 TEST_F(CurrentDateNodeTest, ApplyDate) {
@@ -192,13 +186,13 @@ TEST_F(CurrentDateNodeTest, ApplyDate) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
-    ASSERT_TRUE(result.indexesAffected);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
 
     ASSERT_EQUALS(doc.root().countChildren(), 1U);
     ASSERT_TRUE(doc.root()["a"].ok());
-    ASSERT_EQUALS(doc.root()["a"].getType(), BSONType::Date);
+    ASSERT_EQUALS(doc.root()["a"].getType(), BSONType::date);
 
-    assertOplogEntryIsUpdateOfExpectedType(getOplogEntry(), v2LogBuilderUsed(), "a");
+    assertOplogEntryIsUpdateOfExpectedType(getOplogEntry(), "a");
 }
 
 TEST_F(CurrentDateNodeTest, ApplyTimestamp) {
@@ -212,14 +206,13 @@ TEST_F(CurrentDateNodeTest, ApplyTimestamp) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
-    ASSERT_TRUE(result.indexesAffected);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
 
     ASSERT_EQUALS(doc.root().countChildren(), 1U);
     ASSERT_TRUE(doc.root()["a"].ok());
-    ASSERT_EQUALS(doc.root()["a"].getType(), BSONType::bsonTimestamp);
+    ASSERT_EQUALS(doc.root()["a"].getType(), BSONType::timestamp);
 
-    assertOplogEntryIsUpdateOfExpectedType(
-        getOplogEntry(), v2LogBuilderUsed(), "a", BSONType::bsonTimestamp);
+    assertOplogEntryIsUpdateOfExpectedType(getOplogEntry(), "a", BSONType::timestamp);
 }
 
 TEST_F(CurrentDateNodeTest, ApplyFieldDoesNotExist) {
@@ -233,20 +226,15 @@ TEST_F(CurrentDateNodeTest, ApplyFieldDoesNotExist) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
-    ASSERT_TRUE(result.indexesAffected);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
 
     ASSERT_EQUALS(doc.root().countChildren(), 1U);
     ASSERT_TRUE(doc.root()["a"].ok());
-    ASSERT_EQUALS(doc.root()["a"].getType(), BSONType::Date);
+    ASSERT_EQUALS(doc.root()["a"].getType(), BSONType::date);
 
-    if (v2LogBuilderUsed()) {
-        ASSERT_EQUALS(getOplogEntry().nFields(), 2);
-        ASSERT_EQUALS(getOplogEntry()["$v"].numberInt(), 2);
-        ASSERT_EQUALS(getOplogEntry()["diff"]["i"]["a"].type(), BSONType::Date);
-    } else {
-        ASSERT_EQUALS(getOplogEntry().nFields(), 1);
-        ASSERT_EQUALS(getOplogEntry()["$set"]["a"].type(), BSONType::Date);
-    }
+    ASSERT_EQUALS(getOplogEntry().nFields(), 2);
+    ASSERT_EQUALS(getOplogEntry()["$v"].numberInt(), 2);
+    ASSERT_EQUALS(getOplogEntry()["diff"]["i"]["a"].type(), BSONType::date);
 }
 
 TEST_F(CurrentDateNodeTest, ApplyIndexesNotAffected) {
@@ -260,9 +248,9 @@ TEST_F(CurrentDateNodeTest, ApplyIndexesNotAffected) {
     addIndexedPath("b");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
-    ASSERT_FALSE(result.indexesAffected);
+    ASSERT_FALSE(getIndexAffectedFromLogEntry());
 
-    assertOplogEntryIsUpdateOfExpectedType(getOplogEntry(), v2LogBuilderUsed(), "a");
+    assertOplogEntryIsUpdateOfExpectedType(getOplogEntry(), "a");
 }
 
 TEST_F(CurrentDateNodeTest, ApplyNoIndexDataOrLogBuilder) {
@@ -276,11 +264,11 @@ TEST_F(CurrentDateNodeTest, ApplyNoIndexDataOrLogBuilder) {
     setLogBuilderToNull();
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
-    ASSERT_FALSE(result.indexesAffected);
+    ASSERT_FALSE(getIndexAffectedFromLogEntry());
 
     ASSERT_EQUALS(doc.root().countChildren(), 1U);
     ASSERT_TRUE(doc.root()["a"].ok());
-    ASSERT_EQUALS(doc.root()["a"].getType(), BSONType::Date);
+    ASSERT_EQUALS(doc.root()["a"].getType(), BSONType::date);
 }
 
 }  // namespace

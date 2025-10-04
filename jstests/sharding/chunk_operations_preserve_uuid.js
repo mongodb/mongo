@@ -1,33 +1,26 @@
 /**
  * Test that chunk operations preserve collection UUID in config.chunks documents
  */
-// @tags: [multiversion_incompatible]
 
-(function() {
-'use strict';
-
-load("jstests/sharding/libs/find_chunks_util.js");
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 let st = new ShardingTest({mongos: 1, shards: 3});
 
 const dbName = "test";
 const collName = "foo";
 const ns = dbName + "." + collName;
-var collUUID;  // Initialized after shardCollection
 
 function allChunksWithUUID() {
-    var cursor = findChunksUtil.findChunksByNs(st.config, ns);
-    do {
-        var next = cursor.next().uuid;
-        assert.eq(collUUID, next);
-    } while (cursor.hasNext());
+    const matchChunksWithoutUUID = {"uuid": null};
+    assert.eq(
+        0,
+        st.config.chunks.countDocuments(matchChunksWithoutUUID),
+        "Found chunks with wrong UUID " + tojson(st.config.chunks.find(matchChunksWithoutUUID).toArray()),
+    );
 }
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
-
-collUUID = st.config.collections.findOne({_id: ns}).uuid;
 
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: -10}}));
 allChunksWithUUID();
@@ -54,4 +47,3 @@ assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: -100}, to: st.s
 allChunksWithUUID();
 
 st.stop();
-})();

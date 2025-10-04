@@ -27,13 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/base/init.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/logical_session_cache.h"
-#include "mongo/db/logical_session_id_helpers.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_cache.h"
+#include "mongo/util/assert_util.h"
+
+#include <string>
 
 namespace mongo {
 namespace {
@@ -63,14 +70,14 @@ public:
     }
 
     // No auth needed because it only works when enabled via command line.
-    Status checkAuthForOperation(OperationContext* opCtx,
-                                 const std::string& dbname,
-                                 const BSONObj& cmdObj) const override {
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
         return Status::OK();
     }
 
     bool run(OperationContext* opCtx,
-             const std::string& db,
+             const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         const auto cache = LogicalSessionCache::get(opCtx);
@@ -84,7 +91,7 @@ public:
     }
 };
 
-MONGO_REGISTER_TEST_COMMAND(RefreshLogicalSessionCacheNowCommand);
+MONGO_REGISTER_COMMAND(RefreshLogicalSessionCacheNowCommand).testOnly().forRouter().forShard();
 
 }  // namespace
 }  // namespace mongo

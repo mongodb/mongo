@@ -1,0 +1,586 @@
+/**
+ *    Copyright (C) 2022-present MongoDB, Inc.
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the Server Side Public License, version 1,
+ *    as published by MongoDB, Inc.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    Server Side Public License for more details.
+ *
+ *    You should have received a copy of the Server Side Public License
+ *    along with this program. If not, see
+ *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the Server Side Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
+
+#include "mongo/db/query/write_ops/write_ops_exec.h"
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/bson/unordered_fields_bsonobj_comparator.h"
+#include "mongo/crypto/sha256_block.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/collection_crud/collection_write_path.h"
+#include "mongo/db/dbhelpers.h"
+#include "mongo/db/generic_argument_util.h"
+#include "mongo/db/local_catalog/catalog_raii.h"
+#include "mongo/db/local_catalog/catalog_test_fixture.h"
+#include "mongo/db/local_catalog/collection.h"
+#include "mongo/db/local_catalog/create_collection.h"
+#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
+#include "mongo/db/op_observer/op_observer_noop.h"
+#include "mongo/db/op_observer/op_observer_registry.h"
+#include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
+#include "mongo/db/query/write_ops/write_ops.h"
+#include "mongo/db/record_id_helpers.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/storage/snapshot.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/db/timeseries/timeseries_request_util.h"
+#include "mongo/db/write_concern_idl.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/time_support.h"
+
+#include <cstdint>
+#include <string>
+#include <type_traits>
+#include <utility>
+
+#include <boost/cstdint.hpp>
+#include <boost/none.hpp>
+
+
+namespace mongo {
+namespace {
+
+class WriteOpsExecTest : public CatalogTestFixture {
+protected:
+    using CatalogTestFixture::setUp;
+};
+
+TEST_F(WriteOpsExecTest, TestUpdateSizeEstimationLogic) {
+    // Basic test case.
+    OID id = OID::createFromString("629e1e680958e279dc29a989"_sd);
+    BSONObj updateStmt = fromjson("{$set: {a: 5}}");
+    write_ops::UpdateModification mod(std::move(updateStmt));
+    write_ops::UpdateOpEntry updateOpEntry(BSON("_id" << id), std::move(mod));
+    ASSERT(write_ops::verifySizeEstimate(updateOpEntry));
+
+    // Add 'let' constants.
+    BSONObj constants = fromjson("{constOne: 'foo'}");
+    updateOpEntry.setC(constants);
+    ASSERT(write_ops::verifySizeEstimate(updateOpEntry));
+
+    // Add 'upsertSupplied'.
+    updateOpEntry.setUpsertSupplied(OptionalBool(false));
+    ASSERT(write_ops::verifySizeEstimate(updateOpEntry));
+
+    // Set 'upsertSupplied' to true.
+    updateOpEntry.setUpsertSupplied(OptionalBool(true));
+    ASSERT(write_ops::verifySizeEstimate(updateOpEntry));
+
+    // Set 'upsertSupplied' to boost::none.
+    updateOpEntry.setUpsertSupplied(OptionalBool(boost::none));
+    ASSERT(write_ops::verifySizeEstimate(updateOpEntry));
+
+    // Add a collation.
+    BSONObj collation = fromjson("{locale: 'simple'}");
+    updateOpEntry.setCollation(collation);
+    ASSERT(write_ops::verifySizeEstimate(updateOpEntry));
+
+    // Add a hint.
+    BSONObj hint = fromjson("{_id: 1}");
+    updateOpEntry.setHint(hint);
+    ASSERT(write_ops::verifySizeEstimate(updateOpEntry));
+
+    // Add a sort.
+    BSONObj sort = fromjson("{a: 1}");
+    updateOpEntry.setSort(sort);
+    ASSERT(write_ops::verifySizeEstimate(updateOpEntry));
+
+    // Add arrayFilters.
+    auto arrayFilter = std::vector<BSONObj>{fromjson("{'x.a': {$gt: 85}}")};
+    updateOpEntry.setArrayFilters(arrayFilter);
+    ASSERT(write_ops::verifySizeEstimate(updateOpEntry));
+
+    // Add a sampleId.
+    updateOpEntry.setSampleId(UUID::gen());
+    ASSERT(write_ops::verifySizeEstimate(updateOpEntry));
+
+    // Add $_allowShardKeyUpdatesWithoutFullShardKeyInQuery.
+    updateOpEntry.setAllowShardKeyUpdatesWithoutFullShardKeyInQuery(OptionalBool(false));
+    ASSERT(write_ops::verifySizeEstimate(updateOpEntry));
+
+    // Set '$_allowShardKeyUpdatesWithoutFullShardKeyInQuery' to true.
+    updateOpEntry.setAllowShardKeyUpdatesWithoutFullShardKeyInQuery(OptionalBool(true));
+    ASSERT(write_ops::verifySizeEstimate(updateOpEntry));
+
+    // Set '$_allowShardKeyUpdatesWithoutFullShardKeyInQuery' to boost::none.
+    updateOpEntry.setAllowShardKeyUpdatesWithoutFullShardKeyInQuery(OptionalBool(boost::none));
+    ASSERT(write_ops::verifySizeEstimate(updateOpEntry));
+}
+
+TEST_F(WriteOpsExecTest, TestDeleteSizeEstimationLogic) {
+    // Basic test case.
+    OID id = OID::createFromString("629e1e680958e279dc29a989"_sd);
+    write_ops::DeleteOpEntry deleteOpEntry(BSON("_id" << id), false /* multi */);
+    ASSERT(write_ops::verifySizeEstimate(deleteOpEntry));
+
+    // Add a collation.
+    BSONObj collation = fromjson("{locale: 'simple'}");
+    deleteOpEntry.setCollation(collation);
+    ASSERT(write_ops::verifySizeEstimate(deleteOpEntry));
+
+    // Add a hint.
+    BSONObj hint = fromjson("{_id: 1}");
+    deleteOpEntry.setHint(hint);
+    ASSERT(write_ops::verifySizeEstimate(deleteOpEntry));
+
+    // Add a sampleId.
+    deleteOpEntry.setSampleId(UUID::gen());
+    ASSERT(write_ops::verifySizeEstimate(deleteOpEntry));
+}
+
+TEST_F(WriteOpsExecTest, TestInsertRequestSizeEstimationLogic) {
+    NamespaceString ns =
+        NamespaceString::createNamespaceString_forTest("db_write_ops_exec_test", "insert_test");
+    write_ops::InsertCommandRequest insert(ns);
+    BSONObj docToInsert(fromjson("{_id: 1, foo: 1}"));
+    insert.setDocuments({docToInsert});
+    ASSERT(write_ops::verifySizeEstimate(insert));
+
+    // Configure different fields for 'wcb'.
+    write_ops::WriteCommandRequestBase wcb;
+
+    // stmtId
+    wcb.setStmtId(2);
+    insert.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(insert));
+
+    // stmtIds
+    wcb.setStmtIds(std::vector<int32_t>{2, 3});
+    insert.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(insert));
+
+    // isTimeseries
+    wcb.setIsTimeseriesNamespace(true);
+    insert.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(insert));
+
+    // collUUID
+    wcb.setCollectionUUID(UUID::gen());
+    insert.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(insert));
+
+    // encryptionInfo
+    wcb.setEncryptionInformation(
+        EncryptionInformation(fromjson("{schema: 'I love encrypting and protecting my data'}")));
+    insert.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(insert));
+
+    // originalQuery
+    wcb.setOriginalQuery(fromjson("{field: 'value'}"));
+    insert.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(insert));
+
+    // originalCollation
+    wcb.setOriginalCollation(fromjson("{locale: 'fr'}"));
+    insert.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(insert));
+}
+
+TEST_F(WriteOpsExecTest, TestUpdateRequestSizeEstimationLogic) {
+    NamespaceString ns =
+        NamespaceString::createNamespaceString_forTest("db_write_ops_exec_test", "update_test");
+    write_ops::UpdateCommandRequest update(ns);
+
+    const BSONObj updateStmt = fromjson("{$set: {a: 5}}");
+    auto mod = write_ops::UpdateModification::parseFromClassicUpdate(updateStmt);
+    write_ops::UpdateOpEntry updateOpEntry(BSON("_id" << 1), std::move(mod));
+    update.setUpdates({updateOpEntry});
+
+    ASSERT(write_ops::verifySizeEstimate(update));
+
+    // Configure different fields for 'wcb'.
+    write_ops::WriteCommandRequestBase wcb;
+
+    // stmtId
+    wcb.setStmtId(2);
+    update.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(update));
+
+    // stmtIds
+    wcb.setStmtIds(std::vector<int32_t>{2, 3});
+    update.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(update));
+
+    // isTimeseries
+    wcb.setIsTimeseriesNamespace(true);
+    update.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(update));
+
+    // collUUID
+    wcb.setCollectionUUID(UUID::gen());
+    update.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(update));
+
+    // encryptionInfo
+    wcb.setEncryptionInformation(
+        EncryptionInformation(fromjson("{schema: 'I love encrypting and protecting my data'}")));
+    update.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(update));
+
+    // originalQuery
+    wcb.setOriginalQuery(fromjson("{field: 'value'}"));
+    update.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(update));
+
+    // originalCollation
+    wcb.setOriginalCollation(fromjson("{locale: 'fr'}"));
+    update.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(update));
+
+    // Configure different fields specific to 'UpdateStatementRequest'.
+    LegacyRuntimeConstants legacyRuntimeConstants;
+    const auto now = Date_t::now();
+
+    // At a minimum, $$NOW and $$CLUSTER_TIME must be set.
+    legacyRuntimeConstants.setLocalNow(now);
+    legacyRuntimeConstants.setClusterTime(Timestamp(now));
+    update.setLegacyRuntimeConstants(legacyRuntimeConstants);
+    ASSERT(write_ops::verifySizeEstimate(update));
+
+    // $$JS_SCOPE
+    BSONObj jsScope = fromjson("{constant: 'I love mapReduce and javascript :D'}");
+    legacyRuntimeConstants.setJsScope(jsScope);
+    update.setLegacyRuntimeConstants(legacyRuntimeConstants);
+    ASSERT(write_ops::verifySizeEstimate(update));
+
+    // $$IS_MR
+    legacyRuntimeConstants.setIsMapReduce(true);
+    update.setLegacyRuntimeConstants(legacyRuntimeConstants);
+    ASSERT(write_ops::verifySizeEstimate(update));
+
+    // $$USER_ROLES
+    BSONArray arr = BSON_ARRAY(fromjson("{role: 'readWriteAnyDatabase', db: 'admin'}"));
+    legacyRuntimeConstants.setUserRoles(arr);
+    update.setLegacyRuntimeConstants(legacyRuntimeConstants);
+    ASSERT(write_ops::verifySizeEstimate(update));
+
+    const std::string kLargeString(100 * 1024, 'b');
+    BSONObj letParams = BSON("largeStrParam" << kLargeString);
+    update.setLet(letParams);
+    ASSERT(write_ops::verifySizeEstimate(update));
+}
+
+TEST_F(WriteOpsExecTest, TestDeleteRequestSizeEstimationLogic) {
+    NamespaceString ns =
+        NamespaceString::createNamespaceString_forTest("db_write_ops_exec_test", "delete_test");
+    write_ops::DeleteCommandRequest deleteReq(ns);
+    // Basic test case.
+    write_ops::DeleteOpEntry deleteOpEntry(BSON("_id" << 1), false /* multi */);
+    deleteReq.setDeletes({deleteOpEntry});
+
+    ASSERT(write_ops::verifySizeEstimate(deleteReq));
+
+    // Configure different fields for 'wcb'.
+    write_ops::WriteCommandRequestBase wcb;
+
+    // stmtId
+    wcb.setStmtId(2);
+    deleteReq.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(deleteReq));
+
+    // stmtIds
+    wcb.setStmtIds(std::vector<int32_t>{2, 3});
+    deleteReq.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(deleteReq));
+
+    // isTimeseries
+    wcb.setIsTimeseriesNamespace(true);
+    deleteReq.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(deleteReq));
+
+    // collUUID
+    wcb.setCollectionUUID(UUID::gen());
+    deleteReq.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(deleteReq));
+
+    // encryptionInfo
+    wcb.setEncryptionInformation(
+        EncryptionInformation(fromjson("{schema: 'I love encrypting and protecting my data'}")));
+    deleteReq.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(deleteReq));
+
+    // originalQuery
+    wcb.setOriginalQuery(fromjson("{field: 'value'}"));
+    deleteReq.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(deleteReq));
+
+    // originalCollation
+    wcb.setOriginalCollation(fromjson("{locale: 'fr'}"));
+    deleteReq.setWriteCommandRequestBase(wcb);
+    ASSERT(write_ops::verifySizeEstimate(deleteReq));
+}
+
+TEST_F(WriteOpsExecTest, InsertFailsIfTimeseriesCollectionCreatedDuringInsert) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", true);
+    NamespaceString ns =
+        NamespaceString::createNamespaceString_forTest("db_write_ops_exec_test", "insertColl");
+    auto opCtx = operationContext();
+    write_ops::InsertCommandRequest insertCmdReq(ns);
+    BSONObj docToInsert(fromjson(R"({"t":{"$date":"2022-06-06T15:34:00.000Z"}, "x":1})"));
+    insertCmdReq.setDocuments({docToInsert});
+    // At this point, our collection does not exist, so we proceed to the normal insert path.
+    auto [preConditions, _] = timeseries::getCollectionPreConditionsAndIsTimeseriesLogicalRequest(
+        opCtx, ns, insertCmdReq, /*expectedUUID=*/boost::none);
+    ASSERT_FALSE(preConditions.isTimeseriesCollection());
+    ASSERT_FALSE(preConditions.exists());
+    // After this check, a concurrent operation could create a time-series collection with the same
+    // namespace.
+    auto tsOptions = TimeseriesOptions("t");
+    CreateCommand cmd = CreateCommand(ns);
+    cmd.getCreateCollectionRequest().setTimeseries(std::move(tsOptions));
+    ASSERT_OK(createCollection(opCtx, cmd));
+
+    write_ops_exec::LastOpFixer lastOpFixer(opCtx);
+    write_ops_exec::WriteResult out;
+    std::vector<InsertStatement> batch;
+    for (auto&& doc : insertCmdReq.getDocuments()) {
+        batch.emplace_back(std::vector<StmtId>{0}, doc);
+    }
+
+    // Now when we try to insert into the collection "ns", we should fail because we detect that a
+    // time-series collection was created with this same namespace. This prevents us from writing to
+    // the time-series collection as if it were a normal collection, which would result in a
+    // collection that has both bucket documents and regular documents.
+    ASSERT_THROWS_CODE(insertBatchAndHandleErrors(opCtx,
+                                                  insertCmdReq.getNamespace(),
+                                                  preConditions,
+                                                  insertCmdReq.getOrdered(),
+                                                  batch,
+                                                  OperationSource::kStandard,
+                                                  &lastOpFixer,
+                                                  &out),
+                       DBException,
+                       10685100);
+}
+
+class OpObserverMock : public OpObserverNoop {
+public:
+    ~OpObserverMock() override {
+        ASSERT_FALSE(inBatch);
+    }
+
+    void onBatchedWriteStart(OperationContext* opCtx) override {
+        ASSERT_FALSE(inBatch);
+        inBatch = true;
+    }
+
+    void onBatchedWriteCommit(OperationContext* opCtx,
+                              WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat,
+                              OpStateAccumulator* opStateAccumulator = nullptr) override {
+        ASSERT(inBatch);
+        inBatch = false;
+        batches.push_back(std::move(current_batch_docs));
+    }
+
+    void onBatchedWriteAbort(OperationContext* opCtx) override {
+        current_batch_docs.clear();
+        inBatch = false;
+    }
+
+    void onInserts(OperationContext* opCtx,
+                   const CollectionPtr& coll,
+                   std::vector<InsertStatement>::const_iterator begin,
+                   std::vector<InsertStatement>::const_iterator end,
+                   const std::vector<RecordId>& recordIds,
+                   std::vector<bool> fromMigrate,
+                   bool defaultFromMigrate,
+                   OpStateAccumulator* opAccumulator) override {
+        auto& dest = inBatch ? current_batch_docs : unbatched_docs;
+        std::for_each(begin, end, [&](const auto& insert) { dest.push_back(insert.doc); });
+    }
+
+    bool inBatch = false;
+    std::vector<BSONObj> current_batch_docs;
+    std::vector<BSONObj> unbatched_docs;
+    std::vector<std::vector<BSONObj>> batches;
+};
+
+class WriteOpsExecOplogTest : public CatalogTestFixture {
+public:
+    explicit WriteOpsExecOplogTest(Options options = {})
+        : CatalogTestFixture(options.useReplSettings(true)) {}
+
+protected:
+    void setUp() override {
+        CatalogTestFixture::setUp();
+        auto opObserverRegistry =
+            checked_cast<OpObserverRegistry*>(getServiceContext()->getOpObserver());
+        auto opObserverMock = std::make_unique<OpObserverMock>();
+        _opObserverMock = opObserverMock.get();
+        opObserverRegistry->addObserver(std::move(opObserverMock));
+    }
+
+    OpObserverMock* _opObserverMock;
+};
+
+
+TEST_F(WriteOpsExecOplogTest, VerifySingleInsertOplogDoesntBatch) {
+    NamespaceString ns =
+        NamespaceString::createNamespaceString_forTest("db_write_ops_exec_test", "insertColl");
+    auto opCtx = operationContext();
+    ASSERT_OK(createCollection(opCtx, ns.dbName(), BSON("create" << ns.coll())));
+    write_ops::InsertCommandRequest insertCmdReq(ns);
+    BSONObj docToInsert(fromjson("{_id: 0, foo: 1}"));
+    insertCmdReq.setDocuments({docToInsert});
+    auto result = write_ops_exec::performInserts(
+        opCtx, insertCmdReq, /*preConditions=*/boost::none, OperationSource::kStandard);
+    ASSERT_EQ(1, result.results.size());
+    ASSERT_EQ(1, unittest::assertGet(result.results[0]).getN());
+
+    // We should have generated an unbatched insert.
+    ASSERT(_opObserverMock->batches.empty());
+    ASSERT_EQ(1, _opObserverMock->unbatched_docs.size());
+    ASSERT_BSONOBJ_EQ(_opObserverMock->unbatched_docs[0], docToInsert);
+}
+
+TEST_F(WriteOpsExecOplogTest, VerifyMultiInsertOplogDoesBatch) {
+    NamespaceString ns =
+        NamespaceString::createNamespaceString_forTest("db_write_ops_exec_test", "insertColl");
+    auto opCtx = operationContext();
+    ASSERT_OK(createCollection(opCtx, ns.dbName(), BSON("create" << ns.coll())));
+    write_ops::InsertCommandRequest insertCmdReq(ns);
+    std::vector<BSONObj> docsToInsert{
+        fromjson("{_id: 0, foo: 1}"), fromjson("{_id: 1, bar: 1}"), fromjson("{_id: 2, baz: 1}")};
+    insertCmdReq.setDocuments(docsToInsert);
+    auto result = write_ops_exec::performInserts(
+        opCtx, insertCmdReq, /*preConditions=*/boost::none, OperationSource::kStandard);
+    ASSERT_EQ(3, result.results.size());
+    ASSERT_EQ(1, unittest::assertGet(result.results[0]).getN());
+    ASSERT_EQ(1, unittest::assertGet(result.results[1]).getN());
+    ASSERT_EQ(1, unittest::assertGet(result.results[2]).getN());
+
+    // We should have generated batched inserts.
+    ASSERT_EQ(1, _opObserverMock->batches.size());
+    ASSERT_EQ(3, _opObserverMock->batches[0].size());
+    ASSERT(_opObserverMock->unbatched_docs.empty());
+    ASSERT_BSONOBJ_EQ(_opObserverMock->batches[0][0], docsToInsert[0]);
+    ASSERT_BSONOBJ_EQ(_opObserverMock->batches[0][1], docsToInsert[1]);
+    ASSERT_BSONOBJ_EQ(_opObserverMock->batches[0][2], docsToInsert[2]);
+}
+
+TEST_F(WriteOpsExecOplogTest, VerifyMultiInsertCappedOplogDoesntBatch) {
+    NamespaceString ns =
+        NamespaceString::createNamespaceString_forTest("db_write_ops_exec_test", "insertColl");
+    auto opCtx = operationContext();
+    ASSERT_OK(createCollection(opCtx,
+                               ns.dbName(),
+                               BSON("create" << ns.coll() << "capped"
+                                             << "true"
+                                             << "size" << 10'000'000)));
+    write_ops::InsertCommandRequest insertCmdReq(ns);
+    std::vector<BSONObj> docsToInsert{
+        fromjson("{_id: 0, foo: 1}"), fromjson("{_id: 1, bar: 1}"), fromjson("{_id: 2, baz: 1}")};
+    insertCmdReq.setDocuments(docsToInsert);
+    auto result = write_ops_exec::performInserts(
+        opCtx, insertCmdReq, /*preConditions=*/boost::none, OperationSource::kStandard);
+    ASSERT_EQ(3, result.results.size());
+    ASSERT_EQ(1, unittest::assertGet(result.results[0]).getN());
+    ASSERT_EQ(1, unittest::assertGet(result.results[1]).getN());
+    ASSERT_EQ(1, unittest::assertGet(result.results[2]).getN());
+
+    // We should have generated unbatched inserts.
+    ASSERT(_opObserverMock->batches.empty());
+    ASSERT_EQ(3, _opObserverMock->unbatched_docs.size());
+    ASSERT_BSONOBJ_EQ(_opObserverMock->unbatched_docs[0], docsToInsert[0]);
+    ASSERT_BSONOBJ_EQ(_opObserverMock->unbatched_docs[1], docsToInsert[1]);
+    ASSERT_BSONOBJ_EQ(_opObserverMock->unbatched_docs[2], docsToInsert[2]);
+}
+
+TEST_F(WriteOpsExecOplogTest, VerifyMultiInsertMultipleBatches) {
+    RAIIServerParameterControllerForTest batchSizeController("internalInsertMaxBatchSize", 2);
+
+    NamespaceString ns =
+        NamespaceString::createNamespaceString_forTest("db_write_ops_exec_test", "insertColl");
+    auto opCtx = operationContext();
+    ASSERT_OK(createCollection(opCtx, ns.dbName(), BSON("create" << ns.coll())));
+    write_ops::InsertCommandRequest insertCmdReq(ns);
+    std::vector<BSONObj> docsToInsert{fromjson("{_id: 0, foo: 1}"),
+                                      fromjson("{_id: 1, bar: 1}"),
+                                      fromjson("{_id: 2, baz: 1}"),
+                                      fromjson("{_id: 3, bif: 1}")};
+    insertCmdReq.setDocuments(docsToInsert);
+    auto result = write_ops_exec::performInserts(
+        opCtx, insertCmdReq, /*preConditions=*/boost::none, OperationSource::kStandard);
+    ASSERT_EQ(4, result.results.size());
+    ASSERT_EQ(1, unittest::assertGet(result.results[0]).getN());
+    ASSERT_EQ(1, unittest::assertGet(result.results[1]).getN());
+    ASSERT_EQ(1, unittest::assertGet(result.results[2]).getN());
+    ASSERT_EQ(1, unittest::assertGet(result.results[3]).getN());
+
+    // We should have generated batched inserts in two batches.
+    ASSERT_EQ(2, _opObserverMock->batches.size());
+    ASSERT_EQ(2, _opObserverMock->batches[0].size());
+    ASSERT_EQ(2, _opObserverMock->batches[1].size());
+    ASSERT(_opObserverMock->unbatched_docs.empty());
+    ASSERT_BSONOBJ_EQ(_opObserverMock->batches[0][0], docsToInsert[0]);
+    ASSERT_BSONOBJ_EQ(_opObserverMock->batches[0][1], docsToInsert[1]);
+    ASSERT_BSONOBJ_EQ(_opObserverMock->batches[1][0], docsToInsert[2]);
+    ASSERT_BSONOBJ_EQ(_opObserverMock->batches[1][1], docsToInsert[3]);
+}
+
+TEST_F(WriteOpsExecOplogTest, VerifyMultiInsertBatchedAndUnbatched) {
+    RAIIServerParameterControllerForTest batchSizeController("internalInsertMaxBatchSize", 2);
+
+    NamespaceString ns =
+        NamespaceString::createNamespaceString_forTest("db_write_ops_exec_test", "insertColl");
+    auto opCtx = operationContext();
+    ASSERT_OK(createCollection(opCtx, ns.dbName(), BSON("create" << ns.coll())));
+    write_ops::InsertCommandRequest insertCmdReq(ns);
+    std::vector<BSONObj> docsToInsert{
+        fromjson("{_id: 0, foo: 1}"), fromjson("{_id: 1, bar: 1}"), fromjson("{_id: 2, baz: 1}")};
+    insertCmdReq.setDocuments(docsToInsert);
+    auto result = write_ops_exec::performInserts(
+        opCtx, insertCmdReq, /*preConditions=*/boost::none, OperationSource::kStandard);
+    ASSERT_EQ(3, result.results.size());
+    ASSERT_EQ(1, unittest::assertGet(result.results[0]).getN());
+    ASSERT_EQ(1, unittest::assertGet(result.results[1]).getN());
+    ASSERT_EQ(1, unittest::assertGet(result.results[2]).getN());
+
+    // We should have generated one batch with two inserts, with a single insert unbatched.
+    ASSERT_EQ(1, _opObserverMock->batches.size());
+    ASSERT_EQ(2, _opObserverMock->batches[0].size());
+    ASSERT_EQ(1, _opObserverMock->unbatched_docs.size());
+    ASSERT_BSONOBJ_EQ(_opObserverMock->batches[0][0], docsToInsert[0]);
+    ASSERT_BSONOBJ_EQ(_opObserverMock->batches[0][1], docsToInsert[1]);
+    ASSERT_BSONOBJ_EQ(_opObserverMock->unbatched_docs[0], docsToInsert[2]);
+}
+
+}  // namespace
+}  // namespace mongo

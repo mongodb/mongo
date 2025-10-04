@@ -6,7 +6,7 @@ import threading
 from buildscripts.resmokelib.testing.hooks import jsfile
 
 
-class _BackgroundJob(threading.Thread):  # pylint: disable=too-many-instance-attributes
+class _BackgroundJob(threading.Thread):
     """A thread for running a JS file while a test is running."""
 
     def __init__(self, thread_name):
@@ -45,7 +45,7 @@ class _BackgroundJob(threading.Thread):  # pylint: disable=too-many-instance-att
 
             try:
                 self._hook_test_case.run_dynamic_test(self._test_report)
-            except:  # pylint: disable=bare-except
+            except:
                 self.exc_info = sys.exc_info()
             finally:
                 with self._lock:
@@ -60,8 +60,10 @@ class _BackgroundJob(threading.Thread):  # pylint: disable=too-many-instance-att
         self.join()
 
     def pause(self):  # noqa: D205,D400
-        """Signal the background thread that it should stop executing 'self._hook_test_case', and
-        wait until the current execution has finished.
+        """
+        Signal the background thread that it should stop executing 'self._hook_test_case'.
+
+        Wait until the current execution has finished.
         """
         self._hook_test_case.signal_stop_test()
         with self._lock:

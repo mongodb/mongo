@@ -1,0 +1,397 @@
+#!/usr/bin/perl
+
+use v5.27;
+use strict;
+use warnings;
+no warnings "uninitialized";    # allow 0+undef
+
+our $has_threads;
+BEGIN { $has_threads = eval 'use threads; use threads::shared; 1;'; }
+
+if (@ARGV && $ARGV[0] =~ /^-h/) {
+  print << '_E';
+
+This tool helps to find the exact place where the error is created so that
+there is a distinction between the same error code returned from different places.
+
+The way it works is:
+
+1. It scans WiredTiger's sources for all occurrences where an error is created
+and replaces it with a unique identifier. Zero (0) is never replaced.
+2. It scans the sources for all occurrences where an error is compared and
+replaces it with a macro that compares all variants of the original error.
+3. It adds the unique identifiers to the wiredtiger.h file.
+
+The error identifiers look like this:
+
+#define EBUSY_AT__rec_hs_delete_reinsert_from_pos___rec_hs_c_100 -1000000023
+
+... which means that the error EBUSY was created in the function
+__rec_hs_delete_reinsert_from_pos in the file rec_hs.c at line 100.
+
+It's easily searchable by the error value -1000000023.
+
+A side effect of this is that the new error codes leak out of the WiredTiger
+library API calls. Any external application using error codes should use
+the same macros to compare them.
+
+To automatically convert new errors to regular codes when returning from API,
+add this line to the end of the API_END(s, ret) macro:
+
+        ret = WT_E_BASE(ret);
+
+Flags:
+  -y, -q, -f    - Answer "yes" to the question about modifying files.
+  -h            - This help.
+  -hh           - More help.
+
+
+  !!!ATTENTION!!! This program modifies the source files in place!
+  Make sure you have a copy/branch/stash to restore the original files.
+
+_E
+
+  $ARGV[0] =~ /^-hh/ and print << '_E';
+
+---- To log every error created via __wt_set_return, do this:
+
+1. Patch the source processed by THIS script with the following line:
+
+perl -i -npE 's/(?<!case\s{1,30})\b((EACCES|EAGAIN|EBUSY|ECANCELED|EEXIST|EFBIG|EINTR|EINVAL|EIO|ENOENT|ENOMEM|ENOSPC|ENOTSUP|EPERM|ERANGE|ETIMEDOUT|WT_CACHE_FULL|WT_DUPLICATE_KEY|WT_ERROR|WT_GETOPT_BAD_ARGUMENT|WT_GETOPT_BAD_OPTION|WT_NOTFOUND|WT_PANIC|WT_PREPARE_CONFLICT|WT_RESTART|WT_ROLLBACK|WT_RUN_RECOVERY|WT_TRY_SALVAGE)_AT_\w*)/__wt_set_return(session, $1)/g' `find src -name \*.[ch] | fgrep -v -e bt_debug.c -e bloom.c -e bt_vrfy_dsk.c -e api_calc_modify.c -e config.c -e conn_api.c -e log_auto.c -e os_ -e util_ -e intpack_inline.h -e packing_inline.h`
+
+2. Run CMake.
+
+3. While build fails, fix it with this line (until it stops producing any output):
+
+build 2>&1 | perl -nE 'm{^(.*?):(\d+):\d+: error: use of undeclared identifier \x27session\x27} and (!($h{"$1$2"}++)) and say STDERR "$1:$2" and say qq{perl -i -npE \x27\$. == $2 and s/\\Q__wt_set_return(session, /\\\(/;\x27 $1}' | bash
+
+4. Run with "verbose=[error_returns: 5]" in the config string.
+
+_E
+
+  exit;
+}
+
+if (-t STDOUT && $ARGV[0] !~ /^-[yqf]/) {
+  print << '_E';
+
+!!!WARNING!!! This program modifies the source files in place!
+Make sure you have a copy/branch/stash to restore the original files.
+
+_E
+  print "Are you sure you want to continue? [y/N] "; flush STDOUT;
+  exit if "".<STDIN> !~ /^y/i;
+}
+
+my $root = `git rev-parse --show-toplevel`; exit $? if $?;
+chdir chomp $root and die "Can't chdir to top level: <$root>: $!";
+
+my $ret_arg0 = "__wt_illegal_value|__wt_errno";
+my $ret_arg1 = "return|WT_ERR|WT_ERR_ERROR_OK|WT_ERR_NOTFOUND_OK|WT_RET|WT_RET_TRACK|WT_RET_ERROR_OK|WT_RET_BUSY_OK|WT_RET_NOTFOUND_OK|WT_TRET|WT_TRET_ERROR_OK|WT_TRET_NOTFOUND_OK|__err_cell_corrupt|__err_cell_corrupt_or_eof";
+my $ret_arg2 = "WT_ERR_MSG|WT_ERR_TEST|WT_RET_TEST|WT_ERR_PANIC|WT_RET_VRFY_RETVAL|WT_RET_MSG|WT_PREFETCH_ASSERT|API_END_RET|WT_RET_PANIC|__wt_set_return|__blkcache_read_corrupt|__wt_err|__wt_err_func|__wt_panic|__wt_panic_func";
+my $ret_arg3 = "WT_BLOCK_RET|__config_err";
+my $ret_arg4 = "WT_RET_ASSERT|WT_RET_PANIC_ASSERT|WT_ERR_ASSERT";
+
+my $re_arg = "".qr/(?(DEFINE)(?<TOKEN>
+  \s++ |
+  [;]++ |
+  (?>[,:?]) |
+  (?> (?:\#|\/\/) (?:[^\\\n]|\\.)*+ \n) |
+  (?> \/\* (?:[^*]|\*[^\/])*+ \*\/ ) |
+  (?> " (?>[^\\"]|\\.)* " ) |
+  (?> ' (?>[^\\']|\\.)* ' ) |
+  (?> \{ (?&TOKEN)* \} ) |
+  (?> \( (?&TOKEN)* \) ) |
+  (?> \[ (?&TOKEN)* \] ) |
+  (?>(?:[^\[\](){};:?,\#\s"\x27\/]|\/[^\/\*])++)
+))/nxs;
+
+my $re_arg_expr = "".qr/(?(DEFINE)(?<TOKEN_EXPR>
+  \s++ |
+  (?>[,:?]) |
+  (?> (?:\#|\/\/) (?:[^\\\n]|\\.)*+ \n) |
+  (?> \/\* (?:[^*]|\*[^\/])*+ \*\/ ) |
+  (?> " (?>[^\\"]|\\.)* " ) |
+  (?> ' (?>[^\\']|\\.)* ' ) |
+  (?> \( (?&TOKEN_EXPR)* \) ) |
+  (?> \[ (?&TOKEN_EXPR)* \] ) |
+  (?>(?:[^\[\](){};:?,\#\s"\x27\/]|\/[^\/\*])++)
+))/nxs;
+
+our $PMAP_THREADS = $^O eq "darwin" ? `sysctl -n hw.ncpu 2>/dev/null` : $^O eq "linux" ? `nproc 2>/dev/null` : 8;
+!$PMAP_THREADS and $PMAP_THREADS = 8;
+sub pmap(&@) {
+  my $code = shift;
+  if (!$has_threads || $PMAP_THREADS <= 1 || @_ < 10 || @_ < $PMAP_THREADS*2) { return map { $code->($_) } @_; }
+  my $args :shared = shared_clone(\@_);
+  return map {
+    $_ ? @{$_->join()} : ()
+  } map { async {
+    my @res;
+    while (local $_ = shift @$args) {
+      push @res, $code->($_);
+    }
+    [@res];
+  } } (1 .. $PMAP_THREADS);
+}
+
+sub status(;$$) {
+  -t STDERR or return;
+  print STDERR "\e[K$_[0]\r"; flush STDERR;
+}
+
+sub write_file($$) {
+  my ($file, $content) = @_;
+  open F, ">", $file or die "$file: $!";
+  print F $content;
+  close F;
+}
+
+our ($txt, $line, $level, $funcname);
+my %codes;
+my $errors_re;
+
+sub get_funcname($) {
+  return $funcname if $level > 1;
+  local $_ = shift;  # prematch
+  if (/(?:^|\n)#\s*+define\s+(\w+)(?:[^\n]|\\\n)*$/s) {
+    return $funcname = $1;
+  }
+  if (m!(?:\n|\s)int\n(\w++)\((?:[^\n]|\n#|(?:\n[\s\)\{])|(?:\n\w+:)|(?:\n/[*/]))*$!s) {
+    return $funcname = $1;
+  }
+  return $funcname = undef;
+}
+
+sub add_code($$$$) {
+  my ($code, $func, $file, $line) = @_;
+  my $f = $file =~ s{^.*/([^/]+)$}{$1}r =~ s/[.:]/_/gr;
+  my $newcode = "${code}_AT_${func}___${f}_$line";
+  push @{$codes{$code}}, $newcode;
+#say "+++ $code -> $newcode";
+  return $newcode;
+}
+
+sub unparen($) {
+  local $_ = $_[0];
+  while (s/^\s*+\(\s*+((?&TOKEN)*?)\s*+\)\s*+$re_arg$/$1/s) { }
+  return $_;
+}
+
+sub subst_body {
+  my ($match, $pre, $fn, $nArg, $args) = @_;
+  my $ret = $match;
+  my $save_pos = pos();
+  my $prematch = substr($txt, 0, $-[0]);
+  $line = (() = $prematch =~ /\n/g) + 2;
+  my $parens;
+  while ($args =~ s/^\s*+\(\s*+((?&TOKEN)*?)\s*+\)\s*+$re_arg$/$1/s) { $parens = 1; }   # Remove outermost parentheses
+  my $func = get_funcname($prematch);
+#$args =~ /WT_NOTFOUND/ and say "--- $ARGV:$line: <$func> ($nArg) <$args>";
+  if (defined($func) && $args ne "") {
+    my $pre_re = ($nArg > 1) ? "(?:(?&TOKEN)+?)," x ($nArg-1) : "";
+    $args =~ s!
+      ^
+      ( $pre_re \s*+ )
+      ( (?&TOKEN)+? )
+      ( \s* (?:[,;\)]|$) )
+      $re_arg
+    !
+      my ($pre, $arg, $post) = ($1, $2, $3);
+      if ($arg =~ /\W/) {
+#$args =~ /WT_NOTFOUND/ and say "---...nonword: <$arg>";
+        my $arg_clean = $arg;
+        my $parens2;
+        while ($arg_clean =~ s/^\s*+\(\s*+((?&TOKEN)*?)\s*+\)\s*+$re_arg$/$1/s) { $parens2 = 1; }   # Remove outermost parentheses
+        # Check for ternary operator
+        if ($arg_clean =~ s#(\s*+(?&TOKEN)*?\?\s*+)((?&TOKEN)+?)(\s*+:\s*+)((?&TOKEN)+?)(\s*)$re_arg$#
+                  local $ARGV = "$ARGV:$line";
+                  $level++;
+                  my ($pre, $arg1, $mid1, $arg2, $post) = ($1, $2, $3, $4, $5);
+                  my $ret = $pre.subst_body($arg1, "", "", 1, $arg1).$mid1.subst_body($arg2, "", "", 1, $arg2).$post;
+                  $level--;
+                  $ret;
+              #es) {
+          $arg = $arg_clean;
+        } else {
+          local $ARGV = "$ARGV:$line";
+          $arg = subst_text($arg);
+        }
+      } else {
+#$args =~ /WT_NOTFOUND/ and say "---...word: <$arg>";
+        if ($arg =~ /^[A-Z_][A-Z_0-9]+$/ && not $arg =~ /^(?:NULL|EXIT_SUCCESS|EXIT_FAILURE|BADARG|BADCH)$/) {
+          $arg = add_code($arg, $func, $ARGV, $line);
+        }
+      }
+      "$pre$arg$post"
+    !exs and $ret = "$pre$fn($args)";
+  }
+  pos() = $save_pos;
+  return $ret;
+}
+
+sub subst_text($) {
+  local $txt = local $_ = $_[0];
+
+  $level++;
+
+  my $pre = $level > 1 ? "" : qr/
+        (?:\n[ \t]+[^\n]*?) |
+        (?:\n\#define\s+\w+[^\n]*?)
+  /sx;  # start of line
+
+  s/(?<all>
+      (?<pre>   # Start of line
+        $pre
+      )
+      \b
+      (?:
+        (?<fn_style>
+          (?<fn>(?<fn1>$ret_arg1)|(?<fn2>$ret_arg2)|(?<fn3>$ret_arg3)|(?<fn4>$ret_arg4))
+          \s*+
+          (?<args>\((?&TOKEN)*\))
+        ) |
+        (?<ret_style>
+          (?<ret_fn>(?:ret\s*+=\s))
+          \s*+
+          (?<ret_args>(?&TOKEN_EXPR)+?)\s*+
+        )(?=;)
+      )
+    )
+    $re_arg$re_arg_expr
+  /$+{fn_style} ?
+    subst_body($+{all}, $+{pre}, $+{fn}, ($+{fn1} ? 1 : $+{fn2} ? 2 : $+{fn3} ? 3 : $+{fn4} ? 4 : die "internal error in $ARGV"), $+{args}) :
+    subst_body($+{all}, $+{pre}, $+{ret_fn}, 1, $+{ret_args})
+  /egsx;
+
+  $level--;
+
+  return $_;
+}
+
+
+
+status "Collecting files...\n";
+
+my @files = @ARGV = split /\n/, `find src -name \*.[ch]`;
+
+
+
+status "Processing files...\n";
+
+# while (do { local $/=undef; $_=<>;}) {
+#   status $ARGV;
+#   write_file $ARGV, subst_text($_);
+# }
+
+for (grep {$_} pmap {
+  status $_;
+  local @ARGV = ($_);
+  local $_ = do { local $/=undef; <>; };
+  write_file $ARGV, subst_text($_);
+  my %ret = (%codes);
+  %codes = ();
+  \%ret;
+} @ARGV) {
+  my %c = %$_;
+  for my $code (keys %c) {
+    push @{$codes{$code}}, @{$c{$code}};
+  }
+}
+
+$errors_re = join "|", sort keys %codes;
+
+
+
+status "Re-processing files...\n";
+
+@ARGV = @files;
+while (do { local $/=undef; $_=<>;}) {
+  $txt = $_;
+  s!(\s++=\s++)($errors_re)\b!
+    my $save_pos = pos();
+    my ($pre, $arg) = ($1, $2);
+    my $prematch = substr($txt, 0, $-[0]);
+    $line = (() = $prematch =~ /\n/g) + 1;
+    my $func = get_funcname($prematch);
+    my $ret = $pre.add_code($arg, $func, $ARGV, $line);
+    pos() = $save_pos;
+    $ret;
+  !eg and write_file $ARGV, $_;
+}
+
+
+
+status "Altering references...\n";
+
+# Also modify files in other directories
+@files = @ARGV = split /\n/, `find src bench test ext examples -name \*.[ch]`;
+
+while (do { local $/=undef; $_=<>;}) {
+  $txt = $_;
+
+  s/(?<case> \b case \s++ (?<case_arg> $errors_re ):) |
+    (?<cmp>(?<cmp_pre>[\(\[\|\&\,\?\:\;][\\\s]*+)(?<cmp_arg>(?&TOKEN_EXPR){1,2}?)\s*+(?<cmp_op>==|!=)\s*+(?<cmp_err>$errors_re)\b)
+    $re_arg_expr
+  /$+{case} ?
+    "$+{case} ".join " ", map {"case $_:"} sort @{$codes{$+{case_arg}}} :
+    $+{cmp_pre}.($+{cmp_op} eq "!=" ? "!" : "")."WT_E_EQ__$+{cmp_err}($+{cmp_arg})"
+  /egsx and write_file $ARGV, $_;
+  # do {
+  #   open F, ">", $ARGV or die "$ARGV: $!";
+  #   print F $_;
+  #   close F;
+  # };
+}
+
+$_ = `cat src/include/error.h`; die "Can't read src/include/error.h: $!" if $?;
+s#((__ret|ret)\s*+(==|!=)\s*+((?&TOKEN_EXPR)))$re_arg_expr#
+  my ($all, $ret, $op, $err) = ($1, $2, $3, $4);
+  $err eq "0" ? $all :
+    ($op eq "!=" ? "!" : "")."WT_E_EQ($ret, ".(unparen $err).")"
+#eg;
+write_file "src/include/error.h", $_;
+
+
+
+status "Adding error codes...\n";
+
+my $file_content = `cat src/include/wiredtiger.h.in`; die "Can't read src/include/wiredtiger.h.in: $!" if $?;
+
+$file_content = "#pragma once\n\n$file_content";
+open F, ">", "src/include/wiredtiger.h.in" or die "src/include/wiredtiger.h.in: $!";
+print F $file_content;
+
+my $err = -1000000000;
+for my $code (sort keys %codes) {
+  say F "#define ${code}_MAX ".($err-1);
+  for my $code2 (sort @{$codes{$code}}) {
+    # say F "#define $code2 $code  // ".(--$err);
+    say F "#define $code2 ".(--$err);
+  }
+  say F "#define ${code}_MIN $err";
+}
+
+say F "\n#define WT_E_BASE(E) ({ int __err_eq_base = (E); \\";
+for my $code (sort keys %codes) {
+  say F "    __err_eq_base >= ${code}_MIN && __err_eq_base <= ${code}_MAX ? $code : \\";
+}
+say F "    __err_eq_base; \\";
+say F "})\n";
+
+say F "#define WT_E_EQ_VAL(v, ERR) ({ int __err_eq_val = (v); __err_eq_val == ERR || (__err_eq_val >= ERR##_MIN && __err_eq_val <= ERR##_MAX); })\n";
+say F "#define WT_E_EQ(v, ERR) (WT_E_BASE(v) == (ERR))\n";
+
+for my $code (sort keys %codes) {
+  say F "#define WT_E_EQ__$code(v) ({ int __err_eq_$code = (v); __err_eq_$code == $code || (__err_eq_$code >= ${code}_MIN && __err_eq_$code <= ${code}_MAX); })";
+}
+close F;
+
+# TODO: alter __wt_wiredtiger_error()
+
+say $errors_re;
+
+# Adjust compilation flags
+system q{perl -i -npE 's/-Werror/-Wno-gnu-statement-expression/g' `fgrep -lr -- '-Werror' cmake`};
+
+status "Done\n";

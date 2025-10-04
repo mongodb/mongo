@@ -1,0 +1,14 @@
+# Golden test output of GoldenSbeStageBuilderTest/TestOr
+[6] project [s13 = makeBsonObj(MakeObjSpec([a, c = Add(0), _id], Closed, NewObj, 0), s10, s12)] 
+[6] project [s12 = "b"] 
+[5] filter {traverseF(s11, lambda(l2.0) { ((move(l2.0) == 2) ?: false) }, false)} 
+[5] unique_roaring s9 
+[5] union [s9, s10, s11] 
+    branch0 [s3, s2, s4] 
+        [1] project [s4 = getField(s2, "a")] 
+        [1] project [s2 = getElement(s1, 1), s3 = getElement(s1, 0)] 
+        [1] virtualscan s1 {[[0ll, {"a" : 1, "b" : 2}], [1ll, {"a" : 2, "b" : 2}], [2ll, {"a" : 3, "b" : 2}]]} 
+    branch1 [s7, s6, s8] 
+        [3] project [s6 = getElement(s5, 1), s7 = getElement(s5, 0)] 
+        [3] virtualscan s5 {[[0ll, {"a" : 1, "b" : 2}], [1ll, {"a" : 2, "b" : 2}], [2ll, {"a" : 3, "b" : 2}]]} 
+

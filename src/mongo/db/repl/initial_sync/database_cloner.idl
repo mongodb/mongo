@@ -1,0 +1,77 @@
+# Copyright (C) 2019-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+
+global:
+    cpp_namespace: mongo::repl
+    cpp_includes:
+        - "mongo/db/repl/initial_sync/database_cloner_common.h"
+
+imports:
+    - "mongo/db/basic_types.idl"
+
+types:
+    CollectionOptions:
+        description: "CollectionOptions as passed to createCollection()"
+        cpp_type: "mongo::CollectionOptions"
+        bson_serialization_type: object
+        deserializer: mongo::repl::parseCollectionOptionsForDatabaseCloner
+        serializer: mongo::CollectionOptions::toBSON
+        # View members of CollectionOptions are storageEngine, idIndex, validator, collation, and
+        # pipeline, all of which are always owned.
+        is_view: false
+
+structs:
+    CollectionInfo:
+        description: "A struct representing the 'info' field in the listCollections output."
+        strict: false
+        fields:
+            readOnly:
+                type: bool
+                optional: true
+            uuid:
+                type: uuid
+        mod_visibility: pub
+
+    ListCollectionResult:
+        description: "A struct representing the output of the listCollections command"
+        # Adding fields to listCollections should not break initial sync
+        strict: false
+        fields:
+            name:
+                description: "The collection or view name."
+                type: string
+            type:
+                description: "Either 'collection' or 'view'"
+                type: string
+            options:
+                description: "Collection options as passed to db.createCollection()"
+                type: CollectionOptions
+                non_const_getter: true
+            info:
+                type: CollectionInfo
+            # The idIndex field is not used in initial sync, so we do not define it here.
+        mod_visibility: pub

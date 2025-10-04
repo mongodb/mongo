@@ -1,0 +1,3 @@
+base_suite: sharding_auth
+overrides:
+  - "audit.enable"

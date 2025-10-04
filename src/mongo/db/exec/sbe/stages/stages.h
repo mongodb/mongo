@@ -36,8 +36,11 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/trial_run_tracker.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -119,31 +122,89 @@ public:
     CanChangeState() = default;
 
     /**
+     * Ensures that accessor owns the underlying BSON value, which can be potentially owned by
+     * storage.
+     */
+    void prepareForYielding(value::OwnedValueAccessor& accessor, bool isAccessible) {
+        if (isAccessible) {
+            auto [tag, value] = accessor.getViewOfValue();
+            if (shouldCopyValue(tag)) {
+                accessor.makeOwned();
+            }
+        } else {
+#if defined(MONGO_CONFIG_DEBUG_BUILD)
+            auto [tag, val] = value::getPoisonValue();
+            accessor.reset(false, tag, val);
+#endif
+        }
+    }
+
+    /**
+     * Ensures that accessor owns the underlying BSON value, which can be potentially owned by
+     * storage.
+     */
+    void prepareForYielding(value::BSONObjValueAccessor& accessor, bool isAccessible) {
+        if (isAccessible) {
+            auto [tag, value] = accessor.getViewOfValue();
+            if (shouldCopyValue(tag)) {
+                accessor.makeOwned();
+            }
+        } else {
+#if defined(MONGO_CONFIG_DEBUG_BUILD)
+            auto [tag, val] = value::getPoisonValue();
+            accessor.reset(false, tag, val);
+#endif
+        }
+    }
+
+    void prepareForYielding(value::MaterializedRow& row, bool isAccessible) {
+        if (isAccessible) {
+            for (size_t idx = 0; idx < row.size(); idx++) {
+                auto [tag, value] = row.getViewOfValue(idx);
+                if (shouldCopyValue(tag)) {
+                    row.makeOwned(idx);
+                }
+            }
+        } else {
+#if defined(MONGO_CONFIG_DEBUG_BUILD)
+            auto [tag, val] = value::getPoisonValue();
+            for (size_t idx = 0; idx < row.size(); idx++) {
+                row.reset(idx, false, tag, val);
+            }
+#endif
+        }
+    }
+
+    /**
      * Notifies the stage that the underlying data source may change.
      *
      * It is illegal to call work() or isEOF() when a stage is in the "saved" state. May be called
      * before the first call to open(), before execution of the plan has begun.
      *
+     * The 'disableSlotAccess' parameter indicates whether this stage is allowed to discard slot
+     * state before saving.
+     *
      * Propagates to all children, then calls doSaveState().
      *
-     * The 'relinquishCursor' parameter indicates whether cursors should be reset and all data
-     * should be copied.
-     *
-     * TODO SERVER-59620: Remove the 'relinquishCursor' parameter once all callers pass 'false'.
      */
-    void saveState(bool relinquishCursor) {
+    void saveState(bool disableSlotAccess = false) {
         auto stage = static_cast<T*>(this);
         stage->_commonStats.yields++;
-        stage->doSaveState(relinquishCursor);
+
+        if (disableSlotAccess) {
+            stage->disableSlotAccess();
+        }
+
+        stage->doSaveState();
         // Save the children in a right to left order so dependent stages (i.e. one using correlated
         // slots) are saved first.
         auto& children = stage->_children;
-        for (auto it = children.rbegin(); it != children.rend(); it++) {
-            (*it)->saveState(relinquishCursor);
+        for (auto idx = children.size(); idx-- > 0;) {
+            children[idx]->saveState(disableSlotAccess ? shouldOptimizeSaveState(idx) : false);
         }
 
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
-        _saveState = relinquishCursor ? SaveState::kSavedFull : SaveState::kSavedNotFull;
+        _saveState = SaveState::kSaved;
 #endif
     }
 
@@ -157,29 +218,21 @@ public:
      * Throws a UserException on failure to restore due to a conflicting event such as a
      * collection drop. May throw a WriteConflictException, in which case the caller may choose to
      * retry.
-     *
-     * The 'relinquishCursor' parameter indicates whether the stages are recovering from a "full
-     * save" or not, as discussed in saveState(). It is the caller's responsibility to pass the same
-     * value for 'relinquishCursor' as was passed in the previous call to saveState().
      */
-    void restoreState(bool relinquishCursor) {
+    void restoreState() {
         auto stage = static_cast<T*>(this);
         stage->_commonStats.unyields++;
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
-        if (relinquishCursor) {
-            invariant(_saveState == SaveState::kSavedFull);
-        } else {
-            invariant(_saveState == SaveState::kSavedNotFull);
-        }
+        invariant(_saveState == SaveState::kSaved);
 #endif
 
         for (auto&& child : stage->_children) {
-            child->restoreState(relinquishCursor);
+            child->restoreState();
         }
 
-        stage->doRestoreState(relinquishCursor);
+        stage->doRestoreState();
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
-        stage->_saveState = SaveState::kNotSaved;
+        stage->_saveState = SaveState::kActive;
 #endif
     }
 
@@ -188,10 +241,61 @@ protected:
     // per stage. This information is only used for sanity checking, so we only run these
     // checks in debug builds.
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
-    // TODO SERVER-59620: Remove this.
-    enum class SaveState { kNotSaved, kSavedFull, kSavedNotFull };
-    SaveState _saveState{SaveState::kNotSaved};
+    enum class SaveState {
+        // The "active" state is when the plan can access storage and operations like
+        // open(), getNext(), close() are permitted.
+        kActive,
+
+        // In the "saved" state, the plan is completely detached from the storage engine, but
+        // cannot be executed. In order to bring the plan back into an active state, restoreState()
+        // must be called.
+        kSaved
+    };
+    SaveState _saveState{SaveState::kActive};
 #endif
+
+    virtual bool shouldOptimizeSaveState(size_t idx) const {
+        return false;
+    }
+
+    static bool shouldCopyValue(value::TypeTags tag) {
+        if (isShallowType(tag)) {
+            return false;
+        }
+        switch (tag) {
+            case value::TypeTags::NumberDecimal:
+            case value::TypeTags::StringBig:
+            case value::TypeTags::Array:
+            case value::TypeTags::ArraySet:
+            case value::TypeTags::ArrayMultiSet:
+            case value::TypeTags::Object:
+            case value::TypeTags::ObjectId:
+            case value::TypeTags::RecordId:
+                return false;
+
+            default:
+                return true;
+        }
+    }
+};
+
+template <typename T>
+class CanTrackStats;
+
+/**
+ * An abstract class to be used for traversing a plan-stage tree.
+ */
+class PlanStageVisitor {
+public:
+    virtual ~PlanStageVisitor() = default;
+
+    friend class CanTrackStats<PlanStage>;
+
+protected:
+    /**
+     * Visits one plan-stage during a traversal over the plan-stage tree.
+     */
+    virtual void visit(const PlanStage* stage) = 0;
 };
 
 /**
@@ -203,7 +307,29 @@ protected:
 template <typename T>
 class CanTrackStats {
 public:
-    CanTrackStats(StringData stageType, PlanNodeId nodeId) : _commonStats(stageType, nodeId) {}
+    // Bit flags to indicate what stats are tracked when a TrialRunTracker is attached.
+    enum TrialRunTrackingType : uint32_t {
+        NoTracking = 0x0,
+        TrackReads = 1 << 0,
+        TrackResults = 1 << 1,
+    };
+
+    // Bit mask to accumulate what stats are tracked when a TrialRunTracker is attached.
+    using TrialRunTrackingTypeMask = uint32_t;
+
+    CanTrackStats(StringData stageType,
+                  PlanNodeId nodeId,
+                  bool participateInTrialRunTracking,
+                  TrialRunTrackingType trackingType)
+        : _commonStats(stageType, nodeId),
+          _participateInTrialRunTracking(participateInTrialRunTracking),
+          _trackingType(trackingType) {
+        tassert(8804701,
+                "Expect individual stages to track only reads, as results are tracked in the base "
+                "CanTrackStats code",
+                trackingType == TrialRunTrackingType::NoTracking ||
+                    trackingType == TrialRunTrackingType::TrackReads);
+    }
 
     /**
      * Returns a tree of stats. If the stage has any children it must propagate the request for
@@ -253,34 +379,76 @@ public:
         }
     }
 
+    /**
+     * Implements a pre-order traversal over the plan-stage tree starting from this node. The
+     * visitor parameter plays the role of an accumulator during this traversal.
+     */
+    void accumulate(PlanStageVisitor& visitor) const {
+        auto stage = static_cast<const T*>(this);
+        visitor.visit(stage);
+        for (auto&& child : stage->_children) {
+            child->accumulate(visitor);
+        }
+    }
+
     void detachFromTrialRunTracker() {
+        _tracker = nullptr;
         auto stage = static_cast<T*>(this);
         for (auto&& child : stage->_children) {
             child->detachFromTrialRunTracker();
         }
-
-        stage->doDetachFromTrialRunTracker();
     }
 
-    // Bit flags to indicate what kinds of stages a TrialRunTracker was attached to by a call to the
-    // 'attachToTrialRunTracker()' method.
-    enum TrialRunTrackerAttachResultFlags : uint32_t {
-        NoAttachment = 0x0,
-        AttachedToStreamingStage = 1 << 0,
-        AttachedToBlockingStage = 1 << 1,
-    };
-
-    using TrialRunTrackerAttachResultMask = uint32_t;
-
-    TrialRunTrackerAttachResultMask attachToTrialRunTracker(TrialRunTracker* tracker) {
-        TrialRunTrackerAttachResultMask result = TrialRunTrackerAttachResultFlags::NoAttachment;
-
-        auto stage = static_cast<T*>(this);
-        for (auto&& child : stage->_children) {
-            result |= child->attachToTrialRunTracker(tracker);
+    /**
+     * Recursively traverses the plan tree and attaches the trial run tracker to nodes that do the
+     * tracking.
+     */
+    TrialRunTrackingTypeMask attachToTrialRunTracker(
+        TrialRunTracker* tracker,
+        PlanNodeId runtimePlanningRootNodeId = kEmptyPlanNodeId,
+        bool foundPlanningRoot = false) {
+        TrialRunTrackingTypeMask result = TrialRunTrackingType::NoTracking;
+        if (!_participateInTrialRunTracking) {
+            return result;
         }
 
-        return result | stage->doAttachToTrialRunTracker(tracker, result);
+        if (runtimePlanningRootNodeId != kEmptyPlanNodeId) {
+            // RuntimePlanningRootNodeId determines a root of a QuerySolution sub-tree that was used
+            // in runtime planning. Stage builders are allowed to do any optimizations when
+            // converting QuerySolution to SBE plan, such as dropping or combining nodes,
+            // so 'runtimePlanningRootNodeId' itself may not be present in the plan.
+            // However, for replanning to work we require the
+            // following property: a part of the query solution that was used in runtime planning
+            // should correspond to a single sub-tree in the resulting SBE plan.
+
+            bool isPlanningNode = _commonStats.nodeId <= runtimePlanningRootNodeId;
+            if (foundPlanningRoot) {
+                tassert(8523904,
+                        "There should be no stages that implements QSNs after planning root in the "
+                        "planning sub-tree",
+                        isPlanningNode);
+            } else if (isPlanningNode) {
+                foundPlanningRoot = true;
+                _trackingType |= TrialRunTrackingType::TrackResults;
+            }
+        }
+
+        auto stage = static_cast<T*>(this);
+        size_t childrenWithPlanningRoot = 0;
+        for (auto&& child : stage->_children) {
+            auto childAttachResult = child->attachToTrialRunTracker(
+                tracker, runtimePlanningRootNodeId, foundPlanningRoot);
+            if (childAttachResult & TrialRunTrackingType::TrackResults) {
+                ++childrenWithPlanningRoot;
+                tassert(8523905,
+                        "A part of the query that participated in runtime planning should be "
+                        "implemented as a single sub-tree in SBE plan",
+                        childrenWithPlanningRoot <= 1);
+            }
+            result |= childAttachResult;
+        }
+
+        return result | doAttachToTrialRunTracker(tracker, result);
     }
 
     /**
@@ -288,8 +456,15 @@ public:
      * execution has started.
      */
     void markShouldCollectTimingInfo() {
-        invariant(!_commonStats.executionTimeMillis || *_commonStats.executionTimeMillis == 0);
-        _commonStats.executionTimeMillis.emplace(0);
+        tassert(11093508,
+                "Execution should not have started",
+                durationCount<Microseconds>(_commonStats.executionTime.executionTimeEstimate) == 0);
+
+        if (internalMeasureQueryExecutionTimeInNanoseconds.load()) {
+            _commonStats.executionTime.precision = QueryExecTimerPrecision::kNanos;
+        } else {
+            _commonStats.executionTime.precision = QueryExecTimerPrecision::kMillis;
+        }
 
         auto stage = static_cast<T*>(this);
         for (auto&& child : stage->_children) {
@@ -307,27 +482,59 @@ public:
         }
     }
 
+    void disableTrialRunTracking() {
+        _participateInTrialRunTracking = false;
+    }
+
+    bool slotsAccessible() const {
+        return _slotsAccessible;
+    }
+
+    const boost::optional<SimpleMemoryUsageTracker>& getMemoryTracker() const {
+        return _memoryTracker;
+    }
+
 protected:
+    bool participateInTrialRunTracking() const {
+        return _participateInTrialRunTracking;
+    }
+
+    /**
+     * If trial run tracker is attached, increments the read metric and terminates the trial run
+     * with a special exception if metric has reached the limit.
+     */
+    void trackRead() {
+        tassert(8796901,
+                str::stream() << "Stage " << _commonStats.stageType
+                              << " tracks reads but tracking type is " << _trackingType,
+                (_trackingType & TrialRunTrackingType::TrackReads));
+        if (_tracker && _tracker->trackProgress<TrialRunTracker::kNumReads>(1)) {
+            uasserted(ErrorCodes::QueryTrialRunCompleted,
+                      str::stream() << "Trial run early exit in " << _commonStats.stageType);
+        }
+    }
+
     PlanState trackPlanState(PlanState state) {
         if (state == PlanState::IS_EOF) {
             _commonStats.isEOF = true;
             _slotsAccessible = false;
         } else {
-            invariant(state == PlanState::ADVANCED);
             _commonStats.advances++;
             _slotsAccessible = true;
+
+            if ((_trackingType & TrialRunTrackingType::TrackResults) && _tracker) {
+                bool trackerResult = _tracker->trackProgress<TrialRunTracker::kNumResults>(1);
+                tassert(8523903,
+                        "TrialRunTracker should not terminate plans on reaching kNumResults",
+                        !trackerResult);
+            }
         }
         return state;
     }
 
-
     void trackClose() {
         _commonStats.closes++;
         _slotsAccessible = false;
-    }
-
-    bool slotsAccessible() const {
-        return _slotsAccessible;
     }
 
     /**
@@ -335,9 +542,20 @@ protected:
      * May return boost::none if it is not necessary to collect timing info.
      */
     boost::optional<ScopedTimer> getOptTimer(OperationContext* opCtx) {
-        if (_commonStats.executionTimeMillis && opCtx) {
-            return {{opCtx->getServiceContext()->getFastClockSource(),
-                     _commonStats.executionTimeMillis.get_ptr()}};
+        if (opCtx && _commonStats.executionTime.precision != QueryExecTimerPrecision::kNoTiming) {
+
+            if (MONGO_likely(_commonStats.executionTime.precision ==
+                             QueryExecTimerPrecision::kMillis)) {
+                return boost::optional<ScopedTimer>(
+                    boost::in_place_init,
+                    &_commonStats.executionTime.executionTimeEstimate,
+                    &opCtx->fastClockSource());
+            } else {
+                return boost::optional<ScopedTimer>(
+                    boost::in_place_init,
+                    &_commonStats.executionTime.executionTimeEstimate,
+                    opCtx->getServiceContext()->getTickSource());
+            }
         }
 
         return boost::none;
@@ -345,21 +563,83 @@ protected:
 
     CommonStats _commonStats;
 
+    boost::optional<SimpleMemoryUsageTracker> _memoryTracker{boost::none};
+
 private:
+    // Attaches the trial run tracker to this specific node if needed.
+    TrialRunTrackingTypeMask doAttachToTrialRunTracker(
+        TrialRunTracker* tracker, TrialRunTrackingTypeMask childrenAttachResult) {
+        TrialRunTrackingTypeMask result = TrialRunTrackingType::NoTracking;
+        if (_trackingType & TrialRunTrackingType::TrackReads) {
+            _tracker = tracker;
+            result |= TrialRunTrackingType::TrackReads;
+        }
+        if (_trackingType & TrialRunTrackingType::TrackResults) {
+            _tracker = tracker;
+            result |= TrialRunTrackingType::TrackResults;
+        }
+        return result;
+    }
+
     /**
-     * In general, accessors can be accesed only after getNext returns a row. It is most definitely
+     * In general, accessors can be accessed only after getNext returns a row. It is most definitely
      * not OK to access accessors in ANY other state; e.g. closed, not yet opened, after EOF. We
      * need this tracker to support unfortunate consequences of the internal yielding feature. Once
      * that feature is retired we can then simply revisit all stages and simplify them.
      */
     bool _slotsAccessible{false};
+
+    // Flag which determines whether this node and its children can participate in trial run
+    // tracking. A stage and its children are not eligible for trial run tracking when they are
+    // planned deterministically (that is, the amount of work they perform is independent of
+    // other parts of the tree which are multiplanned).
+    bool _participateInTrialRunTracking{true};
+
+    // Determines what stats are tracked during trial by this specific node.
+    TrialRunTrackingTypeMask _trackingType{TrialRunTrackingType::NoTracking};
+
+    // If provided, used during a trial run to accumulate certain execution stats. Once the trial
+    // run is complete, this pointer is reset to nullptr.
+    TrialRunTracker* _tracker{nullptr};
 };
 
 /**
  * Provides a method which can be used to check if the current operation has been interrupted.
  * Maintains an internal state to maintain the interrupt check period. Also responsible for
  * triggering yields if this object has been configured with a yield policy.
+ *
+ * When yielding is enabled, we use the following rules to determine when SBE is required to yield:
+ *
+ * 1) Stages that are sources of iteration (scan, coscan, unwind, sort, group, spool) should
+ *    perform a yield check at least once per unit of work / getNext().
+ *
+ * 2) Prolonged blocking computation (like sorting) should also periodically perform a yield check.
+ *
+ * 3) Stages that are not sources of iteration (project, nlj, filter, limit, union, merge) don't
+ *    need to perform a yield check as long as they call subtree methods that do.
+ *
+ * "Source of iteration" refers to a stage's ability to iterate over more than 1 row for each input
+ * row (if it exists). Note: filter, nlj stages do introduce a loop, but it is not a source of
+ * iteration, as each input row maps to 0-1 output rows rather than 0-N output rows like unwind.
+ *
+ * Two yielding models were considered, and the second one was adopted for SBE:
+ *
+ * 1) Strong: "Every call to getNext() must result in at least one yield check." We don't satisfy
+ *    that model today because of unwindy stages, which do not perform yielding when iterating over
+ *    their inner loop. If they did, then we would be able to prove by structural induction that
+ *    when a stage calls a child getNext(), then it itself is not required to perform a yield check
+ *    to satisfy that invariant
+ *
+ * 2) Weak: "Every O(1) calls to getNext() must result in a least one yield check." We do satisfy
+ *    that model today if we assume the size of unwind is O(1). As above, the inductive proof works
+ *    and stages that call a child getNext() are not required to perform a yield check themselves.
+ *
+ * In the Weak model, the constant in O(1) is basically limited by the sizes of arrays (which are
+ * limited by the document size limit), craziness of scalar expressions, and craziness of the
+ * pipeline (like chaining many unwinds together). The pipeline itself also has a limited maximum
+ * size, so in fact the amount of work by non-sources of iteration is indeed bounded by O(1).
  */
+template <typename T>
 class CanInterrupt {
 public:
     /**
@@ -373,24 +653,46 @@ public:
      * Checks for interrupt if necessary. If yielding has been enabled for this object, then also
      * performs a yield if necessary.
      */
-    void checkForInterrupt(OperationContext* opCtx) {
+    void checkForInterruptAndYield(OperationContext* opCtx) {
         invariant(opCtx);
 
         if (!_yieldPolicy) {
             // Yielding has been disabled, but interrupt checking can never be disabled (all
             // SBE operations must be interruptible). When yielding is enabled, it is responsible
             // for interrupt checking, but when disabled we do it ourselves.
-            if (--_interruptCounter == 0) {
-                _interruptCounter = kInterruptCheckPeriod;
-                opCtx->checkForInterrupt();
-            }
+            checkForInterruptNoYield(opCtx);
         } else if (_yieldPolicy->shouldYieldOrInterrupt(opCtx)) {
-            uassertStatusOK(_yieldPolicy->yieldOrInterrupt(opCtx));
+            uassertStatusOK(_yieldPolicy->yieldOrInterrupt(
+                opCtx, nullptr, RestoreContext::RestoreType::kYield));
+        }
+    }
+
+    /**
+     * Checks for interrupt if necessary. This will never yield regardless of the yielding policy.
+     * Should only be used in special cases, e.g. needed for performance or to avoid bad edge cases.
+     */
+    void checkForInterruptNoYield(OperationContext* opCtx) {
+        invariant(opCtx);
+
+        if (--_interruptCounter == 0) {
+            _interruptCounter = kInterruptCheckPeriod;
+            opCtx->checkForInterrupt();
+        }
+    }
+
+    void attachNewYieldPolicy(PlanYieldPolicy* yieldPolicy) {
+        auto stage = static_cast<T*>(this);
+        for (auto&& child : stage->_children) {
+            child->attachNewYieldPolicy(yieldPolicy);
+        }
+
+        if (_yieldPolicy) {
+            _yieldPolicy = yieldPolicy;
         }
     }
 
 protected:
-    PlanYieldPolicy* const _yieldPolicy{nullptr};
+    PlanYieldPolicy* _yieldPolicy{nullptr};
 
 private:
     static const int kInterruptCheckPeriod = 128;
@@ -403,14 +705,17 @@ private:
 class PlanStage : public CanSwitchOperationContext<PlanStage>,
                   public CanChangeState<PlanStage>,
                   public CanTrackStats<PlanStage>,
-                  public CanInterrupt {
+                  public CanInterrupt<PlanStage> {
 public:
     using Vector = absl::InlinedVector<std::unique_ptr<PlanStage>, 2>;
 
-    PlanStage(StringData stageType, PlanYieldPolicy* yieldPolicy, PlanNodeId nodeId)
-        : CanTrackStats{stageType, nodeId}, CanInterrupt{yieldPolicy} {}
-
-    PlanStage(StringData stageType, PlanNodeId nodeId) : PlanStage(stageType, nullptr, nodeId) {}
+    PlanStage(StringData stageType,
+              PlanYieldPolicy* yieldPolicy,
+              PlanNodeId nodeId,
+              bool participateInTrialRunTracking,
+              TrialRunTrackingType trackingType = TrialRunTrackingType::NoTracking)
+        : CanTrackStats{stageType, nodeId, participateInTrialRunTracking, trackingType},
+          CanInterrupt{yieldPolicy} {}
 
     virtual ~PlanStage() = default;
 
@@ -438,9 +743,31 @@ public:
      * call and avoids resource acquisition in getNext().
      *
      * When reOpen flag is true then the plan stage should reinitizalize already acquired resources
-     * (e.g. re-hash, re-sort, re-seek, etc).
+     * (e.g. re-hash, re-sort, re-seek, etc), but it can avoid reinitializing things that do not
+     * contain state and are not destroyed by close(), since close() is not called before a reopen.
      */
     virtual void open(bool reOpen) = 0;
+
+    /**
+     * The stage spills its data and asks from all its children to spill their data as well.
+     */
+    void forceSpill(PlanYieldPolicy* yieldPolicy) {
+        if (yieldPolicy && yieldPolicy->shouldYieldOrInterrupt(_opCtx)) {
+            uassertStatusOK(yieldPolicy->yieldOrInterrupt(
+                _opCtx, nullptr, RestoreContext::RestoreType::kYield));
+        }
+        doForceSpill();
+        for (const auto& child : _children) {
+            child->forceSpill(yieldPolicy);
+        }
+    }
+
+    void attachCollectionAcquisition(const MultipleCollectionAccessor& mca) {
+        doAttachCollectionAcquisition(mca);
+        for (auto&& child : _children) {
+            child->attachCollectionAcquisition(mca);
+        }
+    }
 
     /**
      * Moves to the next position. If the end is reached then return EOF otherwise ADVANCED. Callers
@@ -470,18 +797,28 @@ public:
     friend class CanSwitchOperationContext<PlanStage>;
     friend class CanChangeState<PlanStage>;
     friend class CanTrackStats<PlanStage>;
+    friend class CanInterrupt<PlanStage>;
+
+private:
+    /**
+     * Spills the stage's data to disk. Stages that can spill their own data need to override this
+     * method.
+     */
+    virtual void doForceSpill() {}
 
 protected:
     // Derived classes can optionally override these methods.
-    virtual void doSaveState(bool relinquishCursor) {}
-    virtual void doRestoreState(bool relinquishCursor) {}
+    virtual void doSaveState() {}
+    virtual void doRestoreState() {}
     virtual void doDetachFromOperationContext() {}
     virtual void doAttachToOperationContext(OperationContext* opCtx) {}
-    virtual void doDetachFromTrialRunTracker() {}
-    virtual TrialRunTrackerAttachResultMask doAttachToTrialRunTracker(
-        TrialRunTracker* tracker, TrialRunTrackerAttachResultMask childrenAttachResult) {
-        return TrialRunTrackerAttachResultFlags::NoAttachment;
-    }
+
+    /**
+     * Allows collection accessing stages to obtain a reference to the collection acquisition. This
+     * should be a no-op for non-collection accessing stages, and needs to be implemented by
+     * collection accessing stages like scan and ixscan.
+     */
+    virtual void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) = 0;
 
     Vector _children;
 };

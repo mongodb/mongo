@@ -29,15 +29,15 @@
 
 #pragma once
 
+#include "mongo/base/clonable_ptr.h"
+#include "mongo/db/matcher/expression_with_placeholder.h"
+#include "mongo/db/update/update_internal_node.h"
+
 #include <map>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
-
-#include "mongo/base/clonable_ptr.h"
-#include "mongo/db/matcher/expression_with_placeholder.h"
-#include "mongo/db/update/update_internal_node.h"
 
 namespace mongo {
 

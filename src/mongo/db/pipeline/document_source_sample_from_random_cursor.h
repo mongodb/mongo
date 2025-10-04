@@ -29,8 +29,25 @@
 
 #pragma once
 
-#include "mongo/db/exec/document_value/value_comparator.h"
+#include "mongo/base/string_data.h"
+#include "mongo/db/exec/agg/stage.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/pipeline_split_state.h"
+#include "mongo/db/pipeline/stage_constraints.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/util/modules.h"
+
+#include <set>
+#include <string>
+
+#include <boost/none.hpp>
+#include <boost/none_t.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -42,10 +59,16 @@ class DocumentSourceSampleFromRandomCursor final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$sampleFromRandomCursor"_sd;
     const char* getSourceName() const final;
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
+    }
+
+    StageConstraints constraints(PipelineSplitState pipeState) const final {
         return {StreamType::kStreaming,
                 PositionRequirement::kFirst,
                 HostTypeRequirement::kAnyShard,
@@ -66,37 +89,24 @@ public:
         std::string idField,
         long long collectionSize);
 
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {}
+
 private:
+    friend boost::intrusive_ptr<exec::agg::Stage> sampleFromRandomCursorStageToStageFn(
+        const boost::intrusive_ptr<DocumentSource>& documentSourceSampleFromRandomCursor);
+
     DocumentSourceSampleFromRandomCursor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                          long long size,
                                          std::string idField,
                                          long long collectionSize);
-
-    GetNextResult doGetNext() final;
-
-    /**
-     * Keep asking for documents from the random cursor until it yields a new document. Errors if a
-     * a document is encountered without a value for '_idField', or if the random cursor keeps
-     * returning duplicate elements.
-     */
-    GetNextResult getNextNonDuplicateDocument();
 
     long long _size;
 
     // The field to use as the id of a document. Usually '_id', but 'ts' for the oplog.
     std::string _idField;
 
-    // Keeps track of the documents that have been returned, since a random cursor is allowed to
-    // return duplicates.
-    ValueUnorderedSet _seenDocs;
-
     // The approximate number of documents in the collection (includes orphans).
     const long long _nDocsInColl;
-
-    // The value to be assigned to the randMetaField of outcoming documents. Each call to getNext()
-    // will decrement this value by an amount scaled by _nDocsInColl as an attempt to appear as if
-    // the documents were produced by a top-k random sort.
-    double _randMetaFieldVal = 1.0;
 };
 
 }  // namespace mongo

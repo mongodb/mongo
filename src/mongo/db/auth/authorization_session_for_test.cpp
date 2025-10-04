@@ -27,68 +27,47 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/auth/authorization_session_for_test.h"
 
-#include <algorithm>
-#include <memory>
-
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/builtin_roles.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_name.h"
-#include "mongo/db/auth/user_set.h"
+#include "mongo/util/read_through_cache.h"
+
+#include <set>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
-constexpr StringData AuthorizationSessionForTest::kTestDBName;
-
-AuthorizationSessionForTest::~AuthorizationSessionForTest() {
-    revokeAllPrivileges();
-}
-
-void AuthorizationSessionForTest::assumePrivilegesForDB(Privilege privilege, StringData dbName) {
+void AuthorizationSessionForTest::assumePrivilegesForDB(Privilege privilege,
+                                                        const DatabaseName& dbName) {
     assumePrivilegesForDB(std::vector<Privilege>{privilege}, dbName);
 }
 
 void AuthorizationSessionForTest::assumePrivilegesForDB(PrivilegeVector privileges,
-                                                        StringData dbName) {
-    UserHandle userHandle(User(UserName("authorizationSessionForTestUser", dbName)));
-    userHandle->addPrivileges(privileges);
-
-    _authenticatedUsers.add(userHandle);
-    _testUsers.emplace_back(std::move(userHandle));
-    _buildAuthenticatedRolesVector();
+                                                        const DatabaseName& dbName) {
+    std::unique_ptr<UserRequest> request = std::make_unique<UserRequestGeneral>(
+        UserName("authorizationSessionForTestUser"_sd, dbName), boost::none);
+    _authenticatedUser = UserHandle(User(std::move(request)));
+    _authenticatedUser.value()->addPrivileges(privileges);
+    _authenticationMode = AuthorizationSession::AuthenticationMode::kConnection;
+    _updateInternalAuthorizationState();
 }
-
 
 void AuthorizationSessionForTest::assumePrivilegesForBuiltinRole(const RoleName& roleName) {
     PrivilegeVector privileges;
     auth::addPrivilegesForBuiltinRole(roleName, &privileges);
-    StringData db = roleName.getDB();
-    if (db.empty()) {
-        db = "admin"_sd;
+    auto db = roleName.getDatabaseName();
+    if (db.isEmpty()) {
+        db = DatabaseName::kAdmin;
     }
 
     assumePrivilegesForDB(privileges, db);
 }
 
-void AuthorizationSessionForTest::revokePrivilegesForDB(StringData dbName) {
-    _authenticatedUsers.removeByDBName(dbName);
-    _testUsers.erase(
-        std::remove_if(_testUsers.begin(),
-                       _testUsers.end(),
-                       [&](const auto& user) { return dbName == user->getName().getDB(); }),
-        _testUsers.end());
-}
-
-void AuthorizationSessionForTest::revokeAllPrivileges() {
-    _testUsers.erase(std::remove_if(_testUsers.begin(),
-                                    _testUsers.end(),
-                                    [&](const auto& user) {
-                                        _authenticatedUsers.removeByDBName(user->getName().getDB());
-                                        return true;
-                                    }),
-                     _testUsers.end());
-}
 }  // namespace mongo

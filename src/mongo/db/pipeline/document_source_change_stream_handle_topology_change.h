@@ -29,13 +29,22 @@
 
 #pragma once
 
-#include <memory>
-
+#include "mongo/base/string_data.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/change_stream_constants.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
-#include "mongo/s/query/document_source_merge_cursors.h"
-#include "mongo/s/shard_id.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/stage_constraints.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+
+#include <set>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -46,10 +55,14 @@ namespace mongo {
  * the first time. When this event is detected, this stage will establish a new cursor on that
  * shard and add it to the cursors being merged.
  */
-class DocumentSourceChangeStreamHandleTopologyChange final : public DocumentSource {
+class DocumentSourceChangeStreamHandleTopologyChange final
+    : public DocumentSourceInternalChangeStreamStage {
 public:
-    static constexpr StringData kStageName = "$_internalChangeStreamHandleTopologyChange"_sd;
+    static constexpr StringData kStageName =
+        change_stream_constants::stage_names::kHandleTopologyChange;
 
+    static boost::intrusive_ptr<DocumentSourceChangeStreamHandleTopologyChange> createFromBson(
+        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
     /**
      * Creates a new stage which will establish a new cursor and add it to the cursors being merged
      * by 'mergeCursorsStage' whenever a new shard is detected by a change stream.
@@ -58,52 +71,31 @@ public:
         const boost::intrusive_ptr<ExpressionContext>&);
 
     const char* getSourceName() const final {
-        return kStageName.rawData();
+        return kStageName.data();
     }
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final;
+    Value doSerialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
-    StageConstraints constraints(Pipeline::SplitState) const final;
+    StageConstraints constraints(PipelineSplitState) const final;
 
     GetModPathsReturn getModifiedPaths() const final {
         // This stage neither modifies nor renames any field.
-        return {GetModPathsReturn::Type::kFiniteSet, std::set<std::string>{}, {}};
+        return {GetModPathsReturn::Type::kFiniteSet, OrderedPathSet{}, {}};
     }
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
         return DistributedPlanLogic{nullptr, this, change_stream_constants::kSortSpec};
     }
 
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {}
+
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
+    }
+
 private:
     DocumentSourceChangeStreamHandleTopologyChange(const boost::intrusive_ptr<ExpressionContext>&);
-
-    GetNextResult doGetNext() final;
-
-    /**
-     * Establish the new cursors and tell the RouterStageMerge about them.
-     */
-    void addNewShardCursors(const Document& newShardDetectedObj);
-
-    /**
-     * Open the cursors on the new shards.
-     */
-    std::vector<RemoteCursor> establishShardCursorsOnNewShards(const Document& newShardDetectedObj);
-
-    /**
-     * Updates the $changeStream stage in the '_originalAggregateCommand' to reflect the start time
-     * for the newly-added shard(s), then generates the final command object to be run on those
-     * shards.
-     */
-    BSONObj createUpdatedCommandForNewShard(Timestamp shardAddedTime);
-
-    /**
-     * Given the '_originalAggregateCommand' and a resume token, returns a new BSON object with the
-     * same command except with the addition of a resumeAfter option containing the resume token.
-     * If there was a previous resumeAfter option, it will be removed.
-     */
-    BSONObj replaceResumeTokenInCommand(Document resumeToken);
-
-    boost::intrusive_ptr<DocumentSourceMergeCursors> _mergeCursors;
-    BSONObj _originalAggregateCommand;
 };
 }  // namespace mongo

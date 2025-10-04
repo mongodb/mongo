@@ -27,20 +27,23 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
+from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
 from wtscenario import make_scenarios
 
 # test_schema02.py
 #    Columns, column groups, indexes
-class test_schema02(wttest.WiredTigerTestCase):
+class test_schema02(TieredConfigMixin, wttest.WiredTigerTestCase):
     """
     Test basic operations
     """
     nentries = 1000
 
-    scenarios = make_scenarios([
-        ('normal', { 'idx_config' : '' }),
-        ('lsm', { 'idx_config' : ',type=lsm' }),
-    ])
+    types = [
+        ('normal', dict(type='normal', idx_config='')),
+    ]
+
+    tiered_storage_sources = gen_tiered_storage_sources()
+    scenarios = make_scenarios(tiered_storage_sources, types)
 
     def expect_failure_colgroup(self, name, configstr, match):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
@@ -278,6 +281,3 @@ class test_schema02(wttest.WiredTigerTestCase):
         self.session.create("colgroup:main:c2", "columns=(S3,i4)")
         self.populate()
         self.check_entries()
-
-if __name__ == '__main__':
-    wttest.run()

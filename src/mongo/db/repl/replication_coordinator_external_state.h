@@ -29,16 +29,15 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <cstddef>
-#include <functional>
-
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/concurrency/thread_pool.h"
-#include "mongo/util/time_support.h"
+#include "mongo/util/modules.h"
+
+#include <cstddef>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 
@@ -63,7 +62,7 @@ class ReplicationCoordinator;
  * dependencies on large sections of the server code and thus break the unit testability of
  * ReplicationCoordinatorImpl should be moved here.
  */
-class ReplicationCoordinatorExternalState {
+class MONGO_MOD_OPEN ReplicationCoordinatorExternalState {
     ReplicationCoordinatorExternalState(const ReplicationCoordinatorExternalState&) = delete;
     ReplicationCoordinatorExternalState& operator=(const ReplicationCoordinatorExternalState&) =
         delete;
@@ -97,15 +96,6 @@ public:
     virtual void shutdown(OperationContext* opCtx) = 0;
 
     /**
-     * Clears appliedThrough to indicate that the dataset is consistent with top of the
-     * oplog on shutdown.
-     * This should be called after calling shutdown() and should be called holding RSTL
-     * in mode X to make sure that that are no active readers while executing this method
-     * as this does perform timestamped minvalid writes at lastAppliedTimestamp.
-     */
-    virtual void clearAppliedThroughIfCleanShutdown(OperationContext* opCtx) = 0;
-
-    /**
      * Returns task executor for scheduling tasks to be run asynchronously.
      */
     virtual executor::TaskExecutor* getTaskExecutor() const = 0;
@@ -122,16 +112,23 @@ public:
     virtual Status initializeReplSetStorage(OperationContext* opCtx, const BSONObj& config) = 0;
 
     /**
+     * Called when a node is ready to start drain mode for oplog application, after it completes
+     * draining for oplog writes. It is called outside of the global X lock and the replication
+     * replication coordinator mutex.
+     */
+    virtual void onWriterDrainComplete(OperationContext* opCtx) = 0;
+
+    /**
      * Called when a node on way to becoming a primary is ready to leave drain mode. It is called
      * outside of the global X lock and the replication coordinator mutex.
      *
      * Throws on errors.
      */
-    virtual void onDrainComplete(OperationContext* opCtx) = 0;
+    virtual void onApplierDrainComplete(OperationContext* opCtx) = 0;
 
     /**
      * Called as part of the process of transitioning to primary and run with the global X lock and
-     * the replication coordinator mutex acquired, so no majoirty writes are allowed while in this
+     * the replication coordinator mutex acquired, so no majority writes are allowed while in this
      * state. See the call site in ReplicationCoordinatorImpl for details about when and how it is
      * called.
      *
@@ -147,12 +144,26 @@ public:
      * SyncSourceFeedback thread that it needs to wake up and send a replSetUpdatePosition
      * command upstream.
      */
-    virtual void forwardSecondaryProgress() = 0;
+    virtual void forwardSecondaryProgress(bool prioritized = false) = 0;
 
     /**
      * Returns true if "host" is one of the network identities of this node.
      */
     virtual bool isSelf(const HostAndPort& host, ServiceContext* service) = 0;
+
+    /**
+     * Returns true if "host" is one of the network identities of this node, without actually
+     * going out to the network and checking.
+     */
+    virtual bool isSelfFastPath(const HostAndPort& host) = 0;
+
+    /**
+     * Returns true if "host" is one of the network identities of this node, without
+     * checking the fast path first.
+     */
+    virtual bool isSelfSlowPath(const HostAndPort& host,
+                                ServiceContext* service,
+                                Milliseconds timeout) = 0;
 
     /**
      * Gets the replica set config document from local storage, or returns an error.
@@ -166,6 +177,11 @@ public:
     virtual Status storeLocalConfigDocument(OperationContext* opCtx,
                                             const BSONObj& config,
                                             bool writeOplog) = 0;
+
+    /**
+     * Replaces the replica set config document in local storage, or returns an error.
+     **/
+    virtual Status replaceLocalConfigDocument(OperationContext* opCtx, const BSONObj& config) = 0;
 
     /**
      * Creates the collection for "lastVote" documents and initializes it, or returns an error.
@@ -239,6 +255,11 @@ public:
     virtual void startProducerIfStopped() = 0;
 
     /**
+     * Notify interested parties that member data for other nodes has changed.
+     */
+    virtual void notifyOtherMemberDataChanged() = 0;
+
+    /**
      * True if we have discovered that no sync source's oplog overlaps with ours.
      */
     virtual bool tooStale() = 0;
@@ -273,21 +294,11 @@ public:
     virtual void notifyOplogMetadataWaiters(const OpTime& committedOpTime) = 0;
 
     /**
-     * Returns earliest drop optime of drop pending collections.
-     * Returns boost::none if there are no drop pending collections.
-     */
-    virtual boost::optional<OpTime> getEarliestDropPendingOpTime() const = 0;
-
-    /**
      * Returns multiplier to apply to election timeout to obtain upper bound
      * on randomized offset.
      */
     virtual double getElectionTimeoutOffsetLimitFraction() const = 0;
 
-    /**
-     * Returns true if the current storage engine supports read committed.
-     */
-    virtual bool isReadCommittedSupportedByStorageEngine(OperationContext* opCtx) const = 0;
 
     /**
      * Returns true if the current storage engine supports snapshot read concern.

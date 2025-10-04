@@ -33,7 +33,7 @@ HIDDEN int
 arm_handle_signal_frame (unw_cursor_t *cursor)
 {
   struct cursor *c = (struct cursor *) cursor;
-  int ret;
+  int i, ret;
   unw_word_t sc_addr, sp, sp_addr = c->dwarf.cfa;
   struct dwarf_loc sp_loc = DWARF_LOC (sp_addr, 0);
 
@@ -92,6 +92,9 @@ arm_handle_signal_frame (unw_cursor_t *cursor)
   c->sigcontext_addr = sc_addr;
   c->frame_info.frame_type = UNW_ARM_FRAME_SIGRETURN;
   c->frame_info.cfa_reg_offset = sc_addr - sp_addr;
+
+  for (i = 0; i < DWARF_NUM_PRESERVED_REGS; ++i)
+    c->dwarf.loc[i] = DWARF_NULL_LOC;
 
   /* Update the dwarf cursor.
      Set the location of the registers to the corresponding addresses of the

@@ -27,9 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/db/fts/fts_spec.h"
+#include "mongo/base/string_data.h"
+#include "mongo/db/fts/fts_language.h"
 #include "mongo/db/fts/fts_tokenizer.h"
+#include "mongo/db/fts/fts_util.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace mongo {
 namespace fts {
@@ -43,7 +49,7 @@ std::vector<std::string> tokenizeString(const char* str, const char* language) {
     std::vector<std::string> terms;
 
     while (tokenizer->moveNext()) {
-        terms.push_back(tokenizer->get().toString());
+        terms.push_back(std::string{tokenizer->get()});
     }
 
     return terms;

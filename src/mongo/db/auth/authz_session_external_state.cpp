@@ -27,28 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/auth/authz_session_external_state.h"
 
 #include "mongo/base/shim.h"
-#include "mongo/base/status.h"
-#include "mongo/db/namespace_string.h"
+#include "mongo/db/auth/authorization_manager.h"
+
+#include <string>
 
 namespace mongo {
 
-AuthzSessionExternalState::AuthzSessionExternalState(AuthorizationManager* authzManager)
-    : _authzManager(authzManager) {}
+AuthzSessionExternalState::AuthzSessionExternalState(Client* client) : _client(client) {}
 AuthzSessionExternalState::~AuthzSessionExternalState() {}
-
-AuthorizationManager& AuthzSessionExternalState::getAuthorizationManager() {
-    return *_authzManager;
-}
-
-std::unique_ptr<AuthzSessionExternalState> AuthzSessionExternalState::create(
-    AuthorizationManager* authzManager) {
-    static auto w = MONGO_WEAK_FUNCTION_DEFINITION(AuthzSessionExternalState::create);
-    return w(authzManager);
-}
 
 }  // namespace mongo

@@ -29,11 +29,13 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #include <functional>
 #include <memory>
 #include <string>
 
-namespace mongo {
+namespace MONGO_MOD_PRIVATE mongo {
 namespace executor {
 
 class NetworkInterfaceMock;
@@ -55,4 +57,4 @@ void addTestsForExecutor(
         makeExecutor);
 
 }  // namespace executor
-}  // namespace mongo
+}  // namespace MONGO_MOD_PRIVATE mongo

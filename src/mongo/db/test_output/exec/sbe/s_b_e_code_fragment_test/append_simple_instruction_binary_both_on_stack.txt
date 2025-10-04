@@ -1,0 +1,21 @@
+# Golden test output of SBECodeFragmentTest/AppendSimpleInstruction_Binary_BothOnStack
+==== VARIATION append instr
+-- CODE:
+[0x0000-0x0017] stackSize: 1, maxStackSize: 2
+0x0000: pushConstVal(value: 10);
+0x000a: pushConstVal(value: 20);
+0x0014: sub(popLhs: 1, moveFromLhs: 1, offsetLhs: 0, popRhs: 1, moveFromRhs: 1, offsetRhs: 0);
+
+-- RESULT:
+-10
+
+==== VARIATION append code
+-- CODE:
+[0x0000-0x0017] stackSize: 1, maxStackSize: 2
+0x0000: pushConstVal(value: 10);
+0x000a: pushConstVal(value: 20);
+0x0014: sub(popLhs: 1, moveFromLhs: 1, offsetLhs: 0, popRhs: 1, moveFromRhs: 1, offsetRhs: 0);
+
+-- RESULT:
+-10
+

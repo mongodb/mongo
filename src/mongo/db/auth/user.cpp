@@ -29,18 +29,28 @@
 
 #include "mongo/db/auth/user.h"
 
-#include <vector>
-
+#include "mongo/base/data_range.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/crypto/sha1_block.h"
 #include "mongo/crypto/sha256_block.h"
-#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/auth_name.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/auth/restriction_environment.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user_name.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/sequence_util.h"
+#include "mongo/db/multitenancy_gen.h"
+#include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
+
+#include <cstddef>
+#include <memory>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/container/node_hash_set.h>
+#include <absl/meta/type_traits.h>
 
 namespace mongo {
 
@@ -66,8 +76,28 @@ SHA256Block computeDigest(const UserName& name) {
 
 }  // namespace
 
-User::User(const UserName& name)
-    : _name(name), _isInvalidated(false), _digest(computeDigest(_name)) {}
+std::vector<std::string> UserRequest::getUserNameAndRolesVector(
+    const UserName& userName, const boost::optional<std::set<RoleName>>& roles) {
+    std::vector<std::string> hashElements;
+    hashElements.push_back(userName.getUnambiguousName());
+
+    if (roles) {
+        for (auto& role : *roles) {
+            hashElements.push_back(role.getRole());
+        }
+    }
+
+    return hashElements;
+}
+
+UserRequest::UserRequestCacheKey UserRequestGeneral::generateUserRequestCacheKey() const {
+    return UserRequestCacheKey(getUserName(), getUserNameAndRolesVector(getUserName(), getRoles()));
+}
+
+User::User(std::unique_ptr<UserRequest> request)
+    : _request(std::move(request)),
+      _isInvalidated(false),
+      _digest(computeDigest(_request->getUserName())) {}
 
 template <>
 User::SCRAMCredentials<SHA1Block>& User::CredentialData::scram<SHA1Block>() {
@@ -103,12 +133,12 @@ const User::CredentialData& User::getCredentials() const {
     return _credentials;
 }
 
-const ActionSet User::getActionsForResource(const ResourcePattern& resource) const {
-    stdx::unordered_map<ResourcePattern, Privilege>::const_iterator it = _privileges.find(resource);
-    if (it == _privileges.end()) {
-        return ActionSet();
+ActionSet User::getActionsForResource(const ResourcePattern& resource) const {
+    if (auto it = _privileges.find(resource); it != _privileges.end()) {
+        return it->second.getActions();
     }
-    return it->second.getActions();
+
+    return ActionSet();
 }
 
 bool User::hasActionsForResource(const ResourcePattern& resource) const {
@@ -179,7 +209,14 @@ void User::setIndirectRestrictions(RestrictionDocuments restrictions) & {
 }
 
 Status User::validateRestrictions(OperationContext* opCtx) const {
-    const auto& env = RestrictionEnvironment::get(*(opCtx->getClient()));
+    auto& transportSession = opCtx->getClient()->session();
+    if (!transportSession) {
+        // If Client has no transport session, it must be internal system connection
+        invariant(opCtx->getClient()->isFromSystemConnection());
+        return Status::OK();
+    }
+
+    auto& env = transportSession->getAuthEnvironment();
     auto status = _restrictions.validate(env);
     if (!status.isOK()) {
         return {status.code(),
@@ -201,13 +238,13 @@ void User::reportForUsersInfo(BSONObjBuilder* builder,
                               bool showCredentials,
                               bool showPrivileges,
                               bool showAuthenticationRestrictions) const {
-    builder->append(kIdFieldName, _name.getUnambiguousName());
+    builder->append(kIdFieldName, getName().getUnambiguousName());
     UUID::fromCDR(ConstDataRange(_id)).appendToBuilder(builder, kUserIdFieldName);
-    builder->append(kUserFieldName, _name.getUser());
-    builder->append(kDbFieldName, _name.getDB());
+    builder->append(kUserFieldName, getName().getUser());
+    builder->append(kDbFieldName, getName().getDB());
 
     BSONArrayBuilder mechanismNamesBuilder(builder->subarrayStart(kMechanismsFieldName));
-    for (const StringData& mechanism : _credentials.toMechanismsVector()) {
+    for (StringData mechanism : _credentials.toMechanismsVector()) {
         mechanismNamesBuilder.append(mechanism);
     }
     mechanismNamesBuilder.doneFast();

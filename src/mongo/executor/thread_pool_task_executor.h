@@ -29,16 +29,29 @@
 
 #pragma once
 
-#include <list>
-#include <memory>
-
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/baton.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/executor/network_interface.h"
+#include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/baton.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
 #include "mongo/util/hierarchical_acquisition.h"
+#include "mongo/util/interruptible.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/time_support.h"
+
+#include <list>
+#include <memory>
+#include <mutex>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 
@@ -47,27 +60,32 @@ class ThreadPoolInterface;
 namespace executor {
 
 struct ConnectionPoolStats;
-class NetworkInterface;
 
 /**
  * Implementation of a TaskExecutor that uses a pool of threads to execute work items.
  */
 class ThreadPoolTaskExecutor final : public TaskExecutor {
-    ThreadPoolTaskExecutor(const ThreadPoolTaskExecutor&) = delete;
-    ThreadPoolTaskExecutor& operator=(const ThreadPoolTaskExecutor&) = delete;
+    /** Protects the constructor from outside use. */
+    struct Passkey {
+        explicit Passkey() = default;
+    };
 
 public:
     /**
-     * Constructs an instance of ThreadPoolTaskExecutor that runs tasks in "pool" and uses "net"
-     * for network operations.
+     * Creates an instance that runs tasks in `pool` and uses `net` for network
+     * operations, exclusively owned by the returned `shared_ptr`.
      */
-    ThreadPoolTaskExecutor(std::unique_ptr<ThreadPoolInterface> pool,
+    static std::shared_ptr<ThreadPoolTaskExecutor> create(std::unique_ptr<ThreadPoolInterface> pool,
+                                                          std::shared_ptr<NetworkInterface> net);
+
+    ThreadPoolTaskExecutor(Passkey,
+                           std::unique_ptr<ThreadPoolInterface> pool,
                            std::shared_ptr<NetworkInterface> net);
 
-    /**
-     * Destroys a ThreadPoolTaskExecutor.
-     */
-    ~ThreadPoolTaskExecutor();
+    ~ThreadPoolTaskExecutor() override;
+
+    ThreadPoolTaskExecutor(const ThreadPoolTaskExecutor&) = delete;
+    ThreadPoolTaskExecutor& operator=(const ThreadPoolTaskExecutor&) = delete;
 
     void startup() override;
     void shutdown() override;
@@ -85,34 +103,39 @@ public:
     void waitForEvent(const EventHandle& event) override;
     StatusWith<CallbackHandle> scheduleWork(CallbackFn&& work) override;
     StatusWith<CallbackHandle> scheduleWorkAt(Date_t when, CallbackFn&& work) override;
-    StatusWith<CallbackHandle> scheduleRemoteCommandOnAny(
-        const RemoteCommandRequestOnAny& request,
-        const RemoteCommandOnAnyCallbackFn& cb,
+    StatusWith<CallbackHandle> scheduleRemoteCommand(const RemoteCommandRequest& request,
+                                                     const RemoteCommandCallbackFn& cb,
+                                                     const BatonHandle& baton = nullptr) override;
+    StatusWith<CallbackHandle> scheduleExhaustRemoteCommand(
+        const RemoteCommandRequest& request,
+        const RemoteCommandCallbackFn& cb,
         const BatonHandle& baton = nullptr) override;
-    StatusWith<CallbackHandle> scheduleExhaustRemoteCommandOnAny(
-        const RemoteCommandRequestOnAny& request,
-        const RemoteCommandOnAnyCallbackFn& cb,
-        const BatonHandle& baton = nullptr);
     void cancel(const CallbackHandle& cbHandle) override;
     void wait(const CallbackHandle& cbHandle,
               Interruptible* interruptible = Interruptible::notInterruptible()) override;
 
     void appendConnectionStats(ConnectionPoolStats* stats) const override;
 
-    void dropConnections(const HostAndPort& hostAndPort) override;
+    void dropConnections(const HostAndPort& target, const Status& status) override;
 
     void appendNetworkInterfaceStats(BSONObjBuilder&) const override;
 
     /**
-     * Returns true if there are any tasks in any of _poolInProgressQueue, _networkInProgressQueue,
-     * or _sleepersQueue.
+     * Returns true if there are any tasks currently running or waiting to run.
      */
-    bool hasTasks();
+    bool hasTasks() override;
+
+    /** The network interface used for remote command execution and waiting. */
+    const std::shared_ptr<NetworkInterface>& getNetworkInterface() const {
+        return _net;
+    }
 
 private:
     class CallbackState;
+    struct LocalCallbackState;
+    struct RemoteCallbackState;
     class EventState;
-    using WorkQueue = std::list<std::shared_ptr<CallbackState>>;
+
     using EventList = std::list<std::shared_ptr<EventState>>;
 
     /**
@@ -140,70 +163,30 @@ private:
      * makeEvent().
      */
     static EventList makeSingletonEventList();
+    StatusWith<CallbackHandle> _registerCallbackState(std::shared_ptr<CallbackState> cbState);
 
-    /**
-     * Returns an object suitable for passing to enqueueCallbackState_inlock that represents
-     * executing "work" no sooner than "when" (defaults to ASAP). This function may and should be
-     * called outside of _mutex.
-     */
-    static WorkQueue makeSingletonWorkQueue(CallbackFn work,
-                                            const BatonHandle& baton,
-                                            Date_t when = {});
-
-    /**
-     * Moves the single callback in "wq" to the end of "queue". It is required that "wq" was
-     * produced via a call to makeSingletonWorkQueue().
-     */
-    StatusWith<CallbackHandle> enqueueCallbackState_inlock(WorkQueue* queue, WorkQueue* wq);
+    void _unregisterCallbackState(const std::shared_ptr<CallbackState>& cbState);
 
     /**
      * Signals the given event.
      */
-    void signalEvent_inlock(const EventHandle& event, stdx::unique_lock<Latch> lk);
+    void signalEvent_inlock(const EventHandle& event, stdx::unique_lock<stdx::mutex> lk);
 
-    /**
-     * Schedules all items from "fromQueue" into the thread pool and moves them into
-     * _poolInProgressQueue.
-     */
-    void scheduleIntoPool_inlock(WorkQueue* fromQueue, stdx::unique_lock<Latch> lk);
-
-    /**
-     * Schedules the given item from "fromQueue" into the thread pool and moves it into
-     * _poolInProgressQueue.
-     */
-    void scheduleIntoPool_inlock(WorkQueue* fromQueue,
-                                 const WorkQueue::iterator& iter,
-                                 stdx::unique_lock<Latch> lk);
-
-    /**
-     * Schedules entries from "begin" through "end" in "fromQueue" into the thread pool
-     * and moves them into _poolInProgressQueue.
-     */
-    void scheduleIntoPool_inlock(WorkQueue* fromQueue,
-                                 const WorkQueue::iterator& begin,
-                                 const WorkQueue::iterator& end,
-                                 stdx::unique_lock<Latch> lk);
-
-    /**
-     * Schedules cbState into the thread pool and places it into _poolInProgressQueue. Does not
-     * remove the entry from the original queue.
-     */
-    void scheduleExhaustIntoPool_inlock(std::shared_ptr<CallbackState> cbState,
-                                        stdx::unique_lock<Latch> lk);
     /**
      * Executes the callback specified by "cbState".
      */
-    void runCallback(std::shared_ptr<CallbackState> cbState);
+    void runCallback(std::shared_ptr<LocalCallbackState> cbState, Status s);
 
-    /**
-     * Executes the callback specified by "cbState". Will not mark cbState as finished.
-     */
-    void runCallbackExhaust(std::shared_ptr<CallbackState> cbState,
-                            WorkQueue::iterator expectedExhaustIter);
+    TaskExecutor::RemoteCommandCallbackArgs makeRemoteCallbackArgs(
+        const CallbackHandle& cbHandle,
+        const RemoteCallbackState& cbState,
+        StatusWith<RemoteCommandResponse> swr);
 
     bool _inShutdown_inlock() const;
     void _setState_inlock(State newState);
-    stdx::unique_lock<Latch> _join(stdx::unique_lock<Latch> lk);
+    void _continueExhaustCommand(CallbackHandle cbHandle,
+                                 std::shared_ptr<RemoteCallbackState> cbState,
+                                 std::shared_ptr<NetworkInterface::ExhaustResponseReader> rdr);
 
     // The network interface used for remote command execution and waiting.
     std::shared_ptr<NetworkInterface> _net;
@@ -212,21 +195,21 @@ private:
     std::shared_ptr<ThreadPoolInterface> _pool;
 
     // Mutex guarding all remaining fields.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH(
-        // This is sadly held for a subset of task execution HierarchicalAcquisitionLevel(1),
-        "ThreadPoolTaskExecutor::_mutex");
-
-    // Queue containing all items currently scheduled into the thread pool but not yet completed.
-    WorkQueue _poolInProgressQueue;
-
-    // Queue containing all items currently scheduled into the network interface.
-    WorkQueue _networkInProgressQueue;
-
-    // Queue containing all items waiting for a particular point in time to execute.
-    WorkQueue _sleepersQueue;
+    mutable stdx::mutex _mutex;
 
     // List of all events that have yet to be signaled.
     EventList _unsignaledEvents;
+
+    // List of all callbacks that have yet to be fully completed. This includes those that are
+    // actively running, those that are waiting to run, and those that are waiting on the network
+    // for responses. join() will not return until this list is empty.
+    std::list<std::shared_ptr<CallbackState>> _inProgress;
+
+    // Number of tasks that are waiting for a particular point in time to execute.
+    Atomic<size_t> _sleepers;
+
+    // Number of networking tasks are in progress.
+    Atomic<size_t> _networkInProgress;
 
     // Lifecycle state of this executor.
     stdx::condition_variable _stateChange;

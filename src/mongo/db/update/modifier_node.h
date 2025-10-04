@@ -29,14 +29,25 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/mutable_bson/const_element.h"
+#include "mongo/db/exec/mutable_bson/element.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/update/log_builder_interface.h"
+#include "mongo/db/update/runtime_update_path.h"
+#include "mongo/db/update/update_leaf_node.h"
+#include "mongo/db/update/update_node.h"
+#include "mongo/util/assert_util.h"
+
+#include <cstdint>
 #include <map>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include "mongo/base/string_data.h"
-#include "mongo/db/update/update_leaf_node.h"
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -61,21 +72,38 @@ public:
                       UpdateNodeApplyParams updateNodeApplyParams) const final;
 
 protected:
-    enum class ModifyResult {
-        // No log entry is necessary for no-op updates.
-        kNoOp,
+    struct ModifyResult {
+        enum class Type {
+            // No log entry is necessary for no-op updates.
+            kNoOp,
 
-        // The update can be logged as normal (usually with a $set on the entire element).
-        kNormalUpdate,
+            // The update can be logged as normal.
+            kNormalUpdate,
 
-        // The element is an array, and the update only appends new array items to the end. The
-        // update can be logged as a $set on each appended element, rather than including the entire
-        // array in the log entry.
-        kArrayAppendUpdate,
+            // The element is an array, and the update only appends new array items to the end.
+            kArrayAppendUpdate,
 
-        // The element did not exist, so it was created then populated with setValueForNewElement().
-        // The updateExistingElement() method should never return this value.
-        kCreated
+            // The element did not exist, so it was created then populated with
+            // setValueForNewElement().
+            // The updateExistingElement() method should never return this value.
+            kCreated
+        };
+        static const Type kNoOp = Type::kNoOp;
+        static const Type kNormalUpdate = Type::kNormalUpdate;
+        static const Type kArrayAppendUpdate = Type::kArrayAppendUpdate;
+        static const Type kCreated = Type::kCreated;
+
+        struct EmptyDescription {};
+        struct ArrayAppendUpdateDescription {
+            size_t inserted;
+        };
+
+        ModifyResult() {};
+        ModifyResult(ModifyResult::Type type) : type(type) {}
+
+        Type type;
+        std::variant<EmptyDescription, ArrayAppendUpdateDescription> description =
+            EmptyDescription{};
     };
 
     /**
@@ -187,7 +215,7 @@ protected:
         FieldRef* currentPath,
         std::map<std::string, std::vector<std::pair<std::string, BSONObj>>>*
             operatorOrientedUpdates) const override {
-        (*operatorOrientedUpdates)[operatorName().toString()].emplace_back(
+        (*operatorOrientedUpdates)[std::string{operatorName()}].emplace_back(
             currentPath->dottedField(), operatorValue());
     }
 

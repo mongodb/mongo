@@ -6,9 +6,8 @@
  * @tags: [requires_persistence, uses_transactions, uses_prepare_transaction]
  */
 
-(function() {
-"use strict";
-load("jstests/core/txns/libs/prepare_helpers.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const replTest = new ReplSetTest({nodes: 1});
 replTest.startSet();
@@ -17,8 +16,9 @@ replTest.initiate();
 let primary = replTest.getPrimary();
 // The default WC is majority and disableSnapshotting failpoint will prevent satisfying any majority
 // writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 const dbName = "test";
 const collName = "commit_transaction_recovery";
@@ -38,8 +38,7 @@ let prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
 jsTestLog("Disable snapshotting on all nodes");
 // Disable snapshotting so that future operations do not enter the majority snapshot.
-assert.commandWorked(
-    primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "alwaysOn"}));
+assert.commandWorked(primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "alwaysOn"}));
 
 jsTestLog("Committing the transaction");
 // Since the commitTimestamp is after the last snapshot, this oplog entry will be replayed
@@ -71,4 +70,3 @@ assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp)
 assert.eq(testDB[collName].findOne({_id: 1}), {_id: 1, a: 1});
 
 replTest.stopSet();
-}());

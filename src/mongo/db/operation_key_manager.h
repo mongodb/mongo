@@ -31,9 +31,14 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/operation_id.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
+
+#include <cstddef>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -79,7 +84,7 @@ public:
     size_t size() const;
 
 private:
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("OperationKeyManager::_mutex");
+    mutable stdx::mutex _mutex;
 
     stdx::unordered_map<OperationKey, OperationId, OperationKey::Hash> _idByOperationKey;
 };

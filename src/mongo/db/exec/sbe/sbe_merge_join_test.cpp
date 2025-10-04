@@ -27,11 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 #include "mongo/db/exec/sbe/stages/merge_join.h"
-#include "mongo/db/query/sbe_stage_builder_helpers.h"
+#include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
+#include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
+#include "mongo/unittest/unittest.h"
+
+#include <memory>
+#include <utility>
+#include <vector>
 
 namespace mongo::sbe {
 /**
@@ -109,43 +121,22 @@ TEST_F(MergeJoinStageTest, MergeJoinManyToManyIdenticalKeys) {
     auto outerData =
         BSON_ARRAY(BSON_ARRAY(1 << BSON_ARRAY(1 << 1))
                    << BSON_ARRAY(1 << BSON_ARRAY(2 << 2)) << BSON_ARRAY(1 << BSON_ARRAY(3 << 3)));
-    auto innerData = BSON_ARRAY(BSON_ARRAY(1 << BSON_ARRAY("a"
-                                                           << "a"))
-                                << BSON_ARRAY(1 << BSON_ARRAY("b"
-                                                              << "b"))
-                                << BSON_ARRAY(1 << BSON_ARRAY("c"
-                                                              << "c"))
-                                << BSON_ARRAY(2 << BSON_ARRAY("d"
-                                                              << "d")));
+    auto innerData = BSON_ARRAY(BSON_ARRAY(1 << BSON_ARRAY("a" << "a"))
+                                << BSON_ARRAY(1 << BSON_ARRAY("b" << "b"))
+                                << BSON_ARRAY(1 << BSON_ARRAY("c" << "c"))
+                                << BSON_ARRAY(2 << BSON_ARRAY("d" << "d")));
     // Expect to have every possible combination of outer / inner data joined but should ignore the
     // last row of 'innerData' since there is no match on that key.
-    auto expectedData = BSON_ARRAY(BSON_ARRAY(1 << 1 << BSON_ARRAY(1 << 1)
-                                                << BSON_ARRAY("a"
-                                                              << "a"))
-                                   << BSON_ARRAY(1 << 1 << BSON_ARRAY(2 << 2)
-                                                   << BSON_ARRAY("a"
-                                                                 << "a"))
-                                   << BSON_ARRAY(1 << 1 << BSON_ARRAY(3 << 3)
-                                                   << BSON_ARRAY("a"
-                                                                 << "a"))
-                                   << BSON_ARRAY(1 << 1 << BSON_ARRAY(1 << 1)
-                                                   << BSON_ARRAY("b"
-                                                                 << "b"))
-                                   << BSON_ARRAY(1 << 1 << BSON_ARRAY(2 << 2)
-                                                   << BSON_ARRAY("b"
-                                                                 << "b"))
-                                   << BSON_ARRAY(1 << 1 << BSON_ARRAY(3 << 3)
-                                                   << BSON_ARRAY("b"
-                                                                 << "b"))
-                                   << BSON_ARRAY(1 << 1 << BSON_ARRAY(1 << 1)
-                                                   << BSON_ARRAY("c"
-                                                                 << "c"))
-                                   << BSON_ARRAY(1 << 1 << BSON_ARRAY(2 << 2)
-                                                   << BSON_ARRAY("c"
-                                                                 << "c"))
-                                   << BSON_ARRAY(1 << 1 << BSON_ARRAY(3 << 3)
-                                                   << BSON_ARRAY("c"
-                                                                 << "c")));
+    auto expectedData =
+        BSON_ARRAY(BSON_ARRAY(1 << 1 << BSON_ARRAY(1 << 1) << BSON_ARRAY("a" << "a"))
+                   << BSON_ARRAY(1 << 1 << BSON_ARRAY(2 << 2) << BSON_ARRAY("a" << "a"))
+                   << BSON_ARRAY(1 << 1 << BSON_ARRAY(3 << 3) << BSON_ARRAY("a" << "a"))
+                   << BSON_ARRAY(1 << 1 << BSON_ARRAY(1 << 1) << BSON_ARRAY("b" << "b"))
+                   << BSON_ARRAY(1 << 1 << BSON_ARRAY(2 << 2) << BSON_ARRAY("b" << "b"))
+                   << BSON_ARRAY(1 << 1 << BSON_ARRAY(3 << 3) << BSON_ARRAY("b" << "b"))
+                   << BSON_ARRAY(1 << 1 << BSON_ARRAY(1 << 1) << BSON_ARRAY("c" << "c"))
+                   << BSON_ARRAY(1 << 1 << BSON_ARRAY(2 << 2) << BSON_ARRAY("c" << "c"))
+                   << BSON_ARRAY(1 << 1 << BSON_ARRAY(3 << 3) << BSON_ARRAY("c" << "c")));
 
     runTest(outerData, innerData, expectedData);
 }
@@ -154,17 +145,11 @@ TEST_F(MergeJoinStageTest, MergeJoinSingleToManyIdenticalKeys) {
     auto outerData =
         BSON_ARRAY(BSON_ARRAY(1 << BSON_ARRAY(1 << 1))
                    << BSON_ARRAY(1 << BSON_ARRAY(2 << 2)) << BSON_ARRAY(1 << BSON_ARRAY(3 << 3)));
-    auto innerData = BSON_ARRAY(BSON_ARRAY(1 << BSON_ARRAY("a"
-                                                           << "a")));
-    auto expectedData = BSON_ARRAY(BSON_ARRAY(1 << 1 << BSON_ARRAY(1 << 1)
-                                                << BSON_ARRAY("a"
-                                                              << "a"))
-                                   << BSON_ARRAY(1 << 1 << BSON_ARRAY(2 << 2)
-                                                   << BSON_ARRAY("a"
-                                                                 << "a"))
-                                   << BSON_ARRAY(1 << 1 << BSON_ARRAY(3 << 3)
-                                                   << BSON_ARRAY("a"
-                                                                 << "a")));
+    auto innerData = BSON_ARRAY(BSON_ARRAY(1 << BSON_ARRAY("a" << "a")));
+    auto expectedData =
+        BSON_ARRAY(BSON_ARRAY(1 << 1 << BSON_ARRAY(1 << 1) << BSON_ARRAY("a" << "a"))
+                   << BSON_ARRAY(1 << 1 << BSON_ARRAY(2 << 2) << BSON_ARRAY("a" << "a"))
+                   << BSON_ARRAY(1 << 1 << BSON_ARRAY(3 << 3) << BSON_ARRAY("a" << "a")));
 
     runTest(outerData, innerData, expectedData);
 }
@@ -173,22 +158,18 @@ TEST_F(MergeJoinStageTest, MergeJoinUniqueKeys) {
     auto outerData =
         BSON_ARRAY(BSON_ARRAY(1 << BSON_ARRAY(1 << 1))
                    << BSON_ARRAY(2 << BSON_ARRAY(2 << 2)) << BSON_ARRAY(3 << BSON_ARRAY(3 << 3)));
-    auto innerData = BSON_ARRAY(BSON_ARRAY(2 << BSON_ARRAY("a"
-                                                           << "a"
-                                                           << "a"))
-                                << BSON_ARRAY(3 << BSON_ARRAY("b"
-                                                              << "b"
-                                                              << "b"))
+    auto innerData = BSON_ARRAY(BSON_ARRAY(2 << BSON_ARRAY("a" << "a"
+                                                               << "a"))
+                                << BSON_ARRAY(3 << BSON_ARRAY("b" << "b"
+                                                                  << "b"))
                                 << BSON_ARRAY(4 << BSON("c" << 100)));
     // Expect to join on keys '2' and '3' and have appropriate projects from both outer and inner.
     auto expectedData = BSON_ARRAY(BSON_ARRAY(2 << 2 << BSON_ARRAY(2 << 2)
-                                                << BSON_ARRAY("a"
-                                                              << "a"
-                                                              << "a"))
+                                                << BSON_ARRAY("a" << "a"
+                                                                  << "a"))
                                    << BSON_ARRAY(3 << 3 << BSON_ARRAY(3 << 3)
-                                                   << BSON_ARRAY("b"
-                                                                 << "b"
-                                                                 << "b")));
+                                                   << BSON_ARRAY("b" << "b"
+                                                                     << "b")));
 
     runTest(outerData, innerData, expectedData);
 }
@@ -197,20 +178,16 @@ TEST_F(MergeJoinStageTest, MergeJoinLastRowMatch) {
     auto outerData =
         BSON_ARRAY(BSON_ARRAY(1 << BSON_ARRAY(1 << 1)) << BSON_ARRAY(2 << BSON_ARRAY(2 << 2))
                                                        << BSON_ARRAY(10 << BSON_ARRAY(10 << 10)));
-    auto innerData = BSON_ARRAY(BSON_ARRAY(4 << BSON_ARRAY("a"
-                                                           << "a"
-                                                           << "a"))
-                                << BSON_ARRAY(5 << BSON_ARRAY("b"
-                                                              << "b"
-                                                              << "b"))
-                                << BSON_ARRAY(10 << BSON_ARRAY("c"
-                                                               << "c"
-                                                               << "c")));
+    auto innerData = BSON_ARRAY(BSON_ARRAY(4 << BSON_ARRAY("a" << "a"
+                                                               << "a"))
+                                << BSON_ARRAY(5 << BSON_ARRAY("b" << "b"
+                                                                  << "b"))
+                                << BSON_ARRAY(10 << BSON_ARRAY("c" << "c"
+                                                                   << "c")));
     // Expect to skip all keys except for key '10' on last rows of both outer and inner sides.
     auto expectedData = BSON_ARRAY(BSON_ARRAY(10 << 10 << BSON_ARRAY(10 << 10)
-                                                 << BSON_ARRAY("c"
-                                                               << "c"
-                                                               << "c")));
+                                                 << BSON_ARRAY("c" << "c"
+                                                                   << "c")));
 
     runTest(outerData, innerData, expectedData);
 }
@@ -269,23 +246,18 @@ TEST_F(MergeJoinStageTest, MergeJoinSortDirectionDescending) {
     auto outerData =
         BSON_ARRAY(BSON_ARRAY(10 << BSON_ARRAY(3 << 3))
                    << BSON_ARRAY(2 << BSON_ARRAY(2 << 2)) << BSON_ARRAY(1 << BSON_ARRAY(1 << 1)));
-    auto innerData = BSON_ARRAY(BSON_ARRAY(3 << BSON_ARRAY("a"
-                                                           << "a"
-                                                           << "a"))
-                                << BSON_ARRAY(2 << BSON_ARRAY("b"
-                                                              << "b"
-                                                              << "b"))
-                                << BSON_ARRAY(1 << BSON_ARRAY("c"
-                                                              << "c"
-                                                              << "c")));
+    auto innerData = BSON_ARRAY(BSON_ARRAY(3 << BSON_ARRAY("a" << "a"
+                                                               << "a"))
+                                << BSON_ARRAY(2 << BSON_ARRAY("b" << "b"
+                                                                  << "b"))
+                                << BSON_ARRAY(1 << BSON_ARRAY("c" << "c"
+                                                                  << "c")));
     auto expectedData = BSON_ARRAY(BSON_ARRAY(2 << 2 << BSON_ARRAY(2 << 2)
-                                                << BSON_ARRAY("b"
-                                                              << "b"
-                                                              << "b"))
+                                                << BSON_ARRAY("b" << "b"
+                                                                  << "b"))
                                    << BSON_ARRAY(1 << 1 << BSON_ARRAY(1 << 1)
-                                                   << BSON_ARRAY("c"
-                                                                 << "c"
-                                                                 << "c")));
+                                                   << BSON_ARRAY("c" << "c"
+                                                                     << "c")));
 
     runTest(outerData, innerData, expectedData, value::SortDirection::Descending);
 }

@@ -29,11 +29,15 @@
 
 #pragma once
 
-#include <memory>
-#include <vector>
+#include "mongo/db/local_catalog/collection.h"
+#include "mongo/db/local_catalog/index_catalog_entry.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/multiple_collection_accessor.h"
+#include "mongo/util/string_map.h"
+#include "mongo/util/uuid.h"
 
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/index_catalog_entry.h"
+#include <map>
+#include <string>
 
 namespace mongo {
 
@@ -45,26 +49,27 @@ class AllIndicesRequiredChecker {
 public:
     /**
      * Constructs an 'AllIndicesRequiredChecker' which can be used later to ensure that none of the
-     * indices for the given 'collection' have been dropped. The caller must hold the appropriate
-     * db_raii object in order to read the collection's index catalog.
+     * indices from 'collections' have been dropped. The caller must hold the appropriate db_raii
+     * object in order to read the collection's index catalog.
      */
-    explicit AllIndicesRequiredChecker(const CollectionPtr& collection);
+    explicit AllIndicesRequiredChecker(const MultipleCollectionAccessor& collections);
 
     /**
      * Throws a 'QueryPlanKilled' error if any of the indices which existed at the time of
      * construction have since been dropped.
      */
-    void check() const;
+    void check(OperationContext* opCtx, const MultipleCollectionAccessor& collections) const;
 
 private:
-    // This class holds weak pointers to all of the index catalog entries known at the time of
-    // construction. Later, we can attempt to lock each weak pointer in order to determine whether
-    // an index in the list has been destroyed. If we can lock the weak pointer, we need to check
-    // the 'isDropped()' flag on the index catalog entry.
-    std::vector<std::weak_ptr<const IndexCatalogEntry>> _indexCatalogEntries;
+    void saveIndicesForCollection(const CollectionPtr& collection);
 
-    // The names of the indices above. Used for error reporting.
-    std::vector<std::string> _indexNames;
+    void checkIndicesForCollection(OperationContext* opCtx, const CollectionPtr& collection) const;
+
+    // This map of map holds index idents to all of the index catalog entries known at the time of
+    // construction, grouped first by collection UUID then by index name. Later, we can attempt to
+    // lookup the index entry by its ident in order to determine whether an index in the list has
+    // been dropped.
+    std::map<UUID, StringMap<std::string>> _identEntries;
 };
 
 }  // namespace mongo

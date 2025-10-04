@@ -1,0 +1,127 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "rate_limiting",
+    srcs = [
+        "rate_limiting.cpp",
+    ],
+    hdrs = [
+        "rate_limiting.h",
+        "//src/mongo/util:overloaded_visitor.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/util:clock_sources",
+    ],
+)
+
+mongo_cc_library(
+    name = "query_stats",
+    srcs = [
+        "aggregated_metric.cpp",
+        "key.cpp",
+        "optimizer_metrics_stats_entry.cpp",
+        "query_stats.cpp",
+        "query_stats_entry.cpp",
+        "query_stats_failed_to_record_info.cpp",
+        "supplemental_metrics_stats.cpp",
+        "vector_search_stats_entry.cpp",
+    ],
+    hdrs = [
+        "aggregated_metric.h",
+        "key.h",
+        "optimizer_metrics_stats_entry.h",
+        "query_stats.h",
+        "query_stats_entry.h",
+        "query_stats_failed_to_record_info.h",
+        "supplemental_metrics_stats.h",
+        "vector_search_stats_entry.h",
+    ],
+    header_deps = [
+        "//src/mongo/client:read_preference",  # TODO(SERVER-93876): Remove.
+    ],
+    deps = [
+        ":rate_limiting",
+        "//src/mongo/db:api_parameters",
+        "//src/mongo/db:commands",
+        "//src/mongo/util:buildinfo",
+    ],
+)
+
+idl_generator(
+    name = "transform_algorithm_gen",
+    src = "transform_algorithm.idl",
+)
+
+mongo_cc_library(
+    name = "query_stats_parse",
+    srcs = [
+        ":transform_algorithm_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_query_query_stats_test",
+    srcs = [
+        "agg_key_test.cpp",
+        "count_key_test.cpp",
+        "distinct_key_test.cpp",
+        "find_key_test.cpp",
+        "key_test.cpp",
+        "query_stats_store_test.cpp",
+        "query_stats_test.cpp",
+        "rate_limiting_test.cpp",
+        "supplemental_metrics_test.cpp",
+    ],
+    header_deps = [
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/idl:server_parameter_test_controller",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        ":query_stats",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/util:version_impl",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "rate_limiting_bm",
+    srcs = [
+        "rate_limiting_bm.cpp",
+    ],
+    tags = ["query_bm"],
+    deps = [
+        "rate_limiting",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "shapifying_bm",
+    srcs = [
+        "shapifying_bm.cpp",
+    ],
+    header_deps = [
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/query:query_bm_constants",
+    ],
+    tags = ["query_bm"],
+    deps = [
+        "//src/mongo/db/query:query_bm_constants",
+        "//src/mongo/db/query:query_fcv_environment_for_test",
+        "//src/mongo/db/query:query_test_service_context",
+    ],
+)

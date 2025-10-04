@@ -11,11 +11,13 @@ Distributed under the Boost Software License, Version 1.0.
 
 #include <boost/core/default_allocator.hpp>
 #include <boost/smart_ptr/allocate_local_shared_array.hpp>
+#include <boost/smart_ptr/detail/sp_type_traits.hpp>
+#include <type_traits>
 
 namespace boost {
 
 template<class T>
-inline typename enable_if_<is_bounded_array<T>::value,
+inline typename std::enable_if<detail::sp_is_bounded_array<T>::value,
     local_shared_ptr<T> >::type
 make_local_shared()
 {
@@ -24,16 +26,16 @@ make_local_shared()
 }
 
 template<class T>
-inline typename enable_if_<is_bounded_array<T>::value,
+inline typename std::enable_if<detail::sp_is_bounded_array<T>::value,
     local_shared_ptr<T> >::type
-make_local_shared(const typename remove_extent<T>::type& value)
+make_local_shared(const typename std::remove_extent<T>::type& value)
 {
     return boost::allocate_local_shared<T>(boost::default_allocator<typename
         detail::sp_array_element<T>::type>(), value);
 }
 
 template<class T>
-inline typename enable_if_<is_unbounded_array<T>::value,
+inline typename std::enable_if<detail::sp_is_unbounded_array<T>::value,
     local_shared_ptr<T> >::type
 make_local_shared(std::size_t size)
 {
@@ -42,17 +44,17 @@ make_local_shared(std::size_t size)
 }
 
 template<class T>
-inline typename enable_if_<is_unbounded_array<T>::value,
+inline typename std::enable_if<detail::sp_is_unbounded_array<T>::value,
     local_shared_ptr<T> >::type
 make_local_shared(std::size_t size,
-    const typename remove_extent<T>::type& value)
+    const typename std::remove_extent<T>::type& value)
 {
     return boost::allocate_local_shared<T>(boost::default_allocator<typename
         detail::sp_array_element<T>::type>(), size, value);
 }
 
 template<class T>
-inline typename enable_if_<is_bounded_array<T>::value,
+inline typename std::enable_if<detail::sp_is_bounded_array<T>::value,
     local_shared_ptr<T> >::type
 make_local_shared_noinit()
 {
@@ -61,7 +63,7 @@ make_local_shared_noinit()
 }
 
 template<class T>
-inline typename enable_if_<is_unbounded_array<T>::value,
+inline typename std::enable_if<detail::sp_is_unbounded_array<T>::value,
     local_shared_ptr<T> >::type
 make_local_shared_noinit(std::size_t size)
 {

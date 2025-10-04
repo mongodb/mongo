@@ -1,0 +1,14 @@
+# Golden test output of SBEFailTest/SimpleFail
+-- INPUT EXPRESSION:
+fail(2, "test") 
+
+-- COMPILED EXPRESSION:
+[0x0000-0x0015] stackSize: 1, maxStackSize: 2
+0x0000: pushConstVal(value: 2ll);
+0x000a: pushConstVal(value: "test");
+0x0014: fail();
+
+
+-- EXECUTE VARIATION:
+EXCEPTION: BadValue: test
+

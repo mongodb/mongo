@@ -31,6 +31,8 @@
 
 #include "mongo/platform/strcasestr.h"
 
+#include <cstring>
+
 namespace mongo {
 namespace fts {
 

@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 namespace mongo {
 
 int mongo_main(int argc, char* argv[]);

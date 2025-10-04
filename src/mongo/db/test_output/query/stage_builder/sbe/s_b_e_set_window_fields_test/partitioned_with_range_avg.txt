@@ -1,0 +1,38 @@
+# Golden test output of SBESetWindowFieldsTest/PartitionedWithRangeAvg
+[2] project [s18 = makeBsonObj(MakeObjSpec([avg = Set(0)], Open, NewObj, 0), s2, s17)] 
+[2] project [s17 = 
+    if exists(s10) 
+    then aggRemovableAvgFinalize(s10, s11) 
+    else null 
+] 
+[2] window [s6, s2, s4, s13, s12] [frameFirst[], frameLast[], lowBound{((s15 <=> dateAdd(s16, s12, "day", -1ll, "UTC")) >= 0)}, highBound{((s15 <=> dateAdd(s16, s12, "day", 0ll, "UTC")) <= 0)}] [s10 = {init{}, add{aggRemovableSumAdd(s4)}, remove{aggRemovableSumRemove(s4)}}, s11 = {init{}, add{sum(
+    if isNumber((s4 ?: null)) 
+    then 1ll 
+    else 0ll 
+)}, remove{sum(
+    if isNumber((s4 ?: null)) 
+    then -1ll 
+    else 0ll 
+)}}] 
+[2] project [s12 = 
+    let [
+        l4.0 = (s13 ?: null) 
+    ] 
+    in 
+        if isDate(l4.0) 
+        then move(l4.0) 
+        else fail(7956500, "Invalid range: Expected the sortBy field to be a date") 
+] 
+[2] project [s13 = s3] 
+[2] project [s6 = 
+    let [
+        l2.0 = (s5 ?: null) 
+    ] 
+    in 
+        if isArray(l2.0) 
+        then fail(14, "An expression used to partition cannot evaluate to value of type array") 
+        else move(l2.0) 
+] 
+[1] project [s3 = getField(s2, "a"), s4 = getField(s2, "b"), s5 = getField(s2, "c")] 
+[1] project [s2 = getElement(s1, 0)] 
+[1] virtualscan s1 {[[{"a" : Date(1736467200000), "b" : 1, "c" : 1}], [{"a" : Date(1736553600000), "b" : 3, "c" : 1}], [{"a" : Date(1736467200000), "b" : 5, "c" : 2}], [{"a" : Date(1736640000000), "b" : 7, "c" : 2}]]} 

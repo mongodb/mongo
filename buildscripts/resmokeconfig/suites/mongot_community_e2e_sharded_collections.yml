@@ -1,0 +1,64 @@
+# Even though this suite skips auth between mongod and mongot, auth is still required to set up
+# mongot for the fixture.
+config_variables:
+  - &keyFile jstests/with_mongot/keyfile_for_testing
+  - &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+  - &authOptions
+    # mongos requires authenticating as the __system user using the admin database.
+    # This is different than non-sharded search e2e suites, which authenticate on
+    # the local db.
+    authenticationDatabase: admin
+    authenticationMechanism: SCRAM-SHA-256
+    password: *keyFileData
+    username: __system
+
+test_kind: js_test
+description: |
+  This suite is identical to mongot_e2e_sharded_collections in all ways except that mongod
+  will speak gRPC to mongot instead of MongoRPC, and it will not do SASL authentication between
+  mongod and mongot.
+
+selector:
+  roots:
+    - jstests/with_mongot/e2e/**/*.js
+    - jstests/with_mongot/e2e_infrastructure_tests/*.js
+    - jstests/with_mongot/e2e_lib/*_test.js
+  exclude_files:
+    - jstests/with_mongot/e2e/sharding_no_passthrough/**/*.js
+  exclude_with_any_tags:
+    - assumes_against_mongod_not_mongos
+    - assumes_unsharded_collection
+
+executor:
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          auth: true
+          authMechanism: SCRAM-SHA-256
+          keyFile: *keyFile
+          keyFileData: *keyFileData
+          roleGraphInvalidationIsFatal: true
+      eval: >-
+        await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
+        jsTest.authenticate(db.getMongo());
+      <<: *authOptions
+  fixture:
+    class: ShardedClusterFixture
+    auth_options: *authOptions
+    launch_mongot: true
+    num_shards: 2
+    mongod_options:
+      keyFile: *keyFile
+      set_parameters:
+        enableTestCommands: 1
+        featureFlagEgressGrpcForSearch: true
+        useGrpcForSearch: 1
+        skipAuthenticationToMongot: true
+    mongos_options:
+      keyFile: *keyFile
+      set_parameters:
+        enableTestCommands: 1
+        featureFlagEgressGrpcForSearch: true
+        useGrpcForSearch: 1
+        skipAuthenticationToMongot: true

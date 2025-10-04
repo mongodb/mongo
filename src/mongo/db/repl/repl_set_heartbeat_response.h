@@ -29,12 +29,19 @@
 
 #pragma once
 
-#include <string>
-
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_set_config.h"
+#include "mongo/util/modules.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
+
+#include <string>
 
 namespace mongo {
 
@@ -47,7 +54,7 @@ namespace repl {
 /**
  * Response structure for the replSetHeartbeat command.
  */
-class ReplSetHeartbeatResponse {
+class MONGO_MOD_PUB ReplSetHeartbeatResponse {
 public:
     /**
      * Initializes this ReplSetHeartbeatResponse from the contents of "doc".
@@ -67,7 +74,7 @@ public:
     /**
      * Returns toBSON().toString()
      */
-    const std::string toString() const {
+    std::string toString() const {
         return toBSON().toString();
     }
 
@@ -110,6 +117,11 @@ public:
     }
     OpTime getAppliedOpTime() const;
     OpTimeAndWallTime getAppliedOpTimeAndWallTime() const;
+    bool hasWrittenOpTime() const {
+        return _writtenOpTimeSet;
+    }
+    OpTime getWrittenOpTime() const;
+    OpTimeAndWallTime getWrittenOpTimeAndWallTime() const;
     bool hasDurableOpTime() const {
         return _durableOpTimeSet;
     }
@@ -124,7 +136,7 @@ public:
      * Sets _setName to "name".
      */
     void setSetName(StringData name) {
-        _setName = name.toString();
+        _setName = std::string{name};
     }
 
     /**
@@ -181,6 +193,11 @@ public:
         _appliedOpTime = time.opTime;
         _appliedWallTime = time.wallTime;
     }
+    void setWrittenOpTimeAndWallTime(OpTimeAndWallTime time) {
+        _writtenOpTimeSet = true;
+        _writtenOpTime = time.opTime;
+        _writtenWallTime = time.wallTime;
+    }
     void setDurableOpTimeAndWallTime(OpTimeAndWallTime time) {
         _durableOpTimeSet = true;
         _durableOpTime = time.opTime;
@@ -206,6 +223,10 @@ private:
     bool _appliedOpTimeSet = false;
     OpTime _appliedOpTime;
     Date_t _appliedWallTime;
+
+    bool _writtenOpTimeSet = false;
+    OpTime _writtenOpTime;
+    Date_t _writtenWallTime;
 
     bool _durableOpTimeSet = false;
     OpTime _durableOpTime;

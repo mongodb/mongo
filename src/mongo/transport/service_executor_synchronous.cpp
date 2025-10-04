@@ -27,65 +27,217 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kExecutor
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/transport/service_executor_synchronous.h"
 
+// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/base/error_codes.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/thread.h"
-#include "mongo/transport/service_executor_gen.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/transport/service_executor_utils.h"
-#include "mongo/util/thread_safety_context.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/functional.h"
+#include "mongo/util/out_of_line_executor.h"
 
-namespace mongo {
-namespace transport {
-namespace {
-constexpr auto kExecutorName = "passthrough"_sd;
+#include <deque>
+#include <mutex>
+#include <string>
+#include <utility>
 
-constexpr auto kThreadsRunning = "threadsRunning"_sd;
-constexpr auto kClientsInTotal = "clientsInTotal"_sd;
-constexpr auto kClientsRunning = "clientsRunning"_sd;
-constexpr auto kClientsWaiting = "clientsWaitingForData"_sd;
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kExecutor
 
-const auto getServiceExecutorSynchronous =
-    ServiceContext::declareDecoration<std::unique_ptr<ServiceExecutorSynchronous>>();
+namespace mongo::transport {
 
-const auto serviceExecutorSynchronousRegisterer = ServiceContext::ConstructorActionRegisterer{
-    "ServiceExecutorSynchronous", [](ServiceContext* ctx) {
-        getServiceExecutorSynchronous(ctx) = std::make_unique<ServiceExecutorSynchronous>(ctx);
-    }};
-}  // namespace
+namespace service_executor_synchronous_detail {
 
-thread_local std::deque<ServiceExecutor::Task> ServiceExecutorSynchronous::_localWorkQueue = {};
-thread_local int ServiceExecutorSynchronous::_localRecursionDepth = 0;
-thread_local int64_t ServiceExecutorSynchronous::_localThreadIdleCounter = 0;
+class ServiceExecutorSyncImpl::SharedState : public std::enable_shared_from_this<SharedState> {
+private:
+    class LockRef {
+    public:
+        explicit LockRef(SharedState* p) : _p{p} {}
 
-ServiceExecutorSynchronous::ServiceExecutorSynchronous(ServiceContext* ctx)
-    : _shutdownCondition(std::make_shared<stdx::condition_variable>()) {}
+        size_t threads() const {
+            return _p->_threads;
+        }
 
-Status ServiceExecutorSynchronous::start() {
-    _stillRunning.store(true);
+        bool waitForDrain(Milliseconds dur) {
+            return _p->_cv.wait_for(_lk, dur.toSystemDuration(), [&] { return !_p->_threads; });
+        }
 
+        void onStartThread() {
+            ++_p->_threads;
+        }
+
+        void onEndThread() {
+            if (!--_p->_threads)
+                _p->_cv.notify_all();
+        }
+
+    private:
+        SharedState* _p;
+        stdx::unique_lock<stdx::mutex> _lk{_p->_mutex};
+    };
+
+public:
+    explicit SharedState(RunTaskInline runTaskInline) : _runTaskInline(runTaskInline) {}
+
+    void schedule(Task task, StringData name);
+
+    bool isRunning() const {
+        return _isRunning.loadRelaxed();
+    }
+
+    void setIsRunning(bool b) {
+        _isRunning.store(b);
+    }
+
+    LockRef lock() {
+        return LockRef{this};
+    }
+
+private:
+    class WorkerThreadInfo;
+
+    const RunTaskInline _runTaskInline;
+    mutable stdx::mutex _mutex;
+    stdx::condition_variable _cv;
+    AtomicWord<bool> _isRunning;
+    size_t _threads = 0;
+};
+
+class ServiceExecutorSyncImpl::SharedState::WorkerThreadInfo {
+public:
+    explicit WorkerThreadInfo(std::shared_ptr<SharedState> sharedState)
+        : sharedState{std::move(sharedState)} {}
+
+    void run() {
+        while (!queue.empty() && sharedState->isRunning()) {
+            queue.front()(Status::OK());
+            queue.pop_front();
+        }
+    }
+
+    std::shared_ptr<SharedState> sharedState;
+    std::deque<Task> queue;
+};
+
+void ServiceExecutorSyncImpl::SharedState::schedule(Task task, StringData name) {
+    if (!isRunning()) {
+        task(Status(ErrorCodes::ShutdownInProgress, fmt::format("{} is not running", name)));
+        return;
+    }
+
+    thread_local WorkerThreadInfo* workerThreadInfoTls = nullptr;
+
+    if (workerThreadInfoTls) {
+        workerThreadInfoTls->queue.push_back(std::move(task));
+        return;
+    }
+
+    auto workerInfo = std::make_unique<WorkerThreadInfo>(shared_from_this());
+    workerInfo->queue.push_back(std::move(task));
+
+    auto runTask = [w = std::move(workerInfo)] {
+        w->sharedState->lock().onStartThread();
+        ScopeGuard onEndThreadGuard = [&] {
+            w->sharedState->lock().onEndThread();
+        };
+
+        workerThreadInfoTls = &*w;
+        ScopeGuard resetTlsGuard = [&] {
+            workerThreadInfoTls = nullptr;
+        };
+
+        w->run();
+    };
+
+    if (_runTaskInline == RunTaskInline{true}) {
+        runTask();
+    } else {
+        // The usual way to fail to schedule is to invoke the task,
+        // but in this case we will not have the task anymore.
+        // We will have given it away while attempting to launch the thread.
+        LOGV2_DEBUG(22983, 3, "Starting ServiceExecutorSynchronous worker thread");
+        iassert(launchServiceWorkerThread(std::move(runTask)));
+    }
+}
+
+ServiceExecutorSyncImpl::ServiceExecutorSyncImpl(RunTaskInline runTaskInline,
+                                                 std::string statsFieldName)
+    : _sharedState{std::make_shared<SharedState>(runTaskInline)},
+      _statsFieldName(std::move(statsFieldName)) {}
+
+ServiceExecutorSyncImpl::~ServiceExecutorSyncImpl() = default;
+
+void ServiceExecutorSyncImpl::start() {
+    _sharedState->setIsRunning(true);
+}
+
+Status ServiceExecutorSyncImpl::shutdown(Milliseconds timeout) {
+    LOGV2_DEBUG(22982, 3, "Shutting down passthrough executor");
+    auto stopLock = _sharedState->lock();
+    _sharedState->setIsRunning(false);
+    if (!stopLock.waitForDrain(timeout))
+        return Status(ErrorCodes::Error::ExceededTimeLimit,
+                      "passthrough executor couldn't shutdown "
+                      "all worker threads within time limit.");
     return Status::OK();
 }
 
-Status ServiceExecutorSynchronous::shutdown(Milliseconds timeout) {
-    LOGV2_DEBUG(22982, 3, "Shutting down passthrough executor");
-
-    _stillRunning.store(false);
-
-    stdx::unique_lock<Latch> lock(_shutdownMutex);
-    bool result = _shutdownCondition->wait_for(lock, timeout.toSystemDuration(), [this]() {
-        return _numRunningWorkerThreads.load() == 0;
-    });
-
-    return result
-        ? Status::OK()
-        : Status(ErrorCodes::Error::ExceededTimeLimit,
-                 "passthrough executor couldn't shutdown all worker threads within time limit.");
+size_t ServiceExecutorSyncImpl::getRunningThreads() const {
+    return _sharedState->lock().threads();
 }
+
+void ServiceExecutorSyncImpl::appendStats(BSONObjBuilder* bob) const {
+    // Has one client per thread and waits synchronously on that thread.
+    int threads = getRunningThreads();
+    BSONObjBuilder{bob->subobjStart(_statsFieldName)}
+        .append("threadsRunning", threads)
+        .append("clientsInTotal", threads)
+        .append("clientsRunning", threads)
+        .append("clientsWaitingForData", 0);
+}
+
+auto ServiceExecutorSyncImpl::makeTaskRunner() -> std::unique_ptr<TaskRunner> {
+    if (!_sharedState->isRunning())
+        iassert(Status(ErrorCodes::ShutdownInProgress, "Executor is not running"));
+
+    /** Schedules on this. */
+    class ForwardingTaskRunner : public TaskRunner {
+    public:
+        explicit ForwardingTaskRunner(ServiceExecutorSyncImpl* e) : _e{e} {}
+
+        void schedule(Task task) override {
+            _e->_sharedState->schedule(std::move(task), _e->getName());
+        }
+
+        void runTaskForSession(std::shared_ptr<Session> session, Task task) override {
+            invariant(session);
+            _e->_sharedState->schedule(std::move(task), _e->getName());
+        }
+
+    private:
+        ServiceExecutorSyncImpl* _e;
+    };
+    return std::make_unique<ForwardingTaskRunner>(this);
+}
+
+}  // namespace service_executor_synchronous_detail
+
+/////////////////////////////
+// ServiceExecutorSynchronous
+/////////////////////////////
+
+namespace {
+const auto getServiceExecutorSynchronous =
+    ServiceContext::declareDecoration<std::unique_ptr<ServiceExecutorSynchronous>>();
+
+const ServiceContext::ConstructorActionRegisterer serviceExecutorSynchronousRegisterer{
+    "ServiceExecutorSynchronous", [](ServiceContext* ctx) {
+        getServiceExecutorSynchronous(ctx) = std::make_unique<ServiceExecutorSynchronous>();
+    }};
+}  // namespace
 
 ServiceExecutorSynchronous* ServiceExecutorSynchronous::get(ServiceContext* ctx) {
     auto& ref = getServiceExecutorSynchronous(ctx);
@@ -93,76 +245,24 @@ ServiceExecutorSynchronous* ServiceExecutorSynchronous::get(ServiceContext* ctx)
     return ref.get();
 }
 
-Status ServiceExecutorSynchronous::scheduleTask(Task task, ScheduleFlags flags) {
-    if (!_stillRunning.load()) {
-        return Status{ErrorCodes::ShutdownInProgress, "Executor is not running"};
-    }
+/////////////////////////
+// Service ExecutorInline
+/////////////////////////
 
-    if (!_localWorkQueue.empty()) {
-        if ((flags & ScheduleFlags::kMayYieldBeforeSchedule) != ScheduleFlags{}) {
-            yieldIfAppropriate();
-        }
+namespace {
+const auto getServiceExecutorInline =
+    ServiceContext::declareDecoration<std::unique_ptr<ServiceExecutorInline>>();
 
-        // Execute task directly (recurse) if allowed by the caller as it produced better
-        // performance in testing. Try to limit the amount of recursion so we don't blow up the
-        // stack, even though this shouldn't happen with this executor that uses blocking network
-        // I/O.
-        if ((flags & ScheduleFlags::kMayRecurse) != ScheduleFlags{} &&
-            (_localRecursionDepth < synchronousServiceExecutorRecursionLimit.loadRelaxed())) {
-            ++_localRecursionDepth;
-            task();
-        } else {
-            _localWorkQueue.emplace_back(std::move(task));
-        }
-        return Status::OK();
-    }
+const ServiceContext::ConstructorActionRegisterer serviceExecutorInlineRegisterer{
+    "ServiceExecutorInline", [](ServiceContext* ctx) {
+        getServiceExecutorInline(ctx) = std::make_unique<ServiceExecutorInline>();
+    }};
+}  // namespace
 
-    // First call to scheduleTask() for this connection, spawn a worker thread that will push jobs
-    // into the thread local job queue.
-    LOGV2_DEBUG(22983, 3, "Starting new executor thread in passthrough mode");
-
-    Status status = launchServiceWorkerThread(
-        [this, condVarAnchor = _shutdownCondition, task = std::move(task)]() mutable {
-            _numRunningWorkerThreads.addAndFetch(1);
-
-            _localWorkQueue.emplace_back(std::move(task));
-            while (!_localWorkQueue.empty() && _stillRunning.loadRelaxed()) {
-                _localRecursionDepth = 1;
-                _localWorkQueue.front()();
-                _localWorkQueue.pop_front();
-            }
-
-            // We maintain an anchor to "_shutdownCondition" to ensure it remains alive even if the
-            // service executor is freed. Any access to the service executor (through "this") is
-            // prohibited (and unsafe) after the following line. For more context, see SERVER-49432.
-            auto numWorkerThreadsStillRunning = _numRunningWorkerThreads.subtractAndFetch(1);
-            if (numWorkerThreadsStillRunning == 0) {
-                condVarAnchor->notify_all();
-            }
-        });
-
-    return status;
+ServiceExecutorInline* ServiceExecutorInline::get(ServiceContext* ctx) {
+    auto& ref = getServiceExecutorInline(ctx);
+    invariant(ref);
+    return ref.get();
 }
 
-void ServiceExecutorSynchronous::appendStats(BSONObjBuilder* bob) const {
-    // The ServiceExecutorSynchronous has one client per thread and waits synchronously on thread.
-    auto threads = static_cast<int>(_numRunningWorkerThreads.loadRelaxed());
-
-    BSONObjBuilder subbob = bob->subobjStart(kExecutorName);
-    subbob.append(kThreadsRunning, threads);
-    subbob.append(kClientsInTotal, threads);
-    subbob.append(kClientsRunning, threads);
-    subbob.append(kClientsWaiting, 0);
-}
-
-void ServiceExecutorSynchronous::runOnDataAvailable(const SessionHandle& session,
-                                                    OutOfLineExecutor::Task callback) {
-    invariant(session);
-    yieldIfAppropriate();
-
-    schedule([callback = std::move(callback)](Status status) { callback(std::move(status)); });
-}
-
-
-}  // namespace transport
-}  // namespace mongo
+}  // namespace mongo::transport

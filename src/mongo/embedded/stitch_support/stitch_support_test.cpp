@@ -27,17 +27,29 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <string>
-#include <utility>
-
 #include "stitch_support/stitch_support.h"
 
 #include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/exit_code.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/scopeguard.h"
+
+#include <algorithm>
+#include <iostream>
+#include <iterator>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
 
 namespace {
 
@@ -97,7 +109,7 @@ protected:
         ASSERT(matcher);
         ON_BLOCK_EXIT([matcher] { stitch_support_v1_matcher_destroy(matcher); });
         return std::all_of(
-            documentsJSON.begin(), documentsJSON.end(), [=](const char* documentJSON) {
+            documentsJSON.begin(), documentsJSON.end(), [=, this](const char* documentJSON) {
                 bool isMatch;
                 stitch_support_v1_check_match(
                     matcher, toBSONForAPI(documentJSON).first, &isMatch, nullptr);
@@ -152,7 +164,7 @@ protected:
         std::transform(documentsJSON.begin(),
                        documentsJSON.end(),
                        std::back_inserter(results),
-                       [=](const char* documentJSON) {
+                       [=, this](const char* documentJSON) {
                            auto bson = stitch_support_v1_projection_apply(
                                projection, toBSONForAPI(documentJSON).first, nullptr);
                            auto result = fromBSONForAPI(bson);
@@ -284,7 +296,7 @@ protected:
         return std::string(stitch_support_v1_status_get_explanation(updateStatus));
     }
 
-    const std::string getModifiedPaths() {
+    std::string getModifiedPaths() {
         ASSERT(updateDetails);
 
         std::stringstream ss;
@@ -385,11 +397,17 @@ TEST_F(StitchSupportTest, CheckMatchWorksWithStatus) {
               checkMatchStatus("{$where: 'this.a == 1'}", "{a: 1}"));
     ASSERT_EQ("$text is not allowed in this context",
               checkMatchStatus("{$text: {$search: 'stitch'}}", "{a: 'stitch lib'}"));
-    ASSERT_EQ("$geoNear, $near, and $nearSphere are not allowed in this context",
-              checkMatchStatus(
-                  "{location: {$near: {$geometry: {type: 'Point', "
-                  "coordinates: [ -73.9667, 40.78 ] }, $minDistance: 10, $maxDistance: 500}}}",
-                  "{type: 'Point', 'coordinates': [100.0, 0.0]}"));
+    ASSERT_EQ(
+        "$geoNear, $near, and $nearSphere are not allowed in this context, "
+        "as these operators require sorting geospatial data. If you do not "
+        "need sort, consider using $geoWithin instead. Check out "
+        "https://dochub.mongodb.org/core/near-sort-operation and "
+        "https://dochub.mongodb.org/core/nearSphere-sort-operation"
+        "for more details.",
+        checkMatchStatus(
+            "{location: {$near: {$geometry: {type: 'Point', "
+            "coordinates: [ -73.9667, 40.78 ] }, $minDistance: 10, $maxDistance: 500}}}",
+            "{type: 'Point', 'coordinates': [100.0, 0.0]}"));
 
     // 'check_match' cannot actually fail so we do not test it with a status.
 }
@@ -482,7 +500,7 @@ TEST_F(StitchSupportTest, TestReplacementZeroTimestamp) {
         mongo::fromjson(checkUpdate("{b: Timestamp(0, 0)}", "{_id: 123, a: 456}").c_str());
     auto elemB = result["b"];
     ASSERT_TRUE(elemB.ok());
-    ASSERT_EQUALS(elemB.type(), mongo::BSONType::bsonTimestamp);
+    ASSERT_EQUALS(elemB.type(), mongo::BSONType::timestamp);
     auto ts = elemB.timestamp();
     ASSERT_NOT_EQUALS(0U, ts.getSecs());
     ASSERT_NOT_EQUALS(0U, ts.getInc());
@@ -493,7 +511,7 @@ TEST_F(StitchSupportTest, TestUpdateCurrentDateTimestamp) {
         checkUpdate("{$currentDate: {b: {$type: 'timestamp'}}}", "{_id: 123, a: 456}").c_str());
     auto elemB = result["b"];
     ASSERT_TRUE(elemB.ok());
-    ASSERT_EQUALS(elemB.type(), mongo::BSONType::bsonTimestamp);
+    ASSERT_EQUALS(elemB.type(), mongo::BSONType::timestamp);
     auto ts = elemB.timestamp();
     ASSERT_NOT_EQUALS(0U, ts.getSecs());
     ASSERT_NOT_EQUALS(0U, ts.getInc());
@@ -637,13 +655,13 @@ int main(const int argc, const char* const* const argv) {
     auto ret = mongo::runGlobalInitializers(std::vector<std::string>{argv, argv + argc});
     if (!ret.isOK()) {
         std::cerr << "Global initilization failed";
-        return EXIT_FAILURE;
+        return static_cast<int>(mongo::ExitCode::fail);
     }
 
     ret = mongo::runGlobalDeinitializers();
     if (!ret.isOK()) {
         std::cerr << "Global deinitilization failed";
-        return EXIT_FAILURE;
+        return static_cast<int>(mongo::ExitCode::fail);
     }
 
     const auto result = ::mongo::unittest::Suite::run(std::vector<std::string>(), "", "", 1);

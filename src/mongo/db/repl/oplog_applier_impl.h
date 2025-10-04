@@ -30,18 +30,30 @@
 
 #pragma once
 
-#include "mongo/db/commands/fsync.h"
-#include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
-#include "mongo/db/repl/initial_syncer.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/db/multi_key_path_tracker.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/initial_sync/initial_syncer.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_applier.h"
+#include "mongo/db/repl/oplog_buffer.h"
+#include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/oplog_entry_or_grouped_inserts.h"
+#include "mongo/db/repl/oplog_writer.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/replication_metrics.h"
 #include "mongo/db/repl/session_update_tracker.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/replication_state_transition_lock_guard.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+#include <vector>
+
+namespace MONGO_MOD_OPEN mongo {
 namespace repl {
 
 /**
@@ -62,7 +74,7 @@ public:
      * Constructs this OplogApplier with specific options.
      * During steady state replication, _run() obtains batches of operations to apply
      * from the oplogBuffer. During the oplog application phase, the batch of operations is
-     * distributed across writer threads in 'writerPool'. Each writer thread applies its own vector
+     * distributed across writer threads in 'workerPool'. Each writer thread applies its own vector
      * of operations using 'func'. The writer thread pool is not owned by us.
      */
     OplogApplierImpl(executor::TaskExecutor* executor,
@@ -72,11 +84,11 @@ public:
                      ReplicationConsistencyMarkers* consistencyMarkers,
                      StorageInterface* storageInterface,
                      const Options& options,
-                     ThreadPool* writerPool);
+                     ThreadPool* workerPool);
 
     void fillWriterVectors_forTest(OperationContext* opCtx,
                                    std::vector<OplogEntry>* ops,
-                                   std::vector<std::vector<const OplogEntry*>>* writerVectors,
+                                   std::vector<std::vector<ApplierOperation>>* writerVectors,
                                    std::vector<std::vector<OplogEntry>>* derivedOps) noexcept;
 
 private:
@@ -100,33 +112,30 @@ private:
      * to at least the last optime of the batch. If 'minValid' is already greater than or equal
      * to the last optime of this batch, it will not be updated.
      */
-    StatusWith<OpTime> _applyOplogBatch(OperationContext* opCtx, std::vector<OplogEntry> ops);
+    StatusWith<OpTime> _applyOplogBatch(OperationContext* opCtx,
+                                        std::vector<OplogEntry> ops) override;
 
     void _deriveOpsAndFillWriterVectors(OperationContext* opCtx,
                                         std::vector<OplogEntry>* ops,
-                                        std::vector<std::vector<const OplogEntry*>>* writerVectors,
+                                        std::vector<std::vector<ApplierOperation>>* writerVectors,
                                         std::vector<std::vector<OplogEntry>>* derivedOps,
                                         SessionUpdateTracker* sessionUpdateTracker) noexcept;
+
+    void _fillWriterVectors(OperationContext* opCtx,
+                            std::vector<OplogEntry>* ops,
+                            std::vector<std::vector<ApplierOperation>>* writerVectors,
+                            std::vector<std::vector<OplogEntry>>* derivedOps) noexcept;
 
     // Not owned by us.
     ReplicationCoordinator* const _replCoord;
 
     // Pool of worker threads for writing ops to the databases.
     // Not owned by us.
-    ThreadPool* const _writerPool;
+    ThreadPool* const _workerPool;
 
-    StorageInterface* _storageInterface;
+    StorageInterface* const _storageInterface;
 
-    ReplicationConsistencyMarkers* const _consistencyMarkers;
-
-    // Used to determine which operations should be applied during initial sync. If this is null,
-    // we will apply all operations that were fetched.
-    OpTime _beginApplyingOpTime = OpTime();
-
-    void fillWriterVectors(OperationContext* opCtx,
-                           std::vector<OplogEntry>* ops,
-                           std::vector<std::vector<const OplogEntry*>>* writerVectors,
-                           std::vector<std::vector<OplogEntry>>* derivedOps) noexcept;
+    std::unique_ptr<OplogWriter> _oplogWriter;
 
 protected:
     // Marked as protected for use in unit tests.
@@ -138,10 +147,11 @@ protected:
      * This function has been marked as virtual to allow certain unit tests to skip oplog
      * application.
      */
-    virtual Status applyOplogBatchPerWorker(OperationContext* opCtx,
-                                            std::vector<const OplogEntry*>* ops,
-                                            WorkerMultikeyPathInfo* workerMultikeyPathInfo,
-                                            bool isDataConsistent);
+    MONGO_MOD_FILE_PRIVATE virtual Status applyOplogBatchPerWorker(
+        OperationContext* opCtx,
+        std::vector<ApplierOperation>* ops,
+        WorkerMultikeyPathInfo* workerMultikeyPathInfo,
+        bool isDataConsistent);
 };
 
 /**
@@ -153,4 +163,4 @@ Status applyOplogEntryOrGroupedInserts(OperationContext* opCtx,
                                        bool isDataConsistent);
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_OPEN mongo

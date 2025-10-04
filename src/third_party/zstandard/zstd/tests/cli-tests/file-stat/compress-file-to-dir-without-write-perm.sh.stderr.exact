@@ -1,0 +1,26 @@
+Trace:FileStat: > UTIL_isLink(file)
+Trace:FileStat: < 0
+Trace:FileStat: > UTIL_isConsole(2)
+Trace:FileStat: < 0
+Trace:FileStat: > UTIL_getFileSize(file)
+Trace:FileStat:  > UTIL_stat(-1, file)
+Trace:FileStat:  < 1
+Trace:FileStat: < 65537
+Trace:FileStat: > UTIL_stat(-1, file)
+Trace:FileStat: < 1
+Trace:FileStat: > UTIL_isDirectoryStat()
+Trace:FileStat: < 0
+Trace:FileStat: > UTIL_stat(-1, file)
+Trace:FileStat: < 1
+Trace:FileStat: > UTIL_isSameFile(file, out/file.zst)
+Trace:FileStat:  > UTIL_stat(-1, file)
+Trace:FileStat:  < 1
+Trace:FileStat:  > UTIL_stat(-1, out/file.zst)
+Trace:FileStat:  < 0
+Trace:FileStat: < 0
+Trace:FileStat: > UTIL_isRegularFile(out/file.zst)
+Trace:FileStat:  > UTIL_stat(-1, out/file.zst)
+Trace:FileStat:  < 0
+Trace:FileStat: < 0
+zstd: out/file.zst: Permission denied
+zstd: can't stat out/file.zst : Permission denied -- ignored 

@@ -27,16 +27,36 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/db/auth/security_key.h"
 
-#include <boost/filesystem.hpp>
-
+#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/db/auth/auth_name.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/cluster_auth_mode.h"
+#include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/security_file.h"
-#include "mongo/db/auth/security_key.h"
+#include "mongo/db/auth/user.h"
+#include "mongo/db/auth/user_name.h"
 #include "mongo/unittest/unittest.h"
+
+#include <array>
+#include <cstddef>
+#include <initializer_list>
+#include <memory>
+#include <ostream>
+#include <set>
+#include <utility>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/filesystem/file_status.hpp>
+#include <boost/filesystem/fstream.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {
@@ -50,7 +70,7 @@ public:
         boost::filesystem::ofstream stream(_path, std::ios_base::out | std::ios_base::trunc);
         ASSERT_TRUE(stream.good());
 
-        stream.write(contents.rawData(), contents.size());
+        stream.write(contents.data(), contents.size());
         stream.close();
         if (fixPerms) {
             const auto perms = boost::filesystem::owner_read | boost::filesystem::owner_write;
@@ -76,7 +96,7 @@ struct TestCase {
     TestCase(StringData contents_,
              std::initializer_list<std::string> expected_,
              FailureMode mode_ = FailureMode::Success)
-        : fileContents(contents_.toString()), expected(expected_), mode(mode_) {}
+        : fileContents(std::string{contents_}), expected(expected_), mode(mode_) {}
 
     std::string fileContents;
     std::vector<std::string> expected;
@@ -135,7 +155,7 @@ std::initializer_list<TestCase> testCases = {
     // These two keys should pass the security file parsing, but fail loading them as
     // security keys because they are too short or two long
     {"abc", {"abc"}, TestCase::FailureMode::SecurityKeyConstraint},
-    {longKeyMaker(), {longKeyMaker().toString()}, TestCase::FailureMode::SecurityKeyConstraint}};
+    {longKeyMaker(), {std::string{longKeyMaker()}}, TestCase::FailureMode::SecurityKeyConstraint}};
 
 TEST(SecurityFile, Test) {
     for (const auto& testCase : testCases) {
@@ -159,7 +179,9 @@ TEST(SecurityFile, Test) {
 }
 
 TEST(SecurityKey, Test) {
-    internalSecurity.setUser(std::make_shared<UserHandle>(User(UserName("__system", "local"))));
+    User user(std::make_unique<UserRequestGeneral>(UserName("__system", "local"), boost::none));
+    auto userHandle = std::make_shared<UserHandle>(std::move(user));
+    internalSecurity.setUser(userHandle);
 
     for (const auto& testCase : testCases) {
         TestFile file(testCase.fileContents, testCase.mode != TestCase::FailureMode::Permissions);

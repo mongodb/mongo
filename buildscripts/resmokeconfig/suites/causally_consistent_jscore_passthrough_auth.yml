@@ -1,143 +1,121 @@
 config_variables:
-- &keyFile jstests/libs/authTestsKey
-- &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
-- &authOptions
-  authenticationDatabase: admin
-  authenticationMechanism: SCRAM-SHA-1
-  password: *keyFileData
-  username: __system
+  - &keyFile jstests/libs/authTestsKey
+  - &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+  - &authOptions
+    authenticationDatabase: admin
+    authenticationMechanism: SCRAM-SHA-256
+    password: *keyFileData
+    username: __system
 
 test_kind: js_test
 
 selector:
   roots:
-  - jstests/core/**/*.js
+    - jstests/core/**/*.js
+    - jstests/core_sharding/**/*.js
+    - jstests/fle2/**/*.js
+    - src/mongo/db/modules/*/jstests/fle2/**/*.js
   exclude_files:
-  - jstests/core/txns/**/*.js
-  # Skip any tests that run with auth explicitly.
-  - jstests/core/*[aA]uth*.js
-  # Has conditional logic for standalone servers and replica sets, but can't distinguish the two
-  # when connected to mongos.
-  - jstests/core/write_result.js
-  # The following tests fail because a certain command or functionality is not supported on
-  # mongos. This command or functionality is placed in a comment next to the failing test.
-  - jstests/core/apitest_db.js  # serverStatus output doesn't have storageEngine.
-  - jstests/core/check_shard_index.js  # checkShardingIndex.
-  - jstests/core/collection_truncate.js  # emptycapped.
-  - jstests/core/compact_keeps_indexes.js  # compact.
-  - jstests/core/currentop.js  # uses fsync.
-  - jstests/core/dbhash.js  # dbhash.
-  - jstests/core/dbhash2.js  # dbhash.
-  - jstests/core/fsync.js  # uses fsync.
-  - jstests/core/geo_update_btree2.js  # notablescan.
-  - jstests/core/index9.js  # "local" database.
-  - jstests/core/queryoptimizera.js  # "local" database.
-  - jstests/core/stages*.js  # stageDebug.
-  # The following tests fail because mongos behaves differently from mongod when testing certain
-  # functionality. The differences are in a comment next to the failing test.
-  - jstests/core/explain_missing_database.js  # Behavior with no db different on mongos.
-  - jstests/core/geo_2d_explain.js  # executionSuccess in different spot in explain().
-  - jstests/core/geo_s2explain.js  # inputStage in different spot in explain().
-  - jstests/core/geo_s2sparse.js  # keysPerIndex in different spot in validate().
-  - jstests/core/killop_drop_collection.js # Uses fsyncLock.
-  - jstests/core/or_to_in.js # queryPlanner in different spot in explain()
-  # Tests that need triaging & remediation | denylist decision
-  # Comments list possible problem point under review.
-  - jstests/core/stages_delete.js # Uses stageDebug command for deletes.
-  # Tests that fail for Causal Consistency as they have statements that do not support
-  # non-local read concern.
-  - jstests/core/geo_big_polygon3.js
-  - jstests/core/mr*.js
-  - jstests/core/collation.js
-  - jstests/core/loadserverscripts.js
-  - jstests/core/bypass_doc_validation.js
-  - jstests/core/commands_namespace_parsing.js
-  - jstests/core/tailable_cursor_invalidation.js
-  - jstests/core/tailable_getmore_batch_size.js
-  - jstests/core/tailable_skip_limit.js
-  - jstests/core/constructors.js
-  - jstests/core/views/views_all_commands.js
-  - jstests/core/or4.js
-  - jstests/core/recursion.js
-  # An index drop does not necessarily cause cursors to be killed on the secondary.
-  - jstests/core/ord.js
-  # Parallel shell is not causally consistent
-  - jstests/core/benchrun_pipeline_updates.js
-  - jstests/core/crud_ops_do_not_throw_locktimeout.js
-  - jstests/core/cursora.js
-  - jstests/core/find_and_modify_concurrent_update.js
-  - jstests/core/removec.js
-  - jstests/core/shellstartparallel.js
-  # TODO SERVER-30466
-  - jstests/core/explain_multi_plan.js
-  - jstests/core/explain_shell_helpers.js
-  - jstests/core/index_partial_read_ops.js
-  - jstests/core/explain_server_params.js
-  - jstests/core/update_arrayFilters.js
-  # TODO: SERVER-30488
-  - jstests/core/apitest_dbcollection.js
-  - jstests/core/getmore_invalidated_cursors.js
-  - jstests/core/orf.js #explain.executionStats is not CC
-  # getMore is not causally consistent if collection is dropped
-  - jstests/core/drop3.js
-  # Logical sessions require that only one user be authenticated,
-  # but this suite puts us in a multi-auth state.
-  - jstests/core/list_all_sessions.js # Too many users authenticated
-  - jstests/core/list_sessions.js # Too many users authenticated
-  # The following tests fail because of divergent dropCollection behavior between standalones and
-  # sharded clusters. These tests expect a second drop command to error, whereas in sharded clusters
-  # we expect a second drop to return status OK.
-  - jstests/core/explain_upsert.js
-  # The `dbstats` command builds in-memory structures that are not causally consistent.
-  - jstests/core/dbstats.js
+    # Skip any tests that run with auth explicitly.
+    - jstests/core/administrative/*[aA]uth*.js
+    # Has conditional logic for standalone servers and replica sets, but can't distinguish the two
+    # when connected to mongos.
+    - jstests/core/**/write_result.js
+    # The following tests fail because a certain command or functionality is not supported on
+    # mongos. This command or functionality is placed in a comment next to the failing test.
+    - jstests/core/**/apitest_db.js # serverStatus output doesn't have storageEngine.
+    - jstests/core/**/check_shard_index.js # checkShardingIndex.
+    - jstests/core/**/compact_keeps_indexes.js # compact.
+    - jstests/core/**/currentop.js # uses fsync.
+    - jstests/core/**/dbhash.js # dbhash.
+    - jstests/core/**/fsync.js # uses fsync.
+    - jstests/core/**/geo_update_btree2.js # notablescan.
+    - jstests/core/**/queryoptimizera.js # "local" database.
+    # The following tests fail because mongos behaves differently from mongod when testing certain
+    # functionality. The differences are in a comment next to the failing test.
+    - jstests/core/**/geo_2d_explain.js # executionSuccess in different spot in explain().
+    - jstests/core/**/geo_s2explain.js # inputStage in different spot in explain().
+    - jstests/core/**/geo_s2sparse.js # keysPerIndex in different spot in validate().
+    # Logical sessions require that only one user be authenticated,
+    # but this suite puts us in a multi-auth state.
+    - jstests/core/**/list_all_sessions.js # Too many users authenticated
+    - jstests/core/**/list_sessions.js # Too many users authenticated
 
-  # These include operations the root user auth'd on the test database is not authorized to perform,
-  # e.g. dropping or creating system collections.
-  - jstests/core/list_collections_no_views.js
-  - jstests/core/rename_collection_system_db.js
-  - jstests/core/views/duplicate_ns.js
-  - jstests/core/views/invalid_system_views.js
-  - jstests/core/views/view_with_invalid_dbname.js
-  - jstests/core/views/views_creation.js
-  - jstests/core/views/views_drop.js
-  - jstests/core/disallow_system_views_user_writes.js
+    # These include operations the root user auth'd on the test database is not authorized to perform,
+    # e.g. reading system.views, dropping or creating system collections.
+    - jstests/core/**/list_collections_no_views.js
+    - jstests/core/**/rename_collection_system_db.js
+    - jstests/core/catalog/agg_internal_list_collections_stage.js
+    - jstests/core/catalog/views/invalid_system_views.js
+    - jstests/core/catalog/views/view_with_invalid_dbname.js
+    - jstests/core/catalog/views/views_creation.js
+    - jstests/core/catalog/views/views_drop.js
+    - jstests/core/**/query/disallow_system_views_user_writes.js
+    - jstests/core/timeseries/ddl/bucket_granularity.js
+    - jstests/core/timeseries/write/basic.js
+    - jstests/core/timeseries/query/timeseries_buckets_query_explain.js
+    - jstests/core/timeseries/write/timeseries_buckets_write_explain.js
+    - jstests/core/timeseries/query/timeseries_raw_data_getmore.js
+    - jstests/core/timeseries/query/timeseries_raw_data_internal_getmore.js
+    - jstests/core/timeseries/query/timeseries_raw_data_queries.js
+    - jstests/core/timeseries/write/timeseries_raw_data_writes.js
+    - jstests/core_sharding/analyze_shard_key/configure_query_analyzer_cmd_validation.js
+    - jstests/core_sharding/resharding/*.js
 
-  # These tests expect listCollections to return system.bucket.* collections, which are filtered
-  # out by mongos when authentication is enabled.
-  # Refer to filter in cluster_list_collections_cmd.cpp
-  - jstests/core/timeseries/timeseries_*.js
+    # These tests expect listCollections to return system.bucket.* collections, which are filtered
+    # out by mongos when authentication is enabled.
+    # Refer to filter in cluster_list_collections_cmd.cpp
+    - jstests/core/timeseries/ddl/*.js
+    - jstests/core/timeseries/query/timeseries_out_non_sharded.js
+    # This test uses `benchRun` which spawns connections which do not inherit the causal session.
+    - jstests/core/**/benchrun_pipeline_updates.js
+
+    # In the context of auth on mongos, illegal namespaces trigger a different error code than they do
+    # on mongod. To keep the test simple, we avoid running it against a mongos when auth is enabled.
+    - jstests/core/**/illegal_cmd_namespace.js
+
+    # These tests expect writes to system.profile to fail with ErrorCodes.InvalidNamespace, but with
+    # auth enabled the commands instead fail with ErrorCodes.Unauthorized.
+    - jstests/core/query/bulk/bulk_write_non_auth.js
 
   exclude_with_any_tags:
-  - assumes_against_mongod_not_mongos
-  - assumes_standalone_mongod
-  ##
-  # The next tag corresponds to the special error thrown by the set_read_preference_secondary.js
-  # override when it refuses to replace the readPreference of a particular command. Above each tag
-  # are the message(s) that cause the tag to be warranted.
-  ##
-  # "Cowardly refusing to override read preference of command: ..."
-  # "Cowardly refusing to run test with overridden read preference when it reads from a
-  #  non-replicated collection: ..."
-  - assumes_read_preference_unchanged
-  # Multiple users cannot be authenticated on one connection within a session.
-  - creates_and_authenticates_user
-  - does_not_support_causal_consistency
-  - requires_collstats
-  # The system.profile collection is not replicated. So the reads from secondaries will not be
-  # consistent with primary.
-  - requires_profiling
-
+    - assumes_against_mongod_not_mongos
+    - assumes_standalone_mongod
+    ##
+    # The next tag corresponds to the special error thrown by the set_read_preference_secondary.js
+    # override when it refuses to replace the readPreference of a particular command. Above each tag
+    # are the message(s) that cause the tag to be warranted.
+    ##
+    # "Cowardly refusing to override read preference of command: ..."
+    # "Cowardly refusing to run test with overridden read preference when it reads from a
+    #  non-replicated collection: ..."
+    - assumes_read_preference_unchanged
+    # Multiple users cannot be authenticated on one connection within a session.
+    - creates_and_authenticates_user
+    - does_not_support_causal_consistency
+    - requires_collstats
+    # The system.profile collection is not replicated. So the reads from secondaries will not be
+    # consistent with primary.
+    - requires_profiling
+    # These tests are run in sharded_causally_consistent_jscore_txns_passthrough.
+    - uses_transactions
+    # Parallel shell is not causally consistent because it uses a different session.
+    - uses_parallel_shell
+    - requires_2_or_more_shards
+    # These tests run many aggregations, and the override slows them down enough to hit the evergreen timeout.
+    - query_intensive_pbt
 executor:
   archive:
     hooks:
       - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
       - ValidateCollections
   config:
     shell_options:
       global_vars:
         TestData: &TestData
           auth: true
-          authMechanism: SCRAM-SHA-1
+          authMechanism: SCRAM-SHA-256
           keyFile: *keyFile
           keyFileData: *keyFileData
           roleGraphInvalidationIsFatal: true
@@ -165,23 +143,37 @@ executor:
           db.getSiblingDB(jsTest.options().authenticationDatabase).logout();
           db.auth(username, password);
         })();
-        load("jstests/libs/override_methods/enable_causal_consistency.js");
+        await import("jstests/libs/override_methods/enable_causal_consistency.js");
       <<: *authOptions
   hooks:
-  - class: CheckReplDBHash
-    shell_options:
-      global_vars:
-        TestData: *TestData
+    - class: CheckReplDBHash
+      shell_options:
+        global_vars:
+          TestData: *TestData
         eval: jsTest.authenticate(db.getMongo())
-      <<: *authOptions
-  - class: ValidateCollections
-    shell_options:
-      global_vars:
-        TestData: *TestData
+        <<: *authOptions
+    - class: CheckMetadataConsistencyInBackground
+      shell_options:
+        global_vars:
+          TestData: *TestData
         eval: jsTest.authenticate(db.getMongo())
-      <<: *authOptions
-  - class: CleanEveryN
-    n: 20
+        <<: *authOptions
+    - class: ValidateCollections
+      shell_options:
+        global_vars:
+          TestData: *TestData
+        eval: jsTest.authenticate(db.getMongo())
+        <<: *authOptions
+    - class: CheckOrphansDeleted
+      shell_options:
+        global_vars:
+          TestData: *TestData
+        eval: jsTest.authenticate(db.getMongo())
+        <<: *authOptions
+    - class: CleanEveryN
+      n: 20
+      shell_options:
+        <<: *authOptions
   fixture:
     class: ShardedClusterFixture
     mongos_options:
@@ -194,10 +186,8 @@ executor:
           network:
             verbosity: 1
             asio: 2
-          tracking: 0
     mongod_options:
-      enableMajorityReadConcern: ''
-      auth: ''
+      auth: ""
       keyFile: *keyFile
       set_parameters:
         enableTestCommands: 1
@@ -210,8 +200,5 @@ executor:
             asio: 2
           replication:
             heartbeats: 2
-          tracking: 0
     num_rs_nodes_per_shard: 2
-    enable_sharding:
-    - test
     auth_options: *authOptions

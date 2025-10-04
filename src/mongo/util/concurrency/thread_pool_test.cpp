@@ -27,74 +27,130 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-#include "mongo/platform/basic.h"
+#include "mongo/util/concurrency/thread_pool.h"
 
-#include <boost/optional.hpp>
-#include <fmt/format.h>
-
-#include "mongo/base/init.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/concurrency/thread_pool.h"
-#include "mongo/util/concurrency/thread_pool_test_common.h"
-#include "mongo/util/concurrency/thread_pool_test_fixture.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/future.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 
+#include <cstddef>
+#include <functional>
+#include <memory>
+#include <mutex>
+#include <ostream>
+#include <string>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+
+namespace mongo {
 namespace {
-using namespace mongo;
-using namespace fmt::literals;
-
-MONGO_INITIALIZER(ThreadPoolCommonTests)(InitializerContext*) {
-    addTestsForThreadPool("ThreadPoolCommon",
-                          []() { return std::make_unique<ThreadPool>(ThreadPool::Options()); });
-}
-
 class ThreadPoolTest : public unittest::Test {
 protected:
+    /**
+     * Manages blocking work launched by the test.
+     * Starts off in the blocked state.
+     */
+    class BlockingWorkControl {
+    public:
+        ~BlockingWorkControl() {
+            unblock();
+        }
+
+        void block() {
+            stdx::unique_lock lk(_mutex);
+            _workBlocked = true;
+            _cv.notify_all();
+        }
+
+        void unblock() {
+            stdx::unique_lock lk(_mutex);
+            _workBlocked = false;
+            _cv.notify_all();
+        }
+
+        void onWorkStart() {
+            stdx::unique_lock lk(_mutex);
+            ++_workStarted;
+            _cv.notify_all();
+        }
+
+        void pauseWhileBlocked() {
+            stdx::unique_lock lk(_mutex);
+            _cv.wait(lk, [&] { return !_workBlocked; });
+        }
+
+        int pauseUntilWorkStartedCountAtLeast(int count) {
+            stdx::unique_lock lk(_mutex);
+            _cv.wait(lk, [&] { return _workStarted >= count; });
+            return _workStarted;
+        }
+
+    private:
+        mutable stdx::mutex _mutex;
+        stdx::condition_variable _cv;
+        int _workStarted = 0;
+        int _workBlocked = true;
+    };
+
     ThreadPool& makePool(ThreadPool::Options options) {
         ASSERT(!_pool);
         _pool.emplace(std::move(options));
         return *_pool;
     }
 
-    ThreadPool& pool() {
+    void destroyPool() {
+        _pool.reset();
+    }
+
+    ThreadPool& getPool() {
         ASSERT(_pool);
         return *_pool;
     }
 
-    void blockingWork() {
-        stdx::unique_lock<Latch> lk(mutex);
-        ++count1;
-        cv1.notify_all();
-        while (!flag2) {
-            cv2.wait(lk);
+    void waitForReapTo(ThreadPool& pool, size_t upperBound) {
+        Timer reapTimer;
+        while (pool.getStats().numThreads > upperBound) {
+            Microseconds elapsed{reapTimer.micros()};
+            ASSERT_LT(elapsed, Seconds{5})
+                << fmt::format("Failed to reap excess threads after {}", elapsed);
+            sleepFor(Milliseconds{50});
         }
     }
 
-    Mutex mutex = MONGO_MAKE_LATCH("ThreadPoolTest::mutex");
-    stdx::condition_variable cv1;
-    stdx::condition_variable cv2;
-    size_t count1 = 0U;
-    bool flag2 = false;
-
-private:
-    void tearDown() override {
-        stdx::unique_lock<Latch> lk(mutex);
-        flag2 = true;
-        cv2.notify_all();
-        lk.unlock();
+    auto blockingWorkCallback(boost::optional<int> taskNumber = {}) {
+        return [&, taskNumber](auto status) {
+            ASSERT_OK(status) << (taskNumber ? std::to_string(*taskNumber) : std::string{});
+            blockingWorkControl().onWorkStart();
+            blockingWorkControl().pauseWhileBlocked();
+        };
     }
 
+    BlockingWorkControl& blockingWorkControl() {
+        return _blockingWorkControl;
+    }
+
+private:
     boost::optional<ThreadPool> _pool;
+    BlockingWorkControl _blockingWorkControl;
 };
+using ThreadPoolDeathTest = ThreadPoolTest;
 
 TEST_F(ThreadPoolTest, MinPoolSize0) {
     ThreadPool::Options options;
@@ -103,189 +159,175 @@ TEST_F(ThreadPoolTest, MinPoolSize0) {
     options.maxIdleThreadAge = Milliseconds(100);
     auto& pool = makePool(options);
     pool.startup();
-    ASSERT_EQ(0U, pool.getStats().numThreads);
-    stdx::unique_lock<Latch> lk(mutex);
-    pool.schedule([this](auto status) {
-        ASSERT_OK(status);
-        blockingWork();
-    });
-    while (count1 != 1U) {
-        cv1.wait(lk);
+    ASSERT_EQ(pool.getStats().numThreads, 0);
+    for (int i = 0; i < 3; ++i) {
+        pool.schedule(blockingWorkCallback());
+        // First task is in progress, the others are pending.
+        blockingWorkControl().pauseUntilWorkStartedCountAtLeast(1);
+        {
+            auto stats = pool.getStats();
+            ASSERT_EQ(stats.numThreads, 1);
+            ASSERT_EQ(stats.numIdleThreads, 0);
+            ASSERT_EQ(stats.numPendingTasks, i);
+        }
     }
-    auto stats = pool.getStats();
-    ASSERT_EQUALS(1U, stats.numThreads);
-    ASSERT_EQUALS(0U, stats.numPendingTasks);
-    pool.schedule([](auto status) { ASSERT_OK(status); });
-    stats = pool.getStats();
-    ASSERT_EQUALS(1U, stats.numThreads);
-    ASSERT_EQUALS(0U, stats.numIdleThreads);
-    ASSERT_EQUALS(1U, stats.numPendingTasks);
-    flag2 = true;
-    cv2.notify_all();
-    lk.unlock();
-    Timer reapTimer;
-    for (size_t i = 0; i < 100 && (stats = pool.getStats()).numThreads > options.minThreads; ++i) {
-        sleepmillis(100);
+
+    blockingWorkControl().unblock();
+    waitForReapTo(pool, 0);
+
+    blockingWorkControl().block();
+    // This one additional task will start on the one available thread.
+    pool.schedule(blockingWorkCallback());
+    blockingWorkControl().pauseUntilWorkStartedCountAtLeast(4);
+    {
+        auto stats = pool.getStats();
+        ASSERT_EQ(stats.numThreads, 1);
+        ASSERT_EQ(stats.numIdleThreads, 0);
+        ASSERT_EQ(stats.numPendingTasks, 0);
     }
-    const Microseconds reapTime(reapTimer.micros());
-    ASSERT_EQ(options.minThreads, stats.numThreads)
-        << "Failed to reap all threads after " << durationCount<Milliseconds>(reapTime) << "ms";
-    lk.lock();
-    flag2 = false;
-    count1 = 0;
-    pool.schedule([this](auto status) {
-        ASSERT_OK(status);
-        blockingWork();
-    });
-    while (count1 == 0) {
-        cv1.wait(lk);
+
+    blockingWorkControl().unblock();
+    waitForReapTo(pool, 0);
+    {
+        auto stats = pool.getStats();
+        ASSERT_EQ(stats.numThreads, 0);
+        ASSERT_EQ(stats.numIdleThreads, 0);
+        ASSERT_EQ(stats.numPendingTasks, 0);
     }
-    stats = pool.getStats();
-    ASSERT_EQUALS(1U, stats.numThreads);
-    ASSERT_EQUALS(0U, stats.numIdleThreads);
-    ASSERT_EQUALS(0U, stats.numPendingTasks);
-    flag2 = true;
-    cv2.notify_all();
-    lk.unlock();
 }
 
 TEST_F(ThreadPoolTest, MaxPoolSize20MinPoolSize15) {
+    static const size_t extra = 10;
     ThreadPool::Options options;
     options.minThreads = 15;
     options.maxThreads = 20;
     options.maxIdleThreadAge = Milliseconds(100);
     auto& pool = makePool(options);
     pool.startup();
-    stdx::unique_lock<Latch> lk(mutex);
-    for (size_t i = 0U; i < 30U; ++i) {
-        pool.schedule([this, i](auto status) {
-            ASSERT_OK(status) << i;
-            blockingWork();
-        });
+    for (size_t i = 0; i < options.maxThreads + extra; ++i)
+        pool.schedule(blockingWorkCallback(i));
+    ASSERT_EQ(blockingWorkControl().pauseUntilWorkStartedCountAtLeast(options.maxThreads),
+              options.maxThreads);
+    sleepFor(Milliseconds(100));
+    {
+        auto stats = pool.getStats();
+        ASSERT_EQ(stats.numThreads, options.maxThreads);
+        ASSERT_EQ(stats.numIdleThreads, 0);
+        ASSERT_EQ(stats.numPendingTasks, extra);
     }
-    while (count1 < 20U) {
-        cv1.wait(lk);
-    }
-    ASSERT_EQ(20U, count1);
-    auto stats = pool.getStats();
-    ASSERT_EQ(20U, stats.numThreads);
-    ASSERT_EQ(0U, stats.numIdleThreads);
-    ASSERT_EQ(10U, stats.numPendingTasks);
-    flag2 = true;
-    cv2.notify_all();
-    while (count1 < 30U) {
-        cv1.wait(lk);
-    }
-    lk.unlock();
-    stats = pool.getStats();
-    ASSERT_EQ(0U, stats.numPendingTasks);
-    Timer reapTimer;
-    for (size_t i = 0; i < 100 && (stats = pool.getStats()).numThreads > options.minThreads; ++i) {
-        sleepmillis(50);
-    }
-    const Microseconds reapTime(reapTimer.micros());
-    ASSERT_EQ(options.minThreads, stats.numThreads)
-        << "Failed to reap excess threads after " << durationCount<Milliseconds>(reapTime) << "ms";
+
+    blockingWorkControl().unblock();
+    blockingWorkControl().pauseUntilWorkStartedCountAtLeast(options.maxThreads + extra);
+    ASSERT_EQ(pool.getStats().numPendingTasks, 0);
+    waitForReapTo(pool, options.minThreads);
 }
 
-DEATH_TEST_REGEX(ThreadPoolTest,
-                 MaxThreadsTooFewDies,
-                 "Cannot create pool.*with maximum number of threads.*less than 1") {
+DEATH_TEST_REGEX_F(ThreadPoolDeathTest,
+                   MaxThreadsTooFewDies,
+                   "Cannot create pool.*with maximum number of threads.*less than 1") {
     ThreadPool::Options options;
     options.maxThreads = 0;
-    ThreadPool pool(options);
+    makePool(options);
 }
 
-DEATH_TEST_REGEX(
-    ThreadPoolTest,
+DEATH_TEST_REGEX_F(
+    ThreadPoolDeathTest,
     MinThreadsTooManyDies,
-    R"#(.*Cannot create pool.*with minimum number of threads.*larger than the configured maximum.*minThreads":6,"maxThreads":5)#") {
+    R"re(.*Cannot create pool.*with minimum number of threads.*larger than the configured maximum.*minThreads":6,"maxThreads":5)re") {
     ThreadPool::Options options;
     options.maxThreads = 5;
     options.minThreads = 6;
-    ThreadPool pool(options);
+    makePool(options);
 }
 
-TEST(ThreadPoolTest, LivePoolCleanedByDestructor) {
-    ThreadPool pool((ThreadPool::Options()));
+TEST_F(ThreadPoolTest, LivePoolCleanedByDestructor) {
+    auto& pool = makePool({});
     pool.startup();
     while (pool.getStats().numThreads == 0) {
-        sleepmillis(50);
+        sleepFor(Milliseconds{50});
     }
     // Destructor should reap leftover threads.
 }
 
-DEATH_TEST_REGEX(ThreadPoolTest,
-                 DestructionDuringJoinDies,
-                 "Attempted to join pool.*more than once.*DoubleJoinPool") {
-    // This test is a little complicated. We need to ensure that the ThreadPool destructor runs
-    // while some thread is blocked running ThreadPool::join, to see that double-join is fatal in
-    // the pool destructor. To do this, we first wait for minThreads threads to have started. Then,
-    // we create and lock a mutex in the test thread, schedule a work item in the pool to lock that
-    // mutex, schedule an independent thread to call join, and wait for numIdleThreads to hit 0
-    // inside the test thread. When that happens, we know that the thread in the pool executing our
-    // mutex-lock is blocked waiting for the mutex, so the independent thread must be blocked inside
-    // of join(), until the pool thread finishes. At this point, if we destroy the pool, its
-    // destructor should trigger a fatal error due to double-join.
-    auto mutex = MONGO_MAKE_LATCH();
+DEATH_TEST_REGEX_F(ThreadPoolDeathTest,
+                   DestructionDuringJoinDies,
+                   "Attempted to join pool.*more than once.*DoubleJoinPool") {
+    // This test ensures that the ThreadPool destructor runs while some thread is blocked
+    // running ThreadPool::join, to see that double-join is fatal in the pool destructor.
+    stdx::mutex mutex;
     ThreadPool::Options options;
-    options.minThreads = 2;
+    options.minThreads = 1;
+    options.maxThreads = 1;
     options.poolName = "DoubleJoinPool";
-    boost::optional<ThreadPool> pool;
-    pool.emplace(options);
-    pool->startup();
-    while (pool->getStats().numThreads < 2U) {
-        sleepmillis(50);
-    }
-    stdx::unique_lock<Latch> lk(mutex);
-    pool->schedule([&mutex](auto status) {
+    auto& pool = makePool(options);
+    pool.startup();
+    ASSERT_EQ(pool.getStats().numThreads, 1);
+
+    stdx::unique_lock lk(mutex);
+    // Schedule 2 tasks to ensure that independent thread join() is blocked draining the tasks and
+    // causing the ThreadPool destructor join to fail due to double-join.
+    pool.schedule([&mutex](auto status) {
         ASSERT_OK(status);
-        stdx::lock_guard<Latch> lk(mutex);
+        stdx::lock_guard lk(mutex);
     });
-    stdx::thread t([&pool] {
-        pool->shutdown();
-        pool->join();
+    pool.schedule([&mutex](auto status) {
+        ASSERT_OK(status);
+        stdx::lock_guard lk(mutex);
     });
+
+    stdx::thread t{[&] {
+        pool.shutdown();
+        pool.join();
+    }};
+    ScopeGuard onExitGuard = [&] {
+        lk.unlock();
+        if (t.joinable()) {
+            t.join();
+        }
+    };
     ThreadPool::Stats stats;
-    while ((stats = pool->getStats()).numIdleThreads != 0U) {
-        sleepmillis(50);
+    while ((stats = pool.getStats()).numPendingTasks != 0) {
+        sleepFor(Milliseconds{10});
     }
-    ASSERT_EQ(0U, stats.numPendingTasks);
-    pool.reset();
-    lk.unlock();
-    t.join();
+    // Accounts for cleanup and regular worker thread.
+    ASSERT_EQ(stats.numThreads, 2);
+    ASSERT_EQ(stats.numIdleThreads, 0);
+    destroyPool();
+    MONGO_UNREACHABLE;
 }
 
 TEST_F(ThreadPoolTest, ThreadPoolRunsOnCreateThreadFunctionBeforeConsumingTasks) {
-    unittest::Barrier barrier(2U);
+    unittest::Barrier barrier(2);
     std::string journal;
     ThreadPool::Options options;
     options.threadNamePrefix = "mythread";
-    options.maxThreads = 1U;
+    options.maxThreads = 1;
     options.onCreateThread = [&](const std::string& threadName) {
-        journal.append("[onCreate({})]"_format(threadName));
+        journal.append(fmt::format("[onCreate({})]", threadName));
     };
 
     ThreadPool pool(options);
     pool.startup();
     pool.schedule([&](auto status) {
-        journal.append("[Call({})]"_format(status.toString()));
+        journal.append(fmt::format("[Call({})]", status.toString()));
         barrier.countDownAndWait();
     });
     barrier.countDownAndWait();
-    ASSERT_EQUALS(journal, "[onCreate(mythread0)][Call(OK)]");
+    ASSERT_EQ(journal, "[onCreate(mythread0)][Call(OK)]");
 }
 
-TEST(ThreadPoolTest, JoinAllRetiredThreads) {
-    AtomicWord<unsigned long> retiredThreads(0);
+TEST_F(ThreadPoolTest, JoinAllRetiredThreads) {
+    Atomic<int> retiredThreads(0);
     ThreadPool::Options options;
     options.minThreads = 4;
     options.maxThreads = 8;
     options.maxIdleThreadAge = Milliseconds(100);
-    options.onJoinRetiredThread = [&](const stdx::thread& t) { retiredThreads.addAndFetch(1); };
+    options.onJoinRetiredThread = [&](const stdx::thread& t) {
+        retiredThreads.addAndFetch(1);
+    };
     unittest::Barrier barrier(options.maxThreads + 1);
 
-    ThreadPool pool(options);
+    auto& pool = makePool(options);
     for (auto i = options.maxThreads; i > 0; i--) {
         pool.schedule([&](auto status) {
             ASSERT_OK(status);
@@ -297,22 +339,21 @@ TEST(ThreadPoolTest, JoinAllRetiredThreads) {
     barrier.countDownAndWait();
 
     while (pool.getStats().numThreads > options.minThreads) {
-        sleepmillis(100);
+        sleepFor(Microseconds{1});
     }
 
     pool.shutdown();
     pool.join();
 
-    const auto expectedRetiredThreads = options.maxThreads - options.minThreads;
-    ASSERT_EQ(retiredThreads.load(), expectedRetiredThreads);
+    ASSERT_EQ(retiredThreads.load(), options.maxThreads - options.minThreads);
     ASSERT_EQ(pool.getStats().numIdleThreads, 0);
 }
 
-TEST(ThreadPoolTest, SafeToCallWaitForIdleBeforeShutdown) {
+TEST_F(ThreadPoolTest, SafeToCallWaitForIdleBeforeShutdown) {
     ThreadPool::Options options;
     options.minThreads = 1;
     options.maxThreads = 1;
-    ThreadPool pool(options);
+    auto& pool = makePool(options);
     unittest::Barrier barrier(2);
     pool.schedule([&](Status) {
         barrier.countDownAndWait();
@@ -320,7 +361,7 @@ TEST(ThreadPoolTest, SafeToCallWaitForIdleBeforeShutdown) {
         // ThreadPool::shutdown(). Introducing the following sleep increases the chances of such an
         // ordering. However, this is a best-effort, and ThreadPool::shutdown() may still precede
         // ThreadPool::waitForIdle on slow machines.
-        sleepmillis(10);
+        sleepFor(Milliseconds{10});
     });
     pool.schedule([&](Status) { pool.shutdown(); });
     pool.startup();
@@ -328,4 +369,79 @@ TEST(ThreadPoolTest, SafeToCallWaitForIdleBeforeShutdown) {
     pool.waitForIdle();
 }
 
+TEST_F(ThreadPoolTest, UnusedPool) {
+    makePool({});
+}
+
+TEST_F(ThreadPoolTest, CannotScheduleAfterShutdown) {
+    auto& pool = makePool({});
+    pool.shutdown();
+    pool.schedule([](auto status) { ASSERT_EQ(status, ErrorCodes::ShutdownInProgress); });
+}
+
+TEST_F(ThreadPoolTest, PoolDestructorExecutesRemainingTasks) {
+    auto& pool = makePool({});
+    bool executed = false;
+    pool.schedule([&](auto status) {
+        ASSERT_OK(status);
+        executed = true;
+    });
+    destroyPool();
+    ASSERT_TRUE(executed);
+}
+
+TEST_F(ThreadPoolTest, PoolJoinExecutesRemainingTasks) {
+    auto& pool = makePool({});
+    bool executed = false;
+    pool.schedule([&](auto status) {
+        ASSERT_OK(status);
+        executed = true;
+    });
+    pool.shutdown();
+    pool.join();
+    ASSERT_TRUE(executed);
+}
+
+TEST_F(ThreadPoolTest, RepeatedScheduleDoesntSmashStack) {
+    auto& pool = makePool({});
+    auto finished = makePromiseFuture<void>();
+    auto func = [&](auto&& self, int depth) -> void {
+        if (depth) {
+            pool.schedule([&, depth](auto status) {
+                ASSERT_OK(status);
+                self(self, depth - 1);
+            });
+        } else {
+            pool.shutdown();
+            finished.promise.emplaceValue();
+        }
+    };
+    func(func, 10'000);
+    pool.startup();
+    pool.join();
+    finished.future.get();
+}
+
+DEATH_TEST_F(ThreadPoolDeathTest, DieOnDoubleStartUp, "already started") {
+    auto& pool = makePool({});
+    pool.startup();
+    pool.startup();
+}
+
+DEATH_TEST_F(ThreadPoolDeathTest, DieWhenExceptionBubblesUp, "task oops") {
+    auto& pool = makePool({});
+    pool.startup();
+    pool.schedule([](auto&&) { uassertStatusOK(Status({ErrorCodes::BadValue, "task oops"})); });
+    pool.shutdown();
+    pool.join();
+}
+
+DEATH_TEST_F(ThreadPoolDeathTest, DieOnDoubleJoin, "Attempted to join pool") {
+    auto& pool = makePool({});
+    pool.shutdown();
+    pool.join();
+    pool.join();
+}
+
 }  // namespace
+}  // namespace mongo

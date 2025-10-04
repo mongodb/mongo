@@ -29,11 +29,17 @@
 
 #pragma once
 
-#include <cstddef>
-
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement_comparator_interface.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/column/bsoncolumn.h"
 #include "mongo/db/index/multikey_paths.h"
+#include "mongo/platform/compiler.h"
+
+#include <iosfwd>
+
+#include <boost/any.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace timeseries {
@@ -48,8 +54,15 @@ namespace dotted_path_support {
  * original document. Note that the caller should include the 'data' prefix, but omit the depth-2
  * numeric path entry that results from pivoting the data into the bucketed format.
  *
- * Other than the bucketing and unbucketing mentioned above, the function should be have roughly
- * like `mongo::dotted_path_support::extractAllElementsAlongPath'.
+ * Other than the bucketing and unbucketing mentioned above, and the return value, the function
+ * should behave roughly like `mongo::dotted_path_support::extractAllElementsAlongPath'.
+ *
+ * In the case that the input bucket has been compressed, the function may need to decompress the
+ * data in order to examine it and extract the requested data. Since the data is returned as
+ * BSONElement, which does not own the data it references, we will need to provide storage for the
+ * decompressed data that will outlive the function call so that the returned BSONElements remain
+ * valid. This storage is provided via the optional return value. It need not be examined directly,
+ * but it should not be discarded until after the extracted elements.
  *
  * An example:
  *
@@ -57,17 +70,12 @@ namespace dotted_path_support {
  *   {b: 1} and {b: 2}  would be added to the set. 'arrayComponents' would be set as
  *   std::set<size_t>{1U}.
  */
-void extractAllElementsAlongBucketPath(const BSONObj& obj,
-                                       StringData path,
-                                       BSONElementSet& elements,
-                                       bool expandArrayOnTrailingField = true,
-                                       MultikeyComponents* arrayComponents = nullptr);
-
-void extractAllElementsAlongBucketPath(const BSONObj& obj,
-                                       StringData path,
-                                       BSONElementMultiSet& elements,
-                                       bool expandArrayOnTrailingField = true,
-                                       MultikeyComponents* arrayComponents = nullptr);
+[[nodiscard]] boost::optional<BSONColumn> extractAllElementsAlongBucketPath(
+    const BSONObj& obj,
+    StringData path,
+    BSONElementSet& elements,
+    bool expandArrayOnTrailingField = true,
+    MultikeyComponents* arrayComponents = nullptr);
 
 /**
  * Finds arrays in individual metrics along the specified data path.

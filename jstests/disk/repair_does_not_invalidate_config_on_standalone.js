@@ -4,9 +4,11 @@
  * @tags: [requires_wiredtiger]
  */
 
-(function() {
-
-load('jstests/disk/libs/wt_file_helper.js');
+import {
+    assertRepairSucceeds,
+    assertStartAndStopStandaloneOnExistingDbpath,
+    getUriForColl,
+} from "jstests/disk/libs/wt_file_helper.js";
 
 const baseName = "repair_does_not_invalidate_config_on_standalone";
 const dbName = baseName;
@@ -34,11 +36,10 @@ removeFile(collFile);
 
 assertRepairSucceeds(dbpath, port);
 
-assertStartAndStopStandaloneOnExistingDbpath(dbpath, port, function(node) {
+assertStartAndStopStandaloneOnExistingDbpath(dbpath, port, function (node) {
     let nodeDB = node.getDB(dbName);
     assert(nodeDB[collName].exists());
     assert.eq(nodeDB[collName].find().itcount(), 0);
 
     assert(!nodeDB.getSiblingDB("local")["system.replset"].exists());
 });
-})();

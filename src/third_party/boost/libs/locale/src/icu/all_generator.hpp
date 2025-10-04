@@ -1,30 +1,24 @@
 //
-//  Copyright (c) 2009-2011 Artyom Beilis (Tonkikh)
+// Copyright (c) 2009-2011 Artyom Beilis (Tonkikh)
 //
-//  Distributed under the Boost Software License, Version 1.0. (See
-//  accompanying file LICENSE_1_0.txt or copy at
-//  http://www.boost.org/LICENSE_1_0.txt)
-//
+// Distributed under the Boost Software License, Version 1.0.
+// https://www.boost.org/LICENSE_1_0.txt
+
 #ifndef BOOST_LOCALE_IMPL_ALL_GENERATOR_HPP
 #define BOOST_LOCALE_IMPL_ALL_GENERATOR_HPP
 
 #include <boost/locale/generator.hpp>
 
-namespace boost {
-    namespace locale {
-        namespace impl_icu {
-            struct cdata;
-            std::locale create_convert(std::locale const &,cdata const &,character_facet_type); // ok
-            std::locale create_collate(std::locale const &,cdata const &,character_facet_type); // ok 
-            std::locale create_formatting(std::locale const &,cdata const &,character_facet_type); // ok
-            std::locale create_parsing(std::locale const &,cdata const &,character_facet_type);  // ok
-            std::locale create_codecvt(std::locale const &,std::string const &encoding,character_facet_type); // ok
-            std::locale create_boundary(std::locale const &,cdata const &,character_facet_type); // ok
-            std::locale create_calendar(std::locale const &,cdata const &); // ok
+namespace boost { namespace locale { namespace impl_icu {
+    class cdata;
+    std::locale create_convert(const std::locale&, const cdata&, char_facet_t);
+    std::locale create_collate(const std::locale&, const cdata&, char_facet_t);
+    std::locale create_formatting(const std::locale&, const cdata&, char_facet_t);
+    std::locale create_parsing(const std::locale&, const cdata&, char_facet_t);
+    std::locale create_codecvt(const std::locale&, const std::string& encoding, char_facet_t);
+    std::locale create_boundary(const std::locale&, const cdata&, char_facet_t);
+    std::locale create_calendar(const std::locale&, const cdata&);
 
-        }
-    }
-}
+}}} // namespace boost::locale::impl_icu
 
 #endif
-// vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4

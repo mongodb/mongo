@@ -1,0 +1,13 @@
+# Golden test output of GoldenSbeStageBuilderTest/TestReplaceRoot
+[2] project [s4 = 
+    let [
+        l2.0 = (s3 ?: null) 
+    ] 
+    in 
+        if isObject(l2.0) 
+        then move(l2.0) 
+        else fail(8105800, "Expression in $replaceRoot/$replaceWith must evaluate to an object") 
+] 
+[1] project [s3 = getField(s2, "a")] 
+[1] project [s2 = getElement(s1, 0)] 
+[1] virtualscan s1 {[[{"a" : {"a" : 1}, "b" : 2}], [{"a" : {"a" : 2}, "b" : 2}], [{"a" : {"a" : 3}, "b" : 2}]]} 

@@ -33,7 +33,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 static inline int
 local_resume (unw_addr_space_t as, unw_cursor_t *cursor, void *arg)
 {
-#if defined(__linux)
+#if defined(__linux__)
   unw_word_t dirty_partition[2048]; /* AR.RSC.LOADRS is a 14-bit field */
   unw_word_t val, sol, sof, pri_unat, n, pfs, bspstore, dirty_rnat;
   struct cursor *c = (struct cursor *) cursor;
@@ -184,7 +184,7 @@ remote_install_cursor (struct cursor *c)
   unw_word_t val;
   int reg;
 
-#if defined(__linux) && !defined(UNW_REMOTE_ONLY)
+#if defined(__linux__) && !defined(UNW_REMOTE_ONLY)
   if (c->as == unw_local_addr_space)
     {
       /* Take a short-cut: we directly resume out of the cursor and
@@ -233,7 +233,7 @@ remote_install_cursor (struct cursor *c)
       MEMIFY (IA64_REG_F31,     UNW_IA64_FR + 31);
     }
   else
-#endif /* __linux && !UNW_REMOTE_ONLY */
+#endif /* __linux__ && !UNW_REMOTE_ONLY */
     {
       access_reg = c->as->acc.access_reg;
       access_fpreg = c->as->acc.access_fpreg;

@@ -27,13 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/storage/backup_cursor_hooks.h"
 
-#include "mongo/base/init.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo {
 
@@ -97,11 +96,12 @@ bool BackupCursorHooks::isBackupCursorOpen() const {
     return false;
 }
 
-bool BackupCursorHooks::isFileReturnedByCursor(const UUID& backupId, std::string filename) {
+bool BackupCursorHooks::isFileReturnedByCursor(const UUID& backupId,
+                                               boost::filesystem::path filePath) {
     MONGO_UNREACHABLE;
 }
 
-void BackupCursorHooks::addFilename(const UUID& backupId, std::string filename) {
+void BackupCursorHooks::addFile(const UUID& backupId, boost::filesystem::path filePath) {
     MONGO_UNREACHABLE;
 }
 

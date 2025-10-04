@@ -1,0 +1,73 @@
+# Used as a stress test for the framework.
+duration_seconds=600,
+cache_size_mb=2000,
+compression_enabled=true,
+metrics_monitor=
+(
+    stat_db_size=
+    (
+        runtime=false,
+        save=true,
+    )
+),
+timestamp_manager=
+(
+    enabled=true,
+    oldest_lag=30,
+    op_rate=1s,
+    stable_lag=15
+),
+workload_manager=
+(
+    background_compact_config=
+    (
+        thread_count=1,
+        free_space_target_mb=1,
+    ),
+    checkpoint_config=
+    (
+        op_rate=120s,
+    ),
+    populate_config=
+    (
+        collection_count=200,
+        #200GB of data
+        key_count_per_collection=10000,
+        key_size=100,
+        thread_count=200,
+        value_size=100000
+    ),
+    insert_config=
+    (
+        key_size=100,
+        op_rate=10ms,
+        ops_per_transaction=(max=20,min=0),
+        thread_count=40,
+        value_size=1000000
+    ),
+    read_config=
+    (
+        op_rate=1ms,
+        ops_per_transaction=(max=1000,min=50),
+        thread_count=40
+    ),
+    remove_config=
+    (
+        op_rate=1ms,
+        ops_per_transaction=(max=50,min=0),
+        thread_count=20
+    ),
+    update_config=
+    (
+        op_rate=10ms,
+        ops_per_transaction=(max=10,min=0),
+        thread_count=40,
+        value_size=1000000
+    )
+),
+operation_tracker=
+(
+    enabled=true,
+    # Run after checkpoint most of the time.
+    op_rate=40s
+)

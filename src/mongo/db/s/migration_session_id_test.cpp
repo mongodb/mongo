@@ -27,14 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/migration_session_id.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/time_support.h"
+
+#include <memory>
+
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {

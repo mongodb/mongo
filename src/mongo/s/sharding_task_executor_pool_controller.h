@@ -29,16 +29,33 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/client/replica_set_change_notifier.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/executor/connection_pool.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/synchronized_value.h"
+
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
+
+class ShardRegistry;
 
 /**
  * A special Controller for the sharding ConnectionPool
@@ -100,8 +117,16 @@ public:
         AtomicWord<int> pendingTimeoutMS;
         AtomicWord<int> toRefreshTimeoutMS;
 
+        AtomicWord<int> connectionRequestsMaxQueueDepth;
+
         synchronized_value<std::string> matchingStrategyString;
         AtomicWord<MatchingStrategy> matchingStrategy;
+
+        AtomicWord<int> minConnectionsForConfigServers;
+        AtomicWord<int> maxConnectionsForConfigServers;
+
+        AtomicWord<int> baseEstablishmentBackoffMS;
+        AtomicWord<int> maxEstablishmentBackoffMS;
     };
 
     static inline Parameters gParameters;
@@ -110,12 +135,13 @@ public:
      * Validate that hostTimeoutMS is greater than the sum of pendingTimeoutMS and
      * toRefreshTimeoutMS
      */
-    static Status validateHostTimeout(const int& hostTimeoutMS);
+    static Status validateHostTimeout(const int& hostTimeoutMS, const boost::optional<TenantId>&);
 
     /**
      * Validate that pendingTimeoutMS is less than toRefreshTimeoutMS
      */
-    static Status validatePendingTimeout(const int& pendingTimeoutMS);
+    static Status validatePendingTimeout(const int& pendingTimeoutMS,
+                                         const boost::optional<TenantId>&);
 
     /**
      *  Matches the matching strategy string against a set of literals
@@ -123,7 +149,8 @@ public:
      */
     static Status onUpdateMatchingStrategy(const std::string& str);
 
-    ShardingTaskExecutorPoolController() = default;
+    explicit ShardingTaskExecutorPoolController(std::weak_ptr<ShardRegistry> shardRegistry)
+        : _shardRegistry(std::move(shardRegistry)) {}
     ShardingTaskExecutorPoolController& operator=(ShardingTaskExecutorPoolController&&) = delete;
 
     void init(ConnectionPool* parent) override;
@@ -137,6 +164,12 @@ public:
     Milliseconds hostTimeout() const override;
     Milliseconds pendingTimeout() const override;
     Milliseconds toRefreshTimeout() const override;
+
+    size_t connectionRequestsMaxQueueDepth() const override;
+    size_t maxConnections() const override;
+
+    Milliseconds baseEstablishmentBackoffMS() const override;
+    Milliseconds maxEstablishmentBackoffMS() const override;
 
     StringData name() const override {
         return "ShardingTaskExecutorPoolController"_sd;
@@ -185,6 +218,9 @@ private:
         // The host associated with this pool
         HostAndPort host;
 
+        // A pool connected to a config server gets special treatment
+        bool isConfigServer = false;
+
         // The GroupData associated with this pool.
         // Note that this will be invalid if there was a replica set change
         std::weak_ptr<GroupData> groupData;
@@ -208,9 +244,12 @@ private:
         boost::optional<PoolId> maybeId;
     };
 
+    /** Needed by isConfigServer */
+    std::weak_ptr<ShardRegistry> const _shardRegistry;
+
     std::shared_ptr<ReplicaSetChangeNotifier::Listener> _listener;
 
-    Mutex _mutex = MONGO_MAKE_LATCH("ShardingTaskExecutorPoolController::_mutex");
+    stdx::mutex _mutex;
 
     // Entires to _poolDatas are added by addHost() and removed by removeHost()
     stdx::unordered_map<PoolId, PoolData> _poolDatas;

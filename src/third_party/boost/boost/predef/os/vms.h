@@ -14,7 +14,7 @@ http://www.boost.org/LICENSE_1_0.txt)
 /* tag::reference[]
 = `BOOST_OS_VMS`
 
-http://en.wikipedia.org/wiki/Vms[VMS] operating system.
+http://en.wikipedia.org/wiki/OpenVMS[VMS] operating system.
 
 [options="header"]
 |===

@@ -30,26 +30,32 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/duration.h"
+
+#include <memory>
+#include <variant>
+#include <vector>
 
 namespace mongo {
 
 class PlanYieldPolicySBE final : public PlanYieldPolicy {
 public:
-    PlanYieldPolicySBE(YieldPolicy policy,
-                       ClockSource* clockSource,
-                       int yieldFrequency,
-                       Milliseconds yieldPeriod,
-                       const Yieldable* yieldable,
-                       std::unique_ptr<YieldPolicyCallbacks> callbacks,
-                       bool useExperimentalCommitTxnBehavior)
-        : PlanYieldPolicy(
-              policy, clockSource, yieldFrequency, yieldPeriod, yieldable, std::move(callbacks)),
-          _useExperimentalCommitTxnBehavior(useExperimentalCommitTxnBehavior) {
-        uassert(4822879,
-                "WRITE_CONFLICT_RETRY_ONLY yield policy is not supported in SBE",
-                policy != YieldPolicy::WRITE_CONFLICT_RETRY_ONLY);
-    }
+    static std::unique_ptr<PlanYieldPolicySBE> make(OperationContext* opCtx,
+                                                    PlanYieldPolicy::YieldPolicy policy,
+                                                    const MultipleCollectionAccessor& collections,
+                                                    NamespaceString nss);
+
+    static std::unique_ptr<PlanYieldPolicySBE> make(
+        OperationContext* opCtx,
+        YieldPolicy policy,
+        ClockSource* clockSource,
+        int yieldFrequency,
+        Milliseconds yieldPeriod,
+        std::unique_ptr<YieldPolicyCallbacks> callbacks = nullptr);
 
     /**
      * Registers the tree rooted at 'plan' to yield, in addition to all other plans that have been
@@ -67,21 +73,21 @@ public:
     }
 
 private:
+    PlanYieldPolicySBE(OperationContext* opCtx,
+                       YieldPolicy policy,
+                       ClockSource* clockSource,
+                       int yieldFrequency,
+                       Milliseconds yieldPeriod,
+                       std::unique_ptr<YieldPolicyCallbacks> callbacks);
+
     void saveState(OperationContext* opCtx) override;
 
-    void restoreState(OperationContext* opCtx, const Yieldable* yieldable) override;
-
-    // TODO SERVER-59620: Remove this.
-    bool useExperimentalCommitTxnBehavior() const override {
-        return _useExperimentalCommitTxnBehavior;
-    }
+    void restoreState(OperationContext* opCtx,
+                      const Yieldable* yieldable,
+                      RestoreContext::RestoreType restoreType) override;
 
     // The list of plans registered to yield when the configured policy triggers a yield.
     std::vector<sbe::PlanStage*> _yieldingPlans;
-
-    // Whether the experimental behavior which commits transactions across yields instead of
-    // aborting them, should be used.
-    bool _useExperimentalCommitTxnBehavior;
 };
 
 }  // namespace mongo

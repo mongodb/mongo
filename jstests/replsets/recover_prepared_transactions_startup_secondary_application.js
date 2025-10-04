@@ -6,23 +6,23 @@
  * @tags: [requires_persistence, uses_transactions, uses_prepare_transaction]
  */
 
-(function() {
-"use strict";
-load("jstests/core/txns/libs/prepare_helpers.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const replTest = new ReplSetTest({nodes: 2});
 const nodes = replTest.startSet();
 
 // Increase the election timeout to 24 hours so that we do not accidentally trigger an election
 // while the secondary is restarting.
-replTest.initiateWithHighElectionTimeout();
+replTest.initiate();
 
 const primary = replTest.getPrimary();
 let secondary = replTest.getSecondary();
 // The default WC is majority and disableSnapshotting failpoint will prevent satisfying any majority
 // writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 const dbName = "test";
 const collName = "recover_prepared_transactions_startup_secondary_application";
@@ -48,8 +48,9 @@ jsTestLog("Disable snapshotting on all nodes");
 
 // Disable snapshotting on all members of the replica set so that further operations do not
 // enter the majority snapshot.
-nodes.forEach(node => assert.commandWorked(node.adminCommand(
-                  {configureFailPoint: "disableSnapshotting", mode: "alwaysOn"})));
+nodes.forEach((node) =>
+    assert.commandWorked(node.adminCommand({configureFailPoint: "disableSnapshotting", mode: "alwaysOn"})),
+);
 
 session.startTransaction();
 assert.commandWorked(sessionColl.update({_id: 1}, {_id: 1, a: 1}));
@@ -76,8 +77,7 @@ secondary = replTest.start(secondary, {}, true);
 
 jsTestLog("Secondary was restarted");
 
-assert.commandWorked(
-    primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "off"}));
+assert.commandWorked(primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "off"}));
 
 // It's illegal to commit a prepared transaction before its prepare oplog entry has been
 // majority committed. So wait for prepare oplog entry to be majority committed before issuing
@@ -111,7 +111,7 @@ assert.commandWorked(session2.abortTransaction_forTesting());
 replTest.awaitReplication();
 assert.eq(secondaryTestColl.find().sort({_id: 1}).toArray(), [{_id: 1, a: 1}, {_id: 2}]);
 
-jsTestLog("Attempting to run another transction");
+jsTestLog("Attempting to run another transaction");
 
 // Make sure that we can run another conflicting transaction after recovery without any
 // problems and that we can see its changes when we read from the secondary.
@@ -124,4 +124,3 @@ replTest.awaitReplication();
 assert.eq(secondaryTestColl.findOne({_id: 1}), {_id: 1, a: 3});
 
 replTest.stopSet();
-}());

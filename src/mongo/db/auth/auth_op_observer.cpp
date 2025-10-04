@@ -27,88 +27,119 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/auth/auth_op_observer.h"
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/op_observer_util.h"
+#include "mongo/db/local_catalog/collection_options.h"
+#include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/rss/replicated_storage_service.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/namespace_string_util.h"
+
+#include <set>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 
 namespace mongo {
-
-namespace {
-
-const auto documentIdDecoration = OperationContext::declareDecoration<BSONObj>();
-
-}  // namespace
 
 AuthOpObserver::AuthOpObserver() = default;
 
 AuthOpObserver::~AuthOpObserver() = default;
 
 void AuthOpObserver::onInserts(OperationContext* opCtx,
-                               const NamespaceString& nss,
-                               const UUID& uuid,
+                               const CollectionPtr& coll,
                                std::vector<InsertStatement>::const_iterator first,
                                std::vector<InsertStatement>::const_iterator last,
-                               bool fromMigrate) {
+                               const std::vector<RecordId>& recordIds,
+                               std::vector<bool> fromMigrate,
+                               bool defaultFromMigrate,
+                               OpStateAccumulator* opAccumulator) {
+    // This and all below accesses to AuthOpObserver should only happen
+    // from a shard context.
+    dassert(opCtx->getService()->role().has(ClusterRole::ShardServer));
+
     for (auto it = first; it != last; it++) {
-        audit::logInsertOperation(opCtx->getClient(), nss, it->doc);
-        AuthorizationManager::get(opCtx->getServiceContext())
-            ->logOp(opCtx, "i", nss, it->doc, nullptr);
+        audit::logInsertOperation(opCtx->getClient(), coll->ns(), it->doc);
+        AuthorizationManager::get(opCtx->getService())
+            ->notifyDDLOperation(opCtx, "i", coll->ns(), it->doc, nullptr);
     }
 }
 
-void AuthOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
+void AuthOpObserver::onUpdate(OperationContext* opCtx,
+                              const OplogUpdateEntryArgs& args,
+                              OpStateAccumulator* opAccumulator) {
     if (args.updateArgs->update.isEmpty()) {
         return;
     }
 
-    audit::logUpdateOperation(opCtx->getClient(), args.nss, args.updateArgs->updatedDoc);
+    audit::logUpdateOperation(opCtx->getClient(), args.coll->ns(), args.updateArgs->updatedDoc);
 
-    AuthorizationManager::get(opCtx->getServiceContext())
-        ->logOp(opCtx, "u", args.nss, args.updateArgs->update, &args.updateArgs->criteria);
-}
-
-void AuthOpObserver::aboutToDelete(OperationContext* opCtx,
-                                   NamespaceString const& nss,
-                                   const UUID& uuid,
-                                   BSONObj const& doc) {
-    audit::logRemoveOperation(opCtx->getClient(), nss, doc);
-
-    // Extract the _id field from the document. If it does not have an _id, use the
-    // document itself as the _id.
-    documentIdDecoration(opCtx) = doc["_id"] ? doc["_id"].wrap() : doc;
+    dassert(opCtx->getService()->role().has(ClusterRole::ShardServer));
+    AuthorizationManager::get(opCtx->getService())
+        ->notifyDDLOperation(
+            opCtx, "u", args.coll->ns(), args.updateArgs->update, &args.updateArgs->criteria);
 }
 
 void AuthOpObserver::onDelete(OperationContext* opCtx,
-                              const NamespaceString& nss,
-                              const UUID& uuid,
+                              const CollectionPtr& coll,
                               StmtId stmtId,
-                              const OplogDeleteEntryArgs& args) {
-    auto& documentId = documentIdDecoration(opCtx);
+                              const BSONObj& doc,
+                              const DocumentKey& documentKey,
+                              const OplogDeleteEntryArgs& args,
+                              OpStateAccumulator* opAccumulator) {
+    audit::logRemoveOperation(opCtx->getClient(), coll->ns(), doc);
+    // Extract the _id field from the document. If it does not have an _id, use the
+    // document itself as the _id.
+    auto documentId = doc["_id"] ? doc["_id"].wrap() : doc;
     invariant(!documentId.isEmpty());
-    AuthorizationManager::get(opCtx->getServiceContext())
-        ->logOp(opCtx, "d", nss, documentId, nullptr);
+    dassert(opCtx->getService()->role().has(ClusterRole::ShardServer));
+    AuthorizationManager::get(opCtx->getService())
+        ->notifyDDLOperation(opCtx, "d", coll->ns(), documentId, nullptr);
 }
 
-void AuthOpObserver::onCreateCollection(OperationContext* opCtx,
-                                        const CollectionPtr& coll,
-                                        const NamespaceString& collectionName,
-                                        const CollectionOptions& options,
-                                        const BSONObj& idIndex,
-                                        const OplogSlot& createOpTime) {
+void AuthOpObserver::onCreateCollection(
+    OperationContext* opCtx,
+    const NamespaceString& collectionName,
+    const CollectionOptions& options,
+    const BSONObj& idIndex,
+    const OplogSlot& createOpTime,
+    const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
+    bool fromMigrate,
+    bool isTimeseries) {
     const auto cmdNss = collectionName.getCommandNS();
 
     const auto cmdObj =
-        repl::MutableOplogEntry::makeCreateCollCmdObj(collectionName, options, idIndex);
+        repl::MutableOplogEntry::makeCreateCollObject(collectionName, options, idIndex);
 
-    AuthorizationManager::get(opCtx->getServiceContext())
-        ->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
+    BSONObj o2;
+    if (createCollCatalogIdentifier.has_value() &&
+        shouldReplicateLocalCatalogIdentifiers(
+            rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider())) {
+        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+        auto identUniqueTag = storageEngine->getCollectionIdentUniqueTag(
+            createCollCatalogIdentifier->ident, collectionName.dbName());
+        auto idIndexIdentUniqueTag = createCollCatalogIdentifier->idIndexIdent
+            ? boost::optional<StringData>(storageEngine->getIndexIdentUniqueTag(
+                  *createCollCatalogIdentifier->idIndexIdent, collectionName.dbName()))
+            : boost::none;
+        o2 = repl::MutableOplogEntry::makeCreateCollObject2(
+            createCollCatalogIdentifier->catalogId, identUniqueTag, idIndexIdentUniqueTag);
+    }
+
+    dassert(opCtx->getService()->role().has(ClusterRole::ShardServer));
+    AuthorizationManager::get(opCtx->getService())
+        ->notifyDDLOperation(opCtx, "c", cmdNss, cmdObj, &o2);
 }
 
 void AuthOpObserver::onCollMod(OperationContext* opCtx,
@@ -116,34 +147,41 @@ void AuthOpObserver::onCollMod(OperationContext* opCtx,
                                const UUID& uuid,
                                const BSONObj& collModCmd,
                                const CollectionOptions& oldCollOptions,
-                               boost::optional<IndexCollModInfo> indexInfo) {
+                               boost::optional<IndexCollModInfo> indexInfo,
+                               bool isTimeseries) {
     const auto cmdNss = nss.getCommandNS();
 
     // Create the 'o' field object.
     const auto cmdObj = makeCollModCmdObj(collModCmd, oldCollOptions, indexInfo);
 
-    AuthorizationManager::get(opCtx->getServiceContext())
-        ->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
+    dassert(opCtx->getService()->role().has(ClusterRole::ShardServer));
+    AuthorizationManager::get(opCtx->getService())
+        ->notifyDDLOperation(opCtx, "c", cmdNss, cmdObj, nullptr);
 }
 
-void AuthOpObserver::onDropDatabase(OperationContext* opCtx, const std::string& dbName) {
-    const NamespaceString cmdNss{dbName, "$cmd"};
+void AuthOpObserver::onDropDatabase(OperationContext* opCtx,
+                                    const DatabaseName& dbName,
+                                    bool markFromMigrate) {
+    const NamespaceString cmdNss(NamespaceString::makeCommandNamespace(dbName));
     const auto cmdObj = BSON("dropDatabase" << 1);
 
-    AuthorizationManager::get(opCtx->getServiceContext())
-        ->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
+    invariant(opCtx->getService()->role().has(ClusterRole::ShardServer));
+    AuthorizationManager::get(opCtx->getService())
+        ->notifyDDLOperation(opCtx, "c", cmdNss, cmdObj, nullptr);
 }
 
 repl::OpTime AuthOpObserver::onDropCollection(OperationContext* opCtx,
                                               const NamespaceString& collectionName,
                                               const UUID& uuid,
                                               std::uint64_t numRecords,
-                                              const CollectionDropType dropType) {
+                                              bool markFromMigrate,
+                                              bool isTimeseries) {
     const auto cmdNss = collectionName.getCommandNS();
     const auto cmdObj = BSON("drop" << collectionName.coll());
 
-    AuthorizationManager::get(opCtx->getServiceContext())
-        ->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
+    dassert(opCtx->getService()->role().has(ClusterRole::ShardServer));
+    AuthorizationManager::get(opCtx->getService())
+        ->notifyDDLOperation(opCtx, "c", cmdNss, cmdObj, nullptr);
 
     return {};
 }
@@ -152,25 +190,27 @@ void AuthOpObserver::onDropIndex(OperationContext* opCtx,
                                  const NamespaceString& nss,
                                  const UUID& uuid,
                                  const std::string& indexName,
-                                 const BSONObj& indexInfo) {
+                                 const BSONObj& indexInfo,
+                                 bool isTimeseries) {
     const auto cmdNss = nss.getCommandNS();
     const auto cmdObj = BSON("dropIndexes" << nss.coll() << "index" << indexName);
 
-    AuthorizationManager::get(opCtx->getServiceContext())
-        ->logOp(opCtx, "c", cmdNss, cmdObj, &indexInfo);
+    dassert(opCtx->getService()->role().has(ClusterRole::ShardServer));
+    AuthorizationManager::get(opCtx->getService())
+        ->notifyDDLOperation(opCtx, "c", cmdNss, cmdObj, &indexInfo);
 }
 
 void AuthOpObserver::postRenameCollection(OperationContext* const opCtx,
                                           const NamespaceString& fromCollection,
                                           const NamespaceString& toCollection,
                                           const UUID& uuid,
-                                          OptionalCollectionUUID dropTargetUUID,
+                                          const boost::optional<UUID>& dropTargetUUID,
                                           bool stayTemp) {
     const auto cmdNss = fromCollection.getCommandNS();
-
+    const auto sc = SerializationContext::stateDefault();
     BSONObjBuilder builder;
-    builder.append("renameCollection", fromCollection.ns());
-    builder.append("to", toCollection.ns());
+    builder.append("renameCollection", NamespaceStringUtil::serialize(fromCollection, sc));
+    builder.append("to", NamespaceStringUtil::serialize(toCollection, sc));
     builder.append("stayTemp", stayTemp);
     if (dropTargetUUID) {
         dropTargetUUID->appendToBuilder(&builder, "dropTarget");
@@ -178,17 +218,20 @@ void AuthOpObserver::postRenameCollection(OperationContext* const opCtx,
 
     const auto cmdObj = builder.done();
 
-    AuthorizationManager::get(opCtx->getServiceContext())
-        ->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
+    dassert(opCtx->getService()->role().has(ClusterRole::ShardServer));
+    AuthorizationManager::get(opCtx->getService())
+        ->notifyDDLOperation(opCtx, "c", cmdNss, cmdObj, nullptr);
 }
 
 void AuthOpObserver::onRenameCollection(OperationContext* const opCtx,
                                         const NamespaceString& fromCollection,
                                         const NamespaceString& toCollection,
                                         const UUID& uuid,
-                                        OptionalCollectionUUID dropTargetUUID,
+                                        const boost::optional<UUID>& dropTargetUUID,
                                         std::uint64_t numRecords,
-                                        bool stayTemp) {
+                                        bool stayTemp,
+                                        bool markFromMigrate,
+                                        bool isTimeseries) {
     postRenameCollection(opCtx, fromCollection, toCollection, uuid, dropTargetUUID, stayTemp);
 }
 
@@ -199,38 +242,22 @@ void AuthOpObserver::onImportCollection(OperationContext* opCtx,
                                         long long dataSize,
                                         const BSONObj& catalogEntry,
                                         const BSONObj& storageMetadata,
-                                        bool isDryRun) {
-    AuthorizationManager::get(opCtx->getServiceContext())
-        ->logOp(opCtx, "m", nss, catalogEntry, &storageMetadata);
+                                        bool isDryRun,
+                                        bool isTimeseries) {
+
+    dassert(opCtx->getService()->role().has(ClusterRole::ShardServer));
+    AuthorizationManager::get(opCtx->getService())
+        ->notifyDDLOperation(opCtx, "m", nss, catalogEntry, &storageMetadata);
 }
 
-void AuthOpObserver::onApplyOps(OperationContext* opCtx,
-                                const std::string& dbName,
-                                const BSONObj& applyOpCmd) {
-    const NamespaceString cmdNss{dbName, "$cmd"};
-
-    AuthorizationManager::get(opCtx->getServiceContext())
-        ->logOp(opCtx, "c", cmdNss, applyOpCmd, nullptr);
-}
-
-void AuthOpObserver::onEmptyCapped(OperationContext* opCtx,
-                                   const NamespaceString& collectionName,
-                                   const UUID& uuid) {
-    const auto cmdNss = collectionName.getCommandNS();
-    const auto cmdObj = BSON("emptycapped" << collectionName.coll());
-
-    AuthorizationManager::get(opCtx->getServiceContext())
-        ->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
-}
-
-void AuthOpObserver::_onReplicationRollback(OperationContext* opCtx,
-                                            const RollbackObserverInfo& rbInfo) {
+void AuthOpObserver::onReplicationRollback(OperationContext* opCtx,
+                                           const RollbackObserverInfo& rbInfo) {
     // Invalidate any in-memory auth data if necessary.
     const auto& rollbackNamespaces = rbInfo.rollbackNamespaces;
-    if (rollbackNamespaces.count(AuthorizationManager::versionCollectionNamespace) == 1 ||
-        rollbackNamespaces.count(AuthorizationManager::usersCollectionNamespace) == 1 ||
-        rollbackNamespaces.count(AuthorizationManager::rolesCollectionNamespace) == 1) {
-        AuthorizationManager::get(opCtx->getServiceContext())->invalidateUserCache(opCtx);
+    if (rollbackNamespaces.count(NamespaceString::kServerConfigurationNamespace) == 1 ||
+        rollbackNamespaces.count(NamespaceString::kAdminUsersNamespace) == 1 ||
+        rollbackNamespaces.count(NamespaceString::kAdminRolesNamespace) == 1) {
+        AuthorizationManager::get(opCtx->getService())->invalidateUserCache();
     }
 }
 

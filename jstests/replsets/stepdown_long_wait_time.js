@@ -6,48 +6,46 @@
 // 5. Restart replication on the SECONDARY.
 // 6. Wait for PRIMARY to StepDown.
 
-(function() {
-"use strict";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
-load("jstests/libs/write_concern_util.js");
-
-var name = "stepDownWithLongWait";
-var replSet = new ReplSetTest({name: name, nodes: 3});
-var nodes = replSet.nodeList();
+let name = "stepDownWithLongWait";
+let replSet = new ReplSetTest({name: name, nodes: 3});
+let nodes = replSet.nodeList();
 replSet.startSet();
 replSet.initiate({
     "_id": name,
     "members": [
         {"_id": 0, "host": nodes[0], "priority": 3},
         {"_id": 1, "host": nodes[1]},
-        {"_id": 2, "host": nodes[2], "arbiterOnly": true}
-    ]
+        {"_id": 2, "host": nodes[2], "arbiterOnly": true},
+    ],
 });
 
 replSet.waitForState(replSet.nodes[0], ReplSetTest.State.PRIMARY);
-var primary = replSet.getPrimary();
+let primary = replSet.getPrimary();
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
-var secondary = replSet.getSecondary();
-jsTestLog('Disable replication on the SECONDARY ' + secondary.host);
+let secondary = replSet.getSecondary();
+jsTestLog("Disable replication on the SECONDARY " + secondary.host);
 stopServerReplication(secondary);
 
 jsTestLog("do a write then ask the PRIMARY to stepdown");
-var options = {writeConcern: {w: 1, wtimeout: ReplSetTest.kDefaultTimeoutMS}};
+let options = {writeConcern: {w: 1, wtimeout: ReplSetTest.kDefaultTimeoutMS}};
 assert.commandWorked(primary.getDB(name).foo.insert({x: 1}, options));
 
-var stepDownCmd = function() {
+let stepDownCmd = function () {
     assert.commandWorked(db.adminCommand({replSetStepDown: 60, secondaryCatchUpPeriodSecs: 60}));
 };
-var stepDowner = startParallelShell(stepDownCmd, primary.port);
+let stepDowner = startParallelShell(stepDownCmd, primary.port);
 
-assert.soon(function() {
-    var res = primary.getDB('admin').currentOp(true);
-    for (var entry in res.inprog) {
-        if (res.inprog[entry]["command"] &&
-            res.inprog[entry]["command"]["replSetStepDown"] === 60) {
+assert.soon(function () {
+    let res = primary.getDB("admin").currentOp(true);
+    for (let entry in res.inprog) {
+        if (res.inprog[entry]["command"] && res.inprog[entry]["command"]["replSetStepDown"] === 60) {
             return true;
         }
     }
@@ -56,24 +54,23 @@ assert.soon(function() {
 }, "No pending stepdown command found");
 
 jsTestLog("Ensure that writes start failing with NotWritablePrimary errors");
-assert.soonNoExcept(function() {
-    assert.commandFailedWithCode(primary.getDB(name).foo.insert({x: 2}),
-                                 ErrorCodes.NotWritablePrimary);
+assert.soonNoExcept(function () {
+    assert.commandFailedWithCode(primary.getDB(name).foo.insert({x: 2}), ErrorCodes.NotWritablePrimary);
     return true;
 });
 
-jsTestLog("Ensure that even though writes are failing with NotWritablePrimary, we still report " +
-          "ourselves as PRIMARY");
-assert.eq(ReplSetTest.State.PRIMARY, primary.adminCommand('replSetGetStatus').myState);
+jsTestLog(
+    "Ensure that even though writes are failing with NotWritablePrimary, we still report " + "ourselves as PRIMARY",
+);
+assert.eq(ReplSetTest.State.PRIMARY, primary.adminCommand("replSetGetStatus").myState);
 
-jsTestLog('Enable replication on the SECONDARY ' + secondary.host);
+jsTestLog("Enable replication on the SECONDARY " + secondary.host);
 restartServerReplication(secondary);
 
 jsTestLog("Wait for PRIMARY " + primary.host + " to completely step down.");
-replSet.waitForState(primary, ReplSetTest.State.SECONDARY);
-var exitCode = stepDowner();
+replSet.awaitSecondaryNodes(null, [primary]);
+let exitCode = stepDowner();
 
 jsTestLog("Wait for SECONDARY " + secondary.host + " to become PRIMARY");
 replSet.waitForState(secondary, ReplSetTest.State.PRIMARY);
 replSet.stopSet();
-})();

@@ -1,0 +1,38 @@
+test_kind: js_test
+
+description: |
+  This suite runs tests that are targeted for extensions against a one shard cluster. It assumes
+  that extensions (and the corresponding .so files) have already been installed with
+  'install-extensions'. This suite spins up a mongos and a mongod.
+
+selector:
+  roots:
+    - jstests/extensions/**/*.js
+  exclude_with_any_tags:
+    - assumes_against_mongod_not_mongos
+    - requires_sharding
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");
+  hooks:
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: ValidateCollections
+  fixture:
+    class: ShardedClusterFixture
+    num_shards: 1
+    load_all_extensions: true
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        featureFlagExtensionsAPI: true
+    mongos_options:
+      set_parameters:
+        featureFlagExtensionsAPI: true

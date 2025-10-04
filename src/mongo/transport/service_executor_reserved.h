@@ -29,14 +29,21 @@
 
 #pragma once
 
-#include <deque>
-
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/transport/service_executor.h"
+#include "mongo/transport/session.h"
+#include "mongo/util/duration.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <deque>
+#include <memory>
+#include <string>
 
 namespace mongo {
 namespace transport {
@@ -57,29 +64,34 @@ public:
 
     static ServiceExecutorReserved* get(ServiceContext* ctx);
 
-    Status start() override;
+    void start() override;
     Status shutdown(Milliseconds timeout) override;
-    Status scheduleTask(Task task, ScheduleFlags flags) override;
 
     size_t getRunningThreads() const override {
         return _numRunningWorkerThreads.loadRelaxed();
     }
 
-    void runOnDataAvailable(const SessionHandle& session,
-                            OutOfLineExecutor::Task onCompletionCallback) override;
-
     void appendStats(BSONObjBuilder* bob) const override;
+
+    std::unique_ptr<TaskRunner> makeTaskRunner() override;
+
+    StringData getName() const override {
+        return "ServiceExecutorReserved"_sd;
+    }
 
 private:
     Status _startWorker();
 
+    void _schedule(Task task);
+
+    void _runOnDataAvailable(const std::shared_ptr<Session>& session, Task task);
+
     static thread_local std::deque<Task> _localWorkQueue;
-    static thread_local int _localRecursionDepth;
     static thread_local int64_t _localThreadIdleCounter;
 
     AtomicWord<bool> _stillRunning{false};
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ServiceExecutorReserved::_mutex");
+    mutable stdx::mutex _mutex;
     stdx::condition_variable _threadWakeup;
     stdx::condition_variable _shutdownCondition;
 

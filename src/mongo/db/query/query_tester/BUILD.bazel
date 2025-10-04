@@ -1,0 +1,44 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+mongo_cc_library(
+    name = "mongotest_core",
+    srcs = [
+        "command_helpers.cpp",
+        "file_helpers.cpp",
+        "test.cpp",
+        "testfile.cpp",
+    ],
+    hdrs = [
+        "command_helpers.h",
+        "file_helpers.h",
+        "test.h",
+        "testfile.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/client:clientdriver_network",
+        "//src/mongo/db:common",
+        "//src/mongo/db/query/util:jparse_util",
+        "//src/mongo/rpc:message",
+        "//src/mongo/shell:shell_utils",
+        "//src/mongo/transport:transport_layer_manager",
+        "//src/mongo/util:pcre_wrapper",
+    ],
+)
+
+mongo_cc_binary(
+    name = "mongotest",
+    srcs = [
+        "main.cpp",
+        "mock_version_info.h",
+    ],
+    tags = [
+        "devcore",
+        "dist_test",
+    ],
+    deps = [
+        "mongotest_core",
+    ],
+)

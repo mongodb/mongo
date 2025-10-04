@@ -22,7 +22,6 @@ RUN_OS=$(uname -s)
 CPU_SET=0-1
 echo "test read write lock for time shifting using libfaketime"
 
-
 # check for program arguements, if not present, print usage
 if [ -z $1 ]
 then
@@ -43,7 +42,15 @@ then
 fi
 
 # Locate Wiredtiger home directory.
-RW_LOCK_FILE=$(git rev-parse --show-toplevel)/build_posix/test/csuite/test_rwlock
+# If RW_LOCK_FILE isn't set, default to using the build directory this script resides under
+# under. Our CMake build will sync a copy of this script to the build directory the 'test_rwlock'
+# binary is created under. Note this assumes we are executing a copy of the script that lives under
+# the build directory. Otherwise passing the binary path is required.
+: ${RW_LOCK_FILE:=$(dirname $0)/test_rwlock}
+[ -x ${RW_LOCK_FILE} ] || {
+    echo "fail: unable to locate rwlock test binary"
+    exit 1
+}
 
 SEC1=`date +%s`
 if [ "$RUN_OS" = "Darwin" ]
@@ -84,7 +91,7 @@ echo "-$DIFF1""s" >| ~/.faketimerc
 
 wait $PID
 
-#kept echo statement here so as not to loose in cluster of test msgs. 
+#kept echo statement here so as not to loose in cluster of test msgs.
 echo "after sleeping for 5 seconds set ~/.faketimerc value as -ve $DIFF1 seconds"
 rm ~/.faketimerc
 
@@ -96,7 +103,7 @@ fi
 SEC3=`date +%s`
 DIFF2=$((SEC3 - SEC2))
 
-PERC=$((((DIFF2 - DIFF1)*100)/DIFF1)) 
+PERC=$((((DIFF2 - DIFF1)*100)/DIFF1))
 echo "execution time difference : $PERC %, less than 20% is ok"
 echo "normal execution time : $DIFF1 seconds"
 echo "fake time reduction by : $DIFF1 seconds"

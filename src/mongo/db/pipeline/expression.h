@@ -29,41 +29,115 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
+#include <boost/intrusive_ptr.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/crypto/fle_crypto_predicate.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/document_value/value_comparator.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/pipeline/accumulator_percentile_enum_gen.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_visitor.h"
+#include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/pipeline/monotonic_expression.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/db/query/datetime/date_time_support.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/db/query/util/named_enum.h"
+#include "mongo/db/update/pattern_cmp.h"
+#include "mongo/db/version_context.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/pcre.h"
+#include "mongo/util/safe_num.h"
+#include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
 
 #include <algorithm>
-#include <boost/intrusive_ptr.hpp>
+#include <cstddef>
 #include <functional>
+#include <initializer_list>
+#include <iterator>
 #include <map>
-#include <pcre.h>
+#include <memory>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include "mongo/base/init.h"
-#include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/pipeline/dependencies.h"
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/expression_visitor.h"
-#include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/pipeline/variables.h"
-#include "mongo/db/query/allowed_contexts.h"
-#include "mongo/db/query/datetime/date_time_support.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
-#include "mongo/db/query/sort_pattern.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/update/pattern_cmp.h"
-#include "mongo/util/intrusive_counter.h"
-#include "mongo/util/str.h"
-
 namespace mongo {
+constexpr size_t kMaxArgumentCountForSwitchAndSetExprForSbe = 100;
 
-class BSONArrayBuilder;
 class BSONElement;
-class BSONObjBuilder;
-class DocumentSource;
+
+/**
+ * The reasons why an expression is disabled (used for better error messages):
+ *
+ * testCommandsDisabled: Expression was registered via REGISTER_TEST_EXPRESSION, but
+ *                       getTestCommandsEnabled() is false.
+ * featureFlagDisabled:  Expression was registered via REGISTER_EXPRESSION_WITH_FEATURE_FLAG, but
+ *                       the feature flag was not enabled.
+ * otherReasonDisabled:  Expression was registered differently; probably by directly calling
+ *                       REGISTER_EXPRESSION_CONDITIONALLY with evaluatedCondition set to false.
+ */
+enum class ExpressionDisabledReason {
+    testCommandsDisabled,
+    featureFlagDisabled,
+    otherReasonDisabled,
+};
+
+/**
+ * You can specify a condition, evaluated during startup,
+ * that decides whether to register the parser.
+ *
+ * For example, you could check a feature flag, and register the parser only when it's enabled.
+ *
+ * Note that the condition is evaluated only once, during a MONGO_INITIALIZER. Don't specify
+ * a condition that can change at runtime, such as FCV. (Feature flags are ok, because they
+ * cannot be toggled at runtime.)
+ *
+ * This is the most general REGISTER_EXPRESSION* macro, which all others should delegate to.
+ */
+#define REGISTER_EXPRESSION_CONDITIONALLY(                                                      \
+    key, parser, allowedWithApiStrict, allowedClientType, featureFlag, ...)                     \
+    MONGO_INITIALIZER_GENERAL(addToExpressionParserMap_##key,                                   \
+                              ("BeginExpressionRegistration"),                                  \
+                              ("EndExpressionRegistration"))                                    \
+    (InitializerContext*) {                                                                     \
+        /* Require 'featureFlag' to be a constexpr. */                                          \
+        constexpr FeatureFlag* constFeatureFlag{featureFlag};                                   \
+        /* This non-constexpr variable works around a bug in GCC when 'featureFlag' is null. */ \
+        FeatureFlag* featureFlagValue{constFeatureFlag};                                        \
+        bool evaluatedCondition{__VA_ARGS__};                                                   \
+        if (!evaluatedCondition || (featureFlagValue && !featureFlagValue->canBeEnabled())) {   \
+            Expression::registerDisabledExpressionName(                                         \
+                "$" #key,                                                                       \
+                evaluatedCondition ? ExpressionDisabledReason::featureFlagDisabled              \
+                                   : (getTestCommandsEnabled()                                  \
+                                          ? ExpressionDisabledReason::otherReasonDisabled       \
+                                          : ExpressionDisabledReason::testCommandsDisabled));   \
+            return;                                                                             \
+        }                                                                                       \
+        Expression::registerExpression(                                                         \
+            "$" #key, (parser), (allowedWithApiStrict), (allowedClientType), (featureFlag));    \
+    }
 
 /**
  * Registers a Parser so it can be called from parseExpression and friends.
@@ -74,31 +148,27 @@ class DocumentSource;
  * An expression registered this way can be used in any featureCompatibilityVersion and will be
  * considered part of the stable API.
  */
-#define REGISTER_STABLE_EXPRESSION(key, parser)                       \
-    MONGO_INITIALIZER_GENERAL(addToExpressionParserMap_##key,         \
-                              ("BeginExpressionRegistration"),        \
-                              ("EndExpressionRegistration"))          \
-    (InitializerContext*) {                                           \
-        Expression::registerExpression("$" #key,                      \
-                                       (parser),                      \
-                                       AllowedWithApiStrict::kAlways, \
-                                       AllowedWithClientType::kAny,   \
-                                       boost::none);                  \
-    }
+#define REGISTER_STABLE_EXPRESSION(key, parser)                      \
+    REGISTER_EXPRESSION_CONDITIONALLY(key,                           \
+                                      parser,                        \
+                                      AllowedWithApiStrict::kAlways, \
+                                      AllowedWithClientType::kAny,   \
+                                      nullptr, /* featureFlag */     \
+                                      true)
 
 /**
  * Registers a Parser so it can be called from parseExpression and friends. Use this version if your
  * expression can only be persisted to a catalog data structure in a feature compatibility version
- * >= X.
+ * that enables the featureFlag.
  *
  * As an example, if your expression looks like {"$foo": [1,2,3]}, and can only be used in a feature
- * compatibility version >= X, you would add this line:
- * REGISTER_EXPRESSION_WITH_MIN_VERSION(
+ * compatibility version that enables featureFlag, you would add this line:
+ * REGISTER_EXPRESSION_WITH_FEATURE_FLAG(
  *  foo,
  *  ExpressionFoo::parse,
  *  AllowedWithApiStrict::kNeverInVersion1,
  *  AllowedWithClientType::kAny,
- *  X);
+ *  featureFlag);
  *
  * Generally new language features should be excluded from the stable API for a stabilization period
  * to allow for incorporating feedback or fixing accidental semantics bugs.
@@ -107,76 +177,64 @@ class DocumentSource;
  * parser and enforce the 'sometimes' behavior during that invocation. No extra validation will be
  * done here.
  */
-#define REGISTER_EXPRESSION_WITH_MIN_VERSION(                                               \
-    key, parser, allowedWithApiStrict, allowedClientType, minVersion)                       \
-    MONGO_INITIALIZER_GENERAL(addToExpressionParserMap_##key,                               \
-                              ("BeginExpressionRegistration"),                              \
-                              ("EndExpressionRegistration"))                                \
-    (InitializerContext*) {                                                                 \
-        Expression::registerExpression(                                                     \
-            "$" #key, (parser), (allowedWithApiStrict), (allowedClientType), (minVersion)); \
-    }
+#define REGISTER_EXPRESSION_WITH_FEATURE_FLAG(                         \
+    key, parser, allowedWithApiStrict, allowedClientType, featureFlag) \
+    REGISTER_EXPRESSION_CONDITIONALLY(                                 \
+        key, parser, allowedWithApiStrict, allowedClientType, featureFlag, true)
 
 /**
  * Registers a Parser only if test commands are enabled. Use this if your expression is only used
- * for testing purposes.
+ * for testing purposes. If the expression requires a FCV gated feature flag, the feature flag
+ * should be tied to a permanent FCV (see 'featureFlagBlender'). If the expression does not require
+ * a feature flag, a 'nullptr' should be passed.
  */
-#define REGISTER_TEST_EXPRESSION(key, allowedWithApiStrict, allowedClientType, parser)       \
-    MONGO_INITIALIZER_GENERAL(addToExpressionParserMap_##key,                                \
-                              ("BeginExpressionRegistration"),                               \
-                              ("EndExpressionRegistration"))                                 \
-    (InitializerContext*) {                                                                  \
-        if (!getTestCommandsEnabled()) {                                                     \
-            return;                                                                          \
-        }                                                                                    \
-        Expression::registerExpression(                                                      \
-            "$" #key, (parser), (allowedWithApiStrict), (allowedClientType), (boost::none)); \
-    }
-
-/**
- * Like REGISTER_EXPRESSION_WITH_MIN_VERSION, except you can also specify a condition,
- * evaluated during startup, that decides whether to register the parser.
- *
- * For example, you could check a feature flag, and register the parser only when it's enabled.
- *
- * Note that the condition is evaluated only once, during a MONGO_INITIALIZER. Don't specify
- * a condition that can change at runtime, such as FCV. (Feature flags are ok, because they
- * cannot be toggled at runtime.)
- *
- * This is the most general REGISTER_EXPRESSION* macro, which all others should delegate to.
- */
-#define REGISTER_EXPRESSION_CONDITIONALLY(                                                  \
-    key, parser, allowedWithApiStrict, allowedClientType, minVersion, ...)                  \
-    MONGO_INITIALIZER_GENERAL(addToExpressionParserMap_##key,                               \
-                              ("BeginExpressionRegistration"),                              \
-                              ("EndExpressionRegistration"))                                \
-    (InitializerContext*) {                                                                 \
-        if (!(__VA_ARGS__)) {                                                               \
-            return;                                                                         \
-        }                                                                                   \
-        Expression::registerExpression(                                                     \
-            "$" #key, (parser), (allowedWithApiStrict), (allowedClientType), (minVersion)); \
-    }
+#define REGISTER_TEST_EXPRESSION(                                      \
+    key, parser, allowedWithApiStrict, allowedClientType, featureFlag) \
+    REGISTER_EXPRESSION_CONDITIONALLY(key,                             \
+                                      parser,                          \
+                                      allowedWithApiStrict,            \
+                                      allowedClientType,               \
+                                      featureFlag,                     \
+                                      getTestCommandsEnabled())
 
 class Expression : public RefCountable {
 public:
     using Parser = std::function<boost::intrusive_ptr<Expression>(
         ExpressionContext* const, BSONElement, const VariablesParseState&)>;
+    using ExpressionVector = std::vector<boost::intrusive_ptr<Expression>>;
 
     /**
-     * Represents new paths computed by an expression. Computed paths are partitioned into renames
-     * and non-renames. See the comments for Expression::getComputedPaths() for more information.
+     * Describes the paths that an expression produces when it is part of a projection,
+     * or a projection-like clause such as $group _id.
+     *
+     * Produced by 'Expression::getComputedPaths()'.
      */
     struct ComputedPaths {
-        // Non-rename computed paths.
-        std::set<std::string> paths;
+        /**
+         * Non-rename computed paths.
+         *
+         * Mutually exclusive with the keys of 'renames', but may overlap with the keys of
+         * 'complexRenames'.
+         */
+        OrderedPathSet paths;
 
-        // Mappings from the old name of a path before applying this expression, to the new one
-        // after applying this expression.
+        /**
+         * A rename is when the values in a computed path are the same as the values in some
+         * other path immediately before the projection. (Plural "values" because, for example,
+         * a MatchExpression path can refer to zero or more subparts of a document.)
+         *
+         * For example in {$project: {a: "$x"}}, 'a' is renamed from 'x'.
+         *
+         * 'renames' maps from new name to old name: {"a", "x"} in that example.
+         */
         StringMap<std::string> renames;
+
+        // Like 'renames' except it also includes expressions which have dotted notation on the
+        // right side.
+        StringMap<std::string> complexRenames;
     };
 
-    virtual ~Expression(){};
+    ~Expression() override {}
 
     /**
      * Optimize the Expression.
@@ -189,31 +247,14 @@ public:
      *
      * Returns the optimized Expression.
      */
-    virtual boost::intrusive_ptr<Expression> optimize() {
+    [[nodiscard]] virtual boost::intrusive_ptr<Expression> optimize() {
         return this;
     }
 
     /**
-     * Add the fields and variables used in this expression to 'deps'. References to variables which
-     * are local to a particular expression will be filtered out of the tracker upon return.
+     * Creates a deep copy of the expression tree.
      */
-    void addDependencies(DepsTracker* deps) const {
-        _doAddDependencies(deps);
-
-        // Filter out references to any local variables.
-        if (_boundaryVariableId) {
-            deps->vars.erase(deps->vars.upper_bound(*_boundaryVariableId), deps->vars.end());
-        }
-    }
-
-    /**
-     * Convenience wrapper around addDependencies.
-     */
-    DepsTracker getDependencies() const {
-        DepsTracker deps;
-        addDependencies(&deps);
-        return deps;
-    }
+    virtual boost::intrusive_ptr<Expression> clone() const = 0;
 
     /**
      * Serialize the Expression tree recursively.
@@ -221,7 +262,7 @@ public:
      * If 'explain' is false, the returned Value must result in the same Expression when parsed by
      * parseOperand().
      */
-    virtual Value serialize(bool explain) const = 0;
+    virtual Value serialize(const SerializationOptions& options = {}) const = 0;
 
     /**
      * Evaluate the expression with respect to the Document given by 'root' and the Variables given
@@ -232,14 +273,10 @@ public:
     virtual Value evaluate(const Document& root, Variables* variables) const = 0;
 
     /**
-     * Returns information about the paths computed by this expression. This only needs to be
-     * overridden by expressions that have renaming semantics, where optimization code could take
-     * advantage of knowledge of these renames.
+     * Returns information about the paths computed by this expression: see 'ComputedPaths'.
      *
-     * Partitions paths involved in this expression into the set of computed paths and the set of
-     * ("new" => "old") rename mappings. Here "new" refers to the name of the path after applying
-     * this expression, whereas "old" refers to the name of the path before applying this
-     * expression.
+     * This only needs to be overridden by expressions that have renaming semantics, where
+     * optimization code could take advantage of knowledge of these renames.
      *
      * The 'exprFieldPath' is the field path at which the result of this expression will be stored.
      * This is used to determine the value of the "new" path created by the rename.
@@ -247,13 +284,6 @@ public:
      * The 'renamingVar' is needed for checking whether a field path is a rename. For example, at
      * the top level only field paths that begin with the ROOT variable, as in "$$ROOT.path", are
      * renames. A field path such as "$$var.path" is not a rename.
-     *
-     * Now consider the example of a rename expressed via a $map:
-     *
-     *    {$map: {input: "$array", as: "iter", in: {...}}}
-     *
-     * In this case, only field paths inside the "in" clause beginning with "iter", such as
-     * "$$iter.path", are renames.
      */
     virtual ComputedPaths getComputedPaths(const std::string& exprFieldPath,
                                            Variables::Id renamingVar = Variables::kRootId) const {
@@ -320,17 +350,39 @@ public:
      * DO NOT call this method directly. Instead, use the REGISTER_EXPRESSION macro defined in this
      * file.
      */
-    static void registerExpression(
-        std::string key,
-        Parser parser,
-        AllowedWithApiStrict allowedWithApiStrict,
-        AllowedWithClientType allowedWithClientType,
-        boost::optional<multiversion::FeatureCompatibilityVersion> requiredMinVersion);
+    static void registerExpression(std::string key,
+                                   Parser parser,
+                                   AllowedWithApiStrict allowedWithApiStrict,
+                                   AllowedWithClientType allowedWithClientType,
+                                   FeatureFlag* featureFlag);
 
-    const auto& getChildren() const {
+    /**
+     * Register an expression name as disabled to later improve the error message via
+     * getErrorMessage. There is no need to call this function directly - it will be called in
+     * REGISTER_EXPRESSION_CONDITIONALLY.
+     */
+    static void registerDisabledExpressionName(std::string key, ExpressionDisabledReason reason);
+
+    /**
+     * Returned all expressions registered with the expression parser.
+     */
+    static stdx::unordered_set<std::string> listRegisteredExpressions();
+
+    /**
+     * Returned all disabled expressions registered with the expression parser.
+     */
+    static stdx::unordered_set<std::string> listDisabledExpressions();
+
+    /**
+     * Return an error message for an unknown expression. Adds a hint in case the expression is
+     * switched off by a feature flag or is only available in testing mode.
+     */
+    static std::string getErrorMessage(StringData key);
+
+    const ExpressionVector& getChildren() const {
         return _children;
     }
-    auto& getChildren() {
+    ExpressionVector& getChildren() {
         return _children;
     }
 
@@ -338,9 +390,26 @@ public:
         return _expCtx;
     }
 
-protected:
-    using ExpressionVector = std::vector<boost::intrusive_ptr<Expression>>;
+    boost::optional<Variables::Id> getBoundaryVariableId() const {
+        return _boundaryVariableId;
+    }
 
+    bool isMonotonic(const FieldPath& sortedFieldPath) const {
+        return getMonotonicState(sortedFieldPath) != monotonic::State::NonMonotonic;
+    }
+
+    virtual monotonic::State getMonotonicState(const FieldPath& sortedFieldPath) const {
+        return monotonic::State::NonMonotonic;
+    }
+
+    /**
+     * Helper to determine whether this expression always evaluates to the same value.
+     */
+    virtual bool selfAndChildrenAreConstant() const {
+        return false;
+    }
+
+protected:
     Expression(ExpressionContext* const expCtx) : Expression(expCtx, {}) {}
 
     Expression(ExpressionContext* const expCtx, ExpressionVector&& children)
@@ -351,7 +420,20 @@ protected:
         }
     }
 
-    virtual void _doAddDependencies(DepsTracker* deps) const = 0;
+    /**
+     * Returns a vector containing deep copies of all children of this expressions, or an empty
+     * array if it had no children. If a child expression is nullptr, a corresponding element
+     * in the returned array will also be set to nullptr.
+     */
+    ExpressionVector cloneChildren() const;
+
+    /**
+     * Creates a deep copy of a child node at position 'childIdx' in the children vector, or returns
+     * nullptr if the child itself is a null pointer.
+     *
+     * Throws an exception if 'childIdx' is out of bounds of the 'children' container.
+     */
+    boost::intrusive_ptr<Expression> cloneChild(size_t childIdx) const;
 
     /**
      * Owning container for all sub-Expressions.
@@ -365,310 +447,11 @@ protected:
     ExpressionVector _children;
 
 private:
+    // Tracks the latest Variable ID which is defined outside of this expression. Useful for
+    // dependency analysis to avoid reporting dependencies to local variables defined by this
+    // Expression.
     boost::optional<Variables::Id> _boundaryVariableId;
     ExpressionContext* const _expCtx;
-};
-
-/**
- * Inherit from ExpressionVariadic or ExpressionFixedArity instead of directly from this class.
- */
-class ExpressionNary : public Expression {
-public:
-    boost::intrusive_ptr<Expression> optimize() override;
-    Value serialize(bool explain) const override;
-
-    /*
-      Add an operand to the n-ary expression.
-
-      @param pExpression the expression to add
-    */
-    virtual void addOperand(const boost::intrusive_ptr<Expression>& pExpression);
-
-    virtual bool isAssociative() const {
-        return false;
-    }
-
-    virtual bool isCommutative() const {
-        return false;
-    }
-
-    virtual const char* getOpName() const = 0;
-
-    virtual void validateArguments(const ExpressionVector& args) const {}
-
-    static ExpressionVector parseArguments(ExpressionContext* expCtx,
-                                           BSONElement bsonExpr,
-                                           const VariablesParseState& vps);
-
-    const ExpressionVector& getOperandList() const {
-        return _children;
-    }
-
-protected:
-    explicit ExpressionNary(ExpressionContext* const expCtx) : Expression(expCtx) {}
-    ExpressionNary(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : Expression(expCtx, std::move(children)) {}
-
-    void _doAddDependencies(DepsTracker* deps) const override;
-};
-
-/// Inherit from ExpressionVariadic or ExpressionFixedArity instead of directly from this class.
-template <typename SubClass>
-class ExpressionNaryBase : public ExpressionNary {
-public:
-    static boost::intrusive_ptr<Expression> parse(ExpressionContext* const expCtx,
-                                                  BSONElement bsonExpr,
-                                                  const VariablesParseState& vps) {
-        auto expr = make_intrusive<SubClass>(expCtx);
-        ExpressionVector args = parseArguments(expCtx, bsonExpr, vps);
-        expr->validateArguments(args);
-        expr->_children = std::move(args);
-        return expr;
-    }
-
-protected:
-    explicit ExpressionNaryBase(ExpressionContext* const expCtx) : ExpressionNary(expCtx) {}
-    ExpressionNaryBase(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : ExpressionNary(expCtx, std::move(children)) {}
-};
-
-/// Inherit from this class if your expression takes a variable number of arguments.
-template <typename SubClass>
-class ExpressionVariadic : public ExpressionNaryBase<SubClass> {
-public:
-    explicit ExpressionVariadic(ExpressionContext* const expCtx)
-        : ExpressionNaryBase<SubClass>(expCtx) {}
-    ExpressionVariadic(ExpressionContext* const expCtx, Expression::ExpressionVector&& children)
-        : ExpressionNaryBase<SubClass>(expCtx, std::move(children)) {}
-};
-
-/**
- * Inherit from this class if your expression can take a range of arguments, e.g. if it has some
- * optional arguments.
- */
-template <typename SubClass, int MinArgs, int MaxArgs>
-class ExpressionRangedArity : public ExpressionNaryBase<SubClass> {
-public:
-    explicit ExpressionRangedArity(ExpressionContext* const expCtx)
-        : ExpressionNaryBase<SubClass>(expCtx) {}
-    ExpressionRangedArity(ExpressionContext* const expCtx, Expression::ExpressionVector&& children)
-        : ExpressionNaryBase<SubClass>(expCtx, std::move(children)) {}
-
-    void validateArguments(const Expression::ExpressionVector& args) const override {
-        uassert(28667,
-                str::stream() << "Expression " << this->getOpName() << " takes at least " << MinArgs
-                              << " arguments, and at most " << MaxArgs << ", but " << args.size()
-                              << " were passed in.",
-                MinArgs <= args.size() && args.size() <= MaxArgs);
-    }
-};
-
-/// Inherit from this class if your expression takes a fixed number of arguments.
-template <typename SubClass, int NArgs>
-class ExpressionFixedArity : public ExpressionNaryBase<SubClass> {
-public:
-    explicit ExpressionFixedArity(ExpressionContext* const expCtx)
-        : ExpressionNaryBase<SubClass>(expCtx) {}
-    ExpressionFixedArity(ExpressionContext* const expCtx, Expression::ExpressionVector&& children)
-        : ExpressionNaryBase<SubClass>(expCtx, std::move(children)) {}
-
-    void validateArguments(const Expression::ExpressionVector& args) const override {
-        uassert(16020,
-                str::stream() << "Expression " << this->getOpName() << " takes exactly " << NArgs
-                              << " arguments. " << args.size() << " were passed in.",
-                args.size() == NArgs);
-    }
-};
-
-/**
- * Used to make Accumulators available as Expressions, e.g., to make $sum available as an Expression
- * use "REGISTER_STABLE_EXPRESSION(sum, ExpressionAccumulator<AccumulatorSum>::parse);".
- */
-template <typename AccumulatorState>
-class ExpressionFromAccumulator
-    : public ExpressionVariadic<ExpressionFromAccumulator<AccumulatorState>> {
-public:
-    explicit ExpressionFromAccumulator(ExpressionContext* const expCtx)
-        : ExpressionVariadic<ExpressionFromAccumulator<AccumulatorState>>(expCtx) {
-        expCtx->sbeCompatible = false;
-    }
-
-    Value evaluate(const Document& root, Variables* variables) const final {
-        AccumulatorState accum(this->getExpressionContext());
-        const auto n = this->_children.size();
-        // If a single array arg is given, loop through it passing each member to the accumulator.
-        // If a single, non-array arg is given, pass it directly to the accumulator.
-        if (n == 1) {
-            Value singleVal = this->_children[0]->evaluate(root, variables);
-            if (singleVal.getType() == Array) {
-                for (const Value& val : singleVal.getArray()) {
-                    accum.process(val, false);
-                }
-            } else {
-                accum.process(singleVal, false);
-            }
-        } else {
-            // If multiple arguments are given, pass all arguments to the accumulator.
-            for (auto&& argument : this->_children) {
-                accum.process(argument->evaluate(root, variables), false);
-            }
-        }
-        return accum.getValue(false);
-    }
-
-    bool isAssociative() const final {
-        // Return false if a single argument is given to avoid a single array argument being treated
-        // as an array instead of as a list of arguments.
-        if (this->_children.size() == 1) {
-            return false;
-        }
-        return AccumulatorState(this->getExpressionContext()).isAssociative();
-    }
-
-    bool isCommutative() const final {
-        return AccumulatorState(this->getExpressionContext()).isCommutative();
-    }
-
-    const char* getOpName() const final {
-        return AccumulatorState::kName.rawData();
-    }
-
-    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
-        return visitor->visit(this);
-    }
-
-    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
-        return visitor->visit(this);
-    }
-};
-template <typename AccumulatorN>
-class ExpressionFromAccumulatorN : public Expression {
-public:
-    explicit ExpressionFromAccumulatorN(ExpressionContext* const expCtx,
-                                        boost::intrusive_ptr<Expression> n,
-                                        boost::intrusive_ptr<Expression> output)
-        : Expression(expCtx, {n, output}), _n(n), _output(output) {
-        expCtx->sbeCompatible = false;
-    }
-
-    const char* getOpName() const {
-        return AccumulatorN::kName.rawData();
-    }
-
-    Value serialize(bool explain) const {
-        MutableDocument md;
-        AccumulatorN::serializeHelper(_n, _output, explain, md);
-        return Value(DOC(getOpName() << md.freeze()));
-    }
-
-    Value evaluate(const Document& root, Variables* variables) const {
-        AccumulatorN accum(this->getExpressionContext());
-
-        // Evaluate and initialize 'n'.
-        accum.startNewGroup(_n->evaluate(root, variables));
-
-        // Verify that '_output' produces an array and pass each element to 'process'.
-        auto output = _output->evaluate(root, variables);
-        uassert(5788200, "Input must be an array", output.isArray());
-        for (auto item : output.getArray()) {
-            accum.process(item, false);
-        }
-        return accum.getValue(false);
-    }
-
-    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
-        return visitor->visit(this);
-    }
-
-    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
-        return visitor->visit(this);
-    }
-
-protected:
-    void _doAddDependencies(DepsTracker* deps) const {
-        _n->addDependencies(deps);
-        _output->addDependencies(deps);
-    }
-
-private:
-    boost::intrusive_ptr<Expression> _n;
-    boost::intrusive_ptr<Expression> _output;
-};
-
-/**
- * Inherit from this class if your expression takes exactly one numeric argument.
- */
-template <typename SubClass>
-class ExpressionSingleNumericArg : public ExpressionFixedArity<SubClass, 1> {
-public:
-    explicit ExpressionSingleNumericArg(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<SubClass, 1>(expCtx) {}
-    explicit ExpressionSingleNumericArg(ExpressionContext* const expCtx,
-                                        Expression::ExpressionVector&& children)
-        : ExpressionFixedArity<SubClass, 1>(expCtx, std::move(children)) {}
-
-    virtual ~ExpressionSingleNumericArg() = default;
-
-    Value evaluate(const Document& root, Variables* variables) const final {
-        Value arg = this->_children[0]->evaluate(root, variables);
-        if (arg.nullish())
-            return Value(BSONNULL);
-
-        uassert(28765,
-                str::stream() << this->getOpName() << " only supports numeric types, not "
-                              << typeName(arg.getType()),
-                arg.numeric());
-
-        return evaluateNumericArg(arg);
-    }
-
-    virtual Value evaluateNumericArg(const Value& numericArg) const = 0;
-};
-
-/**
- * Inherit from this class if your expression takes exactly two numeric arguments.
- */
-template <typename SubClass>
-class ExpressionTwoNumericArgs : public ExpressionFixedArity<SubClass, 2> {
-public:
-    explicit ExpressionTwoNumericArgs(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<SubClass, 2>(expCtx) {}
-    ExpressionTwoNumericArgs(ExpressionContext* const expCtx,
-                             Expression::ExpressionVector&& children)
-        : ExpressionFixedArity<SubClass, 2>(expCtx, std::move(children)) {}
-
-    virtual ~ExpressionTwoNumericArgs() = default;
-
-    /**
-     * Evaluate performs the type checking necessary to make sure that both arguments are numeric,
-     * then calls the evaluateNumericArgs on the two numeric args:
-     * 1. If either input is nullish, it returns null.
-     * 2. If either input is not numeric, it throws an error.
-     * 3. Call evaluateNumericArgs on the two numeric args.
-     */
-    Value evaluate(const Document& root, Variables* variables) const final {
-        Value arg1 = this->_children[0]->evaluate(root, variables);
-        if (arg1.nullish())
-            return Value(BSONNULL);
-        uassert(51044,
-                str::stream() << this->getOpName() << " only supports numeric types, not "
-                              << typeName(arg1.getType()),
-                arg1.numeric());
-        Value arg2 = this->_children[1]->evaluate(root, variables);
-        if (arg2.nullish())
-            return Value(BSONNULL);
-        uassert(51045,
-                str::stream() << this->getOpName() << " only supports numeric types, not "
-                              << typeName(arg2.getType()),
-                arg2.numeric());
-
-        return evaluateNumericArgs(arg1, arg2);
-    }
-
-    /**
-     *  Evaluate the expression on exactly two numeric arguments.
-     */
-    virtual Value evaluateNumericArgs(const Value& numericArg1, const Value& numericArg2) const = 0;
 };
 
 /**
@@ -678,9 +461,9 @@ class ExpressionConstant final : public Expression {
 public:
     ExpressionConstant(ExpressionContext* expCtx, const Value& value);
 
-    boost::intrusive_ptr<Expression> optimize() final;
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
     Value evaluate(const Document& root, Variables* variables) const final;
-    Value serialize(bool explain) const final;
+    Value serialize(const SerializationOptions& options = {}) const final;
 
     const char* getOpName() const;
 
@@ -703,6 +486,21 @@ public:
     }
 
     /**
+     * Returns true if 'expression' is an instance of an ExpressionConstant.
+     */
+    static bool isConstant(boost::intrusive_ptr<Expression> expression) {
+        return dynamic_cast<ExpressionConstant*>(expression.get());
+    }
+
+    static Value serializeConstant(const SerializationOptions& opts,
+                                   Value val,
+                                   bool wrapRepresentativeValue = true);
+
+    bool selfAndChildrenAreConstant() const final {
+        return true;
+    }
+
+    /**
      * Returns true if every expression in 'expressions' is either a nullptr or an instance of an
      * ExpressionConstant.
      */
@@ -710,6 +508,12 @@ public:
         const std::initializer_list<boost::intrusive_ptr<Expression>>& expressions) {
         return std::all_of(expressions.begin(), expressions.end(), [](auto exp) {
             return ExpressionConstant::isNullOrConstant(exp);
+        });
+    }
+    template <typename ExpressionContainer>
+    static bool allConstant(const ExpressionContainer& expressions) {
+        return std::all_of(expressions.begin(), expressions.end(), [](auto exp) {
+            return ExpressionConstant::isConstant(exp);
         });
     }
 
@@ -722,7 +526,7 @@ public:
 
     void setValue(const Value& value) {
         _value = value;
-    };
+    }
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -732,126 +536,322 @@ public:
         return visitor->visit(this);
     }
 
-protected:
-    void _doAddDependencies(DepsTracker* deps) const override;
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionConstant>(getExpressionContext(), _value);
+    }
 
 private:
+    monotonic::State getMonotonicState(const FieldPath& sortedFieldPath) const final {
+        return monotonic::State::Constant;
+    }
+
     Value _value;
+};
+
+/**
+ * Inherit from ExpressionVariadic or ExpressionFixedArity instead of directly from this class.
+ */
+class ExpressionNary : public Expression {
+public:
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() override;
+    Value serialize(const SerializationOptions& options = {}) const override;
+
+    /*
+      Add an operand to the n-ary expression.
+
+      @param pExpression the expression to add
+    */
+    virtual void addOperand(const boost::intrusive_ptr<Expression>& pExpression);
+
+    enum class Associativity { kFull, kLeft, kNone };
+
+    virtual Associativity getAssociativity() const {
+        return Associativity::kNone;
+    }
+
+    virtual bool isCommutative() const {
+        return false;
+    }
+
+    virtual const char* getOpName() const = 0;
+
+    virtual void validateChildren() const {}
+
+    static ExpressionVector parseArguments(ExpressionContext* expCtx,
+                                           BSONElement bsonExpr,
+                                           const VariablesParseState& vps);
+
+    const ExpressionVector& getOperandList() const {
+        return _children;
+    }
+
+protected:
+    explicit ExpressionNary(ExpressionContext* const expCtx) : Expression(expCtx) {}
+    ExpressionNary(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : Expression(expCtx, std::move(children)) {}
+};
+
+/// Inherit from ExpressionVariadic or ExpressionFixedArity instead of directly from this class.
+template <typename SubClass>
+class ExpressionNaryBase : public ExpressionNary {
+public:
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* const expCtx,
+                                                  BSONElement bsonExpr,
+                                                  const VariablesParseState& vps) {
+        ExpressionVector args = parseArguments(expCtx, bsonExpr, vps);
+        auto expr = make_intrusive<SubClass>(expCtx, std::move(args));
+        expr->validateChildren();
+        return expr;
+    }
+
+protected:
+    explicit ExpressionNaryBase(ExpressionContext* const expCtx) : ExpressionNary(expCtx) {}
+    ExpressionNaryBase(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionNary(expCtx, std::move(children)) {}
+};
+
+/// Inherit from this class if your expression takes a variable number of arguments.
+template <typename SubClass>
+class ExpressionVariadic : public ExpressionNaryBase<SubClass> {
+public:
+    explicit ExpressionVariadic(ExpressionContext* const expCtx)
+        : ExpressionNaryBase<SubClass>(expCtx) {}
+    ExpressionVariadic(ExpressionContext* const expCtx, Expression::ExpressionVector&& children)
+        : ExpressionNaryBase<SubClass>(expCtx, std::move(children)) {}
+
+    Value serialize(const SerializationOptions& options = {}) const override {
+        // As a special case, we would like to serialize a variadic number of children as
+        // "?array<?subtype>" if they are all constant. Check for that here, otherwise default to
+        // the normal one-by-one serialization of the children.
+        if (options.isSerializingLiteralsAsDebugTypes() &&
+            ExpressionConstant::allConstant(this->_children)) {
+            // We could evaluate the expression right here and now and end up with just the one
+            // constant answer, but this is not an optimization funciton, it is meant to just
+            // serialize what we have, so let's preserve the array of constants.
+            auto args = [&]() {
+                std::vector<Value> values;
+                const auto& constants = this->_children;
+                values.reserve(constants.size());
+                std::transform(constants.begin(),
+                               constants.end(),
+                               std::back_inserter(values),
+                               [](const auto& exp) {
+                                   return static_cast<ExpressionConstant*>(exp.get())->getValue();
+                               });
+                return values;
+            }();
+            return Value(Document{
+                {this->getOpName(), ExpressionConstant::serializeConstant(options, Value(args))}});
+        }
+        return ExpressionNary::serialize(options);
+    }
+};
+
+/**
+ * Inherit from this class if your expression can take a range of arguments, e.g. if it has some
+ * optional arguments.
+ */
+template <typename SubClass, int MinArgs, int MaxArgs>
+class ExpressionRangedArity : public ExpressionNaryBase<SubClass> {
+public:
+    explicit ExpressionRangedArity(ExpressionContext* const expCtx)
+        : ExpressionNaryBase<SubClass>(expCtx) {}
+    ExpressionRangedArity(ExpressionContext* const expCtx, Expression::ExpressionVector&& children)
+        : ExpressionNaryBase<SubClass>(expCtx, std::move(children)) {}
+
+    void validateChildren() const override {
+        uassert(28667,
+                str::stream() << "Expression " << this->getOpName() << " takes at least " << MinArgs
+                              << " arguments, and at most " << MaxArgs << ", but "
+                              << this->_children.size() << " were passed in.",
+                MinArgs <= this->_children.size() && this->_children.size() <= MaxArgs);
+    }
+};
+
+/// Inherit from this class if your expression takes a fixed number of arguments.
+template <typename SubClass, int NArgs>
+class ExpressionFixedArity : public ExpressionNaryBase<SubClass> {
+public:
+    explicit ExpressionFixedArity(ExpressionContext* const expCtx)
+        : ExpressionNaryBase<SubClass>(expCtx) {}
+    ExpressionFixedArity(ExpressionContext* const expCtx, Expression::ExpressionVector&& children)
+        : ExpressionNaryBase<SubClass>(expCtx, std::move(children)) {}
+
+    void validateChildren() const override {
+        uassert(16020,
+                str::stream() << "Expression " << this->getOpName() << " takes exactly " << NArgs
+                              << " arguments. " << this->_children.size() << " were passed in.",
+                this->_children.size() == NArgs);
+    }
+};
+
+/**
+ * Used to make Accumulators available as Expressions, e.g., to make $sum available as an Expression
+ * use "REGISTER_STABLE_EXPRESSION(sum, ExpressionAccumulator<AccumulatorSum>::parse);".
+ */
+template <typename AccumulatorState>
+class ExpressionFromAccumulator
+    : public ExpressionVariadic<ExpressionFromAccumulator<AccumulatorState>> {
+public:
+    explicit ExpressionFromAccumulator(ExpressionContext* const expCtx)
+        : ExpressionVariadic<ExpressionFromAccumulator<AccumulatorState>>(expCtx) {
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+    }
+
+    ExpressionFromAccumulator(ExpressionContext* const expCtx,
+                              Expression::ExpressionVector&& children)
+        : ExpressionVariadic<ExpressionFromAccumulator<AccumulatorState>>(expCtx,
+                                                                          std::move(children)) {
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+    }
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+
+    ExpressionNary::Associativity getAssociativity() const final {
+        // Return false if a single argument is given to avoid a single array argument being treated
+        // as an array instead of as a list of arguments.
+        if (this->_children.size() == 1) {
+            return ExpressionNary::Associativity::kNone;
+        }
+        return AccumulatorState(this->getExpressionContext()).getAssociativity();
+    }
+
+    bool isCommutative() const final {
+        return AccumulatorState(this->getExpressionContext()).isCommutative();
+    }
+
+    const char* getOpName() const final {
+        return AccumulatorState::kName.data();
+    }
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionFromAccumulator<AccumulatorState>>(
+            this->getExpressionContext(), this->cloneChildren());
+    }
+};
+
+template <typename AccumulatorN>
+class ExpressionFromAccumulatorN final : public Expression {
+public:
+    explicit ExpressionFromAccumulatorN(ExpressionContext* const expCtx,
+                                        boost::intrusive_ptr<Expression> n,
+                                        boost::intrusive_ptr<Expression> output)
+        : Expression(expCtx, {n, output}), _n(n), _output(output) {
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+    }
+
+    const char* getOpName() const {
+        return AccumulatorN::kName.data();
+    }
+
+    Value serialize(const SerializationOptions& options = {}) const override {
+        MutableDocument md;
+        AccumulatorN::serializeHelper(_n, _output, options, md);
+        return Value(DOC(getOpName() << md.freeze()));
+    }
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+
+    const Expression* getN() const {
+        return _n.get();
+    }
+
+    const Expression* getOutput() const {
+        return _output.get();
+    }
+
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionFromAccumulatorN<AccumulatorN>>(
+            getExpressionContext(), cloneChild(_kNExpr), cloneChild(_kOutputExpr));
+    }
+
+private:
+    static constexpr size_t _kNExpr = 0;
+    static constexpr size_t _kOutputExpr = 1;
+
+    boost::intrusive_ptr<Expression> _n;
+    boost::intrusive_ptr<Expression> _output;
+};
+
+/**
+ * Inherit from this class if your expression takes exactly one numeric argument.
+ */
+template <typename SubClass>
+class ExpressionSingleNumericArg : public ExpressionFixedArity<SubClass, 1> {
+public:
+    explicit ExpressionSingleNumericArg(ExpressionContext* const expCtx)
+        : ExpressionFixedArity<SubClass, 1>(expCtx) {}
+    explicit ExpressionSingleNumericArg(ExpressionContext* const expCtx,
+                                        Expression::ExpressionVector&& children)
+        : ExpressionFixedArity<SubClass, 1>(expCtx, std::move(children)) {}
+
+    ~ExpressionSingleNumericArg() override = default;
+};
+
+/**
+ * Inherit from this class if your expression takes exactly two numeric arguments.
+ */
+template <typename SubClass>
+class ExpressionTwoNumericArgs : public ExpressionFixedArity<SubClass, 2> {
+public:
+    explicit ExpressionTwoNumericArgs(ExpressionContext* const expCtx)
+        : ExpressionFixedArity<SubClass, 2>(expCtx) {}
+    ExpressionTwoNumericArgs(ExpressionContext* const expCtx,
+                             Expression::ExpressionVector&& children)
+        : ExpressionFixedArity<SubClass, 2>(expCtx, std::move(children)) {}
+
+    ~ExpressionTwoNumericArgs() override = default;
 };
 
 /**
  * Inherit from this class if your expression works with date types, and accepts either a single
  * argument which is a date, or an object {date: <date>, timezone: <string>}.
  */
-template <typename SubClass>
 class DateExpressionAcceptingTimeZone : public Expression {
 public:
-    virtual ~DateExpressionAcceptingTimeZone() {}
-
-    Value evaluate(const Document& root, Variables* variables) const final {
-        auto dateVal = _date->evaluate(root, variables);
-        if (dateVal.nullish()) {
-            return Value(BSONNULL);
-        }
-        auto date = dateVal.coerceToDate();
-
-        if (!_timeZone) {
-            return evaluateDate(date, TimeZoneDatabase::utcZone());
-        }
-        auto timeZoneId = _timeZone->evaluate(root, variables);
-        if (timeZoneId.nullish()) {
-            return Value(BSONNULL);
-        }
-
-        uassert(40533,
-                str::stream() << _opName
-                              << " requires a string for the timezone argument, but was given a "
-                              << typeName(timeZoneId.getType()) << " (" << timeZoneId.toString()
-                              << ")",
-                timeZoneId.getType() == BSONType::String);
-
-        invariant(getExpressionContext()->timeZoneDatabase);
-        auto timeZone =
-            getExpressionContext()->timeZoneDatabase->getTimeZone(timeZoneId.getString());
-        return evaluateDate(date, timeZone);
-    }
+    ~DateExpressionAcceptingTimeZone() override {}
 
     /**
      * Always serializes to the full {date: <date arg>, timezone: <timezone arg>} format, leaving
      * off the timezone if not specified.
      */
-    Value serialize(bool explain) const final {
-        auto timezone = _timeZone ? _timeZone->serialize(explain) : Value();
-        return Value(Document{
-            {_opName,
-             Document{{"date", _date->serialize(explain)}, {"timezone", std::move(timezone)}}}});
+    Value serialize(const SerializationOptions& options = {}) const final {
+        auto timezone = _children[_kTimeZone] ? _children[_kTimeZone]->serialize(options) : Value();
+        return Value(Document{{_opName,
+                               Document{{"date", _children[_kDate]->serialize(options)},
+                                        {"timezone", std::move(timezone)}}}});
     }
 
-    boost::intrusive_ptr<Expression> optimize() final {
-        _date = _date->optimize();
-        if (_timeZone) {
-            _timeZone = _timeZone->optimize();
-        }
-        if (ExpressionConstant::allNullOrConstant({_date, _timeZone})) {
-            // Everything is a constant, so we can turn into a constant.
-            return ExpressionConstant::create(
-                getExpressionContext(), evaluate(Document{}, &(getExpressionContext()->variables)));
-        }
-        return this;
-    }
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
 
-    static boost::intrusive_ptr<Expression> parse(ExpressionContext* const expCtx,
-                                                  BSONElement operatorElem,
-                                                  const VariablesParseState& variablesParseState) {
-        if (operatorElem.type() == BSONType::Object) {
-            if (operatorElem.embeddedObject().firstElementFieldName()[0] == '$') {
-                // Assume this is an expression specification representing the date argument
-                // like {$add: [<date>, 1000]}.
-                return new SubClass(expCtx,
-                                    Expression::parseObject(expCtx,
-                                                            operatorElem.embeddedObject(),
-                                                            variablesParseState));
-            } else {
-                // It's an object specifying the date and timezone options like {date: <date>,
-                // timezone: <timezone>}.
-                auto opName = operatorElem.fieldNameStringData();
-                boost::intrusive_ptr<Expression> date;
-                boost::intrusive_ptr<Expression> timeZone;
-                for (const auto& subElem : operatorElem.embeddedObject()) {
-                    auto argName = subElem.fieldNameStringData();
-                    if (argName == "date"_sd) {
-                        date = Expression::parseOperand(expCtx, subElem, variablesParseState);
-                    } else if (argName == "timezone"_sd) {
-                        timeZone = Expression::parseOperand(expCtx, subElem, variablesParseState);
-                    } else {
-                        uasserted(40535,
-                                  str::stream() << "unrecognized option to " << opName << ": \""
-                                                << argName << "\"");
-                    }
-                }
-                uassert(40539,
-                        str::stream() << "missing 'date' argument to " << opName
-                                      << ", provided: " << operatorElem,
-                        date);
-                return new SubClass(expCtx, std::move(date), std::move(timeZone));
-            }
-        } else if (operatorElem.type() == BSONType::Array) {
-            auto elems = operatorElem.Array();
-            uassert(
-                40536,
-                str::stream() << operatorElem.fieldNameStringData()
-                              << " accepts exactly one argument if given an array, but was given "
-                              << elems.size(),
-                elems.size() == 1);
-            // We accept an argument wrapped in a single array. For example, either {$week: <date>}
-            // or {$week: [<date>]} are valid, but not {$week: [{date: <date>}]}.
-            return new SubClass(expCtx,
-                                Expression::parseOperand(expCtx, elems[0], variablesParseState));
-        }
-        // Exhausting the other possibilities, we are left with a literal value which should be
-        // treated as the date argument.
-        return new SubClass(expCtx,
-                            Expression::parseOperand(expCtx, operatorElem, variablesParseState));
+    const Expression* getDate() const {
+        return _children[_kDate].get();
+    }
+    const Expression* getTimeZone() const {
+        return _children[_kTimeZone].get();
+    }
+    StringData getOpName() const {
+        return _opName;
+    }
+    const boost::optional<TimeZone>& getParsedTimeZone() const {
+        return _parsedTimeZone;
     }
 
 protected:
@@ -859,33 +859,20 @@ protected:
                                              const StringData opName,
                                              boost::intrusive_ptr<Expression> date,
                                              boost::intrusive_ptr<Expression> timeZone)
-        : Expression(expCtx, {date, timeZone}),
-          _opName(opName),
-          _date(_children[0]),
-          _timeZone(_children[1]) {}
+        : Expression(expCtx, {date, timeZone}), _opName(opName) {}
 
-    void _doAddDependencies(DepsTracker* deps) const final {
-        _date->addDependencies(deps);
-        if (_timeZone) {
-            _timeZone->addDependencies(deps);
-        }
-    }
+    // The position of the expression representing the date argument.
+    static constexpr size_t _kDate = 0;
 
-    /**
-     * Subclasses should implement this to do their actual date-related logic. Uses 'timezone' to
-     * evaluate the expression against 'data'. If the user did not specify a time zone, 'timezone'
-     * will represent the UTC zone.
-     */
-    virtual Value evaluateDate(Date_t date, const TimeZone& timezone) const = 0;
+    // The position of the expression representing the timezone argument.
+    static constexpr size_t _kTimeZone = 1;
 
 private:
     // The name of this expression, e.g. $week or $month.
     StringData _opName;
 
-    // The expression representing the date argument.
-    boost::intrusive_ptr<Expression>& _date;
-    // The expression representing the timezone argument.
-    boost::intrusive_ptr<Expression>& _timeZone;
+    // Pre-parsed timezone, if the above expression is a constant.
+    boost::optional<TimeZone> _parsedTimeZone;
 };
 
 class ExpressionAbs final : public ExpressionSingleNumericArg<ExpressionAbs> {
@@ -895,7 +882,7 @@ public:
     explicit ExpressionAbs(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionSingleNumericArg<ExpressionAbs>(expCtx, std::move(children)) {}
 
-    Value evaluateNumericArg(const Value& numericArg) const final;
+    Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
@@ -905,19 +892,14 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionAbs>(getExpressionContext(), cloneChildren());
+    }
 };
 
 class ExpressionAdd final : public ExpressionVariadic<ExpressionAdd> {
 public:
-    /**
-     * Adds two values as if by {$add: [{$const: lhs}, {$const: rhs}]}.
-     *
-     * If either argument is nullish, returns BSONNULL.
-     *
-     * Otherwise, returns ErrorCodes::TypeMismatch.
-     */
-    static StatusWith<Value> apply(Value lhs, Value rhs);
-
     explicit ExpressionAdd(ExpressionContext* const expCtx)
         : ExpressionVariadic<ExpressionAdd>(expCtx) {}
 
@@ -927,12 +909,11 @@ public:
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
-    bool isAssociative() const final {
-        return true;
-    }
-
-    bool isCommutative() const final {
-        return true;
+    // ExpressionAdd is left associative because it processes its operands by iterating
+    // left-to-right through its _children vector, but the order of operations impacts the result
+    // due to integer overflow, floating-point rounding and type promotion.
+    Associativity getAssociativity() const final {
+        return Associativity::kLeft;
     }
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
@@ -942,6 +923,15 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionAdd>(getExpressionContext(), cloneChildren());
+    }
+
+private:
+    monotonic::State getMonotonicState(const FieldPath& sortedFieldPath) const final {
+        return monotonic::combineExpressions(sortedFieldPath, getChildren());
+    }
 };
 
 
@@ -949,11 +939,11 @@ class ExpressionAllElementsTrue final : public ExpressionFixedArity<ExpressionAl
 public:
     explicit ExpressionAllElementsTrue(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionAllElementsTrue, 1>(expCtx) {
-        expCtx->sbeCompatible = false;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
     ExpressionAllElementsTrue(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionFixedArity<ExpressionAllElementsTrue, 1>(expCtx, std::move(children)) {
-        expCtx->sbeCompatible = false;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
     Value evaluate(const Document& root, Variables* variables) const final;
@@ -965,6 +955,10 @@ public:
 
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionAllElementsTrue>(getExpressionContext(), cloneChildren());
     }
 };
 
@@ -977,12 +971,12 @@ public:
     ExpressionAnd(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionVariadic<ExpressionAnd>(expCtx, std::move(children)) {}
 
-    boost::intrusive_ptr<Expression> optimize() final;
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
-    bool isAssociative() const final {
-        return true;
+    Associativity getAssociativity() const final {
+        return Associativity::kFull;
     }
 
     bool isCommutative() const final {
@@ -995,6 +989,10 @@ public:
 
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionAnd>(getExpressionContext(), cloneChildren());
     }
 };
 
@@ -1016,15 +1014,17 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionAnyElementTrue>(getExpressionContext(), cloneChildren());
+    }
 };
 
 
 class ExpressionArray final : public ExpressionVariadic<ExpressionArray> {
 public:
     explicit ExpressionArray(ExpressionContext* const expCtx)
-        : ExpressionVariadic<ExpressionArray>(expCtx) {
-        expCtx->sbeCompatible = false;
-    }
+        : ExpressionVariadic<ExpressionArray>(expCtx) {}
 
     ExpressionArray(ExpressionContext* const expCtx,
                     std::vector<boost::intrusive_ptr<Expression>>&& children)
@@ -1033,14 +1033,14 @@ public:
     }
 
     Value evaluate(const Document& root, Variables* variables) const final;
-    Value serialize(bool explain) const final;
+    Value serialize(const SerializationOptions& options = {}) const final;
 
     static boost::intrusive_ptr<ExpressionArray> create(
         ExpressionContext* const expCtx, std::vector<boost::intrusive_ptr<Expression>>&& children) {
         return make_intrusive<ExpressionArray>(expCtx, std::move(children));
     }
 
-    boost::intrusive_ptr<Expression> optimize() final;
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
@@ -1049,6 +1049,12 @@ public:
 
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
+    }
+
+    bool selfAndChildrenAreConstant() const final;
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionArray>(getExpressionContext(), cloneChildren());
     }
 };
 
@@ -1056,10 +1062,14 @@ public:
 class ExpressionArrayElemAt final : public ExpressionFixedArity<ExpressionArrayElemAt, 2> {
 public:
     explicit ExpressionArrayElemAt(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<ExpressionArrayElemAt, 2>(expCtx) {}
+        : ExpressionFixedArity<ExpressionArrayElemAt, 2>(expCtx) {
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+    }
 
     ExpressionArrayElemAt(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : ExpressionFixedArity<ExpressionArrayElemAt, 2>(expCtx, std::move(children)) {}
+        : ExpressionFixedArity<ExpressionArrayElemAt, 2>(expCtx, std::move(children)) {
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+    }
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -1070,16 +1080,24 @@ public:
 
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionArrayElemAt>(getExpressionContext(), cloneChildren());
     }
 };
 
 class ExpressionFirst final : public ExpressionFixedArity<ExpressionFirst, 1> {
 public:
     explicit ExpressionFirst(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<ExpressionFirst, 1>(expCtx) {}
+        : ExpressionFixedArity<ExpressionFirst, 1>(expCtx) {
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+    }
 
     ExpressionFirst(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : ExpressionFixedArity<ExpressionFirst, 1>(expCtx, std::move(children)) {}
+        : ExpressionFixedArity<ExpressionFirst, 1>(expCtx, std::move(children)) {
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+    }
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -1090,13 +1108,24 @@ public:
 
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionFirst>(getExpressionContext(), cloneChildren());
     }
 };
 
 class ExpressionLast final : public ExpressionFixedArity<ExpressionLast, 1> {
 public:
     explicit ExpressionLast(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<ExpressionLast, 1>(expCtx) {}
+        : ExpressionFixedArity<ExpressionLast, 1>(expCtx) {
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+    }
+
+    ExpressionLast(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionLast, 1>(expCtx, std::move(children)) {
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+    }
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -1107,15 +1136,20 @@ public:
 
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionLast>(getExpressionContext(), cloneChildren());
     }
 };
 
 class ExpressionObjectToArray final : public ExpressionFixedArity<ExpressionObjectToArray, 1> {
 public:
     explicit ExpressionObjectToArray(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<ExpressionObjectToArray, 1>(expCtx) {
-        expCtx->sbeCompatible = false;
-    }
+        : ExpressionFixedArity<ExpressionObjectToArray, 1>(expCtx) {}
+
+    ExpressionObjectToArray(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionObjectToArray, 1>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -1127,14 +1161,16 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionObjectToArray>(getExpressionContext(), cloneChildren());
+    }
 };
 
 class ExpressionArrayToObject final : public ExpressionFixedArity<ExpressionArrayToObject, 1> {
 public:
     explicit ExpressionArrayToObject(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<ExpressionArrayToObject, 1>(expCtx) {
-        expCtx->sbeCompatible = false;
-    }
+        : ExpressionFixedArity<ExpressionArrayToObject, 1>(expCtx) {}
 
     ExpressionArrayToObject(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionFixedArity<ExpressionArrayToObject, 1>(expCtx, std::move(children)) {}
@@ -1149,12 +1185,19 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionArrayToObject>(getExpressionContext(), cloneChildren());
+    }
 };
 
 class ExpressionBsonSize final : public ExpressionFixedArity<ExpressionBsonSize, 1> {
 public:
     explicit ExpressionBsonSize(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionBsonSize, 1>(expCtx) {}
+
+    ExpressionBsonSize(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionBsonSize, 1>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final {
@@ -1168,6 +1211,10 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionBsonSize>(getExpressionContext(), cloneChildren());
+    }
 };
 
 class ExpressionCeil final : public ExpressionSingleNumericArg<ExpressionCeil> {
@@ -1177,7 +1224,7 @@ public:
     explicit ExpressionCeil(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionSingleNumericArg<ExpressionCeil>(expCtx, std::move(children)) {}
 
-    Value evaluateNumericArg(const Value& numericArg) const final;
+    Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
@@ -1187,35 +1234,16 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
-};
 
-
-class ExpressionCoerceToBool final : public Expression {
-public:
-    boost::intrusive_ptr<Expression> optimize() final;
-    Value evaluate(const Document& root, Variables* variables) const final;
-    Value serialize(bool explain) const final;
-
-    static boost::intrusive_ptr<ExpressionCoerceToBool> create(
-        ExpressionContext* expCtx, boost::intrusive_ptr<Expression> pExpression);
-
-    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
-        return visitor->visit(this);
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionCeil>(getExpressionContext(), cloneChildren());
     }
-
-    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
-        return visitor->visit(this);
-    }
-
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final;
 
 private:
-    ExpressionCoerceToBool(ExpressionContext* expCtx, boost::intrusive_ptr<Expression> pExpression);
-
-    boost::intrusive_ptr<Expression>& pExpression;
+    monotonic::State getMonotonicState(const FieldPath& sortedFieldPath) const final {
+        return getChildren()[0]->getMonotonicState(sortedFieldPath);
+    }
 };
-
 
 class ExpressionCompare final : public ExpressionFixedArity<ExpressionCompare, 2> {
 public:
@@ -1264,6 +1292,10 @@ public:
         return visitor->visit(this);
     }
 
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionCompare>(getExpressionContext(), cmpOp, cloneChildren());
+    }
+
 private:
     CmpOp cmpOp;
 };
@@ -1279,8 +1311,8 @@ public:
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
-    bool isAssociative() const final {
-        return true;
+    Associativity getAssociativity() const final {
+        return Associativity::kFull;
     }
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
@@ -1289,6 +1321,10 @@ public:
 
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionConcat>(getExpressionContext(), cloneChildren());
     }
 };
 
@@ -1304,8 +1340,8 @@ public:
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
-    bool isAssociative() const final {
-        return true;
+    Associativity getAssociativity() const final {
+        return Associativity::kFull;
     }
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
@@ -1315,6 +1351,10 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionConcatArrays>(getExpressionContext(), cloneChildren());
+    }
 };
 
 
@@ -1322,9 +1362,12 @@ class ExpressionCond final : public ExpressionFixedArity<ExpressionCond, 3> {
 public:
     explicit ExpressionCond(ExpressionContext* const expCtx) : Base(expCtx) {}
 
+    ExpressionCond(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : Base(expCtx, std::move(children)) {}
+
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
-    boost::intrusive_ptr<Expression> optimize() final;
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
 
     static boost::intrusive_ptr<Expression> create(
         ExpressionContext* expCtx,
@@ -1344,6 +1387,10 @@ public:
         return visitor->visit(this);
     }
 
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionCond>(getExpressionContext(), cloneChildren());
+    }
+
 private:
     typedef ExpressionFixedArity<ExpressionCond, 3> Base;
 };
@@ -1357,8 +1404,8 @@ public:
                              boost::intrusive_ptr<Expression> onNull,
                              boost::intrusive_ptr<Expression> onError);
 
-    boost::intrusive_ptr<Expression> optimize() final;
-    Value serialize(bool explain) const final;
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
+    Value serialize(const SerializationOptions& options = {}) const final;
     Value evaluate(const Document& root, Variables* variables) const final;
 
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
@@ -1373,15 +1420,74 @@ public:
         return visitor->visit(this);
     }
 
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final;
+    /**
+     * Returns true if this expression has parameter 'format' specified, otherwise false.
+     */
+    bool isFormatSpecified() const {
+        return static_cast<bool>(_children[_kFormat]);
+    }
+
+    /**
+     * Returns true if this expression has parameter 'timezone' specified, otherwise false.
+     */
+    bool isTimezoneSpecified() const {
+        return static_cast<bool>(_children[_kTimeZone]);
+    }
+
+    /**
+     * Returns true if this expression has parameter 'onError' specified, otherwise false.
+     */
+    bool isOnErrorSpecified() const {
+        return static_cast<bool>(_children[_kOnError]);
+    }
+
+    /**
+     * Returns true if this expression has parameter 'onNull' specified, otherwise false.
+     */
+    bool isOnNullSpecified() const {
+        return static_cast<bool>(_children[_kOnNull]);
+    }
+
+    const Expression* getDateString() const {
+        return _children[_kDateString].get();
+    }
+    const Expression* getFormat() const {
+        return _children[_kFormat].get();
+    }
+    const Expression* getTimeZone() const {
+        return _children[_kTimeZone].get();
+    }
+    const Expression* getOnNull() const {
+        return _children[_kOnNull].get();
+    }
+    const Expression* getOnError() const {
+        return _children[_kOnError].get();
+    }
+    const boost::optional<TimeZone>& getParsedTimeZone() const {
+        return _parsedTimeZone;
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionDateFromString>(getExpressionContext(),
+                                                        cloneChild(_kDateString),
+                                                        cloneChild(_kTimeZone),
+                                                        cloneChild(_kFormat),
+                                                        cloneChild(_kOnNull),
+                                                        cloneChild(_kOnError));
+    }
 
 private:
-    boost::intrusive_ptr<Expression>& _dateString;
-    boost::intrusive_ptr<Expression>& _timeZone;
-    boost::intrusive_ptr<Expression>& _format;
-    boost::intrusive_ptr<Expression>& _onNull;
-    boost::intrusive_ptr<Expression>& _onError;
+    static constexpr size_t _kDateString = 0;
+    static constexpr size_t _kTimeZone = 1;
+    static constexpr size_t _kFormat = 2;
+    static constexpr size_t _kOnNull = 3;
+    static constexpr size_t _kOnError = 4;
+
+    // Pre-parsed timezone, if the above expression is a constant.
+    boost::optional<TimeZone> _parsedTimeZone;
+
+    template <typename H>
+    friend class ExpressionHashVisitor;
 };
 
 class ExpressionDateFromParts final : public Expression {
@@ -1399,8 +1505,8 @@ public:
                             boost::intrusive_ptr<Expression> isoDayOfWeek,
                             boost::intrusive_ptr<Expression> timeZone);
 
-    boost::intrusive_ptr<Expression> optimize() final;
-    Value serialize(bool explain) const final;
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
+    Value serialize(const SerializationOptions& options = {}) const final;
     Value evaluate(const Document& root, Variables* variables) const final;
 
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
@@ -1415,58 +1521,76 @@ public:
         return visitor->visit(this);
     }
 
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final;
+    const Expression* getHour() const {
+        return _children[_kHour].get();
+    }
+    const Expression* getMinute() const {
+        return _children[_kMinute].get();
+    }
+    const Expression* getSecond() const {
+        return _children[_kSecond].get();
+    }
+    const Expression* getMillisecond() const {
+        return _children[_kMillisecond].get();
+    }
+    const Expression* getTimeZone() const {
+        return _children[_kTimeZone].get();
+    }
+    const Expression* getYear() const {
+        return _children[_kYear].get();
+    }
+    const Expression* getMonth() const {
+        return _children[_kMonth].get();
+    }
+    const Expression* getDay() const {
+        return _children[_kDay].get();
+    }
+    const Expression* getIsoWeekYear() const {
+        return _children[_kIsoWeekYear].get();
+    }
+    const Expression* getIsoWeek() const {
+        return _children[_kIsoWeek].get();
+    }
+    const Expression* getIsoDayOfWeek() const {
+        return _children[_kIsoDayOfWeek].get();
+    }
+    const boost::optional<TimeZone>& getParsedTimeZone() const {
+        return _parsedTimeZone;
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionDateFromParts>(getExpressionContext(),
+                                                       cloneChild(_kYear),
+                                                       cloneChild(_kMonth),
+                                                       cloneChild(_kDay),
+                                                       cloneChild(_kHour),
+                                                       cloneChild(_kMinute),
+                                                       cloneChild(_kSecond),
+                                                       cloneChild(_kMillisecond),
+                                                       cloneChild(_kIsoWeekYear),
+                                                       cloneChild(_kIsoWeek),
+                                                       cloneChild(_kIsoDayOfWeek),
+                                                       cloneChild(_kTimeZone));
+    }
 
 private:
-    /**
-     * This function checks whether a field is a number.
-     *
-     * If 'field' is null, the default value is returned trough the 'returnValue' out
-     * parameter and the function returns true.
-     *
-     * If 'field' is not null:
-     * - if the value is "nullish", the function returns false.
-     * - if the value can not be coerced to an integral value, a UserException is thrown.
-     * - otherwise, the coerced integral value is returned through the 'returnValue'
-     *   out parameter, and the function returns true.
-     */
-    bool evaluateNumberWithDefault(const Document& root,
-                                   const Expression* field,
-                                   StringData fieldName,
-                                   long long defaultValue,
-                                   long long* returnValue,
-                                   Variables* variables) const;
+    static constexpr size_t _kYear = 0;
+    static constexpr size_t _kMonth = 1;
+    static constexpr size_t _kDay = 2;
+    static constexpr size_t _kHour = 3;
+    static constexpr size_t _kMinute = 4;
+    static constexpr size_t _kSecond = 5;
+    static constexpr size_t _kMillisecond = 6;
+    static constexpr size_t _kIsoWeekYear = 7;
+    static constexpr size_t _kIsoWeek = 8;
+    static constexpr size_t _kIsoDayOfWeek = 9;
+    static constexpr size_t _kTimeZone = 10;
 
-    /**
-     * This function has the same behavior as evaluteNumberWithDefault(), except that it uasserts if
-     * the resulting value is not in the range defined by kMaxValueForDatePart and
-     * kMinValueForDatePart.
-     */
-    bool evaluateNumberWithDefaultAndBounds(const Document& root,
-                                            const Expression* field,
-                                            StringData fieldName,
-                                            long long defaultValue,
-                                            long long* returnValue,
-                                            Variables* variables) const;
+    // Pre-parsed timezone, if the above expression is a constant.
+    boost::optional<TimeZone> _parsedTimeZone;
 
-    boost::intrusive_ptr<Expression>& _year;
-    boost::intrusive_ptr<Expression>& _month;
-    boost::intrusive_ptr<Expression>& _day;
-    boost::intrusive_ptr<Expression>& _hour;
-    boost::intrusive_ptr<Expression>& _minute;
-    boost::intrusive_ptr<Expression>& _second;
-    boost::intrusive_ptr<Expression>& _millisecond;
-    boost::intrusive_ptr<Expression>& _isoWeekYear;
-    boost::intrusive_ptr<Expression>& _isoWeek;
-    boost::intrusive_ptr<Expression>& _isoDayOfWeek;
-    boost::intrusive_ptr<Expression>& _timeZone;
-
-    // Some date conversions spend a long time iterating through date tables when dealing with large
-    // input numbers, so we place a reasonable limit on the magnitude of any argument to
-    // $dateFromParts: inputs that fit within a 16-bit int are permitted.
-    static constexpr long long kMaxValueForDatePart = std::numeric_limits<int16_t>::max();
-    static constexpr long long kMinValueForDatePart = std::numeric_limits<int16_t>::lowest();
+    template <typename H>
+    friend class ExpressionHashVisitor;
 };
 
 class ExpressionDateToParts final : public Expression {
@@ -1479,8 +1603,8 @@ public:
                           boost::intrusive_ptr<Expression> timeZone,
                           boost::intrusive_ptr<Expression> iso8601);
 
-    boost::intrusive_ptr<Expression> optimize() final;
-    Value serialize(bool explain) const final;
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
+    Value serialize(const SerializationOptions& options = {}) const final;
     Value evaluate(const Document& root, Variables* variables) const final;
 
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
@@ -1495,26 +1619,48 @@ public:
         return visitor->visit(this);
     }
 
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final;
+    const Expression* getDate() const {
+        return _children[_kDate].get();
+    }
+    const Expression* getTimeZone() const {
+        return _children[_kTimeZone].get();
+    }
+    const Expression* getIso8601() const {
+        return _children[_kIso8601].get();
+    }
+    const boost::optional<TimeZone>& getParsedTimeZone() const {
+        return _parsedTimeZone;
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionDateToParts>(getExpressionContext(),
+                                                     cloneChild(_kDate),
+                                                     cloneChild(_kTimeZone),
+                                                     cloneChild(_kIso8601));
+    }
+
 
 private:
-    boost::optional<int> evaluateIso8601Flag(const Document& root, Variables* variables) const;
+    static constexpr size_t _kDate = 0;
+    static constexpr size_t _kTimeZone = 1;
+    static constexpr size_t _kIso8601 = 2;
 
-    boost::intrusive_ptr<Expression>& _date;
-    boost::intrusive_ptr<Expression>& _timeZone;
-    boost::intrusive_ptr<Expression>& _iso8601;
+    // Pre-parsed timezone, if the above expression is a constant.
+    boost::optional<TimeZone> _parsedTimeZone;
+
+    template <typename H>
+    friend class ExpressionHashVisitor;
 };
 
 class ExpressionDateToString final : public Expression {
 public:
     ExpressionDateToString(ExpressionContext* expCtx,
-                           boost::intrusive_ptr<Expression> format,
                            boost::intrusive_ptr<Expression> date,
+                           boost::intrusive_ptr<Expression> format,
                            boost::intrusive_ptr<Expression> timeZone,
                            boost::intrusive_ptr<Expression> onNull);
-    boost::intrusive_ptr<Expression> optimize() final;
-    Value serialize(bool explain) const final;
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
+    Value serialize(const SerializationOptions& options = {}) const final;
     Value evaluate(const Document& root, Variables* variables) const final;
 
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
@@ -1529,27 +1675,73 @@ public:
         return visitor->visit(this);
     }
 
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final;
+    /**
+     * Returns true if this expression has parameter 'format' specified, otherwise false.
+     */
+    bool isFormatSpecified() const {
+        return static_cast<bool>(_children[_kFormat]);
+    }
+
+    /**
+     * Returns true if this expression has parameter 'timezone' specified, otherwise false.
+     */
+    bool isTimezoneSpecified() const {
+        return static_cast<bool>(_children[_kTimeZone]);
+    }
+
+    /**
+     * Returns true if this expression has parameter 'onNull' specified, otherwise false.
+     */
+    bool isOnNullSpecified() const {
+        return static_cast<bool>(_children[_kOnNull]);
+    }
+
+    const Expression* getFormat() const {
+        return _children[_kFormat].get();
+    }
+    const Expression* getDate() const {
+        return _children[_kDate].get();
+    }
+    const Expression* getTimeZone() const {
+        return _children[_kTimeZone].get();
+    }
+    const Expression* getOnNull() const {
+        return _children[_kOnNull].get();
+    }
+    const boost::optional<TimeZone>& getParsedTimeZone() const {
+        return _parsedTimeZone;
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionDateToString>(getExpressionContext(),
+                                                      cloneChild(_kDate),
+                                                      cloneChild(_kFormat),
+                                                      cloneChild(_kTimeZone),
+                                                      cloneChild(_kOnNull));
+    }
 
 private:
-    boost::intrusive_ptr<Expression>& _format;
-    boost::intrusive_ptr<Expression>& _date;
-    boost::intrusive_ptr<Expression>& _timeZone;
-    boost::intrusive_ptr<Expression>& _onNull;
+    static constexpr size_t _kFormat = 0;
+    static constexpr size_t _kDate = 1;
+    static constexpr size_t _kTimeZone = 2;
+    static constexpr size_t _kOnNull = 3;
+
+    // Pre-parsed timezone, if the above expression is a constant.
+    boost::optional<TimeZone> _parsedTimeZone;
+
+    template <typename H>
+    friend class ExpressionHashVisitor;
 };
 
-class ExpressionDayOfMonth final : public DateExpressionAcceptingTimeZone<ExpressionDayOfMonth> {
+class ExpressionDayOfMonth final : public DateExpressionAcceptingTimeZone {
 public:
     explicit ExpressionDayOfMonth(ExpressionContext* const expCtx,
                                   boost::intrusive_ptr<Expression> date,
                                   boost::intrusive_ptr<Expression> timeZone = nullptr)
-        : DateExpressionAcceptingTimeZone<ExpressionDayOfMonth>(
+        : DateExpressionAcceptingTimeZone(
               expCtx, "$dayOfMonth", std::move(date), std::move(timeZone)) {}
 
-    Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
-        return Value(timeZone.dateParts(date).dayOfMonth);
-    }
+    Value evaluate(const Document& root, Variables* variables) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -1558,20 +1750,23 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionDayOfMonth>(
+            getExpressionContext(), cloneChild(_kDate), cloneChild(_kTimeZone));
+    }
 };
 
 
-class ExpressionDayOfWeek final : public DateExpressionAcceptingTimeZone<ExpressionDayOfWeek> {
+class ExpressionDayOfWeek final : public DateExpressionAcceptingTimeZone {
 public:
     explicit ExpressionDayOfWeek(ExpressionContext* const expCtx,
                                  boost::intrusive_ptr<Expression> date,
                                  boost::intrusive_ptr<Expression> timeZone = nullptr)
-        : DateExpressionAcceptingTimeZone<ExpressionDayOfWeek>(
+        : DateExpressionAcceptingTimeZone(
               expCtx, "$dayOfWeek", std::move(date), std::move(timeZone)) {}
 
-    Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
-        return Value(timeZone.dayOfWeek(date));
-    }
+    Value evaluate(const Document& root, Variables* variables) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -1579,21 +1774,24 @@ public:
 
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionDayOfWeek>(
+            getExpressionContext(), cloneChild(_kDate), cloneChild(_kTimeZone));
     }
 };
 
 
-class ExpressionDayOfYear final : public DateExpressionAcceptingTimeZone<ExpressionDayOfYear> {
+class ExpressionDayOfYear final : public DateExpressionAcceptingTimeZone {
 public:
     explicit ExpressionDayOfYear(ExpressionContext* const expCtx,
                                  boost::intrusive_ptr<Expression> date,
                                  boost::intrusive_ptr<Expression> timeZone = nullptr)
-        : DateExpressionAcceptingTimeZone<ExpressionDayOfYear>(
+        : DateExpressionAcceptingTimeZone(
               expCtx, "$dayOfYear", std::move(date), std::move(timeZone)) {}
 
-    Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
-        return Value(timeZone.dayOfYear(date));
-    }
+    Value evaluate(const Document& root, Variables* variables) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -1601,6 +1799,11 @@ public:
 
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionDayOfYear>(
+            getExpressionContext(), cloneChild(_kDate), cloneChild(_kTimeZone));
     }
 };
 
@@ -1625,8 +1828,8 @@ public:
                        boost::intrusive_ptr<Expression> unit,
                        boost::intrusive_ptr<Expression> timezone,
                        boost::intrusive_ptr<Expression> startOfWeek);
-    boost::intrusive_ptr<Expression> optimize() final;
-    Value serialize(bool explain) const final;
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
+    Value serialize(const SerializationOptions& options = {}) const final;
     Value evaluate(const Document& root, Variables* variables) const final;
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
                                                   BSONElement expr,
@@ -1643,55 +1846,86 @@ public:
      * Returns true if this expression has parameter 'timezone' specified, otherwise false.
      */
     bool isTimezoneSpecified() const {
-        return static_cast<bool>(_timeZone);
+        return static_cast<bool>(_children[_kTimeZone]);
     }
 
     /**
      * Returns true if this expression has parameter 'startOfWeek' specified, otherwise false.
      */
     bool isStartOfWeekSpecified() const {
-        return static_cast<bool>(_startOfWeek);
+        return static_cast<bool>(_children[_kStartOfWeek]);
+    }
+
+    const Expression* getStartDate() const {
+        return _children[_kStartDate].get();
+    }
+    const Expression* getEndDate() const {
+        return _children[_kEndDate].get();
+    }
+    const Expression* getUnit() const {
+        return _children[_kUnit].get();
+    }
+    const Expression* getTimeZone() const {
+        return _children[_kTimeZone].get();
+    }
+    const Expression* getStartOfWeek() const {
+        return _children[_kStartOfWeek].get();
+    }
+    const boost::optional<TimeUnit>& getParsedUnit() const {
+        return _parsedUnit;
+    }
+    const boost::optional<TimeZone>& getParsedTimeZone() const {
+        return _parsedTimeZone;
+    }
+    const boost::optional<DayOfWeek>& getParsedStartOfWeek() const {
+        return _parsedStartOfWeek;
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionDateDiff>(getExpressionContext(),
+                                                  cloneChild(_kStartDate),
+                                                  cloneChild(_kEndDate),
+                                                  cloneChild(_kUnit),
+                                                  cloneChild(_kTimeZone),
+                                                  cloneChild(_kStartOfWeek));
     }
 
 private:
-    /**
-     * Converts 'value' to Date_t type for $dateDiff expression for parameter 'parameterName'.
-     */
-    static Date_t convertToDate(const Value& value, StringData parameterName);
-
-    void _doAddDependencies(DepsTracker* deps) const final;
+    monotonic::State getMonotonicState(const FieldPath& sortedFieldPath) const final;
 
     // Starting time instant expression. Accepted types: Date_t, Timestamp, OID.
-    boost::intrusive_ptr<Expression>& _startDate;
+    static constexpr size_t _kStartDate = 0;
 
     // Ending time instant expression. Accepted types the same as for '_startDate'.
-    boost::intrusive_ptr<Expression>& _endDate;
+    static constexpr size_t _kEndDate = 1;
 
     // Length of time interval to measure the difference. Accepted type: std::string. Accepted
     // values: enumerators from TimeUnit enumeration.
-    boost::intrusive_ptr<Expression>& _unit;
+    static constexpr size_t _kUnit = 2;
 
     // Timezone to use for the difference calculation. Accepted type: std::string. If not specified,
     // UTC is used.
-    boost::intrusive_ptr<Expression>& _timeZone;
+    static constexpr size_t _kTimeZone = 3;
 
     // First/start day of the week to use for the date difference calculation when time unit is the
     // week. Accepted type: std::string. If not specified, "sunday" is used.
-    boost::intrusive_ptr<Expression>& _startOfWeek;
+    static constexpr size_t _kStartOfWeek = 4;
+
+    // Pre-parsed time unit, if the above expression is a constant.
+    boost::optional<TimeUnit> _parsedUnit;
+
+    // Pre-parsed timezone, if the above expression is a constant.
+    boost::optional<TimeZone> _parsedTimeZone;
+
+    // Pre-parsed start of week, if the above expression is a constant.
+    boost::optional<DayOfWeek> _parsedStartOfWeek;
+
+    template <typename H>
+    friend class ExpressionHashVisitor;
 };
 
 class ExpressionDivide final : public ExpressionFixedArity<ExpressionDivide, 2> {
 public:
-    /**
-     * Divides two values as if by {$divide: [{$const: numerator}, {$const: denominator]}.
-     *
-     * Returns BSONNULL if either argument is nullish.
-     *
-     * Returns ErrorCodes::TypeMismatch if either argument is non-nullish and non-numeric.
-     * Returns ErrorCodes::BadValue if the denominator is zero.
-     */
-    static StatusWith<Value> apply(Value numerator, Value denominator);
-
     explicit ExpressionDivide(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionDivide, 2>(expCtx) {}
     explicit ExpressionDivide(ExpressionContext* const expCtx, ExpressionVector&& children)
@@ -1707,6 +1941,10 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionDivide>(getExpressionContext(), cloneChildren());
+    }
 };
 
 
@@ -1717,7 +1955,7 @@ public:
     explicit ExpressionExp(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionSingleNumericArg<ExpressionExp>(expCtx, std::move(children)) {}
 
-    Value evaluateNumericArg(const Value& numericArg) const final;
+    Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
@@ -1726,6 +1964,10 @@ public:
 
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionExp>(getExpressionContext(), cloneChildren());
     }
 };
 
@@ -1754,9 +1996,9 @@ public:
         return _variable != Variables::kRootId;
     }
 
-    boost::intrusive_ptr<Expression> optimize() final;
-    Value evaluate(const Document& root, Variables* variables) const;
-    Value serialize(bool explain) const final;
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
+    Value evaluate(const Document& root, Variables* variables) const override;
+    Value serialize(const SerializationOptions& options = {}) const final;
 
     /*
       Create a field path expression using old semantics (rooted off of CURRENT).
@@ -1815,6 +2057,12 @@ public:
     std::unique_ptr<Expression> copyWithSubstitution(
         const StringMap<std::string>& renameList) const;
 
+    /**
+     * Checks if any key of 'renameList' map is a prefix of this ExpressionFieldPath's path. It
+     * would mean that this ExpressionFieldPath is renameable by 'renameList' if so.
+     */
+    bool isRenameableByAnyPrefixNameIn(const StringMap<std::string>& renameList) const;
+
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
     }
@@ -1823,57 +2071,28 @@ public:
         return visitor->visit(this);
     }
 
+    boost::intrusive_ptr<Expression> clone() const final {
+        return boost::intrusive_ptr<Expression>(
+            new ExpressionFieldPath(getExpressionContext(), _fieldPath.fullPath(), _variable));
+    }
+
 protected:
-    void _doAddDependencies(DepsTracker* deps) const final;
     ExpressionFieldPath(ExpressionContext* expCtx,
                         const std::string& fieldPath,
                         Variables::Id variable);
 
 
 private:
-    /*
-      Internal implementation of evaluate(), used recursively.
-
-      The internal implementation doesn't just use a loop because of
-      the possibility that we need to skip over an array.  If the path
-      is "a.b.c", and a is an array, then we fan out from there, and
-      traverse "b.c" for each element of a:[...].  This requires that
-      a be an array of objects in order to navigate more deeply.
-
-      @param index current path field index to extract
-      @param input current document traversed to (not the top-level one)
-      @returns the field found; could be an array
-     */
-    Value evaluatePath(size_t index, const Document& input) const;
-
-    // Helper for evaluatePath to handle Array case
-    Value evaluatePathArray(size_t index, const Value& input) const;
+    monotonic::State getMonotonicState(const FieldPath& sortedFieldPath) const final;
 
     const FieldPath _fieldPath;
     const Variables::Id _variable;
 };
 
-/**
- * A version of ExpressionFieldPath that will throw if evaluated in a sharded pipeline.
- */
-class ExpressionFieldPathNonSharded : public ExpressionFieldPath {
-public:
-    Value evaluate(const Document& root, Variables* variables) const final;
-
-    ExpressionFieldPathNonSharded(ExpressionContext* const expCtx,
-                                  const std::string& fieldPath,
-                                  Variables::Id variable,
-                                  std::string errMsg)
-        : ExpressionFieldPath(expCtx, fieldPath, variable), _errMsg(std::move(errMsg)) {}
-
-private:
-    std::string _errMsg;
-};
-
 class ExpressionFilter final : public Expression {
 public:
-    boost::intrusive_ptr<Expression> optimize() final;
-    Value serialize(bool explain) const final;
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
+    Value serialize(const SerializationOptions& options = {}) const final;
     Value evaluate(const Document& root, Variables* variables) const final;
 
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
@@ -1903,20 +2122,42 @@ public:
         return this->_limit ? true : false;
     }
 
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final;
+    const Expression* getInput() const {
+        return _children[_kInput].get();
+    }
+
+    const Expression* getCond() const {
+        return _children[_kCond].get();
+    }
+
+    const boost::optional<size_t>& getLimit() const {
+        return _limit;
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionFilter>(getExpressionContext(),
+                                                _varName,
+                                                _varId,
+                                                cloneChild(_kInput),
+                                                cloneChild(_kCond),
+                                                _limit ? cloneChild(*_limit) : nullptr);
+    }
 
 private:
+    // The array to iterate over.
+    static constexpr size_t _kInput = 0;
+    // The expression determining whether each element should be present in the result array.
+    static constexpr size_t _kCond = 1;
+
     // The name of the variable to set to each element in the array.
     std::string _varName;
     // The id of the variable to set.
     Variables::Id _varId;
-    // The array to iterate over.
-    boost::intrusive_ptr<Expression>& _input;
-    // The expression determining whether each element should be present in the result array.
-    boost::intrusive_ptr<Expression>& _cond;
     // The optional expression determining how many elements should be present in the result array.
-    boost::optional<boost::intrusive_ptr<Expression>&> _limit;
+    boost::optional<size_t> _limit;
+
+    template <typename H>
+    friend class ExpressionHashVisitor;
 };
 
 
@@ -1927,9 +2168,7 @@ public:
     explicit ExpressionFloor(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionSingleNumericArg<ExpressionFloor>(expCtx, std::move(children)) {}
 
-    static StatusWith<Value> apply(Value lhs);
-
-    Value evaluateNumericArg(const Value& numericArg) const final;
+    Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
@@ -1939,22 +2178,26 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionFloor>(getExpressionContext(), cloneChildren());
+    }
+
+private:
+    monotonic::State getMonotonicState(const FieldPath& sortedFieldPath) const final {
+        return getChildren()[0]->getMonotonicState(sortedFieldPath);
+    }
 };
 
 
-class ExpressionHour final : public DateExpressionAcceptingTimeZone<ExpressionHour> {
+class ExpressionHour final : public DateExpressionAcceptingTimeZone {
 public:
     explicit ExpressionHour(ExpressionContext* const expCtx,
                             boost::intrusive_ptr<Expression> date,
                             boost::intrusive_ptr<Expression> timeZone = nullptr)
-        : DateExpressionAcceptingTimeZone<ExpressionHour>(
-              expCtx, "$hour", std::move(date), std::move(timeZone)) {
-        expCtx->sbeCompatible = false;
-    }
+        : DateExpressionAcceptingTimeZone(expCtx, "$hour", std::move(date), std::move(timeZone)) {}
 
-    Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
-        return Value(timeZone.dateParts(date).hour);
-    }
+    Value evaluate(const Document& root, Variables* variables) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -1962,6 +2205,11 @@ public:
 
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionHour>(
+            getExpressionContext(), cloneChild(_kDate), cloneChild(_kTimeZone));
     }
 };
 
@@ -1971,10 +2219,13 @@ public:
     explicit ExpressionIfNull(ExpressionContext* const expCtx)
         : ExpressionVariadic<ExpressionIfNull>(expCtx) {}
 
+    ExpressionIfNull(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionVariadic<ExpressionIfNull>(expCtx, std::move(children)) {}
+
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
-    void validateArguments(const ExpressionVector& args) const final;
-    boost::intrusive_ptr<Expression> optimize() final;
+    void validateChildren() const final;
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -1983,15 +2234,17 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionIfNull>(getExpressionContext(), cloneChildren());
+    }
 };
 
 
 class ExpressionIn final : public ExpressionFixedArity<ExpressionIn, 2> {
 public:
     explicit ExpressionIn(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<ExpressionIn, 2>(expCtx) {
-        expCtx->sbeCompatible = false;
-    }
+        : ExpressionFixedArity<ExpressionIn, 2>(expCtx) {}
 
     ExpressionIn(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionFixedArity<ExpressionIn, 2>(expCtx, std::move(children)) {}
@@ -2007,6 +2260,10 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionIn>(getExpressionContext(), cloneChildren());
+    }
 };
 
 
@@ -2014,14 +2271,16 @@ class ExpressionIndexOfArray : public ExpressionRangedArity<ExpressionIndexOfArr
 public:
     explicit ExpressionIndexOfArray(ExpressionContext* const expCtx)
         : ExpressionRangedArity<ExpressionIndexOfArray, 2, 4>(expCtx) {
-        expCtx->sbeCompatible = false;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
     ExpressionIndexOfArray(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : ExpressionRangedArity<ExpressionIndexOfArray, 2, 4>(expCtx, std::move(children)) {}
+        : ExpressionRangedArity<ExpressionIndexOfArray, 2, 4>(expCtx, std::move(children)) {
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+    }
 
-    Value evaluate(const Document& root, Variables* variables) const;
-    boost::intrusive_ptr<Expression> optimize() final;
+    Value evaluate(const Document& root, Variables* variables) const override;
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
@@ -2032,32 +2291,19 @@ public:
         return visitor->visit(this);
     }
 
-protected:
-    struct Arguments {
-        Arguments(Value targetOfSearch, int startIndex, int endIndex)
-            : targetOfSearch(targetOfSearch), startIndex(startIndex), endIndex(endIndex) {}
+    const boost::optional<ValueUnorderedMap<std::vector<int>>>& getParsedIndexMap() const {
+        return _parsedIndexMap;
+    }
 
-        Value targetOfSearch;
-        int startIndex;
-        int endIndex;
-    };
-    /**
-     * When given 'operands' which correspond to the arguments to $indexOfArray, evaluates and
-     * validates the target value, starting index, and ending index arguments and returns their
-     * values as a Arguments struct. The starting index and ending index are optional, so as default
-     * 'startIndex' will be 0 and 'endIndex' will be the length of the input array. Throws a
-     * UserException if the values are found to be invalid in some way, e.g. if the indexes are not
-     * numbers.
-     */
-    Arguments evaluateAndValidateArguments(const Document& root,
-                                           const ExpressionVector& operands,
-                                           size_t arrayLength,
-                                           Variables* variables) const;
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionIndexOfArray>(getExpressionContext(), cloneChildren());
+    }
 
 private:
-    class Optimized;
+    // Maps the values in the array to the positions at which they occur. We need to remember
+    // the positions so that we can verify they are in the appropriate range.
+    boost::optional<ValueUnorderedMap<std::vector<int>>> _parsedIndexMap;
 };
-
 
 class ExpressionIndexOfBytes final : public ExpressionRangedArity<ExpressionIndexOfBytes, 2, 4> {
 public:
@@ -2075,6 +2321,10 @@ public:
 
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionIndexOfBytes>(getExpressionContext(), cloneChildren());
     }
 };
 
@@ -2099,25 +2349,44 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionIndexOfCP>(getExpressionContext(), cloneChildren());
+    }
 };
 
 
 class ExpressionLet final : public Expression {
 public:
-    boost::intrusive_ptr<Expression> optimize() final;
-    Value serialize(bool explain) const final;
+    struct NameAndExpression {
+        std::string name;
+        boost::intrusive_ptr<Expression>& expression;
+    };
+    typedef std::map<Variables::Id, NameAndExpression> VariableMap;
+
+    ExpressionLet(ExpressionContext* expCtx,
+                  VariableMap&& vars,
+                  ExpressionVector&& children,
+                  std::vector<Variables::Id> orderedVariableIds);
+
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
+    Value serialize(const SerializationOptions& options = {}) const final;
     Value evaluate(const Document& root, Variables* variables) const final;
 
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
                                                   BSONElement expr,
                                                   const VariablesParseState& vps);
 
-    struct NameAndExpression {
-        std::string name;
-        boost::intrusive_ptr<Expression>& expression;
-    };
+    // Callback function to create the "in" expression with the let variables defined.
+    using CreateInExpr = std::function<boost::intrusive_ptr<Expression>(
+        ExpressionContext*, const VariablesParseState&)>;
 
-    typedef std::map<Variables::Id, NameAndExpression> VariableMap;
+    // Internal API to create a ExpressionLet with the specified variables.
+    static boost::intrusive_ptr<Expression> create(
+        ExpressionContext* expCtx,
+        std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>> letVariables,
+        const VariablesParseState& vpsIn,
+        CreateInExpr createInFunc);
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -2127,30 +2396,52 @@ public:
         return visitor->visit(this);
     }
 
-    auto& getOrderedVariableIds() const {
+    const std::vector<Variables::Id>& getOrderedVariableIds() const {
         return _orderedVariableIds;
     }
 
-    auto& getVariableMap() const {
+    const VariableMap& getVariableMap() const {
         return _variables;
     }
 
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final;
+    const Expression* getSubExpression() const {
+        return _children[_kSubExpression].get();
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        ExpressionVector children = cloneChildren();
+        VariableMap vars;
+
+        for (size_t idx = 0; idx < _orderedVariableIds.size(); ++idx) {
+            Variables::Id id = _orderedVariableIds[idx];
+
+            // A variable could be optimized away as unused and removed from the _variables map,
+            // but still present in the _orderedVariableIds array along with its corresponding
+            // expression.
+            if (auto it = _variables.find(id); it != _variables.end()) {
+                vars.emplace(id, NameAndExpression{it->second.name, children[idx]});
+            }
+        }
+
+        tassert(3100305,
+                fmt::format("Variables map size mismatch between original and cloned 'let' "
+                            "expressions: orig={}, cloned={}",
+                            _variables.size(),
+                            vars.size()),
+                _variables.size() == vars.size());
+
+        return make_intrusive<ExpressionLet>(
+            getExpressionContext(), std::move(vars), std::move(children), _orderedVariableIds);
+    }
 
 private:
-    ExpressionLet(ExpressionContext* expCtx,
-                  VariableMap&& vars,
-                  std::vector<boost::intrusive_ptr<Expression>> children,
-                  std::vector<Variables::Id> orderedVariableIds);
+    // Index of the last element in the '_children' list.
+    const size_t _kSubExpression;
 
     VariableMap _variables;
 
     // These ids are ordered to match their corresponding _children expressions.
     std::vector<Variables::Id> _orderedVariableIds;
-
-    // Reference to the last element in the '_children' list.
-    boost::intrusive_ptr<Expression>& _subExpression;
 };
 
 class ExpressionLn final : public ExpressionSingleNumericArg<ExpressionLn> {
@@ -2160,7 +2451,7 @@ public:
     ExpressionLn(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionSingleNumericArg<ExpressionLn>(expCtx, std::move(children)) {}
 
-    Value evaluateNumericArg(const Value& numericArg) const final;
+    Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
@@ -2170,17 +2461,21 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionLn>(getExpressionContext(), cloneChildren());
+    }
 };
 
 class ExpressionLog final : public ExpressionFixedArity<ExpressionLog, 2> {
 public:
     explicit ExpressionLog(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionLog, 2>(expCtx) {
-        expCtx->sbeCompatible = false;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
     ExpressionLog(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionFixedArity<ExpressionLog, 2>(expCtx, std::move(children)) {
-        expCtx->sbeCompatible = false;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
     Value evaluate(const Document& root, Variables* variables) const final;
@@ -2192,6 +2487,10 @@ public:
 
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionLog>(getExpressionContext(), cloneChildren());
     }
 };
 
@@ -2202,7 +2501,7 @@ public:
     ExpressionLog10(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionSingleNumericArg<ExpressionLog10>(expCtx, std::move(children)) {}
 
-    Value evaluateNumericArg(const Value& numericArg) const final;
+    Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
@@ -2212,6 +2511,85 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionLog10>(getExpressionContext(), cloneChildren());
+    }
+};
+
+class ExpressionInternalFLEEqual final : public Expression {
+public:
+    ExpressionInternalFLEEqual(ExpressionContext* expCtx,
+                               boost::intrusive_ptr<Expression> field,
+                               ServerZerosEncryptionToken zerosToken);
+
+    Value serialize(const SerializationOptions& options = {}) const final;
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+    const char* getOpName() const;
+
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
+                                                  BSONElement expr,
+                                                  const VariablesParseState& vps);
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+
+    const auto& getEncryptedPredicateEvaluator() const {
+        return _evaluatorV2;
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        tassert(3100302,
+                "zerosDecryptionTokens array is empty",
+                !_evaluatorV2.zerosDecryptionTokens().empty());
+        return make_intrusive<ExpressionInternalFLEEqual>(
+            getExpressionContext(), cloneChild(0), _evaluatorV2.zerosDecryptionTokens()[0]);
+    }
+
+private:
+    EncryptedPredicateEvaluatorV2 _evaluatorV2;
+};
+
+class ExpressionInternalFLEBetween final : public Expression {
+public:
+    ExpressionInternalFLEBetween(ExpressionContext* expCtx,
+                                 boost::intrusive_ptr<Expression> field,
+                                 std::vector<ServerZerosEncryptionToken> serverTokens);
+
+    Value serialize(const SerializationOptions& options = {}) const final;
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+    const char* getOpName() const;
+
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
+                                                  BSONElement expr,
+                                                  const VariablesParseState& vps);
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+
+    const auto& getEncryptedPredicateEvaluator() const {
+        return _evaluatorV2;
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionInternalFLEBetween>(
+            getExpressionContext(), cloneChild(0), _evaluatorV2.zerosDecryptionTokens());
+    }
+
+private:
+    EncryptedPredicateEvaluatorV2 _evaluatorV2;
 };
 
 class ExpressionMap final : public Expression {
@@ -2223,16 +2601,13 @@ public:
         boost::intrusive_ptr<Expression> input,  // yields array to iterate
         boost::intrusive_ptr<Expression> each);  // yields results to be added to output array
 
-    boost::intrusive_ptr<Expression> optimize() final;
-    Value serialize(bool explain) const final;
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
+    Value serialize(const SerializationOptions& options = {}) const final;
     Value evaluate(const Document& root, Variables* variables) const final;
 
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
                                                   BSONElement expr,
                                                   const VariablesParseState& vps);
-
-    ComputedPaths getComputedPaths(const std::string& exprFieldPath,
-                                   Variables::Id renamingVar) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -2242,21 +2617,38 @@ public:
         return visitor->visit(this);
     }
 
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final;
+    const Expression* getInput() const {
+        return _children[_kInput].get();
+    }
+
+    const Expression* getEach() const {
+        return _children[_kEach].get();
+    }
+
+    Variables::Id getVarId() const {
+        return _varId;
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionMap>(
+            getExpressionContext(), _varName, _varId, cloneChild(_kInput), cloneChild(_kEach));
+    }
 
 private:
+    static constexpr size_t _kInput = 0;
+    static constexpr size_t _kEach = 1;
     std::string _varName;
     Variables::Id _varId;
-    boost::intrusive_ptr<Expression>& _input;
-    boost::intrusive_ptr<Expression>& _each;
+
+    template <typename H>
+    friend class ExpressionHashVisitor;
 };
 
 class ExpressionMeta final : public Expression {
 public:
     ExpressionMeta(ExpressionContext* expCtx, DocumentMetadataFields::MetaType metaType);
 
-    Value serialize(bool explain) const final;
+    Value serialize(const SerializationOptions& options = {}) const final;
     Value evaluate(const Document& root, Variables* variables) const final;
 
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
@@ -2275,26 +2667,106 @@ public:
         return _metaType;
     }
 
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final;
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionMeta>(getExpressionContext(), _metaType);
+    }
 
 private:
+    // An error message prefix used for parsing errors.
+    static constexpr auto kParseErrPrefix = "Unsupported $meta field: ";
+
+    // Used during $meta expression parsing.
+    struct ParseMetaTypeResult {
+        // The meta enum type.
+        DocumentMetadataFields::MetaType metaType;
+        // The string name used for the meta type.
+        StringData typeName;
+        // An optional path, for use cases like $meta: "stream.window".
+        boost::optional<StringData> path;
+    };
+
+    /**
+     * Asserts that if the API version is strict, that the requested metadata field is compatible
+     * with it.
+     */
+    static void _assertMetaFieldCompatibleWithStrictAPI(ExpressionContext* expCtx,
+                                                        DocumentMetadataFields::MetaType type);
+    /**
+     * Asserts that 'featureFlagRankFusionFull' feature flag is enabled, if the
+     * requested metadata field requires it.
+     */
+    static void _assertMetaFieldCompatibleWithHybridScoringFeatureFlag(
+        ExpressionContext* expCtx, DocumentMetadataFields::MetaType type);
+
+    /**
+     * Asserts that the 'featureFlagStreams' is enabled, depending on the parsed meta type and
+     * optional field path specified.
+     */
+    static void _assertMetaFieldCompatibleWithStreamsFeatureFlag(
+        ExpressionContext* expCtx,
+        DocumentMetadataFields::MetaType type,
+        StringData typeName,
+        boost::optional<StringData> optionalPath);
+
+    /**
+     * Rewrites { $meta: "stream.path" } as
+     * { $let: { in: "$$stream.path", vars: {stream: {$meta: "stream"}} } }
+     */
+    static boost::intrusive_ptr<Expression> _rewriteAsLet(ExpressionContext* expCtx,
+                                                          DocumentMetadataFields::MetaType type,
+                                                          StringData typeName,
+                                                          StringData path,
+                                                          const VariablesParseState& vpsIn);
+
+    /**
+     * Helper utility to parse a meta type and optional path from the user supplied typeName.
+     */
+    static ParseMetaTypeResult _parseMetaType(ExpressionContext* expCtx, StringData typeName);
+
     DocumentMetadataFields::MetaType _metaType;
 };
 
-class ExpressionMillisecond final : public DateExpressionAcceptingTimeZone<ExpressionMillisecond> {
+/**
+ * A 'flavor' of {$meta: "sortKey"} which is intended for efficient comparisons internally. This is
+ * in contrast to the public facing expression which is meant to return a user-comprehensible sort
+ * key, represented as an array. That expression will materialize a new array. Constructing this
+ * array is not necessary for just making internal comparisons.
+ */
+class ExpressionInternalRawSortKey final : public Expression {
+public:
+    static constexpr StringData kName = "$_internalSortKey"_sd;
+
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext*,
+                                                  BSONElement,
+                                                  const VariablesParseState&);
+
+    ExpressionInternalRawSortKey(ExpressionContext* expCtx) : Expression(expCtx) {}
+
+    Value serialize(const SerializationOptions& options = {}) const final;
+    Value evaluate(const Document& root, Variables* variables) const final;
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionInternalRawSortKey>(getExpressionContext());
+    }
+};
+
+class ExpressionMillisecond final : public DateExpressionAcceptingTimeZone {
 public:
     explicit ExpressionMillisecond(ExpressionContext* const expCtx,
                                    boost::intrusive_ptr<Expression> date,
                                    boost::intrusive_ptr<Expression> timeZone = nullptr)
-        : DateExpressionAcceptingTimeZone<ExpressionMillisecond>(
-              expCtx, "$millisecond", std::move(date), std::move(timeZone)) {
-        expCtx->sbeCompatible = false;
-    }
+        : DateExpressionAcceptingTimeZone(
+              expCtx, "$millisecond", std::move(date), std::move(timeZone)) {}
 
-    Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
-        return Value(timeZone.dateParts(date).millisecond);
-    }
+    Value evaluate(const Document& root, Variables* variables) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -2302,23 +2774,24 @@ public:
 
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionMillisecond>(
+            getExpressionContext(), cloneChild(_kDate), cloneChild(_kTimeZone));
     }
 };
 
 
-class ExpressionMinute final : public DateExpressionAcceptingTimeZone<ExpressionMinute> {
+class ExpressionMinute final : public DateExpressionAcceptingTimeZone {
 public:
     explicit ExpressionMinute(ExpressionContext* const expCtx,
                               boost::intrusive_ptr<Expression> date,
                               boost::intrusive_ptr<Expression> timeZone = nullptr)
-        : DateExpressionAcceptingTimeZone<ExpressionMinute>(
-              expCtx, "$minute", std::move(date), std::move(timeZone)) {
-        expCtx->sbeCompatible = false;
+        : DateExpressionAcceptingTimeZone(expCtx, "$minute", std::move(date), std::move(timeZone)) {
     }
 
-    Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
-        return Value(timeZone.dateParts(date).minute);
-    }
+    Value evaluate(const Document& root, Variables* variables) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -2326,6 +2799,11 @@ public:
 
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionMinute>(
+            getExpressionContext(), cloneChild(_kDate), cloneChild(_kTimeZone));
     }
 };
 
@@ -2337,8 +2815,6 @@ public:
     ExpressionMod(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionFixedArity<ExpressionMod, 2>(expCtx, std::move(children)) {}
 
-    static StatusWith<Value> apply(Value lhs, Value rhs);
-
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
@@ -2349,24 +2825,15 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionMod>(getExpressionContext(), cloneChildren());
+    }
 };
 
 
 class ExpressionMultiply final : public ExpressionVariadic<ExpressionMultiply> {
 public:
-    /**
-     * Multiplies two values together as if by evaluate() on
-     *     {$multiply: [{$const: lhs}, {$const: rhs}]}.
-     *
-     * Note that evaluate() does not use apply() directly, because when $multiply takes more than
-     * two arguments, it uses a wider intermediate state than Value.
-     *
-     * Returns BSONNULL if either argument is nullish.
-     *
-     * Returns ErrorCodes::TypeMismatch if any argument is non-nullish, non-numeric.
-     */
-    static StatusWith<Value> apply(Value lhs, Value rhs);
-
     explicit ExpressionMultiply(ExpressionContext* const expCtx)
         : ExpressionVariadic<ExpressionMultiply>(expCtx) {}
     ExpressionMultiply(ExpressionContext* const expCtx, ExpressionVector&& children)
@@ -2375,12 +2842,11 @@ public:
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
-    bool isAssociative() const final {
-        return true;
-    }
-
-    bool isCommutative() const final {
-        return true;
+    // ExpressionMultiply is left associative because it processes its operands by iterating
+    // left-to-right through its _children vector, but the order of operations impacts the result
+    // due to integer overflow, floating-point rounding and type promotion.
+    Associativity getAssociativity() const final {
+        return Associativity::kLeft;
     }
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
@@ -2389,23 +2855,22 @@ public:
 
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionMultiply>(getExpressionContext(), cloneChildren());
     }
 };
 
 
-class ExpressionMonth final : public DateExpressionAcceptingTimeZone<ExpressionMonth> {
+class ExpressionMonth final : public DateExpressionAcceptingTimeZone {
 public:
     explicit ExpressionMonth(ExpressionContext* const expCtx,
                              boost::intrusive_ptr<Expression> date,
                              boost::intrusive_ptr<Expression> timeZone = nullptr)
-        : DateExpressionAcceptingTimeZone<ExpressionMonth>(
-              expCtx, "$month", std::move(date), std::move(timeZone)) {
-        expCtx->sbeCompatible = false;
-    }
+        : DateExpressionAcceptingTimeZone(expCtx, "$month", std::move(date), std::move(timeZone)) {}
 
-    Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
-        return Value(timeZone.dateParts(date).month);
-    }
+    Value evaluate(const Document& root, Variables* variables) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -2413,6 +2878,11 @@ public:
 
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionMonth>(
+            getExpressionContext(), cloneChild(_kDate), cloneChild(_kTimeZone));
     }
 };
 
@@ -2435,6 +2905,10 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionNot>(getExpressionContext(), cloneChildren());
+    }
 };
 
 
@@ -2448,9 +2922,9 @@ public:
  */
 class ExpressionObject final : public Expression {
 public:
-    boost::intrusive_ptr<Expression> optimize() final;
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
     Value evaluate(const Document& root, Variables* variables) const final;
-    Value serialize(bool explain) const final;
+    Value serialize(const SerializationOptions& options = {}) const final;
 
     static boost::intrusive_ptr<ExpressionObject> create(
         ExpressionContext* expCtx,
@@ -2482,8 +2956,18 @@ public:
         return visitor->visit(this);
     }
 
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final;
+    bool selfAndChildrenAreConstant() const final;
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>> expressions;
+
+        expressions.reserve(_expressions.size());
+        for (auto&& [fieldName, expr] : _expressions) {
+            expressions.emplace_back(fieldName, expr->clone());
+        }
+
+        return ExpressionObject::create(getExpressionContext(), std::move(expressions));
+    }
 
 private:
     ExpressionObject(
@@ -2505,12 +2989,12 @@ public:
     ExpressionOr(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionVariadic<ExpressionOr>(expCtx, std::move(children)) {}
 
-    boost::intrusive_ptr<Expression> optimize() final;
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
-    bool isAssociative() const final {
-        return true;
+    Associativity getAssociativity() const final {
+        return Associativity::kFull;
     }
 
     bool isCommutative() const final {
@@ -2524,16 +3008,21 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionOr>(getExpressionContext(), cloneChildren());
+    }
 };
 
 class ExpressionPow final : public ExpressionFixedArity<ExpressionPow, 2> {
 public:
     explicit ExpressionPow(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<ExpressionPow, 2>(expCtx) {
-        expCtx->sbeCompatible = false;
-    }
+        : ExpressionFixedArity<ExpressionPow, 2>(expCtx) {}
     ExpressionPow(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionFixedArity<ExpressionPow, 2>(expCtx, std::move(children)) {}
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+    const char* getOpName() const final;
 
     static boost::intrusive_ptr<Expression> create(ExpressionContext* expCtx,
                                                    Value base,
@@ -2547,9 +3036,9 @@ public:
         return visitor->visit(this);
     }
 
-private:
-    Value evaluate(const Document& root, Variables* variables) const final;
-    const char* getOpName() const final;
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionPow>(getExpressionContext(), cloneChildren());
+    }
 };
 
 
@@ -2557,6 +3046,9 @@ class ExpressionRange final : public ExpressionRangedArity<ExpressionRange, 2, 3
 public:
     explicit ExpressionRange(ExpressionContext* const expCtx)
         : ExpressionRangedArity<ExpressionRange, 2, 3>(expCtx) {}
+
+    ExpressionRange(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionRangedArity<ExpressionRange, 2, 3>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -2567,6 +3059,10 @@ public:
 
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionRange>(getExpressionContext(), cloneChildren());
     }
 };
 
@@ -2580,20 +3076,17 @@ public:
                      Variables::Id thisVar,
                      Variables::Id valueVar)
         : Expression(expCtx, {std::move(input), std::move(initial), std::move(in)}),
-          _input(_children[0]),
-          _initial(_children[1]),
-          _in(_children[2]),
           _thisVar(thisVar),
           _valueVar(valueVar) {
-        expCtx->sbeCompatible = false;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
     Value evaluate(const Document& root, Variables* variables) const final;
-    boost::intrusive_ptr<Expression> optimize() final;
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
                                                   BSONElement expr,
                                                   const VariablesParseState& vps);
-    Value serialize(bool explain) const final;
+    Value serialize(const SerializationOptions& options = {}) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -2603,16 +3096,52 @@ public:
         return visitor->visit(this);
     }
 
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final;
+    const Expression* getInput() const {
+        return _children[_kInput].get();
+    }
+
+    const Expression* getInitial() const {
+        return _children[_kInitial].get();
+    }
+
+    const Expression* getIn() const {
+        return _children[_kIn].get();
+    }
+
+    Variables::Id getThisVar() const {
+        return _thisVar;
+    }
+
+    Variables::Id getValueVar() const {
+        return _valueVar;
+    }
+
+    size_t getAccumulatedValueDepthCheckInterval() const {
+        return _accumulatedValueDepthCheckInterval;
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionReduce>(getExpressionContext(),
+                                                cloneChild(_kInput),
+                                                cloneChild(_kInitial),
+                                                cloneChild(_kIn),
+                                                _thisVar,
+                                                _valueVar);
+    }
 
 private:
-    boost::intrusive_ptr<Expression>& _input;
-    boost::intrusive_ptr<Expression>& _initial;
-    boost::intrusive_ptr<Expression>& _in;
+    static constexpr size_t _kInput = 0;
+    static constexpr size_t _kInitial = 1;
+    static constexpr size_t _kIn = 2;
 
     Variables::Id _thisVar;
     Variables::Id _valueVar;
+
+    const size_t _accumulatedValueDepthCheckInterval =
+        gInternalReduceAccumulatedValueDepthCheckInterval.load();
+
+    template <typename H>
+    friend class ExpressionHashVisitor;
 };
 
 
@@ -2622,32 +3151,44 @@ public:
                           boost::intrusive_ptr<Expression> input,
                           boost::intrusive_ptr<Expression> find,
                           boost::intrusive_ptr<Expression> replacement)
-        : Expression(expCtx, {std::move(input), std::move(find), std::move(replacement)}),
-          _input(_children[0]),
-          _find(_children[1]),
-          _replacement(_children[2]) {}
+        : Expression(expCtx, {std::move(input), std::move(find), std::move(replacement)}) {}
 
     virtual const char* getOpName() const = 0;
-    Value evaluate(const Document& root, Variables* variables) const final;
-    boost::intrusive_ptr<Expression> optimize() final;
-    Value serialize(bool explain) const final;
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
+    Value serialize(const SerializationOptions& options = {}) const final;
+
+    const Expression* getInput() const {
+        return _children[_kInput].get();
+    }
+
+    const Expression* getFind() const {
+        return _children[_kFind].get();
+    }
+
+    const Expression* getReplacement() const {
+        return _children[_kReplacement].get();
+    }
 
 protected:
-    void _doAddDependencies(DepsTracker* deps) const final;
-    virtual Value _doEval(StringData input, StringData find, StringData replacement) const = 0;
-
     // These are owned by this->Expression::_children. They are references to intrusive_ptr instead
     // of direct references to Expression because we need to be able to replace each child in
     // optimize() without invalidating the references.
-    boost::intrusive_ptr<Expression>& _input;
-    boost::intrusive_ptr<Expression>& _find;
-    boost::intrusive_ptr<Expression>& _replacement;
+    static constexpr size_t _kInput = 0;
+    static constexpr size_t _kFind = 1;
+    static constexpr size_t _kReplacement = 2;
 };
 
 
 class ExpressionReplaceOne final : public ExpressionReplaceBase {
 public:
-    using ExpressionReplaceBase::ExpressionReplaceBase;
+    ExpressionReplaceOne(ExpressionContext* const expCtx,
+                         boost::intrusive_ptr<Expression> input,
+                         boost::intrusive_ptr<Expression> find,
+                         boost::intrusive_ptr<Expression> replacement)
+        : ExpressionReplaceBase(expCtx, input, find, replacement) {
+        // TODO(SERVER-108244): Support $replaceOne with regex in SBE.
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+    }
 
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
                                                   BSONElement expr,
@@ -2666,8 +3207,14 @@ public:
         return visitor->visit(this);
     }
 
-protected:
-    Value _doEval(StringData input, StringData find, StringData replacement) const final;
+    Value evaluate(const Document& root, Variables* variables) const final;
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionReplaceOne>(getExpressionContext(),
+                                                    cloneChild(_kInput),
+                                                    cloneChild(_kFind),
+                                                    cloneChild(_kReplacement));
+    }
 };
 
 class ExpressionReplaceAll final : public ExpressionReplaceBase {
@@ -2677,7 +3224,7 @@ public:
                          boost::intrusive_ptr<Expression> find,
                          boost::intrusive_ptr<Expression> replacement)
         : ExpressionReplaceBase(expCtx, input, find, replacement) {
-        expCtx->sbeCompatible = false;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
@@ -2697,23 +3244,25 @@ public:
         return visitor->visit(this);
     }
 
-protected:
-    Value _doEval(StringData input, StringData find, StringData replacement) const final;
+    Value evaluate(const Document& root, Variables* variables) const final;
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionReplaceAll>(getExpressionContext(),
+                                                    cloneChild(_kInput),
+                                                    cloneChild(_kFind),
+                                                    cloneChild(_kReplacement));
+    }
 };
 
-class ExpressionSecond final : public DateExpressionAcceptingTimeZone<ExpressionSecond> {
+class ExpressionSecond final : public DateExpressionAcceptingTimeZone {
 public:
     ExpressionSecond(ExpressionContext* const expCtx,
                      boost::intrusive_ptr<Expression> date,
                      boost::intrusive_ptr<Expression> timeZone = nullptr)
-        : DateExpressionAcceptingTimeZone<ExpressionSecond>(
-              expCtx, "$second", std::move(date), std::move(timeZone)) {
-        expCtx->sbeCompatible = false;
+        : DateExpressionAcceptingTimeZone(expCtx, "$second", std::move(date), std::move(timeZone)) {
     }
 
-    Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
-        return Value(timeZone.dateParts(date).second);
-    }
+    Value evaluate(const Document& root, Variables* variables) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -2722,13 +3271,16 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionSecond>(
+            getExpressionContext(), cloneChild(_kDate), cloneChild(_kTimeZone));
+    }
 };
 
 
 class ExpressionSetDifference final : public ExpressionFixedArity<ExpressionSetDifference, 2> {
 public:
-    explicit ExpressionSetDifference(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<ExpressionSetDifference, 2>(expCtx) {}
     ExpressionSetDifference(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionFixedArity<ExpressionSetDifference, 2>(expCtx, std::move(children)) {}
 
@@ -2742,21 +3294,27 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionSetDifference>(getExpressionContext(), cloneChildren());
+    }
 };
 
 
 class ExpressionSetEquals final : public ExpressionVariadic<ExpressionSetEquals> {
 public:
-    explicit ExpressionSetEquals(ExpressionContext* const expCtx)
-        : ExpressionVariadic<ExpressionSetEquals>(expCtx) {
-        expCtx->sbeCompatible = false;
-    }
     ExpressionSetEquals(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : ExpressionVariadic<ExpressionSetEquals>(expCtx, std::move(children)) {}
+        : ExpressionVariadic<ExpressionSetEquals>(expCtx, std::move(children)) {
+        if (_children.size() > kMaxArgumentCountForSwitchAndSetExprForSbe &&
+            !feature_flags::gFeatureFlagSbeUpgradeBinaryTrees.checkEnabled()) {
+            expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+        }
+    }
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() override;
+    Value evaluate(const Document& root, Variables* variables) const override;
     const char* getOpName() const final;
-    void validateArguments(const ExpressionVector& args) const final;
+    void validateChildren() const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -2765,21 +3323,40 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    const boost::optional<std::pair<size_t, ValueFlatUnorderedSet>>& getCachedConstant() const {
+        return _cachedConstant;
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionSetEquals>(getExpressionContext(), cloneChildren());
+    }
+
+private:
+    // The first element in the pair represent the position on the constant in the '_children'
+    // array. The second element is the constant set.
+    boost::optional<std::pair<size_t, ValueFlatUnorderedSet>> _cachedConstant;
+
+    template <typename H>
+    friend class ExpressionHashVisitor;
 };
 
 
 class ExpressionSetIntersection final : public ExpressionVariadic<ExpressionSetIntersection> {
 public:
-    explicit ExpressionSetIntersection(ExpressionContext* const expCtx)
-        : ExpressionVariadic<ExpressionSetIntersection>(expCtx) {}
     ExpressionSetIntersection(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : ExpressionVariadic<ExpressionSetIntersection>(expCtx, std::move(children)) {}
+        : ExpressionVariadic<ExpressionSetIntersection>(expCtx, std::move(children)) {
+        if (_children.size() > kMaxArgumentCountForSwitchAndSetExprForSbe &&
+            !feature_flags::gFeatureFlagSbeUpgradeBinaryTrees.checkEnabled()) {
+            expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+        }
+    }
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
-    bool isAssociative() const final {
-        return true;
+    Associativity getAssociativity() const final {
+        return Associativity::kFull;
     }
 
     bool isCommutative() const final {
@@ -2793,20 +3370,20 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionSetIntersection>(getExpressionContext(), cloneChildren());
+    }
 };
 
 
 // Not final, inherited from for optimizations.
-class ExpressionSetIsSubset : public ExpressionFixedArity<ExpressionSetIsSubset, 2> {
+class ExpressionSetIsSubset final : public ExpressionFixedArity<ExpressionSetIsSubset, 2> {
 public:
-    explicit ExpressionSetIsSubset(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<ExpressionSetIsSubset, 2>(expCtx) {
-        expCtx->sbeCompatible = false;
-    }
     ExpressionSetIsSubset(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionFixedArity<ExpressionSetIsSubset, 2>(expCtx, std::move(children)) {}
 
-    boost::intrusive_ptr<Expression> optimize() override;
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() override;
     Value evaluate(const Document& root, Variables* variables) const override;
     const char* getOpName() const final;
 
@@ -2818,27 +3395,47 @@ public:
         return visitor->visit(this);
     }
 
-private:
-    class Optimized;
-};
+    const boost::optional<ValueFlatUnorderedSet>& getCachedRhsSet() const {
+        return _cachedRhsSet;
+    }
 
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionSetIsSubset>(getExpressionContext(), cloneChildren());
+    }
+
+private:
+    /**
+     * This class member handles the case where the RHS set is constant.
+     *
+     * Since it is constant we can construct the hashset once which makes the runtime performance
+     * effectively constant with respect to the size of RHS. Large, constant RHS is expected to be a
+     * major use case for $redact and this has been verified to improve performance significantly.
+     */
+    boost::optional<ValueFlatUnorderedSet> _cachedRhsSet;
+};
 
 class ExpressionSetUnion final : public ExpressionVariadic<ExpressionSetUnion> {
 public:
-    explicit ExpressionSetUnion(ExpressionContext* const expCtx)
-        : ExpressionVariadic<ExpressionSetUnion>(expCtx) {}
     ExpressionSetUnion(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : ExpressionVariadic<ExpressionSetUnion>(expCtx, std::move(children)) {}
+        : ExpressionVariadic<ExpressionSetUnion>(expCtx, std::move(children)) {
+        if (_children.size() > kMaxArgumentCountForSwitchAndSetExprForSbe &&
+            !feature_flags::gFeatureFlagSbeUpgradeBinaryTrees.checkEnabled()) {
+            expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+        }
+    }
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
-    bool isAssociative() const final {
-        return true;
+    Associativity getAssociativity() const final {
+        return Associativity::kFull;
     }
 
     bool isCommutative() const final {
-        return true;
+        // Only commutative when performing binary string comparison. The first value entered when
+        // multiple collation-equal but binary-unequal values are added will dictate what is stored
+        // in the set.
+        return getExpressionContext()->getCollator() == nullptr;
     }
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
@@ -2848,14 +3445,147 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionSetUnion>(getExpressionContext(), cloneChildren());
+    }
 };
 
+class ExpressionVectorSimilarity : public Expression {
+public:
+    ExpressionVectorSimilarity(ExpressionContext* const expCtx,
+                               bool score,
+                               ExpressionVector&& children)
+        : Expression(expCtx, std::move(children)), _score(score) {
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+    }
+
+    virtual const char* getOpName() const = 0;
+    Value evaluate(const Document& root, Variables* variables) const override = 0;
+
+    Value serialize(const SerializationOptions& options = {}) const final;
+
+    bool isScore() const {
+        return _score;
+    }
+
+protected:
+    bool _score;
+    static auto _parseInternal(ExpressionContext* expCtx,
+                               BSONElement expr,
+                               const VariablesParseState& vps,
+                               const std::string& similarityName);
+};
+
+class ExpressionSimilarityDotProduct final : public ExpressionVectorSimilarity {
+public:
+    static constexpr auto kName = "$similarityDotProduct"_sd;
+
+    ExpressionSimilarityDotProduct(ExpressionContext* const expCtx,
+                                   bool score,
+                                   ExpressionVector&& children)
+        : ExpressionVectorSimilarity(expCtx, score, std::move(children)) {}
+
+    Value evaluate(const Document& root, Variables* variables) const override;
+
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
+                                                  BSONElement expr,
+                                                  const VariablesParseState& vpsIn);
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+
+    const char* getOpName() const override {
+        return kName.data();
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionSimilarityDotProduct>(
+            getExpressionContext(), _score, cloneChildren());
+    }
+};
+
+class ExpressionSimilarityCosine final : public ExpressionVectorSimilarity {
+public:
+    static constexpr auto kName = "$similarityCosine"_sd;
+
+    ExpressionSimilarityCosine(ExpressionContext* const expCtx,
+                               bool score,
+                               ExpressionVector&& children)
+        : ExpressionVectorSimilarity(expCtx, score, std::move(children)) {}
+
+    Value evaluate(const Document& root, Variables* variables) const override;
+
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
+                                                  BSONElement expr,
+                                                  const VariablesParseState& vpsIn);
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+
+    const char* getOpName() const override {
+        return kName.data();
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionSimilarityCosine>(
+            getExpressionContext(), _score, cloneChildren());
+    }
+};
+
+class ExpressionSimilarityEuclidean final : public ExpressionVectorSimilarity {
+public:
+    static constexpr auto kName = "$similarityEuclidean"_sd;
+
+    ExpressionSimilarityEuclidean(ExpressionContext* const expCtx,
+                                  bool score,
+                                  ExpressionVector&& children)
+        : ExpressionVectorSimilarity(expCtx, score, std::move(children)) {}
+
+    Value evaluate(const Document& root, Variables* variables) const override;
+
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
+                                                  BSONElement expr,
+                                                  const VariablesParseState& vpsIn);
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+
+    const char* getOpName() const override {
+        return kName.data();
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionSimilarityEuclidean>(
+            getExpressionContext(), _score, cloneChildren());
+    }
+};
 
 class ExpressionSize final : public ExpressionFixedArity<ExpressionSize, 1> {
 public:
     explicit ExpressionSize(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionSize, 1>(expCtx) {
-        expCtx->sbeCompatible = false;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+    }
+
+    ExpressionSize(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionSize, 1>(expCtx, std::move(children)) {
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
     Value evaluate(const Document& root, Variables* variables) const final;
@@ -2867,6 +3597,10 @@ public:
 
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionSize>(getExpressionContext(), cloneChildren());
     }
 };
 
@@ -2876,6 +3610,9 @@ public:
     explicit ExpressionReverseArray(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionReverseArray, 1>(expCtx) {}
 
+    ExpressionReverseArray(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionReverseArray, 1>(expCtx, std::move(children)) {}
+
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
@@ -2886,6 +3623,10 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionReverseArray>(getExpressionContext(), cloneChildren());
+    }
 };
 
 class ExpressionSortArray final : public Expression {
@@ -2894,16 +3635,14 @@ public:
     ExpressionSortArray(ExpressionContext* const expCtx,
                         boost::intrusive_ptr<Expression> input,
                         const PatternValueCmp& sortBy)
-        : Expression(expCtx, {std::move(input)}), _input(_children[0]), _sortBy(sortBy) {
-        expCtx->sbeCompatible = false;
-    }
+        : Expression(expCtx, {std::move(input)}), _sortBy(sortBy) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
-    boost::intrusive_ptr<Expression> optimize() final;
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
                                                   BSONElement expr,
                                                   const VariablesParseState& vps);
-    Value serialize(bool explain) const final;
+    Value serialize(const SerializationOptions& options = {}) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -2915,12 +3654,25 @@ public:
 
     const char* getOpName() const;
 
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final;
+    BSONObj getSortPattern() const {
+        return _sortBy.sortPattern;
+    }
+
+    const Expression* getInput() const {
+        return _children[_kInput].get();
+    }
+
+    const PatternValueCmp& getSortBy() const {
+        return _sortBy;
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionSortArray>(
+            getExpressionContext(), cloneChild(_kInput), _sortBy);
+    }
 
 private:
-    boost::intrusive_ptr<Expression>& _input;
-
+    static constexpr size_t _kInput = 0;
     PatternValueCmp _sortBy;
 };
 
@@ -2928,10 +3680,12 @@ class ExpressionSlice final : public ExpressionRangedArity<ExpressionSlice, 2, 3
 public:
     explicit ExpressionSlice(ExpressionContext* const expCtx)
         : ExpressionRangedArity<ExpressionSlice, 2, 3>(expCtx) {
-        expCtx->sbeCompatible = false;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
     ExpressionSlice(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : ExpressionRangedArity<ExpressionSlice, 2, 3>(expCtx, std::move(children)) {}
+        : ExpressionRangedArity<ExpressionSlice, 2, 3>(expCtx, std::move(children)) {
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+    }
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -2943,8 +3697,18 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionSlice>(getExpressionContext(), cloneChildren());
+    }
 };
 
+class ExpressionSigmoid final {
+public:
+    static boost::intrusive_ptr<Expression> parseExpressionSigmoid(ExpressionContext* expCtx,
+                                                                   BSONElement expr,
+                                                                   const VariablesParseState& vps);
+};
 
 class ExpressionIsArray final : public ExpressionFixedArity<ExpressionIsArray, 1> {
 public:
@@ -2964,14 +3728,79 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionIsArray>(getExpressionContext(), cloneChildren());
+    }
+};
+
+/**
+ * Expression used for distinct only. This expression unwinds all singly nested arrays along the
+ * specified path, but does not descend into doubly nested arrays. The resulting array of values
+ * is placed into a specially named field that is consumed by distinct.
+ *
+ * Aggregation's distinct behavior must match Find's, so numeric path components can be treated
+ * as both array indexes and field names.
+ */
+class ExpressionInternalFindAllValuesAtPath final
+    : public ExpressionFixedArity<ExpressionInternalFindAllValuesAtPath, 1> {
+public:
+    explicit ExpressionInternalFindAllValuesAtPath(ExpressionContext* expCtx)
+        : ExpressionFixedArity<ExpressionInternalFindAllValuesAtPath, 1>(expCtx) {
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+    }
+
+    explicit ExpressionInternalFindAllValuesAtPath(ExpressionContext* expCtx,
+                                                   ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionInternalFindAllValuesAtPath, 1>(expCtx,
+                                                                         std::move(children)) {
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+    }
+    Value evaluate(const Document& root, Variables* variables) const final;
+    const char* getOpName() const override {
+        return "$_internalFindAllValuesAtPath";
+    }
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+
+    /**
+     * The base class' optimize will think this expression is const because the argument to it must
+     * be const. However, the results still change based on the document. Therefore skip optimizing.
+     */
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() override {
+        return this;
+    }
+
+    FieldPath getFieldPath() const {
+        auto inputConstExpression = dynamic_cast<ExpressionConstant*>(_children[0].get());
+        uassert(5511201,
+                "Expected const expression as argument to _internalFindAllValuesAtPath",
+                inputConstExpression);
+        auto constVal = inputConstExpression->getValue();
+
+        uassert(9567004,
+                str::stream() << getOpName() << " requires argument to be a string",
+                constVal.getType() == BSONType::string);
+
+        return FieldPath(constVal.getString());
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionInternalFindAllValuesAtPath>(getExpressionContext(),
+                                                                     cloneChildren());
+    }
 };
 
 class ExpressionRound final : public ExpressionRangedArity<ExpressionRound, 1, 2> {
 public:
     explicit ExpressionRound(ExpressionContext* const expCtx)
-        : ExpressionRangedArity<ExpressionRound, 1, 2>(expCtx) {
-        expCtx->sbeCompatible = false;
-    }
+        : ExpressionRangedArity<ExpressionRound, 1, 2>(expCtx) {}
     ExpressionRound(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionRangedArity<ExpressionRound, 1, 2>(expCtx, std::move(children)) {}
 
@@ -2985,17 +3814,21 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionRound>(getExpressionContext(), cloneChildren());
+    }
 };
 
 class ExpressionSplit final : public ExpressionFixedArity<ExpressionSplit, 2> {
 public:
     explicit ExpressionSplit(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionSplit, 2>(expCtx) {
-        expCtx->sbeCompatible = false;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
     ExpressionSplit(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionFixedArity<ExpressionSplit, 2>(expCtx, std::move(children)) {
-        expCtx->sbeCompatible = false;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
     Value evaluate(const Document& root, Variables* variables) const final;
@@ -3008,6 +3841,10 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionSplit>(getExpressionContext(), cloneChildren());
+    }
 };
 
 
@@ -3018,7 +3855,7 @@ public:
     ExpressionSqrt(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionSingleNumericArg<ExpressionSqrt>(expCtx, std::move(children)) {}
 
-    Value evaluateNumericArg(const Value& numericArg) const final;
+    Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
@@ -3028,15 +3865,17 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionSqrt>(getExpressionContext(), cloneChildren());
+    }
 };
 
 
 class ExpressionStrcasecmp final : public ExpressionFixedArity<ExpressionStrcasecmp, 2> {
 public:
     explicit ExpressionStrcasecmp(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<ExpressionStrcasecmp, 2>(expCtx) {
-        expCtx->sbeCompatible = false;
-    }
+        : ExpressionFixedArity<ExpressionStrcasecmp, 2>(expCtx) {}
     ExpressionStrcasecmp(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionFixedArity<ExpressionStrcasecmp, 2>(expCtx, std::move(children)) {}
 
@@ -3050,20 +3889,22 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionStrcasecmp>(getExpressionContext(), cloneChildren());
+    }
 };
 
 
 class ExpressionSubstrBytes final : public ExpressionFixedArity<ExpressionSubstrBytes, 3> {
 public:
     explicit ExpressionSubstrBytes(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<ExpressionSubstrBytes, 3>(expCtx) {
-        expCtx->sbeCompatible = false;
-    }
+        : ExpressionFixedArity<ExpressionSubstrBytes, 3>(expCtx) {}
     ExpressionSubstrBytes(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionFixedArity<ExpressionSubstrBytes, 3>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
-    const char* getOpName() const;
+    const char* getOpName() const override;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -3072,15 +3913,17 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionSubstrBytes>(getExpressionContext(), cloneChildren());
+    }
 };
 
 
 class ExpressionSubstrCP final : public ExpressionFixedArity<ExpressionSubstrCP, 3> {
 public:
     explicit ExpressionSubstrCP(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<ExpressionSubstrCP, 3>(expCtx) {
-        expCtx->sbeCompatible = false;
-    }
+        : ExpressionFixedArity<ExpressionSubstrCP, 3>(expCtx) {}
     ExpressionSubstrCP(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionFixedArity<ExpressionSubstrCP, 3>(expCtx, std::move(children)) {}
 
@@ -3094,15 +3937,17 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionSubstrCP>(getExpressionContext(), cloneChildren());
+    }
 };
 
 
 class ExpressionStrLenBytes final : public ExpressionFixedArity<ExpressionStrLenBytes, 1> {
 public:
     explicit ExpressionStrLenBytes(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<ExpressionStrLenBytes, 1>(expCtx) {
-        expCtx->sbeCompatible = false;
-    }
+        : ExpressionFixedArity<ExpressionStrLenBytes, 1>(expCtx) {}
 
     ExpressionStrLenBytes(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionFixedArity<ExpressionStrLenBytes, 1>(expCtx, std::move(children)) {}
@@ -3117,6 +3962,10 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionStrLenBytes>(getExpressionContext(), cloneChildren());
+    }
 };
 
 
@@ -3124,7 +3973,12 @@ class ExpressionBinarySize final : public ExpressionFixedArity<ExpressionBinaryS
 public:
     ExpressionBinarySize(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionBinarySize, 1>(expCtx) {
-        expCtx->sbeCompatible = false;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+    }
+
+    ExpressionBinarySize(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionBinarySize, 1>(expCtx, std::move(children)) {
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
     Value evaluate(const Document& root, Variables* variables) const final;
@@ -3137,15 +3991,17 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionBinarySize>(getExpressionContext(), cloneChildren());
+    }
 };
 
 
 class ExpressionStrLenCP final : public ExpressionFixedArity<ExpressionStrLenCP, 1> {
 public:
     explicit ExpressionStrLenCP(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<ExpressionStrLenCP, 1>(expCtx) {
-        expCtx->sbeCompatible = false;
-    }
+        : ExpressionFixedArity<ExpressionStrLenCP, 1>(expCtx) {}
     ExpressionStrLenCP(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionFixedArity<ExpressionStrLenCP, 1>(expCtx, std::move(children)) {}
 
@@ -3159,29 +4015,17 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionStrLenCP>(getExpressionContext(), cloneChildren());
+    }
 };
 
 
 class ExpressionSubtract final : public ExpressionFixedArity<ExpressionSubtract, 2> {
 public:
-    /**
-     * Subtracts two values as if by {$subtract: [{$const: lhs}, {$const: rhs}]}.
-     *
-     * If either argument is nullish, returns BSONNULL.
-     *
-     * Otherwise, the arguments can be either:
-     *     (numeric, numeric)
-     *     (Date, Date)       Returns the time difference in milliseconds.
-     *     (Date, numeric)    Returns the date shifted earlier by that many milliseconds.
-     *
-     * Otherwise, returns ErrorCodes::TypeMismatch.
-     */
-    static StatusWith<Value> apply(Value lhs, Value rhs);
-
     explicit ExpressionSubtract(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<ExpressionSubtract, 2>(expCtx) {
-        expCtx->sbeCompatible = false;
-    }
+        : ExpressionFixedArity<ExpressionSubtract, 2>(expCtx) {}
     ExpressionSubtract(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionFixedArity<ExpressionSubtract, 2>(expCtx, std::move(children)) {}
 
@@ -3195,6 +4039,13 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionSubtract>(getExpressionContext(), cloneChildren());
+    }
+
+private:
+    monotonic::State getMonotonicState(const FieldPath& sortedFieldPath) const final;
 };
 
 
@@ -3203,19 +4054,21 @@ public:
     using ExpressionPair =
         std::pair<boost::intrusive_ptr<Expression>&, boost::intrusive_ptr<Expression>&>;
 
-    ExpressionSwitch(ExpressionContext* const expCtx,
-                     std::vector<boost::intrusive_ptr<Expression>> children,
-                     std::vector<ExpressionPair> branches)
-        : Expression(expCtx, std::move(children)),
-          _default(_children.back()),
-          _branches(std::move(branches)) {}
+    ExpressionSwitch(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : Expression(expCtx, std::move(children)) {
+        uassert(40068, "$switch requires at least one branch", numBranches() >= 1);
+        if (_children.size() > kMaxArgumentCountForSwitchAndSetExprForSbe &&
+            !feature_flags::gFeatureFlagSbeUpgradeBinaryTrees.checkEnabled()) {
+            expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+        }
+    }
 
     Value evaluate(const Document& root, Variables* variables) const final;
-    boost::intrusive_ptr<Expression> optimize() final;
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
                                                   BSONElement expr,
                                                   const VariablesParseState& vpsIn);
-    Value serialize(bool explain) const final;
+    Value serialize(const SerializationOptions& options = {}) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -3225,12 +4078,39 @@ public:
         return visitor->visit(this);
     }
 
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final;
+    /**
+     * Returns the number of cases in the switch expression. Each branch is made up of two
+     * expressions ('case' and 'then').
+     */
+    int numBranches() const {
+        return _children.size() / 2;
+    }
+
+    /**
+     * Returns a pair of expression pointers representing the 'case' and 'then' expressions for the
+     * i-th branch of the switch.
+     */
+    std::pair<const Expression*, const Expression*> getBranch(int i) const {
+        invariant(i >= 0);
+        invariant(i < numBranches());
+        return {_children[i * 2].get(), _children[i * 2 + 1].get()};
+    }
+
+    /**
+     * Returns the 'default' expression, or nullptr if there is no 'default'.
+     */
+    const Expression* defaultExpr() const {
+        return _children.back().get();
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionSwitch>(getExpressionContext(), cloneChildren());
+    }
 
 private:
-    boost::intrusive_ptr<Expression>& _default;
-    std::vector<ExpressionPair> _branches;
+    // Helper for 'optimize()'. Deletes the 'case' and 'then' children associated with the i-th
+    // branch of the switch.
+    void deleteBranch(int i);
 };
 
 
@@ -3251,6 +4131,10 @@ public:
 
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionToLower>(getExpressionContext(), cloneChildren());
     }
 };
 
@@ -3273,6 +4157,10 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionToUpper>(getExpressionContext(), cloneChildren());
+    }
 };
 
 
@@ -3293,18 +4181,14 @@ public:
                    boost::intrusive_ptr<Expression> charactersToTrim)
         : Expression(expCtx, {std::move(input), std::move(charactersToTrim)}),
           _trimType(trimType),
-          _name(name.toString()),
-          _input(_children[0]),
-          _characters(_children[1]) {
-        expCtx->sbeCompatible = false;
-    }
+          _name(std::string{name}) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
-    boost::intrusive_ptr<Expression> optimize() final;
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
                                                   BSONElement expr,
                                                   const VariablesParseState& vpsIn);
-    Value serialize(bool explain) const final;
+    Value serialize(const SerializationOptions& options = {}) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -3314,55 +4198,55 @@ public:
         return visitor->visit(this);
     }
 
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final;
+    /* Returns "trim"/"ltrim"/"rtrim" based on the expression name without the $ sign. */
+    std::string getTrimTypeString() const {
+        return _name.substr(1);
+    }
+
+    bool hasCharactersExpr() const {
+        return _children[_kCharacters] != nullptr;
+    }
+
+    const Expression* getInput() const {
+        return _children[_kInput].get();
+    }
+
+    const Expression* getCharacters() const {
+        return _children[_kCharacters].get();
+    }
+
+    const std::string& getName() const {
+        return _name;
+    }
+
+    TrimType getTrimType() const {
+        return _trimType;
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionTrim>(getExpressionContext(),
+                                              _trimType,
+                                              _name,
+                                              cloneChild(_kInput),
+                                              cloneChild(_kCharacters));
+    }
 
 private:
-    /**
-     * Returns true if the unicode character found at index 'indexIntoInput' of 'input' is equal to
-     * 'testCP'.
-     */
-    static bool codePointMatchesAtIndex(const StringData& input,
-                                        std::size_t indexIntoInput,
-                                        const StringData& testCP);
-
-    /**
-     * Given the input string and the code points to trim from that string, returns a substring of
-     * 'input' with any code point from 'trimCPs' trimmed from the left.
-     */
-    static StringData trimFromLeft(StringData input, const std::vector<StringData>& trimCPs);
-
-    /**
-     * Given the input string and the code points to trim from that string, returns a substring of
-     * 'input' with any code point from 'trimCPs' trimmed from the right.
-     */
-    static StringData trimFromRight(StringData input, const std::vector<StringData>& trimCPs);
-
-    /**
-     * Returns the trimmed version of 'input', with all code points in 'trimCPs' removed from the
-     * front, back, or both - depending on _trimType.
-     */
-    StringData doTrim(StringData input, const std::vector<StringData>& trimCPs) const;
+    static constexpr size_t _kInput = 0;
+    static constexpr size_t _kCharacters = 1;  // Optional, null if not specified.
 
     TrimType _trimType;
     std::string _name;  // "$trim", "$ltrim", or "$rtrim".
-    boost::intrusive_ptr<Expression>& _input;
-    boost::intrusive_ptr<Expression>& _characters;  // Optional, null if not specified.
 };
 
 
 class ExpressionTrunc final : public ExpressionRangedArity<ExpressionTrunc, 1, 2> {
 public:
     explicit ExpressionTrunc(ExpressionContext* const expCtx)
-        : ExpressionRangedArity<ExpressionTrunc, 1, 2>(expCtx) {
-        expCtx->sbeCompatible = false;
-    }
+        : ExpressionRangedArity<ExpressionTrunc, 1, 2>(expCtx) {}
     ExpressionTrunc(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionRangedArity<ExpressionTrunc, 1, 2>(expCtx, std::move(children)) {}
 
-    static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
-                                                  BSONElement elem,
-                                                  const VariablesParseState& vps);
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
@@ -3372,6 +4256,10 @@ public:
 
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionTrunc>(getExpressionContext(), cloneChildren());
     }
 };
 
@@ -3380,11 +4268,13 @@ class ExpressionType final : public ExpressionFixedArity<ExpressionType, 1> {
 public:
     explicit ExpressionType(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionType, 1>(expCtx) {
-        expCtx->sbeCompatible = false;
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
     ExpressionType(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : ExpressionFixedArity<ExpressionType, 1>(expCtx, std::move(children)) {}
+        : ExpressionFixedArity<ExpressionType, 1>(expCtx, std::move(children)) {
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+    }
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -3395,6 +4285,38 @@ public:
 
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionType>(getExpressionContext(), cloneChildren());
+    }
+};
+
+class ExpressionSubtype final : public ExpressionFixedArity<ExpressionSubtype, 1> {
+public:
+    explicit ExpressionSubtype(ExpressionContext* const expCtx)
+        : ExpressionFixedArity<ExpressionSubtype, 1>(expCtx) {
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+    }
+
+    ExpressionSubtype(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionSubtype, 1>(expCtx, std::move(children)) {
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+    }
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+    const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionSubtype>(getExpressionContext(), cloneChildren());
     }
 };
 
@@ -3403,6 +4325,9 @@ public:
     explicit ExpressionIsNumber(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionIsNumber, 1>(expCtx) {}
 
+    ExpressionIsNumber(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionIsNumber, 1>(expCtx, std::move(children)) {}
+
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
@@ -3413,21 +4338,20 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionIsNumber>(getExpressionContext(), cloneChildren());
+    }
 };
 
-class ExpressionWeek final : public DateExpressionAcceptingTimeZone<ExpressionWeek> {
+class ExpressionWeek final : public DateExpressionAcceptingTimeZone {
 public:
     ExpressionWeek(ExpressionContext* const expCtx,
                    boost::intrusive_ptr<Expression> date,
                    boost::intrusive_ptr<Expression> timeZone = nullptr)
-        : DateExpressionAcceptingTimeZone<ExpressionWeek>(
-              expCtx, "$week", std::move(date), std::move(timeZone)) {
-        expCtx->sbeCompatible = false;
-    }
+        : DateExpressionAcceptingTimeZone(expCtx, "$week", std::move(date), std::move(timeZone)) {}
 
-    Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
-        return Value(timeZone.week(date));
-    }
+    Value evaluate(const Document& root, Variables* variables) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -3436,22 +4360,23 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionWeek>(
+            getExpressionContext(), cloneChild(_kDate), cloneChild(_kTimeZone));
+    }
 };
 
 
-class ExpressionIsoWeekYear final : public DateExpressionAcceptingTimeZone<ExpressionIsoWeekYear> {
+class ExpressionIsoWeekYear final : public DateExpressionAcceptingTimeZone {
 public:
     ExpressionIsoWeekYear(ExpressionContext* const expCtx,
                           boost::intrusive_ptr<Expression> date,
                           boost::intrusive_ptr<Expression> timeZone = nullptr)
-        : DateExpressionAcceptingTimeZone<ExpressionIsoWeekYear>(
-              expCtx, "$isoWeekYear", std::move(date), std::move(timeZone)) {
-        expCtx->sbeCompatible = false;
-    }
+        : DateExpressionAcceptingTimeZone(
+              expCtx, "$isoWeekYear", std::move(date), std::move(timeZone)) {}
 
-    Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
-        return Value(timeZone.isoYear(date));
-    }
+    Value evaluate(const Document& root, Variables* variables) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -3460,23 +4385,23 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionIsoWeekYear>(
+            getExpressionContext(), cloneChild(_kDate), cloneChild(_kTimeZone));
+    }
 };
 
 
-class ExpressionIsoDayOfWeek final
-    : public DateExpressionAcceptingTimeZone<ExpressionIsoDayOfWeek> {
+class ExpressionIsoDayOfWeek final : public DateExpressionAcceptingTimeZone {
 public:
     ExpressionIsoDayOfWeek(ExpressionContext* const expCtx,
                            boost::intrusive_ptr<Expression> date,
                            boost::intrusive_ptr<Expression> timeZone = nullptr)
-        : DateExpressionAcceptingTimeZone<ExpressionIsoDayOfWeek>(
-              expCtx, "$isoDayOfWeek", std::move(date), std::move(timeZone)) {
-        expCtx->sbeCompatible = false;
-    }
+        : DateExpressionAcceptingTimeZone(
+              expCtx, "$isoDayOfWeek", std::move(date), std::move(timeZone)) {}
 
-    Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
-        return Value(timeZone.isoDayOfWeek(date));
-    }
+    Value evaluate(const Document& root, Variables* variables) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -3485,22 +4410,23 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionIsoDayOfWeek>(
+            getExpressionContext(), cloneChild(_kDate), cloneChild(_kTimeZone));
+    }
 };
 
 
-class ExpressionIsoWeek final : public DateExpressionAcceptingTimeZone<ExpressionIsoWeek> {
+class ExpressionIsoWeek final : public DateExpressionAcceptingTimeZone {
 public:
     ExpressionIsoWeek(ExpressionContext* const expCtx,
                       boost::intrusive_ptr<Expression> date,
                       boost::intrusive_ptr<Expression> timeZone = nullptr)
-        : DateExpressionAcceptingTimeZone<ExpressionIsoWeek>(
-              expCtx, "$isoWeek", std::move(date), std::move(timeZone)) {
-        expCtx->sbeCompatible = false;
-    }
+        : DateExpressionAcceptingTimeZone(
+              expCtx, "$isoWeek", std::move(date), std::move(timeZone)) {}
 
-    Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
-        return Value(timeZone.isoWeek(date));
-    }
+    Value evaluate(const Document& root, Variables* variables) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -3508,23 +4434,23 @@ public:
 
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionIsoWeek>(
+            getExpressionContext(), cloneChild(_kDate), cloneChild(_kTimeZone));
     }
 };
 
 
-class ExpressionYear final : public DateExpressionAcceptingTimeZone<ExpressionYear> {
+class ExpressionYear final : public DateExpressionAcceptingTimeZone {
 public:
     ExpressionYear(ExpressionContext* const expCtx,
                    boost::intrusive_ptr<Expression> date,
                    boost::intrusive_ptr<Expression> timeZone = nullptr)
-        : DateExpressionAcceptingTimeZone<ExpressionYear>(
-              expCtx, "$year", std::move(date), std::move(timeZone)) {
-        expCtx->sbeCompatible = false;
-    }
+        : DateExpressionAcceptingTimeZone(expCtx, "$year", std::move(date), std::move(timeZone)) {}
 
-    Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
-        return Value(timeZone.dateParts(date).year);
-    }
+    Value evaluate(const Document& root, Variables* variables) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -3532,6 +4458,11 @@ public:
 
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionYear>(
+            getExpressionContext(), cloneChild(_kDate), cloneChild(_kTimeZone));
     }
 };
 
@@ -3540,22 +4471,20 @@ class ExpressionZip final : public Expression {
 public:
     ExpressionZip(ExpressionContext* const expCtx,
                   bool useLongestLength,
-                  std::vector<boost::intrusive_ptr<Expression>> children,
+                  ExpressionVector&& children,
                   std::vector<std::reference_wrapper<boost::intrusive_ptr<Expression>>> inputs,
                   std::vector<std::reference_wrapper<boost::intrusive_ptr<Expression>>> defaults)
         : Expression(expCtx, std::move(children)),
           _useLongestLength(useLongestLength),
           _inputs(std::move(inputs)),
-          _defaults(std::move(defaults)) {
-        expCtx->sbeCompatible = false;
-    }
+          _defaults(std::move(defaults)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
-    boost::intrusive_ptr<Expression> optimize() final;
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
                                                   BSONElement expr,
                                                   const VariablesParseState& vpsIn);
-    Value serialize(bool explain) const final;
+    Value serialize(const SerializationOptions& options = {}) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -3565,8 +4494,47 @@ public:
         return visitor->visit(this);
     }
 
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final;
+    bool getUseLongestLength() const {
+        return _useLongestLength;
+    }
+
+    const std::vector<std::reference_wrapper<boost::intrusive_ptr<Expression>>>& getInputs() const {
+        return _inputs;
+    }
+
+    const std::vector<std::reference_wrapper<boost::intrusive_ptr<Expression>>>& getDefaults()
+        const {
+        return _defaults;
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        ExpressionVector children = cloneChildren();
+        std::vector<std::reference_wrapper<boost::intrusive_ptr<Expression>>> inputs;
+        std::vector<std::reference_wrapper<boost::intrusive_ptr<Expression>>> defaults;
+
+        tassert(3100301,
+                fmt::format("Input and default array sizes mismatch with children array, "
+                            "input={}, defaults={}, children={}",
+                            _inputs.size(),
+                            _defaults.size(),
+                            children.size()),
+                _inputs.size() + _defaults.size() == children.size());
+
+        inputs.reserve(_inputs.size());
+        defaults.reserve(_defaults.size());
+        for (size_t childIdx = 0; childIdx < _inputs.size(); ++childIdx) {
+            inputs.push_back(children[childIdx]);
+        }
+        for (size_t childIdx = _inputs.size(); childIdx < children.size(); ++childIdx) {
+            defaults.push_back(children[childIdx]);
+        }
+
+        return make_intrusive<ExpressionZip>(getExpressionContext(),
+                                             _useLongestLength,
+                                             std::move(children),
+                                             std::move(inputs),
+                                             std::move(defaults));
+    }
 
 private:
     bool _useLongestLength;
@@ -3574,28 +4542,105 @@ private:
     std::vector<std::reference_wrapper<boost::intrusive_ptr<Expression>>> _defaults;
 };
 
+enum class ConversionBase {
+    kBinary = 2,
+    kOctal = 8,
+    kDecimal = 10,
+    kHexadecimal = 16,
+};
+
+static bool isValidConversionBase(int base) {
+    switch (base) {
+        case (stdx::to_underlying(ConversionBase::kBinary)):
+        case (stdx::to_underlying(ConversionBase::kOctal)):
+        case (stdx::to_underlying(ConversionBase::kDecimal)):
+        case (stdx::to_underlying(ConversionBase::kHexadecimal)):
+            return true;
+        default:
+            return false;
+    }
+}
+
+// This enum is not compatible with the QUERY_UTIL_NAMED_ENUM_DEFINE util since the "auto" type
+// conflicts with the C++ keyword "auto". Instead, we manually define the enum and the
+// toStringData function below.
+enum class BinDataFormat {
+    kAuto,
+    kBase64,
+    kBase64Url,
+    kHex,
+    kUtf8,
+    kUuid,
+};
+
+static StringData toStringData(BinDataFormat type) {
+    switch (type) {
+        case BinDataFormat::kAuto:
+            return "auto"_sd;
+        case BinDataFormat::kBase64:
+            return "base64"_sd;
+        case BinDataFormat::kBase64Url:
+            return "base64url"_sd;
+        case BinDataFormat::kHex:
+            return "hex"_sd;
+        case BinDataFormat::kUtf8:
+            return "utf8"_sd;
+        case BinDataFormat::kUuid:
+            return "uuid"_sd;
+        default:
+            MONGO_UNREACHABLE_TASSERT(4341123);
+    }
+}
+
+/**
+ * Used in $convert when converting between BinData and numeric types. Represents the endianness in
+ * which we interpret or write the BinData.
+ */
+#define CONVERT_BYTE_ORDER_TYPE(F) \
+    F(little)                      \
+    F(big)
+QUERY_UTIL_NAMED_ENUM_DEFINE(ConvertByteOrderType, CONVERT_BYTE_ORDER_TYPE);
+#undef CONVERT_BYTE_ORDER_TYPE
+
 class ExpressionConvert final : public Expression {
 public:
+    struct ConvertTargetTypeInfo {
+        BSONType type;
+        Value subtype;
+
+        static const Value defaultSubtypeVal;
+        static boost::optional<ConvertTargetTypeInfo> parse(Value value);
+    };
+
     ExpressionConvert(ExpressionContext* expCtx,
                       boost::intrusive_ptr<Expression> input,
                       boost::intrusive_ptr<Expression> to,
+                      boost::intrusive_ptr<Expression> base,
+                      boost::intrusive_ptr<Expression> format,
                       boost::intrusive_ptr<Expression> onError,
-                      boost::intrusive_ptr<Expression> onNull);
+                      boost::intrusive_ptr<Expression> onNull,
+                      boost::intrusive_ptr<Expression> byteOrder,
+                      bool allowBinDataConvert,
+                      bool allowBinDataConvertNumeric);
     /**
      * Creates a $convert expression converting from 'input' to the type given by 'toType'. Leaves
      * 'onNull' and 'onError' unspecified.
      */
-    static boost::intrusive_ptr<Expression> create(ExpressionContext*,
-                                                   boost::intrusive_ptr<Expression> input,
-                                                   BSONType toType);
+    static boost::intrusive_ptr<Expression> create(
+        ExpressionContext*,
+        boost::intrusive_ptr<Expression> input,
+        BSONType toType,
+        boost::optional<BinDataFormat> format = boost::none,
+        boost::optional<BinDataType> toSubtype = boost::none,
+        boost::optional<ConvertByteOrderType> byteOrder = boost::none);
 
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
                                                   BSONElement expr,
                                                   const VariablesParseState& vpsIn);
 
     Value evaluate(const Document& root, Variables* variables) const final;
-    boost::intrusive_ptr<Expression> optimize() final;
-    Value serialize(bool explain) const final;
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
+    Value serialize(const SerializationOptions& options = {}) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -3605,92 +4650,93 @@ public:
         return visitor->visit(this);
     }
 
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final;
+    static bool checkBinDataConvertAllowed();
+    static bool checkBinDataConvertNumericAllowed(const ExpressionContext* expCtx);
+
+    const Expression* getInput() const {
+        return _children[_kInput].get();
+    }
+    const Expression* getTo() const {
+        return _children[_kTo].get();
+    }
+    const Expression* getBase() const {
+        return _children[_kBase].get();
+    }
+    const Expression* getFormat() const {
+        return _children[_kFormat].get();
+    }
+    const Expression* getOnError() const {
+        return _children[_kOnError].get();
+    }
+    const Expression* getOnNull() const {
+        return _children[_kOnNull].get();
+    }
+    const Expression* getByteOrder() const {
+        return _children[_kByteOrder].get();
+    }
+    bool getAllowBinDataConvert() const {
+        return _allowBinDataConvert;
+    }
+    bool getAllowBinDataConvertNumeric() const {
+        return _allowBinDataConvertNumeric;
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionConvert>(getExpressionContext(),
+                                                 cloneChild(_kInput),
+                                                 cloneChild(_kTo),
+                                                 cloneChild(_kBase),
+                                                 cloneChild(_kFormat),
+                                                 cloneChild(_kOnError),
+                                                 cloneChild(_kOnNull),
+                                                 cloneChild(_kByteOrder),
+                                                 _allowBinDataConvert,
+                                                 _allowBinDataConvertNumeric);
+    }
 
 private:
-    BSONType computeTargetType(Value typeName) const;
-    Value performConversion(BSONType targetType, Value inputValue) const;
+    static BSONType computeTargetType(Value typeName);
 
-    boost::intrusive_ptr<Expression>& _input;
-    boost::intrusive_ptr<Expression>& _to;
-    boost::intrusive_ptr<Expression>& _onError;
-    boost::intrusive_ptr<Expression>& _onNull;
+    // Support for BinData $convert is FCV gated. These feature flags are checked once during
+    // parsing to avoid having to acquire FCV snapshot for every document during evaluation.
+    const bool _allowBinDataConvert;
+    const bool _allowBinDataConvertNumeric;
+
+    static constexpr size_t _kInput = 0;
+    static constexpr size_t _kTo = 1;
+    static constexpr size_t _kBase = 2;
+    static constexpr size_t _kFormat = 3;
+    static constexpr size_t _kOnError = 4;
+    static constexpr size_t _kOnNull = 5;
+    static constexpr size_t _kByteOrder = 6;
 };
 
 class ExpressionRegex : public Expression {
 public:
     /**
-     * Object to hold data that is required when calling 'execute()' or 'nextMatch()'.
+     * Struct to hold precompiled regex, validated pattern & options strings and number of captures
+     * when the expression has constant values for their 'regex' and 'options' fields
      */
-    struct RegexExecutionState {
-        /**
-         * The regex pattern, options, and captures buffer for the current execution context.
-         */
+    struct PrecompiledRegex {
         boost::optional<std::string> pattern;
         boost::optional<std::string> options;
-        std::vector<int> capturesBuffer;
+        std::shared_ptr<pcre::Regex> pcrePtr;
         int numCaptures = 0;
-
-        /**
-         * If 'regex' is constant, 'pcrePtr' will be shared between the active RegexExecutionState
-         * and '_initialExecStateForConstantRegex'. If not, then the active RegexExecutionState is
-         * the sole owner.
-         */
-        std::shared_ptr<pcre> pcrePtr;
-
-        /**
-         * The input text and starting position for the current execution context.
-         */
-        boost::optional<std::string> input;
-        int startCodePointPos = 0;
-        int startBytePos = 0;
-
-        /**
-         * If either the text input or regex pattern is nullish, then we consider the operation as a
-         * whole nullish.
-         */
-        bool nullish() {
-            return !input || !pattern;
-        }
     };
 
     /**
-     * Validates the structure of input passed in 'inputExpr'. If valid, generates an initial
-     * execution state. This returned object can later be used for calling execute() or nextMatch().
-     */
-    RegexExecutionState buildInitialState(const Document& root, Variables* variables) const;
-
-    /**
-     * Checks if there is a match for the given input and pattern that are part of 'executionState'.
-     * The method will return a positive number if there is a match and '-1' if there is no match.
-     * Throws 'uassert()' for any errors.
-     */
-    int execute(RegexExecutionState* executionState) const;
-
-    /**
-     * Finds the next possible match for the given input and pattern that are part of
-     * 'executionState'. If there is a match, the function will return a 'Value' object
-     * encapsulating the matched string, the code point index of the matched string and a vector
-     * representing all the captured substrings. The function will also update the parameters
-     * 'startBytePos' and 'startCodePointPos' to the corresponding new indices. If there is no
-     * match, the function will return null 'Value' object.
-     */
-    Value nextMatch(RegexExecutionState* executionState) const;
-
-    /**
      * Optimizes '$regex*' expressions. If the expression has constant 'regex' and 'options' fields,
-     * then it can be optimized. Stores the optimized regex in '_initialExecStateForConstantRegex'
+     * then it can be optimized. Stores the optimized regex in '_precompiledRegex'
      * so that it can be reused during expression evaluation.
      */
-    boost::intrusive_ptr<Expression> optimize();
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() override;
 
     bool hasConstantRegex() const {
-        return _initialExecStateForConstantRegex.has_value();
+        return _precompiledRegex.has_value();
     }
 
     bool hasOptions() const {
-        return (_options.get() != nullptr);
+        return (_children[_kOptions].get() != nullptr);
     }
 
     /**
@@ -3700,10 +4746,26 @@ public:
     boost::optional<std::pair<boost::optional<std::string>, std::string>>
     getConstantPatternAndOptions() const;
 
-    Value serialize(bool explain) const;
+    Value serialize(const SerializationOptions& options = {}) const override;
 
     const std::string& getOpName() const {
         return _opName;
+    }
+
+    const Expression* getInput() const {
+        return _children[_kInput].get();
+    }
+
+    const Expression* getRegex() const {
+        return _children[_kRegex].get();
+    }
+
+    const Expression* getOptions() const {
+        return _children[_kOptions].get();
+    }
+
+    const auto& getPreCompiledRegex() const {
+        return _precompiledRegex;
     }
 
     ExpressionRegex(ExpressionContext* const expCtx,
@@ -3712,35 +4774,24 @@ public:
                     boost::intrusive_ptr<Expression> options,
                     const StringData opName)
         : Expression(expCtx, {std::move(input), std::move(regex), std::move(options)}),
-          _input(_children[0]),
-          _regex(_children[1]),
-          _options(_children[2]),
           _opName(opName) {}
 
-private:
-    void _extractInputField(RegexExecutionState* executionState, const Value& textInput) const;
-    void _extractRegexAndOptions(RegexExecutionState* executionState,
-                                 const Value& regexPattern,
-                                 const Value& regexOptions) const;
-
-    void _compile(RegexExecutionState* executionState) const;
-
-    void _doAddDependencies(DepsTracker* deps) const final;
-
+protected:
     /**
      * Expressions which, when evaluated for a given document, produce the the regex pattern, the
      * regex option flags, and the input text to which the regex should be applied.
      */
-    boost::intrusive_ptr<Expression>& _input;
-    boost::intrusive_ptr<Expression>& _regex;
-    boost::intrusive_ptr<Expression>& _options;
+    static constexpr size_t _kInput = 0;
+    static constexpr size_t _kRegex = 1;
+    static constexpr size_t _kOptions = 2;
 
+private:
     /**
      * This variable will be set when the $regex* expressions have constant values for their 'regex'
      * and 'options' fields, allowing us to pre-compile the regex and re-use it across the
      * Expression's lifetime.
      */
-    boost::optional<RegexExecutionState> _initialExecStateForConstantRegex;
+    boost::optional<PrecompiledRegex> _precompiledRegex;
 
     /**
      * Name of the regex expression.
@@ -3754,6 +4805,8 @@ public:
                                                   BSONElement expr,
                                                   const VariablesParseState& vpsIn);
 
+    using ExpressionRegex::ExpressionRegex;
+
     Value evaluate(const Document& root, Variables* variables) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
@@ -3764,7 +4817,13 @@ public:
         return visitor->visit(this);
     }
 
-    using ExpressionRegex::ExpressionRegex;
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionRegexFind>(getExpressionContext(),
+                                                   cloneChild(_kInput),
+                                                   cloneChild(_kRegex),
+                                                   cloneChild(_kOptions),
+                                                   getOpName());
+    }
 };
 
 class ExpressionRegexFindAll final : public ExpressionRegex {
@@ -3773,6 +4832,8 @@ public:
                                                   BSONElement expr,
                                                   const VariablesParseState& vpsIn);
 
+    using ExpressionRegex::ExpressionRegex;
+
     Value evaluate(const Document& root, Variables* variables) const final;
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -3782,7 +4843,13 @@ public:
         return visitor->visit(this);
     }
 
-    using ExpressionRegex::ExpressionRegex;
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionRegexFindAll>(getExpressionContext(),
+                                                      cloneChild(_kInput),
+                                                      cloneChild(_kRegex),
+                                                      cloneChild(_kOptions),
+                                                      getOpName());
+    }
 };
 
 class ExpressionRegexMatch final : public ExpressionRegex {
@@ -3791,6 +4858,8 @@ public:
                                                   BSONElement expr,
                                                   const VariablesParseState& vpsIn);
 
+    using ExpressionRegex::ExpressionRegex;
+
     Value evaluate(const Document& root, Variables* variables) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
@@ -3801,27 +4870,31 @@ public:
         return visitor->visit(this);
     }
 
-    using ExpressionRegex::ExpressionRegex;
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionRegexMatch>(getExpressionContext(),
+                                                    cloneChild(_kInput),
+                                                    cloneChild(_kRegex),
+                                                    cloneChild(_kOptions),
+                                                    getOpName());
+    }
 };
 
 /**
  * Returns a double-valued random number from 0.0 to 1.0.
  */
 class ExpressionRandom final : public Expression {
-
-    static constexpr double kMinValue = 0.0;
-    static constexpr double kMaxValue = 1.0;
-
 public:
+    explicit ExpressionRandom(ExpressionContext* expCtx);
+
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
                                                   BSONElement exprElement,
                                                   const VariablesParseState& vps);
 
-    Value serialize(bool explain) const final;
+    Value serialize(const SerializationOptions& options = {}) const final;
 
     Value evaluate(const Document& root, Variables* variables) const final;
 
-    boost::intrusive_ptr<Expression> optimize() final;
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
 
     const char* getOpName() const;
 
@@ -3833,22 +4906,50 @@ public:
         return visitor->visit(this);
     }
 
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final override;
-
-private:
-    explicit ExpressionRandom(ExpressionContext* expCtx);
-
-    double getRandomValue() const;
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionRandom>(getExpressionContext());
+    }
 };
 
-class ExpressionToHashedIndexKey : public Expression {
+/**
+ * Returns current wall clock time.
+ */
+class ExpressionCurrentDate final : public Expression {
+public:
+    explicit ExpressionCurrentDate(ExpressionContext* expCtx);
+
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
+                                                  BSONElement exprElement,
+                                                  const VariablesParseState& vps);
+
+    Value serialize(const SerializationOptions& options = {}) const final;
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
+
+    const char* getOpName() const;
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionCurrentDate>(getExpressionContext());
+    }
+};
+
+class ExpressionToHashedIndexKey final : public Expression {
 public:
     ExpressionToHashedIndexKey(ExpressionContext* const expCtx,
                                boost::intrusive_ptr<Expression> inputExpression)
         : Expression(expCtx, {inputExpression}) {
-        expCtx->sbeCompatible = false;
-    };
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+    }
 
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
                                                   BSONElement expr,
@@ -3862,11 +4963,12 @@ public:
         return visitor->visit(this);
     }
 
-    Value evaluate(const Document& root, Variables* variables) const;
-    Value serialize(bool explain) const final;
+    Value evaluate(const Document& root, Variables* variables) const override;
+    Value serialize(const SerializationOptions& options = {}) const final;
 
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final;
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionToHashedIndexKey>(getExpressionContext(), cloneChild(0));
+    }
 };
 
 class ExpressionDateArithmetics : public Expression {
@@ -3880,39 +4982,56 @@ public:
         : Expression(
               expCtx,
               {std::move(startDate), std::move(unit), std::move(amount), std::move(timezone)}),
-          _startDate(_children[0]),
-          _unit(_children[1]),
-          _amount(_children[2]),
-          _timeZone(_children[3]),
           _opName(opName) {}
 
-    boost::intrusive_ptr<Expression> optimize() final;
-    Value serialize(bool explain) const final;
-    Value evaluate(const Document& root, Variables* variables) const final;
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
+    Value serialize(const SerializationOptions& options = {}) const final;
+
+    const Expression* getStartDate() const {
+        return _children[_kStartDate].get();
+    }
+    const Expression* getUnit() const {
+        return _children[_kUnit].get();
+    }
+    const Expression* getAmount() const {
+        return _children[_kAmount].get();
+    }
+    const Expression* getTimeZone() const {
+        return _children[_kTimeZone].get();
+    }
+    const boost::optional<TimeUnit>& getParsedUnit() const {
+        return _parsedUnit;
+    }
+    const boost::optional<TimeZone>& getParsedTimeZone() const {
+        return _parsedTimeZone;
+    }
+    StringData getOpName() const {
+        return _opName;
+    }
 
 protected:
-    void _doAddDependencies(DepsTracker* deps) const final;
+    monotonic::State getMonotonicState(const FieldPath& sortedFieldPath) const final;
+    virtual monotonic::State combineMonotonicStateOfArguments(
+        monotonic::State startDataMonotonicState, monotonic::State amountMonotonicState) const = 0;
 
-    /**
-     * Subclasses should implement this to do their actual date arithmetics.
-     */
-    virtual Value evaluateDateArithmetics(Date_t date,
-                                          TimeUnit unit,
-                                          long long amount,
-                                          const TimeZone& timezone) const = 0;
-
-private:
     // The expression representing the startDate argument.
-    boost::intrusive_ptr<Expression>& _startDate;
+    static constexpr size_t _kStartDate = 0;
 
     // Unit of time: year, quarter, week, etc.
-    boost::intrusive_ptr<Expression>& _unit;
+    static constexpr size_t _kUnit = 1;
 
     // Amount of units to be added or subtracted.
-    boost::intrusive_ptr<Expression>& _amount;
+    static constexpr size_t _kAmount = 2;
 
     // The expression representing the timezone argument.
-    boost::intrusive_ptr<Expression>& _timeZone;
+    static constexpr size_t _kTimeZone = 3;
+
+private:
+    // Pre-parsed time unit, if the above expression is a constant.
+    boost::optional<TimeUnit> _parsedUnit;
+
+    // Pre-parsed timezone, if the above expression is a constant.
+    boost::optional<TimeZone> _parsedTimeZone;
 
     // The name of this expression, e.g. $dateAdd or $dateSubtract.
     StringData _opName;
@@ -3925,6 +5044,7 @@ public:
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
                                                   BSONElement expr,
                                                   const VariablesParseState& vps);
+    Value evaluate(const Document& root, Variables* variables) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -3934,11 +5054,19 @@ public:
         return visitor->visit(this);
     }
 
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionDateAdd>(getExpressionContext(),
+                                                 cloneChild(_kStartDate),
+                                                 cloneChild(_kUnit),
+                                                 cloneChild(_kAmount),
+                                                 cloneChild(_kTimeZone),
+                                                 getOpName());
+    }
+
 private:
-    virtual Value evaluateDateArithmetics(Date_t date,
-                                          TimeUnit unit,
-                                          long long amount,
-                                          const TimeZone& timezone) const override;
+    monotonic::State combineMonotonicStateOfArguments(
+        monotonic::State startDataMonotonicState,
+        monotonic::State amountMonotonicState) const final;
 };
 
 class ExpressionDateSubtract final : public ExpressionDateArithmetics {
@@ -3948,6 +5076,7 @@ public:
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
                                                   BSONElement expr,
                                                   const VariablesParseState& vps);
+    Value evaluate(const Document& root, Variables* variables) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -3957,11 +5086,19 @@ public:
         return visitor->visit(this);
     }
 
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionDateSubtract>(getExpressionContext(),
+                                                      cloneChild(_kStartDate),
+                                                      cloneChild(_kUnit),
+                                                      cloneChild(_kAmount),
+                                                      cloneChild(_kTimeZone),
+                                                      getOpName());
+    }
+
 private:
-    virtual Value evaluateDateArithmetics(Date_t date,
-                                          TimeUnit unit,
-                                          long long amount,
-                                          const TimeZone& timezone) const override;
+    monotonic::State combineMonotonicStateOfArguments(
+        monotonic::State startDataMonotonicState,
+        monotonic::State amountMonotonicState) const final;
 };
 
 struct SubstituteFieldPathWalker {
@@ -3975,6 +5112,30 @@ struct SubstituteFieldPathWalker {
     }
 
     const StringMap<std::string>& renameList;
+};
+
+/**
+ * This visitor is used to visit only ExpressionFieldPath nodes in an expression tree and call 'fn'
+ * on them.
+ *
+ * Usage example:
+ * bool isFoo = false;
+ * FieldPathVisitor visitor([&](const ExpressionFieldPath* expr) {
+ *     isFoo = isFoo || expr->isFoo();
+ * });
+ */
+template <typename F>
+struct FieldPathVisitor : public SelectiveConstExpressionVisitorBase {
+    // To avoid overloaded-virtual warnings.
+    using SelectiveConstExpressionVisitorBase::visit;
+
+    explicit FieldPathVisitor(const F& fn) : _fn(fn) {}
+
+    void visit(const ExpressionFieldPath* expr) final {
+        _fn(expr);
+    }
+
+    F _fn;
 };
 
 /**
@@ -4002,8 +5163,8 @@ public:
                         boost::intrusive_ptr<Expression> binSize,
                         boost::intrusive_ptr<Expression> timezone,
                         boost::intrusive_ptr<Expression> startOfWeek);
-    boost::intrusive_ptr<Expression> optimize() final;
-    Value serialize(bool explain) const final;
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
+    Value serialize(const SerializationOptions& options = {}) const final;
     Value evaluate(const Document& root, Variables* variables) const final;
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -4017,56 +5178,119 @@ public:
      * Returns true if this expression has parameter 'timezone' specified, otherwise false.
      */
     bool isTimezoneSpecified() const {
-        return static_cast<bool>(_timeZone);
+        return static_cast<bool>(_children[_kTimeZone]);
     }
 
     /**
      * Returns true if this expression has parameter 'startOfWeek' specified, otherwise false.
      */
     bool isStartOfWeekSpecified() const {
-        return static_cast<bool>(_startOfWeek);
+        return static_cast<bool>(_children[_kStartOfWeek]);
     }
 
     /**
      * Returns true if this expression has parameter 'binSize' specified, otherwise false.
      */
     bool isBinSizeSpecified() const {
-        return static_cast<bool>(_binSize);
+        return static_cast<bool>(_children[_kBinSize]);
+    }
+
+    boost::optional<TimeUnit> getOptimizedUnit() const {
+        if (_parsedUnit) {
+            return _parsedUnit;
+        }
+        return boost::none;
+    }
+
+    boost::optional<long long> getOptimizedBinSize() const {
+        if (_parsedBinSize) {
+            return _parsedBinSize;
+        }
+        return boost::none;
+    }
+
+    boost::optional<TimeZone> getOptimizedTimeZone() const {
+        if (_parsedTimeZone) {
+            return _parsedTimeZone;
+        }
+        return boost::none;
+    }
+
+    const Expression* getDate() const {
+        return _children[_kDate].get();
+    }
+    const Expression* getUnit() const {
+        return _children[_kUnit].get();
+    }
+    const Expression* getBinSize() const {
+        return _children[_kBinSize].get();
+    }
+    const Expression* getTimeZone() const {
+        return _children[_kTimeZone].get();
+    }
+    const Expression* getStartOfWeek() const {
+        return _children[_kStartOfWeek].get();
+    }
+    const boost::optional<TimeZone>& getParsedTimeZone() const {
+        return _parsedTimeZone;
+    }
+    const boost::optional<TimeUnit>& getParsedUnit() const {
+        return _parsedUnit;
+    }
+    const boost::optional<long long>& getParsedBinSize() const {
+        return _parsedBinSize;
+    }
+    const boost::optional<DayOfWeek>& getParsedStartOfWeek() const {
+        return _parsedStartOfWeek;
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionDateTrunc>(getExpressionContext(),
+                                                   cloneChild(_kDate),
+                                                   cloneChild(_kUnit),
+                                                   cloneChild(_kBinSize),
+                                                   cloneChild(_kTimeZone),
+                                                   cloneChild(_kStartOfWeek));
     }
 
 private:
-    /**
-     * Converts $dateTrunc expression parameter "date" 'value' to Date_t type.
-     */
-    static Date_t convertToDate(const Value& value);
-
-    /**
-     * Converts $dateTrunc expression parameter "binSize" 'value' to 64-bit integer.
-     */
-    static unsigned long long convertToBinSize(const Value& value);
-
-    void _doAddDependencies(DepsTracker* deps) const final;
+    monotonic::State getMonotonicState(const FieldPath& sortedFieldPath) const final;
 
     // Expression that evaluates to a date to truncate. Accepted BSON types: Date, bsonTimestamp,
     // jstOID.
-    boost::intrusive_ptr<Expression>& _date;
+    static constexpr size_t _kDate = 0;
 
     // Time units used to describe the size of bins. Accepted BSON type: String. Accepted values:
     // enumerators from TimeUnit enumeration.
-    boost::intrusive_ptr<Expression>& _unit;
+    static constexpr size_t _kUnit = 1;
 
     // Size of bins in time units '_unit'. Accepted BSON types: NumberInt, NumberLong, NumberDouble,
     // NumberDecimal. Accepted are only values that can be coerced to a 64-bit integer without loss.
     // If not specified, 1 is used.
-    boost::intrusive_ptr<Expression>& _binSize;
+    static constexpr size_t _kBinSize = 2;
 
     // Timezone to use for the truncation operation. Accepted BSON type: String. If not specified,
     // UTC is used.
-    boost::intrusive_ptr<Expression>& _timeZone;
+    static constexpr size_t _kTimeZone = 3;
 
     // First/start day of the week to use for date truncation when the time unit is the week.
     // Accepted BSON type: String. If not specified, "sunday" is used.
-    boost::intrusive_ptr<Expression>& _startOfWeek;
+    static constexpr size_t _kStartOfWeek = 4;
+
+    // Pre-parsed timezone, if the above expression is a constant.
+    boost::optional<TimeZone> _parsedTimeZone;
+
+    // Pre-parsed time unit, if the above expression is a constant.
+    boost::optional<TimeUnit> _parsedUnit;
+
+    // Pre-parsed bin size, if the above expression is a constant.
+    boost::optional<long long> _parsedBinSize;
+
+    // Pre-parsed start of week, if the above expression is a constant.
+    boost::optional<DayOfWeek> _parsedStartOfWeek;
+
+    template <typename H>
+    friend class ExpressionHashVisitor;
 };
 
 class ExpressionGetField final : public Expression {
@@ -4085,17 +5309,15 @@ public:
     ExpressionGetField(ExpressionContext* const expCtx,
                        boost::intrusive_ptr<Expression> field,
                        boost::intrusive_ptr<Expression> input)
-        : Expression(expCtx, {std::move(field), std::move(input)}),
-          _field(_children[0]),
-          _input(_children[1]) {
-        expCtx->sbeCompatible = false;
+        : Expression(expCtx, {std::move(field), std::move(input)}) {
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
-    Value serialize(bool explain) const final;
+    Value serialize(const SerializationOptions& options = {}) const final;
 
     Value evaluate(const Document& root, Variables* variables) const final;
 
-    boost::intrusive_ptr<Expression> optimize() final;
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -4105,14 +5327,24 @@ public:
         return visitor->visit(this);
     }
 
+    const Expression* getField() const {
+        return _children[_kField].get();
+    }
+
+    const Expression* getInput() const {
+        return _children[_kInput].get();
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionGetField>(
+            getExpressionContext(), cloneChild(_kField), cloneChild(_kInput));
+    }
+
     static constexpr auto kExpressionName = "$getField"_sd;
 
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final override;
-
 private:
-    boost::intrusive_ptr<Expression>& _field;
-    boost::intrusive_ptr<Expression>& _input;
+    static constexpr size_t _kField = 0;
+    static constexpr size_t _kInput = 1;
 };
 
 class ExpressionSetField final : public Expression {
@@ -4130,17 +5362,15 @@ public:
                        boost::intrusive_ptr<Expression> input,
                        boost::intrusive_ptr<Expression> value)
         : Expression(expCtx, {std::move(field), std::move(input), std::move(value)}),
-          _field(_children[0]),
-          _input(_children[1]),
-          _value(_children[2]) {
-        expCtx->sbeCompatible = false;
+          _fieldName(getValidFieldName(_children[_kField])) {
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
-    Value serialize(bool explain) const final;
+    Value serialize(const SerializationOptions& options = {}) const final;
 
     Value evaluate(const Document& root, Variables* variables) const final;
 
-    boost::intrusive_ptr<Expression> optimize() final;
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -4150,15 +5380,42 @@ public:
         return visitor->visit(this);
     }
 
+    const std::string& getFieldName() const {
+        return _fieldName;
+    }
+
+    const Expression* getField() const {
+        return _children[_kField].get();
+    }
+
+    const Expression* getInput() const {
+        return _children[_kInput].get();
+    }
+
+    const Expression* getValue() const {
+        return _children[_kValue].get();
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionSetField>(
+            getExpressionContext(), cloneChild(_kField), cloneChild(_kInput), cloneChild(_kValue));
+    }
+
     static constexpr auto kExpressionName = "$setField"_sd;
 
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final override;
-
 private:
-    boost::intrusive_ptr<Expression>& _field;
-    boost::intrusive_ptr<Expression>& _input;
-    boost::intrusive_ptr<Expression>& _value;
+    /**
+     * Ensures 'fieldExpr' is a constant string representing a valid field name and returns it as a
+     * string. If 'fieldExpr' is not valid, this function will throw a 'uassert()'.
+     */
+    std::string getValidFieldName(boost::intrusive_ptr<Expression> fieldExpr);
+
+    // This is pre-validated by the constructor.
+    const std::string _fieldName;
+
+    static constexpr size_t _kField = 0;
+    static constexpr size_t _kInput = 1;
+    static constexpr size_t _kValue = 2;
 };
 
 class ExpressionTsSecond final : public ExpressionFixedArity<ExpressionTsSecond, 1> {
@@ -4183,6 +5440,10 @@ public:
 
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionTsSecond>(getExpressionContext(), cloneChildren());
     }
 };
 
@@ -4209,6 +5470,466 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionTsIncrement>(getExpressionContext(), cloneChildren());
+    }
 };
+
+template <typename SubClass>
+class ExpressionBitwise : public ExpressionVariadic<SubClass> {
+public:
+    explicit ExpressionBitwise(ExpressionContext* const expCtx)
+        : ExpressionVariadic<SubClass>(expCtx) {}
+
+    ExpressionBitwise(ExpressionContext* const expCtx, Expression::ExpressionVector&& children)
+        : ExpressionVariadic<SubClass>(expCtx, std::move(children)) {}
+
+    ExpressionNary::Associativity getAssociativity() const final {
+        return ExpressionNary::Associativity::kFull;
+    }
+
+    bool isCommutative() const final {
+        return true;
+    }
+
+private:
+    virtual SafeNum getIdentity() const = 0;
+};
+
+class ExpressionBitAnd final : public ExpressionBitwise<ExpressionBitAnd> {
+public:
+    SafeNum getIdentity() const final {
+        return -1;  // In two's complement, this is all 1's.
+    }
+
+    const char* getOpName() const final {
+        return "$bitAnd";
+    }
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+
+    explicit ExpressionBitAnd(ExpressionContext* const expCtx)
+        : ExpressionBitwise<ExpressionBitAnd>(expCtx) {
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+    }
+
+    ExpressionBitAnd(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionBitwise<ExpressionBitAnd>(expCtx, std::move(children)) {
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+    }
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionBitAnd>(getExpressionContext(), cloneChildren());
+    }
+};
+
+class ExpressionBitOr final : public ExpressionBitwise<ExpressionBitOr> {
+public:
+    SafeNum getIdentity() const final {
+        return 0;
+    }
+
+    const char* getOpName() const final {
+        return "$bitOr";
+    }
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+
+    explicit ExpressionBitOr(ExpressionContext* const expCtx)
+        : ExpressionBitwise<ExpressionBitOr>(expCtx) {
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+    }
+
+    ExpressionBitOr(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionBitwise<ExpressionBitOr>(expCtx, std::move(children)) {
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+    }
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionBitOr>(getExpressionContext(), cloneChildren());
+    }
+};
+
+class ExpressionBitXor final : public ExpressionBitwise<ExpressionBitXor> {
+public:
+    SafeNum getIdentity() const final {
+        return 0;
+    }
+
+    const char* getOpName() const final {
+        return "$bitXor";
+    }
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+
+    explicit ExpressionBitXor(ExpressionContext* const expCtx)
+        : ExpressionBitwise<ExpressionBitXor>(expCtx) {
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+    }
+
+    ExpressionBitXor(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionBitwise<ExpressionBitXor>(expCtx, std::move(children)) {
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+    }
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionBitXor>(getExpressionContext(), cloneChildren());
+    }
+};
+
+class ExpressionBitNot final : public ExpressionSingleNumericArg<ExpressionBitNot> {
+public:
+    explicit ExpressionBitNot(ExpressionContext* const expCtx)
+        : ExpressionSingleNumericArg<ExpressionBitNot>(expCtx) {
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+    }
+    explicit ExpressionBitNot(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionSingleNumericArg<ExpressionBitNot>(expCtx, std::move(children)) {
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+    }
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+    const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionBitNot>(getExpressionContext(), cloneChildren());
+    }
+};
+
+/**
+ * The expression '$_internalKeyStringValue' is used to generate the key string binary of any
+ * document value ('input' field) under an optionally different non-default collation ('collation'
+ * field). The generated key string binary purposefully doesn't contain the type bits information,
+ * so that the generated binary has the same ordering as the index.
+ *
+ * The expression specification is a follows:
+ * {
+ *     $_internalKeyStringValue: {
+ *         input: <expression>,
+ *         collation: <collation spec>
+ *     }
+ * }
+ *
+ * Examples:
+ * Case 1: The 'input' field is an integer.
+ * Input1:
+ * {
+ *     $_internalKeyStringValue: {
+ *         input: 1
+ *     }
+ * }
+ * Output1: BinData(0, "KwIE")
+ *
+ * Case 2: The 'input' field is an integer of the same numeric value as above but different type.
+ * Input2:
+ * {
+ *     $_internalKeyStringValue: {
+ *         input: 1.0
+ *     }
+ * }
+ * Output2: BinData(0, "KwIE")
+ *
+ * Case 3: The 'input' field is a string. The 'collation' field is a non-default collation spec.
+ * Input3:
+ * {
+ *     $_internalIndexKey: {
+ *         input: "aAa",
+ *         collation: {locale: "en", strength: 1}
+ *     }
+ * }
+ * Output3: BinData(0, "PCkpKQAE")
+ */
+class ExpressionInternalKeyStringValue final : public Expression {
+public:
+    ExpressionInternalKeyStringValue(ExpressionContext* expCtx,
+                                     boost::intrusive_ptr<Expression> input,
+                                     boost::intrusive_ptr<Expression> collation)
+        : Expression(expCtx, {input, collation}) {
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+    }
+
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
+                                                  BSONElement expr,
+                                                  const VariablesParseState& vps);
+
+    Value serialize(const SerializationOptions& options = {}) const final;
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+
+    const char* getOpName() const {
+        return "$_internalKeyStringValue";
+    }
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+
+    const Expression* getInput() const {
+        return _children[_kInput].get();
+    }
+
+    const Expression* getCollation() const {
+        return _children[_kCollation].get();
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionInternalKeyStringValue>(
+            getExpressionContext(), cloneChild(_kInput), cloneChild(_kCollation));
+    }
+
+private:
+    static constexpr size_t _kInput = 0;
+    static constexpr size_t _kCollation = 1;
+};
+
+/**
+ * Returns a UUID.
+ */
+class ExpressionCreateUUID final : public Expression {
+public:
+    explicit ExpressionCreateUUID(ExpressionContext* expCtx);
+
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
+                                                  BSONElement exprElement,
+                                                  const VariablesParseState& vps);
+
+    Value serialize(const SerializationOptions& options = {}) const final;
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
+
+    const char* getOpName() const;
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionCreateUUID>(getExpressionContext());
+    }
+};
+
+
+class ExpressionCreateObjectId : public Expression {
+public:
+    explicit ExpressionCreateObjectId(ExpressionContext* expCtx);
+
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
+                                                  BSONElement exprElement,
+                                                  const VariablesParseState& vps);
+
+    Value serialize(const SerializationOptions& options = {}) const final;
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
+
+    const char* getOpName() const;
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionCreateObjectId>(getExpressionContext());
+    }
+};
+
+
+/**
+ * ExpressionEncTextSearch is the base class for all encrypted text search expressions. The first
+ * operand (input) must be a field path expression, and the second operand (text) a constant
+ * literal expression. Note, specializations of this class can only be evaluated when their text
+ * operand is a BinData payload.
+ * The constant literal (text) can only be one of the following:
+ * 1) A string literal: In this case, the expression can't be evaluated, and is likely being used in
+ *    the context of query analysis to parse and analyze the query.
+ * 2) A BinData payload: In this case, the expression can be evaluated by the server.
+ */
+class ExpressionEncTextSearch : public Expression {
+public:
+    const auto& getEncryptedPredicateEvaluator() const {
+        return _evaluatorV2;
+    }
+
+    // If we didn't have an encrypted payload at instantiation time, then we can't be evaluated.
+    // We'll use this for guardrails around code we know shouldn't ever be called.
+    bool canBeEvaluated() const;
+
+    const ExpressionFieldPath& getInput() const;
+    const ExpressionConstant& getText() const;
+
+protected:
+    ExpressionEncTextSearch(ExpressionContext* expCtx,
+                            boost::intrusive_ptr<Expression> input,
+                            boost::intrusive_ptr<Expression> text);
+
+    static constexpr size_t _kInput = 0;
+    static constexpr size_t _kTextOperand = 1;
+
+private:
+    EncryptedPredicateEvaluatorV2 _evaluatorV2;
+};
+
+class ExpressionEncStrStartsWith final : public ExpressionEncTextSearch {
+public:
+    ExpressionEncStrStartsWith(ExpressionContext* expCtx,
+                               boost::intrusive_ptr<Expression> input,
+                               boost::intrusive_ptr<Expression> prefix);
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+    Value serialize(const SerializationOptions& options = {}) const final;
+    const char* getOpName() const;
+
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
+                                                  BSONElement bsonExpr,
+                                                  const VariablesParseState& vps);
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionEncStrStartsWith>(
+            getExpressionContext(), cloneChild(_kInput), cloneChild(_kTextOperand));
+    }
+};
+
+class ExpressionEncStrEndsWith final : public ExpressionEncTextSearch {
+public:
+    ExpressionEncStrEndsWith(ExpressionContext* expCtx,
+                             boost::intrusive_ptr<Expression> input,
+                             boost::intrusive_ptr<Expression> suffix);
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+    Value serialize(const SerializationOptions& options = {}) const final;
+    const char* getOpName() const;
+
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
+                                                  BSONElement bsonExpr,
+                                                  const VariablesParseState& vps);
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionEncStrEndsWith>(
+            getExpressionContext(), cloneChild(_kInput), cloneChild(_kTextOperand));
+    }
+};
+
+class ExpressionEncStrContains final : public ExpressionEncTextSearch {
+public:
+    ExpressionEncStrContains(ExpressionContext* expCtx,
+                             boost::intrusive_ptr<Expression> input,
+                             boost::intrusive_ptr<Expression> substring);
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+    Value serialize(const SerializationOptions& options = {}) const final;
+    const char* getOpName() const;
+
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
+                                                  BSONElement bsonExpr,
+                                                  const VariablesParseState& vps);
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionEncStrContains>(
+            getExpressionContext(), cloneChild(_kInput), cloneChild(_kTextOperand));
+    }
+};
+
+class ExpressionEncStrNormalizedEq final : public ExpressionEncTextSearch {
+public:
+    ExpressionEncStrNormalizedEq(ExpressionContext* expCtx,
+                                 boost::intrusive_ptr<Expression> input,
+                                 boost::intrusive_ptr<Expression> substring);
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+    Value serialize(const SerializationOptions& options = {}) const final;
+    const char* getOpName() const;
+
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
+                                                  BSONElement bsonExpr,
+                                                  const VariablesParseState& vps);
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionEncStrNormalizedEq>(
+            getExpressionContext(), cloneChild(_kInput), cloneChild(_kTextOperand));
+    }
+};
+
+static boost::intrusive_ptr<Expression> parseParenthesisExprObj(ExpressionContext* expCtx,
+                                                                BSONElement expr,
+                                                                const VariablesParseState& vpsIn);
 
 }  // namespace mongo

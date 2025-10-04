@@ -7,6 +7,7 @@
  */
 
 #include "wt_internal.h"
+#include <signal.h>
 
 /*
  * __wt_abort --
@@ -27,6 +28,22 @@ __wt_abort(WT_SESSION_IMPL *session) WT_GCC_FUNC_ATTRIBUTE((noreturn))
 #else
     __wt_errx(session, "aborting WiredTiger library");
 #endif
+    __wt_error_log_to_handler(session);
     abort();
     /* NOTREACHED */
+}
+
+/*
+ * __wt_debug_crash --
+ *     If windows then abort else kill the process without creating a core.
+ */
+void
+__wt_debug_crash(WT_SESSION_IMPL *session) WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
+{
+#ifdef _WIN32
+    __wt_abort(session);
+#else
+    WT_UNUSED(session);
+    (void)kill(getpid(), SIGKILL);
+#endif
 }

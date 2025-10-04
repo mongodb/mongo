@@ -29,15 +29,17 @@
 
 global:
     cpp_namespace: "mongo::repl"
+    mod_visibility: pub
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 structs:
     OpTimeBase:
-        description: "A document that stores the logical time-related fields in an oplog entry.
-                     Should never be used directly in server code. Instead, create an instance
-                     of OpTime."
+        description:
+            "A document that stores the logical time-related fields in an oplog entry.
+            Should never be used directly in server code. Instead, create an instance
+            of OpTime."
         strict: false
         fields:
             ts:
@@ -46,6 +48,18 @@ structs:
                 description: "The time when the oplog entry was created"
             t:
                 cpp_name: term
-                type: long
+                type: exactInt64
                 optional: true # The term will no longer be optional, see SERVER-42258.
                 description: "The term of the primary that created the oplog entry"
+
+    OpTimeAndWallTimeBase:
+        description: "A document that stores OpTimeBase and wall clock time when the oplog entry was created"
+        strict: false
+        # Oplog Entries are checked by the oplogentry parser
+        unsafe_dangerous_disable_extra_field_duplicate_checks: true
+        chained_structs:
+            OpTimeBase: OpTimeBase
+        fields:
+            wall:
+                type: date
+                description: "The wall clock time when the oplog entry was created"

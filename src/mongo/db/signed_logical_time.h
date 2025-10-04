@@ -31,7 +31,12 @@
 
 #include "mongo/db/logical_time.h"
 #include "mongo/db/time_proof_service.h"
+
 #include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

@@ -27,13 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "summation.h"
 
-#include <cmath>
-
+#include "mongo/base/error_codes.h"
 #include "mongo/util/assert_util.h"
+
+#include <cmath>
+#include <cstdint>
+#include <limits>
 
 namespace mongo {
 void DoubleDoubleSummation::addLong(long long x) {

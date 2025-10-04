@@ -1,10 +1,7 @@
 // Tests for the $merge stage with whenMatched: "replace" and whenNotMatched: "insert".
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/merge_helpers.js");  // For dropWithoutImplicitRecreate.
-load("jstests/aggregation/extras/utils.js");          // For assertErrorCode.
-load("jstests/libs/fixture_helpers.js");              // For FixtureHelpers.isMongos.
+import {dropWithoutImplicitRecreate} from "jstests/aggregation/extras/merge_helpers.js";
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const coll = db.merge_replace_insert;
 const outColl = db.merge_replace_insert_out;
@@ -18,22 +15,26 @@ for (let i = 0; i < nDocs; i++) {
 
 // Test that a $merge with whenMatched: "replace" and whenNotMatched: "insert" mode will
 // default the "on" fields to "_id".
-coll.aggregate(
-    [{$merge: {into: outColl.getName(), whenMatched: "replace", whenNotMatched: "insert"}}]);
+coll.aggregate([{$merge: {into: outColl.getName(), whenMatched: "replace", whenNotMatched: "insert"}}]);
 assert.eq(nDocs, outColl.find().itcount());
 
 // Test that $merge will update existing documents that match the "on" fields.
 const nDocsReplaced = 5;
 coll.aggregate([
     {$project: {_id: {$mod: ["$_id", nDocsReplaced]}}},
-    {$merge: {into: outColl.getName(), whenMatched: "replace", whenNotMatched: "insert", on: "_id"}}
+    {$merge: {into: outColl.getName(), whenMatched: "replace", whenNotMatched: "insert", on: "_id"}},
 ]);
 assert.eq(nDocsReplaced, outColl.find({a: {$exists: false}}).itcount());
 
 // Test $merge with a dotted path "on" fields.
 coll.drop();
 dropWithoutImplicitRecreate(outColl.getName());
-assert.commandWorked(coll.insert([{_id: 0, a: {b: 1}}, {_id: 1, a: {b: 1}, c: 1}]));
+assert.commandWorked(
+    coll.insert([
+        {_id: 0, a: {b: 1}},
+        {_id: 1, a: {b: 1}, c: 1},
+    ]),
+);
 assert.commandWorked(outColl.createIndex({"a.b": 1, _id: 1}, {unique: true}));
 coll.aggregate([
     {$sort: {_id: 1}},
@@ -43,9 +44,9 @@ coll.aggregate([
             into: outColl.getName(),
             whenMatched: "replace",
             whenNotMatched: "insert",
-            on: ["_id", "a.b"]
-        }
-    }
+            on: ["_id", "a.b"],
+        },
+    },
 ]);
 assert.eq([{_id: 0, a: {b: 1}, c: 1}], outColl.find().toArray());
 
@@ -53,33 +54,37 @@ assert.eq([{_id: 0, a: {b: 1}, c: 1}], outColl.find().toArray());
 coll.drop();
 outColl.drop();
 assert.commandWorked(coll.insert({field: "will be removed"}));
-assert.doesNotThrow(() => coll.aggregate([
-    {$replaceRoot: {newRoot: {}}},
-    {
-        $merge: {
-            into: outColl.getName(),
-            whenMatched: "replace",
-            whenNotMatched: "insert",
-        }
-    }
-]));
+assert.doesNotThrow(() =>
+    coll.aggregate([
+        {$replaceRoot: {newRoot: {}}},
+        {
+            $merge: {
+                into: outColl.getName(),
+                whenMatched: "replace",
+                whenNotMatched: "insert",
+            },
+        },
+    ]),
+);
 assert.eq(1, outColl.find({field: {$exists: false}}).itcount());
 
 // Test that $merge will automatically generate a missing "_id", and the aggregation succeeds
 // with multiple "on" fields.
 dropWithoutImplicitRecreate(outColl.getName());
 assert.commandWorked(outColl.createIndex({name: -1, _id: 1}, {unique: true, sparse: true}));
-assert.doesNotThrow(() => coll.aggregate([
-    {$replaceRoot: {newRoot: {name: "jungsoo"}}},
-    {
-        $merge: {
-            into: outColl.getName(),
-            whenMatched: "replace",
-            whenNotMatched: "insert",
-            on: ["_id", "name"]
-        }
-    }
-]));
+assert.doesNotThrow(() =>
+    coll.aggregate([
+        {$replaceRoot: {newRoot: {name: "jungsoo"}}},
+        {
+            $merge: {
+                into: outColl.getName(),
+                whenMatched: "replace",
+                whenNotMatched: "insert",
+                on: ["_id", "name"],
+            },
+        },
+    ]),
+);
 assert.eq(1, outColl.find().itcount());
 
 // Test that we will not attempt to modify the _id of an existing document if the _id is
@@ -90,14 +95,15 @@ assert.commandWorked(coll.insert({name: "nick"}));
 dropWithoutImplicitRecreate(outColl.getName());
 assert.commandWorked(outColl.createIndex({name: 1}, {unique: true}));
 assert.commandWorked(outColl.insert({_id: "must be unchanged", name: "kyle"}));
-assert.doesNotThrow(() => coll.aggregate([
-    {$project: {_id: 0}},
-    {$addFields: {newField: 1}},
-    {
-        $merge:
-            {into: outColl.getName(), whenMatched: "replace", whenNotMatched: "insert", on: "name"}
-    }
-]));
+assert.doesNotThrow(() =>
+    coll.aggregate([
+        {$project: {_id: 0}},
+        {$addFields: {newField: 1}},
+        {
+            $merge: {into: outColl.getName(), whenMatched: "replace", whenNotMatched: "insert", on: "name"},
+        },
+    ]),
+);
 const outResult = outColl.find().sort({name: 1}).toArray();
 const errmsgFn = () => tojson(outResult);
 assert.eq(2, outResult.length, errmsgFn);
@@ -108,18 +114,20 @@ assert.neq(null, outResult[1]._id, errmsgFn);
 
 // Test that $merge with a missing non-id "on" field fails.
 dropWithoutImplicitRecreate(outColl.getName());
-assert.commandWorked(outColl.createIndex({missing: 1}, {unique: true}));
+assert.commandWorked(outColl.createIndex({missing: 1}, {unique: true, sparse: true}));
 assertErrorCode(
     coll,
-    [{
-        $merge: {
-            into: outColl.getName(),
-            whenMatched: "replace",
-            whenNotMatched: "insert",
-            on: "missing"
-        }
-    }],
-    51132  // This attempt should fail because there's no field 'missing' in the document.
+    [
+        {
+            $merge: {
+                into: outColl.getName(),
+                whenMatched: "replace",
+                whenNotMatched: "insert",
+                on: "missing",
+            },
+        },
+    ],
+    51132, // This attempt should fail because there's no field 'missing' in the document.
 );
 
 // Test that a replace fails to insert a document if it violates a unique index constraint. In
@@ -130,61 +138,68 @@ assert.commandWorked(coll.insert([{_id: 0}, {_id: 1}]));
 
 dropWithoutImplicitRecreate(outColl.getName());
 assert.commandWorked(outColl.createIndex({a: 1}, {unique: true}));
-assertErrorCode(
-    coll,
-    [
+const res = assert.throws(() =>
+    coll.aggregate([
         {$addFields: {a: 0}},
-        {$merge: {into: outColl.getName(), whenMatched: "replace", whenNotMatched: "insert"}}
-    ],
-    ErrorCodes.DuplicateKey);
+        {$merge: {into: outColl.getName(), whenMatched: "replace", whenNotMatched: "insert"}},
+    ]),
+);
+assert.commandFailedWithCode(res, ErrorCodes.DuplicateKey);
+assert.includes(res.message, "$merge failed due to a DuplicateKey error");
 
 // Test that $merge fails if the "on" fields contains an array.
 coll.drop();
 assert.commandWorked(coll.insert({_id: 0, a: [1, 2]}));
 assert.commandWorked(outColl.createIndex({"a.b": 1, _id: 1}, {unique: true}));
-assertErrorCode(coll,
-                [
-                    {$addFields: {_id: 0}},
-                    {
-                        $merge: {
-                            into: outColl.getName(),
-                            whenMatched: "replace",
-                            whenNotMatched: "insert",
-                            on: ["_id", "a.b"]
-                        }
-                    }
-                ],
-                51132);
+assertErrorCode(
+    coll,
+    [
+        {$addFields: {_id: 0}},
+        {
+            $merge: {
+                into: outColl.getName(),
+                whenMatched: "replace",
+                whenNotMatched: "insert",
+                on: ["_id", "a.b"],
+            },
+        },
+    ],
+    [51132, 51185],
+);
 
 coll.drop();
 assert.commandWorked(coll.insert({_id: 0, a: [{b: 1}]}));
-assertErrorCode(coll,
-                [
-                    {$addFields: {_id: 0}},
-                    {
-                        $merge: {
-                            into: outColl.getName(),
-                            whenMatched: "replace",
-                            whenNotMatched: "insert",
-                            on: ["_id", "a.b"]
-                        }
-                    }
-                ],
-                51132);
+assertErrorCode(
+    coll,
+    [
+        {$addFields: {_id: 0}},
+        {
+            $merge: {
+                into: outColl.getName(),
+                whenMatched: "replace",
+                whenNotMatched: "insert",
+                on: ["_id", "a.b"],
+            },
+        },
+    ],
+    [51132, 51185],
+);
 
 // Tests for $merge to a database that differs from the aggregation database.
 const foreignDb = db.getSiblingDB("merge_replace_insert_foreign");
 const foreignTargetCollName = "out";
-const pipelineDifferentOutputDb = [{
-    $merge: {
-        into: {
-            db: foreignDb.getName(),
-            coll: foreignTargetCollName,
+const pipelineDifferentOutputDb = [
+    {
+        $merge: {
+            into: {
+                db: foreignDb.getName(),
+                coll: foreignTargetCollName,
+            },
+            whenMatched: "replace",
+            whenNotMatched: "insert",
         },
-        whenMatched: "replace",
-        whenNotMatched: "insert",
-    }
-}];
+    },
+];
 
 coll.drop();
 assert.commandWorked(coll.insert({_id: 0}));
@@ -212,4 +227,3 @@ const newDocuments = [{_id: 0, newField: 1}, {_id: 1}];
 assert.commandWorked(coll.insert(newDocuments));
 coll.aggregate(pipelineDifferentOutputDb);
 assert.eq(foreignDb[foreignTargetCollName].find().sort({_id: 1}).toArray(), newDocuments);
-}());

@@ -30,10 +30,68 @@
 #pragma once
 
 #include "mongo/util/duration.h"
+#include "mongo/util/inline_memory.h"
+
+#include <cstddef>
+#include <list>
+#include <memory>
 
 namespace mongo {
 
 class OperationContext;
+
+class OperationCPUTimer;
+
+/**
+ * Allocates and tracks CPU timers for an OperationContext.
+ */
+class OperationCPUTimers {
+    friend class OperationCPUTimer;
+
+public:
+    virtual ~OperationCPUTimers() = default;
+
+    /**
+     * Returns `nullptr` if the platform does not support tracking of CPU consumption.
+     */
+    static OperationCPUTimers* get(OperationContext*);
+
+    /**
+     * Returns a timer bound to this OperationContext and the threads that it runs on. Timers
+     * created from this function may safely outlive the OperationCPUTimers container and the
+     * OperationContext, but only to simplify destruction ordering problems.
+     */
+    virtual OperationCPUTimer makeTimer() = 0;
+
+    /**
+     * Attaches the current thread.
+     * Must be called when no thread is attached.
+     */
+    virtual void onThreadAttach() = 0;
+
+    /**
+     * Detaches the current thread.
+     * Must be called from the thread that is currently attached.
+     */
+    virtual void onThreadDetach() = 0;
+
+    /**
+     * Returns the number of running timers.
+     */
+    virtual size_t runningCount() const = 0;
+
+protected:
+    /**
+     * Returns the cpu thread time accumulated so far for this thread. Excludes the time when the
+     * thread is detached.
+     * Must be called from the thread that is currently attached.
+     */
+    virtual Nanoseconds _getOperationThreadTime() const = 0;
+
+    virtual void _onTimerStart() = 0;
+
+    virtual void _onTimerStop() = 0;
+};
 
 /**
  * Implements the CPU timer for platforms that support CPU consumption tracking. Consider the
@@ -54,18 +112,33 @@ class OperationContext;
  */
 class OperationCPUTimer {
 public:
-    /**
-     * Returns `nullptr` if the platform does not support tracking of CPU consumption.
-     */
-    static OperationCPUTimer* get(OperationContext*);
+    explicit OperationCPUTimer(OperationCPUTimers** timers);
+    ~OperationCPUTimer();
 
-    virtual Nanoseconds getElapsed() const = 0;
+    Nanoseconds getElapsed() const;
 
-    virtual void start() = 0;
-    virtual void stop() = 0;
+    void start();
+    void stop();
 
-    virtual void onThreadAttach() = 0;
-    virtual void onThreadDetach() = 0;
+private:
+    OperationCPUTimers* getTimers() {
+        return *_timers;
+    }
+
+    const OperationCPUTimers* getTimers() const {
+        return *_timers;
+    }
+
+    // Weak reference to OperationContext-owned tracked list of timers. The Timers container can be
+    // destructed before this Timer.
+    OperationCPUTimers** _timers;
+
+    // Whether the timer is running.
+    bool _timerIsRunning;
+
+    // Total time adjustment accrued so far. Includes the time when timer was started (as negative)
+    // and time when timer was stopped (as positive).
+    Nanoseconds _elapsedAdjustment;
 };
 
 }  // namespace mongo

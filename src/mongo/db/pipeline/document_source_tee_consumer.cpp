@@ -27,44 +27,35 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/pipeline/document_source_tee_consumer.h"
-
-#include <boost/intrusive_ptr.hpp>
-#include <boost/optional.hpp>
-#include <vector>
 
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/expression_context.h"
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
 using boost::intrusive_ptr;
 
+ALLOCATE_DOCUMENT_SOURCE_ID(teeConsumer, DocumentSourceTeeConsumer::id)
+
 DocumentSourceTeeConsumer::DocumentSourceTeeConsumer(const intrusive_ptr<ExpressionContext>& expCtx,
                                                      size_t facetId,
-                                                     const intrusive_ptr<TeeBuffer>& bufferSource)
-    : DocumentSource(kStageName, expCtx), _facetId(facetId), _bufferSource(bufferSource) {}
+                                                     StringData stageName)
+    : DocumentSource(stageName, expCtx), _facetId(facetId), _stageName(std::string{stageName}) {}
 
 boost::intrusive_ptr<DocumentSourceTeeConsumer> DocumentSourceTeeConsumer::create(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    size_t facetId,
-    const boost::intrusive_ptr<TeeBuffer>& bufferSource) {
-    return new DocumentSourceTeeConsumer(expCtx, facetId, bufferSource);
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, size_t facetId, StringData stageName) {
+    return new DocumentSourceTeeConsumer(expCtx, facetId, stageName);
 }
 
-DocumentSource::GetNextResult DocumentSourceTeeConsumer::doGetNext() {
-    return _bufferSource->getNext(_facetId);
+const char* DocumentSourceTeeConsumer::getSourceName() const {
+    return _stageName.c_str();
 }
 
-void DocumentSourceTeeConsumer::doDispose() {
-    _bufferSource->dispose(_facetId);
-}
-
-Value DocumentSourceTeeConsumer::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceTeeConsumer::serialize(const SerializationOptions& opts) const {
     // We only serialize this stage in the context of explain.
-    return explain ? Value(DOC(kStageName << Document())) : Value();
+    return opts.isSerializingForExplain() ? Value(DOC(_stageName << Document())) : Value();
 }
 }  // namespace mongo

@@ -1,0 +1,134 @@
+# This suite is based on the replica_sets_jscore_passthrough and retryable_writes_jscore_passthrough
+# suites. It is used to test that a replica set started with --configsvr functions correctly before
+# it becomes a config shard. This is important to test because in the rs->sharding procedure, users
+# will briefly be running commands on a replica set started with --configsvr that has not yet become
+# a config shard.
+#
+# TODO: SERVER-89292 Re-enable this suite.
+test_kind: js_test
+
+selector:
+  roots:
+    - jstests/core/**/*.js
+    - jstests/fle2/**/*.js
+    - src/mongo/db/modules/*/jstests/fle2/**/*.js
+  exclude_files:
+    # These tests change the transactionLifetimeLimitSeconds server parameter which conflicts with how
+    # the CheckReplDBHashInBackground hook doesn't want transactions to be reaped while it is running.
+    - jstests/core/txns/abort_expired_transaction.js
+    - jstests/core/txns/abort_transaction_thread_does_not_block_on_locks.js
+    - jstests/core/txns/kill_op_on_txn_expiry.js
+    # The set_param1.js test attempts to compare the response from running the {getParameter: "*"}
+    # command multiple times, which may observe the change to the "transactionLifetimeLimitSeconds"
+    # server parameter.
+    - jstests/core/**/set_param1.js
+    # Different explain format
+
+    # These tests fails while DbCheck running in the background:
+    # The DBCheck process continuously populates the currentOp, causing this test to time out while
+    # waiting for empty 'getMore' requests.
+    - jstests/core/query/awaitdata_getmore_cmd.js
+    # These tests utilize 'fsyncLock' and subsequently wait for an insert operation to be blocked by
+    # checking the inprogress 'currentOp', leading to a deadlock with the dbCheck process:
+    # When the fsyncLock is activated, multiple threads acquire writeTickets and become stalled at the
+    # Flusher stage. Consequently, other threads are unable to obtain additional tickets.
+    # In this context, the behavior of the dbcheck process involves acquiring writeTickets in an
+    # attempt to write to the oplog, followed by becoming blocked at the flusher stage. Consequently,
+    # when an insertion is initiated from the test, it is unable to find available writeTickets and
+    # enters a wait state. Additionally, since the AquireCollection is not even obtained,
+    # the curOp (current operation) does not get logged.
+    - jstests/core/administrative/current_op/currentop.js
+    - jstests/core/administrative/fsync/fsync.js
+    # When a transaction is in a prepared state, as seen in that test, it prevents the document edited
+    # within it from being read by the dbcheck process. Therefore, if the test keeps the transaction
+    # in a prepared state for an extended period, it will result in a timeout for the dbcheck process.
+    - jstests/core/txns/prepare_conflict.js
+    # Implicit collection creation not supported for certain commands that are run direct to shard.
+    - jstests/core/ddl/clone_collection_as_capped.js
+    - jstests/core/query/collation/collation.js
+    # Logical session cache for a config server replica set is not usable until there is a shard.
+    - jstests/core/administrative/list_all_sessions.js
+    - jstests/core/administrative/list_sessions.js
+    # Transactions do not support retryability of individual operations.
+    # TODO: Remove this once it is supported (SERVER-33952).
+    - jstests/core/txns/**/*.js
+    # These tests rely on the assumption that an update command is run only once.
+    - jstests/core/**/find_and_modify_metrics.js
+    - jstests/core/**/update_metrics.js
+    # TODO SERVER-31242: findAndModify no-op retry should respect the fields option.
+    - jstests/core/**/crud_api.js
+    - jstests/core/**/find_and_modify.js
+    - jstests/core/**/find_and_modify_fields.js
+    - jstests/core/**/find_and_modify_pipeline_update.js
+    - jstests/core/**/find_and_modify_positional_new_remove.js
+    - jstests/core/**/fts_find_and_modify.js
+    - jstests/core/**/project_with_collation.js
+    # These test run commands using legacy queries, which are not supported on sessions.
+    - jstests/core/**/query/comment_field.js
+    - jstests/core/**/query/exhaust.js
+    # No-op retries are not ignored by top, the profiler, or opcount.
+    - jstests/core/**/operation_latency_histogram.js
+    - jstests/core/**/profile2.js
+    - jstests/core/**/profile3.js
+    - jstests/core/**/profile_findandmodify.js
+    - jstests/core/**/query/top/top.js
+    - jstests/core/catalog/views/views_stats.js
+    - jstests/core/query/bulk/bulk_write_profile.js
+    # This test makes the assumption that a command is run a certain number of times, but
+    # the retryable writes suite overrides the runCommand to repeat commands.
+    - jstests/core/**/failcommand_failpoint.js
+    # Unacknowledged writes prohibited in an explicit session.
+    - jstests/core/**/batch_write_command_w0.js
+
+    # TODO SERVER-94428: Reenable this test.
+    # This test is currently incompatible with dbcheck.
+    - jstests/core/timeseries/write/timeseries_update_multi.js
+
+  exclude_with_any_tags:
+    - assumes_standalone_mongod
+    # After SERVER-80339, the server runs a "listIndexes" command on the background, which could show
+    # up during profiling. Some profiling tests expect a certain command other than this "listIndexes"
+    # command.
+    - requires_profiling
+    - directly_against_shardsvrs_incompatible
+    - does_not_support_causal_consistency
+    - does_not_support_retryable_writes
+
+executor:
+  archive:
+    hooks:
+      - RunDBCheckInBackground
+      - CheckReplDBHashInBackground
+      - ValidateCollectionsInBackground
+      - CheckReplDBHash
+      - CheckReplOplogs
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: >-
+        globalThis.testingReplication = true;
+        await import("jstests/libs/override_methods/enable_sessions.js");
+      global_vars:
+        TestData:
+          alwaysInjectTransactionNumber: true
+          sessionOptions:
+            retryWrites: true
+  hooks:
+    - class: RunDBCheckInBackground
+    # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+    # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+    # validating the entire contents of the collection.
+    - class: CheckReplDBHashInBackground
+    - class: ValidateCollectionsInBackground
+    - class: CheckReplOplogs
+    - class: CheckReplDBHash
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      configsvr: ""
+      set_parameters:
+        enableTestCommands: 1
+    num_nodes: 2

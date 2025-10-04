@@ -18,13 +18,13 @@
 
 #include <cstddef>
 #include <boost/cstdint.hpp>
-#include <boost/static_assert.hpp>
 #include <boost/memory_order.hpp>
 #include <boost/atomic/capabilities.hpp>
 #include <boost/atomic/detail/config.hpp>
 #include <boost/atomic/detail/classify.hpp>
 #include <boost/atomic/detail/atomic_impl.hpp>
 #include <boost/atomic/detail/type_traits/is_trivially_copyable.hpp>
+#include <boost/atomic/detail/type_traits/is_nothrow_default_constructible.hpp>
 #include <boost/atomic/detail/header.hpp>
 
 #ifdef BOOST_HAS_PRAGMA_ONCE
@@ -45,18 +45,20 @@ private:
 
 public:
     typedef typename base_type::value_type value_type;
-    // Deprecated, use value_type instead
-    BOOST_ATOMIC_DETAIL_STORAGE_DEPRECATED
-    typedef typename base_type::storage_type storage_type;
 
-    BOOST_STATIC_ASSERT_MSG(sizeof(value_type) > 0u, "boost::atomic<T> requires T to be a complete type");
+    static_assert(sizeof(value_type) > 0u, "boost::atomic<T> requires T to be a complete type");
 #if !defined(BOOST_ATOMIC_DETAIL_NO_CXX11_IS_TRIVIALLY_COPYABLE)
-    BOOST_STATIC_ASSERT_MSG(atomics::detail::is_trivially_copyable< value_type >::value, "boost::atomic<T> requires T to be a trivially copyable type");
+    static_assert(atomics::detail::is_trivially_copyable< value_type >::value, "boost::atomic<T> requires T to be a trivially copyable type");
 #endif
 
 public:
-    BOOST_DEFAULTED_FUNCTION(atomic() BOOST_ATOMIC_DETAIL_DEF_NOEXCEPT_DECL, BOOST_ATOMIC_DETAIL_DEF_NOEXCEPT_IMPL {})
-    BOOST_FORCEINLINE BOOST_ATOMIC_DETAIL_CONSTEXPR_UNION_INIT atomic(value_arg_type v) BOOST_NOEXCEPT : base_type(v) {}
+    BOOST_FORCEINLINE BOOST_ATOMIC_DETAIL_CONSTEXPR_UNION_INIT atomic() BOOST_NOEXCEPT_IF(atomics::detail::is_nothrow_default_constructible< value_type >::value) : base_type()
+    {
+    }
+
+    BOOST_FORCEINLINE BOOST_ATOMIC_DETAIL_CONSTEXPR_UNION_INIT atomic(value_arg_type v) BOOST_NOEXCEPT : base_type(v)
+    {
+    }
 
     BOOST_FORCEINLINE value_type operator= (value_arg_type v) BOOST_NOEXCEPT
     {
@@ -74,16 +76,6 @@ public:
     {
         return this->load();
     }
-
-    // Deprecated, use value() instead
-    BOOST_ATOMIC_DETAIL_STORAGE_DEPRECATED
-    BOOST_FORCEINLINE typename base_type::storage_type& storage() BOOST_NOEXCEPT { return base_type::storage(); }
-    BOOST_ATOMIC_DETAIL_STORAGE_DEPRECATED
-    BOOST_FORCEINLINE typename base_type::storage_type volatile& storage() volatile BOOST_NOEXCEPT { return base_type::storage(); }
-    BOOST_ATOMIC_DETAIL_STORAGE_DEPRECATED
-    BOOST_FORCEINLINE typename base_type::storage_type const& storage() const BOOST_NOEXCEPT { return base_type::storage(); }
-    BOOST_ATOMIC_DETAIL_STORAGE_DEPRECATED
-    BOOST_FORCEINLINE typename base_type::storage_type const volatile& storage() const volatile BOOST_NOEXCEPT { return base_type::storage(); }
 
     BOOST_DELETED_FUNCTION(atomic(atomic const&))
     BOOST_DELETED_FUNCTION(atomic& operator= (atomic const&))

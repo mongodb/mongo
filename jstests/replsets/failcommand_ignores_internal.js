@@ -1,9 +1,8 @@
 // Tests that the "failCommand" failpoint ignores commands from internal clients: SERVER-34943.
 // @tags: [requires_replication]
-(function() {
-"use strict";
-
 // Prevent elections.
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const replTest = new ReplSetTest({nodes: [{}, {rsConfig: {votes: 0, priority: 0}}]});
 replTest.startSet();
 replTest.initiate();
@@ -16,15 +15,17 @@ const findReply = assert.commandWorked(testDB.runCommand({find: "collection", ba
 const cursorId = findReply.cursor.id;
 
 // Test failing twice with a particular error code.
-assert.commandWorked(testDB.adminCommand({
-    configureFailPoint: "failCommand",
-    mode: {times: 2},
-    data: {errorCode: ErrorCodes.BadValue, failCommands: ["getMore"]}
-}));
+assert.commandWorked(
+    testDB.adminCommand({
+        configureFailPoint: "failCommand",
+        mode: {times: 2},
+        data: {errorCode: ErrorCodes.BadValue, failCommands: ["getMore"]},
+    }),
+);
 const getMore = {
     getMore: cursorId,
     collection: "collection",
-    batchSize: 1
+    batchSize: 1,
 };
 assert.commandFailedWithCode(testDB.runCommand(getMore), ErrorCodes.BadValue);
 
@@ -36,4 +37,3 @@ assert.commandFailedWithCode(testDB.runCommand(getMore), ErrorCodes.BadValue);
 assert.commandWorked(testDB.runCommand(getMore));
 
 replTest.stopSet();
-}());

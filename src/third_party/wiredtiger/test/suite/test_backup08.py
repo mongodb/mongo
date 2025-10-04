@@ -36,7 +36,6 @@ from wtscenario import make_scenarios
 
 class test_backup08(wttest.WiredTigerTestCase):
     conn_config = 'config_base=false,create,log=(enabled)'
-    session_config = 'isolation=snapshot'
     dir = 'backup.dir'
     coll1_uri = 'table:collection10.1'
     coll2_uri = 'table:collection10.2'
@@ -132,6 +131,3 @@ class test_backup08(wttest.WiredTigerTestCase):
         # This tests that the stable timestamp information is transferred
         # with the backup. It should be part of the backup metadata file.
         self.backup_and_recover(ckpt_ts)
-
-if __name__ == '__main__':
-    wttest.run()

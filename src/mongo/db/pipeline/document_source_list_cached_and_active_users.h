@@ -29,11 +29,38 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/stage_constraints.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/db/read_concern_support_result.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/modules.h"
+
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -41,19 +68,22 @@ namespace mongo {
  * This implements an aggregation document source that lists the active/cached users in the
  * authorization manager. It is intended for diagnostic and reporting purposes.
  */
-class DocumentSourceListCachedAndActiveUsers final : public DocumentSource {
+class DocumentSourceListCachedAndActiveUsers final {
 public:
     static constexpr StringData kStageName = "$listCachedAndActiveUsers"_sd;
 
     class LiteParsed final : public LiteParsedDocumentSource {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
-                                                 const BSONElement& spec) {
-            return std::make_unique<LiteParsed>(spec.fieldName());
+                                                 const BSONElement& spec,
+                                                 const LiteParserOptions& options) {
+            return std::make_unique<LiteParsed>(spec.fieldName(), nss.tenantId());
         }
 
-        explicit LiteParsed(std::string parseTimeName)
-            : LiteParsedDocumentSource(std::move(parseTimeName)) {}
+        explicit LiteParsed(std::string parseTimeName, const boost::optional<TenantId>& tenantId)
+            : LiteParsedDocumentSource(std::move(parseTimeName)),
+              _requiredPrivilege(Privilege(ResourcePattern::forAnyNormalResource(tenantId),
+                                           ActionType::listCachedAndActiveUsers)) {}
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
             return stdx::unordered_set<NamespaceString>();
@@ -61,64 +91,28 @@ public:
 
         PrivilegeVector requiredPrivileges(bool isMongos,
                                            bool bypassDocumentValidation) const final {
-            return {Privilege(ResourcePattern::forAnyNormalResource(),
-                              ActionType::listCachedAndActiveUsers)};
+            return {_requiredPrivilege};
         }
 
         bool isInitialSource() const final {
             return true;
         }
 
-        bool allowedToPassthroughFromMongos() const final {
-            return false;
-        }
-
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
-                                                     bool isImplicitDefault) const {
+                                                     bool isImplicitDefault) const override {
             return onlyReadConcernLocalSupported(kStageName, level, isImplicitDefault);
         }
 
-        void assertSupportsMultiDocumentTransaction() const {
+        void assertSupportsMultiDocumentTransaction() const override {
             transactionNotSupported(kStageName);
         }
+
+    private:
+        const Privilege _requiredPrivilege;
     };
-
-    const char* getSourceName() const final {
-        return kStageName.rawData();
-    }
-
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {
-        return Value(Document{{getSourceName(), Document{}}});
-    }
-
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
-        StageConstraints constraints(StreamType::kStreaming,
-                                     PositionRequirement::kFirst,
-                                     HostTypeRequirement::kLocalOnly,
-                                     DiskUseRequirement::kNoDiskUse,
-                                     FacetRequirement::kNotAllowed,
-                                     TransactionRequirement::kNotAllowed,
-                                     LookupRequirement::kAllowed,
-                                     UnionRequirement::kNotAllowed);
-
-        constraints.isIndependentOfAnyCollection = true;
-        constraints.requiresInputDocSource = false;
-        return constraints;
-    }
-
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
-        return boost::none;
-    }
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
-
-private:
-    DocumentSourceListCachedAndActiveUsers(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
-
-    GetNextResult doGetNext() final;
-
-    std::vector<AuthorizationManager::CachedUserInfo> _users;
 };
 
 }  // namespace mongo

@@ -30,11 +30,20 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/client.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/util/modules.h"
+
+#include <memory>
+#include <string>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -50,14 +59,22 @@ public:
     /**
      * Create or get a pointer to a JsExecution instance, capable of invoking Javascript functions
      * and reading the return value. If `loadStoredProcedures` is true, this will load all stored
-     * procedures from database unless 'disableLoadStored' is set on the global ScriptEngine. The
-     * JsExecution* returned is owned by 'opCtx'.
+     * procedures from database. The JsExecution* returned is owned by 'opCtx'.
      */
     static JsExecution* get(OperationContext* opCtx,
                             const BSONObj& scope,
-                            StringData database,
+                            const DatabaseName& database,
                             bool loadStoredProcedures,
                             boost::optional<int> jsHeapLimitMB);
+
+    /**
+     * Gets a pointer to the cached JsExecution instance if it exists, else returns nullptr. This
+     * allows the caller to skip passing all the arguments to the more general JsExecution::get()
+     * method, which avoids having to potentially construct and create a heap copy of a large scope
+     * object that will not be used because a cached JsExecution object already exists.
+     */
+    static JsExecution* getCached(OperationContext* opCtx, bool loadStoredProcedures);
+
     /**
      * Construct with a thread-local scope and initialize with the given scope variables.
      */
@@ -104,11 +121,8 @@ public:
      * Injects the given function 'emitFn' as a native JS function named 'emit', callable from
      * user-defined functions.
      */
-    void injectEmitIfNecessary(NativeFunction emitFn, void* data) {
-        if (!_emitCreated) {
-            _scope->injectNative("emit", emitFn, data);
-            _emitCreated = true;
-        }
+    void injectEmit(NativeFunction emitFn, void* data) {
+        _scope->injectNative("emit", emitFn, data);
     }
 
     Scope* getScope() {
@@ -118,7 +132,6 @@ public:
 private:
     BSONObj _scopeVars;
     std::unique_ptr<Scope> _scope;
-    bool _emitCreated = false;
     bool _storedProceduresLoaded = false;
     int _fnCallTimeoutMillis;
 

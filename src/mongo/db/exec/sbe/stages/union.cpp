@@ -27,29 +27,42 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/exec/sbe/stages/union.h"
 
-#include "mongo/db/exec/sbe/expressions/expression.h"
+#include <fmt/format.h>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
+#include <algorithm>
+#include <utility>
 
 namespace mongo::sbe {
 UnionStage::UnionStage(PlanStage::Vector inputStages,
                        std::vector<value::SlotVector> inputVals,
                        value::SlotVector outputVals,
-                       PlanNodeId planNodeId)
-    : PlanStage("union"_sd, planNodeId),
+                       PlanNodeId planNodeId,
+                       bool participateInTrialRunTracking)
+    : PlanStage("union"_sd, nullptr /* yieldPolicy */, planNodeId, participateInTrialRunTracking),
       _inputVals{std::move(inputVals)},
       _outputVals{std::move(outputVals)} {
     _children = std::move(inputStages);
 
-    invariant(_children.size() > 0);
-    invariant(_children.size() == _inputVals.size());
-    invariant(std::all_of(
-        _inputVals.begin(), _inputVals.end(), [size = _outputVals.size()](const auto& slots) {
-            return slots.size() == size;
-        }));
+    tassert(11094703, "Expecting non-empty list of input stages", _children.size() > 0);
+    tassert(11094702,
+            "Expecting number of input values to match the number of input stages",
+            _children.size() == _inputVals.size());
+    tassert(11094701,
+            "Expect the length of all input slot vectors to match the length of output slot vector",
+            std::all_of(
+                _inputVals.begin(),
+                _inputVals.end(),
+                [size = _outputVals.size()](const auto& slots) { return slots.size() == size; }));
 }
 
 std::unique_ptr<PlanStage> UnionStage::clone() const {
@@ -57,15 +70,23 @@ std::unique_ptr<PlanStage> UnionStage::clone() const {
     for (auto& child : _children) {
         inputStages.emplace_back(child->clone());
     }
-    return std::make_unique<UnionStage>(
-        std::move(inputStages), _inputVals, _outputVals, _commonStats.nodeId);
+    return std::make_unique<UnionStage>(std::move(inputStages),
+                                        _inputVals,
+                                        _outputVals,
+                                        _commonStats.nodeId,
+                                        participateInTrialRunTracking());
 }
 
 void UnionStage::prepare(CompileCtx& ctx) {
-    value::SlotSet dupCheck;
-
     for (size_t childNum = 0; childNum < _children.size(); childNum++) {
         _children[childNum]->prepare(ctx);
+    }
+
+    // All of the slots listed in '_outputVals' must be unique.
+    value::SlotSet dupCheck;
+    for (auto slot : _outputVals) {
+        auto [it, inserted] = dupCheck.insert(slot);
+        uassert(4822807, str::stream() << "duplicate field: " << slot, inserted);
     }
 
     for (size_t idx = 0; idx < _outputVals.size(); ++idx) {
@@ -73,16 +94,13 @@ void UnionStage::prepare(CompileCtx& ctx) {
         accessors.reserve(_children.size());
 
         for (size_t childNum = 0; childNum < _children.size(); childNum++) {
+            // Slots listed in '_inputVals' may not appear in '_outputVals'.
             auto slot = _inputVals[childNum][idx];
-            auto [it, inserted] = dupCheck.insert(slot);
-            uassert(4822806, str::stream() << "duplicate field: " << slot, inserted);
+            bool slotFound = dupCheck.count(slot);
+            uassert(4822806, str::stream() << "duplicate field: " << slot, !slotFound);
 
             accessors.emplace_back(_children[childNum]->getAccessor(ctx, slot));
         }
-
-        auto slot = _outputVals[idx];
-        auto [it, inserted] = dupCheck.insert(slot);
-        uassert(4822807, str::stream() << "duplicate field: " << slot, inserted);
 
         _outValueAccessors.emplace_back(value::SwitchAccessor{std::move(accessors)});
     }
@@ -110,7 +128,7 @@ void UnionStage::open(bool reOpen) {
     }
 
     for (auto& child : _children) {
-        _remainingBranchesToDrain.push({child.get(), reOpen});
+        _remainingBranchesToDrain.push({child.get()});
     }
 
     _remainingBranchesToDrain.front().open();
@@ -193,9 +211,10 @@ std::vector<DebugPrinter::Block> UnionStage::debugPrint() const {
     }
     ret.emplace_back(DebugPrinter::Block("`]"));
 
-    ret.emplace_back(DebugPrinter::Block("[`"));
     ret.emplace_back(DebugPrinter::Block::cmdIncIndent);
     for (size_t childNum = 0; childNum < _children.size(); childNum++) {
+        DebugPrinter::addKeyword(ret, fmt::format("branch{}", childNum));
+
         ret.emplace_back(DebugPrinter::Block("[`"));
         for (size_t idx = 0; idx < _inputVals[childNum].size(); idx++) {
             if (idx) {
@@ -205,15 +224,11 @@ std::vector<DebugPrinter::Block> UnionStage::debugPrint() const {
         }
         ret.emplace_back(DebugPrinter::Block("`]"));
 
+        ret.emplace_back(DebugPrinter::Block::cmdIncIndent);
         DebugPrinter::addBlocks(ret, _children[childNum]->debugPrint());
-
-        if (childNum + 1 < _children.size()) {
-            ret.emplace_back(DebugPrinter::Block(","));
-            DebugPrinter::addNewLine(ret);
-        }
+        ret.emplace_back(DebugPrinter::Block::cmdDecIndent);
     }
     ret.emplace_back(DebugPrinter::Block::cmdDecIndent);
-    ret.emplace_back(DebugPrinter::Block("`]"));
 
     return ret;
 }

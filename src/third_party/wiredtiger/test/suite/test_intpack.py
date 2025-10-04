@@ -30,7 +30,7 @@
 #    Tests integer packing using public methods
 #
 
-import wiredtiger, wttest
+import wttest
 from wtscenario import make_scenarios
 
 class PackTester:
@@ -152,8 +152,8 @@ class test_intpack(wttest.WiredTigerTestCase):
     ])
 
     def test_packing(self):
-        pt = PackTester(self.formatcode, self.low, self.high, self.assertEquals)
-        self.assertEquals(2 ** self.nbits, self.high - self.low + 1)
+        pt = PackTester(self.formatcode, self.low, self.high, self.assertEqual)
+        self.assertEqual(2 ** self.nbits, self.high - self.low + 1)
         pt.initialize(self.session)
         pt.check_range(-self.base_range, self.base_range)
         if self.nbits >= 32:
@@ -170,6 +170,3 @@ class test_intpack(wttest.WiredTigerTestCase):
                 pt.check_range(-i - 1, -i + 1)
                 pt.check_range(i - 1, i + 1)
                 i <<= 1
-
-if __name__ == '__main__':
-    wttest.run()

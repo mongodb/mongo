@@ -13,8 +13,8 @@
 
 #include <boost/smart_ptr/local_shared_ptr.hpp>
 #include <boost/smart_ptr/make_shared.hpp>
-#include <boost/type_traits/remove_const.hpp>
 #include <boost/config.hpp>
+#include <type_traits>
 #include <utility>
 #include <cstddef>
 
@@ -45,7 +45,7 @@ template<class T, class A> class lsp_ms_deleter: public local_counted_impl_em
 {
 private:
 
-    typedef typename sp_aligned_storage<sizeof(T), ::boost::alignment_of<T>::value>::type storage_type;
+    typedef typename sp_aligned_storage<sizeof(T), std::alignment_of<T>::value>::type storage_type;
 
     storage_type storage_;
     A a_;
@@ -53,21 +53,13 @@ private:
 
 private:
 
-    void destroy() BOOST_SP_NOEXCEPT
+    void destroy() noexcept
     {
         if( initialized_ )
         {
             T * p = reinterpret_cast< T* >( storage_.data_ );
 
-#if !defined( BOOST_NO_CXX11_ALLOCATOR )
-
             std::allocator_traits<A>::destroy( a_, p );
-
-#else
-
-            p->~T();
-
-#endif
 
             initialized_ = false;
         }
@@ -75,35 +67,35 @@ private:
 
 public:
 
-    explicit lsp_ms_deleter( A const & a ) BOOST_SP_NOEXCEPT : a_( a ), initialized_( false )
+    explicit lsp_ms_deleter( A const & a ) noexcept : a_( a ), initialized_( false )
     {
     }
 
     // optimization: do not copy storage_
-    lsp_ms_deleter( lsp_ms_deleter const & r ) BOOST_SP_NOEXCEPT : a_( r.a_), initialized_( false )
+    lsp_ms_deleter( lsp_ms_deleter const & r ) noexcept : a_( r.a_), initialized_( false )
     {
     }
 
-    ~lsp_ms_deleter() BOOST_SP_NOEXCEPT
-    {
-        destroy();
-    }
-
-    void operator()( T * ) BOOST_SP_NOEXCEPT
+    ~lsp_ms_deleter() noexcept
     {
         destroy();
     }
 
-    static void operator_fn( T* ) BOOST_SP_NOEXCEPT // operator() can't be static
+    void operator()( T * ) noexcept
+    {
+        destroy();
+    }
+
+    static void operator_fn( T* ) noexcept // operator() can't be static
     {
     }
 
-    void * address() BOOST_SP_NOEXCEPT
+    void * address() noexcept
     {
         return storage_.data_;
     }
 
-    void set_initialized() BOOST_SP_NOEXCEPT
+    void set_initialized() noexcept
     {
         initialized_ = true;
     }
@@ -113,15 +105,7 @@ public:
 
 template<class T, class A, class... Args> typename boost::detail::lsp_if_not_array<T>::type allocate_local_shared( A const & a, Args&&... args )
 {
-#if !defined( BOOST_NO_CXX11_ALLOCATOR )
-
     typedef typename std::allocator_traits<A>::template rebind_alloc<T> A2;
-
-#else
-
-    typedef typename A::template rebind<T>::other A2;
-
-#endif
 
     A2 a2( a );
 
@@ -132,15 +116,7 @@ template<class T, class A, class... Args> typename boost::detail::lsp_if_not_arr
     D * pd = static_cast< D* >( pt._internal_get_untyped_deleter() );
     void * pv = pd->address();
 
-#if !defined( BOOST_NO_CXX11_ALLOCATOR )
-
     std::allocator_traits<A2>::construct( a2, static_cast< T* >( pv ), std::forward<Args>( args )... );
-
-#else
-
-    ::new( pv ) T( std::forward<Args>( args )... );
-
-#endif
 
     pd->set_initialized();
 
@@ -154,15 +130,7 @@ template<class T, class A, class... Args> typename boost::detail::lsp_if_not_arr
 
 template<class T, class A> typename boost::detail::lsp_if_not_array<T>::type allocate_local_shared_noinit( A const & a )
 {
-#if !defined( BOOST_NO_CXX11_ALLOCATOR )
-
     typedef typename std::allocator_traits<A>::template rebind_alloc<T> A2;
-
-#else
-
-    typedef typename A::template rebind<T>::other A2;
-
-#endif
 
     A2 a2( a );
 
@@ -187,13 +155,13 @@ template<class T, class A> typename boost::detail::lsp_if_not_array<T>::type all
 
 template<class T, class... Args> typename boost::detail::lsp_if_not_array<T>::type make_local_shared( Args&&... args )
 {
-    typedef typename boost::remove_const<T>::type T2;
+    typedef typename std::remove_const<T>::type T2;
     return boost::allocate_local_shared<T2>( std::allocator<T2>(), std::forward<Args>(args)... );
 }
 
 template<class T> typename boost::detail::lsp_if_not_array<T>::type make_local_shared_noinit()
 {
-    typedef typename boost::remove_const<T>::type T2;
+    typedef typename std::remove_const<T>::type T2;
     return boost::allocate_shared_noinit<T2>( std::allocator<T2>() );
 }
 

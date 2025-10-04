@@ -29,10 +29,21 @@
 
 #pragma once
 
+#include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/exec/sbe/stages/plan_stats.h"
+#include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/util/debug_print.h"
+#include "mongo/db/exec/sbe/values/row.h"
+#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
+
+#include <cstddef>
+#include <memory>
+#include <unordered_map>
+#include <utility>
 #include <vector>
 
-#include "mongo/db/exec/sbe/stages/stages.h"
-#include "mongo/db/exec/sbe/vm/vm.h"
+#include <boost/optional/optional.hpp>
 
 namespace mongo::sbe {
 /**
@@ -66,7 +77,9 @@ public:
                   value::SlotVector innerCond,
                   value::SlotVector innerProjects,
                   boost::optional<value::SlotId> collatorSlot,
-                  PlanNodeId planNodeId);
+                  PlanYieldPolicy* yieldPolicy,
+                  PlanNodeId planNodeId,
+                  bool participateInTrialRunTracking = true);
 
     std::unique_ptr<PlanStage> clone() const final;
 
@@ -80,6 +93,11 @@ public:
     const SpecificStats* getSpecificStats() const final;
     std::vector<DebugPrinter::Block> debugPrint() const final;
     size_t estimateCompileTimeSize() const final;
+
+protected:
+    void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override {
+        return;
+    }
 
 private:
     using TableType = std::unordered_multimap<value::MaterializedRow,  // NOLINT
@@ -123,9 +141,5 @@ private:
     boost::optional<TableType> _ht;
     TableType::iterator _htIt;
     TableType::iterator _htItEnd;
-
-    vm::ByteCode _bytecode;
-
-    bool _compiled{false};
 };
 }  // namespace mongo::sbe

@@ -2,10 +2,8 @@
  * Tests that the index's full specification is included in the oplog entry corresponding to its
  * creation.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/get_index_helpers.js");
+import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
@@ -19,12 +17,9 @@ const oplogColl = primary.getDB("local").oplog.rs;
 function testOplogEntryContainsIndexInfoObj(coll, keyPattern, indexOptions) {
     assert.commandWorked(coll.createIndex(keyPattern, indexOptions));
     const allIndexes = coll.getIndexes();
-    const indexSpec = GetIndexHelpers.findByKeyPattern(allIndexes, keyPattern);
+    const indexSpec = IndexCatalogHelpers.findByKeyPattern(allIndexes, keyPattern);
 
-    assert.neq(
-        null,
-        indexSpec,
-        "Index with key pattern " + tojson(keyPattern) + " not found: " + tojson(allIndexes));
+    assert.neq(null, indexSpec, "Index with key pattern " + tojson(keyPattern) + " not found: " + tojson(allIndexes));
 
     const indexCreationOplogQuery = {
         op: "c",
@@ -58,10 +53,14 @@ function testOplogEntryContainsIndexInfoObj(coll, keyPattern, indexOptions) {
         delete entrySpec.createIndexes;
         return bsonWoCompare(indexSpec, entrySpec) === 0;
     });
-    assert.eq(1,
-              found.length,
-              "Failed to find full index specification " + indexSpecJson +
-                  " in any oplog entry from index creation: " + allOplogEntriesJson);
+    assert.eq(
+        1,
+        found.length,
+        "Failed to find full index specification " +
+            indexSpecJson +
+            " in any oplog entry from index creation: " +
+            allOplogEntriesJson,
+    );
 
     assert.commandWorked(coll.dropIndex(keyPattern));
 }
@@ -74,22 +73,29 @@ assert.commandWorked(testDB.oplog_format.insert({a: 1}));
 testOplogEntryContainsIndexInfoObj(testDB.oplog_format, {withoutAnyOptions: 1});
 testOplogEntryContainsIndexInfoObj(testDB.oplog_format, {withV1: 1}, {v: 1});
 testOplogEntryContainsIndexInfoObj(
-    testDB.oplog_format, {partialIndex: 1}, {partialFilterExpression: {field: {$exists: true}}});
+    testDB.oplog_format,
+    {partialIndex: 1},
+    {partialFilterExpression: {field: {$exists: true}}},
+);
 
 // Test that the representation of an index's collation in the oplog on a collection with a
 // non-simple default collation exactly matches that of the index's full specification.
-assert.commandWorked(
-    testDB.runCommand({create: "oplog_format_collation", collation: {locale: "fr"}}));
+assert.commandWorked(testDB.runCommand({create: "oplog_format_collation", collation: {locale: "fr"}}));
 
 // Insert document into collection to avoid optimization for index creation on an empty collection.
 assert.commandWorked(testDB.oplog_format_collation.insert({a: 1}));
 
 testOplogEntryContainsIndexInfoObj(testDB.oplog_format_collation, {withDefaultCollation: 1});
 testOplogEntryContainsIndexInfoObj(
-    testDB.oplog_format_collation, {withNonDefaultCollation: 1}, {collation: {locale: "en"}});
+    testDB.oplog_format_collation,
+    {withNonDefaultCollation: 1},
+    {collation: {locale: "en"}},
+);
 testOplogEntryContainsIndexInfoObj(testDB.oplog_format_collation, {withV1: 1}, {v: 1});
 testOplogEntryContainsIndexInfoObj(
-    testDB.oplog_format_collation, {withSimpleCollation: 1}, {collation: {locale: "simple"}});
+    testDB.oplog_format_collation,
+    {withSimpleCollation: 1},
+    {collation: {locale: "simple"}},
+);
 
 rst.stopSet();
-})();

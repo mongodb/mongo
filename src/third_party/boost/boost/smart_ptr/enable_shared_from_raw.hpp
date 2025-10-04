@@ -71,15 +71,12 @@ private:
         }
     }
 
-#ifdef BOOST_NO_MEMBER_TEMPLATE_FRIENDS
-public:
-#else
 private:
+
     template<class Y> friend class shared_ptr;
     template<typename T> friend boost::shared_ptr<T> shared_from_raw(T *);
     template<typename T> friend boost::weak_ptr<T> weak_from_raw(T *);
     template< class X, class Y > friend inline void detail::sp_enable_shared_from_this( boost::shared_ptr<X> * ppx, Y const * py, boost::enable_shared_from_raw const * pe );
-#endif
 
     shared_ptr<void const volatile> shared_from_this() const
     {

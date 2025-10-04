@@ -7,47 +7,45 @@
 // This test involves using fsync to lock the secondaries, so cannot be run on
 // storage engines which do not support the command.
 // @tags: [
-//    requires_fsync,
+//   # TODO (SERVER-85629): Re-enable this test once redness is resolved in multiversion suites.
+//   DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE,
+//   requires_fcv_80,
+//   requires_fsync,
 // ]
 
-(function() {
-'use strict';
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // The mongod secondaries are set to priority 0 to prevent the primaries from stepping down during
 // migrations on slow evergreen builders.
-var s = new ShardingTest({
+let s = new ShardingTest({
     shards: 2,
     other: {
         chunkSize: 1,
         rs0: {
-            nodes: [
-                {},
-                {rsConfig: {priority: 0}},
-            ],
+            nodes: [{}, {rsConfig: {priority: 0}}],
         },
         rs1: {
-            nodes: [
-                {},
-                {rsConfig: {priority: 0}},
-            ],
-        }
-    }
+            nodes: [{}, {rsConfig: {priority: 0}}],
+        },
+    },
 });
 
 var db = s.getDB("test");
-var t = db.foo;
+let t = db.foo;
 
-assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
+assert.commandWorked(s.s0.adminCommand({enablesharding: "test", primaryShard: s.shard0.shardName}));
 // The default WC is 'majority' and fsyncLock will prevent satisfying any majority writes.
 // The default RC is 'local' but fsync will block any refresh on secondaries, that's why RC is
 // defaulted to 'available'.
-assert.commandWorked(s.s.adminCommand({
-    setDefaultRWConcern: 1,
-    defaultReadConcern: {level: "available"},
-    defaultWriteConcern: {w: 1},
-    writeConcern: {w: "majority"}
-}));
-s.ensurePrimaryShard('test', s.shard0.shardName);
+assert.commandWorked(
+    s.s.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultReadConcern: {level: "available"},
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
+);
 
 // -------------------------------------------------------------------------------------------
 // ---------- test that config server updates when replica set config changes ----------------
@@ -65,8 +63,13 @@ function countNodes() {
 
 assert.eq(2, countNodes(), "A1");
 
-var rs = s.rs0;
-rs.add({'shardsvr': ""});
+const rs = s.rs0;
+if (!TestData.configShard) {
+    rs.add({"shardsvr": ""});
+} else {
+    rs.add({"configsvr": ""});
+}
+
 try {
     rs.reInitiate();
 } catch (e) {
@@ -74,32 +77,37 @@ try {
     print(e);
 }
 
-assert.soon(function() {
-    try {
-        printjson(rs.getPrimary().getDB("admin").runCommand("hello"));
-        s.config.shards.find().forEach(printjsononeline);
-        return countNodes() == 3;
-    } catch (e) {
-        print(e);
-    }
-}, "waiting for config server to update", 180 * 1000, 1000);
+assert.soon(
+    function () {
+        try {
+            printjson(rs.getPrimary().getDB("admin").runCommand("hello"));
+            s.config.shards.find().forEach(printjsononeline);
+            return countNodes() == 3;
+        } catch (e) {
+            print(e);
+        }
+    },
+    "waiting for config server to update",
+    180 * 1000,
+    1000,
+);
 
 // cleanup after adding node
-for (var i = 0; i < 5; i++) {
+for (let i = 0; i < 5; i++) {
     try {
         db.foo.findOne();
     } catch (e) {
+        //
     }
 }
 
-jsTest.log(
-    "Awaiting replication of all nodes, so spurious sync'ing queries don't upset our counts...");
+jsTest.log("Awaiting replication of all nodes, so spurious sync'ing queries don't upset our counts...");
 rs.awaitReplication();
 // Make sure we wait for secondaries here - otherwise a secondary could come online later and be
 // used for the
 // count command before being fully replicated
 jsTest.log("Awaiting secondary status of all nodes");
-rs.waitForState(rs.getSecondaries(), ReplSetTest.State.SECONDARY, 180 * 1000);
+rs.awaitSecondaryNodes(180 * 1000);
 
 // -------------------------------------------------------------------------------------------
 // ---------- test routing to secondaries ----------------
@@ -107,22 +115,22 @@ rs.waitForState(rs.getSecondaries(), ReplSetTest.State.SECONDARY, 180 * 1000);
 
 // --- not sharded ----
 
-var m = new Mongo(s.s.name);
-var ts = m.getDB("test").foo;
+let m = new Mongo(s.s.name);
+let ts = m.getDB("test").foo;
 
-var before = rs.getPrimary().adminCommand("serverStatus").opcounters;
+let before = rs.getPrimary().adminCommand("serverStatus").opcounters;
 
-for (var i = 0; i < 10; i++) {
+for (let i = 0; i < 10; i++) {
     assert.eq(17, ts.findOne().x, "B1");
 }
 
 m.setSecondaryOk();
 
-for (var i = 0; i < 10; i++) {
+for (let i = 0; i < 10; i++) {
     assert.eq(17, ts.findOne().x, "B2");
 }
 
-var after = rs.getPrimary().adminCommand("serverStatus").opcounters;
+let after = rs.getPrimary().adminCommand("serverStatus").opcounters;
 
 printjson(before);
 printjson(after);
@@ -133,10 +141,9 @@ assert.lte(before.query + 10, after.query, "B3");
 
 db.foo.createIndex({x: 1});
 
-var bulk = db.foo.initializeUnorderedBulkOp();
-for (var i = 0; i < 100; i++) {
-    if (i == 17)
-        continue;
+let bulk = db.foo.initializeUnorderedBulkOp();
+for (let i = 0; i < 100; i++) {
+    if (i == 17) continue;
     bulk.insert({x: i});
 }
 assert.commandWorked(bulk.execute({w: 3}));
@@ -149,7 +156,7 @@ assert.eq(100, ts.count(), "B4");
 assert.eq(100, ts.find().itcount(), "B5");
 assert.eq(100, ts.find().batchSize(5).itcount(), "B6");
 
-var cursor = t.find().batchSize(3);
+let cursor = t.find().batchSize(3);
 cursor.next();
 cursor.close();
 
@@ -167,15 +174,17 @@ assert.commandWorked(s.s0.adminCommand({split: "test.foo", middle: {x: 50}}));
 
 s.printShardingStatus();
 
-var other = s.config.shards.findOne({_id: {$ne: s.shard0.shardName}});
-assert.commandWorked(s.getDB('admin').runCommand({
-    moveChunk: "test.foo",
-    find: {x: 10},
-    to: other._id,
-    _secondaryThrottle: true,
-    writeConcern: {w: 2},
-    _waitForDelete: true
-}));
+let other = s.config.shards.findOne({_id: {$ne: s.shard0.shardName}});
+assert.commandWorked(
+    s.getDB("admin").runCommand({
+        moveChunk: "test.foo",
+        find: {x: 10},
+        to: other._id,
+        _secondaryThrottle: true,
+        writeConcern: {w: 2},
+        _waitForDelete: true,
+    }),
+);
 rs.awaitReplication();
 assert.eq(100, t.count(), "C3");
 
@@ -188,12 +197,12 @@ ts = m.getDB("test").foo;
 
 before = rs.getPrimary().adminCommand("serverStatus").opcounters;
 
-for (var i = 0; i < 10; i++) {
+for (let i = 0; i < 10; i++) {
     assert.eq(17, ts.findOne({_id: 5}).x, "D1");
 }
 
 m.setSecondaryOk();
-for (var i = 0; i < 10; i++) {
+for (let i = 0; i < 10; i++) {
     assert.eq(17, ts.findOne({_id: 5}).x, "D2");
 }
 
@@ -211,12 +220,12 @@ ts = m.getDB("test").foo;
 
 before = rs.getPrimary().adminCommand("serverStatus").opcounters;
 
-for (var i = 0; i < 10; i++) {
+for (let i = 0; i < 10; i++) {
     assert.eq(57, ts.findOne({x: 57}).x, "E1");
 }
 
 m.setSecondaryOk();
-for (var i = 0; i < 10; i++) {
+for (let i = 0; i < 10; i++) {
     assert.eq(57, ts.findOne({x: 57}).x, "E2");
 }
 
@@ -230,11 +239,9 @@ assert.eq(100, ts.find().itcount(), "E5");
 printjson(ts.find().batchSize(5).explain());
 
 // fsyncLock the secondaries and enable command logging on all the mongods.
-assert.commandWorked(
-    rs.getPrimary().adminCommand({setParameter: 1, logComponentVerbosity: {command: 2}}));
-rs.getSecondaries().forEach(function(secondary) {
-    assert.commandWorked(
-        secondary.adminCommand({setParameter: 1, logComponentVerbosity: {command: 2}}));
+assert.commandWorked(rs.getPrimary().adminCommand({setParameter: 1, logComponentVerbosity: {command: 2}}));
+rs.getSecondaries().forEach(function (secondary) {
+    assert.commandWorked(secondary.adminCommand({setParameter: 1, logComponentVerbosity: {command: 2}}));
     assert.commandWorked(secondary.getDB("test").fsyncLock());
 });
 
@@ -245,21 +252,21 @@ assert.commandWorked(ts.insert({primaryOnly: true, x: 60}));
 // But we can guarantee not to read from primary.
 assert.eq(0, ts.find({primaryOnly: true, x: 60}).itcount());
 // Unlock the secondaries
-rs.getSecondaries().forEach(function(secondary) {
+rs.getSecondaries().forEach(function (secondary) {
     secondary.getDB("test").fsyncUnlock();
 });
 // Clean up the data
 assert.commandWorked(ts.remove({primaryOnly: true, x: 60}, {writeConcern: {w: 3}}));
 
 rs.awaitReplication();
-for (var i = 0; i < 10; i++) {
+for (let i = 0; i < 10; i++) {
     m = new Mongo(s.s.name);
     m.setSecondaryOk();
     ts = m.getDB("test").foo;
     assert.eq(100, ts.find().batchSize(5).itcount(), "F2." + i);
 }
 
-for (var i = 0; i < 10; i++) {
+for (let i = 0; i < 10; i++) {
     m = new Mongo(s.s.name);
     ts = m.getDB("test").foo;
     assert.eq(100, ts.find().batchSize(5).itcount(), "F3." + i);
@@ -268,4 +275,3 @@ for (var i = 0; i < 10; i++) {
 printjson(db.adminCommand("getShardMap"));
 
 s.stop();
-})();

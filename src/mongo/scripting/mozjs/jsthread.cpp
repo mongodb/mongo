@@ -27,36 +27,61 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/scripting/mozjs/jsthread.h"
 
-#include <cstdio>
-#include <memory>
-#include <vm/PosixNSPR.h>
-
-#include "mongo/db/jsobj.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/client.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/scripting/engine.h"
+#include "mongo/scripting/mozjs/engine.h"
+#include "mongo/scripting/mozjs/exception.h"
 #include "mongo/scripting/mozjs/implscope.h"
+#include "mongo/scripting/mozjs/internedstring.h"
+#include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
-#include "mongo/scripting/mozjs/valuewriter.h"
-#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/util/stacktrace.h"
+#include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <mutex>
+#include <string>
+#include <utility>
+
+#include <jsapi.h>
+#include <jsfriendapi.h>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <js/Array.h>
+#include <js/CallArgs.h>
+#include <js/Object.h>
+#include <js/PropertyAndElement.h>
+#include <js/PropertySpec.h>
+#include <js/RootingAPI.h>
+#include <js/TypeDecls.h>
+#include <js/ValueArray.h>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 
 namespace mongo {
 namespace mozjs {
 
 // These are all executed on some object that owns a js thread, rather than a
 // jsthread itself, so CONSTRAINED_METHOD doesn't do the job here.
-const JSFunctionSpec JSThreadInfo::threadMethods[6] = {
+const JSFunctionSpec JSThreadInfo::threadMethods[7] = {
     MONGO_ATTACH_JS_FUNCTION(init),
     MONGO_ATTACH_JS_FUNCTION(start),
     MONGO_ATTACH_JS_FUNCTION(join),
     MONGO_ATTACH_JS_FUNCTION(hasFailed),
+    MONGO_ATTACH_JS_FUNCTION(currentStatus),
     MONGO_ATTACH_JS_FUNCTION(returnData),
     JS_FS_END,
 };
@@ -74,24 +99,27 @@ const char* const JSThreadInfo::className = "JSThread";
  *
  * The idea here is that we create a jsthread by taking a js function and its
  * parameters and encoding them into a single bson object. Then we spawn a
- * thread, have that thread do the work and join() it before checking it's
+ * thread, have that thread do the work and join() it before checking its
  * result (serialized through bson). We can check errors at any time by
  * checking a mutex guarded hasError().
  */
 class JSThreadConfig {
 public:
     JSThreadConfig(JSContext* cx, JS::CallArgs args)
-        : _started(false), _done(false), _sharedData(new SharedData()), _jsthread(*this) {
+        : _started(false),
+          _done(false),
+          _sharedData(std::make_shared<SharedData>()),
+          _jsthread(*this) {
         auto scope = getScope(cx);
 
         uassert(ErrorCodes::JSInterpreterFailure, "need at least one argument", args.length() > 0);
         uassert(ErrorCodes::JSInterpreterFailure,
                 "first argument must be a function",
-                args.get(0).isObject() && JS_ObjectIsFunction(cx, args.get(0).toObjectOrNull()));
+                args.get(0).isObject() && js::IsFunctionObject(args.get(0).toObjectOrNull()));
 
-        JS::RootedObject robj(cx, JS_NewArrayObject(cx, args));
+        JS::RootedObject robj(cx, JS::NewArrayObject(cx, args));
         if (!robj) {
-            uasserted(ErrorCodes::JSInterpreterFailure, "Failed to JS_NewArrayObject");
+            uasserted(ErrorCodes::JSInterpreterFailure, "Failed to JS::NewArrayObject");
         }
 
         _sharedData->_args = ObjectWrapper(cx, robj).toBSON();
@@ -122,12 +150,23 @@ public:
     /**
      * Returns true if the JSThread terminated as a result of an error
      * during its execution, and false otherwise. This operation does
-     * not block, nor does it require join() to have been called.
+     * not wait for the thread to terminate, nor does it require join()
+     * to have been called.
      */
     bool hasFailed() const {
+        return !currentStatus().isOK();
+    }
+
+    /**
+     * Returns the current error status of the thread, which may
+     * change as it is running. This operation does not wait for the
+     * thread to terminate, nor does it require join() to have been
+     * called.
+     */
+    Status currentStatus() const {
         uassert(ErrorCodes::JSInterpreterFailure, "Thread not started", _started);
 
-        return !_sharedData->getErrorStatus().isOK();
+        return _sharedData->getErrorStatus();
     }
 
     BSONObj returnData() {
@@ -150,12 +189,12 @@ private:
         SharedData() = default;
 
         void setErrorStatus(Status status) {
-            stdx::lock_guard<Latch> lck(_statusMutex);
+            stdx::lock_guard<stdx::mutex> lck(_statusMutex);
             _status = std::move(status);
         }
 
         Status getErrorStatus() {
-            stdx::lock_guard<Latch> lck(_statusMutex);
+            stdx::lock_guard<stdx::mutex> lck(_statusMutex);
             return _status;
         }
 
@@ -169,7 +208,7 @@ private:
         std::string _stack;
 
     private:
-        Mutex _statusMutex = MONGO_MAKE_LATCH("SharedData::_statusMutex");
+        stdx::mutex _statusMutex;
         Status _status = Status::OK();
     };
 
@@ -186,14 +225,14 @@ private:
             try {
                 MozJSImplScope scope(static_cast<MozJSScriptEngine*>(getGlobalScriptEngine()),
                                      boost::none /* Don't override global jsHeapLimitMB */);
-
+                Client::initThread("js", getGlobalServiceContext()->getService());
                 scope.setParentStack(thisv->_sharedData->_stack);
                 thisv->_sharedData->_returnData = scope.callThreadArgs(thisv->_sharedData->_args);
             } catch (...) {
                 auto status = exceptionToStatus();
                 LOGV2_WARNING(4988200,
                               "JS Thread exiting after catching unhandled exception",
-                              "error"_attr = status);
+                              "error"_attr = redact(status));
                 thisv->_sharedData->setErrorStatus(status);
                 thisv->_sharedData->_returnData = BSON("ret" << BSONUndefined);
             }
@@ -222,18 +261,19 @@ JSThreadConfig* getConfig(JSContext* cx, JS::CallArgs args) {
     if (!getScope(cx)->getProto<JSThreadInfo>().instanceOf(value))
         uasserted(ErrorCodes::BadValue, "_JSThreadConfig is not a JSThread");
 
-    return static_cast<JSThreadConfig*>(JS_GetPrivate(value.toObjectOrNull()));
+    return JS::GetMaybePtrFromReservedSlot<JSThreadConfig>(value.toObjectOrNull(),
+                                                           JSThreadInfo::JSThreadConfigSlot);
 }
 
 }  // namespace
 
-void JSThreadInfo::finalize(js::FreeOp* fop, JSObject* obj) {
-    auto config = static_cast<JSThreadConfig*>(JS_GetPrivate(obj));
+void JSThreadInfo::finalize(JS::GCContext* gcCtx, JSObject* obj) {
+    auto config = JS::GetMaybePtrFromReservedSlot<JSThreadConfig>(obj, JSThreadConfigSlot);
 
     if (!config)
         return;
 
-    getScope(fop)->trackedDelete(config);
+    getScope(gcCtx)->trackedDelete(config);
 }
 
 void JSThreadInfo::Functions::init::call(JSContext* cx, JS::CallArgs args) {
@@ -242,7 +282,7 @@ void JSThreadInfo::Functions::init::call(JSContext* cx, JS::CallArgs args) {
     JS::RootedObject obj(cx);
     scope->getProto<JSThreadInfo>().newObject(&obj);
     JSThreadConfig* config = scope->trackedNew<JSThreadConfig>(cx, args);
-    JS_SetPrivate(obj, config);
+    JS::SetReservedSlot(obj, JSThreadConfigSlot, JS::PrivateValue(config));
 
     ObjectWrapper(cx, args.thisv()).setObject(InternedString::_JSThreadConfig, obj);
 
@@ -263,6 +303,14 @@ void JSThreadInfo::Functions::join::call(JSContext* cx, JS::CallArgs args) {
 
 void JSThreadInfo::Functions::hasFailed::call(JSContext* cx, JS::CallArgs args) {
     args.rval().setBoolean(getConfig(cx, args)->hasFailed());
+}
+
+void JSThreadInfo::Functions::currentStatus::call(JSContext* cx, JS::CallArgs args) {
+    BSONObjBuilder bob;
+    getConfig(cx, args)->currentStatus().serialize(&bob);
+    const BSONObj* parent = nullptr;
+    const bool readOnly = true;
+    ValueReader(cx, args.rval()).fromBSON(bob.obj(), parent, readOnly);
 }
 
 void JSThreadInfo::Functions::returnData::call(JSContext* cx, JS::CallArgs args) {

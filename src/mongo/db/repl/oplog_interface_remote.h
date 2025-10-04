@@ -29,9 +29,15 @@
 
 #pragma once
 
-#include <functional>
-
 #include "mongo/db/repl/oplog_interface.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/transaction/transaction_history_iterator.h"
+#include "mongo/util/modules.h"
+#include "mongo/util/net/hostandport.h"
+
+#include <functional>
+#include <memory>
+#include <string>
 
 namespace mongo {
 
@@ -43,17 +49,14 @@ namespace repl {
  * Reads oplog on remote server.
  */
 
-class OplogInterfaceRemote : public OplogInterface {
+class MONGO_MOD_PUB OplogInterfaceRemote : public OplogInterface {
 public:
     /**
      * Type of function to return a connection to the sync source.
      */
     using GetConnectionFn = std::function<DBClientBase*()>;
 
-    OplogInterfaceRemote(HostAndPort hostAndPort,
-                         GetConnectionFn getConnection,
-                         const std::string& collectionName,
-                         int batchSize);
+    OplogInterfaceRemote(HostAndPort hostAndPort, GetConnectionFn getConnection, int batchSize);
     std::string toString() const override;
     std::unique_ptr<OplogInterface::Iterator> makeIterator() const override;
     std::unique_ptr<TransactionHistoryIteratorBase> makeTransactionHistoryIterator(
@@ -63,7 +66,6 @@ public:
 private:
     HostAndPort _hostAndPort;
     GetConnectionFn _getConnection;
-    std::string _collectionName;
     int _batchSize;
 };
 

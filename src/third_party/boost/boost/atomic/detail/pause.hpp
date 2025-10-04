@@ -48,6 +48,13 @@ BOOST_FORCEINLINE void pause() BOOST_NOEXCEPT
     __asm__ __volatile__("pause;" : : : "memory");
 #elif (defined(__ARM_ARCH) && __ARM_ARCH >= 8) || defined(__ARM_ARCH_8A__) || defined(__aarch64__)
     __asm__ __volatile__("yield;" : : : "memory");
+#elif defined(__riscv) && __riscv_xlen == 64
+#if defined(__riscv_zihintpause)
+    __asm__ __volatile__("pause" : : : "memory");
+#else
+    /* Encoding of the pause instruction */
+    __asm__ __volatile__ (".4byte 0x100000F");
+#endif
 #endif
 #endif
 }

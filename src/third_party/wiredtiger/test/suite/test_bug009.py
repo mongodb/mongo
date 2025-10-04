@@ -31,8 +31,7 @@
 #       when figuring out how to split pages
 #
 
-import wiredtiger, wttest
-from wiredtiger import stat
+import wttest
 
 class test_bug009(wttest.WiredTigerTestCase):
     name = 'test_bug009'
@@ -53,6 +52,3 @@ class test_bug009(wttest.WiredTigerTestCase):
         # size over a page boundary.
         cursor['fill_2__b_27'] = '0' * 2294
         cursor['fill_2__b_28'] = '0' * 3022
-
-if __name__ == '__main__':
-    wttest.run()

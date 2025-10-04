@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <cstddef>
 
 namespace {
 
@@ -82,6 +83,8 @@ FORCE_INLINE T nativeToLittle( T t )
     return t;
 }
 
+template <typename T> constexpr std::ptrdiff_t ssizeof = sizeof(T);
+
 //-----------------------------------------------------------------------------
 // Block read - if your platform needs to do endian-swapping or can only
 // handle aligned reads, do the conversion here
@@ -89,7 +92,7 @@ template <typename T>
 FORCE_INLINE T getblock( const void* p, int i )
 {
     T t;
-    std::memcpy(&t, static_cast<const char*>(p) + i * sizeof(T), sizeof(T));
+    std::memcpy(&t, static_cast<const char*>(p) + i * ssizeof<T>, sizeof(T));
     return nativeToLittle(t);
 }
 
@@ -108,7 +111,7 @@ template <typename T>
 FORCE_INLINE void putblock( void* p, int i, T t )
 {
     t = nativeToLittle(t);
-    std::memcpy(static_cast<char*>(p) + i * sizeof(T), &t, sizeof(T));
+    std::memcpy(static_cast<char*>(p) + i * ssizeof<T>, &t, sizeof(T));
 }
 
 //-----------------------------------------------------------------------------

@@ -32,12 +32,13 @@
 
 global:
     cpp_namespace: "mongo::repl"
+    mod_visibility: private
     cpp_includes:
         - "mongo/db/repl/election_reason_counter_parser.h"
         - "mongo/db/repl/optime.h"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
     - "mongo/db/repl/replication_types.idl"
 
 enums:
@@ -59,6 +60,8 @@ types:
         cpp_type: ElectionReasonCounter
         serializer: "::mongo::repl::serializeElectionReasonCounterToBSON"
         deserializer: "::mongo::repl::parseElectionReasonCounter"
+        # ElectionReasonCounter has only non view members.
+        is_view: false
 
 structs:
     ElectionMetrics:
@@ -78,8 +81,9 @@ structs:
                 type: ElectionReasonCounter
                 non_const_getter: true
             electionTimeout:
-                description: "Election reason counter for when the node didn't see a primary in the
-                              past electionTimeoutPeriod milliseconds"
+                description:
+                    "Election reason counter for when the node didn't see a primary in the
+                    past electionTimeoutPeriod milliseconds"
                 type: ElectionReasonCounter
                 non_const_getter: true
             freezeTimeout:
@@ -91,18 +95,21 @@ structs:
                 type: long
                 default: 0
             numCatchUps:
-                description: "Number of elections that required the primary to catch up because it
-                              was behind"
+                description:
+                    "Number of elections that required the primary to catch up because it
+                    was behind"
                 type: long
                 default: 0
             numCatchUpsSucceeded:
-                description: "Number of times primary catchup concluded because the primary caught
-                              up to the latest known optime successfully"
+                description:
+                    "Number of times primary catchup concluded because the primary caught
+                    up to the latest known optime successfully"
                 type: long
                 default: 0
             numCatchUpsAlreadyCaughtUp:
-                description: "Number of times primary catchup concluded because the primary was
-                              already caught up"
+                description:
+                    "Number of times primary catchup concluded because the primary was
+                    already caught up"
                 type: long
                 default: 0
             numCatchUpsSkipped:
@@ -114,18 +121,21 @@ structs:
                 type: long
                 default: 0
             numCatchUpsFailedWithError:
-                description: "Number of times primary catchup concluded because it failed with an
-                              error"
+                description:
+                    "Number of times primary catchup concluded because it failed with an
+                    error"
                 type: long
                 default: 0
             numCatchUpsFailedWithNewTerm:
-                description: "Number of times primary catchup concluded because the primary stepped
-                              down on seeing a higher term"
+                description:
+                    "Number of times primary catchup concluded because the primary stepped
+                    down on seeing a higher term"
                 type: long
                 default: 0
             numCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd:
-                description: "Number of times primary catchup concluded because of the
-                              replSetAbortPrimaryCatchUp command"
+                description:
+                    "Number of times primary catchup concluded because of the
+                    replSetAbortPrimaryCatchUp command"
                 type: long
                 default: 0
             averageCatchUpOps:
@@ -134,8 +144,9 @@ structs:
                 default: 0.0
 
     ElectionCandidateMetrics:
-        description: "Stores metrics that are specific to the last election in which the node was a
-                      candidate"
+        description:
+            "Stores metrics that are specific to the last election in which the node was a
+            candidate"
         strict: true
         fields:
             lastElectionReason:
@@ -150,8 +161,11 @@ structs:
             lastCommittedOpTimeAtElection:
                 description: "Last OpTime the node committed before calling the election"
                 type: optime
+            lastSeenWrittenOpTimeAtElection:
+                description: "Latest written OpTime the node saw before calling the election"
+                type: optime
             lastSeenOpTimeAtElection:
-                description: "Last OpTime the node saw before calling the election"
+                description: "Latest applied OpTime the node saw before calling the election"
                 type: optime
             numVotesNeeded:
                 description: "Number of votes the node needed to win the election"
@@ -163,8 +177,9 @@ structs:
                 description: "Timeout duration before a node initiates a new election"
                 type: long
             priorPrimaryMemberId:
-                description: "MemberId of the prior primary, according to the node. Not set if
-                              there was no prior primary"
+                description:
+                    "MemberId of the prior primary, according to the node. Not set if
+                    there was no prior primary"
                 type: int
                 optional: true
             targetCatchupOpTime:
@@ -172,8 +187,9 @@ structs:
                 type: optime
                 optional: true
             numCatchUpOps:
-                description: "Number of ops applied during catchup when the primary successfully
-                              catches up"
+                description:
+                    "Number of ops applied during catchup when the primary successfully
+                    catches up"
                 type: long
                 optional: true
             newTermStartDate:
@@ -204,12 +220,21 @@ structs:
             voteReason:
                 description: "Reason why the node voted the way it did"
                 type: string
+            lastWrittenOpTimeAtElection:
+                description: "Latest written OpTime at the time of voting"
+                type: optime
+            maxWrittenOpTimeInSet:
+                description:
+                    "Highest written time of any node in this replica set, as currently
+                    known by this node"
+                type: optime
             lastAppliedOpTimeAtElection:
                 description: "Latest applied OpTime at the time of voting"
                 type: optime
             maxAppliedOpTimeInSet:
-                description: "Highest applied time of any node in this replica set, as currently
-                              known by this node"
+                description:
+                    "Highest applied time of any node in this replica set, as currently
+                    known by this node"
                 type: optime
             priorityAtElection:
                 description: "The node's priority at the time of the election"

@@ -27,29 +27,28 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplicationRollback
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/roll_back_local_operations.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/storage/remove_saver.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplicationRollback
+
+
 namespace mongo {
 namespace repl {
-
-// After the release of MongoDB 3.8, these fail point declarations can
-// be moved into the rs_rollback.cpp file, as we no longer need to maintain
-// functionality for rs_rollback_no_uuid.cpp. See SERVER-29766.
-
-// Failpoint which causes rollback to hang before finishing.
-MONGO_FAIL_POINT_DEFINE(rollbackHangBeforeFinish);
-
-// Failpoint which causes rollback to hang and then fail after minValid is written.
-MONGO_FAIL_POINT_DEFINE(rollbackHangThenFailAfterWritingMinValid);
-
 
 namespace {
 
@@ -76,6 +75,9 @@ long long getTerm(const OplogInterface::Iterator::Value& oplogValue) {
 }
 }  // namespace
 
+static constexpr auto kRollbackRemoveSaverType = "rollback";
+static constexpr auto kRollbackRemoveSaverWhy = "removed";
+
 RollBackLocalOperations::RollBackLocalOperations(const OplogInterface& localOplog,
                                                  const RollbackOperationFn& rollbackOperation)
 
@@ -99,7 +101,7 @@ RollBackLocalOperations::RollbackCommonPoint::RollbackCommonPoint(BSONObj oplogB
 }
 
 StatusWith<RollBackLocalOperations::RollbackCommonPoint> RollBackLocalOperations::onRemoteOperation(
-    const BSONObj& operation) {
+    const BSONObj& operation, RemoveSaver& removeSaver, bool shouldCreateDataFiles) {
     if (_scanned == 0) {
         auto result = _localOplogIterator->next();
         if (!result.isOK()) {
@@ -116,9 +118,11 @@ StatusWith<RollBackLocalOperations::RollbackCommonPoint> RollBackLocalOperations
         _scanned++;
         LOGV2_DEBUG(21656,
                     2,
-                    "Local oplog entry to roll back: {oplogEntry}",
                     "Local oplog entry to roll back",
                     "oplogEntry"_attr = redact(_localOplogValue.first));
+        if (shouldCreateDataFiles) {
+            fassert(9777500, removeSaver.goingToDelete(_localOplogValue.first));
+        }
         auto status = _rollbackOperation(_localOplogValue.first);
         if (!status.isOK()) {
             invariant(ErrorCodes::NoSuchKey != status.code());
@@ -164,7 +168,8 @@ StatusWith<RollBackLocalOperations::RollbackCommonPoint> RollBackLocalOperations
 StatusWith<RollBackLocalOperations::RollbackCommonPoint> syncRollBackLocalOperations(
     const OplogInterface& localOplog,
     const OplogInterface& remoteOplog,
-    const RollBackLocalOperations::RollbackOperationFn& rollbackOperation) {
+    const RollBackLocalOperations::RollbackOperationFn& rollbackOperation,
+    bool shouldCreateDataFiles) {
 
     std::unique_ptr<OplogInterface::Iterator> remoteIterator;
 
@@ -188,10 +193,12 @@ StatusWith<RollBackLocalOperations::RollbackCommonPoint> syncRollBackLocalOperat
 
     RollBackLocalOperations finder(localOplog, rollbackOperation);
     Timestamp theirTime;
+    RemoveSaver removeSaver(kRollbackRemoveSaverType, "local.oplog.rs", kRollbackRemoveSaverWhy);
     while (remoteResult.isOK()) {
         BSONObj theirObj = remoteResult.getValue().first;
         theirTime = theirObj["ts"].timestamp();
-        auto result = finder.onRemoteOperation(theirObj);
+
+        auto result = finder.onRemoteOperation(theirObj, removeSaver, shouldCreateDataFiles);
         if (result.isOK()) {
             return result.getValue();
         } else if (result.getStatus().code() != ErrorCodes::NoSuchKey) {

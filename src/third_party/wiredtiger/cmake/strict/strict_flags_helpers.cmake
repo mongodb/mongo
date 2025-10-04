@@ -1,11 +1,3 @@
-#
-# Public Domain 2014-present MongoDB, Inc.
-# Public Domain 2008-2014 WiredTiger, Inc.
-#  All rights reserved.
-#
-#  See the file LICENSE for redistribution information
-#
-
 # get_gnu_base_flags(flags)
 # Helper function that generates a set of common GNU flags for a given language.
 #   flags - list of flags.
@@ -47,6 +39,10 @@ function(get_gnu_base_flags flags)
     list(APPEND gnu_flags "-Winit-self")
     list(APPEND gnu_flags "-Wmissing-declarations")
     list(APPEND gnu_flags "-Wmissing-field-initializers")
+    # FIXME-WT-11788: Remove the following flag once the violation of the standard C11 7.1.3 has
+    # been addressed.
+    list(APPEND gnu_flags "-Wno-reserved-identifier")
+    list(APPEND gnu_flags "-Wno-switch-default")
     list(APPEND gnu_flags "-Wpacked")
     list(APPEND gnu_flags "-Wpointer-arith")
     list(APPEND gnu_flags "-Wredundant-decls")
@@ -73,7 +69,7 @@ function(get_gnu_base_flags flags)
     if(${cmake_compiler_version} VERSION_GREATER_EQUAL 6)
         list(APPEND gnu_flags "-Wduplicated-cond")
         list(APPEND gnu_flags "-Wlogical-op")
-        list(APPEND gnu_flags "-Wunused-const-variable=2")
+        list(APPEND gnu_flags "-Wunused-const-variable=1")
     endif()
     if(${cmake_compiler_version} VERSION_GREATER_EQUAL 7)
         list(APPEND gnu_flags "-Walloca")
@@ -129,6 +125,11 @@ function(get_clang_base_flags flags)
     list(APPEND clang_flags "-Wno-packed")
     list(APPEND clang_flags "-Wno-padded")
     list(APPEND clang_flags "-Wno-reserved-id-macro")
+    # FIXME-WT-11788: Remove the following flag once the violation of the standard C11 7.1.3 has
+    # been addressed.
+    list(APPEND clang_flags "-Wno-reserved-identifier")
+    list(APPEND clang_flags "-Wno-switch-default")
+    list(APPEND clang_flags "-Wno-unsafe-buffer-usage")
     list(APPEND clang_flags "-Wno-zero-length-array")
 
     # We should turn on cast-qual, but not as a fatal error: see WT-2690.
@@ -174,6 +175,7 @@ function(get_clang_base_flags flags)
         # compatible with some of the code patterns in WiredTiger.
         list(APPEND clang_flags "-Wno-implicit-fallthrough")
         list(APPEND clang_flags "-Wno-implicit-int-float-conversion")
+        list(APPEND clang_flags "-Wno-maybe-uninitialized")
     endif()
 
     set(${flags} ${clang_flags} PARENT_SCOPE)
@@ -213,10 +215,6 @@ function(get_cl_base_flags flags)
 
     # Warning level 3.
     list(APPEND cl_flags "/WX")
-    # Ignore warning about mismatched const qualifiers.
-    list(APPEND cl_flags "/wd4090")
-    # Ignore deprecated functions.
-    list(APPEND cl_flags "/wd4996")
     # Complain about unreferenced format parameter.
     list(APPEND cl_flags "/we4100")
     # Enable security check.

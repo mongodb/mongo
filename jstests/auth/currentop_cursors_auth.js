@@ -1,12 +1,10 @@
 /**
  * Tests that a user's ability to view open cursors via $currentOp obeys authentication rules on
  * both mongoD and mongoS.
- * @tags: [assumes_read_concern_unchanged, requires_auth, requires_journaling, requires_replication]
+ * @tags: [assumes_read_concern_unchanged, requires_auth, requires_replication]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fixture_helpers.js");  // For isMongos.
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Create a new sharded cluster for testing and enable auth.
 const key = "jstests/libs/key1";
@@ -21,16 +19,30 @@ Random.setRandomSeed();
 const pass = "a" + Random.rand();
 
 // Create one root user and one regular user on the given connection.
-function createUsers(conn) {
+function createUsers(conn, grantDirectShardOperationsRole) {
     const adminDB = conn.getDB("admin");
+
     adminDB.createUser({user: "ted", pwd: pass, roles: ["root"]});
     assert(adminDB.auth("ted", pass), "Authentication 1 Failed");
-    adminDB.createUser({user: "yuta", pwd: pass, roles: ["readWriteAnyDatabase"]});
+
+    let yutaRoles = ["readWriteAnyDatabase"];
+    if (grantDirectShardOperationsRole) yutaRoles.push("directShardOperations");
+
+    adminDB.createUser({user: "yuta", pwd: pass, roles: yutaRoles});
 }
 
-// Create the necessary users at both cluster and shard-local level.
-createUsers(shardConn);
-createUsers(mongosConn);
+// Create the necessary users at the shard local level.
+createUsers(shardConn, /* grantDirectShardOperationsRole */ true);
+
+// Create the necessary users at the cluster level. If the shard is a configShard, then the users
+// will have already been created on the config server from the previous createUsers() call.
+if (!TestData.configShard) {
+    createUsers(mongosConn, /* grantDirectShardOperationsRole */ false);
+} else {
+    // Even though we've skipped creating the users, we still need to log in on the mongos for the
+    // rest of the test.
+    assert(mongosConn.getDB("admin").auth("ted", pass), "Authentication 1 Failed");
+}
 
 // Run the various auth tests on the given shard or mongoS connection.
 function runCursorTests(conn) {
@@ -48,16 +60,15 @@ function runCursorTests(conn) {
     }
 
     // Verify that we can see our own cursor with {allUsers: false}.
-    const cursorId =
-        assert.commandWorked(db.runCommand({find: "jstests_currentop_cursors_auth", batchSize: 2}))
-            .cursor.id;
+    const cursorId = assert.commandWorked(db.runCommand({find: "jstests_currentop_cursors_auth", batchSize: 2})).cursor
+        .id;
 
     let result = adminDB
-                     .aggregate([
-                         {$currentOp: {localOps: true, allUsers: false, idleCursors: true}},
-                         {$match: {$and: [{type: "idleCursor"}, {"cursor.cursorId": cursorId}]}}
-                     ])
-                     .toArray();
+        .aggregate([
+            {$currentOp: {localOps: true, allUsers: false, idleCursors: true}},
+            {$match: {$and: [{type: "idleCursor"}, {"cursor.cursorId": cursorId}]}},
+        ])
+        .toArray();
     assert.eq(result.length, 1, result);
 
     // Log in as the non-root user.
@@ -66,43 +77,44 @@ function runCursorTests(conn) {
 
     // Verify that we cannot see the root user's cursor.
     result = adminDB
-                 .aggregate([
-                     {$currentOp: {localOps: true, allUsers: false, idleCursors: true}},
-                     {$match: {$and: [{type: "idleCursor"}, {"cursor.cursorId": cursorId}]}}
-                 ])
-                 .toArray();
+        .aggregate([
+            {$currentOp: {localOps: true, allUsers: false, idleCursors: true}},
+            {$match: {$and: [{type: "idleCursor"}, {"cursor.cursorId": cursorId}]}},
+        ])
+        .toArray();
     assert.eq(result.length, 0, result);
 
     // Make sure that the behavior is the same when 'allUsers' is not explicitly specified.
     result = adminDB
-                 .aggregate([
-                     {$currentOp: {localOps: true, idleCursors: true}},
-                     {$match: {$and: [{type: "idleCursor"}, {"cursor.cursorId": cursorId}]}}
-                 ])
-                 .toArray();
+        .aggregate([
+            {$currentOp: {localOps: true, idleCursors: true}},
+            {$match: {$and: [{type: "idleCursor"}, {"cursor.cursorId": cursorId}]}},
+        ])
+        .toArray();
     assert.eq(result.length, 0, result);
 
     // Verify that the user without the 'inprog' privilege cannot view shard cursors via mongoS.
     if (FixtureHelpers.isMongos(db)) {
-        assert.commandFailedWithCode(adminDB.runCommand({
-            aggregate: 1,
-            pipeline: [{$currentOp: {localOps: false, idleCursors: true}}],
-            cursor: {}
-        }),
-                                     ErrorCodes.Unauthorized);
+        assert.commandFailedWithCode(
+            adminDB.runCommand({
+                aggregate: 1,
+                pipeline: [{$currentOp: {localOps: false, idleCursors: true}}],
+                cursor: {},
+            }),
+            ErrorCodes.Unauthorized,
+        );
     }
 
     // Create a cursor with the second (non-root) user and confirm that we can see it.
-    const secondCursorId =
-        assert.commandWorked(db.runCommand({find: "jstests_currentop_cursors_auth", batchSize: 2}))
-            .cursor.id;
+    const secondCursorId = assert.commandWorked(db.runCommand({find: "jstests_currentop_cursors_auth", batchSize: 2}))
+        .cursor.id;
 
     result = adminDB
-                 .aggregate([
-                     {$currentOp: {localOps: true, allUsers: false, idleCursors: true}},
-                     {$match: {$and: [{type: "idleCursor"}, {"cursor.cursorId": secondCursorId}]}}
-                 ])
-                 .toArray();
+        .aggregate([
+            {$currentOp: {localOps: true, allUsers: false, idleCursors: true}},
+            {$match: {$and: [{type: "idleCursor"}, {"cursor.cursorId": secondCursorId}]}},
+        ])
+        .toArray();
     assert.eq(result.length, 1, result);
 
     // Log back in with the root user and confirm that the first cursor is still present.
@@ -110,37 +122,35 @@ function runCursorTests(conn) {
     assert(adminDB.auth("ted", pass), "Authentication 4 Failed");
 
     result = adminDB
-                 .aggregate([
-                     {$currentOp: {localOps: true, allUsers: false, idleCursors: true}},
-                     {$match: {$and: [{type: "idleCursor"}, {"cursor.cursorId": cursorId}]}}
-                 ])
-                 .toArray();
+        .aggregate([
+            {$currentOp: {localOps: true, allUsers: false, idleCursors: true}},
+            {$match: {$and: [{type: "idleCursor"}, {"cursor.cursorId": cursorId}]}},
+        ])
+        .toArray();
     assert.eq(result.length, 1, result);
 
     // Confirm that the root user can see both users' cursors with {allUsers: true}.
-    result =
-        adminDB
-            .aggregate([
-                {$currentOp: {localOps: true, allUsers: true, idleCursors: true}},
-                {$match: {type: "idleCursor", "cursor.cursorId": {$in: [cursorId, secondCursorId]}}}
-            ])
-            .toArray();
+    result = adminDB
+        .aggregate([
+            {$currentOp: {localOps: true, allUsers: true, idleCursors: true}},
+            {$match: {type: "idleCursor", "cursor.cursorId": {$in: [cursorId, secondCursorId]}}},
+        ])
+        .toArray();
     assert.eq(result.length, 2, result);
 
     // The root user can also see both cursors on the shard via mongoS with {localOps: false}.
     if (FixtureHelpers.isMongos(db)) {
         result = adminDB
-                     .aggregate([
-                         {$currentOp: {localOps: false, allUsers: true, idleCursors: true}},
-                         {$match: {type: "idleCursor", shard: st.rs0.name}}
-                     ])
-                     .toArray();
+            .aggregate([
+                {$currentOp: {localOps: false, allUsers: true, idleCursors: true}},
+                {$match: {type: "idleCursor", shard: st.shard0.shardName}},
+            ])
+            .toArray();
         assert.eq(result.length, 2, result);
     }
 
     // Clean up the cursors so that they don't affect subsequent tests.
-    assert.commandWorked(
-        db.runCommand({killCursors: coll.getName(), cursors: [cursorId, secondCursorId]}));
+    assert.commandWorked(db.runCommand({killCursors: coll.getName(), cursors: [cursorId, secondCursorId]}));
 
     // Make sure to logout to allow __system user to use the implicit session.
     assert.commandWorked(adminDB.logout());
@@ -153,4 +163,3 @@ jsTestLog("Running cursor tests on mongoS");
 runCursorTests(mongosConn);
 
 st.stop();
-})();

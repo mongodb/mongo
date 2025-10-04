@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
 
 #include "mongo/bson/bsontypes.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -55,15 +55,21 @@ namespace mongo {
  */
 inline uint32_t getBSONTypeMask(BSONType t) noexcept {
     switch (t) {
-        case BSONType::EOO:
+        case BSONType::eoo:
             return 0;
-        case BSONType::MinKey:
+        case BSONType::minKey:
             return uint32_t{1} << 0;
-        case BSONType::MaxKey:
+        case BSONType::maxKey:
             return uint32_t{1} << 31;
         default:
             return uint32_t{1} << static_cast<uint8_t>(t);
     }
 }
+
+const uint32_t kNumberMask = getBSONTypeMask(BSONType::numberInt) |
+    getBSONTypeMask(BSONType::numberLong) | getBSONTypeMask(BSONType::numberDouble) |
+    getBSONTypeMask(BSONType::numberDecimal);
+
+const uint32_t kDateMask = getBSONTypeMask(BSONType::date);
 
 }  // namespace mongo

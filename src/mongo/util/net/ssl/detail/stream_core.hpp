@@ -15,19 +15,21 @@
 #pragma once
 #endif  // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
-#include "asio/detail/config.hpp"
+#include <asio/detail/config.hpp>
 
 #if defined(ASIO_HAS_BOOST_DATE_TIME)
 #include "asio/deadline_timer.hpp"
 #else  // defined(ASIO_HAS_BOOST_DATE_TIME)
-#include "asio/steady_timer.hpp"
+#include <asio/steady_timer.hpp>
 #endif  // defined(ASIO_HAS_BOOST_DATE_TIME)
 
-#include "asio/buffer.hpp"
 #include "mongo/util/net/ssl/apple.hpp"
 #include "mongo/util/net/ssl/detail/engine.hpp"
 
-#include "asio/detail/push_options.hpp"
+#include <asio/buffer.hpp>
+
+// This must be after all other includes
+#include <asio/detail/push_options.hpp>
 
 namespace asio {
 namespace ssl {
@@ -38,22 +40,21 @@ struct stream_core {
     // sufficient to hold the largest possible TLS record.
     enum { max_tls_record_size = 17 * 1024 };
 
+    template <typename Executor>
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_WINDOWS
-    stream_core(SCHANNEL_CRED* context,
-                const std::string& remoteHostName,
-                asio::io_context& io_context)
+    stream_core(SCHANNEL_CRED* context, const std::string& remoteHostName, const Executor& executor)
 #elif MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
-    stream_core(SSL_CTX* context, const std::string& remoteHostName, asio::io_context& io_context)
+    stream_core(SSL_CTX* context, const std::string& remoteHostName, const Executor& executor)
 #elif MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_APPLE
     stream_core(apple::Context* context,
                 const std::string& remoteHostName,
-                asio::io_context& io_context)
+                const Executor& executor)
 #else
 #error "Unknown SSL Provider"
 #endif
         : engine_(context, remoteHostName),
-          pending_read_(io_context),
-          pending_write_(io_context),
+          pending_read_(executor),
+          pending_write_(executor),
           output_buffer_space_(max_tls_record_size),
           output_buffer_(asio::buffer(output_buffer_space_)),
           input_buffer_space_(max_tls_record_size),
@@ -134,6 +135,6 @@ struct stream_core {
 }  // namespace ssl
 }  // namespace asio
 
-#include "asio/detail/pop_options.hpp"
+#include <asio/detail/pop_options.hpp>
 
 #endif  // ASIO_SSL_DETAIL_STREAM_CORE_HPP

@@ -27,23 +27,45 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-#include "mongo/platform/basic.h"
-
-#include <memory>
-
-#include "mongo/client/sdam/sdam.h"
-#include "mongo/client/sdam/topology_listener_mock.h"
 #include "mongo/client/server_ping_monitor.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/sdam/sdam_configuration.h"
+#include "mongo/client/sdam/topology_description.h"
+#include "mongo/client/sdam/topology_listener_mock.h"
+#include "mongo/dbtests/mock/mock_remote_db_server.h"
 #include "mongo/dbtests/mock/mock_replica_set.h"
+#include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_response.h"
+#include "mongo/executor/task_executor_test_fixture.h"
 #include "mongo/executor/thread_pool_mock.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/logv2/log.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/reply_interface.h"
+#include "mongo/rpc/unique_message.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
+
+#include <algorithm>
+#include <list>
+#include <memory>
+#include <ratio>
+#include <utility>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 
 namespace mongo {
 namespace {
@@ -51,7 +73,6 @@ namespace {
 const sdam::HelloRTT initialRTT = duration_cast<Milliseconds>(Milliseconds(100));
 using executor::NetworkInterfaceMock;
 using executor::RemoteCommandResponse;
-using executor::ThreadPoolExecutorTest;
 using InNetworkGuard = NetworkInterfaceMock::InNetworkGuard;
 
 class ServerPingMonitorTestFixture : public unittest::Test {
@@ -62,7 +83,7 @@ protected:
     void setUp() override {
         auto network = std::make_unique<executor::NetworkInterfaceMock>();
         _net = network.get();
-        _executor = makeSharedThreadPoolTestExecutor(std::move(network));
+        _executor = makeThreadPoolTestExecutor(std::move(network));
         _executor->startup();
         _startDate = _net->now();
         _topologyListener.reset(new sdam::TopologyListenerMock());
@@ -71,6 +92,7 @@ protected:
     void tearDown() override {
         _topologyListener.reset();
         _executor->shutdown();
+        executor::NetworkInterfaceMock::InNetworkGuard(_net)->runReadyNetworkOperations();
         _executor->join();
         _executor.reset();
     }
@@ -123,9 +145,10 @@ protected:
         node->setCommandReply("ping", BSON("ok" << 1));
 
         if (node->isRunning()) {
-            const auto opmsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+            const auto opmsg = static_cast<OpMsgRequest>(request);
             const auto reply = node->runCommand(request.id, opmsg)->getCommandReply();
-            _net->scheduleSuccessfulResponse(noi, RemoteCommandResponse(reply, Milliseconds(0)));
+            _net->scheduleSuccessfulResponse(
+                noi, RemoteCommandResponse::make_forTest(reply, Milliseconds(0)));
         } else {
             _net->scheduleErrorResponse(noi, Status(ErrorCodes::HostUnreachable, ""));
         }
@@ -162,7 +185,7 @@ protected:
         ASSERT_LT(elapsed(), deadline);
         auto pingResponse = _topologyListener->getPingResponse(hostAndPort);
 
-        // There should only be one isMaster response queued up.
+        // There should only be one "hello" response queued up.
         ASSERT_EQ(pingResponse.size(), 1);
         ASSERT(pingResponse[0].isOK());
 
@@ -221,14 +244,14 @@ private:
 
 class SingleServerPingMonitorTest : public ServerPingMonitorTestFixture {
 protected:
-    void setUp() {
+    void setUp() override {
         ServerPingMonitorTestFixture::setUp();
         _replSet.reset(new MockReplicaSet(
             "test", 1, /* hasPrimary = */ false, /* dollarPrefixHosts = */ false));
         _hostAndPort = HostAndPort(_replSet->getSecondaries()[0]);
     }
 
-    void tearDown() {
+    void tearDown() override {
         _replSet.reset();
         ServerPingMonitorTestFixture::tearDown();
     }

@@ -1,0 +1,88 @@
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+   - License, v. 2.0. If a copy of the MPL was not distributed with this file,
+   - You can obtain one at http://mozilla.org/MPL/2.0/. -->
+
+<html>
+<head>
+  <title>GC uBench</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+
+  <!-- Benchmark harness and UI -->
+  <script src="harness.js"></script>
+  <script src="perf.js"></script>
+  <script src="sequencer.js"></script>
+  <script src="ui.js"></script>
+
+  <!-- List of garbage-creating test loads -->
+  <script src="test_list.js"></script>
+</head>
+
+<body onload="onload()" onunload="onunload()">
+
+<canvas id="graph" width="980" height="320" style="padding-left:10px"></canvas>
+<canvas id="memgraph" width="980" height="320" style="padding-left:10px"></canvas>
+<div id="memgraph-disabled" style="display: none"><i>No performance.mozMemory object available. If running Firefox, set dom.enable_memory_stats to True to see heap size info.</i></div>
+
+<hr>
+
+<form>
+  <div id='track-sizes-div'>
+    <input id='track-sizes' type='checkbox' onclick="trackHeapSizes(this.checked)">
+    <label for='track-sizes'>Show heap size graph</label>
+  </div>
+
+  <div>
+    <input type="checkbox" id="do-graph" onchange="onUpdateDisplayChanged()" checked></input>
+    <label for='do-graph'>Update display</label>
+  </div>
+
+  <div>
+    <input type="checkbox" id="do-load" onchange="onDoLoadChange()" checked></input>
+    <label for='do-load'>Run allocation load</label>
+  </div>
+
+  <div>
+    <label for='test-selection'>Allocation load:</label>
+    <select id="test-selection" required onchange="onLoadChange()"></select>
+    <span id="load-running">(init)</span>
+  </div>
+
+  <div>
+    <label for='garbage-per-frame'>&nbsp;&nbsp;&nbsp;&nbsp;Garbage items per frame:</label>
+    <input type="text" id="garbage-per-frame" size="8" value="8K"
+           onchange="garbage_per_frame_changed()"></input>
+  </div>
+
+  <div>
+    <label for='garbage-piles'>&nbsp;&nbsp;&nbsp;&nbsp;Garbage piles:</label>
+    <input type="text" id="garbage-piles" size="8" value="8"
+           onchange="garbage_piles_changed()"></input>
+  </div>
+</form>
+
+<hr>
+
+<form>
+  <label for='test-duration'>Duration:</label>
+  <input type="text" id="test-duration" size="3" value="8" onchange="duration_changed()"></input>s
+  <input type="button" id="test-one" value="Run Test" onclick="run_one_test()"></input>
+  <input type="button" id="test-all" value="Run All Tests" onclick="run_all_tests()"></input>
+</form>
+
+<div>
+    &nbsp;&nbsp;&nbsp;&nbsp;Time remaining: <span id="test-progress">(not running)</span>
+</div
+
+<div>
+    &nbsp;&nbsp;&nbsp;&nbsp;60 fps: <span id="pct60">n/a</span>
+    &nbsp;&nbsp;&nbsp;&nbsp;45 fps: <span id="pct45">n/a</span>
+    &nbsp;&nbsp;&nbsp;&nbsp;30 fps: <span id="pct30">n/a</span>
+</div
+
+<div id="results-Area">
+    Test Results:
+    <div id="results-display" style="padding-left: 10px; border: 1px solid black;"></div>
+</div>
+
+</body>
+</html>

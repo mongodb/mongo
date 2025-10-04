@@ -27,13 +27,36 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/field_ref.h"
 #include "mongo/db/index/wildcard_key_generator.h"
+#include "mongo/db/index_names.h"
+#include "mongo/db/local_catalog/index_descriptor.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/db/query/compiler/metadata/index_entry.h"
 #include "mongo/db/query/planner_wildcard_helpers.h"
+#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_planner_test_fixture.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/scopeguard.h"
+
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -52,11 +75,11 @@ protected:
 
         // We're interested in testing plans that use a $** index, so don't generate collection
         // scans.
-        params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+        params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     }
 
     void addWildcardIndex(BSONObj keyPattern,
-                          const std::set<std::string>& multikeyPathSet = {},
+                          const OrderedPathSet& multikeyPathSet = {},
                           BSONObj wildcardProjection = BSONObj{},
                           MatchExpression* partialFilterExpr = nullptr,
                           CollatorInterface* collator = nullptr,
@@ -73,19 +96,19 @@ protected:
 
         _proj = WildcardKeyGenerator::createProjectionExecutor(keyPattern, wildcardProjection);
 
-        params.indices.push_back({std::move(keyPattern),
-                                  IndexType::INDEX_WILDCARD,
-                                  IndexDescriptor::kLatestIndexVersion,
-                                  isMultikey,
-                                  {},  // multikeyPaths
-                                  std::move(multikeyFieldRefs),
-                                  false,  // sparse
-                                  false,  // unique
-                                  IndexEntry::Identifier{indexName},
-                                  partialFilterExpr,
-                                  std::move(infoObj),
-                                  collator,
-                                  _proj.get_ptr()});
+        params.mainCollectionInfo.indexes.push_back({std::move(keyPattern),
+                                                     IndexType::INDEX_WILDCARD,
+                                                     IndexConfig::kLatestIndexVersion,
+                                                     isMultikey,
+                                                     {},  // multikeyPaths
+                                                     std::move(multikeyFieldRefs),
+                                                     false,  // sparse
+                                                     false,  // unique
+                                                     IndexEntry::Identifier{indexName},
+                                                     partialFilterExpr,
+                                                     std::move(infoObj),
+                                                     collator,
+                                                     _proj.get_ptr()});
     }
 
     boost::optional<WildcardProjection> _proj;
@@ -95,17 +118,19 @@ protected:
 // General planning tests.
 //
 
-DEATH_TEST_F(QueryPlannerWildcardTest, CannotExpandPreExpandedWildcardIndexEntry, "Invariant") {
+DEATH_TEST_F(QueryPlannerWildcardTest,
+             CannotExpandPreExpandedWildcardIndexEntry,
+             "Tripwire assertion") {
     addWildcardIndex(BSON("$**" << 1));
-    ASSERT_EQ(params.indices.size(), 2U);
+    ASSERT_EQ(params.mainCollectionInfo.indexes.size(), 2U);
 
     // Expand the $** index and add the expanded entry to the list of available indices.
     std::vector<IndexEntry> expandedIndex;
-    wcp::expandWildcardIndexEntry(params.indices.back(), {"a"}, &expandedIndex);
+    wcp::expandWildcardIndexEntry(params.mainCollectionInfo.indexes.back(), {"a"}, &expandedIndex);
     ASSERT_EQ(expandedIndex.size(), 1U);
-    params.indices.push_back(expandedIndex.front());
+    params.mainCollectionInfo.indexes.push_back(expandedIndex.front());
 
-    // Now run a query. This will invariant when the planner expands the expanded index.
+    // Now run a query. This will tassert when the planner expands the expanded index.
     runQuery(fromjson("{a: 1}"));
 }
 
@@ -170,19 +195,6 @@ TEST_F(QueryPlannerWildcardTest, NotEqualsNullInElemMatchQueriesUseWildcardIndex
         "{fetch: {node: {ixscan: {pattern: {$_path: 1, 'x': 1},"
         "bounds: {'$_path': [['x','x',true,true], ['x.','x/',true,false]],"
         "'x': [['MinKey', 'MaxKey',true,true]]}}}}}");
-}
-
-TEST_F(QueryPlannerWildcardTest, NotEqualsNullInElemMatchObjectSparseMultiKeyAboveElemMatch) {
-    addWildcardIndex(BSON("$**" << 1), {"a", "a.b"});
-
-    runQuery(fromjson("{'a.b': {$elemMatch: {'c.d': {$ne: null}}}}"));
-
-    assertNumSolutions(1U);
-    assertSolutionExists(
-        "{fetch: {node: {ixscan: {pattern: {'$_path': 1, 'a.b.c.d': 1},"
-        "bounds: {'$_path': [['a.b.c.d','a.b.c.d',true,true], ['a.b.c.d.','a.b.c.d/',true,false]],"
-        "'a.b.c.d': [['MinKey', 'MaxKey', true, true]]"
-        "}}}}}");
 }
 
 TEST_F(QueryPlannerWildcardTest, NotEqualsNullInElemMatchObjectSparseMultiKeyBelowElemMatch) {
@@ -418,25 +430,18 @@ TEST_F(QueryPlannerWildcardTest, EqualityIndexScanOverNestedField) {
         "bounds: {'$_path': [['a.b','a.b',true,true]], 'a.b': [[5,5,true,true]]}}}}}");
 }
 
-TEST_F(QueryPlannerWildcardTest, ExprEqCanUseIndex) {
+TEST_F(QueryPlannerWildcardTest, ExprEqCannotUseIndex) {
     addWildcardIndex(BSON("$**" << 1));
     runQuery(fromjson("{a: {$_internalExprEq: 1}}"));
 
-    assertNumSolutions(1U);
-    assertSolutionExists(
-        "{fetch: {filter: null, node: {ixscan: {pattern: {'$_path': 1, a: 1},"
-        "bounds: {'$_path': [['a','a',true,true]], a: [[1,1,true,true]]}}}}}");
+    assertHasOnlyCollscan();
 }
 
-TEST_F(QueryPlannerWildcardTest, ExprEqCanUseSparseIndexForEqualityToNull) {
+TEST_F(QueryPlannerWildcardTest, ExprEqCannotUseSparseIndexForEqualityToNull) {
     addWildcardIndex(BSON("$**" << 1));
     runQuery(fromjson("{a: {$_internalExprEq: null}}"));
 
-    assertNumSolutions(1U);
-    assertSolutionExists(
-        "{fetch: {filter: {a: {$_internalExprEq: null}}, node: {ixscan: {pattern: {'$_path': 1, a: "
-        "1}, bounds: {'$_path': [['a','a',true,true]], a: [[undefined,undefined,true,true], "
-        "[null,null,true,true]]}}}}}");
+    assertHasOnlyCollscan();
 }
 
 TEST_F(QueryPlannerWildcardTest, PrefixRegex) {
@@ -629,7 +634,8 @@ TEST_F(QueryPlannerWildcardTest, DottedFieldCovering) {
 }
 
 TEST_F(QueryPlannerWildcardTest, CoveredIxscanForCountOnIndexedPath) {
-    params.options = QueryPlannerParams::IS_COUNT;
+    params.mainCollectionInfo.options = QueryPlannerParams::DEFAULT;
+    setIsCountLike();
     addWildcardIndex(BSON("$**" << 1));
     runQuery(fromjson("{a: 5}"));
 
@@ -821,7 +827,7 @@ TEST_F(QueryPlannerWildcardTest, PartialIndexWithExistsTrueFilterCanAnswerExiste
 
 TEST_F(QueryPlannerWildcardTest, WildcardIndexDoesNotParticipateInIndexIntersection) {
     // Enable both AND_SORTED and AND_HASH index intersection for this test.
-    params.options |= QueryPlannerParams::INDEX_INTERSECTION;
+    params.mainCollectionInfo.options |= QueryPlannerParams::INDEX_INTERSECTION;
     internalQueryPlannerEnableHashIntersection.store(true);
 
     // Add two standard single-field indexes.
@@ -978,9 +984,7 @@ TEST_F(QueryPlannerWildcardTest, ChooseWildcardIndexHintByName) {
     addWildcardIndex(BSON("$**" << 1), {}, {}, {}, nullCollator, wildcard);
     addIndex(BSON("x" << 1));
 
-    runQueryHint(fromjson("{x: {$eq: 1}}"),
-                 BSON("$hint"
-                      << "wildcard"));
+    runQueryHint(fromjson("{x: {$eq: 1}}"), BSON("$hint" << "wildcard"));
 
     assertNumSolutions(1U);
     assertSolutionExists("{fetch: {node: {ixscan: {pattern: {$_path: 1, x: 1}}}}}");
@@ -1936,7 +1940,7 @@ TEST_F(QueryPlannerWildcardTest,
 }
 
 TEST_F(QueryPlannerWildcardTest, StringComparisonWithEqualCollatorsAndWildcardIndexUsesIndex) {
-    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
 
     CollatorInterfaceMock reverseStringCollator(CollatorInterfaceMock::MockType::kReverseString);
     addWildcardIndex(fromjson("{'$**': 1}"), {}, {}, {}, &reverseStringCollator);
@@ -1980,7 +1984,7 @@ TEST_F(QueryPlannerWildcardTest, CanPushProjectionBeneathSortWithExistsPredicate
         "{proj: {spec: {_id: 0, b: 1}, node: {fetch: {filter: {a: {$eq: 1}}, node:"
         "{ixscan: {filter: null, pattern: {$_path: 1, b: 1}, bounds:"
         "{$_path: [['b','b',true,true], ['b.', 'b/', true, false]],"
-        "b: [['MinKey','MaxKey',true,true]]}}}}}}}}}}}");
+        "b: [['MinKey','MaxKey',true,true]]}}}}}}}}}");
     assertSolutionExists(
         "{sort: {pattern: {b: 1}, limit: 0, type: 'simple', node:"
         "{proj: {spec: {_id: 0, b: 1}, node: {fetch: {filter: {b: {$exists: true}}, node:"

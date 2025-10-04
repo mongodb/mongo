@@ -1,0 +1,15 @@
+{
+  "_comments" : [
+    "// Note: As the JSON file format does not support comments it is necessary to use workarounds such",
+    "// as creating elements like this one to hold comments.",
+
+    "// See the README.md file in this directory for details."
+  ],
+  "setup_actions" : [
+    "cmake -DHAVE_UNITTEST=1 -DHAVE_DIAGNOSTIC=0 -DCODE_COVERAGE_MEASUREMENT=1 -DINLINE_FUNCTIONS_INSTEAD_OF_MACROS=1 -DCMAKE_BUILD_TYPE=Coverage -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_gcc.cmake -G Ninja ../.",
+    "ninja"
+  ],
+  "test_tasks" : [
+    "test/catch2/catch2-unittests"
+  ]
+  }

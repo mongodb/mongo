@@ -5,9 +5,16 @@
  * @tags: [requires_wiredtiger]
  */
 
-(function() {
-
-load('jstests/disk/libs/wt_file_helper.js');
+import {
+    assertErrorOnStartupAfterIncompleteRepair,
+    assertQueryUsesIndex,
+    assertRepairFails,
+    assertRepairSucceeds,
+    corruptFile,
+    getUriForColl,
+    getUriForIndex,
+    startMongodOnExistingPath,
+} from "jstests/disk/libs/wt_file_helper.js";
 
 const baseName = "wt_repair_corrupt_files";
 const collName = "test";
@@ -16,7 +23,7 @@ const dbpath = MongoRunner.dataPath + baseName + "/";
 /**
  * Run the test by supplying additional paramters to MongoRunner.runMongod with 'mongodOptions'.
  */
-let runTest = function(mongodOptions) {
+let runTest = function (mongodOptions) {
     resetDbpath(dbpath);
     jsTestLog("Running test with args: " + tojson(mongodOptions));
 
@@ -101,7 +108,7 @@ let runTest = function(mongodOptions) {
 
     // Ensure the collection orphan was created with the existing document.
     const orphanCollName = "orphan." + testCollUri.replace(/-/g, "_");
-    let orphanColl = mongod.getDB('local').getCollection(orphanCollName);
+    let orphanColl = mongod.getDB("local").getCollection(orphanCollName);
     assert(orphanColl.exists());
     assert.eq(orphanColl.find(doc).itcount(), 1);
     assert.eq(orphanColl.count(), 1);
@@ -115,7 +122,7 @@ let runTest = function(mongodOptions) {
      * the index on the unaffected collection.
      */
 
-    let createIndexedColl = function(collName) {
+    let createIndexedColl = function (collName) {
         let coll = mongod.getDB(baseName)[collName];
         assert.commandWorked(coll.insert(doc));
         assert.commandWorked(coll.createIndex({a: 1}, {name: indexName}));
@@ -170,4 +177,3 @@ let runTest = function(mongodOptions) {
 runTest({});
 runTest({directoryperdb: ""});
 runTest({wiredTigerDirectoryForIndexes: ""});
-})();

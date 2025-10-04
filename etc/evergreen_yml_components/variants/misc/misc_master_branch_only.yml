@@ -1,0 +1,60 @@
+# Miscellaneous build variants
+#
+# After the branching variants in this file
+# should NOT run on a new rapid release (v7.1, v7.2 etc.)
+# and LTS release (v7.0, v6.0 etc.) branch projects
+
+buildvariants:
+  - name: &stm-daily-cron stm-daily-cron
+    display_name: "* STM Daily Cron"
+    tags: ["suggested"]
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - rhel8.8-small
+    expansions:
+      multiversion_platform: rhel8
+      multiversion_edition: enterprise
+      compile_variant: *stm-daily-cron
+    stepback: false
+    tasks:
+      - name: lint_fuzzer_sanity_all
+      - name: powercycle_sentinel
+      - name: powercycle_smoke_skip_compile_gen
+      - name: monitor_mongo_fork_10gen
+      - name: package_bazel_rules_mongo
+      - name: monitor_build_status
+        distros:
+          - ubuntu2404-large
+      - name: check_workstation_setup_script
+        distros:
+          - ubuntu2204-arm64-small
+      - name: test_copybara_sync
+        distros:
+          - ubuntu2204-small
+
+  # Experimental variant running bazel targets for integration tests. To be removed with SERVER-103537.
+  - name: bazel-integration-tests
+    display_name: "~ Bazel Integration Tests"
+    tags: ["experimental"]
+    cron: "0 4 * * 0" # Every week starting 0400 UTC Sunday
+    stepback: false
+    run_on:
+      - amazon2023-arm64-latest-small
+    depends_on:
+      - name: archive_dist_test
+        variant: amazon-linux2023-arm64-static-compile
+      - name: archive_jstestshell
+        variant: amazon-linux2023-arm64-static-compile
+      - name: version_gen
+        variant: generate-tasks-for-version
+    expansions:
+      compile_variant: amazon-linux2023-arm64-static-compile
+      multiversion_platform: amazon2023
+      multiversion_edition: enterprise
+      multiversion_architecture: aarch64
+      multiversion_link_dir: multiversion_binaries
+      bazel_compile_flags: >-
+        --default_test_resources=cpu=1,2,4,8
+    tasks:
+      - name: bazel_multiversion_sanity_check_gen
+      - name: bazel_jstestfuzz_gen

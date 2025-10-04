@@ -29,24 +29,24 @@
 
 #pragma once
 
-/**
- * Test suite generator headers.
- */
-
-#include "mongo/db/db_raii.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/index_builds/multi_index_block.h"
+#include "mongo/db/local_catalog/catalog_raii.h"
+#include "mongo/db/local_catalog/database.h"
+#include "mongo/db/local_catalog/db_raii.h"
+#include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/unittest/unittest.h"
 
-using namespace mongo;
-using namespace mongo::unittest;
-using std::shared_ptr;
+#include <memory>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
-
-class BSONObj;
-class OperationContext;
-class Status;
-class StringData;
-
 namespace dbtests {
 
 /**
@@ -62,8 +62,14 @@ Status createIndex(OperationContext* opCtx,
  */
 Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj& spec);
 
+Status initializeMultiIndexBlock(OperationContext* opCtx,
+                                 CollectionWriter& collection,
+                                 MultiIndexBlock& indexer,
+                                 const BSONObj& spec,
+                                 MultiIndexBlock::OnInitFn onInit = MultiIndexBlock::kNoopOnInitFn);
+
 /**
- * Combines AutoGetDb and OldClientContext. If the requested 'ns' exists, the constructed
+ * Combines AutoGetDb and AutoStatsTracker. If the requested 'ns' exists, the constructed
  * object will have both the database and the collection locked in MODE_IX. Otherwise, the database
  * will be locked in MODE_IX and will be created, while the collection will be locked in MODE_X, but
  * not created.
@@ -76,20 +82,18 @@ public:
     WriteContextForTests(OperationContext* opCtx, StringData ns);
 
     Database* db() const {
-        return _clientContext->db();
+        return _autoDb->getDb();
     }
 
-    CollectionPtr getCollection() const {
-        return CollectionCatalog::get(_opCtx)->lookupCollectionByNamespace(_opCtx, _nss);
-    }
+    CollectionAcquisition getOrCreateCollection(LockMode mode = MODE_IX);
+    CollectionAcquisition getCollection(LockMode mode = MODE_IX) const;
 
 private:
     OperationContext* const _opCtx;
     const NamespaceString _nss;
 
     boost::optional<AutoGetDb> _autoDb;
-    boost::optional<Lock::CollectionLock> _collLock;
-    boost::optional<OldClientContext> _clientContext;
+    boost::optional<AutoStatsTracker> _tracker;
 };
 
 }  // namespace dbtests

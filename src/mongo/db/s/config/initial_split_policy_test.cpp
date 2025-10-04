@@ -27,22 +27,49 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
-#include "mongo/platform/basic.h"
-
-#include "mongo/bson/json.h"
-#include "mongo/db/s/config/config_server_test_fixture.h"
+// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/db/s/config/initial_split_policy.h"
-#include "mongo/db/vector_clock.h"
-#include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/catalog/type_tags.h"
+
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bson_field.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/bson/oid.h"
+#include "mongo/db/global_catalog/ddl/create_collection_coordinator.h"
+#include "mongo/db/global_catalog/type_shard.h"
+#include "mongo/db/global_catalog/type_tags.h"
+#include "mongo/db/logical_time.h"
+#include "mongo/db/sharding_environment/config_server_test_fixture.h"
+#include "mongo/db/topology/shard_registry.h"
+#include "mongo/db/vector_clock/vector_clock.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/time_support.h"
+
+#include <iterator>
+#include <list>
+#include <set>
+#include <string>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
 namespace {
 
 using unittest::assertGet;
+
+const ShardId primaryShard{"primaryShard"};
 
 /**
  * Asserts that the given vectors of BSON objects are equal
@@ -71,90 +98,68 @@ void assertChunkVectorsAreEqual(const std::vector<ChunkType>& expected,
     }
 }
 
-/**
- * Calls calculateHashedSplitPoints according to the given arguments
- * and asserts that calculated split points match with the expected split points.
- */
-void checkCalculatedHashedSplitPoints(const ShardKeyPattern& shardKeyPattern,
-                                      int numShards,
-                                      int numInitialChunks,
-                                      const std::vector<BSONObj>* expectedSplitPoints,
-                                      int expectNumChunkPerShard) {
-    SplitPointsBasedSplitPolicy policy(shardKeyPattern, numShards, numInitialChunks);
-    assertBSONObjVectorsAreEqual(*expectedSplitPoints, policy.getSplitPoints());
-    ASSERT_EQUALS(expectNumChunkPerShard, policy.getNumContiguousChunksPerShard());
+void assertChunkRangesMatch(const std::vector<ChunkRange> expectedRanges,
+                            const std::vector<ChunkType>& actualChunks) {
+    const auto actualRanges = [&]() {
+        std::vector<ChunkRange> actualRanges;
+        std::transform(actualChunks.begin(),
+                       actualChunks.end(),
+                       std::back_inserter(actualRanges),
+                       [](auto& chunk) { return chunk.getRange(); });
+        return actualRanges;
+    }();
+
+    ASSERT_EQ(actualRanges, expectedRanges);
 }
 
-TEST(CalculateHashedSplitPointsTest, HashedPrefixMoreChunksThanShardsWithEqualDistribution) {
-    auto shardKeyPattern = ShardKeyPattern(BSON("x"
-                                                << "hashed"
-                                                << "y" << 1));
-    const std::vector<BSONObj> expectedSplitPoints = {
-        BSON("x" << -4611686018427387902LL << "y" << MINKEY),
-        BSON("x" << 0 << "y" << MINKEY),
-        BSON("x" << 4611686018427387902LL << "y" << MINKEY)};
-    int expectNumChunkPerShard = 2;
-    checkCalculatedHashedSplitPoints(
-        shardKeyPattern, 2, 4, &expectedSplitPoints, expectNumChunkPerShard);
+int getNumberOfChunksOnShard(const std::vector<ChunkType>& chunks, const ShardId& shardId) {
+    return std::count_if(chunks.begin(), chunks.end(), [&shardId](const ChunkType& chunk) {
+        return chunk.getShard() == shardId;
+    });
 }
 
-TEST(CalculateHashedSplitPointsTest, HashedPrefixMoreChunksThanShardsWithUnequalDistribution) {
-    auto shardKeyPattern = ShardKeyPattern(BSON("x"
-                                                << "hashed"));
-    const std::vector<BSONObj> expectedSplitPoints = {
-        BSON("x" << -4611686018427387902LL), BSON("x" << 0), BSON("x" << 4611686018427387902LL)};
-    int expectNumChunkPerShard = 1;
-    checkCalculatedHashedSplitPoints(
-        shardKeyPattern, 3, 4, &expectedSplitPoints, expectNumChunkPerShard);
-}
+class CalculateHashedSplitPointsTest : public ConfigServerTestFixture {
+public:
+    /**
+     * Calls calculateHashedSplitPoints according to the given arguments
+     * and asserts that calculated split points match with the expected split points.
+     */
+    void checkCalculatedHashedSplitPoints(const std::vector<BSONObj>& expectedSplitPoints,
+                                          const ShardKeyPattern& shardKeyPattern,
+                                          const std::vector<ShardId>& availableShardIds) {
+        SplitPointsBasedSplitPolicy policy(availableShardIds);
 
-TEST(CalculateHashedSplitPointsTest, HashedPrefixChunksEqualToShards) {
-    auto shardKeyPattern = ShardKeyPattern(BSON("x"
-                                                << "hashed"
-                                                << "y" << 1));
-    const std::vector<BSONObj> expectedSplitPoints = {
-        BSON("x" << -3074457345618258602LL << "y" << MINKEY),
-        BSON("x" << 3074457345618258602LL << "y" << MINKEY)};
-    int expectNumChunkPerShard = 1;
-    checkCalculatedHashedSplitPoints(
-        shardKeyPattern, 3, 3, &expectedSplitPoints, expectNumChunkPerShard);
-}
+        const SplitPolicyParams splitParams{UUID::gen(), availableShardIds.front()};
+        policy.createFirstChunks(operationContext(), shardKeyPattern, splitParams);
 
-TEST(CalculateHashedSplitPointsTest, HashedPrefixChunksLessThanShards) {
-    const std::vector<BSONObj> expectedSplitPoints = {BSON("x" << 0)};
-    int expectNumChunkPerShard = 1;
-    checkCalculatedHashedSplitPoints(ShardKeyPattern(BSON("x"
-                                                          << "hashed")),
-                                     5,
-                                     2,
-                                     &expectedSplitPoints,
-                                     expectNumChunkPerShard);
-}
+        assertBSONObjVectorsAreEqual(expectedSplitPoints, policy.getSplitPoints());
+    }
+};
 
-TEST(CalculateHashedSplitPointsTest, HashedPrefixChunksOneReturnsNoSplitPoints) {
-    const std::vector<BSONObj> expectedSplitPoints;
-    int expectNumChunkPerShard = 1;
-    checkCalculatedHashedSplitPoints(ShardKeyPattern(BSON("x"
-                                                          << "hashed")),
-                                     2,
-                                     1,
-                                     &expectedSplitPoints,
-                                     expectNumChunkPerShard);
-}
-
-TEST(CalculateHashedSplitPointsTest, HashedPrefixChunksZeroUsesDefault) {
+TEST_F(CalculateHashedSplitPointsTest, HashedPrefixEvenNumberShards) {
+    const std::vector<ShardId> availableShardIds{
+        ShardId("shard0"), ShardId("shard1"), ShardId("shard2"), ShardId("shard3")};
     const std::vector<BSONObj> expectedSplitPoints = {
         BSON("x" << -4611686018427387902LL), BSON("x" << 0), BSON("x" << 4611686018427387902LL)};
-    int expectNumChunkPerShard = 2;
-    checkCalculatedHashedSplitPoints(ShardKeyPattern(BSON("x"
-                                                          << "hashed")),
-                                     2,
-                                     0,
-                                     &expectedSplitPoints,
-                                     expectNumChunkPerShard);
+    checkCalculatedHashedSplitPoints(
+        expectedSplitPoints, ShardKeyPattern(BSON("x" << "hashed")), availableShardIds);
 }
 
-TEST(CalculateHashedSplitPointsTest, HashedSuffix) {
+TEST_F(CalculateHashedSplitPointsTest, HashedPrefixUnevenNumberShards) {
+    const std::vector<ShardId> availableShardIds{ShardId("shard0"),
+                                                 ShardId("shard1"),
+                                                 ShardId("shard2"),
+                                                 ShardId("shard3"),
+                                                 ShardId("shard4")};
+    const std::vector<BSONObj> expectedSplitPoints = {BSON("x" << -5534023222112865483LL),
+                                                      BSON("x" << -1844674407370955161LL),
+                                                      BSON("x" << 1844674407370955161LL),
+                                                      BSON("x" << 5534023222112865483LL)};
+    checkCalculatedHashedSplitPoints(
+        expectedSplitPoints, ShardKeyPattern(BSON("x" << "hashed")), availableShardIds);
+}
+
+TEST(SimpleCalculateHashedSplitPointsTest, HashedSuffix) {
     auto shardKeyPattern = ShardKeyPattern(BSON("x.a" << 1 << "y.b" << 1 << "z.c"
                                                       << "hashed"));
     const auto preDefinedPrefix = fromjson("{'x.a': {p: 1}, 'y.b': 'val'}");
@@ -167,7 +172,7 @@ TEST(CalculateHashedSplitPointsTest, HashedSuffix) {
         InitialSplitPolicy::calculateHashedSplitPoints(shardKeyPattern, preDefinedPrefix, 4));
 }
 
-TEST(CalculateHashedSplitPointsTest, HashedInfix) {
+TEST(SimpleCalculateHashedSplitPointsTest, HashedInfix) {
     auto shardKeyPattern = ShardKeyPattern(BSON("x.a" << 1 << "y.b"
                                                       << "hashed"
                                                       << "z.c" << 1 << "a" << 1));
@@ -192,6 +197,87 @@ TEST(CalculateHashedSplitPointsTest, HashedInfix) {
         InitialSplitPolicy::calculateHashedSplitPoints(shardKeyPattern, preDefinedPrefix, 4));
 }
 
+class InitialSingleChunkOnShardSplitChunks : public ConfigServerTestFixture {
+public:
+    OperationContext* opCtx() {
+        return operationContext();
+    }
+
+protected:
+    const ShardId kShardId0 = ShardId("shard0");
+
+    const ShardId kShardId1 = ShardId("shard1");
+
+    const HostAndPort kShardHost0 = HostAndPort("TestHost0", 12345);
+
+    const HostAndPort kShardHost1 = HostAndPort("TestHost1", 12345);
+
+    const ShardType kShard0{kShardId0.toString(), kShardHost0.toString()};
+
+    const ShardType kShard1{kShardId1.toString(), kShardHost1.toString()};
+
+    const ShardKeyPattern kCorrectShardKey = ShardKeyPattern(BSON("_id" << 1));
+};
+
+TEST_F(InitialSingleChunkOnShardSplitChunks, InitialSingleChunkOnShardSplitChunks) {
+    setupShards({kShard0, kShard1});
+
+    // Wrong shard key.
+    ASSERT_THROWS_CODE(
+        create_collection_util::createPolicy(
+            opCtx(), ShardKeyPattern(BSON("x" << 1)), false, {}, 1, true, true, kShardId0),
+        DBException,
+        ErrorCodes::InvalidOptions);
+
+    // Non existing shard.
+    ASSERT_THROWS_CODE(create_collection_util::createPolicy(
+                           opCtx(), kCorrectShardKey, false, {}, 1, true, true, ShardId("shard2")),
+                       DBException,
+                       ErrorCodes::ShardNotFound);
+
+    // No presplit hashed zones should be passed.
+    ASSERT_THROWS_CODE(create_collection_util::createPolicy(
+                           opCtx(), kCorrectShardKey, true, {}, 1, true, true, kShardId0),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+
+    auto singleChunksOnShardPolicy = create_collection_util::createPolicy(
+        opCtx(), kCorrectShardKey, false, {}, 1, true, true /*unsplittable*/, kShardId0);
+
+    auto config = singleChunksOnShardPolicy->createFirstChunks(
+        opCtx(), kCorrectShardKey, {UUID::gen(), kShardId0});
+
+    ASSERT_EQ(config.chunks.size(), 1);
+    ASSERT_EQ(config.chunks[0].getShard(), kShardId0);
+
+    auto singleChunksOnNonPrimaryShardPolicy = create_collection_util::createPolicy(
+        opCtx(), kCorrectShardKey, false, {}, 1, true, true /*unsplittable*/, kShardId1);
+
+    auto nonPrimaryConfig = singleChunksOnNonPrimaryShardPolicy->createFirstChunks(
+        opCtx(), kCorrectShardKey, {UUID::gen(), kShardId1});
+
+    ASSERT_EQ(nonPrimaryConfig.chunks.size(), 1);
+    ASSERT_EQ(nonPrimaryConfig.chunks[0].getShard(), kShardId1);
+
+    auto shardedSingleChunksOnShardPolicy = create_collection_util::createPolicy(
+        opCtx(), kCorrectShardKey, false, {}, 1, true, false /*unsplittable*/, kShardId0);
+
+    auto shardedConfig = shardedSingleChunksOnShardPolicy->createFirstChunks(
+        opCtx(), kCorrectShardKey, {UUID::gen(), kShardId0});
+
+    ASSERT_EQ(shardedConfig.chunks.size(), 1);
+    ASSERT_EQ(shardedConfig.chunks[0].getShard(), kShardId0);
+
+    auto shardedSingleChunksOnNonPrimaryShardPolicy = create_collection_util::createPolicy(
+        opCtx(), kCorrectShardKey, false, {}, 1, true, false /*unsplittable*/, kShardId1);
+
+    auto shardedNonPrimaryConfig = shardedSingleChunksOnNonPrimaryShardPolicy->createFirstChunks(
+        opCtx(), kCorrectShardKey, {UUID::gen(), kShardId1});
+
+    ASSERT_EQ(shardedNonPrimaryConfig.chunks.size(), 1);
+    ASSERT_EQ(shardedNonPrimaryConfig.chunks[0].getShard(), kShardId1);
+}
+
 class GenerateInitialSplitChunksTestBase : public ConfigServerTestFixture {
 public:
     /**
@@ -199,16 +285,17 @@ public:
      * shardIds[i] is the id of shard for the chunk for chunkRanges[i].
      * Checks that chunkRanges and shardIds have the same length.
      */
-    const std::vector<ChunkType> makeChunks(const std::vector<ChunkRange> chunkRanges,
-                                            const std::vector<ShardId> shardIds,
-                                            Timestamp timeStamp) {
+    std::vector<ChunkType> makeChunks(const std::vector<ChunkRange> chunkRanges,
+                                      const std::vector<ShardId> shardIds,
+                                      Timestamp timeStamp) {
         ASSERT_EQ(chunkRanges.size(), shardIds.size());
         std::vector<ChunkType> chunks;
 
         for (unsigned long i = 0; i < chunkRanges.size(); ++i) {
-            ChunkVersion version(1, 0, OID::gen(), Timestamp(1, 1));
+            ChunkVersion version({OID::gen(), Timestamp(1, 1)}, {1, 0});
             ChunkType chunk(_uuid, chunkRanges[i], version, shardIds[i]);
-            chunk.setHistory({ChunkHistory(timeStamp, shardIds[i])});
+            chunk.setOnCurrentShardSince(timeStamp);
+            chunk.setHistory({ChunkHistory(*chunk.getOnCurrentShardSince(), shardIds[i])});
             chunks.push_back(chunk);
         }
         return chunks;
@@ -218,7 +305,7 @@ public:
      * Returns a vector of numShards shard ids with shard names
      * prefixed by _shardName
      */
-    const std::vector<ShardId> makeShardIds(const int numShards) {
+    std::vector<ShardId> makeShardIds(const int numShards) {
         std::vector<ShardId> shardIds;
         for (int i = 0; i < numShards; i++) {
             shardIds.push_back(shardId(std::to_string(i)));
@@ -226,7 +313,7 @@ public:
         return shardIds;
     }
 
-    const NamespaceString nss() {
+    NamespaceString nss() {
         return _nss;
     }
 
@@ -242,19 +329,18 @@ public:
         return _shardKeyPattern.getKeyPattern();
     }
 
-    const ShardId shardId(std::string shardNum) {
+    ShardId shardId(std::string shardNum) {
         return ShardId(_shardName + shardNum);
     }
 
-    const Timestamp timeStamp() {
+    Timestamp timeStamp() {
         return _timeStamp;
     }
 
 private:
-    const NamespaceString _nss{"test.foo"};
+    const NamespaceString _nss = NamespaceString::createNamespaceString_forTest("test.foo");
     const UUID _uuid{UUID::gen()};
-    const ShardKeyPattern _shardKeyPattern = ShardKeyPattern(BSON("x"
-                                                                  << "hashed"));
+    const ShardKeyPattern _shardKeyPattern = ShardKeyPattern(BSON("x" << "hashed"));
     const std::string _shardName = "testShard";
     const Timestamp _timeStamp{Date_t::now()};
 };
@@ -284,7 +370,7 @@ TEST_F(GenerateInitialHashedSplitChunksTest, NoSplitPoints) {
     const std::vector<BSONObj> splitPoints;
     const std::vector<ShardId> shardIds = makeShardIds(2);
     const auto shardCollectionConfig = InitialSplitPolicy::generateShardCollectionInitialChunks(
-        {UUID::gen(), shardIds[0]}, shardKeyPattern(), timeStamp(), splitPoints, shardIds, 1);
+        {UUID::gen(), shardIds[0]}, shardKeyPattern(), timeStamp(), splitPoints, shardIds);
 
     // there should only be one chunk
     const auto expectedChunks =
@@ -296,34 +382,12 @@ TEST_F(GenerateInitialHashedSplitChunksTest, NoSplitPoints) {
 
 TEST_F(GenerateInitialHashedSplitChunksTest, SplitPointsMoreThanAvailableShards) {
     const std::vector<ShardId> shardIds = makeShardIds(2);
-    const auto shardCollectionConfig =
-        InitialSplitPolicy::generateShardCollectionInitialChunks({UUID::gen(), shardIds[0]},
-                                                                 shardKeyPattern(),
-                                                                 timeStamp(),
-                                                                 hashedSplitPoints(),
-                                                                 shardIds,
-                                                                 1);
+    const auto shardCollectionConfig = InitialSplitPolicy::generateShardCollectionInitialChunks(
+        {UUID::gen(), shardIds[0]}, shardKeyPattern(), timeStamp(), hashedSplitPoints(), shardIds);
 
     // chunks should be distributed in a round-robin manner
     const std::vector<ChunkType> expectedChunks = makeChunks(
         hashedChunkRanges(), {shardId("0"), shardId("1"), shardId("0"), shardId("1")}, timeStamp());
-    assertChunkVectorsAreEqual(expectedChunks, shardCollectionConfig.chunks);
-}
-
-TEST_F(GenerateInitialHashedSplitChunksTest,
-       SplitPointsNumContiguousChunksPerShardsGreaterThanOne) {
-    const std::vector<ShardId> shardIds = makeShardIds(2);
-    const auto shardCollectionConfig =
-        InitialSplitPolicy::generateShardCollectionInitialChunks({UUID::gen(), shardIds[0]},
-                                                                 shardKeyPattern(),
-                                                                 timeStamp(),
-                                                                 hashedSplitPoints(),
-                                                                 shardIds,
-                                                                 2);
-
-    // chunks should be distributed in a round-robin manner two chunks at a time
-    const std::vector<ChunkType> expectedChunks = makeChunks(
-        hashedChunkRanges(), {shardId("0"), shardId("0"), shardId("1"), shardId("1")}, timeStamp());
     assertChunkVectorsAreEqual(expectedChunks, shardCollectionConfig.chunks);
 }
 
@@ -352,19 +416,31 @@ public:
         assertChunkVectorsAreEqual(expectedChunks, shardCollectionConfig.chunks);
     }
 
-    const std::string shardKey() {
+    std::vector<ChunkType> generateInitialZoneChunks(const std::vector<ShardType> shards,
+                                                     const std::vector<TagsType>& tags,
+                                                     const ShardKeyPattern& shardKeyPattern,
+                                                     const ShardId& primaryShard) {
+        auto opCtx = operationContext();
+        setupShards(shards);
+        shardRegistry()->reload(opCtx);
+        SingleChunkPerTagSplitPolicy splitPolicy(opCtx, tags);
+        return splitPolicy.createFirstChunks(opCtx, shardKeyPattern, {UUID::gen(), primaryShard})
+            .chunks;
+    }
+
+    std::string shardKey() {
         return _shardKey;
     }
 
-    const std::string zoneName(std::string zoneNum) {
+    std::string zoneName(std::string zoneNum) {
         return _zoneName + zoneNum;
     }
 
     TagsType makeTag(const ChunkRange range, std::string zoneName) {
         BSONObjBuilder tagDocBuilder;
-        tagDocBuilder.append("_id",
-                             BSON(TagsType::ns(nss().ns()) << TagsType::min(range.getMin())));
-        tagDocBuilder.append(TagsType::ns(), nss().ns());
+        tagDocBuilder.append(
+            "_id", BSON(TagsType::ns(nss().toString_forTest()) << TagsType::min(range.getMin())));
+        tagDocBuilder.append(TagsType::ns(), nss().ns_forTest());
         tagDocBuilder.append(TagsType::min(), range.getMin());
         tagDocBuilder.append(TagsType::max(), range.getMax());
         tagDocBuilder.append(TagsType::tag(), zoneName);
@@ -372,8 +448,7 @@ public:
     }
 
 private:
-    const ShardKeyPattern _shardKeyPattern = ShardKeyPattern(BSON("x"
-                                                                  << "hashed"));
+    const ShardKeyPattern _shardKeyPattern = ShardKeyPattern(BSON("x" << "hashed"));
     const std::string _zoneName = "zoneName";
     const std::string _shardKey = "x";
 };
@@ -401,13 +476,16 @@ TEST_F(SingleChunkPerTagSplitPolicyTest, PredefinedZonesSpanDoNotSpanFromMinToMa
         ChunkRange(BSON(shardKey() << 10), keyPattern().globalMax()),
     };
     const std::vector<TagsType> tags = {makeTag(expectedChunkRanges[1], zoneName("0"))};
-    const std::vector<ShardId> expectedShardIds = {shardId("0"), shardId("0"), shardId("1")};
-    checkGeneratedInitialZoneChunks(kShards,
-                                    tags,
-                                    expectedChunkRanges,
-                                    expectedShardIds,
-                                    ShardKeyPattern(BSON("x"
-                                                         << "hashed")));
+
+    const auto generatedChunks = generateInitialZoneChunks(
+        kShards, tags, ShardKeyPattern(BSON("x" << "hashed")), shardId("0"));
+
+    assertChunkRangesMatch(expectedChunkRanges, generatedChunks);
+    ASSERT_EQ(shardId("0"), generatedChunks[1].getShard());  // corresponds to a zone
+
+    // Shard0 owns the chunk corresponding to the zone plus another one. Shard1 owns just one.
+    ASSERT_EQ(2, getNumberOfChunksOnShard(generatedChunks, shardId("0")));
+    ASSERT_EQ(1, getNumberOfChunksOnShard(generatedChunks, shardId("1")));
 }
 
 TEST_F(SingleChunkPerTagSplitPolicyTest, PredefinedZonesContainGlobalMin) {
@@ -419,9 +497,17 @@ TEST_F(SingleChunkPerTagSplitPolicyTest, PredefinedZonesContainGlobalMin) {
         ChunkRange(BSON(shardKey() << 0), keyPattern().globalMax()),
     };
     const std::vector<TagsType> tags = {makeTag(expectedChunkRanges[0], zoneName("0"))};
-    const std::vector<ShardId> expectedShardIds = {shardId("0"), shardId("0")};
-    checkGeneratedInitialZoneChunks(
-        kShards, tags, expectedChunkRanges, expectedShardIds, ShardKeyPattern(BSON("x" << 1)));
+    const auto generatedChunks =
+        generateInitialZoneChunks(kShards, tags, ShardKeyPattern(BSON("x" << 1)), shardId("0"));
+
+    assertChunkRangesMatch(expectedChunkRanges, generatedChunks);
+    ASSERT_EQ(shardId("0"), generatedChunks[0].getShard());  // corresponds to a zone
+
+    // Shard0 owns the chunk corresponding to the zone. The other chunk (gap chunk) is randomly
+    // assigned to either shard.
+    const auto numChunkOnShard0 = getNumberOfChunksOnShard(generatedChunks, shardId("0"));
+    const auto numChunkOnShard1 = getNumberOfChunksOnShard(generatedChunks, shardId("1"));
+    ASSERT_TRUE((numChunkOnShard0 == 2 || numChunkOnShard1 == 1));
 }
 
 TEST_F(SingleChunkPerTagSplitPolicyTest, PredefinedZonesContainGlobalMax) {
@@ -433,9 +519,17 @@ TEST_F(SingleChunkPerTagSplitPolicyTest, PredefinedZonesContainGlobalMax) {
         ChunkRange(BSON(shardKey() << 0), keyPattern().globalMax()),  // corresponds to a zone
     };
     const std::vector<TagsType> tags = {makeTag(expectedChunkRanges[1], zoneName("0"))};
-    const std::vector<ShardId> expectedShardIds = {shardId("0"), shardId("0")};
-    checkGeneratedInitialZoneChunks(
-        kShards, tags, expectedChunkRanges, expectedShardIds, ShardKeyPattern(BSON("x" << 1)));
+    const auto generatedChunks =
+        generateInitialZoneChunks(kShards, tags, ShardKeyPattern(BSON("x" << 1)), shardId("0"));
+
+    assertChunkRangesMatch(expectedChunkRanges, generatedChunks);
+    ASSERT_EQ(shardId("0"), generatedChunks[1].getShard());  // corresponds to a zone
+
+    // Shard0 owns the chunk corresponding to the zone. The other chunk (gap chunk) is randomly
+    // assigned to either shard.
+    const auto numChunkOnShard0 = getNumberOfChunksOnShard(generatedChunks, shardId("0"));
+    const auto numChunkOnShard1 = getNumberOfChunksOnShard(generatedChunks, shardId("1"));
+    ASSERT_TRUE((numChunkOnShard0 == 2 || numChunkOnShard1 == 1));
 }
 
 TEST_F(SingleChunkPerTagSplitPolicyTest, PredefinedZonesContainGlobalMinAndMax) {
@@ -449,9 +543,12 @@ TEST_F(SingleChunkPerTagSplitPolicyTest, PredefinedZonesContainGlobalMinAndMax) 
     };
     const std::vector<TagsType> tags = {makeTag(expectedChunkRanges[0], zoneName("0")),
                                         makeTag(expectedChunkRanges[2], zoneName("1"))};
-    const std::vector<ShardId> expectedShardIds = {shardId("0"), shardId("0"), shardId("1")};
-    checkGeneratedInitialZoneChunks(
-        kShards, tags, expectedChunkRanges, expectedShardIds, ShardKeyPattern(BSON("x" << 1)));
+    const auto generatedChunks =
+        generateInitialZoneChunks(kShards, tags, ShardKeyPattern(BSON("x" << 1)), shardId("0"));
+
+    assertChunkRangesMatch(expectedChunkRanges, generatedChunks);
+    ASSERT_EQ(shardId("0"), generatedChunks[0].getShard());  // corresponds to a zone
+    ASSERT_EQ(shardId("1"), generatedChunks[2].getShard());  // corresponds to a zone
 }
 
 TEST_F(SingleChunkPerTagSplitPolicyTest, PredefinedZonesContiguous) {
@@ -466,10 +563,16 @@ TEST_F(SingleChunkPerTagSplitPolicyTest, PredefinedZonesContiguous) {
     };
     const std::vector<TagsType> tags = {makeTag(expectedChunkRanges[1], zoneName("1")),
                                         makeTag(expectedChunkRanges[2], zoneName("0"))};
-    const std::vector<ShardId> expectedShardIds = {
-        shardId("0"), shardId("1"), shardId("0"), shardId("1")};
-    checkGeneratedInitialZoneChunks(
-        kShards, tags, expectedChunkRanges, expectedShardIds, ShardKeyPattern(BSON("x" << 1)));
+    const auto generatedChunks =
+        generateInitialZoneChunks(kShards, tags, ShardKeyPattern(BSON("x" << 1)), shardId("0"));
+
+    assertChunkRangesMatch(expectedChunkRanges, generatedChunks);
+    ASSERT_EQ(shardId("1"), generatedChunks[1].getShard());  // corresponds to a zone
+    ASSERT_EQ(shardId("0"), generatedChunks[2].getShard());  // corresponds to a zone
+
+    // The other two chunks are evenly spread over the two shards.
+    ASSERT_EQ(2, getNumberOfChunksOnShard(generatedChunks, shardId("0")));
+    ASSERT_EQ(2, getNumberOfChunksOnShard(generatedChunks, shardId("1")));
 }
 
 TEST_F(SingleChunkPerTagSplitPolicyTest, PredefinedZonesNotContiguous) {
@@ -486,10 +589,17 @@ TEST_F(SingleChunkPerTagSplitPolicyTest, PredefinedZonesNotContiguous) {
     };
     const std::vector<TagsType> tags = {makeTag(expectedChunkRanges[1], zoneName("0")),
                                         makeTag(expectedChunkRanges[3], zoneName("1"))};
-    const std::vector<ShardId> expectedShardIds = {
-        shardId("0"), shardId("0"), shardId("1"), shardId("1"), shardId("2")};
-    checkGeneratedInitialZoneChunks(
-        kShards, tags, expectedChunkRanges, expectedShardIds, ShardKeyPattern(BSON("x" << 1)));
+    const auto generatedChunks =
+        generateInitialZoneChunks(kShards, tags, ShardKeyPattern(BSON("x" << 1)), shardId("0"));
+
+    assertChunkRangesMatch(expectedChunkRanges, generatedChunks);
+    ASSERT_EQ(shardId("0"), generatedChunks[1].getShard());  // corresponds to a zone
+    ASSERT_EQ(shardId("1"), generatedChunks[3].getShard());  // corresponds to a zone
+
+    // The three gap chunks get spread evenly over the three shards
+    ASSERT_EQ(2, getNumberOfChunksOnShard(generatedChunks, shardId("0")));
+    ASSERT_EQ(2, getNumberOfChunksOnShard(generatedChunks, shardId("1")));
+    ASSERT_EQ(1, getNumberOfChunksOnShard(generatedChunks, shardId("2")));
 }
 
 TEST_F(SingleChunkPerTagSplitPolicyTest, NumRemainingChunksGreaterThanNumShards) {
@@ -500,16 +610,22 @@ TEST_F(SingleChunkPerTagSplitPolicyTest, NumRemainingChunksGreaterThanNumShards)
         ChunkRange(keyPattern().globalMin(), BSON(shardKey() << 0)),
         ChunkRange(BSON(shardKey() << 0), BSON(shardKey() << 10)),  // corresponds to a zone
         ChunkRange(BSON(shardKey() << 10), BSON(shardKey() << 20)),
-        ChunkRange(BSON(shardKey() << 20), BSON(shardKey() << 30)),
+        ChunkRange(BSON(shardKey() << 20), BSON(shardKey() << 30)),  // corresponds to a zone
         ChunkRange(BSON(shardKey() << 30), keyPattern().globalMax()),
     };
     const std::vector<TagsType> tags = {makeTag(expectedChunkRanges[1], zoneName("0")),
                                         makeTag(expectedChunkRanges[3], zoneName("1"))};
-    // shard assignment should wrap around to the first shard
-    const std::vector<ShardId> expectedShardIds = {
-        shardId("0"), shardId("0"), shardId("1"), shardId("1"), shardId("0")};
-    checkGeneratedInitialZoneChunks(
-        kShards, tags, expectedChunkRanges, expectedShardIds, ShardKeyPattern(BSON("x" << 1)));
+    const auto generatedChunks =
+        generateInitialZoneChunks(kShards, tags, ShardKeyPattern(BSON("x" << 1)), shardId("0"));
+
+    assertChunkRangesMatch(expectedChunkRanges, generatedChunks);
+    ASSERT_EQ(shardId("0"), generatedChunks[1].getShard());  // corresponds to a zone
+    ASSERT_EQ(shardId("1"), generatedChunks[3].getShard());  // corresponds to a zone
+
+    // The three gap chunks get spread over the two shards. One shard will get two of them, and the
+    // other just one.
+    ASSERT_GTE(getNumberOfChunksOnShard(generatedChunks, shardId("0")), 2);
+    ASSERT_GTE(getNumberOfChunksOnShard(generatedChunks, shardId("1")), 2);
 }
 
 TEST_F(SingleChunkPerTagSplitPolicyTest, MultipleChunksToOneZoneWithMultipleShards) {
@@ -528,10 +644,13 @@ TEST_F(SingleChunkPerTagSplitPolicyTest, MultipleChunksToOneZoneWithMultipleShar
         makeTag(expectedChunkRanges.at(2), zone0),
         makeTag(expectedChunkRanges.at(3), zone0),
     };
-    const std::vector<ShardId> expectedShardIds = {
-        shardId("0"), shardId("0"), shardId("1"), shardId("0")};
-    checkGeneratedInitialZoneChunks(
-        kShards, tags, expectedChunkRanges, expectedShardIds, ShardKeyPattern(BSON("x" << 1)));
+    const auto generatedChunks =
+        generateInitialZoneChunks(kShards, tags, ShardKeyPattern(BSON("x" << 1)), shardId("0"));
+
+    assertChunkRangesMatch(expectedChunkRanges, generatedChunks);
+    // Zoned chunks are assigned round-robin.
+    ASSERT_EQ(generatedChunks[0].getShard(), generatedChunks[3].getShard());
+    ASSERT_NE(generatedChunks[0].getShard(), generatedChunks[2].getShard());
 }
 
 TEST_F(SingleChunkPerTagSplitPolicyTest, MultipleChunksToInterleavedZonesWithMultipleShards) {
@@ -552,10 +671,11 @@ TEST_F(SingleChunkPerTagSplitPolicyTest, MultipleChunksToInterleavedZonesWithMul
         makeTag(expectedChunkRanges.at(3), zone0),
     };
 
-    const std::vector<ShardId> expectedShardIds = {
-        shardId("0"), shardId("0"), shardId("0"), shardId("1")};
-    checkGeneratedInitialZoneChunks(
-        kShards, tags, expectedChunkRanges, expectedShardIds, ShardKeyPattern(BSON("x" << 1)));
+    const auto generatedChunks =
+        generateInitialZoneChunks(kShards, tags, ShardKeyPattern(BSON("x" << 1)), shardId("0"));
+
+    // For each tag, chunks are assigned round-robin.
+    ASSERT_NE(generatedChunks[0].getShard(), generatedChunks[3].getShard());
 }
 
 TEST_F(SingleChunkPerTagSplitPolicyTest, ZoneNotAssociatedWithAnyShardShouldFail) {
@@ -571,13 +691,9 @@ TEST_F(SingleChunkPerTagSplitPolicyTest, ZoneNotAssociatedWithAnyShardShouldFail
         makeTag(ChunkRange(keyPattern().globalMin(), BSON(shardKey() << 0)), zone1),
         makeTag(ChunkRange(BSON(shardKey() << 0), keyPattern().globalMax()), zone2)};
 
-    SingleChunkPerTagSplitPolicy splitPolicy(operationContext(), tags);
-
-    ASSERT_THROWS_CODE(splitPolicy.createFirstChunks(operationContext(),
-                                                     shardKeyPattern(),
-                                                     {UUID::gen(), ShardId("shardId")}),
-                       AssertionException,
-                       50973);
+    ASSERT_THROWS_CODE(SingleChunkPerTagSplitPolicy(operationContext(), tags),
+                       DBException,
+                       ErrorCodes::CannotCreateChunkDistribution);
 }
 
 class PresplitHashedZonesChunksTest : public SingleChunkPerTagSplitPolicyTest {
@@ -586,22 +702,40 @@ public:
      * Calls PresplitHashedZonesSplitPolicy::createFirstChunks() according to the given arguments
      * and asserts that returned chunks match with the chunks created using expectedChunkRanges and
      * expectedShardIds.
+     * A 'boost::none' value on expectedShardIds means that the corresponding chunk can be on any
+     * shard (because it is a gap/boundary chunk).
      */
-    void checkGeneratedInitialZoneChunks(const std::vector<TagsType>& tags,
-                                         const std::vector<ChunkRange>& expectedChunkRanges,
-                                         const std::vector<ShardId>& expectedShardIds,
-                                         const ShardKeyPattern& shardKeyPattern,
-                                         int numInitialChunk,
-                                         bool isCollEmpty = true) {
-        PresplitHashedZonesSplitPolicy splitPolicy(
-            operationContext(), shardKeyPattern, tags, numInitialChunk, isCollEmpty);
-        const auto shardCollectionConfig = splitPolicy.createFirstChunks(
-            operationContext(), shardKeyPattern, {UUID::gen(), expectedShardIds.front()});
+    void checkGeneratedInitialZoneChunks(
+        const std::vector<ChunkRange>& expectedChunkRanges,
+        const std::vector<boost::optional<ShardId>>& expectedShardIds,
+        const ShardKeyPattern& shardKeyPattern,
+        const std::vector<TagsType>& tags,
+        boost::optional<size_t> numInitialChunk = boost::none,
+        bool isCollEmpty = true) {
 
-        const auto currentTime = VectorClock::get(operationContext())->getTime();
-        const std::vector<ChunkType> expectedChunks = makeChunks(
-            expectedChunkRanges, expectedShardIds, currentTime.clusterTime().asTimestamp());
-        assertChunkVectorsAreEqual(expectedChunks, shardCollectionConfig.chunks);
+        PresplitHashedZonesSplitPolicy splitPolicy(
+            operationContext(), shardKeyPattern, tags, isCollEmpty);
+        const auto shardCollectionConfig = splitPolicy.createFirstChunks(
+            operationContext(), shardKeyPattern, {UUID::gen(), primaryShard});
+
+        ASSERT_EQ(expectedShardIds.size(), expectedChunkRanges.size());
+        ASSERT_EQ(expectedChunkRanges.size(), shardCollectionConfig.chunks.size());
+
+        ShardId lastHoleShardId("dummy");
+        for (size_t i = 0; i < shardCollectionConfig.chunks.size(); ++i) {
+            // Check the chunk range matches the expected range.
+            ASSERT_EQ(expectedChunkRanges[i], shardCollectionConfig.chunks[i].getRange());
+
+            // Check that the shardId matches the expected.
+            if (expectedShardIds[i]) {
+                ASSERT_EQ(expectedShardIds[i], shardCollectionConfig.chunks[i].getShard());
+            } else {
+                // Boundary/hole chunks are assigned to any shard in a round-robin fashion.
+                // Note this assert is only valid if there's more than one shard.
+                ASSERT_NE(lastHoleShardId, shardCollectionConfig.chunks[i].getShard());
+                lastHoleShardId = shardCollectionConfig.chunks[i].getShard();
+            }
+        }
     }
 };
 
@@ -717,35 +851,18 @@ TEST_F(PresplitHashedZonesChunksTest, WithHashedPrefix) {
         ShardType(shardId("2").toString(), "rs1/shard1:123", {zoneName("0")})};
     setupShards(kShards);
     shardRegistry()->reload(operationContext());
-    auto shardKeyPattern = ShardKeyPattern(BSON("x"
-                                                << "hashed"
-                                                << "y" << 1));
+    auto shardKeyPattern = ShardKeyPattern(BSON("x" << "hashed"
+                                                    << "y" << 1));
     const auto zoneRange =
         ChunkRange(BSON("x" << MINKEY << "y" << MINKEY), BSON("x" << MAXKEY << "y" << MAXKEY));
     const std::vector<TagsType> tags = {makeTag(zoneRange, zoneName("0"))};
 
-    // numInitialChunks = 0.
     std::vector<ChunkRange> expectedChunkRanges =
-        buildExpectedChunkRanges(tags, shardKeyPattern, {2 * 3});
-    std::vector<ShardId> expectedShardIds = {
-        shardId("0"), shardId("0"), shardId("1"), shardId("1"), shardId("2"), shardId("2")};
-    checkGeneratedInitialZoneChunks(
-        tags, expectedChunkRanges, expectedShardIds, shardKeyPattern, 0 /* numInitialChunks*/);
-
-    // numInitialChunks = 1.
-    expectedChunkRanges = buildExpectedChunkRanges(tags, shardKeyPattern, {3});
-    expectedShardIds = {shardId("0"), shardId("1"), shardId("2")};
-    checkGeneratedInitialZoneChunks(
-        tags, expectedChunkRanges, expectedShardIds, shardKeyPattern, 1 /* numInitialChunks*/);
-
-    // numInitialChunks = 4.
-    expectedChunkRanges = buildExpectedChunkRanges(tags, shardKeyPattern, {6});
-    expectedShardIds = {
-        shardId("0"), shardId("0"), shardId("1"), shardId("1"), shardId("2"), shardId("2")};
-    checkGeneratedInitialZoneChunks(
-        tags, expectedChunkRanges, expectedShardIds, shardKeyPattern, 4 /* numInitialChunks*/);
+        buildExpectedChunkRanges(tags, shardKeyPattern, {3});
+    std::vector<boost::optional<ShardId>> expectedShardIds = {
+        shardId("0"), shardId("1"), shardId("2")};
+    checkGeneratedInitialZoneChunks(expectedChunkRanges, expectedShardIds, shardKeyPattern, tags);
 }
-
 
 TEST_F(PresplitHashedZonesChunksTest, SingleZone) {
     const std::vector<ShardType> kShards{
@@ -755,33 +872,18 @@ TEST_F(PresplitHashedZonesChunksTest, SingleZone) {
     shardRegistry()->reload(operationContext());
     auto shardKeyPattern = ShardKeyPattern(BSON("x" << 1 << "y"
                                                     << "hashed"));
-    const auto zoneRange = ChunkRange(BSON("x"
-                                           << "UK"
-                                           << "y" << MINKEY),
-                                      BSON("x"
-                                           << "US"
-                                           << "y" << MINKEY));
+    const auto zoneRange = ChunkRange(BSON("x" << "UK"
+                                               << "y" << MINKEY),
+                                      BSON("x" << "US"
+                                               << "y" << MINKEY));
     const std::vector<TagsType> tags = {makeTag(zoneRange, zoneName("0"))};
 
-    // numInitialChunks = 0.
     std::vector<ChunkRange> expectedChunkRanges =
-        buildExpectedChunkRanges(tags, shardKeyPattern, {2});
-    std::vector<ShardId> expectedShardIds = {
-        shardId("0"), shardId("0"), shardId("0"), shardId("1")};
-    checkGeneratedInitialZoneChunks(
-        tags, expectedChunkRanges, expectedShardIds, shardKeyPattern, 0 /* numInitialChunks*/);
-
-    // numInitialChunks = 1.
-    expectedChunkRanges = buildExpectedChunkRanges(tags, shardKeyPattern, {1});
-    expectedShardIds = {shardId("0"), shardId("0"), shardId("1")};
-    checkGeneratedInitialZoneChunks(
-        tags, expectedChunkRanges, expectedShardIds, shardKeyPattern, 1 /* numInitialChunks*/);
-
-    // numInitialChunks = 3.
-    expectedChunkRanges = buildExpectedChunkRanges(tags, shardKeyPattern, {3});
-    expectedShardIds = {shardId("0"), shardId("0"), shardId("0"), shardId("0"), shardId("1")};
-    checkGeneratedInitialZoneChunks(
-        tags, expectedChunkRanges, expectedShardIds, shardKeyPattern, 3 /* numInitialChunks*/);
+        buildExpectedChunkRanges(tags, shardKeyPattern, {1});
+    std::vector<boost::optional<ShardId>> expectedShardIds = {boost::none,   // Lower bound.
+                                                              shardId("0"),  // Zone 0
+                                                              boost::none};  // Upper bound.
+    checkGeneratedInitialZoneChunks(expectedChunkRanges, expectedShardIds, shardKeyPattern, tags);
 }
 
 TEST_F(PresplitHashedZonesChunksTest, WithMultipleZonesContiguous) {
@@ -796,102 +898,46 @@ TEST_F(PresplitHashedZonesChunksTest, WithMultipleZonesContiguous) {
                                                           << "hashed"
                                                           << "suffix" << 1));
     const std::vector<TagsType> tags = {
-        makeTag(ChunkRange(BSON("country"
-                                << "IE"
-                                << "city"
-                                << "Dublin"
-                                << "hashedField" << MINKEY << "suffix" << MINKEY),
-                           BSON("country"
-                                << "UK"
-                                << "city"
-                                << "London"
-                                << "hashedField" << MINKEY << "suffix" << MINKEY)),
+        makeTag(ChunkRange(BSON("country" << "IE"
+                                          << "city"
+                                          << "Dublin"
+                                          << "hashedField" << MINKEY << "suffix" << MINKEY),
+                           BSON("country" << "UK"
+                                          << "city"
+                                          << "London"
+                                          << "hashedField" << MINKEY << "suffix" << MINKEY)),
                 zoneName("0")),
-        makeTag(ChunkRange(BSON("country"
-                                << "UK"
-                                << "city"
-                                << "London"
-                                << "hashedField" << MINKEY << "suffix" << MINKEY),
-                           BSON("country"
-                                << "US"
-                                << "city"
-                                << "NewYork"
-                                << "hashedField" << MINKEY << "suffix" << MINKEY)),
+        makeTag(ChunkRange(BSON("country" << "UK"
+                                          << "city"
+                                          << "London"
+                                          << "hashedField" << MINKEY << "suffix" << MINKEY),
+                           BSON("country" << "US"
+                                          << "city"
+                                          << "NewYork"
+                                          << "hashedField" << MINKEY << "suffix" << MINKEY)),
                 zoneName("1")),
-        makeTag(
-            ChunkRange(BSON("country"
-                            << "US"
-                            << "city"
-                            << "NewYork"
-                            << "hashedField" << MINKEY << "suffix" << MINKEY),
-                       BSON("country"
-                            << "US"
-                            << "city" << MAXKEY << "hashedField" << MINKEY << "suffix" << MINKEY)),
-            zoneName("2"))};
+        makeTag(ChunkRange(BSON("country" << "US"
+                                          << "city"
+                                          << "NewYork"
+                                          << "hashedField" << MINKEY << "suffix" << MINKEY),
+                           BSON("country" << "US"
+                                          << "city" << MAXKEY << "hashedField" << MINKEY << "suffix"
+                                          << MINKEY)),
+                zoneName("2"))};
 
-    // numInitialChunks = 0.
-    // This should have 8 chunks, 2 for each zone and 2 boundaries.
-    std::vector<ChunkRange> expectedChunkRanges =
-        buildExpectedChunkRanges(tags, shardKeyPattern, {2, 2, 2});
-
-    std::vector<ShardId> expectedShardForEachChunk = {
-        shardId("0"),  // Lower bound.
-        shardId("0"),
-        shardId("0"),
-        shardId("1"),
-        shardId("1"),
-        shardId("2"),
-        shardId("2"),
-        shardId("1")  // Upper bound.
-    };
-    checkGeneratedInitialZoneChunks(tags,
-                                    expectedChunkRanges,
-                                    expectedShardForEachChunk,
-                                    shardKeyPattern,
-                                    0 /* numInitialChunks*/);
-
-    // numInitialChunks = 1.
     // This should have 5 chunks, 1 for each zone and 2 boundaries.
-    expectedChunkRanges = buildExpectedChunkRanges(tags, shardKeyPattern, {1, 1, 1});
+    std::vector<ChunkRange> expectedChunkRanges =
+        buildExpectedChunkRanges(tags, shardKeyPattern, {1, 1, 1});
 
-    expectedShardForEachChunk = {
-        shardId("0"),  // Lower bound.
-        shardId("0"),
-        shardId("1"),
-        shardId("2"),
-        shardId("1")  // Upper bound.
+    std::vector<boost::optional<ShardId>> expectedShardForEachChunk = {
+        boost::none,   // Lower bound.
+        shardId("0"),  // Zone 0
+        shardId("1"),  // Zone 1
+        shardId("2"),  // Zone 2
+        boost::none    // Upper bound.
     };
-    checkGeneratedInitialZoneChunks(tags,
-                                    expectedChunkRanges,
-                                    expectedShardForEachChunk,
-                                    shardKeyPattern,
-                                    1 /* numInitialChunks*/);
-
-    // numInitialChunks = 10.
-    // This should have 14 chunks, 4 for each zone and 2 boundaries.
-    expectedChunkRanges = buildExpectedChunkRanges(tags, shardKeyPattern, {4, 4, 4});
-
-    expectedShardForEachChunk = {
-        shardId("0"),  // Lower bound.
-        shardId("0"),
-        shardId("0"),
-        shardId("0"),
-        shardId("0"),
-        shardId("1"),
-        shardId("1"),
-        shardId("1"),
-        shardId("1"),
-        shardId("2"),
-        shardId("2"),
-        shardId("2"),
-        shardId("2"),
-        shardId("1")  // Upper bound.
-    };
-    checkGeneratedInitialZoneChunks(tags,
-                                    expectedChunkRanges,
-                                    expectedShardForEachChunk,
-                                    shardKeyPattern,
-                                    10 /* numInitialChunks*/);
+    checkGeneratedInitialZoneChunks(
+        expectedChunkRanges, expectedShardForEachChunk, shardKeyPattern, tags);
 }
 
 TEST_F(PresplitHashedZonesChunksTest, MultipleContiguousZonesWithEachZoneHavingMultipleShards) {
@@ -909,91 +955,40 @@ TEST_F(PresplitHashedZonesChunksTest, MultipleContiguousZonesWithEachZoneHavingM
                                                           << "hashed"
                                                           << "suffix" << 1));
     const std::vector<TagsType> tags = {
-        makeTag(ChunkRange(BSON("country"
-                                << "IE"
-                                << "city"
-                                << "Dublin"
-                                << "hashedField" << MINKEY << "suffix" << MINKEY),
-                           BSON("country"
-                                << "UK"
-                                << "city"
-                                << "London"
-                                << "hashedField" << MINKEY << "suffix" << MINKEY)),
+        makeTag(ChunkRange(BSON("country" << "IE"
+                                          << "city"
+                                          << "Dublin"
+                                          << "hashedField" << MINKEY << "suffix" << MINKEY),
+                           BSON("country" << "UK"
+                                          << "city"
+                                          << "London"
+                                          << "hashedField" << MINKEY << "suffix" << MINKEY)),
                 zoneName("0")),
-        makeTag(ChunkRange(BSON("country"
-                                << "UK"
-                                << "city"
-                                << "London"
-                                << "hashedField" << MINKEY << "suffix" << MINKEY),
-                           BSON("country"
-                                << "US"
-                                << "city"
-                                << "Los Angeles"
-                                << "hashedField" << MINKEY << "suffix" << MINKEY)),
+        makeTag(ChunkRange(BSON("country" << "UK"
+                                          << "city"
+                                          << "London"
+                                          << "hashedField" << MINKEY << "suffix" << MINKEY),
+                           BSON("country" << "US"
+                                          << "city"
+                                          << "Los Angeles"
+                                          << "hashedField" << MINKEY << "suffix" << MINKEY)),
                 zoneName("1"))};
 
-    // numInitialChunks = 0.
-    // This should have 12 chunks, 6 for zone0, 4 for zone1 and 2 boundaries.
+    // This should have 7 chunks, 3 for zone0, 2 for zone1 and 2 boundaries.
     std::vector<ChunkRange> expectedChunkRanges =
-        buildExpectedChunkRanges(tags, shardKeyPattern, {6, 4});
+        buildExpectedChunkRanges(tags, shardKeyPattern, {3, 2});
 
-    std::vector<ShardId> expectedShardForEachChunk = {
-        shardId("0"),  // Lower bound.
-        shardId("0"),  // zone 0.
+    std::vector<boost::optional<ShardId>> expectedShardForEachChunk = {
+        boost::none,   // Lower bound.
         shardId("0"),  // zone 0.
         shardId("3"),  // zone 0.
-        shardId("3"),  // zone 0.
-        shardId("5"),  // zone 0.
         shardId("5"),  // zone 0.
         shardId("2"),  // zone 1.
-        shardId("2"),  // zone 1.
         shardId("4"),  // zone 1.
-        shardId("4"),  // zone 1.
-        shardId("1")   // Upper bound.
+        boost::none    // Upper bound.
     };
-    checkGeneratedInitialZoneChunks(tags,
-                                    expectedChunkRanges,
-                                    expectedShardForEachChunk,
-                                    shardKeyPattern,
-                                    0 /* numInitialChunks*/);
-
-    // numInitialChunks = 1.
-    // This should have 7 chunks, 5 for all zones and 2 boundaries.
-    expectedChunkRanges = buildExpectedChunkRanges(tags, shardKeyPattern, {3, 2});
-
-    expectedShardForEachChunk = {
-        shardId("0"),  // Lower bound.
-        shardId("0"),  // zone0.
-        shardId("3"),  // zone0.
-        shardId("5"),  // zone0.
-        shardId("2"),  // zone1.
-        shardId("4"),  // zone1.
-        shardId("1")   // Upper bound.
-    };
-    checkGeneratedInitialZoneChunks(tags,
-                                    expectedChunkRanges,
-                                    expectedShardForEachChunk,
-                                    shardKeyPattern,
-                                    1 /* numInitialChunks*/);
-
-    // numInitialChunks = 5.
-    // This should have 7 chunks, 5 for all zones and 2 boundaries.
-    expectedChunkRanges = buildExpectedChunkRanges(tags, shardKeyPattern, {3, 2});
-
-    expectedShardForEachChunk = {
-        shardId("0"),  // Lower bound.
-        shardId("0"),  // zone0.
-        shardId("3"),  // zone0.
-        shardId("5"),  // zone0.
-        shardId("2"),  // zone1.
-        shardId("4"),  // zone1.
-        shardId("1")   // Upper bound.
-    };
-    checkGeneratedInitialZoneChunks(tags,
-                                    expectedChunkRanges,
-                                    expectedShardForEachChunk,
-                                    shardKeyPattern,
-                                    5 /* numInitialChunks*/);
+    checkGeneratedInitialZoneChunks(
+        expectedChunkRanges, expectedShardForEachChunk, shardKeyPattern, tags);
 }
 
 TEST_F(PresplitHashedZonesChunksTest, MultipleZonesWithGaps) {
@@ -1009,106 +1004,46 @@ TEST_F(PresplitHashedZonesChunksTest, MultipleZonesWithGaps) {
                                                           << "hashed"
                                                           << "suffix" << 1));
     const std::vector<TagsType> tags = {
-        makeTag(ChunkRange(BSON("country"
-                                << "IE"
-                                << "city"
-                                << "Dublin"
-                                << "hashedField" << MINKEY << "suffix" << MINKEY),
-                           BSON("country"
-                                << "UK"
-                                << "city" << MINKEY << "hashedField" << MINKEY << "suffix"
-                                << "SomeValue")),
+        makeTag(ChunkRange(BSON("country" << "IE"
+                                          << "city"
+                                          << "Dublin"
+                                          << "hashedField" << MINKEY << "suffix" << MINKEY),
+                           BSON("country" << "UK"
+                                          << "city" << MINKEY << "hashedField" << MINKEY << "suffix"
+                                          << "SomeValue")),
                 zoneName("0")),
-        makeTag(ChunkRange(BSON("country"
-                                << "UK"
-                                << "city"
-                                << "London"
-                                << "hashedField" << MINKEY << "suffix" << MINKEY),
-                           BSON("country"
-                                << "US"
-                                << "city" << MINKEY << "hashedField" << 100LL << "suffix"
-                                << "someValue")),
+        makeTag(ChunkRange(BSON("country" << "UK"
+                                          << "city"
+                                          << "London"
+                                          << "hashedField" << MINKEY << "suffix" << MINKEY),
+                           BSON("country" << "US"
+                                          << "city" << MINKEY << "hashedField" << 100LL << "suffix"
+                                          << "someValue")),
                 zoneName("1")),
-        makeTag(
-            ChunkRange(BSON("country"
-                            << "US"
-                            << "city"
-                            << "NewYork"
-                            << "hashedField" << MINKEY << "suffix" << MINKEY),
-                       BSON("country"
-                            << "US"
-                            << "city" << MAXKEY << "hashedField" << MINKEY << "suffix" << MINKEY)),
-            zoneName("2"))};
+        makeTag(ChunkRange(BSON("country" << "US"
+                                          << "city"
+                                          << "NewYork"
+                                          << "hashedField" << MINKEY << "suffix" << MINKEY),
+                           BSON("country" << "US"
+                                          << "city" << MAXKEY << "hashedField" << MINKEY << "suffix"
+                                          << MINKEY)),
+                zoneName("2"))};
 
-    // numInitialChunks = 0.
-    // This should have 10 chunks, 2 for each zone (6), 2 gaps and 2 boundaries.
-    std::vector<ChunkRange> expectedChunkRanges =
-        buildExpectedChunkRanges(tags, shardKeyPattern, {2, 2, 2});
-    // The holes should use round-robin to choose a shard.
-    std::vector<ShardId> expectedShardForEachChunk = {
-        shardId("0"),  // LowerBound.
-        shardId("0"),
-        shardId("0"),
-        shardId("1"),  // Hole.
-        shardId("1"),
-        shardId("1"),
-        shardId("2"),  // Hole.
-        shardId("2"),
-        shardId("2"),
-        shardId("noZone"),  // UpperBound.
-    };
-    checkGeneratedInitialZoneChunks(tags,
-                                    expectedChunkRanges,
-                                    expectedShardForEachChunk,
-                                    shardKeyPattern,
-                                    0 /* numInitialChunks*/);
-
-    // numInitialChunks = 1.
     // This should have 7 chunks, 1 for each zone (3), 2 gaps and 2 boundaries.
-    expectedChunkRanges = buildExpectedChunkRanges(tags, shardKeyPattern, {1, 1, 1});
+    std::vector<ChunkRange> expectedChunkRanges =
+        buildExpectedChunkRanges(tags, shardKeyPattern, {1, 1, 1});
     // The holes should use round-robin to choose a shard.
-    expectedShardForEachChunk = {
-        shardId("0"),  // LowerBound.
+    std::vector<boost::optional<ShardId>> expectedShardForEachChunk = {
+        boost::none,  // LowerBound.
         shardId("0"),
-        shardId("1"),  // Hole.
+        boost::none,  // Hole.
         shardId("1"),
-        shardId("2"),  // Hole.
+        boost::none,  // Hole.
         shardId("2"),
-        shardId("noZone"),  // UpperBound.
+        boost::none,  // UpperBound.
     };
-    checkGeneratedInitialZoneChunks(tags,
-                                    expectedChunkRanges,
-                                    expectedShardForEachChunk,
-                                    shardKeyPattern,
-                                    1 /* numInitialChunks*/);
-
-    // numInitialChunks = 12.
-    // This should have 16 chunks, 4 for each zone (12), 2 gaps and 2 boundaries.
-    expectedChunkRanges = buildExpectedChunkRanges(tags, shardKeyPattern, {4, 4, 4});
-    // The holes should use round-robin to choose a shard.
-    expectedShardForEachChunk = {
-        shardId("0"),  // LowerBound.
-        shardId("0"),
-        shardId("0"),
-        shardId("0"),
-        shardId("0"),
-        shardId("1"),  // Hole.
-        shardId("1"),
-        shardId("1"),
-        shardId("1"),
-        shardId("1"),
-        shardId("2"),  // Hole.
-        shardId("2"),
-        shardId("2"),
-        shardId("2"),
-        shardId("2"),
-        shardId("noZone"),  // UpperBound.
-    };
-    checkGeneratedInitialZoneChunks(tags,
-                                    expectedChunkRanges,
-                                    expectedShardForEachChunk,
-                                    shardKeyPattern,
-                                    12 /* numInitialChunks*/);
+    checkGeneratedInitialZoneChunks(
+        expectedChunkRanges, expectedShardForEachChunk, shardKeyPattern, tags);
 }
 
 TEST_F(PresplitHashedZonesChunksTest, MultipleContiguousZonesWithEachShardHavingMultipleZones) {
@@ -1127,114 +1062,57 @@ TEST_F(PresplitHashedZonesChunksTest, MultipleContiguousZonesWithEachShardHaving
 
     // No gap between the zone ranges.
     const std::vector<TagsType> tags = {
-        makeTag(ChunkRange(BSON("country"
-                                << "IE"
-                                << "city"
-                                << "Dublin"
-                                << "hashedField" << MINKEY << "suffix" << MINKEY),
-                           BSON("country"
-                                << "UK"
-                                << "city"
-                                << "London"
-                                << "hashedField" << MINKEY << "suffix" << MINKEY)),
+        makeTag(ChunkRange(BSON("country" << "IE"
+                                          << "city"
+                                          << "Dublin"
+                                          << "hashedField" << MINKEY << "suffix" << MINKEY),
+                           BSON("country" << "UK"
+                                          << "city"
+                                          << "London"
+                                          << "hashedField" << MINKEY << "suffix" << MINKEY)),
                 zoneName("0")),
-        makeTag(ChunkRange(BSON("country"
-                                << "UK"
-                                << "city"
-                                << "London"
-                                << "hashedField" << MINKEY << "suffix" << MINKEY),
-                           BSON("country"
-                                << "US"
-                                << "city"
-                                << "Los Angeles"
-                                << "hashedField" << MINKEY << "suffix" << MINKEY)),
+        makeTag(ChunkRange(BSON("country" << "UK"
+                                          << "city"
+                                          << "London"
+                                          << "hashedField" << MINKEY << "suffix" << MINKEY),
+                           BSON("country" << "US"
+                                          << "city"
+                                          << "Los Angeles"
+                                          << "hashedField" << MINKEY << "suffix" << MINKEY)),
                 zoneName("1")),
-        makeTag(ChunkRange(BSON("country"
-                                << "US"
-                                << "city"
-                                << "Los Angeles"
-                                << "hashedField" << MINKEY << "suffix" << MINKEY),
-                           BSON("country"
-                                << "US"
-                                << "city"
-                                << "New York"
-                                << "hashedField" << MINKEY << "suffix" << MINKEY)),
+        makeTag(ChunkRange(BSON("country" << "US"
+                                          << "city"
+                                          << "Los Angeles"
+                                          << "hashedField" << MINKEY << "suffix" << MINKEY),
+                           BSON("country" << "US"
+                                          << "city"
+                                          << "New York"
+                                          << "hashedField" << MINKEY << "suffix" << MINKEY)),
                 zoneName("2")),
-        makeTag(
-            ChunkRange(BSON("country"
-                            << "US"
-                            << "city"
-                            << "New York"
-                            << "hashedField" << MINKEY << "suffix" << MINKEY),
-                       BSON("country"
-                            << "US"
-                            << "city" << MAXKEY << "hashedField" << MINKEY << "suffix" << MINKEY)),
-            zoneName("3"))};
+        makeTag(ChunkRange(BSON("country" << "US"
+                                          << "city"
+                                          << "New York"
+                                          << "hashedField" << MINKEY << "suffix" << MINKEY),
+                           BSON("country" << "US"
+                                          << "city" << MAXKEY << "hashedField" << MINKEY << "suffix"
+                                          << MINKEY)),
+                zoneName("3"))};
 
-    // numInitialChunks = 0.
     // This should have 7 chunks, 5 for all zones and 2 boundaries.
     std::vector<ChunkRange> expectedChunkRanges =
         buildExpectedChunkRanges(tags, shardKeyPattern, {1, 1, 2, 1} /* numChunksPerTag*/);
 
-    std::vector<ShardId> expectedShardForEachChunk = {
-        shardId("0"),  // Lower bound.
+    std::vector<boost::optional<ShardId>> expectedShardForEachChunk = {
+        boost::none,   // Lower bound.
         shardId("0"),  // zone0.
         shardId("1"),  // zone1.
         shardId("0"),  // zone2.
         shardId("1"),  // zone2.
         shardId("1"),  // zone3.
-        shardId("1")   // Upper bound.
+        boost::none    // Upper bound.
     };
-    checkGeneratedInitialZoneChunks(tags,
-                                    expectedChunkRanges,
-                                    expectedShardForEachChunk,
-                                    shardKeyPattern,
-                                    0 /* numInitialChunks*/);
-
-    // numInitialChunks = 1.
-    // This should have 7 chunks, 5 for all zones and 2 boundaries.
-    expectedChunkRanges =
-        buildExpectedChunkRanges(tags, shardKeyPattern, {1, 1, 2, 1} /* numChunksPerTag*/);
-
-    expectedShardForEachChunk = {
-        shardId("0"),  // Lower bound.
-        shardId("0"),  // zone0.
-        shardId("1"),  // zone1.
-        shardId("0"),  // zone2.
-        shardId("1"),  // zone2.
-        shardId("1"),  // zone3.
-        shardId("1")   // Upper bound.
-    };
-    checkGeneratedInitialZoneChunks(tags,
-                                    expectedChunkRanges,
-                                    expectedShardForEachChunk,
-                                    shardKeyPattern,
-                                    1 /* numInitialChunks*/);
-
-    // numInitialChunks = 7.
-    // This should have 10 chunks, 10 for all zones and 2 boundaries.
-    expectedChunkRanges =
-        buildExpectedChunkRanges(tags, shardKeyPattern, {2, 2, 4, 2} /* numChunksPerTag*/);
-
-    expectedShardForEachChunk = {
-        shardId("0"),  // Lower bound.
-        shardId("0"),  // zone0.
-        shardId("0"),  // zone0.
-        shardId("1"),  // zone1.
-        shardId("1"),  // zone1.
-        shardId("0"),  // zone2.
-        shardId("0"),  // zone2.
-        shardId("1"),  // zone2.
-        shardId("1"),  // zone2.
-        shardId("1"),  // zone3.
-        shardId("1"),  // zone3.
-        shardId("1")   // Upper bound.
-    };
-    checkGeneratedInitialZoneChunks(tags,
-                                    expectedChunkRanges,
-                                    expectedShardForEachChunk,
-                                    shardKeyPattern,
-                                    7 /* numInitialChunks*/);
+    checkGeneratedInitialZoneChunks(
+        expectedChunkRanges, expectedShardForEachChunk, shardKeyPattern, tags);
 }
 
 TEST_F(PresplitHashedZonesChunksTest, OneLargeZoneAndOtherSmallZonesSharingASingleShard) {
@@ -1258,150 +1136,70 @@ TEST_F(PresplitHashedZonesChunksTest, OneLargeZoneAndOtherSmallZonesSharingASing
 
     // With gaps after each zone ranges.
     const std::vector<TagsType> tags = {
-        makeTag(
-            ChunkRange(BSON("country"
-                            << "country1"
-                            << "city"
-                            << "city1"
-                            << "hashedField" << MINKEY << "suffix" << MINKEY),
-                       BSON("country"
-                            << "country2"
-                            << "city" << MINKEY << "hashedField" << MINKEY << "suffix" << MINKEY)),
-            zoneName("0")),
-        makeTag(
-            ChunkRange(BSON("country"
-                            << "country2"
-                            << "city"
-                            << "city2"
-                            << "hashedField" << MINKEY << "suffix" << MINKEY),
-                       BSON("country"
-                            << "country3"
-                            << "city" << MINKEY << "hashedField" << MINKEY << "suffix" << MINKEY)),
-            zoneName("1")),
-        makeTag(
-            ChunkRange(BSON("country"
-                            << "country3"
-                            << "city"
-                            << "city3"
-                            << "hashedField" << MINKEY << "suffix" << MINKEY),
-                       BSON("country"
-                            << "country4"
-                            << "city" << MINKEY << "hashedField" << MINKEY << "suffix" << MINKEY)),
-            zoneName("2")),
-        makeTag(
-            ChunkRange(BSON("country"
-                            << "country4"
-                            << "city"
-                            << "city4"
-                            << "hashedField" << MINKEY << "suffix" << MINKEY),
-                       BSON("country"
-                            << "country5"
-                            << "city" << MAXKEY << "hashedField" << MINKEY << "suffix" << MINKEY)),
-            zoneName("3")),
-        makeTag(
-            ChunkRange(BSON("country"
-                            << "country6"  // Skip country 5.
-                            << "city"
-                            << "city5"
-                            << "hashedField" << MINKEY << "suffix" << MINKEY),
-                       BSON("country"
-                            << "country7"
-                            << "city" << MAXKEY << "hashedField" << MINKEY << "suffix" << MINKEY)),
-            zoneName("4"))};
+        makeTag(ChunkRange(BSON("country" << "country1"
+                                          << "city"
+                                          << "city1"
+                                          << "hashedField" << MINKEY << "suffix" << MINKEY),
+                           BSON("country" << "country2"
+                                          << "city" << MINKEY << "hashedField" << MINKEY << "suffix"
+                                          << MINKEY)),
+                zoneName("0")),
+        makeTag(ChunkRange(BSON("country" << "country2"
+                                          << "city"
+                                          << "city2"
+                                          << "hashedField" << MINKEY << "suffix" << MINKEY),
+                           BSON("country" << "country3"
+                                          << "city" << MINKEY << "hashedField" << MINKEY << "suffix"
+                                          << MINKEY)),
+                zoneName("1")),
+        makeTag(ChunkRange(BSON("country" << "country3"
+                                          << "city"
+                                          << "city3"
+                                          << "hashedField" << MINKEY << "suffix" << MINKEY),
+                           BSON("country" << "country4"
+                                          << "city" << MINKEY << "hashedField" << MINKEY << "suffix"
+                                          << MINKEY)),
+                zoneName("2")),
+        makeTag(ChunkRange(BSON("country" << "country4"
+                                          << "city"
+                                          << "city4"
+                                          << "hashedField" << MINKEY << "suffix" << MINKEY),
+                           BSON("country" << "country5"
+                                          << "city" << MAXKEY << "hashedField" << MINKEY << "suffix"
+                                          << MINKEY)),
+                zoneName("3")),
+        makeTag(ChunkRange(BSON("country" << "country6"  // Skip country 5.
+                                          << "city"
+                                          << "city5"
+                                          << "hashedField" << MINKEY << "suffix" << MINKEY),
+                           BSON("country" << "country7"
+                                          << "city" << MAXKEY << "hashedField" << MINKEY << "suffix"
+                                          << MINKEY)),
+                zoneName("4"))};
 
-    // numInitialChunks = 0.
-    // This should have 20 chunks, 14 for all zones, 4 gaps and 2 boundaries.
-    std::vector<ChunkRange> expectedChunkRanges =
-        buildExpectedChunkRanges(tags, shardKeyPattern, {1, 1, 1, 2 * 5, 1} /* numChunksPerTag*/);
-
-    std::vector<ShardId> expectedShardForEachChunk = {
-        shardId("0"),  // Lower bound.
-        shardId("0"),  // zone0.
-        shardId("1"),  // hole.
-        shardId("0"),  // zone1.
-        shardId("2"),  // hole.
-        shardId("0"),  // zone2.
-        shardId("3"),  // hole.
-        shardId("2"),  // zone3.
-        shardId("2"),  // zone3.
-        shardId("3"),  // zone3.
-        shardId("3"),  // zone3.
-        shardId("4"),  // zone3.
-        shardId("4"),  // zone3.
-        shardId("5"),  // zone3.
-        shardId("5"),  // zone3.
-        shardId("6"),  // zone3.
-        shardId("6"),  // zone3.
-        shardId("4"),  // hole.
-        shardId("0"),  // zone4.
-        shardId("5")   // Upper bound.
-    };
-    checkGeneratedInitialZoneChunks(tags,
-                                    expectedChunkRanges,
-                                    expectedShardForEachChunk,
-                                    shardKeyPattern,
-                                    0 /* numInitialChunks*/);
-
-    // numInitialChunks = 1.
     // This should have 15 chunks, 9 for all zones, 4 gap and 2 boundaries.
-    expectedChunkRanges =
+    std::vector<ChunkRange> expectedChunkRanges =
         buildExpectedChunkRanges(tags, shardKeyPattern, {1, 1, 1, 5, 1} /* numChunksPerTag*/);
 
-    expectedShardForEachChunk = {
-        shardId("0"),  // Lower bound.
+    std::vector<boost::optional<ShardId>> expectedShardForEachChunk = {
+        boost::none,   // Lower bound.
         shardId("0"),  // zone0.
-        shardId("1"),  // hole.
+        boost::none,   // hole.
         shardId("0"),  // zone1.
-        shardId("2"),  // hole.
+        boost::none,   // hole.
         shardId("0"),  // zone2.
-        shardId("3"),  // hole.
+        boost::none,   // hole.
         shardId("2"),  // zone3.
         shardId("3"),  // zone3.
         shardId("4"),  // zone3.
         shardId("5"),  // zone3.
         shardId("6"),  // zone3.
-        shardId("4"),  // hole.
+        boost::none,   // hole.
         shardId("0"),  // zone4.
-        shardId("5")   // Upper bound.
+        boost::none    // Upper bound.
     };
-    checkGeneratedInitialZoneChunks(tags,
-                                    expectedChunkRanges,
-                                    expectedShardForEachChunk,
-                                    shardKeyPattern,
-                                    1 /* numInitialChunks*/);
-
-    // numInitialChunks = 11.
-    // This should have 10 chunks, 10 for all zones and 2 boundaries.
-    expectedChunkRanges =
-        buildExpectedChunkRanges(tags, shardKeyPattern, {1, 1, 1, 10, 1} /* numChunksPerTag*/);
-
-    expectedShardForEachChunk = {
-        shardId("0"),  // Lower bound.
-        shardId("0"),  // zone0.
-        shardId("1"),  // hole.
-        shardId("0"),  // zone1.
-        shardId("2"),  // hole.
-        shardId("0"),  // zone2.
-        shardId("3"),  // hole.
-        shardId("2"),  // zone3.
-        shardId("2"),  // zone3.
-        shardId("3"),  // zone3.
-        shardId("3"),  // zone3.
-        shardId("4"),  // zone3.
-        shardId("4"),  // zone3.
-        shardId("5"),  // zone3.
-        shardId("5"),  // zone3.
-        shardId("6"),  // zone3.
-        shardId("6"),  // zone3.
-        shardId("4"),  // hole.
-        shardId("0"),  // zone4.
-        shardId("5")   // Upper bound.
-    };
-    checkGeneratedInitialZoneChunks(tags,
-                                    expectedChunkRanges,
-                                    expectedShardForEachChunk,
-                                    shardKeyPattern,
-                                    11 /* numInitialChunks*/);
+    checkGeneratedInitialZoneChunks(
+        expectedChunkRanges, expectedShardForEachChunk, shardKeyPattern, tags);
 }
 
 TEST_F(PresplitHashedZonesChunksTest, InterweavingZones) {
@@ -1420,137 +1218,68 @@ TEST_F(PresplitHashedZonesChunksTest, InterweavingZones) {
 
     // With gaps after each zone ranges.
     const std::vector<TagsType> tags = {
-        makeTag(
-            ChunkRange(BSON("country"
-                            << "country1"
-                            << "city"
-                            << "city1"
-                            << "hashedField" << MINKEY << "suffix" << MINKEY),
-                       BSON("country"
-                            << "country2"
-                            << "city" << MINKEY << "hashedField" << MINKEY << "suffix" << MINKEY)),
-            zoneName("0")),
-        makeTag(
-            ChunkRange(BSON("country"
-                            << "country2"
-                            << "city"
-                            << "city2"
-                            << "hashedField" << MINKEY << "suffix" << MINKEY),
-                       BSON("country"
-                            << "country3"
-                            << "city" << MINKEY << "hashedField" << MINKEY << "suffix" << MINKEY)),
-            zoneName("1")),
-        makeTag(
-            ChunkRange(BSON("country"
-                            << "country3"
-                            << "city"
-                            << "city3"
-                            << "hashedField" << MINKEY << "suffix" << MINKEY),
-                       BSON("country"
-                            << "country4"
-                            << "city" << MINKEY << "hashedField" << MINKEY << "suffix" << MINKEY)),
-            zoneName("2")),
-        makeTag(
-            ChunkRange(BSON("country"
-                            << "country4"
-                            << "city"
-                            << "city4"
-                            << "hashedField" << MINKEY << "suffix" << MINKEY),
-                       BSON("country"
-                            << "country5"
-                            << "city" << MAXKEY << "hashedField" << MINKEY << "suffix" << MINKEY)),
-            zoneName("0")),
-        makeTag(
-            ChunkRange(BSON("country"
-                            << "country6"
-                            << "city"
-                            << "city5"
-                            << "hashedField" << MINKEY << "suffix" << MINKEY),
-                       BSON("country"
-                            << "country7"
-                            << "city" << MAXKEY << "hashedField" << MINKEY << "suffix" << MINKEY)),
-            zoneName("1"))};
+        makeTag(ChunkRange(BSON("country" << "country1"
+                                          << "city"
+                                          << "city1"
+                                          << "hashedField" << MINKEY << "suffix" << MINKEY),
+                           BSON("country" << "country2"
+                                          << "city" << MINKEY << "hashedField" << MINKEY << "suffix"
+                                          << MINKEY)),
+                zoneName("0")),
+        makeTag(ChunkRange(BSON("country" << "country2"
+                                          << "city"
+                                          << "city2"
+                                          << "hashedField" << MINKEY << "suffix" << MINKEY),
+                           BSON("country" << "country3"
+                                          << "city" << MINKEY << "hashedField" << MINKEY << "suffix"
+                                          << MINKEY)),
+                zoneName("1")),
+        makeTag(ChunkRange(BSON("country" << "country3"
+                                          << "city"
+                                          << "city3"
+                                          << "hashedField" << MINKEY << "suffix" << MINKEY),
+                           BSON("country" << "country4"
+                                          << "city" << MINKEY << "hashedField" << MINKEY << "suffix"
+                                          << MINKEY)),
+                zoneName("2")),
+        makeTag(ChunkRange(BSON("country" << "country4"
+                                          << "city"
+                                          << "city4"
+                                          << "hashedField" << MINKEY << "suffix" << MINKEY),
+                           BSON("country" << "country5"
+                                          << "city" << MAXKEY << "hashedField" << MINKEY << "suffix"
+                                          << MINKEY)),
+                zoneName("0")),
+        makeTag(ChunkRange(BSON("country" << "country6"
+                                          << "city"
+                                          << "city5"
+                                          << "hashedField" << MINKEY << "suffix" << MINKEY),
+                           BSON("country" << "country7"
+                                          << "city" << MAXKEY << "hashedField" << MINKEY << "suffix"
+                                          << MINKEY)),
+                zoneName("1"))};
 
-    // numInitialChunks = 0.
     // This should have 13 chunks, 7 for all zones, 4 gaps and 2 boundaries.
     std::vector<ChunkRange> expectedChunkRanges = buildExpectedChunkRanges(
         tags, shardKeyPattern, {1, 1 * 2, 1, 1, 1 * 2} /* numChunksPerTag*/);
 
-    std::vector<ShardId> expectedShardForEachChunk = {
-        shardId("0"),  // Lower bound.
+    std::vector<boost::optional<ShardId>> expectedShardForEachChunk = {
+        boost::none,   // Lower bound.
         shardId("0"),  // tag0.
-        shardId("1"),  // hole.
+        boost::none,   // hole.
         shardId("2"),  // tag1.
         shardId("3"),  // tag1.
-        shardId("2"),  // hole.
+        boost::none,   // hole.
         shardId("0"),  // tag2.
-        shardId("3"),  // hole.
+        boost::none,   // hole.
         shardId("0"),  // tag3.
-        shardId("0"),  // hole.
+        boost::none,   // hole.
         shardId("2"),  // tag4.
         shardId("3"),  // tag4.
-        shardId("1")   // Upper bound.
+        boost::none    // Upper bound.
     };
-    checkGeneratedInitialZoneChunks(tags,
-                                    expectedChunkRanges,
-                                    expectedShardForEachChunk,
-                                    shardKeyPattern,
-                                    0 /* numInitialChunks*/);
-
-    // numInitialChunks = 1.
-    // This should have 13 chunks, 7 for all zones, 4 gaps and 2 boundaries.
-    expectedChunkRanges =
-        buildExpectedChunkRanges(tags, shardKeyPattern, {1, 2, 1, 1, 2} /* numChunksPerTag*/);
-    expectedShardForEachChunk = {
-        shardId("0"),  // Lower bound.
-        shardId("0"),  // tag0.
-        shardId("1"),  // hole.
-        shardId("2"),  // tag1.
-        shardId("3"),  // tag1.
-        shardId("2"),  // hole.
-        shardId("0"),  // tag2.
-        shardId("3"),  // hole.
-        shardId("0"),  // tag3.
-        shardId("0"),  // hole.
-        shardId("2"),  // tag4.
-        shardId("3"),  // tag4.
-        shardId("1")   // Upper bound.
-    };
-    checkGeneratedInitialZoneChunks(tags,
-                                    expectedChunkRanges,
-                                    expectedShardForEachChunk,
-                                    shardKeyPattern,
-                                    1 /* numInitialChunks*/);
-
-    // numInitialChunks = 7.
-    // This should have 17 chunks, 11 for all zones and 6 gaps + boundary.
-    expectedChunkRanges = buildExpectedChunkRanges(
-        tags, shardKeyPattern, {1, 2 * 2, 1, 1, 2 * 2} /* numChunksPerTag*/);
-
-    expectedShardForEachChunk = {
-        shardId("0"),  // Lower bound.
-        shardId("0"),  // tag0.
-        shardId("1"),  // hole.
-        shardId("2"),  // tag1.
-        shardId("2"),  // tag1.
-        shardId("3"),  // tag1.
-        shardId("3"),  // tag1.
-        shardId("2"),  // hole.
-        shardId("0"),  // tag2.
-        shardId("3"),  // hole.
-        shardId("0"),  // tag3.
-        shardId("0"),  // hole.
-        shardId("2"),  // tag4.
-        shardId("2"),  // tag4.
-        shardId("3"),  // tag4.
-        shardId("3"),  // tag4.
-        shardId("1")   // Upper bound.
-    };
-    checkGeneratedInitialZoneChunks(tags,
-                                    expectedChunkRanges,
-                                    expectedShardForEachChunk,
-                                    shardKeyPattern,
-                                    7 /* numInitialChunks*/);
+    checkGeneratedInitialZoneChunks(
+        expectedChunkRanges, expectedShardForEachChunk, shardKeyPattern, tags);
 }
 
 TEST_F(PresplitHashedZonesChunksTest, FailsWhenNoZones) {
@@ -1560,48 +1289,44 @@ TEST_F(PresplitHashedZonesChunksTest, FailsWhenNoZones) {
     auto shardKeyPattern = ShardKeyPattern(BSON("x" << 1 << "y"
                                                     << "hashed"));
     ASSERT_THROWS_CODE(
-        PresplitHashedZonesSplitPolicy(operationContext(), shardKeyPattern, {}, 0, true),
+        PresplitHashedZonesSplitPolicy(operationContext(), shardKeyPattern, {}, true),
         DBException,
         31387);
 }
 
 TEST_F(PresplitHashedZonesChunksTest, FailsWhenCollectionNotEmpty) {
-    setupShards({ShardType(shardId("0").toString(), "rs0/shard0:123")});
+    setupShards({ShardType(shardId("0").toString(), "rs0/shard0:123", {zoneName("1")})});
     shardRegistry()->reload(operationContext());
     auto shardKeyPattern = ShardKeyPattern(BSON("x" << 1 << "y"
                                                     << "hashed"));
-    const auto zoneRange = ChunkRange(BSON("x"
-                                           << "UK"
-                                           << "y" << MINKEY),
-                                      BSON("x"
-                                           << "US"
-                                           << "y" << MINKEY));
+    const auto zoneRange = ChunkRange(BSON("x" << "UK"
+                                               << "y" << MINKEY),
+                                      BSON("x" << "US"
+                                               << "y" << MINKEY));
     ASSERT_THROWS_CODE(
         PresplitHashedZonesSplitPolicy(
-            operationContext(), shardKeyPattern, {makeTag(zoneRange, zoneName("1"))}, 0, false),
+            operationContext(), shardKeyPattern, {makeTag(zoneRange, zoneName("1"))}, false),
         DBException,
         31387);
 }
 
 TEST_F(PresplitHashedZonesChunksTest, FailsWhenShardKeyNotHashed) {
-    setupShards({ShardType(shardId("0").toString(), "rs0/shard0:123")});
+    setupShards({ShardType(shardId("0").toString(), "rs0/shard0:123", {zoneName("1")})});
     shardRegistry()->reload(operationContext());
     auto shardKeyPattern = ShardKeyPattern(BSON("x" << 1 << "y" << 1));
-    const auto zoneRange = ChunkRange(BSON("x"
-                                           << "UK"
-                                           << "y" << MINKEY),
-                                      BSON("x"
-                                           << "US"
-                                           << "y" << MINKEY));
+    const auto zoneRange = ChunkRange(BSON("x" << "UK"
+                                               << "y" << MINKEY),
+                                      BSON("x" << "US"
+                                               << "y" << MINKEY));
     ASSERT_THROWS_CODE(
         PresplitHashedZonesSplitPolicy(
-            operationContext(), shardKeyPattern, {makeTag(zoneRange, zoneName("1"))}, 0, true),
+            operationContext(), shardKeyPattern, {makeTag(zoneRange, zoneName("1"))}, true),
         DBException,
         31387);
 }
 
 TEST_F(PresplitHashedZonesChunksTest, FailsWhenLowerBoundPrecedingHashedFieldHasMinKeyOrMaxKey) {
-    setupShards({ShardType(shardId("0").toString(), "rs0/shard0:123")});
+    setupShards({ShardType(shardId("0").toString(), "rs0/shard0:123", {zoneName("1")})});
     shardRegistry()->reload(operationContext());
     auto shardKeyPattern = ShardKeyPattern(BSON("a" << 1 << "b" << 1 << "c"
                                                     << "hashed"
@@ -1610,46 +1335,46 @@ TEST_F(PresplitHashedZonesChunksTest, FailsWhenLowerBoundPrecedingHashedFieldHas
                                 BSON("a" << 2 << "b" << 1 << "c" << MINKEY << "d" << MINKEY));
     ASSERT_THROWS_CODE(
         PresplitHashedZonesSplitPolicy(
-            operationContext(), shardKeyPattern, {makeTag(zoneRange, zoneName("1"))}, 0, true),
+            operationContext(), shardKeyPattern, {makeTag(zoneRange, zoneName("1"))}, true),
         DBException,
         31388);
     zoneRange = ChunkRange(BSON("a" << 1 << "b" << MAXKEY << "c" << MINKEY << "d" << MINKEY),
                            BSON("a" << 2 << "b" << 1 << "c" << MINKEY << "d" << MINKEY));
     ASSERT_THROWS_CODE(
         PresplitHashedZonesSplitPolicy(
-            operationContext(), shardKeyPattern, {makeTag(zoneRange, zoneName("1"))}, 0, true),
+            operationContext(), shardKeyPattern, {makeTag(zoneRange, zoneName("1"))}, true),
         DBException,
         31388);
     zoneRange = ChunkRange(BSON("a" << MINKEY << "b" << MINKEY << "c" << MINKEY << "d" << MINKEY),
                            BSON("a" << 2 << "b" << 2 << "c" << MINKEY << "d" << MINKEY));
     ASSERT_THROWS_CODE(
         PresplitHashedZonesSplitPolicy(
-            operationContext(), shardKeyPattern, {makeTag(zoneRange, zoneName("1"))}, 0, true),
+            operationContext(), shardKeyPattern, {makeTag(zoneRange, zoneName("1"))}, true),
         DBException,
         31388);
 }
 
 TEST_F(PresplitHashedZonesChunksTest, FailsWhenLowerBoundOfTheHashedFieldIsNotMinKey) {
-    setupShards({ShardType(shardId("0").toString(), "rs0/shard0:123")});
+    setupShards({ShardType(shardId("0").toString(), "rs0/shard0:123", {zoneName("1")})});
     shardRegistry()->reload(operationContext());
     auto shardKeyPattern = ShardKeyPattern(BSON("x" << 1 << "y"
                                                     << "hashed"));
     auto zoneRange = ChunkRange(BSON("x" << 1 << "y" << 1), BSON("x" << 2 << "y" << MINKEY));
     ASSERT_THROWS_CODE(
         PresplitHashedZonesSplitPolicy(
-            operationContext(), shardKeyPattern, {makeTag(zoneRange, zoneName("1"))}, 0, true),
+            operationContext(), shardKeyPattern, {makeTag(zoneRange, zoneName("1"))}, true),
         DBException,
         31389);
     zoneRange = ChunkRange(BSON("x" << 1 << "y" << MAXKEY), BSON("x" << 2 << "y" << MINKEY));
     ASSERT_THROWS_CODE(
         PresplitHashedZonesSplitPolicy(
-            operationContext(), shardKeyPattern, {makeTag(zoneRange, zoneName("1"))}, 0, true),
+            operationContext(), shardKeyPattern, {makeTag(zoneRange, zoneName("1"))}, true),
         DBException,
         31389);
 }
 
 TEST_F(PresplitHashedZonesChunksTest, FailsWhenLowerBoundPrecedingHashedFieldIsSameAsUpperBound) {
-    setupShards({ShardType(shardId("0").toString(), "rs0/shard0:123")});
+    setupShards({ShardType(shardId("0").toString(), "rs0/shard0:123", {zoneName("1")})});
     shardRegistry()->reload(operationContext());
     auto shardKeyPattern = ShardKeyPattern(BSON("a" << 1 << "b" << 1 << "c"
                                                     << "hashed"
@@ -1658,20 +1383,20 @@ TEST_F(PresplitHashedZonesChunksTest, FailsWhenLowerBoundPrecedingHashedFieldIsS
                                 BSON("a" << 2 << "b" << 2 << "c" << MAXKEY << "d" << MINKEY));
     ASSERT_THROWS_CODE(
         PresplitHashedZonesSplitPolicy(
-            operationContext(), shardKeyPattern, {makeTag(zoneRange, zoneName("1"))}, 0, true),
+            operationContext(), shardKeyPattern, {makeTag(zoneRange, zoneName("1"))}, true),
         DBException,
         31390);
     zoneRange = ChunkRange(BSON("a" << 1 << "b" << 1 << "c" << MINKEY << "d" << MINKEY),
                            BSON("a" << 1 << "b" << 1 << "c" << MINKEY << "d" << MAXKEY));
     ASSERT_THROWS_CODE(
         PresplitHashedZonesSplitPolicy(
-            operationContext(), shardKeyPattern, {makeTag(zoneRange, zoneName("1"))}, 0, true),
+            operationContext(), shardKeyPattern, {makeTag(zoneRange, zoneName("1"))}, true),
         DBException,
         31390);
 }
 
 TEST_F(PresplitHashedZonesChunksTest, FailsWhenLowerBoundAfterHashedFieldIsNotMinKey) {
-    setupShards({ShardType(shardId("0").toString(), "rs0/shard0:123")});
+    setupShards({ShardType(shardId("0").toString(), "rs0/shard0:123", {zoneName("1")})});
     shardRegistry()->reload(operationContext());
     auto shardKeyPattern = ShardKeyPattern(BSON("a" << 1 << "b"
                                                     << "hashed"
@@ -1680,14 +1405,14 @@ TEST_F(PresplitHashedZonesChunksTest, FailsWhenLowerBoundAfterHashedFieldIsNotMi
                                 BSON("a" << 2 << "b" << 2 << "c" << MAXKEY << "d" << MINKEY));
     ASSERT_THROWS_CODE(
         PresplitHashedZonesSplitPolicy(
-            operationContext(), shardKeyPattern, {makeTag(zoneRange, zoneName("1"))}, 0, true),
+            operationContext(), shardKeyPattern, {makeTag(zoneRange, zoneName("1"))}, true),
         DBException,
         31391);
     zoneRange = ChunkRange(BSON("a" << 1 << "b" << MINKEY << "c" << MINKEY << "d" << 1),
                            BSON("a" << 2 << "b" << 2 << "c" << MAXKEY << "d" << MINKEY));
     ASSERT_THROWS_CODE(
         PresplitHashedZonesSplitPolicy(
-            operationContext(), shardKeyPattern, {makeTag(zoneRange, zoneName("1"))}, 0, true),
+            operationContext(), shardKeyPattern, {makeTag(zoneRange, zoneName("1"))}, true),
         DBException,
         31391);
 
@@ -1695,7 +1420,7 @@ TEST_F(PresplitHashedZonesChunksTest, FailsWhenLowerBoundAfterHashedFieldIsNotMi
                            BSON("a" << 2 << "b" << 2 << "c" << MAXKEY << "d" << MINKEY));
     ASSERT_THROWS_CODE(
         PresplitHashedZonesSplitPolicy(
-            operationContext(), shardKeyPattern, {makeTag(zoneRange, zoneName("1"))}, 0, true),
+            operationContext(), shardKeyPattern, {makeTag(zoneRange, zoneName("1"))}, true),
         DBException,
         31391);
 }
@@ -1710,10 +1435,99 @@ TEST_F(PresplitHashedZonesChunksTest, RestrictionsDoNotApplyToUpperBound) {
         ChunkRange(BSON("a" << 1 << "b" << MINKEY << "c" << MINKEY << "d" << MINKEY),
                    BSON("a" << MAXKEY << "b" << MAXKEY << "c" << MAXKEY << "d" << MAXKEY));
     PresplitHashedZonesSplitPolicy(
-        operationContext(), shardKeyPattern, {makeTag(zoneRange, zoneName("1"))}, 0, true);
+        operationContext(), shardKeyPattern, {makeTag(zoneRange, zoneName("1"))}, true);
 }
 
-class MockPipelineSource : public ReshardingSplitPolicy::SampleDocumentSource {
+// Validates that building a presplitHashedZones split policy with a set of available shards equal
+// to the total of shards works.
+TEST_F(PresplitHashedZonesChunksTest, WithAvailableShards) {
+    const std::vector<ShardId> kAllShardsIds{shardId("0"), shardId("1")};
+    const std::vector<ShardType> kAllShards{
+        ShardType(kAllShardsIds[0].toString(), "rs0/shard0:123", {zoneName("0")}),
+        ShardType(kAllShardsIds[1].toString(), "rs1/shard1:123", {})};
+    setupShards(kAllShards);
+    shardRegistry()->reload(operationContext());
+    auto shardKeyPattern = ShardKeyPattern(BSON("x" << "hashed"));
+    const auto zoneRange = ChunkRange(BSON("x" << MINKEY), BSON("x" << MAXKEY));
+    const std::vector<TagsType> tags = {makeTag(zoneRange, zoneName("0"))};
+
+    PresplitHashedZonesSplitPolicy splitPolicy(
+        operationContext(), shardKeyPattern, tags, true /* isCollEmpty */, kAllShardsIds);
+
+    const auto config = splitPolicy.createFirstChunks(
+        operationContext(), shardKeyPattern, {UUID::gen(), shardId("0")} /* primaryShard */);
+
+    ASSERT_EQ(1, config.chunks.size());
+    ASSERT_EQ(shardId("0"), config.chunks[0].getShard());
+}
+
+// Validates that building a presplitHashedZones split policy with a set of available shards
+// incompatible with the zone distribution throws an error.
+TEST_F(PresplitHashedZonesChunksTest, CannotCreateChunkDistribution) {
+    const std::vector<ShardId> kAllShardsIds{
+        shardId("0"), shardId("1"), shardId("2"), shardId("3")};
+    const std::vector<ShardType> kAllShards{
+        ShardType(kAllShardsIds[0].toString(), "rs0/shard0:123", {}), /* Available shard */
+        ShardType(kAllShardsIds[1].toString(), "rs1/shard1:123", {}), /* Available shard */
+        ShardType(kAllShardsIds[2].toString(), "rs2/shard2:123", {}), /* Available shard */
+        ShardType(kAllShardsIds[3].toString(),
+                  "rs3/shard3:123",
+                  {zoneName("0")}) /* Not Available shard */
+    };
+    const std::vector<ShardId> kAvailableShardIds{shardId("0"), shardId("1"), shardId("2")};
+    setupShards(kAllShards);
+    shardRegistry()->reload(operationContext());
+    auto shardKeyPattern = ShardKeyPattern(BSON("x" << "hashed"));
+    const auto zoneRange = ChunkRange(BSON("x" << MINKEY), BSON("x" << MAXKEY));
+    const std::vector<TagsType> tags = {makeTag(zoneRange, zoneName("0"))};
+
+    ASSERT_THROWS_CODE(
+        PresplitHashedZonesSplitPolicy(
+            operationContext(), shardKeyPattern, tags, true /* isCollEmpty */, kAvailableShardIds),
+        DBException,
+        ErrorCodes::CannotCreateChunkDistribution);
+}
+
+TEST_F(PresplitHashedZonesChunksTest, ChunkDistributionWillIgnoreShardNotInAvaiableShards) {
+    const std::vector<ShardId> kAllShardIds{shardId("0"), shardId("1"), shardId("2"), shardId("3")};
+    const std::vector<ShardType> kAllShards{
+        ShardType(kAllShardIds[0].toString(),
+                  "rs0/shard0:123",
+                  {zoneName("0")}), /* Not available shard with zone */
+        ShardType(
+            kAllShardIds[1].toString(), "rs1/shard1:123", {}), /* Available shard without zone */
+        ShardType(
+            kAllShardIds[2].toString(), "rs2/shard2:123", {}), /* Available shard without zone */
+        ShardType(kAllShardIds[3].toString(),
+                  "rs3/shard3:123",
+                  {zoneName("0")}) /* Available shard with zone */};
+    const std::vector<ShardId> kAvailableShards{shardId("1"), shardId("2"), shardId("3")};
+    setupShards(kAllShards);
+    shardRegistry()->reload(operationContext());
+    auto shardKeyPattern = ShardKeyPattern(BSON("x" << "hashed"));
+    const auto zoneRange = ChunkRange(BSON("x" << MINKEY), BSON("x" << MAXKEY));
+    const std::vector<TagsType> tags = {makeTag(zoneRange, zoneName("0"))};
+
+    PresplitHashedZonesSplitPolicy splitPolicy{
+        operationContext(), shardKeyPattern, tags, true /* isCollEmpty */, kAvailableShards};
+
+    const auto config = splitPolicy.createFirstChunks(
+        operationContext(), shardKeyPattern, {UUID::gen(), shardId("0")} /* primaryShard */);
+
+    // Validate that shard not in kAvailableShards is not contain in the final chunk
+    // distribution.
+    std::set<ShardId> involvedShards;
+    for (auto&& chunk : config.chunks) {
+        const auto shard = chunk.getShard();
+        ASSERT_NE(shardId("0"), shard);
+        involvedShards.insert(shard);
+    }
+
+    // Validate that we have less shards than total.
+    ASSERT_LT(involvedShards.size(), kAllShards.size());
+}
+
+class MockPipelineSource : public SamplingBasedSplitPolicy::SampleDocumentSource {
 public:
     MockPipelineSource(std::list<BSONObj> toReturn) : _toReturn(std::move(toReturn)) {}
 
@@ -1731,28 +1545,90 @@ private:
     std::list<BSONObj> _toReturn;
 };
 
-class ReshardingInitSplitTest : public SingleChunkPerTagSplitPolicyTest {
+class SamplingBasedInitSplitTest : public SingleChunkPerTagSplitPolicyTest {
 public:
-    /**
-     * Calls createFirstChunks() according to the given arguments and asserts that returned chunks
-     * match with the chunks created using expectedChunkRanges and expectedShardIds.
-     */
-    void checkGeneratedInitialZoneChunks(ReshardingSplitPolicy* splitPolicy,
-                                         const ShardKeyPattern& shardKeyPattern,
-                                         const std::vector<ChunkRange>& expectedChunkRanges,
-                                         const std::vector<ShardId>& expectedShardIds) {
-        const auto shardCollectionConfig = splitPolicy->createFirstChunks(
-            operationContext(), shardKeyPattern, {UUID::gen(), expectedShardIds.front()});
+    std::unique_ptr<SamplingBasedSplitPolicy> makeInitialSplitPolicy(
+        int numInitialChunks,
+        boost::optional<std::vector<TagsType>> zones,
+        std::list<BSONObj> samples,
+        boost::optional<std::vector<ShardId>> availableShardIds) {
+        auto sampleSource = std::make_unique<MockPipelineSource>(std::move(samples));
+        return std::make_unique<SamplingBasedSplitPolicy>(
+            numInitialChunks, zones, std::move(sampleSource), availableShardIds);
+    }
 
-        const auto currentTime = VectorClock::get(operationContext())->getTime();
-        const std::vector<ChunkType> expectedChunks = makeChunks(
-            expectedChunkRanges, expectedShardIds, currentTime.clusterTime().asTimestamp());
-        assertChunkVectorsAreEqual(expectedChunks, shardCollectionConfig.chunks);
+    /**
+     * Calls createFirstChunks() according to the given arguments and asserts that returned
+     * chunks match with the chunks created using expectedChunkRanges and expectedShardIds.
+     */
+    void checkGeneratedInitialZoneChunks(
+        SamplingBasedSplitPolicy* splitPolicy,
+        const ShardKeyPattern& shardKeyPattern,
+        const std::vector<ShardType>& shardList,
+        const std::vector<ChunkRange>& expectedChunkRanges,
+        const std::vector<boost::optional<ShardId>>& expectedShardIds) {
+
+        const auto shardCollectionConfig = splitPolicy->createFirstChunks(
+            operationContext(), shardKeyPattern, {UUID::gen(), primaryShard});
+
+        ASSERT_EQ(expectedShardIds.size(), expectedChunkRanges.size());
+        ASSERT_EQ(expectedChunkRanges.size(), shardCollectionConfig.chunks.size());
+
+        stdx::unordered_map<ShardId, int> shardToNumChunksMap;
+        for (const auto& shard : shardList) {
+            shardToNumChunksMap[ShardId(shard.getName())] = 0;
+        }
+
+        for (size_t i = 0; i < shardCollectionConfig.chunks.size(); ++i) {
+            // Check the chunk range matches the expected range.
+            ASSERT_EQ(expectedChunkRanges[i], shardCollectionConfig.chunks[i].getRange());
+
+            // Check that the shardId matches the expected.
+            const auto& actualShardId = shardCollectionConfig.chunks[i].getShard();
+            if (expectedShardIds[i]) {
+                ASSERT_EQ(expectedShardIds[i], actualShardId);
+            } else {
+                // If not in a zone, this chunk goes to whatever shard owns the least number of
+                // chunks.
+                int minNumChunks = shardToNumChunksMap.begin()->second;
+                std::set<ShardId> candidateShards;
+                for (const auto& it : shardToNumChunksMap) {
+                    if (it.second < minNumChunks) {
+                        candidateShards = {it.first};
+                        minNumChunks = it.second;
+                    } else if (it.second == minNumChunks) {
+                        candidateShards.insert(it.first);
+                    }
+                }
+                ASSERT_TRUE(candidateShards.find(actualShardId) != candidateShards.end());
+            }
+
+            shardToNumChunksMap[actualShardId]++;
+        }
+    }
+
+    /**
+     * Calls createFirstSplitPoints() according to the given arguments and asserts that returned
+     * split points match with the expectedChunkRanges.
+     */
+    void checkGeneratedInitialSplitPoints(SamplingBasedSplitPolicy* splitPolicy,
+                                          const ShardKeyPattern& shardKeyPattern,
+                                          const std::vector<ChunkRange>& expectedChunkRanges) {
+        const auto splitPoints =
+            splitPolicy->createFirstSplitPoints(operationContext(), shardKeyPattern);
+
+        const auto expectedNumSplitPoints = expectedChunkRanges.size() - 1;
+        ASSERT_EQ(splitPoints.size(), expectedNumSplitPoints);
+        auto splitPointsIt = splitPoints.begin();
+        for (size_t i = 0; i < expectedNumSplitPoints; i++) {
+            ASSERT_BSONOBJ_EQ(*splitPointsIt, expectedChunkRanges[i].getMax());
+            std::advance(splitPointsIt, 1);
+        }
     }
 };
 
-TEST_F(ReshardingInitSplitTest, NoZones) {
-    const NamespaceString ns("reshard", "foo");
+TEST_F(SamplingBasedInitSplitTest, NoZones) {
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("foo", "bar");
     const ShardKeyPattern shardKey(BSON("y" << 1));
 
     std::vector<ShardType> shardList;
@@ -1765,14 +1641,11 @@ TEST_F(ReshardingInitSplitTest, NoZones) {
     shardRegistry()->reload(operationContext());
 
     std::list<BSONObj> mockSamples;
-    mockSamples.push_back(BSON("x" << 10 << "y" << 10));
-    mockSamples.push_back(BSON("x" << 10 << "y" << 20));
-    mockSamples.push_back(BSON("x" << 10 << "y" << 30));
+    mockSamples.push_back(BSON("y" << 10));
+    mockSamples.push_back(BSON("y" << 20));
+    mockSamples.push_back(BSON("y" << 30));
 
-    auto mockSampleSource = std::make_unique<MockPipelineSource>(std::move(mockSamples));
-
-    ReshardingSplitPolicy initSplitPolicy(
-        4 /* numInitialChunks */, boost::none /* zones */, std::move(mockSampleSource));
+    auto numInitialChunks = 4;
 
     std::vector<ChunkRange> expectedChunkRanges = {
         ChunkRange(BSON("y" << MINKEY), BSON("y" << 10)),
@@ -1780,17 +1653,31 @@ TEST_F(ReshardingInitSplitTest, NoZones) {
         ChunkRange(BSON("y" << 20), BSON("y" << 30)),
         ChunkRange(BSON("y" << 30), BSON("y" << MAXKEY))};
 
-    std::vector<ShardId> expectedShardForEachChunk = {
-        shardId("0"), shardId("1"), shardId("0"), shardId("1")};
+    // No zones. Chunks assigned round-robin.
+    std::vector<boost::optional<ShardId>> expectedShardForEachChunk = {
+        boost::none, boost::none, boost::none, boost::none};
 
-    checkGeneratedInitialZoneChunks(
-        &initSplitPolicy, shardKey, expectedChunkRanges, expectedShardForEachChunk);
+    checkGeneratedInitialZoneChunks(makeInitialSplitPolicy(numInitialChunks,
+                                                           boost::none /* zones */,
+                                                           mockSamples,
+                                                           boost::none /* availableShardIds */)
+                                        .get(),
+                                    shardKey,
+                                    shardList,
+                                    expectedChunkRanges,
+                                    expectedShardForEachChunk);
+    checkGeneratedInitialSplitPoints(makeInitialSplitPolicy(numInitialChunks,
+                                                            boost::none /* zones */,
+                                                            mockSamples,
+                                                            boost::none /* availableShardIds */)
+                                         .get(),
+                                     shardKey,
+                                     expectedChunkRanges);
 }
 
-TEST_F(ReshardingInitSplitTest, HashedShardKey) {
-    const NamespaceString ns("reshard", "foo");
-    const ShardKeyPattern shardKey(BSON("y"
-                                        << "hashed"));
+TEST_F(SamplingBasedInitSplitTest, HashedShardKey) {
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("foo", "bar");
+    const ShardKeyPattern shardKey(BSON("y" << "hashed"));
 
     std::vector<ShardType> shardList;
     shardList.emplace_back(
@@ -1802,14 +1689,11 @@ TEST_F(ReshardingInitSplitTest, HashedShardKey) {
     shardRegistry()->reload(operationContext());
 
     std::list<BSONObj> mockSamples;
-    mockSamples.push_back(BSON("x" << 10 << "y" << 7766103514953448109LL));
-    mockSamples.push_back(BSON("x" << 10 << "y" << -9117533237618642180LL));
-    mockSamples.push_back(BSON("x" << 10 << "y" << -1196399207910989725LL));
+    mockSamples.push_back(BSON("y" << 7766103514953448109LL));
+    mockSamples.push_back(BSON("y" << -9117533237618642180LL));
+    mockSamples.push_back(BSON("y" << -1196399207910989725LL));
 
-    auto mockSampleSource = std::make_unique<MockPipelineSource>(std::move(mockSamples));
-
-    ReshardingSplitPolicy initSplitPolicy(
-        4 /* numInitialChunks */, boost::none /* zones */, std::move(mockSampleSource));
+    auto numInitialChunks = 4;
 
     std::vector<ChunkRange> expectedChunkRanges = {
         ChunkRange(BSON("y" << MINKEY), BSON("y" << -9117533237618642180LL)),
@@ -1817,15 +1701,30 @@ TEST_F(ReshardingInitSplitTest, HashedShardKey) {
         ChunkRange(BSON("y" << -1196399207910989725LL), BSON("y" << 7766103514953448109LL)),
         ChunkRange(BSON("y" << 7766103514953448109LL), BSON("y" << MAXKEY))};
 
-    std::vector<ShardId> expectedShardForEachChunk = {
-        shardId("0"), shardId("1"), shardId("0"), shardId("1")};
+    // No zones. Chunks assigned round-robin.
+    std::vector<boost::optional<ShardId>> expectedShardForEachChunk = {
+        boost::none, boost::none, boost::none, boost::none};
 
-    checkGeneratedInitialZoneChunks(
-        &initSplitPolicy, shardKey, expectedChunkRanges, expectedShardForEachChunk);
+    checkGeneratedInitialZoneChunks(makeInitialSplitPolicy(numInitialChunks,
+                                                           boost::none /* zones */,
+                                                           mockSamples,
+                                                           boost::none /* availableShardIds */)
+                                        .get(),
+                                    shardKey,
+                                    shardList,
+                                    expectedChunkRanges,
+                                    expectedShardForEachChunk);
+    checkGeneratedInitialSplitPoints(makeInitialSplitPolicy(numInitialChunks,
+                                                            boost::none /* zones */,
+                                                            mockSamples,
+                                                            boost::none /* availableShardIds */)
+                                         .get(),
+                                     shardKey,
+                                     expectedChunkRanges);
 }
 
-TEST_F(ReshardingInitSplitTest, SingleInitialChunk) {
-    const NamespaceString ns("reshard", "foo");
+TEST_F(SamplingBasedInitSplitTest, SingleInitialChunk) {
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("foo", "bar");
     const ShardKeyPattern shardKey(BSON("y" << 1));
 
     std::vector<ShardType> shardList;
@@ -1837,24 +1736,35 @@ TEST_F(ReshardingInitSplitTest, SingleInitialChunk) {
     setupShards(shardList);
     shardRegistry()->reload(operationContext());
 
-    std::list<BSONObj> mockSamples;
-
-    auto mockSampleSource = std::make_unique<MockPipelineSource>(std::move(mockSamples));
-
-    ReshardingSplitPolicy initSplitPolicy(
-        1 /* numInitialChunks */, boost::none /* zones */, std::move(mockSampleSource));
+    auto numInitialChunks = 1;
 
     std::vector<ChunkRange> expectedChunkRanges = {
         ChunkRange(BSON("y" << MINKEY), BSON("y" << MAXKEY))};
 
-    std::vector<ShardId> expectedShardForEachChunk = {shardId("0")};
+    std::vector<boost::optional<ShardId>> expectedShardForEachChunk = {
+        boost::none  // Not in any zone. Can go to any shard.
+    };
 
-    checkGeneratedInitialZoneChunks(
-        &initSplitPolicy, shardKey, expectedChunkRanges, expectedShardForEachChunk);
+    checkGeneratedInitialZoneChunks(makeInitialSplitPolicy(numInitialChunks,
+                                                           boost::none /* zones */,
+                                                           {} /* samples */,
+                                                           boost::none /* availableShardIds */)
+                                        .get(),
+                                    shardKey,
+                                    shardList,
+                                    expectedChunkRanges,
+                                    expectedShardForEachChunk);
+    checkGeneratedInitialSplitPoints(makeInitialSplitPolicy(numInitialChunks,
+                                                            boost::none /* zones */,
+                                                            {} /* samples */,
+                                                            boost::none /* availableShardIds */)
+                                         .get(),
+                                     shardKey,
+                                     expectedChunkRanges);
 }
 
-TEST_F(ReshardingInitSplitTest, ZonesCoversEntireDomainButInsufficient) {
-    const NamespaceString ns("reshard", "foo");
+TEST_F(SamplingBasedInitSplitTest, ZonesCoversEntireDomainButInsufficient) {
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("foo", "bar");
     const ShardKeyPattern shardKey(BSON("y" << 1));
 
     std::vector<ShardType> shardList;
@@ -1867,18 +1777,15 @@ TEST_F(ReshardingInitSplitTest, ZonesCoversEntireDomainButInsufficient) {
     shardRegistry()->reload(operationContext());
 
     std::list<BSONObj> mockSamples;
-    mockSamples.push_back(BSON("x" << 10 << "y" << 10));
-    mockSamples.push_back(BSON("x" << 10 << "y" << 20));
-    mockSamples.push_back(BSON("x" << 10 << "y" << 30));
-
-    auto mockSampleSource = std::make_unique<MockPipelineSource>(std::move(mockSamples));
+    mockSamples.push_back(BSON("y" << 10));
+    mockSamples.push_back(BSON("y" << 20));
+    mockSamples.push_back(BSON("y" << 30));
 
     std::vector<TagsType> zones;
     zones.emplace_back(nss(), "zoneB", ChunkRange(BSON("y" << MINKEY), BSON("y" << 0)));
     zones.emplace_back(nss(), "zoneA", ChunkRange(BSON("y" << 0), BSON("y" << MAXKEY)));
 
-    ReshardingSplitPolicy initSplitPolicy(
-        4 /* numInitialChunks */, zones, std::move(mockSampleSource));
+    auto numInitialChunks = 4;
 
     std::vector<ChunkRange> expectedChunkRanges = {
         ChunkRange(BSON("y" << MINKEY), BSON("y" << 0)),
@@ -1886,15 +1793,27 @@ TEST_F(ReshardingInitSplitTest, ZonesCoversEntireDomainButInsufficient) {
         ChunkRange(BSON("y" << 10), BSON("y" << 20)),
         ChunkRange(BSON("y" << 20), BSON("y" << MAXKEY))};
 
-    std::vector<ShardId> expectedShardForEachChunk = {
+    std::vector<boost::optional<ShardId>> expectedShardForEachChunk = {
         shardId("1"), shardId("0"), shardId("0"), shardId("0")};
 
     checkGeneratedInitialZoneChunks(
-        &initSplitPolicy, shardKey, expectedChunkRanges, expectedShardForEachChunk);
+        makeInitialSplitPolicy(
+            numInitialChunks, zones, mockSamples, boost::none /* availableShardIds */)
+            .get(),
+        shardKey,
+        shardList,
+        expectedChunkRanges,
+        expectedShardForEachChunk);
+    checkGeneratedInitialSplitPoints(
+        makeInitialSplitPolicy(
+            numInitialChunks, zones, mockSamples, boost::none /* availableShardIds */)
+            .get(),
+        shardKey,
+        expectedChunkRanges);
 }
 
-TEST_F(ReshardingInitSplitTest, SamplesCoincidingWithZones) {
-    const NamespaceString ns("reshard", "foo");
+TEST_F(SamplingBasedInitSplitTest, SamplesCoincidingWithZones) {
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("foo", "bar");
     const ShardKeyPattern shardKey(BSON("y" << 1));
 
     std::vector<ShardType> shardList;
@@ -1907,17 +1826,14 @@ TEST_F(ReshardingInitSplitTest, SamplesCoincidingWithZones) {
     shardRegistry()->reload(operationContext());
 
     std::list<BSONObj> mockSamples;
-    mockSamples.push_back(BSON("x" << 10 << "y" << 10));
-    mockSamples.push_back(BSON("x" << 10 << "y" << 20));
-    mockSamples.push_back(BSON("x" << 10 << "y" << 30));
-
-    auto mockSampleSource = std::make_unique<MockPipelineSource>(std::move(mockSamples));
+    mockSamples.push_back(BSON("y" << 10));
+    mockSamples.push_back(BSON("y" << 20));
+    mockSamples.push_back(BSON("y" << 30));
 
     std::vector<TagsType> zones;
     zones.emplace_back(nss(), "zoneA", ChunkRange(BSON("y" << 10), BSON("y" << 20)));
 
-    ReshardingSplitPolicy initSplitPolicy(
-        4 /* numInitialChunks */, zones, std::move(mockSampleSource));
+    auto numInitialChunks = 4;
 
     std::vector<ChunkRange> expectedChunkRanges = {
         ChunkRange(BSON("y" << MINKEY), BSON("y" << 10)),
@@ -1925,19 +1841,31 @@ TEST_F(ReshardingInitSplitTest, SamplesCoincidingWithZones) {
         ChunkRange(BSON("y" << 20), BSON("y" << 30)),
         ChunkRange(BSON("y" << 30), BSON("y" << MAXKEY))};
 
-    std::vector<ShardId> expectedShardForEachChunk = {
-        shardId("0"),  // hole
+    std::vector<boost::optional<ShardId>> expectedShardForEachChunk = {
+        boost::none,   // hole
         shardId("0"),  // zoneA
-        shardId("1"),  // hole
-        shardId("1"),  // hole
+        boost::none,   // hole
+        boost::none,   // hole
     };
 
     checkGeneratedInitialZoneChunks(
-        &initSplitPolicy, shardKey, expectedChunkRanges, expectedShardForEachChunk);
+        makeInitialSplitPolicy(
+            numInitialChunks, zones, mockSamples, boost::none /* availableShardIds */)
+            .get(),
+        shardKey,
+        shardList,
+        expectedChunkRanges,
+        expectedShardForEachChunk);
+    checkGeneratedInitialSplitPoints(
+        makeInitialSplitPolicy(
+            numInitialChunks, zones, mockSamples, boost::none /* availableShardIds */)
+            .get(),
+        shardKey,
+        expectedChunkRanges);
 }
 
-TEST_F(ReshardingInitSplitTest, ZoneWithHoles) {
-    const NamespaceString ns("reshard", "foo");
+TEST_F(SamplingBasedInitSplitTest, ZoneWithHoles) {
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("foo", "bar");
     const ShardKeyPattern shardKey(BSON("y" << 1));
 
     std::vector<ShardType> shardList;
@@ -1949,16 +1877,11 @@ TEST_F(ReshardingInitSplitTest, ZoneWithHoles) {
     setupShards(shardList);
     shardRegistry()->reload(operationContext());
 
-    std::list<BSONObj> mockSamples;
-
-    auto mockSampleSource = std::make_unique<MockPipelineSource>(std::move(mockSamples));
-
     std::vector<TagsType> zones;
     zones.emplace_back(nss(), "zoneB", ChunkRange(BSON("y" << 0), BSON("y" << 20)));
     zones.emplace_back(nss(), "zoneA", ChunkRange(BSON("y" << 30), BSON("y" << 40)));
 
-    ReshardingSplitPolicy initSplitPolicy(
-        4 /* numInitialChunks */, zones, std::move(mockSampleSource));
+    auto numInitialChunks = 4;
 
     std::vector<ChunkRange> expectedChunkRanges = {
         ChunkRange(BSON("y" << MINKEY), BSON("y" << 0)),
@@ -1967,20 +1890,32 @@ TEST_F(ReshardingInitSplitTest, ZoneWithHoles) {
         ChunkRange(BSON("y" << 30), BSON("y" << 40)),
         ChunkRange(BSON("y" << 40), BSON("y" << MAXKEY))};
 
-    std::vector<ShardId> expectedShardForEachChunk = {
-        shardId("0"),  // hole
+    std::vector<boost::optional<ShardId>> expectedShardForEachChunk = {
+        boost::none,   // hole
         shardId("1"),  // zoneB
-        shardId("0"),  // hole
+        boost::none,   // hole
         shardId("0"),  // zoneA
-        shardId("1"),  // hole
+        boost::none,   // hole
     };
 
     checkGeneratedInitialZoneChunks(
-        &initSplitPolicy, shardKey, expectedChunkRanges, expectedShardForEachChunk);
+        makeInitialSplitPolicy(
+            numInitialChunks, zones, {} /* samples */, boost::none /* availableShardIds */)
+            .get(),
+        shardKey,
+        shardList,
+        expectedChunkRanges,
+        expectedShardForEachChunk);
+    checkGeneratedInitialSplitPoints(
+        makeInitialSplitPolicy(
+            numInitialChunks, zones, {} /* samples */, boost::none /* availableShardIds */)
+            .get(),
+        shardKey,
+        expectedChunkRanges);
 }
 
-TEST_F(ReshardingInitSplitTest, UnsortedZoneWithHoles) {
-    const NamespaceString ns("reshard", "foo");
+TEST_F(SamplingBasedInitSplitTest, UnsortedZoneWithHoles) {
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("foo", "bar");
     const ShardKeyPattern shardKey(BSON("y" << 1));
 
     std::vector<ShardType> shardList;
@@ -1992,16 +1927,11 @@ TEST_F(ReshardingInitSplitTest, UnsortedZoneWithHoles) {
     setupShards(shardList);
     shardRegistry()->reload(operationContext());
 
-    std::list<BSONObj> mockSamples;
-
-    auto mockSampleSource = std::make_unique<MockPipelineSource>(std::move(mockSamples));
-
     std::vector<TagsType> zones;
     zones.emplace_back(nss(), "zoneA", ChunkRange(BSON("y" << 30), BSON("y" << 40)));
     zones.emplace_back(nss(), "zoneB", ChunkRange(BSON("y" << 0), BSON("y" << 20)));
 
-    ReshardingSplitPolicy initSplitPolicy(
-        4 /* numInitialChunks */, zones, std::move(mockSampleSource));
+    auto numInitialChunks = 4;
 
     std::vector<ChunkRange> expectedChunkRanges = {
         ChunkRange(BSON("y" << MINKEY), BSON("y" << 0)),
@@ -2010,20 +1940,32 @@ TEST_F(ReshardingInitSplitTest, UnsortedZoneWithHoles) {
         ChunkRange(BSON("y" << 30), BSON("y" << 40)),
         ChunkRange(BSON("y" << 40), BSON("y" << MAXKEY))};
 
-    std::vector<ShardId> expectedShardForEachChunk = {
-        shardId("0"),  // hole
+    std::vector<boost::optional<ShardId>> expectedShardForEachChunk = {
+        boost::none,   // hole
         shardId("1"),  // zoneB
-        shardId("0"),  // hole
+        boost::none,   // hole
         shardId("0"),  // zoneA
-        shardId("1"),  // hole
+        boost::none,   // hole
     };
 
     checkGeneratedInitialZoneChunks(
-        &initSplitPolicy, shardKey, expectedChunkRanges, expectedShardForEachChunk);
+        makeInitialSplitPolicy(
+            numInitialChunks, zones, {} /* samples */, boost::none /* availableShardIds */)
+            .get(),
+        shardKey,
+        shardList,
+        expectedChunkRanges,
+        expectedShardForEachChunk);
+    checkGeneratedInitialSplitPoints(
+        makeInitialSplitPolicy(
+            numInitialChunks, zones, {} /* samples */, boost::none /* availableShardIds */)
+            .get(),
+        shardKey,
+        expectedChunkRanges);
 }
 
-TEST_F(ReshardingInitSplitTest, ZonesIsPrefixOfReshardKey) {
-    const NamespaceString ns("reshard", "foo");
+TEST_F(SamplingBasedInitSplitTest, ZonesIsPrefixOfShardKey) {
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("foo", "bar");
     const ShardKeyPattern shardKey(BSON("y" << 1 << "z" << 1));
 
     std::vector<ShardType> shardList;
@@ -2035,15 +1977,11 @@ TEST_F(ReshardingInitSplitTest, ZonesIsPrefixOfReshardKey) {
     setupShards(shardList);
     shardRegistry()->reload(operationContext());
 
-    std::list<BSONObj> mockSamples;
-    auto mockSampleSource = std::make_unique<MockPipelineSource>(std::move(mockSamples));
-
     std::vector<TagsType> zones;
     zones.emplace_back(nss(), "zoneB", ChunkRange(BSON("y" << MINKEY), BSON("y" << 0)));
     zones.emplace_back(nss(), "zoneA", ChunkRange(BSON("y" << 0), BSON("y" << MAXKEY)));
 
-    ReshardingSplitPolicy initSplitPolicy(
-        2 /* numInitialChunks */, zones, std::move(mockSampleSource));
+    auto numInitialChunks = 2;
 
     std::vector<ChunkRange> expectedChunkRanges = {
         ChunkRange(BSON("y" << MINKEY << "z" << MINKEY), BSON("y" << 0 << "z" << MINKEY)),
@@ -2051,18 +1989,30 @@ TEST_F(ReshardingInitSplitTest, ZonesIsPrefixOfReshardKey) {
         ChunkRange(BSON("y" << MAXKEY << "z" << MINKEY), BSON("y" << MAXKEY << "z" << MAXKEY)),
     };
 
-    std::vector<ShardId> expectedShardForEachChunk = {
-        shardId("1"),
-        shardId("0"),
-        shardId("0"),
+    std::vector<boost::optional<ShardId>> expectedShardForEachChunk = {
+        shardId("1"),  // ZoneB
+        shardId("0"),  // ZoneA
+        boost::none,   // hole
     };
 
     checkGeneratedInitialZoneChunks(
-        &initSplitPolicy, shardKey, expectedChunkRanges, expectedShardForEachChunk);
+        makeInitialSplitPolicy(
+            numInitialChunks, zones, {} /* samples */, boost::none /* availableShardIds */)
+            .get(),
+        shardKey,
+        shardList,
+        expectedChunkRanges,
+        expectedShardForEachChunk);
+    checkGeneratedInitialSplitPoints(
+        makeInitialSplitPolicy(
+            numInitialChunks, zones, {} /* samples */, boost::none /* availableShardIds */)
+            .get(),
+        shardKey,
+        expectedChunkRanges);
 }
 
-TEST_F(ReshardingInitSplitTest, ZonesHasIncompatibleReshardKey) {
-    const NamespaceString ns("reshard", "foo");
+TEST_F(SamplingBasedInitSplitTest, ZonesHasIncompatibleShardKey) {
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("foo", "bar");
     const ShardKeyPattern shardKey(BSON("y" << 1 << "z" << 1));
 
     std::vector<ShardType> shardList;
@@ -2075,22 +2025,29 @@ TEST_F(ReshardingInitSplitTest, ZonesHasIncompatibleReshardKey) {
     shardRegistry()->reload(operationContext());
 
     std::list<BSONObj> mockSamples;
-    auto mockSampleSource = std::make_unique<MockPipelineSource>(std::move(mockSamples));
 
     std::vector<TagsType> zones;
     zones.emplace_back(nss(), "zoneB", ChunkRange(BSON("x" << MINKEY), BSON("x" << 0)));
     zones.emplace_back(nss(), "zoneA", ChunkRange(BSON("x" << 0), BSON("x" << MAXKEY)));
 
-    ReshardingSplitPolicy initSplitPolicy(
-        2 /* numInitialChunks */, zones, std::move(mockSampleSource));
-
+    auto numInitialChunks = 2;
     SplitPolicyParams params{UUID::gen(), shardId("0")};
-    ASSERT_THROWS(initSplitPolicy.createFirstChunks(operationContext(), shardKey, params),
-                  DBException);
+    {
+        auto initSplitPolicy = makeInitialSplitPolicy(
+            numInitialChunks, zones, mockSamples, boost::none /* availableShardIds */);
+        ASSERT_THROWS(initSplitPolicy->createFirstChunks(operationContext(), shardKey, params),
+                      DBException);
+    }
+    {
+        auto initSplitPolicy = makeInitialSplitPolicy(
+            numInitialChunks, zones, mockSamples, boost::none /* availableShardIds */);
+        ASSERT_THROWS(initSplitPolicy->createFirstSplitPoints(operationContext(), shardKey),
+                      DBException);
+    }
 }
 
-TEST_F(ReshardingInitSplitTest, InsufficientSamples) {
-    const NamespaceString ns("reshard", "foo");
+TEST_F(SamplingBasedInitSplitTest, InsufficientSamples) {
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("foo", "bar");
     const ShardKeyPattern shardKey(BSON("y" << 1));
 
     std::vector<ShardType> shardList;
@@ -2104,18 +2061,29 @@ TEST_F(ReshardingInitSplitTest, InsufficientSamples) {
 
     std::list<BSONObj> mockSamples;
     mockSamples.push_back(BSON("x" << 10 << "y" << 10));
-    auto mockSampleSource = std::make_unique<MockPipelineSource>(std::move(mockSamples));
 
-    ReshardingSplitPolicy initSplitPolicy(
-        10 /* numInitialChunks */, boost::none /* zones */, std::move(mockSampleSource));
-
+    auto numInitialChunks = 10;
     SplitPolicyParams params{UUID::gen(), shardId("0")};
-    ASSERT_THROWS(initSplitPolicy.createFirstChunks(operationContext(), shardKey, params),
-                  DBException);
+    {
+        auto initSplitPolicy = makeInitialSplitPolicy(numInitialChunks,
+                                                      boost::none /* zones */,
+                                                      mockSamples,
+                                                      boost::none /* availableShardIds */);
+        ASSERT_THROWS(initSplitPolicy->createFirstChunks(operationContext(), shardKey, params),
+                      DBException);
+    }
+    {
+        auto initSplitPolicy = makeInitialSplitPolicy(numInitialChunks,
+                                                      boost::none /* zones */,
+                                                      mockSamples,
+                                                      boost::none /* availableShardIds */);
+        ASSERT_THROWS(initSplitPolicy->createFirstSplitPoints(operationContext(), shardKey),
+                      DBException);
+    }
 }
 
-TEST_F(ReshardingInitSplitTest, ZeroInitialChunks) {
-    const NamespaceString ns("reshard", "foo");
+TEST_F(SamplingBasedInitSplitTest, ZeroInitialChunks) {
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("foo", "bar");
     const ShardKeyPattern shardKey(BSON("y" << 1));
 
     std::vector<ShardType> shardList;
@@ -2128,12 +2096,274 @@ TEST_F(ReshardingInitSplitTest, ZeroInitialChunks) {
     shardRegistry()->reload(operationContext());
 
     std::list<BSONObj> mockSamples;
-    auto mockSampleSource = std::make_unique<MockPipelineSource>(std::move(mockSamples));
 
-    ASSERT_THROWS(ReshardingSplitPolicy(0 /* numInitialChunks */,
-                                        boost::none /* zones */,
-                                        std::move(mockSampleSource)),
+    auto numInitialChunks = 10;
+    SplitPolicyParams params{UUID::gen(), shardId("0")};
+    {
+        auto initSplitPolicy = makeInitialSplitPolicy(numInitialChunks,
+                                                      boost::none /* zones */,
+                                                      mockSamples,
+                                                      boost::none /* availableShardIds */);
+        ASSERT_THROWS(initSplitPolicy->createFirstChunks(operationContext(), shardKey, params),
+                      DBException);
+    }
+    {
+        auto initSplitPolicy = makeInitialSplitPolicy(numInitialChunks,
+                                                      boost::none /* zones */,
+                                                      mockSamples,
+                                                      boost::none /* availableShardIds */);
+        ASSERT_THROWS(initSplitPolicy->createFirstSplitPoints(operationContext(), shardKey),
+                      DBException);
+    }
+}
+
+TEST_F(SamplingBasedInitSplitTest, WithShardIds) {
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("foo", "bar");
+    const ShardKeyPattern shardKey(BSON("y" << 1));
+
+    std::vector<ShardType> shardList;
+    shardList.emplace_back(
+        ShardType(shardId("0").toString(), "rs0/fakeShard0:123", {std::string("zoneA")}));
+    shardList.emplace_back(
+        ShardType(shardId("1").toString(), "rs1/fakeShard1:123", {std::string("zoneB")}));
+
+    setupShards(shardList);
+    shardRegistry()->reload(operationContext());
+
+    std::list<BSONObj> mockSamples;
+    mockSamples.push_back(BSON("y" << 10));
+    mockSamples.push_back(BSON("y" << 20));
+
+    std::vector<TagsType> zones;
+    zones.emplace_back(nss(), "zoneA", ChunkRange(BSON("y" << MINKEY), BSON("y" << 0)));
+    zones.emplace_back(nss(), "zoneB", ChunkRange(BSON("y" << 0), BSON("y" << MAXKEY)));
+
+    std::vector<ShardId> availableShardIds = {shardId("0"), shardId("1")};
+
+    auto numInitialChunks = 4;
+
+    std::vector<ChunkRange> expectedChunkRanges = {
+        ChunkRange(BSON("y" << MINKEY), BSON("y" << 0)),
+        ChunkRange(BSON("y" << 0), BSON("y" << 10)),
+        ChunkRange(BSON("y" << 10), BSON("y" << 20)),
+        ChunkRange(BSON("y" << 20), BSON("y" << MAXKEY))};
+
+    std::vector<boost::optional<ShardId>> expectedShardForEachChunk = {
+        shardId("0"), shardId("1"), shardId("1"), shardId("1")};
+
+    checkGeneratedInitialZoneChunks(
+        makeInitialSplitPolicy(numInitialChunks, zones, mockSamples, availableShardIds).get(),
+        shardKey,
+        shardList,
+        expectedChunkRanges,
+        expectedShardForEachChunk);
+}
+
+TEST_F(SamplingBasedInitSplitTest, NoAvailableShardInZone) {
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("foo", "bar");
+    const ShardKeyPattern shardKey(BSON("y" << 1));
+
+    std::vector<ShardType> shardList;
+    shardList.emplace_back(
+        ShardType(shardId("0").toString(), "rs0/fakeShard0:123", {std::string("zoneA")}));
+    shardList.emplace_back(
+        ShardType(shardId("1").toString(), "rs1/fakeShard1:123", {std::string("zoneB")}));
+
+    setupShards(shardList);
+    shardRegistry()->reload(operationContext());
+
+    std::vector<TagsType> zones;
+    zones.emplace_back(nss(), "zoneA", ChunkRange(BSON("y" << MINKEY), BSON("y" << 0)));
+    zones.emplace_back(nss(), "zoneB", ChunkRange(BSON("y" << 0), BSON("y" << MAXKEY)));
+
+    std::vector<ShardId> availableShardIds = {shardId("0")};
+
+    std::list<BSONObj> mockSamples;
+
+    auto numInitialChunks = 10;
+    SplitPolicyParams params{UUID::gen(), shardId("0")};
+    {
+        auto initSplitPolicy = makeInitialSplitPolicy(
+            numInitialChunks, boost::none /* zones */, mockSamples, availableShardIds);
+        ASSERT_THROWS(initSplitPolicy->createFirstChunks(operationContext(), shardKey, params),
+                      DBException);
+    }
+}
+
+
+class ShardDistributionInitSplitTest : public SingleChunkPerTagSplitPolicyTest {
+public:
+    std::unique_ptr<ShardDistributionSplitPolicy> makeInitialSplitPolicy(
+        std::vector<ShardKeyRange>& shardDistribution,
+        boost::optional<std::vector<TagsType>> zones) {
+        return std::make_unique<ShardDistributionSplitPolicy>(shardDistribution, zones);
+    }
+
+    /**
+     * Calls createFirstChunks() according to the given arguments and asserts that returned
+     * chunks match with the chunks created using expectedChunkRanges and expectedShardIds.
+     */
+    void checkGeneratedInitialZoneChunks(std::unique_ptr<ShardDistributionSplitPolicy> splitPolicy,
+                                         const ShardKeyPattern& shardKeyPattern,
+                                         const std::vector<ShardType>& shardList,
+                                         const std::vector<ShardKeyRange>& shardDistribution,
+                                         const std::vector<ChunkRange>& expectedChunkRanges,
+                                         const std::vector<ShardId>& expectedShardIds) {
+        const auto shardCollectionConfig = splitPolicy->createFirstChunks(
+            operationContext(), shardKeyPattern, {UUID::gen(), primaryShard});
+
+        ASSERT_EQ(expectedShardIds.size(), expectedChunkRanges.size());
+        ASSERT_EQ(expectedChunkRanges.size(), shardCollectionConfig.chunks.size());
+        for (size_t i = 0; i < shardCollectionConfig.chunks.size(); ++i) {
+            // Check the chunk range matches the expected range.
+            ASSERT_EQ(expectedChunkRanges[i], shardCollectionConfig.chunks[i].getRange());
+
+            // Check that the shardId matches the expected.
+            const auto& actualShardId = shardCollectionConfig.chunks[i].getShard();
+            ASSERT_EQ(expectedShardIds[i], actualShardId);
+        }
+    }
+};
+
+TEST_F(ShardDistributionInitSplitTest, WithoutZones) {
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("foo", "bar");
+    const ShardKeyPattern shardKey(BSON("y" << 1));
+
+    std::vector<ShardType> shardList;
+    shardList.emplace_back(
+        ShardType(shardId("0").toString(), "rs0/fakeShard0:123", {std::string("zoneA")}));
+    shardList.emplace_back(
+        ShardType(shardId("1").toString(), "rs1/fakeShard1:123", {std::string("zoneB")}));
+
+    setupShards(shardList);
+    shardRegistry()->reload(operationContext());
+    ShardKeyRange range0(shardId("0"));
+    range0.setMin(BSON("y" << MINKEY));
+    range0.setMax(BSON("y" << 0));
+    ShardKeyRange range1(shardId("1"));
+    range1.setMin(BSON("y" << 0));
+    range1.setMax(BSON("y" << MAXKEY));
+    std::vector<ShardKeyRange> shardDistribution = {range0, range1};
+
+    std::vector<ChunkRange> expectedChunkRanges = {ChunkRange(BSON("y" << MINKEY), BSON("y" << 0)),
+                                                   ChunkRange(BSON("y" << 0), BSON("y" << MAXKEY))};
+    std::vector<ShardId> expectedShardForEachChunk = {shardId("0"), shardId("1")};
+
+    checkGeneratedInitialZoneChunks(
+        makeInitialSplitPolicy(shardDistribution, boost::none /*zones*/),
+        shardKey,
+        shardList,
+        shardDistribution,
+        expectedChunkRanges,
+        expectedShardForEachChunk);
+}
+
+TEST_F(ShardDistributionInitSplitTest, ZonesConflictShardDistribution) {
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("foo", "bar");
+    const ShardKeyPattern shardKey(BSON("y" << 1));
+
+    std::vector<ShardType> shardList;
+    shardList.emplace_back(
+        ShardType(shardId("0").toString(), "rs0/fakeShard0:123", {std::string("zoneA")}));
+    shardList.emplace_back(
+        ShardType(shardId("1").toString(), "rs1/fakeShard1:123", {std::string("zoneB")}));
+
+    setupShards(shardList);
+    shardRegistry()->reload(operationContext());
+
+    std::vector<TagsType> zones;
+    zones.emplace_back(nss(), "zoneB", ChunkRange(BSON("y" << MINKEY), BSON("y" << 0)));
+    zones.emplace_back(nss(), "zoneA", ChunkRange(BSON("y" << 0), BSON("y" << MAXKEY)));
+
+    ShardKeyRange range0(shardId("0"));
+    range0.setMin(BSON("y" << MINKEY));
+    range0.setMax(BSON("y" << 0));
+    ShardKeyRange range1(shardId("1"));
+    range1.setMin(BSON("y" << 0));
+    range1.setMax(BSON("y" << MAXKEY));
+    std::vector<ShardKeyRange> shardDistribution = {range0, range1};
+
+    SplitPolicyParams params{UUID::gen(), shardId("0")};
+    auto initSplitPolicy = makeInitialSplitPolicy(shardDistribution, zones);
+    ASSERT_THROWS(initSplitPolicy->createFirstChunks(operationContext(), shardKey, params),
                   DBException);
+}
+
+TEST_F(ShardDistributionInitSplitTest, InterleaveWithZones) {
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("foo", "bar");
+    const ShardKeyPattern shardKey(BSON("y" << 1));
+
+    std::vector<ShardType> shardList;
+    shardList.emplace_back(ShardType(shardId("0").toString(),
+                                     "rs0/fakeShard0:123",
+                                     {std::string("zoneA"), std::string("zoneB")}));
+    shardList.emplace_back(
+        ShardType(shardId("1").toString(), "rs1/fakeShard1:123", {std::string("zoneB")}));
+
+    setupShards(shardList);
+    shardRegistry()->reload(operationContext());
+
+    std::vector<TagsType> zones;
+    zones.emplace_back(nss(), "zoneA", ChunkRange(BSON("y" << MINKEY), BSON("y" << 0)));
+    zones.emplace_back(nss(), "zoneB", ChunkRange(BSON("y" << 0), BSON("y" << MAXKEY)));
+
+    ShardKeyRange range0(shardId("0"));
+    range0.setMin(BSON("y" << MINKEY));
+    range0.setMax(BSON("y" << -1));
+    ShardKeyRange range1(shardId("0"));
+    range1.setMin(BSON("y" << -1));
+    range1.setMax(BSON("y" << 1));
+    ShardKeyRange range2(shardId("1"));
+    range2.setMin(BSON("y" << 1));
+    range2.setMax(BSON("y" << MAXKEY));
+    std::vector<ShardKeyRange> shardDistribution = {range0, range1, range2};
+
+    std::vector<ChunkRange> expectedChunkRanges = {ChunkRange(BSON("y" << MINKEY), BSON("y" << -1)),
+                                                   ChunkRange(BSON("y" << -1), BSON("y" << 0)),
+                                                   ChunkRange(BSON("y" << 0), BSON("y" << 1)),
+                                                   ChunkRange(BSON("y" << 1), BSON("y" << MAXKEY))};
+    std::vector<ShardId> expectedShardForEachChunk = {
+        shardId("0"), shardId("0"), shardId("0"), shardId("1")};
+
+    checkGeneratedInitialZoneChunks(makeInitialSplitPolicy(shardDistribution, zones),
+                                    shardKey,
+                                    shardList,
+                                    shardDistribution,
+                                    expectedChunkRanges,
+                                    expectedShardForEachChunk);
+}
+
+TEST_F(ShardDistributionInitSplitTest, ThrowIfContainsDrainingShard) {
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("foo", "bar");
+    const ShardKeyPattern shardKey(BSON("y" << 1));
+
+    ShardType kShard0{shardId("0").toString(), "rs0/fakeShard0:123"};
+    ShardType kShard1{shardId("1").toString(), "rs1/fakeShard1:123"};
+    kShard1.setDraining(true);
+
+    std::vector<ShardType> shardList;
+    shardList.emplace_back(kShard0);
+    shardList.emplace_back(kShard1);
+
+    setupShards(shardList);
+    shardRegistry()->reload(operationContext());
+
+    std::vector<TagsType> zones;
+    ShardKeyRange range0(shardId("0"));
+    range0.setMin(BSON("y" << MINKEY));
+    range0.setMax(BSON("y" << 0));
+    ShardKeyRange range1(shardId("1"));
+    range1.setMin(BSON("y" << 0));
+    range1.setMax(BSON("y" << MAXKEY));
+    std::vector<ShardKeyRange> shardDistribution = {range0, range1};
+
+    const SplitPolicyParams params{UUID::gen(), primaryShard};
+
+    std::unique_ptr<ShardDistributionSplitPolicy> splitPolicy =
+        makeInitialSplitPolicy(shardDistribution, zones);
+    ASSERT_THROWS_CODE(splitPolicy->createFirstChunks(operationContext(), shardKey, params),
+                       DBException,
+                       ErrorCodes::ShardNotFound);
 }
 
 }  // namespace

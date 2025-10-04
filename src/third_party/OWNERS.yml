@@ -1,0 +1,147 @@
+version: 1.0.0
+filters:
+  - "abseil-cpp":
+    approvers:
+      - 10gen/server-programmability
+  - "asio":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "avro-cpp":
+    approvers:
+      - 10gen/streams-engine
+  - "aws-sdk":
+    approvers:
+      - 10gen/streams-engine
+  - "benchmark":
+    approvers:
+      - 10gen/server-programmability
+  - "boost":
+    approvers:
+      - 10gen/server-programmability
+  - "cares":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "cpptrace":
+    approvers:
+      - 10gen/server-programmability
+  - "croaring":
+    approvers:
+      - 10gen/query-execution
+  - "fmt":
+    approvers:
+      - 10gen/server-programmability
+  - "folly":
+    approvers:
+      - 10gen/server-workload-resilience
+  - "googletest_restricted_for_disagg_only":
+    approvers:
+      - 10gen/server-disagg-storage
+  - "gperftools":
+    approvers:
+      - 10gen/server-workload-resilience
+  - "grpc":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "icu4c*":
+    approvers:
+      - 10gen/query-execution
+  - "immer":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "IntelRDFPMathLib*":
+    approvers:
+      - 10gen/server-programmability
+  - "JSON-Schema-Test-Suite":
+    approvers:
+      - 10gen/query-optimization
+  - "libbson":
+    approvers:
+      - 10gen/server-security
+  - "libdwarf":
+    approvers:
+      - 10gen/server-programmability
+  - "libmongocrypt":
+    approvers:
+      - 10gen/server-security
+  - "librdkafka":
+    approvers:
+      - 10gen/streams-engine
+  - "libstemmer_c":
+    approvers:
+      - 10gen/query-integration
+  - "mock_ocsp_responder":
+    approvers:
+      - 10gen/server-security
+  - "mozjs":
+    approvers:
+      - 10gen/query-integration-features
+      - 10gen/server-security
+  - "murmurhash3":
+    approvers:
+      - 10gen/server-programmability
+  - "nlohmann-json":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "node":
+    approvers:
+      - 10gen/server-workload-resilience
+  - "opentelemetry-cpp":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "opentelemetry-proto":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "pcre2":
+    approvers:
+      - 10gen/query-execution
+  - "protobuf":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "re2":
+    approvers:
+      - 10gen/server-programmability
+  - "s2":
+    approvers:
+      - 10gen/query-integration
+  - "SafeInt":
+    approvers:
+      - 10gen/server-programmability
+  - "sasl":
+    approvers:
+      - 10gen/server-security
+  - "schemastore.org":
+    approvers:
+      - 10gen/query-optimization
+  - "snappy":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "tcmalloc":
+    approvers:
+      - 10gen/server-workload-resilience
+  - "timelib":
+    approvers:
+      - 10gen/query-execution
+  - "tomcrypt*":
+    approvers:
+      - 10gen/server-security
+  - "unicode-8.0.0":
+    approvers:
+      - 10gen/query-execution
+  - "unwind":
+    approvers:
+      - 10gen/server-programmability
+  - "valgrind":
+    approvers:
+      - 10gen/devprod-build
+  - "wiredtiger":
+    approvers:
+      - 10gen/storage-engines
+  - "yaml-cpp":
+    approvers:
+      - 10gen/server-security
+  - "zlib":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "zstandard":
+    approvers:
+      - 10gen/server-networking-and-observability

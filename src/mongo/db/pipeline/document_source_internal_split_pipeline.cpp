@@ -27,9 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/pipeline/document_source_internal_split_pipeline.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/version_context.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
+#include <string>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -37,6 +49,7 @@ REGISTER_DOCUMENT_SOURCE(_internalSplitPipeline,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceInternalSplitPipeline::createFromBson,
                          AllowedWithApiStrict::kNeverInVersion1);
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalSplitPipeline, DocumentSourceInternalSplitPipeline::id)
 
 constexpr StringData DocumentSourceInternalSplitPipeline::kStageName;
 
@@ -45,32 +58,55 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSplitPipeline::create
     uassert(ErrorCodes::TypeMismatch,
             str::stream() << "$_internalSplitPipeline must take a nested object but found: "
                           << elem,
-            elem.type() == BSONType::Object);
+            elem.type() == BSONType::object);
 
     auto specObj = elem.embeddedObject();
 
     HostTypeRequirement mergeType = HostTypeRequirement::kNone;
-
+    boost::optional<ShardId> mergeShardId = boost::none;
     for (auto&& elt : specObj) {
         if (elt.fieldNameStringData() == "mergeType"_sd) {
-            uassert(ErrorCodes::BadValue,
-                    str::stream() << "'mergeType' must be a string value but found: " << elt.type(),
-                    elt.type() == BSONType::String);
+            const auto type = elt.type();
 
-            auto mergeTypeString = elt.valueStringData();
+            if (type == BSONType::string) {
+                auto mergeTypeString = elt.valueStringData();
+                if ("localOnly"_sd == mergeTypeString) {
+                    mergeType = HostTypeRequirement::kLocalOnly;
+                } else if ("anyShard"_sd == mergeTypeString) {
+                    mergeType = HostTypeRequirement::kAnyShard;
+                } else if ("router"_sd == mergeTypeString || "mongos"_sd == mergeTypeString) {
+                    mergeType = HostTypeRequirement::kRouter;
+                } else {
+                    uasserted(ErrorCodes::BadValue,
+                              str::stream() << "unrecognized field while parsing mergeType: '"
+                                            << mergeTypeString << "'");
+                }
+            } else if (type == BSONType::object) {
+                auto specificShardObj = elt.Obj();
+                auto specificShardElem = specificShardObj.getField("specificShard"_sd);
+                uassert(7958300,
+                        "Object argument to $_internalSplitPipeline must contain a single string "
+                        "field named 'specificShard'",
+                        specificShardObj.nFields() == 1 &&
+                            specificShardElem.type() == BSONType::string);
 
-            if ("localOnly"_sd == mergeTypeString) {
-                mergeType = HostTypeRequirement::kLocalOnly;
-            } else if ("anyShard"_sd == mergeTypeString) {
-                mergeType = HostTypeRequirement::kAnyShard;
-            } else if ("primaryShard"_sd == mergeTypeString) {
-                mergeType = HostTypeRequirement::kPrimaryShard;
-            } else if ("mongos"_sd == mergeTypeString) {
-                mergeType = HostTypeRequirement::kMongoS;
+                auto* opCtx = expCtx->getOperationContext();
+                auto* grid = Grid::get(opCtx);
+                uassert(
+                    7958301,
+                    "Cannot specify 'mergeType' of 'specificShard' and not have sharding enabled",
+                    grid && grid->isInitialized() && grid->isShardingInitialized());
+
+                // Verify that the specified shardId references an actual shard.
+                auto shardName = specificShardElem.str();
+                ShardId shardId(shardName);
+                uassertStatusOK(grid->shardRegistry()->getShard(opCtx, shardId));
+                mergeShardId = shardId;
             } else {
                 uasserted(ErrorCodes::BadValue,
-                          str::stream() << "unrecognized field while parsing mergeType: '"
-                                        << elt.fieldNameStringData() << "'");
+                          str::stream()
+                              << "'mergeType' must be a string value or an object but found: "
+                              << type);
             }
         } else {
             uasserted(ErrorCodes::BadValue,
@@ -79,43 +115,47 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSplitPipeline::create
         }
     }
 
-    return new DocumentSourceInternalSplitPipeline(expCtx, mergeType);
+    return new DocumentSourceInternalSplitPipeline(expCtx, mergeType, mergeShardId);
 }
 
-DocumentSource::GetNextResult DocumentSourceInternalSplitPipeline::doGetNext() {
-    return pSource->getNext();
-}
-
-Value DocumentSourceInternalSplitPipeline::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceInternalSplitPipeline::serialize(const SerializationOptions& opts) const {
     std::string mergeTypeString;
+    Document specificShardDoc;
 
     switch (_mergeType) {
         case HostTypeRequirement::kAnyShard:
             mergeTypeString = "anyShard";
             break;
 
-        case HostTypeRequirement::kPrimaryShard:
-            mergeTypeString = "primaryShard";
-            break;
-
         case HostTypeRequirement::kLocalOnly:
             mergeTypeString = "localOnly";
             break;
 
-        case HostTypeRequirement::kMongoS:
-            mergeTypeString = "mongos";
+        case HostTypeRequirement::kRouter:
+            if (feature_flags::gFeatureFlagAggMongosToRouter.isEnabled(
+                    VersionContext::getDecoration(getExpCtx()->getOperationContext()),
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                mergeTypeString = "router";
+            } else {
+                mergeTypeString = "mongos";
+            }
             break;
 
         case HostTypeRequirement::kNone:
+            if (_mergeShardId.has_value()) {
+                specificShardDoc = Document{{"specificShard", Value(_mergeShardId->toString())}};
+            }
+            break;
         default:
             break;
     }
 
-    return Value(
-        Document{{getSourceName(),
-                  Value{Document{{"mergeType",
-                                  mergeTypeString.empty() ? Value() : Value(mergeTypeString)}}}}});
+    return Value(Document{
+        {getSourceName(),
+         Value{Document{{"mergeType",
+                         mergeTypeString.empty()
+                             ? (specificShardDoc.empty() ? Value() : Value(specificShardDoc))
+                             : Value(mergeTypeString)}}}}});
 }
 
 }  // namespace mongo

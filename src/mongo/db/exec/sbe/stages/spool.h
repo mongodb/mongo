@@ -29,9 +29,27 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
+#include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/util/debug_print.h"
+#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/exec/sbe/vm/vm.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
+#include <cstddef>
+#include <memory>
+#include <utility>
+#include <vector>
+
 
 namespace mongo::sbe {
 /**
@@ -56,7 +74,9 @@ public:
     SpoolEagerProducerStage(std::unique_ptr<PlanStage> input,
                             SpoolId spoolId,
                             value::SlotVector vals,
-                            PlanNodeId planNodeId);
+                            PlanYieldPolicy* yieldPolicy,
+                            PlanNodeId planNodeId,
+                            bool participateInTrialRunTracking = true);
 
     std::unique_ptr<PlanStage> clone() const final;
 
@@ -70,6 +90,11 @@ public:
     const SpecificStats* getSpecificStats() const final;
     std::vector<DebugPrinter::Block> debugPrint() const final;
     size_t estimateCompileTimeSize() const final;
+
+protected:
+    void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override {
+        return;
+    }
 
 private:
     std::shared_ptr<SpoolBuffer> _buffer{nullptr};
@@ -109,7 +134,8 @@ public:
                            SpoolId spoolId,
                            value::SlotVector vals,
                            std::unique_ptr<EExpression> predicate,
-                           PlanNodeId planNodeId);
+                           PlanNodeId planNodeId,
+                           bool participateInTrialRunTracking = true);
 
     std::unique_ptr<PlanStage> clone() const final;
 
@@ -125,7 +151,14 @@ public:
     size_t estimateCompileTimeSize() const final;
 
 protected:
-    void doSaveState(bool relinquishCursor) final;
+    void doSaveState() final;
+    bool shouldOptimizeSaveState(size_t) const final {
+        return true;
+    }
+
+    void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override {
+        return;
+    }
 
 private:
     std::shared_ptr<SpoolBuffer> _buffer{nullptr};
@@ -165,16 +198,24 @@ private:
 template <bool IsStack>
 class SpoolConsumerStage final : public PlanStage {
 public:
-    SpoolConsumerStage(SpoolId spoolId, value::SlotVector vals, PlanNodeId planNodeId)
-        : PlanStage{IsStack ? "sspool"_sd : "cspool"_sd, planNodeId},
+    SpoolConsumerStage(SpoolId spoolId,
+                       value::SlotVector vals,
+                       PlanYieldPolicy* yieldPolicy,
+                       PlanNodeId planNodeId,
+                       bool participateInTrialRunTracking = true)
+        : PlanStage{IsStack ? "sspool"_sd : "cspool"_sd,
+                    yieldPolicy,
+                    planNodeId,
+                    participateInTrialRunTracking},
           _spoolId{spoolId},
           _vals{std::move(vals)} {}
 
-    std::unique_ptr<PlanStage> clone() const {
-        return std::make_unique<SpoolConsumerStage<IsStack>>(_spoolId, _vals, _commonStats.nodeId);
+    std::unique_ptr<PlanStage> clone() const override {
+        return std::make_unique<SpoolConsumerStage<IsStack>>(
+            _spoolId, _vals, _yieldPolicy, _commonStats.nodeId, participateInTrialRunTracking());
     }
 
-    void prepare(CompileCtx& ctx) {
+    void prepare(CompileCtx& ctx) override {
         if (!_buffer) {
             _buffer = ctx.getSpoolBuffer(_spoolId);
         }
@@ -191,7 +232,7 @@ public:
         }
     }
 
-    value::SlotAccessor* getAccessor(CompileCtx& ctx, value::SlotId slot) {
+    value::SlotAccessor* getAccessor(CompileCtx& ctx, value::SlotId slot) override {
         if (auto it = _outAccessors.find(slot); it != _outAccessors.end()) {
             return &it->second;
         }
@@ -199,15 +240,16 @@ public:
         return ctx.getAccessor(slot);
     }
 
-    void open(bool reOpen) {
+    void open(bool reOpen) override {
         auto optTimer(getOptTimer(_opCtx));
 
         _commonStats.opens++;
         _bufferIt = _buffer->size();
     }
 
-    PlanState getNext() {
+    PlanState getNext() override {
         auto optTimer(getOptTimer(_opCtx));
+        checkForInterruptAndYield(_opCtx);
 
         if constexpr (IsStack) {
             if (_bufferIt != _buffer->size()) {
@@ -233,13 +275,13 @@ public:
         return trackPlanState(PlanState::ADVANCED);
     }
 
-    void close() {
+    void close() override {
         auto optTimer(getOptTimer(_opCtx));
 
         trackClose();
     }
 
-    std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const {
+    std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const override {
         auto ret = std::make_unique<PlanStageStats>(_commonStats);
 
         if (includeDebugInfo) {
@@ -252,11 +294,11 @@ public:
         return ret;
     }
 
-    const SpecificStats* getSpecificStats() const {
+    const SpecificStats* getSpecificStats() const override {
         return nullptr;
     }
 
-    std::vector<DebugPrinter::Block> debugPrint() const {
+    std::vector<DebugPrinter::Block> debugPrint() const override {
         auto ret = PlanStage::debugPrint();
 
         DebugPrinter::addSpoolIdentifier(ret, _spoolId);
@@ -274,10 +316,15 @@ public:
         return ret;
     }
 
-    size_t estimateCompileTimeSize() const {
+    size_t estimateCompileTimeSize() const override {
         size_t size = sizeof(*this);
         size += size_estimator::estimate(_vals);
         return size;
+    }
+
+protected:
+    void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override {
+        return;
     }
 
 private:

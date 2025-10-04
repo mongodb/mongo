@@ -29,7 +29,11 @@
 
 #pragma once
 
+#include "mongo/client/connection_string.h"
+#include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/remote_command_targeter_factory.h"
+
+#include <memory>
 
 namespace mongo {
 
@@ -42,7 +46,7 @@ namespace mongo {
 class RemoteCommandTargeterFactoryImpl final : public RemoteCommandTargeterFactory {
 public:
     RemoteCommandTargeterFactoryImpl();
-    ~RemoteCommandTargeterFactoryImpl();
+    ~RemoteCommandTargeterFactoryImpl() override;
 
     std::unique_ptr<RemoteCommandTargeter> create(const ConnectionString& connStr) override;
 };

@@ -27,16 +27,29 @@
  *    it in the license file.
  */
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/window_function/window_function_first_last_n.h"
 #include "mongo/db/pipeline/window_function/window_function_min_max.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/intrusive_counter.h"
+
+#include <cstddef>
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace {
-// TODO SERVER-57886: Add test cases for $top/$bottom/$topN/$bottomN window functions.
 class WindowFunctionMinMaxNTest : public AggregationContextFixture {
 public:
     static constexpr auto kNarg = 3LL;
@@ -53,7 +66,7 @@ public:
 };
 
 TEST_F(WindowFunctionMinMaxNTest, EmptyWindow) {
-    auto test = [](auto windowFunction) {
+    auto test = [](auto& windowFunction) {
         ASSERT_VALUE_EQ(windowFunction.getValue(), Value{BSONArray()});
 
         // No matter how many nullish values we insert, we should still get back the empty array.
@@ -286,11 +299,11 @@ TEST_F(WindowFunctionFirstLastNTest, NullMissingValuesInWindowIncludedInResult) 
     firstThree.add(Value());
     firstThree.add(Value(BSONNULL));
     ASSERT_VALUE_EQ(firstThree.getValue(),
-                    (Value{std::vector<Value>{Value(), Value{BSONNULL}, Value()}}));
+                    (Value{std::vector<Value>{Value(BSONNULL), Value{BSONNULL}, Value(BSONNULL)}}));
 
     firstThree.add(Value(3));
     ASSERT_VALUE_EQ(firstThree.getValue(),
-                    (Value{std::vector<Value>{Value(), Value{BSONNULL}, Value()}}));
+                    (Value{std::vector<Value>{Value(BSONNULL), Value{BSONNULL}, Value(BSONNULL)}}));
 
     firstThree.remove(Value());
     firstThree.remove(Value(BSONNULL));
@@ -304,11 +317,11 @@ TEST_F(WindowFunctionFirstLastNTest, NullMissingValuesInWindowIncludedInResult) 
     lastThree.add(Value());
     lastThree.add(Value(BSONNULL));
     ASSERT_VALUE_EQ(lastThree.getValue(),
-                    (Value{std::vector<Value>{Value(BSONNULL), Value(), Value(BSONNULL)}}));
+                    (Value{std::vector<Value>{Value(BSONNULL), Value(BSONNULL), Value(BSONNULL)}}));
 
     lastThree.add(Value(3));
     ASSERT_VALUE_EQ(lastThree.getValue(),
-                    (Value{std::vector<Value>{Value(), Value(BSONNULL), Value(3)}}));
+                    (Value{std::vector<Value>{Value(BSONNULL), Value(BSONNULL), Value(3)}}));
 
     lastThree.remove(Value());
     lastThree.remove(Value(BSONNULL));
@@ -353,7 +366,7 @@ TEST_F(WindowFunctionFirstLastNTest, MixNullsAndNonNulls) {
     firstThree.add(Value(BSONNULL));
     firstThree.add(Value{1});
     ASSERT_VALUE_EQ(firstThree.getValue(),
-                    (Value(std::vector<Value>{Value(4), Value(), Value(BSONNULL)})));
+                    (Value(std::vector<Value>{Value(4), Value(BSONNULL), Value(BSONNULL)})));
 
     // Add a couple more values. The result shouldn't change.
     firstThree.add(Value{3});
@@ -361,7 +374,7 @@ TEST_F(WindowFunctionFirstLastNTest, MixNullsAndNonNulls) {
     firstThree.add(Value(BSONNULL));
     firstThree.add(Value{2});
     ASSERT_VALUE_EQ(firstThree.getValue(),
-                    (Value(std::vector<Value>{Value(4), Value(), Value(BSONNULL)})));
+                    (Value(std::vector<Value>{Value(4), Value(BSONNULL), Value(BSONNULL)})));
 
     // Add four values, half of which are null/missing.
     lastThree.add(Value{4});
@@ -369,7 +382,7 @@ TEST_F(WindowFunctionFirstLastNTest, MixNullsAndNonNulls) {
     lastThree.add(Value(BSONNULL));
     lastThree.add(Value{1});
     ASSERT_VALUE_EQ(lastThree.getValue(),
-                    (Value(std::vector<Value>{Value(), Value(BSONNULL), Value(1)})));
+                    (Value(std::vector<Value>{Value(BSONNULL), Value(BSONNULL), Value(1)})));
 
     // Add a couple more values. We should get the latest 3.
     lastThree.add(Value{3});
@@ -377,7 +390,7 @@ TEST_F(WindowFunctionFirstLastNTest, MixNullsAndNonNulls) {
     lastThree.add(Value());
     lastThree.add(Value{2});
     ASSERT_VALUE_EQ(lastThree.getValue(),
-                    (Value(std::vector<Value>{Value(BSONNULL), Value(), Value(2)})));
+                    (Value(std::vector<Value>{Value(BSONNULL), Value(BSONNULL), Value(2)})));
 }
 
 TEST_F(WindowFunctionFirstLastNTest, Ties) {

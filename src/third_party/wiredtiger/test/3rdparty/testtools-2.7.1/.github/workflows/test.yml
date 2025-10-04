@@ -1,0 +1,54 @@
+name: Test
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [3.7, 3.8, 3.9, "3.10", 3.11, 3.12, pypy3.9, pypy3.10]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key:
+            ${{ matrix.os }}-${{ matrix.python-version }}-${{ hashFiles('**/setup.py')
+            }}
+          restore-keys: |
+            ${{ matrix.os }}-${{ matrix.python-version }}-
+
+      - name: Install dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install --upgrade setuptools wheel setuptools_scm
+          python3 -m pip install sphinx
+          python3 -m pip install ".[test,twisted]"
+
+      - name: Tests
+        run: |
+          python -W once -m testtools.run testtools.tests.test_suite
+
+      - name: Docs
+        run: |
+          make clean-sphinx docs
+
+  success:
+    needs: build
+    runs-on: ubuntu-latest
+    name: test successful
+    steps:
+      - name: Success
+        run: echo Test successful

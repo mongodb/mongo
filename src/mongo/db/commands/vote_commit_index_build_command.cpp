@@ -27,16 +27,26 @@
  *    it in the license file.
  */
 
+#include "mongo/base/error_codes.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/commands/vote_index_build_gen.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/index_builds/index_builds_coordinator.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/service_context.h"
+#include "mongo/logv2/log.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/net/hostandport.h"
+
+#include <string>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/vote_commit_index_build_gen.h"
-#include "mongo/db/index_builds_coordinator.h"
-#include "mongo/db/repl/repl_client_info.h"
-#include "mongo/logv2/log.h"
 
 namespace mongo {
 namespace {
@@ -55,7 +65,8 @@ public:
     using Request = VoteCommitIndexBuild;
 
     std::string help() const override {
-        return "Internal intra replica set command";
+        return "Internal intra replica set command to signal to the primary that a member is ready "
+               "to commit an index build.";
     }
 
     bool adminOnly() const override {
@@ -76,8 +87,6 @@ public:
             const auto& cmd = request();
             LOGV2_DEBUG(3856208,
                         1,
-                        "Received voteCommitIndexBuild request for index build: {buildUUID}, "
-                        "from host: {host}",
                         "Received voteCommitIndexBuild request",
                         "buildUUID"_attr = cmd.getCommandParameter(),
                         "host"_attr = cmd.getHostAndPort().toString());
@@ -100,7 +109,7 @@ public:
 
     private:
         NamespaceString ns() const override {
-            return NamespaceString(request().getDbName(), "");
+            return NamespaceString(request().getDbName());
         }
 
         bool supportsWriteConcern() const override {
@@ -111,12 +120,13 @@ public:
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",
                     AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                           ActionType::internal));
+                        ->isAuthorizedForActionsOnResource(
+                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                            ActionType::internal));
         }
     };
-
-} voteCommitIndexBuildCmd;
+};
+MONGO_REGISTER_COMMAND(VoteCommitIndexBuildCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

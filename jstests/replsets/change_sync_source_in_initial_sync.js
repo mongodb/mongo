@@ -4,10 +4,8 @@
  *
  */
 
-(function() {
-"use strict";
-
-load('jstests/libs/fail_point_util.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const testName = "change_sync_source_in_initial_sync";
 const dbName = testName;
@@ -32,10 +30,9 @@ assert.commandWorked(primaryColl.insert({_id: "a"}, {writeConcern: {w: 2}}));
 const initialSyncNode = rst.add({
     rsConfig: {priority: 0},
     setParameter: {
-        'failpoint.initialSyncHangBeforeSplittingControlFlow': tojson({mode: 'alwaysOn'}),
-        'failpoint.forceSyncSourceCandidate':
-            tojson({mode: 'alwaysOn', data: {hostAndPort: primary.name}})
-    }
+        "failpoint.initialSyncHangBeforeSplittingControlFlow": tojson({mode: "alwaysOn"}),
+        "failpoint.forceSyncSourceCandidate": tojson({mode: "alwaysOn", data: {hostAndPort: primary.name}}),
+    },
 });
 rst.reInitiate();
 rst.waitForState(initialSyncNode, ReplSetTest.State.STARTUP_2);
@@ -43,25 +40,24 @@ rst.waitForState(initialSyncNode, ReplSetTest.State.STARTUP_2);
 let failedInitialSyncAttempts;
 
 // Wait for the initial syncing node to choose a sync source.
-assert.soon(function() {
+assert.soon(function () {
     const res = assert.commandWorked(initialSyncNode.adminCommand({"replSetGetStatus": 1}));
     // failedInitialSyncAttempts can be > 0 due to transient network errors in our testing
     // environment.
-    failedInitialSyncAttempts = res.initialSyncStatus.failedInitialSyncAttempts;
+    failedInitialSyncAttempts = res.initialSyncStatus ? res.initialSyncStatus.failedInitialSyncAttempts : 0;
     return primary.name === res.syncSourceHost;
 });
-assert.commandWorked(
-    initialSyncNode.adminCommand({configureFailPoint: "forceSyncSourceCandidate", mode: "off"}));
+assert.commandWorked(initialSyncNode.adminCommand({configureFailPoint: "forceSyncSourceCandidate", mode: "off"}));
 
 jsTestLog("Setting the initial sync source from secondary to primary.");
 assert.commandWorked(initialSyncNode.adminCommand({replSetSyncFrom: secondary.name}));
 
 // Turning off the 'initialSyncHangBeforeSplittingControlFlow' failpoint should cause initial sync
 // to restart with the secondary as the sync source.
-let hangBeforeFinishInitialSync =
-    configureFailPoint(initialSyncNode, "initialSyncHangBeforeFinish");
-assert.commandWorked(initialSyncNode.adminCommand(
-    {configureFailPoint: 'initialSyncHangBeforeSplittingControlFlow', mode: 'off'}));
+let hangBeforeFinishInitialSync = configureFailPoint(initialSyncNode, "initialSyncHangBeforeFinish");
+assert.commandWorked(
+    initialSyncNode.adminCommand({configureFailPoint: "initialSyncHangBeforeSplittingControlFlow", mode: "off"}),
+);
 hangBeforeFinishInitialSync.wait();
 let res = assert.commandWorked(initialSyncNode.adminCommand({"replSetGetStatus": 1}));
 assert.eq(secondary.name, res.syncSourceHost, res);
@@ -71,4 +67,3 @@ hangBeforeFinishInitialSync.off();
 
 rst.awaitSecondaryNodes();
 rst.stopSet();
-})();

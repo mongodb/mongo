@@ -30,11 +30,12 @@
 #   Test that encryption is effective, it leaves no clear text
 #
 
-import os, run, random
-import wiredtiger, wttest
+import os
+import wttest
 from wtscenario import make_scenarios
 
 # Test encryption, when on, does not leak any information
+@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_encrypt06(wttest.WiredTigerTestCase):
     # To test the sodium encryptor, we use secretkey= rather than
     # setting a keyid, because for a "real" (vs. test-only) encryptor,
@@ -54,9 +55,9 @@ class test_encrypt06(wttest.WiredTigerTestCase):
     sodiumkey = ',secretkey=' + sodium_testkey
 
     # Test with various combinations of tables with or without indices
-    # and column groups, also with LSM.  When 'match' is False, we
-    # testing a potential misuse of the API: a table is opened with
-    # with its own encryption options (different from the system),
+    # and column groups.  When 'match' is False, we are testing a
+    # potential misuse of the API: a table is opened with
+    # its own encryption options (different from the system),
     # but the indices and column groups do not specify encryption,
     # so they may get the system encryptor.
     storagetype = [
@@ -74,8 +75,6 @@ class test_encrypt06(wttest.WiredTigerTestCase):
             uriprefix='table:', use_cg=True, use_index=False, match=False)),
         ('table-cg-idx-unmatch', dict(
             uriprefix='table:', use_cg=True, use_index=True, match=False)),
-        ('lsm', dict(
-            uriprefix='lsm:', use_cg=False, use_index=False, match=True)),
     ]
     encrypt = [
         ('none', dict(
@@ -265,6 +264,3 @@ class test_encrypt06(wttest.WiredTigerTestCase):
                 self.assertFalse(self.match_string_in_rundir(txt1))
                 self.assertFalse(self.match_string_in_rundir(keyname1))
                 self.assertFalse(self.match_string_in_rundir(valname1))
-
-if __name__ == '__main__':
-    wttest.run()

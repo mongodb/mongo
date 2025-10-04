@@ -30,8 +30,7 @@
 # wt_util
 # [END_TAGS]
 
-import os, shutil
-import wiredtiger, wttest
+import wttest
 
 from suite_subprocess import suite_subprocess
 
@@ -72,7 +71,7 @@ class test_pretty_hex_dump(wttest.WiredTigerTestCase, suite_subprocess):
     def test_dump(self):
         """
         Generates test table with byte array values. After that dumps the table in hex, pretty and
-        pretty hex formats. And then valudates pretty hex dump.
+        pretty hex formats. And then validates pretty hex dump.
         """
         # Create three dumps: hex, pretty and pretty_hex
         self.session.create(self.uri, self.table_format)
@@ -89,9 +88,9 @@ class test_pretty_hex_dump(wttest.WiredTigerTestCase, suite_subprocess):
 
         # First validate number of lines the dumps
         self.assertEqual(True, len(pretty) == len(pretty_hex),
-            'Pretty and pretty_hex output must have the same numbler of lines.')
+            'Pretty and pretty_hex output must have the same number of lines.')
         self.assertEqual(True, len(hex) == len(pretty_hex),
-            'Hex and pretty_hex output must have the same numbler of lines.')
+            'Hex and pretty_hex output must have the same number of lines.')
 
         # Next analyse the pretty hex dump line by line
         data_started = False
@@ -119,13 +118,10 @@ class test_pretty_hex_dump(wttest.WiredTigerTestCase, suite_subprocess):
                     self.assertEqual(True, p == px,
                         'Dump lines differ!\n' + 'Pretty: ' + p + ', Pretty_hex: ' + px)
 
-            # Test if data sectio has started
+            # Test if data section has started
             if not data_started and p == self.data_header:
                 self.assertEqual(True, p == px,
                     'Data section starts at different lines.\n' + 'Pretty: ' + p + 'Pretty_hex: ' + px)
                 self.assertEqual(True, h == px,
                     'Data section starts at different lines.\n' + 'Hex: ' + h + 'Pretty_hex: ' + px)
                 data_started = True
-
-if __name__ == '__main__':
-    wttest.run()

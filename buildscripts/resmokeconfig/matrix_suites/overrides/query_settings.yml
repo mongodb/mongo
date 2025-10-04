@@ -1,0 +1,195 @@
+- name: common_core_excludes
+  value:
+    exclude_files:
+      # Distinct explain fails with 'database not found' on sharded clusters
+      - jstests/core/query/distinct/distinct_semantics.js
+      # Tests which already use query settings or index filters, which could be overridden by this suite.
+      - jstests/core/index/express.js
+      - jstests/core/index/index_filter_commands.js
+      - jstests/core/query/query_settings/**/*.js
+      # Tests which assert on the number of execution metrics. The additional commands emitted by
+      # this suite might cause the tests to fail.
+      - jstests/core/administrative/current_op/**/*.js
+      - jstests/core/query/collation/collation.js
+      - jstests/core/diagnostics/operation_latency_histogram.js
+      - jstests/core/query/top/top.js
+      - jstests/core/catalog/views/views_stats.js
+      - jstests/core/txns/timestamped_reads_wait_for_prepare_oplog_visibility.js # failpoint 'timesEntered'
+      - jstests/core/timeseries/ddl/timeseries_sparse_index.js
+      # Tests which assert on the output of 'getLog' command. The additional emitted commands might lead to
+      # log truncation, hence failing the tests.
+      - jstests/core/administrative/getlog2.js
+      # Failpoint interferes with majority commited writes.
+      - jstests/core/txns/speculative_snapshot_includes_all_writes.js
+      # Using collection UUID in explain is forbidden.
+      - jstests/core/query/commands_with_uuid.js
+      # This test performs an '{_id: <id>}' query with a collator. This will not pass query settings validation. This
+      # is a design decision due to mongos lacking collation information.
+      - jstests/core/clustered/clustered_collection_collation.js
+      # This test uses an IDHACK-like query, for which it is not allowed to set query settings.
+      - jstests/core/timeseries/write/timeseries_delete_multi.js
+      - jstests/core/timeseries/write/timeseries_simple.js
+      - jstests/core/timeseries/write/timeseries_update.js
+      - jstests/core/timeseries/write/timeseries_update_arbitrary_updates_not_enabled.js
+      - jstests/core/write/empty_ts/bypass_empty_ts_replacement_timeseries.js
+      # Query settings have a higher precedence over index filters.
+      - jstests/core/index/index_filter_catalog_independent.js
+      - jstests/core/index/index_filter_collation.js
+      - jstests/core/index/index_filter_commands.js
+      - jstests/core/index/index_filter_on_hidden_index.js
+      - jstests/core/index/wildcard/compound_wildcard_index_filter.js
+      - jstests/core/index/wildcard/wildcard_index_filter.js
+      # Query settings application is skipped for queries targeting collections containing encryption information.
+      - jstests/core/query/queryable_encryption/**/*.js
+      - src/mongo/db/modules/enterprise/jstests/fle2/**/*.js
+    exclude_with_any_tags:
+      - assumes_standalone_mongod
+      - does_not_support_repeated_reads
+      - requires_profiling
+      - requires_fsync
+      # There are some cases where an invalid query will cause us to fail in unexpected ways when
+      # the query shape is also computed. See SERVER-96850 for example. This is generally not
+      # concerning if the query doesn't normally have hope of succeeding, and we can safely ignore
+      # them.
+      - known_query_shape_computation_problem
+      # These tests run many aggregations, and the override slows them down enough to hit the evergreen timeout.
+      - query_intensive_pbt
+
+- name: common_aggregation_excludes
+  value:
+    exclude_files:
+      # The results of this explain contains very large arrays which take a lot of time to compare
+      # with anyEq(), causing timeouts.
+      - jstests/aggregation/accumulators/accumulator_js_size_limits.js
+      # Test which overcomes the imposed 16Mb query settings limit making the 'setQuerySettings' command fail.
+      - jstests/aggregation/exec/query_limits_test.js
+      # Test which asserts on the number of execution metrics. The additional commands emitted by
+      # this suite might cause the test to fail.
+      - jstests/aggregation/sources/geonear/geonear_hint.js
+      - jstests/aggregation/sources/lookup/lookup_query_stats.js
+      - jstests/aggregation/sources/unionWith/unionWith_query_stats.js
+      # This suite emits additional explains alongside the tested command. This interferes
+      # with the number of expected plan cache entries.
+      - jstests/aggregation/sources/lookup/lookup_single_solution_cache.js
+      # This test performs an '{_id: <id>}' query with a collator. This will not pass query settings validation. This
+      # is a design decision due to mongos lacking collation information.
+      - jstests/aggregation/sources/bucket/collation_bucket.js
+    exclude_with_any_tags:
+      - assumes_standalone_mongod
+      - does_not_support_repeated_reads
+      - requires_profiling
+      - requires_fsync
+      # There are some cases where an invalid query will cause us to fail in unexpected ways when
+      # the query shape is also computed. See SERVER-96850 for example. This is generally not
+      # concerning if the query doesn't normally have hope of succeeding, and we can safely ignore
+      # them.
+      - known_query_shape_computation_problem
+      # These tests run many aggregations, and the override slows them down enough to hit the evergreen timeout.
+      - query_intensive_pbt
+
+- name: fallback_core_excludes
+  value:
+    exclude_files:
+      # TODO SERVER-101603 Validate against explain commands in prepared transactions.
+      - jstests/core/txns/disallow_operations_on_prepared_transaction.js
+      # TODO SERVER-89207: Ensure that the fallback mechanism works for '$_requestResumeToken'
+      # queries.
+      - jstests/core/query/find_with_resume_after_param.js
+      # Cannot clear the plan cache due to timeseries lock.
+      - jstests/core/write/bulk/bulk_write_timeseries_basic.js
+      - jstests/core/index/index_filter_commands_invalidate_plan_cache_entries.js
+      - jstests/core/index/index_stats.js
+      - jstests/core/index/wildcard/wildcard_index_cached_plans.js
+      - jstests/core/query/explain/explain_plan_cache.js
+      - jstests/core/query/plan_cache/in_expression_plan_cache.js
+      - jstests/core/query/plan_cache/introspect_hidden_index_plan_cache_entries.js
+      - jstests/core/query/partial_index_logical.js
+      - jstests/core/query/plan_cache/**/*.js
+      - jstests/core/query/sbe/sbe_plan_cache_autoparameterize_ixscan.js
+      - jstests/core/query/sbe/plan_cache_sbe_with_or_queries.js
+      - jstests/core/query/sbe/sbe_plan_cache_autoparameterize_collscan.js
+      - jstests/core/query/sbe/sbe_plan_cache_duplicate_or_clauses.js
+    exclude_with_any_tags:
+      - uses_parallel_shell # interferes with plan cache check
+
+- name: hints_core_excludes
+  value:
+    exclude_files:
+      # Query settings do not force indexes, and therefore empty filter will result in collection scans.
+      - jstests/core/index/geo/geo6.js
+      - jstests/core/index/index_check6.js
+      - jstests/core/index/index_diag.js
+      - jstests/core/index/index_multikey.js
+      - jstests/core/query/covered_multikey.js
+      - jstests/core/query/cursor/getmore_invalidated_cursors.js
+      - jstests/core/query/explain/explain_shell_helpers.js
+      - jstests/core/query/index_deduplication.js
+      - jstests/core/query/internal_hash_eq/lookup_using_hash_key.js
+      - jstests/core/query/return_key.js
+      - jstests/core/timeseries/ddl/timeseries_index_collation.js
+      - jstests/core/timeseries/query/timeseries_internal_bounded_sort_compound.js
+      - jstests/core/timeseries/ddl/timeseries_metric_index_compound.js
+      - jstests/core/timeseries/ddl/timeseries_special_indexes_metadata.js
+      # Tests partial/sparse indexes. These cannot be forced using query settings if they
+      # lead to an incomplete result set.
+      - jstests/core/index/index_multiple_compatibility.js
+      - jstests/core/index/indext.js
+      - jstests/core/index/sparse_index_internal_expr.js
+      - jstests/core/query/exists/existsa.js
+      - jstests/core/timeseries/ddl/timeseries_index_partial.js
+
+- name: index_filters_to_query_settings_selector
+  value:
+    selector:
+      roots:
+        - jstests/core/index/index_filter_catalog_independent.js
+        - jstests/core/index/index_filter_collation.js
+        - jstests/core/index/index_filter_commands.js
+        - jstests/core/index/index_filter_on_hidden_index.js
+        - jstests/core/index/wildcard/wildcard_index_filter.js
+        - jstests/core/index/wildcard/compound_wildcard_index_filter.js
+      exclude_files: []
+
+- name: eval_cursor_hints_to_query_settings
+  value:
+    eval: >-
+      await import("jstests/libs/override_methods/make_cursor_hints_into_query_settings.js");
+
+- name: eval_index_filters_to_query_settings
+  value:
+    eval: >-
+      await import("jstests/libs/override_methods/make_index_filters_into_query_settings.js");
+      db.adminCommand({configureFailPoint: 'querySettingsPlanCacheInvalidation', mode: 'alwaysOn'});
+
+- name: eval_implicit_query_settings_fallback
+  value:
+    eval: >-
+      await import("jstests/libs/override_methods/implicit_query_settings_fallback.js");
+
+- name: test_data_cursor_hints_to_query_settings
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              isHintsToQuerySettingsSuite: true
+
+- name: test_data_index_filters_to_query_settings
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              isIndexFiltersToQuerySettings: true
+
+- name: replica_sets_fixture
+  value:
+    executor:
+      fixture:
+        class: ReplicaSetFixture
+        mongod_options:
+          set_parameters:
+            enableTestCommands: 1
+        num_nodes: 2

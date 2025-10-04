@@ -29,11 +29,12 @@
 global:
     cpp_namespace: "mongo"
     cpp_includes:
-        - "mongo/db/matcher/matcher_type_set.h"
         - "mongo/db/matcher/schema/encrypt_schema_types.h"
-
+        - "mongo/db/query/compiler/parsers/matcher/schema/encrypt_schema_types_parser.h"
+    mod_visibility: pub
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
+    - "mongo/crypto/encryption_fields.idl"
 
 types:
     encryptSchemaKeyId:
@@ -41,14 +42,18 @@ types:
         description: "A string pointing to the key id or an array UUIDs identifying a set of keys."
         cpp_type: "mongo::EncryptSchemaKeyId"
         serializer: mongo::EncryptSchemaKeyId::serializeToBSON
-        deserializer: mongo::EncryptSchemaKeyId::parseFromBSON
+        deserializer: mongo::parsers::matcher::schema::parseEncryptSchemaKeyId
+        # EncryptSchemaKeyId has only non view members.
+        is_view: false
 
     bsonTypeSet:
         bson_serialization_type: any
         description: "A string or array of strings representing BSONType names."
         cpp_type: "mongo::BSONTypeSet"
         serializer: mongo::BSONTypeSet::serializeToBSON
-        deserializer: mongo::BSONTypeSet::parseFromBSON
+        deserializer: mongo::parsers::matcher::schema::parseBSONTypeSet
+        # BSONTypeSet initialized with non view objects.
+        is_view: false
 
 enums:
     FleAlgorithm:
@@ -57,33 +62,27 @@ enums:
         values:
             kDeterministic: "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic"
             kRandom: "AEAD_AES_256_CBC_HMAC_SHA_512-Random"
-    FleAlgorithmInt:
-        description: "The algorithm used to encrypt fields for field level encryption represented
-            as an unsigned integer."
-        type: int
-        values:
-            kDeterministic: 1
-            kRandom: 2
 
 structs:
     # Maps to the encrypt keyword in JSON Schema.
     EncryptionInfo:
-        description: "Represents the fields that users can specify within the encryptMetadata
+        description:
+            "Represents the fields that users can specify within the encryptMetadata
             subobject in a JSON Schema."
         strict: true
         fields:
-          bsonType:
-            description: "Specifies the type of the to-be-encrypted value."
-            type: bsonTypeSet
-            optional: true
-          algorithm:
-            description: "The encryption algorithm to be used."
-            type: FleAlgorithm
-            optional: true
-          keyId:
-            description: "A JSONPointer to a key or an array of UUIDs identifying a set of keys."
-            type: encryptSchemaKeyId
-            optional: true
+            bsonType:
+                description: "Specifies the type of the to-be-encrypted value."
+                type: bsonTypeSet
+                optional: true
+            algorithm:
+                description: "The encryption algorithm to be used."
+                type: FleAlgorithm
+                optional: true
+            keyId:
+                description: "A JSONPointer to a key or an array of UUIDs identifying a set of keys."
+                type: encryptSchemaKeyId
+                optional: true
 
     # Maps to "encryptMetadata" in JSON Schema.
     EncryptionMetadata:
@@ -92,36 +91,11 @@ structs:
         strict: true
         generate_comparison_operators: true
         fields:
-          algorithm:
-            description: "The encryption algorithm to be used."
-            type: FleAlgorithm
-            optional: true
-          keyId:
-            description: "A JSONPointer to a key or an array of UUIDs identifying a set of keys."
-            type: encryptSchemaKeyId
-            optional: true
-
-    EncryptionPlaceholder:
-        description: "Implements Encryption BinData (subtype 6) sub-subtype 0, the intent-to-encrypt
-            mapping. Contains a value to encrypt and a description of how it should be encrypted."
-        strict: true
-        fields:
-          a:
-            description: "The encryption algorithm to be used."
-            type: FleAlgorithmInt
-            cpp_name: algorithm
-          ki:
-            description: "Used to query the key vault by _id. If omitted, ka must be specified."
-            type: uuid
-            cpp_name: keyId
-            optional: true
-          ka:
-            description: "Used to query the key vault by keyAltName. If omitted,
-                ki must be specified."
-            type: string
-            cpp_name: keyAltName
-            optional: true
-          v:
-            description: "value to encrypt"
-            type: IDLAnyType
-            cpp_name: value
+            algorithm:
+                description: "The encryption algorithm to be used."
+                type: FleAlgorithm
+                optional: true
+            keyId:
+                description: "A JSONPointer to a key or an array of UUIDs identifying a set of keys."
+                type: encryptSchemaKeyId
+                optional: true

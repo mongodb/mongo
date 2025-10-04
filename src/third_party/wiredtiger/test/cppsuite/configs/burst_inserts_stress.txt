@@ -1,41 +1,45 @@
-# Used as a stress test for the framework.
+# Burst inserts is attempting to replicate conditions seen in WT-7798.
+# This workload is a highly stressful insert and read workload that performs insertions rapidly for
+# burst_duration and then sleeps the op_rate defined in the insert config.
+# It intentionally performs relatively infrequent checkpoints.
 duration_seconds=14400,
-cache_size_mb=2000,
-checkpoint_manager=
-(
-    enabled=true,
-    op_rate=60s
-),
-runtime_monitor=
-(
-    enabled=false
-),
+burst_duration=90,
+cache_size_mb=2048,
+# Compression is required otherwise the disk of the host fills up.
+compression_enabled=true,
 timestamp_manager=
 (
     enabled=true,
-    oldest_lag=10,
-    stable_lag=10
+    oldest_lag=30,
+    stable_lag=30
 ),
-workload_generator=
+workload_manager=
 (
     populate_config=
     (
-        collection_count=160,
-        key_count_per_collection=500,
-        key_size=200,
+        collection_count=1000,
+        key_count_per_collection=1,
+        key_size=50,
         thread_count=40,
-        value_size=20000
+        value_size=10
     ),
     insert_config=
     (
-        key_size=200,
+        key_size=50,
         op_rate=10s,
-        ops_per_transaction=(max=2000,min=1000),
-        thread_count=40,
-        value_size=20000
+        # Any more than this and our insert transactions get rolled back.
+        ops_per_transaction=(max=30,min=0),
+        thread_count=100,
+        value_size=1000000
+    ),
+    checkpoint_config=
+    (
+        op_rate=120s,
     )
 ),
-workload_tracking=
+# Operation tracker is disabled as it would create a very large table that cannot be cleaned up
+# as this test only inserts keys.
+operation_tracker=
 (
     enabled=false,
 )

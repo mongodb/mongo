@@ -1,0 +1,50 @@
+/*! @class doc_isolation_levels
+Three isolation models are supported in WiredTiger, from weaker to stronger:
+
+- <code>read-uncommitted</code>:
+Transactions can see changes made by other transactions before those
+transactions are committed.  Dirty reads, non-repeatable reads and
+phantoms are possible.
+
+- <code>read-committed</code>:
+Transactions cannot see changes made by other transactions before those
+transactions are committed.  Dirty reads are not possible;
+non-repeatable reads and phantoms are possible.  Committed changes from
+concurrent transactions become visible periodically during the lifecycle
+of the transaction.
+
+- <code>snapshot</code>:
+Transactions read the versions of records committed before the transaction
+started.  Dirty reads and non-repeatable reads are not possible; phantoms
+are possible.
+Snapshot isolation is the default isolation level, and all updates must be
+done using snapshot isolation.
+
+<!-- FIXME-WT-3983: WT-3983 wants this to be clear on the distinction between
+phantom reads and write skew, which probably needs examples of both. -->
+*/
+
+/*! @page explain_isolation Tutorial: isolation levels
+
+Traditionally, because strict adherence to the ACID semantics can be
+expensive, database systems provide a range of isolation models,
+trading off weaker consistency/isolation guarantees for performance.
+
+@copydoc doc_isolation_levels
+
+Snapshot isolation is a strong guarantee, but does not always
+guarantee behavior equivalent to a
+single-threaded execution of the transactions.
+(The slightly stronger model that does is known as <i>serializable</i>
+isolation.)
+Given two concurrent transactions T1 and T2 running under snapshot
+isolation, if T1 reads data items updated by T2 and T2 reads data
+items updated by
+T1, but the data they update does not overlap, both may commit.
+But because each read the data from before they both started, not the
+other's output, the execution is not equivalent to either running
+strictly before the other and the resulting state may be one that no
+serial execution could produce.
+This behavior is called <i>write skew</i>.
+
+*/

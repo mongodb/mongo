@@ -1,23 +1,22 @@
 // Tests write-concern-related bulk api functionality
-(function() {
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 jsTest.log("Starting bulk api write concern tests...");
 
-// Skip this test if running with the "wiredTiger" storage engine, since it requires
-// using 'nojournal' in a replica set, which is not supported when using WT.
-if (!jsTest.options().storageEngine || jsTest.options().storageEngine === "wiredTiger") {
-    // WT is currently the default engine so it is used when 'storageEngine' is not set.
-    jsTest.log("Skipping test because it is not applicable for the wiredTiger storage engine");
-    return;
+// Skip this test when running with storage engines other than inMemory, as the test relies on
+// journaling not being active.
+if (jsTest.options().storageEngine !== "inMemory") {
+    jsTest.log("Skipping test because it is only applicable for the inMemory storage engine");
+    quit();
 }
 
 // Start a 2-node replica set with no journal.
 // Allows testing immediate write concern failures and wc application failures
-var rst = new ReplSetTest({nodes: 2});
-rst.startSet({nojournal: ""});
+let rst = new ReplSetTest({nodes: 2});
+rst.startSet();
 rst.initiate();
-var mongod = rst.getPrimary();
-var coll = mongod.getCollection("test.bulk_api_wc");
+let mongod = rst.getPrimary();
+let coll = mongod.getCollection("test.bulk_api_wc");
 
 // Create a unique index, legacy writes validate too early to use invalid documents for write error
 // testing
@@ -33,7 +32,7 @@ coll.remove({});
 var bulk = coll.initializeOrderedBulkOp();
 bulk.insert({a: 1});
 bulk.insert({a: 2});
-assert.throws(function() {
+assert.throws(function () {
     bulk.execute({j: true});
 });
 
@@ -43,7 +42,7 @@ coll.remove({});
 var bulk = coll.initializeOrderedBulkOp();
 bulk.insert({a: 1});
 bulk.insert({a: 2});
-assert.throws(function() {
+assert.throws(function () {
     bulk.execute({x: 1});
 });
 
@@ -54,8 +53,8 @@ var bulk = coll.initializeOrderedBulkOp();
 bulk.insert({a: 1});
 bulk.insert({a: 2});
 bulk.insert({a: 2});
-result = assert.throws(function() {
-    bulk.execute({w: 'invalid'});
+result = assert.throws(function () {
+    bulk.execute({w: "invalid"});
 });
 assert.eq(result.nInserted, 2);
 assert.eq(result.getWriteErrors()[0].index, 2);
@@ -73,8 +72,8 @@ var bulk = coll.initializeUnorderedBulkOp();
 bulk.insert({a: 1});
 bulk.insert({a: 2});
 bulk.insert({a: 2});
-var result = assert.throws(function() {
-    bulk.execute({w: 'invalid'});
+var result = assert.throws(function () {
+    bulk.execute({w: "invalid"});
 });
 assert.eq(result.nInserted, 2);
 assert.eq(result.getWriteErrors()[0].index, 2);
@@ -89,7 +88,7 @@ var bulk = coll.initializeUnorderedBulkOp();
 bulk.insert({a: 1});
 bulk.insert({a: 2});
 bulk.insert({a: 2});
-var result = assert.throws(function() {
+var result = assert.throws(function () {
     bulk.execute({w: 3, wtimeout: 1});
 });
 assert.eq(result.nInserted, 2);
@@ -105,8 +104,8 @@ bulk.insert({a: 1});
 bulk.insert({a: 2});
 bulk.find({a: 3}).upsert().updateOne({a: 3});
 bulk.insert({a: 3});
-var result = assert.throws(function() {
-    bulk.execute({w: 'invalid'});
+var result = assert.throws(function () {
+    bulk.execute({w: "invalid"});
 });
 assert.eq(result.nInserted, 2);
 assert.eq(result.nUpserted, 1);
@@ -117,4 +116,3 @@ assert.eq(coll.find().itcount(), 3);
 
 jsTest.log("DONE bulk api wc tests");
 rst.stopSet();
-})();

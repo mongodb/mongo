@@ -1,0 +1,4 @@
+base_suite: replica_sets
+overrides:
+  - "max_mirroring.enable"
+  - "replica_sets.non_enterprise_root"

@@ -29,9 +29,12 @@
 
 #pragma once
 
-#include "mongo/bson/mutable/document.h"
-#include "mongo/bson/mutable/element.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/mutable_bson/document.h"
+#include "mongo/db/exec/mutable_bson/element.h"
 #include "mongo/db/query/collation/collator_interface.h"
 
 namespace mongo {

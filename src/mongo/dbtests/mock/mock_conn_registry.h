@@ -30,10 +30,16 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/client/client_api_version_parameters_gen.h"
+#include "mongo/client/connection_string.h"
+#include "mongo/client/dbclient_base.h"
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
 #include "mongo/dbtests/mock/mock_remote_db_server.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
-#include "mongo/util/concurrency/mutex.h"
+
+#include <memory>
+#include <string>
 
 namespace mongo {
 /**
@@ -75,7 +81,7 @@ public:
      * @return the pointer to MockRemoteDBServer for the given hostname if available in
      * the registry. Otherwise, returns nullptr.
      */
-    MockRemoteDBServer* const getMockRemoteDBServer(const std::string& hostName) const;
+    MockRemoteDBServer* getMockRemoteDBServer(const std::string& hostName) const;
 
     /**
      * Clears the registry.
@@ -104,7 +110,7 @@ private:
          *     replSet and making sure that it lives longer than this object.
          */
         MockConnHook(MockConnRegistry* registry);
-        ~MockConnHook();
+        ~MockConnHook() override;
 
         std::unique_ptr<mongo::DBClientBase> connect(
             const mongo::ConnectionString& connString,
@@ -123,7 +129,7 @@ private:
     MockConnHook _mockConnStrHook;
 
     // protects _registry
-    mutable Mutex _registryMutex = MONGO_MAKE_LATCH("MockConnRegistry::_registryMutex");
+    mutable stdx::mutex _registryMutex;
     stdx::unordered_map<std::string, MockRemoteDBServer*> _registry;
 };
 }  // namespace mongo

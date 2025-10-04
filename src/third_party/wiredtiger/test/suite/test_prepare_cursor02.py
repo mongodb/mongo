@@ -27,14 +27,12 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
-from wtdataset import SimpleDataSet, SimpleIndexDataSet
-from wtdataset import SimpleLSMDataSet, ComplexDataSet, ComplexLSMDataSet
+from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
 # test_prepare_cursor02.py
 #    WT_CURSOR navigation (next/prev) tests with prepared transactions
 class test_prepare_cursor02(wttest.WiredTigerTestCase):
-    session_config = 'isolation=snapshot'
 
     keyfmt = [
         ('row-store', dict(keyfmt='i', valfmt='S')),
@@ -85,6 +83,3 @@ class test_prepare_cursor02(wttest.WiredTigerTestCase):
         prep_session.commit_transaction()
 
         session.rollback_transaction()
-
-if __name__ == '__main__':
-    wttest.run()

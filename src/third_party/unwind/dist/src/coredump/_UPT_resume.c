@@ -27,7 +27,9 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 #include "_UCD_internal.h"
 
 int
-_UCD_resume (unw_addr_space_t as, unw_cursor_t *c, void *arg)
+_UCD_resume (unw_addr_space_t  as UNUSED,
+             unw_cursor_t     *c UNUSED,
+             void             *arg UNUSED)
 {
   print_error (__func__);
   print_error (" not implemented\n");

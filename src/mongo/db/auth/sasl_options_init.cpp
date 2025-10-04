@@ -27,16 +27,23 @@
  *    it in the license file.
  */
 
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/sasl_options_gen.h"
-
-#include <boost/algorithm/string.hpp>
-
-#include "mongo/base/status.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/net/socket_utils.h"
-#include "mongo/util/options_parser/startup_option_init.h"
+#include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/startup_options.h"
-#include "mongo/util/str.h"
+#include "mongo/util/options_parser/value.h"
+
+#include <algorithm>
+#include <string>
+#include <vector>
+
+#include <boost/algorithm/string/trim.hpp>
 
 namespace mongo {
 
@@ -44,25 +51,26 @@ Status storeSASLOptions(const moe::Environment& params) {
     int scramSHA1IterationCount = saslGlobalParams.scramSHA1IterationCount.load();
 
     if (params.count("security.authenticationMechanisms") &&
-        saslGlobalParams.numTimesAuthenticationMechanismsSet <= 1) {
+        saslGlobalParams.numTimesAuthenticationMechanismsSet.load() <= 1) {
         saslGlobalParams.authenticationMechanisms =
             params["security.authenticationMechanisms"].as<std::vector<std::string>>();
     }
-    if (params.count("security.sasl.hostName") && !saslGlobalParams.haveHostName) {
+    if (params.count("security.sasl.hostName") && !saslGlobalParams.haveHostName.load()) {
         saslGlobalParams.hostName = params["security.sasl.hostName"].as<std::string>();
     }
-    if (params.count("security.sasl.serviceName") && !saslGlobalParams.haveServiceName) {
+    if (params.count("security.sasl.serviceName") && !saslGlobalParams.haveServiceName.load()) {
         saslGlobalParams.serviceName = params["security.sasl.serviceName"].as<std::string>();
     }
-    if (params.count("security.sasl.saslauthdSocketPath") && !saslGlobalParams.haveAuthdPath) {
+    if (params.count("security.sasl.saslauthdSocketPath") &&
+        !saslGlobalParams.haveAuthdPath.load()) {
         saslGlobalParams.authdPath = params["security.sasl.saslauthdSocketPath"].as<std::string>();
     }
     if (params.count("security.sasl.scramIterationCount") &&
-        saslGlobalParams.numTimesScramSHA1IterationCountSet <= 1) {
+        saslGlobalParams.numTimesScramSHA1IterationCountSet.load() <= 1) {
         scramSHA1IterationCount = params["security.sasl.scramIterationCount"].as<int>();
         saslGlobalParams.scramSHA1IterationCount.store(scramSHA1IterationCount);
     }
-    if (saslGlobalParams.numTimesScramSHA256IterationCountSet <= 1) {
+    if (saslGlobalParams.numTimesScramSHA256IterationCountSet.load() <= 1) {
         if (params.count("security.sasl.scramSHA256IterationCount")) {
             saslGlobalParams.scramSHA256IterationCount.store(
                 params["security.sasl.scramSHA256IterationCount"].as<int>());

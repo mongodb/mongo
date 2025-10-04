@@ -27,9 +27,11 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 #include "_UCD_internal.h"
 
 int
-_UCD_access_reg (unw_addr_space_t as,
-                                unw_regnum_t regnum, unw_word_t *valp,
-                                int write, void *arg)
+_UCD_access_reg (unw_addr_space_t  as UNUSED,
+                 unw_regnum_t      regnum,
+                 unw_word_t       *valp,
+                 int               write,
+                 void             *arg)
 {
   struct UCD_info *ui = arg;
 
@@ -51,12 +53,51 @@ _UCD_access_reg (unw_addr_space_t as,
 #elif defined(UNW_TARGET_SH)
   if (regnum > UNW_SH_PR)
     goto badreg;
-#elif defined(UNW_TARGET_TILEGX)
-  if (regnum > UNW_TILEGX_CFA)
+#elif defined(UNW_TARGET_IA64) || defined(UNW_TARGET_HPPA) || defined(UNW_TARGET_PPC32) || defined(UNW_TARGET_PPC64)
+  if (regnum >= ARRAY_SIZE(ui->prstatus->pr_reg))
     goto badreg;
-#elif defined(UNW_TARGET_S390X)
-  if (regnum > UNW_S390X_R15)
+#elif defined(UNW_TARGET_RISCV)
+  if (regnum == UNW_RISCV_PC)
+    regnum = 0;
+  else if (regnum > UNW_RISCV_X31)
     goto badreg;
+#elif defined(UNW_TARGET_LOONGARCH64)
+# include <asm/reg.h>
+
+  static const uint8_t remap_regs[] =
+    {
+      [UNW_LOONGARCH64_R0]  = LOONGARCH_EF_R0,
+      [UNW_LOONGARCH64_R1]  = LOONGARCH_EF_R1,
+      [UNW_LOONGARCH64_R2]  = LOONGARCH_EF_R2,
+      [UNW_LOONGARCH64_R3]  = LOONGARCH_EF_R3,
+      [UNW_LOONGARCH64_R4]  = LOONGARCH_EF_R4,
+      [UNW_LOONGARCH64_R5]  = LOONGARCH_EF_R5,
+      [UNW_LOONGARCH64_R6]  = LOONGARCH_EF_R6,
+      [UNW_LOONGARCH64_R7]  = LOONGARCH_EF_R7,
+      [UNW_LOONGARCH64_R8]  = LOONGARCH_EF_R8,
+      [UNW_LOONGARCH64_R9]  = LOONGARCH_EF_R9,
+      [UNW_LOONGARCH64_R10] = LOONGARCH_EF_R10,
+      [UNW_LOONGARCH64_R11] = LOONGARCH_EF_R11,
+      [UNW_LOONGARCH64_R12] = LOONGARCH_EF_R12,
+      [UNW_LOONGARCH64_R13] = LOONGARCH_EF_R13,
+      [UNW_LOONGARCH64_R14] = LOONGARCH_EF_R14,
+      [UNW_LOONGARCH64_R15] = LOONGARCH_EF_R15,
+      [UNW_LOONGARCH64_R16] = LOONGARCH_EF_R16,
+      [UNW_LOONGARCH64_R17] = LOONGARCH_EF_R17,
+      [UNW_LOONGARCH64_R18] = LOONGARCH_EF_R18,
+      [UNW_LOONGARCH64_R19] = LOONGARCH_EF_R19,
+      [UNW_LOONGARCH64_R20] = LOONGARCH_EF_R20,
+      [UNW_LOONGARCH64_R21] = LOONGARCH_EF_R21,
+      [UNW_LOONGARCH64_R22] = LOONGARCH_EF_R22,
+      [UNW_LOONGARCH64_R23] = LOONGARCH_EF_R23,
+      [UNW_LOONGARCH64_R24] = LOONGARCH_EF_R24,
+      [UNW_LOONGARCH64_R25] = LOONGARCH_EF_R25,
+      [UNW_LOONGARCH64_R28] = LOONGARCH_EF_R28,
+      [UNW_LOONGARCH64_R29] = LOONGARCH_EF_R29,
+      [UNW_LOONGARCH64_R30] = LOONGARCH_EF_R30,
+      [UNW_LOONGARCH64_R31] = LOONGARCH_EF_R31,
+      [UNW_LOONGARCH64_PC]  = LOONGARCH_EF_CSR_ERA,
+    };
 #else
 #if defined(UNW_TARGET_MIPS)
   static const uint8_t remap_regs[] =
@@ -92,6 +133,27 @@ _UCD_access_reg (unw_addr_space_t as,
       [UNW_MIPS_R30] = EF_REG30,
       [UNW_MIPS_R31] = EF_REG31,
       [UNW_MIPS_PC]  = EF_CP0_EPC,
+    };
+#elif defined(UNW_TARGET_S390X)
+  static const uint8_t remap_regs[] =
+    {
+      [UNW_S390X_IP]  = offsetof(struct user_regs_struct, psw.addr) / sizeof(long),
+      [UNW_S390X_R0]  = offsetof(struct user_regs_struct, gprs[0]) / sizeof(long),
+      [UNW_S390X_R1]  = offsetof(struct user_regs_struct, gprs[1]) / sizeof(long),
+      [UNW_S390X_R2]  = offsetof(struct user_regs_struct, gprs[2]) / sizeof(long),
+      [UNW_S390X_R3]  = offsetof(struct user_regs_struct, gprs[3]) / sizeof(long),
+      [UNW_S390X_R4]  = offsetof(struct user_regs_struct, gprs[4]) / sizeof(long),
+      [UNW_S390X_R5]  = offsetof(struct user_regs_struct, gprs[5]) / sizeof(long),
+      [UNW_S390X_R6]  = offsetof(struct user_regs_struct, gprs[6]) / sizeof(long),
+      [UNW_S390X_R7]  = offsetof(struct user_regs_struct, gprs[7]) / sizeof(long),
+      [UNW_S390X_R8]  = offsetof(struct user_regs_struct, gprs[8]) / sizeof(long),
+      [UNW_S390X_R9]  = offsetof(struct user_regs_struct, gprs[9]) / sizeof(long),
+      [UNW_S390X_R10] = offsetof(struct user_regs_struct, gprs[10]) / sizeof(long),
+      [UNW_S390X_R11] = offsetof(struct user_regs_struct, gprs[11]) / sizeof(long),
+      [UNW_S390X_R12] = offsetof(struct user_regs_struct, gprs[12]) / sizeof(long),
+      [UNW_S390X_R13] = offsetof(struct user_regs_struct, gprs[13]) / sizeof(long),
+      [UNW_S390X_R14] = offsetof(struct user_regs_struct, gprs[14]) / sizeof(long),
+      [UNW_S390X_R15] = offsetof(struct user_regs_struct, gprs[15]) / sizeof(long),
     };
 #elif defined(UNW_TARGET_X86)
   static const uint8_t remap_regs[] =

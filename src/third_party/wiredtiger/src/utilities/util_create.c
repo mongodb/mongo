@@ -8,16 +8,25 @@
 
 #include "util.h"
 
+/*
+ * usage --
+ *     Display a usage message for the create command.
+ */
 static int
 usage(void)
 {
-    static const char *options[] = {
-      "-c config", "a configuration string to be passed to WT_SESSION.create", NULL, NULL};
+    static const char *options[] = {"-c config",
+      "a configuration string to be passed to WT_SESSION.create", "-?", "show this message", NULL,
+      NULL};
 
     util_usage("create [-c configuration] uri", "options:", options);
     return (1);
 }
 
+/*
+ * util_create --
+ *     The create command.
+ */
 int
 util_create(WT_SESSION *session, int argc, char *argv[])
 {
@@ -26,12 +35,14 @@ util_create(WT_SESSION *session, int argc, char *argv[])
     char *config, *uri;
 
     config = uri = NULL;
-    while ((ch = __wt_getopt(progname, argc, argv, "c:")) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "c:?")) != EOF)
         switch (ch) {
         case 'c': /* command-line configuration */
             config = __wt_optarg;
             break;
         case '?':
+            usage();
+            return (0);
         default:
             return (usage());
         }
@@ -49,6 +60,6 @@ util_create(WT_SESSION *session, int argc, char *argv[])
     if ((ret = session->create(session, uri, config)) != 0)
         (void)util_err(session, ret, "session.create: %s", uri);
 
-    free(uri);
+    util_free(uri);
     return (ret);
 }

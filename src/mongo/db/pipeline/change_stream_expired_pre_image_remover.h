@@ -29,35 +29,60 @@
 
 #pragma once
 
+#include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/mutex.h"
-#include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/periodic_runner.h"
 
 namespace mongo {
 
-class ServiceContext;
-
 /**
- * A periodic background job to remove expired documents from 'system.preimages' collection. A
- * document in this collection is considered expired if its corresponding oplog entry falls off the
- * oplog.
+ * Manages the conditions under which periodic pre-image removal runs on a node.
  */
-class PeriodicChangeStreamExpiredPreImagesRemover final {
+class ChangeStreamExpiredPreImagesRemoverService
+    : public ReplicaSetAwareService<ChangeStreamExpiredPreImagesRemoverService> {
 public:
-    static PeriodicChangeStreamExpiredPreImagesRemover& get(ServiceContext* serviceContext);
+    ChangeStreamExpiredPreImagesRemoverService() = default;
 
-    PeriodicJobAnchor& operator*() const noexcept;
-    PeriodicJobAnchor* operator->() const noexcept;
+    /**
+     * Obtains the service-wide instance.
+     */
+    static ChangeStreamExpiredPreImagesRemoverService* get(ServiceContext* serviceContext);
+    static ChangeStreamExpiredPreImagesRemoverService* get(OperationContext* opCtx);
+
+    void onStartup(OperationContext* opCtx) override {}
+
+    void onSetCurrentConfig(OperationContext* opCtx) override {}
+
+    /**
+     * Controls when/if the periodic pre-image removal job starts up.
+     */
+    void onConsistentDataAvailable(OperationContext* opCtx,
+                                   bool isMajority,
+                                   bool isRollback) override;
+
+    void onStepUpBegin(OperationContext* opCtx, long long term) override {}
+
+    void onStepUpComplete(OperationContext* opCtx, long long term) override {}
+
+    void onStepDown() override {}
+
+    void onRollbackBegin() override {}
+
+    void onBecomeArbiter() override {}
+
+    void onShutdown() override;
+
+    inline std::string getServiceName() const final {
+        return "ChangeStreamExpiredPreImagesRemoverService";
+    }
+
+    bool startedPeriodicJob_forTest() {
+        stdx::lock_guard<stdx::mutex> scopedLock(_mutex);
+        return _periodicJob.isValid();
+    }
 
 private:
-    void _init(ServiceContext* serviceContext);
-
-    inline static const auto _serviceDecoration =
-        ServiceContext::declareDecoration<PeriodicChangeStreamExpiredPreImagesRemover>();
-
-    mutable Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(1),
-                                            "PeriodicChangeStreamExpiredPreImagesRemover::_mutex");
-    std::shared_ptr<PeriodicJobAnchor> _anchor;
+    stdx::mutex _mutex;
+    PeriodicJobAnchor _periodicJob;
 };
 }  // namespace mongo

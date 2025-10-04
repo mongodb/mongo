@@ -1,0 +1,11 @@
+py_library(
+    name = "extensions",
+    srcs = [
+        "__init__.py",
+        "constants.py",
+        "delete_extension_configs.py",
+        "find_and_generate_extension_configs.py",
+        "generate_extension_configs.py",
+    ],
+    visibility = ["//visibility:public"],
+)

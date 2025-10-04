@@ -1,0 +1,93 @@
+# Used as a base test for the framework.
+duration_seconds=60,
+cache_size_mb=200,
+enable_logging=true,
+metrics_monitor=
+(
+    cache_hs_insert=
+    (
+        max=100000000,
+        postrun=true,
+        save=true,
+    ),
+    cc_pages_removed=
+    (
+        max=10000000,
+        postrun=true,
+        save=true,
+    ),
+    stat_cache_size=
+    (
+        max=1000,
+        runtime=true,
+    ),
+    stat_db_size=
+    (
+        #10GB
+        max=10000000000,
+        runtime=true,
+        save=true,
+    ),
+),
+timestamp_manager=
+(
+    enabled=true,
+    oldest_lag=2,
+    op_rate=500ms,
+    stable_lag=2
+),
+workload_manager=
+(
+    background_compact_config=
+    (
+        thread_count=1,
+        free_space_target_mb=20,
+    ),
+    checkpoint_config=
+    (
+        op_rate=5s,
+    ),
+    populate_config=
+    (
+        collection_count=100,
+        key_count_per_collection=50,
+        key_size=10,
+        thread_count=20,
+        value_size=20
+    ),
+    insert_config=
+    (
+        key_size=10,
+        op_rate=10ms,
+        ops_per_transaction=(max=100,min=0),
+        thread_count=5,
+        value_size=20
+    ),
+    read_config=
+    (
+        op_rate=3ms,
+        ops_per_transaction=(max=100,min=50),
+        thread_count=10
+    ),
+    remove_config=
+    (
+        op_rate=500ms,
+        ops_per_transaction=(max=50,min=0),
+        thread_count=1
+    ),
+    update_config=
+    (
+        op_rate=15ms,
+        ops_per_transaction=(max=100,min=20),
+        thread_count=10,
+        value_size=20
+    ),
+    custom_config=
+    (
+        thread_count=1
+    )
+),
+operation_tracker=
+(
+    op_rate=5s
+)

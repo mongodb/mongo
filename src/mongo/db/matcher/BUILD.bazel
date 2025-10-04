@@ -1,0 +1,120 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "path",
+    srcs = [
+        "path.cpp",
+        "path_internal.cpp",
+    ],
+    hdrs = [
+        "path.h",
+        "path_internal.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:common",
+    ],
+)
+
+mongo_cc_library(
+    name = "expressions_mongod_only",
+    srcs = [
+        "expression_text.cpp",
+        "expression_where.cpp",
+        "extensions_callback_real.cpp",
+    ],
+    hdrs = [
+        "expression_text.h",
+        "expression_where.h",
+        "extensions_callback_real.h",
+    ],
+    deps = [
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/exec:js_function",
+        "//src/mongo/db/fts:base_fts",
+        "//src/mongo/scripting:scripting_server",
+    ],
+)
+
+mongo_cc_library(
+    name = "expression_algo",
+    srcs = [
+        "expression_algo.cpp",
+    ],
+    hdrs = [
+        "expression_algo.h",
+    ],
+    deps = [
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db/query/compiler/dependency_analysis",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_matcher_test",
+    srcs = [
+        "debug_string_test.cpp",
+        "expression_algo_test.cpp",
+        "expression_always_boolean_test.cpp",
+        "expression_array_test.cpp",
+        "expression_expr_test.cpp",
+        "expression_internal_expr_comparison_test.cpp",
+        "expression_internal_expr_eq_test.cpp",
+        "expression_leaf_test.cpp",
+        "expression_serialization_test.cpp",
+        "expression_tree_test.cpp",
+        "expression_type_test.cpp",
+        "expression_with_placeholder_test.cpp",
+        "in_list_data_test.cpp",
+        "match_expression_hasher_test.cpp",
+        "match_expression_util_test.cpp",
+        "matcher_type_set_test.cpp",
+        "path_test.cpp",
+        "//src/mongo/db/matcher/schema:expression_internal_schema_all_elem_match_from_index_test.cpp",
+        "//src/mongo/db/matcher/schema:expression_internal_schema_allowed_properties_test.cpp",
+        "//src/mongo/db/matcher/schema:expression_internal_schema_cond_test.cpp",
+        "//src/mongo/db/matcher/schema:expression_internal_schema_eq_test.cpp",
+        "//src/mongo/db/matcher/schema:expression_internal_schema_fmod_test.cpp",
+        "//src/mongo/db/matcher/schema:expression_internal_schema_match_array_index_test.cpp",
+        "//src/mongo/db/matcher/schema:expression_internal_schema_max_items_test.cpp",
+        "//src/mongo/db/matcher/schema:expression_internal_schema_max_length_test.cpp",
+        "//src/mongo/db/matcher/schema:expression_internal_schema_max_properties_test.cpp",
+        "//src/mongo/db/matcher/schema:expression_internal_schema_min_items_test.cpp",
+        "//src/mongo/db/matcher/schema:expression_internal_schema_min_length_test.cpp",
+        "//src/mongo/db/matcher/schema:expression_internal_schema_min_properties_test.cpp",
+        "//src/mongo/db/matcher/schema:expression_internal_schema_object_match_test.cpp",
+        "//src/mongo/db/matcher/schema:expression_internal_schema_root_doc_eq_test.cpp",
+        "//src/mongo/db/matcher/schema:expression_internal_schema_unique_items_test.cpp",
+        "//src/mongo/db/matcher/schema:expression_internal_schema_xor_test.cpp",
+        "//src/mongo/db/matcher/schema:json_pointer_test.cpp",
+        "//src/mongo/db/query/compiler/rewrites/boolean_simplification:bitset_test_util.h",
+    ],
+    data = [
+        "//src/mongo/db/test_output/matcher/debug_string_test:test_data",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":expression_algo",
+        ":path",
+        "//src/mongo/crypto:encrypted_field_config",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db:query_matcher",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/query:query_planner",
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db/query/collation:collator_interface_mock",
+        "//src/mongo/db/query/compiler/parsers/matcher:parsed_match_expression_for_test",
+        "//src/mongo/idl:server_parameter_test_controller",
+    ],
+)

@@ -1,0 +1,12 @@
+test_kind: query_tester_self_test
+description: |
+  This suite will test that QueryTester and its mongotest binary which is a tool for testing the server works as expected.
+  Each test might pass different flags to mongotest, check its return code, output, and/or filesystem changes.
+
+selector:
+  roots:
+    - src/mongo/db/query/query_tester/tests/selfTests/*.py
+
+executor:
+  fixture:
+    class: MongoDFixture

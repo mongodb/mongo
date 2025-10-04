@@ -1,0 +1,20 @@
+# This suite combines testing for core_ese_gcm, core_repeat_queries, core_multiplan_single_solutions, and core_minimum_batch_size.
+# If part of this suite fails, you can comment out individual parts or run the above tests
+# to dig deeper into what is failing.
+base_suite: core
+description: >-
+  This suite is a combination of core_ese_gcm, core_repeat_queries,
+  core_multiplan_single_solutions, and core_minimum_batch_size. You can run any of these tests
+  individually to debug any issues that might arrise.
+overrides:
+  - "minimum_batch_size.enable_override"
+  - "encryption.mongodfixture_ese"
+  - "encryption.mongodfixture_gcm"
+  - "multiplan_single_solutions.enable"
+eval:
+  - "minimum_batch_size.enable_eval"
+excludes:
+  - "encryption.excluded_files"
+  - "repeat_queries.excluded_files"
+  - "minimum_batch_size.excluded_files"
+  - "multiplan_single_solutions.excluded_files"

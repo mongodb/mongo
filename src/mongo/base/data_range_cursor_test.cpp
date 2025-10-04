@@ -30,10 +30,37 @@
 #include "mongo/base/data_range_cursor.h"
 
 #include "mongo/base/data_type_endian.h"
-#include "mongo/platform/endian.h"
+#include "mongo/base/data_view.h"
+#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 
+#include <cstdint>
+#include <string>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+
 namespace mongo {
+namespace {
+// ConstDataRange::operator==() requires that the pointers
+// refer to the same memory addresses.
+// So just promote to a string that we can do direct comparisons on.
+std::string toString(ConstDataRange cdr) {
+    return std::string(cdr.data(), cdr.length());
+}
+
+// The ASSERT macro can't handle template specialization,
+// so work out the value external to the macro call.
+template <typename T>
+bool isConstDataRange(const T& val) {
+    return std::is_same_v<T, ConstDataRange>;
+}
+
+template <typename T>
+bool isDataRange(const T& val) {
+    return std::is_same_v<T, DataRange>;
+}
+}  // namespace
 
 TEST(DataRangeCursor, ConstDataRangeCursor) {
     char buf[14];
@@ -102,4 +129,41 @@ TEST(DataRangeCursor, DataRangeCursorType) {
 
     ASSERT_EQUALS(std::string("fooZ"), buf2);
 }
+
+TEST(DataRangeCursor, sliceAndAdvance) {
+    std::string buffer = "Hello World";
+    ConstDataRangeCursor bufferCDRC(buffer.c_str(), buffer.size());
+
+    // Split by position in range [0..length)
+    auto helloCDR = bufferCDRC.sliceAndAdvance(5);
+    ASSERT_EQ(toString(helloCDR), "Hello");
+    ASSERT_EQ(toString(bufferCDRC), " World");
+
+    // Split by pointer
+    auto spaceCDR = bufferCDRC.sliceAndAdvance(bufferCDRC.data() + 1);
+    ASSERT_EQ(toString(spaceCDR), " ");
+    ASSERT_EQ(toString(bufferCDRC), "World");
+
+    // Get DataRange from a DataRangeCursor if original was non-const.
+    DataRangeCursor mutableDRC(const_cast<char*>(buffer.c_str()), buffer.size());
+    auto mutableByLen = mutableDRC.sliceAndAdvance(1);
+    ASSERT_TRUE(isDataRange(mutableByLen));
+
+    // Get ConstDataRange from a DataRangeCursor if original was const.
+    const DataRange nonmutableDRC = mutableDRC;
+    auto nonmutableCDR = nonmutableDRC.slice(2);
+    ASSERT_TRUE(isConstDataRange(nonmutableCDR));
+}
+
+TEST(DataRange, sliceAndAdvanceThrow) {
+    std::string buffer("Hello World");
+    ConstDataRangeCursor bufferCDRC(buffer.c_str(), buffer.size());
+
+    // Split point is out of range.
+    ASSERT_THROWS(bufferCDRC.sliceAndAdvance(bufferCDRC.length() + 1), AssertionException);
+    ASSERT_THROWS(bufferCDRC.sliceAndAdvance(bufferCDRC.data() + bufferCDRC.length() + 1),
+                  AssertionException);
+    ASSERT_THROWS(bufferCDRC.sliceAndAdvance(bufferCDRC.data() - 1), AssertionException);
+}
+
 }  // namespace mongo

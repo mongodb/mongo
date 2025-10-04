@@ -27,37 +27,74 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <memory>
-
-#include "mongo/client/dbclient_cursor.h"
-#include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/dotted_path/dotted_path_support.h"
+#include "mongo/bson/json.h"
+#include "mongo/bson/oid.h"
 #include "mongo/db/client.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/collection_crud/collection_write_path.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/exec/fetch.h"
-#include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/exec/queued_data_stage.h"
-#include "mongo/db/exec/sort.h"
-#include "mongo/db/json.h"
+#include "mongo/db/exec/classic/fetch.h"
+#include "mongo/db/exec/classic/plan_stage.h"
+#include "mongo/db/exec/classic/queued_data_stage.h"
+#include "mongo/db/exec/classic/sort.h"
+#include "mongo/db/exec/classic/sort_key_generator.h"
+#include "mongo/db/exec/classic/working_set.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/local_catalog/collection.h"
+#include "mongo/db/local_catalog/collection_catalog.h"
+#include "mongo/db/local_catalog/collection_yield_restore.h"
+#include "mongo/db/local_catalog/database.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/document_source_sort.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_executor_impl.h"
+#include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_planner_params.h"
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/snapshot.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/platform/atomic_word.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+
+#include <cstdint>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 /**
  * This file tests db/exec/sort.cpp
  */
 
+namespace mongo {
 namespace QueryStageSortTests {
-
-using std::set;
-using std::unique_ptr;
-
-namespace dps = ::mongo::dotted_path_support;
 
 class QueryStageSortTestBase {
 public:
@@ -70,14 +107,14 @@ public:
     }
 
     virtual ~QueryStageSortTestBase() {
-        _client.dropCollection(ns());
+        _client.dropCollection(nss());
     }
 
     void insert(const BSONObj& obj) {
-        _client.insert(ns(), obj);
+        _client.insert(nss(), obj);
     }
 
-    void getRecordIds(set<RecordId>* out, const CollectionPtr& coll) {
+    void getRecordIds(std::set<RecordId>* out, const CollectionPtr& coll) {
         auto cursor = coll->getCursor(&_opCtx);
         while (auto record = cursor->next()) {
             out->insert(record->id);
@@ -88,10 +125,10 @@ public:
      * We feed a mix of (key, unowned, owned) data to the sort stage.
      */
     void insertVarietyOfObjects(WorkingSet* ws, QueuedDataStage* ms, const CollectionPtr& coll) {
-        set<RecordId> recordIds;
+        std::set<RecordId> recordIds;
         getRecordIds(&recordIds, coll);
 
-        set<RecordId>::iterator it = recordIds.begin();
+        std::set<RecordId>::iterator it = recordIds.begin();
 
         for (int i = 0; i < numObj(); ++i, ++it) {
             ASSERT_FALSE(it == recordIds.end());
@@ -111,13 +148,13 @@ public:
      * Wraps a sort stage with a QueuedDataStage in a plan executor. Returns the plan executor,
      * which is owned by the caller.
      */
-    unique_ptr<PlanExecutor, PlanExecutor::Deleter> makePlanExecutorWithSortStage(
-        const CollectionPtr& coll) {
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makePlanExecutorWithSortStage(
+        const CollectionAcquisition& coll) {
         // Build the mock scan stage which feeds the data.
         auto ws = std::make_unique<WorkingSet>();
         _workingSet = ws.get();
         auto queuedDataStage = std::make_unique<QueuedDataStage>(_expCtx.get(), ws.get());
-        insertVarietyOfObjects(ws.get(), queuedDataStage.get(), coll);
+        insertVarietyOfObjects(ws.get(), queuedDataStage.get(), coll.getCollectionPtr());
 
         auto sortPattern = BSON("foo" << 1);
         auto keyGenStage = std::make_unique<SortKeyGeneratorStage>(
@@ -137,10 +174,10 @@ public:
             plan_executor_factory::make(_expCtx,
                                         std::move(ws),
                                         std::move(ss),
-                                        &coll,
+                                        coll,
                                         PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                         QueryPlannerParams::DEFAULT);
-        invariant(statusWithPlanExecutor.isOK());
+        invariant(statusWithPlanExecutor.getStatus());
         return std::move(statusWithPlanExecutor.getValue());
     }
 
@@ -153,29 +190,73 @@ public:
     }
 
     /**
+     * This method is called after we have produced a row of sorted output. We should be showing
+     * memory usage to account for the rows buffered in memory.
+     *
+     * This method returns the new peak memory usage reported by the tracker, so that we can verify
+     * the peak usage only goes up over time.
+     */
+    uint64_t checkMemoryTracking(const SimpleMemoryUsageTracker& tracker,
+                                 uint64_t oldPeakMemBytes) {
+        uint64_t inUseTrackedMemBytes = tracker.inUseTrackedMemoryBytes();
+        // If we have processed any rows, we should have seen some memory usage.
+        ASSERT_GT(inUseTrackedMemBytes, 0);
+
+        uint64_t actualPeakMemBytes = tracker.peakTrackedMemoryBytes();
+        ASSERT_GTE(actualPeakMemBytes, inUseTrackedMemBytes);
+        ASSERT_GTE(actualPeakMemBytes, oldPeakMemBytes);
+        return actualPeakMemBytes;
+    }
+
+    /**
      * A template used by many tests below.
      * Fill out numObj objects, sort them in the order provided by 'direction'.
      * If extAllowed is true, sorting will use use external sorting if available.
      * If limit is not zero, we limit the output of the sort stage to 'limit' results.
+     *
+     * Tests out both the default and "simple" sort.
      */
-    void sortAndCheck(int direction, const CollectionPtr& coll) {
+    void sortAndCheck(int direction, const CollectionAcquisition& coll) {
+        // Test both default sort (which will use metadata if available) and simple sort, which
+        // works with no metadata.
+        doSortAndCheck<false /* default sort */>(direction, coll);
+        doSortAndCheck<true /* simple sort */>(direction, coll);
+    }
+
+    template <bool useSortStageSimple>
+    void doSortAndCheck(int direction, const CollectionAcquisition& coll) {
         auto ws = std::make_unique<WorkingSet>();
         auto queuedDataStage = std::make_unique<QueuedDataStage>(_expCtx.get(), ws.get());
 
         // Insert a mix of the various types of data.
-        insertVarietyOfObjects(ws.get(), queuedDataStage.get(), coll);
+        insertVarietyOfObjects(ws.get(), queuedDataStage.get(), coll.getCollectionPtr());
 
         auto sortPattern = BSON("foo" << direction);
-        auto keyGenStage = std::make_unique<SortKeyGeneratorStage>(
-            _expCtx, std::move(queuedDataStage), ws.get(), sortPattern);
+        std::unique_ptr<SortStage> sortStage;
+        if constexpr (!useSortStageSimple) {
+            auto keyGenStage = std::make_unique<SortKeyGeneratorStage>(
+                _expCtx, std::move(queuedDataStage), ws.get(), sortPattern);
 
-        auto sortStage = std::make_unique<SortStageDefault>(_expCtx,
-                                                            ws.get(),
-                                                            SortPattern{sortPattern, _expCtx},
-                                                            limit(),
-                                                            maxMemoryUsageBytes(),
-                                                            false,  // addSortKeyMetadata
-                                                            std::move(keyGenStage));
+            sortStage = std::make_unique<SortStageDefault>(_expCtx,
+                                                           ws.get(),
+                                                           SortPattern{sortPattern, _expCtx},
+                                                           limit(),
+                                                           maxMemoryUsageBytes(),
+                                                           false,  // addSortKeyMetadata
+                                                           std::move(keyGenStage));
+        } else {
+            // Create a SortStageSimple instance. Skip the KeyGenStage, which creates the metadata
+            // which is not needed for this case.
+            sortStage = std::make_unique<SortStageSimple>(_expCtx,
+                                                          ws.get(),
+                                                          SortPattern{sortPattern, _expCtx},
+                                                          limit(),
+                                                          maxMemoryUsageBytes(),
+                                                          false,  // addSortKeyMetadata
+                                                          std::move(queuedDataStage));
+        }
+        // We use this below for showing we track memory as the query executes.
+        const SimpleMemoryUsageTracker& memoryTracker = sortStage->getMemoryUsageTracker_forTest();
 
         auto fetchStage = std::make_unique<FetchStage>(
             _expCtx.get(), ws.get(), std::move(sortStage), nullptr, coll);
@@ -185,8 +266,8 @@ public:
             plan_executor_factory::make(_expCtx,
                                         std::move(ws),
                                         std::move(fetchStage),
-                                        &coll,
-                                        PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                        coll,
+                                        PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                         QueryPlannerParams::DEFAULT);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
@@ -202,16 +283,21 @@ public:
 
         BSONObj current;
         PlanExecutor::ExecState state;
+        uint64_t peakMemBytes = 0;
         while (PlanExecutor::ADVANCED == (state = exec->getNext(&current, nullptr))) {
-            int cmp = sgn(dps::compareObjectsAccordingToSort(current, last, sortPattern));
+            int cmp = sgn(::mongo::bson::compareObjectsAccordingToSort(current, last, sortPattern));
             // The next object should be equal to the previous or oriented according to the sort
             // pattern.
             ASSERT(cmp == 0 || cmp == 1);
             ++count;
             last = current.getOwned();
+
+            peakMemBytes = checkMemoryTracking(memoryTracker, peakMemBytes);
         }
         ASSERT_EQUALS(PlanExecutor::IS_EOF, state);
         checkCount(count);
+
+        ASSERT_EQUALS(memoryTracker.inUseTrackedMemoryBytes(), 0);
     }
 
     /**
@@ -236,21 +322,21 @@ public:
     };
 
     uint64_t maxMemoryUsageBytes() const {
-        return internalQueryMaxBlockingSortMemoryUsageBytes.load();
+        return loadMemoryLimit(StageMemoryLimit::QueryMaxBlockingSortMemoryUsageBytes);
     }
 
     static const char* ns() {
         return "unittests.QueryStageSort";
     }
     static NamespaceString nss() {
-        return NamespaceString(ns());
+        return NamespaceString::createNamespaceString_forTest(ns());
     }
 
 protected:
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
     OperationContext& _opCtx = *_txnPtr;
     boost::intrusive_ptr<ExpressionContext> _expCtx =
-        new ExpressionContext(&_opCtx, nullptr, nss());
+        ExpressionContextBuilder{}.opCtx(&_opCtx).ns(nss()).build();
     DBDirectClient _client;
     WorkingSet* _workingSet = nullptr;
 };
@@ -259,20 +345,13 @@ protected:
 // Sort some small # of results in increasing order.
 class QueryStageSortInc : public QueryStageSortTestBase {
 public:
-    virtual int numObj() {
+    int numObj() override {
         return 100;
     }
 
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        Database* db = ctx.db();
-        CollectionPtr coll =
-            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss());
-        if (!coll) {
-            WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
-            wuow.commit();
-        }
+        auto coll = ctx.getOrCreateCollection();
 
         fillData();
         sortAndCheck(1, coll);
@@ -282,20 +361,13 @@ public:
 // Sort some small # of results in decreasing order.
 class QueryStageSortDec : public QueryStageSortTestBase {
 public:
-    virtual int numObj() {
+    int numObj() override {
         return 100;
     }
 
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        Database* db = ctx.db();
-        CollectionPtr coll =
-            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss());
-        if (!coll) {
-            WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
-            wuow.commit();
-        }
+        auto coll = ctx.getOrCreateCollection();
 
         fillData();
         sortAndCheck(-1, coll);
@@ -306,7 +378,7 @@ public:
 template <int LIMIT>
 class QueryStageSortDecWithLimit : public QueryStageSortDec {
 public:
-    virtual int limit() const {
+    int limit() const override {
         return LIMIT;
     }
 };
@@ -314,21 +386,13 @@ public:
 // Sort a big bunch of objects.
 class QueryStageSortExt : public QueryStageSortTestBase {
 public:
-    virtual int numObj() {
+    int numObj() override {
         return 10000;
     }
 
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        Database* db = ctx.db();
-        CollectionPtr coll =
-            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss());
-        if (!coll) {
-            WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
-            wuow.commit();
-        }
-
+        auto coll = ctx.getOrCreateCollection();
         fillData();
         sortAndCheck(-1, coll);
     }
@@ -337,29 +401,22 @@ public:
 // Mutation invalidation of docs fed to sort.
 class QueryStageSortMutationInvalidation : public QueryStageSortTestBase {
 public:
-    virtual int numObj() {
+    int numObj() override {
         return 2000;
     }
-    virtual int limit() const {
+    int limit() const override {
         return 10;
     }
 
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        Database* db = ctx.db();
-        CollectionPtr coll =
-            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss());
-        if (!coll) {
-            WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
-            wuow.commit();
-        }
+        auto coll = ctx.getOrCreateCollection();
 
         fillData();
 
         // The data we're going to later invalidate.
-        set<RecordId> recordIds;
-        getRecordIds(&recordIds, coll);
+        std::set<RecordId> recordIds;
+        getRecordIds(&recordIds, coll.getCollectionPtr());
 
         auto exec = makePlanExecutorWithSortStage(coll);
 
@@ -385,8 +442,8 @@ public:
         // We should have read in the first 'firstRead' recordIds.  Invalidate the first one.
         // Since it's in the WorkingSet, the updates should not be reflected in the output.
         exec->saveState();
-        set<RecordId>::iterator it = recordIds.begin();
-        Snapshotted<BSONObj> oldDoc = coll->docFor(&_opCtx, *it);
+        std::set<RecordId>::iterator it = recordIds.begin();
+        Snapshotted<BSONObj> oldDoc = coll.getCollectionPtr()->docFor(&_opCtx, *it);
 
         const OID updatedId = oldDoc.value().getField("_id").OID();
         const SnapshotId idBeforeUpdate = oldDoc.snapshotId();
@@ -396,13 +453,21 @@ public:
         auto newDoc = [&](const Snapshotted<BSONObj>& oldDoc) {
             return BSON("_id" << oldDoc.value()["_id"] << "foo" << limit() + 10);
         };
-        CollectionUpdateArgs args;
+        CollectionUpdateArgs args{oldDoc.value()};
         {
             WriteUnitOfWork wuow(&_opCtx);
-            coll->updateDocument(&_opCtx, *it, oldDoc, newDoc(oldDoc), false, nullptr, &args);
+            collection_internal::updateDocument(&_opCtx,
+                                                coll.getCollectionPtr(),
+                                                *it,
+                                                oldDoc,
+                                                newDoc(oldDoc),
+                                                collection_internal::kUpdateNoIndexes,
+                                                nullptr /* indexesAffected */,
+                                                nullptr /* opDebug */,
+                                                &args);
             wuow.commit();
         }
-        exec->restoreState(&coll);
+        exec->restoreState(nullptr);
 
         // Read the rest of the data from the queued data stage.
         while (!queuedDataStage->isEOF()) {
@@ -414,14 +479,22 @@ public:
         // should be fetched.
         exec->saveState();
         while (it != recordIds.end()) {
-            oldDoc = coll->docFor(&_opCtx, *it);
+            oldDoc = coll.getCollectionPtr()->docFor(&_opCtx, *it);
             {
                 WriteUnitOfWork wuow(&_opCtx);
-                coll->updateDocument(&_opCtx, *it++, oldDoc, newDoc(oldDoc), false, nullptr, &args);
+                collection_internal::updateDocument(&_opCtx,
+                                                    coll.getCollectionPtr(),
+                                                    *it++,
+                                                    oldDoc,
+                                                    newDoc(oldDoc),
+                                                    collection_internal::kUpdateNoIndexes,
+                                                    nullptr /* indexesAffected */,
+                                                    nullptr /* opDebug */,
+                                                    &args);
                 wuow.commit();
             }
         }
-        exec->restoreState(&coll);
+        exec->restoreState(nullptr);
 
         // Verify that it's sorted, the right number of documents are returned, and they're all
         // in the expected range.
@@ -455,26 +528,19 @@ public:
 // Deletion invalidation of everything fed to sort.
 class QueryStageSortDeletionInvalidation : public QueryStageSortTestBase {
 public:
-    virtual int numObj() {
+    int numObj() override {
         return 2000;
     }
 
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        Database* db = ctx.db();
-        CollectionPtr coll =
-            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss());
-        if (!coll) {
-            WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
-            wuow.commit();
-        }
+        auto coll = ctx.getOrCreateCollection();
 
         fillData();
 
         // The data we're going to later invalidate.
-        set<RecordId> recordIds;
-        getRecordIds(&recordIds, coll);
+        std::set<RecordId> recordIds;
+        getRecordIds(&recordIds, coll.getCollectionPtr());
 
         auto exec = makePlanExecutorWithSortStage(coll);
 
@@ -500,13 +566,14 @@ public:
         // We should have read in the first 'firstRead' recordIds.  Invalidate the first.
         exec->saveState();
         OpDebug* const nullOpDebug = nullptr;
-        set<RecordId>::iterator it = recordIds.begin();
+        std::set<RecordId>::iterator it = recordIds.begin();
         {
             WriteUnitOfWork wuow(&_opCtx);
-            coll->deleteDocument(&_opCtx, kUninitializedStmtId, *it++, nullOpDebug);
+            collection_internal::deleteDocument(
+                &_opCtx, coll.getCollectionPtr(), kUninitializedStmtId, *it++, nullOpDebug);
             wuow.commit();
         }
-        exec->restoreState(&coll);
+        exec->restoreState(nullptr);
 
         // Read the rest of the data from the queued data stage.
         while (!queuedDataStage->isEOF()) {
@@ -519,11 +586,12 @@ public:
         while (it != recordIds.end()) {
             {
                 WriteUnitOfWork wuow(&_opCtx);
-                coll->deleteDocument(&_opCtx, kUninitializedStmtId, *it++, nullOpDebug);
+                collection_internal::deleteDocument(
+                    &_opCtx, coll.getCollectionPtr(), kUninitializedStmtId, *it++, nullOpDebug);
                 wuow.commit();
             }
         }
-        exec->restoreState(&coll);
+        exec->restoreState(nullptr);
 
         // Regardless of storage engine, all the documents should come back with their objects
         int count = 0;
@@ -551,7 +619,7 @@ public:
 template <int LIMIT>
 class QueryStageSortDeletionInvalidationWithLimit : public QueryStageSortDeletionInvalidation {
 public:
-    virtual int limit() const {
+    int limit() const override {
         return LIMIT;
     }
 };
@@ -559,20 +627,13 @@ public:
 // Should error out if we sort with parallel arrays.
 class QueryStageSortParallelArrays : public QueryStageSortTestBase {
 public:
-    virtual int numObj() {
+    int numObj() override {
         return 100;
     }
 
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        Database* db = ctx.db();
-        CollectionPtr coll =
-            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss());
-        if (!coll) {
-            WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
-            wuow.commit();
-        }
+        auto coll = ctx.getOrCreateCollection();
 
         auto ws = std::make_unique<WorkingSet>();
         auto queuedDataStage = std::make_unique<QueuedDataStage>(_expCtx.get(), ws.get());
@@ -617,8 +678,8 @@ public:
             plan_executor_factory::make(_expCtx,
                                         std::move(ws),
                                         std::move(fetchStage),
-                                        &coll,
-                                        PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                        coll,
+                                        PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                         QueryPlannerParams::DEFAULT);
         auto exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -628,11 +689,11 @@ public:
     }
 };
 
-class All : public OldStyleSuiteSpecification {
+class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("query_stage_sort") {}
 
-    void setupTests() {
+    void setupTests() override {
         add<QueryStageSortInc>();
         add<QueryStageSortDec>();
         // Sort with limit has a general limiting strategy for limit > 1
@@ -648,6 +709,7 @@ public:
     }
 };
 
-OldStyleSuiteInitializer<All> queryStageSortTest;
+unittest::OldStyleSuiteInitializer<All> queryStageSortTest;
 
 }  // namespace QueryStageSortTests
+}  // namespace mongo

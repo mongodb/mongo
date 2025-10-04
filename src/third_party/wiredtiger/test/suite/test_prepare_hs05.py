@@ -26,15 +26,14 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest
+import wttest
 from wtscenario import make_scenarios
-from wiredtiger import stat, WT_NOTFOUND
+from wiredtiger import WT_NOTFOUND
 
 # test_prepare_hs05.py
 # Test that after aborting prepare transaction, correct update from the history store is restored.
 class test_prepare_hs05(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB'
-    session_config = 'isolation=snapshot'
 
     format_values = [
         ('column', dict(key_format='r', key=1, value_format='S')),
@@ -88,10 +87,10 @@ class test_prepare_hs05(wttest.WiredTigerTestCase):
         cursor2.set_key(key)
         if self.value_format == '8t':
             # In FLCS, deleted values read back as 0.
-            self.assertEquals(cursor2.search(), 0)
-            self.assertEquals(cursor2.get_value(), 0)
+            self.assertEqual(cursor2.search(), 0)
+            self.assertEqual(cursor2.get_value(), 0)
         else:
-            self.assertEquals(cursor2.search(), WT_NOTFOUND)
+            self.assertEqual(cursor2.search(), WT_NOTFOUND)
         cursor2.reset()
 
         # This should abort the prepared transaction.
@@ -111,8 +110,8 @@ class test_prepare_hs05(wttest.WiredTigerTestCase):
         cursor.set_key(key)
         if self.value_format == '8t':
             # In FLCS, deleted values read back as 0.
-            self.assertEquals(cursor.search(), 0)
-            self.assertEquals(cursor.get_value(), 0)
+            self.assertEqual(cursor.search(), 0)
+            self.assertEqual(cursor.get_value(), 0)
         else:
             self.assertEqual(cursor.search(), WT_NOTFOUND)
         self.session.rollback_transaction()

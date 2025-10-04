@@ -81,7 +81,7 @@
 @mongo_config_optimized_build@
 
 // Defined if OpenSSL has SEQUENCE_ANY
-@mongo_config_ssl_has_asn1_any_definitions@
+@mongo_config_have_asn1_any_definitions@
 
 // Defined if SSL support is enabled with chosen ssl provider
 @mongo_config_ssl_provider@
@@ -103,3 +103,27 @@
 
 // Defined if WiredTiger storage engine is enabled
 @mongo_config_wiredtiger_enabled@
+
+// Defined if grpc support is enabled
+@mongo_config_grpc@
+
+// Defined if the glibc rseq header is present
+@mongo_config_glibc_rseq@
+
+// Defined if using the tcmalloc-google memory allocator
+@mongo_config_tcmalloc_google@
+
+// Defined if using the tcmalloc-gperf memory allocator
+@mongo_config_tcmalloc_gperf@
+
+// Defined if using tracing profiler stats collection
+@mongo_config_use_tracing_profiler@
+
+// Defined if the build includes stream processing module
+@mongo_config_streams@
+
+// Defined if the build includes OpenTelemetry
+@mongo_config_otel@
+
+// Defined if the build includes disaggregated storage
+@mongo_config_disagg_storage@

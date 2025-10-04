@@ -27,18 +27,29 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 #include "mongo/db/client_out_of_line_executor.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/db/baton.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_severity.h"
 #include "mongo/logv2/log_severity_suppressor.h"
-#include "mongo/util/clock_source.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/functional.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/timer.h"
+
+#include <string>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 
 namespace mongo {
 
@@ -48,13 +59,13 @@ public:
     /** Returns Info(), then suppresses to `Debug(2)` for a second. */
     logv2::SeveritySuppressor bumpedSeverity{
         Seconds{1}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(2)};
-    ClockSource::StopWatch stopWatch;
+    Timer timer;
 };
 
 ClientOutOfLineExecutor::ClientOutOfLineExecutor() noexcept
     : _impl{std::make_unique<Impl>()}, _taskQueue{std::make_shared<QueueType>()} {}
 
-ClientOutOfLineExecutor::~ClientOutOfLineExecutor() noexcept {
+ClientOutOfLineExecutor::~ClientOutOfLineExecutor() {
     if (!_requireShutdown.load())
         return;
     invariant(_isShutdown);
@@ -94,14 +105,14 @@ void ClientOutOfLineExecutor::consumeAllTasks() noexcept {
     // approximation of the acceptable overhead in the context of normal client operations.
     static constexpr auto kTimeLimit = Microseconds(30);
 
-    _impl->stopWatch.restart();
+    _impl->timer.reset();
 
     while (auto maybeTask = _taskQueue->tryPop()) {
         auto task = std::move(*maybeTask);
         task(Status::OK());
     }
 
-    auto elapsed = _impl->stopWatch.elapsed();
+    auto elapsed = _impl->timer.elapsed();
 
     if (MONGO_unlikely(elapsed > kTimeLimit)) {
         LOGV2_DEBUG(4651401,
@@ -134,12 +145,12 @@ namespace {
  * before the client decorations are destroyed. See SERVER-48901 for more details.
  */
 class ClientOutOfLineExecutorClientObserver final : public ServiceContext::ClientObserver {
-    void onCreateClient(Client*) {}
-    void onDestroyClient(Client* client) {
+    void onCreateClient(Client*) override {}
+    void onDestroyClient(Client* client) override {
         ClientOutOfLineExecutor::get(client)->shutdown();
     }
-    void onCreateOperationContext(OperationContext*) {}
-    void onDestroyOperationContext(OperationContext*) {}
+    void onCreateOperationContext(OperationContext*) override {}
+    void onDestroyOperationContext(OperationContext*) override {}
 };
 
 ServiceContext::ConstructorActionRegisterer

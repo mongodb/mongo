@@ -110,7 +110,7 @@ static const uint8_t operands[256] =
   };
 
 static inline unw_sword_t
-sword (unw_addr_space_t as, unw_word_t val)
+sword (unw_addr_space_t as UNUSED, unw_word_t val)
 {
   switch (dwarf_addr_size (as))
     {
@@ -251,18 +251,26 @@ dwarf_eval_expr (struct dwarf_cursor *c, unw_word_t stack_val, unw_word_t *addr,
   uint32_t u32;
   uint64_t u64;
   int ret;
+  unw_word_t stackerror = 0;
+
+// pop() is either followed by a semicolon or
+// used in a push() macro
+// In either case we can sneak in an extra statement
 # define pop()                                  \
-({                                              \
-  if ((tos - 1) >= MAX_EXPR_STACK_SIZE)         \
-    {                                           \
-      Debug (1, "Stack underflow\n");           \
-      return -UNW_EINVAL;                       \
-    }                                           \
-  stack[--tos];                                 \
-})
+(((tos - 1) >= MAX_EXPR_STACK_SIZE) ?           \
+  stackerror++ :   stack[--tos]);               \
+if (stackerror)                                 \
+  {                                             \
+    Debug (1, "Stack underflow\n");             \
+    return -UNW_EINVAL;                         \
+  }
+
+// Removed the parentheses on the assignment
+// to allow the extra stack error check
+// when x is evaluated
 # define push(x)                                \
 do {                                            \
-  unw_word_t _x = (x);                          \
+  unw_word_t _x = x;                            \
   if (tos >= MAX_EXPR_STACK_SIZE)               \
     {                                           \
       Debug (1, "Stack overflow\n");            \
@@ -270,16 +278,17 @@ do {                                            \
     }                                           \
   stack[tos++] = _x;                            \
 } while (0)
+
+// Pick is always used in a push() macro
+// In either case we can sneak in an extra statement
 # define pick(n)                                \
-({                                              \
-  unsigned int _index = tos - 1 - (n);          \
-  if (_index >= MAX_EXPR_STACK_SIZE)            \
-    {                                           \
-      Debug (1, "Out-of-stack pick\n");         \
-      return -UNW_EINVAL;                       \
-    }                                           \
-  stack[_index];                                \
-})
+(((tos - 1 - (n)) >= MAX_EXPR_STACK_SIZE) ?     \
+  stackerror++ : stack[tos - 1 - (n)]);         \
+if (stackerror)                                 \
+  {                                             \
+    Debug (1, "Out-of-stack pick\n");           \
+    return -UNW_EINVAL;                         \
+  }
 
   as = c->as;
   arg = c->as_arg;
@@ -521,7 +530,7 @@ do {                                            \
           Debug (15, "OP_abs\n");
           tmp1 = pop ();
           if (tmp1 & ((unw_word_t) 1 << (8 * dwarf_addr_size (as) - 1)))
-            tmp1 = -tmp1;
+            tmp1 = (~tmp1 + 1);
           push (tmp1);
           break;
 
@@ -569,7 +578,8 @@ do {                                            \
 
         case DW_OP_neg:
           Debug (15, "OP_neg\n");
-          push (-pop ());
+          tmp1 = pop ();
+          push (~tmp1 + 1);
           break;
 
         case DW_OP_not:

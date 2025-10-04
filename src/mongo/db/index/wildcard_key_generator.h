@@ -29,11 +29,22 @@
 
 #pragma once
 
-#include "mongo/db/exec/wildcard_projection.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/ordering.h"
+#include "mongo/db/exec/index_path_projection.h"
 #include "mongo/db/field_ref.h"
+#include "mongo/db/index/btree_key_generator.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/storage/key_format.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/util/shared_buffer_fragment.h"
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -41,10 +52,15 @@ namespace mongo {
  * This class is responsible for generating an aggregation projection based on the keyPattern and
  * pathProjection specs, and for subsequently extracting the set of all path-value pairs for each
  * document.
+ *
+ * This key generator supports generating index keys for a compound or a single-field wildcard
+ * index. If 'keyPattern' is compound, the generator will delagate the index key generation of
+ * regular fields to two 'BtreeKeyGenerator'. At last it combines all these three parts
+ * (prefix/suffix of regular fields and the wildcard field) into one 'KeyString'.
  */
 class WildcardKeyGenerator {
 public:
-    static constexpr StringData kSubtreeSuffix = ".$**"_sd;
+    static constexpr StringData kSubtreeSuffix = WildcardNames::WILDCARD_FIELD_NAME_SUFFIX;
 
     /**
      * Returns an owned ProjectionExecutor identical to the one that WildcardKeyGenerator will use
@@ -56,9 +72,9 @@ public:
     WildcardKeyGenerator(BSONObj keyPattern,
                          BSONObj pathProjection,
                          const CollatorInterface* collator,
-                         KeyString::Version keyStringVersion,
+                         key_string::Version keyStringVersion,
                          Ordering ordering,
-                         KeyFormat rsKeyFormat);
+                         boost::optional<KeyFormat> rsKeyFormat = boost::none);
 
     /**
      * Returns a pointer to the key generator's underlying ProjectionExecutor.
@@ -79,46 +95,16 @@ public:
                       BSONObj inputDoc,
                       KeyStringSet* keys,
                       KeyStringSet* multikeyPaths,
-                      boost::optional<RecordId> id = boost::none) const;
+                      const boost::optional<RecordId>& id = boost::none) const;
 
 private:
-    // Traverses every path of the post-projection document, adding keys to the set as it goes.
-    void _traverseWildcard(SharedBufferFragmentBuilder& pooledBufferBuilder,
-                           BSONObj obj,
-                           bool objIsArray,
-                           FieldRef* path,
-                           KeyStringSet::sequence_type* keys,
-                           KeyStringSet::sequence_type* multikeyPaths,
-                           boost::optional<RecordId> id) const;
-
-    // Helper functions to format the entry appropriately before adding it to the key/path tracker.
-    void _addMultiKey(SharedBufferFragmentBuilder& pooledBufferBuilder,
-                      const FieldRef& fullPath,
-                      KeyStringSet::sequence_type* multikeyPaths) const;
-    void _addKey(SharedBufferFragmentBuilder& pooledBufferBuilder,
-                 BSONElement elem,
-                 const FieldRef& fullPath,
-                 KeyStringSet::sequence_type* keys,
-                 boost::optional<RecordId> id) const;
-
-    // Helper to check whether the element is a nested array, and conditionally add it to 'keys'.
-    bool _addKeyForNestedArray(SharedBufferFragmentBuilder& pooledBufferBuilder,
-                               BSONElement elem,
-                               const FieldRef& fullPath,
-                               bool enclosingObjIsArray,
-                               KeyStringSet::sequence_type* keys,
-                               boost::optional<RecordId> id) const;
-    bool _addKeyForEmptyLeaf(SharedBufferFragmentBuilder& pooledBufferBuilder,
-                             BSONElement elem,
-                             const FieldRef& fullPath,
-                             KeyStringSet::sequence_type* keys,
-                             boost::optional<RecordId> id) const;
-
     WildcardProjection _proj;
     const CollatorInterface* _collator;
     const BSONObj _keyPattern;
-    const KeyString::Version _keyStringVersion;
+    const key_string::Version _keyStringVersion;
     const Ordering _ordering;
-    const KeyFormat _rsKeyFormat;
+    const boost::optional<KeyFormat> _rsKeyFormat;
+    boost::optional<BtreeKeyGenerator> _preBtreeGenerator = boost::none;
+    boost::optional<BtreeKeyGenerator> _postBtreeGenerator = boost::none;
 };
 }  // namespace mongo

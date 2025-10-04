@@ -29,18 +29,25 @@
 
 #pragma once
 
-#include <third_party/murmurhash3/MurmurHash3.h>
-
-#include <bitset>
-#include <boost/intrusive_ptr.hpp>
-
 #include "mongo/base/static_assert.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/intrusive_counter.h"
 
+#include <type_traits>
+
+#include <boost/intrusive_ptr.hpp>
+
 namespace mongo {
+
+/**
+ * The following concept is used in several Document APIs that accept templated field name
+ * parameters by value. By using this concept we disallow passing potentially expensive-to-copy
+ * 'std::string' parameters for these APIs.
+ */
+template <typename T>
+concept AnyFieldNameTypeButStdString = (!std::is_same_v<T, std::string>);
+
 /** Helper class to make the position in a document abstract
  *  Warning: This is NOT guaranteed to be the ordered position.
  *           eg. the first field may not be at Position(0)
@@ -184,7 +191,7 @@ public:
      * Get the field name that the iterator currently points to without bringing anything into
      * cache.
      */
-    const StringData fieldName() {
+    StringData fieldName() {
         if (_it) {
             return _it->nameSD();
         }
@@ -275,6 +282,95 @@ private:
     const ValueElement* _end;
 };
 
+/**
+ * Type that bundles the hashed field name along with the actual string so that hashing can be done
+ * outside of inserts and lookups and re-used across calls.
+ *
+ * We opt to store uint32_t instead of size_t for hash and length since:
+ *   - hash collisions on field names are unlikely
+ *   - field names are not going to exceed UINT_MAX
+ *   - this gives us a measurable performance benefit.
+ */
+class HashedFieldName {
+public:
+    using SizeType = uint32_t;
+
+    explicit HashedFieldName(StringData sd, SizeType hash)
+        : _str(sd.data()), _sz(sd.size()), _hash(hash) {
+        uassert(1065170, "Field name too large", sd.size() < std::numeric_limits<uint32_t>::max());
+    }
+    explicit HashedFieldName(std::pair<StringData, SizeType> pair)
+        : HashedFieldName(pair.first, pair.second) {}
+
+    StringData key() const {
+        return {_str, _sz};
+    }
+
+    SizeType hash() const {
+        return _hash;
+    }
+
+    SizeType size() const {
+        return _sz;
+    }
+
+    inline SizeType copy(char* dest, SizeType len) const {
+        const auto count = std::min(len, _sz);
+        std::memcpy(dest, _str, count);
+        return count;
+    }
+
+    constexpr const char* data() const noexcept {
+        return _str;
+    }
+
+private:
+    const char* _str;
+    SizeType _sz;
+    SizeType _hash;
+};
+
+inline bool operator==(HashedFieldName lhs, StringData rhs) {
+    return lhs.key() == rhs;
+}
+
+inline bool operator==(StringData lhs, HashedFieldName rhs) {
+    return lhs == rhs.key();
+}
+
+inline bool operator==(HashedFieldName lhs, HashedFieldName rhs) {
+    return lhs.key() == rhs.key();
+}
+
+/**
+ * Hasher to support heterogeneous lookup for StringData and string-like elements.
+ */
+struct FieldNameHasher {
+    // This using directive activates heterogeneous lookup in the hash table
+    using is_transparent = void;
+
+    HashedFieldName::SizeType operator()(StringData sd) const {
+        // Use the default absl string hasher.
+        return absl::Hash<absl::string_view>{}(absl::string_view(sd.data(), sd.size()));
+    }
+
+    HashedFieldName::SizeType operator()(const std::string& s) const {
+        return operator()(StringData(s));
+    }
+
+    HashedFieldName::SizeType operator()(const char* s) const {
+        return operator()(StringData(s));
+    }
+
+    HashedFieldName::SizeType operator()(HashedFieldName key) const {
+        return key.hash();
+    }
+
+    HashedFieldName hashedFieldName(StringData sd) {
+        return HashedFieldName(sd, operator()(sd));
+    }
+};
+
 /// Storage class used by both Document and MutableDocument
 class DocumentStorage : public RefCountable {
 public:
@@ -282,11 +378,11 @@ public:
 
     /**
      * Construct a storage from the BSON. The BSON is lazily processed as fields are requested from
-     * the document. If we know that the BSON does not contain any metadata fields we can set the
-     * 'stripMetadata' flag to false that will speed up the field iteration.
+     * the document. If we know that the BSON contains metadata fields we can set the
+     * 'bsonHasMetadata' flag to true.
      */
     DocumentStorage(const BSONObj& bson,
-                    bool stripMetadata,
+                    bool bsonHasMetadata,
                     bool modified,
                     uint32_t numBytesFromBSONInCache)
         : _cache(nullptr),
@@ -296,17 +392,22 @@ public:
           _hashTabMask(0),
           _bson(bson),
           _numBytesFromBSONInCache(numBytesFromBSONInCache),
-          _stripMetadata(stripMetadata),
+          _bsonHasMetadata(bsonHasMetadata),
           _modified(modified) {}
 
-    ~DocumentStorage();
+    ~DocumentStorage() override;
 
-    void reset(const BSONObj& bson, bool stripMetadata);
+    void reset(const BSONObj& bson, bool bsonHasMetadata);
 
     /**
-     * Populates the cache by recursively walking the underlying BSON.
+     * Returns a cache-only copy of the document with no backing bson.
      */
-    void fillCache() const;
+    Document shred() const;
+
+    /**
+     * Loads the whole document into cache.
+     */
+    void loadIntoCache() const;
 
     static const DocumentStorage& emptyDoc() {
         return kEmptyDoc;
@@ -326,23 +427,29 @@ public:
         return Position(_usedBytes);
     }
 
-    enum class LookupPolicy {
-        // When looking up a field check the cache only.
-        kCacheOnly,
-        // Look up in a cache and when not found search the unrelying BSON.
-        kCacheAndBSON
-    };
+    /// Returns the position of the named field in the cache or Position()
+    template <typename T>
+    Position findFieldInCache(T requested) const;
 
     /// Returns the position of the named field or Position()
-    Position findField(StringData name, LookupPolicy policy) const;
+    template <typename T>
+    Position findField(T field) const;
 
     // Document uses these
     const ValueElement& getField(Position pos) const {
-        verify(pos.found());
+        MONGO_verify(pos.found());
         return *(_firstElement->plusBytes(pos.index));
     }
+
     Value getField(StringData name) const {
-        Position pos = findField(name, LookupPolicy::kCacheAndBSON);
+        Position pos = findField(name);
+        if (!pos.found())
+            return Value();
+        return getField(pos).val;
+    }
+
+    Value getField(HashedFieldName field) const {
+        Position pos = findField(field);
         if (!pos.found())
             return Value();
         return getField(pos).val;
@@ -351,39 +458,52 @@ public:
     // MutableDocument uses these
     ValueElement& getField(Position pos) {
         _modified = true;
-        verify(pos.found());
+        MONGO_verify(pos.found());
         return *(_firstElement->plusBytes(pos.index));
     }
-    Value& getField(StringData name, LookupPolicy policy) {
+
+    Value& getFieldOrCreate(StringData name) {
         _modified = true;
-        Position pos = findField(name, policy);
+        Position pos = findField(name);
+        if (!pos.found())
+            return appendField(name, ValueElement::Kind::kMaybeInserted);
+        return getField(pos).val;
+    }
+
+    Value& getFieldCacheOnlyOrCreate(StringData name) {
+        _modified = true;
+        Position pos = findFieldInCache(name);
         if (!pos.found())
             return appendField(name, ValueElement::Kind::kMaybeInserted);
         return getField(pos).val;
     }
 
     /**
-     * Given a field name either return a Value if the field resides in the cache, or a BSONElement
-     * if the field resides in the backing BSON.
+     * Retrieves the given field from the cache. Returns a boost::none if the field does not exist.
      */
-    stdx::variant<BSONElement, Value> getFieldNonCaching(StringData name) const {
-        Position pos = findField(name, LookupPolicy::kCacheOnly);
+    boost::optional<Value> getFieldCacheOnly(StringData name) const {
+        Position pos = findFieldInCache(name);
         if (pos.found()) {
-            return {getField(pos).val};
+            return getField(pos).val;
         }
+        return boost::none;
+    }
 
+    /**
+     * Retrieves the given field from the backing BSON. Returns an EOO if the field does not exist.
+     */
+    BSONElement getFieldBsonOnly(StringData name) const {
         for (auto&& bsonElement : _bson) {
             if (name == bsonElement.fieldNameStringData()) {
-                return {bsonElement};
+                return bsonElement;
             }
         }
-
-        // Field not found. Return EOO Value.
-        return {Value()};
+        return BSONElement();
     }
 
     /// Adds a new field with missing Value at the end of the document
-    Value& appendField(StringData name, ValueElement::Kind kind);
+    template <typename T>
+    Value& appendField(T field, ValueElement::Kind kind);
 
     /** Preallocates space for fields. Use this to attempt to prevent buffer growth.
      *  This is only valid to call before anything is added to the document.
@@ -463,7 +583,7 @@ public:
      * WorkingSetMember.
      */
     const DocumentMetadataFields& metadata() const {
-        if (_stripMetadata) {
+        if (_bsonHasMetadata) {
             loadLazyMetadata();
         }
         return _metadataFields;
@@ -487,11 +607,9 @@ public:
         _metadataFields = std::move(metadata);
     }
 
-    static unsigned hashKey(StringData name) {
-        // TODO consider FNV-1a once we have a better benchmark corpus
-        unsigned out;
-        MurmurHash3_x86_32(name.rawData(), name.size(), 0, &out);
-        return out;
+    template <AnyFieldNameTypeButStdString T>
+    static unsigned hashKey(T name) {
+        return FieldNameHasher()(name);
     }
 
     const ValueElement* begin() const {
@@ -503,8 +621,8 @@ public:
         return _firstElement ? _firstElement->plusBytes(_usedBytes) : nullptr;
     }
 
-    auto stripMetadata() const {
-        return _stripMetadata;
+    auto bsonHasMetadata() const {
+        return _bsonHasMetadata;
     }
 
     Position constructInCache(const BSONElement& elem);
@@ -513,19 +631,54 @@ public:
         return _modified;
     }
 
+    auto isMetadataModified() const {
+        return _metadataFields.isModified();
+    }
+
     auto bsonObj() const {
         return _bson;
     }
 
+    size_t currentApproximateSize() const {
+        size_t size = sizeof(DocumentStorage) + allocatedBytes() + getMetadataApproximateSize() +
+            bsonObjSize();
+
+        for (auto it = iteratorCacheOnly(); !it.atEnd(); it.advance()) {
+            size += it->val.getApproximateSize() - sizeof(Value);
+        }
+
+        return size;
+    }
+
+    size_t snapshottedApproximateSize() const {
+        if (_snapshottedSize == 0) {
+            const_cast<DocumentStorage*>(this)->_snapshottedSize = currentApproximateSize();
+        }
+
+        return _snapshottedSize;
+    }
+
+    void resetSnapshottedApproximateSize() {
+        _snapshottedSize = 0;
+    }
+
 private:
-    /// Returns the position of the named field in the cache or Position()
-    Position findFieldInCache(StringData name) const;
+    enum class ConstructorTag { InitApproximateSize = 0 };
+    DocumentStorage(ConstructorTag tag) : DocumentStorage() {
+        switch (tag) {
+            case ConstructorTag::InitApproximateSize:
+                snapshottedApproximateSize();
+                return;
+        }
+        MONGO_UNREACHABLE;
+    }
 
     /// Allocates space in _cache. Copies existing data if there is any.
     void alloc(unsigned newSize);
 
     /// Call after adding field to _cache and increasing _numFields
-    void addFieldToHashTable(Position pos);
+    template <AnyFieldNameTypeButStdString T>
+    void addFieldToHashTable(T field, Position pos);
 
     // assumes _hashTabMask is (power of two) - 1
     unsigned hashTabBuckets() const {
@@ -545,15 +698,16 @@ private:
         memset(static_cast<void*>(_hashTab), -1, hashTabBytes());
     }
 
-    unsigned bucketForKey(StringData name) const {
-        return hashKey(name) & _hashTabMask;
+    template <AnyFieldNameTypeButStdString T>
+    unsigned bucketForKey(T field) const {
+        return hashKey(field) & _hashTabMask;
     }
 
     /// Adds all fields to the hash table
     void rehash() {
         hashTabInit();
         for (auto it = iteratorCacheOnly(); !it.atEnd(); it.advance())
-            addFieldToHashTable(it.position());
+            addFieldToHashTable(getField(it.position()).nameSD(), it.position());
     }
 
     void loadLazyMetadata() const;
@@ -596,21 +750,22 @@ private:
     // whole backing BSON, but only the portion of backing BSON that's not already in the cache.
     uint32_t _numBytesFromBSONInCache = 0;
 
-    // If '_stripMetadata' is true, tracks whether or not the metadata has been lazy-loaded from the
-    // backing '_bson' object. If so, then no attempt will be made to load the metadata again, even
-    // if the metadata has been released by a call to 'releaseMetadata()'.
+    // Tracks whether or not the metadata has been lazy-loaded from the backing '_bson' object. If
+    // so, then no attempt will be made to load the metadata again, even if the metadata has been
+    // released by a call to 'releaseMetadata()'.
     mutable bool _haveLazyLoadedMetadata = false;
 
-    mutable DocumentMetadataFields _metadataFields;
-
-    // The storage constructed from a BSON value may contain metadata. When we process the BSON we
-    // have to move the metadata to the MetadataFields object. If we know that the BSON does not
-    // have any metadata we can set _stripMetadata to false that will speed up the iteration.
-    bool _stripMetadata{false};
+    // True if this storage was constructed from BSON with metadata. Serializing this object using
+    // the 'toBson()' method will omit (strip) the metadata fields.
+    bool _bsonHasMetadata{false};
 
     // This flag is set to true anytime the storage returns a mutable field. It is used to optimize
     // a conversion to BSON; i.e. if there are not any modifications we can directly return _bson.
     bool _modified{false};
+
+    mutable DocumentMetadataFields _metadataFields;
+
+    size_t _snapshottedSize{0};
 
     // Defined in document.cpp
     static const DocumentStorage kEmptyDoc;

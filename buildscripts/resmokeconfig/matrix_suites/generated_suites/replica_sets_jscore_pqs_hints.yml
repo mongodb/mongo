@@ -1,0 +1,116 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/replica_sets_jscore_pqs_hints.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
+##########################################################
+description:
+  Test the correctness of query settings application by emulating cursor
+  hints with 'setQuerySettings' commands. This suite runs jscore tests using a replica
+  set fixture.
+executor:
+  archive:
+    hooks:
+      - RunDBCheckInBackground
+      - CheckReplDBHashInBackground
+      - ValidateCollectionsInBackground
+      - CheckReplDBHash
+      - CheckReplOplogs
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: globalThis.testingReplication = true;; await import("jstests/libs/override_methods/make_cursor_hints_into_query_settings.js");
+      global_vars:
+        TestData:
+          isHintsToQuerySettingsSuite: true
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+    num_nodes: 2
+  hooks:
+    - class: RunDBCheckInBackground
+    - class: CheckReplDBHashInBackground
+    - class: ValidateCollectionsInBackground
+    - class: CheckReplOplogs
+    - class: CheckReplDBHash
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
+matrix_suite: true
+selector:
+  exclude_files:
+    - jstests/core/txns/abort_expired_transaction.js
+    - jstests/core/txns/abort_transaction_thread_does_not_block_on_locks.js
+    - jstests/core/txns/kill_op_on_txn_expiry.js
+    - jstests/core/**/set_param1.js
+    - jstests/core/query/awaitdata_getmore_cmd.js
+    - jstests/core/administrative/current_op/currentop.js
+    - jstests/core/administrative/fsync/fsync.js
+    - jstests/core/txns/prepare_conflict.js
+    - jstests/core/txns/prepare_conflict_aggregation_behavior.js
+    - jstests/core/timeseries/write/timeseries_update_multi.js
+    - jstests/core/query/distinct/distinct_semantics.js
+    - jstests/core/index/express.js
+    - jstests/core/index/index_filter_commands.js
+    - jstests/core/query/query_settings/**/*.js
+    - jstests/core/administrative/current_op/**/*.js
+    - jstests/core/query/collation/collation.js
+    - jstests/core/diagnostics/operation_latency_histogram.js
+    - jstests/core/query/top/top.js
+    - jstests/core/catalog/views/views_stats.js
+    - jstests/core/txns/timestamped_reads_wait_for_prepare_oplog_visibility.js
+    - jstests/core/timeseries/ddl/timeseries_sparse_index.js
+    - jstests/core/administrative/getlog2.js
+    - jstests/core/txns/speculative_snapshot_includes_all_writes.js
+    - jstests/core/query/commands_with_uuid.js
+    - jstests/core/clustered/clustered_collection_collation.js
+    - jstests/core/timeseries/write/timeseries_delete_multi.js
+    - jstests/core/timeseries/write/timeseries_simple.js
+    - jstests/core/timeseries/write/timeseries_update.js
+    - jstests/core/timeseries/write/timeseries_update_arbitrary_updates_not_enabled.js
+    - jstests/core/write/empty_ts/bypass_empty_ts_replacement_timeseries.js
+    - jstests/core/index/index_filter_catalog_independent.js
+    - jstests/core/index/index_filter_collation.js
+    - jstests/core/index/index_filter_commands.js
+    - jstests/core/index/index_filter_on_hidden_index.js
+    - jstests/core/index/wildcard/compound_wildcard_index_filter.js
+    - jstests/core/index/wildcard/wildcard_index_filter.js
+    - jstests/core/query/queryable_encryption/**/*.js
+    - src/mongo/db/modules/enterprise/jstests/fle2/**/*.js
+    - jstests/core/index/geo/geo6.js
+    - jstests/core/index/index_check6.js
+    - jstests/core/index/index_diag.js
+    - jstests/core/index/index_multikey.js
+    - jstests/core/query/covered_multikey.js
+    - jstests/core/query/cursor/getmore_invalidated_cursors.js
+    - jstests/core/query/explain/explain_shell_helpers.js
+    - jstests/core/query/index_deduplication.js
+    - jstests/core/query/internal_hash_eq/lookup_using_hash_key.js
+    - jstests/core/query/return_key.js
+    - jstests/core/timeseries/ddl/timeseries_index_collation.js
+    - jstests/core/timeseries/query/timeseries_internal_bounded_sort_compound.js
+    - jstests/core/timeseries/ddl/timeseries_metric_index_compound.js
+    - jstests/core/timeseries/ddl/timeseries_special_indexes_metadata.js
+    - jstests/core/index/index_multiple_compatibility.js
+    - jstests/core/index/indext.js
+    - jstests/core/index/sparse_index_internal_expr.js
+    - jstests/core/query/exists/existsa.js
+    - jstests/core/timeseries/ddl/timeseries_index_partial.js
+  exclude_with_any_tags:
+    - assumes_standalone_mongod
+    - requires_profiling
+    - assumes_standalone_mongod
+    - does_not_support_repeated_reads
+    - requires_profiling
+    - requires_fsync
+    - known_query_shape_computation_problem
+    - query_intensive_pbt
+  roots:
+    - jstests/core/**/*.js
+    - jstests/fle2/**/*.js
+    - src/mongo/db/modules/*/jstests/fle2/**/*.js
+test_kind: js_test

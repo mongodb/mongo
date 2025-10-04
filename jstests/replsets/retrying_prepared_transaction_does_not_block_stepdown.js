@@ -3,9 +3,8 @@
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
 
-(function() {
-"use strict";
-load("jstests/core/txns/libs/prepare_helpers.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // This test completes with a prepared transaction still active, so we cannot enforce an accurate
 // fast count.
@@ -37,8 +36,6 @@ PrepareHelpers.prepareTransaction(session);
 
 // Test that stepDown can proceed.
 jsTestLog("Step down primary");
-assert.commandWorked(
-    primary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+assert.commandWorked(primary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
 
 replTest.stopSet();
-}());

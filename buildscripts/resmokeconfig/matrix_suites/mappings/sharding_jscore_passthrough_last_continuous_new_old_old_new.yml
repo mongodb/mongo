@@ -1,0 +1,5 @@
+base_suite: sharding_jscore_passthrough
+overrides:
+  - "multiversion.sharding_temporarily_disable_due_to_fcv_upgrade"
+  - "multiversion.sharded_fixture_last_continuous_new_old_old_new"
+  - "multiversion.sharding_multiversion_mongos_testdata_last_continuous"

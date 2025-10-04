@@ -1,0 +1,85 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_test", "mongo_cc_unit_test")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_test", "mongo_cc_unit_test")
+load("@bazel_skylib//lib:selects.bzl", "selects")
+
+package(default_visibility = ["//visibility:public"])
+
+mongo_cc_library(
+    name = "mongor_lib",
+    srcs = [
+        "config_handler.cpp",
+        "performance_reporter.cpp",
+        "rawop_document.cpp",
+        "recording_reader.cpp",
+        "replay_client.cpp",
+        "replay_command.cpp",
+        "replay_command_executor.cpp",
+        "session_handler.cpp",
+        "session_scheduler.cpp",
+        "session_simulator.cpp",
+        "traffic_recording_iterator.cpp",
+    ],
+    hdrs = [
+        "config_handler.h",
+        "performance_reporter.h",
+        "rawop_document.h",
+        "recording_reader.h",
+        "replay_client.h",
+        "replay_command.h",
+        "replay_command_executor.h",
+        "replay_config.h",
+        "session_handler.h",
+        "session_scheduler.h",
+        "session_simulator.h",
+        "traffic_recording_iterator.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/client:clientdriver_network",
+        "//src/mongo/db:traffic_reader",
+        "//src/mongo/db/local_catalog/lock_manager",
+        "//src/mongo/db/query/util:stop_token",
+        "//src/mongo/rpc:message",
+        "//src/mongo/util:periodic_runner",
+        "//src/mongo/util:periodic_runner_factory",
+        "//src/mongo/util:signal_handlers",
+        "//src/mongo/util:version_impl",
+        "//src/third_party/nlohmann-json:json",
+    ],
+)
+
+mongo_cc_binary(
+    name = "mongor",
+    srcs = [
+        "main.cpp",
+    ],
+    deps = [
+        ":mongor_lib",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "mongor-test",
+    srcs = [
+        "config_handler_test.cpp",
+        "mini_mock.h",
+        "performance_reporter_test.cpp",
+        "replay_command_executor_test.cpp",
+        "replay_command_test.cpp",
+        "replay_test_server.cpp",
+        "replay_test_server.h",
+        "session_handler.h",
+        "session_handler_test.cpp",
+        "session_scheduler_test.cpp",
+        "session_simulator_test.cpp",
+        "test_packet.cpp",
+        "test_packet.h",
+        "traffic_reader_test.cpp",
+    ],
+    tags = ["mongo_unittest_sixth_group"],
+    deps = [
+        ":mongor_lib",
+        "//src/mongo/dbtests:mocklib",
+        "//src/mongo/util:clock_source_mock",
+    ],
+)

@@ -29,10 +29,19 @@
 
 #pragma once
 
-#include <jsapi.h>
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/util/modules.h"
+
+#include <cstdint>
 #include <string>
 
-#include "mongo/bson/bsonobj.h"
+#include <jsapi.h>
+
+#include <js/RootingAPI.h>
+#include <js/TypeDecls.h>
 
 namespace mongo {
 namespace mozjs {
@@ -40,7 +49,7 @@ namespace mozjs {
 /**
  * Reads into a JS Value from some Mongo C++ primitive
  */
-class ValueReader {
+class MONGO_MOD_PUB ValueReader {
 public:
     /**
      * Depth is used when readers are invoked from ObjectWrappers to avoid

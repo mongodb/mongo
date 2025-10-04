@@ -27,14 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/logv2/console.h"
 
-#include <iostream>
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 
-#include "mongo/base/init.h"
-#include "mongo/config.h"
+#include <iostream>
 
 #ifdef _WIN32
 #include <io.h>

@@ -31,31 +31,23 @@
 
 #if !defined(MONGO_USE_VISIBILITY)
 
-#define MONGO_VISIBILITY_PUBLIC()
-#define MONGO_VISIBILITY_PRIVATE()
+#define MONGO_API_EXPORT
+#define MONGO_API_IMPORT
 #define MONGO_PRIVATE
-#define MONGO_API(LIB)
 
 #else
 
 #if defined(_MSC_VER)
 
-#include <boost/preprocessor/control/iif.hpp>
-#include <boost/vmd/is_number.hpp>
-
-#define MONGO_DLLEXPORT() __declspec(dllexport)
-#define MONGO_DLLIMPORT() __declspec(dllimport)
+#define MONGO_API_EXPORT __declspec(dllexport)
+#define MONGO_API_IMPORT __declspec(dllimport)
 #define MONGO_PRIVATE
-#define MONGO_API_IMPL2(COND) BOOST_PP_IIF(COND, MONGO_DLLEXPORT, MONGO_DLLIMPORT)()
-#define MONGO_API_IMPL(ARG) MONGO_API_IMPL2(BOOST_VMD_IS_NUMBER(ARG))
-#define MONGO_API(LIB) MONGO_API_IMPL(MONGO_API_##LIB)
 
 #else
 
-#define MONGO_VISIBILITY_PUBLIC() __attribute__((visibility("default")))
-#define MONGO_VISIBILITY_PRIVATE() __attribute__((visibility("hidden")))
-#define MONGO_PRIVATE MONGO_VISIBILITY_PRIVATE()
-#define MONGO_API(LIB) MONGO_VISIBILITY_PUBLIC()
+#define MONGO_API_EXPORT __attribute__((visibility("default")))
+#define MONGO_API_IMPORT __attribute__((visibility("default")))
+#define MONGO_PRIVATE __attribute__((visibility("hidden")))
 
 #endif
 

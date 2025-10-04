@@ -1,12 +1,53 @@
 /*! @page compact Compaction
 
-The WT_SESSION::compact method can be used to compact data sources.
+The WT_SESSION::compact method can be used to compact data sources. Parallel activity can happen on
+the data sources while compaction is running but it might affect the efficiency of compaction. Furthermore,
+it is not possible to run compaction from multiple sessions on the same data source at the same time.
 
-The data source does not have to be quiescent, compaction may be
-performed on an active data source.
+<b>Note:</b> Because checkpoints named by the application are not discarded until explicitly removed or replaced, they may prevent WT_SESSION::compact from accomplishing anything.
 
-Because checkpoints named by the application are not discarded until
-explicitly removed or replaced, they may prevent WT_SESSION::compact
-from accomplishing anything.
+@section foreground Foreground compaction
+
+Foreground compaction is executed when a specific URI is given to the WT_SESSION::compact method.
+The call returns once compaction has been executed on the specified URI.
+
+Example:
+@code
+# Execute compaction on "mytable" with the default parameters.
+int ret = session->compact(session, "table:mytable", NULL);
+
+# Execute compaction on "mytable" if at least 20MB of free space can be theoretically reclaimed by compaction.
+int ret = session->compact(session, "table:mytable", "free_space_target=20MB");
+@endcode
+
+@section background Background compaction
+
+The "background" configuration item can be used to interact with background compaction when calling
+the WT_SESSION::compact method. The call immediately returns to the application but does not
+guarantee compaction will be enabled/disabled at the same time. A successful call simply means the
+request has been submitted to WiredTiger. For instance, if background compaction is disabled while
+it is compacting a table, compaction will be stopped as soon as it is safe to do so.
+
+When background compaction is enabled, WiredTiger autonomously compacts the eligible files in the database.
+You can read more about eligible files on the following page: @ref arch-compact.
+
+<b>Note:</b> When interacting with background compaction, NULL should be assigned to the argument corresponding to the URI.
+
+Example:
+@code
+# Enable background compaction with the default parameters.
+int ret = session->compact(session, NULL, "background=true");
+
+# Enable background compaction and compact tables that have at least 20MB of free space that can be theoretically reclaimed by compaction.
+int ret = session->compact(session, NULL, "background=true,free_space_target=20MB");
+
+# Enable background compaction and exclude the table "mytable".
+int ret = session->compact(session, NULL, "background=true,free_space_target=20MB,exclude=[\"table:mytable.wt\"]");
+
+# Disable background compaction.
+int ret = session->compact(session, NULL, "background=false");
+@endcode
+
+More information about compaction can be read here: @ref arch-compact.
 
  */

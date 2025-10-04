@@ -27,29 +27,36 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+#include "mongo/util/fail_point.h"
 
-#include "mongo/platform/basic.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/client.h"
+#include "mongo/db/exec/mutable_bson/mutable_bson_test_utils.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/thread_assertion_monitor.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/clock_source_mock.h"
+#include "mongo/util/tick_source.h"
+#include "mongo/util/tick_source_mock.h"
+#include "mongo/util/time_support.h"
 
+#include <cstddef>
 #include <functional>
+#include <limits>
+#include <memory>
+#include <ostream>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
-#include "mongo/db/client.h"
-#include "mongo/db/concurrency/locker_noop_client_observer.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
-#include "mongo/stdx/thread.h"
-#include "mongo/unittest/thread_assertion_monitor.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/clock_source_mock.h"
-#include "mongo/util/fail_point.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/tick_source_mock.h"
-#include "mongo/util/time_support.h"
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 using mongo::BSONObj;
 using mongo::FailPoint;
@@ -339,22 +346,19 @@ TEST(FailPoint, parseBSONInvalidModeFails) {
     swTuple = FailPoint::parseBSON(BSON("mode" << true));
     ASSERT_FALSE(swTuple.isOK());
 
-    swTuple = FailPoint::parseBSON(BSON("mode"
-                                        << "notAMode"));
+    swTuple = FailPoint::parseBSON(BSON("mode" << "notAMode"));
     ASSERT_FALSE(swTuple.isOK());
 
     swTuple = FailPoint::parseBSON(BSON("mode" << BSON("invalidSubField" << 1)));
     ASSERT_FALSE(swTuple.isOK());
 
-    swTuple = FailPoint::parseBSON(BSON("mode" << BSON("times"
-                                                       << "notAnInt")));
+    swTuple = FailPoint::parseBSON(BSON("mode" << BSON("times" << "notAnInt")));
     ASSERT_FALSE(swTuple.isOK());
 
     swTuple = FailPoint::parseBSON(BSON("mode" << BSON("times" << -5)));
     ASSERT_FALSE(swTuple.isOK());
 
-    swTuple = FailPoint::parseBSON(BSON("mode" << BSON("activationProbability"
-                                                       << "notADouble")));
+    swTuple = FailPoint::parseBSON(BSON("mode" << BSON("activationProbability" << "notADouble")));
     ASSERT_FALSE(swTuple.isOK());
 
     double greaterThan1 = 1.3;
@@ -367,12 +371,10 @@ TEST(FailPoint, parseBSONInvalidModeFails) {
 }
 
 TEST(FailPoint, parseBSONValidModeSucceeds) {
-    auto swTuple = FailPoint::parseBSON(BSON("mode"
-                                             << "off"));
+    auto swTuple = FailPoint::parseBSON(BSON("mode" << "off"));
     ASSERT_TRUE(swTuple.isOK());
 
-    swTuple = FailPoint::parseBSON(BSON("mode"
-                                        << "alwaysOn"));
+    swTuple = FailPoint::parseBSON(BSON("mode" << "alwaysOn"));
     ASSERT_TRUE(swTuple.isOK());
 
     swTuple = FailPoint::parseBSON(BSON("mode" << BSON("times" << 1)));
@@ -383,17 +385,15 @@ TEST(FailPoint, parseBSONValidModeSucceeds) {
 }
 
 TEST(FailPoint, parseBSONInvalidDataFails) {
-    auto swTuple = FailPoint::parseBSON(BSON("mode"
-                                             << "alwaysOn"
-                                             << "data"
-                                             << "notABSON"));
+    auto swTuple = FailPoint::parseBSON(BSON("mode" << "alwaysOn"
+                                                    << "data"
+                                                    << "notABSON"));
     ASSERT_FALSE(swTuple.isOK());
 }
 
 TEST(FailPoint, parseBSONValidDataSucceeds) {
-    auto swTuple = FailPoint::parseBSON(BSON("mode"
-                                             << "alwaysOn"
-                                             << "data" << BSON("a" << 1)));
+    auto swTuple = FailPoint::parseBSON(BSON("mode" << "alwaysOn"
+                                                    << "data" << BSON("a" << 1)));
     ASSERT_TRUE(swTuple.isOK());
 }
 
@@ -418,6 +418,36 @@ TEST(FailPoint, FailPointEnableBlockByPointer) {
     {
         FailPointEnableBlock dummyFp(failPoint);
         ASSERT_TRUE(failPoint->shouldFail());
+    }
+
+    ASSERT_FALSE(failPoint->shouldFail());
+}
+
+TEST(FailPoint, FailPointEnableBlockWithMode) {
+    auto failPoint = mongo::globalFailPointRegistry().find("dummy");
+
+    ASSERT_FALSE(failPoint->shouldFail());
+
+    {
+        FailPointEnableBlock dummyFp(
+            "dummy", FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
+        ASSERT_TRUE(failPoint->shouldFail());
+        ASSERT_FALSE(failPoint->shouldFail());
+    }
+
+    ASSERT_FALSE(failPoint->shouldFail());
+}
+
+TEST(FailPoint, FailPointEnableBlockByPointerWithMode) {
+    auto failPoint = mongo::globalFailPointRegistry().find("dummy");
+
+    ASSERT_FALSE(failPoint->shouldFail());
+
+    {
+        FailPointEnableBlock dummyFp(
+            failPoint, FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
+        ASSERT_TRUE(failPoint->shouldFail());
+        ASSERT_FALSE(failPoint->shouldFail());
     }
 
     ASSERT_FALSE(failPoint->shouldFail());
@@ -456,14 +486,12 @@ namespace mongo {
  * the function is interruptible.
  */
 void assertFunctionInterruptible(std::function<void(Interruptible* interruptible)> f) {
-    const auto service = ServiceContext::make();
     const std::shared_ptr<ClockSourceMock> mockClock = std::make_shared<ClockSourceMock>();
-    service->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
-    service->setFastClockSource(std::make_unique<SharedClockSourceAdapter>(mockClock));
-    service->setPreciseClockSource(std::make_unique<SharedClockSourceAdapter>(mockClock));
-    service->setTickSource(std::make_unique<TickSourceMock<>>());
+    const auto service = ServiceContext::make(std::make_unique<SharedClockSourceAdapter>(mockClock),
+                                              std::make_unique<SharedClockSourceAdapter>(mockClock),
+                                              std::make_unique<TickSourceMock<>>());
 
-    const auto client = service->makeClient("FailPointTest");
+    const auto client = service->getService()->makeClient("FailPointTest");
     auto opCtx = client->makeOperationContext();
     opCtx->setDeadlineAfterNowBy(Milliseconds{999}, ErrorCodes::ExceededTimeLimit);
 

@@ -32,11 +32,86 @@ global:
     cpp_namespace: "mongo::resharding"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 feature_flags:
-    featureFlagResharding:
-        description: When enabled, allows users to reshard their sharded collections.
-        cpp_varname: gFeatureFlagResharding
+    featureFlagMoveCollection:
+        description: "Feature flag for implementing online move collection."
+        cpp_varname: gFeatureFlagMoveCollection
         default: true
-        version: 5.0
+        version: 8.0
+        fcv_gated: true
+        fcv_context_unaware: true
+    featureFlagUnshardCollection:
+        description: "Feature flag for implementing unshard collection."
+        cpp_varname: gFeatureFlagUnshardCollection
+        default: true
+        version: 8.0
+        fcv_gated: true
+        fcv_context_unaware: true
+    featureFlagReshardingForTimeseries:
+        description: "Feature flag for enabling resharding a timeseries collection."
+        cpp_varname: gFeatureFlagReshardingForTimeseries
+        default: true
+        version: 8.0
+        fcv_gated: true
+        fcv_context_unaware: true
+    featureFlagRelaxedMode:
+        description: "Feature flag for implmenting relaxed resharding mode."
+        cpp_varname: gFeatureFlagReshardingRelaxedMode
+        default: true
+        version: 8.1
+        fcv_gated: true
+    featureFlagReshardingSkipCloningAndApplyingIfApplicable:
+        description:
+            "Feature flag to make recipient shards that are not going to own any chunks for
+            the collection after resharding only clone the options and indexes for the
+            collection (i.e. skip cloning the documents and fetch/apply the oplog entries
+            for it). Currently, only the primary shard can be such a recipient shard."
+        cpp_varname: gFeatureFlagReshardingSkipCloningAndApplyingIfApplicable
+        default: false
+        fcv_gated: true
+    featureFlagReshardingStoreOplogFetcherProgress:
+        description:
+            "Feature flag to make recipient shards store the count of oplog entries fetched
+            in a progress document and use this count instead of the fast count to recover
+            metrics upon recovery."
+        cpp_varname: gFeatureFlagReshardingStoreOplogFetcherProgress
+        default: true
+        version: 8.2
+        fcv_gated: true
+    featureFlagReshardingNumSamplesPerChunk:
+        description: "Feature flag for adding numSamplesPerChunk as a field in reshardCollection."
+        cpp_varname: gfeatureFlagReshardingNumSamplesPerChunk
+        default: true
+        version: 8.1
+        fcv_gated: true
+    featureFlagReshardingVerification:
+        description:
+            "Feature flag to enable data loss and consistency verification steps during
+            resharding to ensure correctness."
+        cpp_varname: gFeatureFlagReshardingVerification
+        default: false
+        fcv_gated: true
+    featureFlagReshardingCloneNoRefresh:
+        description: "Feature flag to enable not using shard version refresh for resharding."
+        cpp_varname: gFeatureFlagReshardingCloneNoRefresh
+        default: false
+        fcv_gated: true
+        fcv_context_unaware: true
+    featureFlagReshardingRemainingTimeEstimateBasedOnMovingAverage:
+        description:
+            "Feature flag to enable using exponential moving average when estimating the
+            remaining time to reach strict consistency."
+        cpp_varname: gFeatureFlagReshardingRemainingTimeEstimateBasedOnMovingAverage
+        default: false
+        fcv_gated: true
+    featureFlagReshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites:
+        description: >-
+            Feature flag to make resharding donors abort in-progress unprepared transactions
+            after transitioning to the "preparing-to-block-writes" state. Aborting unprepared
+            transactions helps prevent the donor from not being to acquire the critical section
+            within the critical section timeout when there are long-running transactions.
+        cpp_varname: gFeatureFlagReshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites
+        default: false
+        fcv_gated: true

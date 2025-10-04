@@ -1,0 +1,209 @@
+test_kind: bulk_write_cluster_js_test
+
+selector:
+  roots:
+    - jstests/core/**/*.js
+  exclude_files:
+    # Excludes from replica set jscore passthrough
+
+    # The set_param1.js test attempts to compare the response from running the {getParameter: "*"}
+    # command multiple times, which may observe the change to the "transactionLifetimeLimitSeconds"
+    # server parameter.
+    - jstests/core/**/set_param1.js
+    # BulkWrite profiling and currentOp output format is not the same as normal writes.
+    - jstests/core/**/profile*.js
+    - jstests/core/query/comment_field.js
+    - jstests/core/administrative/fsync/fsync.js
+    # Runs an update with illegal format (no 'updates'). We could work around this in the override
+    # but it is very annoying.
+    - jstests/core/write/insert/batch_write_command_insert.js
+    - jstests/core/query/batch_write/batch_write_command_update.js
+    - jstests/core/query/batch_write/batch_write_command_delete.js
+    # Requires specific commands to be run to trigger failpoint (i.e. requires insert, we run bulkWrite).
+    - jstests/core/testing/failcommand_failpoint.js
+    # This test adds unknown fields to insert/update/delete ops which we ignore
+    - jstests/core/query/parsing/write_commands_reject_unknown_fields.js
+    # Checks for op names which bulkWrite will not show up as
+    - jstests/core/txns/transactions_profiling.js
+    - jstests/core/txns/currentop_blocked_operations.js
+    # Checks for collation at top level in profile
+    - jstests/core/txns/transactions_profiling_with_drops.js
+    # The conditions of this test returns a different error for delete compared to the function bulkWrite uses.
+    # bulkWrite is consistent with the other CRUD operations here.
+    - jstests/core/txns/multi_statement_transaction_write_error.js
+
+    # Multiple cluster specific exclusions
+
+    # Don't run transaction specific tests.
+    - jstests/core/txns/**/*.js
+
+    # Uses a timestamp in query which causes mismatch between clusters
+    - jstests/core/query/update/update_currentdate_examples.js
+    - jstests/core/query/update/update_affects_indexes.js
+    - jstests/core/index/index_arr2.js
+    - jstests/core/index/index_stats.js
+    - jstests/core/write/ts1.js
+    - jstests/core/query/compare_timestamps.js
+    - jstests/core/query/command_let_variables.js
+    - jstests/core/query/update/update_min_max_examples.js
+    - jstests/core/query/update/update_arrayFilters.js
+    - jstests/core/query/update/update_array_many_elements.js
+    - jstests/core/index/wildcard/wildcard_index_type.js
+    - jstests/core/txns/no_writes_to_config_transactions_with_prepared_transaction.js
+    - jstests/core/query/type/type3.js
+    - jstests/core/txns/commit_prepared_transaction.js
+    - jstests/core/timeseries/**/*.js
+    - jstests/core/txns/timeseries/timeseries_reads_in_txns.js
+    - jstests/core/txns/timeseries_insert_in_txn.js
+    - jstests/core/txns/txn_ops_allowed_on_buckets_coll.js
+    - jstests/core/write/empty_ts/empty_ts.js
+    - jstests/core/write/empty_ts/empty_ts_bulk_write.js
+    - jstests/core/write/empty_ts/bypass_empty_ts_replacement.js
+    - jstests/core/write/empty_ts/bypass_empty_ts_replacement_bulk_write.js
+    - jstests/core/write/empty_ts/bypass_empty_ts_replacement_timeseries.js
+
+    # Multiple cluster override does not support QE
+    - jstests/core/query/queryable_encryption/*.js
+
+    # Batching causes us to go over BSON max obj size for request
+    - jstests/core/query/find/find_getmore_bsonsize.js
+    - jstests/core/txns/commit_and_abort_large_unprepared_transactions.js
+    - jstests/core/query/sort/sortb.js
+    - jstests/core/capped/capped_large_docs.js
+    - jstests/core/query/sort/sortf.js
+    - jstests/core/txns/commit_and_abort_large_prepared_transactions.js
+
+    # Uses mongod generated UUID which is different between the clusters
+    - jstests/core/query/parsing/collection_uuid_write_commands.js
+
+    # update with $ modifiers can sometimes change field ordering
+    - jstests/core/query/update/update_multi5.js
+    - jstests/core/query/update/upsert_and.js
+    - jstests/core/query/dbref_upsert.js
+    - jstests/core/query/rename/rename_operator_missing_source.js
+
+    # requires parameter not supported by override
+    - jstests/core/write/crud_ops_do_not_throw_locktimeout.js
+    - jstests/core/query/command_json_schema_field.js
+    - jstests/core/query/api/api_version_test_expression.js
+    - jstests/core/query/api/api_version_parameters.js
+    - jstests/core/query/map_reduce/mr_null_arguments.js
+    - jstests/core/txns/prepare_transaction_unique_index_conflict.js
+    - jstests/core/txns/no_snapshot_writes_outside_txn.js
+
+    # override does not suppot benchRun
+    - jstests/core/shell/benchrun_pipeline_updates.js
+    - jstests/core/shell/bench_test1.js
+
+    # errors out due to invalid DB name
+    - jstests/core/query/invalid_db_name.js
+    - jstests/core/query/collectionless_agg_ns.js
+
+    # parallel processing causes race conditions in these tests
+    - jstests/core/query/local_tail_capped.js
+    - jstests/core/txns/transactions_block_ddl.js
+    - jstests/core/txns/kill_op_on_txn_expiry.js
+    - jstests/core/txns/write_conflicts_with_non_txns.js
+
+    # the deep copy we use does not deep copy arrays of objects which can be modified after we save them
+    - jstests/core/index/wildcard/wildcard_index_multikey.js
+    - jstests/core/index/wildcard/wildcard_index_basic_index_bounds.js
+    - jstests/core/query/update/update_set_unset.js
+
+    # batching can cause planCache to be different than expectations
+    - jstests/core/query/sbe/sbe_plan_cache_duplicate_or_clauses.js
+    - jstests/core/query/sbe/sbe_plan_cache_autoparameterize_ixscan.js
+    - jstests/core/index/index_filter_commands_invalidate_plan_cache_entries.js
+    - jstests/core/query/plan_cache/plan_cache_sbe.js
+
+    # bulkWrite and delete use different parsing for the multi field
+    - jstests/core/query/batch_write/batch_write_command_w0.js
+
+    # Checks for specific sessions to exist
+    - jstests/core/administrative/list_sessions.js
+
+    # Tries to run a command without a session which we add in and gives different results
+    - jstests/core/txns/multi_statement_transaction_command_args.js
+
+    # Incompatible with enable_sessions.js
+    - jstests/core/txns/shell_prompt_in_transaction.js
+    - jstests/core/query/crud_api.js
+
+    # Uses multiple sessions which the override is incapable of doing.
+    - jstests/core/txns/multi_statement_transaction_abort.js
+    - jstests/core/txns/commit_prepared_transaction_errors.js
+    - jstests/core/txns/create_collection_parallel.js
+    - jstests/core/txns/prepare_conflict_aggregation_behavior.js
+    - jstests/core/txns/many_txns.js
+    - jstests/core/txns/create_indexes_parallel.js
+    - jstests/core/txns/repeatable_reads_in_transaction.js
+
+    # requires use of specific transaction numbers (override uses its own)
+    - jstests/core/txns/finished_transaction_error_handling.js
+
+    # ambiguous multi:false update can target different document on each cluster
+    - jstests/core/index/hashed/hashed_index_with_arrays.js
+
+    # Grabs specific stats from mongod directly which causes failure due to there being
+    # multiple clusters.
+    - jstests/core/administrative/current_op/currentop_cursors.js
+    - jstests/core/diagnostics/operation_latency_histogram.js
+    - jstests/core/catalog/views/views_stats.js
+
+    # Sets cluster parameters, which do writes with timestamps that will vary b/w clusters.
+    - jstests/core/cluster_parameters/cluster_parameter_commands.js
+
+    # Uses cluster time in the commands which produces different results in standalone
+    # and non-standalone settings.
+    - jstests/core/query/cluster_time_command_usage.js
+
+  exclude_with_any_tags:
+    - assumes_standalone_mongod
+    - assumes_read_preference_unchanged
+    - does_not_support_causal_consistency
+    - requires_collstats
+    - uses_transactions
+    - requires_profiling
+    - requires_getmore
+    - uses_parallel_shell
+    # creates a prepare timestamp for each cluster, corresponding commits can fail if
+    # the prepare on the bulkWrite cluster is later than the commit on the normal
+    - uses_prepare_transaction
+    # auth does not get correctly applied to both clusters
+    - requires_auth
+
+executor:
+  archive:
+    tests: true
+    hooks:
+      - CheckReplDBHash
+      - CheckReplOplogs
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: >-
+        testingReplication = true;
+        TestData.preOverrideRunCommand = Mongo.prototype.runCommand;
+        TestData.doNotOverrideReadPreference = true;
+        await import("jstests/libs/override_methods/enable_sessions.js");
+        await import('jstests/libs/override_methods/multiple_crud_ops_as_bulk_write.js');
+        await import('jstests/libs/override_methods/enable_causal_consistency.js');
+  hooks:
+    # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+    # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+    # validating the entire contents of the collection.
+    - class: CheckReplOplogs
+    - class: CheckReplDBHash
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
+  fixture:
+    class: BulkWriteFixture
+    cluster_options:
+      class: ReplicaSetFixture
+      settings:
+        mongod_options:
+          set_parameters:
+            enableTestCommands: 1
+        num_nodes: 2
+        use_replica_set_connection_string: true

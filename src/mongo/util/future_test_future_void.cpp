@@ -27,101 +27,109 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/util/future.h"
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
-
+#include "mongo/util/assert_util.h"
+#include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
 #include "mongo/util/future_test_utils.h"
+
+#include <memory>
+#include <thread>
+#include <type_traits>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {
 
+template <DoExecutorFuture doExecutorFuture = kDoExecutorFuture, typename F>
+void runTests(F&& f) {
+    FUTURE_SUCCESS_TEST<doExecutorFuture>([] {}, std::forward<F>(f));
+}
+
+template <DoExecutorFuture doExecutorFuture = kDoExecutorFuture, typename F>
+void runFailureTests(F&& f) {
+    FUTURE_FAIL_TEST<void, doExecutorFuture>(std::forward<F>(f));
+}
+
 TEST(Future_Void, Success_getLvalue) {
-    FUTURE_SUCCESS_TEST([] {}, [](/*Future<void>*/ auto&& fut) { fut.get(); });
+    runTests([](auto&& fut) { fut.get(); });
 }
 
 TEST(Future_Void, Success_getConstLvalue) {
-    FUTURE_SUCCESS_TEST([] {}, [](const /*Future<void>*/ auto& fut) { fut.get(); });
+    runTests([](const auto& fut) { fut.get(); });
 }
 
 TEST(Future_Void, Success_getRvalue) {
-    FUTURE_SUCCESS_TEST([] {}, [](/*Future<void>*/ auto&& fut) { std::move(fut).get(); });
+    runTests([](auto&& fut) { std::move(fut).get(); });
 }
 
 TEST(Future_Void, Success_getNothrowLvalue) {
-    FUTURE_SUCCESS_TEST(
-        [] {}, [](/*Future<void>*/ auto&& fut) { ASSERT_EQ(fut.getNoThrow(), Status::OK()); });
+    runTests([](auto&& fut) { ASSERT_EQ(fut.getNoThrow(), Status::OK()); });
 }
 
 TEST(Future_Void, Success_getNothrowConstLvalue) {
-    FUTURE_SUCCESS_TEST(
-        [] {}, [](const /*Future<void>*/ auto& fut) { ASSERT_EQ(fut.getNoThrow(), Status::OK()); });
+    runTests([](const auto& fut) { ASSERT_EQ(fut.getNoThrow(), Status::OK()); });
 }
 
 TEST(Future_Void, Success_getNothrowRvalue) {
-    FUTURE_SUCCESS_TEST(
-        [] {},
-        [](/*Future<void>*/ auto&& fut) { ASSERT_EQ(std::move(fut).getNoThrow(), Status::OK()); });
+    runTests([](auto&& fut) { ASSERT_EQ(std::move(fut).getNoThrow(), Status::OK()); });
 }
 
 TEST(Future_Void, Success_semi_get) {
-    FUTURE_SUCCESS_TEST([] {}, [](/*Future<void>*/ auto&& fut) { std::move(fut).semi().get(); });
+    runTests([](auto&& fut) { std::move(fut).semi().get(); });
 }
 
 TEST(Future_Void, Success_getAsync) {
-    FUTURE_SUCCESS_TEST([] {},
-                        [](/*Future<void>*/ auto&& fut) {
-                            auto pf = makePromiseFuture<void>();
-                            std::move(fut).getAsync(
-                                [outside = std::move(pf.promise)](Status status) mutable {
-                                    ASSERT_OK(status);
-                                    outside.emplaceValue();
-                                });
-                            ASSERT_EQ(std::move(pf.future).getNoThrow(), Status::OK());
-                        });
+    runTests([](auto&& fut) {
+        auto pf = makePromiseFuture<void>();
+        std::move(fut).getAsync([outside = std::move(pf.promise)](Status status) mutable {
+            ASSERT_OK(status);
+            outside.emplaceValue();
+        });
+        ASSERT_EQ(std::move(pf.future).getNoThrow(), Status::OK());
+    });
 }
 
 TEST(Future_Void, Fail_getLvalue) {
-    FUTURE_FAIL_TEST<void>(
-        [](/*Future<void>*/ auto&& fut) { ASSERT_THROWS_failStatus(fut.get()); });
+    runFailureTests([](auto&& fut) { ASSERT_THROWS_failStatus(fut.get()); });
 }
 
 TEST(Future_Void, Fail_getConstLvalue) {
-    FUTURE_FAIL_TEST<void>(
-        [](const /*Future<void>*/ auto& fut) { ASSERT_THROWS_failStatus(fut.get()); });
+    runFailureTests([](const auto& fut) { ASSERT_THROWS_failStatus(fut.get()); });
 }
 
 TEST(Future_Void, Fail_getRvalue) {
-    FUTURE_FAIL_TEST<void>(
-        [](/*Future<void>*/ auto&& fut) { ASSERT_THROWS_failStatus(std::move(fut).get()); });
+    runFailureTests([](auto&& fut) { ASSERT_THROWS_failStatus(std::move(fut).get()); });
 }
 
 TEST(Future_Void, Fail_getNothrowLvalue) {
-    FUTURE_FAIL_TEST<void>(
-        [](/*Future<void>*/ auto&& fut) { ASSERT_EQ(fut.getNoThrow(), failStatus()); });
+    runFailureTests([](auto&& fut) { ASSERT_EQ(fut.getNoThrow(), failStatus()); });
 }
 
 TEST(Future_Void, Fail_getNothrowConstLvalue) {
-    FUTURE_FAIL_TEST<void>(
-        [](const /*Future<void>*/ auto& fut) { ASSERT_EQ(fut.getNoThrow(), failStatus()); });
+    runFailureTests([](const auto& fut) { ASSERT_EQ(fut.getNoThrow(), failStatus()); });
 }
 
 TEST(Future_Void, Fail_getNothrowRvalue) {
-    FUTURE_FAIL_TEST<void>(
-        [](/*Future<void>*/ auto&& fut) { ASSERT_EQ(std::move(fut).getNoThrow(), failStatus()); });
+    runFailureTests([](auto&& fut) { ASSERT_EQ(std::move(fut).getNoThrow(), failStatus()); });
 }
 
 TEST(Future_Void, Fail_semi_get) {
-    FUTURE_FAIL_TEST<void>(
-        [](/*Future<void>*/ auto&& fut) { ASSERT_THROWS_failStatus(std::move(fut).semi().get()); });
+    runFailureTests([](auto&& fut) { ASSERT_THROWS_failStatus(std::move(fut).semi().get()); });
 }
 
 TEST(Future_Void, Fail_getAsync) {
-    FUTURE_FAIL_TEST<void>([](/*Future<void>*/ auto&& fut) {
+    runFailureTests([](auto&& fut) {
         auto pf = makePromiseFuture<void>();
         std::move(fut).getAsync([outside = std::move(pf.promise)](Status status) mutable {
             ASSERT(!status.isOK());
@@ -132,20 +140,19 @@ TEST(Future_Void, Fail_getAsync) {
 }
 
 TEST(Future_Void, Success_isReady) {
-    FUTURE_SUCCESS_TEST([] {},
-                        [](/*Future<void>*/ auto&& fut) {
-                            const auto id = stdx::this_thread::get_id();
-                            while (!fut.isReady()) {
-                            }
-                            std::move(fut).getAsync([&](Status status) {
-                                ASSERT_EQ(stdx::this_thread::get_id(), id);
-                                ASSERT_OK(status);
-                            });
-                        });
+    runTests([](auto&& fut) {
+        const auto id = stdx::this_thread::get_id();
+        while (!fut.isReady()) {
+        }
+        std::move(fut).getAsync([&](Status status) {
+            ASSERT_EQ(stdx::this_thread::get_id(), id);
+            ASSERT_OK(status);
+        });
+    });
 }
 
 TEST(Future_Void, Fail_isReady) {
-    FUTURE_FAIL_TEST<void>([](/*Future<void>*/ auto&& fut) {
+    runFailureTests([](auto&& fut) {
         const auto id = stdx::this_thread::get_id();
         while (!fut.isReady()) {
         }
@@ -168,91 +175,71 @@ TEST(Future_Void, isReady_TSAN_OK) {
 }
 
 TEST(Future_Void, Success_thenSimple) {
-    FUTURE_SUCCESS_TEST([] {},
-                        [](/*Future<void>*/ auto&& fut) {
-                            ASSERT_EQ(std::move(fut).then([]() { return 3; }).get(), 3);
-                        });
+    runTests([](auto&& fut) { ASSERT_EQ(std::move(fut).then([]() { return 3; }).get(), 3); });
 }
 
 TEST(Future_Void, Success_thenVoid) {
-    FUTURE_SUCCESS_TEST([] {},
-                        [](/*Future<void>*/ auto&& fut) {
-                            ASSERT_EQ(std::move(fut).then([] {}).then([] { return 3; }).get(), 3);
-                        });
+    runTests(
+        [](auto&& fut) { ASSERT_EQ(std::move(fut).then([] {}).then([] { return 3; }).get(), 3); });
 }
 
 TEST(Future_Void, Success_thenStatus) {
-    FUTURE_SUCCESS_TEST([] {},
-                        [](/*Future<void>*/ auto&& fut) {
-                            ASSERT_EQ(std::move(fut).then([] {}).then([] { return 3; }).get(), 3);
-                        });
+    runTests(
+        [](auto&& fut) { ASSERT_EQ(std::move(fut).then([] {}).then([] { return 3; }).get(), 3); });
 }
 
 TEST(Future_Void, Success_thenError_Status) {
-    FUTURE_SUCCESS_TEST(
-        [] {},
-        [](/*Future<void>*/ auto&& fut) {
-            auto fut2 =
-                std::move(fut).then([]() { return Status(ErrorCodes::BadValue, "oh no!"); });
-            static_assert(future_details::isFutureLike<decltype(fut2)>);
-            static_assert(std::is_same_v<typename decltype(fut2)::value_type, void>);
-            ASSERT_EQ(fut2.getNoThrow(), ErrorCodes::BadValue);
-        });
+    runTests([](auto&& fut) {
+        auto fut2 = std::move(fut).then([]() { return Status(ErrorCodes::BadValue, "oh no!"); });
+        static_assert(future_details::isFutureLike<decltype(fut2)>);
+        static_assert(std::is_same_v<typename decltype(fut2)::value_type, void>);
+        ASSERT_EQ(fut2.getNoThrow(), ErrorCodes::BadValue);
+    });
 }
 
 TEST(Future_Void, Success_thenError_StatusWith) {
-    FUTURE_SUCCESS_TEST(
-        [] {},
-        [](/*Future<void>*/ auto&& fut) {
-            auto fut2 = std::move(fut).then(
-                []() { return StatusWith<double>(ErrorCodes::BadValue, "oh no!"); });
-            static_assert(future_details::isFutureLike<decltype(fut2)>);
-            static_assert(std::is_same_v<typename decltype(fut2)::value_type, double>);
-            ASSERT_EQ(fut2.getNoThrow(), ErrorCodes::BadValue);
-        });
+    runTests([](auto&& fut) {
+        auto fut2 = std::move(fut).then(
+            []() { return StatusWith<double>(ErrorCodes::BadValue, "oh no!"); });
+        static_assert(future_details::isFutureLike<decltype(fut2)>);
+        static_assert(std::is_same_v<typename decltype(fut2)::value_type, double>);
+        ASSERT_EQ(fut2.getNoThrow(), ErrorCodes::BadValue);
+    });
 }
 
 TEST(Future_Void, Success_thenFutureImmediate) {
-    FUTURE_SUCCESS_TEST(
-        [] {},
-        [](/*Future<void>*/ auto&& fut) {
-            ASSERT_EQ(std::move(fut).then([]() { return Future<int>::makeReady(3); }).get(), 3);
-        });
+    runTests([](auto&& fut) {
+        ASSERT_EQ(std::move(fut).then([]() { return Future<int>::makeReady(3); }).get(), 3);
+    });
 }
 
 TEST(Future_Void, Success_thenFutureReady) {
-    FUTURE_SUCCESS_TEST([] {},
-                        [](/*Future<void>*/ auto&& fut) {
-                            ASSERT_EQ(std::move(fut)
-                                          .then([]() {
-                                              auto pf = makePromiseFuture<int>();
-                                              pf.promise.emplaceValue(3);
-                                              return std::move(pf.future);
-                                          })
-                                          .get(),
-                                      3);
-                        });
+    runTests([](auto&& fut) {
+        ASSERT_EQ(std::move(fut)
+                      .then([]() {
+                          auto pf = makePromiseFuture<int>();
+                          pf.promise.emplaceValue(3);
+                          return std::move(pf.future);
+                      })
+                      .get(),
+                  3);
+    });
 }
 
 TEST(Future_Void, Success_thenFutureAsync) {
-    FUTURE_SUCCESS_TEST(
-        [] {},
-        [](/*Future<void>*/ auto&& fut) {
-            ASSERT_EQ(std::move(fut).then([]() { return async([] { return 3; }); }).get(), 3);
-        });
+    runTests([](auto&& fut) {
+        ASSERT_EQ(std::move(fut).then([]() { return async([] { return 3; }); }).get(), 3);
+    });
 }
 
 TEST(Future_Void, Success_thenSemiFutureAsync) {
-    FUTURE_SUCCESS_TEST(
-        [] {},
-        [](/*Future<void>*/ auto&& fut) {
-            ASSERT_EQ(std::move(fut).then([]() { return async([] { return 3; }).semi(); }).get(),
-                      3);
-        });
+    runTests([](auto&& fut) {
+        ASSERT_EQ(std::move(fut).then([]() { return async([] { return 3; }).semi(); }).get(), 3);
+    });
 }
 
 TEST(Future_Void, Fail_thenSimple) {
-    FUTURE_FAIL_TEST<void>([](/*Future<void>*/ auto&& fut) {
+    runFailureTests([](auto&& fut) {
         ASSERT_EQ(std::move(fut)
                       .then([]() {
                           FAIL("then() callback was called");
@@ -264,7 +251,7 @@ TEST(Future_Void, Fail_thenSimple) {
 }
 
 TEST(Future_Void, Fail_thenFutureAsync) {
-    FUTURE_FAIL_TEST<void>([](/*Future<void>*/ auto&& fut) {
+    runFailureTests([](auto&& fut) {
         ASSERT_EQ(std::move(fut)
                       .then([]() {
                           FAIL("then() callback was called");
@@ -276,35 +263,33 @@ TEST(Future_Void, Fail_thenFutureAsync) {
 }
 
 TEST(Future_Void, Success_onErrorSimple) {
-    FUTURE_SUCCESS_TEST([] {},
-                        [](/*Future<void>*/ auto&& fut) {
-                            ASSERT_EQ(
-                                std::move(fut)
-                                    .onError([](Status) { FAIL("onError() callback was called"); })
-                                    .then([] { return 3; })
-                                    .get(),
-                                3);
-                        });
+    runTests([](auto&& fut) {
+        ASSERT_EQ(
+            std::move(fut)
+                .onError([](Status) FTU_LAMBDA_R(void) { FAIL("onError() callback was called"); })
+                .then([] { return 3; })
+                .get(),
+            3);
+    });
 }
 
 TEST(Future_Void, Success_onErrorFutureAsync) {
-    FUTURE_SUCCESS_TEST([] {},
-                        [](/*Future<void>*/ auto&& fut) {
-                            ASSERT_EQ(std::move(fut)
-                                          .onError([](Status) {
-                                              FAIL("onError() callback was called");
-                                              return Future<void>();
-                                          })
-                                          .then([] { return 3; })
-                                          .get(),
-                                      3);
-                        });
+    runTests([](auto&& fut) {
+        ASSERT_EQ(std::move(fut)
+                      .onError([](Status) FTU_LAMBDA_R(Future<void>) {
+                          FAIL("onError() callback was called");
+                          return Future<void>();
+                      })
+                      .then([] { return 3; })
+                      .get(),
+                  3);
+    });
 }
 
 TEST(Future_Void, Fail_onErrorSimple) {
-    FUTURE_FAIL_TEST<void>([](/*Future<void>*/ auto&& fut) {
+    runFailureTests([](auto&& fut) {
         ASSERT_EQ(std::move(fut)
-                      .onError([](Status s) { ASSERT_EQ(s, failStatus()); })
+                      .onError([](Status s) FTU_LAMBDA_R(void) { ASSERT_EQ(s, failStatus()); })
                       .then([] { return 3; })
                       .getNoThrow(),
                   3);
@@ -312,7 +297,7 @@ TEST(Future_Void, Fail_onErrorSimple) {
 }
 
 TEST(Future_Void, Fail_onErrorError_throw) {
-    FUTURE_FAIL_TEST<void>([](/*Future<void>*/ auto&& fut) {
+    runFailureTests([](auto&& fut) {
         auto fut2 = std::move(fut).onError([](Status s) {
             ASSERT_EQ(s, failStatus());
             uasserted(ErrorCodes::BadValue, "oh no!");
@@ -322,8 +307,8 @@ TEST(Future_Void, Fail_onErrorError_throw) {
 }
 
 TEST(Future_Void, Fail_onErrorError_Status) {
-    FUTURE_FAIL_TEST<void>([](/*Future<void>*/ auto&& fut) {
-        auto fut2 = std::move(fut).onError([](Status s) {
+    runFailureTests([](auto&& fut) {
+        auto fut2 = std::move(fut).onError([](Status s) FTU_LAMBDA_R(Status) {
             ASSERT_EQ(s, failStatus());
             return Status(ErrorCodes::BadValue, "oh no!");
         });
@@ -332,9 +317,9 @@ TEST(Future_Void, Fail_onErrorError_Status) {
 }
 
 TEST(Future_Void, Fail_onErrorFutureImmediate) {
-    FUTURE_FAIL_TEST<void>([](/*Future<void>*/ auto&& fut) {
+    runFailureTests([](auto&& fut) {
         ASSERT_EQ(std::move(fut)
-                      .onError([](Status s) {
+                      .onError([](Status s) FTU_LAMBDA_R(Future<void>) {
                           ASSERT_EQ(s, failStatus());
                           return Future<void>::makeReady();
                       })
@@ -345,9 +330,9 @@ TEST(Future_Void, Fail_onErrorFutureImmediate) {
 }
 
 TEST(Future_Void, Fail_onErrorFutureReady) {
-    FUTURE_FAIL_TEST<void>([](/*Future<void>*/ auto&& fut) {
+    runFailureTests([](auto&& fut) {
         ASSERT_EQ(std::move(fut)
-                      .onError([](Status s) {
+                      .onError([](Status s) FTU_LAMBDA_R(Future<void>) {
                           ASSERT_EQ(s, failStatus());
                           auto pf = makePromiseFuture<void>();
                           pf.promise.emplaceValue();
@@ -360,9 +345,9 @@ TEST(Future_Void, Fail_onErrorFutureReady) {
 }
 
 TEST(Future_Void, Fail_onErrorFutureAsync) {
-    FUTURE_FAIL_TEST<void>([](/*Future<void>*/ auto&& fut) {
+    runFailureTests([](auto&& fut) {
         ASSERT_EQ(std::move(fut)
-                      .onError([&](Status s) {
+                      .onError([&](Status s) FTU_LAMBDA_R(Future<void>) {
                           ASSERT_EQ(s, failStatus());
                           return async([] {});
                       })
@@ -373,24 +358,23 @@ TEST(Future_Void, Fail_onErrorFutureAsync) {
 }
 
 TEST(Future_Void, Success_onErrorCode) {
-    FUTURE_SUCCESS_TEST([] {},
-                        [](/*Future<void>*/ auto&& fut) {
-                            ASSERT_EQ(std::move(fut)
-                                          .template onError<ErrorCodes::InternalError>([](Status) {
-                                              FAIL("onError<code>() callback was called");
-                                          })
-                                          .then([] { return 3; })
-                                          .get(),
-                                      3);
-                        });
+    runTests([](auto&& fut) {
+        ASSERT_EQ(std::move(fut)
+                      .template onError<ErrorCodes::InternalError>([](Status) FTU_LAMBDA_R(void) {
+                          FAIL("onError<code>() callback was called");
+                      })
+                      .then([] { return 3; })
+                      .get(),
+                  3);
+    });
 }
 
 TEST(Future_Void, Fail_onErrorCodeMatch) {
-    FUTURE_FAIL_TEST<void>([](/*Future<void>*/ auto&& fut) {
+    runFailureTests([](auto&& fut) {
         bool called = false;
         auto res =
             std::move(fut)
-                .onError([](Status s) {
+                .onError([](Status s) FTU_LAMBDA_R(Status) {
                     ASSERT_EQ(s, failStatus());
                     return Status(ErrorCodes::InternalError, "");
                 })
@@ -403,10 +387,10 @@ TEST(Future_Void, Fail_onErrorCodeMatch) {
 }
 
 TEST(Future_Void, Fail_onErrorCodeMatchFuture) {
-    FUTURE_FAIL_TEST<void>([](/*Future<void>*/ auto&& fut) {
+    runFailureTests([](auto&& fut) {
         bool called = false;
         auto res = std::move(fut)
-                       .onError([](Status s) {
+                       .onError([](Status s) FTU_LAMBDA_R(Status) {
                            ASSERT_EQ(s, failStatus());
                            return Status(ErrorCodes::InternalError, "");
                        })
@@ -422,11 +406,11 @@ TEST(Future_Void, Fail_onErrorCodeMatchFuture) {
 }
 
 TEST(Future_Void, Fail_onErrorCodeMismatch) {
-    FUTURE_FAIL_TEST<void>([](/*Future<void>*/ auto&& fut) {
+    runFailureTests([](auto&& fut) {
         ASSERT_EQ(std::move(fut)
                       .template onError<ErrorCodes::InternalError>(
-                          [](Status s) { FAIL("Why was this called?") << s; })
-                      .onError([](Status s) { ASSERT_EQ(s, failStatus()); })
+                          [](Status s) FTU_LAMBDA_R(void) { FAIL("Why was this called?") << s; })
+                      .onError([](Status s) FTU_LAMBDA_R(void) { ASSERT_EQ(s, failStatus()); })
                       .then([] { return 3; })
                       .getNoThrow(),
                   3);
@@ -434,51 +418,45 @@ TEST(Future_Void, Fail_onErrorCodeMismatch) {
 }
 
 TEST(Future_Void, Success_tap) {
-    FUTURE_SUCCESS_TEST<kNoExecutorFuture_needsTap>(
-        [] {},
-        [](/*Future<void>*/ auto&& fut) {
-            bool tapCalled = false;
-            ASSERT_EQ(
-                std::move(fut).tap([&tapCalled] { tapCalled = true; }).then([] { return 3; }).get(),
-                3);
-            ASSERT(tapCalled);
-        });
+    runTests<kNoExecutorFuture_needsTap>([](auto&& fut) {
+        bool tapCalled = false;
+        ASSERT_EQ(
+            std::move(fut).tap([&tapCalled] { tapCalled = true; }).then([] { return 3; }).get(), 3);
+        ASSERT(tapCalled);
+    });
 }
 
 TEST(Future_Void, Success_tapError) {
-    FUTURE_SUCCESS_TEST<kNoExecutorFuture_needsTap>(
-        [] {},
-        [](/*Future<void>*/ auto&& fut) {
-            ASSERT_EQ(std::move(fut)
-                          .tapError([](Status s) { FAIL("tapError() callback was called"); })
-                          .then([] { return 3; })
-                          .get(),
-                      3);
-        });
+    runTests<kNoExecutorFuture_needsTap>([](auto&& fut) {
+        ASSERT_EQ(std::move(fut)
+                      .tapError([](Status s)
+                                    FTU_LAMBDA_R(void) { FAIL("tapError() callback was called"); })
+                      .then([] { return 3; })
+                      .get(),
+                  3);
+    });
 }
 
 TEST(Future_Void, Success_tapAll_StatusWith) {
-    FUTURE_SUCCESS_TEST<kNoExecutorFuture_needsTap>([] {},
-                                                    [](/*Future<void>*/ auto&& fut) {
-                                                        bool tapCalled = false;
-                                                        ASSERT_EQ(
-                                                            std::move(fut)
-                                                                .tapAll([&tapCalled](Status s) {
-                                                                    ASSERT_OK(s);
-                                                                    tapCalled = true;
-                                                                })
-                                                                .then([] { return 3; })
-                                                                .get(),
-                                                            3);
-                                                        ASSERT(tapCalled);
-                                                    });
+    runTests<kNoExecutorFuture_needsTap>([](auto&& fut) {
+        bool tapCalled = false;
+        ASSERT_EQ(std::move(fut)
+                      .tapAll([&tapCalled](Status s) {
+                          ASSERT_OK(s);
+                          tapCalled = true;
+                      })
+                      .then([] { return 3; })
+                      .get(),
+                  3);
+        ASSERT(tapCalled);
+    });
 }
 
 TEST(Future_Void, Fail_tap) {
-    FUTURE_FAIL_TEST<void, kNoExecutorFuture_needsTap>([](/*Future<void>*/ auto&& fut) {
+    runFailureTests<kNoExecutorFuture_needsTap>([](auto&& fut) {
         ASSERT_EQ(std::move(fut)
                       .tap([] { FAIL("tap() callback was called"); })
-                      .onError([](Status s) { ASSERT_EQ(s, failStatus()); })
+                      .onError([](Status s) FTU_LAMBDA_R(void) { ASSERT_EQ(s, failStatus()); })
                       .then([] { return 3; })
                       .get(),
                   3);
@@ -486,14 +464,14 @@ TEST(Future_Void, Fail_tap) {
 }
 
 TEST(Future_Void, Fail_tapError) {
-    FUTURE_FAIL_TEST<void, kNoExecutorFuture_needsTap>([](/*Future<void>*/ auto&& fut) {
+    runFailureTests<kNoExecutorFuture_needsTap>([](auto&& fut) {
         bool tapCalled = false;
         ASSERT_EQ(std::move(fut)
                       .tapError([&tapCalled](Status s) {
                           ASSERT_EQ(s, failStatus());
                           tapCalled = true;
                       })
-                      .onError([](Status s) { ASSERT_EQ(s, failStatus()); })
+                      .onError([](Status s) FTU_LAMBDA_R(void) { ASSERT_EQ(s, failStatus()); })
                       .then([] { return 3; })
                       .get(),
                   3);
@@ -502,14 +480,14 @@ TEST(Future_Void, Fail_tapError) {
 }
 
 TEST(Future_Void, Fail_tapAll_StatusWith) {
-    FUTURE_FAIL_TEST<void, kNoExecutorFuture_needsTap>([](/*Future<void>*/ auto&& fut) {
+    runFailureTests<kNoExecutorFuture_needsTap>([](auto&& fut) {
         bool tapCalled = false;
         ASSERT_EQ(std::move(fut)
                       .tapAll([&tapCalled](Status sw) {
                           ASSERT_EQ(sw, failStatus());
                           tapCalled = true;
                       })
-                      .onError([](Status s) { ASSERT_EQ(s, failStatus()); })
+                      .onError([](Status s) FTU_LAMBDA_R(void) { ASSERT_EQ(s, failStatus()); })
                       .then([] { return 3; })
                       .get(),
                   3);
@@ -518,102 +496,93 @@ TEST(Future_Void, Fail_tapAll_StatusWith) {
 }
 
 TEST(Future_Void, Success_onCompletionSimple) {
-    FUTURE_SUCCESS_TEST([] {},
-                        [](/*Future<void>*/ auto&& fut) {
-                            ASSERT_EQ(std::move(fut)
-                                          .onCompletion([](Status status) {
-                                              ASSERT_OK(status);
-                                              return 3;
-                                          })
-                                          .get(),
-                                      3);
-                        });
+    runTests([](auto&& fut) {
+        ASSERT_EQ(std::move(fut)
+                      .onCompletion([](Status status) FTU_LAMBDA_R(int) {
+                          ASSERT_OK(status);
+                          return 3;
+                      })
+                      .get(),
+                  3);
+    });
 }
 
 TEST(Future_Void, Success_onCompletionVoid) {
-    FUTURE_SUCCESS_TEST([] {},
-                        [](/*Future<void>*/ auto&& fut) {
-                            ASSERT_EQ(std::move(fut)
-                                          .onCompletion([](Status status) { ASSERT_OK(status); })
-                                          .then([]() { return 3; })
-                                          .get(),
-                                      3);
-                        });
+    runTests([](auto&& fut) {
+        ASSERT_EQ(std::move(fut)
+                      .onCompletion([](Status status) FTU_LAMBDA_R(void) { ASSERT_OK(status); })
+                      .then([]() { return 3; })
+                      .get(),
+                  3);
+    });
 }
 
 TEST(Future_Void, Success_onCompletionError_Status) {
-    FUTURE_SUCCESS_TEST([] {},
-                        [](/*Future<void>*/ auto&& fut) {
-                            auto fut2 = std::move(fut).onCompletion([](Status status) {
-                                ASSERT_OK(status);
-                                return Status(ErrorCodes::BadValue, "oh no!");
-                            });
-                            static_assert(future_details::isFutureLike<decltype(fut2)>);
-                            static_assert(
-                                std::is_same_v<typename decltype(fut2)::value_type, void>);
-                            ASSERT_EQ(fut2.getNoThrow(), ErrorCodes::BadValue);
-                        });
+    runTests([](auto&& fut) {
+        auto fut2 = std::move(fut).onCompletion([](Status status) FTU_LAMBDA_R(Status) {
+            ASSERT_OK(status);
+            return Status(ErrorCodes::BadValue, "oh no!");
+        });
+        static_assert(future_details::isFutureLike<decltype(fut2)>);
+        static_assert(std::is_same_v<typename decltype(fut2)::value_type, void>);
+        ASSERT_EQ(fut2.getNoThrow(), ErrorCodes::BadValue);
+    });
 }
 
 TEST(Future_Void, Success_onCompletionError_StatusWith) {
-    FUTURE_SUCCESS_TEST([] {},
-                        [](/*Future<void>*/ auto&& fut) {
-                            auto fut2 = std::move(fut).onCompletion([](Status status) {
-                                ASSERT_OK(status);
-                                return StatusWith<double>(ErrorCodes::BadValue, "oh no!");
-                            });
-                            static_assert(future_details::isFutureLike<decltype(fut2)>);
-                            static_assert(
-                                std::is_same_v<typename decltype(fut2)::value_type, double>);
-                            ASSERT_EQ(fut2.getNoThrow(), ErrorCodes::BadValue);
-                        });
+    runTests([](auto&& fut) {
+        auto fut2 = std::move(fut).onCompletion([](Status status) FTU_LAMBDA_R(StatusWith<double>) {
+            ASSERT_OK(status);
+            return StatusWith<double>(ErrorCodes::BadValue, "oh no!");
+        });
+        static_assert(future_details::isFutureLike<decltype(fut2)>);
+        static_assert(std::is_same_v<typename decltype(fut2)::value_type, double>);
+        ASSERT_EQ(fut2.getNoThrow(), ErrorCodes::BadValue);
+    });
 }
 
 TEST(Future_Void, Success_onCompletionFutureImmediate) {
-    FUTURE_SUCCESS_TEST([] {},
-                        [](/*Future<void>*/ auto&& fut) {
-                            ASSERT_EQ(std::move(fut)
-                                          .onCompletion([](Status status) {
-                                              ASSERT_OK(status);
-                                              return Future<int>::makeReady(3);
-                                          })
-                                          .get(),
-                                      3);
-                        });
+    runTests([](auto&& fut) {
+        ASSERT_EQ(std::move(fut)
+                      .onCompletion([](Status status) FTU_LAMBDA_R(Future<int>) {
+                          ASSERT_OK(status);
+                          return Future<int>::makeReady(3);
+                      })
+                      .get(),
+                  3);
+    });
 }
 
 TEST(Future_Void, Success_onCompletionFutureReady) {
-    FUTURE_SUCCESS_TEST([] {},
-                        [](/*Future<void>*/ auto&& fut) {
-                            ASSERT_EQ(std::move(fut)
-                                          .onCompletion([](Status status) {
-                                              ASSERT_OK(status);
-                                              auto pf = makePromiseFuture<int>();
-                                              pf.promise.emplaceValue(3);
-                                              return std::move(pf.future);
-                                          })
-                                          .get(),
-                                      3);
-                        });
+    runTests([](auto&& fut) {
+        ASSERT_EQ(std::move(fut)
+                      .onCompletion([](Status status) FTU_LAMBDA_R(Future<int>) {
+                          ASSERT_OK(status);
+                          auto pf = makePromiseFuture<int>();
+                          pf.promise.emplaceValue(3);
+                          return std::move(pf.future);
+                      })
+                      .get(),
+                  3);
+    });
 }
 
 TEST(Future_Void, Success_onCompletionFutureAsync) {
-    FUTURE_SUCCESS_TEST([] {},
-                        [](/*Future<void>*/ auto&& fut) {
-                            ASSERT_EQ(std::move(fut)
-                                          .onCompletion([](Status status) {
-                                              ASSERT_OK(status);
-                                              return async([] { return 3; });
-                                          })
-                                          .get(),
-                                      3);
-                        });
+    runTests([](auto&& fut) {
+        ASSERT_EQ(std::move(fut)
+                      .onCompletion([](Status status) {
+                          ASSERT_OK(status);
+                          return async([] { return 3; });
+                      })
+                      .get(),
+                  3);
+    });
 }
 
 TEST(Future_Void, Fail_onCompletionSimple) {
-    FUTURE_FAIL_TEST<void>([](/*Future<void>*/ auto&& fut) {
+    runFailureTests([](auto&& fut) {
         ASSERT_EQ(std::move(fut)
-                      .onCompletion([](Status s) { ASSERT_EQ(s, failStatus()); })
+                      .onCompletion([](Status s) FTU_LAMBDA_R(void) { ASSERT_EQ(s, failStatus()); })
                       .then([] { return 3; })
                       .getNoThrow(),
                   3);
@@ -621,7 +590,7 @@ TEST(Future_Void, Fail_onCompletionSimple) {
 }
 
 TEST(Future_Void, Fail_onCompletionError_throw) {
-    FUTURE_FAIL_TEST<void>([](/*Future<void>*/ auto&& fut) {
+    runFailureTests([](auto&& fut) {
         auto fut2 = std::move(fut).onCompletion([](Status s) {
             ASSERT_EQ(s, failStatus());
             uasserted(ErrorCodes::BadValue, "oh no!");
@@ -631,8 +600,8 @@ TEST(Future_Void, Fail_onCompletionError_throw) {
 }
 
 TEST(Future_Void, Fail_onCompletionError_Status) {
-    FUTURE_FAIL_TEST<void>([](/*Future<void>*/ auto&& fut) {
-        auto fut2 = std::move(fut).onCompletion([](Status s) {
+    runFailureTests([](auto&& fut) {
+        auto fut2 = std::move(fut).onCompletion([](Status s) FTU_LAMBDA_R(Status) {
             ASSERT_EQ(s, failStatus());
             return Status(ErrorCodes::BadValue, "oh no!");
         });
@@ -641,9 +610,9 @@ TEST(Future_Void, Fail_onCompletionError_Status) {
 }
 
 TEST(Future_Void, Fail_onCompletionFutureImmediate) {
-    FUTURE_FAIL_TEST<void>([](/*Future<void>*/ auto&& fut) {
+    runFailureTests([](auto&& fut) {
         ASSERT_EQ(std::move(fut)
-                      .onCompletion([](Status s) {
+                      .onCompletion([](Status s) FTU_LAMBDA_R(Future<void>) {
                           ASSERT_EQ(s, failStatus());
                           return Future<void>::makeReady();
                       })
@@ -654,9 +623,9 @@ TEST(Future_Void, Fail_onCompletionFutureImmediate) {
 }
 
 TEST(Future_Void, Fail_onCompletionFutureReady) {
-    FUTURE_FAIL_TEST<void>([](/*Future<void>*/ auto&& fut) {
+    runFailureTests([](auto&& fut) {
         ASSERT_EQ(std::move(fut)
-                      .onCompletion([](Status s) {
+                      .onCompletion([](Status s) FTU_LAMBDA_R(Future<void>) {
                           ASSERT_EQ(s, failStatus());
                           auto pf = makePromiseFuture<void>();
                           pf.promise.emplaceValue();
@@ -669,9 +638,9 @@ TEST(Future_Void, Fail_onCompletionFutureReady) {
 }
 
 TEST(Future_Void, Fail_onCompletionFutureAsync) {
-    FUTURE_FAIL_TEST<void>([](/*Future<void>*/ auto&& fut) {
+    runFailureTests([](auto&& fut) {
         ASSERT_EQ(std::move(fut)
-                      .onCompletion([&](Status s) {
+                      .onCompletion([&](Status s) FTU_LAMBDA_R(Future<void>) {
                           ASSERT_EQ(s, failStatus());
                           return async([] {});
                       })

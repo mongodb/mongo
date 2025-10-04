@@ -1,0 +1,128 @@
+load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
+
+package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "all_files",
+    srcs = glob(["**"]),
+    visibility = ["//visibility:public"],
+)
+
+# Javascript imports that are used in most, if not all, jstests. These are typically
+# imports added unconditionally by resmoke when starting the mongo shell or used by
+# resmoke hooks.
+common_jstest_data = [
+    "//jstests/concurrency/fsm_workload_helpers:server_types.js",
+    "//jstests/core/timeseries/libs:timeseries_writes_util.js",
+    "//jstests/core/timeseries/libs:viewless_timeseries_util.js",
+    "//jstests/hooks:all_subpackage_javascript_files",
+    "//jstests/libs:all_subpackage_javascript_files",
+    "//jstests/aggregation/extras:utils.js",
+    "//jstests/sharding/libs:sharded_index_util.js",
+]
+
+# This is a temporary test target for running the jstests core
+# suite as a bazel test. Cleanup with SERVER-103537.
+resmoke_suite_test(
+    name = "core",
+    srcs = [
+        "//jstests/core:all_subpackage_javascript_files",
+        "//jstests/core_standalone:all_subpackage_javascript_files",
+    ],
+    config = ":suites/core.yml",
+    data = [
+        "//jstests/aggregation/extras:merge_helpers.js",
+        "//jstests/noPassthrough/libs:server_parameter_helpers.js",
+        "//jstests/noPassthrough/libs/index_builds:index_build.js",
+        "//jstests/replsets:rslib.js",
+        "//jstests/sharding/libs:last_lts_mongod_commands.js",
+        "//jstests/sharding/libs:last_lts_mongos_commands.js",
+        "//jstests/third_party/fast_check:fc-3.1.0.js",
+        "//src/third_party/schemastore.org:schemas",
+    ] + common_jstest_data,
+    exclude_files = [
+        # Transactions are not supported on MongoDB standalone nodes, so we do not run these tests in the
+        # 'core' suite. Instead we run them against a 1-node replica set in the 'core_txns' suite.
+        "//jstests/core/txns:all_subpackage_javascript_files",
+        # Query settings are not supported on standalone.
+        "//jstests/core/query/query_settings:all_subpackage_javascript_files",
+        # Queryable encryption is not supported on standalone.
+        "//jstests/core/query/queryable_encryption:all_subpackage_javascript_files",
+    ],
+    resmoke_args = [
+        "--storageEngineCacheSizeGB=1",
+    ],
+    tags = [
+        "manual",  # exclude from expansion of target pattern wildcards (..., :*, :all, etc.)
+    ],
+)
+
+# This is an experimental test target for running the jstestfuzz
+# suite as a bazel test. It runs in an experimental Evergreen task on an
+# infrequent build variant. You should not worry about this target being
+# perfectly up-to-date with the suite config, nor create similar bazel targets
+# for other suites. Cleanup with SERVER-103537.
+resmoke_suite_test(
+    name = "jstestfuzz",
+    srcs = [
+        "//:jstestfuzz_generated_tests",
+    ],
+    config = ":suites/jstestfuzz.yml",
+    data = common_jstest_data,
+    resmoke_args = [
+        "--storageEngineCacheSizeGB=1",
+    ],
+    tags = [
+        "manual",  # exclude from expansion of target pattern wildcards (..., :*, :all, etc.)
+    ],
+)
+
+# This is an experimental test target for running the multiversion_sanity_check
+# suite as a bazel test. It runs in an experimental Evergreen task on an
+# infrequent build variant. You should not worry about this target being
+# perfectly up-to-date with the suite config, nor create similar bazel targets
+# for other suites. Cleanup with SERVER-103537.
+resmoke_suite_test(
+    name = "bazel_multiversion_sanity_check_last_continuous_new_new_old",
+    srcs = [
+        "//jstests/core/testing:mixed_version_replica_set.js",
+    ],
+    config = ":matrix_suites/generated_suites/multiversion_sanity_check_last_continuous_new_new_old.yml",
+    data = [
+        ":matrix_suites/mappings/multiversion_sanity_check_last_continuous_new_new_old.yml",
+        ":matrix_suites/overrides/multiversion.yml",
+        "//:multiversion_binaries",
+    ] + common_jstest_data,
+    resmoke_args = [
+        "--storageEngineCacheSizeGB=1",
+    ],
+    shard_count = 1,
+    tags = [
+        "manual",  # exclude from expansion of target pattern wildcards (..., :*, :all, etc.)
+    ],
+)
+
+# This is an experimental test target for running the multiversion_sanity_check
+# suite as a bazel test. It runs in an experimental Evergreen task on an
+# infrequent build variant. You should not worry about this target being
+# perfectly up-to-date with the suite config, nor create similar bazel targets
+# for other suites. Cleanup with SERVER-103537.
+resmoke_suite_test(
+    name = "bazel_multiversion_sanity_check_last_lts_new_new_old",
+    srcs = [
+        "//jstests/core/testing:mixed_version_replica_set.js",
+    ],
+    config = ":matrix_suites/generated_suites/multiversion_sanity_check_last_lts_new_new_old.yml",
+    data = [
+        ":matrix_suites/mappings/multiversion_sanity_check_last_lts_new_new_old.yml",
+        ":matrix_suites/overrides/multiversion.yml",
+        "//:multiversion_binaries",
+    ] + common_jstest_data,
+    resmoke_args = [
+        "--storageEngineCacheSizeGB=1",
+    ],
+    shard_count = 1,
+    tags = [
+        "manual",  # exclude from expansion of target pattern wildcards (..., :*, :all, etc.)
+    ],
+)

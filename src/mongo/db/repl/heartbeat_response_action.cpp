@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/repl/heartbeat_response_action.h"
 
 namespace mongo {
@@ -81,6 +79,10 @@ void HeartbeatResponseAction::setAdvancedOpTimeOrUpdatedConfig(bool advancedOrUp
 
 void HeartbeatResponseAction::setBecameElectable(bool becameElectable) {
     _becameElectable = becameElectable;
+}
+
+void HeartbeatResponseAction::setChangedMemberState(bool changedMemberState) {
+    _changedMemberState = changedMemberState;
 }
 
 }  // namespace repl

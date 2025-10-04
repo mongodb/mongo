@@ -1,0 +1,223 @@
+/*! @arch_page arch-usage-patterns Usage Patterns
+
+WiredTiger is a highly multi-threaded application which means that a large number of operations can
+happen in parallel. In order to be performant WiredTiger utilizes a number of lock-free programming
+mechanisms. Commonly used patterns are documented here. A pattern in this instance is a combination
+of one or more lock-free programming techniques.
+
+This architecture guide page aims to aid developers in understanding and using these patterns in the
+future.
+
+@section message-passing Message passing with acquire and release
+
+When a writer thread needs to share data with one or more reader threads concurrently the message
+passing pattern can be used. For this pattern to work two variables are required. A "payload" which
+is the data being shared, and a "signal" variable. The payload could be a number of things, e.g:
+
+- A struct with any number of fields
+- A single variable in memory
+
+For the writer to share this payload with readers it needs to perform two steps in the correct
+order. Firstly it writes the payload, then writes a signal variable with a release write. The reader
+threads will read the signal variable to know if the payload is safe to read. The release write must
+use the \c WT_RELEASE_WRITE macro described in @ref rel-marked.
+
+The reader threads must read with the opposite order, to do so they read the signal variable using
+the acquire read macro \c WT_ACQUIRE_READ. Then they read the payload, the \c WT_ACQUIRE_READ macro
+provides the required ordering semantics. The macro is described in @ref acq-marked. If the signal
+variable indicates the payload is safe to read the reader thread can read the payload.
+
+This pattern is used in many places in WiredTiger but they are not listed here as the list will
+become stale.
+
+<b> Example pseudocode: </b>
+\code{.c}
+    void write {
+        s->payload = 5;
+        WT_RELEASE_WRITE(s->ready, true);
+    }
+
+    void read {
+        bool ready;
+
+        WT_ACQUIRE_READ(ready, s->ready);
+        if (ready) {
+            var = s->payload;
+        }
+    }
+\endcode
+
+@section slotted-arrays Slotted arrays
+
+@subsection slotted-arrays-overview Overview
+
+Given an array of size \c Z, where objects within the array may be unused. The slot counter pattern
+provides a variable - whose name varies depending on implementation but we will refer to it as
+\c slot_count - to readers to determine how many slots in that array need reviewing. That way the
+reader only has to walk \c slot_count slots in the array instead of traversing the whole list. This
+allows for dynamic array growth and provides an optimization as readers would otherwise have to walk
+the full array.
+
+If the array size is fixed then **no** ordering is defined for \c slot_count. If the array is
+allowed to grow then additional ordering is defined for \c slot_count. See @ref growable-arrays for
+further details.
+
+@subsubsection slotted-arrays-use-cases Use cases
+This pattern should only be used if performance is critical in the read path, prior to usage of this
+pattern the following determinations should be made:
+ - Is walking the entire array too expensive?
+ - Is a read-write lock protecting both traversing and writing to the array too expensive?
+ - Does this array need to be growable?
+
+@subsubsection slotted-arrays-writing Writing
+When an algorithm initializes an object in the array there are two outcomes with respect to
+\c slot_count:
+1. If a free slot is available at an index smaller than \c slot_count the slot will be
+used and the object in the slot will be initialized.
+2. If there is no free slot available at a position less than \c slot_count then the slot at index
+\c slot_count is used and \c slot_count is incremented.
+
+Additionally the writers must follow the @ref message-passing pattern when initializing the slot.
+Firstly the object / slot must be initialized with its payload then a flag or pointer can be set
+for readers to safely read the object held in the slot itself.
+
+@subsubsection slotted-arrays-reading Reading
+Reading from this array requires readers to loop through the array, up until \c slot_count. Readers
+must read \c slot_count **only once** prior to entering the body of the loop and ensure a local copy of
+the value is used for the remainder of the loop.
+
+When reading a specific slot, readers must follow the @ref message-passing pattern by reading a flag
+or pointer indicating the slot is initialized prior to reading the contents of the object held in
+the slot.
+
+@subsubsection slotted-arrays-correctness Correctness of allowing reading while allowing writes
+Additional writes to the array can occur concurrently, and as a copy of \c slot_count is taken by
+readers prior to their traversal they may miss objects being initialized concurrently. The reader
+algorithm must take care to ensure that once it has entered the loop new slots being used in the
+array will not impact the outcome of the loop as it is not guaranteed to see those.
+
+@subsection growable-arrays Growable arrays
+A growable array is one where the value of \c Z is not fixed and the user can increase the array
+size while the array is in use. Here we will discuss the additional semantics required to support
+a growable array.
+
+__Note:__ @ref generations handle the life cycle, creation and freeing of the growable array and
+that will not be covered here.
+
+@subsubsection growable-arrays-writing Writing
+If a new slot is required in the array, but all slots are in use and \c slot_count is equal to the
+size \c Z of the array then the array must grow. The variable \c slot_count has additional ordering
+defined when swapping in the array. The array pointer swap must happen before \c slot_count is
+incremented. This requires a @ref rel-marked.
+
+@subsubsection growable-arrays-reading Reading
+Readers must respect the writer side ordering. The \c slot_count must be read prior to reading the
+array pointer. This requires an @ref acq-marked. If this ordering is not respected the reader could
+read an old array pointer but a new \c slot_count and encounter an array index out of bounds
+exception.
+
+@subsubsection growable-arrays-further-details Further details
+The fixed size version of this pattern is used to maintain the @ref arch-connection's sessions
+array. The dynamically growing version of this pattern is used to maintain the hazard pointer array
+for a @ref arch-session.
+
+@section write-while-stable Write While stable (WwS)
+The Write while Stable (WwS) pattern performs a write to a memory location \c W, but only considers
+that write to be successful if the value of a *separate* memory location \c S has not changed by the
+time the write to \c W has become visible. As a result when the \c WwS pattern succeeds, the next
+time the value of \c S changes all threads can already see the update to \c W.
+
+In this pattern the write to \c W always takes place, however the writing thread will not consider
+the update to be valid until it has verified that \c S is unchanged. The writing thread is
+responsible for either retrying or rolling back the write to \c W on a failure. Threads reading from
+\c W must be able to handle or ignore these interim "failed" writes to \c W, and must perform a
+read-acquire on \c S before reading \c W.
+
+<img src="WwS.png" alt="" style="transform: scale(0.75,0.75);" />
+
+This pattern should only be used in performance critical paths. In all other cases a lock should be
+used as it provides a much simpler interface for developers when reading and debugging code.
+
+@subsection write-while-stable-pseudocode Pseudocode
+\code{.c}
+    void example_WwS(int *W, int *S) {
+        // The initial read from S must take place before the write to W.
+        WT_ACQUIRE_READ(initial_s_value, *S);
+        *W = new_value;
+
+        // This full barrier ensures the write to W is visible to other threads *before*
+        // we re-read the contents of S to verify it hasn't changed.
+        FULL_BARRIER();
+
+        if(*S != initial_s) {
+            // The write was unsuccessful. Rollback or retry.
+        }
+    }
+\endcode
+
+@subsection write-while-stable-wt-implementation Example WT implementation
+
+__Note:__ The following example assumes familiarity with WiredTiger's @ref generations.
+
+In the generation code the \c __wt_session_gen_enter function the current value of the
+\c connection->generation (\c S) and writes it to \c session->generation (\c W). Independently a second
+thread executing \c __gen_oldest will first read \c connection->generation and then walk all
+\c session->generations, reporting the smallest generation seen.
+
+Without this pattern \c __wt_session_gen_enter could enter a generation \c G, the
+\c connection->generation could be advanced to \c G+1, and the \c __gen_oldest thread would see the
+update to \c connection->generation \c G+1 but not the write to the \c session->generation \c G.
+This would incorrectly report the oldest generation as \c G+1 while the \c session->generation \c G
+is still active.
+
+On a successful \c WwS the write to \c session->generation must be visible before advancing the
+\c connection->generation. If the \c connection->generation has not been advanced the new
+\c session->generation is visible and the oldest generation will be equal to it.
+
+On a failed \c WwS \c __wt_session_gen_enter must retry and enter the new generation \c G+1. If
+\c __gen_oldest sees the "invalid" \c session->generation of \c G it will report an older generation
+that the actual oldest generation. This is considered acceptable as it temporarily delays freeing a
+resource which has no impact on correctness.
+
+This is the trimmed down version of the writing thread code in the generations logic:
+\code{.c}
+    do {
+        session->generations[which] = __wt_gen(session, which);
+        WT_FULL_BARRIER();
+    } while (session->generations[which] != __wt_gen(session, which));
+\endcode
+
+@section win-the-race Win the Race
+
+__Note:__ This usage pattern behaves like a lightweight version of a trylock. In non-critical code
+paths a trylock should be preferred as it also provides acquire/release semantics around the
+critical section, guaranteeing instructions inside the critical section take place within the lock.
+
+Multiple threads will often compete to enter a critical section or execute functions that should be
+limited to a single thread. For example in \c __wt_cache_pool_server all threads will attempt to
+become the pool manager but only one manager is allowed. Whichever thread comes first will become
+the manager.
+
+To implement this usage pattern all threads attempt to set some shared flag \c F via a
+\c compare_and_swap. On success the winning thread is allowed to continue into the critical section.
+When the thread leaves the critical section it unsets the flag for the other threads to claim.
+Threads that fail to claim the flag \c F must decide whether to continue, abort or retry.
+
+@subsection win-the-race-example Example
+In \c __wt_cache_pool_server all threads attempt to set the \c pool_managed flag with a call to
+\c __wt_atomic_cas8(&cp->pool_managed, 0, 1) and only the successful thread is allowed then to set
+the \c WT_CACHE_POOL_MANAGER flag and perform the duties of the pool manager.
+
+@subsection win-the-race-pseudocode Example Pseudocode
+
+\code{.c}
+    void win_the_race(int *F) {
+        if(__wt_atomic_int(&F, 0, 1)) {
+            // perform work that must be performed by a single thread
+
+            // unset the flag at the end of the section
+              *F = 0;
+        }
+    }
+\endcode
+*/

@@ -27,7 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/base/init.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/shell_utils.h"
 

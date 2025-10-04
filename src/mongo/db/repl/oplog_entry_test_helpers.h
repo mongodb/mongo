@@ -30,13 +30,25 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/logical_session_id.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/util/modules.h"
+#include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
-namespace mongo {
+#include <string>
+#include <vector>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+namespace MONGO_MOD_PUB mongo {
+
+struct IndexBuildInfo;
 namespace repl {
 /**
  * Creates an OplogEntry with given parameters and preset defaults.
@@ -52,12 +64,6 @@ OplogEntry makeOplogEntry(repl::OpTime opTime,
                           boost::optional<UUID> uuid = boost::none,
                           boost::optional<OpTime> prevOpTime = boost::none);
 
-/**
- * Creates a create collection oplog entry with given optime.
- */
-OplogEntry makeCreateCollectionOplogEntry(OpTime opTime,
-                                          const NamespaceString& nss = NamespaceString("test.t"),
-                                          const BSONObj& options = BSONObj());
 /**
  * Creates an insert oplog entry with given optime and namespace.
  */
@@ -77,6 +83,29 @@ OplogEntry makeUpdateDocumentOplogEntry(OpTime opTime,
                                         const NamespaceString& nss,
                                         const BSONObj& documentToUpdate,
                                         const BSONObj& updatedDocument);
+
+OplogEntry makeContainerInsertOplogEntry(OpTime opTime,
+                                         const NamespaceString& nss,
+                                         StringData containerIdent,
+                                         int64_t key,
+                                         BSONBinData value);
+
+OplogEntry makeContainerInsertOplogEntry(OpTime opTime,
+                                         const NamespaceString& nss,
+                                         StringData containerIdent,
+                                         BSONBinData key,
+                                         BSONBinData value);
+
+OplogEntry makeContainerDeleteOplogEntry(OpTime opTime,
+                                         const NamespaceString& nss,
+                                         StringData containerIdent,
+                                         int64_t key);
+
+OplogEntry makeContainerDeleteOplogEntry(OpTime opTime,
+                                         const NamespaceString& nss,
+                                         StringData containerIdent,
+                                         BSONBinData key);
+
 /**
  * Creates an index creation entry with given optime and namespace.
  */
@@ -84,17 +113,18 @@ OplogEntry makeCreateIndexOplogEntry(OpTime opTime,
                                      const NamespaceString& nss,
                                      const std::string& indexName,
                                      const BSONObj& keyPattern,
-                                     const UUID& uuid);
+                                     const UUID& uuid,
+                                     const BSONObj& options = {});
 /**
  * Creates a two-phase index build start oplog entry with a given optime, namespace, and index
  * build UUID.
  */
 OplogEntry makeStartIndexBuildOplogEntry(OpTime opTime,
                                          const NamespaceString& nss,
-                                         const std::string& indexName,
-                                         const BSONObj& keyPattern,
                                          const UUID& uuid,
-                                         const UUID& indexBuildUUID);
+                                         const UUID& indexBuildUUID,
+                                         const IndexBuildInfo& indexBuildInfo,
+                                         StringData indexIdent);
 
 /**
  * Creates a two-phase index build commit oplog entry with a given optime, namespace, and index
@@ -102,17 +132,17 @@ OplogEntry makeStartIndexBuildOplogEntry(OpTime opTime,
  */
 OplogEntry makeCommitIndexBuildOplogEntry(OpTime opTime,
                                           const NamespaceString& nss,
-                                          const std::string& indexName,
-                                          const BSONObj& keyPattern,
                                           const UUID& uuid,
-                                          const UUID& indexBuildUUID);
+                                          const UUID& indexBuildUUID,
+                                          const IndexBuildInfo& indexBuildInfo);
 
 /**
  * Creates an oplog entry for 'command' with the given 'optime', 'namespace' and optional 'uuid'.
  */
 OplogEntry makeCommandOplogEntry(OpTime opTime,
                                  const NamespaceString& nss,
-                                 const BSONObj& command,
+                                 const BSONObj& object,
+                                 boost::optional<BSONObj> object2 = boost::none,
                                  boost::optional<UUID> uuid = boost::none);
 
 /**
@@ -147,4 +177,4 @@ OplogEntry makeInsertDocumentOplogEntryWithSessionInfoAndStmtIds(
 
 BSONObj makeInsertApplyOpsEntry(const NamespaceString& nss, const UUID& uuid, const BSONObj& doc);
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

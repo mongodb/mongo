@@ -27,21 +27,40 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/dbtests/mock/mock_dbclient_connection.h"
 #include "mongo/dbtests/mock/mock_replica_set.h"
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/connection_string.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/exec/mutable_bson/mutable_bson_test_utils.h"
+#include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/repl/member_config.h"
+#include "mongo/db/repl/member_id.h"
+#include "mongo/db/repl/repl_set_config.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/dbtests/mock/mock_dbclient_connection.h"
+#include "mongo/dbtests/mock/mock_remote_db_server.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/net/hostandport.h"
 
 #include <set>
 #include <string>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 
 using mongo::BSONArrayBuilder;
 using mongo::BSONElement;
 using mongo::BSONObj;
 using mongo::BSONObjBuilder;
 using mongo::BSONObjIterator;
-using mongo::ConnectionString;
 using mongo::HostAndPort;
 using mongo::MockDBClientConnection;
 using mongo::MockRemoteDBServer;
@@ -71,7 +90,7 @@ TEST(MockReplicaSetTest, GetNode) {
     ASSERT(replSet.getNode("$n3:27017") == nullptr);
 }
 
-TEST(MockReplicaSetTest, IsMasterNode0) {
+TEST(MockReplicaSetTest, HelloNode0) {
     MockReplicaSet replSet("n", 3);
     set<string> expectedHosts;
     expectedHosts.insert("$n0:27017");
@@ -80,11 +99,13 @@ TEST(MockReplicaSetTest, IsMasterNode0) {
 
     BSONObj cmdResponse;
     MockRemoteDBServer* node = replSet.getNode("$n0:27017");
-    bool ok =
-        MockDBClientConnection(node).runCommand("foo.bar", BSON("ismaster" << 1), cmdResponse);
+    bool ok = MockDBClientConnection(node).runCommand(
+        mongo::DatabaseName::createDatabaseName_forTest(boost::none, "foo"),
+        BSON("hello" << 1),
+        cmdResponse);
     ASSERT(ok);
 
-    ASSERT(cmdResponse["ismaster"].trueValue());
+    ASSERT(cmdResponse["isWritablePrimary"].trueValue());
     ASSERT(!cmdResponse["secondary"].trueValue());
     ASSERT_EQUALS("$n0:27017", cmdResponse["me"].str());
     ASSERT_EQUALS("$n0:27017", cmdResponse["primary"].str());
@@ -99,7 +120,7 @@ TEST(MockReplicaSetTest, IsMasterNode0) {
     ASSERT(expectedHosts == hostList);
 }
 
-TEST(MockReplicaSetTest, IsMasterNode1) {
+TEST(MockReplicaSetTest, HelloNode1) {
     MockReplicaSet replSet("n", 3);
     set<string> expectedHosts;
     expectedHosts.insert("$n0:27017");
@@ -108,11 +129,13 @@ TEST(MockReplicaSetTest, IsMasterNode1) {
 
     BSONObj cmdResponse;
     MockRemoteDBServer* node = replSet.getNode("$n1:27017");
-    bool ok =
-        MockDBClientConnection(node).runCommand("foo.bar", BSON("ismaster" << 1), cmdResponse);
+    bool ok = MockDBClientConnection(node).runCommand(
+        mongo::DatabaseName::createDatabaseName_forTest(boost::none, "foo"),
+        BSON("hello" << 1),
+        cmdResponse);
     ASSERT(ok);
 
-    ASSERT(!cmdResponse["ismaster"].trueValue());
+    ASSERT(!cmdResponse["isWritablePrimary"].trueValue());
     ASSERT(cmdResponse["secondary"].trueValue());
     ASSERT_EQUALS("$n1:27017", cmdResponse["me"].str());
     ASSERT_EQUALS("$n0:27017", cmdResponse["primary"].str());
@@ -127,7 +150,7 @@ TEST(MockReplicaSetTest, IsMasterNode1) {
     ASSERT(expectedHosts == hostList);
 }
 
-TEST(MockReplicaSetTest, IsMasterNode2) {
+TEST(MockReplicaSetTest, HelloNode2) {
     MockReplicaSet replSet("n", 3);
     set<string> expectedHosts;
     expectedHosts.insert("$n0:27017");
@@ -136,11 +159,13 @@ TEST(MockReplicaSetTest, IsMasterNode2) {
 
     BSONObj cmdResponse;
     MockRemoteDBServer* node = replSet.getNode("$n2:27017");
-    bool ok =
-        MockDBClientConnection(node).runCommand("foo.bar", BSON("ismaster" << 1), cmdResponse);
+    bool ok = MockDBClientConnection(node).runCommand(
+        mongo::DatabaseName::createDatabaseName_forTest(boost::none, "foo"),
+        BSON("hello" << 1),
+        cmdResponse);
     ASSERT(ok);
 
-    ASSERT(!cmdResponse["ismaster"].trueValue());
+    ASSERT(!cmdResponse["isWritablePrimary"].trueValue());
     ASSERT(cmdResponse["secondary"].trueValue());
     ASSERT_EQUALS("$n2:27017", cmdResponse["me"].str());
     ASSERT_EQUALS("$n0:27017", cmdResponse["primary"].str());
@@ -165,7 +190,9 @@ TEST(MockReplicaSetTest, ReplSetGetStatusNode0) {
     BSONObj cmdResponse;
     MockRemoteDBServer* node = replSet.getNode("$n0:27017");
     bool ok = MockDBClientConnection(node).runCommand(
-        "foo.bar", BSON("replSetGetStatus" << 1), cmdResponse);
+        mongo::DatabaseName::createDatabaseName_forTest(boost::none, "foo"),
+        BSON("replSetGetStatus" << 1),
+        cmdResponse);
     ASSERT(ok);
 
     ASSERT_EQUALS("n", cmdResponse["set"].str());
@@ -198,7 +225,9 @@ TEST(MockReplicaSetTest, ReplSetGetStatusNode1) {
     BSONObj cmdResponse;
     MockRemoteDBServer* node = replSet.getNode("$n1:27017");
     bool ok = MockDBClientConnection(node).runCommand(
-        "foo.bar", BSON("replSetGetStatus" << 1), cmdResponse);
+        mongo::DatabaseName::createDatabaseName_forTest(boost::none, "foo"),
+        BSON("replSetGetStatus" << 1),
+        cmdResponse);
     ASSERT(ok);
 
     ASSERT_EQUALS("n", cmdResponse["set"].str());
@@ -233,7 +262,9 @@ TEST(MockReplicaSetTest, ReplSetGetStatusNode2) {
     BSONObj cmdResponse;
     MockRemoteDBServer* node = replSet.getNode("$n2:27017");
     bool ok = MockDBClientConnection(node).runCommand(
-        "foo.bar", BSON("replSetGetStatus" << 1), cmdResponse);
+        mongo::DatabaseName::createDatabaseName_forTest(boost::none, "foo"),
+        BSON("replSetGetStatus" << 1),
+        cmdResponse);
     ASSERT(ok);
 
     ASSERT_EQUALS("n", cmdResponse["set"].str());
@@ -290,7 +321,7 @@ ReplSetConfig _getConfigWithMemberRemoved(const ReplSetConfig& oldConfig,
 }
 }  // namespace
 
-TEST(MockReplicaSetTest, IsMasterReconfigNodeRemoved) {
+TEST(MockReplicaSetTest, HelloReconfigNodeRemoved) {
     MockReplicaSet replSet("n", 3);
 
     ReplSetConfig oldConfig = replSet.getReplConfig();
@@ -299,14 +330,16 @@ TEST(MockReplicaSetTest, IsMasterReconfigNodeRemoved) {
     replSet.setConfig(newConfig);
 
     {
-        // Check isMaster for node still in set
+        // Check that node is still a writable primary.
         BSONObj cmdResponse;
         MockRemoteDBServer* node = replSet.getNode("$n0:27017");
-        bool ok =
-            MockDBClientConnection(node).runCommand("foo.bar", BSON("ismaster" << 1), cmdResponse);
+        bool ok = MockDBClientConnection(node).runCommand(
+            mongo::DatabaseName::createDatabaseName_forTest(boost::none, "foo"),
+            BSON("hello" << 1),
+            cmdResponse);
         ASSERT(ok);
 
-        ASSERT(cmdResponse["ismaster"].trueValue());
+        ASSERT(cmdResponse["isWritablePrimary"].trueValue());
         ASSERT(!cmdResponse["secondary"].trueValue());
         ASSERT_EQUALS("$n0:27017", cmdResponse["me"].str());
         ASSERT_EQUALS("$n0:27017", cmdResponse["primary"].str());
@@ -327,14 +360,16 @@ TEST(MockReplicaSetTest, IsMasterReconfigNodeRemoved) {
     }
 
     {
-        // Check isMaster for node still not in set anymore
+        // Check node is no longer a writable primary.
         BSONObj cmdResponse;
         MockRemoteDBServer* node = replSet.getNode(hostToRemove);
-        bool ok =
-            MockDBClientConnection(node).runCommand("foo.bar", BSON("ismaster" << 1), cmdResponse);
+        bool ok = MockDBClientConnection(node).runCommand(
+            mongo::DatabaseName::createDatabaseName_forTest(boost::none, "foo"),
+            BSON("hello" << 1),
+            cmdResponse);
         ASSERT(ok);
 
-        ASSERT(!cmdResponse["ismaster"].trueValue());
+        ASSERT(!cmdResponse["isWritablePrimary"].trueValue());
         ASSERT(!cmdResponse["secondary"].trueValue());
         ASSERT_EQUALS(hostToRemove, cmdResponse["me"].str());
         ASSERT_EQUALS("n", cmdResponse["setName"].str());
@@ -354,7 +389,9 @@ TEST(MockReplicaSetTest, replSetGetStatusReconfigNodeRemoved) {
         BSONObj cmdResponse;
         MockRemoteDBServer* node = replSet.getNode("$n2:27017");
         bool ok = MockDBClientConnection(node).runCommand(
-            "foo.bar", BSON("replSetGetStatus" << 1), cmdResponse);
+            mongo::DatabaseName::createDatabaseName_forTest(boost::none, "foo"),
+            BSON("replSetGetStatus" << 1),
+            cmdResponse);
         ASSERT(ok);
 
         ASSERT_EQUALS("n", cmdResponse["set"].str());
@@ -387,7 +424,9 @@ TEST(MockReplicaSetTest, replSetGetStatusReconfigNodeRemoved) {
         BSONObj cmdResponse;
         MockRemoteDBServer* node = replSet.getNode(hostToRemove);
         bool ok = MockDBClientConnection(node).runCommand(
-            "foo.bar", BSON("replSetGetStatus" << 1), cmdResponse);
+            mongo::DatabaseName::createDatabaseName_forTest(boost::none, "foo"),
+            BSON("replSetGetStatus" << 1),
+            cmdResponse);
         ASSERT(ok);
 
         ASSERT_EQUALS("n", cmdResponse["set"].str());

@@ -28,10 +28,10 @@
 global:
     cpp_namespace: "mongo::auth"
     cpp_includes:
-    - "mongo/db/auth/sasl_payload.h"
+        - "mongo/db/auth/sasl_payload.h"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 types:
     SaslPayload:
@@ -40,22 +40,27 @@ types:
         cpp_type: SaslPayload
         deserializer: "mongo::auth::SaslPayload::parseFromBSON"
         serializer: "mongo::auth::SaslPayload::serializeToBSON"
+        is_view: false
 
 structs:
     SaslReply:
         description: "Response for saslStart and saslContinue commands"
         strict: false
+        is_command_reply: true
         fields:
             conversationId:
                 # In practice, this field is always populated as 1.
                 description: "Unique identifier for this SASL authentication session"
                 type: int
+                stability: stable
             done:
                 description: "Whether or not the authentication has completed"
                 type: bool
+                stability: stable
             payload:
                 description: "SASL payload"
                 type: SaslPayload
+                stability: stable
 
 commands:
     saslStart:
@@ -72,18 +77,22 @@ commands:
             mechanism:
                 description: "SASL mechanism used for authentication"
                 type: string
+                stability: stable
             autoAuthorize:
                 # This field is ignored and assumed to always be true.
                 description: "Automatically authorized user once authenticated"
                 type: safeBool
                 default: true
+                stability: stable
             options:
                 description: "SASL mechanism specific options"
                 type: object_owned
                 optional: true
+                stability: stable
             payload:
                 description: "Initial client message for SASL exchange"
                 type: SaslPayload
+                stability: stable
 
     saslContinue:
         description: "Continue a SASL based authentication session"
@@ -100,6 +109,8 @@ commands:
                 # This field is expected to be 1, any other value generates an error.
                 description: "Unique identifier for this SASL authentication session"
                 type: int
+                stability: stable
             payload:
                 description: "SASL payload"
                 type: SaslPayload
+                stability: stable

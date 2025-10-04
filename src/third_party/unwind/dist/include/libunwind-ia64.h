@@ -27,7 +27,12 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 #define LIBUNWIND_H
 
 #include <inttypes.h>
+#include <stdint.h>
 #include <ucontext.h>
+
+#ifndef UNW_EMPTY_STRUCT
+#  define UNW_EMPTY_STRUCT uint8_t unused;
+#endif
 
 #if defined(__cplusplus) || defined(c_plusplus)
 extern "C" {
@@ -69,6 +74,8 @@ extern "C" {
 typedef uint64_t unw_word_t;
 typedef int64_t unw_sword_t;
 
+#define UNW_WORD_MAX UINT64_MAX
+
 /* On IA-64, we want to access the contents of floating-point
    registers as a pair of "words", but to ensure 16-byte alignment, we
    make it a union that contains a "long double".  This will do the
@@ -83,6 +90,7 @@ unw_tdep_fpreg_t;
 typedef struct
   {
     /* no ia64-specific auxiliary proc-info */
+    UNW_EMPTY_STRUCT
   }
 unw_tdep_proc_info_t;
 

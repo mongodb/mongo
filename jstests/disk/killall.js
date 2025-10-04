@@ -1,4 +1,11 @@
 /**
+ * @tags: [
+ *   # Uses $where operator
+ *   requires_scripting,
+ * ]
+ */
+
+/**
  * Verify that killing an instance of mongod while it is in a long running computation or infinite
  * loop still leads to clean shutdown, and that said shutdown is prompt.
  *
@@ -6,20 +13,21 @@
  * would not result in a zero return code.
  */
 
-var baseName = "jstests_disk_killall";
-var dbpath = MongoRunner.dataPath + baseName;
+let baseName = "jstests_disk_killall";
+let dbpath = MongoRunner.dataPath + baseName;
 
-var mongod = MongoRunner.runMongod({dbpath: dbpath});
+let mongod = MongoRunner.runMongod({dbpath: dbpath});
 var db = mongod.getDB("test");
-var collection = db.getCollection(baseName);
+let collection = db.getCollection(baseName);
 assert.commandWorked(collection.insert({}));
 
 // set timeout for js function execution to 100 ms to speed up the test.
-assert.commandWorked(
-    db.adminCommand({setParameter: 1, internalQueryJavaScriptFnTimeoutMillis: 100}));
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryJavaScriptFnTimeoutMillis: 100}));
 
-var awaitShell = startParallelShell(
-    "db." + baseName + ".count( { $where: function() { while( 1 ) { ; } } } )", mongod.port);
+let awaitShell = startParallelShell(
+    "db." + baseName + ".count( { $where: function() { while( 1 ) { ; } } } )",
+    mongod.port,
+);
 sleep(1000);
 
 /**
@@ -29,15 +37,14 @@ sleep(1000);
  * will not exit cleanly.  We're checking in this assert that mongod will stop quickly even while
  * evaling an infinite loop in server side js.
  */
-var exitCode = MongoRunner.stopMongod(mongod);
+let exitCode = MongoRunner.stopMongod(mongod);
 assert.eq(0, exitCode, "got unexpected exitCode");
 
 // Waits for shell to complete
 exitCode = awaitShell({checkExitSuccess: false});
 assert.neq(0, exitCode, "expected shell to exit abnormally due to mongod being terminated");
 
-mongod = MongoRunner.runMongod(
-    {port: mongod.port, restart: true, cleanData: false, dbpath: mongod.dbpath});
+mongod = MongoRunner.runMongod({port: mongod.port, restart: true, cleanData: false, dbpath: mongod.dbpath});
 db = mongod.getDB("test");
 collection = db.getCollection(baseName);
 

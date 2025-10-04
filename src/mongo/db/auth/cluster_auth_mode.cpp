@@ -27,13 +27,18 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/cluster_auth_mode.h"
 
-#include "mongo/logv2/log.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
+#include <boost/move/utility_core.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
+
 
 namespace mongo {
 namespace {
@@ -191,6 +196,10 @@ StringData ClusterAuthMode::toString() const {
     };
 
     MONGO_UNREACHABLE;
+}
+
+bool ClusterAuthMode::equals(ClusterAuthMode& rhs) const {
+    return _value == rhs._value;
 }
 
 }  // namespace mongo

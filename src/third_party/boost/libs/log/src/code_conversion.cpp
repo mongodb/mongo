@@ -65,6 +65,14 @@ inline std::codecvt_base::result convert(
 
 } // namespace
 
+#if defined(BOOST_MSVC)
+#pragma warning(push)
+// conversion from 'X' to 'Y', possible loss of data
+// This warning is triggered for the noconv case below, where we convert wchar_t to char if the locale facet
+// reports that no code conversion is needed. In such a case, no data loss will happen.
+#pragma warning(disable: 4244)
+#endif
+
 template< typename SourceCharT, typename TargetCharT, typename FacetT >
 inline std::size_t code_convert(const SourceCharT* begin, const SourceCharT* end, std::basic_string< TargetCharT >& converted, std::size_t max_size, FacetT const& fac)
 {
@@ -137,6 +145,10 @@ inline std::size_t code_convert(const SourceCharT* begin, const SourceCharT* end
 done:
     return static_cast< std::size_t >(begin - original_begin);
 }
+
+#if defined(BOOST_MSVC)
+#pragma warning(pop)
+#endif
 
 //! The function converts one string to the character type of another
 BOOST_LOG_API bool code_convert_impl(const wchar_t* str1, std::size_t len, std::string& str2, std::size_t max_size, std::locale const& loc)

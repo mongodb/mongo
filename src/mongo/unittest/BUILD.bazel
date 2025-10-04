@@ -1,0 +1,207 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "unittest",
+    srcs = [
+        "barrier.cpp",
+        "bson_test_util.cpp",
+        "death_test.cpp",
+        "golden_test.cpp",
+        "inline_auto_update.cpp",
+        "matcher.cpp",
+        "stringify.cpp",
+        "temp_dir.cpp",
+        "unittest.cpp",
+        "log_capture.cpp",
+
+        # Note: Only used here and for the corresponding test. consider moving.
+        "//src/mongo/bson:unordered_fields_bsonobj_comparator.h",
+        "//src/mongo/db/exec/mutable_bson:mutable_bson_test_utils.h",
+        "//src/mongo/db/exec/mutable_bson:document.h",
+        "//src/mongo/db/exec/mutable_bson:const_element.h",
+        "//src/mongo/logv2:log_capture_backend.h",
+    ],
+    hdrs = [
+        "assert.h",
+        "assert_that.h",
+        "barrier.h",
+        "death_test.h",
+        "framework.h",
+        "golden_test.h",
+        "join_thread.h",
+        "log_capture.h",
+        "log_test.h",
+        "matcher.h",
+        "matcher_core.h",
+        "stringify.h",
+        "temp_dir.h",
+        "thread_assertion_monitor.h",
+        "unittest.h",
+    ],
+    deps = [
+        ":golden_test_base",
+        "//src/mongo/db:server_base",
+        "//src/mongo/util:pcre_util",
+        "//src/mongo/util:pcre_wrapper",
+        "//src/mongo/util/options_parser",
+        "//src/third_party/yaml-cpp:yaml",
+    ],
+)
+
+mongo_cc_library(
+    name = "unittest_main",
+    srcs = [
+        "unittest_main.cpp",
+        ":unittest_options_gen",
+    ],
+    deps = [
+        ":unittest",
+        "//src/mongo/db:wire_version",
+        "//src/mongo/db/commands:test_commands_enabled",
+        "//src/mongo/util/options_parser",
+    ] + select({
+        "//bazel/config:non_system_allocator_enabled": [
+            "//src/mongo/util:tcmalloc_set_parameter",
+        ],
+        "//conditions:default": [],
+    }),
+    # TODO(before-merge): ?? AIB_COMPONENT="unittests",
+)
+
+mongo_cc_library(
+    name = "golden_test_base",
+    srcs = [
+        "golden_test_base.cpp",
+    ],
+    hdrs = [
+        "golden_test_base.h",
+        "test_info.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/third_party/yaml-cpp:yaml",
+    ],
+)
+
+mongo_cc_library(
+    name = "task_executor_proxy",
+    srcs = [
+        "task_executor_proxy.cpp",
+        "task_executor_proxy.h",
+    ],
+    deps = [
+        "//src/mongo/executor:task_executor_interface",
+    ],
+    #AIB_COMPONENT="benchmarks",
+)
+
+idl_generator(
+    name = "unittest_options_gen",
+    src = "unittest_options.idl",
+)
+
+idl_generator(
+    name = "integration_test_main_gen",
+    src = "integration_test_main.idl",
+)
+
+idl_generator(
+    name = "benchmark_options_gen",
+    src = "benchmark_options.idl",
+)
+
+mongo_cc_library(
+    name = "integration_test_main",
+    srcs = [
+        "integration_test_main.cpp",
+        "integration_test_main_gen",
+    ],
+    hdrs = [
+        "integration_test.h",
+    ],
+    deps = [
+        "unittest",
+        "//src/mongo/client:connection_string",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:server_options",
+        "//src/mongo/db:server_options_base",
+        "//src/mongo/db:serverinit",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db:wire_version",
+        "//src/mongo/db/commands:test_commands_enabled",
+        "//src/mongo/util:testing_options",
+        "//src/mongo/util/options_parser",
+        "//src/mongo/util/options_parser:options_parser_init",
+    ],
+)
+
+mongo_cc_library(
+    name = "benchmark_util",
+    hdrs = [
+        "benchmark_util.h",
+    ],
+    deps = [
+        "//src/third_party/benchmark",
+    ],
+)
+
+mongo_cc_library(
+    name = "benchmark_main",
+    srcs = [
+        "benchmark_main.cpp",
+        "benchmark_options_gen",
+        "log_test.h",
+    ],
+    tags = ["benchmarks"],
+    deps = [
+        # benchmark_main must not be made to depend on additional libraries.
+        # Additional requirements should be handled by the benchmark itself.
+        # Examples can be found in fail_point_bm and commands_bm. See SERVER-60691.
+        "//src/mongo:base",
+        "//src/mongo/util/options_parser",
+        "//src/third_party/benchmark",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "unittest_test",
+    srcs = [
+        "assert_that_test.cpp",
+        "bson_test_util_test.cpp",
+        "fixture_test.cpp",
+        "golden_test_test.cpp",
+        "inline_auto_update_test.cpp",
+        "log_capture_test.cpp",
+        "temp_dir_test.cpp",
+        "thread_assertion_monitor_test.cpp",
+        "unittest_test.cpp",
+    ],
+    data = [
+        "//src/mongo/unittest/expected_output/golden_self_test:sanity_test",
+        "//src/mongo/unittest/expected_output/golden_self_test2:sanity_test2",
+    ],
+    tags = [
+        "mongo_unittest_fourth_group",
+        "server-programmability",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "system_resource_canary_bm",
+    srcs = [
+        "system_resource_canary_bm.cpp",
+    ],
+    deps = [
+        "//src/mongo/util:processinfo",
+    ],
+)

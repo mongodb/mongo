@@ -29,12 +29,15 @@
 
 #pragma once
 
-#include "mongo/db/logical_session_id.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/rpc/op_msg.h"
 
 namespace mongo {
 
 /**
- * Parses the session information from the body of a request and stores the sessionId and txnNumber
+ * Parses the session information from a request and stores the sessionId and txnNumber
  * on the current operation context. Must only be called once per operation and should be done right
  * in the beginning. Note that the session info will be stored in the operation context and returned
  * only if the current request supports it. For example, if attachToOpCtx is false or this is called
@@ -49,10 +52,12 @@ namespace mongo {
  * isReplSetMemberOrMongos needs to be true if the command contains a transaction number, otherwise
  * this function will throw.
  */
-OperationSessionInfoFromClient initializeOperationSessionInfo(OperationContext* opCtx,
-                                                              const BSONObj& requestBody,
-                                                              bool requiresAuth,
-                                                              bool attachToOpCtx,
-                                                              bool isReplSetMemberOrMongos);
+OperationSessionInfoFromClient initializeOperationSessionInfo(
+    OperationContext* opCtx,
+    const boost::optional<TenantId>& validatedTenantId,
+    const OperationSessionInfoFromClientBase& osi,
+    bool requiresAuth,
+    bool attachToOpCtx,
+    bool isReplSetMemberOrMongos);
 
 }  // namespace mongo

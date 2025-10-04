@@ -1,0 +1,68 @@
+test_kind: js_test
+description: |
+  This suite enables the collection of query stats metrics on a mongos server, then runs the tests in
+  core and aggregation as normal. This should cause each query to compute a query
+  shape and query stats key, and record in-memory some metrics like execution time and number of
+  scanned documents. Then it uses the 'RunQueryStats' hook to collect the query stats at the end of
+  each test, once with HMAC application enabled and once without. It doesn't assert anything about
+  the collected query stats, it is just meant to make sure nothing is going seriously awry (e.g.
+  crashing).
+
+selector:
+  roots:
+    - jstests/core/**/*.js
+    - jstests/core_sharding/**/*.js
+  exclude_files:
+    - jstests/core/txns/**/*.js
+    # The following tests fail because a certain command or functionality is not supported on
+    # mongos. This command or functionality is placed in a comment next to the failing test.
+    - jstests/core/**/apitest_db.js # serverStatus output doesn't have storageEngine.
+    - jstests/core/**/check_shard_index.js # checkShardingIndex.
+    - jstests/core/**/compact_keeps_indexes.js # compact.
+    - jstests/core/**/currentop.js # uses fsync.
+    - jstests/core/**/dbhash.js # dbhash.
+    - jstests/core/**/fsync.js # uses fsync.
+    - jstests/core/**/geo_s2cursorlimitskip.js # profiling.
+    - jstests/core/**/geo_update_btree2.js # notablescan.
+    - jstests/core/**/queryoptimizera.js # "local" database.
+    - jstests/core/**/startup_log.js # "local" database.
+    - jstests/core/**/query/top/top.js # top.
+    # The following tests fail because mongos behaves differently from mongod when testing certain
+    # functionality. The differences are in a comment next to the failing test.
+    - jstests/core/**/geo_2d_explain.js # executionSuccess in different spot in explain().
+    - jstests/core/**/geo_s2explain.js # inputStage in different spot in explain().
+    - jstests/core/**/geo_s2sparse.js # keysPerIndex in different spot in validate().
+    - jstests/core/**/operation_latency_histogram.js # Stats are counted differently on mongos, SERVER-24880.
+    # The following test fires a query that is too large for a debug query shape.
+    - jstests/core/query/query_settings/query_settings_size_limits.js
+  exclude_with_any_tags:
+    - assumes_standalone_mongod
+    - assumes_against_mongod_not_mongos
+    # system.profile collection doesn't exist on mongos.
+    - requires_profiling
+    # Running $queryStats will increment these counters which can screw up some test assertions.
+    - inspects_command_opcounters
+    - known_query_shape_computation_problem
+    - requires_2_or_more_shards
+executor:
+  archive:
+    hooks:
+      - ValidateCollections
+  hooks:
+    # Be sure to run the hooks which depend on the fixture being alive before the CleanEveryN hook.
+    # That way the fixture restart can't cause any trouble for the other hooks.
+    - class: RunQueryStats
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
+  fixture:
+    class: ShardedClusterFixture
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+        internalQueryStatsRateLimit: -1
+        internalQueryStatsErrorsAreCommandFatal: true
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+    num_rs_nodes_per_shard: 1

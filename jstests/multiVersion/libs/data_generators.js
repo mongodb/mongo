@@ -18,10 +18,10 @@
 // }
 //
 function DataGenerator() {
-    var hexChars = "0123456789abcdefABCDEF";
-    var regexOptions = "igm";
-    var stringChars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    var base64Chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let hexChars = "0123456789abcdefABCDEF";
+    let regexOptions = "igm";
+    let stringChars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    let base64Chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
     // Generator functions
     // BSON Type: -1
@@ -38,9 +38,9 @@ function DataGenerator() {
     // BSON Type: 2
     function GenString(seed) {
         var seed = seed || 0;
-        var text = "";
+        let text = "";
 
-        for (var i = 0; i < (seed % 1000) + 1; i++) {
+        for (let i = 0; i < (seed % 1000) + 1; i++) {
             text += stringChars.charAt((seed + (i % 10)) % stringChars.length);
         }
 
@@ -68,19 +68,19 @@ function DataGenerator() {
     function GenBinData(seed) {
         var seed = seed || 0;
 
-        var text = "";
+        let text = "";
 
-        for (var i = 0; i < (seed % 1000) + 1; i++) {
+        for (let i = 0; i < (seed % 1000) + 1; i++) {
             text += base64Chars.charAt((seed + (i % 10)) % base64Chars.length);
         }
 
-        if ((text.length % 4) == 1) {
+        if (text.length % 4 == 1) {
             // Special case to avoid winding up with three terminating '=' chars
             // which would be invalid base64 data
             text += "A==";
         }
 
-        while ((text.length % 4) != 0) {
+        while (text.length % 4 != 0) {
             text += "=";
         }
 
@@ -93,9 +93,9 @@ function DataGenerator() {
     // BSON Type: 7
     function GenObjectId(seed) {
         var seed = seed || 0;
-        var hexString = "";
+        let hexString = "";
 
-        for (var i = 0; i < 24; i++) {
+        for (let i = 0; i < 24; i++) {
             hexString += hexChars.charAt((seed + (i % 10)) % hexChars.length);
         }
 
@@ -105,33 +105,46 @@ function DataGenerator() {
     function GenBool(seed) {
         var seed = seed || 0;
 
-        return (seed % 2) === 0;
+        return seed % 2 === 0;
     }
     // BSON Type: 9
     // Our ISODate constructor equals the Date BSON type
     function GenISODate(seed) {
         var seed = seed || 0;
 
-        var year = (seed % (2037 - 1970)) + 1970;
-        var month = (seed % 12) + 1;
-        var day = (seed % 27) + 1;
-        var hour = seed % 24;
-        var minute = seed % 60;
-        var second = seed % 60;
-        var millis = seed % 1000;
+        let year = (seed % (2037 - 1970)) + 1970;
+        let month = (seed % 12) + 1;
+        let day = (seed % 27) + 1;
+        let hour = seed % 24;
+        let minute = seed % 60;
+        let second = seed % 60;
+        let millis = seed % 1000;
 
         function pad(number, length) {
-            var str = '' + number;
+            let str = "" + number;
 
             while (str.length < length) {
-                str = '0' + str;
+                str = "0" + str;
             }
 
             return str;
         }
 
-        return ISODate(pad(year, 4) + "-" + pad(month, 2) + "-" + pad(day, 2) + "T" + pad(hour, 2) +
-                       ":" + pad(minute, 2) + ":" + pad(second, 2) + "." + pad(millis, 3));
+        return ISODate(
+            pad(year, 4) +
+                "-" +
+                pad(month, 2) +
+                "-" +
+                pad(day, 2) +
+                "T" +
+                pad(hour, 2) +
+                ":" +
+                pad(minute, 2) +
+                ":" +
+                pad(second, 2) +
+                "." +
+                pad(millis, 3),
+        );
     }
     // BSON Type: 10
     function GenNull(seed) {
@@ -140,9 +153,9 @@ function DataGenerator() {
     // BSON Type: 11
     function GenRegExp(seed) {
         var seed = seed || 0;
-        var options = "";
+        let options = "";
 
-        for (var i = 0; i < (seed % 3) + 1; i++) {
+        for (let i = 0; i < (seed % 3) + 1; i++) {
             options += regexOptions.charAt((seed + (i % 10)) % regexOptions.length);
         }
 
@@ -295,12 +308,12 @@ function DataGenerator() {
             // BSON Type: 127
             "MaxKey": MaxKey(),
             // The DBRef type is not a BSON type but is treated specially in the shell:
-            "DBRef": DBRef("bar", 2)
+            "DBRef": DBRef("bar", 2),
         };
     }
 
     // Data we are using as a source for our testing
-    testData = [
+    let testData = [
         GenFlatObjectAllTypesHardCoded(),
         GenFlatObjectAllTypes(0),
         GenFlatObjectAllTypes(2),
@@ -313,17 +326,17 @@ function DataGenerator() {
     ];
 
     // Cursor interface
-    var i = 0;
+    let i = 0;
     return {
-        "hasNext": function() {
+        "hasNext": function () {
             return i < testData.length;
         },
-        "next": function() {
+        "next": function () {
             if (i >= testData.length) {
                 return undefined;
             }
             return testData[i++];
-        }
+        },
     };
 }
 
@@ -375,7 +388,7 @@ function IndexDataGenerator(options) {
     // "aa"
     // "ba"
     // ...
-    var currentKey = "";
+    let currentKey = "";
     function getNextUniqueKey() {
         function setCharAt(str, index, chr) {
             if (index > str.length - 1) {
@@ -385,8 +398,8 @@ function IndexDataGenerator(options) {
         }
 
         // Index of the letter we are advancing in our current key
-        var currentKeyIndex = 0;
-        var keyChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        let currentKeyIndex = 0;
+        let keyChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
         do {
             // If we are advancing a letter that does not exist yet, append a new character and
@@ -398,9 +411,8 @@ function IndexDataGenerator(options) {
 
             // Find the character (index into keyChars) that we currently have at this position, set
             // this position to the next character in the keyChars sequence
-            keyCharsIndex = keyChars.search(currentKey[currentKeyIndex]);
-            currentKey = setCharAt(
-                currentKey, currentKeyIndex, keyChars[(keyCharsIndex + 1) % keyChars.length]);
+            var keyCharsIndex = keyChars.search(currentKey[currentKeyIndex]);
+            currentKey = setCharAt(currentKey, currentKeyIndex, keyChars[(keyCharsIndex + 1) % keyChars.length]);
             currentKeyIndex = currentKeyIndex + 1;
 
             // Loop again if we advanced the character past the end of keyChars and wrapped around,
@@ -416,63 +428,63 @@ function IndexDataGenerator(options) {
     //
 
     function GenSingleFieldIndex(seed) {
-        var index = {};
-        index[getNextUniqueKey()] = (seed % 2) == 1 ? 1 : -1;
+        let index = {};
+        index[getNextUniqueKey()] = seed % 2 == 1 ? 1 : -1;
         return index;
     }
 
     function GenCompoundIndex(seed) {
-        var index = {};
-        var i;
+        let index = {};
+        let i;
         for (i = 0; i < (seed % 2) + 2; i++) {
-            index[getNextUniqueKey()] = ((seed + i) % 2) == 1 ? 1 : -1;
+            index[getNextUniqueKey()] = (seed + i) % 2 == 1 ? 1 : -1;
         }
         return index;
     }
 
     function GenNestedIndex(seed) {
-        var index = {};
-        var i;
-        var key = getNextUniqueKey();
+        let index = {};
+        let i;
+        let key = getNextUniqueKey();
         for (i = 0; i < (seed % 2) + 1; i++) {
             key += "." + getNextUniqueKey();
         }
-        index[key] = (seed % 2) == 1 ? 1 : -1;
+        index[key] = seed % 2 == 1 ? 1 : -1;
         return index;
     }
 
     function Gen2dsphereIndex(seed) {
-        var index = {};
+        let index = {};
         index[getNextUniqueKey()] = "2dsphere";
         return index;
     }
 
     function Gen2dIndex(seed) {
-        var index = {};
+        let index = {};
         index[getNextUniqueKey()] = "2d";
         return index;
     }
 
     function GenTextIndex(seed) {
-        var index = {};
+        let index = {};
         index[getNextUniqueKey()] = "text";
         return index;
     }
 
     function GenHashedIndex(seed) {
-        var index = {};
+        let index = {};
         index[getNextUniqueKey()] = "hashed";
         return index;
     }
 
     function GenIndexOptions(seed) {
-        var attributes = {};
-        var i;
+        let attributes = {};
+        let i;
         for (i = 0; i < (seed % 2) + 1; i++) {
             // Mod 3 first to make sure the property type doesn't correlate with (seed % 2)
-            var propertyType = (seed % 3 + i) % 2;
+            let propertyType = ((seed % 3) + i) % 2;
             if (propertyType == 0) {
-                attributes["expireAfterSeconds"] = ((seed + i) * 10000) % 9999 + 1000;
+                attributes["expireAfterSeconds"] = (((seed + i) * 10000) % 9999) + 1000;
             }
             if (propertyType == 1) {
                 attributes["sparse"] = true;
@@ -486,21 +498,21 @@ function IndexDataGenerator(options) {
     }
 
     function Gen2dIndexOptions(seed) {
-        var attributes = GenIndexOptions(seed);
-        var i;
+        let attributes = GenIndexOptions(seed);
+        let i;
         for (i = 0; i < (seed % 2) + 1; i++) {
             // Mod 3 first to make sure the property type doesn't correlate with (seed % 2)
-            var propertyType = (seed + i) % 3;
+            let propertyType = (seed + i) % 3;
             // When using a 2d index, the following additional index properties are supported:
             // { "bits" : <bit precision>, "min" : <lower bound>, "max" : <upper bound> }
             if (propertyType == 0) {
-                attributes["bits"] = ((seed + i) * 10000) % 100 + 10;
+                attributes["bits"] = (((seed + i) * 10000) % 100) + 10;
             }
             if (propertyType == 1) {
-                attributes["min"] = ((seed + i) * 10000) % 100 + 10;
+                attributes["min"] = (((seed + i) * 10000) % 100) + 10;
             }
             if (propertyType == 2) {
-                attributes["max"] = ((seed + i) * 10000) % 100 + 10;
+                attributes["max"] = (((seed + i) * 10000) % 100) + 10;
             } else {
             }
         }
@@ -519,7 +531,7 @@ function IndexDataGenerator(options) {
         return GenIndexOptions(seed);
     }
 
-    testIndexes = [
+    let testIndexes = [
         // Single Field Indexes
         {"spec": GenSingleFieldIndex(1), "options": GenIndexOptions(0)},
         {"spec": GenSingleFieldIndex(0), "options": GenIndexOptions(1)},
@@ -555,17 +567,17 @@ function IndexDataGenerator(options) {
     ];
 
     // Cursor interface
-    var i = 0;
+    let i = 0;
     return {
-        "hasNext": function() {
+        "hasNext": function () {
             return i < testIndexes.length;
         },
-        "next": function() {
+        "next": function () {
             if (i >= testIndexes.length) {
                 return undefined;
             }
             return testIndexes[i++];
-        }
+        },
     };
 }
 
@@ -588,37 +600,34 @@ function IndexDataGenerator(options) {
 // var metadata = generator.get();
 //
 function CollectionMetadataGenerator(options) {
-    var capped = true;
+    let capped = true;
     var options = options || {};
 
-    for (var option in options) {
+    for (let option in options) {
         if (options.hasOwnProperty(option)) {
-            if (option === 'capped') {
-                if (typeof (options['capped']) !== 'boolean') {
-                    throw Error(
-                        "\"capped\" options must be boolean in CollectionMetadataGenerator");
+            if (option === "capped") {
+                if (typeof options["capped"] !== "boolean") {
+                    throw Error('"capped" options must be boolean in CollectionMetadataGenerator');
                 }
-                capped = options['capped'];
+                capped = options["capped"];
             } else {
-                throw Error("Unsupported key in options passed to CollectionMetadataGenerator: " +
-                            option);
+                throw Error("Unsupported key in options passed to CollectionMetadataGenerator: " + option);
             }
         }
     }
 
     // Collection metadata we are using as a source for testing
-    // db.createCollection(name, {capped: <Boolean>, autoIndexId: <Boolean>, size: <number>, max
-    // <number>} )
-    var cappedCollectionMetadata = {
+    // db.createCollection(name, {capped: <Boolean>, size: <number>, max <number>} )
+    let cappedCollectionMetadata = {
         "capped": true,
         "size": 100000,
         "max": 2000,
     };
 
     return {
-        "get": function() {
+        "get": function () {
             return capped ? cappedCollectionMetadata : {};
-        }
+        },
     };
 }
 
@@ -629,6 +638,6 @@ function CollectionDataGenerator(options) {
     return {
         "data": new DataGenerator(),
         "indexes": new IndexDataGenerator(),
-        "collectionMetadata": new CollectionMetadataGenerator(options)
+        "collectionMetadata": new CollectionMetadataGenerator(options),
     };
 }

@@ -1,0 +1,3 @@
+base_suite: sharded_retryable_writes_downgrade
+overrides:
+  - "multiversion.sharded_fixture_last_continuous_new_old_old_new"

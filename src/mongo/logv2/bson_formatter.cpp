@@ -29,19 +29,33 @@
 
 #include "mongo/logv2/bson_formatter.h"
 
-#include <boost/log/attributes/value_extraction.hpp>
-#include <boost/log/utility/formatting_ostream.hpp>
-
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/attributes.h"
 #include "mongo/logv2/constants.h"
 #include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_service.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/logv2/log_tag.h"
+#include "mongo/logv2/log_util.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
 
+#include <functional>
+#include <string>
+#include <variant>
+
+#include <boost/cstdint.hpp>
+#include <boost/exception/exception.hpp>
+#include <boost/log/attributes/value_extraction.hpp>
+#include <boost/log/core/record_view.hpp>
+#include <boost/log/utility/formatting_ostream.hpp>
+#include <boost/log/utility/formatting_ostream_fwd.hpp>
+#include <boost/log/utility/value_ref.hpp>
 #include <fmt/format.h>
 
 namespace mongo::logv2 {
@@ -56,22 +70,28 @@ struct BSONValueExtractor {
     }
 
     void operator()(StringData name, CustomAttributeValue const& val) {
-        // Try to format as BSON first if available. Prefer BSONAppend if available as we might only
-        // want the value and not the whole element.
-        if (val.BSONAppend) {
-            val.BSONAppend(_builder, name);
-        } else if (val.BSONSerialize) {
-            BSONObjBuilder subObjBuilder = _builder.subobjStart(name);
-            val.BSONSerialize(subObjBuilder);
-            subObjBuilder.done();
-        } else if (val.toBSONArray) {
-            _builder.append(name, val.toBSONArray());
-        } else if (val.stringSerialize) {
-            fmt::memory_buffer buffer;
-            val.stringSerialize(buffer);
-            _builder.append(name, fmt::to_string(buffer));
-        } else {
-            _builder.append(name, val.toString());
+        try {
+            // Try to format as BSON first if available. Prefer BSONAppend if available as we might
+            // only want the value and not the whole element.
+            if (val.BSONAppend) {
+                val.BSONAppend(_builder, name);
+            } else if (val.BSONSerialize) {
+                BSONObjBuilder subObjBuilder = _builder.subobjStart(name);
+                val.BSONSerialize(subObjBuilder);
+                subObjBuilder.done();
+            } else if (val.toBSONArray) {
+                _builder.append(name, val.toBSONArray());
+            } else if (val.stringSerialize) {
+                fmt::memory_buffer buffer;
+                val.stringSerialize(buffer);
+                _builder.append(name, fmt::to_string(buffer));
+            } else {
+                _builder.append(name, val.toString());
+            }
+        } catch (...) {
+            Status s = exceptionToStatus();
+            _builder.append(name,
+                            std::string("Failed to serialize due to exception") + s.toString());
         }
     }
 
@@ -97,7 +117,7 @@ struct BSONValueExtractor {
 
     template <typename Period>
     void operator()(StringData name, const Duration<Period>& value) {
-        _builder.append(name.toString() + value.mongoUnitSuffix(), value.count());
+        _builder.append(std::string{name} + value.mongoUnitSuffix(), value.count());
     }
 
     template <typename T>
@@ -114,7 +134,7 @@ void BSONFormatter::operator()(boost::log::record_view const& rec, BSONObjBuilde
     using boost::log::extract;
 
     // Build a JSON object for the user attributes.
-    const auto& attrs = extract<TypeErasedAttributeStorage>(attributes::attributes(), rec).get();
+    const auto& attrs = extract<TypeErasedAttributeStorage>(attributes::attributes(), rec);
 
     builder.append(constants::kTimestampFieldName,
                    extract<Date_t>(attributes::timeStamp(), rec).get());
@@ -123,17 +143,21 @@ void BSONFormatter::operator()(boost::log::record_view const& rec, BSONObjBuilde
     builder.append(constants::kComponentFieldName,
                    extract<LogComponent>(attributes::component(), rec).get().getNameForLog());
     builder.append(constants::kIdFieldName, extract<int32_t>(attributes::id(), rec).get());
-    if (auto ptr = extract<OID>(attributes::tenant(), rec).get_ptr()) {
-        builder.append(constants::kTenantFieldName, *ptr);
+    const auto& tenant = extract<std::string>(attributes::tenant(), rec);
+    if (!tenant.empty()) {
+        builder.append(constants::kTenantFieldName, tenant.get());
     }
+    if (shouldEmitLogService())
+        builder.append(constants::kServiceFieldName,
+                       getNameForLog(extract<LogService>(attributes::service(), rec).get()));
     builder.append(constants::kContextFieldName,
                    extract<StringData>(attributes::threadName(), rec).get());
     builder.append(constants::kMessageFieldName,
                    extract<StringData>(attributes::message(), rec).get());
 
-    if (!attrs.empty()) {
+    if (!attrs.get().empty()) {
         BSONValueExtractor extractor(builder);
-        attrs.apply(extractor);
+        attrs.get().apply(extractor);
     }
     LogTag tags = extract<LogTag>(attributes::tags(), rec).get();
     if (tags != LogTag::kNone) {

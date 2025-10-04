@@ -1,7 +1,9 @@
 // Storage Node Watchdog test cases
+
+// Disable testing diagnostics (TestingProctor) since that allows setting a lower
+// watchdogPeriodSeconds.
+TestData.testingDiagnosticsEnabled = false;
 // - Validate set parameter functions correctly.
-(function() {
-'use strict';
 const admin = db.getSiblingDB("admin");
 
 // Check the defaults are correct
@@ -33,7 +35,7 @@ assert.commandFailed(setparam(admin, {"watchdogPeriodSeconds": 61}));
 // Now test MongoD with it enabled at startup
 //
 const conn = MongoRunner.runMongod({setParameter: "watchdogPeriodSeconds=60"});
-assert.neq(null, conn, 'mongod was unable to start up');
+assert.neq(null, conn, "mongod was unable to start up");
 
 const admin2 = conn.getDB("admin");
 
@@ -56,4 +58,3 @@ assert.eq(getparam(admin2, "watchdogPeriodSeconds"), -1);
 assert.commandWorked(setparam(admin2, {"watchdogPeriodSeconds": 60}));
 
 MongoRunner.stopMongod(conn);
-})();

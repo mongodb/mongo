@@ -1,0 +1,9 @@
+package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "compass_files",
+    srcs = select({
+        "@platforms//os:windows": ["Install-Compass.ps1"],
+        "//conditions:default": ["install_compass"],
+    }),
+)

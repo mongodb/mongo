@@ -28,11 +28,11 @@
  */
 
 #pragma once
-
-#include <functional>
-
 #include "mongo/base/status_with.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/util/modules.h"
+
+#include <functional>
 
 namespace mongo {
 namespace repl {
@@ -41,7 +41,7 @@ namespace repl {
  * This class represents the interface BackgroundSync and ReplicationCoordinatorExternalState use to
  * interact with the rollback subsystem.
  */
-class Rollback {
+class MONGO_MOD_PUB Rollback {
     Rollback(const Rollback&) = delete;
     Rollback& operator=(const Rollback&) = delete;
 

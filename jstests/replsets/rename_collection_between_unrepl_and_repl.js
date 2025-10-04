@@ -5,8 +5,7 @@
  * 'local' database for unreplicated namespaces.
  */
 
-(function() {
-"use strict";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const name = "rename_collection_between_unrepl_and_repl";
 const rst = new ReplSetTest({"name": name, "nodes": 1});
@@ -23,8 +22,10 @@ let targetNs = "local.unreplicated";
 // Ensure that the source collection exists.
 assert.commandWorked(primary.getCollection(sourceNs).insert({"fromRepl": "toUnrepl"}));
 
-assert.commandFailedWithCode(primary.adminCommand({"renameCollection": sourceNs, "to": targetNs}),
-                             ErrorCodes.IllegalOperation);
+assert.commandFailedWithCode(
+    primary.adminCommand({"renameCollection": sourceNs, "to": targetNs}),
+    ErrorCodes.IllegalOperation,
+);
 
 /**
  * Part 2: Attempt to rename from an unreplicated to a replicated namespace.
@@ -35,8 +36,9 @@ targetNs = "somedb.alsoReplicated";
 // Ensure that the source collection exists.
 assert.commandWorked(primary.getCollection(sourceNs).insert({"fromUnrepl": "toRepl"}));
 
-assert.commandFailedWithCode(primary.adminCommand({"renameCollection": sourceNs, "to": targetNs}),
-                             ErrorCodes.IllegalOperation);
+assert.commandFailedWithCode(
+    primary.adminCommand({"renameCollection": sourceNs, "to": targetNs}),
+    ErrorCodes.IllegalOperation,
+);
 
 rst.stopSet();
-})();

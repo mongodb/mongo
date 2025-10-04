@@ -2,23 +2,10 @@
  * Tests that using a $graphLookup stage inside of a $facet stage will yield the same results as
  * using the $graphLookup stage outside of the $facet stage.
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For documentEq.
-load("jstests/libs/fixture_helpers.js");      // For isSharded.
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
 // We will only use one collection, the $graphLookup will look up from the same collection.
-var graphColl = db.facetGraphLookup;
-
-// Do not run the rest of the tests if the foreign collection is implicitly sharded but the flag to
-// allow $lookup/$graphLookup into a sharded collection is disabled.
-const getShardedLookupParam = db.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
-const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
-    getShardedLookupParam.featureFlagShardedLookup.value;
-if (FixtureHelpers.isSharded(graphColl) && !isShardedLookupEnabled) {
-    return;
-}
+let graphColl = db.facetGraphLookup;
 
 // The graph in ASCII form: 0 --- 1 --- 2    3
 graphColl.drop();
@@ -30,33 +17,29 @@ assert.commandWorked(graphColl.insert({_id: 3}));
 // For each document in the collection, this will compute all the other documents that are
 // reachable from this one.
 const graphLookupStage = {
-        $graphLookup: {
-            from: graphColl.getName(),
-            startWith: "$_id",
-            connectFromField: "edges",
-            connectToField: "_id",
-            as: "connected"
-        }
-    };
+    $graphLookup: {
+        from: graphColl.getName(),
+        startWith: "$_id",
+        connectFromField: "edges",
+        connectToField: "_id",
+        as: "connected",
+    },
+};
 
 const projectStage = {
-    $project: {_id: 1, edges: 1, connected_length: {$size: "$connected"}}
+    $project: {_id: 1, edges: 1, connected_length: {$size: "$connected"}},
 };
 
 const normalResults = graphColl.aggregate([graphLookupStage, projectStage]).toArray();
-const facetedResults =
-    graphColl.aggregate([{$facet: {nested: [graphLookupStage, projectStage]}}]).toArray();
+const facetedResults = graphColl.aggregate([{$facet: {nested: [graphLookupStage, projectStage]}}]).toArray();
 arrayEq(facetedResults, [{nested: normalResults}]);
 
 const sortStage = {
-    $sort: {_id: 1, "connected._id": 1}
+    $sort: {_id: 1, "connected._id": 1},
 };
 
-const normalResultsUnwound =
-    graphColl.aggregate([graphLookupStage, {$unwind: "$connected"}, sortStage]).toArray();
-const facetedResultsUnwound =
-    graphColl
-        .aggregate([{$facet: {nested: [graphLookupStage, {$unwind: "$connected"}, sortStage]}}])
-        .toArray();
+const normalResultsUnwound = graphColl.aggregate([graphLookupStage, {$unwind: "$connected"}, sortStage]).toArray();
+const facetedResultsUnwound = graphColl
+    .aggregate([{$facet: {nested: [graphLookupStage, {$unwind: "$connected"}, sortStage]}}])
+    .toArray();
 arrayEq(facetedResultsUnwound, [{nested: normalResultsUnwound}]);
-}());

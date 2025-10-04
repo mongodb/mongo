@@ -1,0 +1,59 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "mongotmock_core",
+    srcs = [
+        "mongotmock_buildinfo.cpp",
+        "mongotmock_commands.cpp",
+        "mongotmock_ismaster.cpp",
+        "mongotmock_options_init.cpp",
+        "mongotmock_state.cpp",
+    ],
+    hdrs = [
+        "mongotmock_state.h",
+    ],
+    deps = [
+        "//src/mongo/db:api_parameters",
+        "//src/mongo/db:server_options_servers",
+        "//src/mongo/db:wire_version",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/auth:authserver",
+        "//src/mongo/db/commands:buildinfo_common",
+        "//src/mongo/db/commands:core",
+        "//src/mongo/db/commands:test_commands_enabled",
+        "//src/mongo/db/pipeline:sharded_agg_helpers",
+        "//src/mongo/db/query:command_request_response",
+        "//src/mongo/db/query/search:search_index_common",
+        "//src/mongo/util:version_impl",
+        "//src/mongo/util/net:ssl_options_server",
+    ] + select({
+        "//bazel/config:build_grpc_enabled": [
+            "//src/mongo/transport/grpc:grpc_transport_server_options",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+mongo_cc_binary(
+    name = "mongotmock",
+    srcs = [
+        "mongotmock_main_shim.cpp",
+    ],
+    tags = [
+        "dist_test",
+    ],
+    deps = [
+        "mongotmock_core",
+        "//src/mongo/db/query:plan_executor",
+        "//src/mongo/util/cryptd:mongocryptd_core",
+    ],
+)

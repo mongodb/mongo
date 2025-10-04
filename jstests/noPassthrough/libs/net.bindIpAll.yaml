@@ -1,2 +1,2 @@
 net:
-    bindIpAll: true
+  bindIpAll: true

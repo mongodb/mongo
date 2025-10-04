@@ -1,0 +1,13 @@
+test_kind: js_test
+
+selector:
+  exclude_files:
+    # TODO: SERVER-109999 Remove this line.
+    - src/mongo/db/modules/enterprise/jstests/external_auth_oidc_azure/oidc_e2e_azure_machine.js
+  roots:
+    - src/mongo/db/modules/enterprise/jstests/external_auth_oidc_azure/*.js
+
+executor:
+  config:
+    shell_options:
+      nodb: ""

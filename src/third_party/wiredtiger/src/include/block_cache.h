@@ -6,52 +6,61 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 /*
  * WiredTiger's block cache. It is used to cache blocks identical to those that live on disk in a
  * faster storage medium, such as NVRAM.
  */
 
-#ifdef HAVE_LIBMEMKIND
+#ifdef ENABLE_MEMKIND
 #include <memkind.h>
 #endif
 
+/* Cache types. */
+#define WT_BLKCACHE_UNCONFIGURED 0
+#define WT_BLKCACHE_DRAM 1
+#define WT_BLKCACHE_NVRAM 2
+
+/* Hash bucket array size. */
+#define WT_BLKCACHE_HASHSIZE_DEFAULT 32768
+#define WT_BLKCACHE_HASHSIZE_MIN 512
+#define WT_BLKCACHE_HASHSIZE_MAX WT_GIGABYTE
+
+/* How often we compute the total size of the files open in the block manager. */
+#define WT_BLKCACHE_FILESIZE_EST_FREQ (5 * WT_THOUSAND)
+
+#define WT_BLKCACHE_MINREF_INCREMENT 20      /* Eviction references window */
+#define WT_BLKCACHE_EVICT_OTHER 0            /* Not evicting for various reasons */
+#define WT_BLKCACHE_NOT_EVICTION_CANDIDATE 1 /* Not evicting because of frequency counter */
+
+/* Block access operations. */
+#define WT_BLKCACHE_RM_EXIT 1
+#define WT_BLKCACHE_RM_FREE 2
+#define WT_BLKCACHE_RM_EVICTION 3
+
 /*
- * Determines now often we compute the total size of the files open in the block manager.
+ * WT_BLKCACHE_DELTA --
+ *     A delta associated with a block in the block cache.
  */
-#define BLKCACHE_FILESIZE_EST_FREQ 5000
-
-#define BLKCACHE_HASHSIZE_DEFAULT 32768
-#define BLKCACHE_HASHSIZE_MIN 512
-#define BLKCACHE_HASHSIZE_MAX WT_GIGABYTE
-
-#define WT_BLKCACHE_FULL -2
-#define WT_BLKCACHE_BYPASS -3
-
-#define BLKCACHE_MINREF_INCREMENT 20
-#define BLKCACHE_EVICT_OTHER 0
-#define BLKCACHE_NOT_EVICTION_CANDIDATE 1
-
-/*
- * WT_BLKCACHE_ID --
- *    File ID, checksum, offset and size uniquely identify a block.
- */
-WT_PACKED_STRUCT_BEGIN(__wt_blkcache_id)
-    uint32_t fid;
-    uint32_t checksum;
-    uint32_t size;
-    wt_off_t offset;
-WT_PACKED_STRUCT_END
-#define WT_BLKCACHE_ID_SIZE (sizeof(wt_off_t) + 3 * sizeof(uint32_t))
+struct __wt_blkcache_delta {
+    void *data;
+    uint32_t data_size;
+};
 
 /*
  * WT_BLKCACHE_ITEM --
  *     Block cache item. It links with other items in the same hash bucket.
  */
 struct __wt_blkcache_item {
-    struct __wt_blkcache_id id;
     TAILQ_ENTRY(__wt_blkcache_item) hashq;
+
     void *data;
+    uint32_t data_size;
     uint32_t num_references;
+
+    WT_BLKCACHE_DELTA *deltas;
+    uint32_t num_deltas;
 
     /*
      * This counter is incremented every time a block is referenced and decremented every time the
@@ -59,22 +68,14 @@ struct __wt_blkcache_item {
      * been reused or for blocks that were reused in the past but lost their appeal. In this sense,
      * this counter is a metric combining frequency and recency, and hence its name.
      */
-    int32_t freq_rec_counter;
-};
+    wt_shared int32_t freq_rec_counter;
 
-/*
- * WT_BLKCACHE_BUCKET_METADATA --
- *     The metadata indicating the number of bytes in cache is accumulated per
- *     bucket, because we do locking per bucket. Then the eviction thread accumulates
- *     per-bucket data into a global metadata value that is stored in the block
- *     cache structure.
- */
+    wt_shared uint32_t ref_count; /* References */
 
-struct __wt_blkcache_bucket_metadata {
-    WT_CACHE_LINE_PAD_BEGIN
-    volatile uint64_t bucket_num_data_blocks; /* Number of blocks in the bucket */
-    volatile uint64_t bucket_bytes_used;      /* Bytes in the bucket */
-    WT_CACHE_LINE_PAD_END
+    WT_PAGE_BLOCK_META *block_meta; /* Block metadata returned by the read call */
+    uint32_t fid;                   /* File ID */
+    uint8_t addr_size;              /* Address cookie */
+    uint8_t addr[];
 };
 
 /*
@@ -86,16 +87,15 @@ struct __wt_blkcache {
     /* Locked: Block manager cache. Locks are per-bucket. */
     TAILQ_HEAD(__wt_blkcache_hash, __wt_blkcache_item) * hash;
     WT_SPINLOCK *hash_locks;
-    WT_BLKCACHE_BUCKET_METADATA *bucket_metadata;
 
     wt_thread_t evict_thread_tid;
-    volatile bool blkcache_exiting; /* If destroying the cache */
-    int32_t evict_aggressive;       /* Seconds an unused block stays in the cache */
+    wt_shared volatile bool blkcache_exiting; /* If destroying the cache */
+    int32_t evict_aggressive;                 /* Seconds an unused block stays in the cache */
 
     bool cache_on_checkpoint; /* Don't cache blocks written by checkpoints */
     bool cache_on_writes;     /* Cache blocks on writes */
 
-#ifdef HAVE_LIBMEMKIND
+#ifdef ENABLE_MEMKIND
     struct memkind *pmem_kind; /* NVRAM connection */
 #endif
     char *nvram_device_path; /* The absolute path of the file system on NVRAM device */
@@ -107,23 +107,22 @@ struct __wt_blkcache {
     int refs_since_filesize_estimated; /* Counter for recalculating the aggregate file size */
 
     /*
-     * This fraction tells us the good enough ratio of file data cached in the DRAM resident OS
-     * buffer cache, which makes the use of this block cache unnecessary. Suppose we set that
-     * fraction to 50%. Then if half of our file data fits into system DRAM, we consider this block
-     * cache unhelpful.
+     * This fraction tells us the ratio of total file data to the application-declared size of the
+     * OS filesystem buffer cache, which makes the use of this block cache unnecessary. Suppose we
+     * set that fraction to 50%. Then if half of our total file data fits into whatever value the
+     * user gives us for the filesystem buffer cache, we consider this block cache unhelpful.
      *
-     * E.g., if the fraction is set to 50%, our aggregate file size is 500GB, and we have 300GB of
-     * RAM, then we will not use this block cache, because we know that half of our files (250GB)
-     * must be cached by the OS in DRAM.
+     * E.g., if the fraction is set to 50%, our aggregate file size is 500GB, and the application
+     * declares there to be 300GB of OS filesystem buffer cache, then we will not use this block
+     * cache, because half of our total file size (250GB) would fit into such a buffer cache.
      */
     u_int percent_file_in_os_cache;
 
-    u_int hash_size;                   /* Number of block cache hash buckets */
-    u_int type;                        /* Type of block cache (NVRAM or DRAM) */
-    volatile uint64_t bytes_used;      /* Bytes in the block cache */
-    volatile uint64_t num_data_blocks; /* Number of blocks in the block cache */
-    uint64_t max_bytes;                /* Block cache size */
-    uint64_t system_ram;               /* Configured size of system RAM */
+    u_int hash_size;               /* Number of block cache hash buckets */
+    u_int type;                    /* Type of block cache (NVRAM or DRAM) */
+    wt_shared uint64_t bytes_used; /* Bytes in the block cache */
+    uint64_t max_bytes;            /* Block cache size */
+    uint64_t system_ram;           /* Configured size of system RAM */
 
     uint32_t min_num_references; /* The per-block number of references triggering eviction. */
 
@@ -139,17 +138,9 @@ struct __wt_blkcache {
     uint64_t removals;
 
     /* Histograms keeping track of number of references to each block */
-#define BLKCACHE_HIST_BUCKETS 11
-#define BLKCACHE_HIST_BOUNDARY 10
-    uint32_t cache_references[BLKCACHE_HIST_BUCKETS];
-    uint32_t cache_references_removed_blocks[BLKCACHE_HIST_BUCKETS];
-    uint32_t cache_references_evicted_blocks[BLKCACHE_HIST_BUCKETS];
+#define WT_BLKCACHE_HIST_BUCKETS 11
+#define WT_BLKCACHE_HIST_BOUNDARY 10
+    uint32_t cache_references[WT_BLKCACHE_HIST_BUCKETS];
+    uint32_t cache_references_removed_blocks[WT_BLKCACHE_HIST_BUCKETS];
+    uint32_t cache_references_evicted_blocks[WT_BLKCACHE_HIST_BUCKETS];
 };
-
-#define BLKCACHE_UNCONFIGURED 0
-#define BLKCACHE_DRAM 1
-#define BLKCACHE_NVRAM 2
-
-#define BLKCACHE_RM_EXIT 1
-#define BLKCACHE_RM_FREE 2
-#define BLKCACHE_RM_EVICTION 3

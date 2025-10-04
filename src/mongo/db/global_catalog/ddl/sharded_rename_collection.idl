@@ -1,0 +1,191 @@
+# Copyright (C) 2021-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+# This file defines the format of documents stored in config.ddl.dropCollections on the coordinator
+# shard for a drop collection operation.
+
+global:
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/global_catalog/type_collection.h"
+
+imports:
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.idl"
+    - "mongo/db/global_catalog/ddl/sharded_ddl_commands.idl"
+
+enums:
+    RenameCollectionCoordinatorPhase:
+        description: "The current state of a rename collection operation on the coordinator."
+        type: string
+        values:
+            kUnset: "unset"
+            kCheckPreconditions: "checkPreconditions"
+            kFreezeMigrations: "freezeMigrations"
+            kSetupChangeStreamsPreconditions: "setupChangeStreamsPreconditions"
+            kBlockCrudAndRename: "blockCRUDAndRename"
+            kRenameMetadata: "renameMetadata"
+            kUnblockCRUD: "unblockCRUD"
+            kSetResponse: "setResponse"
+
+    RenameCollectionParticipantPhase:
+        description: "The current state of a rename collection operation on a participant."
+        type: string
+        values:
+            kUnset: "unset"
+            kBlockCRUDAndSnapshotRangeDeletions: "blockCRUDAndSnapshotRangeDeletions"
+            kRenameLocalAndRestoreRangeDeletions: "renameLocalAndRestoreRangeDeletions"
+            kDeleteFromRangeDeletions: "deleteFromRangeDeletions"
+            kUnblockCRUD: "unblockCRUD"
+
+commands:
+    _shardsvrRenameCollectionParticipant:
+        command_name: _shardsvrRenameCollectionParticipant
+        cpp_name: ShardsvrRenameCollectionParticipant
+        description: "Internal command sent to shard participating in a rename collection procedure"
+        strict: false
+        api_version: ""
+        namespace: concatenate_with_db
+        chained_structs:
+            RenameCollectionRequest: RenameCollectionRequest
+        fields:
+            sourceUUID:
+                type: uuid
+                description: "ID of the collection getting renamed."
+            targetUUID:
+                type: uuid
+                description: "ID of the existing collection getting dropped."
+                optional: true
+            newTargetCollectionUuid:
+                type: uuid
+                description: "New ID for the renamed collection in case of renaming across DBs."
+                optional: true
+            fromMigrate:
+                type: bool
+                description:
+                    "When set, the participant will apply the specified value to the oplog entry generated upon locally committing the operation.
+                    When missing, the participant will infer the value to be applied based on whether it is the primary shard of the targeted namespaces."
+                optional: true
+        reply_type: OkReply
+
+    _shardsvrRenameCollectionParticipantUnblock:
+        command_name: _shardsvrRenameCollectionParticipantUnblock
+        cpp_name: ShardsvrRenameCollectionUnblockParticipant
+        description: "Parser for the _shardsvrRenameCollectionParticipantUnblock command"
+        strict: false
+        api_version: ""
+        namespace: concatenate_with_db
+        chained_structs:
+            RenameCollectionRequest: RenameCollectionRequest
+        fields:
+            sourceUUID:
+                type: uuid
+                description: "ID of the collection getting renamed."
+        reply_type: OkReply
+
+structs:
+    RenameCollectionCoordinatorDocument:
+        description: "Represents a rename collection operation on the coordinator shard."
+        generate_comparison_operators: false
+        strict: false
+        chained_structs:
+            ShardingDDLCoordinatorMetadata: ShardingDDLCoordinatorMetadata
+            RenameCollectionRequest: RenameCollectionRequest
+        fields:
+            phase:
+                type: RenameCollectionCoordinatorPhase
+                default: kUnset
+            optTrackedCollInfo:
+                description: "CollectionType of the collection currently being renamed (if is tracked by the config server)."
+                type: CollectionType
+                optional: true
+            sourceUUID:
+                type: uuid
+                description: "ID of the collection getting renamed."
+                optional: true
+            targetUUID:
+                type: uuid
+                description: "ID of the existing collection getting dropped."
+                optional: true
+            newTargetCollectionUuid:
+                type: uuid
+                description: "New ID for the renamed collection in case of renaming across DBs."
+                optional: true
+            allowEncryptedCollectionRename:
+                description:
+                    "Encrypted Collection renames are usually disallowed to minimize user error.
+                    C2C needs to do the renames to replicate create collection."
+                type: bool
+                optional: true
+            commitTimeInGlobalCatalog:
+                type: timestamp
+                description: "Cluster time referenced in each config.collections and config.placementHistory document inserted of modified by the commit of this operation."
+                optional: true
+            renamedCollectionEpoch:
+                type: objectid
+                description: "The new epoch that will be applied on the global catalog to the renamed collection"
+                optional: true
+            changeStreamsNotifier:
+                type: shard_id
+                description:
+                    "The identity of the Shard that will be responsible to generate the op log entries supporting change stream readers.
+                    Only set/consumed when changeStreamPreciseShardTargetingEnabled is true."
+                optional: true
+
+    RenameCollectionParticipantDocument:
+        description: "Represents a rename collection operation on a participant shard."
+        generate_comparison_operators: false
+        strict: false
+        chained_structs:
+            RenameCollectionRequest: RenameCollectionRequest
+        fields:
+            _id:
+                type: namespacestring
+                cpp_name: fromNss
+            phase:
+                type: RenameCollectionParticipantPhase
+                default: kUnset
+            forwardableOpMetadata:
+                type: ForwardableOperationMetadata
+            sourceUUID:
+                type: uuid
+                description: "ID of the collection getting renamed."
+            targetUUID:
+                type: uuid
+                description: "ID of the existing collection getting dropped."
+                optional: true
+            newTargetCollectionUuid:
+                type: uuid
+                description: "New ID for the renamed collection in case of renaming across DBs."
+                optional: true
+            fromMigrate:
+                type: bool
+                description:
+                    "When set, the participant will apply the specified value to the oplog entry generated upon locally committing the operation.
+                    When missing, the participant will infer the value to be applied based on whether it is the primary shard of the targeted namespaces."
+                optional: true

@@ -1,0 +1,119 @@
+test_kind: js_test
+description: |
+  Run test suites with a replica set and multitenancy enabled. Simulate the mongoq behavior
+  by overriding and injecting unsigned security token.
+
+selector:
+  roots:
+    - jstests/core/**/*.js
+  exclude_with_any_tags:
+    # This passthrough uses the `simulate_mongoq` override, which some tests are incompatible with.
+    - simulate_mongoq_incompatible
+    # Exclude tests which use commands that aren't supported in Serverless.
+    - command_not_supported_in_serverless
+    # Theses tests expect replication is not enabled.
+    - assumes_standalone_mongod
+    # Capped collections are banned in Serverless.
+    - requires_capped
+    # Server side javascript (such as $where, $function, $accumulator and map-reduce) is not allowed in Serverless.
+    - requires_scripting
+    - uses_map_reduce_with_temp_collections
+    # Skip any tests that run with auth explicitly.
+    - requires_auth
+    # Sharding commands are not tenant aware.
+    - requires_sharding
+  exclude_files:
+    # The "exhaust" function does not use runCommand (required by the simulate_mongoq.js override).
+    - jstests/core/**/query/exhaust.js
+    # These following tests use benchRun which does not use runCommand (required by the simulate_mongoq.js override).
+    - jstests/core/**/bench_test1.js
+    - jstests/core/**/bench_test2.js
+    - jstests/core/**/benchrun_cmd_param_error.js
+    - jstests/core/**/benchrun_pipeline_updates.js
+    # These tests run "applyOps" command which does not depend on unsigned security token pass in tenant information.
+    # The tenantId is provided in the oplog entries provided to the applyOps command.
+    - jstests/core/**/apply_ops*.js
+    - jstests/core/**/bypass_doc_validation.js
+    - jstests/core/**/query/collation/collation.js
+    - jstests/core/ddl/coll_mod_convert_to_unique_apply_ops.js
+    - jstests/core/ddl/coll_mod_without_uuid.js
+    - jstests/core/catalog/list_collections_vs_apply_ops.js
+    - jstests/core/**/list_collections_filter.js
+    - jstests/core/**/list_collections_no_views.js
+    - jstests/core/**/rename_collection_staytemp.js
+    - jstests/core/txns/commands_banning_txnnumber_outside_transactions.js
+    - jstests/core/txns/commands_not_allowed_in_txn.js
+    - jstests/core/txns/prepare_transaction_fails_on_temp_collections.js
+    - jstests/core/catalog/views/duplicate_ns.js
+    - jstests/core/catalog/views/invalid_system_views.js
+    - jstests/core/catalog/views/view_with_invalid_dbname.js
+    - jstests/core/catalog/views/views_all_commands.js
+    - jstests/core/catalog/views/invalid_view_prevents_creating_new_view.js
+    # Sharding command "splictVector" is not tenant aware.
+    - jstests/core/**/splitvector.js
+    # Operations on config.system.sessions are not tenant aware, so cannot be tested with the injected dollar tenant.
+    - jstests/core/**/list_all_sessions.js
+    - jstests/core/**/list_sessions.js
+    - jstests/core/**/api_version_pipeline_stages.js
+    # Operations on config.transactions are not tenant aware, so cannot be tested with the injected dollar tenant.
+    - jstests/core/txns/no_writes_to_config_transactions_with_prepared_transaction.js
+    - jstests/core/txns/commit_prepared_transaction.js
+    - jstests/core/**/create_indexes.js
+    # In a multitenancy environment the catalog will always return tenant-prefixed entries, so the
+    # list_catalog test will be broken as it checks for non-tenant-prefixed entries.
+    - jstests/core/**/list_catalog.js
+    # These tests create a new thread, so unsigned security token won't be properly injected.
+    - jstests/core/txns/transactions_block_ddl.js
+    - jstests/core/txns/write_conflicts_with_non_txns.js
+    - jstests/core/txns/kill_op_on_txn_expiry.js
+    # This test looks for the presence of a log line that contains a db name. Injecting a tenantId in
+    # the requests causes the test to fails due to a mismatch.
+    - jstests/core/query/api/apitest_db_profile_level.js
+    # Queryable encryption test requires an internal connection for the keyvault that does not
+    # inject a security token.
+    - jstests/core/query/queryable_encryption/**/*.js
+    # Failpoints do not support passing in tenancy information.
+    - jstests/core/administrative/profile/profile_hide_index.js
+    - jstests/core/testing/failcommand_failpoint.js
+    - jstests/core/query/comment_field.js
+
+executor:
+  archive:
+    tests: true
+    hooks:
+      - CheckReplDBHash
+      - CheckReplOplogs
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: |
+        globalThis.testingReplication = true;
+        await import('jstests/libs/override_methods/simulate_mongoq.js');
+      global_vars:
+        TestData:
+          tenantId: "636d957b2646ddfaf9b5e13f"
+          useSignedSecurityToken: false
+          hashTestNamesForMultitenancy: true
+  hooks:
+    # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+    # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+    # validating the entire contents of the collection.
+    - class: CheckReplOplogs
+    - class: CheckReplDBHash
+    - class: ValidateCollections
+      use_legacy_validate: true
+    - class: CleanEveryN
+      n: 20
+      skip_database_deletion: true
+  fixture:
+    class: ReplicaSetFixture
+    num_nodes: 2
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        multitenancySupport: true
+        # The mongoq only works with a replica set which has featureFlagRequireTenantID enabled.
+        featureFlagRequireTenantID: true
+        logComponentVerbosity:
+          command: 2
+      noscripting: ""

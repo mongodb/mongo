@@ -27,33 +27,53 @@
  *    it in the license file.
  */
 
-/**
- * This file tests db/exec/delete.cpp.
- */
-
-#include "mongo/platform/basic.h"
-
-#include <memory>
-
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/exec/collection_scan.h"
-#include "mongo/db/exec/delete.h"
-#include "mongo/db/exec/queued_data_stage.h"
+#include "mongo/db/exec/classic/collection_scan.h"
+#include "mongo/db/exec/classic/delete_stage.h"
+#include "mongo/db/exec/classic/plan_stage.h"
+#include "mongo/db/exec/classic/queued_data_stage.h"
+#include "mongo/db/exec/classic/working_set.h"
+#include "mongo/db/exec/collection_scan_common.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/local_catalog/collection.h"
+#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/db/storage/snapshot.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
 
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+namespace mongo {
 namespace QueryStageDelete {
 
-using std::unique_ptr;
-using std::vector;
-
-static const NamespaceString nss("unittests.QueryStageDelete");
+static const NamespaceString nss =
+    NamespaceString::createNamespaceString_forTest("unittests.QueryStageDelete");
 
 //
 // Stage-specific tests.
@@ -62,53 +82,53 @@ static const NamespaceString nss("unittests.QueryStageDelete");
 class QueryStageDeleteBase {
 public:
     QueryStageDeleteBase() : _client(&_opCtx) {
-        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns_forTest());
 
         for (size_t i = 0; i < numObj(); ++i) {
             BSONObjBuilder bob;
             bob.append("_id", static_cast<long long int>(i));
             bob.append("foo", static_cast<long long int>(i));
-            _client.insert(nss.ns(), bob.obj());
+            _client.insert(nss, bob.obj());
         }
     }
 
     virtual ~QueryStageDeleteBase() {
-        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
-        _client.dropCollection(nss.ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns_forTest());
+        _client.dropCollection(nss);
     }
 
     void remove(const BSONObj& obj) {
-        _client.remove(nss.ns(), obj);
+        _client.remove(nss, obj);
     }
 
-    void getRecordIds(const CollectionPtr& collection,
+    void getRecordIds(const CollectionAcquisition& collection,
                       CollectionScanParams::Direction direction,
-                      vector<RecordId>* out) {
+                      std::vector<RecordId>* out) {
         WorkingSet ws;
 
         CollectionScanParams params;
         params.direction = direction;
         params.tailable = false;
 
-        unique_ptr<CollectionScan> scan(
+        std::unique_ptr<CollectionScan> scan(
             new CollectionScan(_expCtx.get(), collection, params, &ws, nullptr));
         while (!scan->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state = scan->work(&id);
             if (PlanStage::ADVANCED == state) {
                 WorkingSetMember* member = ws.get(id);
-                verify(member->hasRecordId());
+                MONGO_verify(member->hasRecordId());
                 out->push_back(member->recordId);
             }
         }
     }
 
-    unique_ptr<CanonicalQuery> canonicalize(const BSONObj& query) {
+    std::unique_ptr<CanonicalQuery> canonicalize(const BSONObj& query) {
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(query);
-        auto statusWithCQ = CanonicalQuery::canonicalize(&_opCtx, std::move(findCommand));
-        ASSERT_OK(statusWithCQ.getStatus());
-        return std::move(statusWithCQ.getValue());
+        return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+            .expCtx = ExpressionContextBuilder{}.fromRequest(&_opCtx, *findCommand).build(),
+            .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
     }
 
     static size_t numObj() {
@@ -120,7 +140,7 @@ protected:
     OperationContext& _opCtx = *_txnPtr;
 
     boost::intrusive_ptr<ExpressionContext> _expCtx =
-        make_intrusive<ExpressionContext>(&_opCtx, nullptr, nss);
+        ExpressionContextBuilder{}.opCtx(&_opCtx).ns(nss).build();
 
 private:
     DBDirectClient _client;
@@ -131,13 +151,15 @@ private:
 class QueryStageDeleteUpcomingObjectWasDeleted : public QueryStageDeleteBase {
 public:
     void run() {
-        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+        const auto coll = acquireCollection(
+            &_opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(&_opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
 
-        const CollectionPtr& coll = ctx.getCollection();
-        ASSERT(coll);
+        ASSERT(coll.exists());
 
         // Get the RecordIds that would be returned by an in-order scan.
-        vector<RecordId> recordIds;
+        std::vector<RecordId> recordIds;
         getRecordIds(coll, CollectionScanParams::FORWARD, &recordIds);
 
         // Configure the scan.
@@ -169,10 +191,11 @@ public:
 
         // Remove recordIds[targetDocIndex];
         static_cast<PlanStage*>(&deleteStage)->saveState();
-        BSONObj targetDoc = coll->docFor(&_opCtx, recordIds[targetDocIndex]).value();
+        BSONObj targetDoc =
+            coll.getCollectionPtr()->docFor(&_opCtx, recordIds[targetDocIndex]).value();
         ASSERT(!targetDoc.isEmpty());
         remove(targetDoc);
-        static_cast<PlanStage*>(&deleteStage)->restoreState(&coll);
+        static_cast<PlanStage*>(&deleteStage)->restoreState(&coll.getCollectionPtr());
 
         // Remove the rest.
         while (!deleteStage.isEOF()) {
@@ -193,16 +216,19 @@ class QueryStageDeleteReturnOldDoc : public QueryStageDeleteBase {
 public:
     void run() {
         // Various variables we'll need.
-        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
-        const CollectionPtr& coll = ctx.getCollection();
-        ASSERT(coll);
+        const auto coll = acquireCollection(
+            &_opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(&_opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+
+        ASSERT(coll.exists());
         const int targetDocIndex = 0;
         const BSONObj query = BSON("foo" << BSON("$gte" << targetDocIndex));
         const auto ws = std::make_unique<WorkingSet>();
-        const unique_ptr<CanonicalQuery> cq(canonicalize(query));
+        const std::unique_ptr<CanonicalQuery> cq(canonicalize(query));
 
         // Get the RecordIds that would be returned by an in-order scan.
-        vector<RecordId> recordIds;
+        std::vector<RecordId> recordIds;
         getRecordIds(coll, CollectionScanParams::FORWARD, &recordIds);
 
         // Configure a QueuedDataStage to pass the first object in the collection back in a
@@ -253,17 +279,18 @@ public:
     }
 };
 
-class All : public OldStyleSuiteSpecification {
+class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("query_stage_delete") {}
 
-    void setupTests() {
+    void setupTests() override {
         // Stage-specific tests below.
         add<QueryStageDeleteUpcomingObjectWasDeleted>();
         add<QueryStageDeleteReturnOldDoc>();
     }
 };
 
-OldStyleSuiteInitializer<All> all;
+unittest::OldStyleSuiteInitializer<All> all;
 
 }  // namespace QueryStageDelete
+}  // namespace mongo

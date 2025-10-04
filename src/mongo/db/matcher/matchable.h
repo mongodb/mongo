@@ -29,10 +29,15 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/matcher/path.h"
+
+#include <cstddef>
 
 namespace mongo {
 
@@ -45,7 +50,7 @@ public:
     virtual BSONObj toBSON() const = 0;
 
     /**
-     * The neewly returned ElementIterator is allowed to keep a pointer to path.
+     * The newly returned ElementIterator is allowed to keep a pointer to path.
      * So the caller of this function should make sure path is in scope until
      * the ElementIterator is deallocated
      */
@@ -77,13 +82,13 @@ public:
 class BSONMatchableDocument : public MatchableDocument {
 public:
     BSONMatchableDocument(const BSONObj& obj);
-    virtual ~BSONMatchableDocument();
+    ~BSONMatchableDocument() override;
 
-    virtual BSONObj toBSON() const {
+    BSONObj toBSON() const override {
         return _obj;
     }
 
-    virtual ElementIterator* allocateIterator(const ElementPath* path) const {
+    ElementIterator* allocateIterator(const ElementPath* path) const override {
         if (_iteratorUsed)
             return new BSONElementIterator(path, _obj);
         _iteratorUsed = true;
@@ -91,7 +96,7 @@ public:
         return &_iterator;
     }
 
-    virtual void releaseIterator(ElementIterator* iterator) const {
+    void releaseIterator(ElementIterator* iterator) const override {
         if (iterator == &_iterator) {
             _iteratorUsed = false;
         } else {

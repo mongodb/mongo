@@ -27,32 +27,31 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 from time import sleep
-import wttest, threading, wiredtiger
+import wttest, threading
 from helper import simulate_crash_restart
 from wtscenario import make_scenarios
 
-# Test a bug that can occur when an out of order update gets insert after a checkpoint begins
-# but before the checkpoint processes the btree. Evict that update before checkpoint but fail the
-# eviction due to out of order timestamps.
+# Test a bug that can occur when an update without a timestamp gets inserted after a checkpoint
+# begins but before the checkpoint processes the btree. Evict that update before checkpoint but
+# fail the eviction due to the missing timestamp.
 #
 # Without the related change this test would fail as a result of an inconsistent checkpoint. Due to
 # a flag being set on an update incorrectly. Specific ordering is required to reproduce:
 # 1. Start a checkpoint, sleep the checkpoint after it takes it snapshot and before it
 #    processes our btree.
-# 2. Insert the out of order update.
-# 3. Evict the out of order update.
+# 2. Insert the update without a timestamp.
+# 3. Evict that update.
 # 4. Complete the checkpoint.
 # 5. Simulate a crash.
 # 6. Read the value and see if it matches the expected value.
 class test_hs_evict_race01(wttest.WiredTigerTestCase):
     conn_config = 'timing_stress_for_test=(checkpoint_slow)'
-    session_config = 'isolation=snapshot'
     uri = 'table:hs_evict_race01'
     numrows = 1
 
     key_format_values = [
         ('column', dict(key_format='r')),
-        ('integer_row', dict(key_format='i')),
+        ('row_integer', dict(key_format='i')),
     ]
     scenarios = make_scenarios(key_format_values)
     value1 = 'aaaaa'
@@ -60,7 +59,7 @@ class test_hs_evict_race01(wttest.WiredTigerTestCase):
     value3 = 'ccccc'
     value4 = 'ddddd'
 
-    def test_out_of_order_ts(self):
+    def test_mm_ts(self):
         self.session.create(self.uri, 'key_format={},value_format=S'.format(self.key_format))
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         cursor = self.session.open_cursor(self.uri)
@@ -70,15 +69,15 @@ class test_hs_evict_race01(wttest.WiredTigerTestCase):
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(4))
         # Move the stable timestamp.
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(4))
-        # Insert a value at timetamp 5
+        # Insert a value at timetamp 6
         self.session.begin_transaction()
         cursor[1] = self.value2
-        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(5))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(6))
 
         cursor.close()
 
         # Create a thread.
-        ooo_thread = threading.Thread(target=self.out_of_order_update_and_evict)
+        ooo_thread = threading.Thread(target=self.no_timestamp_update_and_evict)
 
         # Start the thread
         ooo_thread.start()
@@ -89,21 +88,21 @@ class test_hs_evict_race01(wttest.WiredTigerTestCase):
         simulate_crash_restart(self, '.', "RESTART")
         cursor = self.session.open_cursor(self.uri)
         self.session.begin_transaction('read_timestamp=' + self.timestamp_str(4))
-        self.assertEquals(self.value1, cursor[1])
+        self.assertEqual(self.value1, cursor[1])
         self.session.rollback_transaction()
 
-    def out_of_order_update_and_evict(self):
+    def no_timestamp_update_and_evict(self):
         sleep(0.5)
         session = self.setUpSessionOpen(self.conn)
         cursor = session.open_cursor(self.uri)
-        session.begin_transaction()
+        session.begin_transaction('no_timestamp=true')
         cursor[1] = self.value4
-        session.commit_transaction('commit_timestamp=' + self.timestamp_str(4))
+        session.commit_transaction()
         cursor.close()
         sleep(1.5)
         evict_cursor = session.open_cursor(self.uri, None, "debug=(release_evict)")
         evict_cursor.set_key(1)
-        self.assertEquals(evict_cursor.search(), 0)
+        self.assertEqual(evict_cursor.search(), 0)
         evict_cursor.reset()
         evict_cursor.close()
         session.close()

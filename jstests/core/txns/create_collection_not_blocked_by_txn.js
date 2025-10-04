@@ -1,13 +1,15 @@
 /**
  * Test that create collection only takes database IX lock and will not be blocked by transactions.
  *
- * @tags: [uses_transactions, requires_db_locking, assumes_unsharded_collection]
+ * @tags: [
+ *   uses_transactions,
+ *   requires_db_locking,
+ *   # Creating sharded collections is not supported in multi-document transactions.
+ *   assumes_unsharded_collection,
+ * ]
  */
 
-(function() {
-"use strict";
-
-let dbName = 'create_collection_not_blocked_by_txn';
+let dbName = "create_collection_not_blocked_by_txn";
 let mydb = db.getSiblingDB(dbName);
 
 mydb.a.drop({writeConcern: {w: "majority"}});
@@ -29,4 +31,3 @@ assert.commandWorked(mydb.createCollection("b"));
 assert.commandWorked(mydb.runCommand({insert: "c", documents: [{x: 2}]}));
 
 assert.commandWorked(session.commitTransaction_forTesting());
-})();

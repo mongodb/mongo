@@ -1,0 +1,28 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/auth_primary_driven_index_builds.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
+##########################################################
+executor:
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          roleGraphInvalidationIsFatal: true
+          setParameters:
+            featureFlagPrimaryDrivenIndexBuilds: true
+            featureFlagRecordIdsReplicated: 1
+          setParametersMongos:
+            featureFlagPrimaryDrivenIndexBuilds: true
+            featureFlagRecordIdsReplicated: 1
+          skipCheckDBHashes: true
+          skipCollectionAndIndexValidation: true
+      nodb: ""
+matrix_suite: true
+selector:
+  roots:
+    - jstests/auth/commands_*.js
+test_kind: js_test

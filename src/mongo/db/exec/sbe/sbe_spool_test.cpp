@@ -27,22 +27,32 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
-#include "mongo/db/exec/sbe/stages/filter.h"
+#include "mongo/db/exec/sbe/stages/limit_skip.h"
 #include "mongo/db/exec/sbe/stages/loop_join.h"
 #include "mongo/db/exec/sbe/stages/spool.h"
+#include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/stages/union.h"
+#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
+#include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
+#include "mongo/db/query/util/make_data_structure.h"
+#include "mongo/unittest/unittest.h"
+
+#include <memory>
+#include <string>
+#include <type_traits>
+#include <utility>
+
 
 namespace mongo::sbe {
 
 class SbeSpoolTest : public PlanStageTestFixture {
 public:
-    SpoolId generateSpoolId() {
-        return _spoolIdGenerator.generate();
-    }
-
     /**
      * Given an input subtree 'outerBranch' and a 'spoolId', constructs a plan of the following
      * shape:
@@ -59,8 +69,8 @@ public:
     std::pair<value::SlotId, std::unique_ptr<PlanStage>> makeSpoolConsumer(
         std::unique_ptr<PlanStage> outerBranch, SpoolId spoolId) {
         auto spoolOutputSlot = generateSlotId();
-        auto spoolConsumer =
-            makeS<SpoolConsumerStage<IsStack>>(spoolId, makeSV(spoolOutputSlot), kEmptyPlanNodeId);
+        auto spoolConsumer = makeS<SpoolConsumerStage<IsStack>>(
+            spoolId, makeSV(spoolOutputSlot), nullptr /* yieldPolicy */, kEmptyPlanNodeId);
 
         auto loopJoin = makeS<LoopJoinStage>(std::move(outerBranch),
                                              std::move(spoolConsumer),
@@ -86,23 +96,25 @@ public:
     std::pair<value::SlotId, std::unique_ptr<PlanStage>> makeSpoolUnspoolPlan(
         value::SlotId mockScanSlot, std::unique_ptr<PlanStage> mockScanStage) {
         auto spoolId = generateSpoolId();
-        std::unique_ptr<PlanStage> spoolProducer = makeS<SpoolEagerProducerStage>(
-            std::move(mockScanStage), spoolId, makeSV(mockScanSlot), kEmptyPlanNodeId);
+        std::unique_ptr<PlanStage> spoolProducer =
+            makeS<SpoolEagerProducerStage>(std::move(mockScanStage),
+                                           spoolId,
+                                           makeSV(mockScanSlot),
+                                           nullptr /* yieldPolicy */,
+                                           kEmptyPlanNodeId);
 
-        auto outerBranch =
-            makeS<LimitSkipStage>(std::move(spoolProducer), 1, boost::none, kEmptyPlanNodeId);
+        auto outerBranch = makeS<LimitSkipStage>(std::move(spoolProducer),
+                                                 makeE<EConstant>(value::TypeTags::NumberInt64, 1),
+                                                 nullptr,
+                                                 kEmptyPlanNodeId);
 
         return makeSpoolConsumer<false>(std::move(outerBranch), spoolId);
     }
-
-private:
-    sbe::value::SpoolIdGenerator _spoolIdGenerator;
 };
 
 TEST_F(SbeSpoolTest, SpoolEagerProducerBasic) {
-    auto inputArray = BSON_ARRAY("a"
-                                 << "b"
-                                 << "c");
+    auto inputArray = BSON_ARRAY("a" << "b"
+                                     << "c");
     auto [inputTag, inputVal] = stage_builder::makeValue(inputArray);
     value::ValueGuard inputGuard{inputTag, inputVal};
 
@@ -113,8 +125,11 @@ TEST_F(SbeSpoolTest, SpoolEagerProducerBasic) {
 
     auto makeStageFn = [this](value::SlotId mockScanSlot,
                               std::unique_ptr<PlanStage> mockScanStage) {
-        auto eagerSpoolProducer = makeS<SpoolEagerProducerStage>(
-            std::move(mockScanStage), generateSpoolId(), makeSV(mockScanSlot), kEmptyPlanNodeId);
+        auto eagerSpoolProducer = makeS<SpoolEagerProducerStage>(std::move(mockScanStage),
+                                                                 generateSpoolId(),
+                                                                 makeSV(mockScanSlot),
+                                                                 nullptr /* yieldPolicy */,
+                                                                 kEmptyPlanNodeId);
         return std::make_pair(mockScanSlot, std::move(eagerSpoolProducer));
     };
 
@@ -124,9 +139,8 @@ TEST_F(SbeSpoolTest, SpoolEagerProducerBasic) {
 }
 
 TEST_F(SbeSpoolTest, SpoolLazyProducerBasic) {
-    auto inputArray = BSON_ARRAY("a"
-                                 << "b"
-                                 << "c");
+    auto inputArray = BSON_ARRAY("a" << "b"
+                                     << "c");
     auto [inputTag, inputVal] = stage_builder::makeValue(inputArray);
     value::ValueGuard inputGuard{inputTag, inputVal};
 
@@ -151,9 +165,8 @@ TEST_F(SbeSpoolTest, SpoolLazyProducerBasic) {
 }
 
 TEST_F(SbeSpoolTest, SpoolAndConsumeNonStack) {
-    auto inputArray = BSON_ARRAY("a"
-                                 << "b"
-                                 << "c");
+    auto inputArray = BSON_ARRAY("a" << "b"
+                                     << "c");
     auto [inputTag, inputVal] = stage_builder::makeValue(inputArray);
     value::ValueGuard inputGuard{inputTag, inputVal};
 
@@ -174,9 +187,8 @@ TEST_F(SbeSpoolTest, SpoolAndConsumeNonStack) {
 }
 
 TEST_F(SbeSpoolTest, SpoolAndConsumeStack) {
-    auto inputArray = BSON_ARRAY("a"
-                                 << "b"
-                                 << "c");
+    auto inputArray = BSON_ARRAY("a" << "b"
+                                     << "c");
     auto [inputTag, inputVal] = stage_builder::makeValue(inputArray);
     value::ValueGuard inputGuard{inputTag, inputVal};
 
@@ -234,15 +246,13 @@ TEST_F(SbeSpoolTest, SpoolAndConsumeStack) {
 TEST_F(SbeSpoolTest, SpoolAndConsumeCloseAndReopen) {
     auto ctx = makeCompileCtx();
 
-    auto inputArray1 = BSON_ARRAY("a"
-                                  << "b"
-                                  << "c");
+    auto inputArray1 = BSON_ARRAY("a" << "b"
+                                      << "c");
     auto [inputTag1, inputVal1] = stage_builder::makeValue(inputArray1);
     value::ValueGuard inputGuard1{inputTag1, inputVal1};
 
-    auto inputArray2 = BSON_ARRAY("d"
-                                  << "e"
-                                  << "f");
+    auto inputArray2 = BSON_ARRAY("d" << "e"
+                                      << "f");
     auto [inputTag2, inputVal2] = stage_builder::makeValue(inputArray2);
     value::ValueGuard inputGuard2{inputTag2, inputVal2};
 
@@ -274,8 +284,7 @@ TEST_F(SbeSpoolTest, SpoolAndConsumeCloseAndReopen) {
     for (int i = 0; i < 4; ++i) {
         auto planState = rootStage->getNext();
         ASSERT(planState == PlanState::ADVANCED);
-        auto [tag, val] = accessor->copyOrMoveValue();
-        value::ValueGuard planOutputGuard{tag, val};
+        auto [tag, val] = accessor->getViewOfValue();
         char expectedChar = 'a' + i;
         auto [expectedTag, expectedValue] =
             value::makeNewString(StringData{std::string(1, expectedChar)});
@@ -292,12 +301,11 @@ TEST_F(SbeSpoolTest, SpoolAndConsumeCloseAndReopen) {
     auto [resultsTag, resultsVal] = getAllResults(rootStage.get(), accessor);
     value::ValueGuard resultGuard{resultsTag, resultsVal};
 
-    auto expectedResultsArray = BSON_ARRAY("a"
-                                           << "b"
-                                           << "c"
-                                           << "d"
-                                           << "e"
-                                           << "f");
+    auto expectedResultsArray = BSON_ARRAY("a" << "b"
+                                               << "c"
+                                               << "d"
+                                               << "e"
+                                               << "f");
     auto [expectedTag, expectedVal] = stage_builder::makeValue(expectedResultsArray);
     value::ValueGuard expectedGuard{expectedTag, expectedVal};
     assertValuesEqual(resultsTag, resultsVal, expectedTag, expectedVal);

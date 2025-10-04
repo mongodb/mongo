@@ -20,7 +20,7 @@ def remove_if_exists(path):
         pass
 
 
-def is_yaml_file(filename):
+def is_yaml_file(filename: str) -> bool:
     """Return true if 'filename' ends in .yml or .yaml, and false otherwise."""
     return os.path.splitext(filename)[1] in (".yaml", ".yml")
 

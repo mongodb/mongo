@@ -27,60 +27,68 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/storage/storage_options.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/server_parameter.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
-#include "mongo/platform/compiler.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/util/str.h"
+
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
 StorageGlobalParams::StorageGlobalParams() {
-    reset();
+    _reset();
 }
 
-void StorageGlobalParams::reset() {
+void StorageGlobalParams::reset_forTest() {
+    _reset();
+}
+
+void StorageGlobalParams::_reset() {
     engine = "wiredTiger";
     engineSetByUser = false;
     dbpath = kDefaultDbPath;
     upgrade = false;
     repair = false;
-
-    // The intention here is to enable the journal by default if we are running on a 64 bit system.
-    dur = (sizeof(void*) == 8);
+    validate = false;
+    restore = false;
+    magicRestore = false;
 
     noTableScan.store(false);
     directoryperdb = false;
-    syncdelay = 60.0;
-    readOnly = false;
+    syncdelay.store(-1.0);
+    queryableBackupMode = false;
     groupCollections = false;
     oplogMinRetentionHours.store(0.0);
     allowOplogTruncation = true;
-    disableLockFreeReads = false;
-    checkpointDelaySecs = 0;
+    forceDisableTableLogging = false;
+}
+
+boost::filesystem::path StorageGlobalParams::getSpillDbPath() const {
+    return gSpillPath.empty() ? (boost::filesystem::path(dbpath) / "_tmp" / "spilldb")
+                              : boost::filesystem::path(gSpillPath);
 }
 
 StorageGlobalParams storageGlobalParams;
 
-// Storage global parameters exported read-only via the getParameter mechanism.
-// The IDL has no ability to specify 'none' as set_at type,
-// so use 'startup' in the IDL file, then override to none here.
-StorageDirectoryPerDbParameter::StorageDirectoryPerDbParameter(StringData name, ServerParameterType)
-    : ServerParameter(
-          ServerParameterSet::getGlobal(), name, false /* allowedToChangeAtStartup */, false
-          /* allowedToChangeAtRuntime */) {}
-
-Status StorageDirectoryPerDbParameter::setFromString(const std::string&) {
+Status StorageDirectoryPerDbParameter::setFromString(StringData, const boost::optional<TenantId>&) {
     return {ErrorCodes::IllegalOperation,
             str::stream() << name() << " cannot be set via setParameter"};
 };
 
 void StorageDirectoryPerDbParameter::append(OperationContext* opCtx,
-                                            BSONObjBuilder& builder,
-                                            const std::string& name) {
-    builder.append(name, storageGlobalParams.directoryperdb);
+                                            BSONObjBuilder* builder,
+                                            StringData name,
+                                            const boost::optional<TenantId>&) {
+    builder->append(name, storageGlobalParams.directoryperdb);
 }
 
 

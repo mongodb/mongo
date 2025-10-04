@@ -1,0 +1,43 @@
+load("@poetry//:dependencies.bzl", "dependency")
+
+py_library(
+    name = "utils",
+    srcs = [
+        "__init__.py",
+        "archival.py",
+        "autoloader.py",
+        "batched_baggage_span_processor.py",
+        "check_has_tag.py",
+        "dictionary.py",
+        "evergreen_conn.py",
+        "external_suite.py",
+        "file_span_exporter.py",
+        "filesystem.py",
+        "globstar.py",
+        "history.py",
+        "jscomment.py",
+        "otel_thread_pool_executor.py",
+        "otel_utils.py",
+        "queue.py",
+        "registry.py",
+        "runtime_recorder.py",
+        "self_test_fakes.py",
+        "sharded_cluster_util.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "evergreen-py",
+            group = "testing",
+        ),
+        dependency(
+            "boto3",
+            group = "aws",
+        ),
+        dependency(
+            "botocore",
+            group = "aws",
+        ),
+        "//buildscripts/util:download_utils",
+    ],
+)

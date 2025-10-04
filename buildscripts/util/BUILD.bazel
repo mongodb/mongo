@@ -1,0 +1,59 @@
+load("@poetry//:dependencies.bzl", "dependency")
+
+py_library(
+    name = "util",
+    srcs = [
+        "__init__.py",
+        "buildozer_utils.py",
+        "cedar_report.py",
+        "cmdutils.py",
+        "codeowners_utils.py",
+        "expansions.py",
+        "fileops.py",
+        "generate_co_jira_map.py",
+        "oauth.py",
+        "read_config.py",
+        "runcommand.py",
+        "taskname.py",
+        "testname.py",
+        "teststats.py",
+        "time.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "oauthlib",
+            group = "testing",
+        ),
+        dependency(
+            "structlog",
+            group = "evergreen",
+        ),
+        dependency(
+            "pkce",
+            group = "testing",
+        ),
+        dependency(
+            "requests-oauthlib",
+            group = "testing",
+        ),
+    ],
+)
+
+py_library(
+    name = "download_utils",
+    srcs = [
+        "download_utils.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "boto3",
+            group = "aws",
+        ),
+        dependency(
+            "requests",
+            group = "core",
+        ),
+    ],
+)

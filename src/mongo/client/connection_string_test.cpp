@@ -27,11 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/client/connection_string.h"
 
+#include "mongo/base/status.h"
 #include "mongo/unittest/unittest.h"
+
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {

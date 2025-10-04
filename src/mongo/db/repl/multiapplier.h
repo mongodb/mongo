@@ -29,22 +29,23 @@
 
 #pragma once
 
-#include <functional>
-#include <iosfwd>
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/multi_key_path_tracker.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/util/functional.h"
+#include "mongo/util/modules.h"
+
+#include <functional>
+#include <iosfwd>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace repl {
@@ -126,7 +127,7 @@ public:
     State getState_forTest() const;
 
 private:
-    bool _isActive_inlock() const;
+    bool _isActive(WithLock lk) const;
 
     /**
      * DB worker callback function - applies all operations.
@@ -142,7 +143,7 @@ private:
     CallbackFn _onCompletion;
 
     // Protects member data of this MultiApplier.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("MultiApplier::_mutex");
+    mutable stdx::mutex _mutex;
 
     stdx::condition_variable _condition;
 

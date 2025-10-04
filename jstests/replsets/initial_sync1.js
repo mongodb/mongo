@@ -13,36 +13,32 @@
  * 11. Everyone happy eventually
  *
  * This test assumes a 'newlyAdded' removal.
- *
- * SERVER-49428: Disable for ephemeralForTest, writeConcernMajorityJournalDefault is not off
- * @tags: [
- *   incompatible_with_eft,
- * ]
  */
 
-load("jstests/replsets/rslib.js");
-var basename = "jstests_initsync1";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {reconnect} from "jstests/replsets/rslib.js";
+
+let basename = "jstests_initsync1";
 
 print("1. Bring up set");
 // SERVER-7455, this test is called from ssl/auth_x509.js
-var x509_options1;
-var x509_options2;
-var replTest =
-    new ReplSetTest({name: basename, nodes: {node0: x509_options1, node1: x509_options2}});
+let x509_options1;
+let x509_options2;
+let replTest = new ReplSetTest({name: basename, nodes: {node0: x509_options1, node1: x509_options2}});
 
-var conns = replTest.startSet();
+let conns = replTest.startSet();
 replTest.initiate();
 
-var primary = replTest.getPrimary();
-var foo = primary.getDB("foo");
-var admin = primary.getDB("admin");
+let primary = replTest.getPrimary();
+let foo = primary.getDB("foo");
+let admin = primary.getDB("admin");
 
-var secondary1 = replTest.getSecondary();
-var admin_s1 = secondary1.getDB("admin");
-var local_s1 = secondary1.getDB("local");
+let secondary1 = replTest.getSecondary();
+let admin_s1 = secondary1.getDB("admin");
+let local_s1 = secondary1.getDB("local");
 
 print("2. Insert some data");
-var bulk = foo.bar.initializeUnorderedBulkOp();
+let bulk = foo.bar.initializeUnorderedBulkOp();
 for (var i = 0; i < 100; i++) {
     bulk.insert({date: new Date(), x: i, str: "all the talk on the market"});
 }
@@ -56,15 +52,24 @@ print("5. Freeze #2");
 admin_s1.runCommand({replSetFreeze: 999999});
 
 print("6. Bring up #3");
-var hostname = getHostName();
+let hostname = getHostName();
 
-var secondary2 =
-    MongoRunner.runMongod(Object.merge({replSet: basename, oplogSize: 2}, x509_options2));
+let secondary2 = MongoRunner.runMongod(
+    Object.merge(
+        {
+            replSet: basename,
+            oplogSize: 2,
+            // Preserve the initial sync state to validate an assertion.
+            setParameter: {"failpoint.skipClearInitialSyncState": tojson({mode: "alwaysOn"})},
+        },
+        x509_options2,
+    ),
+);
 
-var local_s2 = secondary2.getDB("local");
-var admin_s2 = secondary2.getDB("admin");
+let local_s2 = secondary2.getDB("local");
+let admin_s2 = secondary2.getDB("admin");
 
-var config = replTest.getReplSetConfig();
+let config = replTest.getReplSetConfig();
 config.version = replTest.getReplSetConfigFromNode().version + 1;
 config.members.push({_id: 2, host: secondary2.host});
 try {
@@ -77,16 +82,16 @@ reconnect(secondary2);
 replTest.waitForAllNewlyAddedRemovals();
 
 print("Config 1: " + tojsononeline(config));
-var config2 = local_s1.system.replset.findOne();
+let config2 = local_s1.system.replset.findOne();
 print("Config 2: " + tojsononeline(config2));
 assert(config2);
 // Add one to config.version to account for the 'newlyAdded' removal.
-assert.eq(config2.version, (config.version + 1));
+assert.eq(config2.version, config.version + 1);
 
-var config3 = local_s2.system.replset.findOne();
+let config3 = local_s2.system.replset.findOne();
 print("Config 3: " + tojsononeline(config3));
 assert(config3);
-assert.eq(config3.version, (config.version + 1));
+assert.eq(config3.version, config.version + 1);
 
 replTest.waitForState(secondary2, [ReplSetTest.State.SECONDARY, ReplSetTest.State.RECOVERING]);
 
@@ -95,7 +100,7 @@ replTest.stop(secondary1);
 
 print("8. Eventually the new node should become a secondary");
 print("if initial sync has started, this will cause it to fail and sleep for 5 minutes");
-replTest.waitForState(secondary2, ReplSetTest.State.SECONDARY, 60 * 1000);
+replTest.awaitSecondaryNodes(60 * 1000, [secondary2]);
 
 print("9. Bring the secondary back up");
 replTest.start(secondary1, {}, true);

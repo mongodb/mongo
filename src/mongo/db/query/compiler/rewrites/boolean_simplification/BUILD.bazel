@@ -1,0 +1,66 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "boolean_simplification",
+    srcs = [
+        "bitset_algebra.cpp",
+        "bitset_tree.cpp",
+        "petrick.cpp",
+        "quine_mccluskey.cpp",
+        "//src/mongo/util:dynamic_bitset.h",
+        "//src/mongo/util:inlined_storage.h",
+        "//src/mongo/util:stream_utils.h",
+    ],
+    hdrs = [
+        "bitset_algebra.h",
+        "bitset_tree.h",
+        "petrick.h",
+        "quine_mccluskey.h",
+    ],
+    deps = [
+        "//src/mongo/db:mongohasher",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "boolean_simplification_test",
+    srcs = [
+        "bitset_algebra_test.cpp",
+        "bitset_test_util.h",
+        "bitset_tree_test.cpp",
+        "petrick_test.cpp",
+        "quine_mccluskey_test.cpp",
+    ],
+    tags = ["mongo_unittest_sixth_group"],
+    deps = [
+        ":boolean_simplification",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "quine_mccluskey_bm",
+    srcs = [
+        "bitset_algebra_bm.cpp",
+        "dynamic_bitset_bm.cpp",
+        "match_expression_bm.cpp",
+        "petrick_bm.cpp",
+        "quine_mccluskey_bm.cpp",
+    ],
+    tags = [
+        "first_half_bm",
+    ],
+    deps = [
+        ":boolean_simplification",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db/query/compiler/rewrites/matcher:matcher_rewrites",
+    ],
+)

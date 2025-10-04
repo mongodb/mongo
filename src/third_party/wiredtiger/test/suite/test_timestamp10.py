@@ -36,7 +36,6 @@ from wtscenario import make_scenarios
 
 class test_timestamp10(wttest.WiredTigerTestCase, suite_subprocess):
     conn_config = 'config_base=false,create,log=(enabled)'
-    session_config = 'isolation=snapshot'
     coll1_uri = 'table:collection10.1'
     coll2_uri = 'table:collection10.2'
     coll3_uri = 'table:collection10.3'
@@ -153,13 +152,13 @@ class test_timestamp10(wttest.WiredTigerTestCase, suite_subprocess):
             ts = (end - 3)
             for i in range(start,end):
                 # The oplog-like table is logged so it always has all the data.
-                self.assertEquals(c_op[i], i)
+                self.assertEqual(c_op[i], i)
                 curs.set_key(i)
                 # Earlier tables have all the data because later checkpoints
                 # will save the last bit of data. Only the last table will
                 # be missing some.
                 if self.use_stable == 'false' or i <= ts or table != self.table_cnt:
-                    self.assertEquals(curs[i], i)
+                    self.assertEqual(curs[i], i)
                 elif self.value_format == '8t':
                     # For FLCS, expect the table to have extended under the lost values.
                     # We should see 0 and not the data that was written.
@@ -167,6 +166,3 @@ class test_timestamp10(wttest.WiredTigerTestCase, suite_subprocess):
                     self.assertEqual(curs.get_value(), 0)
                 else:
                     self.assertEqual(curs.search(), wiredtiger.WT_NOTFOUND)
-
-if __name__ == '__main__':
-    wttest.run()

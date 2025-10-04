@@ -27,15 +27,23 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
 #include "mongo/util/stacktrace.h"
 
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
+#include "mongo/bson/oid.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
+
+#include <algorithm>
+#include <iterator>
+
+#include <fmt/format.h>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
+
 
 namespace mongo::stack_trace_detail {
 namespace {
@@ -94,9 +102,13 @@ uint64_t Hex::fromHex(StringData s) {
 
 void logBacktraceObject(const BSONObj& bt, StackTraceSink* sink, bool withHumanReadable) {
     if (sink) {
-        *sink << fmt::format(FMT_STRING("BACKTRACE: {}\n"), tojson(bt, ExtendedRelaxedV2_0_0));
+        *sink << fmt::format("BACKTRACE: {}\n", tojson(bt, ExtendedRelaxedV2_0_0));
     } else {
-        LOGV2_OPTIONS(31380, {logv2::LogTruncation::Disabled}, "BACKTRACE", "bt"_attr = bt);
+        LOGV2_OPTIONS(
+            31380,
+            mongo::logv2::LogOptions(logv2::LogTag::kBacktraceLog, logv2::LogTruncation::Disabled),
+            "BACKTRACE",
+            "bt"_attr = bt);
     }
     if (withHumanReadable) {
         if (auto elem = bt.getField("backtrace"); !elem.eoo()) {
@@ -113,3 +125,20 @@ void logBacktraceObject(const BSONObj& bt, StackTraceSink* sink, bool withHumanR
 }
 
 }  // namespace mongo::stack_trace_detail
+
+void mongo::StackTrace::log(bool withHumanReadable) const {
+    if (hasError()) {
+        LOGV2_ERROR(31430, "Error collecting stack trace", "error"_attr = _error);
+    }
+
+    StackTraceSink* logv2Sink = nullptr;
+    stack_trace_detail::logBacktraceObject(_stacktrace, logv2Sink, withHumanReadable);
+}
+
+void mongo::StackTrace::sink(StackTraceSink* sink, bool withHumanReadable) const {
+    if (hasError()) {
+        *sink << fmt::format("Error collecting stack trace: {}", _error);
+    }
+
+    stack_trace_detail::logBacktraceObject(_stacktrace, sink, withHumanReadable);
+}

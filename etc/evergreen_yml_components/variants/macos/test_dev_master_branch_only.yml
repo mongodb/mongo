@@ -1,0 +1,29 @@
+# MacOS build variants for testing development environments
+#
+# After the branching variants in this file
+# should NOT run on a new rapid release (v7.1, v7.2 etc.)
+# and LTS release (v7.0, v6.0 etc.) branch projects
+
+buildvariants:
+  - name: &enterprise-macos-arm64 enterprise-macos-arm64
+    display_name: "~ Enterprise macOS arm64"
+    tags: ["bazel_check"]
+    run_on:
+      - macos-14-arm64
+    expansions:
+      compile_variant: *enterprise-macos-arm64
+      test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm
+      resmoke_jobs_max: 6
+    tasks:
+      - name: compile_test_serial_TG
+      - name: run_bazel_compiledb
+      - name: run_unit_tests_8_way_split_TG
+      - name: audit
+      - name: auth_audit_gen
+      - name: fle
+      - name: fle2
+      - name: .jscore .common !.decimal !.sharding
+      - name: replica_sets_auth_gen
+      - name: sasl
+      - name: .crypt
+      - name: run_bazel_TG

@@ -42,8 +42,9 @@
 static uint64_t g_ts = 0;
 
 /*
- * Each thread inserts a set of keys into the record store database. The keys are generated in such
- * a way that there are large gaps in the key range.
+ * thread_func --
+ *     Each thread inserts a set of keys into the record store database. The keys are generated in
+ *     such a way that there are large gaps in the key range.
  */
 static void *
 thread_func(void *arg)
@@ -87,7 +88,7 @@ thread_func(void *arg)
 
             ++g_ts;
             /* 5K updates/sec */
-            (void)usleep(1000000ULL * NR_THREADS / 5000);
+            (void)usleep(1ULL * WT_MILLION * NR_THREADS / (5 * WT_THOUSAND));
         }
     }
 
@@ -96,6 +97,10 @@ thread_func(void *arg)
     return (NULL);
 }
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {
@@ -111,16 +116,16 @@ main(int argc, char *argv[])
     opts = &_opts;
     memset(opts, 0, sizeof(*opts));
     testutil_check(testutil_parse_opts(argc, argv, opts));
-    testutil_make_work_dir(opts->home);
+    testutil_recreate_dir(opts->home);
 
     testutil_check(wiredtiger_open(opts->home, NULL,
       "create,cache_size=1G,checkpoint=(wait=30),eviction_trigger=80,eviction_target=64,eviction_"
       "dirty_target=65,eviction_dirty_trigger=80,log=(enabled,file_max=10M),transaction_sync=("
-      "enabled=true,method=none)",
+      "enabled=true,method=none),statistics=(all),statistics_log=(json,on_close,wait=1)",
       &opts->conn));
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
 
-    testutil_check(__wt_snprintf(table_format, sizeof(table_format), "key_format=r,value_format="));
+    testutil_snprintf(table_format, sizeof(table_format), "key_format=r,value_format=");
     for (i = 0; i < NR_FIELDS; i++)
         strcat(table_format, "Q");
 

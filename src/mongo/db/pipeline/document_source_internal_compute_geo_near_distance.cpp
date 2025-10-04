@@ -27,13 +27,28 @@
  *    it in the license file.
  */
 
+
+#include "mongo/db/pipeline/document_source_internal_compute_geo_near_distance.h"
+
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/geo/geometry_container.h"
+#include "mongo/db/geo/geoparser.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/query/allowed_contexts.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
+
+#include <utility>
+#include <vector>
+
+#include <s2cellid.h>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/geo/geoparser.h"
-#include "mongo/db/pipeline/document_source_internal_compute_geo_near_distance.h"
 
 namespace mongo {
 
@@ -41,6 +56,8 @@ REGISTER_DOCUMENT_SOURCE(_internalComputeGeoNearDistance,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceInternalGeoNearDistance::createFromBson,
                          AllowedWithApiStrict::kInternal);
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalComputeGeoNearDistance,
+                            DocumentSourceInternalGeoNearDistance::id)
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceInternalGeoNearDistance::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
@@ -50,7 +67,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalGeoNearDistance::crea
                           << " field is required and must be a string",
             obj.hasField(DocumentSourceInternalGeoNearDistance::kKeyFieldName) &&
                 obj[DocumentSourceInternalGeoNearDistance::kKeyFieldName].type() ==
-                    BSONType::String);
+                    BSONType::string);
     uassert(5874501,
             str::stream() << DocumentSourceInternalGeoNearDistance::kNearFieldName
                           << " field is required and must be an object or array",
@@ -61,7 +78,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalGeoNearDistance::crea
                           << " field is required and must be a string",
             obj.hasField(DocumentSourceInternalGeoNearDistance::kDistanceFieldFieldName) &&
                 obj[DocumentSourceInternalGeoNearDistance::kDistanceFieldFieldName].type() ==
-                    BSONType::String);
+                    BSONType::string);
     uassert(
         5874503,
         str::stream() << DocumentSourceInternalGeoNearDistance::kDistanceMultiplierFieldName
@@ -105,49 +122,16 @@ DocumentSourceInternalGeoNearDistance::DocumentSourceInternalGeoNearDistance(
       _distanceField(std::move(distanceField)),
       _distanceMultiplier(distanceMultiplier) {}
 
-DocumentSource::GetNextResult DocumentSourceInternalGeoNearDistance::doGetNext() {
-    auto next = pSource->getNext();
-
-    if (next.isAdvanced()) {
-        // Extract all the geometries out of this document for the near query
-        std::vector<std::unique_ptr<StoredGeometry>> geometries;
-        StoredGeometry::extractGeometries(next.getDocument().toBson(), _key, &geometries, false);
-
-        // Compute the minimum distance of all the geometries in the document
-        double minDistance = -1;
-        for (auto it = geometries.begin(); it != geometries.end(); ++it) {
-            StoredGeometry& stored = **it;
-
-            if (!stored.geometry.supportsProject(_centroid->crs))
-                continue;
-            stored.geometry.projectInto(_centroid->crs);
-
-            double nextDistance = stored.geometry.minDistance(*_centroid);
-
-            if (minDistance < 0 || nextDistance < minDistance) {
-                minDistance = nextDistance;
-            }
-        }
-        minDistance *= _distanceMultiplier;
-
-        MutableDocument doc(next.releaseDocument());
-        doc.setNestedField(_distanceField, Value{minDistance});
-
-        return doc.freeze();
-    }
-
-    return next;
-}
-
-Value DocumentSourceInternalGeoNearDistance::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceInternalGeoNearDistance::serialize(const SerializationOptions& opts) const {
     MutableDocument out;
-    out.setField(DocumentSourceInternalGeoNearDistance::kNearFieldName, Value(_coords));
-    out.setField(DocumentSourceInternalGeoNearDistance::kKeyFieldName, Value(_key));
+    out.setField(DocumentSourceInternalGeoNearDistance::kNearFieldName,
+                 opts.serializeLiteral(_coords));
+    out.setField(DocumentSourceInternalGeoNearDistance::kKeyFieldName,
+                 Value(opts.serializeFieldPathFromString(_key)));
     out.setField(DocumentSourceInternalGeoNearDistance::kDistanceFieldFieldName,
-                 Value(_distanceField.fullPath()));
+                 Value(opts.serializeFieldPath(_distanceField)));
     out.setField(DocumentSourceInternalGeoNearDistance::kDistanceMultiplierFieldName,
-                 Value(_distanceMultiplier));
+                 opts.serializeLiteral(_distanceMultiplier));
 
     return Value(DOC(getSourceName() << out.freeze()));
 }

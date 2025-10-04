@@ -29,13 +29,15 @@
 
 #pragma once
 
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+
 #include <memory>
+#include <string>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
-
-#include "mongo/bson/timestamp.h"
-#include "mongo/db/operation_context.h"
 
 namespace mongo {
 

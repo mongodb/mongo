@@ -27,9 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/update/update_array_node.h"
+
+#include "mongo/db/exec/matcher/matcher.h"
 
 namespace mongo {
 
@@ -62,7 +63,7 @@ UpdateExecutor::ApplyResult UpdateArrayNode::apply(
     uassert(ErrorCodes::BadValue,
             str::stream() << "Cannot apply array updates to non-array element "
                           << applyParams.element.toString(),
-            applyParams.element.getType() == BSONType::Array);
+            applyParams.element.getType() == BSONType::array);
 
     // Construct a map from the array index to the set of updates that should be applied to the
     // array element at that index. We do not apply the updates yet because we need to know how many
@@ -88,7 +89,7 @@ UpdateExecutor::ApplyResult UpdateArrayNode::apply(
             } else {
                 auto filter = _arrayFilters.find(update.first);
                 invariant(filter != _arrayFilters.end());
-                if (filter->second->matchesBSONElement(arrayElement)) {
+                if (exec::matcher::matchesBSONElement(filter->second->getFilter(), arrayElement)) {
                     matchingElements[i].push_back(update.second.get());
                 }
             }
@@ -154,8 +155,6 @@ UpdateExecutor::ApplyResult UpdateArrayNode::apply(
             auto childApplyResult =
                 mergedChild->apply(childApplyParams, childUpdateNodeApplyParams);
 
-            applyResult.indexesAffected =
-                applyResult.indexesAffected || childApplyResult.indexesAffected;
             applyResult.noop = applyResult.noop && childApplyResult.noop;
             if (!childApplyResult.noop) {
                 modifiedElement = childElement;

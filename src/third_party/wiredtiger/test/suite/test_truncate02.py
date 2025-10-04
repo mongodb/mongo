@@ -30,15 +30,18 @@
 #       session level operations on tables
 #
 
-import wiredtiger, wttest
+from test_truncate01 import test_truncate_base
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
+import wttest
 
 # test_truncate_fast_delete
 #       When deleting leaf pages that aren't in memory, we set transactional
 # information in the page's WT_REF structure, which results in interesting
 # issues.
-class test_truncate_fast_delete(wttest.WiredTigerTestCase):
+# FIXME-WT-15430: Re-enable once disaggregated storage works with fast truncate tests.
+@wttest.skip_for_hook("disagg", "fast truncate is not supported yet")
+class test_truncate_fast_delete(test_truncate_base):
     name = 'test_truncate'
     nentries = 10000
 
@@ -47,6 +50,10 @@ class test_truncate_fast_delete(wttest.WiredTigerTestCase):
     types = [
         ('file', dict(type='file:', config=\
             'allocation_size=512,leaf_page_max=512')),
+        # FIXME-WT-15430 Re-enable the layered table scenario once disaggregated storage works with fast truncate tests.
+        # Consider whether we need this scenario here if the scenario is already defined in the test truncate base test.
+        # ('layered', dict(type='layered:', config=\
+        #     'allocation_size=512,leaf_page_max=512'))
     ]
 
     # This is all about testing the btree layer, not the schema layer, test
@@ -102,10 +109,10 @@ class test_truncate_fast_delete(wttest.WiredTigerTestCase):
         self.assertEqual(count, expected)
 
     # Open a cursor in a new session and confirm how many records it sees.
-    def outside_count(self, isolation, expected):
+    def outside_count(self, ds, isolation, expected):
         s = self.conn.open_session()
         s.begin_transaction(isolation)
-        cursor = s.open_cursor(self.type + self.name, None)
+        cursor = ds.open_cursor(self.type + self.name, None, session=s)
         self.cursor_count(cursor, expected)
         s.close()
 
@@ -130,19 +137,22 @@ class test_truncate_fast_delete(wttest.WiredTigerTestCase):
         # Optionally add a few overflow records so we block fast delete on
         # those pages.
         if self.overflow:
-            cursor = self.session.open_cursor(uri, None, 'overwrite=false')
+            cursor = ds.open_cursor(uri, None, 'overwrite=false')
             for i in range(1, self.nentries, 3123):
                 cursor.set_key(ds.key(i))
                 cursor.set_value(ds.value(i))
                 cursor.update()
             cursor.close()
 
+        # FIXME-WT-14977 Remove the conditional for layered tables once disaggregated storage can handle checkpoint id after restart.
+        if self.type != 'layered:':
+            self.session.checkpoint()
         # Close and re-open it so we get a disk image, not an insert skiplist.
-        self.reopen_conn()
+            self.reopen_conn()
 
         # Optionally read/write a few rows before truncation.
         if self.readbefore or self.writebefore:
-            cursor = self.session.open_cursor(uri, None, 'overwrite=false')
+            cursor = ds.open_cursor(uri, None, 'overwrite=false')
             if self.readbefore:
                     for i in range(1, self.nentries, 737):
                         cursor.set_key(ds.key(i))
@@ -156,17 +166,17 @@ class test_truncate_fast_delete(wttest.WiredTigerTestCase):
 
         # Begin a transaction, and truncate a big range of rows.
         self.session.begin_transaction(None)
-        start = self.session.open_cursor(uri, None)
+        start = ds.open_cursor(uri, None)
         start.set_key(ds.key(10))
-        end = self.session.open_cursor(uri, None)
+        end = ds.open_cursor(uri, None)
         end.set_key(ds.key(self.nentries - 10))
-        self.session.truncate(None, start, end, None)
+        ds.truncate(None, start, end, None)
         start.close()
         end.close()
 
         # Optionally read/write a few rows after truncation.
         if self.readafter or self.writeafter:
-            cursor = self.session.open_cursor(uri, None, 'overwrite=false')
+            cursor = ds.open_cursor(uri, None, 'overwrite=false')
             if self.readafter:
                     for i in range(1, self.nentries, 1123):
                         cursor.set_key(ds.key(i))
@@ -182,15 +192,15 @@ class test_truncate_fast_delete(wttest.WiredTigerTestCase):
         # The number 19 comes from deleting row 10 (inclusive), to row N - 10,
         # exclusive, or 9 + 10 == 19.
         remaining = 19
-        cursor = self.session.open_cursor(uri, None)
+        cursor = ds.open_cursor(uri, None)
         self.cursor_count(cursor, remaining)
         cursor.close()
 
         # A separate, read_committed cursor should not see the deleted records.
-        self.outside_count("isolation=read-committed", self.nentries)
+        self.outside_count(ds, "isolation=read-committed", self.nentries)
 
         # A separate, read_uncommitted cursor should see the deleted records.
-        self.outside_count("isolation=read-uncommitted", remaining)
+        self.outside_count(ds, "isolation=read-uncommitted", remaining)
 
         # Commit/rollback the transaction.
         if self.commit:
@@ -199,12 +209,9 @@ class test_truncate_fast_delete(wttest.WiredTigerTestCase):
                 self.session.rollback_transaction()
 
         # Check a read_committed cursor sees the right records.
-        cursor = self.session.open_cursor(uri, None)
+        cursor = ds.open_cursor(uri, None)
         if self.commit:
                 self.cursor_count(cursor, remaining)
         else:
                 self.cursor_count(cursor, self.nentries)
         cursor.close()
-
-if __name__ == '__main__':
-    wttest.run()

@@ -27,19 +27,30 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-#include "mongo/platform/basic.h"
+#include "mongo/util/lru_cache.h"
 
-#include <iostream>
-#include <type_traits>
-#include <utility>
-
+#include "mongo/base/string_data.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/lru_cache.h"
+
+#include <array>
+#include <functional>
+#include <iostream>
+#include <iterator>
+#include <memory>
+#include <type_traits>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/hash/hash.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 
 namespace mongo {
 namespace {

@@ -1,0 +1,35 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "dotted_path_support",
+    srcs = [
+        "dotted_path_support.cpp",
+    ],
+    hdrs = [
+        "dotted_path_support.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_bson_test",
+    srcs = [
+        "dotted_path_support_test.cpp",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":dotted_path_support",
+        "//src/mongo/db/exec/document_value",
+    ],
+)

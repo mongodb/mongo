@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bson_comparator_interface_base.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/util/modules_incompletely_marked_header.h"
 
 namespace mongo {
 
@@ -51,7 +52,7 @@ namespace mongo {
  *
  * All methods are thread-safe.
  */
-class BSONObj::ComparatorInterface : public BSONComparatorInterfaceBase<BSONObj> {
+class MONGO_MOD_OPEN BSONObj::ComparatorInterface : public BSONComparatorInterfaceBase<BSONObj> {
 public:
     /**
      * Constructs a BSONObjSet whose equivalence classes are given by this comparator. This

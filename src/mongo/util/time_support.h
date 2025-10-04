@@ -29,22 +29,23 @@
 
 #pragma once
 
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/chrono.h"
+#include "mongo/util/duration.h"
+
 #include <array>
+#include <chrono>
+#include <cstdint>
 #include <ctime>
 #include <iosfwd>
 #include <limits>
 #include <string>
 
-#include "mongo/base/status_with.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
-#include "mongo/stdx/chrono.h"
-#include "mongo/util/duration.h"
-
 namespace mongo {
 
 class BackgroundThreadClockSource;
-
 template <typename Allocator>
 class StringBuilderImpl;
 
@@ -359,15 +360,6 @@ private:
     long long _lastSleepMillis;
     unsigned long long _lastErrorTimeMillis;
 };
-
-// DO NOT TOUCH except for testing
-void jsTimeVirtualSkew(long long skew);
-
-void jsTimeVirtualThreadSkew(long long skew);
-long long getJSTimeVirtualThreadSkew();
-
-/** Date_t is milliseconds since epoch */
-Date_t jsTime();
 
 unsigned long long curTimeMicros64();
 unsigned long long curTimeMillis64();

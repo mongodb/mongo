@@ -27,13 +27,12 @@
  *    it in the license file.
  */
 
+#if defined(_WIN32)
 
 #include "mongo/stdx/exception.h"
 
 #include <atomic>
 #include <utility>
-
-#if defined(_WIN32)
 
 namespace mongo {
 namespace stdx {
@@ -58,8 +57,7 @@ void registerTerminationHook() noexcept {
 [[maybe_unused]] const int initializeTerminationHandler = []() noexcept {
     registerTerminationHook();
     return 0;
-}
-();
+}();
 
 }  // namespace
 }  // namespace stdx

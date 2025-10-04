@@ -86,6 +86,7 @@ class test_config05(wttest.WiredTigerTestCase):
         self.populate(self.session)
         self.verify_entries(self.session)
 
+    @wttest.skip_for_hook("tiered", "Fails with tiered storage")
     def test_too_many_sessions(self):
         self.conn = self.wiredtiger_open('.', 'create,session_max=1')
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
@@ -105,6 +106,3 @@ class test_config05(wttest.WiredTigerTestCase):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.wiredtiger_open('.', 'create'),
             '/WiredTiger database is already being managed/')
-
-if __name__ == '__main__':
-    wttest.run()

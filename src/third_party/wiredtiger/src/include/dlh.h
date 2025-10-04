@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 struct __wt_dlh {
     TAILQ_ENTRY(__wt_dlh) q; /* List of open libraries. */
 

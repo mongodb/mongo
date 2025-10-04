@@ -3,7 +3,10 @@
  *
  * State function that kills a random session from config.system.sessions.
  */
-function killSession(db, collName) {
+import {KilledSessionUtil} from "jstests/libs/killed_session_util.js";
+
+export function killSession(db, collName) {
+    print("Starting killSession");
     let ourSessionWasKilled;
     do {
         ourSessionWasKilled = false;
@@ -11,7 +14,7 @@ function killSession(db, collName) {
         try {
             let res = db.adminCommand({refreshLogicalSessionCacheNow: 1});
             if (res.ok === 1) {
-                assertAlways.commandWorked(res);
+                assert.commandWorked(res);
             } else if (res.code === 18630 || res.code === 18631) {
                 // Refreshing the logical session cache may trigger sharding the sessions
                 // collection, which can fail with 18630 or 18631 if its session is killed while
@@ -20,14 +23,20 @@ function killSession(db, collName) {
                 ourSessionWasKilled = true;
                 continue;
             } else {
-                assertAlways.commandFailedWithCode(res, ErrorCodes.DuplicateKey);
+                assert.commandFailedWithCode(
+                    res,
+                    [ErrorCodes.DuplicateKey, ErrorCodes.WriteConcernTimeout],
+                    "unexpected error code: " + res.code + ": " + res.message,
+                );
             }
 
-            const sessionToKill = db.getSiblingDB("config").system.sessions.aggregate([
-                {$listSessions: {}},
-                {$match: {"_id.id": {$ne: db.getSession().getSessionId().id}}},
-                {$sample: {size: 1}},
-            ]);
+            const sessionToKill = db
+                .getSiblingDB("config")
+                .system.sessions.aggregate([
+                    {$listSessions: {}},
+                    {$match: {"_id.id": {$ne: db.getSession().getSessionId().id}}},
+                    {$sample: {size: 1}},
+                ]);
 
             if (sessionToKill.toArray().length === 0) {
                 break;
@@ -35,10 +44,9 @@ function killSession(db, collName) {
 
             const sessionUUID = sessionToKill.toArray()[0]._id.id;
             res = db.runCommand({killSessions: [{id: sessionUUID}]});
-            assertAlways.commandWorked(res);
+            assert.commandWorked(res);
         } catch (e) {
-            if (e.code == ErrorCodes.Interrupted || e.code == ErrorCodes.CursorKilled ||
-                e.code == ErrorCodes.CursorNotFound) {
+            if (KilledSessionUtil.isKilledSessionCode(e.code)) {
                 // This session was killed when running either listSessions or killSesssions.
                 // We should retry.
                 ourSessionWasKilled = true;
@@ -48,4 +56,5 @@ function killSession(db, collName) {
             throw e;
         }
     } while (ourSessionWasKilled);
+    print("Finished killSession");
 }

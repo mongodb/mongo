@@ -29,7 +29,9 @@
 
 #pragma once
 
+#include "mongo/scripting/mozjs/base.h"
 #include "mongo/scripting/mozjs/wraptype.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 namespace mozjs {

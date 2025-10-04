@@ -1,0 +1,29 @@
+test_kind: js_test
+
+description: |
+  This suite runs tests that are targeted for extensions against a standalone mongod. It assumes
+  that extensions (and the corresponding .so files) have already been installed with
+  'install-extensions'.
+
+selector:
+  roots:
+    - jstests/extensions/**/*.js
+  exclude_with_any_tags:
+    - requires_sharding
+
+executor:
+  archive:
+    hooks:
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");
+  hooks:
+    - class: ValidateCollections
+  fixture:
+    class: MongoDFixture
+    load_all_extensions: true
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        featureFlagExtensionsAPI: true

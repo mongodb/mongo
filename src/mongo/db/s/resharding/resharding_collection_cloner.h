@@ -29,18 +29,29 @@
 
 #pragma once
 
-#include <memory>
-
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/cancelable_operation_context.h"
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/global_catalog/shard_key_pattern.h"
+#include "mongo/db/local_catalog/collection_catalog.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/s/shard_id.h"
-#include "mongo/s/shard_key_pattern.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/db/pipeline/sharded_agg_helpers.h"
+#include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
+#include "mongo/util/uuid.h"
+
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -52,6 +63,7 @@ class TaskExecutor;
 
 class OperationContext;
 class MongoProcessInterface;
+
 class ReshardingMetrics;
 class ServiceContext;
 
@@ -61,30 +73,20 @@ class ServiceContext;
  */
 class ReshardingCollectionCloner {
 public:
-    class Env {
-    public:
-        explicit Env(ReshardingMetrics* metrics) : _metrics(metrics) {}
-
-        ReshardingMetrics* metrics() const {
-            return _metrics;
-        }
-
-    private:
-        ReshardingMetrics* const _metrics;
-    };
-
-    ReshardingCollectionCloner(std::unique_ptr<Env> env,
+    ReshardingCollectionCloner(ReshardingMetrics* metrics,
+                               const UUID& reshardingUUID,
                                ShardKeyPattern newShardKeyPattern,
                                NamespaceString sourceNss,
-                               CollectionUUID sourceUUID,
+                               const UUID& sourceUUID,
                                ShardId recipientShard,
                                Timestamp atClusterTime,
-                               NamespaceString outputNss);
+                               NamespaceString outputNss,
+                               bool storeProgress,
+                               bool relaxed);
 
-    std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(
-        OperationContext* opCtx,
-        std::shared_ptr<MongoProcessInterface> mongoProcessInterface,
-        Value resumeId = Value());
+    std::pair<std::vector<BSONObj>, boost::intrusive_ptr<ExpressionContext>>
+    makeRawNaturalOrderPipeline(OperationContext* opCtx,
+                                std::shared_ptr<MongoProcessInterface> mongoProcessInterface);
 
     /**
      * Schedules work to repeatedly fetch and insert batches of documents.
@@ -99,26 +101,41 @@ public:
                          CancelableOperationContextFactory factory);
 
     /**
-     * Fetches and inserts a single batch of documents.
-     *
-     * Returns true if there are more documents to be fetched and inserted, and returns false
-     * otherwise.
+     * Inserts a single batch of documents and its resume information if provided.
      */
-    bool doOneBatch(OperationContext* opCtx, Pipeline& pipeline);
+    void writeOneBatch(OperationContext* opCtx,
+                       TxnNumber& txnNum,
+                       std::vector<InsertStatement>& batch,
+                       ShardId donorShard,
+                       HostAndPort donorHost,
+                       BSONObj resumeToken);
 
 private:
-    std::unique_ptr<Pipeline, PipelineDeleter> _targetAggregationRequest(OperationContext* opCtx,
-                                                                         const Pipeline& pipeline);
+    sharded_agg_helpers::DispatchShardPipelineResults _queryOnceWithNaturalOrder(
+        OperationContext* opCtx, std::shared_ptr<MongoProcessInterface> mongoProcessInterface);
 
-    std::unique_ptr<Pipeline, PipelineDeleter> _restartPipeline(OperationContext* opCtx);
+    void _writeOnceWithNaturalOrder(OperationContext* opCtx,
+                                    std::shared_ptr<executor::TaskExecutor> executor,
+                                    std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
+                                    CancellationToken cancelToken,
+                                    std::vector<OwnedRemoteCursor> remoteCursors);
 
-    const std::unique_ptr<Env> _env;
+    void _runOnceWithNaturalOrder(OperationContext* opCtx,
+                                  std::shared_ptr<MongoProcessInterface> mongoProcessInterface,
+                                  std::shared_ptr<executor::TaskExecutor> executor,
+                                  std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
+                                  CancellationToken cancelToken);
+
+    ReshardingMetrics* _metrics;
+    const UUID _reshardingUUID;
     const ShardKeyPattern _newShardKeyPattern;
     const NamespaceString _sourceNss;
-    const CollectionUUID _sourceUUID;
+    const UUID _sourceUUID;
     const ShardId _recipientShard;
     const Timestamp _atClusterTime;
     const NamespaceString _outputNss;
+    const bool _storeProgress;
+    const bool _relaxed;
 };
 
 }  // namespace mongo

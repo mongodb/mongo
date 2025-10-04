@@ -29,8 +29,9 @@
 
 #pragma once
 
-#include <kms_message/kms_message.h>
 #include <memory>
+
+#include <kms_message/kms_message.h>
 
 namespace mongo {
 namespace kms_message_support_detail {

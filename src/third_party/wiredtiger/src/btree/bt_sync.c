@@ -9,19 +9,10 @@
 #include "wt_internal.h"
 
 /*
- * A list of WT_REF's.
- */
-typedef struct {
-    WT_REF **list;
-    size_t entry;     /* next entry available in list */
-    size_t max_entry; /* how many allocated in list */
-} WT_REF_LIST;
-
-/*
  * __sync_checkpoint_can_skip --
  *     There are limited conditions under which we can skip writing a dirty page during checkpoint.
  */
-static inline bool
+static WT_INLINE bool
 __sync_checkpoint_can_skip(WT_SESSION_IMPL *session, WT_REF *ref)
 {
     WT_MULTI *multi;
@@ -29,31 +20,29 @@ __sync_checkpoint_can_skip(WT_SESSION_IMPL *session, WT_REF *ref)
     WT_TXN *txn;
     u_int i;
 
-    mod = ref->page->modify;
-    txn = session->txn;
+    WT_ASSERT_SPINLOCK_OWNED(session, &S2BT(session)->flush_lock);
 
     /*
-     * We can skip some dirty pages during a checkpoint. The requirements:
-     *
-     * 1. Not a history btree. As part of the checkpointing the data store, we will move the older
-     *    values into the history store without using any transactions. This led to representation
-     *    of all the modifications on the history store page with a transaction that is maximum than
-     *    the checkpoint snapshot. But these modifications are done by the checkpoint itself, so we
-     *    shouldn't ignore them for consistency.
-     * 2. they must be leaf pages,
-     * 3. there is a snapshot transaction active (which is the case in ordinary application
-     *    checkpoints but not all internal cases),
-     * 4. the first dirty update on the page is sufficiently recent the checkpoint transaction would
-     *     skip them,
-     * 5. there's already an address for every disk block involved.
+     * If we got to this point and we are dealing with an internal page, this means at least one of
+     * its leaf pages has been reconciled and we need to process the internal page as well.
+     */
+    if (F_ISSET(ref, WT_REF_FLAG_INTERNAL))
+        return (false);
+
+    /*
+     * This is the history store btree. As part of the checkpointing the data store, we will move
+     * the older values into the history store without using any transactions, we shouldn't ignore
+     * them for consistency. Same goes for disaggregated storage metadata.
      */
     if (WT_IS_HS(session->dhandle))
         return (false);
-    if (F_ISSET(ref, WT_REF_FLAG_INTERNAL))
+    if (WT_IS_DISAGG_META(session->dhandle))
         return (false);
-    if (!F_ISSET(txn, WT_TXN_HAS_SNAPSHOT))
-        return (false);
-    if (!WT_TXNID_LT(txn->snap_max, mod->first_dirty_txn))
+
+    /* The checkpoint's snapshot includes the first dirty update on the page. */
+    txn = session->txn;
+    mod = ref->page->modify;
+    if (txn->snapshot_data.snap_max >= mod->first_dirty_txn)
         return (false);
 
     /*
@@ -68,8 +57,23 @@ __sync_checkpoint_can_skip(WT_SESSION_IMPL *session, WT_REF *ref)
      */
     if (mod->rec_result == WT_PM_REC_MULTIBLOCK)
         for (multi = mod->mod_multi, i = 0; i < mod->mod_multi_entries; ++multi, ++i)
-            if (multi->addr.addr == NULL)
+            if (multi->addr.block_cookie == NULL)
                 return (false);
+
+    /* RTS, recovery or shutdown should not leave anything dirty behind. */
+    if (F_ISSET(session, WT_SESSION_ROLLBACK_TO_STABLE))
+        return (false);
+    if (F_ISSET(S2C(session), WT_CONN_RECOVERING) ||
+      F_ISSET_ATOMIC_32(S2C(session), WT_CONN_CLOSING_CHECKPOINT))
+        return (false);
+
+    /*
+     * There is no snapshot transaction active. Usually, there is one in ordinary application
+     * checkpoints but not all internal cases. Furthermore, this guarantees the metadata file is
+     * never skipped.
+     */
+    if (!F_ISSET(txn, WT_TXN_HAS_SNAPSHOT))
+        return (false);
 
     return (true);
 }
@@ -78,7 +82,7 @@ __sync_checkpoint_can_skip(WT_SESSION_IMPL *session, WT_REF *ref)
  * __sync_dup_hazard_pointer --
  *     Get a duplicate hazard pointer.
  */
-static inline int
+static WT_INLINE int
 __sync_dup_hazard_pointer(WT_SESSION_IMPL *session, WT_REF *walk)
 {
     bool busy;
@@ -102,7 +106,7 @@ __sync_dup_hazard_pointer(WT_SESSION_IMPL *session, WT_REF *walk)
  * __sync_dup_walk --
  *     Duplicate a tree walk point.
  */
-static inline int
+static WT_INLINE int
 __sync_dup_walk(WT_SESSION_IMPL *session, WT_REF *walk, uint32_t flags, WT_REF **dupp)
 {
     WT_REF *old;
@@ -124,303 +128,6 @@ __sync_dup_walk(WT_SESSION_IMPL *session, WT_REF *walk, uint32_t flags, WT_REF *
 }
 
 /*
- * __sync_ref_list_add --
- *     Add an obsolete history store ref to the list.
- */
-static int
-__sync_ref_list_add(WT_SESSION_IMPL *session, WT_REF_LIST *rlp, WT_REF *ref)
-{
-    WT_RET(__wt_realloc_def(session, &rlp->max_entry, rlp->entry + 1, &rlp->list));
-    rlp->list[rlp->entry++] = ref;
-    return (0);
-}
-
-/*
- * __sync_ref_list_pop --
- *     Add the stored ref to urgent eviction queue and free the list.
- */
-static int
-__sync_ref_list_pop(WT_SESSION_IMPL *session, WT_REF_LIST *rlp, uint32_t flags)
-{
-    WT_DECL_RET;
-    size_t i;
-
-    for (i = 0; i < rlp->entry; i++) {
-        /*
-         * Mark the obsolete page dirty to let the reconciliation to remove the updates from page.
-         * The obsolete pages with overflow keys cannot be fast deleted, so marking them dirty will
-         * let them clean during reconciliation.
-         */
-        WT_RET(__wt_page_modify_init(session, rlp->list[i]->page));
-        __wt_page_modify_set(session, rlp->list[i]->page);
-
-        /*
-         * Ignore the failure from urgent eviction. The failed refs are taken care in the next
-         * checkpoint.
-         */
-        WT_IGNORE_RET_BOOL(__wt_page_evict_urgent(session, rlp->list[i]));
-
-        /* Accumulate errors but continue till all the refs are processed. */
-        WT_TRET(__wt_page_release(session, rlp->list[i], flags));
-        WT_STAT_CONN_DATA_INCR(session, cc_pages_evict);
-        __wt_verbose(session, WT_VERB_CHECKPOINT_CLEANUP,
-          "%p: is an in-memory obsolete page, added to urgent eviction queue.",
-          (void *)rlp->list[i]);
-    }
-
-    __wt_free(session, rlp->list);
-    rlp->entry = 0;
-    rlp->max_entry = 0;
-
-    return (ret);
-}
-
-/*
- * __sync_ref_obsolete_check --
- *     Check whether the ref is obsolete according to the newest stop time point and handle the
- *     obsolete page.
- */
-static int
-__sync_ref_obsolete_check(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_LIST *rlp)
-{
-    WT_ADDR_COPY addr;
-    WT_DECL_RET;
-    WT_MULTI *multi;
-    WT_PAGE_MODIFY *mod;
-    wt_timestamp_t newest_stop_ts, newest_stop_durable_ts;
-    uint64_t newest_stop_txn;
-    uint32_t i;
-    uint8_t previous_state;
-    char tp_string[WT_TP_STRING_SIZE];
-    const char *tag;
-    bool busy, hazard, obsolete;
-
-    /* Ignore root pages as they can never be deleted. */
-    if (__wt_ref_is_root(ref)) {
-        __wt_verbose(session, WT_VERB_CHECKPOINT_CLEANUP, "%p: skipping root page", (void *)ref);
-        return (0);
-    }
-
-    /* Ignore internal pages, these are taken care of during reconciliation. */
-    if (F_ISSET(ref, WT_REF_FLAG_INTERNAL)) {
-        __wt_verbose(session, WT_VERB_CHECKPOINT_CLEANUP,
-          "%p: skipping internal page with parent: %p", (void *)ref, (void *)ref->home);
-        return (0);
-    }
-
-    /* Fast-check, ignore deleted pages. */
-    if (ref->state == WT_REF_DELETED) {
-        __wt_verbose(session, WT_VERB_CHECKPOINT_CLEANUP, "%p: skipping deleted page", (void *)ref);
-        return (0);
-    }
-
-    /* Lock the WT_REF. */
-    WT_REF_LOCK(session, ref, &previous_state);
-
-    /*
-     * If the page is on-disk and obsolete, mark the page as deleted and also set the parent page as
-     * dirty. This is to ensure the parent is written during the checkpoint and the child page
-     * discarded.
-     */
-    newest_stop_ts = WT_TS_NONE;
-    newest_stop_durable_ts = WT_TS_NONE;
-    newest_stop_txn = WT_TXN_NONE;
-    obsolete = false;
-    if (previous_state == WT_REF_DISK) {
-        /*
-         * There should be an address, but simply skip any page where we don't find one. Also skip
-         * the pages that have overflow keys as part of fast delete flow. These overflow keys pages
-         * are handled as an in-memory obsolete page flow.
-         */
-        if (__wt_ref_addr_copy(session, ref, &addr) && addr.type == WT_ADDR_LEAF_NO) {
-            /*
-             * Max stop timestamp is possible only when the prepared update is written to the data
-             * store.
-             */
-            newest_stop_ts = addr.ta.newest_stop_ts;
-            newest_stop_durable_ts =
-              addr.ta.newest_stop_ts == WT_TS_MAX ? WT_TS_MAX : addr.ta.newest_stop_durable_ts;
-            newest_stop_txn = addr.ta.newest_stop_txn;
-            obsolete = __wt_txn_visible_all(session, newest_stop_txn, newest_stop_durable_ts);
-        }
-
-        if (obsolete) {
-            WT_REF_UNLOCK(ref, WT_REF_DELETED);
-            WT_STAT_CONN_DATA_INCR(session, cc_pages_removed);
-
-            WT_RET(__wt_page_parent_modify_set(session, ref, true));
-        } else
-            WT_REF_UNLOCK(ref, previous_state);
-
-        __wt_verbose(session, WT_VERB_CHECKPOINT_CLEANUP,
-          "%p on-disk page obsolete check: %s"
-          "obsolete, stop time point %s",
-          (void *)ref, obsolete ? "" : "not ",
-          __wt_time_point_to_string(
-            newest_stop_ts, newest_stop_durable_ts, newest_stop_txn, tp_string));
-        return (0);
-    }
-    WT_REF_UNLOCK(ref, previous_state);
-
-    /*
-     * Ignore pages that aren't in-memory for some reason other than they're on-disk, for example,
-     * they might have split or been deleted while we were locking the WT_REF.
-     */
-    if (previous_state != WT_REF_MEM) {
-        __wt_verbose(session, WT_VERB_CHECKPOINT_CLEANUP, "%p: skipping page", (void *)ref);
-        return (0);
-    }
-
-    /*
-     * Reviewing in-memory pages requires looking at page reconciliation results and we must ensure
-     * we don't race with page reconciliation as it's writing the page modify information. There are
-     * two ways we call reconciliation: checkpoints and eviction. We are the checkpoint thread so
-     * that's not a problem, acquire a hazard pointer to prevent page eviction. If the page is in
-     * transition or switches state (we've already released our lock), just walk away, we'll deal
-     * with it next time.
-     */
-    WT_RET(__wt_hazard_set(session, ref, &busy));
-    if (busy)
-        return (0);
-    hazard = true;
-
-    mod = ref->page == NULL ? NULL : ref->page->modify;
-    if (mod != NULL && mod->rec_result == WT_PM_REC_EMPTY) {
-        tag = "reconciled empty";
-
-        obsolete = true;
-    } else if (mod != NULL && mod->rec_result == WT_PM_REC_MULTIBLOCK) {
-        tag = "reconciled multi-block";
-
-        /* Calculate the max stop time point by traversing all multi addresses. */
-        for (multi = mod->mod_multi, i = 0; i < mod->mod_multi_entries; ++multi, ++i) {
-            newest_stop_txn = WT_MAX(newest_stop_txn, multi->addr.ta.newest_stop_txn);
-            newest_stop_ts = WT_MAX(newest_stop_ts, multi->addr.ta.newest_stop_ts);
-            newest_stop_durable_ts = WT_MAX(newest_stop_durable_ts,
-              multi->addr.ta.newest_stop_ts == WT_TS_MAX ? WT_TS_MAX :
-                                                           multi->addr.ta.newest_stop_durable_ts);
-        }
-        obsolete = __wt_txn_visible_all(session, newest_stop_txn, newest_stop_durable_ts);
-    } else if (mod != NULL && mod->rec_result == WT_PM_REC_REPLACE) {
-        tag = "reconciled replacement block";
-
-        newest_stop_txn = mod->mod_replace.ta.newest_stop_txn;
-        newest_stop_ts = mod->mod_replace.ta.newest_stop_ts;
-        newest_stop_durable_ts = mod->mod_replace.ta.newest_stop_ts == WT_TS_MAX ?
-          WT_TS_MAX :
-          mod->mod_replace.ta.newest_stop_durable_ts;
-        obsolete = __wt_txn_visible_all(session, newest_stop_txn, newest_stop_durable_ts);
-    } else if (__wt_ref_addr_copy(session, ref, &addr)) {
-        tag = "WT_REF address";
-
-        newest_stop_txn = addr.ta.newest_stop_txn;
-        newest_stop_ts = addr.ta.newest_stop_ts;
-        newest_stop_durable_ts =
-          addr.ta.newest_stop_ts == WT_TS_MAX ? WT_TS_MAX : addr.ta.newest_stop_durable_ts;
-        obsolete = __wt_txn_visible_all(session, newest_stop_txn, newest_stop_durable_ts);
-    } else
-        tag = "unexpected page state";
-
-    /* If the page is obsolete, add it to the list of pages to be evicted. */
-    if (obsolete) {
-        WT_ERR(__sync_ref_list_add(session, rlp, ref));
-        hazard = false;
-    }
-
-    __wt_verbose(session, WT_VERB_CHECKPOINT_CLEANUP,
-      "%p in-memory page obsolete check: %s %s"
-      "obsolete, stop time point %s",
-      (void *)ref, tag, obsolete ? "" : "not ",
-      __wt_time_point_to_string(
-        newest_stop_ts, newest_stop_durable_ts, newest_stop_txn, tp_string));
-
-err:
-    if (hazard)
-        WT_TRET(__wt_hazard_clear(session, ref));
-    return (ret);
-}
-
-/*
- * __sync_ref_int_obsolete_cleanup --
- *     Traverse the internal page and identify the leaf pages that are obsolete and mark them as
- *     deleted.
- */
-static int
-__sync_ref_int_obsolete_cleanup(WT_SESSION_IMPL *session, WT_REF *parent, WT_REF_LIST *rlp)
-{
-    WT_PAGE_INDEX *pindex;
-    WT_REF *ref;
-    uint32_t slot;
-
-    __wt_verbose(session, WT_VERB_CHECKPOINT_CLEANUP,
-      "%p: traversing the internal page %p for obsolete child pages", (void *)parent,
-      (void *)parent->page);
-
-    WT_INTL_INDEX_GET(session, parent->page, pindex);
-    for (slot = 0; slot < pindex->entries; slot++) {
-        ref = pindex->index[slot];
-
-        WT_RET(__sync_ref_obsolete_check(session, ref, rlp));
-    }
-
-    WT_STAT_CONN_DATA_INCRV(session, cc_pages_visited, pindex->entries);
-
-    return (0);
-}
-
-/*
- * __sync_page_skip --
- *     Return if checkpoint requires we read this page.
- */
-static int
-__sync_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, void *context, bool *skipp)
-{
-    WT_ADDR_COPY addr;
-
-    WT_UNUSED(context);
-
-    *skipp = false; /* Default to reading */
-
-    /* If the page is in-memory, we want to look at it. */
-    if (ref->state != WT_REF_DISK)
-        return (0);
-
-    /*
-     * Reading any page that is not in the cache will increase the cache size. Perform a set of
-     * checks to verify the cache can handle it.
-     */
-    if (__wt_cache_aggressive(session) || __wt_cache_full(session) || __wt_cache_stuck(session) ||
-      __wt_eviction_needed(session, false, false, NULL)) {
-        *skipp = true;
-        return (0);
-    }
-
-    /* Don't read pages into cache during startup or shutdown phase. */
-    if (F_ISSET(S2C(session), WT_CONN_RECOVERING | WT_CONN_CLOSING_TIMESTAMP)) {
-        *skipp = true;
-        return (0);
-    }
-
-    /*
-     * Ignore the pages with no on-disk address. It is possible that a page with deleted state may
-     * not have an on-disk address.
-     */
-    if (!__wt_ref_addr_copy(session, ref, &addr))
-        return (0);
-
-    /*
-     * Skip reading the pages that are normal leaf pages or don't have an aggregated durable stop
-     * timestamp.
-     */
-    if (addr.type == WT_ADDR_LEAF_NO || addr.ta.newest_stop_durable_ts == WT_TS_NONE) {
-        __wt_verbose(session, WT_VERB_CHECKPOINT_CLEANUP, "%p: page walk skipped", (void *)ref);
-        WT_STAT_CONN_DATA_INCR(session, cc_pages_walk_skipped);
-        *skipp = true;
-    }
-    return (0);
-}
-
-/*
  * __wt_sync_file --
  *     Flush pages for a specific file.
  */
@@ -433,39 +140,25 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
     WT_PAGE *page;
     WT_PAGE_MODIFY *mod;
     WT_REF *prev, *walk;
-    WT_REF_LIST ref_list;
     WT_TXN *txn;
     uint64_t internal_bytes, internal_pages, leaf_bytes, leaf_pages;
     uint64_t oldest_id, saved_pinned_id, time_start, time_stop;
     uint32_t flags, rec_flags;
-    bool dirty, internal_cleanup, is_hs, timer, tried_eviction;
+    bool dirty, is_hs, is_internal, tried_eviction;
 
     conn = S2C(session);
     btree = S2BT(session);
     prev = walk = NULL;
-    memset(&ref_list, 0, sizeof(ref_list));
     txn = session->txn;
     tried_eviction = false;
-    time_start = time_stop = 0;
 
     /* Don't bump page read generations. */
-    flags = WT_READ_NO_GEN;
-
-    /*
-     * Skip all deleted pages. For a page to be marked deleted, it must have been evicted from cache
-     * and marked clean. Checkpoint should never instantiate deleted pages: if a truncate is not
-     * visible to the checkpoint, the on-disk version is correct. If the truncate is visible to
-     * checkpoint, we write a proxy cell to its parent. We check whether a truncate is visible in
-     * the checkpoint as part of reconciling internal pages (specifically in __rec_child_deleted).
-     */
-    LF_SET(WT_READ_DELETED_SKIP);
+    flags = WT_READ_INTERNAL_OP;
 
     internal_bytes = leaf_bytes = 0;
     internal_pages = leaf_pages = 0;
-    saved_pinned_id = WT_SESSION_TXN_SHARED(session)->pinned_id;
-    timer = WT_VERBOSE_ISSET(session, WT_VERB_CHECKPOINT);
-    if (timer)
-        time_start = __wt_clock(session);
+    saved_pinned_id = __wt_atomic_loadv64(&WT_SESSION_TXN_SHARED(session)->pinned_id);
+    time_start = WT_VERBOSE_ISSET(session, WT_VERB_CHECKPOINT) ? __wt_clock(session) : 0;
 
     switch (syncop) {
     case WT_SYNC_WRITE_LEAVES:
@@ -492,6 +185,9 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
         oldest_id = __wt_txn_oldest_id(session);
 
         LF_SET(WT_READ_CACHE | WT_READ_NO_WAIT | WT_READ_SKIP_INTL);
+        if (!F_ISSET(txn, WT_TXN_HAS_SNAPSHOT))
+            LF_SET(WT_READ_VISIBLE_ALL);
+
         for (;;) {
             WT_ERR(__wt_tree_walk(session, &walk, flags));
             if (walk == NULL)
@@ -503,10 +199,11 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
              * have to visit them anyway.
              */
             page = walk->page;
-            if (__wt_page_is_modified(page) && WT_TXNID_LT(page->modify->update_txn, oldest_id)) {
+            if (__wt_page_is_modified(page) &&
+              __wt_atomic_load64(&page->modify->update_txn) < oldest_id) {
                 if (txn->isolation == WT_ISO_READ_COMMITTED)
                     __wt_txn_get_snapshot(session);
-                leaf_bytes += page->memory_footprint;
+                leaf_bytes += __wt_atomic_loadsize(&page->memory_footprint);
                 ++leaf_pages;
                 WT_ERR(__wt_reconcile(session, walk, NULL, WT_REC_CHECKPOINT));
             }
@@ -542,12 +239,22 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
          * consistent view of that namespace. Set the checkpointing flag to block such actions and
          * wait for any problematic eviction or page splits to complete.
          */
-        WT_ASSERT(session, btree->syncing == WT_BTREE_SYNC_OFF && btree->sync_session == NULL);
+        WT_ASSERT(session,
+          __wt_atomic_load_enum(&btree->syncing) == WT_BTREE_SYNC_OFF &&
+            __wt_atomic_load_pointer(&btree->sync_session) == NULL);
 
-        btree->sync_session = session;
-        btree->syncing = WT_BTREE_SYNC_WAIT;
+        __wt_atomic_store_pointer(&btree->sync_session, session);
+        __wt_atomic_store_enum(&btree->syncing, WT_BTREE_SYNC_WAIT);
         __wt_gen_next_drain(session, WT_GEN_EVICT);
-        btree->syncing = WT_BTREE_SYNC_RUNNING;
+        __wt_atomic_store_enum(&btree->syncing, WT_BTREE_SYNC_RUNNING);
+
+        /*
+         * Reset the number of obsolete time window pages to let the eviction threads and checkpoint
+         * cleanup operation to continue marking the clean obsolete time window pages as dirty once
+         * the checkpoint is finished.
+         */
+        __wt_atomic_store32(&btree->eviction_obsolete_tw_pages, 0);
+        __wt_atomic_store32(&btree->checkpoint_cleanup_obsolete_tw_pages, 0);
         is_hs = WT_IS_HS(btree->dhandle);
 
         /* Add in history store reconciliation for standard files. */
@@ -558,46 +265,36 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
         /* Write all dirty in-cache pages. */
         LF_SET(WT_READ_NO_EVICT);
 
-        /* Read pages with history store entries and evict them asap. */
-        LF_SET(WT_READ_WONT_NEED);
+        /* Limit reads to cache-only. */
+        LF_SET(WT_READ_CACHE);
 
-        /*
-         * Perform checkpoint cleanup when not in startup or shutdown phase by traversing internal
-         * pages looking for obsolete child pages. This is row-store specific, column-store pages
-         * cannot be discarded and must be rewritten as they contain chunks of the name space. For
-         * the same reason, only read in-memory pages when doing column-store checkpoints (row-store
-         * reads all of the internal pages to improve cleanup).
-         */
-        if (btree->type == BTREE_ROW)
-            internal_cleanup = !F_ISSET(conn, WT_CONN_RECOVERING | WT_CONN_CLOSING_TIMESTAMP);
-        else {
-            LF_SET(WT_READ_CACHE);
-            internal_cleanup = false;
-        }
+        if (!F_ISSET(txn, WT_READ_VISIBLE_ALL))
+            LF_SET(WT_READ_VISIBLE_ALL);
 
         for (;;) {
             WT_ERR(__sync_dup_walk(session, walk, flags, &prev));
-            WT_ERR(__wt_tree_walk_custom_skip(session, &walk, __sync_page_skip, NULL, flags));
+            WT_ERR(__wt_tree_walk_custom_skip(session, &walk, NULL, NULL, flags));
 
             if (walk == NULL)
                 break;
 
-            if (F_ISSET(walk, WT_REF_FLAG_INTERNAL) && internal_cleanup) {
-                WT_WITH_PAGE_INDEX(
-                  session, ret = __sync_ref_int_obsolete_cleanup(session, walk, &ref_list));
-                WT_ERR(ret);
-            }
-
+            is_internal = F_ISSET(walk, WT_REF_FLAG_INTERNAL);
             page = walk->page;
+
+            if (is_internal)
+                WT_STAT_CONN_INCR(session, checkpoint_pages_visited_internal);
+            else
+                WT_STAT_CONN_INCR(session, checkpoint_pages_visited_leaf);
 
             /*
              * Check if the page is dirty. Add a barrier between the check and taking a reference to
              * any page modify structure. (It needs to be ordered else a page could be dirtied after
              * taking the local reference.)
              */
-            WT_ORDERED_READ(dirty, __wt_page_is_modified(page));
+            dirty = __wt_page_is_modified(page);
+            WT_ACQUIRE_BARRIER();
 
-            /* Skip clean pages, but always update the maximum transaction ID. */
+            /* Skip clean pages, but always update the maximum transaction ID and timestamp. */
             if (!dirty) {
                 mod = page->modify;
                 if (mod != NULL && mod->rec_max_txn > btree->rec_max_txn)
@@ -618,19 +315,19 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
                 continue;
             }
 
-            if (F_ISSET(walk, WT_REF_FLAG_INTERNAL)) {
-                internal_bytes += page->memory_footprint;
+            if (is_internal) {
+                internal_bytes += __wt_atomic_loadsize(&page->memory_footprint);
                 ++internal_pages;
                 /* Slow down checkpoints. */
                 if (FLD_ISSET(conn->debug_flags, WT_CONN_DEBUG_SLOW_CKPT))
-                    __wt_sleep(0, 10000);
+                    __wt_sleep(0, 10 * WT_THOUSAND);
             } else {
-                leaf_bytes += page->memory_footprint;
+                leaf_bytes += __wt_atomic_loadsize(&page->memory_footprint);
                 ++leaf_pages;
             }
 
             /*
-             * If the page was pulled into cache by our read, try to evict it now.
+             * When the timing stress is enabled, perform the leaf page eviction by the checkpoint.
              *
              * For eviction to have a chance, we first need to move the walk point to the next page
              * checkpoint will visit. We want to avoid this code being too special purpose, so try
@@ -638,14 +335,14 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
              *
              * Regardless of whether eviction succeeds or fails, the walk continues from the
              * previous location. We remember whether we tried eviction, and don't try again. Even
-             * if eviction fails (the page may stay in cache clean but with history that cannot be
-             * discarded), that is not wasted effort because checkpoint doesn't need to write the
-             * page again.
+             * if eviction fails (the page may stay in cache clean), that is not a wasted effort
+             * because checkpoint doesn't need to write the page again.
              *
              * Once the transaction has given up it's snapshot it is no longer safe to reconcile
              * pages. That happens prior to the final metadata checkpoint.
              */
-            if (F_ISSET(walk, WT_REF_FLAG_LEAF) && page->read_gen == WT_READGEN_WONT_NEED &&
+            if (!is_internal &&
+              FLD_ISSET(conn->timing_stress_flags, WT_TIMING_STRESS_CHECKPOINT_EVICT_PAGE) &&
               !tried_eviction && F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT)) {
                 ret = __wt_page_release_evict(session, walk, 0);
                 walk = NULL;
@@ -658,20 +355,36 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
             }
             tried_eviction = false;
 
+            WT_STAT_CONN_INCR(session, checkpoint_pages_reconciled);
+            WT_STAT_CONN_INCRV(session, checkpoint_pages_reconciled_bytes, page->memory_footprint);
+            WT_STATP_DSRC_INCR(session, btree->dhandle->stats, btree_checkpoint_pages_reconciled);
+            if (WT_IS_HS(btree->dhandle))
+                WT_STAT_CONN_INCR(session, checkpoint_hs_pages_reconciled);
+
             WT_ERR(__wt_reconcile(session, walk, NULL, rec_flags));
 
-            /*
-             * Update checkpoint IO tracking data if configured to log verbose progress messages.
-             */
-            if (conn->ckpt_timer_start.tv_sec > 0) {
-                conn->ckpt_write_bytes += page->memory_footprint;
-                ++conn->ckpt_write_pages;
-
-                /* Periodically log checkpoint progress. */
-                if (conn->ckpt_write_pages % 5000 == 0)
-                    __wt_checkpoint_progress(session, false);
-            }
+            /* Update checkpoint IO tracking data. */
+            if (__wt_checkpoint_verbose_timer_started(session))
+                __wt_checkpoint_progress_stats(
+                  session, __wt_atomic_loadsize(&page->memory_footprint));
         }
+
+        /*
+         * During normal checkpoints, mark the tree dirty if the btree has modifications that are
+         * not visible to the checkpoint. There is a drawback in this approach as we compare the
+         * btree's maximum transaction id with the checkpoint snap_min and it is possible that this
+         * transaction may be visible to the checkpoint, but still, we mark the tree as dirty if
+         * there is a long-running transaction in the database.
+         *
+         * Do not mark the tree dirty if there is no change to stable timestamp compared to the last
+         * checkpoint.
+         */
+        if (!btree->modified && !F_ISSET(conn, WT_CONN_RECOVERING) &&
+          !F_ISSET_ATOMIC_32(conn, WT_CONN_CLOSING_CHECKPOINT) &&
+          (btree->rec_max_txn >= txn->snapshot_data.snap_min ||
+            (conn->txn_global.checkpoint_timestamp != conn->txn_global.last_ckpt_timestamp &&
+              btree->rec_max_timestamp > conn->txn_global.checkpoint_timestamp)))
+            __wt_tree_modify_set(session);
         break;
     case WT_SYNC_CLOSE:
     case WT_SYNC_DISCARD:
@@ -679,9 +392,9 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
         break;
     }
 
-    if (timer) {
+    if (time_start != 0) {
         time_stop = __wt_clock(session);
-        __wt_verbose(session, WT_VERB_CHECKPOINT,
+        __wt_verbose_debug2(session, WT_VERB_CHECKPOINT,
           "__sync_file WT_SYNC_%s wrote: %" PRIu64 " leaf pages (%" PRIu64 "B), %" PRIu64
           " internal pages (%" PRIu64 "B), and took %" PRIu64 "ms",
           syncop == WT_SYNC_WRITE_LEAVES ? "WRITE_LEAVES" : "CHECKPOINT", leaf_pages, leaf_bytes,
@@ -693,9 +406,6 @@ err:
     WT_TRET(__wt_page_release(session, walk, flags));
     WT_TRET(__wt_page_release(session, prev, flags));
 
-    /* Process the refs that are saved and free the list. */
-    WT_TRET(__sync_ref_list_pop(session, &ref_list, flags));
-
     /*
      * If we got a snapshot in order to write pages, and there was no snapshot active when we
      * started, release it.
@@ -704,8 +414,8 @@ err:
         __wt_txn_release_snapshot(session);
 
     /* Clear the checkpoint flag. */
-    btree->syncing = WT_BTREE_SYNC_OFF;
-    btree->sync_session = NULL;
+    __wt_atomic_store_enum(&btree->syncing, WT_BTREE_SYNC_OFF);
+    __wt_atomic_store_pointer(&btree->sync_session, NULL);
 
     __wt_spin_unlock(session, &btree->flush_lock);
 

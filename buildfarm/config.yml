@@ -1,0 +1,15 @@
+# Note: This file is read by Buildfarm server at runtime to know how to talk to redis and the worker
+
+backplane:
+  # Note: The port must correspond to the value specified in `docker-compose.yml` for services.redis.ports
+  redisUri: "redis://localhost:6379"
+  queues:
+    - name: "cpu"
+      properties:
+        - name: "min-cores"
+          value: "*"
+        - name: "max-cores"
+          value: "*"
+worker:
+  # Note: The port must correspond to the value specified in `docker-compose.yml` for services.worker.ports
+  publicName: "localhost:8981"

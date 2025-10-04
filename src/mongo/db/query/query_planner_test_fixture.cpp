@@ -27,36 +27,46 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/query/query_planner_test_fixture.h"
 
-#include <algorithm>
-
-#include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/extensions_callback_noop.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_test_lib.h"
+#include "mongo/db/query/query_request_helper.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/unittest/unittest.h"
+
+#include <algorithm>
+
+#include <boost/container/vector.hpp>
+#include <boost/cstdint.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 
 namespace mongo {
 
-using unittest::assertGet;
-
-const NamespaceString QueryPlannerTest::nss("test.collection");
 
 void QueryPlannerTest::setUp() {
+    nss = NamespaceString::createNamespaceString_forTest("test.collection");
     opCtx = serviceContext.makeOperationContext();
-    expCtx = make_intrusive<ExpressionContext>(
-        opCtx.get(), std::unique_ptr<CollatorInterface>(nullptr), nss);
-    internalQueryPlannerEnableHashIntersection.store(true);
-    params.options = QueryPlannerParams::INCLUDE_COLLSCAN;
+    expCtx = ExpressionContextBuilder{}.opCtx(opCtx.get()).ns(nss).build();
+    params.mainCollectionInfo.options = QueryPlannerParams::INCLUDE_COLLSCAN;
     addIndex(BSON("_id" << 1));
 }
 
@@ -69,35 +79,39 @@ void QueryPlannerTest::clearState() {
 }
 
 void QueryPlannerTest::addIndex(BSONObj keyPattern, bool multikey) {
-    params.indices.push_back({keyPattern,
-                              IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                              IndexDescriptor::kLatestIndexVersion,
-                              multikey,
-                              {},
-                              {},
-                              false,  // sparse
-                              false,  // unique
-                              IndexEntry::Identifier{"hari_king_of_the_stove"},
-                              nullptr,  // filterExpr
-                              BSONObj(),
-                              nullptr,
-                              nullptr});
+    params.mainCollectionInfo.indexes.push_back(
+        {keyPattern,
+         IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+         IndexConfig::kLatestIndexVersion,
+         multikey,
+         {},
+         {},
+         false,  // sparse
+         false,  // unique
+         // Add the position to the name so we have a unique set of index names.
+         IndexEntry::Identifier{"hari_king_of_the_stove" +
+                                std::to_string(params.mainCollectionInfo.indexes.size())},
+         nullptr,  // filterExpr
+         BSONObj(),
+         nullptr,
+         nullptr});
 }
 
 void QueryPlannerTest::addIndex(BSONObj keyPattern, bool multikey, bool sparse) {
-    params.indices.push_back({keyPattern,
-                              IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                              IndexDescriptor::kLatestIndexVersion,
-                              multikey,
-                              {},
-                              {},
-                              sparse,
-                              false,  // unique
-                              IndexEntry::Identifier{"note_to_self_dont_break_build"},
-                              nullptr,  // filterExpr
-                              BSONObj(),
-                              nullptr,
-                              nullptr});
+    params.mainCollectionInfo.indexes.push_back(
+        {keyPattern,
+         IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+         IndexConfig::kLatestIndexVersion,
+         multikey,
+         {},
+         {},
+         sparse,
+         false,  // unique
+         IndexEntry::Identifier{"note_to_self_dont_break_build"},
+         nullptr,  // filterExpr
+         BSONObj(),
+         nullptr,
+         nullptr});
 }
 
 void QueryPlannerTest::addIndex(BSONObj keyPattern, bool multikey, bool sparse, bool unique) {
@@ -107,51 +121,54 @@ void QueryPlannerTest::addIndex(BSONObj keyPattern, bool multikey, bool sparse, 
 
 void QueryPlannerTest::addIndex(
     BSONObj keyPattern, bool multikey, bool sparse, bool unique, const std::string& name) {
-    params.indices.push_back({keyPattern,
-                              IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                              IndexDescriptor::kLatestIndexVersion,
-                              multikey,
-                              {},
-                              {},
-                              sparse,
-                              unique,
-                              IndexEntry::Identifier{name},
-                              nullptr,  // filterExpr
-                              BSONObj(),
-                              nullptr,
-                              nullptr});
+    params.mainCollectionInfo.indexes.push_back(
+        {keyPattern,
+         IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+         IndexConfig::kLatestIndexVersion,
+         multikey,
+         {},
+         {},
+         sparse,
+         unique,
+         IndexEntry::Identifier{name},
+         nullptr,  // filterExpr
+         BSONObj(),
+         nullptr,
+         nullptr});
 }
 
 void QueryPlannerTest::addIndex(BSONObj keyPattern, BSONObj infoObj) {
-    params.indices.push_back({keyPattern,
-                              IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                              IndexDescriptor::kLatestIndexVersion,
-                              false,  // multikey
-                              {},
-                              {},
-                              false,  // sparse
-                              false,  // unique
-                              IndexEntry::Identifier{"foo"},
-                              nullptr,  // filterExpr
-                              infoObj,
-                              nullptr,
-                              nullptr});
+    params.mainCollectionInfo.indexes.push_back(
+        {keyPattern,
+         IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+         IndexConfig::kLatestIndexVersion,
+         false,  // multikey
+         {},
+         {},
+         false,  // sparse
+         false,  // unique
+         IndexEntry::Identifier{"foo"},
+         nullptr,  // filterExpr
+         infoObj,
+         nullptr,
+         nullptr});
 }
 
 void QueryPlannerTest::addIndex(BSONObj keyPattern, MatchExpression* filterExpr) {
-    params.indices.push_back({keyPattern,
-                              IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                              IndexDescriptor::kLatestIndexVersion,
-                              false,  // multikey
-                              {},
-                              {},
-                              false,  // sparse
-                              false,  // unique
-                              IndexEntry::Identifier{"foo"},
-                              filterExpr,
-                              BSONObj(),
-                              nullptr,
-                              nullptr});
+    params.mainCollectionInfo.indexes.push_back(
+        {keyPattern,
+         IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+         IndexConfig::kLatestIndexVersion,
+         false,  // multikey
+         {},
+         {},
+         false,  // sparse
+         false,  // unique
+         IndexEntry::Identifier{"foo"},
+         filterExpr,
+         BSONObj(),
+         nullptr,
+         nullptr});
 }
 
 void QueryPlannerTest::addIndex(BSONObj keyPattern, const MultikeyPaths& multikeyPaths) {
@@ -169,7 +186,7 @@ void QueryPlannerTest::addIndex(BSONObj keyPattern, const MultikeyPaths& multike
     const BSONObj infoObj;
     IndexEntry entry(keyPattern,
                      type,
-                     IndexDescriptor::kLatestIndexVersion,
+                     IndexConfig::kLatestIndexVersion,
                      multikey,
                      {},
                      {},
@@ -181,7 +198,7 @@ void QueryPlannerTest::addIndex(BSONObj keyPattern, const MultikeyPaths& multike
                      nullptr,
                      nullptr);
     entry.multikeyPaths = multikeyPaths;
-    params.indices.push_back(entry);
+    params.mainCollectionInfo.indexes.push_back(entry);
 }
 
 void QueryPlannerTest::addIndex(BSONObj keyPattern, const CollatorInterface* collator) {
@@ -194,7 +211,7 @@ void QueryPlannerTest::addIndex(BSONObj keyPattern, const CollatorInterface* col
     const BSONObj infoObj;
     IndexEntry entry(keyPattern,
                      type,
-                     IndexDescriptor::kLatestIndexVersion,
+                     IndexConfig::kLatestIndexVersion,
                      multikey,
                      {},
                      {},
@@ -206,7 +223,7 @@ void QueryPlannerTest::addIndex(BSONObj keyPattern, const CollatorInterface* col
                      nullptr,
                      nullptr);
     entry.collator = collator;
-    params.indices.push_back(entry);
+    params.mainCollectionInfo.indexes.push_back(entry);
 }
 
 void QueryPlannerTest::addIndex(BSONObj keyPattern,
@@ -216,12 +233,12 @@ void QueryPlannerTest::addIndex(BSONObj keyPattern,
     const bool sparse = false;
     const bool unique = false;
     const bool multikey = false;
-    const auto name = indexName.toString();
+    const auto name = std::string{indexName};
     const MatchExpression* filterExpr = nullptr;
     const BSONObj infoObj;
     IndexEntry entry(keyPattern,
                      type,
-                     IndexDescriptor::kLatestIndexVersion,
+                     IndexConfig::kLatestIndexVersion,
                      multikey,
                      {},
                      {},
@@ -233,7 +250,7 @@ void QueryPlannerTest::addIndex(BSONObj keyPattern,
                      nullptr,
                      nullptr);
     entry.collator = collator;
-    params.indices.push_back(entry);
+    params.mainCollectionInfo.indexes.push_back(entry);
 }
 
 void QueryPlannerTest::addIndex(BSONObj keyPattern,
@@ -247,7 +264,7 @@ void QueryPlannerTest::addIndex(BSONObj keyPattern,
     const BSONObj infoObj;
     IndexEntry entry(keyPattern,
                      type,
-                     IndexDescriptor::kLatestIndexVersion,
+                     IndexConfig::kLatestIndexVersion,
                      multikey,
                      {},
                      {},
@@ -259,11 +276,11 @@ void QueryPlannerTest::addIndex(BSONObj keyPattern,
                      nullptr,
                      nullptr);
     entry.collator = collator;
-    params.indices.push_back(entry);
+    params.mainCollectionInfo.indexes.push_back(entry);
 }
 
 void QueryPlannerTest::addIndex(const IndexEntry& ie) {
-    params.indices.push_back(ie);
+    params.mainCollectionInfo.indexes.push_back(ie);
 }
 
 void QueryPlannerTest::runQuery(BSONObj query) {
@@ -271,10 +288,12 @@ void QueryPlannerTest::runQuery(BSONObj query) {
 }
 
 void QueryPlannerTest::runQueryWithPipeline(
-    BSONObj query, std::vector<std::unique_ptr<InnerPipelineStageInterface>> queryLayerPipeline) {
+    BSONObj query,
+    BSONObj proj,
+    std::vector<boost::intrusive_ptr<DocumentSource>> queryLayerPipeline) {
     runQueryFull(query,
                  BSONObj(),
-                 BSONObj(),
+                 proj,
                  0,
                  0,
                  BSONObj(),
@@ -327,16 +346,15 @@ void QueryPlannerTest::runQuerySortProjSkipLimitHint(const BSONObj& query,
     runQueryFull(query, sort, proj, skip, limit, hint, BSONObj(), BSONObj());
 }
 
-void QueryPlannerTest::runQueryFull(
-    const BSONObj& query,
-    const BSONObj& sort,
-    const BSONObj& proj,
-    long long skip,
-    long long limit,
-    const BSONObj& hint,
-    const BSONObj& minObj,
-    const BSONObj& maxObj,
-    std::vector<std::unique_ptr<InnerPipelineStageInterface>> pipeline) {
+void QueryPlannerTest::runQueryFull(const BSONObj& query,
+                                    const BSONObj& sort,
+                                    const BSONObj& proj,
+                                    long long skip,
+                                    long long limit,
+                                    const BSONObj& hint,
+                                    const BSONObj& minObj,
+                                    const BSONObj& maxObj,
+                                    std::vector<boost::intrusive_ptr<DocumentSource>> pipeline) {
     clearState();
 
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
@@ -352,17 +370,15 @@ void QueryPlannerTest::runQueryFull(
     findCommand->setHint(hint);
     findCommand->setMin(minObj);
     findCommand->setMax(maxObj);
-    auto statusWithCQ =
-        CanonicalQuery::canonicalize(opCtx.get(),
-                                     std::move(findCommand),
-                                     false,
-                                     expCtx,
-                                     ExtensionsCallbackNoop(),
-                                     MatchExpressionParser::kAllowAllSpecialFeatures,
-                                     ProjectionPolicies::findProjectionPolicies(),
-                                     std::move(pipeline));
-    ASSERT_OK(statusWithCQ.getStatus());
-    cq = std::move(statusWithCQ.getValue());
+    cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), *findCommand).build(),
+        .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand),
+                                              .allowedFeatures =
+                                                  MatchExpressionParser::kAllowAllSpecialFeatures},
+        .pipeline = std::move(pipeline),
+        .isCountLike = isCountLike});
+    cq->setSbeCompatible(markQueriesSbeCompatible);
+    cq->setForceGenerateRecordId(forceRecordId);
 
     auto statusWithMultiPlanSolns = QueryPlanner::plan(*cq, params);
     ASSERT_OK(statusWithMultiPlanSolns.getStatus());
@@ -430,43 +446,39 @@ void QueryPlannerTest::runInvalidQueryFull(const BSONObj& query,
     findCommand->setHint(hint);
     findCommand->setMin(minObj);
     findCommand->setMax(maxObj);
-    auto statusWithCQ =
-        CanonicalQuery::canonicalize(opCtx.get(),
-                                     std::move(findCommand),
-                                     false,
-                                     expCtx,
-                                     ExtensionsCallbackNoop(),
-                                     MatchExpressionParser::kAllowAllSpecialFeatures);
-    ASSERT_OK(statusWithCQ.getStatus());
-    cq = std::move(statusWithCQ.getValue());
+    cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), *findCommand).build(),
+        .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand),
+                                              .allowedFeatures =
+                                                  MatchExpressionParser::kAllowAllSpecialFeatures},
+        .isCountLike = isCountLike});
+    cq->setSbeCompatible(markQueriesSbeCompatible);
+    cq->setForceGenerateRecordId(forceRecordId);
 
     auto statusWithMultiPlanSolns = QueryPlanner::plan(*cq, params);
     plannerStatus = statusWithMultiPlanSolns.getStatus();
     ASSERT_NOT_OK(plannerStatus);
 }
 
-
 void QueryPlannerTest::runQueryAsCommand(const BSONObj& cmdObj) {
     clearState();
 
     invariant(nss.isValid());
-
-    const bool isExplain = false;
-
     // If there is no '$db', append it.
-    auto cmd = OpMsgRequest::fromDBAndBody(nss.db(), cmdObj).body;
+    auto cmd = OpMsgRequestBuilder::create(
+                   auth::ValidatedTenancyScope::get(opCtx.get()), nss.dbName(), cmdObj)
+                   .body;
     std::unique_ptr<FindCommandRequest> findCommand(
         query_request_helper::makeFromFindCommandForTests(cmd, nss));
 
-    auto statusWithCQ =
-        CanonicalQuery::canonicalize(opCtx.get(),
-                                     std::move(findCommand),
-                                     isExplain,
-                                     expCtx,
-                                     ExtensionsCallbackNoop(),
-                                     MatchExpressionParser::kAllowAllSpecialFeatures);
-    ASSERT_OK(statusWithCQ.getStatus());
-    cq = std::move(statusWithCQ.getValue());
+    cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), *findCommand).build(),
+        .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand),
+                                              .allowedFeatures =
+                                                  MatchExpressionParser::kAllowAllSpecialFeatures},
+        .isCountLike = isCountLike});
+    cq->setSbeCompatible(markQueriesSbeCompatible);
+    cq->setForceGenerateRecordId(forceRecordId);
 
     auto statusWithMultiPlanSolns = QueryPlanner::plan(*cq, params);
     ASSERT_OK(statusWithMultiPlanSolns.getStatus());
@@ -478,22 +490,21 @@ void QueryPlannerTest::runInvalidQueryAsCommand(const BSONObj& cmdObj) {
 
     invariant(nss.isValid());
 
-    const bool isExplain = false;
-
     // If there is no '$db', append it.
-    auto cmd = OpMsgRequest::fromDBAndBody(nss.db(), cmdObj).body;
+    auto cmd = OpMsgRequestBuilder::create(
+                   auth::ValidatedTenancyScope::get(opCtx.get()), nss.dbName(), cmdObj)
+                   .body;
     std::unique_ptr<FindCommandRequest> findCommand(
         query_request_helper::makeFromFindCommandForTests(cmd, nss));
 
-    auto statusWithCQ =
-        CanonicalQuery::canonicalize(opCtx.get(),
-                                     std::move(findCommand),
-                                     isExplain,
-                                     expCtx,
-                                     ExtensionsCallbackNoop(),
-                                     MatchExpressionParser::kAllowAllSpecialFeatures);
-    ASSERT_OK(statusWithCQ.getStatus());
-    cq = std::move(statusWithCQ.getValue());
+    cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), *findCommand).build(),
+        .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand),
+                                              .allowedFeatures =
+                                                  MatchExpressionParser::kAllowAllSpecialFeatures},
+        .isCountLike = isCountLike});
+    cq->setSbeCompatible(markQueriesSbeCompatible);
+    cq->setForceGenerateRecordId(forceRecordId);
 
     auto statusWithMultiPlanSolns = QueryPlanner::plan(*cq, params);
     plannerStatus = statusWithMultiPlanSolns.getStatus();
@@ -525,7 +536,7 @@ void QueryPlannerTest::assertNumSolutions(size_t expectSolutions) const {
        << " instead. Run with --verbose=vv to see reasons for mismatch. Solutions generated: "
        << '\n';
     dumpSolutions(ss);
-    FAIL(ss);
+    FAIL(std::string(ss));
 }
 
 size_t QueryPlannerTest::numSolutionMatches(const std::string& solnJson) const {
@@ -555,7 +566,11 @@ void QueryPlannerTest::assertSolutionExists(const std::string& solnJson, size_t 
        << " instead. Run with --verbose=vv to see reasons for mismatch. All solutions generated: "
        << '\n';
     dumpSolutions(ss);
-    FAIL(ss);
+    FAIL(std::string(ss));
+}
+
+void QueryPlannerTest::assertSolutionDoesntExist(const std::string& solnJson) const {
+    assertSolutionExists(solnJson, 0 /* expect zero matches */);
 }
 
 void QueryPlannerTest::assertHasOneSolutionOf(const std::vector<std::string>& solnStrs) const {
@@ -575,7 +590,7 @@ void QueryPlannerTest::assertHasOneSolutionOf(const std::vector<std::string>& so
        << " instead. Run with --verbose=vv to see reasons for mismatch. All solutions generated: "
        << '\n';
     dumpSolutions(ss);
-    FAIL(ss);
+    FAIL(std::string(ss));
 }
 
 void QueryPlannerTest::assertNoSolutions() const {
@@ -596,8 +611,8 @@ std::unique_ptr<MatchExpression> QueryPlannerTest::parseMatchExpression(
 
     StatusWithMatchExpression status = MatchExpressionParser::parse(obj, expCtx);
     if (!status.isOK()) {
-        FAIL(str::stream() << "failed to parse query: " << obj.toString()
-                           << ". Reason: " << status.getStatus().toString());
+        FAIL(std::string(str::stream() << "failed to parse query: " << obj.toString()
+                                       << ". Reason: " << status.getStatus().toString()));
     }
     return std::move(status.getValue());
 }

@@ -39,7 +39,7 @@ unw_init_local (unw_cursor_t *cursor, unw_context_t *uc)
 static inline void
 set_as_arg (struct cursor *c, unw_context_t *uc)
 {
-#if defined(__linux) && defined(__KERNEL__)
+#if defined(__linux__) && defined(__KERNEL__)
   c->task = current;
   c->as_arg = &uc->sw;
 #else
@@ -51,7 +51,7 @@ static inline int
 get_initial_stack_pointers (struct cursor *c, unw_context_t *uc,
                             unw_word_t *sp, unw_word_t *bsp)
 {
-#if defined(__linux)
+#if defined(__linux__)
   unw_word_t sol, bspstore;
 
 #ifdef __KERNEL__
@@ -83,7 +83,7 @@ unw_init_local (unw_cursor_t *cursor, unw_context_t *uc)
   unw_word_t sp, bsp;
   int ret;
 
-  if (!tdep_init_done)
+  if (!atomic_load(&tdep_init_done))
     tdep_init ();
 
   Debug (1, "(cursor=%p)\n", c);

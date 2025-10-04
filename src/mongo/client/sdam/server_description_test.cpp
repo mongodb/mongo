@@ -26,21 +26,33 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/client/sdam/sdam_test_base.h"
-
-#include <boost/algorithm/string.hpp>
-#include <boost/optional/optional_io.hpp>
-#include <ostream>
-#include <set>
-
 #include "mongo/client/sdam/server_description.h"
+
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/client/sdam/sdam_test_base.h"
 #include "mongo/client/sdam/server_description_builder.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/platform/random.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/str.h"
 #include "mongo/util/system_clock_source.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <iterator>
+#include <set>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/none_t.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo::sdam {
 // Disabling these tests since this causes jstest failures when
@@ -241,7 +253,7 @@ protected:
     static inline const auto kBsonMissingOk = BSONObjBuilder().obj();
     static inline const auto kBsonMongos = okBuilder().append("msg", "isdbgrid").obj();
     static inline const auto kBsonRsPrimary =
-        okBuilder().append("ismaster", true).append("setName", "foo").obj();
+        okBuilder().append("isWritablePrimary", true).append("setName", "foo").obj();
     static inline const auto kBsonRsSecondary =
         okBuilder().append("secondary", true).append("setName", "foo").obj();
     static inline const auto kBsonRsArbiter =
@@ -267,18 +279,13 @@ protected:
                         .append("opTime", kOpTime.toBSON())
                         .obj())
             .obj();
-    static inline const auto kBsonHostNames = okBuilder()
-                                                  .append("me", "Me:1234")
-                                                  .appendArray("hosts",
-                                                               BSON_ARRAY("Foo:1234"
-                                                                          << "Bar:1234"))
-                                                  .appendArray("arbiters",
-                                                               BSON_ARRAY("Baz:1234"
-                                                                          << "Buz:1234"))
-                                                  .appendArray("passives",
-                                                               BSON_ARRAY("Biz:1234"
-                                                                          << "Boz:1234"))
-                                                  .obj();
+    static inline const auto kBsonHostNames =
+        okBuilder()
+            .append("me", "Me:1234")
+            .appendArray("hosts", BSON_ARRAY("Foo:1234" << "Bar:1234"))
+            .appendArray("arbiters", BSON_ARRAY("Baz:1234" << "Buz:1234"))
+            .appendArray("passives", BSON_ARRAY("Biz:1234" << "Boz:1234"))
+            .obj();
     static inline const auto kBsonSetVersionName =
         okBuilder().append("setVersion", 1).append("setName", "bar").obj();
     static inline const auto kBsonElectionId = okBuilder().append("electionId", OID::max()).obj();
@@ -289,7 +296,7 @@ protected:
         okBuilder().append("topologyVersion", TopologyVersion(OID::max(), 0).toBSON()).obj();
 };
 
-TEST_F(ServerDescriptionTestFixture, ShouldParseTypeAsUnknownForIsMasterError) {
+TEST_F(ServerDescriptionTestFixture, ShouldParseTypeAsUnknownForHelloError) {
     auto response = HelloOutcome(HostAndPort("foo:1234"), kTopologyVersion, "an error occurred");
     auto description = ServerDescription(clockSource, response);
     ASSERT_EQUALS(ServerType::kUnknown, description.getType());
@@ -316,7 +323,7 @@ TEST_F(ServerDescriptionTestFixture, ShouldParseTypeAsMongos) {
 }
 
 TEST_F(ServerDescriptionTestFixture, ShouldParseTypeAsRSPrimary) {
-    // "ismaster: true", "setName" in response
+    // "isWritablePrimary: true", "setName" in response
     auto response = HelloOutcome(HostAndPort("foo:1234"), kBsonRsPrimary, HelloRTT::min());
     auto description = ServerDescription(clockSource, response);
     ASSERT_EQUALS(ServerType::kRSPrimary, description.getType());
@@ -391,7 +398,9 @@ TEST_F(ServerDescriptionTestFixture, ShouldPreserveRTTPrecisionForMicroseconds) 
     const int numIterations = 100;
     const int minRttMicros = 100;
 
-    const auto randMicroseconds = [](int m) { return Microseconds(rand.nextInt64(m) + m); };
+    const auto randMicroseconds = [](int m) {
+        return Microseconds(rand.nextInt64(m) + m);
+    };
     auto lastServerDescription = ServerDescriptionBuilder()
                                      .withType(ServerType::kRSPrimary)
                                      .withRtt(randMicroseconds(minRttMicros))
@@ -510,9 +519,8 @@ TEST_F(ServerDescriptionTestFixture, ShouldStoreTopologyVersion) {
     auto response = HelloOutcome(HostAndPort("foo:1234"),
                                  kTopologyVersion,
                                  duration_cast<HelloRTT>(mongo::Milliseconds(40)));
-    auto topologyVersion =
-        TopologyVersion::parse(IDLParserErrorContext("TopologyVersion"),
-                               kTopologyVersion.getObjectField("topologyVersion"));
+    auto topologyVersion = TopologyVersion::parse(
+        kTopologyVersion.getObjectField("topologyVersion"), IDLParserContext("TopologyVersion"));
 
     auto description =
         ServerDescription(clockSource, response, boost::none /*lastRtt*/, topologyVersion);

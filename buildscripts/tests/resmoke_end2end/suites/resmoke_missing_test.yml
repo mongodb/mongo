@@ -1,0 +1,12 @@
+test_kind: js_test
+
+selector:
+  roots:
+    - buildscripts/tests/resmoke_end2end/testfiles/*.js
+  exclude_files:
+    - src/mongo/db/modules/enterprise/this_test_does_not_exist.js
+
+executor:
+  config:
+    shell_options:
+      nodb: ""

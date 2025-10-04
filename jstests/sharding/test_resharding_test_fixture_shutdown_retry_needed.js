@@ -4,15 +4,16 @@
  * Verifies that the background thread running the reshardCollection command will retry when mongos
  * reports an error caused by a network error from the primary shard.
  *
+ * Incompatible with a config shard because it uses a sequence of fail points to test the
+ * resharding test fixture, which doesn't work when the first shard is the config server. This only
+ * tests the testing fixture, so it wouldn't add meaningful coverage for a config shard.
  * @tags: [
+ *   config_shard_incompatible,
  *   requires_persistence,
  *   uses_atclustertime,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/sharding/libs/resharding_test_fixture.js");
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 const reshardingTest = new ReshardingTest({enableElections: true});
 reshardingTest.setup();
@@ -48,7 +49,7 @@ reshardingTest.withReshardingInBackground(
         for (let i = 0; i < numRestarts; ++i) {
             reshardingTest.shutdownAndRestartPrimaryOnShard(primaryShard);
         }
-    });
+    },
+);
 
 reshardingTest.teardown();
-})();

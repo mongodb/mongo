@@ -1,0 +1,51 @@
+# Configuration for background_compact.
+background_compact_debug_mode=true,
+cache_size_mb=10000,
+duration_seconds=30,
+# We don't need to validate anything with the default config.
+validate=false,
+workload_manager=
+(
+    populate_config=
+    (
+        collection_count=3,
+        key_count_per_collection=1000000,
+        thread_count=3,
+        key_size=10,
+        value_size=1000
+    ),
+    insert_config=
+    (
+        thread_count=3,
+        op_rate=10ms,
+        ops_per_transaction=(min=5,max=20),
+        key_size=10,
+        value_size=1000
+    ),
+    remove_config=
+    (
+        op_rate=2s,
+        ops_per_transaction=(max=1,min=0),
+        thread_count=1
+    ),
+    # Set the length of the maintenance window period.
+    custom_config=
+    (
+        op_rate=10s,
+        thread_count=1
+    ),
+    background_compact_config=
+    (
+        thread_count=1,
+        free_space_target_mb=1,
+        op_rate=60s
+    ),
+    checkpoint_config=
+    (
+        op_rate=5s,
+    )
+),
+operation_tracker=
+(
+    enabled=false,
+)

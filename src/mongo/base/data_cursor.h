@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include <cstddef>
-#include <cstring>
-
 #include "mongo/base/data_type.h"
 #include "mongo/base/data_view.h"
 #include "mongo/platform/endian.h"
+
+#include <cstddef>
+#include <cstring>
 
 namespace mongo {
 

@@ -49,14 +49,11 @@ class test_timestamp04(wttest.WiredTigerTestCase, suite_subprocess):
         ('V2', dict(conn_config=',eviction_dirty_trigger=50,eviction_updates_trigger=50,' \
          'log=(enabled)', using_log=True)),
     ]
-    session_config = 'isolation=snapshot'
 
-    # Minimum cache_size requirement of lsm is 31MB.
     types = [
         # FLCS does not yet work in a timestamp world.
         ('col_fix', dict(empty=1, \
           cacheSize='cache_size=20MB', extra_config=',key_format=r,value_format=8t')),
-        ('lsm', dict(empty=0, cacheSize='cache_size=31MB', extra_config=',type=lsm')),
         ('row', dict(empty=0, cacheSize='cache_size=20MB', extra_config='',)),
         ('row-smallcache', dict(empty=0, cacheSize='cache_size=2MB', extra_config='',)),
         ('var', dict(empty=0, cacheSize='cache_size=20MB', extra_config=',key_format=r')),
@@ -302,6 +299,3 @@ class test_timestamp04(wttest.WiredTigerTestCase, suite_subprocess):
                 for k in keys[:(key_range // 2)]))
             self.check(self.session, 'read_timestamp=' + latest_ts,
                 self.table_ts_log, dict((k, 1) for k in keys[(1 + key_range // 2):]), missing=True)
-
-if __name__ == '__main__':
-    wttest.run()

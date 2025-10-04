@@ -27,74 +27,129 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-#include "mongo/platform/basic.h"
+#include "mongo/db/s/resharding/resharding_txn_cloner.h"
 
-#include <boost/optional/optional_io.hpp>
-#include <vector>
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/bson/oid.h"
+#include "mongo/client/connection_string.h"
+#include "mongo/client/dbclient_cursor.h"
+#include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/cancelable_operation_context.h"
+#include "mongo/db/client.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/logical_session_cache_noop.h"
+#include "mongo/db/global_catalog/catalog_cache/catalog_cache_loader.h"
+#include "mongo/db/global_catalog/catalog_cache/catalog_cache_loader_mock.h"
+#include "mongo/db/global_catalog/sharding_catalog_client.h"
+#include "mongo/db/global_catalog/sharding_catalog_client_mock.h"
+#include "mongo/db/global_catalog/type_collection.h"
+#include "mongo/db/global_catalog/type_database_gen.h"
+#include "mongo/db/global_catalog/type_shard.h"
+#include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
+#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/pipeline/process_interface/shardsvr_process_interface.h"
+#include "mongo/db/query/client_cursor/cursor_id.h"
+#include "mongo/db/query/client_cursor/cursor_response.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/optime_with.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
-#include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
-#include "mongo/db/s/resharding/resharding_txn_cloner.h"
 #include "mongo/db/s/resharding/resharding_txn_cloner_progress_gen.h"
-#include "mongo/db/s/shard_server_test_fixture.h"
-#include "mongo/db/s/sharding_state.h"
-#include "mongo/db/session_catalog_mongod.h"
-#include "mongo/db/session_txn_record_gen.h"
-#include "mongo/db/transaction_participant.h"
-#include "mongo/db/vector_clock_metadata_hook.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_cache.h"
+#include "mongo/db/session/logical_session_cache_noop.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/session/session_txn_record_gen.h"
+#include "mongo/db/sharding_environment/client/shard.h"
+#include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/sharding_environment/shard_server_test_fixture.h"
+#include "mongo/db/sharding_environment/sharding_mongod_test_fixture.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/topology/cluster_role.h"
+#include "mongo/db/topology/shard_registry.h"
+#include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/db/vector_clock/vector_clock_metadata_hook.h"
+#include "mongo/db/versioning_protocol/database_version.h"
+#include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_factory.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/task_executor_pool.h"
 #include "mongo/executor/thread_pool_task_executor.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
-#include "mongo/s/catalog/sharding_catalog_client_mock.h"
-#include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/catalog_cache_loader_mock.h"
-#include "mongo/s/database_version.h"
+#include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/out_of_line_executor.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
+
+#include <algorithm>
+#include <cstdint>
+#include <functional>
+#include <ostream>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <fmt/format.h>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 
 namespace mongo {
 namespace {
 
-class ReshardingTxnClonerTest : public ShardServerTestFixture {
-    void setUp() {
-        // Don't call ShardServerTestFixture::setUp so we can install a mock catalog cache loader.
-        ShardingMongodTestFixture::setUp();
-
-        replicationCoordinator()->alwaysAllowWrites(true);
-        serverGlobalParams.clusterRole = ClusterRole::ShardServer;
-
-        _clusterId = OID::gen();
-        ShardingState::get(getServiceContext())->setInitialized(kTwoShardIdList[0], _clusterId);
-
-        auto mockLoader = std::make_unique<CatalogCacheLoaderMock>();
+class ReshardingTxnClonerTest : service_context_test::WithSetupTransportLayer,
+                                public ShardServerTestFixtureWithCatalogCacheLoaderMock {
+    void setUp() override {
+        ShardServerTestFixtureWithCatalogCacheLoaderMock::setUp();
 
         // The config database's primary shard is always config, and it is always sharded.
-        mockLoader->setDatabaseRefreshReturnValue(
-            DatabaseType{NamespaceString::kConfigDb.toString(),
-                         ShardId::kConfigServerId,
-                         true,
-                         DatabaseVersion::makeFixed()});
+        getCatalogCacheLoaderMock()->setDatabaseRefreshReturnValue(DatabaseType{
+            DatabaseName::kConfig, ShardId::kConfigServerId, DatabaseVersion::makeFixed()});
 
         // The config.transactions collection is always unsharded.
-        mockLoader->setCollectionRefreshReturnValue(
+        getCatalogCacheLoaderMock()->setCollectionRefreshReturnValue(
             {ErrorCodes::NamespaceNotFound, "collection not found"});
-
-        CatalogCacheLoader::set(getServiceContext(), std::move(mockLoader));
-
-        uassertStatusOK(
-            initializeGlobalShardingStateForMongodForTest(ConnectionString(kConfigHostAndPort)));
-
-        configTargeterMock()->setFindHostReturnValue(kConfigHostAndPort);
 
         for (const auto& shardId : kTwoShardIdList) {
             auto shardTargeter = RemoteCommandTargeterMock::get(
@@ -108,13 +163,32 @@ class ReshardingTxnClonerTest : public ShardServerTestFixture {
         // onStepUp() relies on the storage interface to create the config.transactions table.
         repl::StorageInterface::set(getServiceContext(),
                                     std::make_unique<repl::StorageInterfaceImpl>());
-        MongoDSessionCatalog::onStepUp(operationContext());
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(operationContext());
+        mongoDSessionCatalog->onStepUp(operationContext());
         LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
+
+        _executor = makeTaskExecutorForCloner();
+        _executor->startup();
+
+        _threadPool = std::make_shared<ThreadPool>([] {
+            ThreadPool::Options options;
+            options.poolName = "TestReshardCloneConfigTransactionsCancelableOpCtxPool";
+            options.minThreads = 1;
+            options.maxThreads = 1;
+            return options;
+        }());
+        _threadPool->startup();
     }
 
-    void tearDown() {
+    void tearDown() override {
+        _executor->shutdown();
+        _executor->join();
+
+        _threadPool->shutdown();
+        _threadPool->join();
+
         WaitForMajorityService::get(getServiceContext()).shutDown();
-        ShardServerTestFixture::tearDown();
+        ShardServerTestFixtureWithCatalogCacheLoaderMock::tearDown();
     }
 
     /**
@@ -123,14 +197,16 @@ class ReshardingTxnClonerTest : public ShardServerTestFixture {
      * ShardRegistry reload is done over DBClient, not the NetworkInterface, and there is no
      * DBClientMock analogous to the NetworkInterfaceMock.
      */
-    std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() {
+    std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() override {
 
         class StaticCatalogClient final : public ShardingCatalogClientMock {
         public:
             StaticCatalogClient(std::vector<ShardId> shardIds) : _shardIds(std::move(shardIds)) {}
 
-            StatusWith<repl::OpTimeWith<std::vector<ShardType>>> getAllShards(
-                OperationContext* opCtx, repl::ReadConcernLevel readConcern) override {
+            repl::OpTimeWith<std::vector<ShardType>> getAllShards(
+                OperationContext* opCtx,
+                repl::ReadConcernLevel readConcern,
+                BSONObj filter) override {
                 std::vector<ShardType> shardTypes;
                 for (const auto& shardId : _shardIds) {
                     const ConnectionString cs = ConnectionString::forReplicaSet(
@@ -152,9 +228,9 @@ class ReshardingTxnClonerTest : public ShardServerTestFixture {
 
 protected:
     const UUID kDefaultReshardingId = UUID::gen();
-    const std::vector<ShardId> kTwoShardIdList{_myShardName, {"otherShardName"}};
+    const std::vector<ShardId> kTwoShardIdList{kMyShardName, {"otherShardName"}};
     const std::vector<ReshardingSourceId> kTwoSourceIdList = {
-        {kDefaultReshardingId, _myShardName}, {kDefaultReshardingId, ShardId("otherShardName")}};
+        {kDefaultReshardingId, kMyShardName}, {kDefaultReshardingId, ShardId("otherShardName")}};
 
     const std::vector<DurableTxnStateEnum> kDurableTxnStateEnumValues = {
         DurableTxnStateEnum::kPrepared,
@@ -178,7 +254,7 @@ protected:
     }
 
     LogicalSessionId getTxnRecordLsid(BSONObj txnRecord) {
-        return SessionTxnRecord::parse(IDLParserErrorContext("ReshardingTxnClonerTest"), txnRecord)
+        return SessionTxnRecord::parse(txnRecord, IDLParserContext("ReshardingTxnClonerTest"))
             .getSessionId();
     }
 
@@ -227,6 +303,21 @@ protected:
         });
     }
 
+    void onKillCursorsRequest(CursorId cursorId) {
+        // Handle the 'killCursors' command.
+        onCommand([&](const executor::RemoteCommandRequest& request) {
+            ASSERT(request.cmdObj["killCursors"]);
+            auto cursors = request.cmdObj["cursors"];
+            ASSERT_EQ(cursors.type(), BSONType::array);
+            auto cursorsArray = cursors.Array();
+            ASSERT_FALSE(cursorsArray.empty());
+            ASSERT_EQ(cursorsArray[0].Long(), cursorId);
+            // The AsyncResultsMerger doesn't actually inspect the response of the killCursors, so
+            // we don't have to put anything except {ok: true}.
+            return BSON("ok" << true);
+        });
+    }
+
     void seedTransactionOnRecipient(LogicalSessionId sessionId,
                                     TxnNumber txnNum,
                                     bool multiDocTxn) {
@@ -238,16 +329,21 @@ protected:
             opCtx->setInMultiDocumentTransaction();
         }
 
-        MongoDOperationContextSession ocs(opCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
 
         auto txnParticipant = TransactionParticipant::get(opCtx);
         ASSERT(txnParticipant);
         if (multiDocTxn) {
-            txnParticipant.beginOrContinue(
-                opCtx, {txnNum}, false /* autocommit */, true /* startTransaction */);
+            txnParticipant.beginOrContinue(opCtx,
+                                           {txnNum},
+                                           false /* autocommit */,
+                                           TransactionParticipant::TransactionActions::kStart);
         } else {
-            txnParticipant.beginOrContinue(
-                opCtx, {txnNum}, boost::none /* autocommit */, boost::none /* startTransaction */);
+            txnParticipant.beginOrContinue(opCtx,
+                                           {txnNum},
+                                           boost::none /* autocommit */,
+                                           TransactionParticipant::TransactionActions::kNone);
         }
     }
 
@@ -261,9 +357,9 @@ protected:
         auto bsonOplog = client.findOne(std::move(findCmd));
         ASSERT(!bsonOplog.isEmpty());
         auto oplogEntry = repl::MutableOplogEntry::parse(bsonOplog).getValue();
-        ASSERT_EQ(oplogEntry.getTxnNumber().get(), txnNum);
+        ASSERT_EQ(oplogEntry.getTxnNumber().value(), txnNum);
         ASSERT_BSONOBJ_EQ(oplogEntry.getObject(), BSON("$sessionMigrateInfo" << 1));
-        ASSERT_BSONOBJ_EQ(oplogEntry.getObject2().get(), BSON("$incompleteOplogHistory" << 1));
+        ASSERT_BSONOBJ_EQ(oplogEntry.getObject2().value(), BSON("$incompleteOplogHistory" << 1));
         ASSERT(oplogEntry.getOpType() == repl::OpTypeEnum::kNoop);
 
         auto bsonTxn =
@@ -271,7 +367,7 @@ protected:
                            BSON(SessionTxnRecord::kSessionIdFieldName << sessionId.toBSON()));
         ASSERT(!bsonTxn.isEmpty());
         auto txn = SessionTxnRecord::parse(
-            IDLParserErrorContext("resharding config transactions cloning test"), bsonTxn);
+            bsonTxn, IDLParserContext("resharding config transactions cloning test"));
         ASSERT_EQ(txn.getTxnNum(), txnNum);
         ASSERT_EQ(txn.getLastWriteOpTime(), oplogEntry.getOpTime());
     }
@@ -279,7 +375,8 @@ protected:
     void checkTxnHasNotBeenUpdated(LogicalSessionId sessionId, TxnNumber txnNum) {
         auto opCtx = operationContext();
         opCtx->setLogicalSessionId(sessionId);
-        MongoDOperationContextSession ocs(opCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
 
         DBDirectClient client(operationContext());
@@ -302,45 +399,14 @@ protected:
             return boost::none;
         }
 
-        return ReshardingTxnClonerProgress::parse(
-            IDLParserErrorContext("ReshardingTxnClonerProgress"), progressDoc);
+        return ReshardingTxnClonerProgress::parse(progressDoc,
+                                                  IDLParserContext("ReshardingTxnClonerProgress"));
     }
 
     boost::optional<LogicalSessionId> getProgressLsid(const ReshardingSourceId& sourceId) {
         auto progressDoc = getTxnCloningProgress(sourceId);
         return progressDoc ? boost::optional<LogicalSessionId>(progressDoc->getProgress())
                            : boost::none;
-    }
-
-    std::shared_ptr<executor::ThreadPoolTaskExecutor> makeTaskExecutorForCloner() {
-        // The ReshardingTxnCloner expects there to already be a Client associated with the thread
-        // from the thread pool. We set up the ThreadPoolTaskExecutor identically to how the
-        // recipient's primary-only service is set up.
-        ThreadPool::Options threadPoolOptions;
-        threadPoolOptions.maxThreads = 1;
-        threadPoolOptions.threadNamePrefix = "TestReshardCloneConfigTransactions-";
-        threadPoolOptions.poolName = "TestReshardCloneConfigTransactionsThreadPool";
-        threadPoolOptions.onCreateThread = [](const std::string& threadName) {
-            Client::initThread(threadName.c_str());
-            auto* client = Client::getCurrent();
-            AuthorizationSession::get(*client)->grantInternalAuthorization(client);
-
-            {
-                stdx::lock_guard<Client> lk(*client);
-                client->setSystemOperationKillableByStepdown(lk);
-            }
-        };
-
-        auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
-        hookList->addHook(std::make_unique<rpc::VectorClockMetadataHook>(getServiceContext()));
-
-        auto executor = std::make_shared<executor::ThreadPoolTaskExecutor>(
-            std::make_unique<ThreadPool>(std::move(threadPoolOptions)),
-            executor::makeNetworkInterface(
-                "TestReshardCloneConfigTransactionsNetwork", nullptr, std::move(hookList)));
-        executor->startup();
-
-        return executor;
     }
 
     std::shared_ptr<MongoProcessInterface> makeMongoProcessInterface() {
@@ -350,35 +416,43 @@ protected:
 
     ExecutorFuture<void> runCloner(
         ReshardingTxnCloner& cloner,
-        std::shared_ptr<executor::ThreadPoolTaskExecutor> executor,
-        std::shared_ptr<executor::ThreadPoolTaskExecutor> cleanupExecutor,
         boost::optional<CancellationToken> customCancelToken = boost::none) {
         // Allows callers to control the cancellation of the cloner's run() function when specified.
-        auto cancelToken = customCancelToken.is_initialized()
-            ? customCancelToken.get()
+        auto cancelToken = customCancelToken.has_value()
+            ? customCancelToken.value()
             : operationContext()->getCancellationToken();
 
-        auto cancelableOpCtxExecutor = std::make_shared<ThreadPool>([] {
-            ThreadPool::Options options;
-            options.poolName = "TestReshardCloneConfigTransactionsCancelableOpCtxPool";
-            options.minThreads = 1;
-            options.maxThreads = 1;
-            return options;
-        }());
-        CancelableOperationContextFactory opCtxFactory(cancelToken, cancelableOpCtxExecutor);
+        CancelableOperationContextFactory opCtxFactory(cancelToken, _threadPool);
 
         // There isn't a guarantee that the reference count to `executor` has been decremented after
         // .run() returns. We schedule a trivial task on the task executor to ensure the callback's
         // destructor has run. Otherwise `executor` could end up outliving the ServiceContext and
         // triggering an invariant due to the task executor's thread having a Client still.
         return cloner
-            .run(executor,
-                 cleanupExecutor,
+            .run(_executor,
+                 _executor,
                  cancelToken,
                  std::move(opCtxFactory),
                  makeMongoProcessInterface())
-            .thenRunOn(executor)
+            .thenRunOn(_executor)
             .onCompletion([](auto x) { return x; });
+    }
+
+    void makeInProgressTxn(OperationContext* opCtx, LogicalSessionId lsid, TxnNumber txnNumber) {
+        opCtx->setInMultiDocumentTransaction();
+        opCtx->setLogicalSessionId(std::move(lsid));
+        opCtx->setTxnNumber(txnNumber);
+
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
+        auto txnParticipant = TransactionParticipant::get(opCtx);
+        txnParticipant.beginOrContinue(opCtx,
+                                       {txnNumber},
+                                       false /* autocommit */,
+                                       TransactionParticipant::TransactionActions::kStart);
+
+        txnParticipant.unstashTransactionResources(opCtx, "insert");
+        txnParticipant.stashTransactionResources(opCtx);
     }
 
     repl::OpTime makePreparedTxn(OperationContext* opCtx,
@@ -388,41 +462,85 @@ protected:
         opCtx->setLogicalSessionId(std::move(lsid));
         opCtx->setTxnNumber(txnNumber);
 
-        MongoDOperationContextSession ocs(opCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
-        txnParticipant.beginOrContinue(
-            opCtx, {txnNumber}, false /* autocommit */, true /* startTransaction */);
+        txnParticipant.beginOrContinue(opCtx,
+                                       {txnNumber},
+                                       false /* autocommit */,
+                                       TransactionParticipant::TransactionActions::kStart);
 
         txnParticipant.unstashTransactionResources(opCtx, "prepareTransaction");
 
         // The transaction machinery cannot store an empty locker.
-        { Lock::GlobalLock globalLock(opCtx, MODE_IX); }
-        auto opTime = repl::getNextOpTime(opCtx);
+        {
+            Lock::GlobalLock globalLock(opCtx, MODE_IX);
+        }
+        auto opTime = [opCtx] {
+            TransactionParticipant::SideTransactionBlock sideTxn{opCtx};
+
+            WriteUnitOfWork wuow{opCtx};
+            auto opTime = repl::getNextOpTime(opCtx);
+            wuow.release();
+
+            shard_role_details::getRecoveryUnit(opCtx)->abortUnitOfWork();
+            shard_role_details::getLocker(opCtx)->endWriteUnitOfWork();
+
+            return opTime;
+        }();
         txnParticipant.prepareTransaction(opCtx, opTime);
         txnParticipant.stashTransactionResources(opCtx);
 
         return opTime;
     }
 
-    void clearPreparedTxn(OperationContext* opCtx, LogicalSessionId lsid, TxnNumber txnNumber) {
+    void abortTxn(OperationContext* opCtx, LogicalSessionId lsid, TxnNumber txnNumber) {
         opCtx->setInMultiDocumentTransaction();
         opCtx->setLogicalSessionId(std::move(lsid));
         opCtx->setTxnNumber(txnNumber);
 
-        MongoDOperationContextSession ocs(opCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
-        txnParticipant.beginOrContinue(
-            opCtx, {txnNumber}, false /* autocommit */, boost::none /* startTransaction */);
+        txnParticipant.beginOrContinue(opCtx,
+                                       {txnNumber},
+                                       false /* autocommit */,
+                                       TransactionParticipant::TransactionActions::kContinue);
 
         txnParticipant.unstashTransactionResources(opCtx, "abortTransaction");
         txnParticipant.abortTransaction(opCtx);
         txnParticipant.stashTransactionResources(opCtx);
     }
 
+    Timestamp getLatestOplogTimestamp(OperationContext* opCtx) {
+        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+        LocalOplogInfo* oplogInfo = LocalOplogInfo::get(opCtx);
+
+        // Oplog should be available in this test.
+        invariant(oplogInfo);
+        storageEngine->waitForAllEarlierOplogWritesToBeVisible(opCtx, oplogInfo->getRecordStore());
+        DBDirectClient client(opCtx);
+
+        FindCommandRequest findRequest{NamespaceString::kRsOplogNamespace};
+        findRequest.setSort(BSON("ts" << -1));
+        findRequest.setLimit(1);
+        auto cursor = client.find(findRequest);
+        ASSERT_TRUE(cursor->more());
+        const auto oplogEntry = cursor->next();
+
+        return oplogEntry.getField("ts").timestamp();
+    }
+
     std::vector<repl::DurableOplogEntry> findOplogEntriesNewerThan(OperationContext* opCtx,
                                                                    Timestamp ts) {
         std::vector<repl::DurableOplogEntry> result;
 
+        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+        LocalOplogInfo* oplogInfo = LocalOplogInfo::get(opCtx);
+
+        // Oplog should be available in this test.
+        invariant(oplogInfo);
+        storageEngine->waitForAllEarlierOplogWritesToBeVisible(opCtx, oplogInfo->getRecordStore());
         PersistentTaskStore<repl::OplogEntryBase> store(NamespaceString::kRsOplogNamespace);
         store.forEach(opCtx, BSON("ts" << BSON("$gt" << ts)), [&](const auto& oplogEntry) {
             result.emplace_back(
@@ -478,19 +596,50 @@ protected:
             << sessionTxnRecord.toBSON() << ", " << foundOp;
     }
 
+    std::shared_ptr<executor::ThreadPoolTaskExecutor> getExecutor() {
+        return _executor;
+    }
+
 private:
+    std::shared_ptr<executor::ThreadPoolTaskExecutor> makeTaskExecutorForCloner() {
+        // The ReshardingTxnCloner expects there to already be a Client associated with the thread
+        // from the thread pool. We set up the ThreadPoolTaskExecutor identically to how the
+        // recipient's primary-only service is set up.
+        ThreadPool::Options threadPoolOptions;
+        threadPoolOptions.maxThreads = 1;
+        threadPoolOptions.threadNamePrefix = "TestReshardCloneConfigTransactions-";
+        threadPoolOptions.poolName = "TestReshardCloneConfigTransactionsThreadPool";
+        threadPoolOptions.onCreateThread = [](const std::string& threadName) {
+            Client::initThread(threadName, getGlobalServiceContext()->getService());
+            auto* client = Client::getCurrent();
+            AuthorizationSession::get(*client)->grantInternalAuthorization();
+        };
+
+        auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
+        hookList->addHook(std::make_unique<rpc::VectorClockMetadataHook>(getServiceContext()));
+
+        auto executor = executor::ThreadPoolTaskExecutor::create(
+            std::make_unique<ThreadPool>(std::move(threadPoolOptions)),
+            executor::makeNetworkInterface(
+                "TestReshardCloneConfigTransactionsNetwork", nullptr, std::move(hookList)));
+
+        return executor;
+    }
+
     static HostAndPort makeHostAndPort(const ShardId& shardId) {
         return HostAndPort(str::stream() << shardId << ":123");
     }
 
     RAIIServerParameterControllerForTest controller{"reshardingTxnClonerProgressBatchSize", 1};
+
+    std::shared_ptr<executor::ThreadPoolTaskExecutor> _executor;
+    std::shared_ptr<ThreadPool> _threadPool;
 };
 
 TEST_F(ReshardingTxnClonerTest, MergeTxnNotOnRecipient) {
     for (auto state : getDurableTxnStatesAndBoostNone()) {
-        auto executor = makeTaskExecutorForCloner();
         ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
-        auto future = runCloner(cloner, executor, executor);
+        auto future = runCloner(cloner);
 
         const auto sessionId = makeLogicalSessionIdForTest();
         TxnNumber txnNum = 3;
@@ -507,9 +656,8 @@ TEST_F(ReshardingTxnClonerTest, MergeTxnNotOnRecipient) {
 }
 
 TEST_F(ReshardingTxnClonerTest, MergeUnParsableTxn) {
-    auto executor = makeTaskExecutorForCloner();
     ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
-    auto future = runCloner(cloner, executor, executor);
+    auto future = runCloner(cloner);
 
     const auto sessionId = makeLogicalSessionIdForTest();
     TxnNumber txnNum = 3;
@@ -519,7 +667,7 @@ TEST_F(ReshardingTxnClonerTest, MergeUnParsableTxn) {
                         {});
 
     auto status = future.getNoThrow();
-    ASSERT_EQ(status, static_cast<ErrorCodes::Error>(40414));
+    ASSERT_EQ(status, ErrorCodes::IDLFailedToParse);
 }
 
 TEST_F(ReshardingTxnClonerTest, MergeNewTxnOverMultiDocTxn) {
@@ -530,9 +678,8 @@ TEST_F(ReshardingTxnClonerTest, MergeNewTxnOverMultiDocTxn) {
 
         seedTransactionOnRecipient(sessionId, recipientTxnNum, true);
 
-        auto executor = makeTaskExecutorForCloner();
         ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
-        auto future = runCloner(cloner, executor, executor);
+        auto future = runCloner(cloner);
 
         auto txn = SessionTxnRecord(sessionId, donorTxnNum, repl::OpTime(), Date_t::now());
         txn.setState(state);
@@ -553,9 +700,8 @@ TEST_F(ReshardingTxnClonerTest, MergeNewTxnOverRetryableWriteTxn) {
 
         seedTransactionOnRecipient(sessionId, recipientTxnNum, false);
 
-        auto executor = makeTaskExecutorForCloner();
         ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
-        auto future = runCloner(cloner, executor, executor);
+        auto future = runCloner(cloner);
 
         auto txn = SessionTxnRecord(sessionId, donorTxnNum, repl::OpTime(), Date_t::now());
         txn.setState(state);
@@ -575,9 +721,8 @@ TEST_F(ReshardingTxnClonerTest, MergeCurrentTxnOverRetryableWriteTxn) {
 
         seedTransactionOnRecipient(sessionId, txnNum, false);
 
-        auto executor = makeTaskExecutorForCloner();
         ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
-        auto future = runCloner(cloner, executor, executor);
+        auto future = runCloner(cloner);
 
         auto txn = SessionTxnRecord(sessionId, txnNum, repl::OpTime(), Date_t::now());
         txn.setState(state);
@@ -597,9 +742,8 @@ TEST_F(ReshardingTxnClonerTest, MergeCurrentTxnOverMultiDocTxn) {
 
         seedTransactionOnRecipient(sessionId, txnNum, true);
 
-        auto executor = makeTaskExecutorForCloner();
         ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
-        auto future = runCloner(cloner, executor, executor);
+        auto future = runCloner(cloner);
 
         auto txn = SessionTxnRecord(sessionId, txnNum, repl::OpTime(), Date_t::now());
         txn.setState(state);
@@ -621,9 +765,8 @@ TEST_F(ReshardingTxnClonerTest, MergeOldTxnOverTxn) {
 
         seedTransactionOnRecipient(sessionId, recipientTxnNum, false);
 
-        auto executor = makeTaskExecutorForCloner();
         ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
-        auto future = runCloner(cloner, executor, executor);
+        auto future = runCloner(cloner);
 
         auto txn = SessionTxnRecord(sessionId, donorTxnNum, repl::OpTime(), Date_t::now());
         txn.setState(state);
@@ -641,9 +784,8 @@ TEST_F(ReshardingTxnClonerTest, MergeMultiDocTransactionAndRetryableWrite) {
     const auto sessionIdMultiDocTxn = makeLogicalSessionIdForTest();
     TxnNumber txnNum = 3;
 
-    auto executor = makeTaskExecutorForCloner();
     ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
-    auto future = runCloner(cloner, executor, executor);
+    auto future = runCloner(cloner);
 
     auto sessionRecordRetryableWrite =
         SessionTxnRecord(sessionIdRetryableWrite, txnNum, repl::OpTime(), Date_t::now());
@@ -666,11 +808,10 @@ TEST_F(ReshardingTxnClonerTest, MergeMultiDocTransactionAndRetryableWrite) {
  */
 TEST_F(ReshardingTxnClonerTest, ClonerOneBatchThenCanceled) {
     const auto txns = makeSortedTxns(4);
-    auto executor = makeTaskExecutorForCloner();
     ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
     auto opCtxToken = operationContext()->getCancellationToken();
     auto cancelSource = CancellationSource(opCtxToken);
-    auto future = runCloner(cloner, executor, executor, cancelSource.token());
+    auto future = runCloner(cloner, cancelSource.token());
 
     onCommand([&](const executor::RemoteCommandRequest& request) {
         cancelSource.cancel();
@@ -693,9 +834,8 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressSingleBatch) {
         ASSERT_FALSE(getTxnCloningProgress(kTwoSourceIdList[0]));
         ASSERT_FALSE(getTxnCloningProgress(kTwoSourceIdList[1]));
 
-        auto executor = makeTaskExecutorForCloner();
         ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
-        auto future = runCloner(cloner, executor, executor);
+        auto future = runCloner(cloner);
 
         onCommandReturnTxnBatch(txns, CursorId{0}, true /* isFirstBatch */);
 
@@ -712,9 +852,8 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressSingleBatch) {
         ASSERT_FALSE(getTxnCloningProgress(kTwoSourceIdList[0]));
         ASSERT_EQ(*getProgressLsid(kTwoSourceIdList[1]), lastLsid);
 
-        auto executor = makeTaskExecutorForCloner();
         ReshardingTxnCloner cloner(kTwoSourceIdList[0], Timestamp::max());
-        auto future = runCloner(cloner, executor, executor);
+        auto future = runCloner(cloner);
 
         onCommandReturnTxnBatch(txns, CursorId{0}, true /* isFirstBatch */);
 
@@ -738,10 +877,9 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressMultipleBatches) {
     ASSERT_FALSE(getTxnCloningProgress(kTwoSourceIdList[0]));
     ASSERT_FALSE(getTxnCloningProgress(kTwoSourceIdList[1]));
 
-    auto executor = makeTaskExecutorForCloner();
     ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
     auto cancelSource = CancellationSource(operationContext()->getCancellationToken());
-    auto future = runCloner(cloner, executor, executor, cancelSource.token());
+    auto future = runCloner(cloner, cancelSource.token());
 
     // The progress document is updated asynchronously after the session record is updated. We fake
     // the cloning operation being canceled to inspect the progress document after the first batch
@@ -760,13 +898,15 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressMultipleBatches) {
     auto status = future.getNoThrow();
     ASSERT_EQ(status, ErrorCodes::CallbackCanceled);
 
+    onKillCursorsRequest(CursorId{123});
+
     // After the first batch, the progress document should contain the lsid of the last document in
     // that batch.
     ASSERT_FALSE(getTxnCloningProgress(kTwoSourceIdList[0]));
     ASSERT_EQ(*getProgressLsid(kTwoSourceIdList[1]), firstLsid);
 
     // Now we run the cloner again and give it the remaining documents.
-    future = runCloner(cloner, executor, executor);
+    future = runCloner(cloner);
 
     onCommandReturnTxnBatch(
         std::vector<BSONObj>(txns.begin() + 1, txns.end()), CursorId{0}, false /* isFirstBatch */);
@@ -788,10 +928,9 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressResume) {
     ASSERT_FALSE(getTxnCloningProgress(kTwoSourceIdList[0]));
     ASSERT_FALSE(getTxnCloningProgress(kTwoSourceIdList[1]));
 
-    auto executor = makeTaskExecutorForCloner();
     ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
     auto cancelSource = CancellationSource(operationContext()->getCancellationToken());
-    auto future = runCloner(cloner, executor, executor, cancelSource.token());
+    auto future = runCloner(cloner, cancelSource.token());
 
     onCommandReturnTxnBatch({txns.front()}, CursorId{123}, true /* isFirstBatch */);
 
@@ -813,13 +952,15 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressResume) {
     auto status = future.getNoThrow();
     ASSERT_EQ(status, ErrorCodes::CallbackCanceled);
 
+    onKillCursorsRequest(CursorId{123});
+
     // The stored progress should be unchanged.
     ASSERT_FALSE(getTxnCloningProgress(kTwoSourceIdList[0]));
     ASSERT_EQ(*getProgressLsid(kTwoSourceIdList[1]), firstLsid);
 
     // Simulate a resume on the new primary by creating a new fetcher that resumes after the lsid in
     // the progress document.
-    future = runCloner(cloner, executor, executor);
+    future = runCloner(cloner);
 
     BSONObj cmdObj;
     onCommand([&](const executor::RemoteCommandRequest& request) {
@@ -848,7 +989,7 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressResume) {
     // fetcher that resumes at the lsid from the first progress document. This verifies cloning is
     // idempotent on the cloning shard.
     cloner.updateProgressDocument_forTest(operationContext(), firstLsid);
-    future = runCloner(cloner, executor, executor);
+    future = runCloner(cloner);
 
     onCommand([&](const executor::RemoteCommandRequest& request) {
         cmdObj = request.cmdObj.getOwned();
@@ -876,9 +1017,8 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressResume) {
 TEST_F(ReshardingTxnClonerTest, ClonerDoesNotUpdateProgressOnEmptyBatch) {
     ASSERT_FALSE(getTxnCloningProgress(kTwoSourceIdList[0]));
 
-    auto executor = makeTaskExecutorForCloner();
     ReshardingTxnCloner cloner(kTwoSourceIdList[0], Timestamp::max());
-    auto future = runCloner(cloner, executor, executor);
+    auto future = runCloner(cloner);
 
     onCommandReturnTxnBatch({}, CursorId{0}, true /* isFirstBatch */);
 
@@ -897,10 +1037,9 @@ TEST_F(ReshardingTxnClonerTest, WaitsOnPreparedTxnAndAutomaticallyRetries) {
     TxnNumber incomingTxnNumber = existingTxnNumber + 1;
     auto sessionTxnRecord = SessionTxnRecord{lsid, incomingTxnNumber, repl::OpTime{}, Date_t{}};
 
-    auto executor = makeTaskExecutorForCloner();
     ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
     CancellationSource cancelSource;
-    auto future = runCloner(cloner, executor, executor, cancelSource.token());
+    auto future = runCloner(cloner, cancelSource.token());
 
     onCommandReturnTxns({sessionTxnRecord.toBSON()}, {});
 
@@ -908,17 +1047,17 @@ TEST_F(ReshardingTxnClonerTest, WaitsOnPreparedTxnAndAutomaticallyRetries) {
     // Wait a little bit to increase the likelihood that the cloner has blocked on the prepared
     // transaction before the transaction is aborted.
     ASSERT_OK(
-        executor->sleepFor(Milliseconds{200}, CancellationToken::uncancelable()).getNoThrow());
+        getExecutor()->sleepFor(Milliseconds{200}, CancellationToken::uncancelable()).getNoThrow());
     ASSERT_FALSE(future.isReady());
 
-    clearPreparedTxn(operationContext(), lsid, existingTxnNumber);
+    abortTxn(operationContext(), lsid, existingTxnNumber);
 
     ASSERT_OK(future.getNoThrow());
 
     {
         auto foundOps = findOplogEntriesNewerThan(operationContext(), opTime.getTimestamp());
         ASSERT_GTE(foundOps.size(), 2U);
-        // The first oplog entry is from aborting the prepared transaction via clearPreparedTxn().
+        // The first oplog entry is from aborting the prepared transaction via abortTxn().
         // The second oplog entry is from the session txn record being updated by
         // ReshardingTxnCloner.
         checkGeneratedNoop(foundOps[1], lsid, incomingTxnNumber, {kIncompleteHistoryStmtId});
@@ -934,15 +1073,14 @@ TEST_F(ReshardingTxnClonerTest, CancelableWhileWaitingOnPreparedTxn) {
 
     TxnNumber existingTxnNumber = 100;
     makePreparedTxn(operationContext(), lsid, existingTxnNumber);
-    ON_BLOCK_EXIT([&] { clearPreparedTxn(operationContext(), lsid, existingTxnNumber); });
+    ON_BLOCK_EXIT([&] { abortTxn(operationContext(), lsid, existingTxnNumber); });
 
     TxnNumber incomingTxnNumber = existingTxnNumber + 1;
     auto sessionTxnRecord = SessionTxnRecord{lsid, incomingTxnNumber, repl::OpTime{}, Date_t{}};
 
-    auto executor = makeTaskExecutorForCloner();
     ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
     CancellationSource cancelSource;
-    auto future = runCloner(cloner, executor, executor, cancelSource.token());
+    auto future = runCloner(cloner, cancelSource.token());
 
     onCommandReturnTxns({sessionTxnRecord.toBSON()}, {});
 
@@ -950,11 +1088,180 @@ TEST_F(ReshardingTxnClonerTest, CancelableWhileWaitingOnPreparedTxn) {
     // Wait a little bit to increase the likelihood that the applier has blocked on the prepared
     // transaction before the cancellation source is canceled.
     ASSERT_OK(
-        executor->sleepFor(Milliseconds{200}, CancellationToken::uncancelable()).getNoThrow());
+        getExecutor()->sleepFor(Milliseconds{200}, CancellationToken::uncancelable()).getNoThrow());
     ASSERT_FALSE(future.isReady());
 
     cancelSource.cancel();
     ASSERT_EQ(future.getNoThrow(), ErrorCodes::CallbackCanceled);
+}
+
+TEST_F(ReshardingTxnClonerTest,
+       WaitsOnInProgressInternalTxnForRetryableWriteAndAutomaticallyRetries) {
+    auto retryableWriteLsid = makeLogicalSessionIdForTest();
+    TxnNumber retryableWriteTxnNumber = 100;
+    auto internalTxnLsid = makeLogicalSessionIdWithTxnNumberAndUUIDForTest(retryableWriteLsid,
+                                                                           retryableWriteTxnNumber);
+    TxnNumber internalTxnTxnNumber = 1;
+
+    // Make two in progress transactions so the one started by resharding must block.
+    {
+        auto newClientOwned = getServiceContext()->getService()->makeClient("newClient");
+        AlternativeClientRegion acr(newClientOwned);
+        auto newOpCtx = cc().makeOperationContext();
+        makeInProgressTxn(newOpCtx.get(),
+                          makeLogicalSessionIdWithTxnNumberAndUUIDForTest(retryableWriteLsid,
+                                                                          retryableWriteTxnNumber),
+                          internalTxnTxnNumber);
+    }
+    makeInProgressTxn(operationContext(), internalTxnLsid, internalTxnTxnNumber);
+    auto lastOplogTs = getLatestOplogTimestamp(operationContext());
+
+    auto sessionTxnRecord =
+        SessionTxnRecord{retryableWriteLsid, retryableWriteTxnNumber, repl::OpTime{}, Date_t{}};
+
+    ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
+    CancellationSource cancelSource;
+    auto future = runCloner(cloner, cancelSource.token());
+
+    onCommandReturnTxns({sessionTxnRecord.toBSON()}, {});
+
+    ASSERT_FALSE(future.isReady());
+    // Wait a little bit to increase the likelihood that the cloner has blocked on the in progress
+    // internal transaction before the transaction is aborted.
+    ASSERT_OK(
+        getExecutor()->sleepFor(Milliseconds{200}, CancellationToken::uncancelable()).getNoThrow());
+    ASSERT_FALSE(future.isReady());
+
+    abortTxn(operationContext(), internalTxnLsid, internalTxnTxnNumber);
+
+    ASSERT_OK(future.getNoThrow());
+
+    {
+        auto foundOps = findOplogEntriesNewerThan(operationContext(), lastOplogTs);
+        ASSERT_GTE(foundOps.size(), 1U);
+        // The first oplog entry is from the session txn record being updated by
+        // ReshardingTxnCloner.
+        checkGeneratedNoop(
+            foundOps[0], retryableWriteLsid, retryableWriteTxnNumber, {kIncompleteHistoryStmtId});
+
+        auto sessionTxnRecord = findSessionRecord(operationContext(), retryableWriteLsid);
+        ASSERT_TRUE(bool(sessionTxnRecord));
+        checkSessionTxnRecord(*sessionTxnRecord, foundOps[0]);
+    }
+}
+
+TEST_F(ReshardingTxnClonerTest,
+       WaitsOnPreparedInternalTxnForRetryableWriteAndAutomaticallyRetries) {
+    auto retryableWriteLsid = makeLogicalSessionIdForTest();
+    TxnNumber retryableWriteTxnNumber = 100;
+    auto internalTxnLsid = makeLogicalSessionIdWithTxnNumberAndUUIDForTest(retryableWriteLsid,
+                                                                           retryableWriteTxnNumber);
+    TxnNumber internalTxnTxnNumber = 1;
+
+    auto opTime = makePreparedTxn(operationContext(), internalTxnLsid, internalTxnTxnNumber);
+
+    auto sessionTxnRecord =
+        SessionTxnRecord{retryableWriteLsid, retryableWriteTxnNumber, repl::OpTime{}, Date_t{}};
+
+    ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
+    CancellationSource cancelSource;
+    auto future = runCloner(cloner, cancelSource.token());
+
+    onCommandReturnTxns({sessionTxnRecord.toBSON()}, {});
+
+    ASSERT_FALSE(future.isReady());
+    // Wait a little bit to increase the likelihood that the cloner has blocked on the in progress
+    // internal transaction before the transaction is aborted.
+    ASSERT_OK(
+        getExecutor()->sleepFor(Milliseconds{200}, CancellationToken::uncancelable()).getNoThrow());
+    ASSERT_FALSE(future.isReady());
+
+    abortTxn(operationContext(), internalTxnLsid, internalTxnTxnNumber);
+
+    ASSERT_OK(future.getNoThrow());
+
+    {
+        auto foundOps = findOplogEntriesNewerThan(operationContext(), opTime.getTimestamp());
+        ASSERT_GTE(foundOps.size(), 2U);
+        // The first oplog entry is from aborting the prepared internal transaction via abortTxn().
+        // The second oplog entry is from the session txn record being updated by
+        // ReshardingTxnCloner.
+        checkGeneratedNoop(
+            foundOps[1], retryableWriteLsid, retryableWriteTxnNumber, {kIncompleteHistoryStmtId});
+
+        auto sessionTxnRecord = findSessionRecord(operationContext(), retryableWriteLsid);
+        ASSERT_TRUE(bool(sessionTxnRecord));
+        checkSessionTxnRecord(*sessionTxnRecord, foundOps[1]);
+    }
+}
+
+TEST_F(ReshardingTxnClonerTest, CancelableWhileWaitingOnInProgressInternalTxnForRetryableWrite) {
+    auto retryableWriteLsid = makeLogicalSessionIdForTest();
+    TxnNumber retryableWriteTxnNumber = 100;
+
+    auto internalTxnLsid = makeLogicalSessionIdWithTxnNumberAndUUIDForTest(retryableWriteLsid,
+                                                                           retryableWriteTxnNumber);
+    TxnNumber internalTxnTxnNumber = 1;
+
+    // Make two in progress transactions so the one started by resharding must block.
+    {
+        auto newClientOwned = getServiceContext()->getService()->makeClient("newClient");
+        AlternativeClientRegion acr(newClientOwned);
+        auto newOpCtx = cc().makeOperationContext();
+        makeInProgressTxn(newOpCtx.get(),
+                          makeLogicalSessionIdWithTxnNumberAndUUIDForTest(retryableWriteLsid,
+                                                                          retryableWriteTxnNumber),
+                          internalTxnTxnNumber);
+    }
+    makeInProgressTxn(operationContext(), internalTxnLsid, internalTxnTxnNumber);
+    ON_BLOCK_EXIT([&] { abortTxn(operationContext(), internalTxnLsid, internalTxnTxnNumber); });
+
+    auto sessionTxnRecord =
+        SessionTxnRecord{retryableWriteLsid, retryableWriteTxnNumber, repl::OpTime{}, Date_t{}};
+
+    ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
+    CancellationSource cancelSource;
+    auto future = runCloner(cloner, cancelSource.token());
+
+    onCommandReturnTxns({sessionTxnRecord.toBSON()}, {});
+
+    ASSERT_FALSE(future.isReady());
+    // Wait a little bit to increase the likelihood that the applier has blocked on the prepared
+    // transaction before the cancellation source is canceled.
+    ASSERT_OK(
+        getExecutor()->sleepFor(Milliseconds{200}, CancellationToken::uncancelable()).getNoThrow());
+    ASSERT_FALSE(future.isReady());
+
+    cancelSource.cancel();
+    ASSERT_EQ(future.getNoThrow(), ErrorCodes::CallbackCanceled);
+}
+
+TEST_F(ReshardingTxnClonerTest, DoNotAddDeadEndSentinelTwice) {
+    auto opCtx = operationContext();
+    ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
+    auto txnRecord = SessionTxnRecord::parse(
+        makeTxn(), IDLParserContext{"ReshardingTxnClonerTest::DoNotAddDeadEndSentinelTwice"});
+
+    DBDirectClient client(opCtx);
+    auto filter = fromjson(fmt::format(
+        R"(
+            {{
+                lsid: {{ $eq: {} }},
+                o2: {{ $eq: {} }}
+            }}
+        )",
+        tojson(txnRecord.getSessionId().toBSON()),
+        tojson(TransactionParticipant::kDeadEndSentinel)));
+
+    auto getSentinelCount = [&] {
+        return client.count(NamespaceString::kRsOplogNamespace, filter);
+    };
+
+    ASSERT_EQ(getSentinelCount(), 0);
+    cloner.doOneRecord(opCtx, txnRecord);
+    ASSERT_EQ(getSentinelCount(), 1);
+    cloner.doOneRecord(opCtx, txnRecord);
+    ASSERT_EQ(getSentinelCount(), 1);
 }
 
 }  // namespace

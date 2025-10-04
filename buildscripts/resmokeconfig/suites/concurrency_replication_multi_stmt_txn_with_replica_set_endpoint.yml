@@ -1,0 +1,110 @@
+# This suite is based on the concurrency_replication_multi_stmt_txn suite. It is used for testing
+# that there is no feature parity issue between a replica set before and after it has been
+# bootstrapped as a single-shard cluster as long as the replica set endpoint is enabled. When
+# feature parity is achieved, the set of tests disabled in this suite should be the same as the
+# set of tests disabled in the concurrency_replication_multi_stmt_txn suite.
+
+test_kind: fsm_workload_test
+
+selector:
+  roots:
+    - jstests/concurrency/fsm_workloads/**/*.js
+  exclude_files:
+    ##
+    # Disabled due to MongoDB restrictions and/or workload restrictions
+    ##
+
+    # Relies on having one thread observe writes from the other threads, which won't become visible
+    # once a transaction in the thread is started because it'll keep reading from the same snapshot.
+    - jstests/concurrency/fsm_workloads/ddl/create_index_background/create_index_background.js
+    - jstests/concurrency/fsm_workloads/ddl/create_index_background/create_index_background_partial_filter.js
+    - jstests/concurrency/fsm_workloads/ddl/create_index_background/create_index_background_wildcard.js
+
+    # Expects reads to die with a particular error, but other errors are possible if the read is part
+    # of a transaction (e.g. ErrorCodes.LockTimeout).
+    - jstests/concurrency/fsm_workloads/query/drop_index_during_replan.js
+    - jstests/concurrency/fsm_workloads/query/drop_index_during_lookup.js
+
+    # Performs direct writes to system.views
+    - jstests/concurrency/fsm_workloads/view_catalog/view_catalog_direct_system_writes.js
+
+    # Extracts error code from write error, which is obscured by runInsideTransaction.
+    - jstests/concurrency/fsm_workloads/access_collection_in_transaction_after_catalog_changes.js
+
+    # Induces non-blindly-retriable errors (see SERVER-45767).
+    - jstests/concurrency/fsm_workloads/ddl/create_database.js
+
+    # The tests below are disabled because of sharding auto-bootstrap and replica set endpoint.
+    # TODO (SERVER-86771): renameCollection on sharded cluster doesn't support implicitly creating
+    # the destination database.
+    - jstests/concurrency/fsm_workloads/ddl/rename_collection/rename_collection_dbname_chain.js
+    # TODO: $exchange is an internal stage that is not supported via a router.
+    # TODO (SERVER-91885): Investigate why the invariant in AsyncResultsMerger is hit.
+    # TODO (SERVER-91129): Investigate why the teardown phase in agg_unionWith_interrupt_cleanup.js
+    # could fail with FailedToSatisfyReadPreference
+    - jstests/concurrency/fsm_workloads/query/agg/agg_unionWith_interrupt_cleanup.js
+
+  exclude_with_any_tags:
+    - requires_standalone
+    - requires_sharding
+    # Snapshot reads in transactions are banned on capped collections.
+    - requires_capped
+    # Sharing cursors between state functions will fail in this suite because it will attempt to use
+    # the same cursor in multiple transactions.
+    - state_functions_share_cursor
+    # These start a transaction in one state function and use it in other state functions. This suite
+    # would instead execute each state function as its own transaction.
+    - state_functions_share_transaction
+    # Tests which expect commands to fail and catch the error can cause transactions to abort and
+    # retry indefinitely.
+    - catches_command_failures
+    # time-series collections do not support write transactions
+    - requires_timeseries
+    - does_not_support_transactions
+    # The tests below are disabled because of sharding auto-bootstrap and replica set endpoint.
+    # prepareTransaction is not a command on a router.
+    - uses_prepare_transaction
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHashInBackground
+      - ValidateCollectionsInBackground
+      # TODO (SERVER-83433): Add back the test coverage for running db hash check on replica set
+      # that is fsync locked and has replica set endpoint enabled.
+      # - CheckReplDBHash
+      - ValidateCollections
+    tests: true
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          runInsideTransaction: true
+          runningWithSessions: true
+          traceExceptions: false
+          testingReplicaSetEndpoint: true
+  hooks:
+    # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+    # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+    # validating the entire contents of the collection.
+    #
+    # TODO SERVER-26466: Add CheckReplOplogs hook to the concurrency suite.
+    - class: CheckReplDBHashInBackground
+    - class: ValidateCollectionsInBackground
+    # TODO (SERVER-83433): Add back the test coverage for running db hash check on replica set that
+    # is fsync locked and has replica set endpoint enabled.
+    # - class: CheckReplDBHash
+    - class: ValidateCollections
+    - class: CleanupConcurrencyWorkloads
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      oplogSize: 1024
+      set_parameters:
+        enableTestCommands: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+        queryAnalysisWriterIntervalSecs: 1
+        roleGraphInvalidationIsFatal: 1
+        featureFlagAllMongodsAreSharded: true
+    use_auto_bootstrap_procedure: 1
+    num_nodes: 3

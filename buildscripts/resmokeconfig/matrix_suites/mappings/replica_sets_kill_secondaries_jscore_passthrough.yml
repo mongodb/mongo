@@ -1,0 +1,8 @@
+base_suite: replica_sets_jscore_passthrough
+overrides:
+  - "replica_sets_kill_secondary.selector"
+  - "replica_sets_kill_secondary.executor"
+  - "replica_sets_kill_secondary.hooks_with_oplog_application_lag"
+
+excludes:
+  - "replica_sets_kill_secondary.exclusions"

@@ -1,0 +1,31 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/replica_sets_primary_driven_index_builds.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
+##########################################################
+executor:
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          setParameters:
+            featureFlagPrimaryDrivenIndexBuilds: true
+            featureFlagRecordIdsReplicated: 1
+          skipCheckDBHashes: true
+          skipCollectionAndIndexValidation: true
+      nodb: ""
+matrix_suite: true
+selector:
+  exclude_with_any_tags:
+    - primary_driven_index_builds_incompatible
+    - rolling_index_builds
+    - requires_commit_quorum
+    - requires_capped
+  roots:
+    - jstests/replsets/*index_build*.js
+    - jstests/replsets/**/*index_build*.js
+    - jstests/replsets/container_operations.js
+test_kind: js_test

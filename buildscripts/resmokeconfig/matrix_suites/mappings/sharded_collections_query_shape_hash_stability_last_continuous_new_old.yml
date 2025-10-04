@@ -1,0 +1,13 @@
+base_suite: sharded_collections_jscore_passthrough
+description: >-
+  This suite runs through all existing core tests and ensures that the 'queryShapeHash'
+  attribute returned in explain is same for multiple explain invocations, across all nodes of two
+  sharded clusters, with different binaries version.
+overrides:
+  - "query_shape_hash_stability.multiversion_cluster_fixture_last_continuous"
+excludes:
+  - "query_shape_hash_stability.common_core_excludes"
+  - "query_shape_hash_stability.common_multiversion_excludes"
+  - "query_shape_hash_stability.multiversion_core_excludes"
+eval:
+  - "query_shape_hash_stability.eval_query_shape_hash_stability"

@@ -29,10 +29,15 @@
 
 #pragma once
 
-#include <memory>
-#include <vector>
-
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/backup_cursor_state.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/util/uuid.h"
+
+#include <functional>
+#include <memory>
 
 namespace mongo {
 class OperationContext;
@@ -73,12 +78,12 @@ public:
     virtual bool isBackupCursorOpen() const;
 
     /**
-     * Returns true if `filename` was returned by the backup cursor `backupId`.
-     * Used to verify filenames passed into $backupFile.
+     * Returns true if `filePath` was returned by the backup cursor `backupId`.
+     * Used to verify files passed into $backupFile.
      */
-    virtual bool isFileReturnedByCursor(const UUID& backupId, std::string filename);
+    virtual bool isFileReturnedByCursor(const UUID& backupId, boost::filesystem::path filePath);
 
-    virtual void addFilename(const UUID& backupId, std::string filename);
+    virtual void addFile(const UUID& backupId, boost::filesystem::path filePath);
 };
 
 }  // namespace mongo

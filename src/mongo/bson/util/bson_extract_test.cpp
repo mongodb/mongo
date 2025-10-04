@@ -27,14 +27,20 @@
  *    it in the license file.
  */
 
-#include <functional>
+#include <cmath>
+// IWYU pragma: no_include "ext/type_traits.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/util/bson_extract.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/unittest.h"
+
 #include <limits>
 #include <string>
-
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/repl/optime.h"
-#include "mongo/unittest/unittest.h"
 
 using namespace mongo;
 
@@ -53,14 +59,16 @@ TEST(ExtractBSON, ExtractTypedField) {
     BSONObj obj = BSON("a" << 1 << "b"
                            << "hello");
     BSONElement element;
-    ASSERT_OK(bsonExtractTypedField(obj, "a", NumberInt, &element));
+    ASSERT_OK(bsonExtractTypedField(obj, "a", BSONType::numberInt, &element));
     ASSERT_EQUALS(1, element.Int());
-    ASSERT_OK(bsonExtractTypedField(obj, "b", String, &element));
+    ASSERT_OK(bsonExtractTypedField(obj, "b", BSONType::string, &element));
     ASSERT_EQUALS(std::string("hello"), element.str());
-    ASSERT_EQUALS(ErrorCodes::NoSuchKey, bsonExtractTypedField(obj, "c", String, &element));
-    ASSERT_EQUALS(ErrorCodes::TypeMismatch, bsonExtractTypedField(obj, "a", String, &element));
+    ASSERT_EQUALS(ErrorCodes::NoSuchKey,
+                  bsonExtractTypedField(obj, "c", BSONType::string, &element));
     ASSERT_EQUALS(ErrorCodes::TypeMismatch,
-                  bsonExtractTypedField(obj, "b", NumberDouble, &element));
+                  bsonExtractTypedField(obj, "a", BSONType::string, &element));
+    ASSERT_EQUALS(ErrorCodes::TypeMismatch,
+                  bsonExtractTypedField(obj, "b", BSONType::numberDouble, &element));
 }
 
 
@@ -139,7 +147,9 @@ TEST(ExtractBSON, ExtractIntegerField) {
     ASSERT_EQUALS(-(1LL << 55), v);
     ASSERT_OK(bsonExtractIntegerField(BSON("a" << 5178), "a", &v));
     ASSERT_EQUALS(5178, v);
-    auto pred = [](long long x) { return x > 0; };
+    auto pred = [](long long x) {
+        return x > 0;
+    };
     ASSERT_OK(bsonExtractIntegerFieldWithDefaultIf(BSON("a" << 1), "a", -1LL, pred, &v));
     ASSERT_OK(bsonExtractIntegerFieldWithDefaultIf(BSON("a" << 1), "b", 1LL, pred, &v));
     auto msg = "'a' has to be greater than zero";

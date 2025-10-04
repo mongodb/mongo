@@ -29,6 +29,12 @@
 
 #include "mongo/db/process_health/fault_facet_impl.h"
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+
+#include <algorithm>
+#include <mutex>
+
 namespace mongo {
 namespace process_health {
 
@@ -48,11 +54,29 @@ HealthCheckStatus FaultFacetImpl::getStatus() const {
     return HealthCheckStatus(getType(), _severity, _description);
 }
 
+Milliseconds FaultFacetImpl::getDuration() const {
+    return std::max(Milliseconds(0), Milliseconds(_clockSource->now() - _startTime));
+}
+
 void FaultFacetImpl::update(HealthCheckStatus status) {
     auto lk = stdx::lock_guard(_mutex);
     _severity = status.getSeverity();
-    _description = status.getShortDescription().toString();
+    _description = std::string{status.getShortDescription()};
 }
+
+void FaultFacetImpl::appendDescription(BSONObjBuilder* builder) const {
+    decltype(_severity) severity;
+    decltype(_description) description;
+    {
+        stdx::lock_guard lk(_mutex);
+        severity = _severity;
+        description = _description;
+    }
+    builder->append("type", FaultFacetType_serializer(getType()));
+    builder->append("severity", severity);
+    builder->append("duration", getDuration().toBSON());
+    builder->append("description", description);
+};
 
 }  // namespace process_health
 }  // namespace mongo

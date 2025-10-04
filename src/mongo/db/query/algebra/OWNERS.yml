@@ -1,0 +1,11 @@
+version: 1.0.0
+filters:
+  # The code here is shared between SBE stage builders and IET, so it's owned both by QO and QE.
+  - "*":
+    approvers:
+      - 10gen/query-optimization
+      - 10gen/query-execution-sbe
+  - "OWNERS.yml":
+    approvers:
+      - 10gen/query-execution-staff-leads
+      - 10gen/query-optimization-staff-leads

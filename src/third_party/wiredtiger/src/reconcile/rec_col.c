@@ -7,16 +7,18 @@
  */
 
 #include "wt_internal.h"
+#include "reconcile_private.h"
+#include "reconcile_inline.h"
 
 /*
  * __rec_col_fix_bulk_insert_split_check --
  *     Check if a bulk-loaded fixed-length column store page needs to split.
  */
-static inline int
+static WT_INLINE int
 __rec_col_fix_bulk_insert_split_check(WT_CURSOR_BULK *cbulk)
 {
     WT_BTREE *btree;
-    WT_RECONCILE *r;
+    WTI_RECONCILE *r;
     WT_SESSION_IMPL *session;
 
     session = CUR2S(cbulk);
@@ -33,12 +35,14 @@ __rec_col_fix_bulk_insert_split_check(WT_CURSOR_BULK *cbulk)
              * No need to have a minimum split size boundary, all pages are filled 100% except the
              * last, allowing it to grow in the future.
              */
-            __wt_rec_incr(
+            __wti_rec_incr(
               session, r, cbulk->entry, __bitstr_size((size_t)cbulk->entry * btree->bitcnt));
-            WT_RET(__wt_rec_split(session, r, 0));
+            __bit_clear_end(
+              WT_PAGE_HEADER_BYTE(btree, r->cur_ptr->image.mem), cbulk->entry, btree->bitcnt);
+            WT_RET(__wti_rec_split(session, r, 0));
         }
         cbulk->entry = 0;
-        cbulk->nrecs = WT_COL_FIX_BYTES_TO_ENTRIES(btree, r->space_avail);
+        cbulk->nrecs = WTI_COL_FIX_BYTES_TO_ENTRIES(btree, r->space_avail);
     }
     return (0);
 }
@@ -52,7 +56,7 @@ __wt_bulk_insert_fix(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk, bool delet
 {
     WT_BTREE *btree;
     WT_CURSOR *cursor;
-    WT_RECONCILE *r;
+    WTI_RECONCILE *r;
     WT_TIME_WINDOW tw;
 
     r = cbulk->reconcile;
@@ -71,7 +75,7 @@ __wt_bulk_insert_fix(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk, bool delet
      * Also, it should reflect the fact that we've just loaded a batch of stable values.
      */
     WT_TIME_WINDOW_INIT(&tw);
-    WT_TIME_AGGREGATE_UPDATE(session, &r->cur_ptr->ta, &tw);
+    WTI_REC_CHUNK_TA_UPDATE(session, r->cur_ptr, &tw);
     return (0);
 }
 
@@ -84,7 +88,7 @@ __wt_bulk_insert_fix_bitmap(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 {
     WT_BTREE *btree;
     WT_CURSOR *cursor;
-    WT_RECONCILE *r;
+    WTI_RECONCILE *r;
     WT_TIME_WINDOW tw;
     uint32_t entries, offset, page_entries, page_size;
     const uint8_t *data;
@@ -109,7 +113,7 @@ __wt_bulk_insert_fix_bitmap(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 
     /* Initialize the time aggregate that's going into the parent page. See note above. */
     WT_TIME_WINDOW_INIT(&tw);
-    WT_TIME_AGGREGATE_UPDATE(session, &r->cur_ptr->ta, &tw);
+    WTI_REC_CHUNK_TA_UPDATE(session, r->cur_ptr, &tw);
     return (0);
 }
 
@@ -121,8 +125,8 @@ int
 __wt_bulk_insert_var(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk, bool deleted)
 {
     WT_BTREE *btree;
-    WT_RECONCILE *r;
-    WT_REC_KV *val;
+    WTI_RECONCILE *r;
+    WTI_REC_KV *val;
     WT_TIME_WINDOW tw;
 
     r = cbulk->reconcile;
@@ -140,20 +144,20 @@ __wt_bulk_insert_var(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk, bool delet
          * Store the bulk cursor's last buffer, not the current value, we're tracking duplicates,
          * which means we want the previous value seen, not the current value.
          */
-        WT_RET(
-          __wt_rec_cell_build_val(session, r, cbulk->last.data, cbulk->last.size, &tw, cbulk->rle));
+        WT_RET(__wti_rec_cell_build_val(
+          session, r, cbulk->last->data, cbulk->last->size, &tw, cbulk->rle));
 
     /* Boundary: split or write the page. */
-    if (WT_CROSSING_SPLIT_BND(r, val->len))
-        WT_RET(__wt_rec_split_crossing_bnd(session, r, val->len));
+    if (WTI_CROSSING_SPLIT_BND(r, val->len))
+        WT_RET(__wti_rec_split_crossing_bnd(session, r, val->len));
 
     /* Copy the value onto the page. */
     if (btree->dictionary)
-        WT_RET(__wt_rec_dict_replace(session, r, &tw, cbulk->rle, val));
-    __wt_rec_image_copy(session, r, val);
+        WT_RET(__wti_rec_dict_replace(session, r, &tw, cbulk->rle, val));
+    __wti_rec_image_copy(session, r, val);
 
     /* Initialize the time aggregate that's going into the parent page. See note above. */
-    WT_TIME_AGGREGATE_UPDATE(session, &r->cur_ptr->ta, &tw);
+    WTI_REC_CHUNK_TA_UPDATE(session, r->cur_ptr, &tw);
 
     /* Update the starting record number in case we split. */
     r->recno += cbulk->rle;
@@ -166,12 +170,12 @@ __wt_bulk_insert_var(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk, bool delet
  *     Merge in a split page.
  */
 static int
-__rec_col_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
+__rec_col_merge(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
 {
     WT_ADDR *addr;
     WT_MULTI *multi;
     WT_PAGE_MODIFY *mod;
-    WT_REC_KV *val;
+    WTI_REC_KV *val;
     uint32_t i;
 
     mod = page->modify;
@@ -185,51 +189,54 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
         /* Build the value cell. */
         addr = &multi->addr;
-        __wt_rec_cell_build_addr(session, r, addr, NULL, false, r->recno);
+        __wti_rec_cell_build_addr(session, r, addr, NULL, r->recno, NULL);
 
         /* Boundary: split or write the page. */
-        if (__wt_rec_need_split(r, val->len))
-            WT_RET(__wt_rec_split_crossing_bnd(session, r, val->len));
+        if (__wti_rec_need_split(r, val->len))
+            WT_RET(__wti_rec_split_crossing_bnd(session, r, val->len));
 
         /* Copy the value onto the page. */
-        __wt_rec_image_copy(session, r, val);
-        WT_TIME_AGGREGATE_MERGE(session, &r->cur_ptr->ta, &addr->ta);
+        __wti_rec_image_copy(session, r, val);
+        WTI_REC_CHUNK_TA_MERGE(session, r->cur_ptr, &addr->ta);
     }
     return (0);
 }
 
 /*
- * __wt_rec_col_int --
+ * __wti_rec_col_int --
  *     Reconcile a column-store internal page.
  */
 int
-__wt_rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *pageref)
+__wti_rec_col_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_REF *pageref)
 {
     WT_ADDR *addr;
     WT_BTREE *btree;
     WT_CELL_UNPACK_ADDR *vpack, _vpack;
-    WT_CHILD_STATE state;
+    WTI_CHILD_MODIFY_STATE cms;
     WT_DECL_RET;
     WT_PAGE *child, *page;
-    WT_REC_KV *val;
+    WT_PAGE_DELETED *page_del;
+    WTI_REC_KV *val;
     WT_REF *ref;
-    WT_TIME_AGGREGATE ta;
-    bool hazard;
+    WT_TIME_AGGREGATE ft_ta, ta;
+    uint8_t prev_ref_changes;
 
     btree = S2BT(session);
     page = pageref->page;
     child = NULL;
-    hazard = false;
     WT_TIME_AGGREGATE_INIT(&ta);
+    WT_TIME_AGGREGATE_INIT_MERGE(&ft_ta);
 
     val = &r->v;
     vpack = &_vpack;
 
     WT_RET(
-      __wt_rec_split_init(session, r, page, pageref->ref_recno, btree->maxintlpage_precomp, 0));
+      __wti_rec_split_init(session, r, page, pageref->ref_recno, btree->maxintlpage_precomp, 0));
 
     /* For each entry in the in-memory page... */
     WT_INTL_FOREACH_BEGIN (session, page, ref) {
+        WT_ACQUIRE_READ(prev_ref_changes, ref->ref_changes);
+
         /* Update the starting record number in case we split. */
         r->recno = ref->ref_recno;
 
@@ -237,32 +244,28 @@ __wt_rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *pageref)
          * Modified child. The page may be emptied or internally created during a split.
          * Deleted/split pages are merged into the parent and discarded.
          */
-        WT_ERR(__wt_rec_child_modify(session, r, ref, &hazard, &state));
+        WT_ERR(__wti_rec_child_modify(session, r, ref, &cms, NULL));
         addr = NULL;
         child = ref->page;
+        page_del = NULL;
 
-        switch (state) {
-        case WT_CHILD_IGNORE:
+        switch (cms.state) {
+        case WTI_CHILD_IGNORE:
             /* Ignored child. */
-            WT_CHILD_RELEASE_ERR(session, hazard, ref);
+            WTI_CHILD_RELEASE_ERR(session, cms.hazard, ref);
             continue;
 
-        case WT_CHILD_MODIFIED:
+        case WTI_CHILD_MODIFIED:
             /*
              * Modified child. Empty pages are merged into the parent and discarded.
              */
             switch (child->modify->rec_result) {
             case WT_PM_REC_EMPTY:
-                /*
-                 * Column-store pages are almost never empty, as discarding a page would remove a
-                 * chunk of the name space. The exceptions are pages created when the tree is
-                 * created, and never filled.
-                 */
-                WT_CHILD_RELEASE_ERR(session, hazard, ref);
+                WTI_CHILD_RELEASE_ERR(session, cms.hazard, ref);
                 continue;
             case WT_PM_REC_MULTIBLOCK:
                 WT_ERR(__rec_col_merge(session, r, child));
-                WT_CHILD_RELEASE_ERR(session, hazard, ref);
+                WTI_CHILD_RELEASE_ERR(session, cms.hazard, ref);
                 continue;
             case WT_PM_REC_REPLACE:
                 addr = &child->modify->mod_replace;
@@ -271,67 +274,83 @@ __wt_rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *pageref)
                 WT_ERR(__wt_illegal_value(session, child->modify->rec_result));
             }
             break;
-        case WT_CHILD_ORIGINAL:
+        case WTI_CHILD_ORIGINAL:
             /* Original child. */
             break;
-        case WT_CHILD_PROXY:
-            /*
-             * Deleted child where we write a proxy cell, not yet supported for column-store.
-             */
-            WT_ERR(__wt_illegal_value(session, state));
+        case WTI_CHILD_PROXY:
+            /* Deleted child where we write a proxy cell. */
+            page_del = &cms.del;
+            break;
         }
 
         /*
          * Build the value cell. The child page address is in one of 3 places: if the page was
-         * replaced, the page's modify structure references it and we built the value cell just
-         * above in the switch statement. Else, the WT_REF->addr reference points to an on-page cell
-         * or an off-page WT_ADDR structure: if it's an on-page cell and we copy it from the page,
-         * else build a new cell.
+         * replaced, the page's modify structure references it and we assigned it just above in the
+         * switch statement. Otherwise, the WT_REF->addr reference points to either an on-page cell
+         * or an off-page WT_ADDR structure: if it's an on-page cell we copy it from the page, else
+         * build a new cell.
          */
         if (addr == NULL && __wt_off_page(page, ref->addr))
             addr = ref->addr;
-        if (addr == NULL) {
+        if (addr != NULL) {
+            __wti_rec_cell_build_addr(session, r, addr, NULL, ref->ref_recno, page_del);
+            WT_TIME_AGGREGATE_COPY(&ta, &addr->ta);
+        } else {
             __wt_cell_unpack_addr(session, page->dsk, ref->addr, vpack);
-            if (F_ISSET(vpack, WT_CELL_UNPACK_TIME_WINDOW_CLEARED)) {
-                /* Need to rebuild the cell with the updated time info. */
-                __wt_rec_cell_build_addr(session, r, NULL, vpack, false, ref->ref_recno);
+            if (cms.state == WTI_CHILD_PROXY ||
+              F_ISSET(vpack, WT_CELL_UNPACK_TIME_WINDOW_CLEARED)) {
+                /*
+                 * Need to build a proxy (page-deleted) cell or rebuild the cell with updated time
+                 * info.
+                 */
+                WT_ASSERT(session, vpack->type != WT_CELL_ADDR_DEL || page_del != NULL);
+                __wti_rec_cell_build_addr(session, r, NULL, vpack, ref->ref_recno, page_del);
             } else {
+                /* Copy the entire existing cell, including any page-delete information. */
                 val->buf.data = ref->addr;
                 val->buf.size = __wt_cell_total_len(vpack);
                 val->cell_len = 0;
                 val->len = val->buf.size;
             }
             WT_TIME_AGGREGATE_COPY(&ta, &vpack->ta);
-        } else {
-            __wt_rec_cell_build_addr(session, r, addr, NULL, false, ref->ref_recno);
-            WT_TIME_AGGREGATE_COPY(&ta, &addr->ta);
         }
-        WT_CHILD_RELEASE_ERR(session, hazard, ref);
+        if (page_del != NULL)
+            WT_TIME_AGGREGATE_UPDATE_PAGE_DEL(session, &ft_ta, page_del);
+        WTI_CHILD_RELEASE_ERR(session, cms.hazard, ref);
 
         /* Boundary: split or write the page. */
-        if (__wt_rec_need_split(r, val->len))
-            WT_ERR(__wt_rec_split_crossing_bnd(session, r, val->len));
+        if (__wti_rec_need_split(r, val->len))
+            WT_ERR(__wti_rec_split_crossing_bnd(session, r, val->len));
 
         /* Copy the value (which is in val, val == r->v) onto the page. */
-        __wt_rec_image_copy(session, r, val);
-        WT_TIME_AGGREGATE_MERGE(session, &r->cur_ptr->ta, &ta);
+        __wti_rec_image_copy(session, r, val);
+        if (page_del != NULL)
+            WTI_REC_CHUNK_TA_MERGE(session, r->cur_ptr, &ft_ta);
+        WTI_REC_CHUNK_TA_MERGE(session, r->cur_ptr, &ta);
+
+        /*
+         * Set the ref_changes state to zero if there were no concurrent changes while reconciling
+         * the internal page.
+         */
+        if (WT_DELTA_INT_ENABLED(btree, S2C(session)))
+            __wt_atomic_casv8(&ref->ref_changes, prev_ref_changes, 0);
     }
     WT_INTL_FOREACH_END;
 
     /* Write the remnant page. */
-    return (__wt_rec_split_finish(session, r));
+    return (__wti_rec_split_finish(session, r));
 
 err:
-    WT_CHILD_RELEASE(session, hazard, ref);
+    WTI_CHILD_RELEASE(session, cms.hazard, ref);
     return (ret);
 }
 
 /*
- * __wt_col_fix_estimate_auxiliary_space --
+ * __col_fix_estimate_auxiliary_space --
  *     Estimate how much on-disk auxiliary space a fixed-length column store page will need.
  */
 static uint32_t
-__wt_col_fix_estimate_auxiliary_space(WT_PAGE *page)
+__col_fix_estimate_auxiliary_space(WT_PAGE *page)
 {
     WT_INSERT *ins;
     uint32_t count;
@@ -371,13 +390,12 @@ __wt_col_fix_estimate_auxiliary_space(WT_PAGE *page)
     return (count * 63 + WT_COL_FIX_AUXHEADER_RESERVATION);
 }
 
-#ifdef HAVE_DIAGNOSTIC
 /*
  * __rec_col_fix_get_bitmap_size --
  *     Figure the bitmap size of a new page from the reconciliation info.
  */
 static uint32_t
-__rec_col_fix_get_bitmap_size(WT_SESSION_IMPL *session, WT_RECONCILE *r)
+__rec_col_fix_get_bitmap_size(WT_SESSION_IMPL *session, WTI_RECONCILE *r)
 {
     uint32_t primary_size;
 
@@ -387,22 +405,22 @@ __rec_col_fix_get_bitmap_size(WT_SESSION_IMPL *session, WT_RECONCILE *r)
     /* Subtract off the main page header. */
     return (primary_size - WT_PAGE_HEADER_BYTE_SIZE(S2BT(session)));
 }
-#endif
 
 /*
- * __wt_rec_col_fix_addtw --
+ * __rec_col_fix_addtw --
  *     Create a fixed-length column store time window cell and add it to the new page image.
  */
 static int
-__wt_rec_col_fix_addtw(
-  WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t recno_offset, WT_TIME_WINDOW *tw)
+__rec_col_fix_addtw(
+  WT_SESSION_IMPL *session, WTI_RECONCILE *r, uint32_t recno_offset, WT_TIME_WINDOW *tw)
 {
-    WT_REC_KV *key, *val;
+    WTI_REC_KV *key, *val;
     size_t add_len, len;
     uint8_t keyspace[WT_INTPACK64_MAXSIZE], *p;
 
-    WT_ASSERT(session,
-      recno_offset <= ((__rec_col_fix_get_bitmap_size(session, r)) * 8) / S2BT(session)->bitcnt);
+    WT_ASSERT_ALWAYS(session,
+      recno_offset <= ((__rec_col_fix_get_bitmap_size(session, r)) * 8) / S2BT(session)->bitcnt,
+      "Attempting to write time window information into bitmap memory");
 
     key = &r->k;
     val = &r->v;
@@ -416,7 +434,7 @@ __wt_rec_col_fix_addtw(
     key->len = key->cell_len + key->buf.size;
 
     /* Pack the value, which is empty, but with a time window. */
-    WT_RET(__wt_rec_cell_build_val(session, r, NULL, 0, tw, 0));
+    WT_RET(__wti_rec_cell_build_val(session, r, NULL, 0, tw, 0));
 
     /* Figure how much space we need, and reallocate the page if about to run out. */
     len = key->len + val->len;
@@ -434,14 +452,14 @@ __wt_rec_col_fix_addtw(
         /* Just in case. */
         if (add_len < len)
             add_len = len * 2;
-        WT_RET(__wt_rec_split_grow(session, r, add_len));
+        WT_RET(__wti_rec_split_grow(session, r, add_len));
     }
 
     /* Copy both cells onto the page. This counts as one entry. */
-    __wt_rec_auximage_copy(session, r, 0, key);
-    __wt_rec_auximage_copy(session, r, 1, val);
+    __wti_rec_auximage_copy(session, r, 0, key);
+    __wti_rec_auximage_copy(session, r, 1, val);
 
-    WT_TIME_AGGREGATE_UPDATE(session, &r->cur_ptr->ta, tw);
+    WTI_REC_CHUNK_TA_UPDATE(session, r->cur_ptr, tw);
 
     /* If we're on key 3 we should have just written at most the 4th time window. */
     WT_ASSERT(session, r->aux_entries <= recno_offset + 1);
@@ -450,29 +468,28 @@ __wt_rec_col_fix_addtw(
 }
 
 /*
- * __wt_rec_col_fix --
+ * __wti_rec_col_fix --
  *     Reconcile a fixed-width, column-store leaf page.
  */
 int
-__wt_rec_col_fix(
-  WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *pageref, WT_SALVAGE_COOKIE *salvage)
+__wti_rec_col_fix(
+  WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_REF *pageref, WT_SALVAGE_COOKIE *salvage)
 {
     WT_BTREE *btree;
     WT_CELL *cell;
     WT_CELL_UNPACK_KV unpack;
-    WT_CURSOR *hs_cursor;
+    WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     WT_INSERT *ins;
-    WT_ITEM hs_recno_key;
     WT_PAGE *page;
     WT_UPDATE *upd;
-    WT_UPDATE_SELECT upd_select;
-    uint64_t curstartrecno, i, rawbitmapsize, origstartrecno, recno;
+    WTI_UPDATE_SELECT upd_select;
+    uint64_t curstartrecno, i, origstartrecno, rawbitmapsize, recno;
     uint32_t auxspace, bitmapsize, entry, maxrecs, nrecs, numtws, tw;
-    uint8_t hs_recno_key_buf[WT_INTPACK64_MAXSIZE], *p, val;
-    bool hs_clear;
+    uint8_t val;
 
     btree = S2BT(session);
+    conn = S2C(session);
     /*
      * Blank the unpack record in case we need to use it before unpacking anything into it. The
      * visibility code currently only uses the value and the time window, and asserts about the
@@ -487,23 +504,6 @@ __wt_rec_col_fix(
     origstartrecno = page->dsk == NULL ? WT_RECNO_OOB : page->dsk->recno;
 
     /*
-     * When removing a key due to a tombstone with a durable timestamp of "none", also remove the
-     * history store contents associated with that key. It's safe to do even if we fail
-     * reconciliation after the removal, the history store content must be obsolete in order for us
-     * to consider removing the key.
-     *
-     * Ignore if this is metadata, as metadata doesn't have any history.
-     *
-     * Some code paths, such as schema removal, involve deleting keys in metadata and assert that
-     * they shouldn't open new dhandles. In those cases we won't ever need to blow away history
-     * store content, so we can skip this.
-     */
-    hs_cursor = NULL;
-    hs_clear = F_ISSET(S2C(session), WT_CONN_HS_OPEN) &&
-      !F_ISSET(session, WT_SESSION_NO_DATA_HANDLES) && !WT_IS_HS(btree->dhandle) &&
-      !WT_IS_METADATA(btree->dhandle);
-
-    /*
      * The configured max leaf page size is the size of the bitmap data on the page, not including
      * the time window data. The actual page size is (often) larger. Estimate how much more space we
      * need. This isn't a guarantee (more inserts can happen while we're working) but it should
@@ -512,7 +512,7 @@ __wt_rec_col_fix(
      * Do this before fiddling around with the salvage logic so the latter can make sure the page
      * size doesn't try to grow past 2^32.
      */
-    auxspace = __wt_col_fix_estimate_auxiliary_space(page);
+    auxspace = __col_fix_estimate_auxiliary_space(page);
 
     /*
      * The salvage code may have found overlapping ranges in the key namespace, in which case we're
@@ -608,7 +608,7 @@ __wt_rec_col_fix(
          * assume elsewhere that any small page might be appended to.
          */
         rawbitmapsize = WT_ALIGN(
-          WT_COL_FIX_ENTRIES_TO_BYTES(btree, salvage->take + salvage->missing), btree->allocsize);
+          WTI_COL_FIX_ENTRIES_TO_BYTES(btree, salvage->take + salvage->missing), btree->allocsize);
 
         /* Salvage is the backup plan: don't let this fail. */
         auxspace *= 2;
@@ -638,7 +638,7 @@ __wt_rec_col_fix(
             bitmapsize = (uint32_t)__bitstr_size((size_t)page->entries * btree->bitcnt);
     }
 
-    WT_RET(__wt_rec_split_init(session, r, page, curstartrecno, bitmapsize, auxspace));
+    WT_RET(__wti_rec_split_init(session, r, page, curstartrecno, bitmapsize, auxspace));
 
     /* Remember where we are. */
     entry = 0;
@@ -669,7 +669,7 @@ __wt_rec_col_fix(
     }
 
     /* Remember how far we can go before the end of page. */
-    maxrecs = WT_COL_FIX_BYTES_TO_ENTRIES(btree, r->space_avail);
+    maxrecs = WTI_COL_FIX_BYTES_TO_ENTRIES(btree, r->space_avail);
 
     /*
      * Iterate over the data items on the page. We need to go through both the insert list and the
@@ -718,9 +718,25 @@ __wt_rec_col_fix(
             cell = WT_COL_FIX_TW_CELL(page, &page->pg_fix_tws[tw]);
             __wt_cell_unpack_kv(session, page->dsk, cell, &unpack);
 
-            /* If it's from a previous run, it might become empty; if so, skip it. */
-            if (!WT_TIME_WINDOW_IS_EMPTY(&unpack.tw))
-                WT_ERR(__wt_rec_col_fix_addtw(session, r,
+            /* Clear the on-disk cell time window if it is obsolete. */
+            __wti_rec_time_window_clear_obsolete(session, NULL, &unpack, r);
+
+            /*
+             * The checks in unpack and clear_obsolete do not handle obsolete stop times; we need to
+             * do that explicitly because we need to act on it. So there are three cases: (a) the
+             * value has a globally visible stop time, in which case we should delete the value and
+             * drop the time window; (b) the time window may have changed but remains nonempty, in
+             * which case we leave the value and write the time window to the new page; or (c) the
+             * time window has become empty, in which case we leave the value and drop the time
+             * window, which amounts to doing nothing at all.
+             */
+
+            if (__wt_txn_tw_stop_visible_all(session, &unpack.tw))
+                __bit_setv(r->first_free,
+                  (uint32_t)(origstartrecno + page->pg_fix_tws[tw].recno_offset - curstartrecno),
+                  btree->bitcnt, 0);
+            else if (!WT_TIME_WINDOW_IS_EMPTY(&unpack.tw))
+                WT_ERR(__rec_col_fix_addtw(session, r,
                   (uint32_t)(origstartrecno + page->pg_fix_tws[tw].recno_offset - curstartrecno),
                   &unpack.tw));
             tw++;
@@ -751,7 +767,7 @@ __wt_rec_col_fix(
         unpack.data = &val;
         unpack.size = 1;
 
-        WT_ERR(__wt_rec_upd_select(session, r, ins, NULL, &unpack, &upd_select));
+        WT_ERR(__wti_rec_upd_select(session, r, ins, NULL, &unpack, &upd_select));
         upd = upd_select.upd;
         if (upd == NULL) {
             /*
@@ -761,48 +777,43 @@ __wt_rec_col_fix(
              * future changes, assert that there's nothing to do.
              */
             WT_ASSERT(session, WT_TIME_WINDOW_IS_EMPTY(&upd_select.tw));
+            /*
+             * If preserve prepared update is enabled, we must select an update to replace the
+             * onpage prepared update. Otherwise, we leak the prepared update.
+             */
+            WT_ASSERT_ALWAYS(session,
+              !F_ISSET(conn, WT_CONN_PRESERVE_PREPARED) || !WT_TIME_WINDOW_HAS_PREPARE(&unpack.tw),
+              "leaked prepared update.");
             continue;
         }
 
         /* If there's an update to apply, apply the value. */
 
         if (upd->type == WT_UPDATE_TOMBSTONE) {
-            /*
-             * When removing a key due to a tombstone with a durable timestamp of "none", also
-             * remove the history store contents associated with that key.
-             */
-            if (upd_select.tw.durable_stop_ts == WT_TS_NONE && hs_clear) {
-                p = hs_recno_key_buf;
-                WT_ERR(__wt_vpack_uint(&p, 0, recno));
-                hs_recno_key.data = hs_recno_key_buf;
-                hs_recno_key.size = WT_PTRDIFF(p, hs_recno_key_buf);
-
-                /* Open a history store cursor if we don't yet have one. */
-                if (hs_cursor == NULL)
-                    WT_ERR(__wt_curhs_open(session, NULL, &hs_cursor));
-
-                /* From WT_TS_NONE to delete all the history store content of the key. */
-                WT_ERR(__wt_hs_delete_key_from_ts(session, hs_cursor, btree->id, &hs_recno_key,
-                  WT_TS_NONE, false, F_ISSET(r, WT_REC_CHECKPOINT_RUNNING)));
-
-                WT_STAT_CONN_INCR(session, cache_hs_key_truncate_onpage_removal);
-                WT_STAT_DATA_INCR(session, cache_hs_key_truncate_onpage_removal);
-            }
-
             val = 0;
+            /* Do not write a time window; if we get just a tombstone, it is globally visible. */
         } else {
             /* MODIFY is not allowed in FLCS. */
             WT_ASSERT(session, upd->type == WT_UPDATE_STANDARD);
             val = *upd->data;
+
+            /* Write the time window. */
+            if (!WT_TIME_WINDOW_IS_EMPTY(&upd_select.tw)) {
+                WT_ERR(__rec_col_fix_addtw(
+                  session, r, (uint32_t)(recno - curstartrecno), &upd_select.tw));
+            }
         }
+
+        /*
+         * When a tombstone without a timestamp is written to disk, remove any historical versions
+         * that are greater in the history store for this key.
+         */
+        if (upd_select.no_ts_tombstone && r->hs_clear_on_tombstone)
+            WT_ERR(__wti_rec_hs_clear_on_tombstone(
+              session, r, recno, NULL, upd->type == WT_UPDATE_TOMBSTONE ? false : true));
 
         /* Write the data. */
         __bit_setv(r->first_free, recno - curstartrecno, btree->bitcnt, val);
-
-        /* Write the time window. */
-        if (!WT_TIME_WINDOW_IS_EMPTY(&upd_select.tw))
-            WT_ERR(__wt_rec_col_fix_addtw(
-              session, r, (uint32_t)(recno - curstartrecno), &upd_select.tw));
 
         /* If there was an entry in the time windows index for this key, skip over it. */
         if (tw < numtws && origstartrecno + page->pg_fix_tws[tw].recno_offset == recno)
@@ -823,18 +834,22 @@ __wt_rec_col_fix(
             /* This time window is for an item salvage wants us to skip. */
             continue;
 
-        /* If it's from a previous run, it might become empty; if so, skip it. */
-        if (!WT_TIME_WINDOW_IS_EMPTY(&unpack.tw))
-            WT_ERR(
-              __wt_rec_col_fix_addtw(session, r, (uint32_t)(recno - curstartrecno), &unpack.tw));
+        /* Clear the on-disk cell time window if it is obsolete. */
+        __wti_rec_time_window_clear_obsolete(session, NULL, &unpack, r);
+
+        /* These cases are the same as the corresponding ones above. */
+
+        if (__wt_txn_tw_stop_visible_all(session, &unpack.tw))
+            __bit_setv(r->first_free, (uint32_t)(recno - curstartrecno), btree->bitcnt, 0);
+        else if (!WT_TIME_WINDOW_IS_EMPTY(&unpack.tw))
+            WT_ERR(__rec_col_fix_addtw(session, r, (uint32_t)(recno - curstartrecno), &unpack.tw));
         tw++;
     }
 
     /*
-     * Figure out how much more space is left. This is how many more entries will fit in in the
-     * bitmap data. We have to accommodate the auxiliary data for those entries, even if it becomes
-     * large. We can't split based on the auxiliary image size, at least not without a major
-     * rewrite.
+     * Figure out how much more space is left. This is how many more entries will fit in the bitmap
+     * data. We have to accommodate the auxiliary data for those entries, even if it becomes large.
+     * We can't split based on the auxiliary image size, at least not without a major rewrite.
      */
     nrecs = maxrecs - entry;
     r->recno += entry;
@@ -875,11 +890,14 @@ __wt_rec_col_fix(
             upd = NULL;
             /* Make sure not to apply an uninitialized time window, or one from another key. */
             WT_TIME_WINDOW_INIT(&unpack.tw);
+
+            /* Initialize the selected update. */
+            WTI_UPDATE_SELECT_INIT(&upd_select);
         } else {
             /* We shouldn't ever get appends during salvage. */
             WT_ASSERT(session, salvage == NULL);
 
-            WT_ERR(__wt_rec_upd_select(session, r, ins, NULL, NULL, &upd_select));
+            WT_ERR(__wti_rec_upd_select(session, r, ins, NULL, NULL, &upd_select));
             upd = upd_select.upd;
             recno = WT_INSERT_RECNO(ins);
             /*
@@ -905,15 +923,34 @@ __wt_rec_col_fix(
                 /* There's still space; write the inserted value. */
                 WT_ASSERT(session, curstartrecno + entry == recno);
                 if (upd == NULL || upd->type == WT_UPDATE_TOMBSTONE)
+                    /*
+                     * If there's no update because we had no insert list and we're filling in at
+                     * the end of an in-memory split, write a globally visible zero with no time
+                     * window. Similarly, if there are only aborted or invisible updates for this
+                     * key (the insert list exists but the visibility code gave us no update to
+                     * write), don't write a time window. And, if we get just a tombstone back from
+                     * visibility, that means a globally visible deleted value. There might be a
+                     * nonempty window in upd_select.tw, but we're supposed to ignore it.
+                     */
                     val = 0;
                 else {
-                    /* MODIFY is not allowed in FLCS. */
+                    /* MODIFY is not allowed in FLCS, so the update must be an ordinary value. */
                     WT_ASSERT(session, upd->type == WT_UPDATE_STANDARD);
                     val = *upd->data;
+
+                    if (!WT_TIME_WINDOW_IS_EMPTY(&upd_select.tw))
+                        WT_ERR(__rec_col_fix_addtw(session, r, entry, &upd_select.tw));
                 }
+
+                /*
+                 * When a tombstone without a timestamp is written to disk, remove any historical
+                 * versions that are greater in the history store for this key.
+                 */
+                if (upd_select.no_ts_tombstone && r->hs_clear_on_tombstone)
+                    WT_ERR(__wti_rec_hs_clear_on_tombstone(session, r, recno, NULL,
+                      (upd == NULL || upd->type == WT_UPDATE_TOMBSTONE) ? false : true));
+
                 __bit_setv(r->first_free, entry, btree->bitcnt, val);
-                if (upd != NULL && !WT_TIME_WINDOW_IS_EMPTY(&upd_select.tw))
-                    WT_ERR(__wt_rec_col_fix_addtw(session, r, entry, &upd_select.tw));
                 --nrecs;
                 ++entry;
                 ++r->recno;
@@ -928,16 +965,20 @@ __wt_rec_col_fix(
              * No need to have a minimum split size boundary, all pages are filled 100% except the
              * last, allowing it to grow in the future.
              */
-            __wt_rec_incr(session, r, entry, __bitstr_size((size_t)entry * btree->bitcnt));
+            __wti_rec_incr(session, r, entry, __bitstr_size((size_t)entry * btree->bitcnt));
 
             /* If there are entries we didn't write timestamps for, aggregate a stable timestamp. */
             if (r->aux_entries < r->entries) {
                 WT_TIME_WINDOW_INIT(&unpack.tw);
-                WT_TIME_AGGREGATE_UPDATE(session, &r->cur_ptr->ta, &unpack.tw);
+                WTI_REC_CHUNK_TA_UPDATE(session, r->cur_ptr, &unpack.tw);
             }
 
+            /* Make sure the trailing bits in the bitmap get cleared. */
+            __bit_clear_end(
+              WT_PAGE_HEADER_BYTE(btree, r->cur_ptr->image.mem), r->entries, btree->bitcnt);
+
             /* Now split. */
-            WT_ERR(__wt_rec_split(session, r, 0));
+            WT_ERR(__wti_rec_split(session, r, 0));
 
             /* (Re)calculate the number of entries per page. */
             entry = 0;
@@ -954,7 +995,7 @@ __wt_rec_col_fix(
     }
 
     /* Update the counters. */
-    __wt_rec_incr(session, r, entry, __bitstr_size((size_t)entry * btree->bitcnt));
+    __wti_rec_incr(session, r, entry, __bitstr_size((size_t)entry * btree->bitcnt));
 
     /*
      * If there are entries we didn't write timestamps for, aggregate in a stable timestamp. Do this
@@ -963,30 +1004,39 @@ __wt_rec_col_fix(
      */
     if (r->aux_entries < r->entries || r->entries == 0) {
         WT_TIME_WINDOW_INIT(&unpack.tw);
-        WT_TIME_AGGREGATE_UPDATE(session, &r->cur_ptr->ta, &unpack.tw);
+        WTI_REC_CHUNK_TA_UPDATE(session, r->cur_ptr, &unpack.tw);
     }
 
+    /* Make sure the trailing bits in the bitmap get cleared. */
+    __bit_clear_end(WT_PAGE_HEADER_BYTE(btree, r->cur_ptr->image.mem), r->entries, btree->bitcnt);
+
     /* Write the remnant page. */
-    WT_ERR(__wt_rec_split_finish(session, r));
+    WT_ERR(__wti_rec_split_finish(session, r));
 
 err:
-    if (hs_cursor != NULL)
-        WT_TRET(hs_cursor->close(hs_cursor));
-
     return (ret);
 }
 
 /*
- * __wt_rec_col_fix_write_auxheader --
+ * __wti_rec_col_fix_write_auxheader --
  *     Write the auxiliary header into the page image.
  */
 void
-__wt_rec_col_fix_write_auxheader(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t entries,
-  uint32_t auxentries, uint8_t *image, size_t size)
+__wti_rec_col_fix_write_auxheader(WT_SESSION_IMPL *session, uint32_t entries,
+  uint32_t aux_start_offset, uint32_t auxentries, uint8_t *image, size_t size)
 {
     WT_BTREE *btree;
-    uint32_t auxdataoffset, auxheaderoffset, bitmapsize, offset;
+    uint32_t auxheaderoffset, bitmapsize, offset, space;
     uint8_t *endp, *p;
+
+    /*
+     * Encoding the offset should fit -- either it is less than what encodes to 1 byte or greater
+     * than or equal to the maximum header size. This works out to asserting that the latter is less
+     * than the maximum 1-byte-encoded integer. That in turn is a static condition.
+     *
+     * This in turn guarantees that the pack calls cannot fail.
+     */
+    static_assert(WT_COL_FIX_AUXHEADER_SIZE_MAX < POS_1BYTE_MAX, "col fix aux header check failed");
 
     btree = S2BT(session);
     WT_UNUSED(size); /* only used in DIAGNOSTIC */
@@ -1032,6 +1082,10 @@ __wt_rec_col_fix_write_auxheader(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint
      *
      * However, this means that we should not assume the bitmap size is given by the btree maximum
      * leaf page size but get it from the reconciliation info.
+     *
+     * Note: it is important to use *this* chunk's auxiliary start offset (passed in) and not read
+     * the auxiliary start offset from the WTI_RECONCILE, as we may be writing the previous chunk
+     * and the latter describes the current chunk.
      */
 
     /* Figure how much primary data we have. */
@@ -1040,14 +1094,8 @@ __wt_rec_col_fix_write_auxheader(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint
     /* The auxiliary header goes after the bitmap, which goes after the page header. */
     auxheaderoffset = WT_PAGE_HEADER_BYTE_SIZE(btree) + bitmapsize;
 
-    /* The auxiliary data goes wherever we have been writing it. */
-    auxdataoffset = r->aux_start_offset;
-
-    /* This should be at or after the place it goes on a normal-sized page. */
-    WT_ASSERT(session, auxdataoffset >= btree->maxleafpage + WT_COL_FIX_AUXHEADER_RESERVATION);
-
     /* This should also have left sufficient room for the header. */
-    WT_ASSERT(session, auxdataoffset >= auxheaderoffset + WT_COL_FIX_AUXHEADER_RESERVATION);
+    WT_ASSERT(session, aux_start_offset >= auxheaderoffset + WT_COL_FIX_AUXHEADER_RESERVATION);
 
     /*
      * If there is no auxiliary data, we will have already shortened the image size to discard the
@@ -1056,32 +1104,25 @@ __wt_rec_col_fix_write_auxheader(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint
      * last page in the tree, this also avoids the space wastage described above.
      */
     if (auxentries == 0) {
-        WT_ASSERT(session, auxdataoffset >= size);
+        WT_ASSERT(session, aux_start_offset >= size);
         return;
     }
 
     /* The offset we're going to write is the distance from the header start to the data. */
-    offset = auxdataoffset - auxheaderoffset;
-
-    /*
-     * Encoding the offset should fit -- either it is less than what encodes to 1 byte or greater
-     * than or equal to the maximum header size. This works out to asserting that the latter is less
-     * than the maximum 1-byte-encoded integer. That in turn is a static condition.
-     *
-     * This in turn guarantees that the pack calls cannot fail.
-     */
-    WT_STATIC_ASSERT(WT_COL_FIX_AUXHEADER_SIZE_MAX < POS_1BYTE_MAX);
-
-    /* Should not be overwriting anything. */
-    WT_ASSERT(session, image[auxheaderoffset] == 0);
+    offset = aux_start_offset - auxheaderoffset;
 
     p = image + auxheaderoffset;
-    endp = image + auxdataoffset;
+    endp = image + aux_start_offset;
 
     *(p++) = WT_COL_FIX_VERSION_TS;
     WT_IGNORE_RET(__wt_vpack_uint(&p, WT_PTRDIFF32(endp, p), auxentries));
     WT_IGNORE_RET(__wt_vpack_uint(&p, WT_PTRDIFF32(endp, p), offset));
     WT_ASSERT(session, p <= endp);
+
+    /* Zero the empty space, if any. */
+    space = WT_PTRDIFF32(endp, p);
+    if (space > 0)
+        memset(p, 0, space);
 }
 
 /*
@@ -1089,13 +1130,14 @@ __wt_rec_col_fix_write_auxheader(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint
  *     Create a column-store variable length record cell and write it onto a page.
  */
 static int
-__rec_col_var_helper(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_SALVAGE_COOKIE *salvage,
-  WT_ITEM *value, WT_TIME_WINDOW *tw, uint64_t rle, bool deleted, bool overflow_type)
+__rec_col_var_helper(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_SALVAGE_COOKIE *salvage,
+  WT_ITEM *value, WT_TIME_WINDOW *tw, uint64_t rle, bool deleted, bool dictionary, bool *ovfl_usedp)
 {
-    WT_BTREE *btree;
-    WT_REC_KV *val;
+    WTI_REC_KV *val;
 
-    btree = S2BT(session);
+    if (ovfl_usedp != NULL)
+        *ovfl_usedp = false;
+
     val = &r->v;
 
     /*
@@ -1133,24 +1175,25 @@ __rec_col_var_helper(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_SALVAGE_COOKI
         val->buf.data = NULL;
         val->buf.size = 0;
         val->len = val->cell_len;
-    } else if (overflow_type) {
+    } else if (ovfl_usedp != NULL) {
         val->cell_len =
           __wt_cell_pack_ovfl(session, &val->cell, WT_CELL_VALUE_OVFL, tw, rle, value->size);
         val->buf.data = value->data;
         val->buf.size = value->size;
         val->len = val->cell_len + value->size;
+        *ovfl_usedp = true;
     } else
-        WT_RET(__wt_rec_cell_build_val(session, r, value->data, value->size, tw, rle));
+        WT_RET(__wti_rec_cell_build_val(session, r, value->data, value->size, tw, rle));
 
     /* Boundary: split or write the page. */
-    if (__wt_rec_need_split(r, val->len))
-        WT_RET(__wt_rec_split_crossing_bnd(session, r, val->len));
+    if (__wti_rec_need_split(r, val->len))
+        WT_RET(__wti_rec_split_crossing_bnd(session, r, val->len));
 
-    /* Copy the value onto the page. */
-    if (!deleted && !overflow_type && btree->dictionary)
-        WT_RET(__wt_rec_dict_replace(session, r, tw, rle, val));
-    __wt_rec_image_copy(session, r, val);
-    WT_TIME_AGGREGATE_UPDATE(session, &r->cur_ptr->ta, tw);
+    /* Copy the value onto the page. Use the dictionary whenever requested. */
+    if (dictionary && !deleted && ovfl_usedp == NULL)
+        WT_RET(__wti_rec_dict_replace(session, r, tw, rle, val));
+    __wti_rec_image_copy(session, r, val);
+    WTI_REC_CHUNK_TA_UPDATE(session, r->cur_ptr, tw);
 
     /* Update the starting record number in case we split. */
     r->recno += rle;
@@ -1159,46 +1202,50 @@ __rec_col_var_helper(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_SALVAGE_COOKI
 }
 
 /*
- * __wt_rec_col_var --
+ * __wti_rec_col_var --
  *     Reconcile a variable-width column-store leaf page.
  */
 int
-__wt_rec_col_var(
-  WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *pageref, WT_SALVAGE_COOKIE *salvage)
+__wti_rec_col_var(
+  WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_REF *pageref, WT_SALVAGE_COOKIE *salvage)
 {
     enum { OVFL_IGNORE, OVFL_UNUSED, OVFL_USED } ovfl_state;
     struct {
         WT_ITEM *value; /* Value */
         WT_TIME_WINDOW tw;
-        bool deleted; /* If deleted */
+        bool deleted;    /* If deleted */
+        bool dictionary; /* If dictionary is in use */
     } last;
     WT_BTREE *btree;
     WT_CELL *cell;
     WT_CELL_UNPACK_KV *vpack, _vpack;
     WT_COL *cip;
-    WT_CURSOR *hs_cursor;
+    WT_CONNECTION_IMPL *conn;
     WT_CURSOR_BTREE *cbt;
     WT_DECL_ITEM(orig);
     WT_DECL_RET;
     WT_INSERT *ins;
-    WT_ITEM hs_recno_key;
     WT_PAGE *page;
     WT_TIME_WINDOW clear_tw, *twp;
     WT_UPDATE *upd;
-    WT_UPDATE_SELECT upd_select;
+    WTI_UPDATE_SELECT upd_select;
     uint64_t n, nrepeat, repeat_count, rle, skip, src_recno;
     uint32_t i, size;
-    uint8_t *p, hs_recno_key_buf[WT_INTPACK64_MAXSIZE];
-    bool deleted, hs_clear, orig_deleted, update_no_copy;
+    bool deleted, dictionary, orig_deleted, orig_stale, ovfl_used, update_no_copy,
+      wrote_real_values;
     const void *data;
 
     btree = S2BT(session);
+    conn = S2C(session);
     vpack = &_vpack;
     page = pageref->page;
     WT_TIME_WINDOW_INIT(&clear_tw);
     twp = NULL;
     upd = NULL;
     size = 0;
+    orig_stale = false;
+    wrote_real_values = false;
+    dictionary = false;
     data = NULL;
 
     cbt = &r->update_modify_cbt;
@@ -1208,26 +1255,10 @@ __wt_rec_col_var(
     last.value = r->last;
     WT_TIME_WINDOW_INIT(&last.tw);
     last.deleted = false;
-
-    /*
-     * When removing a key due to a tombstone with a durable timestamp of "none", also remove the
-     * history store contents associated with that key. It's safe to do even if we fail
-     * reconciliation after the removal, the history store content must be obsolete in order for us
-     * to consider removing the key.
-     *
-     * Ignore if this is metadata, as metadata doesn't have any history.
-     *
-     * Some code paths, such as schema removal, involve deleting keys in metadata and assert that
-     * they shouldn't open new dhandles. In those cases we won't ever need to blow away history
-     * store content, so we can skip this.
-     */
-    hs_cursor = NULL;
-    hs_clear = F_ISSET(S2C(session), WT_CONN_HS_OPEN) &&
-      !F_ISSET(session, WT_SESSION_NO_DATA_HANDLES) && !WT_IS_HS(btree->dhandle) &&
-      !WT_IS_METADATA(btree->dhandle);
+    last.dictionary = false;
 
     WT_RET(
-      __wt_rec_split_init(session, r, page, pageref->ref_recno, btree->maxleafpage_precomp, 0));
+      __wti_rec_split_init(session, r, page, pageref->ref_recno, btree->maxleafpage_precomp, 0));
 
     WT_RET(__wt_scr_alloc(session, 0, &orig));
 
@@ -1245,6 +1276,7 @@ __wt_rec_col_var(
         if (salvage->skip == 0) {
             rle = salvage->missing;
             last.deleted = true;
+            last.dictionary = false;
 
             /*
              * Correct the number of records we're going to "take", pretending the missing records
@@ -1253,7 +1285,7 @@ __wt_rec_col_var(
             salvage->take += salvage->missing;
         } else
             WT_ERR(__rec_col_var_helper(
-              session, r, NULL, NULL, &clear_tw, salvage->missing, true, false));
+              session, r, NULL, NULL, &clear_tw, salvage->missing, true, last.dictionary, NULL));
     }
 
     /*
@@ -1274,6 +1306,7 @@ __wt_rec_col_var(
         __wt_cell_unpack_kv(session, page->dsk, cell, vpack);
         nrepeat = __wt_cell_rle(vpack);
         ins = WT_SKIP_FIRST(WT_COL_UPDATE(page, cip));
+        dictionary = false;
 
         /*
          * If the original value is "deleted", there's no value to compare, we're done.
@@ -1281,6 +1314,9 @@ __wt_rec_col_var(
         orig_deleted = vpack->type == WT_CELL_DEL;
         if (orig_deleted)
             goto record_loop;
+
+        /* If the original value is stale, delete it when no updates are found. */
+        orig_stale = __wt_txn_tw_stop_visible_all(session, &vpack->tw);
 
         /*
          * Overflow items are tricky: we don't know until we're finished processing the set of
@@ -1299,15 +1335,6 @@ __wt_rec_col_var(
             goto record_loop;
         }
 
-        /*
-         * If data is Huffman encoded, we have to decode it in order to compare it with the last
-         * item we saw, which may have been an update string. This guarantees we find every single
-         * pair of objects we can RLE encode, including applications updating an existing record
-         * where the new value happens (?) to match a Huffman- encoded value in a previous or next
-         * record.
-         */
-        WT_ERR(__wt_dsk_cell_data_ref(session, WT_PAGE_COL_VAR, vpack, orig));
-
 record_loop:
         /*
          * Generate on-page entries: loop repeat records, looking for WT_INSERT entries matching the
@@ -1316,7 +1343,7 @@ record_loop:
         for (n = 0; n < nrepeat; n += repeat_count, src_recno += repeat_count) {
             upd = NULL;
             if (ins != NULL && WT_INSERT_RECNO(ins) == src_recno) {
-                WT_ERR(__wt_rec_upd_select(session, r, ins, NULL, vpack, &upd_select));
+                WT_ERR(__wti_rec_upd_select(session, r, ins, NULL, vpack, &upd_select));
                 upd = upd_select.upd;
                 ins = WT_SKIP_NEXT(ins);
             }
@@ -1325,7 +1352,11 @@ record_loop:
             repeat_count = 1;      /* Single record */
             deleted = false;
 
-            if (upd == NULL) {
+            if (upd == NULL && orig_stale) {
+                /* The on-disk value is stale and there was no update. Treat it as deleted. */
+                deleted = true;
+                twp = &clear_tw;
+            } else if (upd == NULL) {
                 update_no_copy = false; /* Maybe data copy */
 
                 /*
@@ -1347,6 +1378,23 @@ record_loop:
                     goto compare;
                 }
                 twp = &vpack->tw;
+                /*
+                 * If preserve prepared update is enabled, we must select an update to replace the
+                 * onpage prepared update. Otherwise, we leak the prepared update.
+                 */
+                WT_ASSERT_ALWAYS(session,
+                  !F_ISSET(conn, WT_CONN_PRESERVE_PREPARED) || !WT_TIME_WINDOW_HAS_PREPARE(twp),
+                  "leaked prepared update.");
+
+                /* Clear the on-disk cell time window if it is obsolete. */
+                __wti_rec_time_window_clear_obsolete(session, NULL, vpack, r);
+
+                /*
+                 * Check if we are dealing with a dictionary cell (a copy of another item on the
+                 * page).
+                 */
+                if (vpack->raw == WT_CELL_VALUE_COPY)
+                    dictionary = btree->dictionary;
 
                 /*
                  * If we are handling overflow items, use the overflow item itself exactly once,
@@ -1361,37 +1409,50 @@ record_loop:
                      * We're going to copy the on-page cell, write out any record we're tracking.
                      */
                     if (rle != 0) {
-                        WT_ERR(__rec_col_var_helper(
-                          session, r, salvage, last.value, &last.tw, rle, last.deleted, false));
+                        WT_ERR(__rec_col_var_helper(session, r, salvage, last.value, &last.tw, rle,
+                          last.deleted, last.dictionary, NULL));
                         rle = 0;
                     }
 
                     last.value->data = vpack->data;
                     last.value->size = vpack->size;
-                    WT_ERR(__rec_col_var_helper(
-                      session, r, salvage, last.value, twp, repeat_count, false, true));
+                    WT_ERR(__rec_col_var_helper(session, r, salvage, last.value, twp, repeat_count,
+                      false, last.dictionary, &ovfl_used));
 
-                    /* Track if page has overflow items. */
-                    r->ovfl_items = true;
+                    wrote_real_values = true;
 
-                    ovfl_state = OVFL_USED;
+                    /*
+                     * Salvage may have caused us to skip the overflow item, only update overflow
+                     * items we use.
+                     */
+                    if (ovfl_used) {
+                        r->ovfl_items = true; /* Track if page has overflow items. */
+                        ovfl_state = OVFL_USED;
+                    }
                     continue;
                 case OVFL_USED:
                     /*
                      * Original is an overflow item; we used it for a key and now we need another
                      * copy; read it into memory.
                      */
-                    WT_ERR(__wt_dsk_cell_data_ref(session, WT_PAGE_COL_VAR, vpack, orig));
-
-                    ovfl_state = OVFL_IGNORE;
-                /* FALLTHROUGH */
-                case OVFL_IGNORE:
-                    /*
-                     * Original is an overflow item and we were forced to copy it into memory, or
-                     * the original wasn't an overflow item; use the data copied into orig.
-                     */
+                    WT_ERR(__wt_dsk_cell_data_ref_kv(session, vpack, orig));
                     data = orig->data;
                     size = (uint32_t)orig->size;
+
+                    ovfl_state = OVFL_IGNORE;
+                    break;
+                case OVFL_IGNORE:
+                    /*
+                     * Use the copied original value if the on-page value is an overflow value.
+                     * Otherwise, use the on-page value.
+                     */
+                    if (F_ISSET(vpack, WT_CELL_UNPACK_OVERFLOW)) {
+                        data = orig->data;
+                        size = (uint32_t)orig->size;
+                    } else {
+                        data = vpack->data;
+                        size = vpack->size;
+                    }
                     break;
                 }
             } else {
@@ -1400,52 +1461,34 @@ record_loop:
                 switch (upd->type) {
                 case WT_UPDATE_MODIFY:
                     cbt->slot = WT_COL_SLOT(page, cip);
-                    WT_ERR(
-                      __wt_modify_reconstruct_from_upd_list(session, cbt, upd, cbt->upd_value));
+                    WT_ERR(__wt_modify_reconstruct_from_upd_list(
+                      session, cbt, upd, cbt->upd_value, WT_OPCTX_RECONCILATION));
                     __wt_value_return(cbt, cbt->upd_value);
                     data = cbt->iface.value.data;
                     size = (uint32_t)cbt->iface.value.size;
                     update_no_copy = false;
+                    dictionary = btree->dictionary;
                     break;
                 case WT_UPDATE_STANDARD:
                     data = upd->data;
                     size = upd->size;
+                    dictionary = btree->dictionary;
                     break;
                 case WT_UPDATE_TOMBSTONE:
-                    /*
-                     * When removing a key due to a tombstone with a durable timestamp of "none",
-                     * also remove the history store contents associated with that key.
-                     */
-                    if (twp->durable_stop_ts == WT_TS_NONE && hs_clear) {
-                        p = hs_recno_key_buf;
-                        WT_ERR(__wt_vpack_uint(&p, 0, src_recno));
-                        hs_recno_key.data = hs_recno_key_buf;
-                        hs_recno_key.size = WT_PTRDIFF(p, hs_recno_key_buf);
-
-                        /* Open a history store cursor if we don't yet have one. */
-                        if (hs_cursor == NULL)
-                            WT_ERR(__wt_curhs_open(session, NULL, &hs_cursor));
-
-                        /*
-                         * From WT_TS_NONE delete all the history store content of the key. This
-                         * path will never be taken for a mixed-mode deletion being evicted and with
-                         * a checkpoint that started prior to the eviction starting its
-                         * reconciliation as previous checks done while selecting an update will
-                         * detect that.
-                         */
-                        WT_ERR(__wt_hs_delete_key_from_ts(
-                          session, hs_cursor, btree->id, &hs_recno_key, WT_TS_NONE, false, false));
-
-                        WT_STAT_CONN_INCR(session, cache_hs_key_truncate_onpage_removal);
-                        WT_STAT_DATA_INCR(session, cache_hs_key_truncate_onpage_removal);
-                    }
-
                     deleted = true;
                     twp = &clear_tw;
                     break;
                 default:
                     WT_ERR(__wt_illegal_value(session, upd->type));
                 }
+
+                /*
+                 * When a tombstone without a timestamp is written to disk, remove any historical
+                 * versions that are greater in the history store for this key.
+                 */
+                if (upd_select.no_ts_tombstone && r->hs_clear_on_tombstone)
+                    WT_ERR(__wti_rec_hs_clear_on_tombstone(session, r, src_recno, NULL,
+                      upd->type == WT_UPDATE_TOMBSTONE ? false : true));
             }
 
 compare:
@@ -1468,8 +1511,10 @@ compare:
                     rle += repeat_count;
                     continue;
                 }
-                WT_ERR(__rec_col_var_helper(
-                  session, r, salvage, last.value, &last.tw, rle, last.deleted, false));
+                if (!last.deleted)
+                    wrote_real_values = true;
+                WT_ERR(__rec_col_var_helper(session, r, salvage, last.value, &last.tw, rle,
+                  last.deleted, last.dictionary, NULL));
             }
 
             /*
@@ -1495,6 +1540,7 @@ compare:
 
             WT_TIME_WINDOW_COPY(&last.tw, twp);
             last.deleted = deleted;
+            last.dictionary = dictionary;
             rle = repeat_count;
         }
 
@@ -1508,33 +1554,17 @@ compare:
 
     /* Walk any append list. */
     for (ins = WT_SKIP_FIRST(WT_COL_APPEND(page));; ins = WT_SKIP_NEXT(ins)) {
-        if (ins == NULL) {
+        if (ins == NULL)
             /*
-             * If the page split, instantiate any missing records in
-             * the page's name space. (Imagine record 98 is
-             * transactionally visible, 99 wasn't created or is not
-             * yet visible, 100 is visible. Then the page splits and
-             * record 100 moves to another page. When we reconcile
-             * the original page, we write record 98, then we don't
-             * see record 99 for whatever reason. If we've moved
-             * record 100, we don't know to write a deleted record
-             * 99 on the page.)
-             *
-             * Assert the recorded record number is past the end of
-             * the page.
-             *
-             * The record number recorded during the split is the
-             * first key on the split page, that is, one larger than
-             * the last key on this page, we have to decrement it.
+             * Stop when we reach the end of the append list. There might be a gap between that and
+             * the beginning of the next page. (Imagine record 98 is written, then record 100 is
+             * written, then the page splits and record 100 moves to another page. There is no entry
+             * for record 99 and we don't write one out.) In VLCS we (now) tolerate such gaps as
+             * they are, though likely smaller, equivalent to gaps created by fast-truncate.
              */
-            if ((n = page->modify->mod_col_split_recno) == WT_RECNO_OOB)
-                break;
-            WT_ASSERT(session, n >= src_recno);
-            n -= 1;
-
-            upd = NULL;
-        } else {
-            WT_ERR(__wt_rec_upd_select(session, r, ins, NULL, NULL, &upd_select));
+            break;
+        else {
+            WT_ERR(__wti_rec_upd_select(session, r, ins, NULL, NULL, &upd_select));
             upd = upd_select.upd;
             n = WT_INSERT_RECNO(ins);
         }
@@ -1577,16 +1607,18 @@ compare:
                      * Impossible slot, there's no backing on-page item.
                      */
                     cbt->slot = UINT32_MAX;
-                    WT_ERR(
-                      __wt_modify_reconstruct_from_upd_list(session, cbt, upd, cbt->upd_value));
+                    WT_ERR(__wt_modify_reconstruct_from_upd_list(
+                      session, cbt, upd, cbt->upd_value, WT_OPCTX_RECONCILATION));
                     __wt_value_return(cbt, cbt->upd_value);
                     data = cbt->iface.value.data;
                     size = (uint32_t)cbt->iface.value.size;
                     update_no_copy = false;
+                    dictionary = btree->dictionary;
                     break;
                 case WT_UPDATE_STANDARD:
                     data = upd->data;
                     size = upd->size;
+                    dictionary = btree->dictionary;
                     break;
                 case WT_UPDATE_TOMBSTONE:
                     twp = &clear_tw;
@@ -1595,6 +1627,14 @@ compare:
                 default:
                     WT_ERR(__wt_illegal_value(session, upd->type));
                 }
+
+                /*
+                 * When a tombstone without a timestamp is written to disk, remove any historical
+                 * versions that are greater in the history store for this key.
+                 */
+                if (upd_select.no_ts_tombstone && r->hs_clear_on_tombstone)
+                    WT_ERR(__wti_rec_hs_clear_on_tombstone(session, r, src_recno, NULL,
+                      upd->type == WT_UPDATE_TOMBSTONE ? false : true));
             }
 
             /*
@@ -1614,8 +1654,10 @@ compare:
                     ++rle;
                     goto next;
                 }
-                WT_ERR(__rec_col_var_helper(
-                  session, r, salvage, last.value, &last.tw, rle, last.deleted, false));
+                if (!last.deleted)
+                    wrote_real_values = true;
+                WT_ERR(__rec_col_var_helper(session, r, salvage, last.value, &last.tw, rle,
+                  last.deleted, last.dictionary, NULL));
             }
 
             /*
@@ -1636,6 +1678,7 @@ compare:
             /* Ready for the next loop, reset the RLE counter. */
             WT_TIME_WINDOW_COPY(&last.tw, twp);
             last.deleted = deleted;
+            last.dictionary = dictionary;
             rle = 1;
 
             /*
@@ -1657,16 +1700,40 @@ next:
     }
 
     /* If we were tracking a record, write it. */
-    if (rle != 0)
+    if (rle != 0) {
+        if (!last.deleted)
+            wrote_real_values = true;
         WT_ERR(__rec_col_var_helper(
-          session, r, salvage, last.value, &last.tw, rle, last.deleted, false));
+          session, r, salvage, last.value, &last.tw, rle, last.deleted, last.dictionary, NULL));
+    }
+
+    /*
+     * If we have not generated any real values but only deleted-value cells, bail out and call the
+     * page empty instead. (Note that this should always be exactly one deleted-value cell, because
+     * of the RLE handling, so we can't have split.) This will create a namespace gap like those
+     * produced by truncate.
+     *
+     * Skip this step if:
+     *     - We're in salvage, to avoid any odd interactions with the way salvage reconstructs the
+     *       namespace.
+     *     - There were invisible updates, because then the page isn't really empty. Also, at least
+     *       for now if we try to restore updates to an empty page col_modify will trip on its
+     *       shoelaces.
+     *     - We wrote no cells at all. This can happen if a page with no cells and no append list
+     *       entries at all (not just one with no or only aborted updates) gets marked dirty somehow
+     *       and reconciled; this is apparently possible in some circumstances.
+     */
+    if (!wrote_real_values && salvage == NULL && r->leave_dirty == false && r->entries > 0) {
+        WT_ASSERT(session, r->entries == 1);
+        r->entries = 0;
+        WT_STAT_CONN_DSRC_INCR(session, rec_vlcs_emptied_pages);
+        /* Don't bother adjusting r->space_avail or r->first_free. */
+    }
 
     /* Write the remnant page. */
-    ret = __wt_rec_split_finish(session, r);
+    WT_ERR(__wti_rec_split_finish(session, r));
 
 err:
-    if (hs_cursor != NULL)
-        WT_TRET(hs_cursor->close(hs_cursor));
     __wt_scr_free(session, &orig);
     return (ret);
 }

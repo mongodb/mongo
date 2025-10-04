@@ -3,11 +3,8 @@
  * test verifies postBatchResumeToken semantics that are common to sharded and unsharded streams.
  * @tags: [uses_transactions]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
-load("jstests/libs/fixture_helpers.js");           // For isMongos.
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 // Drop and recreate collections to assure a clean run.
 const collName = "report_post_batch_resume_token";
@@ -16,13 +13,13 @@ const otherCollection = assertDropAndRecreateCollection(db, "unrelated_" + collN
 const adminDB = db.getSiblingDB("admin");
 
 // Helper function which swallows an assertion if we are running on a sharded cluster.
-assert.eqIfNotMongos = function(val1, val2, errMsg) {
+assert.eqIfNotMongos = function (val1, val2, errMsg) {
     if (!FixtureHelpers.isMongos(db)) {
         assert.eq(val1, val2, errMsg);
     }
 };
 
-let docId = 0;  // Tracks _id of documents inserted to ensure that we do not duplicate.
+let docId = 0; // Tracks _id of documents inserted to ensure that we do not duplicate.
 const batchSize = 2;
 
 // Test that postBatchResumeToken is present on an initial aggregate of batchSize: 0.
@@ -42,7 +39,7 @@ assert.neq(undefined, initialAggPBRT);
 // Verify that no events are returned and the PBRT does not advance or go backwards, even as
 // documents are written into the collection.
 for (let i = 0; i < 5; ++i) {
-    assert(!csCursor.hasNext());  // Causes a getMore to be dispatched.
+    assert(!csCursor.hasNext()); // Causes a getMore to be dispatched.
     const getMorePBRT = csCursor.getResumeToken();
     assert.eq(bsonWoCompare(initialAggPBRT, getMorePBRT), 0);
     assert.commandWorked(testCollection.insert({_id: docId++}));
@@ -55,7 +52,7 @@ initialAggPBRT = csCursor.getResumeToken();
 assert.neq(undefined, initialAggPBRT);
 
 // Test that postBatchResumeToken is present on empty getMore batch.
-assert(!csCursor.hasNext());  // Causes a getMore to be dispatched.
+assert(!csCursor.hasNext()); // Causes a getMore to be dispatched.
 let getMorePBRT = csCursor.getResumeToken();
 assert.neq(undefined, getMorePBRT);
 assert.gte(bsonWoCompare(getMorePBRT, initialAggPBRT), 0);
@@ -63,7 +60,7 @@ assert.gte(bsonWoCompare(getMorePBRT, initialAggPBRT), 0);
 // Test that postBatchResumeToken advances with returned events. Insert one document into the
 // collection and consume the resulting change stream event.
 assert.commandWorked(testCollection.insert({_id: docId++}));
-assert.soon(() => csCursor.hasNext());  // Causes a getMore to be dispatched.
+assert.soon(() => csCursor.hasNext()); // Causes a getMore to be dispatched.
 assert(csCursor.objsLeftInBatch() == 1);
 
 // Because the retrieved event is the most recent entry in the oplog, the PBRT should be equal to
@@ -89,7 +86,7 @@ assert.eq(bsonWoCompare(initialAggPBRT, resumeTokenFromDoc), 0);
 
 // Test that postBatchResumeToken advances with getMore. Iterate the cursor and assert that the
 // observed postBatchResumeToken advanced.
-assert.soon(() => csCursor.hasNext());  // Causes a getMore to be dispatched.
+assert.soon(() => csCursor.hasNext()); // Causes a getMore to be dispatched.
 
 // The postBatchResumeToken is again equal to the final token in the batch, and greater than the
 // PBRT from the initial response.
@@ -106,7 +103,7 @@ assert.gt(bsonWoCompare(getMorePBRT, initialAggPBRT), 0);
 
 // Test that postBatchResumeToken advances with writes to an unrelated collection. First make
 // sure there is nothing left in our cursor, and obtain the latest PBRT...
-while (eventFromCursor.fullDocument._id < (docId - 1)) {
+while (eventFromCursor.fullDocument._id < docId - 1) {
     assert.soon(() => csCursor.hasNext());
     eventFromCursor = csCursor.next();
 }
@@ -117,7 +114,7 @@ assert.neq(undefined, previousGetMorePBRT);
 // ... then test that it advances on an insert to an unrelated collection.
 assert.commandWorked(otherCollection.insert({_id: docId}));
 assert.soon(() => {
-    assert(!csCursor.hasNext());  // Causes a getMore to be dispatched.
+    assert(!csCursor.hasNext()); // Causes a getMore to be dispatched.
     getMorePBRT = csCursor.getResumeToken();
     return bsonWoCompare(getMorePBRT, previousGetMorePBRT) > 0;
 });
@@ -134,7 +131,7 @@ for (let i = 0; i < 2; ++i) {
 // Test that we return the correct postBatchResumeToken in the event that the batch hits the
 // byte size limit. Despite the fact that the batchSize is 2, we should only see 1 result,
 // because the second result cannot fit in the batch.
-assert.soon(() => csCursor.hasNext());  // Causes a getMore to be dispatched.
+assert.soon(() => csCursor.hasNext()); // Causes a getMore to be dispatched.
 assert.eq(csCursor.objsLeftInBatch(), 1);
 
 // Obtain the resume token and the PBRT from the first document.
@@ -143,7 +140,7 @@ getMorePBRT = csCursor.getResumeToken();
 
 // Now retrieve the second event and confirm that the PBRTs and resume tokens are in-order.
 previousGetMorePBRT = getMorePBRT;
-assert.soon(() => csCursor.hasNext());  // Causes a getMore to be dispatched.
+assert.soon(() => csCursor.hasNext()); // Causes a getMore to be dispatched.
 assert.eq(csCursor.objsLeftInBatch(), 1);
 const resumeTokenFromSecondDoc = csCursor.next()._id;
 getMorePBRT = csCursor.getResumeToken();
@@ -154,10 +151,9 @@ assert.gte(bsonWoCompare(getMorePBRT, resumeTokenFromSecondDoc), 0);
 // Sharded collection passthroughs use prepared transactions, which require majority read concern.
 // If the collection is sharded and majority read concern is disabled, skip the transaction tests.
 const rcCmdRes = testCollection.runCommand("find", {readConcern: {level: "majority"}});
-if (FixtureHelpers.isSharded(testCollection) &&
-    rcCmdRes.code === ErrorCodes.ReadConcernMajorityNotEnabled) {
+if (FixtureHelpers.isSharded(testCollection) && rcCmdRes.code === ErrorCodes.ReadConcernMajorityNotEnabled) {
     jsTestLog("Skipping transaction tests since majority read concern is disabled.");
-    return;
+    quit();
 }
 
 // Test that the PBRT is correctly updated when reading events from within a transaction.
@@ -183,8 +179,7 @@ session.endSession();
 previousGetMorePBRT = getMorePBRT;
 assert.soon(() => {
     // Start a new stream from the most recent resume token we retrieved.
-    csCursor = testCollection.watch(
-        [], {resumeAfter: previousGetMorePBRT, cursor: {batchSize: batchSize}});
+    csCursor = testCollection.watch([], {resumeAfter: previousGetMorePBRT, cursor: {batchSize: batchSize}});
     // Wait until we see the first results from the stream.
     assert.soon(() => csCursor.hasNext());
     // There should be two distinct events in the batch.
@@ -192,7 +187,8 @@ assert.soon(() => {
 });
 
 // The clusterTime should be the same on each, but the resume token keeps advancing.
-const txnEvent1 = csCursor.next(), txnEvent2 = csCursor.next();
+const txnEvent1 = csCursor.next(),
+    txnEvent2 = csCursor.next();
 const txnClusterTime = txnEvent1.clusterTime;
 // On a sharded cluster, the events in the txn may be spread across multiple shards. Events from
 // each shard will all have the same clusterTime, but the clusterTimes may differ between shards.
@@ -209,7 +205,7 @@ assert.eq(bsonWoCompare(getMorePBRT, txnEvent2._id), 0);
 
 // Now get the next batch. This contains the third of the four transaction operations.
 previousGetMorePBRT = getMorePBRT;
-assert.soon(() => csCursor.hasNext());  // Causes a getMore to be dispatched.
+assert.soon(() => csCursor.hasNext()); // Causes a getMore to be dispatched.
 assert.eq(csCursor.objsLeftInBatch(), 1);
 
 // The clusterTime of this event is the same as the two events from the previous batch, but its
@@ -224,4 +220,18 @@ assert.gt(bsonWoCompare(txnEvent3._id, previousGetMorePBRT), 0);
 // appear in the batch. Confirm that the postBatchResumeToken has been set correctly.
 getMorePBRT = csCursor.getResumeToken();
 assert.gte(bsonWoCompare(getMorePBRT, txnEvent3._id), 0);
-})();
+
+// Test that a batch does not exceed the limit (and throw BSONObjectTooLarge) with a large
+// post-batch resume token.
+csCursor = testCollection.watch();
+const kSecondDocSize = 80 * 1024;
+// Here, 4.5 is some "unlucky" (non-unique) weight to provoke an error.
+const kFirstDocSize = 16 * 1024 * 1024 - 4.5 * kSecondDocSize;
+testCollection.insertMany([{a: "x".repeat(kFirstDocSize)}, {_id: "x".repeat(kSecondDocSize)}]);
+assert.doesNotThrow(
+    () => {
+        csCursor.hasNext();
+    },
+    [],
+    "Unexpected exception on 'csCursor.hasNext()'.",
+);

@@ -30,16 +30,17 @@ global:
     cpp_namespace: "mongo"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 structs:
     ImportedStableNewFieldReply:
-        description: "This reply contains a field that is unstable in the old command but is
-                      stable in the new command."
+        description:
+            "This reply contains a field that is unstable in the old command but is
+            stable in the new command."
         fields:
             stableNewField:
                 type: string
-                unstable: true
+                stability: unstable
 
 commands:
     importCommand:

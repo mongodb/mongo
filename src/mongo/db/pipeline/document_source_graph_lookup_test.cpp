@@ -27,28 +27,56 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/db/pipeline/document_source_graph_lookup.h"
 
-#include <algorithm>
-#include <deque>
-
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/json.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
-#include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/document_source_graph_lookup.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source_mock.h"
-#include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/process_interface/standalone_process_interface.h"
+#include "mongo/db/pipeline/serverless_aggregation_context_fixture.h"
+#include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
+#include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/stats/counters.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
-namespace mongo {
+#include <algorithm>
+#include <deque>
+#include <initializer_list>
 
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+namespace mongo {
 namespace {
 
 // This provides access to getExpCtx(), but we'll use a different name for this test suite.
 using DocumentSourceGraphLookUpTest = AggregationContextFixture;
+
+/**
+ * This fixture also provides storage engine for spilling.
+ */
+class DocumentSourceGraphLookUpSpillingTest : public DocumentSourceGraphLookUpTest {
+public:
+    DocumentSourceGraphLookUpSpillingTest()
+        : AggregationContextFixture(std::make_unique<MongoDScopedGlobalServiceContextForTest>(
+              MongoDScopedGlobalServiceContextForTest::Options{}, shouldSetupTL)) {}
+};
 
 //
 // Evaluation.
@@ -58,137 +86,49 @@ using DocumentSourceGraphLookUpTest = AggregationContextFixture;
  * A MongoProcessInterface use for testing that supports making pipelines with an initial
  * DocumentSourceMock source.
  */
-class MockMongoInterface final : public StubMongoProcessInterface {
+class MockMongoInterface final : public StandaloneProcessInterface {
 public:
     MockMongoInterface(std::deque<DocumentSource::GetNextResult> results)
-        : _results(std::move(results)) {}
+        : StandaloneProcessInterface(nullptr), _results(std::move(results)) {}
 
-    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
+    std::unique_ptr<Pipeline> preparePipelineForExecution(
         Pipeline* ownedPipeline,
         ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
         boost::optional<BSONObj> readConcern = boost::none) final {
-        std::unique_ptr<Pipeline, PipelineDeleter> pipeline(
-            ownedPipeline, PipelineDeleter(ownedPipeline->getContext()->opCtx));
+        std::unique_ptr<Pipeline> pipeline(ownedPipeline);
         pipeline->addInitialSource(
             DocumentSourceMock::createForTest(_results, pipeline->getContext()));
         return pipeline;
+    }
+
+    std::unique_ptr<mongo::Pipeline> preparePipelineForExecution(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const AggregateCommandRequest& aggRequest,
+        Pipeline* pipeline,
+        boost::optional<BSONObj> shardCursorsSortSpec = boost::none,
+        ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
+        boost::optional<BSONObj> readConcern = boost::none,
+        bool shouldUseCollectionDefaultCollator = false) final {
+        return preparePipelineForExecution(pipeline, shardTargetingPolicy, readConcern);
     }
 
 private:
     std::deque<DocumentSource::GetNextResult> _results;
 };
 
-// Tests that $graphLookup with special 'from' syntax from: {db: local, coll:
-// system.tenantMigration.oplogView} can be round tripped.
-TEST_F(DocumentSourceGraphLookUpTest, LookupReParseSerializedStageWithFromDBAndColl) {
-    auto expCtx = getExpCtx();
-    NamespaceString fromNs("local", "system.tenantMigration.oplogView");
-    expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
-        {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
-
-    auto originalBSON =
-        BSON("$graphLookup" << BSON("from" << BSON("db"
-                                                   << "local"
-                                                   << "coll"
-                                                   << "system.tenantMigration.oplogView")
-                                           << "startWith"
-                                           << "$x"
-                                           << "connectFromField"
-                                           << "id"
-                                           << "connectToField"
-                                           << "id"
-                                           << "as"
-                                           << "connections"));
-    auto graphLookupStage =
-        DocumentSourceGraphLookUp::createFromBson(originalBSON.firstElement(), expCtx);
-
-    //
-    // Serialize the $graphLookup stage and confirm contents.
-    //
-    std::vector<Value> serialization;
-    static const UnorderedFieldsBSONObjComparator kComparator;
-    graphLookupStage->serializeToArray(serialization);
-    auto serializedBSON = serialization[0].getDocument().toBson();
-    ASSERT_EQ(kComparator.compare(serializedBSON, originalBSON), 0);
-
-    auto roundTripped =
-        DocumentSourceGraphLookUp::createFromBson(serializedBSON.firstElement(), expCtx);
-
-    std::vector<Value> newSerialization;
-    roundTripped->serializeToArray(newSerialization);
-
-    ASSERT_EQ(newSerialization.size(), 1UL);
-    ASSERT_VALUE_EQ(newSerialization[0], serialization[0]);
-}
-
-// $graphLookup : {from : {db: <>, coll: <>}} syntax doesn't work for a namespace that isn't
-// local.system.tenantMigration.oplogView.
-TEST_F(DocumentSourceGraphLookUpTest, RejectsPipelineFromDBAndCollNotLocalDBOrRsOplogView) {
-    auto expCtx = getExpCtx();
-    NamespaceString fromNs("test", "coll");
-    expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
-        {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
-
-    ASSERT_THROWS_CODE(
-        DocumentSourceGraphLookUp::createFromBson(
-            fromjson("{$graphLookup: {from: {db: 'test', coll: 'coll'}, startWith: '$x', "
-                     "connectFromField: 'id', connectionToField: 'id', as: 'connections'}}")
-                .firstElement(),
-            expCtx),
-        AssertionException,
-        ErrorCodes::FailedToParse);
-}
-
-// $graphLookup : {from : {db: <>, coll: <>}} syntax fails when "db" is local but "coll" is
-// not "system.tenantMigration.oplogView".
-TEST_F(DocumentSourceGraphLookUpTest, RejectsPipelineFromDBAndCollNotRsOplogView) {
-    auto expCtx = getExpCtx();
-    NamespaceString fromNs("local", "coll");
-    expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
-        {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
-
-    ASSERT_THROWS_CODE(
-        DocumentSourceGraphLookUp::createFromBson(
-            fromjson("{$graphLookup: {from: {db: 'local', coll: 'coll'}, startWith: '$x', "
-                     "connectFromField: 'id', connectionToField: 'id', as: 'connections'}}")
-                .firstElement(),
-            expCtx),
-        AssertionException,
-        ErrorCodes::FailedToParse);
-}
-
-// $lookup : {from : {db: <>, coll: <>}} syntax doesn't work for a namespace when "coll" is
-// "system.tenantMigration.oplogView" but "db" is not "local".
-TEST_F(DocumentSourceGraphLookUpTest, RejectsPipelineFromDBAndCollNotLocalDB) {
-    auto expCtx = getExpCtx();
-    NamespaceString fromNs("test", "system.tenantMigration.oplogView");
-    expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
-        {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
-
-    ASSERT_THROWS_CODE(
-        DocumentSourceGraphLookUp::createFromBson(
-            fromjson("{$graphLookup: {from: {db: 'test', coll: "
-                     "'system.tenantMigration.oplogView'}, startWith: '$x', "
-                     "connectFromField: 'id', connectionToField: 'id', as: 'connections'}}")
-                .firstElement(),
-            expCtx),
-        AssertionException,
-        ErrorCodes::FailedToParse);
-}
-
 TEST_F(DocumentSourceGraphLookUpTest,
        ShouldErrorWhenDoingInitialMatchIfDocumentInFromCollectionIsMissingId) {
     auto expCtx = getExpCtx();
     std::deque<DocumentSource::GetNextResult> inputs{Document{{"_id", 0}}};
-    auto inputMock = DocumentSourceMock::createForTest(std::move(inputs), expCtx);
+    auto inputMock = exec::agg::MockStage::createForTest(std::move(inputs), expCtx);
 
     std::deque<DocumentSource::GetNextResult> fromContents{Document{{"to", 0}}};
 
-    NamespaceString fromNs("test", "graph_lookup");
-    expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
-        {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
-    expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(std::move(fromContents));
-    auto graphLookupStage = DocumentSourceGraphLookUp::create(
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "graph_lookup");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+    expCtx->setMongoProcessInterface(std::make_shared<MockMongoInterface>(std::move(fromContents)));
+    auto graphLookupDS = DocumentSourceGraphLookUp::create(
         expCtx,
         fromNs,
         "results",
@@ -199,6 +139,7 @@ TEST_F(DocumentSourceGraphLookUpTest,
         boost::none,
         boost::none,
         boost::none);
+    auto graphLookupStage = exec::agg::buildStage(graphLookupDS);
     graphLookupStage->setSource(inputMock.get());
     ASSERT_THROWS_CODE(graphLookupStage->getNext(), AssertionException, 40271);
 }
@@ -208,16 +149,16 @@ TEST_F(DocumentSourceGraphLookUpTest,
     auto expCtx = getExpCtx();
 
     std::deque<DocumentSource::GetNextResult> inputs{Document{{"_id", 0}}};
-    auto inputMock = DocumentSourceMock::createForTest(std::move(inputs), expCtx);
+    auto inputMock = exec::agg::MockStage::createForTest(std::move(inputs), expCtx);
 
     std::deque<DocumentSource::GetNextResult> fromContents{
         Document{{"_id", "a"_sd}, {"to", 0}, {"from", 1}}, Document{{"to", 1}}};
 
-    NamespaceString fromNs("test", "graph_lookup");
-    expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
-        {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
-    expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(std::move(fromContents));
-    auto graphLookupStage = DocumentSourceGraphLookUp::create(
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "graph_lookup");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+    expCtx->setMongoProcessInterface(std::make_shared<MockMongoInterface>(std::move(fromContents)));
+    auto graphLookupDS = DocumentSourceGraphLookUp::create(
         expCtx,
         fromNs,
         "results",
@@ -228,6 +169,7 @@ TEST_F(DocumentSourceGraphLookUpTest,
         boost::none,
         boost::none,
         boost::none);
+    auto graphLookupStage = exec::agg::buildStage(graphLookupDS);
     graphLookupStage->setSource(inputMock.get());
 
     ASSERT_THROWS_CODE(graphLookupStage->getNext(), AssertionException, 40271);
@@ -238,16 +180,16 @@ TEST_F(DocumentSourceGraphLookUpTest,
     auto expCtx = getExpCtx();
 
     std::deque<DocumentSource::GetNextResult> inputs{Document{{"_id", 0}}};
-    auto inputMock = DocumentSourceMock::createForTest(std::move(inputs), expCtx);
+    auto inputMock = exec::agg::MockStage::createForTest(std::move(inputs), expCtx);
 
     std::deque<DocumentSource::GetNextResult> fromContents{Document{{"to", 0}}};
 
-    NamespaceString fromNs("test", "graph_lookup");
-    expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
-        {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
-    expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(std::move(fromContents));
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "graph_lookup");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+    expCtx->setMongoProcessInterface(std::make_shared<MockMongoInterface>(std::move(fromContents)));
     auto unwindStage = DocumentSourceUnwind::create(expCtx, "results", false, boost::none);
-    auto graphLookupStage = DocumentSourceGraphLookUp::create(
+    auto graphLookupDS = DocumentSourceGraphLookUp::create(
         expCtx,
         fromNs,
         "results",
@@ -258,6 +200,7 @@ TEST_F(DocumentSourceGraphLookUpTest,
         boost::none,
         boost::none,
         unwindStage);
+    auto graphLookupStage = exec::agg::buildStage(graphLookupDS);
     graphLookupStage->setSource(inputMock.get());
 
     ASSERT_THROWS_CODE(graphLookupStage->getNext(), AssertionException, 40271);
@@ -277,7 +220,7 @@ TEST_F(DocumentSourceGraphLookUpTest,
     auto expCtx = getExpCtx();
 
     std::deque<DocumentSource::GetNextResult> inputs{Document{{"_id", 0}}};
-    auto inputMock = DocumentSourceMock::createForTest(std::move(inputs), expCtx);
+    auto inputMock = exec::agg::MockStage::createForTest(std::move(inputs), expCtx);
 
     Document to0from1{{"_id", "a"_sd}, {"to", 0}, {"from", 1}};
     Document to0from2{{"_id", "a"_sd}, {"to", 0}, {"from", 2}};
@@ -286,11 +229,11 @@ TEST_F(DocumentSourceGraphLookUpTest,
     std::deque<DocumentSource::GetNextResult> fromContents{
         Document(to1), Document(to2), Document(to0from1), Document(to0from2)};
 
-    NamespaceString fromNs("test", "graph_lookup");
-    expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
-        {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
-    expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(std::move(fromContents));
-    auto graphLookupStage = DocumentSourceGraphLookUp::create(
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "graph_lookup");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+    expCtx->setMongoProcessInterface(std::make_shared<MockMongoInterface>(std::move(fromContents)));
+    auto graphLookupDS = DocumentSourceGraphLookUp::create(
         expCtx,
         fromNs,
         "results",
@@ -301,6 +244,7 @@ TEST_F(DocumentSourceGraphLookUpTest,
         boost::none,
         boost::none,
         boost::none);
+    auto graphLookupStage = exec::agg::buildStage(graphLookupDS);
     graphLookupStage->setSource(inputMock.get());
     graphLookupStage->setSource(inputMock.get());
 
@@ -331,9 +275,9 @@ TEST_F(DocumentSourceGraphLookUpTest,
         next = graphLookupStage->getNext();
         ASSERT(next.isEOF());
     } else {
-        FAIL(str::stream() << "Expected either [ " << to0from1.toString() << " ] or [ "
-                           << to0from2.toString() << " ] but found [ "
-                           << next.getDocument().toString() << " ]");
+        FAIL(std::string(str::stream() << "Expected either [ " << to0from1.toString() << " ] or [ "
+                                       << to0from2.toString() << " ] but found [ "
+                                       << next.getDocument().toString() << " ]"));
     }
 }
 
@@ -341,20 +285,20 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldPropagatePauses) {
     auto expCtx = getExpCtx();
 
     auto inputMock =
-        DocumentSourceMock::createForTest({Document{{"startPoint", 0}},
-                                           DocumentSource::GetNextResult::makePauseExecution(),
-                                           Document{{"startPoint", 0}},
-                                           DocumentSource::GetNextResult::makePauseExecution()},
-                                          expCtx);
+        exec::agg::MockStage::createForTest({Document{{"startPoint", 0}},
+                                             DocumentSource::GetNextResult::makePauseExecution(),
+                                             Document{{"startPoint", 0}},
+                                             DocumentSource::GetNextResult::makePauseExecution()},
+                                            expCtx);
 
     std::deque<DocumentSource::GetNextResult> fromContents{
         Document{{"_id", "a"_sd}, {"to", 0}, {"from", 1}}, Document{{"_id", "b"_sd}, {"to", 1}}};
 
-    NamespaceString fromNs("test", "foreign");
-    expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
-        {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
-    expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(std::move(fromContents));
-    auto graphLookupStage = DocumentSourceGraphLookUp::create(
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "foreign");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+    expCtx->setMongoProcessInterface(std::make_shared<MockMongoInterface>(std::move(fromContents)));
+    auto graphLookupDS = DocumentSourceGraphLookUp::create(
         expCtx,
         fromNs,
         "results",
@@ -365,6 +309,7 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldPropagatePauses) {
         boost::none,
         boost::none,
         boost::none);
+    auto graphLookupStage = exec::agg::buildStage(graphLookupDS);
 
     graphLookupStage->setSource(inputMock.get());
 
@@ -376,7 +321,7 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldPropagatePauses) {
     // contents.
     auto result = next.releaseDocument();
     ASSERT_VALUE_EQ(result["startPoint"], Value(0));
-    ASSERT_EQ(result["results"].getType(), BSONType::Array);
+    ASSERT_EQ(result["results"].getType(), BSONType::array);
     ASSERT_EQ(result["results"].getArray().size(), 2UL);
     ASSERT_TRUE(arrayContains(expCtx,
                               result["results"].getArray(),
@@ -390,7 +335,7 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldPropagatePauses) {
     ASSERT_TRUE(next.isAdvanced());
     result = next.releaseDocument();
     ASSERT_VALUE_EQ(result["startPoint"], Value(0));
-    ASSERT_EQ(result["results"].getType(), BSONType::Array);
+    ASSERT_EQ(result["results"].getType(), BSONType::array);
     ASSERT_EQ(result["results"].getArray().size(), 2UL);
     ASSERT_TRUE(arrayContains(expCtx,
                               result["results"].getArray(),
@@ -401,7 +346,6 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldPropagatePauses) {
     ASSERT_TRUE(graphLookupStage->getNext().isPaused());
 
     ASSERT_TRUE(graphLookupStage->getNext().isEOF());
-    ASSERT_TRUE(graphLookupStage->getNext().isEOF());
 }
 
 TEST_F(DocumentSourceGraphLookUpTest, ShouldPropagatePausesWhileUnwinding) {
@@ -409,28 +353,28 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldPropagatePausesWhileUnwinding) {
 
     // Set up the $graphLookup stage
     auto inputMock =
-        DocumentSourceMock::createForTest({Document{{"startPoint", 0}},
-                                           DocumentSource::GetNextResult::makePauseExecution(),
-                                           Document{{"startPoint", 0}},
-                                           DocumentSource::GetNextResult::makePauseExecution()},
-                                          expCtx);
+        exec::agg::MockStage::createForTest({Document{{"startPoint", 0}},
+                                             DocumentSource::GetNextResult::makePauseExecution(),
+                                             Document{{"startPoint", 0}},
+                                             DocumentSource::GetNextResult::makePauseExecution()},
+                                            expCtx);
 
     std::deque<DocumentSource::GetNextResult> fromContents{
         Document{{"_id", "a"_sd}, {"to", 0}, {"from", 1}}, Document{{"_id", "b"_sd}, {"to", 1}}};
 
-    NamespaceString fromNs("test", "foreign");
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "foreign");
 
-    expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
-        {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
 
-    expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(std::move(fromContents));
+    expCtx->setMongoProcessInterface(std::make_shared<MockMongoInterface>(std::move(fromContents)));
 
     const bool preserveNullAndEmptyArrays = false;
     const boost::optional<std::string> includeArrayIndex = boost::none;
     auto unwindStage = DocumentSourceUnwind::create(
         expCtx, "results", preserveNullAndEmptyArrays, includeArrayIndex);
 
-    auto graphLookupStage = DocumentSourceGraphLookUp::create(
+    auto graphLookupDS = DocumentSourceGraphLookUp::create(
         expCtx,
         fromNs,
         "results",
@@ -441,6 +385,7 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldPropagatePausesWhileUnwinding) {
         boost::none,
         boost::none,
         unwindStage);
+    auto graphLookupStage = exec::agg::buildStage(graphLookupDS);
 
     graphLookupStage->setSource(inputMock.get());
 
@@ -479,16 +424,208 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldPropagatePausesWhileUnwinding) {
     ASSERT_TRUE(graphLookupStage->getNext().isPaused());
 
     ASSERT_TRUE(graphLookupStage->getNext().isEOF());
+}
+
+TEST_F(DocumentSourceGraphLookUpSpillingTest, ShouldSpillVisitedDocuments) {
+    static constexpr long long kMemoryLimit = 100 * 1024;
+    RAIIServerParameterControllerForTest memoryLimitController(
+        "internalDocumentSourceGraphLookupMaxMemoryBytes", kMemoryLimit);
+
+    auto expCtx = getExpCtx();
+    auto inputMock = exec::agg::MockStage::createForTest({Document{{"startPoint", 0}}}, expCtx);
+
+    static constexpr long long kPaddingSize = 1024;
+    std::string padding(kPaddingSize, 'a');
+    std::deque<DocumentSource::GetNextResult> fromContents;
+    for (long long i = 0; i < kMemoryLimit / kPaddingSize; ++i) {
+        fromContents.push_back(
+            Document{{{"_id", Value{i}}, {"to", 0}, {"from", 1}, {"padding", padding}}});
+    }
+
+    std::vector<Value> expectedResults;
+    expectedResults.reserve(fromContents.size());
+    for (const auto& doc : fromContents) {
+        expectedResults.emplace_back(doc.getDocument());
+    }
+    std::sort(
+        expectedResults.begin(), expectedResults.end(), expCtx->getValueComparator().getLessThan());
+
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "foreign");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+    expCtx->setMongoProcessInterface(std::make_shared<MockMongoInterface>(fromContents));
+    expCtx->setAllowDiskUse(true);
+
+    auto graphLookupDS = DocumentSourceGraphLookUp::create(
+        expCtx,
+        fromNs,
+        "results",
+        "from",
+        "to",
+        ExpressionFieldPath::deprecatedCreate(expCtx.get(), "startPoint"),
+        boost::none,
+        boost::none,
+        boost::none,
+        boost::none);
+    auto graphLookupStage = exec::agg::buildStage(graphLookupDS);
+
+    graphLookupStage->setSource(inputMock.get());
+
+    auto next = graphLookupStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    std::vector<Value> results = next.getDocument().getField("results").getArray();
+    std::sort(results.begin(), results.end(), expCtx->getValueComparator().getLessThan());
+
+    ASSERT_VALUE_EQ(Value{expectedResults}, Value{results});
     ASSERT_TRUE(graphLookupStage->getNext().isEOF());
+
+    ASSERT_TRUE(graphLookupStage->usedDisk());
+    auto stats =
+        dynamic_cast<const DocumentSourceGraphLookupStats*>(graphLookupStage->getSpecificStats())
+            ->spillingStats;
+    ASSERT_GTE(stats.getSpills(), 1);
+    ASSERT_GTE(stats.getSpilledRecords(), 70);
+}
+
+TEST_F(DocumentSourceGraphLookUpSpillingTest, ShouldSpillSeveralStructures) {
+    static constexpr long long kMemoryLimit = 200 * 1024;
+    RAIIServerParameterControllerForTest memoryLimitController(
+        "internalDocumentSourceGraphLookupMaxMemoryBytes", kMemoryLimit);
+
+    auto expCtx = getExpCtx();
+    auto inputMock = exec::agg::MockStage::createForTest({Document{{"startPoint", 0}}}, expCtx);
+
+    static constexpr long long kPaddingSize = 1024;
+    std::string padding(kPaddingSize, 'a');
+    std::deque<DocumentSource::GetNextResult> fromContents;
+    // All documents will fit into memory limit by themselves, but in total with from values set and
+    // queue memory should overflow.
+    for (long long i = 0; i < 100; ++i) {
+        std::string currentPadding = padding + std::to_string(i);
+        fromContents.push_back(Document{{{"_id", Value{i}}, {"to", 0}, {"from", currentPadding}}});
+    }
+
+    std::vector<Value> expectedResults;
+    expectedResults.reserve(fromContents.size());
+    for (const auto& doc : fromContents) {
+        expectedResults.emplace_back(doc.getDocument());
+    }
+    std::sort(
+        expectedResults.begin(), expectedResults.end(), expCtx->getValueComparator().getLessThan());
+
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "foreign");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+    expCtx->setMongoProcessInterface(std::make_shared<MockMongoInterface>(fromContents));
+    expCtx->setAllowDiskUse(true);
+
+    auto graphLookupDS = DocumentSourceGraphLookUp::create(
+        expCtx,
+        fromNs,
+        "results",
+        "from",
+        "to",
+        ExpressionFieldPath::deprecatedCreate(expCtx.get(), "startPoint"),
+        boost::none,
+        boost::none,
+        boost::none,
+        boost::none);
+    auto graphLookupStage = exec::agg::buildStage(graphLookupDS);
+
+    graphLookupStage->setSource(inputMock.get());
+
+    auto next = graphLookupStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    std::vector<Value> results = next.getDocument().getField("results").getArray();
+    std::sort(results.begin(), results.end(), expCtx->getValueComparator().getLessThan());
+
+    ASSERT_VALUE_EQ(Value{expectedResults}, Value{results});
+    ASSERT_TRUE(graphLookupStage->getNext().isEOF());
+
+    ASSERT_TRUE(graphLookupStage->usedDisk());
+    auto stats =
+        dynamic_cast<const DocumentSourceGraphLookupStats*>(graphLookupStage->getSpecificStats())
+            ->spillingStats;
+    ASSERT_GTE(stats.getSpills(), 2);
+    ASSERT_GTE(stats.getSpilledRecords(), 70);
+}
+
+TEST_F(DocumentSourceGraphLookUpSpillingTest, CanForceSpill) {
+    auto expCtx = getExpCtx();
+    auto inputMock = exec::agg::MockStage::createForTest({Document{{"startPoint", 0}}}, expCtx);
+
+    static constexpr size_t kResultCount = 100;
+    std::deque<DocumentSource::GetNextResult> fromContents;
+    for (size_t i = 0; i < kResultCount; ++i) {
+        fromContents.push_back(
+            Document{{{"_id", Value{static_cast<long long>(i)}}, {"to", 0}, {"from", 1}}});
+    }
+
+    std::vector<Value> expectedResults;
+    expectedResults.reserve(fromContents.size());
+    for (const auto& doc : fromContents) {
+        expectedResults.emplace_back(doc.getDocument());
+    }
+    std::sort(
+        expectedResults.begin(), expectedResults.end(), expCtx->getValueComparator().getLessThan());
+
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "foreign");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+    expCtx->setMongoProcessInterface(std::make_shared<MockMongoInterface>(fromContents));
+    expCtx->setAllowDiskUse(true);
+
+    auto unwindStage = DocumentSourceUnwind::create(expCtx, "results", false, boost::none);
+    auto graphLookupDS = DocumentSourceGraphLookUp::create(
+        expCtx,
+        fromNs,
+        "results",
+        "from",
+        "to",
+        ExpressionFieldPath::deprecatedCreate(expCtx.get(), "startPoint"),
+        boost::none,
+        boost::none,
+        boost::none,
+        unwindStage);
+    auto graphLookupStage = exec::agg::buildStage(graphLookupDS);
+
+    graphLookupStage->setSource(inputMock.get());
+
+    std::vector<Value> results;
+    results.reserve(kResultCount);
+
+    for (size_t i = 0; i < kResultCount / 10; ++i) {
+        for (size_t j = 0; j < 10; ++j) {
+            results.emplace_back(graphLookupStage->getNext().getDocument().getField("results"));
+        }
+        graphLookupStage->forceSpill();
+    }
+
+    std::sort(results.begin(), results.end(), expCtx->getValueComparator().getLessThan());
+    ASSERT_EQ(results.size(), expectedResults.size());
+    for (size_t i = 0; i < results.size(); ++i) {
+        ASSERT_VALUE_EQ(results[i], expectedResults[i]);
+    }
+
+    ASSERT_TRUE(graphLookupStage->getNext().isEOF());
+    ASSERT_TRUE(graphLookupStage->usedDisk());
+    auto stats =
+        dynamic_cast<const DocumentSourceGraphLookupStats*>(graphLookupStage->getSpecificStats())
+            ->spillingStats;
+
+    // There is only one actual spill the first time we call doForceSpill(). Following calls just
+    // remove buffered documents, but don't write anything to disk.
+    ASSERT_EQ(stats.getSpills(), 1);
+    ASSERT_EQ(stats.getSpilledRecords(), 90);
 }
 
 TEST_F(DocumentSourceGraphLookUpTest, GraphLookupShouldReportAsFieldIsModified) {
     auto expCtx = getExpCtx();
-    NamespaceString fromNs("test", "foreign");
-    expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
-        {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
-    expCtx->mongoProcessInterface =
-        std::make_shared<MockMongoInterface>(std::deque<DocumentSource::GetNextResult>{});
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "foreign");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+    expCtx->setMongoProcessInterface(
+        std::make_shared<MockMongoInterface>(std::deque<DocumentSource::GetNextResult>{}));
     auto graphLookupStage = DocumentSourceGraphLookUp::create(
         expCtx,
         fromNs,
@@ -509,11 +646,11 @@ TEST_F(DocumentSourceGraphLookUpTest, GraphLookupShouldReportAsFieldIsModified) 
 
 TEST_F(DocumentSourceGraphLookUpTest, GraphLookupShouldReportFieldsModifiedByAbsorbedUnwind) {
     auto expCtx = getExpCtx();
-    NamespaceString fromNs("test", "foreign");
-    expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
-        {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
-    expCtx->mongoProcessInterface =
-        std::make_shared<MockMongoInterface>(std::deque<DocumentSource::GetNextResult>{});
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "foreign");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+    expCtx->setMongoProcessInterface(
+        std::make_shared<MockMongoInterface>(std::deque<DocumentSource::GetNextResult>{}));
     auto unwindStage =
         DocumentSourceUnwind::create(expCtx, "results", false, std::string("arrIndex"));
     auto graphLookupStage = DocumentSourceGraphLookUp::create(
@@ -539,16 +676,16 @@ TEST_F(DocumentSourceGraphLookUpTest, GraphLookupWithComparisonExpressionForStar
     auto expCtx = getExpCtx();
 
     auto inputMock =
-        DocumentSourceMock::createForTest(Document({{"_id", 0}, {"a", 1}, {"b", 2}}), expCtx);
+        exec::agg::MockStage::createForTest(Document({{"_id", 0}, {"a", 1}, {"b", 2}}), expCtx);
 
-    NamespaceString fromNs("test", "foreign");
-    expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
-        {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "foreign");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
     std::deque<DocumentSource::GetNextResult> fromContents{Document{{"_id", 0}, {"to", true}},
                                                            Document{{"_id", 1}, {"to", false}}};
-    expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(std::move(fromContents));
+    expCtx->setMongoProcessInterface(std::make_shared<MockMongoInterface>(std::move(fromContents)));
 
-    auto graphLookupStage = DocumentSourceGraphLookUp::create(
+    auto graphLookupDS = DocumentSourceGraphLookUp::create(
         expCtx,
         fromNs,
         "results",
@@ -562,6 +699,7 @@ TEST_F(DocumentSourceGraphLookUpTest, GraphLookupWithComparisonExpressionForStar
         boost::none,
         boost::none,
         boost::none);
+    auto graphLookupStage = exec::agg::buildStage(graphLookupDS);
 
     graphLookupStage->setSource(inputMock.get());
 
@@ -583,7 +721,7 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldExpandArraysAtEndOfConnectFromField)
     auto expCtx = getExpCtx();
 
     std::deque<DocumentSource::GetNextResult> inputs{Document{{"_id", 0}, {"startVal", 0}}};
-    auto inputMock = DocumentSourceMock::createForTest(std::move(inputs), expCtx);
+    auto inputMock = exec::agg::MockStage::createForTest(std::move(inputs), expCtx);
 
     /* Make the following graph:
      *   ,> 1 .
@@ -606,11 +744,11 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldExpandArraysAtEndOfConnectFromField)
                                                            Document(middle3),
                                                            Document(sinkDoc)};
 
-    NamespaceString fromNs("test", "graph_lookup");
-    expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
-        {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
-    expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(std::move(fromContents));
-    auto graphLookupStage = DocumentSourceGraphLookUp::create(
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "graph_lookup");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+    expCtx->setMongoProcessInterface(std::make_shared<MockMongoInterface>(std::move(fromContents)));
+    auto graphLookupDS = DocumentSourceGraphLookUp::create(
         expCtx,
         fromNs,
         "results",
@@ -621,7 +759,8 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldExpandArraysAtEndOfConnectFromField)
         boost::none,
         boost::none,
         boost::none);
-    graphLookupStage->setSource(inputMock.get());
+    auto graphLookupStage = exec::agg::buildStage(graphLookupDS);
+
     graphLookupStage->setSource(inputMock.get());
 
     auto next = graphLookupStage->getNext();
@@ -650,7 +789,7 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldNotExpandArraysWithinArraysAtEndOfCo
 
     std::deque<DocumentSource::GetNextResult> inputs{
         Document{{"_id", 0}, {"startVal", makeTupleValue(0, 0)}}};
-    auto inputMock = DocumentSourceMock::createForTest(std::move(inputs), expCtx);
+    auto inputMock = exec::agg::MockStage::createForTest(std::move(inputs), expCtx);
 
     // Make the following graph:
     //
@@ -679,11 +818,11 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldNotExpandArraysWithinArraysAtEndOfCo
     std::deque<DocumentSource::GetNextResult> fromContents{
         Document(startDoc), Document(target1), Document(target2), Document(soloDoc)};
 
-    NamespaceString fromNs("test", "graph_lookup");
-    expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
-        {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
-    expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(std::move(fromContents));
-    auto graphLookupStage = DocumentSourceGraphLookUp::create(
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "graph_lookup");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+    expCtx->setMongoProcessInterface(std::make_shared<MockMongoInterface>(std::move(fromContents)));
+    auto graphLookupDS = DocumentSourceGraphLookUp::create(
         expCtx,
         fromNs,
         "results",
@@ -694,6 +833,8 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldNotExpandArraysWithinArraysAtEndOfCo
         boost::none,
         boost::none,
         boost::none);
+    auto graphLookupStage = exec::agg::buildStage(graphLookupDS);
+
     graphLookupStage->setSource(inputMock.get());
     graphLookupStage->setSource(inputMock.get());
 
@@ -711,6 +852,227 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldNotExpandArraysWithinArraysAtEndOfCo
     ASSERT(arrayContains(expCtx, resultsArray, Value(target2)));
     ASSERT(!arrayContains(expCtx, resultsArray, Value(soloDoc)));
     ASSERT(graphLookupStage->getNext().isEOF());
+}
+
+TEST_F(DocumentSourceGraphLookUpTest, IncrementNestedAggregateOpCounterOnCreateButNotOnCopy) {
+    auto testOpCounter = [&](const NamespaceString& nss, const int expectedIncrease) {
+        auto resolvedNss = ResolvedNamespaceMap{{nss, {nss, std::vector<BSONObj>()}}};
+        auto countBeforeCreate = serviceOpCounters(getOpCtx()).getNestedAggregate()->load();
+
+        // Create a DocumentSourceGraphLookUp and verify that the counter increases by the expected
+        // amount.
+        auto originalExpCtx = make_intrusive<ExpressionContextForTest>(getOpCtx(), nss);
+        originalExpCtx->setResolvedNamespaces(resolvedNss);
+        auto docSource = DocumentSourceGraphLookUp::createFromBson(
+            BSON("$graphLookup" << BSON("from" << nss.coll() << "startWith"
+                                               << "$x"
+                                               << "connectFromField"
+                                               << "id"
+                                               << "connectToField"
+                                               << "id"
+                                               << "as"
+                                               << "connections"))
+                .firstElement(),
+            originalExpCtx);
+        auto originalGraphLookup = static_cast<DocumentSourceGraphLookUp*>(docSource.get());
+        auto countAfterCreate = serviceOpCounters(getOpCtx()).getNestedAggregate()->load();
+        ASSERT_EQ(countAfterCreate - countBeforeCreate, expectedIncrease);
+
+        // Copy the DocumentSourceGraphLookUp and verify that the counter doesn't increase.
+        auto newExpCtx = make_intrusive<ExpressionContextForTest>(getOpCtx(), nss);
+        newExpCtx->setResolvedNamespaces(resolvedNss);
+        DocumentSourceGraphLookUp newGraphLookup{*originalGraphLookup, newExpCtx};
+        auto countAfterCopy = serviceOpCounters(getOpCtx()).getNestedAggregate()->load();
+        ASSERT_EQ(countAfterCopy - countAfterCreate, 0);
+    };
+
+    testOpCounter(NamespaceString::createNamespaceString_forTest("testDb", "testColl"), 1);
+    // $graphLookup against internal databases should not cause the counter to get incremented.
+    testOpCounter(NamespaceString::createNamespaceString_forTest("config", "testColl"), 0);
+    testOpCounter(NamespaceString::createNamespaceString_forTest("admin", "testColl"), 0);
+    testOpCounter(NamespaceString::createNamespaceString_forTest("local", "testColl"), 0);
+}
+
+TEST_F(DocumentSourceGraphLookUpTest, RedactionStartWithSingleField) {
+    NamespaceString graphLookupNs(NamespaceString::createNamespaceString_forTest(
+        getExpCtx()->getNamespaceString().dbName(), "coll"));
+    getExpCtx()->setResolvedNamespaces(
+        ResolvedNamespaceMap{{graphLookupNs, {graphLookupNs, std::vector<BSONObj>()}}});
+
+    auto spec = fromjson(R"({
+        "$graphLookup": {
+            "from": "coll",
+            "startWith": "$a.b",
+            "connectFromField": "c.d",
+            "connectToField": "e.f",
+            "as": "x",
+            "depthField": "y",
+            "maxDepth": 5,
+            "restrictSearchWithMatch": {
+                "foo": "abc",
+                "bar.baz": { "$gt": 5 }
+            }
+        }
+    })");
+    auto docSource = DocumentSourceGraphLookUp::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$graphLookup": {
+                "from": "HASH<coll>",
+                "as": "HASH<x>",
+                "connectToField": "HASH<e>.HASH<f>",
+                "connectFromField": "HASH<c>.HASH<d>",
+                "startWith": "$HASH<a>.HASH<b>",
+                "depthField": "HASH<y>",
+                "maxDepth": "?number",
+                "restrictSearchWithMatch": {
+                    "$and": [
+                        {
+                            "HASH<foo>": {
+                                "$eq": "?string"
+                            }
+                        },
+                        {
+                            "HASH<bar>.HASH<baz>": {
+                                "$gt": "?number"
+                            }
+                        }
+                    ]
+                }
+            }
+        })",
+        redact(*docSource));
+}
+
+TEST_F(DocumentSourceGraphLookUpTest, RedactionStartWithArrayOfFields) {
+    NamespaceString graphLookupNs(NamespaceString::createNamespaceString_forTest(
+        getExpCtx()->getNamespaceString().dbName(), "coll"));
+    getExpCtx()->setResolvedNamespaces(
+        ResolvedNamespaceMap{{graphLookupNs, {graphLookupNs, std::vector<BSONObj>()}}});
+
+    auto spec = fromjson(R"({
+        $graphLookup: {
+            from: "coll",
+            startWith: ["$a.b", "$bar.baz"],
+            connectFromField: "x",
+            connectToField: "y",
+            as: "z"
+        }
+    })");
+    auto docSource = DocumentSourceGraphLookUp::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$graphLookup": {
+                "from": "HASH<coll>",
+                "as": "HASH<z>",
+                "connectToField": "HASH<y>",
+                "connectFromField": "HASH<x>",
+                "startWith": ["$HASH<a>.HASH<b>", "$HASH<bar>.HASH<baz>"]
+            }
+        })",
+        redact(*docSource));
+}
+
+TEST_F(DocumentSourceGraphLookUpTest, RedactionWithAbsorbedUnwind) {
+    auto expCtx = getExpCtx();
+
+    NamespaceString graphLookupNs(NamespaceString::createNamespaceString_forTest(
+        expCtx->getNamespaceString().dbName(), "coll"));
+    expCtx->setResolvedNamespaces(
+        ResolvedNamespaceMap{{graphLookupNs, {graphLookupNs, std::vector<BSONObj>()}}});
+
+    auto unwindStage = DocumentSourceUnwind::create(expCtx, "results", false, boost::none);
+    auto graphLookupStage = DocumentSourceGraphLookUp::create(
+        getExpCtx(),
+        graphLookupNs,
+        "results",
+        "from",
+        "to",
+        ExpressionFieldPath::deprecatedCreate(expCtx.get(), "startPoint"),
+        boost::none,
+        boost::none,
+        boost::none,
+        unwindStage);
+
+    auto serialized = redactToArray(*graphLookupStage);
+    ASSERT_EQ(2, serialized.size());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$graphLookup": {
+                "from": "HASH<coll>",
+                "as": "HASH<results>",
+                "connectToField": "HASH<to>",
+                "connectFromField": "HASH<from>",
+                "startWith": "$HASH<startPoint>"
+            }
+        })",
+        serialized[0].getDocument().toBson());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$unwind": {
+                path: "$HASH<results>"
+            }
+        })",
+        serialized[1].getDocument().toBson());
+}
+
+using DocumentSourceGraphLookupServerlessTest = ServerlessAggregationContextFixture;
+
+TEST_F(DocumentSourceGraphLookupServerlessTest,
+       LiteParsedDocumentSourceLookupStringExpectedNamespacesInServerless) {
+    RAIIServerParameterControllerForTest multitenancySupportController("multitenancySupport", true);
+
+    auto expCtx = getExpCtx();
+    auto originalBSON = BSON("$graphLookup" << BSON("from" << "foo"
+                                                           << "startWith"
+                                                           << "$x"
+                                                           << "connectFromField"
+                                                           << "id"
+                                                           << "connectToField"
+                                                           << "id"
+                                                           << "as"
+                                                           << "connections"));
+
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+        expCtx->getNamespaceString().dbName(), _targetColl);
+    auto liteParsedLookup = DocumentSourceGraphLookUp::LiteParsed::parse(
+        nss, originalBSON.firstElement(), LiteParserOptions{});
+    auto namespaceSet = liteParsedLookup->getInvolvedNamespaces();
+    ASSERT_EQ(1, namespaceSet.size());
+    ASSERT_EQ(1ul,
+              namespaceSet.count(NamespaceString::createNamespaceString_forTest(
+                  expCtx->getNamespaceString().dbName(), "foo")));
+}
+
+TEST_F(DocumentSourceGraphLookupServerlessTest,
+       CreateFromBSONContainsExpectedNamespacesInServerless) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+
+    auto expCtx = getExpCtx();
+    auto tenantId = expCtx->getNamespaceString().tenantId();
+    ASSERT(tenantId);
+
+    NamespaceString graphLookupNs(NamespaceString::createNamespaceString_forTest(
+        expCtx->getNamespaceString().dbName(), "foo"));
+    expCtx->setResolvedNamespaces(
+        ResolvedNamespaceMap{{graphLookupNs, {graphLookupNs, std::vector<BSONObj>()}}});
+
+    auto spec = BSON("$graphLookup" << BSON("from" << "foo"
+                                                   << "startWith"
+                                                   << "$x"
+                                                   << "connectFromField"
+                                                   << "id"
+                                                   << "connectToField"
+                                                   << "id"
+                                                   << "as"
+                                                   << "connections"));
+    auto graphLookupStage = DocumentSourceGraphLookUp::createFromBson(spec.firstElement(), expCtx);
+    auto pipeline =
+        Pipeline::create({DocumentSourceMock::createForTest({}, expCtx), graphLookupStage}, expCtx);
+    auto involvedNssSet = pipeline->getInvolvedCollections();
+    ASSERT_EQ(involvedNssSet.size(), 1UL);
+    ASSERT_EQ(1ul, involvedNssSet.count(graphLookupNs));
 }
 
 }  // namespace

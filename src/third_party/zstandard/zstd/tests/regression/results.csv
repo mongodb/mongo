@@ -1,0 +1,1480 @@
+Data,                               Config,                             Method,                             Total compressed size
+silesia.tar,                        level -5,                           compress simple,                    6861055
+silesia.tar,                        level -3,                           compress simple,                    6505483
+silesia.tar,                        level -1,                           compress simple,                    6179047
+silesia.tar,                        level 0,                            compress simple,                    4854086
+silesia.tar,                        level 1,                            compress simple,                    5327717
+silesia.tar,                        level 3,                            compress simple,                    4854086
+silesia.tar,                        level 4,                            compress simple,                    4791503
+silesia.tar,                        level 5,                            compress simple,                    4679004
+silesia.tar,                        level 6,                            compress simple,                    4614561
+silesia.tar,                        level 7,                            compress simple,                    4579828
+silesia.tar,                        level 9,                            compress simple,                    4555448
+silesia.tar,                        level 13,                           compress simple,                    4502956
+silesia.tar,                        level 16,                           compress simple,                    4360546
+silesia.tar,                        level 19,                           compress simple,                    4265911
+silesia.tar,                        uncompressed literals,              compress simple,                    4854086
+silesia.tar,                        uncompressed literals optimal,      compress simple,                    4265911
+silesia.tar,                        huffman literals,                   compress simple,                    6179047
+github.tar,                         level -5,                           compress simple,                    52115
+github.tar,                         level -3,                           compress simple,                    45678
+github.tar,                         level -1,                           compress simple,                    42560
+github.tar,                         level 0,                            compress simple,                    38831
+github.tar,                         level 1,                            compress simple,                    39200
+github.tar,                         level 3,                            compress simple,                    38831
+github.tar,                         level 4,                            compress simple,                    38893
+github.tar,                         level 5,                            compress simple,                    39651
+github.tar,                         level 6,                            compress simple,                    39282
+github.tar,                         level 7,                            compress simple,                    38005
+github.tar,                         level 9,                            compress simple,                    36723
+github.tar,                         level 13,                           compress simple,                    35501
+github.tar,                         level 16,                           compress simple,                    40466
+github.tar,                         level 19,                           compress simple,                    32276
+github.tar,                         uncompressed literals,              compress simple,                    38831
+github.tar,                         uncompressed literals optimal,      compress simple,                    32276
+github.tar,                         huffman literals,                   compress simple,                    42560
+silesia,                            level -5,                           compress cctx,                      6857372
+silesia,                            level -3,                           compress cctx,                      6503412
+silesia,                            level -1,                           compress cctx,                      6172202
+silesia,                            level 0,                            compress cctx,                      4842075
+silesia,                            level 1,                            compress cctx,                      5306632
+silesia,                            level 3,                            compress cctx,                      4842075
+silesia,                            level 4,                            compress cctx,                      4779186
+silesia,                            level 5,                            compress cctx,                      4667668
+silesia,                            level 6,                            compress cctx,                      4604351
+silesia,                            level 7,                            compress cctx,                      4570271
+silesia,                            level 9,                            compress cctx,                      4545850
+silesia,                            level 13,                           compress cctx,                      4493990
+silesia,                            level 16,                           compress cctx,                      4360041
+silesia,                            level 19,                           compress cctx,                      4296055
+silesia,                            long distance mode,                 compress cctx,                      4842075
+silesia,                            multithreaded,                      compress cctx,                      4842075
+silesia,                            multithreaded long distance mode,   compress cctx,                      4842075
+silesia,                            small window log,                   compress cctx,                      7082951
+silesia,                            small hash log,                     compress cctx,                      6526141
+silesia,                            small chain log,                    compress cctx,                      4912197
+silesia,                            explicit params,                    compress cctx,                      4794318
+silesia,                            uncompressed literals,              compress cctx,                      4842075
+silesia,                            uncompressed literals optimal,      compress cctx,                      4296055
+silesia,                            huffman literals,                   compress cctx,                      6172202
+silesia,                            multithreaded with advanced params, compress cctx,                      4842075
+github,                             level -5,                           compress cctx,                      204407
+github,                             level -5 with dict,                 compress cctx,                      47581
+github,                             level -3,                           compress cctx,                      193253
+github,                             level -3 with dict,                 compress cctx,                      43043
+github,                             level -1,                           compress cctx,                      175468
+github,                             level -1 with dict,                 compress cctx,                      42044
+github,                             level 0,                            compress cctx,                      136332
+github,                             level 0 with dict,                  compress cctx,                      41534
+github,                             level 1,                            compress cctx,                      142365
+github,                             level 1 with dict,                  compress cctx,                      41715
+github,                             level 3,                            compress cctx,                      136332
+github,                             level 3 with dict,                  compress cctx,                      41534
+github,                             level 4,                            compress cctx,                      136199
+github,                             level 4 with dict,                  compress cctx,                      41725
+github,                             level 5,                            compress cctx,                      135121
+github,                             level 5 with dict,                  compress cctx,                      38755
+github,                             level 6,                            compress cctx,                      135122
+github,                             level 6 with dict,                  compress cctx,                      38665
+github,                             level 7,                            compress cctx,                      135122
+github,                             level 7 with dict,                  compress cctx,                      38759
+github,                             level 9,                            compress cctx,                      135122
+github,                             level 9 with dict,                  compress cctx,                      39362
+github,                             level 13,                           compress cctx,                      132878
+github,                             level 13 with dict,                 compress cctx,                      39948
+github,                             level 16,                           compress cctx,                      133209
+github,                             level 16 with dict,                 compress cctx,                      37568
+github,                             level 19,                           compress cctx,                      132879
+github,                             level 19 with dict,                 compress cctx,                      37567
+github,                             long distance mode,                 compress cctx,                      141069
+github,                             multithreaded,                      compress cctx,                      141069
+github,                             multithreaded long distance mode,   compress cctx,                      141069
+github,                             small window log,                   compress cctx,                      141069
+github,                             small hash log,                     compress cctx,                      138949
+github,                             small chain log,                    compress cctx,                      139242
+github,                             explicit params,                    compress cctx,                      140932
+github,                             uncompressed literals,              compress cctx,                      136332
+github,                             uncompressed literals optimal,      compress cctx,                      132879
+github,                             huffman literals,                   compress cctx,                      175468
+github,                             multithreaded with advanced params, compress cctx,                      141069
+silesia,                            level -5,                           zstdcli,                            6857420
+silesia,                            level -3,                           zstdcli,                            6503460
+silesia,                            level -1,                           zstdcli,                            6172250
+silesia,                            level 0,                            zstdcli,                            4842123
+silesia,                            level 1,                            zstdcli,                            5306680
+silesia,                            level 3,                            zstdcli,                            4842123
+silesia,                            level 4,                            zstdcli,                            4779234
+silesia,                            level 5,                            zstdcli,                            4667716
+silesia,                            level 6,                            zstdcli,                            4604399
+silesia,                            level 7,                            zstdcli,                            4570319
+silesia,                            level 9,                            zstdcli,                            4545898
+silesia,                            level 13,                           zstdcli,                            4494038
+silesia,                            level 16,                           zstdcli,                            4360089
+silesia,                            level 19,                           zstdcli,                            4296103
+silesia,                            long distance mode,                 zstdcli,                            4833785
+silesia,                            multithreaded,                      zstdcli,                            4842123
+silesia,                            multithreaded long distance mode,   zstdcli,                            4833785
+silesia,                            small window log,                   zstdcli,                            7095048
+silesia,                            small hash log,                     zstdcli,                            6526189
+silesia,                            small chain log,                    zstdcli,                            4912245
+silesia,                            explicit params,                    zstdcli,                            4795840
+silesia,                            uncompressed literals,              zstdcli,                            5120614
+silesia,                            uncompressed literals optimal,      zstdcli,                            4319566
+silesia,                            huffman literals,                   zstdcli,                            5321417
+silesia,                            multithreaded with advanced params, zstdcli,                            5120614
+silesia.tar,                        level -5,                           zstdcli,                            6862049
+silesia.tar,                        level -3,                           zstdcli,                            6506509
+silesia.tar,                        level -1,                           zstdcli,                            6179789
+silesia.tar,                        level 0,                            zstdcli,                            4854164
+silesia.tar,                        level 1,                            zstdcli,                            5329010
+silesia.tar,                        level 3,                            zstdcli,                            4854164
+silesia.tar,                        level 4,                            zstdcli,                            4792352
+silesia.tar,                        level 5,                            zstdcli,                            4679860
+silesia.tar,                        level 6,                            zstdcli,                            4615355
+silesia.tar,                        level 7,                            zstdcli,                            4581791
+silesia.tar,                        level 9,                            zstdcli,                            4555452
+silesia.tar,                        level 13,                           zstdcli,                            4502960
+silesia.tar,                        level 16,                           zstdcli,                            4360550
+silesia.tar,                        level 19,                           zstdcli,                            4265915
+silesia.tar,                        no source size,                     zstdcli,                            4854160
+silesia.tar,                        long distance mode,                 zstdcli,                            4845745
+silesia.tar,                        multithreaded,                      zstdcli,                            4854164
+silesia.tar,                        multithreaded long distance mode,   zstdcli,                            4845745
+silesia.tar,                        small window log,                   zstdcli,                            7100701
+silesia.tar,                        small hash log,                     zstdcli,                            6529264
+silesia.tar,                        small chain log,                    zstdcli,                            4917022
+silesia.tar,                        explicit params,                    zstdcli,                            4821112
+silesia.tar,                        uncompressed literals,              zstdcli,                            5122571
+silesia.tar,                        uncompressed literals optimal,      zstdcli,                            4310145
+silesia.tar,                        huffman literals,                   zstdcli,                            5342074
+silesia.tar,                        multithreaded with advanced params, zstdcli,                            5122571
+github,                             level -5,                           zstdcli,                            206407
+github,                             level -5 with dict,                 zstdcli,                            47832
+github,                             level -3,                           zstdcli,                            195253
+github,                             level -3 with dict,                 zstdcli,                            46671
+github,                             level -1,                           zstdcli,                            177468
+github,                             level -1 with dict,                 zstdcli,                            43825
+github,                             level 0,                            zstdcli,                            138332
+github,                             level 0 with dict,                  zstdcli,                            43148
+github,                             level 1,                            zstdcli,                            144365
+github,                             level 1 with dict,                  zstdcli,                            43266
+github,                             level 3,                            zstdcli,                            138332
+github,                             level 3 with dict,                  zstdcli,                            43148
+github,                             level 4,                            zstdcli,                            138199
+github,                             level 4 with dict,                  zstdcli,                            43251
+github,                             level 5,                            zstdcli,                            137121
+github,                             level 5 with dict,                  zstdcli,                            40728
+github,                             level 6,                            zstdcli,                            137122
+github,                             level 6 with dict,                  zstdcli,                            40638
+github,                             level 7,                            zstdcli,                            137122
+github,                             level 7 with dict,                  zstdcli,                            40749
+github,                             level 9,                            zstdcli,                            137122
+github,                             level 9 with dict,                  zstdcli,                            41393
+github,                             level 13,                           zstdcli,                            134878
+github,                             level 13 with dict,                 zstdcli,                            41900
+github,                             level 16,                           zstdcli,                            135209
+github,                             level 16 with dict,                 zstdcli,                            39577
+github,                             level 19,                           zstdcli,                            134879
+github,                             level 19 with dict,                 zstdcli,                            39576
+github,                             long distance mode,                 zstdcli,                            138332
+github,                             multithreaded,                      zstdcli,                            138332
+github,                             multithreaded long distance mode,   zstdcli,                            138332
+github,                             small window log,                   zstdcli,                            138332
+github,                             small hash log,                     zstdcli,                            137590
+github,                             small chain log,                    zstdcli,                            138341
+github,                             explicit params,                    zstdcli,                            136197
+github,                             uncompressed literals,              zstdcli,                            167911
+github,                             uncompressed literals optimal,      zstdcli,                            154667
+github,                             huffman literals,                   zstdcli,                            144365
+github,                             multithreaded with advanced params, zstdcli,                            167911
+github.tar,                         level -5,                           zstdcli,                            52119
+github.tar,                         level -5 with dict,                 zstdcli,                            51101
+github.tar,                         level -3,                           zstdcli,                            45682
+github.tar,                         level -3 with dict,                 zstdcli,                            44738
+github.tar,                         level -1,                           zstdcli,                            42564
+github.tar,                         level -1 with dict,                 zstdcli,                            41357
+github.tar,                         level 0,                            zstdcli,                            38835
+github.tar,                         level 0 with dict,                  zstdcli,                            37999
+github.tar,                         level 1,                            zstdcli,                            39204
+github.tar,                         level 1 with dict,                  zstdcli,                            38123
+github.tar,                         level 3,                            zstdcli,                            38835
+github.tar,                         level 3 with dict,                  zstdcli,                            37999
+github.tar,                         level 4,                            zstdcli,                            38897
+github.tar,                         level 4 with dict,                  zstdcli,                            37952
+github.tar,                         level 5,                            zstdcli,                            39655
+github.tar,                         level 5 with dict,                  zstdcli,                            39073
+github.tar,                         level 6,                            zstdcli,                            39286
+github.tar,                         level 6 with dict,                  zstdcli,                            38647
+github.tar,                         level 7,                            zstdcli,                            38009
+github.tar,                         level 7 with dict,                  zstdcli,                            37861
+github.tar,                         level 9,                            zstdcli,                            36727
+github.tar,                         level 9 with dict,                  zstdcli,                            36686
+github.tar,                         level 13,                           zstdcli,                            35505
+github.tar,                         level 13 with dict,                 zstdcli,                            37134
+github.tar,                         level 16,                           zstdcli,                            40470
+github.tar,                         level 16 with dict,                 zstdcli,                            33378
+github.tar,                         level 19,                           zstdcli,                            32280
+github.tar,                         level 19 with dict,                 zstdcli,                            32716
+github.tar,                         no source size,                     zstdcli,                            38832
+github.tar,                         no source size with dict,           zstdcli,                            38004
+github.tar,                         long distance mode,                 zstdcli,                            40236
+github.tar,                         multithreaded,                      zstdcli,                            38835
+github.tar,                         multithreaded long distance mode,   zstdcli,                            40236
+github.tar,                         small window log,                   zstdcli,                            198544
+github.tar,                         small hash log,                     zstdcli,                            129874
+github.tar,                         small chain log,                    zstdcli,                            41673
+github.tar,                         explicit params,                    zstdcli,                            41385
+github.tar,                         uncompressed literals,              zstdcli,                            41529
+github.tar,                         uncompressed literals optimal,      zstdcli,                            35401
+github.tar,                         huffman literals,                   zstdcli,                            38857
+github.tar,                         multithreaded with advanced params, zstdcli,                            41529
+silesia,                            level -5,                           advanced one pass,                  6857372
+silesia,                            level -3,                           advanced one pass,                  6503412
+silesia,                            level -1,                           advanced one pass,                  6172202
+silesia,                            level 0,                            advanced one pass,                  4842075
+silesia,                            level 1,                            advanced one pass,                  5306632
+silesia,                            level 3,                            advanced one pass,                  4842075
+silesia,                            level 4,                            advanced one pass,                  4779186
+silesia,                            level 5 row 1,                      advanced one pass,                  4667668
+silesia,                            level 5 row 2,                      advanced one pass,                  4670326
+silesia,                            level 5,                            advanced one pass,                  4667668
+silesia,                            level 6,                            advanced one pass,                  4604351
+silesia,                            level 7 row 1,                      advanced one pass,                  4570271
+silesia,                            level 7 row 2,                      advanced one pass,                  4565169
+silesia,                            level 7,                            advanced one pass,                  4570271
+silesia,                            level 9,                            advanced one pass,                  4545850
+silesia,                            level 11 row 1,                     advanced one pass,                  4505658
+silesia,                            level 11 row 2,                     advanced one pass,                  4503429
+silesia,                            level 12 row 1,                     advanced one pass,                  4505658
+silesia,                            level 12 row 2,                     advanced one pass,                  4503429
+silesia,                            level 13,                           advanced one pass,                  4493990
+silesia,                            level 16,                           advanced one pass,                  4360041
+silesia,                            level 19,                           advanced one pass,                  4296055
+silesia,                            no source size,                     advanced one pass,                  4842075
+silesia,                            long distance mode,                 advanced one pass,                  4833710
+silesia,                            multithreaded,                      advanced one pass,                  4842075
+silesia,                            multithreaded long distance mode,   advanced one pass,                  4833737
+silesia,                            small window log,                   advanced one pass,                  7095000
+silesia,                            small hash log,                     advanced one pass,                  6526141
+silesia,                            small chain log,                    advanced one pass,                  4912197
+silesia,                            explicit params,                    advanced one pass,                  4795840
+silesia,                            uncompressed literals,              advanced one pass,                  5120566
+silesia,                            uncompressed literals optimal,      advanced one pass,                  4319518
+silesia,                            huffman literals,                   advanced one pass,                  5321369
+silesia,                            multithreaded with advanced params, advanced one pass,                  5120566
+silesia.tar,                        level -5,                           advanced one pass,                  6861055
+silesia.tar,                        level -3,                           advanced one pass,                  6505483
+silesia.tar,                        level -1,                           advanced one pass,                  6179047
+silesia.tar,                        level 0,                            advanced one pass,                  4854086
+silesia.tar,                        level 1,                            advanced one pass,                  5327717
+silesia.tar,                        level 3,                            advanced one pass,                  4854086
+silesia.tar,                        level 4,                            advanced one pass,                  4791503
+silesia.tar,                        level 5 row 1,                      advanced one pass,                  4679004
+silesia.tar,                        level 5 row 2,                      advanced one pass,                  4682334
+silesia.tar,                        level 5,                            advanced one pass,                  4679004
+silesia.tar,                        level 6,                            advanced one pass,                  4614561
+silesia.tar,                        level 7 row 1,                      advanced one pass,                  4579828
+silesia.tar,                        level 7 row 2,                      advanced one pass,                  4575602
+silesia.tar,                        level 7,                            advanced one pass,                  4579828
+silesia.tar,                        level 9,                            advanced one pass,                  4555448
+silesia.tar,                        level 11 row 1,                     advanced one pass,                  4514962
+silesia.tar,                        level 11 row 2,                     advanced one pass,                  4513816
+silesia.tar,                        level 12 row 1,                     advanced one pass,                  4514517
+silesia.tar,                        level 12 row 2,                     advanced one pass,                  4514007
+silesia.tar,                        level 13,                           advanced one pass,                  4502956
+silesia.tar,                        level 16,                           advanced one pass,                  4360546
+silesia.tar,                        level 19,                           advanced one pass,                  4265911
+silesia.tar,                        no source size,                     advanced one pass,                  4854086
+silesia.tar,                        long distance mode,                 advanced one pass,                  4840452
+silesia.tar,                        multithreaded,                      advanced one pass,                  4854160
+silesia.tar,                        multithreaded long distance mode,   advanced one pass,                  4845741
+silesia.tar,                        small window log,                   advanced one pass,                  7100655
+silesia.tar,                        small hash log,                     advanced one pass,                  6529206
+silesia.tar,                        small chain log,                    advanced one pass,                  4917041
+silesia.tar,                        explicit params,                    advanced one pass,                  4807274
+silesia.tar,                        uncompressed literals,              advanced one pass,                  5122473
+silesia.tar,                        uncompressed literals optimal,      advanced one pass,                  4310141
+silesia.tar,                        huffman literals,                   advanced one pass,                  5341705
+silesia.tar,                        multithreaded with advanced params, advanced one pass,                  5122567
+github,                             level -5,                           advanced one pass,                  204407
+github,                             level -5 with dict,                 advanced one pass,                  45832
+github,                             level -3,                           advanced one pass,                  193253
+github,                             level -3 with dict,                 advanced one pass,                  44671
+github,                             level -1,                           advanced one pass,                  175468
+github,                             level -1 with dict,                 advanced one pass,                  41825
+github,                             level 0,                            advanced one pass,                  136332
+github,                             level 0 with dict,                  advanced one pass,                  41148
+github,                             level 0 with dict dms,              advanced one pass,                  41148
+github,                             level 0 with dict dds,              advanced one pass,                  41148
+github,                             level 0 with dict copy,             advanced one pass,                  41124
+github,                             level 0 with dict load,             advanced one pass,                  41847
+github,                             level 1,                            advanced one pass,                  142365
+github,                             level 1 with dict,                  advanced one pass,                  41266
+github,                             level 1 with dict dms,              advanced one pass,                  41266
+github,                             level 1 with dict dds,              advanced one pass,                  41266
+github,                             level 1 with dict copy,             advanced one pass,                  41279
+github,                             level 1 with dict load,             advanced one pass,                  43331
+github,                             level 3,                            advanced one pass,                  136332
+github,                             level 3 with dict,                  advanced one pass,                  41148
+github,                             level 3 with dict dms,              advanced one pass,                  41148
+github,                             level 3 with dict dds,              advanced one pass,                  41148
+github,                             level 3 with dict copy,             advanced one pass,                  41124
+github,                             level 3 with dict load,             advanced one pass,                  41847
+github,                             level 4,                            advanced one pass,                  136199
+github,                             level 4 with dict,                  advanced one pass,                  41251
+github,                             level 4 with dict dms,              advanced one pass,                  41251
+github,                             level 4 with dict dds,              advanced one pass,                  41251
+github,                             level 4 with dict copy,             advanced one pass,                  41216
+github,                             level 4 with dict load,             advanced one pass,                  41548
+github,                             level 5 row 1,                      advanced one pass,                  134584
+github,                             level 5 row 1 with dict dms,        advanced one pass,                  38754
+github,                             level 5 row 1 with dict dds,        advanced one pass,                  38728
+github,                             level 5 row 1 with dict copy,       advanced one pass,                  38755
+github,                             level 5 row 1 with dict load,       advanced one pass,                  41899
+github,                             level 5 row 2,                      advanced one pass,                  135121
+github,                             level 5 row 2 with dict dms,        advanced one pass,                  38938
+github,                             level 5 row 2 with dict dds,        advanced one pass,                  38732
+github,                             level 5 row 2 with dict copy,       advanced one pass,                  38934
+github,                             level 5 row 2 with dict load,       advanced one pass,                  41248
+github,                             level 5,                            advanced one pass,                  135121
+github,                             level 5 with dict,                  advanced one pass,                  38754
+github,                             level 5 with dict dms,              advanced one pass,                  38754
+github,                             level 5 with dict dds,              advanced one pass,                  38728
+github,                             level 5 with dict copy,             advanced one pass,                  38755
+github,                             level 5 with dict load,             advanced one pass,                  41248
+github,                             level 6,                            advanced one pass,                  135122
+github,                             level 6 with dict,                  advanced one pass,                  38669
+github,                             level 6 with dict dms,              advanced one pass,                  38669
+github,                             level 6 with dict dds,              advanced one pass,                  38638
+github,                             level 6 with dict copy,             advanced one pass,                  38665
+github,                             level 6 with dict load,             advanced one pass,                  41153
+github,                             level 7 row 1,                      advanced one pass,                  134584
+github,                             level 7 row 1 with dict dms,        advanced one pass,                  38765
+github,                             level 7 row 1 with dict dds,        advanced one pass,                  38749
+github,                             level 7 row 1 with dict copy,       advanced one pass,                  38759
+github,                             level 7 row 1 with dict load,       advanced one pass,                  43227
+github,                             level 7 row 2,                      advanced one pass,                  135122
+github,                             level 7 row 2 with dict dms,        advanced one pass,                  38860
+github,                             level 7 row 2 with dict dds,        advanced one pass,                  38766
+github,                             level 7 row 2 with dict copy,       advanced one pass,                  38834
+github,                             level 7 row 2 with dict load,       advanced one pass,                  41153
+github,                             level 7,                            advanced one pass,                  135122
+github,                             level 7 with dict,                  advanced one pass,                  38765
+github,                             level 7 with dict dms,              advanced one pass,                  38765
+github,                             level 7 with dict dds,              advanced one pass,                  38749
+github,                             level 7 with dict copy,             advanced one pass,                  38759
+github,                             level 7 with dict load,             advanced one pass,                  41153
+github,                             level 9,                            advanced one pass,                  135122
+github,                             level 9 with dict,                  advanced one pass,                  39439
+github,                             level 9 with dict dms,              advanced one pass,                  39439
+github,                             level 9 with dict dds,              advanced one pass,                  39393
+github,                             level 9 with dict copy,             advanced one pass,                  39362
+github,                             level 9 with dict load,             advanced one pass,                  42148
+github,                             level 11 row 1,                     advanced one pass,                  135367
+github,                             level 11 row 1 with dict dms,       advanced one pass,                  39671
+github,                             level 11 row 1 with dict dds,       advanced one pass,                  39671
+github,                             level 11 row 1 with dict copy,      advanced one pass,                  39651
+github,                             level 11 row 1 with dict load,      advanced one pass,                  41744
+github,                             level 11 row 2,                     advanced one pass,                  135367
+github,                             level 11 row 2 with dict dms,       advanced one pass,                  39671
+github,                             level 11 row 2 with dict dds,       advanced one pass,                  39671
+github,                             level 11 row 2 with dict copy,      advanced one pass,                  39651
+github,                             level 11 row 2 with dict load,      advanced one pass,                  41744
+github,                             level 12 row 1,                     advanced one pass,                  134402
+github,                             level 12 row 1 with dict dms,       advanced one pass,                  39677
+github,                             level 12 row 1 with dict dds,       advanced one pass,                  39677
+github,                             level 12 row 1 with dict copy,      advanced one pass,                  39677
+github,                             level 12 row 1 with dict load,      advanced one pass,                  41553
+github,                             level 12 row 2,                     advanced one pass,                  134402
+github,                             level 12 row 2 with dict dms,       advanced one pass,                  39677
+github,                             level 12 row 2 with dict dds,       advanced one pass,                  39677
+github,                             level 12 row 2 with dict copy,      advanced one pass,                  39677
+github,                             level 12 row 2 with dict load,      advanced one pass,                  41553
+github,                             level 13,                           advanced one pass,                  132878
+github,                             level 13 with dict,                 advanced one pass,                  39900
+github,                             level 13 with dict dms,             advanced one pass,                  39900
+github,                             level 13 with dict dds,             advanced one pass,                  39900
+github,                             level 13 with dict copy,            advanced one pass,                  39948
+github,                             level 13 with dict load,            advanced one pass,                  42624
+github,                             level 16,                           advanced one pass,                  133209
+github,                             level 16 with dict,                 advanced one pass,                  37577
+github,                             level 16 with dict dms,             advanced one pass,                  37577
+github,                             level 16 with dict dds,             advanced one pass,                  37577
+github,                             level 16 with dict copy,            advanced one pass,                  37568
+github,                             level 16 with dict load,            advanced one pass,                  42338
+github,                             level 19,                           advanced one pass,                  132879
+github,                             level 19 with dict,                 advanced one pass,                  37576
+github,                             level 19 with dict dms,             advanced one pass,                  37576
+github,                             level 19 with dict dds,             advanced one pass,                  37576
+github,                             level 19 with dict copy,            advanced one pass,                  37567
+github,                             level 19 with dict load,            advanced one pass,                  39613
+github,                             no source size,                     advanced one pass,                  136332
+github,                             no source size with dict,           advanced one pass,                  41148
+github,                             long distance mode,                 advanced one pass,                  136332
+github,                             multithreaded,                      advanced one pass,                  136332
+github,                             multithreaded long distance mode,   advanced one pass,                  136332
+github,                             small window log,                   advanced one pass,                  136332
+github,                             small hash log,                     advanced one pass,                  135590
+github,                             small chain log,                    advanced one pass,                  136341
+github,                             explicit params,                    advanced one pass,                  137727
+github,                             uncompressed literals,              advanced one pass,                  165911
+github,                             uncompressed literals optimal,      advanced one pass,                  152667
+github,                             huffman literals,                   advanced one pass,                  142365
+github,                             multithreaded with advanced params, advanced one pass,                  165911
+github.tar,                         level -5,                           advanced one pass,                  52115
+github.tar,                         level -5 with dict,                 advanced one pass,                  51097
+github.tar,                         level -3,                           advanced one pass,                  45678
+github.tar,                         level -3 with dict,                 advanced one pass,                  44734
+github.tar,                         level -1,                           advanced one pass,                  42560
+github.tar,                         level -1 with dict,                 advanced one pass,                  41353
+github.tar,                         level 0,                            advanced one pass,                  38831
+github.tar,                         level 0 with dict,                  advanced one pass,                  37995
+github.tar,                         level 0 with dict dms,              advanced one pass,                  38003
+github.tar,                         level 0 with dict dds,              advanced one pass,                  38003
+github.tar,                         level 0 with dict copy,             advanced one pass,                  37995
+github.tar,                         level 0 with dict load,             advanced one pass,                  37956
+github.tar,                         level 1,                            advanced one pass,                  39200
+github.tar,                         level 1 with dict,                  advanced one pass,                  38119
+github.tar,                         level 1 with dict dms,              advanced one pass,                  38406
+github.tar,                         level 1 with dict dds,              advanced one pass,                  38406
+github.tar,                         level 1 with dict copy,             advanced one pass,                  38119
+github.tar,                         level 1 with dict load,             advanced one pass,                  38364
+github.tar,                         level 3,                            advanced one pass,                  38831
+github.tar,                         level 3 with dict,                  advanced one pass,                  37995
+github.tar,                         level 3 with dict dms,              advanced one pass,                  38003
+github.tar,                         level 3 with dict dds,              advanced one pass,                  38003
+github.tar,                         level 3 with dict copy,             advanced one pass,                  37995
+github.tar,                         level 3 with dict load,             advanced one pass,                  37956
+github.tar,                         level 4,                            advanced one pass,                  38893
+github.tar,                         level 4 with dict,                  advanced one pass,                  37948
+github.tar,                         level 4 with dict dms,              advanced one pass,                  37954
+github.tar,                         level 4 with dict dds,              advanced one pass,                  37954
+github.tar,                         level 4 with dict copy,             advanced one pass,                  37948
+github.tar,                         level 4 with dict load,             advanced one pass,                  37927
+github.tar,                         level 5 row 1,                      advanced one pass,                  39651
+github.tar,                         level 5 row 1 with dict dms,        advanced one pass,                  39043
+github.tar,                         level 5 row 1 with dict dds,        advanced one pass,                  39069
+github.tar,                         level 5 row 1 with dict copy,       advanced one pass,                  39145
+github.tar,                         level 5 row 1 with dict load,       advanced one pass,                  39000
+github.tar,                         level 5 row 2,                      advanced one pass,                  39701
+github.tar,                         level 5 row 2 with dict dms,        advanced one pass,                  39365
+github.tar,                         level 5 row 2 with dict dds,        advanced one pass,                  39233
+github.tar,                         level 5 row 2 with dict copy,       advanced one pass,                  39715
+github.tar,                         level 5 row 2 with dict load,       advanced one pass,                  39158
+github.tar,                         level 5,                            advanced one pass,                  39651
+github.tar,                         level 5 with dict,                  advanced one pass,                  39145
+github.tar,                         level 5 with dict dms,              advanced one pass,                  39043
+github.tar,                         level 5 with dict dds,              advanced one pass,                  39069
+github.tar,                         level 5 with dict copy,             advanced one pass,                  39145
+github.tar,                         level 5 with dict load,             advanced one pass,                  39000
+github.tar,                         level 6,                            advanced one pass,                  39282
+github.tar,                         level 6 with dict,                  advanced one pass,                  38656
+github.tar,                         level 6 with dict dms,              advanced one pass,                  38640
+github.tar,                         level 6 with dict dds,              advanced one pass,                  38643
+github.tar,                         level 6 with dict copy,             advanced one pass,                  38656
+github.tar,                         level 6 with dict load,             advanced one pass,                  38647
+github.tar,                         level 7 row 1,                      advanced one pass,                  38005
+github.tar,                         level 7 row 1 with dict dms,        advanced one pass,                  37832
+github.tar,                         level 7 row 1 with dict dds,        advanced one pass,                  37857
+github.tar,                         level 7 row 1 with dict copy,       advanced one pass,                  37839
+github.tar,                         level 7 row 1 with dict load,       advanced one pass,                  37286
+github.tar,                         level 7 row 2,                      advanced one pass,                  38077
+github.tar,                         level 7 row 2 with dict dms,        advanced one pass,                  38012
+github.tar,                         level 7 row 2 with dict dds,        advanced one pass,                  38014
+github.tar,                         level 7 row 2 with dict copy,       advanced one pass,                  38101
+github.tar,                         level 7 row 2 with dict load,       advanced one pass,                  37402
+github.tar,                         level 7,                            advanced one pass,                  38005
+github.tar,                         level 7 with dict,                  advanced one pass,                  37839
+github.tar,                         level 7 with dict dms,              advanced one pass,                  37832
+github.tar,                         level 7 with dict dds,              advanced one pass,                  37857
+github.tar,                         level 7 with dict copy,             advanced one pass,                  37839
+github.tar,                         level 7 with dict load,             advanced one pass,                  37286
+github.tar,                         level 9,                            advanced one pass,                  36723
+github.tar,                         level 9 with dict,                  advanced one pass,                  36531
+github.tar,                         level 9 with dict dms,              advanced one pass,                  36615
+github.tar,                         level 9 with dict dds,              advanced one pass,                  36682
+github.tar,                         level 9 with dict copy,             advanced one pass,                  36531
+github.tar,                         level 9 with dict load,             advanced one pass,                  36322
+github.tar,                         level 11 row 1,                     advanced one pass,                  36085
+github.tar,                         level 11 row 1 with dict dms,       advanced one pass,                  36963
+github.tar,                         level 11 row 1 with dict dds,       advanced one pass,                  36963
+github.tar,                         level 11 row 1 with dict copy,      advanced one pass,                  36557
+github.tar,                         level 11 row 1 with dict load,      advanced one pass,                  36423
+github.tar,                         level 11 row 2,                     advanced one pass,                  36110
+github.tar,                         level 11 row 2 with dict dms,       advanced one pass,                  36963
+github.tar,                         level 11 row 2 with dict dds,       advanced one pass,                  36963
+github.tar,                         level 11 row 2 with dict copy,      advanced one pass,                  36557
+github.tar,                         level 11 row 2 with dict load,      advanced one pass,                  36459
+github.tar,                         level 12 row 1,                     advanced one pass,                  36085
+github.tar,                         level 12 row 1 with dict dms,       advanced one pass,                  36986
+github.tar,                         level 12 row 1 with dict dds,       advanced one pass,                  36986
+github.tar,                         level 12 row 1 with dict copy,      advanced one pass,                  36609
+github.tar,                         level 12 row 1 with dict load,      advanced one pass,                  36423
+github.tar,                         level 12 row 2,                     advanced one pass,                  36110
+github.tar,                         level 12 row 2 with dict dms,       advanced one pass,                  36986
+github.tar,                         level 12 row 2 with dict dds,       advanced one pass,                  36986
+github.tar,                         level 12 row 2 with dict copy,      advanced one pass,                  36609
+github.tar,                         level 12 row 2 with dict load,      advanced one pass,                  36459
+github.tar,                         level 13,                           advanced one pass,                  35501
+github.tar,                         level 13 with dict,                 advanced one pass,                  37130
+github.tar,                         level 13 with dict dms,             advanced one pass,                  37220
+github.tar,                         level 13 with dict dds,             advanced one pass,                  37220
+github.tar,                         level 13 with dict copy,            advanced one pass,                  37130
+github.tar,                         level 13 with dict load,            advanced one pass,                  36010
+github.tar,                         level 16,                           advanced one pass,                  40466
+github.tar,                         level 16 with dict,                 advanced one pass,                  33374
+github.tar,                         level 16 with dict dms,             advanced one pass,                  33206
+github.tar,                         level 16 with dict dds,             advanced one pass,                  33206
+github.tar,                         level 16 with dict copy,            advanced one pass,                  33374
+github.tar,                         level 16 with dict load,            advanced one pass,                  39081
+github.tar,                         level 19,                           advanced one pass,                  32276
+github.tar,                         level 19 with dict,                 advanced one pass,                  32712
+github.tar,                         level 19 with dict dms,             advanced one pass,                  32555
+github.tar,                         level 19 with dict dds,             advanced one pass,                  32555
+github.tar,                         level 19 with dict copy,            advanced one pass,                  32712
+github.tar,                         level 19 with dict load,            advanced one pass,                  32479
+github.tar,                         no source size,                     advanced one pass,                  38831
+github.tar,                         no source size with dict,           advanced one pass,                  37995
+github.tar,                         long distance mode,                 advanced one pass,                  40252
+github.tar,                         multithreaded,                      advanced one pass,                  38831
+github.tar,                         multithreaded long distance mode,   advanced one pass,                  40232
+github.tar,                         small window log,                   advanced one pass,                  198540
+github.tar,                         small hash log,                     advanced one pass,                  129870
+github.tar,                         small chain log,                    advanced one pass,                  41669
+github.tar,                         explicit params,                    advanced one pass,                  41385
+github.tar,                         uncompressed literals,              advanced one pass,                  41525
+github.tar,                         uncompressed literals optimal,      advanced one pass,                  35397
+github.tar,                         huffman literals,                   advanced one pass,                  38853
+github.tar,                         multithreaded with advanced params, advanced one pass,                  41525
+silesia,                            level -5,                           advanced one pass small out,        6857372
+silesia,                            level -3,                           advanced one pass small out,        6503412
+silesia,                            level -1,                           advanced one pass small out,        6172202
+silesia,                            level 0,                            advanced one pass small out,        4842075
+silesia,                            level 1,                            advanced one pass small out,        5306632
+silesia,                            level 3,                            advanced one pass small out,        4842075
+silesia,                            level 4,                            advanced one pass small out,        4779186
+silesia,                            level 5 row 1,                      advanced one pass small out,        4667668
+silesia,                            level 5 row 2,                      advanced one pass small out,        4670326
+silesia,                            level 5,                            advanced one pass small out,        4667668
+silesia,                            level 6,                            advanced one pass small out,        4604351
+silesia,                            level 7 row 1,                      advanced one pass small out,        4570271
+silesia,                            level 7 row 2,                      advanced one pass small out,        4565169
+silesia,                            level 7,                            advanced one pass small out,        4570271
+silesia,                            level 9,                            advanced one pass small out,        4545850
+silesia,                            level 11 row 1,                     advanced one pass small out,        4505658
+silesia,                            level 11 row 2,                     advanced one pass small out,        4503429
+silesia,                            level 12 row 1,                     advanced one pass small out,        4505658
+silesia,                            level 12 row 2,                     advanced one pass small out,        4503429
+silesia,                            level 13,                           advanced one pass small out,        4493990
+silesia,                            level 16,                           advanced one pass small out,        4360041
+silesia,                            level 19,                           advanced one pass small out,        4296055
+silesia,                            no source size,                     advanced one pass small out,        4842075
+silesia,                            long distance mode,                 advanced one pass small out,        4833710
+silesia,                            multithreaded,                      advanced one pass small out,        4842075
+silesia,                            multithreaded long distance mode,   advanced one pass small out,        4833737
+silesia,                            small window log,                   advanced one pass small out,        7095000
+silesia,                            small hash log,                     advanced one pass small out,        6526141
+silesia,                            small chain log,                    advanced one pass small out,        4912197
+silesia,                            explicit params,                    advanced one pass small out,        4795840
+silesia,                            uncompressed literals,              advanced one pass small out,        5120566
+silesia,                            uncompressed literals optimal,      advanced one pass small out,        4319518
+silesia,                            huffman literals,                   advanced one pass small out,        5321369
+silesia,                            multithreaded with advanced params, advanced one pass small out,        5120566
+silesia.tar,                        level -5,                           advanced one pass small out,        6861055
+silesia.tar,                        level -3,                           advanced one pass small out,        6505483
+silesia.tar,                        level -1,                           advanced one pass small out,        6179047
+silesia.tar,                        level 0,                            advanced one pass small out,        4854086
+silesia.tar,                        level 1,                            advanced one pass small out,        5327717
+silesia.tar,                        level 3,                            advanced one pass small out,        4854086
+silesia.tar,                        level 4,                            advanced one pass small out,        4791503
+silesia.tar,                        level 5 row 1,                      advanced one pass small out,        4679004
+silesia.tar,                        level 5 row 2,                      advanced one pass small out,        4682334
+silesia.tar,                        level 5,                            advanced one pass small out,        4679004
+silesia.tar,                        level 6,                            advanced one pass small out,        4614561
+silesia.tar,                        level 7 row 1,                      advanced one pass small out,        4579828
+silesia.tar,                        level 7 row 2,                      advanced one pass small out,        4575602
+silesia.tar,                        level 7,                            advanced one pass small out,        4579828
+silesia.tar,                        level 9,                            advanced one pass small out,        4555448
+silesia.tar,                        level 11 row 1,                     advanced one pass small out,        4514962
+silesia.tar,                        level 11 row 2,                     advanced one pass small out,        4513816
+silesia.tar,                        level 12 row 1,                     advanced one pass small out,        4514517
+silesia.tar,                        level 12 row 2,                     advanced one pass small out,        4514007
+silesia.tar,                        level 13,                           advanced one pass small out,        4502956
+silesia.tar,                        level 16,                           advanced one pass small out,        4360546
+silesia.tar,                        level 19,                           advanced one pass small out,        4265911
+silesia.tar,                        no source size,                     advanced one pass small out,        4854086
+silesia.tar,                        long distance mode,                 advanced one pass small out,        4840452
+silesia.tar,                        multithreaded,                      advanced one pass small out,        4854160
+silesia.tar,                        multithreaded long distance mode,   advanced one pass small out,        4845741
+silesia.tar,                        small window log,                   advanced one pass small out,        7100655
+silesia.tar,                        small hash log,                     advanced one pass small out,        6529206
+silesia.tar,                        small chain log,                    advanced one pass small out,        4917041
+silesia.tar,                        explicit params,                    advanced one pass small out,        4807274
+silesia.tar,                        uncompressed literals,              advanced one pass small out,        5122473
+silesia.tar,                        uncompressed literals optimal,      advanced one pass small out,        4310141
+silesia.tar,                        huffman literals,                   advanced one pass small out,        5341705
+silesia.tar,                        multithreaded with advanced params, advanced one pass small out,        5122567
+github,                             level -5,                           advanced one pass small out,        204407
+github,                             level -5 with dict,                 advanced one pass small out,        45832
+github,                             level -3,                           advanced one pass small out,        193253
+github,                             level -3 with dict,                 advanced one pass small out,        44671
+github,                             level -1,                           advanced one pass small out,        175468
+github,                             level -1 with dict,                 advanced one pass small out,        41825
+github,                             level 0,                            advanced one pass small out,        136332
+github,                             level 0 with dict,                  advanced one pass small out,        41148
+github,                             level 0 with dict dms,              advanced one pass small out,        41148
+github,                             level 0 with dict dds,              advanced one pass small out,        41148
+github,                             level 0 with dict copy,             advanced one pass small out,        41124
+github,                             level 0 with dict load,             advanced one pass small out,        41847
+github,                             level 1,                            advanced one pass small out,        142365
+github,                             level 1 with dict,                  advanced one pass small out,        41266
+github,                             level 1 with dict dms,              advanced one pass small out,        41266
+github,                             level 1 with dict dds,              advanced one pass small out,        41266
+github,                             level 1 with dict copy,             advanced one pass small out,        41279
+github,                             level 1 with dict load,             advanced one pass small out,        43331
+github,                             level 3,                            advanced one pass small out,        136332
+github,                             level 3 with dict,                  advanced one pass small out,        41148
+github,                             level 3 with dict dms,              advanced one pass small out,        41148
+github,                             level 3 with dict dds,              advanced one pass small out,        41148
+github,                             level 3 with dict copy,             advanced one pass small out,        41124
+github,                             level 3 with dict load,             advanced one pass small out,        41847
+github,                             level 4,                            advanced one pass small out,        136199
+github,                             level 4 with dict,                  advanced one pass small out,        41251
+github,                             level 4 with dict dms,              advanced one pass small out,        41251
+github,                             level 4 with dict dds,              advanced one pass small out,        41251
+github,                             level 4 with dict copy,             advanced one pass small out,        41216
+github,                             level 4 with dict load,             advanced one pass small out,        41548
+github,                             level 5 row 1,                      advanced one pass small out,        134584
+github,                             level 5 row 1 with dict dms,        advanced one pass small out,        38754
+github,                             level 5 row 1 with dict dds,        advanced one pass small out,        38728
+github,                             level 5 row 1 with dict copy,       advanced one pass small out,        38755
+github,                             level 5 row 1 with dict load,       advanced one pass small out,        41899
+github,                             level 5 row 2,                      advanced one pass small out,        135121
+github,                             level 5 row 2 with dict dms,        advanced one pass small out,        38938
+github,                             level 5 row 2 with dict dds,        advanced one pass small out,        38732
+github,                             level 5 row 2 with dict copy,       advanced one pass small out,        38934
+github,                             level 5 row 2 with dict load,       advanced one pass small out,        41248
+github,                             level 5,                            advanced one pass small out,        135121
+github,                             level 5 with dict,                  advanced one pass small out,        38754
+github,                             level 5 with dict dms,              advanced one pass small out,        38754
+github,                             level 5 with dict dds,              advanced one pass small out,        38728
+github,                             level 5 with dict copy,             advanced one pass small out,        38755
+github,                             level 5 with dict load,             advanced one pass small out,        41248
+github,                             level 6,                            advanced one pass small out,        135122
+github,                             level 6 with dict,                  advanced one pass small out,        38669
+github,                             level 6 with dict dms,              advanced one pass small out,        38669
+github,                             level 6 with dict dds,              advanced one pass small out,        38638
+github,                             level 6 with dict copy,             advanced one pass small out,        38665
+github,                             level 6 with dict load,             advanced one pass small out,        41153
+github,                             level 7 row 1,                      advanced one pass small out,        134584
+github,                             level 7 row 1 with dict dms,        advanced one pass small out,        38765
+github,                             level 7 row 1 with dict dds,        advanced one pass small out,        38749
+github,                             level 7 row 1 with dict copy,       advanced one pass small out,        38759
+github,                             level 7 row 1 with dict load,       advanced one pass small out,        43227
+github,                             level 7 row 2,                      advanced one pass small out,        135122
+github,                             level 7 row 2 with dict dms,        advanced one pass small out,        38860
+github,                             level 7 row 2 with dict dds,        advanced one pass small out,        38766
+github,                             level 7 row 2 with dict copy,       advanced one pass small out,        38834
+github,                             level 7 row 2 with dict load,       advanced one pass small out,        41153
+github,                             level 7,                            advanced one pass small out,        135122
+github,                             level 7 with dict,                  advanced one pass small out,        38765
+github,                             level 7 with dict dms,              advanced one pass small out,        38765
+github,                             level 7 with dict dds,              advanced one pass small out,        38749
+github,                             level 7 with dict copy,             advanced one pass small out,        38759
+github,                             level 7 with dict load,             advanced one pass small out,        41153
+github,                             level 9,                            advanced one pass small out,        135122
+github,                             level 9 with dict,                  advanced one pass small out,        39439
+github,                             level 9 with dict dms,              advanced one pass small out,        39439
+github,                             level 9 with dict dds,              advanced one pass small out,        39393
+github,                             level 9 with dict copy,             advanced one pass small out,        39362
+github,                             level 9 with dict load,             advanced one pass small out,        42148
+github,                             level 11 row 1,                     advanced one pass small out,        135367
+github,                             level 11 row 1 with dict dms,       advanced one pass small out,        39671
+github,                             level 11 row 1 with dict dds,       advanced one pass small out,        39671
+github,                             level 11 row 1 with dict copy,      advanced one pass small out,        39651
+github,                             level 11 row 1 with dict load,      advanced one pass small out,        41744
+github,                             level 11 row 2,                     advanced one pass small out,        135367
+github,                             level 11 row 2 with dict dms,       advanced one pass small out,        39671
+github,                             level 11 row 2 with dict dds,       advanced one pass small out,        39671
+github,                             level 11 row 2 with dict copy,      advanced one pass small out,        39651
+github,                             level 11 row 2 with dict load,      advanced one pass small out,        41744
+github,                             level 12 row 1,                     advanced one pass small out,        134402
+github,                             level 12 row 1 with dict dms,       advanced one pass small out,        39677
+github,                             level 12 row 1 with dict dds,       advanced one pass small out,        39677
+github,                             level 12 row 1 with dict copy,      advanced one pass small out,        39677
+github,                             level 12 row 1 with dict load,      advanced one pass small out,        41553
+github,                             level 12 row 2,                     advanced one pass small out,        134402
+github,                             level 12 row 2 with dict dms,       advanced one pass small out,        39677
+github,                             level 12 row 2 with dict dds,       advanced one pass small out,        39677
+github,                             level 12 row 2 with dict copy,      advanced one pass small out,        39677
+github,                             level 12 row 2 with dict load,      advanced one pass small out,        41553
+github,                             level 13,                           advanced one pass small out,        132878
+github,                             level 13 with dict,                 advanced one pass small out,        39900
+github,                             level 13 with dict dms,             advanced one pass small out,        39900
+github,                             level 13 with dict dds,             advanced one pass small out,        39900
+github,                             level 13 with dict copy,            advanced one pass small out,        39948
+github,                             level 13 with dict load,            advanced one pass small out,        42624
+github,                             level 16,                           advanced one pass small out,        133209
+github,                             level 16 with dict,                 advanced one pass small out,        37577
+github,                             level 16 with dict dms,             advanced one pass small out,        37577
+github,                             level 16 with dict dds,             advanced one pass small out,        37577
+github,                             level 16 with dict copy,            advanced one pass small out,        37568
+github,                             level 16 with dict load,            advanced one pass small out,        42338
+github,                             level 19,                           advanced one pass small out,        132879
+github,                             level 19 with dict,                 advanced one pass small out,        37576
+github,                             level 19 with dict dms,             advanced one pass small out,        37576
+github,                             level 19 with dict dds,             advanced one pass small out,        37576
+github,                             level 19 with dict copy,            advanced one pass small out,        37567
+github,                             level 19 with dict load,            advanced one pass small out,        39613
+github,                             no source size,                     advanced one pass small out,        136332
+github,                             no source size with dict,           advanced one pass small out,        41148
+github,                             long distance mode,                 advanced one pass small out,        136332
+github,                             multithreaded,                      advanced one pass small out,        136332
+github,                             multithreaded long distance mode,   advanced one pass small out,        136332
+github,                             small window log,                   advanced one pass small out,        136332
+github,                             small hash log,                     advanced one pass small out,        135590
+github,                             small chain log,                    advanced one pass small out,        136341
+github,                             explicit params,                    advanced one pass small out,        137727
+github,                             uncompressed literals,              advanced one pass small out,        165911
+github,                             uncompressed literals optimal,      advanced one pass small out,        152667
+github,                             huffman literals,                   advanced one pass small out,        142365
+github,                             multithreaded with advanced params, advanced one pass small out,        165911
+github.tar,                         level -5,                           advanced one pass small out,        52115
+github.tar,                         level -5 with dict,                 advanced one pass small out,        51097
+github.tar,                         level -3,                           advanced one pass small out,        45678
+github.tar,                         level -3 with dict,                 advanced one pass small out,        44734
+github.tar,                         level -1,                           advanced one pass small out,        42560
+github.tar,                         level -1 with dict,                 advanced one pass small out,        41353
+github.tar,                         level 0,                            advanced one pass small out,        38831
+github.tar,                         level 0 with dict,                  advanced one pass small out,        37995
+github.tar,                         level 0 with dict dms,              advanced one pass small out,        38003
+github.tar,                         level 0 with dict dds,              advanced one pass small out,        38003
+github.tar,                         level 0 with dict copy,             advanced one pass small out,        37995
+github.tar,                         level 0 with dict load,             advanced one pass small out,        37956
+github.tar,                         level 1,                            advanced one pass small out,        39200
+github.tar,                         level 1 with dict,                  advanced one pass small out,        38119
+github.tar,                         level 1 with dict dms,              advanced one pass small out,        38406
+github.tar,                         level 1 with dict dds,              advanced one pass small out,        38406
+github.tar,                         level 1 with dict copy,             advanced one pass small out,        38119
+github.tar,                         level 1 with dict load,             advanced one pass small out,        38364
+github.tar,                         level 3,                            advanced one pass small out,        38831
+github.tar,                         level 3 with dict,                  advanced one pass small out,        37995
+github.tar,                         level 3 with dict dms,              advanced one pass small out,        38003
+github.tar,                         level 3 with dict dds,              advanced one pass small out,        38003
+github.tar,                         level 3 with dict copy,             advanced one pass small out,        37995
+github.tar,                         level 3 with dict load,             advanced one pass small out,        37956
+github.tar,                         level 4,                            advanced one pass small out,        38893
+github.tar,                         level 4 with dict,                  advanced one pass small out,        37948
+github.tar,                         level 4 with dict dms,              advanced one pass small out,        37954
+github.tar,                         level 4 with dict dds,              advanced one pass small out,        37954
+github.tar,                         level 4 with dict copy,             advanced one pass small out,        37948
+github.tar,                         level 4 with dict load,             advanced one pass small out,        37927
+github.tar,                         level 5 row 1,                      advanced one pass small out,        39651
+github.tar,                         level 5 row 1 with dict dms,        advanced one pass small out,        39043
+github.tar,                         level 5 row 1 with dict dds,        advanced one pass small out,        39069
+github.tar,                         level 5 row 1 with dict copy,       advanced one pass small out,        39145
+github.tar,                         level 5 row 1 with dict load,       advanced one pass small out,        39000
+github.tar,                         level 5 row 2,                      advanced one pass small out,        39701
+github.tar,                         level 5 row 2 with dict dms,        advanced one pass small out,        39365
+github.tar,                         level 5 row 2 with dict dds,        advanced one pass small out,        39233
+github.tar,                         level 5 row 2 with dict copy,       advanced one pass small out,        39715
+github.tar,                         level 5 row 2 with dict load,       advanced one pass small out,        39158
+github.tar,                         level 5,                            advanced one pass small out,        39651
+github.tar,                         level 5 with dict,                  advanced one pass small out,        39145
+github.tar,                         level 5 with dict dms,              advanced one pass small out,        39043
+github.tar,                         level 5 with dict dds,              advanced one pass small out,        39069
+github.tar,                         level 5 with dict copy,             advanced one pass small out,        39145
+github.tar,                         level 5 with dict load,             advanced one pass small out,        39000
+github.tar,                         level 6,                            advanced one pass small out,        39282
+github.tar,                         level 6 with dict,                  advanced one pass small out,        38656
+github.tar,                         level 6 with dict dms,              advanced one pass small out,        38640
+github.tar,                         level 6 with dict dds,              advanced one pass small out,        38643
+github.tar,                         level 6 with dict copy,             advanced one pass small out,        38656
+github.tar,                         level 6 with dict load,             advanced one pass small out,        38647
+github.tar,                         level 7 row 1,                      advanced one pass small out,        38005
+github.tar,                         level 7 row 1 with dict dms,        advanced one pass small out,        37832
+github.tar,                         level 7 row 1 with dict dds,        advanced one pass small out,        37857
+github.tar,                         level 7 row 1 with dict copy,       advanced one pass small out,        37839
+github.tar,                         level 7 row 1 with dict load,       advanced one pass small out,        37286
+github.tar,                         level 7 row 2,                      advanced one pass small out,        38077
+github.tar,                         level 7 row 2 with dict dms,        advanced one pass small out,        38012
+github.tar,                         level 7 row 2 with dict dds,        advanced one pass small out,        38014
+github.tar,                         level 7 row 2 with dict copy,       advanced one pass small out,        38101
+github.tar,                         level 7 row 2 with dict load,       advanced one pass small out,        37402
+github.tar,                         level 7,                            advanced one pass small out,        38005
+github.tar,                         level 7 with dict,                  advanced one pass small out,        37839
+github.tar,                         level 7 with dict dms,              advanced one pass small out,        37832
+github.tar,                         level 7 with dict dds,              advanced one pass small out,        37857
+github.tar,                         level 7 with dict copy,             advanced one pass small out,        37839
+github.tar,                         level 7 with dict load,             advanced one pass small out,        37286
+github.tar,                         level 9,                            advanced one pass small out,        36723
+github.tar,                         level 9 with dict,                  advanced one pass small out,        36531
+github.tar,                         level 9 with dict dms,              advanced one pass small out,        36615
+github.tar,                         level 9 with dict dds,              advanced one pass small out,        36682
+github.tar,                         level 9 with dict copy,             advanced one pass small out,        36531
+github.tar,                         level 9 with dict load,             advanced one pass small out,        36322
+github.tar,                         level 11 row 1,                     advanced one pass small out,        36085
+github.tar,                         level 11 row 1 with dict dms,       advanced one pass small out,        36963
+github.tar,                         level 11 row 1 with dict dds,       advanced one pass small out,        36963
+github.tar,                         level 11 row 1 with dict copy,      advanced one pass small out,        36557
+github.tar,                         level 11 row 1 with dict load,      advanced one pass small out,        36423
+github.tar,                         level 11 row 2,                     advanced one pass small out,        36110
+github.tar,                         level 11 row 2 with dict dms,       advanced one pass small out,        36963
+github.tar,                         level 11 row 2 with dict dds,       advanced one pass small out,        36963
+github.tar,                         level 11 row 2 with dict copy,      advanced one pass small out,        36557
+github.tar,                         level 11 row 2 with dict load,      advanced one pass small out,        36459
+github.tar,                         level 12 row 1,                     advanced one pass small out,        36085
+github.tar,                         level 12 row 1 with dict dms,       advanced one pass small out,        36986
+github.tar,                         level 12 row 1 with dict dds,       advanced one pass small out,        36986
+github.tar,                         level 12 row 1 with dict copy,      advanced one pass small out,        36609
+github.tar,                         level 12 row 1 with dict load,      advanced one pass small out,        36423
+github.tar,                         level 12 row 2,                     advanced one pass small out,        36110
+github.tar,                         level 12 row 2 with dict dms,       advanced one pass small out,        36986
+github.tar,                         level 12 row 2 with dict dds,       advanced one pass small out,        36986
+github.tar,                         level 12 row 2 with dict copy,      advanced one pass small out,        36609
+github.tar,                         level 12 row 2 with dict load,      advanced one pass small out,        36459
+github.tar,                         level 13,                           advanced one pass small out,        35501
+github.tar,                         level 13 with dict,                 advanced one pass small out,        37130
+github.tar,                         level 13 with dict dms,             advanced one pass small out,        37220
+github.tar,                         level 13 with dict dds,             advanced one pass small out,        37220
+github.tar,                         level 13 with dict copy,            advanced one pass small out,        37130
+github.tar,                         level 13 with dict load,            advanced one pass small out,        36010
+github.tar,                         level 16,                           advanced one pass small out,        40466
+github.tar,                         level 16 with dict,                 advanced one pass small out,        33374
+github.tar,                         level 16 with dict dms,             advanced one pass small out,        33206
+github.tar,                         level 16 with dict dds,             advanced one pass small out,        33206
+github.tar,                         level 16 with dict copy,            advanced one pass small out,        33374
+github.tar,                         level 16 with dict load,            advanced one pass small out,        39081
+github.tar,                         level 19,                           advanced one pass small out,        32276
+github.tar,                         level 19 with dict,                 advanced one pass small out,        32712
+github.tar,                         level 19 with dict dms,             advanced one pass small out,        32555
+github.tar,                         level 19 with dict dds,             advanced one pass small out,        32555
+github.tar,                         level 19 with dict copy,            advanced one pass small out,        32712
+github.tar,                         level 19 with dict load,            advanced one pass small out,        32479
+github.tar,                         no source size,                     advanced one pass small out,        38831
+github.tar,                         no source size with dict,           advanced one pass small out,        37995
+github.tar,                         long distance mode,                 advanced one pass small out,        40252
+github.tar,                         multithreaded,                      advanced one pass small out,        38831
+github.tar,                         multithreaded long distance mode,   advanced one pass small out,        40232
+github.tar,                         small window log,                   advanced one pass small out,        198540
+github.tar,                         small hash log,                     advanced one pass small out,        129870
+github.tar,                         small chain log,                    advanced one pass small out,        41669
+github.tar,                         explicit params,                    advanced one pass small out,        41385
+github.tar,                         uncompressed literals,              advanced one pass small out,        41525
+github.tar,                         uncompressed literals optimal,      advanced one pass small out,        35397
+github.tar,                         huffman literals,                   advanced one pass small out,        38853
+github.tar,                         multithreaded with advanced params, advanced one pass small out,        41525
+silesia,                            level -5,                           advanced streaming,                 6854744
+silesia,                            level -3,                           advanced streaming,                 6503319
+silesia,                            level -1,                           advanced streaming,                 6172207
+silesia,                            level 0,                            advanced streaming,                 4842075
+silesia,                            level 1,                            advanced streaming,                 5306388
+silesia,                            level 3,                            advanced streaming,                 4842075
+silesia,                            level 4,                            advanced streaming,                 4779186
+silesia,                            level 5 row 1,                      advanced streaming,                 4667668
+silesia,                            level 5 row 2,                      advanced streaming,                 4670326
+silesia,                            level 5,                            advanced streaming,                 4667668
+silesia,                            level 6,                            advanced streaming,                 4604351
+silesia,                            level 7 row 1,                      advanced streaming,                 4570271
+silesia,                            level 7 row 2,                      advanced streaming,                 4565169
+silesia,                            level 7,                            advanced streaming,                 4570271
+silesia,                            level 9,                            advanced streaming,                 4545850
+silesia,                            level 11 row 1,                     advanced streaming,                 4505658
+silesia,                            level 11 row 2,                     advanced streaming,                 4503429
+silesia,                            level 12 row 1,                     advanced streaming,                 4505658
+silesia,                            level 12 row 2,                     advanced streaming,                 4503429
+silesia,                            level 13,                           advanced streaming,                 4493990
+silesia,                            level 16,                           advanced streaming,                 4360041
+silesia,                            level 19,                           advanced streaming,                 4296055
+silesia,                            no source size,                     advanced streaming,                 4842039
+silesia,                            long distance mode,                 advanced streaming,                 4833710
+silesia,                            multithreaded,                      advanced streaming,                 4842075
+silesia,                            multithreaded long distance mode,   advanced streaming,                 4833737
+silesia,                            small window log,                   advanced streaming,                 7111103
+silesia,                            small hash log,                     advanced streaming,                 6526141
+silesia,                            small chain log,                    advanced streaming,                 4912197
+silesia,                            explicit params,                    advanced streaming,                 4795857
+silesia,                            uncompressed literals,              advanced streaming,                 5120566
+silesia,                            uncompressed literals optimal,      advanced streaming,                 4319518
+silesia,                            huffman literals,                   advanced streaming,                 5321370
+silesia,                            multithreaded with advanced params, advanced streaming,                 5120566
+silesia.tar,                        level -5,                           advanced streaming,                 6856523
+silesia.tar,                        level -3,                           advanced streaming,                 6505954
+silesia.tar,                        level -1,                           advanced streaming,                 6179056
+silesia.tar,                        level 0,                            advanced streaming,                 4859271
+silesia.tar,                        level 1,                            advanced streaming,                 5327708
+silesia.tar,                        level 3,                            advanced streaming,                 4859271
+silesia.tar,                        level 4,                            advanced streaming,                 4797470
+silesia.tar,                        level 5 row 1,                      advanced streaming,                 4679020
+silesia.tar,                        level 5 row 2,                      advanced streaming,                 4682355
+silesia.tar,                        level 5,                            advanced streaming,                 4679020
+silesia.tar,                        level 6,                            advanced streaming,                 4614558
+silesia.tar,                        level 7 row 1,                      advanced streaming,                 4579823
+silesia.tar,                        level 7 row 2,                      advanced streaming,                 4575601
+silesia.tar,                        level 7,                            advanced streaming,                 4579823
+silesia.tar,                        level 9,                            advanced streaming,                 4555445
+silesia.tar,                        level 11 row 1,                     advanced streaming,                 4514959
+silesia.tar,                        level 11 row 2,                     advanced streaming,                 4513810
+silesia.tar,                        level 12 row 1,                     advanced streaming,                 4514514
+silesia.tar,                        level 12 row 2,                     advanced streaming,                 4514003
+silesia.tar,                        level 13,                           advanced streaming,                 4502956
+silesia.tar,                        level 16,                           advanced streaming,                 4360546
+silesia.tar,                        level 19,                           advanced streaming,                 4265911
+silesia.tar,                        no source size,                     advanced streaming,                 4859267
+silesia.tar,                        long distance mode,                 advanced streaming,                 4840452
+silesia.tar,                        multithreaded,                      advanced streaming,                 4854160
+silesia.tar,                        multithreaded long distance mode,   advanced streaming,                 4845741
+silesia.tar,                        small window log,                   advanced streaming,                 7117559
+silesia.tar,                        small hash log,                     advanced streaming,                 6529209
+silesia.tar,                        small chain log,                    advanced streaming,                 4917021
+silesia.tar,                        explicit params,                    advanced streaming,                 4807288
+silesia.tar,                        uncompressed literals,              advanced streaming,                 5127423
+silesia.tar,                        uncompressed literals optimal,      advanced streaming,                 4310141
+silesia.tar,                        huffman literals,                   advanced streaming,                 5341712
+silesia.tar,                        multithreaded with advanced params, advanced streaming,                 5122567
+github,                             level -5,                           advanced streaming,                 204407
+github,                             level -5 with dict,                 advanced streaming,                 45832
+github,                             level -3,                           advanced streaming,                 193253
+github,                             level -3 with dict,                 advanced streaming,                 44671
+github,                             level -1,                           advanced streaming,                 175468
+github,                             level -1 with dict,                 advanced streaming,                 41825
+github,                             level 0,                            advanced streaming,                 136332
+github,                             level 0 with dict,                  advanced streaming,                 41148
+github,                             level 0 with dict dms,              advanced streaming,                 41148
+github,                             level 0 with dict dds,              advanced streaming,                 41148
+github,                             level 0 with dict copy,             advanced streaming,                 41124
+github,                             level 0 with dict load,             advanced streaming,                 41847
+github,                             level 1,                            advanced streaming,                 142365
+github,                             level 1 with dict,                  advanced streaming,                 41266
+github,                             level 1 with dict dms,              advanced streaming,                 41266
+github,                             level 1 with dict dds,              advanced streaming,                 41266
+github,                             level 1 with dict copy,             advanced streaming,                 41279
+github,                             level 1 with dict load,             advanced streaming,                 43331
+github,                             level 3,                            advanced streaming,                 136332
+github,                             level 3 with dict,                  advanced streaming,                 41148
+github,                             level 3 with dict dms,              advanced streaming,                 41148
+github,                             level 3 with dict dds,              advanced streaming,                 41148
+github,                             level 3 with dict copy,             advanced streaming,                 41124
+github,                             level 3 with dict load,             advanced streaming,                 41847
+github,                             level 4,                            advanced streaming,                 136199
+github,                             level 4 with dict,                  advanced streaming,                 41251
+github,                             level 4 with dict dms,              advanced streaming,                 41251
+github,                             level 4 with dict dds,              advanced streaming,                 41251
+github,                             level 4 with dict copy,             advanced streaming,                 41216
+github,                             level 4 with dict load,             advanced streaming,                 41548
+github,                             level 5 row 1,                      advanced streaming,                 134584
+github,                             level 5 row 1 with dict dms,        advanced streaming,                 38754
+github,                             level 5 row 1 with dict dds,        advanced streaming,                 38728
+github,                             level 5 row 1 with dict copy,       advanced streaming,                 38755
+github,                             level 5 row 1 with dict load,       advanced streaming,                 41899
+github,                             level 5 row 2,                      advanced streaming,                 135121
+github,                             level 5 row 2 with dict dms,        advanced streaming,                 38938
+github,                             level 5 row 2 with dict dds,        advanced streaming,                 38732
+github,                             level 5 row 2 with dict copy,       advanced streaming,                 38934
+github,                             level 5 row 2 with dict load,       advanced streaming,                 41248
+github,                             level 5,                            advanced streaming,                 135121
+github,                             level 5 with dict,                  advanced streaming,                 38754
+github,                             level 5 with dict dms,              advanced streaming,                 38754
+github,                             level 5 with dict dds,              advanced streaming,                 38728
+github,                             level 5 with dict copy,             advanced streaming,                 38755
+github,                             level 5 with dict load,             advanced streaming,                 41248
+github,                             level 6,                            advanced streaming,                 135122
+github,                             level 6 with dict,                  advanced streaming,                 38669
+github,                             level 6 with dict dms,              advanced streaming,                 38669
+github,                             level 6 with dict dds,              advanced streaming,                 38638
+github,                             level 6 with dict copy,             advanced streaming,                 38665
+github,                             level 6 with dict load,             advanced streaming,                 41153
+github,                             level 7 row 1,                      advanced streaming,                 134584
+github,                             level 7 row 1 with dict dms,        advanced streaming,                 38765
+github,                             level 7 row 1 with dict dds,        advanced streaming,                 38749
+github,                             level 7 row 1 with dict copy,       advanced streaming,                 38759
+github,                             level 7 row 1 with dict load,       advanced streaming,                 43227
+github,                             level 7 row 2,                      advanced streaming,                 135122
+github,                             level 7 row 2 with dict dms,        advanced streaming,                 38860
+github,                             level 7 row 2 with dict dds,        advanced streaming,                 38766
+github,                             level 7 row 2 with dict copy,       advanced streaming,                 38834
+github,                             level 7 row 2 with dict load,       advanced streaming,                 41153
+github,                             level 7,                            advanced streaming,                 135122
+github,                             level 7 with dict,                  advanced streaming,                 38765
+github,                             level 7 with dict dms,              advanced streaming,                 38765
+github,                             level 7 with dict dds,              advanced streaming,                 38749
+github,                             level 7 with dict copy,             advanced streaming,                 38759
+github,                             level 7 with dict load,             advanced streaming,                 41153
+github,                             level 9,                            advanced streaming,                 135122
+github,                             level 9 with dict,                  advanced streaming,                 39439
+github,                             level 9 with dict dms,              advanced streaming,                 39439
+github,                             level 9 with dict dds,              advanced streaming,                 39393
+github,                             level 9 with dict copy,             advanced streaming,                 39362
+github,                             level 9 with dict load,             advanced streaming,                 42148
+github,                             level 11 row 1,                     advanced streaming,                 135367
+github,                             level 11 row 1 with dict dms,       advanced streaming,                 39671
+github,                             level 11 row 1 with dict dds,       advanced streaming,                 39671
+github,                             level 11 row 1 with dict copy,      advanced streaming,                 39651
+github,                             level 11 row 1 with dict load,      advanced streaming,                 41744
+github,                             level 11 row 2,                     advanced streaming,                 135367
+github,                             level 11 row 2 with dict dms,       advanced streaming,                 39671
+github,                             level 11 row 2 with dict dds,       advanced streaming,                 39671
+github,                             level 11 row 2 with dict copy,      advanced streaming,                 39651
+github,                             level 11 row 2 with dict load,      advanced streaming,                 41744
+github,                             level 12 row 1,                     advanced streaming,                 134402
+github,                             level 12 row 1 with dict dms,       advanced streaming,                 39677
+github,                             level 12 row 1 with dict dds,       advanced streaming,                 39677
+github,                             level 12 row 1 with dict copy,      advanced streaming,                 39677
+github,                             level 12 row 1 with dict load,      advanced streaming,                 41553
+github,                             level 12 row 2,                     advanced streaming,                 134402
+github,                             level 12 row 2 with dict dms,       advanced streaming,                 39677
+github,                             level 12 row 2 with dict dds,       advanced streaming,                 39677
+github,                             level 12 row 2 with dict copy,      advanced streaming,                 39677
+github,                             level 12 row 2 with dict load,      advanced streaming,                 41553
+github,                             level 13,                           advanced streaming,                 132878
+github,                             level 13 with dict,                 advanced streaming,                 39900
+github,                             level 13 with dict dms,             advanced streaming,                 39900
+github,                             level 13 with dict dds,             advanced streaming,                 39900
+github,                             level 13 with dict copy,            advanced streaming,                 39948
+github,                             level 13 with dict load,            advanced streaming,                 42624
+github,                             level 16,                           advanced streaming,                 133209
+github,                             level 16 with dict,                 advanced streaming,                 37577
+github,                             level 16 with dict dms,             advanced streaming,                 37577
+github,                             level 16 with dict dds,             advanced streaming,                 37577
+github,                             level 16 with dict copy,            advanced streaming,                 37568
+github,                             level 16 with dict load,            advanced streaming,                 42338
+github,                             level 19,                           advanced streaming,                 132879
+github,                             level 19 with dict,                 advanced streaming,                 37576
+github,                             level 19 with dict dms,             advanced streaming,                 37576
+github,                             level 19 with dict dds,             advanced streaming,                 37576
+github,                             level 19 with dict copy,            advanced streaming,                 37567
+github,                             level 19 with dict load,            advanced streaming,                 39613
+github,                             no source size,                     advanced streaming,                 136332
+github,                             no source size with dict,           advanced streaming,                 41148
+github,                             long distance mode,                 advanced streaming,                 136332
+github,                             multithreaded,                      advanced streaming,                 136332
+github,                             multithreaded long distance mode,   advanced streaming,                 136332
+github,                             small window log,                   advanced streaming,                 136332
+github,                             small hash log,                     advanced streaming,                 135590
+github,                             small chain log,                    advanced streaming,                 136341
+github,                             explicit params,                    advanced streaming,                 137727
+github,                             uncompressed literals,              advanced streaming,                 165911
+github,                             uncompressed literals optimal,      advanced streaming,                 152667
+github,                             huffman literals,                   advanced streaming,                 142365
+github,                             multithreaded with advanced params, advanced streaming,                 165911
+github.tar,                         level -5,                           advanced streaming,                 52152
+github.tar,                         level -5 with dict,                 advanced streaming,                 51181
+github.tar,                         level -3,                           advanced streaming,                 45678
+github.tar,                         level -3 with dict,                 advanced streaming,                 44734
+github.tar,                         level -1,                           advanced streaming,                 42560
+github.tar,                         level -1 with dict,                 advanced streaming,                 41353
+github.tar,                         level 0,                            advanced streaming,                 38831
+github.tar,                         level 0 with dict,                  advanced streaming,                 37995
+github.tar,                         level 0 with dict dms,              advanced streaming,                 38003
+github.tar,                         level 0 with dict dds,              advanced streaming,                 38003
+github.tar,                         level 0 with dict copy,             advanced streaming,                 37995
+github.tar,                         level 0 with dict load,             advanced streaming,                 37956
+github.tar,                         level 1,                            advanced streaming,                 39200
+github.tar,                         level 1 with dict,                  advanced streaming,                 38119
+github.tar,                         level 1 with dict dms,              advanced streaming,                 38406
+github.tar,                         level 1 with dict dds,              advanced streaming,                 38406
+github.tar,                         level 1 with dict copy,             advanced streaming,                 38119
+github.tar,                         level 1 with dict load,             advanced streaming,                 38364
+github.tar,                         level 3,                            advanced streaming,                 38831
+github.tar,                         level 3 with dict,                  advanced streaming,                 37995
+github.tar,                         level 3 with dict dms,              advanced streaming,                 38003
+github.tar,                         level 3 with dict dds,              advanced streaming,                 38003
+github.tar,                         level 3 with dict copy,             advanced streaming,                 37995
+github.tar,                         level 3 with dict load,             advanced streaming,                 37956
+github.tar,                         level 4,                            advanced streaming,                 38893
+github.tar,                         level 4 with dict,                  advanced streaming,                 37948
+github.tar,                         level 4 with dict dms,              advanced streaming,                 37954
+github.tar,                         level 4 with dict dds,              advanced streaming,                 37954
+github.tar,                         level 4 with dict copy,             advanced streaming,                 37948
+github.tar,                         level 4 with dict load,             advanced streaming,                 37927
+github.tar,                         level 5 row 1,                      advanced streaming,                 39651
+github.tar,                         level 5 row 1 with dict dms,        advanced streaming,                 39043
+github.tar,                         level 5 row 1 with dict dds,        advanced streaming,                 39069
+github.tar,                         level 5 row 1 with dict copy,       advanced streaming,                 39145
+github.tar,                         level 5 row 1 with dict load,       advanced streaming,                 39000
+github.tar,                         level 5 row 2,                      advanced streaming,                 39701
+github.tar,                         level 5 row 2 with dict dms,        advanced streaming,                 39365
+github.tar,                         level 5 row 2 with dict dds,        advanced streaming,                 39233
+github.tar,                         level 5 row 2 with dict copy,       advanced streaming,                 39715
+github.tar,                         level 5 row 2 with dict load,       advanced streaming,                 39158
+github.tar,                         level 5,                            advanced streaming,                 39651
+github.tar,                         level 5 with dict,                  advanced streaming,                 39145
+github.tar,                         level 5 with dict dms,              advanced streaming,                 39043
+github.tar,                         level 5 with dict dds,              advanced streaming,                 39069
+github.tar,                         level 5 with dict copy,             advanced streaming,                 39145
+github.tar,                         level 5 with dict load,             advanced streaming,                 39000
+github.tar,                         level 6,                            advanced streaming,                 39282
+github.tar,                         level 6 with dict,                  advanced streaming,                 38656
+github.tar,                         level 6 with dict dms,              advanced streaming,                 38640
+github.tar,                         level 6 with dict dds,              advanced streaming,                 38643
+github.tar,                         level 6 with dict copy,             advanced streaming,                 38656
+github.tar,                         level 6 with dict load,             advanced streaming,                 38647
+github.tar,                         level 7 row 1,                      advanced streaming,                 38005
+github.tar,                         level 7 row 1 with dict dms,        advanced streaming,                 37832
+github.tar,                         level 7 row 1 with dict dds,        advanced streaming,                 37857
+github.tar,                         level 7 row 1 with dict copy,       advanced streaming,                 37839
+github.tar,                         level 7 row 1 with dict load,       advanced streaming,                 37286
+github.tar,                         level 7 row 2,                      advanced streaming,                 38077
+github.tar,                         level 7 row 2 with dict dms,        advanced streaming,                 38012
+github.tar,                         level 7 row 2 with dict dds,        advanced streaming,                 38014
+github.tar,                         level 7 row 2 with dict copy,       advanced streaming,                 38101
+github.tar,                         level 7 row 2 with dict load,       advanced streaming,                 37402
+github.tar,                         level 7,                            advanced streaming,                 38005
+github.tar,                         level 7 with dict,                  advanced streaming,                 37839
+github.tar,                         level 7 with dict dms,              advanced streaming,                 37832
+github.tar,                         level 7 with dict dds,              advanced streaming,                 37857
+github.tar,                         level 7 with dict copy,             advanced streaming,                 37839
+github.tar,                         level 7 with dict load,             advanced streaming,                 37286
+github.tar,                         level 9,                            advanced streaming,                 36723
+github.tar,                         level 9 with dict,                  advanced streaming,                 36531
+github.tar,                         level 9 with dict dms,              advanced streaming,                 36615
+github.tar,                         level 9 with dict dds,              advanced streaming,                 36682
+github.tar,                         level 9 with dict copy,             advanced streaming,                 36531
+github.tar,                         level 9 with dict load,             advanced streaming,                 36322
+github.tar,                         level 11 row 1,                     advanced streaming,                 36085
+github.tar,                         level 11 row 1 with dict dms,       advanced streaming,                 36963
+github.tar,                         level 11 row 1 with dict dds,       advanced streaming,                 36963
+github.tar,                         level 11 row 1 with dict copy,      advanced streaming,                 36557
+github.tar,                         level 11 row 1 with dict load,      advanced streaming,                 36423
+github.tar,                         level 11 row 2,                     advanced streaming,                 36110
+github.tar,                         level 11 row 2 with dict dms,       advanced streaming,                 36963
+github.tar,                         level 11 row 2 with dict dds,       advanced streaming,                 36963
+github.tar,                         level 11 row 2 with dict copy,      advanced streaming,                 36557
+github.tar,                         level 11 row 2 with dict load,      advanced streaming,                 36459
+github.tar,                         level 12 row 1,                     advanced streaming,                 36085
+github.tar,                         level 12 row 1 with dict dms,       advanced streaming,                 36986
+github.tar,                         level 12 row 1 with dict dds,       advanced streaming,                 36986
+github.tar,                         level 12 row 1 with dict copy,      advanced streaming,                 36609
+github.tar,                         level 12 row 1 with dict load,      advanced streaming,                 36423
+github.tar,                         level 12 row 2,                     advanced streaming,                 36110
+github.tar,                         level 12 row 2 with dict dms,       advanced streaming,                 36986
+github.tar,                         level 12 row 2 with dict dds,       advanced streaming,                 36986
+github.tar,                         level 12 row 2 with dict copy,      advanced streaming,                 36609
+github.tar,                         level 12 row 2 with dict load,      advanced streaming,                 36459
+github.tar,                         level 13,                           advanced streaming,                 35501
+github.tar,                         level 13 with dict,                 advanced streaming,                 37130
+github.tar,                         level 13 with dict dms,             advanced streaming,                 37220
+github.tar,                         level 13 with dict dds,             advanced streaming,                 37220
+github.tar,                         level 13 with dict copy,            advanced streaming,                 37130
+github.tar,                         level 13 with dict load,            advanced streaming,                 36010
+github.tar,                         level 16,                           advanced streaming,                 40466
+github.tar,                         level 16 with dict,                 advanced streaming,                 33374
+github.tar,                         level 16 with dict dms,             advanced streaming,                 33206
+github.tar,                         level 16 with dict dds,             advanced streaming,                 33206
+github.tar,                         level 16 with dict copy,            advanced streaming,                 33374
+github.tar,                         level 16 with dict load,            advanced streaming,                 39081
+github.tar,                         level 19,                           advanced streaming,                 32276
+github.tar,                         level 19 with dict,                 advanced streaming,                 32712
+github.tar,                         level 19 with dict dms,             advanced streaming,                 32555
+github.tar,                         level 19 with dict dds,             advanced streaming,                 32555
+github.tar,                         level 19 with dict copy,            advanced streaming,                 32712
+github.tar,                         level 19 with dict load,            advanced streaming,                 32479
+github.tar,                         no source size,                     advanced streaming,                 38828
+github.tar,                         no source size with dict,           advanced streaming,                 38000
+github.tar,                         long distance mode,                 advanced streaming,                 40252
+github.tar,                         multithreaded,                      advanced streaming,                 38831
+github.tar,                         multithreaded long distance mode,   advanced streaming,                 40232
+github.tar,                         small window log,                   advanced streaming,                 199558
+github.tar,                         small hash log,                     advanced streaming,                 129870
+github.tar,                         small chain log,                    advanced streaming,                 41669
+github.tar,                         explicit params,                    advanced streaming,                 41385
+github.tar,                         uncompressed literals,              advanced streaming,                 41525
+github.tar,                         uncompressed literals optimal,      advanced streaming,                 35397
+github.tar,                         huffman literals,                   advanced streaming,                 38853
+github.tar,                         multithreaded with advanced params, advanced streaming,                 41525
+silesia,                            level -5,                           old streaming,                      6854744
+silesia,                            level -3,                           old streaming,                      6503319
+silesia,                            level -1,                           old streaming,                      6172207
+silesia,                            level 0,                            old streaming,                      4842075
+silesia,                            level 1,                            old streaming,                      5306388
+silesia,                            level 3,                            old streaming,                      4842075
+silesia,                            level 4,                            old streaming,                      4779186
+silesia,                            level 5,                            old streaming,                      4667668
+silesia,                            level 6,                            old streaming,                      4604351
+silesia,                            level 7,                            old streaming,                      4570271
+silesia,                            level 9,                            old streaming,                      4545850
+silesia,                            level 13,                           old streaming,                      4493990
+silesia,                            level 16,                           old streaming,                      4360041
+silesia,                            level 19,                           old streaming,                      4296055
+silesia,                            no source size,                     old streaming,                      4842039
+silesia,                            uncompressed literals,              old streaming,                      4842075
+silesia,                            uncompressed literals optimal,      old streaming,                      4296055
+silesia,                            huffman literals,                   old streaming,                      6172207
+silesia.tar,                        level -5,                           old streaming,                      6856523
+silesia.tar,                        level -3,                           old streaming,                      6505954
+silesia.tar,                        level -1,                           old streaming,                      6179056
+silesia.tar,                        level 0,                            old streaming,                      4859271
+silesia.tar,                        level 1,                            old streaming,                      5327708
+silesia.tar,                        level 3,                            old streaming,                      4859271
+silesia.tar,                        level 4,                            old streaming,                      4797470
+silesia.tar,                        level 5,                            old streaming,                      4679020
+silesia.tar,                        level 6,                            old streaming,                      4614558
+silesia.tar,                        level 7,                            old streaming,                      4579823
+silesia.tar,                        level 9,                            old streaming,                      4555445
+silesia.tar,                        level 13,                           old streaming,                      4502956
+silesia.tar,                        level 16,                           old streaming,                      4360546
+silesia.tar,                        level 19,                           old streaming,                      4265911
+silesia.tar,                        no source size,                     old streaming,                      4859267
+silesia.tar,                        uncompressed literals,              old streaming,                      4859271
+silesia.tar,                        uncompressed literals optimal,      old streaming,                      4265911
+silesia.tar,                        huffman literals,                   old streaming,                      6179056
+github,                             level -5,                           old streaming,                      204407
+github,                             level -5 with dict,                 old streaming,                      45832
+github,                             level -3,                           old streaming,                      193253
+github,                             level -3 with dict,                 old streaming,                      44671
+github,                             level -1,                           old streaming,                      175468
+github,                             level -1 with dict,                 old streaming,                      41825
+github,                             level 0,                            old streaming,                      136332
+github,                             level 0 with dict,                  old streaming,                      41148
+github,                             level 1,                            old streaming,                      142365
+github,                             level 1 with dict,                  old streaming,                      41266
+github,                             level 3,                            old streaming,                      136332
+github,                             level 3 with dict,                  old streaming,                      41148
+github,                             level 4,                            old streaming,                      136199
+github,                             level 4 with dict,                  old streaming,                      41251
+github,                             level 5,                            old streaming,                      135121
+github,                             level 5 with dict,                  old streaming,                      38754
+github,                             level 6,                            old streaming,                      135122
+github,                             level 6 with dict,                  old streaming,                      38669
+github,                             level 7,                            old streaming,                      135122
+github,                             level 7 with dict,                  old streaming,                      38765
+github,                             level 9,                            old streaming,                      135122
+github,                             level 9 with dict,                  old streaming,                      39439
+github,                             level 13,                           old streaming,                      132878
+github,                             level 13 with dict,                 old streaming,                      39900
+github,                             level 16,                           old streaming,                      133209
+github,                             level 16 with dict,                 old streaming,                      37577
+github,                             level 19,                           old streaming,                      132879
+github,                             level 19 with dict,                 old streaming,                      37576
+github,                             no source size,                     old streaming,                      140599
+github,                             no source size with dict,           old streaming,                      40654
+github,                             uncompressed literals,              old streaming,                      136332
+github,                             uncompressed literals optimal,      old streaming,                      132879
+github,                             huffman literals,                   old streaming,                      175468
+github.tar,                         level -5,                           old streaming,                      52152
+github.tar,                         level -5 with dict,                 old streaming,                      51181
+github.tar,                         level -3,                           old streaming,                      45678
+github.tar,                         level -3 with dict,                 old streaming,                      44734
+github.tar,                         level -1,                           old streaming,                      42560
+github.tar,                         level -1 with dict,                 old streaming,                      41353
+github.tar,                         level 0,                            old streaming,                      38831
+github.tar,                         level 0 with dict,                  old streaming,                      37995
+github.tar,                         level 1,                            old streaming,                      39200
+github.tar,                         level 1 with dict,                  old streaming,                      38119
+github.tar,                         level 3,                            old streaming,                      38831
+github.tar,                         level 3 with dict,                  old streaming,                      37995
+github.tar,                         level 4,                            old streaming,                      38893
+github.tar,                         level 4 with dict,                  old streaming,                      37948
+github.tar,                         level 5,                            old streaming,                      39651
+github.tar,                         level 5 with dict,                  old streaming,                      39145
+github.tar,                         level 6,                            old streaming,                      39282
+github.tar,                         level 6 with dict,                  old streaming,                      38656
+github.tar,                         level 7,                            old streaming,                      38005
+github.tar,                         level 7 with dict,                  old streaming,                      37839
+github.tar,                         level 9,                            old streaming,                      36723
+github.tar,                         level 9 with dict,                  old streaming,                      36531
+github.tar,                         level 13,                           old streaming,                      35501
+github.tar,                         level 13 with dict,                 old streaming,                      37130
+github.tar,                         level 16,                           old streaming,                      40466
+github.tar,                         level 16 with dict,                 old streaming,                      33374
+github.tar,                         level 19,                           old streaming,                      32276
+github.tar,                         level 19 with dict,                 old streaming,                      32712
+github.tar,                         no source size,                     old streaming,                      38828
+github.tar,                         no source size with dict,           old streaming,                      38000
+github.tar,                         uncompressed literals,              old streaming,                      38831
+github.tar,                         uncompressed literals optimal,      old streaming,                      32276
+github.tar,                         huffman literals,                   old streaming,                      42560
+silesia,                            level -5,                           old streaming advanced,             6854744
+silesia,                            level -3,                           old streaming advanced,             6503319
+silesia,                            level -1,                           old streaming advanced,             6172207
+silesia,                            level 0,                            old streaming advanced,             4842075
+silesia,                            level 1,                            old streaming advanced,             5306388
+silesia,                            level 3,                            old streaming advanced,             4842075
+silesia,                            level 4,                            old streaming advanced,             4779186
+silesia,                            level 5,                            old streaming advanced,             4667668
+silesia,                            level 6,                            old streaming advanced,             4604351
+silesia,                            level 7,                            old streaming advanced,             4570271
+silesia,                            level 9,                            old streaming advanced,             4545850
+silesia,                            level 13,                           old streaming advanced,             4493990
+silesia,                            level 16,                           old streaming advanced,             4360041
+silesia,                            level 19,                           old streaming advanced,             4296055
+silesia,                            no source size,                     old streaming advanced,             4842039
+silesia,                            long distance mode,                 old streaming advanced,             4842075
+silesia,                            multithreaded,                      old streaming advanced,             4842075
+silesia,                            multithreaded long distance mode,   old streaming advanced,             4842075
+silesia,                            small window log,                   old streaming advanced,             7111103
+silesia,                            small hash log,                     old streaming advanced,             6526141
+silesia,                            small chain log,                    old streaming advanced,             4912197
+silesia,                            explicit params,                    old streaming advanced,             4795857
+silesia,                            uncompressed literals,              old streaming advanced,             4842075
+silesia,                            uncompressed literals optimal,      old streaming advanced,             4296055
+silesia,                            huffman literals,                   old streaming advanced,             6172207
+silesia,                            multithreaded with advanced params, old streaming advanced,             4842075
+silesia.tar,                        level -5,                           old streaming advanced,             6856523
+silesia.tar,                        level -3,                           old streaming advanced,             6505954
+silesia.tar,                        level -1,                           old streaming advanced,             6179056
+silesia.tar,                        level 0,                            old streaming advanced,             4859271
+silesia.tar,                        level 1,                            old streaming advanced,             5327708
+silesia.tar,                        level 3,                            old streaming advanced,             4859271
+silesia.tar,                        level 4,                            old streaming advanced,             4797470
+silesia.tar,                        level 5,                            old streaming advanced,             4679020
+silesia.tar,                        level 6,                            old streaming advanced,             4614558
+silesia.tar,                        level 7,                            old streaming advanced,             4579823
+silesia.tar,                        level 9,                            old streaming advanced,             4555445
+silesia.tar,                        level 13,                           old streaming advanced,             4502956
+silesia.tar,                        level 16,                           old streaming advanced,             4360546
+silesia.tar,                        level 19,                           old streaming advanced,             4265911
+silesia.tar,                        no source size,                     old streaming advanced,             4859267
+silesia.tar,                        long distance mode,                 old streaming advanced,             4859271
+silesia.tar,                        multithreaded,                      old streaming advanced,             4859271
+silesia.tar,                        multithreaded long distance mode,   old streaming advanced,             4859271
+silesia.tar,                        small window log,                   old streaming advanced,             7117562
+silesia.tar,                        small hash log,                     old streaming advanced,             6529209
+silesia.tar,                        small chain log,                    old streaming advanced,             4917021
+silesia.tar,                        explicit params,                    old streaming advanced,             4807288
+silesia.tar,                        uncompressed literals,              old streaming advanced,             4859271
+silesia.tar,                        uncompressed literals optimal,      old streaming advanced,             4265911
+silesia.tar,                        huffman literals,                   old streaming advanced,             6179056
+silesia.tar,                        multithreaded with advanced params, old streaming advanced,             4859271
+github,                             level -5,                           old streaming advanced,             213265
+github,                             level -5 with dict,                 old streaming advanced,             46708
+github,                             level -3,                           old streaming advanced,             196126
+github,                             level -3 with dict,                 old streaming advanced,             45476
+github,                             level -1,                           old streaming advanced,             181107
+github,                             level -1 with dict,                 old streaming advanced,             42060
+github,                             level 0,                            old streaming advanced,             141104
+github,                             level 0 with dict,                  old streaming advanced,             41113
+github,                             level 1,                            old streaming advanced,             143693
+github,                             level 1 with dict,                  old streaming advanced,             42430
+github,                             level 3,                            old streaming advanced,             141104
+github,                             level 3 with dict,                  old streaming advanced,             41113
+github,                             level 4,                            old streaming advanced,             141104
+github,                             level 4 with dict,                  old streaming advanced,             41084
+github,                             level 5,                            old streaming advanced,             139402
+github,                             level 5 with dict,                  old streaming advanced,             38723
+github,                             level 6,                            old streaming advanced,             138676
+github,                             level 6 with dict,                  old streaming advanced,             38744
+github,                             level 7,                            old streaming advanced,             138676
+github,                             level 7 with dict,                  old streaming advanced,             38875
+github,                             level 9,                            old streaming advanced,             138676
+github,                             level 9 with dict,                  old streaming advanced,             38941
+github,                             level 13,                           old streaming advanced,             138676
+github,                             level 13 with dict,                 old streaming advanced,             39725
+github,                             level 16,                           old streaming advanced,             138575
+github,                             level 16 with dict,                 old streaming advanced,             40789
+github,                             level 19,                           old streaming advanced,             132879
+github,                             level 19 with dict,                 old streaming advanced,             37576
+github,                             no source size,                     old streaming advanced,             140599
+github,                             no source size with dict,           old streaming advanced,             40608
+github,                             long distance mode,                 old streaming advanced,             141104
+github,                             multithreaded,                      old streaming advanced,             141104
+github,                             multithreaded long distance mode,   old streaming advanced,             141104
+github,                             small window log,                   old streaming advanced,             141104
+github,                             small hash log,                     old streaming advanced,             141597
+github,                             small chain log,                    old streaming advanced,             139275
+github,                             explicit params,                    old streaming advanced,             140937
+github,                             uncompressed literals,              old streaming advanced,             141104
+github,                             uncompressed literals optimal,      old streaming advanced,             132879
+github,                             huffman literals,                   old streaming advanced,             181107
+github,                             multithreaded with advanced params, old streaming advanced,             141104
+github.tar,                         level -5,                           old streaming advanced,             52152
+github.tar,                         level -5 with dict,                 old streaming advanced,             51129
+github.tar,                         level -3,                           old streaming advanced,             45678
+github.tar,                         level -3 with dict,                 old streaming advanced,             44986
+github.tar,                         level -1,                           old streaming advanced,             42560
+github.tar,                         level -1 with dict,                 old streaming advanced,             41650
+github.tar,                         level 0,                            old streaming advanced,             38831
+github.tar,                         level 0 with dict,                  old streaming advanced,             38013
+github.tar,                         level 1,                            old streaming advanced,             39200
+github.tar,                         level 1 with dict,                  old streaming advanced,             38359
+github.tar,                         level 3,                            old streaming advanced,             38831
+github.tar,                         level 3 with dict,                  old streaming advanced,             38013
+github.tar,                         level 4,                            old streaming advanced,             38893
+github.tar,                         level 4 with dict,                  old streaming advanced,             38063
+github.tar,                         level 5,                            old streaming advanced,             39651
+github.tar,                         level 5 with dict,                  old streaming advanced,             39018
+github.tar,                         level 6,                            old streaming advanced,             39282
+github.tar,                         level 6 with dict,                  old streaming advanced,             38635
+github.tar,                         level 7,                            old streaming advanced,             38005
+github.tar,                         level 7 with dict,                  old streaming advanced,             37264
+github.tar,                         level 9,                            old streaming advanced,             36723
+github.tar,                         level 9 with dict,                  old streaming advanced,             36241
+github.tar,                         level 13,                           old streaming advanced,             35501
+github.tar,                         level 13 with dict,                 old streaming advanced,             35807
+github.tar,                         level 16,                           old streaming advanced,             40466
+github.tar,                         level 16 with dict,                 old streaming advanced,             38578
+github.tar,                         level 19,                           old streaming advanced,             32276
+github.tar,                         level 19 with dict,                 old streaming advanced,             32704
+github.tar,                         no source size,                     old streaming advanced,             38828
+github.tar,                         no source size with dict,           old streaming advanced,             38015
+github.tar,                         long distance mode,                 old streaming advanced,             38831
+github.tar,                         multithreaded,                      old streaming advanced,             38831
+github.tar,                         multithreaded long distance mode,   old streaming advanced,             38831
+github.tar,                         small window log,                   old streaming advanced,             199561
+github.tar,                         small hash log,                     old streaming advanced,             129870
+github.tar,                         small chain log,                    old streaming advanced,             41669
+github.tar,                         explicit params,                    old streaming advanced,             41385
+github.tar,                         uncompressed literals,              old streaming advanced,             38831
+github.tar,                         uncompressed literals optimal,      old streaming advanced,             32276
+github.tar,                         huffman literals,                   old streaming advanced,             42560
+github.tar,                         multithreaded with advanced params, old streaming advanced,             38831
+github,                             level -5 with dict,                 old streaming cdict,                45832
+github,                             level -3 with dict,                 old streaming cdict,                44671
+github,                             level -1 with dict,                 old streaming cdict,                41825
+github,                             level 0 with dict,                  old streaming cdict,                41148
+github,                             level 1 with dict,                  old streaming cdict,                41266
+github,                             level 3 with dict,                  old streaming cdict,                41148
+github,                             level 4 with dict,                  old streaming cdict,                41251
+github,                             level 5 with dict,                  old streaming cdict,                38754
+github,                             level 6 with dict,                  old streaming cdict,                38669
+github,                             level 7 with dict,                  old streaming cdict,                38765
+github,                             level 9 with dict,                  old streaming cdict,                39439
+github,                             level 13 with dict,                 old streaming cdict,                39900
+github,                             level 16 with dict,                 old streaming cdict,                37577
+github,                             level 19 with dict,                 old streaming cdict,                37576
+github,                             no source size with dict,           old streaming cdict,                40654
+github.tar,                         level -5 with dict,                 old streaming cdict,                51286
+github.tar,                         level -3 with dict,                 old streaming cdict,                45147
+github.tar,                         level -1 with dict,                 old streaming cdict,                41865
+github.tar,                         level 0 with dict,                  old streaming cdict,                37956
+github.tar,                         level 1 with dict,                  old streaming cdict,                38364
+github.tar,                         level 3 with dict,                  old streaming cdict,                37956
+github.tar,                         level 4 with dict,                  old streaming cdict,                37927
+github.tar,                         level 5 with dict,                  old streaming cdict,                39000
+github.tar,                         level 6 with dict,                  old streaming cdict,                38647
+github.tar,                         level 7 with dict,                  old streaming cdict,                37286
+github.tar,                         level 9 with dict,                  old streaming cdict,                36322
+github.tar,                         level 13 with dict,                 old streaming cdict,                36010
+github.tar,                         level 16 with dict,                 old streaming cdict,                39081
+github.tar,                         level 19 with dict,                 old streaming cdict,                32479
+github.tar,                         no source size with dict,           old streaming cdict,                38000
+github,                             level -5 with dict,                 old streaming advanced cdict,       46708
+github,                             level -3 with dict,                 old streaming advanced cdict,       45476
+github,                             level -1 with dict,                 old streaming advanced cdict,       42060
+github,                             level 0 with dict,                  old streaming advanced cdict,       41113
+github,                             level 1 with dict,                  old streaming advanced cdict,       42430
+github,                             level 3 with dict,                  old streaming advanced cdict,       41113
+github,                             level 4 with dict,                  old streaming advanced cdict,       41084
+github,                             level 5 with dict,                  old streaming advanced cdict,       38723
+github,                             level 6 with dict,                  old streaming advanced cdict,       38744
+github,                             level 7 with dict,                  old streaming advanced cdict,       38875
+github,                             level 9 with dict,                  old streaming advanced cdict,       38941
+github,                             level 13 with dict,                 old streaming advanced cdict,       39725
+github,                             level 16 with dict,                 old streaming advanced cdict,       40789
+github,                             level 19 with dict,                 old streaming advanced cdict,       37576
+github,                             no source size with dict,           old streaming advanced cdict,       40608
+github.tar,                         level -5 with dict,                 old streaming advanced cdict,       50791
+github.tar,                         level -3 with dict,                 old streaming advanced cdict,       44926
+github.tar,                         level -1 with dict,                 old streaming advanced cdict,       41482
+github.tar,                         level 0 with dict,                  old streaming advanced cdict,       38013
+github.tar,                         level 1 with dict,                  old streaming advanced cdict,       38168
+github.tar,                         level 3 with dict,                  old streaming advanced cdict,       38013
+github.tar,                         level 4 with dict,                  old streaming advanced cdict,       38063
+github.tar,                         level 5 with dict,                  old streaming advanced cdict,       39018
+github.tar,                         level 6 with dict,                  old streaming advanced cdict,       38635
+github.tar,                         level 7 with dict,                  old streaming advanced cdict,       37264
+github.tar,                         level 9 with dict,                  old streaming advanced cdict,       36241
+github.tar,                         level 13 with dict,                 old streaming advanced cdict,       35807
+github.tar,                         level 16 with dict,                 old streaming advanced cdict,       38578
+github.tar,                         level 19 with dict,                 old streaming advanced cdict,       32704
+github.tar,                         no source size with dict,           old streaming advanced cdict,       38015

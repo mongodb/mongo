@@ -27,13 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/update/delta_executor.h"
 
-#include "mongo/bson/mutable/document.h"
+#include "mongo/db/exec/mutable_bson/document.h"
+#include "mongo/db/exec/mutable_bson/element.h"
+#include "mongo/db/update/document_diff_applier.h"
 #include "mongo/db/update/object_replace_executor.h"
-#include "mongo/db/update/update_oplog_entry_serialization.h"
 
 namespace mongo {
 
@@ -41,14 +40,12 @@ DeltaExecutor::ApplyResult DeltaExecutor::applyUpdate(
     UpdateExecutor::ApplyParams applyParams) const {
     const auto originalDoc = applyParams.element.getDocument().getObject();
 
-    auto applyDiffOutput = doc_diff::applyDiff(
-        originalDoc, _diff, applyParams.indexData, _mustCheckExistenceForInsertOperations);
-    const auto& postImage = applyDiffOutput.postImage;
+    auto postImage =
+        doc_diff::applyDiff(originalDoc, _diff, _mustCheckExistenceForInsertOperations);
     auto postImageHasId = postImage.hasField("_id");
 
     auto result = ObjectReplaceExecutor::applyReplacementUpdate(
         std::move(applyParams), postImage, postImageHasId);
-    result.indexesAffected = applyDiffOutput.indexesAffected;
     result.oplogEntry = _outputOplogEntry;
     return result;
 }

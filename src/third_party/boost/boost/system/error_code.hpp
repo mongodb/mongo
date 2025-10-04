@@ -17,38 +17,5 @@
 #include <boost/system/generic_category.hpp>
 #include <boost/system/system_category.hpp>
 #include <boost/system/detail/throws.hpp>
-#include <boost/config.hpp>
-
-namespace boost
-{
-
-namespace system
-{
-
-// non-member functions of error_code and error_condition
-
-inline bool operator==( const error_code & code, const error_condition & condition ) BOOST_NOEXCEPT
-{
-    return code.category().equivalent( code.value(), condition ) || condition.category().equivalent( code, condition.value() );
-}
-
-inline bool operator!=( const error_code & lhs, const error_condition & rhs ) BOOST_NOEXCEPT
-{
-    return !( lhs == rhs );
-}
-
-inline bool operator==( const error_condition & condition, const error_code & code ) BOOST_NOEXCEPT
-{
-    return code.category().equivalent( code.value(), condition ) || condition.category().equivalent( code, condition.value() );
-}
-
-inline bool operator!=( const error_condition & lhs, const error_code & rhs ) BOOST_NOEXCEPT
-{
-    return !( lhs == rhs );
-}
-
-} // namespace system
-
-} // namespace boost
 
 #endif // BOOST_SYSTEM_ERROR_CODE_HPP_INCLUDED

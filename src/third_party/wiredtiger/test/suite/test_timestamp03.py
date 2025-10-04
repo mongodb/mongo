@@ -28,6 +28,8 @@
 #
 # test_timestamp03.py
 #   Timestamps: checkpoints
+#   Verify logging configurations of all the URI's and history store file
+#   in the metadata file.
 #
 
 from helper import copy_wiredtiger_home
@@ -36,34 +38,21 @@ from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 from wtscenario import make_scenarios
 
+@wttest.skip_for_hook("disagg", "log tables are disabled in disagg so this test will fail")
 class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
     table_ts_log     = 'ts03_ts_logged'
     table_ts_nolog   = 'ts03_ts_nologged'
     table_nots_log   = 'ts03_nots_logged'
     table_nots_nolog = 'ts03_nots_nologged'
+    hs_file = 'file:WiredTigerHS.wt'
 
-    # XXX neither the use_cg nor the use_index values are actually used.
-    # I've commented out the entries that are therefore duplicates; if/when that's fixed, put
-    # them back I guess.
     types = [
-        ('file-row', dict(uri='file:', key_format='i', value_format='S',
-                use_cg=False, use_index=False)),
-        ('file-col', dict(uri='file:', key_format='r', value_format='S',
-                use_cg=False, use_index=False)),
-        ('file-col-fix', dict(uri='file:', key_format='r', value_format='8t',
-                use_cg=False, use_index=False)),
-        ('lsm', dict(uri='lsm:', key_format='i', value_format='S',
-                use_cg=False, use_index=False)),
-        ('table-row', dict(uri='table:', key_format='i', value_format='S',
-                use_cg=False, use_index=False)),
-        #('table-row-index', dict(uri='table:', key_format='i', value_format='S',
-        #       use_cg=False, use_index=True)),
-        ('table-col', dict(uri='table:', key_format='r', value_format='S',
-                use_cg=False, use_index=False)),
-        ('table-col-fix', dict(uri='table:', key_format='r', value_format='8t',
-                use_cg=False, use_index=False)),
-        #('table-col-cg', dict(uri='table:', key_format='r', value_format='S',
-        #       use_cg=True, use_index=False)),
+        ('file-row', dict(uri='file:', key_format='i', value_format='S')),
+        ('file-col', dict(uri='file:', key_format='r', value_format='S')),
+        ('file-col-fix', dict(uri='file:', key_format='r', value_format='8t')),
+        ('table-row', dict(uri='table:', key_format='i', value_format='S')),
+        ('table-col', dict(uri='table:', key_format='r', value_format='S')),
+        ('table-col-fix', dict(uri='table:', key_format='r', value_format='8t')),
     ]
 
     ckpt = [
@@ -73,13 +62,22 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
     ]
 
     conncfg = [
-        ('nolog', dict(conn_config='create', using_log=False)),
-        ('V1', dict(conn_config='create,log=(archive=false,enabled),compatibility=(release="2.9")', using_log=True)),
-        ('V2', dict(conn_config='create,log=(archive=false,enabled)', using_log=True)),
+        ('V1', dict(conn_config='create,log=(enabled,remove=false),compatibility=(release="2.9")', using_log=True)),
+        ('V2', dict(conn_config='create,log=(enabled,remove=false)', using_log=True)),
     ]
-    session_config = 'isolation=snapshot'
 
     scenarios = make_scenarios(types, ckpt, conncfg)
+
+    # Verify the log string for this URI in the metadata file is correct.
+    def verify_metadata(self, metadata_uri, metastr):
+        c = self.session.open_cursor('metadata:', None, None)
+        c.set_key(metadata_uri)
+        check_meta = metadata_uri.find("file:") == 0
+        if check_meta:
+            self.assertNotEqual(c.search(), wiredtiger.WT_NOTFOUND)
+            value = c.get_value()
+            self.assertTrue(value.find(metastr) != -1)
+        c.close()
 
     def moresetup(self):
         # Binary values.
@@ -233,10 +231,10 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
         # Scenario: 2
         # Check that we see the inserted values as per the timestamp.
         for i, t in enumerate(orig_keys):
-            # Tables using the timestamps should see the values as per the
-            # given read_timestamp
+            # Tables using the timestamps should see the values as per the given read_timestamp.
+            # Logged tables don't use timestamps, so will always see the most recent value.
             self.check(self.session, 'read_timestamp=' + self.timestamp_str(t),
-                self.table_ts_log, dict((k, self.value) for k in orig_keys[:i+1]))
+                self.table_ts_log, dict((k, self.value) for k in orig_keys))
             self.check(self.session, 'read_timestamp=' + self.timestamp_str(t),
                 self.table_ts_nolog, dict((k, self.value) for k in orig_keys[:i+1]))
             # Tables not using the timestamps should see all the values.
@@ -285,7 +283,7 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
         # with the read_timestamp as oldest_timestamp
         # Tables using the timestamps should see old values (i.e. value) only
         self.check(self.session, 'read_timestamp=' + old_ts,
-            self.table_ts_log, dict((k, self.value) for k in orig_keys))
+            self.table_ts_log, dict((k, self.value2) for k in orig_keys))
         self.check(self.session, 'read_timestamp=' + old_ts,
             self.table_ts_nolog, dict((k, self.value) for k in orig_keys))
         # Tables not using the timestamps should see updated values (i.e. value2).
@@ -301,7 +299,7 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
         earlier_ts = self.timestamp_str(90)
         self.check(self.session,
             'read_timestamp=' + earlier_ts +',roundup_timestamps=(read=true)',
-            self.table_ts_log, dict((k, self.value) for k in orig_keys))
+            self.table_ts_log, dict((k, self.value2) for k in orig_keys))
         self.check(self.session,
             'read_timestamp=' + earlier_ts +',roundup_timestamps=(read=true)',
             self.table_ts_nolog, dict((k, self.value) for k in orig_keys))
@@ -322,12 +320,12 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
             expected_dict[i+1] = self.value2
             # Tables using the timestamps should see the updated values as per
             # the given read_timestamp
-            self.check(self.session, 'read_timestamp=' + self.timestamp_str(t + 100),
-                self.table_ts_log, expected_dict)
-            self.check(self.session, 'read_timestamp=' + self.timestamp_str(t + 100),
-                self.table_ts_nolog, expected_dict)
             # Tables not using the timestamps should see all the data values as
             # updated values (i.e. value2).
+            self.check(self.session, 'read_timestamp=' + self.timestamp_str(t + 100),
+                self.table_ts_log, dict((k, self.value2) for k in orig_keys))
+            self.check(self.session, 'read_timestamp=' + self.timestamp_str(t + 100),
+                self.table_ts_nolog, expected_dict)
             self.check(self.session, 'read_timestamp=' + self.timestamp_str(t + 100),
                 self.table_nots_log, dict((k, self.value2) for k in orig_keys))
             self.check(self.session, 'read_timestamp=' + self.timestamp_str(t + 100),
@@ -341,18 +339,9 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
             valcnt_ts_nolog = nkeys
         else:
             # Checkpoint will happen with stable_timestamp=100.
-            if self.using_log == True:
-                # only table_ts_nolog will have old values when logging is enabled
-                self.ckpt_backup(self.value, 0, nkeys, 0, 0)
-            else:
-                # Both table_ts_nolog and table_ts_log will have old values when
-                # logging is disabled.
-                self.ckpt_backup(self.value, nkeys, nkeys, 0, 0)
-            # table_ts_nolog will not have any new values (i.e. value2)
-            valcnt_ts_nolog = 0
+            # only table_ts_log and table_ts_nolog will have old values when logging is enabled
+            self.ckpt_backup(self.value, 0, nkeys, 0, 0)
 
-        if self.ckpt_ts == False:
-            valcnt_ts_log = nkeys
         # Take a checkpoint using the given configuration.  Then verify
         # whether value2 appears in a copy of that data or not.
         valcnt_ts_log = valcnt_nots_log = valcnt_nots_nolog = nkeys
@@ -361,25 +350,16 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
             valcnt_ts_nolog = nkeys
         else:
             # Checkpoint will happen with stable_timestamp=100.
-            if self.using_log == True:
-                # only table_ts_nolog will have old values when logging is enabled
-                self.ckpt_backup(self.value, 0, nkeys, 0, 0)
-            else:
-                # Both table_ts_nolog and table_ts_log will have old values when
-                # logging is disabled.
-                self.ckpt_backup(self.value, nkeys, nkeys, 0, 0)
+            # only table_ts_nolog will have old values when logging is enabled
+            self.ckpt_backup(self.value, 0, nkeys, 0, 0)
             # table_ts_nolog will not have any new values (i.e. value2)
             valcnt_ts_nolog = 0
 
         if self.ckpt_ts == False:
             valcnt_ts_log = nkeys
         else:
-            # When log is enabled, table_ts_log will have all new values, else
-            # none.
-            if self.using_log == True:
-                valcnt_ts_log = nkeys
-            else:
-                valcnt_ts_log = 0
+            # table_ts_log will have all new values
+            valcnt_ts_log = nkeys
 
         self.ckpt_backup(self.value2, valcnt_ts_log, valcnt_ts_nolog,
             valcnt_nots_log, valcnt_nots_nolog)
@@ -389,10 +369,6 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
         # stable_timestamp is moved we should see all keys with value2.
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(100+nkeys))
         self.ckpt_backup(self.value2, nkeys, nkeys, nkeys, nkeys)
-
-        # If we're not using the log we're done.
-        if not self.using_log:
-            return
 
         # Scenario: 7
         # Update the keys and log_flush with out checkpoint.
@@ -422,5 +398,9 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
         self.backup_check(self.value3, valcnt_ts_log, valcnt_ts_nolog,
             valcnt_nots_log, valcnt_nots_nolog)
 
-if __name__ == '__main__':
-    wttest.run()
+        # Verify logging of all the URI's and history store in the metadata.
+        self.verify_metadata(uri_ts_log, 'log=(enabled=true)')
+        self.verify_metadata(uri_ts_nolog, 'log=(enabled=false)')
+        self.verify_metadata(uri_nots_log, 'log=(enabled=true)')
+        self.verify_metadata(uri_nots_nolog, 'log=(enabled=false)')
+        self.verify_metadata(self.hs_file, 'log=(enabled=false)')

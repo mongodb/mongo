@@ -27,13 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/executor/network_test_env.h"
 
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/query/cursor_response.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/query/client_cursor/cursor_response.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 
 namespace mongo {
 
@@ -56,18 +61,20 @@ void NetworkTestEnv::onCommands(std::vector<OnCommandFunction> funcs) {
 
         auto resultStatus = func(request);
 
-        if (request.fireAndForgetMode ==
-            executor::RemoteCommandRequestBase::FireAndForgetMode::kOn) {
+        if (request.fireAndForget) {
             _mockNetwork->blackHole(noi);
         } else if (resultStatus.isOK()) {
             BSONObjBuilder result(std::move(resultStatus.getValue()));
             CommandHelpers::appendCommandStatusNoThrow(result, resultStatus.getStatus());
-            const RemoteCommandResponse response(result.obj(), Milliseconds(1));
+            const RemoteCommandResponse response =
+                RemoteCommandResponse::make_forTest(result.obj(), Milliseconds(1));
 
             _mockNetwork->scheduleResponse(noi, _mockNetwork->now(), response);
         } else {
             _mockNetwork->scheduleResponse(
-                noi, _mockNetwork->now(), {resultStatus.getStatus(), Milliseconds(0)});
+                noi,
+                _mockNetwork->now(),
+                RemoteCommandResponse::make_forTest(resultStatus.getStatus(), Milliseconds(0)));
         }
     }
 
@@ -82,16 +89,20 @@ void NetworkTestEnv::onCommandWithMetadata(OnCommandWithMetadataFunction func) {
 
     auto cmdResponseStatus = func(request);
 
-    if (request.fireAndForgetMode == executor::RemoteCommandRequestBase::FireAndForgetMode::kOn) {
+    if (request.fireAndForget) {
         _mockNetwork->blackHole(noi);
     } else if (cmdResponseStatus.isOK()) {
         BSONObjBuilder result(std::move(cmdResponseStatus.data));
         CommandHelpers::appendCommandStatusNoThrow(result, cmdResponseStatus.status);
-        const RemoteCommandResponse response(result.obj(), Milliseconds(1));
+        const RemoteCommandResponse response =
+            RemoteCommandResponse::make_forTest(result.obj(), Milliseconds(1));
 
         _mockNetwork->scheduleResponse(noi, _mockNetwork->now(), response);
     } else {
-        _mockNetwork->scheduleResponse(noi, _mockNetwork->now(), cmdResponseStatus.status);
+        _mockNetwork->scheduleResponse(
+            noi,
+            _mockNetwork->now(),
+            RemoteCommandResponse::make_forTest(cmdResponseStatus.status));
     }
 
     _mockNetwork->runReadyNetworkOperations();
@@ -110,10 +121,10 @@ void NetworkTestEnv::onFindCommand(OnFindCommandFunction func) {
             arr.append(obj);
         }
 
-        const NamespaceString nss =
-            NamespaceString(request.dbname, request.cmdObj.firstElement().String());
+        const NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+            request.dbname, request.cmdObj.firstElement().String());
         BSONObjBuilder result;
-        appendCursorResponseObject(0LL, nss.toString(), arr.arr(), &result);
+        appendCursorResponseObject(0LL, nss, arr.arr(), boost::none, &result);
 
         return result.obj();
     });
@@ -124,7 +135,7 @@ void NetworkTestEnv::onFindWithMetadataCommand(OnFindCommandWithMetadataFunction
         const auto& resultStatus = func(request);
 
         if (!resultStatus.isOK()) {
-            return resultStatus.getStatus();
+            return RemoteCommandResponse::make_forTest(resultStatus.getStatus());
         }
 
         std::vector<BSONObj> result;
@@ -136,12 +147,12 @@ void NetworkTestEnv::onFindWithMetadataCommand(OnFindCommandWithMetadataFunction
             arr.append(obj);
         }
 
-        const NamespaceString nss =
-            NamespaceString(request.dbname, request.cmdObj.firstElement().String());
+        const NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+            request.dbname, request.cmdObj.firstElement().String());
         BSONObjBuilder resultBuilder(std::move(metadata));
-        appendCursorResponseObject(0LL, nss.toString(), arr.arr(), &resultBuilder);
+        appendCursorResponseObject(0LL, nss, arr.arr(), boost::none, &resultBuilder);
 
-        return RemoteCommandResponse(resultBuilder.obj(), Milliseconds(1));
+        return RemoteCommandResponse::make_forTest(resultBuilder.obj(), Milliseconds(1));
     });
 }
 

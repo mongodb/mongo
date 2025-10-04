@@ -35,12 +35,18 @@
 #include <boost/multi_index/member.hpp>
 #include <boost/multi_index/sequenced_index.hpp>
 #include <boost/multi_index_container.hpp>
-#include <functional>
-
+// IWYU pragma: no_include "boost/multi_index/detail/adl_swap.hpp"
 #include "mongo/logv2/log_severity.h"
-#include "mongo/platform/mutex.h"
-#include "mongo/stdx/unordered_map.h"
+#include "mongo/platform/atomic.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/system_clock_source.h"
 #include "mongo/util/time_support.h"
+
+#include <functional>
+#include <mutex>
+
+#include <boost/multi_index/indexed_by.hpp>
 
 namespace mongo::logv2 {
 
@@ -109,31 +115,39 @@ private:
     Milliseconds _period;
     LogSeverity _normal;
     LogSeverity _quiet;
-    Mutex _mutex;
+    stdx::mutex _mutex;
     Suppressions _suppressions;
 };
 
 class SeveritySuppressor {
 public:
+    SeveritySuppressor(ClockSource* cs, Milliseconds period, LogSeverity normal, LogSeverity quiet)
+        : _stopWatch(cs ? cs : SystemClockSource::get()),
+          _period{period},
+          _normal{normal},
+          _quiet{quiet} {}
+
     SeveritySuppressor(Milliseconds period, LogSeverity normal, LogSeverity quiet)
-        : _period{period}, _normal{normal}, _quiet{quiet} {}
+        : SeveritySuppressor(nullptr, period, normal, quiet) {}
 
     LogSeverity operator()() {
-        auto now = Date_t::now();
-        auto lg = stdx::lock_guard(_mutex);
-        if (_expire <= now) {
-            _expire = now + Seconds{1};
-            return _quiet;
+        auto elapsed = _stopWatch.elapsed();
+        auto expiresAtMillis = _expiresAtMillis.loadRelaxed();
+        if (expiresAtMillis <= durationCount<Milliseconds>(elapsed)) {
+            const auto nextExpiresAtMillis = durationCount<Milliseconds>(elapsed + _period);
+            if (_expiresAtMillis.compareAndSwap(&expiresAtMillis, nextExpiresAtMillis)) {
+                return _normal;
+            }
         }
-        return _normal;
+        return _quiet;
     }
 
 private:
-    Milliseconds _period;
-    LogSeverity _normal;
-    LogSeverity _quiet;
-    Mutex _mutex;
-    Date_t _expire;
+    ClockSource::StopWatch _stopWatch;
+    const Milliseconds _period;
+    const LogSeverity _normal;
+    const LogSeverity _quiet;
+    Atomic<int64_t> _expiresAtMillis{0};
 };
 
 }  // namespace mongo::logv2

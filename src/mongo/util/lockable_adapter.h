@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <type_traits>
+
 namespace mongo {
 
 // BasicLockableAdapter allows non-template functions to take any lockable type. This can be useful
@@ -65,7 +67,9 @@ private:
 
     template <typename T>
     static inline VTable forT = VTable{+[](void* t) { static_cast<T*>(t)->lock(); },
-                                       +[](void* t) { static_cast<T*>(t)->unlock(); }};
+                                       +[](void* t) {
+                                           static_cast<T*>(t)->unlock();
+                                       }};
 
     void* _underlyingLock;
     const VTable* _vtable;

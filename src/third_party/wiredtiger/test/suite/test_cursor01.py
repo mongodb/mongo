@@ -45,7 +45,6 @@ class test_cursor01(wttest.WiredTigerTestCase):
         ('file-col', dict(tablekind='col',uri='file')),
         ('file-fix', dict(tablekind='fix',uri='file')),
         ('file-row', dict(tablekind='row',uri='file')),
-        ('lsm-row', dict(tablekind='row',uri='lsm')),
         ('table-col', dict(tablekind='col',uri='table')),
         ('table-fix', dict(tablekind='fix',uri='table')),
         ('table-row', dict(tablekind='row',uri='table'))
@@ -99,7 +98,8 @@ class test_cursor01(wttest.WiredTigerTestCase):
         self.pr('creating cursor')
         cursor = self.session.open_cursor(tablearg, None, None)
         self.assertCursorHasNoKeyValue(cursor)
-        self.assertEqual(cursor.uri, tablearg)
+        if not self.runningHook('disagg'):
+            self.assertEqual(cursor.uri, tablearg)
 
         for i in range(0, self.nentries):
             cursor[self.genkey(i)] = self.genvalue(i)
@@ -132,6 +132,12 @@ class test_cursor01(wttest.WiredTigerTestCase):
         cursor.reset()
         self.assertCursorHasNoKeyValue(cursor)
 
+        # Layered tables do not support duplicate cursors
+        if 'layered:' in cursor.uri:
+            self.pr("skipping duplicate cursor testing with layered tables")
+            self.assertTrue(self.runningHook('disagg'))
+            return cursor
+
         i = 0
         while True:
             nextret = cursor.next()
@@ -142,7 +148,7 @@ class test_cursor01(wttest.WiredTigerTestCase):
             self.assertEqual(key, self.genkey(i))
             self.assertEqual(value, self.genvalue(i))
             dupc = self.session.open_cursor(None, cursor, None)
-            self.assertEquals(cursor.compare(dupc), 0)
+            self.assertEqual(cursor.compare(dupc), 0)
             key = dupc.get_key()
             value = dupc.get_value()
             self.assertEqual(key, self.genkey(i))
@@ -190,6 +196,12 @@ class test_cursor01(wttest.WiredTigerTestCase):
         cursor.reset()
         self.assertCursorHasNoKeyValue(cursor)
 
+        # Layered tables do not support duplicate cursors
+        if 'layered:' in cursor.uri:
+            self.pr("skipping duplicate cursor testing with layered tables")
+            self.assertTrue(self.runningHook('disagg'))
+            return cursor
+
         i = self.nentries - 1
         while True:
             prevret = cursor.prev()
@@ -201,7 +213,7 @@ class test_cursor01(wttest.WiredTigerTestCase):
             self.assertEqual(value, self.genvalue(i))
             i -= 1
             dupc = self.session.open_cursor(None, cursor, None)
-            self.assertEquals(cursor.compare(dupc), 0)
+            self.assertEqual(cursor.compare(dupc), 0)
             cursor.close()
             cursor = dupc
 
@@ -217,6 +229,3 @@ class test_cursor01(wttest.WiredTigerTestCase):
         cursor = self.backward_iter(cursor)
         cursor = self.backward_iter_with_dup(cursor)
         cursor.close()
-
-if __name__ == '__main__':
-    wttest.run()

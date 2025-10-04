@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # Read and verify the documentation data to make sure path names are valid.
 
 import os, sys

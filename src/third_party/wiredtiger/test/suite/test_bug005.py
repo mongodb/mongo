@@ -33,8 +33,8 @@
 # test_bug005.py
 #       Regression tests.
 
-import wiredtiger, wttest
-from wtdataset import SimpleDataSet, simple_key, simple_value
+import wttest
+from wtdataset import simple_key, simple_value
 
 # Check that verify works when the file has additional data after the last
 # checkpoint.
@@ -51,9 +51,9 @@ class test_bug005(wttest.WiredTigerTestCase):
         cursor.close()
 
         # Verify the object, force it to disk, and verify the on-disk version.
-        self.session.verify(self.uri)
+        self.verifyUntilSuccess(self.session, self.uri)
         self.reopen_conn()
-        self.session.verify(self.uri)
+        self.verifyUntilSuccess(self.session, self.uri)
 
         # Append random data to the end.
         f = open('test_bug005', 'a')
@@ -61,7 +61,4 @@ class test_bug005(wttest.WiredTigerTestCase):
         f.close()
 
         # Verify the object again.
-        self.session.verify(self.uri)
-
-if __name__ == '__main__':
-    wttest.run()
+        self.verifyUntilSuccess(self.session, self.uri)

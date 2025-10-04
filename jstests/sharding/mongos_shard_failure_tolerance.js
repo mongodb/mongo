@@ -10,32 +10,31 @@
 // sequence), idle (connection is connected but not used before a shard change), and new
 // (connection connected after shard change).
 //
-// Checking UUID and index consistency involves talking to shards, but this test shuts down shards.
+// The following checks involve talking to shards, but this test shuts down shards.
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
+TestData.skipCheckShardFilteringMetadata = true;
 
-(function() {
-'use strict';
+let st = new ShardingTest({shards: 3, mongos: 1});
 
-var st = new ShardingTest({shards: 3, mongos: 1});
+let admin = st.s0.getDB("admin");
 
-var admin = st.s0.getDB("admin");
-
-var collSharded = st.s0.getCollection("fooSharded.barSharded");
-var collUnsharded = st.s0.getCollection("fooUnsharded.barUnsharded");
-
-assert.commandWorked(admin.runCommand({enableSharding: collSharded.getDB().toString()}));
-st.ensurePrimaryShard(collSharded.getDB().toString(), st.shard0.shardName);
+const dbCollSharded = "fooSharded";
+const dbCollUnsharded = "fooUnsharded";
+assert.commandWorked(admin.runCommand({enableSharding: dbCollSharded, primaryShard: st.shard0.shardName}));
+assert.commandWorked(admin.runCommand({enableSharding: dbCollUnsharded, primaryShard: st.shard0.shardName}));
+let collSharded = st.s0.getCollection(dbCollSharded + ".barSharded");
+let collUnsharded = st.s0.getCollection(dbCollUnsharded + ".barUnsharded");
 
 assert.commandWorked(admin.runCommand({shardCollection: collSharded.toString(), key: {_id: 1}}));
 assert.commandWorked(admin.runCommand({split: collSharded.toString(), middle: {_id: 0}}));
-assert.commandWorked(
-    admin.runCommand({moveChunk: collSharded.toString(), find: {_id: 0}, to: st.shard1.shardName}));
+assert.commandWorked(admin.runCommand({moveChunk: collSharded.toString(), find: {_id: 0}, to: st.shard1.shardName}));
 
 // Create the unsharded database
 assert.commandWorked(collUnsharded.insert({some: "doc"}));
 assert.commandWorked(collUnsharded.remove({}));
-st.ensurePrimaryShard(collUnsharded.getDB().toString(), st.shard0.shardName);
 
 //
 // Setup is complete
@@ -43,9 +42,9 @@ st.ensurePrimaryShard(collUnsharded.getDB().toString(), st.shard0.shardName);
 
 jsTest.log("Inserting initial data...");
 
-var mongosConnActive = new Mongo(st.s0.host);
-var mongosConnIdle = null;
-var mongosConnNew = null;
+let mongosConnActive = new Mongo(st.s0.host);
+let mongosConnIdle = null;
+let mongosConnNew = null;
 
 assert.commandWorked(mongosConnActive.getCollection(collSharded.toString()).insert({_id: -1}));
 assert.commandWorked(mongosConnActive.getCollection(collSharded.toString()).insert({_id: 1}));
@@ -93,7 +92,7 @@ assert.commandWorked(mongosConnNew.getCollection(collSharded.toString()).insert(
 mongosConnNew = new Mongo(st.s0.host);
 assert.commandWorked(mongosConnNew.getCollection(collUnsharded.toString()).insert({_id: 4}));
 
-gc();  // Clean up new connections
+gc(); // Clean up new connections
 
 jsTest.log("Stopping second shard...");
 
@@ -137,4 +136,3 @@ mongosConnNew = new Mongo(st.s0.host);
 assert.commandWorked(mongosConnNew.getCollection(collUnsharded.toString()).insert({_id: 7}));
 
 st.stop();
-})();

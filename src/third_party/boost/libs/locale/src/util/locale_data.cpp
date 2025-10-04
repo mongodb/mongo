@@ -1,113 +1,208 @@
 //
-//  Copyright (c) 2009-2011 Artyom Beilis (Tonkikh)
+// Copyright (c) 2009-2011 Artyom Beilis (Tonkikh)
+// Copyright (c) 2022-2024 Alexander Grund
 //
-//  Distributed under the Boost Software License, Version 1.0. (See
-//  accompanying file LICENSE_1_0.txt or copy at
-//  http://www.boost.org/LICENSE_1_0.txt)
-//
-#define BOOST_LOCALE_SOURCE
-#include "locale_data.hpp"
-#include "../encoding/conv.hpp"
+// Distributed under the Boost Software License, Version 1.0.
+// https://www.boost.org/LICENSE_1_0.txt
+
+#include <boost/locale/util/locale_data.hpp>
+#include <boost/locale/util/string.hpp>
+#include "encoding.hpp"
+#include <boost/assert.hpp>
+#include <algorithm>
+#include <stdexcept>
 #include <string>
 
-namespace boost {
-namespace locale {
-namespace util {
-    void locale_data::parse(std::string const &locale_name)
+namespace boost { namespace locale { namespace util {
+    /// Convert uppercase ASCII to lower case, return true if converted
+    static bool make_lower(char& c)
     {
-        language = "C";
-        country.clear();
-        variant.clear();
-        encoding = "us-ascii";
-        utf8=false;
-        parse_from_lang(locale_name);
+        if(is_upper_ascii(c)) {
+            c += 'a' - 'A';
+            return true;
+        } else
+            return false;
     }
 
-    void locale_data::parse_from_lang(std::string const &locale_name) 
+    /// Convert lowercase ASCII to upper case, return true if converted
+    static bool make_upper(char& c)
     {
-        size_t end = locale_name.find_first_of("-_@.");
-        std::string tmp = locale_name.substr(0,end);
+        if(is_lower_ascii(c)) {
+            c += 'A' - 'a';
+            return true;
+        } else
+            return false;
+    }
+
+    locale_data::locale_data()
+    {
+        reset();
+    }
+
+    locale_data::locale_data(const std::string& locale_name)
+    {
+        if(!parse(locale_name))
+            throw std::invalid_argument("Failed to parse locale name: " + locale_name);
+    }
+
+    void locale_data::reset()
+    {
+        language_ = "C";
+        script_.clear();
+        country_.clear();
+        encoding_ = "US-ASCII";
+        variant_.clear();
+        utf8_ = false;
+    }
+
+    std::string locale_data::to_string() const
+    {
+        std::string result = language_;
+        if(!script_.empty())
+            (result += '_') += script_;
+        if(!country_.empty())
+            (result += '_') += country_;
+        if(!encoding_.empty() && !util::are_encodings_equal(encoding_, "US-ASCII"))
+            (result += '.') += encoding_;
+        if(!variant_.empty())
+            (result += '@') += variant_;
+        return result;
+    }
+
+    bool locale_data::parse(const std::string& locale_name)
+    {
+        reset();
+        return parse_from_lang(locale_name);
+    }
+
+    bool locale_data::parse_from_lang(const std::string& input)
+    {
+        const auto end = input.find_first_of("-_@.");
+        std::string tmp = input.substr(0, end);
         if(tmp.empty())
-            return;
-        for(unsigned i=0;i<tmp.size();i++) {
-            if('A' <= tmp[i] && tmp[i]<='Z')
-                tmp[i]=tmp[i]-'A'+'a';
-            else if(tmp[i] < 'a' || 'z' < tmp[i])
-                return;
+            return false;
+        // lowercase ASCII
+        for(char& c : tmp) {
+            if(!is_lower_ascii(c) && !make_lower(c))
+                return false;
         }
-        language = tmp;
-        if(end >= locale_name.size())
-            return;
+        if(tmp != "c" && tmp != "posix") // Keep default
+            language_ = tmp;
 
-        if(locale_name[end] == '-' || locale_name[end]=='_') {
-           parse_from_country(locale_name.substr(end+1));
-        }
-        else if(locale_name[end] == '.') {
-           parse_from_encoding(locale_name.substr(end+1));
-        }
-        else if(locale_name[end] == '@') {
-           parse_from_variant(locale_name.substr(end+1));
+        if(end >= input.size())
+            return true;
+        else if(input[end] == '-' || input[end] == '_')
+            return parse_from_script(input.substr(end + 1));
+        else if(input[end] == '.')
+            return parse_from_encoding(input.substr(end + 1));
+        else {
+            BOOST_ASSERT_MSG(input[end] == '@', "Unexpected delimiter");
+            return parse_from_variant(input.substr(end + 1));
         }
     }
 
-    void locale_data::parse_from_country(std::string const &locale_name) 
+    bool locale_data::parse_from_script(const std::string& input)
     {
-        size_t end = locale_name.find_first_of("@.");
-        std::string tmp = locale_name.substr(0,end);
+        const auto end = input.find_first_of("-_@.");
+        std::string tmp = input.substr(0, end);
+        // Script is exactly 4 ASCII characters, otherwise it is not present
+        if(tmp.length() != 4)
+            return parse_from_country(input);
+
+        for(char& c : tmp) {
+            if(!is_lower_ascii(c) && !make_lower(c))
+                return parse_from_country(input);
+        }
+        make_upper(tmp[0]); // Capitalize first letter only
+        script_ = tmp;
+
+        if(end >= input.size())
+            return true;
+        else if(input[end] == '-' || input[end] == '_')
+            return parse_from_country(input.substr(end + 1));
+        else if(input[end] == '.')
+            return parse_from_encoding(input.substr(end + 1));
+        else {
+            BOOST_ASSERT_MSG(input[end] == '@', "Unexpected delimiter");
+            return parse_from_variant(input.substr(end + 1));
+        }
+    }
+
+    bool locale_data::parse_from_country(const std::string& input)
+    {
+        if(language_ == "C")
+            return false;
+
+        const auto end = input.find_first_of("@.");
+        std::string tmp = input.substr(0, end);
         if(tmp.empty())
-            return;
-        for(unsigned i=0;i<tmp.size();i++) {
-            if('a' <= tmp[i] && tmp[i]<='z')
-                tmp[i]=tmp[i]-'a'+'A';
-            else if(tmp[i] < 'A' || 'Z' < tmp[i])
-                return;
+            return false;
+
+        // Make uppercase
+        for(char& c : tmp)
+            make_upper(c);
+
+        // If it's ALL uppercase ASCII, assume ISO 3166 country id
+        if(std::find_if_not(tmp.begin(), tmp.end(), util::is_upper_ascii) != tmp.end()) {
+            // else handle special cases:
+            //   - en_US_POSIX is an alias for C
+            //   - M49 country code: 3 digits
+            if(language_ == "en" && tmp == "US_POSIX") {
+                language_ = "C";
+                tmp.clear();
+            } else if(tmp.size() != 3u || std::find_if_not(tmp.begin(), tmp.end(), util::is_numeric_ascii) != tmp.end())
+                return false;
         }
 
-        country = tmp;
-
-        if(end >= locale_name.size())
-            return;
-        else if(locale_name[end] == '.') {
-           parse_from_encoding(locale_name.substr(end+1));
-        }
-        else if(locale_name[end] == '@') {
-           parse_from_variant(locale_name.substr(end+1));
+        country_ = tmp;
+        if(end >= input.size())
+            return true;
+        else if(input[end] == '.')
+            return parse_from_encoding(input.substr(end + 1));
+        else {
+            BOOST_ASSERT_MSG(input[end] == '@', "Unexpected delimiter");
+            return parse_from_variant(input.substr(end + 1));
         }
     }
-    
-    void locale_data::parse_from_encoding(std::string const &locale_name) 
+
+    bool locale_data::parse_from_encoding(const std::string& input)
     {
-        size_t end = locale_name.find_first_of("@");
-        std::string tmp = locale_name.substr(0,end);
+        const auto end = input.find_first_of('@');
+        std::string tmp = input.substr(0, end);
         if(tmp.empty())
-            return;
-        for(unsigned i=0;i<tmp.size();i++) {
-            if('A' <= tmp[i] && tmp[i]<='Z')
-                tmp[i]=tmp[i]-'A'+'a';
-        }
-        encoding = tmp;
-        
-        utf8 = conv::impl::normalize_encoding(encoding.c_str()) == "utf8";
-
-        if(end >= locale_name.size())
-            return;
-
-        if(locale_name[end] == '@') {
-           parse_from_variant(locale_name.substr(end+1));
+            return false;
+        // No assumptions, but uppercase
+        encoding(std::move(tmp));
+        if(end >= input.size())
+            return true;
+        else {
+            BOOST_ASSERT_MSG(input[end] == '@', "Unexpected delimiter");
+            return parse_from_variant(input.substr(end + 1));
         }
     }
 
-    void locale_data::parse_from_variant(std::string const &locale_name)
+    bool locale_data::parse_from_variant(const std::string& input)
     {
-        variant = locale_name;
-        for(unsigned i=0;i<variant.size();i++) {
-            if('A' <= variant[i] && variant[i]<='Z')
-                variant[i]=variant[i]-'A'+'a';
-        }
+        if(language_ == "C")
+            return false;
+        if(input.empty())
+            return false;
+        variant_ = input;
+        // No assumptions, just make it lowercase
+        for(char& c : variant_)
+            make_lower(c);
+        return true;
     }
 
-} // util
-} // locale 
-} // boost
+    locale_data& locale_data::encoding(std::string new_encoding, const bool uppercase)
+    {
+        if(uppercase) {
+            for(char& c : new_encoding)
+                make_upper(c);
+        }
+        encoding_ = std::move(new_encoding);
+        utf8_ = util::normalize_encoding(encoding_) == "utf8";
+        return *this;
+    }
 
-// vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4
+}}} // namespace boost::locale::util

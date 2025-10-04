@@ -1,0 +1,10 @@
+{
+    "configure-args": "--enable-debug-symbols='-gline-tables-only' --enable-gczeal --disable-jemalloc --enable-address-sanitizer --enable-rust-simd",
+    "optimize": true,
+    "debug": false,
+    "compiler": "clang",
+    "env": {
+        "LLVM_SYMBOLIZER": "{MOZ_FETCHES_DIR}/llvm-symbolizer/bin/llvm-symbolizer"
+    },
+    "use_minidump": false
+}

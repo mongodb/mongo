@@ -29,13 +29,16 @@
 
 #pragma once
 
-#include <functional>
-
+#include "mongo/base/status.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/platform/mutex.h"
-#include "mongo/util/time_support.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+#include <memory>
+
+namespace MONGO_MOD_PUB mongo {
 namespace repl {
 
 
@@ -75,10 +78,10 @@ private:
      * Protects member data of this class during start and stop. There is no need to synchronize
      * access once its running because its run by a one thread only.
      */
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("NoopWriter::_mutex");
+    mutable stdx::mutex _mutex;
 
     std::unique_ptr<PeriodicNoopRunner> _noopRunner;
 };
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

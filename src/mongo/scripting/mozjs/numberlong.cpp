@@ -27,22 +27,40 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/scripting/mozjs/numberlong.h"
 
-#include <boost/optional.hpp>
-#include <js/Conversions.h>
-
+#include "mongo/base/error_codes.h"
 #include "mongo/base/parse_number.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/scripting/mozjs/implscope.h"
+#include "mongo/scripting/mozjs/internedstring.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
-#include "mongo/scripting/mozjs/wrapconstrainedmethod.h"
+#include "mongo/scripting/mozjs/wrapconstrainedmethod.h"  // IWYU pragma: keep
+#include "mongo/util/assert_util.h"
 #include "mongo/util/represent_as.h"
 #include "mongo/util/str.h"
-#include "mongo/util/text.h"
+#include "mongo/util/text.h"  // IWYU pragma: keep
+
+#include <string>
+
+#include <jsapi.h>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/numeric/conversion/converter_policies.hpp>
+#include <boost/optional/optional.hpp>
+#include <js/CallArgs.h>
+#include <js/ComparisonOperators.h>
+#include <js/Object.h>
+#include <js/PropertyDescriptor.h>
+#include <js/PropertySpec.h>
+#include <js/RootingAPI.h>
+#include <js/TypeDecls.h>
 
 namespace mongo {
 namespace mozjs {
@@ -57,20 +75,20 @@ const JSFunctionSpec NumberLongInfo::methods[6] = {
 
 const char* const NumberLongInfo::className = "NumberLong";
 
-void NumberLongInfo::finalize(js::FreeOp* fop, JSObject* obj) {
-    auto numLong = static_cast<int64_t*>(JS_GetPrivate(obj));
+void NumberLongInfo::finalize(JS::GCContext* gcCtx, JSObject* obj) {
+    auto numLong = JS::GetMaybePtrFromReservedSlot<int64_t>(obj, Int64Slot);
 
     if (numLong)
-        getScope(fop)->trackedDelete(numLong);
+        getScope(gcCtx)->trackedDelete(numLong);
 }
 
 int64_t NumberLongInfo::ToNumberLong(JSContext* cx, JS::HandleValue thisv) {
-    auto numLong = static_cast<int64_t*>(JS_GetPrivate(thisv.toObjectOrNull()));
+    auto numLong = JS::GetMaybePtrFromReservedSlot<int64_t>(thisv.toObjectOrNull(), Int64Slot);
     return numLong ? *numLong : 0;
 }
 
 int64_t NumberLongInfo::ToNumberLong(JSContext* cx, JS::HandleObject thisv) {
-    auto numLong = static_cast<int64_t*>(JS_GetPrivate(thisv));
+    auto numLong = JS::GetMaybePtrFromReservedSlot<int64_t>(thisv, Int64Slot);
     return numLong ? *numLong : 0;
 }
 
@@ -201,8 +219,7 @@ void NumberLongInfo::construct(JSContext* cx, JS::CallArgs args) {
 
         numLong = (top << 32) + bot;
     }
-
-    JS_SetPrivate(thisv, scope->trackedNew<int64_t>(numLong));
+    JS::SetReservedSlot(thisv, Int64Slot, JS::PrivateValue(scope->trackedNew<int64_t>(numLong)));
 
     args.rval().setObjectOrNull(thisv);
 }

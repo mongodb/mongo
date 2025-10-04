@@ -29,14 +29,17 @@
 
 #pragma once
 
-#include <functional>
-#include <vector>
-
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/exec/document_value/value_comparator.h"
-#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/util/modules.h"
+
+#include <functional>
 
 namespace mongo {
 namespace document_path_support {
@@ -53,17 +56,47 @@ void visitAllValuesAtPath(const Document& doc,
                           std::function<void(const Value&)> callback);
 
 /**
- * Returns the element at 'path' in 'doc', or a missing Value if the path does not fully exist.
+ * Extracts 'paths' from the input document and returns a BSON object containing only those paths.
  *
- * Returns ErrorCodes::InternalError if an array is encountered along the path or at the end of the
- * path.
+ * The template parameter 'EnsureUniquePrefixes' controls whether or not prefixes in the result
+ * BSONObj will be checked for uniqueness. Setting it to 'false' can be used as a performance
+ * optimization in case it is known that all prefixes in the result object will be unique.
+ * Note: the version that needs to ensure that prefixes are unique has quadratic asymptotic
+ * complexity in the worst case.
  */
-StatusWith<Value> extractElementAlongNonArrayPath(const Document& doc, const FieldPath& path);
+template <bool EnsureUniquePrefixes = true>
+void documentToBsonWithPaths(const Document& input,
+                             const OrderedPathSet& paths,
+                             BSONObjBuilder* builder) {
+    for (auto&& path : paths) {
+        // getNestedField does not handle dotted paths correctly, so instead of retrieving the
+        // entire path, we just extract the first element of the path.
+        auto prefix = FieldPath::extractFirstFieldFromDottedPath(path);
+
+        // Avoid adding the same prefix twice. Note: 'hasField()' iterates over all existing
+        // fields in the builder until it finds a field with the given name or it reaches the
+        // end of the object.
+        if (!EnsureUniquePrefixes || !builder->hasField(prefix)) {
+            input.getField(prefix).addToBsonObj(builder, prefix);
+        }
+    }
+}
 
 /**
- * Extracts 'paths' from the input document and returns a BSON object containing only those paths.
+ * Converts a 'Document' to a BSON object.
+ *
+ * The template parameter 'EnsureUniquePrefixes' controls whether or not prefixes in the result
+ * BSONObj will be checked for uniqueness. Setting it to 'false' can be used as a performance
+ * optimization in case it is known that all prefixes in the result object will be unique.
  */
-BSONObj documentToBsonWithPaths(const Document&, const std::set<std::string>& paths);
+template <typename BSONTraits = BSONObj::DefaultSizeTrait, bool EnsureUniquePrefixes = true>
+BSONObj documentToBsonWithPaths(const Document& input, const OrderedPathSet& paths) {
+    BSONObjBuilder outputBuilder;
+    documentToBsonWithPaths<EnsureUniquePrefixes>(input, paths, &outputBuilder);
+    BSONObj docBSONObj = outputBuilder.obj<BSONTraits>();
+    Document::validateDocumentBSONSize(docBSONObj, BSONTraits::MaxSize);
+    return docBSONObj;
+}
 
 /**
  * Extracts 'paths' from the input document to a flat document.

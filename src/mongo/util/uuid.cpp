@@ -27,26 +27,34 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/util/uuid.h"
 
-#include <fmt/format.h>
-#include <pcrecpp.h>
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/platform/random.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/ctype.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/synchronized_value.h"
+
+#include <algorithm>
+#include <new>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 
 namespace {
 
-using namespace fmt::literals;
-
-StaticImmortal<synchronized_value<SecureRandom>> uuidGen;
+synchronized_value<SecureRandom>& uuidGen() {
+    static StaticImmortal<synchronized_value<SecureRandom>> uuidGen;
+    return uuidGen.value();
+}
 
 }  // namespace
 
@@ -58,9 +66,9 @@ StatusWith<UUID> UUID::parse(BSONElement from) {
     }
 }
 
-StatusWith<UUID> UUID::parse(const std::string& s) {
+StatusWith<UUID> UUID::parse(StringData s) {
     if (!isUUIDString(s)) {
-        return {ErrorCodes::InvalidUUID, "Invalid UUID string: {}"_format(s)};
+        return {ErrorCodes::InvalidUUID, fmt::format("Invalid UUID string: {}", s)};
     }
 
     UUIDStorage uuid;
@@ -72,7 +80,7 @@ StatusWith<UUID> UUID::parse(const std::string& s) {
         if (s[j] == '-')
             j++;
 
-        uuid[i] = hexblob::decodePair(StringData(s).substr(j, 2));
+        uuid[i] = hexblob::decodePair(s.substr(j, 2));
         j += 2;
     }
 
@@ -85,15 +93,12 @@ UUID UUID::parse(const BSONObj& obj) {
     return res.getValue();
 }
 
-bool UUID::isUUIDString(const std::string& s) {
-    // Regex to match valid version 4 UUIDs with variant bits set
-    static StaticImmortal<pcrecpp::RE> uuidRegex(
-        "[[:xdigit:]]{8}-"
-        "[[:xdigit:]]{4}-"
-        "[[:xdigit:]]{4}-"
-        "[[:xdigit:]]{4}-"
-        "[[:xdigit:]]{12}");
-    return uuidRegex->FullMatch(s);
+bool UUID::isUUIDString(StringData s) {
+    static constexpr auto pat = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"_sd;
+    return s.size() == pat.size() &&
+        std::mismatch(s.begin(), s.end(), pat.begin(), [](char a, char b) {
+            return b == 'x' ? ctype::isXdigit(a) : a == b;
+        }).first == s.end();
 }
 
 bool UUID::isRFC4122v4() const {
@@ -102,7 +107,7 @@ bool UUID::isRFC4122v4() const {
 
 UUID UUID::gen() {
     UUIDStorage randomBytes;
-    (*uuidGen)->fill(&randomBytes, sizeof(randomBytes));
+    uuidGen()->fill(&randomBytes, sizeof(randomBytes));
 
     // Set version in high 4 bits of byte 6 and variant in high 2 bits of byte 8, see RFC 4122,
     // section 4.1.1, 4.1.2 and 4.1.3.
@@ -129,18 +134,12 @@ BSONObj UUID::toBSON() const {
 }
 
 std::string UUID::toString() const {
-    return "{}-{}-{}-{}-{}"_format(hexblob::encodeLower(&_uuid[0], 4),
-                                   hexblob::encodeLower(&_uuid[4], 2),
-                                   hexblob::encodeLower(&_uuid[6], 2),
-                                   hexblob::encodeLower(&_uuid[8], 2),
-                                   hexblob::encodeLower(&_uuid[10], 6));
-}
-
-template <>
-BSONObjBuilder& BSONObjBuilderValueStream::operator<<<UUID>(UUID value) {
-    value.appendToBuilder(_builder, _fieldName);
-    _fieldName = StringData();
-    return *_builder;
+    return fmt::format("{}-{}-{}-{}-{}",
+                       hexblob::encodeLower(&_uuid[0], 4),
+                       hexblob::encodeLower(&_uuid[4], 2),
+                       hexblob::encodeLower(&_uuid[6], 2),
+                       hexblob::encodeLower(&_uuid[8], 2),
+                       hexblob::encodeLower(&_uuid[10], 6));
 }
 
 }  // namespace mongo

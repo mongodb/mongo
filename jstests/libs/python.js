@@ -1,27 +1,33 @@
 // Helper for finding the local python binary.
 
-function getPython3Binary() {
-    'use strict';
+export function getPython3Binary() {
+    // On windows it is important to use python vs python3
+    // or else we will pick up a python that is not in our venv
+    clearRawMongoProgramOutput();
+    assert.eq(runNonMongoProgram("python", "--version"), 0);
+    const pythonVersion = rawMongoProgramOutput("Python"); // Will look like "Python 3.10.4\n"
+    const usingPython310 = /Python 3\.10/.exec(pythonVersion);
+    if (usingPython310) {
+        jsTest.log.info("Found python 3.10 by default. Likely this is because we are using a virtual environment.");
+        return "python";
+    }
 
-    let cmd = '/opt/mongodbtoolchain/v3/bin/python3';
-    if (_isWindows()) {
-        const paths = ["c:/python36/python.exe", "c:/python/python36/python.exe"];
-        for (let p of paths) {
-            if (fileExists(p)) {
-                cmd = p;
-                break;
-            }
+    const paths = [
+        "/opt/mongodbtoolchain/v5/bin/python3",
+        "/opt/mongodbtoolchain/v4/bin/python3",
+        "/cygdrive/c/python/python310/python.exe",
+        "c:/python/python310/python.exe",
+    ];
+    for (let p of paths) {
+        if (fileExists(p)) {
+            jsTest.log.info("Found python3 in default location " + p);
+            return p;
         }
     }
 
-    if (fileExists(cmd)) {
-        return cmd;
-    }
-
-    clearRawMongoProgramOutput();
-    assert.eq(runNonMongoProgram("python", "--version"), 0);
-    const pythonVersion = rawMongoProgramOutput();
     assert(/Python 3/.exec(pythonVersion));
 
-    return "python";
+    // We are probs running on mac
+    jsTest.log.info("Did not find python3 in a virtualenv or default location");
+    return "python3";
 }

@@ -18,6 +18,7 @@
 #include <boost/log/detail/setup_config.hpp>
 #include <cstddef>
 #include <ctime>
+#include <boost/core/snprintf.hpp>
 #include <boost/mpl/vector.hpp>
 #include <boost/mpl/vector/vector40.hpp>
 #include <boost/preprocessor/cat.hpp>
@@ -35,7 +36,6 @@
 #include <boost/log/utility/string_literal.hpp>
 #include <boost/log/utility/formatting_ostream.hpp>
 #include <boost/log/detail/code_conversion.hpp>
-#include <boost/log/detail/snprintf.hpp>
 #include <boost/log/detail/process_id.hpp>
 #if !defined(BOOST_LOG_NO_THREADS)
 #include <boost/log/detail/thread_id.hpp>
@@ -112,8 +112,8 @@ private:
                 char buf[32];
                 std::size_t len = std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &t);
                 std::size_t size = sizeof(buf) - len;
-                int res = boost::log::aux::snprintf(buf + len, size, ".%.6u", static_cast< unsigned int >(value.time_of_day().total_microseconds() % 1000000));
-                if (res < 0)
+                int res = boost::core::snprintf(buf + len, size, ".%.6u", static_cast< unsigned int >(value.time_of_day().total_microseconds() % 1000000));
+                if (BOOST_UNLIKELY(res < 0))
                     buf[len] = '\0';
                 else if (static_cast< std::size_t >(res) >= size)
                     len += size - 1;
@@ -172,8 +172,8 @@ private:
                 unsigned int seconds = static_cast< unsigned int >(total_useconds / 1000000ull % 60ull);
                 unsigned int useconds = static_cast< unsigned int >(total_useconds % 1000000ull);
                 char buf[64];
-                int len = boost::log::aux::snprintf(buf, sizeof(buf), "%.2llu:%.2u:%.2u.%.6u", hours, minutes, seconds, useconds);
-                if (len > 0)
+                int len = boost::core::snprintf(buf, sizeof(buf), "%.2llu:%.2u:%.2u.%.6u", hours, minutes, seconds, useconds);
+                if (BOOST_LIKELY(len > 0))
                 {
                     unsigned int size = static_cast< unsigned int >(len) >= sizeof(buf) ? static_cast< unsigned int >(sizeof(buf)) : static_cast< unsigned int >(len);
                     m_strm.write(buf, size);

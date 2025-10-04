@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 /*
  * Define WT threading and concurrency primitives Assumes Windows 7+/2008 R2+
  */
@@ -13,6 +15,7 @@ typedef CONDITION_VARIABLE wt_cond_t;
 typedef CRITICAL_SECTION wt_mutex_t;
 typedef struct {
     bool created;
+    uint16_t name_index; /* Not used on Windows */
     HANDLE id;
 } wt_thread_t;
 

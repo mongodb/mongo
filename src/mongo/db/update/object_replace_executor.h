@@ -29,13 +29,15 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/update/update_executor.h"
+
 #include <map>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
-
-#include "mongo/db/update/update_executor.h"
 
 namespace mongo {
 
@@ -65,10 +67,11 @@ public:
                                               bool allowTopLevelDollarPrefixedFields = false);
 
     /**
-     * Initializes the node with the document to replace with. Any zero-valued timestamps (except
-     * for the _id) are updated to the current time.
+     * Initializes the node with the document to replace with. If 'bypassEmptyTsReplacement' is
+     * false, any zero-valued timestamps (except for the _id) will be replaced with the current
+     * time.
      */
-    explicit ObjectReplaceExecutor(BSONObj replacement);
+    explicit ObjectReplaceExecutor(BSONObj replacement, bool bypassEmptyTsReplacement = false);
 
     /**
      * Replaces the document that 'applyParams.element' belongs to with 'val'. If 'val' does not
@@ -95,6 +98,8 @@ private:
 
     // True if '_replacementDoc' contains an _id.
     bool _containsId;
+
+    bool _bypassEmptyTsReplacement = false;
 };
 
 }  // namespace mongo

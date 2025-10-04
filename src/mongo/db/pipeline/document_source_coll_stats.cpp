@@ -27,15 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/pipeline/document_source_coll_stats.h"
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/db/stats/top.h"
-#include "mongo/util/net/socket_utils.h"
-#include "mongo/util/time_support.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/query/allowed_contexts.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/serialization_context.h"
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 using boost::intrusive_ptr;
 
@@ -45,6 +45,7 @@ REGISTER_DOCUMENT_SOURCE(collStats,
                          DocumentSourceCollStats::LiteParsed::parse,
                          DocumentSourceCollStats::createFromBson,
                          AllowedWithApiStrict::kConditionally);
+ALLOCATE_DOCUMENT_SOURCE_ID(collStats, DocumentSourceCollStats::id)
 
 void DocumentSourceCollStats::LiteParsed::assertPermittedInAPIVersion(
     const APIParameters& apiParameters) const {
@@ -57,71 +58,39 @@ void DocumentSourceCollStats::LiteParsed::assertPermittedInAPIVersion(
 }
 
 const char* DocumentSourceCollStats::getSourceName() const {
-    return kStageName.rawData();
+    return kStageName.data();
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceCollStats::createFromBson(
     BSONElement specElem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
     uassert(40166,
             str::stream() << "$collStats must take a nested object but found: " << specElem,
-            specElem.type() == BSONType::Object);
-    auto spec = DocumentSourceCollStatsSpec::parse(IDLParserErrorContext(kStageName),
-                                                   specElem.embeddedObject());
+            specElem.type() == BSONType::object);
 
+    const auto tenantId = pExpCtx->getNamespaceString().tenantId();
+    const auto vts = tenantId
+        ? boost::make_optional(auth::ValidatedTenancyScopeFactory::create(
+              *tenantId, auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{}))
+        : boost::none;
+    auto spec = DocumentSourceCollStatsSpec::parse(
+        specElem.embeddedObject(),
+        IDLParserContext(
+            kStageName,
+            vts,
+            tenantId,
+            SerializationContext::stateCommandReply(pExpCtx->getSerializationContext())));
+
+    // targetAllNodes is not allowed on mongod instance.
+    if (spec.getTargetAllNodes().value_or(false)) {
+        uassert(ErrorCodes::FailedToParse,
+                "$collStats supports targetAllNodes parameter only for sharded clusters",
+                pExpCtx->getInRouter() || pExpCtx->getFromRouter());
+    }
     return make_intrusive<DocumentSourceCollStats>(pExpCtx, std::move(spec));
 }
 
-DocumentSource::GetNextResult DocumentSourceCollStats::doGetNext() {
-    if (_finished) {
-        return GetNextResult::makeEOF();
-    }
-
-    _finished = true;
-
-    BSONObjBuilder builder;
-
-    builder.append("ns", pExpCtx->ns.ns());
-
-    auto shardName = pExpCtx->mongoProcessInterface->getShardName(pExpCtx->opCtx);
-
-    if (!shardName.empty()) {
-        builder.append("shard", shardName);
-    }
-
-    builder.append("host", getHostNameCachedAndPort());
-    builder.appendDate("localTime", jsTime());
-
-    if (auto latencyStatsSpec = _collStatsSpec.getLatencyStats()) {
-        pExpCtx->mongoProcessInterface->appendLatencyStats(
-            pExpCtx->opCtx, pExpCtx->ns, latencyStatsSpec->getHistograms(), &builder);
-    }
-
-    if (auto storageStats = _collStatsSpec.getStorageStats()) {
-        // If the storageStats field exists, it must have been validated as an object when parsing.
-        BSONObjBuilder storageBuilder(builder.subobjStart("storageStats"));
-        uassertStatusOKWithContext(pExpCtx->mongoProcessInterface->appendStorageStats(
-                                       pExpCtx->opCtx, pExpCtx->ns, *storageStats, &storageBuilder),
-                                   "Unable to retrieve storageStats in $collStats stage");
-        storageBuilder.doneFast();
-    }
-
-    if (_collStatsSpec.getCount()) {
-        uassertStatusOKWithContext(pExpCtx->mongoProcessInterface->appendRecordCount(
-                                       pExpCtx->opCtx, pExpCtx->ns, &builder),
-                                   "Unable to retrieve count in $collStats stage");
-    }
-
-    if (_collStatsSpec.getQueryExecStats()) {
-        uassertStatusOKWithContext(pExpCtx->mongoProcessInterface->appendQueryExecStats(
-                                       pExpCtx->opCtx, pExpCtx->ns, &builder),
-                                   "Unable to retrieve queryExecStats in $collStats stage");
-    }
-
-    return {Document(builder.obj())};
-}
-
-Value DocumentSourceCollStats::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
-    return Value(Document{{getSourceName(), _collStatsSpec.toBSON()}});
+Value DocumentSourceCollStats::serialize(const SerializationOptions& opts) const {
+    return Value(Document{{getSourceName(), _collStatsSpec.toBSON(opts)}});
 }
 
 }  // namespace mongo

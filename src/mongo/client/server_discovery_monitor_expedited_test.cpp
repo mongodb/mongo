@@ -26,20 +26,24 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
+#include "mongo/base/string_data.h"
 #include "mongo/client/server_discovery_monitor.h"
-
-#include <boost/optional/optional_io.hpp>
-
-#include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/duration.h"
 
-namespace mongo {
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
+
+
+namespace mongo::sdam {
 class SingleServerDiscoveryMonitorExpeditedFixture : public unittest::Test {
 public:
     struct TestCase {
-        boost::optional<Milliseconds> timeElapsedSinceLastIsMaster;
+        boost::optional<Milliseconds> timeElapsedSinceLastHello;
         Milliseconds previousRefreshPeriod;
         boost::optional<Milliseconds> expectedResult;
     };
@@ -47,11 +51,11 @@ public:
     void verifyTestCase(TestCase testCase) {
         LOGV2_INFO(4712103,
                    "TestCase",
-                   "timeElapsedSinceLastIsMaster"_attr = testCase.timeElapsedSinceLastIsMaster,
+                   "timeElapsedSinceLastHello"_attr = testCase.timeElapsedSinceLastHello,
                    "previousRefreshPeriod"_attr = testCase.previousRefreshPeriod,
                    "expeditedRefreshPeriod"_attr = kExpeditedRefreshPeriod);
         auto result = SingleServerDiscoveryMonitor::calculateExpeditedDelayUntilNextCheck(
-            testCase.timeElapsedSinceLastIsMaster,
+            testCase.timeElapsedSinceLastHello,
             kExpeditedRefreshPeriod,
             testCase.previousRefreshPeriod);
         ASSERT_EQUALS(testCase.expectedResult, result);
@@ -103,4 +107,4 @@ TEST_F(SingleServerDiscoveryMonitorExpeditedFixture, PreviousRequestConcurrent) 
     verifyTestCase(TestCase{kZeroMs, kLongRefreshPeriod, kExpeditedRefreshPeriod});
     verifyTestCase(TestCase{kZeroMs, kExpeditedRefreshPeriod, boost::none});
 }
-}  // namespace mongo
+}  // namespace mongo::sdam

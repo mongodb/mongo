@@ -1,0 +1,99 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+load("//bazel/config:render_template.bzl", "render_template")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+render_template(
+    name = "codepoints_casefold_gen",
+    srcs = [
+        "gen_casefold_map.py",
+        "gen_helper.py",
+        "//src/third_party/unicode-8.0.0:CaseFolding.txt",
+    ],
+    cmd = [
+        "$(location gen_casefold_map.py)",
+        "$(location //src/third_party/unicode-8.0.0:CaseFolding.txt)",
+        "$(location codepoints_casefold.cpp)",
+    ],
+    output = "codepoints_casefold.cpp",
+)
+
+render_template(
+    name = "codepoints_delimiter_list_gen",
+    srcs = [
+        "gen_delimiter_list.py",
+        "gen_helper.py",
+        "//src/third_party/unicode-8.0.0:PropList.txt",
+    ],
+    cmd = [
+        "$(location gen_delimiter_list.py)",
+        "$(location //src/third_party/unicode-8.0.0:PropList.txt)",
+        "$(location codepoints_delimiter_list.cpp)",
+    ],
+    output = "codepoints_delimiter_list.cpp",
+)
+
+render_template(
+    name = "codepoints_diacritic_list_gen",
+    srcs = [
+        "gen_diacritic_list.py",
+        "gen_helper.py",
+        "//src/third_party/unicode-8.0.0:PropList.txt",
+    ],
+    cmd = [
+        "$(location gen_diacritic_list.py)",
+        "$(location //src/third_party/unicode-8.0.0:PropList.txt)",
+        "$(location codepoints_diacritic_list.cpp)",
+    ],
+    output = "codepoints_diacritic_list.cpp",
+)
+
+mongo_cc_library(
+    name = "unicode",
+    srcs = [
+        "codepoints_casefold.cpp",
+        "codepoints_delimiter_list.cpp",
+        "codepoints_diacritic_list.cpp",
+        "codepoints_diacritic_map.cpp",
+        "string.cpp",
+    ],
+    hdrs = [
+        "byte_vector.h",
+        "codepoints.h",
+        "string.h",
+    ] + select({
+        "@platforms//cpu:x86_64": ["byte_vector_sse2.h"],
+        "@platforms//cpu:aarch64": ["byte_vector_neon.h"],
+        "@platforms//cpu:ppc": ["byte_vector_altivec.h"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/shell:linenoise_utf8",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_fts_unicode_test",
+    srcs = [
+        "byte_vector_test.cpp",
+        "codepoints_test.cpp",
+        "string_test.cpp",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        ":unicode",
+    ],
+)
+
+py_binary(
+    name = "gen_diacritic_map",
+    srcs = ["gen_diacritic_map.py"],
+)

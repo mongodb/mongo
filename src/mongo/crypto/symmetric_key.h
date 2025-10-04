@@ -29,12 +29,19 @@
 
 #pragma once
 
+#include "mongo/base/secure_allocator.h"
+#include "mongo/base/string_data.h"
+#include "mongo/platform/atomic_word.h"
+
+#include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "mongo/base/secure_allocator.h"
-#include "mongo/platform/atomic_word.h"
-#include "third_party/murmurhash3/MurmurHash3.h"
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 class Status;
@@ -68,17 +75,10 @@ public:
         return _name;
     }
 
-    /**
-     * Custom hash function so that SymmetricKeyId can be used by ESE's LRUCache.
-     */
-    struct Hash {
-        std::size_t operator()(const SymmetricKeyId& keyid) const {
-            auto rep = keyid.toString();
-            uint32_t hash;
-            MurmurHash3_x86_32(rep.data(), rep.size(), 0, &hash);
-            return hash;
-        }
-    };
+    template <typename H>
+    friend H AbslHashValue(H h, const SymmetricKeyId& keyid) {
+        return H::combine(std::move(h), keyid.toString());
+    }
 
 private:
     std::string _initStrRep() const;

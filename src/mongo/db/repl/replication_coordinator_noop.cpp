@@ -27,15 +27,25 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "replication_coordinator_noop.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/util/assert_util.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace repl {
 
+ReplSettings makeDefaultReplSettings() {
+    ReplSettings settings;
+    settings.setReplSetString("ReplicationCoordinatorNoOpDefaultSetName");
+    return settings;
+}
+
 ReplicationCoordinatorNoOp::ReplicationCoordinatorNoOp(ServiceContext* service)
-    : _service(service) {}
+    : _service(service), _settings(makeDefaultReplSettings()) {}
 
 void ReplicationCoordinatorNoOp::startup(OperationContext* opCtx,
                                          StorageEngine::LastShutdownState lastShutdownState) {}
@@ -50,17 +60,8 @@ bool ReplicationCoordinatorNoOp::inQuiesceMode() const {
     MONGO_UNREACHABLE;
 }
 
-void ReplicationCoordinatorNoOp::shutdown(OperationContext* opCtx) {}
-
-void ReplicationCoordinatorNoOp::markAsCleanShutdownIfPossible(OperationContext* opCtx) {}
-
-ReplicationCoordinator::Mode ReplicationCoordinatorNoOp::getReplicationMode() const {
-    return modeReplSet;
-}
-
-bool ReplicationCoordinatorNoOp::isReplEnabled() const {
-    return getReplicationMode() == modeReplSet;
-}
+void ReplicationCoordinatorNoOp::shutdown(OperationContext* opCtx,
+                                          BSONObjBuilder* shutdownTimeElapsedBuilder) {}
 
 MemberState ReplicationCoordinatorNoOp::getMemberState() const {
     return MemberState::RS_PRIMARY;
@@ -71,7 +72,7 @@ OpTime ReplicationCoordinatorNoOp::getMyLastAppliedOpTime() const {
 }
 
 const ReplSettings& ReplicationCoordinatorNoOp::getSettings() const {
-    MONGO_UNREACHABLE;
+    return _settings;
 }
 
 bool ReplicationCoordinatorNoOp::isWritablePrimaryForReportingPurposes() {
@@ -79,12 +80,12 @@ bool ReplicationCoordinatorNoOp::isWritablePrimaryForReportingPurposes() {
 }
 
 bool ReplicationCoordinatorNoOp::canAcceptWritesForDatabase(OperationContext* opCtx,
-                                                            StringData dbName) {
+                                                            const DatabaseName& dbName) {
     MONGO_UNREACHABLE;
 }
 
 bool ReplicationCoordinatorNoOp::canAcceptWritesForDatabase_UNSAFE(OperationContext* opCtx,
-                                                                   StringData dbName) {
+                                                                   const DatabaseName& dbName) {
     MONGO_UNREACHABLE;
 }
 
@@ -135,8 +136,7 @@ bool ReplicationCoordinatorNoOp::buildsIndexes() {
     MONGO_UNREACHABLE;
 }
 
-OpTimeAndWallTime ReplicationCoordinatorNoOp::getMyLastAppliedOpTimeAndWallTime(
-    bool rollbackSafe) const {
+OpTimeAndWallTime ReplicationCoordinatorNoOp::getMyLastAppliedOpTimeAndWallTime() const {
     MONGO_UNREACHABLE;
 }
 
@@ -149,7 +149,7 @@ OpTime ReplicationCoordinatorNoOp::getCurrentCommittedSnapshotOpTime() const {
     MONGO_UNREACHABLE;
 }
 
-void ReplicationCoordinatorNoOp::appendDiagnosticBSON(mongo::BSONObjBuilder*) {
+void ReplicationCoordinatorNoOp::appendDiagnosticBSON(mongo::BSONObjBuilder*, StringData) {
     MONGO_UNREACHABLE;
 }
 
@@ -185,11 +185,15 @@ Status ReplicationCoordinatorNoOp::setFollowerModeRollback(OperationContext* opC
     MONGO_UNREACHABLE;
 }
 
-ReplicationCoordinator::ApplierState ReplicationCoordinatorNoOp::getApplierState() {
+ReplicationCoordinator::OplogSyncState ReplicationCoordinatorNoOp::getOplogSyncState() {
     MONGO_UNREACHABLE;
 }
 
-void ReplicationCoordinatorNoOp::signalDrainComplete(OperationContext*, long long) noexcept {
+void ReplicationCoordinatorNoOp::signalWriterDrainComplete(OperationContext*, long long) noexcept {
+    MONGO_UNREACHABLE;
+}
+
+void ReplicationCoordinatorNoOp::signalApplierDrainComplete(OperationContext*, long long) noexcept {
     MONGO_UNREACHABLE;
 }
 
@@ -198,6 +202,11 @@ void ReplicationCoordinatorNoOp::signalUpstreamUpdater() {
 }
 
 void ReplicationCoordinatorNoOp::setMyHeartbeatMessage(const std::string&) {
+    MONGO_UNREACHABLE;
+}
+
+void ReplicationCoordinatorNoOp::setMyLastWrittenOpTimeAndWallTimeForward(
+    const OpTimeAndWallTime&) {
     MONGO_UNREACHABLE;
 }
 
@@ -211,11 +220,13 @@ void ReplicationCoordinatorNoOp::setMyLastDurableOpTimeAndWallTimeForward(
     MONGO_UNREACHABLE;
 }
 
-void ReplicationCoordinatorNoOp::setMyLastAppliedOpTimeAndWallTime(const OpTimeAndWallTime&) {
+void ReplicationCoordinatorNoOp::setMyLastAppliedAndLastWrittenOpTimeAndWallTimeForward(
+    const OpTimeAndWallTime&) {
     MONGO_UNREACHABLE;
 }
 
-void ReplicationCoordinatorNoOp::setMyLastDurableOpTimeAndWallTime(const OpTimeAndWallTime&) {
+void ReplicationCoordinatorNoOp::setMyLastDurableAndLastWrittenOpTimeAndWallTimeForward(
+    const OpTimeAndWallTime&) {
     MONGO_UNREACHABLE;
 }
 
@@ -244,6 +255,12 @@ Status ReplicationCoordinatorNoOp::waitUntilOpTimeForRead(OperationContext*,
 
 Status ReplicationCoordinatorNoOp::waitUntilOpTimeForReadUntil(OperationContext*,
                                                                const ReadConcernArgs&,
+                                                               boost::optional<Date_t>) {
+    MONGO_UNREACHABLE;
+}
+
+Status ReplicationCoordinatorNoOp::waitUntilOpTimeWrittenUntil(OperationContext*,
+                                                               LogicalTime,
                                                                boost::optional<Date_t>) {
     MONGO_UNREACHABLE;
 }
@@ -303,14 +320,6 @@ ConnectionString ReplicationCoordinatorNoOp::getConfigConnectionString() const {
     MONGO_UNREACHABLE;
 }
 
-Milliseconds ReplicationCoordinatorNoOp::getConfigElectionTimeoutPeriod() const {
-    MONGO_UNREACHABLE;
-}
-
-std::vector<MemberConfig> ReplicationCoordinatorNoOp::getConfigVotingMembers() const {
-    MONGO_UNREACHABLE;
-}
-
 std::int64_t ReplicationCoordinatorNoOp::getConfigTerm() const {
     MONGO_UNREACHABLE;
 }
@@ -323,28 +332,13 @@ ConfigVersionAndTerm ReplicationCoordinatorNoOp::getConfigVersionAndTerm() const
     MONGO_UNREACHABLE;
 }
 
-int ReplicationCoordinatorNoOp::getConfigNumMembers() const {
-    MONGO_UNREACHABLE;
-}
-
-Milliseconds ReplicationCoordinatorNoOp::getConfigHeartbeatTimeoutPeriodMillis() const {
-    MONGO_UNREACHABLE;
-}
-
-BSONObj ReplicationCoordinatorNoOp::getConfigBSON() const {
-    MONGO_UNREACHABLE;
-}
-
-const MemberConfig* ReplicationCoordinatorNoOp::findConfigMemberByHostAndPort(
+boost::optional<MemberConfig> ReplicationCoordinatorNoOp::findConfigMemberByHostAndPort_deprecated(
     const HostAndPort& hap) const {
     MONGO_UNREACHABLE;
 }
 
-bool ReplicationCoordinatorNoOp::isConfigLocalHostAllowed() const {
-    MONGO_UNREACHABLE;
-}
-
-Milliseconds ReplicationCoordinatorNoOp::getConfigHeartbeatInterval() const {
+Status ReplicationCoordinatorNoOp::validateWriteConcern(
+    const WriteConcernOptions& writeConcern) const {
     MONGO_UNREACHABLE;
 }
 
@@ -363,6 +357,11 @@ void ReplicationCoordinatorNoOp::cancelAndRescheduleElectionTimeout() {
 }
 
 Status ReplicationCoordinatorNoOp::setMaintenanceMode(OperationContext*, bool) {
+    MONGO_UNREACHABLE;
+}
+
+ChangeSyncSourceAction ReplicationCoordinatorNoOp::shouldChangeSyncSourceOnError(
+    const HostAndPort&, const OpTime&) const {
     MONGO_UNREACHABLE;
 }
 
@@ -394,7 +393,8 @@ Status ReplicationCoordinatorNoOp::doOptimizedReconfig(OperationContext* opCtx,
 }
 
 Status ReplicationCoordinatorNoOp::awaitConfigCommitment(OperationContext* opCtx,
-                                                         bool waitForOplogCommitment) {
+                                                         bool waitForOplogCommitment,
+                                                         long long term) {
     MONGO_UNREACHABLE;
 }
 
@@ -456,7 +456,7 @@ ChangeSyncSourceAction ReplicationCoordinatorNoOp::shouldChangeSyncSource(
     const rpc::ReplSetMetadata&,
     const rpc::OplogQueryMetadata&,
     const OpTime&,
-    const OpTime&) {
+    const OpTime&) const {
     MONGO_UNREACHABLE;
 }
 
@@ -478,7 +478,7 @@ Status ReplicationCoordinatorNoOp::processReplSetRequestVotes(OperationContext*,
     MONGO_UNREACHABLE;
 }
 
-void ReplicationCoordinatorNoOp::prepareReplMetadata(const BSONObj&,
+void ReplicationCoordinatorNoOp::prepareReplMetadata(const GenericArguments&,
                                                      const OpTime&,
                                                      BSONObjBuilder*) const {
     MONGO_UNREACHABLE;
@@ -509,15 +509,16 @@ void ReplicationCoordinatorNoOp::createWMajorityWriteAvailabilityDateWaiter(OpTi
     MONGO_UNREACHABLE;
 }
 
+Status ReplicationCoordinatorNoOp::waitForPrimaryMajorityReadsAvailable(
+    OperationContext* opCtx) const {
+    MONGO_UNREACHABLE;
+}
+
 void ReplicationCoordinatorNoOp::clearCommittedSnapshot() {
     MONGO_UNREACHABLE;
 }
 
 Status ReplicationCoordinatorNoOp::stepUpIfEligible(bool skipDryRun) {
-    MONGO_UNREACHABLE;
-}
-
-void ReplicationCoordinatorNoOp::signalDropPendingCollectionsRemovedFromStorage() {
     MONGO_UNREACHABLE;
 }
 
@@ -568,8 +569,8 @@ ReplicationCoordinatorNoOp::getHelloResponseFuture(
     MONGO_UNREACHABLE;
 }
 
-StatusWith<OpTime> ReplicationCoordinatorNoOp::getLatestWriteOpTime(OperationContext* opCtx) const
-    noexcept {
+StatusWith<OpTime> ReplicationCoordinatorNoOp::getLatestWriteOpTime(
+    OperationContext* opCtx) const noexcept {
     return getMyLastAppliedOpTime();
 }
 
@@ -584,7 +585,7 @@ void ReplicationCoordinatorNoOp::cancelCbkHandle(
 
 BSONObj ReplicationCoordinatorNoOp::runCmdOnPrimaryAndAwaitResponse(
     OperationContext* opCtx,
-    const std::string& dbName,
+    const DatabaseName& dbName,
     const BSONObj& cmdObj,
     OnRemoteCmdScheduledFn onRemoteCmdScheduled,
     OnRemoteCmdCompleteFn onRemoteCmdComplete) {
@@ -596,6 +597,40 @@ void ReplicationCoordinatorNoOp::restartScheduledHeartbeats_forTest() {
 }
 
 void ReplicationCoordinatorNoOp::recordIfCWWCIsSetOnConfigServerOnStartup(OperationContext* opCtx) {
+    MONGO_UNREACHABLE;
+}
+
+ReplicationCoordinatorNoOp::WriteConcernTagChanges*
+ReplicationCoordinatorNoOp::getWriteConcernTagChanges() {
+    MONGO_UNREACHABLE;
+}
+
+SplitPrepareSessionManager* ReplicationCoordinatorNoOp::getSplitPrepareSessionManager() {
+    MONGO_UNREACHABLE;
+}
+
+bool ReplicationCoordinatorNoOp::isRetryableWrite(OperationContext* opCtx) const {
+    MONGO_UNREACHABLE;
+}
+
+boost::optional<UUID> ReplicationCoordinatorNoOp::getInitialSyncId(OperationContext* opCtx) {
+    MONGO_UNREACHABLE;
+}
+
+OpTime ReplicationCoordinatorNoOp::getMyLastWrittenOpTime() const {
+    MONGO_UNREACHABLE;
+}
+
+OpTimeAndWallTime ReplicationCoordinatorNoOp::getMyLastWrittenOpTimeAndWallTime(
+    bool rollbackSafe) const {
+    MONGO_UNREACHABLE;
+}
+
+bool ReplicationCoordinatorNoOp::isDataConsistent() const {
+    MONGO_UNREACHABLE;
+}
+
+void ReplicationCoordinatorNoOp::clearSyncSource() {
     MONGO_UNREACHABLE;
 }
 

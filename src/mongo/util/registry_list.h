@@ -29,11 +29,13 @@
 
 #pragma once
 
+#include "mongo/stdx/mutex.h"
+
+#include <cstddef>
 #include <deque>
 #include <memory>
-
-#include "mongo/stdx/mutex.h"
-#include "mongo/util/concepts.h"
+#include <mutex>
+#include <utility>
 
 namespace mongo {
 
@@ -87,8 +89,8 @@ private:
  * This class does no lifetime management for its elements besides construction and destruction. If
  * you use it to store pointers, the pointed-to memory should be immortal.
  */
-TEMPLATE(typename ElementT)
-REQUIRES(std::is_default_constructible_v<ElementT>)
+template <typename ElementT>
+requires std::is_default_constructible_v<ElementT>
 class RegistryList {
 public:
     using ElementType = ElementT;
@@ -152,15 +154,15 @@ public:
     }
 
 private:
-    mutable stdx::mutex _m;  // NOLINT
+    mutable stdx::mutex _m;
     DataType _data;
 };
 
 /**
  * Wrap the basic RegistryList concept to handle weak_ptrs
  */
-TEMPLATE(typename T)
-REQUIRES(std::is_constructible_v<std::weak_ptr<T>>)
+template <typename T>
+requires std::is_constructible_v<std::weak_ptr<T>>
 class WeakPtrRegistryList : public RegistryList<std::weak_ptr<T>> {
 public:
     using ElementType = std::weak_ptr<T>;
@@ -176,7 +178,7 @@ public:
         }
     };
 
-    virtual ~WeakPtrRegistryList() = default;
+    ~WeakPtrRegistryList() override = default;
 
     auto add(const std::shared_ptr<T>& ptr) {
         return BaseList::add(std::weak_ptr<T>(ptr));

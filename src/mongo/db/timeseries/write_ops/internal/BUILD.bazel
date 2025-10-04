@@ -1,0 +1,54 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    [
+        "timeseries_write_ops_internal.h",
+        "timeseries_write_ops_internal.cpp",
+    ],
+)
+
+mongo_cc_library(
+    name = "timeseries_write_ops_internal",
+    srcs = [
+        "timeseries_write_ops_internal.cpp",
+    ],
+    hdrs = [
+        "timeseries_write_ops_internal.h",
+    ],
+    deps = [
+        "//src/mongo/db:commands",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/query/write_ops:write_ops_exec",
+        "//src/mongo/db/query/write_ops:write_ops_exec_util",
+        "//src/mongo/db/query/write_ops:write_ops_parsers",
+        "//src/mongo/db/timeseries:bucket_compression_failure",
+        "//src/mongo/db/timeseries:timeseries_options",
+        "//src/mongo/db/timeseries:timeseries_write_util",
+        "//src/mongo/db/timeseries/bucket_catalog",
+        "//src/mongo/db/transaction",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_timeseries_write_ops_internal_test",
+    srcs = [
+        "timeseries_write_ops_internal_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_eighth_group",
+        "server-timeseries-bucket-catalog",
+    ],
+    deps = [
+        "//src/mongo/db/collection_crud",
+        "//src/mongo/db/local_catalog:catalog_test_fixture",
+        "//src/mongo/db/query/write_ops:write_ops_exec",
+        "//src/mongo/db/timeseries:timeseries_metadata",
+        "//src/mongo/db/timeseries:timeseries_options",
+        "//src/mongo/db/timeseries:timeseries_test_fixture",
+        "//src/mongo/db/timeseries/bucket_catalog",
+        "//src/mongo/db/timeseries/write_ops:timeseries_write_ops",
+    ],
+)

@@ -38,8 +38,7 @@ struct container_or_allocator_rebind_impl<AllocatorOrContainer, ToType, false>
 
 template<class ToType>
 struct container_or_allocator_rebind_impl<void, ToType, false>
-   : real_allocator<ToType, void>
-{};
+{  typedef void type;  };
 
 template<class AllocatorOrContainer, class ToType>
 struct container_or_allocator_rebind

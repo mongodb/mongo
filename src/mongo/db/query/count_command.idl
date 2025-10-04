@@ -29,10 +29,15 @@
 global:
     cpp_namespace: "mongo"
     cpp_includes:
+        - "mongo/db/namespace_string.h"
         - "mongo/db/query/count_request.h"
+    mod_visibility: pub
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
+    - "mongo/crypto/fle_field_schema.idl"
+    - "mongo/db/auth/action_type.idl"
+    - "mongo/db/auth/access_checks.idl"
     - "mongo/db/query/hint.idl"
 
 types:
@@ -41,18 +46,27 @@ types:
         description: "The absolute value of an int for limit."
         cpp_type: "std::int64_t"
         deserializer: ::count_request::countParseLimit
+        # std::int64_t is not a view.
+        is_view: false
 
-    countSkip:
-        bson_serialization_type: any
-        description: "An int value for skip. Must be positive."
-        cpp_type: "std::int64_t"
-        deserializer: ::count_request::countParseSkip
-
-    maxTimeMS:
-        bson_serialization_type: any
-        description: "An int representing max time ms."
-        cpp_type: "std::int64_t"
-        deserializer: ::count_request::countParseMaxTime
+structs:
+    CountCommandReply:
+        description: "Reply from the {count: ...} command"
+        strict: true
+        is_command_reply: true
+        fields:
+            n:
+                description: "Number of documents"
+                type:
+                    variant: [int, long]
+                optional: false
+                cpp_name: count
+                stability: stable
+            metrics:
+                description: "The metrics for the count command"
+                type: object_owned
+                optional: true
+                stability: unstable
 
 commands:
     count:
@@ -60,44 +74,71 @@ commands:
         command_name: count
         cpp_name: CountCommandRequest
         strict: true
+        # Note: calling count with a UUID is not part of the stable API v1.
         namespace: concatenate_with_db_or_uuid
-        api_version: ""
+        api_version: "1"
+        access_check:
+            complex:
+                - check: should_ignore_auth_checks
+                - check: is_authorized_to_parse_namespace_element
+                - privilege:
+                      resource_pattern: exact_namespace
+                      action_type: find
+                - privilege:
+                      resource_pattern: cluster
+                      action_type: useUUID
+        reply_type: CountCommandReply
         fields:
             query:
-                description: "A query that selects which documents to count in the collection or
-                view."
-                type: object
+                description: >-
+                    A query that selects which documents to count in the collection or
+                    view.
+                type: object_owned
                 default: BSONObj()
+                stability: stable
             limit:
                 description: "The maximum number of matching documents to count."
                 type: countLimit
                 optional: true
+                stability: stable
             skip:
-                description: "The number of matching documents to skip before counting subsequent
+                description:
+                    "The number of matching documents to skip before counting subsequent
                     results."
-                type: countSkip
+                type: safeInt64
                 optional: true
+                validator: {gte: 0}
+                stability: stable
             hint:
                 description: "The index name to use or the index specification document."
                 type: indexHint
                 default: BSONObj()
+                stability: stable
             collation:
                 description: "The collation to use in the count command."
-                type: object
+                type: object_owned
                 optional: true
+                stability: stable
             fields:
                 description: "A BSONObj added by the shell. Left in for backwards compatibility."
                 type: object
                 ignore: true
-            readConcern:
-                description: "A BSONObj read concern."
-                type: object
+                stability: unstable
+            encryptionInformation:
+                description: "Encryption Information schema and other tokens for CRUD commands"
+                type: EncryptionInformation
                 optional: true
-            maxTimeMS:
-                type: maxTimeMS
+                stability: unstable
+            mirrored:
+                description: "Indicates whether the operation is a mirrored read"
+                type: optionalBool
+                stability: unstable
+            sampleId:
+                description: "The unique sample id for the operation if it has been chosen for sampling."
+                type: uuid
                 optional: true
-            $queryOptions:
-                description: "Unwrapped read preference."
-                cpp_name: queryOptions
-                type: object
-                optional: true
+                stability: unstable
+            includeQueryStatsMetrics:
+                description: "Indicates whether or not query stats metrics should be included in the response."
+                type: optionalBool
+                stability: internal

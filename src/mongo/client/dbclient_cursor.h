@@ -29,61 +29,84 @@
 
 #pragma once
 
-#include <stack>
-
-#include "mongo/client/query.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/basic_types.h"
 #include "mongo/db/dbmessage.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/find_command_gen.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/rpc/message.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+
+#include <cstddef>
+#include <memory>
+#include <stack>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
 class AScopedConnection;
 class DBClientBase;
+
 class AggregateCommandRequest;
 
 /**
  * The internal client's cursor representation for find or agg cursors. The cursor is iterated by
  * the caller using the 'more()' and 'next()' methods. Any necessary getMore requests are
- * constructed and issued internally.
+ * constructed and issued internally. The cursor is killed when the object is destroyed unless:
+ * - The caller set 'keepCursorOpen' to true. The cursor is expected to be killed by the caller when
+ *   it is no longer needed.
+ * - The client used to created the cursor has been interrupted.
+ * - The last command (find, aggregate or getMore) returned an error that indicated the cursor is no
+ *   longer open on the server side.
  */
 class DBClientCursor {
     DBClientCursor(const DBClientCursor&) = delete;
     DBClientCursor& operator=(const DBClientCursor&) = delete;
 
 public:
+    /**
+     * Constructs a 'DBClientCursor' that will be opened by issuing the aggregate command described
+     * by 'aggRequest'.
+     */
     static StatusWith<std::unique_ptr<DBClientCursor>> fromAggregationRequest(
         DBClientBase* client,
-        AggregateCommandRequest aggRequest,
+        const AggregateCommandRequest& aggRequest,
         bool secondaryOk,
-        bool useExhaust);
+        bool useExhaust,
+        bool keepCursorOpen = false);
 
+    /**
+     * Constructs a 'DBClientCursor' that will be opened by issuing the find command described by
+     * 'findRequest'.
+     */
     DBClientCursor(DBClientBase* client,
-                   const NamespaceStringOrUUID& nsOrUuid,
-                   const BSONObj& filter,
-                   const Query& querySettings,
-                   int limit,
-                   int nToSkip,
-                   const BSONObj* fieldsToReturn,
-                   int queryOptions,
-                   int bs,
-                   boost::optional<BSONObj> readConcernObj = boost::none);
+                   FindCommandRequest findRequest,
+                   const ReadPreferenceSetting& readPref,
+                   bool isExhaust,
+                   bool keepCursorOpen = false);
 
+    /**
+     * Constructs a 'DBClientCursor' from a pre-existing cursor id.
+     */
     DBClientCursor(DBClientBase* client,
                    const NamespaceStringOrUUID& nsOrUuid,
                    long long cursorId,
-                   int limit,
-                   int options,
+                   bool isExhaust,
                    std::vector<BSONObj> initialBatch = {},
                    boost::optional<Timestamp> operationTime = boost::none,
-                   boost::optional<BSONObj> postBatchResumeToken = boost::none);
-
-    DBClientCursor(DBClientBase* client,
-                   FindCommandRequest findRequest,
-                   const ReadPreferenceSetting& readPref);
+                   boost::optional<BSONObj> postBatchResumeToken = boost::none,
+                   bool keepCursorOpen = false);
 
     virtual ~DBClientCursor();
 
@@ -93,6 +116,7 @@ public:
     virtual bool more();
 
     bool hasMoreToCome() const {
+        tassert(9279700, "Cursor is not initialized", _isInitialized);
         return _connectionHasPendingReplies;
     }
 
@@ -102,8 +126,10 @@ public:
      * whatever data has been fetched to the client already but then perhaps stop.
      */
     int objsLeftInBatch() const {
-        return _putBack.size() + _batch.objs.size() - _batch.pos;
+        tassert(9279701, "Cursor is not initialized", _isInitialized);
+        return _batch.objs.size() - _batch.pos;
     }
+
     bool moreInCurrentBatch() {
         return objsLeftInBatch() > 0;
     }
@@ -119,13 +145,6 @@ public:
     virtual BSONObj next();
 
     /**
-     * Restores an object previously returned by next() to the cursor.
-     */
-    void putBack(const BSONObj& o) {
-        _putBack.push(o.getOwned());
-    }
-
-    /**
      * Similar to 'next()', but throws an AssertionException on error.
      */
     BSONObj nextSafe();
@@ -133,20 +152,18 @@ public:
     /**
      * Peek ahead at items buffered for future next() calls. Never requests new data from the
      * server.
-     *
-     * WARNING: no support for _putBack yet!
      */
-    void peek(std::vector<BSONObj>&, int atMost);
+    void peek(std::vector<BSONObj>&, int atMost) const;
 
     /**
      * Peeks at first element. If no first element exists, returns an empty object.
      */
-    BSONObj peekFirst();
+    BSONObj peekFirst() const;
 
     /**
      * peek ahead and see if an error occurred, and get the error if so.
      */
-    bool peekError(BSONObj* error = nullptr);
+    bool peekError(BSONObj* error = nullptr) const;
 
     /**
      * Iterates the rest of the cursor and returns the resulting number if items.
@@ -168,12 +185,24 @@ public:
         return _cursorId == 0;
     }
 
+    bool wasError() const {
+        return _wasError;
+    }
+
+    bool isInitialized() const {
+        return _isInitialized;
+    }
+
     bool tailable() const {
-        return (_opts & QueryOption_CursorTailable) != 0;
+        return _findRequest && _findRequest->getTailable();
     }
 
     bool tailableAwaitData() const {
-        return tailable() && (_opts & QueryOption_AwaitData);
+        return tailable() && _findRequest->getAwaitData();
+    }
+
+    bool isExhaust() const {
+        return _isExhaust;
     }
 
     /**
@@ -191,10 +220,6 @@ public:
 
     std::string originalHost() const {
         return _originalHost;
-    }
-
-    std::string getns() const {
-        return _ns.ns();
     }
 
     const NamespaceString& getNamespaceString() const {
@@ -236,7 +261,7 @@ public:
 
     void setAwaitDataTimeoutMS(Milliseconds timeout) {
         // It only makes sense to set awaitData timeout if the cursor is in tailable awaitData mode.
-        invariant(tailableAwaitData());
+        tassert(9279703, "Cursor is not in tailable awaitData mode", tailableAwaitData());
         _awaitDataTimeout = timeout;
     }
 
@@ -244,7 +269,7 @@ public:
     void setCurrentTermAndLastCommittedOpTime(
         const boost::optional<long long>& term,
         const boost::optional<repl::OpTime>& lastCommittedOpTime) {
-        invariant(tailableAwaitData());
+        tassert(9279704, "Cursor is not in tailable awaitData mode", tailableAwaitData());
         _term = term;
         _lastKnownCommittedOpTime = lastCommittedOpTime;
     }
@@ -276,21 +301,6 @@ protected:
     Batch _batch;
 
 private:
-    DBClientCursor(DBClientBase* client,
-                   const NamespaceStringOrUUID& nsOrUuid,
-                   const BSONObj& filter,
-                   const Query& querySettings,
-                   long long cursorId,
-                   int limit,
-                   int nToSkip,
-                   const BSONObj* fieldsToReturn,
-                   int queryOptions,
-                   int bs,
-                   std::vector<BSONObj> initialBatch,
-                   boost::optional<BSONObj> readConcernObj,
-                   boost::optional<Timestamp> operationTime,
-                   boost::optional<BSONObj> postBatchResumeToken = boost::none);
-
     void dataReceived(const Message& reply) {
         bool retry;
         std::string lazyHost;
@@ -311,16 +321,13 @@ private:
     Message assembleInit();
     Message assembleGetMore();
 
-    /**
-     * Constructs the initial find commmand request based on a legacy OP_QUERY-style description of
-     * the find operation. Only used if the caller constructed the 'DBClientCursor' with the legacy
-     * API.
-     */
-    Message initFromLegacyRequest();
-
     DBClientBase* _client;
     std::string _originalHost;
     NamespaceStringOrUUID _nsOrUuid;
+
+    // In order to fully initialize a DBClientCursor object, one must first call its constructor
+    // and then subsequently call DBClientCursor::init().
+    bool _isInitialized = false;
 
     // 'ns' is initially the NamespaceString passed in, or the dbName if doing a find by UUID.
     // After a successful 'find' command, 'ns' is updated to contain the namespace returned by that
@@ -329,78 +336,29 @@ private:
 
     long long _cursorId = 0;
 
-    std::stack<BSONObj> _putBack;
     std::string _scopedHost;
     bool _wasError = false;
     bool _connectionHasPendingReplies = false;
     int _lastRequestId = 0;
 
-    int _batchSize;
-    int _limit = 0;
+    int _batchSize = 0;
 
-    // If the caller describes the find command being executed by this cursor as a
-    // 'FindCommandRequest', then that request object and the associated read preference are set
-    // here. Otherwise, if the caller uses the legacy OP_QUERY-inspired API, these members are
-    // default-initialized but never used.
-    boost::optional<FindCommandRequest> _findRequest;
-    ReadPreferenceSetting _readPref;
-
-    // These data members are only used if the cursor was constructed using the legacy
-    // OP_QUERY-inspired API. If the cursor was constructed using the 'FindCommandRequest'-based
-    // API, these are initialized to their default values but never used.
-    BSONObj _filter;
-    Query _querySettings;
-    int _nToSkip = 0;
-    const BSONObj* _fieldsToReturn = nullptr;
-    boost::optional<BSONObj> _readConcernObj;
-
-    // This has the same meaning as the flags bit vector from the no-longer-supported OP_QUERY wire
-    // protocol message. However, it is initialized even if the caller constructed the cursor using
-    // the 'FindCommandRequest`-based API.
+    // A description of the find command provided by the caller which is used to open the cursor.
     //
-    // We should eventually stop using the OP_QUERY flags bit vector in server code, since OP_QUERY
-    // is no longer supported.
-    int _opts;
+    // Has a value of boost::none if the caller constructed this cursor using a pre-existing cursor
+    // id.
+    boost::optional<FindCommandRequest> _findRequest;
+
+    ReadPreferenceSetting _readPref;
+    bool _isExhaust;
 
     Milliseconds _awaitDataTimeout = Milliseconds{0};
     boost::optional<long long> _term;
     boost::optional<repl::OpTime> _lastKnownCommittedOpTime;
     boost::optional<Timestamp> _operationTime;
     boost::optional<BSONObj> _postBatchResumeToken;
-};
-
-/** iterate over objects in current batch only - will not cause a network call
- */
-class DBClientCursorBatchIterator {
-public:
-    DBClientCursorBatchIterator(DBClientCursor& c) : _c(c), _n() {}
-    bool moreInCurrentBatch() {
-        return _c.moreInCurrentBatch();
-    }
-    BSONObj nextSafe() {
-        massert(13383, "BatchIterator empty", moreInCurrentBatch());
-        ++_n;
-        return _c.nextSafe();
-    }
-    int n() const {
-        return _n;
-    }
-    // getNamespaceString() will return the NamespaceString returned by the 'find' command.
-    const NamespaceString& getNamespaceString() {
-        return _c.getNamespaceString();
-    }
-
-    const long long getCursorId() const {
-        return _c.getCursorId();
-    }
-
-    boost::optional<BSONObj> getPostBatchResumeToken() const {
-        return _c.getPostBatchResumeToken();
-    }
-
-private:
-    DBClientCursor& _c;
-    int _n;
+    // If set to true, the cursor will not be killed when the 'DBClientCursor' is destroyed.
+    const bool _keepCursorOpen;
 };
 
 }  // namespace mongo

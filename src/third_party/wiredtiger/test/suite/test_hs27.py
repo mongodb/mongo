@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest
+import wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
@@ -41,7 +41,6 @@ from wtscenario import make_scenarios
 # making sure they read back correctly. (The eviction is necessary to go through the RLE code.)
 class test_hs27(wttest.WiredTigerTestCase):
     conn_config = ''
-    session_config = 'isolation=snapshot'
 
     nrows = 100
     value_1 = 'a' * 119
@@ -266,16 +265,15 @@ class test_hs27(wttest.WiredTigerTestCase):
         ds.populate()
         self.session.checkpoint()
 
-        # Pin oldest and stable to timestamp 1.
-        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
-            ',stable_timestamp=' + self.timestamp_str(1))
-
         # Write the initial values, if requested.
         if self.doinit:
             self.initialize(ds.uri, ds)
 
+        # Pin oldest and stable to timestamp 1.
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
+            ',stable_timestamp=' + self.timestamp_str(1))
+
         # Create a long running read transaction in a separate session.
-        # (Is it necessary for it to be separate? Not sure.)
         session_read = self.conn.open_session()
         session_read.begin_transaction('read_timestamp=' + self.timestamp_str(2))
 
@@ -287,8 +285,6 @@ class test_hs27(wttest.WiredTigerTestCase):
 
         # Check that the new updates are appropriately visible.
         self.checkall(self.session, ds.uri, ds)
-
-        self.session.breakpoint()
 
         # Now forcibly evict, so that all the pages are RLE-encoded and then read back in.
         # There doesn't seem to be any way to just forcibly evict an entire table, so what
@@ -320,6 +316,3 @@ class test_hs27(wttest.WiredTigerTestCase):
 
         # Check that our main session can still read the latest data.
         self.check(self.session, ds.uri, ds, 100)
-
-if __name__ == '__main__':
-    wttest.run()

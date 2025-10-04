@@ -27,9 +27,19 @@
  *    it in the license file.
  */
 
+#include "mongo/db/pipeline/document_source_queue.h"
+
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/document_source_queue.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+
 
 namespace mongo {
 namespace {
@@ -44,7 +54,8 @@ TEST_F(QueueStageTest, QueueStageDeserialization) {
 
     auto expectedResult = Document{{"a"_sd, 1}};
     auto queueDoc1 = BSON("$queue" << BSON_ARRAY(BSON("a" << 1)));
-    auto queueStage1 = DocumentSourceQueue::createFromBson(queueDoc1.firstElement(), getExpCtx());
+    auto queueSource1 = DocumentSourceQueue::createFromBson(queueDoc1.firstElement(), getExpCtx());
+    auto queueStage1 = exec::agg::buildStage(queueSource1);
     ASSERT_TRUE(queueStage1);
     auto next = queueStage1->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -73,9 +84,18 @@ TEST_F(QueueStageTest, QueueStageSerialize) {
 
     ASSERT_TRUE(queueStage);
 
-    auto res = queueStage->serialize(boost::none);
+    auto res = queueStage->serialize();
 
     ASSERT_VALUE_EQ(res, Value{DOC("$queue" << DOC_ARRAY(DOC("a1" << 1) << DOC("a2" << 2)))});
+}
+
+TEST_F(QueueStageTest, RedactsCorrectly) {
+    auto queueDoc = BSON("$queue" << BSON_ARRAY(BSON("a" << 1)));
+    auto queueStage = DocumentSourceQueue::createFromBson(queueDoc.firstElement(), getExpCtx());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({"$queue":"?array<?object>"})",
+        redact(*queueStage));
 }
 
 }  // namespace

@@ -29,34 +29,51 @@
 
 // _ todo: reconnect?
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/client/connpool.h"
-
-#include <limits>
-#include <string>
-
-#include "mongo/base/init.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/client/connection_string.h"
+#include "mongo/client/connpool.h"
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/client/global_conn_pool.h"
-#include "mongo/client/replica_set_monitor.h"
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/chrono.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/util/exit.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/socket_exception.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
+#include "mongo/util/testing_proctor.h"
 
-#if !defined(__has_feature)
-#define __has_feature(x) 0
-#endif
+#include <chrono>
+#include <cstddef>
+#include <exception>
+#include <functional>
+#include <limits>
+#include <ostream>
+#include <set>
+#include <string>
+#include <utility>
 
 #if __has_feature(address_sanitizer)
 #include <sanitizer/lsan_interface.h>
 #endif
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
+
 
 namespace mongo {
 
@@ -67,12 +84,17 @@ const int kDefaultMaxInUse = std::numeric_limits<int>::max();
 auto makeDuration(double secs) {
     return Milliseconds(static_cast<Milliseconds::rep>(1000 * secs));
 }
+
+void recordWaitTime(PoolForHost& p, DBClientBase* conn, Date_t connRequestedAt) {
+    if (conn) {
+        p.recordConnectionWaitTime(connRequestedAt);
+    }
+}
 }  // namespace
 
-using std::endl;
+MONGO_FAIL_POINT_DEFINE(injectWaitTimeForConnpoolAcquisition);
+
 using std::list;
-using std::map;
-using std::set;
 using std::string;
 using std::vector;
 
@@ -96,8 +118,6 @@ PoolForHost::~PoolForHost() {
 void PoolForHost::clear() {
     if (!_parentDestroyed) {
         LOGV2(24124,
-              "Dropping all pooled connections to {connString} "
-              "(with timeout of {timeoutSecs} seconds)",
               "Dropping all pooled connections to a host",
               "connString"_attr = _hostName,
               "socketTimeout"_attr = makeDuration(_socketTimeoutSecs));
@@ -121,8 +141,6 @@ auto PoolForHost::done(DBConnectionPool* pool, DBClientBase* c) -> ConnectionHea
     if (isFailed || isBroken) {
         _badConns++;
         LOGV2(24125,
-              "Ending connection to {connString} (with timeout of {socketTimeout}) "
-              "due to bad connection status; {numOpenConns} connections to that host remain open",
               "Ending connection to a host due to a bad connection status",
               "connString"_attr = _hostName,
               "socketTimeout"_attr = makeDuration(_socketTimeoutSecs),
@@ -131,9 +149,6 @@ auto PoolForHost::done(DBConnectionPool* pool, DBClientBase* c) -> ConnectionHea
     } else if (_maxPoolSize >= 0 && static_cast<int>(_pool.size()) >= _maxPoolSize) {
         // We have a pool size that we need to enforce
         LOGV2(24126,
-              "Ending idle connection to {connString} (with timeout of {socketTimeout}) "
-              "because its pool meets constraints; "
-              "{numOpenConns} connections to that host remain open",
               "Ending idle connection to a host because its pool mees constraints",
               "connString"_attr = _hostName,
               "socketTimeout"_attr = makeDuration(_socketTimeoutSecs),
@@ -161,8 +176,6 @@ void PoolForHost::reportBadConnectionAt(uint64_t microSec) {
         microSec > _minValidCreationTimeMicroSec) {
         _minValidCreationTimeMicroSec = microSec;
         LOGV2(24127,
-              "Detected bad connection created at {currentTime}, "
-              "clearing pool for {connString} of {numOpenConns} connections",
               "Detected bad connection, clearing pool for host",
               "currentTime"_attr =
                   Microseconds(static_cast<Microseconds::rep>(_minValidCreationTimeMicroSec)),
@@ -188,7 +201,7 @@ DBClientBase* PoolForHost::get(DBConnectionPool* pool, double socketTimeout) {
             continue;
         }
 
-        verify(sc.conn->getSoTimeout() == socketTimeout);
+        MONGO_verify(sc.conn->getSoTimeout() == socketTimeout);
 #ifdef MONGO_CONFIG_SSL
         invariant(!sc.conn->isUsingTransientSSLParams());
 #endif
@@ -251,8 +264,10 @@ void PoolForHost::initializeHostName(const std::string& hostName) {
     }
 }
 
-void PoolForHost::waitForFreeConnection(int timeout, stdx::unique_lock<Latch>& lk) {
-    auto condition = [&] { return (numInUse() < _maxInUse || _inShutdown.load()); };
+void PoolForHost::waitForFreeConnection(int timeout, stdx::unique_lock<stdx::mutex>& lk) {
+    auto condition = [&] {
+        return (numInUse() < _maxInUse || _inShutdown.load());
+    };
 
     if (timeout > 0) {
         stdx::chrono::seconds timeoutSeconds{timeout};
@@ -284,9 +299,16 @@ public:
                              const std::string& host,
                              double timeout,
                              Connect connect) {
+        auto connRequestedAt = Date_t::now();
+        if (MONGO_unlikely(injectWaitTimeForConnpoolAcquisition.shouldFail())) {
+            injectWaitTimeForConnpoolAcquisition.execute([&](const BSONObj& data) {
+                sleepFor(Milliseconds(data["sleepTimeMillis"].numberInt()));
+            });
+        }
+
         while (!(_this->_inShutdown.load())) {
             // Get a connection from the pool, if there is one.
-            std::unique_ptr<DBClientBase> c(_this->_get(host, timeout));
+            std::unique_ptr<DBClientBase> c(_this->_get(host, timeout, connRequestedAt));
             if (c) {
                 // This call may throw.
                 _this->onHandedOut(c.get());
@@ -297,13 +319,11 @@ public:
             // there are too many connections in this pool to make a new one, block until a
             // connection is released.
             {
-                stdx::unique_lock<Latch> lk(_this->_mutex);
+                stdx::unique_lock<stdx::mutex> lk(_this->_mutex);
                 PoolForHost& p = _this->_pools[PoolKey(host, timeout)];
 
                 if (p.openConnections() >= _this->_maxInUse) {
                     LOGV2(20112,
-                          "Too many in-use connections; "
-                          "waiting until there are fewer than {maxInUseConns}",
                           "Too many in-use connections; waiting until there are fewer than maximum",
                           "maxInUseConns"_attr = _this->_maxInUse);
                     p.waitForFreeConnection(timeout, lk);
@@ -312,11 +332,21 @@ public:
                     // _finishCreate will take the lock again.
                     lk.unlock();
 
+                    if constexpr (kDebugBuild) {
+                        LOGV2_DEBUG(7591400,
+                                    1,
+                                    "Creating a new connection",
+                                    "target"_attr = host,
+                                    "timeout"_attr = timeout,
+                                    "requestedAt"_attr = connRequestedAt);
+                    }
+
                     // Create a new connection and return. All Connect functions
                     // should throw if they cannot create a connection.
                     auto c = connect();
                     invariant(c);
-                    return _this->_finishCreate(host, timeout, c);
+                    auto conn = _this->_finishCreate(host, timeout, c, connRequestedAt);
+                    return conn;
                 }
             }
         }
@@ -344,7 +374,7 @@ DBConnectionPool::DBConnectionPool()
 
 void DBConnectionPool::shutdown() {
     if (!_inShutdown.swap(true)) {
-        stdx::lock_guard<Latch> L(_mutex);
+        stdx::lock_guard<stdx::mutex> L(_mutex);
         for (auto i = _pools.begin(); i != _pools.end(); i++) {
             PoolForHost& p = i->second;
             p.shutdown();
@@ -352,33 +382,39 @@ void DBConnectionPool::shutdown() {
     }
 }
 
-DBClientBase* DBConnectionPool::_get(const string& ident, double socketTimeout) {
+DBClientBase* DBConnectionPool::_get(const string& ident,
+                                     double socketTimeout,
+                                     Date_t& connRequestedAt) {
     uassert(ErrorCodes::ShutdownInProgress,
             "Can't use connection pool during shutdown",
             !globalInShutdownDeprecated());
-    stdx::lock_guard<Latch> L(_mutex);
+    stdx::lock_guard<stdx::mutex> L(_mutex);
     PoolForHost& p = _pools[PoolKey(ident, socketTimeout)];
     p.setMaxPoolSize(_maxPoolSize);
     p.setSocketTimeout(socketTimeout);
     p.initializeHostName(ident);
-    return p.get(this, socketTimeout);
+    auto c = p.get(this, socketTimeout);
+    recordWaitTime(p, c, connRequestedAt);
+    return c;
 }
 
 int DBConnectionPool::openConnections(const string& ident, double socketTimeout) {
-    stdx::lock_guard<Latch> L(_mutex);
+    stdx::lock_guard<stdx::mutex> L(_mutex);
     PoolForHost& p = _pools[PoolKey(ident, socketTimeout)];
     return p.openConnections();
 }
 
 DBClientBase* DBConnectionPool::_finishCreate(const string& ident,
                                               double socketTimeout,
-                                              DBClientBase* conn) {
+                                              DBClientBase* conn,
+                                              Date_t& connRequestedAt) {
     {
-        stdx::lock_guard<Latch> L(_mutex);
+        stdx::lock_guard<stdx::mutex> L(_mutex);
         PoolForHost& p = _pools[PoolKey(ident, socketTimeout)];
         p.setMaxPoolSize(_maxPoolSize);
         p.initializeHostName(ident);
         p.createdOne(conn);
+        recordWaitTime(p, conn, connRequestedAt);
     }
 
     try {
@@ -390,9 +426,6 @@ DBClientBase* DBConnectionPool::_finishCreate(const string& ident,
     }
 
     LOGV2(20113,
-          "Successfully connected to {connString} "
-          "({numOpenConns} connections now open to that host "
-          "with a {socketTimeoutSecs} second timeout)",
           "Successfully connected to host",
           "connString"_attr = ident,
           "numOpenConns"_attr = openConnections(ident, socketTimeout),
@@ -434,7 +467,8 @@ DBClientBase* DBConnectionPool::get(const string& host, double socketTimeout) {
 DBClientBase* DBConnectionPool::get(const MongoURI& uri, double socketTimeout) {
     auto connect = [&] {
         string errmsg;
-        std::unique_ptr<DBClientBase> c(uri.connect(uri.getAppName().get(), errmsg, socketTimeout));
+        std::unique_ptr<DBClientBase> c(
+            uri.connect(uri.getAppName().value(), errmsg, socketTimeout));
         uassert(40356, fmt::format("{}: connect failed {} : {}", _name, uri.toString(), errmsg), c);
         return c.release();
     };
@@ -442,14 +476,27 @@ DBClientBase* DBConnectionPool::get(const MongoURI& uri, double socketTimeout) {
     return Detail::get(this, uri.toString(), socketTimeout, connect);
 }
 
+Milliseconds DBConnectionPool::getPoolHostConnTime_forTest(const std::string& host,
+                                                           double timeout) const {
+    if (TestingProctor::instance().isEnabled()) {
+        stdx::lock_guard<stdx::mutex> L(_mutex);
+        auto it = _pools.find(PoolKey(host, timeout));
+        iassert(9047201,
+                "Couldn't find a connection that matches the provided host and timeout pair!",
+                it != _pools.end());
+        return it->second._connTime;
+    }
+    return Milliseconds();
+}
+
 int DBConnectionPool::getNumAvailableConns(const string& host, double socketTimeout) const {
-    stdx::lock_guard<Latch> L(_mutex);
+    stdx::lock_guard<stdx::mutex> L(_mutex);
     auto it = _pools.find(PoolKey(host, socketTimeout));
     return (it == _pools.end()) ? 0 : it->second.numAvailable();
 }
 
 int DBConnectionPool::getNumBadConns(const string& host, double socketTimeout) const {
-    stdx::lock_guard<Latch> L(_mutex);
+    stdx::lock_guard<stdx::mutex> L(_mutex);
     auto it = _pools.find(PoolKey(host, socketTimeout));
     return (it == _pools.end()) ? 0 : it->second.getNumBadConns();
 }
@@ -494,7 +541,7 @@ void DBConnectionPool::decrementEgress(const string& host, DBClientBase* c) {
 DBConnectionPool::~DBConnectionPool() {
     // Do not log in destruction, because global connection pools get
     // destroyed after the logging framework.
-    stdx::lock_guard<Latch> L(_mutex);
+    stdx::lock_guard<stdx::mutex> L(_mutex);
     for (PoolMap::iterator i = _pools.begin(); i != _pools.end(); i++) {
         PoolForHost& p = i->second;
         p._parentDestroyed = true;
@@ -506,7 +553,7 @@ DBConnectionPool::~DBConnectionPool() {
 }
 
 void DBConnectionPool::flush() {
-    stdx::lock_guard<Latch> L(_mutex);
+    stdx::lock_guard<stdx::mutex> L(_mutex);
     for (PoolMap::iterator i = _pools.begin(); i != _pools.end(); i++) {
         PoolForHost& p = i->second;
         p.flush();
@@ -514,10 +561,9 @@ void DBConnectionPool::flush() {
 }
 
 void DBConnectionPool::clear() {
-    stdx::lock_guard<Latch> L(_mutex);
+    stdx::lock_guard<stdx::mutex> L(_mutex);
     LOGV2_DEBUG(20114,
                 2,
-                "Removing connections on all pools owned by {poolName}",
                 "Removing all connectionns associated with this set of pools",
                 "poolName"_attr = _name);
     for (PoolMap::iterator iter = _pools.begin(); iter != _pools.end(); ++iter) {
@@ -526,12 +572,9 @@ void DBConnectionPool::clear() {
 }
 
 void DBConnectionPool::removeHost(const string& host) {
-    stdx::lock_guard<Latch> L(_mutex);
-    LOGV2_DEBUG(20115,
-                2,
-                "Removing connections from all pools to {connString}",
-                "Removing connections from all pools to a host",
-                "connString"_attr = host);
+    stdx::lock_guard<stdx::mutex> L(_mutex);
+    LOGV2_DEBUG(
+        20115, 2, "Removing connections from all pools to a host", "connString"_attr = host);
     for (PoolMap::iterator i = _pools.begin(); i != _pools.end(); ++i) {
         const string& poolHost = i->first.ident;
         if (!serverNameCompare()(host, poolHost) && !serverNameCompare()(poolHost, host)) {
@@ -574,7 +617,7 @@ void DBConnectionPool::onDestroy(DBClientBase* conn) {
 
 void DBConnectionPool::appendConnectionStats(executor::ConnectionPoolStats* stats) const {
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         for (PoolMap::const_iterator i = _pools.begin(); i != _pools.end(); ++i) {
             if (i->second.numCreated() == 0)
                 continue;
@@ -584,13 +627,21 @@ void DBConnectionPool::appendConnectionStats(executor::ConnectionPoolStats* stat
             // as our label for connPoolStats. Note that these stats will collide
             // with any existing stats for the chosen host.
             auto uri = ConnectionString::parse(i->first.ident);
-            invariant(uri.isOK());
+            invariant(uri.getStatus());
             HostAndPort host = uri.getValue().getServers().front();
 
             executor::ConnectionStatsPer hostStats{static_cast<size_t>(i->second.numInUse()),
                                                    static_cast<size_t>(i->second.numAvailable()),
+                                                   0,
                                                    static_cast<size_t>(i->second.numCreated()),
+                                                   0,
+                                                   0,
+                                                   0,
+                                                   0,
+                                                   Milliseconds{0},
+                                                   0,
                                                    0};
+            hostStats.acquisitionWaitTimes = i->second.connectionWaitTimeStats();
             stats->updateStatsForHost("global", host, hostStats);
         }
     }
@@ -619,7 +670,7 @@ bool DBConnectionPool::serverNameCompare::operator()(const string& a, const stri
         ++ap;
         ++bp;
     }
-    verify(false);
+    MONGO_verify(false);
 }
 
 bool DBConnectionPool::poolKeyCompare::operator()(const PoolKey& a, const PoolKey& b) const {
@@ -642,7 +693,7 @@ bool DBConnectionPool::isConnectionGood(const string& hostName, DBClientBase* co
     }
 
     {
-        stdx::lock_guard<Latch> sl(_mutex);
+        stdx::lock_guard<stdx::mutex> sl(_mutex);
         PoolForHost& pool = _pools[PoolKey(hostName, conn->getSoTimeout())];
         if (pool.isBadSocketCreationTime(conn->getSockCreationMicroSec())) {
             return false;
@@ -658,7 +709,7 @@ void DBConnectionPool::taskDoWork() {
     {
         // we need to get the connections inside the lock
         // but we can actually delete them outside
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         for (PoolMap::iterator i = _pools.begin(); i != _pools.end(); ++i) {
             i->second.getStaleConnections(idleThreshold, toDelete);
         }
@@ -666,8 +717,8 @@ void DBConnectionPool::taskDoWork() {
 
     for (size_t i = 0; i < toDelete.size(); i++) {
         try {
+            ScopeGuard cleanup([&] { delete toDelete[i]; });
             onDestroy(toDelete[i]);
-            delete toDelete[i];
         } catch (...) {
             // we don't care if there was a socket error
         }
@@ -733,7 +784,6 @@ ScopedDbConnection::~ScopedDbConnection() {
         } else {
             /* see done() comments above for why we log this line */
             LOGV2(24128,
-                  "Scoped connection to {connString} not being returned to the pool",
                   "Scoped connection not being returned to the pool",
                   "connString"_attr = _conn->getServerAddress());
             kill();

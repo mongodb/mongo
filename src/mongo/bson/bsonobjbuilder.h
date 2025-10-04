@@ -29,29 +29,59 @@
 
 #pragma once
 
-#include <cmath>
-#include <cstdint>
-#include <limits>
-#include <map>
-#include <type_traits>
-
+#include "mongo/base/checked_cast.h"
+#include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/parse_number.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_field.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/decimal_counter.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/shared_buffer.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/tracking/allocator.h"
+
+#include <cmath>
+#include <cstdint>
+#include <cstring>
+#include <limits>
+#include <list>
+#include <map>
+#include <set>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include <sys/types.h>
 
 namespace mongo {
 
-#if defined(_WIN32)
-// warning: 'this' : used in base member initializer list
-#pragma warning(disable : 4355)
-#endif
+class BSONObjBuilder;
+
+namespace bsonobjbuilder_details {
+/** Detects that a value can be appended via `builder.append("foo", val)`. */
+template <typename Appendee, typename Builder = BSONObjBuilder>
+concept HasBuilderAppendMemberFunction =
+    requires(Builder& b, StringData name, Appendee val) { b.append(name, val); };
+
+/**
+ * Detects that a value can be appended via `appendToBson(builder, "foo", val)`.
+ * Considers overloads found by ADL.
+ */
+template <typename Appendee, typename Builder = BSONObjBuilder>
+concept HasAdlAppendToBson =
+    requires(Builder& b, StringData name, Appendee val) { appendToBson(b, name, val); };
+}  // namespace bsonobjbuilder_details
 
 /**
  * CRTP Base class for BSONObj builder classes. Do not use this directly.
@@ -70,10 +100,10 @@ class BSONObjBuilderBase {
     BSONObjBuilderBase& operator=(const BSONObjBuilderBase<Derived, B>&) = delete;
 
 public:
-    BSONObjBuilderBase() : BSONObjBuilderBase(kDefaultSize) {}
-
     /** @param initsize this is just a hint as to the final size of the object */
-    BSONObjBuilderBase(int initsize) : _b(_buf), _buf(initsize) {
+    template <typename... BuilderArgs>
+    BSONObjBuilderBase(int initsize = kDefaultSize, BuilderArgs&&... args)
+        : _buf(initsize, std::forward<BuilderArgs>(args)...), _b(_buf) {
         // Skip over space for the object length. The length is filled in by _done.
         _b.skip(sizeof(int));
 
@@ -85,7 +115,9 @@ public:
      *  This is for more efficient adding of subobjects/arrays. See docs for subobjStart for
      *  example.
      */
-    BSONObjBuilderBase(B& baseBuilder) : _b(baseBuilder), _buf(0), _offset(baseBuilder.len()) {
+    template <typename... BuilderArgs>
+    BSONObjBuilderBase(B& baseBuilder, BuilderArgs&&... args)
+        : _buf(0, std::forward<BuilderArgs>(args)...), _b(baseBuilder), _offset(baseBuilder.len()) {
         // Skip over space for the object length, which is filled in by _done. We don't need a
         // holder since we are a sub-builder, and some parent builder has already made the
         // reservation.
@@ -99,31 +131,33 @@ public:
     // building in to an existing BufBuilder that has already been built in to. Use with caution.
     struct ResumeBuildingTag {};
 
-    BSONObjBuilderBase(ResumeBuildingTag, B& existingBuilder, std::size_t offset = 0)
-        : _b(existingBuilder), _buf(0), _offset(offset) {
+    template <typename... BuilderArgs>
+    BSONObjBuilderBase(ResumeBuildingTag,
+                       B& existingBuilder,
+                       std::size_t offset = 0,
+                       BuilderArgs&&... args)
+        : _buf(0, std::forward<BuilderArgs>(args)...), _b(existingBuilder), _offset(offset) {
         invariant(_b.len() - offset >= BSONObj::kMinBSONLength);
         _b.setlen(_b.len() - 1);  // get rid of the previous EOO.
         // Reserve space for our EOO.
         _b.reserveBytes(1);
     }
 
-    BSONObjBuilderBase(const BSONSizeTracker& tracker)
-        : _b(_buf), _buf(tracker.getSize()), _tracker(const_cast<BSONSizeTracker*>(&tracker)) {
-        // See the comments in the first constructor for details.
-        _b.skip(sizeof(int));
-
-        // Reserve space for the EOO byte. This means _done() can't fail.
-        _b.reserveBytes(1);
-    }
-
     // Move constructible, but not assignable due to reference member.
-    BSONObjBuilderBase(BSONObjBuilderBase<Derived, B>&& other)
-        : _b(&other._b == &other._buf ? _buf : other._b),
-          _buf(std::move(other._buf)),
+    BSONObjBuilderBase(BSONObjBuilderBase&& other) noexcept
+        : _buf(std::move(other._buf)),
+          _b(&other._b == &other._buf ? _buf : other._b),
           _offset(std::move(other._offset)),
-          _tracker(std::move(other._tracker)),
           _doneCalled(std::move(other._doneCalled)) {
         other.abandon();
+    }
+
+    Derived& asDerived() {
+        return static_cast<Derived&>(*this);
+    }
+
+    const Derived& asDerived() const {
+        return static_cast<const Derived&>(*this);
     }
 
     /**
@@ -137,48 +171,57 @@ public:
     /** add all the fields from the object specified to this object */
     Derived& appendElements(const BSONObj& x);
 
+    /**
+     * Add all the fields from `x` to this object, replacing each field name with the corresponding
+     * field name in the `newNames` object. If `keepTail` is set to true, and the `newNames` object
+     * contains fewer entries than the `x` object, the fields in `x` that have no matching entry in
+     * `newNames` will be added with their original field names. If `keepTail` is set to false,
+     * these extra fields are not appended.
+     */
+    Derived& appendElementsRenamed(const BSONObj& x, const BSONObj& newNames, bool keepTail = true);
+
     /** add all the fields from the object specified to this object if they don't exist already */
     Derived& appendElementsUnique(const BSONObj& x);
 
     /** append element to the object we are building */
     Derived& append(const BSONElement& e) {
         // do not append eoo, that would corrupt us. the builder auto appends when done() is called.
-        verify(!e.eoo());
+        MONGO_verify(!e.eoo());
         _b.appendBuf((void*)e.rawdata(), e.size());
-        return static_cast<Derived&>(*this);
+        return asDerived();
     }
 
     /** append an element but with a new name */
     Derived& appendAs(const BSONElement& e, StringData fieldName) {
         // do not append eoo, that would corrupt us. the builder auto appends when done() is called.
-        verify(!e.eoo());
+        MONGO_verify(!e.eoo());
         _b.appendNum((char)e.type());
-        _b.appendStr(fieldName);
+        _b.appendCStr(fieldName);
         _b.appendBuf((void*)e.value(), e.valuesize());
-        return static_cast<Derived&>(*this);
+        return asDerived();
     }
 
     /** add a subobject as a member */
     Derived& append(StringData fieldName, BSONObj subObj) {
-        _b.appendNum((char)Object);
-        _b.appendStr(fieldName);
+        _b.appendNum((char)BSONType::object);
+        _b.appendCStr(fieldName);
         _b.appendBuf((void*)subObj.objdata(), subObj.objsize());
-        return static_cast<Derived&>(*this);
+        return asDerived();
     }
 
     /** add a subobject as a member */
     Derived& appendObject(StringData fieldName, const char* objdata, int size = 0) {
-        verify(objdata);
+        MONGO_verify(objdata);
         if (size == 0) {
             size = ConstDataView(objdata).read<LittleEndian<int>>();
         }
 
-        verify(size > 4 && size < 100000000);
+        MONGO_verify(size > 4 && size < 100000000);
 
-        _b.appendNum((char)Object);
-        _b.appendStr(fieldName);
+        _b.appendNum((char)BSONType::object);
+        _b.appendCStr(fieldName);
         _b.appendBuf((void*)objdata, size);
-        return static_cast<Derived&>(*this);
+        return asDerived();
     }
 
     /** add header for a new subobject and return bufbuilder for writing to
@@ -193,8 +236,8 @@ public:
      *  // use b and convert to object
      */
     B& subobjStart(StringData fieldName) {
-        _b.appendNum((char)Object);
-        _b.appendStr(fieldName);
+        _b.appendNum((char)BSONType::object);
+        _b.appendCStr(fieldName);
         return _b;
     }
 
@@ -202,11 +245,10 @@ public:
         style fields in it.
     */
     Derived& appendArray(StringData fieldName, const BSONObj& subObj) {
-        _b.appendNum((char)Array);
-        _b.appendStr(fieldName);
+        _b.appendNum((char)BSONType::array);
+        _b.appendCStr(fieldName);
         _b.appendBuf((void*)subObj.objdata(), subObj.objsize());
-
-        return static_cast<Derived&>(*this);
+        return asDerived();
     }
     Derived& append(StringData fieldName, BSONArray arr) {
         return appendArray(fieldName, arr);
@@ -215,17 +257,17 @@ public:
     /** add header for a new subarray and return bufbuilder for writing to
         the subarray's body */
     B& subarrayStart(StringData fieldName) {
-        _b.appendNum((char)Array);
-        _b.appendStr(fieldName);
+        _b.appendNum((char)BSONType::array);
+        _b.appendCStr(fieldName);
         return _b;
     }
 
     /** Append a boolean element */
-    Derived& appendBool(StringData fieldName, int val) {
-        _b.appendNum((char)Bool);
-        _b.appendStr(fieldName);
-        _b.appendNum((char)(val ? 1 : 0));
-        return static_cast<Derived&>(*this);
+    Derived& appendBool(StringData fieldName, bool val) {
+        _b.appendNum((char)BSONType::boolean);
+        _b.appendCStr(fieldName);
+        _b.appendNum(char(val));
+        return asDerived();
     }
 
     /** Append elements that have the BSONObjAppendFormat trait */
@@ -233,15 +275,15 @@ public:
     Derived& append(StringData fieldName, const T& n) {
         constexpr BSONType type = BSONObjAppendFormat<T>::value;
         _b.appendNum(static_cast<char>(type));
-        _b.appendStr(fieldName);
-        if constexpr (type == Bool) {
+        _b.appendCStr(fieldName);
+        if constexpr (type == BSONType::boolean) {
             _b.appendNum(static_cast<char>(n));
-        } else if constexpr (type == NumberInt) {
+        } else if constexpr (type == BSONType::numberInt) {
             _b.appendNum(static_cast<int>(n));
         } else {
             _b.appendNum(n);
         }
-        return static_cast<Derived&>(*this);
+        return asDerived();
     }
 
     template <typename T,
@@ -274,8 +316,7 @@ public:
         } else {
             append(fieldName, llNumber);
         }
-
-        return static_cast<Derived&>(*this);
+        return asDerived();
     }
 
     /** Append a BSON Object ID (OID type).
@@ -283,8 +324,8 @@ public:
         method for this.
     */
     Derived& appendOID(StringData fieldName, OID* oid = nullptr, bool generateIfBlank = false) {
-        _b.appendNum((char)jstOID);
-        _b.appendStr(fieldName);
+        _b.appendNum((char)BSONType::oid);
+        _b.appendCStr(fieldName);
         if (oid)
             _b.appendBuf(oid->view().view(), OID::kOIDSize);
         else {
@@ -295,7 +336,7 @@ public:
                 tmp.clear();
             _b.appendBuf(tmp.view().view(), OID::kOIDSize);
         }
-        return static_cast<Derived&>(*this);
+        return asDerived();
     }
 
     /**
@@ -304,10 +345,10 @@ public:
     @returns the builder object
     */
     Derived& append(StringData fieldName, OID oid) {
-        _b.appendNum((char)jstOID);
-        _b.appendStr(fieldName);
+        _b.appendNum((char)BSONType::oid);
+        _b.appendCStr(fieldName);
         _b.appendBuf(oid.view().view(), OID::kOIDSize);
-        return static_cast<Derived&>(*this);
+        return asDerived();
     }
 
     /**
@@ -323,10 +364,10 @@ public:
         the number of seconds since January 1, 1970, 00:00:00 GMT
     */
     Derived& appendTimeT(StringData fieldName, time_t dt) {
-        _b.appendNum((char)Date);
-        _b.appendStr(fieldName);
+        _b.appendNum((char)BSONType::date);
+        _b.appendCStr(fieldName);
         _b.appendNum(static_cast<unsigned long long>(dt) * 1000);
-        return static_cast<Derived&>(*this);
+        return asDerived();
     }
     /** Append a date.
         @param dt a Java-style 64 bit date value, that is
@@ -342,12 +383,11 @@ public:
         @param regex options such as "i" or "g"
     */
     Derived& appendRegex(StringData fieldName, StringData regex, StringData options = "") {
-        _b.appendNum((char)RegEx);
-        _b.appendStr(fieldName);
-        _b.appendStr(regex);
-        _b.appendStr(options);
-
-        return static_cast<Derived&>(*this);
+        _b.appendNum((char)BSONType::regEx);
+        _b.appendCStr(fieldName);
+        _b.appendCStr(regex);
+        _b.appendCStr(options);
+        return asDerived();
     }
 
     Derived& append(StringData fieldName, const BSONRegEx& regex) {
@@ -355,11 +395,11 @@ public:
     }
 
     Derived& appendCode(StringData fieldName, StringData code) {
-        _b.appendNum((char)Code);
-        _b.appendStr(fieldName);
+        _b.appendNum((char)BSONType::code);
+        _b.appendCStr(fieldName);
         _b.appendNum((int)code.size() + 1);
-        _b.appendStr(code);
-        return static_cast<Derived&>(*this);
+        _b.appendStrBytesAndNul(code);
+        return asDerived();
     }
 
     Derived& append(StringData fieldName, const BSONCode& code) {
@@ -369,12 +409,11 @@ public:
     /** Append a string element.
         @param sz size includes terminating null character */
     Derived& append(StringData fieldName, const char* str, int sz) {
-        _b.appendNum((char)String);
-        _b.appendStr(fieldName);
+        _b.appendNum((char)BSONType::string);
+        _b.appendCStr(fieldName);
         _b.appendNum((int)sz);
         _b.appendBuf(str, sz);
-
-        return static_cast<Derived&>(*this);
+        return asDerived();
     }
     /** Append a string element */
     Derived& append(StringData fieldName, const char* str) {
@@ -382,19 +421,19 @@ public:
     }
     /** Append a string element */
     Derived& append(StringData fieldName, StringData str) {
-        _b.appendNum((char)String);
-        _b.appendStr(fieldName);
+        _b.appendNum((char)BSONType::string);
+        _b.appendCStr(fieldName);
         _b.appendNum((int)str.size() + 1);
-        _b.appendStr(str, true);
-        return static_cast<Derived&>(*this);
+        _b.appendStrBytesAndNul(str);
+        return asDerived();
     }
 
     Derived& appendSymbol(StringData fieldName, StringData symbol) {
-        _b.appendNum((char)Symbol);
-        _b.appendStr(fieldName);
+        _b.appendNum((char)BSONType::symbol);
+        _b.appendCStr(fieldName);
         _b.appendNum((int)symbol.size() + 1);
-        _b.appendStr(symbol);
-        return static_cast<Derived&>(*this);
+        _b.appendStrBytesAndNul(symbol);
+        return asDerived();
     }
 
     Derived& append(StringData fieldName, const BSONSymbol& symbol) {
@@ -403,48 +442,54 @@ public:
 
     /** Append a Null element to the object */
     Derived& appendNull(StringData fieldName) {
-        _b.appendNum((char)jstNULL);
-        _b.appendStr(fieldName);
-
-        return static_cast<Derived&>(*this);
+        _b.appendNum((char)BSONType::null);
+        _b.appendCStr(fieldName);
+        return asDerived();
     }
 
     // Append an element that is less than all other keys.
     Derived& appendMinKey(StringData fieldName) {
-        _b.appendNum((char)MinKey);
-        _b.appendStr(fieldName);
-        return static_cast<Derived&>(*this);
+        _b.appendNum((char)BSONType::minKey);
+        _b.appendCStr(fieldName);
+        return asDerived();
     }
     // Append an element that is greater than all other keys.
     Derived& appendMaxKey(StringData fieldName) {
-        _b.appendNum((char)MaxKey);
-        _b.appendStr(fieldName);
-        return static_cast<Derived&>(*this);
+        _b.appendNum((char)BSONType::maxKey);
+        _b.appendCStr(fieldName);
+        return asDerived();
     }
 
     // Append a Timestamp field -- will be updated to next server Timestamp
-    Derived& appendTimestamp(StringData fieldName);
+    Derived& appendTimestamp(StringData fieldName) {
+        return append(fieldName, Timestamp());
+    }
 
-    Derived& appendTimestamp(StringData fieldName, unsigned long long val);
+    Derived& appendTimestamp(StringData fieldName, unsigned long long val) {
+        return append(fieldName, Timestamp(val));
+    }
 
     /**
      * To store a Timestamp in BSON, use this function.
      * This captures both the secs and inc fields.
      */
-    Derived& append(StringData fieldName, Timestamp timestamp);
+    Derived& append(StringData fieldName, Timestamp timestamp) {
+        timestamp.append<B>(_b, fieldName);
+        return asDerived();
+    }
 
     /*
     Append an element of the deprecated DBRef type.
     @deprecated
     */
     Derived& appendDBRef(StringData fieldName, StringData ns, const OID& oid) {
-        _b.appendNum((char)DBRef);
-        _b.appendStr(fieldName);
+        _b.appendNum((char)BSONType::dbRef);
+        _b.appendCStr(fieldName);
         _b.appendNum((int)ns.size() + 1);
-        _b.appendStr(ns);
+        _b.appendStrBytesAndNul(ns);
         _b.appendBuf(oid.view().view(), OID::kOIDSize);
 
-        return static_cast<Derived&>(*this);
+        return asDerived();
     }
 
     Derived& append(StringData fieldName, const BSONDBRef& dbref) {
@@ -459,13 +504,13 @@ public:
         @param data the byte array
     */
     Derived& appendBinData(StringData fieldName, int len, BinDataType type, const void* data) {
-        _b.appendNum((char)BinData);
-        _b.appendStr(fieldName);
+        _b.appendNum((char)BSONType::binData);
+        _b.appendCStr(fieldName);
         _b.appendNum(len);
         _b.appendNum((char)type);
         _b.appendBuf(data, len);
 
-        return static_cast<Derived&>(*this);
+        return asDerived();
     }
 
     Derived& append(StringData fieldName, const BSONBinData& bd) {
@@ -479,28 +524,28 @@ public:
     @param len the length of data
     */
     Derived& appendBinDataArrayDeprecated(const char* fieldName, const void* data, int len) {
-        _b.appendNum((char)BinData);
-        _b.appendStr(fieldName);
+        _b.appendNum((char)BSONType::binData);
+        _b.appendCStr(fieldName);
         _b.appendNum(len + 4);
         _b.appendNum((char)0x2);
         _b.appendNum(len);
         _b.appendBuf(data, len);
 
-        return static_cast<Derived&>(*this);
+        return asDerived();
     }
 
     /** Append to the BSON object a field of type CodeWScope.  This is a javascript code
         fragment accompanied by some scope that goes with it.
     */
     Derived& appendCodeWScope(StringData fieldName, StringData code, const BSONObj& scope) {
-        _b.appendNum((char)CodeWScope);
-        _b.appendStr(fieldName);
+        _b.appendNum((char)BSONType::codeWScope);
+        _b.appendCStr(fieldName);
         _b.appendNum((int)(4 + 4 + code.size() + 1 + scope.objsize()));
         _b.appendNum((int)code.size() + 1);
-        _b.appendStr(code);
+        _b.appendStrBytesAndNul(code);
         _b.appendBuf((void*)scope.objdata(), scope.objsize());
 
-        return static_cast<Derived&>(*this);
+        return asDerived();
     }
 
     Derived& append(StringData fieldName, const BSONCodeWScope& cws) {
@@ -508,9 +553,9 @@ public:
     }
 
     Derived& appendUndefined(StringData fieldName) {
-        _b.appendNum((char)Undefined);
-        _b.appendStr(fieldName);
-        return static_cast<Derived&>(*this);
+        _b.appendNum((char)BSONType::undefined);
+        _b.appendCStr(fieldName);
+        return asDerived();
     }
 
     /* helper function -- see Query::where() for primary way to do this. */
@@ -539,9 +584,17 @@ public:
      * Append a map of values as a sub-object.
      * Note: the keys of the map should be StringData-compatible (i.e. strings).
      */
-    template <class K, class T>
-    Derived& append(StringData fieldName, const std::map<K, T>& vals);
+    template <typename Map>
+    requires std::is_convertible_v<decltype(std::declval<Map>().begin()->first), StringData>
+    Derived& append(StringData fieldName, const Map& map) {
+        typename std::remove_reference<Derived>::type bob;
+        for (auto&& [k, v] : map) {
+            bob.append(k, v);
+        }
 
+        append(fieldName, bob.obj());
+        return asDerived();
+    }
 
     /** Append a range of values between two iterators. */
     template <class It>
@@ -556,7 +609,6 @@ public:
      */
     void resetToEmpty() {
         invariant(!_doneCalled);
-        static_cast<Derived*>(this)->doResetToEmpty();
         // Reset the position the next write will go to right after our size reservation.
         _b.setlen(_offset + sizeof(int));
     }
@@ -568,12 +620,12 @@ public:
     */
     template <typename BSONTraits = BSONObj::DefaultSizeTrait>
     BSONObj done() {
-        return BSONObj(static_cast<Derived*>(this)->_done(), BSONTraits{});
+        return BSONObj(asDerived()._done(), BSONTraits{});
     }
 
     // Like 'done' above, but does not construct a BSONObj to return to the caller.
     void doneFast() {
-        (void)static_cast<Derived*>(this)->_done();
+        (void)asDerived()._done();
     }
 
     /** Peek at what is in the builder, but leave the builder ready for more appends.
@@ -581,11 +633,11 @@ public:
         Intended use case: append a field if not already there.
     */
     BSONObj asTempObj() {
-        const char* const buffer = static_cast<Derived*>(this)->_done();
+        const char* const buffer = asDerived()._done();
 
         // None of the code which resets this builder to the not-done state is expected to throw.
         // If it does, that would be a violation of our expectations.
-        ScopeGuard resetObjectState([this]() noexcept {
+        ScopeGuard resetObjectState([this]() {
             // Immediately after the buffer for the ephemeral space created by the call to `_done()`
             // is ready, reset our state to not-done.
             _doneCalled = false;
@@ -635,7 +687,9 @@ protected:
 
     // Initializes the builder without allocating any space. Only used by subclasses.
     struct InitEmptyTag {};
-    BSONObjBuilderBase(InitEmptyTag) : _b(_buf), _buf(0) {}
+    template <typename... BuilderArgs>
+    BSONObjBuilderBase(InitEmptyTag, BuilderArgs&&... args)
+        : _buf(0, std::forward<BuilderArgs>(args)...), _b(_buf) {}
 
     // Intentionally non-virtual.
     ~BSONObjBuilderBase() {
@@ -647,16 +701,12 @@ protected:
         if (_doneCalled)
             return _b.buf() + _offset;
 
-        static_cast<Derived*>(this)->doDone();
-
         _b.claimReservedBytes(1);  // Prevents adding EOO from failing.
-        _b.appendNum((char)EOO);
+        _b.appendNum((char)BSONType::eoo);
 
         char* data = _b.buf() + _offset;
         int size = _b.len() - _offset;
         DataView(data).write(tagLittleEndian(size));
-        if (_tracker)
-            _tracker->got(size);
 
         // Only set `_doneCalled` to true when all functions which could throw haven't thrown.
         _doneCalled = true;
@@ -678,11 +728,9 @@ protected:
         }
     }
 
-
-    B& _b;
     B _buf;
+    B& _b;
     int _offset = 0;
-    BSONSizeTracker* _tracker = nullptr;
     bool _doneCalled = false;
 };
 
@@ -693,6 +741,7 @@ protected:
 // without being sure that you are not undoing the advantages of the
 // extern template declaration.
 class BSONObjBuilder;
+
 extern template class BSONObjBuilderBase<BSONObjBuilder, BufBuilder>;
 
 // BSONObjBuilder needs this forward declared in order to declare the
@@ -708,21 +757,54 @@ class BSONArrayBuilder;
 class BSONObjBuilder : public BSONObjBuilderBase<BSONObjBuilder, BufBuilder> {
 private:
     using Super = BSONObjBuilderBase<BSONObjBuilder, BufBuilder>;
-    friend Super;
 
 public:
     using ArrayBuilder = BSONArrayBuilder;
 
-    BSONObjBuilder() : Super(kDefaultSize), _s(this) {}
+    class ValueStream {
+    public:
+        ValueStream(StringData fieldName, BSONObjBuilder* builder)
+            : _fieldName{fieldName}, _builder{builder} {}
 
-    BSONObjBuilder(int initsize) : Super(initsize), _s(this) {}
+        ValueStream(const ValueStream&&) = delete;
+        ValueStream&& operator=(ValueStream&&) = delete;
 
-    BSONObjBuilder(BufBuilder& baseBuilder) : Super(baseBuilder), _s(this) {}
+        /**
+         * `subobjStart` and `subarrayStart` provide API compatibility with `BSONArrayBuilder`.
+         * This allows generic code to start a nested object with no fieldName.
+         */
+        BufBuilder& subobjStart() {
+            return _builder->subobjStart(_fieldName);
+        }
 
-    BSONObjBuilder(ResumeBuildingTag, BufBuilder& existingBuilder, std::size_t offset = 0)
-        : Super(ResumeBuildingTag{}, existingBuilder, offset), _s(this) {}
+        BufBuilder& subarrayStart() {
+            return _builder->subarrayStart(_fieldName);
+        }
 
-    BSONObjBuilder(const BSONSizeTracker& tracker) : Super(tracker), _s(this) {}
+        BSONObjBuilder& builder() const {
+            return *_builder;
+        }
+
+        StringData fieldName() const {
+            return _fieldName;
+        }
+
+        BSONObjBuilder& operator<<(const BSONElement& e) const {
+            return _builder->appendAs(e, _fieldName);
+        }
+
+        BSONObjBuilder& operator<<(
+            const bsonobjbuilder_details::HasAdlAppendToBson auto& value) const {
+            appendToBson(builder(), fieldName(), value);
+            return builder();
+        }
+
+    private:
+        StringData _fieldName;
+        BSONObjBuilder* _builder;
+    };
+
+    using Super::Super;
 
     /**
      * Creates a new BSONObjBuilder prefixed with the fields in 'prefix'.
@@ -731,7 +813,7 @@ public:
      * able to avoid copying and will just reuse the buffer. Therefore, you should try to std::move
      * into this constructor where possible.
      */
-    BSONObjBuilder(BSONObj prefix) : Super(Super::InitEmptyTag{}), _s(this) {
+    BSONObjBuilder(BSONObj prefix) : Super(Super::InitEmptyTag{}) {
         // If prefix wasn't owned or we don't have exclusive access to it, we must copy.
         if (!prefix.isOwned() || prefix.sharedBuffer().isShared()) {
             _b.grow(prefix.objsize());  // Make sure we won't need to realloc().
@@ -750,7 +832,7 @@ public:
         _b.reserveBytes(1);             // Reserve room for our EOO byte.
     }
 
-    BSONObjBuilder(BSONObjBuilder&& other) : Super(std::move(other)), _s(this) {}
+    BSONObjBuilder(BSONObjBuilder&& other) noexcept : Super(std::move(other)) {}
 
     ~BSONObjBuilder() {
         Super::_destruct();
@@ -770,11 +852,6 @@ public:
     }
 
     /** Stream oriented way to add field names and values. */
-    BSONObjBuilder& operator<<(GENOIDLabeler) {
-        genOID();
-        return *this;
-    }
-
     template <typename T>
     BSONObjBuilder& operator<<(const BSONFieldValue<T>& v) {
         append(v.name(), v.value());
@@ -786,35 +863,60 @@ public:
         return *this;
     }
 
-    /** Stream oriented way to add field names and values. */
-    BSONObjBuilderValueStream& operator<<(StringData name) {
-        _s.endField(name);
-        return _s;
-    }
-
-    Labeler operator<<(const Labeler::Label& l) {
-        massert(10336, "No subobject started", _s.subobjStarted());
-        return _s << l;
+    ValueStream operator<<(StringData name) {
+        return BSONObjBuilder::ValueStream{name, this};
     }
 
     template <typename T>
-    BSONObjBuilderValueStream& operator<<(const BSONField<T>& f) {
-        _s.endField(f.name());
-        return _s;
+    ValueStream operator<<(const BSONField<T>& f) {
+        return ValueStream(f.name(), this);
     }
 
-private:
-    // Compile-time "virtual" methods called by the base class.
-    void doDone() {
-        _s.endField();
+    /**
+     * The fallback overload for appendToBson.
+     * This just tries `bob.append(fieldName, value)` as a default behavior.
+     * ADL is used to find overloads that might be associated with the type of `value`.
+     * So customize this behavior by defining a "hidden friend" of the value type, or similarly
+     * providing an ADL-compatible overload.
+     */
+    friend void appendToBson(
+        BSONObjBuilder& bob,
+        StringData fieldName,
+        const bsonobjbuilder_details::HasBuilderAppendMemberFunction auto& value) {
+        bob.append(fieldName, value);
     }
-
-    void doResetToEmpty() {
-        _s.reset();
-    }
-
-    BSONObjBuilderValueStream _s;
 };
+namespace allocator_aware {
+// The following forward declaration exists to enable the extern declaration, which must come before
+// the use of the matching instantiation of the base class of allocator_aware::BSONObjBuilder. Do
+// not remove or re-order these lines w.r.t BSONObjBuilderBase or allocator_aware::BSONObjBuilder
+// without being sure that you are not undoing the advantages of the extern template declaration.
+template <class>
+class BSONObjBuilder;
+}  // namespace allocator_aware
+
+extern template class BSONObjBuilderBase<allocator_aware::BSONObjBuilder<std::allocator<void>>,
+                                         allocator_aware::BufBuilder<std::allocator<void>>>;
+extern template class BSONObjBuilderBase<allocator_aware::BSONObjBuilder<tracking::Allocator<void>>,
+                                         allocator_aware::BufBuilder<tracking::Allocator<void>>>;
+
+namespace allocator_aware {
+template <class Allocator = std::allocator<void>>
+class BSONObjBuilder : public BSONObjBuilderBase<BSONObjBuilder<Allocator>, BufBuilder<Allocator>> {
+    using Super = BSONObjBuilderBase<BSONObjBuilder<Allocator>, BufBuilder<Allocator>>;
+
+public:
+    BSONObjBuilder() = default;
+
+    explicit BSONObjBuilder(const Allocator& allocator) : Super(Super::kDefaultSize, allocator) {}
+
+    explicit BSONObjBuilder(BufBuilder<Allocator>& builder) : Super(builder, builder.allocator()) {}
+
+    ~BSONObjBuilder() {
+        Super::_destruct();
+    }
+};
+}  // namespace allocator_aware
 
 // The following forward declaration exists to enable the extern
 // declaration, which must come before the use of the matching
@@ -841,7 +943,6 @@ class UniqueBSONArrayBuilder;
 class UniqueBSONObjBuilder : public BSONObjBuilderBase<UniqueBSONObjBuilder, UniqueBufBuilder> {
 private:
     using Super = BSONObjBuilderBase<UniqueBSONObjBuilder, UniqueBufBuilder>;
-    friend Super;
 
 public:
     using Super::BSONObjBuilderBase;
@@ -859,7 +960,6 @@ public:
 
     UniqueBSONObjBuilder(UniqueBSONObjBuilder&&) = default;
     UniqueBSONObjBuilder(const UniqueBSONObjBuilder&) = delete;
-    UniqueBSONObjBuilder& operator=(UniqueBSONObjBuilder&&) = default;
     UniqueBSONObjBuilder& operator=(const UniqueBSONObjBuilder&) = delete;
 
     ~UniqueBSONObjBuilder() {
@@ -877,16 +977,6 @@ public:
         out.shareOwnershipWith(SharedBuffer(_b.release()));
         return out;
     }
-
-private:
-    // Compile-time "virtual" which must be provided to satisfy the base class.
-    void doDone() {
-        // Intentionally left empty.
-    }
-
-    void doResetToEmpty() {
-        // Intentionally left empty.
-    }
 };
 
 /**
@@ -895,20 +985,31 @@ private:
 template <class Derived, class BSONObjBuilderType>
 class BSONArrayBuilderBase {
 public:
-    BSONArrayBuilderBase() {}
-    BSONArrayBuilderBase(int initialSize) : _b(initialSize) {}
+    template <typename... BuilderArgs>
+    BSONArrayBuilderBase(BuilderArgs&&... args) : _b(std::forward<BuilderArgs>(args)...) {}
+
+    template <typename... BuilderArgs>
+    BSONArrayBuilderBase(int initialSize, BuilderArgs&&... args)
+        : _b(initialSize, std::forward<BuilderArgs>(args)...) {}
+
+    Derived& asDerived() {
+        return static_cast<Derived&>(*this);
+    }
+    const Derived& asDerived() const {
+        return static_cast<const Derived&>(*this);
+    }
 
     template <typename T>
     Derived& append(const T& x) {
         _b.append(_fieldCount, x);
         ++_fieldCount;
-        return static_cast<Derived&>(*this);
+        return asDerived();
     }
 
     Derived& append(const BSONElement& e) {
         _b.appendAs(e, _fieldCount);
         ++_fieldCount;
-        return static_cast<Derived&>(*this);
+        return asDerived();
     }
 
     Derived& operator<<(const BSONElement& e) {
@@ -919,31 +1020,31 @@ public:
     Derived& operator<<(const T& x) {
         _b << _fieldCount << x;
         ++_fieldCount;
-        return static_cast<Derived&>(*this);
+        return asDerived();
     }
 
     Derived& appendNull() {
         _b.appendNull(_fieldCount);
         ++_fieldCount;
-        return static_cast<Derived&>(*this);
+        return asDerived();
     }
 
     Derived& appendUndefined() {
         _b.appendUndefined(_fieldCount);
         ++_fieldCount;
-        return static_cast<Derived&>(*this);
+        return asDerived();
     }
 
     Derived& appendMinKey() {
         _b.appendMinKey(_fieldCount);
         ++_fieldCount;
-        return static_cast<Derived&>(*this);
+        return asDerived();
     }
 
     Derived& appendMaxKey() {
         _b.appendMaxKey(_fieldCount);
         ++_fieldCount;
-        return static_cast<Derived&>(*this);
+        return asDerived();
     }
 
     BSONObj done() {
@@ -974,49 +1075,49 @@ public:
     Derived& appendRegex(StringData regex, StringData options = "") {
         _b.appendRegex(_fieldCount, regex, options);
         ++_fieldCount;
-        return static_cast<Derived&>(*this);
+        return asDerived();
     }
 
     Derived& appendBinData(int len, BinDataType type, const void* data) {
         _b.appendBinData(_fieldCount, len, type, data);
         ++_fieldCount;
-        return static_cast<Derived&>(*this);
+        return asDerived();
     }
 
     Derived& appendCode(StringData code) {
         _b.appendCode(_fieldCount, code);
         ++_fieldCount;
-        return static_cast<Derived&>(*this);
+        return asDerived();
     }
 
     Derived& appendCodeWScope(StringData code, const BSONObj& scope) {
         _b.appendCodeWScope(_fieldCount, code, scope);
         ++_fieldCount;
-        return static_cast<Derived&>(*this);
+        return asDerived();
     }
 
     Derived& appendTimeT(time_t dt) {
         _b.appendTimeT(_fieldCount, dt);
         ++_fieldCount;
-        return static_cast<Derived&>(*this);
+        return asDerived();
     }
 
     Derived& appendDate(Date_t dt) {
         _b.appendDate(_fieldCount, dt);
         ++_fieldCount;
-        return static_cast<Derived&>(*this);
+        return asDerived();
     }
 
     Derived& appendBool(bool val) {
         _b.appendBool(_fieldCount, val);
         ++_fieldCount;
-        return static_cast<Derived&>(*this);
+        return asDerived();
     }
 
     Derived& appendTimestamp(unsigned long long ts) {
         _b.appendTimestamp(_fieldCount, ts);
         ++_fieldCount;
-        return static_cast<Derived&>(*this);
+        return asDerived();
     }
 
     bool isArray() const {
@@ -1032,17 +1133,6 @@ public:
 
     auto& bb() {
         return _b.bb();
-    }
-
-    /**
-     * destructive - ownership moves to returned BSONArray
-     * @return owned BSONArray
-     */
-    BSONArray arr() {
-        return BSONArray(_b.obj());
-    }
-    BSONObj obj() {
-        return _b.obj();
     }
 
 protected:
@@ -1072,7 +1162,44 @@ public:
     using BSONArrayBuilderBase<BSONArrayBuilder, BSONObjBuilder>::BSONArrayBuilderBase;
     BSONArrayBuilder(BufBuilder& bufBuilder)
         : BSONArrayBuilderBase<BSONArrayBuilder, BSONObjBuilder>(bufBuilder) {}
+
+    /**
+     * destructive - ownership moves to returned BSONArray
+     * @return owned BSONArray
+     */
+    BSONArray arr() {
+        return BSONArray(_b.obj());
+    }
+    BSONObj obj() {
+        return _b.obj();
+    }
 };
+
+namespace allocator_aware {
+// The following forward declaration exists to enable the extern declaration, which must come before
+// the use of the matching instantiation of the base class of allocator_aware::BSONArrayBuilder. Do
+// not remove or re-order these lines w.r.t BSONArrayBuilderBase or
+// allocator_aware::BSONArrayBuilder without being sure that you are not undoing the advantages of
+// the extern template declaration.
+template <class>
+class BSONArrayBuilder;
+}  // namespace allocator_aware
+
+extern template class BSONArrayBuilderBase<allocator_aware::BSONArrayBuilder<std::allocator<void>>,
+                                           allocator_aware::BSONObjBuilder<std::allocator<void>>>;
+extern template class BSONArrayBuilderBase<
+    allocator_aware::BSONArrayBuilder<tracking::Allocator<void>>,
+    allocator_aware::BSONObjBuilder<tracking::Allocator<void>>>;
+
+namespace allocator_aware {
+template <class Allocator>
+class BSONArrayBuilder
+    : public BSONArrayBuilderBase<BSONArrayBuilder<Allocator>, BSONObjBuilder<Allocator>> {
+public:
+    BSONArrayBuilder(BufBuilder<Allocator>& bufBuilder)
+        : BSONArrayBuilderBase<BSONArrayBuilder, BSONObjBuilder<Allocator>>(bufBuilder) {}
+};
+}  // namespace allocator_aware
 
 // The following extern template declaration must come after the
 // forward delaration of UniqueBSONArrayBuilder above, and before the
@@ -1094,6 +1221,17 @@ public:
     using BSONArrayBuilderBase<UniqueBSONArrayBuilder, UniqueBSONObjBuilder>::BSONArrayBuilderBase;
     UniqueBSONArrayBuilder(UniqueBufBuilder& bufBuilder)
         : BSONArrayBuilderBase<UniqueBSONArrayBuilder, UniqueBSONObjBuilder>(bufBuilder) {}
+
+    /**
+     * destructive - ownership moves to returned BSONArray
+     * @return owned BSONArray
+     */
+    BSONArray arr() {
+        return BSONArray(_b.obj());
+    }
+    BSONObj obj() {
+        return _b.obj();
+    }
 };
 
 template <class Derived, class B>
@@ -1117,18 +1255,6 @@ inline Derived& BSONObjBuilderBase<Derived, B>::append(StringData fieldName,
     return append(fieldName, vals.begin(), vals.end());
 }
 
-template <class Derived, class BufBuilderType>
-template <class K, class T>
-inline Derived& BSONObjBuilderBase<Derived, BufBuilderType>::append(StringData fieldName,
-                                                                    const std::map<K, T>& vals) {
-    typename std::remove_reference<Derived>::type bob;
-    for (typename std::map<K, T>::const_iterator i = vals.begin(); i != vals.end(); ++i) {
-        bob.append(i->first, i->second);
-    }
-    append(fieldName, bob.obj());
-    return static_cast<Derived&>(*this);
-}
-
 template <class Derived, class B>
 template <class It>
 inline Derived& BSONObjBuilderBase<Derived, B>::append(StringData fieldName, It begin, It end) {
@@ -1138,7 +1264,7 @@ inline Derived& BSONObjBuilderBase<Derived, B>::append(StringData fieldName, It 
         arrBuilder.append(StringData{n}, *begin);
         ++n;
     }
-    return static_cast<Derived&>(*this);
+    return asDerived();
 }
 
 template <class Derived, class BSONObjBuilderType>
@@ -1171,64 +1297,193 @@ inline BSONFieldValue<BSONObj> BSONField<T>::query(const char* q, const T& t) co
     return BSONFieldValue<BSONObj>(_name, b.obj());
 }
 
-inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<(const DateNowLabeler& id) {
-    _builder->appendDate(_fieldName, jsTime());
-    _fieldName = StringData();
-    return *_builder;
-}
+/* Utility class to add a Date element with the current time
+   Example:
+     std::cout << BSON( "created" << DATENOW ); // { created : "2009-10-09 11:41:42" }
+*/
+struct DateNowLabeler {
+    friend void appendToBson(BSONObjBuilder& bob, StringData fieldName, DateNowLabeler) {
+        bob.appendDate(fieldName, Date_t::now());
+    }
+};
+constexpr inline DateNowLabeler DATENOW;
 
-inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<(const NullLabeler& id) {
-    _builder->appendNull(_fieldName);
-    _fieldName = StringData();
-    return *_builder;
-}
+/* Utility class to assign a NULL value to a given attribute
+   Example:
+     std::cout << BSON( "a" << BSONNULL ); // { a : null }
+*/
+struct NullLabeler {
+    friend void appendToBson(BSONObjBuilder& bob, StringData fieldName, NullLabeler) {
+        bob.appendNull(fieldName);
+    }
+};
+constexpr inline NullLabeler BSONNULL;
 
-inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<(const UndefinedLabeler& id) {
-    _builder->appendUndefined(_fieldName);
-    _fieldName = StringData();
-    return *_builder;
-}
+/* Utility class to assign an Undefined value to a given attribute
+   Example:
+     std::cout << BSON( "a" << BSONUndefined ); // { a : undefined }
+*/
+struct UndefinedLabeler {
+    friend void appendToBson(BSONObjBuilder& bob, StringData fieldName, UndefinedLabeler) {
+        bob.appendUndefined(fieldName);
+    }
+};
+constexpr inline UndefinedLabeler BSONUndefined;
 
-inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<(const MinKeyLabeler& id) {
-    _builder->appendMinKey(_fieldName);
-    _fieldName = StringData();
-    return *_builder;
-}
+/**
+ * Utility class to add the minKey (minus infinity) to a given attribute
+ * Example:
+ *   std::cout << BSON( "a" << MINKEY ); // { "a" : { "$minKey" : 1 } }
+ */
+struct MinKeyLabeler {
+    friend void appendToBson(BSONObjBuilder& bob, StringData fieldName, MinKeyLabeler) {
+        bob.appendMinKey(fieldName);
+    }
+};
+constexpr inline MinKeyLabeler MINKEY;
 
-inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<(const MaxKeyLabeler& id) {
-    _builder->appendMaxKey(_fieldName);
-    _fieldName = StringData();
-    return *_builder;
-}
+/**
+ * Utility class to add the maxKey (infinity) to a given attribute
+ * Example:
+ *   std::cout << BSON( "a" << MAXKEY ); // { "a" : { "$maxKey" : 1 } }
+ */
+struct MaxKeyLabeler {
+    friend void appendToBson(BSONObjBuilder& bob, StringData fieldName, MaxKeyLabeler) {
+        bob.appendMaxKey(fieldName);
+    }
+};
+constexpr inline MaxKeyLabeler MAXKEY;
 
-template <class T>
-inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<(T value) {
-    _builder->append(_fieldName, value);
-    _fieldName = StringData();
-    return *_builder;
-}
+/**
+ * These labels like GT, GTE, LT, LTE, NE can be helpful for stream-oriented
+ * construction of a BSONObj, particularly when assembling a query.
+ * See (https://www.mongodb.com/docs/manual/reference/operator/query/).
+ *
+ * Each accepts a following value operand with a subsequent `<<`.
+ * Any number of such pairs may follow a fieldname, which
+ * will have the effect of creating that field as holding a subobject
+ * mapping all such labels to their corresponding operands.
+ *
+ * E.g.:
+ *     BSON("a" << GT<<123) => {"a":{"$gt":123}}
+ *     BSON("a" << GT<<123 << NE<<30) => {"a":{"$gt":123,"$ne":30}}
+ *     BSON("a" << GT<<123 << "b" << 2) => {"a":{"$gt":123},"b":2}
+ */
+class QueryConstraintLabel {
+public:
+    // This class and its public methods are marked [[nodiscard]] because it is required to do
+    // *something* with the results. We open a subobject and you must either continue appending
+    // until you append a "normal" field, or you must convert it to BSONObjBuilder&, which happens
+    // automatically when the BSON() macro is closed.
+    class [[nodiscard]] ArgumentAcceptor {
+        class AfterArgument;
 
-template <class T>
-BSONObjBuilder& Labeler::operator<<(T value) {
-    s_->subobj()->append(l_.l_, value);
-    return *s_->_builder;
-}
+    public:
+        ArgumentAcceptor(StringData label, BSONObjBuilder::ValueStream* stream)
+            : _label{label}, _stream{stream}, _subObjBuilder{_stream->subobjStart()} {}
 
-template <class Derived, class B>
-inline Derived& BSONObjBuilderBase<Derived, B>::append(StringData fieldName, Timestamp optime) {
-    optime.append<B>(_b, fieldName);
-    return static_cast<Derived&>(*this);
-}
+        AfterArgument& operator<<(const bsonobjbuilder_details::HasAdlAppendToBson auto& value) {
+            appendToBson(_subObjBuilder, _label, value);
+            return _after;
+        }
 
-template <class Derived, class B>
-inline Derived& BSONObjBuilderBase<Derived, B>::appendTimestamp(StringData fieldName) {
-    return append(fieldName, Timestamp());
-}
+        /**
+         * The value of `e` is appended, but with this
+         * label replacing its fieldName.
+         *     "age" << GT << BSONElement{"dummy", 123}
+         *     {"age":{"$gt":123}}
+         */
+        AfterArgument& operator<<(const BSONElement& e) {
+            _subObjBuilder.appendAs(e, _label);
+            return _after;
+        }
 
-template <class Derived, class B>
-inline Derived& BSONObjBuilderBase<Derived, B>::appendTimestamp(StringData fieldName,
-                                                                unsigned long long val) {
-    return append(fieldName, Timestamp(val));
-}
+    private:
+        class AfterArgument {
+        public:
+            explicit AfterArgument(ArgumentAcceptor* stream) : _stream{stream} {}
+
+            explicit operator BSONObjBuilder&() {
+                _stream->_subObjBuilder.done();
+                return _stream->_stream->builder();
+            }
+
+            decltype(auto) operator<<(const auto& x) {
+                return static_cast<BSONObjBuilder&>(*this) << x;
+            }
+
+            [[nodiscard]] ArgumentAcceptor& operator<<(const QueryConstraintLabel& qcl) {
+                _stream->_label = qcl.label();
+                return *_stream;
+            }
+
+        private:
+            ArgumentAcceptor* _stream;
+        };
+
+        StringData _label;
+        BSONObjBuilder::ValueStream* _stream;
+        AfterArgument _after{this};
+        BSONObjBuilder _subObjBuilder;
+    };
+
+    constexpr explicit QueryConstraintLabel(StringData l) : _label(l) {}
+
+    StringData label() const {
+        return _label;
+    }
+
+    friend ArgumentAcceptor operator<<(BSONObjBuilder::ValueStream& valueStream,
+                                       const QueryConstraintLabel& qcl) {
+        return {qcl.label(), &valueStream};
+    }
+
+    friend ArgumentAcceptor operator<<(BSONObjBuilder::ValueStream&& valueStream,
+                                       const QueryConstraintLabel& qcl) {
+        return valueStream << qcl;
+    }
+
+private:
+    StringData _label;
+};
+
+constexpr inline QueryConstraintLabel GT{"$gt"};
+constexpr inline QueryConstraintLabel GTE{"$gte"};
+constexpr inline QueryConstraintLabel LT{"$lt"};
+constexpr inline QueryConstraintLabel LTE{"$lte"};
+constexpr inline QueryConstraintLabel NE{"$ne"};
+constexpr inline QueryConstraintLabel NIN{"$nin"};
+constexpr inline QueryConstraintLabel BSIZE{"$size"};
+
+constexpr inline int kBSONObjBuilderInitialCapacity = 64;
+
+/** Use BSON macro to build a BSONObj from a stream
+
+    e.g.,
+       BSON( "name" << "joe" << "age" << 33 )
+
+    with auto-generated object id:
+       BSON( "_id" << OID::gen() << "name" << "joe" << "age" << 33 )
+
+    The labels GT, GTE, LT, LTE, NE can be helpful for stream-oriented construction
+    of a BSONObj, particularly when assembling a Query.  For example,
+    BSON( "a" << GT << 23.4 << NE << 30 << "b" << 2 ) produces the object
+    { a: { \$gt: 23.4, \$ne: 30 }, b: 2 }.
+*/
+#define BSON(x)                                                                 \
+    (static_cast<::mongo::BSONObjBuilder&>(                                     \
+         ::mongo::BSONObjBuilder{::mongo::kBSONObjBuilderInitialCapacity} << x) \
+         .obj())
+
+/** Use BSON_ARRAY macro like BSON macro, but without keys
+
+    BSONArray arr = BSON_ARRAY( "hello" << 1 <<
+                        BSON( "foo" << BSON_ARRAY( "bar" << "baz" << "qux" ) ) );
+
+ */
+#define BSON_ARRAY(x)                                                                             \
+    ((::mongo::BSONArrayBuilder(::mongo::BSONObjBuilder{::mongo::kBSONObjBuilderInitialCapacity}) \
+      << x)                                                                                       \
+         .arr())
 
 }  // namespace mongo

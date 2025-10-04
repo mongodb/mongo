@@ -1,0 +1,6 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
+      - 10gen/server-catalog-and-routing-ddl

@@ -3,9 +3,6 @@
  * and that regular startup without --repair fails if the FCV document is missing.
  */
 
-(function() {
-"use strict";
-
 let dbpath = MongoRunner.dataPath + "feature_compatibility_version";
 resetDbpath(dbpath);
 let connection;
@@ -19,7 +16,7 @@ const latest = "latest";
  *
  * The mongod has 'version' binary and is started up on 'dbpath'.
  */
-let doStartupFailTests = function(version, dbpath) {
+let doStartupFailTests = function (version, dbpath) {
     // Set up a mongod with an admin database but without a FCV document in the admin database.
     setupMissingFCVDoc(version, dbpath);
 
@@ -29,17 +26,17 @@ let doStartupFailTests = function(version, dbpath) {
     assert.throws(
         () => MongoRunner.runMongod({dbpath: dbpath, binVersion: version, noCleanData: true}),
         [],
-        "expected mongod to fail when data files are present but no FCV document is found.");
+        "expected mongod to fail when data files are present but no FCV document is found.",
+    );
 };
 
 /**
  * Starts up a mongod with binary 'version' on 'dbpath', then removes the FCV document from the
  * admin database and returns the mongod.
  */
-let setupMissingFCVDoc = function(version, dbpath) {
+let setupMissingFCVDoc = function (version, dbpath) {
     let conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: version});
-    assert.neq(
-        null, conn, "mongod was unable to start up with version=" + version + " and no data files");
+    assert.neq(null, conn, "mongod was unable to start up with version=" + version + " and no data files");
     adminDB = conn.getDB("admin");
     removeFCVDocument(adminDB);
     MongoRunner.stopMongod(conn);
@@ -54,17 +51,11 @@ doStartupFailTests(latest, dbpath);
 // admin database, as long as all collections have UUIDs. The FCV should be initialized to
 // lastLTSFCV / downgraded FCV.
 connection = setupMissingFCVDoc(latest, dbpath);
-let returnCode =
-    runMongoProgram("mongod", "--port", connection.port, "--repair", "--dbpath", dbpath);
-assert.eq(
-    returnCode,
-    0,
-    "expected mongod --repair to execute successfully when restoring a missing FCV document.");
+let returnCode = runMongoProgram("mongod", "--port", connection.port, "--repair", "--dbpath", dbpath);
+assert.eq(returnCode, 0, "expected mongod --repair to execute successfully when restoring a missing FCV document.");
 
 connection = MongoRunner.runMongod({dbpath: dbpath, binVersion: latest, noCleanData: true});
-assert.neq(null,
-           connection,
-           "mongod was unable to start up with version=" + latest + " and existing data files");
+assert.neq(null, connection, "mongod was unable to start up with version=" + latest + " and existing data files");
 adminDB = connection.getDB("admin");
 const fcvDoc = adminDB.system.version.findOne({_id: "featureCompatibilityVersion"});
 assert.eq(fcvDoc.version, lastLTSFCV);
@@ -74,11 +65,8 @@ MongoRunner.stopMongod(connection);
 
 // If the featureCompatibilityVersion document is present, --repair should just return success.
 connection = MongoRunner.runMongod({dbpath: dbpath, binVersion: latest});
-assert.neq(null,
-           connection,
-           "mongod was unable to start up with version=" + latest + " and no data files");
+assert.neq(null, connection, "mongod was unable to start up with version=" + latest + " and no data files");
 MongoRunner.stopMongod(connection);
 
 returnCode = runMongoProgram("mongod", "--port", connection.port, "--repair", "--dbpath", dbpath);
 assert.eq(returnCode, 0);
-})();

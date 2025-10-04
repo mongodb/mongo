@@ -29,7 +29,21 @@
 
 #pragma once
 
+#include "mongo/base/clonable_ptr.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_tree.h"
+#include "mongo/db/matcher/expression_visitor.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/db/query/util/make_data_structure.h"
+
+#include <cstddef>
+#include <memory>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 
@@ -52,14 +66,11 @@ public:
         : ListOfMatchExpression(
               INTERNAL_SCHEMA_XOR, std::move(annotation), makeVector(std::move(expression))) {}
 
-    bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const final;
-
-    bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
-
-    virtual std::unique_ptr<MatchExpression> shallowClone() const {
+    std::unique_ptr<MatchExpression> clone() const override {
         auto xorCopy = std::make_unique<InternalSchemaXorMatchExpression>(_errorAnnotation);
+        xorCopy->reserve(numChildren());
         for (size_t i = 0; i < numChildren(); ++i) {
-            xorCopy->add(getChild(i)->shallowClone());
+            xorCopy->add(getChild(i)->clone());
         }
         if (getTag()) {
             xorCopy->setTag(getTag()->clone());
@@ -69,7 +80,9 @@ public:
 
     void debugString(StringBuilder& debug, int indentationLevel = 0) const final;
 
-    void serialize(BSONObjBuilder* out, bool includePath) const final;
+    void serialize(BSONObjBuilder* out,
+                   const SerializationOptions& opts = {},
+                   bool includePath = true) const final;
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
         visitor->visit(this);

@@ -1,12 +1,12 @@
 """The unittest.TestCase for dbtests."""
 
+import copy
 import os
 import os.path
 import shutil
+from typing import Optional
 
-from buildscripts.resmokelib import config
-from buildscripts.resmokelib import core
-from buildscripts.resmokelib import utils
+from buildscripts.resmokelib import config, core, logging, utils
 from buildscripts.resmokelib.testing.testcases import interface
 
 
@@ -15,15 +15,22 @@ class DBTestCase(interface.ProcessTestCase):
 
     REGISTERED_NAME = "db_test"
 
-    def __init__(self, logger, dbtest_suite, dbtest_executable=None, dbtest_options=None):
+    def __init__(
+        self,
+        logger: logging.Logger,
+        dbtest_suites: list[str],
+        dbtest_executable: Optional[str] = None,
+        dbtest_options: Optional[dict] = None,
+    ):
         """Initialize the DBTestCase with the dbtest suite to run."""
 
-        interface.ProcessTestCase.__init__(self, logger, "dbtest suite", dbtest_suite)
+        assert len(dbtest_suites) == 1
+        interface.ProcessTestCase.__init__(self, logger, "dbtest suite", dbtest_suites[0])
 
         # Command line options override the YAML configuration.
         self.dbtest_executable = utils.default_if_none(config.DBTEST_EXECUTABLE, dbtest_executable)
 
-        self.dbtest_suite = dbtest_suite
+        self.dbtest_suite = dbtest_suites[0]
         self.dbtest_options = utils.default_if_none(dbtest_options, {}).copy()
 
     def configure(self, fixture, *args, **kwargs):
@@ -43,6 +50,10 @@ class DBTestCase(interface.ProcessTestCase):
             # Directory already exists.
             pass
 
+        process_kwargs = copy.deepcopy(self.dbtest_options.get("process_kwargs", {}))
+        interface.append_process_tracking_options(process_kwargs, self._id)
+        self.dbtest_options["process_kwargs"] = process_kwargs
+
     def _execute(self, process):
         interface.ProcessTestCase._execute(self, process)
         self._clear_dbpath()
@@ -51,9 +62,12 @@ class DBTestCase(interface.ProcessTestCase):
         shutil.rmtree(self.dbtest_options["dbpath"], ignore_errors=True)
 
     def _make_process(self):
-        return core.programs.dbtest_program(self.logger, self.fixture.job_num, test_id=self._id,
-                                            executable=self.dbtest_executable,
-                                            suites=[self.dbtest_suite], **self.dbtest_options)
+        return core.programs.dbtest_program(
+            self.logger,
+            executable=self.dbtest_executable,
+            suites=[self.dbtest_suite],
+            **self.dbtest_options,
+        )
 
     @staticmethod
     def _get_dbpath_prefix():

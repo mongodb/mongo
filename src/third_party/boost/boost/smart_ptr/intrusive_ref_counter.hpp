@@ -15,9 +15,8 @@
 #ifndef BOOST_SMART_PTR_INTRUSIVE_REF_COUNTER_HPP_INCLUDED_
 #define BOOST_SMART_PTR_INTRUSIVE_REF_COUNTER_HPP_INCLUDED_
 
-#include <boost/config.hpp>
 #include <boost/smart_ptr/detail/atomic_count.hpp>
-#include <boost/smart_ptr/detail/sp_noexcept.hpp>
+#include <boost/config.hpp>
 
 #ifdef BOOST_HAS_PRAGMA_ONCE
 #pragma once
@@ -46,17 +45,17 @@ struct thread_unsafe_counter
 {
     typedef unsigned int type;
 
-    static unsigned int load(unsigned int const& counter) BOOST_SP_NOEXCEPT
+    static unsigned int load(unsigned int const& counter) noexcept
     {
         return counter;
     }
 
-    static void increment(unsigned int& counter) BOOST_SP_NOEXCEPT
+    static void increment(unsigned int& counter) noexcept
     {
         ++counter;
     }
 
-    static unsigned int decrement(unsigned int& counter) BOOST_SP_NOEXCEPT
+    static unsigned int decrement(unsigned int& counter) noexcept
     {
         return --counter;
     }
@@ -72,17 +71,17 @@ struct thread_safe_counter
 {
     typedef boost::detail::atomic_count type;
 
-    static unsigned int load(boost::detail::atomic_count const& counter) BOOST_SP_NOEXCEPT
+    static unsigned int load(boost::detail::atomic_count const& counter) noexcept
     {
         return static_cast< unsigned int >(static_cast< long >(counter));
     }
 
-    static void increment(boost::detail::atomic_count& counter) BOOST_SP_NOEXCEPT
+    static void increment(boost::detail::atomic_count& counter) noexcept
     {
         ++counter;
     }
 
-    static unsigned int decrement(boost::detail::atomic_count& counter) BOOST_SP_NOEXCEPT
+    static unsigned int decrement(boost::detail::atomic_count& counter) noexcept
     {
         return static_cast< unsigned int >(--counter);
     }
@@ -92,9 +91,9 @@ template< typename DerivedT, typename CounterPolicyT = thread_safe_counter >
 class intrusive_ref_counter;
 
 template< typename DerivedT, typename CounterPolicyT >
-void intrusive_ptr_add_ref(const intrusive_ref_counter< DerivedT, CounterPolicyT >* p) BOOST_SP_NOEXCEPT;
+void intrusive_ptr_add_ref(const intrusive_ref_counter< DerivedT, CounterPolicyT >* p) noexcept;
 template< typename DerivedT, typename CounterPolicyT >
-void intrusive_ptr_release(const intrusive_ref_counter< DerivedT, CounterPolicyT >* p) BOOST_SP_NOEXCEPT;
+void intrusive_ptr_release(const intrusive_ref_counter< DerivedT, CounterPolicyT >* p) noexcept;
 
 /*!
  * \brief A reference counter base class
@@ -122,7 +121,7 @@ public:
      *
      * \post <tt>use_count() == 0</tt>
      */
-    intrusive_ref_counter() BOOST_SP_NOEXCEPT : m_ref_counter(0)
+    intrusive_ref_counter() noexcept : m_ref_counter(0)
     {
     }
 
@@ -131,7 +130,7 @@ public:
      *
      * \post <tt>use_count() == 0</tt>
      */
-    intrusive_ref_counter(intrusive_ref_counter const&) BOOST_SP_NOEXCEPT : m_ref_counter(0)
+    intrusive_ref_counter(intrusive_ref_counter const&) noexcept : m_ref_counter(0)
     {
     }
 
@@ -140,12 +139,12 @@ public:
      *
      * \post The reference counter is not modified after assignment
      */
-    intrusive_ref_counter& operator= (intrusive_ref_counter const&) BOOST_SP_NOEXCEPT { return *this; }
+    intrusive_ref_counter& operator= (intrusive_ref_counter const&) noexcept { return *this; }
 
     /*!
      * \return The reference counter
      */
-    unsigned int use_count() const BOOST_SP_NOEXCEPT
+    unsigned int use_count() const noexcept
     {
         return CounterPolicyT::load(m_ref_counter);
     }
@@ -156,18 +155,18 @@ protected:
      */
     BOOST_DEFAULTED_FUNCTION(~intrusive_ref_counter(), {})
 
-    friend void intrusive_ptr_add_ref< DerivedT, CounterPolicyT >(const intrusive_ref_counter< DerivedT, CounterPolicyT >* p) BOOST_SP_NOEXCEPT;
-    friend void intrusive_ptr_release< DerivedT, CounterPolicyT >(const intrusive_ref_counter< DerivedT, CounterPolicyT >* p) BOOST_SP_NOEXCEPT;
+    friend void intrusive_ptr_add_ref< DerivedT, CounterPolicyT >(const intrusive_ref_counter< DerivedT, CounterPolicyT >* p) noexcept;
+    friend void intrusive_ptr_release< DerivedT, CounterPolicyT >(const intrusive_ref_counter< DerivedT, CounterPolicyT >* p) noexcept;
 };
 
 template< typename DerivedT, typename CounterPolicyT >
-inline void intrusive_ptr_add_ref(const intrusive_ref_counter< DerivedT, CounterPolicyT >* p) BOOST_SP_NOEXCEPT
+inline void intrusive_ptr_add_ref(const intrusive_ref_counter< DerivedT, CounterPolicyT >* p) noexcept
 {
     CounterPolicyT::increment(p->m_ref_counter);
 }
 
 template< typename DerivedT, typename CounterPolicyT >
-inline void intrusive_ptr_release(const intrusive_ref_counter< DerivedT, CounterPolicyT >* p) BOOST_SP_NOEXCEPT
+inline void intrusive_ptr_release(const intrusive_ref_counter< DerivedT, CounterPolicyT >* p) noexcept
 {
     if (CounterPolicyT::decrement(p->m_ref_counter) == 0)
         delete static_cast< const DerivedT* >(p);

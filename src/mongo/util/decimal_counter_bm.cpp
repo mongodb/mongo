@@ -27,12 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/util/decimal_counter.h"
+
+#include "mongo/base/string_data.h"
+#include "mongo/util/itoa.h"
+
+#include <cstdint>
+#include <limits>
+#include <string>
 
 #include <benchmark/benchmark.h>
-
-#include "mongo/util/decimal_counter.h"
-#include "mongo/util/itoa.h"
 
 namespace mongo {
 namespace {
@@ -78,7 +82,7 @@ void BM_ItoACounter(benchmark::State& state) {
     state.SetItemsProcessed(items);
 }
 
-void BM_to_stringCounter(benchmark::State& state) {
+void BM_ToStringCounter(benchmark::State& state) {
     uint64_t items = 0;
     for (auto _ : state) {
         uint32_t count = state.range(1);
@@ -94,6 +98,6 @@ void BM_to_stringCounter(benchmark::State& state) {
 BENCHMARK(BM_decimalCounterPreInc)->Args({10000, 0})->Args({{10, nonzeroStart}});
 BENCHMARK(BM_decimalCounterPostInc)->Args({10000, 0})->Args({{10, nonzeroStart}});
 BENCHMARK(BM_ItoACounter)->Args({10000, 0})->Args({{10, nonzeroStart}});
-BENCHMARK(BM_to_stringCounter)->Args({10000, 0})->Args({{10, nonzeroStart}});
+BENCHMARK(BM_ToStringCounter)->Args({10000, 0})->Args({{10, nonzeroStart}});
 
 }  // namespace mongo

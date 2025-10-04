@@ -1,0 +1,104 @@
+load("@//bazel/toolchains/cc/mongo_windows:mongo_windows_cc_toolchain_config.bzl", "mongo_windows_cc_toolchain_config")
+
+SMALLER_BINARY = select({
+    "@//bazel/config:msvc_opt": True,
+    "//conditions:default": False,
+})
+
+DEFAULT_LINK_FLAGS = [
+    "/MACHINE:X64",
+    "/NODEFAULTLIB:library",
+    "/LIBPATH:external/windows_sasl/lib",
+
+    # This gives 32-bit programs 4 GB of user address space in WOW64, ignored in
+    # 64-bit builds.
+    "/LARGEADDRESSAWARE",
+    
+    "bcrypt.lib",
+    "Dnsapi.lib",
+    "Crypt32.lib",
+    "Version.lib",
+    "Winmm.lib",
+    "Iphlpapi.lib",
+    "Pdh.lib",
+    "kernel32.lib",
+    "shell32.lib",
+    "ws2_32.lib",
+    "DbgHelp.lib",
+    "Psapi.lib",
+    "Secur32.lib",
+]
+
+mongo_windows_cc_toolchain_config(
+    name = "cc_msvc_toolchain_config",
+    abi_libc_version = "local",
+    abi_version = "local",
+    compiler = "msvc-cl",
+    cpu = "x64_windows",
+    cxx_builtin_include_directories = "{include_dirs}".split(";"),
+    dbg_mode_debug_flag = "/DEBUG:FULL",
+    default_compile_flags = ["/nologo"],
+    default_link_flags = DEFAULT_LINK_FLAGS,
+    archiver_flags = ["/MACHINE:X64"],
+    fastbuild_mode_debug_flag = "/DEBUG:FASTLINK",
+    host_system_name = "local",
+    msvc_cl_path = "{cl}",
+    msvc_env_include = "{include_dirs}",
+    msvc_env_lib = "{lib_dirs}",
+    msvc_env_path = "{env_path}",
+    msvc_env_tmp = "{tmp_dir}",
+    msvc_lib_path = "{ar}",
+    msvc_link_path = "{ld}",
+    msvc_ml_path = "{ml}",
+    target_libc = "msvcrt",
+    target_system_name = "local",
+    tool_paths = {
+        "ar": "{ar}",
+        "ml": "{ml}",
+        "cpp": "{cl}",
+        "gcc": "{cl}",
+        "gcov": "wrapper/bin/msvc_nop.bat",
+        "ld": "{ld}",
+        "nm": "wrapper/bin/msvc_nop.bat",
+        "objcopy": "wrapper/bin/msvc_nop.bat",
+        "objdump": "wrapper/bin/msvc_nop.bat",
+        "strip": "wrapper/bin/msvc_nop.bat",
+    },
+    toolchain_identifier = "msvc_x64",
+    supports_parse_showincludes = True,
+    smaller_binary = SMALLER_BINARY,
+)
+
+cc_toolchain(
+    name = "mongo_win_cc_toolchain",
+    all_files = ":all_files",
+    ar_files = ":all_files",
+    compiler_files = ":all_files",
+    dwp_files = ":all_files",
+    linker_files = ":all_files",
+    objcopy_files = ":all_files",
+    strip_files = ":all_files",
+    toolchain_config = "cc_msvc_toolchain_config",
+)
+
+toolchain(
+    name = "windows_cc_toolchain",
+    exec_compatible_with = [
+        "@platforms//os:windows",
+        "@platforms//cpu:x86_64",
+        "@//bazel/platforms:use_mongo_windows_toolchain_config",
+    ],
+    target_compatible_with = [
+        "@platforms//os:windows",
+        "@platforms//cpu:x86_64",
+        "@//bazel/platforms:use_mongo_windows_toolchain_config",
+    ],
+    toolchain = ":mongo_win_cc_toolchain",
+    toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
+)
+
+# Helper target for the toolchain (see below):
+filegroup(
+    name = "all_files",
+    srcs = glob(["**/*"]),
+)

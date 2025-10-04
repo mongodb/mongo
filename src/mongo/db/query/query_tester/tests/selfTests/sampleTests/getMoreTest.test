@@ -1,0 +1,9 @@
+getMoreTest
+getMoreData
+getMoreTest.coll
+
+:results {aggregate: "getMoreTest", pipeline: [ { "$match": {} } ], cursor: {}}
+
+:sortResults {aggregate: "getMoreTest", pipeline: [ { "$match": {} } ], cursor: {}}
+
+:results {aggregate: "getMoreTest", pipeline: [ { "$match": { "a": { "$ne": 102 } } } ], cursor: {}}

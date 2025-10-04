@@ -1,17 +1,13 @@
-/* WiredTiger-specific styling. */ 
+/* WiredTiger-specific styling. */
+
 html {
     font-size: small;
 }
 
-/* Set a max page width for readability on large monitors. */
-div.contents {
-    max-width: 960px;
-}
-
 body, table, div, p, dl {
 	font-family: "Calibri","Helvetica Neue", Helvetica, Arial, sans-serif;
-	color: #373737;
-	line-height: 1.5;
+    color: #373737;
+    line-height: 1.5;
 }
 
 h1 {
@@ -20,6 +16,27 @@ h1 {
 
 h2 {
 	font-size: 110%;
+}
+
+table.lock-hierarchy {
+    border: 1px solid #8886;
+    border-radius: 0.2em;
+    white-space: nowrap;
+    margin: 2em auto;         /* align=center */
+    border-spacing: 0.3em 0.5em;  /* table cellspacing */
+    padding: 1em;
+}
+
+table.lock-hierarchy td {
+    border: none;  /* table border=0 */
+    padding: 1px;  /* table cellpadding */
+}
+
+table.lock-hierarchy td:nth-of-type(2n+1) {
+    border: 1px solid #888;
+    border-radius: 1em;
+    padding: 0.2em 0.8em;
+    background-color: #8882;
 }
 
 /* Architecture guide TOC styling. */
@@ -54,7 +71,11 @@ div.arch_toc h1 {
 /* @group Link Styling */
 
 a {
-	color: #3D578C;
+    color: #3D578C;
+}
+
+.contents a:visited {
+    color: #4665A2;
 }
 
 img {
@@ -65,7 +86,6 @@ img {
 
 div.arch_diagram {
     display: block;
-    background: #FFFFFF;
     background: radial-gradient(#FFDDAA,#FFFFFF);
     margin-top: 2em;
     margin-bottom: 2em;
@@ -117,14 +137,10 @@ img[src="wt_diagram.png"] {
 	display: none;
 }
 
-.contents a:visited {
-	color: #4665A2;
-}
-
 #projectlogo {
 	vertical-align: middle;
 }
- 
+
 .banner {
 	position: absolute; top: -2px; right: 1em;
 	overflow: hidden;

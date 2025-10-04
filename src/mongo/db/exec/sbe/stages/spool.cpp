@@ -27,22 +27,33 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/exec/sbe/stages/spool.h"
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/sbe/expressions/compile_ctx.h"
+#include "mongo/db/exec/sbe/values/row.h"
+
 
 namespace mongo::sbe {
 SpoolEagerProducerStage::SpoolEagerProducerStage(std::unique_ptr<PlanStage> input,
                                                  SpoolId spoolId,
                                                  value::SlotVector vals,
-                                                 PlanNodeId planNodeId)
-    : PlanStage{"espool"_sd, planNodeId}, _spoolId{spoolId}, _vals{std::move(vals)} {
+                                                 PlanYieldPolicy* yieldPolicy,
+                                                 PlanNodeId planNodeId,
+                                                 bool participateInTrialRunTracking)
+    : PlanStage{"espool"_sd, yieldPolicy, planNodeId, participateInTrialRunTracking},
+      _spoolId{spoolId},
+      _vals{std::move(vals)} {
     _children.emplace_back(std::move(input));
 }
 
 std::unique_ptr<PlanStage> SpoolEagerProducerStage::clone() const {
-    return std::make_unique<SpoolEagerProducerStage>(
-        _children[0]->clone(), _spoolId, _vals, _commonStats.nodeId);
+    return std::make_unique<SpoolEagerProducerStage>(_children[0]->clone(),
+                                                     _spoolId,
+                                                     _vals,
+                                                     _yieldPolicy,
+                                                     _commonStats.nodeId,
+                                                     participateInTrialRunTracking());
 }
 
 void SpoolEagerProducerStage::prepare(CompileCtx& ctx) {
@@ -88,7 +99,7 @@ void SpoolEagerProducerStage::open(bool reOpen) {
 
         size_t idx = 0;
         for (auto accessor : _inAccessors) {
-            auto [tag, val] = accessor->copyOrMoveValue();
+            auto [tag, val] = accessor->getCopyOfValue();
             vals.reset(idx++, true, tag, val);
         }
 
@@ -101,6 +112,7 @@ void SpoolEagerProducerStage::open(bool reOpen) {
 
 PlanState SpoolEagerProducerStage::getNext() {
     auto optTimer(getOptTimer(_opCtx));
+    checkForInterruptAndYield(_opCtx);
 
     if (_bufferIt == _buffer->size()) {
         _bufferIt = 0;
@@ -171,8 +183,9 @@ SpoolLazyProducerStage::SpoolLazyProducerStage(std::unique_ptr<PlanStage> input,
                                                SpoolId spoolId,
                                                value::SlotVector vals,
                                                std::unique_ptr<EExpression> predicate,
-                                               PlanNodeId planNodeId)
-    : PlanStage{"lspool"_sd, planNodeId},
+                                               PlanNodeId planNodeId,
+                                               bool participateInTrialRunTracking)
+    : PlanStage{"lspool"_sd, nullptr /* yieldPolicy */, planNodeId, participateInTrialRunTracking},
       _spoolId{spoolId},
       _vals{std::move(vals)},
       _predicate{std::move(predicate)} {
@@ -180,8 +193,12 @@ SpoolLazyProducerStage::SpoolLazyProducerStage(std::unique_ptr<PlanStage> input,
 }
 
 std::unique_ptr<PlanStage> SpoolLazyProducerStage::clone() const {
-    return std::make_unique<SpoolLazyProducerStage>(
-        _children[0]->clone(), _spoolId, _vals, _predicate->clone(), _commonStats.nodeId);
+    return std::make_unique<SpoolLazyProducerStage>(_children[0]->clone(),
+                                                    _spoolId,
+                                                    _vals,
+                                                    _predicate->clone(),
+                                                    _commonStats.nodeId,
+                                                    participateInTrialRunTracking());
 }
 
 void SpoolLazyProducerStage::prepare(CompileCtx& ctx) {
@@ -273,13 +290,9 @@ PlanState SpoolLazyProducerStage::getNext() {
     return trackPlanState(state);
 }
 
-void SpoolLazyProducerStage::doSaveState(bool relinquishCursor) {
-    if (!slotsAccessible() || !relinquishCursor) {
-        return;
-    }
-
+void SpoolLazyProducerStage::doSaveState() {
     for (auto& [slot, accessor] : _outAccessors) {
-        accessor.makeOwned();
+        prepareForYielding(accessor, slotsAccessible());
     }
 }
 

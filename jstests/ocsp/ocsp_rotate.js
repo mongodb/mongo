@@ -1,13 +1,10 @@
 // Validate rotate certificates works with ocsp
-// @tags: [live_record_incompatible, requires_http_client, requires_ocsp_stapling]
-(function() {
-"use strict";
-
-load('jstests/ssl/libs/ssl_helpers.js');
-load('jstests/ocsp/lib/mock_ocsp.js');
+// @tags: [requires_http_client, requires_ocsp_stapling]
+import {FAULT_REVOKED, MockOCSPServer} from "jstests/ocsp/lib/mock_ocsp.js";
+import {OCSP_CA_PEM, OCSP_SERVER_CERT, supportsStapling} from "jstests/ocsp/lib/ocsp_helpers.js";
 
 if (!supportsStapling()) {
-    return;
+    quit();
 }
 
 let mongod;
@@ -24,8 +21,11 @@ function tryRotate(fault) {
     return success;
 }
 
-mongod = MongoRunner.runMongod(
-    {sslMode: "requireSSL", sslPEMKeyFile: OCSP_SERVER_CERT, sslCAFile: OCSP_CA_PEM});
+mongod = MongoRunner.runMongod({
+    tlsMode: "requireTLS",
+    tlsCertificateKeyFile: OCSP_SERVER_CERT,
+    tlsCAFile: OCSP_CA_PEM,
+});
 
 // Positive: test with positive OCSP response
 assert(tryRotate());
@@ -35,4 +35,3 @@ assert(!tryRotate(FAULT_REVOKED));
 
 // Positive: test with positive OCSP response
 assert(tryRotate());
-}());

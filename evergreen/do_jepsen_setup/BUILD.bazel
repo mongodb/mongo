@@ -1,0 +1,26 @@
+package(default_visibility = ["//visibility:public"])
+
+sh_binary(
+    name = "build_libfaketime",
+    srcs = ["build_libfaketime.sh"],
+)
+
+sh_binary(
+    name = "create_fuzz_config",
+    srcs = ["create_fuzz_config.sh"],
+)
+
+sh_binary(
+    name = "install_jepsen",
+    srcs = ["install_jepsen.sh"],
+)
+
+sh_binary(
+    name = "move_binaries",
+    srcs = ["move_binaries.sh"],
+)
+
+sh_binary(
+    name = "nodes",
+    srcs = ["nodes.sh"],
+)

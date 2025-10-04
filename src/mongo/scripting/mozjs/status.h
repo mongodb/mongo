@@ -29,7 +29,13 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
+#include "mongo/scripting/mozjs/base.h"
 #include "mongo/scripting/mozjs/wraptype.h"
+#include "mongo/util/modules.h"
+
+#include <js/Class.h>
+#include <js/TypeDecls.h>
 
 namespace mongo {
 namespace mozjs {
@@ -46,7 +52,9 @@ namespace mozjs {
  * traces, and instanceOf Error.
  */
 struct MongoStatusInfo : public BaseInfo {
-    static void finalize(js::FreeOp* fop, JSObject* obj);
+    enum Slots { StatusSlot, MongoStatusInfoSlotCount };
+
+    static void finalize(JS::GCContext* gcCtx, JSObject* obj);
 
     struct Functions {
         MONGO_DECLARE_JS_FUNCTION(code);
@@ -58,7 +66,8 @@ struct MongoStatusInfo : public BaseInfo {
 
     static const char* const className;
     static const char* const inheritFrom;
-    static const unsigned classFlags = JSCLASS_HAS_PRIVATE;
+    static const unsigned classFlags =
+        JSCLASS_HAS_RESERVED_SLOTS(MongoStatusInfoSlotCount) | BaseInfo::finalizeFlag;
     static const InstallType installType = InstallType::Private;
 
     static Status toStatus(JSContext* cx, JS::HandleObject object);

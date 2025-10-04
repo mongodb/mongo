@@ -6,6 +6,10 @@ engineer wanting to understand how the storage engine works. The goal
 of this guide is to help both MongoDB engineers and external users
 quickly understand the workings of WiredTiger.
 
+\warning
+The Architecture Guide is not updated in lockstep with the code base and is not
+necessarily correct or complete for any specific release.
+
 The relationships between the software components in WiredTiger are
 illustrated in the diagram below. An arrow originating at Component A
 and pointing to Component B indicates that Component B is used by
@@ -62,6 +66,7 @@ rectangle "**WiredTiger Engine**                                                
   rectangle "[[arch-snapshot.html Snapshots]]" as snapshot
   rectangle "[[arch-cache.html Cache]]" as cache
   rectangle "[[arch-eviction.html Eviction]]" as evict
+  rectangle "[[arch-checkpoint.html Checkpoint]]" as checkpoint
 
   together {
     rectangle "[[arch-block.html Block\nManager]]" as block
@@ -90,28 +95,33 @@ c_api -down-> txn
 
 schema -down-> meta
 schema -down-> btree
+
 cursor -down-> btree
+cursor -down-> history
+
 btree -down-> row
+
 meta -up-> cursor
-' The hidden arrow helps our boxes to line up in a better way.
-meta -[hidden]right-> btree
-cursor -[hidden]right-> txn
+
 txn -down-> snapshot
-row -down-> cache
-cache -down-> history
-evict -down-> history
-history -up-> cursor
-snapshot -down-> evict
-cache -right-> evict
-cache -down-> block
-evict -down-> block
 txn -down-> log
 
-block -[hidden]right-> SPACE_log
-cache -[hidden]down-> SPACE_log
-evict -[hidden]down-> SPACE_log
-SPACE_log -[hidden]right-> log
-log -[hidden]right-> SPACE_log2
+snapshot -down-> evict
+snapshot -down-> checkpoint
+
+row -down-> cache
+
+cache -right-> evict
+cache -down-> block
+
+evict -down-> history
+evict -down-> block
+
+checkpoint -down-> block
+checkpoint -down-> os
+checkpoint -up-> meta
+checkpoint -down-> btree
+checkpoint -down-> history
 
 block -down-> os
 log -down-> os
@@ -138,8 +148,13 @@ of the documentation.
     - @ref arch-session
     - @ref arch-cursor
     - @ref arch-transaction
+    - @ref arch-timestamp
     - @ref arch-snapshot
     - @ref arch-rts
+    - @ref arch-fast-truncate
+
+- @subpage arch-toc-api
+    - @ref arch-config-compile
 
 - @subpage arch-toc-data-org
     - @ref arch-schema
@@ -154,9 +169,17 @@ of the documentation.
     - @ref arch-cache
     - @ref arch-eviction
 
+- @subpage arch-toc-int-wt-dev
+    - @ref arch-concurrency
+    - @ref arch-locking-hierarchy
+    - @ref arch-usage-patterns
+
 - @subpage arch-toc-mem-disk
     - @ref arch-block
     - @ref arch-data-file
+    - @ref arch-cloud-storage-extension
+    - @ref arch-prefetch
+    - @ref arch-tiered-storage
 
 - @subpage arch-toc-on-disk
     - @ref arch-checkpoint
@@ -174,6 +197,9 @@ of the documentation.
 
 - @subpage arch-toc-platform
     - @ref arch-fs-os
+
+- @subpage arch-toc-disaggregated-storage
+    - @ref arch-disagg-layered
 
 - @subpage arch-glossary
 
@@ -196,6 +222,9 @@ of the documentation.
 - Transactions provide a powerful abstraction for multiple threads to
 operate on data concurrently.
 
+@subpage arch-timestamp
+- The timestamp data model.
+
 @subpage arch-snapshot
 - Snapshots are implemented by storing transaction ids committed before
 the transaction started.
@@ -203,6 +232,18 @@ the transaction started.
 @subpage arch-rts
 - Rollback the database to a stable state by removing data that is beyond the
 stable timestamp.
+
+@subpage arch-fast-truncate
+- Delete whole pages at once without reading them, and handling of
+such pages.
+
+*/
+
+/*! @page arch-toc-api API
+
+@subpage arch-config-compile
+
+The API allows for configuration strings to be compiled in advance of their use.
 
 */
 
@@ -250,6 +291,14 @@ writing it to disk if it is dirty.
 
 */
 
+/*! @page arch-toc-int-wt-dev Internal WiredTiger Development
+
+@subpage arch-concurrency
+@subpage arch-locking-hierarchy
+@subpage arch-usage-patterns
+
+*/
+
 /*! @page arch-toc-mem-disk Moving Data Between Memory and Disk
 
 @subpage arch-block
@@ -259,6 +308,20 @@ The block manager manages the reading and writing of disk blocks.
 @subpage arch-data-file
 
 The format of the data file is given by structures in \c block.h .
+
+@subpage arch-cloud-storage-extension
+
+The cloud storage source extension which manage the flushing of the data files to and reading from different cloud object stores.
+
+@subpage arch-prefetch
+
+Pre-fetch is a performance optimization that aims to reduce I/O latency by reading pages from disk
+into memory before they are required by the application.
+
+@subpage arch-tiered-storage
+
+Tiered storage allows B-Trees to be stored into multiple places, more
+recently updated blocks are on local disk and less recently updated blocks are in cloud storage.
 
 */
 
@@ -314,5 +377,15 @@ of the WiredTiger functionality.
 A layer of abstraction is above all operating system calls and
 a set of functions can be registered to be called for each file system
 operation.
+
+*/
+
+/*! @page arch-toc-disaggregated-storage Disaggregated Storage
+
+@subpage arch-disagg-layered
+
+WiredTiger includes support for a disaggregated storage layer, allowing persisted data
+to be stored and retrieved using network services. This work is in active development, so
+documentation found here may not be synchronized with the code.
 
 */

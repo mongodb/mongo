@@ -16,33 +16,32 @@
  * ]
  */
 
-(function() {
-'use strict';
-
-load("jstests/libs/fail_point_util.js");
+import {withAbortAndRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const db1Name = "db1";
 const coll1Name = "foo";
-const ns1 = db1Name + "." + coll1Name;
 
 const db2Name = "db2";
 const coll2Name = "bar";
-const ns2 = db2Name + "." + coll2Name;
 
 const st = new ShardingTest({
     shards: {rs0: {nodes: 2}, rs1: {nodes: 1}},
-    config: 1,
+    config: TestData.configShard ? undefined : 1,
     other: {
         mongosOptions: {verbose: 3},
-    }
+    },
+    // By default, our test infrastructure sets the election timeout to a very high value (24
+    // hours). For this test, we need a shorter election timeout because it relies on nodes running
+    // an election when they do not detect an active primary. Therefore, we are setting the
+    // electionTimeoutMillis to its default value.
+    initiateWithDefaultElectionTimeout: true,
 });
 
 jsTest.log("Create two databases on different primary shards.");
 // enableSharding creates the databases.
-assert.commandWorked(st.s.adminCommand({enableSharding: db1Name}));
-assert.commandWorked(st.s.adminCommand({enableSharding: db2Name}));
-assert.commandWorked(st.s.adminCommand({movePrimary: db1Name, to: st.shard0.shardName}));
-assert.commandWorked(st.s.adminCommand({movePrimary: db2Name, to: st.shard1.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: db1Name, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: db2Name, primaryShard: st.shard1.shardName}));
 
 jsTest.log("Insert data on both shards.");
 // This ensures all nodes refresh their routing caches.
@@ -51,23 +50,26 @@ st.s.getDB(db2Name).getCollection(coll2Name).insert({_id: "dummy"});
 
 jsTest.log("Run a single-write-shard transaction and commit it.");
 const session = st.s.startSession();
-session.startTransaction();
-session.getDatabase(db1Name).getCollection(coll1Name).findOne({_id: "readOperationOnShard0"});
-session.getDatabase(db2Name).getCollection(coll2Name).insert({_id: "writeOperationOnShard1"});
-// Use adminCommand so we can pass writeConcern.
-assert.commandWorked(st.s.adminCommand({
-    commitTransaction: 1,
-    lsid: session.getSessionId(),
-    txnNumber: session.getTxnNumber_forTesting(),
-    autocommit: false,
-    writeConcern: {w: "majority"},
-}));
+withAbortAndRetryOnTransientTxnError(session, () => {
+    session.startTransaction();
+    session.getDatabase(db1Name).getCollection(coll1Name).findOne({_id: "readOperationOnShard0"});
+    session.getDatabase(db2Name).getCollection(coll2Name).insert({_id: "writeOperationOnShard1"});
+    // Use adminCommand so we can pass writeConcern.
+    assert.commandWorked(
+        st.s.adminCommand({
+            commitTransaction: 1,
+            lsid: session.getSessionId(),
+            txnNumber: session.getTxnNumber_forTesting(),
+            autocommit: false,
+            writeConcern: {w: "majority"},
+        }),
+    );
+});
 
 jsTest.log("Induce a failover on the read shard.");
 assert.commandWorked(st.rs0.getPrimary().adminCommand({replSetStepDown: 60, force: true}));
-
+st.rs0.getPrimary(); // Make sure a new Primary is elected before committing the transaction.
 jsTest.log("Make second attempt to commit, should still return that the transaction committed");
 assert.commandWorked(session.commitTransaction_forTesting());
 
 st.stop();
-})();

@@ -11,6 +11,11 @@
 #include <boost/mp11/version.hpp>
 #include <cstddef>
 
+#if defined(_MSC_VER) || defined(__GNUC__)
+# pragma push_macro( "I" )
+# undef I
+#endif
+
 #if defined(__has_builtin)
 # if __has_builtin(__make_integer_seq)
 #  define BOOST_MP11_HAS_MAKE_INTEGER_SEQ
@@ -108,5 +113,9 @@ template<class... T> using index_sequence_for = make_integer_sequence<std::size_
 
 } // namespace mp11
 } // namespace boost
+
+#if defined(_MSC_VER) || defined(__GNUC__)
+# pragma pop_macro( "I" )
+#endif
 
 #endif // #ifndef BOOST_MP11_INTEGER_SEQUENCE_HPP_INCLUDED

@@ -26,9 +26,11 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 #include "_UPT_internal.h"
 
 int
-_UPT_resume (unw_addr_space_t as, unw_cursor_t *c, void *arg)
+_UPT_resume (unw_addr_space_t as UNUSED, unw_cursor_t *c UNUSED, void *arg)
 {
   struct UPT_info *ui = arg;
+
+  mi_init ();
 
 #ifdef HAVE_TTRACE
 # warning No support for ttrace() yet.

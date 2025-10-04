@@ -35,9 +35,9 @@
 namespace mongo {
 
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
-constexpr bool kDebugBuild = true;
+inline constexpr bool kDebugBuild = true;
 #else
-constexpr bool kDebugBuild = false;
+inline constexpr bool kDebugBuild = false;
 #endif
 
 template <unsigned period>

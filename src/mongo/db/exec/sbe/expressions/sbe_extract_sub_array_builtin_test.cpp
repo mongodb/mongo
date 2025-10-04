@@ -27,11 +27,22 @@
  *    it in the license file.
  */
 
-#include <cmath>
-#include <limits>
-
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
-#include "mongo/db/exec/sbe/values/bson.h"
+#include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/unittest/unittest.h"
+
+#include <algorithm>
+#include <cstdint>
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo::sbe {
 
@@ -208,6 +219,61 @@ TEST_F(SBEBuiltinExtractSubArrayTest, NotArray) {
         auto [tag, value] = runExpression(testCase, makeInt32(1), boost::none);
         ASSERT_EQ(tag, value::TypeTags::Nothing);
         ASSERT_EQ(value, value::bitcastFrom<int64_t>(0));
+    }
+}
+
+TEST_F(SBEBuiltinExtractSubArrayTest, MemoryManagement) {
+    {
+        auto array = makeArray(BSON_ARRAY("Item#1" << "Item#2"
+                                                   << "Item#3"
+                                                   << "Item#4"));
+
+        // Use 'extractSubArray' to create a stack owned array and extract object from it, then test
+        // if 'getElement' can return the value with correct memory management.
+        auto extractFromSubArrayExpr = makeE<EFunction>(
+            "getElement",
+            makeEs(makeE<EFunction>("extractSubArray",
+                                    makeEs(makeC(array),
+                                           makeC(value::TypeTags::NumberInt32, 1),
+                                           makeC(value::TypeTags::NumberInt32, 2))),
+                   makeC(value::TypeTags::NumberInt32, 0)));
+
+        auto compiledExpr = compileExpression(*extractFromSubArrayExpr);
+
+        auto [tag, value] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(tag, value);
+        ASSERT_TRUE(value::isString(tag));
+        ASSERT_EQ("Item#3", value::getStringView(tag, value));
+    }
+    {
+        const auto [objTag, objVal] = value::makeNewObject();
+        auto obj = value::getObjectView(objVal);
+
+        const auto [fieldTag, fieldVal] = value::makeNewString("not so small string"_sd);
+        ASSERT_EQ(value::TypeTags::StringBig, fieldTag);
+        obj->push_back("field"_sd, fieldTag, fieldVal);
+        const auto [arrTag, arrVal] = value::makeNewArray();
+        auto arr = value::getArrayView(arrVal);
+        arr->push_back(objTag, objVal);
+
+        // Use 'extractSubArray' to create a stack owned array and extract object from it, then test
+        // if 'getField' can return the value with correct memory management.
+        auto extractFromSubArrayExpr = makeE<EFunction>(
+            "getField",
+            makeEs(makeE<EFunction>(
+                       "getElement",
+                       makeEs(makeE<EFunction>("extractSubArray",
+                                               makeEs(makeC(arrTag, arrVal),
+                                                      makeC(value::TypeTags::NumberInt32, 1))),
+                              makeC(value::TypeTags::NumberInt32, 0))),
+                   makeC(value::makeNewString("field"_sd))));
+
+        auto compiledExpr = compileExpression(*extractFromSubArrayExpr);
+
+        auto [tag, value] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(tag, value);
+        ASSERT_TRUE(value::isString(tag));
+        ASSERT_EQ("not so small string"_sd, value::getStringView(tag, value));
     }
 }
 }  // namespace mongo::sbe

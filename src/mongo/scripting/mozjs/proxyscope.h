@@ -29,14 +29,28 @@
 
 #pragma once
 
-#include "vm/PosixNSPR.h"
-
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/client/dbclient_cursor.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/scripting/engine.h"
 #include "mongo/scripting/mozjs/engine.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/functional.h"
+#include "mongo/util/modules.h"
+
+#include <functional>
+#include <string>
+
+#include <vm/PosixNSPR.h>
 
 namespace mongo {
 namespace mozjs {
@@ -107,7 +121,7 @@ class MozJSProxyScope final : public Scope {
 
 public:
     MozJSProxyScope(MozJSScriptEngine* engine);
-    ~MozJSProxyScope();
+    ~MozJSProxyScope() override;
 
     void init(const BSONObj* data) override;
 
@@ -128,6 +142,8 @@ public:
 
     std::string getError() override;
 
+    std::string getBaseURL() const override;
+
     bool hasOutOfMemoryException() override;
 
     void gc() override;
@@ -143,6 +159,12 @@ public:
     std::string getString(const char* field) override;
     bool getBoolean(const char* field) override;
     BSONObj getObject(const char* field) override;
+    OID getOID(const char* field) override;
+    // Note: The resulting BSONBinData is only valid within the scope of the 'withBinData' callback.
+    void getBinData(const char* field,
+                    std::function<void(const BSONBinData&)> withBinData) override;
+    Timestamp getTimestamp(const char* field) override;
+    JSRegEx getRegEx(const char* field) override;
 
     void setNumber(const char* field, double val) override;
     void setString(const char* field, StringData val) override;
@@ -195,7 +217,7 @@ private:
      * This mutex protects _function, _state and _status as channels for
      * function invocation and exception handling
      */
-    Mutex _mutex = MONGO_MAKE_LATCH("MozJSProxyScope::_mutex");
+    stdx::mutex _mutex;
     unique_function<void()> _function;
     State _state;
     Status _status;

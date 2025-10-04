@@ -31,121 +31,93 @@
  * This file tests db/query/plan_ranker.cpp and db/query/multi_plan_runner.cpp.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <iostream>
-#include <memory>
-
-#include "mongo/client/dbclient_cursor.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/client.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/exec/multi_plan.h"
-#include "mongo/db/exec/trial_period_utils.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/json.h"
+#include "mongo/db/exec/classic/multi_plan.h"
+#include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collection_query_info.h"
-#include "mongo/db/query/get_executor.h"
-#include "mongo/db/query/mock_yield_policies.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/plan_ranking_utils.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/plan_cache/classic_plan_cache.h"
+#include "mongo/db/query/plan_cache/plan_cache.h"
+#include "mongo/db/query/plan_cache/plan_cache_key_factory.h"
+#include "mongo/db/query/plan_ranking_decision.h"
 #include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_test_lib.h"
-#include "mongo/db/query/stage_builder_util.h"
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/db/service_context.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/unittest/unittest.h"
+
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
-
-// How we access the external setParameter testing bool.
-extern AtomicWord<bool> internalQueryForceIntersectionPlans;
-
-extern AtomicWord<bool> internalQueryPlannerEnableHashIntersection;
-
-extern AtomicWord<int> internalQueryMaxBlockingSortMemoryUsageBytes;
-
-extern AtomicWord<int> internalQueryPlanEvaluationMaxResults;
-
-}  // namespace mongo
-
 namespace PlanRankingTests {
 
-using std::unique_ptr;
-using std::vector;
-
-static const NamespaceString nss("unittests.PlanRankingTests");
+static const NamespaceString nss =
+    NamespaceString::createNamespaceString_forTest("unittests.PlanRankingTests");
 
 class PlanRankingTestBase {
 public:
-    PlanRankingTestBase()
-        : _internalQueryForceIntersectionPlans(internalQueryForceIntersectionPlans.load()),
-          _enableHashIntersection(internalQueryPlannerEnableHashIntersection.load()),
-          _client(&_opCtx) {
-        // Run all tests with hash-based intersection enabled.
-        internalQueryPlannerEnableHashIntersection.store(true);
-
+    PlanRankingTestBase() : _client(&_opCtx) {
         // Ensure N is significantly larger then internalQueryPlanEvaluationWorks.
         ASSERT_GTE(N, internalQueryPlanEvaluationWorks.load() + 1000);
 
-        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
-        _client.dropCollection(nss.ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns_forTest());
+        _client.dropCollection(nss);
     }
 
-    virtual ~PlanRankingTestBase() {
-        // Restore external setParameter testing bools.
-        internalQueryForceIntersectionPlans.store(_internalQueryForceIntersectionPlans);
-        internalQueryPlannerEnableHashIntersection.store(_enableHashIntersection);
-    }
+    virtual ~PlanRankingTestBase() {}
 
     void insert(const BSONObj& obj) {
-        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
-        _client.insert(nss.ns(), obj);
+        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns_forTest());
+        _client.insert(nss, obj);
     }
 
     void addIndex(const BSONObj& obj) {
-        ASSERT_OK(dbtests::createIndex(&_opCtx, nss.ns(), obj));
+        ASSERT_OK(dbtests::createIndex(&_opCtx, nss.ns_forTest(), obj));
     }
 
     /**
      * Use the MultiPlanRunner to pick the best plan for the query 'cq'.  Goes through
-     * normal planning to generate solutions and feeds them to the MPR.
+     * normal planning to generate solutions and feeds them to the 'MultiPlanStage'.
      *
      * Does NOT take ownership of 'cq'.  Caller DOES NOT own the returned QuerySolution*.
      */
     const QuerySolution* pickBestPlan(CanonicalQuery* cq) {
-        AutoGetCollectionForReadCommand collection(&_opCtx, nss);
+        return plan_ranking_tests::pickBestPlan(cq, _opCtx, _expCtx, _mps, nss);
+    }
 
-        QueryPlannerParams plannerParams;
-        fillOutPlannerParams(&_opCtx, collection.getCollection(), cq, &plannerParams);
-
-        // Plan.
-        auto statusWithMultiPlanSolns = QueryPlanner::plan(*cq, plannerParams);
-        ASSERT_OK(statusWithMultiPlanSolns.getStatus());
-        auto solutions = std::move(statusWithMultiPlanSolns.getValue());
-
-        ASSERT_GREATER_THAN_OR_EQUALS(solutions.size(), 1U);
-
-        // Fill out the MPR.
-        _mps.reset(new MultiPlanStage(_expCtx.get(), collection.getCollection(), cq));
-        unique_ptr<WorkingSet> ws(new WorkingSet());
-        // Put each solution from the planner into the MPR.
-        for (size_t i = 0; i < solutions.size(); ++i) {
-            auto&& root = stage_builder::buildClassicExecutableTree(
-                &_opCtx, collection.getCollection(), *cq, *solutions[i], ws.get());
-            _mps->addPlan(std::move(solutions[i]), std::move(root), ws.get());
-        }
-        // This is what sets a backup plan, should we test for it.
-        NoopYieldPolicy yieldPolicy(_opCtx.getServiceContext()->getFastClockSource());
-        _mps->pickBestPlan(&yieldPolicy).transitional_ignore();
-        ASSERT(_mps->bestPlanChosen());
-
-        auto bestPlanIdx = _mps->bestPlanIdx();
-        ASSERT(bestPlanIdx.has_value());
-        ASSERT_LESS_THAN(*bestPlanIdx, solutions.size());
-
-        // And return a pointer to the best solution.
-        return static_cast<const MultiPlanStage*>(_mps.get())->bestSolution();
+    /**
+     * Use the cost-based ranker (CBR) to find an optimal plan for the query 'cq'.
+     * It is expected that the tests using this function ensure that CBR always
+     * finds an optimal plan. In this case the method returns a pointer tp that
+     * optimal plan.
+     * The plan object itself is owned by this->_bestCBRPlan
+     */
+    const QuerySolution* bestCBRPlan(CanonicalQuery* cq, size_t numDocs) {
+        return plan_ranking_tests::bestCBRPlan(cq, numDocs, _opCtx, N, _bestCBRPlan, nss);
     }
 
     /**
@@ -170,18 +142,18 @@ protected:
     OperationContext& _opCtx = *_txnPtr;
 
     boost::intrusive_ptr<ExpressionContext> _expCtx =
-        make_intrusive<ExpressionContext>(&_opCtx, nullptr, nss);
+        ExpressionContextBuilder{}.opCtx(&_opCtx).ns(nss).build();
 
 private:
-    // Holds the value of global "internalQueryForceIntersectionPlans" setParameter flag.
-    // Restored at end of test invocation regardless of test result.
-    bool _internalQueryForceIntersectionPlans;
+    std::unique_ptr<MultiPlanStage> _mps;
+    std::vector<std::unique_ptr<QuerySolution>> _bestCBRPlan;
 
-    // Holds the value of the global set parameter so it can be restored at the end
-    // of the test.
-    bool _enableHashIntersection;
+    // Run all tests with hash-based intersection enabled.
+    RAIIServerParameterControllerForTest _enableHashIntersection{
+        "internalQueryPlannerEnableHashIntersection", true};
 
-    unique_ptr<MultiPlanStage> _mps;
+    // Configure Sampling CE with a large sample
+    RAIIServerParameterControllerForTest _samplingMarginOfError{"samplingMarginOfError", 1.0};
 
     DBDirectClient _client;
 };
@@ -195,33 +167,20 @@ public:
     PlanRankingPreferNonFailed()
         : PlanRankingTestBase(),
           _internalQueryMaxBlockingSortMemoryUsageBytes(
-              internalQueryMaxBlockingSortMemoryUsageBytes.load()),
+              "internalQueryMaxBlockingSortMemoryUsageBytes", 10),
           // We set the max results to decrease the amount of work that is done during the trial
           // period. We want it to do less work than there are docs to ensure that no plan reaches
           // EOF.
-          _internalQueryPlanEvaluationMaxResults(internalQueryPlanEvaluationMaxResults.load()) {
-        internalQueryMaxBlockingSortMemoryUsageBytes.store(10);
-        internalQueryPlanEvaluationMaxResults.store(100);
-    }
-
-    ~PlanRankingPreferNonFailed() {
-        internalQueryMaxBlockingSortMemoryUsageBytes.store(
-            _internalQueryMaxBlockingSortMemoryUsageBytes);
-        internalQueryPlanEvaluationMaxResults.store(_internalQueryPlanEvaluationMaxResults);
-    }
+          _internalQueryPlanEvaluationMaxResults("internalQueryPlanEvaluationMaxResults", 100) {}
 
     void run() {
-        // We get the number of works done during the trial period in order to make sure that there
-        // are more documents in the collection than works done in the trial period. This ensures
-        // neither of the plans reach EOF or produce results.
-        size_t numWorks = trial_period::getTrialPeriodMaxWorks(opCtx(), nullptr);
-        size_t smallNumber = 10;
-        // The following condition must be met in order for the following test to work. Specifically
-        // this condition guarantees that the score of the plan using the index on d will score
-        // higher than the the plan using the index on a.
-        ASSERT(smallNumber < numWorks);
-        for (size_t i = 0; i < numWorks * 2; ++i) {
-            insert(BSON("a" << static_cast<int>(i >= ((numWorks * 2) - smallNumber)) << "d"
+        const size_t numDocs = 1000;
+        const size_t smallNumber = 10;
+
+        // Insert 'numDocs' documents. A number of documents given by 'smallNumber' should have
+        // a==1, while all other docs have a==0.
+        for (size_t i = 0; i < numDocs; ++i) {
+            insert(BSON("a" << static_cast<int>(i >= (numDocs - smallNumber)) << "d"
                             << static_cast<int>(i)));
         }
 
@@ -230,14 +189,17 @@ public:
         addIndex(BSON("a" << 1));
         addIndex(BSON("d" << 1));
 
+        // Run a query where we expect the most efficient plan to fail due to exhausting the
+        // blocking sort memory limit during multi-planning. We expect this error to be swallowed
+        // and the less efficient plan using index {d: 1} to be chosen instead.
+        //
         // Query: find({a: 1}).sort({d: 1})
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(BSON("a" << 1));
         findCommand->setSort(BSON("d" << 1));
-        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
-        ASSERT_OK(statusWithCQ.getStatus());
-        unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-        ASSERT(cq);
+        auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+            .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
+            .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
         auto soln = pickBestPlan(cq.get());
         ASSERT(QueryPlannerTestLib::solutionMatches("{fetch: {filter: {a:1}, node: "
@@ -245,13 +207,29 @@ public:
                                                     soln->root())
                    .isOK());
 
-        AutoGetCollectionForReadCommand collection(&_opCtx, nss);
+        auto cbrSoln = bestCBRPlan(cq.get(), numDocs);
+        // TODO SERVER-104684
+        // The plan found by CBR is different from the one found by multi-planning - it is the one
+        // that is optimal based on cost. This plan may or may not hit the sort limit during
+        // actual execution depending on the limit itself, and the state of data at the time when
+        // the query is run.
+        ASSERT(QueryPlannerTestLib::solutionMatches(
+                   "{sort: {pattern: {d: 1}, limit: 0, node: {fetch: {node: "
+                   "{ixscan: {filter: null, pattern: {a:1}}}}}}}",
+                   cbrSoln->root())
+                   .isOK());
 
+        const auto collection = acquireCollection(
+            &_opCtx,
+            CollectionAcquisitionRequest(nss,
+                                         PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                         repl::ReadConcernArgs::get(&_opCtx),
+                                         AcquisitionPrerequisites::kRead),
+            MODE_IS);
         StatusWith<std::unique_ptr<PlanCacheEntry>> planCacheEntryWithStatus =
-            CollectionQueryInfo::get(collection.getCollection())
+            CollectionQueryInfo::get(collection.getCollectionPtr())
                 .getPlanCache()
-                ->getEntry(
-                    plan_cache_key_factory::make<PlanCacheKey>(*cq, collection.getCollection()));
+                ->getEntry(plan_cache_key_factory::make<PlanCacheKey>(*cq, collection));
         ASSERT_OK(planCacheEntryWithStatus.getStatus());
         auto debugInfo = planCacheEntryWithStatus.getValue()->debugInfo;
         ASSERT(debugInfo);
@@ -264,10 +242,8 @@ public:
     }
 
 private:
-    // Holds the value of global "internalQueryMaxBlockingSortMemoryUsageBytes" setParameter flag.
-    // Restored at end of test invocation regardless of test result.
-    int _internalQueryMaxBlockingSortMemoryUsageBytes;
-    int _internalQueryPlanEvaluationMaxResults;
+    RAIIServerParameterControllerForTest _internalQueryMaxBlockingSortMemoryUsageBytes;
+    RAIIServerParameterControllerForTest _internalQueryPlanEvaluationMaxResults;
 };
 
 /**
@@ -285,46 +261,49 @@ public:
         addIndex(BSON("a" << 1));
         addIndex(BSON("b" << 1));
 
-        unique_ptr<CanonicalQuery> cq;
-
         // Run the query {a:4, b:1}.
-        {
-            auto findCommand = std::make_unique<FindCommandRequest>(nss);
-            findCommand->setFilter(BSON("a" << 100 << "b" << 1));
-            auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
-            verify(statusWithCQ.isOK());
-            cq = std::move(statusWithCQ.getValue());
-            ASSERT(cq.get());
-        }
+        auto findCommand = std::make_unique<FindCommandRequest>(nss);
+        findCommand->setFilter(BSON("a" << 100 << "b" << 1));
+        auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+            .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
+            .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
         // {a:100} is super selective so choose that.
+        const std::string expectedPlan(
+            "{fetch: {filter: {b:1}, node: {ixscan: {pattern: {a:1}}}}}");
         auto soln = pickBestPlan(cq.get());
-        ASSERT(QueryPlannerTestLib::solutionMatches(
-                   "{fetch: {filter: {b:1}, node: {ixscan: {pattern: {a: 1}}}}}", soln->root())
-                   .isOK());
+        ASSERT(QueryPlannerTestLib::solutionMatches(expectedPlan, soln->root()).isOK());
+
+        auto cbrSoln = bestCBRPlan(cq.get(), N);
+        ASSERT(QueryPlannerTestLib::solutionMatches(expectedPlan, cbrSoln->root()).isOK());
 
         // Turn on the "force intersect" option.
-        // This will be reverted by PlanRankingTestBase's destructor when the test completes.
-        internalQueryForceIntersectionPlans.store(true);
+        RAIIServerParameterControllerForTest forceIntersectionPlans{
+            "internalQueryForceIntersectionPlans", true};
+        RAIIServerParameterControllerForTest enableSortIntersection{
+            "internalQueryPlannerEnableSortIndexIntersection", true};
 
         // And run the same query again.
-        {
-            auto findCommand = std::make_unique<FindCommandRequest>(nss);
-            findCommand->setFilter(BSON("a" << 100 << "b" << 1));
-            auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
-            verify(statusWithCQ.isOK());
-            cq = std::move(statusWithCQ.getValue());
-        }
+        findCommand = std::make_unique<FindCommandRequest>(nss);
+        findCommand->setFilter(BSON("a" << 100 << "b" << 1));
+        cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+            .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
+            .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
         // With the "ranking picks ixisect always" option we pick an intersection plan that uses
         // both the {a:1} and {b:1} indices even though it performs poorly.
 
+        const std::string intersectionPlan(
+            "{fetch: {node: {andSorted: {nodes: ["
+            "{ixscan: {filter: null, pattern: {a:1}}},"
+            "{ixscan: {filter: null, pattern: {b:1}}}]}}}}");
         soln = pickBestPlan(cq.get());
-        ASSERT(QueryPlannerTestLib::solutionMatches("{fetch: {node: {andSorted: {nodes: ["
-                                                    "{ixscan: {filter: null, pattern: {a:1}}},"
-                                                    "{ixscan: {filter: null, pattern: {b:1}}}]}}}}",
-                                                    soln->root())
-                   .isOK());
+        ASSERT(QueryPlannerTestLib::solutionMatches(intersectionPlan, soln->root()).isOK());
+
+        auto cbrIntersectSoln = bestCBRPlan(cq.get(), N);
+        // Unlike the multi-planner, CBR correctly computes that the intersection plan is more
+        // expensive than the single index plan.
+        ASSERT(QueryPlannerTestLib::solutionMatches(expectedPlan, cbrIntersectSoln->root()).isOK());
     }
 };
 
@@ -343,24 +322,31 @@ public:
         addIndex(BSON("a" << 1));
         addIndex(BSON("b" << 1));
 
-        // Run the query {a:1, b:{$gt:1}.
+        // Run the query {a:1, b:{$gt:1}}.
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(BSON("a" << 1 << "b" << BSON("$gt" << 1)));
-        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
-        verify(statusWithCQ.isOK());
-        unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-        ASSERT(nullptr != cq.get());
+        auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+            .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
+            .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
         // Turn on the "force intersect" option.
         // This will be reverted by PlanRankingTestBase's destructor when the test completes.
-        internalQueryForceIntersectionPlans.store(true);
+        RAIIServerParameterControllerForTest forceIntersectionPlans{
+            "internalQueryForceIntersectionPlans", true};
 
+        const std::string expectedMPPlan(
+            "{fetch: {node: {andHash: {nodes: ["
+            "{ixscan: {filter: null, pattern: {a:1}}},"
+            "{ixscan: {filter: null, pattern: {b:1}}}]}}}}");
         auto soln = pickBestPlan(cq.get());
-        ASSERT(QueryPlannerTestLib::solutionMatches("{fetch: {node: {andHash: {nodes: ["
-                                                    "{ixscan: {filter: null, pattern: {a:1}}},"
-                                                    "{ixscan: {filter: null, pattern: {b:1}}}]}}}}",
-                                                    soln->root())
-                   .isOK());
+        ASSERT(QueryPlannerTestLib::solutionMatches(expectedMPPlan, soln->root()).isOK());
+
+        // In fact, the optimal plan is
+        const std::string expectedCBRPlan(
+            "{fetch: {filter: {a:1}, node: "
+            "{ixscan: {filter: null, pattern: {b:1}}}}}");
+        auto cbrSoln = bestCBRPlan(cq.get(), N);
+        ASSERT(QueryPlannerTestLib::solutionMatches(expectedCBRPlan, cbrSoln->root()).isOK());
 
         // Confirm that a backup plan is available.
         ASSERT(hasBackupPlan());
@@ -387,18 +373,18 @@ public:
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(BSON("a" << 27));
         findCommand->setProjection(BSON("_id" << 0 << "a" << 1 << "b" << 1));
-        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
-        ASSERT_OK(statusWithCQ.getStatus());
-        unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-        ASSERT(nullptr != cq.get());
+        auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+            .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
+            .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+        // Prefer the fully covered plan.
+        const std::string expectedPlan(
+            "{proj: {spec: {_id:0, a:1, b:1}, node: {ixscan: {pattern: {a: 1, b:1}}}}}");
 
         auto soln = pickBestPlan(cq.get());
+        ASSERT(QueryPlannerTestLib::solutionMatches(expectedPlan, soln->root()).isOK());
 
-        // Prefer the fully covered plan.
-        ASSERT(QueryPlannerTestLib::solutionMatches(
-                   "{proj: {spec: {_id:0, a:1, b:1}, node: {ixscan: {pattern: {a: 1, b:1}}}}}",
-                   soln->root())
-                   .isOK());
+        auto cbrSoln = bestCBRPlan(cq.get(), N);
+        ASSERT(QueryPlannerTestLib::solutionMatches(expectedPlan, cbrSoln->root()).isOK());
     }
 };
 
@@ -422,19 +408,23 @@ public:
         // There is no data that matches this query but we don't know that until EOF.
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(BSON("a" << 1 << "b" << 1 << "c" << 99));
-        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
-        ASSERT_OK(statusWithCQ.getStatus());
-        unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-        ASSERT(nullptr != cq.get());
-
+        auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+            .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
+            .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
         auto soln = pickBestPlan(cq.get());
 
         // Anti-prefer the intersection plan.
-        auto bestIsScanOverA = QueryPlannerTestLib::solutionMatches(
-            "{fetch: {node: {ixscan: {pattern: {a: 1}}}}}", soln->root());
-        auto bestIsScanOverB = QueryPlannerTestLib::solutionMatches(
-            "{fetch: {node: {ixscan: {pattern: {b: 1}}}}}", soln->root());
+        const std::string bestAScan("{fetch: {node: {ixscan: {pattern: {a: 1}}}}}");
+        const std::string bestBScan("{fetch: {node: {ixscan: {pattern: {b: 1}}}}}");
+
+        auto bestIsScanOverA = QueryPlannerTestLib::solutionMatches(bestAScan, soln->root());
+        auto bestIsScanOverB = QueryPlannerTestLib::solutionMatches(bestBScan, soln->root());
         ASSERT(bestIsScanOverA.isOK() || bestIsScanOverB.isOK());
+
+        auto cbrSoln = bestCBRPlan(cq.get(), N);
+        auto bestCBRIsScanOverA = QueryPlannerTestLib::solutionMatches(bestAScan, cbrSoln->root());
+        auto bestCBRIsScanOverB = QueryPlannerTestLib::solutionMatches(bestBScan, cbrSoln->root());
+        ASSERT(bestCBRIsScanOverA.isOK() || bestCBRIsScanOverB.isOK());
     }
 };
 
@@ -461,17 +451,17 @@ public:
         findCommand->setFilter(BSON("a" << 2));
         findCommand->setProjection(BSON("_id" << 0 << "a" << 1 << "b" << 1));
 
-        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
-        ASSERT_OK(statusWithCQ.getStatus());
-        unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-        ASSERT(nullptr != cq.get());
+        auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+            .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
+            .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
-        auto soln = pickBestPlan(cq.get());
         // Prefer the fully covered plan.
-        ASSERT(QueryPlannerTestLib::solutionMatches(
-                   "{proj: {spec: {_id:0, a:1, b:1}, node: {ixscan: {pattern: {a: 1, b:1}}}}}",
-                   soln->root())
-                   .isOK());
+        const std::string bestPlan(
+            "{proj: {spec: {_id:0, a:1, b:1}, node: {ixscan: {pattern: {a: 1, b:1}}}}}");
+        auto soln = pickBestPlan(cq.get());
+        ASSERT(QueryPlannerTestLib::solutionMatches(bestPlan, soln->root()).isOK());
+        auto cbrSoln = bestCBRPlan(cq.get(), N);
+        ASSERT(QueryPlannerTestLib::solutionMatches(bestPlan, cbrSoln->root()).isOK());
     }
 };
 
@@ -495,16 +485,16 @@ public:
         // Run the query {a:N+1, b:1}.  (No such document.)
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(BSON("a" << N + 1 << "b" << 1));
-        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
-        verify(statusWithCQ.isOK());
-        unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-        ASSERT(nullptr != cq.get());
+        auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+            .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
+            .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
         // {a: 100} is super selective so choose that.
+        const std::string bestPlan("{fetch: {filter: {b:1}, node: {ixscan: {pattern: {a: 1}}}}}");
         auto soln = pickBestPlan(cq.get());
-        ASSERT(QueryPlannerTestLib::solutionMatches(
-                   "{fetch: {filter: {b:1}, node: {ixscan: {pattern: {a: 1}}}}}", soln->root())
-                   .isOK());
+        ASSERT(QueryPlannerTestLib::solutionMatches(bestPlan, soln->root()).isOK());
+        auto cbrSoln = bestCBRPlan(cq.get(), N);
+        ASSERT(QueryPlannerTestLib::solutionMatches(bestPlan, cbrSoln->root()).isOK());
     }
 };
 
@@ -529,19 +519,19 @@ public:
         addIndex(BSON("a" << 1));
         addIndex(BSON("b" << 1));
 
-        // Run the query {a:N+1, b:1}.  (No such document.)
+        // Run the query {a: {$gte: N+1}, b:1}.  (No such document.)
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(BSON("a" << BSON("$gte" << N + 1) << "b" << 1));
-        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
-        verify(statusWithCQ.isOK());
-        unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-        ASSERT(nullptr != cq.get());
+        auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+            .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
+            .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
         // {a: 100} is super selective so choose that.
+        const std::string bestPlan("{fetch: {filter: {b:1}, node: {ixscan: {pattern: {a: 1}}}}}");
         auto soln = pickBestPlan(cq.get());
-        ASSERT(QueryPlannerTestLib::solutionMatches(
-                   "{fetch: {filter: {b:1}, node: {ixscan: {pattern: {a: 1}}}}}", soln->root())
-                   .isOK());
+        ASSERT(QueryPlannerTestLib::solutionMatches(bestPlan, soln->root()).isOK());
+        auto cbrSoln = bestCBRPlan(cq.get(), N);
+        ASSERT(QueryPlannerTestLib::solutionMatches(bestPlan, cbrSoln->root()).isOK());
     }
 };
 
@@ -563,19 +553,19 @@ public:
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(BSON("_id" << BSON("$gte" << 20 << "$lte" << 200)));
         findCommand->setSort(BSON("c" << 1));
-        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
-        ASSERT_OK(statusWithCQ.getStatus());
-        unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-
-        auto soln = pickBestPlan(cq.get());
+        auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+            .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
+            .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
         // The best must not be a collscan.
-        ASSERT(QueryPlannerTestLib::solutionMatches(
-                   "{sort: {pattern: {c: 1}, limit: 0, type:'simple', node:"
-                   "{fetch: {filter: null, node: "
-                   "{ixscan: {filter: null, pattern: {_id: 1}}}}}}}",
-                   soln->root())
-                   .isOK());
+        const std::string bestPlan(
+            "{sort: {pattern: {c: 1}, limit: 0, type:'simple', node:"
+            "{fetch: {filter: null, node: "
+            "{ixscan: {filter: null, pattern: {_id: 1}}}}}}}");
+        auto soln = pickBestPlan(cq.get());
+        ASSERT(QueryPlannerTestLib::solutionMatches(bestPlan, soln->root()).isOK());
+        auto cbrSoln = bestCBRPlan(cq.get(), N);
+        ASSERT(QueryPlannerTestLib::solutionMatches(bestPlan, cbrSoln->root()).isOK());
     }
 };
 
@@ -593,17 +583,16 @@ public:
         // Look for A Space Odyssey.
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(BSON("foo" << 2001));
-        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
-        verify(statusWithCQ.isOK());
-        unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-        ASSERT(nullptr != cq.get());
-
-        auto soln = pickBestPlan(cq.get());
+        auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+            .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
+            .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
         // The best must be a collscan.
-        ASSERT(QueryPlannerTestLib::solutionMatches("{cscan: {dir: 1, filter: {foo: 2001}}}",
-                                                    soln->root())
-                   .isOK());
+        const std::string bestPlan("{cscan: {dir: 1, filter: {foo: 2001}}}");
+        auto soln = pickBestPlan(cq.get());
+        ASSERT(QueryPlannerTestLib::solutionMatches(bestPlan, soln->root()).isOK());
+        auto cbrSoln = bestCBRPlan(cq.get(), N);
+        ASSERT(QueryPlannerTestLib::solutionMatches(bestPlan, cbrSoln->root()).isOK());
     }
 };
 
@@ -628,20 +617,19 @@ public:
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(BSON("a" << 1));
         findCommand->setSort(BSON("d" << 1));
-        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
-        ASSERT_OK(statusWithCQ.getStatus());
-        unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-        ASSERT(nullptr != cq.get());
+        auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+            .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
+            .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
         // No results will be returned during the trial period,
         // so we expect to choose {d: 1, e: 1}, as it allows us
         // to avoid the sort stage.
+        const std::string bestPlan(
+            "{fetch: {filter: {a:1}, node: {ixscan: {filter: null, pattern: {d:1,e:1}}}}}");
         auto soln = pickBestPlan(cq.get());
-        ASSERT(
-            QueryPlannerTestLib::solutionMatches("{fetch: {filter: {a:1}, node: "
-                                                 "{ixscan: {filter: null, pattern: {d:1,e:1}}}}}",
-                                                 soln->root())
-                .isOK());
+        ASSERT(QueryPlannerTestLib::solutionMatches(bestPlan, soln->root()).isOK());
+        auto cbrSoln = bestCBRPlan(cq.get(), N);
+        ASSERT(QueryPlannerTestLib::solutionMatches(bestPlan, cbrSoln->root()).isOK());
     }
 };
 
@@ -666,16 +654,16 @@ public:
         // than an index scan on 'a'.
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(fromjson("{a: 1, b: 1, c: {$gte: 5000}}"));
-        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
-        ASSERT_OK(statusWithCQ.getStatus());
-        unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-        ASSERT(nullptr != cq.get());
+        auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+            .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
+            .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
         // Use index on 'b'.
+        const std::string bestPlan("{fetch: {node: {ixscan: {pattern: {b: 1}}}}}");
         auto soln = pickBestPlan(cq.get());
-        ASSERT(QueryPlannerTestLib::solutionMatches("{fetch: {node: {ixscan: {pattern: {b: 1}}}}}",
-                                                    soln->root())
-                   .isOK());
+        ASSERT(QueryPlannerTestLib::solutionMatches(bestPlan, soln->root()).isOK());
+        auto cbrSoln = bestCBRPlan(cq.get(), N);
+        ASSERT(QueryPlannerTestLib::solutionMatches(bestPlan, cbrSoln->root()).isOK());
     }
 };
 
@@ -687,7 +675,8 @@ public:
 class PlanRankingAccountForKeySkips : public PlanRankingTestBase {
 public:
     void run() {
-        for (int i = 0; i < 100; ++i) {
+        int docCount = 100;
+        for (int i = 0; i < docCount; ++i) {
             insert(BSON("a" << i << "b" << i << "c" << i));
         }
 
@@ -699,24 +688,24 @@ public:
 
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(fromjson("{a: 9, b: {$ne: 10}, c: 9}"));
-        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
-        ASSERT_OK(statusWithCQ.getStatus());
-        unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-        ASSERT(nullptr != cq.get());
+        auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+            .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
+            .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
         // Expect to use index {a: 1, b: 1}.
+        const std::string bestPlan("{fetch: {node: {ixscan: {pattern: {a: 1}}}}}");
         auto soln = pickBestPlan(cq.get());
-        ASSERT(QueryPlannerTestLib::solutionMatches("{fetch: {node: {ixscan: {pattern: {a: 1}}}}}",
-                                                    soln->root())
-                   .isOK());
+        ASSERT(QueryPlannerTestLib::solutionMatches(bestPlan, soln->root()).isOK());
+        auto cbrSoln = bestCBRPlan(cq.get(), static_cast<size_t>(docCount));
+        ASSERT(QueryPlannerTestLib::solutionMatches(bestPlan, cbrSoln->root()).isOK());
     }
 };
 
-class All : public OldStyleSuiteSpecification {
+class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("query_plan_ranking") {}
 
-    void setupTests() {
+    void setupTests() override {
         add<PlanRankingIntersectOverride>();
         add<PlanRankingIntersectWithBackup>();
         add<PlanRankingPreferCovered>();
@@ -733,6 +722,7 @@ public:
     }
 };
 
-OldStyleSuiteInitializer<All> planRankingAll;
+unittest::OldStyleSuiteInitializer<All> planRankingAll;
 
 }  // namespace PlanRankingTests
+}  // namespace mongo

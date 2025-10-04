@@ -27,21 +27,73 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/query/canonical_query_encoder.h"
 
-#include <boost/iterator/transform_iterator.hpp>
-
-#include "mongo/base/simple_string_data_comparator.h"
+#include "mongo/base/string_data_comparator.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/api_parameters.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/basic_types_gen.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/geo/geometry_container.h"
+#include "mongo/db/geo/shapes.h"
 #include "mongo/db/matcher/expression_array.h"
+#include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_geo.h"
-#include "mongo/db/query/projection.h"
-#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/matcher/expression_internal_bucket_geo_within.h"
+#include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/matcher/expression_path.h"
+#include "mongo/db/matcher/expression_text.h"
+#include "mongo/db/matcher/expression_text_noop.h"
+#include "mongo/db/matcher/expression_tree.h"
+#include "mongo/db/matcher/expression_type.h"
+#include "mongo/db/matcher/expression_visitor.h"
+#include "mongo/db/matcher/expression_where.h"
+#include "mongo/db/matcher/expression_where_noop.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_allowed_properties.h"
+#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_match.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/search/search_helper.h"
+#include "mongo/db/query/analyze_regex.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/query_knob_configuration.h"
+#include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/tree_walker.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/overflow_arithmetic.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
+#include "mongo/util/decorable.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <iterator>
+#include <memory>
+#include <set>
+#include <string>
+#include <type_traits>
+#include <vector>
+
+#include <s2cellid.h>
+
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/iterator/transform_iterator.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 
 namespace mongo {
 
@@ -59,7 +111,7 @@ bool isQueryNegatingEqualToNull(const mongo::MatchExpression* tree) {
         case MatchExpression::GTE:
         case MatchExpression::LTE:
             return static_cast<const ComparisonMatchExpression*>(child)->getData().type() ==
-                BSONType::jstNULL;
+                BSONType::null;
 
         default:
             return false;
@@ -68,39 +120,49 @@ bool isQueryNegatingEqualToNull(const mongo::MatchExpression* tree) {
 
 namespace {
 
-// Delimiters for cache key encoding.
-const char kEncodeChildrenBegin = '[';
-const char kEncodeChildrenEnd = ']';
-const char kEncodeChildrenSeparator = ',';
-const char kEncodeCollationSection = '#';
-const char kEncodeProjectionSection = '|';
-const char kEncodeProjectionRequirementSeparator = '-';
-const char kEncodeRegexFlagsSeparator = '/';
-const char kEncodeSortSection = '~';
-const char kEncodeEngineSection = '@';
+/**
+ * AppendChar provides the compiler with a type for a "appendChar(...)" member function.
+ */
+template <class BuilderType>
+using AppendChar = decltype(std::declval<BuilderType>().appendChar(std::declval<char>()));
 
 /**
- * Encode user-provided string. Cache key delimiters seen in the
- * user string are escaped with a backslash.
+ * hasAppendChar is a template variable indicating whether such a void-returning member function
+ * exists for a 'BuilderType'.
  */
-void encodeUserString(StringData s, StringBuilder* keyBuilder) {
+template <typename BuilderType>
+inline constexpr auto hasAppendChar = stdx::is_detected_exact_v<void, AppendChar, BuilderType>;
+
+/**
+ * Encode user-provided string. Cache key delimiters seen in the user string are escaped with a
+ * backslash.
+ */
+template <class BuilderType>
+void encodeUserString(StringData s, BuilderType* builder) {
     for (size_t i = 0; i < s.size(); ++i) {
         char c = s[i];
         switch (c) {
             case kEncodeChildrenBegin:
             case kEncodeChildrenEnd:
             case kEncodeChildrenSeparator:
-            case kEncodeCollationSection:
-            case kEncodeProjectionSection:
+            case kEncodeSectionDelimiter:
             case kEncodeProjectionRequirementSeparator:
             case kEncodeRegexFlagsSeparator:
-            case kEncodeSortSection:
-            case kEncodeEngineSection:
+            case kEncodeParamMarker:
+            case kEncodeConstantLiteralMarker:
             case '\\':
-                *keyBuilder << '\\';
-            // Fall through to default case.
+                if constexpr (hasAppendChar<BuilderType>) {
+                    builder->appendChar('\\');
+                } else {
+                    *builder << '\\';
+                }
+                [[fallthrough]];
             default:
-                *keyBuilder << c;
+                if constexpr (hasAppendChar<BuilderType>) {
+                    builder->appendChar(c);
+                } else {
+                    *builder << c;
+                }
         }
     }
 }
@@ -212,6 +274,9 @@ const char* encodeMatchType(MatchExpression::MatchType mt) {
         case MatchExpression::INTERNAL_EXPR_LTE:
             return "ele";
 
+        case MatchExpression::INTERNAL_EQ_HASHED_KEY:
+            return "ieh";
+
         case MatchExpression::INTERNAL_SCHEMA_ALL_ELEM_MATCH_FROM_INDEX:
             return "internalSchemaAllElemMatchFromIndex";
 
@@ -220,6 +285,9 @@ const char* encodeMatchType(MatchExpression::MatchType mt) {
 
         case MatchExpression::INTERNAL_SCHEMA_BIN_DATA_ENCRYPTED_TYPE:
             return "internalSchemaBinDataEncryptedType";
+
+        case MatchExpression::INTERNAL_SCHEMA_BIN_DATA_FLE2_ENCRYPTED_TYPE:
+            return "internalSchemaBinDataFLE2EncryptedType";
 
         case MatchExpression::INTERNAL_SCHEMA_BIN_DATA_SUBTYPE:
             return "internalSchemaBinDataSubType";
@@ -281,11 +349,11 @@ const char* encodeMatchType(MatchExpression::MatchType mt) {
  * - geometry type
  * - CRS (flat or spherical)
  */
-void encodeGeoMatchExpression(const GeoMatchExpression* tree, StringBuilder* keyBuilder) {
-    const GeoExpression& geoQuery = tree->getGeoExpression();
-
+void encodeGeoMatchExpression(const GeometryContainer& geo,
+                              GeoExpression::Predicate pred,
+                              StringBuilder* keyBuilder) {
     // Type of geo query.
-    switch (geoQuery.getPred()) {
+    switch (pred) {
         case GeoExpression::WITHIN:
             *keyBuilder << "wi";
             break;
@@ -299,20 +367,20 @@ void encodeGeoMatchExpression(const GeoMatchExpression* tree, StringBuilder* key
 
     // Geometry type.
     // Only one of the shared_ptrs in GeoContainer may be non-NULL.
-    *keyBuilder << geoQuery.getGeometry().getDebugType();
+    *keyBuilder << geo.getDebugType();
 
     // CRS (flat or spherical)
-    if (FLAT == geoQuery.getGeometry().getNativeCRS()) {
+    if (FLAT == geo.getNativeCRS()) {
         *keyBuilder << "fl";
-    } else if (SPHERE == geoQuery.getGeometry().getNativeCRS()) {
+    } else if (SPHERE == geo.getNativeCRS()) {
         *keyBuilder << "sp";
-    } else if (STRICT_SPHERE == geoQuery.getGeometry().getNativeCRS()) {
+    } else if (STRICT_SPHERE == geo.getNativeCRS()) {
         *keyBuilder << "ss";
     } else {
         LOGV2_ERROR(23849,
                     "Unknown CRS type in geometry",
-                    "crsType"_attr = (int)geoQuery.getGeometry().getNativeCRS(),
-                    "geometryType"_attr = geoQuery.getGeometry().getDebugType());
+                    "crsType"_attr = (int)geo.getNativeCRS(),
+                    "geometryType"_attr = geo.getDebugType());
         MONGO_UNREACHABLE;
     }
 }
@@ -357,13 +425,13 @@ char encodeEnum(T val) {
 }
 
 void encodeCollation(const CollatorInterface* collation, StringBuilder* keyBuilder) {
+    *keyBuilder << kEncodeSectionDelimiter;
     if (!collation) {
         return;
     }
 
     const Collation& spec = collation->getSpec();
 
-    *keyBuilder << kEncodeCollationSection;
     *keyBuilder << spec.getLocale();
     *keyBuilder << spec.getCaseLevel();
 
@@ -409,7 +477,9 @@ void encodeRegexFlagsForMatch(RegexIterator first, RegexIterator last, StringBui
 // Helper overload to prepare a vector of unique_ptrs for the heavy-lifting function above.
 void encodeRegexFlagsForMatch(const std::vector<std::unique_ptr<RegexMatchExpression>>& regexes,
                               StringBuilder* keyBuilder) {
-    const auto transformFunc = [](const auto& regex) { return regex.get(); };
+    const auto transformFunc = [](const auto& regex) {
+        return regex.get();
+    };
     encodeRegexFlagsForMatch(boost::make_transform_iterator(regexes.begin(), transformFunc),
                              boost::make_transform_iterator(regexes.end(), transformFunc),
                              keyBuilder);
@@ -433,23 +503,90 @@ void encodeKeyForMatch(const MatchExpression* tree, StringBuilder* keyBuilder) {
 
     encodeUserString(tree->path(), keyBuilder);
 
-    // GEO and GEO_NEAR require additional encoding.
-    if (MatchExpression::GEO == tree->matchType()) {
-        encodeGeoMatchExpression(static_cast<const GeoMatchExpression*>(tree), keyBuilder);
-    } else if (MatchExpression::GEO_NEAR == tree->matchType()) {
-        encodeGeoNearMatchExpression(static_cast<const GeoNearMatchExpression*>(tree), keyBuilder);
-    }
-
-    // We encode regular expression flags such that different options produce different shapes.
-    if (MatchExpression::REGEX == tree->matchType()) {
-        encodeRegexFlagsForMatch({static_cast<const RegexMatchExpression*>(tree)}, keyBuilder);
-    } else if (MatchExpression::MATCH_IN == tree->matchType()) {
-        const auto* inMatch = static_cast<const InMatchExpression*>(tree);
-        if (!inMatch->getRegexes().empty()) {
-            // Append '_re' to distinguish an $in without regexes from an $in with regexes.
-            encodeUserString("_re"_sd, keyBuilder);
-            encodeRegexFlagsForMatch(inMatch->getRegexes(), keyBuilder);
+    switch (tree->matchType()) {
+        // Geo operators require additional encoding.
+        case MatchExpression::GEO: {
+            auto geoTree = static_cast<const GeoMatchExpression*>(tree);
+            encodeGeoMatchExpression(geoTree->getGeoExpression().getGeometry(),
+                                     geoTree->getGeoExpression().getPred(),
+                                     keyBuilder);
+            break;
         }
+        case MatchExpression::GEO_NEAR:
+            encodeGeoNearMatchExpression(static_cast<const GeoNearMatchExpression*>(tree),
+                                         keyBuilder);
+            break;
+        case MatchExpression::INTERNAL_BUCKET_GEO_WITHIN: {
+            auto geoTree = static_cast<const InternalBucketGeoWithinMatchExpression*>(tree);
+            encodeGeoMatchExpression(geoTree->getGeoContainer(), GeoExpression::WITHIN, keyBuilder);
+            break;
+        }
+        case MatchExpression::REGEX:
+            // We encode regular expression flags such that different options produce different
+            // shapes.
+            encodeRegexFlagsForMatch({static_cast<const RegexMatchExpression*>(tree)}, keyBuilder);
+            break;
+        case MatchExpression::MATCH_IN: {
+            const auto* inMatch = static_cast<const InMatchExpression*>(tree);
+            if (!inMatch->getRegexes().empty()) {
+                // Append '_re' to distinguish an $in without regexes from an $in with regexes.
+                encodeUserString("_re"_sd, keyBuilder);
+                encodeRegexFlagsForMatch(inMatch->getRegexes(), keyBuilder);
+            }
+            break;
+        }
+        case MatchExpression::AND:
+        case MatchExpression::OR:
+        case MatchExpression::ELEM_MATCH_OBJECT:
+        case MatchExpression::ELEM_MATCH_VALUE:
+        case MatchExpression::SIZE:
+        case MatchExpression::EQ:
+        case MatchExpression::LTE:
+        case MatchExpression::LT:
+        case MatchExpression::GT:
+        case MatchExpression::GTE:
+        case MatchExpression::MOD:
+        case MatchExpression::EXISTS:
+        case MatchExpression::BITS_ALL_SET:
+        case MatchExpression::BITS_ALL_CLEAR:
+        case MatchExpression::BITS_ANY_SET:
+        case MatchExpression::BITS_ANY_CLEAR:
+        case MatchExpression::NOT:
+        case MatchExpression::NOR:
+        case MatchExpression::TYPE_OPERATOR:
+        case MatchExpression::WHERE:
+        case MatchExpression::EXPRESSION:
+        case MatchExpression::ALWAYS_FALSE:
+        case MatchExpression::ALWAYS_TRUE:
+        case MatchExpression::TEXT:
+        case MatchExpression::INTERNAL_2D_POINT_IN_ANNULUS:
+        case MatchExpression::INTERNAL_EXPR_EQ:
+        case MatchExpression::INTERNAL_EXPR_GT:
+        case MatchExpression::INTERNAL_EXPR_GTE:
+        case MatchExpression::INTERNAL_EXPR_LT:
+        case MatchExpression::INTERNAL_EXPR_LTE:
+        case MatchExpression::INTERNAL_EQ_HASHED_KEY:
+        case MatchExpression::INTERNAL_SCHEMA_ALLOWED_PROPERTIES:
+        case MatchExpression::INTERNAL_SCHEMA_ALL_ELEM_MATCH_FROM_INDEX:
+        case MatchExpression::INTERNAL_SCHEMA_BIN_DATA_ENCRYPTED_TYPE:
+        case MatchExpression::INTERNAL_SCHEMA_BIN_DATA_FLE2_ENCRYPTED_TYPE:
+        case MatchExpression::INTERNAL_SCHEMA_BIN_DATA_SUBTYPE:
+        case MatchExpression::INTERNAL_SCHEMA_COND:
+        case MatchExpression::INTERNAL_SCHEMA_EQ:
+        case MatchExpression::INTERNAL_SCHEMA_FMOD:
+        case MatchExpression::INTERNAL_SCHEMA_MATCH_ARRAY_INDEX:
+        case MatchExpression::INTERNAL_SCHEMA_MAX_ITEMS:
+        case MatchExpression::INTERNAL_SCHEMA_MAX_LENGTH:
+        case MatchExpression::INTERNAL_SCHEMA_MAX_PROPERTIES:
+        case MatchExpression::INTERNAL_SCHEMA_MIN_ITEMS:
+        case MatchExpression::INTERNAL_SCHEMA_MIN_LENGTH:
+        case MatchExpression::INTERNAL_SCHEMA_MIN_PROPERTIES:
+        case MatchExpression::INTERNAL_SCHEMA_OBJECT_MATCH:
+        case MatchExpression::INTERNAL_SCHEMA_ROOT_DOC_EQ:
+        case MatchExpression::INTERNAL_SCHEMA_TYPE:
+        case MatchExpression::INTERNAL_SCHEMA_UNIQUE_ITEMS:
+        case MatchExpression::INTERNAL_SCHEMA_XOR:
+            break;
     }
 
     // If the query predicate is minKey or maxKey it can't use the same plan as other GT/LT
@@ -490,11 +627,10 @@ void encodeKeyForMatch(const MatchExpression* tree, StringBuilder* keyBuilder) {
  * FindCommandRequest.
  */
 void encodeKeyForSort(const BSONObj& sortObj, StringBuilder* keyBuilder) {
+    *keyBuilder << kEncodeSectionDelimiter;
     if (sortObj.isEmpty()) {
         return;
     }
-
-    *keyBuilder << kEncodeSortSection;
 
     BSONObjIterator it(sortObj);
     while (it.more()) {
@@ -530,26 +666,22 @@ void encodeKeyForSort(const BSONObj& sortObj, StringBuilder* keyBuilder) {
  * expressions), the projection section is empty.
  */
 void encodeKeyForProj(const projection_ast::Projection* proj, StringBuilder* keyBuilder) {
+    *keyBuilder << kEncodeSectionDelimiter;
     if (!proj || proj->requiresDocument()) {
         // Don't encode anything for the projection section to indicate the entire document is
         // required.
         return;
     }
 
-    std::vector<std::string> requiredFields = proj->getRequiredFields();
+    const auto& requiredFields = proj->getRequiredFields();
 
     // If the only requirement is that $sortKey be included with some value, we just act as if the
     // entire document is needed.
-    if (requiredFields.size() == 1 && requiredFields.front() == "$sortKey") {
+    if (requiredFields.size() == 1 && *requiredFields.begin() == "$sortKey") {
         return;
     }
 
-    // If the projection just re-writes the entire document and has no dependencies on the original
-    // document (e.g. {a: "foo", _id: 0}), then just include the projection delimiter.
-    *keyBuilder << kEncodeProjectionSection;
-
     // Encode the fields required by the projection in order.
-    std::sort(requiredFields.begin(), requiredFields.end());
     bool isFirst = true;
     for (auto&& requiredField : requiredFields) {
         invariant(!requiredField.empty());
@@ -568,17 +700,102 @@ void encodeKeyForProj(const projection_ast::Projection* proj, StringBuilder* key
     }
 }
 
-void encodeFindCommandRequest(const FindCommandRequest& findCommand, BufBuilder* bufBuilder) {
-    if (auto skip = findCommand.getSkip()) {
-        bufBuilder->appendNum(*skip);
-    } else {
-        bufBuilder->appendNum(0);
+/**
+ * Encodes relevant CanonicalDistinct properties into cache key, notably distinct key and sort
+ * requirement. Projection spec is not encoded because it depends on the distinct key and filter
+ * which are already encoded.
+ */
+void encodeKeyForDistinct(const boost::optional<CanonicalDistinct>& distinct,
+                          StringBuilder* keyBuilder,
+                          bool isShardFilteringDistinctScanEnabled) {
+    // Ensure the delimiter is always included in the encoded plan cache key, regardless of the
+    // feature gate state. This avoids inconsistencies in plan cache keys across different FCVs
+    // during upgrades or downgrades.
+    *keyBuilder << kEncodeSectionDelimiter;
+    if (!isShardFilteringDistinctScanEnabled || !distinct.has_value()) {
+        return;
     }
-    if (auto limit = findCommand.getLimit()) {
-        bufBuilder->appendNum(*limit);
-    } else {
-        bufBuilder->appendNum(0);
+    encodeUserString(distinct->getKey(), keyBuilder);
+    *keyBuilder << distinct->isDistinctScanDirectionFlipped();
+    if (distinct->getSortRequirement()) {
+        const auto& sortPattern = distinct->getSortRequirement().get();
+        auto delimiter = "";
+        for (const auto& part : sortPattern) {
+            if (part.fieldPath) {
+                *keyBuilder << delimiter << (part.isAscending ? "a" : "d");
+                encodeUserString(part.fieldPath->fullPath(), keyBuilder);
+                delimiter = ",";
+            }
+        }
     }
+}
+
+void encodeKeyForPipelineStage(DocumentSource* docSource,
+                               std::vector<Value>& serializedArray,
+                               BufBuilder* bufBuilder) {
+    bufBuilder->appendChar(kEncodeSectionDelimiter);
+    serializedArray.clear();
+    docSource->serializeToArray(serializedArray);
+
+    for (const auto& value : serializedArray) {
+        tassert(6443201,
+                "Expected pipeline stage to serialize to objects",
+                value.getType() == BSONType::object);
+        const BSONObj bson = value.getDocument().toBson();
+        bufBuilder->appendBuf(bson.objdata(), bson.objsize());
+    }
+}
+
+/**
+ * Approximate the number of documents to be processed into a small, medium or large category. Best
+ * plans for limit: 10 and limit: 1000 may be different. This allows us to cache different plans for
+ * different cases without unbounded growth of plan cache for each skip and limit value.
+ */
+char getLimitSkipCategory(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                          boost::optional<int64_t> skip,
+                          boost::optional<int64_t> limit) {
+    if (limit.value_or(0) == 1 && !skip) {
+        return '1';
+    }
+
+    size_t limitSkipSum;
+    bool hasOverflowed = overflow::add(static_cast<size_t>(skip.value_or(0)),
+                                       static_cast<size_t>(limit.value_or(0)),
+                                       &limitSkipSum);
+    if (hasOverflowed) {
+        return 'l';
+    }
+    size_t planEvaluationMaxResults =
+        expCtx->getQueryKnobConfiguration().getPlanEvaluationMaxResultsForOp();
+    if (limitSkipSum < planEvaluationMaxResults) {
+        return 's';
+    } else if (limitSkipSum < 10 * planEvaluationMaxResults) {
+        return 'm';
+    } else {
+        return 'l';
+    }
+}
+
+void encodeLimitSkip(const CanonicalQuery& cq, BufBuilder* bufBuilder) {
+    boost::optional<int64_t> skip = cq.getFindCommandRequest().getSkip();
+    boost::optional<int64_t> limit = cq.getFindCommandRequest().getLimit();
+    if (!limit && !skip) {
+        return;
+    }
+    if (cq.shouldParameterizeLimitSkip()) {
+        bufBuilder->appendChar('p');
+        bufBuilder->appendChar(skip ? 1 : 0);
+        bufBuilder->appendChar(limit ? 1 : 0);
+        bufBuilder->appendChar(getLimitSkipCategory(cq.getExpCtx(), skip, limit));
+    } else {
+        bufBuilder->appendChar('c');
+        bufBuilder->appendNum(skip.value_or(0));
+        bufBuilder->appendNum(limit.value_or(0));
+    }
+}
+
+void encodeFindCommandRequest(const CanonicalQuery& cq, BufBuilder* bufBuilder) {
+    encodeLimitSkip(cq, bufBuilder);
 
     // Encode a OptionalBool value - 'n' if the value is not specified, 't' for true, and 'f' for
     // false.
@@ -591,6 +808,7 @@ void encodeFindCommandRequest(const FindCommandRequest& findCommand, BufBuilder*
             bufBuilder->appendChar('f');
         }
     };
+    const auto& findCommand = cq.getFindCommandRequest();
     encodeOptionalBool(findCommand.getAllowDiskUse());
     encodeOptionalBool(findCommand.getReturnKey());
     encodeOptionalBool(findCommand.getRequestResumeToken());
@@ -601,75 +819,623 @@ void encodeFindCommandRequest(const FindCommandRequest& findCommand, BufBuilder*
         bufBuilder->appendBuf(obj.objdata(), obj.objsize());
     };
     encodeBSONObj(findCommand.getResumeAfter());
-    encodeBSONObj(findCommand.getMin());
-    encodeBSONObj(findCommand.getMax());
+
+    encodeBSONObj(findCommand.getStartAt());
+
+    // Read concern "available" results in SBE plans that do not perform shard filtering, so it must
+    // be encoded differently from other read concerns.
+    bool isAvailableReadConcern{false};
+    if (const auto& readConcern = findCommand.getReadConcern()) {
+        isAvailableReadConcern =
+            readConcern->getLevel() == repl::ReadConcernLevel::kAvailableReadConcern;
+    }
+    bufBuilder->appendChar(isAvailableReadConcern ? 't' : 'f');
 }
 
-void encodeQueryParameters(BufBuilder* bufBuilder) {
-    auto encodeBool = [bufBuilder](bool val) { bufBuilder->appendChar(val ? 't' : 'f'); };
+/**
+ * A visitor intended for use in combination with the corresponding walker class below to encode a
+ * 'MatchExpression' into the SBE plan cache key.
+ *
+ * Handles potentially parameterized queries, in which case parameter markers are encoded into the
+ * cache key in place of the actual constant values.
+ */
+class MatchExpressionSbePlanCacheKeySerializationVisitor final
+    : public MatchExpressionConstVisitor {
+public:
+    explicit MatchExpressionSbePlanCacheKeySerializationVisitor(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, BufBuilder* builder, bool hasSort)
+        : _expCtx(expCtx), _builder(builder), _hasSort(hasSort) {}
 
-    encodeBool(internalQueryForceIntersectionPlans.load());
-    encodeBool(internalQueryPlannerEnableIndexIntersection.load());
-    encodeBool(internalQueryPlannerEnableHashIntersection.load());
+    void visit(const BitsAllClearMatchExpression* expr) final {
+        encodeBitTestExpression(expr);
+    }
+    void visit(const BitsAllSetMatchExpression* expr) final {
+        encodeBitTestExpression(expr);
+    }
+    void visit(const BitsAnyClearMatchExpression* expr) final {
+        encodeBitTestExpression(expr);
+    }
+    void visit(const BitsAnySetMatchExpression* expr) final {
+        encodeBitTestExpression(expr);
+    }
 
-    bufBuilder->appendNum(internalQueryPlannerMaxIndexedSolutions.load());
-    encodeBool(internalQueryEnumerationPreferLockstepOrEnumeration.load());
-    bufBuilder->appendNum(internalQueryEnumerationMaxOrSolutions.load());
-    bufBuilder->appendNum(internalQueryEnumerationMaxIntersectPerAnd.load());
-    encodeBool(internalQueryPlanOrChildrenIndependently.load());
-    bufBuilder->appendNum(internalQueryMaxScansToExplode.load());
-    encodeBool(internalQueryPlannerGenerateCoveredWholeIndexScans.load());
+    void visit(const ExistsMatchExpression* expr) final {
+        encodeRhs(expr);
+    }
 
-    bufBuilder->appendNum(internalQueryMaxBlockingSortMemoryUsageBytes.load());
-    bufBuilder->appendNum(internalQuerySlotBasedExecutionMaxStaticIndexScanIntervals.load());
+    void visit(const ExprMatchExpression* expr) final {
+        encodeFull(expr);
+    }
+
+    void visit(const EqualityMatchExpression* expr) final {
+        encodeSingleParamPathNode(expr);
+    }
+    void visit(const GTEMatchExpression* expr) final {
+        encodeSingleParamPathNode(expr);
+    }
+    void visit(const GTMatchExpression* expr) final {
+        encodeSingleParamPathNode(expr);
+    }
+    void visit(const LTEMatchExpression* expr) final {
+        encodeSingleParamPathNode(expr);
+    }
+    void visit(const LTMatchExpression* expr) final {
+        encodeSingleParamPathNode(expr);
+    }
+
+    void visit(const InMatchExpression* expr) final {
+        encodeSingleParamPathNode(expr);
+
+        // Encode the number of unique $in values as part of the plan cache key. If the query is
+        // optimized by exploding for sort, the number of unique elements in $in determines how many
+        // merge branches we get in the query plan. If there is no sort, this is not necessary.
+        if (expr->getInputParamId() && _hasSort) {
+            size_t maxScansToExplode =
+                _expCtx->getQueryKnobConfiguration().getMaxScansToExplodeForOp();
+            // Assume that $in has n elements.
+            // If n is less than or equal to maxScansToExplode, then it is possible that explode for
+            // sort optimization will be used, so we need to add n to plan cache key.
+            // If n is greater than maxScansToExplode, then we can't explode it for sort. So we can
+            // use the same value of (maxScansToExplode + 1) for all queries, so they can share a
+            // plan cache entry.
+            _builder->appendNum(std::min(maxScansToExplode + 1, expr->getEqualities().size()));
+        }
+    }
+
+    void visit(const ModMatchExpression* expr) final {
+        auto divisorParam = expr->getDivisorInputParamId();
+        auto remainderParam = expr->getRemainderInputParamId();
+        if (divisorParam) {
+            tassert(6512902,
+                    "$mod expression should have divisor and remainder params",
+                    remainderParam);
+
+            encodeParamMarker(*divisorParam);
+            encodeParamMarker(*remainderParam);
+        } else {
+            tassert(6579300,
+                    "If divisor param is not set in $mod expression reminder param must be unset "
+                    "as well",
+                    !remainderParam);
+            encodeFull(expr);
+        }
+    }
+
+    void visit(const RegexMatchExpression* expr) final {
+        auto sourceRegexParam = expr->getSourceRegexInputParamId();
+        auto compiledRegexParam = expr->getCompiledRegexInputParamId();
+        if (sourceRegexParam) {
+            tassert(6512904,
+                    "regex expression should have source and compiled params",
+                    compiledRegexParam);
+
+            encodeParamMarker(*sourceRegexParam);
+            encodeParamMarker(*compiledRegexParam);
+
+            // Encode a discriminator so that a "simple" regex which is exactly convertible into
+            // index bounds has a different shape from a non-simple regex.
+            //
+            // We don't actually need to know the contents of the prefix string, so we ignore the
+            // first member of the pair.
+            auto [_, isExact] = analyze_regex::getRegexPrefixMatch(expr->getString().c_str(),
+                                                                   expr->getFlags().c_str());
+            _builder->appendChar(kEncodeBoundsTightnessDiscriminator);
+            _builder->appendChar(static_cast<char>(isExact));
+        } else {
+            tassert(6579301,
+                    "If source param is not set in $regex expression compiled param must be unset "
+                    "as well",
+                    !compiledRegexParam);
+            encodeFull(expr);
+        }
+    }
+
+    void visit(const SizeMatchExpression* expr) final {
+        encodeSingleParamPathNode(expr);
+    }
+
+    void visit(const TextMatchExpression* expr) final {
+        encodeFull(expr);
+    }
+    void visit(const TextNoOpMatchExpression* expr) final {
+        encodeFull(expr);
+    }
+
+    void visit(const TypeMatchExpression* expr) final {
+        encodeSingleParamPathNode(expr);
+    }
+
+    void visit(const WhereMatchExpression* expr) final {
+        encodeSingleParamNode(expr);
+    }
+    void visit(const WhereNoOpMatchExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142109);
+    }
+
+    /**
+     * Nothing needs to be encoded for these nodes beyond their type, their path (if they have one),
+     * and their children.
+     */
+    void visit(const AlwaysFalseMatchExpression* expr) final {}
+    void visit(const AlwaysTrueMatchExpression* expr) final {}
+    void visit(const AndMatchExpression* expr) final {}
+    void visit(const ElemMatchValueMatchExpression* matchExpr) final {}
+    void visit(const ElemMatchObjectMatchExpression* matchExpr) final {}
+    void visit(const NorMatchExpression* expr) final {}
+    void visit(const NotMatchExpression* expr) final {}
+    void visit(const OrMatchExpression* expr) final {}
+    // The 'InternalExpr*' match expressions are generated internally from a $expr, so they do not
+    // need to contribute anything else to the cache key.
+    void visit(const InternalExprEqMatchExpression* expr) final {}
+    void visit(const InternalExprGTEMatchExpression* expr) final {}
+    void visit(const InternalExprGTMatchExpression* expr) final {}
+    void visit(const InternalExprLTEMatchExpression* expr) final {}
+    void visit(const InternalExprLTMatchExpression* expr) final {}
+
+
+    /**
+     * These node types are not yet supported in SBE.
+     */
+    void visit(const InternalEqHashedKey* expr) final {
+        MONGO_UNREACHABLE_TASSERT(7281402);
+    }
+    void visit(const GeoMatchExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142111);
+    }
+    void visit(const GeoNearMatchExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142112);
+    }
+    void visit(const InternalBucketGeoWithinMatchExpression* expr) final {
+        // This is only used for time-series collections, but SBE isn't yet used for querying
+        // time-series collections.
+        MONGO_UNREACHABLE_TASSERT(6142113);
+    }
+    void visit(const InternalSchemaAllElemMatchFromIndexMatchExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142114);
+    }
+    void visit(const InternalSchemaAllowedPropertiesMatchExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142115);
+    }
+    void visit(const InternalSchemaBinDataEncryptedTypeExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142116);
+    }
+    void visit(const InternalSchemaBinDataFLE2EncryptedTypeExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6364303);
+    }
+    void visit(const InternalSchemaBinDataSubTypeExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142117);
+    }
+    void visit(const InternalSchemaCondMatchExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142118);
+    }
+    void visit(const InternalSchemaEqMatchExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142119);
+    }
+    void visit(const InternalSchemaFmodMatchExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142120);
+    }
+    void visit(const InternalSchemaMatchArrayIndexMatchExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142121);
+    }
+    void visit(const InternalSchemaMaxItemsMatchExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142122);
+    }
+    void visit(const InternalSchemaMaxLengthMatchExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142123);
+    }
+    void visit(const InternalSchemaMaxPropertiesMatchExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142124);
+    }
+    void visit(const InternalSchemaMinItemsMatchExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142125);
+    }
+    void visit(const InternalSchemaMinLengthMatchExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142126);
+    }
+    void visit(const InternalSchemaMinPropertiesMatchExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142127);
+    }
+    void visit(const InternalSchemaObjectMatchExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142128);
+    }
+    void visit(const InternalSchemaRootDocEqMatchExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142129);
+    }
+    void visit(const InternalSchemaTypeExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142130);
+    }
+    void visit(const InternalSchemaUniqueItemsMatchExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142131);
+    }
+    void visit(const InternalSchemaXorMatchExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142132);
+    }
+    // Used in the implementation of geoNear, which is not yet supported in SBE.
+    void visit(const TwoDPtInAnnulusExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(6142133);
+    }
+
+private:
+    /**
+     * Encodes a 'PathMatchExpression' node of type T whose constant can be replaced with a single
+     * parameter marker. If the parameter marker is not present, encodes the node's BSON constant
+     * into the cache key.
+     */
+    template <typename T,
+              typename = std::enable_if_t<std::is_convertible_v<T*, PathMatchExpression*>>>
+    void encodeSingleParamPathNode(const T* expr) {
+        if (expr->getInputParamId()) {
+            encodeParamMarker(*expr->getInputParamId());
+        } else {
+            encodeRhs(expr);
+        }
+    }
+
+    /**
+     * Encodes a non-path 'MatchExpression' node of type T whose constant can be replaced with a
+     * single parameter marker. If the parameter marker is not present, encodes the entire node into
+     * the cache key.
+     */
+    template <typename T>
+    void encodeSingleParamNode(const T* expr) {
+        static_assert(!std::is_convertible_v<T*, PathMatchExpression*>);
+        if (expr->getInputParamId()) {
+            encodeParamMarker(*expr->getInputParamId());
+        } else {
+            encodeFull(expr);
+        }
+    }
+
+    void encodeBitTestExpression(const BitTestMatchExpression* expr) {
+        auto bitPositionsParam = expr->getBitPositionsParamId();
+        auto bitMaskParam = expr->getBitMaskParamId();
+        if (bitPositionsParam) {
+
+            tassert(6512906,
+                    "bit-test expression should have bit positions and bitmask params",
+                    bitMaskParam);
+
+            encodeParamMarker(*bitPositionsParam);
+            encodeParamMarker(*bitMaskParam);
+        } else {
+            tassert(6579302,
+                    "If positions param is not set in a bit-test expression bitmask param must be "
+                    "unset as well",
+                    !bitMaskParam);
+            encodeFull(expr);
+        }
+    }
+
+    /**
+     * Adds a special parameter marker byte to the cache key, followed by a four byte integer for
+     * the parameter id.
+     */
+    void encodeParamMarker(MatchExpression::InputParamId paramId) {
+        _builder->appendChar(kEncodeParamMarker);
+        _builder->appendNum(paramId);
+    }
+
+    /**
+     * For path match expressions which can be written as {"some.path": {$operator: <RHS>}}, encodes
+     * the right-hand side portion of the expression verbatim. Illegal to call if 'expr' has a
+     * parameter marker.
+     */
+    void encodeRhs(const PathMatchExpression* expr) {
+        // Call getSerializedRightHandSide() with 'inMatchExprSortAndDedupElements' set to false.
+        SerializationOptions opts;
+        opts.inMatchExprSortAndDedupElements = false;
+
+        encodeHelper(expr->getSerializedRightHandSide(opts));
+    }
+
+    /**
+     * Similar to 'encodeRhs()' above, but for non-path match expressions. In this case, rather than
+     * encode just the right-hand side, we call 'serialize()' to get a serialized version of the
+     * full expression, and encode the result into the plan cache key. Illegal to call if 'expr' has
+     * a parameter marker.
+     */
+    void encodeFull(const MatchExpression* expr) {
+        encodeHelper(expr->serialize());
+    }
+
+    void encodeHelper(const BSONObj& toEncode) {
+        tassert(6142102, "expected object to encode to be non-empty", !toEncode.isEmpty());
+        BSONObjIterator objIter{toEncode};
+        BSONElement firstElem = objIter.next();
+        tassert(6142103, "expected object to encode to have exactly one element", !objIter.more());
+        encodeBsonValue(firstElem);
+    }
+
+    /**
+     * Encodes a special byte to mark a constant, followed by a byte for the BSON type of 'elem',
+     * followed by the bytes of the value part of 'elem' (for types that have such a value).
+     *
+     * Note that the element's field name is not encoded, just the type and value.
+     */
+    void encodeBsonValue(BSONElement elem) {
+        _builder->appendChar(kEncodeConstantLiteralMarker);
+        _builder->appendChar(stdx::to_underlying(elem.type()));
+        _builder->appendBuf(elem.value(), elem.valuesize());
+    }
+
+    const boost::intrusive_ptr<ExpressionContext>& _expCtx;
+    BufBuilder* const _builder;
+    // Whether there is a sort absorbed by the Canonical query. Note: '_hasSort' is true only when
+    // there is a sort that can be used for explode for sort optimization. For a $match stage,
+    // '_hasSort' should be false since $match does not perform index selection. In cases where a
+    // $sort is not absorbed by the canonical query '_hasSort' should be false since we only perform
+    // explode for sort using the sort in canonical query.
+    bool _hasSort;
+};
+
+/**
+ * A tree walker which walks a 'MatchExpression' tree and encodes the corresponding portion of the
+ * SBE plan cache key into 'builder'.
+ *
+ * Handles potentially parameterized queries, in which case parameter markers are encoded into the
+ * cache key in place of the actual constant values.
+ */
+class MatchExpressionSbePlanCacheKeySerializationWalker {
+public:
+    explicit MatchExpressionSbePlanCacheKeySerializationWalker(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, BufBuilder* builder, bool hasSort)
+        : _builder{builder}, _visitor{expCtx, _builder, hasSort} {
+        invariant(_builder);
+    }
+
+    void preVisit(const MatchExpression* expr) {
+        // Encode the type of the node as well as the path (if there is a non-empty path).
+        _builder->appendCStr(encodeMatchType(expr->matchType()));
+        encodeUserString(expr->path(), _builder);
+
+        // The node encodes itself, and then its children.
+        expr->acceptVisitor(&_visitor);
+
+        if (expr->numChildren() > 0) {
+            _builder->appendChar(kEncodeChildrenBegin);
+        }
+    }
+
+    void inVisit(long count, const MatchExpression* expr) {
+        _builder->appendChar(kEncodeChildrenSeparator);
+    }
+
+    void postVisit(const MatchExpression* expr) {
+        if (expr->numChildren() > 0) {
+            _builder->appendChar(kEncodeChildrenEnd);
+        }
+    }
+
+private:
+    BufBuilder* const _builder;
+    MatchExpressionSbePlanCacheKeySerializationVisitor _visitor;
+};
+
+/**
+ * Given a 'matchExpr' which may have parameter markers, encodes a key into 'builder' with the
+ * following property: Two match expression trees which are identical after auto-parameterization
+ * have the same key, otherwise the keys must differ.
+ */
+void encodeKeyForAutoParameterizedMatchSBE(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                           MatchExpression* matchExpr,
+                                           BufBuilder* builder,
+                                           bool hasSort) {
+    MatchExpressionSbePlanCacheKeySerializationWalker walker{expCtx, builder, hasSort};
+    tree_walker::walk<true, MatchExpression>(matchExpr, &walker);
 }
+
 }  // namespace
 
 namespace canonical_query_encoder {
 
-CanonicalQuery::QueryShapeString encode(const CanonicalQuery& cq) {
+/**
+ * Encode the stages pushed down to SBE via CanonicalQuery::cqPipeline.
+ * Also encodes pipelines that are eligible for the Bonsai plan cache.
+ */
+void encodePipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                    const std::vector<boost::intrusive_ptr<DocumentSource>>& cqPipeline,
+                    BufBuilder* bufBuilder) {
+    bufBuilder->appendChar(kEncodeSectionDelimiter);
+    std::vector<Value> serializedArray;
+    for (auto& stage : cqPipeline) {
+        auto documentSource = stage.get();
+        if (auto matchStage = dynamic_cast<DocumentSourceMatch*>(documentSource)) {
+            // Match expressions are parameterized so need to be encoded differently.
+            encodeKeyForAutoParameterizedMatchSBE(
+                expCtx,
+                matchStage->getMatchExpression(),
+                bufBuilder,
+                // We do not use explode for sort optimization for a $match stage, since it is not
+                // a part of index selection.
+                false /*hasSort*/);
+        } else if (!search_helpers::encodeSearchForSbeCache(expCtx, documentSource, bufBuilder)) {
+            encodeKeyForPipelineStage(documentSource, serializedArray, bufBuilder);
+        }
+    }  // for each stage in 'cqPipeline'
+}
+
+CanonicalQuery::QueryShapeString encodePipeline(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const std::vector<boost::intrusive_ptr<DocumentSource>>& pipelineStages) {
+    static constexpr size_t bufferSize = 200;
+    BufBuilder bufBuilder(bufferSize);
+
+    canonical_query_encoder::encodePipeline(expCtx, pipelineStages, &bufBuilder);
+    return base64::encode(StringData(bufBuilder.buf(), bufBuilder.len()));
+}
+
+CanonicalQuery::QueryShapeString encodeClassic(const CanonicalQuery& cq) {
     StringBuilder keyBuilder;
-    encodeKeyForMatch(cq.root(), &keyBuilder);
+    encodeKeyForMatch(cq.getPrimaryMatchExpression(), &keyBuilder);
     encodeKeyForSort(cq.getFindCommandRequest().getSort(), &keyBuilder);
     encodeKeyForProj(cq.getProj(), &keyBuilder);
     encodeCollation(cq.getCollator(), &keyBuilder);
+    encodeKeyForDistinct(cq.getDistinct(),
+                         &keyBuilder,
+                         cq.getExpCtx()->isFeatureFlagShardFilteringDistinctScanEnabled());
 
-    // This encoding can be removed once the classic query engine reaches EOL and SBE is used
-    // exclusively for all query execution.
-    keyBuilder << kEncodeEngineSection << (cq.getForceClassicEngine() ? "f" : "t");
+
+    // The apiStrict flag can cause the query to see different set of indexes. For example, all
+    // sparse indexes will be ignored with apiStrict is used.
+    const bool apiStrict =
+        cq.getOpCtx() && APIParameters::get(cq.getOpCtx()).getAPIStrict().value_or(false);
+    keyBuilder << (apiStrict ? "t" : "f");
+
+
+    // Encode a flag with three possible values:
+    // 1 ('c'): The cache entry is intended to use the classic code path completely. In this case
+    //            the entry stores 'works.'
+    // 2 ('s'): The cache entry was planned with the classic runtime planners, and we intend
+    //            to run it in SBE. In this case the entry stores 'reads.'
+    // 3 ('o'): The cache entry is used for sub-planning using the classic SubPlanner
+    //            and we intend to run it in SBE. In this case the entry stores 'works' but
+    //            since replanning doesn't happen for queries generated from subplanning,
+    //            the value has no meaning. TODO SERVER-90957: Update these entries to store a
+    //            placeholder instead.
+    //
+    // The third case is treated specially because the classic sub-planner stores and reads
+    // cache entries that cannot be executed with SBE. We use this extra flag to avoid the
+    // possibility of the sub planner writing a cache entry for a branch of $or which is then used
+    // by an independent query that doesn't subplan.
+    //
+    // For example, if the user runs an SBE-compatible query {$or: [{a:1,b:1}, {c:1,d:1}]} and a
+    // cache entry is written for each branch, we do NOT want thos cache entries to be re-used for
+    // a query {a:1,b:1} since the second query would expect the cache entry to store a "reads"
+    // value that can be used with SBE's cache recovery path.
+    //
+    // By incorporating 'forSubplanner' we eliminate this possibility.
+
+    if (cq.isSbeCompatible()) {
+        if (cq.forSubPlanner()) {
+            keyBuilder << "o";  // Case 3: 'o' for "OR."
+        } else {
+            keyBuilder << "s";  // Case 2: 's' for "SBE."
+        }
+    } else {
+        keyBuilder << "c";  // Case 1: 'c' for "classic."
+    }
 
     return keyBuilder.str();
 }
 
-std::string encodeSBE(const CanonicalQuery& cq) {
+std::string encodeSBE(const CanonicalQuery& cq, const bool requiresSbeCompatibility) {
+    if (requiresSbeCompatibility) {
+        tassert(6142104,
+                "attempting to encode SBE plan cache key for SBE-incompatible query",
+                cq.isSbeCompatible());
+    }
+
     const auto& filter = cq.getQueryObj();
     const auto& proj = cq.getFindCommandRequest().getProjection();
     const auto& sort = cq.getFindCommandRequest().getSort();
+    const auto& hint = cq.getFindCommandRequest().getHint();
 
     StringBuilder strBuilder;
     encodeKeyForSort(sort, &strBuilder);
     encodeCollation(cq.getCollator(), &strBuilder);
-    auto sortAndCollation = strBuilder.stringData();
+    auto strBuilderEncoded = strBuilder.stringData();
 
     // A constant for reserving buffer size. It should be large enough to reserve the space required
     // to encode various properties from the FindCommandRequest and query knobs.
     const int kBufferSizeConstant = 200;
-    size_t bufSize =
-        filter.objsize() + proj.objsize() + sortAndCollation.size() + kBufferSizeConstant;
+    size_t bufSize = filter.objsize() + proj.objsize() + strBuilderEncoded.size() + hint.objsize() +
+        kBufferSizeConstant;
 
     BufBuilder bufBuilder(bufSize);
-    bufBuilder.appendBuf(filter.objdata(), filter.objsize());
+    // Only encode parameter types in the MatchExpression if this key is being generated by
+    // Bonsai.
+    encodeKeyForAutoParameterizedMatchSBE(
+        cq.getExpCtx(), cq.getPrimaryMatchExpression(), &bufBuilder, !sort.isEmpty());
     bufBuilder.appendBuf(proj.objdata(), proj.objsize());
-    bufBuilder.appendStr(sortAndCollation, false /* includeEndingNull */);
+    bufBuilder.appendStrBytes(strBuilderEncoded);
+    bufBuilder.appendChar(kEncodeSectionDelimiter);
+    if (!hint.isEmpty()) {
+        bufBuilder.appendBuf(hint.objdata(), hint.objsize());
+    }
+    bufBuilder.appendChar(kEncodeSectionDelimiter);
+    bufBuilder.appendChar(cq.getForceGenerateRecordId() ? 1 : 0);
+    bufBuilder.appendChar(cq.isCountLike() ? 1 : 0);
+    // The apiStrict flag can cause the query to see different set of indexes. For example, all
+    // sparse indexes will be ignored with apiStrict is used.
+    const bool apiStrict =
+        cq.getOpCtx() && APIParameters::get(cq.getOpCtx()).getAPIStrict().value_or(false);
+    bufBuilder.appendChar(apiStrict ? 1 : 0);
 
-    encodeFindCommandRequest(cq.getFindCommandRequest(), &bufBuilder);
-    encodeQueryParameters(&bufBuilder);
+    // We can wind up with different query plans for aggregate commands if 'needsMerge' is set or
+    // not. For instance, when 'needsMerge' is true, $group queries will produce partial aggregates
+    // as output, and complete output otherwise.
+    const bool needsMerge = cq.getExpCtx()->getNeedsMerge();
+    bufBuilder.appendChar(needsMerge ? 1 : 0);
+
+    encodeFindCommandRequest(cq, &bufBuilder);
+
+    encodePipeline(cq.getExpCtx(), cq.cqPipeline(), &bufBuilder);
 
     return base64::encode(StringData(bufBuilder.buf(), bufBuilder.len()));
 }
 
+CanonicalQuery::PlanCacheCommandKey encodeForPlanCacheCommand(const CanonicalQuery& cq) {
+    StringBuilder keyBuilder;
+    encodeKeyForMatch(cq.getPrimaryMatchExpression(), &keyBuilder);
+    encodeKeyForSort(cq.getFindCommandRequest().getSort(), &keyBuilder);
+    encodeKeyForProj(cq.getProj(), &keyBuilder);
+
+    // We only encode user-specified collation. Collation inherited from the collection should not
+    // be encoded.
+    if (!cq.getFindCommandRequest().getCollation().isEmpty()) {
+        encodeCollation(cq.getCollator(), &keyBuilder);
+    } else {
+        keyBuilder << kEncodeSectionDelimiter;
+    }
+
+    return keyBuilder.str();
+}
+
+CanonicalQuery::PlanCacheCommandKey encodeForPlanCacheCommand(const Pipeline& pipeline) {
+    static constexpr size_t bufferSize = 200;
+    BufBuilder bufBuilder(bufferSize);
+
+    std::vector<Value> serializedArray;
+    for (auto& stage : pipeline.getSources()) {
+        auto documentSource = stage.get();
+        if (auto matchStage = dynamic_cast<DocumentSourceMatch*>(documentSource)) {
+            StringBuilder keyBuilder;
+            encodeKeyForMatch(matchStage->getMatchExpression(), &keyBuilder);
+            bufBuilder.appendCStr(keyBuilder.stringData());
+        } else if (!search_helpers::encodeSearchForSbeCache(
+                       pipeline.getContext(), documentSource, &bufBuilder)) {
+            encodeKeyForPipelineStage(documentSource, serializedArray, &bufBuilder);
+        }
+    }  // for each stage in 'pipeline'
+
+    std::string key(bufBuilder.buf(), bufBuilder.len());
+    return key;
+}
+
 uint32_t computeHash(StringData key) {
-    return SimpleStringDataComparator::kInstance.hash(key);
+    size_t seed = 0;
+    simpleStringDataComparator.hash_combine(seed, key);
+    return seed;
 }
 }  // namespace canonical_query_encoder
 }  // namespace mongo

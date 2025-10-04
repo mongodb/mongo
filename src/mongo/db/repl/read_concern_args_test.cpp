@@ -27,11 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/jsobj.h"
 #include "mongo/db/repl/read_concern_args.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/unittest/unittest.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace repl {
@@ -39,12 +43,11 @@ namespace {
 
 TEST(ReadAfterParse, OpTimeOnly) {
     ReadConcernArgs readConcern;
-    ASSERT_OK(readConcern.initialize(BSON("find"
-                                          << "test" << ReadConcernArgs::kReadConcernFieldName
-                                          << BSON(ReadConcernArgs::kAfterOpTimeFieldName
-                                                  << BSON(OpTime::kTimestampFieldName
-                                                          << Timestamp(20, 30)
-                                                          << OpTime::kTermFieldName << 2)))));
+    ASSERT_OK(readConcern.initialize(
+        BSON("find" << "test" << ReadConcernArgs::kReadConcernFieldName
+                    << BSON(ReadConcernArgs::kAfterOpTimeFieldName
+                            << BSON(OpTime::kTimestampFieldName << Timestamp(20, 30)
+                                                                << OpTime::kTermFieldName << 2)))));
 
     ASSERT_TRUE(readConcern.getArgsOpTime());
     ASSERT_TRUE(!readConcern.getArgsAfterClusterTime());
@@ -57,10 +60,9 @@ TEST(ReadAfterParse, OpTimeOnly) {
 TEST(ReadAfterParse, AfterClusterTimeOnly) {
     ReadConcernArgs readConcern;
     auto afterClusterTime = LogicalTime(Timestamp(20, 30));
-    ASSERT_OK(readConcern.initialize(BSON("find"
-                                          << "test" << ReadConcernArgs::kReadConcernFieldName
-                                          << BSON(ReadConcernArgs::kAfterClusterTimeFieldName
-                                                  << afterClusterTime.asTimestamp()))));
+    ASSERT_OK(readConcern.initialize(BSON("find" << "test" << ReadConcernArgs::kReadConcernFieldName
+                                                 << BSON(ReadConcernArgs::kAfterClusterTimeFieldName
+                                                         << afterClusterTime.asTimestamp()))));
     auto argsAfterClusterTime = readConcern.getArgsAfterClusterTime();
     ASSERT_TRUE(argsAfterClusterTime);
     ASSERT_TRUE(!readConcern.getArgsOpTime());
@@ -71,12 +73,11 @@ TEST(ReadAfterParse, AfterClusterTimeAndLevelLocal) {
     ReadConcernArgs readConcern;
     // Must have level=majority
     auto afterClusterTime = LogicalTime(Timestamp(20, 30));
-    ASSERT_OK(
-        readConcern.initialize(BSON("find"
-                                    << "test" << ReadConcernArgs::kReadConcernFieldName
-                                    << BSON(ReadConcernArgs::kAfterClusterTimeFieldName
-                                            << afterClusterTime.asTimestamp()
-                                            << ReadConcernArgs::kLevelFieldName << "local"))));
+    ASSERT_OK(readConcern.initialize(
+        BSON("find" << "test" << ReadConcernArgs::kReadConcernFieldName
+                    << BSON(ReadConcernArgs::kAfterClusterTimeFieldName
+                            << afterClusterTime.asTimestamp() << ReadConcernArgs::kLevelFieldName
+                            << "local"))));
     auto argsAfterClusterTime = readConcern.getArgsAfterClusterTime();
     ASSERT_TRUE(argsAfterClusterTime);
     ASSERT_TRUE(!readConcern.getArgsOpTime());
@@ -88,12 +89,11 @@ TEST(ReadAfterParse, AfterClusterTimeAndLevelMajority) {
     ReadConcernArgs readConcern;
     // Must have level=majority
     auto afterClusterTime = LogicalTime(Timestamp(20, 30));
-    ASSERT_OK(
-        readConcern.initialize(BSON("find"
-                                    << "test" << ReadConcernArgs::kReadConcernFieldName
-                                    << BSON(ReadConcernArgs::kAfterClusterTimeFieldName
-                                            << afterClusterTime.asTimestamp()
-                                            << ReadConcernArgs::kLevelFieldName << "majority"))));
+    ASSERT_OK(readConcern.initialize(
+        BSON("find" << "test" << ReadConcernArgs::kReadConcernFieldName
+                    << BSON(ReadConcernArgs::kAfterClusterTimeFieldName
+                            << afterClusterTime.asTimestamp() << ReadConcernArgs::kLevelFieldName
+                            << "majority"))));
     auto argsAfterClusterTime = readConcern.getArgsAfterClusterTime();
     ASSERT_TRUE(argsAfterClusterTime);
     ASSERT_TRUE(!readConcern.getArgsOpTime());
@@ -104,12 +104,11 @@ TEST(ReadAfterParse, AfterClusterTimeAndLevelMajority) {
 TEST(ReadAfterParse, AfterClusterTimeAndLevelSnapshot) {
     ReadConcernArgs readConcern;
     auto afterClusterTime = LogicalTime(Timestamp(20, 30));
-    ASSERT_OK(
-        readConcern.initialize(BSON("find"
-                                    << "test" << ReadConcernArgs::kReadConcernFieldName
-                                    << BSON(ReadConcernArgs::kAfterClusterTimeFieldName
-                                            << afterClusterTime.asTimestamp()
-                                            << ReadConcernArgs::kLevelFieldName << "snapshot"))));
+    ASSERT_OK(readConcern.initialize(
+        BSON("find" << "test" << ReadConcernArgs::kReadConcernFieldName
+                    << BSON(ReadConcernArgs::kAfterClusterTimeFieldName
+                            << afterClusterTime.asTimestamp() << ReadConcernArgs::kLevelFieldName
+                            << "snapshot"))));
     auto argsAfterClusterTime = readConcern.getArgsAfterClusterTime();
     ASSERT_TRUE(argsAfterClusterTime);
     ASSERT_TRUE(!readConcern.getArgsOpTime());
@@ -121,21 +120,19 @@ TEST(ReadAfterParse, AtClusterTimeOnly) {
     ReadConcernArgs readConcern;
     auto atClusterTime = LogicalTime(Timestamp(20, 30));
     ASSERT_EQ(ErrorCodes::InvalidOptions,
-              readConcern.initialize(BSON("find"
-                                          << "test" << ReadConcernArgs::kReadConcernFieldName
-                                          << BSON(ReadConcernArgs::kAtClusterTimeFieldName
-                                                  << atClusterTime.asTimestamp()))));
+              readConcern.initialize(BSON("find" << "test" << ReadConcernArgs::kReadConcernFieldName
+                                                 << BSON(ReadConcernArgs::kAtClusterTimeFieldName
+                                                         << atClusterTime.asTimestamp()))));
 }
 
 TEST(ReadAfterParse, AtClusterTimeAndLevelSnapshot) {
     ReadConcernArgs readConcern;
     auto atClusterTime = LogicalTime(Timestamp(20, 30));
-    ASSERT_OK(
-        readConcern.initialize(BSON("find"
-                                    << "test" << ReadConcernArgs::kReadConcernFieldName
-                                    << BSON(ReadConcernArgs::kAtClusterTimeFieldName
-                                            << atClusterTime.asTimestamp()
-                                            << ReadConcernArgs::kLevelFieldName << "snapshot"))));
+    ASSERT_OK(readConcern.initialize(
+        BSON("find" << "test" << ReadConcernArgs::kReadConcernFieldName
+                    << BSON(ReadConcernArgs::kAtClusterTimeFieldName
+                            << atClusterTime.asTimestamp() << ReadConcernArgs::kLevelFieldName
+                            << "snapshot"))));
     auto argsAtClusterTime = readConcern.getArgsAtClusterTime();
     ASSERT_TRUE(argsAtClusterTime);
     ASSERT_FALSE(readConcern.getArgsOpTime());
@@ -146,57 +143,52 @@ TEST(ReadAfterParse, AtClusterTimeAndLevelSnapshot) {
 TEST(ReadAfterParse, AtClusterTimeAndLevelMajority) {
     ReadConcernArgs readConcern;
     auto atClusterTime = LogicalTime(Timestamp(20, 30));
-    ASSERT_EQ(
-        ErrorCodes::InvalidOptions,
-        readConcern.initialize(BSON("find"
-                                    << "test" << ReadConcernArgs::kReadConcernFieldName
-                                    << BSON(ReadConcernArgs::kAtClusterTimeFieldName
-                                            << atClusterTime.asTimestamp()
-                                            << ReadConcernArgs::kLevelFieldName << "majority"))));
+    ASSERT_EQ(ErrorCodes::InvalidOptions,
+              readConcern.initialize(
+                  BSON("find" << "test" << ReadConcernArgs::kReadConcernFieldName
+                              << BSON(ReadConcernArgs::kAtClusterTimeFieldName
+                                      << atClusterTime.asTimestamp()
+                                      << ReadConcernArgs::kLevelFieldName << "majority"))));
 }
 
 TEST(ReadAfterParse, AtClusterTimeAndLevelLocal) {
     ReadConcernArgs readConcern;
     auto atClusterTime = LogicalTime(Timestamp(20, 30));
-    ASSERT_EQ(
-        ErrorCodes::InvalidOptions,
-        readConcern.initialize(BSON("find"
-                                    << "test" << ReadConcernArgs::kReadConcernFieldName
-                                    << BSON(ReadConcernArgs::kAtClusterTimeFieldName
-                                            << atClusterTime.asTimestamp()
-                                            << ReadConcernArgs::kLevelFieldName << "local"))));
+    ASSERT_EQ(ErrorCodes::InvalidOptions,
+              readConcern.initialize(
+                  BSON("find" << "test" << ReadConcernArgs::kReadConcernFieldName
+                              << BSON(ReadConcernArgs::kAtClusterTimeFieldName
+                                      << atClusterTime.asTimestamp()
+                                      << ReadConcernArgs::kLevelFieldName << "local"))));
 }
 
 TEST(ReadAfterParse, AtClusterTimeAndLevelAvailable) {
     ReadConcernArgs readConcern;
     auto atClusterTime = LogicalTime(Timestamp(20, 30));
-    ASSERT_EQ(
-        ErrorCodes::InvalidOptions,
-        readConcern.initialize(BSON("find"
-                                    << "test" << ReadConcernArgs::kReadConcernFieldName
-                                    << BSON(ReadConcernArgs::kAtClusterTimeFieldName
-                                            << atClusterTime.asTimestamp()
-                                            << ReadConcernArgs::kLevelFieldName << "available"))));
+    ASSERT_EQ(ErrorCodes::InvalidOptions,
+              readConcern.initialize(
+                  BSON("find" << "test" << ReadConcernArgs::kReadConcernFieldName
+                              << BSON(ReadConcernArgs::kAtClusterTimeFieldName
+                                      << atClusterTime.asTimestamp()
+                                      << ReadConcernArgs::kLevelFieldName << "available"))));
 }
 
 TEST(ReadAfterParse, AtClusterTimeAndLevelLinearizable) {
     ReadConcernArgs readConcern;
     auto atClusterTime = LogicalTime(Timestamp(20, 30));
     ASSERT_EQ(ErrorCodes::InvalidOptions,
-              readConcern.initialize(BSON("find"
-                                          << "test" << ReadConcernArgs::kReadConcernFieldName
-                                          << BSON(ReadConcernArgs::kAtClusterTimeFieldName
-                                                  << atClusterTime.asTimestamp()
-                                                  << ReadConcernArgs::kLevelFieldName
-                                                  << "linearizable"))));
+              readConcern.initialize(
+                  BSON("find" << "test" << ReadConcernArgs::kReadConcernFieldName
+                              << BSON(ReadConcernArgs::kAtClusterTimeFieldName
+                                      << atClusterTime.asTimestamp()
+                                      << ReadConcernArgs::kLevelFieldName << "linearizable"))));
 }
 
 TEST(ReadAfterParse, LevelMajorityOnly) {
     ReadConcernArgs readConcern;
-    ASSERT_OK(
-        readConcern.initialize(BSON("find"
-                                    << "test" << ReadConcernArgs::kReadConcernFieldName
-                                    << BSON(ReadConcernArgs::kLevelFieldName << "majority"))));
+    ASSERT_OK(readConcern.initialize(
+        BSON("find" << "test" << ReadConcernArgs::kReadConcernFieldName
+                    << BSON(ReadConcernArgs::kLevelFieldName << "majority"))));
 
     ASSERT_TRUE(!readConcern.getArgsOpTime());
     ASSERT_TRUE(!readConcern.getArgsAfterClusterTime());
@@ -205,10 +197,9 @@ TEST(ReadAfterParse, LevelMajorityOnly) {
 
 TEST(ReadAfterParse, LevelSnapshotOnly) {
     ReadConcernArgs readConcern;
-    ASSERT_OK(
-        readConcern.initialize(BSON("find"
-                                    << "test" << ReadConcernArgs::kReadConcernFieldName
-                                    << BSON(ReadConcernArgs::kLevelFieldName << "snapshot"))));
+    ASSERT_OK(readConcern.initialize(
+        BSON("find" << "test" << ReadConcernArgs::kReadConcernFieldName
+                    << BSON(ReadConcernArgs::kLevelFieldName << "snapshot"))));
 
     ASSERT_TRUE(!readConcern.getArgsOpTime());
     ASSERT_TRUE(!readConcern.getArgsAfterClusterTime());
@@ -219,20 +210,19 @@ TEST(ReadAfterParse, LevelSnapshotOnly) {
 TEST(ReadAfterParse, ReadCommittedFullSpecification) {
     ReadConcernArgs readConcern;
     auto afterClusterTime = LogicalTime(Timestamp(100, 200));
-    ASSERT_NOT_OK(readConcern.initialize(BSON(
-        "find"
-        << "test" << ReadConcernArgs::kReadConcernFieldName
-        << BSON(ReadConcernArgs::kAfterOpTimeFieldName
-                << BSON(OpTime::kTimestampFieldName << Timestamp(20, 30) << OpTime::kTermFieldName
-                                                    << 2)
-                << ReadConcernArgs::kAfterClusterTimeFieldName << afterClusterTime.asTimestamp()
-                << ReadConcernArgs::kLevelFieldName << "majority"))));
+    ASSERT_NOT_OK(readConcern.initialize(
+        BSON("find" << "test" << ReadConcernArgs::kReadConcernFieldName
+                    << BSON(ReadConcernArgs::kAfterOpTimeFieldName
+                            << BSON(OpTime::kTimestampFieldName << Timestamp(20, 30)
+                                                                << OpTime::kTermFieldName << 2)
+                            << ReadConcernArgs::kAfterClusterTimeFieldName
+                            << afterClusterTime.asTimestamp() << ReadConcernArgs::kLevelFieldName
+                            << "majority"))));
 }
 
 TEST(ReadAfterParse, Empty) {
     ReadConcernArgs readConcern;
-    ASSERT_OK(readConcern.initialize(BSON("find"
-                                          << "test")));
+    ASSERT_OK(readConcern.initialize(BSON("find" << "test")));
 
     ASSERT_TRUE(!readConcern.getArgsOpTime());
     ASSERT_TRUE(!readConcern.getArgsAfterClusterTime());
@@ -241,133 +231,118 @@ TEST(ReadAfterParse, Empty) {
 
 TEST(ReadAfterParse, BadRootType) {
     ReadConcernArgs readConcern;
-    ASSERT_NOT_OK(
-        readConcern.initialize(BSON("find"
-                                    << "test" << ReadConcernArgs::kReadConcernFieldName << "x")));
+    ASSERT_NOT_OK(readConcern.initialize(
+        BSON("find" << "test" << ReadConcernArgs::kReadConcernFieldName << "x")));
 }
 
 TEST(ReadAfterParse, BadAtClusterTimeType) {
     ReadConcernArgs readConcern;
     ASSERT_EQ(ErrorCodes::TypeMismatch,
-              readConcern.initialize(BSON("find"
-                                          << "test" << ReadConcernArgs::kReadConcernFieldName
-                                          << BSON(ReadConcernArgs::kAtClusterTimeFieldName
-                                                  << 2 << ReadConcernArgs::kLevelFieldName
-                                                  << "snapshot"))));
+              readConcern.initialize(
+                  BSON("find" << "test" << ReadConcernArgs::kReadConcernFieldName
+                              << BSON(ReadConcernArgs::kAtClusterTimeFieldName
+                                      << 2 << ReadConcernArgs::kLevelFieldName << "snapshot"))));
 }
 
 TEST(ReadAfterParse, BadAtClusterTimeValue) {
     ReadConcernArgs readConcern;
-    ASSERT_EQ(
-        ErrorCodes::InvalidOptions,
-        readConcern.initialize(BSON("find"
-                                    << "test" << ReadConcernArgs::kReadConcernFieldName
-                                    << BSON(ReadConcernArgs::kAtClusterTimeFieldName
-                                            << LogicalTime::kUninitialized.asTimestamp()
-                                            << ReadConcernArgs::kLevelFieldName << "snapshot"))));
+    ASSERT_EQ(ErrorCodes::InvalidOptions,
+              readConcern.initialize(
+                  BSON("find" << "test" << ReadConcernArgs::kReadConcernFieldName
+                              << BSON(ReadConcernArgs::kAtClusterTimeFieldName
+                                      << LogicalTime::kUninitialized.asTimestamp()
+                                      << ReadConcernArgs::kLevelFieldName << "snapshot"))));
 }
 
 TEST(ReadAfterParse, BadOpTimeType) {
     ReadConcernArgs readConcern;
     ASSERT_NOT_OK(
-        readConcern.initialize(BSON("find"
-                                    << "test" << ReadConcernArgs::kReadConcernFieldName
-                                    << BSON(ReadConcernArgs::kAfterOpTimeFieldName << 2))));
+        readConcern.initialize(BSON("find" << "test" << ReadConcernArgs::kReadConcernFieldName
+                                           << BSON(ReadConcernArgs::kAfterOpTimeFieldName << 2))));
 }
 
 TEST(ReadAfterParse, OpTimeNotNeededForValidReadConcern) {
     ReadConcernArgs readConcern;
-    ASSERT_OK(readConcern.initialize(BSON("find"
-                                          << "test" << ReadConcernArgs::kReadConcernFieldName
-                                          << BSONObj())));
+    ASSERT_OK(readConcern.initialize(
+        BSON("find" << "test" << ReadConcernArgs::kReadConcernFieldName << BSONObj())));
 }
 
 TEST(ReadAfterParse, NoOpTimeTS) {
     ReadConcernArgs readConcern;
-    ASSERT_NOT_OK(readConcern.initialize(BSON("find"
-                                              << "test" << ReadConcernArgs::kReadConcernFieldName
-                                              << BSON(ReadConcernArgs::kAfterOpTimeFieldName
-                                                      << BSON(OpTime::kTimestampFieldName << 2)))));
+    ASSERT_NOT_OK(
+        readConcern.initialize(BSON("find" << "test" << ReadConcernArgs::kReadConcernFieldName
+                                           << BSON(ReadConcernArgs::kAfterOpTimeFieldName
+                                                   << BSON(OpTime::kTimestampFieldName << 2)))));
 }
 
 TEST(ReadAfterParse, NoOpTimeTerm) {
     ReadConcernArgs readConcern;
-    ASSERT_NOT_OK(readConcern.initialize(BSON("find"
-                                              << "test" << ReadConcernArgs::kReadConcernFieldName
-                                              << BSON(ReadConcernArgs::kAfterOpTimeFieldName
-                                                      << BSON(OpTime::kTermFieldName << 2)))));
+    ASSERT_NOT_OK(
+        readConcern.initialize(BSON("find" << "test" << ReadConcernArgs::kReadConcernFieldName
+                                           << BSON(ReadConcernArgs::kAfterOpTimeFieldName
+                                                   << BSON(OpTime::kTermFieldName << 2)))));
 }
 
 TEST(ReadAfterParse, BadOpTimeTSType) {
     ReadConcernArgs readConcern;
-    ASSERT_NOT_OK(readConcern.initialize(BSON("find"
-                                              << "test" << ReadConcernArgs::kReadConcernFieldName
-                                              << BSON(ReadConcernArgs::kAfterOpTimeFieldName
-                                                      << BSON(OpTime::kTimestampFieldName
-                                                              << BSON("x" << 1)
-                                                              << OpTime::kTermFieldName << 2)))));
+    ASSERT_NOT_OK(readConcern.initialize(
+        BSON("find" << "test" << ReadConcernArgs::kReadConcernFieldName
+                    << BSON(ReadConcernArgs::kAfterOpTimeFieldName
+                            << BSON(OpTime::kTimestampFieldName << BSON("x" << 1)
+                                                                << OpTime::kTermFieldName << 2)))));
 }
 
 TEST(ReadAfterParse, BadOpTimeTermType) {
     ReadConcernArgs readConcern;
-    ASSERT_NOT_OK(readConcern.initialize(BSON("find"
-                                              << "test" << ReadConcernArgs::kReadConcernFieldName
-                                              << BSON(ReadConcernArgs::kAfterOpTimeFieldName
-                                                      << BSON(OpTime::kTimestampFieldName
-                                                              << Timestamp(1, 0)
-                                                              << OpTime::kTermFieldName << "y")))));
+    ASSERT_NOT_OK(readConcern.initialize(
+        BSON("find" << "test" << ReadConcernArgs::kReadConcernFieldName
+                    << BSON(ReadConcernArgs::kAfterOpTimeFieldName
+                            << BSON(OpTime::kTimestampFieldName
+                                    << Timestamp(1, 0) << OpTime::kTermFieldName << "y")))));
 }
 
 TEST(ReadAfterParse, BadLevelType) {
     ReadConcernArgs readConcern;
     ASSERT_EQ(ErrorCodes::TypeMismatch,
-              readConcern.initialize(BSON("find"
-                                          << "test" << ReadConcernArgs::kReadConcernFieldName
-                                          << BSON(ReadConcernArgs::kLevelFieldName << 7))));
+              readConcern.initialize(BSON("find" << "test" << ReadConcernArgs::kReadConcernFieldName
+                                                 << BSON(ReadConcernArgs::kLevelFieldName << 7))));
 }
 
 TEST(ReadAfterParse, BadLevelValue) {
     ReadConcernArgs readConcern;
-    ASSERT_EQ(ErrorCodes::FailedToParse,
-              readConcern.initialize(BSON("find"
-                                          << "test" << ReadConcernArgs::kReadConcernFieldName
-                                          << BSON(ReadConcernArgs::kLevelFieldName
-                                                  << "seven is not a real level"))));
+    ASSERT_NOT_OK(readConcern.initialize(
+        BSON("find" << "test" << ReadConcernArgs::kReadConcernFieldName
+                    << BSON(ReadConcernArgs::kLevelFieldName << "seven is not a real level"))));
 }
 
 TEST(ReadAfterParse, BadOption) {
     ReadConcernArgs readConcern;
-    ASSERT_EQ(ErrorCodes::InvalidOptions,
-              readConcern.initialize(BSON("find"
-                                          << "test" << ReadConcernArgs::kReadConcernFieldName
-                                          << BSON("asdf" << 1))));
+    ASSERT_NOT_OK(readConcern.initialize(
+        BSON("find" << "test" << ReadConcernArgs::kReadConcernFieldName << BSON("asdf" << 1))));
 }
 
 TEST(ReadAfterParse, AtClusterTimeAndAfterClusterTime) {
     ReadConcernArgs readConcern;
     auto clusterTime = LogicalTime(Timestamp(20, 30));
-    ASSERT_EQ(
-        ErrorCodes::InvalidOptions,
-        readConcern.initialize(BSON("find"
-                                    << "test" << ReadConcernArgs::kReadConcernFieldName
-                                    << BSON(ReadConcernArgs::kAtClusterTimeFieldName
-                                            << clusterTime.asTimestamp()
-                                            << ReadConcernArgs::kAfterClusterTimeFieldName
-                                            << clusterTime.asTimestamp()
-                                            << ReadConcernArgs::kLevelFieldName << "snapshot"))));
+    ASSERT_EQ(ErrorCodes::InvalidOptions,
+              readConcern.initialize(
+                  BSON("find" << "test" << ReadConcernArgs::kReadConcernFieldName
+                              << BSON(ReadConcernArgs::kAtClusterTimeFieldName
+                                      << clusterTime.asTimestamp()
+                                      << ReadConcernArgs::kAfterClusterTimeFieldName
+                                      << clusterTime.asTimestamp()
+                                      << ReadConcernArgs::kLevelFieldName << "snapshot"))));
 }
 
 TEST(ReadAfterParse, AfterOpTimeAndLevelSnapshot) {
     ReadConcernArgs readConcern;
-    ASSERT_EQ(
-        ErrorCodes::InvalidOptions,
-        readConcern.initialize(BSON("find"
-                                    << "test" << ReadConcernArgs::kReadConcernFieldName
-                                    << BSON(ReadConcernArgs::kAfterOpTimeFieldName
-                                            << BSON(OpTime::kTimestampFieldName
-                                                    << Timestamp(20, 30) << OpTime::kTermFieldName
-                                                    << 2)
-                                            << ReadConcernArgs::kLevelFieldName << "snapshot"))));
+    ASSERT_EQ(ErrorCodes::InvalidOptions,
+              readConcern.initialize(
+                  BSON("find" << "test" << ReadConcernArgs::kReadConcernFieldName
+                              << BSON(ReadConcernArgs::kAfterOpTimeFieldName
+                                      << BSON(OpTime::kTimestampFieldName
+                                              << Timestamp(20, 30) << OpTime::kTermFieldName << 2)
+                                      << ReadConcernArgs::kLevelFieldName << "snapshot"))));
 }
 
 TEST(ReadAfterSerialize, Empty) {
@@ -450,12 +425,11 @@ TEST(ReadAfterSerialize, AtClusterTimeAndLevelSnapshot) {
     BSONObjBuilder builder;
     ReadConcernArgs readConcern;
     auto atClusterTime = LogicalTime(Timestamp(20, 30));
-    ASSERT_OK(readConcern.initialize(BSON("find"
-                                          << "test" << ReadConcernArgs::kReadConcernFieldName
-                                          << BSON(ReadConcernArgs::kLevelFieldName
-                                                  << "snapshot"
-                                                  << ReadConcernArgs::kAtClusterTimeFieldName
-                                                  << atClusterTime.asTimestamp()))));
+    ASSERT_OK(readConcern.initialize(
+        BSON("find" << "test" << ReadConcernArgs::kReadConcernFieldName
+                    << BSON(ReadConcernArgs::kLevelFieldName
+                            << "snapshot" << ReadConcernArgs::kAtClusterTimeFieldName
+                            << atClusterTime.asTimestamp()))));
 
     readConcern.appendInfo(&builder);
 

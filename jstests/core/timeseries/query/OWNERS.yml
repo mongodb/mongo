@@ -1,0 +1,14 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/query-integration-timeseries
+  - "timeseries_block_explain.js":
+    approvers:
+      - 10gen/query-execution-sbe
+  - "timeseries_group*":
+    approvers:
+      - 10gen/query-execution-sbe
+  - "timeseries_homogeneous_top_bottom.js":
+    approvers:
+      - 10gen/query-execution-sbe

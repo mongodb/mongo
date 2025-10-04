@@ -27,25 +27,106 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 
+#include "mongo/base/data_type_endian.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/util/rank_fusion_util.h"
+#include "mongo/util/string_map.h"
+
+#include <ostream>
+#include <vector>
 
 namespace mongo {
+using MetaType = DocumentMetadataFields::MetaType;
 
 namespace {
 Value missingToNull(Value maybeMissing) {
     return maybeMissing.missing() ? Value(BSONNULL) : maybeMissing;
 }
+
+static const std::string textScoreName = "textScore";
+static const std::string randValName = "randVal";
+static const std::string searchScoreName = "searchScore";
+static const std::string searchHighlightsName = "searchHighlights";
+static const std::string geoNearDistanceName = "geoNearDistance";
+static const std::string geoNearPointName = "geoNearPoint";
+static const std::string recordIdName = "recordId";
+static const std::string indexKeyName = "indexKey";
+static const std::string sortKeyName = "sortKey";
+static const std::string searchScoreDetailsName = "searchScoreDetails";
+static const std::string searchRootDocumentIdName = "searchRootDocumentId";
+static const std::string searchSequenceTokenName = "searchSequenceToken";
+static const std::string timeseriesBucketMinTimeName = "timeseriesBucketMinTime";
+static const std::string timeseriesBucketMaxTimeName = "timeseriesBucketMaxTime";
+static const std::string vectorSearchScoreName = "vectorSearchScore";
+static const std::string scoreName = "score";
+static const std::string scoreDetailsName = "scoreDetails";
+
+// This field ("value") is extracted from the 'scoreDetails' Document to set the 'score' field too.
+static const std::string scoreDetailsScoreField = "value";
+static const std::string streamName = "stream";
+
+static const std::string changeStreamControlEventName = "changeStreamControlEvent";
+
+static const StringMap<MetaType> kMetaNameToMetaType = {
+    {scoreName, MetaType::kScore},
+    {vectorSearchScoreName, MetaType::kVectorSearchScore},
+    {geoNearDistanceName, MetaType::kGeoNearDist},
+    {geoNearPointName, MetaType::kGeoNearPoint},
+    {indexKeyName, MetaType::kIndexKey},
+    {randValName, MetaType::kRandVal},
+    {recordIdName, MetaType::kRecordId},
+    {searchHighlightsName, MetaType::kSearchHighlights},
+    {searchScoreName, MetaType::kSearchScore},
+    {searchScoreDetailsName, MetaType::kSearchScoreDetails},
+    {searchSequenceTokenName, MetaType::kSearchSequenceToken},
+    {sortKeyName, MetaType::kSortKey},
+    {textScoreName, MetaType::kTextScore},
+    {timeseriesBucketMinTimeName, MetaType::kTimeseriesBucketMinTime},
+    {timeseriesBucketMaxTimeName, MetaType::kTimeseriesBucketMaxTime},
+    {scoreDetailsName, MetaType::kScoreDetails},
+    {searchRootDocumentIdName, MetaType::kSearchRootDocumentId},
+    {streamName, MetaType::kStream},
+    {changeStreamControlEventName, MetaType::kChangeStreamControlEvent},
+};
+
+// NOLINTNEXTLINE needs audit
+static const std::unordered_map<MetaType, StringData> kMetaTypeToMetaName = {
+    {MetaType::kScore, scoreName},
+    {MetaType::kVectorSearchScore, vectorSearchScoreName},
+    {MetaType::kGeoNearDist, geoNearDistanceName},
+    {MetaType::kGeoNearPoint, geoNearPointName},
+    {MetaType::kIndexKey, indexKeyName},
+    {MetaType::kRandVal, randValName},
+    {MetaType::kRecordId, recordIdName},
+    {MetaType::kSearchHighlights, searchHighlightsName},
+    {MetaType::kSearchScore, searchScoreName},
+    {MetaType::kSearchScoreDetails, searchScoreDetailsName},
+    {MetaType::kSearchSequenceToken, searchSequenceTokenName},
+    {MetaType::kSortKey, sortKeyName},
+    {MetaType::kTextScore, textScoreName},
+    {MetaType::kTimeseriesBucketMinTime, timeseriesBucketMinTimeName},
+    {MetaType::kTimeseriesBucketMaxTime, timeseriesBucketMaxTimeName},
+    {MetaType::kScoreDetails, scoreDetailsName},
+    {MetaType::kSearchRootDocumentId, searchRootDocumentIdName},
+    {MetaType::kStream, streamName},
+    {MetaType::kChangeStreamControlEvent, changeStreamControlEventName},
+};
 }  // namespace
 
 DocumentMetadataFields::DocumentMetadataFields(const DocumentMetadataFields& other)
     : _holder(other._holder ? std::make_unique<MetadataHolder>(*other._holder) : nullptr) {}
 
 DocumentMetadataFields& DocumentMetadataFields::operator=(const DocumentMetadataFields& other) {
-    _holder = other._holder ? std::make_unique<MetadataHolder>(*other._holder) : nullptr;
+    if (this != &other) {
+        _holder = other._holder ? std::make_unique<MetadataHolder>(*other._holder) : nullptr;
+        _modified = true;
+    }
     return *this;
 }
 
@@ -54,7 +135,150 @@ DocumentMetadataFields::DocumentMetadataFields(DocumentMetadataFields&& other)
 
 DocumentMetadataFields& DocumentMetadataFields::operator=(DocumentMetadataFields&& other) {
     _holder = std::move(other._holder);
+    _modified = true;
     return *this;
+}
+
+MetaType DocumentMetadataFields::parseMetaType(StringData name) {
+    const auto iter = kMetaNameToMetaType.find(name);
+    uassert(17308, "Unsupported $meta field: " + name, iter != kMetaNameToMetaType.end());
+    return iter->second;
+}
+
+StringData DocumentMetadataFields::serializeMetaType(MetaType type) {
+    const auto nameIter = kMetaTypeToMetaName.find(type);
+    tassert(9733900,
+            str::stream() << "No name found for meta type: " << type,
+            nameIter != kMetaTypeToMetaName.end());
+    return nameIter->second;
+}
+
+void DocumentMetadataFields::setMetaFieldFromValue(MetaType type, Value val) {
+    auto assertType = [&](BSONType typeRequested) {
+        uassert(ErrorCodes::TypeMismatch,
+                str::stream() << "Meta field '" << serializeMetaType(type) << "' requires "
+                              << typeName(typeRequested) << " type, found "
+                              << typeName(val.getType()),
+                val.getType() == typeRequested);
+    };
+    auto assertNumeric = [&]() {
+        uassert(ErrorCodes::TypeMismatch,
+                str::stream() << "Meta field '" << serializeMetaType(type)
+                              << "' requires numeric type, found " << typeName(val.getType()),
+                val.numeric());
+    };
+
+    switch (type) {
+        case DocumentMetadataFields::kGeoNearDist:
+            assertNumeric();
+            setGeoNearDistance(val.getDouble());
+            break;
+        case DocumentMetadataFields::kGeoNearPoint:
+            setGeoNearPoint(val);
+            break;
+        case DocumentMetadataFields::kIndexKey:
+            assertType(BSONType::object);
+            setIndexKey(val.getDocument().toBson());
+            break;
+        case DocumentMetadataFields::kRandVal:
+            assertNumeric();
+            setRandVal(val.getDouble());
+            break;
+        case DocumentMetadataFields::kRecordId:
+            assertNumeric();
+            setRecordId(RecordId(val.getLong()));
+            break;
+        case DocumentMetadataFields::kSearchHighlights:
+            setSearchHighlights(val);
+            break;
+        case DocumentMetadataFields::kSearchScore:
+            assertNumeric();
+            setSearchScore(val.getDouble());
+            break;
+        case DocumentMetadataFields::kTextScore:
+            assertNumeric();
+            setTextScore(val.getDouble());
+            break;
+        case DocumentMetadataFields::kSearchScoreDetails:
+            assertType(BSONType::object);
+            setSearchScoreDetails(val.getDocument().toBson());
+            break;
+        case DocumentMetadataFields::kSearchRootDocumentId:
+            setSearchRootDocumentId(val);
+            break;
+        case DocumentMetadataFields::kTimeseriesBucketMinTime:
+            assertType(BSONType::date);
+            setTimeseriesBucketMinTime(val.getDate());
+            break;
+        case DocumentMetadataFields::kTimeseriesBucketMaxTime:
+            assertType(BSONType::date);
+            setTimeseriesBucketMaxTime(val.getDate());
+            break;
+        case DocumentMetadataFields::kSearchSortValues:
+            assertType(BSONType::object);
+            setSearchSortValues(val.getDocument().toBson());
+            break;
+        case DocumentMetadataFields::kSearchSequenceToken:
+            setSearchSequenceToken(val);
+            break;
+        case DocumentMetadataFields::kVectorSearchScore:
+            assertNumeric();
+            setVectorSearchScore(val.getDouble());
+            break;
+        case DocumentMetadataFields::kScore:
+            assertNumeric();
+            setScore(val.getDouble());
+            break;
+        case DocumentMetadataFields::kScoreDetails:
+            // When using this API to set scoreDetails (likely via $setMetadata), it's required for
+            // 'scoreDetails' to have a "value" field with which 'score' will be set as well. That
+            // validation is done inside setScoreAndScoreDetails().
+            assertType(BSONType::object);
+            setScoreAndScoreDetails(val);
+            break;
+        case DocumentMetadataFields::kSortKey:
+            tasserted(9733901,
+                      "Cannot set the sort key without knowing if it is a single element key");
+        case DocumentMetadataFields::kStream:
+            assertType(BSONType::object);
+            setStream(std::move(val));
+            break;
+        case DocumentMetadataFields::kChangeStreamControlEvent:
+            // The value is completely ignored here. We only set the relevant bit in the bitset.
+            setChangeStreamControlEvent();
+            break;
+        default:
+            MONGO_UNREACHABLE_TASSERT(9733902);
+    }
+}
+
+void DocumentMetadataFields::setScore(double score, bool featureFlagAlreadyValidated) {
+    if (featureFlagAlreadyValidated || isRankFusionFullEnabled()) {
+        _setCommon(MetaType::kScore);
+        _holder->score = score;
+    }
+}
+
+void DocumentMetadataFields::setScoreDetails(Value scoreDetails, bool featureFlagAlreadyValidated) {
+    if (featureFlagAlreadyValidated || isRankFusionFullEnabled()) {
+        _setCommon(MetaType::kScoreDetails);
+        _holder->scoreDetails = scoreDetails;
+    }
+}
+
+void DocumentMetadataFields::setScoreAndScoreDetails(Value scoreDetails) {
+    if (isRankFusionFullEnabled()) {
+        auto score = scoreDetails.getDocument().getField(StringData{scoreDetailsScoreField});
+        tassert(9679300,
+                str::stream() << "scoreDetails must provide a numeric 'value' field with which to "
+                                 "set the score too, but got "
+                              << scoreDetails.toString(),
+                score.numeric());
+
+        const bool featureFlagAlreadyValidated = true;
+        setScore(score.getDouble(), featureFlagAlreadyValidated);
+        setScoreDetails(std::move(scoreDetails), featureFlagAlreadyValidated);
+    }
 }
 
 void DocumentMetadataFields::mergeWith(const DocumentMetadataFields& other) {
@@ -84,6 +308,36 @@ void DocumentMetadataFields::mergeWith(const DocumentMetadataFields& other) {
     }
     if (!hasSearchScoreDetails() && other.hasSearchScoreDetails()) {
         setSearchScoreDetails(other.getSearchScoreDetails());
+    }
+    if (!hasSearchRootDocumentId() && other.hasSearchRootDocumentId()) {
+        setSearchRootDocumentId(other.getSearchRootDocumentId());
+    }
+    if (!hasSearchSequenceToken() && other.hasSearchSequenceToken()) {
+        setSearchSequenceToken(other.getSearchSequenceToken());
+    }
+    if (!hasTimeseriesBucketMinTime() && other.hasTimeseriesBucketMinTime()) {
+        setTimeseriesBucketMinTime(other.getTimeseriesBucketMinTime());
+    }
+    if (!hasTimeseriesBucketMaxTime() && other.hasTimeseriesBucketMaxTime()) {
+        setTimeseriesBucketMaxTime(other.getTimeseriesBucketMaxTime());
+    }
+    if (!hasSearchSortValues() && other.hasSearchSortValues()) {
+        setSearchSortValues(other.getSearchSortValues());
+    }
+    if (!hasVectorSearchScore() && other.hasVectorSearchScore()) {
+        setVectorSearchScore(other.getVectorSearchScore());
+    }
+    if (!hasScore() && other.hasScore()) {
+        setScore(other.getScore());
+    }
+    if (!hasScoreDetails() && other.hasScoreDetails()) {
+        setScoreDetails(other.getScoreDetails());
+    }
+    if (!hasStream() && other.hasStream()) {
+        setStream(other.getStream());
+    }
+    if (!isChangeStreamControlEvent() && other.isChangeStreamControlEvent()) {
+        setChangeStreamControlEvent();
     }
 }
 
@@ -115,6 +369,36 @@ void DocumentMetadataFields::copyFrom(const DocumentMetadataFields& other) {
     if (other.hasSearchScoreDetails()) {
         setSearchScoreDetails(other.getSearchScoreDetails());
     }
+    if (other.hasSearchRootDocumentId()) {
+        setSearchRootDocumentId(other.getSearchRootDocumentId());
+    }
+    if (other.hasSearchSequenceToken()) {
+        setSearchSequenceToken(other.getSearchSequenceToken());
+    }
+    if (other.hasTimeseriesBucketMinTime()) {
+        setTimeseriesBucketMinTime(other.getTimeseriesBucketMinTime());
+    }
+    if (other.hasTimeseriesBucketMaxTime()) {
+        setTimeseriesBucketMaxTime(other.getTimeseriesBucketMaxTime());
+    }
+    if (other.hasSearchSortValues()) {
+        setSearchSortValues(other.getSearchSortValues());
+    }
+    if (other.hasVectorSearchScore()) {
+        setVectorSearchScore(other.getVectorSearchScore());
+    }
+    if (other.hasScore()) {
+        setScore(other.getScore());
+    }
+    if (other.hasScoreDetails()) {
+        setScoreDetails(other.getScoreDetails());
+    }
+    if (other.hasStream()) {
+        setStream(other.getStream());
+    }
+    if (other.isChangeStreamControlEvent()) {
+        setChangeStreamControlEvent();
+    }
 }
 
 size_t DocumentMetadataFields::getApproximateSize() const {
@@ -136,7 +420,12 @@ size_t DocumentMetadataFields::getApproximateSize() const {
     size -= sizeof(_holder->searchHighlights);
     size += _holder->indexKey.objsize();
     size += _holder->searchScoreDetails.objsize();
-
+    size += _holder->searchSortValues.objsize();
+    size -= sizeof(_holder->searchSequenceToken);
+    size += _holder->scoreDetails.getApproximateSize();
+    size -= sizeof(_holder->scoreDetails);
+    size += _holder->stream.getApproximateSize();
+    size -= sizeof(_holder->stream);
     return size;
 }
 
@@ -184,11 +473,53 @@ void DocumentMetadataFields::serializeForSorter(BufBuilder& buf) const {
         buf.appendNum(static_cast<char>(MetaType::kSearchScoreDetails + 1));
         getSearchScoreDetails().appendSelfToBufBuilder(buf);
     }
+    if (hasSearchRootDocumentId()) {
+        buf.appendNum(static_cast<char>(MetaType::kSearchRootDocumentId + 1));
+        getSearchRootDocumentId().serializeForSorter(buf);
+    }
+    if (hasSearchSequenceToken()) {
+        buf.appendNum(static_cast<char>(MetaType::kSearchSequenceToken + 1));
+        getSearchSequenceToken().serializeForSorter(buf);
+    }
+    if (hasTimeseriesBucketMinTime()) {
+        buf.appendNum(static_cast<char>(MetaType::kTimeseriesBucketMinTime + 1));
+        buf.appendNum(getTimeseriesBucketMinTime().toMillisSinceEpoch());
+    }
+    if (hasTimeseriesBucketMaxTime()) {
+        buf.appendNum(static_cast<char>(MetaType::kTimeseriesBucketMaxTime + 1));
+        buf.appendNum(getTimeseriesBucketMaxTime().toMillisSinceEpoch());
+    }
+    if (hasSearchSortValues()) {
+        buf.appendNum(static_cast<char>(MetaType::kSearchSortValues + 1));
+        getSearchSortValues().appendSelfToBufBuilder(buf);
+    }
+    if (hasVectorSearchScore()) {
+        buf.appendNum(static_cast<char>(MetaType::kVectorSearchScore + 1));
+        buf.appendNum(getVectorSearchScore());
+    }
+    if (hasScore()) {
+        buf.appendNum(static_cast<char>(MetaType::kScore + 1));
+        buf.appendNum(getScore());
+    }
+    if (hasScoreDetails()) {
+        buf.appendNum(static_cast<char>(MetaType::kScoreDetails + 1));
+        getScoreDetails().serializeForSorter(buf);
+    }
+    if (hasStream()) {
+        buf.appendNum(static_cast<char>(MetaType::kStream + 1));
+        getStream().serializeForSorter(buf);
+    }
+    if (isChangeStreamControlEvent()) {
+        // When this metadata field is set, it is implicitly true, so we do not need to serialize
+        // any further value for it.
+        buf.appendNum(static_cast<char>(MetaType::kChangeStreamControlEvent + 1));
+    }
+
     buf.appendNum(static_cast<char>(0));
 }
 
 void DocumentMetadataFields::deserializeForSorter(BufReader& buf, DocumentMetadataFields* out) {
-    invariant(out);
+    tassert(11103302, "Expected non-null DocumentMetadataFields", out);
 
     while (char marker = buf.read<char>()) {
         if (marker == static_cast<char>(MetaType::kTextScore) + 1) {
@@ -215,6 +546,34 @@ void DocumentMetadataFields::deserializeForSorter(BufReader& buf, DocumentMetada
         } else if (marker == static_cast<char>(MetaType::kSearchScoreDetails) + 1) {
             out->setSearchScoreDetails(
                 BSONObj::deserializeForSorter(buf, BSONObj::SorterDeserializeSettings()));
+        } else if (marker == static_cast<char>(MetaType::kSearchRootDocumentId) + 1) {
+            out->setSearchRootDocumentId(
+                Value::deserializeForSorter(buf, Value::SorterDeserializeSettings()));
+        } else if (marker == static_cast<char>(MetaType::kTimeseriesBucketMinTime) + 1) {
+            out->setTimeseriesBucketMinTime(
+                Date_t::fromMillisSinceEpoch(buf.read<LittleEndian<long long>>()));
+        } else if (marker == static_cast<char>(MetaType::kTimeseriesBucketMaxTime) + 1) {
+            out->setTimeseriesBucketMaxTime(
+                Date_t::fromMillisSinceEpoch(buf.read<LittleEndian<long long>>()));
+        } else if (marker == static_cast<char>(MetaType::kSearchSortValues) + 1) {
+            out->setSearchSortValues(
+                BSONObj::deserializeForSorter(buf, BSONObj::SorterDeserializeSettings()));
+        } else if (marker == static_cast<char>(MetaType::kVectorSearchScore) + 1) {
+            out->setVectorSearchScore(buf.read<LittleEndian<double>>());
+        } else if (marker == static_cast<char>(MetaType::kSearchSequenceToken) + 1) {
+            out->setSearchSequenceToken(
+                Value::deserializeForSorter(buf, Value::SorterDeserializeSettings()));
+        } else if (marker == static_cast<char>(MetaType::kScore) + 1) {
+            out->setScore(buf.read<LittleEndian<double>>());
+        } else if (marker == static_cast<char>(MetaType::kScoreDetails) + 1) {
+            out->setScoreDetails(
+                Value::deserializeForSorter(buf, Value::SorterDeserializeSettings()));
+        } else if (marker == static_cast<char>(MetaType::kStream) + 1) {
+            out->setStream(Value::deserializeForSorter(buf, Value::SorterDeserializeSettings()));
+        } else if (marker == static_cast<char>(MetaType::kChangeStreamControlEvent) + 1) {
+            // When this metadata field is set, it is implicitly true, so it is not followed by any
+            // further serialized value.
+            out->setChangeStreamControlEvent();
         } else {
             uasserted(28744, "Unrecognized marker, unable to deserialize buffer");
         }
@@ -227,7 +586,7 @@ BSONArray DocumentMetadataFields::serializeSortKey(bool isSingleElementKey, cons
     if (isSingleElementKey) {
         return BSON_ARRAY(missingToNull(value));
     }
-    invariant(value.isArray());
+    tassert(11103303, "Expected value to be an array", value.isArray());
     BSONArrayBuilder bb;
     for (auto&& val : value.getArray()) {
         bb << missingToNull(val);
@@ -270,6 +629,26 @@ const char* DocumentMetadataFields::typeNameToDebugString(DocumentMetadataFields
             return "text score";
         case DocumentMetadataFields::kSearchScoreDetails:
             return "$search score details";
+        case DocumentMetadataFields::kSearchRootDocumentId:
+            return "$search root document id";
+        case DocumentMetadataFields::kTimeseriesBucketMinTime:
+            return "timeseries bucket min time";
+        case DocumentMetadataFields::kTimeseriesBucketMaxTime:
+            return "timeseries bucket max time";
+        case DocumentMetadataFields::kSearchSortValues:
+            return "$search sort values";
+        case DocumentMetadataFields::kSearchSequenceToken:
+            return "$search sequence token";
+        case DocumentMetadataFields::kVectorSearchScore:
+            return "$vectorSearch score";
+        case DocumentMetadataFields::kScore:
+            return "score";
+        case DocumentMetadataFields::kScoreDetails:
+            return "scoreDetails";
+        case DocumentMetadataFields::kStream:
+            return "stream processing metadata";
+        case DocumentMetadataFields::kChangeStreamControlEvent:
+            return "change stream control event";
         default:
             MONGO_UNREACHABLE;
     }

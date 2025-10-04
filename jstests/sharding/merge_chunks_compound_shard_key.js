@@ -3,44 +3,41 @@
 // with a compound shard key.
 //
 
-(function() {
-'use strict';
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var getShardVersion = function() {
-    var res = st.shard0.adminCommand({getShardVersion: coll + ""});
+let getShardVersion = function () {
+    let res = st.shard0.adminCommand({getShardVersion: coll + ""});
     assert.commandWorked(res);
-    var version = res.global;
+    let version = res.global;
     assert(version);
     return version;
 };
 
 // Merge two neighboring chunks and check post conditions.
-var checkMergeWorked = function(lowerBound, upperBound) {
-    var oldVersion = getShardVersion();
-    var numChunksBefore = chunks.find().itcount();
+let checkMergeWorked = function (lowerBound, upperBound) {
+    let oldVersion = getShardVersion();
+    let numChunksBefore = chunks.find().itcount();
 
-    assert.commandWorked(
-        admin.runCommand({mergeChunks: coll + "", bounds: [lowerBound, upperBound]}));
+    assert.commandWorked(admin.runCommand({mergeChunks: coll + "", bounds: [lowerBound, upperBound]}));
 
     assert.eq(numChunksBefore - 1, chunks.find().itcount());
     assert.eq(1, chunks.find({min: lowerBound, max: upperBound}).itcount());
 
-    var newVersion = getShardVersion();
+    let newVersion = getShardVersion();
     assert.eq(newVersion.t, oldVersion.t);
     assert.gt(newVersion.i, oldVersion.i);
 };
 
 var st = new ShardingTest({shards: 2, mongos: 1});
 
-var mongos = st.s;
+let mongos = st.s;
 var admin = mongos.getDB("admin");
-var shards = mongos.getCollection("config.shards").find().toArray();
+let shards = mongos.getCollection("config.shards").find().toArray();
 var chunks = mongos.getCollection("config.chunks");
 var coll = mongos.getCollection("foo.bar");
 
 jsTest.log("Create a sharded collection with a compound shard key.");
-assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));
-printjson(admin.runCommand({movePrimary: coll.getDB() + "", to: st.shard0.shardName}));
+assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard0.shardName}));
 assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {x: 1, y: 1}}));
 
 // Chunks after splits:
@@ -89,4 +86,3 @@ jsTest.log("Merge chunks whos bounds are MinKey/MaxKey, but which have a compoun
 checkMergeWorked({x: MinKey, y: MinKey}, {x: MaxKey, y: MaxKey});
 
 st.stop();
-})();

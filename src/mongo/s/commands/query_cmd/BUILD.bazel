@@ -1,0 +1,70 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob(
+        [
+            "*.h",
+            "*.cpp",
+        ],
+        exclude = [
+            "cluster_replicate_search_index_command.cpp",
+            "populate_cursor.cpp",
+        ],
+    ),
+)
+
+idl_generator(
+    name = "cluster_replicate_search_index_command_gen",
+    src = "cluster_replicate_search_index_command.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "cluster_replicate_search_index_command_idl",
+    srcs = [
+        "cluster_replicate_search_index_command.cpp",
+        "cluster_replicate_search_index_command_gen",
+    ],
+    deps = [
+        "//src/mongo/db:commands",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/query/search:search_index_command_testing_helper",
+    ],
+)
+
+mongo_cc_library(
+    name = "populate_cursor",
+    srcs = [
+        "populate_cursor.cpp",
+    ],
+    hdrs = [
+        "populate_cursor.h",
+        "//src/mongo/db/commands/query_cmd:bulk_write_common.h",
+        "//src/mongo/db/commands/query_cmd:bulk_write_gen",
+        "//src/mongo/db/query:find.h",
+        "//src/mongo/db/query:find_common.h",
+        "//src/mongo/db/sharding_environment:grid.h",
+        "//src/mongo/s/query/exec:cluster_client_cursor.h",
+        "//src/mongo/s/query/exec:cluster_client_cursor_guard.h",
+        "//src/mongo/s/query/exec:cluster_client_cursor_impl.h",
+        "//src/mongo/s/query/exec:cluster_client_cursor_params.h",
+        "//src/mongo/s/query/exec:cluster_cursor_manager.h",
+        "//src/mongo/s/query/exec:cluster_query_result.h",
+        "//src/mongo/s/query/exec:router_exec_stage.h",
+        "//src/mongo/s/query/exec:router_stage_queued_data.h",
+        "//src/mongo/s/write_ops:bulk_write_reply_info.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/commands/query_cmd:bulk_write_common",
+        "//src/mongo/db/query:query_common",
+        "//src/mongo/s/query/exec:cluster_cursor",
+        "//src/mongo/s/query/exec:router_exec_stage",
+    ],
+)

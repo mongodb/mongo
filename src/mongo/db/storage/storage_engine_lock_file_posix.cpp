@@ -27,23 +27,39 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
-#include "mongo/platform/basic.h"
+#include <cerrno>
+#include <exception>
+#include <memory>
+#include <string>
+#include <system_error>
 
-#include "mongo/db/storage/storage_engine_lock_file.h"
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
 
-#include <boost/filesystem.hpp>
+#ifndef _WIN32
 #include <fcntl.h>
-#include <ostream>
-#include <sstream>
+
 #include <sys/file.h>
 #include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
+#endif
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/storage/storage_engine_lock_file.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/errno_util.h"
 #include "mongo/util/str.h"
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
+
 
 namespace mongo {
 
@@ -55,27 +71,28 @@ void flushMyDirectory(const boost::filesystem::path& file) {
     // if called without a fully qualified path it asserts; that makes mongoperf fail.
     // so make a warning. need a better solution longer term.
     // massert(40389, str::stream() << "Couldn't find parent dir for file: " << file.string(),);
-    if (!file.has_branch_path()) {
+    if (!file.has_parent_path()) {
         LOGV2(22274,
-              "warning flushMyDirectory couldn't find parent dir for file: {file}",
               "flushMyDirectory couldn't find parent dir for file",
               "file"_attr = file.generic_string());
         return;
     }
 
 
-    boost::filesystem::path dir = file.branch_path();  // parent_path in new boosts
+    boost::filesystem::path dir = file.parent_path();
 
     LOGV2_DEBUG(22275, 1, "flushing directory {dir_string}", "dir_string"_attr = dir.string());
 
     int fd = ::open(dir.string().c_str(), O_RDONLY);  // DO NOT THROW OR ASSERT BEFORE CLOSING
-    massert(40387,
-            str::stream() << "Couldn't open directory '" << dir.string()
-                          << "' for flushing: " << errnoWithDescription(),
-            fd >= 0);
+    if (fd < 0) {
+        auto ec = lastPosixError();
+        msgasserted(40387,
+                    str::stream() << "Couldn't open directory '" << dir.string()
+                                  << "' for flushing: " << errorMessage(ec));
+    }
     if (fsync(fd) != 0) {
-        int e = errno;
-        if (e == EINVAL) {  // indicates filesystem does not support synchronization
+        auto ec = lastPosixError();
+        if (ec == posixError(EINVAL)) {  // indicates filesystem does not support synchronization
             if (!_warnedAboutFilesystem) {
                 LOGV2_OPTIONS(
                     22276,
@@ -89,7 +106,7 @@ void flushMyDirectory(const boost::filesystem::path& file) {
             close(fd);
             massert(40388,
                     str::stream() << "Couldn't fsync directory '" << dir.string()
-                                  << "': " << errnoWithDescription(e),
+                                  << "': " << errorMessage(ec),
                     false);
         }
     }
@@ -111,9 +128,9 @@ public:
     int _fd;
 };
 
-StorageEngineLockFile::StorageEngineLockFile(const std::string& dbpath, StringData fileName)
+StorageEngineLockFile::StorageEngineLockFile(StringData dbpath, StringData fileName)
     : _dbpath(dbpath),
-      _filespec((boost::filesystem::path(_dbpath) / fileName.toString()).string()),
+      _filespec((boost::filesystem::path(_dbpath) / std::string{fileName}).string()),
       _uncleanShutdown(boost::filesystem::exists(_filespec) &&
                        boost::filesystem::file_size(_filespec) > 0),
       _lockFileHandle(new LockFileHandle()) {}
@@ -145,8 +162,8 @@ Status StorageEngineLockFile::open() {
     int lockFile =
         ::open(_filespec.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if (lockFile < 0) {
-        int errorcode = errno;
-        if (errorcode == EACCES) {
+        auto ec = lastPosixError();
+        if (ec == posixError(EACCES)) {
             return Status(ErrorCodes::IllegalOperation,
                           str::stream()
                               << "Attempted to create a lock file on a read-only directory: "
@@ -154,7 +171,7 @@ Status StorageEngineLockFile::open() {
         }
         return Status(ErrorCodes::DBPathInUse,
                       str::stream() << "Unable to create/open the lock file: " << _filespec << " ("
-                                    << errnoWithDescription(errorcode) << ")."
+                                    << errorMessage(ec) << ")."
                                     << " Ensure the user executing mongod is the owner of the lock "
                                        "file and has the appropriate permissions. Also make sure "
                                        "that another mongod instance is not already running on the "
@@ -162,11 +179,11 @@ Status StorageEngineLockFile::open() {
     }
     int ret = ::flock(lockFile, LOCK_EX | LOCK_NB);
     if (ret != 0) {
-        int errorcode = errno;
+        auto ec = lastPosixError();
         ::close(lockFile);
         return Status(ErrorCodes::DBPathInUse,
                       str::stream() << "Unable to lock the lock file: " << _filespec << " ("
-                                    << errnoWithDescription(errorcode) << ")."
+                                    << errorMessage(ec) << ")."
                                     << " Another mongod instance is already running on the "
                                     << _dbpath << " directory");
     }
@@ -191,18 +208,18 @@ Status StorageEngineLockFile::writeString(StringData str) {
     }
 
     if (::ftruncate(_lockFileHandle->_fd, 0)) {
-        int errorcode = errno;
+        auto ec = lastPosixError();
         return Status(ErrorCodes::FileStreamFailed,
                       str::stream() << "Unable to write string to file (ftruncate failed): "
-                                    << _filespec << ' ' << errnoWithDescription(errorcode));
+                                    << _filespec << ' ' << errorMessage(ec));
     }
 
-    int bytesWritten = ::write(_lockFileHandle->_fd, str.rawData(), str.size());
+    int bytesWritten = ::write(_lockFileHandle->_fd, str.data(), str.size());
     if (bytesWritten < 0) {
-        int errorcode = errno;
+        auto ec = lastPosixError();
         return Status(ErrorCodes::FileStreamFailed,
                       str::stream() << "Unable to write string " << str << " to file: " << _filespec
-                                    << ' ' << errnoWithDescription(errorcode));
+                                    << ' ' << errorMessage(ec));
 
     } else if (bytesWritten == 0) {
         return Status(ErrorCodes::FileStreamFailed,
@@ -211,11 +228,11 @@ Status StorageEngineLockFile::writeString(StringData str) {
     }
 
     if (::fsync(_lockFileHandle->_fd)) {
-        int errorcode = errno;
+        auto ec = lastPosixError();
         return Status(ErrorCodes::FileStreamFailed,
-                      str::stream() << "Unable to write process id " << str
-                                    << " to file (fsync failed): " << _filespec << ' '
-                                    << errnoWithDescription(errorcode));
+                      str::stream()
+                          << "Unable to write process id " << str
+                          << " to file (fsync failed): " << _filespec << ' ' << errorMessage(ec));
     }
 
     flushMyDirectory(_filespec);
@@ -232,11 +249,8 @@ void StorageEngineLockFile::clearPidAndUnlock() {
     // time that was attempted, there was a race condition
     // with StorageEngineLockFile::open().
     if (::ftruncate(_lockFileHandle->_fd, 0)) {
-        int errorcode = errno;
-        LOGV2(22280,
-              "couldn't remove fs lock {errnoWithDescription_errorcode}",
-              "Couldn't remove fs lock",
-              "error"_attr = errnoWithDescription(errorcode));
+        auto ec = lastPosixError();
+        LOGV2(22280, "Couldn't remove fs lock", "error"_attr = errorMessage(ec));
     }
     close();
 }

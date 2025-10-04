@@ -166,7 +166,7 @@ void monotonic_buffer_resource::do_deallocate(void* p, std::size_t bytes, std::s
 {  (void)p; (void)bytes;  (void)alignment;  }
 
 bool monotonic_buffer_resource::do_is_equal(const memory_resource& other) const BOOST_NOEXCEPT
-{  return this == dynamic_cast<const monotonic_buffer_resource*>(&other);  }
+{  return this == &other;  }
 
 }  //namespace pmr {
 }  //namespace container {

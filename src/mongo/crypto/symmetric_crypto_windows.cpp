@@ -27,14 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
-
-#include "mongo/platform/basic.h"
-
-#include <bcrypt.h>
-#include <limits>
-#include <memory>
-#include <vector>
 
 #include "mongo/base/status.h"
 #include "mongo/crypto/block_packer.h"
@@ -44,6 +36,15 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/str.h"
+
+#include <limits>
+#include <memory>
+#include <vector>
+
+#include <bcrypt.h>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
+
 
 namespace mongo {
 namespace crypto {
@@ -65,7 +66,7 @@ std::string statusWithDescription(NTSTATUS status) {
             ULONG errorCode = RtlNtStatusToDosErrorFunc(status);
 
             if (errorCode != ERROR_MR_MID_NOT_FOUND) {
-                return errnoWithDescription(errorCode);
+                return errorMessage(systemError(errorCode));
             }
         }
     }
@@ -87,6 +88,8 @@ public:
     BCryptCryptoLoader() {
         loadAlgo(_algoAESCBC, BCRYPT_AES_ALGORITHM, BCRYPT_CHAIN_MODE_CBC);
         loadAlgo(_algoAESGCM, BCRYPT_AES_ALGORITHM, BCRYPT_CHAIN_MODE_GCM);
+        // AES-CTR is not supported natively, simulating it via ECB mode
+        loadAlgo(_algoAESCTR, BCRYPT_AES_ALGORITHM, BCRYPT_CHAIN_MODE_ECB);
 
         auto status =
             ::BCryptOpenAlgorithmProvider(&_random, BCRYPT_RNG_ALGORITHM, MS_PRIMITIVE_PROVIDER, 0);
@@ -96,6 +99,7 @@ public:
     ~BCryptCryptoLoader() {
         invariant(BCryptCloseAlgorithmProvider(_algoAESCBC.algo, 0) == STATUS_SUCCESS);
         invariant(BCryptCloseAlgorithmProvider(_algoAESGCM.algo, 0) == STATUS_SUCCESS);
+        invariant(BCryptCloseAlgorithmProvider(_algoAESCTR.algo, 0) == STATUS_SUCCESS);
         invariant(BCryptCloseAlgorithmProvider(_random, 0) == STATUS_SUCCESS);
     }
 
@@ -105,6 +109,8 @@ public:
                 return _algoAESCBC;
             case aesMode::gcm:
                 return _algoAESGCM;
+            case aesMode::ctr:
+                return _algoAESCTR;
             default:
                 MONGO_UNREACHABLE;
         }
@@ -148,6 +154,7 @@ private:
 private:
     AlgoInfo _algoAESCBC;
     AlgoInfo _algoAESGCM;
+    AlgoInfo _algoAESCTR;
     BCRYPT_ALG_HANDLE _random;
 };
 
@@ -156,21 +163,79 @@ static BCryptCryptoLoader& getBCryptCryptoLoader() {
     return loader;
 }
 
+// BCrypt does not support AES-CTR natively, so we are running CTR manually via ECB mode
+// Based on following post: https://crypto.stackexchange.com/a/22674
+class AesCtrMaskGenerator {
+public:
+    AesCtrMaskGenerator(BCRYPT_KEY_HANDLE keyHandle, ConstDataRange iv)
+        : _keyHandle(keyHandle),
+          _inputBlock(iv.data(), iv.data() + iv.length()),
+          _outputBlock(aesBlockSize),
+          _blockPtr(0) {
+        uassert(ErrorCodes::BadValue, "IV size mismatch", _inputBlock.size() == aesBlockSize);
+        generateOutputBlock();
+    }
+
+    uint8_t next() {
+        if (_blockPtr >= aesBlockSize) {
+            advanceInputBlock();
+            generateOutputBlock();
+            _blockPtr = 0;
+        }
+        return _outputBlock[_blockPtr++];
+    }
+
+private:
+    void advanceInputBlock() {
+        unsigned int carry = 1;
+        for (int i = aesBlockSize - 1; i >= 0 && carry != 0; --i) {
+            unsigned int bpp = static_cast<unsigned int>(_inputBlock[i]) + carry;
+            carry = bpp >> 8;
+            _inputBlock[i] = bpp & 0xFF;
+        }
+    }
+
+    void generateOutputBlock() {
+        void* pPaddingInfo = nullptr;
+        ULONG bytesEncrypted = 0;
+        const ULONG dwFlags = 0;
+        NTSTATUS status = BCryptEncrypt(_keyHandle,
+                                        reinterpret_cast<PUCHAR>(_inputBlock.data()),
+                                        _inputBlock.size(),
+                                        pPaddingInfo,
+                                        nullptr,
+                                        0,
+                                        reinterpret_cast<PUCHAR>(_outputBlock.data()),
+                                        _outputBlock.size(),
+                                        &bytesEncrypted,
+                                        dwFlags);
+        uassert(ErrorCodes::OperationFailed, "Encrypt failed", status == STATUS_SUCCESS);
+    }
+
+private:
+    BCRYPT_KEY_HANDLE _keyHandle;
+    std::vector<uint8_t> _inputBlock;
+    std::vector<uint8_t> _outputBlock;
+    size_t _blockPtr;
+};
+
 /**
  * Base class to support initialize symmetric key buffers and state.
  */
 template <typename Parent>
 class SymmetricImplWindows : public Parent {
 public:
-    SymmetricImplWindows(const SymmetricKey& key, aesMode mode, const uint8_t* iv, size_t ivLen)
+    SymmetricImplWindows(const SymmetricKey& key, aesMode mode, ConstDataRange iv)
         : _keyHandle(INVALID_HANDLE_VALUE), _mode(mode) {
         AlgoInfo& algo = getBCryptCryptoLoader().getAlgo(mode);
 
         // Initialize key storage buffers
         _keyObjectBuf->resize(algo.keyBlobSize);
 
-        if (mode == aesMode::cbc) {
-            std::copy(iv, iv + ivLen, std::back_inserter(_iv));
+        const auto* iv_cbegin = iv.data<std::uint8_t>();
+        const auto* iv_cend = iv_cbegin + iv.length();
+        if (mode == aesMode::cbc || mode == aesMode::ctr) {
+            std::copy(iv_cbegin, iv_cend, std::back_inserter(_iv));
         } else if (mode == aesMode::gcm) {
             // In GCM mode, the _iv argument to BCrypt{Encrypt,Decrypt} is used
             // only for scratch storage. The real IV is loaded into the padding info.
@@ -179,7 +244,7 @@ public:
             // storage to contain the largest possible IV. This size can be acquired
             // from the algorithm's BCRYPT_BLOCK_LENGTH property.
             _iv = std::vector<unsigned char>(algo.blockLength);
-            std::copy(iv, iv + ivLen, std::back_inserter(_paddingNonce));
+            std::copy(iv_cbegin, iv_cend, std::back_inserter(_paddingNonce));
 
             _paddingInfo = std::make_unique<BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO>();
             BCRYPT_INIT_AUTH_MODE_INFO(*_paddingInfo);
@@ -224,6 +289,10 @@ public:
         uassert(ErrorCodes::OperationFailed,
                 str::stream() << "ImportKey failed: " << statusWithDescription(status),
                 status == STATUS_SUCCESS);
+
+        if (mode == aesMode::ctr) {
+            _maskGenerator.reset(new AesCtrMaskGenerator(_keyHandle, iv));
+        }
     }
 
     ~SymmetricImplWindows() {
@@ -249,6 +318,7 @@ protected:
     std::array<unsigned char, 12> _tag;
     std::array<unsigned char, 16> _macContext;
 
+    std::unique_ptr<AesCtrMaskGenerator> _maskGenerator;
 
     BlockPacker _packer;
 };
@@ -265,15 +335,11 @@ class SymmetricEncryptorWindows : public SymmetricImplWindows<SymmetricEncryptor
 public:
     using SymmetricImplWindows::SymmetricImplWindows;
 
-    SymmetricEncryptorWindows(const SymmetricKey& key,
-                              aesMode mode,
-                              const uint8_t* iv,
-                              size_t ivLen)
-        : SymmetricImplWindows<SymmetricEncryptor>(key, mode, iv, ivLen) {}
+    SymmetricEncryptorWindows(const SymmetricKey& key, aesMode mode, ConstDataRange iv)
+        : SymmetricImplWindows<SymmetricEncryptor>(key, mode, iv) {}
 
-    StatusWith<size_t> update(const uint8_t* in, size_t inLen, uint8_t* out, size_t outLen) final {
-        ConstDataRange inData(in, inLen);
-        DataRangeCursor outCursor(out, outLen);
+    StatusWith<std::size_t> update(ConstDataRange inData, DataRange outData) final {
+        DataRangeCursor outCursor(outData);
         return _packer.pack(inData, [this, &outCursor](ConstDataRange inData) {
             if (inData.length() > std::numeric_limits<ULONG>::max()) {
                 return StatusWith<size_t>{ErrorCodes::Overflow,
@@ -286,20 +352,31 @@ public:
             }
 
             ULONG bytesEncrypted = 0;
-            NTSTATUS status = BCryptEncrypt(_keyHandle,
-                                            const_cast<PUCHAR>(inData.data<UCHAR>()),
-                                            inData.length(),
-                                            _paddingInfo.get(),
-                                            _iv.data(),
-                                            _iv.size(),
-                                            const_cast<PUCHAR>(outCursor.data<UCHAR>()),
-                                            outCursor.length(),
-                                            &bytesEncrypted,
-                                            0);
-            if (status != STATUS_SUCCESS) {
-                return StatusWith<size_t>{ErrorCodes::OperationFailed,
-                                          str::stream() << "Encrypt failed: "
-                                                        << statusWithDescription(status)};
+
+            if (_mode == aesMode::ctr) {
+                // Actual encryption was performed in AesCtrMaskGenerator above.
+                // Here we just XOR in the data to generate a cipher.
+                const ULONG bytesToAdvance = std::min(inData.length(), outCursor.length());
+                for (ULONG i = 0; i < bytesToAdvance; ++i) {
+                    outCursor.data()[i] = inData.data()[i] ^ _maskGenerator->next();
+                }
+                bytesEncrypted = bytesToAdvance;
+            } else {
+                NTSTATUS status = BCryptEncrypt(_keyHandle,
+                                                const_cast<PUCHAR>(inData.data<UCHAR>()),
+                                                inData.length(),
+                                                _paddingInfo.get(),
+                                                _iv.data(),
+                                                _iv.size(),
+                                                const_cast<PUCHAR>(outCursor.data<UCHAR>()),
+                                                outCursor.length(),
+                                                &bytesEncrypted,
+                                                0);
+                if (status != STATUS_SUCCESS) {
+                    return StatusWith<size_t>{ErrorCodes::OperationFailed,
+                                              str::stream() << "Encrypt failed: "
+                                                            << statusWithDescription(status)};
+                }
             }
 
             outCursor.advance(bytesEncrypted);
@@ -307,12 +384,12 @@ public:
         });
     }
 
-    Status addAuthenticatedData(const uint8_t* in, size_t inLen) final {
+    Status addAuthenticatedData(ConstDataRange authData) final {
         fassert(5917500, _mode == aesMode::gcm);
         ULONG len = 0;
 
-        _paddingInfo->pbAuthData = const_cast<uint8_t*>(in);
-        _paddingInfo->cbAuthData = inLen;
+        _paddingInfo->pbAuthData = const_cast<PUCHAR>(authData.data<UCHAR>());
+        _paddingInfo->cbAuthData = authData.length();
 
         NTSTATUS status = BCryptEncrypt(
             _keyHandle, NULL, 0, _paddingInfo.get(), _iv.data(), _iv.size(), NULL, 0, &len, 0);
@@ -331,7 +408,7 @@ public:
     }
 
 
-    StatusWith<size_t> finalize(uint8_t* out, size_t outLen) final {
+    StatusWith<size_t> finalize(DataRange out) final {
         if (_paddingInfo) {
             _paddingInfo->dwFlags &= ~BCRYPT_AUTH_MODE_CHAIN_CALLS_FLAG;
             _paddingInfo->pbAuthData = NULL;
@@ -339,40 +416,49 @@ public:
         }
 
         // BCryptEncrypt may refuse to process GCM tags if no output buffer is provided.
-        uint8_t dummyOut;
-        if (!out) {
-            out = &dummyOut;
+        if (!out.data()) {
+            // const cast becauase DataRange wants a "writable" region,
+            // Our empty string isn't actually writable, but we give it a length of zero,
+            // So we'll never actually try to overwrite anything.
+            out = {const_cast<char*>(""), 0};
         }
 
         auto remainder = _packer.getBlock();
         // if there is any data left over in the block buffer, we will encrypt it with padding
         ULONG len = 0;
-        NTSTATUS status = BCryptEncrypt(_keyHandle,
-                                        const_cast<PUCHAR>(remainder.data<UCHAR>()),
-                                        remainder.length(),
-                                        _paddingInfo.get(),
-                                        _iv.data(),
-                                        _iv.size(),
-                                        out,
-                                        outLen,
-                                        &len,
-                                        _mode == aesMode::cbc ? BCRYPT_BLOCK_PADDING : 0);
+        if (_mode == aesMode::ctr) {
+            // Actual encryption was performed in AesCtrMaskGenerator above.
+            // Here we just XOR in the data to generate a cipher.
+            for (ULONG i = 0; i < remainder.length(); ++i) {
+                out.data()[i] = remainder.data()[i] ^ _maskGenerator->next();
+            }
+            len = remainder.length();
+        } else {
+            NTSTATUS status = BCryptEncrypt(_keyHandle,
+                                            const_cast<PUCHAR>(remainder.data<UCHAR>()),
+                                            remainder.length(),
+                                            _paddingInfo.get(),
+                                            _iv.data(),
+                                            _iv.size(),
+                                            const_cast<PUCHAR>(out.data<UCHAR>()),
+                                            out.length(),
+                                            &len,
+                                            _mode == aesMode::cbc ? BCRYPT_BLOCK_PADDING : 0);
 
-        if (status != STATUS_SUCCESS) {
-            return Status{ErrorCodes::OperationFailed,
-                          str::stream() << "Encrypt failed: " << statusWithDescription(status)};
+            if (status != STATUS_SUCCESS) {
+                return Status{ErrorCodes::OperationFailed,
+                              str::stream() << "Encrypt failed: " << statusWithDescription(status)};
+            }
         }
-
         return static_cast<size_t>(len);
     }
 
-    StatusWith<size_t> finalizeTag(uint8_t* out, size_t outLen) final {
-        if (_mode == aesMode::cbc) {
+    StatusWith<size_t> finalizeTag(DataRange outRange) final {
+        if (_mode != aesMode::gcm) {
             return 0;
         }
 
         ConstDataRange tag(_tag);
-        DataRange outRange(out, outLen);
         DataRangeCursor outCursor(outRange);
         outCursor.writeAndAdvance(tag);
         return tag.length();
@@ -383,9 +469,8 @@ class SymmetricDecryptorWindows : public SymmetricImplWindows<SymmetricDecryptor
 public:
     using SymmetricImplWindows::SymmetricImplWindows;
 
-    StatusWith<size_t> update(const uint8_t* in, size_t inLen, uint8_t* out, size_t outLen) final {
-        ConstDataRange inData(in, inLen);
-        DataRangeCursor outCursor(out, outLen);
+    StatusWith<std::size_t> update(ConstDataRange inData, DataRange outData) final {
+        DataRangeCursor outCursor(outData);
         return _packer.pack(inData, [this, &outCursor](ConstDataRange inData) {
             if (inData.length() > std::numeric_limits<ULONG>::max()) {
                 return StatusWith<size_t>{ErrorCodes::Overflow,
@@ -398,20 +483,30 @@ public:
             }
 
             ULONG bytesDecrypted = 0;
-            NTSTATUS status = BCryptDecrypt(_keyHandle,
-                                            const_cast<PUCHAR>(inData.data<UCHAR>()),
-                                            inData.length(),
-                                            _paddingInfo.get(),
-                                            _iv.data(),
-                                            _iv.size(),
-                                            const_cast<PUCHAR>(outCursor.data<UCHAR>()),
-                                            outCursor.length(),
-                                            &bytesDecrypted,
-                                            0);
-            if (status != STATUS_SUCCESS) {
-                return StatusWith<size_t>{ErrorCodes::OperationFailed,
-                                          str::stream() << "Decrypt failed: "
-                                                        << statusWithDescription(status)};
+            if (_mode == aesMode::ctr) {
+                // Actual encryption was performed in AesCtrMaskGenerator above.
+                // Here we just XOR in the data to generate a cipher.
+                const ULONG bytesToAdvance = std::min(inData.length(), outCursor.length());
+                for (ULONG i = 0; i < bytesToAdvance; ++i) {
+                    outCursor.data()[i] = inData.data()[i] ^ _maskGenerator->next();
+                }
+                bytesDecrypted = bytesToAdvance;
+            } else {
+                NTSTATUS status = BCryptDecrypt(_keyHandle,
+                                                const_cast<PUCHAR>(inData.data<UCHAR>()),
+                                                inData.length(),
+                                                _paddingInfo.get(),
+                                                _iv.data(),
+                                                _iv.size(),
+                                                const_cast<PUCHAR>(outCursor.data<UCHAR>()),
+                                                outCursor.length(),
+                                                &bytesDecrypted,
+                                                0);
+                if (status != STATUS_SUCCESS) {
+                    return StatusWith<size_t>{ErrorCodes::OperationFailed,
+                                              str::stream() << "Decrypt failed: "
+                                                            << statusWithDescription(status)};
+                }
             }
 
             outCursor.advance(bytesDecrypted);
@@ -419,12 +514,12 @@ public:
         });
     }
 
-    Status addAuthenticatedData(const uint8_t* in, size_t inLen) final {
+    Status addAuthenticatedData(ConstDataRange in) final {
         fassert(8423310, _mode == aesMode::gcm);
         ULONG len = 0;
 
-        _paddingInfo->pbAuthData = const_cast<uint8_t*>(in);
-        _paddingInfo->cbAuthData = inLen;
+        _paddingInfo->pbAuthData = const_cast<PUCHAR>(in.data<UCHAR>());
+        _paddingInfo->cbAuthData = in.length();
 
         NTSTATUS status = BCryptDecrypt(
             _keyHandle, NULL, 0, _paddingInfo.get(), _iv.data(), _iv.size(), NULL, 0, &len, 0);
@@ -443,7 +538,7 @@ public:
     }
 
 
-    StatusWith<size_t> finalize(uint8_t* out, size_t outLen) final {
+    StatusWith<size_t> finalize(DataRange out) final {
         ULONG len = 0;
         if (_paddingInfo) {
             _paddingInfo->dwFlags &= ~BCRYPT_AUTH_MODE_CHAIN_CALLS_FLAG;
@@ -451,36 +546,51 @@ public:
             _paddingInfo->cbAuthData = 0;
         }
 
+        // BCryptDecrypt may refuse to process GCM tags if no output buffer is provided.
+        if (!out.data()) {
+            // const cast becauase DataRange wants a "writable" region,
+            // Our empty string isn't actually writable, but we give it a length of zero,
+            // So we'll never actually try to overwrite anything.
+            out = {const_cast<char*>(""), 0};
+        }
+
         auto remainder = _packer.getBlock();
+        if (_mode == aesMode::ctr) {
+            // Actual encryption was performed in AesCtrMaskGenerator above.
+            // Here we just XOR in the data to generate a cipher.
+            for (ULONG i = 0; i < remainder.length(); ++i) {
+                out.data()[i] = remainder.data()[i] ^ _maskGenerator->next();
+            }
+            len = remainder.length();
+        } else {
+            NTSTATUS status = BCryptDecrypt(_keyHandle,
+                                            const_cast<PUCHAR>(remainder.data<UCHAR>()),
+                                            remainder.length(),
+                                            _paddingInfo.get(),
+                                            _iv.data(),
+                                            _iv.size(),
+                                            const_cast<PUCHAR>(out.data<UCHAR>()),
+                                            out.length(),
+                                            &len,
+                                            _mode == aesMode::cbc ? BCRYPT_BLOCK_PADDING : 0);
 
-        NTSTATUS status = BCryptDecrypt(_keyHandle,
-                                        const_cast<PUCHAR>(remainder.data<UCHAR>()),
-                                        remainder.length(),
-                                        _paddingInfo.get(),
-                                        _iv.data(),
-                                        _iv.size(),
-                                        out,
-                                        outLen,
-                                        &len,
-                                        _mode == aesMode::cbc ? BCRYPT_BLOCK_PADDING : 0);
-
-        if (status != STATUS_SUCCESS) {
-            return Status{ErrorCodes::OperationFailed,
-                          str::stream() << "Decrypt failed: " << statusWithDescription(status)};
+            if (status != STATUS_SUCCESS) {
+                return Status{ErrorCodes::OperationFailed,
+                              str::stream() << "Decrypt failed: " << statusWithDescription(status)};
+            }
         }
 
         return static_cast<size_t>(len);
     }
 
-    Status updateTag(const uint8_t* tag, size_t tagLen) final {
-        if (_mode == aesMode::cbc) {
+    Status updateTag(ConstDataRange tag) final {
+        if (_mode != aesMode::gcm) {
             return Status::OK();
         }
 
         DataRange tagRange(_tag);
-        ConstDataRange providedRange(tag, tagLen);
         DataRangeCursor tagCursor(tagRange);
-        tagCursor.writeAndAdvance(providedRange);
+        tagCursor.writeAndAdvance(tag);
         return Status::OK();
     }
 };
@@ -488,11 +598,14 @@ public:
 }  // namespace
 
 std::set<std::string> getSupportedSymmetricAlgorithms() {
-    return {aes256CBCName, aes256GCMName};
+    return {aes256CBCName, aes256GCMName, aes256CTRName};
 }
 
-Status engineRandBytes(uint8_t* buffer, size_t len) {
-    NTSTATUS status = BCryptGenRandom(getBCryptCryptoLoader().getRandom(), buffer, len, 0);
+Status engineRandBytes(DataRange buffer) {
+    NTSTATUS status = BCryptGenRandom(getBCryptCryptoLoader().getRandom(),
+                                      const_cast<PUCHAR>(buffer.data<UCHAR>()),
+                                      buffer.length(),
+                                      0);
     if (status == STATUS_SUCCESS) {
         return Status::OK();
     }
@@ -504,11 +617,10 @@ Status engineRandBytes(uint8_t* buffer, size_t len) {
 
 StatusWith<std::unique_ptr<SymmetricEncryptor>> SymmetricEncryptor::create(const SymmetricKey& key,
                                                                            aesMode mode,
-                                                                           const uint8_t* iv,
-                                                                           size_t ivLen) {
+                                                                           ConstDataRange iv) {
     try {
         std::unique_ptr<SymmetricEncryptor> encryptor =
-            std::make_unique<SymmetricEncryptorWindows>(key, mode, iv, ivLen);
+            std::make_unique<SymmetricEncryptorWindows>(key, mode, iv);
         return std::move(encryptor);
     } catch (const DBException& e) {
         return e.toStatus();
@@ -517,11 +629,10 @@ StatusWith<std::unique_ptr<SymmetricEncryptor>> SymmetricEncryptor::create(const
 
 StatusWith<std::unique_ptr<SymmetricDecryptor>> SymmetricDecryptor::create(const SymmetricKey& key,
                                                                            aesMode mode,
-                                                                           const uint8_t* iv,
-                                                                           size_t ivLen) {
+                                                                           ConstDataRange iv) {
     try {
         std::unique_ptr<SymmetricDecryptor> decryptor =
-            std::make_unique<SymmetricDecryptorWindows>(key, mode, iv, ivLen);
+            std::make_unique<SymmetricDecryptorWindows>(key, mode, iv);
         return std::move(decryptor);
     } catch (const DBException& e) {
         return e.toStatus();

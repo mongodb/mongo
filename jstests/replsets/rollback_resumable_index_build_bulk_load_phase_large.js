@@ -3,14 +3,17 @@
  * phase completes properly after being interrupted for rollback during the bulk load phase.
  *
  * @tags: [
+ *  # Primary-driven index builds aren't resumable.
+ *   primary_driven_index_builds_incompatible,
  *   requires_majority_read_concern,
  *   requires_persistence,
+ *   # The rollback can be slow on certain build variants (such as macOS and code coverage), which
+ *   # can cause the targeted log messages to fall off the log buffer before we search for them.
+ *   incompatible_with_gcov,
  * ]
  */
-(function() {
-"use strict";
-
-load('jstests/replsets/libs/rollback_resumable_index_build.js');
+import {RollbackResumableIndexBuildTest} from "jstests/replsets/libs/rollback_resumable_index_build.js";
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 const dbName = "test";
 
@@ -27,9 +30,12 @@ for (let i = 0; i < numDocuments; i++) {
     docs.push({a: i.toString().repeat(1024 * 256)});
 }
 
-const runRollbackTo = function(rollbackEndFailPoint) {
-    assert.commandWorked(rollbackTest.getPrimary().adminCommand(
-        {setParameter: 1, maxIndexBuildMemoryUsageMegabytes: maxIndexBuildMemoryUsageMB}));
+const runRollbackTo = function (rollbackEndFailPoint) {
+    assert.commandWorked(
+        rollbackTest
+            .getPrimary()
+            .adminCommand({setParameter: 1, maxIndexBuildMemoryUsageMegabytes: maxIndexBuildMemoryUsageMB}),
+    );
 
     RollbackResumableIndexBuildTest.run(
         rollbackTest,
@@ -40,24 +46,23 @@ const runRollbackTo = function(rollbackEndFailPoint) {
         [{name: "hangIndexBuildDuringBulkLoadPhase", logIdWithIndexName: 4924400}],
         // Most documents are at least 0.5 MB, so the index build must have spilled to disk by this
         // point.
-        maxIndexBuildMemoryUsageMB,  // rollbackStartFailPointsIteration
+        maxIndexBuildMemoryUsageMB, // rollbackStartFailPointsIteration
         [rollbackEndFailPoint],
-        1,  // rollbackEndFailPointsIteration
+        1, // rollbackEndFailPointsIteration
         ["hangDuringIndexBuildBulkLoadYield"],
         ["bulk load"],
         [{skippedPhaseLogID: 20391}],
-        [{a: 1}, {a: 2}]);
+        [{a: 1}, {a: 2}],
+    );
 };
 
 // Rollback to before the indexes begin to be built.
 runRollbackTo({name: "hangAfterSettingUpIndexBuild", logIdWithBuildUUID: 20387});
 
 // Rollback to earlier in the collection scan phase.
-runRollbackTo(
-    {name: "hangIndexBuildDuringCollectionScanPhaseBeforeInsertion", logIdWithBuildUUID: 20386});
+runRollbackTo({name: "hangIndexBuildDuringCollectionScanPhaseBeforeInsertion", logIdWithBuildUUID: 20386});
 
 // Rollback to the bulk load phase.
 runRollbackTo({name: "hangIndexBuildDuringBulkLoadPhaseSecond", logIdWithIndexName: 4924400});
 
 rollbackTest.stop();
-})();

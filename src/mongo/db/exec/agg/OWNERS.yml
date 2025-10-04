@@ -1,0 +1,43 @@
+version: 1.0.0
+filters:
+  # The files implementing Stage each contain code related to pipeline execution (QE). Therefore,
+  # we give default ownership of files in this directory to the entire query-execution-classic
+  # team. The special-purpose or special-feature stages are owned by the dedicated teams.
+  - "*":
+    approvers:
+      - 10gen/query-execution-classic
+  - "OWNERS.yml":
+    approvers:
+      - 10gen/query-execution-staff-leads
+      - 10gen/query-optimization-staff-leads
+      - 10gen/query-integration-staff-leads
+  - "coll_stats_stage*":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
+  - "current_op_stage*":
+    approvers:
+      - 10gen/query-integration-observability
+  - "densify_stage*":
+    approvers:
+      - 10gen/query-integration-features
+  - "internal_all_collection_stats_stage*":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
+  - "internal_convert_bucket_index_stats_stage*":
+    approvers:
+      - 10gen/query-integration-timeseries
+  - "internal_list_collections_stage*":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
+  - "internal_set_window_fields_stage*":
+    approvers:
+      - 10gen/query-integration-features
+  - "list_catalog_stage*":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
+  - "plan_cache_stats_stage*":
+    approvers:
+      - 10gen/query-optimization
+  - "query_stats_stage*":
+    approvers:
+      - 10gen/query-integration-observability

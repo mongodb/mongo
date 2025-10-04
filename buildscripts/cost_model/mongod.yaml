@@ -1,0 +1,9 @@
+storage:
+  dbPath: /home/ubuntu/data/db
+systemLog:
+  path: /home/ubuntu/data/logs/mongod.log
+  destination: file
+  logAppend: false
+setParameter:
+  internalMeasureQueryExecutionTimeInNanoseconds: true
+  enableTestCommands: 1

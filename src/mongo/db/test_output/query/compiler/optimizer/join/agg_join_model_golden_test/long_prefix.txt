@@ -1,0 +1,162 @@
+VARIATION longPrefix
+input {
+    "pipeline": [
+        {
+            "$match": {
+                "c": {"$numberInt":"1"},
+                "h": {"$numberInt":"12"}
+            }
+        },
+        {
+            "$sort": {
+                "e": {"$numberInt":"1"}
+            }
+        },
+        {
+            "$project": {
+                "k": false,
+                "_id": true
+            }
+        },
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "fromA",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$fromA"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "B",
+                "as": "fromB",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$fromB"
+            }
+        }
+    ]
+}
+output: {
+    "graph": {
+        "nodes": [
+            {
+                "collectionName": "test.pipeline_test",
+                "accessPath": {
+                    "filter": {
+                        "$and": [
+                            {
+                                "c": {
+                                    "$eq": {"$numberInt":"1"}
+                                }
+                            },
+                            {
+                                "h": {
+                                    "$eq": {"$numberInt":"12"}
+                                }
+                            }
+                        ]
+                    },
+                    "projection": {
+                        "k": false
+                    },
+                    "sort": {
+                        "e": {"$numberInt":"1"}
+                    }
+                },
+                "embedPath": ""
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "fromA"
+            },
+            {
+                "collectionName": "test.B",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "fromB"
+            }
+        ],
+        "edges": [
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"1"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000000000000000000000000000000000000000010"
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"2"}
+                    }
+                ],
+                "left": "0000000000000000000000000000000000000000000000000000000000000001",
+                "right": "0000000000000000000000000000000000000000000000000000000000000100"
+            }
+        ]
+    },
+    "resolvedPaths": [
+        {
+            "nodeId": {"$numberInt":"0"},
+            "fieldName": "a"
+        },
+        {
+            "nodeId": {"$numberInt":"1"},
+            "fieldName": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"2"},
+            "fieldName": "b"
+        }
+    ],
+    "prefix": [
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "fromA",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$fromA"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "B",
+                "as": "fromB",
+                "localField": "a",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$fromB"
+            }
+        }
+    ],
+    "suffix": []
+}
+

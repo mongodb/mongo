@@ -1,11 +1,7 @@
 /**
  * Confirms that $lookup with a non-correlated foreign pipeline returns expected results.
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // documentEq
-load("jstests/libs/fixture_helpers.js");      // For isSharded.
+import {documentEq} from "jstests/aggregation/extras/utils.js";
 
 const testDB = db.getSiblingDB("lookup_non_correlated");
 const localName = "local";
@@ -14,15 +10,6 @@ localColl.drop();
 const foreignName = "foreign";
 const foreignColl = testDB.getCollection(foreignName);
 foreignColl.drop();
-
-// Do not run the rest of the tests if the foreign collection is implicitly sharded but the flag to
-// allow $lookup/$graphLookup into a sharded collection is disabled.
-const getShardedLookupParam = db.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
-const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
-    getShardedLookupParam.featureFlagShardedLookup.value;
-if (FixtureHelpers.isSharded(foreignColl) && !isShardedLookupEnabled) {
-    return;
-}
 
 assert.commandWorked(localColl.insert({_id: "A"}));
 assert.commandWorked(localColl.insert({_id: "B"}));
@@ -49,7 +36,7 @@ assert(!cursor.hasNext());
 cursor = localColl.aggregate([
     {$match: {_id: "A"}},
     {$lookup: {from: foreignName, as: "foreignDocs", pipeline: [{$match: {_id: {"$gte": 2}}}]}},
-    {$unwind: "$foreignDocs"}
+    {$unwind: "$foreignDocs"},
 ]);
 
 assert(cursor.hasNext());
@@ -63,10 +50,9 @@ cursor = localColl.aggregate([
     {$match: {_id: "A"}},
     {$lookup: {from: foreignName, as: "foreignDocs", pipeline: [{$match: {_id: {"$gte": 2}}}]}},
     {$unwind: "$foreignDocs"},
-    {$match: {"foreignDocs._id": 2}}
+    {$match: {"foreignDocs._id": 2}},
 ]);
 
 assert(cursor.hasNext());
 documentEq({_id: "A", foreignDocs: {_id: 2}}, cursor.next());
 assert(!cursor.hasNext());
-})();

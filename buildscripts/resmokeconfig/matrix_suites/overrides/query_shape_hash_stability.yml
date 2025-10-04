@@ -1,0 +1,278 @@
+- name: eval_query_shape_hash_stability
+  value:
+    eval: >-
+      await import("jstests/libs/override_methods/query_shape_hash_stability.js");
+
+- name: fuzzer_selector
+  value:
+    selector:
+      roots:
+        - jstestfuzz/out/*.js
+      exclude_files: []
+      exclude_with_any_tags: []
+
+- name: common_core_excludes
+  value:
+    exclude_files:
+      # Distinct explain fails with 'database not found' on sharded clusters
+      - jstests/core/query/distinct/distinct_semantics.js
+      # Explain cannot target shards directly.
+      - jstests/core/index/text/text_ignore_regex.js
+      - jstests/core/index/fts/fts_spilling.js
+      - jstests/core/timeseries/query/timeseries_merge.js
+      - jstests/core/query/or_use_clustered_collection.js
+      # Tests which assert on the number of execution metrics. The additional commands emitted by
+      # this suite might cause the tests to fail.
+      - jstests/core/administrative/current_op/**/*.js
+      - jstests/core/query/collation/collation.js
+      - jstests/core/diagnostics/operation_latency_histogram.js
+      - jstests/core/query/top/top.js
+      - jstests/core/catalog/views/views_stats.js
+      - jstests/core/txns/timestamped_reads_wait_for_prepare_oplog_visibility.js # failpoint 'timesEntered'
+      - jstests/core/timeseries/ddl/timeseries_sparse_index.js
+      # Tests which assert on the output of 'getLog' command. The additional emitted commands might lead to
+      # log truncation, hence failing the tests.
+      - jstests/core/administrative/getlog2.js
+      # Failpoint interferes with majority commited writes.
+      - jstests/core/txns/speculative_snapshot_includes_all_writes.js
+      # TODO SERVER-100658 Explain on non-existent collection returns empty results for sharded
+      # cluster aggregations.
+      - jstests/core/query/api/api_version_new_50_language_features.js
+      - jstests/core/query/api/api_version_new_51_language_features.js
+      - jstests/core/query/api/api_version_new_52_language_features.js
+      # QueryShapeHash is computed only on the router, but not on the shards due to lack of collection collation information.
+      - jstests/core/index/express_id_eq.js
+      # Tests the number of slow query logs which is changed by the override.
+      - jstests/core/query/query_settings/query_shape_hash_in_slow_query_logs.js
+
+    exclude_with_any_tags:
+      - does_not_support_repeated_reads
+      - requires_fsync
+      # There are some cases where an invalid query will cause us to fail in unexpected ways when
+      # the query shape is also computed. See SERVER-96850 for example. This is generally not
+      # concerning if the query doesn't normally have hope of succeeding, and we can safely ignore
+      # them.
+      - known_query_shape_computation_problem
+      - directly_against_shardsvrs_incompatible
+      # These tests run many aggregations, and the override slows them down enough to hit the evergreen timeout.
+      - query_intensive_pbt
+
+- name: common_aggregation_excludes
+  value:
+    exclude_files:
+      # Test which asserts on the number of execution metrics. The additional commands emitted by
+      # this suite might cause the test to fail.
+      - jstests/aggregation/sources/geonear/geonear_hint.js
+      - jstests/aggregation/sources/lookup/lookup_query_stats.js
+      - jstests/aggregation/sources/unionWith/unionWith_query_stats.js
+      # This suite emits additional explains alongside the tested command. This interferes
+      # with the number of expected plan cache entries.
+      - jstests/aggregation/sources/lookup/lookup_single_solution_cache.js
+      # TODO SERVER-100658 Explain on non-existent collection returns empty results for sharded
+      # cluster aggregations.
+      - jstests/aggregation/sources/unwind/unwind_preserve_null_and_empty_arrays.js
+      - jstests/aggregation/sources/sample/sample_optimization.js
+      - jstests/aggregation/sources/setWindowFields/min_max_scaler_parsing.js
+      - jstests/aggregation/parsing/max_subpipeline_depth.js
+      - jstests/aggregation/sources/densify/parse.js
+      - jstests/aggregation/sources/graphLookup/basic.js
+      - jstests/aggregation/sources/out/required_last_position.js
+      - jstests/aggregation/sources/setWindowFields/parse.js
+      # Explain size is too large and fails validation.
+      - jstests/aggregation/exec/query_limits_test.js
+      # Triggers SERVER-95731 pointer dereference.
+      - jstests/aggregation/sources/internal_document_sources.js
+
+    exclude_with_any_tags:
+      - assumes_standalone_mongod
+      - does_not_support_repeated_reads
+      - requires_profiling
+      - requires_fsync
+      - assumes_unsharded_collection
+      - assumes_against_mongod_not_mongos
+      # There are some cases where an invalid query will cause us to fail in unexpected ways when
+      # the query shape is also computed. See SERVER-96850 for example. This is generally not
+      # concerning if the query doesn't normally have hope of succeeding, and we can safely ignore
+      # them.
+      - known_query_shape_computation_problem
+      - directly_against_shardsvrs_incompatible
+      # These tests run many aggregations, and the override slows them down enough to hit the evergreen timeout.
+      - query_intensive_pbt
+
+- name: change_streams_multiversion_excludes
+  value:
+    exclude_files:
+      - jstests/change_streams/does_not_implicitly_create_database.js
+      - jstests/change_streams/oplog_rewrite/*.js
+      - jstests/change_streams/projection_fakes_internal_event.js
+      - jstests/change_streams/split_large_event.js
+    exclude_with_any_tags:
+      - assumes_against_mongod_not_mongos
+      - multiversion_incompatible
+      - requires_2_or_more_shards
+      - requires_sharding
+
+- name: common_multiversion_excludes
+  value:
+    exclude_files:
+      # Uses commands to discover topology, which interferes with the override, as it will expect
+      # "conn.multiShardedClusterFixture" to have 2 elements, but 0 will be present on monogod's.
+      - src/mongo/db/modules/enterprise/jstests/fle2/basic_create_collection.js
+      # Requires encryped connections.
+      - src/mongo/db/modules/enterprise/jstests/fle2/fle2_bulk_write.js
+    exclude_with_any_tags:
+      - multiversion_incompatible
+      - requires_2_or_more_shards
+
+- name: multiversion_core_excludes
+  value:
+    exclude_files:
+      # Uses commands to discover topology, which interferes with the override, as it will expect
+      # conn.multiShardedClusterFixture to have 2 elements, but 0 will be present on monogd's.
+      - jstests/core/index/express.js
+      - jstests/core/query/idhack.js
+      - jstests/core/query/explain/explain_all_plans_execution_stats.js
+      - jstests/core/timeseries/ddl/rename_timeseries.js
+      - jstests/core/timeseries/write/timeseries_delete_with_meta.js
+      # UUID mismatch on second cluster.
+      - jstests/core/timeseries/ddl/timeseries_collection_uuid.js
+
+- name: multiversion_aggregation_excludes
+  value:
+    exclude_files:
+      # Uses commands to discover topology, which interferes with the override, as it will expect
+      # "conn.multiShardedClusterFixture" to have 2 elements, but 0 will be present on monogod's.
+      - jstests/aggregation/sources/densify/memory_limit.js
+      - jstests/aggregation/sources/setWindowFields/memory_limit.js
+      - jstests/aggregation/sources/densify/densify_sort_opt_comparison.js
+      - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_hj.js
+      - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_inlj.js
+      - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_nlj.js
+      - jstests/aggregation/explain/explain_limit.js
+      - jstests/aggregation/sources/densify/generated_limit.js
+      - jstests/aggregation/sources/unionWith/unionWith.js
+      - jstests/aggregation/sources/lookup/hash_lookup_spill_large_and_small_documents_correctly.js
+      - jstests/aggregation/js/agg_infinite_recursion.js
+      - jstests/aggregation/sources/indexStats/verify_index_stats_output.js
+      - jstests/aggregation/optimization/lookup_let_optimization.js
+      - jstests/aggregation/sources/project/remove_redundant_projects.js
+      - jstests/aggregation/exec/spill_to_disk.js
+      # UUID mismatch on second cluster.
+      - jstests/aggregation/parsing/aggregation_with_uuids.js
+      - jstests/aggregation/sources/collection_uuid_coll_stats_index_stats.js
+
+- name: multiversion_cluster_fixture_last_lts
+  value:
+    executor:
+      hooks:
+        - class: ValidateCollections
+        - class: CleanEveryN
+          n: 20
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              isMultiShardedClusterFixture: true
+      fixture:
+        class: MultiShardedClusterFixture
+        num_sharded_clusters: 2
+        num_shards: 1
+        num_nodes: null
+        num_rs_nodes_per_shard: 2
+        mongod_options: null
+        common_mongod_options:
+          set_parameters:
+            enableTestCommands: 1
+          verbose: ""
+        per_sharded_cluster_options:
+          - old_bin_version: last_lts
+            mixed_bin_versions: old_old
+          - {}
+        persist_connection_strings: true
+
+- name: multiversion_cluster_fixture_last_continuous
+  value:
+    executor:
+      hooks:
+        - class: ValidateCollections
+        - class: CleanEveryN
+          n: 20
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              isMultiShardedClusterFixture: true
+      fixture:
+        class: MultiShardedClusterFixture
+        num_sharded_clusters: 2
+        num_shards: 1
+        num_nodes: null
+        num_rs_nodes_per_shard: 2
+        mongod_options: null
+        common_mongod_options:
+          set_parameters:
+            enableTestCommands: 1
+          verbose: ""
+        per_sharded_cluster_options:
+          - old_bin_version: last_continuous
+            mixed_bin_versions: old_old
+          - {}
+        persist_connection_strings: true
+
+- name: multiversion_cluster_fuzzer_fixture_last_lts
+  value:
+    executor:
+      hooks:
+        - class: ValidateCollections
+        - class: CleanEveryN
+          n: 20
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              isMultiShardedClusterFixture: true
+              isRunningQueryShapeHashFuzzer: true
+      fixture:
+        class: MultiShardedClusterFixture
+        num_sharded_clusters: 2
+        num_shards: 1
+        num_rs_nodes_per_shard: 2
+        mongod_options: null
+        common_mongod_options:
+          set_parameters:
+            enableTestCommands: 1
+          verbose: ""
+        per_sharded_cluster_options:
+          - old_bin_version: last_lts
+            mixed_bin_versions: old_old
+          - {}
+        persist_connection_strings: true
+
+- name: multiversion_cluster_fuzzer_fixture_last_continuous
+  value:
+    executor:
+      hooks:
+        - class: ValidateCollections
+        - class: CleanEveryN
+          n: 20
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              isMultiShardedClusterFixture: true
+              isRunningQueryShapeHashFuzzer: true
+      fixture:
+        class: MultiShardedClusterFixture
+        num_sharded_clusters: 2
+        num_shards: 1
+        num_rs_nodes_per_shard: 2
+        mongod_options: null
+        common_mongod_options:
+          set_parameters:
+            enableTestCommands: 1
+          verbose: ""
+        per_sharded_cluster_options:
+          - old_bin_version: last_continuous
+            mixed_bin_versions: old_old
+          - {}
+        persist_connection_strings: true

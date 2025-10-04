@@ -66,8 +66,12 @@ static WT_THREAD_RET monitor(void *);
  */
 #define RUNTIME 900.0
 
-static WT_EVENT_HANDLER event_handler = {handle_op_error, handle_op_message, NULL, NULL};
+static WT_EVENT_HANDLER event_handler = {handle_op_error, handle_op_message, NULL, NULL, NULL};
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {
@@ -87,10 +91,12 @@ main(int argc, char *argv[])
     memset(opts, 0, sizeof(*opts));
 
     testutil_check(testutil_parse_opts(argc, argv, opts));
-    testutil_make_work_dir(opts->home);
+    testutil_recreate_dir(opts->home);
 
     testutil_check(wiredtiger_open(opts->home, &event_handler,
-      "create,cache_size=1G,timing_stress_for_test=[checkpoint_slow]", &opts->conn));
+      "create,cache_size=1G,timing_stress_for_test=[checkpoint_slow],statistics=(all),statistics_"
+      "log=(json,on_close,wait=1)",
+      &opts->conn));
 
     testutil_check(pthread_create(&ckpt_thread, NULL, do_checkpoints, opts));
 
@@ -121,7 +127,8 @@ main(int argc, char *argv[])
 }
 
 /*
- * Function for repeatedly running checkpoint operations.
+ * do_checkpoints --
+ *     Function for repeatedly running checkpoint operations.
  */
 static WT_THREAD_RET
 do_checkpoints(void *_opts)
@@ -156,8 +163,9 @@ do_checkpoints(void *_opts)
 }
 
 /*
- * Function to monitor running operations and abort to dump core in the event that we catch an
- * operation running long.
+ * monitor --
+ *     Function to monitor running operations and abort to dump core in the event that we catch an
+ *     operation running long.
  */
 static WT_THREAD_RET
 monitor(void *args)
@@ -207,7 +215,8 @@ monitor(void *args)
 }
 
 /*
- * Worker thread. Executes random operations from the set of 6.
+ * do_ops --
+ *     Worker thread. Executes random operations from the set of 6.
  */
 static WT_THREAD_RET
 do_ops(void *args)
@@ -215,7 +224,7 @@ do_ops(void *args)
     WT_RAND_STATE rnd;
     time_t now, start;
 
-    __wt_random_init_seed(NULL, &rnd);
+    __wt_random_init(NULL, &rnd);
     (void)time(&start);
     (void)time(&now);
 

@@ -1,0 +1,154 @@
+load("@poetry//:dependencies.bzl", "dependency")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
+load("//bazel/config:render_template.bzl", "render_template")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    [
+        "generate_error_codes.yml",
+        "generate_error_codes.py",
+    ] + glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+render_template(
+    name = "error_codes_source",
+    srcs = [
+        "error_codes.tpl.cpp",
+        "error_codes.yml",
+        "generate_error_codes.py",
+    ],
+    cmd = [
+        "$(location generate_error_codes.py)",
+        "$(location error_codes.yml)",
+        "$(location error_codes.tpl.cpp)",
+        "$(location error_codes.cpp)",
+    ],
+    output = "error_codes.cpp",
+    python_libs = [
+        dependency(
+            "cheetah3",
+            group = "compile",
+        ),
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+    ],
+)
+
+render_template(
+    name = "error_codes_header",
+    srcs = [
+        "error_codes.tpl.h",
+        "error_codes.yml",
+        "generate_error_codes.py",
+    ],
+    cmd = [
+        "$(location generate_error_codes.py)",
+        "$(location error_codes.yml)",
+        "$(location error_codes.tpl.h)",
+        "$(location error_codes.h)",
+    ],
+    output = "error_codes.h",
+    python_libs = [
+        dependency(
+            "cheetah3",
+            group = "compile",
+        ),
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+    ],
+)
+
+mongo_cc_library(
+    name = "environment_buffer",
+    srcs = [
+        "environment_buffer.cpp",
+    ],
+    hdrs = [
+        "environment_buffer.h",
+    ],
+)
+
+mongo_cc_library(
+    name = "system_error",
+    srcs = [
+        "system_error.cpp",
+    ],
+    hdrs = [
+        "system_error.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "secure_allocator",
+    srcs = [
+        "secure_allocator.cpp",
+    ],
+    hdrs = [
+        "secure_allocator.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/bson:bson_validate",
+        "//src/mongo/util:processinfo",
+        "//src/mongo/util:secure_zero_memory",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "base_test",
+    srcs = [
+        "clonable_ptr_test.cpp",
+        "counter_test.cpp",
+        "data_builder_test.cpp",
+        "data_cursor_test.cpp",
+        "data_range_cursor_test.cpp",
+        "data_range_test.cpp",
+        "data_type_string_data_test.cpp",
+        "data_type_terminated_test.cpp",
+        "data_type_validated_test.cpp",
+        "data_view_test.cpp",
+        "dependency_graph_test.cpp",
+        "encoded_value_storage_test.cpp",
+        "initializer_test.cpp",
+        "murmurhash3_test.cpp",
+        "parse_number_test.cpp",
+        "secure_allocator_test.cpp",
+        "status_test.cpp",
+        "status_with_test.cpp",
+        "string_data_test.cpp",
+        "system_error_test.cpp",
+        "uuid_test.cpp",
+        "//src/mongo/base:data_type_validated.h",
+    ],
+    tags = [
+        "mongo_unittest_seventh_group",
+        "platform",
+        "server-programmability",
+    ],
+    deps = [
+        ":secure_allocator",
+        ":system_error",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "status_bm",
+    srcs = [
+        "status_bm.cpp",
+    ],
+    deps = [
+        "//src/mongo/util:processinfo",
+        "//src/third_party/benchmark",
+    ],
+)

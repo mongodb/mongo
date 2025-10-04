@@ -29,8 +29,15 @@
 
 #pragma once
 
+#include "mongo/base/clonable_ptr.h"
 #include "mongo/base/string_data.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_arity.h"
+#include "mongo/db/matcher/expression_visitor.h"
+
+#include <array>
+#include <memory>
+#include <utility>
 
 namespace mongo {
 
@@ -67,13 +74,6 @@ public:
     MatchCategory getCategory() const final {
         return MatchCategory::kOther;
     }
-
-    /**
-     * If the input object matches 'condition', returns the result of matching it against
-     * 'thenBranch'. Otherwise, returns the result of matching it against 'elseBranch'.
-     */
-    bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const final;
-    bool matchesSingleElement(const BSONElement& elem, MatchDetails* details = nullptr) const final;
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
         visitor->visit(this);

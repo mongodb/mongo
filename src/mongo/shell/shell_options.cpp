@@ -27,36 +27,53 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/shell/shell_options.h"
 
-#include <boost/filesystem/operations.hpp>
-
-#include <iostream>
-
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/client/client_api_version_parameters_gen.h"
 #include "mongo/client/mongo_uri.h"
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/server_options.h"
-#include "mongo/logv2/log.h"
+#include "mongo/db/server_parameter.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_component_settings.h"
+#include "mongo/logv2/log_manager.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/shell/shell_utils.h"
 #include "mongo/transport/message_compressor_options_client_gen.h"
 #include "mongo/transport/message_compressor_registry.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/net/socket_utils.h"
+#include "mongo/util/options_parser/environment.h"
+#include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/startup_options.h"
+#include "mongo/util/options_parser/value.h"
 #include "mongo/util/str.h"
 #include "mongo/util/version.h"
 
+#include <iostream>
+#include <map>
+#include <set>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
+
 namespace mongo {
 
-using std::cout;
-using std::endl;
 using std::string;
 using std::vector;
 
@@ -64,13 +81,16 @@ using std::vector;
 const std::set<std::string> kSetShellParameterAllowlist = {
     "awsEC2InstanceMetadataUrl",
     "awsECSInstanceMetadataUrl",
-    "ocspEnabled",
-    "ocspClientHttpTimeoutSecs",
     "disabledSecureAllocatorDomains",
+    "featureFlagQETextSearchPreview",
     "newLineAfterPasswordPromptForTest",
+    "ocspClientHttpTimeoutSecs",
+    "ocspEnabled",
     "skipShellCursorFinalize",
     "tlsOCSPSlowResponderWarningSecs",
-};
+    "enableDetailedConnectionHealthMetricLogLines",
+    "defaultFindReplicaSetHostTimeoutMS",
+    "multitenancySupport"};
 
 std::string getMongoShellHelp(StringData name, const moe::OptionSection& options) {
     StringBuilder sb;
@@ -137,6 +157,12 @@ Status storeMongoShellOptions(const moe::Environment& params,
         serverGlobalParams.crashOnInvalidBSONError = true;
     }
 
+    // Common to the server and shell, deterministically reproduces the execution order of mongo
+    // initializers.
+    if (params.count("initializerShuffleSeed")) {
+        serverGlobalParams.initializerShuffleSeed = 0;
+    }
+
     if (params.count("port")) {
         shellGlobalParams.port = params["port"].as<string>();
     }
@@ -180,18 +206,21 @@ Status storeMongoShellOptions(const moe::Environment& params,
     if (params.count("disableJavaScriptProtection")) {
         shellGlobalParams.javascriptProtection = false;
     }
-    if (params.count("disableJavaScriptJIT")) {
-        shellGlobalParams.nojit = true;
-    }
-    if (params.count("enableJavaScriptJIT")) {
-        shellGlobalParams.nojit = false;
-    }
     if (params.count("files")) {
         shellGlobalParams.files = params["files"].as<vector<string>>();
     }
     if (params.count("disableImplicitSessions")) {
         shellGlobalParams.shouldUseImplicitSessions = false;
     }
+
+#ifdef MONGO_CONFIG_GRPC
+    if (params.count("gRPC")) {
+        shellGlobalParams.gRPC = true;
+    }
+    if (params.count("gRPCAuthToken")) {
+        shellGlobalParams.gRPCAuthToken = params["gRPCAuthToken"].as<string>();
+    }
+#endif
 
     /* This is a bit confusing, here are the rules:
      *
@@ -291,8 +320,7 @@ Status storeMongoShellOptions(const moe::Environment& params,
     }
 
     if (!shellGlobalParams.networkMessageCompressors.empty()) {
-        const auto ret =
-            storeMessageCompressionOptions(shellGlobalParams.networkMessageCompressors);
+        auto ret = storeMessageCompressionOptions(shellGlobalParams.networkMessageCompressors);
         if (!ret.isOK()) {
             return ret;
         }
@@ -307,21 +335,20 @@ Status storeMongoShellOptions(const moe::Environment& params,
 
     if (params.count("setShellParameter")) {
         auto ssp = params["setShellParameter"].as<std::map<std::string, std::string>>();
-        auto map = ServerParameterSet::getGlobal()->getMap();
-        for (auto it : ssp) {
+        auto* paramSet = ServerParameterSet::getNodeParameterSet();
+        for (const auto& it : ssp) {
             const auto& name = it.first;
-            auto paramIt = map.find(name);
-            if (paramIt == map.end() || !kSetShellParameterAllowlist.count(name)) {
+            auto param = paramSet->getIfExists(name);
+            if (!param || !kSetShellParameterAllowlist.count(name)) {
                 return {ErrorCodes::BadValue,
                         str::stream() << "Unknown --setShellParameter '" << name << "'"};
             }
-            auto* param = paramIt->second;
             if (!param->allowedToChangeAtStartup()) {
                 return {ErrorCodes::BadValue,
                         str::stream()
                             << "Cannot use --setShellParameter to set '" << name << "' at startup"};
             }
-            auto status = param->setFromString(it.second);
+            auto status = param->setFromString(it.second, boost::none);
             if (!status.isOK()) {
                 return {ErrorCodes::BadValue,
                         str::stream()

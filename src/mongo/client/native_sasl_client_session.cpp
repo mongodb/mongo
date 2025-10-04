@@ -27,21 +27,32 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/client/native_sasl_client_session.h"
 
-#include "mongo/base/init.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/authenticate.h"
 #include "mongo/client/sasl_client_conversation.h"
+#include "mongo/client/sasl_oidc_client_conversation.h"
 #include "mongo/client/sasl_plain_client_conversation.h"
 #include "mongo/client/sasl_scram_client_conversation.h"
+#include "mongo/client/sasl_x509_client_conversation.h"
 #include "mongo/client/scram_client_cache.h"
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/crypto/sha1_block.h"
 #include "mongo/crypto/sha256_block.h"
-#include "mongo/db/commands/server_status.h"
+#include "mongo/db/commands/server_status/server_status.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/util/str.h"
+
+#include <tuple>
+
+#include <absl/container/node_hash_map.h>
 
 #ifdef MONGO_CONFIG_SSL
 #include "mongo/client/sasl_aws_client_conversation.h"
@@ -75,9 +86,9 @@ void cacheToBSON(SCRAMClientCache<HashBlock>* cache, StringData name, BSONObjBui
 /**
  * Output stats about the SCRAM client cache to server status.
  */
-class ScramCacheStatsStatusSection : ServerStatusSection {
+class ScramCacheStatsStatusSection : public ServerStatusSection {
 public:
-    ScramCacheStatsStatusSection() : ServerStatusSection("scramCache") {}
+    using ServerStatusSection::ServerStatusSection;
 
     bool includeByDefault() const override {
         return true;
@@ -89,9 +100,11 @@ public:
         cacheToBSON(scramsha1ClientCache, "SCRAM-SHA-1", &builder);
         cacheToBSON(scramsha256ClientCache, "SCRAM-SHA-256", &builder);
         return builder.obj();
-    };
+    }
+};
 
-} scramCacheStatusSection;
+auto& scramCacheSection =
+    *ServerStatusSectionBuilder<ScramCacheStatsStatusSection>("scramCache").forShard().forRouter();
 
 }  // namespace
 
@@ -105,20 +118,32 @@ Status NativeSaslClientSession::initialize() {
         return Status(ErrorCodes::AlreadyInitialized,
                       "Cannot reinitialize NativeSaslClientSession.");
 
-    std::string mechanism = getParameter(parameterMechanism).toString();
-    if (mechanism == "PLAIN") {
-        _saslConversation.reset(new SaslPLAINClientConversation(this));
-    } else if (mechanism == "SCRAM-SHA-1") {
-        _saslConversation.reset(
-            new SaslSCRAMClientConversationImpl<SHA1Block>(this, scramsha1ClientCache));
-    } else if (mechanism == "SCRAM-SHA-256") {
-        _saslConversation.reset(
-            new SaslSCRAMClientConversationImpl<SHA256Block>(this, scramsha256ClientCache));
+    std::string mechanism = std::string{getParameter(parameterMechanism)};
+    if (mechanism == auth::kMechanismSaslPlain) {
+        _saslConversation = std::make_unique<SaslPLAINClientConversation>(this);
+    } else if (mechanism == auth::kMechanismScramSha1) {
+        _saslConversation = std::make_unique<SaslSCRAMClientConversationImpl<SHA1Block>>(
+            this, scramsha1ClientCache);
+    } else if (mechanism == auth::kMechanismScramSha256) {
+        _saslConversation = std::make_unique<SaslSCRAMClientConversationImpl<SHA256Block>>(
+            this, scramsha256ClientCache);
 #ifdef MONGO_CONFIG_SSL
         // AWS depends on kms-message which depends on ssl libraries
-    } else if (mechanism == "MONGODB-AWS") {
-        _saslConversation.reset(new SaslAWSClientConversation(this));
+    } else if (mechanism == auth::kMechanismMongoAWS) {
+        _saslConversation = std::make_unique<SaslAWSClientConversation>(this);
+    } else if (mechanism == auth::kMechanismMongoX509) {
+        _saslConversation = std::make_unique<SaslX509ClientConversation>(this);
 #endif
+    } else if (mechanism == auth::kMechanismMongoOIDC) {
+        auto userName = hasParameter(SaslClientSession::parameterUser)
+            ? getParameter(SaslClientSession::parameterUser)
+            : ""_sd;
+        auto accessToken = hasParameter(SaslClientSession::parameterOIDCAccessToken)
+            ? getParameter(SaslClientSession::parameterOIDCAccessToken)
+            : ""_sd;
+
+        _saslConversation =
+            std::make_unique<SaslOIDCClientConversation>(this, userName, accessToken);
     } else {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "SASL mechanism " << mechanism << " is not supported");

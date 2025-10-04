@@ -1,0 +1,47 @@
+testNums
+test
+basic.coll as fuzzer_coll
+
+1
+:results {aggregate: "fuzzer_coll", pipeline: [{$limit:5}], cursor: {}}
+[
+{"_id":0},
+{"_id":1},
+{"_id":3},
+{"_id":2},
+{"_id":4}
+]
+
+// In --mode run, this will be assigned a default value of 2 (1 greater than the prev testNum)
+2
+:sortResults {aggregate: "fuzzer_coll", pipeline: [{$limit:5}], cursor: {}}
+[
+{"_id":0},
+{"_id":1},
+{"_id":2},
+{"_id":3},
+{"_id":4}
+]
+
+3
+:results {aggregate: "fuzzer_coll", pipeline: [{$limit:1}], cursor: {}}
+[
+{"_id":0}
+]
+
+// Each testNum just needs to be greater than the previous, not consecutive.
+5
+:sortResults {aggregate: "fuzzer_coll", pipeline: [{$limit:5}], cursor: {}}
+[
+{"_id":0},
+{"_id":1},
+{"_id":2},
+{"_id":3},
+{"_id":4}
+]
+
+6
+:results {aggregate: "fuzzer_coll", pipeline: [{$limit:1}], cursor: {}}
+[
+{"_id":0}
+]

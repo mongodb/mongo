@@ -1,0 +1,24 @@
+==== VARIATION: query={ a: /sometext/ }, sort={}, proj={}
+rea||||fc
+==== VARIATION: query={ a: /sometext/ }, sort={}, proj={}
+rea||||fc
+==== VARIATION: query={ a: /sometext/s }, sort={}, proj={}
+rea/s/||||fc
+==== VARIATION: query={ a: /sometext/ms }, sort={}, proj={}
+rea/ms/||||fc
+==== VARIATION: query={ a: /sometext/im }, sort={}, proj={}
+rea/im/||||fc
+==== VARIATION: query={ a: /sometext/mi }, sort={}, proj={}
+rea/im/||||fc
+==== VARIATION: query={ a: /abc/mi }, sort={}, proj={}
+rea/im/||||fc
+==== VARIATION: query={ a: /efg/mi }, sort={}, proj={}
+rea/im/||||fc
+==== VARIATION: query={ a: //ms }, sort={}, proj={}
+rea/ms/||||fc
+==== VARIATION: query={ a: /___/ms }, sort={}, proj={}
+rea/ms/||||fc
+==== VARIATION: query={ a: { $regex: "abc", $options: "imxsu" } }, sort={}, proj={}
+rea/imsx/||||fc
+==== VARIATION: query={ a: /abc/im }, sort={}, proj={}
+rea/im/||||fc

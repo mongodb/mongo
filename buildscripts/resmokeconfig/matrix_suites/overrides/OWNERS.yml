@@ -1,0 +1,50 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/mongo-default-approvers
+  - "bulk_write.yml":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "change_streams*":
+    approvers:
+      - 10gen/query-execution-change-streams
+  - "multiplan_single_solutions.yml":
+    approvers:
+      - 10gen/query-optimization
+  - "networking.yml":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "query_settings.yml":
+    approvers:
+      - 10gen/query-execution-query-settings
+  - "*query_shape_hash_stability*":
+    approvers:
+      - 10gen/query-execution-query-settings
+  - "repeat_queries.yml":
+    approvers:
+      - 10gen/query-optimization
+  - "*viewless_timeseries.yml":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
+  - "stepdown_primary_change_streams.yml":
+    approvers:
+      - 10gen/query-execution-change-streams
+  - "injected_catalog_metadata.yml":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
+  - "ingress_request_rate_limiter.yml":
+    approvers:
+      - 10gen/server-workload-resilience
+  - "fcv_upgrade_downgrade_primary_step_down_overrides.yml":
+    approvers:
+      - 10gen/server-replication-reviewers
+  - "primary_driven_index_builds.yml":
+    approvers:
+      - 10gen/server-index-builds
+  - "replica_sets_kill_secondary.yml":
+    approvers:
+      - 10gen/server-replication-reviewers
+  - "recordids_replicated.yml":
+    approvers:
+      - 10gen/server-collection-write-path

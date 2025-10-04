@@ -1,0 +1,141 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/sharded_collections_pqs_fallback.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
+##########################################################
+description:
+  Test the correctness of the query settings fallback mechanism by introducing
+  planner failures and then expecting that the fallback-generated plan is identical
+  to the original plan. This suite runs jscore tests using a sharded cluster fixture
+  which implicitly shards accessed collections.
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+  config:
+    shell_options:
+      eval:
+        await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");;
+        await import("jstests/libs/override_methods/implicit_query_settings_fallback.js");
+  fixture:
+    class: ShardedClusterFixture
+    enable_balancer: false
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+    num_shards: 2
+  hooks:
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: ValidateCollections
+    - class: CheckOrphansDeleted
+    - class: CleanEveryN
+      n: 20
+matrix_suite: true
+selector:
+  exclude_files:
+    - jstests/core/txns/**/*.js
+    - jstests/core/**/apitest_db.js
+    - jstests/core/**/awaitdata_getmore_cmd.js
+    - jstests/core/**/bypass_doc_validation.js
+    - jstests/core/**/check_shard_index.js
+    - jstests/core/**/compact_keeps_indexes.js
+    - jstests/core/**/currentop.js
+    - jstests/core/**/dbhash.js
+    - jstests/core/**/fsync.js
+    - jstests/core/**/geo_s2cursorlimitskip.js
+    - jstests/core/**/geo_update_btree2.js
+    - jstests/core/**/queryoptimizera.js
+    - jstests/core/**/startup_log.js
+    - jstests/core/**/tailable_cursor_invalidation.js
+    - jstests/core/**/tailable_getmore_batch_size.js
+    - jstests/core/**/tailable_skip_limit.js
+    - jstests/core/**/query/top/top.js
+    - jstests/core/**/geo_2d_explain.js
+    - jstests/core/**/geo_s2explain.js
+    - jstests/core/**/geo_s2sparse.js
+    - jstests/core/**/operation_latency_histogram.js
+    - jstests/core/**/apitest_dbcollection.js
+    - jstests/core/**/bad_index_plugin.js
+    - jstests/core/**/create_indexes.js
+    - jstests/core/**/list_indexes_non_existent_ns.js
+    - jstests/core/**/mr_preserve_indexes.js
+    - jstests/core/**/distinct_index1.js
+    - jstests/core/**/expr_index_use.js
+    - jstests/core/**/index_multikey.js
+    - jstests/core/**/query/explain/optimized_match_explain.js
+    - jstests/core/**/sort_array.js
+    - jstests/core/query/distinct/distinct_semantics.js
+    - jstests/core/index/express.js
+    - jstests/core/index/index_filter_commands.js
+    - jstests/core/query/query_settings/**/*.js
+    - jstests/core/administrative/current_op/**/*.js
+    - jstests/core/query/collation/collation.js
+    - jstests/core/diagnostics/operation_latency_histogram.js
+    - jstests/core/query/top/top.js
+    - jstests/core/catalog/views/views_stats.js
+    - jstests/core/txns/timestamped_reads_wait_for_prepare_oplog_visibility.js
+    - jstests/core/timeseries/ddl/timeseries_sparse_index.js
+    - jstests/core/administrative/getlog2.js
+    - jstests/core/txns/speculative_snapshot_includes_all_writes.js
+    - jstests/core/query/commands_with_uuid.js
+    - jstests/core/clustered/clustered_collection_collation.js
+    - jstests/core/timeseries/write/timeseries_delete_multi.js
+    - jstests/core/timeseries/write/timeseries_simple.js
+    - jstests/core/timeseries/write/timeseries_update.js
+    - jstests/core/timeseries/write/timeseries_update_arbitrary_updates_not_enabled.js
+    - jstests/core/write/empty_ts/bypass_empty_ts_replacement_timeseries.js
+    - jstests/core/index/index_filter_catalog_independent.js
+    - jstests/core/index/index_filter_collation.js
+    - jstests/core/index/index_filter_commands.js
+    - jstests/core/index/index_filter_on_hidden_index.js
+    - jstests/core/index/wildcard/compound_wildcard_index_filter.js
+    - jstests/core/index/wildcard/wildcard_index_filter.js
+    - jstests/core/query/queryable_encryption/**/*.js
+    - src/mongo/db/modules/enterprise/jstests/fle2/**/*.js
+    - jstests/core/txns/disallow_operations_on_prepared_transaction.js
+    - jstests/core/query/find_with_resume_after_param.js
+    - jstests/core/write/bulk/bulk_write_timeseries_basic.js
+    - jstests/core/index/index_filter_commands_invalidate_plan_cache_entries.js
+    - jstests/core/index/index_stats.js
+    - jstests/core/index/wildcard/wildcard_index_cached_plans.js
+    - jstests/core/query/explain/explain_plan_cache.js
+    - jstests/core/query/plan_cache/in_expression_plan_cache.js
+    - jstests/core/query/plan_cache/introspect_hidden_index_plan_cache_entries.js
+    - jstests/core/query/partial_index_logical.js
+    - jstests/core/query/plan_cache/**/*.js
+    - jstests/core/query/sbe/sbe_plan_cache_autoparameterize_ixscan.js
+    - jstests/core/query/sbe/plan_cache_sbe_with_or_queries.js
+    - jstests/core/query/sbe/sbe_plan_cache_autoparameterize_collscan.js
+    - jstests/core/query/sbe/sbe_plan_cache_duplicate_or_clauses.js
+  exclude_with_any_tags:
+    - assumes_standalone_mongod
+    - assumes_against_mongod_not_mongos
+    - assumes_no_implicit_collection_creation_on_get_collection
+    - assumes_no_implicit_collection_creation_after_drop
+    - assumes_no_implicit_index_creation
+    - assumes_unsharded_collection
+    - cannot_create_unique_index_when_using_hashed_shard_key
+    - requires_profiling
+    - requires_capped
+    - assumes_standalone_mongod
+    - does_not_support_repeated_reads
+    - requires_profiling
+    - requires_fsync
+    - known_query_shape_computation_problem
+    - query_intensive_pbt
+    - uses_parallel_shell
+  roots:
+    - jstests/core/**/*.js
+    - jstests/core_sharding/**/*.js
+    - jstests/fle2/**/*.js
+    - src/mongo/db/modules/*/jstests/fle2/**/*.js
+test_kind: js_test

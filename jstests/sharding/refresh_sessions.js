@@ -1,15 +1,21 @@
-(function() {
-"use strict";
-
 // This test makes assumptions about the number of logical sessions.
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 TestData.disableImplicitSessions = true;
 
-var sessionsDb = "config";
-var refresh = {refreshLogicalSessionCacheNow: 1};
-var startSession = {startSession: 1};
+let sessionsDb = "config";
+let refresh = {refreshLogicalSessionCacheNow: 1};
+let startSession = {startSession: 1};
 
-// Create a cluster with 1 shard.
-var cluster = new ShardingTest({shards: 2});
+let cluster = new ShardingTest({
+    mongos: [{setParameter: {sessionWriteConcernTimeoutSystemMillis: 0, sessionMaxBatchSize: 500}}],
+    shards: 2,
+    rs: {setParameter: {sessionWriteConcernTimeoutSystemMillis: 0, sessionMaxBatchSize: 500}},
+    other: {
+        configOptions:
+            {setParameter: {sessionWriteConcernTimeoutSystemMillis: 0, sessionMaxBatchSize: 500}},
+    },
+});
 
 // Test that we can refresh without any sessions, as a sanity check.
 {
@@ -20,8 +26,8 @@ var cluster = new ShardingTest({shards: 2});
 
 // Test that refreshing on mongos flushes local records to the collection.
 {
-    var mongos = cluster.s.getDB(sessionsDb);
-    var sessionCount = mongos.system.sessions.count();
+    let mongos = cluster.s.getDB(sessionsDb);
+    let sessionCount = mongos.system.sessions.count();
 
     // Start one session.
     assert.commandWorked(mongos.runCommand(startSession));
@@ -35,9 +41,9 @@ var cluster = new ShardingTest({shards: 2});
 
 // Test that refreshing on mongod flushes local records to the collection.
 {
-    var mongos = cluster.s.getDB(sessionsDb);
-    var shard = cluster.shard0.getDB(sessionsDb);
-    var sessionCount = mongos.system.sessions.count();
+    let mongos = cluster.s.getDB(sessionsDb);
+    let shard = cluster.shard0.getDB(sessionsDb);
+    let sessionCount = mongos.system.sessions.count();
 
     assert.commandWorked(shard.runCommand(startSession));
     assert.commandWorked(shard.runCommand(refresh));
@@ -50,11 +56,11 @@ var cluster = new ShardingTest({shards: 2});
 
 // Test that refreshing on all servers flushes all records.
 {
-    var mongos = cluster.s.getDB(sessionsDb);
-    var shard0 = cluster.shard0.getDB(sessionsDb);
-    var shard1 = cluster.shard1.getDB(sessionsDb);
+    let mongos = cluster.s.getDB(sessionsDb);
+    let shard0 = cluster.shard0.getDB(sessionsDb);
+    let shard1 = cluster.shard1.getDB(sessionsDb);
 
-    var sessionCount = mongos.system.sessions.count();
+    let sessionCount = mongos.system.sessions.count();
 
     assert.commandWorked(mongos.runCommand(startSession));
     assert.commandWorked(shard0.runCommand(startSession));
@@ -67,20 +73,25 @@ var cluster = new ShardingTest({shards: 2});
 
     // Refresh on each server, see that it ups the session count.
     assert.commandWorked(mongos.runCommand(refresh));
-    assert.eq(mongos.system.sessions.count(),
-              sessionCount + 1,
-              "refresh on mongos did not flush session records to disk");
+    assert.eq(
+        mongos.system.sessions.count(),
+        sessionCount + 1,
+        "refresh on mongos did not flush session records to disk",
+    );
 
     assert.commandWorked(shard0.runCommand(refresh));
-    assert.eq(mongos.system.sessions.count(),
-              sessionCount + 2,
-              "refresh on shard did not flush session records to disk");
+    assert.eq(
+        mongos.system.sessions.count(),
+        sessionCount + 2,
+        "refresh on shard did not flush session records to disk",
+    );
 
     assert.commandWorked(shard1.runCommand(refresh));
-    assert.eq(mongos.system.sessions.count(),
-              sessionCount + 3,
-              "refresh on shard did not flush session records to disk");
+    assert.eq(
+        mongos.system.sessions.count(),
+        sessionCount + 3,
+        "refresh on shard did not flush session records to disk",
+    );
 }
 
 cluster.stop();
-})();

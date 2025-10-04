@@ -29,13 +29,18 @@
 
 #include "mongo/db/auth/sasl_payload.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace auth {
 
 SaslPayload SaslPayload::parseFromBSON(const BSONElement& elem) {
-    if (elem.type() == String) {
+    if (elem.type() == BSONType::string) {
         try {
             SaslPayload ret(base64::decode(elem.valueStringDataSafe()));
             ret.serializeAsBase64(true);
@@ -45,7 +50,7 @@ SaslPayload SaslPayload::parseFromBSON(const BSONElement& elem) {
             uasserted(status.code(),
                       str::stream() << "Failed decoding SASL payload: " << status.reason());
         }
-    } else if (elem.type() == BinData) {
+    } else if (elem.type() == BSONType::binData) {
         uassert(ErrorCodes::BadValue,
                 str::stream() << "Invalid SASLPayload subtype. Expected BinDataGeneral, got: "
                               << typeName(elem.binDataType()),

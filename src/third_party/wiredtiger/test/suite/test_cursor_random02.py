@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest
+import wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
@@ -34,7 +34,6 @@ from wtscenario import make_scenarios
 #    Cursor next_random operations
 class test_cursor_random02(wttest.WiredTigerTestCase):
     types = [
-        ('lsm', dict(type='lsm:random')),
         ('table', dict(type='table:random'))
     ]
     config = [
@@ -95,6 +94,3 @@ class test_cursor_random02(wttest.WiredTigerTestCase):
                 'cursor is returning sequential data')
         self.assertGreater(differentKeys, num_entries // 4,
             'next_random random distribution not adequate')
-
-if __name__ == '__main__':
-    wttest.run()

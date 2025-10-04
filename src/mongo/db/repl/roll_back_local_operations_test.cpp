@@ -27,22 +27,43 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-#include "mongo/platform/basic.h"
+#include "mongo/db/repl/roll_back_local_operations.h"
 
-#include <iterator>
-
-#include "mongo/client/connection_pool.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/client/dbclient_base.h"
 #include "mongo/client/dbclient_connection.h"
+#include "mongo/client/dbclient_cursor.h"
 #include "mongo/client/dbclient_mockcursor.h"
-#include "mongo/db/client.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_interface_mock.h"
 #include "mongo/db/repl/oplog_interface_remote.h"
-#include "mongo/db/repl/roll_back_local_operations.h"
+#include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/storage/remove_saver.h"
+#include "mongo/db/transaction/transaction_history_iterator.h"
 #include "mongo/logv2/log.h"
+#include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/uuid.h"
+
+#include <iterator>
+#include <list>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <fmt/format.h>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 
 namespace {
 
@@ -65,7 +86,22 @@ OplogInterfaceMock::Operation makeOpAndRecordId(long long seconds,
     return std::make_pair(makeOp(seconds, term, wallClockMillis), RecordId(++recordId));
 }
 
-TEST(RollBackLocalOperationsTest, InvalidLocalOplogIterator) {
+class RollBackLocalOperationsTest : public ServiceContextMongoDTest {
+protected:
+    const bool shouldCreateRollbackFiles = true;
+    RemoveSaver removeSaver{"rollback", "local.oplog.rs", "removed"};
+
+private:
+    void setUp() override {
+        ServiceContextMongoDTest::setUp();
+    }
+
+    void tearDown() override {
+        ServiceContextMongoDTest::tearDown();
+    }
+};
+
+TEST(SimpleRollBackLocalOperationsTest, InvalidLocalOplogIterator) {
     class InvalidOplogInterface : public OplogInterface {
     public:
         std::string toString() const override {
@@ -88,21 +124,21 @@ TEST(RollBackLocalOperationsTest, InvalidLocalOplogIterator) {
         ErrorCodes::BadValue);
 }
 
-TEST(RollBackLocalOperationsTest, InvalidRollbackOperationFunction) {
+TEST(SimpleRollBackLocalOperationsTest, InvalidRollbackOperationFunction) {
     ASSERT_THROWS_CODE(RollBackLocalOperations(OplogInterfaceMock({makeOpAndRecordId(1)}),
                                                RollBackLocalOperations::RollbackOperationFn()),
                        AssertionException,
                        ErrorCodes::BadValue);
 }
 
-TEST(RollBackLocalOperationsTest, EmptyLocalOplog) {
+TEST_F(RollBackLocalOperationsTest, EmptyLocalOplog) {
     OplogInterfaceMock localOplog;
     RollBackLocalOperations finder(localOplog, [](const BSONObj&) { return Status::OK(); });
-    auto result = finder.onRemoteOperation(makeOp(1));
+    auto result = finder.onRemoteOperation(makeOp(1), removeSaver, shouldCreateRollbackFiles);
     ASSERT_EQUALS(ErrorCodes::OplogStartMissing, result.getStatus().code());
 }
 
-TEST(RollBackLocalOperationsTest, RollbackMultipleLocalOperations) {
+TEST_F(RollBackLocalOperationsTest, RollbackMultipleLocalOperations) {
     auto commonOperation = makeOpAndRecordId(1);
     OplogInterfaceMock::Operations localOperations({
         makeOpAndRecordId(5),
@@ -119,7 +155,8 @@ TEST(RollBackLocalOperationsTest, RollbackMultipleLocalOperations) {
         return Status::OK();
     };
     RollBackLocalOperations finder(localOplog, rollbackOperation);
-    auto result = finder.onRemoteOperation(commonOperation.first);
+    auto result =
+        finder.onRemoteOperation(commonOperation.first, removeSaver, shouldCreateRollbackFiles);
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(OpTime::parseFromOplogEntry(commonOperation.first),
                   result.getValue().getOpTime());
@@ -130,7 +167,7 @@ TEST(RollBackLocalOperationsTest, RollbackMultipleLocalOperations) {
     ASSERT_TRUE(i == localOperations.cend());
 }
 
-TEST(RollBackLocalOperationsTest, RollbackOperationFailed) {
+TEST_F(RollBackLocalOperationsTest, RollbackOperationFailed) {
     auto commonOperation = makeOpAndRecordId(1);
     OplogInterfaceMock::Operations localOperations({
         makeOpAndRecordId(2),
@@ -141,22 +178,23 @@ TEST(RollBackLocalOperationsTest, RollbackOperationFailed) {
         return Status(ErrorCodes::OperationFailed, "");
     };
     RollBackLocalOperations finder(localOplog, rollbackOperation);
-    auto result = finder.onRemoteOperation(commonOperation.first);
+    auto result =
+        finder.onRemoteOperation(commonOperation.first, removeSaver, shouldCreateRollbackFiles);
     ASSERT_EQUALS(ErrorCodes::OperationFailed, result.getStatus().code());
 }
-
-TEST(RollBackLocalOperationsTest, EndOfLocalOplog) {
+TEST_F(RollBackLocalOperationsTest, EndOfLocalOplog) {
     auto commonOperation = makeOpAndRecordId(1);
     OplogInterfaceMock::Operations localOperations({
         makeOpAndRecordId(2),
     });
     OplogInterfaceMock localOplog(localOperations);
     RollBackLocalOperations finder(localOplog, [](const BSONObj&) { return Status::OK(); });
-    auto result = finder.onRemoteOperation(commonOperation.first);
+    auto result =
+        finder.onRemoteOperation(commonOperation.first, removeSaver, shouldCreateRollbackFiles);
     ASSERT_EQUALS(ErrorCodes::NoMatchingDocument, result.getStatus().code());
 }
 
-TEST(RollBackLocalOperationsTest, SkipRemoteOperations) {
+TEST_F(RollBackLocalOperationsTest, SkipRemoteOperations) {
     auto commonOperation = makeOpAndRecordId(1);
     OplogInterfaceMock::Operations localOperations({
         makeOpAndRecordId(5),
@@ -173,16 +211,17 @@ TEST(RollBackLocalOperationsTest, SkipRemoteOperations) {
     };
     RollBackLocalOperations finder(localOplog, rollbackOperation);
     {
-        auto result = finder.onRemoteOperation(makeOp(6));
+        auto result = finder.onRemoteOperation(makeOp(6), removeSaver, shouldCreateRollbackFiles);
         ASSERT_EQUALS(ErrorCodes::NoSuchKey, result.getStatus().code());
         ASSERT_TRUE(i == localOperations.cbegin());
     }
     {
-        auto result = finder.onRemoteOperation(makeOp(3));
+        auto result = finder.onRemoteOperation(makeOp(3), removeSaver, shouldCreateRollbackFiles);
         ASSERT_EQUALS(ErrorCodes::NoSuchKey, result.getStatus().code());
         ASSERT_TRUE(std::distance(localOperations.cbegin(), i) == 2);
     }
-    auto result = finder.onRemoteOperation(commonOperation.first);
+    auto result =
+        finder.onRemoteOperation(commonOperation.first, removeSaver, shouldCreateRollbackFiles);
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(OpTime::parseFromOplogEntry(commonOperation.first),
                   result.getValue().getOpTime());
@@ -193,7 +232,7 @@ TEST(RollBackLocalOperationsTest, SkipRemoteOperations) {
     ASSERT_TRUE(i == localOperations.cend());
 }
 
-TEST(RollBackLocalOperationsTest, SameTimestampDifferentTermsRollbackNoSuchKey) {
+TEST_F(RollBackLocalOperationsTest, SameTimestampDifferentTermsRollbackNoSuchKey) {
     auto commonOperation = makeOpAndRecordId(1, 1);
     OplogInterfaceMock::Operations localOperations({
         makeOpAndRecordId(2, 3),
@@ -204,29 +243,33 @@ TEST(RollBackLocalOperationsTest, SameTimestampDifferentTermsRollbackNoSuchKey) 
         return Status(ErrorCodes::OperationFailed, "");
     };
     RollBackLocalOperations finder(localOplog, rollbackOperation);
-    auto result = finder.onRemoteOperation(makeOp(2, 2));
+    auto result = finder.onRemoteOperation(makeOp(2, 2), removeSaver, shouldCreateRollbackFiles);
     ASSERT_EQUALS(ErrorCodes::NoSuchKey, result.getStatus().code());
 }
 
-TEST(SyncRollBackLocalOperationsTest, OplogStartMissing) {
+TEST_F(RollBackLocalOperationsTest, OplogStartMissing) {
     ASSERT_EQUALS(ErrorCodes::OplogStartMissing,
-                  syncRollBackLocalOperations(OplogInterfaceMock(),
-                                              OplogInterfaceMock({makeOpAndRecordId(1)}),
-                                              [](const BSONObj&) { return Status::OK(); })
+                  syncRollBackLocalOperations(
+                      OplogInterfaceMock(),
+                      OplogInterfaceMock({makeOpAndRecordId(1)}),
+                      [](const BSONObj&) { return Status::OK(); },
+                      shouldCreateRollbackFiles)
                       .getStatus()
                       .code());
 }
 
-TEST(SyncRollBackLocalOperationsTest, RemoteOplogMissing) {
+TEST_F(RollBackLocalOperationsTest, RemoteOplogMissing) {
     ASSERT_EQUALS(ErrorCodes::InvalidSyncSource,
-                  syncRollBackLocalOperations(OplogInterfaceMock({makeOpAndRecordId(1)}),
-                                              OplogInterfaceMock(),
-                                              [](const BSONObj&) { return Status::OK(); })
+                  syncRollBackLocalOperations(
+                      OplogInterfaceMock({makeOpAndRecordId(1)}),
+                      OplogInterfaceMock(),
+                      [](const BSONObj&) { return Status::OK(); },
+                      shouldCreateRollbackFiles)
                       .getStatus()
                       .code());
 }
 
-TEST(SyncRollBackLocalOperationsTest, RollbackTwoOperations) {
+TEST_F(RollBackLocalOperationsTest, RollbackTwoOperations) {
     auto commonOperation = makeOpAndRecordId(1, 1LL, 1 * 5000);
     auto firstOpAfterCommonPoint = makeOpAndRecordId(2, 1LL, 2 * 60 * 60 * 24 * 1000);
     OplogInterfaceMock::Operations localOperations({
@@ -235,13 +278,15 @@ TEST(SyncRollBackLocalOperationsTest, RollbackTwoOperations) {
         commonOperation,
     });
     auto i = localOperations.cbegin();
-    auto result = syncRollBackLocalOperations(OplogInterfaceMock(localOperations),
-                                              OplogInterfaceMock({commonOperation}),
-                                              [&](const BSONObj& operation) {
-                                                  ASSERT_BSONOBJ_EQ(i->first, operation);
-                                                  i++;
-                                                  return Status::OK();
-                                              });
+    auto result = syncRollBackLocalOperations(
+        OplogInterfaceMock(localOperations),
+        OplogInterfaceMock({commonOperation}),
+        [&](const BSONObj& operation) {
+            ASSERT_BSONOBJ_EQ(i->first, operation);
+            i++;
+            return Status::OK();
+        },
+        shouldCreateRollbackFiles);
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(OpTime::parseFromOplogEntry(commonOperation.first),
                   result.getValue().getOpTime());
@@ -256,60 +301,65 @@ TEST(SyncRollBackLocalOperationsTest, RollbackTwoOperations) {
     ASSERT_TRUE(i == localOperations.cend());
 }
 
-TEST(SyncRollBackLocalOperationsTest, SkipOneRemoteOperation) {
+TEST_F(RollBackLocalOperationsTest, SkipOneRemoteOperation) {
     auto commonOperation = makeOpAndRecordId(1);
     auto remoteOperation = makeOpAndRecordId(2);
-    auto result =
-        syncRollBackLocalOperations(OplogInterfaceMock({commonOperation}),
-                                    OplogInterfaceMock({remoteOperation, commonOperation}),
-                                    [&](const BSONObj& operation) {
-                                        FAIL("should not reach here");
-                                        return Status::OK();
-                                    });
+    auto result = syncRollBackLocalOperations(
+        OplogInterfaceMock({commonOperation}),
+        OplogInterfaceMock({remoteOperation, commonOperation}),
+        [&](const BSONObj& operation) {
+            FAIL("should not reach here");
+            return Status::OK();
+        },
+        shouldCreateRollbackFiles);
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(OpTime::parseFromOplogEntry(commonOperation.first),
                   result.getValue().getOpTime());
     ASSERT_EQUALS(commonOperation.second, result.getValue().getRecordId());
 }
 
-TEST(SyncRollBackLocalOperationsTest, DifferentTimestampEndOfLocalOplog) {
+TEST_F(RollBackLocalOperationsTest, DifferentTimestampEndOfLocalOplog) {
     auto commonOperation = makeOpAndRecordId(1);
     auto localOperation = makeOpAndRecordId(3);
     auto remoteOperation = makeOpAndRecordId(2);
     bool called = false;
-    auto result =
-        syncRollBackLocalOperations(OplogInterfaceMock({localOperation}),
-                                    OplogInterfaceMock({remoteOperation, commonOperation}),
-                                    [&](const BSONObj& operation) {
-                                        ASSERT_BSONOBJ_EQ(localOperation.first, operation);
-                                        called = true;
-                                        return Status::OK();
-                                    });
+    auto result = syncRollBackLocalOperations(
+        OplogInterfaceMock({localOperation}),
+        OplogInterfaceMock({remoteOperation, commonOperation}),
+        [&](const BSONObj& operation) {
+            ASSERT_BSONOBJ_EQ(localOperation.first, operation);
+            called = true;
+            return Status::OK();
+        },
+        shouldCreateRollbackFiles);
     ASSERT_EQUALS(ErrorCodes::NoMatchingDocument, result.getStatus().code());
     ASSERT_STRING_CONTAINS(result.getStatus().reason(), "reached beginning of local oplog");
     ASSERT_TRUE(called);
 }
 
-TEST(SyncRollBackLocalOperationsTest, DifferentTimestampRollbackOperationFailed) {
+TEST_F(RollBackLocalOperationsTest, DifferentTimestampRollbackOperationFailed) {
     auto localOperation = makeOpAndRecordId(3);
     auto remoteOperation = makeOpAndRecordId(2);
     auto result = syncRollBackLocalOperations(
         OplogInterfaceMock({localOperation}),
         OplogInterfaceMock({remoteOperation}),
-        [&](const BSONObj& operation) { return Status(ErrorCodes::OperationFailed, ""); });
+        [&](const BSONObj& operation) { return Status(ErrorCodes::OperationFailed, ""); },
+        shouldCreateRollbackFiles);
     ASSERT_EQUALS(ErrorCodes::OperationFailed, result.getStatus().code());
 }
 
-TEST(SyncRollBackLocalOperationsTest, DifferentTimestampEndOfRemoteOplog) {
+TEST_F(RollBackLocalOperationsTest, DifferentTimestampEndOfRemoteOplog) {
     auto commonOperation = makeOpAndRecordId(1);
     auto localOperation = makeOpAndRecordId(2);
     auto remoteOperation = makeOpAndRecordId(3);
-    auto result = syncRollBackLocalOperations(OplogInterfaceMock({localOperation, commonOperation}),
-                                              OplogInterfaceMock({remoteOperation}),
-                                              [&](const BSONObj& operation) {
-                                                  FAIL("Should not reach here");
-                                                  return Status::OK();
-                                              });
+    auto result = syncRollBackLocalOperations(
+        OplogInterfaceMock({localOperation, commonOperation}),
+        OplogInterfaceMock({remoteOperation}),
+        [&](const BSONObj& operation) {
+            FAIL("Should not reach here");
+            return Status::OK();
+        },
+        shouldCreateRollbackFiles);
     ASSERT_EQUALS(ErrorCodes::NoMatchingDocument, result.getStatus().code());
     ASSERT_STRING_CONTAINS(result.getStatus().reason(), "reached beginning of remote oplog");
 }
@@ -318,28 +368,19 @@ class DBClientConnectionForTest : public DBClientConnection {
 public:
     DBClientConnectionForTest(int numInitFailures) : _initFailuresLeft(numInitFailures) {}
 
-    using DBClientConnection::query;
-
-    std::unique_ptr<DBClientCursor> query(const NamespaceStringOrUUID& nsOrUuid,
-                                          const BSONObj& filter,
-                                          const Query& querySettings,
-                                          int limit,
-                                          int nToSkip,
-                                          const BSONObj* fieldsToReturn,
-                                          int queryOptions,
-                                          int batchSize,
-                                          boost::optional<BSONObj> readConcernObj) override {
+    std::unique_ptr<DBClientCursor> find(FindCommandRequest findRequest,
+                                         const ReadPreferenceSetting& readPref,
+                                         ExhaustMode exhaustMode) override {
         if (_initFailuresLeft > 0) {
             _initFailuresLeft--;
             LOGV2(21657,
-                  "Throwing DBException on DBClientCursorForTest::query(). Failures left: "
-                  "{initFailuresLeft}",
+                  "Throwing DBException on DBClientCursorForTest::find()",
                   "initFailuresLeft"_attr = _initFailuresLeft);
             uasserted(50852, "Simulated network error");
             MONGO_UNREACHABLE;
         }
 
-        LOGV2(21658, "Returning success on DBClientCursorForTest::query()");
+        LOGV2(21658, "Returning success on DBClientCursorForTest::find()");
 
         BSONArrayBuilder builder;
         builder.append(makeOp(1));
@@ -351,21 +392,26 @@ private:
     int _initFailuresLeft;
 };
 
-void checkRemoteIterator(int numNetworkFailures, bool expectedToSucceed) {
+void checkRemoteIterator(int numNetworkFailures,
+                         bool expectedToSucceed,
+                         bool shouldCreateRollbackFiles) {
 
     DBClientConnectionForTest conn(numNetworkFailures);
-    auto getConnection = [&]() -> DBClientBase* { return &conn; };
+    auto getConnection = [&]() -> DBClientBase* {
+        return &conn;
+    };
 
     auto localOperation = makeOpAndRecordId(1);
-    OplogInterfaceRemote remoteOplogMock(
-        HostAndPort("229w43rd", 10036), getConnection, "somecollection", 0);
+    OplogInterfaceRemote remoteOplogMock(HostAndPort("229w43rd", 10036), getConnection, 0);
 
     auto result = Status::OK();
 
     try {
-        result = syncRollBackLocalOperations(OplogInterfaceMock({localOperation}),
-                                             remoteOplogMock,
-                                             [&](const BSONObj&) { return Status::OK(); })
+        result = syncRollBackLocalOperations(
+                     OplogInterfaceMock({localOperation}),
+                     remoteOplogMock,
+                     [&](const BSONObj&) { return Status::OK(); },
+                     shouldCreateRollbackFiles)
                      .getStatus();
     } catch (...) {
         // For the failure scenario.
@@ -377,20 +423,20 @@ void checkRemoteIterator(int numNetworkFailures, bool expectedToSucceed) {
     ASSERT_OK(result);
 }
 
-TEST(SyncRollBackLocalOperationsTest, RemoteOplogMakeIteratorSucceedsWithNoNetworkFailures) {
-    checkRemoteIterator(0, true);
+TEST_F(RollBackLocalOperationsTest, RemoteOplogMakeIteratorSucceedsWithNoNetworkFailures) {
+    checkRemoteIterator(0, true, shouldCreateRollbackFiles);
 }
 
-TEST(SyncRollBackLocalOperationsTest, RemoteOplogMakeIteratorSucceedsWithOneNetworkFailure) {
-    checkRemoteIterator(1, true);
+TEST_F(RollBackLocalOperationsTest, RemoteOplogMakeIteratorSucceedsWithOneNetworkFailure) {
+    checkRemoteIterator(1, true, shouldCreateRollbackFiles);
 }
 
-TEST(SyncRollBackLocalOperationsTest, RemoteOplogMakeIteratorSucceedsWithTwoNetworkFailures) {
-    checkRemoteIterator(2, true);
+TEST_F(RollBackLocalOperationsTest, RemoteOplogMakeIteratorSucceedsWithTwoNetworkFailures) {
+    checkRemoteIterator(2, true, shouldCreateRollbackFiles);
 }
 
-TEST(SyncRollBackLocalOperationsTest, RemoteOplogMakeIteratorFailsWithTooManyNetworkFailures) {
-    checkRemoteIterator(3, false);
+TEST_F(RollBackLocalOperationsTest, RemoteOplogMakeIteratorFailsWithTooManyNetworkFailures) {
+    checkRemoteIterator(3, false, shouldCreateRollbackFiles);
 }
 
 }  // namespace

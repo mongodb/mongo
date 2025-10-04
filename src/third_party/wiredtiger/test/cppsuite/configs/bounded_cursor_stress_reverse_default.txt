@@ -1,0 +1,56 @@
+# Configuration for bounded_cursor_stress default test.
+# There are two configurations, one which specifies a reverse collator and one which doesn't.
+duration_seconds=60,
+cache_size_mb=100,
+reverse_collator=true,
+timestamp_manager=
+(
+    stable_lag=2,
+    oldest_lag=2,
+),
+workload_manager=
+(
+    populate_config=
+    (
+        collection_count=10,
+        key_count_per_collection=100,
+        thread_count=10,
+    ),
+    insert_config=
+    (
+        key_size=100,
+        op_rate=10ms,
+        thread_count=10,
+        value_size=2000,
+        ops_per_transaction=(max=5,min=0)
+    ),
+    read_config=
+    (
+        op_rate=3ms,
+        thread_count=10,
+        ops_per_transaction=(max=5,min=0)
+    ),
+    remove_config=
+    (
+        op_rate=5ms,
+        thread_count=5,
+        ops_per_transaction=(max=5,min=0)
+    ),
+    update_config=
+    (
+        op_rate=15ms,
+        thread_count=10,
+        value_size=2000,
+        ops_per_transaction=(max=5,min=0)
+    ),
+    custom_config=
+    (
+        thread_count=10,
+        op_rate=10ms,
+        ops_per_transaction=(max=5,min=0)
+    )
+),
+operation_tracker=
+(
+    enabled=false,
+)

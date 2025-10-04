@@ -4,20 +4,18 @@
  * never fail without a bug.
  *
  * This test only makes sense for storage engines that support recover to stable timestamp.
- * @tags: [requires_wiredtiger, requires_persistence, requires_journaling, requires_replication,
+ * @tags: [requires_persistence, requires_replication,
  * requires_majority_read_concern,
  * # Restarting as a standalone is not supported in multiversion tests.
  * multiversion_incompatible]
  */
 
-(function() {
-"use strict";
-load("jstests/replsets/rslib.js");
-load("jstests/libs/write_concern_util.js");
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {reconnect} from "jstests/replsets/rslib.js";
 
 const name = jsTestName();
 const dbName = name;
-const collName = 'coll';
+const collName = "coll";
 const logLevel = tojson({storage: {recovery: 2}, replication: 3});
 
 const rst = new ReplSetTest({
@@ -37,12 +35,12 @@ assert.commandWorked(getColl(node).insert({_id: 1}, {writeConcern: {w: 1, j: 1}}
 assert.commandWorked(getColl(node).createIndex({x: 1}, {unique: true}));
 
 jsTestLog("Running inserts and removes");
-const start = (new Date()).getTime();
+const start = new Date().getTime();
 const waitTimeMillis = 5 * 1000;
 const baseNum = 10;
 let iter = 2;
 Random.setRandomSeed();
-while (((new Date()).getTime() - start) < waitTimeMillis) {
+while (new Date().getTime() - start < waitTimeMillis) {
     iter++;
     const uniqueKey = Math.floor(Random.rand() * baseNum);
     assert.commandWorked(getColl(node).insert({_id: iter, x: uniqueKey}));
@@ -55,9 +53,13 @@ rst.stop(node, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL});
 jsTestLog("Restart the node with 'recoverFromOplogAsStandalone'");
 node = rst.restart(node, {
     noReplSet: true,
-    setParameter: {recoverFromOplogAsStandalone: true, logComponentVerbosity: logLevel}
+    setParameter: {recoverFromOplogAsStandalone: true, logComponentVerbosity: logLevel},
 });
+
+// Verify that the 'config.system.indexBuilds' collection is empty after recovering from the oplog
+// in standalone mode.
+assert.eq(0, node.getCollection("config.system.indexBuilds").count());
+
 reconnect(node);
 
 rst.stopSet();
-})();

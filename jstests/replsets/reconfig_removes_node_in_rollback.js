@@ -2,10 +2,10 @@
  * Test that a node in rollback state can safely be removed from the replica set
  * config via reconfig. See SERVER-48179.
  */
-(function() {
-"use strict";
-
-load("jstests/replsets/libs/rollback_test.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 const dbName = "test";
 const collName = "rollbackColl";
@@ -25,8 +25,7 @@ rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
 assert.commandWorked(secondTermPrimary.getDB(dbName)[collName].insert({"num2": 123}));
 
 // Enable a failpoint to hang after transitioning to rollback mode.
-const rollbackHangFailPoint =
-    configureFailPoint(rollbackNode, "rollbackHangAfterTransitionToRollback");
+const rollbackHangFailPoint = configureFailPoint(rollbackNode, "rollbackHangAfterTransitionToRollback");
 
 // Reconnect the isolated node and rollback should start.
 rollbackTest.transitionToSyncSourceOperationsDuringRollback();
@@ -39,8 +38,7 @@ assert.soonNoExcept(() => {
 
 // Enable a failpoint to hang after processing heartbeat reconfig, so we can
 // verify that the old primary was successfully removed while rolling back.
-const postHbReconfigFailPoint =
-    configureFailPoint(rollbackNode, "waitForPostActionCompleteInHbReconfig");
+const postHbReconfigFailPoint = configureFailPoint(rollbackNode, "waitForPostActionCompleteInHbReconfig");
 
 // RollbackTest stopped replication on tie breaker node, need to restart it.
 // Otherwise the new config, which contains only the new primary and the tie
@@ -64,8 +62,7 @@ assert.soonNoExcept(() => {
 }, `failed to wait for fail point ${postHbReconfigFailPoint.failPointName}`);
 
 // Verify the rollback node is removed from replica set config.
-assert.commandFailedWithCode(rollbackNode.adminCommand({replSetGetStatus: 1}),
-                             ErrorCodes.InvalidReplicaSetConfig);
+assert.commandFailedWithCode(rollbackNode.adminCommand({replSetGetStatus: 1}), ErrorCodes.InvalidReplicaSetConfig);
 
 // Now we disable the fail points, allowing the rollback to continue.
 postHbReconfigFailPoint.off();
@@ -81,10 +78,9 @@ assert.commandWorked(secondTermPrimary.adminCommand({replSetReconfig: newConfig}
 rollbackTest.getTestFixture().waitForConfigReplication(secondTermPrimary);
 
 // Verify the removed node is added back and primary sees its state as SECONDARY.
-rollbackTest.getTestFixture().waitForState(rollbackNode, ReplSetTest.State.SECONDARY);
+rollbackTest.getTestFixture().awaitSecondaryNodes(null, [rollbackNode]);
 
 // Transition back to steady state.
 rollbackTest.transitionToSteadyStateOperations();
 
 rollbackTest.stop();
-})();

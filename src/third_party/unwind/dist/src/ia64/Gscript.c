@@ -26,6 +26,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 #include "offsets.h"
 #include "regs.h"
 #include "unwind_i.h"
+#include <stdatomic.h>
 
 enum ia64_script_insn_opcode
   {
@@ -45,14 +46,10 @@ enum ia64_script_insn_opcode
     IA64_INSN_MOVE_SCRATCH_NO_NAT /* like above, but clear NaT info */
   };
 
-#if defined(HAVE___THREAD) && HAVE___THREAD
-static __thread struct ia64_script_cache ia64_per_thread_cache =
+#if defined(HAVE___CACHE_PER_THREAD) && HAVE___CACHE_PER_THREAD
+static _Thread_local struct ia64_script_cache ia64_per_thread_cache =
   {
-#ifdef HAVE_ATOMIC_OPS_H
-    .busy = AO_TS_INITIALIZER
-#else
-    .lock = PTHREAD_MUTEX_INITIALIZER
-#endif
+    .busy = ATOMIC_FLAG_INIT
   };
 #endif
 
@@ -101,30 +98,18 @@ get_script_cache (unw_addr_space_t as, intrmask_t *saved_maskp)
   if (caching == UNW_CACHE_NONE)
     return NULL;
 
-#ifdef HAVE_ATOMIC_H
-  if (!spin_trylock_irqsave (&cache->busy, *saved_maskp))
-    return NULL;
-#else
-# if defined(HAVE___THREAD) && HAVE___THREAD
+# if defined(HAVE___CACHE_PER_THREAD) && HAVE___CACHE_PER_THREAD
   if (as->caching_policy == UNW_CACHE_PER_THREAD)
     cache = &ia64_per_thread_cache;
+  else
 # endif
-# ifdef HAVE_ATOMIC_OPS_H
-  if (AO_test_and_set (&cache->busy) == AO_TS_SET)
+  if (atomic_flag_test_and_set(&cache->busy))
     return NULL;
-# else
-  if (likely (caching == UNW_CACHE_GLOBAL))
-    {
-      Debug (16, "acquiring lock\n");
-      lock_acquire (&cache->lock, *saved_maskp);
-    }
-# endif
-#endif
 
-  if (atomic_read (&as->cache_generation) != atomic_read (&cache->generation))
+  if (atomic_load (&as->cache_generation) != atomic_load (&cache->generation))
     {
       flush_script_cache (cache);
-      cache->generation = as->cache_generation;
+      atomic_store(&cache->generation, atomic_load (&as->cache_generation));
     }
   return cache;
 }
@@ -136,16 +121,7 @@ put_script_cache (unw_addr_space_t as, struct ia64_script_cache *cache,
   assert (as->caching_policy != UNW_CACHE_NONE);
 
   Debug (16, "unmasking signals/interrupts and releasing lock\n");
-#ifdef HAVE_ATOMIC_H
-  spin_unlock_irqrestore (&cache->busy, *saved_maskp);
-#else
-# ifdef HAVE_ATOMIC_OPS_H
-  AO_CLEAR (&cache->busy);
-# else
-  if (likely (as->caching_policy == UNW_CACHE_GLOBAL))
-    lock_release (&cache->lock, *saved_maskp);
-# endif
-#endif
+  atomic_flag_clear(&cache->busy);
 }
 
 static struct ia64_script *
@@ -311,7 +287,7 @@ compile_reg (struct ia64_state_record *sr, int i, struct ia64_reg_info *r,
         {
         case IA64_WHERE_FR:
           /* Note: There is no need to handle NaT-bit info here
-             (indepent of is_preserved_gr), because for floating-point
+             (independent of is_preserved_gr), because for floating-point
              NaTs are represented as NaTVal, so the NaT-info never
              needs to be consulated.  */
           if (rval >= 2 && rval <= 5)

@@ -1,0 +1,155 @@
+# Copyright (C) 2022-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+
+global:
+    cpp_namespace: "mongo::crypto"
+    cpp_includes:
+        - "mongo/util/base64.h"
+
+imports:
+    - "mongo/db/basic_types.idl"
+
+structs:
+    JWK:
+        # RFC 7517 Section 4
+        description: JSON Web Key
+        strict: false
+        fields:
+            kty:
+                description: Key type
+                type: string # Either 'RSA' or 'EC'
+                cpp_name: type
+            kid:
+                description: Unique Key ID
+                type: string
+                cpp_name: keyId
+
+    JWKRSA:
+        description: RSA Specialization of the JWK type.
+        strict: false
+        inline_chained_structs: true
+        chained_structs:
+            JWK: JWK
+        fields:
+            n:
+                description: Modulus of the RSA Key
+                type: base64urlstring
+                cpp_name: modulus
+            e:
+                description: Public key component of the RSA key
+                type: base64urlstring
+                cpp_name: publicExponent
+
+    JWKEC:
+        description: EC Specialization of the JWK type.
+        strict: false
+        inline_chained_structs: true
+        chained_structs:
+            JWK: JWK
+        fields:
+            crv:
+                description: Elliptical curve type, e.g. P-256, P-384, P-512
+                type: string
+                cpp_name: curve
+            x:
+                description: Base64 URL-encoded X-coordinate of the EC public key
+                type: base64urlstring
+                cpp_name: xcoordinate
+            y:
+                description: Base64 URL-encoded Y-coordinate of the EC public key
+                type: base64urlstring
+                cpp_name: ycoordinate
+
+    JWKSet:
+        # RFC 7517 Section 5
+        description: A set of JSON Web Keys
+        strict: false
+        fields:
+            keys:
+                description: The JWK objects
+                # Non-specific sub-type to accommodate future key types
+                type: array<object>
+
+    JWSHeader:
+        description: Describes the contents of a JWT token body and
+            any cryptographic operations applied to the token.
+        strict: false
+        fields:
+            typ:
+                description: The type of the token, e.g. 'JWT'.
+                type: string
+                cpp_name: type
+                optional: true
+            alg:
+                description: Algorithm used to secure the JWT, e.g. 'RS256' or 'ES256'.
+                type: string
+                cpp_name: algorithm
+            kid:
+                description: The ID identifying the key used.
+                type: string
+                cpp_name: keyId
+
+    JWT:
+        description: A set of claims relating to the bearer of the token.
+        strict: false
+        fields:
+            iss:
+                description: Issuer; CS string identifying the issuing provider.
+                type: string
+                cpp_name: issuer
+            sub:
+                description: Subject; CS string identifying the subject.
+                type: string
+                cpp_name: subject
+            aud:
+                description: Audience; array of CS strings identifying
+                    intended token consumer(s).
+                type:
+                    variant: [string, array<string>]
+                cpp_name: audience
+            "mongodb/tenantId":
+                description: TenantId; 24 hexits identifying the tenant for this operation
+                type: tenant_id_hex
+                cpp_name: tenantId
+                optional: true
+            "mongodb/expectPrefix":
+                description:
+                    If TRUE, mongod will expect to receive tenant-prefixed database names,
+                    and should respond the same way.
+                type: safeBool
+                cpp_name: expectPrefix
+                optional: true
+            nbf:
+                description: Time at which the JWT becomes valid. (Unix Epoch)
+                type: unixEpoch
+                cpp_name: notBefore
+                optional: true
+            exp:
+                description: Time at which the JWT expires. (Unix Epoch)
+                type: unixEpoch
+                cpp_name: expiration
+                optional: false # RFC7519 marks this optional, but we refuse to accept non-expiring tokens.

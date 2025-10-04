@@ -1,13 +1,6 @@
 /**
  * Tests some practical use cases of the $facet stage.
  */
-(function() {
-"use strict";
-
-load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For setParameterOnAllHosts.
-load("jstests/libs/discover_topology.js");                       // For findDataBearingNodes.
-
-const dbName = "test";
 const collName = jsTest.name();
 
 Random.setRandomSeed();
@@ -28,8 +21,7 @@ function randomChoice(array) {
  * }
  */
 function generateRandomDocument(docId) {
-    const manufacturers =
-        ["Sony", "Samsung", "LG", "Panasonic", "Mitsubishi", "Vizio", "Toshiba", "Sharp"];
+    const manufacturers = ["Sony", "Samsung", "LG", "Panasonic", "Mitsubishi", "Vizio", "Toshiba", "Sharp"];
     const minPrice = 100;
     const maxPrice = 4000;
     const minScreenSize = 18;
@@ -48,11 +40,11 @@ function generateRandomDocument(docId) {
  * have _ids in the range [0, nDocs).
  */
 function populateData(nDocs) {
-    var coll = db.getCollection(collName);
-    coll.remove({});  // Don't drop the collection, since it might be sharded.
+    let coll = db.getCollection(collName);
+    coll.remove({}); // Don't drop the collection, since it might be sharded.
 
-    var bulk = coll.initializeUnorderedBulkOp();
-    for (var i = 0; i < nDocs; i++) {
+    let bulk = coll.initializeUnorderedBulkOp();
+    for (let i = 0; i < nDocs; i++) {
         const doc = generateRandomDocument(i);
         bulk.insert(doc);
     }
@@ -78,22 +70,23 @@ const bucketedPricePipe = [
     {
         $bucket: {groupBy: "$price", boundaries: [0, 500, 1000, 1500, 2000], default: 2000},
     },
-    {$sort: {count: -1}}
+    {$sort: {count: -1}},
 ];
 const automaticallyBucketedPricePipe = [{$bucketAuto: {groupBy: "$price", buckets: 5}}];
 
 const mostCommonManufacturers = coll.aggregate(manufacturerPipe).toArray();
 const numTVsBucketedByPriceRange = coll.aggregate(bucketedPricePipe).toArray();
-const numTVsAutomaticallyBucketedByPriceRange =
-    coll.aggregate(automaticallyBucketedPricePipe).toArray();
+const numTVsAutomaticallyBucketedByPriceRange = coll.aggregate(automaticallyBucketedPricePipe).toArray();
 
-const facetPipe = [{
-    $facet: {
-        manufacturers: manufacturerPipe,
-        bucketedPrices: bucketedPricePipe,
-        autoBucketedPrices: automaticallyBucketedPricePipe
-    }
-}];
+const facetPipe = [
+    {
+        $facet: {
+            manufacturers: manufacturerPipe,
+            bucketedPrices: bucketedPricePipe,
+            autoBucketedPrices: automaticallyBucketedPricePipe,
+        },
+    },
+];
 
 // Then compute the results using $facet.
 const facetResult = coll.aggregate(facetPipe).toArray();
@@ -115,22 +108,22 @@ coll.drop();
 assert.commandWorked(coll.insert({"_id": 1, "quizzes": [{"score": 100}]}));
 assert.commandWorked(coll.insert({"_id": 2, "quizzes": [{"score": 200}]}));
 
-const facetPipeline =
-    [{$facet: {scoreRank: [{$match: {'quizzes.0.score': {$gt: 0}}}, {$count: 'count'}]}}];
+const facetPipeline = [{$facet: {scoreRank: [{$match: {"quizzes.0.score": {$gt: 0}}}, {$count: "count"}]}}];
 
 const facetRes = coll.aggregate(facetPipeline).toArray();
 assert.eq(facetRes.length, 1);
-const scoreRank = facetRes[0]['scoreRank'];
+const scoreRank = facetRes[0]["scoreRank"];
 assert.eq(scoreRank.length, 1);
-assert.eq(scoreRank[0]['count'], 2);
+assert.eq(scoreRank[0]["count"], 2);
 
 // Fix for SERVER-57599. Make sure this facet does not crash.
 coll.drop();
 assert.commandWorked(coll.insert({"_id": 5, "title": "cakes and oranges"}));
-coll.aggregate([{
-    $facet: {
-        "manufacturers": [{"$sortByCount": "$manufacturer"}, {"$sort": {"count": -1, "_id": 1}}],
-        "autoBucketedPrices": [{"$bucketAuto": {"groupBy": "$price", "buckets": 5}}]
-    }
-}]);
-}());
+coll.aggregate([
+    {
+        $facet: {
+            "manufacturers": [{"$sortByCount": "$manufacturer"}, {"$sort": {"count": -1, "_id": 1}}],
+            "autoBucketedPrices": [{"$bucketAuto": {"groupBy": "$price", "buckets": 5}}],
+        },
+    },
+]);

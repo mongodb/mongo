@@ -29,51 +29,65 @@
 
 #pragma once
 
-#include "mongo/db/record_id.h"
-#include "mongo/util/uuid.h"
+#include "mongo/base/status.h"
+#include "mongo/db/local_catalog/lock_manager/exception_util.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+
+#include <vector>
 
 namespace mongo {
-
-class Collection;
-class Ident;
-class OperationContext;
-class NamespaceString;
-
-namespace catalog {
+namespace storage_helpers {
 
 /**
- * Performs two-phase index drop.
+ * Inserts the batch of documents 'docs' using the provided callable object 'insertFn'.
  *
- * Passthrough to DurableCatalog::removeIndex to execute the first phase of drop by removing the
- * index catalog entry, then registers an onCommit hook to schedule the second phase of drop to
- * delete the index data.
+ * 'insertFnType' type should be Callable and have the following call signature:
+ *     Status insertFn(OperationContext* opCtx,
+ *                     std::vector<InsertStatement>::const_iterator begin,
+ *                     std::vector<InsertStatement>::const_iterator end);
  *
- * Uses 'ident' shared_ptr to ensure that the second phase of drop (data table drop) will not
- * execute until no users of the index (shared owners) remain. 'ident' is allowed to be a nullptr,
- * in which case the caller guarantees that there are no remaining users of the index. This handles
- * situations wherein there is no in-memory state available for an index, such as during repair.
+ *     where 'begin' (inclusive) and 'end' (exclusive) are the iterators for the range of documents
+ * 'docs'.
+ *
+ * The function first attempts to insert documents as one batch. If the insertion fails, then it
+ * falls back to inserting documents one at a time. The insertion is retried in case of write
+ * conflicts.
  */
-void removeIndex(OperationContext* opCtx,
-                 StringData indexName,
-                 Collection* collection,
-                 std::shared_ptr<Ident> ident);
+template <typename insertFnType>
+Status insertBatchAndHandleRetry(OperationContext* opCtx,
+                                 const NamespaceStringOrUUID& nsOrUUID,
+                                 const std::vector<InsertStatement>& docs,
+                                 insertFnType&& insertFn) {
+    if (docs.size() > 1U) {
+        try {
+            if (insertFn(opCtx, docs.cbegin(), docs.cend()).isOK()) {
+                return Status::OK();
+            }
+        } catch (...) {
+            // Ignore this failure and behave as-if we never tried to do the combined batch insert.
+            // The loop below will handle reporting any non-transient errors.
+        }
+    }
 
-/**
- * Performs two-phase collection drop.
- *
- * Passthrough to DurableCatalog::dropCollection to execute the first phase of drop by removing the
- * collection entry, then registers and onCommit hook to schedule the second phase of drop to delete
- * the collection data.
- *
- * Uses 'ident' shared_ptr to ensure that the second phase of drop (data table drop) will not
- * execute until no users of the collection record store (shared owners) remain. 'ident' is not
- * allowed to be nullptr.
- */
-Status dropCollection(OperationContext* opCtx,
-                      const NamespaceString& nss,
-                      RecordId collectionCatalogId,
-                      std::shared_ptr<Ident> ident);
+    // Try to insert the batch one-at-a-time because the batch failed all-at-once inserting.
+    for (auto it = docs.cbegin(); it != docs.cend(); ++it) {
+        auto status = writeConflictRetry(opCtx, "batchInsertDocuments", nsOrUUID, [&] {
+            auto status = insertFn(opCtx, it, it + 1);
+            if (!status.isOK()) {
+                return status;
+            }
 
+            return Status::OK();
+        });
 
-}  // namespace catalog
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+
+    return Status::OK();
+}
+}  // namespace storage_helpers
+
 }  // namespace mongo

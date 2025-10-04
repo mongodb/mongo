@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #include <climits>
 #include <cstdint>
 #include <cstdlib>
@@ -36,7 +38,8 @@
 #include <type_traits>
 #include <utility>
 
-namespace mongo::endian {
+namespace MONGO_MOD_PUB mongo {
+namespace endian {
 
 /** Like `std::endian`. https://en.cppreference.com/w/cpp/types/endian */
 enum class Order {
@@ -139,4 +142,5 @@ T littleToNative(T t) {
     return convertByteOrder<Order::kLittle, Order::kNative>(t);
 }
 
-}  // namespace mongo::endian
+}  // namespace endian
+}  // namespace MONGO_MOD_PUB mongo

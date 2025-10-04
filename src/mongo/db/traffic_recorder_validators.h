@@ -29,13 +29,17 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
+#include "mongo/db/tenant_id.h"
+
 #include <string>
 
-#include "mongo/base/status.h"
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
-Status validateTrafficRecordDestination(const std::string& path);
+Status validateTrafficRecordDestination(const std::string& path, const boost::optional<TenantId>&);
 
 
 }  // namespace mongo

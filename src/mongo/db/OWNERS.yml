@@ -1,0 +1,314 @@
+version: 1.0.0
+filters:
+  - "api_parameters*":
+    approvers:
+      - 10gen/query-optimization
+  - "basic_types.*":
+    approvers:
+      - 10gen/server-programmability
+  - "baton.*":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "cancelable_operation_context*":
+    approvers:
+      - 10gen/server-programmability
+  - "client.*":
+    approvers:
+      - 10gen/server-programmability
+  - "client_context_test.*":
+    approvers:
+      - 10gen/server-programmability
+  - "client_out_of_line_executor*":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "client_strand*":
+    approvers:
+      - 10gen/server-programmability
+  - "cloner.*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "commands.*":
+    approvers:
+      - 10gen/server-programmability
+  - "commands_*":
+    approvers:
+      - 10gen/server-programmability
+  - "command_can_run_here*":
+    approvers:
+      - 10gen/server-replication-reviewers
+  - "connection_health_metrics_parameter.idl":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "dbmessage*":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "default_baton*":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "diagnostic_printers_test.cpp":
+    approvers:
+      - 10gen/query-integration-observability
+  - "keypattern.h":
+    approvers:
+      - 10gen/query-optimization
+      - 10gen/query-execution
+  - "error_labels*":
+    approvers:
+      - 10gen/server-programmability
+  - "field_parser*":
+    approvers:
+      - 10gen/server-programmability
+  - "generic_argument_util.*":
+    approvers:
+      - 10gen/server-programmability
+  - "index_names.*":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "keys_collection*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "max_time.*":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "mongod.cpp":
+    approvers:
+      - 10gen/server-programmability
+  - "mongod_initializers.*":
+    approvers:
+      - 10gen/server-programmability
+  - "mongod_main.*":
+    approvers:
+      - 10gen/server-programmability
+  - "mongod_options*":
+    approvers:
+      - 10gen/server-programmability
+  - "nesting_depth_test.*":
+    approvers:
+      - 10gen/server-programmability
+  - "op_msg_fuzzer*":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "operation_context*":
+    approvers:
+      - 10gen/server-programmability
+  - "operation_cpu_timer*":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "operation_id*":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "operation_key_manager.*":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "operation_killer.*":
+    approvers:
+      - 10gen/server-programmability
+  - "operation_time_tracker*":
+    approvers:
+      - 10gen/server-programmability
+  - "README_default_max_time_ms.md":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "request_execution_context.*":
+    approvers:
+      - 10gen/server-programmability
+  - "service_context*":
+    approvers:
+      - 10gen/server-programmability
+  - "startup_warnings_common.*":
+    approvers:
+      - 10gen/server-programmability
+  - "startup_warnings_mongod.*":
+    approvers:
+      - 10gen/server-programmability
+  - "thread_client_test.*":
+    approvers:
+      - 10gen/server-programmability
+  - "profile_*":
+    approvers:
+      - 10gen/query-integration-observability
+  - "record_id*":
+    approvers:
+      - 10gen/server-storage-engine-integration
+  - "replica_set_endpoint*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "repair*":
+    approvers:
+      - 10gen/server-storage-engine-integration
+  - "throw_hook*":
+    approvers:
+      - 10gen/server-programmability
+  - "*transaction*":
+    approvers:
+      - 10gen/server-transactions
+  - "*txn*":
+    approvers:
+      - 10gen/server-transactions
+  - "dbdirectclient*":
+    approvers:
+      - 10gen/server-programmability
+  - "service_entry_point*":
+    approvers:
+      - 10gen/server-programmability
+  - "service_entry_point_shard_role*":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
+      - 10gen/server-programmability
+  - "audit*":
+    approvers:
+      - 10gen/server-security
+  - "/cluster_auth_mode_option*":
+    approvers:
+      - 10gen/server-security
+  - "fle*":
+    approvers:
+      - 10gen/server-security
+      - 10gen/query-integration-features
+  - "/keyfile_option*":
+    approvers:
+      - 10gen/server-security
+  - "server_options*":
+    approvers:
+      - 10gen/server-programmability
+  - "server_parameter*":
+    approvers:
+      - 10gen/server-security
+  - "system_index*":
+    approvers:
+      - 10gen/server-security
+  - "*change_stream*":
+    approvers:
+      - 10gen/query-execution-change-streams
+  - "aggregated_index_usage_tracker*":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "collection_index_usage_tracker*":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "curop*":
+    approvers:
+      - 10gen/query-integration-observability
+  - "op_debug*":
+    approvers:
+      - 10gen/query-integration-observability
+  - "update_index_data*":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "startup_recovery*":
+    approvers:
+      - 10gen/server-storage-engine-integration
+  - "field_ref*":
+    approvers:
+      - 10gen/query-optimization
+  - "*read_concern*":
+    approvers:
+      - 10gen/server-rw-concerns
+  - "read_write_concern*":
+    approvers:
+      - 10gen/server-rw-concerns
+  - "write_concern*":
+    approvers:
+      - 10gen/server-rw-concerns
+  - "feature_compatibility*":
+    approvers:
+      - 10gen/server-fcv
+  - "catalog_shard_feature_flag.idl":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "traffic*":
+    approvers:
+      - 10gen/query-optimization
+  - "version_context*":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
+  - "server_lifecycle_monitor*":
+    approvers:
+      - 10gen/server-programmability
+  - "server_recovery*":
+    approvers:
+      - 10gen/server-storage-engine-integration
+  - "mongod_options_replication.*":
+    approvers:
+      - 10gen/server-replication-reviewers
+  - "mongod_options_storage.idl":
+    approvers:
+      - 10gen/server-storage-engine-integration
+  - "mongod_options_sharding.*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "dbhelpers*":
+    approvers:
+      - 10gen/server-storage-engine-integration
+  - "dbcommands.idl":
+    approvers:
+      - 10gen/server-storage-engine-integration
+  - "bulk_write_shard_test.cpp":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "change_collection_expired*":
+    approvers:
+      - 10gen/query-execution-change-streams
+  - "multi_key_path_tracker*":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "yieldable.h":
+    approvers:
+      - 10gen/query-execution-yielding
+  - "mirror*":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "wire_version*":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "shutdown_in_progress_quiesce_info*":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "periodic_runner_cache_pressure_rollback*":
+    approvers:
+      - 10gen/server-storage-engine-integration
+  - "startup_warnings_mongod_thp_test*":
+    approvers:
+      - 10gen/server-workload-resilience
+  - "namespace_string*":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
+  - "database_name*":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
+  - "namespace_spec*":
+    approvers:
+      - 10gen/query
+  - "rs_local_client*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "raw_data_operation*":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
+  - "persistent_task_store*":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
+  - "validate_api_parameters*":
+    approvers:
+      - 10gen/query-optimization
+  - "cursor_in_use_info*":
+    approvers:
+      - 10gen/query-execution
+  - "crud_bm*":
+    approvers:
+      - 10gen/performance
+  - "tenant_id*":
+    approvers:
+      - 10gen/server-security
+  - "deferred_writer*":
+    approvers:
+      - 10gen/server-dbcheck
+  - "flow_control_ticketholder*":
+    approvers:
+      - 10gen/server-workload-resilience
+  - "replication_state_transition_lock_guard*":
+    approvers:
+      - 10gen/server-replication-reviewers
+  - "local_executor*":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology

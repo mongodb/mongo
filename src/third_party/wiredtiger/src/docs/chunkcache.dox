@@ -1,0 +1,92 @@
+/*! @page chunkcache Chunk cache
+
+The chunk cache is a feature designed to work in conjunction with @ref
+arch-cloud-storage-extension. These extensions would typically need to do IO
+over the network, which comes with performance and API usage costs. To
+ameliorate these, WiredTiger can be configured to cache in-use content from
+these storage sources on a disk.
+
+Architecturally, the chunk cache sits between the block cache and the
+filesystem layer, caching data as it would appear "at rest". This implies
+the chunk cache stores data in its encrypted and compressed form, making it
+potentially more efficient. However, that also means it has no knowledge of
+the tree or page structure of the table, much like a file system wouldn't.
+
+The chunk cache is read-only, and will only cache read-only content. In
+practice, this means any tiered objects that have been "flushed" during a
+checkpoint and can no longer be altered. Any data that could still be
+modified will reside in any of the block cache, the in-memory page cache, or
+a regular WiredTiger data file.
+
+The cached "chunks" of files are a configurable size, but in general they
+should be large enough to mask the latency of fetching data over a network
+connection. These connections typically have a lot of bandwidth but high
+latency (when compared to a physically attached disk), so larger chunks will
+result in more efficient use of bandwidth. However, larger chunks can also
+result in less efficient utilization of cache space, as each chunk can only
+contain content from a single file (so the chunk containing the end of the
+file is still an entire chunk, even if only a single byte is needed for the
+file content).
+
+The chunk cache resides on-disk and can generate a lot of IO, so should be
+kept on a different disk to WiredTiger's home directory. The cache can reuse
+content between WiredTiger restarts, but the content can be invalidated by
+upgrading WiredTiger or salvaging the database.
+
+@section pinned Pinned Content
+
+This functionality allows users to provide a list of tables that should remain persistently cached, ensuring faster data access times and reducing the need to
+fetch data from potentially much slower block storage. If a user wishes to cache a table in the chunk cache (such that the cached chunks belonging to these tables
+are non-evictable), the pinned configuration is required.
+
+<b>Note:</b> It is crucial to assess the memory implications of pinning large tables. Ensure the chunk cache has enough capacity to cache the pinned tables.
+
+Example Configuration:
+@code
+chunk_cache=[enabled=true,chunk_size=512KB,capacity=20GB,pinned=("table:chunkcache01", "table:chunkcache02")]
+@endcode
+
+In the configuration above, the pinned configuration array contains the names of tables to be pinned. In this example, the tables <b>chunkcache01</b> and <b>chunkcache02</b> are specified.
+By marking tables as pinned in the chunk cache, all chunks belonging to these tables (when read into chunk cache) remain in the cache. These chunks won't be evicted,
+regardless of how infrequently they might be accessed.
+
+<b>Note:</b> There could be circumstances when the pinned chunks can become unpinned (and evicted) for internal reasons.
+
+This ensures that the pinned tables are always relatively cheap to access, minimizing the performance overhead of accessing these tables.
+
+@section inserts Newly inserted or modified content
+
+Newer content is more likely to be accessed again, so we insert freshly-flushed data into the chunk cache. This minimizes latency and reduces resource usage (disk bandwidth and API access).
+This saves the chunk cache from having to read freshly-flushed data back from the object store soon after it was put there. When a tiered object is flushed and before it is deleted locally, we make an ingest call and the new or modified table will be inserted into the chunk cache.
+This function will also check for outdated pinned content in the chunk cache, ensuring the older versions of the pinned content can be cleaned up by chunk cache's eviction process.
+
+@section persistence Persisted content
+
+The chunk cache could contain a considerable quantity of content. This
+content would typically be on-disk, meaning it can be persisted across
+WiredTiger restarts. Doing this saves the user time (due to reduced latency
+when accessing data from disk, compared to networked block storage) and
+resources (as these block storage accesses are often associated with an API
+usage cost).
+
+This persistence is implemented with an additional WiredTiger internal file,
+named WiredTigerCC (where "CC" stands for "chunk cache"). This maintains the
+metadata necessary for WiredTiger to reuse chunk cache content on startup.
+This content could become stale, in which case a checksum failure is
+detected when we attempt to use it. This will result in a logged message and
+some data being re-fetched from block storage.
+
+The persisted chunk cache content is invalidated when a salvage operation is
+run, a WiredTiger upgrade changes the metadata format, or when any of the
+chunk cache capacity, chunk size, or number of buckets is changed.
+
+@section troubleshooting Troubleshooting
+
+It is possible for content in the chunk cache to become outdated.
+WiredTiger's in-built data validation can detect this, and retry a read
+for incorrect data when it came from the chunk cache, but only once. There
+are statistics and verbose messaging around this, and it is not a concern to
+see this happen occasionally, particularly on startup and during crash
+recovery.
+
+*/

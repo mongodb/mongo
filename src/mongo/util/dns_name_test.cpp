@@ -33,6 +33,8 @@
 #include "mongo/stdx/utility.h"
 #include "mongo/unittest/unittest.h"
 
+#include <type_traits>
+
 using namespace std::literals::string_literals;
 
 namespace mongo {
@@ -215,7 +217,7 @@ TEST(DNSNameTest, Resolution) {
             const ::mongo::dns::HostName subdomain(test.subdomain);
             const ::mongo::dns::HostName resolved = [&] {
                 try {
-                    const ::mongo::dns::HostName rv = subdomain.resolvedIn(domain);
+                    ::mongo::dns::HostName rv = subdomain.resolvedIn(domain);
                     return rv;
                 } catch (const ExceptionFor<ErrorCodes::DNSRecordTypeMismatch>&) {
                     ASSERT(test.fails);

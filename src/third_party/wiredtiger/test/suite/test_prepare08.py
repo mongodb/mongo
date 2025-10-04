@@ -26,8 +26,6 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import fnmatch, os, shutil, time
-from helper import copy_wiredtiger_home
 import wiredtiger, wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
@@ -49,20 +47,20 @@ class test_prepare08(wttest.WiredTigerTestCase):
 
     def updates(self, ds, uri, nrows, value, ts):
         cursor = self.session.open_cursor(uri)
-        self.session.begin_transaction('isolation=snapshot')
+        self.session.begin_transaction()
         for i in range(1, nrows):
             cursor.set_key(ds.key(i))
             cursor.set_value(value)
-            self.assertEquals(cursor.update(), 0)
+            self.assertEqual(cursor.update(), 0)
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(ts))
         cursor.close()
 
     def removes(self, ds, uri, nrows, ts):
         cursor = self.session.open_cursor(uri)
-        self.session.begin_transaction('isolation=snapshot')
+        self.session.begin_transaction()
         for i in range(1, nrows):
             cursor.set_key(ds.key(i))
-            self.assertEquals(cursor.remove(), 0)
+            self.assertEqual(cursor.remove(), 0)
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(ts))
         cursor.close()
 
@@ -77,8 +75,8 @@ class test_prepare08(wttest.WiredTigerTestCase):
             if value == None:
                 self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
             else:
-                self.assertEquals(cursor.search(), 0)
-                self.assertEquals(cursor.get_value(),value)
+                self.assertEqual(cursor.search(), 0)
+                self.assertEqual(cursor.get_value(),value)
             cursor.reset()
         self.session.commit_transaction()
         cursor.close()
@@ -135,10 +133,10 @@ class test_prepare08(wttest.WiredTigerTestCase):
         # Remove the updates from a prepare session and keep it open.
         session_p = self.conn.open_session()
         cursor_p = session_p.open_cursor(uri_1)
-        session_p.begin_transaction('isolation=snapshot')
+        session_p.begin_transaction()
         for i in range(1, nrows):
             cursor_p.set_key(ds_1.key(i))
-            self.assertEquals(cursor_p.remove(), 0)
+            self.assertEqual(cursor_p.remove(), 0)
         session_p.prepare_transaction('prepare_timestamp=' + self.timestamp_str(40))
 
         # Adding more updates to other table should trigger eviction on uri_1
@@ -213,13 +211,13 @@ class test_prepare08(wttest.WiredTigerTestCase):
         # Remove the updates from a prepare session and keep it open.
         session_p = self.conn.open_session()
         cursor_p = session_p.open_cursor(uri_1)
-        session_p.begin_transaction('isolation=snapshot')
+        session_p.begin_transaction()
         for i in range(1, nrows):
             cursor_p.set_key(ds_1.key(i))
             cursor_p.set_value(value_c)
-            self.assertEquals(cursor_p.update(), 0)
+            self.assertEqual(cursor_p.update(), 0)
             cursor_p.set_key(ds_1.key(i))
-            self.assertEquals(cursor_p.remove(), 0)
+            self.assertEqual(cursor_p.remove(), 0)
         session_p.prepare_transaction('prepare_timestamp=' + self.timestamp_str(40))
 
         # Adding more updates to other table should trigger eviction on uri_1
@@ -286,19 +284,19 @@ class test_prepare08(wttest.WiredTigerTestCase):
         # Checkpoint
         self.session.checkpoint()
 
-        # Remove the updates from a prepare session and and keep it open.
+        # Remove the updates from a prepare session and keep it open.
         session_p = self.conn.open_session()
         cursor_p = session_p.open_cursor(uri_1)
-        session_p.begin_transaction('isolation=snapshot')
+        session_p.begin_transaction()
         for i in range(1, nrows):
             cursor_p.set_key(ds_1.key(i))
             cursor_p.set_value(value_c)
-            self.assertEquals(cursor_p.update(), 0)
+            self.assertEqual(cursor_p.update(), 0)
             cursor_p.set_key(ds_1.key(i))
             cursor_p.set_value(value_d)
-            self.assertEquals(cursor_p.update(), 0)
+            self.assertEqual(cursor_p.update(), 0)
             cursor_p.set_key(ds_1.key(i))
-            self.assertEquals(cursor_p.remove(), 0)
+            self.assertEqual(cursor_p.remove(), 0)
         session_p.prepare_transaction('prepare_timestamp=' + self.timestamp_str(40))
 
         # Adding more updates to other table should trigger eviction on uri_1
@@ -321,6 +319,3 @@ class test_prepare08(wttest.WiredTigerTestCase):
         cursor_p.close()
         session_p.close()
         self.session.close()
-
-if __name__ == '__main__':
-    wttest.run()

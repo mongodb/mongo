@@ -10,17 +10,16 @@
  * @tags: [requires_persistence, uses_transactions, uses_prepare_transaction]
  */
 
-(function() {
-"use strict";
-load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/libs/storage_helpers.js");  // getOldestRequiredTimestampForCrashRecovery()
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {getOldestRequiredTimestampForCrashRecovery} from "jstests/libs/storage_engine/storage_helpers.js";
 
 // A new replica set for both the commit and abort tests to ensure the same clean state.
 function doTest(commitOrAbort) {
     const replSet = new ReplSetTest({
         // Oplog can be truncated each "sync" cycle. Increase its frequency to once per second.
         nodeOptions: {syncdelay: 1, setParameter: {logComponentVerbosity: tojson({storage: 1})}},
-        nodes: [{}, {rsConfig: {priority: 0, votes: 0}}]
+        nodes: [{}, {rsConfig: {priority: 0, votes: 0}}],
     });
 
     replSet.startSet(PrepareHelpers.replSetStartSetOptions);
@@ -39,8 +38,7 @@ function doTest(commitOrAbort) {
     assert.commandWorked(session.getDatabase("test").test.insert({myTransaction: 1}));
     const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
-    const oldestRequiredTimestampForCrashRecovery =
-        getOldestRequiredTimestampForCrashRecovery(primary.getDB("test"));
+    const oldestRequiredTimestampForCrashRecovery = getOldestRequiredTimestampForCrashRecovery(primary.getDB("test"));
     assert.lte(oldestRequiredTimestampForCrashRecovery, prepareTimestamp);
 
     jsTestLog("Insert documents until oplog exceeds oplogSize");
@@ -49,12 +47,16 @@ function doTest(commitOrAbort) {
     PrepareHelpers.growOplogPastMaxSize(replSet);
 
     // Oplog grew past maxSize, and it includes the oldest active transaction's entry.
-    var secondary = replSet.getSecondary();
+    let secondary = replSet.getSecondary();
     function checkSecondaryOplog() {
         const secondaryOplog = secondary.getDB("local").oplog.rs;
-        assert.soon(() => {
-            return secondaryOplog.dataSize() >= PrepareHelpers.oplogSizeBytes;
-        }, "waiting for secondary oplog to grow", ReplSetTest.kDefaultTimeoutMS);
+        assert.soon(
+            () => {
+                return secondaryOplog.dataSize() >= PrepareHelpers.oplogSizeBytes;
+            },
+            "waiting for secondary oplog to grow",
+            ReplSetTest.kDefaultTimeoutMS,
+        );
         const secondaryOplogEntry = PrepareHelpers.findPrepareEntry(secondaryOplog);
         assert.eq(secondaryOplogEntry.ts, prepareTimestamp, tojson(secondaryOplogEntry));
     }
@@ -89,4 +91,3 @@ function doTest(commitOrAbort) {
 }
 doTest("commit");
 doTest("abort");
-})();

@@ -2,25 +2,27 @@
  * This test makes sure that regex control characters in the namespace of changestream targets don't
  * affect what documents appear in a changestream, in response to SERVER-41164.
  */
-(function() {
-"use strict";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 
-load("jstests/libs/change_stream_util.js");
-load("jstests/libs/collection_drop_recreate.js");
 function test_no_leak(dbNameUnrelated, collNameUnrelated, dbNameProblematic, collNameProblematic) {
     const dbUnrelated = db.getSiblingDB(dbNameUnrelated);
     const cstUnrelated = new ChangeStreamTest(dbUnrelated);
     assertDropAndRecreateCollection(dbUnrelated, collNameUnrelated);
 
-    const watchUnrelated = cstUnrelated.startWatchingChanges(
-        {pipeline: [{$changeStream: {}}], collection: collNameUnrelated});
+    const watchUnrelated = cstUnrelated.startWatchingChanges({
+        pipeline: [{$changeStream: {}}],
+        collection: collNameUnrelated,
+    });
 
     const dbProblematic = db.getSiblingDB(dbNameProblematic);
     const cstProblematic = new ChangeStreamTest(dbProblematic);
     assertDropAndRecreateCollection(dbProblematic, collNameProblematic);
 
-    const watchProblematic = cstProblematic.startWatchingChanges(
-        {pipeline: [{$changeStream: {}}], collection: collNameProblematic});
+    const watchProblematic = cstProblematic.startWatchingChanges({
+        pipeline: [{$changeStream: {}}],
+        collection: collNameProblematic,
+    });
 
     assert.commandWorked(dbUnrelated.getCollection(collNameUnrelated).insert({_id: 2}));
     let expected = {
@@ -56,4 +58,3 @@ test_no_leak("has_[two]_brackets", "coll", "has_t_brackets", "coll");
 test_no_leak("test", "dotted.collection", "testadotted", "collection");
 test_no_leak("carat", "coll", "hasa^carat", "coll");
 test_no_leak("db1", "coll", "db1", "col*");
-}());

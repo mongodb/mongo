@@ -29,15 +29,21 @@
 
 #pragma once
 
-#include <boost/filesystem/path.hpp>
+#include "mongo/base/data_range.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/ftdc/compressor.h"
+#include "mongo/db/ftdc/config.h"
+#include "mongo/db/ftdc/metadata_compressor.h"
+#include "mongo/util/time_support.h"
+
 #include <cstddef>
 #include <cstdint>
-#include <fstream>
+#include <fstream>  // IWYU pragma: keep
 #include <vector>
 
-#include "mongo/base/status.h"
-#include "mongo/db/ftdc/compressor.h"
-#include "mongo/db/jsobj.h"
+#include <boost/filesystem/path.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -82,6 +88,11 @@ public:
     Status writeSample(const BSONObj& sample, Date_t date);
 
     /**
+     * Write a periodic metadata sample to the archive log as needed.
+     */
+    Status writePeriodicMetadataSample(const BSONObj& sample, Date_t date);
+
+    /**
      * Close all the files and shutdown cleanly by zeroing the beginning of the interim file.
      */
     Status close();
@@ -94,7 +105,6 @@ public:
         return _size + _sizeInterim;
     }
 
-public:
     /**
      * Test hook that closes the files without moving interim results to the archive log.
      * Note: OS Buffers are still flushes correctly though.
@@ -117,7 +127,6 @@ private:
      */
     Status writeArchiveFileBuffer(ConstDataRange buf);
 
-private:
     // Config
     const FTDCConfig* const _config;
 
@@ -135,6 +144,9 @@ private:
 
     // FTDC compressor
     FTDCCompressor _compressor;
+
+    // FTDC periodic metadata compressor
+    FTDCMetadataCompressor _metadataCompressor;
 
     // Size of archive file
     std::size_t _size{0};

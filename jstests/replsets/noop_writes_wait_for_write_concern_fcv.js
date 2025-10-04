@@ -4,11 +4,9 @@
  * This tests behavior on both latest and last-lts FCVs.
  * @tags: [multiversion_incompatible]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/write_concern_util.js");  // assertWriteConcernError
-load("jstests/replsets/rslib.js");           // reconfig
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {assertWriteConcernError} from "jstests/libs/write_concern_util.js";
+import {reconfig} from "jstests/replsets/rslib.js";
 
 // Start a two node replica set and set its FCV to the given version, then take down one
 // node so majority write concern can no longer be satisfied and verify that a noop setFCV
@@ -25,12 +23,14 @@ function testFCVNoop(targetVersion) {
     const primary = replTest.getPrimary();
     assert.eq(primary, replTest.nodes[0]);
     // The default WC is majority and this test can't satisfy majority writes.
-    assert.commandWorked(primary.adminCommand(
-        {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+    assert.commandWorked(
+        primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    );
 
     // Set the FCV to the given target version, to ensure calling setFCV below is a no-op.
     assert.commandWorkedIgnoringWriteConcernErrors(
-        primary.adminCommand({setFeatureCompatibilityVersion: targetVersion}));
+        primary.adminCommand({setFeatureCompatibilityVersion: targetVersion, confirm: true}),
+    );
 
     // Stop one node to force commands with "majority" write concern to time out. First increase
     // the election timeout to prevent the primary from stepping down before the test is over.
@@ -56,8 +56,11 @@ function testFCVNoop(targetVersion) {
     // Use w:1 to verify setFCV internally waits for at least write concern majority, and use a
     // small wtimeout to verify it is propagated into the internal waitForWriteConcern and will
     // allow the command to timeout.
-    const res = shell2.adminCommand(
-        {setFeatureCompatibilityVersion: targetVersion, writeConcern: {w: 1, wtimeout: 1000}});
+    const res = shell2.adminCommand({
+        setFeatureCompatibilityVersion: targetVersion,
+        confirm: true,
+        writeConcern: {w: 1, wtimeout: 1000},
+    });
 
     try {
         // Verify the command receives a write concern error. If we don't wait for write concern
@@ -74,4 +77,3 @@ function testFCVNoop(targetVersion) {
 
 testFCVNoop(lastLTSFCV);
 testFCVNoop(latestFCV);
-})();

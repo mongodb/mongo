@@ -32,6 +32,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 
 #include <stdlib.h>
 #include <libunwind.h>
+#include <stdatomic.h>
 
 #include "elf64.h"
 #include "mempool.h"
@@ -77,12 +78,11 @@ struct unw_addr_space
   {
     struct unw_accessors acc;
     int big_endian;
-    unw_caching_policy_t caching_policy;
-#ifdef HAVE_ATOMIC_OPS_H
-    AO_t cache_generation;
-#else
-    uint32_t cache_generation;
+#ifndef UNW_REMOTE_ONLY
+    unw_iterate_phdr_func_t iterate_phdr_function;
 #endif
+    unw_caching_policy_t caching_policy;
+    _Atomic uint32_t cache_generation;
     unw_word_t dyn_generation;          /* see dyn-common.h */
     unw_word_t dyn_info_list_addr;      /* (cached) dyn_info_list_addr */
     struct dwarf_rs_cache global_cache;
@@ -99,13 +99,23 @@ struct cursor
       {
         AARCH64_SCF_NONE,
         AARCH64_SCF_LINUX_RT_SIGFRAME,
+        AARCH64_SCF_FREEBSD_RT_SIGFRAME,
+        AARCH64_SCF_QNX_RT_SIGFRAME,
       }
     sigcontext_format;
     unw_word_t sigcontext_addr;
     unw_word_t sigcontext_sp;
     unw_word_t sigcontext_pc;
     int validate;
+    unw_context_t *uc;
   };
+
+static inline unw_context_t *
+dwarf_get_uc(const struct dwarf_cursor *cursor)
+{
+  const struct cursor *c = (struct cursor *) cursor->as_arg;
+  return c->uc;
+}
 
 #define DWARF_GET_LOC(l)        ((l).val)
 
@@ -115,10 +125,10 @@ struct cursor
 # define DWARF_LOC(r, t)        ((dwarf_loc_t) { .val = (r) })
 # define DWARF_IS_REG_LOC(l)    0
 # define DWARF_REG_LOC(c,r)     (DWARF_LOC((unw_word_t)                      \
-                                 tdep_uc_addr((c)->as_arg, (r)), 0))
+                                 tdep_uc_addr(dwarf_get_uc(c), (r)), 0))
 # define DWARF_MEM_LOC(c,m)     DWARF_LOC ((m), 0)
 # define DWARF_FPREG_LOC(c,r)   (DWARF_LOC((unw_word_t)                      \
-                                 tdep_uc_addr((c)->as_arg, (r)), 0))
+                                 tdep_uc_addr(dwarf_get_uc(c), (r)), 0))
 
 static inline int
 dwarf_getfp (struct dwarf_cursor *c, dwarf_loc_t loc, unw_fpreg_t *val)
@@ -160,8 +170,14 @@ dwarf_put (struct dwarf_cursor *c, dwarf_loc_t loc, unw_word_t val)
 # define DWARF_LOC_TYPE_FP      (1 << 0)
 # define DWARF_LOC_TYPE_REG     (1 << 1)
 # define DWARF_NULL_LOC         DWARF_LOC (0, 0)
-# define DWARF_IS_NULL_LOC(l)                                           \
-                ({ dwarf_loc_t _l = (l); _l.val == 0 && _l.type == 0; })
+
+static inline int
+dwarf_is_null_loc(dwarf_loc_t l)
+{
+  return l.val == 0 && l.type == 0;
+}
+
+# define DWARF_IS_NULL_LOC(l)   dwarf_is_null_loc(l)
 # define DWARF_LOC(r, t)        ((dwarf_loc_t) { .val = (r), .type = (t) })
 # define DWARF_IS_REG_LOC(l)    (((l).type & DWARF_LOC_TYPE_REG) != 0)
 # define DWARF_IS_FP_LOC(l)     (((l).type & DWARF_LOC_TYPE_FP) != 0)
@@ -297,13 +313,13 @@ dwarf_put (struct dwarf_cursor *c, dwarf_loc_t loc, unw_word_t val)
 #define tdep_get_ip(c)                  ((c)->dwarf.ip)
 #define tdep_big_endian(as)             ((as)->big_endian)
 
-extern int tdep_init_done;
+extern atomic_bool tdep_init_done;
 
 extern void tdep_init (void);
 extern int tdep_search_unwind_table (unw_addr_space_t as, unw_word_t ip,
                                      unw_dyn_info_t *di, unw_proc_info_t *pi,
                                      int need_unwind_info, void *arg);
-extern void *tdep_uc_addr (unw_tdep_context_t *uc, int reg);
+extern void *tdep_uc_addr (unw_context_t *uc, int reg);
 extern int tdep_get_elf_image (struct elf_image *ei, pid_t pid, unw_word_t ip,
                                unsigned long *segbase, unsigned long *mapoff,
                                char *path, size_t pathlen);
@@ -315,6 +331,6 @@ extern int tdep_access_fpreg (struct cursor *c, unw_regnum_t reg,
 extern int tdep_trace (unw_cursor_t *cursor, void **addresses, int *n);
 extern void tdep_stash_frame (struct dwarf_cursor *c,
                               struct dwarf_reg_state *rs);
-extern int tdep_getcontext_trace (unw_tdep_context_t *);
+extern int tdep_getcontext_trace (unw_context_t *);
 
 #endif /* AARCH64_LIBUNWIND_I_H */

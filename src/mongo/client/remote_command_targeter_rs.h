@@ -29,11 +29,19 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/client/connection_string.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/client/remote_command_targeter.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/util/cancellation.h"
+#include "mongo/util/future.h"
+#include "mongo/util/net/hostandport.h"
+
 #include <memory>
 #include <string>
 #include <vector>
-
-#include "mongo/client/remote_command_targeter.h"
 
 namespace mongo {
 
@@ -54,13 +62,15 @@ public:
     ConnectionString connectionString() override;
 
     StatusWith<HostAndPort> findHost(OperationContext* opCtx,
-                                     const ReadPreferenceSetting& readPref) override;
+                                     const ReadPreferenceSetting& readPref,
+                                     const TargetingMetadata& targetingMetadata) override;
 
     SemiFuture<std::vector<HostAndPort>> findHosts(const ReadPreferenceSetting& readPref,
                                                    const CancellationToken& cancelToken) override;
 
     SemiFuture<HostAndPort> findHost(const ReadPreferenceSetting& readPref,
-                                     const CancellationToken& cancelToken) override;
+                                     const CancellationToken& cancelToken,
+                                     const TargetingMetadata& targetingMetadata) override;
 
     void markHostNotPrimary(const HostAndPort& host, const Status& status) override;
 
@@ -69,11 +79,23 @@ public:
     void markHostShuttingDown(const HostAndPort& host, const Status& status) override;
 
 private:
+    /**
+     * Returns true if the local host must be targeted, i.e. this is a shardsvr mongod targeting the
+     * replica set it is in and the readPreference has been pre-targeted by the client connected to
+     * it.
+     */
+    bool _mustTargetLocalHost(const ReadPreferenceSetting& readPref) const;
+
+    ServiceContext* const _serviceContext;
+
     // Name of the replica set which this targeter maintains
     const std::string _rsName;
 
     // Monitor for this replica set
     std::shared_ptr<ReplicaSetMonitor> _rsMonitor;
+
+    // Set to true if this is shardsvr mongod targeting the replica set it is in.
+    bool _isTargetingLocalRS = false;
 };
 
 }  // namespace mongo

@@ -29,9 +29,11 @@
 
 #include "mongo/util/options_parser/startup_option_init.h"
 
-#include <stack>
+#include "mongo/base/initializer.h"
 
-#include "mongo/util/assert_util.h"
+#include <stack>
+#include <string>
+#include <vector>
 
 /*
  * These are the initializer groups for command line and config file option registration, parsing,

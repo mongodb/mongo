@@ -30,7 +30,11 @@
 #pragma once
 
 #include <algorithm>
+#include <cstddef>
+
+#include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 
 #ifndef _WIN32
@@ -38,6 +42,7 @@
 #endif
 
 #include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/sockaddr.h"
 
@@ -82,19 +87,27 @@ struct ParserResults {
  */
 boost::optional<ParserResults> parseProxyProtocolHeader(StringData buffer);
 
+/**
+ * Peek a buffer fo at least 12 bytes to determine if it may be a proxy protocol header.
+ *
+ * Note that this does not definitively identify the initial packet as proxy protocol,
+ * it only establishes that it is possible that it is such.
+ * To be used in determining appropriate error messages during otherwise failed
+ * initial handshakes only.
+ */
+bool maybeProxyProtocolHeader(StringData buffer);
+
 namespace proxy_protocol_details {
 static constexpr size_t kMaxUnixPathLength = 108;
 
 template <typename AddrUn = sockaddr_un>
 AddrUn parseSockAddrUn(StringData buffer) {
-    using namespace fmt::literals;
-
     AddrUn addr{};
     addr.sun_family = AF_UNIX;
 
     StringData path = buffer.substr(0, buffer.find('\0'));
     uassert(ErrorCodes::FailedToParse,
-            "Provided unix path longer than system supports: {}"_format(buffer),
+            fmt::format("Provided unix path longer than system supports: {}", buffer),
             path.size() < sizeof(AddrUn::sun_path));
     std::copy(path.begin(), path.end(), addr.sun_path);
     return addr;

@@ -1,0 +1,2024 @@
+# This file contains miscellaneous tasks
+
+################################################
+#                   Variable                   #
+################################################
+variables:
+  - &antithesis_task_template
+    name: antithesis_task_template
+    depends_on:
+      name: archive_dist_test_debug
+    commands:
+      - func: "do setup"
+      - func: "do setup for antithesis"
+      - command: timeout.update
+        params:
+          exec_timeout_secs: 7200 # 2 hrs
+          timeout_secs: 600 # 10 mins
+      - func: "antithesis image build and push"
+        vars:
+          suite: suite_name
+          resmoke_args: >-
+            --arg=val
+            --flag
+
+  - &jepsen_config_vars
+    jepsen_key_time_limit: --key-time-limit 15
+    jepsen_protocol_version: --protocol-version 1
+    jepsen_read_concern: ""
+    jepsen_read_with_find_and_modify: ""
+    jepsen_storage_engine: ""
+    jepsen_test_name: ""
+    # Empirically, we've had greater success in reproducing the issues found in MongoDB versions
+    # 3.4.0-rc3 and 3.4.0-rc4 when running Jepsen with at least --time-limit=600.
+    jepsen_time_limit: --time-limit 1200
+    jepsen_write_concern: ""
+    mongod_conf: --mongod-conf mongod_verbose.conf
+
+  # Template for running Jepsen tests
+  - &run_jepsen_template
+    name: run_jepsen_template
+    depends_on:
+      - name: archive_dist_test
+    commands:
+      - func: "do setup"
+      - func: "do jepsen setup"
+      - func: "run jepsen test"
+        vars:
+          <<: *jepsen_config_vars
+
+  # Templates used by powercycle
+  - &powercycle_remote_credentials
+    private_key_file: src/powercycle.pem
+    private_key_remote: ${__project_aws_ssh_key_value}
+
+  - &sbom_upload_config_vars
+    CONTAINER_COMMAND: podman # podman or docker
+    CONTAINER_IMAGE: 901841024863.dkr.ecr.us-east-1.amazonaws.com/release-infrastructure/silkbomb:2.0
+    CONTAINER_OPTIONS: --pull=always --platform="linux/amd64" -it --rm
+    CONTAINER_ENV_FILES: ${workdir}/kondukto_credentials.env
+    CONTAINER_VOLUMES: ${workdir}:/workdir
+    KODUKTO_ROLE_ARN: arn:aws:iam::119629040606:role/kondukto
+    SBOM_FILE_PATH: ${workdir}/sbom.json
+    LOCAL_REPO_PATH: ${workdir}/src
+
+################################################
+#                    Tasks                     #
+################################################
+tasks:
+  - <<: *antithesis_task_template
+    name: antithesis_concurrency_sharded_stepdown_terminate_kill_primary_with_balancer_and_config_transitions_and_add_remove_shard
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "experimental",
+        "antithesis",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "do setup for antithesis"
+      - func: "antithesis image build and push"
+        vars:
+          suite: concurrency_sharded_stepdown_terminate_kill_primary_with_balancer_and_config_transitions_and_add_remove_shard
+          resmoke_args: >-
+            --runAllFeatureFlagTests
+
+  - <<: *antithesis_task_template
+    name: antithesis_concurrency_sharded_replication_with_balancer_and_config_transitions_and_add_remove_shard
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "experimental",
+        "antithesis",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "do setup for antithesis"
+      - func: "antithesis image build and push"
+        vars:
+          suite: concurrency_sharded_replication_with_balancer_and_config_transitions_and_add_remove_shard
+          resmoke_args: >-
+            --runAllFeatureFlagTests
+
+  - <<: *antithesis_task_template
+    name: antithesis_jstestfuzz_sharded_with_config_transitions
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "experimental",
+        "antithesis",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "do setup for antithesis"
+      - func: "antithesis image build and push"
+        vars:
+          suite: jstestfuzz_sharded_with_config_transitions
+          resmoke_args: >-
+            --runAllFeatureFlagTests
+
+  - <<: *antithesis_task_template
+    name: antithesis_concurrency_sharded_multi_stmt_txn_stepdown_terminate_kill_primary
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "experimental",
+        "antithesis",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "do setup for antithesis"
+      - func: "antithesis image build and push"
+        vars:
+          suite: concurrency_sharded_multi_stmt_txn_stepdown_terminate_kill_primary
+          resmoke_args: >-
+            --runAllFeatureFlagTests
+
+  - <<: *antithesis_task_template
+    name: antithesis_concurrency_sharded_stepdown_terminate_kill_primary_with_balancer
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "experimental",
+        "antithesis",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "do setup for antithesis"
+      - func: "antithesis image build and push"
+        vars:
+          suite: concurrency_sharded_stepdown_terminate_kill_primary_with_balancer
+          resmoke_args: >-
+            --runAllFeatureFlagTests
+
+  - <<: *antithesis_task_template
+    name: antithesis_concurrency_sharded_initial_sync
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "experimental",
+        "antithesis",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "do setup for antithesis"
+      - func: "antithesis image build and push"
+        vars:
+          suite: concurrency_sharded_initial_sync
+          resmoke_args: >-
+            --runAllFeatureFlagTests
+
+  - <<: *antithesis_task_template
+    name: antithesis_replica_sets_initsync_jscore_passthrough
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "experimental",
+        "antithesis",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "do setup for antithesis"
+      - func: "antithesis image build and push"
+        vars:
+          suite: replica_sets_initsync_jscore_passthrough
+          resmoke_args: >-
+            --runAllFeatureFlagTests
+
+  - <<: *antithesis_task_template
+    name: antithesis_concurrency_sharded_stepdown_terminate_kill_primary_with_balancer_config_shard
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "experimental",
+        "antithesis",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "do setup for antithesis"
+      - func: "antithesis image build and push"
+        vars:
+          suite: concurrency_sharded_stepdown_terminate_kill_primary_with_balancer
+          resmoke_args: >-
+            --configShard=0
+            --numShards=2
+            --excludeWithAnyTags=config_shard_incompatible
+            --runAllFeatureFlagTests
+
+  - <<: *antithesis_task_template
+    name: antithesis_config_fuzzer_concurrency_sharded_replication
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "experimental",
+        "antithesis",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "do setup for antithesis"
+      - func: "antithesis image build and push"
+        vars:
+          suite: concurrency_sharded_replication
+          resmoke_args: >-
+            --fuzzMongodConfigs=normal
+            --fuzzMongosConfigs=normal
+            --fuzzRuntimeParams
+            --excludeWithAnyTags=does_not_support_config_fuzzer
+            --runAllFeatureFlagTests
+
+  - <<: *antithesis_task_template
+    name: antithesis_core
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "experimental",
+        "antithesis",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "do setup for antithesis"
+      - func: "antithesis image build and push"
+        vars:
+          suite: core
+          resmoke_args: >-
+            --runAllFeatureFlagTests
+
+  - <<: *antithesis_task_template
+    name: antithesis_fcv_upgrade_downgrade_sharded_collections_jscore_passthrough
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "experimental",
+        "antithesis",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "do setup for antithesis"
+      - func: "antithesis image build and push"
+        vars:
+          suite: fcv_upgrade_downgrade_sharded_collections_jscore_passthrough
+          resmoke_args: >-
+            --runAllFeatureFlagTests
+
+  - <<: *antithesis_task_template
+    name: antithesis_jstestfuzz_sharded
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "experimental",
+        "antithesis",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "do setup for antithesis"
+      - func: "antithesis image build and push"
+        vars:
+          suite: jstestfuzz_sharded
+          resmoke_args: >-
+            --runAllFeatureFlagTests
+
+  - <<: *antithesis_task_template
+    name: antithesis_replica_sets_jscore_passthrough
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "experimental",
+        "antithesis",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "do setup for antithesis"
+      - func: "antithesis image build and push"
+        vars:
+          suite: replica_sets_jscore_passthrough
+          resmoke_args: >-
+            --runAllFeatureFlagTests
+
+  - <<: *antithesis_task_template
+    name: antithesis_replica_sets_lag_oplog_application_jscore_passthrough
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "experimental",
+        "antithesis",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "do setup for antithesis"
+      - func: "antithesis image build and push"
+        vars:
+          suite: replica_sets_lag_oplog_application_jscore_passthrough
+          resmoke_args: >-
+            --runAllFeatureFlagTests
+
+  - <<: *antithesis_task_template
+    name: antithesis_replica_sets_kill_primary_jscore_passthrough
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "experimental",
+        "antithesis",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "do setup for antithesis"
+      - func: "antithesis image build and push"
+        vars:
+          suite: replica_sets_kill_primary_jscore_passthrough
+          resmoke_args: >-
+            --runAllFeatureFlagTests
+
+  - <<: *antithesis_task_template
+    name: antithesis_replica_sets_kill_secondaries_jscore_passthrough
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "experimental",
+        "antithesis",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "do setup for antithesis"
+      - func: "antithesis image build and push"
+        vars:
+          suite: replica_sets_kill_secondaries_jscore_passthrough
+          resmoke_args: >-
+            --runAllFeatureFlagTests
+
+  - <<: *antithesis_task_template
+    name: antithesis_replica_sets_initsync_lagged_sync_source_jscore_passthrough
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "experimental",
+        "antithesis",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "do setup for antithesis"
+      - func: "antithesis image build and push"
+        vars:
+          suite: replica_sets_initsync_lagged_sync_source_jscore_passthrough
+          resmoke_args: >-
+            --runAllFeatureFlagTests
+
+  - name: check_feature_flag_tags
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "development_critical_single_variant",
+      ]
+    patch_only: true
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - command: subprocess.exec
+        type: test
+        params:
+          binary: bash
+          args:
+            - "./src/evergreen/feature_flag_tags_check.sh"
+
+  - name: check_for_todos
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "development_critical_single_variant",
+      ]
+    exec_timeout_secs: 600 # 10 minute timeout
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "configure evergreen api credentials"
+      - command: subprocess.exec
+        type: test
+        params:
+          binary: bash
+          args:
+            - "./src/evergreen/todos_check.sh"
+
+  - name: generate_buildid_to_debug_symbols_mapping
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "release_critical",
+        "incompatible_mac",
+        "incompatible_windows",
+        "requires_compile_variant",
+        "symbolizer",
+      ]
+    stepback: false
+    patchable: true
+    depends_on:
+      - archive_dist_test_debug
+    commands:
+      - func: "f_expansions_write"
+      - func: "do setup"
+      - func: "configure evergreen api credentials"
+      - command: subprocess.exec
+        params:
+          binary: bash
+          args:
+            - "./src/evergreen/generate_buildid_debug_symbols_mapping.sh"
+
+  - name: idl_tests
+    tags: ["assigned_to_jira_team_server_programmability", "default"]
+    depends_on:
+      - name: archive_dist_test
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "upload pip requirements"
+      - func: "run idl tests"
+
+  - <<: *run_jepsen_template
+    name: jepsen_config_fuzzer_list-append
+    tags:
+      [
+        "assigned_to_jira_team_server_repl",
+        "experimental",
+        "jepsen_docker",
+        "requires_extra_system_deps",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "do jepsen docker setup"
+      - func: "setup jepsen docker config fuzzer"
+      - func: "run jepsen docker test"
+
+  - <<: *run_jepsen_template
+    name: jepsen_config_fuzzer_read-concern-majority
+    tags: ["assigned_to_jira_team_server_repl", "experimental", "jepsen"]
+    commands:
+      - func: "do setup"
+      - func: "do jepsen setup"
+      - func: "setup jepsen config fuzzer"
+      - func: "run jepsen test"
+        vars:
+          <<: *jepsen_config_vars
+          mongod_conf: --mongod-conf mongod.conf
+          jepsen_storage_engine: --storage-engine wiredTiger
+          jepsen_test_name: read-concern-majority
+
+  - <<: *run_jepsen_template
+    name: jepsen_config_fuzzer_read-concern-majority_w1
+    tags: ["assigned_to_jira_team_server_repl", "experimental", "jepsen"]
+    commands:
+      - func: "do setup"
+      - func: "do jepsen setup"
+      - func: "setup jepsen config fuzzer"
+      - func: "run jepsen test"
+        vars:
+          <<: *jepsen_config_vars
+          mongod_conf: --mongod-conf mongod.conf
+          jepsen_storage_engine: --storage-engine wiredTiger
+          jepsen_test_name: read-concern-majority
+          jepsen_write_concern: --write-concern w1
+
+  - <<: *run_jepsen_template
+    name: jepsen_config_fuzzer_register_findAndModify
+    tags: ["assigned_to_jira_team_server_repl", "experimental", "jepsen"]
+    commands:
+      - func: "do setup"
+      - func: "do jepsen setup"
+      - func: "setup jepsen config fuzzer"
+      - func: "run jepsen test"
+        vars:
+          <<: *jepsen_config_vars
+          mongod_conf: --mongod-conf mongod.conf
+          jepsen_read_with_find_and_modify: --read-with-find-and-modify
+          jepsen_storage_engine: --storage-engine wiredTiger
+          jepsen_test_name: register
+
+  - <<: *run_jepsen_template
+    name: jepsen_config_fuzzer_register_linearizableRead
+    tags: ["assigned_to_jira_team_server_repl", "experimental", "jepsen"]
+    commands:
+      - func: "do setup"
+      - func: "do jepsen setup"
+      - func: "setup jepsen config fuzzer"
+      - func: "run jepsen test"
+        vars:
+          <<: *jepsen_config_vars
+          mongod_conf: --mongod-conf mongod.conf
+          jepsen_read_concern: --read-concern linearizable
+          jepsen_storage_engine: --storage-engine wiredTiger
+          jepsen_test_name: register
+
+  - <<: *run_jepsen_template
+    name: jepsen_config_fuzzer_set_linearizableRead
+    tags: ["assigned_to_jira_team_server_repl", "experimental", "jepsen"]
+    commands:
+      - func: "do setup"
+      - func: "do jepsen setup"
+      - func: "setup jepsen config fuzzer"
+      - func: "run jepsen test"
+        vars:
+          <<: *jepsen_config_vars
+          mongod_conf: --mongod-conf mongod.conf
+          jepsen_read_concern: --read-concern linearizable
+          jepsen_storage_engine: --storage-engine wiredTiger
+          jepsen_test_name: set
+
+  - <<: *run_jepsen_template
+    name: jepsen_list-append
+    tags:
+      [
+        "assigned_to_jira_team_server_repl",
+        "experimental",
+        "jepsen_docker",
+        "requires_extra_system_deps",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "do jepsen docker setup"
+      - func: "run jepsen docker test"
+
+  - <<: *run_jepsen_template
+    name: jepsen_read-concern-majority
+    tags: ["assigned_to_jira_team_server_repl", "experimental", "jepsen"]
+    commands:
+      - func: "do setup"
+      - func: "do jepsen setup"
+      - func: "run jepsen test"
+        vars:
+          <<: *jepsen_config_vars
+          jepsen_storage_engine: --storage-engine wiredTiger
+          jepsen_test_name: read-concern-majority
+
+  - <<: *run_jepsen_template
+    name: jepsen_read-concern-majority_w1
+    tags: ["assigned_to_jira_team_server_repl", "experimental", "jepsen"]
+    commands:
+      - func: "do setup"
+      - func: "do jepsen setup"
+      - func: "run jepsen test"
+        vars:
+          <<: *jepsen_config_vars
+          jepsen_storage_engine: --storage-engine wiredTiger
+          jepsen_test_name: read-concern-majority
+          jepsen_write_concern: --write-concern w1
+
+  - <<: *run_jepsen_template
+    name: jepsen_register_findAndModify
+    tags: ["assigned_to_jira_team_server_repl", "experimental", "jepsen"]
+    commands:
+      - func: "do setup"
+      - func: "do jepsen setup"
+      - func: "run jepsen test"
+        vars:
+          <<: *jepsen_config_vars
+          jepsen_read_with_find_and_modify: --read-with-find-and-modify
+          jepsen_storage_engine: --storage-engine wiredTiger
+          jepsen_test_name: register
+
+  - <<: *run_jepsen_template
+    name: jepsen_register_linearizableRead
+    tags: ["assigned_to_jira_team_server_repl", "experimental", "jepsen"]
+    commands:
+      - func: "do setup"
+      - func: "do jepsen setup"
+      - func: "run jepsen test"
+        vars:
+          <<: *jepsen_config_vars
+          jepsen_read_concern: --read-concern linearizable
+          jepsen_storage_engine: --storage-engine wiredTiger
+          jepsen_test_name: register
+
+  - <<: *run_jepsen_template
+    name: jepsen_set_linearizableRead
+    tags: ["assigned_to_jira_team_server_repl", "experimental", "jepsen"]
+    commands:
+      - func: "do setup"
+      - func: "do jepsen setup"
+      - func: "run jepsen test"
+        vars:
+          <<: *jepsen_config_vars
+          jepsen_read_concern: --read-concern linearizable
+          jepsen_storage_engine: --storage-engine wiredTiger
+          jepsen_test_name: set
+
+  # TODO(SERVER-97804): rename if display_name appears on the evergreen UI
+  - name: bazel_run_format
+    tags:
+      [
+        "assigned_to_jira_team_devprod_build",
+        "development_critical_single_variant",
+        "lint",
+        "bazel_check",
+      ]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - command: timeout.update
+        params:
+          # 40 minutes
+          exec_timeout_secs: 2400
+      - func: "f_expansions_write"
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "upload pip requirements"
+      - func: "get engflow creds"
+      - func: "bazel run"
+        vars:
+          target: >-
+            //:format -- --check --all
+
+  - name: bazel_run_codeowners
+    tags:
+      [
+        "assigned_to_jira_team_devprod_build",
+        "development_critical_single_variant",
+        "lint",
+        "bazel_check",
+      ]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - command: timeout.update
+        params:
+          # 40 minutes
+          exec_timeout_secs: 2400
+      - func: "f_expansions_write"
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "upload pip requirements"
+      - func: "get engflow creds"
+      - func: "bazel run"
+        vars:
+          target: >-
+            //:codeowners -- --check --expansions-file ../expansions.yml
+
+  - name: bazel_run_lint
+    tags:
+      [
+        "assigned_to_jira_team_devprod_build",
+        "development_critical_single_variant",
+        "lint",
+      ]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - command: timeout.update
+        params:
+          # 20 mins
+          exec_timeout_secs: 1200
+      - func: "f_expansions_write"
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "upload pip requirements"
+      - func: "get engflow creds"
+      - func: "bazel run"
+        vars:
+          target: >-
+            lint //... --lint-yaml=${project} --large-files
+
+  # Check that the mutational fuzzer can parse all JS filess.
+  - name: lint_fuzzer_sanity_all
+    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "setup jstestfuzz"
+      - func: "lint fuzzer sanity all"
+
+  # Check that the mutational fuzzer can parse JS files modified in a patch build.
+  - name: lint_fuzzer_sanity_patch
+    tags: ["assigned_to_jira_team_devprod_correctness", "experimental"]
+    patch_only: true
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "setup jstestfuzz"
+      - func: "lint fuzzer sanity patch"
+
+  - name: lint_modules
+    tags:
+      [
+        "assigned_to_jira_team_devprod_build",
+        "development_critical_single_variant",
+        "requires_large_host",
+        "lint",
+      ]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - command: timeout.update
+        params:
+          # 60 mins
+          exec_timeout_secs: 3600
+      - func: "f_expansions_write"
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "upload pip requirements"
+      - func: "get engflow creds"
+      - command: subprocess.exec
+        type: test
+        params:
+          binary: bash
+          args:
+            - "./src/evergreen/run_python_script_with_report.sh"
+            - "validate-module-calls"
+            - "modules_poc/merge_decls.py"
+      - command: subprocess.exec
+        type: test
+        params:
+          binary: bash
+          args:
+            - "./src/evergreen/run_python_script_with_report.sh"
+            - "ensure-browser-can-parse-output"
+            - "modules_poc/browse.py"
+            - "merged_decls.json"
+            - "--parse-only"
+
+  - name: bazel_coverage
+    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - command: timeout.update
+        params:
+          exec_timeout_secs: 21600 # 6 hours
+      - func: "f_expansions_write"
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "upload pip requirements"
+      - func: "get engflow creds"
+      - func: "bazel coverage"
+        vars:
+          # Running something like "bazel test //src/..." has to do a lot of preprocessing on *all*
+          # targets before it actually runs the much smaller fraction of test targets, unless we're
+          # certain that a full build has already been cached.
+          # It might be optimized by doing a query upfront, which uses minimal analysis:
+          #   targets=$(bazel query 'kind(".*_test", //src/...)')
+          #   bazel test $targets
+          target: >-
+            //src/mongo/...
+          args: >-
+            --test_tag_filters=mongo_unittest_debug,-final_target,-code_coverage_quarantine_debug
+            --test_timeout=600
+            --verbose_failures
+            --instrumentation_filter="^//src/mongo[/:],-^//src/mongo/util:boost_assert_shim,-^//src/mongo/util:icu,-^//src/mongo/db/modules/enterprise/src/streams[/:]"
+
+  - name: unit_test_group1_no_sandbox
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+      - name: compile_libraries_for_unittests
+    exec_timeout_secs: 32400 # 9 hours
+    commands:
+      - func: "bazel compile"
+        vars:
+          targets: install-mongo_unittest_first_group
+          compiling_for_test: true
+          task_compile_flags: ${unittest_compile_flags}
+          bazel_args: >-
+            --config=evg
+            --include_autogenerated_targets=True
+      - func: "f_expansions_write"
+      - func: "run diskstats"
+      - func: "f_expansions_write"
+      - func: "monitor process threads"
+      - func: "collect system resource info"
+      - func: "run tests"
+        vars:
+          suite: unittests_first_group
+          install_dir: bazel-bin/install/bin
+          exec_timeout_secs: 32400 # 9 hours
+
+  - name: unit_test_group2_no_sandbox
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+      - name: compile_libraries_for_unittests
+    exec_timeout_secs: 32400 # 9 hours
+    commands:
+      - func: "bazel compile"
+        vars:
+          targets: install-mongo_unittest_second_group
+          compiling_for_test: true
+          task_compile_flags: ${unittest_compile_flags}
+          bazel_args: >-
+            --config=evg
+            --include_autogenerated_targets=True
+      - func: "f_expansions_write"
+      - func: "run diskstats"
+      - func: "f_expansions_write"
+      - func: "monitor process threads"
+      - func: "collect system resource info"
+      - func: "run tests"
+        vars:
+          suite: unittests_second_group
+          install_dir: bazel-bin/install/bin
+          exec_timeout_secs: 32400 # 9 hours
+
+  - name: unit_test_group3_no_sandbox
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+      - name: compile_libraries_for_unittests
+    exec_timeout_secs: 32400 # 9 hours
+    commands:
+      - func: "bazel compile"
+        vars:
+          targets: install-mongo_unittest_third_group
+          compiling_for_test: true
+          task_compile_flags: ${unittest_compile_flags}
+          bazel_args: >-
+            --config=evg
+            --include_autogenerated_targets=True
+      - func: "f_expansions_write"
+      - func: "run diskstats"
+      - func: "f_expansions_write"
+      - func: "monitor process threads"
+      - func: "collect system resource info"
+      - func: "run tests"
+        vars:
+          suite: unittests_third_group
+          install_dir: bazel-bin/install/bin
+          exec_timeout_secs: 32400 # 9 hours
+
+  - name: unit_test_group4_no_sandbox
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+      - name: compile_libraries_for_unittests
+    exec_timeout_secs: 32400 # 9 hours
+    commands:
+      - func: "bazel compile"
+        vars:
+          targets: install-mongo_unittest_fourth_group
+          compiling_for_test: true
+          task_compile_flags: ${unittest_compile_flags}
+          bazel_args: >-
+            --config=evg
+            --include_autogenerated_targets=True
+      - func: "f_expansions_write"
+      - func: "run diskstats"
+      - func: "f_expansions_write"
+      - func: "monitor process threads"
+      - func: "collect system resource info"
+      - func: "run tests"
+        vars:
+          suite: unittests_fourth_group
+          install_dir: bazel-bin/install/bin
+          exec_timeout_secs: 32400 # 9 hours
+
+  - name: unit_test_group5_no_sandbox
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+      - name: compile_libraries_for_unittests
+    exec_timeout_secs: 32400 # 9 hours
+    commands:
+      - func: "bazel compile"
+        vars:
+          targets: install-mongo_unittest_fifth_group
+          compiling_for_test: true
+          task_compile_flags: ${unittest_compile_flags}
+          bazel_args: >-
+            --config=evg
+            --include_autogenerated_targets=True
+      - func: "f_expansions_write"
+      - func: "run diskstats"
+      - func: "f_expansions_write"
+      - func: "monitor process threads"
+      - func: "collect system resource info"
+      - func: "run tests"
+        vars:
+          suite: unittests_fifth_group
+          install_dir: bazel-bin/install/bin
+          exec_timeout_secs: 32400 # 9 hours
+
+  - name: unit_test_group6_no_sandbox
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+      - name: compile_libraries_for_unittests
+    exec_timeout_secs: 32400 # 9 hours
+    commands:
+      - func: "bazel compile"
+        vars:
+          targets: install-mongo_unittest_sixth_group
+          compiling_for_test: true
+          task_compile_flags: ${unittest_compile_flags}
+          bazel_args: >-
+            --config=evg
+            --include_autogenerated_targets=True
+      - func: "f_expansions_write"
+      - func: "run diskstats"
+      - func: "f_expansions_write"
+      - func: "monitor process threads"
+      - func: "collect system resource info"
+      - func: "run tests"
+        vars:
+          suite: unittests_sixth_group
+          install_dir: bazel-bin/install/bin
+          exec_timeout_secs: 32400 # 9 hours
+
+  - name: unit_test_group7_no_sandbox
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+      - name: compile_libraries_for_unittests
+    exec_timeout_secs: 32400 # 9 hours
+    commands:
+      - func: "bazel compile"
+        vars:
+          targets: install-mongo_unittest_seventh_group
+          compiling_for_test: true
+          task_compile_flags: ${unittest_compile_flags}
+          bazel_args: >-
+            --config=evg
+            --include_autogenerated_targets=True
+      - func: "f_expansions_write"
+      - func: "run diskstats"
+      - func: "f_expansions_write"
+      - func: "monitor process threads"
+      - func: "collect system resource info"
+      - func: "run tests"
+        vars:
+          suite: unittests_seventh_group
+          install_dir: bazel-bin/install/bin
+          exec_timeout_secs: 32400 # 9 hours
+
+  - name: unit_test_group8_no_sandbox
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+      - name: compile_libraries_for_unittests
+    exec_timeout_secs: 32400 # 9 hours
+    commands:
+      - func: "bazel compile"
+        vars:
+          targets: install-mongo_unittest_eighth_group
+          compiling_for_test: true
+          task_compile_flags: ${unittest_compile_flags}
+          bazel_args: >-
+            --config=evg
+            --include_autogenerated_targets=True
+      - func: "f_expansions_write"
+      - func: "run diskstats"
+      - func: "f_expansions_write"
+      - func: "monitor process threads"
+      - func: "collect system resource info"
+      - func: "run tests"
+        vars:
+          suite: unittests_eighth_group
+          install_dir: bazel-bin/install/bin
+          exec_timeout_secs: 32400 # 9 hours
+
+  - name: unit_tests
+    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - command: timeout.update
+        params:
+          exec_timeout_secs: 21600 # 6 hours
+      - func: "f_expansions_write"
+      - func: "get engflow creds"
+      - func: "enable bazel test report creation"
+      - func: "f_expansions_write"
+      - func: "bazel test"
+        vars:
+          targets: //src/mongo/...
+          compiling_for_test: true
+          task_compile_flags: ${unittest_compile_flags}
+          test_timeout_sec: 600
+          bazel_args: >-
+            --config=evg
+            --linkstatic=False
+            --test_tag_filters=mongo_unittest,-final_target,-intermediate_debug,-incompatible_with_bazel_remote_test
+            --build_tag_filters=mongo_unittest,-incompatible_with_bazel_remote_test
+
+  - name: unit_tests_remote_exec_incompatible
+    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - command: timeout.update
+        params:
+          exec_timeout_secs: 21600 # 6 hours
+      - func: "f_expansions_write"
+      - func: "get engflow creds"
+      - func: "enable bazel test report creation"
+      - func: "f_expansions_write"
+      - func: "bazel test"
+        vars:
+          targets: //src/mongo/...
+          compiling_for_test: true
+          task_compile_flags: ${unittest_compile_flags}
+          test_timeout_sec: 600
+          bazel_args: >-
+            --config=evg
+            --include_autogenerated_targets=True
+            --test_tag_filters=incompatible_with_bazel_remote_test,-intermediate_debug,-remote_exec_test
+            --build_tag_filters=incompatible_with_bazel_remote_test
+
+  - name: unit_test_group1
+    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+      - name: compile_libraries_for_unittests
+    commands:
+      - command: timeout.update
+        params:
+          exec_timeout_secs: 21600 # 6 hours
+      - func: "f_expansions_write"
+      - func: "get engflow creds"
+      - func: "enable bazel test report creation"
+      - func: "f_expansions_write"
+      - func: "bazel test"
+        vars:
+          targets: //src/mongo/...
+          compiling_for_test: true
+          task_compile_flags: ${unittest_compile_flags}
+          test_timeout_sec: 600
+          bazel_args: >-
+            --config=evg
+            --include_autogenerated_targets=True
+            --test_tag_filters=mongo_unittest_first_group,-intermediate_debug,-remote_exec_test
+            --build_tag_filters=mongo_unittest_first_group
+
+  - name: unit_test_group2
+    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+      - name: compile_libraries_for_unittests
+    commands:
+      - command: timeout.update
+        params:
+          exec_timeout_secs: 21600 # 6 hours
+      - func: "f_expansions_write"
+      - func: "get engflow creds"
+      - func: "enable bazel test report creation"
+      - func: "f_expansions_write"
+      - func: "bazel test"
+        vars:
+          targets: //src/mongo/...
+          compiling_for_test: true
+          task_compile_flags: ${unittest_compile_flags}
+          test_timeout_sec: 600
+          bazel_args: >-
+            --config=evg
+            --include_autogenerated_targets=True
+            --test_tag_filters=mongo_unittest_second_group,-intermediate_debug,-tracing_test,-remote_exec_test
+            --build_tag_filters=mongo_unittest_second_group
+
+  - name: unit_test_group3
+    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+      - name: compile_libraries_for_unittests
+    commands:
+      - command: timeout.update
+        params:
+          exec_timeout_secs: 21600 # 6 hours
+      - func: "f_expansions_write"
+      - func: "get engflow creds"
+      - func: "enable bazel test report creation"
+      - func: "f_expansions_write"
+      - func: "bazel test"
+        vars:
+          targets: //src/mongo/...
+          compiling_for_test: true
+          task_compile_flags: ${unittest_compile_flags}
+          test_timeout_sec: 600
+          bazel_args: >-
+            --config=evg
+            --include_autogenerated_targets=True
+            --test_tag_filters=mongo_unittest_third_group,-intermediate_debug,-remote_exec_test
+            --build_tag_filters=mongo_unittest_third_group
+
+  - name: unit_test_group4
+    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+      - name: compile_libraries_for_unittests
+    commands:
+      - command: timeout.update
+        params:
+          exec_timeout_secs: 21600 # 6 hours
+      - func: "f_expansions_write"
+      - func: "get engflow creds"
+      - func: "enable bazel test report creation"
+      - func: "f_expansions_write"
+      - func: "bazel test"
+        vars:
+          targets: //src/mongo/...
+          compiling_for_test: true
+          task_compile_flags: ${unittest_compile_flags}
+          test_timeout_sec: 600
+          bazel_args: >-
+            --config=evg
+            --include_autogenerated_targets=True
+            --test_tag_filters=mongo_unittest_fourth_group,-intermediate_debug,-remote_exec_test
+            --build_tag_filters=mongo_unittest_fourth_group
+
+  - name: unit_test_group5
+    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+      - name: compile_libraries_for_unittests
+    commands:
+      - command: timeout.update
+        params:
+          exec_timeout_secs: 21600 # 6 hours
+      - func: "f_expansions_write"
+      - func: "get engflow creds"
+      - func: "enable bazel test report creation"
+      - func: "f_expansions_write"
+      - func: "bazel test"
+        vars:
+          targets: //src/mongo/...
+          compiling_for_test: true
+          task_compile_flags: ${unittest_compile_flags}
+          test_timeout_sec: 600
+          bazel_args: >-
+            --config=evg
+            --include_autogenerated_targets=True
+            --test_tag_filters=mongo_unittest_fifth_group,-intermediate_debug,-remote_exec_test
+            --build_tag_filters=mongo_unittest_fifth_group
+
+  - name: unit_test_group6
+    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+      - name: compile_libraries_for_unittests
+    commands:
+      - command: timeout.update
+        params:
+          exec_timeout_secs: 21600 # 6 hours
+      - func: "f_expansions_write"
+      - func: "get engflow creds"
+      - func: "enable bazel test report creation"
+      - func: "f_expansions_write"
+      - func: "bazel test"
+        vars:
+          targets: //src/mongo/...
+          compiling_for_test: true
+          task_compile_flags: ${unittest_compile_flags}
+          test_timeout_sec: 600
+          bazel_args: >-
+            --config=evg
+            --include_autogenerated_targets=True
+            --test_tag_filters=mongo_unittest_sixth_group,-intermediate_debug,-remote_exec_test
+            --build_tag_filters=mongo_unittest_sixth_group
+
+  - name: unit_test_group7
+    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+      - name: compile_libraries_for_unittests
+    commands:
+      - command: timeout.update
+        params:
+          exec_timeout_secs: 21600 # 6 hours
+      - func: "f_expansions_write"
+      - func: "get engflow creds"
+      - func: "enable bazel test report creation"
+      - func: "f_expansions_write"
+      - func: "bazel test"
+        vars:
+          targets: //src/mongo/...
+          compiling_for_test: true
+          task_compile_flags: ${unittest_compile_flags}
+          test_timeout_sec: 600
+          bazel_args: >-
+            --config=evg
+            --include_autogenerated_targets=True
+            --test_tag_filters=mongo_unittest_seventh_group,-intermediate_debug,-remote_exec_test
+            --build_tag_filters=mongo_unittest_seventh_group
+
+  - name: unit_test_group8
+    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+      - name: compile_libraries_for_unittests
+    commands:
+      - command: timeout.update
+        params:
+          exec_timeout_secs: 21600 # 6 hours
+      - func: "f_expansions_write"
+      - func: "get engflow creds"
+      - func: "enable bazel test report creation"
+      - func: "f_expansions_write"
+      - func: "bazel test"
+        vars:
+          targets: //src/mongo/...
+          compiling_for_test: true
+          task_compile_flags: ${unittest_compile_flags}
+          test_timeout_sec: 600
+          bazel_args: >-
+            --config=evg
+            --include_autogenerated_targets=True
+            --test_tag_filters=mongo_unittest_eighth_group,-intermediate_debug,-remote_exec_test
+            --build_tag_filters=mongo_unittest_eighth_group
+
+  - name: monitor_build_status
+    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "upload pip requirements"
+      - func: "configure evergreen api credentials"
+      - command: subprocess.exec
+        type: test
+        params:
+          binary: bash
+          args:
+            - "src/evergreen/monitor_build_status_run.sh"
+          env:
+            JIRA_AUTH_ACCESS_TOKEN: ${jira_auth_access_token}
+            JIRA_AUTH_ACCESS_TOKEN_SECRET: ${jira_auth_access_token_secret}
+            JIRA_AUTH_CONSUMER_KEY: ${jira_auth_consumer_key}
+            JIRA_AUTH_KEY_CERT: ${jira_auth_key_cert}
+
+  - name: monitor_mongo_fork_10gen
+    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "monitor mongo fork 10gen"
+
+  - name: powercycle
+    tags:
+      [
+        "assigned_to_jira_team_server_storage_engines",
+        "experimental",
+        "powercycle",
+      ]
+    exec_timeout_secs: 7200 # 2 hour timeout for the task overall
+    depends_on:
+      - name: archive_dist_test
+    commands:
+      - func: "do setup"
+      - func: "set up remote credentials"
+        vars:
+          <<: *powercycle_remote_credentials
+      - func: "set up EC2 instance"
+        vars:
+          <<: *powercycle_remote_credentials
+      - func: "run powercycle test"
+        vars:
+          <<: *powercycle_remote_credentials
+        timeout_secs: 1800 # 30 minute timeout for no output
+
+  - name: powercycle_kill_mongod
+    tags:
+      [
+        "assigned_to_jira_team_server_storage_engines",
+        "experimental",
+        "powercycle",
+      ]
+    exec_timeout_secs: 7200 # 2 hour timeout for the task overall
+    depends_on:
+      - name: archive_dist_test
+    commands:
+      - func: "do setup"
+      - func: "set up remote credentials"
+        vars:
+          <<: *powercycle_remote_credentials
+      - func: "set up EC2 instance"
+        vars:
+          <<: *powercycle_remote_credentials
+      - func: "run powercycle test"
+        vars:
+          <<: *powercycle_remote_credentials
+        timeout_secs: 1800 # 30 minute timeout for no output
+
+  - name: powercycle_last_lts_fcv
+    tags:
+      [
+        "assigned_to_jira_team_server_storage_engines",
+        "experimental",
+        "powercycle",
+      ]
+    exec_timeout_secs: 7200 # 2 hour timeout for the task overall
+    depends_on:
+      - name: archive_dist_test
+    commands:
+      - func: "do setup"
+      - func: "set up remote credentials"
+        vars:
+          <<: *powercycle_remote_credentials
+      - func: "set up EC2 instance"
+        vars:
+          <<: *powercycle_remote_credentials
+      - func: "run powercycle test"
+        vars:
+          <<: *powercycle_remote_credentials
+        timeout_secs: 1800 # 30 minute timeout for no output
+
+  - name: powercycle_replication
+    tags:
+      [
+        "assigned_to_jira_team_server_storage_engines",
+        "experimental",
+        "powercycle",
+      ]
+    exec_timeout_secs: 7200 # 2 hour timeout for the task overall
+    depends_on:
+      - name: archive_dist_test
+    commands:
+      - func: "do setup"
+      - func: "set up remote credentials"
+        vars:
+          <<: *powercycle_remote_credentials
+      - func: "set up EC2 instance"
+        vars:
+          <<: *powercycle_remote_credentials
+      - func: "run powercycle test"
+        vars:
+          <<: *powercycle_remote_credentials
+        timeout_secs: 1800 # 30 minute timeout for no output
+
+  - name: powercycle_replication_smalloplog
+    tags:
+      [
+        "assigned_to_jira_team_server_storage_engines",
+        "experimental",
+        "powercycle",
+      ]
+    exec_timeout_secs: 7200 # 2 hour timeout for the task overall
+    depends_on:
+      - name: archive_dist_test
+    commands:
+      - func: "do setup"
+      - func: "set up remote credentials"
+        vars:
+          <<: *powercycle_remote_credentials
+      - func: "set up EC2 instance"
+        vars:
+          <<: *powercycle_remote_credentials
+      - func: "run powercycle test"
+        vars:
+          <<: *powercycle_remote_credentials
+        timeout_secs: 1800 # 30 minute timeout for no output
+
+  - name: powercycle_sentinel
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "experimental",
+        "incompatible_windows",
+      ]
+    exec_timeout_secs: 86400 # 24 hours
+    commands:
+      - func: "run powercycle sentinel"
+        vars:
+          gen_task: powercycle_smoke_skip_compile_gen
+
+  - name: powercycle_smoke
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "default",
+        "incompatible_tsan",
+      ]
+    exec_timeout_secs: 7200 # 2 hour timeout for the task overall
+    depends_on:
+      - name: archive_dist_test
+    commands:
+      - func: "do setup"
+      - func: "set up remote credentials"
+        vars:
+          <<: *powercycle_remote_credentials
+      - func: "set up EC2 instance"
+        vars:
+          <<: *powercycle_remote_credentials
+      - func: "run powercycle test"
+        vars:
+          <<: *powercycle_remote_credentials
+        timeout_secs: 1800 # 30 minute timeout for no output
+
+  - name: powercycle_smoke_skip_compile_gen
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "experimental",
+        "incompatible_windows",
+      ]
+    commands:
+      - func: "generate powercycle tasks"
+        vars:
+          task_names: >-
+            powercycle_smoke_skip_compile
+          num_tasks: 20
+          exec_timeout_secs: 86400 # 24 hours
+          timeout_secs: 86400 # 24 hours
+          set_up_retry_count: 1800
+          run_powercycle_args: --sshAccessRetryCount=1800
+
+  - name: powercycle_syncdelay
+    tags:
+      [
+        "assigned_to_jira_team_server_storage_engines",
+        "experimental",
+        "powercycle",
+      ]
+    exec_timeout_secs: 7200 # 2 hour timeout for the task overall
+    depends_on:
+      - name: archive_dist_test
+    commands:
+      - func: "do setup"
+      - func: "set up remote credentials"
+        vars:
+          <<: *powercycle_remote_credentials
+      - func: "set up EC2 instance"
+        vars:
+          <<: *powercycle_remote_credentials
+      - func: "run powercycle test"
+        vars:
+          <<: *powercycle_remote_credentials
+        timeout_secs: 1800 # 30 minute timeout for no output
+
+  - name: powercycle_write_concern_majority
+    tags:
+      [
+        "assigned_to_jira_team_server_storage_engines",
+        "experimental",
+        "powercycle",
+      ]
+    exec_timeout_secs: 7200 # 2 hour timeout for the task overall
+    depends_on:
+      - name: archive_dist_test
+    commands:
+      - func: "do setup"
+      - func: "set up remote credentials"
+        vars:
+          <<: *powercycle_remote_credentials
+      - func: "set up EC2 instance"
+        vars:
+          <<: *powercycle_remote_credentials
+      - func: "run powercycle test"
+        vars:
+          <<: *powercycle_remote_credentials
+        timeout_secs: 1800 # 30 minute timeout for no output
+
+  - name: run_smoke_tests_gen
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "development_critical_single_variant",
+        "requires_large_host",
+        "incompatible_windows",
+      ]
+    commands:
+      - func: "generate smoke test tasks"
+
+  - name: push_mongod_to_ecr
+    tags: ["assigned_to_jira_team_disag_mongod"]
+    depends_on:
+      - name: package
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "set up venv"
+      - func: "fetch dist tarball"
+      - func: "extract binaries"
+      - command: ec2.assume_role
+        params:
+          role_arn: "${disagg_storage_ecr_arn}"
+      - func: "build and push module images"
+
+  - name: selinux_rhel8_enterprise
+    tags: ["assigned_to_jira_team_server_security", "experimental"]
+    depends_on:
+      - name: archive_dist_test
+      - name: package
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "set up venv"
+      - func: "fetch packages"
+      - func: "fetch binaries"
+      - func: "fetch binaries zstd"
+      - func: "fetch binary zstd shas"
+      - func: "fetch binary tgz shas"
+      - func: "extract binaries"
+      - func: "run selinux tests"
+        vars:
+          distro: rhel8.8-selinux
+          test_list: jstests/selinux/*.js src/mongo/db/modules/enterprise/jstests/selinux/*.js
+
+  - name: selinux_rhel8_org
+    tags: ["assigned_to_jira_team_server_security", "experimental"]
+    depends_on:
+      - name: archive_dist_test
+      - name: package
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "set up venv"
+      - func: "fetch packages"
+      - func: "fetch binaries"
+      - func: "fetch binaries zstd"
+      - func: "fetch binary zstd shas"
+      - func: "fetch binary tgz shas"
+      - func: "extract binaries"
+      - func: "run selinux tests"
+        vars:
+          distro: rhel8.8-selinux
+          test_list: jstests/selinux/*.js
+
+  - name: selinux_rhel9_enterprise
+    tags: ["assigned_to_jira_team_server_security", "experimental"]
+    depends_on:
+      - name: archive_dist_test
+      - name: package
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "set up venv"
+      - func: "fetch packages"
+      - func: "fetch binaries"
+      - func: "fetch binaries zstd"
+      - func: "fetch binary zstd shas"
+      - func: "fetch binary tgz shas"
+      - func: "extract binaries"
+      - func: "run selinux tests"
+        vars:
+          distro: rhel90-selinux
+          test_list: jstests/selinux/*.js src/mongo/db/modules/enterprise/jstests/selinux/*.js
+
+  - name: selinux_rhel9_org
+    tags: ["assigned_to_jira_team_server_security", "experimental"]
+    depends_on:
+      - name: archive_dist_test
+      - name: package
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "set up venv"
+      - func: "fetch packages"
+      - func: "fetch binaries"
+      - func: "fetch binaries zstd"
+      - func: "fetch binary zstd shas"
+      - func: "fetch binary tgz shas"
+      - func: "extract binaries"
+      - func: "run selinux tests"
+        vars:
+          distro: rhel90-selinux
+          test_list: jstests/selinux/*.js
+
+  - name: sync_repo_with_copybara
+    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
+    patchable: false
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "configure evergreen api credentials"
+      - func: "sync repo with copybara"
+
+  - name: test_copybara_sync
+    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
+    patch_only: true
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "configure evergreen api credentials"
+      - func: "test copybara sync"
+
+  - name: test_api_version_compatibility
+    tags:
+      [
+        "assigned_to_jira_team_server_repl",
+        "development_critical_single_variant",
+      ]
+    depends_on:
+      - name: archive_dist_test
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "upload pip requirements"
+      - func: "do setup"
+      - func: "f_expansions_write"
+      - command: subprocess.exec
+        type: test
+        params:
+          binary: bash
+          args:
+            - "src/evergreen/check_idl_compat.sh"
+
+  - name: test_packages
+    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
+    depends_on:
+      - name: package
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "run package test"
+        vars:
+          docker_username: ${dockerhub_username}
+          docker_password: ${dockerhub_password}
+
+  - name: test_packages_release
+    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "run release package test"
+        vars:
+          docker_username: ${dockerhub_username}
+          docker_password: ${dockerhub_password}
+
+  - name: validate_commit_message
+    allowed_requesters: ["github_merge_queue", "github_pr"]
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "development_critical_single_variant",
+      ]
+    exec_timeout_secs: 600 # 10 minute timeout
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "upload pip requirements"
+      - func: "configure evergreen api credentials"
+      - func: "f_expansions_write"
+      - command: github.generate_token
+        params:
+          owner: ${github_org}
+          repo: ${github_repo}
+          expansion_name: github_token
+          permissions:
+            pull_requests: read
+            metadata: read
+      - command: subprocess.exec
+        type: test
+        params:
+          binary: bash
+          include_expansions_in_env:
+            - github_token
+          args:
+            - "./src/evergreen/run_python_script_with_report.sh"
+            - "validate_commit_message"
+            - "buildscripts/validate_commit_message.py"
+          env:
+            JIRA_AUTH_ACCESS_TOKEN: ${jira_auth_access_token}
+            JIRA_AUTH_ACCESS_TOKEN_SECRET: ${jira_auth_access_token_secret}
+            JIRA_AUTH_CONSUMER_KEY: ${jira_auth_consumer_key}
+            JIRA_AUTH_KEY_CERT: ${jira_auth_key_cert}
+            REQUESTER: ${requester}
+            BRANCH_NAME: ${branch_name}
+            PR_NUMBER: ${github_pr_number}
+            GITHUB_ORG: ${github_org}
+            GITHUB_REPO: ${github_repo}
+            GITHUB_TOKEN: ${github_token}
+
+  - name: upload_sbom_via_silkbomb_if_changed
+    allowed_requesters: ["commit"]
+    tags: []
+    exec_timeout_secs: 600 # 10 minute timeout
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "upload pip requirements"
+      - command: ec2.assume_role
+        display_name: Assume Silkbomb IAM role
+        params:
+          role_arn: arn:aws:iam::119629040606:role/silkbomb
+      - command: shell.exec
+        display_name: Write temporary AWS credentials to Silkbomb environment file
+        params:
+          silent: true
+          shell: bash
+          include_expansions_in_env:
+            [AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN]
+          script: |
+            cat << EOF > ${workdir}/silkbomb.env
+            AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+            AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+            AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
+            EOF
+      - command: ec2.assume_role
+        display_name: Assume DevProd Platforms ECR readonly IAM role
+        params:
+          role_arn: arn:aws:iam::901841024863:role/ecr-role-evergreen-ro
+      - command: subprocess.exec
+        params:
+          binary: bash
+          include_expansions_in_env:
+            - AWS_ACCESS_KEY_ID
+            - AWS_SECRET_ACCESS_KEY
+            - AWS_SESSION_TOKEN
+            - github_token
+          args:
+            - "./src/evergreen/run_python_script.sh"
+            - "evergreen/functions/upload_sbom_via_silkbomb.py"
+            - "--run"
+          env:
+            REQUESTER: ${requester}
+            BRANCH_NAME: ${branch_name}
+            GITHUB_ORG: ${github_org}
+            GITHUB_REPO: ${github_repo}
+            CONTAINER_COMMAND: podman # podman or docker
+            CONTAINER_IMAGE: 901841024863.dkr.ecr.us-east-1.amazonaws.com/release-infrastructure/silkbomb:2.0
+            CONTAINER_ENV_FILES: ${workdir}/silkbomb.env
+            WORKING_DIR: ${workdir}
+            SBOM_REPO_PATH: sbom.json
+            LOCAL_REPO_PATH: src
+
+  - name: check_for_noexcept
+    allowed_requesters: ["github_pr"]
+    tags:
+      [
+        "assigned_to_jira_team_server_programmability",
+        "auxiliary",
+        "commit_check",
+      ]
+    exec_timeout_secs: 600
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "upload pip requirements"
+      - func: "configure evergreen api credentials"
+      - func: "f_expansions_write"
+      - command: subprocess.exec
+        type: test
+        params:
+          binary: bash
+          args:
+            - "./src/evergreen/run_python_script.sh"
+            - "buildscripts/check_for_noexcept.py"
+            - "--base=${revision}"
+
+  - name: version_burn_in_gen
+    run_on: ubuntu2404-medium
+    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
+    commands:
+      - command: manifest.load
+      - func: "git get shallow project"
+      - func: "f_expansions_write"
+      - func: "restore git history and tags"
+      - func: "add git tag"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "upload pip requirements"
+      - func: "generate version burn in"
+
+  - name: version_gen
+    run_on: ubuntu2404-medium
+    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
+    commands:
+      - command: manifest.load
+      - func: "git get shallow project"
+      - func: "f_expansions_write"
+      - func: "restore git history and tags"
+      - func: "add git tag"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "upload pip requirements"
+      - func: "get engflow creds"
+      - func: "build all resmoke configs"
+        vars:
+          targets: //...
+          bazel_args: >-
+            --build_tag_filters=resmoke_config
+            --noincompatible_enable_cc_toolchain_resolution
+            --repo_env=no_c++_toolchain=1
+      - func: "generate version"
+
+  - name: version_gen_validation
+    run_on: ubuntu2404-medium
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "development_critical_single_variant",
+      ]
+    commands:
+      - command: manifest.load
+      - func: "git get shallow project"
+      - func: "f_expansions_write"
+      - func: "restore git history and tags"
+      - func: "add git tag"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "upload pip requirements"
+      - func: "get engflow creds"
+      - func: "build all resmoke configs"
+        vars:
+          targets: //...
+          bazel_args: >-
+            --build_tag_filters=resmoke_config
+            --noincompatible_enable_cc_toolchain_resolution
+            --repo_env=no_c++_toolchain=1
+      - func: "generate version validation"
+
+  # Package the supplementary DSI data (mongo tools, feature flag list,
+  # server params list, jstests, and buildscripts).
+  - name: package_supplementary_data
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    tags: ["assigned_to_jira_team_devprod_last_mile", "auxiliary"]
+    commands:
+      - command: manifest.load
+      - func: "git get shallow project"
+      - func: "f_expansions_write"
+      - func: "restore git history and tags"
+      - func: "add git tag"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "upload pip requirements"
+      - func: "get and apply version expansions"
+      - func: "gen supplementary data"
+      - func: "upload supplementary data"
+
+  - name: package_bazel_rules_mongo
+    tags: ["assigned_to_jira_team_devprod_build", "experimental"]
+    commands:
+      - command: manifest.load
+      - func: "git get shallow project"
+      - func: "f_expansions_write"
+      - func: "restore git history and tags"
+      - func: "add git tag"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "upload pip requirements"
+      - func: "f_expansions_write"
+      - command: subprocess.exec
+        params:
+          binary: bash
+          args:
+            - "src/evergreen/run_python_script.sh"
+            - "buildscripts/bazel_rules_mongo/scripts/package_mongo_rules.py"
+      - command: expansions.update
+        params:
+          file: src/bazel_rules_mongo_expansions.yml
+      - func: "f_expansions_write"
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          bucket: mciuploads
+          content_type: application/gzip
+          display_name: "bazel_rules_mongo"
+          local_file: src/${bazel_rules_mongo_file_name}
+          permissions: public-read
+          remote_file: ${project}/${build_variant}/${version_id}/bazel_rules_mongo-${task_id}-${execution}/bazel_rules_mongo.tar.gz
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          bucket: mciuploads
+          content_type: text/plain
+          display_name: "bazel_rules_mongo.sha256"
+          local_file: src/${bazel_rules_mongo_file_name_sha256}
+          permissions: public-read
+          remote_file: ${project}/${build_variant}/${version_id}/bazel_rules_mongo-${task_id}-${execution}/bazel_rules_mongo.tar.gz.sha256
+      # these release assets will not exists in patch builds
+      - command: s3.put
+        params:
+          aws_key: ${aws_key_build}
+          aws_secret: ${aws_secret_build}
+          bucket: mdb-build-public
+          content_type: application/gzip
+          display_name: "bazel_rules_mongo release"
+          local_file: src/${bazel_rules_mongo_release_file_name}
+          permissions: public-read
+          remote_file: bazel_rules_mongo/${bazel_rules_mongo_version}/bazel_rules_mongo.tar.gz
+          skip_existing: true
+          optional: true
+      - command: s3.put
+        params:
+          aws_key: ${aws_key_build}
+          aws_secret: ${aws_secret_build}
+          bucket: mdb-build-public
+          content_type: text/plain
+          display_name: "bazel_rules_mongo.sha256 release"
+          local_file: src/${bazel_rules_mongo_release_sha256_file_name}
+          permissions: public-read
+          remote_file: bazel_rules_mongo/${bazel_rules_mongo_version}/bazel_rules_mongo.tar.gz.sha256
+          skip_existing: true
+          optional: true
+
+  - name: select_multiversion_binaries
+    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "configure evergreen api credentials"
+      - func: "do multiversion selection"

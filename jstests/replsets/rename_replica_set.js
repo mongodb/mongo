@@ -8,12 +8,11 @@
  * @tags: [requires_persistence]
  */
 
-(function() {
-"use strict";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-const replTest = new ReplSetTest({name: 'testSet', nodes: 2});
+const replTest = new ReplSetTest({name: "testSet", nodes: 2});
 let nodes = replTest.startSet();
-replTest.initiate();
+replTest.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 let primary = replTest.getPrimary();
 
@@ -27,10 +26,10 @@ const newReplSetName = "newTestSet";
 assert.commandWorked(coll.insert({a: 1}, {"writeConcern": {"w": 2, "j": true}}));
 
 // Restart all nodes in the set as standalones.
-nodes = replTest.restart(nodes, {noReplSet: true});
+nodes.forEach((node) => replTest.restart(node, {noReplSet: true}));
 
 // Change each node's config to have the new replica set name.
-replTest.nodes.forEach(function(node) {
+replTest.nodes.forEach(function (node) {
     let replsetColl = node.getDB("local").system.replset;
     let doc = replsetColl.findOne();
 
@@ -60,4 +59,3 @@ assert.eq(secondaryReplSetName, newReplSetName);
 assert.commandWorked(coll.insert({b: 2}, {"writeConcern": {"w": 2}}));
 
 replTest.stopSet();
-}());

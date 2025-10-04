@@ -1,0 +1,15 @@
+testQueryShapeHash
+test
+basic.coll as fuzzer_coll
+
+0
+:queryShapeHash {aggregate: "fuzzer_coll", pipeline: [{$limit:5}], cursor: {}}
+[
+{"queryShapeHash":"9B479A1A978ABC2E692C7FF12E1F8D743CE5751D4E670D1C25EDE33E4ADA88FB"}
+]
+
+1
+:queryShapeHash {aggregate: "fuzzer_coll", pipeline: [{$limit:5}], cursor: {}}
+[
+{"queryShapeHash":"9B479A1A978ABC2E692C7FF12E1F8D743CE5751D4E670D1C25EDE33E4ADA88FB"}
+]

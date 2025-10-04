@@ -29,15 +29,34 @@
 
 #pragma once
 
+#include "mongo/base/clonable_ptr.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/crypto/fle_field_schema_gen.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/db/matcher/matcher_type_set.h"
+#include "mongo/db/matcher/path.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/idl/idl_parser.h"
+
+#include <cstddef>
+#include <memory>
+#include <type_traits>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <sys/types.h>
 
 namespace mongo {
-
-/**
- * Types of the encryption payload.
- */
-enum FleBlobSubtype { IntentToEncrypt = 0, Deterministic = 1, Random = 2 };
 
 /**
  * The structure represents how data is laid out in an encrypted payload.
@@ -52,7 +71,7 @@ template <class T>
 class TypeMatchExpressionBase : public LeafMatchExpression {
 public:
     explicit TypeMatchExpressionBase(MatchType matchType,
-                                     StringData path,
+                                     boost::optional<StringData> path,
                                      ElementPath::LeafArrayBehavior leafArrBehavior,
                                      MatcherTypeSet typeSet,
                                      clonable_ptr<ErrorAnnotation> annotation = nullptr)
@@ -63,43 +82,23 @@ public:
                               std::move(annotation)),
           _typeSet(std::move(typeSet)) {}
 
-    virtual ~TypeMatchExpressionBase() = default;
+    ~TypeMatchExpressionBase() override = default;
 
     /**
      * Returns the name of this MatchExpression.
      */
     virtual StringData name() const = 0;
 
-    std::unique_ptr<MatchExpression> shallowClone() const final {
-        auto expr = std::make_unique<T>(path(), _typeSet, _errorAnnotation);
-        if (getTag()) {
-            expr->setTag(getTag()->clone());
-        }
-        return expr;
-    }
-
-    bool matchesSingleElement(const BSONElement& elem, MatchDetails* details = nullptr) const {
-        return _typeSet.hasType(elem.type());
-    }
-
     void debugString(StringBuilder& debug, int indentationLevel) const final {
         _debugAddSpace(debug, indentationLevel);
         debug << path() << " " << name() << ": " << _typeSet.toBSONArray().toString();
-
-        MatchExpression::TagData* td = getTag();
-        if (td) {
-            debug << " ";
-            td->debugString(&debug);
-        }
-        debug << "\n";
+        _debugStringAttachTagInfo(&debug);
     }
 
-    BSONObj getSerializedRightHandSide() const final {
-        BSONObjBuilder subBuilder;
-        BSONArrayBuilder arrBuilder(subBuilder.subarrayStart(name()));
-        _typeSet.toBSONArray(&arrBuilder);
-        arrBuilder.doneFast();
-        return subBuilder.obj();
+    void appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                       const SerializationOptions& opts = {},
+                                       bool includePath = true) const final {
+        bob->appendArray(name(), _typeSet.toBSONArray());
     }
 
     bool equivalent(const MatchExpression* other) const final {
@@ -123,10 +122,6 @@ public:
     }
 
 private:
-    ExpressionOptimizerFunc getOptimizer() const final {
-        return [](std::unique_ptr<MatchExpression> expression) { return expression; };
-    }
-
     // The set of matching types.
     MatcherTypeSet _typeSet;
 };
@@ -135,7 +130,7 @@ class TypeMatchExpression final : public TypeMatchExpressionBase<TypeMatchExpres
 public:
     static constexpr StringData kName = "$type"_sd;
 
-    TypeMatchExpression(StringData path,
+    TypeMatchExpression(boost::optional<StringData> path,
                         MatcherTypeSet typeSet,
                         clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : TypeMatchExpressionBase(MatchExpression::TYPE_OPERATOR,
@@ -148,6 +143,17 @@ public:
         return kName;
     }
 
+    std::unique_ptr<MatchExpression> clone() const final {
+        auto expr = std::make_unique<TypeMatchExpression>(path(), typeSet(), _errorAnnotation);
+        if (getTag()) {
+            expr->setTag(getTag()->clone());
+        }
+        if (getInputParamId()) {
+            expr->setInputParamId(*getInputParamId());
+        }
+        return expr;
+    }
+
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
         visitor->visit(this);
     }
@@ -155,6 +161,17 @@ public:
     void acceptVisitor(MatchExpressionConstVisitor* visitor) const final {
         visitor->visit(this);
     }
+
+    void setInputParamId(InputParamId paramId) {
+        _inputParamId = paramId;
+    }
+
+    boost::optional<InputParamId> getInputParamId() const {
+        return _inputParamId;
+    }
+
+private:
+    boost::optional<InputParamId> _inputParamId;
 };
 
 /**
@@ -167,7 +184,7 @@ class InternalSchemaTypeExpression final
 public:
     static constexpr StringData kName = "$_internalSchemaType"_sd;
 
-    InternalSchemaTypeExpression(StringData path,
+    InternalSchemaTypeExpression(boost::optional<StringData> path,
                                  MatcherTypeSet typeSet,
                                  clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : TypeMatchExpressionBase(MatchExpression::INTERNAL_SCHEMA_TYPE,
@@ -180,8 +197,13 @@ public:
         return kName;
     }
 
-    MatchCategory getCategory() const final {
-        return MatchCategory::kOther;
+    std::unique_ptr<MatchExpression> clone() const final {
+        auto expr =
+            std::make_unique<InternalSchemaTypeExpression>(path(), typeSet(), _errorAnnotation);
+        if (getTag()) {
+            expr->setTag(getTag()->clone());
+        }
+        return expr;
     }
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
@@ -197,7 +219,7 @@ class InternalSchemaBinDataSubTypeExpression final : public LeafMatchExpression 
 public:
     static constexpr StringData kName = "$_internalSchemaBinDataSubType"_sd;
 
-    InternalSchemaBinDataSubTypeExpression(StringData path,
+    InternalSchemaBinDataSubTypeExpression(boost::optional<StringData> path,
                                            BinDataType binDataSubType,
                                            clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : LeafMatchExpression(MatchExpression::INTERNAL_SCHEMA_BIN_DATA_SUBTYPE,
@@ -211,12 +233,7 @@ public:
         return kName;
     }
 
-    bool matchesSingleElement(const BSONElement& elem,
-                              MatchDetails* details = nullptr) const final {
-        return elem.type() == BSONType::BinData && elem.binDataType() == _binDataSubType;
-    }
-
-    std::unique_ptr<MatchExpression> shallowClone() const final {
+    std::unique_ptr<MatchExpression> clone() const final {
         auto expr = std::make_unique<InternalSchemaBinDataSubTypeExpression>(
             path(), _binDataSubType, _errorAnnotation);
         if (getTag()) {
@@ -228,19 +245,23 @@ public:
     void debugString(StringBuilder& debug, int indentationLevel) const final {
         _debugAddSpace(debug, indentationLevel);
         debug << path() << " " << name() << ": " << typeName(_binDataSubType);
-
-        MatchExpression::TagData* td = getTag();
-        if (td) {
-            debug << " ";
-            td->debugString(&debug);
-        }
-        debug << "\n";
+        _debugStringAttachTagInfo(&debug);
     }
 
-    BSONObj getSerializedRightHandSide() const final {
-        BSONObjBuilder bob;
-        bob.append(name(), _binDataSubType);
-        return bob.obj();
+    void appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                       const SerializationOptions& opts = {},
+                                       bool includePath = true) const final {
+        if (opts.isKeepingLiteralsUnchanged()) {
+            bob->append(name(), _binDataSubType);
+        } else {
+            // There is some fancy serialization logic to get the above BSONObjBuilder append to
+            // work. We just want to make sure we're doing the same thing here.
+            static_assert(BSONObjAppendFormat<decltype(_binDataSubType)>::value ==
+                              BSONType::numberInt,
+                          "Expecting that the BinData sub type should be specified and serialized "
+                          "as an int.");
+            opts.appendLiteral(bob, name(), static_cast<int>(_binDataSubType));
+        }
     }
 
     bool equivalent(const MatchExpression* other) const final {
@@ -264,11 +285,11 @@ public:
         visitor->visit(this);
     }
 
-private:
-    ExpressionOptimizerFunc getOptimizer() const final {
-        return [](std::unique_ptr<MatchExpression> expression) { return expression; };
+    BinDataType getBinDataSubType() const {
+        return _binDataSubType;
     }
 
+private:
     BinDataType _binDataSubType;
 };
 
@@ -282,7 +303,7 @@ class InternalSchemaBinDataEncryptedTypeExpression final
 public:
     static constexpr StringData kName = "$_internalSchemaBinDataEncryptedType"_sd;
 
-    InternalSchemaBinDataEncryptedTypeExpression(StringData path,
+    InternalSchemaBinDataEncryptedTypeExpression(boost::optional<StringData> path,
                                                  MatcherTypeSet typeSet,
                                                  clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : TypeMatchExpressionBase(MatchExpression::INTERNAL_SCHEMA_BIN_DATA_ENCRYPTED_TYPE,
@@ -291,41 +312,21 @@ public:
                                   typeSet,
                                   std::move(annotation)) {}
 
-    StringData name() const {
+    StringData name() const override {
         return kName;
+    }
+
+    std::unique_ptr<MatchExpression> clone() const final {
+        auto expr = std::make_unique<InternalSchemaBinDataEncryptedTypeExpression>(
+            path(), typeSet(), _errorAnnotation);
+        if (getTag()) {
+            expr->setTag(getTag()->clone());
+        }
+        return expr;
     }
 
     MatchCategory getCategory() const final {
         return MatchCategory::kOther;
-    }
-
-    bool matchesSingleElement(const BSONElement& elem,
-                              MatchDetails* details = nullptr) const final {
-        if (elem.type() != BSONType::BinData)
-            return false;
-        if (elem.binDataType() != BinDataType::Encrypt)
-            return false;
-
-        int binDataLen;
-        auto binData = elem.binData(binDataLen);
-        if (!binDataLen)
-            return false;
-
-        auto fleBlobSubType = binData[0];
-        switch (fleBlobSubType) {
-            case FleBlobSubtype::IntentToEncrypt:
-                return false;
-            case FleBlobSubtype::Deterministic:
-            case FleBlobSubtype::Random: {
-                // Verify the type of the encrypted data.
-                auto fleBlob = reinterpret_cast<const FleBlobHeader*>(binData);
-                return typeSet().hasType(static_cast<BSONType>(fleBlob->originalBsonType));
-            }
-            default:
-                uasserted(33118,
-                          str::stream() << "unexpected subtype " << static_cast<int>(fleBlobSubType)
-                                        << " of encrypted binary data (0, 1 and 2 are allowed)");
-        }
     }
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
@@ -336,4 +337,51 @@ public:
         visitor->visit(this);
     }
 };
+
+/**
+ * Implements matching semantics for a FLE2 encrypted field. A document
+ * matches successfully if a field is encrypted and the encrypted payload indicates the
+ * original BSON element belongs to the specified type set.
+ */
+class InternalSchemaBinDataFLE2EncryptedTypeExpression final
+    : public TypeMatchExpressionBase<InternalSchemaBinDataFLE2EncryptedTypeExpression> {
+public:
+    static constexpr StringData kName = "$_internalSchemaBinDataFLE2EncryptedType"_sd;
+
+    InternalSchemaBinDataFLE2EncryptedTypeExpression(
+        boost::optional<StringData> path,
+        MatcherTypeSet typeSet,
+        clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        : TypeMatchExpressionBase(MatchExpression::INTERNAL_SCHEMA_BIN_DATA_FLE2_ENCRYPTED_TYPE,
+                                  path,
+                                  ElementPath::LeafArrayBehavior::kNoTraversal,
+                                  std::move(typeSet),
+                                  std::move(annotation)) {}
+
+    StringData name() const override {
+        return kName;
+    }
+
+    std::unique_ptr<MatchExpression> clone() const final {
+        auto expr = std::make_unique<InternalSchemaBinDataFLE2EncryptedTypeExpression>(
+            path(), typeSet(), _errorAnnotation);
+        if (getTag()) {
+            expr->setTag(getTag()->clone());
+        }
+        return expr;
+    }
+
+    MatchCategory getCategory() const final {
+        return MatchCategory::kOther;
+    }
+
+    void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(MatchExpressionConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+};
+
 }  // namespace mongo

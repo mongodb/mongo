@@ -27,24 +27,22 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
+    mod_visibility: private
 
 server_parameters:
-    disableJavaScriptJIT:
-        description: "disable the Javascript Just In Time compiler"
-        set_at: [ startup, runtime ]
-        cpp_vartype: AtomicWord<bool>
-        cpp_varname: gDisableJavaScriptJIT
-        default: true
     javascriptProtection:
         description: "disable automatic JavaScript function marshalling"
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         cpp_vartype: AtomicWord<bool>
         cpp_varname: gJavascriptProtection
         default: false
+        redact: false
+
     jsHeapLimitMB:
         description: "set the js scope's heap size limit"
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: gJSHeapLimitMB
         default: 1100
+        redact: false

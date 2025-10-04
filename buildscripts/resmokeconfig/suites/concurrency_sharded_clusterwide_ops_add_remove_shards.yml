@@ -2,33 +2,45 @@ test_kind: fsm_workload_test
 
 selector:
   roots:
-  - jstests/concurrency/fsm_workloads_add_remove_shards/**/*.js
+    - jstests/concurrency/fsm_workloads_add_remove_shards/**/*.js
 
   exclude_with_any_tags:
-  - requires_replication
-  # mongos has no system.profile collection.
-  - requires_profiling
-  - does_not_support_add_remove_shards
+    - requires_standalone
+    - requires_replication
+    # mongos has no system.profile collection.
+    - requires_profiling
+    - does_not_support_add_remove_shards
 
 executor:
   archive:
     hooks:
       - CheckReplDBHashInBackground
       - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
       - ValidateCollections
     tests: true
-  config: {}
+  config:
+    shell_options:
+      eval: >-
+        await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
+      global_vars:
+        TestData:
+          implicitlyShardOnCreateCollectionOnly: true
   hooks:
-  - class: CheckReplDBHashInBackground
-  - class: CheckReplDBHash
-  - class: CheckOrphansDeleted
-  - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
-  - class: CleanupConcurrencyWorkloads
+    - class: CheckShardFilteringMetadata
+    - class: CheckReplDBHashInBackground
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: CheckOrphansDeleted
+    - class: CheckRoutingTableConsistency
+    - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
+    - class: CleanupConcurrencyWorkloads
   fixture:
     class: ShardedClusterFixture
     mongos_options:
       set_parameters:
         enableTestCommands: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
     shard_options:
       mongod_options:
         oplogSize: 1024
@@ -36,7 +48,8 @@ executor:
       set_parameters:
         enableTestCommands: 1
         roleGraphInvalidationIsFatal: 1
-        receiveChunkWaitForRangeDeleterTimeoutMS: 90000
+        queryAnalysisWriterIntervalSecs: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
     num_rs_nodes_per_shard: 3
     num_shards: 2
     num_mongos: 2

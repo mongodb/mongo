@@ -27,17 +27,32 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/bson/util/builder.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/error_extra_info.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/legacy_reply.h"
 #include "mongo/rpc/legacy_reply_builder.h"
+#include "mongo/rpc/message.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
-#include "mongo/unittest/death_test.h"
+#include "mongo/rpc/reply_builder_interface.h"
+#include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
 
 namespace {
 
@@ -97,8 +112,7 @@ BSONObj buildCommand() {
     commandReplyBob.append("ok", 1.0);
     BSONObjBuilder cursorBuilder;
     BSONArrayBuilder a(cursorBuilder.subarrayStart("firstBatch"));
-    a.append(BSON("Foo"
-                  << "Bar"));
+    a.append(BSON("Foo" << "Bar"));
     a.done();
 
     cursorBuilder.appendNumber("id", 1);
@@ -172,9 +186,10 @@ TEST(OpMsgReplyBuilder, MessageOverBSONSizeLimit) {
 
     {
         // 'builder' is an unowned BSONObjBuilder and thus does none of its own size checking,
-        // allowing us to grow the OpMsgReplyBuilder past the bson object size limit.
+        // allowing us to grow the OpMsgReplyBuilder past kOpMsgReplyBSONBufferMaxSize (32MB +
+        // 64KB).
         auto builder = r.getBodyBuilder();
-        for (auto i = 0; i < 2; i++) {
+        for (auto i = 0; i < 3; i++) {
             builder.append("field" + std::to_string(i), bigStr);
         }
     }

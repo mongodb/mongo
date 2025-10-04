@@ -29,7 +29,10 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/update/update_leaf_node.h"
+
+#include <memory>
 
 namespace mongo {
 namespace modifiertable {

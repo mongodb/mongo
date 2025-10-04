@@ -1,0 +1,224 @@
+# Copyright 2016, 2017 Peter Dimov
+# Copyright 2017 - 2019 James E. King III
+# Copyright 2019 - 2021 Alexander Grund
+# Distributed under the Boost Software License, Version 1.0.
+# (See accompanying file LICENSE_1_0.txt or copy at http://boost.org/LICENSE_1_0.txt)
+
+version: 1.0.{build}-{branch}
+
+shallow_clone: true
+
+branches:
+  only:
+    - master
+    - develop
+    - /bugfix\/.*/
+    - /feature\/.*/
+    - /fix\/.*/
+    - /pr\/.*/
+
+matrix:
+  fast_finish: false
+  # Adding MAYFAIL to any matrix job allows it to fail but the build stays green:
+  allow_failures:
+    - MAYFAIL: true
+
+environment:
+  global:
+    B2_CI_VERSION: 1
+    GIT_FETCH_JOBS: 4
+    B2_ADDRESS_MODEL: 32,64
+    B2_VARIANT: debug,release
+
+  matrix:
+    - FLAVOR: VS2015 (32 bit)
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+      B2_TOOLSET: msvc-14.0
+      B2_ADDRESS_MODEL: 32
+
+    - FLAVOR: VS2015 (64 bit)
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+      B2_TOOLSET: msvc-14.0
+      B2_ADDRESS_MODEL: 64
+
+    - FLAVOR: VS2017 (32 bit, C++14, Debug)
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+      B2_CXXSTD: 14
+      B2_TOOLSET: msvc-14.1
+      B2_ADDRESS_MODEL: 32
+      B2_VARIANT: debug
+
+    - FLAVOR: VS2017 (32 bit, C++17, Release)
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+      B2_CXXSTD: 17
+      B2_TOOLSET: msvc-14.1
+      B2_ADDRESS_MODEL: 32
+      B2_VARIANT: release
+
+    - FLAVOR: VS2017 (32 bit, C++latest, Debug)
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+      B2_CXXSTD: latest
+      B2_TOOLSET: msvc-14.1
+      B2_ADDRESS_MODEL: 32
+      B2_VARIANT: debug
+
+    - FLAVOR: VS2017 (64 bit, C++14, Release)
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+      B2_CXXSTD: 14
+      B2_TOOLSET: msvc-14.1
+      B2_ADDRESS_MODEL: 64
+      B2_VARIANT: release
+
+    - FLAVOR: VS2017 (64 bit, C++17, Debug)
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+      B2_CXXSTD: 17
+      B2_TOOLSET: msvc-14.1
+      B2_ADDRESS_MODEL: 64
+      B2_VARIANT: debug
+
+    - FLAVOR: VS2017 (64 bit, C++latest, Release)
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+      B2_CXXSTD: latest
+      B2_TOOLSET: msvc-14.1
+      B2_ADDRESS_MODEL: 64
+      B2_VARIANT: release
+
+    - FLAVOR: Cygwin (32 bit, C++11, Release)
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+      ADDPATH: C:\cygwin\bin;
+      B2_ADDRESS_MODEL: 32
+      B2_CXXSTD: 11
+      B2_TOOLSET: gcc
+      B2_VARIANT: release
+
+    - FLAVOR: Cygwin (32 bit, C++14, Debug)
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+      ADDPATH: C:\cygwin\bin;
+      B2_ADDRESS_MODEL: 32
+      B2_CXXSTD: 14
+      B2_TOOLSET: gcc
+      B2_VARIANT: debug
+
+    - FLAVOR: Cygwin (32 bit, C++1z, Release)
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+      ADDPATH: C:\cygwin\bin;
+      B2_ADDRESS_MODEL: 32
+      B2_CXXSTD: 1z
+      B2_TOOLSET: gcc
+      B2_VARIANT: release
+
+    - FLAVOR: Cygwin (64 bit, C++11, Debug)
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2022
+      ADDPATH: C:\cygwin64\bin;
+      B2_ADDRESS_MODEL: 64
+      B2_CXXSTD: 11
+      B2_TOOLSET: gcc
+      B2_FLAGS: "include=libs/unordered/test/unordered include=libs/unordered/test/exception"
+      B2_VARIANT: debug
+
+    - FLAVOR: Cygwin (64 bit, C++14, Debug)
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2022
+      ADDPATH: C:\cygwin64\bin;
+      B2_ADDRESS_MODEL: 64
+      B2_CXXSTD: 14
+      B2_TOOLSET: gcc
+      B2_FLAGS: "include=libs/unordered/test/unordered include=libs/unordered/test/exception"
+      B2_VARIANT: debug
+
+    - FLAVOR: Cygwin (64 bit, C++17, Debug)
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2022
+      ADDPATH: C:\cygwin64\bin;
+      B2_ADDRESS_MODEL: 64
+      B2_CXXSTD: 17
+      B2_TOOLSET: gcc
+      B2_FLAGS: "include=libs/unordered/test/unordered include=libs/unordered/test/exception"
+      B2_VARIANT: debug
+
+    - FLAVOR: Cygwin (64 bit, C++2a, Debug)
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2022
+      ADDPATH: C:\cygwin64\bin;
+      B2_ADDRESS_MODEL: 64
+      B2_CXXSTD: 2a
+      B2_TOOLSET: gcc
+      B2_FLAGS: "include=libs/unordered/test/unordered include=libs/unordered/test/exception"
+      B2_VARIANT: debug
+
+    - FLAVOR: MinGW-w64 (32 bit, C++11)
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+      ADDPATH: C:\mingw-w64\i686-8.1.0-posix-dwarf-rt_v6-rev0\mingw32\bin;
+      B2_CXXSTD: 11
+      B2_TOOLSET: gcc
+      B2_ADDRESS_MODEL: 32
+
+    - FLAVOR: MinGW-w64 (32 bit, C++14)
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+      ADDPATH: C:\mingw-w64\i686-8.1.0-posix-dwarf-rt_v6-rev0\mingw32\bin;
+      B2_CXXSTD: 14
+      B2_TOOLSET: gcc
+      B2_ADDRESS_MODEL: 32
+
+    - FLAVOR: MinGW-w64 (32 bit, C++17)
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+      ADDPATH: C:\mingw-w64\i686-8.1.0-posix-dwarf-rt_v6-rev0\mingw32\bin;
+      B2_CXXSTD: 17
+      B2_TOOLSET: gcc
+      B2_ADDRESS_MODEL: 32
+
+    - FLAVOR: MinGW-w64 (32 bit, C++2a)
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+      ADDPATH: C:\mingw-w64\i686-8.1.0-posix-dwarf-rt_v6-rev0\mingw32\bin;
+      B2_CXXSTD: 2a
+      B2_TOOLSET: gcc
+      B2_ADDRESS_MODEL: 32
+
+    - FLAVOR: MinGW-w64 (64 bit, C++11)
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+      ADDPATH: C:\mingw-w64\x86_64-8.1.0-posix-seh-rt_v6-rev0\mingw64\bin;
+      B2_CXXSTD: 11
+      B2_TOOLSET: gcc
+      B2_ADDRESS_MODEL: 64
+
+    - FLAVOR: MinGW-w64 (64 bit, C++14)
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+      ADDPATH: C:\mingw-w64\x86_64-8.1.0-posix-seh-rt_v6-rev0\mingw64\bin;
+      B2_CXXSTD: 14
+      B2_TOOLSET: gcc
+      B2_ADDRESS_MODEL: 64
+
+    - FLAVOR: MinGW-w64 (64 bit, C++17)
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+      ADDPATH: C:\mingw-w64\x86_64-8.1.0-posix-seh-rt_v6-rev0\mingw64\bin;
+      B2_CXXSTD: 17
+      B2_TOOLSET: gcc
+      B2_ADDRESS_MODEL: 64
+
+    - FLAVOR: MinGW-w64 (64 bit, C++2a)
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+      ADDPATH: C:\mingw-w64\x86_64-8.1.0-posix-seh-rt_v6-rev0\mingw64\bin;
+      B2_CXXSTD: 2a
+      B2_TOOLSET: gcc
+      B2_ADDRESS_MODEL: 64
+
+    #- FLAVOR: CodeCov (VS 2019)
+    #  APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+    #  B2_CXXFLAGS: -permissive-
+    #  B2_CXXSTD: 14
+    #  B2_TOOLSET: msvc-14.2
+    #  COVERAGE: true
+
+install:
+  - git clone --depth 1 https://github.com/boostorg/boost-ci.git C:\boost-ci-cloned
+  # Copy ci folder if not testing Boost.CI
+  - if NOT "%APPVEYOR_PROJECT_NAME%" == "boost-ci" xcopy /s /e /q /i /y C:\boost-ci-cloned\ci .\ci
+  - rmdir /s /q C:\boost-ci-cloned
+  - ci\appveyor\install.bat
+
+build: off
+
+test_script: ci\build.bat
+
+for:
+  # CodeCov coverage build
+  - matrix:
+      only: [COVERAGE: true]
+    test_script: [ps: ci\codecov.ps1]

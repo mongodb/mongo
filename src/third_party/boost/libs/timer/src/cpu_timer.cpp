@@ -11,26 +11,24 @@
 
 // define BOOST_TIMER_SOURCE so that <boost/timer/config.hpp> knows
 // the library is being built (possibly exporting rather than importing code)
-#define BOOST_TIMER_SOURCE
+#ifndef BOOST_TIMER_SOURCE
+# define BOOST_TIMER_SOURCE
+#endif
 
 #include <boost/timer/timer.hpp>
-#include <boost/chrono/chrono.hpp>
 #include <boost/io/ios_state.hpp>
-#include <boost/throw_exception.hpp>
-#include <boost/cerrno.hpp>
 #include <boost/predef.h>
+#include <boost/config.hpp>
 #include <cstring>
 #include <sstream>
 #include <cassert>
 
-# if defined(BOOST_WINDOWS_API)
-#   include <windows.h>
-# elif defined(BOOST_POSIX_API)
-#   include <unistd.h>
-#   include <sys/times.h>
-# else
-# error unknown API
-# endif
+#if defined(_WIN32)
+# include <windows.h>
+#else
+# include <unistd.h>
+# include <sys/times.h>
+#endif
 
 using boost::timer::nanosecond_type;
 using boost::timer::cpu_times;
@@ -93,76 +91,91 @@ namespace
     }
   }
 
-# if defined(BOOST_POSIX_API)
+#if defined(_WIN32)
 
-  boost::int_least64_t tick_factor_()
-  {
+boost::long_long_type query_performance_frequency()
+{
+    LARGE_INTEGER li;
+    ::QueryPerformanceFrequency( &li ); // never fails
+
+    return li.QuadPart;
+}
+
+void get_cpu_times( boost::timer::cpu_times& current )
+{
+    static const boost::long_long_type freq = query_performance_frequency();
+
+    LARGE_INTEGER li;
+    ::QueryPerformanceCounter( &li ); // never fails
+
+    boost::long_long_type ctr = li.QuadPart;
+
+    boost::long_long_type const nano = INT64_C( 1000000000 ); // ns
+
+    // ctr * nano / freq, but with less overflow
+
+    boost::long_long_type whole = (ctr / freq) * nano;
+    boost::long_long_type part  = (ctr % freq) * nano / freq;
+
+    current.wall = whole + part;
+    current.user = boost::timer::nanosecond_type( -1 );
+    current.system = boost::timer::nanosecond_type( -1 );
+
+#if BOOST_PLAT_WINDOWS_DESKTOP
+
+    FILETIME creation, exit, kernel, user;
+
+    if( !::GetProcessTimes( ::GetCurrentProcess(), &creation, &exit, &kernel, &user ) )
+    {
+        return;
+    }
+
+    // Windows uses 100 nanosecond ticks
+
+    current.system = ( ( boost::timer::nanosecond_type( kernel.dwHighDateTime ) << 32 ) + kernel.dwLowDateTime ) * 100;
+    current.user = ( ( boost::timer::nanosecond_type( user.dwHighDateTime ) << 32 ) + user.dwLowDateTime ) * 100;
+
+#endif
+}
+
+#else
+
+// multiplier to convert ticks to nanoseconds; -1 if unknown
+boost::int_least64_t tick_factor()
+{
     boost::int_least64_t tf = ::sysconf( _SC_CLK_TCK );
     if( tf <= 0 ) return -1;
 
-    tf = INT64_C(1000000000) / tf;  // compute factor
+    tf = INT64_C( 1000000000 ) / tf;  // compute factor
     if( tf == 0 ) tf = -1;
 
     return tf;
-  }
+}
 
-  boost::int_least64_t tick_factor() // multiplier to convert ticks
-                                     //  to nanoseconds; -1 if unknown
-  {
-    static boost::int_least64_t tf = tick_factor_();
-    return tf;
-  }
+void get_cpu_times( boost::timer::cpu_times& current )
+{
+    current.wall = boost::timer::nanosecond_type( -1 );
+    current.user = boost::timer::nanosecond_type( -1 );
+    current.system = boost::timer::nanosecond_type( -1 );
 
-# endif
+    static boost::int_least64_t tf = tick_factor();
 
-  void get_cpu_times(boost::timer::cpu_times& current)
-  {
-    boost::chrono::duration<boost::int64_t, boost::nano>
-      x (boost::chrono::high_resolution_clock::now().time_since_epoch());
-    current.wall = x.count();
+    if( tf == -1 ) return;
 
-# if defined(BOOST_WINDOWS_API)
-
-#  if BOOST_PLAT_WINDOWS_DESKTOP || defined(__CYGWIN__)
-    FILETIME creation, exit;
-    if (::GetProcessTimes(::GetCurrentProcess(), &creation, &exit,
-            (LPFILETIME)&current.system, (LPFILETIME)&current.user))
-    {
-      current.user   *= 100;  // Windows uses 100 nanosecond ticks
-      current.system *= 100;
-    }
-    else
-#  endif
-    {
-      current.system = current.user = boost::timer::nanosecond_type(-1);
-    }
-# else
     tms tm;
-    clock_t c = ::times(&tm);
-    if (c == static_cast<clock_t>(-1)) // error
-    {
-      current.system = current.user = boost::timer::nanosecond_type(-1);
-    }
-    else
-    {
-      current.system = boost::timer::nanosecond_type(tm.tms_stime + tm.tms_cstime);
-      current.user = boost::timer::nanosecond_type(tm.tms_utime + tm.tms_cutime);
-      boost::int_least64_t factor;
-      if ((factor = tick_factor()) != -1)
-      {
-        current.user *= factor;
-        current.system *= factor;
-      }
-      else
-      {
-        current.user = current.system = boost::timer::nanosecond_type(-1);
-      }
-    }
-# endif
-  }
+    clock_t c = ::times( &tm );
 
-  // CAUTION: must be identical to same constant in auto_timers_construction.cpp
-  const std::string default_fmt(" %ws wall, %us user + %ss system = %ts CPU (%p%)\n");
+    if( c == static_cast<clock_t>( -1 ) ) return;
+
+    current.wall = boost::timer::nanosecond_type( c ) * tf;
+    current.system = boost::timer::nanosecond_type( tm.tms_stime + tm.tms_cstime ) * tf;
+    current.user = boost::timer::nanosecond_type( tm.tms_utime + tm.tms_cutime ) * tf;
+}
+
+#endif
+
+// CAUTION: must be identical to same constant in auto_timers_construction.cpp
+const std::string default_fmt(" %ws wall, %us user + %ss system = %ts CPU (%p%)\n");
 
 } // unnamed namespace
 

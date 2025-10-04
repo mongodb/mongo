@@ -29,10 +29,12 @@
 
 #pragma once
 
-#include <vector>
-
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/storage/key_string/key_string.h"
+#include "mongo/util/bufreader.h"
+
+#include <vector>
 
 namespace mongo::sbe::value {
 
@@ -42,10 +44,11 @@ namespace mongo::sbe::value {
  * sbe::value::Value. During construction, these pairs are stored in the parallel '_tagList' and
  * '_valList' arrays, as a "structure of arrays."
  *
- * After constructing the array, use the 'readValues()' method to populate a OwnedValueAccessor
- * vector. Some "views" (values that are pointers into other memory) are constructed by appending
- * them to the 'valueBufferBuilder' provided to the constructor, and the internal buffer in that
- * 'valueBufferBuilder' must be kept alive for as long as the accessors are to remain valid.
+ * After constructing the array, an implementer of ValueBuilder must provide a 'readValues()' method
+ * to populate the tags/vals into a container or an  sbe SlotAccessor. Some "views" (values that are
+ * pointers into other memory) are constructed by appending them to the 'valueBufferBuilder'
+ * provided to the constructor, and the internal buffer in that 'valueBufferBuilder' must be kept
+ * alive for as long as the accessors are to remain valid.
  *
  * Note that, in addition to destroying the 'valueBufferBuilder' or calling its 'reset()' or
  * 'release()' function, appending more values to the buffer (either directly or via this
@@ -54,205 +57,180 @@ namespace mongo::sbe::value {
  * The 'valueBufferBuilder' is _not_ owned by the ValueBuilder class, so that the caller can reuse
  * it without freeing and then reallocating its memory.
  *
- * NB: The ValueBuilder is specifically intended to adapt KeyString::Value conversion, which
+ * NB: The ValueBuilder is specifically intended to adapt key_string::Value conversion, which
  * operates by appending results to a BSONObjBuilder, to instead convert to SBE values. It is not
  * intended as a general-purpose tool for populating SBE accessors, and no new code should construct
  * or use a ValueBuilder.
- *
- * Also note that some data types are not yet supported by SBE and appending them will throw a
- * query-fatal error.
  */
-class ValueBuilder {
+class ValueBuilder : public key_string::BuilderInterface {
 public:
     ValueBuilder(BufBuilder* valueBufferBuilder) : _valueBufferBuilder(valueBufferBuilder) {}
     ValueBuilder(ValueBuilder& other) = delete;
 
-    void append(const MinKeyLabeler& id) {
+
+    void append(const MinKeyLabeler& id) override {
         appendValue(TypeTags::MinKey, 0);
     }
 
-    void append(const MaxKeyLabeler& id) {
+    void append(const MaxKeyLabeler& id) override {
         appendValue(TypeTags::MaxKey, 0);
     }
 
-    void append(const NullLabeler& id) {
+    void append(const NullLabeler& id) override {
         appendValue(TypeTags::Null, 0);
     }
 
-    void append(const UndefinedLabeler& id) {
+    void append(const UndefinedLabeler& id) override {
         appendValue(TypeTags::bsonUndefined, 0);
     }
 
-    void append(const bool in) {
+    void append(const bool in) override {
         appendValue(TypeTags::Boolean, value::bitcastFrom<bool>(in));
     }
 
-    void append(const Date_t& in) {
+    void append(const Date_t& in) override {
         appendValue(TypeTags::Date, value::bitcastFrom<int64_t>(in.toMillisSinceEpoch()));
     }
 
-    void append(const Timestamp& in) {
+    void append(const Timestamp& in) override {
         appendValue(TypeTags::Timestamp, value::bitcastFrom<uint64_t>(in.asULL()));
     }
 
-    void append(const OID& in) {
+    void append(const OID& in) override {
         appendValueBufferOffset(TypeTags::ObjectId);
         _valueBufferBuilder->appendBuf(in.view().view(), OID::kOIDSize);
     }
 
-    void append(const std::string& in) {
+    void append(const std::string& in) override {
         append(StringData{in});
     }
 
-    void append(StringData in) {
-        if (canUseSmallString({in.rawData(), in.size()})) {
-            appendValue(makeSmallString({in.rawData(), in.size()}));
+    void append(StringData in) override {
+        if (canUseSmallString({in.data(), in.size()})) {
+            appendValue(makeSmallString({in.data(), in.size()}));
         } else {
             appendValueBufferOffset(TypeTags::StringBig);
             _valueBufferBuilder->appendNum(static_cast<int32_t>(in.size() + 1));
-            _valueBufferBuilder->appendStr(in, true /* includeEndingNull */);
+            _valueBufferBuilder->appendStrBytesAndNul(in);
         }
     }
 
-    void append(const BSONSymbol& in) {
+    void append(const BSONSymbol& in) override {
         appendValueBufferOffset(TypeTags::bsonSymbol);
         _valueBufferBuilder->appendNum(static_cast<int32_t>(in.symbol.size() + 1));
-        _valueBufferBuilder->appendStr(in.symbol, true /* includeEndingNull */);
+        _valueBufferBuilder->appendStrBytesAndNul(in.symbol);
     }
 
-    void append(const BSONCode& in) {
+    void append(const BSONCode& in) override {
         appendValueBufferOffset(TypeTags::bsonJavascript);
         // Add one to account null byte at the end.
         _valueBufferBuilder->appendNum(static_cast<uint32_t>(in.code.size() + 1));
-        _valueBufferBuilder->appendStr(in.code, true /* includeEndingNull */);
+        _valueBufferBuilder->appendStrBytesAndNul(in.code);
     }
 
-    void append(const BSONCodeWScope& in) {
+    void append(const BSONCodeWScope& in) override {
         appendValueBufferOffset(TypeTags::bsonCodeWScope);
         _valueBufferBuilder->appendNum(
             static_cast<uint32_t>(4 + in.code.size() + 1 + in.scope.objsize()));
         _valueBufferBuilder->appendNum(static_cast<int32_t>(in.code.size() + 1));
-        _valueBufferBuilder->appendStr(in.code, true /* includeEndingNull */);
+        _valueBufferBuilder->appendStrBytesAndNul(in.code);
         _valueBufferBuilder->appendBuf(in.scope.objdata(), in.scope.objsize());
     }
 
-    void append(const BSONBinData& in) {
+    void append(const BSONBinData& in) override {
         appendValueBufferOffset(TypeTags::bsonBinData);
         _valueBufferBuilder->appendNum(in.length);
         _valueBufferBuilder->appendNum(static_cast<char>(in.type));
         _valueBufferBuilder->appendBuf(in.data, in.length);
     }
 
-    void append(const BSONRegEx& in) {
+    void append(const BSONRegEx& in) override {
         appendValueBufferOffset(TypeTags::bsonRegex);
-        _valueBufferBuilder->appendStr(in.pattern, true /* includeEndingNull */);
-        _valueBufferBuilder->appendStr(in.flags, true /* includeEndingNull */);
+        _valueBufferBuilder->appendCStr(in.pattern);
+        _valueBufferBuilder->appendCStr(in.flags);
     }
 
-    void append(const BSONDBRef& in) {
+    void append(const BSONDBRef& in) override {
         appendValueBufferOffset(TypeTags::bsonDBPointer);
         _valueBufferBuilder->appendNum(static_cast<int32_t>(in.ns.size() + 1));
-        _valueBufferBuilder->appendStr(in.ns, true /* includeEndingNull */);
+        _valueBufferBuilder->appendStrBytesAndNul(in.ns);
         _valueBufferBuilder->appendBuf(in.oid.view().view(), OID::kOIDSize);
     }
 
-    void append(double in) {
+    void append(double in) override {
         appendValue(TypeTags::NumberDouble, value::bitcastFrom<double>(in));
     }
 
-    void append(const Decimal128& in) {
+    void append(const Decimal128& in) override {
         appendValueBufferOffset(TypeTags::NumberDecimal);
         _valueBufferBuilder->appendNum(in);
     }
 
-    void append(long long in) {
+    void append(long long in) override {
         appendValue(TypeTags::NumberInt64, value::bitcastFrom<int64_t>(in));
     }
 
-    void append(int32_t in) {
+    void append(int32_t in) override {
         appendValue(TypeTags::NumberInt32, value::bitcastFrom<int32_t>(in));
     }
 
-    BufBuilder& subobjStart() {
+    BufBuilder& subobjStart() override {
         appendValueBufferOffset(TypeTags::bsonObject);
         return *_valueBufferBuilder;
     }
 
-    BufBuilder& subarrayStart() {
+    BufBuilder& subarrayStart() override {
         appendValueBufferOffset(TypeTags::bsonArray);
         return *_valueBufferBuilder;
     }
 
     /**
-     * Remove the last value that was streamed to this ValueBuilder.
+     * Returns the number of sbe tag/value pairs appended to this ValueBuilder.
      */
-    void popValue() {
-        // If the removed value was a view of a string, object or array in the '_valueBufferBuilder'
-        // buffer, this value will remain in that buffer, even though we've removed it from the
-        // list. It will still get deallocated along with everything else when that buffer gets
-        // cleared or deleted, though, so there is no leak.
-        --_numValues;
-    }
+    virtual size_t numValues() const = 0;
 
-    size_t numValues() const {
-        return _numValues;
-    }
+protected:
+    // We expect most rows to end up containing this many values or fewer.
+    static constexpr int kInlinedVectorSize = 16;
 
-    /**
-     * Populate the given list of accessors with TypeTags and Values. Some Values may be "views"
-     * into the memory constructed by the '_valueBufferBuilder' object, which is a caller-owned
-     * object that must remain valid for as long as these accessors are to remain valid.
-     */
-    void readValues(std::vector<OwnedValueAccessor>* accessors) {
-        auto bufferLen = _valueBufferBuilder->len();
-        for (size_t i = 0; i < _numValues; ++i) {
-            auto tag = _tagList[i];
-            auto val = _valList[i];
+    std::pair<TypeTags, Value> getValue(size_t index, int bufferLen) {
+        tassert(11093605, "Index out of bounds", index < _tagList.size());
+        auto tag = _tagList[index];
+        auto val = _valList[index];
 
-            switch (tag) {
-                // As noted in the comments for the 'appendValueBufferOffset' function, some values
-                // are stored as offsets into the buffer during construction. This is where we
-                // convert those offsets into pointers.
-                case TypeTags::ObjectId:
-                case TypeTags::StringBig:
-                case TypeTags::bsonSymbol:
-                case TypeTags::NumberDecimal:
-                case TypeTags::bsonObject:
-                case TypeTags::bsonArray:
-                case TypeTags::bsonBinData:
-                case TypeTags::bsonRegex:
-                case TypeTags::bsonJavascript:
-                case TypeTags::bsonDBPointer:
-                case TypeTags::bsonCodeWScope: {
-                    auto offset = bitcastTo<decltype(bufferLen)>(val);
-                    invariant(offset < bufferLen);
-                    val = bitcastFrom<const char*>(_valueBufferBuilder->buf() + offset);
-                    break;
-                }
-                default:
-                    // 'val' is already set correctly.
-                    break;
+        switch (tag) {
+            // As noted in the comments for the 'appendValueBufferOffset' function, some values
+            // are stored as offsets into the buffer during construction. This is where we
+            // convert those offsets into pointers.
+            case TypeTags::ObjectId:
+            case TypeTags::StringBig:
+            case TypeTags::bsonSymbol:
+            case TypeTags::NumberDecimal:
+            case TypeTags::bsonObject:
+            case TypeTags::bsonArray:
+            case TypeTags::bsonBinData:
+            case TypeTags::bsonRegex:
+            case TypeTags::bsonJavascript:
+            case TypeTags::bsonDBPointer:
+            case TypeTags::bsonCodeWScope: {
+                auto offset = bitcastTo<decltype(bufferLen)>(val);
+                tassert(11093606, "Offset out of bounds", offset < bufferLen);
+                val = bitcastFrom<const char*>(_valueBufferBuilder->buf() + offset);
+                break;
             }
-
-            invariant(i < accessors->size());
-            (*accessors)[i].reset(false, tag, val);
+            default:
+                // 'val' is already set correctly.
+                break;
         }
+        return {tag, val};
     }
 
-private:
-    void unsupportedType(const char* typeDescription) {
-        uasserted(4935100,
-                  str::stream() << "SBE does not support type present in index entry: "
-                                << typeDescription);
+    void appendValue(TypeTags tag, Value val) {
+        _tagList.push_back(tag);
+        _valList.push_back(val);
     }
 
-    void appendValue(TypeTags tag, Value val) noexcept {
-        _tagList[_numValues] = tag;
-        _valList[_numValues] = val;
-        ++_numValues;
-    }
-
-    void appendValue(std::pair<TypeTags, Value> in) noexcept {
+    void appendValue(std::pair<TypeTags, Value> in) {
         appendValue(in.first, in.second);
     }
 
@@ -264,21 +242,135 @@ private:
     // storing a pointer, we store an _offset_ into the under-construction buffer. Translation from
     // offset to pointer occurs as part of the 'readValues()' function.
     void appendValueBufferOffset(TypeTags tag) {
-        _tagList[_numValues] = tag;
-        _valList[_numValues] = value::bitcastFrom<int32_t>(_valueBufferBuilder->len());
-        ++_numValues;
+        _tagList.push_back(tag);
+        _valList.push_back(value::bitcastFrom<int32_t>(_valueBufferBuilder->len()));
     }
 
-    std::array<TypeTags, Ordering::kMaxCompoundIndexKeys> _tagList;
-    std::array<Value, Ordering::kMaxCompoundIndexKeys> _valList;
-    size_t _numValues = 0;
+    absl::InlinedVector<TypeTags, kInlinedVectorSize> _tagList;
+    absl::InlinedVector<Value, kInlinedVectorSize> _valList;
 
     BufBuilder* _valueBufferBuilder;
+};
+
+/**
+ * Allows sbe tag/values to be read into a vector of OwnedValueAccessors.
+ */
+class OwnedValueAccessorValueBuilder : public ValueBuilder {
+public:
+    OwnedValueAccessorValueBuilder(BufBuilder* valueBufferBuilder, bool fromKeyString = false)
+        : ValueBuilder(valueBufferBuilder) {}
+    OwnedValueAccessorValueBuilder(OwnedValueAccessorValueBuilder& other) = delete;
+
+    /*
+     * Remove the last value that was streamed to this ValueBuilder.
+     */
+    void popValue() {
+        // If the removed value was a view of a string, object or array in the '_valueBufferBuilder'
+        // buffer, this value will remain in that buffer, even though we've removed it from the
+        // list. It will still get deallocated along with everything else when that buffer gets
+        // cleared or deleted, though, so there is no leak.
+        _tagList.pop_back();
+        _valList.pop_back();
+    }
+
+    size_t numValues() const override {
+        return _tagList.size();
+    }
+
+    /**
+     * Populate the given list of accessors with TypeTags and Values. Some Values may be "views"
+     * into the memory constructed by the '_valueBufferBuilder' object, which is a caller-owned
+     * object that must remain valid for as long as these accessors are to remain valid.
+     */
+    void readValues(std::vector<OwnedValueAccessor>* accessors) {
+        auto bufferLen = _valueBufferBuilder->len();
+        for (size_t i = 0; i < _tagList.size(); ++i) {
+            auto [tag, val] = getValue(i, bufferLen);
+            invariant(i < accessors->size());
+            (*accessors)[i].reset(false, tag, val);
+        }
+    }
+};
+
+/**
+ * A ValueBuilder that supports reading of sbe tag/values into a MaterializedRow.
+ */
+template <typename RowType>
+class RowValueBuilder : public ValueBuilder {
+public:
+    RowValueBuilder(BufBuilder* valueBufferBuilder) : ValueBuilder(valueBufferBuilder) {}
+    RowValueBuilder(RowValueBuilder<RowType>& other) = delete;
+
+    size_t numValues() const override {
+        size_t nVals = 0;
+        size_t bufIdx = 0;
+        while (bufIdx < _tagList.size()) {
+            auto tag = _tagList[bufIdx];
+            auto val = _valList[bufIdx];
+            if (tag == TypeTags::Boolean && !bitcastTo<bool>(val)) {
+                // Nothing case.
+                bufIdx++;
+            } else {
+                // Skip the next value
+                bufIdx += 2;
+            }
+            nVals++;
+        }
+        return nVals;
+    }
+
+    void readValues(RowType& row) {
+        auto bufferLen = _valueBufferBuilder->len();
+        size_t bufIdx = 0;
+        size_t rowIdx = 0;
+        // The 'row' output parameter might be smaller than the number of values owned by this
+        // builder. Be careful to only read as many values into 'row' as this output 'row' has space
+        // for.
+        while (rowIdx < row.size()) {
+            invariant(rowIdx < row.size());
+            auto [_, tagNothing, valNothing] = getValue(bufIdx++, bufferLen);
+            tassert(6136200, "sbe tag must be 'Boolean'", tagNothing == TypeTags::Boolean);
+            if (!bitcastTo<bool>(valNothing)) {
+                row.reset(rowIdx++, false, TypeTags::Nothing, 0);
+            } else {
+                auto [owned, tag, val] = getValue(bufIdx++, bufferLen);
+                row.reset(rowIdx++, owned, tag, val);
+            }
+        }
+    }
+
+private:
+    std::tuple<bool, TypeTags, Value> getValue(size_t index, int bufferLen) {
+        auto [tag, val] = ValueBuilder::getValue(index, bufferLen);
+        if (tag == TypeTags::bsonBinData) {
+            auto binData = getBSONBinData(tag, val);
+            BufReader buf(binData, getBSONBinDataSize(tag, val));
+            auto sbeTag = buf.read<TypeTags>();
+            switch (sbeTag) {
+                case TypeTags::bsonBinData: {
+                    // Return a pointer to one byte past the sbeTag in the inner BinData.
+                    return {false, TypeTags::bsonBinData, bitcastFrom<uint8_t*>(binData + 1)};
+                }
+                case TypeTags::keyString: {
+                    // Read the KeyString after the 'sbeTag' byte. This gets written to the
+                    // buffer in 'KeyStringEntry::serialize'.
+                    auto ks = value::KeyStringEntry::deserialize(buf);
+                    return {true, TypeTags::keyString, bitcastFrom<value::KeyStringEntry*>(ks)};
+                }
+                case TypeTags::RecordId: {
+                    auto [tag, val] = makeCopyRecordId(RecordId::deserializeToken(buf));
+                    return {true, tag, val};
+                }
+                default:
+                    MONGO_UNREACHABLE_TASSERT(11122920);
+            }
+        }
+        return {false, tag, val};
+    }
 };
 
 template <typename T>
 void operator<<(ValueBuilder& valBuilder, T operand) {
     valBuilder.append(operand);
 }
-
 }  // namespace mongo::sbe::value

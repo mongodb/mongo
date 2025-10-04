@@ -27,21 +27,31 @@
  *    it in the license file.
  */
 
-#include <array>
-#include <boost/filesystem.hpp>
-#include <fstream>
-#include <map>
-#include <ostream>
-#include <sstream>
+#include "mongo/util/options_parser/options_parser.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/options_parser/constraints.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_description.h"
 #include "mongo/util/options_parser/option_section.h"
-#include "mongo/util/options_parser/options_parser.h"
+#include "mongo/util/options_parser/value.h"
+
+#include <cstddef>
+#include <exception>
+#include <fstream>  // IWYU pragma: keep
+#include <map>
+#include <memory>
+#include <utility>
+
+#include <boost/filesystem/path.hpp>
 
 namespace {
 
@@ -55,7 +65,9 @@ constexpr auto OptionParserTest = moe::OptionSection::OptionParserUsageType::Opt
 
 class OptionsParserTester : public moe::OptionsParser {
 public:
-    Status readConfigFile(const std::string& filename, std::string* config, ConfigExpand) {
+    Status readConfigFile(const std::string& filename,
+                          std::string* config,
+                          moe::ConfigExpand) override {
         if (filename != _filename) {
             ::mongo::StringBuilder sb;
             sb << "Parser using filename: " << filename
@@ -2192,6 +2204,12 @@ TEST(ConfigFromFilesystem, NullTerminated) {
     argv.push_back(TEST_CONFIG_PATH("endStringNull.conf"));
 
     ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
+}
+
+TEST(ConfigFromFilesystem, ReadRawFile) {
+    std::string fileContents;
+    ASSERT_OK(readRawFile(TEST_CONFIG_PATH("good.json"), &fileContents, moe::ConfigExpand{}));
+    ASSERT_EQ("{\n    \"port\" : 5\n}\n", fileContents);
 }
 
 TEST(JSONConfigFile, ComposingStringVector) {
@@ -4488,7 +4506,7 @@ TEST(NumericalBaseParsing, CommandLine) {
     // Hex values
     argv = std::vector<std::string>();
     argv.push_back("binaryname");
-#if !(defined(_WIN32) || defined(__sun))
+#if !defined(_WIN32)
     // Hex doubles are not parseable by the Windows SDK libc or the Solaris libc in the mode we
     // build, so we cannot read hex doubles from the command line on those platforms.
     // See SERVER-14131.
@@ -4507,7 +4525,7 @@ TEST(NumericalBaseParsing, CommandLine) {
     environment = moe::Environment();
     ASSERT_OK(parser.run(testOpts, argv, &environment));
 
-#if !(defined(_WIN32) || defined(__sun))
+#if !defined(_WIN32)
     // See SERVER-14131.
     ASSERT_OK(environment.get(moe::Key("doubleVal"), &value));
     ASSERT_OK(value.get(&doubleVal));
@@ -4649,7 +4667,7 @@ TEST(NumericalBaseParsing, INIConfigFile) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.ini");
-#if !(defined(_WIN32) || defined(__sun))
+#if !defined(_WIN32)
     // Hex doubles are not parseable by the Windows SDK libc or the Solaris libc in the mode we
     // build, so we cannot read hex doubles from a config file on those platforms.
     // See SERVER-14131.
@@ -4665,7 +4683,7 @@ TEST(NumericalBaseParsing, INIConfigFile) {
     environment = moe::Environment();
     ASSERT_OK(parser.run(testOpts, argv, &environment));
 
-#if !(defined(_WIN32) || defined(__sun))
+#if !defined(_WIN32)
     // See SERVER-14131.
     ASSERT_OK(environment.get(moe::Key("doubleVal"), &value));
     ASSERT_OK(value.get(&doubleVal));
@@ -4807,7 +4825,7 @@ TEST(NumericalBaseParsing, YAMLConfigFile) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.yaml");
-#if !(defined(_WIN32) || defined(__sun))
+#if !defined(_WIN32)
     // Hex doubles are not parseable by the Windows SDK libc or the Solaris libc in the mode we
     // build, so we cannot read hex doubles from a config file on those platforms.
     // See SERVER-14131.
@@ -4823,7 +4841,7 @@ TEST(NumericalBaseParsing, YAMLConfigFile) {
     environment = moe::Environment();
     ASSERT_OK(parser.run(testOpts, argv, &environment));
 
-#if !(defined(_WIN32) || defined(__sun))
+#if !defined(_WIN32)
     // See SERVER-14131.
     ASSERT_OK(environment.get(moe::Key("doubleVal"), &value));
     ASSERT_OK(value.get(&doubleVal));

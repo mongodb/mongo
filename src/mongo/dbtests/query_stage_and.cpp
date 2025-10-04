@@ -32,60 +32,85 @@
  * fetch so we cannot test it outside of a dbtest.
  */
 
-
-#include "mongo/platform/basic.h"
-
+#include <cstddef>
 #include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "mongo/client/dbclient_cursor.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/index_catalog.h"
+#include <boost/container/small_vector.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/client.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/exec/and_hash.h"
-#include "mongo/db/exec/and_sorted.h"
-#include "mongo/db/exec/fetch.h"
-#include "mongo/db/exec/index_scan.h"
-#include "mongo/db/exec/mock_stage.h"
-#include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/json.h"
-#include "mongo/db/matcher/expression_parser.h"
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/db/exec/classic/and_hash.h"
+#include "mongo/db/exec/classic/and_sorted.h"
+#include "mongo/db/exec/classic/fetch.h"
+#include "mongo/db/exec/classic/index_scan.h"
+#include "mongo/db/exec/classic/mock_stage.h"
+#include "mongo/db/exec/classic/plan_stage.h"
+#include "mongo/db/exec/classic/working_set.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/local_catalog/collection.h"
+#include "mongo/db/local_catalog/database.h"
+#include "mongo/db/local_catalog/index_catalog.h"
+#include "mongo/db/local_catalog/index_descriptor.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/snapshot.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 
-namespace QueryStageAnd {
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
-using std::set;
-using std::shared_ptr;
-using std::unique_ptr;
+namespace mongo {
+namespace QueryStageAnd {
 
 class QueryStageAndBase {
 public:
     QueryStageAndBase() : _client(&_opCtx) {}
 
     virtual ~QueryStageAndBase() {
-        _client.dropCollection(ns());
+        _client.dropCollection(nss());
     }
 
     void addIndex(const BSONObj& obj) {
         ASSERT_OK(dbtests::createIndex(&_opCtx, ns(), obj));
     }
 
-    const IndexDescriptor* getIndex(const BSONObj& obj, const CollectionPtr& coll) {
+    const IndexDescriptor* getIndex(const BSONObj& obj, const CollectionAcquisition& coll) {
         std::vector<const IndexDescriptor*> indexes;
-        coll->getIndexCatalog()->findIndexesByKeyPattern(&_opCtx, obj, false, &indexes);
+        coll.getCollectionPtr()->getIndexCatalog()->findIndexesByKeyPattern(
+            &_opCtx, obj, IndexCatalog::InclusionPolicy::kReady, &indexes);
         if (indexes.empty()) {
-            FAIL(str::stream() << "Unable to find index with key pattern " << obj);
+            FAIL(std::string(str::stream() << "Unable to find index with key pattern " << obj));
         }
         return indexes[0];
     }
 
     IndexScanParams makeIndexScanParams(OperationContext* opCtx,
-                                        const CollectionPtr& collection,
+                                        const CollectionAcquisition& collection,
                                         const IndexDescriptor* descriptor) {
-        IndexScanParams params(opCtx, collection, descriptor);
+        IndexScanParams params(opCtx, collection.getCollectionPtr(), descriptor);
         params.bounds.isSimpleRange = true;
         params.bounds.endKey = BSONObj();
         params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
@@ -93,19 +118,19 @@ public:
         return params;
     }
 
-    void getRecordIds(set<RecordId>* out, const CollectionPtr& coll) {
-        auto cursor = coll->getCursor(&_opCtx);
+    void getRecordIds(std::set<RecordId>* out, const CollectionAcquisition& coll) {
+        auto cursor = coll.getCollectionPtr()->getCursor(&_opCtx);
         while (auto record = cursor->next()) {
             out->insert(record->id);
         }
     }
 
     void insert(const BSONObj& obj) {
-        _client.insert(ns(), obj);
+        _client.insert(nss(), obj);
     }
 
     void remove(const BSONObj& obj) {
-        _client.remove(ns(), obj);
+        _client.remove(nss(), obj);
     }
 
     /**
@@ -148,19 +173,23 @@ public:
         return BSONObj();
     }
 
-    static const char* ns() {
-        return "unittests.QueryStageAnd";
+    StringData ns() {
+        return _nss.ns_forTest();
     }
-    NamespaceString nss() {
-        return NamespaceString(ns());
+    const NamespaceString& nss() {
+        return _nss;
     }
+
+private:
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("unittests.QueryStageAnd");
 
 protected:
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
     OperationContext& _opCtx = *_txnPtr;
 
     boost::intrusive_ptr<ExpressionContext> _expCtx =
-        make_intrusive<ExpressionContext>(&_opCtx, nullptr, nss());
+        ExpressionContextBuilder{}.opCtx(&_opCtx).ns(_nss).build();
 
 private:
     DBDirectClient _client;
@@ -178,20 +207,17 @@ class QueryStageAndHashDeleteDuringYield : public QueryStageAndBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        Database* db = ctx.db();
-        CollectionPtr coll = ctx.getCollection();
-        if (!coll) {
-            WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
-            wuow.commit();
-        }
 
-        for (int i = 0; i < 50; ++i) {
-            insert(BSON("foo" << i << "bar" << i));
+        {
+            auto coll = ctx.getOrCreateCollection();
+            for (int i = 0; i < 50; ++i) {
+                insert(BSON("foo" << i << "bar" << i));
+            }
         }
-
         addIndex(BSON("foo" << 1));
         addIndex(BSON("bar" << 1));
+
+        const auto coll = ctx.getCollection();
 
         WorkingSet ws;
         auto ah = std::make_unique<AndHashStage>(_expCtx.get(), &ws);
@@ -217,17 +243,18 @@ public:
 
         // Save state and delete one of the read objects.
         ah->saveState();
-        set<RecordId> data;
+        std::set<RecordId> data;
         getRecordIds(&data, coll);
         size_t memUsageBefore = ah->getMemUsage();
-        for (set<RecordId>::const_iterator it = data.begin(); it != data.end(); ++it) {
-            if (coll->docFor(&_opCtx, *it).value()["foo"].numberInt() == 15) {
-                remove(coll->docFor(&_opCtx, *it).value());
+        const auto& collPtr = coll.getCollectionPtr();
+        for (std::set<RecordId>::const_iterator it = data.begin(); it != data.end(); ++it) {
+            if (collPtr->docFor(&_opCtx, *it).value()["foo"].numberInt() == 15) {
+                remove(collPtr->docFor(&_opCtx, *it).value());
                 break;
             }
         }
         size_t memUsageAfter = ah->getMemUsage();
-        ah->restoreState(&coll);
+        ah->restoreState(RestoreContext(nullptr));
 
         // The deleted result should still be buffered inside the AND_HASH stage, so there should be
         // no change in memory consumption.
@@ -264,21 +291,17 @@ class QueryStageAndHashDeleteLookaheadDuringYield : public QueryStageAndBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        Database* db = ctx.db();
-        CollectionPtr coll = ctx.getCollection();
-        if (!coll) {
-            WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
-            wuow.commit();
-        }
+        {
+            auto coll = ctx.getOrCreateCollection();
 
-        for (int i = 0; i < 50; ++i) {
-            insert(BSON("_id" << i << "foo" << i << "bar" << i << "baz" << i));
+            for (int i = 0; i < 50; ++i) {
+                insert(BSON("_id" << i << "foo" << i << "bar" << i << "baz" << i));
+            }
         }
-
         addIndex(BSON("foo" << 1));
         addIndex(BSON("bar" << 1));
         addIndex(BSON("baz" << 1));
+        const auto coll = ctx.getCollection();
 
         WorkingSet ws;
         auto ah = std::make_unique<AndHashStage>(_expCtx.get(), &ws);
@@ -305,13 +328,14 @@ public:
         // Delete 'deletedObj' from the collection.
         BSONObj deletedObj = BSON("_id" << 20 << "foo" << 20 << "bar" << 20 << "baz" << 20);
         ah->saveState();
-        set<RecordId> data;
+        std::set<RecordId> data;
         getRecordIds(&data, coll);
 
         size_t memUsageBefore = ah->getMemUsage();
+        const auto& collPtr = coll.getCollectionPtr();
         for (auto&& recordId : data) {
-            if (0 == deletedObj.woCompare(coll->docFor(&_opCtx, recordId).value())) {
-                remove(coll->docFor(&_opCtx, recordId).value());
+            if (0 == deletedObj.woCompare(collPtr->docFor(&_opCtx, recordId).value())) {
+                remove(collPtr->docFor(&_opCtx, recordId).value());
                 break;
             }
         }
@@ -320,7 +344,7 @@ public:
         size_t memUsageAfter = ah->getMemUsage();
         ASSERT_EQUALS(memUsageBefore, memUsageAfter);
 
-        ah->restoreState(&coll);
+        ah->restoreState(RestoreContext(nullptr));
 
         // We expect that the deleted document doers not appear in our result set.
         int count = 0;
@@ -332,7 +356,8 @@ public:
             }
             WorkingSetMember* wsm = ws.get(id);
             ASSERT_NOT_EQUALS(0,
-                              deletedObj.woCompare(coll->docFor(&_opCtx, wsm->recordId).value()));
+                              deletedObj.woCompare(
+                                  coll.getCollectionPtr()->docFor(&_opCtx, wsm->recordId).value()));
             ++count;
         }
 
@@ -345,20 +370,17 @@ class QueryStageAndHashTwoLeaf : public QueryStageAndBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        Database* db = ctx.db();
-        CollectionPtr coll = ctx.getCollection();
-        if (!coll) {
-            WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
-            wuow.commit();
-        }
 
-        for (int i = 0; i < 50; ++i) {
-            insert(BSON("foo" << i << "bar" << i));
-        }
+        {
+            auto coll = ctx.getOrCreateCollection();
 
+            for (int i = 0; i < 50; ++i) {
+                insert(BSON("foo" << i << "bar" << i));
+            }
+        }
         addIndex(BSON("foo" << 1));
         addIndex(BSON("bar" << 1));
+        const auto coll = ctx.getCollection();
 
         WorkingSet ws;
         auto ah = std::make_unique<AndHashStage>(_expCtx.get(), &ws);
@@ -389,22 +411,18 @@ class QueryStageAndHashTwoLeafFirstChildLargeKeys : public QueryStageAndBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        Database* db = ctx.db();
-        CollectionPtr coll = ctx.getCollection();
-        if (!coll) {
-            WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
-            wuow.commit();
-        }
-
         // Generate large keys for {foo: 1, big: 1} index.
         std::string big(512, 'a');
-        for (int i = 0; i < 50; ++i) {
-            insert(BSON("foo" << i << "bar" << i << "big" << big));
-        }
+        {
+            auto coll = ctx.getOrCreateCollection();
 
+            for (int i = 0; i < 50; ++i) {
+                insert(BSON("foo" << i << "bar" << i << "big" << big));
+            }
+        }
         addIndex(BSON("foo" << 1 << "big" << 1));
         addIndex(BSON("bar" << 1));
+        const auto coll = ctx.getCollection();
 
         // Lower buffer limit to 20 * sizeof(big) to force memory error
         // before hashed AND is done reading the first child (stage has to
@@ -438,22 +456,18 @@ class QueryStageAndHashTwoLeafLastChildLargeKeys : public QueryStageAndBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        Database* db = ctx.db();
-        CollectionPtr coll = ctx.getCollection();
-        if (!coll) {
-            WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
-            wuow.commit();
-        }
-
         // Generate large keys for {baz: 1, big: 1} index.
         std::string big(512, 'a');
-        for (int i = 0; i < 50; ++i) {
-            insert(BSON("foo" << i << "bar" << i << "big" << big));
-        }
+        {
+            auto coll = ctx.getOrCreateCollection();
 
+            for (int i = 0; i < 50; ++i) {
+                insert(BSON("foo" << i << "bar" << i << "big" << big));
+            }
+        }
         addIndex(BSON("foo" << 1));
         addIndex(BSON("bar" << 1 << "big" << 1));
+        const auto coll = ctx.getCollection();
 
         // Lower buffer limit to 5 * sizeof(big) to ensure that
         // keys in last child's index are not buffered. There are 6 keys
@@ -484,21 +498,17 @@ class QueryStageAndHashThreeLeaf : public QueryStageAndBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        Database* db = ctx.db();
-        CollectionPtr coll = ctx.getCollection();
-        if (!coll) {
-            WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
-            wuow.commit();
-        }
+        {
+            auto coll = ctx.getOrCreateCollection();
 
-        for (int i = 0; i < 50; ++i) {
-            insert(BSON("foo" << i << "bar" << i << "baz" << i));
+            for (int i = 0; i < 50; ++i) {
+                insert(BSON("foo" << i << "bar" << i << "baz" << i));
+            }
         }
-
         addIndex(BSON("foo" << 1));
         addIndex(BSON("bar" << 1));
         addIndex(BSON("baz" << 1));
+        const auto coll = ctx.getCollection();
 
         WorkingSet ws;
         auto ah = std::make_unique<AndHashStage>(_expCtx.get(), &ws);
@@ -537,23 +547,20 @@ class QueryStageAndHashThreeLeafMiddleChildLargeKeys : public QueryStageAndBase 
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        Database* db = ctx.db();
-        CollectionPtr coll = ctx.getCollection();
-        if (!coll) {
-            WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
-            wuow.commit();
-        }
-
         // Generate large keys for {bar: 1, big: 1} index.
         std::string big(512, 'a');
-        for (int i = 0; i < 50; ++i) {
-            insert(BSON("foo" << i << "bar" << i << "baz" << i << "big" << big));
+        {
+            auto coll = ctx.getOrCreateCollection();
+
+            for (int i = 0; i < 50; ++i) {
+                insert(BSON("foo" << i << "bar" << i << "baz" << i << "big" << big));
+            }
         }
 
         addIndex(BSON("foo" << 1));
         addIndex(BSON("bar" << 1 << "big" << 1));
         addIndex(BSON("baz" << 1));
+        const auto coll = ctx.getCollection();
 
         // Lower buffer limit to 10 * sizeof(big) to force memory error
         // before hashed AND is done reading the second child (stage has to
@@ -590,20 +597,17 @@ class QueryStageAndHashWithNothing : public QueryStageAndBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        Database* db = ctx.db();
-        CollectionPtr coll = ctx.getCollection();
-        if (!coll) {
-            WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
-            wuow.commit();
-        }
 
-        for (int i = 0; i < 50; ++i) {
-            insert(BSON("foo" << i << "bar" << 20));
-        }
+        {
+            auto coll = ctx.getOrCreateCollection();
 
+            for (int i = 0; i < 50; ++i) {
+                insert(BSON("foo" << i << "bar" << 20));
+            }
+        }
         addIndex(BSON("foo" << 1));
         addIndex(BSON("bar" << 1));
+        const auto coll = ctx.getCollection();
 
         WorkingSet ws;
         auto ah = std::make_unique<AndHashStage>(_expCtx.get(), &ws);
@@ -646,21 +650,17 @@ class QueryStageAndHashProducesNothing : public QueryStageAndBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        Database* db = ctx.db();
-        CollectionPtr coll = ctx.getCollection();
-        if (!coll) {
-            WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
-            wuow.commit();
-        }
+        {
+            auto coll = ctx.getOrCreateCollection();
 
-        for (int i = 0; i < 10; ++i) {
-            insert(BSON("foo" << (100 + i)));
-            insert(BSON("bar" << i));
+            for (int i = 0; i < 10; ++i) {
+                insert(BSON("foo" << (100 + i)));
+                insert(BSON("bar" << i));
+            }
         }
-
         addIndex(BSON("foo" << 1));
         addIndex(BSON("bar" << 1));
+        const auto coll = ctx.getCollection();
 
         WorkingSet ws;
         auto ah = std::make_unique<AndHashStage>(_expCtx.get(), &ws);
@@ -676,8 +676,7 @@ public:
         // This is subtle and confusing.  We couldn't extract any keys from the elements with
         // 'foo' in them so we would normally index them with the "nothing found" key.  We don't
         // want to include that in our scan.
-        params.bounds.endKey = BSON(""
-                                    << "");
+        params.bounds.endKey = BSON("" << "");
         params.bounds.boundInclusion = BoundInclusion::kIncludeStartKeyOnly;
         params.direction = -1;
         ah->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
@@ -694,20 +693,16 @@ class QueryStageAndHashFirstChildFetched : public QueryStageAndBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        Database* db = ctx.db();
-        CollectionPtr coll = ctx.getCollection();
-        if (!coll) {
-            WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
-            wuow.commit();
-        }
 
-        for (int i = 0; i < 50; ++i) {
-            insert(BSON("foo" << i << "bar" << i));
+        {
+            auto coll = ctx.getOrCreateCollection();
+            for (int i = 0; i < 50; ++i) {
+                insert(BSON("foo" << i << "bar" << i));
+            }
         }
-
         addIndex(BSON("foo" << 1));
         addIndex(BSON("bar" << 1));
+        const auto coll = ctx.getCollection();
 
         WorkingSet ws;
         auto ah = std::make_unique<AndHashStage>(_expCtx.get(), &ws);
@@ -747,20 +742,17 @@ class QueryStageAndHashSecondChildFetched : public QueryStageAndBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        Database* db = ctx.db();
-        CollectionPtr coll = ctx.getCollection();
-        if (!coll) {
-            WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
-            wuow.commit();
-        }
 
-        for (int i = 0; i < 50; ++i) {
-            insert(BSON("foo" << i << "bar" << i));
-        }
+        {
+            auto coll = ctx.getOrCreateCollection();
 
+            for (int i = 0; i < 50; ++i) {
+                insert(BSON("foo" << i << "bar" << i));
+            }
+        }
         addIndex(BSON("foo" << 1));
         addIndex(BSON("bar" << 1));
+        const auto coll = ctx.getCollection();
 
         WorkingSet ws;
         auto ah = std::make_unique<AndHashStage>(_expCtx.get(), &ws);
@@ -797,14 +789,7 @@ class QueryStageAndHashDeadChild : public QueryStageAndBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        Database* db = ctx.db();
-        CollectionPtr coll = ctx.getCollection();
-        if (!coll) {
-            WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
-            wuow.commit();
-        }
-
+        auto coll = ctx.getOrCreateCollection();
         const BSONObj dataObj = fromjson("{'foo': 'bar'}");
 
         // Confirm exception is thrown when children contain the following WorkingSetMembers:
@@ -919,20 +904,17 @@ class QueryStageAndSortedDeleteDuringYield : public QueryStageAndBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        Database* db = ctx.db();
-        CollectionPtr coll = ctx.getCollection();
-        if (!coll) {
-            WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
-            wuow.commit();
-        }
+        {
+            auto coll = ctx.getOrCreateCollection();
 
-        // Insert a bunch of data.
-        for (int i = 0; i < 50; ++i) {
-            insert(BSON("foo" << 1 << "bar" << 1));
+            // Insert a bunch of data.
+            for (int i = 0; i < 50; ++i) {
+                insert(BSON("foo" << 1 << "bar" << 1));
+            }
         }
         addIndex(BSON("foo" << 1));
         addIndex(BSON("bar" << 1));
+        const auto coll = ctx.getCollection();
 
         WorkingSet ws;
         auto ah = std::make_unique<AndSortedStage>(_expCtx.get(), &ws);
@@ -950,7 +932,7 @@ public:
         ah->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
 
         // Get the set of RecordIds in our collection to use later.
-        set<RecordId> data;
+        std::set<RecordId> data;
         getRecordIds(&data, coll);
 
         // We're making an assumption here that happens to be true because we clear out the
@@ -964,8 +946,8 @@ public:
         // The first thing that the index scan returns (due to increasing RecordId trick) is the
         // very first insert, which should be the very first thing in data. Delete it.
         ah->saveState();
-        remove(coll->docFor(&_opCtx, *data.begin()).value());
-        ah->restoreState(&coll);
+        remove(coll.getCollectionPtr()->docFor(&_opCtx, *data.begin()).value());
+        ah->restoreState(RestoreContext(nullptr));
 
         auto it = data.begin();
 
@@ -996,8 +978,8 @@ public:
         }
         // Remove a result that's coming up.
         ah->saveState();
-        remove(coll->docFor(&_opCtx, *it).value());
-        ah->restoreState(&coll);
+        remove(coll.getCollectionPtr()->docFor(&_opCtx, *it).value());
+        ah->restoreState(RestoreContext(nullptr));
 
         // Get all results aside from the two we deleted.
         while (!ah->isEOF()) {
@@ -1027,29 +1009,26 @@ class QueryStageAndSortedThreeLeaf : public QueryStageAndBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        Database* db = ctx.db();
-        CollectionPtr coll = ctx.getCollection();
-        if (!coll) {
-            WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
-            wuow.commit();
-        }
 
-        // Insert a bunch of data
-        for (int i = 0; i < 50; ++i) {
-            // Some data that'll show up but not be in all.
-            insert(BSON("foo" << 1 << "baz" << 1));
-            insert(BSON("foo" << 1 << "bar" << 1));
-            // The needle in the haystack.  Only these should be returned by the AND.
-            insert(BSON("foo" << 1 << "bar" << 1 << "baz" << 1));
-            insert(BSON("foo" << 1));
-            insert(BSON("bar" << 1));
-            insert(BSON("baz" << 1));
-        }
+        {
+            auto coll = ctx.getOrCreateCollection();
 
+            // Insert a bunch of data
+            for (int i = 0; i < 50; ++i) {
+                // Some data that'll show up but not be in all.
+                insert(BSON("foo" << 1 << "baz" << 1));
+                insert(BSON("foo" << 1 << "bar" << 1));
+                // The needle in the haystack.  Only these should be returned by the AND.
+                insert(BSON("foo" << 1 << "bar" << 1 << "baz" << 1));
+                insert(BSON("foo" << 1));
+                insert(BSON("bar" << 1));
+                insert(BSON("baz" << 1));
+            }
+        }
         addIndex(BSON("foo" << 1));
         addIndex(BSON("bar" << 1));
         addIndex(BSON("baz" << 1));
+        const auto coll = ctx.getCollection();
 
         WorkingSet ws;
         auto ah = std::make_unique<AndSortedStage>(_expCtx.get(), &ws);
@@ -1081,20 +1060,17 @@ class QueryStageAndSortedWithNothing : public QueryStageAndBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        Database* db = ctx.db();
-        CollectionPtr coll = ctx.getCollection();
-        if (!coll) {
-            WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
-            wuow.commit();
-        }
 
-        for (int i = 0; i < 50; ++i) {
-            insert(BSON("foo" << 8 << "bar" << 20));
-        }
+        {
+            auto coll = ctx.getOrCreateCollection();
 
+            for (int i = 0; i < 50; ++i) {
+                insert(BSON("foo" << 8 << "bar" << 20));
+            }
+        }
         addIndex(BSON("foo" << 1));
         addIndex(BSON("bar" << 1));
+        const auto coll = ctx.getCollection();
 
         WorkingSet ws;
         auto ah = std::make_unique<AndSortedStage>(_expCtx.get(), &ws);
@@ -1120,24 +1096,21 @@ class QueryStageAndSortedProducesNothing : public QueryStageAndBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        Database* db = ctx.db();
-        CollectionPtr coll = ctx.getCollection();
-        if (!coll) {
-            WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
-            wuow.commit();
-        }
 
-        for (int i = 0; i < 50; ++i) {
-            // Insert data with foo=7, bar==20, but nothing with both.
-            insert(BSON("foo" << 8 << "bar" << 20));
-            insert(BSON("foo" << 7 << "bar" << 21));
-            insert(BSON("foo" << 7));
-            insert(BSON("bar" << 20));
-        }
+        {
+            auto coll = ctx.getOrCreateCollection();
 
+            for (int i = 0; i < 50; ++i) {
+                // Insert data with foo=7, bar==20, but nothing with both.
+                insert(BSON("foo" << 8 << "bar" << 20));
+                insert(BSON("foo" << 7 << "bar" << 21));
+                insert(BSON("foo" << 7));
+                insert(BSON("bar" << 20));
+            }
+        }
         addIndex(BSON("foo" << 1));
         addIndex(BSON("bar" << 1));
+        const auto coll = ctx.getCollection();
 
         WorkingSet ws;
         auto ah = std::make_unique<AndSortedStage>(_expCtx.get(), &ws);
@@ -1163,20 +1136,17 @@ class QueryStageAndSortedByLastChild : public QueryStageAndBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        Database* db = ctx.db();
-        CollectionPtr coll = ctx.getCollection();
-        if (!coll) {
-            WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
-            wuow.commit();
-        }
 
-        for (int i = 0; i < 50; ++i) {
-            insert(BSON("foo" << 1 << "bar" << i));
-        }
+        {
+            auto coll = ctx.getOrCreateCollection();
 
+            for (int i = 0; i < 50; ++i) {
+                insert(BSON("foo" << 1 << "bar" << i));
+            }
+        }
         addIndex(BSON("foo" << 1));
         addIndex(BSON("bar" << 1));
+        const auto coll = ctx.getCollection();
 
         WorkingSet ws;
         auto ah = std::make_unique<AndHashStage>(_expCtx.get(), &ws);
@@ -1194,6 +1164,7 @@ public:
         ah->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
 
         WorkingSetID lastId = WorkingSet::INVALID_ID;
+        const auto& collPtr = coll.getCollectionPtr();
 
         int count = 0;
         while (!ah->isEOF()) {
@@ -1202,11 +1173,11 @@ public:
             if (PlanStage::ADVANCED != status) {
                 continue;
             }
-            BSONObj thisObj = coll->docFor(&_opCtx, ws.get(id)->recordId).value();
+            BSONObj thisObj = collPtr->docFor(&_opCtx, ws.get(id)->recordId).value();
             ASSERT_EQUALS(7 + count, thisObj["bar"].numberInt());
             ++count;
             if (WorkingSet::INVALID_ID != lastId) {
-                BSONObj lastObj = coll->docFor(&_opCtx, ws.get(lastId)->recordId).value();
+                BSONObj lastObj = collPtr->docFor(&_opCtx, ws.get(lastId)->recordId).value();
                 ASSERT_LESS_THAN(lastObj["bar"].woCompare(thisObj["bar"]), 0);
             }
             lastId = id;
@@ -1224,24 +1195,21 @@ class QueryStageAndSortedFirstChildFetched : public QueryStageAndBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        Database* db = ctx.db();
-        CollectionPtr coll = ctx.getCollection();
-        if (!coll) {
-            WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
-            wuow.commit();
-        }
 
-        // Insert a bunch of data
-        for (int i = 0; i < 50; ++i) {
-            insert(BSON("foo" << 1 << "bar" << 1));
-        }
+        {
+            auto coll = ctx.getOrCreateCollection();
 
+            // Insert a bunch of data
+            for (int i = 0; i < 50; ++i) {
+                insert(BSON("foo" << 1 << "bar" << 1));
+            }
+        }
         addIndex(BSON("foo" << 1));
         addIndex(BSON("bar" << 1));
+        const auto coll = ctx.getCollection();
 
         WorkingSet ws;
-        unique_ptr<AndSortedStage> as = std::make_unique<AndSortedStage>(_expCtx.get(), &ws);
+        std::unique_ptr<AndSortedStage> as = std::make_unique<AndSortedStage>(_expCtx.get(), &ws);
 
         // Scan over foo == 1
         auto params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("foo" << 1), coll));
@@ -1277,24 +1245,21 @@ class QueryStageAndSortedSecondChildFetched : public QueryStageAndBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        Database* db = ctx.db();
-        CollectionPtr coll = ctx.getCollection();
-        if (!coll) {
-            WriteUnitOfWork wuow(&_opCtx);
-            coll = db->createCollection(&_opCtx, nss());
-            wuow.commit();
-        }
 
-        // Insert a bunch of data
-        for (int i = 0; i < 50; ++i) {
-            insert(BSON("foo" << 1 << "bar" << 1));
-        }
+        {
+            auto coll = ctx.getOrCreateCollection();
 
+            // Insert a bunch of data
+            for (int i = 0; i < 50; ++i) {
+                insert(BSON("foo" << 1 << "bar" << 1));
+            }
+        }
         addIndex(BSON("foo" << 1));
         addIndex(BSON("bar" << 1));
+        const auto coll = ctx.getCollection();
 
         WorkingSet ws;
-        unique_ptr<AndSortedStage> as = std::make_unique<AndSortedStage>(_expCtx.get(), &ws);
+        std::unique_ptr<AndSortedStage> as = std::make_unique<AndSortedStage>(_expCtx.get(), &ws);
 
         // Scan over foo == 1
         auto params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("foo" << 1), coll));
@@ -1323,11 +1288,11 @@ public:
 };
 
 
-class All : public OldStyleSuiteSpecification {
+class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("query_stage_and") {}
 
-    void setupTests() {
+    void setupTests() override {
         add<QueryStageAndHashDeleteDuringYield>();
         add<QueryStageAndHashTwoLeaf>();
         add<QueryStageAndHashTwoLeafFirstChildLargeKeys>();
@@ -1350,6 +1315,7 @@ public:
     }
 };
 
-OldStyleSuiteInitializer<All> queryStageAndAll;
+unittest::OldStyleSuiteInitializer<All> queryStageAndAll;
 
 }  // namespace QueryStageAnd
+}  // namespace mongo

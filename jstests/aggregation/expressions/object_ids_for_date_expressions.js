@@ -1,9 +1,6 @@
 // SERVER-9406: Allow ObjectId type to be treated as a date in date related expressions
 
-(function() {
-"use strict";
-
-load('jstests/libs/dateutil.js');
+import {DateUtil} from "jstests/libs/dateutil.js";
 
 const coll = db.server9406;
 let testOpCount = 0;
@@ -42,27 +39,27 @@ function testOp(op, value) {
     assert.eq(res2.result, res1.result, tojson(pipeline));
 }
 
-testOp('$dateToString', {date: new Date("1980-12-31T23:59:59Z"), format: "%V-%G"});
-testOp('$dateToString', {date: new Date("1980-12-31T23:59:59Z"), format: "%G-%V"});
+testOp("$dateToString", {date: new Date("1980-12-31T23:59:59Z"), format: "%V-%G"});
+testOp("$dateToString", {date: new Date("1980-12-31T23:59:59Z"), format: "%G-%V"});
 
 const years = [
-    2002,  // Starting and ending on Tuesday.
-    2014,  // Starting and ending on Wednesday.
-    2015,  // Starting and ending on Thursday.
-    2010,  // Starting and ending on Friday.
-    2011,  // Starting and ending on Saturday.
-    2006,  // Starting and ending on Sunday.
-    1996,  // Starting on Monday, ending on Tuesday.
-    2008,  // Starting on Tuesday, ending on Wednesday.
-    1992,  // Starting on Wednesday, ending on Thursday.
-    2004,  // Starting on Thursday, ending on Friday.
-    2016,  // Starting on Friday, ending on Saturday.
-    2000,  // Starting on Saturday, ending on Sunday (special).
-    2012   // Starting on Sunday, ending on Monday.
+    2002, // Starting and ending on Tuesday.
+    2014, // Starting and ending on Wednesday.
+    2015, // Starting and ending on Thursday.
+    2010, // Starting and ending on Friday.
+    2011, // Starting and ending on Saturday.
+    2006, // Starting and ending on Sunday.
+    1996, // Starting on Monday, ending on Tuesday.
+    2008, // Starting on Tuesday, ending on Wednesday.
+    1992, // Starting on Wednesday, ending on Thursday.
+    2004, // Starting on Thursday, ending on Friday.
+    2016, // Starting on Friday, ending on Saturday.
+    2000, // Starting on Saturday, ending on Sunday (special).
+    2012, // Starting on Sunday, ending on Monday.
 ];
 
 const day = 1;
-years.forEach(function(year) {
+years.forEach(function (year) {
     // forEach starts indexing at zero but weekdays start with Monday on 1 so we add +1.
     let newYear = DateUtil.getNewYear(year);
     let endOfFirstWeekInYear = DateUtil.getEndOfFirstWeekInYear(year, day);
@@ -73,25 +70,24 @@ years.forEach(function(year) {
     now.setYear(year);
     now.setMilliseconds(0);
 
-    testOp('$isoDayOfWeek', newYear);
-    testOp('$isoDayOfWeek', endOfFirstWeekInYear);
-    testOp('$isoDayOfWeek', startOfSecondWeekInYear);
-    testOp('$isoWeekYear', birthday);
+    testOp("$isoDayOfWeek", newYear);
+    testOp("$isoDayOfWeek", endOfFirstWeekInYear);
+    testOp("$isoDayOfWeek", startOfSecondWeekInYear);
+    testOp("$isoWeekYear", birthday);
 
-    testOp('$isoWeek', newYear);
-    testOp('$isoWeek', now);
-    testOp('$isoWeekYear', newYear);
-    testOp('$isoWeek', endOfFirstWeekInYear);
-    testOp('$dateToString', {format: '%G-W%V-%u', date: newYear});
-    testOp('$isoWeek', endOfFirstWeekInYear);
-    testOp('$year', endOfFirstWeekInYear);
-    testOp('$month', endOfFirstWeekInYear);
-    testOp('$dayOfMonth', endOfFirstWeekInYear);
-    testOp('$dayOfWeek', birthday);
-    testOp('$dayOfWeek', newYearsEve);
-    testOp('$minute', newYearsEve);
-    testOp('$second', now);
-    testOp('$millisecond', newYear);
+    testOp("$isoWeek", newYear);
+    testOp("$isoWeek", now);
+    testOp("$isoWeekYear", newYear);
+    testOp("$isoWeek", endOfFirstWeekInYear);
+    testOp("$dateToString", {format: "%G-W%V-%u", date: newYear});
+    testOp("$isoWeek", endOfFirstWeekInYear);
+    testOp("$year", endOfFirstWeekInYear);
+    testOp("$month", endOfFirstWeekInYear);
+    testOp("$dayOfMonth", endOfFirstWeekInYear);
+    testOp("$dayOfWeek", birthday);
+    testOp("$dayOfWeek", newYearsEve);
+    testOp("$minute", newYearsEve);
+    testOp("$second", now);
+    testOp("$millisecond", newYear);
 });
-assert.eq(testOpCount, 236, 'Expected 236 tests to run');
-})();
+assert.eq(testOpCount, 236, "Expected 236 tests to run");

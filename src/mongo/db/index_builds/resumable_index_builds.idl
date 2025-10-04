@@ -1,0 +1,144 @@
+# Copyright (C) 2020-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+
+global:
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/util/uuid.h"
+
+imports:
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/record_id.idl"
+    - "mongo/db/sorter/sorter.idl"
+
+enums:
+    IndexBuildMethod:
+        description: "Index build method"
+        type: string
+        values:
+            # Use a collection scan to dump all keys into an external sorter. During this process,
+            # concurrent client writes are accepted, and their generated keys are written into an
+            # interceptor. On completion, this interceptor is drained and used to verify uniqueness
+            # constraints on the index.
+            kHybrid: "hybrid"
+            # Perform a collection scan to dump all keys into the external sorter, then into the
+            # index. During this process, callers guarantee that no writes will be accepted on this
+            # collection.
+            kForeground: "foreground"
+            # The overall index build process is similar to kHybrid. However, instead of building
+            # the index independently on each replica, only the primary runs the logic to build the
+            # index. Replicas simply apply the oplog entries generated during the build.
+            #
+            # This is the default for all index builds in a disaggregated storage cluster and is
+            # currently not supported in an attached storage cluster.
+            kPrimaryDriven: "Primary driven"
+    IndexBuildPhase:
+        description: "Phase of a hybrid index build"
+        type: string
+        values:
+            kInitialized: "initialized"
+            kCollectionScan: "collection scan"
+            kBulkLoad: "bulk load"
+            kDrainWrites: "drain writes"
+
+structs:
+    MultikeyPath:
+        description: "One set of multikey components for the multikey paths."
+        strict: true
+        fields:
+            multikeyComponents:
+                description: "The path-level components of the multikey paths."
+                type: array<int>
+
+    IndexStateInfo:
+        description: "The state of the index build needed to resume it."
+        strict: true
+        fields:
+            sideWritesTable:
+                description:
+                    "The name of the ident associated with the side writes table for this
+                    index build"
+                type: string
+            duplicateKeyTrackerTable:
+                description:
+                    "The name of the ident associated with the duplicate key tracker table
+                    for this index build"
+                type: string
+                optional: true
+            skippedRecordTrackerTable:
+                description:
+                    "The name of the ident associated with the skipped record tracker table
+                    for this index build"
+                type: string
+                optional: true
+            fileName:
+                description: "The name of the file that sorted data is written to"
+                type: string
+                optional: true
+            numKeys:
+                description: "The number of keys that were that were already sorted and spilled to disk"
+                type: long
+                optional: true
+            ranges:
+                description: "All ranges of data that were already sorted and spilled to disk"
+                type: array<SorterRange>
+                optional: true
+            spec:
+                description: "The index specification"
+                type: object_owned
+            isMultikey:
+                description: "Whether the index was already marked as multikey."
+                type: bool
+            multikeyPaths:
+                description: "The multikey paths for the index, if supported."
+                type: array<MultikeyPath>
+
+    ResumeIndexInfo:
+        description: "Information needed to resume index builds"
+        strict: true
+        fields:
+            _id:
+                description:
+                    "A UUID that uniquely identifies the index build across replica set
+                    members."
+                cpp_name: buildUUID
+                type: uuid
+            phase:
+                description: "The phase the index build was in when the node shut down"
+                type: IndexBuildPhase
+            collectionUUID:
+                description:
+                    "A UUID that uniquely identifies which collection the index is being
+                    built on"
+                type: uuid
+            collectionScanPosition:
+                description: "The last record id inserted into the sorter before shutdown"
+                type: RecordId
+                optional: true
+            indexes:
+                description: "The information needed to resume each specific index in this build"
+                type: array<IndexStateInfo>

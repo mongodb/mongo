@@ -1,0 +1,5 @@
+bson_size_limit
+bson_size_limit
+test.coll as fuzzer_coll
+
+:sortResults {aggregate: "fuzzer_coll", pipeline: [{$match: {_id: 0}}, {$project: {value: {$range: [0, {$multiply: [8, 1024, 1024]}]}}}], cursor: {}}

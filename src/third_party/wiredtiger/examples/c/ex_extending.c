@@ -27,7 +27,7 @@
  *
  * ex_extending.c
  *	This is an example demonstrating ways to extend WiredTiger with
- *	extractors, collators and loadable modules.
+ *	collators and loadable modules.
  */
 #include <test_util.h>
 

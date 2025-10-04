@@ -27,16 +27,26 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/s/balancer/balance_stats.h"
 
+#include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/s/balancer/balancer_policy.h"
-#include "mongo/logv2/log.h"
-#include "mongo/s/chunk_manager.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/string_map.h"
+
+#include <cstdint>
+#include <iterator>
+#include <set>
+#include <string>
+#include <utility>
+
+#include <absl/container/flat_hash_map.h>
+#include <absl/container/node_hash_map.h>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
+
 
 namespace mongo {
 
@@ -50,13 +60,13 @@ int64_t getMaxChunkImbalanceCount(const ChunkManager& routingInfo,
     for (const auto& shard : allShards) {
         chunkDistributionPerZone[""][shard.getName()] = 0;
 
-        for (const auto& tag : shard.getTags()) {
-            chunkDistributionPerZone[tag][shard.getName()] = 0;
+        for (const auto& zone : shard.getTags()) {
+            chunkDistributionPerZone[zone][shard.getName()] = 0;
         }
     }
 
     routingInfo.forEachChunk([&zoneInfo, &chunkDistributionPerZone](auto chunk) {
-        auto zone = zoneInfo.getZoneForChunk(chunk.getRange());
+        auto zone = zoneInfo.getZoneForRange(chunk.getRange());
         chunkDistributionPerZone[zone][chunk.getShardId()] += 1;
         return true;
     });

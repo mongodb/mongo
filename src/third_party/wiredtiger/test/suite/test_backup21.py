@@ -26,9 +26,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import queue, threading, wiredtiger, wttest
+import os, queue, threading, wttest
 from wtbackup import backup_base
-from wtscenario import make_scenarios
 from wtthread import op_thread
 
 # test_backup21.py
@@ -41,6 +40,7 @@ class test_backup21(backup_base):
     key_fmt = "S"
 
     def test_concurrent_operations_with_backup(self):
+        os.mkdir(self.dir)
         done = threading.Event()
         table_uri = 'table:' + self.uri
 
@@ -84,6 +84,3 @@ class test_backup21(backup_base):
             work_queue.join()
             done.set()
             t.join()
-
-if __name__ == '__main__':
-    wttest.run()

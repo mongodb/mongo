@@ -1,0 +1,75 @@
+# This configuration is for migrating code from one Git repository to another using Copybara.
+# It selectively copies content, excluding specific paths and preserving authorship.
+
+sourceUrl = "https://github.com/10gen/mongo.git"
+prodUrl = "https://github.com/mongodb/mongo.git"
+testUrl = "https://github.com/10gen/mongo-copybara.git"
+testBranch = "copybara_test_branch"
+
+def make_workflow(workflow_name, destination_url, branch):
+
+    core.workflow(
+        name = workflow_name,
+        origin = git.origin(
+            url = "https://github.com/10gen/mongo.git",
+            ref = branch,
+        ),
+        destination = git.destination(
+            url = destination_url,
+            fetch = branch,
+            push = branch,
+        ),
+        # Change path to the folder you want to publish publicly
+        origin_files = glob(["**"], exclude = ["src/mongo/db/modules/**", "buildscripts/modules/**", ".github/workflows/**"]),
+        authoring = authoring.pass_thru("MongoDB <mongodb@mongodb.com>"),
+        mode = "ITERATIVE",
+        transformations = [
+            # The transformation rules below will remove the commit message's body, while preserving
+            # any trailer lines that have acceptable keys (Co-authored-by, etc).  The first line of
+            # the commit message (ie. the commit's subject/summary line) is also always retained.
+            #
+            # Achieving this requires a 4 step process.
+            #
+            # STEP 1: Non-initial lines (ie. those which appear after a newline char) that start with
+            # an acceptable trailer key are preserved, but any other lines have their content removed
+            # (leaving a blank line).
+            #
+            # This works because the first .* (inside capture group 1) only matches if the line starts
+            # with a trailer key.  If it doesn't, then the line is fully consumed by the second .*
+            # (which is outside the capture group, and therefore $1 is empty).
+            metadata.scrubber(
+                "\n((?:Co-authored-by|Signed-off-by|Reviewed-by): .*)?.*",
+                replacement = "\n$1",
+            ),
+            #
+            # STEP 2: Remove blank lines, ie. sequences of newlines get condensed down to one newline.
+            metadata.scrubber("\n+", replacement = "\n"),
+            #
+            # STEP 3: Remove any trailing newline.
+            metadata.scrubber("\n$", replacement = ""),
+            #
+            # STEP 4: If there are trailer lines (ie. if the first line has a newline followed by more
+            # text), then add an extra blank line after the first line, ie. to separate the commit's
+            # trailers from the subject line.
+            #
+            # The first capture group (^.*?\n) is the first line (non-greedily consuming chars until a
+            # newline), while the second capture group ((\n|.)*) is the rest of the message (greedily
+            # consume all chars, including newlines).
+            # If there are no trailers, then there will only be a single line of text, with no newline
+            # chars, and so the pattern will fail to match.
+            metadata.scrubber("(^.*?\n)((?:\n|.)*)", replacement = "$1\n$2"),
+            #
+            # STEP 5: Replace any private links with their public equivalent.
+            core.replace(
+                before = "https://github.com/10gen/mongo",
+                after = "https://github.com/mongodb/mongo",
+                paths = glob(["**/*.md"]),
+            ),
+        ],
+    )
+
+# push to the public repo
+make_workflow("prod", prodUrl, "master")
+
+# push to private test repo to validate configs
+make_workflow("test", testUrl, testBranch)

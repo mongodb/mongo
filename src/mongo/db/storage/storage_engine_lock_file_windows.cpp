@@ -27,20 +27,18 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/storage/storage_engine_lock_file.h"
-
-#include <boost/filesystem.hpp>
-#include <io.h>
-#include <ostream>
-#include <sstream>
-
 #include "mongo/logv2/log.h"
 #include "mongo/util/str.h"
 #include "mongo/util/text.h"
+
+#include <io.h>
+
+#include <boost/filesystem.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
+
 
 namespace mongo {
 
@@ -52,17 +50,17 @@ Status _truncateFile(HANDLE handle) {
     LARGE_INTEGER largeint;
     largeint.QuadPart = 0;
     if (::SetFilePointerEx(handle, largeint, NULL, FILE_BEGIN) == FALSE) {
-        int errorcode = GetLastError();
+        auto ec = lastSystemError();
         return Status(ErrorCodes::FileStreamFailed,
                       str::stream() << "Unable to truncate lock file (SetFilePointerEx failed) "
-                                    << errnoWithDescription(errorcode));
+                                    << errorMessage(ec));
     }
 
     if (::SetEndOfFile(handle) == FALSE) {
-        int errorcode = GetLastError();
+        auto ec = lastSystemError();
         return Status(ErrorCodes::FileStreamFailed,
                       str::stream() << "Unable to truncate lock file (SetEndOfFile failed) "
-                                    << errnoWithDescription(errorcode));
+                                    << errorMessage(ec));
     }
 
     return Status::OK();
@@ -82,9 +80,9 @@ public:
     HANDLE _handle;
 };
 
-StorageEngineLockFile::StorageEngineLockFile(const std::string& dbpath, StringData fileName)
+StorageEngineLockFile::StorageEngineLockFile(StringData dbpath, StringData fileName)
     : _dbpath(dbpath),
-      _filespec((boost::filesystem::path(_dbpath) / fileName.toString()).string()),
+      _filespec((boost::filesystem::path(_dbpath) / std::string{fileName}).string()),
       _uncleanShutdown(boost::filesystem::exists(_filespec) &&
                        boost::filesystem::file_size(_filespec) > 0),
       _lockFileHandle(new LockFileHandle()) {}
@@ -119,8 +117,8 @@ Status StorageEngineLockFile::open() {
                                         NULL);
 
     if (lockFileHandle == INVALID_HANDLE_VALUE) {
-        int errorcode = GetLastError();
-        if (errorcode == ERROR_ACCESS_DENIED) {
+        auto ec = lastSystemError();
+        if (ec == systemError(ERROR_ACCESS_DENIED)) {
             return Status(ErrorCodes::IllegalOperation,
                           str::stream()
                               << "Attempted to create a lock file on a read-only directory: "
@@ -128,7 +126,7 @@ Status StorageEngineLockFile::open() {
         }
         return Status(ErrorCodes::DBPathInUse,
                       str::stream() << "Unable to create/open the lock file: " << _filespec << " ("
-                                    << errnoWithDescription(errorcode) << ")."
+                                    << errorMessage(ec) << ")."
                                     << " Ensure the user executing mongod is the owner of the lock "
                                        "file and has the appropriate permissions. Also make sure "
                                        "that another mongod instance is not already running on the "
@@ -160,14 +158,14 @@ Status StorageEngineLockFile::writeString(StringData str) {
 
     DWORD bytesWritten = 0;
     if (::WriteFile(_lockFileHandle->_handle,
-                    static_cast<LPCVOID>(str.rawData()),
+                    static_cast<LPCVOID>(str.data()),
                     static_cast<DWORD>(str.size()),
                     &bytesWritten,
                     NULL) == FALSE) {
-        int errorcode = GetLastError();
+        auto ec = lastSystemError();
         return Status(ErrorCodes::FileStreamFailed,
                       str::stream() << "Unable to write string " << str << " to file: " << _filespec
-                                    << ' ' << errnoWithDescription(errorcode));
+                                    << ' ' << errorMessage(ec));
     } else if (bytesWritten == 0) {
         return Status(ErrorCodes::FileStreamFailed,
                       str::stream() << "Unable to write string " << str << " to file: " << _filespec
@@ -189,10 +187,7 @@ void StorageEngineLockFile::clearPidAndUnlock() {
     // with StorageEngineLockFile::open().
     Status status = _truncateFile(_lockFileHandle->_handle);
     if (!status.isOK()) {
-        LOGV2(22282,
-              "couldn't remove fs lock: {error}",
-              "Couldn't remove fs lock",
-              "error"_attr = status);
+        LOGV2(22282, "Couldn't remove fs lock", "error"_attr = status);
     }
     CloseHandle(_lockFileHandle->_handle);
     _lockFileHandle->clear();

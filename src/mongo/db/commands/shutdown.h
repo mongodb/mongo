@@ -27,17 +27,27 @@
  *    it in the license file.
  */
 
-#include <string>
-#include <vector>
+#pragma once
 
-#include "mongo/db/commands/shutdown_gen.h"
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/commands/shutdown_gen.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/ntservice.h"
+
+#include <string>
+#include <vector>
 
 namespace mongo {
 Status stepDownForShutdown(OperationContext* opCtx,
@@ -46,10 +56,13 @@ Status stepDownForShutdown(OperationContext* opCtx,
 
 namespace shutdown_detail {
 /**
- * Completes the shutdown. 'timeoutSecs' is the total time permitted for shutdown-related timeouts.
+ * Completes the shutdown. 'timeout' is the total time permitted for shutdown-related timeouts.
  * 'quiesceTime' is the remaining time allowed for quiescing.
  */
-void finishShutdown(bool force, long long timeoutSecs, Milliseconds quiesceTime);
+void finishShutdown(OperationContext* opCtx,
+                    bool force,
+                    Milliseconds timeout,
+                    Milliseconds quiesceTime);
 }  // namespace shutdown_detail
 
 template <typename Derived>
@@ -64,23 +77,26 @@ public:
 
         void typedRun(OperationContext* opCtx) {
             auto force = Base::request().getForce();
-            auto timeoutSecs = Base::request().getTimeoutSecs();
-            auto shutdownStartTime = opCtx->getServiceContext()->getPreciseClockSource()->now();
+            Seconds timeout{Base::request().getTimeoutSecs()};
+
+            auto getCurrentTime = [&] {
+                return opCtx->getServiceContext()->getPreciseClockSource()->now();
+            };
+
+            auto shutdownStartTime = getCurrentTime();
 
             // Commands derived from CmdShutdown should define their own
             // `beginShutdown` methods.
-            Derived::beginShutdown(opCtx, force, timeoutSecs);
-            Milliseconds quiesceTime =
-                std::max(Milliseconds::zero(),
-                         Milliseconds(Seconds(timeoutSecs)) -
-                             (opCtx->getServiceContext()->getPreciseClockSource()->now() -
-                              shutdownStartTime));
-            shutdown_detail::finishShutdown(force, timeoutSecs, quiesceTime);
+            Derived::beginShutdown(opCtx, force, timeout);
+
+            auto quiesceTime =
+                std::max(shutdownStartTime + timeout - getCurrentTime(), Milliseconds{0});
+            shutdown_detail::finishShutdown(opCtx, force, timeout, quiesceTime);
         }
 
     private:
         NamespaceString ns() const override {
-            return NamespaceString(Base::request().getDbName(), "");
+            return NamespaceString(Base::request().getDbName());
         }
 
         bool supportsWriteConcern() const override {
@@ -92,14 +108,15 @@ public:
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",
                     AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                        ResourcePattern::forClusterResource(), ActionType::shutdown));
+                        ResourcePattern::forClusterResource(Base::request().getDbName().tenantId()),
+                        ActionType::shutdown));
         }
     };
 
     bool requiresAuth() const override {
         return true;
     }
-    virtual bool adminOnly() const {
+    bool adminOnly() const override {
         return true;
     }
     bool localHostOnlyIfNoAuth() const override {
@@ -107,13 +124,6 @@ public:
     }
     Command::AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return Command::AllowedOnSecondary::kAlways;
-    }
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {
-        ActionSet actions;
-        actions.addAction(ActionType::shutdown);
-        out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
 };
 

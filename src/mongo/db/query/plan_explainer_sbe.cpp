@@ -27,180 +27,75 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/query/plan_explainer_sbe.h"
 
-#include <queue>
-
-#include "mongo/db/exec/plan_stats_walker.h"
+#include "mongo/bson/bson_depth.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/fts/fts_query_impl.h"
-#include "mongo/db/keypattern.h"
+#include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/local_catalog/index_descriptor.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection_ast_util.h"
+#include "mongo/db/query/compiler/metadata/index_entry.h"
+#include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/eof_node_type.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
+#include "mongo/db/query/plan_explainer_factory.h"
 #include "mongo/db/query/plan_explainer_impl.h"
 #include "mongo/db/query/plan_summary_stats_visitor.h"
-#include "mongo/db/query/projection_ast_util.h"
 #include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/tree_walker.h"
-#include "mongo/db/record_id_helpers.h"
+#include "mongo/db/query/record_id_bound.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/namespace_string_util.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <set>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {
-void statsToBSON(const QuerySolutionNode* node,
-                 BSONObjBuilder* bob,
-                 const BSONObjBuilder* topLevelBob) {
-    invariant(bob);
-    invariant(topLevelBob);
+/**
+ * This function replaces field names in *replace* with those from the object
+ * *fieldNames*, preserving field ordering.  Both objects must have the same
+ * number of fields.
+ *
+ * Example:
+ *
+ *     replaceBSONKeyNames({ 'a': 1, 'b' : 1 }, { '': 'foo', '', 'bar' }) =>
+ *
+ *         { 'a' : 'foo' }, { 'b' : 'bar' }
+ */
+BSONObj replaceBSONFieldNames(const BSONObj& replace, const BSONObj& fieldNames) {
+    invariant(replace.nFields() == fieldNames.nFields());
 
-    // Stop as soon as the BSON object we're building exceeds the limit.
-    if (topLevelBob->len() > internalQueryExplainSizeThresholdBytes.load()) {
-        bob->append("warning", "stats tree exceeded BSON size limit for explain");
-        return;
+    BSONObjBuilder bob;
+    auto iter = fieldNames.begin();
+
+    for (const BSONElement& el : replace) {
+        bob.appendAs(el, (*iter++).fieldNameStringData());
     }
 
-    bob->append("stage", stageTypeToString(node->getType()));
-    bob->appendNumber("planNodeId", static_cast<long long>(node->nodeId()));
-
-    // Display the BSON representation of the filter, if there is one.
-    if (node->filter) {
-        bob->append("filter", node->filter->serialize());
-    }
-
-    // Stage-specific stats.
-    switch (node->getType()) {
-        case STAGE_COLLSCAN: {
-            auto csn = static_cast<const CollectionScanNode*>(node);
-            bob->append("direction", csn->direction > 0 ? "forward" : "backward");
-            if (csn->minRecord) {
-                record_id_helpers::appendToBSONAs(*csn->minRecord, bob, "minRecord");
-            }
-            if (csn->maxRecord) {
-                record_id_helpers::appendToBSONAs(*csn->maxRecord, bob, "maxRecord");
-            }
-            break;
-        }
-        case STAGE_GEO_NEAR_2D: {
-            auto geo2d = static_cast<const GeoNear2DNode*>(node);
-            bob->append("keyPattern", geo2d->index.keyPattern);
-            bob->append("indexName", geo2d->index.identifier.catalogName);
-            bob->append("indexVersion", geo2d->index.version);
-            break;
-        }
-        case STAGE_GEO_NEAR_2DSPHERE: {
-            auto geo2dsphere = static_cast<const GeoNear2DSphereNode*>(node);
-            bob->append("keyPattern", geo2dsphere->index.keyPattern);
-            bob->append("indexName", geo2dsphere->index.identifier.catalogName);
-            bob->append("indexVersion", geo2dsphere->index.version);
-            break;
-        }
-        case STAGE_IXSCAN: {
-            auto ixn = static_cast<const IndexScanNode*>(node);
-
-            bob->append("keyPattern", ixn->index.keyPattern);
-            bob->append("indexName", ixn->index.identifier.catalogName);
-            auto collation =
-                ixn->index.infoObj.getObjectField(IndexDescriptor::kCollationFieldName);
-            if (!collation.isEmpty()) {
-                bob->append("collation", collation);
-            }
-            bob->appendBool("isMultiKey", ixn->index.multikey);
-            if (!ixn->index.multikeyPaths.empty()) {
-                appendMultikeyPaths(ixn->index.keyPattern, ixn->index.multikeyPaths, bob);
-            }
-            bob->appendBool("isUnique", ixn->index.unique);
-            bob->appendBool("isSparse", ixn->index.sparse);
-            bob->appendBool("isPartial", ixn->index.filterExpr != nullptr);
-            bob->append("indexVersion", static_cast<int>(ixn->index.version));
-            bob->append("direction", ixn->direction > 0 ? "forward" : "backward");
-
-            auto bounds = ixn->bounds.toBSON();
-            if (topLevelBob->len() + bounds.objsize() >
-                internalQueryExplainSizeThresholdBytes.load()) {
-                bob->append("warning", "index bounds omitted due to BSON size limit for explain");
-            } else {
-                bob->append("indexBounds", bounds);
-            }
-            break;
-        }
-        case STAGE_LIMIT: {
-            auto ln = static_cast<const LimitNode*>(node);
-            bob->appendNumber("limitAmount", ln->limit);
-            break;
-        }
-        case STAGE_PROJECTION_DEFAULT:
-        case STAGE_PROJECTION_SIMPLE:
-        case STAGE_PROJECTION_COVERED: {
-            auto pn = static_cast<const ProjectionNode*>(node);
-            bob->append("transformBy", projection_ast::astToDebugBSON(pn->proj.root()));
-            break;
-        }
-        case STAGE_SKIP: {
-            auto sn = static_cast<const SkipNode*>(node);
-            bob->appendNumber("skipAmount", sn->skip);
-            break;
-        }
-        case STAGE_SORT_SIMPLE:
-        case STAGE_SORT_DEFAULT: {
-            auto sn = static_cast<const SortNode*>(node);
-            bob->append("sortPattern", sn->pattern);
-            bob->appendNumber("memLimit", static_cast<long long>(sn->maxMemoryUsageBytes));
-
-            if (sn->limit > 0) {
-                bob->appendNumber("limitAmount", static_cast<long long>(sn->limit));
-            }
-
-            bob->append("type", node->getType() == STAGE_SORT_SIMPLE ? "simple" : "default");
-            break;
-        }
-        case STAGE_SORT_MERGE: {
-            auto smn = static_cast<const MergeSortNode*>(node);
-            bob->append("sortPattern", smn->sort);
-            break;
-        }
-        case STAGE_TEXT_MATCH: {
-            auto tn = static_cast<const TextMatchNode*>(node);
-
-            bob->append("indexPrefix", tn->indexPrefix);
-            bob->append("indexName", tn->index.identifier.catalogName);
-            auto ftsQuery = dynamic_cast<fts::FTSQueryImpl*>(tn->ftsQuery.get());
-            invariant(ftsQuery);
-            bob->append("parsedTextQuery", ftsQuery->toBSON());
-            bob->append("textIndexVersion", tn->index.version);
-            break;
-        }
-        default:
-            break;
-    }
-
-    // We're done if there are no children.
-    if (node->children.empty()) {
-        return;
-    }
-
-    // If there's just one child (a common scenario), avoid making an array. This makes
-    // the output more readable by saving a level of nesting. Name the field 'inputStage'
-    // rather than 'inputStages'.
-    if (node->children.size() == 1) {
-        BSONObjBuilder childBob(bob->subobjStart("inputStage"));
-        statsToBSON(node->children[0], &childBob, topLevelBob);
-        return;
-    }
-
-    // There is more than one child. Recursively call statsToBSON(...) on each
-    // of them and add them to the 'inputStages' array.
-    BSONArrayBuilder childrenBob(bob->subarrayStart("inputStages"));
-    for (auto&& child : node->children) {
-        BSONObjBuilder childBob(childrenBob.subobjStart());
-        statsToBSON(child, &childBob, topLevelBob);
-    }
-    childrenBob.doneFast();
+    return bob.obj();
 }
+
 void statsToBSONHelper(const sbe::PlanStageStats* stats,
                        BSONObjBuilder* bob,
                        const BSONObjBuilder* topLevelBob,
                        std::uint32_t currentDepth) {
-    invariant(stats);
-    invariant(bob);
-    invariant(topLevelBob);
+    tassert(9378607, "encountered unexpected nullptr for PlanStageStats", stats);
+    tassert(9378608, "encountered unexpected nullptr for BSONObjBuilder", bob);
+    tassert(9258809, "encountered unexpected nullptr for BSONObjBuilder", topLevelBob);
 
     // Stop as soon as the BSON object we're building exceeds the limit.
     if (topLevelBob->len() > internalQueryExplainSizeThresholdBytes.load()) {
@@ -222,9 +117,21 @@ void statsToBSONHelper(const sbe::PlanStageStats* stats,
 
     // Some top-level exec stats get pulled out of the root stage.
     bob->appendNumber("nReturned", static_cast<long long>(stats->common.advances));
-    // Include executionTimeMillis if it was recorded.
-    if (stats->common.executionTimeMillis) {
-        bob->appendNumber("executionTimeMillisEstimate", *stats->common.executionTimeMillis);
+    // Include the execution time if it was recorded.
+    if (stats->common.executionTime.precision == QueryExecTimerPrecision::kMillis) {
+        bob->appendNumber(
+            "executionTimeMillisEstimate",
+            durationCount<Milliseconds>(stats->common.executionTime.executionTimeEstimate));
+    } else if (stats->common.executionTime.precision == QueryExecTimerPrecision::kNanos) {
+        bob->appendNumber(
+            "executionTimeMillisEstimate",
+            durationCount<Milliseconds>(stats->common.executionTime.executionTimeEstimate));
+        bob->appendNumber(
+            "executionTimeMicros",
+            durationCount<Microseconds>(stats->common.executionTime.executionTimeEstimate));
+        bob->appendNumber(
+            "executionTimeNanos",
+            durationCount<Nanoseconds>(stats->common.executionTime.executionTimeEstimate));
     }
     bob->appendNumber("opens", static_cast<long long>(stats->common.opens));
     bob->appendNumber("closes", static_cast<long long>(stats->common.closes));
@@ -285,35 +192,27 @@ void statsToBSON(const sbe::PlanStageStats* stats,
     statsToBSONHelper(stats, bob, topLevelBob, 0);
 }
 
-PlanSummaryStats collectExecutionStatsSummary(const sbe::PlanStageStats* stats) {
-    invariant(stats);
-
-    PlanSummaryStats summary;
-    summary.nReturned = stats->common.advances;
-
-    if (stats->common.executionTimeMillis) {
-        summary.executionTimeMillisEstimate = *stats->common.executionTimeMillis;
-    }
-
-    auto visitor = PlanSummaryStatsVisitor(summary);
-    auto walker = PlanStageStatsWalker<true, sbe::CommonStats>(nullptr, nullptr, &visitor);
-    tree_walker::walk<true, sbe::PlanStageStats>(stats, &walker);
-    return summary;
-}
-
 PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
     const QuerySolution* solution,
-    const sbe::PlanStageStats* stats,
-    const boost::optional<BSONObj>& execPlanDebugInfo,
-    ExplainOptions::Verbosity verbosity) {
+    const sbe::PlanStageStats& stats,
+    const sbe::PlanStage* sbePlanStageRoot,
+    const stage_builder::PlanStageData* sbePlanStageData,
+    const boost::optional<std::string>& planSummary,
+    const boost::optional<BSONObj>& queryParams,
+    const boost::optional<BSONArray>& remotePlanInfo,
+    ExplainOptions::Verbosity verbosity,
+    bool isCached) {
     BSONObjBuilder bob;
 
     if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-        auto summary = collectExecutionStatsSummary(stats);
-        if (verbosity >= ExplainOptions::Verbosity::kExecAllPlans) {
+        auto summary = sbe::collectExecutionStatsSummary(stats);
+        if (solution != nullptr && verbosity >= ExplainOptions::Verbosity::kExecAllPlans) {
             summary.score = solution->score;
+            if (internalQueryAllowForcedPlanByHash.load()) {
+                bob.append("solutionHashUnstable", (long long)solution->hash());
+            }
         }
-        statsToBSON(stats, &bob, &bob);
+        statsToBSON(&stats, &bob, &bob);
         // At the 'kQueryPlanner' verbosity level we use the QSN-derived format for the given plan,
         // and thus the winning plan and rejected plans at this verbosity should display the
         // stringified SBE plan, which is added below. However, at the 'kExecStats' the execution
@@ -323,94 +222,354 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
         return {bob.obj(), std::move(summary)};
     }
 
-    statsToBSON(solution->root(), &bob, &bob);
-    invariant(execPlanDebugInfo);
-    return {BSON("queryPlan" << bob.obj() << "slotBasedPlan" << *execPlanDebugInfo), boost::none};
+    if (solution != nullptr) {
+        statsToBSON(solution->root(), &bob, &bob);
+        if (internalQueryAllowForcedPlanByHash.load()) {
+            bob.append("solutionHashUnstable", (long long)solution->hash());
+        }
+    }
+
+    BSONObjBuilder plan;
+    if (planSummary) {
+        plan.append("planSummary", *planSummary);
+    }
+
+    plan.append("isCached", isCached);
+    plan.append("queryPlan", bob.obj());
+
+    int explainThresholdBytes = internalQueryExplainSizeThresholdBytes.loadRelaxed();
+
+    if (plan.len() > explainThresholdBytes) {
+        plan.append("warning", "slotBasedPlan exceeded BSON size limit for explain");
+    } else {
+        BSONObj execPlanDebugInfo = PlanExplainerSBEBase::buildExecPlanDebugInfo(
+            sbePlanStageRoot, sbePlanStageData, explainThresholdBytes - plan.len() /*lengthCap*/
+        );
+        if (plan.len() + execPlanDebugInfo.objsize() > explainThresholdBytes) {
+            plan.append("warning", "slotBasedPlan exceeded BSON size limit for explain");
+        } else {
+            plan.append("slotBasedPlan", execPlanDebugInfo);
+        }
+    }
+    if (remotePlanInfo && !remotePlanInfo->isEmpty()) {
+        plan.append("remotePlans", *remotePlanInfo);
+    }
+    return {plan.obj(), boost::none};
 }
 }  // namespace
 
-const PlanExplainer::ExplainVersion& PlanExplainerSBE::getVersion() const {
-    static const ExplainVersion kExplainVersion = "2";
-    return kExplainVersion;
-}
+void statsToBSON(const QuerySolutionNode* node,
+                 BSONObjBuilder* bob,
+                 const BSONObjBuilder* topLevelBob) {
+    tassert(9378604, "encountered unexpected nullptr for BSONObjBuilder", bob);
+    tassert(9378605, "encountered unexpected nullptr for BSONObjBuilder", topLevelBob);
 
-std::string PlanExplainerSBE::getPlanSummary() const {
-    if (!_solution) {
-        return {};
+    // Stop as soon as the BSON object we're building exceeds the limit.
+    if (topLevelBob->len() > internalQueryExplainSizeThresholdBytes.load()) {
+        bob->append("warning", "stats tree exceeded BSON size limit for explain");
+        return;
     }
 
-    StringBuilder sb;
-    bool seenLeaf = false;
-    std::queue<const QuerySolutionNode*> queue;
-    queue.push(_solution->root());
+    bob->append("stage", nodeStageTypeToString(node));
+    bob->appendNumber("planNodeId", static_cast<long long>(node->nodeId()));
 
-    while (!queue.empty()) {
-        auto node = queue.front();
-        queue.pop();
+    // Display the BSON representation of the filter, if there is one.
+    if (node->filter) {
+        bob->append("filter", node->filter->serialize());
+    }
 
-        if (node->children.empty()) {
-            if (seenLeaf) {
-                sb << ", ";
+    // Stage-specific stats.
+    switch (node->getType()) {
+        case STAGE_COLLSCAN: {
+            auto csn = static_cast<const CollectionScanNode*>(node);
+            bob->append("direction", csn->direction > 0 ? "forward" : "backward");
+            if (csn->minRecord) {
+                csn->minRecord->appendToBSONAs(bob, "minRecord");
+            }
+            if (csn->maxRecord) {
+                csn->maxRecord->appendToBSONAs(bob, "maxRecord");
+            }
+            break;
+        }
+        case STAGE_COUNT_SCAN: {
+            auto csn = static_cast<const CountScanNode*>(node);
+
+            bob->append("keyPattern", csn->index.keyPattern);
+            bob->append("indexName", csn->index.identifier.catalogName);
+            auto collation =
+                csn->index.infoObj.getObjectField(IndexDescriptor::kCollationFieldName);
+            if (!collation.isEmpty()) {
+                bob->append("collation", collation);
+            }
+            bob->appendBool("isMultiKey", csn->index.multikey);
+            if (!csn->index.multikeyPaths.empty()) {
+                appendMultikeyPaths(csn->index.keyPattern, csn->index.multikeyPaths, bob);
+            }
+            bob->appendBool("isUnique", csn->index.unique);
+            bob->appendBool("isSparse", csn->index.sparse);
+            bob->appendBool("isPartial", csn->index.filterExpr != nullptr);
+            bob->append("indexVersion", static_cast<int>(csn->index.version));
+
+            BSONObjBuilder indexBoundsBob(bob->subobjStart("indexBounds"));
+            indexBoundsBob.append("startKey",
+                                  replaceBSONFieldNames(csn->startKey, csn->index.keyPattern));
+            indexBoundsBob.append("startKeyInclusive", csn->startKeyInclusive);
+            indexBoundsBob.append("endKey",
+                                  replaceBSONFieldNames(csn->endKey, csn->index.keyPattern));
+            indexBoundsBob.append("endKeyInclusive", csn->endKeyInclusive);
+            break;
+        }
+        case STAGE_GEO_NEAR_2D: {
+            auto geo2d = static_cast<const GeoNear2DNode*>(node);
+            bob->append("keyPattern", geo2d->index.keyPattern);
+            bob->append("indexName", geo2d->index.identifier.catalogName);
+            bob->append("indexVersion", geo2d->index.version);
+            break;
+        }
+        case STAGE_GEO_NEAR_2DSPHERE: {
+            auto geo2dsphere = static_cast<const GeoNear2DSphereNode*>(node);
+            bob->append("keyPattern", geo2dsphere->index.keyPattern);
+            bob->append("indexName", geo2dsphere->index.identifier.catalogName);
+            bob->append("indexVersion", geo2dsphere->index.version);
+            break;
+        }
+        case STAGE_IXSCAN: {
+            auto ixn = static_cast<const IndexScanNode*>(node);
+
+            bob->append("keyPattern", ixn->index.keyPattern);
+            bob->append("indexName", ixn->index.identifier.catalogName);
+            auto collation =
+                ixn->index.infoObj.getObjectField(IndexDescriptor::kCollationFieldName);
+            if (!collation.isEmpty()) {
+                bob->append("collation", collation);
+            }
+            bob->appendBool("isMultiKey", ixn->index.multikey);
+            if (!ixn->index.multikeyPaths.empty()) {
+                appendMultikeyPaths(ixn->index.keyPattern, ixn->index.multikeyPaths, bob);
+            }
+            bob->appendBool("isUnique", ixn->index.unique);
+            bob->appendBool("isSparse", ixn->index.sparse);
+            bob->appendBool("isPartial", ixn->index.filterExpr != nullptr);
+            bob->append("indexVersion", static_cast<int>(ixn->index.version));
+            bob->append("direction", ixn->direction > 0 ? "forward" : "backward");
+
+            auto bounds = ixn->bounds.toBSON(!collation.isEmpty());
+            if (topLevelBob->len() + bounds.objsize() >
+                internalQueryExplainSizeThresholdBytes.load()) {
+                bob->append("warning", "index bounds omitted due to BSON size limit for explain");
             } else {
-                seenLeaf = true;
+                bob->append("indexBounds", bounds);
+            }
+            break;
+        }
+        case STAGE_LIMIT: {
+            auto ln = static_cast<const LimitNode*>(node);
+            bob->appendNumber("limitAmount", ln->limit);
+            break;
+        }
+        case STAGE_PROJECTION_DEFAULT:
+        case STAGE_PROJECTION_SIMPLE:
+        case STAGE_PROJECTION_COVERED: {
+            auto pn = static_cast<const ProjectionNode*>(node);
+            bob->append("transformBy", projection_ast::astToDebugBSON(pn->proj.root()));
+            break;
+        }
+        case STAGE_SKIP: {
+            auto sn = static_cast<const SkipNode*>(node);
+            bob->appendNumber("skipAmount", sn->skip);
+            break;
+        }
+        case STAGE_SORT_SIMPLE:
+        case STAGE_SORT_DEFAULT: {
+            auto sn = static_cast<const SortNode*>(node);
+            bob->append("sortPattern", sn->pattern);
+            bob->appendNumber("memLimit", static_cast<long long>(sn->maxMemoryUsageBytes));
+
+            if (sn->limit > 0) {
+                bob->appendNumber("limitAmount", static_cast<long long>(sn->limit));
             }
 
-            sb << stageTypeToString(node->getType());
+            bob->append("type", node->getType() == STAGE_SORT_SIMPLE ? "simple" : "default");
+            break;
+        }
+        case STAGE_SORT_MERGE: {
+            auto smn = static_cast<const MergeSortNode*>(node);
+            bob->append("sortPattern", smn->sort);
+            break;
+        }
+        case STAGE_TEXT_MATCH: {
+            auto tn = static_cast<const TextMatchNode*>(node);
 
-            switch (node->getType()) {
-                case STAGE_COUNT_SCAN: {
-                    auto csn = static_cast<const CountScanNode*>(node);
-                    const KeyPattern keyPattern{csn->index.keyPattern};
-                    sb << " " << keyPattern;
-                    break;
-                }
-                case STAGE_DISTINCT_SCAN: {
-                    auto dn = static_cast<const DistinctNode*>(node);
-                    const KeyPattern keyPattern{dn->index.keyPattern};
-                    sb << " " << keyPattern;
-                    break;
-                }
-                case STAGE_GEO_NEAR_2D: {
-                    auto geo2d = static_cast<const GeoNear2DNode*>(node);
-                    const KeyPattern keyPattern{geo2d->index.keyPattern};
-                    sb << " " << keyPattern;
-                    break;
-                }
-                case STAGE_GEO_NEAR_2DSPHERE: {
-                    auto geo2dsphere = static_cast<const GeoNear2DSphereNode*>(node);
-                    const KeyPattern keyPattern{geo2dsphere->index.keyPattern};
-                    sb << " " << keyPattern;
-                    break;
-                }
-                case STAGE_IXSCAN: {
-                    auto ixn = static_cast<const IndexScanNode*>(node);
-                    const KeyPattern keyPattern{ixn->index.keyPattern};
-                    sb << " " << keyPattern;
-                    break;
-                }
-                case STAGE_TEXT_MATCH: {
-                    auto tn = static_cast<const TextMatchNode*>(node);
-                    const KeyPattern keyPattern{tn->indexPrefix};
-                    sb << " " << keyPattern;
-                    break;
-                }
-                default:
-                    break;
+            bob->append("indexPrefix", tn->indexPrefix);
+            bob->append("indexName", tn->index.identifier.catalogName);
+            auto ftsQuery = dynamic_cast<fts::FTSQueryImpl*>(tn->ftsQuery.get());
+            invariant(ftsQuery);
+            bob->append("parsedTextQuery", ftsQuery->toBSON());
+            bob->append("textIndexVersion", tn->index.version);
+            break;
+        }
+        case STAGE_EQ_LOOKUP: {
+            auto eln = static_cast<const EqLookupNode*>(node);
+
+            bob->append("foreignCollection",
+                        NamespaceStringUtil::serialize(eln->foreignCollection,
+                                                       SerializationContext::stateDefault()));
+            bob->append("localField", eln->joinFieldLocal.fullPath());
+            bob->append("foreignField", eln->joinFieldForeign.fullPath());
+            bob->append("asField", eln->joinField.fullPath());
+            bob->append("strategy", EqLookupNode::serializeLookupStrategy(eln->lookupStrategy));
+            if (eln->idxEntry) {
+                bob->append("indexName", eln->idxEntry->identifier.catalogName);
+                bob->append("indexKeyPattern", eln->idxEntry->keyPattern);
             }
+            bob->append("scanDirection", toString(eln->scanDirection));
+            break;
         }
+        case STAGE_EQ_LOOKUP_UNWIND: {
+            auto eln = static_cast<const EqLookupUnwindNode*>(node);
 
-        for (auto&& child : node->children) {
-            queue.push(child);
+            bob->append("foreignCollection",
+                        NamespaceStringUtil::serialize(eln->foreignCollection,
+                                                       SerializationContext::stateDefault()));
+            bob->append("localField", eln->joinFieldLocal.fullPath());
+            bob->append("foreignField", eln->joinFieldForeign.fullPath());
+            bob->append("asField", eln->joinField.fullPath());
+            bob->append("strategy", EqLookupNode::serializeLookupStrategy(eln->lookupStrategy));
+            if (eln->idxEntry) {
+                bob->append("indexName", eln->idxEntry->identifier.catalogName);
+                bob->append("indexKeyPattern", eln->idxEntry->keyPattern);
+            }
+            bob->append("scanDirection", toString(eln->scanDirection));
+            break;
         }
+        case STAGE_UNPACK_TS_BUCKET: {
+            auto utsbn = static_cast<const UnpackTsBucketNode*>(node);
+            {
+                const auto behaviorField =
+                    utsbn->bucketSpec.behavior() == timeseries::BucketSpec::Behavior::kInclude
+                    ? "include"
+                    : "exclude";
+                BSONArrayBuilder fieldsBab{bob->subarrayStart(behaviorField)};
+                for (const auto& field : utsbn->bucketSpec.fieldSet()) {
+                    fieldsBab.append(field);
+                }
+                if (utsbn->bucketSpec.behavior() == timeseries::BucketSpec::Behavior::kInclude &&
+                    utsbn->includeMeta) {
+                    fieldsBab.append(*utsbn->bucketSpec.metaField());
+                }
+            }
+            {
+                BSONArrayBuilder fieldsBab{bob->subarrayStart("computedMetaProjFields")};
+                for (const auto& computedMeta : utsbn->bucketSpec.computedMetaProjFields()) {
+                    fieldsBab.append(computedMeta);
+                }
+            }
+            bob->append("includeMeta", utsbn->includeMeta);
+            bob->append("eventFilter",
+                        utsbn->eventFilter ? utsbn->eventFilter->serialize() : BSONObj());
+            bob->append("wholeBucketFilter",
+                        utsbn->wholeBucketFilter ? utsbn->wholeBucketFilter->serialize()
+                                                 : BSONObj());
+
+            break;
+        }
+        case STAGE_SEARCH: {
+            auto sn = static_cast<const SearchNode*>(node);
+            bob->append("isSearchMeta", sn->isSearchMeta);
+            bob->appendNumber("remoteCursorId", static_cast<long long>(sn->remoteCursorId));
+            bob->append("searchQuery", sn->searchQuery);
+            break;
+        }
+        case STAGE_EOF: {
+            auto eofn = static_cast<const EofNode*>(node);
+            bob->append("type", eof_node::typeStr(eofn->type));
+            break;
+        }
+        case STAGE_HASH_JOIN_EMBEDDING_NODE:
+        case STAGE_NESTED_LOOP_JOIN_EMBEDDING_NODE:
+        case STAGE_INDEXED_NESTED_LOOP_JOIN_EMBEDDING_NODE: {
+            // These are all BinaryJoinEmbeddingNodes.
+            auto bjen = static_cast<const BinaryJoinEmbeddingNode*>(node);
+            bob->append("leftEmbeddingField",
+                        (bjen->leftEmbeddingField ? bjen->leftEmbeddingField->fullPath() : "none"));
+            bob->append(
+                "rightEmbeddingField",
+                (bjen->rightEmbeddingField ? bjen->rightEmbeddingField->fullPath() : "none"));
+            {
+                // Append join predicates.
+                BSONArrayBuilder bab;
+                for (auto&& jp : bjen->joinPredicates) {
+                    bab.append(jp.toString());
+                }
+                bob->append("joinPredicates", bab.arr());
+            }
+            break;
+        }
+        default:
+            break;
     }
 
-    return sb.str();
+    // We're done if there are no children.
+    if (node->children.empty()) {
+        return;
+    }
+
+    // If there's just one child (a common scenario), avoid making an array. This makes
+    // the output more readable by saving a level of nesting. Name the field 'inputStage'
+    // rather than 'inputStages'.
+    if (node->children.size() == 1) {
+        BSONObjBuilder childBob(bob->subobjStart("inputStage"));
+        statsToBSON(node->children[0].get(), &childBob, topLevelBob);
+        return;
+    }
+
+    // There is more than one child. Recursively call statsToBSON(...) on each
+    // of them and add them to the 'inputStages' array.
+    BSONArrayBuilder childrenBob(bob->subarrayStart("inputStages"));
+    for (auto&& child : node->children) {
+        BSONObjBuilder childBob(childrenBob.subobjStart());
+        statsToBSON(child.get(), &childBob, topLevelBob);
+    }
+    childrenBob.doneFast();
 }
 
-void PlanExplainerSBE::getSummaryStats(PlanSummaryStats* statsOut) const {
-    invariant(statsOut);
+PlanExplainerSBEBase::PlanExplainerSBEBase(
+    const sbe::PlanStage* root,
+    const stage_builder::PlanStageData* data,
+    const QuerySolution* solution,
+    bool isMultiPlan,
+    bool isCachedPlan,
+    boost::optional<size_t> cachedPlanHash,
+    std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo,
+    RemoteExplainVector* remoteExplains)
+    : PlanExplainer{solution},
+      _root{root},
+      _rootData{data},
+      _isMultiPlan{isMultiPlan},
+      _isFromPlanCache{isCachedPlan},
+      _cachedPlanHash{cachedPlanHash},
+      _debugInfo{debugInfo},
+      _remoteExplains{remoteExplains} {
+    tassert(5968203, "_debugInfo should not be null", _debugInfo);
+};
 
-    if (!_solution || !_root) {
+const PlanExplainer::ExplainVersion& PlanExplainerSBEBase::getVersion() const {
+    static const ExplainVersion kExplainVersionForStageBuilders = "2";
+    return kExplainVersionForStageBuilders;
+}
+
+bool PlanExplainerSBEBase::matchesCachedPlan() const {
+    return _cachedPlanHash && (*_cachedPlanHash == _solution->hash());
+};
+
+std::string PlanExplainerSBEBase::getPlanSummary() const {
+    return _debugInfo->planSummary;
+}
+
+void PlanExplainerSBEBase::getSummaryStats(PlanSummaryStats* statsOut) const {
+    tassert(6466201, "statsOut should be a valid pointer", statsOut);
+
+    if (!_root) {
         return;
     }
 
@@ -420,6 +579,7 @@ void PlanExplainerSBE::getSummaryStats(PlanSummaryStats* statsOut) const {
     auto common = _root->getCommonStats();
     statsOut->nReturned = common->advances;
     statsOut->fromMultiPlanner = isMultiPlan();
+    statsOut->fromPlanCache = isFromCache();
     statsOut->totalKeysExamined = 0;
     statsOut->totalDocsExamined = 0;
     statsOut->replanReason = _rootData->replanReason;
@@ -428,124 +588,100 @@ void PlanExplainerSBE::getSummaryStats(PlanSummaryStats* statsOut) const {
     auto visitor = PlanSummaryStatsVisitor(*statsOut);
     _root->accumulate(kEmptyPlanNodeId, &visitor);
 
-    std::queue<const QuerySolutionNode*> queue;
-    queue.push(_solution->root());
+    // Use the pre-computed summary stats instead of traversing the QuerySolution tree.
+    const auto& indexesUsed = _debugInfo->mainStats.indexesUsed;
+    statsOut->indexesUsed.clear();
+    statsOut->indexesUsed.insert(indexesUsed.begin(), indexesUsed.end());
+    statsOut->collectionScans = _debugInfo->mainStats.collectionScans;
+    statsOut->collectionScansNonTailable = _debugInfo->mainStats.collectionScansNonTailable;
+}
 
-    // Look through the QuerySolution to collect some static stat details.
-    while (!queue.empty()) {
-        auto node = queue.front();
-        queue.pop();
-        invariant(node);
+void PlanExplainerSBEBase::getSecondarySummaryStats(const NamespaceString& secondaryColl,
+                                                    PlanSummaryStats* statsOut) const {
+    tassert(6466202, "statsOut should be a valid pointer", statsOut);
 
-        switch (node->getType()) {
-            case STAGE_COUNT_SCAN: {
-                auto csn = static_cast<const CountScanNode*>(node);
-                statsOut->indexesUsed.insert(csn->index.identifier.catalogName);
-                break;
-            }
-            case STAGE_DISTINCT_SCAN: {
-                auto dn = static_cast<const DistinctNode*>(node);
-                statsOut->indexesUsed.insert(dn->index.identifier.catalogName);
-                break;
-            }
-            case STAGE_GEO_NEAR_2D: {
-                auto geo2d = static_cast<const GeoNear2DNode*>(node);
-                statsOut->indexesUsed.insert(geo2d->index.identifier.catalogName);
-                break;
-            }
-            case STAGE_GEO_NEAR_2DSPHERE: {
-                auto geo2dsphere = static_cast<const GeoNear2DSphereNode*>(node);
-                statsOut->indexesUsed.insert(geo2dsphere->index.identifier.catalogName);
-                break;
-            }
-            case STAGE_IXSCAN: {
-                auto ixn = static_cast<const IndexScanNode*>(node);
-                statsOut->indexesUsed.insert(ixn->index.identifier.catalogName);
-                break;
-            }
-            case STAGE_TEXT_MATCH: {
-                auto tn = static_cast<const TextMatchNode*>(node);
-                statsOut->indexesUsed.insert(tn->index.identifier.catalogName);
-                break;
-            }
-            case STAGE_COLLSCAN: {
-                statsOut->collectionScans++;
-                auto csn = static_cast<const CollectionScanNode*>(node);
-                if (!csn->tailable) {
-                    statsOut->collectionScansNonTailable++;
-                }
-            }
-            default:
-                break;
-        }
-
-        for (auto&& child : node->children) {
-            queue.push(child);
-        }
+    // Use the pre-computed summary stats instead of traversing the QuerySolution tree.
+    const auto& entry = _debugInfo->secondaryStats.find(secondaryColl);
+    // The secondary collection stats may not be filled in debugInfo if the SBE engine is only
+    // responsible for the subtree of the query.
+    if (entry != _debugInfo->secondaryStats.end()) {
+        const auto& secondaryStats = entry->second;
+        const auto& indexesUsed = secondaryStats.indexesUsed;
+        statsOut->indexesUsed.insert(indexesUsed.begin(), indexesUsed.end());
+        statsOut->collectionScans += secondaryStats.collectionScans;
+        statsOut->collectionScansNonTailable += secondaryStats.collectionScansNonTailable;
     }
 }
 
-PlanExplainer::PlanStatsDetails PlanExplainerSBE::getWinningPlanStats(
+PlanExplainer::PlanStatsDetails PlanExplainerSBEBase::getWinningPlanStats(
     ExplainOptions::Verbosity verbosity) const {
-    invariant(_root);
-    invariant(_solution);
+    tassert(9378606, "encountered unexpected nullptr for root PlanStage", _root);
     auto stats = _root->getStats(true /* includeDebugInfo  */);
-    return buildPlanStatsDetails(
-        _solution, stats.get(), buildExecPlanDebugInfo(_root, _rootData), verbosity);
+    tassert(9378611, "encountered unexpected nullptr for PlanStageStats", stats);
+
+    return buildPlanStatsDetails(_solution,
+                                 *stats,
+                                 _root,
+                                 _rootData,
+                                 boost::none /* planSummary */,
+                                 boost::none /* queryParams */,
+                                 buildRemotePlanInfo(),
+                                 verbosity,
+                                 matchesCachedPlan());
 }
 
-PlanExplainer::PlanStatsDetails PlanExplainerSBE::getWinningPlanTrialStats() const {
-    invariant(_rootData);
-    if (_rootData->savedStatsOnEarlyExit) {
-        invariant(_solution);
-        return buildPlanStatsDetails(
-            _solution,
-            _rootData->savedStatsOnEarlyExit.get(),
-            // This parameter is not used in `buildPlanStatsDetails` if the last parameter is
-            // `ExplainOptions::Verbosity::kExecAllPlans`, as is the case here.
-            boost::none,
-            ExplainOptions::Verbosity::kExecAllPlans);
+boost::optional<BSONArray> PlanExplainerSBEBase::buildRemotePlanInfo() const {
+    if (!_remoteExplains) {
+        return boost::none;
     }
-    return getWinningPlanStats(ExplainOptions::Verbosity::kExecAllPlans);
+    BSONArrayBuilder arrBuilder;
+    for (const auto& explain : *_remoteExplains) {
+        arrBuilder << explain;
+    }
+    return arrBuilder.arr();
 }
 
-std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerSBE::getRejectedPlansStats(
+PlanExplainerClassicRuntimePlannerForSBE::PlanExplainerClassicRuntimePlannerForSBE(
+    const sbe::PlanStage* root,
+    const stage_builder::PlanStageData* data,
+    const QuerySolution* solution,
+    bool isMultiPlan,
+    bool isCachedPlan,
+    boost::optional<size_t> cachedPlanHash,
+    std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo,
+    std::unique_ptr<PlanStage> classicRuntimePlannerStage,
+    RemoteExplainVector* remoteExplains)
+    : PlanExplainerSBEBase{root,
+                           data,
+                           solution,
+                           isMultiPlan,
+                           isCachedPlan,
+                           cachedPlanHash,
+                           std::move(debugInfo),
+                           remoteExplains},
+      _classicRuntimePlannerStage{std::move(classicRuntimePlannerStage)},
+      _classicRuntimePlannerExplainer{
+          _classicRuntimePlannerStage  // If there were no multi-planning, this will be nullptr.
+              ? plan_explainer_factory::make(_classicRuntimePlannerStage.get(), cachedPlanHash)
+              : nullptr} {
+    if (_classicRuntimePlannerExplainer) {
+        _classicRuntimePlannerExplainer->updateEnumeratorExplainInfo(
+            _solution->_enumeratorExplainInfo);
+    }
+}
+
+PlanExplainer::PlanStatsDetails PlanExplainerClassicRuntimePlannerForSBE::getWinningPlanTrialStats()
+    const {
+    return _classicRuntimePlannerExplainer
+        ? _classicRuntimePlannerExplainer->getWinningPlanTrialStats()
+        : PlanExplainer::PlanStatsDetails{};
+}
+
+std::vector<PlanExplainer::PlanStatsDetails>
+PlanExplainerClassicRuntimePlannerForSBE::getRejectedPlansStats(
     ExplainOptions::Verbosity verbosity) const {
-    if (_rejectedCandidates.empty()) {
-        return {};
-    }
-
-    std::vector<PlanStatsDetails> res;
-    res.reserve(_rejectedCandidates.size());
-    for (auto&& candidate : _rejectedCandidates) {
-        invariant(candidate.root);
-        invariant(candidate.solution);
-
-        auto stats = candidate.root->getStats(true /* includeDebugInfo  */);
-        auto execPlanDebugInfo = buildExecPlanDebugInfo(candidate.root.get(), &candidate.data);
-        res.push_back(buildPlanStatsDetails(
-            candidate.solution.get(), stats.get(), execPlanDebugInfo, verbosity));
-    }
-    return res;
-}
-
-std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerSBE::getCachedPlanStats(
-    const plan_cache_debug_info::DebugInfo& debugInfo, ExplainOptions::Verbosity verbosity) const {
-    const auto& decision = *debugInfo.decision;
-    std::vector<PlanStatsDetails> res;
-
-    auto&& stats = decision.getStats<mongo::sbe::PlanStageStats>();
-    if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-        for (auto&& planStats : stats.candidatePlanStats) {
-            res.push_back(buildPlanStatsDetails(nullptr, planStats.get(), boost::none, verbosity));
-        }
-    } else {
-        // At the "queryPlanner" verbosity we only need to provide details about the winning plan
-        // when explaining from the plan cache.
-        invariant(verbosity == ExplainOptions::Verbosity::kQueryPlanner);
-        res.push_back({stats.serializedWinningPlan, boost::none});
-    }
-
-    return res;
+    return _classicRuntimePlannerExplainer
+        ? _classicRuntimePlannerExplainer->getRejectedPlansStats(verbosity)
+        : std::vector<PlanExplainer::PlanStatsDetails>{};
 }
 }  // namespace mongo

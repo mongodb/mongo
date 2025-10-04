@@ -26,29 +26,26 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import time
-from helper import copy_wiredtiger_home
-import wiredtiger, wttest
+import wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 from wiredtiger import stat
 from helper import simulate_crash_restart
-from test_rollback_to_stable01 import test_rollback_to_stable_base
+from rollback_to_stable_util import test_rollback_to_stable_base
 
 # Test that rollback to stable does not open any dhandles that don't have unstable updates.
 class test_rollback_to_stable20(test_rollback_to_stable_base):
-    session_config = 'isolation=snapshot'
 
     format_values = [
         ('column', dict(key_format='r', value_format='S')),
         ('column_fix', dict(key_format='r', value_format='8t')),
-        ('integer_row', dict(key_format='i', value_format='S')),
+        ('row_integer', dict(key_format='i', value_format='S')),
     ]
 
     scenarios = make_scenarios(format_values)
 
     def conn_config(self):
-        config = 'cache_size=50MB,statistics=(all)'
+        config = 'cache_size=50MB,statistics=(all),verbose=(rts:5)'
         return config
 
     def test_rollback_to_stable(self):
@@ -56,9 +53,7 @@ class test_rollback_to_stable20(test_rollback_to_stable_base):
         ntables = 100
         create_params = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         uri = "table:rollback_to_stable20"
-        ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
-            config='log=(enabled=false)')
+        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format)
         ds.populate()
 
         if self.value_format == '8t':
@@ -89,6 +84,3 @@ class test_rollback_to_stable20(test_rollback_to_stable_base):
         stat_cursor.close()
 
         self.assertLess(open_dhandle_count, 5)
-
-if __name__ == '__main__':
-    wttest.run()

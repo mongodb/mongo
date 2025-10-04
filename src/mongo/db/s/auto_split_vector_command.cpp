@@ -27,17 +27,48 @@
  *    it in the license file.
  */
 
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/s/auto_split_vector.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/topology/cluster_role.h"
+#include "mongo/db/topology/sharding_state.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/s/request_types/auto_split_vector_gen.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <fmt/format.h>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/s/auto_split_vector.h"
-#include "mongo/db/s/sharding_state.h"
-#include "mongo/logv2/log.h"
-#include "mongo/s/request_types/auto_split_vector_gen.h"
 
 namespace mongo {
 namespace {
+
+static constexpr int64_t kSmallestChunkSizeBytesSupported = 1024 * 1024;
+static constexpr int64_t kBiggestChunkSizeBytesSupported = 1024 * 1024 * 1024;
+
+std::string rangeString(const BSONObj& min, const BSONObj& max) {
+    std::ostringstream os;
+    os << "{min: " << min.toString() << " , max" << max.toString() << " }";
+    return os.str();
+}
 
 class AutoSplitVectorCommand final : public TypedCommand<AutoSplitVectorCommand> {
 public:
@@ -65,21 +96,43 @@ public:
         Response typedRun(OperationContext* opCtx) {
             uassert(ErrorCodes::IllegalOperation,
                     "The autoSplitVector command can only be invoked on shards (no CSRS).",
-                    serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+                    serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
 
-            uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
-            opCtx->setAlwaysInterruptAtStepDownOrUp();
+            ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
+            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
             const auto& req = request();
 
-            auto splitKeys = autoSplitVector(opCtx,
-                                             ns(),
-                                             req.getKeyPattern(),
-                                             req.getMin(),
-                                             req.getMax(),
-                                             req.getMaxChunkSizeBytes());
+            uassert(ErrorCodes::ErrorCodes::InvalidOptions,
+                    str::stream() << "maxChunksSizeBytes must lie within the range ["
+                                  << kSmallestChunkSizeBytesSupported / (1024 * 1024) << "MB, "
+                                  << kBiggestChunkSizeBytesSupported / (1024 * 1024) << "MB]",
+                    req.getMaxChunkSizeBytes() >= kSmallestChunkSizeBytesSupported &&
+                        req.getMaxChunkSizeBytes() <= kBiggestChunkSizeBytesSupported);
 
-            return splitKeys;
+            const auto acquisition =
+                acquireCollection(opCtx,
+                                  CollectionAcquisitionRequest::fromOpCtx(
+                                      opCtx, ns(), AcquisitionPrerequisites::kRead),
+                                  MODE_IS);
+            uassert(ErrorCodes::InvalidOptions,
+                    fmt::format(
+                        "The range {} for the namespace {} is required to be owned by one shard",
+                        rangeString(req.getMin(), req.getMax()),
+                        ns().toStringForErrorMsg()),
+                    !acquisition.getShardingDescription().isSharded() ||
+                        acquisition.getShardingFilter()->isRangeEntirelyOwned(
+                            req.getMin(), req.getMax(), false /*includeMaxBound*/));
+
+
+            auto [splitPoints, continuation] = autoSplitVector(opCtx,
+                                                               acquisition,
+                                                               req.getKeyPattern(),
+                                                               req.getMin(),
+                                                               req.getMax(),
+                                                               req.getMaxChunkSizeBytes(),
+                                                               req.getLimit());
+            return Response(std::move(splitPoints), continuation);
         }
 
     private:
@@ -95,11 +148,13 @@ public:
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",
                     AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                           ActionType::splitVector));
+                        ->isAuthorizedForActionsOnResource(
+                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                            ActionType::splitVector));
         }
     };
-} autoSplitVectorCommand;
+};
+MONGO_REGISTER_COMMAND(AutoSplitVectorCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

@@ -29,9 +29,15 @@
 
 #pragma once
 
+#include "mongo/db/client.h"
 #include "mongo/db/s/server_transaction_coordinators_metrics.h"
 #include "mongo/db/s/single_transaction_coordinator_stats.h"
 #include "mongo/db/s/transaction_coordinator.h"
+#include "mongo/db/s/transaction_coordinator_document_gen.h"
+#include "mongo/util/tick_source.h"
+#include "mongo/util/time_support.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -55,47 +61,13 @@ public:
     void onRecoveryFromFailover();
 
     /**
-     * Updates relevant metrics when a transaction coordinator is about to write the participant
-     * list.
+     * Updates relevant metrics when a transaction coordinator is about to start a new step.
      */
-    void onStartWritingParticipantList(
-        ServerTransactionCoordinatorsMetrics* serverTransactionCoordinatorMetrics,
-        TickSource* tickSource,
-        Date_t curWallClockTime);
-
-    /**
-     * Updates relevant metrics when a transaction coordinator is about to send 'prepare' and start
-     * waiting for votes (i.e., 'prepare' responses).
-     */
-    void onStartWaitingForVotes(
-        ServerTransactionCoordinatorsMetrics* serverTransactionCoordinatorMetrics,
-        TickSource* tickSource,
-        Date_t curWallClockTime);
-
-    /**
-     * Updates relevant metrics when a transaction coordinator is about to write the decision.
-     */
-    void onStartWritingDecision(
-        ServerTransactionCoordinatorsMetrics* serverTransactionCoordinatorMetrics,
-        TickSource* tickSource,
-        Date_t curWallClockTime);
-
-    /**
-     * Updates relevant metrics when a transaction coordinator is about to send the decision to
-     * participants and start waiting for acknowledgements.
-     */
-    void onStartWaitingForDecisionAcks(
-        ServerTransactionCoordinatorsMetrics* serverTransactionCoordinatorMetrics,
-        TickSource* tickSource,
-        Date_t curWallClockTime);
-
-    /**
-     * Updates relevant metrics when a transaction coordinator is about to delete its durable state.
-     */
-    void onStartDeletingCoordinatorDoc(
-        ServerTransactionCoordinatorsMetrics* serverTransactionCoordinatorMetrics,
-        TickSource* tickSource,
-        Date_t curWallClockTime);
+    void onStartStep(TransactionCoordinator::Step step,
+                     TransactionCoordinator::Step previousStep,
+                     ServerTransactionCoordinatorsMetrics* serverTransactionCoordinatorMetrics,
+                     TickSource* tickSource,
+                     Date_t curWallClockTime);
 
     /**
      * Updates relevant metrics when a transaction coordinator is destroyed.
@@ -116,7 +88,6 @@ public:
     const SingleTransactionCoordinatorStats& getSingleTransactionCoordinatorStats() const {
         return _singleTransactionCoordinatorStats;
     }
-
 
     /**
      * Save information about the last client that interacted with this transaction.

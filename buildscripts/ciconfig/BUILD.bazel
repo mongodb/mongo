@@ -1,0 +1,21 @@
+load("@poetry//:dependencies.bzl", "dependency")
+
+py_library(
+    name = "ciconfig",
+    srcs = [
+        "__init__.py",
+        "evergreen.py",
+        "yaml_load.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "structlog",
+            group = "evergreen",
+        ),
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+    ],
+)

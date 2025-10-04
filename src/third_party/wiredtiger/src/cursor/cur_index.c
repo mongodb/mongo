@@ -19,7 +19,7 @@ __curindex_get_value(WT_CURSOR *cursor, ...)
     WT_SESSION_IMPL *session;
     va_list ap;
 
-    JOINABLE_CURSOR_API_CALL(cursor, session, get_value, NULL);
+    CURSOR_API_CALL(cursor, session, ret, get_value, NULL);
 
     va_start(ap, cursor);
     ret = __wt_curindex_get_valuev(cursor, ap);
@@ -41,7 +41,7 @@ __curindex_set_valuev(WT_CURSOR *cursor, va_list ap)
 
     WT_UNUSED(ap);
 
-    JOINABLE_CURSOR_API_CALL(cursor, session, set_value, NULL);
+    CURSOR_API_CALL(cursor, session, ret, set_value, NULL);
     WT_ERR_MSG(session, ENOTSUP, "WT_CURSOR.set_value not supported for index cursors");
 
 err:
@@ -76,7 +76,7 @@ __curindex_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
     WT_SESSION_IMPL *session;
 
     cindex = (WT_CURSOR_INDEX *)a;
-    JOINABLE_CURSOR_API_CALL(a, session, compare, NULL);
+    CURSOR_API_CALL(a, session, ret, compare, NULL);
 
     /* Check both cursors are "index:" type. */
     if (!WT_PREFIX_MATCH(a->uri, "index:") || strcmp(a->uri, b->uri) != 0)
@@ -147,7 +147,7 @@ __curindex_next(WT_CURSOR *cursor)
     WT_SESSION_IMPL *session;
 
     cindex = (WT_CURSOR_INDEX *)cursor;
-    JOINABLE_CURSOR_API_CALL(cursor, session, next, NULL);
+    CURSOR_API_CALL(cursor, session, ret, next, NULL);
     F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
     if ((ret = cindex->child->next(cindex->child)) == 0)
@@ -169,7 +169,7 @@ __curindex_prev(WT_CURSOR *cursor)
     WT_SESSION_IMPL *session;
 
     cindex = (WT_CURSOR_INDEX *)cursor;
-    JOINABLE_CURSOR_API_CALL(cursor, session, prev, NULL);
+    CURSOR_API_CALL(cursor, session, ret, prev, NULL);
     F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
     if ((ret = cindex->child->prev(cindex->child)) == 0)
@@ -193,7 +193,7 @@ __curindex_reset(WT_CURSOR *cursor)
     u_int i;
 
     cindex = (WT_CURSOR_INDEX *)cursor;
-    JOINABLE_CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, reset, NULL);
+    CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, reset, NULL);
     F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
     WT_TRET(cindex->child->reset(cindex->child));
@@ -203,6 +203,13 @@ __curindex_reset(WT_CURSOR *cursor)
         WT_TRET((*cp)->reset(*cp));
     }
 
+    /*
+     * The bounded cursor API clears bounds on external calls to cursor->reset. We determine this by
+     * guarding the call to cursor bound reset with the API_USER_ENTRY macro. Doing so prevents
+     * internal API calls from resetting cursor bounds unintentionally, e.g. cursor->remove.
+     */
+    if (API_USER_ENTRY(session))
+        __wt_cursor_bound_reset(cindex->child);
 err:
     API_END_RET(session, ret);
 }
@@ -223,7 +230,7 @@ __curindex_search(WT_CURSOR *cursor)
 
     cindex = (WT_CURSOR_INDEX *)cursor;
     child = cindex->child;
-    JOINABLE_CURSOR_API_CALL(cursor, session, search, NULL);
+    CURSOR_API_CALL(cursor, session, ret, search, NULL);
 
     /*
      * We are searching using the application-specified key, which (usually) doesn't contain the
@@ -292,7 +299,7 @@ __curindex_search_near(WT_CURSOR *cursor, int *exact)
 
     cindex = (WT_CURSOR_INDEX *)cursor;
     child = cindex->child;
-    JOINABLE_CURSOR_API_CALL(cursor, session, search, NULL);
+    CURSOR_API_CALL(cursor, session, ret, search_near, NULL);
 
     /*
      * We are searching using the application-specified key, which (usually) doesn't contain the
@@ -348,6 +355,123 @@ err:
 }
 
 /*
+ * __increment_bound_array --
+ *     Increment the given buffer by one bit, return true if we incremented the buffer or not. If
+ *     all of the values inside the buffer are UINT8_MAX value we do not increment the buffer.
+ */
+static WT_INLINE bool
+__increment_bound_array(WT_ITEM *user_item)
+{
+    size_t i, usz;
+    uint8_t *userp;
+
+    usz = user_item->size;
+    userp = (uint8_t *)user_item->data;
+    /*
+     * First loop through all max values on the buffer from the end. This is to find the appropriate
+     * position to increment add one to the byte.
+     */
+    for (i = usz - 1; i > 0 && userp[i] == UINT8_MAX; --i)
+        ;
+
+    /*
+     * If all of the buffer are max values, we don't need to do increment the buffer as the key
+     * format is a fixed length format. Ideally we double check that the table format has a fixed
+     * length string.
+     */
+    if (i == 0 && userp[i] == UINT8_MAX)
+        return (false);
+
+    userp[i++] += 1;
+    for (; i < usz; ++i)
+        userp[i] = 0;
+    return (true);
+}
+
+/*
+ * __curindex_bound --
+ *     WT_CURSOR->bound method for the index cursor type.
+ *
+ */
+static int
+__curindex_bound(WT_CURSOR *cursor, const char *config)
+{
+    WT_CONFIG_ITEM cval;
+    WT_CURSOR *child;
+    WT_CURSOR_BOUNDS_STATE saved_bounds;
+    WT_CURSOR_INDEX *cindex;
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+    bool inclusive;
+
+    cindex = (WT_CURSOR_INDEX *)cursor;
+    child = cindex->child;
+    WT_CLEAR(saved_bounds);
+    inclusive = false;
+
+    CURSOR_API_CALL_CONF(cursor, session, ret, bound, config, cfg, NULL);
+
+    /* Save the current state of the bounds in case we fail to apply the new state. */
+    WT_ERR(__wt_cursor_bounds_save(session, child, &saved_bounds));
+
+    WT_ERR(__wt_config_gets(session, cfg, "action", &cval));
+
+    /* When setting bounds, we need to check that the key is set. */
+    if (WT_CONFIG_LIT_MATCH("set", cval)) {
+        WT_ERR(__cursor_checkkey(cursor));
+
+        /* Point the public cursor to the key in the child. */
+        __wt_cursor_set_raw_key(child, &cursor->key);
+
+        WT_ERR(__wt_config_gets(session, cfg, "inclusive", &cval));
+        inclusive = cval.val != 0;
+
+        /* Check if we have set the lower bound or upper bound. */
+        WT_ERR(__wt_config_gets(session, cfg, "bound", &cval));
+    }
+
+    WT_ERR(child->bound(child, config));
+
+    /*
+     * Index tables internally combines the user chosen columns with the key format of the table to
+     * maintain uniqueness between each key. However user's are not aware of the combining the key
+     * format and cannot set bounds based on the combined index format. Therefore WiredTiger needs
+     * to internally fix this by incrementing one bit to the array in two cases:
+     *  1. If the set bound is lower and it is not inclusive.
+     *  2. If the set bound is upper and it is inclusive.
+     */
+    if (WT_CONFIG_LIT_MATCH("lower", cval) && !inclusive) {
+        /*
+         * In the case that we can't increment the lower bound, it means we have reached the max
+         * possible key for the lower bound. This is a very tricky case since there isn't a trivial
+         * way to set the lower bound to a key exclusively not show the max possible key. This is
+         * due to how index key formats are combined with the main table's key format. In this edge
+         * case we expect no entries to be returned, thus we return it back to the user with an
+         * error instead.
+         */
+        if (!__increment_bound_array(&child->lower_bound)) {
+            WT_ERR(__wt_cursor_bounds_restore(session, child, &saved_bounds));
+            WT_ERR_MSG(session, EINVAL,
+              "Cannot set index cursors with the max possible key as the lower bound");
+        }
+    }
+
+    if (WT_CONFIG_LIT_MATCH("upper", cval) && inclusive) {
+        /*
+         * In the case that we can't increment the upper bound, it means we have reached the max
+         * possible key for the upper bound. In that case we can just clear upper bound.
+         */
+        if (!__increment_bound_array(&child->upper_bound))
+            WT_ERR(child->bound(child, "action=clear,bound=upper"));
+    }
+err:
+
+    __wt_scr_free(session, &saved_bounds.lower_bound);
+    __wt_scr_free(session, &saved_bounds.upper_bound);
+    API_END_RET(session, ret);
+}
+
+/*
  * __curindex_close --
  *     WT_CURSOR->close method for index cursors.
  */
@@ -363,10 +487,10 @@ __curindex_close(WT_CURSOR *cursor)
 
     cindex = (WT_CURSOR_INDEX *)cursor;
     idx = cindex->index;
-    JOINABLE_CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, close, NULL);
+    CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, close, NULL);
 err:
 
-    if ((cp = cindex->cg_cursors) != NULL)
+    if (cindex->cg_cursors != NULL)
         for (i = 0, cp = cindex->cg_cursors; i < WT_COLGROUPS(cindex->table); i++, cp++)
             if (*cp != NULL) {
                 WT_TRET((*cp)->close(*cp));
@@ -438,6 +562,7 @@ __wt_curindex_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, 
 {
     WT_CURSOR_STATIC_INIT(iface, __wt_cursor_get_key, /* get-key */
       __curindex_get_value,                           /* get-value */
+      __wti_cursor_get_raw_key_value_notsup,          /* get-raw-key-value */
       __wt_cursor_set_key,                            /* set-key */
       __curindex_set_value,                           /* set-value */
       __curindex_compare,                             /* compare */
@@ -452,10 +577,12 @@ __wt_curindex_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, 
       __wt_cursor_notsup,                             /* update */
       __wt_cursor_notsup,                             /* remove */
       __wt_cursor_notsup,                             /* reserve */
-      __wt_cursor_reconfigure_notsup,                 /* reconfigure */
+      __wt_cursor_config_notsup,                      /* reconfigure */
       __wt_cursor_notsup,                             /* largest_key */
+      __curindex_bound,                               /* bound */
       __wt_cursor_notsup,                             /* cache */
       __wt_cursor_reopen_notsup,                      /* reopen */
+      __wt_cursor_checkpoint_id,                      /* checkpoint ID */
       __curindex_close);                              /* close */
     WT_CURSOR_INDEX *cindex;
     WT_CURSOR *cursor;

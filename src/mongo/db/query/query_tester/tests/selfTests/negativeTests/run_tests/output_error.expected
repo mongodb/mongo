@@ -1,0 +1,24 @@
+output_error
+negative_test
+test.coll as coll
+
+// This test should execute successfully and be numbered 0.
+0
+:sortFull { "aggregate" : "coll", "pipeline" : [ { "$addFields" : { "projected" : { "$toString": "$value" } } } ], cursor: {} }
+[
+{"_id":0,"projected":"a","value":"a"},
+{"_id":1,"projected":"b","value":"b"}
+]
+
+// This test should fail and be numbered 1.
+1
+:sortFull { "aggregate" : "coll", "pipeline" : [ { "$addFields" : { "projected" : { "$toDate": "$value" } } } ], cursor: {} }
+Failed to execute test number 1. Expected OK command result but got { ok: 0.0, errmsg: "Executor error during aggregate command on namespace: negative_test.coll :: caused by :: an incomplete date/time string has been found, with elements ...", code: 241, codeName: "ConversionFailure" }
+
+// This test should execute successfully and be numbered 2.
+2
+:sortFull { "aggregate" : "coll", "pipeline" : [ { "$addFields" : { "projected" : { "$toLong": "$_id" } } } ], cursor: {} }
+[
+{"_id":0,"projected":0,"value":"a"},
+{"_id":1,"projected":1,"value":"b"}
+]

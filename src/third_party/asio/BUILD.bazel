@@ -1,0 +1,75 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+mongo_cc_library(
+    name = "asio",
+    srcs = [
+        "dist/asio/src/asio.cpp",
+    ],
+    hdrs = glob([
+        "dist/asio/include/**/*.hpp",
+        "dist/asio/include/**/*.ipp",
+    ]),
+    defines = [
+        # Instruct ASIO not to depend on Boost. ASIO is also included as part
+        # of Boost, but we don't use that version. We use this "standalone"
+        # version.
+        "ASIO_STANDALONE",
+        # Build ASIO as one translation unit (dist/asio/src/asio.cpp) rather
+        # than expanding all definitions inline everywhere asio/* headers are
+        # included.
+        "ASIO_SEPARATE_COMPILATION",
+        # Many functions in ASIO used to report errors by returning
+        # `error_code` values. This was then changed to a convention of
+        # reporting errors via an `error_code&` output parameter instead. To
+        # ease the migration, ASIO defined an error return type macro that
+        # expands to `error_code` in a backward compatible build configuration
+        # but expands to `void` in a strict build configuration.
+        # `ASIO_NO_DEPRECATED` is the strict build configuration.
+        "ASIO_NO_DEPRECATED",
+    ],
+    includes = [
+        "dist/asio/include",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "asio_compilation_test",
+    srcs = [
+        "test/compilation_test.cpp",
+    ],
+    tags = ["mongo_unittest_seventh_group"],
+    deps = [
+        ":asio",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "asio_local_endpoint_test",
+    srcs = [
+        "test/local_endpoint_test.cpp",
+    ],
+    tags = ["mongo_unittest_fifth_group"],
+    deps = [":asio"],
+)
+
+mongo_cc_unit_test(
+    name = "asio_socket_timeout_test",
+    srcs = [
+        "test/socket_timeout_test.cpp",
+    ],
+    tags = [
+        "incompatible_with_bazel_remote_test",
+        "mongo_unittest_fourth_group",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:remote_test_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":asio",
+        "//src/mongo:base",
+        "//src/mongo/transport/asio:asio_socket_test_util",
+    ],
+)

@@ -29,15 +29,23 @@
 
 #pragma once
 
-namespace mongo {
+#include "mongo/base/status.h"
+#include "mongo/db/database_name.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
+
+namespace MONGO_MOD_PUB mongo {
 
 class BSONObj;
+
 class OperationContext;
 class Status;
 template <typename T>
 class StatusWith;
+
 enum class PrepareConflictBehavior;
 class StringData;
+
 namespace repl {
 class ReadConcernArgs;
 class SpeculativeMajorityReadInfo;
@@ -65,7 +73,7 @@ void setPrepareConflictBehaviorForReadConcern(OperationContext* opCtx,
  */
 Status waitForReadConcern(OperationContext* opCtx,
                           const repl::ReadConcernArgs& readConcernArgs,
-                          StringData dbName,
+                          const DatabaseName& dbName,
                           bool allowAfterClusterTime);
 
 /*
@@ -75,7 +83,7 @@ Status waitForReadConcern(OperationContext* opCtx,
  * A readConcernTimeout of 0 indicates that the operation will block indefinitely waiting for read
  * concern.
  */
-Status waitForLinearizableReadConcern(OperationContext* opCtx, int readConcernTimeout);
+Status waitForLinearizableReadConcern(OperationContext* opCtx, Milliseconds readConcernTimeout);
 
 /**
  * Waits to satisfy a "speculative" majority read.
@@ -85,4 +93,4 @@ Status waitForLinearizableReadConcern(OperationContext* opCtx, int readConcernTi
 Status waitForSpeculativeMajorityReadConcern(OperationContext* opCtx,
                                              repl::SpeculativeMajorityReadInfo speculativeReadInfo);
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

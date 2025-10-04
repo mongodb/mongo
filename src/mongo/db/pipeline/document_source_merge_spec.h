@@ -29,13 +29,20 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/document_source_merge_modes_gen.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/util/serialization_context.h"
+
 #include <string>
 #include <vector>
 
-#include "mongo/base/string_data.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/document_source_merge_modes_gen.h"
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 class BSONObjBuilder;
@@ -54,8 +61,12 @@ struct MergeWhenMatchedPolicy {
  */
 void mergeTargetNssSerializeToBSON(const NamespaceString& targetNss,
                                    StringData fieldName,
-                                   BSONObjBuilder* bob);
-NamespaceString mergeTargetNssParseFromBSON(const BSONElement& elem);
+                                   BSONObjBuilder* bob,
+                                   const SerializationContext& sc,
+                                   const SerializationOptions& opts);
+NamespaceString mergeTargetNssParseFromBSON(boost::optional<TenantId> tenantId,
+                                            const BSONElement& elem,
+                                            const SerializationContext& sc);
 
 /**
  * Serialize and deserialize functions for the $merge stage 'on' field which can be a single string
@@ -63,7 +74,8 @@ NamespaceString mergeTargetNssParseFromBSON(const BSONElement& elem);
  */
 void mergeOnFieldsSerializeToBSON(const std::vector<std::string>& fields,
                                   StringData fieldName,
-                                  BSONObjBuilder* bob);
+                                  BSONObjBuilder* bob,
+                                  const SerializationOptions& opts = {});
 std::vector<std::string> mergeOnFieldsParseFromBSON(const BSONElement& elem);
 
 /**

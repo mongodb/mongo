@@ -1,0 +1,8 @@
+create_table(2, table2, Q, Q)
+begin_transaction(1632)
+insert(2, 1632, 586662, 363594)
+prepare_transaction(1632, 935013)
+begin_transaction(1556)
+truncate(2, 1556, 308400, 567975)
+commit_transaction(1632, 935466, 935563)
+commit_transaction(1556, 883277, 0)

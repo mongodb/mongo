@@ -1,10 +1,8 @@
 /**
  * This test simulates workflows for adding a new node and resyncing a node recommended by docs.
  */
-(function() {
-"use strict";
-
-load('jstests/replsets/rslib.js');  // waitForState.
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {disconnectSecondaries, reconnectSecondaries, waitForState} from "jstests/replsets/rslib.js";
 
 const testName = TestData.testName;
 const rst = new ReplSetTest({
@@ -13,7 +11,7 @@ const rst = new ReplSetTest({
     useBridge: true,
     // We shorten the election timeout period so the tests with an unhealthy set run and recover
     // faster.
-    settings: {electionTimeoutMillis: 2000, heartbeatIntervalMillis: 400}
+    settings: {electionTimeoutMillis: 2000, heartbeatIntervalMillis: 400},
 });
 rst.startSet();
 rst.initiate();
@@ -29,7 +27,7 @@ function testAddWithInitialSync(secondariesDown) {
     const majorityDown = secondariesDown > 1;
     if (majorityDown) {
         // Wait for the set to become unhealthy.
-        rst.waitForState(primary, ReplSetTest.State.SECONDARY);
+        rst.awaitSecondaryNodes(null, [primary]);
     }
     // Add a new, voting node.
     const newNode = rst.add({rsConfig: {priority: 0}});
@@ -39,11 +37,12 @@ function testAddWithInitialSync(secondariesDown) {
     config.members = newConfig.members;
     config.version += 1;
     jsTestLog("Reconfiguring set to add node.");
-    assert.commandWorked(primary.adminCommand(
-        {replSetReconfig: config, maxTimeMS: ReplSetTest.kDefaultTimeoutMS, force: majorityDown}));
+    assert.commandWorked(
+        primary.adminCommand({replSetReconfig: config, maxTimeMS: ReplSetTest.kDefaultTimeoutMS, force: majorityDown}),
+    );
 
     jsTestLog("Waiting for node to sync.");
-    rst.waitForState(newNode, ReplSetTest.State.SECONDARY);
+    rst.awaitSecondaryNodes(null, [newNode]);
 
     // Make sure the set is still consistent after adding the node.
     reconnectSecondaries(rst);
@@ -71,7 +70,7 @@ function testReplaceWithInitialSync(secondariesDown) {
     disconnectSecondaries(rst, secondariesDown);
     if (majorityDown) {
         // Wait for the set to become unhealthy.
-        rst.waitForState(primary, ReplSetTest.State.SECONDARY);
+        rst.awaitSecondaryNodes(null, [primary]);
     }
 
     let nodeId = rst.getNodeId(nodeToBeReplaced);
@@ -80,16 +79,18 @@ function testReplaceWithInitialSync(secondariesDown) {
     jsTestLog("Reconfiguring to remove the node.");
     config.version += 1;
     config.members.splice(nodeId, 1);
-    assert.commandWorked(primary.adminCommand(
-        {replSetReconfig: config, maxTimeMS: ReplSetTest.kDefaultTimeoutMS, force: majorityDown}));
+    assert.commandWorked(
+        primary.adminCommand({replSetReconfig: config, maxTimeMS: ReplSetTest.kDefaultTimeoutMS, force: majorityDown}),
+    );
 
     jsTestLog("Stopping node for replacement");
     rst.stop(nodeToBeReplaced, undefined, {skipValidation: true}, {forRestart: true});
     rst.remove(nodeToBeReplaced);
     if (!majorityDown) {
         // Add some data.  This can't work in a majority-down situation, so we don't do it then.
-        assert.commandWorked(testDb[testName].insert({replaceWithInitialSync: secondariesDown},
-                                                     {writeConcern: {w: 1}}));
+        assert.commandWorked(
+            testDb[testName].insert({replaceWithInitialSync: secondariesDown}, {writeConcern: {w: 1}}),
+        );
     }
 
     jsTestLog("Starting a new replacement node with empty data directory.");
@@ -105,11 +106,12 @@ function testReplaceWithInitialSync(secondariesDown) {
     config.members[nodeId]._id = highestMemberId + 1;
     config.version += 1;
     jsTestLog("Reconfiguring set to add the replacement node.");
-    assert.commandWorked(primary.adminCommand(
-        {replSetReconfig: config, maxTimeMS: ReplSetTest.kDefaultTimeoutMS, force: majorityDown}));
+    assert.commandWorked(
+        primary.adminCommand({replSetReconfig: config, maxTimeMS: ReplSetTest.kDefaultTimeoutMS, force: majorityDown}),
+    );
 
     jsTestLog("Waiting for the replacement node to sync.");
-    rst.waitForState(replacementNode, ReplSetTest.State.SECONDARY);
+    rst.awaitSecondaryNodes(null, [replacementNode]);
 
     if (!majorityDown) {
         // Make sure we can replicate to it, if the set is otherwise healthy.
@@ -148,4 +150,3 @@ jsTestLog("Test replacing a node with initial sync with two secondaries unreacha
 testReplaceWithInitialSync(2);
 
 rst.stopSet();
-})();

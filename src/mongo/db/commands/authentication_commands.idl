@@ -30,19 +30,22 @@ global:
     cpp_namespace: "mongo"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 structs:
     AuthenticateReply:
         description: "Response for MONGODB-X509 authenticate command"
         strict: true
+        is_command_reply: true
         fields:
             dbname:
                 description: "Name of the database the user is authenticating to"
                 type: "string"
+                stability: stable
             user:
                 description: "Username"
                 type: "string"
+                stability: stable
 
 commands:
     authenticate:
@@ -59,10 +62,12 @@ commands:
             mechanism:
                 description: "Mechanism used for authentication. Should be 'MONGODB-X509'."
                 type: string
+                stability: stable
             user:
                 description: "The user attempting to authenticate"
                 type: string
                 optional: true
+                stability: stable
 
     logout:
         description: "Deauthenticate from the current database"

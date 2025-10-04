@@ -29,19 +29,22 @@
 
 #pragma once
 
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+
 #include <array>
+#include <compare>
 #include <cstdint>
 #include <exception>
 #include <iomanip>
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <tuple>
+#include <utility>
 #include <vector>
 
 #include <boost/noncopyable.hpp>
-
-#include "mongo/util/assert_util.h"
-#include "mongo/util/duration.h"
 
 namespace mongo {
 namespace dns {

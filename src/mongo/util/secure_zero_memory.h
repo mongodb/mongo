@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <cstring>
+
 namespace mongo {
 
 /**

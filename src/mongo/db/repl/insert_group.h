@@ -30,9 +30,15 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/db/repl/multiapplier.h"
-#include "mongo/db/repl/oplog_applier.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_entry_or_grouped_inserts.h"
+#include "mongo/util/modules.h"
+
+#include <functional>
+#include <vector>
 
 namespace mongo {
 namespace repl {
@@ -40,7 +46,7 @@ namespace repl {
 /**
  * Groups consecutive insert operations on the same namespace and applies the combined operation
  * as a single oplog entry.
- * Advances the the std::vector<const OplogEntry*> iterator if the grouped insert is applied
+ * Advances the the std::vector<ApplierOperation> iterator if the grouped insert is applied
  * successfully.
  */
 class InsertGroup {
@@ -48,13 +54,13 @@ class InsertGroup {
     InsertGroup& operator=(const InsertGroup&) = delete;
 
 public:
-    using ConstIterator = std::vector<const OplogEntry*>::const_iterator;
+    using ConstIterator = std::vector<ApplierOperation>::const_iterator;
     using Mode = OplogApplication::Mode;
     typedef std::function<Status(
         OperationContext*, const OplogEntryOrGroupedInserts&, OplogApplication::Mode, bool)>
         ApplyFunc;
 
-    InsertGroup(std::vector<const OplogEntry*>* ops,
+    InsertGroup(std::vector<ApplierOperation>* ops,
                 OperationContext* opCtx,
                 Mode mode,
                 bool isDataConsistent,
@@ -68,9 +74,10 @@ public:
     StatusWith<ConstIterator> groupAndApplyInserts(ConstIterator oplogEntriesIterator) noexcept;
 
 private:
-    // _doNotGroupBeforePoint is used to prevent retrying bad group inserts by marking the final op
-    // of a failed group and not allowing further group inserts until that op has been processed.
-    ConstIterator _doNotGroupBeforePoint;
+    // _nextOpToGroup is used to prevent retrying bad group inserts by marking the next op to
+    // attempt group inserts and not allowing further group inserts until all previous ops have been
+    // processed.
+    ConstIterator _nextOpToGroup;
 
     // Used for constructing search bounds when grouping inserts.
     ConstIterator _end;

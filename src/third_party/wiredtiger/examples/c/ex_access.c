@@ -43,7 +43,7 @@ access_example(void)
     int ret;
 
     /* Open a connection to the database, creating it if necessary. */
-    error_check(wiredtiger_open(home, NULL, "create", &conn));
+    error_check(wiredtiger_open(home, NULL, "create,statistics=(all)", &conn));
 
     /* Open a session handle for the database. */
     error_check(conn->open_session(conn, NULL, NULL, &session));

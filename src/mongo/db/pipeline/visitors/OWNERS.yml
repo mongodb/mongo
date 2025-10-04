@@ -1,0 +1,8 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/query-optimization
+  - "*docs_needed_bounds*":
+    approvers:
+      - 10gen/query-integration-search

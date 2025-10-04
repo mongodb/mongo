@@ -27,13 +27,17 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/repl_settings.h"
 
 #include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/util/assert_util.h"
+
+#include <cstddef>
+#include <utility>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
+
 
 namespace mongo {
 namespace repl {
@@ -46,8 +50,8 @@ std::string ReplSettings::ourSetName() const {
     return _replSetString.substr(0, sl);
 }
 
-bool ReplSettings::usingReplSets() const {
-    return !_replSetString.empty();
+bool ReplSettings::isReplSet() const {
+    return !_replSetString.empty() || _shouldAutoInitiate;
 }
 
 /**
@@ -66,6 +70,14 @@ bool ReplSettings::shouldRecoverFromOplogAsStandalone() {
     return recoverFromOplogAsStandalone;
 }
 
+bool ReplSettings::shouldSkipOplogSampling() {
+    return skipOplogSampling;
+}
+
+bool ReplSettings::shouldAutoInitiate() const {
+    return _shouldAutoInitiate;
+}
+
 /**
  * Setters
  */
@@ -75,7 +87,11 @@ void ReplSettings::setOplogSizeBytes(long long oplogSizeBytes) {
 }
 
 void ReplSettings::setReplSetString(std::string replSetString) {
-    _replSetString = replSetString;
+    _replSetString = std::move(replSetString);
+}
+
+void ReplSettings::setShouldAutoInitiate() {
+    _shouldAutoInitiate = true;
 }
 
 }  // namespace repl

@@ -31,25 +31,14 @@
 
 #include "mongo/util/tick_source.h"
 
+#include <memory>
+
 namespace mongo {
 
-/**
- * Tick source based on platform specific clock ticks. Should be of reasonably high
- * performance. The maximum span measurable by the counter and convertible to microseconds
- * is about 10 trillion ticks. As long as there are fewer than 100 ticks per nanosecond,
- * timer durations of 2.5 years will be supported. Since a typical tick duration will be
- * under 10 per nanosecond, if not below 1 per nanosecond, this should not be an issue.
- */
-class SystemTickSource final : public TickSource {
-public:
-    TickSource::Tick getTicks() override;
+/** Tick source based on `std:::chrono::steady_clock`. Monotonic, cheap, and high-precision. */
+std::unique_ptr<TickSource> makeSystemTickSource();
 
-    TickSource::Tick getTicksPerSecond() override;
+/** Accesses a singleton instance made by `makeSystemTickSource`. Safe to call at any time. */
+TickSource* globalSystemTickSource();
 
-    /**
-     * Gets the singleton instance of SystemTickSource. Should not be called before
-     * the global initializers are done.
-     */
-    static SystemTickSource* get();
-};
 }  // namespace mongo

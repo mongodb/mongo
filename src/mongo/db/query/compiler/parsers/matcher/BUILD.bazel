@@ -1,0 +1,61 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "matcher_parser",
+    srcs = [
+        "expression_geo_parser.cpp",
+        "expression_parser.cpp",
+        "matcher_type_set_parser.cpp",
+    ],
+    hdrs = [
+        "expression_geo_parser.h",
+        "expression_parser.h",
+        "matcher_type_set_parser.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db/geo:geoparser",
+        "//src/mongo/db/matcher/doc_validation",
+        "//src/mongo/db/query/compiler/parsers/matcher/schema:json_schema_parser",
+        "//src/mongo/db/query/compiler/rewrites/matcher:matcher_rewrites",
+    ],
+)
+
+mongo_cc_library(
+    name = "parsed_match_expression_for_test",
+    hdrs = [
+        "parsed_match_expression_for_test.h",
+    ],
+    deps = [
+        ":matcher_parser",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "expression_parser_test",
+    srcs = [
+        "expression_parser_array_test.cpp",
+        "expression_parser_geo_test.cpp",
+        "expression_parser_leaf_test.cpp",
+        "expression_parser_schema_test.cpp",
+        "expression_parser_test.cpp",
+        "matcher_type_set_parser_test.cpp",
+        "path_accepting_keyword_test.cpp",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":matcher_parser",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+    ],
+)

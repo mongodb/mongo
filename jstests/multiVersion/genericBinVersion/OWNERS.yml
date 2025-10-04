@@ -1,0 +1,41 @@
+version: 2.0.0
+filters:
+  - "authz_schema_version.js":
+    approvers:
+      - 10gen/server-security
+  - "auto_bootstrap_upgrade_behavior.js":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "command_registration_startup_behavior_fcv.js":
+    approvers:
+      - 10gen/server-replication-reviewers
+  - "*query_stats*":
+    approvers:
+      - 10gen/query-integration-observability
+  - "example_fcv_upgrade_downgrade_test.js":
+    approvers:
+      - 10gen/server-fcv
+  - "ident_suffix_compatability.js":
+    approvers:
+      - 10gen/server-storage-engine-integration
+  - "keystring_index.js":
+    approvers:
+      - 10gen/server-storage-engine-integration
+  - "minor_version*":
+    approvers:
+      - 10gen/server-fcv
+  - "mixed_cluster_roles.js":
+    approvers:
+      - 10gen/server-replication-reviewers
+  - "mixed_replica_set_with_latest_primary.js":
+    approvers:
+      - 10gen/server-fcv
+  - "register_query_feature_flag.js":
+    approvers:
+      - 10gen/query
+  - "remove_invalid_index_options.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
+  - "upgrade_during_vectored_insert.js":
+    approvers:
+      - 10gen/server-replication-reviewers

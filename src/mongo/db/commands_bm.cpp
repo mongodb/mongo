@@ -27,12 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/idl/command_generic_argument.h"
+
+#include <string>
+#include <vector>
 
 #include <benchmark/benchmark.h>
-
-#include "mongo/base/string_data.h"
-#include "mongo/idl/command_generic_argument.h"
 
 namespace mongo {
 namespace {

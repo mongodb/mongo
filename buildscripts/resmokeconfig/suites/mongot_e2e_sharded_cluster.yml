@@ -1,0 +1,50 @@
+config_variables:
+  - &keyFile jstests/with_mongot/keyfile_for_testing
+  - &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+  - &authOptions
+    # mongos requires authenticating as the __system user using the admin database.
+    # This is different than non-sharded search e2e suites, which authenticate on
+    # the local db.
+    authenticationDatabase: admin
+    authenticationMechanism: SCRAM-SHA-256
+    password: *keyFileData
+    username: __system
+
+test_kind: js_test
+description: |
+  This suite spins up a two node sharded cluster with atlas search enabled, consisting of a
+  mongos, two mongods and two mongots. Unlike the mongot_e2e_sharded_collections suite,
+  collections are not implicitly sharded by test infrastructure.
+
+selector:
+  # IMPORTANT: THIS SUITE IS OPT-IN ONLY.
+  # We do _not_ select all the tests in the e2e directory. We assume that the hot path taken for
+  # queries in this suite matches the hot path taken in the mongot_e2e_single_shard suite,
+  # so we don't need to repeat coverage.
+  roots:
+    - jstests/with_mongot/e2e/sharding_no_passthrough/**/*.js
+
+executor:
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          auth: true
+          authMechanism: SCRAM-SHA-256
+          keyFile: *keyFile
+          keyFileData: *keyFileData
+          roleGraphInvalidationIsFatal: true
+      eval: >-
+        jsTest.authenticate(db.getMongo());
+      <<: *authOptions
+  fixture:
+    class: ShardedClusterFixture
+    auth_options: *authOptions
+    launch_mongot: true
+    num_shards: 2
+    mongod_options:
+      keyFile: *keyFile
+      set_parameters:
+        enableTestCommands: 1
+    mongos_options:
+      keyFile: *keyFile

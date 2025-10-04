@@ -1,0 +1,13 @@
+# Golden test output of SBESetWindowFieldsTest/TopNUnboundedToCurrent
+[2] project [s13 = makeBsonObj(MakeObjSpec([top2 = Set(0)], Open, NewObj, 0), s2, s12)] 
+[2] project [s12 = 
+    if exists(s9) 
+    then aggTopNFinalize(s9, s8) 
+    else null 
+] 
+[2] window [s2, s6, s10] [frameFirst[], frameLast[], lowBound{}, highBound{((s11 <=> s10) <= 0)}] [s9 = {init{[[], 0ll, 2ll, 0, 104857600, false]}, add{aggTopN(s8, null, sortKeyComponentVectorToArray(generateCheapSortKey(s8, s2)), s6)}, remove{}}] 
+[2] project [s6 = (s3 ?: null)] 
+[2] agg_project [s10 = sum(1)] 
+[1] project [s3 = getField(s2, "a"), s4 = getField(s2, "b")] 
+[1] project [s2 = getElement(s1, 0)] 
+[1] virtualscan s1 {[[{"a" : 1, "b" : 1}], [{"a" : 2, "b" : 7}], [{"a" : 3, "b" : 5}], [{"a" : 4, "b" : 3}]]} 

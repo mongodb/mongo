@@ -29,7 +29,26 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/pipeline/accumulator.h"
+#include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/window_function/window_bounds.h"
+#include "mongo/db/pipeline/window_function/window_function.h"
 #include "mongo/db/pipeline/window_function/window_function_expression.h"
+#include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
+
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::window_function {
 
@@ -68,11 +87,11 @@ public:
         MONGO_UNREACHABLE_TASSERT(5424302);
     }
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final;
+    Value serialize(const SerializationOptions& opts) const final;
 
 private:
     static boost::intrusive_ptr<Expression> parseShiftArgs(BSONObj obj,
-                                                           const mongo::StringData& accName,
+                                                           mongo::StringData accName,
                                                            ExpressionContext* expCtx);
 
     boost::optional<mongo::Value> _defaultVal;

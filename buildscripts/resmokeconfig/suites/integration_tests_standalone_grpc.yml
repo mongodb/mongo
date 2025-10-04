@@ -1,0 +1,33 @@
+test_kind: cpp_integration_test
+
+selector:
+  root: bazel-bin/install/install-mongo_integration_test_test_list.txt
+  include_files:
+    - bazel-bin/**/grpc_transport_integration_test*
+    - bazel-bin/**/executor_integration_test*
+
+executor:
+  archive:
+    hooks:
+      - ValidateCollections
+  config:
+    program_options:
+      tlsMode: "preferTLS"
+      tlsCAFile: jstests/libs/ca.pem
+      tlsCertificateKeyFile: jstests/libs/client.pem
+      useEgressGRPC: true
+  hooks:
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      set_parameters:
+        featureFlagGRPC: true
+        logComponentVerbosity:
+          command: 2
+        enableTestCommands: 1
+      tlsMode: preferTLS
+      tlsCAFile: jstests/libs/ca.pem
+      tlsCertificateKeyFile: jstests/libs/server.pem

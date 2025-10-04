@@ -29,10 +29,12 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/util/assert_util.h"
+
 #include <climits>
 #include <cstdint>
-
-#include "mongo/util/assert_util.h"
+#include <iosfwd>
 
 namespace mongo {
 
@@ -134,8 +136,8 @@ private:
     }
 
     explicit constexpr Level(ValueType value, IndexType index) : _value(value), _index(index) {
-        invariantForConstexpr(_value >= minValue());
-        invariantForConstexpr(_value <= maxValue());
+        invariant(_value >= minValue());
+        invariant(_value <= maxValue());
     }
 
     ValueType _value;

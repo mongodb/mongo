@@ -27,14 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/json.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/map_reduce_output_format.h"
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/unittest/unittest.h"
+
+#include <boost/none.hpp>
 
 using namespace std::literals::string_literals;
 

@@ -27,17 +27,19 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #ifndef MONGO_ALLOW_INCLUDE_UTIL_DNS_QUERY_PLATFORM
 #error Do not include the DNS Query platform implementation headers.  Please use "mongo/util/dns_query.h" instead.
 #endif
 
-#include <windns.h>
-
-#include <stdio.h>
+#include "mongo/util/duration.h"
+#include "mongo/util/errno_util.h"
 
 #include <array>
 #include <cassert>
 #include <cstdint>
+#include <cstdio>
 #include <exception>
 #include <iostream>
 #include <memory>
@@ -46,10 +48,9 @@
 #include <string>
 #include <vector>
 
-#include <boost/noncopyable.hpp>
+#include <windns.h>
 
-#include "mongo/util/duration.h"
-#include "mongo/util/errno_util.h"
+#include <boost/noncopyable.hpp>
 
 using std::begin;
 using std::end;
@@ -279,16 +280,16 @@ public:
                        const DNSQueryClass class_,
                        const DNSQueryType type) {
         PDNS_RECORDA queryResults;
-        auto ec = DnsQuery_UTF8(service.c_str(),
-                                WORD(type),
-                                DNS_QUERY_BYPASS_CACHE,
-                                nullptr,
-                                reinterpret_cast<PDNS_RECORD*>(&queryResults),
-                                nullptr);
-
-        if (ec) {
+        auto e = DnsQuery_UTF8(service.c_str(),
+                               WORD(type),
+                               DNS_QUERY_BYPASS_CACHE,
+                               nullptr,
+                               reinterpret_cast<PDNS_RECORD*>(&queryResults),
+                               nullptr);
+        if (e) {
+            auto ec = systemError(e);
             uasserted(ErrorCodes::DNSHostNotFound,
-                      "Failed to look up service \""s + "\":"s + errnoWithDescription(ec));
+                      "Failed to look up service \""s + "\":"s + errorMessage(ec));
         }
         return DNSResponse{service, queryResults};
     }

@@ -29,13 +29,14 @@
 
 #pragma once
 
-#include <iostream>
-
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 
-namespace mongo {
+#include <iostream>
+
+namespace MONGO_MOD_PUB mongo {
 namespace repl {
 
 /**
@@ -114,4 +115,4 @@ private:
 };
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

@@ -27,14 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/s/router_transactions_metrics.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/router_transactions_stats_gen.h"
 #include "mongo/s/transaction_router.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+
+#include <mutex>
+#include <type_traits>
+#include <utility>
 
 namespace mongo {
 namespace {
@@ -223,7 +228,7 @@ void RouterTransactionsMetrics::incrementCommitSuccessful(TransactionRouter::Com
 void RouterTransactionsMetrics::incrementAbortCauseMap(std::string abortCause) {
     invariant(!abortCause.empty());
 
-    stdx::lock_guard<Latch> lock(_abortCauseMutex);
+    stdx::lock_guard<stdx::mutex> lock(_abortCauseMutex);
     auto it = _abortCauseMap.find(abortCause);
     if (it == _abortCauseMap.end()) {
         _abortCauseMap.emplace(std::pair<std::string, std::int64_t>(std::move(abortCause), 1));
@@ -241,16 +246,16 @@ CommitTypeStats RouterTransactionsMetrics::_constructCommitTypeStats(const Commi
 }
 
 void RouterTransactionsMetrics::updateStats(RouterTransactionsStats* stats) {
-    stats->setCurrentOpen(_currentOpen.load());
-    stats->setCurrentActive(_currentActive.load());
-    stats->setCurrentInactive(_currentInactive.load());
+    stats->setCurrentOpen(_currentOpen.loadRelaxed());
+    stats->setCurrentActive(_currentActive.loadRelaxed());
+    stats->setCurrentInactive(_currentInactive.loadRelaxed());
 
-    stats->setTotalStarted(_totalStarted.load());
-    stats->setTotalCommitted(_totalCommitted.load());
-    stats->setTotalAborted(_totalAborted.load());
-    stats->setTotalContactedParticipants(_totalContactedParticipants.load());
-    stats->setTotalParticipantsAtCommit(_totalParticipantsAtCommit.load());
-    stats->setTotalRequestsTargeted(_totalRequestsTargeted.load());
+    stats->setTotalStarted(_totalStarted.loadRelaxed());
+    stats->setTotalCommitted(_totalCommitted.loadRelaxed());
+    stats->setTotalAborted(_totalAborted.loadRelaxed());
+    stats->setTotalContactedParticipants(_totalContactedParticipants.loadRelaxed());
+    stats->setTotalParticipantsAtCommit(_totalParticipantsAtCommit.loadRelaxed());
+    stats->setTotalRequestsTargeted(_totalRequestsTargeted.loadRelaxed());
 
     CommitTypes commitTypes;
     commitTypes.setNoShards(_constructCommitTypeStats(_noShardsCommitStats));
@@ -263,7 +268,7 @@ void RouterTransactionsMetrics::updateStats(RouterTransactionsStats* stats) {
 
     BSONObjBuilder bob;
     {
-        stdx::lock_guard<Latch> lock(_abortCauseMutex);
+        stdx::lock_guard<stdx::mutex> lock(_abortCauseMutex);
         for (auto const& abortCauseEntry : _abortCauseMap) {
             bob.append(abortCauseEntry.first, abortCauseEntry.second);
         }

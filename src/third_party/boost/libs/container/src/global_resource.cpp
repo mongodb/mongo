@@ -11,7 +11,6 @@
 #define BOOST_CONTAINER_SOURCE
 #include <boost/container/pmr/memory_resource.hpp>
 #include <boost/container/pmr/global_resource.hpp>
-#include <boost/core/no_exceptions_support.hpp>
 #include <boost/container/throw_exception.hpp>
 #include <boost/container/detail/dlmalloc.hpp>  //For global lock
 #include <boost/container/detail/singleton.hpp>
@@ -54,11 +53,10 @@ struct null_memory_resource_imp
       (void)bytes; (void)alignment;
       #if defined(BOOST_CONTAINER_USER_DEFINED_THROW_CALLBACKS) || defined(BOOST_NO_EXCEPTIONS)
       throw_bad_alloc();
+      return 0;
       #else
       throw std::bad_alloc();
       #endif
-
-      return 0;
    }
 
    void do_deallocate(void* p, std::size_t bytes, std::size_t alignment) BOOST_OVERRIDE
@@ -78,12 +76,13 @@ BOOST_CONTAINER_DECL memory_resource* null_memory_resource() BOOST_NOEXCEPT
    return &boost::container::dtl::singleton_default<null_memory_resource_imp>::instance();
 }
 
+#if defined(BOOST_NO_CXX11_HDR_ATOMIC)
+
 static memory_resource *default_memory_resource =
    &boost::container::dtl::singleton_default<new_delete_resource_imp>::instance();
 
 BOOST_CONTAINER_DECL memory_resource* set_default_resource(memory_resource* r) BOOST_NOEXCEPT
 {
-   //TO-DO: synchronizes-with part using atomics
    if(dlmalloc_global_sync_lock()){
       memory_resource *previous = default_memory_resource;
       if(!previous){
@@ -101,7 +100,6 @@ BOOST_CONTAINER_DECL memory_resource* set_default_resource(memory_resource* r) B
 
 BOOST_CONTAINER_DECL memory_resource* get_default_resource() BOOST_NOEXCEPT
 {
-   //TO-DO: synchronizes-with part using atomics
    if(dlmalloc_global_sync_lock()){
       memory_resource *current = default_memory_resource;
       if(!current){
@@ -115,6 +113,34 @@ BOOST_CONTAINER_DECL memory_resource* get_default_resource() BOOST_NOEXCEPT
       return new_delete_resource();
    }
 }
+
+#else //   #if defined(BOOST_NO_CXX11_HDR_ATOMIC)
+
+}  //namespace pmr {
+}  //namespace container {
+}  //namespace boost {
+
+#include <atomic>
+
+namespace boost {
+namespace container {
+namespace pmr {
+
+std::atomic<memory_resource*>& default_memory_resource_instance() {
+    static std::atomic<memory_resource*> instance(new_delete_resource());
+    return instance;
+}
+
+BOOST_CONTAINER_DECL memory_resource* set_default_resource(memory_resource* r) BOOST_NOEXCEPT
+{
+   memory_resource *const res = r ? r : new_delete_resource();
+   return default_memory_resource_instance().exchange(res, std::memory_order_acq_rel);
+}
+
+BOOST_CONTAINER_DECL memory_resource* get_default_resource() BOOST_NOEXCEPT
+{  return default_memory_resource_instance().load(std::memory_order_acquire); }
+
+#endif
 
 }  //namespace pmr {
 }  //namespace container {

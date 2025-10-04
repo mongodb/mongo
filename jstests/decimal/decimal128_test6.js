@@ -2,10 +2,7 @@
  * Derived from test cases at https://github.com/mongodb/specifications
  */
 
-(function() {
-"use strict";
-
-var parseErrors = [
+let parseErrors = [
     {"description": "Incomplete Exponent", "string": "1e"},
     {"description": "Exponent at the beginning", "string": "E01"},
     {"description": "Just a decimal place", "string": "."},
@@ -36,14 +33,13 @@ var parseErrors = [
     {"description": "Invalid", "string": "-Na"},
     {"description": "Invalid", "string": "1.23abc"},
     {"description": "Invalid", "string": "1.23abcE+02"},
-    {"description": "Invalid", "string": "1.23E+0aabs2"}
+    {"description": "Invalid", "string": "1.23E+0aabs2"},
 ];
 
-parseErrors.forEach(function(testCase) {
+parseErrors.forEach(function (testCase) {
     print(`Test - ${testCase.description}`);
     function test() {
         NumberDecimal(testCase.string);
     }
     assert.throws(test, [], `[Test - ${testCase.description}] should have failed with error.`);
 });
-}());

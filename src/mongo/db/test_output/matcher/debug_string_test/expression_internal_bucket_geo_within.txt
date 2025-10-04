@@ -1,0 +1,6 @@
+==== VARIATION: matchExpression=ExpressionInternalBucketGeoWithin
+{ $_internalBucketGeoWithin: { withinRegion: { $geometry: { type: "Polygon", coordinates: [ [ [ 0, 0 ], [ 0, 5 ], [ 5, 5 ], [ 5, 0 ], [ 0, 0 ] ] ] } }, field: "loc" } }
+
+==== VARIATION: taggedMatchExpression=ExpressionInternalBucketGeoWithin
+{ $_internalBucketGeoWithin: { withinRegion: { $geometry: { type: "Polygon", coordinates: [ [ [ 0, 0 ], [ 0, 5 ], [ 5, 5 ], [ 5, 0 ], [ 0, 0 ] ] ] } }, field: "loc" } } || Selected Index #2 pos 0 combine 1
+

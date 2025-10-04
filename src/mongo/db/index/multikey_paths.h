@@ -29,12 +29,14 @@
 
 #pragma once
 
+#include "mongo/bson/bson_depth.h"
+
+#include <cstddef>
+#include <functional>
+#include <string>
+
 #include <boost/container/flat_set.hpp>
 #include <boost/container/small_vector.hpp>
-#include <cstddef>
-#include <vector>
-
-#include "mongo/bson/bson_depth.h"
 
 namespace mongo {
 
@@ -67,4 +69,5 @@ using MultikeyComponents = boost::container::flat_set<
 constexpr std::size_t kFewCompoundIndexFields = 4;
 using MultikeyPaths = boost::container::small_vector<MultikeyComponents, kFewCompoundIndexFields>;
 
+std::string multikeyPathsToString(MultikeyPaths paths);
 }  // namespace mongo

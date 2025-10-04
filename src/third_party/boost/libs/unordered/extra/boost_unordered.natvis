@@ -1,0 +1,509 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+Copyright 2024 Braden Ganetsky.
+Distributed under the Boost Software License, Version 1.0. (See accompanying
+file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
+-->
+
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+
+    <!-- FCA containers -->
+    
+    <Type Name="boost::unordered::detail::functions&lt;*&gt;" Inheritable="false">
+        <Intrinsic Name="active_idx" Expression="current_ &amp; 1" />
+        <Intrinsic Name="spare_idx" Expression="1 - active_idx()" />
+        <Intrinsic Name="has_spare" Expression="(current_ &amp; 2) != 0" />
+
+        <Intrinsic Name="hash" Expression="*reinterpret_cast&lt;$T1*&gt;(static_cast&lt;function_pair::base1*&gt;(&amp;funcs_[idx].t_))">
+            <Parameter Name="idx" Type="size_t" />
+        </Intrinsic>
+        <Intrinsic Name="key_eq" Expression="*reinterpret_cast&lt;$T2*&gt;(static_cast&lt;function_pair::base2*&gt;(&amp;funcs_[idx].t_))">
+            <Parameter Name="idx" Type="size_t" />
+        </Intrinsic>
+
+        <Expand>
+            <Item Name="[hash_function]">hash(active_idx())</Item>
+            <Item Name="[key_eq]">key_eq(active_idx())</Item>
+            <Item Name="[spare_hash_function]" Condition="has_spare()">hash(spare_idx())</Item>
+            <Item Name="[spare_key_eq]" Condition="has_spare()">key_eq(spare_idx())</Item>
+        </Expand>
+    </Type>
+
+    <Type Name="boost::unordered::detail::grouped_bucket_array&lt;*&gt;" Inheritable="false">
+        <!--
+            The expression `&**p` is used so the Intrinsic fails to parse for a fancy pointer type.
+            Only one of the definitions can exist at any given time, so the other must always fail to parse, similar to SFINAE in C++.
+            For a raw pointer, this expression is exactly equivalent to `*p`.
+            For a fancy pointer, this expression will try to call a user-defined `operator*()`, which is not allowed in Natvis, and it will fail.
+        -->
+        <Intrinsic Name="to_address" Optional="true" Expression="&amp;**p">
+            <Parameter Name="p" Type="bucket_pointer*" />
+        </Intrinsic>
+        <Intrinsic Name="to_address" Optional="true" Expression="&amp;**p">
+            <Parameter Name="p" Type="node_pointer*" />
+        </Intrinsic>
+        <Intrinsic Name="to_address" Optional="true" Expression="p-&gt;boost_to_address()">
+            <Parameter Name="p" Type="bucket_pointer*" />
+        </Intrinsic>
+        <Intrinsic Name="to_address" Optional="true" Expression="p-&gt;boost_to_address()">
+            <Parameter Name="p" Type="node_pointer*" />
+        </Intrinsic>
+        <!--
+            The casting expression `(xyz_pointer)p` is used so the Intrinsic fails to parse for a fancy pointer type.
+            Only one of the definitions can exist at any given time, so the other must always fail to parse, similar to SFINAE in C++.
+            In this case, `(xyz_pointer)p` is either a no-op for a raw pointer type, or it's an invalid expression.
+        -->
+        <Intrinsic Name="next" Optional="true" Expression="((bucket_pointer)p) + n">
+            <Parameter Name="p" Type="bucket_type*" />
+            <Parameter Name="n" Type="ptrdiff_t" />
+        </Intrinsic>
+        <Intrinsic Name="next" Optional="true" Expression="((bucket_pointer*)nullptr)->boost_next(p, n)">
+            <Parameter Name="p" Type="bucket_type*" />
+            <Parameter Name="n" Type="ptrdiff_t" />
+        </Intrinsic>
+        
+        <Expand>
+            <CustomListItems MaxItemsPerView="100">
+                <Variable Name="size" InitialValue="size_" />
+                <Variable Name="bucket_index" InitialValue="0" />
+                <Variable Name="current_bucket" InitialValue="to_address(&amp;buckets)" />
+                <Variable Name="node" InitialValue="to_address(&amp;current_bucket-&gt;next)" />
+                <Loop Condition="bucket_index != size">
+                    <Exec>current_bucket = next(to_address(&amp;buckets), bucket_index)</Exec>
+                    <Exec>node = to_address(&amp;current_bucket-&gt;next)</Exec>
+                    <Loop Condition="node != nullptr">
+                        <Item>node-&gt;buf.t_</Item>
+                        <Exec>node = to_address(&amp;node-&gt;next)</Exec>
+                    </Loop>
+                    <Exec>++bucket_index</Exec>
+                </Loop>
+            </CustomListItems>
+        </Expand>
+    </Type>
+
+    <Type Name="boost::unordered::detail::grouped_bucket_array&lt;*&gt;" Inheritable="false" IncludeView="MapHelper">
+        <Expand>
+            <CustomListItems MaxItemsPerView="100">
+                <Variable Name="size" InitialValue="size_" />
+                <Variable Name="bucket_index" InitialValue="0" />
+                <Variable Name="current_bucket" InitialValue="to_address(&amp;buckets)" />
+                <Variable Name="node" InitialValue="to_address(&amp;current_bucket-&gt;next)" />
+                <Loop Condition="bucket_index != size">
+                    <Exec>current_bucket = next(to_address(&amp;buckets), bucket_index)</Exec>
+                    <Exec>node = to_address(&amp;current_bucket-&gt;next)</Exec>
+                    <Loop Condition="node != nullptr">
+                        <Item Name="[{node-&gt;buf.t_.first}]">node-&gt;buf.t_</Item>
+                        <Exec>node = to_address(&amp;node-&gt;next)</Exec>
+                    </Loop>
+                    <Exec>++bucket_index</Exec>
+                </Loop>
+            </CustomListItems>
+        </Expand>
+    </Type>
+
+    <Type Name="boost::unordered::unordered_map&lt;*&gt;" Priority="Medium">
+        <AlternativeType Name="boost::unordered::unordered_multimap&lt;*&gt;" />
+        <AlternativeType Name="boost::unordered::unordered_set&lt;*&gt;" />
+        <AlternativeType Name="boost::unordered::unordered_multiset&lt;*&gt;" />
+        <DisplayString>{{ size={table_.size_} }}</DisplayString>
+        <Expand>
+            <Item Name="[bucket_count]" IncludeView="detailed">table_.buckets_.size_</Item>
+            <Item Name="[max_load_factor]" IncludeView="detailed">table_.mlf_</Item>
+            <ExpandedItem ExcludeView="simple">*reinterpret_cast&lt;table::functions*&gt;(&amp;table_)</ExpandedItem>
+            <Item Name="[allocator]" ExcludeView="simple">*reinterpret_cast&lt;table::bucket_array_type::node_allocator_type*&gt;(&amp;table_.buckets_)</Item>
+            <ExpandedItem>table_.buckets_</ExpandedItem>
+        </Expand>
+    </Type>
+
+    <Type Name="boost::unordered::unordered_map&lt;*&gt;" Priority="MediumHigh" ExcludeView="ShowElementsByIndex">
+        <AlternativeType Name="boost::unordered::unordered_multimap&lt;*&gt;" />
+        <DisplayString>{{ size={table_.size_} }}</DisplayString>
+        <Expand>
+            <Item Name="[bucket_count]" IncludeView="detailed">table_.buckets_.size_</Item>
+            <Item Name="[max_load_factor]" IncludeView="detailed">table_.mlf_</Item>
+            <ExpandedItem ExcludeView="simple">*reinterpret_cast&lt;table::functions*&gt;(&amp;table_)</ExpandedItem>
+            <Item Name="[allocator]" ExcludeView="simple">*reinterpret_cast&lt;table::bucket_array_type::node_allocator_type*&gt;(&amp;table_.buckets_)</Item>
+            <ExpandedItem>table_.buckets_,view(MapHelper)</ExpandedItem>
+        </Expand>
+    </Type>
+
+    <!-- FCA iterators -->
+
+    <Type Name="boost::unordered::detail::iterator_detail::iterator&lt;*&gt;" Inheritable="false">
+        <AlternativeType Name="boost::unordered::detail::iterator_detail::c_iterator&lt;*&gt;" />
+        <Intrinsic Name="to_address" Optional="true" Expression="&amp;**p">
+            <Parameter Name="p" Type="node_pointer*" />
+        </Intrinsic>
+        <Intrinsic Name="to_address" Optional="true" Expression="&amp;**p">
+            <Parameter Name="p" Type="bucket_iterator::bucket_pointer*" />
+        </Intrinsic>
+        <Intrinsic Name="to_address" Optional="true" Expression="&amp;**p">
+            <Parameter Name="p" Type="bucket_iterator::bucket_group_pointer*" />
+        </Intrinsic>
+        <Intrinsic Name="to_address" Optional="true" Expression="p-&gt;boost_to_address()">
+            <Parameter Name="p" Type="node_pointer*" />
+        </Intrinsic>
+        <Intrinsic Name="to_address" Optional="true" Expression="p-&gt;boost_to_address()">
+            <Parameter Name="p" Type="bucket_iterator::bucket_pointer*" />
+        </Intrinsic>
+        <Intrinsic Name="to_address" Optional="true" Expression="p-&gt;boost_to_address()">
+            <Parameter Name="p" Type="bucket_iterator::bucket_group_pointer*" />
+        </Intrinsic>
+        <Intrinsic Name="valid" Expression="to_address(&amp;p) &amp;&amp; to_address(&amp;itb.p) &amp;&amp; to_address(&amp;itb.pbg)" />
+        <DisplayString Condition="valid()">{to_address(&amp;p)-&gt;buf.t_}</DisplayString>
+        <DisplayString Condition="!valid()">{{ end iterator }}</DisplayString>
+        <Expand>
+            <ExpandedItem Condition="valid()">to_address(&amp;p)-&gt;buf.t_</ExpandedItem>
+        </Expand>
+    </Type>
+
+    <!-- FOA and CFOA helpers -->
+
+    <Type Name="boost::unordered::detail::foa::element_type&lt;*&gt;" Priority="Medium" Inheritable="false">
+        <Intrinsic Name="to_address" Optional="true" Expression="&amp;**p">
+            <Parameter Name="p" Type="pointer*" />
+        </Intrinsic>
+        <Intrinsic Name="to_address" Optional="true" Expression="p-&gt;boost_to_address()">
+            <Parameter Name="p" Type="pointer*" />
+        </Intrinsic>
+        <Intrinsic Name="get" Expression="to_address(&amp;p)" />
+        
+        <DisplayString>{*get()}</DisplayString>
+        <Expand>
+            <ExpandedItem>*get()</ExpandedItem>
+        </Expand>
+    </Type>
+
+    <Type Name="boost::unordered::detail::foa::plain_integral&lt;*&gt;" Inheritable="false">
+        <Intrinsic Name="get" Expression="n" />
+    </Type>
+
+    <Type Name="boost::unordered::detail::foa::atomic_integral&lt;*&gt;" Inheritable="false">
+        <Intrinsic Name="get" Expression="n._Storage._Value" />
+    </Type>
+
+    <Type Name="boost::unordered::detail::foa::group15&lt;*&gt;" Inheritable="false">
+        <Intrinsic Name="check_bit" Expression="(m[b].get() == 0) ? (1 &lt;&lt; b) : 0">
+            <Parameter Name="b" Type="int" />
+        </Intrinsic>
+        <Intrinsic Name="__match_occupied_regular_layout_true" Expression="0x7FFF &amp; ~(
+                check_bit( 0) + check_bit( 1) + check_bit( 2) + check_bit( 3) +
+                check_bit( 4) + check_bit( 5) + check_bit( 6) + check_bit( 7) +
+                check_bit( 8) + check_bit( 9) + check_bit(10) + check_bit(11) +
+                check_bit(12) + check_bit(13) + check_bit(14) + check_bit(15)
+        )" />
+        <Intrinsic Name="__match_occupied_x" Expression="m[0].get() | m[1].get()" />
+        <Intrinsic Name="__match_occupied_y" Expression="static_cast&lt;uint32_t&gt;(__match_occupied_x() | (__match_occupied_x() &gt;&gt; 32))" />
+        <Intrinsic Name="__match_occupied_regular_layout_false" Expression="0x7FFF &amp; (__match_occupied_y() | (__match_occupied_y() &gt;&gt; 16))" />
+        <Intrinsic Name="match_occupied" Expression="regular_layout ? __match_occupied_regular_layout_true() : __match_occupied_regular_layout_false()" />
+
+        <Intrinsic Name="__is_sentinel_regular_layout_true" Expression="pos == N-1 &amp;&amp; m[N-1].get() == sentinel_" >
+            <Parameter Name="pos" Type="size_t" />
+        </Intrinsic>
+        <Intrinsic Name="__is_sentinel_regular_layout_false" Expression="pos == N-1 &amp;&amp; (m[0].get() &amp; uint64_t(0x4000400040004000ull)) == uint64_t(0x4000ull) &amp;&amp; (m[1].get() &amp; uint64_t(0x4000400040004000ull))==0" >
+            <Parameter Name="pos" Type="size_t" />
+        </Intrinsic>
+        <Intrinsic Name="is_sentinel" Expression="regular_layout ? __is_sentinel_regular_layout_true(pos) : __is_sentinel_regular_layout_false(pos)" >
+            <Parameter Name="pos" Type="size_t" />
+        </Intrinsic>
+    </Type>
+
+    <!-- FOA and CFOA stats -->
+
+    <Type Name="boost::unordered::detail::foa::table_core_cumulative_stats" Inheritable="false">
+        <DisplayString>stats</DisplayString>
+        <Expand>
+            <Item Name="[insertion]">insertion</Item>
+            <Item Name="[successful_lookup]">successful_lookup</Item>
+            <Item Name="[unsuccessful_lookup]">unsuccessful_lookup</Item>
+        </Expand>
+    </Type>
+
+    <Type Name="boost::unordered::detail::foa::cumulative_stats&lt;*&gt;" Inheritable="true">
+        <Intrinsic Name="bit_cast_to_double" Expression="*reinterpret_cast&lt;double*&gt;(&amp;i)">
+            <Parameter Name="i" Type="uint64_t" />
+        </Intrinsic>
+        <Intrinsic Name="bit_cast_to_uint64_t" Expression="*reinterpret_cast&lt;uint64_t*&gt;(&amp;d)">
+            <Parameter Name="d" Type="double" />
+        </Intrinsic>
+        
+        <!-- https://en.wikipedia.org/wiki/Fast_inverse_square_root#Magic_number -->
+        <Intrinsic Name="__inv_sqrt_init" Expression="bit_cast_to_double(0x5FE6EB50C7B537A9ull - (bit_cast_to_uint64_t(x) &gt;&gt; 1))">
+            <Parameter Name="x" Type="double" />
+        </Intrinsic>
+        <Intrinsic Name="__inv_sqrt_iter" Expression="0.5 * f * (3 - x * f * f)">
+            <Parameter Name="x" Type="double" />
+            <Parameter Name="f" Type="double" />
+        </Intrinsic>
+        <Intrinsic Name="inv_sqrt" Expression="__inv_sqrt_iter(x, __inv_sqrt_iter(x, __inv_sqrt_iter(x, __inv_sqrt_iter(x, __inv_sqrt_init(x)))))">
+            <Parameter Name="x" Type="double" />
+        </Intrinsic>
+
+        <Intrinsic Name="average" Expression="data[idx].m">
+            <Parameter Name="idx" Type="size_t" />
+        </Intrinsic>
+        <Intrinsic Name="variance" Expression="n != 0 ? data[idx].s / static_cast&lt;double&gt;(n) : 0.0">
+            <Parameter Name="idx" Type="size_t" />
+        </Intrinsic>
+        <Intrinsic Name="deviation" Expression="variance(idx) == 0 ? 0.0 : 1/inv_sqrt(variance(idx))">
+            <Parameter Name="idx" Type="size_t" />
+        </Intrinsic>
+        
+        <DisplayString>{{ count = {n} }}</DisplayString>
+        <Expand>
+            <Item Name="[count]">n</Item>
+            <Synthetic Name="[probe_length]" Condition="$T1 > 0">
+                <DisplayString>{{ average = {average(0)} }}</DisplayString>
+                <Expand>
+                    <Item Name="[average]">average(0)</Item>
+                    <Item Name="[variance]">variance(0)</Item>
+                    <Item Name="[deviation]">deviation(0)</Item>
+                </Expand>
+            </Synthetic>
+            <Synthetic Name="[num_comparisons]" Condition="$T1 > 1">
+                <DisplayString>{{ average = {average(1)} }}</DisplayString>
+                <Expand>
+                    <Item Name="[average]">average(1)</Item>
+                    <Item Name="[variance]">variance(1)</Item>
+                    <Item Name="[deviation]">deviation(1)</Item>
+                </Expand>
+            </Synthetic>
+        </Expand>
+    </Type>
+
+    <!-- FOA and CFOA containers -->
+
+    <Type Name="boost::unordered::detail::foa::table&lt;*&gt;" Inheritable="false">
+        <AlternativeType Name="boost::unordered::detail::foa::concurrent_table&lt;*&gt;" />
+        
+        <Intrinsic Name="to_address" Optional="true" Expression="&amp;**p">
+            <Parameter Name="p" Type="arrays_type::value_type_pointer*" />
+        </Intrinsic>
+        <Intrinsic Name="to_address" Optional="true" Expression="&amp;**p">
+            <Parameter Name="p" Type="arrays_type::group_type_pointer*" />
+        </Intrinsic>
+        <Intrinsic Name="to_address" Optional="true" Expression="p-&gt;boost_to_address()">
+            <Parameter Name="p" Type="arrays_type::value_type_pointer*" />
+        </Intrinsic>
+        <Intrinsic Name="to_address" Optional="true" Expression="p-&gt;boost_to_address()">
+            <Parameter Name="p" Type="arrays_type::group_type_pointer*" />
+        </Intrinsic>
+        <Intrinsic Name="next" Optional="true" Expression="((arrays_type::value_type_pointer)p) + n">
+            <Parameter Name="p" Type="arrays_type::value_type*" />
+            <Parameter Name="n" Type="ptrdiff_t" />
+        </Intrinsic>
+        <Intrinsic Name="next" Optional="true" Expression="((arrays_type::char_pointer)p) + n">
+            <Parameter Name="p" Type="unsigned char*" />
+            <Parameter Name="n" Type="ptrdiff_t" />
+        </Intrinsic>
+        <Intrinsic Name="next" Optional="true" Expression="((arrays_type::value_type_pointer*)nullptr)->boost_next(p, n)">
+            <Parameter Name="p" Type="arrays_type::value_type*" />
+            <Parameter Name="n" Type="ptrdiff_t" />
+        </Intrinsic>
+        <Intrinsic Name="next" Optional="true" Expression="((arrays_type::char_pointer*)nullptr)->boost_next(p, n)">
+            <Parameter Name="p" Type="unsigned char*" />
+            <Parameter Name="n" Type="ptrdiff_t" />
+        </Intrinsic>
+        
+        <Intrinsic Optional="true" Name="get_value" ReturnType="value_type*" Expression="e">
+            <Parameter Name="e" Type="value_type*" />
+        </Intrinsic>
+        <Intrinsic Optional="true" Name="get_value" ReturnType="value_type*" Expression="e-&gt;get()">
+            <Parameter Name="e" Type="element_type*" />
+        </Intrinsic>
+
+        <Intrinsic Name="check_bit" Expression="(n &amp; (1 &lt;&lt; i)) != 0">
+            <Parameter Name="n" Type="unsigned int" />
+            <Parameter Name="i" Type="unsigned int" />
+        </Intrinsic>
+        <Intrinsic Name="countr_zero" Expression="
+            check_bit(n,  0) ?  0 : check_bit(n,  1) ?  1 : check_bit(n,  2) ?  2 : check_bit(n,  3) ?  3 :
+            check_bit(n,  4) ?  4 : check_bit(n,  5) ?  5 : check_bit(n,  6) ?  6 : check_bit(n,  7) ?  7 :
+            check_bit(n,  8) ?  8 : check_bit(n,  9) ?  9 : check_bit(n, 10) ? 10 : check_bit(n, 11) ? 11 :
+            check_bit(n, 12) ? 12 : check_bit(n, 13) ? 13 : check_bit(n, 14) ? 14 : check_bit(n, 15) ? 15 :
+            check_bit(n, 16) ? 16 : check_bit(n, 17) ? 17 : check_bit(n, 18) ? 18 : check_bit(n, 19) ? 19 :
+            check_bit(n, 20) ? 20 : check_bit(n, 21) ? 21 : check_bit(n, 22) ? 22 : check_bit(n, 23) ? 23 :
+            check_bit(n, 24) ? 24 : check_bit(n, 25) ? 25 : check_bit(n, 26) ? 26 : check_bit(n, 27) ? 27 :
+            check_bit(n, 28) ? 28 : check_bit(n, 29) ? 29 : check_bit(n, 30) ? 30 : check_bit(n, 31) ? 31 : 32
+        ">
+            <Parameter Name="n" Type="unsigned int" />
+        </Intrinsic>
+
+        <Expand>
+            <Item Name="[stats]" Optional="true">cstats</Item>
+            <CustomListItems MaxItemsPerView="100">
+                <Variable Name="pc_" InitialValue="reinterpret_cast&lt;unsigned char*&gt;(to_address(&amp;arrays.groups_))" />
+                <Variable Name="p_" InitialValue="to_address(&amp;arrays.elements_)" />
+                <Variable Name="first_time" InitialValue="true" />
+                <Variable Name="mask" InitialValue="(int)0" />
+                <Variable Name="n0" InitialValue="(size_t)0" />
+                <Variable Name="n" InitialValue="(unsigned int)0" />
+
+                <Loop Condition="p_ != nullptr">
+
+                    <!-- This if block mirrors the condition in the begin() call -->
+                    <If Condition="!first_time || !(p_ &amp;&amp; !(to_address(&amp;arrays.groups_)[0].match_occupied() &amp; 0x1))">
+                        <Item>*p_</Item>
+                    </If>
+                    <Exec>first_time = false</Exec>
+
+                    <Exec>n0 = reinterpret_cast&lt;uintptr_t&gt;(pc_) % sizeof(group_type)</Exec>
+                    <Exec>pc_ = next(pc_, -(ptrdiff_t)n0)</Exec>
+
+                    <Exec>mask = (reinterpret_cast&lt;group_type*&gt;(pc_)-&gt;match_occupied() &gt;&gt; (n0+1)) &lt;&lt; (n0+1)</Exec>
+                    <Loop Condition="mask == 0">
+                        <Exec>pc_ = next(pc_, sizeof(group_type))</Exec>
+                        <Exec>p_ = next(p_, group_type::N)</Exec>
+                        <Exec>mask = reinterpret_cast&lt;group_type*&gt;(pc_)-&gt;match_occupied()</Exec>
+                    </Loop>
+                    
+                    <Exec>n = countr_zero(mask)</Exec>
+                    <If Condition="reinterpret_cast&lt;group_type*&gt;(pc_)-&gt;is_sentinel(n)">
+                        <Exec>p_ = nullptr</Exec>
+                    </If>
+                    <Else>
+                        <Exec>pc_ = next(pc_, (ptrdiff_t)n)</Exec>
+                        <Exec>p_ = next(p_, (ptrdiff_t)n - (ptrdiff_t)n0)</Exec>
+                    </Else>
+                    
+                </Loop>
+            </CustomListItems>
+        </Expand>
+    </Type>
+
+    <Type Name="boost::unordered::detail::foa::table&lt;*&gt;" Inheritable="false" IncludeView="MapHelper">
+        <AlternativeType Name="boost::unordered::detail::foa::concurrent_table&lt;*&gt;" />
+        <Expand>
+            <Item Name="[stats]" Optional="true">cstats</Item>
+            <CustomListItems MaxItemsPerView="100">
+                <Variable Name="pc_" InitialValue="reinterpret_cast&lt;unsigned char*&gt;(to_address(&amp;arrays.groups_))" />
+                <Variable Name="p_" InitialValue="to_address(&amp;arrays.elements_)" />
+                <Variable Name="first_time" InitialValue="true" />
+                <Variable Name="mask" InitialValue="(int)0" />
+                <Variable Name="n0" InitialValue="(size_t)0" />
+                <Variable Name="n" InitialValue="(unsigned int)0" />
+
+                <Loop Condition="p_ != nullptr">
+
+                    <!-- This if block mirrors the condition in the begin() call -->
+                    <If Condition="!first_time || !(p_ &amp;&amp; !(to_address(&amp;arrays.groups_)[0].match_occupied() &amp; 0x1))">
+                        <Item Name="[{get_value(p_)-&gt;first}]">*p_</Item>
+                    </If>
+                    <Exec>first_time = false</Exec>
+
+                    <Exec>n0 = reinterpret_cast&lt;uintptr_t&gt;(pc_) % sizeof(group_type)</Exec>
+                    <Exec>pc_ = next(pc_, -(ptrdiff_t)n0)</Exec>
+
+                    <Exec>mask = (reinterpret_cast&lt;group_type*&gt;(pc_)-&gt;match_occupied() &gt;&gt; (n0+1)) &lt;&lt; (n0+1)</Exec>
+                    <Loop Condition="mask == 0">
+                        <Exec>pc_ = next(pc_, sizeof(group_type))</Exec>
+                        <Exec>p_ = next(p_, group_type::N)</Exec>
+                        <Exec>mask = reinterpret_cast&lt;group_type*&gt;(pc_)-&gt;match_occupied()</Exec>
+                    </Loop>
+                    
+                    <Exec>n = countr_zero(mask)</Exec>
+                    <If Condition="reinterpret_cast&lt;group_type*&gt;(pc_)-&gt;is_sentinel(n)">
+                        <Exec>p_ = nullptr</Exec>
+                    </If>
+                    <Else>
+                        <Exec>pc_ = next(pc_, (ptrdiff_t)n)</Exec>
+                        <Exec>p_ = next(p_, (ptrdiff_t)n - (ptrdiff_t)n0)</Exec>
+                    </Else>
+                    
+                </Loop>
+            </CustomListItems>
+        </Expand>
+    </Type>
+
+    <Type Name="boost::unordered::unordered_flat_map&lt;*&gt;" Priority="Medium">
+        <AlternativeType Name="boost::unordered::unordered_flat_set&lt;*&gt;" />
+        <AlternativeType Name="boost::unordered::unordered_node_map&lt;*&gt;" />
+        <AlternativeType Name="boost::unordered::unordered_node_set&lt;*&gt;" />
+        <AlternativeType Name="boost::unordered::concurrent_flat_map&lt;*&gt;" />
+        <AlternativeType Name="boost::unordered::concurrent_flat_set&lt;*&gt;" />
+        <AlternativeType Name="boost::unordered::concurrent_node_map&lt;*&gt;" />
+        <AlternativeType Name="boost::unordered::concurrent_node_set&lt;*&gt;" />
+        <DisplayString>{{ size={table_.size_ctrl.size} }}</DisplayString>
+        <Expand>
+            <Item Name="[hash_function]" ExcludeView="simple">*reinterpret_cast&lt;hasher*&gt;(static_cast&lt;table_type::super::hash_base*&gt;(&amp;table_))</Item>
+            <Item Name="[key_eq]" ExcludeView="simple">*reinterpret_cast&lt;key_equal*&gt;(static_cast&lt;table_type::super::pred_base*&gt;(&amp;table_))</Item>
+            <Item Name="[allocator]" ExcludeView="simple">*reinterpret_cast&lt;allocator_type*&gt;(static_cast&lt;table_type::super::allocator_base*&gt;(&amp;table_))</Item>
+            <ExpandedItem>table_</ExpandedItem>
+        </Expand>
+    </Type>
+
+    <Type Name="boost::unordered::unordered_flat_map&lt;*&gt;" Priority="MediumHigh" ExcludeView="ShowElementsByIndex">
+        <AlternativeType Name="boost::unordered::unordered_node_map&lt;*&gt;" />
+        <AlternativeType Name="boost::unordered::concurrent_flat_map&lt;*&gt;" />
+        <AlternativeType Name="boost::unordered::concurrent_node_map&lt;*&gt;" />
+        <DisplayString>{{ size={table_.size_ctrl.size} }}</DisplayString>
+        <Expand>
+            <Item Name="[hash_function]" ExcludeView="simple">*reinterpret_cast&lt;hasher*&gt;(static_cast&lt;table_type::super::hash_base*&gt;(&amp;table_))</Item>
+            <Item Name="[key_eq]" ExcludeView="simple">*reinterpret_cast&lt;key_equal*&gt;(static_cast&lt;table_type::super::pred_base*&gt;(&amp;table_))</Item>
+            <Item Name="[allocator]" ExcludeView="simple">*reinterpret_cast&lt;allocator_type*&gt;(static_cast&lt;table_type::super::allocator_base*&gt;(&amp;table_))</Item>
+            <ExpandedItem>table_,view(MapHelper)</ExpandedItem>
+        </Expand>
+    </Type>
+
+    <!-- FOA iterators -->
+
+    <Type Name="boost::unordered::detail::foa::table_iterator&lt;*&gt;" Inheritable="false">
+        <Intrinsic Name="to_address" Optional="true" Expression="&amp;**p">
+            <Parameter Name="p" Type="table_element_pointer*" />
+        </Intrinsic>
+        <Intrinsic Name="to_address" Optional="true" Expression="p-&gt;boost_to_address()">
+            <Parameter Name="p" Type="table_element_pointer*" />
+        </Intrinsic>
+        <Intrinsic Name="to_address" Optional="true" Expression="&amp;**p">
+            <Parameter Name="p" Type="char_pointer*" />
+        </Intrinsic>
+        <Intrinsic Name="to_address" Optional="true" Expression="p-&gt;boost_to_address()">
+            <Parameter Name="p" Type="char_pointer*" />
+        </Intrinsic>
+        
+        <Intrinsic Name="valid" Expression="to_address(&amp;p_) != nullptr &amp;&amp; to_address(&amp;pc_) != nullptr" />
+        <DisplayString Condition="valid()">{*to_address(&amp;p_)}</DisplayString>
+        <DisplayString Condition="!valid()">{{ end iterator }}</DisplayString>
+        <Expand>
+            <ExpandedItem Condition="valid()">*to_address(&amp;p_)</ExpandedItem>
+        </Expand>
+    </Type>
+
+    <!-- Fancy pointer support -->
+
+    <!--
+        To allow your own fancy pointer type to interact with Boost.Unordered Natvis,
+        add the following intrinsics to your type, with the following conditions.
+
+        (Note, this is assuming the presence of a type alias `pointer` for the underlying
+        raw pointer type, and a type alias `difference_type` for your fancy pointer
+        difference type. Substitute whichever names are applicable in your case.)
+
+        `boost_to_address`
+            * Takes no parameters
+            * Returns the raw pointer equivalent to your fancy pointer
+
+        `boost_next`
+            * Parameter 1, an underlying raw pointer of type `pointer`
+            * Parameter 2, an offset of type `difference_type`
+            * Returns the raw pointer equivalent to your fancy pointer, as if you did the following operations
+                1. Convert the incoming raw pointer to your fancy pointer
+                2. Use operator+= to add the offset to the fancy pointer
+                3. Convert back to the raw pointer
+            * Note, you will not actually do these operations as stated. You will do equivalent lower-level operations that emulate having done the above.
+        
+        Example
+        ```
+        <Type Name="my_fancy_ptr&lt;*&gt;">
+            ...
+            <Intrinsic Name="boost_to_address" ReturnType="pointer" Expression="..." />
+            <Intrinsic Name="boost_next" ReturnType="pointer" Expression="...">
+                <Parameter Name="ptr" Type="pointer" />
+                <Parameter Name="offset" Type="difference_type" />
+            </Intrinsic>
+            ...
+        </Type>
+        ```
+    -->
+
+</AutoVisualizer>

@@ -6,25 +6,7 @@
  * See the file LICENSE for redistribution information.
  */
 
-/*
- * WT_TIERED_MANAGER --
- *	A structure that holds resources used to manage any tiered storage
- *	for the whole database.
- */
-struct __wt_tiered_manager {
-    uint64_t wait_usecs; /* Wait time period */
-    uint32_t workers;    /* Current number of workers */
-    uint32_t workers_max;
-    uint32_t workers_min;
-
-#define WT_TIERED_MAX_WORKERS 20
-#define WT_TIERED_MIN_WORKERS 1
-
-/* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_TIERED_MANAGER_SHUTDOWN 0x1u /* Manager has shut down */
-                                        /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
-    uint32_t flags;
-};
+#pragma once
 
 /*
  * Define the maximum number of tiers for convenience. We expect at most two initially. This can
@@ -40,31 +22,27 @@ struct __wt_tiered_manager {
 
 /* Object name types */
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_TIERED_NAME_LOCAL 0x1u
-#define WT_TIERED_NAME_OBJECT 0x2u
-#define WT_TIERED_NAME_PREFIX 0x4u
-#define WT_TIERED_NAME_SHARED 0x8u
-/* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
-
-/* Flush tier flags */
-/* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_FLUSH_TIER_FORCE 0x1u
-#define WT_FLUSH_TIER_OFF 0x2u
-#define WT_FLUSH_TIER_ON 0x4u
+#define WT_TIERED_NAME_LOCAL 0x01u
+#define WT_TIERED_NAME_OBJECT 0x02u
+#define WT_TIERED_NAME_ONLY 0x04u
+#define WT_TIERED_NAME_PREFIX 0x08u
+#define WT_TIERED_NAME_SHARED 0x10u
+#define WT_TIERED_NAME_SKIP_PREFIX 0x20u
 /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
 
 /*
  * The flush state is a simple counter we manipulate atomically.
  */
-#define WT_FLUSH_STATE_DONE(state) ((state) == 0)
+#define WT_FLUSH_STATE_DONE(state) (__wt_atomic_loadv32(&(state)) == 0)
 
 /*
  * Different types of work units for tiered trees.
  */
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_TIERED_WORK_DROP_LOCAL 0x1u  /* Drop object from local storage. */
-#define WT_TIERED_WORK_DROP_SHARED 0x2u /* Drop object from tier. */
-#define WT_TIERED_WORK_FLUSH 0x4u       /* Flush object to tier. */
+#define WT_TIERED_WORK_FLUSH 0x1u         /* Flush object to tier. */
+#define WT_TIERED_WORK_FLUSH_FINISH 0x2u  /* Perform flush finish on object. */
+#define WT_TIERED_WORK_REMOVE_LOCAL 0x4u  /* Remove object from local storage. */
+#define WT_TIERED_WORK_REMOVE_SHARED 0x8u /* Remove object from tier. */
 /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
 
 /*
@@ -102,6 +80,8 @@ struct __wt_tiered_tiers {
     uint32_t flags; /* Flags including operations */
 };
 
+#define WT_TIERED_OBJECTID_NONE 0
+
 /*
  * WT_TIERED --
  *	Handle for a tiered data source. This data structure is used as the basis for metadata
@@ -122,8 +102,6 @@ struct __wt_tiered {
     WT_BUCKET_STORAGE *bstorage;
 
     WT_TIERED_TIERS tiers[WT_TIERED_MAX_TIERS]; /* Tiers array */
-
-    WT_BLOCK_FILE_OPENER opener;
 
     uint32_t current_id; /* Current object id number */
     uint32_t next_id;    /* Next object number */

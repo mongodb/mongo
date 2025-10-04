@@ -27,7 +27,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 
 #include "unwind_i.h"
 
-/* Here is the "common" init, for remote and local debuging" */
+/* Here is the "common" init, for remote and local debugging" */
 
 static inline int
 common_init_ppc32 (struct cursor *c, unsigned use_prev_instr)

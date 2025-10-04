@@ -1,17 +1,22 @@
 """Helper functions to download."""
+
 import contextlib
 import errno
 import glob
 import os
+import platform
 import shutil
 import tarfile
-import tempfile
 import zipfile
+from urllib.parse import parse_qs, urlparse
 
-import requests
 import structlog
 
-from buildscripts.resmokelib.utils.filesystem import mkdtemp_in_build_dir, build_hygienic_bin_path
+from buildscripts.resmokelib.utils.filesystem import build_hygienic_bin_path, mkdtemp_in_build_dir
+from buildscripts.util.download_utils import (
+    download_from_s3_with_boto,
+    download_from_s3_with_requests,
+)
 
 S3_BUCKET = "mciuploads"
 
@@ -24,6 +29,14 @@ class DownloadError(Exception):
     pass
 
 
+def is_s3_presigned_url(url: str) -> bool:
+    """
+    Return True if `url` looks like an AWS S3 presigned URL (SigV4).
+    """
+    qs = parse_qs(urlparse(url).query)
+    return "X-Amz-Signature" in qs
+
+
 def download_from_s3(url):
     """Download file from S3 bucket by a given URL."""
 
@@ -31,11 +44,19 @@ def download_from_s3(url):
         raise DownloadError("Download URL not found")
 
     LOGGER.info("Downloading.", url=url)
-    filename = os.path.join(mkdtemp_in_build_dir(), url.split('/')[-1].split('?')[0])
+    filename = os.path.join(mkdtemp_in_build_dir(), url.split("/")[-1].split("?")[0])
 
-    with requests.get(url, stream=True) as reader:
-        with open(filename, 'wb') as file_handle:
-            shutil.copyfileobj(reader.raw, file_handle)
+    arch = platform.uname().machine.lower()
+
+    if is_s3_presigned_url(url) or arch.startswith(("s390", "ppc")):
+        # S3 presigned URL can't be downloaded with boto3 library;
+        # S390 and PPC architectures do not have adequate credentials;
+        # thus we fall back using standard requests library
+        download_from_s3_with_requests(url, filename)
+    else:
+        # Prefer boto3 library when possible.
+        # boto3 library is much faster because it use multipart download.
+        download_from_s3_with_boto(url, filename)
 
     return filename
 
@@ -153,6 +174,7 @@ def symlink_version(suffix, installed_dir, link_dir=None):
                 def symlink_ms(source, symlink_name):
                     """Provide symlink for Windows."""
                     import ctypes
+
                     csl = ctypes.windll.kernel32.CreateSymbolicLinkW
                     csl.argtypes = (ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_uint32)
                     csl.restype = ctypes.c_ubyte

@@ -35,13 +35,13 @@ tdep_get_elf_image (struct elf_image *ei, pid_t pid, unw_word_t ip,
                     char *path, size_t pathlen)
 {
   struct map_iterator mi;
-  int found = 0, rc;
+  int found = 0, rc = UNW_ESUCCESS;
   unsigned long hi;
 
   if (maps_init (&mi, pid) < 0)
     return -1;
 
-  while (maps_next (&mi, segbase, &hi, mapoff))
+  while (maps_next (&mi, segbase, &hi, mapoff, NULL))
     if (ip >= *segbase && ip < hi)
       {
         found = 1;
@@ -53,11 +53,18 @@ tdep_get_elf_image (struct elf_image *ei, pid_t pid, unw_word_t ip,
       maps_close (&mi);
       return -1;
     }
+
   if (path)
     {
       strncpy(path, mi.path, pathlen);
+      path[pathlen - 1] = '\0';
     }
-  rc = elf_map_image (ei, mi.path);
+
+  if (ei)
+    rc = elf_map_image (ei, mi.path);
+  else
+    rc = strlen(mi.path) >= pathlen ? -UNW_ENOMEM : UNW_ESUCCESS:;
+
   maps_close (&mi);
   return rc;
 }

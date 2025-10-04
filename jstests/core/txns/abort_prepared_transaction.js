@@ -1,11 +1,14 @@
 /**
  * Tests prepared transaction abort support.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * @tags: [
+ *   # The test runs commands that are not allowed with security token: prepareTransaction.
+ *   not_allowed_with_signed_security_token,
+ *   uses_transactions,
+ *   uses_prepare_transaction
+ * ]
  */
-(function() {
-"use strict";
-load("jstests/core/txns/libs/prepare_helpers.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 
 const dbName = "test";
 const collName = "abort_prepared_transaction";
@@ -21,7 +24,7 @@ const sessionColl = sessionDB.getCollection(collName);
 
 const doc1 = {
     _id: 1,
-    x: 1
+    x: 1,
 };
 
 // ---- Test 1. Insert a single document and run prepare. ----
@@ -51,7 +54,7 @@ assert.commandWorked(sessionColl.update(doc1, {$inc: {x: 1}}));
 
 const doc2 = {
     _id: 1,
-    x: 2
+    x: 2,
 };
 
 // Update should not be visible outside the session.
@@ -85,4 +88,3 @@ assert.commandWorked(session.abortTransaction_forTesting());
 
 // After abort the delete is rolled back.
 assert.eq(doc2, testColl.findOne(doc2));
-}());

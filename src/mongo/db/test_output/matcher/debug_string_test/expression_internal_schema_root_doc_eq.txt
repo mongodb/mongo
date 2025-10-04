@@ -1,0 +1,6 @@
+==== VARIATION: matchExpression=InternalSchemaRootDocEqMatchExpression
+$_internalSchemaRootDocEq { a: 1, b: { c: 1 } }
+
+==== VARIATION: taggedMatchExpression=InternalSchemaRootDocEqMatchExpression
+$_internalSchemaRootDocEq { a: 1, b: { c: 1 } } || Selected Index #2 pos 0 combine 1
+

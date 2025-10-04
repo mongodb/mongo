@@ -27,11 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/document_source_current_op.h"
 
-#include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -43,6 +52,7 @@ const StringData kLocalOpsFieldName = "localOps"_sd;
 const StringData kTruncateOpsFieldName = "truncateOps"_sd;
 const StringData kIdleCursorsFieldName = "idleCursors"_sd;
 const StringData kBacktraceFieldName = "backtrace"_sd;
+const StringData kTargetAllNodesFieldName = "targetAllNodes"_sd;
 
 const StringData kOpIdFieldName = "opid"_sd;
 const StringData kClientFieldName = "client"_sd;
@@ -56,20 +66,22 @@ REGISTER_DOCUMENT_SOURCE(currentOp,
                          DocumentSourceCurrentOp::LiteParsed::parse,
                          DocumentSourceCurrentOp::createFromBson,
                          AllowedWithApiStrict::kNeverInVersion1);
+ALLOCATE_DOCUMENT_SOURCE_ID(currentOp, DocumentSourceCurrentOp::id)
 
 constexpr StringData DocumentSourceCurrentOp::kStageName;
 
 std::unique_ptr<DocumentSourceCurrentOp::LiteParsed> DocumentSourceCurrentOp::LiteParsed::parse(
-    const NamespaceString& nss, const BSONElement& spec) {
-    // Need to check the value of allUsers; if true then inprog privilege is required.
-    if (spec.type() != BSONType::Object) {
+    const NamespaceString& nss, const BSONElement& spec, const LiteParserOptions& options) {
+    // Need to check the value of allUsers; if true then the inprog privilege is returned by
+    // requiredPrivileges(), which is called in the auth subsystem.
+    if (spec.type() != BSONType::object) {
         uasserted(ErrorCodes::TypeMismatch,
                   str::stream() << "$currentOp options must be specified in an object, but found: "
                                 << typeName(spec.type()));
     }
 
-    auto allUsers = UserMode::kExcludeOthers;
-    auto localOps = LocalOpsMode::kRemoteShardOps;
+    auto allUsers = kDefaultUserMode;
+    auto localOps = kDefaultLocalOpsMode;
 
     // Check the spec for all fields named 'allUsers'. If any of them are 'true', we require
     // the 'inprog' privilege. This avoids the possibility that a spec with multiple
@@ -78,7 +90,7 @@ std::unique_ptr<DocumentSourceCurrentOp::LiteParsed> DocumentSourceCurrentOp::Li
     // operations rather than forwarding the request to the shards.
     for (auto&& elem : spec.embeddedObject()) {
         if (elem.fieldNameStringData() == "allUsers"_sd) {
-            if (elem.type() != BSONType::Bool) {
+            if (elem.type() != BSONType::boolean) {
                 uasserted(ErrorCodes::TypeMismatch,
                           str::stream() << "The 'allUsers' parameter of the $currentOp stage "
                                            "must be a boolean value, but found: "
@@ -93,7 +105,7 @@ std::unique_ptr<DocumentSourceCurrentOp::LiteParsed> DocumentSourceCurrentOp::Li
                     str::stream() << "The 'localOps' parameter of the $currentOp stage must be a "
                                      "boolean value, but found: "
                                   << typeName(elem.type()),
-                    elem.type() == BSONType::Bool);
+                    elem.type() == BSONType::boolean);
 
             if (elem.boolean()) {
                 localOps = LocalOpsMode::kLocalMongosOps;
@@ -102,74 +114,11 @@ std::unique_ptr<DocumentSourceCurrentOp::LiteParsed> DocumentSourceCurrentOp::Li
     }
 
     return std::make_unique<DocumentSourceCurrentOp::LiteParsed>(
-        spec.fieldName(), allUsers, localOps);
+        spec.fieldName(), nss.tenantId(), allUsers, localOps);
 }
 
 const char* DocumentSourceCurrentOp::getSourceName() const {
-    return kStageName.rawData();
-}
-
-DocumentSource::GetNextResult DocumentSourceCurrentOp::doGetNext() {
-    if (_ops.empty()) {
-        _ops = pExpCtx->mongoProcessInterface->getCurrentOps(pExpCtx,
-                                                             _includeIdleConnections,
-                                                             _includeIdleSessions,
-                                                             _includeOpsFromAllUsers,
-                                                             _truncateOps,
-                                                             _idleCursors,
-                                                             _backtrace);
-
-        _opsIter = _ops.begin();
-
-        if (pExpCtx->fromMongos) {
-            _shardName = pExpCtx->mongoProcessInterface->getShardName(pExpCtx->opCtx);
-
-            uassert(40465,
-                    "Aggregation request specified 'fromMongos' but unable to retrieve shard name "
-                    "for $currentOp pipeline stage.",
-                    !_shardName.empty());
-        }
-    }
-
-    if (_opsIter != _ops.end()) {
-        if (!pExpCtx->fromMongos) {
-            return Document(*_opsIter++);
-        }
-
-        // This $currentOp is running in a sharded context.
-        invariant(!_shardName.empty());
-
-        const BSONObj& op = *_opsIter++;
-        MutableDocument doc;
-
-        // Add the shard name to the output document.
-        doc.addField(kShardFieldName, Value(_shardName));
-
-        // For operations on a shard, we change the opid from the raw numeric form to
-        // 'shardname:opid'. We also change the fieldname 'client' to 'client_s' to indicate
-        // that the IP is that of the mongos which initiated this request.
-        for (auto&& elt : op) {
-            StringData fieldName = elt.fieldNameStringData();
-
-            if (fieldName == kOpIdFieldName) {
-                uassert(ErrorCodes::TypeMismatch,
-                        str::stream() << "expected numeric opid for $currentOp response from '"
-                                      << _shardName << "' but got: " << typeName(elt.type()),
-                        elt.isNumber());
-
-                std::string shardOpID = (str::stream() << _shardName << ":" << elt.numberInt());
-                doc.addField(kOpIdFieldName, Value(shardOpID));
-            } else if (fieldName == kClientFieldName) {
-                doc.addField(kMongosClientFieldName, Value(elt.str()));
-            } else {
-                doc.addField(fieldName, Value(elt));
-            }
-        }
-
-        return doc.freeze();
-    }
-
-    return GetNextResult::makeEOF();
+    return kStageName.data();
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceCurrentOp::createFromBson(
@@ -177,87 +126,75 @@ intrusive_ptr<DocumentSource> DocumentSourceCurrentOp::createFromBson(
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "$currentOp options must be specified in an object, but found: "
                           << typeName(spec.type()),
-            spec.type() == BSONType::Object);
+            spec.type() == BSONType::object);
 
-    const NamespaceString& nss = pExpCtx->ns;
+    const NamespaceString& nss = pExpCtx->getNamespaceString();
 
     uassert(ErrorCodes::InvalidNamespace,
             "$currentOp must be run against the 'admin' database with {aggregate: 1}",
-            nss.db() == NamespaceString::kAdminDb && nss.isCollectionlessAggregateNS());
+            nss.isAdminDB() && nss.isCollectionlessAggregateNS());
 
-    ConnMode includeIdleConnections = ConnMode::kExcludeIdle;
-    SessionMode includeIdleSessions = SessionMode::kIncludeIdle;
-    UserMode includeOpsFromAllUsers = UserMode::kExcludeOthers;
-    LocalOpsMode showLocalOpsOnMongoS = LocalOpsMode::kRemoteShardOps;
-    TruncationMode truncateOps = TruncationMode::kNoTruncation;
-    CursorMode idleCursors = CursorMode::kExcludeCursors;
-    BacktraceMode backtrace = BacktraceMode::kExcludeBacktrace;
+    boost::optional<ConnMode> includeIdleConnections;
+    boost::optional<SessionMode> includeIdleSessions;
+    boost::optional<UserMode> includeOpsFromAllUsers;
+    boost::optional<LocalOpsMode> showLocalOpsOnMongoS;
+    boost::optional<TruncationMode> truncateOps;
+    boost::optional<CursorMode> idleCursors;
+    boost::optional<bool> targetAllNodes;
 
-    for (auto&& elem : spec.embeddedObject()) {
-        const auto fieldName = elem.fieldNameStringData();
+    auto currentOpSpec = CurrentOpSpec::parse(spec.embeddedObject(), IDLParserContext(kStageName));
 
-        if (fieldName == kIdleConnectionsFieldName) {
+    // Populate the values, if present.
+    if (currentOpSpec.getAllUsers().has_value()) {
+        includeOpsFromAllUsers = currentOpSpec.getAllUsers().value_or(false)
+            ? UserMode::kIncludeAll
+            : UserMode::kExcludeOthers;
+    }
+    if (currentOpSpec.getIdleConnections().has_value()) {
+        includeIdleConnections = currentOpSpec.getIdleConnections().value_or(false)
+            ? ConnMode::kIncludeIdle
+            : ConnMode::kExcludeIdle;
+    }
+    if (currentOpSpec.getIdleCursors().has_value()) {
+        idleCursors = currentOpSpec.getIdleCursors().value_or(false) ? CursorMode::kIncludeCursors
+                                                                     : CursorMode::kExcludeCursors;
+    }
+    if (currentOpSpec.getIdleSessions().has_value()) {
+        includeIdleSessions = currentOpSpec.getIdleSessions().value_or(false)
+            ? SessionMode::kIncludeIdle
+            : SessionMode::kExcludeIdle;
+    }
+    if (currentOpSpec.getLocalOps().has_value()) {
+        const auto localOpsVal = currentOpSpec.getLocalOps().value_or(false);
+        uassert(ErrorCodes::FailedToParse,
+                str::stream() << "The 'localOps' parameter of the $currentOp stage cannot be "
+                                 "true when 'targetAllNodes' is also true",
+                !(targetAllNodes.value_or(false) && localOpsVal));
+
+        showLocalOpsOnMongoS =
+            localOpsVal ? LocalOpsMode::kLocalMongosOps : LocalOpsMode::kRemoteShardOps;
+    }
+    if (currentOpSpec.getTargetAllNodes().has_value()) {
+        const auto targetAllNodesVal = currentOpSpec.getTargetAllNodes().value_or(false);
+        uassert(ErrorCodes::FailedToParse,
+                "The 'localOps' parameter of the $currentOp stage cannot be "
+                "true when 'targetAllNodes' is also true",
+                !((showLocalOpsOnMongoS &&
+                   showLocalOpsOnMongoS.value() == LocalOpsMode::kLocalMongosOps) &&
+                  targetAllNodesVal));
+
+        targetAllNodes = targetAllNodesVal;
+
+        if (targetAllNodesVal) {
             uassert(ErrorCodes::FailedToParse,
-                    str::stream() << "The 'idleConnections' parameter of the $currentOp stage must "
-                                     "be a boolean value, but found: "
-                                  << typeName(elem.type()),
-                    elem.type() == BSONType::Bool);
-            includeIdleConnections =
-                (elem.boolean() ? ConnMode::kIncludeIdle : ConnMode::kExcludeIdle);
-        } else if (fieldName == kIdleSessionsFieldName) {
-            uassert(
-                ErrorCodes::FailedToParse,
-                str::stream() << "The 'idleSessions' parameter of the $currentOp stage must be a "
-                                 "boolean value, but found: "
-                              << typeName(elem.type()),
-                elem.type() == BSONType::Bool);
-            includeIdleSessions =
-                (elem.boolean() ? SessionMode::kIncludeIdle : SessionMode::kExcludeIdle);
-        } else if (fieldName == kAllUsersFieldName) {
-            uassert(ErrorCodes::FailedToParse,
-                    str::stream() << "The 'allUsers' parameter of the $currentOp stage must be a "
-                                     "boolean value, but found: "
-                                  << typeName(elem.type()),
-                    elem.type() == BSONType::Bool);
-            includeOpsFromAllUsers =
-                (elem.boolean() ? UserMode::kIncludeAll : UserMode::kExcludeOthers);
-        } else if (fieldName == kLocalOpsFieldName) {
-            uassert(ErrorCodes::FailedToParse,
-                    str::stream() << "The 'localOps' parameter of the $currentOp stage must be "
-                                     "a boolean value, but found: "
-                                  << typeName(elem.type()),
-                    elem.type() == BSONType::Bool);
-            showLocalOpsOnMongoS =
-                (elem.boolean() ? LocalOpsMode::kLocalMongosOps : LocalOpsMode::kRemoteShardOps);
-        } else if (fieldName == kTruncateOpsFieldName) {
-            uassert(ErrorCodes::FailedToParse,
-                    str::stream() << "The 'truncateOps' parameter of the $currentOp stage must be "
-                                     "a boolean value, but found: "
-                                  << typeName(elem.type()),
-                    elem.type() == BSONType::Bool);
-            truncateOps =
-                (elem.boolean() ? TruncationMode::kTruncateOps : TruncationMode::kNoTruncation);
-        } else if (fieldName == kIdleCursorsFieldName) {
-            uassert(ErrorCodes::FailedToParse,
-                    str::stream() << "The 'idleCursors' parameter of the $currentOp stage must be "
-                                     "a boolean value, but found: "
-                                  << typeName(elem.type()),
-                    elem.type() == BSONType::Bool);
-            idleCursors =
-                (elem.boolean() ? CursorMode::kIncludeCursors : CursorMode::kExcludeCursors);
-        } else if (fieldName == kBacktraceFieldName) {
-            uassert(ErrorCodes::FailedToParse,
-                    str::stream() << "The 'backtrace' parameter of the $currentOp stage must be "
-                                     "a boolean value, but found: "
-                                  << typeName(elem.type()),
-                    elem.type() == BSONType::Bool);
-            backtrace = (elem.boolean() ? BacktraceMode::kIncludeBacktrace
-                                        : BacktraceMode::kExcludeBacktrace);
-        } else {
-            uasserted(ErrorCodes::FailedToParse,
-                      str::stream()
-                          << "Unrecognized option '" << fieldName << "' in $currentOp stage.");
+                    "$currentOp supports targetAllNodes parameter only for sharded clusters",
+                    pExpCtx->getFromRouter() || pExpCtx->getInRouter());
         }
+    }
+    if (currentOpSpec.getTruncateOps().has_value()) {
+        truncateOps = currentOpSpec.getTruncateOps().value_or(false)
+            ? TruncationMode::kTruncateOps
+            : TruncationMode::kNoTruncation;
     }
 
     return new DocumentSourceCurrentOp(pExpCtx,
@@ -267,18 +204,18 @@ intrusive_ptr<DocumentSource> DocumentSourceCurrentOp::createFromBson(
                                        showLocalOpsOnMongoS,
                                        truncateOps,
                                        idleCursors,
-                                       backtrace);
+                                       targetAllNodes);
 }
 
 intrusive_ptr<DocumentSourceCurrentOp> DocumentSourceCurrentOp::create(
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-    ConnMode includeIdleConnections,
-    SessionMode includeIdleSessions,
-    UserMode includeOpsFromAllUsers,
-    LocalOpsMode showLocalOpsOnMongoS,
-    TruncationMode truncateOps,
-    CursorMode idleCursors,
-    BacktraceMode backtrace) {
+    boost::optional<ConnMode> includeIdleConnections,
+    boost::optional<SessionMode> includeIdleSessions,
+    boost::optional<UserMode> includeOpsFromAllUsers,
+    boost::optional<LocalOpsMode> showLocalOpsOnMongoS,
+    boost::optional<TruncationMode> truncateOps,
+    boost::optional<CursorMode> idleCursors,
+    boost::optional<bool> targetAllNodes) {
     return new DocumentSourceCurrentOp(pExpCtx,
                                        includeIdleConnections,
                                        includeIdleSessions,
@@ -286,25 +223,40 @@ intrusive_ptr<DocumentSourceCurrentOp> DocumentSourceCurrentOp::create(
                                        showLocalOpsOnMongoS,
                                        truncateOps,
                                        idleCursors,
-                                       backtrace);
+                                       targetAllNodes);
 }
 
-Value DocumentSourceCurrentOp::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceCurrentOp::serialize(const SerializationOptions& opts) const {
     return Value(Document{
         {getSourceName(),
-         Document{{kIdleConnectionsFieldName,
-                   _includeIdleConnections == ConnMode::kIncludeIdle ? Value(true) : Value()},
-                  {kIdleSessionsFieldName,
-                   _includeIdleSessions == SessionMode::kExcludeIdle ? Value(false) : Value()},
-                  {kAllUsersFieldName,
-                   _includeOpsFromAllUsers == UserMode::kIncludeAll ? Value(true) : Value()},
-                  {kLocalOpsFieldName,
-                   _showLocalOpsOnMongoS == LocalOpsMode::kLocalMongosOps ? Value(true) : Value()},
-                  {kTruncateOpsFieldName,
-                   _truncateOps == TruncationMode::kTruncateOps ? Value(true) : Value()},
-                  {kIdleCursorsFieldName,
-                   _idleCursors == CursorMode::kIncludeCursors ? Value(true) : Value()},
-                  {kBacktraceFieldName,
-                   _backtrace == BacktraceMode::kIncludeBacktrace ? Value(true) : Value()}}}});
+         Document{
+             {kIdleConnectionsFieldName,
+              _includeIdleConnections.has_value()
+                  ? opts.serializeLiteral(_includeIdleConnections.value() == ConnMode::kIncludeIdle)
+                  : Value()},
+             {kIdleSessionsFieldName,
+              _includeIdleSessions.has_value()
+                  ? opts.serializeLiteral(_includeIdleSessions.value() == SessionMode::kIncludeIdle)
+                  : Value()},
+             {kAllUsersFieldName,
+              _includeOpsFromAllUsers.has_value()
+                  ? opts.serializeLiteral(_includeOpsFromAllUsers.value() == UserMode::kIncludeAll)
+                  : Value()},
+             {kLocalOpsFieldName,
+              _showLocalOpsOnMongoS.has_value()
+                  ? opts.serializeLiteral(_showLocalOpsOnMongoS.value() ==
+                                          LocalOpsMode::kLocalMongosOps)
+                  : Value()},
+             {kTruncateOpsFieldName,
+              _truncateOps.has_value()
+                  ? opts.serializeLiteral(_truncateOps.value() == TruncationMode::kTruncateOps)
+                  : Value()},
+             {kIdleCursorsFieldName,
+              _idleCursors.has_value()
+                  ? opts.serializeLiteral(_idleCursors.value() == CursorMode::kIncludeCursors)
+                  : Value()},
+             {kTargetAllNodesFieldName,
+              _targetAllNodes.has_value() ? opts.serializeLiteral(_targetAllNodes.value())
+                                          : Value()}}}});
 }
 }  // namespace mongo

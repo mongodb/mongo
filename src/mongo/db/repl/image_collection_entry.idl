@@ -30,16 +30,18 @@
 
 global:
     cpp_namespace: "mongo::repl"
+    mod_visibility: pub
 
 imports:
-    - "mongo/idl/basic_types.idl"
-    - "mongo/db/logical_session_id.idl"
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/session/logical_session_id.idl"
     - "mongo/db/repl/oplog_entry.idl"
 
 structs:
     ImageEntry:
-        description: "Represents either a pre-image or post-image necessary for satisfying a
-                      retryable findAndModify."
+        description:
+            "Represents either a pre-image or post-image necessary for satisfying a
+            retryable findAndModify."
         strict: false
         fields:
             _id:

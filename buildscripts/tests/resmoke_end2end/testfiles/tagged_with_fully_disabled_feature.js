@@ -1,0 +1,5 @@
+/**
+ * @tags: [featureFlagFryer]
+ */
+
+(function () {})();

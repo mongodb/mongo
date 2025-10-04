@@ -1,9 +1,6 @@
 // Check that rotation will fail if a certificate file is missing
 
-(function() {
-"use strict";
-
-load('jstests/ssl/libs/ssl_helpers.js');
+import {copyCertificateFile, determineSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
 function deleteFile(file) {
     if (_isWindows()) {
@@ -24,11 +21,11 @@ copyCertificateFile("jstests/libs/server.pem", dbPath + "/server-test.pem");
 copyCertificateFile("jstests/libs/crl.pem", dbPath + "/crl-test.pem");
 
 const mongod = MongoRunner.runMongod({
-    sslMode: "requireSSL",
-    sslPEMKeyFile: dbPath + "/server-test.pem",
-    sslCAFile: dbPath + "/ca-test.pem",
-    sslClusterFile: dbPath + "/client-test.pem",
-    sslCRLFile: dbPath + "/crl-test.pem",
+    tlsMode: "requireTLS",
+    tlsCertificateKeyFile: dbPath + "/server-test.pem",
+    tlsCAFile: dbPath + "/ca-test.pem",
+    tlsClusterFile: dbPath + "/client-test.pem",
+    tlsCRLFile: dbPath + "/crl-test.pem",
 });
 
 // if we are on apple, don't do delete test on CRL -- it will succeed.
@@ -49,4 +46,3 @@ for (let certType of certTypes) {
 }
 
 MongoRunner.stopMongod(mongod);
-})();

@@ -25,14 +25,15 @@ __wt_timestamp_to_string(wt_timestamp_t ts, char *ts_string)
  *     Converts a time point to a standard string representation.
  */
 char *
-__wt_time_point_to_string(
-  wt_timestamp_t ts, wt_timestamp_t durable_ts, uint64_t txn_id, char *tp_string)
+__wt_time_point_to_string(wt_timestamp_t durable_ts, wt_timestamp_t ts, wt_timestamp_t prepare_ts,
+  uint64_t prepared_id, uint64_t txn_id, char *tp_string)
 {
-    char ts_string[WT_TS_INT_STRING_SIZE];
+    char ts_string[3][WT_TS_INT_STRING_SIZE];
 
-    WT_IGNORE_RET(__wt_snprintf(tp_string, WT_TP_STRING_SIZE, "%s/%s/%" PRIu64,
-      __wt_timestamp_to_string(ts, ts_string), __wt_timestamp_to_string(durable_ts, ts_string),
-      txn_id));
+    WT_IGNORE_RET(__wt_snprintf(tp_string, WT_TIME_STRING_SIZE, "%s/%s/%s/%" PRIu64 "/%" PRIu64,
+      __wt_timestamp_to_string(durable_ts, ts_string[0]),
+      __wt_timestamp_to_string(ts, ts_string[1]),
+      __wt_timestamp_to_string(prepare_ts, ts_string[2]), prepared_id, txn_id));
     return (tp_string);
 }
 
@@ -43,15 +44,17 @@ __wt_time_point_to_string(
 char *
 __wt_time_window_to_string(WT_TIME_WINDOW *tw, char *tw_string)
 {
-    char ts_string[4][WT_TS_INT_STRING_SIZE];
+    char ts_string[6][WT_TS_INT_STRING_SIZE];
 
     WT_IGNORE_RET(__wt_snprintf(tw_string, WT_TIME_STRING_SIZE,
-      "start: %s/%s/%" PRIu64 " stop: %s/%s/%" PRIu64 "%s",
+      "start: %s/%s/%s/%" PRIu64 "/%" PRIu64 " | stop: %s/%s/%s/%" PRIu64 "/%" PRIu64 "%s",
       __wt_timestamp_to_string(tw->durable_start_ts, ts_string[0]),
-      __wt_timestamp_to_string(tw->start_ts, ts_string[1]), tw->start_txn,
-      __wt_timestamp_to_string(tw->durable_stop_ts, ts_string[2]),
-      __wt_timestamp_to_string(tw->stop_ts, ts_string[3]), tw->stop_txn,
-      tw->prepare ? ", prepared" : ""));
+      __wt_timestamp_to_string(tw->start_ts, ts_string[1]),
+      __wt_timestamp_to_string(tw->start_prepare_ts, ts_string[2]), tw->start_prepared_id,
+      tw->start_txn, __wt_timestamp_to_string(tw->durable_stop_ts, ts_string[3]),
+      __wt_timestamp_to_string(tw->stop_ts, ts_string[4]),
+      __wt_timestamp_to_string(tw->stop_prepare_ts, ts_string[5]), tw->stop_prepared_id,
+      tw->stop_txn, WT_TIME_WINDOW_HAS_PREPARE(tw) ? ", prepared" : ""));
     return (tw_string);
 }
 
@@ -65,7 +68,7 @@ __wt_time_aggregate_to_string(WT_TIME_AGGREGATE *ta, char *ta_string)
     char ts_string[4][WT_TS_INT_STRING_SIZE];
 
     WT_IGNORE_RET(__wt_snprintf(ta_string, WT_TIME_STRING_SIZE,
-      "newest durable: %s/%s oldest start: %s/%" PRIu64 " newest stop %s/%" PRIu64 "%s",
+      "newest_durable: %s/%s | oldest_start: %s/%" PRIu64 " | newest_stop: %s/%" PRIu64 "%s",
       __wt_timestamp_to_string(ta->newest_start_durable_ts, ts_string[0]),
       __wt_timestamp_to_string(ta->newest_stop_durable_ts, ts_string[1]),
       __wt_timestamp_to_string(ta->oldest_start_ts, ts_string[2]), ta->newest_txn,
@@ -245,7 +248,63 @@ __wt_time_aggregate_validate(
 {
     char time_string[2][WT_TIME_STRING_SIZE];
 
-    if (ta->oldest_start_ts > ta->newest_stop_ts)
+    /*
+     * The aggregated time window values that are tracked at the page level.
+     *    newest_start_durable_ts - The default value is WT_TS_NONE. It tracks the maximum durable
+     timestamp of all the inserts, updates, or modify operations performed on a page.
+     *    newest_stop_durable_ts - The default value is WT_TS_NONE. It tracks the maximum durable
+     timestamp of all the the delete operations performed on a page.
+     *    oldest_start_ts - The default value is WT_TS_NONE. It tracks the minimum commit timestamp
+     of any inserts performed on a page.
+     *    newest_txn - The default value is WT_TXN_NONE. It tracks the maximum transaction id of any
+     modification (insert/delete) performed on a page.
+     *    newest_stop_ts - The default value is WT_TS_MAX. It tracks the maximum commit timestamp of
+     a delete operation on a page. If there is no removal for a key, this value will be WT_TS_MAX.
+     *    newest_stop_txn - The default value is WT_TXN_MAX. It tracks the maximum commit
+     transaction id of a delete operation on a page. If there is no removal for a key, this value
+     will be WT_TXN_MAX.
+     *
+     *
+     * Three scenarios might happen at any point of time.
+     * Scenario 1 - No deletes on the page, only inserts and updates.
+     *    newest_start_durable_ts will be some valid value (not WT_TS_MAX or WT_TS_NONE)
+     *    oldest_start_ts will be the minimum commit timestamp of any inserts performed on a page.
+     *    newest_stop_durable_ts will be WT_TS_NONE
+     *    newest_stop_ts will be WT_TS_MAX since there is no removal of any key.
+     *    newest_txn will be the maximum transaction id of any modification (insert/delete)
+     performed on a page.
+     *    newest_stop_txn will be WT_TXN_MAX.
+
+     * Scenario 2 - All the entries on the page are deleted.
+     *    newest_start_durable_ts will be some valid value (not WT_TS_MAX or WT_TS_NONE)
+     *    oldest_start_ts will be the minimum commit timestamp of any inserts performed on a page.
+     *    newest_stop_durable_ts will be some valid value (not WT_TS_MAX or WT_TS_NONE)
+     *    newest_stop_ts will be maximum commit timestamp of any delete operation on a page but not
+     WT_TS_MAX.
+     *    newest_txn will be the maximum transaction id of any modification (insert/delete)
+     performed on a page.
+     *    newest_stop_txn will be the maximum commit transaction id of any delete operation on a
+     page but cannot be WT_TXN_MAX
+
+     * Scenario 3 - Some entries are deleted, but not all.
+     *    newest_start_durable_ts will be some valid value (not WT_TS_MAX or WT_TS_NONE)
+     *    oldest_start_ts will be the minimum commit timestamp of any inserts performed on a page.
+     *    newest_stop_durable_ts will be the maximum durable timestamp of all the deletes performed
+     on a page.
+     *    newest_stop_ts can be WT_TS_MAX or any valid value
+     *    newest_txn will be the maximum transaction id of any modification (insert/delete)
+     performed on a page.
+     *    newest_stop_txn will be the maximum commit transaction id of any delete operation on a
+     page but cannot be WT_TXN_MAX
+     *
+     */
+
+    /*
+     * Although timestamped truncates are supported in MongoDB, it is still possible for MongoDB to
+     * do truncate operations without a timestamp. In this case, validate needs to handle page
+     * deleted structures with a zero timestamp.
+     */
+    if (ta->newest_stop_ts != WT_TS_NONE && ta->oldest_start_ts > ta->newest_stop_ts)
         WT_TIME_VALIDATE_RET(session,
           "aggregate time window has an oldest start time after its newest stop time; time "
           "aggregate %s",
@@ -270,14 +329,22 @@ __wt_time_aggregate_validate(
           __wt_time_aggregate_to_string(ta, time_string[0]));
 
     /*
-     * In the case of out of order timestamps, we assign the start point to the stop point and
-     * newest start durable timestamp may be larger than newest stop timestamp. Check whether start
-     * and stop are equal first.
+     * In the case of missing timestamps, we assign the start point to the stop point and newest
+     * start durable timestamp may be larger than newest stop timestamp. Check whether start and
+     * stop are equal first and then check the newest start durable timestamp against newest stop
+     * durable timestamp if all the data on the page are deleted.
+     *
+     *
+     * Although timestamped truncates are supported in MongoDB, it is still possible for MongoDB to
+     * do truncate operations without a timestamp. In this case, validate needs to handle page
+     * deleted structures with a zero timestamp.
      */
-    if (ta->newest_start_durable_ts != ta->newest_stop_durable_ts &&
-      ta->newest_start_durable_ts > ta->newest_stop_ts)
+    if (ta->newest_stop_durable_ts != WT_TS_NONE &&
+      ta->newest_start_durable_ts != ta->newest_stop_durable_ts &&
+      ta->newest_stop_ts != WT_TS_MAX && ta->newest_start_durable_ts > ta->newest_stop_durable_ts)
         WT_TIME_VALIDATE_RET(session,
-          "aggregate time window has a newest stop durable time after its newest stop time; time "
+          "aggregate time window has a newest start durable time after its newest stop durable "
+          "time; time "
           "aggregate %s",
           __wt_time_aggregate_to_string(ta, time_string[0]));
 
@@ -352,15 +419,23 @@ __time_value_validate_parent(
           "time; time window %s, parent %s",
           __wt_time_window_to_string(tw, time_string[0]),
           __wt_time_aggregate_to_string(parent, time_string[1]));
-
-    if (tw->start_ts < parent->oldest_start_ts)
+    if (WT_TIME_WINDOW_HAS_START_PREPARE(tw)) {
+        if (tw->start_prepare_ts < parent->oldest_start_ts)
+            WT_TIME_VALIDATE_RET(session,
+              "value time window has a start prepare time before its parent's oldest start time; "
+              "time "
+              "window "
+              "%s, parent %s",
+              __wt_time_window_to_string(tw, time_string[0]),
+              __wt_time_aggregate_to_string(parent, time_string[1]));
+    } else if (tw->start_ts < parent->oldest_start_ts)
         WT_TIME_VALIDATE_RET(session,
           "value time window has a start time before its parent's oldest start time; time window "
           "%s, parent %s",
           __wt_time_window_to_string(tw, time_string[0]),
           __wt_time_aggregate_to_string(parent, time_string[1]));
 
-    if (tw->start_txn > parent->newest_txn)
+    if (parent->newest_txn != WT_TXN_NONE && tw->start_txn > parent->newest_txn)
         WT_TIME_VALIDATE_RET(session,
           "value time window has a start transaction after its parent's newest transaction; "
           "time window %s, parent %s",
@@ -375,23 +450,31 @@ __time_value_validate_parent(
           __wt_time_window_to_string(tw, time_string[0]),
           __wt_time_aggregate_to_string(parent, time_string[1]));
 
-    if (tw->stop_ts > parent->newest_stop_ts)
+    if (WT_TIME_WINDOW_HAS_STOP_PREPARE(tw)) {
+        if (tw->stop_prepare_ts > parent->newest_stop_ts)
+            WT_TIME_VALIDATE_RET(session,
+              "value time window has a stop prepare time after its parent's newest stop time; time "
+              "window %s, "
+              "parent %s",
+              __wt_time_window_to_string(tw, time_string[0]),
+              __wt_time_aggregate_to_string(parent, time_string[1]));
+    } else if (tw->stop_ts > parent->newest_stop_ts)
         WT_TIME_VALIDATE_RET(session,
           "value time window has a stop time after its parent's newest stop time; time window %s, "
           "parent %s",
           __wt_time_window_to_string(tw, time_string[0]),
           __wt_time_aggregate_to_string(parent, time_string[1]));
 
-    if (tw->stop_txn > parent->newest_stop_txn)
+    if (parent->newest_stop_txn != WT_TXN_NONE && tw->stop_txn > parent->newest_stop_txn)
         WT_TIME_VALIDATE_RET(session,
           "value time window has a stop transaction after its parent's newest stop transaction; "
           "time window %s, parent %s",
           __wt_time_window_to_string(tw, time_string[0]),
           __wt_time_aggregate_to_string(parent, time_string[1]));
 
-    if (tw->prepare && !parent->prepare)
+    if (WT_TIME_WINDOW_HAS_PREPARE(tw) && !parent->prepare)
         WT_TIME_VALIDATE_RET(session,
-          "aggregate time window is prepared but its parent is not; time aggregate %s, parent %s",
+          "value time window is prepared but its parent is not; time window %s, parent %s",
           __wt_time_window_to_string(tw, time_string[0]),
           __wt_time_aggregate_to_string(parent, time_string[1]));
 
@@ -429,9 +512,9 @@ __wt_time_value_validate(
           __wt_time_window_to_string(tw, time_string[0]));
 
     /*
-     * In the case of out of order timestamps, we assign start time point to the stop point and
-     * durable start timestamp may be larger than stop timestamp. Check whether start and stop are
-     * equal first.
+     * In the case of missing timestamps, we assign start time point to the stop point and durable
+     * start timestamp may be larger than stop timestamp. Check whether start and stop are equal
+     * first.
      */
     if (tw->durable_start_ts != tw->durable_stop_ts && tw->durable_start_ts > tw->stop_ts)
         WT_TIME_VALIDATE_RET(session,
@@ -441,6 +524,59 @@ __wt_time_value_validate(
     if (tw->durable_stop_ts != WT_TS_NONE && tw->durable_start_ts > tw->durable_stop_ts)
         WT_TIME_VALIDATE_RET(session,
           "value time window has a durable start time after its durable stop time; time window %s",
+          __wt_time_window_to_string(tw, time_string[0]));
+    /* Validate that if start prepare_ts is set, start_prepared_id must be set */
+    if (WT_TIME_WINDOW_HAS_START_PREPARE(tw)) {
+        if (tw->start_prepare_ts == WT_TS_NONE)
+            WT_TIME_VALIDATE_RET(session,
+              "Start prepared value time window has no start prepare time "
+              "window %s",
+              __wt_time_window_to_string(tw, time_string[0]));
+        if (F_ISSET(S2C(session), WT_CONN_PRESERVE_PREPARED)) {
+            if (tw->start_prepared_id == WT_PREPARED_ID_NONE)
+                WT_TIME_VALIDATE_RET(session,
+                  "Start prepared value time window has no start prepared id; time "
+                  "window %s",
+                  __wt_time_window_to_string(tw, time_string[0]));
+        }
+        if (tw->start_ts != WT_TS_NONE)
+            WT_TIME_VALIDATE_RET(session,
+              "Start prepared value time window has a start time set; time "
+              "window %s",
+              __wt_time_window_to_string(tw, time_string[0]));
+        if (tw->durable_start_ts != WT_TS_NONE)
+            WT_TIME_VALIDATE_RET(session,
+              "Start prepared value time window has a durable start time set; time "
+              "window %s",
+              __wt_time_window_to_string(tw, time_string[0]));
+    }
+    if (WT_TIME_WINDOW_HAS_STOP_PREPARE(tw)) {
+        if (tw->stop_prepare_ts == WT_TS_NONE)
+            WT_TIME_VALIDATE_RET(session,
+              "Stop prepared value time window has no stop prepare time "
+              "window %s",
+              __wt_time_window_to_string(tw, time_string[0]));
+        if (F_ISSET(S2C(session), WT_CONN_PRESERVE_PREPARED)) {
+            if (tw->stop_prepared_id == WT_PREPARED_ID_NONE)
+                WT_TIME_VALIDATE_RET(session,
+                  "Stop prepared value time window has no stop prepared id; time "
+                  "window %s",
+                  __wt_time_window_to_string(tw, time_string[0]));
+        }
+        if (tw->stop_ts != WT_TS_MAX)
+            WT_TIME_VALIDATE_RET(session,
+              "Stop prepared value time window has a stop time set; time "
+              "window %s",
+              __wt_time_window_to_string(tw, time_string[0]));
+        if (tw->durable_stop_ts != WT_TS_NONE)
+            WT_TIME_VALIDATE_RET(session,
+              "Stop prepared value time window has a durable stop time set; time "
+              "window %s",
+              __wt_time_window_to_string(tw, time_string[0]));
+    } else if (tw->stop_txn != WT_TXN_MAX && tw->stop_ts == WT_TS_MAX)
+        WT_TIME_VALIDATE_RET(session,
+          "Time window has a stop transaction id but no prepare or stop time set; time "
+          "window %s",
           __wt_time_window_to_string(tw, time_string[0]));
 
     /*

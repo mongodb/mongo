@@ -27,18 +27,24 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-#include "mongo/platform/basic.h"
+#include "mongo/util/invalidating_lru_cache.h"
 
-#include <boost/optional.hpp>
-#include <functional>
-
+#include "mongo/base/string_data.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/future.h"
-#include "mongo/util/invalidating_lru_cache.h"
+
+#include <cstdint>
+#include <ostream>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 
 namespace mongo {
 namespace {
@@ -467,6 +473,19 @@ TEST(InvalidatingLRUCacheTest, AdvanceTimeSameTime) {
     ASSERT(!cache.advanceTimeInStore(100, Timestamp(30)));
 }
 
+TEST(InvalidatingLRUCacheTest, TimeMonotonicityViolation) {
+    TestValueCacheCausallyConsistent cache(2);
+    cache.insertOrAssign(100, TestValue("Value @ TS 30"), Timestamp(30));
+    cache.insertOrAssign(200, TestValue("Value @ TS 30"), Timestamp(30));
+
+    ASSERT_THROWS_CODE(cache.insertOrAssign(100, TestValue("Value @ TS 20"), Timestamp(20)),
+                       DBException,
+                       ErrorCodes::ReadThroughCacheTimeMonotonicityViolation);
+    ASSERT_THROWS_CODE(cache.insertOrAssign(200, TestValue("Value @ TS 20"), Timestamp(20)),
+                       DBException,
+                       ErrorCodes::ReadThroughCacheTimeMonotonicityViolation);
+}
+
 template <class TCache, typename TestFunc>
 void parallelTest(size_t cacheSize, TestFunc doTest) {
     constexpr auto kNumIterations = 100'000;
@@ -528,7 +547,7 @@ TEST(InvalidatingLRUCacheParallelTest, CacheSizeZeroInsertOrAssignAndGet) {
 
 TEST(InvalidatingLRUCacheParallelTest, AdvanceTime) {
     AtomicWord<uint64_t> counter{1};
-    Mutex insertOrAssignMutex = MONGO_MAKE_LATCH("ReadThroughCacheBase::_cancelTokenMutex");
+    stdx::mutex insertOrAssignMutex;
 
     parallelTest<TestValueCacheCausallyConsistent>(0, [&](auto& cache) {
         const int key = 300;

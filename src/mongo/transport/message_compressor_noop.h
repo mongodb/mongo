@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/transport/message_compressor_base.h"
 
 namespace mongo {

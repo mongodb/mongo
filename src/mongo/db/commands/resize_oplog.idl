@@ -30,25 +30,25 @@ global:
     cpp_namespace: "mongo"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 commands:
     replSetResizeOplog:
         description: "Parser for the 'replSetResizeOplog' command."
         command_name: replSetResizeOplog
         cpp_name: ReplSetResizeOplogRequest
-        strict: false
+        strict: true
         namespace: type
         api_version: ""
         type: safeInt64
         fields:
             size:
                 description: "Size of the oplog in MB"
-                type: double
+                type: safeDouble
                 optional: true
-                validator: { gte: 990, lte: 1073741824 } # gte 990MB; lte 1PB (in MB)
+                validator: {gte: 990, lte: 1073741824} # gte 990MB; lte 1PB (in MB)
             minRetentionHours:
                 description: "Minimum number of hours to preserve oplog entry."
-                type: double
+                type: safeDouble
                 optional: true
-                validator: { gte: 0 } 
+                validator: {gte: 0}

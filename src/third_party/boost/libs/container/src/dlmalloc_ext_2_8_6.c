@@ -35,7 +35,6 @@
 #ifdef __GNUC__
 #define FORCEINLINE inline
 #endif
-#include "dlmalloc_2_8_6.c"
 
 #ifdef _MSC_VER
 #pragma warning (push)
@@ -45,7 +44,12 @@
 #pragma warning (disable : 4702)
 #pragma warning (disable : 4390) /*empty controlled statement found; is this the intent?*/
 #pragma warning (disable : 4251 4231 4660) /*dll warnings*/
+#pragma warning (disable : 4057) /*differs in indirection to slightly different base types from*/
+#pragma warning (disable : 4702) /*unreachable code*/
+#pragma warning (disable : 4127) /*conditional expression is constant*/
 #endif
+
+#include "dlmalloc_2_8_6.c"
 
 #define DL_SIZE_IMPL(p) (chunksize(mem2chunk(p)) - overhead_for(mem2chunk(p)))
 
@@ -1220,14 +1224,12 @@ size_t boost_cont_allocated_memory()
       if (is_initialized(m)) {
       size_t nfree = SIZE_T_ONE; /* top always free */
       size_t mfree = m->topsize + TOP_FOOT_SIZE;
-      size_t sum = mfree;
       msegmentptr s = &m->seg;
       while (s != 0) {
          mchunkptr q = align_as_chunk(s->base);
          while (segment_holds(s, q) &&
                q != m->top && q->head != FENCEPOST_HEAD) {
             size_t sz = chunksize(q);
-            sum += sz;
             if (!is_inuse(q)) {
             mfree += sz;
             ++nfree;

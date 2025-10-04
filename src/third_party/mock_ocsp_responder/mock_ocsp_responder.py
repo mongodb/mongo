@@ -129,6 +129,7 @@ class OCSPResponseBuilder(object):
     _revocation_date = None
     _certificate_issuer = None
     _hash_algo = None
+    _issuer_hash_algo = None
     _key_hash_algo = None
     _nonce = None
     _this_update = None
@@ -173,6 +174,7 @@ class OCSPResponseBuilder(object):
         self._certificate_status_list = certificate_status_list
         self._revocation_date = revocation_date
 
+        self._issuer_hash_algo = 'sha1'
         self._key_hash_algo = 'sha1'
         self._hash_algo = 'sha256'
         self._response_data_extensions = {}
@@ -237,6 +239,23 @@ class OCSPResponseBuilder(object):
             ))
 
         self._next_update = value
+
+    @_writer
+    def issuer_hash_algo(self, value):
+        """
+        String name of the hash algorithm used for hashing the issuer name and
+        issuer public key.
+        """
+
+        if not isinstance(value, str):
+            raise TypeError(_pretty_message(
+                '''
+                issuer_hash_algo must be an instance of str, not %s
+                ''',
+                _type_name(value)
+            ))
+
+        self._issuer_hash_algo = value
 
     def build(self, responder_private_key=None, responder_certificate=None):
         """
@@ -363,10 +382,10 @@ class OCSPResponseBuilder(object):
             response = {
                     'cert_id': {
                         'hash_algorithm': {
-                            'algorithm': self._key_hash_algo
+                            'algorithm': self._issuer_hash_algo
                         },
-                        'issuer_name_hash': getattr(issuer.subject, self._key_hash_algo),
-                        'issuer_key_hash': getattr(issuer.public_key, self._key_hash_algo),
+                        'issuer_name_hash': getattr(issuer.subject, self._issuer_hash_algo),
+                        'issuer_key_hash': getattr(issuer.public_key, self._issuer_hash_algo),
                         'serial_number': serial,
                     },
                     'cert_status': cert_status,
@@ -450,7 +469,8 @@ app = Flask(__name__)
 class OCSPResponder:
 
     def __init__(self, issuer_cert: str, responder_cert: str, responder_key: str,
-            fault: str, next_update_seconds: int, response_delay_seconds: int):
+            fault: str, next_update_seconds: int, response_delay_seconds: int,
+            include_extraneous_status: bool, issuer_hash_algorithm: str):
         """
         Create a new OCSPResponder instance.
 
@@ -467,6 +487,8 @@ class OCSPResponder:
         :param next_update_seconds: The ``nextUpdate`` value that will be written
             into the response. Default: 9 hours.
         :param response_delay_seconds: Delays the HTTP response by this many seconds.
+        :param include_extraneous_status: Include status of irrelevant certs in the response.
+        :param issuer_hash_algorithm: Algorithm to use when hashing the issuer name & key.
         """
         # Certs and keys
         self._issuer_cert = asymmetric.load_certificate(issuer_cert)
@@ -479,6 +501,10 @@ class OCSPResponder:
         self._fault = fault
 
         self._response_delay_seconds = response_delay_seconds
+
+        self._include_extraneous_status = include_extraneous_status
+
+        self._issuer_hash_algorithm = issuer_hash_algorithm
 
     def _fail(self, status: ResponseStatus) -> OCSPResponse:
         builder = OCSPResponseBuilder(response_status=status.value)
@@ -518,11 +544,19 @@ class OCSPResponder:
         # Check certificate status
         try:
             certificate_status, revocation_date = self.validate()
+            logger.info(f'The certification status is {certificate_status}')
         except Exception as e:
             logger.exception('Could not determine certificate status: %s', e)
             return self._fail(ResponseStatus.internal_error)
 
-        certificate_status_list = [(serial, certificate_status.value)]
+        if self._include_extraneous_status:
+            revocation_date = datetime(2018, 1, 1, 1, 00, 00, 00, timezone.utc)
+            certificate_status_list = [ (serial+3, CertificateStatus.good.value),
+                                        (serial+2, CertificateStatus.unknown.value),
+                                        (serial+1, CertificateStatus.revoked.value),
+                                        (serial, certificate_status.value) ]
+        else:
+            certificate_status_list = [(serial, certificate_status.value)]
 
         # Build the response
         builder = OCSPResponseBuilder(**{
@@ -563,6 +597,10 @@ class OCSPResponder:
         # Set certificate issuer
         builder.certificate_issuer = self._issuer_cert
 
+        # Set the issuer hash algorithm
+        if self._issuer_hash_algorithm:
+            builder.issuer_hash_algo = self._issuer_hash_algorithm
+
         # Set next update date
         if self._next_update_seconds > 0:
             now = datetime.now(timezone.utc)
@@ -583,13 +621,17 @@ class OCSPResponder:
 
 responder = None
 
-def init_responder(issuer_cert: str, responder_cert: str, responder_key: str, fault: str, next_update_seconds: int, response_delay_seconds: int):
+def init_responder(issuer_cert: str, responder_cert: str, responder_key: str, fault: str,
+            next_update_seconds: int, response_delay_seconds: int, include_extraneous_status: bool,
+            issuer_hash_algorithm: str):
     global responder
-    responder = OCSPResponder(issuer_cert=issuer_cert, responder_cert=responder_cert, responder_key=responder_key, fault=fault, next_update_seconds=next_update_seconds, response_delay_seconds=response_delay_seconds)
+    responder = OCSPResponder(issuer_cert=issuer_cert, responder_cert=responder_cert, responder_key=responder_key,
+        fault=fault, next_update_seconds=next_update_seconds, response_delay_seconds=response_delay_seconds,
+        include_extraneous_status=include_extraneous_status, issuer_hash_algorithm=issuer_hash_algorithm)
 
 def init(port=8080, debug=False, host=None):
     logger.info('Launching %sserver on port %d', 'debug' if debug else '', port)
-    app.run(port=port, debug=debug, host=host)
+    app.run(port=port, debug=debug, host=host, use_reloader=False)
 
 @app.route('/', methods=['GET'])
 def _handle_root():
@@ -605,6 +647,7 @@ def _handle_get(u_path):
     """
     if "Host" not in request.headers:
         raise ValueError ("Required 'Host' header not present")
+    logger.info("Receive GET request on /status")
     der = base64.b64decode(u_path)
     ocsp_request = responder.parse_ocsp_request(der)
     return responder.build_http_response(ocsp_request)
@@ -618,5 +661,6 @@ def _handle_post():
     """
     if "Host" not in request.headers:
         raise ValueError ("Required 'Host' header not present")
+    logger.info("Receive POST request on /status")
     ocsp_request = responder.parse_ocsp_request(request.data)
     return responder.build_http_response(ocsp_request)

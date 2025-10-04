@@ -1,0 +1,3 @@
+# Golden test output of GoldenSbeStageBuilderTest/TestLimitSkip
+[3] limitskip s4 s1 
+[1] scan s2 s3 none none none none none none [] @"UUID" true 

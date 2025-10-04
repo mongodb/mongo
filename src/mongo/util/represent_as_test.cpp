@@ -27,27 +27,34 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/util/represent_as.h"
 
-#include <cmath>
-#include <fmt/format.h>
-#include <limits>
-#include <type_traits>
-
-#include <boost/optional.hpp>
-
+#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 
-#include "mongo/util/represent_as.h"
+#include <cmath>
+#include <cstdint>
+#include <limits>
+#include <memory>
+#include <string>
+#include <type_traits>
+#include <vector>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/numeric/conversion/converter_policies.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 
 namespace {
 
-using namespace fmt::literals;
-
 // Char values
-const signed char kCharMax = std::numeric_limits<signed char>::max();
+const char kCharMax = std::numeric_limits<char>::max();
+const signed char kSCharMax = std::numeric_limits<signed char>::max();
+const int kSCharMaxAsInt = kSCharMax;
 const int kCharMaxAsInt = kCharMax;
 
 // Unsigned char values
@@ -361,9 +368,12 @@ void integerToDecimal128() {
         ASSERT(d);
         if (!d->isEqual(Decimal128(std::to_string(n)))) {
             FAIL(
-                "Failed expectation, representAs<Decimal128>({}) == Decimal128({}),"
-                " but !Decimal128({}).isEqual(Decimal128(std::to_string({}))"_format(
-                    n, d->toString(), d->toString(), n));
+                fmt::format("Failed expectation, representAs<Decimal128>({}) == Decimal128({}),"
+                            " but !Decimal128({}).isEqual(Decimal128(std::to_string({}))",
+                            n,
+                            d->toString(),
+                            d->toString(),
+                            n));
         }
     }
 }
@@ -430,8 +440,11 @@ TEST(RepresentAs, DoubleToDecimal128) {
 
 TEST(RepresentAs, PlatformDependent) {
     // signed char
-    ASSERT(*(representAs<int>(kCharMax)) == kCharMaxAsInt);
+    ASSERT(*(representAs<int>(kSCharMax)) == kSCharMaxAsInt);
     ASSERT(!(representAs<signed char>(kIntMax)));
+
+    // unspecified/bare char
+    ASSERT(*(representAs<int>(kCharMax)) == kCharMaxAsInt);
 
     // unsigned char
     ASSERT(*(representAs<int>(kUCharMax)) == kUCharMaxAsInt);

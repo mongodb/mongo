@@ -26,21 +26,38 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-#include "mongo/platform/basic.h"
+#include "mongo/db/exec/projection_executor_builder.h"
 
 #include "mongo/base/exact_cast.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/exec/exclusion_projection_executor.h"
 #include "mongo/db/exec/inclusion_projection_executor.h"
 #include "mongo/db/exec/projection_executor.h"
-#include "mongo/db/exec/projection_executor_builder.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/transformer_interface.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
-#include "mongo/db/query/projection_ast_util.h"
-#include "mongo/db/query/projection_parser.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection_parser.h"
+#include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 
 namespace mongo::projection_executor {
 namespace {
@@ -50,7 +67,7 @@ namespace {
  *
  * The 'AllowFallBackToDefault' parameter should be set to 'true', if the executor is allowed to
  * fall back to the default inclusion projection implementation if the fast-path projection cannot
- * be used for a specific test. If set to 'false', an invariant will be triggered if fast-path
+ * be used for a specific test. If set to 'false', a tassert will be triggered if fast-path
  * projection was expected to be chosen, but the default one has been picked instead.
  */
 template <bool AllowFallBackToDefault>
@@ -110,18 +127,26 @@ protected:
 
         auto executor = buildProjectionExecutor(getExpCtx(), &projection, {}, builderParams);
         if (executor->getType() == TransformerInterface::TransformerType::kInclusionProjection) {
-            auto inclusionExecutor =
-                static_cast<projection_executor::InclusionProjectionExecutor*>(executor.get());
-            auto fastPathRootNode =
-                exact_pointer_cast<projection_executor::FastPathEligibleInclusionNode*>(
-                    inclusionExecutor->getRoot());
-            if (_allowFastPath) {
-                ASSERT_TRUE(fastPathRootNode || AllowFallBackToDefault);
-            } else {
-                ASSERT_FALSE(fastPathRootNode);
-            }
+            assertFastPathHandledCorrectly<projection_executor::InclusionProjectionExecutor,
+                                           projection_executor::FastPathEligibleInclusionNode>(
+                executor.get());
+        } else {
+            assertFastPathHandledCorrectly<projection_executor::ExclusionProjectionExecutor,
+                                           projection_executor::FastPathEligibleExclusionNode>(
+                executor.get());
         }
         return executor;
+    }
+
+    template <typename ExecutorImpl, typename FastPathNode>
+    void assertFastPathHandledCorrectly(projection_executor::ProjectionExecutor* executor) {
+        auto executorImpl = static_cast<ExecutorImpl*>(executor);
+        auto fastPathRootNode = exact_pointer_cast<FastPathNode*>(executorImpl->getRoot());
+        if (_allowFastPath) {
+            ASSERT_TRUE(fastPathRootNode || AllowFallBackToDefault);
+        } else {
+            ASSERT_FALSE(fastPathRootNode);
+        }
     }
 
     // True, if the projection executor is allowed to use the fast-path inclusion projection
@@ -162,6 +187,18 @@ TEST_F(ProjectionExecutorTestWithoutFallBackToDefault, CanProjectInclusionDotted
         executor->applyTransformation(Document{fromjson("{a: {b: 'abc', c: 'def', d: 'ghi'}}")}));
 }
 
+TEST_F(ProjectionExecutorTestWithoutFallBackToDefault, CanProjectInclusionDottedPathNestedArrays) {
+    auto proj = parseWithDefaultPolicies(fromjson("{'a.b': 1}"));
+    auto executor = createProjectionExecutor(proj);
+    Document input{fromjson("{a: [{b: 'abc', c: 'def'}, [{b: 'abc', c: 'def'}, 'd'], 'd']}")};
+    BSONObj expected = fromjson("{a: [{b: 'abc'}, [{b: 'abc'}]]}");
+    BSONObj found = executor->applyTransformation(input).toBsonWithMetaData();
+    // Using BSONObj instead of Document because non-fastpath projection leaves missing values when
+    // projecting scalar elements of array. Because of missing values in the array,
+    // ASSERT_DOCUMENT_EQ consideres expected and found Documents different.
+    ASSERT_BSONOBJ_EQ(expected, found);
+}
+
 TEST_F(ProjectionExecutorTestWithFallBackToDefault, CanProjectExpression) {
     auto proj = parseWithDefaultPolicies(fromjson("{c: {$add: ['$a', '$b']}}"));
     auto executor = createProjectionExecutor(proj);
@@ -177,7 +214,7 @@ TEST_F(ProjectionExecutorTestWithFallBackToDefault, CanProjectExpressionWithComm
                        executor->applyTransformation(Document{fromjson("{a: {b: {e: 4}, p: 2}}")}));
 }
 
-TEST_F(ProjectionExecutorTestWithFallBackToDefault, CanProjectExclusionWithIdPath) {
+TEST_F(ProjectionExecutorTestWithoutFallBackToDefault, CanProjectExclusionWithIdPath) {
     auto projWithoutId = parseWithDefaultPolicies(fromjson("{a: 0, _id: 0}"));
     auto executor = createProjectionExecutor(projWithoutId);
     ASSERT_DOCUMENT_EQ(Document{fromjson("{b: 'def', c: 'ghi'}")},
@@ -185,7 +222,7 @@ TEST_F(ProjectionExecutorTestWithFallBackToDefault, CanProjectExclusionWithIdPat
                            Document{fromjson("{_id: 123, a: 'abc', b: 'def', c: 'ghi'}")}));
 }
 
-TEST_F(ProjectionExecutorTestWithFallBackToDefault, CanProjectExclusionUndottedPath) {
+TEST_F(ProjectionExecutorTestWithoutFallBackToDefault, CanProjectExclusionUndottedPath) {
     auto proj = parseWithDefaultPolicies(fromjson("{a: 0, b: 0}"));
     auto executor = createProjectionExecutor(proj);
     ASSERT_DOCUMENT_EQ(
@@ -193,12 +230,20 @@ TEST_F(ProjectionExecutorTestWithFallBackToDefault, CanProjectExclusionUndottedP
         executor->applyTransformation(Document{fromjson("{a: 'abc', b: 'def', c: 'ghi'}")}));
 }
 
-TEST_F(ProjectionExecutorTestWithFallBackToDefault, CanProjectExclusionDottedPath) {
+TEST_F(ProjectionExecutorTestWithoutFallBackToDefault, CanProjectExclusionDottedPath) {
     auto proj = parseWithDefaultPolicies(fromjson("{'a.b': 0, 'a.d': 0}"));
     auto executor = createProjectionExecutor(proj);
     ASSERT_DOCUMENT_EQ(
         Document{fromjson("{a: {c: 'def'}}")},
         executor->applyTransformation(Document{fromjson("{a: {b: 'abc', c: 'def', d: 'ghi'}}")}));
+}
+
+TEST_F(ProjectionExecutorTestWithoutFallBackToDefault, CanProjectExclusionDottedPathNestedArrays) {
+    auto proj = parseWithDefaultPolicies(fromjson("{'a.c': 0}"));
+    auto executor = createProjectionExecutor(proj);
+    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: [{b: 'abc'}, [{b: 'abc'}, 'd'], 'd']}")},
+                       executor->applyTransformation(Document{fromjson(
+                           "{a: [{b: 'abc', c: 'def'}, [{b: 'abc', c: 'def'}, 'd'], 'd']}")}));
 }
 
 TEST_F(ProjectionExecutorTestWithFallBackToDefault, CanProjectFindPositional) {
@@ -303,7 +348,7 @@ TEST_F(ProjectionExecutorTestWithFallBackToDefault, ExecutorOptimizesExpression)
     auto proj = parseWithDefaultPolicies(fromjson("{a: 1, b: {$add: [1, 2]}}"));
     auto executor = createProjectionExecutor(proj);
     ASSERT_DOCUMENT_EQ(Document{fromjson("{_id: true, a: true, b: {$const: 3}}")},
-                       executor->serializeTransformation(boost::none));
+                       executor->serializeTransformation());
 }
 }  // namespace
 }  // namespace mongo::projection_executor

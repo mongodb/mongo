@@ -1,0 +1,30 @@
+==== VARIATION: query={ a: { $in: [ /foo/ ] } }, sort={}, proj={}
+rea||||fc
+==== VARIATION: query={ a: { $in: [ /foo/i ] } }, sort={}, proj={}
+rea/i/||||fc
+==== VARIATION: query={ a: { $in: [ 1, "foo" ] } }, sort={}, proj={}
+ina||||fc
+==== VARIATION: query={ a: { $in: [ 1, /foo/ ] } }, sort={}, proj={}
+ina_re||||fc
+==== VARIATION: query={ a: { $in: [ 1, /foo/is ] } }, sort={}, proj={}
+ina_re/is/||||fc
+==== VARIATION: query={ a: { $in: [ 1, /foo/si ] } }, sort={}, proj={}
+ina_re/is/||||fc
+==== VARIATION: query={ a: { $in: [ 1, /foo/i, /bar/m, /baz/s ] } }, sort={}, proj={}
+ina_re/ims/||||fc
+==== VARIATION: query={ a: { $in: [ 1, /foo/i, /bar/m, /baz/s, /qux/i, /quux/s ] } }, sort={}, proj={}
+ina_re/ims/||||fc
+==== VARIATION: query={ a: { $in: [ 1, /foo/ism, /bar/msi, /baz/im, /qux/si, /quux/im ] } }, sort={}, proj={}
+ina_re/ims/||||fc
+==== VARIATION: query={ a: { $in: [ 1, /foo/msi, /bar/ism, /baz/is, /qux/mi, /quux/im ] } }, sort={}, proj={}
+ina_re/ims/||||fc
+==== VARIATION: query={ a: { $not: { $in: [ 1, "foo" ] } } }, sort={}, proj={}
+nt[ina]||||fc
+==== VARIATION: query={ a: { $not: { $in: [ 1, /foo/ ] } } }, sort={}, proj={}
+nt[ina_re]||||fc
+==== VARIATION: query={ a: { $not: { $in: [ 1, /foo/i, /bar/i, /baz/msi ] } } }, sort={}, proj={}
+nt[ina_re/ims/]||||fc
+==== VARIATION: query={ a: { $not: { $in: [ /foo/ ] } } }, sort={}, proj={}
+nt[rea]||||fc
+==== VARIATION: query={ a: { $not: { $in: [ /foo/i ] } } }, sort={}, proj={}
+nt[rea/i/]||||fc

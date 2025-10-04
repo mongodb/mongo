@@ -43,10 +43,10 @@ structs:
         strict: false
         fields:
             operationRuntime:
-                    type: ReshardingMetricsTimeInterval
-                    description: >-
-                        The time interval of the entire resharding operation on this donor.
-                    optional: true
+                type: ReshardingMetricsTimeInterval
+                description: >-
+                    The time interval of the entire resharding operation on this donor.
+                optional: true
             criticalSection:
                 type: ReshardingMetricsTimeInterval
                 description: >-
@@ -73,4 +73,7 @@ structs:
             metrics:
                 type: ReshardingDonorMetrics
                 description: "Metrics related to this donor."
+                optional: true
+            changeStreamsMonitor:
+                type: ChangeStreamsMonitorContext
                 optional: true

@@ -30,7 +30,7 @@
 # Transactions: commits and rollbacks
 #
 
-import fnmatch, os, shutil, run, time
+import os
 from suite_subprocess import suite_subprocess
 from wiredtiger import stat
 from wtscenario import make_scenarios
@@ -40,7 +40,7 @@ class test_txn07(wttest.WiredTigerTestCase, suite_subprocess):
     logmax = "100K"
     tablename = 'test_txn07'
     uri = 'table:' + tablename
-    archive_list = ['true', 'false']
+    remove_list = ['true', 'false']
     sync_list = [
         '(method=dsync,enabled)',
         '(method=fsync,enabled)',
@@ -71,8 +71,8 @@ class test_txn07(wttest.WiredTigerTestCase, suite_subprocess):
                                prune=30, prunelong=1000)
 
     def conn_config(self):
-        return 'log=(archive=false,enabled,file_max=%s,' % self.logmax + \
-        'compressor=%s)' % self.compress + \
+        return 'log=(enabled,file_max=%s,' % self.logmax + \
+        'compressor=%s,remove=false)' % self.compress + \
         ',create,error_prefix="%s",' % self.shortid() + \
         "statistics=(fast)," + \
         'transaction_sync="%s",' % \
@@ -227,6 +227,3 @@ class test_txn07(wttest.WiredTigerTestCase, suite_subprocess):
         # journal file read.
         #
         self.runWt(['-h', self.backup_dir, 'printlog'], outfilename='printlog.out')
-
-if __name__ == '__main__':
-    wttest.run()

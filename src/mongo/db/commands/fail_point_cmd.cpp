@@ -27,21 +27,32 @@
  *    it in the license file.
  */
 
-#include <vector>
-
-#include "mongo/base/init.h"
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/privilege.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/s/request_types/wait_for_fail_point_gen.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+
+#include <memory>
+#include <string>
 
 namespace mongo {
 
 /**
- * Command for modifying installed fail points.
+ * Test-only command for modifying installed fail points.
+ *
+ * Requires the 'enableTestCommands' server parameter to be set. See docs/test_commands.md.
  *
  * Format
  * {
@@ -87,16 +98,22 @@ public:
     }
 
     // No auth needed because it only works when enabled via command line.
-    void addRequiredPrivileges(const std::string& dbname,
-                               const BSONObj& cmdObj,
-                               std::vector<Privilege>* out) const override {}
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const DatabaseName& dbName,
+                                 const BSONObj& cmdObj) const override {
+        return Status::OK();
+    }
+
+    bool allowedWithSecurityToken() const final {
+        return true;
+    }
 
     std::string help() const override {
         return "modifies the settings of a fail point";
     }
 
     bool run(OperationContext* opCtx,
-             const std::string& dbname,
+             const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         const std::string failPointName(cmdObj.firstElement().str());
@@ -123,7 +140,10 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            const std::string failPointName = request().getCommandParameter().toString();
+            uassert(ErrorCodes::FailedToParse,
+                    "Missing maxTimeMS",
+                    request().getGenericArguments().getMaxTimeMS());
+            const std::string failPointName = std::string{request().getCommandParameter()};
             FailPoint* failPoint = globalFailPointRegistry().find(failPointName);
             if (failPoint == nullptr)
                 uasserted(ErrorCodes::FailPointSetFailed, failPointName + " not found");
@@ -138,7 +158,7 @@ public:
         // The command parameter happens to be string so it's historically been interpreted
         // by parseNs as a collection. Continuing to do so here for unexamined compatibility.
         NamespaceString ns() const override {
-            return NamespaceString(request().getDbName(), "");
+            return NamespaceString(request().getDbName());
         }
 
         // No auth needed because it only works when enabled via command line.
@@ -160,8 +180,8 @@ public:
     bool requiresAuth() const override {
         return false;
     }
+};
 
-} WaitForFailPointCmd;
-
-MONGO_REGISTER_TEST_COMMAND(FaultInjectCmd);
+MONGO_REGISTER_COMMAND(WaitForFailPointCommand).testOnly().forRouter().forShard();
+MONGO_REGISTER_COMMAND(FaultInjectCmd).testOnly().forRouter().forShard();
 }  // namespace mongo

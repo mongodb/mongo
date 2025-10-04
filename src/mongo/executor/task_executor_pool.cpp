@@ -27,29 +27,45 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/executor/task_executor_pool.h"
 
-#include <algorithm>
+#include "mongo/executor/task_executor_pool_parameters_gen.h"  // IWYU pragma: keep
+#include "mongo/util/assert_util.h"
+#include "mongo/util/processinfo.h"  // IWYU pragma: keep
 
-#include "mongo/executor/task_executor_pool_parameters_gen.h"
-#include "mongo/util/processinfo.h"
+#include <cstdint>
+#include <utility>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT mongo::logv2::LogComponent::kExecutor
 
 namespace mongo {
 namespace executor {
 
 size_t TaskExecutorPool::getSuggestedPoolSize() {
-    auto poolSize = taskExecutorPoolSize.load();
-    if (poolSize > 0) {
-        return poolSize;
+    // TODO SERVER-103733 Consider if we can fix the pool size to 1 once getMores from router
+    // to shards happen on the baton.
+    size_t numPools = []() -> size_t {
+        if (gTaskExecutorPoolSize > 0) {
+            return gTaskExecutorPoolSize;
+        }
+
+        ProcessInfo p;
+        auto numCores = p.getNumAvailableCores();
+
+        // Never suggest a number outside the range [4, 64].
+        return std::max<size_t>(4U, std::min<size_t>(64U, numCores));
+    }();
+
+    if (numPools > 1) {
+        LOGV2_WARNING(
+            10247700,
+            "The sharding task executor pool size is greater than one. This can have "
+            "adverse effects on performance. To avoid this, set taskExecutorPoolSize to 1.",
+            "taskExecutorPoolSize"_attr = gTaskExecutorPoolSize,
+            "numPools"_attr = numPools);
     }
 
-    ProcessInfo p;
-    auto numCores = p.getNumAvailableCores();
-
-    // Never suggest a number outside the range [4, 64].
-    return std::max<size_t>(4U, std::min<size_t>(64U, numCores));
+    return numPools;
 }
 
 void TaskExecutorPool::startup() {
@@ -67,6 +83,20 @@ void TaskExecutorPool::shutdownAndJoin() {
     _fixedExecutor->join();
     for (auto&& exec : _executors) {
         exec->shutdown();
+        exec->join();
+    }
+}
+
+void TaskExecutorPool::shutdown_forTest() {
+    _fixedExecutor->shutdown();
+    for (auto&& exec : _executors) {
+        exec->shutdown();
+    }
+}
+
+void TaskExecutorPool::join_forTest() {
+    _fixedExecutor->join();
+    for (auto&& exec : _executors) {
         exec->join();
     }
 }

@@ -3,21 +3,23 @@
  *
  * Always run on a fully upgraded cluster, so that {$meta: "sortKey"} projections use the newest
  * sort key format.
+ * @tags: [
+ *   requires_scripting,
+ * ]
  */
-(function() {
-"use strict";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var cmdRes;
-var cursorId;
+let cmdRes;
+let cursorId;
 
-var st = new ShardingTest({shards: 2});
+let st = new ShardingTest({shards: 2});
 st.stopBalancer();
 
 // Set up a collection sharded by "_id" with one chunk on each of the two shards.
 var db = st.s.getDB("test");
-var coll = db.getCollection("find_getmore_cmd");
+assert.commandWorked(db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+let coll = db.getCollection("find_getmore_cmd");
 
-coll.drop();
 assert.commandWorked(coll.insert({_id: -9, a: 4, b: "foo foo"}));
 assert.commandWorked(coll.insert({_id: -5, a: 8}));
 assert.commandWorked(coll.insert({_id: -1, a: 10, b: "foo"}));
@@ -27,12 +29,9 @@ assert.commandWorked(coll.insert({_id: 9, a: 3}));
 
 assert.commandWorked(coll.createIndex({b: "text"}));
 
-assert.commandWorked(db.adminCommand({enableSharding: db.getName()}));
-st.ensurePrimaryShard(db.getName(), st.shard0.shardName);
 db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}});
 assert.commandWorked(db.adminCommand({split: coll.getFullName(), middle: {_id: 0}}));
-assert.commandWorked(
-    db.adminCommand({moveChunk: coll.getFullName(), find: {_id: 1}, to: st.shard1.shardName}));
+assert.commandWorked(db.adminCommand({moveChunk: coll.getFullName(), find: {_id: 1}, to: st.shard1.shardName}));
 
 // Find with no options.
 cmdRes = db.runCommand({find: coll.getName()});
@@ -82,7 +81,7 @@ assert.eq(cmdRes.cursor.firstBatch.length, 1);
 assert.eq(cmdRes.cursor.firstBatch[0], {_id: -5, a: 8});
 
 // Find where adding limit and skip overflows.
-const largeInt = new NumberLong('9223372036854775807');
+const largeInt = new NumberLong("9223372036854775807");
 cmdRes = db.runCommand({find: coll.getName(), skip: largeInt, limit: largeInt});
 assert.commandFailed(cmdRes);
 cmdRes = db.runCommand({find: coll.getName(), skip: largeInt, limit: largeInt, singleBatch: true});
@@ -125,7 +124,7 @@ cmdRes = db.runCommand({
     find: coll.getName(),
     filter: {$text: {$search: "foo"}},
     sort: {score: {$meta: "textScore"}},
-    projection: {score: {$meta: "textScore"}}
+    projection: {score: {$meta: "textScore"}},
 });
 assert.commandWorked(cmdRes);
 assert.eq(cmdRes.cursor.id, NumberLong(0));
@@ -138,16 +137,15 @@ assert.eq(cmdRes.cursor.firstBatch[2]["_id"], -1);
 // User projection on $sortKey is illegal.
 cmdRes = db.runCommand({find: coll.getName(), projection: {$sortKey: 1}, sort: {_id: 1}});
 assert.commandFailed(cmdRes);
-cmdRes = db.runCommand(
-    {find: coll.getName(), projection: {$sortKey: {$meta: 'sortKey'}}, sort: {_id: 1}});
+cmdRes = db.runCommand({find: coll.getName(), projection: {$sortKey: {$meta: "sortKey"}}, sort: {_id: 1}});
 assert.commandFailed(cmdRes);
 
 // User should be able to issue a sortKey meta-projection, as long as it's not on the reserved
 // $sortKey field.
 cmdRes = db.runCommand({
     find: coll.getName(),
-    projection: {_id: 0, a: 0, b: 0, key: {$meta: 'sortKey'}},
-    sort: {_id: 1}
+    projection: {_id: 0, a: 0, b: 0, key: {$meta: "sortKey"}},
+    sort: {_id: 1},
 });
 assert.commandWorked(cmdRes);
 assert.eq(cmdRes.cursor.id, NumberLong(0));
@@ -161,4 +159,3 @@ assert.eq(cmdRes.cursor.firstBatch[4], {key: [5]});
 assert.eq(cmdRes.cursor.firstBatch[5], {key: [9]});
 
 st.stop();
-})();

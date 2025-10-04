@@ -4,10 +4,8 @@
  *
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
-(function() {
-"use strict";
-
-load("jstests/core/txns/libs/prepare_helpers.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const dbName = "test";
 const collName = "foo";
@@ -19,7 +17,7 @@ const config = rst.getReplSetConfig();
 // Increase the election timeout so that we do not accidentally trigger an election while
 // stepping up the old secondary.
 config.settings = {
-    "electionTimeoutMillis": 12 * 60 * 60 * 1000
+    "electionTimeoutMillis": 12 * 60 * 60 * 1000,
 };
 rst.initiate(config);
 
@@ -38,14 +36,14 @@ const prepareTimestamp1 = PrepareHelpers.prepareTransaction(priSession);
 
 jsTestLog("Error committing the transaction");
 // This will error in the "commit unprepared transaction" code path.
-assert.commandFailedWithCode(priSessionDB.adminCommand({commitTransaction: 1}),
-                             ErrorCodes.InvalidOptions);
+assert.commandFailedWithCode(priSessionDB.adminCommand({commitTransaction: 1}), ErrorCodes.InvalidOptions);
 
 // This will error in the "commit prepared transaction" code path.
 const tooEarlyTS1 = Timestamp(prepareTimestamp1.getTime() - 1, 1);
 assert.commandFailedWithCode(
     priSessionDB.adminCommand({commitTransaction: 1, commitTimestamp: tooEarlyTS1}),
-    ErrorCodes.InvalidOptions);
+    ErrorCodes.InvalidOptions,
+);
 
 // Wait for the commit point to be propagated to the secondary before stepping it up.
 rst.awaitLastOpCommitted();
@@ -53,7 +51,7 @@ rst.awaitLastOpCommitted();
 jsTestLog("Step up the secondary");
 rst.stepUp(secConn);
 assert.eq(secConn, rst.getPrimary());
-rst.waitForState(priConn, ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [priConn]);
 
 jsTestLog("commitTransaction command is retryable after failover");
 
@@ -76,22 +74,22 @@ assert.commandWorked(secSessionColl.insert({_id: 2}));
 const prepareTimestamp2 = PrepareHelpers.prepareTransaction(secSession);
 
 jsTestLog("Error committing the transaction");
-assert.commandFailedWithCode(secSessionDB.adminCommand({commitTransaction: 1}),
-                             ErrorCodes.InvalidOptions);
+assert.commandFailedWithCode(secSessionDB.adminCommand({commitTransaction: 1}), ErrorCodes.InvalidOptions);
 const tooEarlyTS2 = Timestamp(prepareTimestamp2.getTime() - 1, 1);
 assert.commandFailedWithCode(
     secSessionDB.adminCommand({commitTransaction: 1, commitTimestamp: tooEarlyTS2}),
-    ErrorCodes.InvalidOptions);
+    ErrorCodes.InvalidOptions,
+);
 
 jsTestLog("Step up the original primary");
 rst.stepUp(priConn);
 assert.eq(priConn, rst.getPrimary());
-rst.waitForState(secConn, ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [secConn]);
 
 jsTestLog("Step up the original secondary immediately");
 rst.stepUp(secConn);
 assert.eq(secConn, rst.getPrimary());
-rst.waitForState(priConn, ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [priConn]);
 
 assert.commandWorked(PrepareHelpers.commitTransaction(secSession, prepareTimestamp2));
 
@@ -104,4 +102,3 @@ assert.eq(priConn.getDB(dbName)[collName].count(), 2);
 assert.eq(priConn.getDB(dbName)[collName].find().itcount(), 2);
 
 rst.stopSet();
-}());

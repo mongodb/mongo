@@ -1,0 +1,25 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+mongo_cc_library(
+    name = "rule_based_rewriter",
+    srcs = [],
+    hdrs = [
+        "rule_based_rewriter.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "rule_based_rewriter_test",
+    srcs = [
+        "rule_based_rewriter_test.cpp",
+    ],
+    tags = ["mongo_unittest_fifth_group"],
+    deps = [
+        ":rule_based_rewriter",
+    ],
+)

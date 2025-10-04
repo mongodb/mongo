@@ -1,0 +1,28 @@
+/*! @page explain_acid Tutorial: transactions and ACID properties
+
+Transactions provide a powerful abstraction for multiple threads to
+operate on data concurrently because they have the following properties:
+
+- \b Atomicity: all or none of a transaction is completed.
+- \b Consistency: if each transaction maintains some property when considered
+  separately, then the combined effect of executing the transactions
+  concurrently will maintain the same property.
+- \b Isolation: every execution of a transaction is equivalent to one
+  that runs single-threaded.
+- \b Durability: once a transaction is fully complete, changes it made
+  cannot be lost.
+
+These properties greatly simplify the reasoning required for
+writing concurrent applications.
+Developers can reason about transactions as if they run
+single-threaded and independently.
+
+When the data operations in a transaction are complete, the
+application will normally <i>commit</i> it.
+This causes it to "take effect."
+In keeping with the atomicity property, a transaction that fails
+during execution, or that fails to commit due to a conflict with
+another running transaction, is then <i>aborted</i> and any changes
+it may have made are rolled back.
+
+*/

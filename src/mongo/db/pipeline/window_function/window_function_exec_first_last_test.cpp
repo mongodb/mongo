@@ -27,18 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/db/pipeline/window_function/window_function_exec_first_last.h"
 
+#include "mongo/base/string_data.h"
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
-#include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/window_function/partition_iterator.h"
 #include "mongo/db/pipeline/window_function/window_bounds.h"
-#include "mongo/db/pipeline/window_function/window_function_exec_first_last.h"
 #include "mongo/unittest/unittest.h"
+
+#include <deque>
+#include <memory>
+#include <string>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace {
@@ -53,13 +61,13 @@ public:
         // 'defaultValue' is an internal functionality of $first needed for $shift desugaring.
         using optExp = boost::optional<boost::intrusive_ptr<Expression>>;
         using optVal = boost::optional<Value>;
-        _docSource = DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
+        _docStage = exec::agg::MockStage::createForTest(std::move(docs), getExpCtx());
         auto expCtx = getExpCtx().get();
         auto vps = expCtx->variablesParseState;
         auto optKey =
             keyPath ? optExp(ExpressionFieldPath::parse(expCtx, *keyPath, vps)) : boost::none;
         _iter = std::make_unique<PartitionIterator>(
-            expCtx, _docSource.get(), &_tracker, optKey, boost::none);
+            expCtx, _docStage.get(), &_tracker, optKey, boost::none);
         auto inputField = ExpressionFieldPath::parse(expCtx, "$val", vps);
 
         return {WindowFunctionExecFirst(
@@ -72,7 +80,7 @@ public:
     }
 
 private:
-    boost::intrusive_ptr<DocumentSourceMock> _docSource;
+    boost::intrusive_ptr<exec::agg::MockStage> _docStage;
     MemoryUsageTracker _tracker{false, 100 * 1024 * 1024 /* default memory limit */};
     std::unique_ptr<PartitionIterator> _iter;
 };

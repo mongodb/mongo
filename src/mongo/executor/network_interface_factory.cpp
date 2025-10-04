@@ -27,41 +27,73 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/executor/network_interface_factory.h"
 
-#include <memory>
-
-#include "mongo/base/init.h"
-#include "mongo/base/status.h"
-#include "mongo/config.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/config.h"     // IWYU pragma: keep
+#include "mongo/db/service_context.h"
 #include "mongo/executor/connection_pool.h"
+#include "mongo/executor/egress_connection_closer_manager.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_tl.h"
+#include "mongo/executor/pooled_async_client_factory.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
+
+#include <memory>
+#include <utility>
+
+#include <fmt/format.h>
+
+#ifdef MONGO_CONFIG_GRPC
+#include "mongo/transport/grpc/async_client_factory.h"
+#endif
 
 namespace mongo {
 namespace executor {
 
-std::unique_ptr<NetworkInterface> makeNetworkInterface(std::string instanceName) {
-    return makeNetworkInterface(std::move(instanceName), nullptr, nullptr);
+std::string makeInstanceName(StringData name) {
+    return fmt::format("NetworkInterfaceTL-{}", name);
+}
+
+std::unique_ptr<NetworkInterface> makeNetworkInterface(StringData instanceName) {
+    return makeNetworkInterface(instanceName, nullptr, nullptr);
 }
 
 std::unique_ptr<NetworkInterface> makeNetworkInterface(
-    std::string instanceName,
+    StringData instanceName,
     std::unique_ptr<NetworkConnectionHook> hook,
     std::unique_ptr<rpc::EgressMetadataHook> metadataHook,
-    ConnectionPool::Options connPoolOptions) {
+    ConnectionPool::Options connPoolOptions,
+    transport::TransportProtocol protocol) {
 
-    if (!connPoolOptions.egressTagCloserManager && hasGlobalServiceContext()) {
-        connPoolOptions.egressTagCloserManager =
-            &EgressTagCloserManager::get(getGlobalServiceContext());
+    if (!connPoolOptions.egressConnectionCloserManager && hasGlobalServiceContext()) {
+        connPoolOptions.egressConnectionCloserManager =
+            &EgressConnectionCloserManager::get(getGlobalServiceContext());
     }
 
-    auto svcCtx = hasGlobalServiceContext() ? getGlobalServiceContext() : nullptr;
+    return makeNetworkInterfaceWithClientFactory(
+        instanceName,
+        std::make_shared<PooledAsyncClientFactory>(
+            makeInstanceName(instanceName), std::move(connPoolOptions), std::move(hook), protocol),
+        std::move(metadataHook));
+}
+
+#ifdef MONGO_CONFIG_GRPC
+std::unique_ptr<NetworkInterface> makeNetworkInterfaceGRPC(
+    StringData instanceName, std::unique_ptr<rpc::EgressMetadataHook> metadataHook) {
+    return makeNetworkInterfaceWithClientFactory(
+        instanceName,
+        std::make_shared<transport::grpc::GRPCAsyncClientFactory>(makeInstanceName(instanceName)),
+        std::move(metadataHook));
+}
+#endif
+
+std::unique_ptr<NetworkInterface> makeNetworkInterfaceWithClientFactory(
+    StringData instanceName,
+    std::shared_ptr<AsyncClientFactory> clientFactory,
+    std::unique_ptr<rpc::EgressMetadataHook> metadataHook) {
     return std::make_unique<NetworkInterfaceTL>(
-        instanceName, connPoolOptions, svcCtx, std::move(hook), std::move(metadataHook));
+        makeInstanceName(instanceName), std::move(clientFactory), std::move(metadataHook));
 }
 
 }  // namespace executor

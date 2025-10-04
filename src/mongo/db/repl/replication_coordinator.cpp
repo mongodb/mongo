@@ -27,15 +27,22 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
-#include "mongo/platform/basic.h"
+#include "mongo/db/repl/replication_coordinator.h"
 
 #include "mongo/db/client.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/service_context.h"
-#include "mongo/logv2/log.h"
+#include "mongo/db/storage/storage_options.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+
+#include <utility>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
+
 
 namespace mongo {
 namespace repl {
@@ -70,7 +77,7 @@ void ReplicationCoordinator::set(ServiceContext* service,
 
 bool ReplicationCoordinator::isOplogDisabledFor(OperationContext* opCtx,
                                                 const NamespaceString& nss) const {
-    if (getReplicationMode() == ReplicationCoordinator::modeNone) {
+    if (!getSettings().isReplSet()) {
         return true;
     }
 
@@ -82,25 +89,49 @@ bool ReplicationCoordinator::isOplogDisabledFor(OperationContext* opCtx,
         return true;
     }
 
-    fassert(28626, opCtx->recoveryUnit());
+    // Magic restore performs writes to replicated collections (e.g in the config DB) that we don't
+    // want replicated via the oplog.
+    if (storageGlobalParams.magicRestore) {
+        return true;
+    }
+
+    fassert(28626, shard_role_details::getRecoveryUnit(opCtx));
 
     return false;
 }
 
+void ReplicationCoordinator::setOldestTimestamp(const Timestamp& timestamp) {
+    getServiceContext()->getStorageEngine()->setOldestTimestamp(timestamp, false /*force*/);
+}
+
 bool ReplicationCoordinator::isOplogDisabledForNS(const NamespaceString& nss) {
-    if (nss.isLocal()) {
-        return true;
-    }
-
-    if (nss.isSystemDotProfile()) {
-        return true;
-    }
-
-    if (nss.isDropPendingNamespace()) {
+    if (!nss.isReplicated()) {
         return true;
     }
 
     return false;
+}
+
+bool ReplicationCoordinator::isInInitialSyncOrRollback() const {
+    if (!getSettings().isReplSet()) {
+        return false;
+    }
+
+    const auto memberState = getMemberState();
+    return memberState.startup2() || memberState.rollback();
+}
+
+bool ReplicationCoordinator::shouldUseEmptyOplogBatchToPropagateCommitPoint(
+    OpTime clientOpTime) const {
+    if (!repl::allowEmptyOplogBatchesToPropagateCommitPoint) {
+        return false;
+    }
+
+    // For getMore operations with a last committed opTime, we should not wait if our
+    // lastCommittedOpTime has progressed past the client's lastCommittedOpTime. In that case,
+    // we will return early so that we can inform the client of the new lastCommittedOpTime
+    // immediately.
+    return clientOpTime < getLastCommittedOpTime();
 }
 
 }  // namespace repl

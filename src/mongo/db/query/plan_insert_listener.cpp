@@ -26,18 +26,28 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/query/plan_insert_listener.h"
 
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/local_catalog/collection.h"
+#include "mongo/db/local_catalog/collection_catalog.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/query/find_common.h"
+#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/scopeguard.h"
+
+#include <memory>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 
 namespace mongo::insert_listener {
 namespace {
@@ -61,59 +71,70 @@ bool shouldWaitForInserts(OperationContext* opCtx,
         // We expect awaitData cursors to be yielding.
         invariant(yieldPolicy->canReleaseLocksDuringExecution());
 
-        // For operations with a last committed opTime, we should not wait if the replication
-        // coordinator's lastCommittedOpTime has progressed past the client's lastCommittedOpTime.
-        // In that case, we will return early so that we can inform the client of the new
-        // lastCommittedOpTime immediately.
-        if (!clientsLastKnownCommittedOpTime(opCtx).isNull()) {
+        // For operations with a last committed opTime, we are fetching oplog entries and should not
+        // wait if the replication coordinator's lastCommittedOpTime has progressed past the
+        // client's lastCommittedOpTime. In that case, we will return early so that we can inform
+        // the client of the new lastCommittedOpTime immediately.
+        if (clientsLastKnownCommittedOpTime(opCtx)) {
             auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-            return clientsLastKnownCommittedOpTime(opCtx) >= replCoord->getLastCommittedOpTime();
+            return !replCoord->shouldUseEmptyOplogBatchToPropagateCommitPoint(
+                clientsLastKnownCommittedOpTime(opCtx).value());
         }
         return true;
     }
     return false;
 }
 
-std::shared_ptr<CappedInsertNotifier> getCappedInsertNotifier(OperationContext* opCtx,
-                                                              const NamespaceString& nss,
-                                                              PlanYieldPolicy* yieldPolicy) {
+std::unique_ptr<Notifier> getCappedInsertNotifier(OperationContext* opCtx,
+                                                  const NamespaceString& nss,
+                                                  PlanYieldPolicy* yieldPolicy) {
     // We don't expect to need a capped insert notifier for non-yielding plans.
     invariant(yieldPolicy->canReleaseLocksDuringExecution());
 
-    // We can only wait if we have a collection; otherwise we should retry immediately when
-    // we hit EOF.
-    auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(opCtx, nss);
-    invariant(collection);
+    // In case of the read concern majority, return a majority committed point notifier, otherwise,
+    // a notifier associated with that capped collection
+    //
+    // We can only wait on the capped collection insert notifier if the collection is present,
+    // otherwise we should retry immediately when we hit EOF.
+    if (shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource() ==
+        RecoveryUnit::kMajorityCommitted) {
+        return std::make_unique<MajorityCommittedPointNotifier>();
+    } else {
+        auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
+        invariant(collection);
 
-    return collection->getCappedInsertNotifier();
+        return std::make_unique<LocalCappedInsertNotifier>(
+            collection->getRecordStore()->capped()->getInsertNotifier());
+    }
 }
 
 void waitForInserts(OperationContext* opCtx,
                     PlanYieldPolicy* yieldPolicy,
-                    CappedInsertNotifierData* notifierData) {
-    invariant(notifierData->notifier);
-
+                    std::unique_ptr<Notifier>& notifier) {
     // The notifier wait() method will not wait unless the version passed to it matches the
     // current version of the notifier.  Since the version passed to it is the current version
     // of the notifier at the time of the previous EOF, we require two EOFs in a row with no
     // notifier version change in order to wait.  This is sufficient to ensure we never wait
     // when data is available.
-    auto curOp = CurOp::get(opCtx);
-    curOp->pauseTimer();
-    ON_BLOCK_EXIT([curOp] { curOp->resumeTimer(); });
-
-    uint64_t currentNotifierVersion = notifierData->notifier->getVersion();
-    auto yieldResult = yieldPolicy->yieldOrInterrupt(opCtx, [opCtx, notifierData] {
-        const auto deadline = awaitDataState(opCtx).waitForInsertsDeadline;
-        notifierData->notifier->waitUntil(notifierData->lastEOFVersion, deadline);
-        if (MONGO_unlikely(planExecutorHangWhileYieldedInWaitForInserts.shouldFail())) {
-            LOGV2(4452903,
-                  "PlanExecutor - planExecutorHangWhileYieldedInWaitForInserts fail point enabled. "
-                  "Blocking until fail point is disabled");
-            planExecutorHangWhileYieldedInWaitForInserts.pauseWhileSet();
-        }
-    });
-    notifierData->lastEOFVersion = currentNotifierVersion;
+    notifier->prepareForWait(opCtx);
+    auto yieldResult = yieldPolicy->yieldOrInterrupt(
+        opCtx,
+        [opCtx, &notifier] {
+            const auto deadline = awaitDataState(opCtx).waitForInsertsDeadline;
+            auto curOp = CurOp::get(opCtx);
+            curOp->pauseTimer();
+            ON_BLOCK_EXIT([curOp] { curOp->resumeTimer(); });
+            notifier->waitUntil(opCtx, deadline);
+            if (MONGO_unlikely(planExecutorHangWhileYieldedInWaitForInserts.shouldFail())) {
+                LOGV2(4452903,
+                      "PlanExecutor - planExecutorHangWhileYieldedInWaitForInserts fail point "
+                      "enabled. "
+                      "Blocking until fail point is disabled");
+                planExecutorHangWhileYieldedInWaitForInserts.pauseWhileSet();
+            }
+        },
+        RestoreContext::RestoreType::kYield);
+    notifier->doneWaiting(opCtx);
 
     uassertStatusOK(yieldResult);
 }

@@ -29,14 +29,23 @@
 
 #pragma once
 
-#include <queue>
-
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_set_window_fields.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/window_function/partition_iterator.h"
-#include "mongo/db/pipeline/window_function/window_bounds.h"
 #include "mongo/db/pipeline/window_function/window_function.h"
+#include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
+
+#include <memory>
+#include <queue>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -66,8 +75,13 @@ public:
 
     /**
      * Retrieve the next value computed by the window function.
+     * @param current The current document whose output fields are being calculated.
+     * This argument is optional as only some window functions rely on the current document
+     * to compute their output Value. Each window function may assert that the current doucment
+     * is present if they need it to compute their output Value.
+     * Normally, the current document is only absent in unit tests.
      */
-    virtual Value getNext() = 0;
+    virtual Value getNext(boost::optional<Document> current = boost::none) = 0;
 
     /**
      * Resets the executor as well as any execution state to a clean slate.
@@ -75,12 +89,11 @@ public:
     virtual void reset() = 0;
 
 protected:
-    WindowFunctionExec(PartitionAccessor iter,
-                       MemoryUsageTracker::PerFunctionMemoryTracker* memTracker)
-        : _iter(iter), _memTracker(memTracker){};
+    WindowFunctionExec(PartitionAccessor iter, SimpleMemoryUsageTracker* memTracker)
+        : _iter(iter), _memTracker(memTracker) {};
 
     PartitionAccessor _iter;
-    MemoryUsageTracker::PerFunctionMemoryTracker* _memTracker;
+    SimpleMemoryUsageTracker* _memTracker;
 };
 
 /**
@@ -91,14 +104,19 @@ protected:
  */
 class WindowFunctionExecRemovable : public WindowFunctionExec {
 public:
-    Value getNext() override {
+    Value getNext(boost::optional<Document> current = boost::none) override {
         update();
-        return _function->getValue();
+        if (!current.has_value()) {
+            return _function->getValue();
+        }
+        return _function->getValue(
+            _input->evaluate(*current, &_input->getExpressionContext()->variables));
     }
 
-    void reset() {
+    void reset() override {
         _function->reset();
-        _values = std::queue<Value>();
+        _values = std::queue<MemoryUsageTokenWith<Value>>();
+        _memTracker->set(_function->getApproximateSize());
         doReset();
     }
 
@@ -107,33 +125,32 @@ protected:
                                 PartitionAccessor::Policy policy,
                                 boost::intrusive_ptr<Expression> input,
                                 std::unique_ptr<WindowFunctionState> function,
-                                MemoryUsageTracker::PerFunctionMemoryTracker* memTracker)
+                                SimpleMemoryUsageTracker* memTracker)
         : WindowFunctionExec(PartitionAccessor(iter, policy), memTracker),
           _input(std::move(input)),
-          _function(std::move(function)) {}
+          _function(std::move(function)) {
+        _memTracker->set(_function->getApproximateSize());
+    }
 
     void addValue(Value v) {
         long long prior = _function->getApproximateSize();
-        long long valueSize = v.getApproximateSize();
         _function->add(v);
-        _values.push(v);
-        _memTracker->update(valueSize + static_cast<long long>(_function->getApproximateSize()) -
-                            prior);
+        _values.emplace(MemoryUsageToken{v.getApproximateSize(), _memTracker}, std::move(v));
+        _memTracker->add(_function->getApproximateSize() - prior);
     }
 
     void removeValue() {
         tassert(5429400, "Tried to remove more values than we added", !_values.empty());
-        auto v = _values.front();
         long long prior = _function->getApproximateSize();
-        _function->remove(v);
-        _memTracker->update(static_cast<long long>(_function->getApproximateSize()) - prior -
-                            v.getApproximateSize());
+        auto& v = _values.front();
+        _function->remove(std::move(v.value()));
         _values.pop();
+        _memTracker->add(_function->getApproximateSize() - prior);
     }
 
     boost::intrusive_ptr<Expression> _input;
     // Keep track of values in the window function that will need to be removed later.
-    std::queue<Value> _values;
+    std::queue<MemoryUsageTokenWith<Value>> _values;
 
 private:
     /**

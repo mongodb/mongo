@@ -31,11 +31,11 @@ namespace pmr {
 
 class pool_data_t;
 
-static const std::size_t pool_options_minimum_max_blocks_per_chunk = 1u;
-static const std::size_t pool_options_default_max_blocks_per_chunk = 32u;
-static const std::size_t pool_options_minimum_largest_required_pool_block =
+BOOST_CONTAINER_CONSTANT_VAR std::size_t pool_options_minimum_max_blocks_per_chunk = 1u;
+BOOST_CONTAINER_CONSTANT_VAR std::size_t pool_options_default_max_blocks_per_chunk = 32u;
+BOOST_CONTAINER_CONSTANT_VAR std::size_t pool_options_minimum_largest_required_pool_block =
    memory_resource::max_align > 2*sizeof(void*) ? memory_resource::max_align : 2*sizeof(void*);
-static const std::size_t pool_options_default_largest_required_pool_block =
+BOOST_CONTAINER_CONSTANT_VAR std::size_t pool_options_default_largest_required_pool_block =
    pool_options_minimum_largest_required_pool_block > 4096u
       ? pool_options_minimum_largest_required_pool_block : 4096u;
 
@@ -100,7 +100,7 @@ class pool_resource
 
    //! <b>Effects</b>: Calls
    //!   `this->release()`.
-   virtual ~pool_resource();
+   ~pool_resource();
 
    //! <b>Effects</b>: Calls Calls `upstream_resource()->deallocate()` as necessary
    //!   to release all allocated memory. [ Note: memory is released back to
@@ -131,18 +131,14 @@ class pool_resource
    //!   using `upstream_resource()->allocate()`.
    //!
    //! <b>Throws</b>: Nothing unless `upstream_resource()->allocate()` throws.
-   virtual void* do_allocate(std::size_t bytes, std::size_t alignment);
+   void* do_allocate(std::size_t bytes, std::size_t alignment);
 
    //! <b>Effects</b>: Return the memory at p to the pool. It is unspecified if or under
    //!   what circumstances this operation will result in a call to
    //!   `upstream_resource()->deallocate()`.
    //!
    //! <b>Throws</b>: Nothing.
-   virtual void do_deallocate(void* p, std::size_t bytes, std::size_t alignment);
-
-   //! <b>Returns</b>:
-   //!   `this == dynamic_cast<const pool_resource*>(&other)`.
-   virtual bool do_is_equal(const memory_resource& other) const BOOST_NOEXCEPT;
+   void do_deallocate(void* p, std::size_t bytes, std::size_t alignment);
 
    //Non-standard observers
    public:

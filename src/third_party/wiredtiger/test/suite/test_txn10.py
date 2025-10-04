@@ -30,7 +30,6 @@
 #   Transactions: commits and rollbacks
 #
 
-import fnmatch, os, shutil, time
 from helper import simulate_crash_restart
 from suite_subprocess import suite_subprocess
 import wttest
@@ -39,7 +38,7 @@ class test_txn10(wttest.WiredTigerTestCase, suite_subprocess):
     t1 = 'table:test_txn10_1'
     t2 = 'table:test_txn10_2'
     create_params = 'key_format=i,value_format=i'
-    conn_config = 'log=(archive=false,enabled,file_max=100K),' + \
+    conn_config = 'log=(enabled,file_max=100K,remove=false),' + \
                 'transaction_sync=(method=dsync,enabled)'
 
     def test_recovery(self):
@@ -76,6 +75,3 @@ class test_txn10(wttest.WiredTigerTestCase, suite_subprocess):
             i += 1
         self.assertEqual(i, 0)
         c.close()
-
-if __name__ == '__main__':
-    wttest.run()

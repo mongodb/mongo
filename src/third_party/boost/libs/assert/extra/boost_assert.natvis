@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+
+<Type Name="boost::source_location">
+    <DisplayString>{function_,sb} @ {file_,sb}:{line_}</DisplayString>
+    <Expand>
+        <Item Name="[file]">file_,sb</Item>
+        <Item Name="[line]">line_</Item>
+        <Item Name="[column]">column_</Item>
+        <Item Name="[function]">function_,sb</Item>
+    </Expand>
+</Type>
+
+</AutoVisualizer>

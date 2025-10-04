@@ -31,13 +31,13 @@
  * Unittest for MultikeyPathTracker operations.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <sstream>
-
 #include "mongo/db/multi_key_path_tracker.h"
+
+#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
+
+#include <boost/container/vector.hpp>
 
 namespace mongo {
 namespace {
@@ -45,9 +45,9 @@ namespace {
 void assertMultikeyPathsAreEqual(const MultikeyPaths& actual, const MultikeyPaths& expected) {
     bool match = (expected == actual);
     if (!match) {
-        FAIL(str::stream() << "Expected: " << MultikeyPathTracker::dumpMultikeyPaths(expected)
-                           << ", "
-                           << "Actual: " << MultikeyPathTracker::dumpMultikeyPaths(actual));
+        FAIL(std::string(str::stream()
+                         << "Expected: " << MultikeyPathTracker::dumpMultikeyPaths(expected) << ", "
+                         << "Actual: " << MultikeyPathTracker::dumpMultikeyPaths(actual)));
     }
     ASSERT(match);
 }

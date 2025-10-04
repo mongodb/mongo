@@ -28,8 +28,8 @@
 
 import threading, time
 from helper import simulate_crash_restart
-from test_rollback_to_stable01 import test_rollback_to_stable_base
-from wiredtiger import stat, WT_NOTFOUND
+from rollback_to_stable_util import test_rollback_to_stable_base
+from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 from wtthread import checkpoint_thread
@@ -38,12 +38,11 @@ from wtthread import checkpoint_thread
 # Test the rollback to stable does properly restore the prepare rollback entry
 # from the history store.
 class test_rollback_to_stable26(test_rollback_to_stable_base):
-    session_config = 'isolation=snapshot'
 
     format_values = [
         ('column', dict(key_format='r', value_format='S')),
         ('column_fix', dict(key_format='r', value_format='8t')),
-        ('integer_row', dict(key_format='i', value_format='S')),
+        ('row_integer', dict(key_format='i', value_format='S')),
     ]
 
     hs_remove_values = [
@@ -51,15 +50,20 @@ class test_rollback_to_stable26(test_rollback_to_stable_base):
         ('hs_remove', dict(hs_remove=True))
     ]
 
+    prepare_values = [
+        ('no_prepare', dict(prepare=False)),
+        ('prepare', dict(prepare=True))
+    ]
+
     prepare_remove_values = [
         ('no_prepare_remove', dict(prepare_remove=False)),
         ('prepare_remove', dict(prepare_remove=True))
     ]
 
-    scenarios = make_scenarios(format_values, hs_remove_values, prepare_remove_values)
+    scenarios = make_scenarios(format_values, hs_remove_values, prepare_values, prepare_remove_values)
 
     def conn_config(self):
-        config = 'cache_size=10MB,statistics=(all),timing_stress_for_test=[history_store_checkpoint_delay]'
+        config = 'cache_size=10MB,statistics=(all),timing_stress_for_test=[history_store_checkpoint_delay],verbose=(rts:5)'
         return config
 
     def evict_cursor(self, uri, nrows):
@@ -76,11 +80,9 @@ class test_rollback_to_stable26(test_rollback_to_stable_base):
     def test_rollback_to_stable(self):
         nrows = 10
 
-        # Create a table without logging.
+        # Create a table.
         uri = "table:rollback_to_stable26"
-        ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
-            config='log=(enabled=false)')
+        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format)
         ds.populate()
 
         if self.value_format == '8t':
@@ -100,11 +102,11 @@ class test_rollback_to_stable26(test_rollback_to_stable_base):
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
             ',stable_timestamp=' + self.timestamp_str(10))
 
-        self.large_updates(uri, value_a, ds, nrows, False, 20)
-        self.large_updates(uri, value_b, ds, nrows, False, 30)
+        self.large_updates(uri, value_a, ds, nrows, self.prepare, 20)
+        self.large_updates(uri, value_b, ds, nrows, self.prepare, 30)
 
         if self.hs_remove:
-            self.large_removes(uri, ds, nrows, False, 40)
+            self.large_removes(uri, ds, nrows, self.prepare, 40)
 
         prepare_session = self.conn.open_session()
         prepare_session.begin_transaction()
@@ -118,8 +120,8 @@ class test_rollback_to_stable26(test_rollback_to_stable_base):
         prepare_session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(50))
 
         # Verify data is visible and correct.
-        self.check(value_a, uri, nrows, None, 20)
-        self.check(value_b, uri, nrows, None, 30)
+        self.check(value_a, uri, nrows, None, 21 if self.prepare else 20)
+        self.check(value_b, uri, nrows, None, 31 if self.prepare else 30)
 
         self.evict_cursor(uri, nrows)
 
@@ -131,19 +133,26 @@ class test_rollback_to_stable26(test_rollback_to_stable_base):
         ckpt = checkpoint_thread(self.conn, done)
         try:
             ckpt.start()
-            # Sleep for sometime so that checkpoint starts before committing last transaction.
-            time.sleep(5)
+
+            # Wait for checkpoint to start before committing last transaction.
+            ckpt_started = 0
+            while not ckpt_started:
+                stat_cursor = self.session.open_cursor('statistics:', None, None)
+                ckpt_started = stat_cursor[stat.conn.checkpoint_state][2] != 0
+                stat_cursor.close()
+                time.sleep(1)
+
             prepare_session.rollback_transaction()
         finally:
             done.set()
             ckpt.join()
 
-        self.large_updates(uri, value_d, ds, nrows, False, 60)
+        self.large_updates(uri, value_d, ds, nrows, self.prepare, 60)
 
         # Check that the correct data.
-        self.check(value_a, uri, nrows, None, 20)
-        self.check(value_b, uri, nrows, None, 30)
-        self.check(value_d, uri, nrows, None, 60)
+        self.check(value_a, uri, nrows, None, 21 if self.prepare else 20)
+        self.check(value_b, uri, nrows, None, 31 if self.prepare else 30)
+        self.check(value_d, uri, nrows, None, 61 if self.prepare else 60)
 
         # Simulate a server crash and restart.
         simulate_crash_restart(self, ".", "RESTART")
@@ -159,17 +168,14 @@ class test_rollback_to_stable26(test_rollback_to_stable_base):
         self.assertEqual(hs_removed, nrows)
 
         # Check that the correct data.
-        self.check(value_a, uri, nrows, None, 20)
-        self.check(value_b, uri, nrows, None, 30)
+        self.check(value_a, uri, nrows, None, 21 if self.prepare else 20)
+        self.check(value_b, uri, nrows, None, 31 if self.prepare else 30)
 
-        self.large_updates(uri, value_e, ds, nrows, False, 60)
+        self.large_updates(uri, value_e, ds, nrows, self.prepare, 70)
 
         self.evict_cursor(uri, nrows)
 
         # Check that the correct data.
-        self.check(value_a, uri, nrows, None, 20)
-        self.check(value_b, uri, nrows, None, 30)
-        self.check(value_e, uri, nrows, None, 60)
-
-if __name__ == '__main__':
-    wttest.run()
+        self.check(value_a, uri, nrows, None, 21 if self.prepare else 20)
+        self.check(value_b, uri, nrows, None, 31 if self.prepare else 30)
+        self.check(value_e, uri, nrows, None, 71 if self.prepare else 70)

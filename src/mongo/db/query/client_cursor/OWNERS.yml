@@ -1,0 +1,15 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/query-execution
+  - "OWNERS.yml":
+    approvers:
+      - 10gen/query-execution-staff-leads
+      - 10gen/query-integration-staff-leads
+  - "exhaust_cursor_currentop_integration_test.cpp":
+    approvers:
+      - 10gen/query-integration-observability
+  - "collect_query_stats_mongod.*":
+    approvers:
+      - 10gen/query-integration-observability

@@ -33,12 +33,19 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/update/document_diff_serialization.h"
 
+#include <vector>
+
 namespace mongo {
 namespace change_stream_document_diff_parser {
 struct DeltaUpdateDescription {
+    DeltaUpdateDescription(const DeltaUpdateDescription& other) = delete;
+    DeltaUpdateDescription(DeltaUpdateDescription&& other) = default;
+    DeltaUpdateDescription() = default;
+
     Document updatedFields;
     std::vector<Value> removedFields;
     std::vector<Value> truncatedArrays;
+    Document disambiguatedPaths;
 };
 
 /**

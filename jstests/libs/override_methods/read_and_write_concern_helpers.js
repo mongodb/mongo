@@ -1,17 +1,12 @@
 /**
  * Commands supporting read and write concern.
  */
-var kCommandsSupportingReadConcern = new Set([
-    "aggregate",
-    "count",
-    "distinct",
-    "find",
-]);
+export var kCommandsSupportingReadConcern = new Set(["aggregate", "count", "distinct", "find"]);
 
 /**
  * Write commands supporting snapshot readConcern in a transaction.
  */
-var kWriteCommandsSupportingSnapshotInTransaction = new Set([
+export var kWriteCommandsSupportingSnapshotInTransaction = new Set([
     "delete",
     "findAndModify",
     "findandmodify",
@@ -22,20 +17,17 @@ var kWriteCommandsSupportingSnapshotInTransaction = new Set([
 /**
  * Commands supporting snapshot readConcern outside of transactions.
  */
-var kCommandsSupportingSnapshot = new Set([
-    "aggregate",
-    "distinct",
-    "find",
-]);
+export var kCommandsSupportingSnapshot = new Set(["aggregate", "distinct", "find"]);
 
-var kCommandsSupportingWriteConcern = new Set([
+export var kCommandsSupportingWriteConcern = new Set([
     "_configsvrAddShard",
     "_configsvrAddShardToZone",
     "_configsvrCommitChunksMerge",
     "_configsvrCommitChunkMigration",
     "_configsvrCommitChunkSplit",
+    "_configsvrCommitMergeAllChunksOnShard",
     "_configsvrCreateDatabase",
-    "_configsvrMoveChunk",
+    "_configsvrMoveRange",
     "_configsvrRemoveShard",
     "_configsvrRemoveShardFromZone",
     "_configsvrUpdateZoneKeyRange",
@@ -45,7 +37,7 @@ var kCommandsSupportingWriteConcern = new Set([
     "appendOplogNote",
     "applyOps",
     "aggregate",
-    "captrunc",
+    "bulkWrite",
     "cleanupOrphaned",
     "clone",
     "cloneCollectionAsCapped",
@@ -65,7 +57,6 @@ var kCommandsSupportingWriteConcern = new Set([
     "dropIndexes",
     "dropRole",
     "dropUser",
-    "emptycapped",
     "findAndModify",
     "findandmodify",
     "godinsert",
@@ -81,10 +72,10 @@ var kCommandsSupportingWriteConcern = new Set([
     "revokeRolesFromRole",
     "revokeRolesFromUser",
     "setFeatureCompatibilityVersion",
+    "testInternalTransactions",
     "update",
     "updateRole",
     "updateUser",
 ]);
 
-var kCommandsSupportingWriteConcernInTransaction =
-    new Set(["abortTransaction", "commitTransaction"]);
+export var kCommandsSupportingWriteConcernInTransaction = new Set(["abortTransaction", "commitTransaction"]);

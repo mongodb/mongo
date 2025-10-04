@@ -35,8 +35,9 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 class Status;
 class DBException;
@@ -88,7 +89,7 @@ public:
     static Error fromString(StringData name);
 
     /**
-     * Reuses a unique numeric code in a way that supresses the duplicate code detection. This
+     * Reuses a unique numeric code in a way that suppresses the duplicate code detection. This
      * should only be used when testing error cases to ensure that the code under test fails in the
      * right place. It should NOT be used in non-test code to either make a new error site (use
      * ErrorCodes::Error(CODE) for that) or to see if a specific failure case occurred (use named
@@ -155,7 +156,7 @@ template <>
 constexpr inline bool isNamedCode<ErrorCodes::$ec.name> = true;
 //#end for
 
-MONGO_COMPILER_NORETURN void throwExceptionForStatus(const Status& status);
+MONGO_MOD_NEEDS_REPLACEMENT MONGO_COMPILER_NORETURN void throwExceptionForStatus(const Status& status);
 
 //
 // ErrorCategoriesFor

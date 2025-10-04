@@ -27,34 +27,45 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
-#include "mongo/platform/basic.h"
-
 
 #include "mongo/dbtests/framework_options.h"
 
-#include <boost/filesystem/operations.hpp>
-#include <iostream>
-
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/db/query/find.h"
-#include "mongo/db/storage/flow_control_parameters_gen.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/admission/flow_control_parameters_gen.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/server_parameter.h"
 #include "mongo/db/storage/storage_options.h"
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/debug_util.h"
+#include "mongo/util/options_parser/environment.h"
+#include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/startup_options.h"
-#include "mongo/util/password.h"
+#include "mongo/util/options_parser/value.h"
+#include "mongo/util/str.h"
+
+#include <iostream>
+#include <map>
+#include <utility>
+
+#include <boost/filesystem/directory.hpp>
+#include <boost/filesystem/exception.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
-
-using std::cout;
-using std::endl;
-using std::string;
-using std::vector;
 
 FrameworkGlobalParams frameworkGlobalParams;
 
@@ -87,11 +98,11 @@ bool handlePreValidationTestFrameworkOptions(const moe::Environment& params,
 Status storeTestFrameworkOptions(const moe::Environment& params,
                                  const std::vector<std::string>& args) {
     if (params.count("dbpath")) {
-        frameworkGlobalParams.dbpathSpec = params["dbpath"].as<string>();
+        frameworkGlobalParams.dbpathSpec = params["dbpath"].as<std::string>();
     }
 
     if (params.count("debug") || params.count("verbose")) {
-        setMinimumLoggedSeverity(logv2::LogSeverity::Debug(1));
+        unittest::setMinimumLoggedSeverity(logv2::LogSeverity::Debug(1));
     }
 
     boost::filesystem::path p(frameworkGlobalParams.dbpathSpec);
@@ -122,56 +133,47 @@ Status storeTestFrameworkOptions(const moe::Environment& params,
     if (kDebugBuild)
         LOGV2(22491, "DEBUG build");
 
-    string dbpathString = p.string();
+    std::string dbpathString = p.string();
     storageGlobalParams.dbpath = dbpathString.c_str();
 
-    storageGlobalParams.engine = params["storage.engine"].as<string>();
+    storageGlobalParams.engine = params["storage.engine"].as<std::string>();
     gFlowControlEnabled.store(params["enableFlowControl"].as<bool>());
 
     if (gFlowControlEnabled.load()) {
         LOGV2(22492, "Flow Control enabled");
     }
 
-    if (params.count("replication.enableMajorityReadConcern")) {
-        serverGlobalParams.enableMajorityReadConcern =
-            params["replication.enableMajorityReadConcern"].as<bool>();
-    }
-
     if (params.count("setParameter")) {
         std::map<std::string, std::string> parameters =
             params["setParameter"].as<std::map<std::string, std::string>>();
-        for (std::map<std::string, std::string>::iterator parametersIt = parameters.begin();
-             parametersIt != parameters.end();
-             parametersIt++) {
-            const auto& serverParams = ServerParameterSet::getGlobal()->getMap();
-            auto iter = serverParams.find(parametersIt->first);
-            ServerParameter* parameter = (iter == serverParams.end()) ? nullptr : iter->second;
+        auto* paramSet = ServerParameterSet::getNodeParameterSet();
+        for (const auto& it : parameters) {
+            auto parameter = paramSet->getIfExists(it.first);
             if (nullptr == parameter) {
-                StringBuilder sb;
-                sb << "Illegal --setParameter parameter: \"" << parametersIt->first << "\"";
-                return Status(ErrorCodes::BadValue, sb.str());
+                return {ErrorCodes::BadValue,
+                        str::stream()
+                            << "Illegal --setParameter parameter: \"" << it.first << "\""};
             }
             if (!parameter->allowedToChangeAtStartup()) {
-                StringBuilder sb;
-                sb << "Cannot use --setParameter to set \"" << parametersIt->first
-                   << "\" at startup";
-                return Status(ErrorCodes::BadValue, sb.str());
+                return {ErrorCodes::BadValue,
+                        str::stream() << "Cannot use --setParameter to set \"" << it.first
+                                      << "\" at startup"};
             }
-            Status status = parameter->setFromString(parametersIt->second);
+            Status status = parameter->setFromString(it.second, boost::none);
             if (!status.isOK()) {
-                StringBuilder sb;
-                sb << "Bad value for parameter \"" << parametersIt->first
-                   << "\": " << status.reason();
-                return Status(ErrorCodes::BadValue, sb.str());
+                return {ErrorCodes::BadValue,
+                        str::stream() << "Bad value for parameter \"" << it.first
+                                      << "\": " << status.reason()};
             }
 
             LOGV2(4539300,
                   "Setting server parameter",
-                  "parameter"_attr = parametersIt->first,
-                  "value"_attr = parametersIt->second);
+                  "parameter"_attr = it.first,
+                  "value"_attr = it.second);
         }
     }
 
     return Status::OK();
 }
+
 }  // namespace mongo

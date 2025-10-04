@@ -8,14 +8,11 @@ Wants=network-online.target
 User=mongod
 Group=mongod
 Environment="OPTIONS=-f /etc/mongod.conf"
+Environment="MONGODB_CONFIG_OVERRIDE_NOFORK=1"
+Environment="GLIBC_TUNABLES=glibc.pthread.rseq=0"
 EnvironmentFile=-/etc/sysconfig/mongod
 ExecStart=/usr/bin/mongod $OPTIONS
-ExecStartPre=/usr/bin/mkdir -p /var/run/mongodb
-ExecStartPre=/usr/bin/chown mongod:mongod /var/run/mongodb
-ExecStartPre=/usr/bin/chmod 0755 /var/run/mongodb
-PermissionsStartOnly=true
-PIDFile=/var/run/mongodb/mongod.pid
-Type=forking
+RuntimeDirectory=mongodb
 # file size
 LimitFSIZE=infinity
 # cpu time

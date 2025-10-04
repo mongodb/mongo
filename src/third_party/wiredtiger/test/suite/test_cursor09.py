@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
-from wtdataset import SimpleDataSet, ComplexDataSet, ComplexLSMDataSet
+from wtdataset import SimpleDataSet, ComplexDataSet
 from wtscenario import make_scenarios
 
 # test_cursor09.py
@@ -37,7 +37,6 @@ class test_cursor09(wttest.WiredTigerTestCase):
         ('file-f', dict(type='file:', keyfmt='r', valfmt='8t', dataset=SimpleDataSet)),
         ('file-r', dict(type='file:', keyfmt='r', valfmt='S', dataset=SimpleDataSet)),
         ('file-S', dict(type='file:', keyfmt='S', valfmt='S', dataset=SimpleDataSet)),
-        ('lsm-S', dict(type='lsm:', keyfmt='S', valfmt='S', dataset=SimpleDataSet)),
         ('table-f', dict(type='table:', keyfmt='r', valfmt='8t', dataset=SimpleDataSet)),
         ('table-r', dict(type='table:', keyfmt='r', valfmt='S', dataset=SimpleDataSet)),
         ('table-S', dict(type='table:', keyfmt='S', valfmt='S', dataset=SimpleDataSet)),
@@ -45,8 +44,6 @@ class test_cursor09(wttest.WiredTigerTestCase):
             dataset=ComplexDataSet)),
         ('table-S-complex', dict(type='table:', keyfmt='S', valfmt=None,
             dataset=ComplexDataSet)),
-        ('table-S-complex-lsm', dict(type='table:', keyfmt='S', valfmt=None,
-            dataset=ComplexLSMDataSet)),
     ])
 
     # WT_CURSOR.insert doesn't leave the cursor positioned, verify any
@@ -57,11 +54,8 @@ class test_cursor09(wttest.WiredTigerTestCase):
         ds = self.dataset(self, uri, 100, key_format=self.keyfmt, value_format=self.valfmt)
         ds.populate()
 
-        cursor = self.session.open_cursor(uri, None, None)
+        cursor = ds.open_cursor(uri, None, None)
         cursor[ds.key(10)] = ds.value(10)
         msg = '/requires key be set/'
         self.assertRaisesWithMessage(
             wiredtiger.WiredTigerError, cursor.search, msg)
-
-if __name__ == '__main__':
-    wttest.run()

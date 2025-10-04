@@ -1,0 +1,98 @@
+version: 1.0.0
+filters:
+  - "write_concern_all_commands.js":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "replsettest.js":
+    approvers:
+      - 10gen/server-jstest-infra
+  - "shardingtest.js":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "*golden_test.js":
+    approvers:
+      - 10gen/query-optimization
+  - "sharded_cluster_fixture_helpers.js":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "assert_schema_match.js":
+    approvers:
+      - 10gen/query-execution
+  - "doc_validation_utils.js":
+    approvers:
+      - 10gen/query-execution
+  - "json_schema_test_runner.js":
+    approvers:
+      - 10gen/query-execution
+  - "*bulk_write*":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "curop_helpers.js":
+    approvers:
+      - 10gen/query-integration-observability
+  - "dateutil.js":
+    approvers:
+      - 10gen/query-execution
+  - "fts.js":
+    approvers:
+      - 10gen/query-integration-search
+  - "local_reads.js":
+    approvers:
+      - 10gen/query-integration-observability
+  - "pin_getmore_cursor.js":
+    approvers:
+      - 10gen/query-integration-observability
+  - "profiler.js":
+    approvers:
+      - 10gen/query-integration-observability
+  - "run_with_retries.js":
+    approvers:
+      - 10gen/query-execution
+  - "stats.js":
+    approvers:
+      - 10gen/query-integration-observability
+  - "search.js":
+    approvers:
+      - 10gen/query-integration-search
+  - "shard_targeting_util.js":
+    approvers:
+      - 10gen/query-optimization
+  - "api_version_helpers.js":
+    approvers:
+      - 10gen/query-optimization
+  - "mochalite.js":
+    approvers:
+      - 10gen/devprod-correctness
+  - "mirror_reads_helpers.js":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "conn_pool_helpers.js":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "pause_after_populate.js":
+    approvers:
+      - 10gen/query-optimization
+  - "check_shard_filtering_metadata_helpers.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
+  - "check_metadata_consistency_helpers.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
+  - "catalog_list_operations_consistency_validator.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
+  - "raw_operation_utils.js":
+    approvers:
+      - 10gen/server-collection-write-path
+  - "json_utils.js":
+    approvers:
+      - 10gen/query-integration-features
+  - "replicated_ident_utils.js":
+    approvers:
+      - 10gen/server-storage-engine-integration
+  - "replicated_record_ids_utils.js":
+    approvers:
+      - 10gen/server-storage-engine-integration
+  - "host_ipaddr.js":
+    approvers:
+      - 10gen/server-networking-and-observability

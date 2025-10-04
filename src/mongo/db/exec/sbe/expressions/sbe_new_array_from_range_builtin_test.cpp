@@ -27,7 +27,16 @@
  *    it in the license file.
  */
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
+#include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/unittest/unittest.h"
+
+#include <memory>
+#include <utility>
 
 namespace mongo::sbe {
 class SBEBuiltinNewArrayFromRangeTest : public EExpressionTestFixture {

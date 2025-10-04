@@ -27,37 +27,27 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/matcher/schema/expression_internal_schema_root_doc_eq.h"
+
+#include "mongo/bson/util/builder.h"
 
 namespace mongo {
 
 constexpr StringData InternalSchemaRootDocEqMatchExpression::kName;
 
-bool InternalSchemaRootDocEqMatchExpression::matches(const MatchableDocument* doc,
-                                                     MatchDetails* details) const {
-    return _objCmp.evaluate(doc->toBSON() == _rhsObj);
-}
-
 void InternalSchemaRootDocEqMatchExpression::debugString(StringBuilder& debug,
                                                          int indentationLevel) const {
     _debugAddSpace(debug, indentationLevel);
     debug << kName << " " << _rhsObj.toString();
-
-    auto td = getTag();
-    if (td) {
-        debug << " ";
-        td->debugString(&debug);
-    }
-
-    debug << "\n";
+    _debugStringAttachTagInfo(&debug);
 }
 
 void InternalSchemaRootDocEqMatchExpression::serialize(BSONObjBuilder* out,
+                                                       const SerializationOptions& opts,
                                                        bool includePath) const {
     BSONObjBuilder subObj(out->subobjStart(kName));
-    subObj.appendElements(_rhsObj);
+    SerializationOptions options = opts;
+    options.addHmacedObjToBuilder(&subObj, _rhsObj);
     subObj.doneFast();
 }
 
@@ -70,7 +60,7 @@ bool InternalSchemaRootDocEqMatchExpression::equivalent(const MatchExpression* o
     return _objCmp.evaluate(_rhsObj == realOther->_rhsObj);
 }
 
-std::unique_ptr<MatchExpression> InternalSchemaRootDocEqMatchExpression::shallowClone() const {
+std::unique_ptr<MatchExpression> InternalSchemaRootDocEqMatchExpression::clone() const {
     auto clone =
         std::make_unique<InternalSchemaRootDocEqMatchExpression>(_rhsObj.copy(), _errorAnnotation);
     if (getTag()) {

@@ -29,9 +29,10 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/db/fts/fts_util.h"
+#include "mongo/util/modules.h"
+
+#include <string>
 
 namespace mongo {
 namespace fts {
@@ -99,6 +100,19 @@ public:
 
     virtual size_t getApproximateSize() const {
         return sizeof(FTSQuery) + _query.size() + 1 + _language.size() + 1;
+    }
+
+    /**
+     * FTSQuery's hash function compatible with absl::Hash. Designed be consistent with
+     * 'FTSQuery::equivalent()'.
+     */
+    template <typename H>
+    friend H AbslHashValue(H h, const FTSQuery& ftsQuery) {
+        return H::combine(std::move(h),
+                          ftsQuery.getQuery(),
+                          ftsQuery.getLanguage(),
+                          ftsQuery.getCaseSensitive(),
+                          ftsQuery.getDiacriticSensitive());
     }
 
 private:

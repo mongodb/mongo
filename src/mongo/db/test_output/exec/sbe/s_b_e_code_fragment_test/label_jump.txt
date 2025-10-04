@@ -1,0 +1,27 @@
+# Golden test output of SBECodeFragmentTest/LabelJump
+==== VARIATION append instr
+-- CODE:
+[0x0000-0x0026] stackSize: 1, maxStackSize: 1
+0x0000: pushConstVal(value: 10);
+0x000a: jmp(target: 0x0017);
+0x000f: sub(popLhs: 1, moveFromLhs: 1, offsetLhs: 0, popRhs: 1, moveFromRhs: 1, offsetRhs: 0);
+0x0012: jmp(target: 0x0026);
+0x0017: pushConstVal(value: 20);
+0x0021: jmp(target: 0x000f);
+
+-- RESULT:
+-10
+
+==== VARIATION append code
+-- CODE:
+[0x0000-0x0026] stackSize: 1, maxStackSize: 1
+0x0000: pushConstVal(value: 10);
+0x000a: jmp(target: 0x0017);
+0x000f: sub(popLhs: 1, moveFromLhs: 1, offsetLhs: 0, popRhs: 1, moveFromRhs: 1, offsetRhs: 0);
+0x0012: jmp(target: 0x0026);
+0x0017: pushConstVal(value: 20);
+0x0021: jmp(target: 0x000f);
+
+-- RESULT:
+-10
+

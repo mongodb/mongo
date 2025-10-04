@@ -1,7 +1,16 @@
 .TH mongoldap 1
 .SH MONGOLDAP
+\fIMongoDB Enterprise\f1
+.PP
+Starting in MongoDB 8.0, LDAP authentication and authorization is
+deprecated. LDAP is available and will continue to operate without
+changes throughout the lifetime of MongoDB 8. LDAP will be removed in a
+future major release.
+.PP
+For details, see \fBLDAP Deprecation\f1\&.
 .SH SYNOPSIS
-Starting in version 3.4, MongoDB Enterprise provides
+.PP
+MongoDB Enterprise provides
 \fBmongoldap\f1\f1 for testing MongoDB\(aqs LDAP \fBconfiguration
 options\f1 against a running LDAP server or set
 of servers.
@@ -174,6 +183,19 @@ configuration files are valid, the output might be as follows:
   [OK] Successfully acquired the following roles:
   ...
 .EE
+.SH BEHAVIOR
+.PP
+Starting in MongoDB 5.1, \fBmongoldap\f1 supports prefixing LDAP
+server with \fBsrv:\f1 and \fBsrv_raw:\f1\&.
+.PP
+If your connection string specifies \fB"srv:<DNS_NAME>"\f1, \fBmongoldap\f1
+verifies that \fB"_ldap._tcp.gc._msdcs.<DNS_NAME>"\f1 exists for SRV to
+support Active Directory. If not found, \fBmongoldap\f1 verifies that
+\fB"_ldap._tcp.<DNS_NAME>"\f1 exists for SRV. If an SRV record cannot be
+found, \fBmongoldap\f1 warns you to use \fB"srv_raw:<DNS_NAME>"\f1 instead.
+.PP
+If your connection string specifies \fB"srv_raw:<DNS_NAME>"\f1,
+\fBmongoldap\f1 performs an SRV record lookup for \fB"<DNS NAME>"\f1\&.
 .SH OPTIONS
 .PP
 \fBmongoldap \-\-config\f1, \fBmongoldap \-f\f1
@@ -181,11 +203,11 @@ configuration files are valid, the output might be as follows:
 .PP
 Specifies a configuration file for runtime configuration options.
 The options are equivalent to the command\-line
-configuration options. See \fBConfiguration File Options\f1 for
+configuration options. See \fBSelf\-Managed Configuration File Options\f1 for
 more information.
 .PP
-\fBmongoldap\f1\f1 uses any configuration options related to \fBLDAP Proxy Authentication\f1
-or \fBLDAP Authorization\f1 for testing LDAP authentication or
+\fBmongoldap\f1\f1 uses any configuration options related to \fBSelf\-Managed LDAP Proxy Authentication\f1
+or \fBLDAP Authorization on Self\-Managed Deployments\f1 for testing LDAP authentication or
 authorization.
 .PP
 Requires specifying \fB\-\-user\f1\f1\&. May accept \fB\-\-password\f1\f1 for
@@ -226,14 +248,13 @@ servers, specify \fIone\f1 LDAP server or any of its replicated instances to
 4.1.10 (https://www.rfc\-editor.org/rfc/rfc4511.txt)\&. Do not use \fB\-\-ldapServers\f1\f1
 for listing every LDAP server in your infrastructure.
 .PP
-This setting can be configured on a running \fBmongoldap\f1\f1 using
-\fBsetParameter\f1\f1\&.
-.PP
 If unset, \fBmongoldap\f1\f1 cannot use \fBLDAP authentication or authorization\f1\&.
 .RE
 .PP
 \fBmongoldap \-\-ldapQueryUser\f1
 .RS
+.PP
+\fIAvailable in MongoDB Enterprise only.\f1
 .PP
 The identity with which \fBmongoldap\f1\f1 binds as, when connecting to or
 performing queries on an LDAP server.
@@ -252,30 +273,31 @@ You must use \fB\-\-ldapQueryUser\f1\f1 with \fB\-\-ldapQueryPassword\f1\f1\&.
 .PP
 If unset, \fBmongoldap\f1\f1 will not attempt to bind to the LDAP server.
 .PP
-This setting can be configured on a running \fBmongoldap\f1\f1 using
-\fBsetParameter\f1\f1\&.
-.PP
 Windows MongoDB deployments can use \fB\-\-ldapBindWithOSDefaults\f1\f1
 instead of \fB\-\-ldapQueryUser\f1\f1 and \fB\-\-ldapQueryPassword\f1\f1\&. You cannot specify
 both \fB\-\-ldapQueryUser\f1\f1 and \fB\-\-ldapBindWithOSDefaults\f1\f1 at the same time.
 .RE
 .PP
-\fBmongoldap \-\-ldapQueryPassword\f1
-.RS
+\fIAvailable in MongoDB Enterprise only.\f1
 .PP
 The password used to bind to an LDAP server when using
 \fB\-\-ldapQueryUser\f1\f1\&. You must use \fB\-\-ldapQueryPassword\f1\f1 with
 \fB\-\-ldapQueryUser\f1\f1\&.
 .PP
-If unset, \fBmongoldap\f1\f1 will not attempt to bind to the LDAP server.
+If not set, \fBmongoldap\f1\f1 does not attempt to bind to the LDAP server.
 .PP
-This setting can be configured on a running \fBmongoldap\f1\f1 using
+You can configure this setting on a running \fBmongoldap\f1\f1 using
 \fBsetParameter\f1\f1\&.
 .PP
+The \fBldapQueryPassword\f1\fBsetParameter\f1\f1 command accepts either a
+string or an array of strings. If \fBldapQueryPassword\f1 is set to an array,
+MongoDB tries each password in order until one succeeds. Use a password array
+to roll over the LDAP account password without downtime.
+.PP
 Windows MongoDB deployments can use \fB\-\-ldapBindWithOSDefaults\f1\f1
-instead of \fB\-\-ldapQueryPassword\f1\f1 and \fB\-\-ldapQueryPassword\f1\f1\&. You cannot specify
-both \fB\-\-ldapQueryPassword\f1\f1 and \fB\-\-ldapBindWithOSDefaults\f1\f1 at the same time.
-.RE
+instead of \fB\-\-ldapQueryUser\f1\f1 and \fB\-\-ldapQueryPassword\f1\f1\&.
+You cannot specify both \fB\-\-ldapQueryPassword\f1\f1 and
+\fB\-\-ldapBindWithOSDefaults\f1\f1 at the same time.
 .PP
 \fBmongoldap \-\-ldapBindWithOSDefaults\f1
 .RS
@@ -305,6 +327,8 @@ Use \fB\-\-ldapBindWithOSDefaults\f1\f1 to replace \fB\-\-ldapQueryUser\f1\f1 an
 .RS
 .PP
 \fIDefault\f1: simple
+.PP
+\fIAvailable in MongoDB Enterprise only.\f1
 .PP
 The method \fBmongoldap\f1\f1 uses to authenticate to an LDAP
 server. Use with \fB\-\-ldapQueryUser\f1\f1 and \fB\-\-ldapQueryPassword\f1\f1 to connect to the LDAP server.
@@ -345,6 +369,8 @@ using \fBDIGEST\-MD5\f1 mechanism.
 .PP
 \fIDefault\f1: DIGEST\-MD5
 .PP
+\fIAvailable in MongoDB Enterprise only.\f1
+.PP
 A comma\-separated list of SASL mechanisms \fBmongoldap\f1\f1 can
 use when authenticating to the LDAP server. The \fBmongoldap\f1\f1 and the
 LDAP server must agree on at least one mechanism. The \fBmongoldap\f1\f1
@@ -358,7 +384,7 @@ libraries by default. Defer to the documentation associated with each
 SASL mechanism for guidance on installation and configuration.
 .PP
 If using the \fBGSSAPI\f1 SASL mechanism for use with
-\fBKerberos Authentication\f1, verify the following for the
+\fBKerberos Authentication on Self\-Managed Deployments\f1, verify the following for the
 \fBmongoldap\f1\f1 host machine:
 .PP
 \fBLinux\f1\f1
@@ -416,6 +442,8 @@ For Windows, please see the Windows SASL documentation (https://msdn.microsoft.c
 .PP
 \fIDefault\f1: tls
 .PP
+\fIAvailable in MongoDB Enterprise only.\f1
+.PP
 By default, \fBmongoldap\f1\f1 creates a TLS/SSL secured connection to the LDAP
 server.
 .PP
@@ -444,6 +472,8 @@ credentials between \fBmongoldap\f1\f1 and the LDAP server.
 .PP
 \fIDefault\f1: 10000
 .PP
+\fIAvailable in MongoDB Enterprise only.\f1
+.PP
 The amount of time in milliseconds \fBmongoldap\f1\f1 should wait for an LDAP server
 to respond to a request.
 .PP
@@ -451,13 +481,12 @@ Increasing the value of \fB\-\-ldapTimeoutMS\f1\f1 may prevent connection failur
 MongoDB server and the LDAP server, if the source of the failure is a
 connection timeout. Decreasing the value of \fB\-\-ldapTimeoutMS\f1\f1 reduces the time
 MongoDB waits for a response from the LDAP server.
-.PP
-This setting can be configured on a running \fBmongoldap\f1\f1 using
-\fBsetParameter\f1\f1\&.
 .RE
 .PP
 \fBmongoldap \-\-ldapUserToDNMapping\f1
 .RS
+.PP
+\fIAvailable in MongoDB Enterprise only.\f1
 .PP
 Maps the username provided to \fBmongoldap\f1\f1 for authentication to a LDAP
 Distinguished Name (DN). You may need to use \fB\-\-ldapUserToDNMapping\f1\f1 to transform a
@@ -470,7 +499,7 @@ authenticate to MongoDB with usernames that are not full LDAP DNs.
 Using an \fBLDAP authorization query template\f1\f1 that requires a DN.
 .IP \(bu 2
 Transforming the usernames of clients authenticating to Mongo DB using
-different authentication mechanisms (e.g. x.509, kerberos) to a full LDAP
+different authentication mechanisms (e.g. X.509, kerberos) to a full LDAP
 DN for authorization.
 .RE
 .PP
@@ -546,7 +575,7 @@ dc=com??one?(user={0})"\f1
 .RE
 .PP
 An explanation of  RFC4514 (https://www.ietf.org/rfc/rfc4514.txt),
-RFC4515 (https://tools.ietf.org/search/rfc4515),
+RFC4515 (https://tools.ietf.org/html/rfc4515),
 RFC4516 (https://tools.ietf.org/html/rfc4516), or LDAP queries is out
 of scope for the MongoDB Documentation. Please review the RFC directly or
 use your preferred LDAP resource.
@@ -567,11 +596,10 @@ to find additional matches. If no matches are found in any document,
 or the transformation the document describes fails,
 \fBmongoldap\f1\f1 returns an error.
 .PP
-Starting in MongoDB 4.4, \fBmongoldap\f1\f1 also returns an error
-if one of the transformations cannot be evaluated due to networking
-or authentication failures to the LDAP server. \fBmongoldap\f1\f1
-rejects the connection request and does not check the remaining
-documents in the array.
+\fBmongoldap\f1\f1 also returns an error if one of the transformations
+cannot be evaluated due to networking or authentication failures to the
+LDAP server. \fBmongoldap\f1\f1 rejects the connection request and does
+not check the remaining documents in the array.
 .PP
 Starting in MongoDB 5.0, \fB\-\-ldapUserToDNMapping\f1\f1
 accepts an empty string \fB""\f1 or empty array \fB[ ]\f1 in place of a
@@ -615,15 +643,14 @@ query against the LDAP server, returning the result
 .PP
 If \fB\-\-ldapUserToDNMapping\f1\f1 is unset, \fBmongoldap\f1\f1 applies no transformations to the username
 when attempting to authenticate or authorize a user against the LDAP server.
-.PP
-This setting can be configured on a running \fBmongoldap\f1\f1 using the
-\fBsetParameter\f1\f1 database command.
 .RE
 .PP
 \fBmongoldap \-\-ldapAuthzQueryTemplate\f1
 .RS
 .PP
-A relative LDAP query URL formatted conforming to RFC4515 (https://tools.ietf.org/search/rfc4515) and RFC4516 (https://tools.ietf.org/html/rfc4516) that \fBmongoldap\f1\f1 executes to obtain
+\fIAvailable in MongoDB Enterprise only.\f1
+.PP
+A relative LDAP query URL formatted conforming to RFC4515 (https://tools.ietf.org/html/rfc4515) and RFC4516 (https://tools.ietf.org/html/rfc4516) that \fBmongoldap\f1\f1 executes to obtain
 the LDAP groups to which the authenticated user belongs to. The query is
 relative to the host or hosts specified in \fB\-\-ldapServers\f1\f1\&.
 .PP
@@ -688,10 +715,7 @@ Configure your query with respect to your own unique LDAP configuration.
 .PP
 If unset, \fBmongoldap\f1\f1 cannot authorize users using LDAP.
 .PP
-This setting can be configured on a running \fBmongoldap\f1\f1 using the
-\fBsetParameter\f1\f1 database command.
-.PP
-An explanation of RFC4515 (https://tools.ietf.org/search/rfc4515),
+An explanation of RFC4515 (https://tools.ietf.org/html/rfc4515),
 RFC4516 (https://tools.ietf.org/html/rfc4516) or LDAP queries is out
 of scope for the MongoDB Documentation. Please review the RFC directly or
 use your preferred LDAP resource.

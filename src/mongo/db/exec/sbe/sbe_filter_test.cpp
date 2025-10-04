@@ -31,11 +31,24 @@
  * This file contains tests for sbe::FilterStage.
  */
 
-#include "mongo/platform/basic.h"
-
-
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 #include "mongo/db/exec/sbe/stages/filter.h"
+#include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
+#include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
+#include "mongo/unittest/unittest.h"
+
+#include <memory>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
 
 namespace mongo::sbe {
 

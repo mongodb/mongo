@@ -27,14 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/repl/task_runner_test_fixture.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/db/client.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/task_runner.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/unittest.h"
 
 #include <functional>
 #include <memory>
-
-#include "mongo/db/repl/task_runner.h"
+#include <string>
 
 namespace mongo {
 namespace repl {
@@ -63,7 +67,9 @@ void TaskRunnerTest::destroyTaskRunner() {
 void TaskRunnerTest::setUp() {
     ThreadPool::Options options;
     options.poolName = "TaskRunnerTest";
-    options.onCreateThread = [](const std::string& name) { Client::initThread(name); };
+    options.onCreateThread = [](const std::string& name) {
+        Client::initThread(name, getGlobalServiceContext()->getService());
+    };
     _threadPool = std::make_unique<ThreadPool>(options);
     _threadPool->startup();
 

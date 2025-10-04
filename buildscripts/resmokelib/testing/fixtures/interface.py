@@ -2,14 +2,20 @@
 
 import os.path
 import time
-from enum import Enum
 from collections import namedtuple
-from typing import List
+from enum import Enum
+from logging import Logger
+from threading import Lock
+from typing import TYPE_CHECKING, List
 
 import pymongo
 import pymongo.errors
 
-import buildscripts.resmokelib.utils.registry as registry
+from buildscripts.resmokelib.utils import registry
+
+# TODO: if we ever fix the circular deps in resmoke we will be able to get rid of this
+if TYPE_CHECKING:
+    from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
 
 _VERSIONS = {}  # type: ignore
 
@@ -31,7 +37,7 @@ _VERSIONS = {}  # type: ignore
 # interface.py and fixturelib API establishes forward-compatibility of fixture files.
 # If the informal API becomes heavily used and needs forward-compatibility,
 # consider adding it to the formal API.
-class APIVersion(object, metaclass=registry.make_registry_metaclass(_VERSIONS)):  # pylint: disable=invalid-metaclass
+class APIVersion(object, metaclass=registry.make_registry_metaclass(_VERSIONS)):
     """Class storing fixture API version info."""
 
     REGISTERED_NAME = "APIVersion"
@@ -68,7 +74,7 @@ class TeardownMode(Enum):
     ABORT = 6
 
 
-class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):  # pylint: disable=invalid-metaclass
+class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):
     """Base class for all fixtures."""
 
     # Error response codes copied from mongo/base/error_codes.yml.
@@ -86,7 +92,9 @@ class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):  #
 
     AWAIT_READY_TIMEOUT_SECS = 300
 
-    def __init__(self, logger, job_num, fixturelib, dbpath_prefix=None):
+    def __init__(
+        self, logger: Logger, job_num: int, fixturelib: "FixtureLib", dbpath_prefix: str = None
+    ):
         """Initialize the fixture with a logger instance."""
 
         self.fixturelib = fixturelib
@@ -103,8 +111,9 @@ class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):  #
         self.job_num = job_num
 
         dbpath_prefix = self.fixturelib.default_if_none(self.config.DBPATH_PREFIX, dbpath_prefix)
-        dbpath_prefix = self.fixturelib.default_if_none(dbpath_prefix,
-                                                        self.config.DEFAULT_DBPATH_PREFIX)
+        dbpath_prefix = self.fixturelib.default_if_none(
+            dbpath_prefix, self.config.DEFAULT_DBPATH_PREFIX
+        )
         self._dbpath_prefix = os.path.join(dbpath_prefix, "job{}".format(self.job_num))
 
     def pids(self):
@@ -130,7 +139,7 @@ class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):  #
         """
 
         try:
-            self._do_teardown(mode=mode)
+            self._do_teardown(finished=finished, mode=mode)
         finally:
             if finished:
                 for handler in self.logger.handlers:
@@ -138,7 +147,7 @@ class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):  #
                     # want the logs to eventually get flushed.
                     self.fixturelib.close_loggers(handler)
 
-    def _do_teardown(self, mode=None):  # noqa
+    def _do_teardown(self, finished=False, mode=None):  # noqa
         """Destroy the fixture.
 
         This method must be implemented by subclasses.
@@ -148,11 +157,11 @@ class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):  #
         """
         pass
 
-    def is_running(self):  # pylint: disable=no-self-use
+    def is_running(self):
         """Return true if the fixture is still operating and more tests and can be run."""
         return True
 
-    def get_node_info(self):  # pylint: disable=no-self-use
+    def get_node_info(self):
         """Return a list of NodeInfo objects."""
         return []
 
@@ -175,7 +184,27 @@ class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):  #
         expected by the mongo::ConnectionString class.
         """
         raise NotImplementedError(
-            "get_internal_connection_string must be implemented by Fixture subclasses")
+            "get_internal_connection_string must be implemented by Fixture subclasses"
+        )
+
+    def get_shell_connection_string(self, use_grpc=False):
+        """Return the connection string to be used by the mongo shell process executing a jstest.
+
+        Specify use_grpc=True to get a connection string with the gRPC port.
+
+        This is NOT a driver connection string, but a connection string of the format
+        expected by the mongo::ConnectionString class.
+        """
+        return self.get_internal_connection_string()
+
+    def get_shell_connection_url(self):
+        """Return the mongodb connection string to be used by the mongo shell process executing a jstest.
+
+        Defaults to returning the driver connection url, but can be overriden to provide
+        shell-specific options (such as using a gRPC port).
+        https://docs.mongodb.com/manual/reference/connection-string/
+        """
+        return self.get_driver_connection_url()
 
     def get_driver_connection_url(self):
         """Return the mongodb connection string as defined below.
@@ -183,28 +212,105 @@ class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):  #
         https://docs.mongodb.com/manual/reference/connection-string/
         """
         raise NotImplementedError(
-            "get_driver_connection_url must be implemented by Fixture subclasses")
+            "get_driver_connection_url must be implemented by Fixture subclasses"
+        )
 
-    def mongo_client(self, read_preference=pymongo.ReadPreference.PRIMARY, timeout_millis=30000):
+    def mongo_client(
+        self, read_preference=pymongo.ReadPreference.PRIMARY, timeout_millis=30000, **kwargs
+    ):
         """Return a pymongo.MongoClient connecting to this fixture with specified 'read_preference'.
 
         The PyMongo driver will wait up to 'timeout_millis' milliseconds
         before concluding that the server is unavailable.
         """
 
-        kwargs = {"connectTimeoutMS": timeout_millis}
+        kwargs["connectTimeoutMS"] = timeout_millis
         if pymongo.version_tuple[0] >= 3:
             kwargs["serverSelectionTimeoutMS"] = timeout_millis
             kwargs["connect"] = True
 
-        return pymongo.MongoClient(host=self.get_driver_connection_url(),
-                                   read_preference=read_preference, **kwargs)
+        if self.config.TLS_MODE == "requireTLS":
+            # When server is in 'tlsMode == requireTLS`,
+            # the client would be unable to connect
+            # without local TLS being explicitly turned on.
+            # Other modes, such as 'allowTLS' permit both tls and non-tls clients.
+            kwargs["tls"] = True
+            kwargs["tlsAllowInvalidHostnames"] = True
+            if self.config.TLS_CA_FILE:
+                kwargs["tlsCAFile"] = self.config.TLS_CA_FILE
+            if self.config.SHELL_TLS_CERTIFICATE_KEY_FILE:
+                kwargs["tlsCertificateKeyFile"] = self.config.SHELL_TLS_CERTIFICATE_KEY_FILE
+
+        return pymongo.MongoClient(
+            host=self.get_driver_connection_url(), read_preference=read_preference, **kwargs
+        )
 
     def __str__(self):
         return "%s (Job #%d)" % (self.__class__.__name__, self.job_num)
 
     def __repr__(self):
         return "%r(%r, %r)" % (self.__class__.__name__, self.logger, self.job_num)
+
+    def get_independent_clusters(self) -> List["Fixture"]:
+        """Return a list of the independent clusters that participate in this fixture."""
+        return [self]
+
+    def get_testable_clusters(self) -> List["Fixture"]:
+        """Return a list of the clusters in this fixture that we want to run tests against."""
+        return [self]
+
+
+class DockerComposeException(Exception):
+    """Exception to use when there is a failure in the docker compose interface."""
+
+    pass
+
+
+class _DockerComposeInterface:
+    """
+    Implement the `_all_mongo_d_s_t_instances` method which returns all `mongo{d,s,t}` instances.
+
+    Fixtures that use this interface can programmatically generate `docker-compose.yml` configurations
+    by leveraging the `all_processes` method to access the startup args.
+    """
+
+    def _all_mongo_d_s_t(self) -> List[Fixture]:
+        """
+        Return a list of all mongo{d,s,t} `Fixture` instances in this fixture.
+
+        :return: A list of `mongo{d,s,t}` `Fixture` instances.
+        """
+        raise NotImplementedError(
+            "_all_mongo_d_s_t_instances must be implemented by Fixture subclasses that support `docker-compose.yml` generation."
+        )
+
+    def all_processes(self) -> List["Process"]:
+        """
+        Return a list of all `mongo{d,s,t}` `Process` instances in the fixture.
+
+        :return: A list of mongo{d,s,t} processes for the current fixture.
+        """
+        if not self.config.DOCKER_COMPOSE_BUILD_IMAGES:
+            raise DockerComposeException(
+                "This method is reserved for `--dockerComposeBuildImages` only."
+            )
+
+        processes = []
+
+        # If `mongo_d_s.NOOP_MONGO_D_S_PROCESSES=True`, `mongo_d_s.setup()` will setup a dummy process
+        # to extract args from instead of a real `mongo{d,s}`.
+        for mongo_d_s in self._all_mongo_d_s_t():
+            if mongo_d_s.__class__.__name__ == "MongoDFixture":
+                mongo_d_s.setup()
+                processes += [mongo_d_s.mongod]
+            elif mongo_d_s.__class__.__name__ == "_MongoSFixture":
+                mongo_d_s.setup()
+                processes += [mongo_d_s.mongos]
+            else:
+                raise NotImplementedError(
+                    f"Support for this class has not yet been added to docker compose: {mongo_d_s.__class__.__name__}"
+                )
+        return processes
 
 
 class MultiClusterFixture(Fixture):
@@ -218,10 +324,15 @@ class MultiClusterFixture(Fixture):
 
     REGISTERED_NAME = registry.LEAVE_UNREGISTERED  # type: ignore
 
-    def get_independent_clusters(self):
-        """Return a list of the independent clusters (fixtures) that participate in this fixture."""
+    def get_independent_clusters(self) -> List[Fixture]:
+        """Return a list of the independent clusters that participate in this fixture."""
         raise NotImplementedError(
-            "get_independent_clusters must be implemented by MultiClusterFixture subclasses")
+            "get_independent_clusters must be implemented by MultiClusterFixture subclasses"
+        )
+
+    def get_testable_clusters(self) -> List[Fixture]:
+        """Return a list of the clusters in this fixture that we want to run tests against."""
+        return self.get_independent_clusters()
 
 
 class ReplFixture(Fixture):
@@ -263,7 +374,8 @@ class ReplFixture(Fixture):
                 remaining = deadline - time.time()
                 if remaining <= 0.0:
                     message = "Failed to connect to {} within {} minutes".format(
-                        self.get_driver_connection_url(), ReplFixture.AWAIT_REPL_TIMEOUT_MINS)
+                        self.get_driver_connection_url(), ReplFixture.AWAIT_REPL_TIMEOUT_MINS
+                    )
                     self.logger.error(message)
                     raise self.fixturelib.ServerFailure(message)
             except pymongo.errors.WTimeoutError:
@@ -272,7 +384,8 @@ class ReplFixture(Fixture):
                 raise self.fixturelib.ServerFailure(message)
             except pymongo.errors.PyMongoError as err:
                 message = "Write operation on {} failed: {}".format(
-                    self.get_driver_connection_url(), err)
+                    self.get_driver_connection_url(), err
+                )
                 raise self.fixturelib.ServerFailure(message)
 
 
@@ -289,7 +402,7 @@ class NoOpFixture(Fixture):
         """:return: any pids owned by this fixture (none for NopFixture)."""
         return []
 
-    def mongo_client(self, read_preference=None, timeout_millis=None):
+    def mongo_client(self, read_preference=None, timeout_millis=None, **kwargs):
         """Return the mongo_client connection."""
         raise NotImplementedError("NoOpFixture does not support a mongo_client")
 
@@ -312,6 +425,7 @@ class FixtureTeardownHandler(object):
             logger: A logger to use to log teardown activity.
         """
         self._logger = logger
+        self._lock = Lock()
         self._success = True
         self._message = None
 
@@ -342,9 +456,7 @@ class FixtureTeardownHandler(object):
             return True
         except fixture.fixturelib.ServerFailure as err:
             msg = "Error while stopping {}: {}".format(name, err)
-            self._logger.warning(msg)
-            self._add_error_message(msg)
-            self._success = False
+            self._register_teardown_error(msg)
             return False
 
     def _add_error_message(self, message):
@@ -352,6 +464,12 @@ class FixtureTeardownHandler(object):
             self._message = message
         else:
             self._message = "{} - {}".format(self._message, message)
+
+    def _register_teardown_error(self, message):
+        self._logger.warning(message)
+        with self._lock:
+            self._add_error_message(message)
+            self._success = False
 
 
 def create_fixture_table(fixture):
@@ -366,9 +484,13 @@ def create_fixture_table(fixture):
         longest[key] = len(key)
         columns[key] = []
         for node in info:
-            value = str(getattr(node, key))
-            columns[key].append(value)
-            longest[key] = max(longest[key], len(value))
+            attr = getattr(node, key)
+            str_value = str(attr) if attr is not None else "-"
+            columns[key].append(str_value)
+            longest[key] = max(longest[key], len(str_value))
+
+    # Filter out columns where no row has a value
+    columns = {k: v for k, v in columns.items() if not all(x == "-" for x in v)}
 
     def horizontal_separator():
         row = ""
@@ -402,14 +524,19 @@ def create_fixture_table(fixture):
     return "Fixture status:\n" + table
 
 
-def authenticate(client, auth_options=None):
+def build_client(node, auth_options=None, read_preference=pymongo.ReadPreference.PRIMARY):
     """Authenticate client for the 'authenticationDatabase' and return the client."""
     if auth_options is not None:
-        auth_db = client[auth_options["authenticationDatabase"]]
-        auth_db.authenticate(auth_options["username"], password=auth_options["password"],
-                             mechanism=auth_options["authenticationMechanism"])
-    return client
+        return node.mongo_client(
+            username=auth_options["username"],
+            password=auth_options["password"],
+            authSource=auth_options["authenticationDatabase"],
+            authMechanism=auth_options["authenticationMechanism"],
+            read_preference=read_preference,
+        )
+    else:
+        return node.mongo_client(read_preference=read_preference)
 
 
 # Represents a row in a node info table.
-NodeInfo = namedtuple('NodeInfo', ['full_name', 'name', 'port', 'pid'])
+NodeInfo = namedtuple("NodeInfo", ["full_name", "name", "port", "pid"])

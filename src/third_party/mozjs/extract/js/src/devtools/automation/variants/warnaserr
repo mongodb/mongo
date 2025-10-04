@@ -1,0 +1,4 @@
+{
+    "configure-args": "--enable-warnings-as-errors --enable-rust-simd",
+    "optimize": true
+}

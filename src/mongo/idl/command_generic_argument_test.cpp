@@ -27,81 +27,99 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/idl/command_generic_argument.h"
+
 #include "mongo/unittest/unittest.h"
+
+#include <array>
+#include <memory>
+
+#include <fmt/format.h>
 
 namespace mongo {
 namespace test {
-
-using namespace fmt::literals;
 
 // A copy of the generic command arguments and reply fields from before they were moved to IDL in
 // SERVER-51848. We will test that the IDL definitions match these old C++ definitions.
 struct SpecialArgRecord {
     StringData name;
-    bool isGeneric;
+    bool isGenericArgument;
+    bool isGenericReply;
     bool stripFromRequest;
     bool stripFromReply;
 };
 
 // clang-format off
-static constexpr std::array<SpecialArgRecord, 34> specials{{
-    //                                       /-isGeneric
-    //                                       |  /-stripFromRequest
-    //                                       |  |  /-stripFromReply
-    {"apiVersion"_sd,                        1, 1, 0},
-    {"apiStrict"_sd,                         1, 1, 0},
-    {"apiDeprecationErrors"_sd,              1, 1, 0},
-    {"$audit"_sd,                            1, 1, 0},
-    {"$client"_sd,                           1, 1, 0},
-    {"$configServerState"_sd,                1, 1, 1},
-    {"$db"_sd,                               1, 1, 0},
-    {"allowImplicitCollectionCreation"_sd,   1, 1, 0},
-    {"$oplogQueryData"_sd,                   1, 1, 1},
-    {"$queryOptions"_sd,                     1, 0, 0},
-    {"$readPreference"_sd,                   1, 1, 0},
-    {"$replData"_sd,                         1, 1, 1},
-    {"$clusterTime"_sd,                      1, 1, 1},
-    {"maxTimeMS"_sd,                         1, 0, 0},
-    {"readConcern"_sd,                       1, 0, 0},
-    {"databaseVersion"_sd,                   1, 1, 0},
-    {"shardVersion"_sd,                      1, 1, 0},
-    {"tracking_info"_sd,                     1, 1, 0},
-    {"writeConcern"_sd,                      1, 0, 0},
-    {"lsid"_sd,                              1, 0, 0},
-    {"clientOperationKey"_sd,                1, 0, 0},
-    {"txnNumber"_sd,                         1, 0, 0},
-    {"autocommit"_sd,                        1, 0, 0},
-    {"coordinator"_sd,                       1, 0, 0},
-    {"startTransaction"_sd,                  1, 0, 0},
-    {"stmtId"_sd,                            1, 0, 0},
-    {"$gleStats"_sd,                         0, 0, 1},
-    {"operationTime"_sd,                     0, 0, 1},
-    {"lastCommittedOpTime"_sd,               0, 0, 1},
-    {"readOnly"_sd,                          0, 0, 1},
-    {"comment"_sd,                           1, 0, 0},
-    {"maxTimeMSOpOnly"_sd,                   1, 1, 0},
-    {"$configTime"_sd,                       1, 1, 1},
-    {"$topologyTime"_sd,                     1, 1, 1}}};
+static constexpr std::array<SpecialArgRecord, 35> specials{{
+    //                                       /-isGenericArgument
+    //                                       |  /-isGenericReply
+    //                                       |  |  /-stripFromRequest
+    //                                       |  |  |  /-stripFromReply
+    {"apiVersion"_sd,                        1, 0, 1, 0},
+    {"apiStrict"_sd,                         1, 0, 1, 0},
+    {"apiDeprecationErrors"_sd,              1, 0, 1, 0},
+    {"$audit"_sd,                            1, 0, 1, 0},
+    {"$client"_sd,                           1, 0, 1, 0},
+    {"$configServerState"_sd,                1, 1, 1, 1},
+    {"$db"_sd,                               1, 0, 1, 0},
+    {"$oplogQueryData"_sd,                   1, 1, 1, 1},
+    {"$queryOptions"_sd,                     1, 0, 0, 0},
+    {"$readPreference"_sd,                   1, 0, 1, 0},
+    {"$replData"_sd,                         1, 1, 1, 1},
+    {"$clusterTime"_sd,                      1, 1, 1, 1},
+    {"maxTimeMS"_sd,                         1, 0, 0, 0},
+    {"readConcern"_sd,                       1, 0, 0, 0},
+    {"databaseVersion"_sd,                   1, 0, 1, 0},
+    {"shardVersion"_sd,                      1, 0, 1, 0},
+    {"tracking_info"_sd,                     1, 0, 1, 0},
+    {"writeConcern"_sd,                      1, 0, 0, 0},
+    {"lsid"_sd,                              1, 0, 0, 0},
+    {"clientOperationKey"_sd,                1, 0, 0, 0},
+    {"txnNumber"_sd,                         1, 0, 0, 0},
+    {"autocommit"_sd,                        1, 0, 0, 0},
+    {"coordinator"_sd,                       1, 0, 0, 0},
+    {"startTransaction"_sd,                  1, 0, 0, 0},
+    {"stmtId"_sd,                            1, 0, 0, 0},
+    {"$gleStats"_sd,                         0, 1, 0, 1},
+    {"operationTime"_sd,                     0, 1, 0, 1},
+    {"lastCommittedOpTime"_sd,               0, 1, 0, 1},
+    {"readOnly"_sd,                          0, 1, 0, 1},
+    {"comment"_sd,                           1, 0, 0, 0},
+    {"maxTimeMSOpOnly"_sd,                   1, 0, 1, 0},
+    {"$configTime"_sd,                       1, 1, 1, 1},
+    {"ok"_sd,                                0, 1, 0, 0},
+    {"$topologyTime"_sd,                     1, 1, 1, 1},
+    {"$traceCtx"_sd,                         1, 0, 0, 0}}};
 // clang-format on
 
 TEST(CommandGenericArgument, AllGenericArgumentsAndReplyFields) {
     for (const auto& record : specials) {
-        if (isGenericArgument(record.name) != record.isGeneric) {
-            FAIL("isGenericArgument('{}') should be {}, but it's {}"_format(
-                record.name, record.isGeneric, isGenericArgument(record.name)));
+        if (isGenericArgument(record.name) != record.isGenericArgument) {
+            FAIL(fmt::format("isGenericArgument('{}') should be {}, but it's {}",
+                             record.name,
+                             record.isGenericArgument,
+                             isGenericArgument(record.name)));
+        }
+
+        if (isGenericReply(record.name) != record.isGenericReply) {
+            FAIL(fmt::format("isGenericReply('{}') should be {}, but it's {}",
+                             record.name,
+                             record.isGenericReply,
+                             isGenericReply(record.name)));
         }
 
         if (shouldForwardToShards(record.name) == record.stripFromRequest) {
-            FAIL("shouldForwardToShards('{}') should be {}, but it's {}"_format(
-                record.name, !record.stripFromRequest, shouldForwardToShards(record.name)));
+            FAIL(fmt::format("shouldForwardToShards('{}') should be {}, but it's {}",
+                             record.name,
+                             !record.stripFromRequest,
+                             shouldForwardToShards(record.name)));
         }
 
         if (shouldForwardFromShards(record.name) == record.stripFromReply) {
-            FAIL("shouldForwardFromShards('{}') should be {}, but it's {}"_format(
-                record.name, !record.stripFromReply, shouldForwardFromShards(record.name)));
+            FAIL(fmt::format("shouldForwardFromShards('{}') should be {}, but it's {}",
+                             record.name,
+                             !record.stripFromReply,
+                             shouldForwardFromShards(record.name)));
         }
     }
 }

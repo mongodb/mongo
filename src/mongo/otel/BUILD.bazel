@@ -1,0 +1,69 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+OTEL_TARGET_COMPATIBLE_WITH = select({
+    "//bazel/config:build_otel_enabled": [],
+    "//conditions:default": ["@platforms//:incompatible"],
+})
+
+exports_files(
+    glob(["*.h"]) + glob(["*.cpp"]),
+)
+
+mongo_cc_library(
+    name = "otel_base",
+    srcs = [
+        "telemetry_context_holder.cpp",
+    ],
+    hdrs = [
+        "telemetry_context.h",
+        "telemetry_context_holder.h",
+        "telemetry_context_serialization.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "otel_internal",
+    srcs = [
+        "telemetry_context_serialization.cpp",
+    ],
+    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+    deps = [
+        ":otel_base",
+        "//src/mongo/otel/traces:tracing_internal",
+    ],
+)
+
+mongo_cc_library(
+    name = "otel",
+    deps = [
+        ":otel_base",
+    ] + select(
+        {
+            "@//bazel/config:build_otel_enabled": [
+                ":otel_internal",
+            ],
+            "//conditions:default": [],
+        },
+    ),
+)
+
+mongo_cc_unit_test(
+    name = "otel_test",
+    srcs = [
+        "telemetry_context_serialization_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_first_group",
+        "otel_test",
+    ],
+    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+    deps = [
+        ":otel",
+        "//src/third_party/opentelemetry-cpp/api",
+    ],
+)

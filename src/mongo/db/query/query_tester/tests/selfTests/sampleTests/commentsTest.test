@@ -1,0 +1,41 @@
+// PreName 1
+// PreName 2
+commentsTest
+// PreCollName 1
+// PreCollName 2
+getMoreData
+// PreCollFiles 1
+// PreCollFiles 2
+getMoreTest.coll
+// PreCollFiles 3
+// PreCollFiles 4
+basic.coll
+// PreCollFiles 5
+// PreCollFiles 6
+
+// PreTest 1
+// PreTest 2
+0
+// PreQuery 1
+// PreQuery 2
+:results {aggregate: "getMoreTest", pipeline: [ { "$match": {} } ], cursor: {}}
+// PostTest 1
+// PostTest 2
+
+// PreTest 3
+// PreTest 4
+1
+// PreQuery 3
+// PreQuery 4
+:sortResults {aggregate: "getMoreTest", pipeline: [ { "$match": {} } ], cursor: {}}
+// PostTest 3
+// PostTest 4
+
+// PreTest 5
+// PreTest 6
+2
+// PreQuery 5
+// PreQuery 6
+:results {aggregate: "getMoreTest", pipeline: [ { "$match": { "a": { "$ne": 102 } } } ], cursor: {}}
+// PostTest 5
+// PostTest 6

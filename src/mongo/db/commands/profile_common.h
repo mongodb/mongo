@@ -29,11 +29,23 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-
 #include "mongo/base/status.h"
-#include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/profile_settings.h"
+#include "mongo/db/service_context.h"
+#include "mongo/util/modules.h"
+
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -47,7 +59,7 @@ class ProfileCmdRequest;
 class ProfileCmdBase : public BasicCommand {
 public:
     ProfileCmdBase() : BasicCommand("profile") {}
-    virtual ~ProfileCmdBase() {}
+    ~ProfileCmdBase() override {}
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kAlways;
@@ -64,22 +76,21 @@ public:
         return false;
     }
 
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) const final;
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const final;
 
     bool run(OperationContext* opCtx,
-             const std::string& dbName,
+             const DatabaseName& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) final;
 
 protected:
     // Applies the given profiling level and filter, or throws if the profiling level could not be
     // set. On success, returns a struct indicating the previous profiling level and filter.
-    virtual CollectionCatalog::ProfileSettings _applyProfilingLevel(
-        OperationContext* opCtx,
-        const std::string& dbName,
-        const ProfileCmdRequest& request) const = 0;
+    virtual ProfileSettings _applyProfilingLevel(OperationContext* opCtx,
+                                                 const DatabaseName& dbName,
+                                                 const ProfileCmdRequest& request) const = 0;
 };
 
 struct ObjectOrUnset {

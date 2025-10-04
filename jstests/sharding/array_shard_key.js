@@ -3,16 +3,15 @@
 //   uses_multi_shard_transaction,
 //   uses_transactions,
 // ]
-(function() {
-'use strict';
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({shards: 3});
+let st = new ShardingTest({shards: 3});
 
-var mongos = st.s0;
+let mongos = st.s0;
 
-const kDbName = 'TestDB';
-const kCollName = 'Foo';
-const kFullNs = kDbName + '.' + kCollName;
+const kDbName = "TestDB";
+const kCollName = "Foo";
+const kFullNs = kDbName + "." + kCollName;
 
 const session = st.s.startSession({retryWrites: true});
 const sessionDB = session.getDatabase(kDbName);
@@ -24,7 +23,7 @@ printjson(mongos.getDB("config").chunks.find().toArray());
 
 print("1: insert some invalid data");
 
-var value = null;
+let value = null;
 
 // Insert an object with invalid array key
 assert.commandFailedWithCode(coll.insert({i: [1, 2]}), ErrorCodes.ShardKeyNotFound);
@@ -41,18 +40,22 @@ assert.commandWorked(coll.update(value, {$set: {j: 2}}));
 
 // Update the value with invalid other fields
 value = coll.findOne({i: 1});
-assert.commandFailedWithCode(sessionDB[kCollName].update(value, Object.merge(value, {i: [3]})),
-                             ErrorCodes.NotSingleValueField);
+assert.commandFailedWithCode(
+    sessionDB[kCollName].update(value, Object.merge(value, {i: [3]})),
+    ErrorCodes.NotSingleValueField,
+);
 
 // Multi-update the value with invalid other fields
 value = coll.findOne({i: 1});
-assert.commandFailedWithCode(coll.update(value, Object.merge(value, {i: [3, 4]}), false, true),
-                             ErrorCodes.InvalidOptions);
+assert.commandFailedWithCode(
+    coll.update(value, Object.merge(value, {i: [3, 4]}), false, true),
+    ErrorCodes.InvalidOptions,
+);
 
 // Multi-update the value with other fields (won't work, but no error)
 value = coll.findOne({i: 1});
 assert.commandWorked(coll.update(Object.merge(value, {i: [1, 1]}), {$set: {k: 4}}, false, true));
-assert.docEq(coll.findOne({i: 1}, {_id: 0}), {i: 1, j: 2});
+assert.docEq({i: 1, j: 2}, coll.findOne({i: 1}, {_id: 0}));
 
 // Query the value with other fields (won't work, but no error)
 value = coll.findOne({i: 1});
@@ -90,14 +93,13 @@ assert.commandWorked(coll.update({_id: 1, i: 1}, {_id: 1, i: 1, j: [1, 2]}, true
 assert.eq(coll.find().itcount(), 1);
 
 jsTestLog("Testing dotted path shard key with array value inserts.");
-const kDottedCollName = 'collDotted';
-const kDottedFullNs = kDbName + '.' + kDottedCollName;
+const kDottedCollName = "collDotted";
+const kDottedFullNs = kDbName + "." + kDottedCollName;
 const dottedColl = mongos.getCollection(kDottedFullNs);
 
 assert.commandWorked(mongos.adminCommand({shardCollection: kDottedFullNs, key: {"a.b": 1}}));
 
-assert.commandFailedWithCode(dottedColl.insert({a: [{b: -5}, {b: 5}]}),
-                             ErrorCodes.ShardKeyNotFound);
+assert.commandFailedWithCode(dottedColl.insert({a: [{b: -5}, {b: 5}]}), ErrorCodes.ShardKeyNotFound);
 assert.eq(null, dottedColl.findOne({"a.b": 5}));
 assert.eq(null, dottedColl.findOne({"a.b": -5}));
 
@@ -105,8 +107,7 @@ jsTestLog("Testing dotted path shard key with array value updates.");
 
 assert.commandWorked(dottedColl.insert({a: {b: 1}}));
 
-assert.commandFailedWithCode(dottedColl.update({a: {b: 1}}, {a: [{b: -5}, {b: 5}]}),
-                             ErrorCodes.NotSingleValueField);
+assert.commandFailedWithCode(dottedColl.update({a: {b: 1}}, {a: [{b: -5}, {b: 5}]}), ErrorCodes.NotSingleValueField);
 
 assert.commandWorked(sessionDB[kDottedCollName].update({a: {b: 1}}, {}));
 
@@ -143,4 +144,3 @@ st.shardColl(coll, {_id: 1, i: 1}, {_id: ObjectId(), i: 1});
 st.printShardingStatus();
 
 st.stop();
-})();

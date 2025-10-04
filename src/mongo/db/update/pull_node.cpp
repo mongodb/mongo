@@ -27,12 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/update/pull_node.h"
 
+#include "mongo/base/clonable_ptr.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/matcher/matcher.h"
+#include "mongo/db/exec/mutable_bson/const_element.h"
 #include "mongo/db/matcher/copyable_match_expression.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/extensions_callback.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
+#include "mongo/util/assert_util.h"
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -53,8 +65,8 @@ public:
     }
 
     bool match(const mutablebson::ConstElement& element) final {
-        if (element.getType() == mongo::Object) {
-            return _matchExpr->matchesBSON(element.getValueObject());
+        if (element.getType() == BSONType::object) {
+            return exec::matcher::matchesBSON(&*_matchExpr, element.getValueObject());
         } else {
             return false;
         }
@@ -94,7 +106,7 @@ public:
 
     bool match(const mutablebson::ConstElement& element) final {
         BSONObj candidate = element.getValue().wrap("");
-        return _matchExpr->matchesBSON(candidate);
+        return exec::matcher::matchesBSON(&*_matchExpr, candidate);
     }
 
     void setCollator(const CollatorInterface* collator) final {
@@ -143,11 +155,11 @@ Status PullNode::init(BSONElement modExpr, const boost::intrusive_ptr<Expression
     invariant(modExpr.ok());
 
     try {
-        if (modExpr.type() == mongo::Object &&
+        if (modExpr.type() == BSONType::object &&
             !MatchExpressionParser::parsePathAcceptingKeyword(
                 modExpr.embeddedObject().firstElement())) {
             _matcher = std::make_unique<ObjectMatcher>(modExpr.embeddedObject(), expCtx);
-        } else if (modExpr.type() == mongo::Object || modExpr.type() == mongo::RegEx) {
+        } else if (modExpr.type() == BSONType::object || modExpr.type() == BSONType::regEx) {
             _matcher = std::make_unique<WrappedObjectMatcher>(modExpr, expCtx);
         } else {
             _matcher = std::make_unique<EqualityMatcher>(modExpr, expCtx->getCollator());

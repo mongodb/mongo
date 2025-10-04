@@ -1,0 +1,205 @@
+/*! @page timestamp_global_api Managing the global timestamp state
+
+Applications using timestamps need to manage the global timestamp state. These
+timestamps are queried using the WT_CONNECTION::query_timestamp method and set
+using the WT_CONNECTION::set_timestamp method.
+
+Applications will generally focus on two of these global timestamps: first, the
+beginning of the database's read window, called \c oldest_timestamp, and
+second, the application time at which data is known to be stable and
+will never be rolled back, called \c stable_timestamp.
+
+The oldest timestamp is the oldest time at which a transaction is
+allowed to read. The historic values of data modified before this time can no
+longer be read by new transactions. Transactions already in progress
+are not affected when the \c oldest_timestamp changes.
+
+The stable timestamp is the earliest time at which data is considered stable.
+(Data is said to be stable when it is not only durable, but additionally,
+transactions committed at or before the stable time cannot be rolled back by
+application-level transaction management.) The stable timestamp is saved
+along with every checkpoint, and that saved time is the point to which the
+database is recovered after a crash. It is also the earliest point to which
+the database can be returned via an explicit WT_CONNECTION::rollback_to_stable
+call. (See @ref timestamp_misc_rts.)  All transactions must commit after
+the current \c stable timestamp.
+
+Applications are responsible for managing these timestamps and periodically
+updating them.
+
+Note that updating the stable timestamp does not itself trigger a database
+checkpoint or change data durability; updates before the new stable timestamp
+become stable (and thus visible after recovery) as part of the next checkpoint.
+
+@section timestamp_global_setting_timestamps Setting global timestamps
+
+The following table lists the global timestamps an application can set using the
+WT_CONNECTION::set_timestamp method, including constraints.
+
+| Timestamp | Constraints | Description |
+|-----------|-------------|-------------|
+| durable_timestamp | none | temporarily set the system's maximum durable timestamp, bounding the timestamp returned by \c all_durable. |
+| oldest_timestamp | <= stable; may not move backward, set to the value as of the last checkpoint during recovery | Inform the system future reads and writes will never be earlier than the specified timestamp. |
+| stable_timestamp | may not move backward, set to the stable timestamp during rollback-to-stable and recovery | Inform the system checkpoints should not include commits newer than the specified timestamp. |
+
+@subsection timestamp_global_set_api_durable_timestamp Setting the global "durable_timestamp" timestamp
+
+The global \c durable_timestamp temporarily sets the system's maximum durable
+timestamp, bounding the timestamp returned when querying the \c all_durable
+timestamp (see below). Note that the "system's maximum durable timestamp" is
+the maximum durable timestamp of any committed transaction, and \b not the
+timestamp of data changes which have made it to stable storage.
+
+The \c durable_timestamp is advanced to the transaction's durable timestamp (or
+the transaction's commit timestamp, if no durable timestamp was set), by any
+transaction commit with a durable (commit) timestamp after the current value.
+
+The \c durable_timestamp is set to the stable timestamp whenever the
+WT_CONNECTION::rollback_to_stable method is called.
+
+\warning The \c durable timestamp is used by the MongoDB server and is
+generally not expected to be useful to other applications.
+
+@subsection timestamp_global_set_api_oldest_timestamp Setting the "oldest_timestamp" timestamp
+
+Setting \c oldest_timestamp indicates future read timestamps will be at least
+as recent as the timestamp, allowing WiredTiger to discard history before the
+specified point. It is not required that there be no currently active readers
+at earlier timestamps: this setting only indicates future application needs.
+In other words, as active readers age out of the system, historic data up to
+the oldest timestamp may be discarded, but no historic data at or after the
+\c oldest timestamp will be discarded. Retaining history can be expensive in
+terms of both disk and I/O resources.
+
+During recovery, the \c oldest_timestamp is set to its value as of the checkpoint
+to which recovery is done.
+
+The \c oldest_timestamp must be less than or equal to the \c stable_timestamp.
+
+@subsection timestamp_global_set_api_stable_timestamp Setting the "stable_timestamp" timestamp
+
+The \c stable_timestamp determines the timestamp for subsequent checkpoints. In
+other words, updates to an object after the stable timestamp will not be included in a
+future checkpoint. Because tables in a timestamp world are generally using
+checkpoint durability, the \c stable_timestamp also determines the point to which
+recovery will be done after failures.
+
+During recovery, the \c stable_timestamp is set to the value to which recovery is
+performed.
+
+It is possible to explicitly roll back to a time after, or equal to, the current
+\c stable_timestamp using the WT_CONNECTION::rollback_to_stable method.
+(See @ref timestamp_misc_rts.)
+
+The \c stable_timestamp should be updated frequently as it determines the
+amount of work required after recovery to bring the system online.
+
+Using the stable timestamp in the checkpoint is not required, and can be
+overridden using the <tt>use_timestamp=false</tt> configuration of the
+WT_SESSION::checkpoint call. This is not intended for general use, but can
+be useful for backup scenarios where rolling back to a stable timestamp
+isn't possible and it's useful for a checkpoint to contain the most recent
+possible data.
+
+@section timestamp_global_querying_timestamps Querying global timestamps
+
+The following table lists the global timestamps an application can query using
+the WT_CONNECTION::query_timestamp method, including constraints. In all cases,
+a timestamp of 0 is returned if the timestamp is not available or has not been
+set, for example, the \c last_checkpoint timestamp if no checkpoints have run,
+or \c oldest_reader if there are no active transactions.
+
+| Timestamp | Constraints | Description |
+|-----------|-------------|-------------|
+| all_durable | None | The largest timestamp such that all timestamps up to that value have been made durable, bounded by the \c durable timestamp. |
+| last_checkpoint | <= stable | The stable timestamp at which the last checkpoint ran. |
+| oldest_reader | None | The timestamp of the oldest currently active read transaction. |
+| oldest_timestamp | <= stable | The current application-set \c oldest_timestamp value. |
+| pinned | <= oldest | The minimum of the \c oldest_timestamp and the oldest active reader. |
+| recovery | <= stable | The stable timestamp used in the most recent checkpoint prior to the last shutdown. |
+| stable_timestamp | None | The current application-set \c stable_timestamp value. |
+
+@subsection timestamp_global_query_api_all_durable Reading the "all_durable" timestamp
+
+The \c all_durable timestamp is the minimum of the global \c durable_timestamp
+value and a durable timestamp before any unresolved transaction in the system.
+
+For example:
+- If a transaction commits with a durable timestamp of 50 and there are no
+running transactions in the system, \c all_durable will return 50.
+- If a transaction commits with a durable timestamp of 50, and there is
+an unresolved transaction with a durable timestamp of 40, \c all_durable will
+return 39.
+- If a transaction commits with a durable timestamp of 50 and there
+are no running transactions in the system and the application sets
+\c durable_timestamp to 30, \c all_durable will return 30.
+- If a transaction commits with a durable timestamp of 50, and there is an
+unresolved transaction with a durable timestamp of 20 and the application sets
+\c durable_timestamp to 30, \c all_durable will return 19.
+- If the application sets \c durable_timestamp to 30, and a transaction then
+commits with a durable timestamp of 50, \c all_durable will return 50.
+
+\warning It is possible for the \c all_durable value read by the application
+to be obsolete by the time the application receives it and applications using
+this value to make operational decisions are responsible for coordinating their
+own actions (for example by using high-level locks) to ensure its validity.
+Specifically, any transaction commit with a durable timestamp (or a commit
+timestamp if no durable timestamp was set), larger than the current
+\c durable_timestamp value will set the \c durable_timestamp to the transaction's
+durable (commit) timestamp. Calling the WT_CONNECTION::rollback_to_stable
+method will reset the \c durable_timestamp to the stable timestamp.
+
+\warning Reading the \c all_durable timestamp does not prevent additional
+prepared but uncommitted transactions from appearing if a transaction prepares,
+setting an earlier durable timestamp.
+
+\warning The \c all_durable query is used by the MongoDB server and is
+generally not expected to be useful to other applications.
+
+The \c all_durable timestamp is read-only.
+
+@subsection timestamp_global_query_api_last_checkpoint Reading the "last_checkpoint" timestamp
+
+The \c last_checkpoint timestamp is the stable timestamp of the previous
+checkpoint (or 0 if no checkpoints have run).  This timestamp is a general case
+of the \c recovery timestamp. Generally, applications are expected to use the
+\c recovery timestamp and not the \c last_checkpoint timestamp.
+
+The \c last_checkpoint timestamp is read-only.
+
+@subsection timestamp_global_query_api_oldest_reader Reading the "oldest_reader" timestamp
+
+The \c oldest_reader timestamp is the oldest transaction read timestamp active,
+including the read timestamp of any running checkpoint.
+
+The \c oldest_reader timestamp is read-only.
+
+@subsection timestamp_global_query_api_oldest_timestamp Reading the "oldest_timestamp" timestamp
+
+The \c oldest_timestamp is the current \c oldest_timestamp as set by the
+application.
+
+@subsection timestamp_global_query_api_pinned Reading the "pinned" timestamp
+
+The \c pinned timestamp is the minimum of \c oldest_timestamp and the oldest active
+reader, including any running checkpoint. It is not the same as \c oldest_timestamp
+because the oldest timestamp can be advanced past currently active readers, leaving
+a reader as the earliest timestamp in the system. Applications can use the \c pinned
+timestamp to understand the earliest data required by any reader in the system.
+
+The \c pinned timestamp is read-only.
+
+@subsection timestamp_global_query_api_recovery Reading the "recovery" timestamp
+
+The \c recovery timestamp is the stable timestamp to which recovery was
+performed on startup. Applications can use the \c recovery timestamp to
+retrieve the value the stable timestamp had at system startup.
+
+The \c recovery timestamp is read-only.
+
+@subsection timestamp_global_query_api_stable_timestamp Reading the "stable_timestamp" timestamp
+
+The \c stable_timestamp is the current \c stable_timestamp as set by the
+application.
+
+*/

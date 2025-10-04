@@ -27,15 +27,26 @@
  *    it in the license file.
  */
 #pragma once
-#include <functional>
-#include <vector>
-
+#include "mongo/bson/bsonobj.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/sdam/sdam_configuration.h"
 #include "mongo/client/sdam/sdam_datatypes.h"
 #include "mongo/client/sdam/server_description.h"
 #include "mongo/client/sdam/topology_description.h"
 #include "mongo/platform/random.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/functional.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/time_support.h"
+
+#include <algorithm>
+#include <functional>
+#include <memory>
+#include <vector>
+
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo::sdam {
 /**
@@ -85,7 +96,7 @@ public:
 private:
     void _getCandidateServers(std::vector<ServerDescriptionPtr>* result,
                               TopologyDescriptionPtr topologyDescription,
-                              const ReadPreferenceSetting& criteria,
+                              ReadPreferenceSetting effectiveCriteria,
                               const std::vector<HostAndPort>& excludedHosts);
 
     bool _containsAllTags(ServerDescriptionPtr server, const BSONObj& tags);
@@ -197,11 +208,13 @@ private:
 
     const SelectionFilter shardedFilter = [this](const ReadPreferenceSetting& readPref,
                                                  const std::vector<HostAndPort>& excludedHosts) {
-        return [&](const ServerDescriptionPtr& s) { return s->getType() == ServerType::kMongos; };
+        return [&](const ServerDescriptionPtr& s) {
+            return s->getType() == ServerType::kMongos;
+        };
     };
 
     SdamConfiguration _config;
-    mutable PseudoRandom _random;
+    static thread_local PseudoRandom _random;
 };
 
 // This is used to filter out servers based on their current latency measurements.

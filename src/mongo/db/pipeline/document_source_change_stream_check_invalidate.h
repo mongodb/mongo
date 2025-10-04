@@ -29,42 +29,65 @@
 
 #pragma once
 
-#include "mongo/db/pipeline/change_stream_invalidation_info.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_change_stream.h"
+#include "mongo/db/pipeline/document_source_change_stream_gen.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/resume_token.h"
+#include "mongo/db/pipeline/stage_constraints.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/util/assert_util.h"
+
+#include <set>
+#include <utility>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
 /**
- * This stage is used internally for change stream notifications to artifically generate an
+ * This stage is used internally for change stream notifications to artificially generate an
  * "invalidate" entry for commands that should invalidate the change stream (e.g. collection drop
  * for a single-collection change stream). It is not intended to be created by the user.
  */
-class DocumentSourceChangeStreamCheckInvalidate final : public DocumentSource {
+class DocumentSourceChangeStreamCheckInvalidate final
+    : public DocumentSourceInternalChangeStreamStage {
 public:
     static constexpr StringData kStageName = "$_internalChangeStreamCheckInvalidate"_sd;
 
     const char* getSourceName() const final {
         // This is used in error reporting.
-        return DocumentSourceChangeStreamCheckInvalidate::kStageName.rawData();
+        return DocumentSourceChangeStreamCheckInvalidate::kStageName.data();
     }
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
-        return {StreamType::kStreaming,
-                PositionRequirement::kNone,
-                HostTypeRequirement::kNone,
-                DiskUseRequirement::kNoDiskUse,
-                FacetRequirement::kNotAllowed,
-                TransactionRequirement::kNotAllowed,
-                LookupRequirement::kNotAllowed,
-                UnionRequirement::kNotAllowed,
-                ChangeStreamRequirement::kChangeStreamStage};
+    StageConstraints constraints(PipelineSplitState pipeState) const final {
+        StageConstraints constraints(StreamType::kStreaming,
+                                     PositionRequirement::kNone,
+                                     HostTypeRequirement::kNone,
+                                     DiskUseRequirement::kNoDiskUse,
+                                     FacetRequirement::kNotAllowed,
+                                     TransactionRequirement::kNotAllowed,
+                                     LookupRequirement::kNotAllowed,
+                                     UnionRequirement::kNotAllowed,
+                                     ChangeStreamRequirement::kChangeStreamStage);
+        constraints.consumesLogicalCollectionData = false;
+        return constraints;
     }
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
         return boost::none;
     }
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final;
+    Value doSerialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
     static boost::intrusive_ptr<DocumentSourceChangeStreamCheckInvalidate> createFromBson(
         BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& expCtx);
@@ -73,23 +96,36 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const DocumentSourceChangeStreamSpec& spec);
 
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
+    }
+
+    /**
+     * Whether the current aggregation command in the 'ExpressionContext' can lead to change stream
+     * invalidate events being issued. Currently, invalidate events can only occur in
+     * collection-level and database-level change streams, but not in all-cluster change streams.
+     */
+    static bool canInvalidateEventOccur(const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
 private:
+    friend boost::intrusive_ptr<exec::agg::Stage>
+    documentSourceChangeStreamCheckInvalidateToStageFn(
+        const boost::intrusive_ptr<DocumentSource>& documentSource);
+
     /**
      * Use the create static method to create a DocumentSourceChangeStreamCheckInvalidate.
      */
     DocumentSourceChangeStreamCheckInvalidate(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                               boost::optional<ResumeTokenData> startAfterInvalidate)
-        : DocumentSource(kStageName, expCtx),
+        : DocumentSourceInternalChangeStreamStage(kStageName, expCtx),
           _startAfterInvalidate(std::move(startAfterInvalidate)) {
         invariant(!_startAfterInvalidate ||
                   _startAfterInvalidate->fromInvalidate == ResumeTokenData::kFromInvalidate);
     }
 
-    GetNextResult doGetNext() final;
-
     boost::optional<ResumeTokenData> _startAfterInvalidate;
-    boost::optional<Document> _queuedInvalidate;
-    boost::optional<ChangeStreamInvalidationInfo> _queuedException;
 };
 
 }  // namespace mongo

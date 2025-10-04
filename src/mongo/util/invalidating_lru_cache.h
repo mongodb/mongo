@@ -29,15 +29,29 @@
 
 #pragma once
 
+#include "mongo/base/static_assert.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/stdx/trusted_hasher.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/lru_cache.h"
+#include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
 #include <memory>
+#include <mutex>
+#include <string>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
-#include "mongo/platform/mutex.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/with_lock.h"
-#include "mongo/util/lru_cache.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/string_map.h"
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -64,6 +78,10 @@ struct CacheNotCausallyConsistent {
     }
     bool operator<=(const CacheNotCausallyConsistent&) const {
         return true;
+    }
+
+    std::string toString() const {
+        return "NotCausallyConsistent";
     }
 };
 
@@ -155,7 +173,7 @@ class InvalidatingLRUCache {
             if (!owningCache)
                 return;
 
-            stdx::unique_lock<Latch> ul(owningCache->_mutex);
+            stdx::unique_lock<stdx::mutex> ul(owningCache->_mutex);
             auto& evictedCheckedOutValues = owningCache->_evictedCheckedOutValues;
             auto it = evictedCheckedOutValues.find(*key);
 
@@ -315,6 +333,14 @@ public:
         LockGuardWithPostUnlockDestructor guard(_mutex);
         Time currentTime, currentTimeInStore;
         _invalidate(&guard, key, _cache.find(key), &currentTime, &currentTimeInStore);
+        if constexpr (!std::is_same_v<Time, CacheNotCausallyConsistent>) {
+            uassert(ErrorCodes::ReadThroughCacheTimeMonotonicityViolation,
+                    str::stream() << "Time monotonicity violation: new lookup time "
+                                  << time.toString() << " which is less than the current time  "
+                                  << currentTime.toString() << ".",
+                    currentTime <= time);
+        }
+
         if (auto evicted =
                 _cache.add(key,
                            std::make_shared<StoredValue>(this,
@@ -365,6 +391,15 @@ public:
         LockGuardWithPostUnlockDestructor guard(_mutex);
         Time currentTime, currentTimeInStore;
         _invalidate(&guard, key, _cache.find(key), &currentTime, &currentTimeInStore);
+
+        if constexpr (!std::is_same_v<Time, CacheNotCausallyConsistent>) {
+            uassert(ErrorCodes::ReadThroughCacheTimeMonotonicityViolation,
+                    str::stream() << "Time monotonicity violation: new lookup time "
+                                  << time.toString() << " which is less than the current time  "
+                                  << currentTime.toString() << ".",
+                    currentTime <= time);
+        }
+
         if (auto evicted =
                 _cache.add(key,
                            std::make_shared<StoredValue>(this,
@@ -410,12 +445,12 @@ public:
      * it could still get evicted if the cache is under pressure. The returned handle must be
      * destroyed before the owning cache object itself is destroyed.
      */
-    TEMPLATE(typename KeyType)
-    REQUIRES(IsComparable<KeyType>)
+    template <typename KeyType>
+    requires IsComparable<KeyType>
     ValueHandle get(
         const KeyType& key,
         CacheCausalConsistency causalConsistency = CacheCausalConsistency::kLatestCached) {
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         std::shared_ptr<StoredValue> storedValue;
         if (auto it = _cache.find(key); it != _cache.end()) {
             storedValue = it->second;
@@ -431,6 +466,33 @@ public:
     }
 
     /**
+     * Returns a vector of the latest values from the cache which satisfy the predicate. Uses the
+     * 'kLatestCached' causal consistency model.
+     */
+    template <typename Pred>
+    std::vector<ValueHandle> getLatestCachedIf(Pred predicate) {
+        stdx::lock_guard lg(_mutex);
+        std::vector<ValueHandle> entries;
+        entries.reserve(_cache.size() + _evictedCheckedOutValues.size());
+
+        for (const auto& kv : _cache) {
+            if (predicate(kv.first, &kv.second->value)) {
+                entries.push_back(ValueHandle(kv.second));
+            }
+        }
+
+        for (const auto& kv : _evictedCheckedOutValues) {
+            if (auto storedValue = kv.second.lock()) {
+                if (predicate(kv.first, &storedValue->value)) {
+                    entries.push_back(ValueHandle(std::move(storedValue)));
+                }
+            }
+        }
+
+        return entries;
+    }
+
+    /**
      * Indicates to the cache that the backing store contains a new value for the specified key,
      * with a timestamp of 'newTimeInStore'.
      *
@@ -443,10 +505,10 @@ public:
      * Returns true if the passed 'newTimeInStore' is grater than the time of the currently cached
      * value or if no value is cached for 'key'.
      */
-    TEMPLATE(typename KeyType)
-    REQUIRES(IsComparable<KeyType>)
+    template <typename KeyType>
+    requires IsComparable<KeyType>
     bool advanceTimeInStore(const KeyType& key, const Time& newTimeInStore) {
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         std::shared_ptr<StoredValue> storedValue;
         if (auto it = _cache.find(key); it != _cache.end()) {
             storedValue = it->second;
@@ -473,10 +535,10 @@ public:
      * which can either be from the time of insertion or from the latest call to
      * 'advanceTimeInStore'. Otherwise, returns a nullptr ValueHandle and Time().
      */
-    TEMPLATE(typename KeyType)
-    REQUIRES(IsComparable<KeyType>)
+    template <typename KeyType>
+    requires IsComparable<KeyType>
     std::pair<ValueHandle, Time> getCachedValueAndTimeInStore(const KeyType& key) {
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         std::shared_ptr<StoredValue> storedValue;
         if (auto it = _cache.find(key); it != _cache.end()) {
             storedValue = it->second;
@@ -499,8 +561,8 @@ public:
      * Any already returned ValueHandles will start returning isValid = false. Subsequent calls to
      * 'get' will *not* return value for 'key' until the next call to 'insertOrAssign'.
      */
-    TEMPLATE(typename KeyType)
-    REQUIRES(IsComparable<KeyType>)
+    template <typename KeyType>
+    requires IsComparable<KeyType>
     void invalidate(const KeyType& key) {
         LockGuardWithPostUnlockDestructor guard(_mutex);
         _invalidate(&guard, key, _cache.find(key));
@@ -535,32 +597,6 @@ public:
         }
     }
 
-    /**
-     * Returns a vector of ValueHandles for all of the entries that satisfy matchPredicate.
-     */
-    template <typename Pred>
-    std::vector<ValueHandle> getEntriesIf(Pred matchPredicate) {
-        std::vector<ValueHandle> entries;
-        entries.reserve(_cache.size() + _evictedCheckedOutValues.size());
-        {
-            stdx::lock_guard lg(_mutex);
-            for (const auto& entry : _cache) {
-                if (matchPredicate(entry.first, &entry.second->value)) {
-                    entries.push_back(ValueHandle(entry.second));
-                }
-            }
-
-            for (const auto& entry : _evictedCheckedOutValues) {
-                if (auto storedValue = entry.second.lock()) {
-                    if (matchPredicate(entry.first, &storedValue->value)) {
-                        entries.push_back(ValueHandle(std::move(storedValue)));
-                    }
-                }
-            }
-        }
-        return entries;
-    }
-
     struct CachedItemInfo {
         Key key;            // The key of the item in the cache
         long int useCount;  // The number of callers of 'get', which still have the item checked-out
@@ -572,7 +608,7 @@ public:
      * checked-out.
      */
     std::vector<CachedItemInfo> getCacheInfo() const {
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
 
         std::vector<CachedItemInfo> ret;
         ret.reserve(_cache.size() + _evictedCheckedOutValues.size());
@@ -598,7 +634,7 @@ private:
      */
     class LockGuardWithPostUnlockDestructor {
     public:
-        LockGuardWithPostUnlockDestructor(Mutex& mutex) : _ul(mutex) {}
+        LockGuardWithPostUnlockDestructor(stdx::mutex& mutex) : _ul(mutex) {}
 
         void releasePtr(std::shared_ptr<StoredValue>&& value) {
             _valuesToDestroy.emplace_back(std::move(value));
@@ -609,7 +645,7 @@ private:
         // outside of the cache's mutex
         std::vector<std::shared_ptr<StoredValue>> _valuesToDestroy;
 
-        stdx::unique_lock<Latch> _ul;
+        stdx::unique_lock<stdx::mutex> _ul;
     };
 
     /**
@@ -618,8 +654,8 @@ private:
      * the key may not exist, and after this call will no longer be valid and will not be in either
      * of the maps.
      */
-    TEMPLATE(typename KeyType)
-    REQUIRES(IsComparable<KeyType>)
+    template <typename KeyType>
+    requires IsComparable<KeyType>
     void _invalidate(LockGuardWithPostUnlockDestructor* guard,
                      const KeyType& key,
                      typename Cache::iterator it,
@@ -656,7 +692,7 @@ private:
     }
 
     // Protects the state below
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("InvalidatingLRUCache::_mutex");
+    mutable stdx::mutex _mutex;
 
     // This map is used to track any values, which were evicted from the LRU cache below, while they
     // were checked out (i.e., their use_count > 1, where the 1 comes from the ownership by

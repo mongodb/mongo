@@ -1,16 +1,12 @@
-'use strict';
-
-(function() {
-load('jstests/libs/discover_topology.js');  // For Topology and DiscoverTopology.
-load('jstests/libs/fixture_helpers.js');
+import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 function cleanupHelloFailInjection(connection) {
     jsTestLog(`Cleanup Hello fail injection in ${connection}`);
-    let adminDB = connection.getDB('admin');
-    assert.commandWorked(adminDB.runCommand({configureFailPoint: 'waitInHello', mode: "off"}));
-    const res =
-        assert.commandWorked(adminDB.runCommand({getParameter: 1, "failpoint.waitInHello": 1}));
-    assert.eq(res["failpoint.waitInHello"].mode, 0);
+    let adminDB = connection.getDB("admin");
+    assert.commandWorked(adminDB.runCommand({configureFailPoint: "shardWaitInHello", mode: "off"}));
+    const res = assert.commandWorked(adminDB.runCommand({getParameter: 1, "failpoint.shardWaitInHello": 1}));
+    assert.eq(res[`failpoint.shardWaitInHello`].mode, 0);
 }
 
 function doFailInjectionCleanup(db) {
@@ -21,8 +17,8 @@ function doFailInjectionCleanup(db) {
     }
 }
 
-assert.eq(typeof db, 'object', 'Invalid `db` object, is the shell connected to a mongod?');
-var cmdLineOpts = db.adminCommand('getCmdLineOpts');
+assert.eq(typeof db, "object", "Invalid `db` object, is the shell connected to a mongod?");
+let cmdLineOpts = db.adminCommand("getCmdLineOpts");
 const topology = DiscoverTopology.findConnectedNodes(db.getMongo());
 jsTestLog(`Run Hello test suite cleanup in ${JSON.stringify(topology)},
                Invoked with ${JSON.stringify(cmdLineOpts)},
@@ -32,4 +28,3 @@ if (topology.type === Topology.kShardedCluster) {
     doFailInjectionCleanup(db);
 }
 jsTestLog(`Hello fail hook completed`);
-})();

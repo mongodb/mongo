@@ -1,21 +1,22 @@
-'use strict';
-
 // The tojson() function that is commonly used to build up assertion messages doesn't support the
 // Symbol type, so we just use unique string values instead.
-var Topology = {
-    kStandalone: 'stand-alone',
-    kRouter: 'mongos router',
-    kReplicaSet: 'replica set',
-    kShardedCluster: 'sharded cluster',
+export var Topology = {
+    kStandalone: "stand-alone",
+    kRouter: "mongos router",
+    kReplicaSet: "replica set",
+    kShardedCluster: "sharded cluster",
 };
 
-var DiscoverTopology = (function() {
-    const kDefaultConnectFn = (host) => new Mongo(host);
+export var DiscoverTopology = (function () {
+    const kDefaultConnectFn = (host) => new Mongo(host, undefined, {gRPC: false});
+    // Nodes discovered via isMaster have a MongoRPC port and must not use gRPC.
+    const kDisableGRPCConnString = (hostConn) =>
+        jsTestOptions().shellGRPC ? `mongodb://${hostConn}/?grpc=false` : hostConn;
 
     function getDataMemberConnectionStrings(conn) {
         const res = assert.commandWorked(conn.adminCommand({isMaster: 1}));
 
-        if (!res.hasOwnProperty('setName')) {
+        if (!res.hasOwnProperty("setName")) {
             // 'conn' represents a connection to a stand-alone mongod.
             return {type: Topology.kStandalone, mongod: conn.host};
         }
@@ -25,8 +26,9 @@ var DiscoverTopology = (function() {
         res.passives = res.passives || [];
         return {
             type: Topology.kReplicaSet,
-            primary: res.primary,
-            nodes: [...res.hosts, ...res.passives]
+            configsvr: res.configsvr == 2,
+            primary: kDisableGRPCConnString(res.primary),
+            nodes: [...res.hosts, ...res.passives].map((host) => kDisableGRPCConnString(host)),
         };
     }
 
@@ -34,26 +36,28 @@ var DiscoverTopology = (function() {
         function getConfigServerConnectionString() {
             const shardMap = conn.adminCommand({getShardMap: 1});
 
-            if (!shardMap.hasOwnProperty('map')) {
+            if (!shardMap.hasOwnProperty("map")) {
                 throw new Error(
-                    'Expected "getShardMap" command to return an object with a "map" field: ' +
-                    tojson(shardMap));
+                    'Expected "getShardMap" command to return an object with a "map" field: ' + tojson(shardMap),
+                );
             }
 
-            if (!shardMap.map.hasOwnProperty('config')) {
+            if (!shardMap.map.hasOwnProperty("config")) {
                 throw new Error(
                     'Expected "getShardMap" command to return an object with a "map.config"' +
-                    ' field: ' + tojson(shardMap));
+                        " field: " +
+                        tojson(shardMap),
+                );
             }
 
             return shardMap.map.config;
         }
 
-        const connectFn =
-            options.hasOwnProperty('connectFn') ? options.connectFn : kDefaultConnectFn;
+        const connectFn = options.hasOwnProperty("connectFn") ? options.connectFn : kDefaultConnectFn;
 
         const configsvrConn = connectFn(getConfigServerConnectionString());
         const configsvrHosts = getDataMemberConnectionStrings(configsvrConn);
+        configsvrConn.close();
 
         const shards = assert.commandWorked(conn.adminCommand({listShards: 1})).shards;
         const shardHosts = {};
@@ -61,6 +65,7 @@ var DiscoverTopology = (function() {
         for (let shardInfo of shards) {
             const shardConn = connectFn(shardInfo.host);
             shardHosts[shardInfo._id] = getDataMemberConnectionStrings(shardConn);
+            shardConn.close();
         }
 
         // Discover mongos URIs from the connection string. If a mongos is not passed in explicitly,
@@ -69,7 +74,7 @@ var DiscoverTopology = (function() {
 
         const mongos = {
             type: Topology.kRouter,
-            nodes: mongosUris.servers.map(uriObj => uriObj.server),
+            nodes: mongosUris.servers.map((uriObj) => uriObj.server),
         };
 
         return {
@@ -117,7 +122,7 @@ var DiscoverTopology = (function() {
      * shard or a replica set shard.
      */
     function findConnectedNodes(conn, options = {connectFn: kDefaultConnectFn}) {
-        const isMongod = assert.commandWorked(conn.adminCommand({isMaster: 1})).msg !== 'isdbgrid';
+        const isMongod = assert.commandWorked(conn.adminCommand({isMaster: 1})).msg !== "isdbgrid";
 
         if (isMongod) {
             return getDataMemberConnectionStrings(conn);
@@ -138,7 +143,7 @@ var DiscoverTopology = (function() {
             }
             hostList.push(...topology.mongos.nodes);
         } else {
-            throw new Error('Unrecognized topology format: ' + tojson(topology));
+            throw new Error("Unrecognized topology format: " + tojson(topology));
         }
     }
 
@@ -146,8 +151,8 @@ var DiscoverTopology = (function() {
      * Return list of nodes in the cluster given a connection NOT including config servers (if
      * there are any).
      */
-    function findNonConfigNodes(conn) {
-        const topology = findConnectedNodes(conn);
+    function findNonConfigNodes(conn, options = {connectFn: kDefaultConnectFn}) {
+        const topology = findConnectedNodes(conn, options);
         let hostList = [];
         addNonConfigNodesToList(topology, hostList);
         return hostList;

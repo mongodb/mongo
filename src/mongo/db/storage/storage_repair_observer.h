@@ -29,11 +29,15 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
+#include "mongo/db/service_context.h"
+
+#include <functional>
+#include <memory>
+#include <string>
+#include <vector>
 
 #include <boost/filesystem.hpp>
-
-#include "mongo/db/service_context.h"
+#include <boost/filesystem/path.hpp>
 
 namespace mongo {
 
@@ -44,6 +48,8 @@ namespace mongo {
  * */
 class StorageRepairObserver {
 public:
+    using InvalidateReplConfigCallback = std::function<void()>;
+
     StorageRepairObserver(const StorageRepairObserver&) = delete;
     StorageRepairObserver& operator=(const StorageRepairObserver&) = delete;
 
@@ -108,12 +114,13 @@ public:
 
     /**
      * This must be called to notify the repair observer that a database repair operation completed
-     * successfully. If any calls to invalidatingModification have been made, this invalidates the
-     * replica set configuration so this node will be unable to rejoin a replica set.
+     * successfully. If any calls to invalidatingModification have been made, a callback is expected
+     * to invalidate the replica set configuration so this node will be unable to rejoin a replica
+     * set.
      *
      * May only be called after a call to onRepairStarted().
      */
-    void onRepairDone(OperationContext* opCtx);
+    void onRepairDone(OperationContext* opCtx, const InvalidateReplConfigCallback& cb);
 
     /**
      * Returns 'true' if this node is an incomplete repair state.
@@ -163,7 +170,6 @@ private:
 
     void _touchRepairIncompleteFile();
     void _removeRepairIncompleteFile();
-    void _invalidateReplConfigIfNeeded(OperationContext* opCtx);
 
     boost::filesystem::path _repairIncompleteFilePath;
     RepairState _repairState;

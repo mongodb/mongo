@@ -29,11 +29,30 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/pipeline/change_stream_event_transform.h"
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
+#include "mongo/db/pipeline/document_source_change_stream_gen.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/stage_constraints.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+
+#include <memory>
+#include <set>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
-class DocumentSourceChangeStreamTransform : public DocumentSource {
+class DocumentSourceChangeStreamTransform final : public DocumentSourceInternalChangeStreamStage {
 public:
     static constexpr StringData kStageName = "$_internalChangeStreamTransform"_sd;
 
@@ -51,62 +70,55 @@ public:
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
 
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {}
+
     DocumentSource::GetModPathsReturn getModifiedPaths() const final;
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final;
+    /**
+     * This function should never be called, since this DocumentSource has its own serialize method.
+     */
+    Value doSerialize(const SerializationOptions& opts) const final {
+        MONGO_UNREACHABLE;
+    }
+
+    StageConstraints constraints(PipelineSplitState pipeState) const final;
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
         return boost::none;
     }
 
     const char* getSourceName() const final {
-        return kStageName.rawData();
+        return kStageName.data();
     }
 
-protected:
-    DocumentSource::GetNextResult doGetNext() override;
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
+    }
+
+    const ChangeStreamEventTransformation::SupportedEvents& getSupportedEvents_forTest() const {
+        return _transformer->getSupportedEvents_forTest();
+    }
 
 private:
+    friend boost::intrusive_ptr<exec::agg::Stage> documentSourceChangeStreamTransformToStageFn(
+        const boost::intrusive_ptr<DocumentSource>& documentSource);
+
     // This constructor is private, callers should use the 'create()' method above.
     DocumentSourceChangeStreamTransform(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                         DocumentSourceChangeStreamSpec spec);
 
-    struct DocumentKeyCacheEntry {
-        DocumentKeyCacheEntry() = default;
-
-        DocumentKeyCacheEntry(std::pair<std::vector<FieldPath>, bool> documentKeyFieldsIn)
-            : documentKeyFields(documentKeyFieldsIn.first), isFinal(documentKeyFieldsIn.second){};
-        // Fields of the document key, in order, including "_id" and the shard key if the
-        // collection is sharded. Empty until the first oplog entry with a uuid is encountered.
-        // Needed for transforming 'insert' oplog entries.
-        std::vector<FieldPath> documentKeyFields;
-
-        // Set to true if the document key fields for this entry are definitively known and will
-        // not change. This implies that either the collection has become sharded or has been
-        // dropped.
-        bool isFinal;
-    };
-
-    /**
-     * Helper used for determining what resume token to return.
-     */
-    ResumeTokenData getResumeToken(Value ts, Value uuid, Value documentKey, Value txnOpIndex);
-
     DocumentSourceChangeStreamSpec _changeStreamSpec;
 
-    // Map of collection UUID to document key fields.
-    std::map<UUID, DocumentKeyCacheEntry> _documentKeyCache;
+    // TODO SERVER-105521: Check if we can change from 'std::shared_ptr' to 'std::unique_ptr', and
+    // std::move the transformer to the Stage.
+    std::shared_ptr<ChangeStreamEventTransformer> _transformer;
 
     // Set to true if this transformation stage can be run on the collectionless namespace.
     bool _isIndependentOfAnyCollection;
-
-    // Set to true if the pre-image should be included in the output documents.
-    bool _preImageRequested = false;
-
-    // Set to true if the post-image should be included in the output documents.
-    bool _postImageRequested = false;
 };
 
 }  // namespace mongo

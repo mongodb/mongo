@@ -1,22 +1,21 @@
 """Manage a thread responsible for periodically calling flush() on logging.Handler instances.
 
-These instances are used to send logs to buildlogger.
+These instances are used to send logs to ??? TODO: SERVER-97556
 """
 
 import logging
+import sched
 import threading
 import time
 
-from buildscripts.resmokelib.utils import scheduler
-
 _FLUSH_THREAD_LOCK = threading.Lock()
-_FLUSH_THREAD = None
+_FLUSH_THREAD: "_FlushThread" = None
 
 
 def start_thread():
     """Start the flush thread."""
 
-    global _FLUSH_THREAD  # pylint: disable=global-statement
+    global _FLUSH_THREAD
     with _FLUSH_THREAD_LOCK:
         if _FLUSH_THREAD is not None:
             raise ValueError("FlushThread has already been started")
@@ -33,9 +32,9 @@ def stop_thread():
             raise ValueError("FlushThread hasn't been started")
 
     _FLUSH_THREAD.signal_shutdown()
-    # Wait for 5min instead of _FLUSH_THREAD.await_shutdown() because we can
+    # Wait for 1min instead of _FLUSH_THREAD.await_shutdown() because we can
     # sometimes wait indefinitely for a response, causing a task timeout.
-    _FLUSH_THREAD.join(5 * 60)
+    _FLUSH_THREAD.join(60)
 
     success = not _FLUSH_THREAD.is_alive()
     return success
@@ -98,7 +97,7 @@ class _FlushThread(threading.Thread):
             self.__schedule_updated.wait(secs)
             self.__schedule_updated.clear()
 
-        self.__scheduler = scheduler.Scheduler(time.monotonic, interruptible_sleep)
+        self.__scheduler = sched.scheduler(time.monotonic, interruptible_sleep)
         self.__schedule_updated = threading.Event()
         self.__should_stop = threading.Event()
         self.__terminated = threading.Event()

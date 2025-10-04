@@ -5,9 +5,9 @@
  * ReplSetTest instance associated with the replica set/shard.
  */
 
-load("jstests/libs/write_concern_util.js");
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
-function testReadCommittedLookup(db, secondary, rst) {
+export function testReadCommittedLookup(db, secondary, rst) {
     /**
      * stopServerReplication uses the 'stopReplProducer' fail point to stop server replication on
      * the given secondary.
@@ -28,35 +28,37 @@ function testReadCommittedLookup(db, secondary, rst) {
         aggregate: "local",
         pipeline: [
             {
-              $lookup: {
-                  from: "foreign",
-                  localField: "foreignKey",
-                  foreignField: "matchedField",
-                  as: "match",
-              }
+                $lookup: {
+                    from: "foreign",
+                    localField: "foreignKey",
+                    foreignField: "matchedField",
+                    as: "match",
+                },
             },
         ],
         cursor: {},
         readConcern: {
             level: "majority",
-        }
+        },
     };
 
     const aggCmdGraphLookupObj = {
         aggregate: "local",
-        pipeline: [{
-            $graphLookup: {
-                from: "foreign",
-                startWith: '$foreignKey',
-                connectFromField: 'foreignKey',
-                connectToField: "matchedField",
-                as: "match"
-            }
-        }],
+        pipeline: [
+            {
+                $graphLookup: {
+                    from: "foreign",
+                    startWith: "$foreignKey",
+                    connectFromField: "foreignKey",
+                    connectToField: "matchedField",
+                    as: "match",
+                },
+            },
+        ],
         cursor: {},
         readConcern: {
             level: "majority",
-        }
+        },
     };
 
     // Seed matching data.
@@ -66,25 +68,32 @@ function testReadCommittedLookup(db, secondary, rst) {
     db.foreign.deleteMany({}, majorityWriteConcernObj);
     const foreignId = db.foreign.insertOne({matchedField: "x"}, majorityWriteConcernObj).insertedId;
 
-    const expectedMatchedResult = [{
-        _id: localId,
-        foreignKey: "x",
-        match: [
-            {_id: foreignId, matchedField: "x"},
-        ],
-    }];
-    const expectedUnmatchedResult = [{
-        _id: localId,
-        foreignKey: "x",
-        match: [],
-    }];
+    const expectedMatchedResult = [
+        {
+            _id: localId,
+            foreignKey: "x",
+            match: [{_id: foreignId, matchedField: "x"}],
+        },
+    ];
+    const expectedUnmatchedResult = [
+        {
+            _id: localId,
+            foreignKey: "x",
+            match: [],
+        },
+    ];
 
     // Confirm lookup/graphLookup return the matched result.
-    let result = db.runCommand(aggCmdLookupObj).cursor.firstBatch;
+    let result = assert.commandWorked(db.runCommand(aggCmdLookupObj)).cursor.firstBatch;
     assert.eq(result, expectedMatchedResult);
 
-    result = db.runCommand(aggCmdGraphLookupObj).cursor.firstBatch;
+    result = assert.commandWorked(db.runCommand(aggCmdGraphLookupObj)).cursor.firstBatch;
     assert.eq(result, expectedMatchedResult);
+
+    // Run finds on the two collections to ensure that no background tasks can trigger refreshes on
+    // the primary.
+    assert.commandWorked(db.runCommand({find: "local", $readPreference: {mode: "secondary"}}));
+    assert.commandWorked(db.runCommand({find: "foreign", $readPreference: {mode: "secondary"}}));
 
     // Stop oplog application on the secondary so that it won't acknowledge updates.
     pauseReplication(secondary);
@@ -94,10 +103,10 @@ function testReadCommittedLookup(db, secondary, rst) {
 
     // lookup/graphLookup should not see the update, since it has not been acknowledged by the
     // secondary.
-    result = db.runCommand(aggCmdLookupObj).cursor.firstBatch;
+    result = assert.commandWorked(db.runCommand(aggCmdLookupObj)).cursor.firstBatch;
     assert.eq(result, expectedMatchedResult);
 
-    result = db.runCommand(aggCmdGraphLookupObj).cursor.firstBatch;
+    result = assert.commandWorked(db.runCommand(aggCmdGraphLookupObj)).cursor.firstBatch;
     assert.eq(result, expectedMatchedResult);
 
     // Restart oplog application on the secondary and wait for it's snapshot to catch up.
@@ -105,9 +114,9 @@ function testReadCommittedLookup(db, secondary, rst) {
     rst.awaitLastOpCommitted();
 
     // Now lookup/graphLookup should report that the documents don't match.
-    result = db.runCommand(aggCmdLookupObj).cursor.firstBatch;
+    result = assert.commandWorked(db.runCommand(aggCmdLookupObj)).cursor.firstBatch;
     assert.eq(result, expectedUnmatchedResult);
 
-    result = db.runCommand(aggCmdGraphLookupObj).cursor.firstBatch;
+    result = assert.commandWorked(db.runCommand(aggCmdGraphLookupObj)).cursor.firstBatch;
     assert.eq(result, expectedUnmatchedResult);
 }

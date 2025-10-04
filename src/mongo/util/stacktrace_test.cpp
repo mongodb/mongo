@@ -27,47 +27,60 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-#include "mongo/platform/basic.h"
-
+// IWYU pragma: no_include "bits/types/__sigset_t.h"
+// IWYU pragma: no_include "bits/types/siginfo_t.h"
+// IWYU pragma: no_include "bits/types/stack_t.h"
+#include <fmt/format.h>
+#include <fmt/printf.h>  // IWYU pragma: keep
+#include <fmt/ranges.h>  // IWYU pragma: keep
+// IWYU pragma: no_include "syscall.h"
+// IWYU pragma: no_include "cxxabi.h"
+#include <algorithm>
 #include <array>
-#include <cstddef>
+#include <chrono>
+#include <csignal>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
-#include <fmt/format.h>
-#include <fmt/printf.h>
+#include <deque>
 #include <functional>
+#include <iostream>
+#include <iterator>
 #include <map>
-#include <pcrecpp.h>
-#include <random>
-#include <signal.h>
-#include <sstream>
-#include <utility>
+#include <memory>
+#include <mutex>
+#include <set>
+#include <thread>
 #include <vector>
-
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/json.h"
-#include "mongo/config.h"
-#include "mongo/logv2/log.h"
-#include "mongo/platform/mutex.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/thread.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/debug_util.h"
-#include "mongo/util/hex.h"
-#include "mongo/util/stacktrace.h"
 
 /** `sigaltstack` was introduced in glibc-2.12 in 2010. */
 #if !defined(_WIN32)
 #define HAVE_SIGALTSTACK
 #endif
+#include "mongo/base/parse_number.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/json.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/logv2/log.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
+#include "mongo/util/pcre.h"
+#include "mongo/util/signal_handlers_synchronous.h"
+#include "mongo/util/stacktrace.h"
+#include "mongo/util/stacktrace_test_helpers.h"
 
-#ifdef __linux__
-#include <sys/syscall.h>
-#include <time.h>
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
-#endif  //  __linux__
+#endif
+
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 
 // Needs to have linkage so we can test metadata. Needs to be extern
 // "C" so it doesn't get mangled so we can name it with EXPORT_SYMBOLS
@@ -79,7 +92,7 @@ mongo_stacktrace_test_detail_testFunctionWithLinkage() {
 
 namespace mongo {
 
-namespace stack_trace_test_detail {
+namespace stacktrace_test_detail {
 
 struct RecursionParam {
     std::uint64_t n;
@@ -95,11 +108,10 @@ MONGO_COMPILER_NOINLINE int recurseWithLinkage(RecursionParam& p, std::uint64_t 
     return 0;
 }
 
-}  // namespace stack_trace_test_detail
+}  // namespace stacktrace_test_detail
 
 namespace {
 
-using namespace fmt::literals;
 using namespace std::literals::chrono_literals;
 
 constexpr bool kSuperVerbose = 0;  // Devel instrumentation
@@ -151,6 +163,15 @@ uintptr_t fromHex(const std::string& s) {
     return static_cast<uintptr_t>(std::stoull(s, nullptr, 16));
 }
 
+bool consume(const pcre::Regex& re, StringData* in, std::string* out) {
+    auto m = re.matchView(*in);
+    if (!m)
+        return false;
+    *in = in->substr(m[0].size());
+    *out = std::string{m[1]};
+    return true;
+}
+
 // Break down a printStackTrace output for a contrived call tree and sanity-check it.
 TEST(StackTrace, PosixFormat) {
     if (kIsWindows) {
@@ -158,11 +179,11 @@ TEST(StackTrace, PosixFormat) {
     }
 
     std::string trace;
-    stack_trace_test_detail::RecursionParam param{3, [&] {
-                                                      StringStackTraceSink sink{trace};
-                                                      printStackTrace(sink);
-                                                  }};
-    stack_trace_test_detail::recurseWithLinkage(param, 3);
+    stacktrace_test_detail::RecursionParam param{3, [&] {
+                                                     StringStackTraceSink sink{trace};
+                                                     printStackTrace(sink);
+                                                 }};
+    stacktrace_test_detail::recurseWithLinkage(param, 3);
 
     if (kSuperVerbose) {
         LOGV2_OPTIONS(24153, {logv2::LogTruncation::Disabled}, "Trace", "trace"_attr = trace);
@@ -172,18 +193,18 @@ TEST(StackTrace, PosixFormat) {
     // Each "Frame:" line holds a full json object, but we only examine its "a" field here.
     std::string jsonLine;
     std::vector<uintptr_t> humanAddrs;
-    pcrecpp::StringPiece in{trace};
-    static const pcrecpp::RE jsonLineRE(R"re(BACKTRACE: (\{.*\})\n?)re");
-    ASSERT_TRUE(jsonLineRE.Consume(&in, &jsonLine)) << "\"" << in.as_string() << "\"";
+    StringData in{trace};
+    static const pcre::Regex jsonLineRE(R"re(^BACKTRACE: (\{.*\})\n?)re");
+    ASSERT_TRUE(consume(jsonLineRE, &in, &jsonLine)) << "\"" << in << "\"";
     while (true) {
         std::string frameLine;
-        static const pcrecpp::RE frameRE(R"re(  Frame: (\{.*\})\n?)re");
-        if (!frameRE.Consume(&in, &frameLine))
+        static const pcre::Regex frameRE(R"re(^  Frame: (\{.*\})\n?)re");
+        if (!consume(frameRE, &in, &frameLine))
             break;
         BSONObj frameObj = fromjson(frameLine);  // throwy
         humanAddrs.push_back(fromHex(frameObj["a"].String()));
     }
-    ASSERT_TRUE(in.empty()) << "must be consumed fully: \"" << in.as_string() << "\"";
+    ASSERT_TRUE(in.empty()) << "must be consumed fully: \"" << in << "\"";
 
     BSONObj jsonObj = fromjson(jsonLine);  // throwy
     ASSERT_TRUE(jsonObj.hasField("backtrace"));
@@ -200,9 +221,13 @@ TEST(StackTrace, PosixFormat) {
         auto soObj = so.Obj();
         SoMapEntry ent{};
         ent.base = fromHex(soObj["b"].String());
-        if (soObj.hasField("path")) {
-            ent.path = soObj["path"].String();
-        }
+        ASSERT_TRUE(soObj.hasField("path"))
+            << "no path for entry with base address " << soObj["b"].String();
+        ent.path = soObj["path"].String();
+        ASSERT_FALSE(ent.path.empty());
+        ASSERT_TRUE(soMap.find(ent.base) == soMap.end())
+            << "Duplicate entry for base address " << soObj["b"].String() << " found both "
+            << ent.path << " and " << soMap[ent.base].path;
         soMap[ent.base] = ent;
     }
 
@@ -222,7 +247,7 @@ TEST(StackTrace, PosixFormat) {
 std::vector<std::string> splitLines(std::string in) {
     std::vector<std::string> lines;
     while (true) {
-        auto pos = in.find("\n");
+        auto pos = in.find('\n');
         if (pos == std::string::npos) {
             break;
         } else {
@@ -243,24 +268,28 @@ TEST(StackTrace, WindowsFormat) {
 
     std::string trace = [&] {
         std::string s;
-        stack_trace_test_detail::RecursionParam param{3, [&] {
-                                                          StringStackTraceSink sink{s};
-                                                          printStackTrace(sink);
-                                                      }};
-        stack_trace_test_detail::recurseWithLinkage(param);
+        stacktrace_test_detail::RecursionParam param{3, [&] {
+                                                         StringStackTraceSink sink{s};
+                                                         printStackTrace(sink);
+                                                     }};
+        stacktrace_test_detail::recurseWithLinkage(param);
         return s;
     }();
 
     std::vector<std::string> lines = splitLines(trace);
 
-    std::string jsonLine;
-    ASSERT_TRUE(pcrecpp::RE(R"re(BACKTRACE: (\{.*\}))re").FullMatch(lines[0], &jsonLine));
+    auto re = pcre::Regex(R"re(^BACKTRACE: (\{.*\})$)re");
+    auto m = re.matchView(lines[0]);
+    ASSERT_TRUE(!!m);
+    std::string jsonLine{m[1]};
 
     std::vector<uintptr_t> humanAddrs;
     for (size_t i = 1; i < lines.size(); ++i) {
-        static const pcrecpp::RE re(R"re(  Frame: (?:\{"a":"(.*?)",.*\}))re");
+        static const pcre::Regex re(R"re(^  Frame: (?:\{"a":"(.*?)",.*\})$)re");
         uintptr_t addr;
-        ASSERT_TRUE(re.FullMatch(lines[i], pcrecpp::Hex(&addr))) << lines[i];
+        auto m = re.matchView(lines[i]);
+        ASSERT_TRUE(!!m) << lines[i];
+        ASSERT_OK(NumberParser{}.base(16)(m[1], &addr));
         humanAddrs.push_back(addr);
     }
 
@@ -312,7 +341,61 @@ TEST(StackTrace, EarlyTraceSanity) {
     }
 }
 
+template <int N>
+StackTrace getTrace() {
+    boost::optional<StackTrace> trace;
+    stacktrace_test::executeUnderCallstack<N>([&] { trace = getStackTrace(); });
+    ASSERT_TRUE(trace.has_value());
+    ASSERT_EQ(trace->getError(), {});
+    return *trace;
+}
+
+int countGeneratedFrames(const StackTrace& trace) {
+    BSONObj bsonTrace = trace.getBSONRepresentation();
+    auto backtrace = bsonTrace["backtrace"];
+    ASSERT_FALSE(backtrace.eoo());
+    auto frames = backtrace.Array();
+    int matchingFrames = 0;
+
+    for (const auto& frame : frames) {
+        ASSERT_TRUE(frame.isABSONObj());
+        auto demangledElem = frame["C"];
+        if (demangledElem.eoo()) {
+            continue;
+        }
+        auto demangled = demangledElem.valueStringDataSafe();
+        if (demangled.find("stacktrace_test::callNext") != demangled.npos) {
+            matchingFrames++;
+        }
+    }
+
+    return matchingFrames;
+}
+
 #ifndef _WIN32
+// This test isn't enabled on Windows as we may not be able to reliably generate deep stack
+// traces on that platform.
+TEST(StackTrace, StackTrace80Frames) {
+    constexpr int numFrames = 80;
+    StackTrace trace = getTrace<numFrames>();
+    int generatedFrames = countGeneratedFrames(trace);
+    ASSERT_EQ(generatedFrames, numFrames)
+        << "Stacktrace doesn't contain all expected frames " << trace.getBSONRepresentation();
+}
+
+// This test isn't enabled on Windows as we may not be able to reliably generate deep stack
+// traces on that platform.
+TEST(StackTrace, StackTrace200Frames) {
+    using namespace unittest::match;
+    constexpr int numFrames = 200;
+    StackTrace trace = getTrace<numFrames>();
+
+    // There's a 100-frame limit and there are some frames below the last generated
+    // frame, so we expect to see close to, but less than 100 matching frames.
+    ASSERT_THAT(countGeneratedFrames(trace), AllOf(Ge(80), Le(100)))
+        << trace.getBSONRepresentation();
+}
+
 // `MetadataGenerator::load` should fill its meta member with something reasonable.
 // Only testing with functions which we expect the dynamic linker to know about, so
 // they must have external linkage.
@@ -400,8 +483,9 @@ public:
               "tid"_attr = ostr(stdx::this_thread::get_id()),
               "sig"_attr = sig);
         char storage;
-        LOGV2(
-            23388, "Local var", "var"_attr = "{:X}"_format(reinterpret_cast<uintptr_t>(&storage)));
+        LOGV2(23388,
+              "Local var",
+              "var"_attr = fmt::format("{:X}", reinterpret_cast<uintptr_t>(&storage)));
     }
 
     static void tryHandler(sigAction_t* handler) {
@@ -412,8 +496,8 @@ public:
         std::fill(buf->begin(), buf->end(), kSentinel);
         LOGV2(24157,
               "sigaltstack buf",
-              "size"_attr = "{:X}"_format(buf->size()),
-              "data"_attr = "{:X}"_format(reinterpret_cast<uintptr_t>(buf->data())));
+              "size"_attr = fmt::format("{:X}", buf->size()),
+              "data"_attr = fmt::format("{:X}", reinterpret_cast<uintptr_t>(buf->data())));
         stdx::thread thr([&] {
             LOGV2(23389, "Thread running", "tid"_attr = ostr(stdx::this_thread::get_id()));
             {
@@ -509,7 +593,7 @@ class PrintAllThreadStacksTest : public unittest::Test {
 public:
     struct WatchInt {
         int v = 0;
-        Mutex* m;
+        stdx::mutex* m;
         stdx::condition_variable cond;
 
         void incr(int i) {
@@ -581,7 +665,7 @@ public:
             ASSERT(seenTids.find(w.tid) != seenTids.end()) << "missing tid:" << w.tid;
     }
 
-    Mutex mutex;
+    stdx::mutex mutex;
     WatchInt endAll{0, &mutex};
     WatchInt pending{0, &mutex};
     std::deque<Worker> workers;
@@ -631,8 +715,7 @@ TEST_F(PrintAllThreadStacksTest, WithDeadThreads) {
         bool missingBacktrace = !obj.hasElement("backtrace");
         ASSERT_EQ(witer->blocks, missingBacktrace);
     }
-    ASSERT(mustSee.empty()) << format(FMT_STRING("tids missing from report: {}"),
-                                      fmt::join(mustSee, ","));
+    ASSERT(mustSee.empty()) << fmt::format("tids missing from report: {}", fmt::join(mustSee, ","));
 }
 
 TEST_F(PrintAllThreadStacksTest, Go_2_Threads) {
@@ -643,6 +726,66 @@ TEST_F(PrintAllThreadStacksTest, Go_20_Threads) {
 }
 TEST_F(PrintAllThreadStacksTest, Go_200_Threads) {
     doPrintAllThreadStacks(200);
+}
+
+TEST_F(PrintAllThreadStacksTest, SessionBasic) {
+    stack_trace_detail::PrintAllStacksSession session;
+
+    auto waiter = boost::make_optional(session.waiter());
+    stdx::thread producer{[&] {
+        auto notifier = session.notifier();
+    }};
+    waiter = {};
+    producer.join();
+}
+
+TEST_F(PrintAllThreadStacksTest, SessionProducerConsumers) {
+    synchronized_value<std::string> values;
+    stack_trace_detail::PrintAllStacksSession session;
+
+    struct PromiseFuture {
+        SharedPromise<void> promise;
+        SharedSemiFuture<void> future;
+    };
+
+    std::vector<PromiseFuture> promisesFutures(2);
+
+    for (auto& pf : promisesFutures) {
+        pf.future = pf.promise.getFuture();
+    }
+
+    std::vector<stdx::thread> consumers;
+    for (auto& pf : promisesFutures) {
+        consumers.emplace_back([&, p = &pf.promise] {
+            auto waiter = boost::make_optional(session.waiter());
+            p->emplaceValue();
+            waiter = {};
+            values->push_back('3');
+        });
+    }
+
+    // This does not enforce ordering between push_back('3') above and the push_back calls below if
+    // PrintAllStacksSession::waiter/notifier don't.
+    for (auto& pf : promisesFutures) {
+        pf.future.wait();
+    }
+
+    stdx::thread producer{[&] {
+        values->push_back('1');
+        auto notifier = boost::make_optional(session.notifier());
+        values->push_back('2');
+        notifier = {};
+        values->push_back('3');
+    }};
+
+    for (auto& consumer : consumers) {
+        consumer.join();
+    }
+
+    producer.join();
+
+    auto guard = values.synchronize();
+    ASSERT(*guard == "12333") << *guard;
 }
 
 #endif  // defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
@@ -676,7 +819,7 @@ TEST(StackTrace, BacktraceThroughLibc) {
         LOGV2(23392,
               "Frame",
               "i"_attr = i,
-              "frame"_attr = "{:X}"_format(reinterpret_cast<uintptr_t>(capture.arr[i])));
+              "frame"_attr = fmt::format("{:X}", reinterpret_cast<uintptr_t>(capture.arr[i])));
     }
 }
 #endif  // mongo stacktrace backend

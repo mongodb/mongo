@@ -1,0 +1,3 @@
+base_suite: retryable_writes_downgrade
+overrides:
+  - "multiversion.replica_fixture_last_lts_old_new_new"

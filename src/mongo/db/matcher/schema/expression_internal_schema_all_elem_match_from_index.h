@@ -28,13 +28,24 @@
  */
 #pragma once
 
-#include <boost/optional.hpp>
-
+#include "mongo/base/clonable_ptr.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_array.h"
+#include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/db/matcher/expression_with_placeholder.h"
-#include "mongo/db/matcher/match_expression_util.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/util/assert_util.h"
+
+#include <cstddef>
+#include <memory>
+#include <vector>
+
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 /**
@@ -45,39 +56,21 @@ class InternalSchemaAllElemMatchFromIndexMatchExpression final
     : public ArrayMatchingMatchExpression {
 public:
     static constexpr StringData kName = "$_internalSchemaAllElemMatchFromIndex"_sd;
+    static constexpr int kNumChildren = 1;
 
     InternalSchemaAllElemMatchFromIndexMatchExpression(
-        StringData path,
+        boost::optional<StringData> path,
         long long index,
         std::unique_ptr<ExpressionWithPlaceholder> expression,
         clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
-    std::unique_ptr<MatchExpression> shallowClone() const final;
-
-    bool matchesArray(const BSONObj& array, MatchDetails* details) const final {
-        return !findFirstMismatchInArray(array, details);
-    }
-
-    /**
-     * Finds the first element in the sub-array of array 'array' that the expression applies to that
-     * does not match the sub-expression. If such element does not exist, then returns empty (i.e.
-     * EOO) value.
-     */
-    BSONElement findFirstMismatchInArray(const BSONObj& array, MatchDetails* details) const {
-        auto iter = BSONObjIterator(array);
-        match_expression_util::advanceBy(_index, iter);
-        while (iter.more()) {
-            auto element = iter.next();
-            if (!_expression->matchesBSONElement(element, details)) {
-                return element;
-            }
-        }
-        return {};
-    }
+    std::unique_ptr<MatchExpression> clone() const final;
 
     void debugString(StringBuilder& debug, int indentationLevel) const final;
 
-    BSONObj getSerializedRightHandSide() const final;
+    void appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                       const SerializationOptions& opts = {},
+                                       bool includePath = true) const final;
 
     bool equivalent(const MatchExpression* other) const final;
 
@@ -93,13 +86,19 @@ public:
     }
 
     size_t numChildren() const final {
-        return 1;
+        return kNumChildren;
     }
 
     MatchExpression* getChild(size_t i) const final {
-        invariant(i == 0);
+        tassert(6400200, "Out-of-bounds access to child of MatchExpression.", i < kNumChildren);
         return _expression->getFilter();
     }
+
+    void resetChild(size_t i, MatchExpression* other) override {
+        tassert(6329407, "Out-of-bounds access to child of MatchExpression.", i < kNumChildren);
+        _expression->resetFilter(other);
+    };
+
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
         visitor->visit(this);
@@ -109,9 +108,15 @@ public:
         visitor->visit(this);
     }
 
-private:
-    ExpressionOptimizerFunc getOptimizer() const final;
+    const ExpressionWithPlaceholder* getExpression() const {
+        return _expression.get();
+    }
 
+    ExpressionWithPlaceholder* getExpression() {
+        return _expression.get();
+    }
+
+private:
     long long _index;
     std::unique_ptr<ExpressionWithPlaceholder> _expression;
 };

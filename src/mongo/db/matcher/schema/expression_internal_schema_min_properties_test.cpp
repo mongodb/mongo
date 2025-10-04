@@ -27,49 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_max_properties.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_min_properties.h"
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_max_properties.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
 namespace {
-
-TEST(InternalSchemaMinPropertiesMatchExpression, RejectsObjectsWithTooFewElements) {
-    InternalSchemaMinPropertiesMatchExpression minProperties(2);
-
-    ASSERT_FALSE(minProperties.matchesBSON(BSONObj()));
-    ASSERT_FALSE(minProperties.matchesBSON(BSON("b" << 21)));
-}
-
-TEST(InternalSchemaMinPropertiesMatchExpression, AcceptsObjectWithAtLeastMinElements) {
-    InternalSchemaMinPropertiesMatchExpression minProperties(2);
-
-    ASSERT_TRUE(minProperties.matchesBSON(BSON("b" << 21 << "c" << BSONNULL)));
-    ASSERT_TRUE(minProperties.matchesBSON(BSON("b" << 21 << "c" << 3)));
-    ASSERT_TRUE(minProperties.matchesBSON(BSON("b" << 21 << "c" << 3 << "d" << 43)));
-}
-
-TEST(InternalSchemaMinPropertiesMatchExpression, MinPropertiesZeroAllowsEmptyObjects) {
-    InternalSchemaMinPropertiesMatchExpression minProperties(0);
-
-    ASSERT_TRUE(minProperties.matchesBSON(BSONObj()));
-}
-
-TEST(InternalSchemaMinPropertiesMatchExpression, NestedObjectsAreNotUnwound) {
-    InternalSchemaMinPropertiesMatchExpression minProperties(2);
-
-    ASSERT_FALSE(minProperties.matchesBSON(BSON("b" << BSON("c" << 2 << "d" << 3))));
-}
-
-TEST(InternalSchemaMinPropertiesMatchExpression, NestedArraysAreNotUnwound) {
-    InternalSchemaMinPropertiesMatchExpression minProperties(2);
-
-    ASSERT_FALSE(minProperties.matchesBSON(BSON("a" << (BSON("b" << 2 << "c" << 3 << "d" << 4)))));
-}
 
 TEST(InternalSchemaMinPropertiesMatchExpression, EquivalentFunctionIsAccurate) {
     InternalSchemaMinPropertiesMatchExpression minProperties1(1);
@@ -79,6 +49,15 @@ TEST(InternalSchemaMinPropertiesMatchExpression, EquivalentFunctionIsAccurate) {
     ASSERT_TRUE(minProperties1.equivalent(&minProperties1));
     ASSERT_TRUE(minProperties1.equivalent(&minProperties2));
     ASSERT_FALSE(minProperties1.equivalent(&minProperties3));
+}
+
+DEATH_TEST_REGEX(InternalSchemaMinPropertiesMatchExpression,
+                 GetChildFailsIndexGreaterThanZero,
+                 "Tripwire assertion.*6400216") {
+    InternalSchemaMaxPropertiesMatchExpression minProperties(1);
+
+    ASSERT_EQ(minProperties.numChildren(), 0);
+    ASSERT_THROWS_CODE(minProperties.getChild(0), AssertionException, 6400216);
 }
 
 }  // namespace

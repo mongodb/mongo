@@ -31,7 +31,8 @@ from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 from helper import simulate_crash_restart
-from test_rollback_to_stable01 import test_rollback_to_stable_base
+from rollback_to_stable_util import test_rollback_to_stable_base
+import wttest
 
 # test_rollback_to_stable28.py
 # Test the debug mode setting for update_restore_evict during recovery.
@@ -39,13 +40,14 @@ from test_rollback_to_stable01 import test_rollback_to_stable_base
 # perform this in recovery to ensure that all the in-memory images have
 # the proper write generation number and we don't end up reading stale
 # transaction ID's stored on the page.
+@wttest.skip_for_hook("tiered", "Tiered causes python crash")
 class test_rollback_to_stable28(test_rollback_to_stable_base):
-    conn_config = 'log=(enabled=true),statistics=(all)'
+    conn_config = 'statistics=(all),verbose=(rts:5)'
     # Recovery connection config: The debug mode is only effective on high cache pressure as WiredTiger can potentially decide
     # to do an update restore evict on a page when the cache pressure requirements are not met.
     # This means setting eviction target low and cache size low.
     conn_recon = ',eviction_updates_trigger=10,eviction_dirty_trigger=5,eviction_dirty_target=1,' \
-            'cache_size=1MB,debug_mode=(update_restore_evict=true),log=(recover=on)'
+            'cache_size=1MB,debug_mode=(update_restore_evict=true)'
 
     # In principle this test should be run on VLCS and FLCS; but it doesn't run reliably, in that
     # while it always works in the sense of producing the right values, it doesn't always trigger
@@ -56,9 +58,9 @@ class test_rollback_to_stable28(test_rollback_to_stable_base):
     # so disabling these scenarios seems like the best strategy.
     format_values = [
         #('column', dict(key_format='r', value_format='S', extraconfig='')),
-        #('column_fix', dict(key_format='r', value_format='8t', 
+        #('column_fix', dict(key_format='r', value_format='8t',
         #    extraconfig=',allocation_size=512,leaf_page_max=512')),
-        ('integer_row', dict(key_format='i', value_format='S', extraconfig='')),
+        ('row_integer', dict(key_format='i', value_format='S', extraconfig='')),
     ]
 
     scenarios = make_scenarios(format_values)
@@ -93,7 +95,7 @@ class test_rollback_to_stable28(test_rollback_to_stable_base):
 
         # Create our table.
         ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format,
-            config='log=(enabled=false)' + self.extraconfig)
+            config=self.extraconfig)
         ds.populate()
 
         if self.value_format == '8t':

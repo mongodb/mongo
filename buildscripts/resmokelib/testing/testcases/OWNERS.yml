@@ -1,0 +1,5 @@
+version: 1.0.0
+filters:
+  - "query_tester_server_test.py":
+    approvers:
+      - 10gen/query-optimization

@@ -4,16 +4,18 @@ set -e
 
 # Smoke-test random_directio as part of running "make check".
 
-# If $top_builddir/$top_srcdir aren't set, default to building in build_posix
-# and running in test/csuite.
-top_builddir=${top_builddir:-../../build_posix}
-top_srcdir=${top_srcdir:-../..}
+# If $binary_dir isn't set, default to using the build directory
+# this script resides under. Our CMake build will sync a copy of this
+# script to the build directory. Note this assumes we are executing a
+# copy of the script that lives under the build directory. Otherwise
+# passing the binary path is required.
+binary_dir=${binary_dir:-`dirname $0`}
 
 if [ -n "$1" ]
 then
     RUN_TEST_CMD="$TEST_WRAPPER $1"
 else
-    RUN_TEST_CMD="$TEST_WRAPPER $top_builddir/test/csuite/test_random_directio"
+    RUN_TEST_CMD="$TEST_WRAPPER $binary_dir/test_random_directio"
 fi
 # Replace for more complete testing
 #TEST_THREADS="1 5 10"
@@ -33,8 +35,8 @@ for threads in $TEST_THREADS; do
         # reliably pass.  'verbose' can be added to any.
         #$RUN_TEST -T $threads -S create,integrated,create_check      || exit 1
         #$RUN_TEST -T $threads -S create,integrated,drop,drop_check   || exit 1
-        #$RUN_TEST -T $threads -S create,integrated,rename            || exit 1
-        #$RUN_TEST -T $threads -S create,integrated,rename,drop_check || exit 1
+        #$RUN_TEST -T $threads -S create,integrated                   || exit 1
+        #$RUN_TEST -T $threads -S create,integrated,drop_check        || exit 1
         #$RUN_TEST -T $threads -S all,verbose                         || exit 1
     done
 done

@@ -1,0 +1,25 @@
+load("@poetry//:dependencies.bzl", "dependency")
+
+py_library(
+    name = "powercycle",
+    srcs = glob(["**/*.py"]),  # TODO: tighten this down
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "psutil",
+            group = "build-metrics",
+        ),
+        dependency(
+            "pymongo",
+            group = "core",
+        ),
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+        dependency(
+            "requests",
+            group = "core",
+        ),
+    ],
+)

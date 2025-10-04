@@ -1,0 +1,85 @@
+From b9b3a2135f2b04b30be899d75869981dacca5bcb Mon Sep 17 00:00:00 2001
+From: Benety Goh <benety@mongodb.com>
+Date: Fri, 11 Jul 2025 19:34:01 +0000
+Subject: [PATCH] SERVER-105009 add metrics to opentelemetry-proto BUILD
+
+---
+ .../opentelemetry-proto/dist/BUILD            | 41 ++++++++++++++-----
+ 1 file changed, 30 insertions(+), 11 deletions(-)
+
+diff --git a/src/third_party/opentelemetry-proto/dist/BUILD b/src/third_party/opentelemetry-proto/dist/BUILD
+index 8afdd5438fd..e9d5dd492ab 100644
+--- a/src/third_party/opentelemetry-proto/dist/BUILD
++++ b/src/third_party/opentelemetry-proto/dist/BUILD
+@@ -13,9 +13,6 @@ mongo_proto_library(
+ 
+ mongo_cc_proto_lib(
+     name = "common_proto_cc",
+-    srcs = [
+-        "opentelemetry/proto/common/v1/dummy_file.cpp",
+-    ],
+     deps = [":common_proto"],
+ )
+ 
+@@ -32,9 +29,6 @@ mongo_proto_library(
+ 
+ mongo_cc_proto_lib(
+     name = "resource_proto_cc",
+-    srcs = [
+-        "opentelemetry/proto/resource/v1/dummy_file.cpp",
+-    ],
+     deps = [":resource_proto"],
+ )
+ 
+@@ -52,9 +46,6 @@ mongo_proto_library(
+ 
+ mongo_cc_proto_lib(
+     name = "trace_proto_cc",
+-    srcs = [
+-        "opentelemetry/proto/trace/v1/dummy_file.cpp",
+-    ],
+     deps = [":trace_proto"],
+ )
+ 
+@@ -71,8 +62,36 @@ mongo_proto_library(
+ 
+ mongo_cc_proto_lib(
+     name = "trace_service_proto_cc",
++    deps = [":trace_service_proto"],
++)
++
++mongo_proto_library(
++    name = "metrics_proto",
+     srcs = [
+-        "opentelemetry/proto/collector/trace/v1/dummy_file.cpp",
++        "opentelemetry/proto/metrics/v1/metrics.proto",
+     ],
+-    deps = [":trace_service_proto"],
++    deps = [
++        ":common_proto",
++        ":resource_proto",
++    ],
++)
++
++mongo_cc_proto_lib(
++    name = "metrics_proto_cc",
++    deps = [":metrics_proto"],
++)
++
++mongo_proto_library(
++    name = "metrics_service_proto",
++    srcs = [
++        "opentelemetry/proto/collector/metrics/v1/metrics_service.proto",
++    ],
++    deps = [
++        ":metrics_proto",
++    ],
++)
++
++mongo_cc_proto_lib(
++    name = "metrics_service_proto_cc",
++    deps = [":metrics_service_proto"],
+ )
+-- 
+2.34.1
+

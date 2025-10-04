@@ -13,9 +13,10 @@
  *         at http://www.boost.org/doc/libs/release/libs/log/doc/html/index.html.
  */
 
+#include <boost/log/detail/setup_config.hpp>
+
 #ifndef BOOST_LOG_WITHOUT_SETTINGS_PARSERS
 
-#include <boost/log/detail/setup_config.hpp>
 #include <string>
 #include <locale>
 #include <iostream>

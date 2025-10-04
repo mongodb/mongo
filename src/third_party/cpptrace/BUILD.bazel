@@ -1,0 +1,38 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+mongo_cc_library(
+    name = "cpptrace",
+    srcs = glob([
+        "dist/src/**/*.hpp",
+        "dist/src/**/*.cpp",
+    ]),
+    hdrs = glob([
+        "dist/include/cpptrace/*.hpp",
+        "dist/include/ctrace/*.h",
+    ]),
+    includes = [
+        "dist/include",
+        "dist/src",
+    ],
+    linkopts = [
+        "-ldl",
+    ],
+    local_defines = [
+        "CPPTRACE_UNWIND_WITH_LIBUNWIND",
+        "CPPTRACE_GET_SYMBOLS_WITH_LIBDWARF",
+        "CPPTRACE_DEMANGLE_WITH_CXXABI",
+    ],
+    target_compatible_with = ["@platforms//os:linux"] + select({
+        "//bazel/config:release_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:libunwind_disabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    visibility = ["//visibility:public"],
+    deps = [
+        "//src/third_party/libdwarf",
+        "//src/third_party/zlib",
+        "//src/third_party/zstandard:zstd",
+    ],
+)

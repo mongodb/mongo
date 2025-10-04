@@ -1,0 +1,6 @@
+==== VARIATION: matchExpression=InternalSchemaMatchArrayIndexMatchExpression
+{ a: { $_internalSchemaMatchArrayIndex: { index: 2, namePlaceholder: "i", expression: { i: { $lt: 3 } } } } }
+
+==== VARIATION: taggedMatchExpression=InternalSchemaMatchArrayIndexMatchExpression
+{ a: { $_internalSchemaMatchArrayIndex: { index: 2, namePlaceholder: "i", expression: { i: { $lt: 3 } } } } } || Selected Index #2 pos 0 combine 1
+

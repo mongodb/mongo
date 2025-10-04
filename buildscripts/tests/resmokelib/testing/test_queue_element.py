@@ -1,11 +1,10 @@
 """Unit tests for the resmokelib.testing.executor module."""
+
 import unittest
 
 import mock
 
 from buildscripts.resmokelib.testing import queue_element
-
-# pylint: disable=missing-docstring,protected-access
 
 
 class TestQueueElemFactory(unittest.TestCase):
@@ -42,6 +41,7 @@ class TestQueueElemRepeatTime(unittest.TestCase):
         """
         for _ in range(n_expected):
             self.assertTrue(queue_elem.should_requeue())
+            queue_elem.job_started()
             queue_elem.job_completed(run_time)
 
         self.assertFalse(queue_elem.should_requeue())

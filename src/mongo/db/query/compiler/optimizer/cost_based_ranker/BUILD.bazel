@@ -1,0 +1,172 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "cardinality_estimator",
+    srcs = [
+        "cardinality_estimator.cpp",
+        "cbr_rewrites.cpp",
+        "ce_cache.cpp",
+    ],
+    hdrs = [
+        "cardinality_estimator.h",
+        "cbr_rewrites.h",
+        "ce_cache.h",
+        "//src/mongo/db/query:query_planner_params.h",
+    ],
+    deps = [
+        "ce_utils",
+        "estimates",
+        "heuristic_estimator",
+        "//src/mongo/db/query/compiler/ce/histogram:histogram_estimator",
+        "//src/mongo/db/query/compiler/ce/sampling:sampling_estimator_interface",
+        "//src/mongo/db/query/compiler/optimizer/index_bounds_builder",
+        "//src/mongo/db/query/compiler/stats:collection_statistics_interface",
+    ],
+)
+
+mongo_cc_library(
+    name = "cost_estimator",
+    srcs = [
+        "cost_estimator.cpp",
+    ],
+    hdrs = [
+        "cost_estimator.h",
+        "//src/mongo/db/query/compiler/physical_model/query_solution:query_solution.h",
+    ],
+    deps = [
+        "cardinality_estimator",
+        "ce_utils",
+        "estimates",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/exec:scoped_timer",
+    ],
+)
+
+mongo_cc_library(
+    name = "estimates",
+    srcs = [
+        "estimates.cpp",
+    ],
+    hdrs = [
+        "estimates.h",
+        "estimates_storage.h",
+        "//src/mongo/db/query/util:named_enum.h",
+        "//src/mongo/util:fixed_string.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "heuristic_estimator",
+    srcs = [
+        "heuristic_estimator.cpp",
+    ],
+    hdrs = [
+        "heuristic_estimator.h",
+        "//src/mongo/db/matcher:expression.h",
+        "//src/mongo/db/matcher:expression_visitor.h",
+        "//src/mongo/db/matcher:matchable.h",
+        "//src/mongo/db/matcher:path.h",
+        "//src/mongo/db/pipeline:legacy_runtime_constants_gen",
+        "//src/mongo/db/pipeline:variables.h",
+        "//src/mongo/db/query/compiler/dependency_analysis:dependencies.h",
+    ],
+    deps = [
+        "ce_utils",
+        "estimates",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/query/compiler/metadata:query_metadata",
+        "//src/mongo/db/query/compiler/physical_model/index_bounds",
+    ],
+)
+
+mongo_cc_library(
+    name = "ce_utils",
+    srcs = [
+        "ce_utils.cpp",
+    ],
+    hdrs = [
+        "ce_utils.h",
+    ],
+    deps = [
+        "estimates",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "cost_based_ranker_test",
+    srcs = [
+        "cardinality_estimator_test.cpp",
+        "cost_estimator_test.cpp",
+        "estimates_test.cpp",
+        "heuristic_estimator_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        ":cbr_test_utils",
+        "//src/mongo/db/query/compiler/ce/sampling:sampling_test_utils",
+    ],
+)
+
+mongo_cc_library(
+    name = "cbr_test_utils",
+    srcs = [
+        "cbr_test_utils.cpp",
+    ],
+    hdrs = [
+        "cbr_test_utils.h",
+    ],
+    deps = [
+        ":cardinality_estimator",
+        ":estimates",
+        ":heuristic_estimator",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db/query/compiler/ce:ce_test_utils",
+        "//src/mongo/db/query/compiler/ce/histogram:histogram_test_utils",
+        "//src/mongo/db/query/compiler/ce/sampling:sampling_estimator_interface",
+        "//src/mongo/db/query/compiler/stats:collection_statistics_mock",
+        "//src/mongo/db/query/compiler/stats:stats_histograms",
+        "//src/mongo/db/query/compiler/stats:stats_test_utils",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_library(
+    name = "plan_ranking_utils",
+    srcs = [
+        "//src/mongo/db/query/compiler/optimizer/cost_based_ranker:plan_ranking_utils.cpp",
+        "//src/mongo/db/query/compiler/optimizer/cost_based_ranker:plan_ranking_utils.h",
+        "//src/mongo/dbtests:dbtests.h",
+    ],
+    deps = [
+        "//src/mongo/db/index_builds:multi_index_block",
+        "//src/mongo/db/query:query_planner_test_lib",
+        "//src/mongo/idl:server_parameter_test_controller",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "plan_ranking_bm",
+    srcs = [
+        "plan_ranking_bm.cpp",
+    ],
+    tags = ["second_half_bm"],
+    deps = [
+        "plan_ranking_utils",
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db/query/compiler/ce:ce_test_utils",
+        "//src/mongo/db/query/compiler/ce/sampling:sampling_test_utils",
+    ],
+)

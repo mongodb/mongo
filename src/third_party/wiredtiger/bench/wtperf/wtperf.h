@@ -31,7 +31,6 @@
 
 #include "test_util.h"
 
-#include <assert.h>
 #include <math.h>
 
 #include "config_opt.h"
@@ -40,23 +39,20 @@ typedef struct __wtperf WTPERF;
 typedef struct __wtperf_thread WTPERF_THREAD;
 typedef struct __truncate_queue_entry TRUNCATE_QUEUE_ENTRY;
 
-#ifndef LZ4_PATH
-#define LZ4_PATH "lz4/.libs/libwiredtiger_lz4.so"
-#endif
-#ifndef SNAPPY_PATH
-#define SNAPPY_PATH "snappy/.libs/libwiredtiger_snappy.so"
-#endif
-#ifndef ZLIB_PATH
-#define ZLIB_PATH "zlib/.libs/libwiredtiger_zlib.so"
-#endif
-#ifndef ZSTD_PATH
-#define ZSTD_PATH "zstd/.libs/libwiredtiger_zstd.so"
-#endif
-
 #define EXT_PFX ",extensions=("
 #define EXT_SFX ")"
-#define EXTPATH "../../ext/compressors/" /* Extensions path */
+#define EXTPATH "../../ext/" /* Extensions path */
 #define BLKCMP_PFX "block_compressor="
+
+/* Compressor Extensions */
+#undef LZ4_PATH
+#define LZ4_PATH "compressors/lz4/libwiredtiger_lz4.so"
+#undef SNAPPY_PATH
+#define SNAPPY_PATH "compressors/snappy/libwiredtiger_snappy.so"
+#undef ZLIB_PATH
+#define ZLIB_PATH "compressors/zlib/libwiredtiger_zlib.so"
+#undef ZSTD_PATH
+#define ZSTD_PATH "compressors/zstd/libwiredtiger_zstd.so"
 
 #define LZ4_BLK BLKCMP_PFX "lz4"
 #define LZ4_EXT EXT_PFX EXTPATH LZ4_PATH EXT_SFX
@@ -67,8 +63,24 @@ typedef struct __truncate_queue_entry TRUNCATE_QUEUE_ENTRY;
 #define ZSTD_BLK BLKCMP_PFX "zstd"
 #define ZSTD_EXT EXT_PFX EXTPATH ZSTD_PATH EXT_SFX
 
+/* Tiered Storage Extensions */
+#ifndef DIR_STORE_PATH
+#define DIR_STORE_PATH "storage_sources/dir_store/libwiredtiger_dir_store.so"
+#endif
+#ifndef S3_PATH
+#define S3_PATH "storage_sources/s3_store/libwiredtiger_s3_store.so"
+#endif
+
+#define DIR_EXT EXT_PFX EXTPATH DIR_STORE_PATH EXT_SFX
+#define S3_EXT EXT_PFX EXTPATH S3_PATH EXT_SFX
+
 #define MAX_MODIFY_PCT 10
 #define MAX_MODIFY_NUM 16
+
+#define INDEX_BASE 10000
+#define INDEX_MAX_MULTIPLIER 50
+#define INDEX_POPULATE_MULT 1
+#define INDEX_VALUE "SMALL_VALUE"
 
 typedef struct {
     int64_t threads;   /* Thread count */
@@ -82,6 +94,7 @@ typedef struct {
     int64_t modify_delta;   /* Value size change on modify */
     bool modify_distribute; /* Distribute the change of modifications across the whole new record */
     bool modify_force_update; /* Do force update instead of modify */
+    bool reopen_cursor;       /* Reopen cursor for each operation. */
     int64_t ops_per_txn;
     int64_t pause;           /* Time between scans */
     int64_t read_range;      /* Range of reads */
@@ -129,13 +142,14 @@ typedef struct {
 
 #define LOG_PARTIAL_CONFIG ",log=(enabled=false)"
 #define READONLY_CONFIG ",readonly=true"
-struct __wtperf {         /* Per-database structure */
-    char *home;           /* WiredTiger home */
-    char *monitor_dir;    /* Monitor output dir */
-    char *partial_config; /* Config string for partial logging */
-    char *reopen_config;  /* Config string for conn reopen */
-    char *log_table_uri;  /* URI for log table */
-    char **uris;          /* URIs */
+struct __wtperf {          /* Per-database structure */
+    char *home;            /* WiredTiger home */
+    char *monitor_dir;     /* Monitor output dir */
+    char *partial_config;  /* Config string for partial logging */
+    char *reopen_config;   /* Config string for conn reopen */
+    char *index_table_uri; /* URI for index-like table */
+    char *log_table_uri;   /* URI for log table */
+    char **uris;           /* URIs */
 
     WT_CONNECTION *conn; /* Database connection */
 
@@ -144,8 +158,12 @@ struct __wtperf {         /* Per-database structure */
     const char *compress_ext;   /* Compression extension for conn */
     const char *compress_table; /* Compression arg to table create */
 
+    const char *tiered_ext;   /* Tiered extension for conn */
+    const char *tiered_table; /* Tiered arg to table create */
+
     WTPERF_THREAD *backupthreads; /* Backup threads */
     WTPERF_THREAD *ckptthreads;   /* Checkpoint threads */
+    WTPERF_THREAD *flushthreads;  /* Flush_tier threads */
     WTPERF_THREAD *popthreads;    /* Populate threads */
     WTPERF_THREAD *scanthreads;   /* Scan threads */
 
@@ -159,6 +177,7 @@ struct __wtperf {         /* Per-database structure */
     /* State tracking variables. */
     uint64_t backup_ops;   /* backup operations */
     uint64_t ckpt_ops;     /* checkpoint operations */
+    uint64_t flush_ops;    /* flush operations */
     uint64_t scan_ops;     /* scan operations */
     uint64_t insert_ops;   /* insert operations */
     uint64_t modify_ops;   /* modify operations */
@@ -166,19 +185,23 @@ struct __wtperf {         /* Per-database structure */
     uint64_t truncate_ops; /* truncate operations */
     uint64_t update_ops;   /* update operations */
 
-    uint64_t insert_key;         /* insert key */
-    uint64_t log_like_table_key; /* used to allocate IDs for log table */
+    uint64_t index_max_multiplier; /* used to find and modify index keys */
+    uint64_t insert_key;           /* insert key */
+    uint64_t log_like_table_key;   /* used to allocate IDs for log table */
 
     volatile bool backup;    /* backup in progress */
     volatile bool ckpt;      /* checkpoint in progress */
+    volatile bool flush;     /* flush_tier in progress */
     volatile bool scan;      /* scan in progress */
     volatile bool error;     /* thread error */
+    volatile bool ckpt_stop; /* notify checkpoint thread to stop */
     volatile bool stop;      /* notify threads to stop */
     volatile bool in_warmup; /* running warmup phase */
 
     volatile bool idle_cycle_run; /* Signal for idle cycle thread */
 
-    volatile uint32_t totalsec; /* total seconds running */
+    uint32_t testsec;           /* total seconds executing workload */
+    volatile uint32_t totalsec; /* total seconds running - including populate */
 
 #define CFG_GROW 0x0001     /* There is a grow workload */
 #define CFG_SHRINK 0x0002   /* There is a shrink workload */
@@ -242,9 +265,9 @@ typedef struct {
     /*
      * Latency buckets.
      */
-    uint32_t us[1000]; /* < 1us ... 1000us */
-    uint32_t ms[1000]; /* < 1ms ... 1000ms */
-    uint32_t sec[100]; /* < 1s 2s ... 100s */
+    uint32_t us[WT_THOUSAND]; /* < 1us ... 1000us */
+    uint32_t ms[WT_THOUSAND]; /* < 1ms ... 1000ms */
+    uint32_t sec[100];        /* < 1s 2s ... 100s */
 } TRACK;
 
 struct __wtperf_thread {    /* Per-thread structure */
@@ -255,7 +278,8 @@ struct __wtperf_thread {    /* Per-thread structure */
 
     wt_thread_t handle; /* Handle */
 
-    char *key_buf, *value_buf; /* Key/value memory */
+    char *index_buf, *index_del_buf; /* Index memory */
+    char *key_buf, *value_buf;       /* Key/value memory */
 
     WORKLOAD *workload; /* Workload */
 
@@ -265,6 +289,7 @@ struct __wtperf_thread {    /* Per-thread structure */
 
     TRACK backup;         /* Backup operations */
     TRACK ckpt;           /* Checkpoint operations */
+    TRACK flush;          /* Flush_tier operations */
     TRACK insert;         /* Insert operations */
     TRACK modify;         /* Modify operations */
     TRACK read;           /* Read operations */
@@ -274,7 +299,7 @@ struct __wtperf_thread {    /* Per-thread structure */
     TRACK update;         /* Update operations */
 };
 
-void backup_read(WTPERF *, const char *);
+void backup_read(WTPERF *, WT_SESSION *);
 void cleanup_truncate_config(WTPERF *);
 int config_opt_file(WTPERF *, const char *);
 void config_opt_cleanup(CONFIG_OPTS *);
@@ -284,7 +309,10 @@ int config_opt_name_value(WTPERF *, const char *, const char *);
 void config_opt_print(WTPERF *);
 int config_opt_str(WTPERF *, const char *);
 void config_opt_usage(void);
+char *config_reopen(CONFIG_OPTS *);
 int config_sanity(WTPERF *);
+int delete_index_key(WTPERF *, WT_CURSOR *, char *, uint64_t);
+void generate_index_key(WTPERF_THREAD *, bool, char *, uint64_t);
 void latency_insert(WTPERF *, uint32_t *, uint32_t *, uint32_t *);
 void latency_modify(WTPERF *, uint32_t *, uint32_t *, uint32_t *);
 void latency_print(WTPERF *);
@@ -299,6 +327,7 @@ void stop_idle_table_cycle(WTPERF *, wt_thread_t);
 void worker_throttle(WTPERF_THREAD *);
 uint64_t sum_backup_ops(WTPERF *);
 uint64_t sum_ckpt_ops(WTPERF *);
+uint64_t sum_flush_ops(WTPERF *);
 uint64_t sum_scan_ops(WTPERF *);
 uint64_t sum_insert_ops(WTPERF *);
 uint64_t sum_modify_ops(WTPERF *);

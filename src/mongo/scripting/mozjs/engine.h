@@ -29,13 +29,15 @@
 
 #pragma once
 
-#include <jsapi.h>
-
-#include "mongo/platform/mutex.h"
 #include "mongo/scripting/deadline_monitor.h"
 #include "mongo/scripting/engine.h"
-#include "mongo/stdx/unordered_map.h"
-#include "mongo/util/concurrency/mutex.h"
+#include "mongo/util/modules.h"
+
+#include <string>
+
+#include <jsapi.h>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace mozjs {
@@ -48,11 +50,8 @@ class MozJSImplScope;
  */
 class MozJSScriptEngine final : public mongo::ScriptEngine {
 public:
-    MozJSScriptEngine(bool disableLoadStored);
+    MozJSScriptEngine(ExecutionEnvironment env);
     ~MozJSScriptEngine() override;
-
-    mongo::Scope* createScope() override;
-    mongo::Scope* createScopeForCurrentThread(boost::optional<int> jsHeapLimitMB) override;
 
     void runTest() override {}
 
@@ -60,12 +59,9 @@ public:
         return true;
     }
 
-    void interrupt(unsigned opId) override;
+    void interrupt(ClientLock&, OperationContext*) override;
 
-    void interruptAll() override;
-
-    void enableJIT(bool value) override;
-    bool isJITEnabled() const override;
+    void interruptAll(ServiceContextLock&) override;
 
     void enableJavaScriptProtection(bool value) override;
     bool isJavaScriptProtectionEnabled() const override;
@@ -73,29 +69,28 @@ public:
     int getJSHeapLimitMB() const override;
     void setJSHeapLimitMB(int limit) override;
 
-    void registerOperation(OperationContext* ctx, MozJSImplScope* scope);
-    void unregisterOperation(unsigned int opId);
+    std::string getLoadPath() const override;
+    void setLoadPath(const std::string& loadPath) override;
 
-    using ScopeCallback = void (*)(Scope&);
-    ScopeCallback getScopeInitCallback() {
-        return _scopeInitCallback;
-    };
+    void registerOperation(OperationContext* ctx, MozJSImplScope* scope);
+    void unregisterOperation(OperationContext* opCtx);
 
     DeadlineMonitor<MozJSImplScope>& getDeadlineMonitor() {
         return _deadlineMonitor;
     }
 
+    ExecutionEnvironment executionEnvironment() const {
+        return _executionEnvironment;
+    }
+
+protected:
+    mongo::Scope* createScope() override;
+    mongo::Scope* createScopeForCurrentThread(boost::optional<int> jsHeapLimitMB) override;
+
 private:
-    /**
-     * This mutex protects _opToScopeMap
-     */
-    Mutex _globalInterruptLock = MONGO_MAKE_LATCH("MozJSScriptEngine::_globalInterruptLock");
-
-    using OpIdToScopeMap = stdx::unordered_map<unsigned, MozJSImplScope*>;
-    OpIdToScopeMap _opToScopeMap;  // map of mongo op ids to scopes (protected by
-                                   // _globalInterruptLock).
-
     DeadlineMonitor<MozJSImplScope> _deadlineMonitor;
+    ExecutionEnvironment _executionEnvironment;
+    std::string _loadPath;
 };
 
 }  // namespace mozjs

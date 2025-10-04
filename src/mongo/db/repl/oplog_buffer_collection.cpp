@@ -26,41 +26,59 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/oplog_buffer_collection.h"
 
-#include <algorithm>
-#include <iterator>
-#include <numeric>
-
+#include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/ops/write_ops_exec.h"
+#include "mongo/db/index/index_constants.h"
+#include "mongo/db/local_catalog/catalog_raii.h"
+#include "mongo/db/local_catalog/clustered_collection_options_gen.h"
+#include "mongo/db/local_catalog/clustered_collection_util.h"
+#include "mongo/db/local_catalog/collection_options.h"
+#include "mongo/db/local_catalog/document_validation.h"
+#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/write_ops/write_ops_exec.h"
+#include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/util/assert_util.h"
+
+#include <algorithm>
+#include <iterator>
+#include <mutex>
+#include <numeric>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
+
 
 namespace mongo {
 namespace repl {
 
 namespace {
 
-const StringData kDefaultOplogCollectionNamespace = "local.temp_oplog_buffer"_sd;
 const StringData kOplogEntryFieldName = "entry"_sd;
 const StringData kIdFieldName = "_id"_sd;
 const StringData kTimestampFieldName = "ts"_sd;
-const StringData kIdIdxName = "_id_"_sd;
+const StringData kIdIdxName = IndexConstants::kIdIndexName;
 
+const Timestamp kInvalidLastPushedTimestamp(0, 1);
 }  // namespace
 
 NamespaceString OplogBufferCollection::getDefaultNamespace() {
-    return NamespaceString(kDefaultOplogCollectionNamespace);
+    return NamespaceString::kDefaultOplogCollectionNamespace;
 }
 
 std::tuple<BSONObj, Timestamp> OplogBufferCollection::addIdToDocument(const BSONObj& orig) {
@@ -101,13 +119,13 @@ void OplogBufferCollection::startup(OperationContext* opCtx) {
     // If the collection doesn't already exist, create it.
     _createCollection(opCtx);
 
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     // If we are starting from an existing collection, we must populate the in memory state of the
     // buffer.
-    auto sizeResult = _storageInterface->getCollectionSize(opCtx, _nss);
-    fassert(40403, sizeResult);
-    _size = sizeResult.getValue();
+    _size = uassertStatusOK(_storageInterface->getCollectionSize(opCtx, _nss));
     _sizeIsValid = true;
+
+    _count = uassertStatusOK(_storageInterface->getCollectionCount(opCtx, _nss));
 
     // We always start from the beginning, with _lastPoppedKey being empty. This is safe because
     // it is always safe to replay old oplog entries in order. We explicitly reset all fields
@@ -119,18 +137,9 @@ void OplogBufferCollection::startup(OperationContext* opCtx) {
     _updateLastPushedTimestampFromCollection(lk, opCtx);
 }
 
-void OplogBufferCollection::_updateLastPushedTimestampFromCollection(WithLock,
+void OplogBufferCollection::_updateLastPushedTimestampFromCollection(WithLock lk,
                                                                      OperationContext* opCtx) {
-    auto countResult = _storageInterface->getCollectionCount(opCtx, _nss);
-    fassert(40404, countResult);
-    _count = countResult.getValue();
-
-    if (_count == 0) {
-        _lastPushedTimestamp = {};
-        return;
-    }
-
-    auto lastPushedObj = _lastDocumentPushed_inlock(opCtx);
+    auto lastPushedObj = _lastDocumentPushed(lk, opCtx);
     if (lastPushedObj) {
         auto lastPushedId = lastPushedObj->getObjectField(kIdFieldName);
         fassert(
@@ -143,7 +152,7 @@ void OplogBufferCollection::_updateLastPushedTimestampFromCollection(WithLock,
 
 void OplogBufferCollection::shutdown(OperationContext* opCtx) {
     if (_options.dropCollectionAtShutdown) {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _dropCollection(opCtx);
         _size = 0;
         _count = 0;
@@ -155,11 +164,12 @@ void OplogBufferCollection::shutdown(OperationContext* opCtx) {
 
 void OplogBufferCollection::push(OperationContext* opCtx,
                                  Batch::const_iterator begin,
-                                 Batch::const_iterator end) {
+                                 Batch::const_iterator end,
+                                 boost::optional<const Cost&> cost) {
     if (begin == end) {
         return;
     }
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     // Make sure timestamp order is correct.
     auto ts = _lastPushedTimestamp;
     std::for_each(begin, end, [&ts](const Value& value) {
@@ -181,10 +191,18 @@ void OplogBufferCollection::preload(OperationContext* opCtx,
     if (begin == end) {
         return;
     }
-    stdx::lock_guard<Latch> lk(_mutex);
+
+    ScopeGuard failToPreloadGuard([this] {
+        stdx::unique_lock lk(_mutex);
+        _lastPushedTimestamp = kInvalidLastPushedTimestamp;
+    });
+
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(_lastPoppedKey.isEmpty());
     _push(lk, opCtx, begin, end);
     _updateLastPushedTimestampFromCollection(lk, opCtx);
+
+    failToPreloadGuard.dismiss();
 }
 
 void OplogBufferCollection::_push(WithLock,
@@ -230,30 +248,29 @@ void OplogBufferCollection::_push(WithLock,
     _cvNoLongerEmpty.notify_all();
 }
 
-void OplogBufferCollection::waitForSpace(OperationContext* opCtx, std::size_t size) {}
+void OplogBufferCollection::waitForSpace(OperationContext* opCtx, const Cost& cost) {}
 
 bool OplogBufferCollection::isEmpty() const {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _count == 0;
 }
 
-std::size_t OplogBufferCollection::getMaxSize() const {
-    return 0;
-}
-
 std::size_t OplogBufferCollection::getSize() const {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     uassert(4940100, "getSize() called on OplogBufferCollection after seek", _sizeIsValid);
     return _size;
 }
 
 std::size_t OplogBufferCollection::getCount() const {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _count;
 }
 
 void OplogBufferCollection::clear(OperationContext* opCtx) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    // We acquire the appropriate locks for the temporary oplog buffer collection here,
+    // so that we perform the drop and create under the same locks.
+    AutoGetCollection autoColl(opCtx, NamespaceString::kDefaultOplogCollectionNamespace, MODE_X);
     _dropCollection(opCtx);
     _createCollection(opCtx);
     _size = 0;
@@ -265,35 +282,45 @@ void OplogBufferCollection::clear(OperationContext* opCtx) {
 }
 
 bool OplogBufferCollection::tryPop(OperationContext* opCtx, Value* value) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (_count == 0) {
         return false;
     }
-    return _pop_inlock(opCtx, value);
+    return _pop(lk, opCtx, value);
 }
 
-bool OplogBufferCollection::waitForData(Seconds waitDuration) {
-    stdx::unique_lock<Latch> lk(_mutex);
-    if (!_cvNoLongerEmpty.wait_for(
-            lk, waitDuration.toSystemDuration(), [&]() { return _count != 0; })) {
+bool OplogBufferCollection::waitForDataFor(Milliseconds waitDuration,
+                                           Interruptible* interruptible) {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    if (!interruptible->waitForConditionOrInterruptFor(
+            _cvNoLongerEmpty, lk, waitDuration, [&]() { return _count != 0; })) {
+        return false;
+    }
+    return _count != 0;
+}
+
+bool OplogBufferCollection::waitForDataUntil(Date_t deadline, Interruptible* interruptible) {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    if (!interruptible->waitForConditionOrInterruptUntil(
+            _cvNoLongerEmpty, lk, deadline, [&]() { return _count != 0; })) {
         return false;
     }
     return _count != 0;
 }
 
 bool OplogBufferCollection::peek(OperationContext* opCtx, Value* value) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (_count == 0) {
         return false;
     }
-    *value = _peek_inlock(opCtx, PeekMode::kExtractEmbeddedDocument);
+    *value = _peek(lk, opCtx, PeekMode::kExtractEmbeddedDocument);
     return true;
 }
 
 boost::optional<OplogBuffer::Value> OplogBufferCollection::lastObjectPushed(
     OperationContext* opCtx) const {
-    stdx::lock_guard<Latch> lk(_mutex);
-    auto lastDocumentPushed = _lastDocumentPushed_inlock(opCtx);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    auto lastDocumentPushed = _lastDocumentPushed(lk, opCtx);
     if (lastDocumentPushed) {
         BSONObj entryObj = extractEmbeddedOplogDocument(*lastDocumentPushed);
         entryObj.shareOwnershipWith(*lastDocumentPushed);
@@ -324,7 +351,7 @@ StatusWith<OplogBuffer::Value> OplogBufferCollection::findByTimestamp(OperationC
 Status OplogBufferCollection::seekToTimestamp(OperationContext* opCtx,
                                               const Timestamp& ts,
                                               SeekStrategy exact) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     BSONObj docWithTimestamp;
     auto docWithStatus = _getDocumentWithTimestamp(opCtx, ts);
     if (docWithStatus.isOK()) {
@@ -341,7 +368,7 @@ Status OplogBufferCollection::seekToTimestamp(OperationContext* opCtx,
         _lastPoppedKey = key;
     } else {
         // The document with the requested timestamp was found.  _lastPoppedKey will be set to that
-        // document's timestamp once the document is popped from the peek cache in _pop_inlock().
+        // document's timestamp once the document is popped from the peek cache in _pop().
         _lastPoppedKey = {};
         _peekCache.push(docWithTimestamp);
     }
@@ -356,27 +383,25 @@ Status OplogBufferCollection::seekToTimestamp(OperationContext* opCtx,
     return Status::OK();
 }
 
-boost::optional<OplogBuffer::Value> OplogBufferCollection::_lastDocumentPushed_inlock(
-    OperationContext* opCtx) const {
+boost::optional<OplogBuffer::Value> OplogBufferCollection::_lastDocumentPushed(
+    WithLock lk, OperationContext* opCtx) const {
     if (_count == 0) {
         return boost::none;
     }
     const auto docs =
-        fassert(40348,
-                _storageInterface->findDocuments(opCtx,
-                                                 _nss,
-                                                 kIdIdxName,
-                                                 StorageInterface::ScanDirection::kBackward,
-                                                 {},
-                                                 BoundInclusion::kIncludeStartKeyOnly,
-                                                 1U));
+        uassertStatusOK(_storageInterface->findDocuments(opCtx,
+                                                         _nss,
+                                                         kIdIdxName,
+                                                         StorageInterface::ScanDirection::kBackward,
+                                                         {},
+                                                         BoundInclusion::kIncludeStartKeyOnly,
+                                                         1U));
     invariant(1U == docs.size());
     return docs.front();
 }
 
-bool OplogBufferCollection::_pop_inlock(OperationContext* opCtx, Value* value) {
-    BSONObj docFromCollection =
-        _peek_inlock(opCtx, PeekMode::kReturnUnmodifiedDocumentFromCollection);
+bool OplogBufferCollection::_pop(WithLock lk, OperationContext* opCtx, Value* value) {
+    BSONObj docFromCollection = _peek(lk, opCtx, PeekMode::kReturnUnmodifiedDocumentFromCollection);
     _lastPoppedKey = docFromCollection[kIdFieldName].wrap("");
     *value = extractEmbeddedOplogDocument(docFromCollection).getOwned();
 
@@ -393,7 +418,7 @@ bool OplogBufferCollection::_pop_inlock(OperationContext* opCtx, Value* value) {
     return true;
 }
 
-BSONObj OplogBufferCollection::_peek_inlock(OperationContext* opCtx, PeekMode peekMode) {
+BSONObj OplogBufferCollection::_peek(WithLock lk, OperationContext* opCtx, PeekMode peekMode) {
     invariant(_count > 0);
 
     BSONObj startKey;
@@ -411,15 +436,14 @@ BSONObj OplogBufferCollection::_peek_inlock(OperationContext* opCtx, PeekMode pe
     // when size of read ahead cache is greater than zero in the options.
     if (_peekCache.empty()) {
         std::size_t limit = isPeekCacheEnabled ? _options.peekCacheSize : 1U;
-        const auto docs =
-            fassert(40163,
-                    _storageInterface->findDocuments(opCtx,
-                                                     _nss,
-                                                     kIdIdxName,
-                                                     StorageInterface::ScanDirection::kForward,
-                                                     startKey,
-                                                     boundInclusion,
-                                                     limit));
+        const auto docs = uassertStatusOK(
+            _storageInterface->findDocuments(opCtx,
+                                             _nss,
+                                             kIdIdxName,
+                                             StorageInterface::ScanDirection::kForward,
+                                             startKey,
+                                             boundInclusion,
+                                             limit));
         invariant(!docs.empty());
         for (const auto& doc : docs) {
             _peekCache.push(doc);
@@ -443,7 +467,10 @@ BSONObj OplogBufferCollection::_peek_inlock(OperationContext* opCtx, PeekMode pe
 void OplogBufferCollection::_createCollection(OperationContext* opCtx) {
     CollectionOptions options;
     options.temp = _options.useTemporaryCollection;
-    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+    // This oplog-like collection will benefit from clustering by _id to reduce storage engine
+    // overhead and improve _id query efficiency.
+    options.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
+
     auto status = _storageInterface->createCollection(opCtx, _nss, options);
     if (status.code() == ErrorCodes::NamespaceExists)
         return;
@@ -451,23 +478,17 @@ void OplogBufferCollection::_createCollection(OperationContext* opCtx) {
 }
 
 void OplogBufferCollection::_dropCollection(OperationContext* opCtx) {
-    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
     uassertStatusOK(_storageInterface->dropCollection(opCtx, _nss));
 }
 
-Timestamp OplogBufferCollection::getLastPushedTimestamp() const {
-    stdx::lock_guard<Latch> lk(_mutex);
-    return _lastPushedTimestamp;
-}
-
 Timestamp OplogBufferCollection::getLastPoppedTimestamp_forTest() const {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _lastPoppedKey.isEmpty() ? Timestamp()
                                     : _lastPoppedKey[""].Obj()[kTimestampFieldName].timestamp();
 }
 
 std::queue<BSONObj> OplogBufferCollection::getPeekCache_forTest() const {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _peekCache;
 }
 

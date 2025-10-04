@@ -1,8 +1,10 @@
 """The unittest.TestCase for tests with a static JavaScript runner file."""
 
-from buildscripts.resmokelib import config
-from buildscripts.resmokelib import core
-from buildscripts.resmokelib import utils
+import copy
+import os
+from typing import Optional
+
+from buildscripts.resmokelib import config, core, logging, utils
 from buildscripts.resmokelib.testing.testcases import interface
 from buildscripts.resmokelib.utils import registry
 
@@ -12,9 +14,15 @@ class JSRunnerFileTestCase(interface.ProcessTestCase):
 
     REGISTERED_NAME = registry.LEAVE_UNREGISTERED
 
-    def __init__(  # pylint: disable=too-many-arguments
-            self, logger, test_kind, test_name, test_runner_file, shell_executable=None,
-            shell_options=None):
+    def __init__(
+        self,
+        logger: logging.Logger,
+        test_kind: str,
+        test_name: str,
+        test_runner_file: str,
+        shell_executable: Optional[str] = None,
+        shell_options: Optional[dict] = None,
+    ):
         """Initialize the JSRunnerFileTestCase with the 'test_name' file."""
 
         interface.ProcessTestCase.__init__(self, logger, test_kind, test_name)
@@ -37,6 +45,10 @@ class JSRunnerFileTestCase(interface.ProcessTestCase):
         global_vars["TestData"] = test_data
         self.shell_options["global_vars"] = global_vars
 
+        process_kwargs = copy.deepcopy(self.shell_options.get("process_kwargs", {}))
+        interface.append_process_tracking_options(process_kwargs, self._id)
+        self.shell_options["process_kwargs"] = process_kwargs
+
     def _populate_test_data(self, test_data):
         """Provide base method.
 
@@ -47,6 +59,10 @@ class JSRunnerFileTestCase(interface.ProcessTestCase):
 
     def _make_process(self):
         return core.programs.mongo_shell_program(
-            self.logger, self.fixture.job_num, test_id=self._id, executable=self.shell_executable,
-            connection_string=self.fixture.get_driver_connection_url(),
-            filename=self.test_runner_file, test_filename=self.test_name, **self.shell_options)
+            self.logger,
+            executable=self.shell_executable,
+            connection_string=self.fixture.get_shell_connection_url(),
+            filenames=[self.test_runner_file],
+            test_name=os.path.splitext(os.path.basename(self.test_name))[0],
+            **self.shell_options,
+        )

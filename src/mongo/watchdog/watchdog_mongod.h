@@ -30,6 +30,10 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/db/tenant_id.h"
+
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -43,7 +47,7 @@ void startWatchdog(ServiceContext* service);
 /**
  * Callbacks used by the 'watchdogPeriodSeconds' set parameter.
  */
-Status validateWatchdogPeriodSeconds(const int& value);
+Status validateWatchdogPeriodSeconds(const int& value, const boost::optional<TenantId>&);
 Status onUpdateWatchdogPeriodSeconds(const int& value);
 
 }  // namespace mongo

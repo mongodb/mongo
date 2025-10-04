@@ -1,0 +1,152 @@
+test_kind: js_test
+
+selector:
+  roots:
+    - jstests/core/**/*.js
+  exclude_files:
+    # The following tests fail because a certain command or functionality is not supported on
+    # mongos. This command or functionality is placed in a comment next to the failing test.
+    - jstests/core/**/apitest_db.js # serverStatus output doesn't have storageEngine.
+    - jstests/core/**/awaitdata_getmore_cmd.js # capped collections.
+    - jstests/core/**/bypass_doc_validation.js # sharded $out output not permitted
+    - jstests/core/**/check_shard_index.js # checkShardingIndex.
+    - jstests/core/**/compact_keeps_indexes.js # compact.
+    - jstests/core/**/currentop.js # uses fsync.
+    - jstests/core/**/dbhash.js # dbhash.
+    - jstests/core/**/fsync.js # uses fsync.
+    - jstests/core/**/geo_s2cursorlimitskip.js # profiling.
+    - jstests/core/**/geo_update_btree2.js # notablescan.
+    - jstests/core/**/queryoptimizera.js # "local" database.
+    - jstests/core/**/startup_log.js # "local" database.
+    - jstests/core/**/tailable_cursor_invalidation.js # capped collections.
+    - jstests/core/**/tailable_getmore_batch_size.js # capped collections.
+    - jstests/core/**/tailable_skip_limit.js # capped collections.
+    - jstests/core/**/query/top/top.js # top.
+    # The following tests fail because mongos behaves differently from mongod when testing certain
+    # functionality. The differences are in a comment next to the failing test.
+    - jstests/core/**/geo_2d_explain.js # executionSuccess in different spot in explain().
+    - jstests/core/**/geo_s2explain.js # inputStage in different spot in explain().
+    - jstests/core/**/geo_s2sparse.js # keysPerIndex in different spot in validate().
+    - jstests/core/**/operation_latency_histogram.js # Stats are counted differently on mongos, SERVER-24880.
+    # Profile can only be run against the admin database on mongos.
+    - jstests/core/txns/transactions_profiling.js
+    - jstests/core/txns/transactions_profiling_with_drops.js
+    # transactionLifetimeLimitSeconds parameter is not available in mongos.
+    - jstests/core/txns/abort_expired_transaction.js
+    - jstests/core/txns/abort_transaction_thread_does_not_block_on_locks.js
+    - jstests/core/txns/kill_op_on_txn_expiry.js
+    # Uses hangAfterCollectionInserts failpoint not available on  mongos.
+    - jstests/core/txns/speculative_snapshot_includes_all_writes.js
+
+    # The following tests explicitly create collections inside multi-document transactions. These are
+    # non-idempotent operations, and the implicit collection sharding logic upon collection access
+    # results in premature collection creation, causing the tests to fail.
+    - jstests/core/txns/create_collection.js
+    - jstests/core/txns/create_collection_parallel.js
+    - jstests/core/txns/create_indexes.js
+    - jstests/core/txns/create_indexes_parallel.js
+    # The following tests fail because they count indexes. These counts do not take into account the
+    # additional hashed shard key indexes that are automatically added by this passthrough.
+    - jstests/core/**/apitest_dbcollection.js
+    - jstests/core/**/bad_index_plugin.js
+    - jstests/core/**/create_indexes.js
+    - jstests/core/**/list_indexes_non_existent_ns.js
+    - jstests/core/**/mr_preserve_indexes.js
+    # TODO: Remove after fixing SERVER-103278. executionStats.nReturned is incorrect for sharded distinct commands.
+    - jstests/core/**/distinct_index1.js
+    # TODO SERVER-32311: These tests use plan stage helpers which can't handle sharded explain output.
+    - jstests/core/**/expr_index_use.js
+    - jstests/core/**/index_multikey.js
+    - jstests/core/**/query/explain/optimized_match_explain.js
+    - jstests/core/**/sort_array.js
+    - jstests/core/**/bucket_unpacking_with_sort_extended_range.js
+
+    # The following test expects collections that have not been explicitly created to not exist so the
+    # implicit shard accessed collection logic causes it to fail.
+    - jstests/core/**/collection_uuid_index_commands.js
+    # The following test requires the collection to be unsharded.
+    - jstests/core/txns/finished_transaction_error_handling.js
+
+    # The following test fails because configureQueryAnalyzer is not allowed on QE collections
+    - jstests/core/query/queryable_encryption/**/*.js
+    # The following test assumes the plan cache to be empty, which may not be guaranteed by this suite.
+    - jstests/core/query/query_settings/query_settings_plan_cache.js
+    # The following test doesn't support $lookup where one collection is sharded and the other is unsharded
+    - jstests/core/query/explain/explain_find_trivially_false_predicates_in_agg_pipelines.js
+
+  exclude_with_any_tags:
+    - assumes_against_mongod_not_mongos
+    - assumes_standalone_mongod
+    # system.profile collection doesn't exist on mongos.
+    - requires_profiling
+
+    # analyzeShardKey doesn't support timeseries collections/views.
+    - requires_timeseries
+
+    # Transactions are not allowed to operate on capped collections.
+    - requires_capped
+    # Prepare is not a command on mongos.
+    - uses_prepare_transaction
+
+    # Tests tagged with the following will fail because they assume collections are not sharded.
+    - assumes_no_implicit_collection_creation_after_drop
+    - assumes_no_implicit_collection_creation_on_get_collection
+    - assumes_no_implicit_index_creation
+    - assumes_unsharded_collection
+    - cannot_create_unique_index_when_using_hashed_shard_key
+    # Cannot retry a getMore command if a transient transaction or network error occurs during
+    # it, since we won't know whether the cursor was advanced or not.
+    - requires_getmore
+
+    - uses_api_parameters
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckReplOplogs
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: >-
+        await import("jstests/libs/override_methods/implicitly_configure_query_analyzer.js");
+      global_vars:
+        TestData:
+          isAnalyzingShardKey: true
+  hooks:
+    - class: AnalyzeShardKeysInBackground
+    - class: CheckReplOplogs
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: ValidateCollections
+    - class: CheckOrphansDeleted
+    - class: CleanEveryN
+      n: 20
+  fixture:
+    class: ShardedClusterFixture
+    num_shards: 2
+    enable_balancer: false
+    configsvr_options:
+      all_nodes_electable: true
+    shard_options:
+      all_nodes_electable: true
+    mongod_options:
+      set_parameters:
+        enableElectionHandoff: 0
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+        queryAnalysisWriterIntervalSecs: 5
+        analyzeShardKeyNumRanges: 10
+        analyzeShardKeySplitPointExpirationSecs: 10
+        ttlMonitorSleepSecs: 5
+        logComponentVerbosity:
+          verbosity: 0
+          sharding: 2
+    mongos_options:
+      set_parameters:
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+        logComponentVerbosity:
+          verbosity: 0
+          sharding: 2
+    num_rs_nodes_per_shard: 3
+    num_mongos: 1

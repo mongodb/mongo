@@ -29,15 +29,30 @@
 
 #pragma once
 
-#include <memory>
-
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/string_map.h"
 
+#include <algorithm>
+#include <cstdint>
+#include <functional>
+#include <iterator>
+#include <map>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
 namespace mongo {
+class Expression;
 class ExpressionContext;
 class VariablesParseState;
 
@@ -77,6 +92,17 @@ public:
         return id >= 0;
     }
 
+    /**
+     * Returns 'true' if any of the 'vars' appear in the passed 'ids' set.
+     */
+    static bool hasVariableReferenceTo(const std::set<Variables::Id>& vars,
+                                       const std::set<Variables::Id>& ids) {
+        std::vector<Variables::Id> match;
+        std::set_intersection(
+            vars.begin(), vars.end(), ids.begin(), ids.end(), std::back_inserter(match));
+        return !match.empty();
+    }
+
     // Ids for builtin variables.
     static constexpr auto kRootId = Id(-1);
     static constexpr auto kRemoveId = Id(-2);
@@ -85,6 +111,16 @@ public:
     static constexpr auto kJsScopeId = Id(-5);
     static constexpr auto kIsMapReduceId = Id(-6);
     static constexpr auto kSearchMetaId = Id(-7);
+    static constexpr auto kUserRolesId = Id(-8);
+
+    static constexpr StringData kRootName = "ROOT"_sd;
+    static constexpr StringData kRemoveName = "REMOVE"_sd;
+    static constexpr StringData kNowName = "NOW"_sd;
+    static constexpr StringData kClusterTimeName = "CLUSTER_TIME"_sd;
+    static constexpr StringData kJsScopeName = "JS_SCOPE"_sd;
+    static constexpr StringData kIsMapReduceName = "IS_MR"_sd;
+    static constexpr StringData kSearchMetaName = "SEARCH_META"_sd;
+    static constexpr StringData kUserRolesName = "USER_ROLES"_sd;
 
     // Map from builtin var name to reserved id number.
     static const StringMap<Id> kBuiltinVarNameToId;
@@ -158,9 +194,20 @@ public:
     void setDefaultRuntimeConstants(OperationContext* opCtx);
 
     /**
-     * Seed let parameters with the given BSONObj.
+     * Seed let parameters with the given BSONObj. The 'exprRequirementsValidator' is a callback
+     * function to validate that the 'let' parameter expressions don't have any dependencies on
+     * the input documents or metadata.
      */
-    void seedVariablesWithLetParameters(ExpressionContext* expCtx, BSONObj letParameters);
+    void seedVariablesWithLetParameters(
+        ExpressionContext* expCtx,
+        BSONObj letParameters,
+        std::function<bool(const Expression* expr)> exprRequirementsValidator);
+
+    /**
+     * Serializes this Variables object to a BSONObj, according to the top level field names of
+     * 'varsToSerialize'.
+     */
+    BSONObj toBSON(const VariablesParseState& vps, const BSONObj& varsToSerialize) const;
 
     bool hasValue(Variables::Id id) const {
         return _definitions.find(id) != _definitions.end();
@@ -190,6 +237,29 @@ public:
         MONGO_UNREACHABLE_TASSERT(5858104);
     }
 
+    /**
+     * Return true if the passed-in variable ID belongs to a builtin variable.
+     */
+    static auto isBuiltin(Variables::Id variable) {
+        return kIdToBuiltinVarName.find(variable) != kIdToBuiltinVarName.end();
+    }
+
+    /**
+     * Define the value of the $$USER_ROLES variable.
+     */
+    void defineUserRoles(OperationContext* opCtx);
+
+    /**
+     * Define the value of the $$NOW variable by reading the current time.
+     */
+    void defineLocalNow();
+
+    /**
+     * Define the value of the $$CLUSTER_TIME variable by consulting the VectorClock (may be
+     * expensive due to mutex).
+     */
+    void defineClusterTime(OperationContext* opCtx);
+
 private:
     struct ValueAndState {
         ValueAndState() = default;
@@ -204,6 +274,21 @@ private:
 
     IdGenerator _idGenerator;
     stdx::unordered_map<Id, ValueAndState> _definitions;
+};
+
+/**
+ * This class represents the let variable that is defined under 'let' attribute in aggregation
+ * stages such as $lookup and $merge.
+ *
+ * 'let' attribute may store multiple let variables and these variables have to be stored in an
+ * order preserving container in order to guarantee the stability in the query shape serialization..
+ */
+struct LetVariable {
+    LetVariable(std::string name, boost::intrusive_ptr<Expression> expression, Variables::Id id);
+
+    std::string name;
+    boost::intrusive_ptr<Expression> expression;
+    Variables::Id id;
 };
 
 /**

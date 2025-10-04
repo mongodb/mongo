@@ -29,10 +29,19 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/background.h"
 #include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
+
+#include <memory>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -69,16 +78,15 @@ public:
     static JournalFlusher* get(OperationContext* opCtx);
     static void set(ServiceContext* serviceCtx, std::unique_ptr<JournalFlusher> journalFlusher);
 
-    std::string name() const {
+    std::string name() const override {
         return "JournalFlusher";
     }
 
     /**
      * Runs data flushes every 'storageGlobalParams.journalCommitIntervalMs' millis (unless
-     * '_disablePeriodicFlushes' is set) or immediately if triggerJournalFlush() or
-     * waitForJournalFlush() is called.
+     * '_disablePeriodicFlushes' is set) or immediately if  waitForJournalFlush() is called.
      */
-    void run();
+    void run() override;
 
     /**
      * Signals the thread to quit and then waits until it does. The given 'reason' is returned to
@@ -99,11 +107,6 @@ public:
     void resume();
 
     /**
-     * Signals an immediate journal flush and leaves.
-     */
-    void triggerJournalFlush();
-
-    /**
      * Signals an immediate journal flush and waits for it to complete before returning.
      *
      * Retries internally on InterruptedDueToReplStateChange errors.
@@ -113,7 +116,12 @@ public:
      * in parallel with replication rollback due to concurrent recoverToStableTimestamp(). But
      * untimestamped writes will be retained.
      */
-    void waitForJournalFlush();
+    void waitForJournalFlush(Interruptible* interruptible = Interruptible::notInterruptible());
+
+    /**
+     * Signals an immediate journal flush and returns without waiting for completion.
+     */
+    void triggerJournalFlush();
 
     /**
      * Interrupts the journal flusher thread via its operation context with an
@@ -130,22 +138,19 @@ private:
     };
 
     /**
-     * Signals an immediate journal flush and waits for it to complete before returning.
-     *
-     * Will throw ErrorCodes::isShutdownError if the flusher thread is being stopped.
-     * Will throw InterruptedDueToReplStateChange if a flusher round is interrupted by stepdown.
+     * Signals an immediate journal flush under mutex and returns without waiting for completion.
      */
-    void _waitForJournalFlushNoRetry();
+    void _triggerJournalFlush(WithLock lk);
 
     // Serializes setting/resetting _uniqueCtx and marking _uniqueCtx killed.
-    mutable Mutex _opCtxMutex = MONGO_MAKE_LATCH("JournalFlusherOpCtxMutex");
+    mutable stdx::mutex _opCtxMutex;
 
     // Saves a reference to the flusher thread's operation context so it can be interrupted if the
     // flusher is active.
     boost::optional<ServiceContext::UniqueOperationContext> _uniqueCtx;
 
     // Protects the state below.
-    mutable Mutex _stateMutex = MONGO_MAKE_LATCH("JournalFlusherStateMutex");
+    mutable stdx::mutex _stateMutex;
 
     // Signaled to wake up the thread, if the thread is waiting or paused. The thread will check
     // whether _flushJournalNow, _needToPause, or _shuttingDown is set and flush, pause, or stop

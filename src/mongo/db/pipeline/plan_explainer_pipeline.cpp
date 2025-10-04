@@ -27,31 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/pipeline/plan_explainer_pipeline.h"
 
-#include "mongo/db/pipeline/document_source_cursor.h"
-#include "mongo/db/pipeline/document_source_facet.h"
-#include "mongo/db/pipeline/document_source_lookup.h"
-#include "mongo/db/pipeline/document_source_sort.h"
-#include "mongo/db/pipeline/document_source_union_with.h"
-#include "mongo/db/pipeline/plan_executor_pipeline.h"
-#include "mongo/db/query/explain.h"
+#include "mongo/db/exec/agg/cursor_stage.h"
 #include "mongo/db/query/plan_summary_stats_visitor.h"
+#include "mongo/util/assert_util.h"
+
+#include <algorithm>
+
 
 namespace mongo {
-/**
- * Templatized method to get plan summary stats from document source and aggregate it to 'statsOut'.
- */
-template <typename DocSourceType, typename DocSourceStatType>
-void collectPlanSummaryStats(const DocSourceType& source, PlanSummaryStats* statsOut) {
-    auto specificStats = source.getSpecificStats();
-    invariant(specificStats);
-    auto visitor = PlanSummaryStatsVisitor(*statsOut);
-    specificStats->acceptVisitor(&visitor);
-}
-
 const PlanExplainer::ExplainVersion& PlanExplainerPipeline::getVersion() const {
     static const ExplainVersion kExplainVersion = "1";
 
@@ -63,47 +48,47 @@ const PlanExplainer::ExplainVersion& PlanExplainerPipeline::getVersion() const {
 }
 
 std::string PlanExplainerPipeline::getPlanSummary() const {
-    if (auto docSourceCursor =
-            dynamic_cast<DocumentSourceCursor*>(_pipeline->getSources().front().get())) {
-        return docSourceCursor->getPlanSummaryStr();
+    if (auto cursorStage =
+            dynamic_cast<exec::agg::CursorStage*>(_execPipeline->getStages().front().get())) {
+        return cursorStage->getPlanSummaryStr();
     }
 
     return "";
 }
 
 void PlanExplainerPipeline::getSummaryStats(PlanSummaryStats* statsOut) const {
-    invariant(statsOut);
+    tassert(9378603, "Encountered unexpected nullptr for PlanSummaryStats", statsOut);
 
-    if (auto docSourceCursor =
-            dynamic_cast<DocumentSourceCursor*>(_pipeline->getSources().front().get())) {
-        *statsOut = docSourceCursor->getPlanSummaryStats();
-    }
+    auto stage_it = _execPipeline->getStages().cbegin();
+    if (auto cursorStage = dynamic_cast<exec::agg::CursorStage*>(stage_it->get())) {
+        *statsOut = cursorStage->getPlanSummaryStats();
+        ++stage_it;
+    };
 
-    for (auto&& source : _pipeline->getSources()) {
-        statsOut->usedDisk = statsOut->usedDisk || source->usedDisk();
-
-        if (dynamic_cast<DocumentSourceSort*>(source.get())) {
-            statsOut->hasSortStage = true;
-        } else if (auto docSourceLookUp = dynamic_cast<DocumentSourceLookUp*>(source.get())) {
-            collectPlanSummaryStats<DocumentSourceLookUp, DocumentSourceLookupStats>(
-                *docSourceLookUp, statsOut);
-        } else if (auto docSourceUnionWith = dynamic_cast<DocumentSourceUnionWith*>(source.get())) {
-            collectPlanSummaryStats<DocumentSourceUnionWith, UnionWithStats>(*docSourceUnionWith,
-                                                                             statsOut);
-        } else if (auto docSourceFacet = dynamic_cast<DocumentSourceFacet*>(source.get())) {
-            collectPlanSummaryStats<DocumentSourceFacet, DocumentSourceFacetStats>(*docSourceFacet,
-                                                                                   statsOut);
+    PlanSummaryStatsVisitor visitor(*statsOut);
+    std::for_each(stage_it, _execPipeline->getStages().cend(), [&](const auto& stage) {
+        statsOut->usedDisk = statsOut->usedDisk || stage->usedDisk();
+        if (auto specificStats = stage->getSpecificStats()) {
+            specificStats->acceptVisitor(&visitor);
         }
-    }
+    });
 
-    if (_nReturned) {
-        statsOut->nReturned = _nReturned;
-    }
+    statsOut->nReturned = _nReturned;
 }
 
 PlanExplainer::PlanStatsDetails PlanExplainerPipeline::getWinningPlanStats(
     ExplainOptions::Verbosity verbosity) const {
     // TODO SERVER-49808: Report execution stats for the pipeline.
+    if (_pipeline->empty()) {
+        return {};
+    }
+
+    if (auto docSourceCursor =
+            dynamic_cast<DocumentSourceCursor*>(_pipeline->getSources().cbegin()->get())) {
+        if (auto explainer = docSourceCursor->getPlanExplainer()) {
+            return explainer->getWinningPlanStats(verbosity);
+        }
+    };
     return {};
 }
 
@@ -116,11 +101,5 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerPipeline::getRejectedP
     ExplainOptions::Verbosity verbosity) const {
     // Multi-planning is not supported for aggregation pipelines.
     return {};
-}
-
-std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerPipeline::getCachedPlanStats(
-    const plan_cache_debug_info::DebugInfo&, ExplainOptions::Verbosity) const {
-    // Pipelines are not cached, so we should never try to rebuild the stats from a cached entry.
-    MONGO_UNREACHABLE;
 }
 }  // namespace mongo

@@ -28,10 +28,10 @@
  */
 
 
-#include "mongo/unittest/unittest.h"
-
-#include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/fts/stemmer.h"
+
+#include "mongo/db/fts/fts_util.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace fts {

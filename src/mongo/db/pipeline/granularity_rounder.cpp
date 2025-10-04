@@ -27,11 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/pipeline/granularity_rounder.h"
 
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

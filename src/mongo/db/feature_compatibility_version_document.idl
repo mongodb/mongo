@@ -1,0 +1,72 @@
+#Copyright(C) 2020 - present MongoDB, Inc.
+#
+#This program is free software : you can redistribute it and / or modify
+#it under the terms of the Server Side Public License, version 1,
+#as published by MongoDB, Inc.
+#
+#This program is distributed in the hope that it will be useful,
+#but WITHOUT ANY WARRANTY; without even the implied warranty of
+#MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.See the
+#Server Side Public License for more details.
+#
+#You should have received a copy of the Server Side Public License
+#along with this program.If not, see
+# <http: //www.mongodb.com/licensing/server-side-public-license>.
+#
+#As a special exception, the copyright holders give permission to link the
+#code of portions of this program with the OpenSSL library under certain
+#conditions as described in each individual source file and distribute
+#linked combinations including the program with the OpenSSL library.You
+#must comply with the Server Side Public License in all respects for
+#all of the code used other than as permitted herein.If you modify file(s)
+#with this exception, you may extend this exception to your version of the
+#file(s), but you are not obligated to do so.If you do not wish to do so,
+#delete this exception statement from your version.If you delete this
+#exception statement from all source files in the program, then also delete
+#it in the license file.
+#
+global:
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/feature_compatibility_version_parser.h"
+
+imports:
+    - "mongo/db/basic_types.idl"
+
+structs:
+    featureCompatibilityVersionDocument:
+        description: "featureCompatibilityVersion on-disk document format"
+        generate_comparison_operators: true
+        fields:
+            _id:
+                type: string
+                description: "Key of the featureCompatibilityVersion state singleton document"
+                default: '"featureCompatibilityVersion"'
+            version:
+                description: "Effective featureCompatibilityVersion"
+                type: fcv_string
+            targetVersion:
+                description: "Target featureCompatibilityVersion for upgrade/downgrade"
+                type: fcv_string
+                optional: true
+            previousVersion:
+                description: >-
+                    Previous featureCompatibilityVersion for downgrading states, will always be kLatest when
+                    present
+                type: fcv_string
+                optional: true
+                validator:
+                    callback: "FeatureCompatibilityVersionParser::validatePreviousVersionField"
+            changeTimestamp:
+                description:
+                    "Timestamp used to identify the 2-phase setFCV request. Both phases (kStart and
+                    kComplete) must have the same timestamp for the entire sequence, and every new
+                    sequence started must strictly have incrementing timestamp."
+                type: timestamp
+                optional: true
+            isCleaningServerMetadata:
+                description:
+                    "Boolean indicating whether the setFCV downgrade request is in the middle of
+                    cleaning up internal server metadata."
+                type: bool
+                optional: true

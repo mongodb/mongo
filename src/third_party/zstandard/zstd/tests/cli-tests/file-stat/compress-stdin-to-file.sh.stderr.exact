@@ -1,0 +1,24 @@
+Trace:FileStat: > UTIL_isConsole(0)
+Trace:FileStat: < 0
+Trace:FileStat: > UTIL_isConsole(2)
+Trace:FileStat: < 0
+Trace:FileStat: > UTIL_getFileSize(/*stdin*\)
+Trace:FileStat:  > UTIL_stat(-1, /*stdin*\)
+Trace:FileStat:  < 0
+Trace:FileStat: < -1
+Trace:FileStat: > UTIL_isSameFile(/*stdin*\, file.zst)
+Trace:FileStat:  > UTIL_stat(-1, /*stdin*\)
+Trace:FileStat:  < 0
+Trace:FileStat: < 0
+Trace:FileStat: > UTIL_isRegularFile(file.zst)
+Trace:FileStat:  > UTIL_stat(-1, file.zst)
+Trace:FileStat:  < 0
+Trace:FileStat: < 0
+Trace:FileStat: > UTIL_isRegularFile(file.zst)
+Trace:FileStat:  > UTIL_stat(-1, file.zst)
+Trace:FileStat:  < 1
+Trace:FileStat: < 1
+Trace:FileStat: > UTIL_getFileSize(/*stdin*\)
+Trace:FileStat:  > UTIL_stat(-1, /*stdin*\)
+Trace:FileStat:  < 0
+Trace:FileStat: < -1

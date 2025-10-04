@@ -27,12 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/auth/authorization_manager.h"
 
-#include "mongo/base/init.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/shim.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+
+#include <string>
 
 namespace mongo {
 
@@ -47,32 +50,9 @@ constexpr StringData AuthorizationManager::PASSWORD_FIELD_NAME;
 constexpr StringData AuthorizationManager::V1_USER_NAME_FIELD_NAME;
 constexpr StringData AuthorizationManager::V1_USER_SOURCE_FIELD_NAME;
 
-
-const NamespaceString AuthorizationManager::adminCommandNamespace("admin.$cmd");
-const NamespaceString AuthorizationManager::rolesCollectionNamespace("admin.system.roles");
-const NamespaceString AuthorizationManager::usersBackupCollectionNamespace(
-    "admin.system.backup_users");
-const NamespaceString AuthorizationManager::usersCollectionNamespace("admin.system.users");
-const NamespaceString AuthorizationManager::versionCollectionNamespace("admin.system.version");
-const NamespaceString AuthorizationManager::defaultTempUsersCollectionNamespace("admin.tempusers");
-const NamespaceString AuthorizationManager::defaultTempRolesCollectionNamespace("admin.temproles");
-
 const Status AuthorizationManager::authenticationFailedStatus(ErrorCodes::AuthenticationFailed,
                                                               "Authentication failed.");
 
-const BSONObj AuthorizationManager::versionDocumentQuery = BSON("_id"
-                                                                << "authSchema");
-
-constexpr StringData AuthorizationManager::schemaVersionFieldName;
-
-const int AuthorizationManager::schemaVersion24;
-const int AuthorizationManager::schemaVersion26Upgrade;
-const int AuthorizationManager::schemaVersion26Final;
-const int AuthorizationManager::schemaVersion28SCRAM;
-
-std::unique_ptr<AuthorizationManager> AuthorizationManager::create(ServiceContext* serviceContext) {
-    static auto w = MONGO_WEAK_FUNCTION_DEFINITION(AuthorizationManager::create);
-    return w(serviceContext);
-}
+const BSONObj AuthorizationManager::versionDocumentQuery = BSON("_id" << "authSchema");
 
 }  // namespace mongo

@@ -24,10 +24,10 @@ __wt_import_repair(WT_SESSION_IMPL *session, const char *uri, char **configp)
     WT_DECL_ITEM(checkpoint);
     WT_DECL_RET;
     WT_KEYED_ENCRYPTOR *kencryptor;
-    uint32_t allocsize;
-    char *checkpoint_list, *config, *config_tmp, *metadata, fileid[64];
+    uint32_t fileid;
+    char *checkpoint_list, *config, *config_tmp, fileid_cfg[64], *metadata;
     const char *cfg[] = {WT_CONFIG_BASE(session, file_meta), NULL, NULL, NULL, NULL, NULL, NULL};
-    const char *filename;
+    bool shared;
 
     ckptbase = NULL;
     checkpoint_list = config = config_tmp = metadata = NULL;
@@ -37,16 +37,12 @@ __wt_import_repair(WT_SESSION_IMPL *session, const char *uri, char **configp)
     WT_ERR(__wt_scr_alloc(session, 1024, &buf));
     WT_ERR(__wt_scr_alloc(session, 0, &checkpoint));
 
-    WT_ASSERT(session, WT_PREFIX_MATCH(uri, "file:"));
-    filename = uri;
-    WT_PREFIX_SKIP(filename, "file:");
-
     /*
      * Open the file, request block manager checkpoint information. We don't know the allocation
      * size, but 512B allows us to read the descriptor block and that's all we care about.
      */
     F_SET(session, WT_SESSION_IMPORT_REPAIR);
-    WT_ERR(__wt_block_manager_open(session, filename, NULL, cfg, false, true, 512, &bm));
+    WT_ERR(__wt_blkcache_open(session, uri, cfg, false, true, 512, NULL, &bm));
     ret = bm->checkpoint_last(bm, session, &metadata, &checkpoint_list, checkpoint);
     WT_TRET(bm->close(bm, session));
     F_CLR(session, WT_SESSION_IMPORT_REPAIR);
@@ -63,7 +59,7 @@ __wt_import_repair(WT_SESSION_IMPL *session, const char *uri, char **configp)
         WT_ERR_MSG(session, EINVAL,
           "%s: loaded object's encryption configuration doesn't match the database's encryption "
           "configuration",
-          filename);
+          uri);
     /*
      * The metadata was quoted to avoid configuration string characters acting as separators.
      * Discard any quote characters.
@@ -103,22 +99,27 @@ __wt_import_repair(WT_SESSION_IMPL *session, const char *uri, char **configp)
     WT_ERR(__wt_reset_blkmod(session, a->data, buf));
     cfg[3] = buf->mem;
     cfg[4] = "checkpoint_lsn=";
-    WT_WITH_SCHEMA_LOCK(session,
-      ret = __wt_snprintf(fileid, sizeof(fileid), "id=%" PRIu32, ++S2C(session)->next_file_id));
+    WT_WITH_SCHEMA_LOCK(session, fileid = WT_BTREE_ID_NAMESPACED(++S2C(session)->next_file_id));
+    WT_ERR(__wt_snprintf(fileid_cfg, sizeof(fileid_cfg), "id=%" PRIu32, fileid));
     WT_ERR(ret);
-    cfg[5] = fileid;
+    cfg[5] = fileid_cfg;
     WT_ERR(__wt_config_collapse(session, cfg, &config_tmp));
 
-    /* Now that we've retrieved the configuration, let's get the real allocation size. */
-    WT_ERR(__wt_config_getones(session, config_tmp, "allocation_size", &v));
-    allocsize = (uint32_t)v.val;
+    /*
+     * FIXME-WT-14723: import needs a little thought for shared tables once we've decided how to
+     * allocate shared file IDs. It's not enough (even temporarily) to just share the allocated file
+     * ID, since if we do that it may clash with another imported shared ID.
+     */
+    WT_ERR(__wt_btree_shared(session, uri, cfg, &shared));
+    if (shared)
+        WT_ERR_MSG(session, EINVAL, "TODO import of shared tree unsupported");
 
     /*
      * Now we need to retrieve the last checkpoint again but this time, with the correct allocation
      * size. When we did this earlier, we were able to read the descriptor block properly but the
      * checkpoint's byte representation was wrong because it was using the wrong allocation size.
      */
-    WT_ERR(__wt_block_manager_open(session, filename, NULL, cfg, false, true, allocsize, &bm));
+    WT_ERR(__wt_blkcache_open(session, uri, cfg, false, true, 0, NULL, &bm));
     __wt_free(session, checkpoint_list);
     __wt_free(session, metadata);
     ret = bm->checkpoint_last(bm, session, &metadata, &checkpoint_list, checkpoint);
@@ -141,13 +142,13 @@ __wt_import_repair(WT_SESSION_IMPL *session, const char *uri, char **configp)
     F_SET(ckpt, WT_CKPT_UPDATE);
     WT_ERR(__wt_buf_set(session, &ckpt->raw, checkpoint->data, checkpoint->size));
     WT_ERR(__wt_meta_ckptlist_update_config(session, ckptbase, config_tmp, &config));
-    __wt_verbose(session, WT_VERB_CHECKPOINT, "import metadata: %s", config);
+    __wt_verbose_info(session, WT_VERB_CHECKPOINT, "import metadata: %s", config);
     *configp = config;
-
+    WT_STAT_CONN_INCR(session, session_table_create_import_repair);
 err:
     F_CLR(session, WT_SESSION_IMPORT_REPAIR);
 
-    __wt_meta_ckptlist_free(session, &ckptbase);
+    __wt_ckptlist_free(session, &ckptbase);
 
     __wt_free(session, checkpoint_list);
     if (ret != 0)

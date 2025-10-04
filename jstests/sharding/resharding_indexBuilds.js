@@ -6,13 +6,10 @@
  *   uses_atclustertime,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/discover_topology.js");
-load("jstests/sharding/libs/resharding_test_fixture.js");
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/parallelTester.js");
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 const reshardingTest = new ReshardingTest({numDonors: 1});
 reshardingTest.setup();
@@ -25,9 +22,7 @@ const inputCollection = reshardingTest.createShardedCollection({
 });
 
 // Insert a document so that the index build will hit the failpoint.
-assert.commandWorked(inputCollection.insert([
-    {_id: 0, oldKey: -10, newKey: -10},
-]));
+assert.commandWorked(inputCollection.insert([{_id: 0, oldKey: -10, newKey: -10}]));
 
 const mongos = inputCollection.getMongo();
 const recipientShardNames = reshardingTest.recipientShardNames;
@@ -35,10 +30,9 @@ const recipientShardNames = reshardingTest.recipientShardNames;
 const topology = DiscoverTopology.findConnectedNodes(mongos);
 const donor_host = topology.shards[donorShardNames[0]].primary;
 const donor0 = new Mongo(donor_host);
-const configsvr = new Mongo(topology.configsvr.nodes[0]);
 
 // Create an inProgress index build.
-const createIndexThread = new Thread(function(host) {
+const createIndexThread = new Thread(function (host) {
     const con = new Mongo(host).getCollection("reshardingDb.coll");
     return con.createIndexes([{newKey: 1}]);
 }, donor_host);
@@ -52,7 +46,8 @@ reshardingTest.withReshardingInBackground(
         newChunks: [{min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardNames[0]}],
     },
     () => {},
-    {expectedErrorCode: ErrorCodes.BackgroundOperationInProgressForNamespace});
+    {expectedErrorCode: ErrorCodes.BackgroundOperationInProgressForNamespace},
+);
 
 // Resume index build.
 createIndexFailpoint.off();
@@ -60,4 +55,3 @@ createIndexThread.join();
 assert.commandWorked(createIndexThread.returnData());
 
 reshardingTest.teardown();
-})();

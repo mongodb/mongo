@@ -29,15 +29,13 @@
 
 #pragma once
 
-#include "mongo/db/storage/key_string.h"
-
 namespace mongo {
 
 class BSONObj;
 class NamespaceString;
 class OperationContext;
 class RecordId;
-struct ValidateResults;
+class ValidateResults;
 
 /**
  * Helpers to facilitate unit test debugging in the case of test failure.

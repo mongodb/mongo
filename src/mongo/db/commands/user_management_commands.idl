@@ -29,15 +29,18 @@ global:
     cpp_namespace: "mongo"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
     - "mongo/db/auth/auth_types.idl"
     - "mongo/db/auth/address_restriction.idl"
+    - "mongo/db/auth/parsed_privilege.idl"
     - "mongo/db/auth/user_management_commands_parser.idl"
+    - "mongo/db/multitenancy.idl"
 
 structs:
     dropAllUsersFromDatabaseReply:
         description: "Response for dropAllUsersFromDatabase command"
         strict: false
+        is_command_reply: true
         fields:
             n:
                 description: "Number of users dropped from database"
@@ -47,6 +50,7 @@ structs:
     dropAllRolesFromDatabaseReply:
         description: "Response for dropAllRolesFromDatabase command"
         strict: false
+        is_command_reply: true
         fields:
             n:
                 description: "Number of roles dropped from database"
@@ -56,6 +60,7 @@ structs:
     usersInfoReply:
         description: "Reply from usersInfo command"
         strict: false
+        is_command_reply: true
         fields:
             users:
                 description: "Users descriptions"
@@ -64,6 +69,7 @@ structs:
     rolesInfoReply:
         description: "Reply from rolesInfo command"
         strict: false
+        is_command_reply: true
         fields:
             roles:
                 description: "Users descriptions"
@@ -77,6 +83,7 @@ structs:
     GetUserCacheGenerationReply:
         description: "Reply from _getUserCacheGeneration command"
         strict: false
+        is_command_reply: true
         fields:
             cacheGeneration:
                 description: "Cache generation"
@@ -88,7 +95,7 @@ structs:
             commitDelayMS:
                 type: int
                 default: 0
-                validator: { gte: 0 }
+                validator: {gte: 0}
 
 commands:
     createUser:
@@ -115,10 +122,6 @@ commands:
                 description: "True if the server should digest the password, false for pre-digested"
                 type: safeBool
                 default: true
-            writeConcern:
-                description: "The level of write concern for the creation operation"
-                type: object
-                optional: true
             authenticationRestrictions:
                 description: "Authentication restrictions to enforce on the user"
                 type: array<address_restriction>
@@ -153,10 +156,6 @@ commands:
                 description: "True if the server should digest the password, false for pre-digested"
                 type: safeBool
                 default: true
-            writeConcern:
-                description: "The level of write concern for the update operation"
-                type: object
-                optional: true
             authenticationRestrictions:
                 description: "Authentication restrictions to enforce on the user"
                 type: array<address_restriction>
@@ -221,7 +220,7 @@ commands:
         fields:
             privileges:
                 description: "Actions explicitly granted to this role"
-                type: array<Privilege>
+                type: array<ParsedPrivilege>
             roles:
                 description: "Roles to inherit additional privileges from"
                 type: array<RoleNameOrString>
@@ -241,7 +240,7 @@ commands:
         fields:
             privileges:
                 description: "Actions explicitly granted to this role"
-                type: array<Privilege>
+                type: array<ParsedPrivilege>
                 optional: true
             roles:
                 description: "Roles to inherit additional privileges from"
@@ -263,7 +262,7 @@ commands:
         fields:
             privileges:
                 description: "Privileges to grant to this role"
-                type: array<Privilege>
+                type: array<ParsedPrivilege>
 
     revokePrivilegesFromRole:
         description: "Grants privileges to a role"
@@ -276,7 +275,7 @@ commands:
         fields:
             privileges:
                 description: "Privileges to revoke from this role"
-                type: array<Privilege>
+                type: array<ParsedPrivilege>
 
     grantRolesToRole:
         description: "Grant roles to a role"
@@ -361,7 +360,7 @@ commands:
             showCustomData:
                 description: >-
                     Set the field to false to omit the custom data provided by the client for the
-                    user. 
+                    user.
                 type: safeBool
                 default: true
             filter:
@@ -442,4 +441,3 @@ commands:
                 description: "Drop temp collections when complete"
                 type: bool
                 default: false
-

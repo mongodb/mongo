@@ -29,16 +29,21 @@
 
 #include "mongo/db/server_options_base.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/auth/cluster_auth_mode.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/server_options_base_gen.h"
 #include "mongo/db/server_options_general_gen.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_description.h"
 #include "mongo/util/options_parser/option_section.h"
-#include "mongo/util/options_parser/startup_option_init.h"
-#include "mongo/util/options_parser/startup_options.h"
+#include "mongo/util/options_parser/value.h"
+#include "mongo/util/str.h"
+
+#include <ostream>
 
 namespace moe = mongo::optionenvironment;
 
@@ -98,10 +103,8 @@ Status addGeneralServerOptions(moe::OptionSection* options) {
 }
 
 Status validateSystemLogDestinationSetting(const std::string& value) {
-    constexpr auto kSyslog = "syslog"_sd;
-    constexpr auto kFile = "file"_sd;
-
-    if (!kSyslog.equalCaseInsensitive(value) && !kFile.equalCaseInsensitive(value)) {
+    if (!(str::equalCaseInsensitive(value, "syslog"_sd) ||
+          str::equalCaseInsensitive(value, "file"_sd))) {
         return {ErrorCodes::BadValue, "systemLog.destination expects one of 'syslog' or 'file'"};
     }
 

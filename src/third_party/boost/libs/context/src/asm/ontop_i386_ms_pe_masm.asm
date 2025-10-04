@@ -55,10 +55,10 @@ ENDIF
     mov  eax, [edx]
     mov  [esp+018h], eax
 
-    mov  [esp+01ch], edi  ; save EDI 
-    mov  [esp+020h], esi  ; save ESI 
-    mov  [esp+024h], ebx  ; save EBX 
-    mov  [esp+028h], ebp  ; save EBP 
+    mov  [esp+01ch], edi  ; save EDI
+    mov  [esp+020h], esi  ; save ESI
+    mov  [esp+024h], ebx  ; save EBX
+    mov  [esp+028h], ebp  ; save EBP
 
     ; store ESP (pointing to context-data) in ECX
     mov  ecx, esp
@@ -77,7 +77,7 @@ ENDIF
 
     ; third arg of ontop_fcontext() == ontop-function
     mov  ecx, [esp+038h]
-    
+
     ; restore ESP (pointing to context-data) from EAX
     mov  esp, eax
 
@@ -108,10 +108,10 @@ ENDIF
     mov  eax, [esp+018h]
     mov  [edx], eax
 
-    mov  edi, [esp+01ch]  ; restore EDI 
-    mov  esi, [esp+020h]  ; restore ESI 
-    mov  ebx, [esp+024h]  ; restore EBX 
-    mov  ebp, [esp+028h]  ; restore EBP 
+    mov  edi, [esp+01ch]  ; restore EDI
+    mov  esi, [esp+020h]  ; restore ESI
+    mov  ebx, [esp+024h]  ; restore EBX
+    mov  ebp, [esp+028h]  ; restore EBP
 
     ; prepare stack
     lea  esp, [esp+02ch]

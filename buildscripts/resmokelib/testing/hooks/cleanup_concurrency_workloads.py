@@ -3,8 +3,8 @@
 import copy
 
 from buildscripts.resmokelib import utils
-from buildscripts.resmokelib.testing.fixtures import shardedcluster
 from buildscripts.resmokelib.testing.hooks import interface
+from buildscripts.resmokelib.testing.retry import with_naive_retry
 
 
 class CleanupConcurrencyWorkloads(interface.Hook):
@@ -20,8 +20,9 @@ class CleanupConcurrencyWorkloads(interface.Hook):
 
     IS_BACKGROUND = False
 
-    def __init__(  #pylint: disable=too-many-arguments
-            self, hook_logger, fixture, exclude_dbs=None, same_collection=False, same_db=False):
+    def __init__(
+        self, hook_logger, fixture, exclude_dbs=None, same_collection=False, same_db=False
+    ):
         """Initialize CleanupConcurrencyWorkloads."""
         description = "CleanupConcurrencyWorkloads drops all databases in the fixture"
         interface.Hook.__init__(self, hook_logger, fixture, description)
@@ -40,7 +41,8 @@ class CleanupConcurrencyWorkloads(interface.Hook):
     def after_test(self, test, test_report):
         """After test cleanup."""
         hook_test_case = CleanupConcurrencyWorkloadsTestCase.create_after_test(
-            test.logger, test, self)
+            test.logger, test, self
+        )
         hook_test_case.configure(self.fixture)
         hook_test_case.run_dynamic_test(test_report)
 
@@ -59,7 +61,7 @@ class CleanupConcurrencyWorkloadsTestCase(interface.DynamicTestCase):
         """Execute drop databases hook."""
         same_db_name = None
         client = self._hook.fixture.mongo_client()
-        db_names = client.database_names()
+        db_names = with_naive_retry(lambda: client.list_database_names())
 
         exclude_dbs = copy.copy(self._hook.exclude_dbs)
         if self._hook.same_db_name:
@@ -68,32 +70,29 @@ class CleanupConcurrencyWorkloadsTestCase(interface.DynamicTestCase):
                 exclude_dbs.append(same_db_name)
         self.logger.info("Dropping all databases except for %s", exclude_dbs)
 
-        is_sharded_fixture = isinstance(self._hook.fixture, shardedcluster.ShardedClusterFixture)
-        # Stop the balancer.
-        if is_sharded_fixture and self._hook.fixture.enable_balancer:
-            self._hook.fixture.stop_balancer()
-
         for db_name in [db for db in db_names if db not in exclude_dbs]:
             self.logger.info("Dropping database %s", db_name)
             try:
-                client.drop_database(db_name)
+                with_naive_retry(lambda: client.drop_database(db_name))
             except:
                 self.logger.exception("Encountered an error while dropping database %s.", db_name)
                 raise
 
         if self._hook.same_collection_name and same_db_name:
-            self.logger.info("Dropping all collections in db %s except for %s", same_db_name,
-                             self._hook.same_collection_name)
-            colls = client[same_db_name].collection_names()
+            self.logger.info(
+                "Dropping all collections in db %s except for %s",
+                same_db_name,
+                self._hook.same_collection_name,
+            )
+            colls = with_naive_retry(lambda: client[same_db_name].list_collection_names())
             for coll in [coll for coll in colls if coll != self._hook.same_collection_name]:
                 self.logger.info("Dropping db %s collection %s", same_db_name, coll)
                 try:
-                    client[same_db_name].drop_collection(coll)
+                    with_naive_retry(lambda: client[same_db_name].drop_collection(coll))
                 except:
-                    self.logger.exception("Encountered an error while dropping db % collection %s.",
-                                          same_db_name, coll)
+                    self.logger.exception(
+                        "Encountered an error while dropping db % collection %s.",
+                        same_db_name,
+                        coll,
+                    )
                     raise
-
-        # Start the balancer.
-        if is_sharded_fixture and self._hook.fixture.enable_balancer:
-            self._hook.fixture.start_balancer()

@@ -27,19 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/matcher/extensions_callback_real.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_text.h"
 #include "mongo/db/matcher/expression_where.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_function.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/util/make_data_structure.h"
-#include "mongo/scripting/engine.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+
+#include <utility>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -55,7 +62,9 @@ std::unique_ptr<MatchExpression> ExtensionsCallbackReal::createWhere(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     WhereMatchExpressionBase::WhereParams where) const {
     if (getTestCommandsEnabled() && internalQueryDesugarWhereToFunction.load()) {
-        uassert(ErrorCodes::BadValue, "ns for $where cannot be empty", expCtx->ns.db().size() != 0);
+        uassert(ErrorCodes::BadValue,
+                "ns for $where cannot be empty",
+                expCtx->getNamespaceString().dbSize() != 0);
 
         auto code = where.code;
 
@@ -72,8 +81,9 @@ std::unique_ptr<MatchExpression> ExtensionsCallbackReal::createWhere(
 
         return std::make_unique<ExprMatchExpression>(fnExpression, expCtx);
     } else {
-        expCtx->hasWhereClause = true;
-        return std::make_unique<WhereMatchExpression>(_opCtx, std::move(where), expCtx->ns.db());
+        expCtx->setHasWhereClause(true);
+        return std::make_unique<WhereMatchExpression>(
+            _opCtx, std::move(where), expCtx->getNamespaceString().dbName());
     }
 }
 

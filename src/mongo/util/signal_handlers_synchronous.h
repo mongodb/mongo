@@ -29,14 +29,26 @@
 
 #pragma once
 
-#include <functional>
-#include <iosfwd>
-#include <vector>
-
 #include "mongo/platform/compiler.h"
 #include "mongo/util/dynamic_catch.h"
 
+#include <functional>
+#include <iosfwd>
+#include <typeinfo>
+#include <vector>
+
+#include <boost/optional.hpp>
+
 namespace mongo {
+/**
+ * Sets the appropriate state to enable/disable diagnostic logging based on `newVal`.
+ */
+void setDiagnosticLoggingInSignalHandlers(bool newVal);
+
+/**
+ * Restores the default signal handlers and ends the process.
+ */
+void endProcessWithSignal(int signalNum);
 
 /**
  * Sets up handlers for synchronous events, like segv, abort, terminate and malloc-failure.
@@ -75,6 +87,10 @@ void clearSignalMask();
 int stackTraceSignal();
 #endif
 
+/**
+ * Returns the signal used for stress-testing of EINTR resilience.
+ */
+int interruptResilienceTestingSignal();
 
 /**
  * Analyzes the active exception, describing it to an ostream.
@@ -131,5 +147,14 @@ private:
 
 /** The singleton ActiveExceptionWitness. */
 ActiveExceptionWitness& globalActiveExceptionWitness();
+
+std::string describeActiveException();
+
+/**
+ * Returns a `shared_ptr` that will have sole ownership of a `MallocFreeOStreamGuard`. The passed in
+ * signal number is used to end the process if the deadlock mitigation is triggered.
+ */
+std::shared_ptr<void> makeMallocFreeOStreamGuard_forTest(int sig);
+void setMallocFreeOStreamGuardDeadlockCallback_forTest(std::function<void(int)> cb);
 
 }  // namespace mongo

@@ -1,0 +1,92 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "change_streams",
+    srcs = [
+        "all_databases_change_stream_shard_targeter_impl.cpp",
+        "change_stream_db_absent_state_event_handler.cpp",
+        "change_stream_db_present_state_event_handler.cpp",
+        "change_stream_reader_builder_impl.cpp",
+        "collection_change_stream_db_absent_state_event_handler.cpp",
+        "collection_change_stream_db_present_state_event_handler.cpp",
+        "collection_change_stream_shard_targeter_impl.cpp",
+        "data_to_shards_allocation_query_service_impl.cpp",
+        "database_change_stream_shard_targeter_impl.cpp",
+        "historical_placement_fetcher_impl.cpp",
+    ],
+    hdrs = [
+        "all_databases_change_stream_shard_targeter_impl.h",
+        "change_stream_db_absent_state_event_handler.h",
+        "change_stream_db_present_state_event_handler.h",
+        "change_stream_reader_builder_impl.h",
+        "change_stream_shard_targeter_state_event_handler.h",
+        "collection_change_stream_db_absent_state_event_handler.h",
+        "collection_change_stream_db_present_state_event_handler.h",
+        "collection_change_stream_shard_targeter_impl.h",
+        "data_to_shards_allocation_query_service_impl.h",
+        "database_change_stream_shard_targeter_impl.h",
+        "historical_placement_fetcher_impl.h",
+    ],
+    deps = [
+        ":change_streams_control_events",
+        "//src/mongo/db:namespace_spec",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/exec/document_value",
+        "//src/mongo/db/pipeline:change_stream_helpers",
+        "//src/mongo/db/pipeline:change_stream_interfaces",
+        "//src/mongo/s:grid",
+        "//src/mongo/util:pcre_util",
+    ],
+)
+
+mongo_cc_library(
+    name = "change_streams_control_events",
+    srcs = [
+        "control_events.cpp",
+    ],
+    hdrs = [
+        "control_events.h",
+    ],
+    deps = [
+        "//src/mongo/db:namespace_spec",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/exec/document_value",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "change_streams_test",
+    srcs = [
+        "change_stream_reader_builder_impl_test.cpp",
+        "change_stream_shard_targeter_state_event_handler_mock.h",
+        "collection_change_stream_db_absent_state_event_handler_test.cpp",
+        "collection_change_stream_db_present_state_event_handler_test.cpp",
+        "collection_change_stream_shard_targeter_impl_test.cpp",
+        "control_events_test.cpp",
+        "data_to_shards_allocation_query_service_impl_test.cpp",
+        "//src/mongo/db/pipeline:change_stream_reader_context_mock.h",
+        "//src/mongo/db/pipeline:historical_placement_fetcher_mock.h",
+    ],
+    tags = ["mongo_unittest_fifth_group"],
+    deps = [
+        ":change_streams",
+        ":change_streams_control_events",
+        "//src/mongo/db:namespace_spec",
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/exec/document_value",
+        "//src/mongo/db/global_catalog/ddl:notify_sharding_event_idl",
+        "//src/mongo/db/pipeline:change_stream_test_helpers",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/repl:change_stream_oplog_notification",
+    ],
+)

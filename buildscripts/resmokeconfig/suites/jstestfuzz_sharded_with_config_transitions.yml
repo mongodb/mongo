@@ -1,0 +1,85 @@
+config_variables:
+  - &movePrimaryComment continuousConfigShardTransitionMovePrimary
+
+test_kind: js_test
+
+selector:
+  roots:
+    - jstestfuzz/out/*.js
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: >-
+        await import('jstests/libs/override_methods/config_transitions.js');
+      global_vars:
+        TestData:
+          # Other fuzzers test commands against sharded clusters with logical session ids.
+          disableImplicitSessions: true
+          shardsAddedRemoved: true
+          runningWithBalancer: true
+      crashOnInvalidBSONError: ""
+      objcheck: ""
+  hooks:
+    - class: ContinuousAddRemoveShard
+      transition_configsvr: true
+      move_primary_comment: *movePrimaryComment
+      move_sessions_collection: true
+    - class: FuzzerRestoreSettings
+    - class: RunQueryStats
+      allow_feature_not_supported: true
+    - class: CheckReplDBHash
+      shell_options:
+        global_vars:
+          TestData:
+            skipValidationOnInvalidViewDefinitions: true
+    - class: CheckMetadataConsistencyInBackground
+    - class: ValidateCollections
+      shell_options:
+        global_vars:
+          TestData:
+            skipValidationOnInvalidViewDefinitions: true
+            shardsAddedRemoved: true
+            hasRandomShardsAddedRemoved: true
+    - class: CheckRoutingTableConsistency
+      shell_options:
+        global_vars:
+          TestData:
+            mayForgeReshardingTempCollections: true
+  fixture:
+    class: ShardedClusterFixture
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+        internalQueryStatsRateLimit: -1
+        internalQueryStatsErrorsAreCommandFatal: true
+      verbose: ""
+    mongod_options:
+      set_parameters:
+        disableLogicalSessionCacheRefresh: false
+        enableTestCommands: 1
+        transactionLifetimeLimitSeconds: 1
+        writePeriodicNoops: 1
+        internalQueryStatsRateLimit: -1
+        reshardingMinimumOperationDurationMillis: 0
+        internalQueryStatsErrorsAreCommandFatal: true
+        # Manually set the random migration fail point so we can set a threshold for skipping
+        # moveCollection to prevent "starving" random chunk migrations.
+        failpoint.balancerShouldReturnRandomMigrations:
+          data:
+            skipMoveCollectionThreshold: 0.5
+          mode: alwaysOn
+        balancerMigrationsThrottlingMs: 250
+        failpoint.movePrimaryFailIfNeedToCloneMovableCollections:
+          data:
+            comment: *movePrimaryComment
+          mode: alwaysOn
+      verbose: ""
+    num_rs_nodes_per_shard: 1
+    num_shards: 2
+    config_shard: "any"

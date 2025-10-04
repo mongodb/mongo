@@ -29,15 +29,18 @@
 
 #include "mongo/db/repl/bson_extract_optime.h"
 
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/repl/optime.h"
 
 namespace mongo {
 
 Status bsonExtractOpTimeField(const BSONObj& object, StringData fieldName, repl::OpTime* out) {
     BSONElement element;
-    Status status = bsonExtractTypedField(object, fieldName, Object, &element);
+    Status status = bsonExtractTypedField(object, fieldName, BSONType::object, &element);
     if (!status.isOK())
         return status;
 

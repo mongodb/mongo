@@ -27,12 +27,14 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
+    mod_visibility: private
 
 server_parameters:
     scriptingEngineInterruptIntervalMS:
         description: "The number of milliseconds between executions of the deadline monitor."
-        set_at: [ startup, runtime ]
-        cpp_vartype: 'AtomicWord<int>'
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<int>"
         cpp_varname: gScriptingEngineInterruptIntervalMS
         default: 1000
+        redact: false

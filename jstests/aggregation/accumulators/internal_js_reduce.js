@@ -1,9 +1,10 @@
 // Tests basic functionality of the $_internalJsReduce accumulator, which provides capability for
 // the reduce stage of MapReduce.
-(function() {
-"use strict";
-
-load('jstests/aggregation/extras/utils.js');
+//
+// @tags: [
+//   requires_scripting,
+// ]
+import {resultsEq} from "jstests/aggregation/extras/utils.js";
 
 db.js_reduce.drop();
 
@@ -16,24 +17,26 @@ function reduce(key, values) {
     return Array.sum(values);
 }
 
-let groupPipe = [{
-    $group: {
-        _id: "$word",
-        wordCount: {
-            $_internalJsReduce: {
-                data: {k: "$word", v: "$val"},
-                eval: reduce,
-            }
-        }
-    }
-}];
+let groupPipe = [
+    {
+        $group: {
+            _id: "$word",
+            wordCount: {
+                $_internalJsReduce: {
+                    data: {k: "$word", v: "$val"},
+                    eval: reduce,
+                },
+            },
+        },
+    },
+];
 
 let command = {
-    aggregate: 'js_reduce',
+    aggregate: "js_reduce",
     cursor: {},
     pipeline: groupPipe,
-    allowDiskUse: true  // Set allowDiskUse to true to force the expression to run on a shard in the
-                        // passthrough suites, where javascript execution is supported.
+    allowDiskUse: true, // Set allowDiskUse to true to force the expression to run on a shard in the
+    // passthrough suites, where javascript execution is supported.
 };
 
 const expectedResults = [
@@ -99,18 +102,17 @@ assert.commandFailedWithCode(db.runCommand(command), 31242);
 
 groupPipe[0].$group.wordCount.$_internalJsReduce = {
     notEval: 1,
-    notData: 1
+    notData: 1,
 };
 assert.commandFailedWithCode(db.runCommand(command), 31243);
 
 groupPipe[0].$group.wordCount.$_internalJsReduce = {
     eval: reduce,
-    data: {v: 1}
+    data: {v: 1},
 };
 assert.commandFailedWithCode(db.runCommand(command), 31251);
 groupPipe[0].$group.wordCount.$_internalJsReduce.data = {
     key: 1,
-    value: 1
+    value: 1,
 };
 assert.commandFailedWithCode(db.runCommand(command), 31251);
-})();

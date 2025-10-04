@@ -29,7 +29,7 @@
 # test_bug021.py
 #       Fixed-length column store implicit record operations test.
 
-import wiredtiger, wttest
+import wttest
 
 # Fixed-length column store implicit record operations test.
 class test_bug021(wttest.WiredTigerTestCase):
@@ -118,21 +118,21 @@ class test_bug021(wttest.WiredTigerTestCase):
         self.check(current)
 
         # Check cursor next/operation inside trailing implicit keys.
-        cursor.set_key(62)
+        cursor.set_key(60)
         self.assertEqual(cursor.search(), 0)
         for i in range(1, 5):
             self.assertEqual(cursor.next(), 0)
             self.assertEqual(cursor.remove(), 0)
-            current[62 + i] = 0
+            current[60 + i] = 0
         self.check(current)
 
         # Check cursor prev/operation inside trailing implicit keys.
-        cursor.set_key(68)
+        cursor.set_key(70)
         self.assertEqual(cursor.search(), 0)
         for i in range(1, 5):
             self.assertEqual(cursor.prev(), 0)
             self.assertEqual(cursor.remove(), 0)
-            current[68 - i] = 0
+            current[70 - i] = 0
         self.check(current)
 
     def test_implicit_record_cursor_remove_prev(self):
@@ -207,6 +207,3 @@ class test_bug021(wttest.WiredTigerTestCase):
             self.assertEqual(cursor.update(), 0)
             current[18 - i] = i
         self.check(current)
-
-if __name__ == '__main__':
-    wttest.run()

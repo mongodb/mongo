@@ -27,28 +27,24 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 #include "mongo/util/testing_proctor.h"
 
-#include "mongo/base/init.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/static_immortal.h"
+
+#include <new>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 
 namespace mongo {
-
-TestingProctor& TestingProctor::instance() {
-    static StaticImmortal<TestingProctor> proctor{};
-    return proctor.value();
-}
-
-bool TestingProctor::isEnabled() const {
-    uassert(ErrorCodes::NotYetInitialized,
-            "Cannot check whether testing diagnostics is enabled before it is initialized",
-            isInitialized());
-    return _diagnosticsEnabled.get();
-}
 
 void TestingProctor::setEnabled(bool enable) {
     if (!isInitialized()) {
@@ -58,7 +54,7 @@ void TestingProctor::setEnabled(bool enable) {
 
     uassert(ErrorCodes::AlreadyInitialized,
             "Cannot alter testing diagnostics once initialized",
-            _diagnosticsEnabled.get() == enable);
+            _diagnosticsEnabled.value() == enable);
 
     LOGV2(4672601, "Overriding testing diagnostics", "enabled"_attr = enable);
 }

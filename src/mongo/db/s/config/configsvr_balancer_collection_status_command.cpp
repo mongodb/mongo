@@ -27,28 +27,30 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/auth/action_set.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/client.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/balancer/balancer.h"
-#include "mongo/db/s/database_sharding_state.h"
-#include "mongo/db/s/migration_source_manager.h"
-#include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/s/shard_filtering_metadata_refresh.h"
-#include "mongo/db/s/sharding_state.h"
-#include "mongo/s/catalog_cache_loader.h"
-#include "mongo/s/grid.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/topology/cluster_role.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/s/request_types/balancer_collection_status_gen.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
+#include <memory>
+#include <string>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
+
 
 namespace mongo {
 namespace {
@@ -67,21 +69,15 @@ public:
             uassert(ErrorCodes::IllegalOperation,
                     str::stream() << ConfigsvrBalancerCollectionStatus::kCommandName
                                   << " can only be run on config servers",
-                    serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+                    serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
 
             const NamespaceString& nss = ns();
 
             uassert(ErrorCodes::InvalidNamespace,
-                    str::stream() << "Invalid namespace specified '" << nss.ns() << "'",
+                    str::stream() << "Invalid namespace specified '" << nss.toStringForErrorMsg()
+                                  << "'",
                     nss.isValid());
-            const auto& balancerStatus = Balancer::get(opCtx)->getBalancerStatusForNs(opCtx, nss);
-            Response response(balancerStatus.balancerCompliant);
-            response.setFirstComplianceViolation(
-                balancerStatus.firstComplianceViolation.is_initialized()
-                    ? boost::optional<StringData>(
-                          StringData(*balancerStatus.firstComplianceViolation))
-                    : boost::optional<StringData>(boost::none));
-            return response;
+            return Balancer::get(opCtx)->getBalancerStatusForNs(opCtx, nss);
         }
 
     private:
@@ -97,8 +93,9 @@ public:
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",
                     AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                           ActionType::internal));
+                        ->isAuthorizedForActionsOnResource(
+                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                            ActionType::internal));
         }
     };
 
@@ -121,8 +118,8 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
-
-} configsvrBalancerCollectionStatusCmd;
+};
+MONGO_REGISTER_COMMAND(ConfigsvrBalancerCollectionStatusCmd).forShard();
 
 }  // namespace
 }  // namespace mongo

@@ -29,92 +29,66 @@
 
 #pragma once
 
-#include <functional>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/utility.h"
-#include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/out_of_line_executor.h"
+#include "mongo/util/time_support.h"
 
-namespace mongo {
-namespace transport {
+#include <cstddef>
+#include <functional>
+#include <memory>
+
+namespace mongo::transport {
 
 /*
  * This is the interface for all ServiceExecutors.
  */
-class ServiceExecutor : public OutOfLineExecutor {
+class ServiceExecutor {
 public:
-    /**
-     * An enum to indicate if a ServiceExecutor should use dedicated or borrowed threading
-     * resources.
-     */
-    enum class ThreadingModel {
-        kBorrowed,
-        kDedicated,
+    using Task = OutOfLineExecutor::Task;
+
+    class TaskRunner : public OutOfLineExecutor {
+    public:
+        /**
+         * Runs the task associated with a session. On success, it will schedule the callback on
+         * current executor. Otherwise, it will invoke the callback with a non-okay status on the
+         * caller thread.
+         */
+        virtual void runTaskForSession(std::shared_ptr<Session> session, Task task) = 0;
     };
 
-    friend StringData toString(ThreadingModel threadingModel);
+    /**
+     * Starts up all executors registered as ServiceContext decorations.
+     * If an executor fails to start up, it will throw and that exception will bubble up here.
+     */
+    static void startupAll(ServiceContext* svcCtx);
 
-    static Status setInitialThreadingModelFromString(StringData value) noexcept;
-    static void setInitialThreadingModel(ThreadingModel threadingModel) noexcept;
-    static ThreadingModel getInitialThreadingModel() noexcept;
+    /**
+     * Shuts down all executors registered as ServiceContext decorations.
+     * If an executor fails to shut down, a warning will be logged, but shutdowns will continue.
+     */
+    static void shutdownAll(ServiceContext* svcCtx, Milliseconds timeout);
 
-    static void shutdownAll(ServiceContext* serviceContext, Date_t deadline);
+    /**
+     * Append statistics to the `network.serviceExecutors` serverStatus output.
+     */
+    static void appendAllServerStats(BSONObjBuilder*, ServiceContext*);
 
     virtual ~ServiceExecutor() = default;
-    using Task = unique_function<void()>;
 
-    /** With no flags set, `scheduleTask` will launch new threads as needed. */
-    enum class ScheduleFlags {
-        kDeferredTask = 1 << 0,           /**< Never given a newly launched thread. */
-        kMayRecurse = 1 << 1,             /**< May be run recursively. */
-        kMayYieldBeforeSchedule = 1 << 2, /**< May yield before scheduling. */
-    };
-    friend constexpr ScheduleFlags operator&(ScheduleFlags a, ScheduleFlags b) noexcept {
-        return ScheduleFlags{stdx::to_underlying(a) & stdx::to_underlying(b)};
-    }
-    friend constexpr ScheduleFlags operator|(ScheduleFlags a, ScheduleFlags b) noexcept {
-        return ScheduleFlags{stdx::to_underlying(a) | stdx::to_underlying(b)};
-    }
+    virtual std::unique_ptr<TaskRunner> makeTaskRunner() = 0;
 
     /*
      * Starts the ServiceExecutor. This may create threads even if no tasks are scheduled.
      */
-    virtual Status start() = 0;
-
-    /*
-     * Schedules a task with the ServiceExecutor and returns immediately.
-     *
-     * This is guaranteed to unwind the stack before running the task, although the task may be
-     * run later in the same thread.
-     *
-     * If defer is true, then the executor may defer execution of this Task until an available
-     * thread is available.
-     */
-    virtual Status scheduleTask(Task task, ScheduleFlags flags) = 0;
-
-    /*
-     * Provides an executor-friendly wrapper for "scheduleTask". Internally, it wraps instance of
-     * "OutOfLineExecutor::Task" inside "ServiceExecutor::Task" objects, which are then scheduled
-     * for execution on the service executor. May throw if "scheduleTask" returns a non-okay status.
-     */
-    void schedule(OutOfLineExecutor::Task func) override {
-        iassert(scheduleTask([task = std::move(func)]() mutable { task(Status::OK()); }, {}));
-    }
-
-    /*
-     * Awaits the availability of incoming data for the specified session. On success, it will
-     * schedule the callback on current executor. Otherwise, it will invoke the callback with a
-     * non-okay status on the caller thread.
-     */
-    virtual void runOnDataAvailable(const SessionHandle& session,
-                                    OutOfLineExecutor::Task onCompletionCallback) = 0;
+    virtual void start() = 0;
 
     /*
      * Stops and joins the ServiceExecutor. Any outstanding tasks will not be executed, and any
@@ -126,15 +100,17 @@ public:
 
     virtual size_t getRunningThreads() const = 0;
 
-    /*
-     * Appends statistics about task scheduling to a BSONObjBuilder for serverStatus output.
-     */
+    /** Appends statistics about task scheduling to a BSONObjBuilder for serverStatus output. */
     virtual void appendStats(BSONObjBuilder* bob) const = 0;
 
-    /**
-     * Yield if we have more threads than cores.
-     */
+    /** Yield if this executor controls more threads than we have cores. */
     void yieldIfAppropriate() const;
+
+    /**
+     * Returns the class name of this service executor.
+     * Used in logging and exception messaging.
+     */
+    virtual StringData getName() const = 0;
 };
 
 /**
@@ -142,21 +118,32 @@ public:
  */
 class ServiceExecutorContext {
 public:
-    using ThreadingModel = ServiceExecutor::ThreadingModel;
+    // Roughly a 1:1 mapping to the ServiceExecutor type which will be used.
+    // ThreadModel::kSynchronous + canUseReserved may result in ServiceExecutorReserved.
+    enum class ThreadModel {
+        kSynchronous,
+        kInline,
+    };
+
+    // Manually hoist these enum values into the class to aid callsite usage.
+    // As our toolchain is updated, we may be able to replace this with a simple:
+    // `using enum ThreadModel;`
+    static constexpr inline auto kSynchronous = ThreadModel::kSynchronous;
+    static constexpr inline auto kInline = ThreadModel::kInline;
 
     /**
      * Get a pointer to the ServiceExecutorContext for a given client.
      *
      * This function is valid to invoke either on the Client thread or with the Client lock.
      */
-    static ServiceExecutorContext* get(Client* client) noexcept;
+    static ServiceExecutorContext* get(Client* client);
 
     /**
      * Set the ServiceExecutorContext for a given client.
      *
      * This function may only be invoked once and only while under the Client lock.
      */
-    static void set(Client* client, ServiceExecutorContext seCtx) noexcept;
+    static void set(Client* client, std::unique_ptr<ServiceExecutorContext> seCtx);
 
 
     /**
@@ -164,46 +151,30 @@ public:
      *
      * This function may only be invoked once and only while under the Client lock.
      */
-    static void reset(Client* client) noexcept;
+    static void reset(Client* client);
 
     ServiceExecutorContext() = default;
+    /** Test only */
+    explicit ServiceExecutorContext(std::function<ServiceExecutor*()> getServiceExecutorForTest)
+        : _getServiceExecutorForTest(getServiceExecutorForTest) {}
     ServiceExecutorContext(const ServiceExecutorContext&) = delete;
     ServiceExecutorContext& operator=(const ServiceExecutorContext&) = delete;
-    ServiceExecutorContext(ServiceExecutorContext&& seCtx)
-        : _client{std::exchange(seCtx._client, nullptr)},
-          _sep{std::exchange(seCtx._sep, nullptr)},
-          _threadingModel{seCtx._threadingModel},
-          _canUseReserved{seCtx._canUseReserved} {}
-    ServiceExecutorContext& operator=(ServiceExecutorContext&& seCtx) {
-        _client = std::exchange(seCtx._client, nullptr);
-        _sep = std::exchange(seCtx._sep, nullptr);
-        _threadingModel = seCtx._threadingModel;
-        _canUseReserved = seCtx._canUseReserved;
-        return *this;
-    }
+    ServiceExecutorContext(ServiceExecutorContext&&) = delete;
+    ServiceExecutorContext& operator=(ServiceExecutorContext&&) = delete;
 
     /**
-     * Set the ThreadingModel for the associated Client's service execution.
+     * Set the thread model for the associated Client's service execution.
      *
-     * This function is only valid to invoke with the Client lock or before the Client is set.
+     * These functions are only valid to invoke with the Client lock or before the Client is set.
      */
-    void setThreadingModel(ThreadingModel threadingModel) noexcept;
+    void setThreadModel(ThreadModel model);
 
     /**
      * Set if reserved resources are available for the associated Client's service execution.
      *
      * This function is only valid to invoke with the Client lock or before the Client is set.
      */
-    void setCanUseReserved(bool canUseReserved) noexcept;
-
-    /**
-     * Get the ThreadingModel for the associated Client.
-     *
-     * This function is valid to invoke either on the Client thread or with the Client lock.
-     */
-    auto getThreadingModel() const noexcept {
-        return _threadingModel;
-    }
+    void setCanUseReserved(bool canUseReserved);
 
     /**
      * Get an appropriate ServiceExecutor given the current parameters.
@@ -211,15 +182,17 @@ public:
      * This function is only valid to invoke from the associated Client thread. This function does
      * not require the Client lock since all writes must also happen from that thread.
      */
-    ServiceExecutor* getServiceExecutor() noexcept;
+    ServiceExecutor* getServiceExecutor();
 
 private:
     Client* _client = nullptr;
-    ServiceEntryPoint* _sep = nullptr;
 
-    ThreadingModel _threadingModel = ThreadingModel::kDedicated;
     bool _canUseReserved = false;
     bool _hasUsedSynchronous = false;
+    ThreadModel _threadModel{ThreadModel::kSynchronous};
+
+    /** For tests to override the behavior of `getServiceExecutor()`. */
+    std::function<ServiceExecutor*()> _getServiceExecutorForTest;
 };
 
 /**
@@ -227,24 +200,8 @@ private:
  */
 class ServiceExecutorStats {
 public:
-    /**
-     * Get the current value of ServiceExecutorStats for the given ServiceContext.
-     *
-     * Note that this value is intended for statistics and logging. It is unsynchronized and
-     * unsuitable for informing decisions in runtime.
-     */
-    static ServiceExecutorStats get(ServiceContext* ctx) noexcept;
-
-    // The number of Clients who use the dedicated executors.
-    size_t usesDedicated = 0;
-
-    // The number of Clients who use the borrowed executors.
-    size_t usesBorrowed = 0;
-
     // The number of Clients that are allowed to ignore maxConns and use reserved resources.
-    size_t limitExempt = 0;
+    AtomicWord<std::size_t> limitExempt{0};
 };
 
-}  // namespace transport
-
-}  // namespace mongo
+}  // namespace mongo::transport

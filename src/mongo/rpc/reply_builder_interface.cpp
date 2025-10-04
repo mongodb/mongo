@@ -27,16 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/rpc/reply_builder_interface.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/error_extra_info.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/db/basic_types_gen.h"
+#include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/idl/idl_parser.h"
+
+#include <memory>
 #include <utility>
 
-#include "mongo/base/status_with.h"
-#include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/idl/basic_types_gen.h"
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace rpc {
@@ -80,7 +84,7 @@ BSONObj augmentReplyWithStatus(const Status& status, BSONObj reply) {
     // construct an invalid error reply.
     if (getTestCommandsEnabled()) {
         try {
-            ErrorReply::parse(IDLParserErrorContext("augmentReplyWithStatus"), bob.asTempObj());
+            ErrorReply::parse(bob.asTempObj(), IDLParserContext("augmentReplyWithStatus"));
         } catch (const DBException&) {
             invariant(false,
                       "invalid error-response to a command constructed in "

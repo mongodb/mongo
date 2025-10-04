@@ -29,16 +29,23 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
+#include "mongo/base/counter.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/platform/decimal128.h"
+#include "mongo/stdx/utility.h"
+#include "mongo/util/assert_util.h"
+
 #include <cstdint>
 #include <iosfwd>
+#include <limits>
 #include <type_traits>
 
-#include "mongo/base/counter.h"
-#include "mongo/base/string_data.h"
-#include "mongo/config.h"
-#include "mongo/platform/decimal128.h"
-#include "mongo/util/assert_util.h"
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 
@@ -47,7 +54,6 @@ class BSONElement;
 class BSONElementCmpWithoutField;
 class BSONObj;
 class BSONObjBuilder;
-class BSONObjBuilderValueStream;
 class BSONObjIterator;
 class Ordering;
 struct BSONArray;  // empty subclass of BSONObj useful for overloading
@@ -56,57 +62,60 @@ extern const BSONObj kMaxBSONKey;
 extern const BSONObj kMinBSONKey;
 
 /**
-    the complete list of valid BSON types
-    see also bsonspec.org
-*/
-enum BSONType {
+ *  The complete list of valid BSON types. See also bsonspec.org.
+ */
+enum class BSONType : int {
     /** smaller than all other types */
-    MinKey = -1,
+    minKey = -1,
     /** end of object */
-    EOO = 0,
+    eoo = 0,
     /** double precision floating point value */
-    NumberDouble = 1,
+    numberDouble = 1,
     /** character string, stored in utf8 */
-    String = 2,
+    string = 2,
     /** an embedded object */
-    Object = 3,
+    object = 3,
     /** an embedded array */
-    Array = 4,
+    array = 4,
     /** binary data */
-    BinData = 5,
+    binData = 5,
     /** (Deprecated) Undefined type */
-    Undefined = 6,
+    undefined = 6,
     /** ObjectId */
-    jstOID = 7,
+    oid = 7,
     /** boolean type */
-    Bool = 8,
+    boolean = 8,
     /** date type */
-    Date = 9,
+    date = 9,
     /** null type */
-    jstNULL = 10,
+    null = 10,
     /** regular expression, a pattern with options */
-    RegEx = 11,
+    regEx = 11,
     /** (Deprecated) */
-    DBRef = 12,
+    dbRef = 12,
     /** code type */
-    Code = 13,
+    code = 13,
     /** (Deprecated) a programming language (e.g., Python) symbol */
-    Symbol = 14,
+    symbol = 14,
     /** (Deprecated) javascript code that can execute on the database server, with SavedContext */
-    CodeWScope = 15,
+    codeWScope = 15,
     /** 32 bit signed integer */
-    NumberInt = 16,
+    numberInt = 16,
     /** Two 32 bit signed integers */
-    bsonTimestamp = 17,
+    timestamp = 17,
     /** 64 bit integer */
-    NumberLong = 18,
+    numberLong = 18,
     /** 128 bit decimal */
-    NumberDecimal = 19,
+    numberDecimal = 19,
     /** max type that is not MaxKey */
-    JSTypeMax = 19,
+    jsTypeMax = 19,
     /** larger than all other types */
-    MaxKey = 127
+    maxKey = 127
 };
+
+inline auto format_as(BSONType t) {
+    return fmt::underlying(t);
+}
 
 /**
  * Maps from the set of type aliases accepted by the $type query operator to the corresponding BSON
@@ -135,12 +144,18 @@ std::ostream& operator<<(std::ostream& stream, BSONType type);
  */
 bool isValidBSONType(int type);
 
+/**
+ * IDL callback validator
+ */
+Status isValidBSONTypeName(StringData typeName);
+
+
 inline bool isNumericBSONType(BSONType type) {
     switch (type) {
-        case NumberDouble:
-        case NumberInt:
-        case NumberLong:
-        case NumberDecimal:
+        case BSONType::numberDouble:
+        case BSONType::numberInt:
+        case BSONType::numberLong:
+        case BSONType::numberDecimal:
             return true;
         default:
             return false;
@@ -152,29 +167,29 @@ inline bool isNumericBSONType(BSONType type) {
  **/
 inline bool isVariableWidthType(BSONType type) {
     switch (type) {
-        case Array:
-        case BinData:
-        case Code:
-        case CodeWScope:
-        case DBRef:
-        case Object:
-        case RegEx:
-        case String:
-        case Symbol:
+        case BSONType::array:
+        case BSONType::binData:
+        case BSONType::code:
+        case BSONType::codeWScope:
+        case BSONType::dbRef:
+        case BSONType::object:
+        case BSONType::regEx:
+        case BSONType::string:
+        case BSONType::symbol:
             return true;
-        case Bool:
-        case bsonTimestamp:
-        case Date:
-        case EOO:
-        case jstNULL:
-        case jstOID:
-        case MaxKey:
-        case MinKey:
-        case NumberDecimal:
-        case NumberDouble:
-        case NumberInt:
-        case NumberLong:
-        case Undefined:
+        case BSONType::boolean:
+        case BSONType::timestamp:
+        case BSONType::date:
+        case BSONType::eoo:
+        case BSONType::null:
+        case BSONType::oid:
+        case BSONType::maxKey:
+        case BSONType::minKey:
+        case BSONType::numberDecimal:
+        case BSONType::numberDouble:
+        case BSONType::numberInt:
+        case BSONType::numberLong:
+        case BSONType::undefined:
             return false;
         default:
             MONGO_UNREACHABLE;
@@ -192,10 +207,16 @@ enum BinDataType {
     bdtUUID = 3,             /* deprecated */
     newUUID = 4,             /* language-independent UUID format across all drivers */
     MD5Type = 5,
-    Encrypt = 6, /* encryption placeholder or encrypted data */
-    Column = 7,  /* compressed column */
+    Encrypt = 6,   /* encryption placeholder or encrypted data */
+    Column = 7,    /* compressed column */
+    Sensitive = 8, /* data that should be redacted and protected from unnecessary exposure */
+    Vector = 9,    /* A denser format of an array of numbers representing a vector */
     bdtCustom = 128
 };
+
+inline auto format_as(BinDataType type) {
+    return fmt::underlying(type);
+}
 
 /**
  * Return the name of the BinData Type.
@@ -210,52 +231,79 @@ bool isValidBinDataType(int type);
 /** Returns a number for where a given type falls in the sort order.
  *  Elements with the same return value should be compared for value equality.
  *  The return value is not a BSONType and should not be treated as one.
- *  Note: if the order changes, indexes have to be re-built or than can be corruption
+ *  Note: if the order changes, indexes have to be re-built or there can be corruption
  */
-inline int canonicalizeBSONType(BSONType type) {
+inline constexpr std::int8_t canonicalizeBSONTypeUnsafeLookup(BSONType type) {
+    // This switch statement gets compiled down to a lookup table in GCC >= 8.5
+    // To achieve this there must be NO exceptions thrown nor functions called as
+    // otherwise it would break the optimization.
+    // Additionally, it must also contain a default case in order to fully build
+    // out the lookup table as it won't generate it as such without it.
     switch (type) {
-        case MinKey:
-        case MaxKey:
-            return type;
-        case EOO:
-        case Undefined:
+        case BSONType::minKey:
+            return stdx::to_underlying(BSONType::minKey);
+        case BSONType::maxKey:
+            return stdx::to_underlying(BSONType::maxKey);
+        case BSONType::eoo:
+        case BSONType::undefined:
             return 0;
-        case jstNULL:
+        case BSONType::null:
             return 5;
-        case NumberDecimal:
-        case NumberDouble:
-        case NumberInt:
-        case NumberLong:
+        case BSONType::numberDecimal:
+        case BSONType::numberDouble:
+        case BSONType::numberInt:
+        case BSONType::numberLong:
             return 10;
-        case mongo::String:
-        case Symbol:
+        case BSONType::string:
+        case BSONType::symbol:
             return 15;
-        case Object:
+        case BSONType::object:
             return 20;
-        case mongo::Array:
+        case BSONType::array:
             return 25;
-        case BinData:
+        case BSONType::binData:
             return 30;
-        case jstOID:
+        case BSONType::oid:
             return 35;
-        case mongo::Bool:
+        case BSONType::boolean:
             return 40;
-        case mongo::Date:
+        case BSONType::date:
             return 45;
-        case bsonTimestamp:
+        case BSONType::timestamp:
             return 47;
-        case RegEx:
+        case BSONType::regEx:
             return 50;
-        case DBRef:
+        case BSONType::dbRef:
             return 55;
-        case Code:
+        case BSONType::code:
             return 60;
-        case CodeWScope:
+        case BSONType::codeWScope:
             return 65;
         default:
-            verify(0);
-            return -1;
+            // As all possible values are mapped in the BSONType enum, we'll return a signal value
+            // to be checked (if desired) by callers of the method if something completely
+            // unexpected comes in. This codepath would only be reached if the given BSONType is not
+            // a valid BSONType. One way this could occur is if the given value was constructed by
+            // forcibly casting something into a BSONType without checking if it's valid.
+            const auto ret = std::numeric_limits<std::int8_t>::min();
+            // To explicitly make it different that all BSONTypes
+            static_assert(ret < stdx::to_underlying(BSONType::minKey));
+            return ret;
     }
+}
+
+/** Returns a number for where a given type falls in the sort order.
+ *  Elements with the same return value should be compared for value equality.
+ *  The return value is not a BSONType and should not be treated as one.
+ *  Note: if the order changes, indexes have to be re-built or there can be corruption
+ */
+inline int canonicalizeBSONType(BSONType type) {
+    auto ret = canonicalizeBSONTypeUnsafeLookup(type);
+    if (ret != std::numeric_limits<std::int8_t>::min()) {
+        return ret;
+    }
+    msgasserted(ErrorCodes::InvalidBSONType,
+                fmt::format("Invalid/undefined BSONType value was provided ({:d})", type));
 }
 
 template <BSONType value>
@@ -280,14 +328,15 @@ template <typename T, typename = void>
 struct BSONObjFallbackFormat {};
 
 template <typename T>
-struct BSONObjFallbackFormat<T, std::enable_if_t<std::is_enum_v<T>>> : FormatKind<NumberInt> {};
+struct BSONObjFallbackFormat<T, std::enable_if_t<std::is_enum_v<T>>>
+    : FormatKind<BSONType::numberInt> {};
 
 /** This is a special case because long long and int64_t are the same on some platforms but
  * different on others. If they are the same, the long long partial specialization of
  * BSONObjAppendFormat is accepted, otherwise the int64_t partial specialization of
  * BSONObjFallbackFormat is chosen. */
 template <>
-struct BSONObjFallbackFormat<std::int64_t> : FormatKind<NumberLong> {};
+struct BSONObjFallbackFormat<std::int64_t> : FormatKind<BSONType::numberLong> {};
 
 /** Determine if T is appendable based on whether or not BSONOBjAppendFormat<T> has a value. */
 template <typename T, typename = void>
@@ -306,38 +355,38 @@ template <typename T>
 struct BSONObjAppendFormat : bsontype_detail::BSONObjFallbackFormat<T> {};
 
 template <>
-struct BSONObjAppendFormat<bool> : FormatKind<Bool> {};
+struct BSONObjAppendFormat<bool> : FormatKind<BSONType::boolean> {};
 
 template <>
-struct BSONObjAppendFormat<char> : FormatKind<NumberInt> {};
+struct BSONObjAppendFormat<char> : FormatKind<BSONType::numberInt> {};
 
 template <>
-struct BSONObjAppendFormat<unsigned char> : FormatKind<NumberInt> {};
+struct BSONObjAppendFormat<unsigned char> : FormatKind<BSONType::numberInt> {};
 
 template <>
-struct BSONObjAppendFormat<short> : FormatKind<NumberInt> {};
+struct BSONObjAppendFormat<short> : FormatKind<BSONType::numberInt> {};
 
 template <>
-struct BSONObjAppendFormat<unsigned short> : FormatKind<NumberInt> {};
+struct BSONObjAppendFormat<unsigned short> : FormatKind<BSONType::numberInt> {};
 
 template <>
-struct BSONObjAppendFormat<int> : FormatKind<NumberInt> {};
+struct BSONObjAppendFormat<int> : FormatKind<BSONType::numberInt> {};
 
 /* For platforms where long long and int64_t are the same, this partial specialization will be
    used for both. Otherwise, int64_t will use the specialization above. */
 template <>
-struct BSONObjAppendFormat<long long> : FormatKind<NumberLong> {};
+struct BSONObjAppendFormat<long long> : FormatKind<BSONType::numberLong> {};
 
 template <>
-struct BSONObjAppendFormat<Counter64> : FormatKind<NumberLong> {};
+struct BSONObjAppendFormat<Counter64> : FormatKind<BSONType::numberLong> {};
 
 template <>
-struct BSONObjAppendFormat<Decimal128> : FormatKind<NumberDecimal> {};
+struct BSONObjAppendFormat<Decimal128> : FormatKind<BSONType::numberDecimal> {};
 
 template <>
-struct BSONObjAppendFormat<double> : FormatKind<NumberDouble> {};
+struct BSONObjAppendFormat<double> : FormatKind<BSONType::numberDouble> {};
 
 template <>
-struct BSONObjAppendFormat<float> : FormatKind<NumberDouble> {};
+struct BSONObjAppendFormat<float> : FormatKind<BSONType::numberDouble> {};
 
 }  // namespace mongo

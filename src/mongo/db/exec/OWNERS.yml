@@ -1,0 +1,43 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/query-execution-classic
+  - "OWNERS.yml":
+    approvers:
+      - 10gen/query-execution-staff-leads
+      - 10gen/query-optimization-staff-leads
+      - 10gen/query-integration-staff-leads
+  - "*timeseries*":
+    approvers:
+      - 10gen/query-integration-timeseries
+  - "text_*":
+    approvers:
+      - 10gen/query-integration-search
+  - "*near*":
+    approvers:
+      - 10gen/query-integration-features
+  - "cached_plan*":
+    approvers:
+      - 10gen/query-optimization
+  - "multi_plan*":
+    approvers:
+      - 10gen/query-optimization
+  - "subplan*":
+    approvers:
+      - 10gen/query-optimization
+  - "plan_cache*":
+    approvers:
+      - 10gen/query-optimization
+  - "trial_period_utils*":
+    approvers:
+      - 10gen/query-optimization
+  - "trial_run_tracker.h":
+    approvers:
+      - 10gen/query-optimization
+  - "trial_stage*":
+    approvers:
+      - 10gen/query-optimization
+  - "scoped_timer*":
+    approvers:
+      - 10gen/server-programmability

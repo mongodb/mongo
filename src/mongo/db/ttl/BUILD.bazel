@@ -1,0 +1,80 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "ttl_collection_cache",
+    srcs = [
+        "ttl_collection_cache.cpp",
+    ],
+    hdrs = [
+        "ttl_collection_cache.h",
+    ],
+    deps = [
+        "//src/mongo:base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:service_context",
+    ],
+)
+
+idl_generator(
+    name = "ttl_gen",
+    src = "ttl.idl",
+)
+
+mongo_cc_library(
+    name = "ttl_d",
+    srcs = [
+        "ttl.cpp",
+        ":ttl_gen",
+    ],
+    hdrs = [
+        "ttl.h",
+    ],
+    deps = [
+        ":ttl_collection_cache",
+        "//src/mongo/db:coll_mod_command_idl",
+        "//src/mongo/db:index_commands_idl",
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db:record_id_helpers",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/commands:fsync_locked",
+        "//src/mongo/db/commands/server_status:server_status_core",
+        "//src/mongo/db/local_catalog:catalog_helpers",
+        "//src/mongo/db/local_catalog:index_key_validate",
+        "//src/mongo/db/query/write_ops",
+        "//src/mongo/db/repl:replica_set_aware_service",
+        "//src/mongo/db/s:sharding_runtime_d",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "ttl_test",
+    srcs = [
+        "ttl_collection_cache_test.cpp",
+        "ttl_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_fifth_group",
+        "server-ttl",
+    ],
+    deps = [
+        ":ttl_collection_cache",
+        ":ttl_d",
+        "//src/mongo/db:dbdirectclient",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/index_builds:index_build_entry_helpers",
+        "//src/mongo/db/index_builds:index_builds_coordinator_mongod",
+        "//src/mongo/db/repl:replmocks",
+        "//src/mongo/idl:server_parameter_test_controller",
+    ],
+)

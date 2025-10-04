@@ -29,14 +29,26 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <chrono>
-#include <string>
-
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <chrono>
+#include <iosfwd>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 
 /**
@@ -53,7 +65,7 @@ enum class TopologyType {
     kSharded,
     kUnknown
 };
-const std::vector<TopologyType> allTopologyTypes();
+std::vector<TopologyType> allTopologyTypes();
 std::string toString(TopologyType topologyType);
 StatusWith<TopologyType> parseTopologyType(StringData strTopologyType);
 std::ostream& operator<<(std::ostream& os, TopologyType topologyType);
@@ -68,7 +80,7 @@ enum class ServerType {
     kRSGhost,
     kUnknown
 };
-const std::vector<ServerType> allServerTypes();
+std::vector<ServerType> allServerTypes();
 std::string toString(ServerType serverType);
 StatusWith<ServerType> parseServerType(StringData strServerType);
 std::ostream& operator<<(std::ostream& os, ServerType serverType);
@@ -85,8 +97,8 @@ public:
         : _server(std::move(server)), _success(true), _response(response), _rtt(rtt) {
         const auto topologyVersionField = response.getField("topologyVersion");
         if (topologyVersionField) {
-            _topologyVersion = TopologyVersion::parse(IDLParserErrorContext("TopologyVersion"),
-                                                      topologyVersionField.Obj());
+            _topologyVersion = TopologyVersion::parse(topologyVersionField.Obj(),
+                                                      IDLParserContext("TopologyVersion"));
         }
     }
 
@@ -95,8 +107,8 @@ public:
         : _server(std::move(server)), _success(false), _errorMsg(errorMsg) {
         const auto topologyVersionField = response.getField("topologyVersion");
         if (topologyVersionField) {
-            _topologyVersion = TopologyVersion::parse(IDLParserErrorContext("TopologyVersion"),
-                                                      topologyVersionField.Obj());
+            _topologyVersion = TopologyVersion::parse(topologyVersionField.Obj(),
+                                                      IDLParserContext("TopologyVersion"));
         }
     }
 

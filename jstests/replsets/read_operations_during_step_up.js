@@ -2,13 +2,9 @@
  * Test that the read operations are not killed and their connections are also not
  * closed during step up.
  */
-load('jstests/libs/parallelTester.js');
-load("jstests/libs/curop_helpers.js");  // for waitForCurOpByFailPoint().
-load("jstests/replsets/rslib.js");
-
-(function() {
-
-"use strict";
+import {waitForCurOpByFailPoint} from "jstests/libs/curop_helpers.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const testName = jsTestName();
 const dbName = "test";
@@ -16,7 +12,7 @@ const collName = "coll";
 
 const rst = new ReplSetTest({name: testName, nodes: 2});
 rst.startSet();
-rst.initiateWithHighElectionTimeout();
+rst.initiate();
 
 const primary = rst.getPrimary();
 const primaryDB = primary.getDB(dbName);
@@ -32,8 +28,7 @@ TestData.dbName = dbName;
 TestData.collName = collName;
 
 jsTestLog("1. Do a document write");
-assert.commandWorked(
-        primaryColl.insert({_id: 0}, {"writeConcern": {"w": "majority"}}));
+assert.commandWorked(primaryColl.insert({_id: 0}, {"writeConcern": {"w": "majority"}}));
 rst.awaitReplication();
 
 // It's possible for notPrimaryUnacknowledgedWrites to be non-zero because of mirrored reads during
@@ -42,40 +37,41 @@ let replMetrics = assert.commandWorked(secondaryAdmin.adminCommand({serverStatus
 const startingNumNotMasterErrors = replMetrics.network.notPrimaryUnacknowledgedWrites;
 
 // Open a cursor on secondary.
-const cursorIdToBeReadAfterStepUp =
-    assert.commandWorked(secondaryDB.runCommand({"find": collName, batchSize: 0})).cursor.id;
+const cursorIdToBeReadAfterStepUp = assert.commandWorked(secondaryDB.runCommand({"find": collName, batchSize: 0}))
+    .cursor.id;
 
 jsTestLog("2. Start blocking getMore cmd before step up");
 const joinGetMoreThread = startParallelShell(() => {
     // Open another cursor on secondary before step up.
-    secondaryDB = db.getSiblingDB(TestData.dbName);
+    const secondaryDB = db.getSiblingDB(TestData.dbName);
     secondaryDB.getMongo().setSecondaryOk();
 
-    const cursorIdToBeReadDuringStepUp =
-        assert.commandWorked(secondaryDB.runCommand({"find": TestData.collName, batchSize: 0}))
-            .cursor.id;
+    const cursorIdToBeReadDuringStepUp = assert.commandWorked(
+        secondaryDB.runCommand({"find": TestData.collName, batchSize: 0}),
+    ).cursor.id;
 
     // Enable the fail point for get more cmd.
-    assert.commandWorked(db.adminCommand(
-        {configureFailPoint: "waitAfterPinningCursorBeforeGetMoreBatch", mode: "alwaysOn"}));
+    assert.commandWorked(
+        db.adminCommand({configureFailPoint: "waitAfterPinningCursorBeforeGetMoreBatch", mode: "alwaysOn"}),
+    );
 
-    getMoreRes = assert.commandWorked(secondaryDB.runCommand(
-        {"getMore": cursorIdToBeReadDuringStepUp, collection: TestData.collName}));
+    const getMoreRes = assert.commandWorked(
+        secondaryDB.runCommand({"getMore": cursorIdToBeReadDuringStepUp, collection: TestData.collName}),
+    );
     assert.docEq([{_id: 0}], getMoreRes.cursor.nextBatch);
 }, secondary.port);
 
 // Wait for getmore cmd to reach the fail point.
-waitForCurOpByFailPoint(
-    secondaryAdmin, secondaryCollNss, "waitAfterPinningCursorBeforeGetMoreBatch");
+waitForCurOpByFailPoint(secondaryAdmin, secondaryCollNss, "waitAfterPinningCursorBeforeGetMoreBatch");
 
 jsTestLog("2. Start blocking find cmd before step up");
 const joinFindThread = startParallelShell(() => {
-    secondaryDB = db.getSiblingDB(TestData.dbName);
+    const secondaryDB = db.getSiblingDB(TestData.dbName);
     secondaryDB.getMongo().setSecondaryOk();
 
-    // Enable the fail point for find cmd.
-    assert.commandWorked(
-        db.adminCommand({configureFailPoint: "waitInFindBeforeMakingBatch", mode: "alwaysOn"}));
+    // Enable the fail point for find cmd. We are in a parallel shell, so we can't use the helper
+    // function. Enable the shard variant of the fail point.
+    assert.commandWorked(db.adminCommand({configureFailPoint: "shardWaitInFindBeforeMakingBatch", mode: "alwaysOn"}));
 
     const findRes = assert.commandWorked(secondaryDB.runCommand({"find": TestData.collName}));
     assert.docEq([{_id: 0}], findRes.cursor.firstBatch);
@@ -94,14 +90,14 @@ checkLog.contains(secondary, "Starting to kill user operations");
 
 // Enable "waitAfterCommandFinishesExecution" fail point to make sure the find and get more
 // commands on database 'test' does not complete before step up.
-configureFailPoint(secondaryAdmin,
-                   "waitAfterCommandFinishesExecution",
-                   {ns: secondaryCollNss, commands: ["find", "getMore"]});
+configureFailPoint(secondaryAdmin, "waitAfterCommandFinishesExecution", {
+    ns: secondaryCollNss,
+    commands: ["find", "getMore"],
+});
 
 jsTestLog("4. Disable fail points");
 configureFailPoint(secondaryAdmin, "waitInFindBeforeMakingBatch", {} /* data */, "off");
-configureFailPoint(
-    secondaryAdmin, "waitAfterPinningCursorBeforeGetMoreBatch", {} /* data */, "off");
+configureFailPoint(secondaryAdmin, "waitAfterPinningCursorBeforeGetMoreBatch", {} /* data */, "off");
 
 // Wait until the secondary transitioned to PRIMARY state.
 joinStepUpThread();
@@ -118,17 +114,16 @@ joinFindThread();
 
 jsTestLog("5. Start get more cmd after step up");
 const getMoreRes = assert.commandWorked(
-    secondaryDB.runCommand({"getMore": cursorIdToBeReadAfterStepUp, collection: collName}));
+    secondaryDB.runCommand({"getMore": cursorIdToBeReadAfterStepUp, collection: collName}),
+);
 assert.docEq([{_id: 0}], getMoreRes.cursor.nextBatch);
 
-// Validate that no operations got killed on step up and no network disconnection happened due
-// to failed unacknowledged operations.
+// Validate that no network disconnection happened due to failed unacknowledged operations.
 replMetrics = assert.commandWorked(secondaryAdmin.adminCommand({serverStatus: 1})).metrics.repl;
 assert.eq(replMetrics.stateTransition.lastStateTransition, "stepUp");
-assert.eq(replMetrics.stateTransition.userOperationsKilled, 0);
 // Should account for find and getmore commands issued before step up.
-assert.gte(replMetrics.stateTransition.userOperationsRunning, 2);
+// TODO (SERVER-85259): Remove references to replMetrics.stateTransition.userOperations*
+assert.gte(replMetrics.stateTransition.totalOperationsRunning || replMetrics.stateTransition.userOperationsRunning, 2);
 assert.eq(replMetrics.network.notPrimaryUnacknowledgedWrites, startingNumNotMasterErrors);
 
 rst.stopSet();
-})();

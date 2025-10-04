@@ -31,6 +31,7 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/operation_id.h"
 #include "mongo/db/service_context.h"
 
 namespace mongo {
@@ -55,7 +56,7 @@ public:
     /**
      * Verify that the target exists and the myClient is allowed to kill it
      */
-    bool isAuthorizedToKill(const LockedClient& target) const;
+    bool isAuthorizedToKill(const ClientLock& target) const;
 
     /**
      * Kill an operation running on this instance of mongod or mongos.

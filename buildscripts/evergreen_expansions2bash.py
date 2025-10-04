@@ -1,8 +1,7 @@
 """Convert Evergreen's expansions.yml to an eval-able shell script."""
+
 import sys
-import platform
 from shlex import quote
-from typing import Any
 
 
 def _error(msg: str) -> None:
@@ -11,19 +10,23 @@ def _error(msg: str) -> None:
 
 
 try:
-    import yaml
     import click
+    import yaml
 except ModuleNotFoundError:
-    _error("ERROR: Failed to import a dependency. This is almost certainly because "
-           "the task did not initialize the venv immediately after cloning the repository.")
+    _error(
+        "ERROR: Failed to import a dependency. This is almost certainly because "
+        "the task did not initialize the venv immediately after cloning the repository."
+    )
 
 
 def _load_defaults(defaults_file: str) -> dict:
-    with open(defaults_file) as fh:
+    with open(defaults_file, encoding="utf8") as fh:
         defaults = yaml.safe_load(fh)
         if not isinstance(defaults, dict):
-            _error("ERROR: expected to read a dictionary. expansions.defaults.yml"
-                   "must be a dictionary. Check the indentation.")
+            _error(
+                "ERROR: expected to read a dictionary. expansions.defaults.yml"
+                "must be a dictionary. Check the indentation."
+            )
 
         # expansions MUST be strings. Reject any that are not
         bad_expansions = set()
@@ -32,11 +35,13 @@ def _load_defaults(defaults_file: str) -> dict:
                 bad_expansions.add(key)
 
         if bad_expansions:
-            _error("ERROR: all default expansions must be strings. You can "
-                   " fix this error by quoting the values in expansions.defaults.yml. "
-                   "Integers, floating points, 'true', 'false', and 'null' "
-                   "must be quoted. The following keys were interpreted as "
-                   f"other types: {bad_expansions}")
+            _error(
+                "ERROR: all default expansions must be strings. You can "
+                " fix this error by quoting the values in expansions.defaults.yml. "
+                "Integers, floating points, 'true', 'false', and 'null' "
+                "must be quoted. The following keys were interpreted as "
+                f"other types: {bad_expansions}"
+            )
 
         # These values show up if 1. Python's str is used to naively convert
         # a boolean to str, 2. A human manually entered one of those strings.
@@ -50,27 +55,35 @@ def _load_defaults(defaults_file: str) -> dict:
                 risky_boolean_keys.add(key)
 
         if risky_boolean_keys:
-            _error("ERROR: Found keys which had 'True' or 'False' as values. "
-                   "Shell scripts assume that booleans are represented as 'true'"
-                   " or 'false' (leading lowercase). If you added a new boolean, "
-                   "ensure that it's represented in lowercase. If not, please report this in "
-                   f"#server-testing. Keys with bad values: {risky_boolean_keys}")
+            _error(
+                "ERROR: Found keys which had 'True' or 'False' as values. "
+                "Shell scripts assume that booleans are represented as 'true'"
+                " or 'false' (leading lowercase). If you added a new boolean, "
+                "ensure that it's represented in lowercase. If not, please report this in "
+                f"#server-testing. Keys with bad values: {risky_boolean_keys}"
+            )
 
         return defaults
 
 
 def _load_expansions(expansions_file) -> dict:
-    with open(expansions_file) as fh:
+    with open(expansions_file, encoding="utf8") as fh:
         expansions = yaml.safe_load(fh)
 
         if not isinstance(expansions, dict):
-            _error("ERROR: expected to read a dictionary. Has the output format "
-                   "of expansions.write changed?")
+            _error(
+                "ERROR: expected to read a dictionary. Has the output format "
+                "of expansions.write changed?"
+            )
 
         if not expansions:
             _error("ERROR: found 0 expansions. This is almost certainly wrong.")
 
         return expansions
+
+
+def _clean_key(key):
+    return key.replace("-", "_")
 
 
 @click.command()
@@ -87,11 +100,11 @@ def _main(expansions_file: str, defaults_file: str):
                 expansions[key] = value
 
         for key, value in expansions.items():
-            print(f"{key}={quote(value)}; ", end="")
+            print(f"{_clean_key(key)}={quote(value)}; ", end="")
 
-    except Exception as ex:  # pylint: disable=broad-except
+    except Exception as ex:
         _error(ex)
 
 
 if __name__ == "__main__":
-    _main()  # pylint: disable=no-value-for-parameter
+    _main()

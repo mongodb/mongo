@@ -31,6 +31,7 @@
 
 #include "mongo/base/counter.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/out_of_line_executor.h"
@@ -75,6 +76,8 @@ private:
     Counter64 _runningBuckets[kNumBuckets];
 
     ClockSource* const _clkSource;
+    logv2::SeveritySuppressor severitySuppressor{
+        Seconds{10}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(2)};
 };
 
 }  // namespace mongo

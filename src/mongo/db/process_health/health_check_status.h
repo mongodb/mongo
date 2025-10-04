@@ -28,40 +28,45 @@
  */
 #pragma once
 
-#include <memory>
-#include <ostream>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/process_health/fault_manager_config.h"
 
+#include <memory>
+#include <ostream>
+
 namespace mongo {
 namespace process_health {
 
+enum class Severity { kOk, kFailure };
+static const StringData SeverityStrings[] = {"kOk", "kFailure"};
 
+inline StringBuilder& operator<<(StringBuilder& s, const Severity& sev) {
+    return s << SeverityStrings[static_cast<int>(sev)];
+}
+
+inline std::ostream& operator<<(std::ostream& s, const Severity& sev) {
+    return s << SeverityStrings[static_cast<int>(sev)];
+}
 /**
  * Immutable class representing current status of an ongoing fault tracked by facet.
  */
 class HealthCheckStatus {
 public:
-    static constexpr double kResolvedSeverity = 0;
-    // The range for active fault is inclusive: [ 1, Inf ).
-    static constexpr double kActiveFaultSeverity = 1.0;
-    // We chose to subtract a small 'epsilon' value from 1.0 to
-    // avoid rounding problems and be sure that severity of 1.0 is guaranteed to be an active fault.
-    static constexpr double kActiveFaultSeverityEpsilon = 0.000001;
-
-    using Severity = double;
-
     HealthCheckStatus(FaultFacetType type, Severity severity, StringData description)
         : _type(type), _severity(severity), _description(description) {}
 
     // Constructs a resolved status (no fault detected).
     explicit HealthCheckStatus(FaultFacetType type)
-        : _type(type), _severity(0), _description("resolved"_sd) {}
+        : _type(type), _severity(Severity::kOk), _description("resolved"_sd) {}
+
+    explicit HealthCheckStatus(HealthObserverTypeEnum type)
+        : _type(toFaultFacetType(type)), _severity(Severity::kOk), _description("resolved"_sd) {}
 
     HealthCheckStatus(const HealthCheckStatus&) = default;
-    HealthCheckStatus& operator=(const HealthCheckStatus&) = delete;
+    HealthCheckStatus& operator=(const HealthCheckStatus&) = default;
+    HealthCheckStatus(HealthCheckStatus&&) = default;
+    HealthCheckStatus& operator=(HealthCheckStatus&&) = default;
 
     /**
      * @return FaultFacetType of this status.
@@ -91,45 +96,27 @@ public:
 
     // Helpers for severity levels.
 
-    static bool isResolved(double severity) {
-        return severity <= kResolvedSeverity;
+    static bool isResolved(Severity severity) {
+        return severity == Severity::kOk;
     }
 
-    static bool isTransientFault(double severity) {
-        return severity > kResolvedSeverity && severity < kActiveFaultSeverity;
+    static bool isActiveFault(Severity severity) {
+        return severity == Severity::kFailure;
     }
 
-    static bool isActiveFault(double severity) {
-        // Range is inclusive.
-        return severity >= kActiveFaultSeverity - kActiveFaultSeverityEpsilon;
+    bool isActiveFault() const {
+        return isActiveFault(getSeverity());
     }
 
 private:
     friend std::ostream& operator<<(std::ostream&, const HealthCheckStatus&);
     friend StringBuilder& operator<<(StringBuilder& s, const HealthCheckStatus& hcs);
 
-    const FaultFacetType _type;
-    const double _severity;
-    const std::string _description;
+
+    FaultFacetType _type;
+    Severity _severity;
+    std::string _description;
 };
-
-inline StringBuilder& operator<<(StringBuilder& s, const FaultFacetType& type) {
-    switch (type) {
-        case FaultFacetType::kMock1:
-            return s << "kMock1"_sd;
-        case FaultFacetType::kMock2:
-            return s << "kMock2"_sd;
-        default:
-            return s << "Uknown"_sd;
-    }
-}
-
-inline std::ostream& operator<<(std::ostream& os, const FaultFacetType& type) {
-    StringBuilder sb;
-    sb << type;
-    os << sb.stringData();
-    return os;
-}
 
 inline void HealthCheckStatus::appendDescription(BSONObjBuilder* builder) const {
     builder->append("type", _type);

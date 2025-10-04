@@ -27,29 +27,44 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/exec/sbe/values/value.h"
 
 #include "mongo/base/compare_numbers.h"
-#include "mongo/db/exec/js_function.h"
+#include "mongo/base/string_data_comparator.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/db/exec/sbe/util/print_options.h"
+#include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/bson.h"
-#include "mongo/db/exec/sbe/values/sort_spec.h"
+#include "mongo/db/exec/sbe/values/cell_interface.h"
+#include "mongo/db/exec/sbe/values/generic_compare.h"
+#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/sbe/values/util.h"
 #include "mongo/db/exec/sbe/values/value_builder.h"
+#include "mongo/db/exec/sbe/values/value_printer.h"
+#include "mongo/db/index/btree_key_generator.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/datetime/date_time_support.h"
-#include "mongo/db/storage/key_string.h"
-#include "mongo/util/regex_util.h"
+#include "mongo/db/storage/key_string/key_string.h"
+#include "mongo/util/bufreader.h"
+#include "mongo/util/duration.h"
+
+#include <cmath>
+
+#include <absl/container/flat_hash_map.h>
+#include <absl/hash/hash.h>
+#include <absl/strings/string_view.h>
+#include <boost/cstdint.hpp>
+#include <boost/numeric/conversion/converter_policies.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace sbe {
 namespace value {
-
 namespace {
 template <typename T>
 auto abslHash(const T& val) {
     if constexpr (std::is_same_v<T, StringData>) {
-        return absl::Hash<absl::string_view>{}(absl::string_view{val.rawData(), val.size()});
+        return absl::Hash<absl::string_view>{}(absl::string_view{val.data(), val.size()});
     } else if constexpr (IsEndian<T>::value) {
         return abslHash(val.value);
     } else {
@@ -58,6 +73,27 @@ auto abslHash(const T& val) {
 }
 }  // namespace
 
+constexpr size_t gTypeOpsSize =
+    size_t(TypeTags::TypeTagsMax) - size_t(TypeTags::EndOfNativeTypeTags);
+
+const ExtendedTypeOps* gTypeOps[gTypeOpsSize] = {0};
+
+const ExtendedTypeOps* getExtendedTypeOps(TypeTags tag) {
+    dassert(size_t(tag) > size_t(TypeTags::EndOfNativeTypeTags));
+
+    size_t typeOpsIdx = size_t(tag) - (size_t(TypeTags::EndOfNativeTypeTags) + 1);
+    return gTypeOps[typeOpsIdx];
+}
+
+void registerExtendedTypeOps(TypeTags tag, const ExtendedTypeOps* typeOps) {
+    tassert(7690414,
+            "Expected tag value to be within the range of extended types",
+            size_t(tag) > size_t(TypeTags::EndOfNativeTypeTags));
+
+    size_t typeOpsIdx = size_t(tag) - (size_t(TypeTags::EndOfNativeTypeTags) + 1);
+    gTypeOps[typeOpsIdx] = typeOps;
+}
+
 std::pair<TypeTags, Value> makeNewBsonRegex(StringData pattern, StringData flags) {
     // Add 2 to account NULL bytes after pattern and flags.
     auto totalSize = pattern.size() + flags.size() + 2;
@@ -65,8 +101,8 @@ std::pair<TypeTags, Value> makeNewBsonRegex(StringData pattern, StringData flags
     auto rawBuffer = buffer.get();
 
     // Copy pattern first and flags after it.
-    memcpy(rawBuffer, pattern.rawData(), pattern.size());
-    memcpy(rawBuffer + pattern.size() + 1, flags.rawData(), flags.size());
+    memcpy(rawBuffer, pattern.data(), pattern.size());
+    memcpy(rawBuffer + pattern.size() + 1, flags.data(), flags.size());
 
     // Ensure NULL byte is placed after each part.
     rawBuffer[pattern.size()] = '\0';
@@ -90,7 +126,7 @@ std::pair<TypeTags, Value> makeNewBsonDBPointer(StringData ns, const uint8_t* id
     ptr += sizeof(uint32_t);
 
     // Write 'ns' followed by a null terminator.
-    memcpy(ptr, ns.rawData(), nsLen);
+    memcpy(ptr, ns.data(), nsLen);
     ptr[nsLen] = '\0';
     ptr += nsLenWithNull;
 
@@ -117,7 +153,7 @@ std::pair<TypeTags, Value> makeNewBsonCodeWScope(StringData code, const char* sc
     ptr += sizeof(uint32_t);
 
     // Write 'code' followed by a null terminator.
-    memcpy(ptr, code.rawData(), codeLen);
+    memcpy(ptr, code.data(), codeLen);
     ptr[codeLen] = '\0';
     ptr += codeLenWithNull;
 
@@ -127,124 +163,56 @@ std::pair<TypeTags, Value> makeNewBsonCodeWScope(StringData code, const char* sc
     return {TypeTags::bsonCodeWScope, bitcastFrom<char*>(buffer.release())};
 }
 
-std::pair<TypeTags, Value> makeCopyKeyString(const KeyString::Value& inKey) {
-    auto k = new KeyString::Value(inKey);
-    return {TypeTags::ksValue, bitcastFrom<KeyString::Value*>(k)};
+std::pair<TypeTags, Value> makeKeyString(const key_string::Value& inKey) {
+    return {TypeTags::keyString,
+            bitcastFrom<value::KeyStringEntry*>(new value::KeyStringEntry(inKey))};
 }
 
-std::pair<TypeTags, Value> makeNewPcreRegex(StringData pattern, StringData options) {
-    auto regex = std::make_unique<PcreRegex>(pattern, options);
-    return {TypeTags::pcreRegex, bitcastFrom<PcreRegex*>(regex.release())};
+std::pair<TypeTags, Value> makeCopyTimeZone(const TimeZone& tz) {
+    auto tzCopy = std::make_unique<TimeZone>(tz);
+    return {TypeTags::timeZone, bitcastFrom<TimeZone*>(tzCopy.release())};
 }
 
-std::pair<TypeTags, Value> makeCopyPcreRegex(const PcreRegex& regex) {
-    auto regexCopy = std::make_unique<PcreRegex>(regex);
-    return {TypeTags::pcreRegex, bitcastFrom<PcreRegex*>(regexCopy.release())};
+std::pair<TypeTags, Value> makeCopyValueBlock(const ValueBlock& b) {
+    auto cpy = b.clone();
+    return {TypeTags::valueBlock, bitcastFrom<ValueBlock*>(cpy.release())};
 }
 
-void PcreRegex::_compile() {
-    const auto pcreOptions = regex_util::flagsToPcreOptions(_options.c_str()).all_options();
-    const char* compile_error;
-    int eoffset;
-    _pcrePtr = pcre_compile(_pattern.c_str(), pcreOptions, &compile_error, &eoffset, nullptr);
-    uassert(5073402, str::stream() << "Invalid Regex: " << compile_error, _pcrePtr != nullptr);
+std::pair<TypeTags, Value> makeCopyCellBlock(const CellBlock& b) {
+    auto cpy = b.clone();
+    return {TypeTags::cellBlock, bitcastFrom<CellBlock*>(cpy.release())};
 }
 
-int PcreRegex::execute(StringData stringView, int startPos, std::vector<int>& buf) {
-    return pcre_exec(_pcrePtr,
-                     nullptr,
-                     stringView.rawData(),
-                     stringView.size(),
-                     startPos,
-                     0,
-                     &(buf.front()),
-                     buf.size());
+std::pair<TypeTags, Value> makeCopyCollator(const CollatorInterface& collator) {
+    auto collatorCopy = bitcastFrom<CollatorInterface*>(collator.clone().release());
+    return {TypeTags::collator, collatorCopy};
 }
 
-size_t PcreRegex::getNumberCaptures() const {
-    int numCaptures;
-    pcre_fullinfo(_pcrePtr, nullptr, PCRE_INFO_CAPTURECOUNT, &numCaptures);
-    invariant(numCaptures >= 0);
-    return static_cast<size_t>(numCaptures);
+std::pair<TypeTags, Value> makeNewRecordId(int64_t rid) {
+    auto val = bitcastFrom<RecordId*>(new RecordId(rid));
+    return {TypeTags::RecordId, val};
 }
 
-size_t PcreRegex::getApproximateSize() const {
-    size_t pcreSize;
-    pcre_fullinfo(_pcrePtr, nullptr, PCRE_INFO_SIZE, &pcreSize);
-    return sizeof(PcreRegex) + _pattern.size() + 1 + _options.size() + 1 + pcreSize;
+std::pair<TypeTags, Value> makeNewRecordId(const char* str, int32_t size) {
+    auto val = bitcastFrom<RecordId*>(new RecordId(std::span(str, size)));
+    return {TypeTags::RecordId, val};
 }
 
-KeyString::Value SortSpec::generateSortKey(const BSONObj& obj) const {
-    KeyStringSet keySet;
-    SharedBufferFragmentBuilder allocator(KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
-    const bool skipMultikey = false;
-    MultikeyPaths* multikeyPaths = nullptr;
-    _keyGen.getKeys(allocator, obj, skipMultikey, &keySet, multikeyPaths);
-
-    // When 'isSparse' is false, BtreeKeyGenerator::getKeys() is guaranteed to insert at least
-    // one key into 'keySet', so this assertion should always be true.
-    tassert(5037000, "BtreeKeyGenerator failed to generate key", !keySet.empty());
-
-    // Return the first KeyString in the set.
-    return std::move(*keySet.extract_sequence().begin());
+std::pair<TypeTags, Value> makeCopyRecordId(const RecordId& rid) {
+    auto copy = bitcastFrom<RecordId*>(new RecordId(rid));
+    return {TypeTags::RecordId, copy};
 }
 
-BtreeKeyGenerator SortSpec::initKeyGen() const {
-    tassert(
-        5037003, "SortSpec should not be passed an empty sort pattern", !_sortPattern.isEmpty());
-
-    std::vector<const char*> fields;
-    std::vector<BSONElement> fixed;
-    for (auto&& elem : _sortPattern) {
-        fields.push_back(elem.fieldName());
-
-        // BtreeKeyGenerator's constructor's first parameter (the 'fields' vector) and second
-        // parameter (the 'fixed' vector) are parallel vectors. The 'fixed' vector allows the
-        // caller to specify if the any sort keys have already been determined for one or more
-        // of the field paths from the 'fields' vector. In this case, we haven't determined what
-        // the sort keys are for any of the fields paths, so we populate the 'fixed' vector with
-        // EOO values to indicate this.
-        fixed.emplace_back();
-    }
-
-    const bool isSparse = false;
-    auto version = KeyString::Version::kLatestVersion;
-    auto ordering = Ordering::make(_sortPattern);
-
-    return {std::move(fields), std::move(fixed), isSparse, _collator, version, ordering};
+std::pair<TypeTags, Value> makeCopyIndexBounds(const IndexBounds& bounds) {
+    auto boundsCopy = bitcastFrom<IndexBounds*>(new IndexBounds(bounds));
+    return {TypeTags::indexBounds, boundsCopy};
 }
 
-size_t SortSpec::getApproximateSize() const {
-    // _collator points to a block of memory that SortSpec doesn't own, so we don't acccount
-    // for the size of this block of memory here.
-    auto size = sizeof(SortSpec);
-    size += _sortPattern.isOwned() ? _sortPattern.objsize() : 0;
-    size += _keyGen.getApproximateSize() - sizeof(_keyGen);
-    return size;
-}
-
-std::pair<TypeTags, Value> makeCopyJsFunction(const JsFunction& jsFunction) {
-    auto ownedJsFunction = bitcastFrom<JsFunction*>(new JsFunction(jsFunction));
-    return {TypeTags::jsFunction, ownedJsFunction};
-}
-
-std::pair<TypeTags, Value> makeCopyShardFilterer(const ShardFilterer& filterer) {
-    auto filtererCopy = bitcastFrom<ShardFilterer*>(filterer.clone().release());
-    return {TypeTags::shardFilterer, filtererCopy};
-}
-
-std::pair<TypeTags, Value> makeCopyFtsMatcher(const fts::FTSMatcher& matcher) {
-    auto copy = bitcastFrom<fts::FTSMatcher*>(new fts::FTSMatcher(matcher.query(), matcher.spec()));
-    return {TypeTags::ftsMatcher, copy};
-}
-
-std::pair<TypeTags, Value> makeCopySortSpec(const SortSpec& ss) {
-    auto ssCopy = bitcastFrom<SortSpec*>(new SortSpec(ss));
-    return {TypeTags::sortSpec, ssCopy};
-}
-
-void releaseValue(TypeTags tag, Value val) noexcept {
+void releaseValueDeep(TypeTags tag, Value val) noexcept {
     switch (tag) {
+        case TypeTags::RecordId:
+            delete getRecordIdView(val);
+            break;
         case TypeTags::NumberDecimal:
             delete[] getRawPointerView(val);
             break;
@@ -254,8 +222,14 @@ void releaseValue(TypeTags tag, Value val) noexcept {
         case TypeTags::ArraySet:
             delete getArraySetView(val);
             break;
+        case TypeTags::ArrayMultiSet:
+            delete getArrayMultiSetView(val);
+            break;
         case TypeTags::Object:
             delete getObjectView(val);
+            break;
+        case TypeTags::MultiMap:
+            delete getMultiMapView(val);
             break;
         case TypeTags::ObjectId:
             delete getObjectIdView(val);
@@ -274,556 +248,134 @@ void releaseValue(TypeTags tag, Value val) noexcept {
         case TypeTags::bsonObject:
             UniqueBuffer::reclaim(getRawPointerView(val));
             break;
-        case TypeTags::ksValue:
-            delete getKeyStringView(val);
-            break;
-        case TypeTags::pcreRegex:
-            delete getPcreRegexView(val);
-            break;
-        case TypeTags::jsFunction:
-            delete getJsFunctionView(val);
-            break;
-        case TypeTags::shardFilterer:
-            delete getShardFiltererView(val);
-            break;
-        case TypeTags::ftsMatcher:
-            delete getFtsMatcherView(val);
-            break;
-        case TypeTags::sortSpec:
-            delete getSortSpecView(val);
-            break;
-        default:
-            break;
-    }
-}
-
-template <typename T>
-void writeTagToStream(T& stream, const TypeTags tag) {
-    switch (tag) {
-        case TypeTags::Nothing:
-            stream << "Nothing";
-            break;
-        case TypeTags::NumberInt32:
-            stream << "NumberInt32";
-            break;
-        case TypeTags::NumberInt64:
-            stream << "NumberInt64";
-            break;
-        case TypeTags::NumberDouble:
-            stream << "NumberDouble";
-            break;
-        case TypeTags::NumberDecimal:
-            stream << "NumberDecimal";
-            break;
-        case TypeTags::Date:
-            stream << "Date";
-            break;
-        case TypeTags::Timestamp:
-            stream << "Timestamp";
-            break;
-        case TypeTags::Boolean:
-            stream << "Boolean";
-            break;
-        case TypeTags::Null:
-            stream << "Null";
-            break;
-        case TypeTags::StringSmall:
-            stream << "StringSmall";
-            break;
-        case TypeTags::StringBig:
-            stream << "StringBig";
-            break;
-        case TypeTags::Array:
-            stream << "Array";
-            break;
-        case TypeTags::ArraySet:
-            stream << "ArraySet";
-            break;
-        case TypeTags::Object:
-            stream << "Object";
-            break;
-        case TypeTags::ObjectId:
-            stream << "ObjectId";
-            break;
-        case TypeTags::MinKey:
-            stream << "MinKey";
-            break;
-        case TypeTags::MaxKey:
-            stream << "MaxKey";
-            break;
-        case TypeTags::bsonObject:
-            stream << "bsonObject";
-            break;
-        case TypeTags::bsonArray:
-            stream << "bsonArray";
-            break;
-        case TypeTags::bsonString:
-            stream << "bsonString";
-            break;
-        case TypeTags::bsonSymbol:
-            stream << "bsonSymbol";
-            break;
-        case TypeTags::bsonObjectId:
-            stream << "bsonObjectId";
-            break;
-        case TypeTags::bsonBinData:
-            stream << "bsonBinData";
-            break;
-        case TypeTags::LocalLambda:
-            stream << "LocalLambda";
-            break;
-        case TypeTags::bsonUndefined:
-            stream << "bsonUndefined";
-            break;
-        case TypeTags::ksValue:
-            stream << "KeyString";
-            break;
-        case TypeTags::pcreRegex:
-            stream << "pcreRegex";
-            break;
-        case TypeTags::timeZoneDB:
-            stream << "timeZoneDB";
-            break;
-        case TypeTags::RecordId:
-            stream << "RecordId";
-            break;
-        case TypeTags::jsFunction:
-            stream << "jsFunction";
-            break;
-        case TypeTags::shardFilterer:
-            stream << "shardFilterer";
+        case TypeTags::keyString:
+            delete getKeyString(val);
             break;
         case TypeTags::collator:
-            stream << "collator";
+            delete getCollatorView(val);
             break;
-        case TypeTags::bsonRegex:
-            stream << "bsonRegex";
+        case TypeTags::timeZone:
+            delete getTimeZoneView(val);
             break;
-        case TypeTags::bsonJavascript:
-            stream << "bsonJavascript";
+        case TypeTags::valueBlock:
+            delete getValueBlock(val);
             break;
-        case TypeTags::bsonDBPointer:
-            stream << "bsonDBPointer";
+        case TypeTags::cellBlock:
+            delete getCellBlock(val);
             break;
-        case TypeTags::bsonCodeWScope:
-            stream << "bsonCodeWScope";
-            break;
-        case TypeTags::ftsMatcher:
-            stream << "ftsMatcher";
-            break;
-        case TypeTags::sortSpec:
-            stream << "sortSpec";
-            break;
-        default:
-            stream << "unknown tag";
-            break;
-    }
-}
-
-namespace {
-template <typename T>
-void writeStringDataToStream(T& stream, StringData sd, bool isJavaScript = false) {
-    if (!isJavaScript) {
-        stream << '"';
-    }
-    if (sd.size() <= kStringMaxDisplayLength) {
-        stream << sd;
-        if (!isJavaScript) {
-            stream << '"';
-        }
-    } else {
-        stream << sd.substr(0, kStringMaxDisplayLength);
-        if (!isJavaScript) {
-            stream << "\"...";
-        } else {
-            stream << "...";
-        }
-    }
-}
-
-template <typename T>
-void writeArrayToStream(T& stream, TypeTags tag, Value val, size_t depth = 1) {
-    stream << '[';
-    auto shouldTruncate = true;
-    size_t iter = 0;
-    if (auto ae = ArrayEnumerator{tag, val}; !ae.atEnd()) {
-        while (iter < kArrayObjectOrNestingMaxDepth && depth < kArrayObjectOrNestingMaxDepth) {
-            auto [aeTag, aeVal] = ae.getViewOfValue();
-            if (aeTag == TypeTags::Array || aeTag == TypeTags::Object) {
-                ++depth;
-            }
-            writeValueToStream(stream, aeTag, aeVal, depth);
-            ae.advance();
-            if (ae.atEnd()) {
-                shouldTruncate = false;
-                break;
-            }
-            stream << ", ";
-            ++iter;
-        }
-        if (shouldTruncate || depth > kArrayObjectOrNestingMaxDepth) {
-            stream << "...";
-        }
-    }
-    stream << ']';
-}
-
-template <typename T>
-void writeObjectToStream(T& stream, TypeTags tag, Value val, size_t depth = 1) {
-    stream << '{';
-    auto shouldTruncate = true;
-    size_t iter = 0;
-    if (auto oe = ObjectEnumerator{tag, val}; !oe.atEnd()) {
-        while (iter < kArrayObjectOrNestingMaxDepth && depth < kArrayObjectOrNestingMaxDepth) {
-            stream << "\"" << oe.getFieldName() << "\" : ";
-            auto [oeTag, oeVal] = oe.getViewOfValue();
-            if (oeTag == TypeTags::Array || oeTag == TypeTags::Object) {
-                ++depth;
-            }
-            writeValueToStream(stream, oeTag, oeVal, depth);
-
-            oe.advance();
-            if (oe.atEnd()) {
-                shouldTruncate = false;
-                break;
-            }
-
-            stream << ", ";
-            ++iter;
-        }
-        if (shouldTruncate || depth > kArrayObjectOrNestingMaxDepth) {
-            stream << "...";
-        }
-    }
-    stream << '}';
-}
-
-template <typename T>
-void writeObjectToStream(T& stream, const BSONObj& obj) {
-    writeObjectToStream(stream, TypeTags::bsonObject, bitcastFrom<const char*>(obj.objdata()));
-}
-
-template <typename T>
-void writeObjectIdToStream(T& stream, TypeTags tag, Value val) {
-    auto objId =
-        tag == TypeTags::ObjectId ? getObjectIdView(val)->data() : bitcastTo<uint8_t*>(val);
-
-    stream << (tag == TypeTags::ObjectId ? "ObjectId(\"" : "bsonObjectId(\"")
-           << OID::from(objId).toString() << "\")";
-}
-
-template <typename T>
-void writeCollatorToStream(T& stream, const CollatorInterface* collator) {
-    if (collator) {
-        stream << "Collator(";
-        writeObjectToStream(stream, collator->getSpec().toBSON());
-        stream << ')';
-    } else {
-        stream << "null";
-    }
-}
-
-template <typename T>
-void writeBsonRegexToStream(T& stream, const BsonRegex& regex) {
-    stream << '/';
-    if (regex.pattern.size() <= kStringMaxDisplayLength) {
-        stream << regex.pattern;
-    } else {
-        stream << regex.pattern.substr(0, kStringMaxDisplayLength) << " ... ";
-    }
-    stream << '/' << regex.flags;
-}
-
-}  // namespace
-
-template <typename T>
-void writeValueToStream(T& stream, TypeTags tag, Value val, size_t depth = 1) {
-    switch (tag) {
-        case TypeTags::NumberInt32:
-            stream << bitcastTo<int32_t>(val);
-            break;
-        case TypeTags::NumberInt64:
-            stream << bitcastTo<int64_t>(val);
-            break;
-        case TypeTags::NumberDouble:
-            stream << bitcastTo<double>(val);
-            break;
-        case TypeTags::NumberDecimal:
-            stream << bitcastTo<Decimal128>(val).toString();
-            break;
-        case TypeTags::Date:
-            stream << bitcastTo<int64_t>(val);
-            break;
-        case TypeTags::Boolean:
-            stream << (bitcastTo<bool>(val) ? "true" : "false");
-            break;
-        case TypeTags::Null:
-            stream << "null";
-            break;
-        case TypeTags::StringSmall:
-        case TypeTags::StringBig:
-        case TypeTags::bsonString:
-            writeStringDataToStream(stream, getStringOrSymbolView(tag, val));
-            break;
-        case TypeTags::bsonSymbol:
-            stream << "Symbol(";
-            writeStringDataToStream(stream, getStringOrSymbolView(tag, val));
-            stream << ')';
-            break;
-        case TypeTags::Array:
-        case TypeTags::ArraySet:
-        case TypeTags::bsonArray:
-            writeArrayToStream(stream, tag, val, depth);
-            break;
-        case TypeTags::Object:
-        case TypeTags::bsonObject:
-            writeObjectToStream(stream, tag, val, depth);
-            break;
-        case TypeTags::ObjectId:
-        case TypeTags::bsonObjectId:
-            writeObjectIdToStream(stream, tag, val);
-            break;
-        case TypeTags::Nothing:
-            stream << "Nothing";
-            break;
-        case TypeTags::MinKey:
-            stream << "minKey";
-            break;
-        case TypeTags::MaxKey:
-            stream << "maxKey";
-            break;
-        case TypeTags::bsonBinData: {
-            auto data =
-                reinterpret_cast<const char*>(getBSONBinDataCompat(TypeTags::bsonBinData, val));
-            auto len = getBSONBinDataSizeCompat(TypeTags::bsonBinData, val);
-            auto type = getBSONBinDataSubtype(TypeTags::bsonBinData, val);
-
-            // If the BinData is a correctly sized newUUID, display it as such.
-            if (type == newUUID && len == kNewUUIDLength) {
-                using namespace fmt::literals;
-                StringData sd(data, len);
-                // 4 Octets - 2 Octets - 2 Octets - 2 Octets - 6 Octets
-                stream << "UUID(\"{}-{}-{}-{}-{}\")"_format(hexblob::encodeLower(sd.substr(0, 4)),
-                                                            hexblob::encodeLower(sd.substr(4, 2)),
-                                                            hexblob::encodeLower(sd.substr(6, 2)),
-                                                            hexblob::encodeLower(sd.substr(8, 2)),
-                                                            hexblob::encodeLower(sd.substr(10, 6)));
-                break;
-            }
-
-            stream << "BinData(" << type << ", "
-                   << hexblob::encode(data, std::min(len, kBinDataMaxDisplayLength))
-                   << (len > kBinDataMaxDisplayLength ? "...)" : ")");
-            break;
-        }
-        case TypeTags::bsonUndefined:
-            stream << "undefined";
-            break;
-        case TypeTags::LocalLambda:
-            stream << "LocalLambda";
-            break;
-        case TypeTags::ksValue: {
-            auto ks = getKeyStringView(val);
-            stream << "KS(" << ks->toString() << ")";
-            break;
-        }
-        case TypeTags::Timestamp: {
-            Timestamp ts{bitcastTo<uint64_t>(val)};
-            stream << ts.toString();
-            break;
-        }
-        case TypeTags::pcreRegex: {
-            auto regex = getPcreRegexView(val);
-            stream << "PcreRegex(/" << regex->pattern() << "/" << regex->options() << ")";
-            break;
-        }
-        case TypeTags::timeZoneDB: {
-            auto tzdb = getTimeZoneDBView(val);
-            auto timeZones = tzdb->getTimeZoneStrings();
-            stream << "TimeZoneDatabase(" << timeZones.front() << "..." << timeZones.back() + ")";
-            break;
-        }
-        case TypeTags::RecordId:
-            stream << "RecordId(" << bitcastTo<int64_t>(val) << ")";
-            break;
+        case TypeTags::pcreRegex:
         case TypeTags::jsFunction:
-            // TODO: Also include code.
-            stream << "jsFunction";
-            break;
         case TypeTags::shardFilterer:
-            stream << "ShardFilterer";
-            break;
-        case TypeTags::collator:
-            writeCollatorToStream(stream, getCollatorView(val));
-            break;
-        case TypeTags::bsonRegex: {
-            writeBsonRegexToStream(stream, getBsonRegexView(val));
-            break;
-        }
-        case TypeTags::bsonJavascript:
-            stream << "Javascript(";
-            writeStringDataToStream(stream, getStringView(TypeTags::StringBig, val), true);
-            stream << ")";
-            break;
-        case TypeTags::bsonDBPointer: {
-            const auto dbptr = getBsonDBPointerView(val);
-            stream << "DBPointer(";
-            writeStringDataToStream(stream, dbptr.ns);
-            stream << ", ";
-            writeObjectIdToStream(
-                stream, TypeTags::bsonObjectId, bitcastFrom<const uint8_t*>(dbptr.id));
-            stream << ')';
-            break;
-        }
-        case TypeTags::bsonCodeWScope: {
-            const auto cws = getBsonCodeWScopeView(val);
-            stream << "CodeWScope(" << cws.code << ", ";
-            writeObjectToStream(stream, TypeTags::bsonObject, bitcastFrom<const char*>(cws.scope));
-            stream << ')';
-            break;
-        }
-        case value::TypeTags::ftsMatcher: {
-            auto ftsMatcher = getFtsMatcherView(val);
-            stream << "FtsMatcher(";
-            writeObjectToStream(stream, ftsMatcher->query().toBSON());
-            stream << ')';
-            break;
-        }
+        case TypeTags::ftsMatcher:
         case TypeTags::sortSpec:
-            stream << "SortSpec(";
-            writeObjectToStream(stream, getSortSpecView(val)->getPattern());
-            stream << ", ";
-            writeCollatorToStream(stream, getSortSpecView(val)->getCollator());
-            stream << ')';
+        case TypeTags::makeObjSpec:
+        case TypeTags::indexBounds:
+        case TypeTags::inList:
+            getExtendedTypeOps(tag)->release(val);
             break;
         default:
-            MONGO_UNREACHABLE;
+            break;
     }
 }
 
 std::ostream& operator<<(std::ostream& os, const TypeTags tag) {
-    writeTagToStream(os, tag);
+    ValuePrinters::make(os, PrintOptions()).writeTagToStream(tag);
     return os;
 }
 
 str::stream& operator<<(str::stream& str, const TypeTags tag) {
-    writeTagToStream(str, tag);
+    ValuePrinters::make(str, PrintOptions()).writeTagToStream(tag);
     return str;
 }
 
 std::ostream& operator<<(std::ostream& os, const std::pair<TypeTags, Value>& value) {
-    writeValueToStream(os, value.first, value.second);
+    ValuePrinters::make(os, PrintOptions()).writeValueToStream(value.first, value.second);
     return os;
 }
 
 str::stream& operator<<(str::stream& str, const std::pair<TypeTags, Value>& value) {
-    writeValueToStream(str, value.first, value.second);
+    ValuePrinters::make(str, PrintOptions()).writeValueToStream(value.first, value.second);
     return str;
+}
+
+std::string print(const std::pair<TypeTags, Value>& value) {
+    str::stream stream = str::stream();
+    stream << value;
+    return stream;
+}
+
+std::string printTagAndVal(const TypeTags tag, const Value value) {
+    return printTagAndVal(std::pair<TypeTags, Value>{tag, value});
+}
+
+std::string printTagAndVal(const std::pair<TypeTags, Value>& value) {
+    str::stream stream = str::stream();
+    stream << "tag: " << value.first << ", val: " << value;
+    return stream;
 }
 
 BSONType tagToType(TypeTags tag) noexcept {
     switch (tag) {
         case TypeTags::Nothing:
-            return BSONType::EOO;
+            return BSONType::eoo;
         case TypeTags::NumberInt32:
-            return BSONType::NumberInt;
-        case TypeTags::RecordId:
+            return BSONType::numberInt;
         case TypeTags::NumberInt64:
-            return BSONType::NumberLong;
+            return BSONType::numberLong;
         case TypeTags::NumberDouble:
-            return BSONType::NumberDouble;
+            return BSONType::numberDouble;
         case TypeTags::NumberDecimal:
-            return BSONType::NumberDecimal;
+            return BSONType::numberDecimal;
         case TypeTags::Date:
-            return BSONType::Date;
+            return BSONType::date;
         case TypeTags::Timestamp:
-            return BSONType::bsonTimestamp;
+            return BSONType::timestamp;
         case TypeTags::Boolean:
-            return BSONType::Bool;
+            return BSONType::boolean;
         case TypeTags::Null:
-            return BSONType::jstNULL;
+            return BSONType::null;
         case TypeTags::StringSmall:
-            return BSONType::String;
+            return BSONType::string;
         case TypeTags::StringBig:
-            return BSONType::String;
+            return BSONType::string;
         case TypeTags::Array:
-            return BSONType::Array;
+            return BSONType::array;
         case TypeTags::ArraySet:
-            return BSONType::Array;
+            return BSONType::array;
+        case TypeTags::ArrayMultiSet:
+            return BSONType::array;
         case TypeTags::Object:
-            return BSONType::Object;
+            return BSONType::object;
         case TypeTags::ObjectId:
-            return BSONType::jstOID;
+            return BSONType::oid;
         case TypeTags::MinKey:
-            return BSONType::MinKey;
+            return BSONType::minKey;
         case TypeTags::MaxKey:
-            return BSONType::MaxKey;
+            return BSONType::maxKey;
         case TypeTags::bsonObject:
-            return BSONType::Object;
+            return BSONType::object;
         case TypeTags::bsonArray:
-            return BSONType::Array;
+            return BSONType::array;
         case TypeTags::bsonString:
-            return BSONType::String;
+            return BSONType::string;
         case TypeTags::bsonSymbol:
-            return BSONType::Symbol;
+            return BSONType::symbol;
         case TypeTags::bsonObjectId:
-            return BSONType::jstOID;
+            return BSONType::oid;
         case TypeTags::bsonBinData:
-            return BSONType::BinData;
+            return BSONType::binData;
         case TypeTags::bsonUndefined:
-            return BSONType::Undefined;
-        case TypeTags::ksValue:
-            // This is completely arbitrary.
-            return BSONType::EOO;
+            return BSONType::undefined;
         case TypeTags::bsonRegex:
-            return BSONType::RegEx;
+            return BSONType::regEx;
         case TypeTags::bsonJavascript:
-            return BSONType::Code;
+            return BSONType::code;
         case TypeTags::bsonDBPointer:
-            return BSONType::DBRef;
+            return BSONType::dbRef;
         case TypeTags::bsonCodeWScope:
-            return BSONType::CodeWScope;
+            return BSONType::codeWScope;
         default:
-            MONGO_UNREACHABLE;
-    }
-}
-
-bool isShallowType(TypeTags tag) noexcept {
-    switch (tag) {
-        case TypeTags::Nothing:
-        case TypeTags::Null:
-        case TypeTags::NumberInt32:
-        case TypeTags::NumberInt64:
-        case TypeTags::NumberDouble:
-        case TypeTags::Date:
-        case TypeTags::Timestamp:
-        case TypeTags::Boolean:
-        case TypeTags::StringSmall:
-        case TypeTags::RecordId:
-        case TypeTags::MinKey:
-        case TypeTags::MaxKey:
-        case TypeTags::bsonUndefined:
-        case TypeTags::LocalLambda:
-            return true;
-        case TypeTags::NumberDecimal:
-        case TypeTags::StringBig:
-        case TypeTags::bsonString:
-        case TypeTags::bsonSymbol:
-        case TypeTags::Array:
-        case TypeTags::ArraySet:
-        case TypeTags::Object:
-        case TypeTags::ObjectId:
-        case TypeTags::bsonObjectId:
-        case TypeTags::bsonObject:
-        case TypeTags::bsonArray:
-        case TypeTags::bsonBinData:
-        case TypeTags::ksValue:
-        case TypeTags::bsonRegex:
-        case TypeTags::bsonJavascript:
-        case TypeTags::bsonDBPointer:
-            return false;
-        default:
-            MONGO_UNREACHABLE;
+            return BSONType::eoo;
     }
 }
 
@@ -836,8 +388,9 @@ inline std::size_t hashObjectId(const uint8_t* objId) noexcept {
 std::size_t hashValue(TypeTags tag, Value val, const CollatorInterface* collator) noexcept {
     switch (tag) {
         case TypeTags::NumberInt32:
-            return abslHash(bitcastTo<int32_t>(val));
+            return abslHash(static_cast<int64_t>(bitcastTo<int32_t>(val)));
         case TypeTags::RecordId:
+            return getRecordIdView(val)->hash();
         case TypeTags::NumberInt64:
             return abslHash(bitcastTo<int64_t>(val));
         case TypeTags::NumberDouble: {
@@ -893,10 +446,9 @@ std::size_t hashValue(TypeTags tag, Value val, const CollatorInterface* collator
                 tag == TypeTags::ObjectId ? getObjectIdView(val)->data() : bitcastTo<uint8_t*>(val);
             return hashObjectId(objId);
         }
-        case TypeTags::ksValue:
-            return getKeyStringView(val)->hash();
+        case TypeTags::keyString:
+            return getKeyString(val)->hash();
         case TypeTags::Array:
-        case TypeTags::ArraySet:
         case TypeTags::bsonArray: {
             auto arr = ArrayEnumerator{tag, val};
             auto res = hashInit();
@@ -910,6 +462,21 @@ std::size_t hashValue(TypeTags tag, Value val, const CollatorInterface* collator
 
             return res;
         }
+        case TypeTags::ArraySet:
+        case TypeTags::ArrayMultiSet: {
+            size_t size = tag == TypeTags::ArraySet ? getArraySetView(val)->size()
+                                                    : getArrayMultiSetView(val)->size();
+            std::vector<size_t> valueHashes;
+            valueHashes.reserve(size);
+            for (ArrayEnumerator arr{tag, val}; !arr.atEnd(); arr.advance()) {
+                auto [elemTag, elemVal] = arr.getViewOfValue();
+                valueHashes.push_back(hashValue(elemTag, elemVal));
+            }
+            // TODO SERVER-92666 Implement a more efficient hashing algorithm
+            std::sort(valueHashes.begin(), valueHashes.end());
+            return std::accumulate(
+                valueHashes.begin(), valueHashes.end(), hashInit(), &hashCombine);
+        }
         case TypeTags::Object:
         case TypeTags::bsonObject: {
             auto obj = ObjectEnumerator{tag, val};
@@ -922,6 +489,16 @@ std::size_t hashValue(TypeTags tag, Value val, const CollatorInterface* collator
                 obj.advance();
             }
 
+            return res;
+        }
+        case TypeTags::MultiMap: {
+            auto multiMap = getMultiMapView(val);
+            auto res = hashInit();
+
+            for (const auto& [key, value] : multiMap->values()) {
+                res = hashCombine(res, hashValue(key.first, key.second, collator));
+                res = hashCombine(res, hashValue(value.first, value.second, collator));
+            }
             return res;
         }
         case TypeTags::bsonBinData: {
@@ -960,25 +537,16 @@ std::size_t hashValue(TypeTags tag, Value val, const CollatorInterface* collator
                 hashCombine(hashInit(), abslHash(cws.code)),
                 hashValue(TypeTags::bsonObject, bitcastFrom<const char*>(cws.scope)));
         }
+        case TypeTags::timeZone: {
+            auto timezone = getTimeZoneView(val);
+            return hashCombine(hashCombine(hashInit(), abslHash(timezone->getTzInfo())),
+                               abslHash(timezone->getUtcOffset().count()));
+        }
         default:
             break;
     }
 
     return 0;
-}
-
-/**
- * Performs a three-way comparison for any type that has < and == operators. Additionally,
- * guarantees that the result will be exactlty -1, 0, or 1, which is important, because not all
- * comparison functions make that guarantee.
- *
- * The StringData::compare(basic_string_view s) function, for example, only promises that it
- * will return a value less than 0 in the case that 'this' is less than 's,' whereas we want to
- * return exactly -1.
- */
-template <typename T>
-int32_t compareHelper(const T lhs, const T rhs) noexcept {
-    return lhs < rhs ? -1 : (lhs == rhs ? 0 : 1);
 }
 
 /*
@@ -988,7 +556,7 @@ std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
                                         Value lhsValue,
                                         TypeTags rhsTag,
                                         Value rhsValue,
-                                        const StringData::ComparatorInterface* comparator) {
+                                        const StringDataComparator* comparator) {
     if (isNumber(lhsTag) && isNumber(rhsTag)) {
         switch (getWidestNumericalType(lhsTag, rhsTag)) {
             case TypeTags::NumberInt32: {
@@ -1032,7 +600,7 @@ std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
                 return {TypeTags::NumberInt32, bitcastFrom<int32_t>(result)};
             }
             default:
-                MONGO_UNREACHABLE;
+                MONGO_UNREACHABLE_TASSERT(11122922);
         }
     } else if (isStringOrSymbol(lhsTag) && isStringOrSymbol(rhsTag)) {
         auto lhsStr = getStringOrSymbolView(lhsTag, lhsValue);
@@ -1059,16 +627,27 @@ std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
     } else if (lhsTag == TypeTags::bsonUndefined && rhsTag == TypeTags::bsonUndefined) {
         return {TypeTags::NumberInt32, bitcastFrom<int32_t>(0)};
     } else if (isArray(lhsTag) && isArray(rhsTag)) {
-        // ArraySets carry semantics of an unordered set, so we cannot define a deterministic
-        // less or greater operations on them, but only compare for equality. Comparing an
-        // ArraySet with a regular Array is equivalent of converting the ArraySet to an Array
-        // and them comparing the two Arrays, so we can simply use a generic algorithm below.
+        // ArraySets and ArrayMultiSet carry semantics of an unordered set, so we cannot define a
+        // deterministic less or greater operations on them, but only compare for equality.
+        // Comparing an ArraySet or ArrayMultiSet with a regular Array is equivalent of converting
+        // the ArraySet/ArrayMultiSet to an Array and them comparing the two Arrays, so we can
+        // simply use a generic algorithm below.
         if (lhsTag == TypeTags::ArraySet && rhsTag == TypeTags::ArraySet) {
             auto lhsArr = getArraySetView(lhsValue);
             auto rhsArr = getArraySetView(rhsValue);
             if (*lhsArr == *rhsArr) {
                 return {TypeTags::NumberInt32, bitcastFrom<int32_t>(0)};
             }
+            return {TypeTags::Nothing, 0};
+        }
+
+        if (lhsTag == TypeTags::ArrayMultiSet && rhsTag == TypeTags::ArrayMultiSet) {
+            auto lhsArr = getArrayMultiSetView(lhsValue);
+            auto rhsArr = getArrayMultiSetView(rhsValue);
+            if (*lhsArr == *rhsArr) {
+                return {TypeTags::NumberInt32, bitcastFrom<int32_t>(0)};
+            }
+            // If they are not equal then we cannot say if one is smaller than the other.
             return {TypeTags::Nothing, 0};
         }
 
@@ -1092,6 +671,14 @@ std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
         } else {
             return {TypeTags::NumberInt32, bitcastFrom<int32_t>(1)};
         }
+    } else if (lhsTag == TypeTags::MultiMap && rhsTag == TypeTags::MultiMap) {
+        auto lhsMap = getMultiMapView(lhsValue);
+        auto rhsMap = getMultiMapView(rhsValue);
+        if (*lhsMap == *rhsMap) {
+            return {TypeTags::NumberInt32, bitcastFrom<int32_t>(0)};
+        }
+        // If they are not equal then we cannot say if one is smaller than the other.
+        return {TypeTags::Nothing, 0};
     } else if (isObject(lhsTag) && isObject(rhsTag)) {
         auto lhsObj = ObjectEnumerator{lhsTag, lhsValue};
         auto rhsObj = ObjectEnumerator{rhsTag, rhsValue};
@@ -1147,15 +734,15 @@ std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
                              getRawPointerView(rhsValue) + sizeof(uint32_t),
                              lsz + 1);
         return {TypeTags::NumberInt32, bitcastFrom<int32_t>(compareHelper(result, 0))};
-    } else if (lhsTag == TypeTags::ksValue && rhsTag == TypeTags::ksValue) {
-        auto result = getKeyStringView(lhsValue)->compare(*getKeyStringView(rhsValue));
+    } else if (lhsTag == TypeTags::keyString && rhsTag == TypeTags::keyString) {
+        auto result = getKeyString(lhsValue)->compare(*getKeyString(rhsValue));
         return {TypeTags::NumberInt32, bitcastFrom<int32_t>(result)};
     } else if (lhsTag == TypeTags::Nothing && rhsTag == TypeTags::Nothing) {
         // Special case for Nothing in a hash table (group) and sort comparison.
         return {TypeTags::NumberInt32, bitcastFrom<int32_t>(0)};
     } else if (lhsTag == TypeTags::RecordId && rhsTag == TypeTags::RecordId) {
-        auto result = compareHelper(bitcastTo<int64_t>(lhsValue), bitcastTo<int64_t>(rhsValue));
-        return {TypeTags::NumberInt32, bitcastFrom<int32_t>(result)};
+        int32_t result = getRecordIdView(lhsValue)->compare(*getRecordIdView(rhsValue));
+        return {TypeTags::NumberInt32, bitcastFrom<int32_t>(compareHelper(result, 0))};
     } else if (lhsTag == TypeTags::bsonRegex && rhsTag == TypeTags::bsonRegex) {
         auto lhsRegex = getBsonRegexView(lhsValue);
         auto rhsRegex = getBsonRegexView(rhsValue);
@@ -1202,25 +789,28 @@ std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
                             bitcastFrom<const char*>(rhsCws.scope));
     } else {
         // Different types.
+        if (lhsTag == TypeTags::Nothing || rhsTag == TypeTags::Nothing) {
+            return {TypeTags::Nothing, 0};
+        }
         auto lhsType = tagToType(lhsTag);
         auto rhsType = tagToType(rhsTag);
         tassert(5365500, "values cannot have the same type", lhsType != rhsType);
         auto result = canonicalizeBSONType(lhsType) - canonicalizeBSONType(rhsType);
         return {TypeTags::NumberInt32, bitcastFrom<int32_t>(compareHelper(result, 0))};
     }
-}
+}  // compareValue
 
-bool isNaN(TypeTags tag, Value val) {
+bool isNaN(TypeTags tag, Value val) noexcept {
     return (tag == TypeTags::NumberDouble && std::isnan(bitcastTo<double>(val))) ||
         (tag == TypeTags::NumberDecimal && bitcastTo<Decimal128>(val).isNaN());
 }
 
-bool isInfinity(TypeTags tag, Value val) {
+bool isInfinity(TypeTags tag, Value val) noexcept {
     return (tag == TypeTags::NumberDouble && std::isinf(bitcastTo<double>(val))) ||
         (tag == TypeTags::NumberDecimal && bitcastTo<Decimal128>(val).isInfinite());
 }
 
-void ArraySet::push_back(TypeTags tag, Value val) {
+bool ArraySet::push_back(TypeTags tag, Value val) {
     if (tag != TypeTags::Nothing) {
         ValueGuard guard{tag, val};
         auto [it, inserted] = _values.insert({tag, val});
@@ -1228,17 +818,44 @@ void ArraySet::push_back(TypeTags tag, Value val) {
         if (inserted) {
             guard.reset();
         }
+
+        return inserted;
     }
+
+    return false;
+}
+
+bool ArraySet::push_back_clone(TypeTags tag, Value val) {
+    if (tag != TypeTags::Nothing) {
+        return _values.insert_lazy({tag, val}, [&]() { return value::copyValue(tag, val); }).second;
+    }
+
+    return false;
+}
+
+std::pair<TypeTags, Value> makeNewArraySet(TypeTags tag,
+                                           Value value,
+                                           const CollatorInterface* collator) {
+    auto [resTag, resVal] = makeNewArraySet(collator);
+    ValueGuard guard(resTag, resVal);
+    ArraySet* setValues = getArraySetView(resVal);
+    setValues->reserve(getArraySize(tag, value));
+    arrayForEach(tag, value, [&](TypeTags elemTag, Value elemVal) {
+        setValues->push_back_clone(elemTag, elemVal);
+    });
+    guard.reset();
+    return {resTag, reinterpret_cast<Value>(setValues)};
 }
 
 std::pair<TypeTags, Value> ArrayEnumerator::getViewOfValue() const {
     if (_array) {
         return _array->getAt(_index);
     } else if (_arraySet) {
-        return {_iter->first, _iter->second};
+        return {_arraySetIter->first, _arraySetIter->second};
+    } else if (_arrayMultiSet) {
+        return {_arrayMultiSetIter->first, _arrayMultiSetIter->second};
     } else {
-        auto sv = bson::fieldNameView(_arrayCurrent);
-        return bson::convertFrom<true>(_arrayCurrent, _arrayEnd, sv.size());
+        return bson::convertFrom<true>(_arrayCurrent, _arrayEnd, _fieldNameSize);
     }
 }
 
@@ -1250,18 +867,26 @@ bool ArrayEnumerator::advance() {
 
         return _index < _array->size();
     } else if (_arraySet) {
-        if (_iter != _arraySet->values().end()) {
-            ++_iter;
+        if (_arraySetIter != _arraySet->values().end()) {
+            ++_arraySetIter;
         }
 
-        return _iter != _arraySet->values().end();
+        return _arraySetIter != _arraySet->values().end();
+    } else if (_arrayMultiSet) {
+        if (_arrayMultiSetIter != _arrayMultiSet->values().end()) {
+            ++_arrayMultiSetIter;
+        }
+
+        return _arrayMultiSetIter != _arrayMultiSet->values().end();
     } else {
-        if (*_arrayCurrent != 0) {
-            auto sv = bson::fieldNameView(_arrayCurrent);
-            _arrayCurrent = bson::advance(_arrayCurrent, sv.size());
+        if (_arrayCurrent != _arrayEnd - 1) {
+            _arrayCurrent = bson::advance(_arrayCurrent, _fieldNameSize);
+            if (_arrayCurrent != _arrayEnd - 1) {
+                _fieldNameSize = TinyStrHelpers::strlen(bson::fieldNameRaw(_arrayCurrent));
+            }
         }
 
-        return *_arrayCurrent != 0;
+        return _arrayCurrent != _arrayEnd - 1;
     }
 }
 
@@ -1269,7 +894,7 @@ std::pair<TypeTags, Value> ObjectEnumerator::getViewOfValue() const {
     if (_object) {
         return _object->getAt(_index);
     } else {
-        auto sv = bson::fieldNameView(_objectCurrent);
+        auto sv = bson::fieldNameAndLength(_objectCurrent);
         return bson::convertFrom<true>(_objectCurrent, _objectEnd, sv.size());
     }
 }
@@ -1283,7 +908,7 @@ bool ObjectEnumerator::advance() {
         return _index < _object->size();
     } else {
         if (*_objectCurrent != 0) {
-            auto sv = bson::fieldNameView(_objectCurrent);
+            auto sv = bson::fieldNameAndLength(_objectCurrent);
             _objectCurrent = bson::advance(_objectCurrent, sv.size());
         }
 
@@ -1301,44 +926,52 @@ StringData ObjectEnumerator::getFieldName() const {
         }
     } else {
         if (*_objectCurrent != 0) {
-            return bson::fieldNameView(_objectCurrent);
+            return bson::fieldNameAndLength(_objectCurrent);
         } else {
             return ""_sd;
         }
     }
 }
 
-void readKeyStringValueIntoAccessors(const KeyString::Value& keyString,
+void readKeyStringValueIntoAccessors(const SortedDataKeyValueView& keyString,
                                      const Ordering& ordering,
                                      BufBuilder* valueBufferBuilder,
                                      std::vector<OwnedValueAccessor>* accessors,
                                      boost::optional<IndexKeysInclusionSet> indexKeysToInclude) {
-    ValueBuilder valBuilder(valueBufferBuilder);
-    invariant(!indexKeysToInclude || indexKeysToInclude->count() == accessors->size());
+    OwnedValueAccessorValueBuilder valBuilder(valueBufferBuilder);
+    tassert(11089607,
+            "Number of index keys doesn't match the number of accessors",
+            !indexKeysToInclude || indexKeysToInclude->count() == accessors->size());
 
-    BufReader reader(keyString.getBuffer(), keyString.getSize());
-    KeyString::TypeBits typeBits(keyString.getTypeBits());
-    KeyString::TypeBits::Reader typeBitsReader(typeBits);
+    auto ks = keyString.getKeyStringWithoutRecordIdView();
+    BufReader reader(ks.data(), ks.size());
+
+    auto typeBits = keyString.getTypeBitsView();
+    BufReader typeBitsBr(typeBits.data(), typeBits.size());
+    auto typeBitsReader =
+        key_string::TypeBits::getReaderFromBuffer(keyString.getVersion(), &typeBitsBr);
 
     bool keepReading = true;
     size_t componentIndex = 0;
     do {
         // In the edge case that 'componentIndex' indicates that we have already read
-        // 'kMaxCompoundIndexKeys' components, we expect that the next 'readSBEValue()' will
+        // 'kMaxCompoundIndexKeys' components, we expect that the next 'readValue()' will
         // return false (to indicate EOF), so the value of 'inverted' does not matter.
         bool inverted = (componentIndex < Ordering::kMaxCompoundIndexKeys)
             ? (ordering.get(componentIndex) == -1)
             : false;
 
-        keepReading = KeyString::readSBEValue(
-            &reader, &typeBitsReader, inverted, typeBits.version, &valBuilder);
+        keepReading = key_string::readValue(
+            &reader, &typeBitsReader, inverted, keyString.getVersion(), &valBuilder);
 
-        invariant(componentIndex < Ordering::kMaxCompoundIndexKeys || !keepReading);
+        tassert(11093607,
+                "Reached 'kMaxCompoundIndexKeys' components, but still reading index keys",
+                componentIndex < Ordering::kMaxCompoundIndexKeys || !keepReading);
 
         // If 'indexKeysToInclude' indicates that this index key component is not part of the
         // projection, remove it from the list of values that will be fed to the 'accessors'
         // list. Note that, even when we are excluding a key component, we can't skip the call
-        // to 'KeyString::readSBEValue()' because it is needed to advance the 'reader' and
+        // to 'key_string::readValue()' because it is needed to advance the 'reader' and
         // 'typeBitsReader' stream.
         if (indexKeysToInclude && (componentIndex < Ordering::kMaxCompoundIndexKeys) &&
             !(*indexKeysToInclude)[componentIndex]) {
@@ -1384,6 +1017,66 @@ bool operator==(const ArraySet& lhs, const ArraySet& rhs) {
 
 bool operator!=(const ArraySet& lhs, const ArraySet& rhs) {
     return !(lhs == rhs);
+}
+
+bool operator==(const MultiMap& lhs, const MultiMap& rhs) {
+    return lhs.values() == rhs.values();
+}
+
+bool operator!=(const MultiMap& lhs, const MultiMap& rhs) {
+    return !(lhs == rhs);
+}
+
+std::pair<TypeTags, Value> genericEq(TypeTags lhsTag,
+                                     Value lhsVal,
+                                     TypeTags rhsTag,
+                                     Value rhsVal,
+                                     const StringDataComparator* comparator) {
+    return genericCompare<std::equal_to<>>(lhsTag, lhsVal, rhsTag, rhsVal, comparator);
+}
+
+std::pair<TypeTags, Value> genericNeq(TypeTags lhsTag,
+                                      Value lhsVal,
+                                      TypeTags rhsTag,
+                                      Value rhsVal,
+                                      const StringDataComparator* comparator) {
+    auto [tag, val] = genericEq(lhsTag, lhsVal, rhsTag, rhsVal, comparator);
+    // genericEq() will return either Boolean or Nothing. If it returns Boolean, negate
+    // 'val' before returning it.
+    val = tag == TypeTags::Boolean ? bitcastFrom<bool>(!bitcastTo<bool>(val)) : val;
+    return {tag, val};
+}
+
+std::pair<TypeTags, Value> genericLt(TypeTags lhsTag,
+                                     Value lhsVal,
+                                     TypeTags rhsTag,
+                                     Value rhsVal,
+                                     const StringDataComparator* comparator) {
+    return genericCompare<std::less<>>(lhsTag, lhsVal, rhsTag, rhsVal, comparator);
+}
+
+std::pair<TypeTags, Value> genericLte(TypeTags lhsTag,
+                                      Value lhsVal,
+                                      TypeTags rhsTag,
+                                      Value rhsVal,
+                                      const StringDataComparator* comparator) {
+    return genericCompare<std::less_equal<>>(lhsTag, lhsVal, rhsTag, rhsVal, comparator);
+}
+
+std::pair<TypeTags, Value> genericGt(TypeTags lhsTag,
+                                     Value lhsVal,
+                                     TypeTags rhsTag,
+                                     Value rhsVal,
+                                     const StringDataComparator* comparator) {
+    return genericCompare<std::greater<>>(lhsTag, lhsVal, rhsTag, rhsVal, comparator);
+}
+
+std::pair<TypeTags, Value> genericGte(TypeTags lhsTag,
+                                      Value lhsVal,
+                                      TypeTags rhsTag,
+                                      Value rhsVal,
+                                      const StringDataComparator* comparator) {
+    return genericCompare<std::greater_equal<>>(lhsTag, lhsVal, rhsTag, rhsVal, comparator);
 }
 }  // namespace value
 }  // namespace sbe

@@ -27,38 +27,80 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
 #include "mongo/util/options_parser/options_parser.h"
 
 #include <algorithm>
-#include <boost/filesystem.hpp>
-#include <boost/iostreams/device/file_descriptor.hpp>
-#include <boost/iostreams/stream.hpp>
-#include <boost/iostreams/stream_buffer.hpp>
-#include <boost/program_options.hpp>
 #include <cerrno>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <exception>
+#include <fstream>  // IWYU pragma: keep
+#include <iterator>
+#include <map>
+#include <memory>
+#include <stdexcept>
+#include <type_traits>
+#include <utility>
+
 #include <fcntl.h>
-#include <fstream>
-#include <stdio.h>
+
+#include <boost/any.hpp>
+#include <boost/any/bad_any_cast.hpp>
+#include <boost/core/typeinfo.hpp>
+#include <boost/filesystem.hpp>
+#include <boost/iostreams/categories.hpp>
+#include <boost/iostreams/device/file_descriptor.hpp>
+#include <boost/iostreams/imbue.hpp>
+#include <boost/iostreams/stream_buffer.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/program_options/cmdline.hpp>
+#include <boost/program_options/errors.hpp>
+#include <boost/program_options/options_description.hpp>
+#include <boost/program_options/parsers.hpp>
+#include <boost/program_options/positional_options.hpp>
+#include <boost/program_options/variables_map.hpp>
+#include <boost/type_index.hpp>
+#include <boost/type_index/type_index_facade.hpp>
+#include <fmt/format.h>
 #include <sys/stat.h>
-#include <sys/types.h>
-#include <yaml-cpp/yaml.h>
+#include <yaml-cpp/exceptions.h>
+#include <yaml-cpp/node/detail/iterator.h>
+#include <yaml-cpp/node/detail/iterator_fwd.h>
+#include <yaml-cpp/node/impl.h>
+#include <yaml-cpp/node/iterator.h>
+#include <yaml-cpp/node/node.h>
+#include <yaml-cpp/node/parse.h>
+#include <yaml-cpp/yaml.h>  // IWYU pragma: keep
+// IWYU pragma: no_include "boost/program_options/detail/parsers.hpp"
+// IWYU pragma: no_include "ext/alloc_traits.h"
+// IWYU pragma: no_include "boost/iostreams/detail/error.hpp"
+// IWYU pragma: no_include "boost/iostreams/detail/streambuf/indirect_streambuf.hpp"
 
 #ifdef _WIN32
 #include <io.h>
 #endif
 
-#include "mongo/base/init.h"
+#include "mongo/base/data_builder.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
 #include "mongo/base/parse_number.h"
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/crypto/hash_block.h"
 #include "mongo/crypto/sha256_block.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
+#include "mongo/util/errno_util.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/http_client.h"
@@ -66,10 +108,17 @@
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_description.h"
 #include "mongo/util/options_parser/option_section.h"
-#include "mongo/util/scopeguard.h"
+#include "mongo/util/options_parser/value.h"
 #include "mongo/util/shell_exec.h"
 #include "mongo/util/str.h"
-#include "mongo/util/text.h"
+#include "mongo/util/text.h"  // IWYU pragma: keep
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
+
 
 namespace mongo {
 namespace optionenvironment {
@@ -284,7 +333,7 @@ class ConfigExpandNode {
 public:
     ConfigExpandNode(const YAML::Node& node,
                      const std::string& nodePath,
-                     const OptionsParser::ConfigExpand& configExpand) {
+                     const ConfigExpand& configExpand) {
         invariant(node.IsMap());
 
         auto nodeName = nodePath;
@@ -530,10 +579,10 @@ std::string runYAMLRestExpansion(StringData url, Seconds timeout) {
         ErrorCodes::OperationFailed, "No HTTP Client available in this build of MongoDB", client);
 
     // Expect https:// URLs unless we can be sure we're talking to localhost.
-    if (!url.startsWith("https://")) {
+    if (!url.starts_with("https://")) {
         uassert(ErrorCodes::BadValue,
                 "__rest configuration expansion only supports http/https",
-                url.startsWith("http://"));
+                url.starts_with("http://"));
         const auto start = strlen("http://");
         auto end = url.find('/', start);
         if (end == std::string::npos) {
@@ -567,7 +616,7 @@ std::string runYAMLRestExpansion(StringData url, Seconds timeout) {
  */
 StatusWith<YAML::Node> runYAMLExpansion(const YAML::Node& node,
                                         const std::string& nodePath,
-                                        const OptionsParser::ConfigExpand& configExpand) try {
+                                        const ConfigExpand& configExpand) try {
     invariant(node.IsMap());
     ConfigExpandNode expansion(node, nodePath, configExpand);
 
@@ -580,14 +629,12 @@ StatusWith<YAML::Node> runYAMLExpansion(const YAML::Node& node,
     }
 
     LOGV2(23318,
-          "Processing {expansion} config expansion for: {node}",
           "Processing config expansion",
           "expansion"_attr = expansion.getExpansionName(),
           "node"_attr = nodeName);
     const auto action = expansion.getAction();
     LOGV2_DEBUG(23319,
                 2,
-                "{prefix}{expansion}: {action}",
                 "Performing expansion action",
                 "prefix"_attr = prefix,
                 "expansion"_attr = expansion.getExpansionName(),
@@ -621,7 +668,7 @@ Status YAMLNodeToValue(const YAML::Node& YAMLNode,
                        const Key& key,
                        OptionDescription const** option,
                        Value* value,
-                       const OptionsParser::ConfigExpand& configExpand) {
+                       const ConfigExpand& configExpand) {
     bool isRegistered = false;
 
     // The logic below should ensure that we don't use this uninitialized, but we need to
@@ -654,8 +701,6 @@ Status YAMLNodeToValue(const YAML::Node& YAMLNode,
             *option = &*iterator;
             if (isDeprecated) {
                 LOGV2_WARNING(23320,
-                              "Option: Given key {deprecatedKey} is deprecated. "
-                              "Please use preferred key {preferredKey} instead.",
                               "Option: Given key is deprecated. Please use preferred key instead.",
                               "deprecatedKey"_attr = key,
                               "preferredKey"_attr = iterator->_dottedName);
@@ -734,7 +779,7 @@ Status YAMLNodeToValue(const YAML::Node& YAMLNode,
                 auto swExpansion = runYAMLExpansion(
                     elementVal, str::stream() << key << "." << elementKey, configExpand);
                 if (swExpansion.isOK()) {
-                    const auto status = addPair(elementKey, swExpansion.getValue());
+                    auto status = addPair(elementKey, swExpansion.getValue());
                     if (!status.isOK()) {
                         return status;
                     }
@@ -744,7 +789,7 @@ Status YAMLNodeToValue(const YAML::Node& YAMLNode,
                 }  // else not an expansion block.
             }
 
-            const auto status = addPair(std::move(elementKey), elementVal);
+            auto status = addPair(std::move(elementKey), elementVal);
             if (!status.isOK()) {
                 return status;
             }
@@ -795,12 +840,10 @@ Status checkLongName(const po::variables_map& vm,
 
     if (vm.count(long_name)) {
         if (!vm[long_name].defaulted() && singleName != option._singleName) {
-            LOGV2_WARNING(
-                23321,
-                "Option: {deprecatedName} is deprecated. Please use {preferredName} instead.",
-                "Option: This name is deprecated. Please use the preferred name instead.",
-                "deprecatedName"_attr = singleName,
-                "preferredName"_attr = option._singleName);
+            LOGV2_WARNING(23321,
+                          "Option: This name is deprecated. Please use the preferred name instead.",
+                          "deprecatedName"_attr = singleName,
+                          "preferredName"_attr = option._singleName);
         } else if (long_name == "sslMode") {
             LOGV2_WARNING(23322, "Option: sslMode is deprecated. Please use tlsMode instead.");
         }
@@ -830,8 +873,8 @@ Status checkLongName(const po::variables_map& vm,
                     sb << "Illegal option assignment: \"" << *keyValueVectorIt << "\"";
                     return Status(ErrorCodes::BadValue, sb.str());
                 }
-                std::string key = keySD.toString();
-                std::string value = valueSD.toString();
+                std::string key = std::string{keySD};
+                std::string value = std::string{valueSD};
                 // Make sure we aren't setting an option to two different values
                 if (mapValue.count(key) > 0 && mapValue[key] != value) {
                     StringBuilder sb;
@@ -905,7 +948,7 @@ Status addYAMLNodesToEnvironment(const YAML::Node& root,
                                  const OptionSection& options,
                                  const std::string parentPath,
                                  Environment* environment,
-                                 const OptionsParser::ConfigExpand& configExpand) {
+                                 const ConfigExpand& configExpand) {
     std::vector<OptionDescription> options_vector;
     Status ret = options.getAllOptions(&options_vector);
     if (!ret.isOK()) {
@@ -921,11 +964,8 @@ Status addYAMLNodesToEnvironment(const YAML::Node& root,
         auto swExpansion = runYAMLExpansion(root, parentPath, configExpand);
         if (swExpansion.isOK()) {
             // Expanded fine, but disallow recursion.
-            return addYAMLNodesToEnvironment(swExpansion.getValue(),
-                                             options,
-                                             parentPath,
-                                             environment,
-                                             OptionsParser::ConfigExpand());
+            return addYAMLNodesToEnvironment(
+                swExpansion.getValue(), options, parentPath, environment, ConfigExpand());
         } else if (swExpansion.getStatus().code() != ErrorCodes::NoSuchKey) {
             return swExpansion.getStatus();
         }  // else not an expansion block.
@@ -954,7 +994,7 @@ Status addYAMLNodesToEnvironment(const YAML::Node& root,
             // If this is not a special field name, and we are in a sub object, append our
             // current fieldName to the selector for the sub object we are traversing
             else {
-                dottedName = parentPath + '.' + fieldName;
+                dottedName = fmt::format("{}.{}", parentPath, fieldName);
             }
         }
 
@@ -965,7 +1005,7 @@ Status addYAMLNodesToEnvironment(const YAML::Node& root,
             auto swExpansion = runYAMLExpansion(YAMLNode, dottedName, expand);
             if (swExpansion.isOK()) {
                 YAMLNode = std::move(swExpansion.getValue());
-                expand = OptionsParser::ConfigExpand();
+                expand = ConfigExpand();
             } else if (swExpansion.getStatus().code() != ErrorCodes::NoSuchKey) {
                 return swExpansion.getStatus();
             }  // else not an expansion block.
@@ -1364,8 +1404,9 @@ Status checkFileOwnershipAndMode(int fd, mode_t prohibit, StringData modeDesc) {
     struct stat stats;
 
     if (::fstat(fd, &stats) == -1) {
-        const auto& ewd = errnoWithDescription();
-        return {ErrorCodes::InvalidPath, str::stream() << "Error reading file metadata: " << ewd};
+        auto ec = lastSystemError();
+        return {ErrorCodes::InvalidPath,
+                str::stream() << "Error reading file metadata: " << errorMessage(ec)};
     }
 
     if (stats.st_uid != ::getuid()) {
@@ -1407,15 +1448,19 @@ Status OptionsParser::addDefaultValues(const OptionSection& options, Environment
     return Status::OK();
 }
 
+Status OptionsParser::readConfigFile(const std::string& filename,
+                                     std::string* contents,
+                                     ConfigExpand configExpand) {
+    return readRawFile(filename, contents, configExpand);
+}
+
 /**
  * Reads the entire config file into the output string.  This was done this way because the JSON
  * parser only takes complete strings, and we were using that to parse the config file before.
  * We could redesign the parser to use some kind of streaming interface, but for now this is
  * simple and works for the current use case of config files which should be limited in size.
  */
-Status OptionsParser::readConfigFile(const std::string& filename,
-                                     std::string* contents,
-                                     ConfigExpand configExpand) {
+Status readRawFile(const std::string& filename, std::string* contents, ConfigExpand configExpand) {
     // check if it's a valid file
     const auto badFile = [&](StringData errMsg) -> Status {
         return {ErrorCodes::BadValue,
@@ -1437,8 +1482,9 @@ Status OptionsParser::readConfigFile(const std::string& filename,
 #endif
 
     if (fd < 0) {
-        const auto& ewd = errnoWithDescription();
-        return {ErrorCodes::InternalError, str::stream() << "Error opening config file: " << ewd};
+        auto ec = lastPosixError();
+        return {ErrorCodes::InternalError,
+                str::stream() << "Error opening config file: " << errorMessage(ec)};
     }
 
 #ifdef _WIN32
@@ -1679,8 +1725,8 @@ StatusWith<std::vector<std::string>> transformImplicitOptions(
 
 }  // namespace
 
-StatusWith<OptionsParser::ConfigExpand> parseConfigExpand(const Environment& cli) {
-    OptionsParser::ConfigExpand ret;
+StatusWith<ConfigExpand> parseConfigExpand(const Environment& cli) {
+    ConfigExpand ret;
 
     if (!cli.count("configExpand")) {
         return ret;

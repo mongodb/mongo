@@ -26,171 +26,19 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import time
-from helper import copy_wiredtiger_home
 import wiredtiger, wttest
+from rollback_to_stable_util import test_rollback_to_stable_base
 from wtdataset import SimpleDataSet
-from wiredtiger import stat, wiredtiger_strerror, WiredTigerError, WT_ROLLBACK
+from wiredtiger import stat
 from wtscenario import make_scenarios
-from time import sleep
 
 # test_rollback_to_stable01.py
-# Shared base class used by rollback to stable tests.
-#
-# Note: this class now expects self.value_format to have been set for some of the
-# operations (those that need to specialize themselves for FLCS).
-class test_rollback_to_stable_base(wttest.WiredTigerTestCase):
-    def retry_rollback(self, name, txn_session, code):
-        retry_limit = 100
-        retries = 0
-        completed = False
-        saved_exception = None
-        while not completed and retries < retry_limit:
-            if retries != 0:
-                self.pr("Retrying operation for " + name)
-                if txn_session:
-                    txn_session.rollback_transaction()
-                sleep(0.1)
-                if txn_session:
-                    txn_session.begin_transaction('isolation=snapshot')
-                    self.pr("Began new transaction for " + name)
-            try:
-                code()
-                completed = True
-            except WiredTigerError as e:
-                rollback_str = wiredtiger_strerror(WT_ROLLBACK)
-                if rollback_str not in str(e):
-                    raise(e)
-                retries += 1
-                saved_exception = e
-        if not completed and saved_exception:
-            raise(saved_exception)
-
-    def large_updates(self, uri, value, ds, nrows, prepare, commit_ts):
-        # Update a large number of records.
-        session = self.session
-        try:
-            cursor = session.open_cursor(uri)
-            for i in range(1, nrows + 1):
-                session.begin_transaction()
-                cursor[ds.key(i)] = value
-                if commit_ts == 0:
-                    session.commit_transaction()
-                elif prepare:
-                    session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(commit_ts-1))
-                    session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(commit_ts))
-                    session.timestamp_transaction('durable_timestamp=' + self.timestamp_str(commit_ts+1))
-                    session.commit_transaction()
-                else:
-                    session.commit_transaction('commit_timestamp=' + self.timestamp_str(commit_ts))
-            cursor.close()
-        except WiredTigerError as e:
-            rollback_str = wiredtiger_strerror(WT_ROLLBACK)
-            if rollback_str in str(e):
-                session.rollback_transaction()
-            raise(e)
-
-    def large_modifies(self, uri, value, ds, location, nbytes, nrows, prepare, commit_ts):
-        # Load a slight modification.
-        session = self.session
-        try:
-            cursor = session.open_cursor(uri)
-            session.begin_transaction()
-            for i in range(1, nrows + 1):
-                cursor.set_key(i)
-                # FLCS doesn't support modify (for obvious reasons) so just update.
-                # Use the first character of the passed-in value.
-                if self.value_format == '8t':
-                    cursor.set_value(bytes(value, encoding='utf-8')[0])
-                    self.assertEqual(cursor.update(), 0)
-                else:
-                    mods = [wiredtiger.Modify(value, location, nbytes)]
-                    self.assertEqual(cursor.modify(mods), 0)
-
-            if commit_ts == 0:
-                session.commit_transaction()
-            elif prepare:
-                session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(commit_ts-1))
-                session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(commit_ts))
-                session.timestamp_transaction('durable_timestamp=' + self.timestamp_str(commit_ts+1))
-                session.commit_transaction()
-            else:
-                session.commit_transaction('commit_timestamp=' + self.timestamp_str(commit_ts))
-            cursor.close()
-        except WiredTigerError as e:
-            rollback_str = wiredtiger_strerror(WT_ROLLBACK)
-            if rollback_str in str(e):
-                session.rollback_transaction()
-            raise(e)
-
-    def large_removes(self, uri, ds, nrows, prepare, commit_ts):
-        # Remove a large number of records.
-        session = self.session
-        try:
-            cursor = session.open_cursor(uri)
-            for i in range(1, nrows + 1):
-                session.begin_transaction()
-                cursor.set_key(i)
-                cursor.remove()
-                if commit_ts == 0:
-                    session.commit_transaction()
-                elif prepare:
-                    session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(commit_ts-1))
-                    session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(commit_ts))
-                    session.timestamp_transaction('durable_timestamp=' + self.timestamp_str(commit_ts+1))
-                    session.commit_transaction()
-                else:
-                    session.commit_transaction('commit_timestamp=' + self.timestamp_str(commit_ts))
-            cursor.close()
-        except WiredTigerError as e:
-            rollback_str = wiredtiger_strerror(WT_ROLLBACK)
-            if rollback_str in str(e):
-                session.rollback_transaction()
-            raise(e)
-
-    def check(self, check_value, uri, nrows, flcs_extrarows, read_ts):
-        # In FLCS, deleted values read back as 0, and (at least for now) uncommitted appends
-        # cause zeros to appear under them. If flcs_extrarows isn't None, expect that many
-        # rows of zeros following the regular data.
-        flcs_tolerance = self.value_format == '8t' and flcs_extrarows is not None
-
-        session = self.session
-        if read_ts == 0:
-            session.begin_transaction()
-        else:
-            session.begin_transaction('read_timestamp=' + self.timestamp_str(read_ts))
-        cursor = session.open_cursor(uri)
-        count = 0
-        for k, v in cursor:
-            if flcs_tolerance and count >= nrows:
-                self.assertEqual(v, 0)
-            else:
-                self.assertEqual(v, check_value)
-            count += 1
-        session.commit_transaction()
-        self.assertEqual(count, nrows + flcs_extrarows if flcs_tolerance else nrows)
-        cursor.close()
-
-    def evict_cursor(self, uri, nrows, check_value):
-        # Configure debug behavior on a cursor to evict the page positioned on when the reset API is used.
-        evict_cursor = self.session.open_cursor(uri, None, "debug=(release_evict)")
-        self.session.begin_transaction("ignore_prepare=true")
-        for i in range (1, nrows + 1):
-            evict_cursor.set_key(i)
-            self.assertEqual(evict_cursor[i], check_value)
-            if i % 10 == 0:
-                evict_cursor.reset()
-        evict_cursor.close()
-        self.session.rollback_transaction()
-
 # Test that rollback to stable clears the remove operation.
 class test_rollback_to_stable01(test_rollback_to_stable_base):
-    session_config = 'isolation=snapshot'
-
     format_values = [
         ('column', dict(key_format='r', value_format='S')),
-        ('column_fix', dict(key_format='r', value_format='8t')),
-        ('integer_row', dict(key_format='i', value_format='S')),
+        #('column_fix', dict(key_format='r', value_format='8t')),  # FIXME-WT-14972
+        ('row_integer', dict(key_format='i', value_format='S')),
     ]
 
     in_memory_values = [
@@ -203,24 +51,35 @@ class test_rollback_to_stable01(test_rollback_to_stable_base):
         ('prepare', dict(prepare=True))
     ]
 
-    scenarios = make_scenarios(format_values, in_memory_values, prepare_values)
+    dryrun_values = [
+        ('no_dryrun', dict(dryrun=False)),
+        ('dryrun', dict(dryrun=True)),
+    ]
+
+    worker_thread_values = [
+        ('0', dict(threads=0)),
+        ('4', dict(threads=4)),
+        ('8', dict(threads=8))
+    ]
+
+    scenarios = make_scenarios(format_values, in_memory_values, prepare_values, dryrun_values, worker_thread_values)
 
     def conn_config(self):
-        config = 'cache_size=50MB,statistics=(all)'
+        config = 'cache_size=50MB,statistics=(all),verbose=(rts:5)'
         if self.in_memory:
             config += ',in_memory=true'
-        else:
-            config += ',log=(enabled),in_memory=false'
         return config
 
     def test_rollback_to_stable(self):
+        # FIXME-WT-14937: not working with disagg.
+        self.skipTest("page delta")
         nrows = 10000
 
-        # Create a table without logging.
+        # Create a table.
         uri = "table:rollback_to_stable01"
-        ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
-            config='log=(enabled=false)')
+        ds_config = 'log=(enabled=false)' if self.in_memory else ''
+        ds = SimpleDataSet(self, uri, 0,
+            key_format=self.key_format, value_format=self.value_format, config=ds_config)
         ds.populate()
 
         if self.value_format == '8t':
@@ -234,12 +93,12 @@ class test_rollback_to_stable01(test_rollback_to_stable_base):
 
         self.large_updates(uri, valuea, ds, nrows, self.prepare, 10)
         # Check that all updates are seen.
-        self.check(valuea, uri, nrows, None, 10)
+        self.check(valuea, uri, nrows, None, 11 if self.prepare else 10)
 
         # Remove all keys with newer timestamp.
         self.large_removes(uri, ds, nrows, self.prepare, 20)
         # Check that the no keys should be visible.
-        self.check(valuea, uri, 0, nrows, 20)
+        self.check(valuea, uri, 0, nrows, 21 if self.prepare else 20)
 
         # Pin stable to timestamp 20 if prepare otherwise 10.
         if self.prepare:
@@ -250,29 +109,34 @@ class test_rollback_to_stable01(test_rollback_to_stable_base):
         if not self.in_memory:
             self.session.checkpoint()
 
-        self.conn.rollback_to_stable()
+        self.conn.rollback_to_stable("dryrun={}".format("true" if self.dryrun else "false") + ',threads=' + str(self.threads))
         # Check that the new updates are only seen after the update timestamp.
         self.session.breakpoint()
-        self.check(valuea, uri, nrows, None, 20)
+        if self.dryrun:
+            self.check(0, uri, nrows if self.value_format == '8t' else 0, None, 20)
+        else:
+            self.check(valuea, uri, nrows, None, 20)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         calls = stat_cursor[stat.conn.txn_rts][2]
         hs_removed = stat_cursor[stat.conn.txn_rts_hs_removed][2]
         keys_removed = stat_cursor[stat.conn.txn_rts_keys_removed][2]
         keys_restored = stat_cursor[stat.conn.txn_rts_keys_restored][2]
+        keys_restored_dryrun = stat_cursor[stat.conn.txn_rts_keys_restored_dryrun][2]
         pages_visited = stat_cursor[stat.conn.txn_rts_pages_visited][2]
         upd_aborted = stat_cursor[stat.conn.txn_rts_upd_aborted][2]
+        upd_aborted_dryrun = stat_cursor[stat.conn.txn_rts_upd_aborted_dryrun][2]
         stat_cursor.close()
 
         self.assertEqual(calls, 1)
         self.assertEqual(hs_removed, 0)
         self.assertEqual(keys_removed, 0)
-        if self.in_memory:
-            self.assertEqual(upd_aborted, nrows)
+        if self.dryrun:
+            self.assertEqual(upd_aborted, 0)
+            self.assertEqual(upd_aborted_dryrun + keys_restored_dryrun, nrows)
+        elif self.in_memory:
+            self.assertEqual(upd_aborted + upd_aborted_dryrun, nrows)
         else:
             self.assertEqual(upd_aborted + keys_restored, nrows)
         self.assertGreaterEqual(keys_restored, 0)
         self.assertGreater(pages_visited, 0)
-
-if __name__ == '__main__':
-    wttest.run()

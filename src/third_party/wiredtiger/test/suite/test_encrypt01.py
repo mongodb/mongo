@@ -30,8 +30,8 @@
 #   Basic block encryption operations
 #
 
-import os, run, random
-import wiredtiger, wttest
+import random
+import wttest
 from wtscenario import make_scenarios
 
 # Test basic encryption
@@ -134,8 +134,5 @@ class test_encrypt01(wttest.WiredTigerTestCase):
             val = self.bigvalue[start:r.randint(0,10000)] + str(idx)
             cursor.set_key(key)
             self.assertEqual(cursor.search(), 0)
-            self.assertEquals(cursor.get_value(), val)
+            self.assertEqual(cursor.get_value(), val)
         cursor.close()
-
-if __name__ == '__main__':
-    wttest.run()

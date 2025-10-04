@@ -6,19 +6,17 @@
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   requires_replication,
- *   requires_wiredtiger,
  * ]
  */
 
-(function() {
-"use strict";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const dbName = "test";
 const collName = jsTestName();
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
-rst.initiateWithHighElectionTimeout();
+rst.initiate();
 const primary = rst.getPrimary();
 const primaryDB = primary.getDB(dbName);
 
@@ -26,19 +24,20 @@ const recoveryTimestamp = assert.commandWorked(primaryDB.runCommand({ping: 1})).
 
 // Hold back the recovery timestamp before doing another write so we have some oplog entries to
 // apply when restart in queryableBackupMode with recoverToOplogTimestamp.
-assert.commandWorked(primaryDB.adminCommand({
-    "configureFailPoint": 'holdStableTimestampAtSpecificTimestamp',
-    "mode": 'alwaysOn',
-    "data": {"timestamp": recoveryTimestamp}
-}));
+assert.commandWorked(
+    primaryDB.adminCommand({
+        "configureFailPoint": "holdStableTimestampAtSpecificTimestamp",
+        "mode": "alwaysOn",
+        "data": {"timestamp": recoveryTimestamp},
+    }),
+);
 
 assert.commandWorked(primaryDB.getCollection(collName).createIndex({a: 1}));
 
 const docs = [{_id: 1, a: 1}];
-const operationTime =
-    assert.commandWorked(primaryDB.runCommand({insert: collName, documents: docs})).operationTime;
+const operationTime = assert.commandWorked(primaryDB.runCommand({insert: collName, documents: docs})).operationTime;
 
-rst.stopSet(/*signal=*/null, /*forRestart=*/true);
+rst.stopSet(/*signal=*/ null, /*forRestart=*/ true);
 
 // Restart as standalone in queryableBackupMode and run replication recovery up to the last insert.
 const primaryStandalone = MongoRunner.runMongod({
@@ -46,11 +45,10 @@ const primaryStandalone = MongoRunner.runMongod({
     noReplSet: true,
     noCleanData: true,
     setParameter: {recoverToOplogTimestamp: tojson({timestamp: operationTime})},
-    queryableBackupMode: ""
+    queryableBackupMode: "",
 });
 
 // Test that the last insert is visible after replication recovery.
 assert.eq(primaryStandalone.getDB(dbName)[collName].find().toArray(), docs);
 
 MongoRunner.stopMongod(primaryStandalone);
-}());

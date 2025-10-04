@@ -29,20 +29,27 @@
 
 #pragma once
 
-#include <map>
-#include <sstream>
-#include <string>
-#include <vector>
-
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/client/connection_string.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <compare>
+#include <iterator>
+#include <map>
+#include <sstream>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -105,6 +112,8 @@ StatusWith<std::string> uriDecode(StringData str);
  */
 class MongoURI {
 public:
+    inline static const std::string kDefaultTestRunnerAppName = "MongoDB Shell";
+
     class CaseInsensitiveString {
     public:
         CaseInsensitiveString(std::string str);
@@ -120,7 +129,7 @@ public:
             return lhs._lowercase == rhs._lowercase;
         }
 
-        const std::string& original() const noexcept {
+        const std::string& original() const {
             return _original;
         }
 
@@ -149,10 +158,13 @@ public:
      */
     static std::string redact(StringData url);
 
-    DBClientBase* connect(StringData applicationName,
-                          std::string& errmsg,
-                          boost::optional<double> socketTimeoutSecs = boost::none,
-                          const ClientAPIVersionParameters* apiParameters = nullptr) const;
+    DBClientBase* connect(
+        StringData applicationName,
+        std::string& errmsg,
+        boost::optional<double> socketTimeoutSecs = boost::none,
+        const ClientAPIVersionParameters* apiParameters = nullptr,
+        const boost::optional<TransientSSLParams>& transientSSLParams = boost::none,
+        ErrorCodes::Error* errcode = nullptr) const;
 
     const std::string& getUser() const {
         return _user;
@@ -233,7 +245,7 @@ public:
     }
 
 
-    const boost::optional<std::string> getAppName() const;
+    boost::optional<std::string> getAppName() const;
 
     std::string canonicalizeURIAsString() const;
 
@@ -255,6 +267,16 @@ public:
         _helloOk.emplace(helloOk);
     }
 
+#ifdef MONGO_CONFIG_GRPC
+    void setIsGRPC(bool isGRPC) {
+        _gRPC = isGRPC;
+    }
+
+    bool isGRPC() const {
+        return _gRPC.get_value_or(false);
+    }
+#endif
+
     // If you are trying to clone a URI (including its options/auth information) for a single
     // server (say a member of a replica-set), you can pass in its HostAndPort information to
     // get a new URI with the same info, except type() will be kStandalone and getServers() will
@@ -264,7 +286,7 @@ public:
         out._connectString = ConnectionString(std::move(hostAndPort));
 
         if (!out.getAppName()) {
-            out._options["appName"] = applicationName.toString();
+            out._options["appName"] = std::string{applicationName};
         }
 
         return out;
@@ -303,6 +325,27 @@ private:
           _helloOk(helloOk),
           _options(std::move(options)) {}
 
+#ifdef MONGO_CONFIG_GRPC
+    MongoURI(ConnectionString connectString,
+             const std::string& user,
+             const std::string& password,
+             const std::string& database,
+             boost::optional<bool> retryWrites,
+             transport::ConnectSSLMode sslMode,
+             boost::optional<bool> helloOk,
+             boost::optional<bool> grpc,
+             OptionsMap options)
+        : _connectString(std::move(connectString)),
+          _user(user),
+          _password(password),
+          _database(database),
+          _retryWrites(std::move(retryWrites)),
+          _sslMode(sslMode),
+          _helloOk(helloOk),
+          _gRPC(grpc),
+          _options(std::move(options)) {}
+#endif
+
     static MongoURI parseImpl(StringData url);
 
     ConnectionString _connectString;
@@ -312,6 +355,9 @@ private:
     boost::optional<bool> _retryWrites;
     transport::ConnectSSLMode _sslMode = transport::kGlobalSSLMode;
     boost::optional<bool> _helloOk;
+#ifdef MONGO_CONFIG_GRPC
+    boost::optional<bool> _gRPC;
+#endif
     OptionsMap _options;
 };
 

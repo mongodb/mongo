@@ -27,36 +27,53 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
-#include "mongo/platform/basic.h"
+#include "mongo/client/server_discovery_monitor.h"
 
-#include <memory>
-
-#include <boost/optional/optional_io.hpp>
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/replica_set_monitor_protocol_test_util.h"
-#include "mongo/client/sdam/sdam.h"
-#include "mongo/client/sdam/sdam_configuration_parameters_gen.h"
+#include "mongo/client/replica_set_monitor_server_parameters.h"
 #include "mongo/client/sdam/topology_description.h"
 #include "mongo/client/sdam/topology_listener_mock.h"
-#include "mongo/client/server_discovery_monitor.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/wire_version.h"
+#include "mongo/dbtests/mock/mock_remote_db_server.h"
 #include "mongo/dbtests/mock/mock_replica_set.h"
+#include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_response.h"
+#include "mongo/executor/task_executor_test_fixture.h"
 #include "mongo/executor/thread_pool_mock.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/logv2/log.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/reply_interface.h"
+#include "mongo/rpc/unique_message.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 
-namespace mongo {
+#include <list>
+#include <memory>
+#include <ratio>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
+
+namespace mongo::sdam {
 namespace {
 
 using executor::NetworkInterfaceMock;
 using executor::RemoteCommandResponse;
-using executor::ThreadPoolExecutorTest;
 using InNetworkGuard = NetworkInterfaceMock::InNetworkGuard;
 
 class ServerDiscoveryMonitorTestFixture : public unittest::Test {
@@ -66,17 +83,18 @@ protected:
      */
     void setUp() override {
         auto serviceContext = ServiceContext::make();
+        WireSpec::getWireSpec(serviceContext.get()).initialize(WireSpec::Specification{});
         setGlobalServiceContext(std::move(serviceContext));
         ReplicaSetMonitorProtocolTestUtil::setRSMProtocol(ReplicaSetMonitorProtocol::kSdam);
         ReplicaSetMonitor::cleanup();
 
         auto network = std::make_unique<executor::NetworkInterfaceMock>();
         _net = network.get();
-        _executor = makeSharedThreadPoolTestExecutor(std::move(network));
+        _executor = makeThreadPoolTestExecutor(std::move(network));
         _executor->startup();
         _startDate = _net->now();
         _eventsPublisher = std::make_shared<sdam::TopologyEventsPublisher>(_executor);
-        _topologyListener.reset(new sdam::TopologyListenerMock());
+        _topologyListener = std::make_shared<sdam::TopologyListenerMock>();
         _eventsPublisher->registerListener(_topologyListener);
     }
 
@@ -84,6 +102,7 @@ protected:
         _eventsPublisher.reset();
         _topologyListener.reset();
         _executor->shutdown();
+        executor::NetworkInterfaceMock::InNetworkGuard(_net)->runReadyNetworkOperations();
         _executor->join();
         _executor.reset();
         ReplicaSetMonitor::cleanup();
@@ -120,53 +139,53 @@ protected:
     }
 
     /**
-     * Sets up a SingleServerDiscoveryMonitor that starts sending isMasters to the server.
+     * Sets up a SingleServerDiscoveryMonitor that starts sending "hello" to the server.
      */
     std::shared_ptr<SingleServerDiscoveryMonitor> initSingleServerDiscoveryMonitor(
         const sdam::SdamConfiguration& sdamConfiguration,
         const HostAndPort& hostAndPort,
         MockReplicaSet* replSet) {
-        auto ssIsMasterMonitor = std::make_shared<SingleServerDiscoveryMonitor>(replSet->getURI(),
-                                                                                hostAndPort,
-                                                                                boost::none,
-                                                                                sdamConfiguration,
-                                                                                _eventsPublisher,
-                                                                                _executor,
-                                                                                _stats);
-        ssIsMasterMonitor->init();
+        auto ssHelloMonitor = std::make_shared<SingleServerDiscoveryMonitor>(replSet->getURI(),
+                                                                             hostAndPort,
+                                                                             boost::none,
+                                                                             sdamConfiguration,
+                                                                             _eventsPublisher,
+                                                                             _executor,
+                                                                             _stats);
+        ssHelloMonitor->init();
 
-        // Ensure that the clock has not advanced since setUp() and _startDate is representative
-        // of when the first isMaster request was sent.
+        // Ensure that the clock has not advanced since setUp() and _startDate is representative of
+        // when the first "hello" request was sent.
         ASSERT_EQ(getStartDate(), getNet()->now());
-        return ssIsMasterMonitor;
+        return ssHelloMonitor;
     }
 
     std::shared_ptr<ServerDiscoveryMonitor> initServerDiscoveryMonitor(
         const MongoURI& setUri,
         const sdam::SdamConfiguration& sdamConfiguration,
         const sdam::TopologyDescriptionPtr topologyDescription) {
-        auto serverIsMasterMonitor = std::make_shared<ServerDiscoveryMonitor>(
+        auto serverHelloMonitor = std::make_shared<ServerDiscoveryMonitor>(
             setUri, sdamConfiguration, _eventsPublisher, topologyDescription, _stats, _executor);
 
         // Ensure that the clock has not advanced since setUp() and _startDate is representative
-        // of when the first isMaster request was sent.
+        // of when the first "hello" request was sent.
         ASSERT_EQ(getStartDate(), getNet()->now());
-        return serverIsMasterMonitor;
+        return serverHelloMonitor;
     }
 
     /**
-     * Checks that an isMaster request has been sent to some server and schedules a response. If
-     * assertHostCheck is true, asserts that the isMaster was sent to the server at hostAndPort.
+     * Checks that an "hello" request has been sent to some server and schedules a response. If
+     * assertHostCheck is true, asserts that the "hello" was sent to the server at hostAndPort.
      */
-    void processIsMasterRequest(MockReplicaSet* replSet,
-                                boost::optional<HostAndPort> hostAndPort = boost::none) {
+    void processHelloRequest(MockReplicaSet* replSet,
+                             boost::optional<HostAndPort> hostAndPort = boost::none) {
         ASSERT(hasReadyRequests());
         InNetworkGuard guard(_net);
         _net->runReadyNetworkOperations();
         auto noi = _net->getNextReadyRequest();
         auto request = noi->getRequest();
 
-        executor::TaskExecutorTest::assertRemoteCommandNameEquals("isMaster", request);
+        executor::TaskExecutorTest::assertRemoteCommandNameEquals("hello", request);
         auto requestHost = request.target.toString();
         if (hostAndPort) {
             ASSERT_EQ(request.target, hostAndPort);
@@ -179,9 +198,11 @@ protected:
 
         const auto node = replSet->getNode(requestHost);
         if (node->isRunning()) {
-            const auto opmsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+            const auto opmsg = OpMsgRequestBuilder::create(
+                auth::ValidatedTenancyScope::kNotRequired, request.dbname, request.cmdObj);
             const auto reply = node->runCommand(request.id, opmsg)->getCommandReply();
-            _net->scheduleSuccessfulResponse(noi, RemoteCommandResponse(reply, Milliseconds(0)));
+            _net->scheduleSuccessfulResponse(
+                noi, RemoteCommandResponse::make_forTest(reply, Milliseconds(0)));
         } else {
             _net->scheduleErrorResponse(noi, Status(ErrorCodes::HostUnreachable, ""));
         }
@@ -201,55 +222,55 @@ protected:
     }
 
     /**
-     * Checks that exactly one successful isMaster occurs within a time interval of
+     * Checks that exactly one successful "hello" occurs within a time interval of
      * heartbeatFrequency.
      */
-    void checkSingleIsMaster(Milliseconds heartbeatFrequency,
-                             const HostAndPort& hostAndPort,
-                             MockReplicaSet* replSet) {
+    void checkSingleHello(Milliseconds heartbeatFrequency,
+                          const HostAndPort& hostAndPort,
+                          MockReplicaSet* replSet) {
         auto deadline = elapsed() + heartbeatFrequency;
-        processIsMasterRequest(replSet, hostAndPort);
+        processHelloRequest(replSet, hostAndPort);
 
-        while (elapsed() < deadline && !_topologyListener->hasIsMasterResponse(hostAndPort)) {
+        while (elapsed() < deadline && !_topologyListener->hasHelloResponse(hostAndPort)) {
             advanceTime(Milliseconds(1));
         }
-        validateIsMasterResponse(hostAndPort, deadline);
+        validateHelloResponse(hostAndPort, deadline);
         checkNoActivityBefore(deadline, hostAndPort);
     }
 
-    void validateIsMasterResponse(const HostAndPort& hostAndPort, Milliseconds deadline) {
-        ASSERT_TRUE(_topologyListener->hasIsMasterResponse(hostAndPort));
+    void validateHelloResponse(const HostAndPort& hostAndPort, Milliseconds deadline) {
+        ASSERT_TRUE(_topologyListener->hasHelloResponse(hostAndPort));
         ASSERT_LT(elapsed(), deadline);
-        auto isMasterResponse = _topologyListener->getIsMasterResponse(hostAndPort);
+        auto helloResponse = _topologyListener->getHelloResponse(hostAndPort);
 
-        // There should only be one isMaster response queued up.
-        ASSERT_EQ(isMasterResponse.size(), 1);
-        ASSERT(isMasterResponse[0].isOK());
+        // There should only be one "hello" response queued up.
+        ASSERT_EQ(helloResponse.size(), 1);
+        ASSERT(helloResponse[0].isOK());
     }
 
     /**
-     * Confirms no more isMaster requests are sent between elapsed() and deadline. Confirms no more
-     * isMaster responses are received between elapsed() and deadline when hostAndPort is specified.
+     * Confirms no more "hello" requests are sent between elapsed() and deadline. Confirms no more
+     * "hello" responses are received between elapsed() and deadline when hostAndPort is specified.
      */
     void checkNoActivityBefore(Milliseconds deadline,
                                boost::optional<HostAndPort> hostAndPort = boost::none) {
         while (elapsed() < deadline) {
             ASSERT_FALSE(hasReadyRequests());
             if (hostAndPort) {
-                ASSERT_FALSE(_topologyListener->hasIsMasterResponse(hostAndPort.get()));
+                ASSERT_FALSE(_topologyListener->hasHelloResponse(hostAndPort.value()));
             }
             advanceTime(Milliseconds(1));
         }
     }
 
     /**
-     * Waits up to timeoutMS for the next isMaster request to go out.
-     * Causes the test to fail if timeoutMS time passes and no request is ready.
+     * Waits up to timeoutMS for the next "hello" request to go out. Causes the test to fail if
+     * timeoutMS time passes and no request is ready.
      *
-     * NOTE: The time between each isMaster request is the heartbeatFrequency compounded by response
+     * NOTE: The time between each "hello" request is the heartbeatFrequency compounded by response
      * time.
      */
-    void waitForNextIsMaster(Milliseconds timeoutMS) {
+    void waitForNextHello(Milliseconds timeoutMS) {
         auto deadline = elapsed() + timeoutMS;
         while (!hasReadyRequests() && elapsed() < deadline) {
             advanceTime(Milliseconds(1));
@@ -272,7 +293,7 @@ private:
 };
 
 /**
- * Checks that a SingleServerDiscoveryMonitor sends isMaster requests at least heartbeatFrequency
+ * Checks that a SingleServerDiscoveryMonitor sends "hello" requests at least heartbeatFrequency
  * apart.
  */
 TEST_F(ServerDiscoveryMonitorTestFixture, heartbeatFrequencyCheck) {
@@ -281,28 +302,28 @@ TEST_F(ServerDiscoveryMonitorTestFixture, heartbeatFrequencyCheck) {
     auto hostAndPort = HostAndPort(replSet->getSecondaries()[0]);
 
     const auto config = SdamConfiguration(std::vector<HostAndPort>{hostAndPort});
-    auto ssIsMasterMonitor = initSingleServerDiscoveryMonitor(config, hostAndPort, replSet.get());
-    ssIsMasterMonitor->disableExpeditedChecking();
+    auto ssHelloMonitor = initSingleServerDiscoveryMonitor(config, hostAndPort, replSet.get());
+    ssHelloMonitor->disableExpeditedChecking();
 
-    // An isMaster command fails if it takes as long or longer than timeoutMS.
+    // A "hello" command fails if it takes as long or longer than timeoutMS.
     auto timeoutMS = config.getConnectionTimeout();
     auto heartbeatFrequency = config.getHeartBeatFrequency();
 
-    checkSingleIsMaster(heartbeatFrequency, hostAndPort, replSet.get());
-    waitForNextIsMaster(timeoutMS);
+    checkSingleHello(heartbeatFrequency, hostAndPort, replSet.get());
+    waitForNextHello(timeoutMS);
 
-    checkSingleIsMaster(heartbeatFrequency, hostAndPort, replSet.get());
-    waitForNextIsMaster(timeoutMS);
+    checkSingleHello(heartbeatFrequency, hostAndPort, replSet.get());
+    waitForNextHello(timeoutMS);
 
-    checkSingleIsMaster(heartbeatFrequency, hostAndPort, replSet.get());
-    waitForNextIsMaster(timeoutMS);
+    checkSingleHello(heartbeatFrequency, hostAndPort, replSet.get());
+    waitForNextHello(timeoutMS);
 
-    checkSingleIsMaster(heartbeatFrequency, hostAndPort, replSet.get());
-    waitForNextIsMaster(timeoutMS);
+    checkSingleHello(heartbeatFrequency, hostAndPort, replSet.get());
+    waitForNextHello(timeoutMS);
 }
 
 /**
- * Confirms that a SingleServerDiscoveryMonitor reports to the TopologyListener when an isMaster
+ * Confirms that a SingleServerDiscoveryMonitor reports to the TopologyListener when a "hello"
  * command generates an error.
  */
 TEST_F(ServerDiscoveryMonitorTestFixture, singleServerDiscoveryMonitorReportsFailure) {
@@ -317,23 +338,23 @@ TEST_F(ServerDiscoveryMonitorTestFixture, singleServerDiscoveryMonitorReportsFai
     }
 
     const auto config = SdamConfiguration(std::vector<HostAndPort>{hostAndPort});
-    auto ssIsMasterMonitor = initSingleServerDiscoveryMonitor(config, hostAndPort, replSet.get());
-    ssIsMasterMonitor->disableExpeditedChecking();
+    auto ssHelloMonitor = initSingleServerDiscoveryMonitor(config, hostAndPort, replSet.get());
+    ssHelloMonitor->disableExpeditedChecking();
 
-    processIsMasterRequest(replSet.get(), hostAndPort);
+    processHelloRequest(replSet.get(), hostAndPort);
     auto topologyListener = getTopologyListener();
     auto timeoutMS = config.getConnectionTimeout();
-    while (elapsed() < timeoutMS && !topologyListener->hasIsMasterResponse(hostAndPort)) {
-        // Advance time in small increments to ensure we stop before another isMaster is sent.
+    while (elapsed() < timeoutMS && !topologyListener->hasHelloResponse(hostAndPort)) {
+        // Advance time in small increments to ensure we stop before another "hello" is sent.
         advanceTime(Milliseconds(1));
     }
-    ASSERT_TRUE(topologyListener->hasIsMasterResponse(hostAndPort));
-    auto response = topologyListener->getIsMasterResponse(hostAndPort);
+    ASSERT_TRUE(topologyListener->hasHelloResponse(hostAndPort));
+    auto response = topologyListener->getHelloResponse(hostAndPort);
     ASSERT_EQ(response.size(), 1);
     ASSERT_EQ(response[0], ErrorCodes::HostUnreachable);
 }
 
-TEST_F(ServerDiscoveryMonitorTestFixture, serverIsMasterMonitorOnTopologyDescriptionChangeAddHost) {
+TEST_F(ServerDiscoveryMonitorTestFixture, ServerHelloMonitorOnTopologyDescriptionChangeAddHost) {
     auto replSet = std::make_unique<MockReplicaSet>(
         "test", 2, /* hasPrimary = */ false, /* dollarPrefixHosts = */ false);
 
@@ -345,11 +366,11 @@ TEST_F(ServerDiscoveryMonitorTestFixture, serverIsMasterMonitorOnTopologyDescrip
     auto sdamConfig0 = sdam::SdamConfiguration(host0Vec);
     auto topologyDescription0 = std::make_shared<sdam::TopologyDescription>(sdamConfig0);
     auto uri = replSet->getURI();
-    auto isMasterMonitor = initServerDiscoveryMonitor(uri, sdamConfig0, topologyDescription0);
-    isMasterMonitor->disableExpeditedChecking();
+    auto helloMonitor = initServerDiscoveryMonitor(uri, sdamConfig0, topologyDescription0);
+    helloMonitor->disableExpeditedChecking();
 
     auto host1Delay = Milliseconds(100);
-    checkSingleIsMaster(host1Delay, host0, replSet.get());
+    checkSingleHello(host1Delay, host0, replSet.get());
     ASSERT_FALSE(hasReadyRequests());
 
     // Start monitoring host1.
@@ -358,21 +379,20 @@ TEST_F(ServerDiscoveryMonitorTestFixture, serverIsMasterMonitorOnTopologyDescrip
     auto sdamConfigAllHosts = sdam::SdamConfiguration(allHostsVec);
     auto topologyDescriptionAllHosts =
         std::make_shared<sdam::TopologyDescription>(sdamConfigAllHosts);
-    isMasterMonitor->onTopologyDescriptionChangedEvent(topologyDescription0,
-                                                       topologyDescriptionAllHosts);
+    helloMonitor->onTopologyDescriptionChangedEvent(topologyDescription0,
+                                                    topologyDescriptionAllHosts);
     // Ensure expedited checking is disabled for the SingleServerDiscoveryMonitor corresponding to
     // host1 as well.
-    isMasterMonitor->disableExpeditedChecking();
+    helloMonitor->disableExpeditedChecking();
 
     // Confirm host0 and host1 are monitored.
     auto heartbeatFrequency = sdamConfigAllHosts.getHeartBeatFrequency();
-    checkSingleIsMaster(heartbeatFrequency - host1Delay, host1, replSet.get());
-    waitForNextIsMaster(sdamConfigAllHosts.getConnectionTimeout());
-    checkSingleIsMaster(host1Delay, host0, replSet.get());
+    checkSingleHello(heartbeatFrequency - host1Delay, host1, replSet.get());
+    waitForNextHello(sdamConfigAllHosts.getConnectionTimeout());
+    checkSingleHello(host1Delay, host0, replSet.get());
 }
 
-TEST_F(ServerDiscoveryMonitorTestFixture,
-       serverIsMasterMonitorOnTopologyDescriptionChangeRemoveHost) {
+TEST_F(ServerDiscoveryMonitorTestFixture, ServerHelloMonitorOnTopologyDescriptionChangeRemoveHost) {
     auto replSet = std::make_unique<MockReplicaSet>(
         "test", 2, /* hasPrimary = */ false, /* dollarPrefixHosts = */ false);
 
@@ -386,45 +406,45 @@ TEST_F(ServerDiscoveryMonitorTestFixture,
     auto topologyDescriptionAllHosts =
         std::make_shared<sdam::TopologyDescription>(sdamConfigAllHosts);
     auto uri = replSet->getURI();
-    auto isMasterMonitor =
+    auto helloMonitor =
         initServerDiscoveryMonitor(uri, sdamConfigAllHosts, topologyDescriptionAllHosts);
-    isMasterMonitor->disableExpeditedChecking();
+    helloMonitor->disableExpeditedChecking();
 
     // Confirm that both hosts are monitored.
     auto heartbeatFrequency = sdamConfigAllHosts.getHeartBeatFrequency();
     while (hasReadyRequests()) {
-        processIsMasterRequest(replSet.get());
+        processHelloRequest(replSet.get());
     }
     auto deadline = elapsed() + heartbeatFrequency;
     auto topologyListener = getTopologyListener();
     auto hasResponses = [&]() {
-        return topologyListener->hasIsMasterResponse(host0) &&
-            topologyListener->hasIsMasterResponse(host1);
+        return topologyListener->hasHelloResponse(host0) &&
+            topologyListener->hasHelloResponse(host1);
     };
     while (elapsed() < heartbeatFrequency && !hasResponses()) {
         advanceTime(Milliseconds(1));
     }
-    validateIsMasterResponse(host0, deadline);
-    validateIsMasterResponse(host1, deadline);
+    validateHelloResponse(host0, deadline);
+    validateHelloResponse(host1, deadline);
 
     // Remove host1 from the TopologyDescription to stop monitoring it.
     std::vector<HostAndPort> host0Vec{host0};
     auto sdamConfig0 = sdam::SdamConfiguration(host0Vec);
     auto topologyDescription0 = std::make_shared<sdam::TopologyDescription>(sdamConfig0);
-    isMasterMonitor->onTopologyDescriptionChangedEvent(topologyDescriptionAllHosts,
-                                                       topologyDescription0);
+    helloMonitor->onTopologyDescriptionChangedEvent(topologyDescriptionAllHosts,
+                                                    topologyDescription0);
 
     checkNoActivityBefore(deadline);
-    waitForNextIsMaster(sdamConfig0.getConnectionTimeout());
+    waitForNextHello(sdamConfig0.getConnectionTimeout());
 
-    checkSingleIsMaster(heartbeatFrequency, host0, replSet.get());
-    waitForNextIsMaster(sdamConfig0.getConnectionTimeout());
+    checkSingleHello(heartbeatFrequency, host0, replSet.get());
+    waitForNextHello(sdamConfig0.getConnectionTimeout());
 
-    // Confirm the next isMaster request is sent to host0 and not host1.
-    checkSingleIsMaster(heartbeatFrequency, host0, replSet.get());
+    // Confirm the next "hello" request is sent to host0 and not host1.
+    checkSingleHello(heartbeatFrequency, host0, replSet.get());
 }
 
-TEST_F(ServerDiscoveryMonitorTestFixture, serverIsMasterMonitorShutdownStopsIsMasterRequests) {
+TEST_F(ServerDiscoveryMonitorTestFixture, ServerHelloMonitorShutdownStopsHelloRequests) {
     auto replSet = std::make_unique<MockReplicaSet>(
         "test", 1, /* hasPrimary = */ false, /* dollarPrefixHosts = */ false);
 
@@ -432,13 +452,13 @@ TEST_F(ServerDiscoveryMonitorTestFixture, serverIsMasterMonitorShutdownStopsIsMa
     auto sdamConfig = sdam::SdamConfiguration(hostVec);
     auto topologyDescription = std::make_shared<sdam::TopologyDescription>(sdamConfig);
     auto uri = replSet->getURI();
-    auto isMasterMonitor = initServerDiscoveryMonitor(uri, sdamConfig, topologyDescription);
-    isMasterMonitor->disableExpeditedChecking();
+    auto helloMonitor = initServerDiscoveryMonitor(uri, sdamConfig, topologyDescription);
+    helloMonitor->disableExpeditedChecking();
 
     auto heartbeatFrequency = sdamConfig.getHeartBeatFrequency();
-    checkSingleIsMaster(heartbeatFrequency - Milliseconds(200), hostVec[0], replSet.get());
+    checkSingleHello(heartbeatFrequency - Milliseconds(200), hostVec[0], replSet.get());
 
-    isMasterMonitor->shutdown();
+    helloMonitor->shutdown();
 
     // After the ServerDiscoveryMonitor shuts down, the TopologyListener may have responses until
     // heartbeatFrequency has passed, but none of them should indicate Status::OK.
@@ -448,27 +468,26 @@ TEST_F(ServerDiscoveryMonitorTestFixture, serverIsMasterMonitorShutdownStopsIsMa
     // Drain any requests already scheduled.
     while (elapsed() < deadline) {
         while (hasReadyRequests()) {
-            processIsMasterRequest(replSet.get(), hostVec[0]);
+            processHelloRequest(replSet.get(), hostVec[0]);
         }
-        if (topologyListener->hasIsMasterResponse(hostVec[0])) {
-            auto isMasterResponses = topologyListener->getIsMasterResponse(hostVec[0]);
-            for (auto& response : isMasterResponses) {
+        if (topologyListener->hasHelloResponse(hostVec[0])) {
+            auto helloResponses = topologyListener->getHelloResponse(hostVec[0]);
+            for (auto& response : helloResponses) {
                 ASSERT_FALSE(response.isOK());
             }
         }
         advanceTime(Milliseconds(1));
     }
 
-    ASSERT_FALSE(topologyListener->hasIsMasterResponse(hostVec[0]));
+    ASSERT_FALSE(topologyListener->hasHelloResponse(hostVec[0]));
 }
 
 /**
  * Tests that the ServerDiscoveryMonitor waits until SdamConfiguration::kMinHeartbeatFrequency has
- * passed since the last isMaster was received if requestImmediateCheck() is called before enough
+ * passed since the last "hello" was received if requestImmediateCheck() is called before enough
  * time has passed.
  */
-TEST_F(ServerDiscoveryMonitorTestFixture,
-       serverIsMasterMonitorRequestImmediateCheckWaitMinHeartbeat) {
+TEST_F(ServerDiscoveryMonitorTestFixture, ServerHelloMonitorRequestImmediateCheckWaitMinHeartbeat) {
     auto replSet = std::make_unique<MockReplicaSet>(
         "test", 1, /* hasPrimary = */ false, /* dollarPrefixHosts = */ false);
 
@@ -478,41 +497,41 @@ TEST_F(ServerDiscoveryMonitorTestFixture,
     auto sdamConfig0 = sdam::SdamConfiguration(hostVec);
     auto topologyDescription0 = std::make_shared<sdam::TopologyDescription>(sdamConfig0);
     auto uri = replSet->getURI();
-    auto isMasterMonitor = initServerDiscoveryMonitor(uri, sdamConfig0, topologyDescription0);
+    auto helloMonitor = initServerDiscoveryMonitor(uri, sdamConfig0, topologyDescription0);
 
     // Ensure the server is not in expedited mode *before* requestImmediateCheck().
-    isMasterMonitor->disableExpeditedChecking();
+    helloMonitor->disableExpeditedChecking();
 
-    // Check that there is only one isMaster request at time t=0 up until
-    // timeAdvanceFromFirstIsMaster.
+    // Check that there is only one "hello" request at time t=0 up until
+    // timeAdvanceFromFirstHello.
     auto minHeartbeatFrequency = SdamConfiguration::kMinHeartbeatFrequency;
-    auto timeAdvanceFromFirstIsMaster = Milliseconds(10);
-    ASSERT_LT(timeAdvanceFromFirstIsMaster, minHeartbeatFrequency);
-    checkSingleIsMaster(timeAdvanceFromFirstIsMaster, hostVec[0], replSet.get());
+    auto timeAdvanceFromFirstHello = Milliseconds(10);
+    ASSERT_LT(timeAdvanceFromFirstHello, minHeartbeatFrequency);
+    checkSingleHello(timeAdvanceFromFirstHello, hostVec[0], replSet.get());
 
-    // It's been less than SdamConfiguration::kMinHeartbeatFrequency since the last isMaster was
-    // received. The next isMaster should be sent SdamConfiguration::kMinHeartbeatFrequency since
-    // the last isMaster was recieved rather than immediately.
+    // It's been less than SdamConfiguration::kMinHeartbeatFrequency since the last "hello" was
+    // received. The next "hello" should be sent SdamConfiguration::kMinHeartbeatFrequency since
+    // the last "hello" was received rather than immediately.
     auto timeRequestImmediateSent = elapsed();
-    isMasterMonitor->requestImmediateCheck();
-    waitForNextIsMaster(minHeartbeatFrequency);
+    helloMonitor->requestImmediateCheck();
+    waitForNextHello(minHeartbeatFrequency);
 
-    auto timeIsMasterSent = elapsed();
-    ASSERT_LT(timeRequestImmediateSent, timeIsMasterSent);
-    ASSERT_LT(timeIsMasterSent, timeRequestImmediateSent + minHeartbeatFrequency);
-    checkSingleIsMaster(minHeartbeatFrequency, hostVec[0], replSet.get());
+    auto timeHelloSent = elapsed();
+    ASSERT_LT(timeRequestImmediateSent, timeHelloSent);
+    ASSERT_LT(timeHelloSent, timeRequestImmediateSent + minHeartbeatFrequency);
+    checkSingleHello(minHeartbeatFrequency, hostVec[0], replSet.get());
 
     // Confirm expedited requests continue since there is no primary.
-    waitForNextIsMaster(sdamConfig0.getConnectionTimeout());
-    checkSingleIsMaster(minHeartbeatFrequency, hostVec[0], replSet.get());
+    waitForNextHello(sdamConfig0.getConnectionTimeout());
+    checkSingleHello(minHeartbeatFrequency, hostVec[0], replSet.get());
 }
 
 /**
  * Tests that if more than SdamConfiguration::kMinHeartbeatFrequency has passed since the last
- * isMaster response was received, the ServerDiscoveryMonitor sends an isMaster immediately after
+ * "hello" response was received, the ServerDiscoveryMonitor sends an "hello" immediately after
  * requestImmediateCheck() is called.
  */
-TEST_F(ServerDiscoveryMonitorTestFixture, serverIsMasterMonitorRequestImmediateCheckNoWait) {
+TEST_F(ServerDiscoveryMonitorTestFixture, ServerHelloMonitorRequestImmediateCheckNoWait) {
     auto replSet = std::make_unique<MockReplicaSet>(
         "test", 1, /* hasPrimary = */ false, /* dollarPrefixHosts = */ false);
 
@@ -522,24 +541,24 @@ TEST_F(ServerDiscoveryMonitorTestFixture, serverIsMasterMonitorRequestImmediateC
     auto sdamConfig0 = sdam::SdamConfiguration(hostVec);
     auto topologyDescription0 = std::make_shared<sdam::TopologyDescription>(sdamConfig0);
     auto uri = replSet->getURI();
-    auto isMasterMonitor = initServerDiscoveryMonitor(uri, sdamConfig0, topologyDescription0);
+    auto helloMonitor = initServerDiscoveryMonitor(uri, sdamConfig0, topologyDescription0);
 
     // Ensure the server is not in expedited mode *before* requestImmediateCheck().
-    isMasterMonitor->disableExpeditedChecking();
+    helloMonitor->disableExpeditedChecking();
 
     // No less than SdamConfiguration::kMinHeartbeatFrequency must pass before
     // requestImmediateCheck() is called in order to ensure the server reschedules for an immediate
     // check.
     auto minHeartbeatFrequency = SdamConfiguration::kMinHeartbeatFrequency;
-    checkSingleIsMaster(minHeartbeatFrequency + Milliseconds(10), hostVec[0], replSet.get());
+    checkSingleHello(minHeartbeatFrequency + Milliseconds(10), hostVec[0], replSet.get());
 
-    isMasterMonitor->requestImmediateCheck();
-    checkSingleIsMaster(minHeartbeatFrequency, hostVec[0], replSet.get());
+    helloMonitor->requestImmediateCheck();
+    checkSingleHello(minHeartbeatFrequency, hostVec[0], replSet.get());
 
     // Confirm expedited requests continue since there is no primary.
-    waitForNextIsMaster(sdamConfig0.getConnectionTimeout());
-    checkSingleIsMaster(minHeartbeatFrequency, hostVec[0], replSet.get());
+    waitForNextHello(sdamConfig0.getConnectionTimeout());
+    checkSingleHello(minHeartbeatFrequency, hostVec[0], replSet.get());
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace mongo::sdam

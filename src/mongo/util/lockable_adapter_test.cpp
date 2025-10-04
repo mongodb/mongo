@@ -27,14 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/util/lockable_adapter.h"
 
-#include "mongo/unittest/unittest.h"
-
+#include "mongo/base/string_data.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/future.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/util/lockable_adapter.h"
+#include "mongo/unittest/unittest.h"
+
+#include <future>
+#include <memory>
+#include <mutex>
+#include <system_error>
 
 namespace mongo {
 
@@ -68,7 +72,7 @@ public:
     int unlockCalls{0};
 
 private:
-    stdx::mutex _mutex;  // NOLINT
+    stdx::mutex _mutex;
 };
 
 }  // namespace
@@ -76,7 +80,7 @@ private:
 TEST(BasicLockableAdapter, TestWithConditionVariable) {
     bool ready = false;
     stdx::condition_variable_any cv;
-    stdx::mutex mut;  // NOLINT
+    stdx::mutex mut;
 
     auto result = stdx::async(stdx::launch::async, [&ready, &mut, &cv] {
         stdx::lock_guard lock(mut);
@@ -93,12 +97,12 @@ TEST(BasicLockableAdapter, TestWithConditionVariable) {
 TEST(BasicLockableAdapter, TestWithMutexTypes) {
 
     {
-        stdx::mutex mut;  // NOLINT
+        stdx::mutex mut;
         callUnderLock(mut);
     }
 
     {
-        stdx::timed_mutex mut;
+        std::timed_mutex mut;  // NOLINT
         callUnderLock(mut);
     }
 

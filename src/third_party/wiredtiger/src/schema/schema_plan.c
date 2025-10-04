@@ -56,7 +56,7 @@ cgcols:
             if (cg == 0 && table->ncolgroups > 0 && col == table->nkey_columns - 1)
                 goto cgcols;
         }
-        WT_RET_TEST(ret != WT_NOTFOUND, ret);
+        WT_RET_NOTFOUND_OK(ret);
 
         colgroup = NULL;
     }
@@ -76,11 +76,11 @@ cgcols:
 }
 
 /*
- * __wt_schema_colcheck --
+ * __wti_schema_colcheck --
  *     Check that a list of columns matches a (key,value) format pair.
  */
 int
-__wt_schema_colcheck(WT_SESSION_IMPL *session, const char *key_format, const char *value_format,
+__wti_schema_colcheck(WT_SESSION_IMPL *session, const char *key_format, const char *value_format,
   WT_CONFIG_ITEM *colconf, u_int *kcolsp, u_int *vcolsp)
 {
     WT_CONFIG conf;
@@ -98,13 +98,13 @@ __wt_schema_colcheck(WT_SESSION_IMPL *session, const char *key_format, const cha
     WT_RET(__pack_init(session, &pack, value_format));
     for (vcols = 0; (ret = __pack_next(&pack, &pv)) == 0; vcols++)
         ;
-    WT_RET_TEST(ret != WT_NOTFOUND, ret);
+    WT_RET_NOTFOUND_OK(ret);
 
     /* Walk through the named columns. */
     __wt_config_subinit(session, &conf, colconf);
     for (ncols = 0; (ret = __wt_config_next(&conf, &k, &v)) == 0; ncols++)
         ;
-    WT_RET_TEST(ret != WT_NOTFOUND, ret);
+    WT_RET_NOTFOUND_OK(ret);
 
     if (ncols != 0 && ncols != kcols + vcols)
         WT_RET_MSG(session, EINVAL,
@@ -120,11 +120,11 @@ __wt_schema_colcheck(WT_SESSION_IMPL *session, const char *key_format, const cha
 }
 
 /*
- * __wt_table_check --
+ * __wti_table_check --
  *     Make sure all columns appear in a column group.
  */
 int
-__wt_table_check(WT_SESSION_IMPL *session, WT_TABLE *table)
+__wti_table_check(WT_SESSION_IMPL *session, WT_TABLE *table)
 {
     WT_CONFIG conf;
     WT_CONFIG_ITEM k, v;
@@ -142,7 +142,7 @@ __wt_table_check(WT_SESSION_IMPL *session, WT_TABLE *table)
     for (i = 0; i < table->nkey_columns; i++)
         WT_RET(__wt_config_next(&conf, &k, &v));
     cg = col = 0;
-    coltype = 0;
+    coltype = '\0';
     while ((ret = __wt_config_next(&conf, &k, &v)) == 0) {
         if (__find_next_col(session, table, &k, &cg, &col, &coltype) != 0)
             WT_RET_MSG(session, EINVAL, "Column '%.*s' in '%s' does not appear in a column group",
@@ -153,7 +153,7 @@ __wt_table_check(WT_SESSION_IMPL *session, WT_TABLE *table)
          */
         WT_ASSERT(session, coltype == WT_PROJ_VALUE);
     }
-    WT_RET_TEST(ret != WT_NOTFOUND, ret);
+    WT_RET_NOTFOUND_OK(ret);
 
     return (0);
 }
@@ -228,15 +228,10 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table, const char *columns,
                 WT_RET(__wt_buf_catfmt(session, plan, "%c", WT_PROJ_REUSE));
             current_col = col + 1;
         }
-        /*
-         * We may fail to find a column if it is a custom extractor. In that case, treat it as the
-         * first value column: we only ever use such plans to extract the primary key from the
-         * index.
-         */
-        if (ret == WT_NOTFOUND)
-            WT_RET(__wt_buf_catfmt(session, plan, "0%c%c", WT_PROJ_VALUE, WT_PROJ_NEXT));
+
+        WT_RET_NOTFOUND_OK(ret);
     }
-    WT_RET_TEST(ret != WT_NOTFOUND, ret);
+    WT_RET_NOTFOUND_OK(ret);
 
     /* Special case empty plans. */
     if (i == 0 && plan->size == 0)
@@ -354,11 +349,11 @@ __wt_struct_reformat(WT_SESSION_IMPL *session, WT_TABLE *table, const char *colu
 }
 
 /*
- * __wt_struct_truncate --
+ * __wti_struct_truncate --
  *     Return a packing string for the first N columns in a value.
  */
 int
-__wt_struct_truncate(WT_SESSION_IMPL *session, const char *input_fmt, u_int ncols, WT_ITEM *format)
+__wti_struct_truncate(WT_SESSION_IMPL *session, const char *input_fmt, u_int ncols, WT_ITEM *format)
 {
     WT_DECL_PACK_VALUE(pv);
     WT_PACK pack;

@@ -10,8 +10,8 @@ import atomic-arch-config ;
 lib synchronization ;
 explicit synchronization ;
 
-exe has_synchronization : has_synchronization.cpp : <library>synchronization ;
-explicit has_synchronization ;
+exe has_synchronization_lib : has_synchronization_lib.cpp : <library>synchronization ;
+explicit has_synchronization_lib ;
 
 obj has_sse2 : has_sse2.cpp : <conditional>@atomic-arch-config.sse2-flags ;
 explicit has_sse2 ;

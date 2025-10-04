@@ -1,0 +1,86 @@
+version: 1.0.0
+filters:
+  - "cluster_build_info.cpp":
+    approvers:
+      - 10gen/server-programmability
+  - "cluster_hello_cmd.cpp":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "cluster_kill_op.cpp":
+    approvers:
+      - 10gen/server-programmability
+  - "cluster_killoperations_cmd.cpp":
+    approvers:
+      - 10gen/server-programmability
+  - "cluster_shutdown_cmd.cpp":
+    approvers:
+      - 10gen/server-programmability
+  - "cluster_filemd5_cmd.cpp":
+    approvers:
+      - 10gen/query-execution-router
+  - "cluster_user_management_commands.cpp":
+    approvers:
+      - 10gen/server-security
+  - "cluster_whats_my_uri_cmd.cpp":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "cluster_fle2*":
+    approvers:
+      - 10gen/server-security
+  - "document_shard_key*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "*fsync_unlock*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "*split*vector*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "*transition_from_dedicated*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "*transition_to_dedicated*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "cluster_move_chunk_cmd.cpp":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "cluster_split_cmd.cpp":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "cluster_query_without_shard_key_cmd.cpp":
+    approvers:
+      - 10gen/query-execution-router
+  - "cluster_write_without_shard_key_cmd.cpp":
+    approvers:
+      - 10gen/query-execution-router
+  - "*balanc*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "cluster_clear_jumbo_flag_cmd.cpp":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "cluster_update_zone_key_range_cmd.cpp":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "strategy.*":
+    approvers:
+      - 10gen/server-programmability
+  - "cluster_ftdc_commands.cpp":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "cluster_netstat_cmd.cpp":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "cluster_query_settings_cmds.cpp":
+    approvers:
+      - 10gen/query-execution-query-settings
+  - "cluster_rwc_defaults_commands.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
+  - "cluster_set_feature_compatibility_version_cmd.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
+  - "*read_write_concern_defaults*":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology

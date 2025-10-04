@@ -29,25 +29,48 @@
 
 #include "mongo/logv2/file_rotate_sink.h"
 
+#include <algorithm>
+#include <exception>
+#include <fstream>  // IWYU pragma: keep
+#include <iostream>
+#include <utility>
+
+#include <absl/container/flat_hash_map.h>
+#include <absl/meta/type_traits.h>
 #include <boost/exception/diagnostic_information.hpp>
+#include <boost/exception/exception.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/iterator/filter_iterator.hpp>
+#include <boost/iterator/iterator_facade.hpp>
 #include <boost/iterator/transform_iterator.hpp>
-#include <boost/make_shared.hpp>
+#include <boost/log/core/record_view.hpp>
+#include <boost/log/sinks/text_ostream_backend.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr/make_shared_object.hpp>
+#include <boost/smart_ptr/shared_ptr.hpp>
 #include <fmt/format.h>
-#include <fstream>
+// IWYU pragma: no_include "boost/system/detail/errc.hpp"
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/json_formatter.h"
-#include "mongo/logv2/log_detail.h"
-#include "mongo/logv2/shared_access_fstream.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/logv2/log_tag.h"
+#include "mongo/logv2/log_truncation.h"
+#include "mongo/logv2/shared_access_fstream.h"  // IWYU pragma: keep
+#include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/exit_code.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/string_map.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo::logv2 {
 namespace {
-
-using namespace fmt::literals;
 
 #if _WIN32
 using stream_t = Win32SharedAccessOfstream;
@@ -117,15 +140,19 @@ Status FileRotateSink::rotate(bool rename,
 
             if (!targetExists.isOK()) {
                 return Status(ErrorCodes::FileRenameFailed, targetExists.getStatus().reason())
-                    .withContext("Cannot verify whether destination already exists: {}"_format(
-                        renameTarget));
+                    .withContext(fmt::format("Cannot verify whether destination already exists: {}",
+                                             renameTarget));
             }
 
             if (targetExists.getValue()) {
                 if (onMinorError) {
-                    onMinorError({ErrorCodes::FileRenameFailed,
-                                  "Target already exists during log rotation. Skipping this file. "
-                                  "target={}, file={}"_format(renameTarget, filename)});
+                    onMinorError(
+                        {ErrorCodes::FileRenameFailed,
+                         fmt::format(
+                             "Target already exists during log rotation. Skipping this file. "
+                             "target={}, file={}",
+                             renameTarget,
+                             filename)});
                 }
                 continue;
             }
@@ -137,12 +164,15 @@ Status FileRotateSink::rotate(bool rename,
                     if (onMinorError)
                         onMinorError(
                             {ErrorCodes::FileRenameFailed,
-                             "Source file was missing during log rotation. Creating a new one. "
-                             "file={}"_format(filename)});
+                             fmt::format(
+                                 "Source file was missing during log rotation. Creating a new "
+                                 "one. file={}",
+                                 filename)});
                 } else {
-                    return Status(ErrorCodes::FileRenameFailed,
-                                  "Failed to rename {} to {}: {}"_format(
-                                      filename, renameTarget, ec.message()));
+                    return Status(
+                        ErrorCodes::FileRenameFailed,
+                        fmt::format(
+                            "Failed to rename {} to {}: {}", filename, renameTarget, ec.message()));
                 }
             }
         }
@@ -163,7 +193,9 @@ Status FileRotateSink::rotate(bool rename,
 
 void FileRotateSink::consume(const boost::log::record_view& rec,
                              const string_type& formatted_string) {
-    auto isFailed = [](const auto& file) { return file.second->fail(); };
+    auto isFailed = [](const auto& file) {
+        return file.second->fail();
+    };
     boost::log::sinks::text_ostream_backend::consume(rec, formatted_string);
     if (std::any_of(_impl->files.begin(), _impl->files.end(), isFailed)) {
         try {
@@ -189,11 +221,12 @@ void FileRotateSink::consume(const boost::log::record_view& rec,
                         LogComponent::kControl,
                         Date_t::now(),
                         4522200,
+                        getLogService(),
                         getThreadName(),
                         "Writing to log file failed, aborting application",
                         TypeErasedAttributeStorage(attrs),
                         LogTag::kNone,
-                        nullptr /* tenantID */,
+                        std::string() /* tenantID */,
                         LogTruncation::Disabled);
             // Commented out log line below to get validation of the log id with the errorcodes
             // linter LOGV2(4522200, "Writing to log file failed, aborting application");
@@ -209,7 +242,7 @@ void FileRotateSink::consume(const boost::log::record_view& rec,
         }
 
         printStackTrace(std::cerr);
-        quickExitWithoutLogging(EXIT_FAILURE);
+        quickExitWithoutLogging(ExitCode::fail);
     }
 }
 

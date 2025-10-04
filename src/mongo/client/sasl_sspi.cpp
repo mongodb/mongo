@@ -29,12 +29,6 @@
 
 #ifdef _WIN32
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
-
-#include "mongo/platform/basic.h"
-
-#include <sasl/sasl.h>
-#include <sasl/saslplug.h>
 
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
@@ -43,6 +37,11 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/text.h"
+
+#include <sasl/sasl.h>
+#include <sasl/saslplug.h>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 extern "C" int plain_client_plug_init(const sasl_utils_t* utils,
                                       int maxversion,
@@ -103,9 +102,7 @@ void HandleLastError(const sasl_utils_t* utils, DWORD errCode, const char* msg) 
     LocalFree(err);
 }
 
-int sspiClientMechNew(void* glob_context,
-                      sasl_client_params_t* cparams,
-                      void** conn_context) throw() {
+int sspiClientMechNew(void* glob_context, sasl_client_params_t* cparams, void** conn_context) {
     // Prepare auth identity to pass to AcquireCredentialsHandle
     SEC_WINNT_AUTH_IDENTITY authIdentity;
     authIdentity.Flags = SEC_WINNT_AUTH_IDENTITY_UNICODE;
@@ -199,10 +196,11 @@ int sspiClientMechNew(void* glob_context,
 
     // Then obtain all potential FQDNs for the hostname.
     std::string canonName = cparams->serverFQDN;
-    auto fqdns = getHostFQDNs(cparams->serverFQDN, saslSSPIGlobalParams.canonicalization);
-    if (!fqdns.empty()) {
+    auto fqdnsSW = getHostFQDNs(cparams->serverFQDN, saslSSPIGlobalParams.canonicalization);
+    if (fqdnsSW.isOK() && !fqdnsSW.getValue().empty()) {
         // PTR records should point to the canonical name. If there's more than one, warn and
         // arbitrarily use the last entry.
+        auto fqdns = fqdnsSW.getValue();
         if (fqdns.size() > 1) {
             LOGV2_WARNING(23933,
                           "Found multiple PTR records while performing reverse DNS",
@@ -354,7 +352,7 @@ int sspiClientMechStep(void* conn_context,
                        sasl_interact_t** prompt_need,
                        const char** clientout,
                        unsigned* clientoutlen,
-                       sasl_out_params_t* oparams) throw() {
+                       sasl_out_params_t* oparams) {
     SspiConnContext* pcctx = static_cast<SspiConnContext*>(conn_context);
     *clientout = nullptr;
     *clientoutlen = 0;
@@ -472,7 +470,8 @@ int sspiClientPluginInit(const sasl_utils_t* utils,
  * created.
  */
 MONGO_INITIALIZER_WITH_PREREQUISITES(SaslSspiClientPlugin,
-                                     ("CyrusSaslAllocatorsAndMutexes", "CyrusSaslClientContext"))
+                                     ("CyrusSaslAllocatorsAndMutexesClient",
+                                      "CyrusSaslClientContext"))
 (InitializerContext*) {
     int ret = sasl_client_add_plugin(sspiPluginName, sspiClientPluginInit);
     if (SASL_OK != ret) {
@@ -483,7 +482,8 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SaslSspiClientPlugin,
 }
 
 MONGO_INITIALIZER_WITH_PREREQUISITES(SaslPlainClientPlugin,
-                                     ("CyrusSaslAllocatorsAndMutexes", "CyrusSaslClientContext"))
+                                     ("CyrusSaslAllocatorsAndMutexesClient",
+                                      "CyrusSaslClientContext"))
 (InitializerContext*) {
     int ret = sasl_client_add_plugin("PLAIN", plain_client_plug_init);
     if (SASL_OK != ret) {

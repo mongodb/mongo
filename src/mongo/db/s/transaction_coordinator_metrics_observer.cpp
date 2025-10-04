@@ -27,9 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/transaction_coordinator_metrics_observer.h"
+
+#include "mongo/db/s/server_transaction_coordinators_metrics.h"
+#include "mongo/db/s/transaction_coordinator.h"
+#include "mongo/db/s/transaction_coordinator_structures.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -56,8 +60,9 @@ void TransactionCoordinatorMetricsObserver::onRecoveryFromFailover() {
     _singleTransactionCoordinatorStats.setRecoveredFromFailover();
 }
 
-
-void TransactionCoordinatorMetricsObserver::onStartWritingParticipantList(
+void TransactionCoordinatorMetricsObserver::onStartStep(
+    TransactionCoordinator::Step step,
+    TransactionCoordinator::Step previousStep,
     ServerTransactionCoordinatorsMetrics* serverTransactionCoordinatorsMetrics,
     TickSource* tickSource,
     Date_t curWallClockTime) {
@@ -65,87 +70,18 @@ void TransactionCoordinatorMetricsObserver::onStartWritingParticipantList(
     //
     // Per transaction coordinator stats.
     //
-    _singleTransactionCoordinatorStats.setWritingParticipantListStartTime(tickSource->getTicks(),
-                                                                          curWallClockTime);
+    _singleTransactionCoordinatorStats.setStepStartTime(
+        step, tickSource->getTicks(), curWallClockTime);
 
     //
     // Server wide transaction coordinators metrics.
     //
-
-    serverTransactionCoordinatorsMetrics->incrementTotalStartedTwoPhaseCommit();
-    serverTransactionCoordinatorsMetrics->incrementCurrentWritingParticipantList();
-}
-
-void TransactionCoordinatorMetricsObserver::onStartWaitingForVotes(
-    ServerTransactionCoordinatorsMetrics* serverTransactionCoordinatorsMetrics,
-    TickSource* tickSource,
-    Date_t curWallClockTime) {
-
-    //
-    // Per transaction coordinator stats.
-    //
-    _singleTransactionCoordinatorStats.setWaitingForVotesStartTime(tickSource->getTicks(),
-                                                                   curWallClockTime);
-
-    //
-    // Server wide transaction coordinators metrics.
-    //
-    serverTransactionCoordinatorsMetrics->decrementCurrentWritingParticipantList();
-    serverTransactionCoordinatorsMetrics->incrementCurrentWaitingForVotes();
-}
-
-void TransactionCoordinatorMetricsObserver::onStartWritingDecision(
-    ServerTransactionCoordinatorsMetrics* serverTransactionCoordinatorsMetrics,
-    TickSource* tickSource,
-    Date_t curWallClockTime) {
-
-    //
-    // Per transaction coordinator stats.
-    //
-    _singleTransactionCoordinatorStats.setWritingDecisionStartTime(tickSource->getTicks(),
-                                                                   curWallClockTime);
-
-    //
-    // Server wide transaction coordinators metrics.
-    //
-    serverTransactionCoordinatorsMetrics->decrementCurrentWaitingForVotes();
-    serverTransactionCoordinatorsMetrics->incrementCurrentWritingDecision();
-}
-
-void TransactionCoordinatorMetricsObserver::onStartWaitingForDecisionAcks(
-    ServerTransactionCoordinatorsMetrics* serverTransactionCoordinatorsMetrics,
-    TickSource* tickSource,
-    Date_t curWallClockTime) {
-
-    //
-    // Per transaction coordinator stats.
-    //
-    _singleTransactionCoordinatorStats.setWaitingForDecisionAcksStartTime(tickSource->getTicks(),
-                                                                          curWallClockTime);
-
-    //
-    // Server wide transaction coordinators metrics.
-    //
-    serverTransactionCoordinatorsMetrics->decrementCurrentWritingDecision();
-    serverTransactionCoordinatorsMetrics->incrementCurrentWaitingForDecisionAcks();
-}
-
-void TransactionCoordinatorMetricsObserver::onStartDeletingCoordinatorDoc(
-    ServerTransactionCoordinatorsMetrics* serverTransactionCoordinatorsMetrics,
-    TickSource* tickSource,
-    Date_t curWallClockTime) {
-
-    //
-    // Per transaction coordinator stats.
-    //
-    _singleTransactionCoordinatorStats.setDeletingCoordinatorDocStartTime(tickSource->getTicks(),
-                                                                          curWallClockTime);
-
-    //
-    // Server wide transaction coordinators metrics.
-    //
-    serverTransactionCoordinatorsMetrics->decrementCurrentWaitingForDecisionAcks();
-    serverTransactionCoordinatorsMetrics->incrementCurrentDeletingCoordinatorDoc();
+    serverTransactionCoordinatorsMetrics->incrementCurrentInStep(step);
+    if (step == TransactionCoordinator::Step::kWritingParticipantList) {
+        serverTransactionCoordinatorsMetrics->incrementTotalStartedTwoPhaseCommit();
+    } else {
+        serverTransactionCoordinatorsMetrics->decrementCurrentInStep(previousStep);
+    }
 }
 
 void TransactionCoordinatorMetricsObserver::onEnd(
@@ -180,24 +116,8 @@ void TransactionCoordinatorMetricsObserver::onEnd(
 void TransactionCoordinatorMetricsObserver::_decrementLastStep(
     ServerTransactionCoordinatorsMetrics* serverTransactionCoordinatorsMetrics,
     TransactionCoordinator::Step step) {
-    switch (step) {
-        case TransactionCoordinator::Step::kInactive:
-            break;
-        case TransactionCoordinator::Step::kWritingParticipantList:
-            serverTransactionCoordinatorsMetrics->decrementCurrentWritingParticipantList();
-            break;
-        case TransactionCoordinator::Step::kWaitingForVotes:
-            serverTransactionCoordinatorsMetrics->decrementCurrentWaitingForVotes();
-            break;
-        case TransactionCoordinator::Step::kWritingDecision:
-            serverTransactionCoordinatorsMetrics->decrementCurrentWritingDecision();
-            break;
-        case TransactionCoordinator::Step::kWaitingForDecisionAcks:
-            serverTransactionCoordinatorsMetrics->decrementCurrentWaitingForDecisionAcks();
-            break;
-        case TransactionCoordinator::Step::kDeletingCoordinatorDoc:
-            serverTransactionCoordinatorsMetrics->decrementCurrentDeletingCoordinatorDoc();
-            break;
+    if (step != TransactionCoordinator::Step::kInactive) {
+        serverTransactionCoordinatorsMetrics->decrementCurrentInStep(step);
     }
 }
 

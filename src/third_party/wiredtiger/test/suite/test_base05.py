@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest
+import wttest
 from wtscenario import make_scenarios
 
 # test_base05.py
@@ -34,23 +34,11 @@ from wtscenario import make_scenarios
 class test_base05(wttest.WiredTigerTestCase):
     """
     Test that various types of content can be stored
-    Test the 'english' huffman encoding with English and non-English strings.
     """
 
     table_name1 = 'test_base05a'
     table_name2 = 'test_base05b'
     nentries = 1000
-    scenarios = make_scenarios([
-        ('no_huffman', dict(extraconfig='')),
-        ('huffman_val', dict(extraconfig='huffman_value="english"')),
-        ])
-
-    def config_string(self):
-        """
-        Return any additional configuration.
-        This method may be overridden.
-        """
-        return self.extraconfig
 
     def session_create(self, name, args):
         """
@@ -157,7 +145,7 @@ class test_base05(wttest.WiredTigerTestCase):
         """
         Create entries, and read back in a cursor: key=string, value=string
         """
-        create_args = 'key_format=S,value_format=S,' + self.config_string()
+        create_args = 'key_format=S,value_format=S,'
         self.session_create("table:" + self.table_name1, create_args)
         self.pr('creating cursor')
         cursor = self.session.open_cursor('table:' + self.table_name1)
@@ -198,7 +186,7 @@ class test_base05(wttest.WiredTigerTestCase):
         non-ASCII (UTF) chars and optionally converts them to
         Unicode (considered a type separate from string in Python).
         """
-        create_args = 'key_format=S,value_format=S,' + self.config_string()
+        create_args = 'key_format=S,value_format=S,'
         self.session_create("table:" + self.table_name1, create_args)
         self.pr('creating cursor')
         cursor = self.session.open_cursor('table:' + self.table_name1)
@@ -233,6 +221,3 @@ class test_base05(wttest.WiredTigerTestCase):
         and read back in a cursor: key=string, value=string
         """
         self.do_test_table_base(True)
-
-if __name__ == '__main__':
-    wttest.run()

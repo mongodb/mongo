@@ -10,16 +10,25 @@
 
 static int copy(WT_SESSION *, const char *, const char *);
 
+/*
+ * usage --
+ *     Display a usage message for the backup command.
+ */
 static int
 usage(void)
 {
     static const char *options[] = {"-t uri",
-      "backup the named data sources (by default the entire database is backed up)", NULL, NULL};
+      "backup the named data sources (by default the entire database is backed up)", "-?",
+      "show this message", NULL, NULL};
 
     util_usage("backup [-t uri] directory", "options:", options);
     return (1);
 }
 
+/*
+ * util_backup --
+ *     The backup command.
+ */
 int
 util_backup(WT_SESSION *session, int argc, char *argv[])
 {
@@ -34,7 +43,7 @@ util_backup(WT_SESSION *session, int argc, char *argv[])
     session_impl = (WT_SESSION_IMPL *)session;
 
     target = false;
-    while ((ch = __wt_getopt(progname, argc, argv, "t:")) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "t:?")) != EOF)
         switch (ch) {
         case 't':
             if (!target) {
@@ -45,6 +54,9 @@ util_backup(WT_SESSION *session, int argc, char *argv[])
             target = true;
             break;
         case '?':
+            usage();
+            ret = 0;
+            goto done;
         default:
             WT_ERR(usage());
         }
@@ -53,6 +65,7 @@ util_backup(WT_SESSION *session, int argc, char *argv[])
 
     if (argc != 1) {
         (void)usage();
+        ret = EXIT_FAILURE;
         goto err;
     }
     directory = *argv;
@@ -81,11 +94,16 @@ util_backup(WT_SESSION *session, int argc, char *argv[])
         goto err;
     }
 
+done:
 err:
     __wt_scr_free(session_impl, &tmp);
     return (ret);
 }
 
+/*
+ * copy --
+ *     Copy a file.
+ */
 static int
 copy(WT_SESSION *session, const char *directory, const char *name)
 {
@@ -97,7 +115,7 @@ copy(WT_SESSION *session, const char *directory, const char *name)
 
     /* Build the target pathname. */
     len = strlen(directory) + strlen(name) + 2;
-    if ((to = malloc(len)) == NULL) {
+    if ((to = util_malloc(len)) == NULL) {
         fprintf(stderr, "%s: %s\n", progname, strerror(errno));
         return (1);
     }
@@ -120,6 +138,6 @@ copy(WT_SESSION *session, const char *directory, const char *name)
           session->strerror(session, ret));
 
 err:
-    free(to);
+    util_free(to);
     return (ret);
 }

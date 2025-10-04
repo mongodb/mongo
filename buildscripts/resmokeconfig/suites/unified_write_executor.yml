@@ -1,0 +1,65 @@
+# Tests for the unified write executor. Specifically, this suite runs tests which do not start their
+# own sharded cluster. Currently, this includes tests that run bulkWrite commands directly. Many of
+# them are currently commented out and we will work to re-enable them as development continues.
+
+# TODO SERVER-105762: add support for errorsOnly to UWE. (bulk_write_insert_cursor.js)
+
+test_kind: js_test
+
+selector:
+  roots:
+    # Tests from 'jstests/core'
+    - jstests/core/write/insert/*.js
+    - jstests/core/query/update/*.js
+    - jstests/core/query/delete/*.js
+    - jstests/core/query/bulk/bulk_write.js
+    - jstests/core/timeseries/write/*.js
+    - jstests/core/write/empty_ts/bypass_empty_ts_replacement_bulk_write.js
+    - jstests/core/write/empty_ts/empty_ts_bulk_write.js
+    # - jstests/core/query/bulk/bulk_write_delete_cursor.js
+    # - jstests/core/query/bulk/bulk_write_non_auth.js
+    # - jstests/core/query/bulk/bulk_write_non_retryable_cursor.js
+    # - jstests/core/query/bulk/bulk_write_update_cursor.js
+    # - jstests/core/query/bulk/bulk_write_update_per_statement_constants.js
+    # - jstests/core/write/bulk/bulk_write_insert_cursor.js
+    # - jstests/core/write/bulk/bulk_write_non_transaction.js
+    # TODO: SERVER-104139 timeseries support.
+    # - jstests/core/txns/txn_ops_allowed_on_buckets_coll.js
+  exclude_files:
+    # TODO 110636: add more failpoints to UWE and re-enable this test.
+    - jstests/core/timeseries/write/timeseries_delete_hint.js
+    - jstests/core/timeseries/write/timeseries_update_concurrent.js
+    - jstests/core/timeseries/write/timeseries_update_hint.js
+    - jstests/core/timeseries/write/timeseries_delete_with_meta_concurrent.js
+    - jstests/core/timeseries/write/timeseries_update_concurrent_arbitrary_updates_not_enabled.js
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          internalQueryUnifiedWriteExecutor: true
+  hooks:
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: ValidateCollections
+    - class: CheckOrphansDeleted
+    - class: CleanEveryN
+      n: 20
+  fixture:
+    class: ShardedClusterFixture
+    num_shards: 2
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+        internalQueryUnifiedWriteExecutor: true
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        internalQueryUnifiedWriteExecutor: true
+    num_rs_nodes_per_shard: 1

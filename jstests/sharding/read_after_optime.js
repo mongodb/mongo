@@ -1,24 +1,22 @@
 // Test read after opTime functionality with maxTimeMS on config servers (CSRS only)`.
-load("jstests/libs/logv2_helpers.js");
 
-(function() {
-'use strict';
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var shardingTest = new ShardingTest({shards: 0});
-assert(shardingTest.configRS, 'this test requires config servers to run in CSRS mode');
+let shardingTest = new ShardingTest({shards: TestData.configShard ? 1 : 0});
 
-var configReplSetTest = shardingTest.configRS;
-var primaryConn = configReplSetTest.getPrimary();
+assert(shardingTest.configRS, "this test requires config servers to run in CSRS mode");
 
-var lastOp = configReplSetTest.awaitLastOpCommitted();
-assert(lastOp, 'invalid op returned from ReplSetTest.awaitLastOpCommitted()');
+let configReplSetTest = shardingTest.configRS;
+let primaryConn = configReplSetTest.getPrimary();
 
-var config = configReplSetTest.getReplSetConfigFromNode();
-var term = lastOp.t;
+let lastOp = configReplSetTest.awaitLastOpCommitted();
+assert(lastOp, "invalid op returned from ReplSetTest.awaitLastOpCommitted()");
 
-var runFindCommand = function(ts) {
-    return primaryConn.getDB('local').runCommand({
-        find: 'oplog.rs',
+let term = lastOp.t;
+
+let runFindCommand = function (ts) {
+    return primaryConn.getDB("local").runCommand({
+        find: "oplog.rs",
         readConcern: {
             afterOpTime: {
                 ts: ts,
@@ -31,24 +29,26 @@ var runFindCommand = function(ts) {
 
 assert.commandWorked(runFindCommand(lastOp.ts));
 
-var pingIntervalSeconds = 10;
+let pingIntervalSeconds = 10;
 assert.commandFailedWithCode(
     runFindCommand(new Timestamp(lastOp.ts.getTime() + pingIntervalSeconds * 5, 0)),
-    ErrorCodes.MaxTimeMSExpired);
+    ErrorCodes.MaxTimeMSExpired,
+);
 
-var msg = 'Command on database local timed out waiting for read concern to be satisfied';
-if (isJsonLogNoConn()) {
-    msg = /Command timed out waiting for read concern to be satisfied.*"db":"local"/;
-}
+let msg = /Command timed out waiting for read concern to be satisfied.*"db":"local"/;
 
-assert.soon(function() {
-    var logMessages = assert.commandWorked(primaryConn.adminCommand({getLog: 'global'})).log;
-    for (var i = 0; i < logMessages.length; i++) {
-        if (logMessages[i].search(msg) != -1) {
-            return true;
+assert.soon(
+    function () {
+        let logMessages = assert.commandWorked(primaryConn.adminCommand({getLog: "global"})).log;
+        for (let i = 0; i < logMessages.length; i++) {
+            if (logMessages[i].search(msg) != -1) {
+                return true;
+            }
         }
-    }
-    return false;
-}, 'Did not see any log entries containing the following message: ' + msg, 60000, 300);
+        return false;
+    },
+    "Did not see any log entries containing the following message: " + msg,
+    60000,
+    300,
+);
 shardingTest.stop();
-})();

@@ -1,43 +1,15 @@
 set -euo pipefail
 
-if [ ! $(which docker) ]; then
-  sudo apt-get update
-  sudo apt-get install -yq \
-    apt-transport-https \
-    ca-certificates \
-    curl \
-    gnupg \
-    lsb-release
+# Clone our internal fork of jepsen-io/jepsen to get the core
+# functionality with a few tweaks meant for evergreen integration.
+git clone --branch=v0.3.0-evergreen-master https://x-access-token:${jepsen_github_token}@github.com/10gen/jepsen.git jepsen
 
-  if [ ! -f "/usr/share/keyrings/docker-archive-keyring.gpg" ]; then
-    curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-  fi
-
-  set +e
-  if ! grep "https://download.docker.com/linux/debian" "/etc/apt/sources.list.d/docker.list"; then
-    echo \
-      "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian \
-            $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-  fi
-  set -e
-
-  sudo apt-get update
-  sudo apt-get install -yq docker-ce docker-ce-cli containerd.io
-  sudo docker run hello-world
-fi
-
-if [ ! $(which docker-compose) ]; then
-  sudo curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/bin/docker-compose
-  sudo chmod +x /usr/bin/docker-compose
-fi
-
-sudo chmod 777 /var/run/docker.sock
-
-git clone --branch=evergreen-master git@github.com:10gen/jepsen.git jepsen
+# Copy our mongodb source for jepsen to run into the docker area to be
+# copied into the image during the build process.
 cp -rf src/dist-test jepsen/docker/node
-# place the mongodb jepsen test adjacent to the control node's Dockerfile.
-# it'll get copied into the image during the build process
-git clone --branch=no-download-master git@github.com:10gen/jepsen-io-mongodb.git jepsen/docker/control/mongodb
 
-# kill any running containers
+# Clone our internal tests to run
+git clone --branch=v0.3.0 https://x-access-token:${jepsen_io_github_token}@github.com/10gen/jepsen-io-mongodb.git jepsen/docker/control/mongodb
+
+# Kill any running containers
 sudo docker container kill $(docker ps -q) || true

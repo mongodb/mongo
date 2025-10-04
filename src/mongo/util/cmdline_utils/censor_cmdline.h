@@ -29,10 +29,10 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
+
 #include <string>
 #include <vector>
-
-#include "mongo/db/jsobj.h"
 
 namespace mongo {
 

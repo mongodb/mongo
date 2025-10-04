@@ -1,0 +1,238 @@
+June 22, 2021.
+If ./configure is absent type
+        ./autogen.sh
+        (you will need to have installed autoconf, automake
+        and libtool for autogen.sh to work)
+To build libdwarf.a, type
+        ./configure
+        make
+To build libdwarf.so, type
+        ./configure --enable-shared --disable-static
+        make
+To build  both, type
+        ./configure --enable-shared
+        make
+
+=======
+April 16, 2017: Some people have had build problems, getting
+errors like:
+"dwarf_elf_access.c:238:21: warning: assignment makes
+pointer from integer without a cast [enabled by default]
+     if ((ehdr_ident = elf_getident(elf, NULL)) == NULL) {"
+That suggests that the libelf headers needed are missing.
+On Ubuntu the command 'sudo apt-get install libelf-dev'
+should solve this problem.
+
+
+January 30, 2013: libdwarf.h is no longer in the distribution,
+but libdwarf.h.in is identical to libdwarf.h.  'configure'
+copies libdwarf.h.in to libdwarf.h and whether libelf.h defines
+'struct _Elf' or 'struct Elf' configure attempts to create
+libdwarf.h appropriately.
+
+No real install target is provided here, so 'make install' does
+not do much. One can copy either or both of libdwarf.a libdwarf.so
+to somewhere fairly standard (but intended for software you build)
+like '/usr/local/lib'.  Or anywhere else you want to copy it.
+
+To use dwarf or libdwarf, you may want to copy dwarf.h and
+a generated libdwarf.h somewhere convenient
+(possibly /usr/local/include),
+and you may need to copy the libdwarf to a convenient spot
+(/usr/local/lib is a traditional place for libraries one builds
+oneself on Unix and Linux).
+This copying is not needed to build dwarfdump.
+
+
+Multi Threading, or using threads with libdwarf (Thread Safety):
+  Nothing in libdwarf does any locking.  Every Dwarf_Debug
+  (such as returned by dwarf_init()) is fully independent
+  of all other Dwarf_Debug-s.  However, calls to libdwarf can
+  change a Dwarf_Debug. So it is unsafe to have two different
+  threads accessing a single Dwarf_Debug simultaneously.
+  It is therefore sufficient to ensure than any one Dwarf_Debug
+  is only accessed from a single thread.
+
+Warnings like
+ "warning: cast from pointer to integer of different size"
+at compile time are to be expected in dwarf_frame.c and
+dwarf_frame2.c.   Do not be alarmed.
+
+Warnings like
+ "warning: passing argument 1 of ‘dbg->de_callback_func_c’
+discards ‘const’ qualifier from pointer target type
+[enabled by default]" at compile time are to be expected in
+some pro*.c source files.  Fixing the public prototype could
+cause some producer-library user's code to fail to compile
+so we live with the warnings.
+
+When cross-compiling, gennames has to be built by the
+native compiler. So try
+  make HOSTCC=cc gennames
+as a first step before the normal make.
+
+
+If your headers are not in the expected places,
+use the make command line to add flags and include directories.
+For example
+  ./configure
+  PREINCS="-I /usr/local/share/include" POSTINCS="-I /home/x/include"  make
+PREINCS content is inserted before CFLAGS as make(1) is running.
+POSTINCS content is added after the CFLAGS value.
+
+To set LDFLAGS (which is used when building a .so and
+in building gennames to create some source here),
+do so at configure time, for example:
+  ./configure LDFLAGS="-L /var/tmp"
+Or use PRELIBS and/or POSTLIBS at 'make' time similar to the use
+of PREINCS and POSTINCS.
+
+Windows (February 2016): Those wishing to read DWARF2 or
+later from Windows PE files (using Mingw) should take a look at
+  https://github.com/jrfonseca/drmingw/tree/master/src/mgwhelp
+which shows simple LGPL code that implements the necessary object
+reading interfaces for PE objects. dwarf_pe.cpp
+fills out the Dwarf_Obj_Access_Methods
+object interface and opens an object
+(see dwarf_object_init())
+using the PE object access making the full libdwarf API
+available.
+To enable dection of Windows pathnames as full paths
+add --enable-windowspath.  Doing this does mean things like
+A:foo and \anything are treated as full paths (these are
+unlikely path names on a POSIX system but are legal
+POSIX partial paths).
+
+Back to Linux/Unix:
+It is possible to request a shared library (libdwarf.so) build with
+        --enable-shared
+To turn off the build of the archive library (libdwarf.a) specify
+        --disable-nonshared
+but in this case you must specify --enable-shared or nothing will
+build!
+
+TARGET DEPENDENCIES of .debug_frame:
+dwarf.h
+  These should be revised if you have more than the defined
+  63 'normal' registers.  It's not harmful to have these too large!
+  Too small will lead to errors reading .debug_frame and .eh_frame.
+  DW_FRAME_HIGHEST_NORMAL_REGISTER
+  DW_FRAME_LAST_REG_NUM
+
+  These you might revise, but can safely ignore if simply
+  using dwarfdump.  If using the producer code you will want
+  to get these exactly right for your architecture.
+  DW_FRAME_RA_COL
+  DW_FRAME_STATIC_LINK
+  DW_FRAME_CFA_COL
+
+libdwarf.h
+  The DW_FRAME_REG_INITIAL_VALUE #define should be set to
+  the value appropriate to your architecture. See libdwarf.h
+  for details.
+
+  If DW_REG_TABLE_SIZE is not set large enough attempts to
+  fill in the .debug_frame tables will get an error.
+  Should be at least as large as DW_FRAME_LAST_REG_NUM.
+  If it's too large nothing is harmed (but some extra space taken
+  at run time).
+
+If your printf does not support C standard %llx etc,
+(such as MSWindows with long long), configure
+option --enable-nonstandardprintf
+and defines like DW_PR_DUx etc in libdwarf.h
+provide a way to configure for that relatively easily.
+
+
+The .debug_frame is so very architecture dependent
+and because the host (where libdwarf/dwarfdump are executed)
+and target (the objects read) could be different.
+It's currently not supported to have dwarfdump/libdwarf determine
+the architecture on-the-fly and do-the-right-thing.
+Just setting DW_FRAME_LAST_REG_NUM and DW_FRAME_HIGHEST_NORMAL_REGISTER
+and DW_REG_TABLE_SIZE high enough will likely suffice for most
+purposes and most compilers/architectures..
+See comments in dwarf.h/libdwarf.h.
+
+It's perfectly safe to ignore the above suggestions as long
+as libdwarf does not get a DW_DLE_DF_REG_NUM_TOO_HIGH error.
+(which would only happen on reading .debug_frame or .eh_frame data).
+
+If you intend to use the libdwarf dwarf-producer code
+for .debug_frame information
+you must do a thorough analysys and revise dwarf.h
+substantially to match the output target architecture.
+
+In general, in the producer code, numbers are copied from and
+to integers with memcpy().  In case of endianness problems,
+constants set in dwarf_producer_init() can fix the problems.
+If one wants to produce a *different-endian* output the best
+solution is to change the integer memcpy calls to call thru a
+new dbg-based function pointer and have it 'do the right thing'
+to adjust endianness.  Set the function pointer correctly in
+dwarf_producer_init() and the rest of the code will just call
+thru the function pointer.  Tedious work to find and change the
+memcpy calls to be dbg->de_memcpy(), but once done the code is
+no longer endian dependent (right now there is no way to ask
+for cross-endian: a new flag needed or ?).
+
+leb128 numbers are endian-independent, so nothing need be
+done with those for cross-endian support (the storage
+of leb128 on disk is always little-endian).
+
+The .ps files are postscript. So those who cannot deal with mm
+format files but do have a postscript printer (or have
+ghostscript) can print the documents.
+This form was chosen before pdf format existed...
+
+libdwarf2.1.pdf documents a way for a debugger to read dwarf information.
+libdwarf2p.1.pdf documents a way for a compiler to generate dwarf information.
+mips_extensions.ps documents the mips/sgi extensions to dwarf.
+
+See the Makefile for the commands used to build pdf files
+libdwarf.2.1.pdf and libdwarf1p.1.pdf.
+
+pic is a picture processing tool (ATT command).
+tbl is a table-processing tool.
+(part of Documentor's Work Bench on ATT-like systems).
+tbl and pic are available on linux.
+
+psroff is a name for a troff-like processor, part of
+Documentor's Work Bench on IRIX. Substitute a
+troff-like or nroff-like processor (GNU groff works fine).
+
+To use dwarf or libdwarf, you may want to install dwarf.h and
+libdwarf.h somewhere convenient.
+
+You will also need libelf (libelf.a and/or libelf.so) and
+libelf.h installed. These are available from GNU repositories
+and from the normal Linux repositories for Linux releases.
+On Ubuntu Linux for example:
+        sudo apt-get install libelf-dev libelf1
+
+Compiler warnings:
+A few Warnings like:
+dwarf_frame.c:715:29: warning: cast from pointer to integer of different size [-
+Wpointer-to-int-cast]
+dwarf_arange.c:113:13: warning: variable ‘local_extension_size’ set but not used
+ [-Wunused-but-set-variable]
+are considered normal.
+
+
+As of January 2013 the code compiles with gcc without
+problems with -Wall and -Wsign-compare
+aside from the warnings hinted at above.
+
+The following gcc/clang options
+have not all been tried as of January 2013,
+but will be as time permits.
+-Wsystem-headers
+-Wall  -Wsign-compare
+-Wno-format-y2k -W
+-Wno-unused-parameter -Wstrict-prototypes
+-Wmissing-prototypes -Wpointer-arith
+-Wreturn-type -Wcast-qual -Wwrite-strings
+-Wswitch -Wshadow -Wunused-parameter
+-Wcast-align -Wchar-subscripts -Winline
+-Wnested-externs -Wredundant-decls
+-Wold-style-definition -Wno-pointer-sign

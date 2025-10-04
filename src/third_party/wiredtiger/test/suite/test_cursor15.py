@@ -31,7 +31,6 @@
 #
 
 import wttest
-from wiredtiger import stat
 
 class test_cursor15(wttest.WiredTigerTestCase):
     tablename = 'test_read_once'
@@ -65,6 +64,3 @@ class test_cursor15(wttest.WiredTigerTestCase):
             for key, value in cursor:
                 pass
             cursor.close()
-
-if __name__ == '__main__':
-    wttest.run()

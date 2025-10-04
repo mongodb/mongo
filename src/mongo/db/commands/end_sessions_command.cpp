@@ -27,16 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/base/init.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/client.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/sessions_commands_gen.h"
-#include "mongo/db/logical_session_cache.h"
-#include "mongo/db/logical_session_id_helpers.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_cache.h"
+#include "mongo/db/session/logical_session_id_helpers.h"
+#include "mongo/rpc/op_msg.h"
+
+#include <memory>
+#include <set>
+#include <string>
 
 namespace mongo {
 namespace {
@@ -58,6 +61,12 @@ public:
 
     std::string help() const final {
         return "end a set of logical sessions";
+    }
+
+    // We should allow users to end sessions even if the user does not have the direct shard roles
+    // action type.
+    bool shouldSkipDirectConnectionChecks() const final {
+        return true;
     }
 
     /**
@@ -83,9 +92,7 @@ public:
         void doCheckAuthorization(OperationContext* opCtx) const final {
             // It is always ok to run this command, as long as you are authenticated
             // as some user, if auth is enabled.
-            uassert(ErrorCodes::Unauthorized,
-                    "Not authorized to run endSessions command",
-                    AuthorizationSession::get(opCtx->getClient())->getSingleUser());
+            // requiresAuth() => true covers this for us.
         }
 
         Reply typedRun(OperationContext* opCtx) final {
@@ -95,8 +102,8 @@ public:
             return Reply();
         }
     };
-
-} endSessionsCommand;
+};
+MONGO_REGISTER_COMMAND(EndSessionsCommand).forRouter().forShard();
 
 }  // namespace
 }  // namespace mongo

@@ -1,0 +1,18 @@
+==== VARIATION: matchExpression=TypeMatchExpression
+a $type: { 0: "number" }
+
+==== VARIATION: taggedMatchExpression=TypeMatchExpression
+a $type: { 0: "number" } || Selected Index #2 pos 0 combine 1
+
+==== VARIATION: matchExpression=InternalSchemaTypeExpression
+a $_internalSchemaType: { 0: "number" }
+
+==== VARIATION: taggedMatchExpression=InternalSchemaTypeExpression
+a $_internalSchemaType: { 0: "number" } || Selected Index #2 pos 0 combine 1
+
+==== VARIATION: matchExpression=InternalSchemaBinDataSubTypeExpression
+ $_internalSchemaBinDataSubType: general
+
+==== VARIATION: taggedMatchExpression=InternalSchemaBinDataSubTypeExpression
+ $_internalSchemaBinDataSubType: general || Selected Index #2 pos 0 combine 1
+

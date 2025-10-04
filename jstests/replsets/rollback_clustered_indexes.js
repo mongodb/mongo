@@ -2,24 +2,20 @@
  * Tests that writes on collections clustered by _id can be rolled back.
  * @tags: [
  *   requires_replication,
- *   requires_wiredtiger,
  * ]
  */
-(function() {
-'use strict';
-
-load('jstests/replsets/libs/rollback_test.js');
-load('jstests/replsets/libs/rollback_files.js');
-load("jstests/libs/uuid_util.js");
+import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
+import {checkRollbackFiles} from "jstests/replsets/libs/rollback_files.js";
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 // Operations that will be present on both nodes, before the common point.
-const dbName = 'test';
-const collName = 'test.system.buckets.t';
-const collNameShort = 'system.buckets.t';
+const dbName = jsTestName();
+const collName = "testColl";
+const fullCollName = `${dbName}.${collName}`;
 let commonOps = (node) => {
     const db = node.getDB(dbName);
-    assert.commandWorked(db.createCollection(collNameShort, {clusteredIndex: true}));
-    const coll = node.getCollection(collName);
+    assert.commandWorked(db.createCollection(collName, {clusteredIndex: {key: {_id: 1}, unique: true}}));
+    const coll = node.getCollection(fullCollName);
     assert.commandWorked(coll.createIndex({a: 1, b: -1}));
     assert.commandWorked(coll.insert({a: 0, b: 0}));
 };
@@ -27,7 +23,7 @@ let commonOps = (node) => {
 // Operations that will be performed on the rollback node past the common point.
 let rollbackDocs = [];
 let rollbackOps = (node) => {
-    const coll = node.getCollection(collName);
+    const coll = node.getCollection(fullCollName);
     let doc;
     doc = {_id: new ObjectId(), a: 1, b: 3};
     assert.commandWorked(coll.insert(doc));
@@ -57,15 +53,14 @@ rollbackTest.transitionToSteadyStateOperations();
 
 // Check collection count.
 const primary = rollbackTest.getPrimary();
-const coll = primary.getCollection(collName);
+const coll = primary.getCollection(fullCollName);
 assert.eq(1, coll.find().itcount());
 assert.eq(1, coll.count());
 
 // Confirm that the rollback wrote deleted documents to a file.
 const replTest = rollbackTest.getTestFixture();
 
-const uuid = getUUIDFromListCollections(rollbackTest.getPrimary().getDB(dbName), collNameShort);
-checkRollbackFiles(replTest.getDbPath(rollbackNode), collName, uuid, rollbackDocs);
+const uuid = getUUIDFromListCollections(rollbackTest.getPrimary().getDB(dbName), collName);
+checkRollbackFiles(replTest.getDbPath(rollbackNode), fullCollName, uuid, rollbackDocs);
 
 rollbackTest.stop();
-})();

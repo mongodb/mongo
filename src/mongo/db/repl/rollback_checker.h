@@ -29,9 +29,14 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
+#include "mongo/util/net/hostandport.h"
+
+#include <functional>
 
 namespace mongo {
 namespace repl {
@@ -58,7 +63,7 @@ namespace repl {
  * 4) Repeat steps 2 and 3 as needed.
  *
  */
-class RollbackChecker {
+class MONGO_MOD_PUB RollbackChecker {
     RollbackChecker(const RollbackChecker&) = delete;
     RollbackChecker& operator=(const RollbackChecker&) = delete;
 
@@ -104,7 +109,7 @@ public:
 private:
     // Assumes a lock has been taken. Returns if a rollback has occurred by comparing the remoteRBID
     // provided and the stored baseline rbid. Sets _lastRBID to the remoteRBID provided.
-    bool _checkForRollback_inlock(int remoteRBID);
+    bool _checkForRollback(WithLock lk, int remoteRBID);
 
     // Schedules a remote command to get the rbid at the sync source and then calls the nextAction.
     // If there is an error scheduling the call, it returns the error from
@@ -112,13 +117,13 @@ private:
     StatusWith<CallbackHandle> _scheduleGetRollbackId(const RemoteCommandCallbackFn& nextAction);
 
     // Assumes a lock has been taken. Sets the current rbid used as the baseline for rollbacks.
-    void _setRBID_inlock(int rbid);
+    void _setRBID(WithLock lk, int rbid);
 
     // Not owned by us.
     executor::TaskExecutor* const _executor;
 
     // Protects member data of this RollbackChecker.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("RollbackChecker::_mutex");
+    mutable stdx::mutex _mutex;
 
     // The sync source to check for rollbacks against.
     HostAndPort _syncSource;

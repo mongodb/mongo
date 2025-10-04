@@ -27,13 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/query/explain_common.h"
 
+#include "mongo/bson/util/builder.h"
+#include "mongo/db/curop.h"
+#include "mongo/db/query/query_knob_configuration.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/server_parameter.h"
 #include "mongo/util/net/socket_utils.h"
+#include "mongo/util/str.h"
 #include "mongo/util/version.h"
 
 namespace mongo::explain_common {
@@ -48,23 +52,33 @@ void generateServerInfo(BSONObjBuilder* out) {
     serverBob.doneFast();
 }
 
-void generateServerParameters(BSONObjBuilder* out) {
+void generateServerParameters(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                              BSONObjBuilder* out) {
     BSONObjBuilder serverBob(out->subobjStart("serverParameters"));
-    out->appendNumber("internalQueryFacetBufferSizeBytes",
-                      internalQueryFacetBufferSizeBytes.load());
+    appendStageMemoryLimitsToExplain(*out);
     out->appendNumber("internalQueryFacetMaxOutputDocSizeBytes",
                       internalQueryFacetMaxOutputDocSizeBytes.load());
     out->appendNumber("internalLookupStageIntermediateDocumentMaxSizeBytes",
                       internalLookupStageIntermediateDocumentMaxSizeBytes.load());
-    out->appendNumber("internalDocumentSourceGroupMaxMemoryBytes",
-                      internalDocumentSourceGroupMaxMemoryBytes.load());
-    out->appendNumber("internalQueryMaxBlockingSortMemoryUsageBytes",
-                      internalQueryMaxBlockingSortMemoryUsageBytes.load());
     out->appendNumber("internalQueryProhibitBlockingMergeOnMongoS",
                       internalQueryProhibitBlockingMergeOnMongoS.load());
     out->appendNumber("internalQueryMaxAddToSetBytes", internalQueryMaxAddToSetBytes.load());
-    out->appendNumber("internalDocumentSourceSetWindowFieldsMaxMemoryBytes",
-                      internalDocumentSourceSetWindowFieldsMaxMemoryBytes.load());
+    auto queryControl = expCtx->getQueryKnobConfiguration().getInternalQueryFrameworkControlForOp();
+    out->append("internalQueryFrameworkControl", QueryFrameworkControl_serializer(queryControl));
+    out->appendNumber("internalQueryPlannerIgnoreIndexWithCollationForRegex",
+                      internalQueryPlannerIgnoreIndexWithCollationForRegex.load());
+}
+
+void generateQueryShapeHash(OperationContext* opCtx, BSONObjBuilder* out) {
+    if (auto&& queryShapeHash = mongo::CurOp::get(opCtx)->debug().getQueryShapeHash()) {
+        out->append("queryShapeHash", queryShapeHash->toHexString());
+    }
+}
+
+void generatePeakTrackedMemBytes(const OperationContext* opCtx, BSONObjBuilder* out) {
+    if (int64_t peakTrackedMemBytes = mongo::CurOp::get(opCtx)->getPeakTrackedMemoryBytes()) {
+        out->append("peakTrackedMemBytes", peakTrackedMemBytes);
+    }
 }
 
 bool appendIfRoom(const BSONObj& toAppend, StringData fieldName, BSONObjBuilder* out) {

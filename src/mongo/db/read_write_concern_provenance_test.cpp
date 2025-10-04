@@ -27,12 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/jsobj.h"
 #include "mongo/db/read_write_concern_provenance.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {
@@ -106,36 +114,33 @@ DEATH_TEST(ReadWriteConcernProvenanceTest,
 }
 
 TEST(ReadWriteConcernProvenanceTest, ParseAbsentElement) {
-    BSONObj obj = BSON("something"
-                       << "else");
-    auto provenance = ReadWriteConcernProvenance::parse(
-        IDLParserErrorContext("ReadWriteConcernProvenanceTest"), obj);
+    BSONObj obj = BSON("something" << "else");
+    auto provenance =
+        ReadWriteConcernProvenance::parse(IDLParserContext("ReadWriteConcernProvenanceTest"), obj);
     ASSERT_FALSE(provenance.hasSource());
 }
 
 TEST(ReadWriteConcernProvenanceTest, ParseNonString) {
     BSONObj obj = BSON("provenance" << 42);
-    ASSERT_THROWS_CODE(ReadWriteConcernProvenance::parse(
-                           IDLParserErrorContext("ReadWriteConcernProvenanceTest"), obj),
-                       DBException,
-                       ErrorCodes::TypeMismatch);
+    ASSERT_THROWS_CODE(
+        ReadWriteConcernProvenance::parse(IDLParserContext("ReadWriteConcernProvenanceTest"), obj),
+        DBException,
+        ErrorCodes::TypeMismatch);
 }
 
 TEST(ReadWriteConcernProvenanceTest, ParseValidSource) {
-    BSONObj obj = BSON("provenance"
-                       << "clientSupplied");
-    auto provenance = ReadWriteConcernProvenance::parse(
-        IDLParserErrorContext("ReadWriteConcernProvenanceTest"), obj);
+    BSONObj obj = BSON("provenance" << "clientSupplied");
+    auto provenance =
+        ReadWriteConcernProvenance::parse(IDLParserContext("ReadWriteConcernProvenanceTest"), obj);
     ASSERT_TRUE(ReadWriteConcernProvenance::Source::clientSupplied == provenance.getSource());
 }
 
 TEST(ReadWriteConcernProvenanceTest, ParseInvalidSource) {
-    BSONObj obj = BSON("provenance"
-                       << "foobar");
-    ASSERT_THROWS_CODE(ReadWriteConcernProvenance::parse(
-                           IDLParserErrorContext("ReadWriteConcernProvenanceTest"), obj),
-                       DBException,
-                       ErrorCodes::BadValue);
+    BSONObj obj = BSON("provenance" << "foobar");
+    ASSERT_THROWS_CODE(
+        ReadWriteConcernProvenance::parse(IDLParserContext("ReadWriteConcernProvenanceTest"), obj),
+        DBException,
+        ErrorCodes::BadValue);
 }
 
 TEST(ReadWriteConcernProvenanceTest, SerializeUnset) {
@@ -149,9 +154,7 @@ TEST(ReadWriteConcernProvenanceTest, SerializeSet) {
     ReadWriteConcernProvenance provenance(ReadWriteConcernProvenance::Source::clientSupplied);
     BSONObjBuilder builder;
     provenance.serialize(&builder);
-    ASSERT_BSONOBJ_EQ(BSON("provenance"
-                           << "clientSupplied"),
-                      builder.obj());
+    ASSERT_BSONOBJ_EQ(BSON("provenance" << "clientSupplied"), builder.obj());
 }
 
 }  // namespace

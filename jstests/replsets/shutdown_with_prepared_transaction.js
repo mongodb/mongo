@@ -3,9 +3,8 @@
  *
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
-(function() {
-"use strict";
-load("jstests/core/txns/libs/prepare_helpers.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const replTest = new ReplSetTest({nodes: 1});
 replTest.startSet();
@@ -35,4 +34,3 @@ jsTestLog("Shutting down the set with the transaction still in prepare state");
 // Skip validation during ReplSetTest cleanup since validate() will block behind the prepared
 // transaction's locks when trying to take a collection X lock.
 replTest.stopSet(null /*signal*/, false /*forRestart*/, {skipValidation: true});
-}());

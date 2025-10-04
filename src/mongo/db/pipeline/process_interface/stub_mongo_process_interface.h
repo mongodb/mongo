@@ -29,9 +29,9 @@
 
 #pragma once
 
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
-
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -46,34 +46,78 @@ class StubMongoProcessInterface : public MongoProcessInterface {
 public:
     StubMongoProcessInterface() : MongoProcessInterface(nullptr) {}
     using MongoProcessInterface::MongoProcessInterface;
-    virtual ~StubMongoProcessInterface() = default;
+    ~StubMongoProcessInterface() override = default;
 
     std::unique_ptr<TransactionHistoryIteratorBase> createTransactionHistoryIterator(
         repl::OpTime time) const override {
         MONGO_UNREACHABLE;
     }
 
+    class StubWriteSizeEstimator final : public WriteSizeEstimator {
+    public:
+        int estimateInsertHeaderSize(
+            const write_ops::InsertCommandRequest& insertReq) const override {
+            return 0;
+        }
+
+        int estimateUpdateHeaderSize(
+            const write_ops::UpdateCommandRequest& insertReq) const override {
+            return 0;
+        }
+
+        int estimateInsertSizeBytes(const BSONObj& insert) const override {
+            MONGO_UNREACHABLE;
+        }
+
+        int estimateUpdateSizeBytes(const BatchObject& batchObject,
+                                    UpsertType type) const override {
+            MONGO_UNREACHABLE;
+        }
+    };
+
+    std::unique_ptr<WriteSizeEstimator> getWriteSizeEstimator(
+        OperationContext* opCtx, const NamespaceString& ns) const override {
+        return std::make_unique<StubWriteSizeEstimator>();
+    }
+
+    bool isExpectedToExecuteQueries() override {
+        return false;
+    }
+
     bool isSharded(OperationContext* opCtx, const NamespaceString& ns) override {
         return false;
     }
+
+    boost::optional<ShardId> determineSpecificMergeShard(
+        OperationContext* opCtx, const NamespaceString& nss) const override {
+        return boost::none;
+    };
 
     void updateClientOperationTime(OperationContext* opCtx) const override {}
 
     Status insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                   const NamespaceString& ns,
-                  std::vector<BSONObj>&& objs,
+                  std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
                   const WriteConcernOptions& wc,
                   boost::optional<OID>) override {
         MONGO_UNREACHABLE;
     }
 
+    Status insertTimeseries(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                            const NamespaceString& ns,
+                            std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
+                            const WriteConcernOptions& wc,
+                            boost::optional<OID> targetEpoch) override {
+        MONGO_UNREACHABLE;
+    }
+
     StatusWith<UpdateResult> update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                     const NamespaceString& ns,
-                                    BatchedObjects&& batch,
+                                    std::unique_ptr<write_ops::UpdateCommandRequest> updateCommand,
                                     const WriteConcernOptions& wc,
                                     UpsertType upsert,
                                     bool multi,
-                                    boost::optional<OID>) final {
+                                    boost::optional<OID>) override {
         MONGO_UNREACHABLE;
     }
 
@@ -84,9 +128,26 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    std::list<BSONObj> getIndexSpecs(OperationContext* opCtx,
-                                     const NamespaceString& ns,
-                                     bool includeBuildUUIDs) override {
+    std::vector<BSONObj> getIndexSpecs(OperationContext* opCtx,
+                                       const NamespaceString& ns,
+                                       bool includeBuildUUIDs) override {
+        MONGO_UNREACHABLE;
+    }
+
+    std::deque<BSONObj> listCatalog(OperationContext* opCtx) const override {
+        MONGO_UNREACHABLE;
+    }
+
+    void createTimeseriesView(OperationContext* opCtx,
+                              const NamespaceString& ns,
+                              const BSONObj& cmdObj,
+                              const TimeseriesOptions& userOpts) final {
+        MONGO_UNREACHABLE;
+    }
+
+    boost::optional<BSONObj> getCatalogEntry(OperationContext* opCtx,
+                                             const NamespaceString& ns,
+                                             const boost::optional<UUID>& collUUID) const override {
         MONGO_UNREACHABLE;
     }
 
@@ -97,10 +158,11 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    Status appendStorageStats(OperationContext* opCtx,
+    Status appendStorageStats(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                               const NamespaceString& nss,
                               const StorageStatsSpec& spec,
-                              BSONObjBuilder* builder) const override {
+                              BSONObjBuilder* builder,
+                              const boost::optional<BSONObj>& filterObj) const override {
         MONGO_UNREACHABLE;
     }
 
@@ -116,22 +178,46 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    void appendOperationStats(OperationContext* opCtx,
+                              const NamespaceString& nss,
+                              BSONObjBuilder* builder) const override {
+        MONGO_UNREACHABLE;
+    }
+
     BSONObj getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) override {
+        MONGO_UNREACHABLE;
+    }
+
+    UUID fetchCollectionUUIDFromPrimary(OperationContext* opCtx, const NamespaceString& nss) final {
+        MONGO_UNREACHABLE;
+    }
+
+    query_shape::CollectionType getCollectionType(OperationContext* opCtx,
+                                                  const NamespaceString& nss) final {
         MONGO_UNREACHABLE;
     }
 
     void renameIfOptionsAndIndexesHaveNotChanged(
         OperationContext* opCtx,
-        const BSONObj& renameCommandObj,
+        const NamespaceString& sourceNs,
         const NamespaceString& targetNs,
+        bool dropTarget,
+        bool stayTemp,
         const BSONObj& originalCollectionOptions,
-        const std::list<BSONObj>& originalIndexes) override {
+        const std::vector<BSONObj>& originalIndexes) override {
         MONGO_UNREACHABLE;
     }
 
     void createCollection(OperationContext* opCtx,
-                          const std::string& dbName,
+                          const DatabaseName& dbName,
                           const BSONObj& cmdObj) override {
+        MONGO_UNREACHABLE;
+    }
+
+    void createTempCollection(OperationContext* opCtx,
+                              const NamespaceString& nss,
+                              const BSONObj& collectionOptions,
+                              boost::optional<ShardId> dataShard) override {
         MONGO_UNREACHABLE;
     }
 
@@ -140,14 +226,43 @@ public:
                                         const std::vector<BSONObj>& indexSpecs) override {
         MONGO_UNREACHABLE;
     }
+
     void dropCollection(OperationContext* opCtx, const NamespaceString& ns) override {
         MONGO_UNREACHABLE;
     }
 
-    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
+    void dropTempCollection(OperationContext* opCtx, const NamespaceString& nss) override {
+        MONGO_UNREACHABLE;
+    }
+
+    std::unique_ptr<Pipeline> finalizeAndMaybePreparePipelineForExecution(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        Pipeline* ownedPipeline,
+        bool attachCursorAfterOptimizing,
+        std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                           Pipeline* pipeline,
+                           CollectionMetadata collData)> finalizePipeline = nullptr,
+        ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
+        boost::optional<BSONObj> readConcern = boost::none,
+        bool shouldUseCollectionDefaultCollator = false) override {
+        MONGO_UNREACHABLE;
+    }
+
+    std::unique_ptr<Pipeline> preparePipelineForExecution(
         Pipeline* pipeline,
         ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
         boost::optional<BSONObj> readConcern = boost::none) override {
+        MONGO_UNREACHABLE;
+    }
+
+    std::unique_ptr<Pipeline> preparePipelineForExecution(
+        const boost::intrusive_ptr<mongo::ExpressionContext>& expCtx,
+        const AggregateCommandRequest& aggRequest,
+        Pipeline* pipeline,
+        boost::optional<BSONObj> shardCursorsSortSpec = boost::none,
+        ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
+        boost::optional<BSONObj> readConcern = boost::none,
+        bool shouldUseCollectionDefaultCollator = false) override {
         MONGO_UNREACHABLE;
     }
 
@@ -156,13 +271,24 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipelineForLocalRead(
-        Pipeline* pipeline) override {
+    std::unique_ptr<Pipeline> attachCursorSourceToPipelineForLocalRead(
+        Pipeline* pipeline,
+        boost::optional<const AggregateCommandRequest&> aggRequest = boost::none,
+        bool shouldUseCollectionDefaultCollator = false,
+        ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{}) override {
         MONGO_UNREACHABLE;
     }
 
-    std::unique_ptr<ShardFilterer> getShardFilterer(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx) const override {
+    std::unique_ptr<Pipeline> finalizeAndAttachCursorToPipelineForLocalRead(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        Pipeline* ownedPipeline,
+        bool attachCursorAfterOptimizing,
+        std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                           Pipeline* pipeline,
+                           CollectionMetadata collData)> finalizePipeline = nullptr,
+        bool shouldUseCollectionDefaultCollator = false,
+        boost::optional<const AggregateCommandRequest&> aggRequest = boost::none,
+        ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{}) override {
         MONGO_UNREACHABLE;
     }
 
@@ -171,8 +297,7 @@ public:
                                        CurrentOpSessionsMode sessionMode,
                                        CurrentOpUserMode userMode,
                                        CurrentOpTruncateMode truncateMode,
-                                       CurrentOpCursorMode cursorMode,
-                                       CurrentOpBacktraceMode backtraceMode) const override {
+                                       CurrentOpCursorMode cursorMode) const override {
         MONGO_UNREACHABLE;
     }
 
@@ -180,31 +305,43 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    boost::optional<ShardId> getShardId(OperationContext* opCtx) const override {
+        return boost::none;
+    }
+
+    bool inShardedEnvironment(OperationContext* opCtx) const override {
+        MONGO_UNREACHABLE;
+    }
+
     std::string getHostAndPort(OperationContext* opCtx) const override {
         MONGO_UNREACHABLE;
     }
 
-    std::pair<std::vector<FieldPath>, bool> collectDocumentKeyFieldsForHostedCollection(
-        OperationContext*, const NamespaceString&, UUID) const override {
-        MONGO_UNREACHABLE;
-    }
-
     std::vector<FieldPath> collectDocumentKeyFieldsActingAsRouter(
-        OperationContext*, const NamespaceString&) const override {
+        OperationContext*,
+        const NamespaceString&,
+        RoutingContext* routingCtx = nullptr) const override {
         MONGO_UNREACHABLE;
     }
 
     boost::optional<Document> lookupSingleDocument(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const NamespaceString& nss,
-        UUID collectionUUID,
+        boost::optional<UUID> collectionUUID,
         const Document& documentKey,
-        boost::optional<BSONObj> readConcern) {
+        boost::optional<BSONObj> readConcern) override {
         MONGO_UNREACHABLE;
     }
 
+    boost::optional<Document> lookupSingleDocumentLocally(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const NamespaceString& nss,
+        const Document& documentKey) override {
+        MONGO_UNREACHABLE_TASSERT(6148002);
+    }
+
     std::vector<GenericCursor> getIdleCursors(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                              CurrentOpUserMode userMode) const {
+                                              CurrentOpUserMode userMode) const override {
         MONGO_UNREACHABLE;
     }
 
@@ -213,11 +350,11 @@ public:
         return BackupCursorState{UUID::gen(), boost::none, nullptr, {}};
     }
 
-    void closeBackupCursor(OperationContext* opCtx, const UUID& backupId) final {}
+    void closeBackupCursor(OperationContext* opCtx, const UUID& backupId) override {}
 
     BackupCursorExtendState extendBackupCursor(OperationContext* opCtx,
                                                const UUID& backupId,
-                                               const Timestamp& extendTo) final {
+                                               const Timestamp& extendTo) override {
         return {{}};
     }
 
@@ -227,16 +364,11 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    bool fieldsHaveSupportingUniqueIndex(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                         const NamespaceString& nss,
-                                         const std::set<FieldPath>& fieldPaths) const override {
-        return true;
-    }
-
-    boost::optional<ChunkVersion> refreshAndGetCollectionVersion(
+    SupportingUniqueIndex fieldsHaveSupportingUniqueIndex(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const NamespaceString& nss) const override {
-        return boost::none;
+        const NamespaceString& nss,
+        const std::set<FieldPath>& fieldPaths) const override {
+        return SupportingUniqueIndex::Full;
     }
 
     void checkRoutingInfoEpochOrThrow(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -245,68 +377,74 @@ public:
         uasserted(51019, "Unexpected check of routing table");
     }
 
-    std::unique_ptr<ResourceYielder> getResourceYielder() const override {
-        return nullptr;
+    std::vector<DatabaseName> getAllDatabases(OperationContext* opCtx,
+                                              boost::optional<TenantId> tenantId) override {
+        MONGO_UNREACHABLE_TASSERT(9525801);
     }
 
-    std::pair<std::set<FieldPath>, boost::optional<ChunkVersion>>
-    ensureFieldsUniqueOrResolveDocumentKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                           boost::optional<std::set<FieldPath>> fieldPaths,
-                                           boost::optional<ChunkVersion> targetCollectionVersion,
-                                           const NamespaceString& outputNs) const override {
+    std::vector<BSONObj> runListCollections(OperationContext* opCtx,
+                                            const DatabaseName& db,
+                                            bool addPrimaryShard) override {
+        MONGO_UNREACHABLE_TASSERT(9525802);
+    }
+
+    DocumentKeyResolutionMetadata ensureFieldsUniqueOrResolveDocumentKey(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        boost::optional<std::set<FieldPath>> fieldPaths,
+        boost::optional<ChunkVersion> targetCollectionPlacementVersion,
+        const NamespaceString& outputNs) const override {
         if (!fieldPaths) {
-            return {std::set<FieldPath>{"_id"}, targetCollectionVersion};
+            return {std::set<FieldPath>{"_id"},
+                    targetCollectionPlacementVersion,
+                    SupportingUniqueIndex::Full};
         }
 
-        return {*fieldPaths, targetCollectionVersion};
+        return {*fieldPaths, targetCollectionPlacementVersion, SupportingUniqueIndex::Full};
     }
 
-    void setExpectedShardVersion(OperationContext* opCtx,
-                                 const NamespaceString& nss,
-                                 boost::optional<ChunkVersion> chunkVersion) override {
-        // Do nothing.
+    std::unique_ptr<ScopedExpectUnshardedCollection> expectUnshardedCollectionInScope(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const boost::optional<DatabaseVersion>& dbVersion) override {
+        class ScopedExpectUnshardedCollectionNoop : public ScopedExpectUnshardedCollection {
+        public:
+            ScopedExpectUnshardedCollectionNoop() = default;
+        };
+
+        return std::make_unique<ScopedExpectUnshardedCollectionNoop>();
     }
 
-    void unsetExpectedDbVersion(OperationContext* opCtx, const NamespaceString& nss) override {
-        // Do nothing.
-    }
-
-    bool setExpectedDbVersion(OperationContext* opCtx,
-                              const NamespaceString& nss,
-                              DatabaseVersion dbVersion) override {
-        return false;
-    }
-
-    void checkOnPrimaryShardForDb(OperationContext* opCtx, const NamespaceString& nss) override {
-        // Do nothing.
-    }
-
-    std::unique_ptr<TemporaryRecordStore> createTemporaryRecordStore(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, KeyFormat keyFormat) const {
+    std::unique_ptr<SpillTable> createSpillTable(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, KeyFormat keyFormat) const override {
         MONGO_UNREACHABLE;
     }
 
-    void writeRecordsToRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                   RecordStore* rs,
-                                   std::vector<Record>* records,
-                                   const std::vector<Timestamp>& ts) const {
+    void writeRecordsToSpillTable(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                  SpillTable& spillTable,
+                                  std::vector<Record>* records) const override {
         MONGO_UNREACHABLE;
     }
 
-    Document readRecordFromRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                       RecordStore* rs,
-                                       RecordId rID) const {
+    Document readRecordFromSpillTable(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                      const SpillTable& spillTable,
+                                      RecordId rID) const override {
         MONGO_UNREACHABLE;
     }
 
-    void deleteRecordFromRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                     RecordStore* rs,
-                                     RecordId rID) const {
+    bool checkRecordInSpillTable(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                 const SpillTable& spillTable,
+                                 RecordId rID) const override {
         MONGO_UNREACHABLE;
     }
 
-    void truncateRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                             RecordStore* rs) const {
+    void deleteRecordFromSpillTable(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                    SpillTable& spillTable,
+                                    RecordId rID) const override {
+        MONGO_UNREACHABLE;
+    }
+
+    void truncateSpillTable(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                            SpillTable& spillTable) const override {
         MONGO_UNREACHABLE;
     }
 };

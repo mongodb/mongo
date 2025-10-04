@@ -1,9 +1,5 @@
-(function() {
-'use strict';
+import {runAllRoleManagementCommandsTests} from "jstests/auth/role_management_commands_lib.js";
 
-load('jstests/auth/role_management_commands_lib.js');
-
-var conn = MongoRunner.runMongod({auth: '', useHostname: false});
+let conn = MongoRunner.runMongod({auth: "", useHostname: false});
 runAllRoleManagementCommandsTests(conn);
 MongoRunner.stopMongod(conn);
-})();

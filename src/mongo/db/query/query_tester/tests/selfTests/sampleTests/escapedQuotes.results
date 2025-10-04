@@ -1,0 +1,112 @@
+escapedQuotes
+escapedQuotes
+escapedQuotes.coll as fuzzer_coll
+
+0
+:results {aggregate: "fuzzer_coll", pipeline: [{$project: {a: 1, fieldLength: {$strLenCP: "$a"}}}], cursor: {}}
+[
+{"_id":0,"a":"\"","fieldLength":1},
+{"_id":1,"a":"\"\"","fieldLength":2},
+{"_id":2,"a":"\"Yippee!\"","fieldLength":9},
+{"_id":3,"a":"\"Yippee!\" she said","fieldLength":18},
+{"_id":4,"a":"\"Yippee!\" she said. \"That's the right attitude.\" he chuckled.","fieldLength":61},
+{"_id":5,"a":"'","fieldLength":1},
+{"_id":6,"a":"''","fieldLength":2},
+{"_id":7,"a":"'Yippee!'","fieldLength":9},
+{"_id":8,"a":"","fieldLength":0},
+{"_id":9,"a":"\\","fieldLength":1},
+{"_id":10,"a":"\n","fieldLength":1},
+{"_id":11,"a":"\b","fieldLength":1},
+{"_id":12,"a":"\f","fieldLength":1},
+{"_id":13,"a":"\r","fieldLength":1},
+{"_id":14,"a":"\t","fieldLength":1}
+]
+
+1
+:results {aggregate: "fuzzer_coll", pipeline: [{$match: {a: ""}}], cursor: {}}
+[
+{"_id":8,"a":""}
+]
+
+2
+:results {aggregate: "fuzzer_coll", pipeline: [{$match: {a: "Yippee!"}}], cursor: {}}
+[
+]
+
+3
+:results {aggregate: "fuzzer_coll", pipeline: [{$match: {a: "\""}}], cursor: {}}
+[
+{"_id":0,"a":"\""}
+]
+
+4
+:results {aggregate: "fuzzer_coll", pipeline: [{$match: {a: "\"\""}}], cursor: {}}
+[
+{"_id":1,"a":"\"\""}
+]
+
+5
+:results {aggregate: "fuzzer_coll", pipeline: [{$match: {a: "\"Yippee!\""}}], cursor: {}}
+[
+{"_id":2,"a":"\"Yippee!\""}
+]
+
+6
+:results {aggregate: "fuzzer_coll", pipeline: [{$match: {a: ''}}], cursor: {}}
+[
+{"_id":8,"a":""}
+]
+
+7
+:results {aggregate: "fuzzer_coll", pipeline: [{$match: {a: '\''}}], cursor: {}}
+[
+{"_id":5,"a":"'"}
+]
+
+8
+:results {aggregate: "fuzzer_coll", pipeline: [{$match: {a: '\'\''}}], cursor: {}}
+[
+{"_id":6,"a":"''"}
+]
+
+9
+:results {aggregate: "fuzzer_coll", pipeline: [{$match: {a: '\'Yippee!\''}}], cursor: {}}
+[
+{"_id":7,"a":"'Yippee!'"}
+]
+
+10
+:results {aggregate: "fuzzer_coll", pipeline: [{$match: {a: "\\"}}], cursor: {}}
+[
+{"_id":9,"a":"\\"}
+]
+
+11
+:results {aggregate: "fuzzer_coll", pipeline: [{$match: {a: "\n"}}], cursor: {}}
+[
+{"_id":10,"a":"\n"}
+]
+
+12
+:results {aggregate: "fuzzer_coll", pipeline: [{$match: {a: "\b"}}], cursor: {}}
+[
+{"_id":11,"a":"\b"}
+]
+
+13
+:results {aggregate: "fuzzer_coll", pipeline: [{$match: {a: "\f"}}], cursor: {}}
+[
+{"_id":12,"a":"\f"}
+]
+
+14
+:results {aggregate: "fuzzer_coll", pipeline: [{$match: {a: "\r"}}], cursor: {}}
+[
+{"_id":13,"a":"\r"}
+]
+
+15
+:results {aggregate: "fuzzer_coll", pipeline: [{$match: {a: "\t"}}], cursor: {}}
+[
+{"_id":14,"a":"\t"}
+]

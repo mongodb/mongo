@@ -1,0 +1,15 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/query-execution-router
+  - "OWNERS.yml":
+    approvers:
+      - 10gen/query-execution-staff-leads
+      - 10gen/query-integration-staff-leads
+  - "document_source_merge_cursors*":
+    approvers:
+      - 10gen/query-execution-classic
+  - "collect_query_stats_mongos.*":
+    approvers:
+      - 10gen/query-integration-observability

@@ -1,0 +1,332 @@
+# Golden test output of GoldenGenExpressionTest/TestExprDate
+ExpressionDateAdd
+
+    let [
+        l2.0 = getField(s1, "date1") 
+    ] 
+    in 
+        if (typeMatch(l2.0, 1088) ?: true) 
+        then null 
+        elif !(isTimezone(s2, "America/New_York")) 
+        then fail(7157903, "$dateAdd expects a valid timezone") 
+        elif typeMatch(l2.0, 131712) 
+        then dateAdd(s2, move(l2.0), "quarter", 1ll, "America/New_York") 
+        else fail(7157904, "$dateAdd must have startDate argument convertable to date") 
+
+# Golden test output of GoldenGenExpressionTest/TestExprDate
+ExpressionDateSubtract
+
+    let [
+        l4.0 = getField(s1, "date1") 
+    ] 
+    in 
+        if (typeMatch(l4.0, 1088) ?: true) 
+        then null 
+        elif !(isTimezone(s2, "America/New_York")) 
+        then fail(7157903, "$dateSubtract expects a valid timezone") 
+        elif typeMatch(l4.0, 131712) 
+        then dateAdd(s2, move(l4.0), "week", -1ll, "America/New_York") 
+        else fail(7157904, "$dateSubtract must have startDate argument convertable to date") 
+
+# Golden test output of GoldenGenExpressionTest/TestExprDate
+ExpressionDateDiff
+
+    let [
+        l6.0 = getField(s1, "date1") 
+        l6.1 = getField(s1, "date2") 
+    ] 
+    in 
+        if (typeMatch(l6.0, 1088) ?: true) 
+        then null 
+        elif (typeMatch(l6.1, 1088) ?: true) 
+        then null 
+        elif !(isTimezone(s2, "America/New_York")) 
+        then fail(7157920, "$dateDiff parameter 'timezone' must be a valid timezone") 
+        elif !(typeMatch(l6.0, 131712)) 
+        then fail(7157921, "$dateDiff parameter 'startDate' must be coercible to date") 
+        elif typeMatch(l6.1, 131712) 
+        then dateDiff(s2, move(l6.0), move(l6.1), "week", "America/New_York") 
+        else fail(7157922, "$dateDiff parameter 'endDate' must be coercible to date") 
+
+# Golden test output of GoldenGenExpressionTest/TestExprDate
+ExpressionDateFromString
+
+    let [
+        l8.0 = getField(s1, "dateStr") 
+    ] 
+    in 
+        if (typeMatch(l8.0, 1088) ?: true) 
+        then null 
+        elif isString(l8.0) 
+        then dateFromString(s2, move(l8.0), "GMT", "%m/%d/%Y %H:%M:%S") 
+        else fail(241, "$dateFromString requires that 'dateString' be a string") 
+
+# Golden test output of GoldenGenExpressionTest/TestExprDate
+ExpressionDateFromParts
+dateParts(s2, 2024ll, 11ll, 18ll, 14ll, 30ll, 15ll, 0, "UTC") 
+# Golden test output of GoldenGenExpressionTest/TestExprDate
+ExpressionDateToParts
+
+    let [
+        l23.0 = getField(s1, "date1") 
+    ] 
+    in 
+        if !(isTimezone(s2, "UTC")) 
+        then fail(7157913, "$dateToParts timezone must be a valid timezone") 
+        elif (typeMatch(l23.0, 1088) ?: true) 
+        then null 
+        elif typeMatch(l23.0, 131712) 
+        then dateToParts(s2, move(l23.0), "UTC", false) 
+        else fail(7157915, "$dateToParts date must have the format of a date") 
+
+# Golden test output of GoldenGenExpressionTest/TestExprDate
+ExpressionDateToString
+
+    let [
+        l25.0 = getField(s1, "date1") 
+        l25.1 = dateToString(s2, l25.0, "%m/%d/%Y %H:%M:%S", "UTC") 
+    ] 
+    in 
+        if exists(l25.1) 
+        then makeOwn(move(l25.1)) 
+        elif (typeMatch(l25.0, 1088) ?: true) 
+        then false 
+        elif typeMatch(move(l25.0), 131712) 
+        then Nothing 
+        else fail(4997901, "$dateToString parameter 'date' must be coercible to date") 
+
+# Golden test output of GoldenGenExpressionTest/TestExprDate
+ExpressionDateTrunc
+
+    let [
+        l28.0 = getField(s1, "date1") 
+        l28.1 = dateTrunc(s2, l28.0, "week", 1ll, "UTC", "sun") 
+    ] 
+    in 
+        if exists(l28.1) 
+        then makeOwn(move(l28.1)) 
+        else 
+            if (typeMatch(l28.0, 1088) ?: true) 
+            then null 
+            elif typeMatch(move(l28.0), 131712) 
+            then Nothing 
+            else fail(7157932, "$dateTrunc parameter 'date' must be coercible to date") 
+
+# Golden test output of GoldenGenExpressionTest/TestExprDate
+ExpressionDayOfMonth
+
+    let [
+        l30.0 = getField(s1, "date1") 
+        l30.1 = dayOfMonth(l30.0, TimeZone(UTC)) 
+    ] 
+    in 
+        if exists(l30.1) 
+        then makeOwn(move(l30.1)) 
+        elif (typeMatch(l30.0, 1088) ?: true) 
+        then null 
+        elif typeMatch(move(l30.0), 131712) 
+        then Nothing 
+        else fail(5157904, "dayOfMonth parameter 'date' must be coercible to date") 
+
+# Golden test output of GoldenGenExpressionTest/TestExprDate
+ExpressionDayOfWeek
+
+    let [
+        l32.0 = getField(s1, "date1") 
+        l32.1 = dayOfWeek(l32.0, TimeZone(UTC)) 
+    ] 
+    in 
+        if exists(l32.1) 
+        then makeOwn(move(l32.1)) 
+        elif (typeMatch(l32.0, 1088) ?: true) 
+        then null 
+        elif typeMatch(move(l32.0), 131712) 
+        then Nothing 
+        else fail(5157904, "dayOfWeek parameter 'date' must be coercible to date") 
+
+# Golden test output of GoldenGenExpressionTest/TestExprDate
+ExpressionDayOfYear
+
+    let [
+        l34.0 = getField(s1, "date1") 
+        l34.1 = dayOfYear(l34.0, TimeZone(UTC)) 
+    ] 
+    in 
+        if exists(l34.1) 
+        then makeOwn(move(l34.1)) 
+        elif (typeMatch(l34.0, 1088) ?: true) 
+        then null 
+        elif typeMatch(move(l34.0), 131712) 
+        then Nothing 
+        else fail(5157904, "dayOfYear parameter 'date' must be coercible to date") 
+
+# Golden test output of GoldenGenExpressionTest/TestExprDate
+ExpressionHour
+
+    let [
+        l36.0 = getField(s1, "date1") 
+        l36.1 = hour(l36.0, TimeZone(UTC)) 
+    ] 
+    in 
+        if exists(l36.1) 
+        then makeOwn(move(l36.1)) 
+        elif (typeMatch(l36.0, 1088) ?: true) 
+        then null 
+        elif typeMatch(move(l36.0), 131712) 
+        then Nothing 
+        else fail(5157904, "hour parameter 'date' must be coercible to date") 
+
+# Golden test output of GoldenGenExpressionTest/TestExprDate
+ExpressionMillisecond
+
+    let [
+        l38.0 = getField(s1, "date1") 
+        l38.1 = millisecond(l38.0, TimeZone(UTC)) 
+    ] 
+    in 
+        if exists(l38.1) 
+        then makeOwn(move(l38.1)) 
+        elif (typeMatch(l38.0, 1088) ?: true) 
+        then null 
+        elif typeMatch(move(l38.0), 131712) 
+        then Nothing 
+        else fail(5157904, "millisecond parameter 'date' must be coercible to date") 
+
+# Golden test output of GoldenGenExpressionTest/TestExprDate
+ExpressionMinute
+
+    let [
+        l40.0 = getField(s1, "date1") 
+        l40.1 = minute(l40.0, TimeZone(UTC)) 
+    ] 
+    in 
+        if exists(l40.1) 
+        then makeOwn(move(l40.1)) 
+        elif (typeMatch(l40.0, 1088) ?: true) 
+        then null 
+        elif typeMatch(move(l40.0), 131712) 
+        then Nothing 
+        else fail(5157904, "minute parameter 'date' must be coercible to date") 
+
+# Golden test output of GoldenGenExpressionTest/TestExprDate
+ExpressionMonth
+
+    let [
+        l42.0 = getField(s1, "date1") 
+        l42.1 = month(l42.0, TimeZone(UTC)) 
+    ] 
+    in 
+        if exists(l42.1) 
+        then makeOwn(move(l42.1)) 
+        elif (typeMatch(l42.0, 1088) ?: true) 
+        then null 
+        elif typeMatch(move(l42.0), 131712) 
+        then Nothing 
+        else fail(5157904, "month parameter 'date' must be coercible to date") 
+
+# Golden test output of GoldenGenExpressionTest/TestExprDate
+ExpressionSecond
+
+    let [
+        l44.0 = getField(s1, "date1") 
+        l44.1 = second(l44.0, TimeZone(UTC)) 
+    ] 
+    in 
+        if exists(l44.1) 
+        then makeOwn(move(l44.1)) 
+        elif (typeMatch(l44.0, 1088) ?: true) 
+        then null 
+        elif typeMatch(move(l44.0), 131712) 
+        then Nothing 
+        else fail(5157904, "second parameter 'date' must be coercible to date") 
+
+# Golden test output of GoldenGenExpressionTest/TestExprDate
+ExpressionWeek
+
+    let [
+        l46.0 = getField(s1, "date1") 
+        l46.1 = week(l46.0, TimeZone(UTC)) 
+    ] 
+    in 
+        if exists(l46.1) 
+        then makeOwn(move(l46.1)) 
+        elif (typeMatch(l46.0, 1088) ?: true) 
+        then null 
+        elif typeMatch(move(l46.0), 131712) 
+        then Nothing 
+        else fail(5157904, "week parameter 'date' must be coercible to date") 
+
+# Golden test output of GoldenGenExpressionTest/TestExprDate
+ExpressionIsoWeekYear
+
+    let [
+        l48.0 = getField(s1, "date1") 
+        l48.1 = isoWeekYear(l48.0, TimeZone(UTC)) 
+    ] 
+    in 
+        if exists(l48.1) 
+        then makeOwn(move(l48.1)) 
+        elif (typeMatch(l48.0, 1088) ?: true) 
+        then null 
+        elif typeMatch(move(l48.0), 131712) 
+        then Nothing 
+        else fail(5157904, "isoWeekYear parameter 'date' must be coercible to date") 
+
+# Golden test output of GoldenGenExpressionTest/TestExprDate
+ExpressionIsoDayOfWeek
+
+    let [
+        l50.0 = getField(s1, "date1") 
+        l50.1 = isoDayOfWeek(l50.0, TimeZone(UTC)) 
+    ] 
+    in 
+        if exists(l50.1) 
+        then makeOwn(move(l50.1)) 
+        elif (typeMatch(l50.0, 1088) ?: true) 
+        then null 
+        elif typeMatch(move(l50.0), 131712) 
+        then Nothing 
+        else fail(5157904, "isoDayOfWeek parameter 'date' must be coercible to date") 
+
+# Golden test output of GoldenGenExpressionTest/TestExprDate
+ExpressionYear
+
+    let [
+        l52.0 = getField(s1, "date1") 
+        l52.1 = year(l52.0, TimeZone(UTC)) 
+    ] 
+    in 
+        if exists(l52.1) 
+        then makeOwn(move(l52.1)) 
+        elif (typeMatch(l52.0, 1088) ?: true) 
+        then null 
+        elif typeMatch(move(l52.0), 131712) 
+        then Nothing 
+        else fail(5157904, "year parameter 'date' must be coercible to date") 
+
+# Golden test output of GoldenGenExpressionTest/TestExprDate
+ExpressionTsSecond
+
+    let [
+        l54.0 = getField(s1, "ts") 
+    ] 
+    in 
+        if (typeMatch(l54.0, 1088) ?: true) 
+        then null 
+        elif isTimestamp(l54.0) 
+        then tsSecond(move(l54.0)) 
+        else fail(7157900, "$tsSecond expects argument of type timestamp") 
+
+# Golden test output of GoldenGenExpressionTest/TestExprDate
+ExpressionTsIncrement
+
+    let [
+        l56.0 = getField(s1, "ts") 
+    ] 
+    in 
+        if (typeMatch(l56.0, 1088) ?: true) 
+        then null 
+        elif isTimestamp(l56.0) 
+        then tsIncrement(move(l56.0)) 
+        else fail(7157901, "$tsIncrement expects argument of type timestamp") 
+

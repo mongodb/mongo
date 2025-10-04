@@ -29,23 +29,41 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <memory>
-
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/authorization_router.h"
 #include "mongo/db/auth/builtin_roles.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/privilege_format.h"
+#include "mongo/db/auth/resolve_role_option.h"
 #include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/auth/restriction_set.h"
+#include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/auth/user_name.h"
+#include "mongo/db/client.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/stdx/unordered_set.h"
+
+#include <cstdint>
+#include <memory>
+#include <vector>
+
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
 class AuthorizationSession;
-class AuthzManagerExternalState;
+class Client;
 class OperationContext;
 class ServiceContext;
 
@@ -86,11 +104,11 @@ class AuthorizationManager {
     AuthorizationManager& operator=(const AuthorizationManager&) = delete;
 
 public:
-    static AuthorizationManager* get(ServiceContext* service);
-    static AuthorizationManager* get(ServiceContext& service);
-    static void set(ServiceContext* service, std::unique_ptr<AuthorizationManager> authzManager);
+    static AuthorizationManager* get(Service* service);
+    static AuthorizationManager* get(Service& service);
+    static void set(Service* service, std::unique_ptr<AuthorizationManager> authzManager);
 
-    static std::unique_ptr<AuthorizationManager> create(ServiceContext* serviceContext);
+    static std::unique_ptr<AuthorizationManager> create(Service* service);
 
     AuthorizationManager() = default;
 
@@ -105,14 +123,6 @@ public:
     static constexpr StringData V1_USER_NAME_FIELD_NAME = "user"_sd;
     static constexpr StringData V1_USER_SOURCE_FIELD_NAME = "userSource"_sd;
 
-    static const NamespaceString adminCommandNamespace;
-    static const NamespaceString rolesCollectionNamespace;
-    static const NamespaceString usersBackupCollectionNamespace;
-    static const NamespaceString usersCollectionNamespace;
-    static const NamespaceString versionCollectionNamespace;
-    static const NamespaceString defaultTempUsersCollectionNamespace;  // for mongorestore
-    static const NamespaceString defaultTempRolesCollectionNamespace;  // for mongorestore
-
     /**
      * Status to be returned when authentication fails. Being consistent about our returned Status
      * prevents information leakage.
@@ -120,50 +130,29 @@ public:
     static const Status authenticationFailedStatus;
 
     /**
-     * Query to match the auth schema version document in the versionCollectionNamespace.
+     * Query to match the auth schema version document in the versionCollectionNamespace while
+     * upserting it on FCV downgrade.
      */
     static const BSONObj versionDocumentQuery;
 
     /**
-     * Name of the field in the auth schema version document containing the current schema
-     * version.
+     * Name of the field in the auth schema version document containing the current schema version.
      */
     static constexpr StringData schemaVersionFieldName = "currentVersion"_sd;
-
-    /**
-     * Value used to represent that the schema version is not cached or invalid.
-     */
-    static const int schemaVersionInvalid = 0;
-
-    /**
-     * Auth schema version for MongoDB v2.4 and prior.
-     */
-    static const int schemaVersion24 = 1;
-
-    /**
-     * Auth schema version for MongoDB v2.6 during the upgrade process.  Same as
-     * schemaVersion26Final, except that user documents are found in admin.new.users, and user
-     * management commands are disabled.
-     */
-    static const int schemaVersion26Upgrade = 2;
-
-    /**
-     * Auth schema version for MongoDB 2.6 and 3.0 MONGODB-CR/SCRAM mixed auth mode.
-     * Users are stored in admin.system.users, roles in admin.system.roles.
-     */
-    static const int schemaVersion26Final = 3;
 
     /**
      * Auth schema version for MongoDB 3.0 SCRAM only mode.
      * Users are stored in admin.system.users, roles in admin.system.roles.
      * MONGODB-CR credentials have been replaced with SCRAM credentials in the user documents.
+     * Note - this is the only supported auth schema version now. It is left simply so that
+     * it can be supplied in the output of {getParameter: {authSchemaVersion: 1}}.
      */
-    static const int schemaVersion28SCRAM = 5;
+    static constexpr int schemaVersion28SCRAM = 5;
 
     /**
      * Returns a new AuthorizationSession for use with this AuthorizationManager.
      */
-    virtual std::unique_ptr<AuthorizationSession> makeAuthorizationSession() = 0;
+    virtual std::unique_ptr<AuthorizationSession> makeAuthorizationSession(Client* client) = 0;
 
     /**
      * Sets whether or not startup AuthSchema validation checks should be applied in this manager.
@@ -186,15 +175,6 @@ public:
     virtual bool isAuthEnabled() const = 0;
 
     /**
-     * Returns via the output parameter "version" the version number of the authorization
-     * system.  Returns Status::OK() if it was able to successfully fetch the current
-     * authorization version.  If it has problems fetching the most up to date version it
-     * returns a non-OK status.  When returning a non-OK status, *version will be set to
-     * schemaVersionInvalid (0).
-     */
-    virtual Status getAuthorizationVersion(OperationContext* opCtx, int* version) = 0;
-
-    /**
      * The value reported by this method must change every time some persisted authorization rule
      * gets modified. It serves as a means for consumers of authorization data to discover that
      * something changed and that they need to re-cache.
@@ -215,103 +195,26 @@ public:
     virtual bool hasAnyPrivilegeDocuments(OperationContext* opCtx) = 0;
 
     /**
-     * Delegates method call to the underlying AuthzManagerExternalState.
+     * This method is used to indicate that an operation has occurred that may affect
+     * the user cache. Delegates method call to the underlying AuthorizationRouter.
+     * Note that this method is not expected to be called on the router Service.
+     * Doing so will result in a no-op.
      */
-    virtual Status getUserDescription(OperationContext* opCtx,
-                                      const UserName& userName,
-                                      BSONObj* result) = 0;
+    virtual void notifyDDLOperation(OperationContext* opCtx,
+                                    StringData op,
+                                    const NamespaceString& nss,
+                                    const BSONObj& o,
+                                    const BSONObj* o2) = 0;
 
     /**
-     * Delegates method call to the underlying AuthzManagerExternalState.
-     */
-    virtual Status rolesExist(OperationContext* opCtx, const std::vector<RoleName>& roleNames) = 0;
-
-    /**
-     * Options for what data resolveRoles() should mine from the role tree.
-     *
-     * kRoles:        Collect RoleNames in the "roles" field in each role document for subordinates.
-     * kPrivileges:   Examine the "privileges" field in each role document and
-     *                merge "actions" for identicate "resource" patterns.
-     * kRestrictions: Collect the "authenticationRestrictions" field in each role document.
-     *
-     * kDirectOnly:   If specified, only the RoleNames explicitly supplied to resolveRoles()
-     *                will be examined.
-     *                If not specified, then resolveRoles() will continue examining all
-     *                subordinate roles until the tree has been exhausted.
-     *
-     * kAll, kDirectRoles, kDirectPrivileges, kDirectRestrictions, and kDirectAll
-     * exist as convenience aliases for combinations of the above flags.
-     */
-    enum ResolveRoleOption : std::uint8_t {
-
-        kRoles = 0x01,
-        kPrivileges = 0x02,
-        kRestrictions = 0x04,
-        kAll = kRoles | kPrivileges | kRestrictions,
-
-        // Only collect from the first pass.
-        kDirectOnly = 0x10,
-
-        kDirectRoles = kRoles | kDirectOnly,
-        kDirectPrivileges = kPrivileges | kDirectOnly,
-        kDirectRestrictions = kRestrictions | kDirectOnly,
-        kDirectAll = kAll | kDirectOnly,
-    };
-
-    /**
-     * Return type for resolveRoles().
-     * Each member will be populated ONLY IF their corresponding Option flag was specifed.
-     * Otherwise, they will be equal to boost::none.
-     */
-    struct ResolvedRoleData {
-        boost::optional<stdx::unordered_set<RoleName>> roles;
-        boost::optional<PrivilegeVector> privileges;
-        boost::optional<RestrictionDocuments> restrictions;
-    };
-
-    /**
-     * Delegates method call to the underlying AuthzManagerExternalState.
-     */
-    virtual StatusWith<ResolvedRoleData> resolveRoles(OperationContext* opCtx,
-                                                      const std::vector<RoleName>& roleNames,
-                                                      ResolveRoleOption option) = 0;
-
-    /**
-     * Delegates method call to the underlying AuthzManagerExternalState.
-     */
-    virtual Status getRolesDescription(OperationContext* opCtx,
-                                       const std::vector<RoleName>& roleName,
-                                       PrivilegeFormat privilegeFormat,
-                                       AuthenticationRestrictionsFormat,
-                                       std::vector<BSONObj>* result) = 0;
-
-    /**
-     * Delegates method call to the underlying AuthzManagerExternalState.
-     */
-    virtual Status getRolesAsUserFragment(OperationContext* opCtx,
-                                          const std::vector<RoleName>& roleName,
-                                          AuthenticationRestrictionsFormat,
-                                          BSONObj* result) = 0;
-
-    /**
-     * Delegates method call to the underlying AuthzManagerExternalState.
-     */
-    virtual Status getRoleDescriptionsForDB(OperationContext* opCtx,
-                                            StringData dbname,
-                                            PrivilegeFormat privilegeFormat,
-                                            AuthenticationRestrictionsFormat,
-                                            bool showBuiltinRoles,
-                                            std::vector<BSONObj>* result) = 0;
-
-    /**
-     * Returns a Status or UserHandle for the given userName. If the user cache already has a
-     * user object for this user, it returns a handle from the cache, otherwise it reads the
-     * user document from disk or LDAP - this may block for a long time.
+     * Returns a Status or UserHandle for the given userRequest. If the user cache already has a
+     * user object for this user, it returns a handle from the cache, otherwise it retrieves the
+     * user via a usersInfo command routed to the appropriate node - this may block for a long time.
      *
      * The returned user may be invalid by the time the caller gets access to it.
      */
     virtual StatusWith<UserHandle> acquireUser(OperationContext* opCtx,
-                                               const UserName& userName) = 0;
+                                               std::unique_ptr<UserRequest> userRequest) = 0;
 
     /**
      * Validate the ID associated with a known user while refreshing session cache.
@@ -322,12 +225,23 @@ public:
     /**
      * Marks the given user as invalid and removes it from the user cache.
      */
-    virtual void invalidateUserByName(OperationContext* opCtx, const UserName& user) = 0;
+    virtual void invalidateUserByName(const UserName& user) = 0;
 
     /**
-     * Invalidates all users who's source is "dbname" and removes them from the user cache.
+     * Invalidates all users whose source is "dbname" and removes them from the user cache.
      */
-    virtual void invalidateUsersFromDB(OperationContext* opCtx, StringData dbname) = 0;
+    virtual void invalidateUsersFromDB(const DatabaseName& dbname) = 0;
+
+    /**
+     * Invalidate all users associated with a given tenant,
+     * or entire cache if tenant == boost::none.
+     */
+    virtual void invalidateUsersByTenant(const boost::optional<TenantId>& tenant) = 0;
+
+    /**
+     * Invalidates all of the contents of the user cache.
+     */
+    virtual void invalidateUserCache() = 0;
 
     /**
      * Retrieves all users whose source is "$external" and checks if the corresponding user in the
@@ -343,38 +257,12 @@ public:
      */
     virtual Status initialize(OperationContext* opCtx) = 0;
 
-    /**
-     * Invalidates all of the contents of the user cache.
-     */
-    virtual void invalidateUserCache(OperationContext* opCtx) = 0;
+    virtual std::vector<AuthorizationRouter::CachedUserInfo> getUserCacheInfo() const = 0;
 
     /**
-     * Sets the list of users that should be pinned in memory.
-     *
-     * This will start the PinnedUserTracker thread if it hasn't been started already.
+     * Return type for resolveRoles().
+     * Each member will be populated ONLY IF their corresponding Option flag was specifed.
+     * Otherwise, they will be equal to boost::none.
      */
-    virtual void updatePinnedUsersList(std::vector<UserName> names) = 0;
-
-    /**
-     * Hook called by replication code to let the AuthorizationManager observe changes
-     * to relevant collections.
-     */
-    virtual void logOp(OperationContext* opCtx,
-                       StringData opstr,
-                       const NamespaceString& nss,
-                       const BSONObj& obj,
-                       const BSONObj* patt) = 0;
-
-    /*
-     * Represents a user in the user cache.
-     */
-    struct CachedUserInfo {
-        UserName userName;  // The username of the user
-        bool active;        // Whether the user is currently in use by a thread (a thread has
-                            // called acquireUser and still owns the returned shared_ptr)
-    };
-
-    virtual std::vector<CachedUserInfo> getUserCacheInfo() const = 0;
 };
-
 }  // namespace mongo

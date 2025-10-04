@@ -1,9 +1,10 @@
 /**
  * Sample file to demonstrate various clang-format messages
  */
-#include <stdio.h>
-#include <vector>
 #include <string>
+#include <vector>
+
+#include <stdio.h>
 
 // NamespaceIndentation: None
 namespace foo {
@@ -13,9 +14,10 @@ int foo;
 namespace bar {
 int bar;
 
+
 namespace {
 int anony;
-}  // namespace anony
+}  // namespace
 
 }  // namespace bar
 

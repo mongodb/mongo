@@ -29,12 +29,14 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/util/duration.h"
+
 #include <string>
 #include <vector>
 
-#include "mongo/base/status.h"
-#include "mongo/util/duration.h"
+#include <boost/optional.hpp>
 
 namespace mongo {
 
@@ -44,6 +46,32 @@ class Environment;
 }  // namespace optionenvironment
 
 namespace moe = mongo::optionenvironment;
+
+/**
+ * The sole purpose of this class is to avoid compilation errors with the definition of 'nokillop'
+ * field in shell_options.idl which the generated option parser requires assignment operator for the
+ * field to work but AtomicWord<T> does not support assignment operator(s).
+ */
+class AssignableAtomicBool {
+public:
+    AssignableAtomicBool() = default;
+    explicit AssignableAtomicBool(bool value) : _value(value) {}
+
+    AssignableAtomicBool& operator=(bool value) {
+        store(value);
+        return *this;
+    }
+
+    bool load() const {
+        return _value.load();
+    }
+    void store(bool value) {
+        _value.store(value);
+    }
+
+private:
+    Atomic<bool> _value;
+};
 
 struct ShellGlobalParams {
     std::string url;
@@ -78,8 +106,13 @@ struct ShellGlobalParams {
     bool shouldUseImplicitSessions = true;
 
     int jsHeapLimitMB = 0;
-    bool nokillop = false;
+    AssignableAtomicBool nokillop{false};
     Seconds idleSessionTimeout = Seconds{0};
+
+#ifdef MONGO_CONFIG_GRPC
+    bool gRPC = false;
+    boost::optional<std::string> gRPCAuthToken;
+#endif
 };
 
 extern ShellGlobalParams shellGlobalParams;

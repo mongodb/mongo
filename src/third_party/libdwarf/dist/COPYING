@@ -1,0 +1,25 @@
+                       COPYING
+                    August 6 2023
+
+The source code in the libdwarf directory is LGPL version
+2.1.  See libdwarf/LIBDWARFCOPYRIGHT libdwarf/LGPL.txt A
+few of files use the two-clause BSD copyright ("FreeBSD
+License").
+
+The source code in the dwarfdump directory is
+generally GPL version 2. See dwarfdump/COPYING
+dwarfdump/DWARFDUMPCOPYRIGHT dwarfdump/GPL.txt a
+
+A few files in some directories may have the 3-clause
+BSD copyright.
+
+The source code in the dwarfgen directory generally has
+the two-clause BSD copyright.  See dwarfgen/COPYING
+
+Various files begin with a copyright and a notice
+saying the file is PUBLIC DOMAIN (sometimes spelled
+public domain).  Such files can be copied, modified,
+and used by anyone for any purpose without attribution
+or restriction.  Example source code is marked as public
+domain as we expect many people will use such as a starting
+point in their code.

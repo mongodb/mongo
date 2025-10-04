@@ -27,20 +27,62 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/query/plan_yield_policy_sbe.h"
 
+#include "mongo/db/query/yield_policy_callbacks_impl.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
+
 namespace mongo {
+std::unique_ptr<PlanYieldPolicySBE> PlanYieldPolicySBE::make(
+    OperationContext* opCtx,
+    PlanYieldPolicy::YieldPolicy policy,
+    const MultipleCollectionAccessor& collections,
+    NamespaceString nss) {
+    return make(opCtx,
+                policy,
+                &opCtx->fastClockSource(),
+                internalQueryExecYieldIterations.load(),
+                Milliseconds{internalQueryExecYieldPeriodMS.load()},
+                std::make_unique<YieldPolicyCallbacksImpl>(std::move(nss)));
+}
+
+std::unique_ptr<PlanYieldPolicySBE> PlanYieldPolicySBE::make(
+    OperationContext* opCtx,
+    YieldPolicy policy,
+    ClockSource* clockSource,
+    int yieldFrequency,
+    Milliseconds yieldPeriod,
+    std::unique_ptr<YieldPolicyCallbacks> callbacks) {
+    return std::unique_ptr<PlanYieldPolicySBE>(new PlanYieldPolicySBE(
+        opCtx, policy, clockSource, yieldFrequency, yieldPeriod, std::move(callbacks)));
+}
+
+PlanYieldPolicySBE::PlanYieldPolicySBE(OperationContext* opCtx,
+                                       YieldPolicy policy,
+                                       ClockSource* clockSource,
+                                       int yieldFrequency,
+                                       Milliseconds yieldPeriod,
+                                       std::unique_ptr<YieldPolicyCallbacks> callbacks)
+    : PlanYieldPolicy(
+          opCtx, policy, clockSource, yieldFrequency, yieldPeriod, std::move(callbacks)) {
+    uassert(4822879,
+            "WRITE_CONFLICT_RETRY_ONLY yield policy is not supported in SBE",
+            policy != YieldPolicy::WRITE_CONFLICT_RETRY_ONLY);
+
+    // TODO SERVER-103267: Remove gYieldingSupportForSBE.
+}
+
 void PlanYieldPolicySBE::saveState(OperationContext* opCtx) {
     for (auto&& root : _yieldingPlans) {
-        root->saveState(!_useExperimentalCommitTxnBehavior /* relinquish cursor */);
+        root->saveState();
     }
 }
 
-void PlanYieldPolicySBE::restoreState(OperationContext* opCtx, const Yieldable*) {
+void PlanYieldPolicySBE::restoreState(OperationContext* opCtx,
+                                      const Yieldable*,
+                                      RestoreContext::RestoreType restoreType) {
     for (auto&& root : _yieldingPlans) {
-        root->restoreState(!_useExperimentalCommitTxnBehavior /* relinquish cursor */);
+        root->restoreState();
     }
 }
 }  // namespace mongo

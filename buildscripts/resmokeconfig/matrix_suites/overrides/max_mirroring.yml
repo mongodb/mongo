@@ -1,0 +1,15 @@
+### Overrides for matrix suites that include max_mirroring ###
+- name: enable
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              setParameters:
+                mirrorReads: "{samplingRate: 1.0}"
+
+- name: sharding_excluded_files
+  value:
+    exclude_files:
+      - jstests/sharding/query/map_reduce/mrShardedOutput.js

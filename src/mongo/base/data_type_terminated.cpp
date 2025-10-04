@@ -29,6 +29,8 @@
 
 #include "mongo/base/data_type_terminated.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

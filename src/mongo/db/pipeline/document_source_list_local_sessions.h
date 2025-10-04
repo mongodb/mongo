@@ -29,20 +29,41 @@
 
 #pragma once
 
-#include <vector>
-
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobj.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/crypto/sha256_block.h"
-#include "mongo/db/logical_session_cache.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_list_sessions_gen.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/stage_constraints.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/db/read_concern_support_result.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/modules.h"
+
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
 ListSessionsSpec listSessionsParseSpec(StringData stageName, const BSONElement& spec);
-PrivilegeVector listSessionsRequiredPrivileges(const ListSessionsSpec& spec);
+PrivilegeVector listSessionsRequiredPrivileges(const ListSessionsSpec& spec,
+                                               const boost::optional<TenantId>& tenantId);
 std::vector<SHA256Block> listSessionsUsersToDigests(const std::vector<ListSessionsUser>& users);
 
 /**
@@ -57,15 +78,21 @@ public:
     class LiteParsed final : public LiteParsedDocumentSource {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
-                                                 const BSONElement& spec) {
+                                                 const BSONElement& spec,
+                                                 const LiteParserOptions& options) {
 
             return std::make_unique<LiteParsed>(
                 spec.fieldName(),
+                nss.tenantId(),
                 listSessionsParseSpec(DocumentSourceListLocalSessions::kStageName, spec));
         }
 
-        explicit LiteParsed(std::string parseTimeName, const ListSessionsSpec& spec)
-            : LiteParsedDocumentSource(std::move(parseTimeName)), _spec(spec) {}
+        explicit LiteParsed(std::string parseTimeName,
+                            const boost::optional<TenantId>& tenantId,
+                            const ListSessionsSpec& spec)
+            : LiteParsedDocumentSource(std::move(parseTimeName)),
+              _spec(spec),
+              _privileges(listSessionsRequiredPrivileges(_spec, tenantId)) {}
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
             return stdx::unordered_set<NamespaceString>();
@@ -73,39 +100,46 @@ public:
 
         PrivilegeVector requiredPrivileges(bool isMongos,
                                            bool bypassDocumentValidation) const final {
-            return listSessionsRequiredPrivileges(_spec);
+            return _privileges;
+        }
+
+        bool requiresAuthzChecks() const override {
+            return false;
         }
 
         bool isInitialSource() const final {
             return true;
         }
 
-        bool allowedToPassthroughFromMongos() const final {
-            return false;
-        }
-
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
-                                                     bool isImplicitDefault) const {
+                                                     bool isImplicitDefault) const override {
             return onlyReadConcernLocalSupported(kStageName, level, isImplicitDefault);
         }
 
-        void assertSupportsMultiDocumentTransaction() const {
+        void assertSupportsMultiDocumentTransaction() const override {
             transactionNotSupported(DocumentSourceListLocalSessions::kStageName);
         }
 
     private:
         const ListSessionsSpec _spec;
+        const PrivilegeVector _privileges;
     };
 
     const char* getSourceName() const final {
-        return DocumentSourceListLocalSessions::kStageName.rawData();
+        return DocumentSourceListLocalSessions::kStageName.data();
     }
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {
-        return Value(Document{{getSourceName(), _spec.toBSON()}});
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
     }
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final {
+        return Value(Document{{getSourceName(), _spec.toBSON(opts)}});
+    }
+
+    StageConstraints constraints(PipelineSplitState pipeState) const final {
         StageConstraints constraints(StreamType::kStreaming,
                                      PositionRequirement::kFirst,
                                      HostTypeRequirement::kLocalOnly,
@@ -116,7 +150,7 @@ public:
                                      UnionRequirement::kNotAllowed);
 
         constraints.isIndependentOfAnyCollection = true;
-        constraints.requiresInputDocSource = false;
+        constraints.setConstraintsForNoInputSources();
         return constraints;
     }
 
@@ -124,18 +158,19 @@ public:
         return boost::none;
     }
 
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {}
+
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
+    const ListSessionsSpec& getSpec() const {
+        return _spec;
+    }
 
 private:
     DocumentSourceListLocalSessions(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                     const ListSessionsSpec& spec);
-
-    GetNextResult doGetNext() final;
-
     const ListSessionsSpec _spec;
-    const LogicalSessionCache* _cache;
-    std::vector<LogicalSessionId> _ids;
 };
 
 }  // namespace mongo

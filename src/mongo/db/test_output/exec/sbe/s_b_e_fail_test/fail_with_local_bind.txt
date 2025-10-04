@@ -1,0 +1,22 @@
+# Golden test output of SBEFailTest/FailWithLocalBind
+-- INPUT EXPRESSION:
+
+    let [
+        l10.0 = NumberDecimal(123) 
+    ] 
+    in fail(2, "test") 
+
+
+-- COMPILED EXPRESSION:
+[0x0000-0x0021] stackSize: 1, maxStackSize: 3
+0x0000: pushConstVal(value: NumberDecimal(123));
+0x000a: pushConstVal(value: 2ll);
+0x0014: pushConstVal(value: "test");
+0x001e: fail();
+0x001f: swap();
+0x0020: pop();
+
+
+-- EXECUTE VARIATION:
+EXCEPTION: BadValue: test
+

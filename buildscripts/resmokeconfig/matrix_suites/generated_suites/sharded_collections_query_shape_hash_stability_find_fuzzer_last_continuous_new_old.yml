@@ -1,0 +1,56 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/sharded_collections_query_shape_hash_stability_find_fuzzer_last_continuous_new_old.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
+##########################################################
+description:
+  This suite runs through all fuzzer generated tests and ensures that the
+  'queryShapeHash' attribute returned in explain is same for multiple explain invocations,
+  across all nodes of two sharded clusters, with different binaries version.
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+  config:
+    shell_options:
+      eval:
+        await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");;
+        await import("jstests/libs/override_methods/query_shape_hash_stability.js");
+      global_vars:
+        TestData:
+          isMultiShardedClusterFixture: true
+          isRunningQueryShapeHashFuzzer: true
+  fixture:
+    class: MultiShardedClusterFixture
+    common_mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+      verbose: ""
+    enable_balancer: false
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+    num_rs_nodes_per_shard: 2
+    num_sharded_clusters: 2
+    num_shards: 1
+    per_sharded_cluster_options:
+      - mixed_bin_versions: old_old
+        old_bin_version: last_continuous
+      - {}
+    persist_connection_strings: true
+  hooks:
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
+matrix_suite: true
+selector:
+  exclude_files: []
+  exclude_with_any_tags: []
+  roots:
+    - jstestfuzz/out/*.js
+test_kind: js_test

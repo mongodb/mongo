@@ -29,9 +29,13 @@
 
 #pragma once
 
-#include "mongo/platform/mutex.h"
+#include "mongo/base/status.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/background.h"
+
+#include <memory>
+#include <string>
 
 namespace mongo {
 
@@ -42,9 +46,8 @@ class Timestamp;
 
 class Checkpointer : public BackgroundJob {
 public:
-    Checkpointer(KVEngine* kvEngine)
+    Checkpointer()
         : BackgroundJob(false /* deleteSelf */),
-          _kvEngine(kvEngine),
           _shuttingDown(false),
           _shutdownReason(Status::OK()),
           _hasTriggeredFirstStableCheckpoint(false),
@@ -59,7 +62,7 @@ public:
     }
 
     /**
-     * Starts the checkpoint thread that runs every storageGlobalParams.checkpointDelaySecs seconds.
+     * Starts the checkpoint thread that runs every storageGlobalParams.syncdelay seconds.
      */
     void run() override;
 
@@ -67,9 +70,9 @@ public:
      * Triggers taking the first stable checkpoint if the stable timestamp has advanced past the
      * initial data timestamp.
      *
-     * The checkpoint thread runs automatically every storageGlobalParams.checkpointDelaySecs
-     * seconds. This function avoids potentially waiting that full duration for a stable checkpoint,
-     * initiating one immediately.
+     * The checkpoint thread runs automatically every storageGlobalParams.syncdelay seconds. This
+     * function avoids potentially waiting that full duration for a stable checkpoint, initiating
+     * one immediately.
      *
      * Do not call this function if hasTriggeredFirstStableCheckpoint() returns true.
      */
@@ -88,13 +91,8 @@ public:
     void shutdown(const Status& reason);
 
 private:
-    // A pointer to the KVEngine is maintained only due to unit testing limitations that don't fully
-    // setup the ServiceContext.
-    // TODO SERVER-50861: Remove this pointer.
-    KVEngine* const _kvEngine;
-
     // Protects the state below.
-    Mutex _mutex = MONGO_MAKE_LATCH("Checkpointer::_mutex");
+    stdx::mutex _mutex;
 
     // The checkpoint thread idles on this condition variable for a particular time duration between
     // taking checkpoints. It can be triggered early to expedite either: immediate checkpointing if

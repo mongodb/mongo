@@ -1,19 +1,19 @@
 """Utility functions for udb."""
 
-# pylint: disable=unused-argument,missing-docstring,no-self-use
 import os
 import re
-from typing import Optional
+
 import gdb
 
 # Pattern to match output of 'info files'
 PATTERN_ELF_SECTIONS = re.compile(
-    r'(?P<begin>[0x0-9a-fA-F]+)\s-\s(?P<end>[0x0-9a-fA-F]+)\s\bis\b\s(?P<section>\.[a-z]+$)')
+    r"(?P<begin>[0x0-9a-fA-F]+)\s-\s(?P<end>[0x0-9a-fA-F]+)\s\bis\b\s(?P<section>\.[a-z]+$)"
+)
 
 
 def parse_sections():
     """Find addresses for .text, .data, and .bss sections."""
-    file_info = gdb.execute('info files', to_string=True)
+    file_info = gdb.execute("info files", to_string=True)
     section_map = {}
     for line in file_info.splitlines():
         line = line.strip()
@@ -21,10 +21,10 @@ def parse_sections():
         if match is None:
             continue
 
-        section = match.group('section')
-        if section not in ('.text', '.data', '.bss'):
+        section = match.group("section")
+        if section not in (".text", ".data", ".bss"):
             continue
-        begin = match.group('begin')
+        begin = match.group("begin")
         section_map[section] = begin
 
     return section_map
@@ -32,8 +32,9 @@ def parse_sections():
 
 def load_sym_file_at_addrs(dbg_file, smap):
     """Invoke add-symbol-file with addresses."""
-    cmd = 'add-symbol-file {} {} -s .data {} -s .bss {}'.format(dbg_file, smap['.text'],
-                                                                smap['.data'], smap['.bss'])
+    cmd = "add-symbol-file {} {} -s .data {} -s .bss {}".format(
+        dbg_file, smap[".text"], smap[".data"], smap[".bss"]
+    )
     gdb.execute(cmd, to_string=True)
 
 
@@ -42,37 +43,37 @@ class LoadDebugFile(gdb.Command):
 
     def __init__(self):
         """GDB Command API init."""
-        super(LoadDebugFile, self).__init__('load-debug-symbols', gdb.COMPLETE_EXPRESSION)
+        super(LoadDebugFile, self).__init__("load-debug-symbols", gdb.COMPLETE_EXPRESSION)
 
     def invoke(self, args, from_tty):
         """GDB Command API invoke."""
         arglist = args.split()
         if len(arglist) != 1:
-            print('Usage: load-debug-symbols <file_path>')
+            print("Usage: load-debug-symbols <file_path>")
             return
 
         dbg_file = arglist[0]
         if not os.path.exists(dbg_file):
-            print('{} is not a valid file path'.format(dbg_file))
+            print("{} is not a valid file path".format(dbg_file))
             return
 
         try:
             section_map = parse_sections()
             load_sym_file_at_addrs(dbg_file, section_map)
-        except Exception as err:  # pylint: disable=broad-except
+        except Exception as err:
             print(err)
 
 
 LoadDebugFile()
 
 PATTERN_ELF_SOLIB_SECTIONS = re.compile(
-    r'(?P<begin>[0x0-9a-fA-F]+)\s-\s(?P<end>[0x0-9a-fA-F]+)\s\bis\b\s(?P<section>\.[a-z]+)\s\bin\b\s(?P<file>.*$)'
+    r"(?P<begin>[0x0-9a-fA-F]+)\s-\s(?P<end>[0x0-9a-fA-F]+)\s\bis\b\s(?P<section>\.[a-z]+)\s\bin\b\s(?P<file>.*$)"
 )
 
 
 def parse_solib_sections():
     """Find addresses for .text, .data, and .bss sections."""
-    file_info = gdb.execute('info files', to_string=True)
+    file_info = gdb.execute("info files", to_string=True)
     section_map = {}
     for line in file_info.splitlines():
         line = line.strip()
@@ -80,15 +81,18 @@ def parse_solib_sections():
         if match is None:
             continue
 
-        section = match.group('section')
-        if section not in ('.text', '.data', '.bss'):
+        section = match.group("section")
+        if section not in (".text", ".data", ".bss"):
             continue
-        begin = match.group('begin')
+        begin = match.group("begin")
         # TODO duplicate fnames?
-        fname = os.path.basename(match.group('file'))
+        fname = os.path.basename(match.group("file"))
 
-        if fname.startswith("system-supplied DSO") or match.group('file').startswith(
-                "/lib") or match.group('file').startswith("/usr/lib"):
+        if (
+            fname.startswith("system-supplied DSO")
+            or match.group("file").startswith("/lib")
+            or match.group("file").startswith("/usr/lib")
+        ):
             continue
         fname = f"{fname}.debug"
         section_map.setdefault(fname, {})
@@ -112,7 +116,9 @@ def find_dwarf_files(path):
     return out
 
 
-SOLIB_SEARCH_PATH_PREFIX = "The search path for loading non-absolute shared library symbol files is "
+SOLIB_SEARCH_PATH_PREFIX = (
+    "The search path for loading non-absolute shared library symbol files is "
+)
 
 
 def extend_solib_search_path(new_path: str):
@@ -120,7 +126,7 @@ def extend_solib_search_path(new_path: str):
     solib_search_path = gdb.execute("show solib-search-path", to_string=True)
     # remove the prefix and suffix (which is a period and space) from the
     # search path
-    solib_search_path = solib_search_path[len(SOLIB_SEARCH_PATH_PREFIX):-2]
+    solib_search_path = solib_search_path[len(SOLIB_SEARCH_PATH_PREFIX) : -2]
     solib_search_path = f"{new_path}:{solib_search_path}"
     if solib_search_path.endswith(":"):
         solib_search_path = solib_search_path[:-1]
@@ -136,7 +142,7 @@ def extend_debug_file_directory(new_path: str):
     debug_file_directory = gdb.execute("show debug-file-directory", to_string=True)
     # remove the prefix and suffix (which is a period and space) from the
     # search path
-    debug_file_directory = debug_file_directory[len(DEBUG_FILE_DIRECTORY_PREFIX):-3]
+    debug_file_directory = debug_file_directory[len(DEBUG_FILE_DIRECTORY_PREFIX) : -3]
     debug_file_directory = f"{new_path}:{debug_file_directory}"
     if debug_file_directory.endswith(":"):
         debug_file_directory = debug_file_directory[:-1]
@@ -153,7 +159,7 @@ class LoadDistTest(gdb.Command):
 
     def __init__(self):
         """GDB Command API init."""
-        super(LoadDistTest, self).__init__('load-dist-test', gdb.COMPLETE_EXPRESSION)
+        super(LoadDistTest, self).__init__("load-dist-test", gdb.COMPLETE_EXPRESSION)
 
         try:
             # test if we're running udb
@@ -167,16 +173,15 @@ class LoadDistTest(gdb.Command):
         """Fetch the name of the binary gdb is attached to."""
         main_binary_name = gdb.objfiles()[0].filename
         main_binary_name = os.path.splitext(os.path.basename(main_binary_name))[0]
-        if main_binary_name.endswith('mongod'):
+        if main_binary_name.endswith("mongod"):
             return "mongod"
-        if main_binary_name.endswith('mongo'):
+        if main_binary_name.endswith("mongo"):
             return "mongo"
-        if main_binary_name.endswith('mongos'):
+        if main_binary_name.endswith("mongos"):
             return "mongos"
 
         return None
 
-    # pylint: disable=too-many-branches,too-many-locals
     def invoke(self, args, from_tty):
         """GDB Command API invoke."""
         arglist = args.split()
@@ -185,7 +190,7 @@ class LoadDistTest(gdb.Command):
             print(f"No path provided, assuming '{arglist[0]}'")
 
         if len(arglist) != 1:
-            print('Usage: load-dist-test <path/to/dist-test>')
+            print("Usage: load-dist-test <path/to/dist-test>")
             return
 
         dist_test = arglist[0]
@@ -242,7 +247,7 @@ class LoadDistTest(gdb.Command):
                 if (idx + 1) % 50 == 0 or len(dwarf_files) == idx + 1:
                     print(f"{idx+1}/{len(dwarf_files)} symbol files loaded")
 
-        except Exception as err:  # pylint: disable=broad-except
+        except Exception as err:
             print(err)
 
         if self._is_udb:

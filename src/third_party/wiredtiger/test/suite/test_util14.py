@@ -28,7 +28,7 @@
 
 import os
 from suite_subprocess import suite_subprocess
-import wiredtiger, wttest
+import wttest
 
 # test_util14.py
 #    Utilities: wt truncate
@@ -42,7 +42,7 @@ class test_util14(wttest.WiredTigerTestCase, suite_subprocess):
         """
         params = 'key_format=S,value_format=S'
         self.session.create('table:' + self.tablename, params)
-        self.assertTrue(os.path.exists(self.tablename + ".wt"))
+        self.assertTrue(self.tableExists(self.tablename))
         cursor = self.session.open_cursor('table:' + self.tablename, None, None)
         for i in range(0, self.nentries):
             cursor[str(i)] = str(i)
@@ -55,7 +55,7 @@ class test_util14(wttest.WiredTigerTestCase, suite_subprocess):
         """
         outfile="outfile.txt"
         errfile="errfile.txt"
-        self.assertTrue(os.path.exists(self.tablename + ".wt"))
+        self.assertTrue(self.tableExists(self.tablename))
         self.runWt(["read", 'table:' + self.tablename, 'NoMatch'],
             outfilename=outfile, errfilename=errfile, failure=True)
         self.check_empty_file(outfile)
@@ -87,6 +87,3 @@ class test_util14(wttest.WiredTigerTestCase, suite_subprocess):
             outfilename=outfile, errfilename=errfile, failure=True)
         self.check_empty_file(outfile)
         self.check_file_contains(errfile, 'usage:')
-
-if __name__ == '__main__':
-    wttest.run()

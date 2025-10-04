@@ -1,24 +1,26 @@
 /*
  * Utilities for checking indexes on shards.
  */
-var ShardedIndexUtil = (function() {
+export var ShardedIndexUtil = (function () {
     /*
      * Asserts that the shard has an index for the collection with the given index key.
      */
-    let assertIndexExistsOnShard = function(shard, dbName, collName, targetIndexKey) {
+    let assertIndexExistsOnShard = function (shard, dbName, collName, targetIndexKey) {
         let res = shard.getDB(dbName).runCommand({listIndexes: collName});
         assert.commandWorked(res);
 
         let indexesOnShard = res.cursor.firstBatch;
         const isTargetIndex = (index) => bsonWoCompare(index.key, targetIndexKey) === 0;
-        assert(indexesOnShard.some(isTargetIndex),
-               `expected shard ${shard.shardName} to have the index ${tojson(targetIndexKey)}`);
+        assert(
+            indexesOnShard.some(isTargetIndex),
+            `expected shard ${shard.shardName} to have the index ${tojson(targetIndexKey)}`,
+        );
     };
 
     /*
      * Asserts that the shard does not have an index for the collection with the given index key.
      */
-    let assertIndexDoesNotExistOnShard = function(shard, dbName, collName, targetIndexKey) {
+    let assertIndexDoesNotExistOnShard = function (shard, dbName, collName, targetIndexKey) {
         let res = shard.getDB(dbName).runCommand({listIndexes: collName});
         if (!res.ok && res.code === ErrorCodes.NamespaceNotFound) {
             // The collection does not exist on the shard, neither does the target index.
@@ -27,18 +29,19 @@ var ShardedIndexUtil = (function() {
         assert.commandWorked(res);
 
         let indexesOnShard = res.cursor.firstBatch;
-        indexesOnShard.forEach(function(index) {
-            assert.neq(0,
-                       bsonWoCompare(index.key, targetIndexKey),
-                       `expected shard ${shard.shardName} to not have the index ${
-                           tojson(targetIndexKey)}`);
+        indexesOnShard.forEach(function (index) {
+            assert.neq(
+                0,
+                bsonWoCompare(index.key, targetIndexKey),
+                `expected shard ${shard.shardName} to not have the index ${tojson(targetIndexKey)}`,
+            );
         });
     };
 
     /*
      * Returns true if the array contains the given BSON object, ignoring the field order
      */
-    let containsBSONIgnoreFieldsOrder = function(arr, targetObj) {
+    let containsBSONIgnoreFieldsOrder = function (arr, targetObj) {
         for (const obj of arr) {
             if (bsonUnorderedFieldsCompare(obj, targetObj) === 0) {
                 return true;
@@ -47,15 +50,16 @@ var ShardedIndexUtil = (function() {
         return false;
     };
 
-    let getPerShardIndexes = function(coll) {
+    let getPerShardIndexes = function (coll) {
         return coll
             .aggregate(
                 [
                     {$indexStats: {}},
                     {$group: {_id: "$shard", indexes: {$push: {spec: "$spec"}}}},
-                    {$project: {_id: 0, shard: "$_id", indexes: 1}}
+                    {$project: {_id: 0, shard: "$_id", indexes: 1}},
                 ],
-                {readConcern: {level: "local"}})
+                {readConcern: {level: "local"}},
+            )
             .toArray();
     };
 
@@ -71,13 +75,14 @@ var ShardedIndexUtil = (function() {
      *  {"shard" : "rs1",
      *      "indexes" : [{"spec" : {"v" : 2, "key" : {"_id" :1}, "name" : "_id_"}}]}];
      */
-    let findInconsistentIndexesAcrossShards = function(indexDocs) {
+    let findInconsistentIndexesAcrossShards = function (indexDocs) {
         // Find indexes that exist on all shards. For the example above:
         // [{"spec" : {"v" : 2, "key" : {"_id" : 1}, "name" : "_id_"}}];
         let consistentIndexes = indexDocs[0].indexes;
         for (let i = 1; i < indexDocs.length; i++) {
-            consistentIndexes = consistentIndexes.filter(
-                index => this.containsBSONIgnoreFieldsOrder(indexDocs[i].indexes, index));
+            consistentIndexes = consistentIndexes.filter((index) =>
+                this.containsBSONIgnoreFieldsOrder(indexDocs[i].indexes, index),
+            );
         }
 
         // Find inconsistent indexes. For the example above:
@@ -85,7 +90,8 @@ var ShardedIndexUtil = (function() {
         const inconsistentIndexesOnShard = {};
         for (const indexDoc of indexDocs) {
             const inconsistentIndexes = indexDoc.indexes.filter(
-                index => !this.containsBSONIgnoreFieldsOrder(consistentIndexes, index));
+                (index) => !this.containsBSONIgnoreFieldsOrder(consistentIndexes, index),
+            );
             inconsistentIndexesOnShard[indexDoc.shard] = inconsistentIndexes;
         }
 
@@ -97,6 +103,6 @@ var ShardedIndexUtil = (function() {
         assertIndexDoesNotExistOnShard,
         containsBSONIgnoreFieldsOrder,
         getPerShardIndexes,
-        findInconsistentIndexesAcrossShards
+        findInconsistentIndexesAcrossShards,
     };
 })();

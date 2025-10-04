@@ -1,0 +1,212 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+idl_generator(
+    name = "async_results_merger_params_gen",
+    src = "async_results_merger_params.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/query:tailable_mode_gen",
+        "//src/mongo/db/session:logical_session_id_gen",
+        "//src/mongo/util/net:hostandport_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "async_results_merger",
+    srcs = [
+        "async_results_merger.cpp",
+        "blocking_results_merger.cpp",
+        "establish_cursors.cpp",
+        "next_high_watermark_determining_strategy.cpp",
+        "shard_tag.cpp",
+        ":async_results_merger_params_gen",
+    ],
+    hdrs = [
+        "async_results_merger.h",
+        "blocking_results_merger.h",
+        "establish_cursors.h",
+        "next_high_watermark_determining_strategy.h",
+        "shard_tag.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db/local_catalog:collection_uuid_mismatch_info",
+        "//src/mongo/db/query:command_request_response",
+        "//src/mongo/db/query:query_common",
+        "//src/mongo/executor:async_multicaster",
+        "//src/mongo/executor:task_executor_interface",
+        "//src/mongo/s:sharding_router_api",
+        "//src/mongo/s/client:sharding_client",
+    ],
+)
+
+mongo_cc_library(
+    name = "cluster_cursor_manager",
+    srcs = [
+        "cluster_cursor_manager.cpp",
+    ],
+    hdrs = [
+        "cluster_client_cursor.h",
+        "cluster_client_cursor_guard.h",
+        "cluster_client_cursor_params.h",
+        "cluster_cursor_manager.h",
+        "cluster_query_result.h",
+        "router_exec_stage.h",
+        ":async_results_merger_params_gen",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/client:retry_strategy",
+        "//src/mongo/db:commands",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/auth",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/auth:auth_checks",
+        "//src/mongo/db/auth:authprivilege",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/memory_tracking",
+        "//src/mongo/db/query:command_request_response",
+        "//src/mongo/db/query:query_knobs",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query/client_cursor:generic_cursor",
+        "//src/mongo/db/session:kill_sessions",
+        "//src/mongo/db/session:logical_session_cache",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/session:logical_session_id",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "router_exec_stage",
+    srcs = [
+        "document_source_merge_cursors.cpp",
+        "merge_cursors_stage.cpp",
+        "router_stage_limit.cpp",
+        "router_stage_mock.cpp",
+        "router_stage_pipeline.cpp",
+        "router_stage_queued_data.cpp",
+        "router_stage_remove_metadata_fields.cpp",
+        "router_stage_skip.cpp",
+    ],
+    hdrs = [
+        "document_source_merge_cursors.h",
+        "merge_cursors_stage.h",
+        "router_stage_limit.h",
+        "router_stage_mock.h",
+        "router_stage_pipeline.h",
+        "router_stage_queued_data.h",
+        "router_stage_remove_metadata_fields.h",
+        "router_stage_skip.h",
+        "//src/mongo/db/exec/agg:document_source_to_stage_registry.h",
+        "//src/mongo/db/exec/agg:stage.h",
+    ],
+    deps = [
+        ":async_results_merger",
+        "//src/mongo/db/local_catalog/shard_role_api:resource_yielders",
+        "//src/mongo/db/pipeline",
+        "//src/mongo/s:sharding_router_api",
+    ],
+)
+
+mongo_cc_library(
+    name = "cluster_cursor",
+    srcs = [
+        "cluster_client_cursor_impl.cpp",
+        "cluster_client_cursor_params.cpp",
+        "collect_query_stats_mongos.cpp",
+        "store_possible_cursor.cpp",
+    ],
+    hdrs = [
+        "cluster_client_cursor_impl.h",
+        "cluster_client_cursor_params.h",
+        "collect_query_stats_mongos.h",
+        "owned_remote_cursor.h",
+        "store_possible_cursor.h",
+    ],
+    deps = [
+        ":async_results_merger",
+        ":cluster_cursor_cleanup_job",
+        ":cluster_cursor_manager",
+        ":router_exec_stage",
+        "//src/mongo/db:commands",
+        "//src/mongo/db:curop_failpoint_helpers",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/local_catalog:collection_uuid_mismatch_info",
+        "//src/mongo/db/query:command_request_response",
+        "//src/mongo/db/query:query_common",
+        "//src/mongo/db/query/query_stats",
+        "//src/mongo/s:sharding_router_api",
+        "//src/mongo/util/concurrency:spin_lock",
+    ],
+)
+
+mongo_cc_library(
+    name = "cluster_cursor_cleanup_job",
+    srcs = [
+        "cluster_cursor_cleanup_job.cpp",
+    ],
+    hdrs = [
+        "cluster_cursor_cleanup_job.h",
+    ],
+    deps = [
+        "//src/mongo/db/query/client_cursor:cursor_server_params",
+        "//src/mongo/s:grid",
+        "//src/mongo/util:background_job",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "s_query_exec_test",
+    srcs = [
+        "async_results_merger_test.cpp",
+        "blocking_results_merger_test.cpp",
+        "cluster_client_cursor_impl_test.cpp",
+        "cluster_client_cursor_mock.cpp",
+        "cluster_client_cursor_mock.h",
+        "cluster_cursor_manager_test.cpp",
+        "cluster_exchange_test.cpp",
+        "establish_cursors_test.cpp",
+        "results_merger_test_fixture.cpp",
+        "results_merger_test_fixture.h",
+        "router_stage_limit_test.cpp",
+        "router_stage_remove_metadata_fields_test.cpp",
+        "router_stage_skip_test.cpp",
+        "shard_tag_test.cpp",
+        "sharded_agg_test_fixture.h",
+        "store_possible_cursor_test.cpp",
+        "//src/mongo/db/session:logical_session_cache_noop.h",
+    ],
+    tags = [
+        "mongo_unittest_first_group",
+    ],
+    deps = [
+        ":async_results_merger",
+        ":cluster_cursor",
+        ":cluster_cursor_manager",
+        ":router_exec_stage",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/auth:saslauth",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/query:query_request",
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db/session:logical_session_id",
+        "//src/mongo/db:shared_request_handling",
+        "//src/mongo/db:vector_clock",
+        "//src/mongo/executor:thread_pool_task_executor_test_fixture",
+        "//src/mongo/idl:server_parameter_test_controller",
+        # Linking to cluster_commands is necessary for async_results_merger_test.cpp since it
+        # requires linking to the getMore command. Otherwise the test fails due to a uassert
+        # being thrown.
+        "//src/mongo/s/commands:cluster_commands",
+        "//src/mongo/s/commands:cluster_commands_common",
+        "//src/mongo/s/query/planner:cluster_aggregate",
+        "//src/mongo/s:sharding_mongos_test_fixture",
+        "//src/mongo/util:clock_source_mock",
+    ],
+)

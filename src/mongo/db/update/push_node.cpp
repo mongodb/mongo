@@ -27,17 +27,30 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/update/push_node.h"
 
-#include <numeric>
-
-#include "mongo/base/simple_string_data_comparator.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/mutable/algorithm.h"
-#include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/update/update_internal_node.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/mutable_bson/algorithm.h"
+#include "mongo/db/exec/mutable_bson/document.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
+
+#include <cstdlib>
+#include <iterator>
+#include <limits>
+#include <numeric>
+#include <set>
+#include <string>
+#include <type_traits>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -63,12 +76,14 @@ long long safeApproximateAbs(long long val) {
 Status PushNode::init(BSONElement modExpr, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     invariant(modExpr.ok());
 
-    if (modExpr.type() == BSONType::Object && modExpr[kEachClauseName]) {
-        std::set<StringData> validClauseNames{
-            kEachClauseName, kSliceClauseName, kSortClauseName, kPositionClauseName};
-        auto clausesFound =
-            SimpleStringDataComparator::kInstance.makeStringDataUnorderedMap<const BSONElement>();
-
+    if (modExpr.type() == BSONType::object && modExpr[kEachClauseName]) {
+        const StringDataSet validClauseNames{
+            kEachClauseName,
+            kSliceClauseName,
+            kSortClauseName,
+            kPositionClauseName,
+        };
+        StringDataMap<BSONElement> clausesFound;
         for (auto&& modifier : modExpr.embeddedObject()) {
             auto clauseName = modifier.fieldNameStringData();
 
@@ -79,19 +94,18 @@ Status PushNode::init(BSONElement modExpr, const boost::intrusive_ptr<Expression
                                             << modifier.fieldNameStringData());
             }
 
-            if (clausesFound.find(*foundClauseName) != clausesFound.end()) {
+            auto [insIter, insOk] = clausesFound.insert({*foundClauseName, modifier});
+            if (!insOk) {
                 return Status(ErrorCodes::BadValue,
                               str::stream() << "Only one " << clauseName << " is supported.");
             }
-
-            clausesFound.insert(std::make_pair(*foundClauseName, modifier));
         }
 
         // Parse $each.
         auto eachIt = clausesFound.find(kEachClauseName);
         invariant(eachIt != clausesFound.end());  // We already checked for a $each clause.
         const auto& eachClause = eachIt->second;
-        if (eachClause.type() != BSONType::Array) {
+        if (eachClause.type() != BSONType::array) {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "The argument to $each in $push must be"
                                            " an array but it was of type: "
@@ -122,7 +136,7 @@ Status PushNode::init(BSONElement modExpr, const boost::intrusive_ptr<Expression
         if (sortIt != clausesFound.end()) {
             auto sortClause = sortIt->second;
 
-            if (sortClause.type() == BSONType::Object) {
+            if (sortClause.type() == BSONType::object) {
                 auto status = pattern_cmp::checkSortClause(sortClause.embeddedObject());
 
                 if (status.isOK()) {
@@ -179,9 +193,9 @@ BSONObj PushNode::operatorValue() const {
                 eachBuilder << value;
         }
         if (_slice)
-            subBuilder << "$slice" << _slice.get();
+            subBuilder << "$slice" << _slice.value();
         if (_position)
-            subBuilder << "$position" << _position.get();
+            subBuilder << "$position" << _position.value();
         if (_sort) {
             // The sort pattern is stored in a dummy enclosing object that we must unwrap.
             if (_sort->useWholeValue)
@@ -214,15 +228,16 @@ ModifierNode::ModifyResult PushNode::insertElementsWithPosition(
     if (arraySize == 0) {
         invariant(array->pushBack(firstElementToInsert));
         result = ModifyResult::kNormalUpdate;
-    } else if (!position || position.get() > arraySize) {
+    } else if (!position || position.value() > arraySize) {
         invariant(array->pushBack(firstElementToInsert));
         result = ModifyResult::kArrayAppendUpdate;
-    } else if (position.get() > 0) {
-        auto insertAfter = getNthChild(*array, position.get() - 1);
+    } else if (position.value() > 0) {
+        auto insertAfter = getNthChild(*array, position.value() - 1);
         invariant(insertAfter.addSiblingRight(firstElementToInsert));
         result = ModifyResult::kNormalUpdate;
-    } else if (position.get() < 0 && safeApproximateAbs(position.get()) < arraySize) {
-        auto insertAfter = getNthChild(*array, arraySize - safeApproximateAbs(position.get()) - 1);
+    } else if (position.value() < 0 && safeApproximateAbs(position.value()) < arraySize) {
+        auto insertAfter =
+            getNthChild(*array, arraySize - safeApproximateAbs(position.value()) - 1);
         invariant(insertAfter.addSiblingRight(firstElementToInsert));
         result = ModifyResult::kNormalUpdate;
     } else {
@@ -252,7 +267,7 @@ ModifierNode::ModifyResult PushNode::insertElementsWithPosition(
 
 ModifierNode::ModifyResult PushNode::performPush(mutablebson::Element* element,
                                                  const FieldRef* elementPath) const {
-    if (element->getType() != BSONType::Array) {
+    if (element->getType() != BSONType::array) {
         invariant(elementPath);  // We can only hit this error if we are updating an existing path.
         auto idElem = mutablebson::findFirstChildNamed(element->getDocument().root(), "_id");
         uasserted(ErrorCodes::BadValue,
@@ -270,11 +285,11 @@ ModifierNode::ModifyResult PushNode::performPush(mutablebson::Element* element,
     }
 
     if (_slice) {
-        const auto sliceAbs = safeApproximateAbs(_slice.get());
+        const auto sliceAbs = safeApproximateAbs(_slice.value());
 
         while (static_cast<long long>(countChildren(*element)) > sliceAbs) {
             result = ModifyResult::kNormalUpdate;
-            if (_slice.get() >= 0) {
+            if (_slice.value() >= 0) {
                 invariant(element->popBack());
             } else {
                 // A negative value in '_slice' trims the array down to abs(_slice) but removes
@@ -299,12 +314,12 @@ void PushNode::logUpdate(LogBuilderInterface* logBuilder,
                          boost::optional<int> createdFieldIdx) const {
     invariant(logBuilder);
 
-    if (modifyResult == ModifyResult::kNormalUpdate) {
+    if (modifyResult.type == ModifyResult::kNormalUpdate) {
         uassertStatusOK(logBuilder->logUpdatedField(pathTaken, element));
-    } else if (modifyResult == ModifyResult::kCreated) {
+    } else if (modifyResult.type == ModifyResult::kCreated) {
         invariant(createdFieldIdx);
         uassertStatusOK(logBuilder->logCreatedField(pathTaken, *createdFieldIdx, element));
-    } else if (modifyResult == ModifyResult::kArrayAppendUpdate) {
+    } else if (modifyResult.type == ModifyResult::kArrayAppendUpdate) {
         // This update only modified the array by appending entries to the end. Rather than writing
         // out the entire contents of the array, we create oplog entries for the newly appended
         // elements.

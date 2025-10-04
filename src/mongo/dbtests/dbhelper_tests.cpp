@@ -27,33 +27,53 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/client/dbclient_cursor.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/global_settings.h"
-#include "mongo/db/op_observer_impl.h"
-#include "mongo/db/op_observer_registry.h"
+#include "mongo/db/local_catalog/collection.h"
+#include "mongo/db/local_catalog/collection_catalog.h"
+#include "mongo/db/local_catalog/collection_options.h"
+#include "mongo/db/local_catalog/database.h"
+#include "mongo/db/local_catalog/database_holder.h"
+#include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
+#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer/op_observer.h"
+#include "mongo/db/op_observer/op_observer_impl.h"
+#include "mongo/db/op_observer/op_observer_registry.h"
+#include "mongo/db/op_observer/operation_logger_impl.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/range_arithmetic.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/write_concern_options.h"
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace mongo {
-
 namespace {
-
-using std::set;
-using std::unique_ptr;
 
 /**
  * Unit tests related to DBHelpers
@@ -83,8 +103,9 @@ private:
 
     BSONArray docs(OperationContext* opCtx) const {
         DBDirectClient client(opCtx);
-        unique_ptr<DBClientCursor> cursor =
-            client.query(NamespaceString(ns), BSONObj{}, Query().hint(BSON("_id" << 1)));
+        FindCommandRequest findRequest{NamespaceString::createNamespaceString_forTest(ns)};
+        findRequest.setHint(BSON("_id" << 1));
+        std::unique_ptr<DBClientCursor> cursor = client.find(std::move(findRequest));
         BSONArrayBuilder bab;
         while (cursor->more()) {
             bab << cursor->next();
@@ -100,13 +121,6 @@ public:
     void run() {
         auto serviceContext = getGlobalServiceContext();
 
-        // This test is designed for storage engines that detect write conflicts when they attempt
-        // to write to a record. ephemeralForTest, however, only detects write conflicts when a
-        // WriteUnitOfWork commits.
-        if (storageGlobalParams.engine == "ephemeralForTest") {
-            return;
-        }
-
         repl::ReplSettings replSettings;
         replSettings.setOplogSizeBytes(10 * 1024 * 1024);
         replSettings.setReplSetString("rs");
@@ -117,26 +131,28 @@ public:
         repl::ReplicationCoordinator::set(
             serviceContext, std::unique_ptr<repl::ReplicationCoordinator>(coordinatorMock));
 
-        NamespaceString nss("test.findandnoopupdate");
+        NamespaceString nss =
+            NamespaceString::createNamespaceString_forTest("test.findandnoopupdate");
 
-        auto client1 = serviceContext->makeClient("client1");
+        auto client1 = serviceContext->getService()->makeClient("client1");
         auto opCtx1 = client1->makeOperationContext();
 
-        auto client2 = serviceContext->makeClient("client2");
+        auto client2 = serviceContext->getService()->makeClient("client2");
         auto opCtx2 = client2->makeOperationContext();
 
-        auto registry = std::make_unique<OpObserverRegistry>();
-        registry->addObserver(std::make_unique<OpObserverImpl>());
-        opCtx1.get()->getServiceContext()->setOpObserver(std::move(registry));
+        serviceContext->resetOpObserver_forTest(
+            std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
+
         repl::createOplog(opCtx1.get());
 
-        Lock::DBLock dbLk1(opCtx1.get(), nss.db(), LockMode::MODE_IX);
+        Lock::DBLock dbLk1(opCtx1.get(), nss.dbName(), LockMode::MODE_IX);
         Lock::CollectionLock collLk1(opCtx1.get(), nss, LockMode::MODE_IX);
 
-        Lock::DBLock dbLk2(opCtx2.get(), nss.db(), LockMode::MODE_IX);
+        Lock::DBLock dbLk2(opCtx2.get(), nss.dbName(), LockMode::MODE_IX);
         Lock::CollectionLock collLk2(opCtx2.get(), nss, LockMode::MODE_IX);
 
-        Database* db = DatabaseHolder::get(opCtx1.get())->openDb(opCtx1.get(), nss.db(), nullptr);
+        Database* db =
+            DatabaseHolder::get(opCtx1.get())->openDb(opCtx1.get(), nss.dbName(), nullptr);
 
         // Create the collection and insert one doc
         BSONObj doc = BSON("_id" << 1 << "x" << 2);
@@ -145,17 +161,18 @@ public:
         CollectionPtr collection1;
         {
             WriteUnitOfWork wuow(opCtx1.get());
-            collection1 = db->createCollection(opCtx1.get(), nss, CollectionOptions(), true);
-            ASSERT_TRUE(collection1 != nullptr);
-            ASSERT_TRUE(collection1
-                            ->insertDocument(
-                                opCtx1.get(), InsertStatement(doc), nullptr /* opDebug */, false)
-                            .isOK());
+            collection1 = CollectionPtr::CollectionPtr_UNSAFE(
+                db->createCollection(opCtx1.get(), nss, CollectionOptions(), true));
+            ASSERT_TRUE(collection1);
+            ASSERT_TRUE(
+                collection_internal::insertDocument(
+                    opCtx1.get(), collection1, InsertStatement(doc), nullptr /* opDebug */, false)
+                    .isOK());
             wuow.commit();
         }
 
         BSONObj result;
-        Helpers::findById(opCtx1.get(), db, nss.ns(), idQuery, result, nullptr, nullptr);
+        Helpers::findById(opCtx1.get(), nss, idQuery, result);
         ASSERT_BSONOBJ_EQ(result, doc);
 
         // Assert that the same doc still exists after findByIdAndNoopUpdate
@@ -165,7 +182,8 @@ public:
             auto lastApplied = repl::ReplicationCoordinator::get(opCtx1->getServiceContext())
                                    ->getMyLastAppliedOpTime()
                                    .getTimestamp();
-            ASSERT_OK(opCtx1->recoveryUnit()->setTimestamp(lastApplied + 1));
+            ASSERT_OK(
+                shard_role_details::getRecoveryUnit(opCtx1.get())->setTimestamp(lastApplied + 1));
             auto foundDoc = Helpers::findByIdAndNoopUpdate(opCtx1.get(), collection1, idQuery, res);
             wuow.commit();
             ASSERT_TRUE(foundDoc);
@@ -174,7 +192,7 @@ public:
 
         // Assert that findByIdAndNoopUpdate did not generate an oplog entry.
         BSONObj oplogEntry;
-        Helpers::getLast(opCtx1.get(), NamespaceString::kRsOplogNamespace.ns().c_str(), oplogEntry);
+        Helpers::getLast(opCtx1.get(), NamespaceString::kRsOplogNamespace, oplogEntry);
         ASSERT_BSONOBJ_NE(oplogEntry, BSONObj());
         ASSERT_TRUE(oplogEntry.getStringField("op") == "i"_sd);
 
@@ -202,33 +220,37 @@ private:
             WriteUnitOfWork wuow1(opCtx1);
 
             WriteUnitOfWork wuow2(opCtx2);
-            auto collection2 =
-                CollectionCatalog::get(opCtx2)->lookupCollectionByNamespace(opCtx2, nss);
-            ASSERT(collection2 != nullptr);
+            const auto collection2 =
+                acquireCollection(opCtx2,
+                                  CollectionAcquisitionRequest::fromOpCtx(
+                                      opCtx2, nss, AcquisitionPrerequisites::kWrite),
+                                  MODE_IX);
+            ASSERT(collection2.exists());
             auto lastApplied = repl::ReplicationCoordinator::get(opCtx2->getServiceContext())
                                    ->getMyLastAppliedOpTime()
                                    .getTimestamp();
-            ASSERT_OK(opCtx2->recoveryUnit()->setTimestamp(lastApplied + 1));
+            ASSERT_OK(shard_role_details::getRecoveryUnit(opCtx2)->setTimestamp(lastApplied + 1));
             BSONObj res;
-            ASSERT_TRUE(Helpers::findByIdAndNoopUpdate(opCtx2, collection2, idQuery, res));
+            ASSERT_TRUE(Helpers::findByIdAndNoopUpdate(
+                opCtx2, collection2.getCollectionPtr(), idQuery, res));
 
-            ASSERT_THROWS(Helpers::emptyCollection(opCtx1, nss), WriteConflictException);
+            ASSERT_THROWS(Helpers::emptyCollection(opCtx1, collection2), WriteConflictException);
 
             wuow2.commit();
         }
 
         // Assert that the doc still exists in the collection.
         BSONObj res1;
-        Helpers::findById(opCtx1, db, nss.ns(), idQuery, res1, nullptr, nullptr);
+        Helpers::findById(opCtx1, nss, idQuery, res1);
         ASSERT_BSONOBJ_EQ(res1, doc);
 
         BSONObj res2;
-        Helpers::findById(opCtx2, db, nss.ns(), idQuery, res2, nullptr, nullptr);
+        Helpers::findById(opCtx2, nss, idQuery, res2);
         ASSERT_BSONOBJ_EQ(res2, doc);
 
         // Assert that findByIdAndNoopUpdate did not generate an oplog entry.
         BSONObj oplogEntry;
-        Helpers::getLast(opCtx2, NamespaceString::kRsOplogNamespace.ns().c_str(), oplogEntry);
+        Helpers::getLast(opCtx2, NamespaceString::kRsOplogNamespace, oplogEntry);
         ASSERT_BSONOBJ_NE(oplogEntry, BSONObj());
         ASSERT_TRUE(oplogEntry.getStringField("op") == "i"_sd);
     }
@@ -241,21 +263,31 @@ private:
                                                     const BSONObj& idQuery) {
         {
             WriteUnitOfWork wuow1(opCtx1);
-            auto lastApplied = repl::ReplicationCoordinator::get(opCtx1->getServiceContext())
-                                   ->getMyLastAppliedOpTime()
-                                   .getTimestamp();
-            ASSERT_OK(opCtx1->recoveryUnit()->setTimestamp(lastApplied + 1));
-            Helpers::emptyCollection(opCtx1, nss);
+            {
+                const auto coll =
+                    acquireCollection(opCtx1,
+                                      CollectionAcquisitionRequest::fromOpCtx(
+                                          opCtx1, nss, AcquisitionPrerequisites::kWrite),
+                                      MODE_IX);
+                auto lastApplied = repl::ReplicationCoordinator::get(opCtx1->getServiceContext())
+                                       ->getMyLastAppliedOpTime()
+                                       .getTimestamp();
+                ASSERT_OK(
+                    shard_role_details::getRecoveryUnit(opCtx1)->setTimestamp(lastApplied + 1));
+                Helpers::emptyCollection(opCtx1, coll);
+            }
 
             {
                 WriteUnitOfWork wuow2(opCtx2);
                 auto collection2 =
                     CollectionCatalog::get(opCtx2)->lookupCollectionByNamespace(opCtx2, nss);
-                ASSERT(collection2 != nullptr);
+                ASSERT(collection2);
 
                 BSONObj res;
-                ASSERT_THROWS(Helpers::findByIdAndNoopUpdate(opCtx2, collection2, idQuery, res),
-                              WriteConflictException);
+                ASSERT_THROWS(
+                    Helpers::findByIdAndNoopUpdate(
+                        opCtx2, CollectionPtr::CollectionPtr_UNSAFE(collection2), idQuery, res),
+                    WriteConflictException);
             }
 
             wuow1.commit();
@@ -263,27 +295,27 @@ private:
 
         // Assert that the first storage transaction succeeded and that the doc is removed.
         BSONObj res1;
-        Helpers::findById(opCtx1, db, nss.ns(), idQuery, res1, nullptr, nullptr);
+        Helpers::findById(opCtx1, nss, idQuery, res1);
         ASSERT_BSONOBJ_EQ(res1, BSONObj());
 
         BSONObj res2;
-        Helpers::findById(opCtx2, db, nss.ns(), idQuery, res2, nullptr, nullptr);
+        Helpers::findById(opCtx2, nss, idQuery, res2);
         ASSERT_BSONOBJ_EQ(res2, BSONObj());
     }
 
     repl::ReplicationCoordinatorMock* _coordinatorMock;
 };
 
-class All : public OldStyleSuiteSpecification {
+class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("dbhelpers") {}
-    void setupTests() {
+    void setupTests() override {
         add<RemoveRange>();
         add<FindAndNoopUpdateTest>();
     }
 };
 
-OldStyleSuiteInitializer<All> myall;
+unittest::OldStyleSuiteInitializer<All> myall;
 
 }  // namespace
 }  // namespace mongo

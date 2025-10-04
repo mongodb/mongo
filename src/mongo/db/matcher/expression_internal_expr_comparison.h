@@ -29,7 +29,20 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/matcher/expression_visitor.h"
+#include "mongo/db/matcher/path.h"
+#include "mongo/util/assert_util.h"
+
+#include <memory>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -50,53 +63,28 @@ namespace mongo {
  *
  * - Comparison to an array is illegal. It is invalid usage to construct a
  *   InternalExprComparisonMatchExpression node which compares to an array.
+ *
+ * These expressions are always treated as "imprecise" and are to be used as the first level in a
+ * two-level filtering scheme. They must always be accompanied by a later filter which is precise.
  */
 template <typename T>
 class InternalExprComparisonMatchExpression : public ComparisonMatchExpressionBase {
 public:
-    InternalExprComparisonMatchExpression(MatchType type, StringData path, BSONElement value)
+    InternalExprComparisonMatchExpression(MatchType type,
+                                          boost::optional<StringData> path,
+                                          BSONElement value)
         : ComparisonMatchExpressionBase(type,
                                         path,
                                         Value(value),
                                         ElementPath::LeafArrayBehavior::kNoTraversal,
                                         ElementPath::NonLeafArrayBehavior::kMatchSubpath) {
-        invariant(_rhs.type() != BSONType::Undefined);
-        invariant(_rhs.type() != BSONType::Array);
+        tassert(11052405, "_rhs cannot be undefined", _rhs.type() != BSONType::undefined);
+        tassert(11052406, "_rhs cannot be an array", _rhs.type() != BSONType::array);
     }
 
-    virtual ~InternalExprComparisonMatchExpression() = default;
+    ~InternalExprComparisonMatchExpression() override = default;
 
-    bool matchesSingleElement(const BSONElement& elem, MatchDetails* details) const final {
-        // We use NonLeafArrayBehavior::kMatchSubpath traversal in
-        // InternalExprComparisonMatchExpression. This means matchesSinglElement() will be called
-        // when an array is found anywhere along the patch we are matching against. When this
-        // occurs, we return 'true' and depend on the corresponding ExprMatchExpression node to
-        // filter properly.
-        if (elem.type() == BSONType::Array) {
-            return true;
-        }
-
-        auto comp = elem.woCompare(_rhs, BSONElement::ComparisonRulesSet(0), _collator);
-
-        switch (matchType()) {
-            case INTERNAL_EXPR_GT:
-                return comp > 0;
-            case INTERNAL_EXPR_GTE:
-                return comp >= 0;
-            case INTERNAL_EXPR_LT:
-                return comp < 0;
-            case INTERNAL_EXPR_LTE:
-                return comp <= 0;
-            case INTERNAL_EXPR_EQ:
-                return comp == 0;
-            default:
-                // This is a comparison match expression, so it must be either a $eq, $lt, $lte, $gt
-                // or $gte expression.
-                MONGO_UNREACHABLE_TASSERT(3994308);
-        }
-    };
-
-    std::unique_ptr<MatchExpression> shallowClone() const final {
+    std::unique_ptr<MatchExpression> clone() const final {
         auto clone = std::make_unique<T>(path(), _rhs);
         clone->setCollator(_collator);
         if (getTag()) {
@@ -116,7 +104,7 @@ class InternalExprEqMatchExpression final
 public:
     static constexpr StringData kName = "$_internalExprEq"_sd;
 
-    InternalExprEqMatchExpression(StringData path, BSONElement value)
+    InternalExprEqMatchExpression(boost::optional<StringData> path, BSONElement value)
         : InternalExprComparisonMatchExpression<InternalExprEqMatchExpression>(
               MatchType::INTERNAL_EXPR_EQ, path, value) {}
 
@@ -134,7 +122,7 @@ class InternalExprGTMatchExpression final
 public:
     static constexpr StringData kName = "$_internalExprGt"_sd;
 
-    InternalExprGTMatchExpression(StringData path, BSONElement value)
+    InternalExprGTMatchExpression(boost::optional<StringData> path, BSONElement value)
         : InternalExprComparisonMatchExpression<InternalExprGTMatchExpression>(
               MatchType::INTERNAL_EXPR_GT, path, value) {}
 
@@ -153,7 +141,7 @@ class InternalExprGTEMatchExpression final
 public:
     static constexpr StringData kName = "$_internalExprGte"_sd;
 
-    InternalExprGTEMatchExpression(StringData path, BSONElement value)
+    InternalExprGTEMatchExpression(boost::optional<StringData> path, BSONElement value)
         : InternalExprComparisonMatchExpression<InternalExprGTEMatchExpression>(
               MatchType::INTERNAL_EXPR_GTE, path, value) {}
 
@@ -171,7 +159,7 @@ class InternalExprLTMatchExpression final
 public:
     static constexpr StringData kName = "$_internalExprLt"_sd;
 
-    InternalExprLTMatchExpression(StringData path, BSONElement value)
+    InternalExprLTMatchExpression(boost::optional<StringData> path, BSONElement value)
         : InternalExprComparisonMatchExpression<InternalExprLTMatchExpression>(
               MatchType::INTERNAL_EXPR_LT, path, value) {}
 
@@ -189,7 +177,7 @@ class InternalExprLTEMatchExpression final
 public:
     static constexpr StringData kName = "$_internalExprLte"_sd;
 
-    InternalExprLTEMatchExpression(StringData path, BSONElement value)
+    InternalExprLTEMatchExpression(boost::optional<StringData> path, BSONElement value)
         : InternalExprComparisonMatchExpression<InternalExprLTEMatchExpression>(
               MatchType::INTERNAL_EXPR_LTE, path, value) {}
 

@@ -29,14 +29,10 @@
 
 #pragma once
 
-#include <map>
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
-
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/mutable/element.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/mutable_bson/element.h"
+#include "mongo/db/field_ref.h"
 #include "mongo/db/field_ref_set.h"
 #include "mongo/db/update/log_builder_interface.h"
 #include "mongo/db/update/runtime_update_path.h"
@@ -44,6 +40,12 @@
 #include "mongo/db/update/update_node_visitor.h"
 #include "mongo/db/update_index_data.h"
 #include "mongo/util/assert_util.h"
+
+#include <map>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 

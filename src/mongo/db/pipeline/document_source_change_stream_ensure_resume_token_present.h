@@ -29,7 +29,18 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_resumability.h"
+#include "mongo/db/pipeline/document_source_change_stream_gen.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/resume_token.h"
+#include "mongo/db/pipeline/stage_constraints.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 /**
@@ -39,35 +50,39 @@ namespace mongo {
 class DocumentSourceChangeStreamEnsureResumeTokenPresent final
     : public DocumentSourceChangeStreamCheckResumability {
 public:
-    static constexpr StringData kStageName = "$_internalChangeStreamEnsureResumeTokenPresent"_sd;
+    static constexpr StringData kStageName =
+        change_stream_constants::stage_names::kEnsureResumeTokenPresent;
 
     const char* getSourceName() const final;
 
-    StageConstraints constraints(Pipeline::SplitState) const final;
+    StageConstraints constraints(PipelineSplitState) const final;
 
     GetModPathsReturn getModifiedPaths() const final {
         // This stage neither modifies nor renames any field.
-        return {GetModPathsReturn::Type::kFiniteSet, std::set<std::string>{}, {}};
+        return {GetModPathsReturn::Type::kFiniteSet, OrderedPathSet{}, {}};
     }
 
     static boost::intrusive_ptr<DocumentSourceChangeStreamEnsureResumeTokenPresent> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const DocumentSourceChangeStreamSpec& spec);
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final;
+    Value doSerialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
+    }
 
 private:
+    friend boost::intrusive_ptr<exec::agg::Stage>
+    documentSourceChangeStreamEnsureResumeTokenPresentToStageFn(
+        const boost::intrusive_ptr<DocumentSource>& documentSource);
+
     /**
      * Use the create static method to create a DocumentSourceChangeStreamEnsureResumeTokenPresent.
      */
     DocumentSourceChangeStreamEnsureResumeTokenPresent(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, ResumeTokenData token);
-
-    GetNextResult doGetNext() final;
-
-    GetNextResult _tryGetNext();
-
-    // Records whether we have observed the token in the resumed stream.
-    bool _hasSeenResumeToken = false;
 };
 }  // namespace mongo

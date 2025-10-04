@@ -36,7 +36,6 @@ import wiredtiger, wttest
 class test_timestamp09(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_timestamp09'
     uri = 'table:' + tablename
-    session_config = 'isolation=snapshot'
 
     def test_timestamp_api(self):
         self.session.create(self.uri, 'key_format=i,value_format=i')
@@ -44,9 +43,9 @@ class test_timestamp09(wttest.WiredTigerTestCase, suite_subprocess):
 
         # Begin by adding some data.
         self.session.begin_transaction()
+        c[1] = 1
         self.session.commit_transaction(
             'commit_timestamp=' + self.timestamp_str(1))
-        c[1] = 1
 
         # In a single transaction it is illegal to set a commit timestamp
         # older than the first commit timestamp used for this transaction.
@@ -105,17 +104,23 @@ class test_timestamp09(wttest.WiredTigerTestCase, suite_subprocess):
                 '/oldest timestamp \(0, 3\) must not be later than stable timestamp \(0, 1\)/')
 
         # Oldest timestamp is 3 at the moment, trying to set it to an earlier
-        # timestamp is a no-op.
-        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
-        self.assertTimestampsEqual(self.conn.query_timestamp('get=oldest'), self.timestamp_str(3))
+        # timestamp generates an error.
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1)),
+                '/oldest timestamp \(0, 1\) must not be older than current oldest timestamp \(0, 3\)/')
+        self.assertTimestampsEqual(\
+            self.conn.query_timestamp('get=oldest_timestamp'), self.timestamp_str(3))
 
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(3) +
             ',stable_timestamp=' + self.timestamp_str(3))
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(5))
         # Stable timestamp is 5 at the moment, trying to set it to an earlier
-        # timestamp is a no-op.
-        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(4))
-        self.assertTimestampsEqual(self.conn.query_timestamp('get=stable'), self.timestamp_str(5))
+        # timestamp generates an error.
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(4)),
+                '/stable timestamp \(0, 4\) must not be older than current stable timestamp \(0, 5\)/')
+        self.assertTimestampsEqual(\
+            self.conn.query_timestamp('get=stable_timestamp'), self.timestamp_str(5))
 
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(5))
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
@@ -123,15 +128,14 @@ class test_timestamp09(wttest.WiredTigerTestCase, suite_subprocess):
                 self.timestamp_str(6)),
                 '/oldest timestamp \(0, 6\) must not be later than stable timestamp \(0, 5\)/')
 
-        # Commit timestamp >= Stable timestamp.
+        # Commit timestamp > Stable timestamp.
         # Check both timestamp_transaction and commit_transaction APIs.
         # Oldest and stable timestamp are set to 5 at the moment.
-        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(6))
         self.session.begin_transaction()
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.timestamp_transaction(
                 'commit_timestamp=' + self.timestamp_str(5)),
-                '/less than the stable timestamp/')
+                '/must be after the stable timestamp/')
         self.session.rollback_transaction()
 
         self.session.begin_transaction()
@@ -139,7 +143,7 @@ class test_timestamp09(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.commit_transaction(
                 'commit_timestamp=' + self.timestamp_str(5)),
-                '/less than the stable timestamp/')
+                '/must be after the stable timestamp/')
 
         # When explicitly set, commit timestamp for a transaction can be earlier
         # than the commit timestamp of an earlier transaction.
@@ -156,12 +160,17 @@ class test_timestamp09(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.commit_transaction(
             'commit_timestamp=' + self.timestamp_str(7))
 
-        # Read timestamp >= Oldest timestamp
+        # Read timestamp >= oldest timestamp
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(7) +
             ',stable_timestamp=' + self.timestamp_str(7))
-        with self.expectedStdoutPattern('less than the oldest timestamp'):
-            self.assertRaisesException(wiredtiger.WiredTigerError,
-                lambda: self.session.begin_transaction('read_timestamp=' + self.timestamp_str(6)))
+        if wiredtiger.standalone_build():
+            self.assertRaisesException(wiredtiger.WiredTigerError, lambda:
+                self.session.begin_transaction('read_timestamp=' + self.timestamp_str(6)))
+        else:
+            # This is a MongoDB message, not written in standalone builds.
+            with self.expectedStdoutPattern('less than the oldest timestamp'):
+                self.assertRaisesException(wiredtiger.WiredTigerError, lambda:
+                    self.session.begin_transaction('read_timestamp=' + self.timestamp_str(6)))
 
         # c[8] is not visible at read_timestamp < 8
         self.session.begin_transaction('read_timestamp=' + self.timestamp_str(7))
@@ -180,15 +189,16 @@ class test_timestamp09(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.commit_transaction()
 
         # We can move the oldest timestamp backwards with "force"
-        self.conn.set_timestamp(
-            'oldest_timestamp=' + self.timestamp_str(5) + ',force')
-        with self.expectedStdoutPattern('less than the oldest timestamp'):
-            self.assertRaisesException(wiredtiger.WiredTigerError,
-                lambda: self.session.begin_transaction('read_timestamp=' + self.timestamp_str(4)))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(5) + ',force')
+        if wiredtiger.standalone_build():
+            self.assertRaisesException(wiredtiger.WiredTigerError, lambda:
+                self.session.begin_transaction('read_timestamp=' + self.timestamp_str(4)))
+        else:
+            # This is a MongoDB message, not written in standalone builds.
+            with self.expectedStdoutPattern('less than the oldest timestamp'):
+                self.assertRaisesException(wiredtiger.WiredTigerError, lambda:
+                    self.session.begin_transaction('read_timestamp=' + self.timestamp_str(4)))
         self.session.begin_transaction('read_timestamp=' + self.timestamp_str(6))
         self.assertTimestampsEqual(
             self.conn.query_timestamp('get=oldest_reader'), self.timestamp_str(6))
         self.session.commit_transaction()
-
-if __name__ == '__main__':
-    wttest.run()

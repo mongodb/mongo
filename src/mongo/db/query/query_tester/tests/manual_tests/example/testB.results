@@ -1,0 +1,22 @@
+testB
+test
+basic.coll as fuzzer_coll
+
+1
+:results {aggregate: "fuzzer_coll", pipeline: [{$match: {_id: {$lt: 0}}}], cursor: {}}
+[
+]
+
+2
+:results {aggregate: "fuzzer_coll", pipeline: [{$limit: -1}], cursor: {}}
+Failed to execute test number 2. Expected OK command result but got { ok: 0.0, errmsg: "invalid argument to $limit stage: Expected a non-negative number in: $limit: -1.0", code: 5107201, codeName: "Location5107201" }
+
+3
+:results {aggregate: "fuzzer_coll", pipeline: [{$limit: 5}], cursor: {}}
+[
+{"_id":0},
+{"_id":1},
+{"_id":3},
+{"_id":2},
+{"_id":4}
+]

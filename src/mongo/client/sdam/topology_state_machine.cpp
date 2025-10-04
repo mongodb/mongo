@@ -26,16 +26,23 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 #include "mongo/client/sdam/topology_state_machine.h"
 
-#include <ostream>
-
+// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/client/sdam/election_id_set_version_pair.h"
-#include "mongo/client/sdam/sdam_test_base.h"
+#include "mongo/client/sdam/server_description.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/fail_point.h"
+#include "mongo/util/assert_util.h"
+
+#include <set>
+
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
+
 
 namespace mongo::sdam {
 namespace {
@@ -58,7 +65,11 @@ inline int idx(T enumType) {
  * https://github.com/mongodb/specifications/blob/master/source/server-discovery-and-monitoring/server-discovery-and-monitoring.rst#topologytype-table
  */
 void mongo::sdam::TopologyStateMachine::initTransitionTable() {
-    auto bindThis = [&](auto&& pmf) { return [=](auto&&... a) { (this->*pmf)(a...); }; };
+    auto bindThis = [&](auto&& pmf) {
+        return [=, this](auto&&... a) {
+            (this->*pmf)(a...);
+        };
+    };
 
     // init the table to No-ops
     _stt.resize(allTopologyTypes().size() + 1);
@@ -153,11 +164,11 @@ void mongo::sdam::TopologyStateMachine::initTransitionTable() {
 void TopologyStateMachine::onServerDescription(TopologyDescription& topologyDescription,
                                                const ServerDescriptionPtr& serverDescription) {
     if (!topologyDescription.containsServerAddress(serverDescription->getAddress())) {
+        const auto& setName = topologyDescription.getSetName();
         LOGV2_DEBUG(20219,
                     kLogLevel,
-                    "Ignoring isMaster reply from server that is not in the topology: "
-                    "{serverAddress}",
-                    "Ignoring isMaster reply from server that is not in the topology",
+                    "Ignoring 'hello' reply from server that is not in the topology",
+                    "replicaSet"_attr = setName ? *setName : std::string(""),
                     "serverAddress"_attr = serverDescription->getAddress());
         return;
     }
@@ -382,7 +393,6 @@ void TopologyStateMachine::removeServerDescription(TopologyDescription& topology
     topologyDescription.removeServerDescription(serverAddress);
     LOGV2_DEBUG(20220,
                 kLogLevel,
-                "Server '{serverAddress}' was removed from the topology",
                 "Server was removed from the topology",
                 "serverAddress"_attr = serverAddress,
                 "topologyDescription"_attr = topologyDescription.toBSON());

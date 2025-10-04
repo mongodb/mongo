@@ -47,10 +47,10 @@ fi
 NAME=icu4c
 MAJOR_VERSION=57
 MINOR_VERSION=1
-VERSION="${MAJOR_VERSION}.${MINOR_VERSION}"
+VERSION="57.1"
 
-TARBALL="${NAME}-${MAJOR_VERSION}_${MINOR_VERSION}-src.tgz"
-TARBALL_DOWNLOAD_URL="http://download.icu-project.org/files/${NAME}/${VERSION}/${TARBALL}"
+LIB_GIT_REVISION=d2fbfead0830e1119dad0eee49350fc419cf7eb0
+LIB_GIT_REPO=https://github.com/mongodb-forks/icu.git
 
 ICU_THIRD_PARTY_DIR="$(git rev-parse --show-toplevel)/src/third_party/${NAME}-${VERSION}"
 MONGO_SOURCES_DIR="${ICU_THIRD_PARTY_DIR}/source/mongo_sources"
@@ -65,26 +65,27 @@ ICU_DATA_FILE_BIG_ENDIAN_OUT="${MONGO_SOURCES_DIR}/icudt${MAJOR_VERSION}b.dat"
 TEMP_DIR="$(mktemp -d /tmp/icu.XXXXXX)"
 trap "rm -rf $TEMP_DIR" EXIT
 
-TARBALL_DIR="${TEMP_DIR}/tarball"
+SOURCE_DIR="${TEMP_DIR}/source"
 INSTALL_DIR="${TEMP_DIR}/install"
 DATA_DIR="${TEMP_DIR}/data"
-mkdir "$TARBALL_DIR" "$INSTALL_DIR" "$DATA_DIR"
+FRESH_SOURCE_DIR="${TEMP_DIR}/source2"
+mkdir "$SOURCE_DIR" "$INSTALL_DIR" "$DATA_DIR" "$FRESH_SOURCE_DIR"
 
 #
-# Download and extract tarball into temp directory.
+# Clone and checkout the git repo into temp directory.
 #
 
-cd "$TEMP_DIR"
-wget "$TARBALL_DOWNLOAD_URL"
-tar --strip-components=1 -C "$TARBALL_DIR" -zxf "$TARBALL"
+git clone $LIB_GIT_REPO $SOURCE_DIR
+git -C $SOURCE_DIR checkout $LIB_GIT_REVISION
 
 #
-# Build and install ICU in temp directory, in order to use data packaging tools.
+# Build, test and install ICU in temp directory, in order to use data packaging tools.
 #
 
-cd "${TARBALL_DIR}/source"
+cd "${SOURCE_DIR}/icu4c/source"
 ./runConfigureICU "$KERNEL" --prefix="${TEMP_DIR}/install"
 make -j
+make pcheck
 make install
 
 #
@@ -93,7 +94,7 @@ make install
 
 # If the original data file wasn't passed as an argument, use the one from the ICU source tree.
 if [ -z ${ORIGINAL_DATA_FILE+x} ]; then
-    ORIGINAL_DATA_FILE="${TARBALL_DIR}/source/data/in/icudt${MAJOR_VERSION}l.dat"
+    ORIGINAL_DATA_FILE="${SOURCE_DIR}/icu4c/source/data/in/icudt${MAJOR_VERSION}l.dat"
 fi
 
 ORIGINAL_DATA_LIST="${DATA_DIR}/icudt${MAJOR_VERSION}l.lst.orig"
@@ -137,10 +138,13 @@ LD_LIBRARY_PATH= eval $("${INSTALL_DIR}/bin/icu-config" --invoke=icupkg) -s "$DA
     -a "$NEW_DATA_LIST" -tb new "$ICU_DATA_FILE_BIG_ENDIAN_OUT"
 
 #
-# Re-extract pristine sources into final destination, prune unneeded sources.
+# Copy pristine sources into final destination, prune unneeded sources.
 #
 
-tar --strip-components=1 -C "$ICU_THIRD_PARTY_DIR" -zxf "${TEMP_DIR}/${TARBALL}"
+git clone $LIB_GIT_REPO $FRESH_SOURCE_DIR
+git -C $FRESH_SOURCE_DIR checkout $LIB_GIT_REVISION
+cp -r ${FRESH_SOURCE_DIR}/icu4c/* ${ICU_THIRD_PARTY_DIR}
+
 rm -f ${ICU_THIRD_PARTY_DIR}/source/*.in             # Build system.
 rm -f ${ICU_THIRD_PARTY_DIR}/source/*.m4             # Build system.
 rm -f ${ICU_THIRD_PARTY_DIR}/source/install-sh       # Build system.

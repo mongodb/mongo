@@ -30,7 +30,6 @@
 #   Transactions: commits and rollbacks
 #
 
-import fnmatch, os, shutil, time
 from helper import simulate_crash_restart
 from suite_subprocess import suite_subprocess
 from wtscenario import make_scenarios
@@ -40,7 +39,7 @@ class test_txn14(wttest.WiredTigerTestCase, suite_subprocess):
     t1 = 'table:test_txn14_1'
     entries = 10000
     extra_entries = 5
-    conn_config = 'log=(archive=false,enabled,file_max=100K)'
+    conn_config = 'log=(enabled,file_max=100K,remove=false)'
 
     sync_list = [
         ('write', dict(sync='off')),
@@ -90,6 +89,3 @@ class test_txn14(wttest.WiredTigerTestCase, suite_subprocess):
         all = self.entries + self.extra_entries
         self.assertEqual(i, all + 1)
         c.close()
-
-if __name__ == '__main__':
-    wttest.run()

@@ -33,9 +33,15 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/extensions_callback.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
-#include "mongo/db/matcher/match_details.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
+
+#include <memory>
+#include <string>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 
 namespace mongo {
@@ -59,11 +65,9 @@ public:
             MatchExpressionParser::AllowedFeatureSet allowedFeatures =
                 MatchExpressionParser::kDefaultSpecialFeatures);
 
-    bool matches(const BSONObj& doc, MatchDetails* details = nullptr) const;
-
     const BSONObj* getQuery() const {
         return &_pattern;
-    };
+    }
 
     std::string toString() const {
         return _pattern.toString();

@@ -1,0 +1,18 @@
+Trace:FileStat: > UTIL_isLink(file.zst)
+Trace:FileStat: < 0
+Trace:FileStat: > UTIL_isConsole(1)
+Trace:FileStat: < 0
+Trace:FileStat: > UTIL_isConsole(2)
+Trace:FileStat: < 0
+Trace:FileStat: > UTIL_isDirectory(file.zst)
+Trace:FileStat:  > UTIL_stat(-1, file.zst)
+Trace:FileStat:  < 1
+Trace:FileStat:  > UTIL_isDirectoryStat()
+Trace:FileStat:  < 0
+Trace:FileStat: < 0
+Trace:FileStat: > UTIL_stat(-1, file.zst)
+Trace:FileStat: < 1
+Trace:FileStat: > UTIL_isRegularFile(/*stdout*\)
+Trace:FileStat:  > UTIL_stat(-1, /*stdout*\)
+Trace:FileStat:  < 0
+Trace:FileStat: < 0

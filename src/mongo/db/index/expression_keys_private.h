@@ -29,20 +29,27 @@
 
 #pragma once
 
-#include <vector>
-
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobj_comparator_interface.h"
+#include "mongo/bson/ordering.h"
 #include "mongo/db/hasher.h"
-#include "mongo/db/index/multikey_paths.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/index/index_access_method.h"
+#include "mongo/db/local_catalog/index_catalog.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/storage/key_string/key_string.h"
+#include "mongo/util/shared_buffer_fragment.h"
+
+#include <vector>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
 class CollectionPtr;
 class CollatorInterface;
-struct TwoDIndexingParams;
-struct S2IndexingParams;
 
 namespace fts {
 
@@ -51,9 +58,13 @@ class FTSSpec;
 }  // namespace fts
 
 /**
- * Do not use this class or any of its methods directly.  The key generation of btree-indexed
- * expression indices is kept outside of the access method for testing and for upgrade
- * compatibility checking.
+ * Do not use this class or any of its methods directly.
+ *
+ * The key generation of btree-indexed expression indices is kept outside of the access method for
+ * testing and for upgrade compatibility checking.
+ *
+ * The key generators of 2d- and 2dsphere-indexed expressions are kept separate for code ownership
+ * reasons.
  */
 class ExpressionKeysPrivate {
 public:
@@ -66,18 +77,6 @@ public:
                                        const BSONObj& keyPattern);
 
     //
-    // 2d
-    //
-
-    static void get2DKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
-                          const BSONObj& obj,
-                          const TwoDIndexingParams& params,
-                          KeyStringSet* keys,
-                          KeyString::Version keyStringVersion,
-                          Ordering ordering,
-                          boost::optional<RecordId> id = boost::none);
-
-    //
     // FTS
     //
 
@@ -85,9 +84,9 @@ public:
                            const BSONObj& obj,
                            const fts::FTSSpec& ftsSpec,
                            KeyStringSet* keys,
-                           KeyString::Version keyStringVersion,
+                           key_string::Version keyStringVersion,
                            Ordering ordering,
-                           boost::optional<RecordId> id = boost::none);
+                           const boost::optional<RecordId>& id = boost::none);
 
     //
     // Hash
@@ -99,39 +98,21 @@ public:
     static void getHashKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
                             const BSONObj& obj,
                             const BSONObj& keyPattern,
-                            HashSeed seed,
                             int hashVersion,
                             bool isSparse,
                             const CollatorInterface* collator,
                             KeyStringSet* keys,
-                            KeyString::Version keyStringVersion,
+                            key_string::Version keyStringVersion,
                             Ordering ordering,
                             bool ignoreArraysAlongPath,
-                            boost::optional<RecordId> id = boost::none);
+                            const boost::optional<RecordId>& id = boost::none);
 
     /**
      * Hashing function used by both getHashKeys and the cursors we create.
      * Exposed for testing in dbtests/namespacetests.cpp and
      * so mongo/db/index_legacy.cpp can use it.
      */
-    static long long int makeSingleHashKey(const BSONElement& e, HashSeed seed, int v);
-
-    //
-    // S2
-    //
-
-    /**
-     * Generates keys for S2 access method.
-     */
-    static void getS2Keys(SharedBufferFragmentBuilder& pooledBufferBuilder,
-                          const BSONObj& obj,
-                          const BSONObj& keyPattern,
-                          const S2IndexingParams& params,
-                          KeyStringSet* keys,
-                          MultikeyPaths* multikeyPaths,
-                          KeyString::Version keyStringVersion,
-                          Ordering ordering,
-                          boost::optional<RecordId> id = boost::none);
+    static long long int makeSingleHashKey(const BSONElement& e, int v);
 };
 
 }  // namespace mongo

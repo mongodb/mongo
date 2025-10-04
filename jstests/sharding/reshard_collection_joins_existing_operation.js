@@ -4,27 +4,37 @@
  * the ongoing resharding instance.
  *
  * Use _configsvrReshardCollection instead of reshardCollection to exercise the behavior of the
- * config server in the absence of the distributed lock taken by _shardsvrReshardCollection on the
+ * config server in the absence of the DDL lock taken by _shardsvrReshardCollection on the
  * primary shard for the database.
  *
  * @tags: [
  *   uses_atclustertime,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/discover_topology.js");
-load("jstests/libs/parallelTester.js");
-load("jstests/sharding/libs/resharding_test_fixture.js");
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
+import {getUUIDFromConfigCollections, getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 // Generates a new thread to run _configsvrReshardCollection.
 const makeConfigsvrReshardCollectionThread = (configsvrConnString, ns) => {
-    return new Thread((configsvrConnString, ns) => {
-        const configsvr = new Mongo(configsvrConnString);
-        assert.commandWorked(configsvr.adminCommand(
-            {_configsvrReshardCollection: ns, key: {newKey: 1}, writeConcern: {w: "majority"}}));
-    }, configsvrConnString, ns);
+    return new Thread(
+        (configsvrConnString, ns) => {
+            const configsvr = new Mongo(configsvrConnString);
+            assert.commandWorked(
+                configsvr.adminCommand({
+                    _configsvrReshardCollection: ns,
+                    key: {newKey: 1},
+                    numInitialChunks: 1,
+                    writeConcern: {w: "majority"},
+                    provenance: "reshardCollection",
+                }),
+            );
+        },
+        configsvrConnString,
+        ns,
+    );
 };
 
 const getTempUUID = (tempNs) => {
@@ -46,11 +56,12 @@ const mongos = sourceCollection.getMongo();
 const topology = DiscoverTopology.findConnectedNodes(mongos);
 const configsvr = new Mongo(topology.configsvr.nodes[0]);
 
-const pauseBeforeCloningFP =
-    configureFailPoint(configsvr, "reshardingPauseCoordinatorBeforeCloning");
+const pauseBeforeCloningFP = configureFailPoint(configsvr, "reshardingPauseCoordinatorBeforeCloning");
 
 const configsvrReshardCollectionThread = makeConfigsvrReshardCollectionThread(
-    topology.configsvr.nodes[0], sourceCollection.getFullName());
+    topology.configsvr.nodes[0],
+    sourceCollection.getFullName(),
+);
 
 // Fulfilled once the first reshardCollection command creates the temporary collection.
 let expectedUUIDAfterReshardingCompletes = undefined;
@@ -67,8 +78,7 @@ reshardingTest.withReshardingInBackground(
         // collection once resharding has completed.
         expectedUUIDAfterReshardingCompletes = getTempUUID(tempNs);
 
-        const reshardCollectionJoinedFP =
-            configureFailPoint(configsvr, "reshardCollectionJoinedExistingOperation");
+        const reshardCollectionJoinedFP = configureFailPoint(configsvr, "reshardCollectionJoinedExistingOperation");
 
         configsvrReshardCollectionThread.start();
 
@@ -79,16 +89,15 @@ reshardingTest.withReshardingInBackground(
 
         reshardCollectionJoinedFP.off();
         pauseBeforeCloningFP.off();
-    });
+    },
+);
 
 configsvrReshardCollectionThread.join();
 
 // Confirm the UUID for the namespace that was resharded is the same as the temporary collection's
 // UUID before the second reshardCollection command was issued.
 assert.neq(expectedUUIDAfterReshardingCompletes, undefined);
-const finalSourceCollectionUUID =
-    getUUIDFromListCollections(sourceCollection.getDB(), sourceCollection.getName());
+const finalSourceCollectionUUID = getUUIDFromListCollections(sourceCollection.getDB(), sourceCollection.getName());
 assert.eq(expectedUUIDAfterReshardingCompletes, finalSourceCollectionUUID);
 
 reshardingTest.teardown();
-})();

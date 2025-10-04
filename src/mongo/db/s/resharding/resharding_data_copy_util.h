@@ -29,18 +29,41 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <vector>
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/logical_session_id.h"
+#include "mongo/db/global_catalog/catalog_cache/catalog_cache.h"
+#include "mongo/db/local_catalog/collection.h"
+#include "mongo/db/local_catalog/collection_catalog.h"
+#include "mongo/db/local_catalog/collection_options.h"
+#include "mongo/db/local_catalog/shard_role_catalog/shard_filtering_metadata_refresh.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/s/shard_filtering_metadata_refresh.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/s/resharding/recipient_resume_document_gen.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/versioning_protocol/chunk_version.h"
+#include "mongo/db/versioning_protocol/shard_version.h"
+#include "mongo/db/versioning_protocol/stale_exception.h"
 #include "mongo/s/resharding/common_types_gen.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/functional.h"
+#include "mongo/util/future.h"
+#include "mongo/util/uuid.h"
+
+#include <memory>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -68,7 +91,8 @@ void ensureCollectionExists(OperationContext* opCtx,
  */
 void ensureCollectionDropped(OperationContext* opCtx,
                              const NamespaceString& nss,
-                             const boost::optional<CollectionUUID>& uuid = boost::none);
+                             const boost::optional<UUID>& uuid = boost::none);
+
 /**
  * Removes documents from the oplog applier progress and transaction applier progress collections
  * that are associated with an in-progress resharding operation. Also drops all oplog buffer
@@ -90,24 +114,37 @@ void ensureOplogCollectionsDropped(OperationContext* opCtx,
 void ensureTemporaryReshardingCollectionRenamed(OperationContext* opCtx,
                                                 const CommonReshardingMetadata& metadata);
 
+bool isCollectionCapped(OperationContext* opCtx, const NamespaceString& nss);
+/**
+ * Removes all entries matching the given reshardingUUID from the recipient resume data table.
+ */
+void deleteRecipientResumeData(OperationContext* opCtx, const UUID& reshardingUUID);
+
 /**
  * Returns the largest _id value in the collection.
  */
-Value findHighestInsertedId(OperationContext* opCtx, const CollectionPtr& collection);
+Value findHighestInsertedId(OperationContext* opCtx, const CollectionAcquisition& collection);
 
 /**
  * Returns the full document of the largest _id value in the collection.
  */
 boost::optional<Document> findDocWithHighestInsertedId(OperationContext* opCtx,
-                                                       const CollectionPtr& collection);
+                                                       const CollectionAcquisition& collection);
 
 /**
- * Returns a batch of documents suitable for being inserted with insertBatch().
- *
- * The batch of documents is returned once its size exceeds batchSizeLimitBytes or the pipeline has
- * been exhausted.
+ * Atomically inserts a batch of documents in a single multi-document transaction, and updates
+ * the resume token and increments the number of documents and bytes copied (only if 'storeProgress'
+ * is true) in the same transaction. Returns the number of bytes inserted.
  */
-std::vector<InsertStatement> fillBatchForInsert(Pipeline& pipeline, int batchSizeLimitBytes);
+int insertBatchTransactionally(OperationContext* opCtx,
+                               const NamespaceString& nss,
+                               TxnNumber& txnNumber,
+                               std::vector<InsertStatement>& batch,
+                               const UUID& reshardingUUID,
+                               const ShardId& donorShard,
+                               const HostAndPort& donorHost,
+                               const BSONObj& resumeToken,
+                               bool storeProgress);
 
 /**
  * Atomically inserts a batch of documents in a single storage transaction. Returns the number of
@@ -120,28 +157,12 @@ int insertBatch(OperationContext* opCtx,
                 std::vector<InsertStatement>& batch);
 
 /**
- * Checks out the logical session and acts in one of the following ways depending on the state of
- * this shard's config.transactions table:
- *
- *   (a) When this shard already knows about a higher transaction than txnNumber,
- *       withSessionCheckedOut() skips calling the supplied lambda function and returns boost::none.
- *
- *   (b) When this shard already knows about the retryable write statement (txnNumber, *stmtId),
- *       withSessionCheckedOut() skips calling the supplied lambda function and returns boost::none.
- *
- *   (c) When this shard has an earlier prepared transaction still active, withSessionCheckedOut()
- *       skips calling the supplied lambda function and returns a future that becomes ready once the
- *       active prepared transaction on this shard commits or aborts. After waiting for the returned
- *       future to become ready, the caller should then invoke withSessionCheckedOut() with the same
- *       arguments a second time.
- *
- *   (d) Otherwise, withSessionCheckedOut() calls the lambda function and returns boost::none.
+ * Checks out the logical session in the opCtx and runs the supplied lambda function in a
+ * transaction, using the transaction number supplied in the opCtx.
  */
-boost::optional<SharedSemiFuture<void>> withSessionCheckedOut(OperationContext* opCtx,
-                                                              LogicalSessionId lsid,
-                                                              TxnNumber txnNumber,
-                                                              boost::optional<StmtId> stmtId,
-                                                              unique_function<void()> callable);
+void runWithTransactionFromOpCtx(OperationContext* opCtx,
+                                 const NamespaceString& nss,
+                                 unique_function<void(OperationContext*)> func);
 
 /**
  * Updates this shard's config.transactions table based on a retryable write or multi-statement
@@ -154,27 +175,45 @@ void updateSessionRecord(OperationContext* opCtx,
                          BSONObj o2Field,
                          std::vector<StmtId> stmtIds,
                          boost::optional<repl::OpTime> preImageOpTime,
-                         boost::optional<repl::OpTime> postImageOpTime);
+                         boost::optional<repl::OpTime> postImageOpTime,
+                         NamespaceString sourceNss);
+
+/**
+ * Retrieves the resume data natural order scans for all donor shards.
+ */
+std::vector<ReshardingRecipientResumeData> getRecipientResumeData(OperationContext* opCtx,
+                                                                  const UUID& reshardingUUID);
 
 /**
  * Calls and returns the value from the supplied lambda function.
  *
- * If a StaleConfig exception is thrown during its execution, then this function will attempt to
- * refresh the collection and invoke the supplied lambda function a second time.
+ * If a StaleConfig error is thrown during its execution, then this function will attempt to refresh
+ * the collection and invoke the supplied lambda function a second time.
+ *
+ * TODO SERVER-77402: Replace this function with the new ShardRole retry loop utility
  */
 template <typename Callable>
-auto withOneStaleConfigRetry(OperationContext* opCtx, Callable&& callable) {
+auto staleConfigShardLoop(OperationContext* opCtx, Callable&& callable) {
     try {
         return callable();
-    } catch (const ExceptionForCat<ErrorCategory::StaleShardVersionError>& ex) {
+    } catch (const ExceptionFor<ErrorCategory::StaleShardVersionError>& ex) {
         if (auto sce = ex.extraInfo<StaleConfigInfo>()) {
-            const auto refreshed =
-                onShardVersionMismatchNoExcept(opCtx, sce->getNss(), sce->getVersionReceived())
-                    .isOK();
 
-            if (refreshed) {
-                return callable();
+            if (sce->getVersionWanted() &&
+                (sce->getVersionReceived().placementVersion() <=>
+                 sce->getVersionWanted()->placementVersion()) == std::partial_ordering::less) {
+                // The shard is recovered and the router is staler than the shard, so we cannot
+                // retry locally.
+                throw;
             }
+
+            // Recover the sharding metadata if there was no wanted version in the staleConfigInfo
+            // or it was older than the received version.
+            uassertStatusOK(
+                FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
+                    opCtx, sce->getNss(), sce->getVersionReceived().placementVersion()));
+
+            return callable();
         }
         throw;
     }

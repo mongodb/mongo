@@ -1,0 +1,14 @@
+# This benchmark measures the performance of expressions in SBE.
+test_kind: benchmark_test
+
+selector:
+  root: bazel-bin/install/install-mongo_benchmark-stripped_test_list.txt
+  include_files:
+    # The trailing asterisk is for handling the .exe extension on Windows.
+    - bazel-bin/**/system_resource_canary_bm*
+    - bazel-bin/**/sbe_expression_bm*
+
+executor:
+  config: {}
+  hooks:
+    - class: GenerateAndCheckPerfResults

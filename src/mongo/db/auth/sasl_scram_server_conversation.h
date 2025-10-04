@@ -29,10 +29,28 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/crypto/mechanism_scram.h"
+#include "mongo/crypto/sha1_block.h"
 #include "mongo/db/auth/sasl_mechanism_policies.h"
 #include "mongo/db/auth/sasl_mechanism_registry.h"
+#include "mongo/db/auth/user.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/util/icu.h"
+
+#include <algorithm>
+#include <cstring>
+#include <string>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -55,17 +73,25 @@ public:
      *
      **/
     StatusWith<std::tuple<bool, std::string>> stepImpl(OperationContext* opCtx,
-                                                       StringData inputData);
+                                                       StringData inputData) override;
 
     StatusWith<std::string> saslPrep(StringData str) const {
         if (std::is_same<SHA1Block, HashBlock>::value) {
-            return str.toString();
+            return std::string{str};
         } else {
             return icuSaslPrep(str);
         }
     }
 
     Status setOptions(BSONObj options) final;
+
+    boost::optional<unsigned int> currentStep() const override {
+        return _step;
+    }
+
+    boost::optional<unsigned int> totalSteps() const override {
+        return _totalSteps();
+    }
 
 private:
     /**
@@ -79,7 +105,11 @@ private:
     StatusWith<std::tuple<bool, std::string>> _secondStep(OperationContext* opCtx,
                                                           StringData input);
 
-    int _step{0};
+    unsigned int _totalSteps() const {
+        return _skipEmptyExchange ? 2 : 3;
+    }
+
+    unsigned int _step{0};
     std::string _authMessage;
 
     // The secrets to check the client proof against during the second step

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/exec/shard_filterer.h"
 
 namespace mongo {

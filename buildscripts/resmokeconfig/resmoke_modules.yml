@@ -1,0 +1,12 @@
+enterprise:
+  jstest_dirs:
+    - src/mongo/db/modules/enterprise/jstests
+atlas:
+  fixture_dirs:
+    - buildscripts/modules/atlas/fixtures
+  hook_dirs:
+    - buildscripts/modules/atlas/hooks
+  suite_dirs:
+    - buildscripts/modules/atlas/suites
+  jstest_dirs:
+    - src/mongo/db/modules/atlas/jstests

@@ -1,0 +1,254 @@
+# Copyright (C) 2020-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/util/uuid.h"
+
+imports:
+    - "mongo/db/auth/access_checks.idl"
+    - "mongo/db/auth/action_type.idl"
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/local_catalog/ddl/create_indexes.idl"
+
+structs:
+    ListIndexesReplyItem:
+        description: "An item in the listIndexes command's reply"
+        # If adding new fields, the set 'kAllowedListIndexesFieldNames' in
+        # 'src/mongo/db/commands/list_indexes_allowed_fields.h' should also be updated.
+        fields:
+            #
+            # A built index appears with these fields, which must be the same as NewIndexSpec's
+            # fields. The "key" and "name" fields are required for built indexes, but marked
+            # optional to allow the in-progress index build format using the fields below.
+            #
+            v:
+                type: safeInt
+                optional: true
+                stability: stable
+            key:
+                type: object_owned
+                optional: true
+                stability: stable
+            name:
+                type: string
+                optional: true
+                stability: stable
+            ns:
+                # MongoDB 4.2 and older generate this field, see SERVER-41696.
+                type: string
+                ignore: true
+                stability: stable
+            background:
+                type: safeBool
+                optional: true
+                stability: stable
+            unique:
+                type: safeBool
+                optional: true
+                stability: stable
+            hidden:
+                type: safeBool
+                optional: true
+                stability: stable
+            partialFilterExpression:
+                type: object_owned
+                optional: true
+                stability: stable
+            sparse:
+                type: safeBool
+                optional: true
+                stability: stable
+            expireAfterSeconds:
+                type: safeInt
+                optional: true
+                stability: stable
+            storageEngine:
+                type: object_owned
+                optional: true
+                stability: stable
+            weights:
+                type:
+                    variant: [string, object_owned]
+                optional: true
+                stability: stable
+            default_language:
+                type: string
+                optional: true
+                stability: stable
+            language_override:
+                type: string
+                optional: true
+                stability: stable
+            textIndexVersion:
+                type: safeInt
+                optional: true
+                stability: stable
+            2dsphereIndexVersion:
+                type: safeInt
+                optional: true
+                stability: stable
+            bits:
+                type: safeInt
+                optional: true
+                stability: stable
+            min:
+                type: safeDouble
+                optional: true
+                stability: stable
+            max:
+                type: safeDouble
+                optional: true
+                stability: stable
+            bucketSize:
+                type: safeDouble
+                optional: true
+                stability: stable
+            collation:
+                type: object_owned
+                optional: true
+                stability: stable
+            wildcardProjection:
+                type: object_owned
+                optional: true
+                stability: stable
+            coarsestIndexedLevel:
+                type: safeInt
+                optional: true
+                stability: stable
+            finestIndexedLevel:
+                type: safeInt
+                optional: true
+                stability: stable
+            dropDups:
+                type: safeBool
+                optional: true
+                stability: stable
+            originalSpec:
+                type: object_owned
+                optional: true
+                stability: unstable
+            clustered:
+                type: safeBool
+                optional: true
+                stability: stable
+            prepareUnique:
+                type: safeBool
+                optional: true
+                stability: unstable
+            #
+            # Depending on the values of includeIndexBuildInfo and includeBuildUUIDs, indexes may
+            # appear with a combination of these three fields. Specifically, if includeIndexBuildInfo
+            # is set, completed index builds will appear with spec, and in-progress index builds will
+            # appear with both spec and indexBuildInfo, while if includeBuildUUIDs is set, in-progress
+            # index builds will appear with both spec and buildUUID. They're required, but marked
+            # optional to permit the built index format using the fields above instead.
+            #
+            indexBuildInfo:
+                description: "Contains information about the build. Included if includeIndexBuildInfo is set and the index is currently building."
+                type: object_owned
+                optional: true
+                stability: unstable
+            buildUUID:
+                description: "The UUID of a two-phase index build. Included if includeBuildUUIDs is set and the index is currently building."
+                type: uuid
+                optional: true
+                stability: stable
+            spec:
+                description: "Contains the index spec. If includeIndexBuildInfo is set, always included. If includeBuildUUIDs is set, included if the index is currently building."
+                type: NewIndexSpec
+                optional: true
+                stability: stable
+
+    ListIndexesReplyCursor:
+        description: "Cursor object"
+        fields:
+            id:
+                type: long
+                stability: stable
+            ns:
+                type: namespacestring
+                stability: stable
+            firstBatch:
+                type: array<ListIndexesReplyItem>
+                stability: stable
+
+    ListIndexesReply:
+        description: "The listIndexes command's reply."
+        is_command_reply: true
+        fields:
+            cursor:
+                type: ListIndexesReplyCursor
+                stability: stable
+            # Included so mongos can parse shards' listIndexes replies.
+            ok:
+                type: safeDouble
+                validator: {gte: 0.0, lte: 1.0}
+                optional: true
+                stability: stable
+
+commands:
+    listIndexes:
+        description: "Parser for the listIndexes command"
+        command_name: listIndexes
+        namespace: concatenate_with_db_or_uuid
+        cpp_name: listIndexes
+        strict: true
+        api_version: "1"
+        access_check:
+            complex:
+                - check: is_authorized_to_parse_namespace_element
+                - privilege:
+                      resource_pattern: exact_namespace
+                      action_type: listIndexes
+                - privilege:
+                      resource_pattern: cluster
+                      action_type: useUUID
+        fields:
+            cursor:
+                type: SimpleCursorOptions
+                optional: true
+                stability: stable
+            includeBuildUUIDs:
+                type: safeBool
+                optional: true
+                stability: unstable
+            includeIndexBuildInfo:
+                description: "If true, the reply will include information about the build status for each index."
+                type: safeBool
+                optional: true
+                stability: unstable
+            isTimeseriesNamespace:
+                description:
+                    "This flag is set to true when the command was originally sent to
+                    mongos on the time-series view, but got rewritten to target
+                    time-series buckets namespace before being sent to shards."
+                type: optionalBool
+                stability: internal
+        reply_type: ListIndexesReply

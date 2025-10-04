@@ -27,20 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <array>
-#include <cmath>
-#include <cstdint>
-#include <limits>
-#include <random>
-#include <string>
-#include <vector>
+#include "mongo/util/itoa.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/decimal_counter.h"
-#include "mongo/util/itoa.h"
+
+#include <cstdint>
+#include <iterator>
+#include <limits>
+#include <ostream>
+#include <random>
+#include <string>
+#include <vector>
 
 namespace mongo {
 namespace {
@@ -107,7 +105,10 @@ TEST(ItoA, StringDataEquality) {
     }
 
     for (const auto& i : cases) {
-        ASSERT_EQ(StringData(ItoA{i}), std::to_string(i)) << ", i=" << i;
+        ItoA a{i};
+        std::string expected = std::to_string(i);
+        ASSERT_EQ(StringData(a), expected) << ", i=" << i;
+        ASSERT_EQ(a.toStringData(), expected) << ", i=" << i;
     }
 }
 

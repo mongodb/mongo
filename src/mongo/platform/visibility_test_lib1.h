@@ -26,16 +26,22 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#pragma once
+
+#include "mongo/platform/visibility.h"
 
 #include <string>
 #include <string_view>
 
-#include "mongo/platform/visibility.h"
+#ifdef MONGO_API_visibility_test_lib1
+#define MONGO_VISIBILITY_TEST_LIB1_API MONGO_API_EXPORT
+#else
+#define MONGO_VISIBILITY_TEST_LIB1_API MONGO_API_IMPORT
+#endif
 
 namespace mongo {
 namespace visibility_test_lib1 {
-
-class MONGO_API(visibility_test_lib1) Base {
+class MONGO_VISIBILITY_TEST_LIB1_API Base {
 public:
     explicit Base(const std::string& name);
     std::string_view name() const;

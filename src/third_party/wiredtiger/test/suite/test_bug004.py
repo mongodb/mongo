@@ -33,8 +33,8 @@
 # test_bug004.py
 #       Regression tests.
 
-import wiredtiger, wttest
-from wtdataset import SimpleDataSet, simple_key, simple_value
+import wttest
+from wtdataset import simple_key, simple_value
 from wtscenario import make_scenarios
 
 # Check to make sure we see the right versions of overflow keys and values
@@ -51,7 +51,7 @@ class test_bug004(wttest.WiredTigerTestCase):
 
     key_format_values = [
         ('column', dict(key_format='r')),
-        ('string_row', dict(key_format='S')),
+        ('row_string', dict(key_format='S')),
     ]
 
     scenarios = make_scenarios(key_format_values)
@@ -74,14 +74,14 @@ class test_bug004(wttest.WiredTigerTestCase):
         c1.close()
 
         # Verify the object, force it to disk, and verify the on-disk version.
-        self.session.verify(self.uri)
+        self.verifyUntilSuccess(self.session, self.uri)
         self.reopen_conn()
-        self.session.verify(self.uri)
+        self.verifyUntilSuccess(self.session, self.uri)
 
         # Create a new session and start a transaction to force the engine
         # to access old versions of the key/value pairs.
         tmp_session = self.conn.open_session(None)
-        tmp_session.begin_transaction("isolation=snapshot")
+        tmp_session.begin_transaction()
 
         # Load the object and use truncate to delete a set of records.  (I'm
         # using truncate because it doesn't instantiate keys, all other ops
@@ -104,10 +104,7 @@ class test_bug004(wttest.WiredTigerTestCase):
         c1.search()
         for i in range(2, self.nentries):
             c1.next()
-            self.assertEquals(
+            self.assertEqual(
                 c1.get_key(), self.make_key(c1, i))
-            self.assertEquals(
+            self.assertEqual(
                 c1.get_value(), simple_value(c1, i) + 'abcdef' * 100)
-
-if __name__ == '__main__':
-    wttest.run()

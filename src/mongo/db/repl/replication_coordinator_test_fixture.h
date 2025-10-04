@@ -29,17 +29,35 @@
 
 #pragma once
 
-#include <string>
-
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
+#include "mongo/db/repl/last_vote.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
+#include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/modules.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/time_support.h"
+
+#include <functional>
+#include <memory>
+#include <string>
 
 namespace mongo {
 
@@ -49,8 +67,10 @@ struct HostAndPort;
 namespace repl {
 
 class ReplSetConfig;
+
 class ReplicationCoordinatorExternalStateMock;
 class ReplicationCoordinatorImpl;
+
 class StorageInterfaceMock;
 class TopologyCoordinator;
 
@@ -59,7 +79,7 @@ using executor::NetworkInterfaceMock;
 /**
  * Fixture for testing ReplicationCoordinatorImpl behaviors.
  */
-class ReplCoordTest : public ServiceContextMongoDTest {
+class MONGO_MOD_OPEN ReplCoordTest : public ServiceContextMongoDTest {
 public:
     /**
      * Makes a command response with the given "doc" response and optional elapsed time "millis".
@@ -85,21 +105,29 @@ public:
     }
 
     static BSONObj configWithMembers(int version, long long term, BSONArray members) {
-        return BSON("_id"
-                    << "mySet"
-                    << "protocolVersion" << 1 << "version" << version << "term" << term << "members"
-                    << members);
+        return BSON("_id" << "mySet"
+                          << "protocolVersion" << 1 << "version" << version << "term" << term
+                          << "members" << members);
     }
 
 protected:
-    ReplCoordTest();
-    virtual ~ReplCoordTest();
+    explicit ReplCoordTest(Options options = Options{}.useMockClock(true));
+    ~ReplCoordTest() override;
 
     /**
      * Asserts that calling start(configDoc, selfHost) successfully initiates the
      * ReplicationCoordinator under test.
      */
     virtual void assertStartSuccess(const BSONObj& configDoc, const HostAndPort& selfHost);
+
+    /**
+     * Asserts that calling start with data (such as a populated oplog or last vote document)
+     * successfully initiates the ReplicationCoordinator under test.
+     */
+    virtual void assertStartSuccessWithData(const BSONObj& configDoc,
+                                            const HostAndPort& selfHost,
+                                            const LastVote& lastVote,
+                                            const OpTime& topOfOplog);
 
     /**
      * Gets the network mock.
@@ -120,14 +148,20 @@ protected:
         return _repl.get();
     }
 
-    void replCoordSetMyLastAppliedOpTime(const OpTime& opTime, Date_t wallTime = Date_t()) {
+    /**
+     * These are the setters to advance lastWritten/lastApplied/lastDurable timestamp in replication
+     * coordinator. Note that the call will be ignored if the input timestamp is not greater than
+     * the current one in ReplicationCoordinatorImpl(that's what "Forward" means), while the call
+     * won't be ignored in ReplicationCoordinatorMock.
+     */
+    void replCoordSetMyLastWrittenOpTime(const OpTime& opTime, Date_t wallTime = Date_t()) {
         if (wallTime == Date_t()) {
             wallTime = Date_t() + Seconds(opTime.getSecs());
         }
-        getReplCoord()->setMyLastAppliedOpTimeAndWallTime({opTime, wallTime});
+        getReplCoord()->setMyLastWrittenOpTimeAndWallTimeForward({opTime, wallTime});
     }
 
-    void replCoordSetMyLastAppliedOpTimeForward(const OpTime& opTime, Date_t wallTime = Date_t()) {
+    void replCoordSetMyLastAppliedOpTime(const OpTime& opTime, Date_t wallTime = Date_t()) {
         if (wallTime == Date_t()) {
             wallTime = Date_t() + Seconds(opTime.getSecs());
         }
@@ -138,18 +172,28 @@ protected:
         if (wallTime == Date_t()) {
             wallTime = Date_t() + Seconds(opTime.getSecs());
         }
-        getReplCoord()->setMyLastDurableOpTimeAndWallTime({opTime, wallTime});
-    }
-
-    void replCoordSetMyLastDurableOpTimeForward(const OpTime& opTime, Date_t wallTime = Date_t()) {
-        if (wallTime == Date_t()) {
-            wallTime = Date_t() + Seconds(opTime.getSecs());
-        }
         getReplCoord()->setMyLastDurableOpTimeAndWallTimeForward({opTime, wallTime});
     }
 
-    void replCoordSetMyLastAppliedAndDurableOpTime(const OpTime& opTime,
-                                                   Date_t wallTime = Date_t()) {
+    void replCoordSetMyLastDurableAndLastWrittenOpTime(const OpTime& opTime,
+                                                       Date_t wallTime = Date_t()) {
+        if (wallTime == Date_t()) {
+            wallTime = Date_t() + Seconds(opTime.getSecs());
+        }
+        getReplCoord()->setMyLastDurableAndLastWrittenOpTimeAndWallTimeForward({opTime, wallTime});
+    }
+
+    void replCoordSetMyLastAppliedAndLastWrittenOpTime(const OpTime& opTime,
+                                                       Date_t wallTime = Date_t()) {
+        if (wallTime == Date_t()) {
+            wallTime = Date_t() + Seconds(opTime.getSecs());
+        }
+        getReplCoord()->setMyLastAppliedAndLastWrittenOpTimeAndWallTimeForward({opTime, wallTime});
+    }
+
+    void replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(const OpTime& opTime,
+                                                             Date_t wallTime = Date_t()) {
+        replCoordSetMyLastWrittenOpTime(opTime, wallTime);
         replCoordSetMyLastAppliedOpTime(opTime, wallTime);
         replCoordSetMyLastDurableOpTime(opTime, wallTime);
     }
@@ -178,7 +222,7 @@ protected:
      * Gets the topology coordinator used by the replication coordinator under test.
      */
     TopologyCoordinator& getTopoCoord() {
-        return *_topo;
+        return *_repl->getTopologyCoordinator_forTest();
     }
 
     /**
@@ -268,7 +312,7 @@ protected:
      * progressing time past that point, takes in what time to expect an election to occur at.
      * Useful for simulating elections triggered via priority takeover.
      */
-    void simulateSuccessfulV1ElectionAt(Date_t electionTime);
+    void simulateSuccessfulV1ElectionAt(OperationContext* opCtx, Date_t electionTime);
 
     /**
      * When the test has been configured with a replica set config with a single member, use this
@@ -284,9 +328,14 @@ protected:
                                                              OperationContext* opCtx);
 
     /**
+     * Transition the ReplicationCoordinator from writer draining mode to applier draining mode.
+     */
+    void signalWriterDrainComplete(OperationContext* opCtx) noexcept;
+
+    /**
      * Transition the ReplicationCoordinator from drain mode to being fully primary/master.
      */
-    void signalDrainComplete(OperationContext* opCtx) noexcept;
+    void signalApplierDrainComplete(OperationContext* opCtx) noexcept;
 
     /**
      * Shuts down the objects under test.
@@ -324,8 +373,6 @@ protected:
 
 private:
     std::unique_ptr<ReplicationCoordinatorImpl> _repl;
-    // Owned by ReplicationCoordinatorImpl
-    TopologyCoordinator* _topo = nullptr;
     // Owned by executor
     executor::NetworkInterfaceMock* _net = nullptr;
     // Owned by ReplicationCoordinatorImpl
@@ -337,6 +384,14 @@ private:
 
     ReplSettings _settings;
     bool _callShutdown = false;
+
+    // Disable the QueryAnalysisCoordinator because this fixture doesn't construct the
+    // ServiceEntryPoint and this causes a segmentation fault when the QueryAnalysisCoordinator
+    // uses DBDirectClient to call into the ServiceEntryPoint.
+    FailPointEnableBlock _disableQueryAnalysisCoordinator{"disableQueryAnalysisCoordinator"};
+    // Disable the QueryAnalysisWriter because the fixture doesn't construct the ServiceEntryPoint
+    // or the PeriodicRunner.
+    FailPointEnableBlock _disableQueryAnalysisWriter{"disableQueryAnalysisWriter"};
 };
 
 }  // namespace repl

@@ -1,0 +1,35 @@
+test_kind: fsm_workload_test
+
+selector:
+  roots:
+    - jstests/concurrency/fsm_workloads/**/*.js
+  exclude_files:
+    ##
+    # Disabled due to MongoDB restrictions and/or workload restrictions
+    ##
+
+  exclude_with_any_tags:
+    - requires_standalone
+    - requires_sharding
+
+executor:
+  archive:
+    hooks:
+      - SimulateCrash
+    tests: true
+  config: {}
+  hooks:
+    - class: SimulateCrash
+    - class: CleanupConcurrencyWorkloads
+    - class: CleanEveryN
+      n: 10
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      oplogSize: 1024
+      syncdelay: 10
+      set_parameters:
+        enableTestCommands: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+        queryAnalysisWriterIntervalSecs: 1
+    num_nodes: 3

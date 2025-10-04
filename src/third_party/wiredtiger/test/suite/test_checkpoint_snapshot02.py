@@ -26,10 +26,10 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import fnmatch, os, shutil, threading, time
-from wtthread import checkpoint_thread, op_thread
+import os, shutil, threading, time
+from wtthread import checkpoint_thread
 from helper import simulate_crash_restart
-import wttest
+import wiredtiger, wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 from wiredtiger import stat
@@ -42,17 +42,24 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
 
     # Create a table.
     uri = "table:test_checkpoint_snapshot02"
+    backup_dir = "BACKUP"
+    backup_dir2 = "BACKUP2"
 
     format_values = [
         ('column_fix', dict(key_format='r', value_format='8t')),
         ('column', dict(key_format='r', value_format='S')),
-        ('integer_row', dict(key_format='i', value_format='S')),
+        ('row_integer', dict(key_format='i', value_format='S')),
     ]
 
-    scenarios = make_scenarios(format_values)
+    restart_values = [
+        ("crash_restart", dict(restart=True)),
+        ("backup", dict(restart=False)),
+    ]
+
+    scenarios = make_scenarios(format_values, restart_values)
 
     def conn_config(self):
-        config = 'cache_size=10MB,statistics=(all),statistics_log=(json,on_close,wait=1),log=(enabled=true),timing_stress_for_test=[checkpoint_slow]'
+        config = 'cache_size=10MB,statistics=(all),statistics_log=(json,on_close,wait=1),log=(enabled=false),timing_stress_for_test=[checkpoint_slow]'
         return config
 
     def moresetup(self):
@@ -65,6 +72,23 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
             self.extraconfig = ''
             self.nrows = 1000
             self.valuea = "aaaaa" * 100
+
+    def take_full_backup(self, fromdir, todir):
+        # Open up the backup cursor, and copy the files.  Do a full backup.
+        cursor = self.session.open_cursor('backup:', None, None)
+        self.pr('Full backup from '+ fromdir + ' to ' + todir + ': ')
+        os.mkdir(todir)
+        while True:
+            ret = cursor.next()
+            if ret != 0:
+                break
+            bkup_file = cursor.get_key()
+            copy_file = os.path.join(fromdir, bkup_file)
+            sz = os.path.getsize(copy_file)
+            self.pr('Copy from: ' + bkup_file + ' (' + str(sz) + ') to ' + todir)
+            shutil.copy(copy_file, todir)
+        self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
+        cursor.close()
 
     def large_updates(self, uri, value, ds, nrows, commit_ts):
         # Update a large number of records.
@@ -94,15 +118,60 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
             session.begin_transaction('read_timestamp=' + self.timestamp_str(read_ts))
         cursor = session.open_cursor(uri)
         count = 0
+        last_key = 0
         for k, v in cursor:
+            if k - last_key > 1:
+                print(f"Gap in keys: {last_key} to {k}")
+            elif k < last_key:
+                print(f"Keys out of order: {last_key} to {k}")
+            last_key = k
             if flcs_tolerance and count >= nrows:
                 self.assertEqual(v, 0)
             else:
                 self.assertEqual(v, check_value)
             count += 1
         session.commit_transaction()
-        self.assertEqual(count, nrows * 2 if flcs_tolerance else nrows)
+        targetCount = nrows * 2 if flcs_tolerance else nrows
+        if count != targetCount and count != 2*targetCount: print(f"Counted {count} out of {nrows} rows. Last key: {k}.")
+        if not self.runningHook('disagg'):
+            self.assertEqual(count, targetCount)
+        else:
+            # If Disag, it's ok to get the double count since transaction could make it through.
+            # TODO: Make sure it's ok as part of FIXME-WT-15429.
+            self.assertTrue(count == targetCount or count == targetCount * 2)
 
+    def perform_backup_or_crash_restart(self, fromdir, todir):
+        if self.restart == True:
+            #Simulate a crash by copying to a new directory(RESTART).
+            simulate_crash_restart(self, fromdir, todir)
+        else:
+            #Take a backup and restore it.
+            self.take_full_backup(fromdir, todir)
+            self.reopen_conn(todir)
+
+    def ckpt_snapshot(self, sessionX):
+        # Create a checkpoint thread
+        done = threading.Event()
+        ckpt = checkpoint_thread(self.conn, done)
+        try:
+            ckpt.start()
+
+            # Wait for checkpoint to start and acquire its snapshot before committing.
+            ckpt_snapshot = 0
+            while not ckpt_snapshot:
+                time.sleep(1)
+                stat_cursor = self.session.open_cursor('statistics:', None, None)
+                ckpt_snapshot = stat_cursor[stat.conn.checkpoint_snapshot_acquired][2]
+                stat_cursor.close()
+
+            sessionX.commit_transaction()
+
+        finally:
+            done.set()
+            ckpt.join()
+
+
+    @wttest.skip_for_hook("disagg", "Fails in Disagg with error: Gap in keys. FIXME-WT-15429.")
     def test_checkpoint_snapshot(self):
         self.moresetup()
 
@@ -123,21 +192,9 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
             cursor1.set_value(self.valuea)
             self.assertEqual(cursor1.insert(), 0)
 
-        # Create a checkpoint thread
-        done = threading.Event()
-        ckpt = checkpoint_thread(self.conn, done)
-        try:
-            ckpt.start()
-            # Sleep for sometime so that checkpoint starts before committing last transaction.
-            time.sleep(2)
-            session1.commit_transaction()
+        self.ckpt_snapshot(session1)
 
-        finally:
-            done.set()
-            ckpt.join()
-
-        #Simulate a crash by copying to a new directory(RESTART).
-        simulate_crash_restart(self, ".", "RESTART")
+        self.perform_backup_or_crash_restart(".", self.backup_dir)
 
         # Check the table contains the last checkpointed value.
         self.check(self.valuea, self.uri, self.nrows, 0, True)
@@ -147,9 +204,11 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
         keys_removed = stat_cursor[stat.conn.txn_rts_keys_removed][2]
         stat_cursor.close()
 
-        self.assertGreater(inconsistent_ckpt, 0)
         self.assertGreaterEqual(keys_removed, 0)
+        if not self.runningHook('disagg'): # Disagg doesn't have inconsistent checkpoints or RTS.
+            self.assertGreater(inconsistent_ckpt, 0)
 
+    @wttest.skip_for_hook("disagg", "Fails in Disagg with error: Gap in keys. FIXME-WT-15429.")
     def test_checkpoint_snapshot_with_timestamp(self):
         self.moresetup()
 
@@ -175,24 +234,12 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
             self.assertEqual(cursor1.insert(), 0)
         session1.timestamp_transaction('commit_timestamp=' + self.timestamp_str(30))
 
-        # Set stable timestamp to 40
-        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(40))
+        # Set stable timestamp to 25
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(25))
 
-        # Create a checkpoint thread
-        done = threading.Event()
-        ckpt = checkpoint_thread(self.conn, done)
-        try:
-            ckpt.start()
-            # Sleep for sometime so that checkpoint starts before committing last transaction.
-            time.sleep(2)
-            session1.commit_transaction()
+        self.ckpt_snapshot(session1)
 
-        finally:
-            done.set()
-            ckpt.join()
-
-        #Simulate a crash by copying to a new directory(RESTART).
-        simulate_crash_restart(self, ".", "RESTART")
+        self.perform_backup_or_crash_restart(".", self.backup_dir)
 
         # Check the table contains the last checkpointed value.
         self.check(self.valuea, self.uri, self.nrows, 30, True)
@@ -205,6 +252,8 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
         self.assertGreater(inconsistent_ckpt, 0)
         self.assertGreaterEqual(keys_removed, 0)
 
+    @wttest.skip_for_hook("tiered", "Fails with tiered storage")
+    @wttest.skip_for_hook("disagg", "Fails in Disagg with error: Gap in keys. FIXME-WT-15429.")
     def test_checkpoint_snapshot_with_txnid_and_timestamp(self):
         self.moresetup()
 
@@ -236,22 +285,11 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
         # Set stable timestamp to 40
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(40))
 
-        # Create a checkpoint thread
-        done = threading.Event()
-        ckpt = checkpoint_thread(self.conn, done)
-        try:
-            ckpt.start()
-            # Sleep for sometime so that checkpoint starts before committing last transaction.
-            time.sleep(2)
-            session2.commit_transaction()
-
-        finally:
-            done.set()
-            ckpt.join()
+        self.ckpt_snapshot(session2)
 
         session1.rollback_transaction()
-        #Simulate a crash by copying to a new directory(RESTART).
-        simulate_crash_restart(self, ".", "RESTART")
+
+        self.perform_backup_or_crash_restart(".", self.backup_dir)
 
         # Check the table contains the last checkpointed value.
         self.check(self.valuea, self.uri, self.nrows, 30, True)
@@ -261,10 +299,12 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
         keys_removed = stat_cursor[stat.conn.txn_rts_keys_removed][2]
         stat_cursor.close()
 
-        self.assertGreater(inconsistent_ckpt, 0)
+        if not self.runningHook('disagg'): # Disagg doesn't have inconsistent checkpoints or RTS.
+            self.assertGreater(inconsistent_ckpt, 0)
         self.assertGreaterEqual(keys_removed, 0)
 
-        simulate_crash_restart(self, "RESTART", "RESTART2")
+        self.perform_backup_or_crash_restart(self.backup_dir, self.backup_dir2)
+
         # Check the table contains the last checkpointed value.
         self.check(self.valuea, self.uri, self.nrows, 30, True)
 
@@ -273,8 +313,6 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
         keys_removed = stat_cursor[stat.conn.txn_rts_keys_removed][2]
         stat_cursor.close()
 
-        self.assertGreaterEqual(inconsistent_ckpt, 0)
+        if not self.runningHook('disagg'): # Disagg doesn't have inconsistent checkpoints or RTS.
+            self.assertGreaterEqual(inconsistent_ckpt, 0)
         self.assertEqual(keys_removed, 0)
-
-if __name__ == '__main__':
-    wttest.run()

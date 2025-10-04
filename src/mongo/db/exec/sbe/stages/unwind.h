@@ -29,7 +29,18 @@
 
 #pragma once
 
+#include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/util/debug_print.h"
+#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
+#include "mongo/db/query/plan_yield_policy.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <vector>
 
 namespace mongo::sbe {
 /**
@@ -43,7 +54,7 @@ namespace mongo::sbe {
  *
  * Debug string representation:
  *
- *   unwind inputSlot outputValueSlot outputIndexSlot preserveNullAndEmptyArrays childStage
+ *   unwind outputValueSlot outputIndexSlot inputSlot preserveNullAndEmptyArrays childStage
  */
 class UnwindStage final : public PlanStage {
 public:
@@ -52,7 +63,9 @@ public:
                 value::SlotId outField,
                 value::SlotId outIndex,
                 bool preserveNullAndEmptyArrays,
-                PlanNodeId planNodeId);
+                PlanNodeId planNodeId,
+                PlanYieldPolicy* yieldPolicy = nullptr,
+                bool participateInTrialRunTracking = true);
 
     std::unique_ptr<PlanStage> clone() const final;
 
@@ -68,8 +81,12 @@ public:
     size_t estimateCompileTimeSize() const final;
 
 protected:
-    void doSaveState(bool relinquishCursor) final;
-    void doRestoreState(bool relinquishCursor) final;
+    void doSaveState() final;
+    void doRestoreState() final;
+
+    void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override {
+        return;
+    }
 
 private:
     const value::SlotId _inField;

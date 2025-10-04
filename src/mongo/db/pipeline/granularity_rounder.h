@@ -29,14 +29,17 @@
 
 #pragma once
 
-#include <functional>
-#include <vector>
-
-#include "mongo/base/init.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/util/intrusive_counter.h"
+
+#include <functional>
+#include <string>
+#include <vector>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -141,16 +144,16 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         std::vector<double> baseSeries,
         std::string name);
-    Value roundUp(Value value);
-    Value roundDown(Value value);
+    Value roundUp(Value value) override;
+    Value roundDown(Value value) override;
 
-    std::string getName();
+    std::string getName() override;
 
     /**
      * Returns a vector that represents the preferred number series that this
      * GranularityRounderPreferredNumbers is using for rounding.
      */
-    const std::vector<double> getSeries() const;
+    std::vector<double> getSeries() const;
 
 private:
     GranularityRounderPreferredNumbers(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -172,9 +175,9 @@ class GranularityRounderPowersOfTwo final : public GranularityRounder {
 public:
     static boost::intrusive_ptr<GranularityRounder> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
-    Value roundUp(Value value);
-    Value roundDown(Value value);
-    std::string getName();
+    Value roundUp(Value value) override;
+    Value roundDown(Value value) override;
+    std::string getName() override;
 
 private:
     GranularityRounderPowersOfTwo(const boost::intrusive_ptr<ExpressionContext>& expCtx)

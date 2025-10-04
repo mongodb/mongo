@@ -2,18 +2,21 @@
  * Tests that --repair deletes corrupt BSON documents.
  */
 
-(function() {
-
-load('jstests/disk/libs/wt_file_helper.js');
+import {
+    assertQueryUsesIndex,
+    assertRepairSucceeds,
+    getUriForIndex,
+    startMongodOnExistingPath,
+} from "jstests/disk/libs/wt_file_helper.js";
 
 const baseName = "repair_corrupt_document";
 const collName = "test";
 const dbpath = MongoRunner.dataPath + baseName + "/";
 const doc1 = {
-    a: 1
+    a: 1,
 };
 const doc2 = {
-    a: 2
+    a: 2,
 };
 const indexName = "a_1";
 
@@ -24,7 +27,7 @@ resetDbpath(dbpath);
 let port;
 
 // Initialize test collection.
-let createCollWithDoc = function(coll) {
+let createCollWithDoc = function (coll) {
     assert.commandWorked(coll.insert(doc1));
     validDoc = coll.findOne(doc1);
 
@@ -35,13 +38,11 @@ let createCollWithDoc = function(coll) {
 };
 
 // Insert corrupt document for testing via failpoint.
-let corruptDocumentOnInsert = function(db, coll) {
+let corruptDocumentOnInsert = function (db, coll) {
     jsTestLog("Corrupt document BSON on insert.");
-    assert.commandWorked(
-        db.adminCommand({configureFailPoint: "corruptDocumentOnInsert", mode: "alwaysOn"}));
+    assert.commandWorked(db.adminCommand({configureFailPoint: "corruptDocumentOnInsert", mode: "alwaysOn"}));
     assert.commandWorked(coll.insert(doc2));
-    assert.commandWorked(
-        db.adminCommand({configureFailPoint: "corruptDocumentOnInsert", mode: "off"}));
+    assert.commandWorked(db.adminCommand({configureFailPoint: "corruptDocumentOnInsert", mode: "off"}));
 };
 
 /**
@@ -83,5 +84,4 @@ let corruptDocumentOnInsert = function(db, coll) {
 
     MongoRunner.stopMongod(mongod);
     jsTestLog("Exiting runValidateWithRepairMode.");
-})();
 })();

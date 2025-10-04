@@ -1,0 +1,86 @@
+# This suite is based on the concurrency_replication_causal_consistency suite. It is used for
+# testing that there is no feature parity issue between a replica set before and after it has been
+# bootstrapped as a single-shard cluster as long as the replica set endpoint is enabled. When
+# feature parity is achieved, the set of tests disabled in this suite should be the same as the
+# set of tests disabled in the concurrency_replication_causal_consistency suite.
+
+test_kind: fsm_workload_test
+
+selector:
+  roots:
+    - jstests/concurrency/fsm_workloads/**/*.js
+    - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*.js
+  exclude_files:
+    ##
+    # Disabled due to MongoDB restrictions and/or workload restrictions
+    ##
+
+    # The tests below are disabled because of sharding auto-bootstrap and replica set endpoint.
+    # TODO (SERVER-86771): renameCollection on sharded cluster doesn't support implicitly creating
+    # the destination database.
+    - jstests/concurrency/fsm_workloads/ddl/rename_collection/rename_capped_collection_dbname_chain.js
+    - jstests/concurrency/fsm_workloads/ddl/rename_collection/rename_collection_dbname_chain.js
+    # TODO: $exchange is an internal stage that is not supported via a router.
+    - jstests/concurrency/fsm_workloads/query/exchange_producer.js
+    # TODO (SERVER-91885): Investigate why the invariant in AsyncResultsMerger is hit.
+    # TODO (SERVER-91129): Investigate why the teardown phase in agg_unionWith_interrupt_cleanup.js
+    # could fail with FailedToSatisfyReadPreference
+
+  exclude_with_any_tags:
+    - requires_standalone
+    - does_not_support_causal_consistency
+    - uses_transactions
+    # collStats is not causally consistent
+    - requires_collstats
+    - requires_dbstats
+    - requires_sharding
+    # Tests which use $currentOp. Running an aggregation with $currentOp and read preference
+    # secondary doesn't make much sense, since there's no guarantee *which* secondary you get results
+    # from.
+    - uses_curop_agg_stage
+    # The system.profile collection is not replicated, so these tests are incompatible with
+    # readPreference secondary.
+    - requires_profiling
+
+executor:
+  archive:
+    hooks:
+      # TODO (SERVER-83433): Add back the test coverage for running db hash check on replica set
+      # that is fsync locked and has replica set endpoint enabled.
+      # - CheckReplDBHash
+      - ValidateCollections
+    tests: true
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          pinningSecondary: true
+          runningWithCausalConsistency: true
+          testingReplicaSetEndpoint: true
+  hooks:
+    # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+    # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+    # validating the entire contents of the collection.
+    #
+    # TODO SERVER-26466: Add CheckReplOplogs hook to the concurrency suite.
+    # TODO (SERVER-83433): Add back the test coverage for running db hash check on replica set that
+    # is fsync locked and has replica set endpoint enabled.
+    # - class: CheckReplDBHash
+    - class: ValidateCollections
+    - class: CleanupConcurrencyWorkloads
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      oplogSize: 1024
+      set_parameters:
+        enableTestCommands: 1
+        # Allow many initial sync attempts. Initial sync may fail if the sync source does not have
+        # an oplog yet because it has not conducted its own initial sync yet.
+        numInitialSyncAttempts: 10000000
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+        queryAnalysisWriterIntervalSecs: 1
+        roleGraphInvalidationIsFatal: 1
+        featureFlagAllMongodsAreSharded: true
+    use_auto_bootstrap_procedure: 1
+    num_nodes: 5
+    linear_chain: true

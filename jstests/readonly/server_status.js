@@ -1,14 +1,14 @@
-load('jstests/readonly/lib/read_only_test.js');
+import {runReadOnlyTest} from "jstests/readonly/lib/read_only_test.js";
 
-runReadOnlyTest(function() {
-    'use strict';
+runReadOnlyTest(
+    (function () {
+        return {
+            name: "server_status",
 
-    return {
-        name: 'server_status',
-
-        load: function(writableCollection) {},
-        exec: function(readableCollection) {
-            assert.commandWorked(readableCollection.getDB().serverStatus());
-        }
-    };
-}());
+            load: function (writableCollection) {},
+            exec: function (readableCollection) {
+                assert.commandWorked(readableCollection.getDB().serverStatus());
+            },
+        };
+    })(),
+);

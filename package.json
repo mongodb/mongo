@@ -1,0 +1,19 @@
+{
+  "name": "mongodb",
+  "version": "1.0.0",
+  "private": true,
+  "devDependencies": {
+    "@eslint/eslintrc": "3.2.0",
+    "@eslint/js": "^9",
+    "eslint": "9.19.0",
+    "eslint-formatter-unix": "^8.40.0",
+    "globals": "14.0.0",
+    "prettier": "3.4.2"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": []
+  },
+  "dependencies": {
+    "eslint-plugin-mongodb": "file:buildscripts/eslint-plugin-mongodb"
+  }
+}

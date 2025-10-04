@@ -1,0 +1,75 @@
+# Copyright (C) 2022-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/db/basic_types.idl"
+
+structs:
+    TestInternalTransactionsCommandReply:
+        description: "Response for internal transaction command."
+        strict: false
+        is_command_reply: true
+        fields:
+            responses:
+                description: "List of responses to commands in the transaction."
+                type: array<object>
+
+    TestInternalTransactionsCommandInfo:
+        description: "A command, its database name, and other test options."
+        strict: false
+        fields:
+            dbName:
+                type: database_name
+            command:
+                type: object_owned
+            exhaustCursor:
+                type: bool
+                optional: true
+
+commands:
+    testInternalTransactions:
+        command_name: testInternalTransactions
+        description: "The 'testInternalTransactions' command."
+        namespace: ignored
+        api_version: ""
+        fields:
+            useClusterClient:
+                description:
+                    "Whether the transaction API client used should opt into running the
+                    'cluster' versions of commands that enables a non-router node to run
+                    the router versions of commands. Only meaningful on mongod because a
+                    mongos will always run 'cluster' commands."
+                type: bool
+                default: false
+            commandInfos:
+                description: "List of TestInternalTransactionsCommandInfos to run in a single transaction."
+                type: array<TestInternalTransactionsCommandInfo>
+        reply_type: TestInternalTransactionsCommandReply

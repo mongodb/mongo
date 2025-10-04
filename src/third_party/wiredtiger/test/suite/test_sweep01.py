@@ -31,7 +31,7 @@
 # with and without checkpoints.
 #
 
-import fnmatch, os, shutil, run, time
+import time
 from suite_subprocess import suite_subprocess
 from wtscenario import make_scenarios
 from wiredtiger import stat
@@ -44,7 +44,8 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
     numkv = 1000
     conn_config = 'file_manager=(close_handle_minimum=0,' + \
                   'close_idle_time=3,close_scan_interval=1),' + \
-                  'statistics=(fast),operation_tracking=(enabled=false),'
+                  'statistics=(fast),operation_tracking=(enabled=false),' + \
+                  'verbose=(sweep:2)'
 
     types = [
         ('row', dict(tabletype='row',
@@ -58,6 +59,10 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
     scenarios = make_scenarios(types)
 
     def test_ops(self):
+        # FIXME-WT-11367
+        if self.runningHook('tiered'):
+            self.skipTest("this test does not yet work with tiered storage")
+
         #
         # Set up numfiles with numkv entries.  We just want some data in there
         # we don't care what it is.
@@ -74,7 +79,7 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
                 time.sleep(1)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
-        close1 = stat_cursor[stat.conn.dh_sweep_close][2]
+        close1 = stat_cursor[stat.conn.dh_sweep_dead_close][2]
         remove1 = stat_cursor[stat.conn.dh_sweep_remove][2]
         sweep1 = stat_cursor[stat.conn.dh_sweeps][2]
         sclose1 = stat_cursor[stat.conn.dh_session_handles][2]
@@ -84,29 +89,28 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
         nfile1 = stat_cursor[stat.conn.file_open][2]
         stat_cursor.close()
 
-        #
-        # We've configured checkpoints to run every 5 seconds, sweep server to
-        # run every 2 seconds and idle time to be 6 seconds. It should take
-        # about 8 seconds for a handle to be closed. Sleep for double to be
-        # safe.
-        #
         uri = '%s.test' % self.uri
         self.session.create(uri, self.create_params)
 
         #
-        # Keep inserting data to keep at least one handle active and give
-        # checkpoint something to do.  Make sure checkpoint doesn't adjust
-        # the time of death for inactive handles.
+        # Keep inserting data to keep one handle active and give checkpoint
+        # something to do.  Make sure checkpoint doesn't adjust the time of
+        # death for inactive handles.
         #
         # Note that we do checkpoints inline because that has the side effect
         # of sweeping the session cache, which will allow handles to be
         # removed.
         #
+        # We've configured the sweep server to run every second and the idle time
+        # to be 3 seconds. It should take about 4 seconds for a handle to be closed.
+        # Run a reasonable amount longer that this monitoring the statistics for
+        # open and removed files to track progress.
+        #
         c = self.session.open_cursor(uri, None)
         k = 0
         sleep = 0
         max = 60
-        final_nfile = 4
+        final_nfile = 5
         while sleep < max:
             self.session.checkpoint()
             k = k+1
@@ -130,7 +134,7 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
         self.pr("Sweep loop took " + str(sleep))
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
-        close2 = stat_cursor[stat.conn.dh_sweep_close][2]
+        close2 = stat_cursor[stat.conn.dh_sweep_dead_close][2]
         remove2 = stat_cursor[stat.conn.dh_sweep_remove][2]
         sweep2 = stat_cursor[stat.conn.dh_sweeps][2]
         sclose2 = stat_cursor[stat.conn.dh_session_handles][2]
@@ -192,7 +196,7 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
             print("XX: nfile1: " + str(nfile1) + " nfile2: " + str(nfile2))
         self.assertEqual(nfile2 < nfile1, True)
         # The only files that should be left are the metadata, the history store
-        # file, the lock file, and the active file.
+        # file, the lock file, the active file and the statistics file.
         if (nfile2 != final_nfile):
             print("close1: " + str(close1) + " close2: " + str(close2))
             print("remove1: " + str(remove1) + " remove2: " + str(remove2))
@@ -203,6 +207,3 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
             print("ref1: " + str(ref1) + " ref2: " + str(ref2))
             print("XX2: nfile1: " + str(nfile1) + " nfile2: " + str(nfile2))
         self.assertEqual(nfile2 == final_nfile, True)
-
-if __name__ == '__main__':
-    wttest.run()

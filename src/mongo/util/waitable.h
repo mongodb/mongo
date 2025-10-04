@@ -30,8 +30,8 @@
 #pragma once
 
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/modules_incompletely_marked_header.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -41,16 +41,16 @@ namespace mongo {
  * work while the condvar 'waits'.
  *
  * It handles this dance by using a special hook that condvar provides to register itself (as a
- * notifyable, which it inherits from) during calls to wait.  Then, rather than actually waiting on
+ * notifiable, which it inherits from) during calls to wait.  Then, rather than actually waiting on
  * the condvar, it invokes its run/run_until methods.
  *
  * The current implementer of Waitable is the transport layer baton type, which performs delayed IO
  * when it would otherwise block.
  *
- * Note that every Waitable should be level-triggered like its base class, Notifyable. See
+ * Note that every Waitable should be level-triggered like its base class, Notifiable. See
  * mongo/stdx/condition_variable.h for more details.
  */
-class Waitable : public Notifyable {
+class MONGO_MOD_OPEN Waitable : public Notifiable {
 public:
     template <typename LockT>
     static void wait(Waitable* waitable,
@@ -58,7 +58,7 @@ public:
                      stdx::condition_variable& cv,
                      LockT& lk) {
         if (waitable) {
-            cv._runWithNotifyable(*waitable, [&]() noexcept {
+            cv.waitWithNotifiable(*waitable, [&]() noexcept {
                 lk.unlock();
                 waitable->run(clkSource);
                 lk.lock();
@@ -89,7 +89,7 @@ public:
         if (waitable) {
             auto rval = stdx::cv_status::no_timeout;
 
-            cv._runWithNotifyable(*waitable, [&]() noexcept {
+            cv.waitWithNotifiable(*waitable, [&]() noexcept {
                 lk.unlock();
                 if (waitable->run_until(clkSource, Date_t(timeout_time)) == TimeoutState::Timeout) {
                     rval = stdx::cv_status::timeout;
@@ -141,7 +141,7 @@ public:
     virtual TimeoutState run_until(ClockSource* clkSource, Date_t deadline) noexcept = 0;
 
 protected:
-    ~Waitable() noexcept {}
+    ~Waitable() = default;
 };
 
 }  // namespace mongo

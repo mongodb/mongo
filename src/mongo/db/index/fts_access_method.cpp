@@ -28,26 +28,32 @@
  */
 
 #include "mongo/db/index/fts_access_method.h"
-#include "mongo/db/catalog/index_catalog_entry.h"
+
 #include "mongo/db/index/expression_keys_private.h"
-#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/local_catalog/index_catalog_entry.h"
+#include "mongo/db/local_catalog/index_descriptor.h"
+
+#include <utility>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
 FTSAccessMethod::FTSAccessMethod(IndexCatalogEntry* btreeState,
                                  std::unique_ptr<SortedDataInterface> btree)
-    : AbstractIndexAccessMethod(btreeState, std::move(btree)),
+    : SortedDataIndexAccessMethod(btreeState, std::move(btree)),
       _ftsSpec(btreeState->descriptor()->infoObj()) {}
 
 void FTSAccessMethod::doGetKeys(OperationContext* opCtx,
                                 const CollectionPtr& collection,
+                                const IndexCatalogEntry* entry,
                                 SharedBufferFragmentBuilder& pooledBufferBuilder,
                                 const BSONObj& obj,
                                 GetKeysContext context,
                                 KeyStringSet* keys,
                                 KeyStringSet* multikeyMetadataKeys,
                                 MultikeyPaths* multikeyPaths,
-                                boost::optional<RecordId> id) const {
+                                const boost::optional<RecordId>& id) const {
     ExpressionKeysPrivate::getFTSKeys(pooledBufferBuilder,
                                       obj,
                                       _ftsSpec,

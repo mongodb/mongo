@@ -1,45 +1,31 @@
 /**
  * Verify the KMS support handles a buggy Key Store
  */
-
-load("jstests/client_encrypt/lib/mock_kms.js");
-load('jstests/ssl/libs/ssl_helpers.js');
-
-(function() {
-"use strict";
-
-const mock_kms = new MockKMSServerAWS();
-mock_kms.start();
+import {CA_CERT, SERVER_CERT} from "jstests/ssl/libs/ssl_helpers.js";
 
 const x509_options = {
     sslMode: "requireSSL",
     sslPEMKeyFile: SERVER_CERT,
-    sslCAFile: CA_CERT
+    sslCAFile: CA_CERT,
 };
 
 const conn = MongoRunner.runMongod(x509_options);
 const test = conn.getDB("test");
 const collection = test.coll;
 
-const awsKMS = {
-    accessKeyId: "access",
-    secretAccessKey: "secret",
-    url: mock_kms.getURL(),
-};
-
-var localKMS = {
+let localKMS = {
     key: BinData(
         0,
-        "tu9jUCBqZdwCelwE/EAm/4WqdxrSMi04B8e9uAV+m30rI1J2nhKZZtQjdvsSCwuI4erR6IEcEK+5eGUAODv43NDNIR9QheT2edWFewUfHKsl9cnzTc86meIzOmYl6drp"),
+        "tu9jUCBqZdwCelwE/EAm/4WqdxrSMi04B8e9uAV+m30rI1J2nhKZZtQjdvsSCwuI4erR6IEcEK+5eGUAODv43NDNIR9QheT2edWFewUfHKsl9cnzTc86meIzOmYl6drp",
+    ),
 };
 
 const clientSideFLEOptions = {
     kmsProviders: {
-        aws: awsKMS,
         local: localKMS,
     },
     keyVaultNamespace: "test.coll",
-    schemaMap: {}
+    schemaMap: {},
 };
 
 function testFault(kmsType, func) {
@@ -48,14 +34,14 @@ function testFault(kmsType, func) {
     const shell = Mongo(conn.host, clientSideFLEOptions);
     const keyVault = shell.getKeyVault();
 
-    keyVault.createKey(kmsType, "arn:aws:kms:us-east-1:fake:fake:fake", ['mongoKey']);
+    keyVault.createKey(kmsType, "arn:aws:kms:us-east-1:fake:fake:fake", ["mongoKey"]);
     const keyId = keyVault.getKeyByAltName("mongoKey").toArray()[0]._id;
 
     func(keyId, shell);
 }
 
 function testFaults(func) {
-    const kmsTypes = ["aws", "local"];
+    const kmsTypes = ["local"];
 
     for (const kmsType of kmsTypes) {
         testFault(kmsType, func);
@@ -68,7 +54,7 @@ testFaults((keyId, shell) => {
 
     const str = "mongo";
     assert.throws(() => {
-        const encStr = shell.getClientEncryption().encrypt(keyId, str);
+        shell.getClientEncryption().encrypt(keyId, str);
     });
 });
 
@@ -78,7 +64,7 @@ testFaults((keyId, shell) => {
 
     const str = "mongo";
     assert.throws(() => {
-        const encStr = shell.getClientEncryption().encrypt(keyId, str);
+        shell.getClientEncryption().encrypt(keyId, str);
     });
 });
 
@@ -88,10 +74,8 @@ testFaults((keyId, shell) => {
 
     const str = "mongo";
     assert.throws(() => {
-        const encStr = shell.getClientEncryption().encrypt(keyId, str);
+        shell.getClientEncryption().encrypt(keyId, str);
     });
 });
 
 MongoRunner.stopMongod(conn);
-mock_kms.stop();
-}());

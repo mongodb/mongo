@@ -29,10 +29,8 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-
 #include "mongo/base/status.h"
-#include "mongo/bson/oid.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log_attr.h"
@@ -42,10 +40,30 @@
 #include "mongo/logv2/log_severity.h"
 #include "mongo/util/errno_util.h"
 
-namespace mongo {
-namespace logv2::detail {
-using GetTenantIDFn = std::function<boost::optional<OID>()>;
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <string>
+#include <tuple>
+
+#include <boost/optional.hpp>
+#include <fmt/format.h>
+
+namespace mongo::logv2 {
+
+// Whether there is a doLogImpl call currently on this thread's stack.
+bool loggingInProgress();
+
+// Write message to stderr in a signal-safe manner.
+void signalSafeWriteToStderr(StringData message);
+namespace detail {
+
+using GetTenantIDFn = std::function<std::string()>;
 void setGetTenantIDCallback(GetTenantIDFn&& fn);
+
+using LogCounterCallback = std::function<void()>;
+// Must be called before other threads start logging
+void setLogCounterCallback(LogCounterCallback);
 
 void doLogImpl(int32_t id,
                LogSeverity const& severity,
@@ -60,76 +78,39 @@ void doUnstructuredLogImpl(LogSeverity const& severity,  // NOLINT
 
 
 // doLogUnpacked overloads require the arguments to be flattened attributes
-template <typename S, typename... Args>
+template <size_t N, typename... Args>
 void doLogUnpacked(int32_t id,
                    LogSeverity const& severity,
                    LogOptions const& options,
-                   const S& message,
-                   const NamedArg<Args>&... args) {
-    auto attributes = makeAttributeStorage(args...);
-
-    fmt::string_view msg{message};
-    doLogImpl(id, severity, options, StringData(msg.data(), msg.size()), attributes);
-}
-
-template <typename S, size_t N, typename... Args>
-void doLogUnpacked(int32_t id,
-                   LogSeverity const& severity,
-                   LogOptions const& options,
-                   const S&,  // formatMsg not used
                    const char (&msg)[N],
                    const NamedArg<Args>&... args) {
-    doLogUnpacked(id, severity, options, msg, args...);
+    auto attributes = AttributeStorage(args...);
+
+    doLogImpl(id, severity, options, msg, attributes);
 }
 
-template <typename S>
+template <size_t N>
 void doLogUnpacked(int32_t id,
                    LogSeverity const& severity,
                    LogOptions const& options,
-                   const S& message,
-                   const DynamicAttributes& dynamicAttrs) {
-    fmt::string_view msg{message};
-    doLogImpl(id, severity, options, StringData(msg.data(), msg.size()), dynamicAttrs);
-}
-
-template <typename S, size_t N>
-void doLogUnpacked(int32_t id,
-                   LogSeverity const& severity,
-                   LogOptions const& options,
-                   const S&,  // formatMsg not used
                    const char (&msg)[N],
                    const DynamicAttributes& dynamicAttrs) {
-    doLogUnpacked(id, severity, options, msg, dynamicAttrs);
+    doLogImpl(id, severity, options, msg, dynamicAttrs);
 }
 
 // Args may be raw attributes or CombinedAttr's here. We need to flatten any combined attributes
 // into just raw attributes for doLogUnpacked. We do this building flat tuples for every argument,
 // concatenating them into a single tuple that we can expand again using apply.
-template <typename S, typename... Args>
+template <size_t N, typename... Args>
 void doLog(int32_t id,
            LogSeverity const& severity,
            LogOptions const& options,
-           const S& formatMsg,
+           const char (&msg)[N],
            const Args&... args) {
-    std::apply([id, &severity, &options, &formatMsg](
-                   auto&&... args) { doLogUnpacked(id, severity, options, formatMsg, args...); },
+    std::apply([&](auto&&... tup) { doLogUnpacked(id, severity, options, msg, tup...); },
                std::tuple_cat(toFlatAttributesTupleRef(args)...));
 }
 
-template <typename S, size_t N, typename... Args>
-void doLog(int32_t id,
-           LogSeverity const& severity,
-           LogOptions const& options,
-           const S& formatMsg,
-           const char (&msg)[N],
-           const Args&... args) {
-    std::apply(
-        [id, &severity, &options, &formatMsg, &msg](auto&&... unpackedArgs) {
-            doLogUnpacked(id, severity, options, formatMsg, msg, unpackedArgs...);
-        },
-        std::tuple_cat(toFlatAttributesTupleRef(args)...));
-}
+}  // namespace detail
 
-}  // namespace logv2::detail
-
-}  // namespace mongo
+}  // namespace mongo::logv2

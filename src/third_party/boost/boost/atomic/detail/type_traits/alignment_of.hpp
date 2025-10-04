@@ -17,9 +17,9 @@
 #include <boost/atomic/detail/config.hpp>
 
 #if defined(BOOST_ATOMIC_DETAIL_NO_CXX11_BASIC_HDR_TYPE_TRAITS) ||\
-    (defined(BOOST_GCC) && (BOOST_GCC+0) < 80100) ||\
-    (defined(BOOST_CLANG) && !defined(__apple_build_version__) && (__clang_major__+0) < 8) ||\
-    (defined(BOOST_CLANG) && defined(__apple_build_version__) && (__clang_major__+0) < 9)
+    (defined(BOOST_GCC) && BOOST_GCC < 80100) ||\
+    (defined(BOOST_CLANG) && !defined(__apple_build_version__) && __clang_major__ < 9) ||\
+    (defined(BOOST_CLANG) && defined(__apple_build_version__) && __clang_major__ < 10)
 // For some compilers std::alignment_of gives the wrong result for 64-bit types on 32-bit targets
 #define BOOST_ATOMIC_DETAIL_NO_CXX11_STD_ALIGNMENT_OF
 #endif

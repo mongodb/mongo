@@ -100,24 +100,24 @@ evergreen_buildvariants:
     platform: rhel62
     architecture: x86_64
 
-  - name: rhel70
+  - name: rhel79
     edition: targeted
-    platform: rhel70
+    platform: rhel79
     architecture: x86_64
 
-  - name: enterprise-rhel-70-64-bit
+  - name: enterprise-rhel-79-64-bit
     edition: enterprise
-    platform: rhel70
+    platform: rhel79
     architecture: x86_64
 
-  - name: rhel80
+  - name: rhel8
     edition: targeted
-    platform: rhel80
+    platform: rhel8
     architecture: x86_64
 
-  - name: enterprise-rhel-80-64-bit
+  - name: enterprise-rhel-8-64-bit
     edition: enterprise
-    platform: rhel80
+    platform: rhel8
     architecture: x86_64
 
   - name: rhel-82-arm64
@@ -130,6 +130,16 @@ evergreen_buildvariants:
     platform: rhel82
     architecture: arm64
 
+  - name: rhel-8-arm64
+    edition: targeted
+    platform: rhel8
+    architecture: arm64
+
+  - name: enterprise-rhel-8-arm64
+    edition: enterprise
+    platform: rhel8
+    architecture: arm64
+
   - name: enterprise-rhel-71-ppc64le
     edition: enterprise
     platform: rhel71
@@ -138,6 +148,11 @@ evergreen_buildvariants:
   - name: enterprise-rhel-81-ppc64le
     edition: enterprise
     platform: rhel81
+    architecture: ppc64le
+
+  - name: enterprise-rhel-9-ppc64le
+    edition: enterprise
+    platform: rhel9
     architecture: ppc64le
 
   - name: rhel-67-s390x
@@ -190,16 +205,6 @@ evergreen_buildvariants:
     platform: suse15
     architecture: x86_64
 
-  - name: debian92
-    edition: targeted
-    platform: debian92
-    architecture: x86_64
-
-  - name: enterprise-debian92-64
-    edition: enterprise
-    platform: debian92
-    architecture: x86_64
-
   - name: debian10
     edition: targeted
     platform: debian10
@@ -208,6 +213,26 @@ evergreen_buildvariants:
   - name: enterprise-debian10-64
     edition: enterprise
     platform: debian10
+    architecture: x86_64
+
+  - name: debian11
+    edition: targeted
+    platform: debian11
+    architecture: x86_64
+
+  - name: debian12
+    edition: targeted
+    platform: debian12
+    architecture: x86_64
+
+  - name: enterprise-debian11-64
+    edition: enterprise
+    platform: debian11
+    architecture: x86_64
+
+  - name: enterprise-debian12-64
+    edition: enterprise
+    platform: debian12
     architecture: x86_64
 
   - name: windows

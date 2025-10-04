@@ -1,14 +1,13 @@
 // Test auth of the explain command.
 
-var conn = MongoRunner.runMongod({auth: ""});
-var authzErrorCode = 13;
+let conn = MongoRunner.runMongod({auth: ""});
 
-var admin = conn.getDB("admin");
+let admin = conn.getDB("admin");
 admin.createUser({user: "adminUser", pwd: "pwd", roles: ["root"]});
 admin.auth({user: "adminUser", pwd: "pwd"});
 
 var db = conn.getDB("explain_auth_db");
-var coll = db.explain_auth_coll;
+let coll = db.explain_auth_coll;
 
 assert.commandWorked(coll.insert({_id: 1, a: 1}));
 
@@ -28,7 +27,7 @@ assert.commandWorked(coll.insert({_id: 1, a: 1}));
  * indicates that the explain command should not be authorized.
  */
 function testExplainAuth(authSpec) {
-    var cmdResult;
+    let cmdResult;
 
     function assertCmdResult(result, expectSuccess) {
         if (expectSuccess) {
@@ -47,13 +46,11 @@ function testExplainAuth(authSpec) {
     assertCmdResult(cmdResult, authSpec.count);
 
     // .remove()
-    cmdResult =
-        db.runCommand({explain: {delete: coll.getName(), deletes: [{q: {a: 1}, limit: 1}]}});
+    cmdResult = db.runCommand({explain: {delete: coll.getName(), deletes: [{q: {a: 1}, limit: 1}]}});
     assertCmdResult(cmdResult, authSpec.remove);
 
     // .update()
-    cmdResult = db.runCommand(
-        {explain: {update: coll.getName(), updates: [{q: {a: 1}, u: {$set: {b: 1}}}]}});
+    cmdResult = db.runCommand({explain: {update: coll.getName(), updates: [{q: {a: 1}, u: {$set: {b: 1}}}]}});
     assertCmdResult(cmdResult, authSpec.update);
 }
 
@@ -61,17 +58,17 @@ function testExplainAuth(authSpec) {
 db.createRole({
     role: "findOnly",
     privileges: [{resource: {db: db.getName(), collection: coll.getName()}, actions: ["find"]}],
-    roles: []
+    roles: [],
 });
 db.createRole({
     role: "updateOnly",
     privileges: [{resource: {db: db.getName(), collection: coll.getName()}, actions: ["update"]}],
-    roles: []
+    roles: [],
 });
 db.createRole({
     role: "removeOnly",
     privileges: [{resource: {db: db.getName(), collection: coll.getName()}, actions: ["remove"]}],
-    roles: []
+    roles: [],
 });
 
 // Create three users:

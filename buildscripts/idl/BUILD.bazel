@@ -1,0 +1,82 @@
+load("@poetry//:dependencies.bzl", "dependency")
+
+filegroup(
+    name = "idlc",
+    srcs = [
+        "__init__.py",
+        "idlc.py",
+    ] + glob(["**/idl/*.py"]),
+    visibility = ["//visibility:public"],
+)
+
+py_library(
+    name = "idl",
+    srcs = [
+        "gen_all_feature_flag_list.py",
+        "idlc.py",
+        "lib.py",
+    ] + glob(["idl/**/*.py"]),
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "typer",
+            group = "core",
+        ),
+    ],
+)
+
+py_library(
+    name = "idl_compatibility_errors",
+    srcs = [
+        "idl_compatibility_errors.py",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+py_binary(
+    name = "idl_check_compatibility",
+    srcs = [
+        "idl_check_compatibility.py",
+    ],
+    main = "idl_check_compatibility.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        "idl_compatibility_errors",
+    ],
+)
+
+py_binary(
+    name = "check_stable_api_commands_have_idl_definitions",
+    srcs = [
+        "check_stable_api_commands_have_idl_definitions.py",
+    ],
+    main = "check_stable_api_commands_have_idl_definitions.py",
+    visibility = ["//visibility:public"],
+)
+
+py_binary(
+    name = "checkout_idl_files_from_past_releases",
+    srcs = [
+        "checkout_idl_files_from_past_releases.py",
+    ],
+    main = "checkout_idl_files_from_past_releases.py",
+    visibility = ["//visibility:public"],
+)
+
+py_binary(
+    name = "gen_all_server_params_list",
+    srcs = [
+        "gen_all_server_params_list.py",
+    ],
+    main = "gen_all_server_params_list.py",
+    visibility = ["//visibility:public"],
+)
+
+py_binary(
+    name = "run_tests",
+    srcs = [
+        "run_tests.py",
+    ],
+    main = "run_tests.py",
+    visibility = ["//visibility:public"],
+)

@@ -27,10 +27,28 @@
  *    it in the license file.
  */
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/db/exec/sbe/sbe_unittest.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
+#include "mongo/db/exec/sbe/vm/vm_printer.h"
+#include "mongo/db/query/datetime/date_time_support.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/unittest/golden_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/represent_as.h"
+
+#include <cstdint>
+#include <cstring>
+#include <limits>
+
 
 namespace mongo::sbe {
 
@@ -229,6 +247,47 @@ TEST(SBEValues, HashCompound) {
         value::releaseValue(tag1, val1);
         value::releaseValue(tag2, val2);
     }
+
+    {
+        auto [tag1, val1] = value::makeNewArraySet();
+        auto set1 = value::getArraySetView(val1);
+        set1->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-5));
+        set1->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-6));
+        set1->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-7));
+
+        auto [tag2, val2] = value::makeNewArraySet();
+        auto set2 = value::getArraySetView(val2);
+        set2->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-7.0));
+        set2->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-6.0));
+        set2->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-5.0));
+
+
+        ASSERT_EQUALS(value::hashValue(tag1, val1), value::hashValue(tag2, val2));
+
+        value::releaseValue(tag1, val1);
+        value::releaseValue(tag2, val2);
+    }
+
+    {
+        auto [tag1, val1] = value::makeNewArrayMultiSet();
+        auto set1 = value::getArrayMultiSetView(val1);
+        set1->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-5));
+        set1->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-5));
+        set1->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-6));
+        set1->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-7));
+
+        auto [tag2, val2] = value::makeNewArrayMultiSet();
+        auto set2 = value::getArrayMultiSetView(val2);
+        set2->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-7.0));
+        set2->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-6.0));
+        set2->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-5.0));
+        set2->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-5.0));
+
+        ASSERT_EQUALS(value::hashValue(tag1, val1), value::hashValue(tag2, val2));
+
+        value::releaseValue(tag1, val1);
+        value::releaseValue(tag2, val2);
+    }
 }
 
 TEST(SBEVM, Add) {
@@ -242,7 +301,7 @@ TEST(SBEVM, Add) {
         vm::CodeFragment code;
         code.appendConstVal(tagInt32, valInt32);
         code.appendConstVal(tagInt64, valInt64);
-        code.appendAdd();
+        code.appendAdd({}, {});
 
         vm::ByteCode interpreter;
         auto [owned, tag, val] = interpreter.run(&code);
@@ -260,7 +319,7 @@ TEST(SBEVM, Add) {
         vm::CodeFragment code;
         code.appendConstVal(tagInt32, valInt32);
         code.appendConstVal(tagDouble, valDouble);
-        code.appendAdd();
+        code.appendAdd({}, {});
 
         vm::ByteCode interpreter;
         auto [owned, tag, val] = interpreter.run(&code);
@@ -277,7 +336,7 @@ TEST(SBEVM, Add) {
         vm::CodeFragment code;
         code.appendConstVal(tagDecimal, valDecimal);
         code.appendConstVal(tagDouble, valDouble);
-        code.appendAdd();
+        code.appendAdd({}, {});
 
         vm::ByteCode interpreter;
         auto [owned, tag, val] = interpreter.run(&code);
@@ -303,7 +362,7 @@ TEST(SBEVM, CompareBinData) {
                             value::bitcastFrom<const char*>(operands[0].value()));
         code.appendConstVal(value::TypeTags::bsonBinData,
                             value::bitcastFrom<const char*>(operands[1].value()));
-        code.appendCmp3w();
+        code.appendCmp3w({}, {});
 
         vm::ByteCode interpreter;
         auto [owned, tag, val] = interpreter.run(&code);
@@ -323,7 +382,7 @@ TEST(SBEVM, CompareBinData) {
                             value::bitcastFrom<const char*>(operands[0].value()));
         code.appendConstVal(value::TypeTags::bsonBinData,
                             value::bitcastFrom<const char*>(operands[1].value()));
-        code.appendCmp3w();
+        code.appendCmp3w({}, {});
 
         vm::ByteCode interpreter;
         auto [owned, tag, val] = interpreter.run(&code);
@@ -343,7 +402,7 @@ TEST(SBEVM, CompareBinData) {
                             value::bitcastFrom<const char*>(operands[0].value()));
         code.appendConstVal(value::TypeTags::bsonBinData,
                             value::bitcastFrom<const char*>(operands[1].value()));
-        code.appendCmp3w();
+        code.appendCmp3w({}, {});
 
         vm::ByteCode interpreter;
         auto [owned, tag, val] = interpreter.run(&code);
@@ -367,7 +426,7 @@ TEST(SBEVM, CompareBinData) {
                             value::bitcastFrom<const char*>(operands[0].value()));
         code.appendConstVal(value::TypeTags::bsonBinData,
                             value::bitcastFrom<const char*>(operands[1].value()));
-        code.appendCmp3w();
+        code.appendCmp3w({}, {});
 
         vm::ByteCode interpreter;
         auto [owned, tag, val] = interpreter.run(&code);
@@ -391,7 +450,7 @@ TEST(SBEVM, CompareBinData) {
                             value::bitcastFrom<const char*>(operands[0].value()));
         code.appendConstVal(value::TypeTags::bsonBinData,
                             value::bitcastFrom<const char*>(operands[1].value()));
-        code.appendCmp3w();
+        code.appendCmp3w({}, {});
 
         vm::ByteCode interpreter;
         auto [owned, tag, val] = interpreter.run(&code);
@@ -413,10 +472,49 @@ TEST(SBEVM, ConvertBinDataToBsonObj) {
     array.push_back(binDataTag, binDataVal);
 
     BSONArrayBuilder builder;
-    bson::convertToBsonObj(builder, &array);
+    bson::convertToBsonArr(builder, &array);
     auto convertedBinData = builder.done();
 
     ASSERT_EQ(originalBinData.woCompare(convertedBinData), 0);
+}
+
+TEST(SBEVM, CodeFragmentToStringSanity) {
+    vm::CodeFragment code;
+    auto ptr2str = [](const void* ptr) {
+        std::stringstream ss;
+        ss << ptr;
+        return ss.str();
+    };
+
+    code.appendDiv({}, {});
+    std::string instrs = code.toString();
+
+    ASSERT_TRUE(instrs.find("[" + ptr2str(code.instrs().data()) + "]: div") >= 0);
+}
+
+TEST(SBEVM, CodeFragmentPrintStable) {
+    GoldenTestContext ctx(&goldenTestConfigSbe);
+    ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
+
+    auto& os = ctx.outStream();
+
+    vm::CodeFragment code;
+    code.appendFillEmpty(vm::Instruction::Null);
+    code.appendFillEmpty(vm::Instruction::False);
+    code.appendFillEmpty(vm::Instruction::True);
+    code.appendTraverseP(0xAA, 1, vm::Instruction::Nothing);
+    code.appendTraverseP(0xAA, 1, vm::Instruction::Int32One);
+    code.appendTraverseF(0xBB, 1, vm::Instruction::True);
+    code.appendGetField({}, "Hello world!"_sd);
+    code.appendAdd({}, {});
+
+    TimeZoneDatabase timezoneDB;
+    code.appendDateTrunc(
+        TimeUnit::day, 1, timezoneDB.getTimeZone("America/New_York"_sd), DayOfWeek::monday);
+
+    vm::CodeFragmentPrinter printer(vm::CodeFragmentPrinter::PrintFormat::Stable);
+    printer.print(os, code);
+    os << std::endl;
 }
 
 namespace {

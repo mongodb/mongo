@@ -5,23 +5,22 @@
  *
  * This hook will run concurrently with tests.
  */
-
-'use strict';
-
-(function() {
-load('jstests/libs/discover_topology.js');  // For Topology and DiscoverTopology.
-load('jstests/libs/parallelTester.js');     // For Thread.
+import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
+import newMongoWithRetry from "jstests/libs/retryable_mongo.js";
 
 /**
  * Returns true if the error code is transient.
  */
 function isIgnorableError(codeName) {
-    if (codeName === "NotWritablePrimary" || codeName === "InterruptedDueToReplStateChange" ||
-        codeName === "PrimarySteppedDown" || codeName === "NodeNotFound" ||
-        codeName === "ShutdownInProgress") {
-        return true;
-    }
-    return false;
+    return (
+        codeName === "ConfigurationInProgress" ||
+        codeName === "InterruptedAtShutdown" ||
+        codeName === "InterruptedDueToReplStateChange" ||
+        codeName === "NodeNotFound" ||
+        codeName === "NotWritablePrimary" ||
+        codeName === "PrimarySteppedDown" ||
+        codeName === "ShutdownInProgress"
+    );
 }
 
 /**
@@ -30,9 +29,12 @@ function isIgnorableError(codeName) {
 function isShutdownError(error) {
     // TODO (SERVER-54026): Remove check for error message once the shell correctly
     // propagates the error code.
-    return error.code === ErrorCodes.ShutdownInProgress ||
+    return (
+        error.code === ErrorCodes.ShutdownInProgress ||
         error.code === ErrorCodes.InterruptedAtShutdown ||
-        error.message.includes("The server is in quiesce mode and will shut down");
+        error.message.includes("The server is in quiesce mode and will shut down") ||
+        error.message.includes("interrupted at shutdown")
+    );
 }
 
 /**
@@ -71,52 +73,50 @@ function reconfigBackground(primary, numNodes) {
         return {ok: 1};
     }
 
-    jsTestLog("primary is " + primary);
+    jsTestLog(`primary is ${primary}`);
 
     // Suppress the log messages generated establishing new mongo connections. The
     // run_reconfig_background.js hook is executed frequently by resmoke.py and
     // could lead to generating an overwhelming amount of log messages.
     let conn;
     quietly(() => {
-        conn = new Mongo(primary);
+        conn = newMongoWithRetry(primary);
     });
-    assert.neq(
-        null, conn, "Failed to connect to primary '" + primary + "' for background reconfigs");
+    assert.neq(null, conn, `Failed to connect to primary '${primary}' for background reconfigs`);
 
-    var config = assert.commandWorked(conn.getDB("admin").runCommand({replSetGetConfig: 1})).config;
+    let config = assert.commandWorked(conn.getDB("admin").runCommand({replSetGetConfig: 1})).config;
 
     // Find the correct host in the member config
-    const primaryHostIndex = (cfg, pHost) => cfg.members.findIndex(m => m.host === pHost);
+    const primaryHostIndex = (cfg, pHost) => cfg.members.findIndex((m) => m.host === pHost);
     const primaryIndex = primaryHostIndex(config, primary);
-    jsTestLog("primaryIndex is " + primaryIndex);
-    jsTestLog("primary's config: (configVersion: " + config.version +
-              ", configTerm: " + config.term + ")");
+    jsTestLog(`primaryIndex is ${primaryIndex}`);
+    jsTestLog(`primary's config: (configVersion: ${config.version}, configTerm: ${config.term})`);
 
     // Calculate the total number of voting nodes in this set so that we make sure we
     // always have at least two voting nodes. This is so that the primary can always
     // safely step down because there is at least one other electable secondary.
-    const numVotingNodes = config.members.filter(member => member.votes === 1).length;
+    const numVotingNodes = config.members.filter((member) => member.votes === 1).length;
 
     // Randomly change the vote of a node to 1 or 0 depending on its current value. Do not
     // change the primary's votes.
-    var indexToChange = primaryIndex;
+    let indexToChange = primaryIndex;
     while (indexToChange === primaryIndex) {
         // randInt is exclusive of the upper bound.
         indexToChange = Random.randInt(numNodes);
     }
 
-    jsTestLog("Running reconfig to change votes of node at index " + indexToChange);
+    jsTestLog(`Running reconfig to change votes of node at index ${indexToChange}`);
 
     // Change the priority to correspond to the votes. If the member's current votes field
     // is 1, only change it to 0 if there are more than 3 voting members in this set.
     // We want to ensure that there are at least 3 voting nodes so that killing the primary
     // will not affect a majority.
     config.version++;
-    config.members[indexToChange].votes =
-        (config.members[indexToChange].votes === 1 && numVotingNodes > 3) ? 0 : 1;
+    config.members[indexToChange].votes = config.members[indexToChange].votes === 1 && numVotingNodes > 3 ? 0 : 1;
     config.members[indexToChange].priority = config.members[indexToChange].votes;
 
     let votingRes = conn.getDB("admin").runCommand({replSetReconfig: config});
+    jsTestLog(`votingRes: ${tojson(votingRes)}`);
     if (!votingRes.ok && !isIgnorableError(votingRes.codeName)) {
         jsTestLog("Reconfig to change votes FAILED.");
         return votingRes;
@@ -133,7 +133,7 @@ try {
     const topology = DiscoverTopology.findConnectedNodes(conn.getMongo());
 
     if (topology.type !== Topology.kReplicaSet) {
-        throw new Error('Unsupported topology configuration: ' + tojson(topology));
+        throw new Error(`Unsupported topology configuration: ${tojson(topology)}`);
     }
 
     const numNodes = topology.nodes.length;
@@ -144,21 +144,23 @@ try {
     // Ignore this error until we find a new primary.
     const kReplicaSetMonitorErrors = [
         /^Could not find host matching read preference.*mode: "primary"/,
-        /^can't connect to new replica set primary/
+        /^can't connect to new replica set primary/,
     ];
 
     if (isNetworkError(e)) {
-        jsTestLog("Ignoring network error" + tojson(e));
-    } else if (kReplicaSetMonitorErrors.some((regex) => {
-                   return regex.test(e.message);
-               })) {
-        jsTestLog("Ignoring replica set monitor error" + tojson(e));
+        jsTestLog(`Ignoring network error: ${tojson(e)}`);
+    } else if (
+        kReplicaSetMonitorErrors.some((regex) => {
+            return regex.test(e.message);
+        })
+    ) {
+        jsTestLog(`Ignoring replica set monitor error: ${tojson(e)}`);
     } else if (isShutdownError(e)) {
         // It's possible that the primary we passed in gets killed by the kill primary hook.
         // During shutdown, mongod will respond to incoming hello requests with ShutdownInProgress
         // or InterruptedAtShutdown. This hook should ignore both cases and wait until we have a
         // new primary in a subsequent run.
-        jsTestLog("Ignoring ShutdownInProgress error" + tojson(e));
+        jsTestLog(`Ignoring ShutdownInProgress error: ${tojson(e)}`);
     } else {
         jsTestLog(`run_reconfig_background unexpected error: ${tojson(e)}`);
         throw e;
@@ -167,5 +169,4 @@ try {
     res = {ok: 1};
 }
 
-assert.commandWorked(res, "reconfig hook failed: " + tojson(res));
-})();
+assert.commandWorked(res, `reconfig hook failed: ${tojson(res)}`);

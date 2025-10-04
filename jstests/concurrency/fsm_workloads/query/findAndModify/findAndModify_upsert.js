@@ -1,0 +1,105 @@
+/**
+ * findAndModify_upsert.js
+ *
+ * Each thread repeatedly performs the findAndModify command, specifying
+ * upsert as either true or false. A single document is selected (or
+ * created) based on the 'query' specification, and updated using the
+ * $push operator.
+ */
+export const $config = (function () {
+    let data = {sort: false, shardKey: {tid: 1}};
+
+    let states = (function () {
+        // Returns true if the specified array is sorted in ascending order,
+        // and false otherwise.
+        function isSorted(arr) {
+            for (let i = 0; i < arr.length - 1; ++i) {
+                if (arr[i] > arr[i + 1]) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        function init(db, collName) {
+            this.iter = 0;
+
+            // Need to guarantee that an upsert has occurred prior to an update,
+            // which is not enforced by the transition table under composition
+            upsert.call(this, db, collName);
+        }
+
+        function upsert(db, collName) {
+            let updatedValue = this.iter++;
+
+            // Use a query specification that does not match any existing documents
+            let query = {_id: new ObjectId(), tid: this.tid};
+
+            let cmdObj = {
+                findandmodify: db[collName].getName(),
+                query: query,
+                update: {$setOnInsert: {values: [updatedValue]}},
+                new: true,
+                upsert: true,
+            };
+
+            if (this.sort) {
+                cmdObj.sort = this.sort;
+            }
+
+            let res = db.runCommand(cmdObj);
+            assert.commandWorkedOrFailedWithCode(res, ErrorCodes.StaleConfig);
+
+            if (res.ok === 1) {
+                let doc = res.value;
+                assert(doc !== null, "a document should have been inserted");
+
+                assert.eq(this.tid, doc.tid);
+                assert(Array.isArray(doc.values), "expected values to be an array");
+                assert.eq(1, doc.values.length);
+                assert.eq(updatedValue, doc.values[0]);
+            }
+        }
+
+        function update(db, collName) {
+            let updatedValue = this.iter++;
+
+            let cmdObj = {
+                findandmodify: db[collName].getName(),
+                query: {tid: this.tid},
+                update: {$push: {values: updatedValue}},
+                new: true,
+                upsert: false,
+            };
+
+            if (this.sort) {
+                cmdObj.sort = this.sort;
+            }
+
+            let res = db.runCommand(cmdObj);
+            assert.commandWorkedOrFailedWithCode(res, ErrorCodes.StaleConfig);
+
+            if (res.ok === 1) {
+                let doc = res.value;
+                assert(doc !== null, "query spec should have matched a document, returned " + tojson(res));
+
+                assert.eq(this.tid, doc.tid);
+                assert(Array.isArray(doc.values), "expected values to be an array");
+                assert.gte(doc.values.length, 2);
+                assert.eq(updatedValue, doc.values[doc.values.length - 1]);
+                assert(isSorted(doc.values), "expected values to be sorted: " + tojson(doc.values));
+            }
+        }
+
+        return {init: init, upsert: upsert, update: update};
+    })();
+
+    let transitions = {
+        init: {upsert: 0.1, update: 0.9},
+        upsert: {upsert: 0.1, update: 0.9},
+        update: {upsert: 0.1, update: 0.9},
+    };
+
+    return {threadCount: 20, iterations: 20, data: data, states: states, transitions: transitions};
+})();

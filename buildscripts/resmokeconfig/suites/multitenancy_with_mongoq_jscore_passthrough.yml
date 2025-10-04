@@ -1,0 +1,123 @@
+test_kind: js_test
+description: |
+  Run test suites with a replica set and multitenancy enabled. Simulate the mongoq behavior
+  by overriding and injecting signed security token.
+
+selector:
+  roots:
+    - jstests/core/**/*.js
+    - jstests/aggregation/**/*.js
+  exclude_with_any_tags:
+    # This passthrough uses the `simulate_mongoq` override, which some tests are incompatible with.
+    - simulate_mongoq_incompatible
+    # Exclude tests which use commands that aren't supported in Serverless.
+    - command_not_supported_in_serverless
+    # Exclude tests which we know use commands that don't support a security token.
+    - not_allowed_with_signed_security_token
+    # Theses tests expect replication is not enabled.
+    - assumes_standalone_mongod
+    # capped collections are banned in Serverless.
+    - requires_capped
+    # startParallelShell creates a new connections with a different security token.
+    - uses_parallel_shell
+    # Server side javascript not allowed in Serverless.
+    - requires_scripting
+    # server-side javascript is not supported in serverless mode.
+    - requires_system_dot_js_stored_functions
+  exclude_files:
+    # setLogLevel calls setParameter command which is not allowed with security token.
+    - jstests/core/**/list_all_local_sessions.js
+    - jstests/core/**/list_all_sessions.js
+    - jstests/core/txns/timestamped_reads_wait_for_prepare_oplog_visibility.js
+    # cursor.close() calls killCursors command which is not allowed with security token.
+    - jstests/core/catalog/list_collections.js
+    - jstests/core/**/list_indexes.js
+    # collection.getPlanCache().* calls planCache* commands which are not allowed with security token.
+    - jstests/core/**/cached_plan_trial_does_not_discard_work.js
+    - jstests/core/**/collation_plan_cache.js
+    - jstests/core/**/plan_cache/in_expression_plan_cache.js
+    - jstests/core/**/index_filter_commands.js
+    - jstests/core/**/index_filter_commands_invalidate_plan_cache_entries.js
+    - jstests/core/**/plan_cache/introspect_hidden_index_plan_cache_entries.js
+    - jstests/core/**/neq_null_correctly_cache.js
+    - jstests/core/**/operation_latency_histogram.js
+    - jstests/core/**/plan_cache_list_plans.js
+    - jstests/core/**/plan_cache_sbe.js
+    - jstests/core/**/plan_cache_shell_helpers.js
+    - jstests/core/**/plan_cache_stats_shard_and_host.js
+    - jstests/core/**/profile_query_hash.js
+    - jstests/core/query/sbe/from_plan_cache_flag.js
+    - jstests/core/query/sbe/plan_cache_sbe_with_or_queries.js
+    - jstests/core/query/sbe/sbe_plan_cache_autoparameterize_collscan.js
+    - jstests/core/timeseries/query/bucket_unpacking_with_sort_plan_cache.js
+    - jstests/core/**/wildcard_index_cached_plans.js
+    # defaultPrompt() calls buildInfo command which is not allowed with security token.
+    - jstests/core/txns/shell_prompt_in_transaction.js
+    # Cannot test the user is not allowed to create indexes in config.transactions as the
+    # simulate_mongoq.js runs command on tenant's config.transactions.
+    - jstests/core/**/create_indexes.js
+    # checkLog calls getLog command which is not allowed  with security token.
+    - jstests/core/**/doc_validation_options.js
+    # exhaust does not use runCommand (required by the simulate_mongoq.js override).
+    - jstests/core/**/query/exhaust.js
+    # This test does not use same connection on same database (required by the simulate_mongoq.js override).
+    - jstests/core/txns/write_conflicts_with_non_txns.js
+    # In a multitenancy environment the catalog will always return tenant-prefixed entries, and the
+    # override we use in this suite checks for the absence of a prefix breaking the list_catalog tests.
+    - jstests/core/**/list_catalog.js
+    # This test uses '_hashBSONElement' command that cannot be run with security token.
+    - jstests/core/**/index_key_expression.js
+    # Queryable encryption test performs implicit encryption which issues commands that don't
+    # include the security token.
+    - jstests/core/query/queryable_encryption/**/*.js
+    # These following tests use benchRun which does not use runCommand (required by the simulate_mongoq.js override).
+    - jstests/core/**/bench_test1.js
+    - jstests/core/**/bench_test2.js
+    - jstests/core/**/benchrun_cmd_param_error.js
+    - jstests/core/**/benchrun_pipeline_updates.js
+    # QueryExecutorStats assertions are hardcoded for single-node results
+    - jstests/aggregation/sources/lookup/lookup_query_stats.js
+
+executor:
+  archive:
+    tests: true
+    hooks:
+      - CheckReplDBHash
+      - CheckReplOplogs
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: |
+        globalThis.testingReplication = true;
+        await import('jstests/libs/override_methods/simulate_mongoq.js');
+      global_vars:
+        TestData:
+          tenantId: "636d957b2646ddfaf9b5e13a"
+          useSignedSecurityToken: true
+          hashTestNamesForMultitenancy: true
+          testOnlyValidatedTenancyScopeKey: secret
+  hooks:
+    # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+    # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+    # validating the entire contents of the collection.
+    - class: CheckReplOplogs
+    - class: CheckReplDBHash
+    - class: ValidateCollections
+      use_legacy_validate: true
+    - class: CleanEveryN
+      n: 20
+      skip_database_deletion: true
+  fixture:
+    class: ReplicaSetFixture
+    num_nodes: 2
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        multitenancySupport: true
+        featureFlagSecurityToken: true
+        testOnlyValidatedTenancyScopeKey: secret
+        # The mongoq only works with a replica set which has featureFlagRequireTenantID enabled.
+        featureFlagRequireTenantID: true
+        logComponentVerbosity:
+          command: 2
+      noscripting: ""

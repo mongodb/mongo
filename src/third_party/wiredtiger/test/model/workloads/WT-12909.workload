@@ -1,0 +1,7 @@
+create_table(4, table4, Q, Q)
+begin_transaction(2)
+insert(4, 2, 70018, 454916)
+commit_transaction(2, 2353, 0)
+set_oldest_timestamp(2739)
+checkpoint()
+rollback_to_stable()

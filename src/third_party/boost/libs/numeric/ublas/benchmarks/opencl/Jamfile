@@ -1,0 +1,27 @@
+#
+# Copyright (c) 2018 Stefan Seefeld
+#
+# Distributed under the Boost Software License, Version 1.0.
+# (See accompanying file LICENSE_1_0.txt or
+# copy at http://www.boost.org/LICENSE_1_0.txt)
+
+import ac ;
+
+# work around a bug in Boost.Build
+import ../../opencl ;
+import ../../clblas ;
+using opencl ;
+using clblas ;
+
+project boost/ublas/benchmarks/opencl
+    : requirements
+      <library>/boost/program_options//boost_program_options
+      <toolset>gcc:<cxxflags>-Wno-ignored-attributes
+      [ ac.check-library /clblas//clblas : <library>/clblas//clblas <library>/opencl//opencl : <build>no ]
+    ;
+
+exe add : add.cpp ;
+exe mm_prod : mm_prod.cpp ;
+exe mv_prod : mv_prod.cpp ;
+exe inner_prod : inner_prod.cpp ;
+exe outer_prod : outer_prod.cpp ;

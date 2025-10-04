@@ -29,10 +29,17 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/stdx/unordered_set.h"
+
+#include <string>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo::projection_executor_utils {
 /**
@@ -45,9 +52,17 @@ bool applyProjectionToOneField(projection_executor::ProjectionExecutor* executor
  * Applies the projection to each field from the 'fields' set and stores it in the returned set
  * if the projection would allow that field to remain in a document.
  **/
-stdx::unordered_set<std::string> applyProjectionToFields(
-    projection_executor::ProjectionExecutor* executor,
-    const stdx::unordered_set<std::string>& fields);
+template <typename Container>
+std::set<std::string> applyProjectionToFields(projection_executor::ProjectionExecutor* executor,
+                                              Container const& fields) {
+    std::set<std::string> out;
+    for (const auto& field : fields) {
+        if (applyProjectionToOneField(executor, field)) {
+            out.insert(field);
+        }
+    }
+    return out;
+}
 
 /**
  * Applies a positional projection on the first array found in the 'path' on a projection
@@ -90,7 +105,7 @@ Document applyFindPositionalProjection(const Document& preImage,
  * If the 'matchExpr' does not match the input document, the function returns a missing value.
  *
  * Since the $elemMatch projection cannot be used with a nested field, the 'path' value must not
- * be a dotted path, otherwise an invariant will be triggered.
+ * be a dotted path, otherwise a tassert will be triggered.
  */
 Value applyFindElemMatchProjection(const Document& input,
                                    const MatchExpression& matchExpr,

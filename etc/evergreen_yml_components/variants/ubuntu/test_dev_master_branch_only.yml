@@ -1,0 +1,61 @@
+# Ubuntu build variants for testing development environments
+#
+# After the branching variants in this file
+# should NOT run on a new rapid release (v7.1, v7.2 etc.)
+# and LTS release (v7.0, v6.0 etc.) branch projects
+
+buildvariants:
+  - name: &ubuntu2204-x86-64-bazel-compile ubuntu2204-x86-64-bazel-compile
+    display_name: "Ubuntu 22.04 x86_64 Enterprise Bazel Compile"
+    tags: ["bazel_check"]
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - ubuntu2204-large
+    stepback: false
+    expansions:
+      compile_variant: *ubuntu2204-x86-64-bazel-compile
+    tasks:
+      - name: compile_bazel_TG
+      - name: run_bazel_TG
+
+  - name: &workstation_bazel_cache_hydration_arm64 workstation_bazel_cache_hydration_arm64
+    display_name: "~ Workstation Bazel Cache Hydration arm64"
+    tags: ["bazel_cache_hydration"]
+    cron: "0 * * * *" # Every hour
+    run_on:
+      - ubuntu2204-arm64-large
+    stepback: false
+    expansions:
+      compile_variant: *workstation_bazel_cache_hydration_arm64
+      evergreen_remote_exec: on
+    tasks:
+      - name: hydrate_bazel_profile_TG
+      - name: .clang_tidy
+
+  - name: &workstation_bazel_cache_hydration_x86_64 workstation_bazel_cache_hydration_x86_64
+    display_name: "~ Workstation Bazel Cache Hydration x86_64"
+    tags: ["bazel_cache_hydration"]
+    cron: "30 * * * *" # Every hour, 30 min offset
+    run_on:
+      - ubuntu2204-large
+    stepback: false
+    expansions:
+      compile_variant: *workstation_bazel_cache_hydration_x86_64
+      evergreen_remote_exec: on
+    tasks:
+      - name: hydrate_bazel_profile_TG
+      - name: .clang_tidy
+
+  - name: &upload_source_graph_index upload_source_graph_index
+    display_name: "~ Upload Source Graph Index"
+    tags: ["source_graph_indexing"]
+    cron: "0 */4 * * *" # Every 4 hours
+    # SourceGraph's indexer requires a lot of CPU to execute in a reasonable amount of time
+    run_on:
+      - rhel93-xxlarge
+    stepback: false
+    expansions:
+      compile_variant: *upload_source_graph_index
+      evergreen_remote_exec: on
+    tasks:
+      - name: build_source_graph_index_TG

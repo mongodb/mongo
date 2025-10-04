@@ -27,18 +27,29 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <jsapi.h>
 
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <js/CallArgs.h>
+#include <js/PropertySpec.h>
+#include <js/RootingAPI.h>
+#include <js/TypeDecls.h>
+// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/base/error_codes.h"
 #include "mongo/scripting/mozjs/countdownlatch.h"
-
-#include <cmath>
-
-#include "mongo/platform/mutex.h"
-#include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
-#include "mongo/scripting/mozjs/valuewriter.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/assert_util.h"
+
+#include <climits>
+#include <cmath>
+#include <cstdint>
+#include <memory>
+#include <mutex>
+#include <utility>
 
 namespace mongo {
 namespace mozjs {
@@ -64,7 +75,7 @@ public:
 
     int32_t make(int32_t count) {
         uassert(ErrorCodes::JSInterpreterFailure, "argument must be >= 0", count >= 0);
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
 
         int32_t desc = ++_counter;
         _latches.insert(std::make_pair(desc, std::make_shared<CountDownLatch>(count)));
@@ -74,7 +85,7 @@ public:
 
     void await(int32_t desc) {
         auto latch = get(desc);
-        stdx::unique_lock<Latch> lock(latch->mutex);
+        stdx::unique_lock<stdx::mutex> lock(latch->mutex);
 
         while (latch->count != 0) {
             latch->cv.wait(lock);
@@ -83,7 +94,7 @@ public:
 
     void countDown(int32_t desc) {
         auto latch = get(desc);
-        stdx::unique_lock<Latch> lock(latch->mutex);
+        stdx::unique_lock<stdx::mutex> lock(latch->mutex);
 
         if (latch->count > 0)
             latch->count--;
@@ -94,7 +105,7 @@ public:
 
     int32_t getCount(int32_t desc) {
         auto latch = get(desc);
-        stdx::unique_lock<Latch> lock(latch->mutex);
+        stdx::unique_lock<stdx::mutex> lock(latch->mutex);
 
         return latch->count;
     }
@@ -106,13 +117,13 @@ private:
     struct CountDownLatch {
         CountDownLatch(int32_t count) : count(count) {}
 
-        Mutex mutex = MONGO_MAKE_LATCH("Latch::mutex");
+        stdx::mutex mutex;
         stdx::condition_variable cv;
         int32_t count;
     };
 
     std::shared_ptr<CountDownLatch> get(int32_t desc) {
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
 
         auto iter = _latches.find(desc);
         uassert(ErrorCodes::JSInterpreterFailure,
@@ -124,7 +135,7 @@ private:
 
     using Map = stdx::unordered_map<int32_t, std::shared_ptr<CountDownLatch>>;
 
-    Mutex _mutex = MONGO_MAKE_LATCH("CountDownLatchHolder::_mutex");
+    stdx::mutex _mutex;
     Map _latches;
     int32_t _counter;
 };
@@ -201,12 +212,14 @@ void CountDownLatchInfo::postInstall(JSContext* cx,
 
     JS::RootedValue val(cx);
     for (auto iter = methods; iter->name; ++iter) {
-        protoWrapper.getValue(iter->name, &val);
-        objWrapper.setValue(iter->name, val);
+        invariant(!iter->name.isSymbol());
+        ObjectWrapper::Key key(iter->name.string());
+        protoWrapper.getValue(key, &val);
+        objWrapper.setValue(key, val);
     }
 
     val.setObjectOrNull(obj);
-    ObjectWrapper(cx, global).setValue("CountDownLatch", val);
+    ObjectWrapper(cx, global).setValue(CountDownLatchInfo::className, val);
 }
 
 }  // namespace mozjs

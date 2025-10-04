@@ -33,6 +33,7 @@ import wiredtiger, wttest
 #    Test privileged operations.
 #    This is a variant of test_config02.py.  This test should be run as both
 # normal and privileged (e.g. root) user, and should pass in both cases.
+@wttest.skip_for_hook("tiered", "using environment variable to set WT home")
 class test_priv01(wttest.WiredTigerTestCase):
     """
     This tests privileged operations.
@@ -163,6 +164,3 @@ class test_priv01(wttest.WiredTigerTestCase):
         self.common_test(None, edir, 'use_environment=false')
         self.checknofiles(edir)
         self.checkfiles('.')
-
-if __name__ == '__main__':
-    wttest.run()

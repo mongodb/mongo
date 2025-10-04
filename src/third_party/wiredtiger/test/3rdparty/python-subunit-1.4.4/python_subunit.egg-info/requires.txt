@@ -1,0 +1,10 @@
+iso8601
+testtools>=0.9.34
+
+[docs]
+docutils
+
+[test]
+fixtures
+testscenarios
+hypothesis

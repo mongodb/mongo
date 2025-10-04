@@ -32,6 +32,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/query/tailable_mode_gen.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

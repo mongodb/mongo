@@ -1,0 +1,11 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/server-programmability
+  - "*ticketholder*":
+    approvers:
+      - 10gen/server-workload-resilience
+  - "admission_context.*":
+    approvers:
+      - 10gen/server-workload-resilience

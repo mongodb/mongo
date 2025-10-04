@@ -12,6 +12,11 @@
 #include <boost/mp11/utility.hpp>
 #include <cstddef>
 
+#if defined(_MSC_VER) || defined(__GNUC__)
+# pragma push_macro( "I" )
+# undef I
+#endif
+
 namespace boost
 {
 namespace mp11
@@ -107,5 +112,9 @@ template<class Q, class... T> using mp_bind_q = mp_bind<Q::template fn, T...>;
 
 } // namespace mp11
 } // namespace boost
+
+#if defined(_MSC_VER) || defined(__GNUC__)
+# pragma pop_macro( "I" )
+#endif
 
 #endif // #ifndef BOOST_MP11_BIND_HPP_INCLUDED

@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # Examine WT_WITH_* macros and complain if an early exit out of the
 # macro is done.  These macros potentially restore state after they execute
 # an expression, and an early exit, like a return/goto means the state
@@ -9,9 +11,9 @@ import re, sys
 def get_indent(line):
     return len(line) - len(line.lstrip())
 
-filepat = re.compile('===(.*)===')
-withpat = re.compile('WT_WITH_')
-exitpat = re.compile('(WT_ERR|WT_RET|return\(|goto )')
+filepat = re.compile(r'===(.*)===')
+withpat = re.compile(r'WT_WITH_')
+exitpat = re.compile(r'(WT_ERR|WT_RET|return\(|goto )')
 filename = ''
 linenum = 0
 with_indent = -1

@@ -30,8 +30,14 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 
 namespace mongo {
+
+/**
+ * This file is included by every IDL-generated command and provides functionality used in
+ * serialization and deserialization.
+ */
 
 /**
  * Returns true if the provided argument is one that is handled by the command processing layer
@@ -39,6 +45,13 @@ namespace mongo {
  * commands that fail on unrecognized arguments must not fail for any of these.
  */
 bool isGenericArgument(StringData arg);
+
+/**
+ * Returns true if the provided reply field is one that is handled by the command processing layer
+ * and should generally be ignored by individual command implementations. In particular,
+ * replies that fail on unrecognized fields must not fail for any of these.
+ */
+bool isGenericReply(StringData arg);
 
 /**
  * Returns true if arg should be forwarded to shards.
@@ -53,11 +66,5 @@ bool shouldForwardToShards(StringData arg);
  * See 'CommandHelpers::filterCommandReplyForPassthrough'.
  */
 bool shouldForwardFromShards(StringData replyField);
-
-/**
- * Returns true if the provided argument is one that should be handled by a mongocryptd process.
- */
-bool isMongocryptdArgument(StringData arg);
-
 
 }  // namespace mongo

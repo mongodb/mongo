@@ -1,0 +1,7 @@
+# Golden test output of GoldenSbeStageBuilderTest/TestCountScan
+[2] project [s8 = newBsonObj("_id", s6, "count", s7)] 
+[2] project [s7 = (convert ( s5, int32) ?: s5)] 
+[2] group [s6] [s5 = count()] spillSlots[s4] mergingExprs[sum(s4)] 
+[2] project [s6 = (s3 ?: null)] 
+[1] project [s3 = getField(s2, "_id")] 
+[1] ixseek KS(27FDFE) KS(2BFE01) none s1 none none [] @"UUID" @"a_1" true 

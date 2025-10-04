@@ -27,22 +27,26 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/startup_warnings_common.h"
 
-#include <boost/filesystem/operations.hpp>
-#include <fstream>
-
-#include "mongo/client/authenticate.h"
-#include "mongo/config.h"
+#include "mongo/client/internal_auth.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/net/ssl_options.h"
-#include "mongo/util/processinfo.h"
-#include "mongo/util/version.h"
+
+#include <fstream>  // IWYU pragma: keep
+#include <string>
+#include <vector>
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
+
 
 namespace mongo {
 
@@ -50,7 +54,7 @@ namespace mongo {
 bool CheckPrivilegeEnabled(const wchar_t* name) {
     LUID luid;
     if (!LookupPrivilegeValueW(nullptr, name, &luid)) {
-        auto str = errnoWithPrefix("Failed to LookupPrivilegeValue");
+        auto str = "Failed to LookupPrivilegeValue: " + errorMessage(lastSystemError());
         LOGV2_WARNING(4718701, "{str}", "str"_attr = str);
         return false;
     }
@@ -58,7 +62,7 @@ bool CheckPrivilegeEnabled(const wchar_t* name) {
     // Get the access token for the current process.
     HANDLE accessToken;
     if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &accessToken)) {
-        auto str = errnoWithPrefix("Failed to OpenProcessToken");
+        auto str = "Failed to OpenProcessToken: " + errorMessage(lastSystemError());
         LOGV2_WARNING(4718702, "{str}", "str"_attr = str);
         return false;
     }
@@ -74,7 +78,7 @@ bool CheckPrivilegeEnabled(const wchar_t* name) {
     privileges.Privilege[0].Attributes = 0;
 
     if (!PrivilegeCheck(accessToken, &privileges, &ret)) {
-        auto str = errnoWithPrefix("Failed to PrivilegeCheck");
+        auto str = "Failed to PrivilegeCheck: " + errorMessage(lastSystemError());
         LOGV2_WARNING(4718703, "{str}", "str"_attr = str);
         return false;
     }
@@ -120,27 +124,6 @@ void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
             "make or accept connections to untrusted parties");
     }
 #endif
-
-    /*
-     * We did not add the message to startupWarningsLog as the user can not
-     * specify a sslCAFile parameter from the shell
-     */
-    if (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled &&
-#ifdef MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS
-        sslGlobalParams.sslCertificateSelector.empty() &&
-#endif
-        sslGlobalParams.sslCAFile.empty()) {
-#ifdef MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS
-        LOGV2_WARNING(22132,
-                      "No client certificate validation can be performed since no CA file has been "
-                      "provided and no sslCertificateSelector has been specified. Please specify "
-                      "an sslCAFile parameter");
-#else
-        LOGV2_WARNING(22133,
-                      "No client certificate validation can be performed since no CA file has been "
-                      "provided. Please specify an sslCAFile parameter");
-#endif
-    }
 
 #if defined(_WIN32) && !defined(_WIN64)
     // Warn user that they are running a 32-bit app on 64-bit Windows

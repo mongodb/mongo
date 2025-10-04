@@ -1,0 +1,53 @@
+version: 1.0.0
+filters:
+  - "index_access_method*":
+    approvers:
+      - 10gen/server-index-builds
+  - "key_gen_bm.cpp":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "multikey_metadata_access_stats.h":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "btree_key_generator*":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "hash_key_generator*":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "preallocated_container_pool*":
+    approvers:
+      - 10gen/server-index-builds
+  - "sort_key_generator*":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "wildcard_key_generator*":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "expression_keys*":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "expression_params*":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "wildcard_validation*":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "multikey_paths*":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "2d_common*":
+    approvers:
+      - 10gen/query-integration-features
+  - "2d_key_generator*":
+    approvers:
+      - 10gen/query-integration-features
+  - "s2_common*":
+    approvers:
+      - 10gen/query-integration-features
+  - "s2*key_generator*":
+    approvers:
+      - 10gen/query-integration-features
+  - "wildcard_access_method*":
+    approvers:
+      - 10gen/query-execution-write-exec

@@ -6,11 +6,8 @@
  * ]
  */
 
-(function() {
-'use strict';
-
-load("jstests/libs/discover_topology.js");
-load("jstests/sharding/libs/resharding_test_fixture.js");
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 function setupTest(reshardingTest, namespace, timeout) {
     reshardingTest.setup();
@@ -30,26 +27,28 @@ function setupTest(reshardingTest, namespace, timeout) {
     const mongos = inputCollection.getMongo();
     const topology = DiscoverTopology.findConnectedNodes(mongos);
     const coordinator = new Mongo(topology.configsvr.nodes[0]);
-    assert.commandWorked(coordinator.getDB("admin").adminCommand(
-        {setParameter: 1, reshardingCriticalSectionTimeoutMillis: timeout}));
+    assert.commandWorked(
+        coordinator.getDB("admin").adminCommand({setParameter: 1, reshardingCriticalSectionTimeoutMillis: timeout}),
+    );
 
-    assert.commandWorked(inputCollection.insert([
-        {_id: "stays on shard0", oldKey: -10, newKey: -10},
-        {_id: "moves to shard0", oldKey: 10, newKey: -10},
-        {_id: "moves to shard1", oldKey: -10, newKey: 10},
-        {_id: "stays on shard1", oldKey: 10, newKey: 10},
-    ]));
+    assert.commandWorked(
+        inputCollection.insert([
+            {_id: "stays on shard0", oldKey: -10, newKey: -10},
+            {_id: "moves to shard0", oldKey: 10, newKey: -10},
+            {_id: "moves to shard1", oldKey: -10, newKey: 10},
+            {_id: "stays on shard1", oldKey: 10, newKey: 10},
+        ]),
+    );
 }
 
 // This test will not timeout.
-const successReshardingTest =
-    new ReshardingTest({numDonors: 2, numRecipients: 2, reshardInPlace: true});
+const successReshardingTest = new ReshardingTest({numDonors: 2, numRecipients: 2, reshardInPlace: true});
 const noTimeoutMillis = 8000;
-var namespace = `reshardingDb.coll${noTimeoutMillis}`;
+let namespace = `reshardingDb.coll${noTimeoutMillis}`;
 
 setupTest(successReshardingTest, namespace, noTimeoutMillis);
 
-var recipientShardNames = successReshardingTest.recipientShardNames;
+let recipientShardNames = successReshardingTest.recipientShardNames;
 successReshardingTest.withReshardingInBackground({
     newShardKeyPattern: {newKey: 1},
     newChunks: [
@@ -61,8 +60,7 @@ successReshardingTest.withReshardingInBackground({
 successReshardingTest.teardown();
 
 // This test will timeout.
-const failureReshardingTest =
-    new ReshardingTest({numDonors: 2, numRecipients: 2, reshardInPlace: true});
+const failureReshardingTest = new ReshardingTest({numDonors: 2, numRecipients: 2, reshardInPlace: true});
 const shouldTimeoutMillis = 0;
 namespace = `reshardingDb.coll${shouldTimeoutMillis}`;
 
@@ -77,8 +75,8 @@ failureReshardingTest.withReshardingInBackground(
             {min: {newKey: 0}, max: {newKey: MaxKey}, shard: recipientShardNames[1]},
         ],
     },
-    (tempNs) => {},
-    {expectedErrorCode: ErrorCodes.ReshardingCriticalSectionTimeout});
+    () => {},
+    {expectedErrorCode: ErrorCodes.ReshardingCriticalSectionTimeout},
+);
 
 failureReshardingTest.teardown();
-})();

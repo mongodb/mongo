@@ -1,12 +1,13 @@
 """Setup multiversion config."""
+
 from typing import List
 
-SETUP_MULTIVERSION_CONFIG = "buildscripts/resmokeconfig/setup_multiversion/setup_multiversion_config.yml"
+SETUP_MULTIVERSION_CONFIG = (
+    "buildscripts/resmokeconfig/setup_multiversion/setup_multiversion_config.yml"
+)
 
 # Records the paths of installed multiversion binaries on Windows.
 WINDOWS_BIN_PATHS_FILE = "windows_binary_paths.txt"
-
-USE_EXISTING_RELEASES_FILE = False
 
 
 class Buildvariant:

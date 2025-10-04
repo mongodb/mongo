@@ -26,31 +26,56 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
-#include <fstream>
-#include <iostream>
-#include <memory>
-
-#include <boost/algorithm/string.hpp>
 #include <boost/filesystem.hpp>
-#include <boost/filesystem/operations.hpp>
-#include <boost/format.hpp>
-#include <boost/optional/optional_io.hpp>
-
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/client/sdam/json_test_arg_parser.h"
+#include "mongo/client/sdam/sdam_configuration.h"
 #include "mongo/client/sdam/sdam_configuration_parameters_gen.h"
+#include "mongo/client/sdam/sdam_datatypes.h"
+#include "mongo/client/sdam/server_description.h"
 #include "mongo/client/sdam/server_description_builder.h"
 #include "mongo/client/sdam/server_selector.h"
-#include "mongo/client/sdam/topology_manager.h"
+#include "mongo/client/sdam/topology_description.h"
+#include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/ctype.h"
-#include "mongo/util/options_parser/environment.h"
-#include "mongo/util/options_parser/option_section.h"
-#include "mongo/util/options_parser/options_parser.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/options_parser/value.h"
+#include "mongo/util/time_support.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <fstream>  // IWYU pragma: keep
+#include <iostream>
+#include <iterator>
+#include <memory>
+#include <ratio>
+#include <set>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 
 /**
  * This program runs the Server Discover and Monitoring JSON test files located in
@@ -69,7 +94,6 @@
  */
 
 namespace fs = boost::filesystem;
-namespace moe = mongo::optionenvironment;
 using namespace mongo::sdam;
 
 namespace mongo::sdam {
@@ -114,9 +138,9 @@ public:
         parseTest(testFilePath);
     }
 
-    ~JsonRttTestCase() = default;
+    ~JsonRttTestCase() override = default;
 
-    TestCaseResult execute() {
+    TestCaseResult execute() override {
         LOGV2(4333500, "### Running Test ###", "testFilePath"_attr = _testFilePath);
 
         ServerDescriptionPtr updatedServerDescription;
@@ -130,7 +154,7 @@ public:
                                   HelloOutcome(HostAndPort("dummy"),
                                                BSON("ok" << 1 << "setname"
                                                          << "replSet"
-                                                         << "ismaster" << true),
+                                                         << "isWritablePrimary" << true),
                                                HelloRTT(Milliseconds(_newRtt)))));
         }
 
@@ -144,7 +168,7 @@ public:
         return result;
     }
 
-    const std::string& FilePath() const {
+    const std::string& FilePath() const override {
         return _testFilePath;
     }
 
@@ -162,7 +186,7 @@ private:
         // Only create the initial server description if the original avg rtt is not "NULL". If it
         // is, the test case is meant to mimic creating the first ServerDescription which we will do
         // above.
-        std::string origRttAsString = _jsonTest.getStringField("avg_rtt_ms");
+        std::string origRttAsString = std::string{_jsonTest.getStringField("avg_rtt_ms")};
         if (origRttAsString.compare("NULL") != 0) {
             auto serverDescription = ServerDescriptionBuilder()
                                          .withAddress(HostAndPort("dummy"))
@@ -187,7 +211,7 @@ private:
             return;
         }
 
-        auto newAvgRtt = duration_cast<Milliseconds>(newServerDescription->getRtt().get());
+        auto newAvgRtt = duration_cast<Milliseconds>(newServerDescription->getRtt().value());
         if (newAvgRtt.compare(duration_cast<Milliseconds>(Milliseconds(_newAvgRtt))) != 0) {
             std::stringstream errorMessage;
             errorMessage << "new average RTT is incorrect, got '" << newAvgRtt
@@ -218,9 +242,9 @@ public:
                                          testFilePath.string()};
         }
     }
-    ~JsonServerSelectionTestCase() = default;
+    ~JsonServerSelectionTestCase() override = default;
 
-    TestCaseResult execute() {
+    TestCaseResult execute() override {
         LOGV2(4333504, "### Running Test ###", "testFilePath"_attr = _testFilePath);
         if (_parseError)
             return *_parseError;
@@ -257,11 +281,11 @@ public:
         return result;
     }
 
-    const std::string& FilePath() const {
+    const std::string& FilePath() const override {
         return _testFilePath;
     }
 
-    bool errorIsExpected() {
+    bool errorIsExpected() override {
         return _errorExpected;
     }
 
@@ -286,7 +310,7 @@ private:
         // lowercased keywords. Also, change the key "tags_set" to "tags".
         // This can throw for test cases that have invalid read preferences.
         auto readPrefObj = _jsonTest.getObjectField("read_preference");
-        std::string mode = readPrefObj.getStringField("mode");
+        std::string mode = std::string{readPrefObj.getStringField("mode")};
         mode[0] = ctype::toLower(mode[0]);
         auto tagSetsObj = readPrefObj["tag_sets"];
         auto tags = tagSetsObj ? BSONArray(readPrefObj["tag_sets"].Obj()) : BSONArray();
@@ -364,7 +388,7 @@ private:
             auto tagsObj = server.getObjectField("tags");
             const auto keys = tagsObj.getFieldNames<std::set<std::string>>();
             for (const auto& key : keys) {
-                serverDescription.withTag(key, tagsObj.getStringField(key));
+                serverDescription.withTag(key, std::string{tagsObj.getStringField(key)});
             }
 
             serverDescriptions.push_back(serverDescription.instance());
@@ -379,12 +403,13 @@ private:
         if (serverAddresses.size() > 0)
             seedList = serverAddresses;
 
-        auto config = SdamConfiguration(seedList,
-                                        initType,
-                                        Milliseconds{sdamHeartBeatFrequencyMs},
-                                        Milliseconds{sdamConnectTimeoutMs},
-                                        Milliseconds{sdamLocalThreshholdMs},
-                                        setName);
+        auto config =
+            SdamConfiguration(seedList,
+                              initType,
+                              Milliseconds{sdamHeartBeatFrequencyMs},
+                              Milliseconds{sdamConnectTimeoutMs},
+                              Milliseconds{serverGlobalParams.defaultLocalThresholdMillis},
+                              setName);
         _topologyDescription = std::make_shared<TopologyDescription>(config);
 
         std::vector<BSONElement> bsonLatencyWindow;
@@ -415,7 +440,9 @@ private:
         std::vector<HostAndPort> selectedHostAndPorts;
         std::vector<HostAndPort> expectedHostAndPorts;
 
-        auto extractHost = [](const ServerDescriptionPtr& s) { return s->getAddress(); };
+        auto extractHost = [](const ServerDescriptionPtr& s) {
+            return s->getAddress();
+        };
         if (selectedServers) {
             std::transform(selectedServers->begin(),
                            selectedServers->end(),
@@ -463,7 +490,7 @@ public:
     std::vector<JsonTestCase::TestCaseResult> runTests() {
         std::vector<JsonTestCase::TestCaseResult> results;
         const auto testFiles = getTestFiles();
-        for (auto jsonTest : testFiles) {
+        for (const auto& jsonTest : testFiles) {
             int restoreHeartBeatFrequencyMs = sdamHeartBeatFrequencyMs;
 
             std::unique_ptr<JsonTestCase> testCase;
@@ -509,7 +536,7 @@ public:
         std::string result;
         for (size_t i = 0; i < errors.size(); ++i) {
             auto error = errors[i];
-            result = result + error.first + " - " + error.second;
+            result += error.first += std::string(" - ") += error.second;
             if (i != errors.size() - 1) {
                 result += "; ";
             }

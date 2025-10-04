@@ -27,63 +27,30 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_items.h"
+
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
 namespace {
 
-TEST(InternalSchemaMaxItemsMatchExpression, RejectsNonArrayElements) {
-    InternalSchemaMaxItemsMatchExpression maxItems("a", 1);
+DEATH_TEST_REGEX(InternalSchemaMaxItemsMatchExpression,
+                 GetChildFailsIndexGreaterThanZero,
+                 "Tripwire assertion.*6400215") {
+    InternalSchemaMaxItemsMatchExpression maxItems("a"_sd, 2);
 
-    ASSERT(!maxItems.matchesBSON(BSON("a" << BSONObj())));
-    ASSERT(!maxItems.matchesBSON(BSON("a" << 1)));
-    ASSERT(!maxItems.matchesBSON(BSON("a"
-                                      << "string")));
-}
-
-TEST(InternalSchemaMaxItemsMatchExpression, RejectsArraysWithTooManyElements) {
-    InternalSchemaMaxItemsMatchExpression maxItems("a", 0);
-
-    ASSERT(!maxItems.matchesBSON(BSON("a" << BSON_ARRAY(1))));
-    ASSERT(!maxItems.matchesBSON(BSON("a" << BSON_ARRAY(1 << 2))));
-}
-
-TEST(InternalSchemaMaxItemsMatchExpression, AcceptsArrayWithLessThanOrEqualToMaxElements) {
-    InternalSchemaMaxItemsMatchExpression maxItems("a", 2);
-
-    ASSERT(maxItems.matchesBSON(BSON("a" << BSON_ARRAY(5 << 6))));
-    ASSERT(maxItems.matchesBSON(BSON("a" << BSON_ARRAY(5))));
-}
-
-TEST(InternalSchemaMaxItemsMatchExpression, MaxItemsZeroAllowsEmptyArrays) {
-    InternalSchemaMaxItemsMatchExpression maxItems("a", 0);
-
-    ASSERT(maxItems.matchesBSON(BSON("a" << BSONArray())));
-}
-
-TEST(InternalSchemaMaxItemsMatchExpression, NullArrayEntriesCountAsItems) {
-    InternalSchemaMaxItemsMatchExpression maxItems("a", 2);
-
-    ASSERT(maxItems.matchesBSON(BSON("a" << BSON_ARRAY(BSONNULL << 1))));
-    ASSERT(!maxItems.matchesBSON(BSON("a" << BSON_ARRAY(BSONNULL << 1 << 2))));
-}
-
-TEST(InternalSchemaMaxItemsMatchExpression, NestedArraysAreNotUnwound) {
-    InternalSchemaMaxItemsMatchExpression maxItems("a", 2);
-
-    ASSERT(maxItems.matchesBSON(BSON("a" << BSON_ARRAY(BSON_ARRAY(1 << 2 << 3)))));
-}
-
-TEST(InternalSchemaMaxItemsMatchExpression, NestedArraysWorkWithDottedPaths) {
-    InternalSchemaMaxItemsMatchExpression maxItems("a.b", 2);
-
-    ASSERT(maxItems.matchesBSON(BSON("a" << BSON("b" << BSON_ARRAY(1)))));
-    ASSERT(!maxItems.matchesBSON(BSON("a" << BSON("b" << BSON_ARRAY(1 << 2 << 3)))));
+    ASSERT_EQ(maxItems.numChildren(), 0);
+    ASSERT_THROWS_CODE(maxItems.getChild(0), AssertionException, 6400215);
 }
 
 }  // namespace

@@ -29,17 +29,15 @@
 
 #pragma once
 
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/prepare_conflict_tracker.h"
+#include "mongo/db/storage/prepare_conflict_tracker.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 
-namespace mongo {
+#include <wiredtiger.h>
 
-// When set, simulates returning WT_PREPARE_CONFLICT on WT cursor read operations.
-extern FailPoint WTPrepareConflictForReads;
+namespace mongo {
 
 // When set, WT_ROLLBACK is returned in place of retrying on WT_PREPARE_CONFLICT errors.
 extern FailPoint WTSkipPrepareConflictRetries;
@@ -56,8 +54,6 @@ void wiredTigerPrepareConflictLog(int attempt);
  */
 void wiredTigerPrepareConflictFailPointLog();
 
-void wiredTigerPrepareConflictOplogResourceLog();
-
 /**
  * Runs the argument function f as many times as needed for f to return an error other than
  * WT_PREPARE_CONFLICT. Each time f returns WT_PREPARE_CONFLICT we wait until the current unit of
@@ -65,98 +61,21 @@ void wiredTigerPrepareConflictOplogResourceLog();
  * re-try f, so any required timeout behavior must be enforced within f.
  * The function f must return a WiredTiger error code.
  */
-template <typename F>
-int wiredTigerPrepareConflictRetry(OperationContext* opCtx, F&& f) {
-    invariant(opCtx);
+int wiredTigerPrepareConflictRetrySlow(Interruptible& interruptible,
+                                       PrepareConflictTracker& tracker,
+                                       RecoveryUnit& ru,
+                                       std::function<int()> func);
 
-    // If the failpoint is enabled, don't call the function, just simulate a conflict.
-    int ret = MONGO_unlikely(WTPrepareConflictForReads.shouldFail()) ? WT_PREPARE_CONFLICT
-                                                                     : WT_READ_CHECK(f());
+template <typename F>
+int wiredTigerPrepareConflictRetry(Interruptible& interruptible,
+                                   PrepareConflictTracker& tracker,
+                                   RecoveryUnit& ru,
+                                   F&& f) {
+    int ret = WT_READ_CHECK(f());
     if (ret != WT_PREPARE_CONFLICT)
         return ret;
 
-    if (opCtx->recoveryUnit()->isTimestamped()) {
-        // This transaction is holding a resource in the form of an oplog slot. Committed
-        // transactions that get a later oplog slot will be unable to replicate until this resource
-        // is released (in the form of this transaction committing or aborting). For this case, we
-        // choose to abort our transaction and retry instead of blocking. It's possible that we can
-        // be blocking on a prepared update that requires replication to make progress, creating a
-        // stall in the MDB cluster.
-        wiredTigerPrepareConflictOplogResourceLog();
-        throw WriteConflictException();
-    }
-
-    auto recoveryUnit = WiredTigerRecoveryUnit::get(opCtx);
-    int attempts = 1;
-    // If we return from this function, we have either returned successfully or we've returned an
-    // error other than WT_PREPARE_CONFLICT. Reset PrepareConflictTracker accordingly.
-    ON_BLOCK_EXIT([opCtx] { PrepareConflictTracker::get(opCtx).endPrepareConflict(opCtx); });
-    PrepareConflictTracker::get(opCtx).beginPrepareConflict(opCtx);
-
-    auto client = opCtx->getClient();
-    if (client->isFromSystemConnection()) {
-        // System (internal) connections that hit a prepare conflict should be killable to prevent
-        // deadlocks with prepared transactions on replica set step up and step down.
-        stdx::lock_guard<Client> lk(*client);
-        invariant(client->canKillSystemOperationInStepdown(lk));
-    }
-    // It is contradictory to be running into a prepare conflict when we are ignoring interruptions,
-    // particularly when running code inside an
-    // OperationContext::runWithoutInterruptionExceptAtGlobalShutdown block. Operations executed in
-    // this way are expected to be set to ignore prepare conflicts.
-    invariant(!opCtx->isIgnoringInterrupts());
-
-    if (MONGO_unlikely(WTPrintPrepareConflictLog.shouldFail())) {
-        wiredTigerPrepareConflictFailPointLog();
-    }
-
-    CurOp::get(opCtx)->debug().additiveMetrics.incrementPrepareReadConflicts(1);
-    wiredTigerPrepareConflictLog(attempts);
-
-    const auto lockerInfo = opCtx->lockState()->getLockerInfo(boost::none);
-    invariant(lockerInfo);
-    for (const auto& lock : lockerInfo->locks) {
-        const auto type = lock.resourceId.getType();
-        // If a user operation on secondaries acquires a lock in MODE_S and then blocks on a prepare
-        // conflict with a prepared transaction, deadlock will occur at the commit time of the
-        // prepared transaction when it attempts to reacquire (since locks were yielded on
-        // secondaries) an IX lock that conflicts with the MODE_S lock held by the user operation.
-        // User operations that acquire MODE_X locks and block on prepare conflicts could lead to
-        // the same problem. However, user operations on secondaries should never hold MODE_X locks.
-        // Since prepared transactions will not reacquire RESOURCE_MUTEX / RESOURCE_METADATA locks
-        // at commit time, these lock types are safe. Therefore, invariant here that we do not get a
-        // prepare conflict while holding a global, database, or collection MODE_S lock (or MODE_X
-        // lock for completeness).
-        if (type == RESOURCE_GLOBAL || type == RESOURCE_DATABASE || type == RESOURCE_COLLECTION)
-            invariant(lock.mode != MODE_S && lock.mode != MODE_X,
-                      str::stream() << lock.resourceId.toString() << " in " << modeName(lock.mode));
-    }
-
-    if (MONGO_unlikely(WTSkipPrepareConflictRetries.shouldFail())) {
-        // Callers of wiredTigerPrepareConflictRetry() should eventually call wtRCToStatus() via
-        // invariantWTOK() and have the WT_ROLLBACK error bubble up as a WriteConflictException.
-        // Enabling the "skipWriteConflictRetries" failpoint in conjunction with the
-        // "WTSkipPrepareConflictRetries" failpoint prevents the higher layers from retrying the
-        // entire operation.
-        return WT_ROLLBACK;
-    }
-
-    while (true) {
-        attempts++;
-        auto lastCount = recoveryUnit->getSessionCache()->getPrepareCommitOrAbortCount();
-        // If the failpoint is enabled, don't call the function, just simulate a conflict.
-        ret = MONGO_unlikely(WTPrepareConflictForReads.shouldFail()) ? WT_PREPARE_CONFLICT
-                                                                     : WT_READ_CHECK(f());
-
-        if (ret != WT_PREPARE_CONFLICT)
-            return ret;
-
-        CurOp::get(opCtx)->debug().additiveMetrics.incrementPrepareReadConflicts(1);
-        wiredTigerPrepareConflictLog(attempts);
-
-        // Wait on the session cache to signal that a unit of work has been committed or aborted.
-        recoveryUnit->getSessionCache()->waitUntilPreparedUnitOfWorkCommitsOrAborts(opCtx,
-                                                                                    lastCount);
-    }
+    return wiredTigerPrepareConflictRetrySlow(interruptible, tracker, ru, f);
 }
+
 }  // namespace mongo

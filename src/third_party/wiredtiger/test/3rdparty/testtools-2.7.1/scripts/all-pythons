@@ -1,0 +1,93 @@
+#!/usr/bin/python
+
+"""Run the testtools test suite for all supported Pythons.
+
+Prints output as a subunit test suite. If anything goes to stderr, that is
+treated as a test error. If a Python is not available, then it is skipped.
+"""
+
+from datetime import datetime
+import io
+import os
+import subprocess
+import sys
+
+import subunit
+from subunit import (
+    iso8601,
+    _make_stream_binary,
+    TestProtocolClient,
+    TestProtocolServer,
+    )
+from testtools import (
+    PlaceHolder,
+    TestCase,
+    )
+from testtools.content import text_content
+
+
+ROOT = os.path.dirname(os.path.dirname(__file__))
+
+
+def run_for_python(version, result, tests):
+    if not tests:
+        tests = ['testtools.tests.test_suite']
+    # XXX: This could probably be broken up and put into subunit.
+    python = 'python%s' % (version,)
+    # XXX: Correct API, but subunit doesn't support it. :(
+    # result.tags(set(python), set())
+    result.time(now())
+    test = PlaceHolder(''.join(c for c in python if c != '.'))
+    process = subprocess.Popen(
+        '%s -c pass' % (python,), shell=True,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    process.communicate()
+
+    if process.returncode:
+        result.startTest(test)
+        result.addSkip(test, reason='%s not available' % (python,))
+        result.stopTest(test)
+        return
+
+    env = os.environ.copy()
+    if env.get('PYTHONPATH', None):
+        env['PYTHONPATH'] = os.pathsep.join([ROOT, env['PYTHONPATH']])
+    else:
+        env['PYTHONPATH'] = ROOT
+    result.time(now())
+    protocol = TestProtocolServer(result)
+    subunit_path = os.path.join(os.path.dirname(subunit.__file__), 'run.py')
+    cmd = [
+        python,
+        '-W', 'ignore:Module testtools was already imported',
+        subunit_path]
+    cmd.extend(tests)
+    process = subprocess.Popen(
+        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
+    _make_stream_binary(process.stdout)
+    _make_stream_binary(process.stderr)
+    # XXX: This buffers everything. Bad for memory, bad for getting progress
+    # on jenkins.
+    output, error = process.communicate()
+    protocol.readFrom(io.BytesIO(output))
+    if error:
+        result.startTest(test)
+        result.addError(test, details={
+            'stderr': text_content(error),
+           })
+        result.stopTest(test)
+    result.time(now())
+    # XXX: Correct API, but subunit doesn't support it. :(
+    #result.tags(set(), set(python))
+
+
+def now():
+    return datetime.utcnow().replace(tzinfo=iso8601.Utc())
+
+
+
+if __name__ == '__main__':
+    sys.path.append(ROOT)
+    result = TestProtocolClient(sys.stdout)
+    for version in '3.7 3.8 3.9 3.10 3.11 3.12'.split():
+        run_for_python(version, result, sys.argv[1:])

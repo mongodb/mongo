@@ -1,0 +1,50 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+    ]),
+)
+
+mongo_cc_library(
+    name = "tracking",
+    hdrs = [
+        "allocator.h",
+        "btree_map.h",
+        "context.h",
+        "flat_hash_set.h",
+        "inlined_vector.h",
+        "list.h",
+        "map.h",
+        "memory.h",
+        "set.h",
+        "string.h",
+        "string_map.h",
+        "unordered_map.h",
+        "vector.h",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "tracking_allocator_test",
+    srcs = [
+        "tracking_allocator_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_seventh_group",
+        "server-tracking-allocators",
+    ],
+    deps = [
+        "//src/mongo/db:service_context_test_fixture",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "tracking_allocator_bm",
+    srcs = [
+        "tracking_allocator_bm.cpp",
+    ],
+    deps = [],
+)

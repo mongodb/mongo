@@ -1,0 +1,2 @@
+Checks: '-*,mongo-header-bracket-check'
+WarningsAsErrors: '*'

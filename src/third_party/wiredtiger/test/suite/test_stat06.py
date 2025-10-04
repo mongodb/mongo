@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import helper, wiredtiger, wttest
+import wiredtiger, wttest
 from time import sleep
 from wiredtiger import stat
 
@@ -34,20 +34,32 @@ from wiredtiger import stat
 #    Check that statistics are started or stopped when intended
 class test_stat06(wttest.WiredTigerTestCase):
 
+    # Turn off statistics by default for this test.
+    def conn_config(self):
+        return 'statistics=(none)'
+
     def test_stats_on(self):
+        # FIXME-WT-15439: force content before closing, needed to create initial checkpoint
+        if self.runningHook('disagg'):
+            self.session.create('table:_ignore')
+            self.session.checkpoint()
         self.close_conn()
         self.conn = self.wiredtiger_open(None, "statistics=(fast)")
         self.stats_gathered(True)
 
     def test_stats_off(self):
+        # FIXME-WT-15439: force content before closing, needed to create initial checkpoint
+        if self.runningHook('disagg'):
+            self.session.create('table:_ignore')
+            self.session.checkpoint()
         self.close_conn()
         self.conn = self.wiredtiger_open(None, "statistics=(none),statistics_log=(json)")
         self.stats_gathered(False)
 
     def stats_gathered(self, stats_expected):
         self.session = self.conn.open_session()
-        self.session.create("table:foo", None)
-        self.session.create("table:bar", None)
+        self.session.create("table:foo")
+        self.session.create("table:bar")
         sleep(2)
         if stats_expected:
             stat_cursor = self.session.open_cursor('statistics:', None, None)
@@ -56,6 +68,3 @@ class test_stat06(wttest.WiredTigerTestCase):
             msg = '/database statistics configuration/'
             self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda:
                 self.session.open_cursor('statistics:', None, None), msg)
-
-if __name__ == '__main__':
-    wttest.run()

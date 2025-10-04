@@ -29,16 +29,36 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/global_catalog/type_chunk.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/s/migration_session_id.h"
-#include "mongo/platform/mutex.h"
-#include "mongo/s/request_types/move_chunk_request.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/s/request_types/move_range_request_gen.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/notification.h"
+
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
 class OperationContext;
+
 class ScopedDonateChunk;
 class ScopedReceiveChunk;
 class ScopedSplitMergeChunk;
@@ -87,20 +107,25 @@ public:
      * Otherwise returns a ConflictingOperationInProgress error.
      */
     StatusWith<ScopedDonateChunk> registerDonateChunk(OperationContext* opCtx,
-                                                      const MoveChunkRequest& args);
+                                                      const ShardsvrMoveRange& args);
 
     /**
-     * If there are no migrations or split/merges running on this shard, registers an active receive
-     * operation with the specified session id and returns a ScopedReceiveChunk. The
-     * ScopedReceiveChunk will unregister the migration when the ScopedReceiveChunk goes out of
-     * scope.
+     * Registers an active receive chunk operation with the specified session id and returns a
+     * ScopedReceiveChunk. The returned ScopedReceiveChunk object will unregister the migration when
+     * it goes out of scope.
      *
-     * Otherwise returns a ConflictingOperationInProgress error.
+     * In case registerReceiveChunk() is called while other operations (a second migration or a
+     * registry lock()) are already holding resources of the ActiveMigrationsRegistry, the function
+     * will either
+     * - wait for such operations to complete and then perform the registration
+     * - return a ConflictingOperationInProgress error
+     * based on the value of the waitForCompletionOfConflictingOps parameter
      */
     StatusWith<ScopedReceiveChunk> registerReceiveChunk(OperationContext* opCtx,
                                                         const NamespaceString& nss,
                                                         const ChunkRange& chunkRange,
-                                                        const ShardId& fromShardId);
+                                                        const ShardId& fromShardId,
+                                                        bool waitForCompletionOfConflictingOps);
 
     /**
      * If there are no migrations running on this shard, registers an active split or merge
@@ -132,7 +157,7 @@ private:
 
     // Describes the state of a currently active moveChunk operation
     struct ActiveMoveChunkState {
-        ActiveMoveChunkState(MoveChunkRequest inArgs)
+        ActiveMoveChunkState(ShardsvrMoveRange inArgs)
             : args(std::move(inArgs)), notification(std::make_shared<Notification<Status>>()) {}
 
         /**
@@ -141,7 +166,7 @@ private:
         Status constructErrorStatus() const;
 
         // Exact arguments of the currently active operation
-        MoveChunkRequest args;
+        ShardsvrMoveRange args;
 
         // Notification event that will be signaled when the currently active operation completes
         std::shared_ptr<Notification<Status>> notification;
@@ -199,7 +224,7 @@ private:
     void _clearSplitMergeChunk(const NamespaceString& nss);
 
     // Protects the state below
-    Mutex _mutex = MONGO_MAKE_LATCH("ActiveMigrationsRegistry::_mutex");
+    stdx::mutex _mutex;
 
     // Condition variable which will be signaled whenever any of the states below become false,
     // boost::none or a specific namespace removed from the map.
@@ -226,8 +251,9 @@ public:
         : _registry(ActiveMigrationsRegistry::get(opCtx)), _reason(std::move(reason)) {
         // Ensure any thread attempting to use a MigrationBlockingGuard will be interrupted by
         // a stepdown.
-        invariant(opCtx->lockState()->wasGlobalLockTakenInModeConflictingWithWrites() ||
-                  opCtx->shouldAlwaysInterruptAtStepDownOrUp());
+        invariant(
+            shard_role_details::getLocker(opCtx)->wasGlobalLockTakenInModeConflictingWithWrites() ||
+            opCtx->shouldAlwaysInterruptAtStepDownOrUp());
         _registry.lock(opCtx, _reason);
     }
 
@@ -291,8 +317,12 @@ private:
      */
     bool _shouldExecute;
 
-    // This is the future, which will be signaled at the end of a migration
+    // This is the future, which will be set at the end of a migration.
     std::shared_ptr<Notification<Status>> _completionNotification;
+
+    // This is the outcome of the migration execution, stored when signalComplete() is called and
+    // set on the future of the executing ScopedDonateChunk object when this gets destroyed.
+    boost::optional<Status> _completionOutcome;
 };
 
 /**

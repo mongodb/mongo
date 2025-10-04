@@ -27,24 +27,34 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
 #include <cstdlib>
 #include <string>
 
+#ifndef _WIN32
 #include <kvm.h>
+
 #include <sys/file.h>
 #include <sys/mman.h>
 #include <sys/param.h>
+#include <sys/socket.h>
 #include <sys/sysctl.h>
 #include <sys/types.h>
 #include <sys/user.h>
 #include <sys/vmmeter.h>
-#include <unistd.h>
+#endif
 
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
+#include "mongo/util/processinfo.h"
 #include "mongo/util/scopeguard.h"
-#include "processinfo.h"
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
+
 
 namespace mongo {
 
@@ -96,10 +106,6 @@ int getSysctlByIDWithDefault<std::string>(const int* sysctlID,
     return 0;
 }
 
-bool ProcessInfo::checkNumaEnabled() {
-    return false;
-}
-
 int ProcessInfo::getVirtualMemorySize() {
     kvm_t* kd = NULL;
     int cnt = 0;
@@ -140,7 +146,6 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     int status = getSysctlByIDWithDefault(mib, 2, std::string("unknown"), &osVersion);
     if (status != 0)
         LOGV2(23345,
-              "Unable to collect OS Version. (errno: {errno} msg: {msg})",
               "Unable to collect OS Version.",
               "errno"_attr = status,
               "msg"_attr = strerror(status));
@@ -150,7 +155,6 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     status = getSysctlByIDWithDefault(mib, 2, std::string("unknown"), &cpuArch);
     if (status != 0)
         LOGV2(23346,
-              "Unable to collect Machine Architecture. (errno: {errno} msg: {msg})",
               "Unable to collect Machine Architecture.",
               "errno"_attr = status,
               "msg"_attr = strerror(status));
@@ -181,7 +185,11 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
 
     pageSize = static_cast<unsigned long long>(sysconf(_SC_PAGESIZE));
 
-    hasNuma = checkNumaEnabled();
+    hasNuma = false;
+
+    // The appropriate system parameter is `{CTL_KERN, KERN_SOMAXCONN}`, but to
+    // simplify testing we hardcode to `SOMAXCONN`.
+    defaultListenBacklog = SOMAXCONN;
 }
 
 void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {}

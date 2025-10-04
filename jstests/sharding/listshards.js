@@ -1,71 +1,178 @@
-//
-// Test the listShards command by adding stand-alone and replica-set shards to a cluster
-//
-(function() {
-'use strict';
+/**
+ * Test the listShards command by adding stand-alone and replica-set shards to a cluster
+ */
 
-// TODO SERVER-50144 Remove this and allow orphan checking.
-// This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
-// therefore preventing orphans from being cleaned up.
-TestData.skipCheckOrphans = true;
+import {after, afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
-const checkShardName = function(shardName, shardsArray) {
-    var found = false;
-    shardsArray.forEach((shardObj) => {
-        if (shardObj._id === shardName) {
-            found = true;
+describe("listShards correct functionality test", function () {
+    before(() => {
+        // TODO SERVER-50144 Remove this and allow orphan checking.
+        // This test calls removeShard which can leave docs in config.rangeDeletions in state
+        // "pending", therefore preventing orphans from being cleaned up.
+        TestData.skipCheckOrphans = true;
+        this.isMultiversion =
+            Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+
+        this.checkShardName = function (shardName, shardsArray) {
+            let found = false;
+            shardsArray.forEach((shardObj) => {
+                if (shardObj._id === shardName) {
+                    found = true;
+                    return;
+                }
+            });
+            return found;
+        };
+
+        this.st = new ShardingTest({name: "listShardsTest", shards: 1, mongos: 1, other: {useHostname: true}});
+
+        // add replica set named 'repl1'
+        this.rs1 = new ReplSetTest({name: "repl1", nodes: 1, useHostName: true, nodeOptions: {shardsvr: ""}});
+
+        // add replica set named 'repl2'
+        this.rs2 = new ReplSetTest({name: "repl2", nodes: 1, useHostName: true, nodeOptions: {shardsvr: ""}});
+
+        this.mongos = this.st.s0;
+    });
+
+    beforeEach(() => {
+        this.rs1.startSet();
+        this.rs1.initiate();
+
+        this.rs2.startSet();
+        this.rs2.initiate();
+
+        // Add the replica set to the cluster
+        assert.commandWorked(this.st.admin.runCommand({addShard: this.rs1.getURL()}));
+    });
+
+    afterEach(() => {
+        removeShard(this.st, "repl1");
+        removeShard(this.st, "repl2");
+
+        /// Stop the replica sets
+        this.rs1.stopSet();
+        this.rs2.stopSet();
+
+        // Check that the number of shards remains the same after each test case
+        assert.eq(1, this.st.s.getDB("config").shards.count());
+    });
+
+    after(() => {
+        this.st.stop();
+    });
+
+    it("listShards returns all shards", () => {
+        const res = this.mongos.adminCommand("listShards");
+        assert.commandWorked(res, "listShards command failed");
+        const shardsArray = res.shards;
+        assert.eq(shardsArray.length, 2);
+    });
+
+    it("listShards returns correct shards after adding new shard", () => {
+        // Add the replica set to the cluster
+        let res = this.st.admin.runCommand({addShard: this.rs2.getURL()});
+        assert.commandWorked(res, "addShard command failed");
+        res = this.mongos.adminCommand("listShards");
+        assert.commandWorked(res, "listShards command failed");
+        const shardsArray = res.shards;
+        assert.eq(shardsArray.length, 3);
+        assert(
+            this.checkShardName("repl2", shardsArray),
+            "listShards command didn't return replica set shard: " + tojson(shardsArray),
+        );
+    });
+
+    it("listShards returns correct shards after removing a shard", () => {
+        // remove 'repl1' shard
+        removeShard(this.st, "repl1");
+        const res = this.mongos.adminCommand("listShards");
+        assert.commandWorked(res, "listShards command failed");
+        const shardsArray = res.shards;
+        assert.eq(shardsArray.length, 1);
+        assert(
+            !this.checkShardName("repl1", shardsArray),
+            "listShards command returned removed replica set shard: " + tojson(shardsArray),
+        );
+    });
+
+    it("listShards 'draining : true' filter returns only the actively draining shards", () => {
+        if (this.isMultiversion) {
             return;
         }
+        assert.commandWorked(this.st.admin.runCommand({startShardDraining: "repl1"}));
+        // Check that filter only returns draining shards
+        const draining = this.st.admin.runCommand({listShards: 1, filter: {draining: true}});
+        assert.commandWorked(draining, "listShards command failed");
+        const shardsArray = draining.shards;
+        assert.eq(shardsArray.length, 1);
+        assert(
+            this.checkShardName("repl1", shardsArray),
+            "listShards command didn't return the draining shard: " + tojson(shardsArray),
+        );
     });
-    return found;
-};
 
-const shardTest =
-    new ShardingTest({name: 'listShardsTest', shards: 1, mongos: 1, other: {useHostname: true}});
+    it("listShards 'draining : false' filter returns only the non-draining shards", () => {
+        if (this.isMultiversion) {
+            return;
+        }
+        assert.commandWorked(this.st.admin.runCommand({startShardDraining: "repl1"}));
+        const non_draining = this.st.admin.runCommand({listShards: 1, filter: {draining: false}});
+        assert.commandWorked(non_draining);
+        const shardsArray = non_draining.shards;
+        assert.eq(shardsArray.length, 1);
+        assert(
+            this.checkShardName(this.st.shard0.shardName, shardsArray),
+            "listShards command didn't return the non-draining shard: " + tojson(shardsArray),
+        );
+    });
 
-const mongos = shardTest.s0;
-let res = mongos.adminCommand('listShards');
-assert.commandWorked(res, 'listShards command failed');
-let shardsArray = res.shards;
-assert.eq(shardsArray.length, 1);
+    it("listShards wrong draining filter value throws error", () => {
+        if (this.isMultiversion) {
+            return;
+        }
+        assert.commandFailedWithCode(
+            this.st.admin.runCommand({listShards: 1, filter: {draining: 1}}),
+            ErrorCodes.TypeMismatch,
+        );
+    });
 
-// add replica set named 'repl'
-const rs1 =
-    new ReplSetTest({name: 'repl', nodes: 1, useHostName: true, nodeOptions: {shardsvr: ""}});
-rs1.startSet();
-rs1.initiate();
-res = shardTest.admin.runCommand({addShard: rs1.getURL()});
-assert.commandWorked(res, 'addShard command failed');
-res = mongos.adminCommand('listShards');
-assert.commandWorked(res, 'listShards command failed');
-shardsArray = res.shards;
-assert.eq(shardsArray.length, 2);
-assert(checkShardName('repl', shardsArray),
-       'listShards command didn\'t return replica set shard: ' + tojson(shardsArray));
+    it("listShards unknown filter throws error", () => {
+        if (this.isMultiversion) {
+            return;
+        }
+        // Call listShards with unknown filter
+        assert.commandFailedWithCode(
+            this.st.admin.runCommand({listShards: 1, filter: {droining: true}}),
+            ErrorCodes.IDLUnknownField,
+        );
+    });
 
-// remove 'repl' shard
-assert.soon(function() {
-    var res = shardTest.admin.runCommand({removeShard: 'repl'});
-    if (!res.ok && res.code === ErrorCodes.ShardNotFound) {
-        // If the config server primary steps down right after removing the config.shards doc
-        // for the shard but before responding with "state": "completed", the mongos would retry
-        // the _configsvrRemoveShard command against the new config server primary, which would
-        // not find the removed shard in its ShardRegistry if it has done a ShardRegistry reload
-        // after the config.shards doc for the shard was removed. This would cause the command
-        // to fail with ShardNotFound.
-        return true;
-    }
-    assert.commandWorked(res, 'removeShard command failed');
-    return res.state === 'completed';
-}, 'failed to remove the replica set shard');
+    it("listShards returns correct shards after stopping the draining", () => {
+        if (this.isMultiversion) {
+            return;
+        }
+        assert.commandWorked(this.st.admin.runCommand({startShardDraining: "repl1"}));
+        // Stop draining the 'repl1' shard
+        const stop_draining = this.st.admin.runCommand({stopShardDraining: "repl1"});
+        assert.commandWorked(stop_draining);
+        // Check that filter doesn't return the 'repl1' shard
+        const res = this.st.admin.runCommand({listShards: 1, filter: {draining: true}});
+        assert.commandWorked(res, "listShards command failed");
+        const shardsArray = res.shards;
+        assert.eq(shardsArray.length, 0);
+    });
 
-res = mongos.adminCommand('listShards');
-assert.commandWorked(res, 'listShards command failed');
-shardsArray = res.shards;
-assert.eq(shardsArray.length, 1);
-assert(!checkShardName('repl', shardsArray),
-       'listShards command returned removed replica set shard: ' + tojson(shardsArray));
-
-rs1.stopSet();
-shardTest.stop();
-})();
+    it("listShards with draining filter and unknown filters throws error", () => {
+        if (this.isMultiversion) {
+            return;
+        }
+        assert.commandFailedWithCode(
+            this.st.admin.runCommand({listShards: 1, filter: {draining: true, droining: true}}),
+            ErrorCodes.IDLUnknownField,
+        );
+    });
+});

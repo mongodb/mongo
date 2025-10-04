@@ -1,0 +1,85 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+idl_generator(
+    name = "sharding_api_d_params_gen",
+    src = "sharding_api_d_params.idl",
+)
+
+idl_generator(
+    name = "shard_retry_server_parameters_gen",
+    src = "shard_retry_server_parameters.idl",
+)
+
+idl_generator(
+    name = "sharding_runtime_d_params_gen",
+    src = "sharding_runtime_d_params.idl",
+)
+
+idl_generator(
+    name = "mongos_server_parameters_gen",
+    src = "mongos_server_parameters.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "sharding_config_server_parameters_gen",
+    src = "sharding_config_server_parameters.idl",
+)
+
+idl_generator(
+    name = "cluster_commands_gen",
+    src = "cluster_commands.idl",
+    deps = [
+        ":sharding_types_gen",
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "mongod_and_mongos_server_parameters_gen",
+    src = "mongod_and_mongos_server_parameters.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "sharding_feature_flags_gen",
+    src = "sharding_feature_flags.idl",
+)
+
+idl_generator(
+    name = "sharding_types_gen",
+    src = "sharding_types.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "sharding_runtime_d_params_idl",
+    srcs = [
+        ":sharding_runtime_d_params_gen",
+    ],
+    hdrs = [
+        ":sharding_runtime_d_params.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/commands:test_commands_enabled",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/s:common_s",
+        "//src/mongo/util:processinfo",
+    ],
+)

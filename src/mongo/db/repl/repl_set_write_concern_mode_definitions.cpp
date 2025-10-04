@@ -27,11 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/repl/repl_set_write_concern_mode_definitions.h"
-#include "mongo/unittest/unittest.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
+#include <algorithm>
+
+#include <absl/container/flat_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace repl {
@@ -60,7 +72,7 @@ ReplSetWriteConcernModeDefinitions ReplSetWriteConcernModeDefinitions::parseFrom
     uassert(ErrorCodes::TypeMismatch,
             str::stream() << "Expected " << fieldName << " to be an Object, it actually had type "
                           << typeName(patternMapElement.type()),
-            patternMapElement.type() == Object);
+            patternMapElement.type() == BSONType::object);
     Definitions definitions;
     BSONObj modes = patternMapElement.Obj();
     for (auto&& modeElement : modes) {
@@ -71,7 +83,7 @@ ReplSetWriteConcernModeDefinitions ReplSetWriteConcernModeDefinitions::parseFrom
         uassert(ErrorCodes::TypeMismatch,
                 str::stream() << "Expected " << fieldName << '.' << modeElement.fieldName()
                               << " to be an Object, not " << typeName(modeElement.type()),
-                modeElement.type() == Object);
+                modeElement.type() == BSONType::object);
         Definition& definition = definitions[modeElement.fieldNameStringData()];
         for (auto&& constraintElement : modeElement.Obj()) {
             uassert(ErrorCodes::TypeMismatch,

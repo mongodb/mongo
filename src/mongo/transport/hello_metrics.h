@@ -29,11 +29,22 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/transport/session.h"
+
+#include <cstddef>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
+namespace transport {
+class SessionManager;
+}  // namespace transport
+
+class HelloMetrics;
 
 /**
  * A decoration on the Session object used to track exhaust metrics. We are
@@ -43,6 +54,11 @@ namespace mongo {
  */
 class InExhaustHello {
 public:
+    enum class Command {
+        kHello,
+        kIsMaster,
+    };
+
     InExhaustHello() = default;
 
     InExhaustHello(const InExhaustHello&) = delete;
@@ -51,14 +67,26 @@ public:
     InExhaustHello& operator=(InExhaustHello&&) = delete;
 
     static InExhaustHello* get(transport::Session* session);
-    void setInExhaust(bool inExhaust, StringData commandName);
+    void setInExhaust(Command command);
+    void resetInExhaust();
     bool getInExhaustIsMaster() const;
     bool getInExhaustHello() const;
     ~InExhaustHello();
 
 private:
+    void transitionOutOfInExhaustHello(HelloMetrics*);
+    void transitionOutOfInExhaustIsMaster(HelloMetrics*);
+
     bool _inExhaustIsMaster = false;
     bool _inExhaustHello = false;
+
+    // In most cases, SessionManager can be derived from
+    // Decoration.owner(decoration)->getTransportLayer()->getSessionManager().
+    // However, during the destructor call, when we need to restore HelloMetrics counts,
+    // the Session pointer is no longer valid and getTransportLayer() is invalid.
+    // Stash a weak pointer to the SessionManager associated with our HelloMetrics
+    // during initial load of InExhaustHello.
+    boost::optional<std::weak_ptr<transport::SessionManager>> _sessionManager;
 };
 
 /**
@@ -76,7 +104,7 @@ class HelloMetrics {
 public:
     HelloMetrics() = default;
 
-    static HelloMetrics* get(ServiceContext* service);
+    // Convenience accessor for acquiring HelloMetrics from a SessionManager.
     static HelloMetrics* get(OperationContext* opCtx);
 
     size_t getNumExhaustIsMaster() const;
@@ -86,10 +114,18 @@ public:
     void incrementNumAwaitingTopologyChanges();
     void decrementNumAwaitingTopologyChanges();
 
-    void resetNumAwaitingTopologyChanges();
     friend InExhaustHello;
 
+    /**
+     * Loops through all SessionManagers on the ServiceContext's TransportLayerManager
+     * and resets their numAwaitingTopologyChanges.
+     */
+    static void resetNumAwaitingTopologyChangesForAllSessionManagers(ServiceContext*);
+
+    void serialize(BSONObjBuilder*) const;
+
 private:
+    void resetNumAwaitingTopologyChanges();
     void incrementNumExhaustIsMaster();
     void decrementNumExhaustIsMaster();
 

@@ -2,18 +2,14 @@
 //
 // Cannot implicitly shard accessed collections because a collection can be implictly created and
 // exists when none is expected.
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
-load("jstests/libs/fixture_helpers.js");      // For FixtureHelpers.isMongos.
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 
 const source = db[`${jsTest.name()}_source`];
 source.drop();
 const target = db[`${jsTest.name()}_target`];
 target.drop();
 const mergeStage = {
-    $merge: {into: target.getName(), whenMatched: [{$addFields: {x: 2}}], whenNotMatched: "fail"}
+    $merge: {into: target.getName(), whenMatched: [{$addFields: {x: 2}}], whenNotMatched: "fail"},
 };
 const pipeline = [mergeStage];
 
@@ -21,8 +17,19 @@ const pipeline = [mergeStage];
 // the target collection.
 (function testMergeFailsIfMatchingDocumentNotFound() {
     // Single document without a match.
-    assert.commandWorked(source.insert([{_id: 1, a: 1}, {_id: 2, a: 2}, {_id: 3, a: 3}]));
-    assert.commandWorked(target.insert([{_id: 1, b: 1}, {_id: 3, b: 3}]));
+    assert.commandWorked(
+        source.insert([
+            {_id: 1, a: 1},
+            {_id: 2, a: 2},
+            {_id: 3, a: 3},
+        ]),
+    );
+    assert.commandWorked(
+        target.insert([
+            {_id: 1, b: 1},
+            {_id: 3, b: 3},
+        ]),
+    );
     let error = assert.throws(() => source.aggregate(pipeline));
     assert.commandFailedWithCode(error, ErrorCodes.MergeStageNoMatchingDocument);
     // Since there is no way to guarantee the ordering of the writes performed by $merge, it
@@ -32,14 +39,13 @@ const pipeline = [mergeStage];
     // updates. In particular, it should be the case that each document has fields '_id' and
     // 'b', but may or not have field 'x'. Additionally, 'b' should have the same value as
     // '_id' and if 'x' is present, it should be equal to 2.
-    let checkOutputDocument = function(document) {
+    let checkOutputDocument = function (document) {
         const hasB = document.hasOwnProperty("b");
         const hasX = document.hasOwnProperty("x");
         assert(hasB, document);
         const value = document["b"];
-        assert.eq(value, document['_id'], document);
-        if (hasX)
-            assert.eq(2, document['x'], document);
+        assert.eq(value, document["_id"], document);
+        if (hasX) assert.eq(2, document["x"], document);
     };
 
     let result = target.find().toArray();
@@ -65,19 +71,44 @@ const pipeline = [mergeStage];
     assert(source.drop());
     assert(target.drop());
     assert.commandWorked(source.insert({_id: 3, a: 3}));
-    assert.commandWorked(target.insert([{_id: 1, b: 1}, {_id: 3, b: 3}]));
-    assert.doesNotThrow(() => source.aggregate(pipeline));
-    assertArrayEq(
-        {actual: target.find().toArray(), expected: [{_id: 1, b: 1}, {_id: 3, b: 3, x: 2}]});
-
-    // Source has multiple documents with matches in the target.
-    assert(target.drop());
-    assert.commandWorked(source.insert([{_id: 1, a: 1}, {_id: 2, a: 2}]));
-    assert.commandWorked(target.insert([{_id: 1, b: 1}, {_id: 2, b: 2}, {_id: 3, b: 3}]));
+    assert.commandWorked(
+        target.insert([
+            {_id: 1, b: 1},
+            {_id: 3, b: 3},
+        ]),
+    );
     assert.doesNotThrow(() => source.aggregate(pipeline));
     assertArrayEq({
         actual: target.find().toArray(),
-        expected: [{_id: 1, b: 1, x: 2}, {_id: 2, b: 2, x: 2}, {_id: 3, b: 3, x: 2}]
+        expected: [
+            {_id: 1, b: 1},
+            {_id: 3, b: 3, x: 2},
+        ],
+    });
+
+    // Source has multiple documents with matches in the target.
+    assert(target.drop());
+    assert.commandWorked(
+        source.insert([
+            {_id: 1, a: 1},
+            {_id: 2, a: 2},
+        ]),
+    );
+    assert.commandWorked(
+        target.insert([
+            {_id: 1, b: 1},
+            {_id: 2, b: 2},
+            {_id: 3, b: 3},
+        ]),
+    );
+    assert.doesNotThrow(() => source.aggregate(pipeline));
+    assertArrayEq({
+        actual: target.find().toArray(),
+        expected: [
+            {_id: 1, b: 1, x: 2},
+            {_id: 2, b: 2, x: 2},
+            {_id: 3, b: 3, x: 2},
+        ],
     });
 })();
 
@@ -86,9 +117,20 @@ const pipeline = [mergeStage];
 (function testMergeWhenSourceIsEmpty() {
     assert.commandWorked(source.deleteMany({}));
     assert(target.drop());
-    assert.commandWorked(target.insert([{_id: 1, b: 1}, {_id: 2, b: 2}]));
+    assert.commandWorked(
+        target.insert([
+            {_id: 1, b: 1},
+            {_id: 2, b: 2},
+        ]),
+    );
     assert.doesNotThrow(() => source.aggregate(pipeline));
-    assertArrayEq({actual: target.find().toArray(), expected: [{_id: 1, b: 1}, {_id: 2, b: 2}]});
+    assertArrayEq({
+        actual: target.find().toArray(),
+        expected: [
+            {_id: 1, b: 1},
+            {_id: 2, b: 2},
+        ],
+    });
 })();
 
 // Test that variables referencing the fields in the source document can be specified in the
@@ -96,18 +138,36 @@ const pipeline = [mergeStage];
 (function testMergeWithLetVariables() {
     assert(source.drop());
     assert(target.drop());
-    assert.commandWorked(source.insert([{_id: 1, a: 1, b: 1}, {_id: 2, a: 2, b: 2}]));
-    assert.commandWorked(target.insert([{_id: 1, c: 1}, {_id: 2, c: 2}]));
+    assert.commandWorked(
+        source.insert([
+            {_id: 1, a: 1, b: 1},
+            {_id: 2, a: 2, b: 2},
+        ]),
+    );
+    assert.commandWorked(
+        target.insert([
+            {_id: 1, c: 1},
+            {_id: 2, c: 2},
+        ]),
+    );
 
-    assert.doesNotThrow(() => source.aggregate([{
-        $merge: {
-            into: target.getName(),
-            let : {x: "$a", y: "$b"},
-            whenMatched: [{$set: {z: {$add: ["$$x", "$$y"]}}}],
-            whenNotMatched: "fail"
-        }
-    }]));
-    assertArrayEq(
-        {actual: target.find().toArray(), expected: [{_id: 1, c: 1, z: 2}, {_id: 2, c: 2, z: 4}]});
+    assert.doesNotThrow(() =>
+        source.aggregate([
+            {
+                $merge: {
+                    into: target.getName(),
+                    let: {x: "$a", y: "$b"},
+                    whenMatched: [{$set: {z: {$add: ["$$x", "$$y"]}}}],
+                    whenNotMatched: "fail",
+                },
+            },
+        ]),
+    );
+    assertArrayEq({
+        actual: target.find().toArray(),
+        expected: [
+            {_id: 1, c: 1, z: 2},
+            {_id: 2, c: 2, z: 4},
+        ],
+    });
 })();
-}());

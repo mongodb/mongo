@@ -1,0 +1,26 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "authenticate*":
+    approvers:
+      - 10gen/server-security
+  - "cyrus_sasl_client_session.*":
+    approvers:
+      - 10gen/server-security
+  - "internal_auth*":
+    approvers:
+      - 10gen/server-security
+  - "sasl*":
+    approvers:
+      - 10gen/server-security
+  - "scram_*":
+    approvers:
+      - 10gen/server-security
+  - "sasl_*":
+    approvers:
+      - 10gen/server-security
+  - "native_*":
+    approvers:
+      - 10gen/server-security

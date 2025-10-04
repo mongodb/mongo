@@ -27,9 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/client/remote_command_targeter_factory_mock.h"
+
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/cancellation.h"
+#include "mongo/util/future.h"
+#include "mongo/util/net/hostandport.h"
+
+#include <utility>
+#include <vector>
 
 namespace mongo {
 namespace {
@@ -43,13 +53,15 @@ public:
     }
 
     StatusWith<HostAndPort> findHost(OperationContext* opCtx,
-                                     const ReadPreferenceSetting& readPref) override {
-        return _mock->findHost(opCtx, readPref);
+                                     const ReadPreferenceSetting& readPref,
+                                     const TargetingMetadata& targetingMetadata) override {
+        return _mock->findHost(opCtx, readPref, targetingMetadata);
     }
 
     SemiFuture<HostAndPort> findHost(const ReadPreferenceSetting& readPref,
-                                     const CancellationToken& cancelToken) override {
-        return _mock->findHost(readPref, cancelToken);
+                                     const CancellationToken& cancelToken,
+                                     const TargetingMetadata& targetingMetadata) override {
+        return _mock->findHost(readPref, cancelToken, targetingMetadata);
     }
 
     SemiFuture<std::vector<HostAndPort>> findHosts(const ReadPreferenceSetting& readPref,

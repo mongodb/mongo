@@ -29,10 +29,12 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+
+#include <cstddef>
 #include <cstdint>
 #include <limits>
-
-#include "mongo/base/string_data.h"
+#include <string>
 
 namespace mongo {
 
@@ -50,7 +52,11 @@ public:
     ItoA& operator=(const ItoA&) = delete;
 
     std::string toString() const {
-        return _str.toString();
+        return std::string{_str};
+    }
+
+    StringData toStringData() const {
+        return _str;
     }
 
     operator StringData() const {

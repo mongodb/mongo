@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+
+#include <string>
 
 namespace mongo {
 
@@ -58,5 +58,8 @@ StatusWith<std::string> icuSaslPrep(StringData str, UStringPrepOptions = kUStrin
  * so it can be compared against other X509 DNs
  */
 StatusWith<std::string> icuX509DNPrep(StringData str);
+
+// Similar to mk_wcswidth, but use the larger unicode database for character lookup.
+int icuGetStringWidth(StringData str, bool ambiguousAsFullWidth, bool expandEmojiSequence);
 
 }  // namespace mongo

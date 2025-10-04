@@ -29,50 +29,47 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_set_window_fields_gen.h"
+#include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/pipeline/memory_usage_tracker.h"
-#include "mongo/db/pipeline/window_function/partition_iterator.h"
+#include "mongo/db/pipeline/stage_constraints.h"
+#include "mongo/db/pipeline/variables.h"
 #include "mongo/db/pipeline/window_function/window_bounds.h"
 #include "mongo/db/pipeline/window_function/window_function_exec.h"
-#include "mongo/db/pipeline/window_function/window_function_expression.h"
+#include "mongo/db/pipeline/window_function/window_function_statement.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/db/query/compiler/dependency_analysis/expression_dependencies.h"
+#include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/modules.h"
+#include "mongo/util/string_map.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <list>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
-
-class WindowFunctionExec;
-
-struct WindowFunctionStatement {
-    std::string fieldName;  // top-level fieldname, not a path
-    boost::intrusive_ptr<window_function::Expression> expr;
-
-    WindowFunctionStatement(std::string fieldName,
-                            boost::intrusive_ptr<window_function::Expression> expr)
-        : fieldName(std::move(fieldName)), expr(std::move(expr)) {}
-
-    static WindowFunctionStatement parse(BSONElement elem,
-                                         const boost::optional<SortPattern>& sortBy,
-                                         ExpressionContext* expCtx);
-
-    void addDependencies(DepsTracker* deps) const {
-        if (expr) {
-            expr->addDependencies(deps);
-        }
-
-        const FieldPath path(fieldName);
-
-        // We do this because acting on "a.b" where a is an object also depends on "a" not being
-        // changed (e.g. to a non-object).
-        for (size_t i = 0; i < path.getPathLength() - 1; i++) {
-            deps->fields.insert(path.getSubpath(i).toString());
-        }
-    }
-
-    void serialize(MutableDocument& outputFields,
-                   boost::optional<ExplainOptions::Verbosity> explain) const;
-};
 
 /**
  * $setWindowFields is an alias: it desugars to some combination of projection, sorting,
@@ -87,41 +84,10 @@ std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
 std::list<boost::intrusive_ptr<DocumentSource>> create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     boost::optional<boost::intrusive_ptr<Expression>> partitionBy,
-    const boost::optional<SortPattern>& sortBy,
-    std::vector<WindowFunctionStatement> outputFields);
+    boost::optional<SortPattern> sortBy,
+    std::vector<WindowFunctionStatement> outputFields,
+    SbeCompatibility sbeCompatibility);
 
-class LiteParsedSetWindowFields : public LiteParsedDocumentSource {
-public:
-    static std::unique_ptr<LiteParsedSetWindowFields> parse(const NamespaceString& nss,
-                                                            const BSONElement& spec) {
-        return std::make_unique<LiteParsedSetWindowFields>(spec.fieldName());
-    }
-
-    explicit LiteParsedSetWindowFields(std::string parseTimeName)
-        : LiteParsedDocumentSource(std::move(parseTimeName)) {}
-
-    ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
-                                                 bool isImplicitDefault) const {
-        // $setWindowFields cannot spill to disk if read concern is set to "snapshot".
-        // TODO SERVER-59772 Enable $setWindowFields with read concern "snapshot".
-        return {{level == repl::ReadConcernLevel::kSnapshotReadConcern && !isImplicitDefault,
-                 {ErrorCodes::InvalidOptions,
-                  str::stream() << "Aggregation stage " << kStageName
-                                << " cannot run with readConcern '"
-                                << repl::readConcernLevels::toString(
-                                       repl::ReadConcernLevel::kSnapshotReadConcern)}},
-                // The default read concern can't be snapshot.
-                boost::none};
-    }
-
-    stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
-        return stdx::unordered_set<NamespaceString>();
-    }
-
-    PrivilegeVector requiredPrivileges(bool isMongos, bool bypassDocumentValidation) const final {
-        return {};
-    }
-};
 }  // namespace document_source_set_window_fields
 
 class DocumentSourceInternalSetWindowFields final : public DocumentSource {
@@ -138,18 +104,17 @@ public:
     DocumentSourceInternalSetWindowFields(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         boost::optional<boost::intrusive_ptr<Expression>> partitionBy,
-        const boost::optional<SortPattern>& sortBy,
+        boost::optional<SortPattern> sortBy,
         std::vector<WindowFunctionStatement> outputFields,
-        size_t maxMemoryBytes)
+        SbeCompatibility sbeCompatibility)
         : DocumentSource(kStageName, expCtx),
           _partitionBy(partitionBy),
           _sortBy(std::move(sortBy)),
           _outputFields(std::move(outputFields)),
-          _memoryTracker{expCtx->allowDiskUse, maxMemoryBytes},
-          _iterator(expCtx.get(), pSource, &_memoryTracker, std::move(partitionBy), _sortBy){};
+          _sbeCompatibility(sbeCompatibility) {};
 
     GetModPathsReturn getModifiedPaths() const final {
-        std::set<std::string> outputPaths;
+        OrderedPathSet outputPaths;
         for (auto&& outputField : _outputFields) {
             outputPaths.insert(outputField.fieldName);
         }
@@ -157,23 +122,26 @@ public:
         return {DocumentSource::GetModPathsReturn::Type::kFiniteSet, std::move(outputPaths), {}};
     }
 
-
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
+    StageConstraints constraints(PipelineSplitState pipeState) const final {
         return StageConstraints(StreamType::kBlocking,
                                 PositionRequirement::kNone,
                                 HostTypeRequirement::kNone,
                                 DiskUseRequirement::kWritesTmpData,
                                 FacetRequirement::kAllowed,
-                                // $setWindowFields does not work inside transactions.
-                                // TODO SERVER-59772 Enable $setWindowFields inside transactions.
-                                TransactionRequirement::kNotAllowed,
+                                TransactionRequirement::kAllowed,
                                 LookupRequirement::kAllowed,
                                 UnionRequirement::kAllowed);
     }
 
-    const char* getSourceName() const {
-        return kStageName.rawData();
+    const char* getSourceName() const override {
+        return kStageName.data();
     };
+
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
+    }
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final {
         if (_sortBy) {
@@ -181,7 +149,7 @@ public:
         }
 
         if (_partitionBy && (*_partitionBy)) {
-            (*_partitionBy)->addDependencies(deps);
+            expression::addDependencies((*_partitionBy).get(), deps);
         }
 
         for (auto&& outputField : _outputFields) {
@@ -191,40 +159,51 @@ public:
         return DepsTracker::State::SEE_NEXT;
     }
 
-    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                     Pipeline::SourceContainer* container) final;
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {
+        if (_partitionBy && (*_partitionBy)) {
+            expression::addVariableRefs((*_partitionBy).get(), refs);
+        }
 
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() {
+        for (auto&& outputField : _outputFields) {
+            outputField.addVariableRefs(refs);
+        }
+    }
+
+    DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
+                                                   DocumentSourceContainer* container) final;
+
+    boost::optional<DistributedPlanLogic> distributedPlanLogic() override {
         // Force to run on the merging half for now.
         return DistributedPlanLogic{nullptr, this, boost::none};
     }
 
     boost::intrusive_ptr<DocumentSource> optimize() final;
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
-    DocumentSource::GetNextResult doGetNext();
-
-    void setSource(DocumentSource* source) final {
-        pSource = source;
-        _iterator.setSource(source);
+    SbeCompatibility sbeCompatibility() const {
+        return _sbeCompatibility;
     }
 
-    bool usedDisk() final {
-        return _iterator.usedDisk();
-    };
+    boost::optional<boost::intrusive_ptr<Expression>> getPartitionBy() const {
+        return _partitionBy;
+    }
+
+    boost::optional<SortPattern> getSortBy() const {
+        return _sortBy;
+    }
+
+    const std::vector<WindowFunctionStatement>& getOutputFields() const {
+        return _outputFields;
+    }
+
 
 private:
-    void initialize();
-
     boost::optional<boost::intrusive_ptr<Expression>> _partitionBy;
     boost::optional<SortPattern> _sortBy;
     std::vector<WindowFunctionStatement> _outputFields;
-    MemoryUsageTracker _memoryTracker;
-    PartitionIterator _iterator;
-    StringMap<std::unique_ptr<WindowFunctionExec>> _executableOutputs;
-    bool _init = false;
-    bool _eof = false;
+
+    SbeCompatibility _sbeCompatibility = SbeCompatibility::noRequirements;
 };
 
 }  // namespace mongo

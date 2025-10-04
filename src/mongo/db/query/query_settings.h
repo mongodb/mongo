@@ -29,16 +29,20 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <string>
-
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/bson/bsonobj_comparator_interface.h"
 #include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/index_entry.h"
-#include "mongo/db/query/plan_cache.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/db/query/compiler/metadata/index_entry.h"
+#include "mongo/platform/atomic.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/stdx/unordered_set.h"
+
+#include <string>
+#include <vector>
+
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -114,11 +118,11 @@ public:
     QuerySettings() = default;
 
     /**
-     * Returns AllowedIndicesFilter for the query if it is set in the query settings, or
+     * Returns AllowedIndicesFilter for the 'query' if it is set in the query settings, or
      * boost::none if it isn't.
      */
     boost::optional<AllowedIndicesFilter> getAllowedIndicesFilter(
-        const CanonicalQuery::QueryShapeString& query) const;
+        const CanonicalQuery& query) const;
 
     /**
      * Returns copies of all overrides for the collection.
@@ -136,7 +140,7 @@ public:
     /**
      * Removes single entry from query settings. No effect if query shape is not found.
      */
-    void removeAllowedIndices(const CanonicalQuery::QueryShapeString& canonicalQuery);
+    void removeAllowedIndices(const CanonicalQuery::PlanCacheCommandKey& key);
 
     /**
      * Clears all allowed indices from query settings.
@@ -144,15 +148,27 @@ public:
     void clearAllowedIndices();
 
 private:
+    /**
+     * Updates '_someAllowedIndexEntriesPresent' field state. Should be invoked when the mutex
+     * protecting the index filters is held and just before releasing the mutex to ensure
+     * '_someAllowedIndexEntriesPresent' is consistent with '_allowedIndexEntryMap'.
+     */
+    void _updateSomeAllowedIndexEntriesPresent();
+
     // Allowed index entries owned here.
     using AllowedIndexEntryMap =
-        stdx::unordered_map<CanonicalQuery::QueryShapeString, AllowedIndexEntry>;
+        stdx::unordered_map<CanonicalQuery::PlanCacheCommandKey, AllowedIndexEntry>;
     AllowedIndexEntryMap _allowedIndexEntryMap;
+
+    // Is 'true' if '_allowedIndexEntryMap' has at least one entry. It is used to avoid acquiring
+    // the mutex in a typical scenario - when there are no index filters associated with the
+    // collection.
+    Atomic<bool> _someAllowedIndexEntriesPresent{false};
 
     /**
      * Protects data in query settings.
      */
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("QuerySettings::_mutex");
+    mutable stdx::mutex _mutex;
 };
 
 }  // namespace mongo

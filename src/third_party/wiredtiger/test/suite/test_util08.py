@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 from suite_subprocess import suite_subprocess
-import wiredtiger, wttest
+import wttest
 
 # test_util08.py
 #    Utilities: wt copyright
@@ -41,6 +41,3 @@ class test_util08(wttest.WiredTigerTestCase, suite_subprocess):
         with open(outfile, 'r') as f:
             text = f.read(1000)
             self.assertTrue('Copyright' in text)
-
-if __name__ == '__main__':
-    wttest.run()

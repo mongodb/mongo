@@ -29,16 +29,18 @@
 
 #pragma once
 
-#include <functional>
-#include <list>
-
+#include "mongo/base/status.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/functional.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+#include <list>
+#include <string>
+
+namespace MONGO_MOD_PARENT_PRIVATE mongo {
 
 class Status;
 class OperationContext;
@@ -56,20 +58,10 @@ public:
     enum class NextAction {
         kInvalid = 0,
         kDisposeOperationContext = 1,
-        kKeepOperationContext = 2,
         kCancel = 3,
     };
 
     using Task = unique_function<NextAction(OperationContext*, const Status&)>;
-
-    /**
-     * Creates a Task returning kCancel. This is useful in shutting down the task runner after
-     * running a series of tasks.
-     *
-     * Without a cancellation task, the client would need to coordinate the completion of the
-     * last task with calling cancel() on the task runner.
-     */
-    static Task makeCancelTask();
 
     explicit TaskRunner(ThreadPool* threadPool);
 
@@ -100,9 +92,6 @@ public:
      *
      *     If the task returns kDisposeOperationContext, the task runner destroys the operation
      *     context. The next task to be invoked will receive a new operation context.
-     *
-     *     If the task returns kKeepOperationContext, the task runner will retain the operation
-     *     context to pass to the next task in the queue.
      *
      *     If the task returns kCancel, the task runner will destroy the operation context and
      *     cancel the remaining tasks (each task will be invoked with a status containing the
@@ -140,7 +129,7 @@ private:
      * Loop exits when any of the tasks returns a non-kContinue next action.
      */
     void _runTasks();
-    void _finishRunTasks_inlock();
+    void _finishRunTasks(WithLock lk);
 
     /**
      * Waits for next scheduled task to be added to queue.
@@ -151,7 +140,7 @@ private:
     ThreadPool* _threadPool;
 
     // Protects member data of this TaskRunner.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("TaskRunner::_mutex");
+    mutable stdx::mutex _mutex;
 
     stdx::condition_variable _condition;
 
@@ -166,4 +155,4 @@ private:
 };
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_PARENT_PRIVATE mongo

@@ -52,7 +52,7 @@ BOOST_ARCHIVE_SIGNATURE(){
 // versions of this library
 // 1 - initial version
 // 2 - made address tracking optional
-// 3 - numerous changes - can't guarentee compatibility with previous versions
+// 3 - numerous changes - can't guarantee compatibility with previous versions
 // 4 - Boost 1.34
 //     added item_version to properly support versioning for collections 
 // 5 - Boost 1.36
@@ -80,14 +80,14 @@ BOOST_ARCHIVE_SIGNATURE(){
 // 16- eliminated dependency on <codecvt> which is buggy in some libraries
 //     and now officially deprecated in the standard
 // 17- Boost 1.68 August 2018
-// 18- addressed undefined behavior in archive constuctors.
+// 18- addressed undefined behavior in archive constructors.
 //     init() called from base wrote archive header before archive
 //     was fully constructed.
-//     Boost 1.76 
-
+// 19- Boost 1.76 April 2021
+// 20- Boost 1.84 April 2021
 BOOST_SYMBOL_VISIBLE boost::serialization::library_version_type
 BOOST_ARCHIVE_VERSION(){
-    return boost::serialization::library_version_type(19);
+    return boost::serialization::library_version_type(20);
 }
 
 } // namespace archive

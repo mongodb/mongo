@@ -79,15 +79,6 @@ logged:
 
 @snippet ex_all.c Statistics clear configuration
 
-The following example opens a statistics cursor on an open join cursor:
-
-@snippet ex_schema.c Statistics cursor join cursor
-
-The statistics gathered will be organized by reference cursors participating
-in the join (see WT_SESSION::join); the uri of each reference cursor appears
-as a prefix in the description field returned as a value by the statistics
-cursor.
-
 The following example opens a statistics cursor on an open WiredTiger session:
 
 @snippet ex_all.c Statistics cursor session
@@ -96,12 +87,17 @@ A reset call on this cursor would reset the session statistics values to zero,
 with or without the statistics configuration \c clear being specified to the
 WT_SESSION::open_cursor method.
 
+The following example shows that the application can indicate columns
+that will not be needed:
+
+@snippet ex_all.c Statistics cursor ignore column
+
 @section statistics_log Statistics logging
 
 WiredTiger will optionally log database statistics into files when the
 the ::wiredtiger_open \c statistics_log configuration is set.
 
-The log files are named \c WiredTiger.%%d.%%H, where \c %%d is replaced
+The log files are named \c WiredTigerStat.%%d.%%H, where \c %%d is replaced
 with the day of the month as a decimal number (01-31), and \c %%H
 is replaced by the hour (24-hour clock) as a decimal number (00-23).
 Each log file contains the statistics for the hour specified in its name.

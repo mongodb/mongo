@@ -1,0 +1,129 @@
+# Golden test output of SBEConstantTest/SbeConstants
+-- INPUT EXPRESSION:
+Nothing 
+
+-- COMPILED EXPRESSION:
+[0x0000-0x000a] stackSize: 1, maxStackSize: 1
+0x0000: pushConstVal(value: Nothing);
+
+
+-- INPUT EXPRESSION:
+null 
+
+-- COMPILED EXPRESSION:
+[0x0000-0x000a] stackSize: 1, maxStackSize: 1
+0x0000: pushConstVal(value: null);
+
+
+-- INPUT EXPRESSION:
+true 
+
+-- COMPILED EXPRESSION:
+[0x0000-0x000a] stackSize: 1, maxStackSize: 1
+0x0000: pushConstVal(value: true);
+
+
+-- INPUT EXPRESSION:
+123 
+
+-- COMPILED EXPRESSION:
+[0x0000-0x000a] stackSize: 1, maxStackSize: 1
+0x0000: pushConstVal(value: 123);
+
+
+-- INPUT EXPRESSION:
+123ll 
+
+-- COMPILED EXPRESSION:
+[0x0000-0x000a] stackSize: 1, maxStackSize: 1
+0x0000: pushConstVal(value: 123ll);
+
+
+-- INPUT EXPRESSION:
+123L 
+
+-- COMPILED EXPRESSION:
+[0x0000-0x000a] stackSize: 1, maxStackSize: 1
+0x0000: pushConstVal(value: 123L);
+
+
+-- INPUT EXPRESSION:
+minKey 
+
+-- COMPILED EXPRESSION:
+[0x0000-0x000a] stackSize: 1, maxStackSize: 1
+0x0000: pushConstVal(value: minKey);
+
+
+-- INPUT EXPRESSION:
+maxKey 
+
+-- COMPILED EXPRESSION:
+[0x0000-0x000a] stackSize: 1, maxStackSize: 1
+0x0000: pushConstVal(value: maxKey);
+
+
+-- INPUT EXPRESSION:
+NumberDecimal(123.000000000000) 
+
+-- COMPILED EXPRESSION:
+[0x0000-0x000a] stackSize: 1, maxStackSize: 1
+0x0000: pushConstVal(value: NumberDecimal(123.000000000000));
+
+
+-- INPUT EXPRESSION:
+"abc" 
+
+-- COMPILED EXPRESSION:
+[0x0000-0x000a] stackSize: 1, maxStackSize: 1
+0x0000: pushConstVal(value: "abc");
+
+
+-- INPUT EXPRESSION:
+"abcdefghijklmnop" 
+
+-- COMPILED EXPRESSION:
+[0x0000-0x000a] stackSize: 1, maxStackSize: 1
+0x0000: pushConstVal(value: "abcdefghijklmnop");
+
+
+-- INPUT EXPRESSION:
+RecordId(123) 
+
+-- COMPILED EXPRESSION:
+[0x0000-0x000a] stackSize: 1, maxStackSize: 1
+0x0000: pushConstVal(value: RecordId(123));
+
+
+-- INPUT EXPRESSION:
+ObjectId("000102030405060708090a0b") 
+
+-- COMPILED EXPRESSION:
+[0x0000-0x000a] stackSize: 1, maxStackSize: 1
+0x0000: pushConstVal(value: ObjectId("000102030405060708090a0b"));
+
+
+-- INPUT EXPRESSION:
+[1, 2, 3] 
+
+-- COMPILED EXPRESSION:
+[0x0000-0x000a] stackSize: 1, maxStackSize: 1
+0x0000: pushConstVal(value: [1, 2, 3]);
+
+
+-- INPUT EXPRESSION:
+[1, 2, 3] 
+
+-- COMPILED EXPRESSION:
+[0x0000-0x000a] stackSize: 1, maxStackSize: 1
+0x0000: pushConstVal(value: [1, 2, 3]);
+
+
+-- INPUT EXPRESSION:
+{"a" : 1, "b" : 2} 
+
+-- COMPILED EXPRESSION:
+[0x0000-0x000a] stackSize: 1, maxStackSize: 1
+0x0000: pushConstVal(value: {"a" : 1, "b" : 2});
+
+

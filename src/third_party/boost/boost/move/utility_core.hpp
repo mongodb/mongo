@@ -29,7 +29,6 @@
 #include <boost/move/detail/workaround.hpp>  //forceinline
 #include <boost/move/core.hpp>
 #include <boost/move/detail/meta_utils.hpp>
-#include <boost/static_assert.hpp>
 
 #if defined(BOOST_NO_CXX11_RVALUE_REFERENCES) && !defined(BOOST_MOVE_DOXYGEN_INVOKED)
 
@@ -209,7 +208,8 @@
       #else //BOOST_MOVE_OLD_RVALUE_REF_BINDING_RULES
 
          template <class T>
-         BOOST_MOVE_FORCEINLINE typename ::boost::move_detail::remove_reference<T>::type && move(T&& t) BOOST_NOEXCEPT
+         BOOST_MOVE_INTRINSIC_CAST
+         typename ::boost::move_detail::remove_reference<T>::type && move(T&& t) BOOST_NOEXCEPT
          { return static_cast<typename ::boost::move_detail::remove_reference<T>::type &&>(t); }
 
       #endif   //BOOST_MOVE_OLD_RVALUE_REF_BINDING_RULES
@@ -245,49 +245,16 @@
       #else //Old move
 
          template <class T>
-         BOOST_MOVE_FORCEINLINE T&& forward(typename ::boost::move_detail::remove_reference<T>::type& t) BOOST_NOEXCEPT
+         BOOST_MOVE_INTRINSIC_CAST
+         T&& forward(typename ::boost::move_detail::remove_reference<T>::type& t) BOOST_NOEXCEPT
          {  return static_cast<T&&>(t);   }
 
          template <class T>
-         BOOST_MOVE_FORCEINLINE T&& forward(typename ::boost::move_detail::remove_reference<T>::type&& t) BOOST_NOEXCEPT
+         BOOST_MOVE_INTRINSIC_CAST
+         T&& forward(typename ::boost::move_detail::remove_reference<T>::type&& t) BOOST_NOEXCEPT
          {
             //"boost::forward<T> error: 'T' is a lvalue reference, can't forward as rvalue.";
-            BOOST_STATIC_ASSERT(!boost::move_detail::is_lvalue_reference<T>::value);
-            return static_cast<T&&>(t);
-         }
-
-      #endif   //BOOST_MOVE_DOXYGEN_INVOKED
-
-      //////////////////////////////////////////////////////////////////////////////
-      //
-      //                         move_if_not_lvalue_reference
-      //
-      //////////////////////////////////////////////////////////////////////////////
-
-
-      #if defined(BOOST_MOVE_DOXYGEN_INVOKED)
-         //! <b>Effects</b>: Calls `boost::move` if `input_reference` is not a lvalue reference.
-         //!   Otherwise returns the reference
-         template <class T> output_reference move_if_not_lvalue_reference(input_reference) noexcept;
-      #elif defined(BOOST_MOVE_OLD_RVALUE_REF_BINDING_RULES)
-
-         //Old move approach, lvalues could bind to rvalue references
-
-         template <class T>
-         BOOST_MOVE_FORCEINLINE T&& move_if_not_lvalue_reference(typename ::boost::move_detail::identity<T>::type&& t) BOOST_NOEXCEPT
-         {  return t;   }
-
-      #else //Old move
-
-         template <class T>
-         BOOST_MOVE_FORCEINLINE T&& move_if_not_lvalue_reference(typename ::boost::move_detail::remove_reference<T>::type& t) BOOST_NOEXCEPT
-         {  return static_cast<T&&>(t);   }
-
-         template <class T>
-         BOOST_MOVE_FORCEINLINE T&& move_if_not_lvalue_reference(typename ::boost::move_detail::remove_reference<T>::type&& t) BOOST_NOEXCEPT
-         {
-            //"boost::forward<T> error: 'T' is a lvalue reference, can't forward as rvalue.";
-            BOOST_STATIC_ASSERT(!boost::move_detail::is_lvalue_reference<T>::value);
+            BOOST_MOVE_STATIC_ASSERT(!boost::move_detail::is_lvalue_reference<T>::value);
             return static_cast<T&&>(t);
          }
 
@@ -295,7 +262,45 @@
 
       }  //namespace boost {
 
-   #endif   //#if defined(BOOST_MOVE_USE_STANDARD_LIBRARY_MOVE)
+   #endif   //BOOST_MOVE_USE_STANDARD_LIBRARY_MOVE
+
+   //////////////////////////////////////////////////////////////////////////////
+   //
+   //                         move_if_not_lvalue_reference
+   //
+   //////////////////////////////////////////////////////////////////////////////
+
+   namespace boost {
+
+   #if defined(BOOST_MOVE_DOXYGEN_INVOKED)
+      //! <b>Effects</b>: Calls `boost::move` if `input_reference` is not a lvalue reference.
+      //!   Otherwise returns the reference
+      template <class T> output_reference move_if_not_lvalue_reference(input_reference) noexcept;
+   #elif defined(BOOST_MOVE_OLD_RVALUE_REF_BINDING_RULES)
+
+      //Old move approach, lvalues could bind to rvalue references
+
+      template <class T>
+      BOOST_MOVE_FORCEINLINE T&& move_if_not_lvalue_reference(typename ::boost::move_detail::identity<T>::type&& t) BOOST_NOEXCEPT
+      {  return t;   }
+
+   #else //Old move
+
+      template <class T>
+      BOOST_MOVE_FORCEINLINE T&& move_if_not_lvalue_reference(typename ::boost::move_detail::remove_reference<T>::type& t) BOOST_NOEXCEPT
+      {  return static_cast<T&&>(t);   }
+
+      template <class T>
+      BOOST_MOVE_FORCEINLINE T&& move_if_not_lvalue_reference(typename ::boost::move_detail::remove_reference<T>::type&& t) BOOST_NOEXCEPT
+      {
+         //"boost::forward<T> error: 'T' is a lvalue reference, can't forward as rvalue.";
+         BOOST_MOVE_STATIC_ASSERT(!boost::move_detail::is_lvalue_reference<T>::value);
+         return static_cast<T&&>(t);
+      }
+
+   #endif   //BOOST_MOVE_DOXYGEN_INVOKED
+
+   }  //namespace boost {
 
 #endif   //BOOST_NO_CXX11_RVALUE_REFERENCES
 

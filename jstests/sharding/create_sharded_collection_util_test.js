@@ -1,11 +1,9 @@
 /**
  * Tests for the create_sharded_collection_util.js module.
  */
-(function() {
-"use strict";
-
-load("jstests/sharding/libs/create_sharded_collection_util.js");
-load("jstests/sharding/libs/find_chunks_util.js");
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 const st = new ShardingTest({mongos: 1, shards: 3, rs: {nodes: 1}});
 const collection = st.s.getCollection("test.create_sharded_collection_util");
@@ -15,10 +13,11 @@ function assertCreatedWithChunks(shardKey, chunks) {
     CreateShardedCollectionUtil.shardCollectionWithChunks(collection, shardKey, chunks);
 
     const configDB = st.s.getDB("config");
-    const actualChunks =
-        findChunksUtil.findChunksByNs(configDB, collection.getFullName()).sort({min: 1}).toArray();
-    assert.eq(chunks.slice().sort((a, b) => bsonWoCompare(a.min, b.min)),
-              actualChunks.map(chunk => ({min: chunk.min, max: chunk.max, shard: chunk.shard})));
+    const actualChunks = findChunksUtil.findChunksByNs(configDB, collection.getFullName()).sort({min: 1}).toArray();
+    assert.eq(
+        chunks.slice().sort((a, b) => bsonWoCompare(a.min, b.min)),
+        actualChunks.map((chunk) => ({min: chunk.min, max: chunk.max, shard: chunk.shard})),
+    );
 
     // CreateShardedCollectionUtil.shardCollectionWithChunks() should have cleaned up any zones it
     // generated temporarily.
@@ -67,39 +66,44 @@ assertCreatedWithChunks({a: "hashed"}, [
 
 function assertFailToCreateWithChunks(shardKey, chunks, errRegex) {
     collection.drop();
-    const err = assert.throws(
-        () => CreateShardedCollectionUtil.shardCollectionWithChunks(collection, shardKey, chunks));
+    const err = assert.throws(() =>
+        CreateShardedCollectionUtil.shardCollectionWithChunks(collection, shardKey, chunks),
+    );
 
-    assert(errRegex.test(err.message),
-           `${tojson(errRegex)} didn't match error message: ${tojson(err)}`);
+    assert(errRegex.test(err.message), `${tojson(errRegex)} didn't match error message: ${tojson(err)}`);
 }
 
 // Cannot have chunks array be empty.
 assertFailToCreateWithChunks({a: 1}, [], /empty/);
 
 // Cannot omit MinKey chunk.
-assertFailToCreateWithChunks({a: 1},
-                             [
-                                 {min: {a: 0}, max: {a: 10}, shard: st.shard1.shardName},
-                                 {min: {a: 10}, max: {a: MaxKey}, shard: st.shard2.shardName},
-                             ],
-                             /MinKey/);
+assertFailToCreateWithChunks(
+    {a: 1},
+    [
+        {min: {a: 0}, max: {a: 10}, shard: st.shard1.shardName},
+        {min: {a: 10}, max: {a: MaxKey}, shard: st.shard2.shardName},
+    ],
+    /MinKey/,
+);
 
 // Cannot omit MaxKey chunk.
-assertFailToCreateWithChunks({a: 1},
-                             [
-                                 {min: {a: MinKey}, max: {a: 0}, shard: st.shard0.shardName},
-                                 {min: {a: 0}, max: {a: 10}, shard: st.shard1.shardName},
-                             ],
-                             /MaxKey/);
+assertFailToCreateWithChunks(
+    {a: 1},
+    [
+        {min: {a: MinKey}, max: {a: 0}, shard: st.shard0.shardName},
+        {min: {a: 0}, max: {a: 10}, shard: st.shard1.shardName},
+    ],
+    /MaxKey/,
+);
 
 // Cannot have any gaps between chunks.
-assertFailToCreateWithChunks({a: 1},
-                             [
-                                 {min: {a: MinKey}, max: {a: 0}, shard: st.shard0.shardName},
-                                 {min: {a: 10}, max: {a: MaxKey}, shard: st.shard2.shardName},
-                             ],
-                             /found gap/);
+assertFailToCreateWithChunks(
+    {a: 1},
+    [
+        {min: {a: MinKey}, max: {a: 0}, shard: st.shard0.shardName},
+        {min: {a: 10}, max: {a: MaxKey}, shard: st.shard2.shardName},
+    ],
+    /found gap/,
+);
 
 st.stop();
-})();

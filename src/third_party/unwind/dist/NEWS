@@ -28,11 +28,11 @@
 
 * News for v1.0:
 
-** Fast unwind (rbp, rsp, rip only) on x86_64 with a fallback to 
+** Fast unwind (rbp, rsp, rip only) on x86_64 with a fallback to
    slow code path (Lassi Tuura)
 ** Improved local and remote unwinding on ARM (Ken Werner)
 ** Testing, stability and many fixes on x86 (Paul Pluzhnikov)
-** FreeBSD port and clean separation of OS specific bits 
+** FreeBSD port and clean separation of OS specific bits
    (Konstantin Belousov)
 ** Thanks for all the bug reports, contributions and testing!
 
@@ -108,7 +108,7 @@
 * News for v0.98:
 
 ** Update libunwind to be compliant with the updated/expanded
-   ia64 unwind specificiation by HJ Lu [1].  This is needed for
+   ia64 unwind specification by HJ Lu [1].  This is needed for
    GCC 3.4 compatibility.
 
    [1] http://www.kernel.org/pub/linux/devel/gcc/unwind/
@@ -116,7 +116,7 @@
 ** Initial support for x86-64 has been added courtesy of Max Asbock.
    Along with this came a bunch of DWARF2 unwinder fixes.
 
-** A new rountine unw_strerror() has been added courtesy of
+** A new routine unw_strerror() has been added courtesy of
    Thomas Hallgren.
 
 ** Including <libunwind.h> now defines 4 macros that can be used
@@ -188,40 +188,40 @@
    at IBM and it is expected that this support will be merged into the
    official tree soon.
 
-
+
 * News for v0.96:
 
 ** _Unwind_*() routines defined by the C++ ABI are now included in
    libunwind.
 
-
+
 * News for v0.95:
 
 ** Bigger, better, faster, or so the theory goes.
 
-
+
 * News for v0.93:
 
 ** More bug-fixes & improved HP-UX support.
 
-
+
 * News for v0.92:
 
 ** Bug-fix release.  IA-64 unwinder can now be built with Intel compiler (ECC).
 
-
+
 * News for v0.91:
 
 ** Lots of documentation updates
 ** Some portability fixes.
 
-
+
 * News for v0.9:
 
 ** The libunwind API is mostly feature-complete at this point (hence the
    version jump from v0.2 to v0.9).
 
-
+
 * News for v0.2:
 
 ** Automated configuration/build with autoconf and automake.
@@ -236,12 +236,12 @@
    e.g., useful for building a debugger that can support multiple targets
    such as x86, ia64, etc.)
 
-
+
 * News for v0.1:
 
 ** Added support for exception handling.
 
-
+
 * News for v0.0:
 
 ** It's a brand new package.

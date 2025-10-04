@@ -27,11 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/matcher/expression_where_base.h"
 
-#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/util/builder.h"
+
+#include <utility>
 
 namespace mongo {
 
@@ -40,14 +41,17 @@ WhereMatchExpressionBase::WhereMatchExpressionBase(WhereParams params)
 
 void WhereMatchExpressionBase::debugString(StringBuilder& debug, int indentationLevel) const {
     _debugAddSpace(debug, indentationLevel);
-    debug << "$where\n";
+    debug << "$where";
+    _debugStringAttachTagInfo(&debug);
 
     _debugAddSpace(debug, indentationLevel + 1);
     debug << "code: " << getCode() << "\n";
 }
 
-void WhereMatchExpressionBase::serialize(BSONObjBuilder* out, bool includePath) const {
-    out->appendCode("$where", getCode());
+void WhereMatchExpressionBase::serialize(BSONObjBuilder* out,
+                                         const SerializationOptions& opts,
+                                         bool includePath) const {
+    opts.appendLiteral(out, "$where", BSONCode(getCode()));
 }
 
 bool WhereMatchExpressionBase::equivalent(const MatchExpression* other) const {

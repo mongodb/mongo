@@ -1,21 +1,36 @@
 """FCV and Server binary version constants used for multiversion testing."""
 
-from bisect import bisect_left, bisect_right
+import glob
+import http
 import os
-import re
 import shutil
-from subprocess import call, CalledProcessError, check_output, STDOUT, DEVNULL
-import structlog
-import yaml
+from subprocess import DEVNULL, STDOUT, CalledProcessError, call, check_output
 
-from packaging.version import Version
-from buildscripts.resmokelib.setup_multiversion.config import USE_EXISTING_RELEASES_FILE
+import requests
+import structlog
+from retry import retry
+
+import buildscripts.resmokelib.config as _config
+from buildscripts.resmokelib.multiversion.multiversion_service import (
+    MongoReleases,
+    MongoVersion,
+    MultiversionService,
+)
+from buildscripts.resmokelib.multiversionsetupconstants import USE_EXISTING_RELEASES_FILE
+from buildscripts.util.expansions import get_expansion
+
+LAST_LTS = "last_lts"
+LAST_CONTINUOUS = "last_continuous"
+
+RELEASES_LOCAL_FILE = os.path.join("src", "mongo", "util", "version", "releases.yml")
+# We use the "releases.yml" file from "master" because it is guaranteed to be up-to-date
+# with the latest EOL versions. If a "last-continuous" version is EOL, we don't include
+# it in the multiversion config and therefore don't test against it.
+MASTER_RELEASES_REMOTE_FILE = (
+    "https://raw.githubusercontent.com/mongodb/mongo/master/src/mongo/util/version/releases.yml"
+)
 
 LOGGER = structlog.getLogger(__name__)
-
-# These values must match the include paths for artifacts.tgz in evergreen.yml.
-MONGO_VERSION_YAML = ".resmoke_mongo_version.yml"
-RELEASES_YAML = ".resmoke_mongo_release_values.yml"
 
 
 def generate_mongo_version_file():
@@ -26,38 +41,79 @@ def generate_mongo_version_file():
         raise ChildProcessError("Failed to run git describe to get the latest tag") from exp
 
     # Write the current MONGO_VERSION to a data file.
-    with open(MONGO_VERSION_YAML, 'w') as mongo_version_fh:
+    with open(_config.MONGO_VERSION_FILE, "w") as mongo_version_fh:
         # E.g. res = 'r5.1.0-alpha-597-g8c345c6693\n'
         res = res[1:]  # Remove the leading "r" character.
         mongo_version_fh.write("mongo_version: " + res)
 
 
+@retry(tries=5, delay=3)
+def get_releases_file_from_remote():
+    """Get the latest releases.yml from github."""
+    try:
+        with open(_config.RELEASES_FILE, "wb") as file:
+            response = requests.get(MASTER_RELEASES_REMOTE_FILE)
+            if response.status_code != http.HTTPStatus.OK:
+                raise RuntimeError(
+                    f"Fetching releases.yml file returned unsuccessful status: {response.status_code}, "
+                    f"response body: {response.text}\n"
+                )
+            file.write(response.content)
+        LOGGER.info(f"Got releases.yml file remotely: {MASTER_RELEASES_REMOTE_FILE}")
+    except Exception as exc:
+        LOGGER.warning(f"Could not get releases.yml file remotely: {MASTER_RELEASES_REMOTE_FILE}")
+        raise exc
+
+
+def get_releases_file_locally_or_fallback_to_remote():
+    """Get the latest releases.yml locally or fallback to getting it from github."""
+    if os.path.exists(RELEASES_LOCAL_FILE):
+        LOGGER.info(f"Found releases.yml file locally: {RELEASES_LOCAL_FILE}")
+        shutil.copyfile(RELEASES_LOCAL_FILE, _config.RELEASES_FILE)
+
+    else:
+        LOGGER.warning(f"Could not find releases.yml file locally: {RELEASES_LOCAL_FILE}")
+        get_releases_file_from_remote()
+
+
 def generate_releases_file():
     """Generate the releases constants file."""
-    # Copy the 'releases.yml' file from the source tree.
-    releases_yaml_path = os.path.join("src", "mongo", "util", "version", "releases.yml")
-    if not os.path.isfile(releases_yaml_path):
-        LOGGER.info(
-            'Skipping yml file generation because file .resmoke_mongo_release_values.yml does not exist at path {}.'
-            .format(releases_yaml_path))
-        return
 
-    shutil.copyfile(releases_yaml_path, RELEASES_YAML)
+    # If we are not in master, we want to grab the releases file from master as a source of truth.
+    # If we are on master in CI, we can grab it locally to accommodate any changes made for testing.
+    # On older versions we use the master releases.yml file to ensure we do not run multiversion
+    # testing against eol versions.
+    if _config.EVERGREEN_TASK_ID and get_expansion("branch_name") != "master":
+        get_releases_file_from_remote()
+    else:
+        get_releases_file_locally_or_fallback_to_remote()
 
 
 def in_git_root_dir():
     """Return True if we are in the root of a git directory."""
-    if call(["git", "branch"], stderr=STDOUT, stdout=DEVNULL) != 0:
-        # We are not in a git directory.
+    try:
+        if call(["git", "branch"], stderr=STDOUT, stdout=DEVNULL) != 0:
+            # We are not in a git directory.
+            return False
+    except FileNotFoundError:
+        # Git is not even installed.
         return False
 
-    git_root_dir = check_output("git rev-parse --show-toplevel", shell=True, text=True).strip()
-    # Always use forward slash for the cwd path to resolve inconsistent formatting with Windows.
-    curr_dir = os.getcwd().replace("\\", "/")
+    git_root_dir = os.path.realpath(
+        check_output("git rev-parse --show-toplevel", shell=True, text=True).strip()
+    )
+    curr_dir = os.path.realpath(os.getcwd())
     return git_root_dir == curr_dir
 
 
-if in_git_root_dir():
+# Check for the source dir that exists on spawnhosts
+def in_spawn_host():
+    if glob.glob("/data/mci/source*"):
+        return True
+    return False
+
+
+if (in_git_root_dir() or "BUILD_WORKSPACE_DIRECTORY" in os.environ) and not in_spawn_host():
     generate_mongo_version_file()
 else:
     LOGGER.info("Skipping generating mongo version file since we're not in the root of a git repo")
@@ -68,102 +124,60 @@ if not USE_EXISTING_RELEASES_FILE:
     generate_releases_file()
 else:
     LOGGER.info(
-        "Skipping generating releases file since the --useExistingReleasesFile flag has been set")
-
-
-class FCVConstantValues(object):
-    """Object to hold the calculated FCV constants."""
-
-    def __init__(self, latest, last_continuous, last_lts, requires_fcv_tag_list,
-                 fcvs_less_than_latest):
-        """
-        Initialize the object.
-
-        :param latest: Latest FCV.
-        :param last_continuous: Last continuous FCV.
-        :param last_lts: Last LTS FCV.
-        :param requires_fcv_tag_list: List of FCVs that we need to generate a tag for.
-        :param fcvs_less_than_latest: List of all FCVs that are less than latest, starting from v4.0.
-        """
-        self.latest = latest
-        self.last_continuous = last_continuous
-        self.last_lts = last_lts
-        self.requires_fcv_tag_list = requires_fcv_tag_list
-        self.fcvs_less_than_latest = fcvs_less_than_latest
-
-
-def calculate_fcv_constants():
-    """Calculate multiversion constants from data files."""
-    mongo_version_yml_file = open(MONGO_VERSION_YAML, 'r')
-    mongo_version_yml = yaml.safe_load(mongo_version_yml_file)
-    mongo_version = mongo_version_yml['mongo_version']
-    latest = Version(re.match(r'^[0-9]+\.[0-9]+', mongo_version).group(0))
-
-    releases_yml_file = open(RELEASES_YAML, 'r')
-    releases_yml = yaml.safe_load(releases_yml_file)
-
-    fcvs = releases_yml['featureCompatibilityVersions']
-    fcvs = list(map(Version, fcvs))
-    lts = releases_yml['longTermSupportReleases']
-    lts = list(map(Version, lts))
-
-    mongo_version_yml_file.close()
-    releases_yml_file.close()
-
-    # Highest release less than latest.
-    last_continuous = fcvs[bisect_left(fcvs, latest) - 1]
-
-    # Highest LTS release less than latest.
-    last_lts = lts[bisect_left(lts, latest) - 1]
-
-    # All FCVs greater than last LTS, up to latest.
-    requires_fcv_tag_list = fcvs[bisect_right(fcvs, last_lts):bisect_right(fcvs, latest)]
-
-    # All FCVs less than latest.
-    fcvs_less_than_latest = fcvs[:bisect_left(fcvs, latest)]
-
-    return FCVConstantValues(latest, last_continuous, last_lts, requires_fcv_tag_list,
-                             fcvs_less_than_latest)
-
-
-def version_str(version):
-    """Return a string of the given version in 'MAJOR.MINOR' form."""
-    return '{}.{}'.format(version.major, version.minor)
-
-
-def tag_str(version):
-    """Return a tag for the given version."""
-    return 'requires_fcv_{}{}'.format(version.major, version.minor)
+        "Skipping generating releases file since the --useExistingReleasesFile flag has been set"
+    )
 
 
 def evg_project_str(version):
     """Return the evergreen project name for the given version."""
-    return 'mongodb-mongo-v{}.{}'.format(version.major, version.minor)
+    return "mongodb-mongo-v{}.{}".format(version.major, version.minor)
 
 
-fcv_constants = calculate_fcv_constants()
+multiversion_service = MultiversionService(
+    mongo_version=MongoVersion.from_yaml_file(_config.MONGO_VERSION_FILE),
+    mongo_releases=MongoReleases.from_yaml_file(_config.RELEASES_FILE),
+)
 
-LAST_LTS_BIN_VERSION = version_str(fcv_constants.last_lts)
-LAST_CONTINUOUS_BIN_VERSION = version_str(fcv_constants.last_continuous)
+version_constants = multiversion_service.calculate_version_constants()
 
-LAST_LTS_FCV = version_str(fcv_constants.last_lts)
-LAST_CONTINUOUS_FCV = version_str(fcv_constants.last_continuous)
-LATEST_FCV = version_str(fcv_constants.latest)
+LAST_LTS_BIN_VERSION = version_constants.get_last_lts_fcv()
+LAST_CONTINUOUS_BIN_VERSION = version_constants.get_last_continuous_fcv()
 
-LAST_CONTINUOUS_MONGO_BINARY = "mongo-" + LAST_CONTINUOUS_BIN_VERSION
-LAST_CONTINUOUS_MONGOD_BINARY = "mongod-" + LAST_CONTINUOUS_BIN_VERSION
-LAST_CONTINUOUS_MONGOS_BINARY = "mongos-" + LAST_CONTINUOUS_BIN_VERSION
+LAST_LTS_FCV = version_constants.get_last_lts_fcv()
+LAST_CONTINUOUS_FCV = version_constants.get_last_continuous_fcv()
+LATEST_FCV = version_constants.get_latest_fcv()
 
-LAST_LTS_MONGO_BINARY = "mongo-" + LAST_LTS_BIN_VERSION
-LAST_LTS_MONGOD_BINARY = "mongod-" + LAST_LTS_BIN_VERSION
-LAST_LTS_MONGOS_BINARY = "mongos-" + LAST_LTS_BIN_VERSION
+LAST_CONTINUOUS_MONGO_BINARY = version_constants.build_last_continuous_binary("mongo")
+LAST_CONTINUOUS_MONGOD_BINARY = version_constants.build_last_continuous_binary("mongod")
+LAST_CONTINUOUS_MONGOS_BINARY = version_constants.build_last_continuous_binary("mongos")
 
-REQUIRES_FCV_TAG_LATEST = tag_str(fcv_constants.latest)
+LAST_LTS_MONGO_BINARY = version_constants.build_last_lts_binary("mongo")
+LAST_LTS_MONGOD_BINARY = version_constants.build_last_lts_binary("mongod")
+LAST_LTS_MONGOS_BINARY = version_constants.build_last_lts_binary("mongos")
+
+REQUIRES_FCV_TAG_LATEST = version_constants.get_latest_tag()
 
 # Generate tags for all FCVS in (lastLTS, latest].
 # All multiversion tests should be run with these tags excluded.
-REQUIRES_FCV_TAG = ",".join([tag_str(fcv) for fcv in fcv_constants.requires_fcv_tag_list])
+REQUIRES_FCV_TAG = version_constants.get_fcv_tag_list()
+
+REQUIRES_FCV_TAGS_LESS_THAN_LATEST = version_constants.get_fcv_tags_less_than_latest()
 
 # Generate evergreen project names for all FCVs less than latest.
-EVERGREEN_PROJECTS = ['mongodb-mongo-master']
-EVERGREEN_PROJECTS.extend([evg_project_str(fcv) for fcv in fcv_constants.fcvs_less_than_latest])
+EVERGREEN_PROJECTS = ["mongodb-mongo-master"]
+EVERGREEN_PROJECTS.extend([evg_project_str(fcv) for fcv in version_constants.fcvs_less_than_latest])
+
+OLD_VERSIONS = (
+    [LAST_LTS]
+    if LAST_CONTINUOUS_FCV == LAST_LTS_FCV or LAST_CONTINUOUS_FCV in version_constants.get_eols()
+    else [LAST_LTS, LAST_CONTINUOUS]
+)
+
+
+def log_constants(exec_log):
+    """Log FCV constants."""
+    exec_log.info("Last LTS FCV: {}".format(LAST_LTS_FCV))
+    exec_log.info("Last Continuous FCV: {}".format(LAST_CONTINUOUS_FCV))
+    exec_log.info("Latest FCV: {}".format(LATEST_FCV))
+    exec_log.info("Requires FCV Tag Latest: {}".format(REQUIRES_FCV_TAG_LATEST))
+    exec_log.info("Requires FCV Tag: {}".format(REQUIRES_FCV_TAG))

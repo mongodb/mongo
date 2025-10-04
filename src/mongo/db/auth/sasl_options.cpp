@@ -28,10 +28,12 @@
  */
 
 #include "mongo/db/auth/sasl_options.h"
+
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
 #include "mongo/db/auth/sasl_options_gen.h"
 #include "mongo/db/stats/counters.h"
-
-#include "mongo/util/text.h"
+#include "mongo/util/text.h"  // IWYU pragma: keep
 
 namespace mongo {
 
@@ -42,6 +44,12 @@ SASLGlobalParams saslGlobalParams;
 SASLGlobalParams::SASLGlobalParams() {
     scramSHA1IterationCount.store(kScramIterationCountDefault);
     scramSHA256IterationCount.store(kScramSHA256IterationCountDefault);
+    numTimesAuthenticationMechanismsSet.store(0);
+    haveHostName.store(false);
+    haveServiceName.store(false);
+    haveAuthdPath.store(false);
+    numTimesScramSHA1IterationCountSet.store(0);
+    numTimesScramSHA256IterationCountSet.store(0);
     authenticationMechanisms = kDefaultAuthenticationMechanisms;
 
     // Default value for auth failed delay

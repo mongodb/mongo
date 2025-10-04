@@ -27,22 +27,21 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/crypto/symmetric_crypto.h"
 
-#include <memory>
-
-#include "mongo/base/data_cursor.h"
-#include "mongo/base/init.h"
-#include "mongo/base/status.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/secure_allocator.h"
 #include "mongo/crypto/symmetric_key.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/net/ssl_manager.h"
-#include "mongo/util/str.h"
+
+#include <utility>
+#include <vector>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 
 namespace mongo {
 namespace crypto {
@@ -55,6 +54,8 @@ size_t aesGetIVSize(crypto::aesMode mode) {
             return crypto::aesCBCIVSize;
         case crypto::aesMode::gcm:
             return crypto::aesGCMIVSize;
+        case crypto::aesMode::ctr:
+            return crypto::aesCTRIVSize;
         default:
             fassertFailed(4053);
     }
@@ -65,6 +66,8 @@ aesMode getCipherModeFromString(const std::string& mode) {
         return aesMode::cbc;
     } else if (mode == aes256GCMName) {
         return aesMode::gcm;
+    } else if (mode == aes256CTRName) {
+        return aesMode::ctr;
     } else {
         MONGO_UNREACHABLE;
     }
@@ -75,6 +78,8 @@ std::string getStringFromCipherMode(aesMode mode) {
         return aes256CBCName;
     } else if (mode == aesMode::gcm) {
         return aes256GCMName;
+    } else if (mode == aesMode::ctr) {
+        return aes256CTRName;
     } else {
         MONGO_UNREACHABLE;
     }

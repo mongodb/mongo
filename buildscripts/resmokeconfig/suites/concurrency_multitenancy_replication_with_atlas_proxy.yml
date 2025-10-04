@@ -1,0 +1,88 @@
+test_kind: fsm_workload_test
+
+selector:
+  roots:
+    - jstests/concurrency/fsm_workloads/**/*.js
+    - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*.js
+  exclude_files:
+    ##
+    # Disabled due to MongoDB restrictions and/or workload restrictions
+    ##
+
+    # OOM kills on test hosts.
+
+    # TODO SERVER-80966: `rolesInfo` is returning unprefixed database names.
+    - jstests/concurrency/fsm_workloads/auth/auth_privilege_cache_miss.js
+    - jstests/concurrency/fsm_workloads/auth/auth_drop_user.js
+    - jstests/concurrency/fsm_workloads/auth/auth_drop_role.js
+    - jstests/concurrency/fsm_workloads/auth/auth_create_role.js
+    - jstests/concurrency/fsm_workloads/auth/auth_create_user.js
+    - jstests/concurrency/fsm_workloads/auth/auth_role_consistency.js
+
+    # TODO SERVER-82260: FLE2 tests access an invalid VTS which has neither tenant nor user name.
+    - src/mongo/db/modules/enterprise/jstests/concurrency/fsm_workloads/fle2_compact.js
+    - src/mongo/db/modules/enterprise/jstests/concurrency/fsm_workloads/fle2_crud.js
+
+  exclude_with_any_tags:
+    - requires_standalone
+    - requires_sharding
+    # This passthrough uses the `simulate_atlas_proxy` override, which some tests are incompatible with.
+    - simulate_atlas_proxy_incompatible
+    # Exclude tests which use commands that aren't supported in Serverless.
+    - command_not_supported_in_serverless
+    # Theses tests expect replication is not enabled.
+    - assumes_standalone_mongod
+    # Capped collections are banned in Serverless.
+    - requires_capped
+    # Server side javascript (such as $where, $function, $accumulator and map-reduce) is not allowed in Serverless.
+    - requires_scripting
+    - requires_profiling
+    # Skip any tests that run with auth explicitly.
+    - requires_auth
+    # Skip any tests that use transactions
+    - uses_transactions
+
+executor:
+  archive:
+    hooks:
+      - RunDBCheckInBackground
+      - CheckReplDBHashInBackground
+      - ValidateCollectionsInBackground
+      - CheckReplDBHash
+      - ValidateCollections
+    tests: true
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          hashTestNamesForMultitenancy: true
+          useSecurityToken: true
+          useResponsePrefixChecking: true
+
+  hooks:
+    # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+    # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+    # validating the entire contents of the collection.
+    - class: RunDBCheckInBackground
+    - class: CheckReplDBHashInBackground
+    - class: ValidateCollectionsInBackground
+    - class: CheckReplDBHash
+    - class: ValidateCollections
+      use_legacy_validate: true
+    # TODO SERVER-87536 The suite was disabled because this pymongo hook doesn't support security token.
+    # Upgrade pymongo and propagate security token to make the teset pass.
+    - class: CleanupConcurrencyWorkloads
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      oplogSize: 1024
+      set_parameters:
+        enableTestCommands: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+        queryAnalysisWriterIntervalSecs: 1
+        roleGraphInvalidationIsFatal: 1
+        multitenancySupport: true
+        logComponentVerbosity:
+          command: 2
+      noscripting: ""
+    num_nodes: 3

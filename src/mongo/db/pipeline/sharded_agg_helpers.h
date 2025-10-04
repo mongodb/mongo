@@ -29,36 +29,39 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/global_catalog/catalog_cache/catalog_cache.h"
+#include "mongo/db/global_catalog/router_role_api/router_role.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/pipeline/exchange_spec_gen.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
+#include "mongo/db/pipeline/split_pipeline.h"
+#include "mongo/db/query/explain_options.h"
+#include "mongo/db/sharding_environment/client/shard.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/s/async_requests_sender.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/query/owned_remote_cursor.h"
-#include "mongo/s/stale_shard_version_helpers.h"
-#include "mongo/stdx/variant.h"
+#include "mongo/s/query/exec/owned_remote_cursor.h"
+
+#include <cstddef>
+#include <memory>
+#include <utility>
+#include <variant>
+#include <vector>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace sharded_agg_helpers {
-
-/**
- * Represents the two halves of a pipeline that will execute in a sharded cluster. 'shardsPipeline'
- * will execute in parallel on each shard, and 'mergePipeline' will execute on the merge host -
- * either one of the shards or a mongos.
- */
-struct SplitPipeline {
-    SplitPipeline(std::unique_ptr<Pipeline, PipelineDeleter> shardsPipeline,
-                  std::unique_ptr<Pipeline, PipelineDeleter> mergePipeline,
-                  boost::optional<BSONObj> shardCursorsSortSpec)
-        : shardsPipeline(std::move(shardsPipeline)),
-          mergePipeline(std::move(mergePipeline)),
-          shardCursorsSortSpec(std::move(shardCursorsSortSpec)) {}
-
-    std::unique_ptr<Pipeline, PipelineDeleter> shardsPipeline;
-    std::unique_ptr<Pipeline, PipelineDeleter> mergePipeline;
-
-    // If set, the cursors from the shards are expected to be sorted according to this spec, and to
-    // have populated a "$sortKey" metadata field which can be used to compare the results.
-    boost::optional<BSONObj> shardCursorsSortSpec;
-};
 
 struct ShardedExchangePolicy {
     // The exchange specification that will be sent to shards as part of the aggregate command.
@@ -70,9 +73,9 @@ struct ShardedExchangePolicy {
 };
 
 struct DispatchShardPipelineResults {
-    // True if this pipeline was split, and the second half of the pipeline needs to be run on
-    // the primary shard for the database.
-    bool needsPrimaryShardMerge;
+    // Contains a value when the second half of the pipeline was requested to run on a specific
+    // shard.
+    boost::optional<ShardId> mergeShardId;
 
     // Populated if this *is not* an explain, this vector represents the cursors on the remote
     // shards.
@@ -86,7 +89,7 @@ struct DispatchShardPipelineResults {
     boost::optional<SplitPipeline> splitPipeline;
 
     // If the pipeline targeted a single shard, this is the pipeline to run on that shard.
-    std::unique_ptr<Pipeline, PipelineDeleter> pipelineForSingleShard;
+    std::unique_ptr<Pipeline> pipelineForSingleShard;
 
     // The command object to send to the targeted shards.
     BSONObj commandForTargetedShards;
@@ -106,53 +109,79 @@ boost::optional<ShardedExchangePolicy> checkIfEligibleForExchange(OperationConte
                                                                   const Pipeline* mergePipeline);
 
 /**
- * Split the current Pipeline into a Pipeline for each shard, and a Pipeline that combines the
- * results within a merging process. This call also performs optimizations with the aim of reducing
- * computing time and network traffic when a pipeline has been split into two pieces.
- *
- * The 'mergePipeline' returned as part of the SplitPipeline here is not ready to execute until the
- * 'shardsPipeline' has been sent to the shards and cursors have been established. Once cursors have
- * been established, the merge pipeline can be made executable by calling 'addMergeCursorsSource()'
+ * Used to indicate if a pipeline contains any data source requiring extra handling for targeting
+ * shards.
  */
-SplitPipeline splitPipeline(std::unique_ptr<Pipeline, PipelineDeleter> pipeline);
+enum class PipelineDataSource {
+    kNormal,
+    kChangeStream,          // Indicates a pipeline has a $changeStream stage.
+    kGeneratesOwnDataOnce,  // Indicates the shards part needs to be executed on a single node.
+};
 
 /**
- * Targets shards for the pipeline and returns a struct with the remote cursors or results, and
- * the pipeline that will need to be executed to merge the results from the remotes. If a stale
- * shard version is encountered, refreshes the routing table and tries again.
+ * Targets shards for the pipeline and returns a struct with the remote cursors or results, and the
+ * pipeline that will need to be executed to merge the results from the remotes. If the command is
+ * eligible for sampling, attaches a unique sample id to the request for one of the targeted shards
+ * if the collection has query sampling enabled and the rate-limited sampler successfully generates
+ * a sample id for it.
+ *
+ * Although the 'pipeline' has an 'ExpressionContext' which indicates whether this operation is an
+ * explain (and if it is an explain what the verbosity is), the caller must explicitly indicate
+ * whether it wishes to dispatch a regular aggregate command or an explain command using the
+ * explicit 'explain' parameter. The reason for this is that in some contexts, the caller wishes to
+ * dispatch a regular agg command rather than an explain command even if the top-level operation is
+ * an explain. Consider the example of an explain that contains a stage like this:
+ *
+ *     {$unionWith: {coll: "innerShardedColl", pipeline: <sub-pipeline>}}
+ *
+ * The explain works by first executing the inner and outer subpipelines in order to gather runtime
+ * statistics. While dispatching the inner pipeline, we must dispatch it not as an explain but as a
+ * regular agg command so that the runtime stats are accurate.
+ *
+ * The caller of this function must handle any stale shard version error error thrown by
+ * `dispatchShardPipeline`.
  */
 DispatchShardPipelineResults dispatchShardPipeline(
+    RoutingContext& routingCtx,
     Document serializedCommand,
-    bool hasChangeStream,
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+    PipelineDataSource pipelineDataSource,
+    bool eligibleForSampling,
+    std::unique_ptr<Pipeline> pipeline,
+    boost::optional<ExplainOptions::Verbosity> explain,
+    const NamespaceString& targetedNss,
+    bool requestQueryStatsFromRemotes = false,
     ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
-    boost::optional<BSONObj> readConcern = boost::none);
+    boost::optional<BSONObj> readConcern = boost::none,
+    AsyncRequestsSender::ShardHostMap designatedHostsMap = {},
+    stdx::unordered_map<ShardId, BSONObj> resumeTokenMap = {},
+    std::set<ShardId> shardsToSkip = {});
 
 BSONObj createPassthroughCommandForShard(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     Document serializedCommand,
     boost::optional<ExplainOptions::Verbosity> explainVerbosity,
     Pipeline* pipeline,
-    BSONObj collationObj,
-    boost::optional<BSONObj> readConcern);
+    boost::optional<BSONObj> readConcern,
+    boost::optional<int> overrideBatchSize,
+    bool requestQueryStatsFromRemotes);
 
 BSONObj createCommandForTargetedShards(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        Document serializedCommand,
                                        const SplitPipeline& splitPipeline,
                                        boost::optional<ShardedExchangePolicy> exchangeSpec,
                                        bool needsMerge,
-                                       boost::optional<BSONObj> readConcern = boost::none);
+                                       boost::optional<ExplainOptions::Verbosity> explain,
+                                       boost::optional<BSONObj> readConcern = boost::none,
+                                       bool requestQueryStatsFromRemotes = false);
 
 /**
- * Creates a new DocumentSourceMergeCursors from the provided 'remoteCursors' and adds it to the
- * front of 'mergePipeline'.
+ * Convenience method for callers that want to do 'partitionCursors', 'injectMetaCursors', and
+ * 'addMergeCursorsSource' in order.
  */
-void addMergeCursorsSource(Pipeline* mergePipeline,
-                           BSONObj cmdSentToShards,
-                           std::vector<OwnedRemoteCursor> ownedCursors,
-                           const std::vector<ShardId>& targetedShards,
-                           boost::optional<BSONObj> shardCursorsSortSpec,
-                           bool hasChangeStream);
+void partitionAndAddMergeCursorsSource(Pipeline* pipeline,
+                                       std::vector<OwnedRemoteCursor> cursors,
+                                       boost::optional<BSONObj> shardCursorsSortSpec,
+                                       bool requestQueryStatsFromRemotes);
 
 /**
  * Targets the shards with an aggregation command built from `ownedPipeline` and explain set to
@@ -160,6 +189,9 @@ void addMergeCursorsSource(Pipeline* mergePipeline,
  */
 BSONObj targetShardsForExplain(Pipeline* ownedPipeline);
 
+
+void mergeExplainOutputFromShards(const std::vector<AsyncRequestsSender::Response>& shardResponses,
+                                  BSONObjBuilder* result);
 /**
  * Appends the explain output of `dispatchResults` to `result`.
  */
@@ -168,20 +200,14 @@ Status appendExplainResults(DispatchShardPipelineResults&& dispatchResults,
                             BSONObjBuilder* result);
 
 /**
- * Returns the proper routing table to use for targeting shards: either a historical routing table
- * based on the global read timestamp if there is an active transaction with snapshot level read
- * concern or the latest routing table otherwise.
- *
- * Returns 'ShardNotFound' or 'NamespaceNotFound' if there are no shards in the cluster or if
- * collection 'execNss' does not exist, respectively.
- */
-StatusWith<ChunkManager> getExecutionNsRoutingInfo(OperationContext* opCtx,
-                                                   const NamespaceString& execNss);
-
-/**
  * Returns true if an aggregation over 'nss' must run on all shards.
  */
-bool mustRunOnAllShards(const NamespaceString& nss, bool hasChangeStream);
+bool checkIfMustRunOnAllShards(const NamespaceString& nss, PipelineDataSource pipelineDataSource);
+
+/**
+ * Returns the PipelineDataSource given a parsed pipeline.
+ */
+PipelineDataSource getPipelineDataSource(const LiteParsedPipeline& liteParsedPipeline);
 
 /**
  * Retrieves the desired retry policy based on whether the default writeConcern is set on 'opCtx'.
@@ -189,14 +215,34 @@ bool mustRunOnAllShards(const NamespaceString& nss, bool hasChangeStream);
 Shard::RetryPolicy getDesiredRetryPolicy(OperationContext* opCtx);
 
 /**
- * Uses sharded_agg_helpers to split the pipeline and dispatch half to the shards, leaving the
- * merging half executing in this process after attaching a $mergeCursors. Will retry on network
- * errors and also on StaleConfig errors to avoid restarting the entire operation.
+ * Prepares the given pipeline for execution. This involves:
+ * (1) Determining if the pipeline needs to have a cursor source attached.
+ * (2) If a cursor source is needed, attaching one. This may involve a local or remote cursor,
+ * depending on whether or not the pipeline's expression context permits local reads and a local
+ * read could be used to serve the pipeline. (3) Splitting the pipeline if required, and dispatching
+ * half to the shards, leaving the merging half executing in this process after attaching a
+ * $mergeCursors.
+ *
+ * Will retry on network errors and also on StaleConfig errors to avoid restarting the entire
+ * operation. Returns `ownedPipeline`, but made-ready for execution.
  */
-std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
+std::unique_ptr<Pipeline> preparePipelineForExecution(
     Pipeline* ownedPipeline,
     ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
     boost::optional<BSONObj> readConcern = boost::none);
+
+
+std::unique_ptr<Pipeline> finalizeAndMaybePreparePipelineForExecution(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    Pipeline* ownedPipeline,
+    bool attachCursorAfterOptimizing,
+    std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                       Pipeline* pipeline,
+                       MongoProcessInterface::CollectionMetadata collData)> finalizePipeline =
+        nullptr,
+    ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
+    boost::optional<BSONObj> readConcern = boost::none,
+    bool shouldUseCollectionDefaultCollator = false);
 
 /**
  * For a sharded collection, establishes remote cursors on each shard that may have results, and
@@ -204,17 +250,30 @@ std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
  * beginning with that DocumentSourceMergeCursors stage. Note that one of the 'remote' cursors might
  * be this node itself.
  *
+ * Even if the ExpressionContext indicates that this operation is explain, this function still
+ * dispatches the pipeline as a non-explain, since it must open cursors on the remote nodes and
+ * merge them with a $mergeCursors. If the caller's intent is to dispatch an explain command, it
+ * must use a different helper.
+ *
  * Use the AggregateCommandRequest alternative for 'targetRequest' to explicitly specify command
  * options (e.g. read concern) to the shards when establishing remote cursors. Note that doing so
  * incurs the cost of parsing the pipeline.
+ *
+ * Use the std::pair<AggregateCommandRequest, std::unique_ptr<Pipeline>>
+ * alternative for 'targetRequest' to explicitly specify command options (e.g. read concern) to the
+ * shards when establishing remote cursors, and to pass a pipeline that has already been parsed.
+ * This is useful when the pipeline has already been parsed as it avoids the cost
+ * of parsing it again.
  */
-std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
+std::unique_ptr<Pipeline> targetShardsAndAddMergeCursors(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    stdx::variant<std::unique_ptr<Pipeline, PipelineDeleter>, AggregateCommandRequest>
-        targetRequest,
+    std::variant<std::unique_ptr<Pipeline>,
+                 AggregateCommandRequest,
+                 std::pair<AggregateCommandRequest, std::unique_ptr<Pipeline>>> targetRequest,
     boost::optional<BSONObj> shardCursorsSortSpec = boost::none,
     ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
-    boost::optional<BSONObj> readConcern = boost::none);
+    boost::optional<BSONObj> readConcern = boost::none,
+    bool shouldUseCollectionDefaultCollator = false);
 
 /**
  * For a sharded or unsharded collection, establishes a remote cursor on only the specified shard,
@@ -227,10 +286,11 @@ std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
  *
  * Note that the specified AggregateCommandRequest must not be for an explain command.
  */
-std::unique_ptr<Pipeline, PipelineDeleter> runPipelineDirectlyOnSingleShard(
+std::unique_ptr<Pipeline> runPipelineDirectlyOnSingleShard(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     AggregateCommandRequest request,
-    ShardId shardId);
+    ShardId shardId,
+    bool requestQueryStatsFromRemotes);
 
 }  // namespace sharded_agg_helpers
 }  // namespace mongo

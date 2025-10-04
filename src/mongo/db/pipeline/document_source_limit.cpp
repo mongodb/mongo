@@ -27,17 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/pipeline/document_source_limit.h"
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/query/allowed_contexts.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <iterator>
+#include <list>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -51,11 +57,12 @@ REGISTER_DOCUMENT_SOURCE(limit,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceLimit::createFromBson,
                          AllowedWithApiStrict::kAlways);
+ALLOCATE_DOCUMENT_SOURCE_ID(limit, DocumentSourceLimit::id)
 
 constexpr StringData DocumentSourceLimit::kStageName;
 
-Pipeline::SourceContainer::iterator DocumentSourceLimit::doOptimizeAt(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+DocumentSourceContainer::iterator DocumentSourceLimit::doOptimizeAt(
+    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     invariant(*itr == this);
 
     if (std::next(itr) == container->end()) {
@@ -72,24 +79,8 @@ Pipeline::SourceContainer::iterator DocumentSourceLimit::doOptimizeAt(
     return std::next(itr);
 }
 
-DocumentSource::GetNextResult DocumentSourceLimit::doGetNext() {
-    if (_nReturned >= _limit) {
-        return GetNextResult::makeEOF();
-    }
-
-    auto nextInput = pSource->getNext();
-    if (nextInput.isAdvanced()) {
-        ++_nReturned;
-        if (_nReturned >= _limit) {
-            dispose();
-        }
-    }
-
-    return nextInput;
-}
-
-Value DocumentSourceLimit::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
-    return Value(Document{{getSourceName(), _limit}});
+Value DocumentSourceLimit::serialize(const SerializationOptions& opts) const {
+    return Value(Document{{getSourceName(), opts.serializeLiteral(_limit)}});
 }
 
 intrusive_ptr<DocumentSourceLimit> DocumentSourceLimit::create(

@@ -1,0 +1,12 @@
+Test zstd ./file1 - file2
+stdin
+file1
+file2
+Test zstd -d ./file1.zst - file2.zst
+stdin
+file1
+file2
+zstd -d ./file1.zst - file2.zst -c
+file1
+stdin
+file2

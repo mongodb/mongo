@@ -28,69 +28,93 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/index_catalog.h"
+#include <boost/container/small_vector.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/client.h"
-#include "mongo/db/clientcursor.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/exec/collection_scan.h"
-#include "mongo/db/exec/fetch.h"
-#include "mongo/db/exec/index_scan.h"
-#include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/json.h"
-#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/exec/classic/collection_scan.h"
+#include "mongo/db/exec/classic/fetch.h"
+#include "mongo/db/exec/classic/index_scan.h"
+#include "mongo/db/exec/classic/plan_stage.h"
+#include "mongo/db/exec/classic/working_set.h"
+#include "mongo/db/exec/collection_scan_common.h"
+#include "mongo/db/local_catalog/collection.h"
+#include "mongo/db/local_catalog/collection_catalog.h"
+#include "mongo/db/local_catalog/database.h"
+#include "mongo/db/local_catalog/index_catalog.h"
+#include "mongo/db/local_catalog/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/pipeline/plan_executor_pipeline.h"
+#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/multiple_collection_accessor.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_factory.h"
+#include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_planner_params.h"
-#include "mongo/db/query/query_solution.h"
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/tailable_mode_gen.h"
+#include "mongo/db/service_context.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace {
 
-using std::shared_ptr;
 using std::string;
 using std::unique_ptr;
 
-static const NamespaceString nss("unittests.QueryPlanExecutor");
+static const NamespaceString nss =
+    NamespaceString::createNamespaceString_forTest("unittests.QueryPlanExecutor");
 
 class PlanExecutorTest : public unittest::Test {
 public:
     PlanExecutorTest() : _client(&_opCtx) {}
 
-    virtual ~PlanExecutorTest() {
-        _client.dropCollection(nss.ns());
+    ~PlanExecutorTest() override {
+        _client.dropCollection(nss);
     }
 
     void addIndex(const BSONObj& obj) {
-        ASSERT_OK(dbtests::createIndex(&_opCtx, nss.ns(), obj));
+        ASSERT_OK(dbtests::createIndex(&_opCtx, nss.ns_forTest(), obj));
     }
 
     void insert(const BSONObj& obj) {
-        _client.insert(nss.ns(), obj);
+        _client.insert(nss, obj);
     }
 
     void remove(const BSONObj& obj) {
-        _client.remove(nss.ns(), obj);
+        _client.remove(nss, obj);
     }
 
     void dropCollection() {
-        _client.dropCollection(nss.ns());
+        _client.dropCollection(nss);
     }
 
     void update(BSONObj& query, BSONObj& updateSpec) {
-        _client.update(nss.ns(), query, updateSpec);
+        _client.update(nss, query, updateSpec);
     }
 
     /**
@@ -98,9 +122,9 @@ public:
      * capable of executing a simple collection scan.
      */
     unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeCollScanExec(
-        const CollectionPtr& coll,
+        const CollectionAcquisition& coll,
         BSONObj& filterObj,
-        PlanYieldPolicy::YieldPolicy yieldPolicy = PlanYieldPolicy::YieldPolicy::YIELD_MANUAL,
+        PlanYieldPolicy::YieldPolicy yieldPolicy = PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
         TailableModeEnum tailableMode = TailableModeEnum::kNormal) {
         CollectionScanParams csparams;
         csparams.direction = CollectionScanParams::FORWARD;
@@ -110,20 +134,19 @@ public:
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(filterObj);
         query_request_helper::setTailableMode(tailableMode, findCommand.get());
-        auto statusWithCQ = CanonicalQuery::canonicalize(&_opCtx, std::move(findCommand));
-        ASSERT_OK(statusWithCQ.getStatus());
-        unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-        verify(nullptr != cq.get());
+        auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+            .expCtx = ExpressionContextBuilder{}.fromRequest(&_opCtx, *findCommand).build(),
+            .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
         // Make the stage.
-        unique_ptr<PlanStage> root(
-            new CollectionScan(cq->getExpCtxRaw(), coll, csparams, ws.get(), cq.get()->root()));
+        unique_ptr<PlanStage> root(new CollectionScan(
+            cq->getExpCtxRaw(), coll, csparams, ws.get(), cq->getPrimaryMatchExpression()));
 
         // Hand the plan off to the executor.
         auto statusWithPlanExecutor = plan_executor_factory::make(std::move(cq),
                                                                   std::move(ws),
                                                                   std::move(root),
-                                                                  &coll,
+                                                                  coll,
                                                                   yieldPolicy,
                                                                   QueryPlannerParams::DEFAULT);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
@@ -142,10 +165,10 @@ public:
      * over the specified index with the specified bounds.
      */
     unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeIndexScanExec(
-        Database* db, const CollectionPtr& coll, BSONObj& indexSpec, int start, int end) {
+        Database* db, const CollectionAcquisition& coll, BSONObj& indexSpec, int start, int end) {
         // Build the index scan stage.
         auto descriptor = getIndex(db, indexSpec);
-        IndexScanParams ixparams(&_opCtx, coll, descriptor);
+        IndexScanParams ixparams(&_opCtx, coll.getCollectionPtr(), descriptor);
         ixparams.bounds.isSimpleRange = true;
         ixparams.bounds.startKey = BSON("" << start);
         ixparams.bounds.endKey = BSON("" << end);
@@ -157,18 +180,17 @@ public:
             std::make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ixscan), nullptr, coll);
 
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
-        auto statusWithCQ = CanonicalQuery::canonicalize(&_opCtx, std::move(findCommand));
-        verify(statusWithCQ.isOK());
-        unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-        verify(nullptr != cq.get());
+        auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+            .expCtx = ExpressionContextBuilder{}.fromRequest(&_opCtx, *findCommand).build(),
+            .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
         // Hand the plan off to the executor.
         auto statusWithPlanExecutor =
             plan_executor_factory::make(std::move(cq),
                                         std::move(ws),
                                         std::move(root),
-                                        &coll,
-                                        PlanYieldPolicy::YieldPolicy::YIELD_MANUAL,
+                                        coll,
+                                        PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                         QueryPlannerParams::DEFAULT);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         return std::move(statusWithPlanExecutor.getValue());
@@ -179,14 +201,16 @@ protected:
     OperationContext& _opCtx = *_opCtxPtr;
 
     boost::intrusive_ptr<ExpressionContext> _expCtx =
-        make_intrusive<ExpressionContext>(&_opCtx, nullptr, nss);
+        ExpressionContextBuilder{}.opCtx(&_opCtx).ns(nss).build();
 
 private:
     const IndexDescriptor* getIndex(Database* db, const BSONObj& obj) {
-        CollectionPtr collection =
-            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss);
+        // TODO(SERVER-103403): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        CollectionPtr collection = CollectionPtr::CollectionPtr_UNSAFE(
+            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss));
         std::vector<const IndexDescriptor*> indexes;
-        collection->getIndexCatalog()->findIndexesByKeyPattern(&_opCtx, obj, false, &indexes);
+        collection->getIndexCatalog()->findIndexesByKeyPattern(
+            &_opCtx, obj, IndexCatalog::InclusionPolicy::kReady, &indexes);
         ASSERT_LTE(indexes.size(), 1U);
         return indexes.size() == 0 ? nullptr : indexes[0];
     }
@@ -198,7 +222,7 @@ private:
  * Test dropping the collection while an agg PlanExecutor is doing an index scan.
  */
 TEST_F(PlanExecutorTest, DropIndexScanAgg) {
-    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns_forTest());
 
     insert(BSON("_id" << 1 << "a" << 6));
     insert(BSON("_id" << 2 << "a" << 7));
@@ -206,24 +230,38 @@ TEST_F(PlanExecutorTest, DropIndexScanAgg) {
     BSONObj indexSpec = BSON("a" << 1);
     addIndex(indexSpec);
 
-    CollectionPtr collection = ctx.getCollection();
+    auto outerExec = [&]() {
+        const auto collection = ctx.getCollection();
 
-    // Create the aggregation pipeline.
-    std::vector<BSONObj> rawPipeline = {fromjson("{$match: {a: {$gte: 7, $lte: 10}}}")};
+        // Create the aggregation pipeline.
+        std::vector<BSONObj> rawPipeline = {fromjson("{$match: {a: {$gte: 7, $lte: 10}}}")};
 
-    // Create an "inner" plan executor and register it with the cursor manager so that it can
-    // get notified when the collection is dropped.
-    unique_ptr<PlanExecutor, PlanExecutor::Deleter> innerExec(
-        makeIndexScanExec(ctx.db(), collection, indexSpec, 7, 10));
+        // Create an "inner" plan executor and register it with the cursor manager so that it can
+        // get notified when the collection is dropped.
+        unique_ptr<PlanExecutor, PlanExecutor::Deleter> innerExec(
+            makeIndexScanExec(ctx.db(), collection, indexSpec, 7, 10));
 
-    // Wrap the "inner" plan executor in a DocumentSourceCursor and add it as the first source
-    // in the pipeline.
-    innerExec->saveState();
-    auto cursorSource = DocumentSourceCursor::create(
-        collection, std::move(innerExec), _expCtx, DocumentSourceCursor::CursorType::kRegular);
-    auto pipeline = Pipeline::create({cursorSource}, _expCtx);
+        // Wrap the "inner" plan executor in a DocumentSourceCursor and add it as the first source
+        // in the pipeline.
+        innerExec->saveState();
+        MultipleCollectionAccessor collections(collection);
+        auto transactionResourcesStasher =
+            make_intrusive<ShardRoleTransactionResourcesStasherForPipeline>();
+        auto catalogResourceHandle =
+            make_intrusive<DSCursorCatalogResourceHandle>(transactionResourcesStasher);
+        auto cursorSource =
+            DocumentSourceCursor::create(collections,
+                                         std::move(innerExec),
+                                         catalogResourceHandle,
+                                         _expCtx,
+                                         DocumentSourceCursor::CursorType::kRegular);
+        auto pipeline = Pipeline::create({cursorSource}, _expCtx);
 
-    auto outerExec = plan_executor_factory::make(_expCtx, std::move(pipeline));
+        // Stash the ShardRole resources.
+        stashTransactionResourcesFromOperationContext(&_opCtx, transactionResourcesStasher.get());
+
+        return plan_executor_factory::make(_expCtx, std::move(pipeline));
+    }();
 
     dropCollection();
 
@@ -235,13 +273,13 @@ TEST_F(PlanExecutorTest, DropIndexScanAgg) {
 }
 
 TEST_F(PlanExecutorTest, ShouldReportErrorIfExceedsTimeLimitDuringYield) {
-    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns_forTest());
     insert(BSON("_id" << 1));
     insert(BSON("_id" << 2));
 
     BSONObj filterObj = fromjson("{_id: {$gt: 0}}");
 
-    const CollectionPtr& coll = ctx.getCollection();
+    auto coll = ctx.getCollection();
     auto exec = makeCollScanExec(coll, filterObj, PlanYieldPolicy::YieldPolicy::ALWAYS_TIME_OUT);
 
     BSONObj resultObj;
@@ -252,13 +290,13 @@ TEST_F(PlanExecutorTest, ShouldReportErrorIfExceedsTimeLimitDuringYield) {
 }
 
 TEST_F(PlanExecutorTest, ShouldReportErrorIfKilledDuringYieldButIsTailableAndAwaitData) {
-    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns_forTest());
     insert(BSON("_id" << 1));
     insert(BSON("_id" << 2));
 
     BSONObj filterObj = fromjson("{_id: {$gt: 0}}");
 
-    const CollectionPtr& coll = ctx.getCollection();
+    auto coll = ctx.getCollection();
     auto exec = makeCollScanExec(coll,
                                  filterObj,
                                  PlanYieldPolicy::YieldPolicy::ALWAYS_TIME_OUT,
@@ -272,13 +310,13 @@ TEST_F(PlanExecutorTest, ShouldReportErrorIfKilledDuringYieldButIsTailableAndAwa
 }
 
 TEST_F(PlanExecutorTest, ShouldNotSwallowExceedsTimeLimitDuringYieldButIsTailableButNotAwaitData) {
-    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns_forTest());
     insert(BSON("_id" << 1));
     insert(BSON("_id" << 2));
 
     BSONObj filterObj = fromjson("{_id: {$gt: 0}}");
 
-    const CollectionPtr& coll = ctx.getCollection();
+    auto coll = ctx.getCollection();
     auto exec = makeCollScanExec(coll,
                                  filterObj,
                                  PlanYieldPolicy::YieldPolicy::ALWAYS_TIME_OUT,
@@ -292,13 +330,13 @@ TEST_F(PlanExecutorTest, ShouldNotSwallowExceedsTimeLimitDuringYieldButIsTailabl
 }
 
 TEST_F(PlanExecutorTest, ShouldReportErrorIfKilledDuringYield) {
-    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns_forTest());
     insert(BSON("_id" << 1));
     insert(BSON("_id" << 2));
 
     BSONObj filterObj = fromjson("{_id: {$gt: 0}}");
 
-    const CollectionPtr& coll = ctx.getCollection();
+    auto coll = ctx.getCollection();
     auto exec = makeCollScanExec(coll, filterObj, PlanYieldPolicy::YieldPolicy::ALWAYS_MARK_KILLED);
 
     BSONObj resultObj;
@@ -310,14 +348,12 @@ TEST_F(PlanExecutorTest, ShouldReportErrorIfKilledDuringYield) {
 
 class PlanExecutorSnapshotTest : public PlanExecutorTest {
 protected:
-    CollectionPtr setupCollection() {
+    void setupCollection() {
         insert(BSON("_id" << 1 << "a" << 1));
         insert(BSON("_id" << 2 << "a" << 2 << "payload"
                           << "x"));
         insert(BSON("_id" << 3 << "a" << 3));
         insert(BSON("_id" << 4 << "a" << 4));
-
-        return CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss);
     }
 
     /**
@@ -360,12 +396,12 @@ protected:
  * scan.
  */
 TEST_F(PlanExecutorSnapshotTest, SnapshotControl) {
-    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns_forTest());
     setupCollection();
 
     BSONObj filterObj = fromjson("{a: {$gte: 2}}");
 
-    const CollectionPtr& coll = ctx.getCollection();
+    auto coll = ctx.getCollection();
     auto exec = makeCollScanExec(coll, filterObj);
 
     BSONObj objOut;
@@ -384,12 +420,13 @@ TEST_F(PlanExecutorSnapshotTest, SnapshotControl) {
  * index scan.
  */
 TEST_F(PlanExecutorSnapshotTest, SnapshotTest) {
-    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
-    auto coll = setupCollection();
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns_forTest());
+    setupCollection();
     BSONObj indexSpec = BSON("_id" << 1);
     addIndex(indexSpec);
 
     BSONObj filterObj = fromjson("{a: {$gte: 2}}");
+    const auto coll = ctx.getCollection();
     auto exec = makeIndexScanExec(ctx.db(), coll, indexSpec, 2, 5);
 
     BSONObj objOut;

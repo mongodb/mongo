@@ -27,30 +27,34 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/util/cancellation.h"
+
+#include "mongo/util/future.h"
+
+#include <forward_list>
+#include <utility>
 
 #include <benchmark/benchmark.h>
-#include <forward_list>
-
-#include "mongo/util/cancellation.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr.hpp>
 
 namespace mongo {
 
 
-void BM_create_single_token_from_source(benchmark::State& state) {
+void BM_CreateSingleTokenFromSource(benchmark::State& state) {
     CancellationSource source;
     for (auto _ : state) {
         benchmark::DoNotOptimize(source.token());
     }
 }
 
-void BM_uncancelable_token_ctor(benchmark::State& state) {
+void BM_UncancelableTokenCtor(benchmark::State& state) {
     for (auto _ : state) {
         benchmark::DoNotOptimize(CancellationToken::uncancelable());
     }
 }
 
-void BM_cancel_tokens_from_single_source(benchmark::State& state) {
+void BM_CancelTokensFromSingleSource(benchmark::State& state) {
     for (auto _ : state) {
         state.PauseTiming();  // Do not time the construction and set-up of the source + tokens.
         CancellationSource source;
@@ -62,7 +66,7 @@ void BM_cancel_tokens_from_single_source(benchmark::State& state) {
     }
 }
 
-void BM_check_if_token_from_source_canceled(benchmark::State& state) {
+void BM_CheckIfTokenFromSourceCanceled(benchmark::State& state) {
     CancellationSource source;
     auto token = source.token();
     for (auto _ : state) {
@@ -70,7 +74,7 @@ void BM_check_if_token_from_source_canceled(benchmark::State& state) {
     }
 }
 
-void BM_cancellation_source_from_token_ctor(benchmark::State& state) {
+void BM_CancellationSourceFromTokenCtor(benchmark::State& state) {
     CancellationSource source;
     for (auto _ : state) {
         CancellationSource child(source.token());
@@ -78,7 +82,7 @@ void BM_cancellation_source_from_token_ctor(benchmark::State& state) {
     }
 }
 
-void BM_cancellation_source_default_ctor(benchmark::State& state) {
+void BM_CancellationSourceDefaultCtor(benchmark::State& state) {
     for (auto _ : state) {
         CancellationSource source;
         benchmark::DoNotOptimize(source);
@@ -91,7 +95,7 @@ void BM_cancellation_source_default_ctor(benchmark::State& state) {
  * hierarchy (all sources in the hierarchy, and any tokens obtained from any source in the
  * hierarchy) will be canceled.
  */
-void BM_ranged_depth_cancellation_hierarchy(benchmark::State& state) {
+void BM_RangedDepthCancellationHierarchy(benchmark::State& state) {
     for (auto _ : state) {
         state.PauseTiming();
         CancellationSource root;
@@ -109,12 +113,12 @@ void BM_ranged_depth_cancellation_hierarchy(benchmark::State& state) {
     }
 }
 
-BENCHMARK(BM_create_single_token_from_source);
-BENCHMARK(BM_uncancelable_token_ctor);
-BENCHMARK(BM_cancel_tokens_from_single_source)->RangeMultiplier(10)->Range(1, 100 * 100 * 100);
-BENCHMARK(BM_check_if_token_from_source_canceled);
-BENCHMARK(BM_cancellation_source_from_token_ctor);
-BENCHMARK(BM_cancellation_source_default_ctor);
-BENCHMARK(BM_ranged_depth_cancellation_hierarchy)->RangeMultiplier(10)->Range(1, 1000);
+BENCHMARK(BM_CreateSingleTokenFromSource);
+BENCHMARK(BM_UncancelableTokenCtor);
+BENCHMARK(BM_CancelTokensFromSingleSource)->RangeMultiplier(10)->Range(1, 100 * 100 * 100);
+BENCHMARK(BM_CheckIfTokenFromSourceCanceled);
+BENCHMARK(BM_CancellationSourceFromTokenCtor);
+BENCHMARK(BM_CancellationSourceDefaultCtor);
+BENCHMARK(BM_RangedDepthCancellationHierarchy)->RangeMultiplier(10)->Range(1, 1000);
 
 }  // namespace mongo

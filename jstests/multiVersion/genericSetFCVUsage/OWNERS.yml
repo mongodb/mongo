@@ -1,0 +1,103 @@
+version: 1.0.0
+filters:
+  - "OWNERS.yml":
+    approvers:
+      - 10gen/server-fcv
+  - "rsm*":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "bit_update_mixed_fcv.js":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "fcv_upgrade_removes_legacy_timeseries_bucketing_parameters_flag.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
+  - "view_definition_feature_compatibility_version.js":
+    approvers:
+      - 10gen/query-optimization
+  - "1_test_launching_replset.js":
+    approvers:
+      - 10gen/server-replication-reviewers
+  - "3_upgrade_replset.js":
+    approvers:
+      - 10gen/server-fcv
+  - "abort_unprepared_transactions_on_FCV_downgrade.js":
+    approvers:
+      - 10gen/server-fcv
+  - "arbiter_always_has_latest_fcv.js":
+    approvers:
+      - 10gen/server-fcv
+  - "await_prepared_transactions_on_FCV_downgrade.js":
+    approvers:
+      - 10gen/server-fcv
+  - "cannot_downgrade_from_latest_to_last_continuous.js":
+    approvers:
+      - 10gen/server-fcv
+  - "create_coll_validator_new_feature_no_applyops_check.js":
+    approvers:
+      - 10gen/query-optimization
+  - "default_startup_FCV_parameter.js":
+    approvers:
+      - 10gen/server-fcv
+  - "do_upgrade_downgrade.js":
+    approvers:
+      - 10gen/server-fcv
+  - "downgrade_replset.js":
+    approvers:
+      - 10gen/server-fcv
+  - "feature_compatibility_version_lagging_secondary.js":
+    approvers:
+      - 10gen/server-fcv
+  - "initial_sync*":
+    approvers:
+      - 10gen/server-initial-sync
+      - 10gen/server-fcv
+  - "major_version_upgrade.js":
+    approvers:
+      - 10gen/server-fcv
+  - "profile_filter_query_feature_flag.js":
+    approvers:
+      - 10gen/query-integration-observability
+  - "remove_feature_compatibility_version.js":
+    approvers:
+      - 10gen/server-fcv
+  - "repair_feature_compatibility_version.js":
+    approvers:
+      - 10gen/server-fcv
+  - "restart_during_downgrading_fcv.js":
+    approvers:
+      - 10gen/server-fcv
+  - "rollback*":
+    approvers:
+      - 10gen/server-fcv
+  - "run_feature_flag_multiversion_test.js":
+    approvers:
+      - 10gen/server-fcv
+  - "set_feature_compatibility_version.js":
+    approvers:
+      - 10gen/server-fcv
+      - 10gen/server-catalog-and-routing-routing-and-topology
+  - "set_feature_compatibility_version_confirm.js":
+    approvers:
+      - 10gen/server-fcv
+  - "test_replica_set_startup_in_downgrading_state.js":
+    approvers:
+      - 10gen/server-fcv
+  - "test_sharding_startup_in_downgrading_state.js":
+    approvers:
+      - 10gen/server-fcv
+  - "set_fcv_dry_run_mode.js":
+    approvers:
+      - 10gen/server-fcv
+      - 10gen/server-catalog-and-routing-routing-and-topology
+  - "set_fcv_automatic_dryRun.js":
+    approvers:
+      - 10gen/server-fcv
+      - 10gen/server-catalog-and-routing-routing-and-topology
+  - "fcv_transition_fails_during_is_cleaning_server_metadata.js":
+    approvers:
+      - 10gen/server-fcv
+  - "can_transition_to_originalFCV_after_failed_upgrade_or_downgrade.js":
+    approvers:
+      - 10gen/server-fcv
+      - 10gen/server-catalog-and-routing-routing-and-topology

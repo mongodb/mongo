@@ -1,0 +1,51 @@
+diff --git a/double-conversion/double-to-string.cc b/double-conversion/double-to-string.cc
+--- a/double-conversion/double-to-string.cc
++++ b/double-conversion/double-to-string.cc
+@@ -207,25 +207,21 @@ bool DoubleToStringConverter::ToShortest
+   }
+   return true;
+ }
+ 
+ 
+ bool DoubleToStringConverter::ToFixed(double value,
+                                       int requested_digits,
+                                       StringBuilder* result_builder) const {
+-  DOUBLE_CONVERSION_ASSERT(kMaxFixedDigitsBeforePoint == 60);
+-  const double kFirstNonFixed = 1e60;
+-
+   if (Double(value).IsSpecial()) {
+     return HandleSpecialValues(value, result_builder);
+   }
+ 
+   if (requested_digits > kMaxFixedDigitsAfterPoint) return false;
+-  if (value >= kFirstNonFixed || value <= -kFirstNonFixed) return false;
+ 
+   // Find a sufficiently precise decimal representation of n.
+   int decimal_point;
+   bool sign;
+   // Add space for the '\0' byte.
+   const int kDecimalRepCapacity =
+       kMaxFixedDigitsBeforePoint + kMaxFixedDigitsAfterPoint + 1;
+   char decimal_rep[kDecimalRepCapacity];
+diff --git a/double-conversion/double-to-string.h b/double-conversion/double-to-string.h
+--- a/double-conversion/double-to-string.h
++++ b/double-conversion/double-to-string.h
+@@ -33,17 +33,17 @@
+ 
+ namespace double_conversion {
+ 
+ class DoubleToStringConverter {
+  public:
+   // When calling ToFixed with a double > 10^kMaxFixedDigitsBeforePoint
+   // or a requested_digits parameter > kMaxFixedDigitsAfterPoint then the
+   // function returns false.
+-  static const int kMaxFixedDigitsBeforePoint = 60;
++  static const int kMaxFixedDigitsBeforePoint = 308;
+   static const int kMaxFixedDigitsAfterPoint = 100;
+ 
+   // When calling ToExponential with a requested_digits
+   // parameter > kMaxExponentialDigits then the function returns false.
+   static const int kMaxExponentialDigits = 120;
+ 
+   // When calling ToPrecision with a requested_digits
+   // parameter < kMinPrecisionDigits or requested_digits > kMaxPrecisionDigits

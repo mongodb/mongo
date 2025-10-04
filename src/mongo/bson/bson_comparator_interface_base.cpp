@@ -27,16 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/bson/bson_comparator_interface_base.h"
 
-#include <boost/functional/hash.hpp>
-
-#include "mongo/base/simple_string_data_comparator.h"
+#include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/util/time_support.h"
+
+#include <cmath>
+#include <limits>
+
+#include <boost/functional/hash.hpp>
 
 namespace mongo {
 
@@ -45,7 +50,7 @@ void BSONComparatorInterfaceBase<T>::hashCombineBSONObj(
     size_t& seed,
     const BSONObj& objToHash,
     ComparisonRulesSet rules,
-    const StringData::ComparatorInterface* stringComparator) {
+    const StringDataComparator* stringComparator) {
 
     if (rules & ComparisonRules::kIgnoreFieldOrder) {
         BSONObjIteratorSorted iter(objToHash);
@@ -64,36 +69,36 @@ void BSONComparatorInterfaceBase<T>::hashCombineBSONElement(
     size_t& hash,
     BSONElement elemToHash,
     ComparisonRulesSet rules,
-    const StringData::ComparatorInterface* stringComparator) {
+    const StringDataComparator* stringComparator) {
     boost::hash_combine(hash, elemToHash.canonicalType());
 
     const StringData fieldName = elemToHash.fieldNameStringData();
     if ((rules & ComparisonRules::kConsiderFieldName) && !fieldName.empty()) {
-        SimpleStringDataComparator::kInstance.hash_combine(hash, fieldName);
+        simpleStringDataComparator.hash_combine(hash, fieldName);
     }
 
     switch (elemToHash.type()) {
-        case mongo::EOO:
-        case mongo::Undefined:
-        case mongo::jstNULL:
-        case mongo::MaxKey:
-        case mongo::MinKey:
+        case mongo::BSONType::eoo:
+        case mongo::BSONType::undefined:
+        case mongo::BSONType::null:
+        case mongo::BSONType::maxKey:
+        case mongo::BSONType::minKey:
             // These are valueless types
             break;
 
-        case mongo::Bool:
+        case mongo::BSONType::boolean:
             boost::hash_combine(hash, elemToHash.boolean());
             break;
 
-        case mongo::bsonTimestamp:
+        case mongo::BSONType::timestamp:
             boost::hash_combine(hash, elemToHash.timestamp().asULL());
             break;
 
-        case mongo::Date:
+        case mongo::BSONType::date:
             boost::hash_combine(hash, elemToHash.date().asInt64());
             break;
 
-        case mongo::NumberDecimal: {
+        case mongo::BSONType::numberDecimal: {
             const Decimal128 dcml = elemToHash.numberDecimal();
             if (dcml.toAbs().isGreater(Decimal128(std::numeric_limits<double>::max(),
                                                   Decimal128::kRoundTo34Digits,
@@ -109,10 +114,11 @@ void BSONComparatorInterfaceBase<T>::hashCombineBSONElement(
             // Else, fall through and convert the decimal to a double and hash.
             // At this point the decimal fits into the range of doubles, is infinity, or is NaN,
             // which doubles have a cheaper representation for.
+            [[fallthrough]];
         }
-        case mongo::NumberDouble:
-        case mongo::NumberLong:
-        case mongo::NumberInt: {
+        case mongo::BSONType::numberDouble:
+        case mongo::BSONType::numberLong:
+        case mongo::BSONType::numberInt: {
             // This converts all numbers to doubles, which ignores the low-order bits of
             // NumberLongs > 2**53 and precise decimal numbers without double representations,
             // but that is ok since the hash will still be the same for equal numbers and is
@@ -129,52 +135,51 @@ void BSONComparatorInterfaceBase<T>::hashCombineBSONElement(
             break;
         }
 
-        case mongo::jstOID:
+        case mongo::BSONType::oid:
             elemToHash.__oid().hash_combine(hash);
             break;
 
-        case mongo::String: {
+        case mongo::BSONType::string: {
             if (stringComparator) {
                 stringComparator->hash_combine(hash, elemToHash.valueStringData());
             } else {
-                SimpleStringDataComparator::kInstance.hash_combine(hash,
-                                                                   elemToHash.valueStringData());
+                simpleStringDataComparator.hash_combine(hash, elemToHash.valueStringData());
             }
             break;
         }
 
-        case mongo::Code:
-        case mongo::Symbol:
-            SimpleStringDataComparator::kInstance.hash_combine(hash, elemToHash.valueStringData());
+        case mongo::BSONType::code:
+        case mongo::BSONType::symbol:
+            simpleStringDataComparator.hash_combine(hash, elemToHash.valueStringData());
             break;
 
-        case mongo::Object:
-        case mongo::Array:
+        case mongo::BSONType::object:
+        case mongo::BSONType::array:
             hashCombineBSONObj(hash,
                                elemToHash.embeddedObject(),
                                rules | ComparisonRules::kConsiderFieldName,
                                stringComparator);
             break;
 
-        case mongo::DBRef:
-        case mongo::BinData:
+        case mongo::BSONType::dbRef:
+        case mongo::BSONType::binData:
             // All bytes of the value are required to be identical.
-            SimpleStringDataComparator::kInstance.hash_combine(
+            simpleStringDataComparator.hash_combine(
                 hash, StringData(elemToHash.value(), elemToHash.valuesize()));
             break;
 
-        case mongo::RegEx:
-            SimpleStringDataComparator::kInstance.hash_combine(hash, elemToHash.regex());
-            SimpleStringDataComparator::kInstance.hash_combine(hash, elemToHash.regexFlags());
+        case mongo::BSONType::regEx:
+            simpleStringDataComparator.hash_combine(hash, elemToHash.regex());
+            simpleStringDataComparator.hash_combine(hash, elemToHash.regexFlags());
             break;
 
-        case mongo::CodeWScope: {
-            SimpleStringDataComparator::kInstance.hash_combine(
+        case mongo::BSONType::codeWScope: {
+            simpleStringDataComparator.hash_combine(
                 hash, StringData(elemToHash.codeWScopeCode(), elemToHash.codeWScopeCodeLen()));
             hashCombineBSONObj(hash,
                                elemToHash.codeWScopeObject(),
                                rules | ComparisonRules::kConsiderFieldName,
-                               &SimpleStringDataComparator::kInstance);
+                               &simpleStringDataComparator);
             break;
         }
     }

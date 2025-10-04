@@ -1,0 +1,14 @@
+test_kind: benchmark_test
+
+selector:
+  root: bazel-bin/install/install-mongo_benchmark-stripped_test_list.txt
+  # Please always add the glob pattern for the canary tests as part of "include_files" section when
+  # defining a new test suite for your benchmarks. Doing so ensures they'll still run as part of the
+  # Evergreen task associated with the new test suite.
+  include_files:
+    - bazel-bin/**/tracking_allocator_bm*
+
+executor:
+  config: {}
+  hooks:
+    - class: GenerateAndCheckPerfResults

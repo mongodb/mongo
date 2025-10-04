@@ -1,0 +1,59 @@
+# This suite is used to run the smoke tests for the features owned by the Cluster Scalability team.
+# It is intended to be executed locally and should finish in a short time frame (< 10 minutes) with
+# The goal being to provide quick feedback that none of the major CS features are broken.
+
+test_kind: js_test
+
+selector:
+  roots:
+    # Analyze shard key smoke tests
+    - jstests/core_sharding/analyze_shard_key/analyze_shard_key.js
+    - jstests/core_sharding/analyze_shard_key/cardinality_and_frequency.js
+    - jstests/core_sharding/analyze_shard_key/configure_query_analyzer_basic.js
+    - jstests/core_sharding/analyze_shard_key/configure_query_analyzer_cmd_validation.js
+    - jstests/core_sharding/analyze_shard_key/configure_query_analyzer_persistence.js
+
+    # Chunk migration smoke tests
+    - jstests/core_sharding/chunk_migration/chunk_operations_preserve_uuid.js
+    - jstests/core_sharding/chunk_migration/merge_split_chunks.js
+    - jstests/core_sharding/chunk_migration/move_chunk.js
+
+    # Resharding smoke tests
+    - jstests/core_sharding/resharding/reshard_collection_basic.js
+    - jstests/core_sharding/resharding/reshard_collection_clustered.js
+    - jstests/core_sharding/resharding/reshard_collection_resharding_improvements_basic.js
+    - jstests/core_sharding/resharding/reshard_collection_timeseries.js
+
+    # movePrimary smoke tests
+    - jstests/core_sharding/ddl/move_primary_preserve_data.js
+
+    # moveCollection smoke tests
+    - jstests/core_sharding/move_collection/move_collection_basic.js
+    - jstests/core_sharding/move_collection/move_collection_capped_collection.js
+
+    # refineCollectionShardKey smoke tests
+    - jstests/core_sharding/ddl/refine_collection_shard_key.js
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+  config:
+    shell_options: {}
+  hooks:
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: ValidateCollections
+    - class: CheckOrphansDeleted
+  fixture:
+    class: ShardedClusterFixture
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+    num_rs_nodes_per_shard: 3
+    num_shards: 2

@@ -36,8 +36,7 @@ unw_create_addr_space (unw_accessors_t *a, int byte_order)
   unw_addr_space_t as;
 
   /* SH supports little-endian and big-endian. */
-  if (byte_order != 0 && byte_order != __LITTLE_ENDIAN
-      && byte_order != __BIG_ENDIAN)
+  if (byte_order != 0 && byte_order_is_valid(byte_order) == 0)
     return NULL;
 
   as = malloc (sizeof (*as));
@@ -49,7 +48,7 @@ unw_create_addr_space (unw_accessors_t *a, int byte_order)
   as->acc = *a;
 
   /* Default to little-endian for SH. */
-  if (byte_order == 0 || byte_order == __LITTLE_ENDIAN)
+  if (byte_order == 0 || byte_order == UNW_LITTLE_ENDIAN)
     as->big_endian = 0;
   else
     as->big_endian = 1;

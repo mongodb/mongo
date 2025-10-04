@@ -1,0 +1,25 @@
+indexOptions
+indexOptions
+indexOptions.coll as fuzzer_coll
+
+0
+:results {aggregate: "fuzzer_coll", pipeline: [{$limit:5}], cursor: {}}
+[
+{"_id":0},
+{"_id":1},
+{"_id":3},
+{"_id":2},
+{"_id":4}
+]
+
+1
+:sortResults {aggregate: "fuzzer_coll", pipeline: [{$limit:1}], cursor: {}}
+[
+{"_id":0}
+]
+
+2
+:results {aggregate: "fuzzer_coll", pipeline: [{$limit:1}], cursor: {}}
+[
+{"_id":0}
+]

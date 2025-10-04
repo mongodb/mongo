@@ -1,0 +1,17 @@
+# This test suite runs the tests with 'internalQueryPlannerUseMultiplannerForSingleSolutions'
+# query knob enabled to increase coverage of multiplanning and replanning.
+- name: excluded_files
+  value:
+    exclude_with_any_tags:
+      # Used to tag tests which cannot run in the 'multiplan_single_solutions' suites.
+      - does_not_support_multiplanning_single_solutions
+
+- name: enable
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              setParameters:
+                internalQueryPlannerUseMultiplannerForSingleSolutions: true

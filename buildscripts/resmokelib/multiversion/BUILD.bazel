@@ -1,0 +1,28 @@
+load("@poetry//:dependencies.bzl", "dependency")
+
+py_library(
+    name = "multiversion",
+    srcs = [
+        "__init__.py",
+        "multiversion_service.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+        dependency(
+            "structlog",
+            group = "evergreen",
+        ),
+        dependency(
+            "packaging",
+            group = "testing",
+        ),
+        dependency(
+            "pydantic",
+            group = "evergreen",
+        ),
+    ],
+)

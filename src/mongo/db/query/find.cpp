@@ -27,60 +27,37 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/query/find.h"
 
-#include <memory>
-
-#include "mongo/base/error_codes.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/client.h"
-#include "mongo/db/clientcursor.h"
-#include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/curop_failpoint_helpers.h"
-#include "mongo/db/cursor_manager.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/exec/filter.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/keypattern.h"
-#include "mongo/db/matcher/extensions_callback_real.h"
-#include "mongo/db/query/collection_query_info.h"
-#include "mongo/db/query/explain.h"
-#include "mongo/db/query/find_common.h"
-#include "mongo/db/query/get_executor.h"
-#include "mongo/db/query/internal_plans.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/client_cursor/clientcursor.h"
+#include "mongo/db/query/client_cursor/collect_query_stats_mongod.h"
+#include "mongo/db/query/collection_index_usage_tracker_decoration.h"
+#include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/query/query_planner_params.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/stats/resource_consumption_metrics.h"
-#include "mongo/db/stats/top.h"
-#include "mongo/db/storage/storage_options.h"
-#include "mongo/db/views/view_catalog.h"
-#include "mongo/logv2/log.h"
-#include "mongo/s/chunk_version.h"
-#include "mongo/s/stale_exception.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/str.h"
+
+#include <memory>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 
 namespace mongo {
 
-using std::unique_ptr;
 
 // Failpoint for checking whether we've received a getmore.
 MONGO_FAIL_POINT_DEFINE(failReceivedGetmore);
 
 bool shouldSaveCursor(OperationContext* opCtx,
                       const CollectionPtr& collection,
-                      PlanExecutor::ExecState finalState,
                       PlanExecutor* exec) {
     const FindCommandRequest& findCommand = exec->getCanonicalQuery()->getFindCommandRequest();
     if (findCommand.getSingleBatch()) {
@@ -108,25 +85,41 @@ void endQueryOp(OperationContext* opCtx,
                 const CollectionPtr& collection,
                 const PlanExecutor& exec,
                 long long numResults,
-                CursorId cursorId) {
+                boost::optional<ClientCursorPin&> cursor,
+                const BSONObj& cmdObj) {
     auto curOp = CurOp::get(opCtx);
 
-    // Fill out basic CurOp query exec properties.
-    curOp->debug().nreturned = numResults;
-    curOp->debug().cursorid = (0 == cursorId ? -1 : cursorId);
-    curOp->debug().cursorExhausted = (0 == cursorId);
+    // Fill out basic CurOp query exec properties. More metrics (nreturned and executionTime)
+    // are collected within collectQueryStatsMongod.
+    curOp->debug().cursorid = (cursor.has_value() ? cursor->getCursor()->cursorid() : -1);
+    curOp->debug().cursorExhausted = !cursor.has_value();
+    curOp->debug().additiveMetrics.nBatches = 1;
 
     // Fill out CurOp based on explain summary statistics.
     PlanSummaryStats summaryStats;
     auto&& explainer = exec.getPlanExplainer();
     explainer.getSummaryStats(&summaryStats);
-    curOp->debug().setPlanSummaryMetrics(summaryStats);
 
     if (collection) {
-        CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, collection, summaryStats);
+        CollectionIndexUsageTrackerDecoration::recordCollectionIndexUsage(
+            collection.get(),
+            summaryStats.collectionScans,
+            summaryStats.collectionScansNonTailable,
+            summaryStats.indexesUsed);
     }
 
-    if (curOp->shouldDBProfile(opCtx)) {
+    curOp->debug().setPlanSummaryMetrics(std::move(summaryStats));
+    curOp->setEndOfOpMetrics(numResults);
+
+    if (cursor) {
+        collectQueryStatsMongod(opCtx, *cursor);
+    } else {
+        auto* cq = exec.getCanonicalQuery();
+        const auto& expCtx = cq ? cq->getExpCtx() : makeBlankExpressionContext(opCtx, exec.nss());
+        collectQueryStatsMongod(opCtx, expCtx, std::move(curOp->debug().queryStatsInfo.key));
+    }
+
+    if (curOp->shouldDBProfile()) {
         auto&& [stats, _] = explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
         curOp->debug().execStats = std::move(stats);
     }

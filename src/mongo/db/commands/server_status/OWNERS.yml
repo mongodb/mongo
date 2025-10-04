@@ -1,0 +1,14 @@
+version: 2.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "server_status_security_servers.cpp":
+    approvers:
+      - 10gen/server-security
+  - "read_write_concern_defaults_server_status.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
+  - "logical_session_server_status_section.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology

@@ -27,16 +27,16 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 server_parameters:
     featureCompatibilityVersion:
-        description: 'Read-only view of current Feature Compatability Version'
-        # Actually, never.
-        set_at: startup
+        description: "Read-only view of current Feature Compatability Version"
+        set_at: "readonly"
         cpp_class:
             name: FeatureCompatibilityVersionParameter
-            override_ctor: true
+        redact: false
+
     internalValidateFeaturesAsPrimary:
         deprecated_name: "internalValidateFeaturesAsMaster"
         description: >
@@ -46,3 +46,11 @@ server_parameters:
         cpp_vartype: bool
         cpp_varname: gInternalValidateFeaturesAsPrimary
         default: true
+        redact: false
+
+    defaultStartupFCV:
+        description: "Startup parameter to set a default FCV at startup"
+        set_at: startup
+        cpp_vartype: std::string
+        cpp_varname: gDefaultStartupFCV
+        redact: false

@@ -27,82 +27,59 @@
  *    it in the license file.
  */
 
-// #pragma once is not used in this header.
-// This header attempts to enforce the rule that no logging should be done in
-// an inline function defined in a header.
-// To enforce this "no logging in header" rule, we use #include guards with a validating #else
-// clause.
-// Also, this header relies on a preprocessor macro to determine the default component for the
-// unconditional logging functions severe(), error(), warning() and log(). Disallowing multiple
-// inclusion of log.h will ensure that the default component will be set correctly.
-
-#if defined(MONGO_UTIL_LOGV2_H_)
-#error \
-    "mongo/logv2/log.h cannot be included multiple times. " \
-       "This may occur when log.h is included in a header. " \
-       "Please check your #include's."
-#else  // MONGO_UTIL_LOGV2_H_
-#define MONGO_UTIL_LOGV2_H_
+#pragma once
 
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/logv2/log_component.h"
-#include "mongo/logv2/log_component_settings.h"
-#include "mongo/logv2/log_debug.h"
-#include "mongo/logv2/log_detail.h"
-#include "mongo/logv2/log_domain.h"
-#include "mongo/logv2/log_options.h"
-#include "mongo/logv2/log_severity.h"
-#include "mongo/logv2/redaction.h"
+#include "mongo/logv2/attribute_storage.h"       // IWYU pragma: export
+#include "mongo/logv2/log_attr.h"                // IWYU pragma: export
+#include "mongo/logv2/log_component.h"           // IWYU pragma: export
+#include "mongo/logv2/log_component_settings.h"  // IWYU pragma: export
+#include "mongo/logv2/log_debug.h"               // IWYU pragma: export
+#include "mongo/logv2/log_detail.h"              // IWYU pragma: export
+#include "mongo/logv2/log_domain.h"              // IWYU pragma: export
+#include "mongo/logv2/log_manager.h"             // IWYU pragma: export
+#include "mongo/logv2/log_options.h"             // IWYU pragma: export
+#include "mongo/logv2/log_severity.h"            // IWYU pragma: export
+#include "mongo/logv2/log_tag.h"                 // IWYU pragma: export
+#include "mongo/logv2/log_truncation.h"          // IWYU pragma: export
+#include "mongo/logv2/redaction.h"               // IWYU pragma: export
 #include "mongo/util/errno_util.h"
 
-namespace {
-#if defined(MONGO_LOGV2_DEFAULT_COMPONENT)
-// Provide log component in global scope so that MONGO_LOG will always have a valid component.
-// Global log component will be kDefault unless overridden by MONGO_LOGV2_DEFAULT_COMPONENT.
-const mongo::logv2::LogComponent MongoLogV2DefaultComponent_component =
-    MONGO_LOGV2_DEFAULT_COMPONENT;
-#else
-#error \
-    "mongo/logv2/log.h requires MONGO_LOGV2_DEFAULT_COMPONENT to be defined. " \
-       "Please see https://github.com/mongodb/mongo/blob/master/src/mongo/logv2/README.md "
-#endif  // MONGO_LOGV2_DEFAULT_COMPONENT
-}  // namespace
+// The logging macros below are documented in detail under docs/logging.md
+//
+// They all (except LOGV2_IMPL) require a `MONGO_LOGV2_DEFAULT_COMPONENT` macro.
+// This configuration macro must expand at their point of use to a
+// `LogComponent` expression. For example:
+//
+//     #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+//
+//     LOGV2(1234500, "Something interesting happened");
+//
 
-// The logging macros below are documented in detail under src/mongo/logv2/README.md
-namespace mongo {
-// Internal helper to be able to create LogOptions with two arguments from other macros
-#define MAKE_OPTIONS_ARG2(ARG0, ARG1) \
-    ::mongo::logv2::LogOptions {      \
-        ARG0, ARG1                    \
-    }
-
-// Internal helper to perform the logging where it requires the MESSAGE to be a compile time string.
-#define LOGV2_IMPL(ID, SEVERITY, OPTIONS, FMTSTR_MESSAGE, ...) \
-    ::mongo::logv2::detail::doLog(ID, SEVERITY, OPTIONS, FMT_STRING(FMTSTR_MESSAGE), ##__VA_ARGS__)
+// Internal helper to perform the logging.
+// Requires `MESSAGE` to be a string literal.
+#define LOGV2_IMPL(ID, SEVERITY, OPTIONS, MESSAGE, ...) \
+    ::mongo::logv2::detail::doLog(ID, SEVERITY, OPTIONS, MESSAGE, ##__VA_ARGS__)
 
 /**
  * Log with default severity and component.
  *
- * This macro acts like a function with 4 overloads:
- *   LOGV2(ID, FMTSTR_MESSAGE, ATTRIBUTES...)
- *   LOGV2(ID, FMTSTR_MESSAGE, DYNAMIC_ATTRIBUTES)
- *   LOGV2(ID, FMTSTR_MESSAGE, MESSAGE, ATTRIBUTES...)
- *   LOGV2(ID, FMTSTR_MESSAGE, MESSAGE, DYNAMIC_ATTRIBUTES)
+ * This macro acts like an overloaded function:
+ *   LOGV2(ID, MSG, ATTRIBUTES...)
+ *   LOGV2(ID, MSG, DYNAMIC_ATTRIBUTES)
  *
  * ID is a unique signed int32 in the same number space as other error codes.
- * FMTSTR_MESSAGE is a compile time string constant. Regular "string" is preferred.
- *   This string may contain libfmt replacement fields.
- * MESSAGE is an optional compile time string constant of message without libfmt replacement fields
+ * MSG is a string literal
  * ATTRIBUTES zero more more static attributes created with "name"_attr=value expressions
  * DYNAMIC_ATTRIBUTES single argument DynamicAttributes object
  *   no attributes may be passed with "name"_attr=value when this is used
  */
-#define LOGV2(ID, FMTSTR_MESSAGE, ...)                                           \
-    LOGV2_IMPL(ID,                                                               \
-               ::mongo::logv2::LogSeverity::Log(),                               \
-               ::mongo::logv2::LogOptions{MongoLogV2DefaultComponent_component}, \
-               FMTSTR_MESSAGE,                                                   \
+#define LOGV2(ID, MSG, ...)                                               \
+    LOGV2_IMPL(ID,                                                        \
+               ::mongo::logv2::LogSeverity::Log(),                        \
+               ::mongo::logv2::LogOptions{MONGO_LOGV2_DEFAULT_COMPONENT}, \
+               MSG,                                                       \
                ##__VA_ARGS__)
 
 /**
@@ -113,24 +90,24 @@ namespace mongo {
  *
  * See LOGV2() for documentation of the other parameters
  */
-#define LOGV2_OPTIONS(ID, OPTIONS, FMTSTR_MESSAGE, ...)            \
-    LOGV2_IMPL(ID,                                                 \
-               ::mongo::logv2::LogSeverity::Log(),                 \
-               ::mongo::logv2::LogOptions::ensureValidComponent(   \
-                   OPTIONS, MongoLogV2DefaultComponent_component), \
-               FMTSTR_MESSAGE,                                     \
-               ##__VA_ARGS__)
+#define LOGV2_OPTIONS(ID, OPTIONS, MSG, ...)                                                      \
+    LOGV2_IMPL(                                                                                   \
+        ID,                                                                                       \
+        ::mongo::logv2::LogSeverity::Log(),                                                       \
+        ::mongo::logv2::LogOptions::ensureValidComponent(OPTIONS, MONGO_LOGV2_DEFAULT_COMPONENT), \
+        MSG,                                                                                      \
+        ##__VA_ARGS__)
 
 /**
  * Log with info severity.
  *
  * See LOGV2() for documentation of the parameters
  */
-#define LOGV2_INFO(ID, FMTSTR_MESSAGE, ...)                                      \
-    LOGV2_IMPL(ID,                                                               \
-               ::mongo::logv2::LogSeverity::Info(),                              \
-               ::mongo::logv2::LogOptions{MongoLogV2DefaultComponent_component}, \
-               FMTSTR_MESSAGE,                                                   \
+#define LOGV2_INFO(ID, MSG, ...)                                          \
+    LOGV2_IMPL(ID,                                                        \
+               ::mongo::logv2::LogSeverity::Info(),                       \
+               ::mongo::logv2::LogOptions{MONGO_LOGV2_DEFAULT_COMPONENT}, \
+               MSG,                                                       \
                ##__VA_ARGS__)
 
 /**
@@ -138,24 +115,24 @@ namespace mongo {
  *
  * See LOGV2_OPTIONS() for documentation of the parameters
  */
-#define LOGV2_INFO_OPTIONS(ID, OPTIONS, FMTSTR_MESSAGE, ...)       \
-    LOGV2_IMPL(ID,                                                 \
-               ::mongo::logv2::LogSeverity::Info(),                \
-               ::mongo::logv2::LogOptions::ensureValidComponent(   \
-                   OPTIONS, MongoLogV2DefaultComponent_component), \
-               FMTSTR_MESSAGE,                                     \
-               ##__VA_ARGS__)
+#define LOGV2_INFO_OPTIONS(ID, OPTIONS, MSG, ...)                                                 \
+    LOGV2_IMPL(                                                                                   \
+        ID,                                                                                       \
+        ::mongo::logv2::LogSeverity::Info(),                                                      \
+        ::mongo::logv2::LogOptions::ensureValidComponent(OPTIONS, MONGO_LOGV2_DEFAULT_COMPONENT), \
+        MSG,                                                                                      \
+        ##__VA_ARGS__)
 
 /**
  * Log with warning severity.
  *
  * See LOGV2() for documentation of the parameters
  */
-#define LOGV2_WARNING(ID, FMTSTR_MESSAGE, ...)                                   \
-    LOGV2_IMPL(ID,                                                               \
-               ::mongo::logv2::LogSeverity::Warning(),                           \
-               ::mongo::logv2::LogOptions{MongoLogV2DefaultComponent_component}, \
-               FMTSTR_MESSAGE,                                                   \
+#define LOGV2_WARNING(ID, MSG, ...)                                       \
+    LOGV2_IMPL(ID,                                                        \
+               ::mongo::logv2::LogSeverity::Warning(),                    \
+               ::mongo::logv2::LogOptions{MONGO_LOGV2_DEFAULT_COMPONENT}, \
+               MSG,                                                       \
                ##__VA_ARGS__)
 
 /**
@@ -163,24 +140,24 @@ namespace mongo {
  *
  * See LOGV2_OPTIONS() for documentation of the parameters
  */
-#define LOGV2_WARNING_OPTIONS(ID, OPTIONS, FMTSTR_MESSAGE, ...)    \
-    LOGV2_IMPL(ID,                                                 \
-               ::mongo::logv2::LogSeverity::Warning(),             \
-               ::mongo::logv2::LogOptions::ensureValidComponent(   \
-                   OPTIONS, MongoLogV2DefaultComponent_component), \
-               FMTSTR_MESSAGE,                                     \
-               ##__VA_ARGS__)
+#define LOGV2_WARNING_OPTIONS(ID, OPTIONS, MSG, ...)                                              \
+    LOGV2_IMPL(                                                                                   \
+        ID,                                                                                       \
+        ::mongo::logv2::LogSeverity::Warning(),                                                   \
+        ::mongo::logv2::LogOptions::ensureValidComponent(OPTIONS, MONGO_LOGV2_DEFAULT_COMPONENT), \
+        MSG,                                                                                      \
+        ##__VA_ARGS__)
 
 /**
  * Log with error severity.
  *
  * See LOGV2() for documentation of the parameters
  */
-#define LOGV2_ERROR(ID, FMTSTR_MESSAGE, ...)                                     \
-    LOGV2_IMPL(ID,                                                               \
-               ::mongo::logv2::LogSeverity::Error(),                             \
-               ::mongo::logv2::LogOptions{MongoLogV2DefaultComponent_component}, \
-               FMTSTR_MESSAGE,                                                   \
+#define LOGV2_ERROR(ID, MSG, ...)                                         \
+    LOGV2_IMPL(ID,                                                        \
+               ::mongo::logv2::LogSeverity::Error(),                      \
+               ::mongo::logv2::LogOptions{MONGO_LOGV2_DEFAULT_COMPONENT}, \
+               MSG,                                                       \
                ##__VA_ARGS__)
 
 /**
@@ -188,27 +165,27 @@ namespace mongo {
  *
  * See LOGV2_OPTIONS() for documentation of the parameters
  */
-#define LOGV2_ERROR_OPTIONS(ID, OPTIONS, FMTSTR_MESSAGE, ...)      \
-    LOGV2_IMPL(ID,                                                 \
-               ::mongo::logv2::LogSeverity::Error(),               \
-               ::mongo::logv2::LogOptions::ensureValidComponent(   \
-                   OPTIONS, MongoLogV2DefaultComponent_component), \
-               FMTSTR_MESSAGE,                                     \
-               ##__VA_ARGS__)
+#define LOGV2_ERROR_OPTIONS(ID, OPTIONS, MSG, ...)                                                \
+    LOGV2_IMPL(                                                                                   \
+        ID,                                                                                       \
+        ::mongo::logv2::LogSeverity::Error(),                                                     \
+        ::mongo::logv2::LogOptions::ensureValidComponent(OPTIONS, MONGO_LOGV2_DEFAULT_COMPONENT), \
+        MSG,                                                                                      \
+        ##__VA_ARGS__)
 
 /**
  * Log with fatal severity. fassertFailed(ID) will be performed after writing the log
  *
  * See LOGV2() for documentation of the parameters
  */
-#define LOGV2_FATAL(ID, FMTSTR_MESSAGE, ...)                                         \
-    do {                                                                             \
-        LOGV2_IMPL(ID,                                                               \
-                   ::mongo::logv2::LogSeverity::Severe(),                            \
-                   ::mongo::logv2::LogOptions{MongoLogV2DefaultComponent_component}, \
-                   FMTSTR_MESSAGE,                                                   \
-                   ##__VA_ARGS__);                                                   \
-        fassertFailed(ID);                                                           \
+#define LOGV2_FATAL(ID, MSG, ...)                                             \
+    do {                                                                      \
+        LOGV2_IMPL(ID,                                                        \
+                   ::mongo::logv2::LogSeverity::Severe(),                     \
+                   ::mongo::logv2::LogOptions{MONGO_LOGV2_DEFAULT_COMPONENT}, \
+                   MSG,                                                       \
+                   ##__VA_ARGS__);                                            \
+        fassertFailed(ID);                                                    \
     } while (false)
 
 /**
@@ -216,15 +193,15 @@ namespace mongo {
  *
  * See LOGV2() for documentation of the parameters
  */
-#define LOGV2_FATAL_NOTRACE(ID, FMTSTR_MESSAGE, ...)                             \
-    do {                                                                         \
-        LOGV2_IMPL(ID,                                                           \
-                   ::mongo::logv2::LogSeverity::Severe(),                        \
-                   MAKE_OPTIONS_ARG2(MongoLogV2DefaultComponent_component,       \
-                                     ::mongo::logv2::FatalMode::kAssertNoTrace), \
-                   FMTSTR_MESSAGE,                                               \
-                   ##__VA_ARGS__);                                               \
-        fassertFailedNoTrace(ID);                                                \
+#define LOGV2_FATAL_NOTRACE(ID, MSG, ...)                                                   \
+    do {                                                                                    \
+        LOGV2_IMPL(ID,                                                                      \
+                   ::mongo::logv2::LogSeverity::Severe(),                                   \
+                   (::mongo::logv2::LogOptions{MONGO_LOGV2_DEFAULT_COMPONENT,               \
+                                               ::mongo::logv2::FatalMode::kAssertNoTrace}), \
+                   MSG,                                                                     \
+                   ##__VA_ARGS__);                                                          \
+        fassertFailedNoTrace(ID);                                                           \
     } while (false)
 
 /**
@@ -232,12 +209,12 @@ namespace mongo {
  *
  * See LOGV2() for documentation of the parameters
  */
-#define LOGV2_FATAL_CONTINUE(ID, FMTSTR_MESSAGE, ...)                   \
-    LOGV2_IMPL(ID,                                                      \
-               ::mongo::logv2::LogSeverity::Severe(),                   \
-               MAKE_OPTIONS_ARG2(MongoLogV2DefaultComponent_component,  \
-                                 ::mongo::logv2::FatalMode::kContinue), \
-               FMTSTR_MESSAGE,                                          \
+#define LOGV2_FATAL_CONTINUE(ID, MSG, ...)                                         \
+    LOGV2_IMPL(ID,                                                                 \
+               ::mongo::logv2::LogSeverity::Severe(),                              \
+               (::mongo::logv2::LogOptions{MONGO_LOGV2_DEFAULT_COMPONENT,          \
+                                           ::mongo::logv2::FatalMode::kContinue}), \
+               MSG,                                                                \
                ##__VA_ARGS__)
 
 /**
@@ -247,23 +224,20 @@ namespace mongo {
  *
  * See LOGV2_OPTIONS() for documentation of the parameters
  */
-#define LOGV2_FATAL_OPTIONS(ID, OPTIONS, FMTSTR_MESSAGE, ...)                       \
-    do {                                                                            \
-        auto optionsMacroLocal_ = ::mongo::logv2::LogOptions::ensureValidComponent( \
-            OPTIONS, MongoLogV2DefaultComponent_component);                         \
-        LOGV2_IMPL(ID,                                                              \
-                   ::mongo::logv2::LogSeverity::Severe(),                           \
-                   optionsMacroLocal_,                                              \
-                   FMTSTR_MESSAGE,                                                  \
-                   ##__VA_ARGS__);                                                  \
-        switch (optionsMacroLocal_.fatalMode()) {                                   \
-            case ::mongo::logv2::FatalMode::kAssert:                                \
-                fassertFailed(ID);                                                  \
-            case ::mongo::logv2::FatalMode::kAssertNoTrace:                         \
-                fassertFailedNoTrace(ID);                                           \
-            case ::mongo::logv2::FatalMode::kContinue:                              \
-                break;                                                              \
-        };                                                                          \
+#define LOGV2_FATAL_OPTIONS(ID, OPTIONS, MSG, ...)                                              \
+    do {                                                                                        \
+        auto optionsMacroLocal_ = ::mongo::logv2::LogOptions::ensureValidComponent(             \
+            OPTIONS, MONGO_LOGV2_DEFAULT_COMPONENT);                                            \
+        LOGV2_IMPL(                                                                             \
+            ID, ::mongo::logv2::LogSeverity::Severe(), optionsMacroLocal_, MSG, ##__VA_ARGS__); \
+        switch (optionsMacroLocal_.fatalMode()) {                                               \
+            case ::mongo::logv2::FatalMode::kAssert:                                            \
+                fassertFailed(ID);                                                              \
+            case ::mongo::logv2::FatalMode::kAssertNoTrace:                                     \
+                fassertFailedNoTrace(ID);                                                       \
+            case ::mongo::logv2::FatalMode::kContinue:                                          \
+                break;                                                                          \
+        };                                                                                      \
     } while (false)
 
 /**
@@ -273,16 +247,15 @@ namespace mongo {
  *
  * See LOGV2_OPTIONS() for documentation of the other parameters
  */
-#define LOGV2_DEBUG_OPTIONS(ID, DLEVEL, OPTIONS, FMTSTR_MESSAGE, ...)                        \
-    do {                                                                                     \
-        auto severityMacroLocal_ = ::mongo::logv2::LogSeverity::Debug(DLEVEL);               \
-        auto optionsMacroLocal_ = ::mongo::logv2::LogOptions::ensureValidComponent(          \
-            OPTIONS, MongoLogV2DefaultComponent_component);                                  \
-        if (::mongo::logv2::LogManager::global().getGlobalSettings().shouldLog(              \
-                optionsMacroLocal_.component(), severityMacroLocal_)) {                      \
-            LOGV2_IMPL(                                                                      \
-                ID, severityMacroLocal_, optionsMacroLocal_, FMTSTR_MESSAGE, ##__VA_ARGS__); \
-        }                                                                                    \
+#define LOGV2_DEBUG_OPTIONS(ID, DLEVEL, OPTIONS, MSG, ...)                               \
+    do {                                                                                 \
+        auto severityMacroLocal_ = ::mongo::logv2::LogSeverity::Debug(DLEVEL);           \
+        auto optionsMacroLocal_ = ::mongo::logv2::LogOptions::ensureValidComponent(      \
+            OPTIONS, MONGO_LOGV2_DEFAULT_COMPONENT);                                     \
+        if (::mongo::logv2::LogManager::global().getGlobalSettings().shouldLog(          \
+                optionsMacroLocal_.component(), severityMacroLocal_)) {                  \
+            LOGV2_IMPL(ID, severityMacroLocal_, optionsMacroLocal_, MSG, ##__VA_ARGS__); \
+        }                                                                                \
     } while (false)
 
 /**
@@ -292,17 +265,40 @@ namespace mongo {
  *
  * See LOGV2() for documentation of the other parameters
  */
-#define LOGV2_DEBUG(ID, DLEVEL, FMTSTR_MESSAGE, ...)                                      \
-    LOGV2_DEBUG_OPTIONS(ID,                                                               \
-                        DLEVEL,                                                           \
-                        ::mongo::logv2::LogOptions{MongoLogV2DefaultComponent_component}, \
-                        FMTSTR_MESSAGE,                                                   \
-                        ##__VA_ARGS__)
+#define LOGV2_DEBUG(ID, DLEVEL, MSG, ...) \
+    LOGV2_DEBUG_OPTIONS(                  \
+        ID, DLEVEL, ::mongo::logv2::LogOptions{MONGO_LOGV2_DEFAULT_COMPONENT}, MSG, ##__VA_ARGS__)
 
-inline bool shouldLog(logv2::LogComponent logComponent, logv2::LogSeverity severity) {
-    return logv2::LogManager::global().getGlobalSettings().shouldLog(logComponent, severity);
+/**
+ * Logs like a default (debug-0) level log in production, but debug-1 log in testing. See the
+ * documentation of 'LogSeverity::ProdOnly()' for more details.
+ *
+ * See LOGV2() for documentation of the parameters.
+ */
+#define LOGV2_PROD_ONLY(ID, MSG, ...)                                     \
+    LOGV2_IMPL(ID,                                                        \
+               ::mongo::logv2::LogSeverity::ProdOnly(),                   \
+               ::mongo::logv2::LogOptions{MONGO_LOGV2_DEFAULT_COMPONENT}, \
+               MSG,                                                       \
+               ##__VA_ARGS__)
+
+
+/**
+ * Logs like a default (debug-0) level log in production, but debug-1 log in testing with custom
+ * options. See the documentation of 'LogSeverity::ProdOnly()' for more details.
+ *
+ * See LOGV2_OPTIONS() for documentation of the parameters.
+ */
+#define LOGV2_PROD_ONLY_OPTIONS(ID, OPTIONS, MSG, ...)                                            \
+    LOGV2_IMPL(                                                                                   \
+        ID,                                                                                       \
+        ::mongo::logv2::LogSeverity::ProdOnly(),                                                  \
+        ::mongo::logv2::LogOptions::ensureValidComponent(OPTIONS, MONGO_LOGV2_DEFAULT_COMPONENT), \
+        MSG,                                                                                      \
+        ##__VA_ARGS__)
+
+namespace mongo::logv2 {
+inline bool shouldLog(LogComponent logComponent, LogSeverity severity) {
+    return LogManager::global().getGlobalSettings().shouldLog(logComponent, severity);
 }
-
-}  // namespace mongo
-
-#endif  // MONGO_UTIL_LOGV2_H_
+}  // namespace mongo::logv2

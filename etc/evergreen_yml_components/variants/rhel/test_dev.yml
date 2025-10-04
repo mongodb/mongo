@@ -1,0 +1,370 @@
+# RHEL build variants for testing development environments
+#
+# After the branching variants in this file
+# should continue to run on a new rapid release (v7.1, v7.2 etc.)
+# and LTS release (v7.0, v6.0 etc.) branch projects
+
+variables:
+  # THIS HAS COPIES IN:
+  # - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &linux-x86-dynamic-compile-params # Essential set of compile parameters used for Linux dev variants.
+    run_on:
+      - rhel8.8-xlarge
+    activate: true # These compile variants run on every commit to reduce latency of the auto-reverter.
+    stepback: false
+
+  # THIS HAS COPIES IN:
+  # - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &linux-x86-dynamic-enterprise-compile-expansions
+    has_packages: false
+    bazel_compile_flags: >-
+      --define=MONGO_DISTMOD=rhel88
+      --linkstatic=False
+
+  # THIS HAS COPIES IN:
+  # - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/rhel/test_dev_master_and_lts_branches_only.yml
+  # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &linux_x86_dynamic_compile_variant_name linux-x86-dynamic-compile
+
+  # THIS HAS COPIES IN:
+  # - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/rhel/test_dev_master_and_lts_branches_only.yml
+  # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &linux_x86_dynamic_compile_variant_dependency
+    depends_on:
+      - name: archive_dist_test
+        variant: *linux_x86_dynamic_compile_variant_name
+      - name: version_gen
+        variant: generate-tasks-for-version
+        # This is added because of EVG-18211.
+        # Without this we are adding extra dependencies on evergreen and it is causing strain
+        omit_generated_tasks: true
+    # - name: generate_buildid_to_debug_symbols_mapping
+    #   variant: linux-x86-dynamic-compile
+
+  # THIS HAS COPIES IN:
+  # - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/rhel/test_dev_master_and_lts_branches_only.yml
+  # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &linux_x86_generic_expansions
+    multiversion_platform: rhel8
+    multiversion_edition: enterprise
+    repo_edition: enterprise
+    large_distro_name: rhel8.8-medium
+    core_analyzer_distro_name: rhel8.8-xlarge
+    compile_variant: *linux_x86_dynamic_compile_variant_name
+
+  # THIS HAS COPIES IN:
+  # - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &enterprise-rhel-8-64-bit-dynamic-expansions
+    <<: *linux_x86_generic_expansions
+    has_packages: false
+    jstestfuzz_num_generated_files: 40
+    jstestfuzz_concurrent_num_files: 10
+    target_resmoke_time: 10
+    max_sub_suites: 5
+    idle_timeout_factor: 1.5
+    exec_timeout_factor: 1.5
+    large_distro_name: rhel8.8-medium
+
+buildvariants:
+  - <<: *linux-x86-dynamic-compile-params
+    name: &linux-x86-dynamic-compile linux-x86-dynamic-compile
+    display_name: "* Linux x86 Enterprise Shared Library"
+    tags: ["suggested", "forbid_tasks_tagged_with_experimental"]
+    expansions:
+      <<: *linux-x86-dynamic-enterprise-compile-expansions
+      compile_variant: *linux-x86-dynamic-compile
+      build_mongot: true
+      download_mongot_release: true
+    tasks:
+      - name: run_unit_tests_TG
+      - name: compile_test_parallel_core_stream_TG
+      - name: compile_test_parallel_dbtest_stream_TG
+      - name: compile_integration_and_test_parallel_stream_TG
+      - name: .development_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.stitch !.crypt
+      - name: .development_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.stitch !.crypt
+        distros:
+          - rhel8.8-xlarge
+      - name: .release_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.stitch !.crypt
+      - name: .release_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.stitch !.crypt
+        distros:
+          - rhel8.8-xlarge
+      - name: .default .requires_compile_variant !.requires_large_host !.incompatible_development_variant
+      - name: .default .requires_compile_variant .requires_large_host !.incompatible_development_variant
+        distros:
+          - rhel8.8-xlarge
+
+  - <<: *linux_x86_dynamic_compile_variant_dependency
+    name: enterprise-rhel-8-64-bit-dynamic
+    display_name: "* Shared Library Enterprise RHEL 8"
+    tags: ["suggested", "forbid_tasks_tagged_with_experimental"]
+    cron: "0 1,5,9,13,17,21 * * *" # From the ${project_required_suggested_cron} parameter
+    run_on:
+      - rhel8.8-small
+    expansions:
+      <<: *enterprise-rhel-8-64-bit-dynamic-expansions
+    tasks: &enterprise-rhel-8-64-bit-dynamic-task-list
+      - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
+      - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
+        distros:
+          - rhel8.8-medium
+      - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
+      - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
+        distros:
+          - rhel8.8-medium
+      - name: .default !.requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
+      - name: .default .requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
+        distros:
+          - rhel8.8-medium
+
+  - <<: *linux_x86_dynamic_compile_variant_dependency
+    name: enterprise-rhel-8-64-bit-dynamic-roll-back-incremental-feature-flags
+    display_name: "Shared Library Enterprise RHEL 8 (roll back incremental feature flags)"
+    tags: ["forbid_tasks_tagged_with_experimental"]
+    cron: "0 4 1-31/2 * *" # For cost reasons, we run this variant every other day
+    run_on:
+      - rhel8.8-small
+    expansions:
+      <<: *enterprise-rhel-8-64-bit-dynamic-expansions
+      test_flags: --disableUnreleasedIFRFlags
+    tasks: *enterprise-rhel-8-64-bit-dynamic-task-list
+
+  # TODO (SERVER-75884): Remove this variant once we switch to config shard as the default.
+  # This build variant is used to test suites that use sharded cluster fixture with config shard mode.
+  - <<: *linux_x86_dynamic_compile_variant_dependency
+    name: enterprise-rhel-8-64-bit-dynamic-config-shard
+    display_name: "* Shared Library Enterprise RHEL 8 (Config Shard)"
+    tags: ["suggested"]
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - rhel8.8-small
+    stepback: false
+    expansions:
+      <<: *enterprise-rhel-8-64-bit-dynamic-expansions
+      test_flags: >-
+        --configShard=any
+        --excludeWithAnyTags=config_shard_incompatible
+    tasks:
+      - name: aggregation_mongos_passthrough
+        distros:
+          - rhel8.8-large
+      - name: aggregation_one_shard_sharded_collections
+      - name: aggregation_sharded_collections_causally_consistent_passthrough
+        distros:
+          - rhel8.8-large
+      - name: aggregation_sharded_collections_passthrough
+        distros:
+          - rhel8.8-large
+      - name: auth_gen
+      - name: causally_consistent_jscore_passthrough_auth_gen
+      - name: causally_consistent_jscore_passthrough_gen
+      - name: change_streams
+      - name: change_streams_mongos_sessions_passthrough
+      - name: change_streams_multi_stmt_txn_mongos_passthrough
+      - name: change_streams_multi_stmt_txn_sharded_collections_passthrough
+      - name: change_streams_per_shard_cursor_passthrough
+      - name: change_streams_sharded_collections_query_shape_hash_stability_multiversion_gen
+      - name: fle2_sharding_high_cardinality
+      - name: fle2_sharding
+      - name: jstestfuzz_sharded_causal_consistency_gen
+      - name: jstestfuzz_sharded_gen
+      - name: jstestfuzz_sharded_kill_terminate_stepdown_gen
+      - name: jstestfuzz_sharded_notablescan_gen
+      - name: sharded_causally_consistent_jscore_passthrough_gen
+      - name: sharded_causally_consistent_read_concern_snapshot_passthrough_gen
+      - name: sharding_auth_gen
+      # Explicitly include instead of using tags to avoid pulling in replica_sets_multiversion_gen. This
+      # variant will be removed when config shards become the default, so this is only temporary.
+      - name: sharding_multiversion_gen
+      - name: sharding_jscore_multiversion_gen
+      - name: sharding_jscore_kill_primary_multiversion_gen
+      - name: .sharding .txns
+      # Skip csrs stepdown suite because most tests can't handle the first shard stepping down.
+      - name: .sharding .common !.csrs !.feature_flag_guarded
+      - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
+      - name: .concurrency .sharded !.large
+      - name: .concurrency .sharded .large
+      - name: .unsplittable_collections
+        distros:
+          - rhel8.8-medium
+      - name: .multi_shard
+
+  - <<: *linux_x86_dynamic_compile_variant_dependency
+    name: enterprise-rhel-8-64-bit-dynamic-classic-engine
+    display_name: "Shared Library Enterprise RHEL 8 (Classic Engine)"
+    tags: []
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - rhel8.8-small
+    stepback: false
+    expansions:
+      <<: *enterprise-rhel-8-64-bit-dynamic-expansions
+      jstestfuzz_num_generated_files: 40
+      jstestfuzz_concurrent_num_files: 10
+      target_resmoke_time: 10
+      max_sub_suites: 5
+      test_flags: >-
+        --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
+        --excludeWithAnyTags=featureFlagSbeFull
+      large_distro_name: rhel8.8-medium
+    depends_on:
+      - name: archive_dist_test
+        variant: *linux_x86_dynamic_compile_variant_name
+      - name: version_gen
+        variant: generate-tasks-for-version
+        # This is added because of EVG-18211.
+        # Without this we are adding extra dependencies on evergreen and it is causing strain
+        omit_generated_tasks: true
+    tasks:
+      - name: .aggfuzzer !.sbe_only
+      - name: .aggregation !.sbe_only !.requires_large_host
+      - name: .aggregation !.sbe_only .requires_large_host
+        distros:
+          - rhel8.8-medium
+      - name: .auth
+      - name: .causally_consistent !.sharding
+      - name: .change_stream_fuzzer
+      - name: .change_streams
+      - name: .concurrency !.large !.no_txns !.compute_mode !.feature_flag_guarded
+      - name: .concurrency .large !.no_txns !.compute_mode !.feature_flag_guarded
+        distros:
+          - rhel8.8-medium
+      - name: .encrypt
+      - name: .jscore .common !jsCore !.sbe_only
+      - name: .jstestfuzz !.feature_flag_guarded
+      - name: .misc_js !.requires_large_host
+      - name: .misc_js .requires_large_host
+        distros:
+          - rhel8.8-medium
+      - name: .multi_shard
+      - name: .query_fuzzer
+      - name: query_golden_classic
+      - name: query_golden_sharding
+      - name: .random_multiversion_ds
+      - name: .read_only
+      - name: .read_write_concern !.large !.requires_large_host
+      - name: .read_write_concern !.large .requires_large_host
+        distros:
+          - rhel8.8-medium
+      - name: .read_write_concern .large
+        distros:
+          - rhel8.8-medium
+      - name: .replica_sets !.encrypt !.auth
+        distros:
+          - rhel8.8-xlarge
+      - name: .rollbackfuzzer
+      - name: .sharding .common !.feature_flag_guarded
+      - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
+      - name: .sharding .txns
+      - name: .updatefuzzer
+      - name: aggregation_repeat_queries_multiplan_single_solutions
+      - name: audit
+      - name: burn_in_tests_gen
+        depends_on:
+          - name: version_burn_in_gen
+            variant: generate-tasks-for-version
+            omit_generated_tasks: true
+          - name: archive_dist_test
+            variant: *linux_x86_dynamic_compile_variant_name
+      - name: check_feature_flag_tags
+      - name: check_for_todos
+      - name: disk_wiredtiger
+      - name: initial_sync_fuzzer_gen
+      - name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
+      - name: fcv_upgrade_downgrade_sharding_jscore_passthrough_gen
+      - name: fcv_upgrade_downgrade_sharded_collections_jscore_passthrough_gen
+      - name: jsCore
+        distros:
+          - rhel8.8-xlarge
+      - name: jsCore_min_batch_repeat_queries_multiplan_single_solutions_ese_gsm
+      - name: jsCore_txns_large_txns_format
+      - name: json_schema
+      - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
+      - name: multiversion_gen
+      - name: .multiversion_sanity_check
+      - name: replica_sets_api_version_jscore_passthrough_gen
+      - name: replica_sets_reconfig_jscore_passthrough_gen
+      - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
+        distros:
+          - rhel8.8-xlarge
+      - name: replica_sets_reconfig_kill_primary_jscore_passthrough_gen
+        distros:
+          - rhel8.8-xlarge
+      - name: change_streams_pre_images_replica_sets_stepdown_primary_jscore_passthrough_gen
+        distros:
+          - rhel8.8-xlarge
+      - name: change_streams_pre_images_replica_sets_kill_secondary_jscore_passthrough_gen
+        distros:
+          - rhel8.8-xlarge
+      - name: retryable_writes_jscore_passthrough_gen
+      - name: retryable_writes_jscore_stepdown_passthrough_gen
+      - name: sasl
+      - name: search
+        distros:
+          - rhel8.8-large
+      - name: search_community
+        distros:
+          - rhel8.8-large
+      - name: search_community_ssl
+        distros:
+          - rhel8.8-large
+      - name: search_auth
+        distros:
+          - rhel8.8-large
+      - name: search_no_pinned_connections_auth
+      - name: search_ssl
+      - name: secondary_reads_passthrough_gen
+      - name: session_jscore_passthrough
+      - name: sharding_api_version_jscore_passthrough_gen
+      - name: test_api_version_compatibility
+      - name: unittest_shell_hang_analyzer_gen
+      - name: vector_search
+      - name: vector_search_auth
+      - name: vector_search_ssl
+      - name: aggregation_mongos_pqs_fallback_gen
+      - name: aggregation_mongos_pqs_hints_gen
+      - name: aggregation_pqs_fallback_gen
+      - name: aggregation_pqs_hints_gen
+      - name: aggregation_sharded_collections_pqs_fallback_gen
+      - name: aggregation_sharded_collections_pqs_hints_gen
+      - name: aggregation_sharded_collections_query_shape_hash_stability_gen
+      - name: replica_sets_jscore_pqs_fallback_gen
+      - name: replica_sets_jscore_pqs_hints_gen
+      - name: replica_sets_jscore_pqs_index_filters_gen
+      - name: sharded_collections_pqs_fallback_gen
+      - name: sharded_collections_pqs_hints_gen
+      - name: sharded_collections_pqs_index_filters_gen
+      - name: sharded_collections_query_shape_hash_stability_gen
+      - name: sharding_pqs_fallback_gen
+      - name: sharding_pqs_hints_gen
+      - name: sharding_pqs_index_filters_gen
+
+  - name: upload-sbom-if-changed
+    display_name: "Upload SBOM if changed"
+    allowed_requesters: ["commit"]
+    activate: true
+    paths:
+      - "sbom.json"
+    tags: []
+    run_on:
+      - rhel8.8-small
+    stepback: false
+    tasks:
+      - name: upload_sbom_via_silkbomb_if_changed

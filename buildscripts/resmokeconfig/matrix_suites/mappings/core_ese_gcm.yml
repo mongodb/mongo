@@ -1,0 +1,8 @@
+# This suite should not be run in evergreen, it is combined into
+# core_min_batch_repeat_queries_multiplan_single_solutions_ese_gsm
+base_suite: core
+overrides:
+  - "encryption.mongodfixture_ese"
+  - "encryption.mongodfixture_gcm"
+excludes:
+  - "encryption.excluded_files"

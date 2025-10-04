@@ -1,0 +1,36 @@
+# Golden test output of SBELocalBindTest/NestedBind2
+-- INPUT EXPRESSION:
+
+    let [
+        l20.0 = 
+            let [
+                l10.0 = 10 
+                l10.1 = 20 
+            ] 
+            in (l10.0 + l10.1) 
+        
+        l20.1 = 30 
+    ] 
+    in (l20.0 + l20.1) 
+
+
+-- COMPILED EXPRESSION:
+[0x0000-0x003c] stackSize: 1, maxStackSize: 3
+0x0000: pushConstVal(value: 10);
+0x000a: pushConstVal(value: 20);
+0x0014: add(popLhs: 0, moveFromLhs: 0, offsetLhs: 1, popRhs: 0, moveFromRhs: 0, offsetRhs: 0);
+0x001f: swap();
+0x0020: pop();
+0x0021: swap();
+0x0022: pop();
+0x0023: pushConstVal(value: 30);
+0x002d: add(popLhs: 0, moveFromLhs: 0, offsetLhs: 1, popRhs: 0, moveFromRhs: 0, offsetRhs: 0);
+0x0038: swap();
+0x0039: pop();
+0x003a: swap();
+0x003b: pop();
+
+
+-- EXECUTE VARIATION:
+RESULT: 60
+

@@ -29,6 +29,18 @@
 
 #include "mongo/db/pipeline/expression_function.h"
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/expression/evaluate.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
+#include <memory>
+#include <vector>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
 namespace mongo {
 
 REGISTER_STABLE_EXPRESSION(function, ExpressionFunction::parse);
@@ -43,37 +55,36 @@ ExpressionFunction::ExpressionFunction(ExpressionContext* const expCtx,
       _assignFirstArgToThis(assignFirstArgToThis),
       _funcSource(std::move(funcSource)),
       _lang(std::move(lang)) {
-    expCtx->sbeCompatible = false;
+    expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
 }
 
-Value ExpressionFunction::serialize(bool explain) const {
-    MutableDocument d;
-    d["body"] = Value(_funcSource);
-    d["args"] = Value(_passedArgs->serialize(explain));
-    d["lang"] = Value(_lang);
-    // This field will only be seralized when desugaring $where in $expr + $_internalJs
+Value ExpressionFunction::serialize(const SerializationOptions& options) const {
+    MutableDocument innerOpts(Document{{"body"_sd, options.serializeLiteral(_funcSource)},
+                                       {"args"_sd, _passedArgs->serialize(options)},
+                                       // "lang" is purposefully not treated as a literal since it
+                                       // is more of a selection of an enum
+                                       {"lang"_sd, _lang}});
+
+    // This field will only be serialized when desugaring $where in $expr + $_internalJs
     if (_assignFirstArgToThis) {
-        d["_internalSetObjToThis"] = Value(_assignFirstArgToThis);
+        innerOpts["_internalSetObjToThis"] = options.serializeLiteral(_assignFirstArgToThis);
     }
-    return Value(Document{{kExpressionName, d.freezeToValue()}});
-}
-
-void ExpressionFunction::_doAddDependencies(mongo::DepsTracker* deps) const {
-    _children[0]->addDependencies(deps);
+    return Value(Document{{kExpressionName, innerOpts.freezeToValue()}});
 }
 
 boost::intrusive_ptr<Expression> ExpressionFunction::parse(ExpressionContext* const expCtx,
                                                            BSONElement expr,
                                                            const VariablesParseState& vps) {
+    expCtx->setServerSideJsConfigFunction(true);
 
     uassert(4660800,
             str::stream() << kExpressionName << " cannot be used inside a validator.",
-            !expCtx->isParsingCollectionValidator);
+            !expCtx->getIsParsingCollectionValidator());
 
     uassert(31260,
             str::stream() << kExpressionName
                           << " requires an object as an argument, found: " << expr.type(),
-            expr.type() == BSONType::Object);
+            expr.type() == BSONType::object);
 
     BSONElement bodyField = expr["body"];
 
@@ -87,7 +98,7 @@ boost::intrusive_ptr<Expression> ExpressionFunction::parse(ExpressionContext* co
     auto bodyValue = bodyConst->getValue();
     uassert(31262,
             "The body function must evaluate to type string or code",
-            bodyValue.getType() == BSONType::String || bodyValue.getType() == BSONType::Code);
+            bodyValue.getType() == BSONType::string || bodyValue.getType() == BSONType::code);
 
     BSONElement argsField = expr["args"];
     uassert(31263, "The args field must be specified.", argsField);
@@ -100,7 +111,7 @@ boost::intrusive_ptr<Expression> ExpressionFunction::parse(ExpressionContext* co
     uassert(31418, "The lang field must be specified.", langField);
     uassert(31419,
             "Currently the only supported language specifier is 'js'.",
-            langField.type() == BSONType::String && langField.str() == kJavaScript);
+            langField.type() == BSONType::string && langField.str() == kJavaScript);
 
     return new ExpressionFunction(expCtx,
                                   argsExpr,
@@ -110,39 +121,7 @@ boost::intrusive_ptr<Expression> ExpressionFunction::parse(ExpressionContext* co
 }
 
 Value ExpressionFunction::evaluate(const Document& root, Variables* variables) const {
-    auto jsExec = getExpressionContext()->getJsExecWithScope(_assignFirstArgToThis);
-    auto scope = jsExec->getScope();
+    return exec::expression::evaluate(*this, root, variables);
+}
 
-    // createFunction is memoized in MozJSImplScope, so it's ok to call this for each
-    // eval call.
-    ScriptingFunction func = jsExec->getScope()->createFunction(_funcSource.c_str());
-    uassert(31265, "The body function did not evaluate", func);
-
-    auto argValue = _passedArgs->evaluate(root, variables);
-    uassert(31266, "The args field must be of type array", argValue.getType() == BSONType::Array);
-
-    // This logic exists to desugar $where into $expr + $function. In this case set the global obj
-    // to this, to handle cases where the $where function references the current document through
-    // obj.
-    BSONObjBuilder bob;
-    if (_assignFirstArgToThis) {
-        // For defense-in-depth, The $where case will pass a field path expr carrying $$CURRENT as
-        // the only element of the array.
-        auto args = argValue.getArray();
-        uassert(31422,
-                "field path $$CURRENT must be the only element in args",
-                argValue.getArrayLength() == 1);
-
-        BSONObj thisBSON = args[0].getDocument().toBson();
-        scope->setObject("obj", thisBSON);
-
-        return jsExec->callFunction(func, bob.done(), thisBSON);
-    }
-
-    int argNum = 0;
-    for (const auto& arg : argValue.getArray()) {
-        arg.addToBsonObj(&bob, "arg" + std::to_string(argNum++));
-    }
-    return jsExec->callFunction(func, bob.done(), {});
-};
 }  // namespace mongo

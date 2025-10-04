@@ -29,11 +29,17 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/db/database_name.h"
+
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
 
-#include "mongo/db/jsobj.h"
+#include <boost/optional/optional.hpp>
 
 namespace boost {
 namespace filesystem {
@@ -89,12 +95,9 @@ public:
      * This key is persistent across process restarts. Otherwise, an ephemeral key that is only
      * consistent for the duration of the process will be generated and used for encryption.
      */
-    virtual Status protectTmpData(const uint8_t* in,
-                                  size_t inLen,
-                                  uint8_t* out,
-                                  size_t outLen,
-                                  size_t* resultLen,
-                                  boost::optional<std::string> dbName);
+    virtual Status protectTmpData(ConstDataRange in,
+                                  DataRange* out,
+                                  boost::optional<DatabaseName> dbName);
 
     /**
      * Transform temporary data that has been spilled to disk back into readable form. If dbName
@@ -103,12 +106,9 @@ public:
      * restart had occurred after encryption. Otherwise, an ephemeral key that can only decrypt data
      * encrypted earlier in the current process's lifetime will be used.
      */
-    virtual Status unprotectTmpData(const uint8_t* in,
-                                    size_t inLen,
-                                    uint8_t* out,
-                                    size_t outLen,
-                                    size_t* resultLen,
-                                    boost::optional<std::string> dbName);
+    virtual Status unprotectTmpData(ConstDataRange in,
+                                    DataRange* out,
+                                    boost::optional<DatabaseName> dbName);
 
     /**
      * Inform the encryption storage system to prepare its data such that its files can be copied

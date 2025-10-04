@@ -3,59 +3,52 @@
  * progress.
  */
 
-(function() {
-"use strict";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-load("jstests/libs/fail_point_util.js");
-
-var name = 'initial_sync_replSetGetStatus';
-var replSet = new ReplSetTest({
+let name = "initial_sync_replSetGetStatus";
+let replSet = new ReplSetTest({
     name: name,
     nodes: 1,
 });
 
 replSet.startSet();
 replSet.initiate();
-var primary = replSet.getPrimary();
+let primary = replSet.getPrimary();
 
-const barColl = primary.getDB('pretest').bar;
+const barColl = primary.getDB("pretest").bar;
 assert.commandWorked(barColl.insert({a: 1}));
 assert.commandWorked(barColl.insert({a: 2}));
 assert.commandWorked(barColl.insert({a: 3}));
 
-var coll = primary.getDB('test').foo;
+let coll = primary.getDB("test").foo;
 assert.commandWorked(coll.insert({a: 1}));
 assert.commandWorked(coll.insert({a: 2}));
 
 // Add a secondary node but make it hang before copying databases.
-let secondary = replSet.add(
-    {rsConfig: {votes: 0, priority: 0}, setParameter: {'collectionClonerBatchSize': 2}});
+let secondary = replSet.add({rsConfig: {votes: 0, priority: 0}, setParameter: {"collectionClonerBatchSize": 2}});
 secondary.setSecondaryOk();
 
-const failPointBeforeCopying =
-    configureFailPoint(secondary, 'initialSyncHangBeforeCopyingDatabases');
-const failPointBeforeFinish = configureFailPoint(secondary, 'initialSyncHangBeforeFinish');
-const failPointAfterFinish = configureFailPoint(secondary, 'initialSyncHangAfterFinish');
-let failPointAfterNumDocsCopied =
-    configureFailPoint(secondary,
-                       'initialSyncHangDuringCollectionClone',
-                       {namespace: barColl.getFullName(), numDocsToClone: 2});
+const failPointBeforeCopying = configureFailPoint(secondary, "initialSyncHangBeforeCopyingDatabases");
+const failPointBeforeFinish = configureFailPoint(secondary, "initialSyncHangBeforeFinish");
+const failPointAfterFinish = configureFailPoint(secondary, "initialSyncHangAfterFinish");
+let failPointAfterNumDocsCopied = configureFailPoint(secondary, "initialSyncHangDuringCollectionClone", {
+    namespace: barColl.getFullName(),
+    numDocsToClone: 2,
+});
 replSet.reInitiate();
 
 // Wait for initial sync to pause before it copies the databases.
 failPointBeforeCopying.wait();
 
 // Test that replSetGetStatus returns the correct results while initial sync is in progress.
-var res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
-assert(res.initialSyncStatus,
-       () => "Response should have an 'initialSyncStatus' field: " + tojson(res));
+let res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
+assert(res.initialSyncStatus, () => "Response should have an 'initialSyncStatus' field: " + tojson(res));
 
 res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1, initialSync: 0}));
-assert(!res.initialSyncStatus,
-       () => "Response should not have an 'initialSyncStatus' field: " + tojson(res));
+assert(!res.initialSyncStatus, () => "Response should not have an 'initialSyncStatus' field: " + tojson(res));
 
-assert.commandFailedWithCode(secondary.adminCommand({replSetGetStatus: 1, initialSync: "t"}),
-                             ErrorCodes.TypeMismatch);
+assert.commandFailedWithCode(secondary.adminCommand({replSetGetStatus: 1, initialSync: "t"}), ErrorCodes.TypeMismatch);
 
 assert.commandWorked(coll.insert({a: 3}));
 assert.commandWorked(coll.insert({a: 4}));
@@ -88,8 +81,7 @@ assert.lt(barCollRes.approxBytesCopied, pretestDbRes.initialSyncStatus.approxTot
 const bytesCopiedAdminDb =
     pretestDbRes.initialSyncStatus.databases.admin["admin.system.version"].approxBytesCopied +
     pretestDbRes.initialSyncStatus.databases.admin["admin.system.keys"].approxBytesCopied;
-assert.eq(pretestDbRes.initialSyncStatus.approxTotalBytesCopied,
-          bytesCopiedAdminDb + barCollRes.approxBytesCopied);
+assert.eq(pretestDbRes.initialSyncStatus.approxTotalBytesCopied, bytesCopiedAdminDb + barCollRes.approxBytesCopied);
 assert.gt(pretestDbRes.initialSyncStatus.approxTotalBytesCopied, 0);
 
 // The server still has the 'pretest' and 'test' dbs to finish cloning.
@@ -103,22 +95,26 @@ failPointBeforeFinish.wait();
 
 // Test that replSetGetStatus returns the correct results when initial sync is at the very end.
 const endOfCloningRes = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
-assert(endOfCloningRes.initialSyncStatus,
-       () => "Response should have an 'initialSyncStatus' field: " + tojson(res));
+assert(endOfCloningRes.initialSyncStatus, () => "Response should have an 'initialSyncStatus' field: " + tojson(res));
 
 // It is possible that we update the config document after going through a reconfig. So make sure
 // we account for this.
 assert.gte(endOfCloningRes.initialSyncStatus.appliedOps, 3);
 
 // Assert metrics have progressed in the right direction since the last time we checked the metrics.
-assert.gt(endOfCloningRes.initialSyncStatus.totalInitialSyncElapsedMillis,
-          pretestDbRes.initialSyncStatus.totalInitialSyncElapsedMillis);
-assert.lt(endOfCloningRes.initialSyncStatus.remainingInitialSyncEstimatedMillis,
-          pretestDbRes.initialSyncStatus.remainingInitialSyncEstimatedMillis);
-assert.gt(endOfCloningRes.initialSyncStatus.approxTotalBytesCopied,
-          pretestDbRes.initialSyncStatus.approxTotalBytesCopied);
-assert.eq(endOfCloningRes.initialSyncStatus.approxTotalDataSize,
-          pretestDbRes.initialSyncStatus.approxTotalDataSize);
+assert.gt(
+    endOfCloningRes.initialSyncStatus.totalInitialSyncElapsedMillis,
+    pretestDbRes.initialSyncStatus.totalInitialSyncElapsedMillis,
+);
+assert.lt(
+    endOfCloningRes.initialSyncStatus.remainingInitialSyncEstimatedMillis,
+    pretestDbRes.initialSyncStatus.remainingInitialSyncEstimatedMillis,
+);
+assert.gt(
+    endOfCloningRes.initialSyncStatus.approxTotalBytesCopied,
+    pretestDbRes.initialSyncStatus.approxTotalBytesCopied,
+);
+assert.eq(endOfCloningRes.initialSyncStatus.approxTotalDataSize, pretestDbRes.initialSyncStatus.approxTotalDataSize);
 
 assert.eq(endOfCloningRes.initialSyncStatus.failedInitialSyncAttempts, 0);
 assert.eq(endOfCloningRes.initialSyncStatus.maxFailedInitialSyncAttempts, 10);
@@ -146,10 +142,14 @@ assert.eq(fooCollRes.fetchedBatches, 2);
 assert.gt(fooCollRes.bytesToCopy, 0);
 assert.eq(fooCollRes.approxBytesCopied, fooCollRes.bytesToCopy);
 
-assert.eq(endOfCloningRes.initialSyncStatus.approxTotalDataSize,
-          endOfCloningRes.initialSyncStatus.approxTotalBytesCopied);
-assert.eq(endOfCloningRes.initialSyncStatus.approxTotalBytesCopied,
-          fooCollRes.approxBytesCopied + barCollRes.approxBytesCopied + bytesCopiedAdminDb);
+assert.eq(
+    endOfCloningRes.initialSyncStatus.approxTotalDataSize,
+    endOfCloningRes.initialSyncStatus.approxTotalBytesCopied,
+);
+assert.eq(
+    endOfCloningRes.initialSyncStatus.approxTotalBytesCopied,
+    fooCollRes.approxBytesCopied + barCollRes.approxBytesCopied + bytesCopiedAdminDb,
+);
 
 failPointBeforeFinish.off();
 
@@ -158,19 +158,18 @@ failPointAfterFinish.wait();
 
 // Test that replSetGetStatus returns the correct results after initial sync is finished.
 res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
-assert(!res.initialSyncStatus,
-       () => "Response should not have an 'initialSyncStatus' field: " + tojson(res));
+assert(!res.initialSyncStatus, () => "Response should not have an 'initialSyncStatus' field: " + tojson(res));
 
-assert.commandFailedWithCode(secondary.adminCommand({replSetGetStatus: 1, initialSync: "m"}),
-                             ErrorCodes.TypeMismatch);
+assert.commandFailedWithCode(secondary.adminCommand({replSetGetStatus: 1, initialSync: "m"}), ErrorCodes.TypeMismatch);
 
 // Let initial sync finish and get into secondary state.
 failPointAfterFinish.off();
 replSet.awaitSecondaryNodes(60 * 1000);
 
-assert.eq(0,
-          secondary.getDB('local')['temp_oplog_buffer'].find().itcount(),
-          "Oplog buffer was not dropped after initial sync");
+assert.eq(
+    0,
+    secondary.getDB("local")["temp_oplog_buffer"].find().itcount(),
+    "Oplog buffer was not dropped after initial sync",
+);
 
 replSet.stopSet();
-})();

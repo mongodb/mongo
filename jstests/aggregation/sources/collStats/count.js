@@ -1,17 +1,13 @@
 // Test that count within a $collStats stage returns the correct number of documents.
 // @tags: [assumes_no_implicit_collection_creation_after_drop]
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For "assertErrorCode".
-load("jstests/libs/fixture_helpers.js");      // For "FixtureHelpers".
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 let testDB = db.getSiblingDB("aggregation_count_db");
 let coll = testDB.aggregation_count;
 coll.drop();
 
 let nDocs = 1000;
-for (var i = 0; i < nDocs; i++) {
+for (let i = 0; i < nDocs; i++) {
     assert.commandWorked(coll.insert({a: i}));
 }
 
@@ -66,4 +62,3 @@ assertErrorCode(coll, pipeline, ErrorCodes.NamespaceNotFound);
 // Test that we error when the database does not exist.
 assert.commandWorked(testDB.dropDatabase());
 assertErrorCode(coll, pipeline, ErrorCodes.NamespaceNotFound);
-}());

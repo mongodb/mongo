@@ -1,0 +1,99 @@
+- name: selector
+  value:
+    selector:
+      roots:
+        - jstests/core/**/*.js
+      exclude_files:
+      # Intentional empty override.
+
+- name: executor
+  value:
+    executor:
+      fixture:
+        class: ReplicaSetFixture
+        mongod_options:
+          syncdelay: 5
+          wiredTigerEngineConfigString: "debug_mode=(table_logging=true)"
+          set_parameters:
+            enableTestCommands: 1
+            logComponentVerbosity:
+              replication:
+                heartbeats: 2
+                rollback: 2
+              storage:
+                recovery: 2
+            # Non-voting replica set members will synchronously build an index upon observing an
+            # commitIndexBuild oplog entry. We lower resumableIndexBuildMajorityOpTimeTimeoutMillis so
+            # oplog application doesn't wait as long when tests have a large number of index builds.
+            resumableIndexBuildMajorityOpTimeTimeoutMillis: 10
+        num_nodes: 2
+        voting_secondaries: false
+        replset_config_options:
+          settings:
+            # Secondaries don't vote, so turning the election timeout down will not cause undesirable
+            # elections. It will make desirable elections (on fixture restart) go faster though. We
+            # can't turn it down too low since that will lower the heartbeat interval and spam the logs.
+            electionTimeoutMillis: 5000
+
+- name: hooks
+  value:
+    executor:
+      archive:
+        tests: true
+        hooks:
+          - PeriodicKillSecondaries
+      hooks:
+        - class: PeriodicKillSecondaries
+
+- name: hooks_with_legacy_validate
+  value:
+    executor:
+      archive:
+        tests: true
+        hooks:
+          - PeriodicKillSecondaries
+      hooks:
+        - class: PeriodicKillSecondaries
+          use_legacy_validate: true
+
+- name: hooks_with_oplog_application_lag
+  value:
+    executor:
+      archive:
+        tests: true
+        hooks:
+          - LagOplogApplicationInBackground
+          - PeriodicKillSecondaries
+      hooks:
+        - class: LagOplogApplicationInBackground
+          shell_options:
+            nodb: ""
+        - class: PeriodicKillSecondaries
+
+- name: exclusions
+  value:
+    exclude_files:
+      # The following tests perform a write with a writeConcern of w=2 when 'testingReplication' is
+      # true. This causes the test to hang because the secondary is running with the "rsSyncApplyStop"
+      # failpoint enabled.
+      - jstests/core/**/geo_update_btree.js
+      # The following tests create large oplog entries, which can cause the secondary to fall off the
+      # primary's oplog when run as a part of burn_in_tests.
+      - jstests/core/**/query/max_doc_size.js
+      - jstests/core/**/mr_bigobject.js
+      - jstests/core/**/capped_large_docs.js
+      - jstests/core/**/capped_resize.js
+      - jstests/core/**/query/exhaust.js
+      - jstests/core/query/index_correctness_pbt.js
+      - jstests/core/query/plan_cache/cache_correctness_pbt.js
+      - jstests/core/query/run_all_plans_pbt.js
+      - jstests/core/query/partial_index_pbt.js
+      - jstests/core/query/query_knob_correctness_pbt.js
+      - jstests/core/query/or/subplanning_pbt.js
+      - jstests/core/**/geo_circle_spilling.js
+      # The following tests also create large oplog entries due to the maximum blocking sort size being
+      # 100 MB.
+      - jstests/core/**/explain_execution_error.js
+      - jstests/core/**/sortb.js
+      - jstests/core/**/sortg.js
+      - jstests/core/**/sortj.js

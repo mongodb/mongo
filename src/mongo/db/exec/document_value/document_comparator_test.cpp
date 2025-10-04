@@ -27,15 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/exec/document_value/document_comparator.h"
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes_util.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/unittest/unittest.h"
+
+#include <utility>
+#include <vector>
+
 
 namespace mongo {
 namespace {
@@ -282,27 +286,15 @@ TEST(DocumentComparatorTest, UnorderedMapOfDocumentRespectsCollation) {
 TEST(DocumentComparatorTest, ComparingCodeWScopeShouldNotRespectCollation) {
     const CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
     const DocumentComparator comparator(&collator);
-    const Document doc1{{"a",
-                         BSONCodeWScope("js code",
-                                        BSON("foo"
-                                             << "bar"))}};
-    const Document doc2{{"a",
-                         BSONCodeWScope("js code",
-                                        BSON("foo"
-                                             << "not bar"))}};
+    const Document doc1{{"a", BSONCodeWScope("js code", BSON("foo" << "bar"))}};
+    const Document doc2{{"a", BSONCodeWScope("js code", BSON("foo" << "not bar"))}};
     ASSERT_TRUE(comparator.evaluate(doc1 != doc2));
 }
 
 TEST(DocumentComparatorTest, HashingCodeWScopeShouldNotRespectCollation) {
     const CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
-    const Document doc1{{"a",
-                         BSONCodeWScope("js code",
-                                        BSON("foo"
-                                             << "bar"))}};
-    const Document doc2{{"a",
-                         BSONCodeWScope("js code",
-                                        BSON("foo"
-                                             << "not bar"))}};
+    const Document doc1{{"a", BSONCodeWScope("js code", BSON("foo" << "bar"))}};
+    const Document doc2{{"a", BSONCodeWScope("js code", BSON("foo" << "not bar"))}};
     size_t seed1, seed2 = 0;
     doc1.hash_combine(seed1, &collator);
     doc2.hash_combine(seed2, &collator);

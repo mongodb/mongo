@@ -1,43 +1,43 @@
 // Tests finding NumberDecimal from the shell in mixed collections.
 
-(function() {
-"use strict";
-var col = db.decimal_find_mixed;
+let col = db.decimal_find_mixed;
 col.drop();
 
 // Insert some sample data.
 
-assert.commandWorked(col.insert([
-    {"a": -1},
-    {"a": NumberDecimal("-1")},
-    {"a": NumberLong("-1")},
-    {"a": NumberInt("-1")},
-    {"a": -0.3},
-    {"a": NumberDecimal("-0.3")},
-    {"a": -0.1},
-    {"a": NumberDecimal("-0.1")},
-    {"a": NumberDecimal("0")},
-    {"a": 0},
-    {"a": NumberDecimal("-0")},
-    {"a": NumberDecimal("0.00")},
-    {"a": NumberDecimal("0.1")},
-    {"a": 0.1},
-    {"a": NumberDecimal("0.3")},
-    {"a": 0.3},
-    {"a": NumberDecimal("0.5")},
-    {"a": 0.5},
-    {"a": NumberDecimal("1.0")},
-    {"a": NumberLong("1")},
-    {"a": NumberDecimal("1.00")},
-    {"a": NumberDecimal("2.00")},
-    {"a": NumberDecimal("12345678901234567890.12345678901234")},
-    {"a": NumberDecimal("NaN")},
-    {"a": NumberDecimal("-NaN")},
-    {"a": NaN},
-    {"a": NumberDecimal("Infinity")},
-    {"a": Infinity}
-]),
-                     "Initial decimal insertion failed");
+assert.commandWorked(
+    col.insert([
+        {"a": -1},
+        {"a": NumberDecimal("-1")},
+        {"a": NumberLong("-1")},
+        {"a": NumberInt("-1")},
+        {"a": -0.3},
+        {"a": NumberDecimal("-0.3")},
+        {"a": -0.1},
+        {"a": NumberDecimal("-0.1")},
+        {"a": NumberDecimal("0")},
+        {"a": 0},
+        {"a": NumberDecimal("-0")},
+        {"a": NumberDecimal("0.00")},
+        {"a": NumberDecimal("0.1")},
+        {"a": 0.1},
+        {"a": NumberDecimal("0.3")},
+        {"a": 0.3},
+        {"a": NumberDecimal("0.5")},
+        {"a": 0.5},
+        {"a": NumberDecimal("1.0")},
+        {"a": NumberLong("1")},
+        {"a": NumberDecimal("1.00")},
+        {"a": NumberDecimal("2.00")},
+        {"a": NumberDecimal("12345678901234567890.12345678901234")},
+        {"a": NumberDecimal("NaN")},
+        {"a": NumberDecimal("-NaN")},
+        {"a": NaN},
+        {"a": NumberDecimal("Infinity")},
+        {"a": Infinity},
+    ]),
+    "Initial decimal insertion failed",
+);
 
 // Simple finds
 assert.eq(col.find({"a": -1}).count(), 4, "A1");
@@ -67,4 +67,3 @@ assert.eq(col.find({"a": NumberDecimal("36028797018963967")}).count(), 1, "E1");
 // Not representable as double
 assert.eq(col.find({"a": 36028797018963967}).count(), 0, "E2");
 assert.eq(col.find({"a": NumberLong("36028797018963967")}).count(), 1, "E3");
-}());

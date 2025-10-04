@@ -29,8 +29,13 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/values/value.h"
+
+#include <cstddef>
+#include <utility>
 
 namespace mongo {
 namespace sbe {
@@ -40,14 +45,70 @@ std::pair<value::TypeTags, value::Value> convertFrom(const char* be,
                                                      const char* end,
                                                      size_t fieldNameSize);
 
-const char* advance(const char* be, size_t fieldNameSize);
+template <bool View>
+std::pair<value::TypeTags, value::Value> convertFrom(const BSONElement& elem) {
+    return convertFrom<View>(
+        elem.rawdata(), elem.rawdata() + elem.size(), elem.fieldNameSize() - 1);
+}
 
-inline auto fieldNameView(const char* be) noexcept {
-    return StringData{be + 1};
+/**
+ * Advance table specifies how to change the pointer to skip current BSON value (so that pointer
+ * points to the next byte after the BSON value):
+ *  - For each entry N in 'kAdvanceTable' that is less than 0x7F, pointer is advanced by N.
+ *  - For each entry N in 'kAdvanceTable' that is greater than 0x7F, pointer is advanced by
+ *      the 32-bit integer stored in buffer plus ~N.
+ *  - For each entry N in 'kAdvanceTable' that is equal to 0x7F, the type is either RegEx or it
+ *      is an unsupported type (EOO) or its an invalid type value (i.e. the type value does not
+ *      correspond to any known type).
+ */
+extern const uint8_t kAdvanceTable alignas(64)[256];
+
+const char* advanceHelper(const char* be, size_t fieldNameSize);
+
+inline const char* advance(const char* be, size_t fieldNameSize) {
+    auto type = static_cast<unsigned char>(*be);
+    auto advOffset = kAdvanceTable[type];
+
+    size_t sizeOfTypeCodeAndFieldName =
+        1 /*type*/ + fieldNameSize + 1 /*zero at the end of fieldname*/;
+
+    if (MONGO_likely(advOffset < 0x7Fu)) {
+        be += sizeOfTypeCodeAndFieldName;
+        be += advOffset;
+        return be;
+    } else if (MONGO_likely(advOffset > 0x7Fu)) {
+        advOffset = ~advOffset;
+        be += sizeOfTypeCodeAndFieldName;
+        be += ConstDataView(be).read<LittleEndian<int32_t>>();
+        be += advOffset;
+        return be;
+    }
+
+    return advanceHelper(be, fieldNameSize);
+}
+
+inline auto fieldNameAndLength(const char* be) noexcept {
+    return StringData{be + 1, strlen(be + 1)};
+}
+
+// add 1(typetag) + stringlength + 1(nullptr) to skip the null byte should give the value
+inline const char* getValue(const char* be) noexcept {
+    return be + 1 + strlen(be + 1) + 1;
+}
+
+inline const char* fieldNameRaw(const char* be) noexcept {
+    return be + 1;
+}
+
+inline const char* bsonEnd(const char* bsonStart) noexcept {
+    return bsonStart + ConstDataView(bsonStart).read<LittleEndian<uint32_t>>();
 }
 
 template <class ArrayBuilder>
-void convertToBsonObj(ArrayBuilder& builder, value::Array* arr);
+void convertToBsonArr(ArrayBuilder& builder, value::Array* arr);
+
+template <class ArrayBuilder>
+void appendValueToBsonArr(ArrayBuilder& builder, value::TypeTags tag, value::Value val);
 
 template <class ObjBuilder>
 void convertToBsonObj(ObjBuilder& builder, value::Object* obj);
@@ -57,6 +118,10 @@ void appendValueToBsonObj(ObjBuilder& builder,
                           StringData name,
                           value::TypeTags tag,
                           value::Value val);
+
+template <class ArrayBuilder>
+void convertToBsonArr(ArrayBuilder& builder, value::ArrayEnumerator arr);
+
 }  // namespace bson
 }  // namespace sbe
 }  // namespace mongo

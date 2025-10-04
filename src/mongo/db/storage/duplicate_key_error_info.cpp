@@ -27,15 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/storage/duplicate_key_error_info.h"
 
-#include "mongo/base/init.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/util/hex.h"
-#include "mongo/util/text.h"
+#include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
+#include "mongo/util/text.h"                // IWYU pragma: keep
+
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {
@@ -43,6 +50,23 @@ namespace {
 MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(DuplicateKeyErrorInfo);
 
 }  // namespace
+
+DuplicateKeyErrorInfo::DuplicateKeyErrorInfo(const BSONObj& keyPattern,
+                                             const BSONObj& keyValue,
+                                             const BSONObj& collation,
+                                             FoundValue&& foundValue,
+                                             boost::optional<RecordId> duplicateRid)
+    : _keyPattern(keyPattern.getOwned()),
+      _keyValue(keyValue.getOwned()),
+      _collation(collation.getOwned()),
+      _foundValue(std::move(foundValue)) {
+    if (auto foundValueObj = get_if<BSONObj>(&_foundValue)) {
+        _foundValue = foundValueObj->getOwned();
+    }
+    if (duplicateRid) {
+        _duplicateRid = *duplicateRid;
+    }
+}
 
 void DuplicateKeyErrorInfo::serialize(BSONObjBuilder* bob) const {
     bob->append("keyPattern", _keyPattern);
@@ -53,7 +77,7 @@ void DuplicateKeyErrorInfo::serialize(BSONObjBuilder* bob) const {
 
     BSONObjBuilder keyValueBuilder{bob->subobjStart("keyValue")};
     for (const auto& keyValueElem : _keyValue) {
-        const bool shouldHexEncode = keyValueElem.type() == BSONType::String &&
+        const bool shouldHexEncode = keyValueElem.type() == BSONType::string &&
             (!_collation.isEmpty() || !isValidUTF8(keyValueElem.valueStringData()));
 
         hexEncodedComponents.push_back(shouldHexEncode);
@@ -78,6 +102,21 @@ void DuplicateKeyErrorInfo::serialize(BSONObjBuilder* bob) const {
 
     if (!_collation.isEmpty()) {
         bob->append("collation", _collation);
+    }
+
+    visit(OverloadedVisitor{
+              [](std::monostate) {},
+              [bob](const RecordId& rid) { rid.serializeToken("foundValue", bob); },
+              [bob](const BSONObj& obj) {
+                  if (obj.objsize() < BSONObjMaxUserSize / 2) {
+                      bob->append("foundValue", obj);
+                  }
+              },
+          },
+          _foundValue);
+
+    if (_duplicateRid) {
+        _duplicateRid->serializeToken("duplicateRid", bob);
     }
 }
 
@@ -111,7 +150,22 @@ std::shared_ptr<const ErrorExtraInfo> DuplicateKeyErrorInfo::parse(const BSONObj
         collation = collationElt.Obj();
     }
 
-    return std::make_shared<DuplicateKeyErrorInfo>(keyPattern, keyValue, collation);
+    FoundValue foundValue;
+    if (auto foundValueElt = obj["foundValue"]) {
+        if (foundValueElt.isABSONObj()) {
+            foundValue = foundValueElt.Obj();
+        } else {
+            foundValue = RecordId::deserializeToken(foundValueElt);
+        }
+    }
+
+    boost::optional<RecordId> duplicateRid;
+    if (auto duplicateRidElt = obj["duplicateRid"]) {
+        duplicateRid = RecordId::deserializeToken(duplicateRidElt);
+    }
+
+    return std::make_shared<DuplicateKeyErrorInfo>(
+        keyPattern, keyValue, collation, std::move(foundValue), duplicateRid);
 }
 
 }  // namespace mongo

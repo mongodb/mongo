@@ -4,8 +4,7 @@ import collections
 import functools
 import threading
 
-from buildscripts.resmokelib import config
-from buildscripts.resmokelib import errors
+from buildscripts.resmokelib import config, errors
 
 
 def _check_port(func):
@@ -23,8 +22,10 @@ def _check_port(func):
             raise errors.PortAllocationError("Attempted to use a negative port")
 
         if port > PortAllocator.MAX_PORT:
-            raise errors.PortAllocationError("Exhausted all available ports. Consider decreasing"
-                                             " the number of jobs, or using a lower base port")
+            raise errors.PortAllocationError(
+                "Exhausted all available ports. Consider decreasing"
+                " the number of jobs, or using a lower base port"
+            )
 
         return port
 
@@ -49,7 +50,7 @@ class PortAllocator(object):
 
     # The first _PORTS_PER_FIXTURE ports of each range are reserved for the fixtures, the remainder
     # of the port range is used by tests.
-    _PORTS_PER_FIXTURE = 20
+    _PORTS_PER_FIXTURE = 40
 
     _NUM_USED_PORTS_LOCK = threading.Lock()
 
@@ -58,46 +59,54 @@ class PortAllocator(object):
 
     @classmethod
     @_check_port
-    def next_fixture_port(cls, job_num):
+    def next_fixture_port(cls, job_num: int) -> int:
         """Return the next port for a fixture to use.
 
         Raises a PortAllocationError if the fixture has requested more
         ports than are reserved per job, or if the next port is not a
         valid port number.
         """
+        offset = cls.get_job_offset(job_num)
         with cls._NUM_USED_PORTS_LOCK:
-            start_port = config.BASE_PORT + (job_num * cls._PORTS_PER_JOB)
-            num_used_ports = cls._NUM_USED_PORTS[job_num]
+            start_port = config.BASE_PORT + (offset * cls._PORTS_PER_JOB)
+            num_used_ports = cls._NUM_USED_PORTS[offset]
             next_port = start_port + num_used_ports
 
-            cls._NUM_USED_PORTS[job_num] += 1
+            cls._NUM_USED_PORTS[offset] += 1
 
             if next_port >= start_port + cls._PORTS_PER_FIXTURE:
                 raise errors.PortAllocationError(
-                    "Fixture has requested more than the %d ports reserved per fixture" %
-                    cls._PORTS_PER_FIXTURE)
+                    "Fixture has requested more than the %d ports reserved per fixture"
+                    % cls._PORTS_PER_FIXTURE
+                )
 
             return next_port
 
     @classmethod
     @_check_port
-    def min_test_port(cls, job_num):
+    def min_test_port(cls, job_num: int) -> int:
         """Return the lowest port that is reserved for use by tests, for specified job.
 
         Raises a PortAllocationError if that port is higher than the
         maximum port.
         """
-        return config.BASE_PORT + (job_num * cls._PORTS_PER_JOB) + cls._PORTS_PER_FIXTURE
+        return (
+            config.BASE_PORT
+            + (cls.get_job_offset(job_num) * cls._PORTS_PER_JOB)
+            + cls._PORTS_PER_FIXTURE
+        )
 
     @classmethod
     @_check_port
-    def max_test_port(cls, job_num):
+    def max_test_port(cls, job_num: int) -> int:
         """Return the highest port that is reserved for use by tests, for specified job.
 
         Raises a PortAllocationError if that port is higher than the
         maximum port.
         """
-        next_range_start = config.BASE_PORT + ((job_num + 1) * cls._PORTS_PER_JOB)
+        next_range_start = config.BASE_PORT + (
+            (cls.get_job_offset(job_num) + 1) * cls._PORTS_PER_JOB
+        )
         return next_range_start - 1
 
     @classmethod
@@ -110,3 +119,10 @@ class PortAllocator(object):
 
         with cls._NUM_USED_PORTS_LOCK:
             cls._NUM_USED_PORTS = collections.defaultdict(int)
+
+    @classmethod
+    def get_job_offset(cls, job_num: int) -> int:
+        """Return the offset relative to the base port for the specified job number."""
+
+        # When sharding is enabled, the job number is the shard index, but only on job is actually running.
+        return job_num if config.SHARD_INDEX is None else 0

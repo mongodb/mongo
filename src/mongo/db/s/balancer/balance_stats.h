@@ -29,10 +29,11 @@
 
 #pragma once
 
-#include <cstddef>
-#include <vector>
+#include "mongo/db/global_catalog/type_shard.h"
 
-#include "mongo/s/catalog/type_shard.h"
+#include <cstddef>
+#include <cstdint>
+#include <vector>
 
 namespace mongo {
 

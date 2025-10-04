@@ -1,0 +1,138 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "batch_write_types",
+    srcs = [
+        "batched_command_request.cpp",
+        "batched_command_response.cpp",
+        "batched_upsert_detail.cpp",
+        "bulk_write_command_modifier.cpp",
+        "write_command_ref.cpp",
+    ],
+    hdrs = [
+        "batched_command_request.h",
+        "batched_command_response.h",
+        "batched_upsert_detail.h",
+        "bulk_write_command_modifier.h",
+        "write_command_ref.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:commands",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:common",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:error_labels",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:expression_context_builder",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db:vector_clock",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/commands/query_cmd:bulk_write_parser",
+        "//src/mongo/db/query/write_ops:write_ops_parsers",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/repl:optime",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/rpc:command_status",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/s:common_s",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "wc_error",
+    srcs = [
+        "wc_error.cpp",
+    ],
+    hdrs = [
+        "wc_error.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo:core_headers_library",
+        "//src/mongo/rpc:command_status",
+        "//src/mongo/s:sharding_router_api",
+    ],
+)
+
+mongo_cc_library(
+    name = "fle",
+    srcs = [
+        "fle.cpp",
+    ],
+    hdrs = [
+        "bulk_write_reply_info.h",
+        "fle.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:fle_crud",
+        "//src/mongo/db/commands/query_cmd:bulk_write_common",
+        "//src/mongo/s:sharding_router_api",
+    ],
+)
+
+mongo_cc_library(
+    name = "write_op_helper",
+    srcs = [
+        "write_op_helper.cpp",
+    ],
+    hdrs = [
+        "write_op_helper.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo:core_headers_library",
+        "//src/mongo/rpc:command_status",
+        "//src/mongo/s:sharding_router_api",
+    ],
+)
+
+mongo_cc_library(
+    name = "pause_migrations_during_multi_updates_enablement",
+    srcs = [
+        "pause_migrations_during_multi_updates_enablement.cpp",
+        "//src/mongo/db/cluster_parameters:migration_blocking_operation_cluster_parameters_gen",
+    ],
+    hdrs = [
+        "pause_migrations_during_multi_updates_enablement.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo:core_headers_library",
+        "//src/mongo/s:sharding_router_api",
+    ],
+)
+
+mongo_cc_library(
+    name = "sharded_write_ops",
+    srcs = [
+        "batch_write_exec.cpp",
+        "batch_write_op.cpp",
+        "bulk_write_exec.cpp",
+        "coordinate_multi_update_util.cpp",
+        "write_op.cpp",
+    ],
+    hdrs = [
+        "batch_write_exec.h",
+        "batch_write_op.h",
+        "bulk_write_exec.h",
+        "bulk_write_reply_info.h",
+        "coordinate_multi_update_util.h",
+        "write_op.h",
+    ],
+    deps = [
+        "batch_write_types",
+        "fle",
+        "pause_migrations_during_multi_updates_enablement",
+        "wc_error",
+        "write_op_helper",
+        "//src/mongo:base",
+        "//src/mongo:core_headers_library",
+        "//src/mongo/db/timeseries/write_ops:timeseries_write_ops_utils",
+        "//src/mongo/s:sharding_write_without_shard_key_api",
+        "//src/mongo/s/commands/query_cmd:populate_cursor",
+    ],
+)

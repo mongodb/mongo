@@ -1,0 +1,102 @@
+# Copyright (C) 2019-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+
+global:
+    cpp_namespace: mongo
+    cpp_includes:
+        - "mongo/db/ttl/ttl.h"
+server_parameters:
+    ttlMonitorEnabled:
+        description: "Enable the TTL monitor."
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: ttlMonitorEnabled
+        default: true
+        redact: false
+
+    ttlMonitorSleepSecs:
+        description: "Period of TTL monitor thread (used for testing)."
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: ttlMonitorSleepSecs
+        on_update: "TTLMonitor::onUpdateTTLMonitorSleepSeconds"
+        default: 60
+        validator:
+            gt: 0
+        redact: false
+
+    ttlMonitorBatchDeletes:
+        description:
+            "When enabled, the TTLMonitor batches TTL deletions and also removes expired documents
+            more fairly among the TTL indexes. When disabled, it falls back to legacy
+            doc-by-document deletions."
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: ttlMonitorBatchDeletes
+        default: true
+        redact: false
+
+    ttlMonitorSubPassTargetSecs:
+        description:
+            "Limits (approximately) the amount of time spent iterating over a set TTL indexes where
+            expired documents remain. Additionally, the frequency at which we refresh the view of
+            TTL indexes within a pass where documents remain. 0 means each TTL index will be
+            iterated over once before the sub-pass completes. Only applicable when
+            'ttlMonitorBatchDeletes' is true."
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: ttlMonitorSubPassTargetSecs
+        default: 60
+        validator:
+            gte: 0
+        redact: false
+
+    ttlIndexDeleteTargetTimeMS:
+        description:
+            "Limits (approximately) the time, in milliseconds, spent performing a batched delete
+            pass over a given TTL index. 0 means unlimited. Only applicable when
+            'ttlMonitorBatchDeletes' is true."
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: ttlIndexDeleteTargetTimeMS
+        default: 1000
+        validator:
+            gte: 0
+        redact: false
+
+    ttlIndexDeleteTargetDocs:
+        description:
+            "Limits (approximately) the number of expired documents removed from a TTL index over a
+            batched delete. 0 means unlimited. Only applicable when 'ttlMonitorBatchDeletes' is
+            true."
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: ttlIndexDeleteTargetDocs
+        default: 50000
+        validator:
+            gte: 0
+        redact: false

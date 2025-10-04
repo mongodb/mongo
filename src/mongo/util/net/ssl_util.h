@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include <fstream>
-
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+
+#include <fstream>
 
 namespace mongo {
 
@@ -45,6 +45,11 @@ StatusWith<StringData> findPEMBlob(StringData blob,
                                    StringData type,
                                    size_t position = 0,
                                    bool allowEmpty = false);
+
+/**
+ * Read the contents of a PEM-encoded file to a std::string.
+ */
+StatusWith<std::string> readPEMFile(StringData fileName);
 
 }  // namespace ssl_util
 

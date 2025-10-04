@@ -4,16 +4,14 @@
  *
  * @tags: [requires_replication]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const dbName = "kill_ttl_on_stepdown";
 
 const rst = new ReplSetTest({
     nodes: [{}, {rsConfig: {priority: 0}}],
-    nodeOptions: {setParameter: "ttlMonitorSleepSecs=15"}
+    nodeOptions: {setParameter: "ttlMonitorSleepSecs=15"},
 });
 rst.startSet();
 rst.initiate();
@@ -22,7 +20,8 @@ let primary = rst.getPrimary();
 let db = primary.getDB(dbName);
 
 // Create a TTL index.
-db.getCollection("test").createIndex({x: 1}, {expireAfterSeconds: 3600});
+const collName = jsTestName();
+db.getCollection(collName).createIndex({x: 1}, {expireAfterSeconds: 3600});
 
 function getNumTTLPasses() {
     let serverStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
@@ -41,9 +40,8 @@ failPoint.wait();
 let ttlPassesBeforeStepdown = getNumTTLPasses();
 
 // Force a stepdown of the primary.
-assert.commandWorked(
-    primary.getDB("admin").runCommand({replSetStepDown: 60 * 10 /* 10 minutes */, force: true}));
-rst.waitForState(primary, ReplSetTest.State.SECONDARY);
+assert.commandWorked(primary.getDB("admin").runCommand({replSetStepDown: 60 * 10 /* 10 minutes */, force: true}));
+rst.awaitSecondaryNodes(null, [primary]);
 assert.commandWorked(primary.adminCommand({replSetFreeze: 0}));
 assert.commandWorked(primary.adminCommand({replSetStepUp: 1}));
 
@@ -64,4 +62,3 @@ assert.soon(() => {
 }, "TTLMonitor was not running after stepdown");
 
 rst.stopSet();
-}());

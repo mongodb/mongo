@@ -34,7 +34,6 @@ from wtdataset import SimpleDataSet
 # Make sure modify fails cleanly on FLCS tables.
 
 class test_flcs04(wttest.WiredTigerTestCase):
-    session_config = 'isolation=snapshot'
     conn_config = 'in_memory=false'
 
     def test_flcs(self):
@@ -44,7 +43,7 @@ class test_flcs04(wttest.WiredTigerTestCase):
             self, uri, nrows, key_format='r', value_format='6t', config='leaf_page_max=4096')
         ds.populate()
 
-        
+
         cursor = self.session.open_cursor(uri)
         self.session.begin_transaction()
 

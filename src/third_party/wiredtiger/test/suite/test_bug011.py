@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import random, wiredtiger, wttest
+import random, wttest
 from wtdataset import SimpleDataSet
 
 # test_bug011.py
@@ -71,6 +71,3 @@ class test_bug011(wttest.WiredTigerTestCase):
                 cursors[i].set_key(ds.key(random.randint(0, self.nrows - 1)))
                 cursors[i].search()
                 cursors[i].reset()
-
-if __name__ == '__main__':
-    wttest.run()

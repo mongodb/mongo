@@ -27,37 +27,63 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/client/authenticate.h"
-#include "mongo/config.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/internal_auth.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/auth/authorization_client_handle.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_manager_factory.h"
 #include "mongo/db/auth/authorization_manager_global_parameters_gen.h"
-#include "mongo/db/auth/authz_manager_external_state.h"
 #include "mongo/db/auth/cluster_auth_mode.h"
-#include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/auth/security_key.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/ssl_manager.h"
+#include "mongo/util/net/ssl_types.h"
+
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {
 
-ServiceContext::ConstructorActionRegisterer createAuthorizationManager(
+ServiceContext::ConstructorActionRegisterer setClusterAuthMode(
+    "SetClusterAuthMode", [](ServiceContext* serviceContext) {
+        // Officially set the ClusterAuthMode for this ServiceContext
+        if (!ClusterAuthMode::get(serviceContext)
+                 .equals(serverGlobalParams.startupClusterAuthMode)) {
+            ClusterAuthMode::set(serviceContext, serverGlobalParams.startupClusterAuthMode);
+        }
+    });
+
+Service::ConstructorActionRegisterer createAuthorizationManager(
     "CreateAuthorizationManager",
     {"OIDGeneration", "EndStartupOptionStorage"},
-    [](ServiceContext* service) {
-        // Officially set the ClusterAuthMode for this ServiceContext
-        ClusterAuthMode::set(service, serverGlobalParams.startupClusterAuthMode);
-
+    [](Service* service) {
         const auto clusterAuthMode = serverGlobalParams.startupClusterAuthMode;
         const auto authIsEnabled =
             serverGlobalParams.authState == ServerGlobalParams::AuthState::kEnabled;
 
-        auto authzManager = AuthorizationManager::create(service);
+        std::unique_ptr<AuthorizationManager> authzManager;
+
+        if (service->role().hasExclusively(ClusterRole::RouterServer)) {
+            authzManager = globalAuthzManagerFactory->createRouter(service);
+        } else {
+            authzManager = globalAuthzManagerFactory->createShard(service);
+            auth::AuthorizationBackendInterface::set(
+                service, globalAuthzManagerFactory->createBackendInterface(service));
+        }
+
         authzManager->setAuthEnabled(authIsEnabled);
         authzManager->setShouldValidateAuthSchemaOnStartup(gStartupAuthSchemaValidation);
 
@@ -84,25 +110,20 @@ ServiceContext::ConstructorActionRegisterer createAuthorizationManager(
                                                 .clientSubjectName.toString()}));
 #endif
         }
-    });
+    },
+    [](Service* service) { AuthorizationManager::set(service, nullptr); });
 
 }  // namespace
 
-// This setting is unique in that it is read-only. The IDL subststem doesn't actually allow for
-// that, so we'll pretend it's startup-settable, then override it here.
-AuthzVersionParameter::AuthzVersionParameter(StringData name, ServerParameterType)
-    : ServerParameter(ServerParameterSet::getGlobal(), name, false, false) {}
-
 void AuthzVersionParameter::append(OperationContext* opCtx,
-                                   BSONObjBuilder& b,
-                                   const std::string& name) {
-    int authzVersion;
-    uassertStatusOK(AuthorizationManager::get(opCtx->getServiceContext())
-                        ->getAuthorizationVersion(opCtx, &authzVersion));
-    b.append(name, authzVersion);
+                                   BSONObjBuilder* b,
+                                   StringData name,
+                                   const boost::optional<TenantId>&) {
+    b->append(name, AuthorizationManager::schemaVersion28SCRAM);
 }
 
-Status AuthzVersionParameter::setFromString(const std::string& newValueString) {
+Status AuthzVersionParameter::setFromString(StringData newValueString,
+                                            const boost::optional<TenantId>&) {
     return {ErrorCodes::InternalError, "set called on unsettable server parameter"};
 }
 

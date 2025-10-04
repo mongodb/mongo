@@ -31,26 +31,38 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/catalog/clustered_collection_options_gen.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/local_catalog/clustered_collection_options_gen.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/storage/key_format.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 class Timestamp;
 class RecordId;
+
 namespace record_id_helpers {
 
 /**
  * Converts Timestamp to a RecordId in an unspecified manor that is safe to use as the key to
  * in a RecordStore.
  */
-StatusWith<RecordId> keyForOptime(const Timestamp& opTime);
+StatusWith<RecordId> keyForOptime(const Timestamp& opTime, KeyFormat keyFormat);
 
 /**
  * For clustered collections, converts various values into a RecordId.
  */
-StatusWith<RecordId> keyForDoc(const BSONObj& doc, const ClusteredIndexSpec& indexSpec);
+StatusWith<RecordId> keyForDoc(const BSONObj& doc,
+                               const ClusteredIndexSpec& indexSpec,
+                               const CollatorInterface* collator);
 RecordId keyForElem(const BSONElement& elem);
+RecordId keyForObj(const BSONObj& obj);
 RecordId keyForOID(OID oid);
 RecordId keyForDate(Date_t date);
 
@@ -67,14 +79,14 @@ StatusWith<RecordId> extractKeyOptime(const char* data, int len);
  * RecordId because it loses information about the original RecordId format. If you require passing
  * a RecordId as a token or storing for a resumable scan, for example, use RecordId::serializeToken.
  */
-void appendToBSONAs(RecordId rid, BSONObjBuilder* builder, StringData fieldName);
-BSONObj toBSONAs(RecordId rid, StringData fieldName);
+void appendToBSONAs(const RecordId& rid, BSONObjBuilder* builder, StringData fieldName);
+BSONObj toBSONAs(const RecordId& rid, StringData fieldName);
 
 /**
  * Enumerates all reserved ids that have been allocated for a specific purpose. These IDs may not be
  * stored in RecordStores, but rather may be encoded as RecordIds as meaningful values in indexes.
  */
-enum class ReservationId { kWildcardMultikeyMetadataId };
+enum class ReservationId { kWildcardMultikeyMetadataId = 0 };
 
 /**
  * Returns the reserved RecordId value for a given ReservationId and RecordStore KeyFormat.
@@ -82,9 +94,14 @@ enum class ReservationId { kWildcardMultikeyMetadataId };
 RecordId reservedIdFor(ReservationId res, KeyFormat keyFormat);
 
 /**
+ * Returns the maximum RecordId value for a given RecordStore KeyFormat.
+ */
+RecordId maxRecordId(KeyFormat keyFormat);
+
+/**
  * Returns true if this RecordId falls within the reserved range for a given RecordId type.
  */
-bool isReserved(RecordId id);
+bool isReserved(const RecordId& id);
 
 }  // namespace record_id_helpers
 }  // namespace mongo

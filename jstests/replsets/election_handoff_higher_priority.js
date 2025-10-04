@@ -4,14 +4,12 @@
  * replica set, where one of the secondaries has a higher priority than the other. The test
  * expects that that secondary gets chosen as the election handoff candidate.
  */
-
-(function() {
-"use strict";
-load("jstests/replsets/libs/election_handoff.js");
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ElectionHandoffTest} from "jstests/replsets/libs/election_handoff.js";
 
 const testName = "election_handoff_higher_priority";
 const numNodes = 3;
-const rst = ReplSetTest({name: testName, nodes: numNodes});
+const rst = new ReplSetTest({name: testName, nodes: numNodes});
 const nodes = rst.nodeList();
 rst.startSet();
 
@@ -23,11 +21,10 @@ config.members[2].priority = 2;
 // Make sure there are no election timeouts firing for the duration of the test. This helps
 // ensure that the test will only pass if the election handoff succeeds.
 config.settings = {
-    "electionTimeoutMillis": 12 * 60 * 60 * 1000
+    "electionTimeoutMillis": 12 * 60 * 60 * 1000,
 };
 rst.initiate(config);
 
 ElectionHandoffTest.testElectionHandoff(rst, 0, 2);
 
 rst.stopSet();
-})();

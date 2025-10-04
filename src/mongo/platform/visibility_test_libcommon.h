@@ -27,15 +27,23 @@
  *    it in the license file.
  */
 
-#include <string_view>
+#pragma once
 
 #include "mongo/platform/visibility.h"
+
+#include <string_view>
+
+#ifdef MONGO_API_visibility_test_libcommon
+#define MONGO_VISIBILITY_TEST_LIBCOMMON_API MONGO_API_EXPORT
+#else
+#define MONGO_VISIBILITY_TEST_LIBCOMMON_API MONGO_API_IMPORT
+#endif
 
 namespace mongo {
 namespace visibility_test_libcommon {
 
-MONGO_API(visibility_test_libcommon) bool validate(std::string_view data);
-MONGO_API(visibility_test_libcommon) bool validate(double data);
+MONGO_VISIBILITY_TEST_LIBCOMMON_API bool validate(std::string_view data);
+MONGO_VISIBILITY_TEST_LIBCOMMON_API bool validate(double data);
 
 }  // namespace visibility_test_libcommon
 }  // namespace mongo

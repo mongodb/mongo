@@ -30,9 +30,19 @@
 #pragma once
 
 #include "mongo/base/data_view.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
+
+#include <compare>
+#include <cstdint>
+#include <iosfwd>
+#include <string>
+#include <tuple>
 
 namespace mongo {
 
@@ -92,6 +102,10 @@ public:
         return static_cast<long long>(asULL());
     }
 
+    std::int64_t asInt64() const {
+        return static_cast<std::int64_t>(asLL());
+    }
+
     bool isNull() const {
         return secs == 0;
     }
@@ -131,11 +145,11 @@ public:
     // name. This lives here because Timestamp manages its own serialization format.
 
     template <class Builder>
-    void append(Builder& builder, const StringData& fieldName) const {
+    void append(Builder& builder, StringData fieldName) const {
         // No endian conversions needed, since we store in-memory representation
         // in little endian format, regardless of target endian.
-        builder.appendNum(static_cast<char>(bsonTimestamp));
-        builder.appendStr(fieldName);
+        builder.appendNum(static_cast<char>(BSONType::timestamp));
+        builder.appendCStr(fieldName);
         builder.appendNum(asULL());
     }
     BSONObj toBSON() const;
@@ -148,5 +162,13 @@ private:
     unsigned i = 0;
     unsigned secs = 0;
 };
+
+inline std::ostream& operator<<(std::ostream& s, const Timestamp& t) {
+    return (s << t.toString());
+}
+
+inline StringBuilder& operator<<(StringBuilder& s, const Timestamp& t) {
+    return (s << t.toString());
+}
 
 }  // namespace mongo

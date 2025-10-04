@@ -1,0 +1,100 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+idl_generator(
+    name = "dbcheck_gen",
+    src = "dbcheck.idl",
+    deps = [
+        "//src/mongo/bson:bson_validate_gen",
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db:record_id_gen",
+        "//src/mongo/db:write_concern_options_gen",
+        "//src/mongo/db/repl:replication_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "dbcheck",
+    srcs = [
+        "dbcheck.cpp",
+        "dbcheck_idl.cpp",
+        ":dbcheck_gen",
+    ],
+    hdrs = [
+        "dbcheck.h",
+        "dbcheck_idl.h",
+    ],
+    deps = [
+        "//src/mongo/bson:bson_validate",
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db:record_id_helpers",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/local_catalog:collection_options",
+        "//src/mongo/db/local_catalog:health_log_interface",
+        "//src/mongo/db/local_catalog:throttle_cursor",
+        "//src/mongo/db/repl:repl_server_parameters",
+        "//src/mongo/util:md5",
+    ],
+)
+
+mongo_cc_library(
+    name = "dbcheck_test_fixture",
+    srcs = [
+        "dbcheck_test_fixture.cpp",
+    ],
+    hdrs = [
+        "dbcheck_test_fixture.h",
+        "//src/mongo/db/op_observer:operation_logger_mock.h",
+    ],
+    deps = [
+        ":dbcheck",
+        "//src/mongo:base",
+        "//src/mongo/db:dbdirectclient",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db/collection_crud",
+        "//src/mongo/db/commands:dbcheck_command",
+        "//src/mongo/db/index_builds:index_builds_coordinator",
+        "//src/mongo/db/local_catalog:catalog_test_fixture",
+        "//src/mongo/db/local_catalog:health_log",
+        "//src/mongo/db/local_catalog:health_log_interface",
+        "//src/mongo/db/op_observer",
+        "//src/mongo/db/op_observer:op_observer_impl",
+        "//src/mongo/db/repl:storage_interface",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "dbcheck_test",
+    srcs = [
+        "dbcheck_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_fifth_group",
+        "server-integration-smoke",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:use_wiredtiger_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":dbcheck",
+        ":dbcheck_test_fixture",
+        "//src/mongo/db/local_catalog:catalog_helpers",
+        "//src/mongo/db/local_catalog:catalog_test_fixture",
+        "//src/mongo/db/local_catalog:health_log",
+        "//src/mongo/unittest",
+        "//src/mongo/unittest:task_executor_proxy",
+        "//src/mongo/util:clock_source_mock",
+        "//src/mongo/util/concurrency:thread_pool",
+    ],
+)

@@ -27,23 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/matcher/expression_where_noop.h"
 
-#include <memory>
+#include "mongo/util/assert_util.h"
 
+#include <memory>
+#include <string>
+#include <utility>
 
 namespace mongo {
 
 WhereNoOpMatchExpression::WhereNoOpMatchExpression(WhereParams params)
     : WhereMatchExpressionBase(std::move(params)) {}
 
-bool WhereNoOpMatchExpression::matches(const MatchableDocument* doc, MatchDetails* details) const {
-    MONGO_UNREACHABLE;
-}
-
-std::unique_ptr<MatchExpression> WhereNoOpMatchExpression::shallowClone() const {
+std::unique_ptr<MatchExpression> WhereNoOpMatchExpression::clone() const {
     WhereParams params;
     params.code = getCode();
     std::unique_ptr<WhereNoOpMatchExpression> e =

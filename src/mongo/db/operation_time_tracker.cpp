@@ -27,10 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/operation_time_tracker.h"
-#include "mongo/platform/mutex.h"
+
+#include "mongo/stdx/mutex.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+
+#include <mutex>
+#include <utility>
 
 namespace mongo {
 namespace {
@@ -51,12 +55,12 @@ std::shared_ptr<OperationTimeTracker> OperationTimeTracker::get(OperationContext
 }
 
 LogicalTime OperationTimeTracker::getMaxOperationTime() const {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     return _maxOperationTime;
 }
 
 void OperationTimeTracker::updateOperationTime(LogicalTime newTime) {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     if (newTime > _maxOperationTime) {
         _maxOperationTime = std::move(newTime);
     }

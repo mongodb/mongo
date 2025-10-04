@@ -27,24 +27,52 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/traffic_recorder.h"
-#include "mongo/db/traffic_recorder_gen.h"
-
-#include <boost/filesystem/operations.hpp>
-#include <fstream>
 
 #include "mongo/base/data_builder.h"
+#include "mongo/base/data_range_cursor.h"
+#include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_type_terminated.h"
-#include "mongo/base/init.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/commands/server_status.h"
+#include "mongo/db/commands/server_status/server_status.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
-#include "mongo/rpc/factory.h"
+#include "mongo/db/sorter/sorter_checksum_calculator.h"
+#include "mongo/db/traffic_recorder.h"
+#include "mongo/db/traffic_recorder_gen.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/producer_consumer_queue.h"
-#include "mongo/util/str.h"
+#include "mongo/util/tick_source.h"
+#include "mongo/util/time_support.h"
+
+#include <chrono>
+#include <cstddef>
+#include <cstdint>
+#include <deque>
+#include <fstream>  // IWYU pragma: keep
+#include <limits>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <tuple>
+#include <utility>
+
+#include <boost/filesystem/fstream.hpp>
+#include <boost/filesystem/path.hpp>
 
 namespace mongo {
 
@@ -72,189 +100,211 @@ MONGO_INITIALIZER(ShouldAlwaysRecordTraffic)(InitializerContext*) {
 
 }  // namespace
 
-/**
- * The Recording class represents a single recording that the recorder is exposing.  It's made up of
- * a background thread which flushes records to disk, and helper methods to push to that thread,
- * expose stats, and stop the recording.
- */
-class TrafficRecorder::Recording {
-public:
-    Recording(const StartRecordingTraffic& options)
-        : _path(_getPath(options.getFilename().toString())), _maxLogSize(options.getMaxFileSize()) {
+void appendPacketHeader(DataBuilder& db, const TrafficRecordingPacket& packet) {
+    db.clear();
+    Message toWrite = packet.message;
 
-        MultiProducerSingleConsumerQueue<TrafficRecordingPacket, CostFunction>::Options
-            queueOptions;
-        queueOptions.maxQueueDepth = options.getBufferSize();
-        if (!shouldAlwaysRecordTraffic) {
-            queueOptions.maxProducerQueueDepth = 0;
+    uassertStatusOK(db.writeAndAdvance<LittleEndian<uint32_t>>(0));
+    uassertStatusOK(db.writeAndAdvance<EventType>(packet.eventType));
+    uassertStatusOK(db.writeAndAdvance<LittleEndian<uint64_t>>(packet.id));
+    uassertStatusOK(db.writeAndAdvance<Terminated<'\0', StringData>>(StringData(packet.session)));
+    uassertStatusOK(
+        db.writeAndAdvance<LittleEndian<uint64_t>>(durationCount<Microseconds>(packet.offset)));
+    uassertStatusOK(db.writeAndAdvance<LittleEndian<uint64_t>>(packet.order));
+
+    auto fullSize = db.size() + packet.message.size();
+    db.getCursor().write<LittleEndian<uint32_t>>(fullSize);
+}
+
+TrafficRecorder::Recording::Recording(const StartTrafficRecording& options, TickSource* tickSource)
+    : _path(_getPath(std::string{options.getDestination()})),
+      _maxLogSize(options.getMaxFileSize()) {
+
+    MultiProducerSingleConsumerQueue<TrafficRecordingPacket, CostFunction>::Options queueOptions;
+    queueOptions.maxQueueDepth = options.getMaxMemUsage();
+    if (!shouldAlwaysRecordTraffic) {
+        queueOptions.maxProducerQueueDepth = 0;
+    }
+    _pcqPipe =
+        MultiProducerSingleConsumerQueue<TrafficRecordingPacket, CostFunction>::Pipe(queueOptions);
+
+    _trafficStats.setRunning(true);
+    _trafficStats.setBufferSize(options.getMaxMemUsage());
+    _trafficStats.setRecordingDir(_path);
+    _trafficStats.setMaxFileSize(_maxLogSize);
+
+    startTime.store(tickSource->ticksTo<Microseconds>(tickSource->getTicks()));
+}
+
+void TrafficRecorder::Recording::run() {
+    _thread = stdx::thread([consumer = std::move(_pcqPipe.consumer), this] {
+        if (!boost::filesystem::is_directory(boost::filesystem::absolute(_path))) {
+            boost::filesystem::create_directory(boost::filesystem::absolute(_path));
         }
-        _pcqPipe = MultiProducerSingleConsumerQueue<TrafficRecordingPacket, CostFunction>::Pipe(
-            queueOptions);
 
-        _trafficStats.setRunning(true);
-        _trafficStats.setBufferSize(options.getBufferSize());
-        _trafficStats.setRecordingFile(_path);
-        _trafficStats.setMaxFileSize(_maxLogSize);
-    }
+        static const std::string checkSumFileName = "checksum.txt";
+        boost::filesystem::path checksumFile(boost::filesystem::absolute(_path));
+        checksumFile /= checkSumFileName;
+        boost::filesystem::ofstream checksumOut(checksumFile,
+                                                std::ios_base::app | std::ios_base::out);
 
-    void run() {
-        _thread = stdx::thread([consumer = std::move(_pcqPipe.consumer), this] {
-            try {
-                DataBuilder db;
-                std::fstream out(_path,
-                                 std::ios_base::binary | std::ios_base::trunc | std::ios_base::out);
+        // The calculator calculates the checksum of each recording for integrity check.
+        SorterChecksumCalculator checksumCalculator = {SorterChecksumVersion::v2};
+        auto writeChecksum = [&checksumOut, &checksumCalculator](const std::string& recordingFile) {
+            auto checkSumVal = checksumCalculator.hexdigest();
+            checksumOut << recordingFile << "\t" << checkSumVal << std::endl;
+            checksumCalculator.reset();
+        };
 
-                while (true) {
-                    std::deque<TrafficRecordingPacket> storage;
-                    size_t bytes;
-
-                    std::tie(storage, bytes) = consumer.popManyUpTo(MaxMessageSizeBytes);
-
-                    // if this fired... somehow we got a message bigger than a message
-                    invariant(bytes);
-
-                    for (const auto& packet : storage) {
-                        db.clear();
-                        Message toWrite = packet.message;
-
-                        uassertStatusOK(db.writeAndAdvance<LittleEndian<uint32_t>>(0));
-                        uassertStatusOK(db.writeAndAdvance<LittleEndian<uint64_t>>(packet.id));
-                        uassertStatusOK(db.writeAndAdvance<Terminated<'\0', StringData>>(
-                            StringData(packet.local)));
-                        uassertStatusOK(db.writeAndAdvance<Terminated<'\0', StringData>>(
-                            StringData(packet.remote)));
-                        uassertStatusOK(db.writeAndAdvance<LittleEndian<uint64_t>>(
-                            packet.now.toMillisSinceEpoch()));
-                        uassertStatusOK(db.writeAndAdvance<LittleEndian<uint64_t>>(packet.order));
-
-                        auto size = db.size() + toWrite.size();
-                        db.getCursor().write<LittleEndian<uint32_t>>(size);
-
-                        {
-                            stdx::lock_guard<Latch> lk(_mutex);
-                            _written += size;
-                        }
-
-                        uassert(ErrorCodes::LogWriteFailed,
-                                "hit maximum log size",
-                                _written < _maxLogSize);
-
-                        out.write(db.getCursor().data(), db.size());
-                        out.write(toWrite.buf(), toWrite.size());
-                    }
-                }
-            } catch (const ExceptionFor<ErrorCodes::ProducerConsumerQueueConsumed>&) {
-                // Close naturally
-            } catch (...) {
-                auto status = exceptionToStatus();
-
-                stdx::lock_guard<Latch> lk(_mutex);
-                _result = status;
+        // This function guarantees to open a new recording file. Force the thread to sleep for
+        // a very short period of time if a file with the same name exists and then create a new
+        // file. This case is rare and only happens when the 'maxFileSize' is too small. The
+        // same recording file could be opened twice within 1 millisecond.
+        auto openNewRecordingFile = [this](boost::filesystem::path& recordingFile,
+                                           boost::filesystem::ofstream& out) {
+            recordingFile = boost::filesystem::absolute(_path);
+            recordingFile /= std::to_string(Date_t::now().toMillisSinceEpoch());
+            recordingFile += ".bin";
+            while (boost::filesystem::exists(recordingFile)) {
+                stdx::this_thread::sleep_for(stdx::chrono::milliseconds(5));
+                recordingFile = boost::filesystem::absolute(_path);
+                recordingFile /= std::to_string(Date_t::now().toMillisSinceEpoch());
+                recordingFile += ".bin";
             }
-        });
-    }
-
-    /**
-     * pushRecord returns false if the queue was full.  This is ultimately fatal to the recording
-     */
-    bool pushRecord(const transport::SessionHandle& ts,
-                    Date_t now,
-                    const uint64_t order,
-                    const Message& message) {
+            out.open(recordingFile,
+                     std::ios_base::binary | std::ios_base::trunc | std::ios_base::out);
+        };
+        boost::filesystem::path recordingFile;
+        boost::filesystem::ofstream out;
         try {
-            _pcqPipe.producer.push(
-                {ts->id(), ts->local().toString(), ts->remote().toString(), now, order, message});
-            return true;
-        } catch (const ExceptionFor<ErrorCodes::ProducerConsumerQueueProducerQueueDepthExceeded>&) {
-            invariant(!shouldAlwaysRecordTraffic);
+            DataBuilder db;
+            openNewRecordingFile(recordingFile, out);
 
-            // If we couldn't push our packet begin the process of failing the recording
-            _pcqPipe.producer.close();
+            while (true) {
+                std::deque<TrafficRecordingPacket> storage;
+                size_t bytes;
 
-            stdx::lock_guard<Latch> lk(_mutex);
+                std::tie(storage, bytes) = consumer.popManyUpTo(MaxMessageSizeBytes);
 
-            // If the result was otherwise okay, mark it as failed due to the queue blocking.  If
-            // it failed for another reason, don't overwrite that.
-            if (_result.isOK()) {
-                _result = Status(ErrorCodes::Error(51061), "queue was blocked in traffic recorder");
+                // if this fired... somehow we got a message bigger than a message
+                invariant(bytes);
+
+                for (const auto& packet : storage) {
+                    appendPacketHeader(db, packet);
+                    Message toWrite = packet.message;
+
+                    auto size = db.size() + toWrite.size();
+
+                    bool maxSizeExceeded = false;
+
+                    {
+                        stdx::lock_guard<stdx::mutex> lk(_mutex);
+                        _written += size;
+                        maxSizeExceeded = _written >= _maxLogSize;
+                    }
+
+                    if (maxSizeExceeded) {
+                        writeChecksum(recordingFile.string());
+                        out.close();
+                        // The current recording file hits the maximum file size, open a new
+                        // recording file.
+                        openNewRecordingFile(recordingFile, out);
+                        // We assume that the size of one packet message is greater than the max
+                        // file size. It's intentional to not assert if
+                        // 'size' >= '_maxLogSize' for testing purposes.
+                        {
+                            stdx::lock_guard<stdx::mutex> lk(_mutex);
+                            _written = size;
+                        }
+                    }
+
+                    out.write(db.getCursor().data(), db.size());
+                    checksumCalculator.addData(db.getCursor().data(), db.size());
+                    out.write(toWrite.buf(), toWrite.size());
+                    checksumCalculator.addData(toWrite.buf(), toWrite.size());
+                }
             }
-        } catch (const ExceptionFor<ErrorCodes::ProducerConsumerQueueEndClosed>&) {
-        }
+        } catch (const ExceptionFor<ErrorCodes::ProducerConsumerQueueConsumed>&) {
+            // Close naturally
+            writeChecksum(recordingFile.string());
+        } catch (...) {
+            writeChecksum(recordingFile.string());
+            auto status = exceptionToStatus();
 
-        return false;
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            _result = status;
+        }
+    });
+}
+
+bool TrafficRecorder::Recording::pushRecord(const uint64_t id,
+                                            const std::string session,
+                                            Microseconds offset,
+                                            const uint64_t& order,
+                                            const Message& message,
+                                            EventType eventType) {
+    try {
+        _pcqPipe.producer.push({eventType, id, session, offset, order, message});
+        return true;
+    } catch (const ExceptionFor<ErrorCodes::ProducerConsumerQueueProducerQueueDepthExceeded>&) {
+        invariant(!shouldAlwaysRecordTraffic);
+
+        // If we couldn't push our packet begin the process of failing the recording
+        _pcqPipe.producer.close();
+
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+
+        // If the result was otherwise okay, mark it as failed due to the queue blocking.  If
+        // it failed for another reason, don't overwrite that.
+        if (_result.isOK()) {
+            _result = Status(ErrorCodes::Error(51061), "queue was blocked in traffic recorder");
+        }
+    } catch (const ExceptionFor<ErrorCodes::ProducerConsumerQueueEndClosed>&) {
     }
 
-    Status shutdown() {
-        stdx::unique_lock<Latch> lk(_mutex);
+    return false;
+}
 
-        if (!_inShutdown) {
-            _inShutdown = true;
-            lk.unlock();
+Status TrafficRecorder::Recording::shutdown() {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
 
-            _pcqPipe.producer.close();
-            _thread.join();
+    if (!_inShutdown) {
+        _inShutdown = true;
+        lk.unlock();
 
-            lk.lock();
-        }
+        _pcqPipe.producer.close();
+        _thread.join();
 
-        return _result;
+        lk.lock();
     }
 
-    BSONObj getStats() {
-        stdx::lock_guard<Latch> lk(_mutex);
-        _trafficStats.setBufferedBytes(_pcqPipe.controller.getStats().queueDepth);
-        _trafficStats.setCurrentFileSize(_written);
-        return _trafficStats.toBSON();
+    return _result;
+}
+
+BSONObj TrafficRecorder::Recording::getStats() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _trafficStats.setBufferedBytes(_pcqPipe.controller.getStats().queueDepth);
+    _trafficStats.setCurrentFileSize(_written);
+    return _trafficStats.toBSON();
+}
+
+std::string TrafficRecorder::Recording::_getPath(const std::string& filename) {
+    uassert(
+        ErrorCodes::BadValue, "Traffic recording filename must not be empty", !filename.empty());
+
+    if (gTrafficRecordingDirectory.back() == '/') {
+        gTrafficRecordingDirectory.pop_back();
     }
+    auto parentPath = boost::filesystem::path(gTrafficRecordingDirectory);
+    auto path = parentPath / filename;
 
-    AtomicWord<uint64_t> order{0};
+    uassert(ErrorCodes::BadValue,
+            "Traffic recording filename must be a simple filename",
+            path.parent_path() == parentPath);
 
-private:
-    struct TrafficRecordingPacket {
-        const uint64_t id;
-        const std::string local;
-        const std::string remote;
-        const Date_t now;
-        const uint64_t order;
-        const Message message;
-    };
+    return path.string();
+}
 
-    struct CostFunction {
-        size_t operator()(const TrafficRecordingPacket& packet) const {
-            return packet.message.size();
-        }
-    };
-
-    static std::string _getPath(const std::string& filename) {
-        uassert(ErrorCodes::BadValue,
-                "Traffic recording filename must not be empty",
-                !filename.empty());
-
-        if (gTrafficRecordingDirectory.back() == '/') {
-            gTrafficRecordingDirectory.pop_back();
-        }
-        auto parentPath = boost::filesystem::path(gTrafficRecordingDirectory);
-        auto path = parentPath / filename;
-
-        uassert(ErrorCodes::BadValue,
-                "Traffic recording filename must be a simple filename",
-                path.parent_path() == parentPath);
-
-        return path.string();
-    }
-
-    const std::string _path;
-    const size_t _maxLogSize;
-
-    MultiProducerSingleConsumerQueue<TrafficRecordingPacket, CostFunction>::Pipe _pcqPipe;
-    stdx::thread _thread;
-
-    Mutex _mutex = MONGO_MAKE_LATCH("Recording::_mutex");
-    bool _inShutdown = false;
-    TrafficRecorderStats _trafficStats;
-    size_t _written = 0;
-    Status _result = Status::OK();
-};
 
 namespace {
 static const auto getTrafficRecorder = ServiceContext::declareDecoration<TrafficRecorder>();
@@ -268,11 +318,16 @@ TrafficRecorder::TrafficRecorder() : _shouldRecord(shouldAlwaysRecordTraffic) {}
 
 TrafficRecorder::~TrafficRecorder() {
     if (shouldAlwaysRecordTraffic) {
-        _recording->shutdown().ignore();
+        (**_recording)->shutdown().ignore();
     }
 }
 
-void TrafficRecorder::start(const StartRecordingTraffic& options) {
+std::shared_ptr<TrafficRecorder::Recording> TrafficRecorder::_makeRecording(
+    const StartTrafficRecording& options, TickSource* tickSource) const {
+    return std::make_shared<Recording>(options, tickSource);
+}
+
+void TrafficRecorder::start(const StartTrafficRecording& options, ServiceContext* svcCtx) {
     invariant(!shouldAlwaysRecordTraffic);
 
     uassert(ErrorCodes::BadValue,
@@ -280,54 +335,104 @@ void TrafficRecorder::start(const StartRecordingTraffic& options) {
             !gTrafficRecordingDirectory.empty());
 
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        auto rec = _recording.synchronize();
+        uassert(ErrorCodes::BadValue, "Traffic recording already active", !*rec);
+        *rec = _makeRecording(options, svcCtx->getTickSource());
 
-        uassert(ErrorCodes::BadValue, "Traffic recording already active", !_recording);
-
-        _recording = std::make_shared<Recording>(options);
-        _recording->run();
+        (*rec)->run();
     }
-
     _shouldRecord.store(true);
+    {
+        // Record SessionStart events if exists any active session.
+        stdx::lock_guard<stdx::recursive_mutex> sessionLk(_openSessionsLk);
+        for (const auto& [id, session] : _openSessions) {
+            observe(id, session, Message(), svcCtx, EventType::kSessionStart);
+        }
+    }
 }
 
-void TrafficRecorder::stop() {
+void TrafficRecorder::updateOpenSessions(uint64_t id,
+                                         const std::string& session,
+                                         EventType eventType) {
+    if (eventType == EventType::kSessionEnd) {
+        stdx::lock_guard<stdx::recursive_mutex> lk(_openSessionsLk);
+        auto sessionItr = _openSessions.find(id);
+        if (sessionItr != _openSessions.end()) {
+            _openSessions.erase(sessionItr);
+        }
+    }
+
+    if (eventType == EventType::kSessionStart) {
+        stdx::lock_guard<stdx::recursive_mutex> lk(_openSessionsLk);
+        _openSessions.emplace(id, session);
+    }
+}
+
+void TrafficRecorder::stop(ServiceContext* svcCtx) {
     invariant(!shouldAlwaysRecordTraffic);
+    // Record SessionEnd events if exists any active session.
+    {
+        stdx::lock_guard<stdx::recursive_mutex> lk(_openSessionsLk);
+        // A copy of open sessions to remove from '_openSessionsLk' while observing a SessionEnd
+        // event for each open session. 'observe()' will modify '_openSessions'.
+        stdx::unordered_map<uint64_t, std::string> sessions(_openSessions);
+
+        for (const auto& [id, session] : sessions) {
+            observe(id, session, Message(), svcCtx, EventType::kSessionEnd);
+        }
+    }
 
     _shouldRecord.store(false);
 
     auto recording = [&] {
-        stdx::lock_guard<Latch> lk(_mutex);
+        auto rec = _recording.synchronize();
+        uassert(ErrorCodes::BadValue, "Traffic recording not active", *rec);
 
-        uassert(ErrorCodes::BadValue, "Traffic recording not active", _recording);
-
-        return std::move(_recording);
+        return std::move(*rec);
     }();
 
     uassertStatusOK(recording->shutdown());
 }
 
-void TrafficRecorder::observe(const transport::SessionHandle& ts,
-                              Date_t now,
-                              const Message& message) {
+void TrafficRecorder::observe(const std::shared_ptr<transport::Session>& ts,
+                              const Message& message,
+                              ServiceContext* svcCtx,
+                              EventType eventType) {
+    observe(ts->id(), ts->toBSON().toString(), message, svcCtx, eventType);
+}
+
+void TrafficRecorder::observe(uint64_t id,
+                              const std::string& session,
+                              const Message& message,
+                              ServiceContext* svcCtx,
+                              EventType eventType) {
+    // Keep track of active sessions not recording anything. Session start/end events will be
+    // recorded on the start/stop of the traffic recording.
+    if (eventType == EventType::kSessionEnd || eventType == EventType::kSessionStart) {
+        updateOpenSessions(id, session, eventType);
+    }
+    auto* tickSource = svcCtx->getTickSource();
     if (shouldAlwaysRecordTraffic) {
-        {
-            stdx::lock_guard<Latch> lk(_mutex);
+        auto rec = _recording.synchronize();
 
-            if (!_recording) {
-                StartRecordingTraffic options;
-                options.setFilename(gAlwaysRecordTraffic);
-                options.setMaxFileSize(std::numeric_limits<int64_t>::max());
+        if (!*rec) {
+            StartTrafficRecording options;
+            options.setDestination(gAlwaysRecordTraffic);
+            options.setMaxFileSize({double(std::numeric_limits<int64_t>::max())});
 
-                _recording = std::make_shared<Recording>(options);
-                _recording->run();
-            }
+            *rec = _makeRecording(options, tickSource);
+            (*rec)->run();
         }
 
-        invariant(_recording->pushRecord(ts, now, _recording->order.addAndFetch(1), message));
+        invariant((*rec)->pushRecord(id,
+                                     session,
+                                     tickSource->ticksTo<Microseconds>(tickSource->getTicks()) -
+                                         (*rec)->startTime.load(),
+                                     (*rec)->order.addAndFetch(1),
+                                     message,
+                                     eventType));
         return;
     }
-
     if (!_shouldRecord.load()) {
         return;
     }
@@ -340,16 +445,19 @@ void TrafficRecorder::observe(const transport::SessionHandle& ts,
     }
 
     // Try to record the message
-    if (recording->pushRecord(ts, now, recording->order.addAndFetch(1), message)) {
+    if (recording->pushRecord(id,
+                              session,
+                              tickSource->ticksTo<Microseconds>(tickSource->getTicks()) -
+                                  recording->startTime.load(),
+                              recording->order.addAndFetch(1),
+                              message,
+                              eventType)) {
         return;
     }
 
-    // We couldn't queue
-    stdx::lock_guard<Latch> lk(_mutex);
-
     // If the recording isn't the one we have in hand bail (its been ended, or a new one has
     // been created
-    if (_recording != recording) {
+    if (**_recording != recording) {
         return;
     }
 
@@ -358,13 +466,12 @@ void TrafficRecorder::observe(const transport::SessionHandle& ts,
 }
 
 std::shared_ptr<TrafficRecorder::Recording> TrafficRecorder::_getCurrentRecording() const {
-    stdx::lock_guard<Latch> lk(_mutex);
-    return _recording;
+    return *_recording;
 }
 
 class TrafficRecorder::TrafficRecorderSSS : public ServerStatusSection {
 public:
-    TrafficRecorderSSS() : ServerStatusSection("trafficRecording") {}
+    using ServerStatusSection::ServerStatusSection;
 
     bool includeByDefault() const override {
         return true;
@@ -386,6 +493,39 @@ public:
 
         return recording->getStats();
     }
-} trafficRecorderStats;
+};
+auto& trafficRecorderStats =
+    *ServerStatusSectionBuilder<TrafficRecorder::TrafficRecorderSSS>("trafficRecording");
+
+std::shared_ptr<TrafficRecorderForTest::RecordingForTest>
+TrafficRecorderForTest::getCurrentRecording() const {
+    return std::dynamic_pointer_cast<TrafficRecorderForTest::RecordingForTest>(
+        _getCurrentRecording());
+}
+
+
+std::shared_ptr<TrafficRecorder::Recording> TrafficRecorderForTest::_makeRecording(
+    const StartTrafficRecording& options, TickSource* tickSource) const {
+    return std::make_shared<TrafficRecorderForTest::RecordingForTest>(options, tickSource);
+}
+
+TrafficRecorderForTest::RecordingForTest::RecordingForTest(const StartTrafficRecording& options,
+                                                           TickSource* tickSource)
+    : TrafficRecorder::Recording(options, tickSource) {}
+
+MultiProducerSingleConsumerQueue<TrafficRecordingPacket,
+                                 TrafficRecorder::Recording::CostFunction>::Pipe&
+TrafficRecorderForTest::RecordingForTest::getPcqPipe() {
+    return _pcqPipe;
+}
+
+void TrafficRecorderForTest::RecordingForTest::run() {
+    // No-op for tests
+}
+
+Status TrafficRecorderForTest::RecordingForTest::shutdown() {
+    // No-op for tests
+    return Status::OK();
+}
 
 }  // namespace mongo

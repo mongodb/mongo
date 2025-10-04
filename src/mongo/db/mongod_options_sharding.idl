@@ -30,57 +30,60 @@ global:
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/db/mongod_options_sharding.h"
+        - "mongo/db/server_options.h"
     configs:
-        section: 'Sharding options'
+        section: "Sharding options"
         initializer:
             register: addMongodShardingOptions
 
 configs:
     configsvr:
-        description: 'Declare this is a config db of a cluster; default port 27019; default dir /data/configdb'
-        arg_vartype: Switch
-        source: [ cli, ini ]
-        conflicts: [ shardsvr, nojournal ]
-    shardsvr:
-        description: 'Declare this is a shard db of a cluster; default port 27018'
-        arg_vartype: Switch
-        source: [ cli, ini ]
-        conflicts: configsvr
-    'sharding.clusterRole':
         description: >-
-            Choose what role this mongod has in a sharded cluster.  Possible values are:
-            "configsvr": Start this node as a config server.  Starts on port 27019 by default.
-            "shardsvr": Start this node as a shard server.  Starts on port 27018 by default.
+            Assigns the config-server role to this node in a sharded cluster. The default listening
+            port is 27019 and the default database directory is /data/configdb.
+        arg_vartype: Switch
+        source: [cli, ini]
+        conflicts: shardsvr
+    shardsvr:
+        description: >-
+            Assigns the shard-server role to this node in a sharded cluster. The default listening
+            port is 27018.
+        arg_vartype: Switch
+        source: [cli, ini]
+        conflicts: configsvr
+    "sharding.clusterRole":
+        description: >-
+            Assigns a role to this node in a sharded cluster. Possible values are:
+            "configsvr": Assigns the config-server role. The default listening port is 27019.
+            "shardsvr": Assigns the shard-server role. The default listening port is 27018.
         arg_vartype: String
         source: yaml
         validator:
             callback: validateShardingClusterRoleSetting
-    'sharding._overrideShardIdentity':
+    "sharding._overrideShardIdentity":
         description: >-
             Overrides the shardIdentity document settings stored in the local storage with
             a MongoDB Extended JSON document in string format.
         arg_vartype: String
         source: yaml
         conflicts: configsvr
-        requires: 'storage.queryableBackupMode'
-    noMoveParanoia:
-        description: 'Turn off paranoid saving of data for the moveChunk command; default'
-        arg_vartype: Switch
-        source: [ cli, ini ]
-        conflicts: moveParanoia
-        hidden: true
-    moveParanoia:
+        requires: "storage.queryableBackupMode"
+    maintenanceMode:
         description: >-
-            Turn on paranoid saving of data during the moveChunk command
-            (used for internal system diagnostics)
-        arg_vartype: Switch
-        source: [ cli, ini ]
-        conflicts: noMoveParanoia
-        hidden: true
-    'sharding.archiveMovedChunks':
+            Allows this node to skip starting up sharding components or both replication and 
+            sharding components. This allows for performing maintenance on this node. To skip 
+            setting up just sharding components use --maintenanceMode=replicaSet. To skip setting 
+            up both sharding and replication components use --maintenanceMode=standalone.
+        arg_vartype: String
+        source: [cli, ini]
+        conflicts: [configsvr, shardsvr]
+        validator:
+            callback: validateMaintenanceModeSetting
+    replicaSetConfigShardMaintenanceMode:
         description: >-
-            Config file option to turn on paranoid saving of data during the
-            moveChunk command (used for internal system diagnostics)
-        arg_vartype: Bool
-        source: yaml
-        hidden: true
+            Bypasses validation of configuration mismatches between startup parameters and the
+            stored replSetConfig. Enables restarting the node as a configsvr even if the stored
+            configuration is for a replica set, and vice versa.
+        arg_vartype: Switch
+        source: [cli, ini]
+        conflicts: shardsvr

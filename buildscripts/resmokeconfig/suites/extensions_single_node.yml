@@ -1,0 +1,34 @@
+test_kind: js_test
+
+description: |
+  This suite runs tests that are targeted for extensions against a single node replica set (eg a
+  single, primary node). It assumes that extensions (and the corresponding .so files) have already
+  been installed with 'install-extensions'. Given that it is a single replica set node, the suite's
+  read preference is the primary.
+
+selector:
+  roots:
+    - jstests/extensions/**/*.js
+  exclude_with_any_tags:
+    - assumes_standalone_mongod
+    - requires_sharding
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");
+  hooks:
+    - class: CheckReplDBHash
+    - class: ValidateCollections
+  fixture:
+    class: ReplicaSetFixture
+    num_nodes: 1
+    load_all_extensions: true
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        featureFlagExtensionsAPI: true

@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 #define WT_SYSCALL(call, ret)                                          \
     do {                                                               \
         /*                                                             \
@@ -50,7 +52,7 @@
             case EMFILE:                                       \
             case ENFILE:                                       \
             case ENOSPC:                                       \
-                __wt_sleep(0L, 50000L);                        \
+                __wt_sleep(0L, 50L * WT_THOUSAND);             \
                 continue;                                      \
             default:                                           \
                 break;                                         \
@@ -70,13 +72,6 @@
 #define WT_CLOCKDIFF_US(end, begin) (WT_CLOCKDIFF_NS(end, begin) / WT_THOUSAND)
 #define WT_CLOCKDIFF_MS(end, begin) (WT_CLOCKDIFF_NS(end, begin) / WT_MILLION)
 #define WT_CLOCKDIFF_SEC(end, begin) (WT_CLOCKDIFF_NS(end, begin) / WT_BILLION)
-
-#define WT_TIMECMP(t1, t2)                                                        \
-    ((t1).tv_sec < (t2).tv_sec ?                                                  \
-        -1 :                                                                      \
-        (t1).tv_sec == (t2).tv_sec ?                                              \
-        (t1).tv_nsec < (t2).tv_nsec ? -1 : (t1).tv_nsec == (t2).tv_nsec ? 0 : 1 : \
-        1)
 
 /*
  * Macros to ensure a file handle is inserted or removed from both the main and the hashed queue,
@@ -104,13 +99,13 @@ struct __wt_fh {
      */
     const char *name; /* File name */
 
-    uint64_t name_hash;             /* hash of name */
-    uint64_t last_sync;             /* time of background fsync */
-    volatile uint64_t written;      /* written since fsync */
-    TAILQ_ENTRY(__wt_fh) q;         /* internal queue */
-    TAILQ_ENTRY(__wt_fh) hashq;     /* internal hash queue */
-    u_int ref;                      /* reference count */
-    WT_FS_OPEN_FILE_TYPE file_type; /* file type */
+    uint64_t name_hash;                  /* hash of name */
+    uint64_t last_sync;                  /* time of background fsync */
+    wt_shared volatile uint64_t written; /* written since fsync */
+    TAILQ_ENTRY(__wt_fh) q;              /* internal queue */
+    TAILQ_ENTRY(__wt_fh) hashq;          /* internal hash queue */
+    u_int ref;                           /* reference count */
+    WT_FS_OPEN_FILE_TYPE file_type;      /* file type */
 
     WT_FILE_HANDLE *handle;
 };
@@ -125,7 +120,7 @@ struct __wt_file_handle_win {
     HANDLE filehandle;           /* Windows file handle */
     HANDLE filehandle_secondary; /* Windows file handle
                                     for file size changes */
-    bool direct_io;              /* O_DIRECT configured */
+    DWORD desired_access;        /* Read-only or read/write */
 };
 
 #else
@@ -138,15 +133,14 @@ struct __wt_file_handle_posix {
      */
     int fd; /* POSIX file handle */
 
-    bool direct_io; /* O_DIRECT configured */
-
     /* The memory buffer and variables if we use mmap for I/O */
     uint8_t *mmap_buf;
     bool mmap_file_mappable;
     int mmap_prot;
-    volatile uint32_t mmap_resizing;
+    int mmap_flags;
+    wt_shared volatile uint32_t mmap_resizing;
     wt_off_t mmap_size;
-    volatile uint32_t mmap_usecount;
+    wt_shared volatile uint32_t mmap_usecount;
 };
 #endif
 

@@ -1,0 +1,312 @@
+# Golden test output of SBEPrimBinaryTest/EqString
+-- INPUT EXPRESSION:
+(s1 ==[s3] s2) 
+
+-- COMPILED EXPRESSION:
+[0x0000-0x001f] stackSize: 1, maxStackSize: 3
+0x0000: pushAccessVal(accessor: <accessor>);
+0x0009: pushAccessVal(accessor: <accessor>);
+0x0012: pushAccessVal(accessor: <accessor>);
+0x001b: collEq(popLhs: 1, moveFromLhs: 1, offsetLhs: 0, popRhs: 1, moveFromRhs: 1, offsetRhs: 0, popColl: 1, moveFromColl: 1, offsetColl: 0);
+
+
+-- EXECUTE VARIATION:
+SLOTS: [1: Nothing, 2: Nothing, 3: Nothing]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: Nothing, 2: Nothing, 3: Collator({"locale" : "mock_always_equal", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: Nothing, 2: Nothing, 3: Collator({"locale" : "mock_to_lower_string", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: Nothing, 2: "abc", 3: Nothing]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: Nothing, 2: "abc", 3: Collator({"locale" : "mock_always_equal", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: Nothing, 2: "abc", 3: Collator({"locale" : "mock_to_lower_string", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: Nothing, 2: "ABC", 3: Nothing]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: Nothing, 2: "ABC", 3: Collator({"locale" : "mock_always_equal", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: Nothing, 2: "ABC", 3: Collator({"locale" : "mock_to_lower_string", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: Nothing, 2: "abcdefghijkop", 3: Nothing]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: Nothing, 2: "abcdefghijkop", 3: Collator({"locale" : "mock_always_equal", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: Nothing, 2: "abcdefghijkop", 3: Collator({"locale" : "mock_to_lower_string", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: Nothing, 2: "ABCDEFGHIJKOP", 3: Nothing]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: Nothing, 2: "ABCDEFGHIJKOP", 3: Collator({"locale" : "mock_always_equal", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: Nothing, 2: "ABCDEFGHIJKOP", 3: Collator({"locale" : "mock_to_lower_string", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "abc", 2: Nothing, 3: Nothing]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "abc", 2: Nothing, 3: Collator({"locale" : "mock_always_equal", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "abc", 2: Nothing, 3: Collator({"locale" : "mock_to_lower_string", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "abc", 2: "abc", 3: Nothing]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "abc", 2: "abc", 3: Collator({"locale" : "mock_always_equal", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: true
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "abc", 2: "abc", 3: Collator({"locale" : "mock_to_lower_string", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: true
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "abc", 2: "ABC", 3: Nothing]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "abc", 2: "ABC", 3: Collator({"locale" : "mock_always_equal", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: true
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "abc", 2: "ABC", 3: Collator({"locale" : "mock_to_lower_string", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: true
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "abc", 2: "abcdefghijkop", 3: Nothing]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "abc", 2: "abcdefghijkop", 3: Collator({"locale" : "mock_always_equal", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: true
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "abc", 2: "abcdefghijkop", 3: Collator({"locale" : "mock_to_lower_string", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: false
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "abc", 2: "ABCDEFGHIJKOP", 3: Nothing]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "abc", 2: "ABCDEFGHIJKOP", 3: Collator({"locale" : "mock_always_equal", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: true
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "abc", 2: "ABCDEFGHIJKOP", 3: Collator({"locale" : "mock_to_lower_string", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: false
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "ABC", 2: Nothing, 3: Nothing]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "ABC", 2: Nothing, 3: Collator({"locale" : "mock_always_equal", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "ABC", 2: Nothing, 3: Collator({"locale" : "mock_to_lower_string", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "ABC", 2: "abc", 3: Nothing]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "ABC", 2: "abc", 3: Collator({"locale" : "mock_always_equal", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: true
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "ABC", 2: "abc", 3: Collator({"locale" : "mock_to_lower_string", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: true
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "ABC", 2: "ABC", 3: Nothing]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "ABC", 2: "ABC", 3: Collator({"locale" : "mock_always_equal", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: true
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "ABC", 2: "ABC", 3: Collator({"locale" : "mock_to_lower_string", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: true
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "ABC", 2: "abcdefghijkop", 3: Nothing]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "ABC", 2: "abcdefghijkop", 3: Collator({"locale" : "mock_always_equal", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: true
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "ABC", 2: "abcdefghijkop", 3: Collator({"locale" : "mock_to_lower_string", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: false
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "ABC", 2: "ABCDEFGHIJKOP", 3: Nothing]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "ABC", 2: "ABCDEFGHIJKOP", 3: Collator({"locale" : "mock_always_equal", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: true
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "ABC", 2: "ABCDEFGHIJKOP", 3: Collator({"locale" : "mock_to_lower_string", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: false
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "abcdefghijkop", 2: Nothing, 3: Nothing]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "abcdefghijkop", 2: Nothing, 3: Collator({"locale" : "mock_always_equal", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "abcdefghijkop", 2: Nothing, 3: Collator({"locale" : "mock_to_lower_string", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "abcdefghijkop", 2: "abc", 3: Nothing]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "abcdefghijkop", 2: "abc", 3: Collator({"locale" : "mock_always_equal", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: true
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "abcdefghijkop", 2: "abc", 3: Collator({"locale" : "mock_to_lower_string", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: false
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "abcdefghijkop", 2: "ABC", 3: Nothing]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "abcdefghijkop", 2: "ABC", 3: Collator({"locale" : "mock_always_equal", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: true
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "abcdefghijkop", 2: "ABC", 3: Collator({"locale" : "mock_to_lower_string", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: false
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "abcdefghijkop", 2: "abcdefghijkop", 3: Nothing]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "abcdefghijkop", 2: "abcdefghijkop", 3: Collator({"locale" : "mock_always_equal", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: true
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "abcdefghijkop", 2: "abcdefghijkop", 3: Collator({"locale" : "mock_to_lower_string", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: true
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "abcdefghijkop", 2: "ABCDEFGHIJKOP", 3: Nothing]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "abcdefghijkop", 2: "ABCDEFGHIJKOP", 3: Collator({"locale" : "mock_always_equal", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: true
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "abcdefghijkop", 2: "ABCDEFGHIJKOP", 3: Collator({"locale" : "mock_to_lower_string", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: true
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "ABCDEFGHIJKOP", 2: Nothing, 3: Nothing]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "ABCDEFGHIJKOP", 2: Nothing, 3: Collator({"locale" : "mock_always_equal", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "ABCDEFGHIJKOP", 2: Nothing, 3: Collator({"locale" : "mock_to_lower_string", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "ABCDEFGHIJKOP", 2: "abc", 3: Nothing]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "ABCDEFGHIJKOP", 2: "abc", 3: Collator({"locale" : "mock_always_equal", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: true
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "ABCDEFGHIJKOP", 2: "abc", 3: Collator({"locale" : "mock_to_lower_string", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: false
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "ABCDEFGHIJKOP", 2: "ABC", 3: Nothing]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "ABCDEFGHIJKOP", 2: "ABC", 3: Collator({"locale" : "mock_always_equal", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: true
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "ABCDEFGHIJKOP", 2: "ABC", 3: Collator({"locale" : "mock_to_lower_string", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: false
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "ABCDEFGHIJKOP", 2: "abcdefghijkop", 3: Nothing]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "ABCDEFGHIJKOP", 2: "abcdefghijkop", 3: Collator({"locale" : "mock_always_equal", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: true
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "ABCDEFGHIJKOP", 2: "abcdefghijkop", 3: Collator({"locale" : "mock_to_lower_string", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: true
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "ABCDEFGHIJKOP", 2: "ABCDEFGHIJKOP", 3: Nothing]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "ABCDEFGHIJKOP", 2: "ABCDEFGHIJKOP", 3: Collator({"locale" : "mock_always_equal", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: true
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "ABCDEFGHIJKOP", 2: "ABCDEFGHIJKOP", 3: Collator({"locale" : "mock_to_lower_string", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
+RESULT: true
+

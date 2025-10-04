@@ -6,14 +6,10 @@
  *  multiversion_incompatible,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
-(function() {
-"use strict";
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/write_concern_util.js");
-load("jstests/replsets/rslib.js");
-
-const rst = ReplSetTest({
+const rst = new ReplSetTest({
     name: jsTestName(),
     nodes: [
         {
@@ -33,7 +29,7 @@ const rst = ReplSetTest({
             rsConfig: {priority: 0},
         },
     ],
-    useBridge: true
+    useBridge: true,
 });
 
 rst.startSet();
@@ -76,7 +72,7 @@ jsTestLog("Disconnecting old primary");
 node0.disconnect(node1);
 node0.disconnect(node2);
 assert.commandWorked(oldPrimary.adminCommand({replSetStepDown: 10 * 60, force: true}));
-rst.waitForState(rst.nodes[0], ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [rst.nodes[0]]);
 
 jsTestLog("Electing new primary");
 
@@ -84,7 +80,7 @@ restartServerReplication(node1);
 restartServerReplication(node2);
 
 const newPrimary = rst.getPrimary();
-const lastNode = (newPrimary.host === node1.host) ? node2 : node1;
+const lastNode = newPrimary.host === node1.host ? node2 : node1;
 
 jsTestLog("Writing to new primary " + newPrimary.host);
 const newPrimaryDB = newPrimary.getDB(dbName);
@@ -103,16 +99,18 @@ rst.waitForState(rst.nodes[0], ReplSetTest.State.ROLLBACK);
 
 // We take a stable checkpoint at the end of rollback so we need the checkpointer to be running.
 jsTestLog("Reenabling checkpointer so rollback can complete");
-assert.commandWorked(
-    rst.nodes[0].adminCommand({configureFailPoint: 'pauseCheckpointThread', mode: 'off'}));
 
-assert.soonNoExcept(function() {
-    const rbid = assert.commandWorked(node0.adminCommand("replSetGetRBID")).rbid;
-    return rbid > lastRBID;
-}, "rbid did not update", ReplSetTest.kDefaultTimeoutMS);
+assert.soonNoExcept(
+    function () {
+        assert.commandWorked(rst.nodes[0].adminCommand({configureFailPoint: "pauseCheckpointThread", mode: "off"}));
+        const rbid = assert.commandWorked(node0.adminCommand("replSetGetRBID")).rbid;
+        return rbid > lastRBID;
+    },
+    "rbid did not update",
+    ReplSetTest.kDefaultTimeoutMS,
+);
 
-rst.waitForState(rst.nodes[0], ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [rst.nodes[0]]);
 
 jsTestLog("Done with test");
 rst.stopSet();
-})();

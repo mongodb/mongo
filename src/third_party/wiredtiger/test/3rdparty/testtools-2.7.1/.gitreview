@@ -1,0 +1,4 @@
+[gerrit]
+host=review.testing-cabal.org
+port=29418
+project=testing-cabal/testtools.git

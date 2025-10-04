@@ -1,0 +1,108 @@
+# -*- Mode: python; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+FINAL_LIBRARY = "js"
+
+# Includes should be relative to parent path
+LOCAL_INCLUDES += ["!..", ".."]
+
+include("../js-config.mozbuild")
+include("../js-cxxflags.mozbuild")
+
+
+# Generate frontend/ReservedWordsGenerated.h from frontend/ReservedWords.h
+flags = []
+if CONFIG["ENABLE_DECORATORS"]:
+    flags.append("--enable-decorators")
+if CONFIG["ENABLE_EXPLICIT_RESOURCE_MANAGEMENT"]:
+    flags.append("--enable-explicit-resource-management")
+if flags:
+    GeneratedFile(
+        "ReservedWordsGenerated.h",
+        script="GenerateReservedWords.py",
+        inputs=["ReservedWords.h"],
+        flags=flags,
+    )
+else:
+    GeneratedFile(
+        "ReservedWordsGenerated.h",
+        script="GenerateReservedWords.py",
+        inputs=["ReservedWords.h"],
+    )
+
+if CONFIG["JS_ENABLE_SMOOSH"]:
+    CbindgenHeader("smoosh_generated.h", inputs=["/js/src/frontend/smoosh"])
+
+UNIFIED_SOURCES += [
+    "AbstractScopePtr.cpp",
+    "AsyncEmitter.cpp",
+    "BytecodeCompiler.cpp",
+    "BytecodeControlStructures.cpp",
+    "BytecodeEmitter.cpp",
+    "BytecodeSection.cpp",
+    "CallOrNewEmitter.cpp",
+    "CForEmitter.cpp",
+    "CompileScript.cpp",
+    "DefaultEmitter.cpp",
+    "DoWhileEmitter.cpp",
+    "ElemOpEmitter.cpp",
+    "EmitterScope.cpp",
+    "ExpressionStatementEmitter.cpp",
+    "FoldConstants.cpp",
+    "ForInEmitter.cpp",
+    "ForOfEmitter.cpp",
+    "ForOfLoopControl.cpp",
+    "FrontendContext.cpp",
+    "FunctionEmitter.cpp",
+    "IfEmitter.cpp",
+    "JumpList.cpp",
+    "LabelEmitter.cpp",
+    "LexicalScopeEmitter.cpp",
+    "NameFunctions.cpp",
+    "NameOpEmitter.cpp",
+    "ObjectEmitter.cpp",
+    "ObjLiteral.cpp",
+    "OptionalEmitter.cpp",
+    "ParseContext.cpp",
+    "ParseNode.cpp",
+    "ParseNodeVerify.cpp",
+    "ParserAtom.cpp",
+    "PrivateOpEmitter.cpp",
+    "PropOpEmitter.cpp",
+    "SharedContext.cpp",
+    "SourceNotes.cpp",
+    "Stencil.cpp",
+    "StencilXdr.cpp",
+    "SwitchEmitter.cpp",
+    "TDZCheckCache.cpp",
+    "TokenStream.cpp",
+    "TryEmitter.cpp",
+    "WhileEmitter.cpp",
+]
+
+if CONFIG["JS_ENABLE_SMOOSH"]:
+    UNIFIED_SOURCES += [
+        "Frontend2.cpp",
+    ]
+
+if CONFIG["ENABLE_DECORATORS"]:
+    UNIFIED_SOURCES += [
+        "DecoratorEmitter.cpp",
+    ]
+
+if CONFIG["ENABLE_EXPLICIT_RESOURCE_MANAGEMENT"]:
+    UNIFIED_SOURCES += [
+        "UsingEmitter.cpp",
+    ]
+
+# Parser.cpp cannot be built in unified mode because of explicit
+#   template instantiations.
+SOURCES += [
+    "Parser.cpp",
+]
+
+if CONFIG["FUZZING_INTERFACES"] and CONFIG["LIBFUZZER"]:
+    include("/tools/fuzzing/libfuzzer-config.mozbuild")

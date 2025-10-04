@@ -1,0 +1,263 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "top",
+    srcs = [
+        "operation_latency_histogram.cpp",
+        "top.cpp",
+    ],
+    hdrs = [
+        "operation_latency_histogram.h",
+        "top.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query/query_stats",
+    ],
+)
+
+mongo_cc_library(
+    name = "api_version_metrics",
+    srcs = [
+        "api_version_metrics.cpp",
+    ],
+    hdrs = [
+        "api_version_metrics.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:shared_request_handling",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:validate_api_parameters",
+        "//src/mongo/rpc:client_metadata",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+idl_generator(
+    name = "read_concern_stats_gen",
+    src = "read_concern_stats.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "server_write_concern_metrics_gen",
+    src = "server_write_concern_metrics.idl",
+)
+
+mongo_cc_library(
+    name = "server_read_concern_write_concern_metrics",
+    srcs = [
+        "server_read_concern_metrics.cpp",
+        "server_write_concern_metrics.cpp",
+        ":read_concern_stats_gen",
+        ":server_write_concern_metrics_gen",
+    ],
+    hdrs = [
+        "server_read_concern_metrics.h",
+        "server_write_concern_metrics.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/commands/server_status:server_status_core",
+        "//src/mongo/db/repl:read_concern_args",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+idl_generator(
+    name = "read_preference_metrics_gen",
+    src = "read_preference_metrics.idl",
+    deps = [
+        "//src/mongo/client:read_preference_gen",
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "read_preference_metrics",
+    srcs = [
+        "read_preference_metrics.cpp",
+        ":read_preference_metrics_gen",
+    ],
+    hdrs = [
+        "read_preference_metrics.h",
+    ],
+    deps = [
+        "//src/mongo/client:read_preference",
+        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/commands/server_status:server_status_core",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/repl:repl_coordinator_interface",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/repl:repl_settings",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "transaction_stats",
+    srcs = [
+        "single_transaction_stats.cpp",
+    ],
+    hdrs = [
+        "single_transaction_stats.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/repl:read_concern_args",
+        "//src/mongo/util/concurrency:ticketholder_queue_stats",
+    ],
+)
+
+mongo_cc_library(
+    name = "timer_stats",
+    srcs = [
+        "timer_stats.cpp",
+    ],
+    hdrs = [
+        "//src/mongo/base:error_codes_header",
+        "//src/mongo/db/stats:timer_stats.h",
+    ],
+    header_deps = [
+        "//src/mongo/db/fts:fts_query_noop",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "counters_sort",
+    srcs = [
+        "counters_sort.cpp",
+    ],
+    hdrs = [
+        "counters_sort.h",
+    ],
+    deps = [
+        "//src/mongo/db/commands/server_status:server_status_metric",
+    ],
+)
+
+mongo_cc_library(
+    name = "counters",
+    srcs = [
+        "counters.cpp",
+    ],
+    hdrs = [
+        "//src/mongo/bson:bsonelement_comparator.h",
+        "//src/mongo/db/exec/sbe/values:key_string_entry.h",
+        "//src/mongo/db/exec/sbe/values:value.h",
+        "//src/mongo/db/matcher:expression_leaf.h",
+        "//src/mongo/db/matcher:expression_path.h",
+        "//src/mongo/db/matcher:in_list_data.h",
+        "//src/mongo/db/pipeline:expression_from_accumulator_quantile.h",
+        "//src/mongo/db/pipeline:javascript_execution.h",
+        "//src/mongo/db/pipeline:resume_token.h",
+        "//src/mongo/db/storage:sorted_data_interface.h",
+    ],
+    deps = [
+        ":counters_sort",
+        "//src/mongo:base",
+        "//src/mongo/db/commands/server_status:server_status_core",
+        "//src/mongo/db/storage:index_entry_comparison",
+        "//src/mongo/util/concurrency:spin_lock",
+    ],
+)
+
+mongo_cc_library(
+    name = "serveronly_stats",
+    srcs = [
+        "lock_server_status_section.cpp",
+        "storage_stats.cpp",
+    ],
+    hdrs = [
+        "storage_stats.h",
+    ],
+    deps = [
+        ":top",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/commands/server_status:server_status_core",
+        "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/local_catalog:collection_options",
+        "//src/mongo/db/local_catalog:index_catalog",
+        "//src/mongo/db/pipeline:document_sources_idl",
+        "//src/mongo/db/s:balancer_stats_registry",
+        "//src/mongo/db/timeseries/bucket_catalog",
+        "//src/mongo/util/concurrency:spin_lock",
+    ],
+)
+
+mongo_cc_library(
+    name = "latency_server_stats",
+    srcs = [
+        "latency_server_status_section.cpp",
+    ],
+    deps = [
+        ":top",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/commands/server_status:server_status_core",
+        "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/local_catalog:index_catalog",
+        "//src/mongo/db/pipeline:document_sources_idl",
+        "//src/mongo/db/timeseries/bucket_catalog",
+    ],
+)
+
+mongo_cc_library(
+    name = "change_collection_server_status",
+    srcs = [
+        "change_collection_server_status.cpp",
+        "change_stream_preimages_server_status.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:change_stream_change_collection_manager",
+        "//src/mongo/db:change_stream_pre_image_util",
+        "//src/mongo/db:change_stream_pre_images_collection_manager",
+        "//src/mongo/db:change_stream_serverless_helpers",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/commands/server_status:server_status_core",
+    ],
+)
+
+mongo_cc_library(
+    name = "counter_ops",
+    srcs = [],
+    hdrs = [
+        "counter_ops.h",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_stats_test",
+    srcs = [
+        "api_version_metrics_test.cpp",
+        "operation_latency_histogram_test.cpp",
+        "timer_stats_test.cpp",
+        "top_test.cpp",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":api_version_metrics",
+        ":timer_stats",
+        ":top",
+        "//src/mongo:base",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db:shared_request_handling",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/repl:replmocks",
+        "//src/mongo/util:clock_source_mock",
+    ],
+)

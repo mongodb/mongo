@@ -18,6 +18,8 @@
 #  pragma once
 #endif
 
+#include <cstddef>
+
 struct boost_move_new_t{};
 
 //avoid including <new>

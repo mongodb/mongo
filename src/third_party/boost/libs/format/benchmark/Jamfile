@@ -1,0 +1,32 @@
+#  Boost.Format Library benchmark Jamfile
+#
+#  Copyright (c) 2003 Samuel Krempp
+#
+#  Distributed under the Boost Software License, Version 1.0.
+#  See www.boost.org/LICENSE_1_0.txt
+#
+
+project
+    : requirements
+        <library>/boost/format//boost_format
+        <library>/boost/timer//boost_timer
+        <toolset>msvc:<define>_CRT_SECURE_NO_WARNINGS
+    ;
+
+exe bench_format_no_locale
+    : bench_format.cpp
+      /boost/timer//boost_timer
+    : <define>BOOST_NO_STD_LOCALE <location-prefix>no_locale
+    ;
+
+exe bench_format_normal
+    : bench_format.cpp
+      /boost/timer//boost_timer
+    : <location-prefix>normal
+    ;
+
+exe bench_format_no_reuse_stream
+    : bench_format.cpp
+      /boost/timer//boost_timer
+    : <include>alts <define>BOOST_FORMAT_NO_OSS_MEMBER <location-prefix>no_reuse_stream
+    ;

@@ -30,10 +30,9 @@ global:
     cpp_includes:
         - "mongo/db/write_concern_options.h"
 
-
 imports:
-    - "mongo/idl/basic_types.idl"
-
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/read_write_concern_provenance_base.idl"
 
 types:
     WriteConcern:
@@ -42,3 +41,4 @@ types:
         cpp_type: "mongo::WriteConcernOptions"
         serializer: "mongo::WriteConcernOptions::toBSON"
         deserializer: "mongo::WriteConcernOptions::deserializerForIDL"
+        is_view: false

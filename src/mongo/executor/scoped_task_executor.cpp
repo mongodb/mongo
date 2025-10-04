@@ -27,10 +27,37 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/executor/scoped_task_executor.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/baton.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/functional.h"
+#include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/interruptible.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/time_support.h"
+
+#include <cstddef>
+#include <mutex>
+#include <string>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace executor {
@@ -53,7 +80,7 @@ public:
     Impl(std::shared_ptr<TaskExecutor> executor, Status shutdownStatus)
         : _executor(std::move(executor)), _shutdownStatus(std::move(shutdownStatus)) {}
 
-    ~Impl() {
+    ~Impl() override {
         // The ScopedTaskExecutor dtor calls shutdown, so this is guaranteed.
         invariant(_inShutdown);
     }
@@ -147,29 +174,28 @@ public:
             std::move(work));
     }
 
-    StatusWith<CallbackHandle> scheduleRemoteCommandOnAny(
-        const RemoteCommandRequestOnAny& request,
-        const RemoteCommandOnAnyCallbackFn& cb,
-        const BatonHandle& baton = nullptr) override {
+    StatusWith<CallbackHandle> scheduleRemoteCommand(const RemoteCommandRequest& request,
+                                                     const RemoteCommandCallbackFn& cb,
+                                                     const BatonHandle& baton = nullptr) override {
         return _wrapCallback(
             [&](auto&& x) {
-                return _executor->scheduleRemoteCommandOnAny(request, std::move(x), baton);
+                return _executor->scheduleRemoteCommand(request, std::move(x), baton);
             },
             cb);
     }
 
-    StatusWith<CallbackHandle> scheduleExhaustRemoteCommandOnAny(
-        const RemoteCommandRequestOnAny& request,
-        const RemoteCommandOnAnyCallbackFn& cb,
+    StatusWith<CallbackHandle> scheduleExhaustRemoteCommand(
+        const RemoteCommandRequest& request,
+        const RemoteCommandCallbackFn& cb,
         const BatonHandle& baton = nullptr) override {
         return _wrapCallback(
             [&](auto&& x) {
-                return _executor->scheduleExhaustRemoteCommandOnAny(request, std::move(x), baton);
+                return _executor->scheduleExhaustRemoteCommand(request, std::move(x), baton);
             },
             cb);
     }
 
-    bool hasTasks() {
+    bool hasTasks() override {
         return _executor->hasTasks();
     }
 
@@ -186,7 +212,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    void dropConnections(const HostAndPort& hostAndPort) override {
+    void dropConnections(const HostAndPort& target, const Status& status) override {
         MONGO_UNREACHABLE;
     }
 
@@ -251,41 +277,109 @@ private:
         size_t id;
 
         // State 1 - No Data
-        {
-            stdx::lock_guard lk(_mutex);
+        stdx::unique_lock lk(_mutex);
 
-            // No clean up needed because we never ran or recorded anything
-            if (_inShutdown) {
-                return _shutdownStatus;
-            }
+        // No clean up needed because we never ran or recorded anything
+        if (_inShutdown) {
+            return _shutdownStatus;
+        }
 
-            id = _id++;
+        id = _id++;
 
-            _cbHandles.emplace(
-                std::piecewise_construct, std::forward_as_tuple(id), std::forward_as_tuple());
-        };
+        _cbHandles.emplace(
+            std::piecewise_construct, std::forward_as_tuple(id), std::forward_as_tuple());
 
         if (MONGO_unlikely(ScopedTaskExecutorHangBeforeSchedule.shouldFail())) {
             ScopedTaskExecutorHangBeforeSchedule.setMode(FailPoint::off);
-
+            lk.unlock();
             ScopedTaskExecutorHangExitBeforeSchedule.pauseWhileSet();
+            lk.lock();
+        }
+
+        static_assert(std::is_same_v<Work, CallbackFn> ||
+                      std::is_same_v<Work, const RemoteCommandCallbackFn&>);
+
+        // Allocate memory to hold the moved work, but don't move it yet,
+        // so TaskExecutor::schedule() works correctly if swCbHandle
+        // returns an error.
+
+        struct MoveState {
+            MoveState(std::unique_ptr<CallbackFn> mem,
+                      CallbackFn&& from,
+                      stdx::unique_lock<stdx::mutex>& _lk)
+                : work(std::move(mem)), moveFrom(std::move(from)), lk(_lk) {}
+
+            // Dummy copy constructor so the variant has a copy constructor
+            // for the RemoteCommandCallbackFn case. Should never be called.
+            MoveState(const MoveState& ms) : moveFrom(std::move(ms.moveFrom)), lk(ms.lk) {
+                MONGO_UNREACHABLE;
+            }
+            MoveState(MoveState&& ms)
+                : work(std::move(ms.work)),
+                  moveFrom(std::move(ms.moveFrom)),
+                  lk(ms.lk),
+                  tid(ms.tid) {}
+
+            MoveState& operator=(const MoveState&) = delete;
+            MoveState& operator=(MoveState&&) = delete;
+
+            std::unique_ptr<CallbackFn> work;
+            CallbackFn&& moveFrom;
+            stdx::unique_lock<stdx::mutex>& lk;
+            std::thread::id tid{stdx::this_thread::get_id()};
+        };
+        std::variant<RemoteCommandCallbackFn, MoveState> state;
+        CallbackFn* moveTo = nullptr;
+
+        if constexpr (std::is_same_v<Work, CallbackFn>) {
+            auto mem = std::make_unique<CallbackFn>();
+            moveTo = mem.get();
+            state.template emplace<MoveState>(  // NOLINT(bugprone-use-after-move)
+                std::move(mem),                 // NOLINT(bugprone-use-after-move)
+                std::move(work),                // NOLINT(bugprone-use-after-move)
+                lk);
+        } else {
+            state.template emplace<RemoteCommandCallbackFn>(work);
+            lk.unlock();
         }
 
         // State 2 - Indeterminate state.  We don't know yet if the task will get scheduled.
         auto swCbHandle = std::forward<ScheduleCall>(schedule)(
-            [id, work = std::forward<Work>(work), self = shared_self()](const auto& cargs) {
+            [id, state = std::move(state), self = shared_self()](const auto& cargs) {
                 using ArgsT = std::decay_t<decltype(cargs)>;
 
-                stdx::unique_lock<Latch> lk(self->_mutex);
+                stdx::unique_lock<stdx::mutex> lk(self->_mutex, stdx::defer_lock);
+                std::unique_lock<stdx::mutex>* useLock = nullptr;
+
+                if constexpr (std::is_same_v<Work, CallbackFn>) {
+                    // check for inline execution, tid check must be first
+                    const MoveState& mstate = std::get<MoveState>(state);
+                    CallbackFn& moveTo = *(mstate.work.get());
+                    if (mstate.tid == stdx::this_thread::get_id() && !moveTo) {
+                        // we're inline, do the move and borrow the lock
+                        moveTo = std::move(mstate.moveFrom);
+                        useLock = &mstate.lk;
+                    }
+                }
+
+                if (!useLock) {
+                    // not inline under the lock, do our own locking
+                    lk.lock();
+                    useLock = &lk;
+                }
 
                 auto doWorkAndNotify = [&](const ArgsT& x) noexcept {
-                    lk.unlock();
-                    work(x);
-                    lk.lock();
+                    useLock->unlock();
+                    if constexpr (std::is_same_v<Work, CallbackFn>) {
+                        (*std::get<MoveState>(state).work.get())(x);
+                    } else {
+                        (std::get<RemoteCommandCallbackFn>(state))(x);
+                    }
+                    useLock->lock();
 
                     // After we've run the task, we erase and notify.  Sometimes that happens
                     // before we stash the cbHandle.
-                    self->_eraseAndNotifyIfNeeded(lk, id);
+                    self->_eraseAndNotifyIfNeeded(*useLock, id);
                 };
 
                 if (!self->_inShutdown) {
@@ -300,18 +394,26 @@ private:
                 if constexpr (std::is_same_v<ArgsT, CallbackArgs>) {
                     args.status = self->_shutdownStatus;
                 } else {
-                    static_assert(std::is_same_v<ArgsT, RemoteCommandOnAnyCallbackArgs>,
+                    static_assert(std::is_same_v<ArgsT, RemoteCommandCallbackArgs>,
                                   "_wrapCallback only supports CallbackArgs and "
-                                  "RemoteCommandOnAnyCallbackArgs");
+                                  "RemoteCommandCallbackArgs");
                     args.response.status = self->_shutdownStatus;
                 }
 
                 doWorkAndNotify(args);
             });
 
-        ScopedTaskExecutorHangAfterSchedule.pauseWhileSet();
+        // We must do the move before dropping the lock, so the
+        // callback blocks until the work is moved.
+        if constexpr (std::is_same_v<Work, CallbackFn>) {
+            if (swCbHandle.isOK() && work)            // NOLINT(bugprone-use-after-move)
+                *moveTo = std::move(work);            // NOLINT(bugprone-use-after-move)
+            invariant(!!swCbHandle.isOK() == !work);  // NOLINT(bugprone-use-after-move)
+            lk.unlock();
+        }
 
-        stdx::unique_lock lk(_mutex);
+        ScopedTaskExecutorHangAfterSchedule.pauseWhileSet();
+        lk.lock();
 
         if (!swCbHandle.isOK()) {
             // State 2.b - Failed to schedule
@@ -354,7 +456,7 @@ private:
         }
     }
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ScopedTaskExecutor::_mutex");
+    mutable stdx::mutex _mutex;
     bool _inShutdown = false;
     std::shared_ptr<TaskExecutor> _executor;
     Status _shutdownStatus;
@@ -371,7 +473,9 @@ ScopedTaskExecutor::ScopedTaskExecutor(std::shared_ptr<TaskExecutor> executor)
 
 ScopedTaskExecutor::ScopedTaskExecutor(std::shared_ptr<TaskExecutor> executor,
                                        Status shutdownStatus)
-    : _executor(std::make_shared<Impl>(std::move(executor), std::move(shutdownStatus))) {}
+    : _executor(std::make_shared<Impl>(std::move(executor), shutdownStatus)) {
+    invariant(ErrorCodes::isA<ErrorCategory::CancellationError>(shutdownStatus));
+}
 
 ScopedTaskExecutor::~ScopedTaskExecutor() {
     _executor->shutdown();

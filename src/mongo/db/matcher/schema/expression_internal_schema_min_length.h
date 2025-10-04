@@ -29,15 +29,25 @@
 
 #pragma once
 
+#include "mongo/base/clonable_ptr.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_str_length.h"
+
+#include <memory>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
 class InternalSchemaMinLengthMatchExpression final : public InternalSchemaStrLengthMatchExpression {
 
 public:
-    InternalSchemaMinLengthMatchExpression(StringData path,
+    InternalSchemaMinLengthMatchExpression(boost::optional<StringData> path,
                                            long long strLen,
                                            clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : InternalSchemaStrLengthMatchExpression(MatchType::INTERNAL_SCHEMA_MIN_LENGTH,
@@ -47,10 +57,12 @@ public:
                                                  std::move(annotation)) {}
 
     Validator getComparator() const final {
-        return [strLen = strLen()](int lenWithoutNullTerm) { return lenWithoutNullTerm >= strLen; };
+        return [strLen = strLen()](int lenWithoutNullTerm) {
+            return lenWithoutNullTerm >= strLen;
+        };
     }
 
-    std::unique_ptr<MatchExpression> shallowClone() const final {
+    std::unique_ptr<MatchExpression> clone() const final {
         std::unique_ptr<InternalSchemaMinLengthMatchExpression> minLen =
             std::make_unique<InternalSchemaMinLengthMatchExpression>(
                 path(), strLen(), _errorAnnotation);

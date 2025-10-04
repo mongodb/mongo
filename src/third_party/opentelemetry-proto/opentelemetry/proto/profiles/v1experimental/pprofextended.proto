@@ -1,0 +1,388 @@
+// Copyright 2023, OpenTelemetry Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+// This file includes work covered by the following copyright and permission notices:
+//
+// Copyright 2016 Google Inc. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Profile is a common stacktrace profile format.
+//
+// Measurements represented with this format should follow the
+// following conventions:
+//
+// - Consumers should treat unset optional fields as if they had been
+//   set with their default value.
+//
+// - When possible, measurements should be stored in "unsampled" form
+//   that is most useful to humans.  There should be enough
+//   information present to determine the original sampled values.
+//
+// - On-disk, the serialized proto must be gzip-compressed.
+//
+// - The profile is represented as a set of samples, where each sample
+//   references a sequence of locations, and where each location belongs
+//   to a mapping.
+// - There is a N->1 relationship from sample.location_id entries to
+//   locations. For every sample.location_id entry there must be a
+//   unique Location with that index.
+// - There is an optional N->1 relationship from locations to
+//   mappings. For every nonzero Location.mapping_id there must be a
+//   unique Mapping with that index.
+
+syntax = "proto3";
+
+package opentelemetry.proto.profiles.v1experimental;
+
+import "opentelemetry/proto/common/v1/common.proto";
+
+option csharp_namespace = "OpenTelemetry.Proto.Profiles.V1Experimental";
+option java_multiple_files = true;
+option java_package = "io.opentelemetry.proto.profiles.v1experimental";
+option go_package = "go.opentelemetry.io/proto/otlp/profiles/v1experimental";
+
+// Represents a complete profile, including sample types, samples,
+// mappings to binaries, locations, functions, string table, and additional metadata.
+message Profile {
+  // A description of the samples associated with each Sample.value.
+  // For a cpu profile this might be:
+  //   [["cpu","nanoseconds"]] or [["wall","seconds"]] or [["syscall","count"]]
+  // For a heap profile, this might be:
+  //   [["allocations","count"], ["space","bytes"]],
+  // If one of the values represents the number of events represented
+  // by the sample, by convention it should be at index 0 and use
+  // sample_type.unit == "count".
+  repeated ValueType sample_type = 1;
+  // The set of samples recorded in this profile.
+  repeated Sample sample = 2;
+  // Mapping from address ranges to the image/binary/library mapped
+  // into that address range.  mapping[0] will be the main binary.
+  repeated Mapping mapping = 3;
+  // Locations referenced by samples via location_indices.
+  repeated Location location = 4;
+  // Array of locations referenced by samples.
+  repeated int64 location_indices = 15;
+  // Functions referenced by locations.
+  repeated Function function = 5;
+  // Lookup table for attributes.
+  repeated opentelemetry.proto.common.v1.KeyValue attribute_table = 16;
+  // Represents a mapping between Attribute Keys and Units.
+  repeated AttributeUnit attribute_units = 17;
+  // Lookup table for links.
+  repeated Link link_table = 18;
+  // A common table for strings referenced by various messages.
+  // string_table[0] must always be "".
+  repeated string string_table = 6;
+  // frames with Function.function_name fully matching the following
+  // regexp will be dropped from the samples, along with their successors.
+  int64 drop_frames = 7;   // Index into string table.
+  // frames with Function.function_name fully matching the following
+  // regexp will be kept, even if it matches drop_frames.
+  int64 keep_frames = 8;  // Index into string table.
+
+  // The following fields are informational, do not affect
+  // interpretation of results.
+
+  // Time of collection (UTC) represented as nanoseconds past the epoch.
+  int64 time_nanos = 9;
+  // Duration of the profile, if a duration makes sense.
+  int64 duration_nanos = 10;
+  // The kind of events between sampled occurrences.
+  // e.g [ "cpu","cycles" ] or [ "heap","bytes" ]
+  ValueType period_type = 11;
+  // The number of events between sampled occurrences.
+  int64 period = 12;
+  // Free-form text associated with the profile. The text is displayed as is
+  // to the user by the tools that read profiles (e.g. by pprof). This field
+  // should not be used to store any machine-readable information, it is only
+  // for human-friendly content. The profile must stay functional if this field
+  // is cleaned.
+  repeated int64 comment = 13; // Indices into string table.
+  // Index into the string table of the type of the preferred sample
+  // value. If unset, clients should default to the last sample value.
+  int64 default_sample_type = 14;
+}
+
+// Represents a mapping between Attribute Keys and Units.
+message AttributeUnit {
+  // Index into string table.
+  int64 attribute_key = 1;
+  // Index into string table.
+  int64 unit = 2;
+}
+
+// A pointer from a profile Sample to a trace Span.
+// Connects a profile sample to a trace span, identified by unique trace and span IDs.
+message Link {
+  // A unique identifier of a trace that this linked span is part of. The ID is a
+  // 16-byte array.
+  bytes trace_id = 1;
+
+  // A unique identifier for the linked span. The ID is an 8-byte array.
+  bytes span_id = 2;
+}
+
+// Specifies the method of aggregating metric values, either DELTA (change since last report)
+// or CUMULATIVE (total since a fixed start time).
+enum AggregationTemporality {
+  /* UNSPECIFIED is the default AggregationTemporality, it MUST not be used. */
+  AGGREGATION_TEMPORALITY_UNSPECIFIED = 0;
+
+  /** DELTA is an AggregationTemporality for a profiler which reports
+  changes since last report time. Successive metrics contain aggregation of
+  values from continuous and non-overlapping intervals.
+
+  The values for a DELTA metric are based only on the time interval
+  associated with one measurement cycle. There is no dependency on
+  previous measurements like is the case for CUMULATIVE metrics.
+
+  For example, consider a system measuring the number of requests that
+  it receives and reports the sum of these requests every second as a
+  DELTA metric:
+
+  1. The system starts receiving at time=t_0.
+  2. A request is received, the system measures 1 request.
+  3. A request is received, the system measures 1 request.
+  4. A request is received, the system measures 1 request.
+  5. The 1 second collection cycle ends. A metric is exported for the
+      number of requests received over the interval of time t_0 to
+      t_0+1 with a value of 3.
+  6. A request is received, the system measures 1 request.
+  7. A request is received, the system measures 1 request.
+  8. The 1 second collection cycle ends. A metric is exported for the
+      number of requests received over the interval of time t_0+1 to
+      t_0+2 with a value of 2. */
+  AGGREGATION_TEMPORALITY_DELTA = 1;
+
+  /** CUMULATIVE is an AggregationTemporality for a profiler which
+  reports changes since a fixed start time. This means that current values
+  of a CUMULATIVE metric depend on all previous measurements since the
+  start time. Because of this, the sender is required to retain this state
+  in some form. If this state is lost or invalidated, the CUMULATIVE metric
+  values MUST be reset and a new fixed start time following the last
+  reported measurement time sent MUST be used.
+
+  For example, consider a system measuring the number of requests that
+  it receives and reports the sum of these requests every second as a
+  CUMULATIVE metric:
+
+  1. The system starts receiving at time=t_0.
+  2. A request is received, the system measures 1 request.
+  3. A request is received, the system measures 1 request.
+  4. A request is received, the system measures 1 request.
+  5. The 1 second collection cycle ends. A metric is exported for the
+      number of requests received over the interval of time t_0 to
+      t_0+1 with a value of 3.
+  6. A request is received, the system measures 1 request.
+  7. A request is received, the system measures 1 request.
+  8. The 1 second collection cycle ends. A metric is exported for the
+      number of requests received over the interval of time t_0 to
+      t_0+2 with a value of 5.
+  9. The system experiences a fault and loses state.
+  10. The system recovers and resumes receiving at time=t_1.
+  11. A request is received, the system measures 1 request.
+  12. The 1 second collection cycle ends. A metric is exported for the
+      number of requests received over the interval of time t_1 to
+      t_1+1 with a value of 1.
+
+  Note: Even though, when reporting changes since last report time, using
+  CUMULATIVE is valid, it is not recommended. */
+  AGGREGATION_TEMPORALITY_CUMULATIVE = 2;
+}
+
+// ValueType describes the type and units of a value, with an optional aggregation temporality.
+message ValueType {
+  int64 type = 1; // Index into string table.
+  int64 unit = 2; // Index into string table.
+
+  AggregationTemporality aggregation_temporality = 3;
+}
+
+// Each Sample records values encountered in some program
+// context. The program context is typically a stack trace, perhaps
+// augmented with auxiliary information like the thread-id, some
+// indicator of a higher level request being handled etc.
+message Sample {
+  // The indices recorded here correspond to locations in Profile.location.
+  // The leaf is at location_index[0]. [deprecated, superseded by locations_start_index / locations_length]
+  repeated uint64 location_index = 1;
+  // locations_start_index along with locations_length refers to to a slice of locations in Profile.location.
+  // Supersedes location_index.
+  uint64 locations_start_index = 7;
+  // locations_length along with locations_start_index refers to a slice of locations in Profile.location.
+  // Supersedes location_index.
+  uint64 locations_length = 8;
+  // A 128bit id that uniquely identifies this stacktrace, globally. Index into string table. [optional]
+  uint32 stacktrace_id_index = 9;
+  // The type and unit of each value is defined by the corresponding
+  // entry in Profile.sample_type. All samples must have the same
+  // number of values, the same as the length of Profile.sample_type.
+  // When aggregating multiple samples into a single sample, the
+  // result has a list of values that is the element-wise sum of the
+  // lists of the originals.
+  repeated int64 value = 2;
+  // label includes additional context for this sample. It can include
+  // things like a thread id, allocation size, etc.
+  //
+  // NOTE: While possible, having multiple values for the same label key is
+  // strongly discouraged and should never be used. Most tools (e.g. pprof) do
+  // not have good (or any) support for multi-value labels. And an even more
+  // discouraged case is having a string label and a numeric label of the same
+  // name on a sample.  Again, possible to express, but should not be used.
+  // [deprecated, superseded by attributes]
+  repeated Label label = 3;
+  // References to attributes in Profile.attribute_table. [optional]
+  repeated uint64 attributes = 10;
+
+  // Reference to link in Profile.link_table. [optional]
+  uint64 link = 12;
+
+  // Timestamps associated with Sample represented in nanoseconds. These timestamps are expected
+  // to fall within the Profile's time range. [optional]
+  repeated uint64 timestamps_unix_nano = 13;
+}
+
+// Provides additional context for a sample,
+// such as thread ID or allocation size, with optional units. [deprecated]
+message Label {
+  int64 key = 1;   // Index into string table
+
+  // At most one of the following must be present
+  int64 str = 2;   // Index into string table
+  int64 num = 3;
+
+  // Should only be present when num is present.
+  // Specifies the units of num.
+  // Use arbitrary string (for example, "requests") as a custom count unit.
+  // If no unit is specified, consumer may apply heuristic to deduce the unit.
+  // Consumers may also  interpret units like "bytes" and "kilobytes" as memory
+  // units and units like "seconds" and "nanoseconds" as time units,
+  // and apply appropriate unit conversions to these.
+  int64 num_unit = 4;  // Index into string table
+}
+
+// Indicates the semantics of the build_id field.
+enum BuildIdKind {
+  // Linker-generated build ID, stored in the ELF binary notes.
+  BUILD_ID_LINKER = 0;
+  // Build ID based on the content hash of the binary. Currently no particular
+  // hashing approach is standardized, so a given producer needs to define it
+  // themselves and thus unlike BUILD_ID_LINKER this kind of hash is producer-specific.
+  // We may choose to provide a standardized stable hash recommendation later.
+  BUILD_ID_BINARY_HASH = 1;
+}
+
+// Describes the mapping of a binary in memory, including its address range,
+// file offset, and metadata like build ID
+message Mapping {
+  // Unique nonzero id for the mapping. [deprecated]
+  uint64 id = 1;
+  // Address at which the binary (or DLL) is loaded into memory.
+  uint64 memory_start = 2;
+  // The limit of the address range occupied by this mapping.
+  uint64 memory_limit = 3;
+  // Offset in the binary that corresponds to the first mapped address.
+  uint64 file_offset = 4;
+  // The object this entry is loaded from.  This can be a filename on
+  // disk for the main binary and shared libraries, or virtual
+  // abstractions like "[vdso]".
+  int64 filename = 5;  // Index into string table
+  // A string that uniquely identifies a particular program version
+  // with high probability. E.g., for binaries generated by GNU tools,
+  // it could be the contents of the .note.gnu.build-id field.
+  int64 build_id = 6;  // Index into string table
+  // Specifies the kind of build id. See BuildIdKind enum for more details [optional]
+  BuildIdKind build_id_kind = 11;
+  // References to attributes in Profile.attribute_table. [optional]
+  repeated uint64 attributes = 12;
+  // The following fields indicate the resolution of symbolic info.
+  bool has_functions = 7;
+  bool has_filenames = 8;
+  bool has_line_numbers = 9;
+  bool has_inline_frames = 10;
+}
+
+// Describes function and line table debug information.
+message Location {
+  // Unique nonzero id for the location.  A profile could use
+  // instruction addresses or any integer sequence as ids. [deprecated]
+  uint64 id = 1;
+  // The index of the corresponding profile.Mapping for this location.
+  // It can be unset if the mapping is unknown or not applicable for
+  // this profile type.
+  uint64 mapping_index = 2;
+  // The instruction address for this location, if available.  It
+  // should be within [Mapping.memory_start...Mapping.memory_limit]
+  // for the corresponding mapping. A non-leaf address may be in the
+  // middle of a call instruction. It is up to display tools to find
+  // the beginning of the instruction if necessary.
+  uint64 address = 3;
+  // Multiple line indicates this location has inlined functions,
+  // where the last entry represents the caller into which the
+  // preceding entries were inlined.
+  //
+  // E.g., if memcpy() is inlined into printf:
+  //    line[0].function_name == "memcpy"
+  //    line[1].function_name == "printf"
+  repeated Line line = 4;
+  // Provides an indication that multiple symbols map to this location's
+  // address, for example due to identical code folding by the linker. In that
+  // case the line information above represents one of the multiple
+  // symbols. This field must be recomputed when the symbolization state of the
+  // profile changes.
+  bool is_folded = 5;
+
+  // Type of frame (e.g. kernel, native, python, hotspot, php). Index into string table.
+  uint32 type_index = 6;
+
+  // References to attributes in Profile.attribute_table. [optional]
+  repeated uint64 attributes = 7;
+}
+
+// Details a specific line in a source code, linked to a function.
+message Line {
+  // The index of the corresponding profile.Function for this line.
+  uint64 function_index = 1;
+  // Line number in source code.
+  int64 line = 2;
+  // Column number in source code.
+  int64 column = 3;
+}
+
+// Describes a function, including its human-readable name, system name,
+// source file, and starting line number in the source.
+message Function {
+  // Unique nonzero id for the function. [deprecated]
+  uint64 id = 1;
+  // Name of the function, in human-readable form if available.
+  int64 name = 2; // Index into string table
+  // Name of the function, as identified by the system.
+  // For instance, it can be a C++ mangled name.
+  int64 system_name = 3; // Index into string table
+  // Source file containing the function.
+  int64 filename = 4; // Index into string table
+  // Line number in source file.
+  int64 start_line = 5;
+}

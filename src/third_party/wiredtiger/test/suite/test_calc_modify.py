@@ -108,7 +108,7 @@ class test_calc_modify(wttest.WiredTigerTestCase):
         self.assertIsNotNone(mods)
 
         c[k] = oldv
-        self.session.begin_transaction('isolation=snapshot')
+        self.session.begin_transaction()
         c.set_key(k)
         c.modify(mods)
         self.session.commit_transaction()
@@ -124,6 +124,3 @@ class test_calc_modify(wttest.WiredTigerTestCase):
             maxdiff = r.randint(64, size // 10)
             self.pr("size %s, repeats %s, nmods %s, maxdiff %s" % (size, repeats, nmods, maxdiff))
             self.one_test(c, k, size, repeats, nmods, maxdiff)
-
-if __name__ == '__main__':
-    wttest.run()

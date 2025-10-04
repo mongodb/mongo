@@ -29,16 +29,19 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
+
 #include <vector>
+
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
 class BSONObj;
-class NamespaceString;
+
 class OperationContext;
-template <typename T>
-class StatusWith;
 
 /**
  * Given a chunk, determines whether it can be split and returns the split points if so. This
@@ -57,7 +60,7 @@ class StatusWith;
  * makes maxChunkSize equal the size of the chunk.
  */
 std::vector<BSONObj> splitVector(OperationContext* opCtx,
-                                 const NamespaceString& nss,
+                                 const CollectionAcquisition& collection,
                                  const BSONObj& keyPattern,
                                  const BSONObj& min,
                                  const BSONObj& max,

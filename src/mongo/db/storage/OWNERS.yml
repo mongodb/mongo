@@ -1,0 +1,11 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/server-storage-engine-integration
+  - "backup*":
+    approvers:
+      - 10gen/server-backup-restore
+  - "compact_options*":
+    approvers:
+      - 10gen/server-compact

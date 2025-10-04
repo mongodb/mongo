@@ -1,0 +1,128 @@
+# This is a smoke test suite for the server-index-builds component. It is meant to be run locally
+# in a relatively short period of time and is meant to give feedback on whether a given change
+# broke any major feature functionality of the server-index-builds component.
+# It is not meant to replace a full patch build, but rather to provide a means to receive
+# feedback during iterative development.
+#
+# The unit tests and integration tests can be run with the following:
+# bazel test --test_tag_filters=server-index-builds --test_output=summary //src/mongo/...
+# bazel build install-dist-test && python buildscripts/run_smoke_tests.py --suites=server_index_builds
+
+suites:
+  core:
+    - jstests/core/timeseries/ddl/timeseries_index_build_failure.js
+  no_passthrough:
+    - jstests/noPassthrough/index_builds/absent_ns_field_in_index_specs.js
+    - jstests/noPassthrough/index_builds/commit_quorum_does_not_hang_with_initial_sync.js
+    - jstests/noPassthrough/index_builds/commit_quorum_standalones.js
+    - jstests/noPassthrough/index_builds/commit_quorum.js
+    - jstests/noPassthrough/index_builds/compound_2dsphere_max_index_keys.js
+    - jstests/noPassthrough/index_builds/create_indexes_fails_if_insufficient_disk_space.js
+    - jstests/noPassthrough/index_builds/create_indexes_in_txn_errors_if_already_in_progress.js
+    - jstests/noPassthrough/index_builds/do_not_rebuild_indexes_before_repair.js
+    - jstests/noPassthrough/index_builds/drop_indexes_aborts_in_progress_index_builds_complex_name.js
+    - jstests/noPassthrough/index_builds/drop_indexes_aborts_in_progress_index_builds_key_pattern.js
+    - jstests/noPassthrough/index_builds/drop_indexes_aborts_in_progress_index_builds_multiple.js
+    - jstests/noPassthrough/index_builds/drop_indexes_aborts_in_progress_index_builds_simple_name.js
+    - jstests/noPassthrough/index_builds/drop_indexes_aborts_in_progress_index_builds_wildcard.js
+    - jstests/noPassthrough/index_builds/drop_indexes_on_recreated_index.js
+    - jstests/noPassthrough/index_builds/drop_indexes_prevents_dropping_ready_indexes_after_aborting.js
+    - jstests/noPassthrough/index_builds/drop_indexes_rename_collection.js
+    - jstests/noPassthrough/index_builds/drop_ready_index_while_building_an_index.js
+    - jstests/noPassthrough/index_builds/drop_unfinished_replicated_index_build_in_standalone.js
+    - jstests/noPassthrough/index_builds/durable_hidden_index.js
+    - jstests/noPassthrough/index_builds/durable_history_index_usage.js
+    - jstests/noPassthrough/index_builds/hybrid_geo_index_remove_invalid_doc.js
+    - jstests/noPassthrough/index_builds/hybrid_geo_index_update_invalid_doc.js
+    - jstests/noPassthrough/index_builds/hybrid_index_with_updates.js
+    - jstests/noPassthrough/index_builds/hybrid_multikey.js
+    - jstests/noPassthrough/index_builds/hybrid_partial_geo_index.js
+    - jstests/noPassthrough/index_builds/hybrid_partial_index_update.js
+    - jstests/noPassthrough/index_builds/hybrid_unique_index_with_updates.js
+    - jstests/noPassthrough/index_builds/index_abort_before_commit_signal.js
+    - jstests/noPassthrough/index_builds/index_abort_stepdown_prepare.js
+    - jstests/noPassthrough/index_builds/index_build_capped_position_lost.js
+    - jstests/noPassthrough/index_builds/index_build_external_and_internal_abort_do_not_deadlock_single_phase.js
+    - jstests/noPassthrough/index_builds/index_build_external_and_internal_abort_do_not_deadlock_two_phase.js
+    - jstests/noPassthrough/index_builds/index_build_external_and_internal_abort.js
+    - jstests/noPassthrough/index_builds/index_build_killed_disk_space_secondary.js
+    - jstests/noPassthrough/index_builds/index_build_killed_disk_space.js
+    - jstests/noPassthrough/index_builds/index_build_killop_primary.js
+    - jstests/noPassthrough/index_builds/index_build_killop_secondary_after_commit.js
+    - jstests/noPassthrough/index_builds/index_build_killop_secondary_before_commit.js
+    - jstests/noPassthrough/index_builds/index_build_out_of_order_scan.js
+    - jstests/noPassthrough/index_builds/index_build_prepareUnique.js
+    - jstests/noPassthrough/index_builds/index_build_restart_secondary.js
+    - jstests/noPassthrough/index_builds/index_build_restart_standalone.js
+    - jstests/noPassthrough/index_builds/index_build_skipped_record_multikey.js
+    - jstests/noPassthrough/index_builds/index_build_step_up_retry_while_commit.js
+    - jstests/noPassthrough/index_builds/index_build_stepdown_dropCollection_during_early_setup.js
+    - jstests/noPassthrough/index_builds/index_build_stepdown_prepared_transaction_intent_shared.js
+    - jstests/noPassthrough/index_builds/index_build_unregisters_after_stepdown.js
+    - jstests/noPassthrough/index_builds/index_build_vote_abort_while_vote_commit.js
+    - jstests/noPassthrough/index_builds/index_build_yield_bulk_load.js
+    - jstests/noPassthrough/index_builds/index_build_yield_prepare_conflicts.js
+    - jstests/noPassthrough/index_builds/index_builds_ignore_prepare_conflicts.js
+    - jstests/noPassthrough/index_builds/index_commit_currentop_slow.js
+    - jstests/noPassthrough/index_builds/index_drop_before_running.js
+    - jstests/noPassthrough/index_builds/index_empty_collection_secondary.js
+    - jstests/noPassthrough/index_builds/index_empty_collection.js
+    - jstests/noPassthrough/index_builds/index_failover_key_errors.js
+    - jstests/noPassthrough/index_builds/index_failover_resolved_key_errors_after_stepdown.js
+    - jstests/noPassthrough/index_builds/index_failover_resolved_key_errors.js
+    - jstests/noPassthrough/index_builds/index_initial_sync.js
+    - jstests/noPassthrough/index_builds/index_initial_sync.js
+    - jstests/noPassthrough/index_builds/index_killop_after_stepdown.js
+    - jstests/noPassthrough/index_builds/index_killop_standalone.js
+    - jstests/noPassthrough/index_builds/index_partial_no_explain_cmds.js
+    - jstests/noPassthrough/index_builds/index_secondary_awaiting_primary_abort_crash_on_commit.js
+    - jstests/noPassthrough/index_builds/index_secondary_commit_after_scan_error.js
+    - jstests/noPassthrough/index_builds/index_secondary_signal_primary_abort.js
+    - jstests/noPassthrough/index_builds/index_secondary_wait_for_abort.js
+    - jstests/noPassthrough/index_builds/index_secondary_wait_for_commit.js
+    - jstests/noPassthrough/index_builds/index_shutdown_cmd_primary.js
+    - jstests/noPassthrough/index_builds/index_shutdown_cmd_secondary.js
+    - jstests/noPassthrough/index_builds/index_signaling_primary_abort_shutdown.js
+    - jstests/noPassthrough/index_builds/index_stepdown_abort_prepare_conflict.js
+    - jstests/noPassthrough/index_builds/index_stepdown_abort.js
+    - jstests/noPassthrough/index_builds/index_stepdown_commit_prepare_conflict.js
+    - jstests/noPassthrough/index_builds/index_stepdown_conflict.js
+    - jstests/noPassthrough/index_builds/index_stepdown_failover.js
+    - jstests/noPassthrough/index_builds/index_stepdown_prepare_conflict.js
+    - jstests/noPassthrough/index_builds/index_stepdown_unique_failure.js
+    - jstests/noPassthrough/index_builds/index_stepdown_unique.js
+    - jstests/noPassthrough/index_builds/index_stepup_abort_skipped_records.js
+    - jstests/noPassthrough/index_builds/index_stepup_missing_skipped_record.js
+    - jstests/noPassthrough/index_builds/index_version_autoupgrade.js
+    - jstests/noPassthrough/index_builds/index_version_v2.js
+    - jstests/noPassthrough/index_builds/indexbg_drop.js
+    - jstests/noPassthrough/index_builds/indexbg_killop_primary_after_init.js
+    - jstests/noPassthrough/index_builds/indexbg_killop_secondary_success.js
+    - jstests/noPassthrough/index_builds/indexbg_killop_stepdown.js
+    - jstests/noPassthrough/index_builds/indexbg_killop_stepup.js
+    - jstests/noPassthrough/index_builds/indexbg2.js
+    - jstests/noPassthrough/index_builds/initial_sync_aborts_two_phase_index_builds_hide_index.js
+    - jstests/noPassthrough/index_builds/initial_sync_aborts_two_phase_index_builds_rename.js
+    - jstests/noPassthrough/index_builds/initial_sync_drops_ready_indexes_while_having_index_builds.js
+    - jstests/noPassthrough/index_builds/list_indexes_ready_and_in_progress.js
+    - jstests/noPassthrough/index_builds/list_indexes_with_build_uuids.js
+    - jstests/noPassthrough/index_builds/missing_index_ident_standalone_drop.js
+    - jstests/noPassthrough/index_builds/rebuild_multiple_indexes_at_startup.js
+    - jstests/noPassthrough/index_builds/reindex_crash_rebuilds_id_index.js
+    - jstests/noPassthrough/index_builds/restart_and_unclean_shutdown_recovery_before_index_build_commit_timestamp.js
+    - jstests/noPassthrough/index_builds/restart_index_build_if_resume_fails.js
+    - jstests/noPassthrough/index_builds/rolling_index_builds_interrupted.js
+    - jstests/noPassthrough/index_builds/rolling_index_builds.js
+    - jstests/noPassthrough/index_builds/salvage_incomplete_rolling_index_builds.js
+    - jstests/noPassthrough/index_builds/timestamp_index_builds.js
+    - jstests/noPassthrough/index_builds/two_phase_index_build_ops_disabled_through_applyops.js
+    - jstests/noPassthrough/index_builds/unfinished_index_builds_restart_using_same_ident.js
+    - jstests/noPassthrough/index_builds/unindex_detects_data_corruption.js
+    - jstests/noPassthrough/index_builds/unique_index_insert_during_collection_scan.js
+    - jstests/noPassthrough/index_builds/vote_abort_index_build.js
+  concurrency:
+    - jstests/concurrency/fsm_workloads/ddl/create_index_background/create_index_background_partial_filter.js
+    - jstests/concurrency/fsm_workloads/ddl/create_index_background/create_index_background_unique_capped.js
+    - jstests/concurrency/fsm_workloads/ddl/create_index_background/create_index_background_unique.js
+    - jstests/concurrency/fsm_workloads/ddl/create_index_background/create_index_background_wildcard.js
+    - jstests/concurrency/fsm_workloads/ddl/create_index_background/create_index_background.js

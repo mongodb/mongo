@@ -21,7 +21,11 @@ LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 
-#include <elf.h>
+#if defined(HAVE_ELF_H)
+# include <elf.h>
+#elif defined(HAVE_SYS_ELF_H)
+# include <sys/elf.h>
+#endif
 
 #include "_UCD_lib.h"
 #include "_UCD_internal.h"
@@ -31,7 +35,7 @@ get_unwind_info(struct UCD_info *ui, unw_addr_space_t as, unw_word_t ip)
 {
   unsigned long segbase, mapoff;
 
-#if UNW_TARGET_IA64 && defined(__linux)
+#if UNW_TARGET_IA64 && defined(__linux__)
   if (!ui->edi.ktab.start_ip && _Uia64_get_kernel_table (&ui->edi.ktab) < 0)
     return -UNW_ENOINFO;
 
@@ -49,6 +53,9 @@ get_unwind_info(struct UCD_info *ui, unw_addr_space_t as, unw_word_t ip)
        && ip >= ui->edi.di_debug.start_ip && ip < ui->edi.di_debug.end_ip))
     return 0;
 
+  /* The invalidate_edi call unmaps memory it doesn't own, so just null it out
+     instead. */
+  ui->edi.ei.image = NULL;
   invalidate_edi (&ui->edi);
 
   /* Used to be tdep_get_elf_image() in ptrace unwinding code */
@@ -58,17 +65,22 @@ get_unwind_info(struct UCD_info *ui, unw_addr_space_t as, unw_word_t ip)
       Debug(1, "returns error: _UCD_get_elf_image failed\n");
       return -UNW_ENOINFO;
     }
+
+  ucd_file_t *ucd_file = ucd_file_table_at(&ui->ucd_file_table, phdr->p_backing_file_index);
+  if (ucd_file == NULL)
+    {
+      Debug(0, "no backing file for index %d\n", phdr->p_backing_file_index);
+      return -UNW_ENOINFO;
+    }
+
   /* segbase: where it is mapped in virtual memory */
-  /* mapoff: offset in the file */
   segbase = phdr->p_vaddr;
-  /*mapoff  = phdr->p_offset; WRONG! phdr->p_offset is the offset in COREDUMP file */
+  /* mapoff doesn't matter since the entire file is loaded */
   mapoff  = 0;
-///FIXME. text segment is USUALLY, not always, at offset 0 in the binary/.so file.
-// ensure that at initialization.
 
   /* Here, SEGBASE is the starting-address of the (mmap'ped) segment
      which covers the IP we're looking for.  */
-  if (tdep_find_unwind_table(&ui->edi, as, phdr->backing_filename, segbase, mapoff, ip) < 0)
+  if (tdep_find_unwind_table(&ui->edi, as, ucd_file->filename, segbase, mapoff, ip) < 0)
     {
       Debug(1, "returns error: tdep_find_unwind_table failed\n");
       return -UNW_ENOINFO;

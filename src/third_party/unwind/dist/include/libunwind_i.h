@@ -37,7 +37,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 
 #include "compiler.h"
 
-#if defined(HAVE___THREAD) && HAVE___THREAD
+#if defined(HAVE___CACHE_PER_THREAD) && HAVE___CACHE_PER_THREAD
 #define UNWI_DEFAULT_CACHING_POLICY UNW_CACHE_PER_THREAD
 #else
 #define UNWI_DEFAULT_CACHING_POLICY UNW_CACHE_GLOBAL
@@ -51,10 +51,17 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 #include <libunwind.h>
 #include <pthread.h>
 #include <signal.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/mman.h>
+#include <errno.h>
+#include <stdio.h>
+
+#if defined(HAVE_SYS_SYSCALL_H)
+# include <sys/syscall.h>   /* For SYS_xxx definitions */
+#endif
 
 #if defined(HAVE_ELF_H)
 # include <elf.h>
@@ -63,37 +70,77 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 #else
 # error Could not locate <elf.h>
 #endif
+#if defined(ELFCLASS32)
+# define UNW_ELFCLASS32 ELFCLASS32
+#else
+# define UNW_ELFCLASS32 1
+#endif
+#if defined(ELFCLASS64)
+# define UNW_ELFCLASS64 ELFCLASS64
+#else
+# define UNW_ELFCLASS64 2
+#endif
 
 #if defined(HAVE_ENDIAN_H)
 # include <endian.h>
 #elif defined(HAVE_SYS_ENDIAN_H)
 # include <sys/endian.h>
-# if defined(_LITTLE_ENDIAN) && !defined(__LITTLE_ENDIAN)
-#   define __LITTLE_ENDIAN _LITTLE_ENDIAN
-# endif
-# if defined(_BIG_ENDIAN) && !defined(__BIG_ENDIAN)
-#   define __BIG_ENDIAN _BIG_ENDIAN
-# endif
-# if defined(_BYTE_ORDER) && !defined(__BYTE_ORDER)
-#   define __BYTE_ORDER _BYTE_ORDER
-# endif
+#elif defined(HAVE_SYS_PARAM_H)
+# include <sys/param.h>
+#endif
+
+#if defined(__LITTLE_ENDIAN)
+# define UNW_LITTLE_ENDIAN __LITTLE_ENDIAN
+#elif defined(_LITTLE_ENDIAN)
+# define UNW_LITTLE_ENDIAN _LITTLE_ENDIAN
+#elif defined(LITTLE_ENDIAN)
+# define UNW_LITTLE_ENDIAN LITTLE_ENDIAN
 #else
-# define __LITTLE_ENDIAN        1234
-# define __BIG_ENDIAN           4321
+# define UNW_LITTLE_ENDIAN 1234
+#endif
+
+#if defined(__BIG_ENDIAN)
+# define UNW_BIG_ENDIAN __BIG_ENDIAN
+#elif defined(_BIG_ENDIAN)
+# define UNW_BIG_ENDIAN _BIG_ENDIAN
+#elif defined(BIG_ENDIAN)
+# define UNW_BIG_ENDIAN BIG_ENDIAN
+#else
+# define UNW_BIG_ENDIAN 4321
+#endif
+
+#if defined(__BYTE_ORDER)
+# define UNW_BYTE_ORDER __BYTE_ORDER
+#elif defined(_BYTE_ORDER)
+# define UNW_BYTE_ORDER _BYTE_ORDER
+#elif defined(BIG_ENDIAN)
+# define UNW_BYTE_ORDER BYTE_ORDER
+#else
 # if defined(__hpux)
-#   define __BYTE_ORDER __BIG_ENDIAN
-# elif defined(__QNX__)
-#   if defined(__BIGENDIAN__)
-#     define __BYTE_ORDER __BIG_ENDIAN
-#   elif defined(__LITTLEENDIAN__)
-#     define __BYTE_ORDER __LITTLE_ENDIAN
-#   else
-#     error Host has unknown byte-order.
-#   endif
+#  define UNW_BYTE_ORDER UNW_BIG_ENDIAN
 # else
-#   error Host has unknown byte-order.
+#  error Target has unknown byte ordering.
 # endif
 #endif
+
+static inline int
+byte_order_is_valid(int byte_order)
+{
+    return byte_order == UNW_BIG_ENDIAN
+        || byte_order == UNW_LITTLE_ENDIAN;
+}
+
+static inline int
+byte_order_is_big_endian(int byte_order)
+{
+    return byte_order == UNW_BIG_ENDIAN;
+}
+
+static inline int
+target_is_big_endian(void)
+{
+    return byte_order_is_big_endian(UNW_BYTE_ORDER);
+}
 
 #if defined(HAVE__BUILTIN_UNREACHABLE)
 # define unreachable() __builtin_unreachable()
@@ -104,7 +151,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 #ifdef DEBUG
 # define UNW_DEBUG      1
 #else
-# define UNW_DEBUG      0
+# undef UNW_DEBUG
 #endif
 
 /* Make it easy to write thread-safe code which may or may not be
@@ -115,6 +162,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 #pragma weak pthread_mutex_init
 #pragma weak pthread_mutex_lock
 #pragma weak pthread_mutex_unlock
+#pragma weak pthread_sigmask
 
 #define mutex_init(l)                                                   \
         (pthread_mutex_init != NULL ? pthread_mutex_init ((l), NULL) : 0)
@@ -123,57 +171,6 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 #define mutex_unlock(l)                                                 \
         (pthread_mutex_unlock != NULL ? pthread_mutex_unlock (l) : 0)
 
-#ifdef HAVE_ATOMIC_OPS_H
-# include <atomic_ops.h>
-static inline int
-cmpxchg_ptr (void *addr, void *old, void *new)
-{
-  union
-    {
-      void *vp;
-      AO_t *aop;
-    }
-  u;
-
-  u.vp = addr;
-  return AO_compare_and_swap(u.aop, (AO_t) old, (AO_t) new);
-}
-# define fetch_and_add1(_ptr)           AO_fetch_and_add1(_ptr)
-# define fetch_and_add(_ptr, value)     AO_fetch_and_add(_ptr, value)
-# define atomic_read(ptr) (AO_load(ptr))
-   /* GCC 3.2.0 on HP-UX crashes on cmpxchg_ptr() */
-#  if !(defined(__hpux) && __GNUC__ == 3 && __GNUC_MINOR__ == 2)
-#   define HAVE_CMPXCHG
-#  endif
-# define HAVE_FETCH_AND_ADD
-#elif defined(HAVE_SYNC_ATOMICS) || defined(HAVE_IA64INTRIN_H)
-# ifdef HAVE_IA64INTRIN_H
-#  include <ia64intrin.h>
-# endif
-static inline int
-cmpxchg_ptr (void *addr, void *old, void *new)
-{
-  union
-    {
-      void *vp;
-      long *vlp;
-    }
-  u;
-
-  u.vp = addr;
-  return __sync_bool_compare_and_swap(u.vlp, (long) old, (long) new);
-}
-# define fetch_and_add1(_ptr)           __sync_fetch_and_add(_ptr, 1)
-# define fetch_and_add(_ptr, value)     __sync_fetch_and_add(_ptr, value)
-# define atomic_read(ptr) (__atomic_load_n(ptr,__ATOMIC_RELAXED))
-# define HAVE_CMPXCHG
-# define HAVE_FETCH_AND_ADD
-#endif
-
-#ifndef atomic_read
-#define atomic_read(ptr)        (*(ptr))
-#endif
-
 #define UNWI_OBJ(fn)      UNW_PASTE(UNW_PREFIX,UNW_PASTE(I,fn))
 #define UNWI_ARCH_OBJ(fn) UNW_PASTE(UNW_PASTE(UNW_PASTE(_UI,UNW_TARGET),_), fn)
 
@@ -181,7 +178,7 @@ cmpxchg_ptr (void *addr, void *old, void *new)
 
 /* Type of a mask that can be used to inhibit preemption.  At the
    userlevel, preemption is caused by signals and hence sigset_t is
-   appropriate.  In constrast, the Linux kernel uses "unsigned long"
+   appropriate.  In contrast, the Linux kernel uses "unsigned long"
    to hold the processor "flags" instead.  */
 typedef sigset_t intrmask_t;
 
@@ -193,8 +190,11 @@ static inline void mark_as_used(void *v UNUSED) {
 }
 
 #if defined(CONFIG_BLOCK_SIGNALS)
+/* SIGPROCMASK ignores return values, so we do not have to correct for pthread_sigmask() returning
+   errno on failure when sigprocmask() returns -1. */
 # define SIGPROCMASK(how, new_mask, old_mask) \
-  sigprocmask((how), (new_mask), (old_mask))
+    (pthread_sigmask != NULL ? pthread_sigmask((how), (new_mask), (old_mask)) \
+     : sigprocmask((how), (new_mask), (old_mask)))
 #else
 # define SIGPROCMASK(how, new_mask, old_mask) mark_as_used(old_mask)
 #endif
@@ -222,14 +222,46 @@ do {                                            \
 
 #define SOS_MEMORY_SIZE 16384   /* see src/mi/mempool.c */
 
+/* Provide an internal syscall version of mmap to improve signal safety. */
+static ALWAYS_INLINE void *
+mi_mmap (void *addr, size_t len, int prot, int flags, int fd, off_t offset)
+{
+#if defined(SYS_mmap) && !defined(__i386__)
+  /* Where supported, bypass libc and invoke the syscall directly. */
+# if defined(__FreeBSD__) // prefer over syscall on *BSD
+  long int ret = __syscall (SYS_mmap, addr, len, prot, flags, fd, offset);
+# else
+  long int ret = syscall (SYS_mmap, addr, len, prot, flags, fd, offset);
+# endif
+  // @todo this is very likely Linux specific
+  if ((unsigned long int)ret > -4096UL)
+    return MAP_FAILED;
+  else
+    return (void *)ret;
+#else
+  /* Where direct syscalls are not supported, forward to the libc call. */
+  return mmap (addr, len, prot, flags, fd, offset);
+#endif
+}
+
+/* Provide an internal syscall version of munmap to improve signal safety. */
+static ALWAYS_INLINE int
+mi_munmap (void *addr, size_t len)
+{
+#ifdef SYS_munmap
+  return syscall (SYS_munmap, addr, len);
+#else
+  return munmap (addr, len);
+#endif
+}
+
 #ifndef MAP_ANONYMOUS
 # define MAP_ANONYMOUS MAP_ANON
 #endif
 #define GET_MEMORY(mem, size)                                               \
 do {                                                                        \
-  /* Hopefully, mmap() goes straight through to a system call stub...  */   \
-  mem = mmap (NULL, size, PROT_READ | PROT_WRITE,                           \
-              MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);                          \
+  mem = mi_mmap (NULL, size, PROT_READ | PROT_WRITE,                        \
+                 MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);                       \
   if (mem == MAP_FAILED)                                                    \
     mem = NULL;                                                             \
 } while (0)
@@ -270,32 +302,65 @@ extern int unwi_dyn_validate_cache (unw_addr_space_t as, void *arg);
 extern unw_dyn_info_list_t _U_dyn_info_list;
 extern pthread_mutex_t _U_dyn_info_list_lock;
 
-#if UNW_DEBUG
-#define unwi_debug_level                UNWI_ARCH_OBJ(debug_level)
+#define unw_address_is_valid UNWI_ARCH_OBJ(address_is_valid)
+HIDDEN bool unw_address_is_valid(unw_word_t, size_t);
+
+
+#if defined(UNW_DEBUG)
+# define unwi_debug_level                UNWI_ARCH_OBJ(debug_level)
 extern long unwi_debug_level;
 
+# include <stdarg.h>
 # include <stdio.h>
-# define Debug(level,format...)                                         \
-do {                                                                    \
-  if (unwi_debug_level >= level)                                        \
-    {                                                                   \
-      int _n = level;                                                   \
-      if (_n > 16)                                                      \
-        _n = 16;                                                        \
-      fprintf (stderr, "%*c>%s: ", _n, ' ', __FUNCTION__);              \
-      fprintf (stderr, format);                                         \
-    }                                                                   \
-} while (0)
-# define Dprintf(format...)         fprintf (stderr, format)
-#else
-# define Debug(level,format...)
-# define Dprintf(format...)
-#endif
+# include <unistd.h>
+
+#define Debug(level, ...) _unw_debug(level, __FUNCTION__,  __VA_ARGS__)
+
+/**
+ * Send a debug message to stderr.
+ *
+ * This function may be called from within a signal handler context where
+ * fprintf(3) is not safe to call. The write(2) call is safe, however, and we're
+ * going to have to assume that snprintf(3) is signal safe otherwise it's pretty
+ * pointless to use Debug() calls anywhere.
+ */
+static inline void _unw_debug(int level, char const * const fname, char const * const fmt, ...)
+{
+  if (unwi_debug_level >= level)
+    {
+      enum { buf_size = 512 };
+      char buf[buf_size];
+
+      if (level > 16) level = 16;
+      int bcount = snprintf (buf, buf_size, "%*c>%s: ", level, ' ', fname);
+      int res = write(STDERR_FILENO, buf, bcount);
+
+      va_list ap;
+      va_start(ap, fmt);
+      bcount = vsnprintf (buf, buf_size, fmt, ap);
+      va_end(ap);
+      res = write(STDERR_FILENO, buf, bcount);
+      (void)res; /* silence "variable set but not used" warning */
+    }
+}
+# define Dprintf(/* format */ ...)                                      \
+  fprintf (stderr, /* format */ __VA_ARGS__)
+#else /* defined(UNW_DEBUG) */
+# define Debug(level, /* format */ ...)
+# define Dprintf( /* format */ ...)
+#endif /* defined(UNW_DEBUG) */
 
 static ALWAYS_INLINE int
 print_error (const char *string)
 {
   return write (2, string, strlen (string));
+}
+
+HIDDEN extern long unw_page_size;
+
+static inline unw_word_t unw_page_start(unw_word_t addr)
+{
+  return addr & ~(unw_page_size - 1);
 }
 
 #define mi_init         UNWI_ARCH_OBJ(mi_init)
@@ -327,7 +392,7 @@ struct elf_dyn_info
 static inline void invalidate_edi (struct elf_dyn_info *edi)
 {
   if (edi->ei.image)
-    munmap (edi->ei.image, edi->ei.size);
+    mi_munmap (edi->ei.image, edi->ei.size);
   memset (edi, 0, sizeof (*edi));
   edi->di_cache.format = -1;
   edi->di_debug.format = -1;
@@ -355,6 +420,10 @@ static inline void invalidate_edi (struct elf_dyn_info *edi)
 #endif /* !PT_ARM_EXIDX */
 
 #include "tdep/libunwind_i.h"
+
+#ifndef TDEP_DWARF_SP
+#define TDEP_DWARF_SP UNW_TDEP_SP
+#endif
 
 #ifndef tdep_get_func_addr
 # define tdep_get_func_addr(as,addr,v)          (*(v) = addr, 0)

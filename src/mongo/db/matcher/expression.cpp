@@ -29,9 +29,15 @@
 
 #include "mongo/db/matcher/expression.h"
 
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/matcher/schema/json_schema_parser.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/query/compiler/parsers/matcher/schema/json_schema_parser.h"
+
+#include <algorithm>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -41,77 +47,8 @@ namespace mongo {
  */
 MONGO_FAIL_POINT_DEFINE(disableMatchExpressionOptimization);
 
-namespace {
-/**
- * Comparator for MatchExpression nodes.  Returns an integer less than, equal to, or greater
- * than zero if 'lhs' is less than, equal to, or greater than 'rhs', respectively.
- *
- * Sorts by:
- * 1) operator type (MatchExpression::MatchType)
- * 2) path name (MatchExpression::path())
- * 3) sort order of children
- * 4) number of children (MatchExpression::numChildren())
- *
- * The third item is needed to ensure that match expression trees which should have the same
- * cache key always sort the same way. If you're wondering when the tuple (operator type, path
- * name) could ever be equal, consider this query:
- *
- * {$and:[{$or:[{a:1},{a:2}]},{$or:[{a:1},{b:2}]}]}
- *
- * The two OR nodes would compare as equal in this case were it not for tuple item #3 (sort
- * order of children).
- */
-int matchExpressionComparator(const MatchExpression* lhs, const MatchExpression* rhs) {
-    MatchExpression::MatchType lhsMatchType = lhs->matchType();
-    MatchExpression::MatchType rhsMatchType = rhs->matchType();
-    if (lhsMatchType != rhsMatchType) {
-        return lhsMatchType < rhsMatchType ? -1 : 1;
-    }
-
-    StringData lhsPath = lhs->path();
-    StringData rhsPath = rhs->path();
-    int pathsCompare = lhsPath.compare(rhsPath);
-    if (pathsCompare != 0) {
-        return pathsCompare;
-    }
-
-    const size_t numChildren = std::min(lhs->numChildren(), rhs->numChildren());
-    for (size_t childIdx = 0; childIdx < numChildren; ++childIdx) {
-        int childCompare =
-            matchExpressionComparator(lhs->getChild(childIdx), rhs->getChild(childIdx));
-        if (childCompare != 0) {
-            return childCompare;
-        }
-    }
-
-    if (lhs->numChildren() != rhs->numChildren()) {
-        return lhs->numChildren() < rhs->numChildren() ? -1 : 1;
-    }
-
-    // They're equal!
-    return 0;
-}
-
-bool matchExpressionLessThan(const MatchExpression* lhs, const MatchExpression* rhs) {
-    return matchExpressionComparator(lhs, rhs) < 0;
-}
-
-}  // namespace
-
 MatchExpression::MatchExpression(MatchType type, clonable_ptr<ErrorAnnotation> annotation)
     : _errorAnnotation(std::move(annotation)), _matchType(type) {}
-
-// static
-void MatchExpression::sortTree(MatchExpression* tree) {
-    for (size_t i = 0; i < tree->numChildren(); ++i) {
-        sortTree(tree->getChild(i));
-    }
-    if (auto&& children = tree->getChildVector()) {
-        std::stable_sort(children->begin(), children->end(), [](auto&& lhs, auto&& rhs) {
-            return matchExpressionLessThan(lhs.get(), rhs.get());
-        });
-    }
-}
 
 std::string MatchExpression::toString() const {
     return serialize().toString();
@@ -128,16 +65,6 @@ void MatchExpression::_debugAddSpace(StringBuilder& debug, int indentationLevel)
         debug << "    ";
 }
 
-bool MatchExpression::matchesBSON(const BSONObj& doc, MatchDetails* details) const {
-    BSONMatchableDocument mydoc(doc);
-    return matches(&mydoc, details);
-}
-
-bool MatchExpression::matchesBSONElement(BSONElement elem, MatchDetails* details) const {
-    BSONElementViewMatchableDocument matchableDoc(elem);
-    return matches(&matchableDoc, details);
-}
-
 void MatchExpression::setCollator(const CollatorInterface* collator) {
     for (size_t i = 0; i < numChildren(); ++i) {
         getChild(i)->setCollator(collator);
@@ -146,34 +73,84 @@ void MatchExpression::setCollator(const CollatorInterface* collator) {
     _doSetCollator(collator);
 }
 
-void MatchExpression::addDependencies(DepsTracker* deps) const {
-    for (size_t i = 0; i < numChildren(); ++i) {
+bool MatchExpression::isInternalNodeWithPath(MatchType m) {
+    switch (m) {
+        case ELEM_MATCH_OBJECT:
+        case ELEM_MATCH_VALUE:
+        case INTERNAL_SCHEMA_OBJECT_MATCH:
+        case INTERNAL_SCHEMA_MATCH_ARRAY_INDEX:
+            // This node generates a child expression with a field that isn't prefixed by the path
+            // of the node.
+        case INTERNAL_SCHEMA_ALL_ELEM_MATCH_FROM_INDEX:
+            // This node generates a child expression with a field that isn't prefixed by the path
+            // of the node.
+            return true;
 
-        // Don't recurse through MatchExpression nodes which require an entire array or entire
-        // subobject for matching.
-        const auto type = matchType();
-        switch (type) {
-            case MatchExpression::ELEM_MATCH_VALUE:
-            case MatchExpression::ELEM_MATCH_OBJECT:
-            case MatchExpression::INTERNAL_SCHEMA_OBJECT_MATCH:
-                continue;
-            default:
-                getChild(i)->addDependencies(deps);
-        }
+        case AND:
+        case OR:
+        case SIZE:
+        case EQ:
+        case LTE:
+        case LT:
+        case GT:
+        case GTE:
+        case REGEX:
+        case MOD:
+        case EXISTS:
+        case MATCH_IN:
+        case BITS_ALL_SET:
+        case BITS_ALL_CLEAR:
+        case BITS_ANY_SET:
+        case BITS_ANY_CLEAR:
+        case NOT:
+        case NOR:
+        case TYPE_OPERATOR:
+        case GEO:
+        case WHERE:
+        case EXPRESSION:
+        case ALWAYS_FALSE:
+        case ALWAYS_TRUE:
+        case GEO_NEAR:
+        case TEXT:
+        case INTERNAL_2D_POINT_IN_ANNULUS:
+        case INTERNAL_BUCKET_GEO_WITHIN:
+        case INTERNAL_EXPR_EQ:
+        case INTERNAL_EXPR_GT:
+        case INTERNAL_EXPR_GTE:
+        case INTERNAL_EXPR_LT:
+        case INTERNAL_EXPR_LTE:
+        case INTERNAL_EQ_HASHED_KEY:
+        case INTERNAL_SCHEMA_ALLOWED_PROPERTIES:
+        case INTERNAL_SCHEMA_BIN_DATA_ENCRYPTED_TYPE:
+        case INTERNAL_SCHEMA_BIN_DATA_FLE2_ENCRYPTED_TYPE:
+        case INTERNAL_SCHEMA_BIN_DATA_SUBTYPE:
+        case INTERNAL_SCHEMA_COND:
+        case INTERNAL_SCHEMA_EQ:
+        case INTERNAL_SCHEMA_FMOD:
+        case INTERNAL_SCHEMA_MAX_ITEMS:
+        case INTERNAL_SCHEMA_MAX_LENGTH:
+        case INTERNAL_SCHEMA_MAX_PROPERTIES:
+        case INTERNAL_SCHEMA_MIN_ITEMS:
+        case INTERNAL_SCHEMA_MIN_LENGTH:
+        case INTERNAL_SCHEMA_MIN_PROPERTIES:
+        case INTERNAL_SCHEMA_ROOT_DOC_EQ:
+        case INTERNAL_SCHEMA_TYPE:
+        case INTERNAL_SCHEMA_UNIQUE_ITEMS:
+        case INTERNAL_SCHEMA_XOR:
+            return false;
     }
-
-    _doAddDependencies(deps);
+    MONGO_UNREACHABLE;
 }
 
 MatchExpression::ErrorAnnotation::SchemaAnnotations::SchemaAnnotations(
     const BSONObj& jsonSchemaElement) {
     auto title = jsonSchemaElement[JSONSchemaParser::kSchemaTitleKeyword];
-    if (title.type() == BSONType::String) {
+    if (title.type() == BSONType::string) {
         this->title = {title.String()};
     }
 
     auto description = jsonSchemaElement[JSONSchemaParser::kSchemaDescriptionKeyword];
-    if (description.type() == BSONType::String) {
+    if (description.type() == BSONType::string) {
         this->description = {description.String()};
     }
 }
@@ -181,11 +158,11 @@ MatchExpression::ErrorAnnotation::SchemaAnnotations::SchemaAnnotations(
 void MatchExpression::ErrorAnnotation::SchemaAnnotations::appendElements(
     BSONObjBuilder& builder) const {
     if (title) {
-        builder << JSONSchemaParser::kSchemaTitleKeyword << title.get();
+        builder << JSONSchemaParser::kSchemaTitleKeyword << title.value();
     }
 
     if (description) {
-        builder << JSONSchemaParser::kSchemaDescriptionKeyword << description.get();
+        builder << JSONSchemaParser::kSchemaDescriptionKeyword << description.value();
     }
 }
 }  // namespace mongo

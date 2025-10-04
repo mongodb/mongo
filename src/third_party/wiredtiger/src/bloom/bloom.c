@@ -129,7 +129,7 @@ __bloom_open_cursor(WT_BLOOM *bloom, WT_CURSOR *owner)
  * Bump the cache priority for Bloom filters: this makes eviction favor pages from other trees over
  * Bloom filters.
  */
-#define WT_EVICT_BLOOM_SKEW 1000
+#define WT_EVICT_BLOOM_SKEW WT_THOUSAND
     __wt_evict_priority_set(session, WT_EVICT_BLOOM_SKEW);
 
     bloom->c = c;
@@ -244,12 +244,12 @@ __wt_bloom_hash(WT_BLOOM *bloom, WT_ITEM *key, WT_BLOOM_HASH *bhash)
 }
 
 /*
- * __wt_bloom_hash_get --
+ * __bloom_hash_get --
  *     Tests whether the key (as given by its hash signature) is in the Bloom filter. Returns zero
  *     if found, WT_NOTFOUND if not.
  */
-int
-__wt_bloom_hash_get(WT_BLOOM *bloom, WT_BLOOM_HASH *bhash)
+static int
+__bloom_hash_get(WT_BLOOM *bloom, WT_BLOOM_HASH *bhash)
 {
     WT_CURSOR *c;
     WT_DECL_RET;
@@ -314,49 +314,7 @@ __wt_bloom_get(WT_BLOOM *bloom, WT_ITEM *key) WT_GCC_FUNC_ATTRIBUTE((visibility(
     WT_BLOOM_HASH bhash;
 
     __wt_bloom_hash(bloom, key, &bhash);
-    return (__wt_bloom_hash_get(bloom, &bhash));
-}
-
-/*
- * __wt_bloom_inmem_get --
- *     Tests whether the given key is in the Bloom filter. This can be used in place of
- *     __wt_bloom_get for Bloom filters that are memory only.
- */
-int
-__wt_bloom_inmem_get(WT_BLOOM *bloom, WT_ITEM *key)
-{
-    uint64_t h1, h2;
-    uint32_t i;
-
-    h1 = __wt_hash_fnv64(key->data, key->size);
-    h2 = __wt_hash_city64(key->data, key->size);
-    for (i = 0; i < bloom->k; i++, h1 += h2) {
-        if (!__bit_test(bloom->bitstring, h1 % bloom->m))
-            return (WT_NOTFOUND);
-    }
-    return (0);
-}
-
-/*
- * __wt_bloom_intersection --
- *     Modify the Bloom filter to contain the intersection of this filter with another.
- */
-int
-__wt_bloom_intersection(WT_BLOOM *bloom, WT_BLOOM *other)
-{
-    uint64_t i, nbytes;
-
-    if (bloom->k != other->k || bloom->factor != other->factor || bloom->m != other->m ||
-      bloom->n != other->n)
-        WT_RET_MSG(bloom->session, EINVAL,
-          "bloom filter intersection configuration mismatch: (%" PRIu32 "/%" PRIu32 ", %" PRIu32
-          "/%" PRIu32 ", %" PRIu64 "/%" PRIu64 ", %" PRIu64 "/%" PRIu64 ")",
-          bloom->k, other->k, bloom->factor, other->factor, bloom->m, other->m, bloom->n, other->n);
-
-    nbytes = __bitstr_size(bloom->m);
-    for (i = 0; i < nbytes; i++)
-        bloom->bitstring[i] &= other->bitstring[i];
-    return (0);
+    return (__bloom_hash_get(bloom, &bhash));
 }
 
 /*

@@ -29,21 +29,33 @@
 
 #pragma once
 
-#include <functional>
-#include <memory>
-#include <string>
-
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/baton.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/transport/baton.h"
 #include "mongo/util/cancellation.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/functional.h"
 #include "mongo/util/future.h"
+#include "mongo/util/interruptible.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/time_support.h"
+
+#include <cstddef>
+#include <functional>
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 
@@ -86,14 +98,12 @@ public:
 
     struct CallbackArgs;
     struct RemoteCommandCallbackArgs;
-    struct RemoteCommandOnAnyCallbackArgs;
     class CallbackState;
     class CallbackHandle;
     class EventState;
     class EventHandle;
 
     using ResponseStatus = RemoteCommandResponse;
-    using ResponseOnAnyStatus = RemoteCommandOnAnyResponse;
 
     /**
      * Type of a regular callback function.
@@ -115,13 +125,11 @@ public:
      */
     using RemoteCommandCallbackFn = std::function<void(const RemoteCommandCallbackArgs&)>;
 
-    using RemoteCommandOnAnyCallbackFn = std::function<void(const RemoteCommandOnAnyCallbackArgs&)>;
-
     /**
      * Destroys the task executor. Implicitly performs the equivalent of shutdown() and join()
      * before returning, if necessary.
      */
-    virtual ~TaskExecutor();
+    ~TaskExecutor() override;
 
     /**
      * Causes the executor to initialize its internal state (start threads if appropriate, create
@@ -183,6 +191,9 @@ public:
      *
      * May be called up to one time per event.
      *
+     * Any unsignaled event will be signaled during shutdown, and subsequent attempts to signal the
+     * event will be ignored.
+     *
      * May be called by client threads or callbacks running in the executor.
      */
     virtual void signalEvent(const EventHandle& event) = 0;
@@ -218,7 +229,7 @@ public:
 
     /**
      * Same as waitForEvent without an OperationContext, but if the OperationContext gets
-     * interrupted, will return the kill code, or, if the the deadline passes, will return
+     * interrupted, will return the kill code, or, if the deadline passes, will return
      * Status::OK with cv_status::timeout.
      */
     virtual StatusWith<stdx::cv_status> waitForEvent(OperationContext* opCtx,
@@ -230,7 +241,7 @@ public:
      * Schedules the given Task to run in this executor.
      * Note that 'func' is implicitly noexcept and should not ever leak exceptions.
      */
-    void schedule(OutOfLineExecutor::Task func) final override;
+    void schedule(OutOfLineExecutor::Task func) final;
 
     /**
      * Schedules "work" to be run by the executor ASAP.
@@ -309,9 +320,10 @@ public:
      * Contract: Implementations should guarantee that callback should be called *after* doing any
      * processing related to the callback.
      */
-    virtual StatusWith<CallbackHandle> scheduleRemoteCommand(const RemoteCommandRequest& request,
-                                                             const RemoteCommandCallbackFn& cb,
-                                                             const BatonHandle& baton = nullptr);
+    virtual StatusWith<CallbackHandle> scheduleRemoteCommand(
+        const RemoteCommandRequest& request,
+        const RemoteCommandCallbackFn& cb,
+        const BatonHandle& baton = nullptr) = 0;
 
     /**
      * Schedules the given request to be sent and returns a future containing the response. The
@@ -328,17 +340,6 @@ public:
         const CancellationToken& token,
         const BatonHandle& baton = nullptr);
 
-    virtual StatusWith<CallbackHandle> scheduleRemoteCommandOnAny(
-        const RemoteCommandRequestOnAny& request,
-        const RemoteCommandOnAnyCallbackFn& cb,
-        const BatonHandle& baton = nullptr) = 0;
-
-    ExecutorFuture<TaskExecutor::ResponseOnAnyStatus> scheduleRemoteCommandOnAny(
-        const RemoteCommandRequestOnAny& request,
-        const CancellationToken& token,
-        const BatonHandle& baton = nullptr);
-
-
     /**
      * Schedules "cb" to be run by the executor on each reply received from executing the exhaust
      * remote command described by "request".
@@ -354,11 +355,6 @@ public:
     virtual StatusWith<CallbackHandle> scheduleExhaustRemoteCommand(
         const RemoteCommandRequest& request,
         const RemoteCommandCallbackFn& cb,
-        const BatonHandle& baton = nullptr);
-
-    virtual StatusWith<CallbackHandle> scheduleExhaustRemoteCommandOnAny(
-        const RemoteCommandRequestOnAny& request,
-        const RemoteCommandOnAnyCallbackFn& cb,
         const BatonHandle& baton = nullptr) = 0;
 
     /**
@@ -379,12 +375,6 @@ public:
     ExecutorFuture<TaskExecutor::ResponseStatus> scheduleExhaustRemoteCommand(
         const RemoteCommandRequest& request,
         const RemoteCommandCallbackFn& cb,
-        const CancellationToken& token,
-        const BatonHandle& baton = nullptr);
-
-    ExecutorFuture<TaskExecutor::ResponseOnAnyStatus> scheduleExhaustRemoteCommandOnAny(
-        const RemoteCommandRequestOnAny& request,
-        const RemoteCommandOnAnyCallbackFn& cb,
         const CancellationToken& token,
         const BatonHandle& baton = nullptr);
 
@@ -410,7 +400,8 @@ public:
      *
      * NOTE: Do not call from a callback running in the executor.
      *
-     * Prefer the version that takes an OperationContext* to this version.
+     * Prefer passing an OperationContext* or other interruptible as the second argument to leaving
+     * as not interruptible.
      */
     virtual void wait(const CallbackHandle& cbHandle,
                       Interruptible* interruptible = Interruptible::notInterruptible()) = 0;
@@ -422,9 +413,10 @@ public:
     virtual void appendConnectionStats(ConnectionPoolStats* stats) const = 0;
 
     /**
-     * Drops all connections to the given host on the network interface.
+     * Drops all connections to the given host on the network interface and relays a status message
+     * describing why the connection was dropped.
      */
-    virtual void dropConnections(const HostAndPort& hostAndPort) = 0;
+    virtual void dropConnections(const HostAndPort& target, const Status& status) = 0;
 
     /**
      * Appends statistics for the underlying network interface.
@@ -445,6 +437,11 @@ protected:
     // Sets the given EventHandle to point to the given event.
     static void setEventForHandle(EventHandle* eventHandle, std::shared_ptr<EventState> event);
 
+    /**
+     * `TaskExecutor` is an `enable_shared_from_this` class, and parts of its
+     * implementation assume that it is managed with a `std::shared_ptr`.
+     * Derived classes are responsible for enforcing this.
+     */
     TaskExecutor();
 };
 
@@ -601,24 +598,12 @@ struct TaskExecutor::RemoteCommandCallbackArgs {
                               const RemoteCommandRequest& theRequest,
                               const ResponseStatus& theResponse);
 
-    RemoteCommandCallbackArgs(const RemoteCommandOnAnyCallbackArgs& other, size_t idx);
+    RemoteCommandCallbackArgs(const RemoteCommandCallbackArgs& other);
 
     TaskExecutor* executor;
     CallbackHandle myHandle;
     RemoteCommandRequest request;
     ResponseStatus response;
-};
-
-struct TaskExecutor::RemoteCommandOnAnyCallbackArgs {
-    RemoteCommandOnAnyCallbackArgs(TaskExecutor* theExecutor,
-                                   const CallbackHandle& theHandle,
-                                   const RemoteCommandRequestOnAny& theRequest,
-                                   const ResponseOnAnyStatus& theResponse);
-
-    TaskExecutor* executor;
-    CallbackHandle myHandle;
-    RemoteCommandRequestOnAny request;
-    ResponseOnAnyStatus response;
 };
 
 }  // namespace executor

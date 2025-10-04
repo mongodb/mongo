@@ -44,15 +44,21 @@ public:
         : _preVisitor{preVisitor}, _inVisitor{inVisitor}, _postVisitor{postVisitor} {}
 
     void preVisit(const MatchExpression* expr) {
-        expr->acceptVisitor(_preVisitor);
+        if (_preVisitor != nullptr) {
+            expr->acceptVisitor(_preVisitor);
+        }
     }
 
     void postVisit(const MatchExpression* expr) {
-        expr->acceptVisitor(_postVisitor);
+        if (_postVisitor != nullptr) {
+            expr->acceptVisitor(_postVisitor);
+        }
     }
 
     void inVisit(long count, const MatchExpression* expr) {
-        expr->acceptVisitor(_inVisitor);
+        if (_inVisitor != nullptr) {
+            expr->acceptVisitor(_inVisitor);
+        }
     }
 
 private:

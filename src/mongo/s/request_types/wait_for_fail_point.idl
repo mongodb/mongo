@@ -32,7 +32,7 @@ global:
     cpp_namespace: "mongo"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 commands:
     waitForFailPoint:
@@ -46,8 +46,4 @@ commands:
             timesEntered:
                 type: safeInt64
                 description: "The target number of times the fail point has been entered."
-                optional: false
-            maxTimeMS:
-                type: safeInt64
-                description: "The wait timeout in milliseconds."
                 optional: false

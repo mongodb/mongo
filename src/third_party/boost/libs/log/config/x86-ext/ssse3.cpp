@@ -6,14 +6,13 @@
  */
 
 #include <tmmintrin.h>
-
-void pretend_used(__m128i*);
+#include <stdio.h>
 
 int main(int, char*[])
 {
     __m128i mm = _mm_setzero_si128();
-    pretend_used(&mm);
+    fread(&mm, 1u, sizeof(mm), stdin);
     mm = _mm_shuffle_epi8(_mm_alignr_epi8(mm, mm, 10), mm);
-    pretend_used(&mm);
+    fwrite(&mm, 1u, sizeof(mm), stdout);
     return 0;
 }

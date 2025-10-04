@@ -30,11 +30,16 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/db/fts/fts_language.h"
+#include "mongo/util/modules.h"
+#include "mongo/util/string_map.h"
+
+#include <cstddef>
 #include <set>
 #include <string>
 
-#include "mongo/db/fts/fts_language.h"
-#include "mongo/util/string_map.h"
+#include <absl/container/node_hash_map.h>
 
 namespace mongo {
 

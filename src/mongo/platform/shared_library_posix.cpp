@@ -26,19 +26,25 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/logv2/log.h"
+#include "mongo/platform/shared_library.h"
+#include "mongo/util/str.h"
+
+#include <memory>
+#include <string>
+
+#include <dlfcn.h>
+
+#include <boost/filesystem/path.hpp>
+#include <boost/move/utility_core.hpp>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/platform/shared_library.h"
-
-#include <boost/filesystem.hpp>
-#include <dlfcn.h>
-#include <memory>
-
-#include "mongo/logv2/log.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -56,7 +62,7 @@ StatusWith<std::unique_ptr<SharedLibrary>> SharedLibrary::create(
     LOGV2_DEBUG(
         22613, 1, "Loading library: {full_path_c_str}", "full_path_c_str"_attr = full_path.c_str());
 
-    void* handle = dlopen(full_path.c_str(), RTLD_NOW | RTLD_GLOBAL);
+    void* handle = dlopen(full_path.c_str(), RTLD_NOW | RTLD_LOCAL);
     if (handle == nullptr) {
         return Status(ErrorCodes::InternalError,
                       str::stream() << "Load library failed: " << dlerror());
@@ -73,7 +79,7 @@ StatusWith<void*> SharedLibrary::getSymbol(StringData name) {
     dlerror();
 
     // StringData is not assued to be null-terminated
-    std::string symbolName = name.toString();
+    std::string symbolName = std::string{name};
 
     void* symbol = dlsym(_handle, symbolName.c_str());
 

@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <vector>
-
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/keys_collection_document_gen.h"
+
+#include <vector>
 
 namespace mongo {
 
@@ -54,7 +54,7 @@ public:
         OperationContext* opCtx,
         StringData purpose,
         const LogicalTime& newerThanThis,
-        bool useMajority) = 0;
+        bool tryUseMajority) = 0;
 
     /**
      * Returns all external keys (validation-only keys copied from other clusters) that match the
@@ -69,9 +69,10 @@ public:
     virtual Status insertNewKey(OperationContext* opCtx, const BSONObj& doc) = 0;
 
     /**
-     * Returns true if it performs majority reads
+     * Returns true if the client can only read with local read concern, which means keys read by a
+     * refresh may be rolled back.
      */
-    virtual bool supportsMajorityReads() const = 0;
+    virtual bool mustUseLocalReads() const = 0;
 };
 
 }  // namespace mongo

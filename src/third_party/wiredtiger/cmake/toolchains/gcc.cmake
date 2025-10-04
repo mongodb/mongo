@@ -1,11 +1,3 @@
-#
-# Public Domain 2014-present MongoDB, Inc.
-# Public Domain 2008-2014 WiredTiger, Inc.
-#  All rights reserved.
-#
-# See the file LICENSE for redistribution information.
-#
-
 cmake_minimum_required(VERSION 3.10.0)
 
 if(NOT "${COMPILE_DEFINITIONS}" STREQUAL "")
@@ -26,6 +18,15 @@ if((NOT "${wt_config_arch}" STREQUAL "") AND (NOT "${wt_config_os}" STREQUAL "")
     include("${CMAKE_CURRENT_LIST_DIR}/${wt_config_arch}/${wt_config_os}/plat_gcc.cmake")
 endif()
 
-set(CMAKE_C_COMPILER "${CROSS_COMPILER_PREFIX}gcc")
-set(CMAKE_CXX_COMPILER "${CROSS_COMPILER_PREFIX}g++")
-set(CMAKE_ASM_COMPILER "${CROSS_COMPILER_PREFIX}gcc")
+set(C_COMPILER_VERSION_SUFFIX)
+set(CXX_COMPILER_VERSION_SUFFIX)
+if(GNU_C_VERSION)
+    set(C_COMPILER_VERSION_SUFFIX "-${GNU_C_VERSION}")
+endif()
+if(GNU_CXX_VERSION)
+    set(CXX_COMPILER_VERSION_SUFFIX "-${GNU_CXX_VERSION}")
+endif()
+
+set(CMAKE_C_COMPILER "${CROSS_COMPILER_PREFIX}gcc${C_COMPILER_VERSION_SUFFIX}")
+set(CMAKE_CXX_COMPILER "${CROSS_COMPILER_PREFIX}g++${CXX_COMPILER_VERSION_SUFFIX}")
+set(CMAKE_ASM_COMPILER "${CROSS_COMPILER_PREFIX}gcc${C_COMPILER_VERSION_SUFFIX}")

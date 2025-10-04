@@ -29,9 +29,18 @@
 
 #pragma once
 
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_text_base.h"
+#include "mongo/db/matcher/expression_where_base.h"
 #include "mongo/db/matcher/extensions_callback.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+#include <memory>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * ExtensionsCallbackNoop does not capture any context, and produces "no op" expressions that can't
@@ -52,4 +61,4 @@ public:
     }
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

@@ -1,0 +1,37 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# Configuration shared between browser and shell builds.
+
+# The configuration options are chosen to compile the most code
+# (--enable-debug, --enable-tests) in the trickiest way possible
+# (--enable-optimize) to maximize the chance of seeing tricky static orderings.
+ac_add_options --enable-debug
+ac_add_options --enable-tests
+ac_add_options --enable-optimize
+
+# Wrap all compiler invocations in order to enable the plugin and send
+# information to a common database.
+if [ -z "$AUTOMATION" ]; then
+    # Developer build: `mach hazards bootstrap` puts tools here:
+    TOOLS_DIR="$MOZBUILD_STATE_PATH/hazard-tools"
+else
+    # Automation build: tools are downloaded from upstream tasks.
+    TOOLS_DIR="$MOZ_FETCHES_DIR"
+fi
+ac_add_options --with-compiler-wrapper="${TOOLS_DIR}"/sixgill/usr/libexec/sixgill/scripts/wrap_gcc/basecc
+
+# Stuff that gets in the way.
+ac_add_options --without-ccache
+ac_add_options --disable-replace-malloc
+
+# -Wattributes is very verbose due to attributes being ignored on template
+# instantiations.
+#
+# -Wignored-attributes is very verbose due to attributes being
+# ignored on template parameters.
+ANALYSIS_EXTRA_CFLAGS="-Wno-attributes -Wno-ignored-attributes"
+CFLAGS="$CFLAGS $ANALYSIS_EXTRA_CFLAGS"
+CPPFLAGS="$CPPFLAGS $ANALYSIS_EXTRA_CFLAGS"
+CXXFLAGS="$CXXFLAGS $ANALYSIS_EXTRA_CFLAGS"

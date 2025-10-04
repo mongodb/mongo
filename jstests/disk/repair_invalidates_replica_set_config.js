@@ -5,9 +5,15 @@
  * @tags: [requires_wiredtiger, requires_replication]
  */
 
-(function() {
-
-load('jstests/disk/libs/wt_file_helper.js');
+import {
+    assertErrorOnStartupWhenInitialSyncingWithData,
+    assertErrorOnStartupWhenStartingAsReplSet,
+    assertRepairSucceeds,
+    assertStartAndStopStandaloneOnExistingDbpath,
+    assertStartInReplSet,
+    getUriForColl,
+} from "jstests/disk/libs/wt_file_helper.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // This test triggers an unclean shutdown (an fassert), which may cause inaccurate fast counts.
 TestData.skipEnforceFastCountOnValidate = true;
@@ -45,7 +51,7 @@ MongoRunner.stopMongod(secondary);
 assertRepairSucceeds(secondaryDbpath, secondaryPort);
 
 // Starting up without --replSet should not fail, and the collection should exist with its data.
-assertStartAndStopStandaloneOnExistingDbpath(secondaryDbpath, secondaryPort, function(node) {
+assertStartAndStopStandaloneOnExistingDbpath(secondaryDbpath, secondaryPort, function (node) {
     let nodeDB = node.getDB(dbName);
     assert(nodeDB[collName].exists());
     assert.eq(nodeDB[collName].find().itcount(), 1);
@@ -53,10 +59,15 @@ assertStartAndStopStandaloneOnExistingDbpath(secondaryDbpath, secondaryPort, fun
 
 // Starting the secondary with the same data directory should succeed with the same data.
 secondary = assertStartInReplSet(
-    replSet, originalSecondary, false /* cleanData */, false /* expectResync */, function(node) {
+    replSet,
+    originalSecondary,
+    false /* cleanData */,
+    false /* expectResync */,
+    function (node) {
         let nodeDB = node.getDB(dbName);
         assert.eq(nodeDB[collName].find().itcount(), 1);
-    });
+    },
+);
 secondaryDB = secondary.getDB(dbName);
 
 //
@@ -75,11 +86,10 @@ removeFile(secondaryCollFile);
 assertRepairSucceeds(secondaryDbpath, secondaryPort);
 
 // Starting up with --replSet should fail with a specific error.
-assertErrorOnStartupWhenStartingAsReplSet(
-    secondaryDbpath, secondaryPort, replSet.getReplSetConfig()._id);
+assertErrorOnStartupWhenStartingAsReplSet(secondaryDbpath, secondaryPort, replSet.getReplSetConfig()._id);
 
 // Starting up without --replSet should not fail, but the collection should exist with no data.
-assertStartAndStopStandaloneOnExistingDbpath(secondaryDbpath, secondaryPort, function(node) {
+assertStartAndStopStandaloneOnExistingDbpath(secondaryDbpath, secondaryPort, function (node) {
     let nodeDB = node.getDB(dbName);
     assert(nodeDB[collName].exists());
     assert.eq(nodeDB[collName].find().itcount(), 0);
@@ -87,10 +97,15 @@ assertStartAndStopStandaloneOnExistingDbpath(secondaryDbpath, secondaryPort, fun
 
 // Starting the secondary with a wiped data directory should force an initial sync.
 secondary = assertStartInReplSet(
-    replSet, originalSecondary, true /* cleanData */, true /* expectResync */, function(node) {
+    replSet,
+    originalSecondary,
+    true /* cleanData */,
+    true /* expectResync */,
+    function (node) {
         let nodeDB = node.getDB(dbName);
         assert.eq(nodeDB[collName].find().itcount(), 1);
-    });
+    },
+);
 secondaryDB = secondary.getDB(dbName);
 
 //
@@ -108,20 +123,27 @@ removeFile(mdbCatalogFile);
 assertRepairSucceeds(secondaryDbpath, secondaryPort);
 
 // Starting up without --replSet should not fail, but the collection should exist with no data.
-assertStartAndStopStandaloneOnExistingDbpath(secondaryDbpath, secondaryPort, function(node) {
+assertStartAndStopStandaloneOnExistingDbpath(secondaryDbpath, secondaryPort, function (node) {
     let nodeDB = node.getDB(dbName);
     assert(!nodeDB[collName].exists());
     assert(!nodeDB.getSiblingDB("local")["system.replset"].exists());
 });
 
-// The node's local.system.replset collection has been deleted, so it's perfectly okay that it
-// is is able to start up and re-sync.
-// Starting the secondary with the same data directory should force an initial sync.
+// The node's local.system.replset collection has been deleted, so the node will need to re-sync to
+// join the replica set. If we attempt to resync without first clearing the data from the node
+// initial sync will fail.
+assertErrorOnStartupWhenInitialSyncingWithData(replSet, originalSecondary);
+
+// Clearing the data will allow us to successfully complete initial sync on the node.
 secondary = assertStartInReplSet(
-    replSet, originalSecondary, false /* cleanData */, true /* expectResync */, function(node) {
+    replSet,
+    originalSecondary,
+    true /* cleanData */,
+    true /* expectResync */,
+    function (node) {
         let nodeDB = node.getDB(dbName);
         assert.eq(nodeDB[collName].find().itcount(), 1);
-    });
+    },
+);
 
 replSet.stopSet();
-})();

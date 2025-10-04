@@ -1,0 +1,45 @@
+/*! @page timestamp_misc Miscellaneous timestamp topics
+
+@section timestamp_read_roundup Rounding up the read timestamp
+
+Applications setting timestamps for a transaction have to comply with the
+constraints based on the global timestamp state. In order to be compliant with
+the constraints, applications will need to query the global timestamp state,
+check their timestamps for compliance, and adjust timestamps if required.
+To reduce application burden, WiredTiger supports automatic timestamp rounding
+in some scenarios.
+
+Applications can configure <code>roundup_timestamps=(read=true)</code>
+with the WT_SESSION::begin_transaction method.  Configuring
+<code>roundup_timestamps=(read=true)</code> causes the read timestamp to be
+rounded up to the oldest timestamp. If the read timestamp is greater than
+the oldest timestamp no change will be made.
+
+@section timestamp_misc_rts Using rollback-to-stable with timestamps
+
+Applications can explicitly roll back the system to a specific stable timestamp
+by calling the WT_CONNECTION::rollback_to_stable method. Applications must first
+set the \c stable timestamp using WT_CONNECTION::set_timestamp and then call
+WT_CONNECTION::rollback_to_stable, which will discard all updates to
+checkpoint-durable tables that have commit timestamps more recent than the set
+stable timestamp.
+
+Logged tables and updates made without an associated commit timestamp are
+unaffected.
+
+The database must be quiescent during this process: applications must resolve
+all running transactions and close or reset all open cursors before calling
+WT_CONNECTION::rollback_to_stable, and no other API calls should be made for
+the duration of the call.
+
+@section timestamps_misc_in_memory In-memory configurations and timestamps
+
+Timestamps are supported for in-memory databases, but must be configured as in
+ordinary databases, and the same APIs are used in both cases for historical
+reasons. By default, in-memory database objects behave like commit-level
+objects in ordinary databases, that is, timestamps are ignored. If logging
+is disabled for the object, using the \c "log=(enabled=false)" configuration,
+then the timestamps will not be ignored and will behave as with objects in
+ordinary databases where logging has been disabled.
+
+*/

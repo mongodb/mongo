@@ -28,13 +28,14 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include <benchmark/benchmark.h>
+#include "mongo/util/fail_point.h"
 
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/util/fail_point.h"
+
+#include <string>
+
+#include <benchmark/benchmark.h>
 
 namespace mongo {
 namespace {
@@ -74,7 +75,12 @@ BENCHMARK(BM_FailPointExecute)->Range(0, 1);
 void BM_FailPointExecuteIf(benchmark::State& state) {
     failPointBench.setMode(state.range(0) ? FailPoint::alwaysOn : FailPoint::off);
     for (auto _ : state)
-        failPointBench.executeIf([](auto&&) { benchmark::DoNotOptimize(0); }, nullptr);
+        failPointBench.executeIf([](auto&&) { benchmark::DoNotOptimize(0); },
+                                 [](auto&&) {
+                                     bool b;
+                                     benchmark::DoNotOptimize(b);
+                                     return b;
+                                 });
     failPointBench.setMode(FailPoint::off);
 }
 BENCHMARK(BM_FailPointExecuteIf)->Range(0, 1);

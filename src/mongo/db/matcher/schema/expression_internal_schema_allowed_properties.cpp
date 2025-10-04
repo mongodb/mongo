@@ -27,9 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/matcher/schema/expression_internal_schema_allowed_properties.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/util/errno_util.h"
+#include "mongo/util/str.h"
+
+#include <algorithm>
+#include <type_traits>
+
+#include <absl/container/node_hash_map.h>
 
 namespace mongo {
 constexpr StringData InternalSchemaAllowedPropertiesMatchExpression::kName;
@@ -47,10 +58,10 @@ InternalSchemaAllowedPropertiesMatchExpression::InternalSchemaAllowedPropertiesM
       _otherwise(std::move(otherwise)) {
 
     for (auto&& constraint : _patternProperties) {
-        const auto& errorStr = constraint.first.regex->error();
+        const auto& re = constraint.first.regex;
         uassert(ErrorCodes::BadValue,
-                str::stream() << "Invalid regular expression: " << errorStr,
-                errorStr.empty());
+                str::stream() << "Invalid regular expression: " << errorMessage(re->error()),
+                *re);
     }
 }
 
@@ -59,16 +70,9 @@ void InternalSchemaAllowedPropertiesMatchExpression::debugString(StringBuilder& 
     _debugAddSpace(debug, indentationLevel);
 
     BSONObjBuilder builder;
-    serialize(&builder, true);
-    debug << builder.obj().toString() << "\n";
-
-    const auto* tag = getTag();
-    if (tag) {
-        debug << " ";
-        tag->debugString(&debug);
-    }
-
-    debug << "\n";
+    serialize(&builder, {});
+    debug << builder.obj().toString();
+    _debugStringAttachTagInfo(&debug);
 }
 
 bool InternalSchemaAllowedPropertiesMatchExpression::equivalent(const MatchExpression* expr) const {
@@ -89,102 +93,49 @@ bool InternalSchemaAllowedPropertiesMatchExpression::equivalent(const MatchExpre
                             });
 }
 
-bool InternalSchemaAllowedPropertiesMatchExpression::matches(const MatchableDocument* doc,
-                                                             MatchDetails* details) const {
-    return _matchesBSONObj(doc->toBSON());
-}
-
-bool InternalSchemaAllowedPropertiesMatchExpression::matchesSingleElement(const BSONElement& elem,
-                                                                          MatchDetails*) const {
-    if (elem.type() != BSONType::Object) {
-        return false;
-    }
-
-    return _matchesBSONObj(elem.embeddedObject());
-}
-
-bool InternalSchemaAllowedPropertiesMatchExpression::_matchesBSONObj(const BSONObj& obj) const {
-    for (auto&& property : obj) {
-        bool checkOtherwise = true;
-        for (auto&& constraint : _patternProperties) {
-            if (constraint.first.regex->PartialMatch(property.fieldName())) {
-                checkOtherwise = false;
-                if (!constraint.second->matchesBSONElement(property)) {
-                    return false;
-                }
-            }
-        }
-
-        if (checkOtherwise &&
-            _properties.find(property.fieldNameStringData()) != _properties.end()) {
-            checkOtherwise = false;
-        }
-
-        if (checkOtherwise && !_otherwise->matchesBSONElement(property)) {
-            return false;
-        }
-    }
-    return true;
-}
-
 void InternalSchemaAllowedPropertiesMatchExpression::serialize(BSONObjBuilder* builder,
+                                                               const SerializationOptions& opts,
                                                                bool includePath) const {
     BSONObjBuilder expressionBuilder(
         builder->subobjStart(InternalSchemaAllowedPropertiesMatchExpression::kName));
 
     std::vector<StringData> sortedProperties(_properties.begin(), _properties.end());
     std::sort(sortedProperties.begin(), sortedProperties.end());
-    expressionBuilder.append("properties", sortedProperties);
-
+    opts.appendLiteral(&expressionBuilder, "properties", sortedProperties);
+    // This will be serialized to "i", which is the parser chosen namePlaceholder. Using this
+    // unmodified will have a similar effect to serializing to "?", however it preserves round trip
+    // parsing.
     expressionBuilder.append("namePlaceholder", _namePlaceholder);
 
     BSONArrayBuilder patternPropertiesBuilder(expressionBuilder.subarrayStart("patternProperties"));
-    for (auto&& item : _patternProperties) {
-        BSONObjBuilder itemBuilder(patternPropertiesBuilder.subobjStart());
-        itemBuilder.appendRegex("regex", item.first.rawRegex);
-
-        BSONObjBuilder subexpressionBuilder(itemBuilder.subobjStart("expression"));
-        item.second->getFilter()->serialize(&subexpressionBuilder, includePath);
-        subexpressionBuilder.doneFast();
+    for (auto&& [pattern, expression] : _patternProperties) {
+        patternPropertiesBuilder << BSON(
+            "regex" << opts.serializeLiteral(BSONRegEx(pattern.rawRegex)) << "expression"
+                    << expression->getFilter()->serialize(opts, includePath));
     }
     patternPropertiesBuilder.doneFast();
 
     BSONObjBuilder otherwiseBuilder(expressionBuilder.subobjStart("otherwise"));
-    _otherwise->getFilter()->serialize(&otherwiseBuilder, includePath);
+    _otherwise->getFilter()->serialize(&otherwiseBuilder, opts, includePath);
     otherwiseBuilder.doneFast();
     expressionBuilder.doneFast();
 }
 
-std::unique_ptr<MatchExpression> InternalSchemaAllowedPropertiesMatchExpression::shallowClone()
-    const {
+std::unique_ptr<MatchExpression> InternalSchemaAllowedPropertiesMatchExpression::clone() const {
     std::vector<PatternSchema> clonedPatternProperties;
     clonedPatternProperties.reserve(_patternProperties.size());
     for (auto&& constraint : _patternProperties) {
         clonedPatternProperties.emplace_back(Pattern(constraint.first.rawRegex),
-                                             constraint.second->shallowClone());
+                                             constraint.second->clone());
     }
 
     auto clone = std::make_unique<InternalSchemaAllowedPropertiesMatchExpression>(
         _properties,
         _namePlaceholder,
         std::move(clonedPatternProperties),
-        _otherwise->shallowClone(),
+        _otherwise->clone(),
         _errorAnnotation);
     return {std::move(clone)};
 }
 
-MatchExpression::ExpressionOptimizerFunc
-InternalSchemaAllowedPropertiesMatchExpression::getOptimizer() const {
-    return [](std::unique_ptr<MatchExpression> expression) {
-        auto& allowedPropertiesExpr =
-            static_cast<InternalSchemaAllowedPropertiesMatchExpression&>(*expression);
-
-        for (auto& property : allowedPropertiesExpr._patternProperties) {
-            property.second->optimizeFilter();
-        }
-        allowedPropertiesExpr._otherwise->optimizeFilter();
-
-        return expression;
-    };
-}
 }  // namespace mongo

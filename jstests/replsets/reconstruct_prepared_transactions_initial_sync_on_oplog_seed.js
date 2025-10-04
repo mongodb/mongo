@@ -14,11 +14,9 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/libs/fail_point_util.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const replTest = new ReplSetTest({nodes: 2});
 replTest.startSet();
@@ -27,7 +25,7 @@ const config = replTest.getReplSetConfig();
 // Increase the election timeout so that we do not accidentally trigger an election while the
 // secondary is restarting.
 config.settings = {
-    "electionTimeoutMillis": 12 * 60 * 60 * 1000
+    "electionTimeoutMillis": 12 * 60 * 60 * 1000,
 };
 replTest.initiate(config);
 
@@ -35,8 +33,9 @@ const primary = replTest.getPrimary();
 let secondary = replTest.getSecondary();
 
 // The default WC is majority and this test can't satisfy majority writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 const dbName = "test";
 const collName = "reconstruct_prepared_transactions_initial_sync_on_oplog_seed";
@@ -59,23 +58,28 @@ secondary = replTest.start(
     {
         startClean: true,
         setParameter: {
-            'numInitialSyncAttempts': 2,
+            "numInitialSyncAttempts": 2,
             // Fail point to force the first attempt to fail and hang before starting the second
             // attempt.
-            'failpoint.failAndHangInitialSync': tojson({mode: 'alwaysOn'}),
-            'failpoint.initialSyncHangDuringCollectionClone': tojson(
-                {mode: 'alwaysOn', data: {namespace: testColl.getFullName(), numDocsToClone: 0}}),
-            'logComponentVerbosity': tojson({'replication': {'initialSync': 2}})
-        }
+            "failpoint.failAndHangInitialSync": tojson({mode: "alwaysOn"}),
+            "failpoint.initialSyncHangDuringCollectionClone": tojson({
+                mode: "alwaysOn",
+                data: {namespace: testColl.getFullName(), numDocsToClone: 0},
+            }),
+            "logComponentVerbosity": tojson({"replication": {"initialSync": 2}}),
+        },
     },
-    true /* wait */);
+    true /* wait */,
+);
 
 // Wait for failpoint to be reached so we know that collection cloning is paused.
-assert.commandWorked(secondary.adminCommand({
-    waitForFailPoint: "initialSyncHangDuringCollectionClone",
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+assert.commandWorked(
+    secondary.adminCommand({
+        waitForFailPoint: "initialSyncHangDuringCollectionClone",
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout,
+    }),
+);
 
 jsTestLog("Running operations while collection cloning is paused");
 
@@ -86,16 +90,17 @@ assert.commandWorked(testColl.insert({_id: 2}));
 jsTestLog("Resuming initial sync");
 
 // Resume initial sync.
-assert.commandWorked(secondary.adminCommand(
-    {configureFailPoint: "initialSyncHangDuringCollectionClone", mode: "off"}));
+assert.commandWorked(secondary.adminCommand({configureFailPoint: "initialSyncHangDuringCollectionClone", mode: "off"}));
 
 // Wait for failpoint to be reached so we know that first attempt is finishing and is about to
 // fail.
-assert.commandWorked(secondary.adminCommand({
-    waitForFailPoint: "failAndHangInitialSync",
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+assert.commandWorked(
+    secondary.adminCommand({
+        waitForFailPoint: "failAndHangInitialSync",
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout,
+    }),
+);
 
 jsTestLog("Preparing the transaction before the second attempt of initial sync");
 
@@ -105,8 +110,7 @@ const prepareTimestamp = PrepareHelpers.prepareTransaction(session, {w: 1});
 
 jsTestLog("Resuming initial sync for the second attempt");
 // Resume initial sync.
-assert.commandWorked(
-    secondary.adminCommand({configureFailPoint: "failAndHangInitialSync", mode: "off"}));
+assert.commandWorked(secondary.adminCommand({configureFailPoint: "failAndHangInitialSync", mode: "off"}));
 
 // Wait for the secondary to complete initial sync.
 replTest.awaitSecondaryNodes();
@@ -133,4 +137,3 @@ replTest.awaitReplication();
 assert.eq(secondaryColl.findOne({_id: 1}), {_id: 1, a: 1});
 
 replTest.stopSet();
-})();

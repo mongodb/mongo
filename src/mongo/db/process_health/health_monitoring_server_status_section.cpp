@@ -27,18 +27,22 @@
  *    it in the license file.
  */
 
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/util/builder_fwd.h"
-#include "mongo/db/commands/server_status.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/commands/server_status/server_status.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/process_health/fault_manager.h"
 #include "mongo/db/service_context.h"
+
+#include <memory>
 
 namespace mongo {
 
 class HealthMonitoringServerStatus : public ServerStatusSection {
 public:
-    HealthMonitoringServerStatus() : ServerStatusSection("health") {}
+    using ServerStatusSection::ServerStatusSection;
 
     bool includeByDefault() const override {
         return true;
@@ -47,23 +51,23 @@ public:
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
         auto* fault_manager = process_health::FaultManager::get(getGlobalServiceContext());
-        BSONObjBuilder result;
-        StringBuilder os;
-        os << fault_manager->getFaultState();
-
-        result.append("state", os.str());
-        result.appendDate("enteredStateAtTime", fault_manager->getLastTransitionTime());
-
-        auto fault = fault_manager->currentFault();
-        if (fault) {
-            BSONObjBuilder sub_result;
-            fault->appendDescription(&sub_result);
-            result.append("faultInformation", sub_result.obj());
+        if (!fault_manager) {
+            return BSONObj();
         }
+
+        BSONObjBuilder result;
+
+        bool appendDetails = false;
+        if (configElement.type() == BSONType::object && configElement.Obj().hasElement("details")) {
+            appendDetails = configElement.Obj()["details"].trueValue();
+        }
+
+        fault_manager->appendDescription(&result, appendDetails);
 
         return result.obj();
     }
-
-} healthMonitoringServerStatus;
+};
+auto& healthMonitoringServerStatus =
+    *ServerStatusSectionBuilder<HealthMonitoringServerStatus>("health").forRouter();
 
 }  // namespace mongo

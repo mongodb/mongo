@@ -52,4 +52,30 @@ rolling back any active transaction and closing the cursors that are still open.
 @section arch_session_thread Multithreading
 A session is always executed as a single thread, see @ref threads for more details.
 
+@section arch_session_error Error and Sub-level Errors Handling
+WT_SESSION::get_last_error can be used to provide more detailed information about the last
+session API call. The information includes an error code, a sub-level error code and message
+providing contextual information. The intended usage of the sub-level error code is to allow
+users to programmatically make decisions on the application level.
+
+Internal to WiredTiger the WT_ERROR_INFO structure lives within the session object and
+tracks errors that occur during a session API call. The WT_SESSION::get_last_error will return
+back any information recorded within the WT_ERROR_INFO structure. An internal function
+set_last_error has been created and utilized throughout the code base to set any errors that may
+occur within WiredTiger.
+
+There is an assumption made in the code base that an error returned with a sub-level error code or
+message will be not changed. Therefore when multiple errors happen within one session API call,
+the first error that returns with a sub-level error code or message will be returned to the user.
+In the case that none of the errors have a sub-level error code or message, the last error code is
+returned.
+
+@subsection arch_session_error_sessions Sub-level Errors - External & Internal Sessions
+When saving an error, the session must have the WT_SESSION_SAVE_ERRORS flag set, or the error will
+not be saved. External sessions have this flag set while internal sessions do not. This is because
+internal sessions are not part of the session API and users do not have access to them. However, when an
+external session opens an internal session, it will inherit the external sessions flags including
+the WT_SESSION_SAVE_ERRORS flag. This allows any errors that occur to be saved within the internal
+session and propagate back to the external session, when the internal session is closed. This is
+required for only schema-type operations.
 */

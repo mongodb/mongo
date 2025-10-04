@@ -1,0 +1,42 @@
+Trace:FileStat: > UTIL_isLink(file)
+Trace:FileStat: < 0
+Trace:FileStat: > UTIL_isConsole(2)
+Trace:FileStat: < 0
+Trace:FileStat: > UTIL_getFileSize(file)
+Trace:FileStat:  > UTIL_stat(-1, file)
+Trace:FileStat:  < 1
+Trace:FileStat: < 65537
+Trace:FileStat: > UTIL_stat(-1, file)
+Trace:FileStat: < 1
+Trace:FileStat: > UTIL_isDirectoryStat()
+Trace:FileStat: < 0
+Trace:FileStat: > UTIL_stat(-1, file)
+Trace:FileStat: < 1
+Trace:FileStat: > UTIL_isSameFile(file, file.zst)
+Trace:FileStat:  > UTIL_stat(-1, file)
+Trace:FileStat:  < 1
+Trace:FileStat:  > UTIL_stat(-1, file.zst)
+Trace:FileStat:  < 0
+Trace:FileStat: < 0
+Trace:FileStat: > UTIL_isRegularFile(file.zst)
+Trace:FileStat:  > UTIL_stat(-1, file.zst)
+Trace:FileStat:  < 0
+Trace:FileStat: < 0
+Trace:FileStat: > UTIL_isRegularFile(file.zst)
+Trace:FileStat:  > UTIL_stat(-1, file.zst)
+Trace:FileStat:  < 1
+Trace:FileStat: < 1
+Trace:FileStat: > UTIL_getFileSize(file)
+Trace:FileStat:  > UTIL_stat(-1, file)
+Trace:FileStat:  < 1
+Trace:FileStat: < 65537
+Trace:FileStat: > UTIL_setFileStat(4, file.zst)
+Trace:FileStat:  > UTIL_stat(4, file.zst)
+Trace:FileStat:  < 1
+Trace:FileStat:  > UTIL_chmod(file.zst, 0642)
+Trace:FileStat:   > fchmod
+Trace:FileStat:   < 0
+Trace:FileStat:  < 0
+Trace:FileStat: < 0
+Trace:FileStat: > UTIL_utime(file.zst)
+Trace:FileStat: < 0

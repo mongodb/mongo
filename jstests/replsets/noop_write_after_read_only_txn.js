@@ -3,9 +3,12 @@
 // writeConcern majority.
 //
 // @tags: [uses_transactions, requires_majority_read_concern]
-(function() {
-"use strict";
-load('jstests/libs/write_concern_util.js');
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {
+    assertWriteConcernError,
+    restartReplSetReplication,
+    stopReplicationOnSecondaries,
+} from "jstests/libs/write_concern_util.js";
 
 const name = "noop_write_after_read_only_txn";
 const rst = new ReplSetTest({
@@ -24,28 +27,26 @@ testDB.runCommand({drop: name, writeConcern: {w: "majority"}});
 assert.commandWorked(testDB.getCollection(name).insert({}, {writeConcern: {w: "majority"}}));
 
 function runTest({readConcernLevel, shouldWrite, provokeWriteConcernError}) {
-    jsTestLog(`Read concern level "${readConcernLevel}", shouldWrite: ${
-        shouldWrite}, provokeWriteConcernError: ${provokeWriteConcernError}`);
+    jsTestLog(
+        `Read concern level "${readConcernLevel}", shouldWrite: ${
+            shouldWrite
+        }, provokeWriteConcernError: ${provokeWriteConcernError}`,
+    );
 
     const session = primary.startSession();
     const sessionDB = session.getDatabase(dbName);
     const txnOptions = {writeConcern: {w: "majority"}};
-    if (readConcernLevel)
-        txnOptions.readConcern = {level: readConcernLevel};
+    if (readConcernLevel) txnOptions.readConcern = {level: readConcernLevel};
 
-    if (provokeWriteConcernError)
-        txnOptions.writeConcern.wtimeout = 1000;
+    if (provokeWriteConcernError) txnOptions.writeConcern.wtimeout = 1000;
 
     session.startTransaction(txnOptions);
     assert.commandWorked(sessionDB.runCommand({find: name}));
-    if (shouldWrite)
-        assert.commandWorked(sessionDB.getCollection(name).insert({}));
+    if (shouldWrite) assert.commandWorked(sessionDB.getCollection(name).insert({}));
 
-    if (provokeWriteConcernError)
-        stopReplicationOnSecondaries(rst);
+    if (provokeWriteConcernError) stopReplicationOnSecondaries(rst);
 
-    const commitResult =
-        assert.commandWorkedIgnoringWriteConcernErrors(session.commitTransaction_forTesting());
+    const commitResult = assert.commandWorkedIgnoringWriteConcernErrors(session.commitTransaction_forTesting());
 
     jsTestLog(`commitResult ${tojson(commitResult)}`);
     if (provokeWriteConcernError) {
@@ -54,14 +55,17 @@ function runTest({readConcernLevel, shouldWrite, provokeWriteConcernError}) {
         assert.commandWorked(commitResult);
     }
 
-    const entries = rst.findOplog(primary,
-                                  {
-                                      op: "n",
-                                      ts: {$gte: commitResult.operationTime},
-                                      "o.msg": /.*read-only transaction.*/
-                                  },
-                                  1)
-                        .toArray();
+    const entries = rst
+        .findOplog(
+            primary,
+            {
+                op: "n",
+                ts: {$gte: commitResult.operationTime},
+                "o.msg": /.*read-only transaction.*/,
+            },
+            1,
+        )
+        .toArray();
 
     // If the transaction had a write, it should not *also* do a noop.
     if (shouldWrite) {
@@ -81,11 +85,10 @@ for (let readConcernLevel of [null, "local", "majority", "snapshot"]) {
             runTest({
                 readConcernLevel: readConcernLevel,
                 shouldWrite: shouldWrite,
-                provokeWriteConcernError: provokeWriteConcernError
+                provokeWriteConcernError: provokeWriteConcernError,
             });
         }
     }
 }
 
 rst.stopSet();
-}());

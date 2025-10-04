@@ -1,0 +1,182 @@
+/*! @page timestamp_txn_api Managing the transaction timestamp state
+
+Individual transactions also have timestamp state. These timestamps are queried
+using WT_SESSION::query_timestamp but are potentially set in a variety of
+methods to allow configuration at various stages of the transaction:
+WT_SESSION::begin_transaction, WT_SESSION::commit_transaction,
+WT_SESSION::prepare_transaction and WT_SESSION::timestamp_transaction.
+
+Applications will focus on two transactional timestamps: the read timestamp and the
+commit timestamp. Without a read timestamp, reads will occur based on the transaction's
+snapshot, which will include the latest values as of when the snapshot is taken.
+With a read timestamp, reads will occur as of the specified time.
+
+The transaction's commit timestamp is the time at which the transaction takes
+effect. This is the time at which other transactions, with appropriately set
+read timestamps, will see the transaction's writes instead of any previous
+value. Applications can also set commit timestamps on a per-update basis in
+a single transaction, in which case the commit timestamp is the time of the
+visibility of the effected updates.
+
+@section timestamp_txn_api_configure Application timestamp configuration
+
+The WT_SESSION::create method's \c "assert=(read_timestamp)" configuration
+checks that timestamps always or never be used on reads in the table.
+
+By default, WiredTiger requires commit timestamps be used in "ordered" mode:
+updates to a table can be made both with and without a commit timestamp,
+but once a commit timestamp is used to update a key, all future updates to
+the key require a commit timestamp. Further, each update to a key must have
+a commit timestamp at or after the previous commit timestamp.
+
+Updating a key without a commit timestamp creates a value that has "always
+existed" and is visible regardless of timestamp. This makes sense when
+loading initial data into an object, but once timestamps are used to update
+a particular value, subsequent updates will normally also have a commit
+timestamp. Similarly, because implicit transactions have no associated
+timestamp, implicit transactions are generally only useful until timestamps
+have been used to update a table.
+
+These requirements can be changed on a per-table basis, to specify no updates
+to a table have timestamps, with the WT_SESSION::create method's
+\c "write_timestamp_usage=(never)" configuration.
+
+These requirements can be changed on a per-transaction basis, to permit updates
+without timestamps, after a key has already been updated using a timestamp,
+with the WT_SESSION::begin_transaction method's \c no_timestamp configuration.
+Updating a key without a commit timestamp, after making updates with a commit
+timestamp, will discard all prior historical values, and future reads will
+read the new value regardless of read timestamp. In other words, readers
+with already acquired snapshots will see prior historical values based
+on their timestamps. Readers acquiring a snapshot after the commit of the
+update without a timestamp will not see prior historical values regardless
+of their read timestamps.
+
+There are additional timestamp usage checks in diagnostic builds.
+Building in diagnostic mode to enable these usage checks will decrease
+application performance. While applications should not configure diagnostic
+builds for production use, they are strongly recommended during development.
+
+If WiredTiger detects a violation of timestamp policy, an error message
+will be logged and the transaction commit will fail. In diagnostic builds,
+the library will log an error message and drop core at the failing check.
+
+\warning
+These are best-effort checks by WiredTiger, and there are cases where
+application misbehavior will not be detected.
+
+@section timestamp_txn_api_commit_timestamp Setting the transaction's commit timestamp
+
+The \c commit time is the time at which other transactions with appropriately set
+read timestamps will see the transaction's updates.
+
+The commit timestamp can be set at any point in the transaction's lifecycle.
+For prepared transactions, however, it can only be set after the transaction
+has been successfully prepared.
+
+\warning Commit (and prepare) timestamps must not be set in the past
+of any read timestamp
+that has ever been used. This rule is enforced by assertions in diagnostic
+builds, but if applications violate this rule in non-diagnostic builds, data
+consistency can be violated.
+Similarly, because reading without a read timestamp reads the latest
+values for all keys, one must not commit into the past of such a
+transaction.
+
+Applications using timestamps usually specify a timestamp to the
+WT_SESSION::commit_transaction method to set the commit time for all updates in
+the transaction.
+
+For prepared transactions, the commit timestamp must not be before the prepare
+timestamp. Otherwise, the commit timestamp must be after the stable timestamp.
+
+@section timestamp_txn_api_commit_multi_timestamp Setting multiple commit timestamps
+
+Applications may set different commit timestamps for different updates in a
+single transaction by calling WT_SESSION::timestamp_transaction repeatedly to
+set a new commit timestamp between updates in the transaction.  Each new commit
+timestamp is applied to any subsequent updates. This gives applications the
+ability to commit updates that take effect at different times;
+that is, it is possible to create chains of updates where each
+update appears at a different time to readers.  For transactions that set
+multiple commit timestamps, the first commit timestamp set is also required to
+be the earliest: the second and subsequent commit timestamps may not be
+earlier than the first commit timestamp.  This feature is not compatible with
+prepared transactions, which must use only a single commit timestamp.
+
+This functionality is generally available as a mechanism to allow an optimized
+implementation of re-creating a timestamp view of a data set. For example, in
+a MongoDB replica set, content is generated on one node where transactions are
+assigned a single commit timestamp, that content is re-created on each other
+member in a replica set. When re-creating the content multiple changes from
+the original node are batched together into a single WiredTiger transaction.
+
+@section timestamp_txn_api_read_timestamp Setting the transaction's read timestamp
+
+Setting the transaction's read timestamp causes a transaction to not see any
+commits with a newer timestamp. (Updates may still conflict with commits having
+a newer timestamp, of course.),
+
+The read timestamp may be set to any time equal to or after the system's
+\c oldest timestamp.
+
+This restriction is enforced and applications can rely on an error return to
+detect attempts to set the read timestamp older than the \c oldest timestamp.
+
+The read timestamp may only be set once in the lifetime of a transaction.
+
+@section timestamp_txn_api_query Querying transaction timestamp information
+
+The following table lists the timestamps that can be queried using
+WT_SESSION::query_timestamp. In all cases, a timestamp of 0 is returned
+if the timestamp is not available or has not been set, for example, the
+\c commit timestamp if no commit timestamp has been set.
+
+| Timestamp | Description |
+|-----------|-------------|
+| commit | the transaction's most recently set commit timestamp |
+| first_commit | the transaction's first/earliest set commit timestamp |
+| prepare | the timestamp used to prepare the transaction |
+| read | the timestamp at which the transaction is reading |
+
+@section timestamp_txn_api_begin Configuring transaction timestamp information with WT_SESSION::begin_transaction
+
+The following table lists the transaction's timestamps and behaviors that can be set when the transaction begins, using WT_SESSION::begin_transaction:
+
+| Timestamp | Constraint |  Description |
+|-----------|------------|-------------|
+| read_timestamp | >= oldest | the transaction's read timestamp, see @ref timestamp_txn_api_read_timestamp for details |
+| roundup_timestamps | None | boolean setting for timestamp auto-adjustments, see @ref timestamp_prepare_roundup and @ref timestamp_read_roundup for details |
+
+@section timestamp_txn_api_commit Configuring transaction timestamp information with WT_SESSION::commit_transaction
+
+The following table lists the transaction's timestamps that can be set when the
+transaction commits, using WT_SESSION::commit_transaction:
+
+| Timestamp | Constraint | Description |
+|-----------|------------|-------------|
+| commit_timestamp | > stable and >= prepare and >= any system read timestamp | the transaction's commit timestamp, see @ref timestamp_txn_api_commit_timestamp for details |
+| durable_timestamp | >= commit | the transaction's durable timestamp, only applicable to prepared transactions, see @ref timestamp_prepare for details |
+
+@section timestamp_txn_api_prepare Configuring transaction timestamp information with WT_SESSION::prepare_transaction
+
+The following table lists the transaction's timestamps that can be set when the
+transaction is prepared, using WT_SESSION::prepare_transaction:
+
+| Timestamp | Constraint |Description |
+|-----------|------------|-------------|
+| prepare_timestamp | > stable and >= any system read timestamp | the transaction's prepare timestamp, see @ref timestamp_prepare for details |
+
+@section timestamp_txn_api_timestamp_transaction Configuring transaction timestamp information with WT_SESSION::timestamp_transaction
+
+The following table lists the transaction's timestamps that can be set at other
+points in the transaction's lifetime, using WT_SESSION::timestamp_transaction:
+
+| Timestamp | Constraint | Description |
+|-----------|------------|-------------|
+| commit_timestamp | > stable and >= prepare and >= any system read timestamp | the transaction's commit timestamp, see @ref timestamp_txn_api_commit_timestamp for details |
+| durable_timestamp | >= commit | the transaction's durable timestamp, only applicable to prepared transactions, see @ref timestamp_prepare for details |
+| prepare_timestamp | > stable and >= any system read timestamp | the transaction's prepare timestamp, see @ref timestamp_prepare for details |
+| read_timestamp | >= oldest | the transaction's read timestamp, see @ref timestamp_txn_api_read_timestamp for details |
+
+ */

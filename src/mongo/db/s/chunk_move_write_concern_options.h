@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/base/status_with.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/write_concern_options.h"
 
 namespace mongo {

@@ -27,14 +27,19 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/storage/storage_engine_lock_file.h"
 
 #include "mongo/platform/process_id.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/str.h"
+
+#include <ostream>
+
+#include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
+
 
 namespace mongo {
 namespace {
@@ -61,6 +66,30 @@ std::string StorageEngineLockFile::_getNonExistentPathMessage() const {
                          << " not found. Create the missing directory or specify another path "
                             "using (1) the --dbpath command line option, or (2) by adding the "
                             "'storage.dbPath' option in the configuration file.";
+}
+
+void StorageEngineLockFile::create(ServiceContext* service, StringData dbpath) {
+    auto& lockFile = StorageEngineLockFile::get(service);
+    try {
+        lockFile.emplace(dbpath);
+    } catch (const std::exception& ex) {
+        uasserted(28596,
+                  str::stream() << "Unable to determine status of lock file in the data directory "
+                                << dbpath << ": " << ex.what());
+    }
+    const bool wasUnclean = lockFile->createdByUncleanShutdown();
+    const auto openStatus = lockFile->open();
+    if (openStatus == ErrorCodes::IllegalOperation) {
+        lockFile = boost::none;
+    } else {
+        uassertStatusOK(openStatus);
+    }
+
+    if (wasUnclean) {
+        LOGV2_WARNING(22271,
+                      "Detected unclean shutdown - Lock file is not empty",
+                      "lockFile"_attr = lockFile->getFilespec());
+    }
 }
 
 }  // namespace mongo

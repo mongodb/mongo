@@ -27,11 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_planner_test_fixture.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/str.h"
+
+#include <memory>
+#include <string>
 
 namespace mongo {
 /**
@@ -45,7 +54,7 @@ protected:
 
         // We're interested in testing plans that use a hashed index, so don't generate collection
         // scans.
-        params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+        params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     }
 
     /**
@@ -62,9 +71,8 @@ protected:
 // Range queries.
 //
 TEST_F(QueryPlannerHashedTest, RangeQueryWhenHashedFieldIsAPrefix) {
-    addIndex(BSON("x"
-                  << "hashed"
-                  << "y" << 1 << "z" << -1));
+    addIndex(BSON("x" << "hashed"
+                      << "y" << 1 << "z" << -1));
 
     // Range query on hashed field cannot use index.
     runQuery(fromjson("{'x': {$gt: 0, $lt: 9}}"));
@@ -113,9 +121,8 @@ TEST_F(QueryPlannerHashedTest, RangeQueryWhenNonHashedFieldIsAPrefix) {
 // Tests related to object comparison.
 //
 TEST_F(QueryPlannerHashedTest, DottedFieldInIndex) {
-    addIndex(BSON("x.a"
-                  << "hashed"
-                  << "y" << 1 << "z" << -1));
+    addIndex(BSON("x.a" << "hashed"
+                        << "y" << 1 << "z" << -1));
 
     // Cannot use index when the query is on a prefix of the index field.
     runQuery(fromjson("{x: {a: 1}}"));
@@ -131,9 +138,8 @@ TEST_F(QueryPlannerHashedTest, DottedFieldInIndex) {
 }
 
 TEST_F(QueryPlannerHashedTest, QueryOnObject) {
-    addIndex(BSON("x"
-                  << "hashed"
-                  << "y" << 1 << "z" << -1));
+    addIndex(BSON("x" << "hashed"
+                      << "y" << 1 << "z" << -1));
 
     // Can use index when the query predicate is an object.
     runQuery(fromjson("{x: {a: 1}, y: 1}"));
@@ -153,9 +159,8 @@ TEST_F(QueryPlannerHashedTest, QueryOnObject) {
 //
 TEST_F(QueryPlannerHashedTest, ExistsTrueQueries) {
     // $exists:true query can use index regardless of prefix field type.
-    addIndex(BSON("x"
-                  << "hashed"
-                  << "y" << 1 << "z" << -1));
+    addIndex(BSON("x" << "hashed"
+                      << "y" << 1 << "z" << -1));
     addIndex(BSON("x" << 1 << "y"
                       << "hashed"
                       << "z" << -1));
@@ -175,9 +180,8 @@ TEST_F(QueryPlannerHashedTest, ExistsTrueQueries) {
 
 TEST_F(QueryPlannerHashedTest, ExistsFalseQueries) {
     // $exists:false query can use index regardless of prefix field type.
-    addIndex(BSON("x"
-                  << "hashed"
-                  << "y" << 1 << "z" << -1));
+    addIndex(BSON("x" << "hashed"
+                      << "y" << 1 << "z" << -1));
     addIndex(BSON("x" << 1 << "y"
                       << "hashed"
                       << "z" << -1));
@@ -197,9 +201,8 @@ TEST_F(QueryPlannerHashedTest, ExistsFalseQueries) {
 
 TEST_F(QueryPlannerHashedTest, NegationQueriesOnHashedPrefix) {
     // $not queries on a hashed prefix field cannot use index.
-    addIndex(BSON("x"
-                  << "hashed"
-                  << "y" << 1 << "z" << -1));
+    addIndex(BSON("x" << "hashed"
+                      << "y" << 1 << "z" << -1));
     runQuery(fromjson("{x: {$ne: null}}"));
     assertHasOnlyCollscan();
 
@@ -211,9 +214,9 @@ TEST_F(QueryPlannerHashedTest, NegationQueriesOnHashedPrefix) {
     assertSolutionExists(
         "{fetch: {filter: {x: {$eq: null}}, node: {ixscan: {pattern: {x: 'hashed', y: 1, z: -1}, "
         "bounds: {x: [" +
-        getHashedBound(BSONUndefined) + "," + getHashedBound(BSONNULL) +
+        getHashedBound(BSONNULL) +
         "], y: [['MinKey', 1, true, false], [1, 2, false, false], [2,'MaxKey', false, true]], z: "
-        "[['MaxKey', null, true, false], [undefined, 'MinKey', false, true]]}}}}}");
+        "[['MaxKey', null, true, false], [null, 'MinKey', false, true]]}}}}}");
 }
 
 TEST_F(QueryPlannerHashedTest, NegationQueriesOnHashedNonPrefix) {
@@ -229,7 +232,7 @@ TEST_F(QueryPlannerHashedTest, NegationQueriesOnHashedNonPrefix) {
         "{fetch: {filter: {y: {$ne: null}}, node: {ixscan: {pattern: {x: 1, y: 'hashed', z: -1}, "
         "bounds: {x: [['MinKey', 1, true, false], [1, 2, false, false], [2,'MaxKey', false, "
         "true]], y: [['MinKey', 'MaxKey', true, true]], z: [['MaxKey', null, true, false], "
-        "[undefined, 'MinKey', false, true]]}}}}}");
+        "[null, 'MinKey', false, true]]}}}}}");
 
     runQuery(fromjson("{x: {$nin: [1, 2]}, y: {$ne: 5}, z: {$ne: null}}"));
     assertNumSolutions(1);
@@ -237,20 +240,19 @@ TEST_F(QueryPlannerHashedTest, NegationQueriesOnHashedNonPrefix) {
         "{fetch: {filter: {y: {$ne: 5}}, node: {ixscan: {pattern: {x: 1, y: 'hashed', z: -1}, "
         "bounds: {x: [['MinKey', 1, true, false], [1, 2, false, false], [2,'MaxKey', false, "
         "true]], y: [['MinKey', 'MaxKey', true, true]], z: [['MaxKey', null, true, false], "
-        "[undefined, 'MinKey', false, true]]}}}}}");
+        "[null, 'MinKey', false, true]]}}}}}");
 }
 
 TEST_F(QueryPlannerHashedTest, EqualsNullQueries) {
     // When hashed field is a prefix, $eq:null queries can use index. The bounds will be point
     // intervals of hashed value of 'undefined' and 'null'.
-    addIndex(BSON("x"
-                  << "hashed"
-                  << "y" << 1 << "z" << -1));
+    addIndex(BSON("x" << "hashed"
+                      << "y" << 1 << "z" << -1));
     runQuery(fromjson("{x: {$eq: null}}"));
     assertSolutionExists(
         "{fetch: {filter: {x: {$eq: null}}, node: {ixscan:{pattern: {x: 'hashed', y: 1, z: "
         "-1},bounds: {x: [" +
-        getHashedBound(BSONUndefined) + "," + getHashedBound(BSONNULL) +
+        getHashedBound(BSONNULL) +
         "],y: [['MinKey','MaxKey',true,true]], z: [['MaxKey','MinKey',true,true]]"
         "}}}}}");
 
@@ -262,7 +264,7 @@ TEST_F(QueryPlannerHashedTest, EqualsNullQueries) {
     runQuery(fromjson("{x: {$eq: null}}"));
     assertSolutionExists(
         "{fetch: {filter: {x: {$eq: null}}, node: {ixscan:{pattern: {x: 1, y: 'hashed', z: -1}, "
-        "bounds: {x:[[undefined, undefined, true, true],[null, null, true, true]], y: "
+        "bounds: {x:[[null, null, true, true]], y: "
         "[['MinKey','MaxKey',true,true]], z: [['MaxKey','MinKey',true,true]]"
         "}}}}}");
 }
@@ -271,9 +273,8 @@ TEST_F(QueryPlannerHashedTest, EqualsNullQueries) {
 // Tests with $or operator.
 //
 TEST_F(QueryPlannerHashedTest, OrWithMultipleEqualityPredicatesOnHashedPrefixUsesSingleIndexScan) {
-    addIndex(BSON("a"
-                  << "hashed"
-                  << "b" << 1));
+    addIndex(BSON("a" << "hashed"
+                      << "b" << 1));
     runQuery(fromjson("{$or: [{a: 5}, {a: 10}]}"));
 
     assertNumSolutions(1U);
@@ -299,9 +300,8 @@ TEST_F(QueryPlannerHashedTest,
 }
 
 TEST_F(QueryPlannerHashedTest, OrWithOneRegularAndOneHashedIndexPathUsesTwoIndexes) {
-    addIndex(BSON("a"
-                  << "hashed"
-                  << "c" << 1));
+    addIndex(BSON("a" << "hashed"
+                      << "c" << 1));
     addIndex(BSON("b" << 1));
     runQuery(fromjson("{$or: [{a: 5}, {b: 10}]}"));
 
@@ -316,12 +316,10 @@ TEST_F(QueryPlannerHashedTest, OrWithOneRegularAndOneHashedIndexPathUsesTwoIndex
 }
 
 TEST_F(QueryPlannerHashedTest, OrPushdownWithHashedPrefix) {
-    addIndex(BSON("a"
-                  << "hashed"
-                  << "b" << 1));
-    addIndex(BSON("a"
-                  << "hashed"
-                  << "c" << 1));
+    addIndex(BSON("a" << "hashed"
+                      << "b" << 1));
+    addIndex(BSON("a" << "hashed"
+                      << "c" << 1));
     runQuery(fromjson("{a: 1, $or: [{b: 2}, {c: 3}]}"));
     assertNumSolutions(3U);
 
@@ -353,9 +351,8 @@ TEST_F(QueryPlannerHashedTest, OrPushdownWithHashedPrefix) {
 TEST_F(QueryPlannerHashedTest, OrPushdownWithNonHashedPrefix) {
     addIndex(BSON("a" << 1 << "b"
                       << "hashed"));
-    addIndex(BSON("a"
-                  << "hashed"
-                  << "c" << 1));
+    addIndex(BSON("a" << "hashed"
+                      << "c" << 1));
     runQuery(fromjson("{a: 1, $or: [{b: 2}, {c: 3}]}"));
     assertNumSolutions(3U);
 
@@ -385,9 +382,8 @@ TEST_F(QueryPlannerHashedTest, OrPushdownWithNonHashedPrefix) {
 // Covered projections.
 //
 TEST_F(QueryPlannerHashedTest, CannotCoverQueryWhenHashedFieldIsPrefix) {
-    addIndex(BSON("x"
-                  << "hashed"
-                  << "y" << 1));
+    addIndex(BSON("x" << "hashed"
+                      << "y" << 1));
 
     // Verify that a query doesn't get covered when the query is on a hashed field, even if the
     // projection doesn't include the hashed field. This is to avoid the possibility of hash
@@ -448,7 +444,7 @@ TEST_F(QueryPlannerHashedTest, CompoundHashedShardKeyWhenIndexAndShardKeyBothPro
     addIndex(BSON("x" << 1 << "y"
                       << "hashed"
                       << "z" << -1));
-    params.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
+    params.mainCollectionInfo.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
     params.shardKey = BSON("x" << 1 << "y"
                                << "hashed");
 
@@ -467,7 +463,7 @@ TEST_F(QueryPlannerHashedTest,
     addIndex(BSON("x" << 1 << "y"
                       << "hashed"
                       << "z" << -1));
-    params.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
+    params.mainCollectionInfo.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
     params.shardKey = BSON("x" << 1 << "y"
                                << "hashed");
 
@@ -496,7 +492,7 @@ TEST_F(QueryPlannerHashedTest,
     addIndex(BSON("x" << 1 << "y"
                       << "hashed"
                       << "z" << -1));
-    params.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
+    params.mainCollectionInfo.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
 
     // Can cover the query when index provides range value for a field ('z'), but the corresponding
     // shard key field is hashed.
@@ -514,7 +510,7 @@ TEST_F(QueryPlannerHashedTest,
     addIndex(BSON("x" << 1 << "y"
                       << "hashed"
                       << "z" << -1));
-    params.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
+    params.mainCollectionInfo.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
 
     // Cannot cover the query when index provides hashed value for a field ('y'), but the
     // corresponding shard key field is a range field.
@@ -533,7 +529,7 @@ TEST_F(QueryPlannerHashedTest, CompoundHashedShardKeyWhenIndexDoesNotHaveAllShar
     addIndex(BSON("x" << 1 << "y"
                       << "hashed"
                       << "z" << -1));
-    params.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
+    params.mainCollectionInfo.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
 
     // Cannot cover the query when one of the shard key field ('newField') is not in the index.
     params.shardKey = BSON("x" << 1 << "y"
@@ -562,9 +558,8 @@ TEST_F(QueryPlannerHashedTest, CompoundHashedShardKeyWhenIndexDoesNotHaveAllShar
 // Sorting tests.
 //
 TEST_F(QueryPlannerHashedTest, SortWhenHashedFieldIsPrefix) {
-    addIndex(BSON("x"
-                  << "hashed"
-                  << "y" << -1 << "z" << 1));
+    addIndex(BSON("x" << "hashed"
+                      << "y" << -1 << "z" << 1));
 
     // Verify that sort on a hashed field results in collection scan.
     runQueryAsCommand(fromjson("{find: 'test', filter: {}, sort: {x: 1}}"));
@@ -722,9 +717,8 @@ TEST_F(QueryPlannerHashedTest, SortWithMissingOrIrrelevantQueryPredicate) {
 TEST_F(QueryPlannerHashedTest, PartialIndexCanAnswerPredicateOnFilteredFieldWithHashedPrefix) {
     auto filterObj = fromjson("{x: {$gt: 0}}");
     auto filterExpr = QueryPlannerTest::parseMatchExpression(filterObj);
-    addIndex(BSON("x"
-                  << "hashed"
-                  << "y" << 1),
+    addIndex(BSON("x" << "hashed"
+                      << "y" << 1),
              filterExpr.get());
 
     runQuery(fromjson("{x: 5}"));
@@ -772,9 +766,8 @@ TEST_F(QueryPlannerHashedTest, PartialIndexDoesNotAnswerPredicatesExcludedByFilt
     auto filterExpr = QueryPlannerTest::parseMatchExpression(filterObj);
 
     // Hashed prefix.
-    addIndex(BSON("x"
-                  << "hashed"
-                  << "y" << 1),
+    addIndex(BSON("x" << "hashed"
+                      << "y" << 1),
              filterExpr.get());
 
     runQuery(fromjson("{x: {$eq: -1}}"));
@@ -799,9 +792,8 @@ TEST_F(QueryPlannerHashedTest, PartialIndexDoesNotAnswerPredicatesExcludedByFilt
 // Hinting with hashed index tests.
 //
 TEST_F(QueryPlannerHashedTest, ChooseHashedIndexHint) {
-    addIndex(BSON("x"
-                  << "hashed"
-                  << "y" << 1));
+    addIndex(BSON("x" << "hashed"
+                      << "y" << 1));
 
     addIndex(BSON("x" << 1));
     runQueryAsCommand(fromjson("{find: 'test', filter: {x: 3}, hint: {x: 'hashed', y: 1}}"));
@@ -812,9 +804,8 @@ TEST_F(QueryPlannerHashedTest, ChooseHashedIndexHint) {
 }
 
 TEST_F(QueryPlannerHashedTest, ChooseHashedIndexHintWithOr) {
-    addIndex(BSON("x"
-                  << "hashed"
-                  << "y" << 1));
+    addIndex(BSON("x" << "hashed"
+                      << "y" << 1));
 
     addIndex(BSON("y" << 1));
 
@@ -827,20 +818,16 @@ TEST_F(QueryPlannerHashedTest, ChooseHashedIndexHintWithOr) {
 }
 
 TEST_F(QueryPlannerHashedTest, HintWhenHashedIndexDoesNotExist) {
-    addIndex(BSON("x"
-                  << "hashed"
-                  << "y" << 1));
+    addIndex(BSON("x" << "hashed"
+                      << "y" << 1));
 
-    runInvalidQueryHint(fromjson("{x: {$eq: 1}}"),
-                        BSON("x"
-                             << "hashed"));
+    runInvalidQueryHint(fromjson("{x: {$eq: 1}}"), BSON("x" << "hashed"));
 }
 
 TEST_F(QueryPlannerHashedTest, TypeOfWithHashedIndex) {
     // Hashed prefix.
-    addIndex(BSON("x"
-                  << "hashed"
-                  << "y" << 1));
+    addIndex(BSON("x" << "hashed"
+                      << "y" << 1));
     runQuery(fromjson("{x: {$type: 'number'}}"));
     assertHasOnlyCollscan();
 
@@ -862,9 +849,8 @@ TEST_F(QueryPlannerHashedTest, TypeOfWithHashedIndex) {
 TEST_F(QueryPlannerHashedTest,
        StringComparisonWithUnequalCollatorsAndHashedIndexResultsInCollscan) {
     CollatorInterfaceMock alwaysEqualCollator(CollatorInterfaceMock::MockType::kAlwaysEqual);
-    addIndex(BSON("a"
-                  << "hashed"
-                  << "b" << 1),
+    addIndex(BSON("a" << "hashed"
+                      << "b" << 1),
              &alwaysEqualCollator);
 
     runQueryAsCommand(
@@ -874,9 +860,8 @@ TEST_F(QueryPlannerHashedTest,
 
 TEST_F(QueryPlannerHashedTest, StringComparisonWithEqualCollatorsAndHashedIndexUsesIndex) {
     CollatorInterfaceMock reverseStringCollator(CollatorInterfaceMock::MockType::kReverseString);
-    addIndex(BSON("a"
-                  << "hashed"
-                  << "b" << 1),
+    addIndex(BSON("a" << "hashed"
+                      << "b" << 1),
              &reverseStringCollator);
 
     runQueryAsCommand(
@@ -893,9 +878,8 @@ TEST_F(QueryPlannerHashedTest, StringComparisonWithEqualCollatorsAndHashedIndexU
 
 TEST_F(QueryPlannerHashedTest, NonStringComparisonWithUnequalCollators) {
     CollatorInterfaceMock alwaysEqualCollator(CollatorInterfaceMock::MockType::kAlwaysEqual);
-    addIndex(BSON("a"
-                  << "hashed"
-                  << "b" << 1),
+    addIndex(BSON("a" << "hashed"
+                      << "b" << 1),
              &alwaysEqualCollator);
 
     runQueryAsCommand(fromjson("{find: 'testns', filter: {a: 2}, collation: {locale: 'reverse'}}"));
@@ -913,9 +897,8 @@ TEST_F(QueryPlannerHashedTest, NonStringComparisonWithUnequalCollators) {
 //
 TEST_F(QueryPlannerHashedTest, QueryWithPrefixRegex) {
     // Prefix regex cannot use index when prefix field is hashed.
-    addIndex(BSON("x"
-                  << "hashed"
-                  << "y" << 1 << "z" << -1));
+    addIndex(BSON("x" << "hashed"
+                      << "y" << 1 << "z" << -1));
     runQuery(fromjson("{x: /^foo/}"));
     assertHasOnlyCollscan();
 
@@ -932,9 +915,8 @@ TEST_F(QueryPlannerHashedTest, QueryWithPrefixRegex) {
 }
 
 TEST_F(QueryPlannerHashedTest, BasicSkip) {
-    addIndex(BSON("x"
-                  << "hashed"
-                  << "y" << 1));
+    addIndex(BSON("x" << "hashed"
+                      << "y" << 1));
 
     runQueryAsCommand(fromjson("{find: 'test', filter: {x: 5}, skip: 8}"));
     assertNumSolutions(1U);
@@ -948,9 +930,8 @@ TEST_F(QueryPlannerHashedTest, BasicSkip) {
 }
 
 TEST_F(QueryPlannerHashedTest, BasicLimit) {
-    addIndex(BSON("x"
-                  << "hashed"
-                  << "y" << 1));
+    addIndex(BSON("x" << "hashed"
+                      << "y" << 1));
 
     runQueryAsCommand(fromjson("{find: 'test', filter: {x: 5}, limit: 5}"));
     assertNumSolutions(1U);
@@ -964,20 +945,17 @@ TEST_F(QueryPlannerHashedTest, BasicLimit) {
 }
 
 TEST_F(QueryPlannerHashedTest, MinMaxParameter) {
-    addIndex(BSON("x"
-                  << "hashed"
-                  << "y" << 1));
+    addIndex(BSON("x" << "hashed"
+                      << "y" << 1));
 
     runInvalidQueryHintMinMax(BSONObj(),
-                              BSON("x"
-                                   << "hashed"
-                                   << "y" << 1),
+                              BSON("x" << "hashed"
+                                       << "y" << 1),
                               fromjson("{x: 1}"),  // min.
                               BSONObj());
     runInvalidQueryHintMinMax(BSONObj(),
-                              BSON("x"
-                                   << "hashed"
-                                   << "y" << 1),
+                              BSON("x" << "hashed"
+                                       << "y" << 1),
                               BSONObj(),
                               fromjson("{x: 1}")  // max.
     );
@@ -1014,14 +992,13 @@ TEST_F(QueryPlannerHashedTest, MinMaxParameter) {
 }
 
 TEST_F(QueryPlannerHashedTest, ExprEqCanUseIndex) {
-    addIndex(BSON("x"
-                  << "hashed"
-                  << "y" << 1));
+    addIndex(BSON("x" << "hashed"
+                      << "y" << 1));
     runQuery(fromjson("{$expr: {$eq: ['$x', 1]}}"));
 
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{fetch: {filter: {$and: [{x: {$_internalExprEq: 1}}, {$expr: {$eq: ['$x', {$const: "
+        "{fetch: {filter: {$and: [{$expr: {$eq: ['$x', {$const: "
         "1}]}}]}, node: {ixscan: {pattern: {x: 'hashed', y: 1}, bounds: {x : [" +
         getHashedBound(1) + "], y: [['MinKey','MaxKey',true,true]] } }}}}");
 }

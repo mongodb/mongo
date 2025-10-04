@@ -30,12 +30,12 @@
 #   Test that compact reduces the file size.
 #
 
-import time, wiredtiger, wttest
-from wiredtiger import stat
+import time, wiredtiger
+from compact_util import compact_util
 from wtscenario import make_scenarios
 
 # Test basic compression
-class test_compact02(wttest.WiredTigerTestCase):
+class test_compact02(compact_util):
 
     types = [
         ('table', dict(uri='table:test_compact02')),
@@ -57,7 +57,11 @@ class test_compact02(wttest.WiredTigerTestCase):
         ('64KB', dict(fileConfig='leaf_page_max=64KB')),
         ('128KB', dict(fileConfig='leaf_page_max=128KB')),
     ]
-    scenarios = make_scenarios(types, cacheSize, fileConfig)
+    dryrun = [
+        ('dryrun', dict(dryrun=True)),
+        ('no-dryrun', dict(dryrun=False))
+    ]
+    scenarios = make_scenarios(types, cacheSize, fileConfig, dryrun)
 
     # We want about 22K records that total about 130Mb.  That is an average
     # of 6196 bytes per record.  Half the records should be smaller, about
@@ -78,28 +82,6 @@ class test_compact02(wttest.WiredTigerTestCase):
     smallvalue = "ihgfedcba" * 303         # 9*303 == 2727
 
     fullsize = nrecords // 2 * len(bigvalue) + nrecords // 2 * len(smallvalue)
-
-    # Return stats that track the progress of compaction.
-    def getCompactProgressStats(self):
-        cstat = self.session.open_cursor(
-            'statistics:' + self.uri, None, 'statistics=(all)')
-        statDict = {}
-        statDict["pages_reviewed"] = cstat[stat.dsrc.btree_compact_pages_reviewed][2]
-        statDict["pages_skipped"] = cstat[stat.dsrc.btree_compact_pages_skipped][2]
-        statDict["pages_rewritten"] = cstat[stat.dsrc.btree_compact_pages_rewritten][2]
-        cstat.close()
-        return statDict
-
-    # Return the size of the file
-    def getSize(self):
-        # To allow this to work on systems without ftruncate,
-        # get the portion of the file allocated, via 'statistics=(all)',
-        # not the physical file size, via 'statistics=(size)'.
-        cstat = self.session.open_cursor(
-            'statistics:' + self.uri, None, 'statistics=(all)')
-        sz = cstat[stat.dsrc.block_size][2]
-        cstat.close()
-        return sz
 
     # This test varies the cache size and so needs to set up its own connection.
     # Override the standard methods.
@@ -123,16 +105,9 @@ class test_compact02(wttest.WiredTigerTestCase):
     def test_compact02(self):
         mb = 1024 * 1024
 
-        # FIXME-WT-7187
-        # This test is temporarily disabled for OS/X, it fails, but not consistently.
-        import platform
-        if platform.system() == 'Darwin':
-            self.skipTest('Compaction tests skipped, as they fail on OS/X')
-
         self.ConnectionOpen(self.cacheSize)
 
         # Set the leaf_value_max to ensure we never create overflow items.
-        # FIXME: WT-2298
         params = 'key_format=i,value_format=S,leaf_value_max=10MB,' + self.fileConfig
 
         # 1. Create a table with the data, alternating record size.
@@ -147,9 +122,10 @@ class test_compact02(wttest.WiredTigerTestCase):
 
         # 2. Checkpoint and get stats on the table to confirm the size.
         self.session.checkpoint()
-        sz = self.getSize()
+        sz = self.get_size(self.uri)
         self.pr('After populate ' + str(sz // mb) + 'MB')
-        self.assertGreater(sz, self.fullsize)
+        if not self.runningHook('tiered'):
+            self.assertGreater(sz, self.fullsize)
 
         # 3. Delete the half of the records with the larger record size.
         c = self.session.open_cursor(self.uri, None)
@@ -168,26 +144,33 @@ class test_compact02(wttest.WiredTigerTestCase):
         # 5. Call compact.
         # Compact can collide with eviction, if that happens we retry. Wait for
         # a long time, the check for EBUSY means we're not retrying on any real
-        # errors.
+        # errors. Set the minimum threshold to make sure compaction can be executed.
+        compact_cfg = "free_space_target=1MB"
+        if (self.dryrun):
+            compact_cfg += ",dryrun=true"
+
         for i in range(1, 100):
             if not self.raisesBusy(
-              lambda: self.session.compact(self.uri, None)):
+              lambda: self.session.compact(self.uri, compact_cfg)):
                 break
             time.sleep(6)
 
         # 6. Get stats on compacted table.
-        sz = self.getSize()
+        sz = self.get_size(self.uri)
         self.pr('After compact ' + str(sz // mb) + 'MB')
 
+        statDict = self.get_compact_progress_stats(self.uri)
         # After compact, the file size should be less than half the full size.
-        self.assertLess(sz, self.fullsize // 2)
+        if not self.runningHook('tiered') and not self.dryrun:
+            self.assertLess(sz, self.fullsize // 2)
 
-        # Verify compact progress stats.
-        statDict = self.getCompactProgressStats()
-        self.assertGreater(statDict["pages_reviewed"],0)
-        self.assertGreater(statDict["pages_rewritten"],0)
-        self.assertEqual(statDict["pages_rewritten"] + statDict["pages_skipped"],
+            # Verify compact progress stats.
+            self.assertGreater(statDict["pages_reviewed"],0)
+            self.assertGreater(statDict["pages_rewritten"],0)
+            self.assertEqual(statDict["pages_rewritten"] + statDict["pages_skipped"],
                             statDict["pages_reviewed"])
 
-if __name__ == '__main__':
-    wttest.run()
+        # Dryrun uses the estimation phase which only works after reviewing at least 1000 pages.
+        if self.dryrun and statDict["pages_reviewed"] >= 1000:
+            self.assertGreater(statDict["bytes_rewritten_expected"], 0)
+            self.assertGreater(statDict["pages_rewritten_expected"], 0)

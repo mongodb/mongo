@@ -29,7 +29,18 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
+
+#include <memory>
+#include <string>
 
 namespace mongo {
 
@@ -53,14 +64,16 @@ public:
     static const bool kDiacriticSensitiveDefault;
 
     explicit TextMatchExpressionBase(StringData path);
-    virtual ~TextMatchExpressionBase() {}
+    ~TextMatchExpressionBase() override {}
 
     /**
      * Returns a reference to the parsed text query that this TextMatchExpressionBase owns.
      */
     virtual const fts::FTSQuery& getFTSQuery() const = 0;
 
-    BSONObj getSerializedRightHandSide() const final {
+    void appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                       const SerializationOptions& opts = {},
+                                       bool includePath = true) const final {
         MONGO_UNREACHABLE;
     }
 
@@ -70,14 +83,11 @@ public:
 
     void debugString(StringBuilder& debug, int indentationLevel = 0) const final;
 
-    void serialize(BSONObjBuilder* out, bool includePath) const final;
+    void serialize(BSONObjBuilder* out,
+                   const SerializationOptions& opts = {},
+                   bool includePath = true) const final;
 
     bool equivalent(const MatchExpression* other) const final;
-
-private:
-    ExpressionOptimizerFunc getOptimizer() const final {
-        return [](std::unique_ptr<MatchExpression> expression) { return expression; };
-    }
 };
 
 }  // namespace mongo

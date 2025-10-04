@@ -265,13 +265,13 @@ ALIASES                = "arch_page_table{2}=<div class= arch_head><table><tr><t
                          "arch_page_top{2}=@page \1 \2" \
                          "arch_page_caution=<b>Caution: the Architecture Guide is not updated in lockstep with the code base and is not necessarily correct or complete for any specific release.</b>" \
                          "config{3}=  @row{<tt>\1</tt>,\2,\3}" \
-                         "configempty{2}=@param config configuration string, see @ref config_strings.  No values currently permitted." \
+                         "configempty{2}=@param config configuration string, see @ref config_strings. No values currently permitted." \
                          "configend=  </table>" \
                          "configstart{2}=@param config configuration string, see @ref config_strings. Permitted values:\n  <table>@hrow{Name,Effect,Values}" \
-                         "ebusy_errors=@returns zero on success, EBUSY if the object is not available for exclusive access, and a non-zero error code on failure.  See @ref error_handling \"Error handling\" for details." \
-                         "errors=@returns zero on success and a non-zero error code on failure.  See @ref error_handling \"Error handling\" for details." \
-                         "exclusive=This method requires exclusive access to the specified data source(s).  If any cursors are open with the specified name(s) or a data source is otherwise in use, the call will fail and return \c EBUSY.\n\n" \
-                         "not_transactional=This method is not transactional, and will not guarantee ACID properties, see @ref transactions for more details." \
+                         "ebusy_errors=@returns zero on success, EBUSY if the object is not available for exclusive access, and a non-zero error code on failure. See @ref error_handling \"Error handling\" for details." \
+                         "errors=@returns zero on success and a non-zero error code on failure. See @ref error_handling \"Error handling\" for details." \
+                         "exclusive=This method requires exclusive access to the specified data source(s). If any cursors are open with the specified name(s) or a data source is otherwise in use, the call will fail and return \c EBUSY. See @ref error_handling \"Error handling\" for details.\n\n" \
+                         "not_transactional=This method is not transactional, and will not guarantee ACID properties; see @ref transactions for more details." \
                          "ex_ref{1}=@ref \1 \"\1\"" \
                          "hrow{1}=<tr><th>\1</th></tr>" \
                          "hrow{2}=<tr><th>\1</th><th>\2</th></tr>" \
@@ -860,7 +860,7 @@ WARN_LOGFILE           = doxygen.log
 # spaces. See also FILE_PATTERNS and EXTENSION_MAPPING
 # Note: If this tag is empty the current directory is searched.
 
-INPUT                  = ../include/wiredtiger.in \
+INPUT                  = ../include/wiredtiger.h.in \
                          ../include/wiredtiger_ext.h \
                          .
 
@@ -2242,7 +2242,7 @@ PREDEFINED             = DOXYGEN \
                          __wt_encryptor:=WT_ENCRYPTOR \
                          __wt_event_handler:=WT_EVENT_HANDLER \
                          __wt_extension_api:=WT_EXTENSION_API \
-                         __wt_extractor:=WT_EXTRACTOR \
+                         __wt_extension_spinlock:=WT_EXTENSION_SPINLOCK \
                          __wt_file_handle:=WT_FILE_HANDLE \
                          __wt_file_system:=WT_FILE_SYSTEM \
                          __wt_item:=WT_ITEM \
@@ -2250,9 +2250,7 @@ PREDEFINED             = DOXYGEN \
                          __wt_modify:=WT_MODIFY \
                          __wt_session:=WT_SESSION \
                          __wt_storage_source:=WT_STORAGE_SOURCE \
-                         __wt_txn_notify:=WT_TXN_NOTIFY \
-                         WT_HANDLE_CLOSED(x):=x \
-                         WT_HANDLE_NULLABLE(x):=x
+                         __wt_txn_notify:=WT_TXN_NOTIFY
 
 # If the MACRO_EXPANSION and EXPAND_ONLY_PREDEF tags are set to YES then this
 # tag can be used to specify a list of macro names that should be expanded. The

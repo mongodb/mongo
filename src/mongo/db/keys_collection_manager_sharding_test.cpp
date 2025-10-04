@@ -27,19 +27,42 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/jsobj.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/keys_collection_client_direct.h"
 #include "mongo/db/keys_collection_client_sharded.h"
 #include "mongo/db/keys_collection_document_gen.h"
 #include "mongo/db/keys_collection_manager.h"
-#include "mongo/db/s/config/config_server_test_fixture.h"
+#include "mongo/db/keys_collection_manager_gen.h"
+#include "mongo/db/logical_time.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/sharding_environment/config_server_test_fixture.h"
+#include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/time_proof_service.h"
-#include "mongo/db/vector_clock_mutable.h"
+#include "mongo/db/vector_clock/vector_clock_mutable.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source_mock.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
+
+#include <memory>
+#include <ratio>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace {
@@ -51,15 +74,11 @@ public:
     }
 
 protected:
+    KeysManagerShardedTest() : ConfigServerTestFixture(Options{}.useMockClock(true)) {}
+
     void setUp() override {
         ConfigServerTestFixture::setUp();
 
-        auto clockSource = std::make_unique<ClockSourceMock>();
-        // Timestamps of "0 seconds" are not allowed, so we must advance our clock mock to the first
-        // real second.
-        clockSource->advance(Seconds(1));
-
-        operationContext()->getServiceContext()->setFastClockSource(std::move(clockSource));
         auto catalogClient = std::make_unique<KeysCollectionClientSharded>(
             Grid::get(operationContext())->catalogClient());
         _keyManager =
@@ -77,12 +96,26 @@ private:
 };
 
 TEST_F(KeysManagerShardedTest, GetKeyForValidationTimesOutIfRefresherIsNotRunning) {
-    operationContext()->setDeadlineAfterNowBy(Microseconds(250 * 1000),
-                                              ErrorCodes::ExceededTimeLimit);
+    Milliseconds maxTime{25};
+    operationContext()->setDeadlineAfterNowBy(maxTime, ErrorCodes::ExceededTimeLimit);
 
-    ASSERT_THROWS(
-        keyManager()->getKeysForValidation(operationContext(), 1, LogicalTime(Timestamp(100, 0))),
-        DBException);
+    AtomicWord<bool> done{false};
+    stdx::thread t{[&] {
+        ASSERT_THROWS(keyManager()->getKeysForValidation(
+                          operationContext(), 1, LogicalTime(Timestamp(100, 0))),
+                      DBException);
+        done.store(true);
+    }};
+
+    int numTimesAdvanced = 0;
+    while (!done.load()) {
+        ClockSourceMock clock;
+        clock.advance(maxTime);
+        ++numTimesAdvanced;
+    }
+    t.join();
+
+    ASSERT_GT(numTimesAdvanced, 0);
 }
 
 TEST_F(KeysManagerShardedTest, GetKeyForValidationErrorsIfKeyDoesntExist) {
@@ -195,6 +228,187 @@ TEST_F(KeysManagerShardedTest, GetKeyWithoutRefreshShouldReturnRightKey) {
         ASSERT_EQ(origKey2.getKey(), key.getKey());
         ASSERT_EQ(Timestamp(110, 0), key.getExpiresAt().asTimestamp());
     }
+}
+
+// Test that a call to getKeysForValidation will eventually succeed, after the refresher internally
+// retries due to a ReadConcernMajorityNotAvailableYet error. This prevents the waiters from getting
+// a KeyNotFound error because we don't have a majority snapshot available at startup, and expect
+// one to become available after a small number of retries.
+TEST_F(KeysManagerShardedTest, GetKeyReadConcernMajorityNotAvailableYetSingleRequest) {
+    // Insert a key that we should find after failing the initial refresh.
+    KeysCollectionDocument origKey1(1);
+    origKey1.setKeysCollectionDocumentBase(
+        {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
+    ASSERT_OK(insertToConfigCollection(
+        operationContext(), NamespaceString::kKeysCollectionNamespace, origKey1.toBSON()));
+
+    // Force the initial refresh to fail with ReadConcernMajorityNotAvailableYet.
+    auto failRefreshFp =
+        globalFailPointRegistry().find("keyRefreshFailWithReadConcernMajorityNotAvailableYet");
+    auto timesEnteredBefore = failRefreshFp->setMode(FailPoint::nTimes, 1);
+
+
+    // Start monitoring, which will kick of the initial refresh.
+    keyManager()->startMonitoring(getServiceContext());
+
+    auto getKeysForValidation = [&](OperationContext* opCtx) {
+        auto keyStatus =
+            keyManager()->getKeysForValidation(opCtx, 1, LogicalTime(Timestamp(100, 0)));
+        ASSERT_OK(keyStatus.getStatus());
+        auto key = keyStatus.getValue().front();
+        ASSERT_EQ(1, key.getKeyId());
+        ASSERT_EQ(origKey1.getKey(), key.getKey());
+        ASSERT_EQ(Timestamp(105, 0), key.getExpiresAt().asTimestamp());
+    };
+
+    stdx::thread t{[&] {
+        ThreadClient client(getServiceContext()->getService());
+        auto opCtx = cc().makeOperationContext();
+        getKeysForValidation(opCtx.get());
+    }};
+
+    failRefreshFp->waitForTimesEntered(timesEnteredBefore + 1);
+    // Now that the refresher has failed internally, we need to wake it up to try and
+    // refresh again, before we can join the thread.
+    keyManager()->refreshNow(operationContext());
+    // Ensure that after the failure, we can still get the key due to the internal retry.
+    t.join();
+
+    auto timesEnteredAfter = failRefreshFp->setMode(FailPoint::off);
+    ASSERT_EQ(timesEnteredAfter, timesEnteredBefore + 1);
+}
+
+// Similar to the above test, but with multiple concurrent requests for getting a key from the mgr.
+TEST_F(KeysManagerShardedTest, GetKeyReadConcernMajorityNotAvailableYetMultipleRequests) {
+    KeysCollectionDocument origKey1(1);
+    origKey1.setKeysCollectionDocumentBase(
+        {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
+    ASSERT_OK(insertToConfigCollection(
+        operationContext(), NamespaceString::kKeysCollectionNamespace, origKey1.toBSON()));
+
+    // Force the next refresh to fail with ReadConcernMajorityNotAvailableYet.
+    auto failRefreshFp =
+        globalFailPointRegistry().find("keyRefreshFailWithReadConcernMajorityNotAvailableYet");
+    auto timesEnteredBefore = failRefreshFp->setMode(FailPoint::nTimes, 1);
+
+    keyManager()->startMonitoring(getServiceContext());
+
+    auto getKeysForValidation = [&](OperationContext* opCtx) {
+        auto keyStatus =
+            keyManager()->getKeysForValidation(opCtx, 1, LogicalTime(Timestamp(100, 0)));
+        ASSERT_OK(keyStatus.getStatus());
+        auto key = keyStatus.getValue().front();
+        ASSERT_EQ(1, key.getKeyId());
+        ASSERT_EQ(origKey1.getKey(), key.getKey());
+        ASSERT_EQ(Timestamp(105, 0), key.getExpiresAt().asTimestamp());
+    };
+
+    stdx::thread t1{[&] {
+        ThreadClient client(getServiceContext()->getService());
+        auto opCtx = cc().makeOperationContext();
+        getKeysForValidation(opCtx.get());
+    }};
+    stdx::thread t2{[&] {
+        ThreadClient client(getServiceContext()->getService());
+        auto opCtx = cc().makeOperationContext();
+        getKeysForValidation(opCtx.get());
+    }};
+
+    failRefreshFp->waitForTimesEntered(timesEnteredBefore + 1);
+    keyManager()->refreshNow(operationContext());
+    // Both requests should succeed, even though one should fail once and spark an internal retry
+    // due to the failpoint.
+    t1.join();
+    t2.join();
+
+    auto timesEnteredAfter = failRefreshFp->setMode(FailPoint::off);
+    ASSERT_EQ(timesEnteredBefore + 1, timesEnteredAfter);
+}
+
+// Tests that a request to get a key will fail if the maxTimeMS of the request's opCtx
+// expires before we can refresh the keys after a RCMNAY error.
+TEST_F(KeysManagerShardedTest, GetKeyReadConcernMajorityNotAvailableYetDeadline) {
+    // Insert a matching key so that, after successful refresh, the KCM will see this key.
+    KeysCollectionDocument origKey1(1);
+    origKey1.setKeysCollectionDocumentBase(
+        {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
+    ASSERT_OK(insertToConfigCollection(
+        operationContext(), NamespaceString::kKeysCollectionNamespace, origKey1.toBSON()));
+
+    // Force the next two refreshes to fail with ReadConcernMajorityNotAvailableYet.
+    // This ensure that both the initial refresh from startMonitoring and the one prompted
+    // by the call to getKeysForValidation fail to load the key.
+    auto failRefreshFp =
+        globalFailPointRegistry().find("keyRefreshFailWithReadConcernMajorityNotAvailableYet");
+    auto timesEnteredBefore = failRefreshFp->setMode(FailPoint::nTimes, 2);
+
+    keyManager()->startMonitoring(getServiceContext());
+
+    // Wait for the background thread to fail its initial refresh.
+    failRefreshFp->waitForTimesEntered(timesEnteredBefore + 1);
+
+    stdx::thread t{[&] {
+        ThreadClient client(getServiceContext()->getService());
+        auto opCtx = cc().makeOperationContext();
+        // Ensure this opCtx will hit a maxTimeMS deadline before the KCM refreshes after
+        // encountering an error.
+        opCtx->setDeadlineAfterNowBy(KeysCollectionManager::kRefreshIntervalIfErrored / 2,
+                                     ErrorCodes::MaxTimeMSExpired);
+        ASSERT_THROWS_CODE(
+            keyManager()->getKeysForValidation(opCtx.get(), 1, LogicalTime(Timestamp(100, 0))),
+            DBException,
+            ErrorCodes::MaxTimeMSExpired);
+    }};
+
+    // The getKeysForValidation call will spark an additional refresh, which will also fail.
+    failRefreshFp->waitForTimesEntered(timesEnteredBefore + 2);
+    // Now we can advance the clock. We should hit the timeout before waking up to refresh again.
+    ClockSourceMock clock;
+    clock.advance(KeysCollectionManager::kRefreshIntervalIfErrored);
+    t.join();
+
+    auto timesEnteredAfter = failRefreshFp->setMode(FailPoint::off);
+    ASSERT_EQ(timesEnteredAfter, timesEnteredBefore + 2);
+}
+
+// Ensure that if a we can't refresh the key after the max number of retries on RCMNAY errors
+// the error is propogated to the client.
+TEST_F(KeysManagerShardedTest, GetKeyReadConcernMajorityNotAvailableYetMaxTries) {
+    KeysCollectionDocument origKey1(1);
+    origKey1.setKeysCollectionDocumentBase(
+        {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
+    ASSERT_OK(insertToConfigCollection(
+        operationContext(), NamespaceString::kKeysCollectionNamespace, origKey1.toBSON()));
+
+    // Force the next maxTries+1 refreshes to fail with ReadConcernMajorityNotAvailableYet.
+    auto failRefreshFp =
+        globalFailPointRegistry().find("keyRefreshFailWithReadConcernMajorityNotAvailableYet");
+    auto timesToEnter = KeysCollectionManager::kReadConcernMajorityNotAvailableYetMaxTries + 1;
+    auto timesEnteredBefore = failRefreshFp->setMode(FailPoint::nTimes, timesToEnter);
+
+    keyManager()->startMonitoring(getServiceContext());
+
+    // Wait for the background thread to fail its initial refresh.
+    failRefreshFp->waitForTimesEntered(timesEnteredBefore + 1);
+
+    stdx::thread t{[&] {
+        ThreadClient client(getServiceContext()->getService());
+        auto opCtx = cc().makeOperationContext();
+        auto keyStatus =
+            keyManager()->getKeysForValidation(opCtx.get(), 1, LogicalTime(Timestamp(100, 0)));
+        ASSERT_EQ(keyStatus.getStatus(), ErrorCodes::KeyNotFound);
+    }};
+
+    unsigned timesEntered = 1;  // Already waited to enter it above.
+    while (timesEntered < KeysCollectionManager::kReadConcernMajorityNotAvailableYetMaxTries) {
+        failRefreshFp->waitForTimesEntered(timesEnteredBefore + timesEntered + 1);
+        timesEntered++;
+        keyManager()->requestRefreshAsync(operationContext());
+    }
+    t.join();
+
+    auto timesEnteredAfter = failRefreshFp->setMode(FailPoint::off);
+    ASSERT_EQ(timesEnteredBefore + timesToEnter, timesEnteredAfter);
 }
 
 TEST_F(KeysManagerShardedTest, GetKeyForSigningShouldReturnRightKey) {
@@ -371,8 +585,7 @@ TEST_F(KeysManagerShardedTest, HasSeenKeysIsFalseUntilKeysAreFound) {
 
 class KeysManagerDirectTest : public ConfigServerTestFixture {
 protected:
-    const UUID kMigrationId1 = UUID::gen();
-    const UUID kMigrationId2 = UUID::gen();
+    KeysManagerDirectTest() : ConfigServerTestFixture(Options{}.useMockClock(true)) {}
 
     KeysCollectionManager* keyManager() {
         return _keyManager.get();
@@ -381,14 +594,10 @@ protected:
     void setUp() override {
         ConfigServerTestFixture::setUp();
 
-        auto clockSource = std::make_unique<ClockSourceMock>();
-        // Timestamps of "0 seconds" are not allowed, so we must advance our clock mock to the first
-        // real second.
-        clockSource->advance(Seconds(1));
-
-        operationContext()->getServiceContext()->setFastClockSource(std::move(clockSource));
         _keyManager = std::make_unique<KeysCollectionManager>(
-            "dummy", std::make_unique<KeysCollectionClientDirect>(), Seconds(1));
+            "dummy",
+            std::make_unique<KeysCollectionClientDirect>(false /*mustUseLocalReads*/),
+            Seconds(1));
     }
 
     void tearDown() override {
@@ -407,7 +616,7 @@ TEST_F(KeysManagerDirectTest, CacheExternalKeyBasic) {
     // Refresh immediately to prevent a refresh from discovering the inserted keys.
     keyManager()->refreshNow(operationContext());
 
-    ExternalKeysCollectionDocument externalKey1(OID::gen(), 1, kMigrationId1);
+    ExternalKeysCollectionDocument externalKey1(OID::gen(), 1);
     externalKey1.setKeysCollectionDocumentBase(
         {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(100, 0))});
     ASSERT_OK(insertToConfigCollection(operationContext(),
@@ -444,7 +653,7 @@ TEST_F(KeysManagerDirectTest, WillNotCacheExternalKeyWhenMonitoringIsStopped) {
     ASSERT_OK(insertToConfigCollection(
         operationContext(), NamespaceString::kKeysCollectionNamespace, internalKey.toBSON()));
 
-    ExternalKeysCollectionDocument externalKey1(OID::gen(), 1, kMigrationId1);
+    ExternalKeysCollectionDocument externalKey1(OID::gen(), 1);
     externalKey1.setKeysCollectionDocumentBase(
         {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(100, 0))});
     ASSERT_OK(insertToConfigCollection(operationContext(),
@@ -462,7 +671,7 @@ TEST_F(KeysManagerDirectTest, WillNotCacheExternalKeyWhenMonitoringIsStopped) {
 
     keyManager()->stopMonitoring();
 
-    ExternalKeysCollectionDocument externalKey2(OID::gen(), 1, kMigrationId2);
+    ExternalKeysCollectionDocument externalKey2(OID::gen(), 1);
     externalKey2.setKeysCollectionDocumentBase(
         {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(100, 0))});
 

@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/db/client.h"
+#include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/protocol.h"
 
@@ -54,7 +56,7 @@ std::unique_ptr<ReplyInterface> makeReply(const Message* unownedMessage);
 /**
  * Parses the message (from any protocol) into an OpMsgRequest.
  */
-OpMsgRequest opMsgRequestFromAnyProtocol(const Message& unownedMessage);
+OpMsgRequest opMsgRequestFromAnyProtocol(const Message& unownedMessage, Client* client = nullptr);
 
 /**
  * Returns the appropriate concrete ReplyBuilder.

@@ -30,22 +30,22 @@
 
 #pragma once
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
-
-#include "asio/detail/config.hpp"
-
-#include "asio/detail/push_options.hpp"
-#include "asio/detail/throw_error.hpp"
-#include "asio/error.hpp"
-
-#include <arpa/inet.h>
-
 #include "mongo/logv2/log.h"
 #include "mongo/util/net/ssl/apple.hpp"
 #include "mongo/util/net/ssl/detail/engine.hpp"
 #include "mongo/util/net/ssl/detail/stream_core.hpp"
 #include "mongo/util/net/ssl/error.hpp"
 #include "mongo/util/str.h"
+
+#include "asio/detail/config.hpp"
+#include "asio/detail/throw_error.hpp"
+#include "asio/error.hpp"
+#include <arpa/inet.h>
+
+// This must be after all other includes
+#include "asio/detail/push_options.hpp"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 namespace asio {
 namespace ssl {
@@ -61,7 +61,7 @@ public:
         return "Secure.Transport";
     }
 
-    std::string message(int value) const noexcept final {
+    std::string message(int value) const final {
         const auto status = static_cast<::OSStatus>(value);
         apple::CFUniquePtr<::CFStringRef> errstr(::SecCopyErrorMessageString(status, nullptr));
         if (!errstr) {
@@ -155,10 +155,6 @@ bool engine::_initSSL(stream_base::handshake_type type, asio::error_code& ec) {
 
     if (_certs && (status == ::errSecSuccess)) {
         status = ::SSLSetCertificate(_ssl.get(), _certs.get());
-    }
-
-    if (status == ::errSecSuccess) {
-        status = ::SSLSetPeerID(_ssl.get(), _ssl.get(), sizeof(native_handle_type));
     }
 
     if (status == ::errSecSuccess) {
@@ -309,7 +305,8 @@ asio::mutable_buffer engine::get_output(const asio::mutable_buffer& data) {
     const auto requested = *data_len;
     *data_len = std::min<size_t>(requested, max_outbuf_size - this_->_outbuf.size());
     this_->_outbuf.insert(this_->_outbuf.end(), p, p + *data_len);
-    return (requested == *data_len) ? ::errSecSuccess : ::errSSLWouldBlock;
+    return (requested == *data_len) ? static_cast<OSStatus>(::errSecSuccess)
+                                    : static_cast<OSStatus>(::errSSLWouldBlock);
 }
 
 boost::optional<std::string> engine::get_sni() {

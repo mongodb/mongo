@@ -29,11 +29,12 @@
 
 #pragma once
 
+#include "mongo/stdx/type_traits.h"
+#include "mongo/util/modules.h"
+
 #include <memory>
 #include <type_traits>
 #include <utility>
-
-#include "mongo/stdx/type_traits.h"
 
 namespace mongo::expression_walker {
 
@@ -60,7 +61,7 @@ template <typename Node, typename Walker>
 inline constexpr auto hasVoidPreVisit =
     stdx::is_detected_exact_v<void, PreVisit, Walker, MaybeConstPtr<std::is_const_v<Node>, Node>>;
 /**
- * hasVoidPreVisit is a template variable indicating whether such a pointer-returning member
+ * hasPtrPreVisit is a template variable indicating whether such a pointer-returning member
  * function exists for a given Walker type when called on a pointer to our Node type.
  */
 template <typename Node, typename Walker>

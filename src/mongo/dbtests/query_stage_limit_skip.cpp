@@ -32,21 +32,36 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include <memory>
-
-#include "mongo/client/dbclient_cursor.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
-#include "mongo/db/exec/limit.h"
-#include "mongo/db/exec/mock_stage.h"
-#include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/exec/skip.h"
-#include "mongo/db/json.h"
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/db/exec/classic/limit.h"
+#include "mongo/db/exec/classic/mock_stage.h"
+#include "mongo/db/exec/classic/plan_stage.h"
+#include "mongo/db/exec/classic/skip.h"
+#include "mongo/db/exec/classic/working_set.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/snapshot.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/intrusive_counter.h"
 
-using namespace mongo;
+#include <algorithm>
+#include <memory>
+#include <string>
+#include <vector>
 
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+namespace mongo {
 namespace {
 
 using std::max;
@@ -97,9 +112,10 @@ int countResults(PlanStage* stage) {
 class QueryStageLimitSkipBasicTest {
 public:
     void run() {
-        const boost::intrusive_ptr<ExpressionContext> expCtx(make_intrusive<ExpressionContext>(
-            _opCtx, std::unique_ptr<CollatorInterface>(nullptr), NamespaceString("test.dummyNS")));
-
+        const auto expCtx = ExpressionContextBuilder{}
+                                .opCtx(_opCtx)
+                                .ns(NamespaceString::createNamespaceString_forTest("test.dummyNS"))
+                                .build();
         for (int i = 0; i < 2 * N; ++i) {
             WorkingSet ws;
 
@@ -118,15 +134,16 @@ protected:
     OperationContext* const _opCtx = _uniqOpCtx.get();
 };
 
-class All : public OldStyleSuiteSpecification {
+class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("query_stage_limit_skip") {}
 
-    void setupTests() {
+    void setupTests() override {
         add<QueryStageLimitSkipBasicTest>();
     }
 };
 
-OldStyleSuiteInitializer<All> queryStageLimitSkipAll;
+unittest::OldStyleSuiteInitializer<All> queryStageLimitSkipAll;
 
 }  // namespace
+}  // namespace mongo

@@ -1,6 +1,6 @@
 // Helper for generating random geo data, used in time-series tests.
 
-function randomLongLat() {
+export function randomLongLat() {
     // Sample points uniformly on a sphere in two steps:
     // 1. Sample uniformly from a unit ball (the volume within a sphere).
     // 2. Project onto a sphere.
@@ -18,8 +18,8 @@ function randomLongLat() {
         // onto a sphere.
         const longRadians = Math.atan2(y, x);
         const latRadians = Math.atan2(z, Math.sqrt(x * x + y * y));
-        const long = longRadians * 180 / Math.PI;
-        const lat = latRadians * 180 / Math.PI;
+        const long = (longRadians * 180) / Math.PI;
+        const lat = (latRadians * 180) / Math.PI;
         return [long, lat];
     }
 }

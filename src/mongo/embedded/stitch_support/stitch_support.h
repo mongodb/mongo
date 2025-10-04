@@ -26,11 +26,17 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
+#pragma once
 #ifndef HEADERUUID_645147E3_14CB_4DFC_8F05_16CE4D190C18_DEFINED
 #define HEADERUUID_645147E3_14CB_4DFC_8F05_16CE4D190C18_DEFINED
 
-#include <stddef.h>
-#include <stdint.h>
+/**
+ * Note: it's necessary to use C headers here instead of the preferred <cstddef> and <cstdint> so
+ * that this header is usable in Go projects.
+ */
+#include <stddef.h>  // NOLINT
+#include <stdint.h>  // NOLINT
 
 #pragma push_macro("MONGO_API_CALL")
 #undef MONGO_API_CALL

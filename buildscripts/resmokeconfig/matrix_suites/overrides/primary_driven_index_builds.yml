@@ -1,0 +1,88 @@
+- name: enable_primary_driven_index_builds_feature_flag_mongod
+  value:
+    executor:
+      fixture:
+        mongod_options:
+          set_parameters:
+            featureFlagPrimaryDrivenIndexBuilds: 1
+            featureFlagRecordIdsReplicated: 1
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              # TODO(SERVER-110172): Re-enable these checks.
+              skipCheckDBHashes: true
+              skipCollectionAndIndexValidation: true
+- name: enable_primary_driven_index_builds_feature_flag_mongos
+  value:
+    executor:
+      fixture:
+        mongos_options:
+          set_parameters:
+            featureFlagPrimaryDrivenIndexBuilds: 1
+            featureFlagRecordIdsReplicated: 1
+- name: enable_primary_driven_index_builds_feature_flag_testdata_parameter_mongod
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              setParameters:
+                featureFlagPrimaryDrivenIndexBuilds: true
+                featureFlagRecordIdsReplicated: 1
+              # TODO(SERVER-110172): Re-enable these checks.
+              skipCheckDBHashes: true
+              skipCollectionAndIndexValidation: true
+- name: enable_primary_driven_index_builds_feature_flag_testdata_parameter_mongos
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              setParametersMongos:
+                featureFlagPrimaryDrivenIndexBuilds: true
+                featureFlagRecordIdsReplicated: 1
+- name: exclude_primary_driven_index_builds_incompatible_tag
+  value:
+    exclude_with_any_tags:
+      - primary_driven_index_builds_incompatible
+      - rolling_index_builds
+      - requires_commit_quorum
+      - requires_capped
+- name: all_no_passthrough_index_builds_tests_selector
+  value:
+    selector:
+      exclude_files: null
+      roots:
+        - jstests/noPassthrough/**/index_builds/*.js
+- name: all_replica_sets_index_builds_tests_selector
+  value:
+    selector:
+      exclude_files: null
+      roots:
+        - jstests/replsets/*index_build*.js
+        - jstests/replsets/**/*index_build*.js
+        - jstests/replsets/container_operations.js
+- name: all_sharding_index_builds_tests_selector
+  value:
+    selector:
+      exclude_files: null
+      roots:
+        - jstests/sharding/*index_build*.js
+- name: all_concurrency_index_builds_tests_selector
+  value:
+    selector:
+      exclude_files: null
+      roots:
+        - jstests/concurrency/fsm_workloads/index_builds/*.js
+        - jstests/concurrency/fsm_workloads/ddl/create_index_background/*.js
+- name: all_auth_commands_tests_selector
+  value:
+    selector:
+      exclude_files: null
+      roots:
+        # We are primarily concerned with coverage of the containerInsert and containerDelete
+        # action type, so this selector is sufficient.
+        - jstests/auth/commands_*.js

@@ -29,20 +29,17 @@
 
 #pragma once
 
-#include "mongo/bson/oid.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/tenant_id.h"
+
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
 /**
- * kSystemTenantID must be unique across all possible tenant IDs.
- * Since the first four bytes of an OID are a unix epoch timestamp,
- * we can simply select a value prior to the inception of MongoDB,
- * and be guaranteed to never have a collision with a value
- * produced by OID::gen().
+ * Extract the active TenantId for this OperationContext.
  */
-const OID kSystemTenantID(
-    "15650000"   /* timestamp: 1981-05-17 */
-    "0102030405" /* process id */
-    "060708" /* counter */);
+boost::optional<TenantId> getActiveTenant(OperationContext* opCtx);
 
 }  // namespace mongo

@@ -1,0 +1,5 @@
+vector_size_limit
+vector_size_limit
+test.coll as fuzzer_coll
+
+:sortResults {aggregate: "fuzzer_coll", pipeline: [{$project: {smallDocs: {$map: {input: {$range: [0, {$multiply: [1, 1024, 1024]}]}, as: "num", in: {value: {$add: ["$$num", 1]}}}}}}, {$unwind: "$smallDocs"}, {$replaceRoot: {newRoot: "$smallDocs"}}, {$replaceRoot: {newRoot: {value: {$range: [0, {$multiply: [1, 1024, 1024]}]}}}}, {$unwind: "$value"}], cursor: {}}

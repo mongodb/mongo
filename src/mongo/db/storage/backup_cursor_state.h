@@ -29,12 +29,14 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <string>
-#include <vector>
-
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/storage/backup_block.h"
 #include "mongo/db/storage/storage_engine.h"
+
+#include <deque>
+#include <string>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 
@@ -42,13 +44,14 @@ struct BackupCursorState {
     UUID backupId;
     boost::optional<Document> preamble;
     std::unique_ptr<StorageEngine::StreamingCursor> streamingCursor;
-    // 'otherBackupBlocks' includes the backup blocks for the encrypted storage engine in the
+    // 'otherBackupBlocks' includes the kv backup blocks for the encrypted storage engine in the
     // enterprise module.
-    std::vector<StorageEngine::BackupBlock> otherBackupBlocks;
+    std::deque<KVBackupBlock> otherKVBackupBlocks;
+    stdx::unordered_map<std::string, std::pair<NamespaceString, UUID>> identsToNsAndUUID;
 };
 
 struct BackupCursorExtendState {
-    std::vector<std::string> filenames;
+    std::deque<std::string> filePaths;
 };
 
 }  // namespace mongo

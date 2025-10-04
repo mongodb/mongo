@@ -29,12 +29,24 @@
 
 #include "mongo/util/cmdline_utils/censor_cmdline.h"
 
-#include <set>
-#include <string>
-
-#include "mongo/util/options_parser/startup_option_init.h"
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/options_parser/option_description.h"
+#include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <cstring>
+#include <set>
+#include <string>
 
 namespace mongo {
 namespace cmdline_utils {
@@ -139,18 +151,18 @@ void censorBSONObjRecursive(const BSONObj& params,          // Object we are cen
     BSONObjIterator paramsIterator(params);
     while (paramsIterator.more()) {
         BSONElement param = paramsIterator.next();
-        std::string dottedName =
-            (parentPath.empty() ? param.fieldName()
-                                : isArray ? parentPath : parentPath + '.' + param.fieldName());
-        if (param.type() == Array) {
+        std::string dottedName = (parentPath.empty() ? param.fieldName()
+                                      : isArray      ? parentPath
+                                                     : parentPath + '.' + param.fieldName());
+        if (param.type() == BSONType::array) {
             BSONObjBuilder subArray(result->subarrayStart(param.fieldName()));
             censorBSONObjRecursive(param.Obj(), dottedName, true, &subArray);
             subArray.done();
-        } else if (param.type() == Object) {
+        } else if (param.type() == BSONType::object) {
             BSONObjBuilder subObj(result->subobjStart(param.fieldName()));
             censorBSONObjRecursive(param.Obj(), dottedName, false, &subObj);
             subObj.done();
-        } else if (param.type() == String) {
+        } else if (param.type() == BSONType::string) {
             if (_isPasswordArgument(dottedName.c_str())) {
                 result->append(param.fieldName(), "<password>");
             } else {

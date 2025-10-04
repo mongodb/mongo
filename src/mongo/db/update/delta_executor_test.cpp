@@ -27,188 +27,215 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
-#include "mongo/platform/basic.h"
-
-#include "mongo/bson/json.h"
-#include "mongo/bson/mutable/document.h"
 #include "mongo/db/update/delta_executor.h"
-#include "mongo/logv2/log.h"
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/exec/mutable_bson/document.h"
+#include "mongo/db/exec/mutable_bson/element.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/field_ref_set.h"
+#include "mongo/db/update/document_diff_calculator.h"
+#include "mongo/db/update_index_data.h"
 #include "mongo/unittest/unittest.h"
+
+#include <vector>
+
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
 namespace {
 
+/**
+ * Return a bitmask where each bit indicates whether the matching position in the indexData
+ * argument is for an index that has been affected by the modification described by the logEntry
+ * argument. E.g., a return value of 0 means "no indexes are affected", a return value of 1 (2^0)
+ * means that the index whose UpdateIndexData descriptor is placed in the first position of the
+ * indexData argument is affected by the changes, a return value of 2 (2^1) points to the second
+ * entry in the indexData vector, a return value of 3 (1+2) indicates that both first and second
+ * entry in the idnexDaa vector are affected by the modification.
+ */
+unsigned long getIndexAffectedFromLogEntry(std::vector<const UpdateIndexData*> indexData,
+                                           BSONObj logEntry) {
+    auto diff = update_oplog_entry::extractDiffFromOplogEntry(logEntry);
+    if (!diff) {
+        return (unsigned long)-1;
+    }
+    mongo::doc_diff::IndexUpdateIdentifier updateIdentifier{indexData.size() /*numIndexes*/};
+    for (size_t i = 0; i < indexData.size(); i++) {
+        updateIdentifier.addIndex(i /*indexCounter*/, *indexData[i]);
+    }
+
+    // Convert the set bits into a numeric value to return.
+    // This assumes that the value fits into an unsigned long, which is true for the test cases in
+    // this file.
+    doc_diff::IndexSet indexSet = updateIdentifier.determineAffectedIndexes(*diff);
+    unsigned long value = 0;
+    for (size_t pos = indexSet.findFirst(); pos != mongo::doc_diff::IndexSet::npos;
+         pos = indexSet.findNext(pos)) {
+        value |= 1 << pos;
+    }
+    return value;
+}
+
 TEST(DeltaExecutorTest, Delete) {
     BSONObj preImage(fromjson("{f1: {a: {b: {c: 1}, c: 1}}}"));
-    UpdateIndexData indexData;
+    UpdateIndexData indexData1, indexData2;
     constexpr bool mustCheckExistenceForInsertOperations = true;
-    indexData.addPath(FieldRef("p.a.b"));
-    indexData.addPath(FieldRef("f1.a.b"));
+    indexData1.addPath(FieldRef("p.a.b"));
+    indexData2.addPath(FieldRef("f1.a.b"));
     FieldRefSet fieldRefSet;
     {
         // When a path in the diff is a prefix of index path.
         auto doc = mutablebson::Document(preImage);
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
-        params.indexData = &indexData;
         DeltaExecutor test(fromjson("{d: {f1: false, f2: false, f3: false}}"),
                            mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(), BSONObj());
-        ASSERT(result.indexesAffected);
+        ASSERT_EQ(2, getIndexAffectedFromLogEntry({&indexData1, &indexData2}, result.oplogEntry));
     }
 
     {
         // When a path in the diff is same as index path.
         auto doc = mutablebson::Document(preImage);
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
-        params.indexData = &indexData;
         DeltaExecutor test(fromjson("{sf1: {sa: {d: {p: false, c: false, b: false}}}}"),
                            mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: {a: {}}}"));
-        ASSERT(result.indexesAffected);
+        ASSERT_EQ(2, getIndexAffectedFromLogEntry({&indexData1, &indexData2}, result.oplogEntry));
     }
     {
         // When the index path is a prefix of a path in the diff.
         auto doc = mutablebson::Document(preImage);
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
-        params.indexData = &indexData;
         auto test = DeltaExecutor(fromjson("{sf1: {sa: {sb: {d: {c: false}}}}}"),
                                   mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: {a: {b: {}, c: 1}}}"));
-        ASSERT(result.indexesAffected);
+        ASSERT_EQ(2, getIndexAffectedFromLogEntry({&indexData1, &indexData2}, result.oplogEntry));
     }
     {
         // With common parent, but path diverges.
         auto doc = mutablebson::Document(preImage);
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
-        params.indexData = &indexData;
         auto test = DeltaExecutor(fromjson("{sf1: {sa: {d: {c: false}}}}"),
                                   mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: {a: {b: {c: 1}}}}"));
-        ASSERT(!result.indexesAffected);
+        ASSERT_EQ(0, getIndexAffectedFromLogEntry({&indexData1, &indexData2}, result.oplogEntry));
     }
 }
 
 TEST(DeltaExecutorTest, Update) {
     BSONObj preImage(fromjson("{f1: {a: {b: {c: 1}, c: 1}}}"));
-    UpdateIndexData indexData;
+    UpdateIndexData indexData1, indexData2;
     constexpr bool mustCheckExistenceForInsertOperations = true;
-    indexData.addPath(FieldRef("p.a.b"));
-    indexData.addPath(FieldRef("f1.a.b"));
+    indexData1.addPath(FieldRef("p.a.b"));
+    indexData2.addPath(FieldRef("f1.a.b"));
     FieldRefSet fieldRefSet;
     {
         // When a path in the diff is a prefix of index path.
         auto doc = mutablebson::Document(preImage);
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
-        params.indexData = &indexData;
         DeltaExecutor test(fromjson("{u: {f1: false, f2: false, f3: false}}"),
                            mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: false, f2: false, f3: false}"));
-        ASSERT(result.indexesAffected);
+        ASSERT_EQ(2, getIndexAffectedFromLogEntry({&indexData1, &indexData2}, result.oplogEntry));
     }
     {
         // When a path in the diff is same as index path.
         auto doc = mutablebson::Document(preImage);
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
-        params.indexData = &indexData;
         auto test = DeltaExecutor(fromjson("{sf1: {sa: {u: {p: false, c: false, b: false}}}}"),
                                   mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: {a: {b: false, c: false, p: false}}}"));
-        ASSERT(result.indexesAffected);
+        ASSERT_EQ(2, getIndexAffectedFromLogEntry({&indexData1, &indexData2}, result.oplogEntry));
     }
     {
         // When the index path is a prefix of a path in the diff.
         auto doc = mutablebson::Document(preImage);
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
-        params.indexData = &indexData;
         auto test = DeltaExecutor(fromjson("{sf1: {sa: {sb: {u: {c: false}}}}}"),
                                   mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: {a: {b: {c: false}, c: 1}}}"));
-        ASSERT(result.indexesAffected);
+        ASSERT_EQ(2, getIndexAffectedFromLogEntry({&indexData1, &indexData2}, result.oplogEntry));
     }
     {
         // With common parent, but path diverges.
         auto doc = mutablebson::Document(preImage);
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
-        params.indexData = &indexData;
         auto test = DeltaExecutor(fromjson("{sf1: {sa: {u: {c: false}}}}"),
                                   mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: {a: {b: {c: 1}, c: false}}}"));
-        ASSERT(!result.indexesAffected);
+        ASSERT_EQ(0, getIndexAffectedFromLogEntry({&indexData1, &indexData2}, result.oplogEntry));
     }
 }
 
 TEST(DeltaExecutorTest, Insert) {
-    UpdateIndexData indexData;
+    UpdateIndexData indexData1, indexData2;
     constexpr bool mustCheckExistenceForInsertOperations = true;
-    indexData.addPath(FieldRef("p.a.b"));
+    indexData1.addPath(FieldRef("p.a.b"));
     // 'UpdateIndexData' will canonicalize the path and remove all numeric components. So the '2'
     // and '33' components should not matter.
-    indexData.addPath(FieldRef("f1.2.a.33.b"));
+    indexData2.addPath(FieldRef("f1.2.a.33.b"));
     FieldRefSet fieldRefSet;
     {
         // When a path in the diff is a prefix of index path.
         auto doc = mutablebson::Document(BSONObj());
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
-        params.indexData = &indexData;
         DeltaExecutor test(fromjson("{i: {f1: false, f2: false, f3: false}}"),
                            mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: false, f2: false, f3: false}"));
-        ASSERT(result.indexesAffected);
+        ASSERT_EQ(2, getIndexAffectedFromLogEntry({&indexData1, &indexData2}, result.oplogEntry));
     }
     {
         // When a path in the diff is same as index path.
-        auto doc = mutablebson::Document(fromjson("{f1: {a: {c: true}}}}"));
+        auto doc = mutablebson::Document(fromjson("{f1: {a: {c: true}}}"));
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
-        params.indexData = &indexData;
         auto test = DeltaExecutor(fromjson("{sf1: {sa: {i: {p: false, c: false, b: false}}}}"),
                                   mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: {a: {p: false, c: false, b: false}}}"));
-        ASSERT(result.indexesAffected);
+        ASSERT_EQ(2, getIndexAffectedFromLogEntry({&indexData1, &indexData2}, result.oplogEntry));
     }
     {
         // When the index path is a prefix of a path in the diff.
         auto doc = mutablebson::Document(fromjson("{f1: {a: {b: {c: {e: 1}}}}}"));
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
-        params.indexData = &indexData;
         auto test = DeltaExecutor(fromjson("{sf1: {sa: {sb: {sc: {i : {d: 2} }}}}}"),
                                   mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: {a: {b: {c: {e: 1, d: 2}}}}}"));
-        ASSERT(result.indexesAffected);
+        ASSERT_EQ(2, getIndexAffectedFromLogEntry({&indexData1, &indexData2}, result.oplogEntry));
     }
     {
         // With common parent, but path diverges.
         auto doc = mutablebson::Document(fromjson("{f1: {a: {b: {c: 1}}}}"));
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
-        params.indexData = &indexData;
         auto test = DeltaExecutor(fromjson("{sf1: {sa: {i: {c: 2}}}}"),
                                   mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: {a: {b: {c: 1}, c: 2}}}"));
-        ASSERT(!result.indexesAffected);
+        ASSERT_EQ(0, getIndexAffectedFromLogEntry({&indexData1, &indexData2}, result.oplogEntry));
     }
 }
 
@@ -224,24 +251,22 @@ TEST(DeltaExecutorTest, InsertNumericFieldNamesTopLevel) {
     {
         auto doc = mutablebson::Document(preImage);
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
-        params.indexData = &indexData;
         DeltaExecutor test(fromjson("{i: {'0': false, '1': false, '2': false}}"),
                            mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{'0': false, '1': false, '2': false}"));
-        ASSERT(result.indexesAffected);
+        ASSERT_EQ(1, getIndexAffectedFromLogEntry({&indexData}, result.oplogEntry));
     }
     {
         auto doc = mutablebson::Document(preImage);
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
-        params.indexData = &indexData;
         DeltaExecutor test(fromjson("{i: {'0': false, '2': false}}"),
                            mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{'0': false, '2': false}"));
-        ASSERT(!result.indexesAffected);
+        ASSERT_EQ(0, getIndexAffectedFromLogEntry({&indexData}, result.oplogEntry));
     }
 }
 
@@ -257,130 +282,121 @@ TEST(DeltaExecutorTest, InsertNumericFieldNamesNested) {
     {
         auto doc = mutablebson::Document(preImage);
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
-        params.indexData = &indexData;
         DeltaExecutor test(fromjson("{sa: {i: {'0': false, '1': false, '2': false}}}"),
                            mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{a: {'0': false, '1': false, '2': false}}"));
-        ASSERT(result.indexesAffected);
+        ASSERT_EQ(1, getIndexAffectedFromLogEntry({&indexData}, result.oplogEntry));
     }
     {
         auto doc = mutablebson::Document(preImage);
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
-        params.indexData = &indexData;
         DeltaExecutor test(fromjson("{sa: {i: {'0': false, '2': false}}}"),
                            mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{a: {'0': false, '2': false}}"));
-        ASSERT(result.indexesAffected);
+        ASSERT_EQ(1, getIndexAffectedFromLogEntry({&indexData}, result.oplogEntry));
     }
 }
 
 TEST(DeltaExecutorTest, ArraysInIndexPath) {
     BSONObj preImage(fromjson("{f1: [{a: {b: {c: 1}, c: 1}}, 1]}"));
-    UpdateIndexData indexData;
+    UpdateIndexData indexData1, indexData2;
     constexpr bool mustCheckExistenceForInsertOperations = true;
-    indexData.addPath(FieldRef("p.a.b"));
+    indexData1.addPath(FieldRef("p.a.b"));
     // Numeric components will be ignored, so they should not matter.
-    indexData.addPath(FieldRef("f1.9.a.10.b"));
+    indexData2.addPath(FieldRef("f1.9.a.10.b"));
     FieldRefSet fieldRefSet;
     {
         // Test resize.
         auto doc = mutablebson::Document(preImage);
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
-        params.indexData = &indexData;
         DeltaExecutor test(fromjson("{sf1: {a: true, l: 1}}"),
                            mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: [{a: {b: {c: 1}, c: 1}}]}"));
-        ASSERT(result.indexesAffected);
+        ASSERT_EQ(2, getIndexAffectedFromLogEntry({&indexData1, &indexData2}, result.oplogEntry));
     }
     {
         // When the index path is a prefix of a path in the diff and also involves numeric
         // components along the way. The numeric components should always be ignored.
         auto doc = mutablebson::Document(preImage);
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
-        params.indexData = &indexData;
         auto test = DeltaExecutor(fromjson("{sf1: {a: true, s0: {sa: {sb: {i: {d: 1} }}}}}"),
                                   mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: [{a: {b: {c: 1, d: 1}, c: 1}}, 1]}"));
-        ASSERT(result.indexesAffected);
+        ASSERT_EQ(2, getIndexAffectedFromLogEntry({&indexData1, &indexData2}, result.oplogEntry));
     }
     {
         // When inserting a sub-object into array, and the sub-object diverges from the index path.
         auto doc = mutablebson::Document(preImage);
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
-        params.indexData = &indexData;
         auto test = DeltaExecutor(fromjson("{sf1: {a: true, u2: {b: 1}}}"),
                                   mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: [{a: {b: {c: 1}, c: 1}}, 1, {b:1}]}"));
-        ASSERT(result.indexesAffected);
+        ASSERT_EQ(2, getIndexAffectedFromLogEntry({&indexData1, &indexData2}, result.oplogEntry));
     }
     {
         // When a common array path element is updated, but the paths diverge at the last element.
         auto doc = mutablebson::Document(preImage);
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
-        params.indexData = &indexData;
         auto test = DeltaExecutor(fromjson("{sf1: {a: true, s0: {sa: {d: {c: false} }}}}"),
                                   mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: [{a: {b: {c: 1}}}, 1]}"));
-        ASSERT(!result.indexesAffected);
+        ASSERT_EQ(0, getIndexAffectedFromLogEntry({&indexData1, &indexData2}, result.oplogEntry));
     }
 }
 
 TEST(DeltaExecutorTest, ArraysAfterIndexPath) {
     BSONObj preImage(fromjson("{f1: {a: {b: [{c: 1}, 2]}}}"));
-    UpdateIndexData indexData;
+    UpdateIndexData indexData1, indexData2;
     constexpr bool mustCheckExistenceForInsertOperations = true;
-    indexData.addPath(FieldRef("p.a.b"));
+    indexData1.addPath(FieldRef("p.a.b"));
     // 'UpdateIndexData' will canonicalize the path and remove all numeric components. So the '9'
     // and '10' components should not matter.
-    indexData.addPath(FieldRef("f1.9.a.10"));
+    indexData2.addPath(FieldRef("f1.9.a.10"));
     FieldRefSet fieldRefSet;
     {
         // Test resize.
         auto doc = mutablebson::Document(preImage);
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
-        params.indexData = &indexData;
         DeltaExecutor test(fromjson("{sf1: {sa: {sb: {a: true, l: 1}}}}"),
                            mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: {a: {b: [{c: 1}]}}}"));
-        ASSERT(result.indexesAffected);
+        ASSERT_EQ(2, getIndexAffectedFromLogEntry({&indexData1, &indexData2}, result.oplogEntry));
     }
     {
         // Updating a sub-array element.
         auto doc = mutablebson::Document(preImage);
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
-        params.indexData = &indexData;
         auto test = DeltaExecutor(fromjson("{sf1: {sa: {sb: {a: true, s0: {u: {c: 2}} }}}}"),
                                   mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: {a: {b: [{c: 2}, 2]}}}"));
-        ASSERT(result.indexesAffected);
+        ASSERT_EQ(2, getIndexAffectedFromLogEntry({&indexData1, &indexData2}, result.oplogEntry));
     }
     {
         // Updating an array element.
         auto doc = mutablebson::Document(preImage);
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
-        params.indexData = &indexData;
         auto test = DeltaExecutor(fromjson("{sf1: {sa: {sb: {a: true, u0: 1 }}}}"),
                                   mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: {a: {b: [1, 2]}}}"));
-        ASSERT(result.indexesAffected);
+        ASSERT_EQ(2, getIndexAffectedFromLogEntry({&indexData1, &indexData2}, result.oplogEntry));
     }
 }
 

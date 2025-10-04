@@ -3,21 +3,20 @@
  *
  * @tags: [
  *   assumes_read_concern_unchanged,
- *   requires_wiredtiger,
  *   # We are setting the failpoint only on primaries, so we need to disable reads from secondaries,
  *   # where the failpoint is not enabled.
  *   assumes_read_preference_unchanged,
  *   # $indexStats aggregation stage cannot be used with $facet.
  *   do_not_wrap_aggregations_in_facets,
  *   uses_parallel_shell,
+ *   # Multi clients cannot share global fail points. When one client turns off a fail point, other
+ *   # clients waiting on the fail point will get failed.
+ *   multi_clients_incompatible,
  * ]
  */
-(function() {
-"use strict";
-load('jstests/noPassthrough/libs/index_build.js');  // for waitForIndexBuildToStart().
-load('jstests/libs/fixture_helpers.js');            // for runCommandOnEachPrimary.
-load("jstests/aggregation/extras/utils.js");        // for resultsEq.
-load("jstests/libs/fail_point_util.js");            // for configureFailPoint.
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
 const coll = db.index_stats_output;
 coll.drop();
@@ -31,7 +30,7 @@ assert.commandWorked(bulk.execute());
 
 const indexKey = {
     _id: 1,
-    a: 1
+    a: 1,
 };
 const indexName = "testIndex";
 
@@ -40,9 +39,10 @@ const indexName = "testIndex";
 
 // Enable 'hangAfterStartingIndexBuild' failpoint on each of the primaries. This will make index
 // building process infinite.
-const failPoints = FixtureHelpers.mapOnEachPrimary({
+const failPoints = FixtureHelpers.mapOnEachShardNode({
     db: db.getSiblingDB("admin"),
-    func: (db) => configureFailPoint(db, "hangAfterStartingIndexBuild")
+    func: (db) => configureFailPoint(db, "hangAfterStartingIndexBuild"),
+    primaryNodeOnly: true,
 });
 
 const join = startParallelShell(() => {
@@ -65,9 +65,12 @@ let pausedOutput = coll.aggregate([{$indexStats: {}}, {$match: {name: indexName}
 
 let allShards = [];
 let shardsFound = [];
-db.getSiblingDB("config").shards.find().forEach(function(shard) {
-    allShards.push(shard._id);
-});
+db.getSiblingDB("config")
+    .shards.find()
+    .forEach(function (shard) {
+        allShards.push(shard._id);
+    });
+const isShardedCluster = !!allShards.length;
 
 for (const indexStats of pausedOutput) {
     assert.hasFields(indexStats, ["building", "spec"]);
@@ -83,6 +86,8 @@ for (const indexStats of pausedOutput) {
     // names of known shards.
     if (indexStats.hasOwnProperty("shard")) {
         shardsFound.push(indexStats["shard"]);
+    } else {
+        assert(!isShardedCluster);
     }
 }
 
@@ -107,4 +112,3 @@ let finishedOutput = coll.aggregate([{$indexStats: {}}, {$match: {name: indexNam
 for (const indexStats of finishedOutput) {
     assert(!indexStats.hasOwnProperty("building"), tojson(indexStats));
 }
-})();

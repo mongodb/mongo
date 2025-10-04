@@ -27,9 +27,13 @@
  *    it in the license file.
  */
 
+#include "mongo/base/string_data.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_component_settings.h"
+#include "mongo/logv2/log_severity.h"
 #include "mongo/unittest/unittest.h"
+
+#include <string>
 
 
 namespace mongo::logv2 {

@@ -1,0 +1,131 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+idl_generator(
+    name = "query_shape_gen",
+    src = "query_shape.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "query_shape_common",
+    srcs = [
+        "query_shape_gen",
+        "serialization_options.cpp",
+    ],
+    hdrs = [
+        "serialization_options.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/exec/document_value",
+        "//src/mongo/db/pipeline:field_path",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "query_shape",
+    srcs = [
+        "query_shape.cpp",
+        "shape_helpers.cpp",
+        "//src/mongo/db/query:count_request.h",
+        "//src/mongo/db/query/compiler/logical_model/projection:projection_ast_util.h",
+    ],
+    hdrs = [
+        "agg_cmd_shape.h",
+        "find_cmd_shape.h",
+        "let_shape_component.h",
+        "query_shape.h",
+        "shape_helpers.h",
+        "//src/mongo/db/pipeline:aggregate_command_gen",
+    ],
+    header_deps = [
+        ":query_shape_hash",
+    ],
+    deps = [
+        ":query_shape_common",
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/exec/document_value",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/pipeline:field_path",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+idl_generator(
+    name = "query_shape_hash_gen",
+    src = "query_shape_hash.idl",
+    deps = [
+        "//src/mongo/crypto:sha256_block_gen",
+    ],
+)
+
+idl_generator(
+    name = "query_shape_test_gen",
+    src = "query_shape_test.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "query_shape_hash",
+    srcs = [
+        ":query_shape_hash_gen",
+    ],
+    hdrs = [
+        "query_shape_hash.h",
+    ],
+    deps = [
+        "//src/mongo/crypto:sha256_block",
+    ],
+)
+
+# TODO(SERVER-96861): Remove cycle created by moving //src/mongo/db/query/query_shape:serialization_options.h to //src/mongo/db/query/query_shape:query_shape_common
+filegroup(
+    name = "serialization_options_hdrs",
+    srcs = [":serialization_options.h"],
+)
+
+mongo_cc_unit_test(
+    name = "db_query_query_shape_test",
+    srcs = [
+        "query_shape_test.cpp",
+        ":query_shape_test_gen",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        ":query_shape",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db/query/compiler/parsers/matcher:parsed_match_expression_for_test",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "query_shape_test",
+    srcs = [
+        "agg_cmd_shape_test.cpp",
+        "count_cmd_shape_test.cpp",
+        "distinct_cmd_shape_test.cpp",
+        "find_cmd_shape_test.cpp",
+        "let_shape_component_test.cpp",
+        "serialization_options_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_sixth_group",
+    ],
+    deps = [
+        "//src/mongo/db/pipeline:expression_context_for_test",
+    ],
+)

@@ -1,0 +1,40 @@
+nonnormalized
+norm
+norm.coll as fuzzer_coll
+
+:results {aggregate: "fuzzer_coll", pipeline: [{$limit:5}], cursor: {}}
+[{_id: 1, a: NumberLong(10), b: {b: 2, a: 1, c: 3}}, {_id: 0, b: [3, 2, 1], a: 5}, {_id: 2, a: 10, b: {a: 1, b: 2, c: [true, false, {d: 1}]}}, {_id: 3, a: [NumberDecimal('2'), 21]}, {_id: 4, b: 5, a: [1, 3, 2]}]
+
+:sortResults {aggregate: "fuzzer_coll", pipeline: [{$limit:5}], cursor: {}}
+[{_id: 0, b: [3, 2, 1], a: 5}, {_id: 1, a: NumberLong(10), b: {b: 2, a: 1, c: 3}}, {_id: 2, a: 10, b: {a: 1, b: 2, c: [true, false, {d: 1}]}}, {_id: 3, a: [NumberDecimal('2'), 21]}, {_id: 4, b: 5, a: [1, 3, 2]}]
+
+:normalizeNumerics {aggregate: "fuzzer_coll", pipeline: [{$limit:1}], cursor: {}}
+[{_id: NumberDecimal('1'), a: NumberDecimal('10'), b: {b: NumberDecimal('2'), a: NumberDecimal('1'), c: NumberDecimal('3')}}]
+
+:normalizeNulls {aggregate: "fuzzer_coll", pipeline: [{$limit:10}], cursor: {}}
+[{_id: 1, a: NumberLong(10), b: {b: 2, a: 1, c: 3}}, {_id: 0, b: [3, 2, 1], a: 5}, {_id: 2, a: 10, b: {a: 1, b: 2, c: [true, false, {d: 1}]}}, {_id: 3, a: [NumberDecimal('2'), 21]}, {_id: 4, b: 5, a: [1, 3, 2]}, {_id: 5}, {_id: 6, c: [5]}, {_id: 7}, {_id: 8, c: [7]}]
+
+:sortBSON {aggregate: "fuzzer_coll", pipeline: [{$limit:2}], cursor: {}}
+[{_id: 0, a: 5, b: [3, 2, 1]}, {_id: 1, a: NumberLong(10), b: {a: 1, b: 2, c: 3}}]
+
+:sortFull {aggregate: "fuzzer_coll", pipeline: [{$limit:5}], cursor: {}}
+[{_id: 0, a: 5, b: [1, 2, 3]}, {_id: 1, a: NumberLong(10), b: {a: 1, b: 2, c: 3}}, {_id: 2, a: 10, b: {a: 1, b: 2, c: [{d: 1}, false, true]}}, {_id: 3, a: [NumberDecimal('2'), 21]}, {_id: 4, a: [1, 2, 3], b: 5}]
+
+:sortBSONNormalizeNumerics {aggregate: "fuzzer_coll", pipeline: [{$limit:2}], cursor: {}}
+[{_id: NumberDecimal('0E-6176'), a: NumberDecimal('5'), b: [NumberDecimal('3'), NumberDecimal('2'), NumberDecimal('1')]}, {_id: NumberDecimal('1'), a: NumberDecimal('10'), b: {a: NumberDecimal('1'), b: NumberDecimal('2'), c: NumberDecimal('3')}}]
+
+:normalizeNonNull {aggregate: "fuzzer_coll", pipeline: [{$limit:5}], cursor: {}}
+[{_id: NumberDecimal('0E-6176'), a: NumberDecimal('5'), b: [NumberDecimal('1'), NumberDecimal('2'), NumberDecimal('3')]}, {_id: NumberDecimal('1'), a: NumberDecimal('10'), b: {a: NumberDecimal('1'), b: NumberDecimal('2'), c: NumberDecimal('3')}}, {_id: NumberDecimal('2'), a: NumberDecimal('10'), b: {a: NumberDecimal('1'), b: NumberDecimal('2'), c: [{d: NumberDecimal('1')}, false, true]}}, {_id: NumberDecimal('3'), a: [NumberDecimal('2'), NumberDecimal('210000000000000000000000000000000')]}, {_id: NumberDecimal('4'), a: [NumberDecimal('1'), NumberDecimal('2'), NumberDecimal('3')], b: NumberDecimal('5')}]
+
+:normalizeFull {aggregate: "fuzzer_coll", pipeline: [{$limit:10}], cursor: {}}
+[
+{_id: NumberDecimal('0E-6176'), a: NumberDecimal('5'), b: [NumberDecimal('1'), NumberDecimal('2'), NumberDecimal('3')]},
+{_id: NumberDecimal('1'), a: NumberDecimal('10'), b: {a: NumberDecimal('1'), b: NumberDecimal('2'), c: NumberDecimal('3')}},
+{_id: NumberDecimal('2'), a: NumberDecimal('10'), b: {a: NumberDecimal('1'), b: NumberDecimal('2'), c: [{d: NumberDecimal('1')}, false, true]}},
+{_id: NumberDecimal('3'), a: [NumberDecimal('2'), NumberDecimal('210000000000000000000000000000000')]},
+{_id: NumberDecimal('4'), a: [NumberDecimal('1'), NumberDecimal('2'), NumberDecimal('3')], b: NumberDecimal('5')},
+{_id: NumberDecimal('5')},
+{_id: NumberDecimal('6'), c: [NumberDecimal('5')]},
+{_id: NumberDecimal('7')},
+{_id: NumberDecimal('8'), c: [NumberDecimal('7')]}
+]

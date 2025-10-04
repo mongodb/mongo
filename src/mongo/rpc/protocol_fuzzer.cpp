@@ -30,7 +30,7 @@
 #include "mongo/base/data_range_cursor.h"
 #include "mongo/bson/bson_validate.h"
 #include "mongo/db/dbmessage.h"
-#include "mongo/db/ops/write_ops.h"
+#include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/message.h"
 #include "mongo/transport/message_compressor_manager.h"
@@ -50,10 +50,6 @@ struct CompressionInfrastructure {
     MessageCompressorRegistry registry;
     MessageCompressorManager manager;
 };
-
-void validateBSON(const BSONObj& obj) {
-    validateBSON(obj.objdata(), obj.objsize()).ignore();
-}
 
 void doFuzzing(ConstDataRangeCursor fuzzedData) try {
     if (fuzzedData.length() < sizeof(MSGHEADER::Layout)) {
@@ -79,10 +75,10 @@ void doFuzzing(ConstDataRangeCursor fuzzedData) try {
     switch (msg.operation()) {
         case dbMsg: {
             auto request = OpMsgRequest::parseOwned(msg);
-            validateBSON(request.body);
+            validateBSON(request.body).ignore();
             for (const auto& docSeq : request.sequences) {
                 for (const auto& doc : docSeq.objs) {
-                    validateBSON(doc);
+                    validateBSON(doc).ignore();
                 }
             }
         } break;

@@ -1,0 +1,39 @@
+==== VARIATION: cq=ns=test.collectionTree: $or
+    $and
+        a $eq 1
+        x $eq 1
+    $and
+        b $eq 1
+        y $eq 2
+Sort: {}
+Proj: {}
+or[an[eqa,eqx],an[eqb,eqy]]||||fs
+
+==== VARIATION: cq=ns=test.collectionTree: $and
+    a $eq 1
+    x $eq 1
+Sort: {}
+Proj: {}
+an[eqa,eqx]||||fo
+
+==== VARIATION: cq=ns=test.collectionTree: $and
+    b $eq 1
+    y $eq 2
+Sort: {}
+Proj: {}
+an[eqb,eqy]||||fo
+
+==== VARIATION: cq=ns=test.collectionTree: $and
+    a $eq 1
+    x $eq 1
+Sort: {}
+Proj: {}
+an[eqa,eqx]||||fs
+
+==== VARIATION: cq=ns=test.collectionTree: $and
+    b $eq 1
+    y $eq 2
+Sort: {}
+Proj: {}
+an[eqb,eqy]||||fs
+

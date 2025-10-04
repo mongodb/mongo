@@ -27,9 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/scripting/mozjs/base.h"
+
+#include <js/CallArgs.h>
+#include <js/Class.h>
+#include <js/Id.h>
+#include <js/PropertySpec.h>
+#include <js/RootingAPI.h>
+#include <js/TracingAPI.h>
+#include <js/TypeDecls.h>
 
 namespace mongo {
 namespace mozjs {
@@ -51,18 +57,14 @@ void BaseInfo::delProperty(JSContext* cx,
                            JS::ObjectOpResult& result) {}
 void BaseInfo::enumerate(JSContext* cx,
                          JS::HandleObject obj,
-                         JS::AutoIdVector& properties,
+                         JS::MutableHandleIdVector properties,
                          bool enumerableOnly) {}
-void BaseInfo::finalize(js::FreeOp* fop, JSObject* obj) {}
+void BaseInfo::finalize(JS::GCContext* gcCtx, JSObject* obj) {}
 void BaseInfo::getProperty(JSContext* cx,
                            JS::HandleObject obj,
                            JS::HandleId id,
                            JS::HandleValue receiver,
                            JS::MutableHandleValue vp) {}
-void BaseInfo::hasInstance(JSContext* cx,
-                           JS::HandleObject obj,
-                           JS::MutableHandleValue vp,
-                           bool* bp) {}
 bool BaseInfo::mayResolve(const JSAtomState& names, jsid id, JSObject* maybeObj) {
     return false;
 }

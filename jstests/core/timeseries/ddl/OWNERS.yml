@@ -1,0 +1,20 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
+  - "timeseries_index_build_failure.js":
+    approvers:
+      - 10gen/server-index-builds
+  - "timeseries_index_spec.js":
+    approvers:
+      - 10gen/server-collection-write-path
+  - "timeseries_index_spec_with_originalSpec.js":
+    approvers:
+      - 10gen/server-collection-write-path
+  - "timeseries_index_ttl_partial.js":
+    approvers:
+      - 10gen/query-integration-timeseries
+  - "timeseries_index_use.js":
+    approvers:
+      - 10gen/query-integration-timeseries

@@ -6,17 +6,19 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 /*
  * Define functions that increment histogram statistics for filesystem operations latency.
  */
-WT_STAT_MSECS_HIST_INCR_FUNC(fsread, perf_hist_fsread_latency, 10)
-WT_STAT_MSECS_HIST_INCR_FUNC(fswrite, perf_hist_fswrite_latency, 10)
+WT_STAT_MSECS_HIST_INCR_FUNC(fsread, perf_hist_fsread_latency)
+WT_STAT_MSECS_HIST_INCR_FUNC(fswrite, perf_hist_fswrite_latency)
 
 /*
  * __wt_fsync --
  *     POSIX fsync.
  */
-static inline int
+static WT_INLINE int
 __wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh, bool block)
 {
     WT_DECL_RET;
@@ -47,10 +49,13 @@ __wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh, bool block)
  * __wt_fextend --
  *     Extend a file.
  */
-static inline int
+static WT_INLINE int
 __wt_fextend(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset)
 {
     WT_FILE_HANDLE *handle;
+#ifdef HAVE_DIAGNOSTIC
+    wt_off_t cur_size;
+#endif
 
     WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
     WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
@@ -63,6 +68,14 @@ __wt_fextend(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset)
      * function to call.
      */
     handle = fh->handle;
+#ifdef HAVE_DIAGNOSTIC
+    /* Make sure we don't try to shrink the file during backup. */
+    if (handle->fh_size != NULL) {
+        WT_RET(handle->fh_size(handle, (WT_SESSION *)session, &cur_size));
+        WT_ASSERT(
+          session, cur_size <= offset || __wt_atomic_load64(&S2C(session)->hot_backup_start) == 0);
+    }
+#endif
     if (handle->fh_extend_nolock != NULL)
         return (handle->fh_extend_nolock(handle, (WT_SESSION *)session, offset));
     if (handle->fh_extend != NULL)
@@ -74,7 +87,7 @@ __wt_fextend(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset)
  * __wt_file_lock --
  *     Lock/unlock a file.
  */
-static inline int
+static WT_INLINE int
 __wt_file_lock(WT_SESSION_IMPL *session, WT_FH *fh, bool lock)
 {
     WT_FILE_HANDLE *handle;
@@ -90,14 +103,14 @@ __wt_file_lock(WT_SESSION_IMPL *session, WT_FH *fh, bool lock)
  * __wt_read --
  *     POSIX pread.
  */
-static inline int
+static WT_INLINE int
 __wt_read(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size_t len, void *buf)
 {
     WT_DECL_RET;
     uint64_t time_start, time_stop;
 
-    __wt_verbose(session, WT_VERB_HANDLEOPS, "%s: handle-read: %" WT_SIZET_FMT " at %" PRIuMAX,
-      fh->handle->name, len, (uintmax_t)offset);
+    __wt_verbose_debug2(session, WT_VERB_HANDLEOPS,
+      "%s: handle-read: %" WT_SIZET_FMT " at %" PRIuMAX, fh->handle->name, len, (uintmax_t)offset);
 
     WT_STAT_CONN_INCR_ATOMIC(session, thread_read_active);
     WT_STAT_CONN_INCR(session, read_io);
@@ -107,7 +120,7 @@ __wt_read(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size_t len, void
 
     /* Flag any failed read: if we're in startup, it may be fatal. */
     if (ret != 0)
-        F_SET(S2C(session), WT_CONN_DATA_CORRUPTION);
+        F_SET_ATOMIC_32(S2C(session), WT_CONN_DATA_CORRUPTION);
 
     time_stop = __wt_clock(session);
     __wt_stat_msecs_hist_incr_fsread(session, WT_CLOCKDIFF_MS(time_stop, time_start));
@@ -119,7 +132,7 @@ __wt_read(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size_t len, void
  * __wt_filesize --
  *     Get the size of a file in bytes, by file handle.
  */
-static inline int
+static WT_INLINE int
 __wt_filesize(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *sizep)
 {
     __wt_verbose(session, WT_VERB_HANDLEOPS, "%s: handle-size", fh->handle->name);
@@ -131,10 +144,13 @@ __wt_filesize(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *sizep)
  * __wt_ftruncate --
  *     Truncate a file.
  */
-static inline int
+static WT_INLINE int
 __wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset)
 {
     WT_FILE_HANDLE *handle;
+#ifdef HAVE_DIAGNOSTIC
+    wt_off_t cur_size;
+#endif
 
     WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
 
@@ -146,6 +162,14 @@ __wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset)
      * function to call.
      */
     handle = fh->handle;
+#ifdef HAVE_DIAGNOSTIC
+    /* Make sure we don't try to shrink the file during backup. */
+    if (handle->fh_size != NULL) {
+        WT_RET(handle->fh_size(handle, (WT_SESSION *)session, &cur_size));
+        WT_ASSERT(
+          session, cur_size <= offset || __wt_atomic_load64(&S2C(session)->hot_backup_start) == 0);
+    }
+#endif
     if (handle->fh_truncate != NULL)
         return (handle->fh_truncate(handle, (WT_SESSION *)session, offset));
     return (__wt_set_return(session, ENOTSUP));
@@ -155,7 +179,7 @@ __wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset)
  * __wt_write --
  *     POSIX pwrite.
  */
-static inline int
+static WT_INLINE int
 __wt_write(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size_t len, const void *buf)
 {
     WT_DECL_RET;
@@ -165,8 +189,8 @@ __wt_write(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size_t len, con
       !F_ISSET(S2C(session), WT_CONN_READONLY) ||
         WT_STRING_MATCH(fh->name, WT_SINGLETHREAD, strlen(WT_SINGLETHREAD)));
 
-    __wt_verbose(session, WT_VERB_HANDLEOPS, "%s: handle-write: %" WT_SIZET_FMT " at %" PRIuMAX,
-      fh->handle->name, len, (uintmax_t)offset);
+    __wt_verbose_debug2(session, WT_VERB_HANDLEOPS,
+      "%s: handle-write: %" WT_SIZET_FMT " at %" PRIuMAX, fh->handle->name, len, (uintmax_t)offset);
 
     /*
      * Do a final panic check before I/O, so we stop writing as quickly as possible if there's an

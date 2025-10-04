@@ -1,0 +1,184 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "expression_params",
+    srcs = [
+        "2d_common.cpp",
+        "expression_params.cpp",
+        "s2_common.cpp",
+    ],
+    hdrs = [
+        "2d_common.h",
+        "expression_params.h",
+        "s2_common.h",
+    ],
+    deps = [
+        "//src/mongo/bson/util:bson_extract",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:mongohasher",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/geo:geometry",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/geo:geoparser",
+        "//src/mongo/db/query/collation:collator_interface",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/storage/key_string",  # TODO(SERVER-93876): Remove.
+        "//src/third_party/s2",
+    ],
+)
+
+mongo_cc_library(
+    name = "index_access_method",
+    srcs = [
+        "2d_access_method.cpp",
+        "2d_key_generator.cpp",
+        "btree_access_method.cpp",
+        "btree_key_generator.cpp",
+        "expression_keys_private.cpp",
+        "fts_access_method.cpp",
+        "hash_access_method.cpp",
+        "index_access_method.cpp",
+        "multikey_paths.cpp",
+        "s2_access_method.cpp",
+        "s2_key_generator.cpp",
+        "sort_key_generator.cpp",
+        "wildcard_access_method.cpp",
+        "wildcard_key_generator.cpp",
+        "wildcard_validation.cpp",
+        "//src/mongo/db/local_catalog:index_descriptor.cpp",
+        "//src/mongo/db/storage/kv:kv_engine.h",
+    ],
+    hdrs = [
+        "2d_access_method.h",
+        "2d_key_generator.h",
+        "btree_access_method.h",
+        "btree_key_generator.h",
+        "expression_keys_private.h",
+        "fts_access_method.h",
+        "hash_access_method.h",
+        "index_access_method.h",
+        "multikey_metadata_access_stats.h",
+        "multikey_paths.h",
+        "s2_access_method.h",
+        "s2_bucket_access_method.h",
+        "s2_key_generator.h",
+        "sort_key_generator.h",
+        "wildcard_access_method.h",
+        "wildcard_key_generator.h",
+        "wildcard_validation.h",
+        "//src/mongo/db/exec:index_path_projection.h",
+        "//src/mongo/db/local_catalog:index_descriptor.h",
+    ],
+    deps = [
+        ":expression_params",
+        "//src/mongo/bson/dotted_path:dotted_path_support",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:mongohasher",
+        "//src/mongo/db:multi_key_path_tracker",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:query_expressions",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:record_id_helpers",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:shard_role_api",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/collection_crud:container_write",
+        "//src/mongo/db/exec:projection_executor",
+        "//src/mongo/db/exec:working_set",
+        "//src/mongo/db/fts:base_fts",
+        "//src/mongo/db/geo:geoparser",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/index:preallocated_container_pool",
+        "//src/mongo/db/index_builds:index_build_interceptor",
+        "//src/mongo/db/index_builds:resumable_index_builds_idl",
+        "//src/mongo/db/local_catalog:index_catalog",
+        "//src/mongo/db/local_catalog/lock_manager",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/local_catalog/lock_manager:exception_util",
+        "//src/mongo/db/pipeline:document_path_support",
+        "//src/mongo/db/query:spill_util",
+        "//src/mongo/db/query/collation:collator_factory_interface",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query/compiler/logical_model/projection:projection_ast",
+        "//src/mongo/db/query/compiler/logical_model/sort_pattern",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query/query_stats",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/sorter:sorter_base",
+        "//src/mongo/db/sorter:sorter_stats",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/storage:encryption_hooks",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/storage:index_entry_comparison",
+        "//src/mongo/db/storage:record_store_base",
+        "//src/mongo/db/storage:storage_options",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/storage:write_unit_of_work",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/storage/key_string",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/timeseries:timeseries_conversion_util",
+        "//src/mongo/util:progress_meter",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
+        "//src/third_party/s2",  # TODO(SERVER-93876): Remove.
+        "//src/third_party/snappy",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "preallocated_container_pool",
+    srcs = [
+        "preallocated_container_pool.cpp",
+    ],
+    hdrs = [
+        "preallocated_container_pool.h",
+        "//src/mongo/util:auto_clear_ptr.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/storage/key_string",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_index_test",
+    srcs = [
+        "2d_key_generator_test.cpp",
+        "btree_key_generator_test.cpp",
+        "hash_key_generator_test.cpp",
+        "multikey_paths_test.cpp",
+        "s2_bucket_key_generator_test.cpp",
+        "s2_key_generator_test.cpp",
+        "sort_key_generator_test.cpp",
+        "wildcard_key_generator_test.cpp",
+        "wildcard_validation_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        ":expression_params",
+        ":index_access_method",
+        "//src/mongo/db:mongohasher",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db:record_id_helpers",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/exec:working_set",
+        "//src/mongo/db/exec/document_value:document_value_test_util",
+        "//src/mongo/db/local_catalog:catalog_test_fixture",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db/query/collation:collator_interface_mock",
+        "//src/mongo/db/query/compiler/logical_model/sort_pattern",
+        "//src/mongo/db/sorter:sorter_stats",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/idl:server_parameter_test_controller",
+        "//src/third_party/snappy",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "key_gen_bm",
+    srcs = [
+        "key_gen_bm.cpp",
+    ],
+    tags = ["second_half_bm"],
+    deps = [
+        ":index_access_method",
+        "//src/mongo:base",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db/query/compiler/logical_model/sort_pattern",
+    ],
+)

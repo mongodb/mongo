@@ -1,0 +1,181 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob(["*.h"]) + glob(["*.cpp"]),
+)
+
+# Headers designed to be used without source code. Split these out
+# into targets if they're meant to be used with source code.
+filegroup(
+    name = "headers",
+    srcs = [
+        "admission_context.h",
+        "lock_free_read_list.h",
+        "spin_lock.h",
+        "ticketholder.h",
+    ],
+)
+
+mongo_cc_library(
+    name = "spin_lock",
+    srcs = [
+        "spin_lock.cpp",
+    ],
+    hdrs = [
+        "spin_lock.h",
+        "//src/mongo/platform:pause.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "admission_context",
+    srcs = [
+        "admission_context.cpp",
+    ],
+    hdrs = [
+        "admission_context.h",
+    ],
+    header_deps = [
+        "//src/mongo/db/local_catalog/lock_manager:flow_control_ticketholder",
+    ],
+    deps = [
+        ":spin_lock",
+        "//src/mongo:base",
+    ],
+)
+
+idl_generator(
+    name = "ticketholder_parameters_gen",
+    src = "ticketholder_parameters.idl",
+)
+
+mongo_cc_library(
+    name = "ticketholder",
+    srcs = [
+        "ticketholder.cpp",
+        "ticketholder_parameters_gen",
+    ],
+    hdrs = [
+        "ticketholder.h",
+    ],
+    deps = [
+        ":admission_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:server_feature_flags",
+        "//src/third_party/boost:boost_filesystem",  # TODO(SERVER-93876): Remove.
+        "//src/third_party/boost:boost_iostreams",  # TODO(SERVER-93876): Remove.
+        "//src/third_party/boost:boost_log",  # TODO(SERVER-93876): Remove.
+        "//src/third_party/boost:boost_program_options",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "ticketholder_queue_stats",
+    srcs = [
+        "ticketholder_queue_stats.cpp",
+    ],
+    hdrs = [
+        "ticketholder_queue_stats.h",
+    ],
+    deps = [
+        ":admission_context",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/admission:execution_admission_context",
+        "//src/mongo/db/admission:ingress_admission_control",
+    ],
+)
+
+mongo_cc_library(
+    name = "thread_pool",
+    srcs = [
+        "thread_pool.cpp",
+    ],
+    hdrs = [
+        "thread_pool.h",
+        "//src/mongo/util/concurrency:thread_pool_interface.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "util_concurrency_test",
+    srcs = [
+        "spin_lock_test.cpp",
+        "thread_pool_test.cpp",
+        "with_lock_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_third_group",
+        "server-programmability",
+    ],
+    deps = [
+        ":spin_lock",
+        ":thread_pool",
+        ":ticketholder",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/unittest",
+        "//src/mongo/util:packaged_task",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "lock_free_read_list_test",
+    srcs = [
+        "lock_free_read_list_test.cpp",
+        "//src/mongo/unittest:join_thread.h",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [],
+)
+
+mongo_cc_benchmark(
+    name = "lock_free_read_list_bm",
+    srcs = [
+        "lock_free_read_list_bm.cpp",
+    ],
+    deps = [
+        "//src/mongo/util:processinfo",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "ticketholder_bm",
+    srcs = [
+        "ticketholder_bm.cpp",
+        "//src/mongo/util:latency_distribution.h",
+    ],
+    tags = [
+        "second_half_bm",
+    ],
+    deps = [
+        ":ticketholder",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db/admission:execution_admission_context",
+        "//src/mongo/db/local_catalog/lock_manager",
+        "//src/mongo/util:tick_source_mock",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "ticketholder_test",
+    srcs = [
+        "ticketholder_test.cpp",
+    ],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/util:packaged_task",
+        "//src/mongo/util/concurrency:ticketholder",
+    ],
+)

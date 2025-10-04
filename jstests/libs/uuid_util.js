@@ -4,8 +4,9 @@
  * Reads the collection entry for 'nss' from config.collections, asserts that such an entry exists,
  * and returns its 'uuid' field, which may be undefined.
  */
-function getUUIDFromConfigCollections(mongosConn, nss) {
-    let collEntry = mongosConn.getDB("config").collections.findOne({_id: nss});
+export function getUUIDFromConfigCollections(conn, nss) {
+    const configDB = conn.getSiblingDB ? conn.getSiblingDB("config") : conn.getDB("config");
+    let collEntry = configDB.collections.findOne({_id: nss});
     assert.neq(undefined, collEntry);
     return collEntry.uuid;
 }
@@ -14,7 +15,7 @@ function getUUIDFromConfigCollections(mongosConn, nss) {
  * Calls listCollections on a connection to 'db' with a filter for 'collName', asserts that a result
  * for 'collName' was returned, and returns its 'uuid' field, which may be undefined.
  */
-function getUUIDFromListCollections(db, collName) {
+export function getUUIDFromListCollections(db, collName) {
     let listCollsRes = db.runCommand({listCollections: 1, filter: {name: collName}});
     assert.commandWorked(listCollsRes);
     assert.neq(undefined, listCollsRes.cursor);
@@ -29,7 +30,7 @@ function getUUIDFromListCollections(db, collName) {
  * string of the form xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx.
  *
  */
-function extractUUIDFromObject(uuid) {
+export function extractUUIDFromObject(uuid) {
     const uuidString = uuid.toString();
     return uuidString.substring(6, uuidString.length - 2);
 }

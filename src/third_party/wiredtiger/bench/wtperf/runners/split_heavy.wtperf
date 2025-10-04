@@ -1,0 +1,13 @@
+conn_config="cache_size=100MB,log=(enabled=false),statistics=[fast],statistics_log=(wait=5,json=false)"
+table_config="leaf_page_max=8k,internal_page_max=8k,leaf_key_max=1433,leaf_value_max=1433,type=file,memory_page_max=1MB,split_deepen_min_child=100"
+table_count=3
+icount=50000
+populate_threads=1
+random_range=100000000
+checkpoint_threads=0
+report_interval=5
+run_time=10
+threads=((count=20,inserts=1))
+value_sz=200
+key_sz=64
+reopen_connection=false

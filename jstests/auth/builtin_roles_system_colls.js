@@ -27,9 +27,9 @@ function testBackupSystemCollStats(adminDB) {
     adminDB.createUser({user: "backup-agent", pwd: "pwd", roles: ["backup"]});
     adminDB.system.js.save({
         _id: "testFunction",
-        value: function(x) {
+        value: function (x) {
             return x;
-        }
+        },
     });
     adminDB.logout();
 
@@ -42,8 +42,8 @@ function testBackupSystemCollStats(adminDB) {
 
 // ************************************************************
 
-var conn = MongoRunner.runMongod({auth: ""});
-var adminDB = conn.getDB("admin");
+let conn = MongoRunner.runMongod({auth: ""});
+let adminDB = conn.getDB("admin");
 adminDB.createUser({user: "root", pwd: "pwd", roles: ["root"]});
 
 testUserAdminAnyDatabaseSystemCollIndexing(adminDB);

@@ -29,12 +29,22 @@
 
 #pragma once
 
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/data_view.h"
+#include "mongo/base/encoded_value_storage.h"
 #include "mongo/base/static_assert.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_validate.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/client/constants.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/server_options.h"
 #include "mongo/rpc/message.h"
+
+#include <cstdint>
+#include <cstdio>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -227,7 +237,7 @@ public:
      * Indicates whether this message is expected to have a ns.
      */
     bool messageShouldHaveNs() const {
-        return (_msg.operation() >= dbUpdate) & (_msg.operation() <= dbDelete);
+        return static_cast<int>(_msg.operation() >= dbUpdate) & (_msg.operation() <= dbDelete);
     }
 
     /**
@@ -241,7 +251,6 @@ public:
     }
 
     const char* getns() const;
-    int getQueryNToReturn() const;
 
     int pullInt();
     long long pullInt64();
@@ -426,10 +435,10 @@ enum InsertOptions {
  * The OP_INSERT command is no longer supported, so new callers of this function should not be
  * added! This is currently retained for the limited purpose of unit testing.
  */
-Message makeDeprecatedInsertMessage(StringData ns,
-                                    const BSONObj* objs,
-                                    size_t count,
-                                    int flags = 0);
+Message makeUnsupportedOpInsertMessage(StringData ns,
+                                       const BSONObj* objs,
+                                       size_t count,
+                                       int flags = 0);
 
 /**
  * A response to a DbMessage.
@@ -451,5 +460,5 @@ struct DbResponse {
 /**
  * Helper to build an error DbResponse for OP_QUERY and OP_GET_MORE.
  */
-DbResponse makeErrorResponseToDeprecatedOpQuery(StringData errorMsg);
+DbResponse makeErrorResponseToUnsupportedOpQuery(StringData errorMsg);
 }  // namespace mongo

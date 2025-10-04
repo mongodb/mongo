@@ -27,18 +27,25 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/matcher/schema/expression_internal_schema_fmod.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/util/assert_util.h"
+
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
 InternalSchemaFmodMatchExpression::InternalSchemaFmodMatchExpression(
-    StringData path,
+    boost::optional<StringData> path,
     Decimal128 divisor,
     Decimal128 remainder,
     clonable_ptr<ErrorAnnotation> annotation)
@@ -50,39 +57,18 @@ InternalSchemaFmodMatchExpression::InternalSchemaFmodMatchExpression(
     uassert(ErrorCodes::BadValue, "divisor cannot be infinite", !divisor.isInfinite());
 }
 
-bool InternalSchemaFmodMatchExpression::matchesSingleElement(const BSONElement& e,
-                                                             MatchDetails* details) const {
-    if (!e.isNumber()) {
-        return false;
-    }
-    std::uint32_t flags = Decimal128::SignalingFlag::kNoFlag;
-    Decimal128 result = e.numberDecimal().modulo(_divisor, &flags);
-    if (flags == Decimal128::SignalingFlag::kNoFlag) {
-        return result.isEqual(_remainder);
-    }
-    return false;
-}
-
 void InternalSchemaFmodMatchExpression::debugString(StringBuilder& debug,
                                                     int indentationLevel) const {
     _debugAddSpace(debug, indentationLevel);
     debug << path() << " fmod: divisor: " << _divisor.toString()
           << " remainder: " << _remainder.toString();
-    MatchExpression::TagData* td = getTag();
-    if (td) {
-        debug << " ";
-        td->debugString(&debug);
-    }
-    debug << "\n";
+    _debugStringAttachTagInfo(&debug);
 }
 
-BSONObj InternalSchemaFmodMatchExpression::getSerializedRightHandSide() const {
-    BSONObjBuilder objMatchBob;
-    BSONArrayBuilder arrBuilder(objMatchBob.subarrayStart("$_internalSchemaFmod"));
-    arrBuilder.append(_divisor);
-    arrBuilder.append(_remainder);
-    arrBuilder.doneFast();
-    return objMatchBob.obj();
+void InternalSchemaFmodMatchExpression::appendSerializedRightHandSide(
+    BSONObjBuilder* bob, const SerializationOptions& opts, bool includePath) const {
+    bob->append("$_internalSchemaFmod"_sd,
+                BSON_ARRAY(opts.serializeLiteral(_divisor) << opts.serializeLiteral(_remainder)));
 }
 
 bool InternalSchemaFmodMatchExpression::equivalent(const MatchExpression* other) const {

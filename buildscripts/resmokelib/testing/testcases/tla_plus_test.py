@@ -1,8 +1,10 @@
 """The unittest.TestCase for model-checking TLA+ specifications."""
 
 import os
+import shlex
+from typing import Optional
 
-from buildscripts.resmokelib import core
+from buildscripts.resmokelib import core, logging
 from buildscripts.resmokelib.testing.testcases import interface
 
 
@@ -11,36 +13,50 @@ class TLAPlusTestCase(interface.ProcessTestCase):
 
     REGISTERED_NAME = "tla_plus_test"
 
-    def __init__(self, logger, model_config_file, java_binary=None):
+    def __init__(
+        self,
+        logger: logging.Logger,
+        model_config_files: list[str],
+        java_binary: Optional[str] = None,
+        model_check_command: Optional[str] = "sh model-check.sh",
+    ):
         """Initialize the TLAPlusTestCase with a TLA+ model config file.
 
         model_config_file is the full path to a file like
-        src/mongo/tla_plus/MongoReplReconfig/MCMongoReplReconfig.cfg.
+        src/mongo/tla_plus/**/MCMongoReplReconfig.cfg.
 
         java_binary is the full path to the "java" program, or None.
         """
-        message = f"Path '{model_config_file}' doesn't" \
-                  f" match **/<SpecName>/MC<SpecName>.cfg"
 
-        # spec_dir should be like src/mongo/tla_plus/MongoReplReconfig.
-        spec_dir, filename = os.path.split(model_config_file)
-        if not (spec_dir and filename):
-            raise ValueError(message)
+        assert len(model_config_files) == 1
+        message = f"Path '{model_config_files[0]}' doesn't" f" match **/<SpecName>/MC<SpecName>.cfg"
 
-        # working_dir is like src/mongo/tla_plus.
-        self.working_dir, specname = os.path.split(spec_dir)
-        if not specname or filename != f'MC{specname}.cfg':
+        # working_dir is always src/mongo/tla_plus, which contains 'model-check.sh' and subfolders
+        # organizing specifications per component.
+        self.working_dir = "src/mongo/tla_plus/"
+        cfg_relpath = os.path.relpath(model_config_files[0], self.working_dir)
+
+        # cfg_relpath should be like **/MongoReplReconfig/MCMongoReplReconfig.cfg
+        spec_dir, filename = os.path.split(cfg_relpath)
+        specname = os.path.split(spec_dir)[1]
+        if not (spec_dir and filename) or filename != f"MC{specname}.cfg":
             raise ValueError(message)
 
         self.java_binary = java_binary
 
-        interface.ProcessTestCase.__init__(self, logger, "TLA+ test", specname)
+        self.model_check_command = model_check_command
+
+        interface.ProcessTestCase.__init__(self, logger, "TLA+ test", spec_dir)
 
     def _make_process(self):
         process_kwargs = {"cwd": self.working_dir}
         if self.java_binary is not None:
             process_kwargs["env_vars"] = {"JAVA_BINARY": self.java_binary}
 
-        return core.programs.generic_program(self.logger, ["sh", "model-check.sh", self.test_name],
-                                             self.fixture.job_num, test_id=self._id,
-                                             process_kwargs=process_kwargs)
+        interface.append_process_tracking_options(process_kwargs, self._id)
+
+        return core.programs.generic_program(
+            self.logger,
+            [*shlex.split(self.model_check_command), self.test_name],
+            process_kwargs=process_kwargs,
+        )

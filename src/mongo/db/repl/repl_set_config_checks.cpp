@@ -27,41 +27,44 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <cstddef>
 
+#include <boost/move/utility_core.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/db/repl/member_config.h"
+#include "mongo/db/repl/member_config_gen.h"
+#include "mongo/db/repl/member_id.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/repl_set_config_checks.h"
+#include "mongo/db/repl/repl_set_config_gen.h"
+#include "mongo/db/repl/replication_coordinator_external_state.h"
+#include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/service_context.h"
+#include "mongo/logv2/log.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/str.h"
 
 #include <algorithm>
 #include <iterator>
+#include <set>
+#include <vector>
 
-#include "mongo/db/repl/repl_server_parameters_gen.h"
-#include "mongo/db/repl/repl_set_config.h"
-#include "mongo/db/repl/replication_coordinator_external_state.h"
-#include "mongo/db/s/sharding_state.h"
-#include "mongo/db/service_context.h"
-#include "mongo/util/str.h"
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
 namespace mongo {
 namespace repl {
 
 namespace {
-
-/**
- * Checks if the node with the given config index is electable, returning a useful
- * status message if not.
- */
-Status checkElectable(const ReplSetConfig& newConfig, int configIndex) {
-    const MemberConfig& myConfig = newConfig.getMemberAt(configIndex);
-    if (!myConfig.isElectable()) {
-        return Status(ErrorCodes::NodeNotElectable,
-                      str::stream() << "This node, " << myConfig.getHostAndPort().toString()
-                                    << ", with _id " << myConfig.getId()
-                                    << " is not electable under the new configuration with "
-                                    << newConfig.getConfigVersionAndTerm().toString()
-                                    << " for replica set " << newConfig.getReplSetName());
-    }
-    return Status::OK();
-}
 
 /**
  * Checks that the priorities of all the arbiters in the configuration are 0.  If they were 1,
@@ -109,10 +112,10 @@ Status ensureNoNewlyAddedMembers(const ReplSetConfig& config) {
 Status validateSingleNodeChange(const ReplSetConfig& oldConfig, const ReplSetConfig& newConfig) {
     // Add MemberId of voting nodes from each config into respective sets.
     std::set<MemberId> oldIdSet, newIdSet;
-    for (MemberConfig m : oldConfig.votingMembers()) {
+    for (const MemberConfig& m : oldConfig.votingMembers()) {
         oldIdSet.insert(m.getId());
     }
-    for (MemberConfig m : newConfig.votingMembers()) {
+    for (const MemberConfig& m : newConfig.votingMembers()) {
         newIdSet.insert(m.getId());
     }
 
@@ -160,7 +163,8 @@ Status validateSingleNodeChange(const ReplSetConfig& oldConfig, const ReplSetCon
  * When "force" is true, skips config version check, since the version is guaranteed
  * to be valid either by "force" reconfig command or by internal use.
  */
-Status validateOldAndNewConfigsCompatible(const ReplSetConfig& oldConfig,
+Status validateOldAndNewConfigsCompatible(const VersionContext& vCtx,
+                                          const ReplSetConfig& oldConfig,
                                           const ReplSetConfig& newConfig) {
     invariant(newConfig.isInitialized());
     invariant(oldConfig.isInitialized());
@@ -191,10 +195,16 @@ Status validateOldAndNewConfigsCompatible(const ReplSetConfig& oldConfig,
                                     << newConfig.getReplicaSetId());
     }
 
-    if (oldConfig.getConfigServer() && !newConfig.getConfigServer()) {
+    // If we are running with replicaSetConfigShardMaintenanceMode then it's safe to skip this check
+    // as we are about to reconfigure the replicaset
+    if (oldConfig.getConfigServer_deprecated() && !newConfig.getConfigServer_deprecated() &&
+        !serverGlobalParams.replicaSetConfigShardMaintenanceMode &&
+        !gFeatureFlagAllMongodsAreSharded.isEnabledUseLatestFCVWhenUninitialized(
+            vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         return Status(ErrorCodes::NewReplicaSetConfigurationIncompatible,
-                      str::stream() << "Cannot remove \"" << ReplSetConfig::kConfigServerFieldName
-                                    << "\" from replica set configuration on reconfig");
+                      str::stream()
+                          << "Cannot remove \"" << ReplSetConfig::kConfigServer_deprecatedFieldName
+                          << "\" from replica set configuration on reconfig");
     }
 
     //
@@ -302,6 +312,23 @@ Status validateOldAndNewConfigsCompatible(const ReplSetConfig& oldConfig,
 }
 }  // namespace
 
+/**
+ * Checks if the node with the given config index is electable, returning a useful
+ * status message if not.
+ */
+Status checkElectable(const ReplSetConfig& newConfig, int configIndex) {
+    const MemberConfig& myConfig = newConfig.getMemberAt(configIndex);
+    if (!myConfig.isElectable()) {
+        return Status(ErrorCodes::NodeNotElectable,
+                      str::stream() << "This node, " << myConfig.getHostAndPort().toString()
+                                    << ", with _id " << myConfig.getId()
+                                    << " is not electable under the new configuration with "
+                                    << newConfig.getConfigVersionAndTerm().toString()
+                                    << " for replica set " << newConfig.getReplSetName());
+    }
+    return Status::OK();
+}
+
 bool sameConfigContents(const ReplSetConfig& oldConfig, const ReplSetConfig& newConfig) {
     auto oldBSON = oldConfig.toBSON();
     auto newBSON = newConfig.toBSON();
@@ -321,8 +348,18 @@ StatusWith<int> findSelfInConfig(ReplicationCoordinatorExternalState* externalSt
     for (ReplSetConfig::MemberIterator iter = newConfig.membersBegin();
          iter != newConfig.membersEnd();
          ++iter) {
-        if (externalState->isSelf(iter->getHostAndPort(), ctx)) {
+        if (externalState->isSelfFastPath(iter->getHostAndPort())) {
             meConfigs.push_back(iter);
+        }
+    }
+    if (meConfigs.empty()) {
+        // No self-hosts were found using the fastpath; check with the slow path.
+        for (ReplSetConfig::MemberIterator iter = newConfig.membersBegin();
+             iter != newConfig.membersEnd();
+             ++iter) {
+            if (externalState->isSelfSlowPath(iter->getHostAndPort(), ctx, Seconds(30))) {
+                meConfigs.push_back(iter);
+            }
         }
     }
     if (meConfigs.empty()) {
@@ -346,7 +383,9 @@ StatusWith<int> findSelfInConfig(ReplicationCoordinatorExternalState* externalSt
     }
 
     int myIndex = std::distance(newConfig.membersBegin(), meConfigs.front());
-    invariant(myIndex >= 0 && myIndex < newConfig.getNumMembers());
+    invariant(myIndex >= 0 && myIndex < newConfig.getNumMembers(),
+              str::stream() << "myIndex: " << myIndex
+                            << ", numMembers: " << newConfig.getNumMembers());
     return StatusWith<int>(myIndex);
 }
 
@@ -361,6 +400,30 @@ StatusWith<int> findSelfInConfigIfElectable(ReplicationCoordinatorExternalState*
         }
     }
     return result;
+}
+
+int findOwnHostInConfigQuick(const ReplSetConfig& newConfig, HostAndPort host) {
+    if (host.empty()) {
+        return -1;
+    }
+
+    int firstMatchIndex = -1;
+    int currIndex = 0;
+
+    for (ReplSetConfig::MemberIterator iter = newConfig.membersBegin();
+         iter != newConfig.membersEnd();
+         ++iter) {
+
+        if (iter->getHostAndPort() == host) {
+            firstMatchIndex = currIndex;
+            invariant(firstMatchIndex >= 0);
+            break;
+        }
+
+        currIndex++;
+    }
+
+    return firstMatchIndex;
 }
 
 StatusWith<int> validateConfigForStartUp(ReplicationCoordinatorExternalState* externalState,
@@ -425,7 +488,8 @@ StatusWith<int> validateConfigForInitiate(ReplicationCoordinatorExternalState* e
     return findSelfInConfigIfElectable(externalState, newConfig, ctx);
 }
 
-Status validateConfigForReconfig(const ReplSetConfig& oldConfig,
+Status validateConfigForReconfig(const VersionContext& vCtx,
+                                 const ReplSetConfig& oldConfig,
                                  const ReplSetConfig& newConfig,
                                  bool force,
                                  bool allowSplitHorizonIP) {
@@ -442,7 +506,7 @@ Status validateConfigForReconfig(const ReplSetConfig& oldConfig,
             "set a cluster-wide default writeConcern.",
             !newConfig.containsCustomizedGetLastErrorDefaults());
 
-    status = validateOldAndNewConfigsCompatible(oldConfig, newConfig);
+    status = validateOldAndNewConfigsCompatible(vCtx, oldConfig, newConfig);
     if (!status.isOK()) {
         return status;
     }
@@ -468,6 +532,7 @@ Status validateConfigForReconfig(const ReplSetConfig& oldConfig,
 StatusWith<int> validateConfigForHeartbeatReconfig(
     ReplicationCoordinatorExternalState* externalState,
     const ReplSetConfig& newConfig,
+    HostAndPort ownHost,
     ServiceContext* ctx) {
     Status status = newConfig.validateAllowingSplitHorizonIP();
     if (!status.isOK()) {
@@ -480,6 +545,14 @@ StatusWith<int> validateConfigForHeartbeatReconfig(
             "been deprecated and is now ignored. Use setDefaultRWConcern instead to "
             "set a cluster-wide default writeConcern.",
             !newConfig.containsCustomizedGetLastErrorDefaults());
+
+    auto quickIndex = findOwnHostInConfigQuick(newConfig, ownHost);
+    if (quickIndex >= 0) {
+        LOGV2(6475001,
+              "Was able to quickly find new index in config. Skipping full isSelf checks",
+              "index"_attr = quickIndex);
+        return quickIndex;
+    }
 
     return findSelfInConfig(externalState, newConfig, ctx);
 }

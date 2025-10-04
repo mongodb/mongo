@@ -29,12 +29,18 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/db/update/update_oplog_entry_version.h"
 
+#include <cstddef>
+
+#include <boost/optional/optional.hpp>
+
 /**
- * This provides helpers for creating oplog entries. To create a $v: 1 modifier-style oplog
- * entry, a LogBuilder must be used instead.
+ * This provides helpers for creating oplog entries.
  */
 namespace mongo::update_oplog_entry {
 static inline constexpr StringData kDiffObjectFieldName = "diff"_sd;
@@ -51,7 +57,6 @@ constexpr size_t kSizeOfDeltaOplogEntryMetadata = 15;
  */
 enum class UpdateType {
     kReplacement,
-    kV1Modifier,
     kV2Delta,
 };
 
@@ -67,6 +72,11 @@ enum class FieldRemovedStatus { kFieldRemoved, kFieldNotRemoved, kUnknown };
 BSONObj makeDeltaOplogEntry(const doc_diff::Diff& diff);
 
 /**
+ * Given a $v: 2 delta-style oplog entry, return the embedded diff object.
+ */
+boost::optional<BSONObj> extractDiffFromOplogEntry(const BSONObj& opLog);
+
+/**
  * Produce the contents of the 'o' field of a replacement style oplog entry.
  */
 inline BSONObj makeReplacementOplogEntry(const BSONObj& replacement) {
@@ -74,8 +84,8 @@ inline BSONObj makeReplacementOplogEntry(const BSONObj& replacement) {
 }
 
 /**
- * Given the 'o' field of an update oplog entry, determine its type. If the type cannot be
- * determined, boost::none is returned.
+ * Given the 'o' field of an update oplog entry, determine its type. Throws if the object is not of
+ * the expected format.
  */
 UpdateType extractUpdateType(const BSONObj& oField);
 

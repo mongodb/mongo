@@ -27,18 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/pipeline/document_source_skip.h"
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/pipeline/document_source_limit.h"
-#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/query/allowed_contexts.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <iterator>
+#include <limits>
+#include <list>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -52,36 +57,20 @@ REGISTER_DOCUMENT_SOURCE(skip,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceSkip::createFromBson,
                          AllowedWithApiStrict::kAlways);
+ALLOCATE_DOCUMENT_SOURCE_ID(skip, DocumentSourceSkip::id)
 
 constexpr StringData DocumentSourceSkip::kStageName;
 
-DocumentSource::GetNextResult DocumentSourceSkip::doGetNext() {
-    while (_nSkippedSoFar < _nToSkip) {
-        // For performance reasons, a streaming stage must not keep references to documents across
-        // calls to getNext(). Such stages must retrieve a result from their child and then release
-        // it (or return it) before asking for another result. Failing to do so can result in extra
-        // work, since the Document/Value library must copy data on write when that data has a
-        // refcount above one.
-        auto nextInput = pSource->getNext();
-        if (!nextInput.isAdvanced()) {
-            return nextInput;
-        }
-        ++_nSkippedSoFar;
-    }
-
-    return pSource->getNext();
-}
-
-Value DocumentSourceSkip::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
-    return Value(DOC(getSourceName() << _nToSkip));
+Value DocumentSourceSkip::serialize(const SerializationOptions& opts) const {
+    return Value(DOC(getSourceName() << opts.serializeLiteral(_nToSkip)));
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceSkip::optimize() {
     return _nToSkip == 0 ? nullptr : this;
 }
 
-Pipeline::SourceContainer::iterator DocumentSourceSkip::doOptimizeAt(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+DocumentSourceContainer::iterator DocumentSourceSkip::doOptimizeAt(
+    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     invariant(*itr == this);
 
     if (std::next(itr) == container->end()) {

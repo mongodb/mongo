@@ -1,10 +1,8 @@
-/**
- * Tests that maxTimeMS is respected even in an inner $unionWith pipeline.
- */
-
-(function() {
-"use strict";
-
+// Tests that maxTimeMS is respected even in an inner $unionWith pipeline.
+//
+// @tags: [
+//   requires_scripting,
+// ]
 const testDB = db.getSiblingDB(jsTestName());
 const collA = testDB.A;
 collA.drop();
@@ -19,19 +17,23 @@ function sleepAndIncrement(val) {
     sleep(2000);
     return val + 1;
 }
-assert.commandFailedWithCode(testDB.runCommand({
-    aggregate: collA.getName(),
-    pipeline: [{
-        $unionWith: {
-            coll: collB.getName(),
-            pipeline: [{
-                $project:
-                    {newVal: {$function: {args: ["$val"], body: sleepAndIncrement, lang: "js"}}}
-            }]
-        }
-    }],
-    cursor: {},
-    maxTimeMS: 3 * 1000
-}),
-                             ErrorCodes.MaxTimeMSExpired);
-})();
+assert.commandFailedWithCode(
+    testDB.runCommand({
+        aggregate: collA.getName(),
+        pipeline: [
+            {
+                $unionWith: {
+                    coll: collB.getName(),
+                    pipeline: [
+                        {
+                            $project: {newVal: {$function: {args: ["$val"], body: sleepAndIncrement, lang: "js"}}},
+                        },
+                    ],
+                },
+            },
+        ],
+        cursor: {},
+        maxTimeMS: 3 * 1000,
+    }),
+    ErrorCodes.MaxTimeMSExpired,
+);

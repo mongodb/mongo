@@ -232,6 +232,3 @@ class test_shared_cache01(wttest.WiredTigerTestCase):
             sess.create(self.uri, "key_format=S,value_format=S")
             self.add_records(sess, 0, nops)
         self.closeConnections()
-
-if __name__ == '__main__':
-    wttest.run()

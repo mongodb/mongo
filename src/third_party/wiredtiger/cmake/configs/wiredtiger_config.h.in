@@ -24,17 +24,47 @@
 /* ZSTD support automatically loaded. */
 #cmakedefine HAVE_BUILTIN_EXTENSION_ZSTD 1
 
+/* IAA support automatically loaded. */
+#cmakedefine HAVE_BUILTIN_EXTENSION_IAA 1
+
 /* libsodium support automatically loaded. */
 #cmakedefine HAVE_BUILTIN_EXTENSION_SODIUM 1
-
-/* Define to 1 if you have the `clock_gettime' function. */
-#cmakedefine HAVE_CLOCK_GETTIME 1
 
 /* Define to 1 for diagnostic tests. */
 #cmakedefine HAVE_DIAGNOSTIC 1
 
-/* Define to 1 if you have the <dlfcn.h> header file. */
-#cmakedefine HAVE_DLFCN_H 1
+#cmakedefine HAVE_CALL_LOG 1
+
+/* Define to 1 for ref tracking */
+#cmakedefine HAVE_REF_TRACK 1
+
+/* Define to 1 to remove full memory barriers on diagnostic yields. */
+#cmakedefine NON_BARRIER_DIAGNOSTIC_YIELDS 0
+
+/* Define to 1 for unit tests. */
+#cmakedefine HAVE_UNITTEST 0
+
+/*
+ * Define to 1 to when measuring code coverage to make measurements more accurate, by switching code where needed,
+ * for example from macros to inline functions.
+ *
+ * An #ifdef guard for CODE_COVERAGE_MEASUREMENT macro can be used as a temporary measure while evaluating the
+ * performance of inline functions vs the original macros.
+ *
+ * Once inline functions have been validated as providing similar (or better) performance than the original macros
+ * the macro versions can be removed and the #ifdef guard using CODE_COVERAGE_MEASUREMENT removed to make the inline
+ * functions the only version.
+ */
+#cmakedefine CODE_COVERAGE_MEASUREMENT 0
+
+/* define 1 to to switch code that exists in both inline function and macro versions to use the inline versions. */
+#cmakedefine INLINE_FUNCTIONS_INSTEAD_OF_MACROS 0
+
+/* 
+ * Define to 1 for unit testing assertions. 
+ * This overrides normal abort logic and should be used *only* when unit testing assertions.
+ */
+#cmakedefine HAVE_UNITTEST_ASSERTS 0
 
 /* Define to 1 if you have the `fallocate' function. */
 #cmakedefine HAVE_FALLOCATE 1
@@ -42,20 +72,29 @@
 /* Define to 1 if you have the `fdatasync' function. */
 #cmakedefine HAVE_FDATASYNC 1
 
-/* Define to 1 if you have the `ftruncate' function. */
-#cmakedefine HAVE_FTRUNCATE 1
+/* Define to 1 if you have the `clock_gettime' function. */
+#cmakedefine HAVE_CLOCK_GETTIME 1
 
 /* Define to 1 if you have the `gettimeofday' function. */
 #cmakedefine HAVE_GETTIMEOFDAY 1
 
-/* Define to 1 if you have the <inttypes.h> header file. */
-#cmakedefine HAVE_INTTYPES_H 1
-
 /* Define to 1 if you have the `dl' library (-ldl). */
 #cmakedefine HAVE_LIBDL 1
 
+/* Define to 1 if you have the `stdc++' library (-lstdc++). */
+#cmakedefine HAVE_LIBCXX 1
+
+/* Define to 1 if you have the `accel-config' library (-laccel-config). */
+#cmakedefine HAVE_LIBACCEL_CONFIG 1
+
 /* Define to 1 if you have the `lz4' library (-llz4). */
 #cmakedefine HAVE_LIBLZ4 1
+
+/* Define to 1 if you have the `memkind' library (-lmemkind). */
+#cmakedefine HAVE_LIBMEMKIND 1
+
+/* Define to 1 if the user has explicitly enable memkind builds. */
+#cmakedefine ENABLE_MEMKIND 1
 
 /* Define to 1 if you have the `pthread' library (-lpthread). */
 #cmakedefine HAVE_LIBPTHREAD 1
@@ -66,19 +105,8 @@
 /* Define to 1 if you have the `snappy' library (-lsnappy). */
 #cmakedefine HAVE_LIBSNAPPY 1
 
-/* Define to 1 if the user has explictly enabled TCMalloc builds. */
-#cmakedefine ENABLE_TCMALLOC 1
-
-/*
- * To remain compatible with autoconf & scons builds, we
- * define HAVE_LIBTCMALLOC for configuring our sources to actually
- * include the tcmalloc headers, as opposed to the sources
- * using ENABLE_TCMALLOC.
- */
-#if defined ENABLE_TCMALLOC
-  /* Define to 1 if you have the `tcmalloc' library (-ltcmalloc). */
-  #cmakedefine HAVE_LIBTCMALLOC 1
-#endif
+/* Define to 1 if the user has set enable antithesis. */
+#cmakedefine ENABLE_ANTITHESIS 1
 
 /* Define to 1 if you have the `z' library (-lz). */
 #cmakedefine HAVE_LIBZ 1
@@ -86,11 +114,14 @@
 /* Define to 1 if you have the `zstd' library (-lzstd). */
 #cmakedefine HAVE_LIBZSTD 1
 
+/* Define to 1 if you have the `qpl' library (-lqpl). */
+#cmakedefine HAVE_LIBQPL 1
+
 /* Define to 1 if you have the `sodium' library (-lsodium). */
 #cmakedefine HAVE_LIBSODIUM 1
 
-/* Define to 1 if you have the <memory.h> header file. */
-#cmakedefine HAVE_MEMORY_H 1
+/* Automatically set by the build system, turns on or off optional RCpc ARM instructions. */
+#cmakedefine HAVE_RCPC 0
 
 /* Define to 1 to disable any crc32 hardware support. */
 #cmakedefine HAVE_NO_CRC32_HARDWARE
@@ -113,35 +144,17 @@
 /* Define to 1 if you have the `setrlimit' function. */
 #cmakedefine HAVE_SETRLIMIT 1
 
-/* Define to 1 if you have the <stdint.h> header file. */
-#cmakedefine HAVE_STDINT_H 1
-
-/* Define to 1 if you have the <stdlib.h> header file. */
-#cmakedefine HAVE_STDLIB_H 1
-
-/* Define to 1 if you have the <strings.h> header file. */
-#cmakedefine HAVE_STRINGS_H 1
-
-/* Define to 1 if you have the <string.h> header file. */
-#cmakedefine HAVE_STRING_H 1
-
-/* Define to 1 if you have the `strtouq' function. */
-#cmakedefine HAVE_STRTOUQ 1
-
 /* Define to 1 if you have the `sync_file_range' function. */
 #cmakedefine HAVE_SYNC_FILE_RANGE 1
-
-/* Define to 1 if you have the <sys/stat.h> header file. */
-#cmakedefine HAVE_SYS_STAT_H 1
 
 /* Define to 1 if you have the `timer_create' function. */
 #cmakedefine HAVE_TIMER_CREATE 1
 
-/* Define to 1 if you have the <unistd.h> header file. */
-#cmakedefine HAVE_UNISTD_H 1
-
 /* Define to 1 if you have the <x86intrin.h> header file. */
 #cmakedefine HAVE_X86INTRIN_H 1
+
+/* Define to 1 if you have the <arm_neon.h> header file. */
+#cmakedefine HAVE_ARM_NEON_INTRIN_H 1
 
 /* Spinlock type from mutex.h. */
 #cmakedefine SPINLOCK_TYPE @SPINLOCK_TYPE_CONFIG_VAR@
@@ -152,21 +165,6 @@
 /* Version number of package */
 #define VERSION "@VERSION_MAJOR@.@VERSION_MINOR@.@VERSION_PATCH@"
 
-/* Define WORDS_BIGENDIAN to 1 if your processor stores words with the most
-   significant byte first (like Motorola and SPARC, unlike Intel). */
-#if defined AC_APPLE_UNIVERSAL_BUILD
-# if defined __BIG_ENDIAN__
-#  define WORDS_BIGENDIAN 1
-# endif
-#else
-# ifndef WORDS_BIGENDIAN
-/* #  undef WORDS_BIGENDIAN */
-# endif
-#endif
-
-/* Default alignment of buffers used for I/O. */
-#define WT_BUFFER_ALIGNMENT_DEFAULT @WT_BUFFER_ALIGNMENT_DEFAULT@
-
 /* Define to 1 to support standalone build. */
 #cmakedefine WT_STANDALONE_BUILD 1
 
@@ -174,4 +172,4 @@
 # define _DARWIN_USE_64_BIT_INODE 1
 #endif
 
-#endif
+#endif /* __WIREDTIGER_CONFIG_H_ */

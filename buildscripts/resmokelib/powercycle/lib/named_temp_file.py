@@ -1,4 +1,5 @@
 """Wrapper for the NamedTempFile class."""
+
 import logging
 import os
 import shutil
@@ -20,8 +21,9 @@ class NamedTempFile(object):
             LOGGER.debug("Creating temporary directory %s", directory)
             os.makedirs(directory)
             cls._DIR_LIST.append(directory)
-        temp_file = tempfile.NamedTemporaryFile(mode="w+", newline=newline, suffix=suffix,
-                                                dir=directory, delete=False)
+        temp_file = tempfile.NamedTemporaryFile(
+            mode="w+", newline=newline, suffix=suffix, dir=directory, delete=False
+        )
         cls._FILE_MAP[temp_file.name] = temp_file
         return temp_file.name
 

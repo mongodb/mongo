@@ -7,10 +7,7 @@
  *   uses_atclustertime
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/sharding/libs/resharding_test_fixture.js");
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 const reshardingTest = new ReshardingTest({numDonors: 2, numRecipients: 2, reshardInPlace: true});
 reshardingTest.setup();
@@ -27,12 +24,14 @@ const sourceCollection = reshardingTest.createShardedCollection({
 });
 
 // Perform some inserts before resharding starts so there's data to clone.
-assert.commandWorked(sourceCollection.insert([
-    {_id: "stays on shard0", oldKey: -10, newKey: -10},
-    {_id: "moves to shard0", oldKey: 10, newKey: -10},
-    {_id: "moves to shard1", oldKey: -10, newKey: 10},
-    {_id: "stays on shard1", oldKey: 10, newKey: 10},
-]));
+assert.commandWorked(
+    sourceCollection.insert([
+        {_id: "stays on shard0", oldKey: -10, newKey: -10},
+        {_id: "moves to shard0", oldKey: 10, newKey: -10},
+        {_id: "moves to shard1", oldKey: -10, newKey: 10},
+        {_id: "stays on shard1", oldKey: 10, newKey: 10},
+    ]),
+);
 
 const recipientShardNames = reshardingTest.recipientShardNames;
 reshardingTest.startReshardingInBackground({
@@ -54,13 +53,10 @@ assert.soon(() => {
 assert.commandWorked(sourceCollection.update({_id: 0}, {$inc: {extra: 1}}, {multi: true}));
 
 // The reshardCollection command should still be actively running on mongos.
-const ops = mongos.getDB("admin")
-                .aggregate([
-                    {$currentOp: {allUsers: true, localOps: true}},
-                    {$match: {"command.reshardCollection": ns}},
-                ])
-                .toArray();
+const ops = mongos
+    .getDB("admin")
+    .aggregate([{$currentOp: {allUsers: true, localOps: true}}, {$match: {"command.reshardCollection": ns}}])
+    .toArray();
 assert.eq(1, ops.length, "failed to find reshardCollection in $currentOp output");
 
 reshardingTest.teardown();
-})();

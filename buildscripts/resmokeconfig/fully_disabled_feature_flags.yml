@@ -1,7 +1,36 @@
 # Feature flags here are turned off even on the "all feature flags" build variants.
+# Feature flags here disable jstests that are tagged with these feature flags on all variants.
 #
 # These flags can be enabled on a per-task or per-build-variant basis
 # by modifying their respective definitions in evergreen.yml.
 
 - featureFlagFryer
-- featureFlagNoChangeStreamEventsDueToOrphans
+# This flag exists to help users in managed environments that upgraded to 6.0 before 6.0.0-rc8 was
+# released create the transactions collection index and is only meant to be enabled adhoc, so only
+# its targeted tests should enable it.
+- featureFlagAlwaysCreateConfigTransactionsPartialIndexOnStepUp
+- featureFlagUpdateDocumentShardKeyUsingTransactionApi
+# TODO SERVER-102586: Revisit propagation of the VersionContext to checks,
+# if featureFlagAllMongodsAreSharded is re-enabled.
+- featureFlagAllMongodsAreSharded
+- featureFlagGRPC
+- featureFlagCreateCollectionInPreparedTransactions
+- featureFlagSearchInSbe
+- featureFlagEgressGrpcForSearch
+- featureFlagTSBucketingParametersUnchanged
+# TODO SERVER-99433: Delete featureFlagReplicaSetEndpoint.
+- featureFlagReplicaSetEndpoint
+- featureFlagGaplessFTDC
+# TODO SERVER-101589: start testing viewless timeseries in allFeatureFlag variant
+- featureFlagCreateViewlessTimeseriesCollections
+# TODO SERVER-67034: re-enable 'featureFlagSbeFull'.
+- featureFlagSbeFull
+- featureFlagSessionsCollectionCoordinatorOnConfigServer
+# TODO (SERVER-108818): test primary-driven index builds in allFeatureFlag variant.
+- featureFlagPrimaryDrivenIndexBuilds
+# TODO SERVER-104494 SERVER-104258: Turn this back on once the issues are fixed.
+- featureFlagReshardingCloneNoRefresh
+# TODO SERVER-100132: Remove this once we know the impact of enabling tracing.
+- featureFlagTracing
+# TODO SERVER-111747 Re-enable 'featureFlagExtractFieldPathsSbeStage'
+- featureFlagExtractFieldPathsSbeStage

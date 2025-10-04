@@ -27,16 +27,37 @@
  *    it in the license file.
  */
 
+#include "mongo/base/data_range.h"
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonelement_comparator.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobj_comparator.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/json.h"
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
 #include "mongo/platform/decimal128.h"
-
+#include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/string_map.h"
+
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <limits>
+#include <string>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 
 namespace {
 using namespace mongo;
@@ -621,16 +642,36 @@ TEST(Looping, Cpp11Auto) {
     ASSERT_EQUALS(count, 1 + 2 + 3);
 }
 
+TEST(Looping, Cpp17StructuredBindings) {
+    int count = 0;
+    for (auto [name, e] : BSON("a" << 1 << "a" << 2 << "a" << 3)) {
+        ASSERT_EQUALS(name, "a");
+        count += e.Int();
+    }
+
+    ASSERT_EQUALS(count, 1 + 2 + 3);
+}
+
+TEST(BSONObj, getFieldsWithEmbeddedNull) {
+    // Test that getField() returns an eoo element when the field name contains an embedded null.
+    // This should never happen, but we want to make sure we handle it correctly.
+    BSONObj obj = BSON("" << "foo"_sd
+                          << "bar" << 9 << "baz" << 4.5);
+    ASSERT_TRUE(obj.getField("\0"_sd).eoo());
+    ASSERT_TRUE(obj.getField("ba\0r"_sd).eoo());
+    ASSERT_TRUE(obj.getField("baz\0"_sd).eoo());
+}
+
 TEST(BSONObj, getFields) {
     auto e = BSON("a" << 1 << "b" << 2 << "c" << 3 << "d" << 4 << "e" << 5 << "f" << 6);
     std::array<StringData, 3> fieldNames{"c", "d", "f"};
     std::array<BSONElement, 3> fields;
     e.getFields(fieldNames, &fields);
-    ASSERT_EQUALS(fields[0].type(), BSONType::NumberInt);
+    ASSERT_EQUALS(fields[0].type(), BSONType::numberInt);
     ASSERT_EQUALS(fields[0].numberInt(), 3);
-    ASSERT_EQUALS(fields[1].type(), BSONType::NumberInt);
+    ASSERT_EQUALS(fields[1].type(), BSONType::numberInt);
     ASSERT_EQUALS(fields[1].numberInt(), 4);
-    ASSERT_EQUALS(fields[2].type(), BSONType::NumberInt);
+    ASSERT_EQUALS(fields[2].type(), BSONType::numberInt);
     ASSERT_EQUALS(fields[2].numberInt(), 6);
 }
 
@@ -641,9 +682,9 @@ TEST(BSONObj, getFieldsWithDuplicates) {
     std::array<StringData, 2> fieldNames{"a", "b"};
     std::array<BSONElement, 2> fields;
     e.getFields(fieldNames, &fields);
-    ASSERT_EQUALS(fields[0].type(), BSONType::NumberInt);
+    ASSERT_EQUALS(fields[0].type(), BSONType::numberInt);
     ASSERT_EQUALS(fields[0].numberInt(), 2);
-    ASSERT_EQUALS(fields[1].type(), BSONType::String);
+    ASSERT_EQUALS(fields[1].type(), BSONType::string);
     ASSERT_EQUALS(fields[1].str(), "3");
 }
 
@@ -741,7 +782,7 @@ TEST(BSONObj, sizeChecks) {
     // Large buffers cause an exception to be thrown.
     ASSERT_THROWS_CODE(
         [&] {
-            auto largeBuffer = generateBuffer(17 * 1024 * 1024);
+            auto largeBuffer = generateBuffer(126 * 1024 * 1024);
             BSONObj obj(largeBuffer.data());
         }(),
         DBException,
@@ -757,11 +798,50 @@ TEST(BSONObj, sizeChecks) {
     // But a size is in fact being enforced.
     ASSERT_THROWS_CODE(
         [&]() {
-            auto hugeBuffer = generateBuffer(70 * 1024 * 1024);
+            auto hugeBuffer = generateBuffer(130 * 1024 * 1024);
             BSONObj obj(hugeBuffer.data(), BSONObj::LargeSizeTrait{});
         }(),
         DBException,
         ErrorCodes::BSONObjectTooLarge);
+}
+
+TEST(BSONObj, nullByteInStringBasic) {
+    const size_t size = 3;
+    StringData str("b\0c", size);
+
+    // { "a": "b\0c" }
+    BSONObjBuilder b;
+    b.append("a"_sd, str);
+    BSONObj obj{b.obj()};
+
+    ASSERT_EQ(str.size(), obj.getStringField("a").size());
+    ASSERT_EQ(str, obj.getStringField("a"));
+}
+
+TEST(BSONObj, nullByteInStringMulti) {
+    const size_t size = 5;
+    StringData str("b\0c\0d", size);
+
+    // { "a": "b\0c\0d" }
+    BSONObjBuilder b;
+    b.append("a"_sd, str);
+    BSONObj obj{b.obj()};
+
+    ASSERT_EQ(str.size(), obj.getStringField("a").size());
+    ASSERT_EQ(str, obj.getStringField("a"));
+}
+
+TEST(BSONObj, nullByteInStringFull) {
+    const size_t size = 9;
+    StringData str("\0\0\0\0\0\0\0\0\0", size);
+
+    // { "a": "\0\0\0\0\0\0\0\0\0" }
+    BSONObjBuilder b;
+    b.append("a"_sd, str);
+    BSONObj obj{b.obj()};
+
+    ASSERT_EQ(str.size(), obj.getStringField("a").size());
+    ASSERT_EQ(str, obj.getStringField("a"));
 }
 
 }  // unnamed namespace

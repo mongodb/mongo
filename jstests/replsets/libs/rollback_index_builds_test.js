@@ -2,12 +2,11 @@
  * Fixture to test rollback permutations with index builds.
  */
 
-"use strict";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
-load("jstests/noPassthrough/libs/index_build.js");  // for IndexBuildTest
-load('jstests/replsets/libs/rollback_test.js');     // for RollbackTest
-
-class RollbackIndexBuildsTest {
+export class RollbackIndexBuildsTest {
     constructor(expectedErrors) {
         jsTestLog("Set up a Rollback Test.");
         const replTest = new ReplSetTest({
@@ -19,7 +18,7 @@ class RollbackIndexBuildsTest {
         let config = replTest.getReplSetConfig();
         config.members[2].priority = 0;
         config.settings = {chainingAllowed: false};
-        replTest.initiateWithHighElectionTimeout(config);
+        replTest.initiate(config);
         this.rollbackTest = new RollbackTest(jsTestName(), replTest);
         this.expectedErrors = expectedErrors;
     }
@@ -59,32 +58,33 @@ class RollbackIndexBuildsTest {
     runSchedules(schedules) {
         const self = this;
         let i = 0;
-        schedules.forEach(function(schedule) {
+        schedules.forEach(function (schedule) {
             const collName = "coll_" + i;
             const indexSpec = {a: 1};
 
-            jsTestLog("iteration: " + i + " collection: " + collName +
-                      " schedule: " + tojson(schedule));
+            jsTestLog("iteration: " + i + " collection: " + collName + " schedule: " + tojson(schedule));
 
             const primary = self.rollbackTest.getPrimary();
-            const primaryDB = primary.getDB('test');
+            const primaryDB = primary.getDB("test");
             const collection = primaryDB.getCollection(collName);
 
             let transitionedToSteadyState = false;
             let createdColl = false;
             let indexBuilds = [];
 
-            schedule.forEach(function(op) {
+            schedule.forEach(function (op) {
                 print("Running operation: " + op);
                 switch (op) {
                     case "holdStableTimestamp":
-                        assert.commandWorked(primary.adminCommand(
-                            {configureFailPoint: 'disableSnapshotting', mode: 'alwaysOn'}));
+                        assert.commandWorked(
+                            primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "alwaysOn"}),
+                        );
                         break;
-                    case "transitionToRollback":
+                    case "transitionToRollback": {
                         const curPrimary = self.rollbackTest.transitionToRollbackOperations();
                         assert.eq(curPrimary, primary);
                         break;
+                    }
                     case "transitionToSteadyState":
                         self.rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
 
@@ -95,19 +95,16 @@ class RollbackIndexBuildsTest {
                         self.rollbackTest.transitionToSyncSourceOperationsDuringRollback();
 
                         // To speed up the test, defer data validation until the fixture shuts down.
-                        self.rollbackTest.transitionToSteadyStateOperations(
-                            {skipDataConsistencyChecks: true});
+                        self.rollbackTest.transitionToSteadyStateOperations({skipDataConsistencyChecks: true});
                         transitionedToSteadyState = true;
                         break;
                     case "createColl":
-                        assert.commandWorked(
-                            collection.insert({a: "created collection explicitly"}));
+                        assert.commandWorked(collection.insert({a: "created collection explicitly"}));
                         createdColl = true;
                         break;
                     case "start":
                         if (!createdColl) {
-                            assert.commandWorked(
-                                collection.insert({a: "created collection with start"}));
+                            assert.commandWorked(collection.insert({a: "created collection with start"}));
                             createdColl = true;
                         }
                         IndexBuildTest.pauseIndexBuilds(primary);
@@ -115,21 +112,30 @@ class RollbackIndexBuildsTest {
                         var errcodes = self.expectedErrors ? self.expectedErrors : [];
                         // This test creates indexes with majority of nodes not available for
                         // replication. So, disabling index build commit quorum.
-                        indexBuilds.push(IndexBuildTest.startIndexBuild(
-                            primary, collection.getFullName(), indexSpec, {}, errcodes, 0));
+                        indexBuilds.push(
+                            IndexBuildTest.startIndexBuild(
+                                primary,
+                                collection.getFullName(),
+                                indexSpec,
+                                {},
+                                errcodes,
+                                0,
+                            ),
+                        );
 
-                        IndexBuildTest.waitForIndexBuildToStart(primaryDB, collName, "a_1");
+                        IndexBuildTest.waitForIndexBuildToScanCollection(primaryDB, collName, "a_1");
                         break;
                     case "commit":
                         IndexBuildTest.resumeIndexBuilds(primary);
                         IndexBuildTest.waitForIndexBuildToStop(primaryDB, collName, "a_1");
                         break;
-                    case "abort":
+                    case "abort": {
                         const opId = IndexBuildTest.getIndexBuildOpId(primaryDB, collName, "a_1");
                         assert.commandWorked(primaryDB.killOp(opId));
                         IndexBuildTest.resumeIndexBuilds(primary);
                         IndexBuildTest.waitForIndexBuildToStop(primaryDB, collName, "a_1");
                         break;
+                    }
                     case "drop":
                         collection.dropIndexes(indexSpec);
                         break;
@@ -140,19 +146,17 @@ class RollbackIndexBuildsTest {
 
             // Check for success -- any expected Error failures were passed
             // as parameters to the startIndexBuild() call
-            indexBuilds.forEach(indexBuild => indexBuild({checkExitSuccess: true}));
+            indexBuilds.forEach((indexBuild) => indexBuild({checkExitSuccess: true}));
 
             if (!transitionedToSteadyState) {
                 self.rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
                 self.rollbackTest.transitionToSyncSourceOperationsDuringRollback();
 
                 // To speed up the test, defer data validation until the fixture shuts down.
-                self.rollbackTest.transitionToSteadyStateOperations(
-                    {skipDataConsistencyChecks: true});
+                self.rollbackTest.transitionToSteadyStateOperations({skipDataConsistencyChecks: true});
             }
 
-            assert.commandWorked(
-                primary.adminCommand({configureFailPoint: 'disableSnapshotting', mode: 'off'}));
+            assert.commandWorked(primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "off"}));
             i++;
         });
     }

@@ -1,0 +1,11 @@
+bad_test_nums
+bad_test_nums
+test.coll as fuzzer_coll
+
+1
+:sortResults {aggregate: "fuzzer_coll", pipeline: [{$match: {}}], cursor: {}}
+
+:sortResults {aggregate: "fuzzer_coll", pipeline: [{$match: {}}], cursor: {}}
+
+2
+:sortResults {aggregate: "fuzzer_coll", pipeline: [{$match: {}}], cursor: {}}

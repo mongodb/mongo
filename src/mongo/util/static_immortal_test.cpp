@@ -29,12 +29,13 @@
 
 #include "mongo/util/static_immortal.h"
 
+#include "mongo/base/string_data.h"
+#include "mongo/unittest/unittest.h"
+
 #include <map>
 #include <string>
 #include <type_traits>
 #include <utility>
-
-#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {
@@ -86,7 +87,9 @@ TEST(StaticImmortalTest, DeducedValueTypeCopyInit) {
 }
 
 TEST(StaticImmortalTest, DeducedValueTypeExpression) {
-    static const StaticImmortal m = [] { return Map{{"hello", 123}, {"bye", 456}}; }();
+    static const StaticImmortal m = [] {
+        return Map{{"hello", 123}, {"bye", 456}};
+    }();
     ASSERT_EQ(m->find("bye")->second, 456);
 }
 

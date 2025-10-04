@@ -30,8 +30,15 @@
 #pragma once
 
 #include "mongo/db/repl/oplog_interface.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/transaction/transaction_history_iterator.h"
+#include "mongo/util/modules.h"
+#include "mongo/util/net/hostandport.h"
 
-namespace mongo {
+#include <memory>
+#include <string>
+
+namespace MONGO_MOD_OPEN mongo {
 
 class OperationContext;
 
@@ -55,4 +62,4 @@ private:
 };
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_OPEN mongo

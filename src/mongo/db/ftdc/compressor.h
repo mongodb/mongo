@@ -29,17 +29,21 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
+#include "mongo/base/data_range.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/db/ftdc/block_compressor.h"
+#include "mongo/db/ftdc/config.h"
+#include "mongo/util/time_support.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <tuple>
 #include <vector>
 
-#include "mongo/base/status_with.h"
-#include "mongo/bson/util/builder.h"
-#include "mongo/db/ftdc/block_compressor.h"
-#include "mongo/db/ftdc/config.h"
-#include "mongo/db/jsobj.h"
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

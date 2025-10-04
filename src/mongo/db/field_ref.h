@@ -31,21 +31,39 @@
 
 #include <boost/container/small_vector.hpp>
 #include <boost/optional.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bson_depth.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/container_size_helper.h"
+
+#include <cstddef>
+#include <cstdint>
 #include <iosfwd>
 #include <set>
 #include <string>
 #include <vector>
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bson_depth.h"
-#include "mongo/util/container_size_helper.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
+
+
+/**
+ * For performance reasons, we need to reduce the size of FieldRef::StringView. Since we have a cap
+ * on the size of FieldRef that is lower than the uint32 max value, we'll never run into overflow.
+ * However we should static assert that this is true in case of future changes.
+ */
+MONGO_STATIC_ASSERT(BSONObjMaxInternalSize < std::numeric_limits<std::uint32_t>::max());
 
 /**
  * A FieldPath represents a path in a document, starting from the root. The path
  * is made of "field parts" separated by dots. The class provides an efficient means to
- * "split" the dotted fields in its parts, but no validation is done.
+ * "split" the dotted fields in its parts. It does not do UTF-8 validation but it does throw a
+ * uassert() upon an attempt to construct a FieldRef in which any field path component contains an
+ * embedded null byte.
  *
  * Any field part may be replaced, after the "original" field reference was parsed. Any
  * part can be accessed through a StringData object.
@@ -80,6 +98,23 @@ public:
     static bool isNumericPathComponentStrict(StringData component);
 
     /**
+     * Checks whether document path 'path' overlaps with a path of an indexed field 'indexedPath'.
+     */
+    static bool pathOverlaps(const FieldRef& path, const FieldRef& indexedPath);
+
+    /**
+     * Returns the canonicalized index form for 'path', removing numerical path components as well
+     * as '$' path components.
+     */
+    static FieldRef getCanonicalIndexField(const FieldRef& path);
+
+    /**
+     * Returns whether the provided path component can be included in the canonicalized index form
+     * of a path.
+     */
+    static bool isComponentPartOfCanonicalizedIndexPath(StringData pathComponent);
+
+    /**
      * Similar to the function above except strings that contain leading zero's are considered
      * numeric. For instance, the above function would return false for an input "01" however this
      * function will return true.
@@ -89,12 +124,6 @@ public:
     FieldRef() = default;
 
     explicit FieldRef(StringData path);
-
-    /**
-     * Field parts accessed through getPart() calls no longer would be valid, after the destructor
-     * ran.
-     */
-    ~FieldRef() {}
 
     /**
      * Builds a field path out of each field part in 'dottedField'.
@@ -141,6 +170,11 @@ public:
     bool isPrefixOfOrEqualTo(const FieldRef& other) const;
 
     /**
+     * Returns true if 'this' is a prefix of, or equal to, 'other', or vice versa.
+     */
+    bool fullyOverlapsWith(const FieldRef& other) const;
+
+    /**
      * Returns the number of field parts in the prefix that 'this' and 'other' share.
      */
     FieldIndex commonPrefixSize(const FieldRef& other) const;
@@ -151,6 +185,12 @@ public:
      * ^(0|[1-9]+[0-9]*)$.
      */
     bool isNumericPathComponentStrict(FieldIndex i) const;
+
+    /**
+     * Similar to isNumericPathComponentStrict, but returns true for 0-prefixed indices, such as
+     * "00" and "01".
+     */
+    bool isNumericPathComponentLenient(FieldIndex i) const;
 
     /**
      * Returns true if this FieldRef has any numeric path components.
@@ -212,16 +252,43 @@ public:
     uint64_t estimateObjectSizeInBytes() const {
         return  // Add size of each element in '_replacements' vector.
             container_size_helper::estimateObjectSizeInBytes(
-                _replacements, [](const std::string& s) { return s.capacity(); }, true) +
+                _replacements,
+                [](const ValidatedPathString& s) { return s.get().capacity(); },
+                true) +
             // Add size of each element in '_parts' vector.
             container_size_helper::estimateObjectSizeInBytes(_parts) +
             // Add runtime size of '_dotted' string.
-            _dotted.capacity() +
+            _dotted.get().capacity() +
             // Add size of the object.
             sizeof(*this);
     }
 
 private:
+    /**
+     * Represents a string that has been validated to not contain embedded null bytes.
+     */
+    class ValidatedPathString {
+    public:
+        ValidatedPathString() = default;
+
+        explicit ValidatedPathString(std::string value) : _value(std::move(value)) {
+            uassert(9867600,
+                    "Field name can't contain null bytes",
+                    _value.find('\0') == std::string::npos);
+        }
+
+        void clear() {
+            _value.clear();
+        }
+
+        const std::string& get() const {
+            return _value;
+        }
+
+    private:
+        std::string _value;
+    };
+
     // Dotted fields are most often not longer than four parts. We use a mixed structure
     // here that will not require any extra memory allocation when that is the case. And
     // handle larger dotted fields if it is. The idea is not to penalize the common case
@@ -235,14 +302,16 @@ private:
         // Constructs an empty StringView.
         StringView() = default;
 
-        StringView(std::size_t offset, std::size_t len) : offset(offset), len(len){};
+        StringView(std::uint32_t offset, std::uint32_t len) : offset(offset), len(len) {};
 
         StringData toStringData(const std::string& viewInto) const {
             return {viewInto.c_str() + offset, len};
         };
 
-        std::size_t offset = 0;
-        std::size_t len = 0;
+        // uint32 is large enough for FieldRef since we have a limit on it's size. At the top of
+        // this file we statically assert that this is true.
+        std::uint32_t offset = 0;
+        std::uint32_t len = 0;
     };
 
     /**
@@ -273,13 +342,13 @@ private:
      * Cached copy of the complete dotted name string. The StringView objects in "_parts" reference
      * this string.
      */
-    mutable std::string _dotted;
+    mutable ValidatedPathString _dotted;
 
     /**
      * String storage for path parts that have been replaced with setPart() or added with
      * appendPart() since the lasted time "_dotted" was materialized.
      */
-    mutable std::vector<std::string> _replacements;
+    mutable std::vector<ValidatedPathString> _replacements;
 };
 
 inline bool operator==(const FieldRef& lhs, const FieldRef& rhs) {

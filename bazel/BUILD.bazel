@@ -1,0 +1,40 @@
+load("@poetry//:dependencies.bzl", "dependency")
+
+package(default_visibility = ["//visibility:public"])
+
+# Expose script for external usage through bazel.
+exports_files([
+    "install_rules.py",
+    "run_under_working_dir.sh",
+])
+
+sh_binary(
+    name = "lint",
+    srcs = ["lint.sh"],
+    visibility = ["//visibility:public"],
+)
+
+py_binary(
+    name = "bazelisk",
+    srcs = ["bazelisk.py"],
+)
+
+py_binary(
+    name = "merge_tidy_configs",
+    srcs = [
+        "merge_tidy_configs.py",
+    ],
+    main = "merge_tidy_configs.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+    ],
+)
+
+filegroup(
+    name = "test_wrapper",
+    srcs = ["test_wrapper.sh"],
+)

@@ -2,31 +2,37 @@ test_kind: js_test
 
 selector:
   roots:
-  - jstests/multiVersion/**/*.js
-  - src/mongo/db/modules/*/jstests/hot_backups/multiVersion/*.js
+    - jstests/multiVersion/**/*.js
+    - src/mongo/db/modules/*/jstests/hot_backups_multiversion/*.js
+    - src/mongo/db/modules/*/jstests/live_import_multiversion/*.js
+    - src/mongo/db/modules/*/jstests/audit/multiVersion/*.js
   exclude_files:
-  # Do not execute files with helper functions.
-  - jstests/multiVersion/libs/*.js
+    # Do not execute files with helper functions.
+    - jstests/multiVersion/libs/*.js
 
-  # TODO: SERVER-21578
-  - jstests/multiVersion/genericSetFCVUsage/balancer_multiVersion_detect.js
+    # TODO: SERVER-28104
+    - jstests/multiVersion/genericBinVersion/minor_version_tags_new_old_new.js
 
-  # TODO: SERVER-28104
-  - jstests/multiVersion/minor_version_tags_new_old_new.js
-
-  # TODO SERVER-42919: recent work on the ReplicaSetMonitor means that mongoS no longer crashes when
-  # it attempts to connect to an upgraded mongoD. Un-denylist when SERVER-42919 fixes this issue.
-  - jstests/multiVersion/genericSetFCVUsage/crash_mongos_against_upgraded_cluster.js
+    # TODO SERVER-42919: recent work on the ReplicaSetMonitor means that mongoS no longer crashes when
+    # it attempts to connect to an upgraded mongoD. Un-denylist when SERVER-42919 fixes this issue.
+    - jstests/multiVersion/genericSetFCVUsage/crash_mongos_against_upgraded_cluster.js
   exclude_with_any_tags:
-  - featureFlagToaster
-  - featureFlagSpoon
-  - disabled_due_to_server_60490
+    - featureFlagToaster
+    - featureFlagSpoon
+    # This suite's fixture does not set up authentication. There is a multiversion_auth variant
+    # which does. Those tests which require auth should not run here, only in the auth variant.
+    - requires_auth
 
 # Multiversion tests start their own mongod's.
 executor:
   archive:
     tests:
-      - src/mongo/db/modules/enterprise/jstests/hot_backups/multiVersion/*.js
+      - src/mongo/db/modules/enterprise/jstests/hot_backups_multiversion/*.js
+      - src/mongo/db/modules/enterprise/jstests/live_imports_multiversion/*.js
   config:
     shell_options:
-      nodb: ''
+      nodb: ""
+      global_vars:
+        TestData:
+          setParameters:
+            bsonTestValidationVersion: 1

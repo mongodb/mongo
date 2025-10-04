@@ -27,18 +27,15 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import time
-from helper import copy_wiredtiger_home
 import wiredtiger, wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
 # test_hs07.py
-# Test that the history store sweep cleans the obsolete history store entries and gives expected results.
+# Test history store sweep cleans the obsolete history store entries and gives expected results.
 class test_hs07(wttest.WiredTigerTestCase):
     # Force a small cache.
-    conn_config = ('cache_size=50MB,eviction_updates_trigger=95,'
-                   'eviction_updates_target=80,log=(enabled)')
-    session_config = 'isolation=snapshot'
+    conn_config = ('cache_size=50MB,eviction_updates_trigger=95,eviction_updates_target=80')
 
     format_values = (
         ('column', dict(key_format='r', value_format='S')),
@@ -71,15 +68,12 @@ class test_hs07(wttest.WiredTigerTestCase):
     def test_hs(self):
         nrows = 10000
 
-        # Create a table without logging to ensure we get "skew_newest" history store eviction
-        # behavior.
-        uri = "table:las07_main"
-        ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
-            config='log=(enabled=false)')
+        # Create a table.
+        uri = "table:hs07_main"
+        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format)
         ds.populate()
 
-        uri2 = "table:las07_extra"
+        uri2 = "table:hs07_extra"
         ds2 = SimpleDataSet(
             self, uri2, 0, key_format=self.key_format, value_format=self.value_format)
         ds2.populate()
@@ -91,11 +85,12 @@ class test_hs07(wttest.WiredTigerTestCase):
             bigvalue = "aaaaa" * 100
             bigvalue2 = "ddddd" * 100
 
+        # Commit at timestamp 1.
+        self.large_updates(uri, bigvalue, ds, nrows, 1)
+
         # Pin oldest and stable to timestamp 1.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
             ',stable_timestamp=' + self.timestamp_str(1))
-
-        self.large_updates(uri, bigvalue, ds, nrows, 1)
 
         # Check that all updates are seen
         self.check(bigvalue, uri, nrows, 100)
@@ -230,5 +225,4 @@ class test_hs07(wttest.WiredTigerTestCase):
         # Check that the new updates are only seen after the update timestamp
         self.check(bigvalue, uri, nrows, 300)
 
-if __name__ == '__main__':
-    wttest.run()
+        self.ignoreStdoutPatternIfExists('Eviction took more than 1 minute')

@@ -1,0 +1,1539 @@
+# This file contains compile and related tasks
+
+################################################
+#                   Variable                   #
+################################################
+variables:
+  - &compile_bazel_task_group_template
+    name: compile_bazel_task_group_template
+    max_hosts: -1
+    tasks: []
+    setup_task:
+      - func: "override task timeout"
+    setup_group_can_fail_task: true
+    setup_group:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "set task expansion macros"
+      - func: "f_expansions_write"
+      - func: "set up venv"
+      - func: "upload pip requirements"
+      - func: "configure evergreen api credentials"
+      - func: "get buildnumber"
+      - func: "f_expansions_write"
+      - func: "set up credentials"
+      - func: "f_expansions_write"
+      - func: "get engflow creds"
+
+  # THIS HAS COPIES IN
+  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
+  # - etc/evergreen_yml_components/tasks/compile_tasks.yml
+  # - etc/evergreen_yml_components/tasks/compile_tasks_shared.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &compile_task_group_template
+    name: compile_task_group_template
+    max_hosts: 1
+    tasks: []
+    setup_task:
+      - func: "f_expansions_write"
+      - func: "set task expansion macros"
+      - func: "f_expansions_write"
+      - func: "override task timeout"
+      - func: "get engflow creds"
+    teardown_task:
+      - func: "f_expansions_write"
+      - func: "create bazel test report"
+      - func: "attach report"
+      - func: "attach artifacts"
+      - func: "attach local resmoke invocation"
+      - func: "attach multiversion download links"
+      - func: "kill processes"
+      - func: "save code coverage data"
+      - func: "save mongo coredumps"
+      - func: "generate hang analyzer tasks"
+      - func: "save failed unittests"
+      - func: "save bazel headers"
+      - func: "save bazel jvm dump"
+      - func: "save bazel exec logs"
+      - func: "save hang analyzer debugger files"
+      - func: "save disk statistics"
+      - func: "save system resource information"
+      - func: "save libfuzzertest corpora"
+      - func: "remove files"
+        vars:
+          files: >-
+            src/resmoke_error_code
+            src/*.gcda.gcov
+            src/gcov-intermediate-files.tgz
+            src/*.core src/*.mdmp src/*.core.gz src/*.mdmp.gz
+            mongo-coredumps.json
+            src/dist-unittests/bin/*
+            src/dist-unittests/lib/*
+            mongo-unittests.tgz
+            src/debugger*.*
+            src/mongo-hanganalyzer.tgz
+            diskstats.tgz
+            system-resource-info.tgz
+            ${report_file|src/report.json}
+            ${archive_file|src/archive.json}
+    setup_group_can_fail_task: true
+    setup_group:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "set task expansion macros"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      # The python virtual environment is installed in ${workdir}, which is created in
+      # "set up venv".
+      - func: "set up venv"
+      - func: "upload pip requirements"
+      - func: "f_expansions_write"
+      - func: "configure evergreen api credentials"
+      - func: "get buildnumber"
+      - func: "f_expansions_write"
+      - func: "set up credentials"
+      - func: "f_expansions_write"
+      - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
+      - func: "f_expansions_write"
+    teardown_group:
+      - func: "f_expansions_write"
+      - func: "cleanup environment"
+    timeout:
+      - func: "f_expansions_write"
+      - func: "run hang analyzer"
+      - func: "wait for resmoke to shutdown"
+      - func: "save bazel run logs"
+
+################################################
+#                    Tasks                     #
+################################################
+tasks:
+  # TODO(SERVER-82195): simplify this to avoid duplication of parameters in other tests.
+  - name: compile_dist_test_quick
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary", "bazel_check"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - func: "bazel compile"
+        vars:
+          targets: >-
+            //src/mongo/db/commands:fsync_locked_with_debug
+          bazel_args: >-
+            --config=evg
+      - func: "verify build output present"
+        vars:
+          output: bazel-bin/src/mongo/db/commands/libfsync_locked_with_debug.lo
+
+  - name: run_bazel_program
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary", "bazel_check"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - func: "bazel run"
+        vars:
+          target: >-
+            //src/mongo/platform:visibility1_test
+
+  - name: bazel_archive_and_run_dist_test
+    tags: ["assigned_to_jira_team_devprod_build", "bazel_check", "auxiliary"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    exec_timeout_secs: 32400 # 9 hours
+    commands:
+      - func: "bazel compile"
+        vars:
+          targets: archive-dist-test
+          bazel_args: --config=opt --separate_debug=True
+      - func: "run tests"
+        vars:
+          suite: core
+          install_dir: bazel-bin/install/bin
+          resmoke_jobs_max: 4 # No cap on number of jobs.
+          exec_timeout_secs: 32400 # 9 hours
+
+  - name: hydrate_bazel_profile_fastbuild
+    tags:
+      [
+        "assigned_to_jira_team_devprod_build",
+        "bazel_cache_hydration",
+        "auxiliary",
+      ]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - func: "bazel compile"
+        vars:
+          targets: //src/...
+          # Use --linkopt="-s" to dramatically reduce link time, since we only care about hydrating cache
+          # on CppCompile as CppLink is performed locally and not cached remotely.
+          bazel_args: >-
+            --config=fastbuild
+            --define GIT_COMMIT_HASH=nogitversion
+            --output_groups=compilation_outputs
+            --keep_going
+            --build_tag_filters=${bazel_filters_for_cache_hydration}
+
+  - name: build_source_graph_index
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - func: "bazel compile"
+        vars:
+          targets: compiledb
+          bazel_args: --intree_compdb
+      - func: "bazel compile"
+        vars:
+          targets: //src/...
+          bazel_args: --output_groups=compilation_outputs --build_enterprise=True --config=dbg --remote_download_outputs=all
+      - func: "bazel run"
+        vars:
+          target: //:scip-clang -- --compdb-path ./compile_commands.json
+      - func: "bazel run"
+        vars:
+          target: //:scip-src -- code-intel upload -file=index.scip
+          args: -github-token=${SOURCE_GRAPH_GITHUB_CLONER_TOKEN}
+          env: SRC_ENDPOINT=https://mongodb.sourcegraphcloud.com SRC_ACCESS_TOKEN=${SOURCE_GRAPH_API_ACCESS_TOKEN}
+          redact_args: true
+
+  - name: hydrate_bazel_profile_opt
+    tags:
+      [
+        "assigned_to_jira_team_devprod_build",
+        "bazel_cache_hydration",
+        "auxiliary",
+      ]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - func: "bazel compile"
+        vars:
+          targets: //src/...
+          # TODO(SERVER-99213): limit to --jobs 32 once fission is enabled by default in CI
+          bazel_args: >-
+            --config=opt
+            --define GIT_COMMIT_HASH=nogitversion
+            --output_groups=compilation_outputs
+            --keep_going
+            --build_tag_filters=${bazel_filters_for_cache_hydration}
+
+  - name: hydrate_bazel_profile_dbg
+    tags:
+      [
+        "assigned_to_jira_team_devprod_build",
+        "bazel_cache_hydration",
+        "auxiliary",
+      ]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - func: "bazel compile"
+        vars:
+          targets: //src/...
+          # Use --linkopt="-s" to dramatically reduce link time, since we only care about hydrating cache
+          # on CppCompile as CppLink is performed locally and not cached remotely.
+          bazel_args: >-
+            --config=dbg
+            --define GIT_COMMIT_HASH=nogitversion
+            --output_groups=compilation_outputs
+            --keep_going
+            --build_tag_filters=${bazel_filters_for_cache_hydration}
+
+  - name: hydrate_bazel_profile_dbg_aubsan
+    tags:
+      [
+        "assigned_to_jira_team_devprod_build",
+        "bazel_cache_hydration",
+        "auxiliary",
+      ]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - func: "bazel compile"
+        vars:
+          targets: //src/...
+          # Use --linkopt="-s" to dramatically reduce link time, since we only care about hydrating cache
+          # on CppCompile as CppLink is performed locally and not cached remotely.
+          bazel_args: >-
+            --config=dbg_aubsan
+            --define GIT_COMMIT_HASH=nogitversion
+            --output_groups=compilation_outputs
+            --keep_going
+            --build_tag_filters=${bazel_filters_for_cache_hydration}
+
+  - name: hydrate_bazel_profile_dbg_tsan
+    tags:
+      [
+        "assigned_to_jira_team_devprod_build",
+        "bazel_cache_hydration",
+        "auxiliary",
+      ]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - func: "bazel compile"
+        vars:
+          targets: //src/...
+          # Use --linkopt="-s" to dramatically reduce link time, since we only care about hydrating cache
+          # on CppCompile as CppLink is performed locally and not cached remotely.
+          bazel_args: >-
+            --config=dbg_tsan
+            --define GIT_COMMIT_HASH=nogitversion
+            --output_groups=compilation_outputs
+            --keep_going
+            --build_tag_filters=${bazel_filters_for_cache_hydration}
+
+  - name: run_bazel_clang_tidy
+    tags:
+      [
+        "assigned_to_jira_team_devprod_build",
+        "development_critical_single_variant",
+        "requires_large_host",
+        "clang_tidy",
+      ]
+    exec_timeout_secs: 3600 # 1 hr timeout for the task overall, commit queue has a more specific timeout
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - func: "do bazel setup"
+      - func: "enable run_for_clang_tidy expansions"
+      - func: "bazel run"
+        vars:
+          target: >-
+            mongo-tidy-test
+      - func: "bazel compile"
+        vars:
+          # Note that we only run clang-tidy on the Mongo-authored targets, not on third-party code.
+          targets: //src/mongo/...
+          bazel_args: --config=clang-tidy --mongo_toolchain_version=${clang_tidy_toolchain|v5} --keep_going
+      - func: "generate clang-tidy report"
+
+  - name: run_bazel_compiledb
+    tags:
+      [
+        "assigned_to_jira_team_devprod_build",
+        "development_critical_single_variant",
+        "lint",
+      ]
+    exec_timeout_secs: 600 # 10 min timeout for the task overall
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - func: "do bazel setup"
+      - func: "bazel compile"
+        vars:
+          targets: compiledb
+      - func: bazel run
+        vars:
+          target: //evergreen:validate_compile_commands
+
+  - name: run_bazel_program_windows
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary", "bazel_check"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - func: "bazel run"
+        vars:
+          target: >-
+            //src/mongo/platform:visibility1_test
+          # TODO DEVPROD-2508 remove dbg flags when compilation_mode is synced with build_mode automatically
+          args: >-
+            --compilation_mode=dbg
+
+  - name: compile_upload_benchmarks
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - func: "bazel compile"
+        vars:
+          targets: >-
+            archive-mongo_benchmark-stripped
+          bazel_args: >-
+            --config=evg
+            --include_autogenerated_targets=True
+            --build_tag_filters=-repl_bm,-query_bm,-bsoncolumn_bm,-first_half_bm,-second_half_bm,-storage_bm,-sharding_bm,-sep_bm
+          compiling_for_test: true
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/bazel-bin/mongo_benchmark-stripped.${ext|tgz}
+          remote_file: ${mongo_benchmarks}
+          bucket: mciuploads
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
+          content_type: application/tar
+          display_name: Benchmarks
+
+  - name: compile_upload_benchmarks_debug
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
+    # TODO(SERVER-86426): Figure out a workable long-term solution to benchmark debug symbols
+    disable: true
+    depends_on:
+      - name: compile_upload_benchmarks
+    commands:
+      - func: "bazel compile"
+        vars:
+          targets: >-
+            archive-mongo_benchmark-debug
+          bazel_args: >-
+            --config=evg
+            --include_autogenerated_targets=True
+            --build_tag_filters=-repl_bm,-query_bm,-bsoncolumn_bm,-first_half_bm,-second_half_bm,-storage_bm,-sharding_bm,-sep_bm
+          compiling_for_test: true
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/bazel-bin/mongo_benchmark-debug.${ext|tgz}
+          remote_file: ${mongo_benchmarks_debugsymbols}
+          bucket: mciuploads
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
+          content_type: application/tar
+          display_name: Benchmarks Debug
+
+  ## compile_all - build all bazel targets ##
+  - name: compile_all_future_git_tag_multiversion
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
+    depends_on:
+      - name: version_expansions_future_git_tag_multiversion_gen
+    commands:
+      - func: "bazel compile"
+        vars:
+          targets: //src/...
+          bazel_args: >-
+            --config=evg
+          compiling_for_test: true
+
+  - name: compile_all_but_not_unittests
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
+    depends_on:
+      - name: archive_dist_test
+    commands:
+      - func: "bazel compile"
+        vars:
+          targets: //src/...
+          compiling_for_test: true
+          # The executables generated by the install-all target are not used after successfully being
+          # compiled. We therefore link them without debug symbols to compile them faster.
+          bazel_args: >-
+            --config=evg
+            --build_tag_filters=-mongo_unittest,mongo_binary,mongo_benchmark,mongo_integration_test
+            --linkopt=-s
+          task_compile_flags: ${compile_all_but_not_unittests_flags|--linkopt=-s}
+
+  ## compile_unittests ##
+  - name: compile_unittests_future_git_tag_multiversion
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
+    depends_on:
+      - name: version_expansions_future_git_tag_multiversion_gen
+    commands:
+      - func: "bazel compile"
+        vars:
+          targets: install-mongo_unittest
+          bazel_args: >-
+            --config=evg
+            --include_autogenerated_targets=True
+          compiling_for_test: true
+
+  - name: compile_libraries_for_unittests
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    exec_timeout_secs: 32400 # 9 hours
+    commands:
+      - func: "bazel compile"
+        vars:
+          # Target the conf to just run the bazel part of the build
+          targets: //src/...
+          compiling_for_test: true
+          task_compile_flags: ${unittest_library_compile_flags}
+          bazel_args: >-
+            --config=evg
+            --build_tag_filters=mongo_library
+
+  ## run_unittests ##
+  - name: run_unittests_future_git_tag_multiversion
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
+    depends_on:
+      - name: compile_unittests_future_git_tag_multiversion
+    commands:
+      - func: "f_expansions_write"
+      - func: "run diskstats"
+      - func: "f_expansions_write"
+      - func: "monitor process threads"
+      - func: "collect system resource info"
+      - func: "enable bazel test report creation"
+      - func: "f_expansions_write"
+      - func: "bazel test"
+        vars:
+          targets: //src/mongo/...
+          compiling_for_test: true
+          task_compile_flags: ${unittest_compile_flags}
+          test_timeout_sec: 600
+          bazel_args: >-
+            --config=evg
+            --include_autogenerated_targets=True
+            --test_tag_filters=mongo_unittest,-intermediate_debug
+            --build_tag_filters=mongo_unittest
+
+  ##compile_and_archive_libfuzzertests - build libfuzzertests ##
+  - name: compile_and_archive_libfuzzertests
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - func: "bazel compile"
+        vars:
+          targets: archive-mongo_fuzzer_test
+          compiling_for_test: true
+          bazel_args: >-
+            --config=evg
+            --include_autogenerated_targets=True
+      # Store the fuzzer executable, which we use to generate and run fuzzer inputs.
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: "src/bazel-bin/mongo_fuzzer_test.${ext|tgz}"
+          remote_file: "${project}/libfuzzer-tests/${build_variant}/${revision}/libfuzzer-tests.tgz"
+          bucket: mciuploads
+          permissions: private
+          visibility: signed
+          content_type: application/tar
+          display_name: "LibFuzzer Tests"
+
+  ## compile_dbtest ##
+  - &compile_dbtest
+    name: compile_dbtest
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
+    depends_on:
+      - name: archive_dist_test
+    commands:
+      - func: "bazel compile"
+        vars:
+          targets: install-dbtest
+          bazel_args: >-
+            --config=evg
+
+  - <<: *compile_dbtest
+    name: compile_dbtest_future_git_tag_multiversion
+    depends_on:
+      - name: version_expansions_future_git_tag_multiversion_gen
+
+  ## run_dbtest ##
+  - &run_dbtest
+    name: run_dbtest
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary", "bazel_check"]
+    depends_on:
+      - name: compile_dbtest
+    commands:
+      - func: "f_expansions_write"
+      - func: "run diskstats"
+      - func: "f_expansions_write"
+      - func: "monitor process threads"
+      - func: "collect system resource info"
+      - func: "run tests"
+        vars:
+          suite: dbtest
+          install_dir: bazel-bin/install/bin
+
+  - <<: *run_dbtest
+    name: run_dbtest_future_git_tag_multiversion
+    depends_on:
+      - name: compile_dbtest_future_git_tag_multiversion
+
+  - &archive_dbtest
+    name: archive_dbtest
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary", "bazel_check"]
+    depends_on:
+      - name: compile_dbtest
+    commands:
+      - func: "bazel compile"
+        vars:
+          targets: archive-dbtest
+          bazel_args: >-
+            --config=evg
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/bazel-bin/dbtest.${ext|tgz}
+          remote_file: ${project}/${build_variant}/${revision}/dbtest/dbtest-${build_id}-${task_name}-${execution}.tgz
+          bucket: mciuploads
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
+          content_type: application/tar
+          display_name: dbtest binary - Execution ${execution}
+          optional: true
+
+  - <<: *archive_dbtest
+    name: archive_dbtest_future_git_tag_multiversion
+    depends_on:
+      - name: compile_dbtest_future_git_tag_multiversion
+
+  - name: compile_integration_test
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
+    depends_on:
+      - name: archive_dist_test
+    commands:
+      - func: "bazel compile"
+        vars:
+          targets: install-mongo_integration_test
+          bazel_args: >-
+            --config=evg
+            --include_autogenerated_targets=True
+          task_compile_flags: ${integration_test_compile_flags}
+          compiling_for_test: true
+
+  - name: archive_jstestshell
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - func: "activate task"
+        vars:
+          task_to_activate: archive_jstestshell_debug
+      - func: "bazel compile"
+        vars: &archive_jstestshell_vars
+          targets: archive-mongo-stripped
+          bazel_args: >-
+            --config=evg
+          task_compile_flags: >-
+            --asan=False
+            --tsan=False
+            --ubsan=False
+            --linkstatic=True
+            --dbg=True
+            --opt=on
+      - func: "f_expansions_write"
+      - command: subprocess.exec
+        params:
+          binary: bash
+          add_expansions_to_env: true
+          args:
+            - "src/evergreen/run_python_script.sh"
+            - "buildscripts/s3_binary/sha256sum.py"
+            - "bazel-bin/mongo-stripped.${ext|tgz}"
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/bazel-bin/mongo-stripped.${ext|tgz}
+          remote_file: ${mongo_jstestshell}
+          bucket: mciuploads
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
+          content_type: ${content_type|application/gzip}
+          display_name: Jstestshell
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/bazel-bin/mongo-stripped.${ext|tgz}.sha256
+          remote_file: ${mongo_jstestshell}.sha256
+          bucket: mciuploads
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
+          content_type: text/plain
+          display_name: Jstestshell SHA256
+
+  - name: archive_jstestshell_debug
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
+    depends_on:
+      - name: archive_jstestshell
+    commands:
+      - func: "f_expansions_write"
+      - func: "bazel compile"
+        vars:
+          <<: *archive_jstestshell_vars
+          targets: archive-mongo-debug
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/bazel-bin/mongo-debug.${ext|tgz}
+          remote_file: ${mongo_jstestshell_debugsymbols}
+          bucket: mciuploads
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
+          content_type: ${content_type|application/gzip}
+          display_name: Jstestshell Debugsymbols
+
+  - name: stitch_support_create_lib
+    tags:
+      [
+        "assigned_to_jira_team_devprod_build",
+        "release_critical",
+        "requires_compile_variant",
+        "requires_large_host",
+        "stitch",
+        "bazel_check",
+      ]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - func: "do bazel setup"
+      - func: "f_expansions_write"
+      - func: "bazel compile"
+        vars:
+          targets: archive-stitch_support
+          bazel_args: >-
+            --config=evg_stitch
+          task_compile_flags: --linkstatic=True
+      - func: "f_expansions_write"
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: "src/bazel-bin/stitch_support.${ext|tgz}"
+          remote_file: "${project}/stitch-support/${build_variant}/${revision}/stitch-support-${version}.tgz"
+          bucket: mciuploads
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
+          content_type: application/tar
+          display_name: "Stitch Support Library"
+
+  - name: stitch_support_install_and_run_tests
+    tags:
+      [
+        "assigned_to_jira_team_devprod_build",
+        "release_critical",
+        "incompatible_mac",
+        "requires_compile_variant",
+        "requires_large_host",
+        "stitch",
+        "bazel_check",
+      ]
+    depends_on:
+      - name: stitch_support_create_lib
+    commands:
+      - func: "do bazel setup"
+      - func: "f_expansions_write"
+      - func: "bazel compile"
+        vars:
+          targets: install-stitch_support_test
+          compiling_for_test: true
+          bazel_args: >-
+            --config=evg_stitch_test
+      - func: "get and apply version expansions"
+      - func: "f_expansions_write"
+      - command: subprocess.exec
+        type: test
+        params:
+          binary: bash
+          args:
+            - "src/evergreen/stitch_support_run_tests.sh"
+
+  - name: crypt_create_debug_lib
+    tags: ["assigned_to_jira_team_server_security", "auxiliary", "bazel_check"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - func: "f_expansions_write"
+      - func: "bazel compile"
+        vars:
+          targets: archive-mongo_crypt-debug archive-mongo_crypt-stripped
+          bazel_args: >-
+            --config=evg_crypt_dbg
+          task_compile_flags: --linkstatic=True
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: "src/bazel-bin/mongo_crypt-stripped.${ext|tgz}"
+          remote_file: "${project}/mongo_crypt/${build_variant}/${revision}/mongo_crypt_shared_v1_dev-${version}.${ext|tgz}"
+          bucket: mciuploads
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
+          content_type: ${content_type|application/tar}
+          display_name: "Mongo Crypt Library dev"
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: "src/bazel-bin/mongo_crypt-debug.${ext|tgz}"
+          remote_file: "${project}/mongo_crypt/${build_variant}/${revision}/mongo_crypt_shared_v1_debug-${version}.${ext|tgz}"
+          bucket: mciuploads
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
+          content_type: ${content_type|application/tar}
+          display_name: "Mongo Crypt Library debug"
+
+  - name: crypt_install_tests
+    tags: ["assigned_to_jira_team_server_security", "auxiliary", "bazel_check"]
+    depends_on:
+      - name: crypt_create_debug_lib
+    commands:
+      - func: "f_expansions_write"
+      - func: "bazel compile"
+        vars:
+          targets: archive-mongo_crypt_shlib_test-stripped
+          compiling_for_test: true
+          bazel_args: >-
+            --config=evg_crypt_test
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: "src/bazel-bin/mongo_crypt_shlib_test-stripped.${ext|tgz}"
+          remote_file: "${project}/mongo_crypt/${build_variant}/${revision}/mongo_crypt_shlib_test-${version}.${ext|tgz}"
+          bucket: mciuploads
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
+          content_type: ${content_type|application/tar}
+          display_name: "Mongo Crypt Shared Library Test"
+
+  - name: crypt_run_tests
+    tags: ["assigned_to_jira_team_server_security", "auxiliary", "bazel_check"]
+    depends_on:
+      - name: crypt_install_tests
+    commands:
+      - func: "get and apply version expansions"
+      - func: "f_expansions_write"
+      - command: subprocess.exec
+        type: test
+        params:
+          binary: bash
+          args:
+            - "src/evergreen/crypt_run_tests.sh"
+
+  - name: publish_packages
+    run_on: rhel8.7-small
+    tags:
+      [
+        "assigned_to_jira_team_devprod_build",
+        "release_critical",
+        "incompatible_development_variant",
+        "requires_compile_variant",
+        "publish",
+      ]
+    # This should prevent this task from running in patch builds, where we
+    # don't want to publish packages.
+    patchable: false
+    stepback: false
+    # Same dependencies as "push" below
+    depends_on:
+      - name: package
+      - name: jsCore
+      - name: run_dbtest
+      - name: replica_sets_jscore_passthrough_gen
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "get and apply version expansions"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "fetch packages"
+      - func: "f_expansions_write"
+      - func: "set up remote credentials"
+        vars:
+          aws_key_remote: ${repo_aws_key}
+          aws_secret_remote: ${repo_aws_secret}
+      - func: "set up notary client credentials"
+      - func: "f_expansions_write"
+      - func: "log into devprod container registry"
+      - command: subprocess.exec
+        params:
+          binary: bash
+          env:
+            AWS_ACCESS_KEY_ID: ${upload_lock_access_key_id}
+            AWS_SECRET_ACCESS_KEY: ${upload_lock_secret_access_key}
+            UPLOAD_LOCK_IMAGE: ${upload_lock_image_ecr}
+            UPLOAD_BUCKET: ${upload_lock_bucket}
+            AWS_REGION: ${upload_lock_region}
+            EVERGREEN_TASK_ID: ${task_id}
+          args:
+            - "./src/evergreen/packages_publish.sh"
+
+  - name: promote_custom_build
+    run_on: amazon2023-small
+    tags: ["assigned_to_jira_team_devprod_release_infrastructure", "auxiliary"]
+    allowed_requesters: ["patch"]
+    stepback: false
+    commands:
+      - command: git.get_project
+        params:
+          directory: src
+          clone_depth: 1
+      - func: "f_expansions_write"
+      - command: subprocess.exec
+        params:
+          binary: bash
+          env:
+            PROMOTE_TASK_ID: ${promote_task_id}
+            PROMOTE_PROJECT_IDENTIFIER: ${promote_custom_project_identifier}
+            EVERGREEN_API_USER: ${evergreen_api_user}
+            EVERGREEN_API_KEY: ${evergreen_api_key}
+          args:
+            - "./src/evergreen/get_custom_build_promotion_expansions_debug.sh"
+      - command: expansions.update
+        params:
+          file: debug-promote-expansions.yml
+      - func: "f_expansions_write"
+      - command: subprocess.exec
+        params:
+          binary: bash
+          env:
+            PROMOTE_TASK_ID: ${promote_archive_dist_test_task_id}
+            PROMOTE_PROJECT_IDENTIFIER: ${promote_custom_project_identifier}
+            CDN_PATH: "server-custom-builds"
+            EVERGREEN_API_USER: ${evergreen_api_user}
+            EVERGREEN_API_KEY: ${evergreen_api_key}
+          args:
+            - "./src/evergreen/get_custom_build_promotion_expansions.sh"
+      - command: expansions.update
+        params:
+          file: promote-expansions.yml
+      - func: "f_expansions_write"
+      - command: s3.get
+        display_name: "fetch promote version expansions"
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          remote_file: ${promote_project_identifier}/${promote_version_id}/version_expansions.yml
+          bucket: mciuploads
+          local_file: src/promote-version-expansions.yml
+      - command: expansions.update
+        params:
+          file: src/promote-version-expansions.yml
+      - func: "f_expansions_write"
+      - command: s3.put
+        params:
+          role_arn: "arn:aws:iam::119629040606:role/s3-access.cdn-origin-server-custom-builds"
+          remote_file: "server-custom-builds/${promote_project_identifier}/${promote_version_id}/${promote_build_variant}/${promote_build_id}/mongo-binaries.${promote_extension}"
+          bucket: cdn-origin-server-custom-builds
+          permissions: private
+          local_file: mongo-binaries.${promote_extension}
+          content_type: application/gzip
+          skip_existing: true
+      - command: attach.artifacts
+        params:
+          files:
+            - attach-address.json
+      - command: s3.put
+        params:
+          role_arn: "arn:aws:iam::119629040606:role/s3-access.cdn-origin-server-custom-builds"
+          remote_file: "server-custom-builds/${promote_project_identifier}/${promote_version_id}/${promote_build_variant}/${promote_build_id}/mongo-debugsymbols.${promote_extension}"
+          bucket: cdn-origin-server-custom-builds
+          permissions: private
+          local_file: mongo-debugsymbols.${promote_extension}
+          content_type: application/gzip
+          skip_existing: true
+      - command: attach.artifacts
+        params:
+          files:
+            - attach-address-debug.json
+      - command: subprocess.exec
+        params:
+          binary: bash
+          env:
+            PROMOTE_TO_CLOUD_ENV: ${promote_to_cloud_dev}
+            CLOUD_ENV: "cloud-dev"
+            PROMOTE_BUILD_VARIANT: ${promote_build_variant}
+            PROMOTE_MONGO_VERSION: ${version}
+            PROMOTE_REVISION: ${promote_revision}
+            PROMOTE_CDN_ADDRESS: ${promote_cdn_address}
+            CLOUD_ENV_API_PUBLIC_KEY: ${cloud_dev_api_public_key}
+            CLOUD_ENV_API_PRIVATE_KEY: ${cloud_dev_api_private_key}
+          args:
+            - "./src/evergreen/upload_custom_build_to_cloud_env.sh"
+
+  - name: promote_sys_perf_build
+    run_on: amazon2023-small
+    tags: ["assigned_to_jira_team_devprod_release_infrastructure", "auxiliary"]
+    allowed_requesters: ["patch"]
+    stepback: false
+    commands:
+      - command: git.get_project
+        params:
+          directory: src
+          clone_depth: 1
+      - func: "f_expansions_write"
+      - command: subprocess.exec
+        params:
+          binary: bash
+          env:
+            PROMOTE_TASK_ID: ${promote_task_id}
+            PROMOTE_PROJECT_IDENTIFIER: ${promote_custom_project_identifier}
+            CDN_PATH: "sys-perf-builds"
+            EVERGREEN_API_USER: ${evergreen_api_user}
+            EVERGREEN_API_KEY: ${evergreen_api_key}
+          args:
+            - "./src/evergreen/get_custom_build_promotion_expansions.sh"
+      - command: expansions.update
+        params:
+          file: promote-expansions.yml
+      - func: "f_expansions_write"
+      - command: s3.get
+        display_name: "fetch promote version expansions"
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          remote_file: ${promote_project_identifier}/${promote_version_id}/version_expansions.yml
+          bucket: mciuploads
+          local_file: src/promote-version-expansions.yml
+      - command: expansions.update
+        params:
+          file: src/promote-version-expansions.yml
+      - func: "f_expansions_write"
+      - command: s3.put
+        params:
+          role_arn: "arn:aws:iam::119629040606:role/s3-access.cdn-origin-sys-perf-builds"
+          remote_file: "sys-perf-builds/${promote_project_identifier}/${promote_version_id}/${promote_build_variant}/${promote_build_id}/mongo-binaries.${promote_extension}"
+          bucket: cdn-origin-sys-perf-builds
+          permissions: private
+          local_file: mongo-binaries.${promote_extension}
+          content_type: application/gzip
+          skip_existing: true
+      - command: attach.artifacts
+        params:
+          files:
+            - attach-address.json
+      - command: subprocess.exec
+        params:
+          binary: bash
+          env:
+            PROMOTE_TO_CLOUD_ENV: ${promote_to_cloud_dev}
+            CLOUD_ENV: "cloud-dev"
+            PROMOTE_BUILD_VARIANT: ${promote_build_variant}
+            PROMOTE_MONGO_VERSION: ${version}
+            PROMOTE_REVISION: ${promote_revision}
+            PROMOTE_CDN_ADDRESS: ${promote_cdn_address}
+            CLOUD_ENV_API_PUBLIC_KEY: ${cloud_dev_api_public_key}
+            CLOUD_ENV_API_PRIVATE_KEY: ${cloud_dev_api_private_key}
+          args:
+            - "./src/evergreen/upload_custom_build_to_cloud_env.sh"
+
+  - name: crypt_push
+    run_on: rhel8.7-small
+    tags:
+      [
+        "assigned_to_jira_team_server_security",
+        "release_critical",
+        "incompatible_development_variant",
+        "incompatible_community",
+        "requires_compile_variant",
+        "publish_crypt",
+      ]
+    patchable: false
+    stepback: false
+    depends_on:
+      - name: crypt_create_lib
+    commands:
+      - command: manifest.load
+      - func: "f_expansions_write"
+      - func: "git get project and add git tag"
+      - func: "set task expansion macros"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "upload pip requirements"
+      - func: "get buildnumber"
+      - func: "f_expansions_write"
+      - func: "get and apply version expansions"
+      - func: "f_expansions_write"
+      - command: s3.get
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          remote_file: ${project}/mongo_crypt/${build_variant}/${revision}/mongo_crypt_shared_v1-${version}.${ext|tgz}
+          bucket: mciuploads
+          local_file: src/mongo_crypt_shared_v1.${ext|tgz}
+      - func: "f_expansions_write"
+      - func: "set up remote credentials"
+        vars:
+          aws_key_remote: ${repo_aws_key}
+          aws_secret_remote: ${repo_aws_secret}
+      - func: "f_expansions_write"
+      - func: "log into devprod container registry"
+      - command: subprocess.exec
+        params:
+          binary: bash
+          args:
+            - "./src/evergreen/garasign_gpg_crypt_sign.sh"
+      # Put the crypt tarball/zipfile
+      - command: s3.put
+        params:
+          aws_secret: ${aws_secret}
+          local_file: src/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}
+          aws_key: ${aws_key}
+          bucket: ${push_bucket}
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
+          content_type: ${content_type|application/gzip}
+          remote_file: ${push_path}/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}
+          skip_existing: ${is_release}
+      # Put the crypt tarball signature
+      - command: s3.put
+        params:
+          aws_secret: ${aws_secret}
+          local_file: src/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
+          aws_key: ${aws_key}
+          bucket: ${push_bucket}
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
+          content_type: ${content_type|application/gzip}
+          remote_file: ${push_path}/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
+          skip_existing: ${is_release}
+      # Put the crypt tarball sha1
+      - command: s3.put
+        params:
+          aws_secret: ${aws_secret}
+          local_file: src/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
+          aws_key: ${aws_key}
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
+          bucket: ${push_bucket}
+          content_type: text/plain
+          remote_file: ${push_path}/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
+          skip_existing: ${is_release}
+      # Put the crypt tarball sha256
+      - command: s3.put
+        params:
+          aws_secret: ${aws_secret}
+          local_file: src/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
+          aws_key: ${aws_key}
+          bucket: ${push_bucket}
+          content_type: text/plain
+          remote_file: ${push_path}/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
+          skip_existing: ${is_release}
+      # Put the crypt tarball md5
+      - command: s3.put
+        params:
+          aws_secret: ${aws_secret}
+          local_file: src/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
+          aws_key: ${aws_key}
+          bucket: ${push_bucket}
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
+          content_type: text/plain
+          remote_file: ${push_path}/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
+          skip_existing: ${is_release}
+      # Put the crypt tarball/zipfile
+      - command: s3.put
+        params:
+          local_file: src/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}
+          bucket: ${push_bucket_new}
+          role_arn: ${push_role_arn}
+          permissions: private
+          content_type: ${content_type|application/gzip}
+          remote_file: ${push_path}/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}
+          skip_existing: ${is_release}
+      # Put the crypt tarball signature
+      - command: s3.put
+        params:
+          local_file: src/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
+          bucket: ${push_bucket_new}
+          role_arn: ${push_role_arn}
+          permissions: private
+          content_type: ${content_type|application/gzip}
+          remote_file: ${push_path}/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
+          skip_existing: ${is_release}
+      # Put the crypt tarball sha1
+      - command: s3.put
+        params:
+          local_file: src/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
+          permissions: private
+          role_arn: ${push_role_arn}
+          bucket: ${push_bucket_new}
+          content_type: text/plain
+          remote_file: ${push_path}/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
+          skip_existing: ${is_release}
+      # Put the crypt tarball sha256
+      - command: s3.put
+        params:
+          local_file: src/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
+          permissions: private
+          bucket: ${push_bucket_new}
+          role_arn: ${push_role_arn}
+          content_type: text/plain
+          remote_file: ${push_path}/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
+          skip_existing: ${is_release}
+      # Put the crypt tarball md5
+      - command: s3.put
+        params:
+          local_file: src/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
+          bucket: ${push_bucket_new}
+          role_arn: ${push_role_arn}
+          permissions: private
+          content_type: text/plain
+          remote_file: ${push_path}/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
+          skip_existing: ${is_release}
+      #Trace artifacts (crypt) using Papertrail
+      - command: subprocess.exec
+        params:
+          binary: bash
+          env:
+            IS_RELEASE: ${is_release}
+          args:
+            - "./src/evergreen/papertrail_generate_expansions.sh"
+      - command: expansions.update
+        params:
+          file: src/papertrail-expansions.yml
+      - func: "f_expansions_write"
+      - command: papertrail.trace
+        params:
+          key_id: ${papertrail_key_id}
+          secret_key: ${papertrail_secret_key}
+          product: ${product_for_papertrail}
+          version: ${release_version}
+          filenames:
+            - "src/mongo_crypt_shared_v1-${push_name}-${push_arch}*"
+
+  # Sys-perf relies on this task for uploading pgo data please reach out before changing it.
+  - name: upload_pgo_bolt_data
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
+    run_on: amazon2023-arm64-latest-small
+    depends_on:
+      - name: archive_dist_test
+    commands:
+      - func: "bazel compile"
+        vars:
+          targets: install-profile_data
+      - command: s3.put
+        params:
+          aws_key: ${aws_key_build}
+          aws_secret: ${aws_secret_build}
+          local_file: src/bazel-bin/install-profile_data/bin/bolt.fdata
+          remote_file: profiling_data/bolt/mongod_${revision}_${build_arch}_clang_thinlto_pgo_bolt_${version}.fdata
+          bucket: mdb-build-public
+          permissions: public-read
+          skip_existing: true
+          content_type: text/plain
+          display_name: Bolt
+          optional: true
+      - command: s3.put
+        params:
+          aws_key: ${aws_key_build}
+          aws_secret: ${aws_secret_build}
+          local_file: src/bazel-bin/install-profile_data/bin/clang_pgo.profdata
+          remote_file: profiling_data/pgo/mongod_${revision}_${build_arch}_clang_thinlto_pgo_${version}.profdata
+          bucket: mdb-build-public
+          permissions: public-read
+          skip_existing: true
+          content_type: text/plain
+          display_name: clang_pgo
+          optional: true
+      - command: s3.put
+        params:
+          aws_key: ${aws_key_build}
+          aws_secret: ${aws_secret_build}
+          local_file: src/bazel-bin/install-profile_data/bin/pgo_gcda.tgz
+          remote_file: profiling_data/pgo/mongod_${revision}_${build_arch}_gcc_lto_pgo_${version}.tgz
+          bucket: mdb-build-public
+          permissions: public-read
+          skip_existing: true
+          content_type: application/tar
+          display_name: gcc_pgo
+          optional: true
+      - command: subprocess.exec
+        params:
+          binary: bash
+          args:
+            - "src/evergreen/run_python_script.sh"
+            - "buildscripts/profile_data_pr.py"
+            - "https://mdb-build-public.s3.us-east-1.amazonaws.com/profiling_data/bolt/mongod_${revision}_${build_arch}_clang_thinlto_pgo_bolt_${version}.fdata"
+            - "https://mdb-build-public.s3.us-east-1.amazonaws.com/profiling_data/pgo/mongod_${revision}_${build_arch}_clang_thinlto_pgo_${version}.profdata"
+            - "https://mdb-build-public.s3.us-east-1.amazonaws.com/profiling_data/pgo/mongod_${revision}_${build_arch}_gcc_lto_pgo_${version}.tgz"
+            - "${branch_name}"
+            - "SERVER-110427-${revision}"
+            - "${MONGO_PR_BOT_APP_ID}"
+            - "${MONGO_PR_BOT_PRIVATE_KEY}"
+
+################################################
+#                 Task Groups                  #
+################################################
+task_groups:
+  - <<: *compile_task_group_template
+    name: archive_dist_test_TG
+    tasks:
+      - archive_dist_test
+
+  - <<: *compile_bazel_task_group_template
+    name: compile_bazel_TG
+    tasks:
+      - compile_dist_test_quick
+
+  - <<: *compile_bazel_task_group_template
+    name: run_bazel_TG
+    tasks:
+      - run_bazel_program
+      - bazel_archive_and_run_dist_test
+
+  # We want to run these sequentially to put less load on the cluster
+  - <<: *compile_task_group_template
+    name: hydrate_bazel_profile_TG
+    max_hosts: -1
+    tasks:
+      - hydrate_bazel_profile_fastbuild
+      - hydrate_bazel_profile_opt
+      - hydrate_bazel_profile_dbg
+      - hydrate_bazel_profile_dbg_aubsan
+      - hydrate_bazel_profile_dbg_tsan
+
+  - <<: *compile_task_group_template
+    name: build_source_graph_index_TG
+    max_hosts: -1
+    tasks:
+      - build_source_graph_index
+
+  - <<: *compile_bazel_task_group_template
+    name: compile_bazel_windows_TG
+    tasks:
+      - run_bazel_program_windows
+
+  - <<: *compile_bazel_task_group_template
+    name: compile_bazel_macos_TG
+    tasks:
+      - compile_dist_test_quick
+
+  - <<: *compile_task_group_template
+    name: compile_upload_benchmarks_TG
+    tasks:
+      - compile_upload_benchmarks
+      # TODO(SERVER-86426): Figure out a workable long-term solution to benchmark debug symbols
+      # - compile_upload_benchmarks_debug
+
+  - <<: *compile_task_group_template
+    name: compile_and_archive_dist_test_TG
+    tasks:
+      - archive_dist_test
+      - archive_dist_test_debug
+
+  - <<: *compile_task_group_template
+    name: compile_and_archive_dist_test_then_package_TG
+    tasks:
+      - archive_dist_test
+      - archive_dist_test_debug
+      - package
+
+  - <<: *compile_task_group_template
+    name: compile_run_and_archive_dbtest_TG
+    tasks:
+      - compile_dbtest
+      - run_dbtest
+      - archive_dbtest
+
+  - <<: *compile_task_group_template
+    name: compile_test_serial_TG
+    tasks:
+      - archive_dist_test
+      - archive_dist_test_debug
+      - compile_dbtest
+      - run_dbtest
+      - archive_dbtest
+
+  - <<: *compile_task_group_template
+    name: compile_jstestshell_TG
+    tasks:
+      - archive_jstestshell
+      - archive_jstestshell_debug
+
+  - <<: *compile_task_group_template
+    name: compile_test_serial_future_git_tag_multiversion_TG
+    tasks:
+      - archive_dist_test_future_git_tag_multiversion
+      - archive_dist_test_debug_future_git_tag_multiversion
+      - compile_unittests_future_git_tag_multiversion
+      - run_unittests_future_git_tag_multiversion
+      - compile_dbtest_future_git_tag_multiversion
+      - run_dbtest_future_git_tag_multiversion
+      - archive_dbtest_future_git_tag_multiversion
+      - compile_all_future_git_tag_multiversion
+
+  - <<: *compile_task_group_template
+    name: compile_test_and_package_serial_TG
+    tasks:
+      - archive_dist_test
+      - archive_dist_test_debug
+      # package task here to reduce peak diskspace SERVER-86662
+      - package
+      - compile_dbtest
+      - run_dbtest
+      - archive_dbtest
+
+  # The *no_unittests_TG taskgroups are useful for static builds,
+  # were the static binaries of the unittests can take up to
+  # a terabyte of data.
+  - <<: *compile_task_group_template
+    name: compile_test_serial_no_unittests_TG
+    tasks:
+      - archive_dist_test
+      - archive_dist_test_debug
+      - compile_dbtest
+      - run_dbtest
+      - archive_dbtest
+      - compile_all_but_not_unittests
+
+  - <<: *compile_task_group_template
+    name: compile_test_and_package_serial_no_unittests_TG
+    tasks:
+      - archive_dist_test
+      - archive_dist_test_debug
+      # package task here to reduce peak diskspace SERVER-86662
+      - package
+      - compile_dbtest
+      - run_dbtest
+      - archive_dbtest
+      - compile_all_but_not_unittests
+
+  # TODO: SERVER-79886 Fix commented out tasks
+  - <<: *compile_task_group_template
+    name: compile_test_and_package_serial_lto_no_unittests_TG
+    tasks:
+      - archive_dist_test
+      - archive_dist_test_debug
+      # package task here to reduce peak diskspace SERVER-86662
+      - package
+      - compile_dbtest
+    # - run_dbtest
+    # - archive_dbtest
+    # - compile_all_but_not_unittests
+
+  # The *no_unittests_TG taskgroups are useful for static builds,
+  # were the static binaries of the unittests can take up to
+  # a terabyte of data.
+  - <<: *compile_task_group_template
+    name: compile_test_benchmark_and_package_serial_no_unittests_TG
+    tasks:
+      - archive_dist_test
+      - archive_dist_test_debug
+      # package task here to reduce peak diskspace SERVER-86662
+      - package
+      - compile_dbtest
+      - run_dbtest
+      - archive_dbtest
+      - compile_upload_benchmarks
+      # TODO(SERVER-86426): Figure out a workable long-term solution to benchmark debug symbols
+      # - compile_upload_benchmarks_debug
+      - compile_all_but_not_unittests
+
+  - <<: *compile_task_group_template
+    name: run_unit_tests_TG
+    max_hosts: -1
+    tasks:
+      - unit_tests
+      - unit_tests_remote_exec_incompatible
+
+  - <<: *compile_task_group_template
+    name: run_unit_tests_8_way_split_TG
+    max_hosts: -1
+    tasks:
+      - compile_libraries_for_unittests
+      - unit_test_group1
+      - unit_test_group2
+      - unit_test_group3
+      - unit_test_group4
+      - unit_test_group5
+      - unit_test_group6
+      - unit_test_group7
+      - unit_test_group8
+
+  - <<: *compile_task_group_template
+    name: run_unit_tests_no_sandbox_TG
+    max_hosts: -1
+    tasks:
+      - compile_libraries_for_unittests
+      - unit_test_group1_no_sandbox
+      - unit_test_group2_no_sandbox
+      - unit_test_group3_no_sandbox
+      - unit_test_group4_no_sandbox
+      - unit_test_group5_no_sandbox
+      - unit_test_group6_no_sandbox
+      - unit_test_group7_no_sandbox
+      - unit_test_group8_no_sandbox
+
+  - <<: *compile_task_group_template
+    name: compile_unittest_libaries_TG
+    max_hosts: -1
+    tasks:
+      - compile_libraries_for_unittests
+
+  # These `parallel` task groups are only appropriate for builders that
+  # use --linkstatic=False. Such builders are able to share all build
+  # artifacts, and therefore will not repeatedly re-link the same
+  # code. In that mode, it makes sense to run all of these tasks
+  # concurrently, since they will share state across machines and can
+  # complete faster than running them serially. We keep them in task
+  # groups so that if they do run on the same machine, they can avoid the
+  # cost of re-running the setup tasks.
+  - <<: *compile_task_group_template
+    name: compile_test_parallel_core_stream_TG
+    tasks:
+      - archive_dist_test
+      - archive_dist_test_debug
+      - compile_all_but_not_unittests
+
+  - <<: *compile_task_group_template
+    name: compile_test_parallel_core_stream_and_pretty_printer_tests_TG
+    tasks:
+      - archive_dist_test
+      - archive_dist_test_debug
+      - run_pretty_printer_tests
+
+  - <<: *compile_task_group_template
+    name: compile_all_but_not_unittests_TG
+    tasks:
+      - compile_all_but_not_unittests
+
+  - <<: *compile_task_group_template
+    name: compile_test_parallel_dbtest_stream_TG
+    tasks:
+      - compile_dbtest
+      - run_dbtest
+      - archive_dbtest
+
+  - <<: *compile_task_group_template
+    name: upload_pgo_bolt_data_TG
+    tasks:
+      - upload_pgo_bolt_data
+
+  - name: crypt_build_debug_and_test
+    setup_task:
+      - func: "f_expansions_write"
+      - func: "set task expansion macros"
+      - func: "f_expansions_write"
+      - func: "get engflow creds"
+    setup_group_can_fail_task: true
+    setup_group:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "set task expansion macros"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "upload pip requirements"
+      - func: "get buildnumber"
+    max_hosts: 1
+    tasks:
+      - "crypt_create_debug_lib"
+      - "crypt_install_tests"
+      - "crypt_run_tests"

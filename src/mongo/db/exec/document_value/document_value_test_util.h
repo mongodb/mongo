@@ -29,9 +29,14 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_comparator.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/unittest/unittest.h"
+
+#include <string>
 
 /**
  * Use to compare two instances of type Value under the default ValueComparator in unit tests.
@@ -59,6 +64,8 @@
 #define _ASSERT_DOCVAL_COMPARISON(NAME, a, b) \
     ::mongo::unittest::assertComparison_##NAME(__FILE__, __LINE__, #a, #b, a, b)
 
+#define ASSERT_VALUE_EQ_AUTO(expected, val) ASSERT_STR_EQ_AUTO(expected, val.toString())
+#define ASSERT_DOCUMENT_EQ_AUTO(expected, actual) ASSERT_BSONOBJ_EQ_AUTO(expected, actual.toBson())
 namespace mongo {
 namespace unittest {
 

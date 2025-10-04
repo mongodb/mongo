@@ -28,7 +28,6 @@
 
 import wiredtiger, wttest
 from suite_subprocess import suite_subprocess
-from wiredtiger import stat
 
 # test_txn12.py
 #    test of commit following failed op in a read only transaction.
@@ -43,7 +42,7 @@ class test_txn12(wttest.WiredTigerTestCase, suite_subprocess):
         # Setup the session and table.
         session = self.conn.open_session(None)
         session.create(self.uri, self.create_params)
-        session.begin_transaction("isolation=snapshot")
+        session.begin_transaction()
 
         # Create a read only transaction.
         c = session.open_cursor(self.uri, None)
@@ -56,7 +55,7 @@ class test_txn12(wttest.WiredTigerTestCase, suite_subprocess):
         session.commit_transaction()
 
         # Create a read/write transaction.
-        session.begin_transaction("isolation=snapshot")
+        session.begin_transaction()
         c = session.open_cursor(self.uri, None)
         c[123] = 123
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
@@ -64,6 +63,3 @@ class test_txn12(wttest.WiredTigerTestCase, suite_subprocess):
         # This commit should succeed as open cursor should not set transaction
         # error.
         session.commit_transaction()
-
-if __name__ == '__main__':
-    wttest.run()

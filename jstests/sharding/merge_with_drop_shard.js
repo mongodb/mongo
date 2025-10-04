@@ -1,9 +1,8 @@
 // Tests that the $merge aggregation stage is resilient to drop shard in both the source and
 // output collection during execution.
-(function() {
-'use strict';
-
-load("jstests/aggregation/extras/merge_helpers.js");  // For withEachMergeMode.
+import {withEachMergeMode} from "jstests/aggregation/extras/merge_helpers.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
 // TODO SERVER-50144 Remove this and allow orphan checking.
 // This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
@@ -13,31 +12,36 @@ TestData.skipCheckOrphans = true;
 const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 
 const mongosDB = st.s.getDB(jsTestName());
+assert.commandWorked(
+    st.s.getDB("admin").runCommand({enableSharding: mongosDB.getName(), primaryShard: st.shard0.name}),
+);
+
 const sourceColl = mongosDB["source"];
 const targetColl = mongosDB["target"];
 
-assert.commandWorked(st.s.getDB("admin").runCommand({enableSharding: mongosDB.getName()}));
-st.ensurePrimaryShard(mongosDB.getName(), st.shard1.name);
-
 function setAggHang(mode) {
-    assert.commandWorked(st.shard0.adminCommand(
-        {configureFailPoint: "hangWhileBuildingDocumentSourceMergeBatch", mode: mode}));
-    assert.commandWorked(st.shard1.adminCommand(
-        {configureFailPoint: "hangWhileBuildingDocumentSourceMergeBatch", mode: mode}));
+    // Match on the output namespace to avoid hanging the sharding metadata refresh aggregation when
+    // shard0 is a config shard.
+    assert.commandWorked(
+        st.shard0.adminCommand({
+            configureFailPoint: "hangWhileBuildingDocumentSourceMergeBatch",
+            mode: mode,
+            data: {nss: targetColl.getFullName()},
+        }),
+    );
+    assert.commandWorked(
+        st.shard1.adminCommand({
+            configureFailPoint: "hangWhileBuildingDocumentSourceMergeBatch",
+            mode: mode,
+            data: {nss: targetColl.getFullName()},
+        }),
+    );
 }
 
-function removeShard(shard) {
+function removeShardAndRefreshRouter(shard) {
     // We need the balancer to drain all the chunks out of the shard that is being removed.
     assert.commandWorked(st.startBalancer());
-    st.waitForBalancer(true, 60000);
-    var res = st.s.adminCommand({removeShard: shard.shardName});
-    assert.commandWorked(res);
-    assert.eq('started', res.state);
-    assert.soon(function() {
-        res = st.s.adminCommand({removeShard: shard.shardName});
-        assert.commandWorked(res);
-        return ('completed' === res.state);
-    }, "removeShard never completed for shard " + shard.shardName);
+    removeShard(st, shard.shardName);
 
     // Drop the test database on the removed shard so it does not interfere with addShard later.
     assert.commandWorked(shard.getDB(mongosDB.getName()).dropDatabase());
@@ -45,17 +49,14 @@ function removeShard(shard) {
     st.configRS.awaitLastOpCommitted();
     assert.commandWorked(st.s.adminCommand({flushRouterConfig: 1}));
     assert.commandWorked(st.stopBalancer());
-    st.waitForBalancer(false, 60000);
 }
 
 function addShard(shard) {
     assert.commandWorked(st.s.adminCommand({addShard: shard}));
-    assert.commandWorked(
-        st.s.adminCommand({moveChunk: sourceColl.getFullName(), find: {shardKey: 0}, to: shard}));
+    assert.commandWorked(st.s.adminCommand({moveChunk: sourceColl.getFullName(), find: {shardKey: 0}, to: shard}));
 }
 
-function runMergeWithMode(
-    whenMatchedMode, whenNotMatchedMode, shardedColl, dropShard, expectFailCode) {
+function runMergeWithMode(whenMatchedMode, whenNotMatchedMode, shardedColl, dropShard, expectFailCode) {
     // Set the failpoint to hang in the first call to DocumentSourceCursor's getNext().
     setAggHang("alwaysOn");
 
@@ -73,7 +74,7 @@ function runMergeWithMode(
                 cursor: {},
                 comment: "${comment}"
             });
-            
+
             if (${expectFailCode} !== undefined) {
                 assert.commandFailedWithCode(cmdRes, ${expectFailCode});
             } else {
@@ -89,25 +90,28 @@ function runMergeWithMode(
     // the shard on some test runs.
     assert.soon(
         () => {
-            const response = assert.commandWorkedOrFailedWithCode(mongosDB.currentOp({
-                $or: [
-                    {op: "command", "command.comment": comment},
-                    {op: "getmore", "cursor.originatingCommand.comment": comment}
-                ]
-            }),
-                                                                  [ErrorCodes.ShardNotFound]);
-            return (response.ok) ? response.inprog.length >= 1 : false;
+            const response = assert.commandWorkedOrFailedWithCode(
+                mongosDB.currentOp({
+                    $or: [
+                        {op: "command", "command.comment": comment},
+                        {op: "getmore", "cursor.originatingCommand.comment": comment},
+                    ],
+                }),
+                [ErrorCodes.ShardNotFound],
+            );
+            return response.ok ? response.inprog.length >= 1 : false;
         },
         () => {
             const msg = "Timeout waiting for parallel shell to hit the failpoint";
             const response = mongosDB.currentOp();
-            return (response.ok) ? msg + ":\n" + tojson(response.inprog) : msg;
-        });
+            return response.ok ? msg + ":\n" + tojson(response.inprog) : msg;
+        },
+    );
 
     if (dropShard) {
-        removeShard(st.shard0);
+        removeShardAndRefreshRouter(st.shard1);
     } else {
-        addShard(st.rs0.getURL());
+        addShard(st.rs1.getURL());
     }
     // Unset the failpoint to unblock the $merge and join with the parallel shell.
     setAggHang("off");
@@ -138,12 +142,13 @@ withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
     }
 
     runMergeWithMode(whenMatchedMode, whenNotMatchedMode, targetColl, true, undefined);
-    runMergeWithMode(whenMatchedMode,
-                     whenNotMatchedMode,
-                     targetColl,
-                     false,
-                     whenMatchedMode == "fail" ? ErrorCodes.DuplicateKey : undefined);
+    runMergeWithMode(
+        whenMatchedMode,
+        whenNotMatchedMode,
+        targetColl,
+        false,
+        whenMatchedMode == "fail" ? ErrorCodes.DuplicateKey : undefined,
+    );
 });
 
 st.stop();
-})();

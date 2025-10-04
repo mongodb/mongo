@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 
 namespace mongo {

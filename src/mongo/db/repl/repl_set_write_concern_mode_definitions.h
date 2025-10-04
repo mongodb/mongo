@@ -29,17 +29,22 @@
 
 #pragma once
 
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/db/repl/repl_set_tag.h"
+#include "mongo/util/modules.h"
+#include "mongo/util/string_map.h"
+
+#include <cstdint>
+#include <string>
 #include <utility>
 #include <vector>
-
-#include "mongo/base/status.h"
-#include "mongo/db/repl/repl_set_tag.h"
-#include "mongo/util/string_map.h"
 
 namespace mongo {
 namespace repl {
 
-class ReplSetWriteConcernModeDefinitions {
+class MONGO_MOD_PARENT_PRIVATE ReplSetWriteConcernModeDefinitions {
 public:
     // Default constructor for use as an IDL default.
     ReplSetWriteConcernModeDefinitions() {}

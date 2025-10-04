@@ -13,7 +13,9 @@
 // define BOOST_CHRONO_SOURCE so that <boost/chrono/config.hpp> knows
 // the library is being built (possibly exporting rather than importing code)
 
-#define BOOST_CHRONO_SOURCE
+#ifndef BOOST_CHRONO_SOURCE
+# define BOOST_CHRONO_SOURCE
+#endif
 
 #include <boost/chrono/detail/inlined/thread_clock.hpp>
 

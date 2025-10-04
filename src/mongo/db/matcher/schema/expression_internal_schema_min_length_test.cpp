@@ -27,119 +27,27 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_min_length.h"
+
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
+
+#include <tuple>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
 namespace {
 
-TEST(InternalSchemaMinLengthMatchExpression, RejectsNonStringElements) {
-    InternalSchemaMinLengthMatchExpression minLength("a", 1);
-
-    ASSERT_FALSE(minLength.matchesBSON(BSON("a" << BSONObj())));
-    ASSERT_FALSE(minLength.matchesBSON(BSON("a" << 1)));
-    ASSERT_FALSE(minLength.matchesBSON(BSON("a" << BSON_ARRAY(1))));
-}
-
-TEST(InternalSchemaMinLengthMatchExpression, RejectsStringsWithTooFewChars) {
-    InternalSchemaMinLengthMatchExpression minLength("a", 2);
-
-    ASSERT_FALSE(minLength.matchesBSON(BSON("a"
-                                            << "")));
-    ASSERT_FALSE(minLength.matchesBSON(BSON("a"
-                                            << "a")));
-}
-
-TEST(InternalSchemaMinLengthMatchExpression, AcceptsStringWithAtLeastMinChars) {
-    InternalSchemaMinLengthMatchExpression minLength("a", 2);
-
-    ASSERT_TRUE(minLength.matchesBSON(BSON("a"
-                                           << "ab")));
-    ASSERT_TRUE(minLength.matchesBSON(BSON("a"
-                                           << "abc")));
-    ASSERT_TRUE(minLength.matchesBSON(BSON("a"
-                                           << "abcde")));
-}
-
-TEST(InternalSchemaMinLengthMatchExpression, MinLengthZeroAllowsEmptyString) {
-    InternalSchemaMinLengthMatchExpression minLength("a", 0);
-
-    ASSERT_TRUE(minLength.matchesBSON(BSON("a"
-                                           << "")));
-}
-
-TEST(InternalSchemaMinLengthMatchExpression, RejectsNull) {
-    InternalSchemaMinLengthMatchExpression minLength("a", 1);
-
-    ASSERT_FALSE(minLength.matchesBSON(BSON("a" << BSONNULL)));
-}
-
-TEST(InternalSchemaMinLengthMatchExpression, TreatsMultiByteCodepointAsOneCharacter) {
-    InternalSchemaMinLengthMatchExpression matchingMinLength("a", 1);
-    InternalSchemaMinLengthMatchExpression nonMatchingMinLength("a", 2);
-
-    // This string has one code point, so it should meet minimum length 1 but not minimum length 2.
-    const auto testString = u8"\U0001f4a9"_as_char_ptr;
-    ASSERT_TRUE(matchingMinLength.matchesBSON(BSON("a" << testString)));
-    ASSERT_FALSE(nonMatchingMinLength.matchesBSON(BSON("a" << testString)));
-}
-
-TEST(InternalSchemaMinLengthMatchExpression, CorectlyCountsUnicodeCodepoints) {
-    InternalSchemaMinLengthMatchExpression matchingMinLength("a", 5);
-    InternalSchemaMinLengthMatchExpression nonMatchingMinLength("a", 6);
-
-    // A test string that contains single-byte, 2-byte, 3-byte, and 4-byte code points.
-    const auto testString =
-        u8":"                        // Single-byte character
-        u8"\u00e9"                   // 2-byte character
-        u8")"                        // Single-byte character
-        u8"\U0001f4a9"               // 4-byte character
-        u8"\U000020ac"_as_char_ptr;  // 3-byte character
-
-    // This string has five code points, so it should meet minimum length 5 but not minimum
-    // length 6.
-    ASSERT_TRUE(matchingMinLength.matchesBSON(BSON("a" << testString)));
-    ASSERT_FALSE(nonMatchingMinLength.matchesBSON(BSON("a" << testString)));
-}
-
-TEST(InternalSchemaMinLengthMatchExpression, DealsWithInvalidUTF8) {
-    InternalSchemaMinLengthMatchExpression minLength("a", 1);
-
-    // Several kinds of invalid byte sequences listed in the Wikipedia article about UTF-8:
-    // https://en.wikipedia.org/wiki/UTF-8
-    constexpr auto testStringUnexpectedContinuationByte = "\bf";
-    constexpr auto testStringOverlongEncoding = "\xf0\x82\x82\xac";
-    constexpr auto testStringInvalidCodePoint = "\xed\xa0\x80";  // U+d800 is not allowed
-    constexpr auto testStringLeadingByteWithoutContinuationByte = "\xdf";
-
-    // Because these inputs are invalid, we don't have any expectations about the answers we get.
-    // Our only requirement is that the test does not crash.
-    std::ignore = minLength.matchesBSON(BSON("a" << testStringUnexpectedContinuationByte));
-    std::ignore = minLength.matchesBSON(BSON("a" << testStringOverlongEncoding));
-    std::ignore = minLength.matchesBSON(BSON("a" << testStringInvalidCodePoint));
-    std::ignore = minLength.matchesBSON(BSON("a" << testStringLeadingByteWithoutContinuationByte));
-}
-
-TEST(InternalSchemaMinLengthMatchExpression, NestedFieldsWorkWithDottedPaths) {
-    InternalSchemaMinLengthMatchExpression minLength("a.b", 2);
-
-    ASSERT_TRUE(minLength.matchesBSON(BSON("a" << BSON("b"
-                                                       << "ab"))));
-    ASSERT_TRUE(minLength.matchesBSON(BSON("a" << BSON("b"
-                                                       << "abc"))));
-    ASSERT_FALSE(minLength.matchesBSON(BSON("a" << BSON("b"
-                                                        << "a"))));
-}
-
 TEST(InternalSchemaMinLengthMatchExpression, SameMinLengthTreatedEquivalent) {
-    InternalSchemaMinLengthMatchExpression minLength1("a", 2);
-    InternalSchemaMinLengthMatchExpression minLength2("a", 2);
-    InternalSchemaMinLengthMatchExpression minLength3("a", 3);
+    InternalSchemaMinLengthMatchExpression minLength1("a"_sd, 2);
+    InternalSchemaMinLengthMatchExpression minLength2("a"_sd, 2);
+    InternalSchemaMinLengthMatchExpression minLength3("a"_sd, 3);
 
     ASSERT_TRUE(minLength1.equivalent(&minLength2));
     ASSERT_FALSE(minLength1.equivalent(&minLength3));

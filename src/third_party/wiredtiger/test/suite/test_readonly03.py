@@ -31,7 +31,7 @@
 #   all return ENOTSUP.
 #
 
-import os, sys, wiredtiger, wttest
+import wiredtiger, wttest
 from suite_subprocess import suite_subprocess
 from wtdataset import SimpleDataSet
 
@@ -43,8 +43,8 @@ class test_readonly03(wttest.WiredTigerTestCase, suite_subprocess):
     conn_params = 'create,log=(enabled),operation_tracking=(enabled=false),'
     conn_params_rd = 'readonly=true,operation_tracking=(enabled=false),'
 
-    session_ops = [ 'alter', 'create', 'compact', 'drop', 'log_flush',
-        'log_printf', 'rename', 'salvage', 'truncate', 'upgrade', ]
+    session_ops = [ 'alter', 'create', 'compact', 'drop', 'flush_tier', 'log_flush',
+        'log_printf', 'salvage', 'truncate', ]
     cursor_ops = [ 'insert', 'remove', 'update', ]
 
     def setUpConnectionOpen(self, dir):
@@ -99,15 +99,15 @@ class test_readonly03(wttest.WiredTigerTestCase, suite_subprocess):
             elif op == 'drop':
                 self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
                     lambda: self.session.drop(self.uri, None), msg)
+            elif op == 'flush_tier':
+                self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+                    lambda: self.session.checkpoint('flush_tier=(enabled)'), msg)
             elif op == 'log_flush':
                 self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
                     lambda: self.session.log_flush(None), msg)
             elif op == 'log_printf':
                 self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
                     lambda: self.session.log_printf("test"), msg)
-            elif op == 'rename':
-                self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-                    lambda: self.session.rename(self.uri, self.uri2, None), msg)
             elif op == 'salvage':
                 self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
                     lambda: self.session.salvage(self.uri, None), msg)
@@ -115,11 +115,5 @@ class test_readonly03(wttest.WiredTigerTestCase, suite_subprocess):
                 self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
                     lambda: self.session.truncate(self.uri, None, None, None),
                     msg)
-            elif op == 'upgrade':
-                self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-                    lambda: self.session.upgrade(self.uri, None), msg)
             else:
                 self.fail('Unknown session method: ' + op)
-
-if __name__ == '__main__':
-    wttest.run()

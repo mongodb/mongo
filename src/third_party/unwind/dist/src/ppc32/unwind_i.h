@@ -33,7 +33,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 #include <libunwind-ppc32.h>
 
 #include <libunwind_i.h>
-#include <sys/ucontext.h>
+#include <ucontext.h>
 
 #define ppc32_lock                      UNW_OBJ(lock)
 #define ppc32_local_resume              UNW_OBJ(local_resume)

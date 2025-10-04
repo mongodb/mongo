@@ -1,0 +1,47 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "storage_devnull_core",
+    srcs = [
+        "devnull_kv_engine.cpp",
+        "ephemeral_catalog_record_store.cpp",
+    ],
+    hdrs = [
+        "devnull_kv_engine.h",
+        "ephemeral_catalog_record_store.h",
+        "//src/mongo/db/rss:persistence_provider.h",
+        "//src/mongo/db/storage/kv:kv_engine.h",
+    ],
+    deps = [
+        "//src/mongo/db:record_id_helpers",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/storage:backup_block",
+        "//src/mongo/db/storage:kv_backup_block",
+        "//src/mongo/db/storage:record_store_base",
+        "//src/mongo/db/storage:recovery_unit_base",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/db/storage:stub_container",
+    ],
+)
+
+mongo_cc_library(
+    name = "storage_devnull",
+    srcs = [
+        "devnull_init.cpp",
+    ],
+    deps = [
+        ":storage_devnull_core",
+        "//src/mongo/db/storage:storage_engine_common",
+        "//src/mongo/db/storage:storage_engine_impl",
+        "//src/mongo/db/storage:storage_engine_lock_file",
+    ],
+)

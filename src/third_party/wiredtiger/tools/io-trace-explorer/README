@@ -1,0 +1,53 @@
+ I/O Trace Explorer
+====================
+
+I/O Trace Explorer is a GUI tool for visualizing I/O traces from WiredTiger, at both the file level
+and at the device level. It helps us to better understand and optimize our I/O patterns.
+
+
+ Prerequisites
+---------------
+
+To capture traces, please install the "blktrace" package, which should include the following tools:
+  * blktrace (for capturing the traces)
+  * blkparse (for parsing the output of blktrace)
+  * iowatcher (for plotting the results - not strictly needed)
+
+To build and use the tool, you need to install the following packages:
+  * GTKMM 4, including development libraries ("brew install gtkmm4" on macOS)
+
+
+ Capturing traces
+------------------
+
+To capture traces at the file level, enable DEBUG_2 level logging for WT_VERB_READ and
+WT_VERB_WRITE and capture the logs to a file, e.g., by piping the stdout to a file. You can enable
+the read and write logging by running the following before the workload:
+
+    export WIREDTIGER_CONFIG="verbose=[read:2,write:2]"
+
+Use blktrace to capture the block trace at the device level, and then use "blkparse -t" to parse it.
+
+Note that if you combine traces from multiple devices and/or from the block device and from the
+files, you need to start their captures as close together as possible, so they are synchronized.
+
+You can also use a convenience script, such as scripts/trace-wtperf.sh.
+
+
+ Compiling and running the visualization tool
+----------------------------------------------
+
+I/O Trace Explorer uses CMAKE. To prepare the build:
+
+    mkdir -p build
+    cd build
+    cmake -G Ninja ..
+    cd ..
+
+Then to actually build the project, run:
+
+    ninja -C build
+
+To run on macOS:
+
+    build/IOTraceExplorer.app/Contents/MacOS/IOTraceExplorer INPUT_FILES...

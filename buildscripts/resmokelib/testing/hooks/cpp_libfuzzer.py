@@ -6,7 +6,7 @@ from buildscripts.resmokelib import core
 from buildscripts.resmokelib.testing.hooks import interface
 
 
-class LibfuzzerHook(interface.Hook):  # pylint: disable=too-many-instance-attributes
+class LibfuzzerHook(interface.Hook):
     """Merges inputs after a fuzzer run."""
 
     DESCRIPTION = "Merges inputs after a fuzzer run"
@@ -41,14 +41,17 @@ class LibfuzzerHook(interface.Hook):  # pylint: disable=too-many-instance-attrib
         self._merge_corpus(test)
 
     def _merge_corpus(self, test):
-        self.logger.info(f"Merge for {test.short_name()} libfuzzer test started, "
-                         f"merging to {test.merged_corpus_directory}.")
+        self.logger.info(
+            f"Merge for {test.short_name()} libfuzzer test started, "
+            f"merging to {test.merged_corpus_directory}."
+        )
         os.makedirs(test.merged_corpus_directory, exist_ok=True)
         default_args = [
             test.program_executable,
             "-merge=1",
             test.merged_corpus_directory,
             test.corpus_directory,
+            "-artifact-prefix=./out/fuzzer-",
         ]
         process = core.programs.make_process(self.logger, default_args, **test.program_options)
         process.start()

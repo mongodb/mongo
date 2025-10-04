@@ -1,0 +1,35 @@
+# -*- Mode: python; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+FINAL_LIBRARY = "js"
+
+# Includes should be relative to parent path
+LOCAL_INCLUDES += ["!../..", "../.."]
+
+include("../../js-config.mozbuild")
+include("../../js-cxxflags.mozbuild")
+
+if CONFIG["JS_HAS_TEMPORAL_API"]:
+    UNIFIED_SOURCES += [
+        "Calendar.cpp",
+        "Duration.cpp",
+        "Instant.cpp",
+        "Int128.cpp",
+        "Int96.cpp",
+        "PlainDate.cpp",
+        "PlainDateTime.cpp",
+        "PlainMonthDay.cpp",
+        "PlainTime.cpp",
+        "PlainYearMonth.cpp",
+        "Temporal.cpp",
+        "TemporalFields.cpp",
+        "TemporalNow.cpp",
+        "TemporalParser.cpp",
+        "TimeZone.cpp",
+        "ToString.cpp",
+        "Wrapped.cpp",
+        "ZonedDateTime.cpp",
+    ]

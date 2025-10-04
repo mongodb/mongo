@@ -4,58 +4,58 @@
 // requires_persistence because it restarts a shard.
 // @tags: [requires_persistence]
 
-(function() {
-"use strict";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // This test restarts a shard.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
-/*****************************************************************************
- * Unsharded mongod.
- ****************************************************************************/
+if (!jsTestOptions().useAutoBootstrapProcedure) {
+    // TODO: SERVER-80318 Remove block
+    /*****************************************************************************
+     * Unsharded mongod.
+     ****************************************************************************/
 
-// cleanupOrphaned fails against unsharded mongod.
-var mongod = MongoRunner.runMongod();
-assert.commandFailed(mongod.getDB('admin').runCommand({cleanupOrphaned: 'foo.bar'}));
-MongoRunner.stopMongod(mongod);
+    // cleanupOrphaned fails against unsharded mongod.
+    let mongod = MongoRunner.runMongod();
+    assert.commandFailed(mongod.getDB("admin").runCommand({cleanupOrphaned: "foo.bar"}));
+    MongoRunner.stopMongod(mongod);
+}
 
 /*****************************************************************************
  * Bad invocations of cleanupOrphaned command.
  ****************************************************************************/
 
-var st = new ShardingTest({other: {rs: true, rsOptions: {nodes: 2}}});
+let st = new ShardingTest({other: {rs: true, rsOptions: {nodes: 2}}});
 
-var mongos = st.s0;
-var mongosAdmin = mongos.getDB('admin');
-var dbName = 'foo';
-var collectionName = 'bar';
-var ns = dbName + '.' + collectionName;
-var coll = mongos.getCollection(ns);
+let mongos = st.s0;
+let mongosAdmin = mongos.getDB("admin");
+let dbName = "foo";
+let collectionName = "bar";
+let ns = dbName + "." + collectionName;
+
+assert.commandWorked(mongosAdmin.runCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+let coll = mongos.getCollection(ns);
 
 // cleanupOrphaned fails against mongos ('no such command'): it must be run
 // on mongod.
 assert.commandFailed(mongosAdmin.runCommand({cleanupOrphaned: ns}));
 
 // cleanupOrphaned must be run on admin DB.
-var shardFooDB = st.shard0.getDB(dbName);
+let shardFooDB = st.shard0.getDB(dbName);
 assert.commandFailed(shardFooDB.runCommand({cleanupOrphaned: ns}));
 
 // Must be run on primary.
-var secondaryAdmin = st.rs0.getSecondary().getDB('admin');
-var response = secondaryAdmin.runCommand({cleanupOrphaned: ns});
-print('cleanupOrphaned on secondary:');
+let secondaryAdmin = st.rs0.getSecondary().getDB("admin");
+let response = secondaryAdmin.runCommand({cleanupOrphaned: ns});
+print("cleanupOrphaned on secondary:");
 printjson(response);
 assert.commandFailed(response);
 
-var shardAdmin = st.shard0.getDB('admin');
-var badNS = ' \\/."*<>:|?';
+let shardAdmin = st.shard0.getDB("admin");
+let badNS = ' \\/."*<>:|?';
 assert.commandFailed(shardAdmin.runCommand({cleanupOrphaned: badNS}));
 
 // cleanupOrphaned works on sharded collection.
-assert.commandWorked(mongosAdmin.runCommand({enableSharding: coll.getDB().getName()}));
-
-st.ensurePrimaryShard(coll.getDB().getName(), st.shard0.shardName);
-
 assert.commandWorked(mongosAdmin.runCommand({shardCollection: ns, key: {_id: 1}}));
 
 assert.commandWorked(shardAdmin.runCommand({cleanupOrphaned: ns}));
@@ -71,25 +71,26 @@ function testBadStartingFromKeys(shardAdmin) {
     assert.eq(null, response.stoppedAtKey);
 
     // startingFromKey doesn't match number of fields in shard key.
-    assert.commandFailed(shardAdmin.runCommand(
-        {cleanupOrphaned: ns, startingFromKey: {someKey: 'someValue', someOtherKey: 1}}));
+    assert.commandFailed(
+        shardAdmin.runCommand({cleanupOrphaned: ns, startingFromKey: {someKey: "someValue", someOtherKey: 1}}),
+    );
+
+    // startingFromKey matches number of fields in shard key but not field names.
+    assert.commandFailed(shardAdmin.runCommand({cleanupOrphaned: ns, startingFromKey: {someKey: "someValue"}}));
+
+    let coll2 = mongos.getCollection("foo.baz");
+
+    assert.commandWorked(mongosAdmin.runCommand({shardCollection: coll2.getFullName(), key: {a: 1, b: 1}}));
+
+    // startingFromKey doesn't match number of fields in shard key.
+    assert.commandFailed(
+        shardAdmin.runCommand({cleanupOrphaned: coll2.getFullName(), startingFromKey: {someKey: "someValue"}}),
+    );
 
     // startingFromKey matches number of fields in shard key but not field names.
     assert.commandFailed(
-        shardAdmin.runCommand({cleanupOrphaned: ns, startingFromKey: {someKey: 'someValue'}}));
-
-    var coll2 = mongos.getCollection('foo.baz');
-
-    assert.commandWorked(
-        mongosAdmin.runCommand({shardCollection: coll2.getFullName(), key: {a: 1, b: 1}}));
-
-    // startingFromKey doesn't match number of fields in shard key.
-    assert.commandFailed(shardAdmin.runCommand(
-        {cleanupOrphaned: coll2.getFullName(), startingFromKey: {someKey: 'someValue'}}));
-
-    // startingFromKey matches number of fields in shard key but not field names.
-    assert.commandFailed(shardAdmin.runCommand(
-        {cleanupOrphaned: coll2.getFullName(), startingFromKey: {a: 'someValue', c: 1}}));
+        shardAdmin.runCommand({cleanupOrphaned: coll2.getFullName(), startingFromKey: {a: "someValue", c: 1}}),
+    );
 }
 
 // Note the 'startingFromKey' parameter is validated FCV is 4.4+, but is not otherwise used (in
@@ -97,4 +98,3 @@ function testBadStartingFromKeys(shardAdmin) {
 testBadStartingFromKeys(shardAdmin);
 
 st.stop();
-})();

@@ -26,26 +26,37 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-#include "mongo/platform/basic.h"
+#include "mongo/db/repl/rollback_checker.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/executor/network_connection_hook.h"
+#include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/task_executor_test_fixture.h"
+#include "mongo/executor/thread_pool_task_executor_test_fixture.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
 
 #include <memory>
+#include <mutex>
 
-#include "mongo/db/client.h"
-#include "mongo/db/repl/rollback_checker.h"
-#include "mongo/executor/network_interface_mock.h"
-#include "mongo/executor/thread_pool_task_executor_test_fixture.h"
-#include "mongo/unittest/unittest.h"
+#include <fmt/format.h>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 
 namespace {
 
 using namespace mongo;
 using namespace mongo::repl;
-using executor::NetworkInterfaceMock;
-using executor::RemoteCommandResponse;
 
-using LockGuard = stdx::lock_guard<Latch>;
+using LockGuard = stdx::lock_guard<stdx::mutex>;
 
 class RollbackCheckerTest : public executor::ThreadPoolExecutorTest {
 public:
@@ -57,15 +68,14 @@ protected:
     std::unique_ptr<RollbackChecker> _rollbackChecker;
     RollbackChecker::Result _hasRolledBackResult = {ErrorCodes::NotYetInitialized, ""};
     bool _hasCalledCallback;
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("RollbackCheckerTest::_mutex");
+    mutable stdx::mutex _mutex;
 };
 
 void RollbackCheckerTest::setUp() {
     executor::ThreadPoolExecutorTest::setUp();
     launchExecutorThread();
-    getNet()->enterNetwork();
     _rollbackChecker = std::make_unique<RollbackChecker>(&getExecutor(), HostAndPort());
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _hasRolledBackResult = {ErrorCodes::NotYetInitialized, ""};
     _hasCalledCallback = false;
 }
@@ -83,7 +93,8 @@ TEST_F(RollbackCheckerTest, InvalidConstruction) {
 }
 
 TEST_F(RollbackCheckerTest, ShutdownBeforeStart) {
-    auto callback = [](const RollbackChecker::Result&) {};
+    auto callback = [](const RollbackChecker::Result&) {
+    };
     shutdownExecutorThread();
     joinExecutorThread();
     ASSERT_NOT_OK(getRollbackChecker()->reset(callback).getStatus());
@@ -103,14 +114,18 @@ TEST_F(RollbackCheckerTest, ShutdownBeforeResetSync) {
 }
 
 TEST_F(RollbackCheckerTest, reset) {
-    auto callback = [](const RollbackChecker::Result&) {};
+    auto callback = [](const RollbackChecker::Result&) {
+    };
     auto cbh = unittest::assertGet(getRollbackChecker()->reset(callback));
     ASSERT(cbh);
 
     auto commandResponse = BSON("ok" << 1 << "rbid" << 3);
-    getNet()->scheduleSuccessfulResponse(commandResponse);
-    getNet()->runReadyNetworkOperations();
-    getNet()->exitNetwork();
+
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
+        getNet()->scheduleSuccessfulResponse(commandResponse);
+        getNet()->runReadyNetworkOperations();
+    }
 
     getExecutor().wait(cbh);
     ASSERT_EQUALS(getRollbackChecker()->getBaseRBID(), 3);
@@ -126,8 +141,11 @@ TEST_F(RollbackCheckerTest, RollbackRBID) {
     auto refreshCBH = unittest::assertGet(getRollbackChecker()->reset(callback));
     ASSERT(refreshCBH);
     auto commandResponse = BSON("ok" << 1 << "rbid" << 3);
-    getNet()->scheduleSuccessfulResponse(commandResponse);
-    getNet()->runReadyNetworkOperations();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
+        getNet()->scheduleSuccessfulResponse(commandResponse);
+        getNet()->runReadyNetworkOperations();
+    }
     getExecutor().wait(refreshCBH);
     ASSERT_EQUALS(getRollbackChecker()->getBaseRBID(), 3);
     {
@@ -142,9 +160,11 @@ TEST_F(RollbackCheckerTest, RollbackRBID) {
     ASSERT(rbCBH);
 
     commandResponse = BSON("ok" << 1 << "rbid" << 4);
-    getNet()->scheduleSuccessfulResponse(commandResponse);
-    getNet()->runReadyNetworkOperations();
-    getNet()->exitNetwork();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
+        getNet()->scheduleSuccessfulResponse(commandResponse);
+        getNet()->runReadyNetworkOperations();
+    }
 
     getExecutor().wait(rbCBH);
     ASSERT_EQUALS(getRollbackChecker()->getLastRBID_forTest(), 4);
@@ -164,8 +184,11 @@ TEST_F(RollbackCheckerTest, NoRollbackRBID) {
     auto refreshCBH = unittest::assertGet(getRollbackChecker()->reset(callback));
     ASSERT(refreshCBH);
     auto commandResponse = BSON("ok" << 1 << "rbid" << 3);
-    getNet()->scheduleSuccessfulResponse(commandResponse);
-    getNet()->runReadyNetworkOperations();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
+        getNet()->scheduleSuccessfulResponse(commandResponse);
+        getNet()->runReadyNetworkOperations();
+    }
     getExecutor().wait(refreshCBH);
     ASSERT_EQUALS(getRollbackChecker()->getBaseRBID(), 3);
     {
@@ -180,9 +203,11 @@ TEST_F(RollbackCheckerTest, NoRollbackRBID) {
     ASSERT(rbCBH);
 
     commandResponse = BSON("ok" << 1 << "rbid" << 3);
-    getNet()->scheduleSuccessfulResponse(commandResponse);
-    getNet()->runReadyNetworkOperations();
-    getNet()->exitNetwork();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
+        getNet()->scheduleSuccessfulResponse(commandResponse);
+        getNet()->runReadyNetworkOperations();
+    }
 
     getExecutor().wait(rbCBH);
     ASSERT_EQUALS(getRollbackChecker()->getLastRBID_forTest(), 3);

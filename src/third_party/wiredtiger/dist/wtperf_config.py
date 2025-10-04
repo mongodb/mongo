@@ -1,5 +1,6 @@
+#!/usr/bin/env python3
+
 ''' Output a doxgen version of the wtperf configuration options. '''
-from __future__ import print_function
 import sys
 
 for line in sys.stdin:

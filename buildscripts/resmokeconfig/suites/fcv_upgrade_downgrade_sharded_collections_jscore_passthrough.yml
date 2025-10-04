@@ -1,0 +1,284 @@
+test_kind: js_test
+
+# Cloned from buildscripts/resmokeconfig/suites/sharded_collections_jscore_passthrough.yml
+# to run FCV upgrade downgrade in the background
+
+selector:
+  roots:
+    - jstests/core/**/*.js
+    - jstests/fle2/**/*.js
+    - jstests/aggregation/**/*.js
+    - src/mongo/db/modules/*/jstests/fle/**/*.js
+
+  exclude_files:
+    # The following tests fail because a certain command or functionality is not supported on
+    # mongos. This command or functionality is placed in a comment next to the failing test.
+    - jstests/core/**/apitest_db.js # serverStatus output doesn't have storageEngine.
+    - jstests/core/**/awaitdata_getmore_cmd.js # capped collections.
+    - jstests/core/**/bypass_doc_validation.js # sharded $out output not permitted
+    - jstests/core/**/check_shard_index.js # checkShardingIndex.
+    - jstests/core/**/compact_keeps_indexes.js # compact.
+    - jstests/core/**/currentop.js # uses fsync.
+    - jstests/core/**/dbhash.js # dbhash.
+    - jstests/core/**/fsync.js # uses fsync.
+    - jstests/core/**/geo_s2cursorlimitskip.js # profiling.
+    - jstests/core/**/geo_update_btree2.js # notablescan.
+    - jstests/core/**/queryoptimizera.js # "local" database.
+    - jstests/core/**/startup_log.js # "local" database.
+    - jstests/core/**/tailable_cursor_invalidation.js # capped collections.
+    - jstests/core/**/tailable_getmore_batch_size.js # capped collections.
+    - jstests/core/**/tailable_skip_limit.js # capped collections.
+    - jstests/core/**/query/top/top.js # top.
+    # The following tests fail because mongos behaves differently from mongod when testing certain
+    # functionality. The differences are in a comment next to the failing test.
+    - jstests/core/**/geo_2d_explain.js # executionSuccess in different spot in explain().
+    - jstests/core/**/geo_s2explain.js # inputStage in different spot in explain().
+    - jstests/core/**/geo_s2sparse.js # keysPerIndex in different spot in validate().
+    - jstests/core/**/operation_latency_histogram.js # Stats are counted differently on mongos, SERVER-24880.
+    # The following tests fail because they count indexes. These counts do not take into account the
+    # additional hashed shard key indexes that are automatically added by this passthrough.
+    - jstests/core/**/apitest_dbcollection.js
+    - jstests/core/**/bad_index_plugin.js
+    - jstests/core/**/create_indexes.js
+    - jstests/core/**/list_indexes_non_existent_ns.js
+    - jstests/core/**/mr_preserve_indexes.js
+    # TODO: Remove after fixing SERVER-103278. executionStats.nReturned is incorrect for sharded distinct commands.
+    - jstests/core/**/distinct_index1.js
+    # TODO SERVER-32311: These tests use plan stage helpers which can't handle sharded explain output.
+    - jstests/core/**/expr_index_use.js
+    - jstests/core/**/index_multikey.js
+    - jstests/core/**/query/explain/optimized_match_explain.js
+    - jstests/core/**/sort_array.js
+
+    # Excludes from fcv_upgrade_downgrade_jscore_passthrough.yml
+    #
+    # TODO (SERVER-78220): Investigate failing api version tests in the fcv jscore passthrough suite.
+    - jstests/core/query/api/api_version_unstable_indexes.js
+
+    # TODO: Remove after fixing SERVER-78201: the following received command without explicit readConcern.
+    - jstests/aggregation/sources/densify/internal_parse.js
+    - jstests/aggregation/parsing/api_version_stage_allowance_checks.js
+
+    # TODO (SERVER-78200): The tests below sometimes hang when they run concurrently with a setFCV command.
+    - src/mongo/db/modules/*/jstests/fle/fle_admin_e2e.js
+    - src/mongo/db/modules/*/jstests/fle/fle_implicit_encryption.js
+    - src/mongo/db/modules/*/jstests/fle/fle_use_cases.js
+    - src/mongo/db/modules/*/jstests/fle/fle_drivers_integration.js
+
+    # Expected failure due to command count being not precise due to potential retry of index build.
+    - jstests/core/diagnostics/operation_latency_histogram.js
+
+    # Expected failures due to unexpected query execution stats from restarted operations from fcv upgrade.
+    - jstests/aggregation/sources/lookup/lookup_query_stats.js
+    - jstests/aggregation/sources/facet/facet_stats.js
+    - jstests/aggregation/sources/unionWith/unionWith_query_stats.js
+
+    # Test runs an updateOne without shard key which will use an internal transaction
+    # that can be aborted by the fcv upgrade downgrade suite.
+    - jstests/aggregation/sources/unionWith/unionWith_invalid_usage.js
+    - jstests/core/query/command_let_variables_expressions.js
+    - jstests/core/index/hashed/hashed_index_with_arrays.js
+    - jstests/core/query/update/update_multi5.js
+    - jstests/core/query/find_and_modify/find_and_modify_last_error_object.js
+    - jstests/core/query/update/update_with_pipeline.js
+    - jstests/core/query/update/update_nested_arr_idx.js
+    - jstests/core/index/fts/fts_index3.js
+    - jstests/core/index/geo/geo_update.js
+    - jstests/core/index/index_stats.js
+    - jstests/core/index/index_type_change.js
+    - jstests/core/query/and/and2.js
+    - jstests/core/query/cursor/getmore_invalidated_documents.js
+    - jstests/core/query/explain/explain_multi_plan.js
+    - jstests/core/query/inc/inc_negative_overflow.js
+    - jstests/core/query/inc/inc3.js
+    - jstests/core/query/pull/pull.js
+    - jstests/core/query/pull/pull2.js
+    - jstests/core/query/pull/pull_or.js
+    - jstests/core/query/pull/pull_remove1.js
+    - jstests/core/query/pull/pullall.js
+    - jstests/core/query/pull/pullall2.js
+    - jstests/core/query/set/set3.js
+    - jstests/core/query/set/set4.js
+    - jstests/core/query/set/set5.js
+    - jstests/core/query/set/set6.js
+    - jstests/core/query/set/set7.js
+    - jstests/core/query/set/set_type_change.js
+    - jstests/core/query/sort/sort_with_update_between_getmores.js
+    - jstests/core/query/unset/unset2.js
+    - jstests/core/query/dbref_upsert.js
+    - jstests/core/shell/shell_writeconcern.js
+    - jstests/core/write/autoid.js
+    - jstests/core/query/batch_write/batch_write_collation_estsize.js
+    - jstests/core/query/batch_write/batch_write_command_w0.js
+    - jstests/core/query/bulk/bulk_api_ordered.js
+    - jstests/core/query/bulk/bulk_api_unordered.js
+    - jstests/core/query/crud_api.js
+    - jstests/core/query/batch_write/batch_write_command_delete.js
+    - jstests/core/query/delete/remove_justone.js
+    - jstests/core/query/find_and_modify/find_and_modify.js
+    - jstests/core/query/find_and_modify/find_and_modify_fields.js
+    - jstests/core/query/find_and_modify/find_and_modify_positional.js
+    - jstests/core/query/find_and_modify/find_and_modify_upsert.js
+    - jstests/core/query/find_and_modify/find_and_modify_concurrent_update.js
+    - jstests/core/query/find_and_modify/find_and_modify_empty_coll.js
+    - jstests/core/query/find_and_modify/find_and_modify_empty_update.js
+    - jstests/core/query/find_and_modify/find_and_modify_new.js
+    - jstests/core/query/find_and_modify/find_and_modify_positional2.js
+    - jstests/core/query/find_and_modify/find_and_modify_upsert_non_existent.js
+    - jstests/core/query/find_and_modify/find_and_modify_positional_new_remove.js
+    - jstests/core/query/find_and_modify/find_and_modify_dotted_fields.js
+    - jstests/core/query/find_and_modify/find_and_modify_positional3.js
+    - jstests/core/query/find_and_modify/find_and_modify_new_upsert_sort.js
+    - jstests/core/query/find_and_modify/find_and_modify_where.js
+    - jstests/core/query/batch_write/batch_write_command_update.js
+    - jstests/core/query/update/update_index.js
+    - jstests/core/query/update/update_mod_dotted.js
+    - jstests/core/query/update/update_inc_create_embedded_field.js
+    - jstests/core/query/update/update_multi7.js
+    - jstests/core/query/update/update_addToSet.js
+    - jstests/core/query/update/update_arraymatch1.js
+    - jstests/core/query/update/update_positional_inc.js
+    - jstests/core/query/update/update_arraymatch6.js
+    - jstests/core/query/update/update_arraymatch7.js
+    - jstests/core/query/update/update_arraymatch8.js
+    - jstests/core/query/update/update_bit_examples.js
+    - jstests/core/query/update/update_blank1.js
+    - jstests/core/query/update/update_currentdate_examples.js
+    - jstests/core/query/update/update_dbref.js
+    - jstests/core/query/update/update_mul_examples.js
+    - jstests/core/query/update/update_set_unset.js
+    - jstests/core/query/update/update_upsert_add_filter.js
+    - jstests/core/query/update/update_set_large_numeric_field.js
+    - jstests/core/query/update/update_inc_implicit_subfield.js
+    - jstests/core/query/update/update_dollar_fields.js
+    - jstests/core/query/update/update_options_object.js
+    - jstests/core/query/update/update_numeric_eq_strings.js
+    - jstests/core/query/update/update_guarantee_id.js
+    - jstests/core/query/update/upsert_and.js
+    - jstests/core/query/update/upsert_fields.js
+    - jstests/core/query/update/upsert_fields_duplicate_or.js
+    - jstests/core/query/update/upsert_shell.js
+    - jstests/core/query/update/update_inc.js
+    - jstests/core/write/write_result.js
+
+    # Expected failure due to interfering collMod commands acquiring a lock that the test does not expect.
+    - jstests/core/write/crud_ops_do_not_throw_locktimeout.js
+
+    # The tests below use transactions (which are aborted on fcv upgrade/downgrade) and thus are expected to fail.
+    - jstests/core/shell/role_management_helpers.js
+    - jstests/core/administrative/roles_info.js
+    - jstests/core/catalog/views/views_all_commands.js
+
+    # The following test timesout due to fcv downgrade interfering with index build (see BF-29538)
+    - jstests/aggregation/sources/indexStats/verify_index_stats_output.js
+
+    # Sharding specific failed:
+    #
+    # $unionWith explain output does not check whether the collection is sharded in a sharded cluster.
+    - jstests/aggregation/sources/unionWith/unionWith_explain.js
+    # Cannot specify runtime constants option to a mongos
+    - jstests/aggregation/expressions/internal_js_emit_with_scope.js
+    - jstests/aggregation/accumulators/internal_js_reduce_with_scope.js
+    # The tests below depend on internal transactions which are expected to get interrupted during an FCV upgrade or downgrade, but they do not have the 'uses_transactions' tag so are not excluded by default in this suite.
+    - jstests/aggregation/sources/lookup/lookup_non_correlated.js
+    - jstests/core/ddl/collection_uuid_index_commands.js
+    # Queryable encryption tests create internal transactions which are expected to fail.
+    - jstests/core/query/queryable_encryption/*.js
+    # TODO (SERVER-77910): Find out why spill_to_disk.js fails to spill to disk after FCV down.
+    - jstests/aggregation/exec/spill_to_disk.js
+    # TODO (SERVER-32311): These tests use getAggPlanStage(), which can't handle sharded explain output.
+    - jstests/aggregation/optimization/match_swapping_renamed_fields.js
+    - jstests/aggregation/optimization/use_query_project_and_sort.js
+    - jstests/aggregation/optimization/use_query_projection.js
+    - jstests/aggregation/optimization/use_query_sort.js
+    # TODO: Remove when SERVER-23229 is fixed.
+    - jstests/aggregation/sources/group/groupMissing.js
+    - jstests/aggregation/sources/graphLookup/variables.js
+    # TODO (SERVER-77935): Investigate timeout from fcv downgrade in jstests/core/query/push/push2.js.
+    - jstests/core/query/push/push2.js
+    - jstests/core/query/update/update_addToSet2.js
+
+    # SERVER-85456: this test uses benchRun which does not use runCommand and index creation can fail.
+    - jstests/core/shell/bench_test1.js
+
+    # TODO (SERVER-95788): This test creates a capped collection and fails because this suite is not
+    # compatible with them (they can't be sharded), but does not exclude the `requires_capped` tag.
+    - jstests/core/catalog/list_catalog_stage_consistency.js
+
+    # This test assumes query settings representative queries are stored in the cluster parameter,
+    # which is not the case if featureFlagPQSBackfill is on.
+    - jstests/core/query/query_settings/query_settings_size_limits.js
+
+  exclude_with_any_tags:
+    - assumes_standalone_mongod
+    - assumes_against_mongod_not_mongos
+    # This passthrough implicitly shards the accessed collections. Do not run tests where collections
+    # can't be created on `getCollection` call.
+    - assumes_no_implicit_collection_creation_on_get_collection
+    # Tests tagged with the following will fail because they assume collections are not sharded.
+    - assumes_no_implicit_collection_creation_after_drop
+    - assumes_no_implicit_index_creation
+    - assumes_unsharded_collection
+    - cannot_create_unique_index_when_using_hashed_shard_key
+    # system.profile collection doesn't exist on mongos.
+    - requires_profiling
+    - featureFlagFLE2CleanupCommand
+    # TODO: SERVER-66393 Remove Feature Flag for PM-2919.
+    - featureFlagTimeseriesUpdatesSupport
+    - featureFlagTimeseriesUpdatesSupport_incompatible
+    # TODO: SERVER-78068 Remove Feature Flag for PM-2983
+    - featureFlagRecordIdsReplicated
+    # TODO: SERVER-85426 Remove Feature Flag for SPM-3541
+    - featureFlagRankFusionBasic
+    - featureFlagRankFusionFull
+    - featureFlagSearchHybridScoringFull
+    # Transactions are aborted upon fcv upgrade or downgrade.
+    - uses_transactions
+    # Exclude tests that require a specific fcv.
+    # Once SERVER-81054 is complete this is no longer needed.
+    - requires_fcv_71
+    - requires_fcv_72
+    - requires_fcv_73
+    - requires_fcv_80
+    - requires_fcv_81
+    - requires_fcv_82
+    - requires_fcv_83
+    # Exclude tests that are not compatible with upgrade/downgrade.
+    - cannot_run_during_upgrade_downgrade
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+      - FCVUpgradeDowngradeInBackground
+  config:
+    shell_options:
+      eval: >-
+        await import("jstests/libs/override_methods/retry_aborted_db_and_index_creation.js");
+        await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
+        await import("jstests/libs/override_methods/implicitly_retry_on_fcv_upgrade_downgrade.js");
+      global_vars:
+        TestData:
+          isRunningFCVUpgradeDowngradeSuite: true
+  hooks:
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: ValidateCollections
+    - class: FCVUpgradeDowngradeInBackground
+    - class: CleanEveryN
+      n: 20
+  fixture:
+    class: ShardedClusterFixture
+    num_shards: 2
+    enable_balancer: false
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+        disableTransitionFromLatestToLastContinuous: False
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        disableTransitionFromLatestToLastContinuous: False
+    num_rs_nodes_per_shard: 2

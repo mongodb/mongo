@@ -1,0 +1,4 @@
+# The downgrade suites only need one starting version. No need for all version combinations.
+base_suite: retryable_writes_downgrade
+overrides:
+  - "multiversion.replica_fixture_last_continuous_new_old_new"

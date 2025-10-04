@@ -1,0 +1,56 @@
+==== VARIATION: sbe, query={}, sort={}, proj={}
+YW4ABQAAAAB8fHx8AAAAAG5ubm4FAAAAAAUAAAAAZnw=
+==== VARIATION: sbe, query={$or: [{a: 1}, {b: 2}]}, sort={}, proj={}
+b3IAW2VxAGE/AAAAACxlcQBiPwEAAABdBQAAAAB8fHx8AAAAAG5ubm4FAAAAAAUAAAAAZnw=
+==== VARIATION: sbe, query={a: 1}, sort={}, proj={}
+ZXEAYT8AAAAABQAAAAB8fHx8AAAAAG5ubm4FAAAAAAUAAAAAZnw=
+==== VARIATION: sbe, query={b: 1}, sort={}, proj={}
+ZXEAYj8AAAAABQAAAAB8fHx8AAAAAG5ubm4FAAAAAAUAAAAAZnw=
+==== VARIATION: sbe, query={a: 1, b: 1, c: 1}, sort={}, proj={}
+YW4AW2VxAGE/AAAAACxlcQBiPwEAAAAsZXEAYz8CAAAAXQUAAAAAfHx8fAAAAABubm5uBQAAAAAFAAAAAGZ8
+==== VARIATION: sbe, query={}, sort={a: 1}, proj={}
+YW4ABQAAAAB8YWF8fHwAAAAAbm5ubgUAAAAABQAAAABmfA==
+==== VARIATION: sbe, query={}, sort={a: -1}, proj={}
+YW4ABQAAAAB8ZGF8fHwAAAAAbm5ubgUAAAAABQAAAABmfA==
+==== VARIATION: sbe, query={a: 1}, sort={a: 1}, proj={}
+ZXEAYT8AAAAABQAAAAB8YWF8fHwAAAAAbm5ubgUAAAAABQAAAABmfA==
+==== VARIATION: sbe, query={a: 1}, sort={a: 1}, proj={a: 1}
+ZXEAYT8AAAAADAAAABBhAAEAAAAAfGFhfHx8AAAAAG5ubm4FAAAAAAUAAAAAZnw=
+==== VARIATION: sbe, query={}, sort={a: 1}, proj={a: 1}
+YW4ADAAAABBhAAEAAAAAfGFhfHx8AAAAAG5ubm4FAAAAAAUAAAAAZnw=
+==== VARIATION: sbe, query={}, sort={a: 1}, proj={a: 1}
+YW4ADAAAABBhAAEAAAAAfGFhfHx8AAAAAG5ubm4FAAAAAAUAAAAAZnw=
+==== VARIATION: sbe, query={}, sort={}, proj={a: 1}
+YW4ADAAAABBhAAEAAAAAfHx8fAAAAABubm5uBQAAAAAFAAAAAGZ8
+==== VARIATION: sbe, query={}, sort={}, proj={a: true}
+YW4ACQAAAAhhAAEAfHx8fAAAAABubm5uBQAAAAAFAAAAAGZ8
+==== VARIATION: sbe, query={}, sort={}, proj={a: false}
+YW4ACQAAAAhhAAAAfHx8fAAAAABubm5uBQAAAAAFAAAAAGZ8
+==== VARIATION: sbe, query={}, sort={}, proj={}, isCountLike=true
+YW4ABQAAAAB8fHx8AAEAAG5ubm4FAAAAAAUAAAAAZnw=
+==== VARIATION: sbe, query={a: 1}, sort={a: 1}, proj={}, hint={}, allowDiskUse=0, returnKey=0, requestResumeToken=0
+ZXEAYT8AAAAABQAAAAB8YWF8fHwAAAAAbm5ubgUAAAAABQAAAABmfA==
+==== VARIATION: sbe, query={a: 1}, sort={a: 1}, proj={}, hint={}, allowDiskUse=1, returnKey=0, requestResumeToken=0
+ZXEAYT8AAAAABQAAAAB8YWF8fHwAAAAAdG5ubgUAAAAABQAAAABmfA==
+==== VARIATION: sbe, query={a: 1}, sort={a: 1}, proj={}, hint={}, allowDiskUse=0, returnKey=0, requestResumeToken=0
+ZXEAYT8AAAAABQAAAAB8YWF8fHwAAAAAZm5ubgUAAAAABQAAAABmfA==
+==== VARIATION: sbe, query={a: 1}, sort={a: 1}, proj={}, hint={}, allowDiskUse=0, returnKey=1, requestResumeToken=0
+ZXEAYT8AAAAABQAAAAB8YWF8fHwAAAAAbnRubgUAAAAABQAAAABmfA==
+==== VARIATION: sbe, query={a: 1}, sort={a: 1}, proj={}, hint={}, allowDiskUse=0, returnKey=0, requestResumeToken=0
+ZXEAYT8AAAAABQAAAAB8YWF8fHwAAAAAbm5mbgUAAAAABQAAAABmfA==
+==== VARIATION: sbe, query={a: 1}, sort={a: 1}, proj={}, hint={}, allowDiskUse=0, returnKey=0, requestResumeToken=0
+ZXEAYT8AAAAABQAAAAB8YWF8fHwAAAAAcAEAc25ubm4FAAAAAAUAAAAAZnw=
+==== VARIATION: sbe, query={a: 1}, sort={a: 1}, proj={}, hint={}, allowDiskUse=0, returnKey=0, requestResumeToken=0
+ZXEAYT8AAAAABQAAAAB8YWF8fHwAAAAAcAABc25ubm4FAAAAAAUAAAAAZnw=
+==== VARIATION: sbe, query={a: 1}, sort={a: 1}, proj={}, hint={}, allowDiskUse=0, returnKey=0, requestResumeToken=0
+ZXEAYT8AAAAABQAAAAB8YWF8fHwAAAAAbm5ubgUAAAAABQAAAABmfA==
+==== VARIATION: sbe, query={a: 1}, sort={a: 1}, proj={}, hint={}, allowDiskUse=0, returnKey=0, requestResumeToken=0
+ZXEAYT8AAAAABQAAAAB8YWF8fHwAAAAAbm5ubgUAAAAABQAAAABmfA==
+==== VARIATION: sbe, query={a: 1}, sort={}, proj={}, hint={ $natural: 1 }, allowDiskUse=0, returnKey=0, requestResumeToken=1, resumeAfter=1
+ZXEAYT8AAAAABQAAAAB8fHwTAAAAECRuYXR1cmFsAAEAAAAAfAAAAABubnRuGAAAABIkcmVjb3JkSWQAAQAAAAAAAAAABQAAAABmfA==
+==== VARIATION: sbe, query={a: 1}, sort={}, proj={}, hint={ $natural: 1 }, allowDiskUse=0, returnKey=0, requestResumeToken=1, startAt=1
+ZXEAYT8AAAAABQAAAAB8fHwTAAAAECRuYXR1cmFsAAEAAAAAfAAAAABubnRuBQAAAAAYAAAAEiRyZWNvcmRJZAABAAAAAAAAAABmfA==
+==== VARIATION: sbe, query={a: 1}, sort={}, proj={}, hint={ a: 1 }, allowDiskUse=0, returnKey=0, requestResumeToken=0
+ZXEAYT8AAAAABQAAAAB8fHwMAAAAEGEAAQAAAAB8AAAAAG5ubm4FAAAAAAUAAAAAZnw=
+==== VARIATION: sbe, query={a: 1}, sort={}, proj={}, hint={ a: -1 }, allowDiskUse=0, returnKey=0, requestResumeToken=0
+ZXEAYT8AAAAABQAAAAB8fHwMAAAAEGEA/////wB8AAAAAG5ubm4FAAAAAAUAAAAAZnw=

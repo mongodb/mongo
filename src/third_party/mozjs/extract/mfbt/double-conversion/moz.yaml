@@ -1,0 +1,48 @@
+schema: 1
+
+bugzilla:
+  product: Core
+  component: "MFBT"
+
+origin:
+  name: double-conversion
+  description: binary-decimal and decimal-binary routines for IEEE doubles
+
+  url: https://github.com/google/double-conversion
+
+  release: 4f7a25d8ced8c7cf6eee6fd09d6788eaa23c9afe (2023-05-18T12:20:37Z).
+  revision: 4f7a25d8ced8c7cf6eee6fd09d6788eaa23c9afe
+
+  license: BSD-3-Clause
+  license-file: LICENSE
+
+vendoring:
+  url: https://github.com/google/double-conversion
+  source-hosting: github
+  tracking: commit
+
+  exclude:
+    - "*"
+    - "double-conversion/*"
+    - cmake
+    - msvc
+    - test
+
+  include:
+    - LICENSE
+    - README.md
+    - "double-conversion/*.h"
+    - "double-conversion/*.cc"
+
+  patches:
+    - add-mfbt-api-markers.patch
+    - use-mozilla-assertions.patch
+    - debug-only-functions.patch
+    - to-fixed-dbl-max.patch
+
+  update-actions:
+    - action: move-file
+      from: '{vendor_dir}/README.md'
+      to: '{vendor_dir}/double-conversion/README.md'
+    - action: delete-path
+      path: '{vendor_dir}/double-conversion/.gitignore'

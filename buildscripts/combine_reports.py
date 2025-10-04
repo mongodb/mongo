@@ -11,8 +11,8 @@ from optparse import OptionParser
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from buildscripts.resmokelib.testing import report  # pylint: disable=wrong-import-position
-from buildscripts.resmokelib import utils  # pylint: disable=wrong-import-position
+from buildscripts.resmokelib import utils
+from buildscripts.resmokelib.testing import report
 
 
 def read_json_file(json_file):
@@ -25,7 +25,7 @@ def report_exit(combined_test_report):
     """Return report exit code.
 
     The exit code of this script is based on the following:
-        0:  All tests have status "pass", or only non-dynamic tests have status "silentfail".
+        0:  All tests have status "pass".
         31: At least one test has status "fail" or "timeout".
     Note: A test can be considered dynamic if its name contains a ":" character.
     """
@@ -51,13 +51,24 @@ def main():
     usage = "usage: %prog [options] report1.json report2.json ..."
     parser = OptionParser(description=__doc__, usage=usage)
     parser.add_option(
-        "-o", "--output-file", dest="outfile", default="-",
-        help=("If '-', then the combined report file is written to stdout."
-              " Any other value is treated as the output file name. By default,"
-              " output is written to stdout."))
-    parser.add_option("-x", "--no-report-exit", dest="report_exit", default=True,
-                      action="store_false",
-                      help="Do not exit with a non-zero code if any test in the report fails.")
+        "-o",
+        "--output-file",
+        dest="outfile",
+        default="-",
+        help=(
+            "If '-', then the combined report file is written to stdout."
+            " Any other value is treated as the output file name. By default,"
+            " output is written to stdout."
+        ),
+    )
+    parser.add_option(
+        "-x",
+        "--no-report-exit",
+        dest="report_exit",
+        default=True,
+        action="store_false",
+        help="Do not exit with a non-zero code if any test in the report fails.",
+    )
 
     (options, args) = parser.parse_args()
 

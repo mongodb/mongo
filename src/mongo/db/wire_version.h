@@ -29,13 +29,18 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/version/releases.h"
+
+#include <memory>
+#include <string>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 
@@ -126,6 +131,8 @@ struct WireVersionInfo {
 
 class WireSpec {
 public:
+    static WireSpec& getWireSpec(ServiceContext* sc);
+
     struct Specification {
         // incomingExternalClient.minWireVersion - Minimum version that the server accepts on
         // incoming requests from external clients. We should bump this whenever we don't want to
@@ -167,30 +174,28 @@ public:
         bool isInternalClient = false;
 
         static void appendToBSON(const Specification& spec, BSONObjBuilder* bob) {
-            auto appendWireVersion = [bob](std::string tag,
-                                           const WireVersionInfo& wireVersionInfo) {
+            auto appendWireVersion = [bob](StringData tag, const WireVersionInfo& wireVersionInfo) {
                 BSONObjBuilder builder = bob->subobjStart(tag);
                 WireVersionInfo::appendToBSON(wireVersionInfo, &builder);
             };
 
-            appendWireVersion("incomingExternalClient", spec.incomingExternalClient);
-            appendWireVersion("incomingInternalClient", spec.incomingInternalClient);
-            appendWireVersion("outgoing", spec.outgoing);
+            appendWireVersion("incomingExternalClient"_sd, spec.incomingExternalClient);
+            appendWireVersion("incomingInternalClient"_sd, spec.incomingInternalClient);
+            appendWireVersion("outgoing"_sd, spec.outgoing);
 
             bob->append("isInternalClient", spec.isInternalClient);
         }
     };
 
 public:
-    static WireSpec& instance();
-
     /**
      * Appends the min and max versions in 'wireVersionInfo' to 'builder' in the format expected for
-     * reporting information about the internal client.
+     * reporting information about the internal client, if the WireSpec represents the internal
+     * client.
      *
-     * Intended for use as part of performing the isMaster handshake with a remote node. When an
-     * internal clients make a connection to another node in the cluster, it includes internal
-     * client information as a parameter to the isMaster command. This parameter has the following
+     * Intended for use as part of performing the isMaster/hello handshake with a remote node. When
+     * an internal clients make a connection to another node in the cluster, it includes internal
+     * client information as a parameter to the hello command. This parameter has the following
      * format:
      *
      *    internalClient: {
@@ -200,25 +205,32 @@ public:
      *
      * This information can be used to ensure correctness during upgrade in mixed version clusters.
      */
-    static void appendInternalClientWireVersion(WireVersionInfo wireVersionInfo,
-                                                BSONObjBuilder* builder);
+    void appendInternalClientWireVersionIfNeeded(BSONObjBuilder* builder);
 
     void initialize(Specification spec);
 
     void reset(Specification spec);
 
-    // Calling `get()` on uninitialized instances of `WireSpec` is prohibited.
-    std::shared_ptr<const Specification> get() const;
+    // Calling `get()` on uninitialized instances of `WireSpec` is an invariant failure.
+    std::shared_ptr<const Specification> get();
 
-    bool isInitialized() const {
-        return _spec ? true : false;
-    }
+    // These getters allow direct access to fields in `WireSpec::Specification.`
+    // Calling these getters on uninitialized instances of `WireSpec` is an invariant failure.
+    WireVersionInfo getIncomingExternalClient() const;
+    WireVersionInfo getIncomingInternalClient() const;
+    WireVersionInfo getOutgoing() const;
+    bool isInternalClient() const;
 
 private:
-    // Ensures concurrent accesses to `get()` and `reset()` are thread-safe.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("WireSpec::_mutex");
+    // Ensures concurrent accesses to `get()`, `appendInternalClientWireVersionIfNeeded()`, and
+    // `reset()` are thread-safe.
+    mutable stdx::mutex _mutex;
 
     std::shared_ptr<const Specification> _spec;
+
+    bool isInitialized() const {
+        return !!_spec;
+    }
 };
 
 namespace wire_version {

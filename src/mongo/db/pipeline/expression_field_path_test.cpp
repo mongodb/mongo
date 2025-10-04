@@ -27,17 +27,32 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
-#include "mongo/db/exec/document_value/value_comparator.h"
-#include "mongo/db/json.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/db/query/compiler/dependency_analysis/expression_dependencies.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
+
+#include <functional>
+#include <string>
+#include <vector>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace ExpressionTests {
@@ -97,9 +112,9 @@ TEST(FieldPath, RemoveOptimizesToMissingValue) {
 
     auto optimizedExpr = expression->optimize();
 
-    ASSERT_VALUE_EQ(
-        Value(),
-        optimizedExpr->evaluate(Document(BSON("x" << BSON("y" << 123))), &expCtx.variables));
+    auto constantExpr = dynamic_cast<ExpressionConstant*>(optimizedExpr.get());
+    ASSERT_TRUE(constantExpr);
+    ASSERT_VALUE_EQ(Value(), constantExpr->getValue());
 }
 
 TEST(FieldPath, NoOptimizationOnNormalPath) {
@@ -186,6 +201,35 @@ TEST(FieldPath, NoOptimizationOnVariableWithMissingValue) {
     ASSERT_FALSE(dynamic_cast<ExpressionConstant*>(optimizedExpr.get()));
 }
 
+TEST(FieldPath, NoOptimizationOnCertainVariablesUnderSbeFull) {
+    RAIIServerParameterControllerForTest sbe("featureFlagSbeFull", true);
+
+    auto expCtx = ExpressionContextForTest{};
+
+    {
+        auto expr = ExpressionFieldPath::parse(&expCtx, "$$NOW", expCtx.variablesParseState);
+        ASSERT_TRUE(dynamic_cast<ExpressionFieldPath*>(expr.get()));
+
+        auto optimizedExpr = expr->optimize();
+        ASSERT_FALSE(dynamic_cast<ExpressionConstant*>(optimizedExpr.get()));
+    }
+    {
+        auto expr =
+            ExpressionFieldPath::parse(&expCtx, "$$CLUSTER_TIME", expCtx.variablesParseState);
+        ASSERT_TRUE(dynamic_cast<ExpressionFieldPath*>(expr.get()));
+
+        auto optimizedExpr = expr->optimize();
+        ASSERT_FALSE(dynamic_cast<ExpressionConstant*>(optimizedExpr.get()));
+    }
+    {
+        auto expr = ExpressionFieldPath::parse(&expCtx, "$$USER_ROLES", expCtx.variablesParseState);
+        ASSERT_TRUE(dynamic_cast<ExpressionFieldPath*>(expr.get()));
+
+        auto optimizedExpr = expr->optimize();
+        ASSERT_FALSE(dynamic_cast<ExpressionConstant*>(optimizedExpr.get()));
+    }
+}
+
 TEST(FieldPath, ScalarVariableWithDottedFieldPathOptimizesToConstantMissingValue) {
     auto expCtx = ExpressionContextForTest{};
     auto varId = expCtx.variablesParseState.defineVariable("userVar");
@@ -200,6 +244,72 @@ TEST(FieldPath, ScalarVariableWithDottedFieldPathOptimizesToConstantMissingValue
     ASSERT_VALUE_EQ(Value(), constantExpr->getValue());
 }
 
+TEST(FieldPath, SerializeWithRedaction) {
+    SerializationOptions options = SerializationOptions::kMarkIdentifiers_FOR_TEST;
+
+    auto expCtx = ExpressionContextForTest{};
+    intrusive_ptr<Expression> expression =
+        ExpressionFieldPath::createPathFromString(&expCtx, "bar", expCtx.variablesParseState);
+    ASSERT_VALUE_EQ_AUTO(  // NOLINT
+        "\"$HASH<bar>\"",
+        expression->serialize(options));
+
+    // Repeat with a dotted path.
+    expression =
+        ExpressionFieldPath::createPathFromString(&expCtx, "a.b.c", expCtx.variablesParseState);
+    ASSERT_VALUE_EQ_AUTO(  // NOLINT
+        "\"$HASH<a>.HASH<b>.HASH<c>\"",
+        expression->serialize(options));
+
+    auto expr = [&](const std::string& json) {
+        return Expression::parseExpression(&expCtx, fromjson(json), expCtx.variablesParseState);
+    };
+
+    // Expression with multiple field paths.
+    expression = expr(R"({$and: [{$gt: ["$foo", 5]}, {$lt: ["$foo", 10]}]})");
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({
+            "$and": [
+                {
+                    "$gt": [
+                        "$HASH<foo>",
+                        {
+                            "$const": 5
+                        }
+                    ]
+                },
+                {
+                    "$lt": [
+                        "$HASH<foo>",
+                        {
+                            "$const": 10
+                        }
+                    ]
+                }
+            ]
+        })",
+        expression->serialize(options).getDocument());
+
+    // Test that a variable followed by user fields is properly hashed.
+    options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
+
+    expression = expr(R"({$gt: ["$$ROOT.a.b", 5]})");
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"$gt":["$$ROOT.HASH<a>.HASH<b>","?number"]})",
+        expression->serialize(options).getDocument());
+
+    expression = expr(R"({$gt: ["$foo", "$$NOW"]})");
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"$gt":["$HASH<foo>","$$NOW"]})",
+        expression->serialize(options).getDocument());
+
+    // Repeat the above test with a dotted path.
+    expression = expr(R"({$gt: ["$foo.a.b", "$$NOW"]})");
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"$gt":["$HASH<foo>.HASH<a>.HASH<b>","$$NOW"]})",
+        expression->serialize(options).getDocument());
+}
+
 /** The field path itself is a dependency. */
 class Dependencies {
 public:
@@ -208,210 +318,11 @@ public:
         intrusive_ptr<Expression> expression =
             ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b");
         DepsTracker dependencies;
-        expression->addDependencies(&dependencies);
+        expression::addDependencies(expression.get(), &dependencies);
         ASSERT_EQUALS(1U, dependencies.fields.size());
         ASSERT_EQUALS(1U, dependencies.fields.count("a.b"));
         ASSERT_EQUALS(false, dependencies.needWholeDocument);
         ASSERT_EQUALS(false, dependencies.getNeedsAnyMetadata());
-    }
-};
-
-/** Field path target field is missing. */
-class Missing {
-public:
-    void run() {
-        auto expCtx = ExpressionContextForTest{};
-        intrusive_ptr<Expression> expression = ExpressionFieldPath::deprecatedCreate(&expCtx, "a");
-        ASSERT_BSONOBJ_BINARY_EQ(fromjson("{}"),
-                                 toBson(expression->evaluate({}, &expCtx.variables)));
-    }
-};
-
-/** Simple case where the target field is present. */
-class Present {
-public:
-    void run() {
-        auto expCtx = ExpressionContextForTest{};
-        intrusive_ptr<Expression> expression = ExpressionFieldPath::deprecatedCreate(&expCtx, "a");
-        ASSERT_BSONOBJ_BINARY_EQ(
-            fromjson("{'':123}"),
-            toBson(expression->evaluate(fromBson(BSON("a" << 123)), &expCtx.variables)));
-    }
-};
-
-/** Target field parent is null. */
-class NestedBelowNull {
-public:
-    void run() {
-        auto expCtx = ExpressionContextForTest{};
-        intrusive_ptr<Expression> expression =
-            ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b");
-        ASSERT_BSONOBJ_BINARY_EQ(
-            fromjson("{}"),
-            toBson(expression->evaluate(fromBson(fromjson("{a:null}")), &expCtx.variables)));
-    }
-};
-
-/** Target field parent is undefined. */
-class NestedBelowUndefined {
-public:
-    void run() {
-        auto expCtx = ExpressionContextForTest{};
-        intrusive_ptr<Expression> expression =
-            ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b");
-        ASSERT_BSONOBJ_BINARY_EQ(
-            fromjson("{}"),
-            toBson(expression->evaluate(fromBson(fromjson("{a:undefined}")), &expCtx.variables)));
-    }
-};
-
-/** Target field parent is missing. */
-class NestedBelowMissing {
-public:
-    void run() {
-        auto expCtx = ExpressionContextForTest{};
-        intrusive_ptr<Expression> expression =
-            ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b");
-        ASSERT_BSONOBJ_BINARY_EQ(
-            fromjson("{}"),
-            toBson(expression->evaluate(fromBson(fromjson("{z:1}")), &expCtx.variables)));
-    }
-};
-
-/** Target field parent is an integer. */
-class NestedBelowInt {
-public:
-    void run() {
-        auto expCtx = ExpressionContextForTest{};
-        intrusive_ptr<Expression> expression =
-            ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b");
-        ASSERT_BSONOBJ_BINARY_EQ(
-            fromjson("{}"),
-            toBson(expression->evaluate(fromBson(BSON("a" << 2)), &expCtx.variables)));
-    }
-};
-
-/** A value in a nested object. */
-class NestedValue {
-public:
-    void run() {
-        auto expCtx = ExpressionContextForTest{};
-        intrusive_ptr<Expression> expression =
-            ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b");
-        ASSERT_BSONOBJ_BINARY_EQ(BSON("" << 55),
-                                 toBson(expression->evaluate(fromBson(BSON("a" << BSON("b" << 55))),
-                                                             &expCtx.variables)));
-    }
-};
-
-/** Target field within an empty object. */
-class NestedBelowEmptyObject {
-public:
-    void run() {
-        auto expCtx = ExpressionContextForTest{};
-        intrusive_ptr<Expression> expression =
-            ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b");
-        ASSERT_BSONOBJ_BINARY_EQ(
-            fromjson("{}"),
-            toBson(expression->evaluate(fromBson(BSON("a" << BSONObj())), &expCtx.variables)));
-    }
-};
-
-/** Target field within an empty array. */
-class NestedBelowEmptyArray {
-public:
-    void run() {
-        auto expCtx = ExpressionContextForTest{};
-        intrusive_ptr<Expression> expression =
-            ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b");
-        ASSERT_BSONOBJ_BINARY_EQ(
-            BSON("" << BSONArray()),
-            toBson(expression->evaluate(fromBson(BSON("a" << BSONArray())), &expCtx.variables)));
-    }
-};
-
-/** Target field within an array containing null. */
-class NestedBelowArrayWithNull {
-public:
-    void run() {
-        auto expCtx = ExpressionContextForTest{};
-        intrusive_ptr<Expression> expression =
-            ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b");
-        ASSERT_BSONOBJ_BINARY_EQ(
-            fromjson("{'':[]}"),
-            toBson(expression->evaluate(fromBson(fromjson("{a:[null]}")), &expCtx.variables)));
-    }
-};
-
-/** Target field within an array containing undefined. */
-class NestedBelowArrayWithUndefined {
-public:
-    void run() {
-        auto expCtx = ExpressionContextForTest{};
-        intrusive_ptr<Expression> expression =
-            ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b");
-        ASSERT_BSONOBJ_BINARY_EQ(
-            fromjson("{'':[]}"),
-            toBson(expression->evaluate(fromBson(fromjson("{a:[undefined]}")), &expCtx.variables)));
-    }
-};
-
-/** Target field within an array containing an integer. */
-class NestedBelowArrayWithInt {
-public:
-    void run() {
-        auto expCtx = ExpressionContextForTest{};
-        intrusive_ptr<Expression> expression =
-            ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b");
-        ASSERT_BSONOBJ_BINARY_EQ(
-            fromjson("{'':[]}"),
-            toBson(expression->evaluate(fromBson(fromjson("{a:[1]}")), &expCtx.variables)));
-    }
-};
-
-/** Target field within an array. */
-class NestedWithinArray {
-public:
-    void run() {
-        auto expCtx = ExpressionContextForTest{};
-        intrusive_ptr<Expression> expression =
-            ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b");
-        ASSERT_BSONOBJ_BINARY_EQ(
-            fromjson("{'':[9]}"),
-            toBson(expression->evaluate(fromBson(fromjson("{a:[{b:9}]}")), &expCtx.variables)));
-    }
-};
-
-/** Multiple value types within an array. */
-class MultipleArrayValues {
-public:
-    void run() {
-        auto expCtx = ExpressionContextForTest{};
-        intrusive_ptr<Expression> expression =
-            ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b");
-        ASSERT_BSONOBJ_BINARY_EQ(
-            fromjson("{'':[9,20]}"),
-            toBson(expression->evaluate(
-                fromBson(fromjson("{a:[{b:9},null,undefined,{g:4},{b:20},{}]}")),
-                &expCtx.variables)));
-    }
-};
-
-/** Expanding values within nested arrays. */
-class ExpandNestedArrays {
-public:
-    void run() {
-        auto expCtx = ExpressionContextForTest{};
-        intrusive_ptr<Expression> expression =
-            ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b.c");
-        ASSERT_BSONOBJ_BINARY_EQ(
-            fromjson("{'':[[1,2],3,[4],[[5]],[6,7]]}"),
-            toBson(expression->evaluate(fromBson(fromjson("{a:[{b:[{c:1},{c:2}]},"
-                                                          "{b:{c:3}},"
-                                                          "{b:[{c:4}]},"
-                                                          "{b:[{c:[5]}]},"
-                                                          "{b:{c:[6,7]}}]}")),
-                                        &expCtx.variables)));
     }
 };
 
@@ -422,9 +333,7 @@ public:
         auto expCtx = ExpressionContextForTest{};
         intrusive_ptr<Expression> expression =
             ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b.c");
-        ASSERT_BSONOBJ_BINARY_EQ(BSON("foo"
-                                      << "$a.b.c"),
-                                 BSON("foo" << expression->serialize(false)));
+        ASSERT_BSONOBJ_BINARY_EQ(BSON("foo" << "$a.b.c"), BSON("foo" << expression->serialize()));
     }
 };
 
@@ -436,42 +345,26 @@ public:
         intrusive_ptr<Expression> expression =
             ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b.c");
         BSONArrayBuilder bab;
-        bab << expression->serialize(false);
+        bab << expression->serialize();
         ASSERT_BSONOBJ_BINARY_EQ(BSON_ARRAY("$a.b.c"), bab.arr());
     }
 };
 
 }  // namespace FieldPath
 
-class All : public OldStyleSuiteSpecification {
+class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("expression") {}
 
-    void setupTests() {
+    void setupTests() override {
         add<FieldPath::Invalid>();
         add<FieldPath::Dependencies>();
-        add<FieldPath::Missing>();
-        add<FieldPath::Present>();
-        add<FieldPath::NestedBelowNull>();
-        add<FieldPath::NestedBelowUndefined>();
-        add<FieldPath::NestedBelowMissing>();
-        add<FieldPath::NestedBelowInt>();
-        add<FieldPath::NestedValue>();
-        add<FieldPath::NestedBelowEmptyObject>();
-        add<FieldPath::NestedBelowEmptyArray>();
-        add<FieldPath::NestedBelowEmptyArray>();
-        add<FieldPath::NestedBelowArrayWithNull>();
-        add<FieldPath::NestedBelowArrayWithUndefined>();
-        add<FieldPath::NestedBelowArrayWithInt>();
-        add<FieldPath::NestedWithinArray>();
-        add<FieldPath::MultipleArrayValues>();
-        add<FieldPath::ExpandNestedArrays>();
         add<FieldPath::AddToBsonObj>();
         add<FieldPath::AddToBsonArray>();
     }
 };
 
-OldStyleSuiteInitializer<All> fieldPathAll;
+unittest::OldStyleSuiteInitializer<All> fieldPathAll;
 
 }  // namespace
 }  // namespace ExpressionTests

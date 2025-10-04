@@ -197,7 +197,7 @@ ENDIF
 
     ; transport_t as 1.arg of context-function
     ; RCX contains address of returned (hidden) transfer_t
-    mov rcx,  rax  
+    mov rcx,  rax
     ; RDX contains address of passed transfer_t
     mov rdx,  rax
 

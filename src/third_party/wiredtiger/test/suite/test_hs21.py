@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import time, re
-import wiredtiger, wttest
+import wttest
 from wtdataset import SimpleDataSet
 from wiredtiger import stat
 from wtscenario import make_scenarios
@@ -38,11 +38,11 @@ from wtscenario import make_scenarios
 # We want to ensure that when an active history file is idle closed we can continue reading the
 # correct version of data and their base write generation hasn't changed (since we haven't
 # restarted the system).
+@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_hs21(wttest.WiredTigerTestCase):
     # Configure handle sweeping to occur within a specific amount of time.
     conn_config = 'file_manager=(close_handle_minimum=0,close_idle_time=2,close_scan_interval=1),' + \
             'statistics=(all),operation_tracking=(enabled=false)'
-    session_config = 'isolation=snapshot'
     file_name = 'test_hs21'
     numfiles = 10
     nrows = 1000
@@ -137,16 +137,16 @@ class test_hs21(wttest.WiredTigerTestCase):
             # Load data at timestamp 2.
             self.large_updates(ds.uri, value1, ds, self.nrows // 2 , 2)
 
-        # We want to create a long running read transaction in a seperate session which we will persist over the closing and
+        # We want to create a long running read transaction in a separate session which we will persist over the closing and
         # re-opening of handles. We want to ensure the correct data gets read throughout this time period.
         session_read = self.conn.open_session()
         session_read.begin_transaction('read_timestamp=' + self.timestamp_str(2))
-        # Check our inital set of updates are seen at the read timestamp.
+        # Check our initial set of updates are seen at the read timestamp.
         for (_, ds) in active_files:
             # Check that all updates at timestamp 2 are seen.
             self.check(session_read, value1, ds.uri, self.nrows // 2)
 
-        # Perform a series of updates over over files at a later timestamp. Checking the history store data is consistent
+        # Perform a series of updates over files at a later timestamp. Checking the history store data is consistent
         # with old and new timestamps.
         for (_, ds) in active_files:
             # Load more data with a later timestamp.
@@ -154,6 +154,9 @@ class test_hs21(wttest.WiredTigerTestCase):
             # Check that the new updates are only seen after the update timestamp.
             self.check(self.session, value1, ds.uri, self.nrows // 2, 2, flcs_nrows=self.nrows)
             self.check(self.session, value2, ds.uri, self.nrows, 100)
+
+        # Set the stable timestamp to 100 to let checkpoint write all the stable data.
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(100))
 
         # Our sweep scan interval is every 1 second and the amount of idle time needed for a handle to be closed is 2 seconds.
         # It should take roughly 3 seconds for the sweep server to close our file handles. Lets wait at least double
@@ -176,7 +179,7 @@ class test_hs21(wttest.WiredTigerTestCase):
             stat_cursor.reset()
             curr_files_open = stat_cursor[stat.conn.file_open][2]
             curr_dhandles_removed = stat_cursor[stat.conn.dh_sweep_remove][2]
-            curr_dhandle_sweep_closes = stat_cursor[stat.conn.dh_sweep_close][2]
+            curr_dhandle_sweep_closes = stat_cursor[stat.conn.dh_sweep_dead_close][2]
 
             self.printVerbose(3, "==== loop " + str(sleep))
             self.printVerbose(3, "Number of files open: " + str(curr_files_open))
@@ -189,7 +192,7 @@ class test_hs21(wttest.WiredTigerTestCase):
                 break
 
         stat_cursor.reset()
-        final_dhandle_sweep_closes = stat_cursor[stat.conn.dh_sweep_close][2]
+        final_dhandle_sweep_closes = stat_cursor[stat.conn.dh_sweep_dead_close][2]
         stat_cursor.close()
         # We want to assert our active history files have all been closed.
         self.assertGreaterEqual(final_dhandle_sweep_closes, self.numfiles)
@@ -213,6 +216,3 @@ class test_hs21(wttest.WiredTigerTestCase):
             # closed.
             base_write_gen = self.parse_run_write_gen(file_uri)
             self.assertEqual(initial_base_write_gen, base_write_gen)
-
-if __name__ == '__main__':
-    wttest.run()

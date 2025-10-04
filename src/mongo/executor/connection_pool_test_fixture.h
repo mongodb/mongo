@@ -27,19 +27,34 @@
  *    it in the license file.
  */
 
+#pragma once
+
+#include "mongo/base/status.h"
+#include "mongo/executor/connection_pool.h"
+#include "mongo/transport/transport_layer.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/clock_source_mock.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/executor_test_util.h"
+#include "mongo/util/functional.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/out_of_line_executor.h"
+#include "mongo/util/time_support.h"
+
+#include <cstddef>
 #include <deque>
 #include <memory>
 #include <set>
+#include <string>
 
-#include "mongo/executor/connection_pool.h"
-#include "mongo/util/executor_test_util.h"
-#include "mongo/util/functional.h"
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace executor {
 namespace connection_pool_test_details {
 
 class ConnectionPoolTest;
+
 class PoolImpl;
 
 /**
@@ -82,7 +97,10 @@ public:
     using PushSetupCallback = unique_function<Status()>;
     using PushRefreshCallback = unique_function<Status()>;
 
-    ConnectionImpl(const HostAndPort& hostAndPort, size_t generation, PoolImpl* global);
+    ConnectionImpl(const HostAndPort& hostAndPort,
+                   PoolConnectionId,
+                   size_t generation,
+                   PoolImpl* global);
 
     size_t id() const;
 
@@ -150,6 +168,7 @@ public:
     std::shared_ptr<ConnectionPool::ConnectionInterface> makeConnection(
         const HostAndPort& hostAndPort,
         transport::ConnectSSLMode sslMode,
+        PoolConnectionId,
         size_t generation) override;
 
     std::shared_ptr<ConnectionPool::TimerInterface> makeTimer() override;
@@ -157,6 +176,10 @@ public:
     const std::shared_ptr<OutOfLineExecutor>& getExecutor() override;
 
     Date_t now() override;
+
+    ClockSource* getFastClockSource() override {
+        return &_fastClockSource;
+    }
 
     void shutdown() override {
         TimerImpl::clear();
@@ -172,6 +195,7 @@ private:
     std::shared_ptr<OutOfLineExecutor> _executor;
 
     static boost::optional<Date_t> _now;
+    static ClockSourceMock _fastClockSource;
 };
 
 }  // namespace connection_pool_test_details

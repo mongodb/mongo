@@ -1,0 +1,6 @@
+base_suite: replica_sets
+overrides:
+  - "encryption.testdata_ese"
+  - "encryption.testdata_gcm"
+excludes:
+  - "encryption.excluded_files"

@@ -5,4 +5,3 @@ selector: {}
 executor:
   config:
     dbtest_options:
-      dur: ''

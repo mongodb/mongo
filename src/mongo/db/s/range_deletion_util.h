@@ -28,53 +28,45 @@
  */
 #pragma once
 
-#include <list>
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/client.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/global_catalog/type_chunk.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/s/range_deletion_task_gen.h"
+#include "mongo/db/service_context.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/util/uuid.h"
 
 #include <boost/optional.hpp>
 
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/s/range_deletion_task_gen.h"
-#include "mongo/executor/task_executor.h"
-#include "mongo/s/catalog/type_chunk.h"
-
 namespace mongo {
 
-class BSONObj;
+namespace rangedeletionutil {
 
-// The maximum number of documents to delete in a single batch during range deletion.
-// secondaryThrottle and rangeDeleterBatchDelayMS apply between each batch.
-// Must be positive or 0 (the default), which means to use the value of
-// internalQueryExecYieldIterations (or 1 if that's negative or zero).
-extern AtomicWord<int> rangeDeleterBatchSize;
-
-// After completing a batch of document deletions, the time in millis to wait before commencing the
-// next batch of deletions.
-extern AtomicWord<int> rangeDeleterBatchDelayMS;
+constexpr auto kRangeDeletionThreadName = "range-deleter"_sd;
 
 /**
- * Deletes a range of orphaned documents for the given namespace and collection UUID. Returns a
- * future which will be resolved when the range has finished being deleted. The resulting future
- * will contain an error in cases where the range could not be deleted successfully.
- *
- * The overall algorithm is as follows:
- * 1. Wait for the all active queries which could be using the range to resolve by waiting
- *    for the waitForActiveQueriesToComplete future to resolve.
- * 2. Waits for delayForActiveQueriesOnSecondariesToComplete seconds before deleting any documents,
- *    to give queries running on secondaries a chance to finish.
- * 3. Delete documents in a series of batches with up to numDocsToRemovePerBatch documents per
- *    batch, with a delay of delayBetweenBatches milliseconds in between batches.
+ * Delete the range in a sequence of batches until there are no more documents to delete or deletion
+ * returns an error. If successful, returns the number of deleted documents and bytes.
  */
-SharedSemiFuture<void> removeDocumentsInRange(
-    const std::shared_ptr<executor::TaskExecutor>& executor,
-    SemiFuture<void> waitForActiveQueriesToComplete,
-    const NamespaceString& nss,
-    const UUID& collectionUuid,
-    const BSONObj& keyPattern,
-    const ChunkRange& range,
-    boost::optional<UUID> migrationId,
-    int numDocsToRemovePerBatch,
-    Seconds delayForActiveQueriesOnSecondariesToComplete,
-    Milliseconds delayBetweenBatches);
+StatusWith<std::pair<int, int>> deleteRangeInBatches(OperationContext* opCtx,
+                                                     const DatabaseName& dbName,
+                                                     const UUID& collectionUuid,
+                                                     const BSONObj& keyPattern,
+                                                     const ChunkRange& range);
+
+
+/**
+ * Check if there is at least one range deletion task for the specified collection.
+ */
+bool hasAtLeastOneRangeDeletionTaskForCollection(OperationContext* opCtx,
+                                                 const NamespaceString& nss,
+                                                 const UUID& collectionUuid);
 
 /**
  * - Retrieves source collection's persistent range deletion tasks from `config.rangeDeletions`
@@ -99,4 +91,110 @@ void deleteRangeDeletionTasksForRename(OperationContext* opCtx,
                                        const NamespaceString& fromNss,
                                        const NamespaceString& toNss);
 
+/**
+ * Updates the range deletion task document to increase or decrease numOrphanedDocs
+ */
+void persistUpdatedNumOrphans(OperationContext* opCtx,
+                              const UUID& collectionUuid,
+                              const ChunkRange& range,
+                              long long changeInOrphans);
+
+/**
+ * Removes range deletion task documents from `config.rangeDeletions` for the specified range and
+ * collection
+ */
+void removePersistentRangeDeletionTask(OperationContext* opCtx,
+                                       const UUID& collectionUuid,
+                                       const ChunkRange& range);
+
+/**
+ * Removes all range deletion task documents from `config.rangeDeletions` for the specified
+ * collection
+ */
+void removePersistentRangeDeletionTasksByUUID(OperationContext* opCtx, const UUID& collectionUuid);
+
+/**
+ * Creates a query object that can used to find overlapping ranges in the pending range deletions
+ * collection.
+ */
+BSONObj overlappingRangeDeletionsQuery(const ChunkRange& range, const UUID& uuid);
+
+/**
+ * Checks the pending range deletions collection to see if there are any pending ranges that
+ * conflict with the passed in range.
+ */
+size_t checkForConflictingDeletions(OperationContext* opCtx,
+                                    const ChunkRange& range,
+                                    const UUID& uuid);
+/**
+ * Writes the range deletion task document to config.rangeDeletions and waits for majority write
+ * concern.
+ */
+void persistRangeDeletionTaskLocally(OperationContext* opCtx,
+                                     const RangeDeletionTask& deletionTask,
+                                     const WriteConcernOptions& writeConcern);
+
+/**
+ * Retrieves the value of 'numOrphanedDocs' from the recipient shard's range deletion task document.
+ */
+long long retrieveNumOrphansFromShard(OperationContext* opCtx,
+                                      const ShardId& shardId,
+                                      const UUID& migrationId);
+
+/**
+ * Retrieves the shard key pattern from the local range deletion task.
+ */
+boost::optional<KeyPattern> getShardKeyPatternFromRangeDeletionTask(OperationContext* opCtx,
+                                                                    const UUID& migrationId);
+
+/**
+ * Deletes the range deletion task document with the specified id from config.rangeDeletions and
+ * waits for majority write concern.
+ */
+void deleteRangeDeletionTaskLocally(OperationContext* opCtx,
+                                    const UUID& collectionUuid,
+                                    const ChunkRange& range,
+                                    const WriteConcernOptions& writeConcern);
+
+/**
+ * Deletes the range deletion task document with the specified id from config.rangeDeletions on the
+ * specified shard and waits for majority write concern.
+ */
+void deleteRangeDeletionTaskOnRecipient(OperationContext* opCtx,
+                                        const ShardId& recipientId,
+                                        const UUID& collectionUuid,
+                                        const ChunkRange& range,
+                                        const UUID& migrationId);
+
+/**
+ * Removes the 'pending' flag from the range deletion task document with the specified id from
+ * config.rangeDeletions and waits for majority write concern. This marks the range as ready for
+ * deletion.
+ */
+void markAsReadyRangeDeletionTaskLocally(OperationContext* opCtx,
+                                         const UUID& collectionUuid,
+                                         const ChunkRange& range);
+
+
+/**
+ * Removes the 'pending' flag from the range deletion task document with the specified id from
+ * config.rangeDeletions on the specified shard and waits for majority write concern. This marks the
+ * range as ready for deletion.
+ */
+void markAsReadyRangeDeletionTaskOnRecipient(OperationContext* opCtx,
+                                             const ShardId& recipientId,
+                                             const UUID& collectionUuid,
+                                             const ChunkRange& range,
+                                             const UUID& migrationId);
+
+
+/**
+ * Updates each document in the `config.rangeDeletions` collection by setting the
+ * `preMigrationShardVersion` field to the default value `ChunkVersion::IGNORED()`, but only for
+ * documents where the field is not already set.
+ *
+ * TODO SERVER-103046: Remove once 9.0 becomes last lts.
+ */
+void setPreMigrationShardVersionOnRangeDeletionTasks(OperationContext* opCtx);
+}  // namespace rangedeletionutil
 }  // namespace mongo

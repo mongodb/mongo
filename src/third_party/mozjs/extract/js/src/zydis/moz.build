@@ -1,0 +1,53 @@
+FINAL_LIBRARY = 'js'
+
+# Includes should be relative to parent path
+LOCAL_INCLUDES += [
+    '!..',
+    '..'
+]
+
+include('../js-config.mozbuild')
+include('../js-cxxflags.mozbuild')
+
+if CONFIG['JS_CODEGEN_X64'] or CONFIG['JS_CODEGEN_X86']:
+    SOURCES += [
+        'Zycore/Allocator.c',
+        'Zycore/API/Memory.c',
+        'Zycore/API/Process.c',
+        'Zycore/ArgParse.c',
+        'Zycore/Bitset.c',
+        'Zycore/Format.c',
+        'Zycore/List.c',
+        'Zycore/Vector.c',
+        'Zycore/Zycore.c',
+        'Zycore/ZycoreString.c',
+        'Zydis/Decoder.c',
+        'Zydis/DecoderData.c',
+        'Zydis/Disassembler.c',
+        'Zydis/Encoder.c',
+        'Zydis/EncoderData.c',
+        'Zydis/Formatter.c',
+        'Zydis/FormatterATT.c',
+        'Zydis/FormatterBase.c',
+        'Zydis/FormatterBuffer.c',
+        'Zydis/FormatterIntel.c',
+        'Zydis/MetaInfo.c',
+        'Zydis/Mnemonic.c',
+        'Zydis/Register.c',
+        'Zydis/Segment.c',
+        'Zydis/SharedData.c',
+        'Zydis/Utils.c',
+        'Zydis/Zydis.c',
+        'Zydis/ZydisString.c',
+        'ZydisAPI.cpp',
+    ]
+
+    # Suppress warnings in third-party code.
+    SOURCES['Zydis/Decoder.c'].flags += ['-Wno-unused-local-typedefs']
+    SOURCES['Zydis/Register.c'].flags += ['-Wno-sign-compare']
+    SOURCES['Zydis/SharedData.c'].flags += ['-Wno-sign-compare']
+
+    # clang -Wtautological-constant-in-range-compare implicitly enables
+    # -Wtautological-value-range-compare, but we need to disable it for Zydis.
+    if "-Wtautological-constant-in-range-compare" in CONFIG["WARNINGS_CFLAGS"]:
+        CFLAGS += ["-Wno-tautological-value-range-compare"]

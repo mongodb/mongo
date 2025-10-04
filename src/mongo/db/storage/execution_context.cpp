@@ -28,12 +28,20 @@
  */
 
 #include "mongo/db/storage/execution_context.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
+
+#include "mongo/util/decorable.h"
 
 namespace mongo {
-const OperationContext::Decoration<StorageExecutionContext> StorageExecutionContext::get =
+
+namespace {
+
+const OperationContext::Decoration<StorageExecutionContext> storageExecutionContextDecoration =
     OperationContext::declareDecoration<StorageExecutionContext>();
 
-StorageExecutionContext::StorageExecutionContext() {}
+}  // namespace
+
+StorageExecutionContext* StorageExecutionContext::get(OperationContext* opCtx) {
+    return &storageExecutionContextDecoration(opCtx);
+}
 
 }  // namespace mongo

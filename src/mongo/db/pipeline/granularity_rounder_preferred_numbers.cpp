@@ -27,9 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/granularity_rounder.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
+
+#include <algorithm>
+#include <cmath>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -169,7 +182,7 @@ Value GranularityRounderPreferredNumbers::roundUp(Value value) {
         return value;
     }
 
-    if (value.getType() == BSONType::NumberDecimal) {
+    if (value.getType() == BSONType::numberDecimal) {
         Decimal128 number = value.getDecimal();
         Decimal128 multiplier = Decimal128(1);
 
@@ -254,7 +267,7 @@ Value GranularityRounderPreferredNumbers::roundDown(Value value) {
         return value;
     }
 
-    if (value.getType() == BSONType::NumberDecimal) {
+    if (value.getType() == BSONType::numberDecimal) {
         Decimal128 number = value.getDecimal();
         Decimal128 multiplier = Decimal128(1);
 
@@ -348,7 +361,7 @@ string GranularityRounderPreferredNumbers::getName() {
     return _name;
 }
 
-const vector<double> GranularityRounderPreferredNumbers::getSeries() const {
+vector<double> GranularityRounderPreferredNumbers::getSeries() const {
     return _baseSeries;
 }
 }  //  namespace mongo

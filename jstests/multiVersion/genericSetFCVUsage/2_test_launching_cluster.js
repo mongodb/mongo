@@ -1,79 +1,62 @@
-//
-// Tests launching multi-version ShardingTest clusters.
-//
-//
+import "jstests/multiVersion/libs/verify_versions.js";
 
-load('./jstests/multiVersion/libs/verify_versions.js');
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-(function() {
-"use strict";
+function checkEquivalent(testConfig, st) {
+    let expectedVersions = [testConfig.other.mongosOptions.binVersion];
+    let expectedNodes = [...testConfig.shards.rs0.nodes, ...testConfig.shards.rs1.nodes];
+    for (j = 0; j < expectedNodes.length; j++) {
+        expectedVersions.push(expectedNodes[j].binVersion);
+    }
 
-// TODO(SERVER-61100): Re-enable this test.
-if (true) {
-    jsTestLog("Skipping test as it is currently disabled.");
-    return;
+    let versionsFound = [st.s0.getBinVersion()];
+    let nodes = [...st._rs[0].test.nodes, ...st._rs[1].test.nodes];
+    for (var j = 0; j < nodes.length; j++) {
+        versionsFound.push(nodes[j].getBinVersion());
+    }
+    assert.allBinVersions(expectedVersions, versionsFound);
 }
 
-// Sharded cluster upgrade order: config servers -> shards -> mongos.
-const mixedVersionsToCheck = [
-    {config: ["latest"], shard: ["last-lts", "latest"], mongos: ["last-lts"]},
-    {config: ["latest"], shard: ["last-continuous", "latest"], mongos: ["last-continuous"]},
-    {config: ["latest"], shard: ["last-continuous", "last-lts"], mongos: ["last-continuous"]},
-    {config: ["latest"], shard: ["last-lts", "last-continuous"], mongos: ["last-lts"]},
+if (MongoRunner.areBinVersionsTheSame("last-continuous", "last-lts")) {
+    jsTest.log("Skipping test because 'last-continuous' == 'last-lts'");
+    quit();
+}
+
+const invalidMixedVersionsToCheck = [
+    {
+        shards: {
+            rs0: {nodes: [{binVersion: "last-continuous"}, {binVersion: "last-lts"}]},
+            rs1: {nodes: [{binVersion: "last-lts"}]},
+        },
+        other: {mongosOptions: {binVersion: "last-lts"}},
+    },
 ];
 
-for (let versions of mixedVersionsToCheck) {
-    jsTest.log("Testing mixed versions: " + tojson(versions));
-    try {
-        // Set up a multi-version cluster
-        var st = new ShardingTest({
-            shards: 2,
-            mongos: 2,
-            other: {
-                mongosOptions: {binVersion: versions.mongos},
-                configOptions: {binVersion: versions.config},
-                shardOptions: {binVersion: versions.shard},
-                enableBalancer: true
-            }
-        });
-    } catch (e) {
-        if (e instanceof Error) {
-            if (e.message.includes(
-                    "Can only specify one of 'last-lts' and 'last-continuous' in binVersion, not both.")) {
-                continue;
-            }
-        }
-        throw e;
-    }
-    if ((versions.shard[0] === "last-continuous" && versions.shard[1] === "last-lts") ||
-        (versions.shard[1] === "last-continuous" && versions.shard[0] === "last-lts")) {
-        assert(
-            MongoRunner.areBinVersionsTheSame("last-continuous", "last-lts"),
-            "Should have thrown error in creating ShardingTest because can only specify one of 'last-lts' and 'last-continuous' in binVersion, not both.");
-    }
-    var shards = [st.shard0, st.shard1];
-    var mongoses = [st.s0, st.s1];
-    var configs = [st.config0, st.config1, st.config2];
+for (let config of invalidMixedVersionsToCheck) {
+    jsTest.log("Testing invalid mixed versions: " + tojson(config));
 
-    // Make sure we have hosts of all the different versions
-    var versionsFound = [];
-    for (var j = 0; j < shards.length; j++)
-        versionsFound.push(shards[j].getBinVersion());
+    let err = assert.throws(() => new ShardingTest({shouldFailInit: true, shards: config.shards, other: config.other}));
+    assert.eq(
+        true,
+        formatErrorMsg(err.message, err.extraAttr).includes(
+            "Can only specify one of 'last-lts' and 'last-continuous' in binVersion, not both.",
+        ),
+        "Unexpected Error",
+    );
+}
 
-    assert.allBinVersions(versions.shard, versionsFound);
+const validMixedVersionsToCheck = [
+    {
+        shards: {rs0: {nodes: [{binVersion: "latest"}]}, rs1: {nodes: [{binVersion: "last-lts"}]}},
+        other: {mongosOptions: {binVersion: "last-lts"}},
+    },
+];
 
-    versionsFound = [];
-    for (var j = 0; j < mongoses.length; j++)
-        versionsFound.push(mongoses[j].getBinVersion());
-
-    assert.allBinVersions(versions.mongos, versionsFound);
-
-    versionsFound = [];
-    for (var j = 0; j < configs.length; j++)
-        versionsFound.push(configs[j].getBinVersion());
-
-    assert.allBinVersions(versions.config, versionsFound);
+for (let config of validMixedVersionsToCheck) {
+    jsTest.log("Testing valid mixed versions: " + tojson(config));
+    let st = new ShardingTest({shards: config.shards, other: config.other});
+    let configs = [st.config0, st.config1, st.config2];
+    checkEquivalent(config, st);
 
     st.stop();
 }
-})();

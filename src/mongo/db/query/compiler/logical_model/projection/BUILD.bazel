@@ -1,0 +1,52 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "projection_ast",
+    srcs = [
+        "projection.cpp",
+        "projection_ast_path_tracking_visitor.h",
+        "projection_ast_util.cpp",
+        "projection_parser.cpp",
+    ],
+    hdrs = [
+        "projection.h",
+        "projection_ast.h",
+        "projection_ast_util.h",
+        "projection_ast_visitor.h",
+        "projection_parser.h",
+        "//src/mongo/base:exact_cast.h",
+        "//src/mongo/db/query/compiler/rewrites/matcher:expression_optimizer.h",
+    ],
+    deps = [
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/query/compiler/dependency_analysis",
+        "//src/mongo/db/query/compiler/parsers/matcher:matcher_parser",
+        "//src/mongo/db/query/compiler/rewrites/matcher:matcher_rewrites",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "projection_ast_test",
+    srcs = [
+        "projection_ast_test.cpp",
+        "projection_test.cpp",
+    ],
+    tags = ["mongo_unittest_fifth_group"],
+    deps = [
+        ":projection_ast",
+        "//src/mongo/db/exec/document_value:document_value_test_util",
+        "//src/mongo/db/pipeline:aggregation_context_fixture",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/query:query_test_service_context",
+    ],
+)

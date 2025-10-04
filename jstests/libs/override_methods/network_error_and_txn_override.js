@@ -9,36 +9,42 @@
  * retries transactions that fail due to implicit collection creation.
  *
  * (2) When a network connection to the mongo shell is closed, attempting to call
- * Mongo.prototype.runCommand() and Mongo.prototype.runCommandWithMetadata() throws a JavaScript
- * exception. This override catches these exceptions (i.e. ones where isNetworkError() returns true)
- * and automatically re-sends the command request to the server, or propagates the error if the
- * command should already be using the shell's existing retryability logic. The goal of this
- * override is to implement retry logic such that the assertions within our existing JavaScript
- * tests still pass despite stepdowns of replica set primaries (optionally in sharded clusters)
- * happening in the background.
+ * Mongo.prototype.runCommand() throws a JavaScript exception. This override catches these
+ * exceptions (i.e. ones where isNetworkError() returns true) and automatically re-sends the
+ * command request to the server, or propagates the error if the command should already be using
+ * the shell's existing retryability logic. The goal of this override is to implement retry logic
+ * such that the assertions within our existing JavaScript tests still pass despite stepdowns of
+ * replica set primaries (optionally in sharded clusters) happening in the background.
  *
  * These two overrides are unified to simplify the retry logic.
  *
  * Unittests for these overrides are included in:
- *     jstests/noPassthrough/txn_override_causal_consistency.js
+ *     jstests/noPassthrough/txns_retryable_writes_sessions/txn_override_causal_consistency.js
  *     jstests/replsets/txn_override_unittests.js
  *     jstests/libs/txns/txn_passthrough_runner_selftest.js
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/error_code_utils.js");
-load('jstests/libs/override_methods/override_helpers.js');
-load("jstests/libs/override_methods/read_and_write_concern_helpers.js");
-load("jstests/libs/retryable_writes_util.js");
-load("jstests/libs/transactions_util.js");
+import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
+import {
+    kCommandsSupportingReadConcern,
+    kCommandsSupportingWriteConcern,
+    kCommandsSupportingWriteConcernInTransaction,
+} from "jstests/libs/override_methods/read_and_write_concern_helpers.js";
+import {
+    hasError,
+    hasWriteConcernError,
+    isSuccess,
+    Result,
+    RetryTracker,
+} from "jstests/libs/override_methods/retry_utils.js";
+import {RetryableWritesUtil} from "jstests/libs/retryable_writes_util.js";
+import {TxnUtil} from "jstests/libs/txns/txn_util.js";
 
 // Truncates the 'print' output if it's too long to print.
 const kMaxPrintLength = 5000;
 const kNumPrintEndChars = kMaxPrintLength / 2;
 const originalPrint = print;
-print = function(msg) {
+globalThis.print = function (msg) {
     if (typeof msg !== "string") {
         originalPrint(msg);
         return;
@@ -55,8 +61,7 @@ print = function(msg) {
 
 function configuredForNetworkRetry() {
     assert(TestData.networkErrorAndTxnOverrideConfig, TestData);
-    return TestData.networkErrorAndTxnOverrideConfig.retryOnNetworkErrors &&
-        !jsTest.options().skipRetryOnNetworkError;
+    return TestData.networkErrorAndTxnOverrideConfig.retryOnNetworkErrors && !jsTest.options().skipRetryOnNetworkError;
 }
 
 function configuredForTxnOverride() {
@@ -77,8 +82,9 @@ const kNonRetryableCommands = new Set([
     "_configsvrCommitChunksMerge",
     "_configsvrCommitChunkMigration",
     "_configsvrCommitChunkSplit",
+    "_configsvrCommitMergeAllChunksOnShard",
     "_configsvrCreateDatabase",
-    "_configsvrMoveChunk",
+    "_configsvrMoveRange",
     "_configsvrRemoveShard",
     "_configsvrRemoveShardFromZone",
     "_configsvrUpdateZoneKeyRange",
@@ -86,11 +92,8 @@ const kNonRetryableCommands = new Set([
     "_recvChunkStart",
     "appendOplogNote",
     "applyOps",
-    "captrunc",
     "clone",
     "cloneCollectionAsCapped",
-    "convertToCapped",
-    "create",
     "createIndexes",
     "deleteIndexes",
     "drop",
@@ -100,7 +103,6 @@ const kNonRetryableCommands = new Set([
     "dropIndexes",
     "dropRole",
     "dropUser",
-    "emptycapped",
     "godinsert",
     "internalRenameIfOptionsAndIndexesMatch",
     "updateRole",
@@ -111,13 +113,12 @@ const kNonRetryableCommands = new Set([
 // completing (like IndexNotFound, NamespaceExists, etc.), but because they only take effect
 // once, and many tests use them to set up state, their errors on retries are handled specially.
 const kAcceptableNonRetryableCommands = new Set([
-    "create",
     "createIndexes",
     "createRole",
     "createUser",
     "deleteIndexes",
     "drop",
-    "dropDatabase",  // Already ignores NamespaceNotFound errors, so not handled below.
+    "dropDatabase", // Already ignores NamespaceNotFound errors, so not handled below.
     "dropIndexes",
     "moveChunk",
 ]);
@@ -138,37 +139,28 @@ function isAcceptableRetryFailedResponse(cmdName, res) {
     // These codes are uniquely returned from user_management_commands.cpp
     const kErrorCodeRoleAlreadyExists = 51002;
     const kErrorCodeUserAlreadyExists = 51003;
-    return ((cmdName === "create" && res.code === ErrorCodes.NamespaceExists) ||
-            (cmdName === "createIndexes" && res.code === ErrorCodes.IndexAlreadyExists) ||
-            (cmdName === "drop" && res.code === ErrorCodes.NamespaceNotFound) ||
-            ((cmdName == "createUser") && (res.code === kErrorCodeUserAlreadyExists)) ||
-            ((cmdName == "createRole") && (res.code === kErrorCodeRoleAlreadyExists)) ||
-            ((cmdName === "dropIndexes" || cmdName === "deleteIndexes") &&
-             res.code === ErrorCodes.IndexNotFound));
+    return (
+        (cmdName === "drop" && res.code === ErrorCodes.NamespaceNotFound) ||
+        (cmdName == "createUser" && res.code === kErrorCodeUserAlreadyExists) ||
+        (cmdName == "createRole" && res.code === kErrorCodeRoleAlreadyExists) ||
+        ((cmdName === "dropIndexes" || cmdName === "deleteIndexes") && res.code === ErrorCodes.IndexNotFound)
+    );
 }
-
-const kCmdsThatInsert = new Set([
-    'insert',
-    'update',
-    'findAndModify',
-    'findandmodify',
-]);
 
 // Commands that may return different values or fail if retried on a new primary after a
 // failover.
 const kNonFailoverTolerantCommands = new Set([
-    "currentOp",  // Failovers can change currentOp output.
-    "getLog",     // The log is different on different servers.
-    "killOp",     // Failovers may interrupt operations intended to be killed later in the test.
+    "currentOp", // Failovers can change currentOp output.
+    "getLog", // The log is different on different servers.
+    "killOp", // Failovers may interrupt operations intended to be killed later in the test.
     "logRotate",
-    "planCacheClear",  // The plan cache isn't replicated.
+    "planCacheClear", // The plan cache isn't replicated.
     "planCacheClearFilters",
     "planCacheListFilters",
     "planCacheSetFilter",
-    "profile",       // Not replicated, so can't tolerate failovers.
-    "setParameter",  // Not replicated, so can't tolerate failovers.
-    "stageDebug",
-    "startSession",  // Sessions are flushed to disk asynchronously.
+    "profile", // Not replicated, so can't tolerate failovers.
+    "setParameter", // Not replicated, so can't tolerate failovers.
+    "startSession", // Sessions are flushed to disk asynchronously.
 ]);
 
 function isCommitOrAbort(cmdName) {
@@ -213,47 +205,49 @@ function isRetryableReadCode(code) {
 //
 // TODO SERVER-32208: Remove this function once it is no longer needed.
 function isRetryableExecutorCodeAndMessage(code, msg) {
-    return code === ErrorCodes.OperationFailed && typeof msg !== "undefined" &&
-        msg.indexOf("InterruptedDueToReplStateChange") >= 0;
+    return (
+        code === ErrorCodes.OperationFailed &&
+        typeof msg !== "undefined" &&
+        msg.indexOf("InterruptedDueToReplStateChange") >= 0
+    );
 }
 
 // Returns true if the given response could have come from shardCollection being interrupted by
 // a failover.
 function isRetryableShardCollectionResponse(res) {
     // shardCollection can bury the original error code in the error message.
-    return RetryableWritesUtil.errmsgContainsRetryableCodeName(res.errmsg) ||
+    return (
+        RetryableWritesUtil.errmsgContainsRetryableCodeName(res.errmsg) ||
         // shardCollection creates collections on each shard that will receive a chunk using
         // _cloneCollectionsOptionsFromPrimaryShard, which may fail with the following code if
         // interupted by a failover.
-        res.code === ErrorCodes.CallbackCanceled;
+        res.code === ErrorCodes.CallbackCanceled
+    );
 }
 
 // Returns true if the given response could have come from moveChunk being interrupted by a
 // failover.
 function isRetryableMoveChunkResponse(res) {
-    return (res.code === ErrorCodes.OperationFailed &&
+    return (
+        (res.code === ErrorCodes.OperationFailed &&
             (RetryableWritesUtil.errmsgContainsRetryableCodeName(res.errmsg) ||
-             // The transaction number is bumped by the migration coordinator when its commit or
-             // abort decision is being made durable.
-             res.errmsg.includes("TransactionTooOld") ||
-             // The range deletion task may have been interrupted. This error can occur even when
-             // _waitForDelete=false.
-             res.errmsg.includes("operation was interrupted"))) ||
+                // The transaction number is bumped by the migration coordinator when its commit or
+                // abort decision is being made durable.
+                res.errmsg.includes("TransactionTooOld") ||
+                // The range deletion task may have been interrupted. This error can occur even when
+                // _waitForDelete=false.
+                res.errmsg.includes("operation was interrupted"))) ||
         // This error may occur when the node is shutting down.
-        res.code === ErrorCodes.CallbackCanceled;
+        res.code === ErrorCodes.CallbackCanceled
+    );
 }
 
-function hasError(res) {
-    return res.ok !== 1 || res.writeErrors;
-}
+// Tracks if the current command is being run as part of a transaction retry.
+let inTransactionRetry = false;
 
-function hasWriteConcernError(res) {
-    return res.hasOwnProperty("writeConcernError");
+function isTransactionRetry() {
+    return inTransactionRetry;
 }
-
-// Tracks if the current command is being run in a network retry. This is specifically for
-// retries that this file initiates, not ones that retryable writes initiates.
-let inCommandNetworkErrorRetry = false;
 
 // "Command ID" is an identifier for a given command being overridden. This is to track what log
 // messages come from what commands. This override is highly recursive and this is helpful for
@@ -296,20 +290,23 @@ const maxOpsInTransaction = 10;
 const kLogPrefix = "=-=-=-=";
 
 function logErrorFull(msg, cmdName, cmdObj, res) {
-    print(`${kLogPrefix} ${msg} :: ${cmdName}, CommandID: ${currentCommandID},` +
-          ` error: ${tojsononeline(res)}, command: ${tojsononeline(cmdObj)}`);
+    jsTest.log.info(`${kLogPrefix} ${msg} :: ${cmdName}, CommandID: ${currentCommandID}`, {
+        error: res,
+        command: cmdObj,
+    });
     assert.eq(nestingLevel, currentCommandID.length);
 }
 
 function logMsgFull(msgHeader, msgFooter) {
-    print(`${kLogPrefix} ${msgHeader} :: CommandID: ${currentCommandID}, msg: ${msgFooter}`);
+    jsTest.log.info(`${kLogPrefix} ${msgHeader} :: CommandID: ${currentCommandID}, msg: ${msgFooter}`);
     assert.eq(nestingLevel, currentCommandID.length);
 }
 
 // Validate the command before running it, to prevent tests with non-retryable commands
 // from being run.
 function validateCmdNetworkErrorCompatibility(cmdName, cmdObj) {
-    assert(!inCommandNetworkErrorRetry);
+    assert(!isCmdInTransaction(cmdObj));
+    assert(!isTransactionRetry());
     assert(!isNested());
 
     const isRetryableWriteCmd = RetryableWritesUtil.isRetryableWriteCmdName(cmdName);
@@ -317,83 +314,88 @@ function validateCmdNetworkErrorCompatibility(cmdName, cmdObj) {
     const logSuffix = " CmdName: " + cmdName + ", CmdObj: " + tojson(cmdObj);
 
     if (isRetryableWriteCmd && !canRetryWrites) {
-        throw new Error("Refusing to run a test that issues non-retryable write operations" +
-                        " since the test likely makes assertions on the write results and" +
-                        " can lead to spurious failures if a network error occurs." + logSuffix);
+        throw new Error(
+            "Refusing to run a test that issues non-retryable write operations" +
+                " since the test likely makes assertions on the write results and" +
+                " can lead to spurious failures if a network error occurs." +
+                logSuffix,
+        );
     } else if (cmdName === "getMore") {
         throw new Error(
             "Refusing to run a test that issues a getMore command since if a network error" +
-            " occurs during it then we won't know whether the cursor was advanced or not." +
-            logSuffix);
-    } else if (kNonRetryableCommands.has(cmdName) &&
-               !kAcceptableNonRetryableCommands.has(cmdName)) {
-        throw new Error(
-            "Refusing to run a test that issues commands that are not blindly retryable, " +
-            logSuffix);
+                " occurs during it then we won't know whether the cursor was advanced or not." +
+                logSuffix,
+        );
+    } else if (kNonRetryableCommands.has(cmdName) && !kAcceptableNonRetryableCommands.has(cmdName)) {
+        throw new Error("Refusing to run a test that issues commands that are not blindly retryable, " + logSuffix);
     } else if (kNonFailoverTolerantCommands.has(cmdName)) {
         throw new Error(
             "Refusing to run a test that issues commands that may return different values" +
-            " after a failover, " + logSuffix);
+                " after a failover, " +
+                logSuffix,
+        );
     } else if (cmdName === "aggregate") {
-        var stages = cmdObj.pipeline;
+        let stages = cmdObj.pipeline;
 
         // $listLocalSessions must be the first stage in the pipeline.
-        const firstStage =
-            stages && Array.isArray(stages) && (stages.length > 0) ? stages[0] : undefined;
-        const hasListLocalStage = firstStage && (typeof firstStage === "object") &&
-            firstStage.hasOwnProperty("$listLocalSessions");
+        const firstStage = stages && Array.isArray(stages) && stages.length > 0 ? stages[0] : undefined;
+        const hasListLocalStage =
+            firstStage && typeof firstStage === "object" && firstStage.hasOwnProperty("$listLocalSessions");
         if (hasListLocalStage) {
-            throw new Error("Refusing to run a test that issues an aggregation command with" +
-                            " $listLocalSessions because it relies on in-memory" +
-                            " state that may not survive failovers." + logSuffix);
+            throw new Error(
+                "Refusing to run a test that issues an aggregation command with" +
+                    " $listLocalSessions because it relies on in-memory" +
+                    " state that may not survive failovers." +
+                    logSuffix,
+            );
         }
 
         // Aggregate can be either a read or a write depending on whether it has a $out stage.
         // $out is required to be the last stage of the pipeline.
-        const lastStage = stages && Array.isArray(stages) && (stages.length !== 0)
-            ? stages[stages.length - 1]
-            : undefined;
-        const hasOut =
-            lastStage && (typeof lastStage === "object") && lastStage.hasOwnProperty("$out");
+        const lastStage =
+            stages && Array.isArray(stages) && stages.length !== 0 ? stages[stages.length - 1] : undefined;
+        const hasOut = lastStage && typeof lastStage === "object" && lastStage.hasOwnProperty("$out");
         if (hasOut) {
-            throw new Error("Refusing to run a test that issues an aggregation command" +
-                            " with $out because it is not retryable." + logSuffix);
+            throw new Error(
+                "Refusing to run a test that issues an aggregation command" +
+                    " with $out because it is not retryable." +
+                    logSuffix,
+            );
         }
 
         const hasExplain = cmdObj.hasOwnProperty("explain");
-        if (hasExplain) {
+        if (hasExplain && cmdObj.explain) {
             throw new Error(
                 "Refusing to run a test that issues an aggregation command with explain" +
-                " because it may return incomplete results if interrupted by a stepdown." +
-                logSuffix);
+                    " because it may return incomplete results if interrupted by a stepdown." +
+                    logSuffix,
+            );
         }
     }
 }
 
-// Default read concern level to use for transactions. Snapshot read concern is not supported in
-// sharded transactions when majority reads are disabled.
-const kDefaultTransactionReadConcernLevel =
-    TestData.hasOwnProperty("defaultTransactionReadConcernLevel")
+// Default read concern level to use for transactions.
+const kDefaultTransactionReadConcernLevel = TestData.hasOwnProperty("defaultTransactionReadConcernLevel")
     ? TestData.defaultTransactionReadConcernLevel
-    : (TestData.enableMajorityReadConcern !== false ? "snapshot" : "local");
+    : "snapshot";
 
 const kDefaultTransactionWriteConcernW = TestData.hasOwnProperty("defaultTransactionWriteConcernW")
     ? TestData.defaultTransactionWriteConcernW
     : "majority";
 
 // Default read concern level to use for commands that are not transactions.
-const kDefaultReadConcernLevel = (function() {
+const kDefaultReadConcernLevel = (function () {
     if (TestData.hasOwnProperty("defaultReadConcernLevel")) {
         return TestData.defaultReadConcernLevel;
     }
 
-    // Use majority if the suite didn't specify a level, unless the variant doesn't support it.
-    return TestData.enableMajorityReadConcern !== false ? "majority" : "local";
+    return "majority";
 })();
 
 // Default write concern w to use for both transactions and non-transactions.
-const kDefaultWriteConcernW =
-    TestData.hasOwnProperty("defaultWriteConcernW") ? TestData.defaultWriteConcernW : "majority";
+const kDefaultWriteConcernW = TestData.hasOwnProperty("defaultWriteConcernW")
+    ? TestData.defaultWriteConcernW
+    : "majority";
 
 // Use a "signature" value that won't typically match a value assigned in normal use. This way
 // the wtimeout set by this override is distinguishable in the server logs.
@@ -412,9 +414,14 @@ function appendReadAndWriteConcern(conn, dbName, cmdName, cmdObj) {
             shouldForceWriteConcern = false;
         }
     } else if (cmdName === "aggregate") {
-        if (OverrideHelpers.isAggregationWithListLocalSessionsStage(cmdName, cmdObj) ||
+        // TODO (SERVER-98658) Reconsider if $listClusterCatalog still needs a local read concern
+        if (
+            OverrideHelpers.isAggregationWithListLocalSessionsStage(cmdName, cmdObj) ||
             OverrideHelpers.isAggregationWithChangeStreamStage(cmdName, cmdObj) ||
-            OverrideHelpers.isAggregationWithCurrentOpStage(cmdName, cmdObj)) {
+            OverrideHelpers.isAggregationWithCurrentOpStage(cmdName, cmdObj) ||
+            OverrideHelpers.isAggregationWithListClusterCatalog(cmdName, cmdObj) ||
+            OverrideHelpers.isAggregationWithInternalListCollections(cmdName, cmdObj)
+        ) {
             // The $listLocalSessions and $currentOp stages can only be used with
             // readConcern={level: "local"}, and the $changeStream stage can only be used with
             // readConcern={level: "majority"}.
@@ -441,8 +448,11 @@ function appendReadAndWriteConcern(conn, dbName, cmdName, cmdObj) {
     }
 
     // If we're retrying on network errors the write concern should already be majority.
-    if ((cmdName === 'drop' || cmdName === 'convertToCapped') && configuredForTxnOverride() &&
-        !configuredForNetworkRetry()) {
+    if (
+        (cmdName === "drop" || cmdName === "convertToCapped") &&
+        configuredForTxnOverride() &&
+        !configuredForNetworkRetry()
+    ) {
         // Convert all collection drops to w:majority so they won't prevent subsequent
         // operations in transactions from failing when failing to acquire collection locks.
         cmdObj.writeConcern = cmdObj.writeConcern || {w: "majority", wtimeout: kDefaultWtimeout};
@@ -457,10 +467,17 @@ function appendReadAndWriteConcern(conn, dbName, cmdName, cmdObj) {
             readConcernLevel = kDefaultReadConcernLevel;
         }
 
-        if (cmdObj.hasOwnProperty("readConcern") && cmdObj.readConcern.hasOwnProperty("level") &&
-            cmdObj.readConcern.level !== readConcernLevel) {
-            throw new Error("refusing to override existing readConcern " +
-                            cmdObj.readConcern.level + " with readConcern " + readConcernLevel);
+        if (
+            cmdObj.hasOwnProperty("readConcern") &&
+            cmdObj.readConcern.hasOwnProperty("level") &&
+            cmdObj.readConcern.level !== readConcernLevel
+        ) {
+            throw new Error(
+                "refusing to override existing readConcern " +
+                    cmdObj.readConcern.level +
+                    " with readConcern " +
+                    readConcernLevel,
+            );
         } else {
             cmdObj.readConcern = {level: readConcernLevel};
         }
@@ -468,8 +485,7 @@ function appendReadAndWriteConcern(conn, dbName, cmdName, cmdObj) {
         // Only attach afterClusterTime if causal consistency is explicitly enabled. Note, it is
         // OK to send a readConcern with only afterClusterTime, which is interpreted as local
         // read concern by the server.
-        if (TestData.hasOwnProperty("sessionOptions") &&
-            TestData.sessionOptions.causalConsistency === true) {
+        if (TestData.hasOwnProperty("sessionOptions") && TestData.sessionOptions.causalConsistency === true) {
             const driverSession = conn.getDB(dbName).getSession();
             const operationTime = driverSession.getOperationTime();
             if (operationTime !== undefined) {
@@ -482,12 +498,14 @@ function appendReadAndWriteConcern(conn, dbName, cmdName, cmdObj) {
     if (shouldForceWriteConcern) {
         if (cmdObj.hasOwnProperty("writeConcern")) {
             let writeConcern = cmdObj.writeConcern;
-            if (typeof writeConcern !== "object" || writeConcern === null ||
+            if (
+                typeof writeConcern !== "object" ||
+                writeConcern === null ||
                 (writeConcern.hasOwnProperty("w") &&
-                 bsonWoCompare({_: writeConcern.w}, {_: kDefaultWriteConcernW}) !== 0 &&
-                 bsonWoCompare({_: writeConcern.w}, {_: 1}) !== 0)) {
-                throw new Error("Cowardly refusing to override write concern of command: " +
-                                tojson(cmdObj));
+                    bsonWoCompare({_: writeConcern.w}, {_: kDefaultWriteConcernW}) !== 0 &&
+                    bsonWoCompare({_: writeConcern.w}, {_: 1}) !== 0)
+            ) {
+                throw new Error("Cowardly refusing to override write concern of command: " + tojson(cmdObj));
             }
         }
 
@@ -504,29 +522,33 @@ function commitTransaction(conn, lsid, txnNumber) {
     assert(configuredForTxnOverride());
     assert.gte(txnNumber, 0);
 
-    logMsgFull('commitTransaction',
-               `Committing transaction ${txnNumber} on session ${tojsononeline(lsid)}`);
+    logMsgFull("commitTransaction", `Committing transaction ${txnNumber} on session ${tojsononeline(lsid)}`);
 
-    // Running the command on conn will reenter from the top of `runCommandOverride`, retrying
-    // as needed.
-    assert.commandWorked(conn.adminCommand({
+    const cmdObj = {
         commitTransaction: 1,
         autocommit: false,
         lsid: lsid,
         txnNumber: txnNumber,
-    }));
+    };
+    // Append this override-generated commit to the transaction state.
+    // The transaction is being ended, but the commit may need to be retried
+    // if it fails.
+    continueTransaction("admin", "commitTransaction", cmdObj);
+    // Running the command on conn will reenter from the top of `runCommandOverride`, retrying
+    // as needed.
+    const res = assert.commandWorked(conn.adminCommand(cmdObj));
 
     // We've successfully committed the transaction, so we can forget the ops we've successfully
     // run.
     clearOpsList();
+    return res;
 }
 
 function abortTransaction(conn, lsid, txnNumber) {
     assert(configuredForTxnOverride());
     assert.gte(txnNumber, 0);
 
-    logMsgFull('abortTransaction',
-               `Aborting transaction ${txnNumber} on session ${tojsononeline(lsid)}`);
+    logMsgFull("abortTransaction", `Aborting transaction ${txnNumber} on session ${tojsononeline(lsid)}`);
 
     // Running the command on conn will reenter from the top of `runCommandOverride`, retrying
     // as needed.
@@ -538,7 +560,7 @@ function abortTransaction(conn, lsid, txnNumber) {
     });
 
     // Transient transaction errors mean the transaction has aborted, so consider it a success.
-    if (TransactionsUtil.isTransientTransactionError(res)) {
+    if (TxnUtil.isTransientTransactionError(res)) {
         return;
     }
     assert.commandWorked(res);
@@ -566,6 +588,8 @@ function calculateStmtIdInc(cmdName, cmdObj) {
                 return cmdObj.updates.length;
             case "delete":
                 return cmdObj.deletes.length;
+            case "bulkWrite":
+                return cmdObj.ops.length;
             default:
                 return 1;
         }
@@ -575,7 +599,7 @@ function calculateStmtIdInc(cmdName, cmdObj) {
     }
 }
 
-function continueTransaction(conn, dbName, cmdName, cmdObj) {
+function continueTransaction(dbName, cmdName, cmdObj) {
     cmdObj.txnNumber = txnOptions.txnNumber;
     cmdObj.stmtId = txnOptions.stmtId;
     cmdObj.autocommit = false;
@@ -584,13 +608,13 @@ function continueTransaction(conn, dbName, cmdName, cmdObj) {
     txnOptions.stmtId = new NumberInt(txnOptions.stmtId + calculateStmtIdInc(cmdName, cmdObj));
 
     // This function expects to get a command without any read or write concern properties.
-    assert(!cmdObj.hasOwnProperty('readConcern'), cmdObj);
-    assert(!cmdObj.hasOwnProperty('writeConcern'), cmdObj);
+    assert(!cmdObj.hasOwnProperty("readConcern"), cmdObj);
+    assert(!cmdObj.hasOwnProperty("writeConcern"), cmdObj);
 
     // If this is the first time we are running this command, push it to the ops array.
-    if (!isNested() && !inCommandNetworkErrorRetry) {
+    if (!isNested()) {
         // Make a copy so the command does not get changed by the test.
-        const objCopy = TransactionsUtil.deepCopyObject({}, cmdObj);
+        const objCopy = TxnUtil.deepCopyObject({}, cmdObj);
 
         // Empty transaction state that needs to be refreshed. The stmtId and startTransaction
         // fields shouldn't need to be refreshed.
@@ -613,7 +637,7 @@ function isCommandNonTxnGetMore(cmdName, cmdObj) {
 function isNamespaceSystemDotProfile(cmdObj) {
     // No operations on system.profile are permitted inside transactions (see SERVER-46900).
     for (let val of Object.values(cmdObj)) {
-        if (typeof val === 'string' && val.endsWith('system.profile')) {
+        if (typeof val === "string" && val.endsWith("system.profile")) {
             return true;
         }
     }
@@ -628,140 +652,52 @@ function setupTransactionCommand(conn, dbName, cmdName, cmdObj, lsid) {
     // If sessions are explicitly disabled for this command, we skip overriding it to
     // use transactions.
     const driverSession = conn.getDB(dbName).getSession();
-    const commandSupportsTransaction = TransactionsUtil.commandSupportsTxn(dbName, cmdName, cmdObj);
+    const commandSupportsTransaction = TxnUtil.commandSupportsTxn(dbName, cmdName, cmdObj);
     const isSystemDotProfile = isNamespaceSystemDotProfile(cmdObj);
+    const isNonTxnGetMore = isCommandNonTxnGetMore(cmdName, cmdObj);
 
-    if (commandSupportsTransaction && !isSystemDotProfile &&
-        driverSession.getSessionId() !== null && !isCommandNonTxnGetMore(cmdName, cmdObj)) {
+    const includeInTransaction =
+        commandSupportsTransaction && !isSystemDotProfile && driverSession.getSessionId() !== null && !isNonTxnGetMore;
+
+    if (includeInTransaction) {
         if (isNested()) {
             // Nested commands should never start a new transaction.
         } else if (ops.length === 0) {
-            // We should never end a transaction on a getMore.
+            // We should never start a transaction on a getMore.
             assert.neq(cmdName, "getMore", cmdObj);
             startNewTransaction(conn, cmdObj);
         } else if (cmdName === "getMore") {
             // If the command is a getMore, we cannot consider ending the transaction.
         } else if (ops.length >= maxOpsInTransaction) {
-            logMsgFull('setupTransactionCommand',
-                       `Committing transaction ${txnOptions.txnNumber} on session` +
-                           ` ${tojsononeline(lsid)} because we have hit max ops length`);
+            logMsgFull(
+                "setupTransactionCommand",
+                `Committing transaction ${txnOptions.txnNumber} on session` +
+                    ` ${tojsononeline(lsid)} because we have hit max ops length`,
+            );
             commitTransaction(conn, lsid, txnOptions.txnNumber);
             startNewTransaction(conn, cmdObj);
         }
-        continueTransaction(conn, dbName, cmdName, cmdObj);
-
+        continueTransaction(dbName, cmdName, cmdObj);
     } else {
         if (ops.length > 0 && !isNested() && !isSystemDotProfile) {
             // Operations on system.profile must be allowed to execute in parallel with open
             // transactions, so operations on system.profile should not commit the current open
             // transaction.
-            logMsgFull('setupTransactionCommand',
-                       `Committing transaction ${txnOptions.txnNumber} on session` +
-                           ` ${tojsononeline(lsid)} to run a command that does not support` +
-                           ` transactions: ${cmdName}`);
+            logMsgFull(
+                "setupTransactionCommand",
+                `Committing transaction ${txnOptions.txnNumber} on session` +
+                    ` ${tojsononeline(lsid)} to run a command that does not support` +
+                    ` transactions: ${cmdName}`,
+            );
             commitTransaction(conn, lsid, txnOptions.txnNumber);
         }
     }
     appendReadAndWriteConcern(conn, dbName, cmdName, cmdObj);
-}
-
-// Retries the entire transaction without committing it. Returns immediately on an error with
-// the response from the failed command. This may recursively retry the entire transaction in
-// which case parent retries are completed early.
-function retryEntireTransaction(conn, lsid) {
-    // Re-run every command in the ops array.
-    assert.gt(ops.length, 0);
-
-    // Keep track of what txnNumber this retry is attempting.
-    const retriedTxnNumber = startNewTransaction(conn, {"ignored object": 1});
-
-    logMsgFull('Retrying entire transaction',
-               `txnNumber: ${retriedTxnNumber}, lsid: ${tojsononeline(lsid)}`);
-    let res;
-    for (let op of ops) {
-        logMsgFull('Retrying op',
-                   `txnNumber: ${retriedTxnNumber}, lsid: ${tojsononeline(lsid)},` +
-                       ` db: ${op.dbName}, op: ${tojsononeline(op.cmdObj)}`);
-        // Running the command on conn will reenter from the top of `runCommandOverride`,
-        // individual statement retries will be suppressed by tracking nesting level.
-        res = conn.getDB(op.dbName).runCommand(op.cmdObj);
-
-        if (hasError(res) || hasWriteConcernError(res)) {
-            return res;
-        }
-        // Sanity check that we checked for an error correctly.
-        assert.commandWorked(res);
-
-        // If we recursively retried the entire transaction, we do not want to continue this
-        // retry. We just pass up the response from the retry that completed.
-        if (txnOptions.txnNumber !== retriedTxnNumber) {
-            return res;
-        }
-    }
-
-    // We do not commit the transaction and let it continue in the next operation.
-    return res;
-}
-
-// Creates the given collection, retrying if needed. Throws on failure.
-function createCollectionExplicitly(conn, dbName, collName, lsid) {
-    logMsgFull(
-        'create',
-        `Explicitly creating collection ${dbName}.${collName} and then retrying transaction`);
-
-    // Always majority commit the create because this is not expected to roll back once
-    // successful.
-    const createCmdObj = {
-        create: collName,
-        lsid: lsid,
-        writeConcern: {w: 'majority'},
-    };
-
-    // Running the command on conn will reenter from the top of `runCommandOverride`, retrying
-    // as needed. If an error returned by `create` were tolerable, it would already have been
-    // retried by the time it surfaced here.
-    assert.commandWorked(conn.getDB(dbName).runCommand(createCmdObj));
-}
-
-// Processes the response to the command if we are configured for txn override. Performs retries
-// if necessary for implicit collection creation or transient transaction errors.
-// Returns the last command response received by a command or retry.
-function retryWithTxnOverride(res, conn, dbName, cmdName, cmdObj, lsid, logError) {
-    assert(configuredForTxnOverride());
-
-    const failedOnCRUDStatement =
-        hasError(res) && !isCommitOrAbort(cmdName) && isCmdInTransaction(cmdObj);
-    if (failedOnCRUDStatement) {
-        assert.gt(ops.length, 0);
-        abortTransaction(conn, lsid, txnOptions.txnNumber);
-
-        // Transaction statements cannot be retried, but retryable codes are expected to succeed
-        // on full transaction retry.
-        if (configuredForNetworkRetry() && RetryableWritesUtil.isRetryableCode(res.code)) {
-            logError("Retrying on retryable error for transaction statement");
-            return retryEntireTransaction(conn, lsid);
-        }
-    }
-
-    // Transient transaction errors should retry the entire transaction. A
-    // TransientTransactionError on "abortTransaction" is considered a success.
-    if (TransactionsUtil.isTransientTransactionError(res) && cmdName !== "abortTransaction") {
-        logError("Retrying on TransientTransactionError response");
-        res = retryEntireTransaction(conn, lsid);
-
-        // If we got a TransientTransactionError on 'commitTransaction' retrying the transaction
-        // will not retry it, so we retry it here.
-        if (!hasError(res) && cmdName === "commitTransaction") {
-            commitTransaction(conn, lsid, txnOptions.txnNumber);
-        }
-        return res;
-    }
-
-    return res;
+    return includeInTransaction;
 }
 
 // Returns true if any error code in a response's "raw" field is retryable.
-function rawResponseHasRetryableError(rawRes, cmdName, logError) {
+function rawResponseHasRetryableError(rawRes, cmdName, startTime, logError) {
     for (let shard in rawRes) {
         const shardRes = rawRes[shard];
 
@@ -773,7 +709,12 @@ function rawResponseHasRetryableError(rawRes, cmdName, logError) {
         // Don't override the responses from each shard because only the top-level code in a
         // response is used to determine if a command succeeded or not.
         const networkRetryShardRes = shouldRetryWithNetworkErrorOverride(
-            shardRes, cmdName, logShardError, false /* shouldOverrideAcceptableError */);
+            shardRes,
+            cmdName,
+            startTime,
+            logShardError,
+            false /* shouldOverrideAcceptableError */,
+        );
         if (networkRetryShardRes === kContinue) {
             return true;
         }
@@ -787,13 +728,26 @@ const kContinue = Object.create(null);
 // provided response if we should not retry in this override. Returns kContinue if we should
 // retry the current command without subtracting from our retry allocation. By default sets ok=1
 // for failures with acceptable error codes, unless shouldOverrideAcceptableError is false.
-function shouldRetryWithNetworkErrorOverride(
-    res, cmdName, logError, shouldOverrideAcceptableError = true) {
+function shouldRetryWithNetworkErrorOverride(res, cmdName, startTime, logError, shouldOverrideAcceptableError = true) {
     assert(configuredForNetworkRetry());
 
+    if (
+        RetryableWritesUtil.isFailedToSatisfyPrimaryReadPreferenceError(res) &&
+        Date.now() - startTime < 5 * 60 * 1000
+    ) {
+        // ReplicaSetMonitor::getHostOrRefresh() waits up to 15 seconds to find the
+        // primary of the replica set. It is possible for the step up attempt of another
+        // node in the replica set to take longer than 15 seconds so we allow retrying
+        // for up to 5 minutes.
+        logError("Failed to find primary when attempting to run command," + " will retry for another 15 seconds");
+        return kContinue;
+    }
+
     if (RetryableWritesUtil.isRetryableWriteCmdName(cmdName)) {
-        if ((cmdName === "findandmodify" || cmdName === "findAndModify") &&
-            isRetryableExecutorCodeAndMessage(res.code, res.errmsg)) {
+        if (
+            (cmdName === "findandmodify" || cmdName === "findAndModify") &&
+            isRetryableExecutorCodeAndMessage(res.code, res.errmsg)
+        ) {
             // findAndModify can fail during the find stage and return an executor error.
             logError("Retrying because of executor interruption");
             return kContinue;
@@ -809,25 +763,12 @@ function shouldRetryWithNetworkErrorOverride(
         return kContinue;
     }
 
-    if (cmdName === "explain") {
+    if (cmdName === "explain" && RetryableWritesUtil.shouldRetryExplainCommand(res)) {
         // If an explain is interrupted by a stepdown, and it returns before its connection is
         // closed, it will return incomplete results. To prevent failing the test, force retries
         // of interrupted explains.
-        if (res.hasOwnProperty("executionStats") && !res.executionStats.executionSuccess &&
-            (RetryableWritesUtil.isRetryableCode(res.executionStats.errorCode) ||
-             isRetryableExecutorCodeAndMessage(res.executionStats.errorCode,
-                                               res.executionStats.errorMessage))) {
-            logError("Forcing retry of interrupted explain");
-            return kContinue;
-        }
-
-        // An explain command can fail if its child command cannot be run on the current server.
-        // This can be hit if a primary only or not explicitly slaveOk command is accepted by a
-        // primary node that then steps down and returns before having its connection closed.
-        if (!res.ok && res.errmsg.indexOf("child command cannot run on this node") >= 0) {
-            logError("Forcing retry of explain likely interrupted by transition to secondary");
-            return kContinue;
-        }
+        logError("Forcing retry of interrupted explain");
+        return kContinue;
     }
 
     if (!res.ok) {
@@ -844,23 +785,14 @@ function shouldRetryWithNetworkErrorOverride(
             return kContinue;
         }
 
-        // listCollections and listIndexes called through mongos may return OperationFailed if
-        // the request to establish a cursor on the targeted shard fails with a network error.
-        //
-        // TODO SERVER-30949: Remove this check once those two commands retry on retryable
-        // errors automatically.
-        if ((cmdName === "listCollections" || cmdName === "listIndexes") &&
-            res.code === ErrorCodes.OperationFailed && res.hasOwnProperty("errmsg") &&
-            res.errmsg.indexOf("failed to read command response from shard") >= 0) {
-            logError("Retrying failed mongos cursor command");
-            return kContinue;
-        }
-
         // Some sharding commands return raw responses from all contacted shards and there won't
         // be a top level code if shards returned more than one error code, in which case retry
         // if any error is retryable.
-        if (res.hasOwnProperty("raw") && !res.hasOwnProperty("code") &&
-            rawResponseHasRetryableError(res.raw, cmdName, logError)) {
+        if (
+            res.hasOwnProperty("raw") &&
+            !res.hasOwnProperty("code") &&
+            rawResponseHasRetryableError(res.raw, cmdName, startTime, logError)
+        ) {
             logError("Retrying because of retryable code in raw response");
             return kContinue;
         }
@@ -922,52 +854,25 @@ function shouldRetryForBackgroundReconfigOverride(res, cmdName, logError) {
     return res;
 }
 
-// Processes exceptions if configured for txn override. Retries the entire transaction on
-// transient transaction errors or network errors if configured for network errors as well.
-// If a retry fails, returns the response, or returns null for further exception processing.
-function retryWithTxnOverrideException(e, conn, cmdName, cmdObj, lsid, logError) {
-    assert(configuredForTxnOverride());
-
-    if (TransactionsUtil.isTransientTransactionError(e) && cmdName !== "abortTransaction") {
-        logError("Retrying on TransientTransactionError exception for command");
-        const res = retryEntireTransaction(conn, lsid);
-
-        // If we got a TransientTransactionError on 'commitTransaction' retrying the transaction
-        // will not retry it, so we retry it here.
-        if (!hasError(res) && cmdName === "commitTransaction") {
-            commitTransaction(conn, lsid, txnOptions.txnNumber);
-        }
-        return res;
-    }
-
-    if (configuredForNetworkRetry() && isNetworkError(e) &&
-        !canRetryNetworkErrorForCommand(cmdName, cmdObj)) {
-        logError("Retrying on network exception for transaction statement");
-        return retryEntireTransaction(conn, lsid);
-    }
-    return null;
-}
-
 // Processes exceptions if configured for network error retry. Returns whether to subtract one
 // from the number of command retries this override counts. Throws if we should not retry.
-function shouldRetryWithNetworkExceptionOverride(
-    e, cmdName, cmdObj, startTime, numNetworkErrorRetries, logError) {
+function shouldRetryWithNetworkExceptionOverride(e, cmdName, cmdObj, startTime, numNetworkErrorRetries, logError) {
     assert(configuredForNetworkRetry());
 
-    const kReplicaSetMonitorError =
-        /^Could not find host matching read preference.*mode: "primary"/;
     if (numNetworkErrorRetries === 0) {
         logError("No retries, throwing");
         throw e;
-    } else if (e.message.match(kReplicaSetMonitorError) && Date.now() - startTime < 5 * 60 * 1000) {
+    } else if (
+        RetryableWritesUtil.isFailedToSatisfyPrimaryReadPreferenceError(e) &&
+        Date.now() - startTime < 5 * 60 * 1000
+    ) {
         // ReplicaSetMonitor::getHostOrRefresh() waits up to 15 seconds to find the
         // primary of the replica set. It is possible for the step up attempt of another
         // node in the replica set to take longer than 15 seconds so we allow retrying
         // for up to 5 minutes.
-        logError("Failed to find primary when attempting to run command," +
-                 " will retry for another 15 seconds");
+        logError("Failed to find primary when attempting to run command," + " will retry for another 15 seconds");
         return false;
-    } else if ((e.message.indexOf("writeConcernError") >= 0) && isRetryableError(e)) {
+    } else if (e.message.indexOf("writeConcernError") >= 0 && isRetryableError(e)) {
         logError("Retrying write concern error exception with retryable code");
         return false;
     } else if (!isNetworkError(e)) {
@@ -987,50 +892,38 @@ function shouldRetryWithNetworkExceptionOverride(
     return true;
 }
 
-const kMaxNumRetries = 3;
+const kMaxNumNetworkErrorRetries = 3;
 
 // This function is the heart of the override with the main error retry loop.
-function runCommandOverrideBody(conn, dbName, cmdName, cmdObj, lsid, clientFunction, makeFuncArgs) {
+function networkRetryOverrideBody(conn, cmdName, cmdObj, clientFunction, makeFuncArgs) {
     const startTime = Date.now();
 
     const isTxnStatement = isCmdInTransaction(cmdObj);
 
-    if (configuredForNetworkRetry() && !isNested() && !isTxnStatement) {
+    if (configuredForNetworkRetry() && !isTxnStatement) {
         // If this is a top level command, make sure that the command supports network error
         // retries. Don't validate transaction statements because their encompassing transaction
         // can be retried at a higher level, even if each statement isn't retryable on its own.
         validateCmdNetworkErrorCompatibility(cmdName, cmdObj);
     }
 
-    if (configuredForTxnOverride()) {
-        setupTransactionCommand(conn, dbName, cmdName, cmdObj, lsid);
-    }
-
     const canRetryNetworkError = canRetryNetworkErrorForCommand(cmdName, cmdObj);
     const canRetryReadError = canRetryReadErrorDuringBackgroundReconfig(cmdName);
-    let numNetworkErrorRetries = canRetryNetworkError ? kMaxNumRetries : 0;
+    let numNetworkErrorRetriesRemaining = canRetryNetworkError ? kMaxNumNetworkErrorRetries : 0;
     do {
         try {
             // Actually run the provided command.
             let res = clientFunction.apply(conn, makeFuncArgs(cmdObj));
-            if (configuredForTxnOverride()) {
-                logMsgFull("Override got response",
-                           `res: ${tojsononeline(res)}, cmd: ${tojsononeline(cmdObj)}`);
 
-                if (!hasError(res) &&
-                    TransactionsUtil.commandIsNonTxnAggregation(cmdName, cmdObj)) {
-                    nonTxnAggCursorSet[res.cursor.id] = true;
-                }
+            // There's no error, no retries need to be attempted.
+            if (isSuccess(res)) {
+                return res;
             }
 
             const logError = (msg) => logErrorFull(msg, cmdName, cmdObj, res);
 
-            if (configuredForTxnOverride()) {
-                res = retryWithTxnOverride(res, conn, dbName, cmdName, cmdObj, lsid, logError);
-            }
-
             if (canRetryNetworkError) {
-                const networkRetryRes = shouldRetryWithNetworkErrorOverride(res, cmdName, logError);
+                const networkRetryRes = shouldRetryWithNetworkErrorOverride(res, cmdName, startTime, logError);
                 if (networkRetryRes === kContinue) {
                     continue;
                 } else {
@@ -1039,8 +932,7 @@ function runCommandOverrideBody(conn, dbName, cmdName, cmdObj, lsid, clientFunct
             }
 
             if (canRetryReadError) {
-                const readRetryRes =
-                    shouldRetryForBackgroundReconfigOverride(res, cmdName, logError);
+                const readRetryRes = shouldRetryForBackgroundReconfigOverride(res, cmdName, logError);
                 if (readRetryRes === kContinue) {
                     continue;
                 } else {
@@ -1049,63 +941,287 @@ function runCommandOverrideBody(conn, dbName, cmdName, cmdObj, lsid, clientFunct
             }
 
             return res;
-
         } catch (e) {
             const logError = (msg) => logErrorFull(msg, cmdName, cmdObj, e);
 
-            if (configuredForTxnOverride()) {
-                const txnRetryOnException =
-                    retryWithTxnOverrideException(e, conn, cmdName, cmdObj, lsid, logError);
-                if (txnRetryOnException) {
-                    return txnRetryOnException;
-                }
-            }
-
             if (canRetryNetworkError) {
                 const decrementRetryCount = shouldRetryWithNetworkExceptionOverride(
-                    e, cmdName, cmdObj, startTime, numNetworkErrorRetries, logError);
+                    e,
+                    cmdName,
+                    cmdObj,
+                    startTime,
+                    numNetworkErrorRetriesRemaining,
+                    logError,
+                );
                 if (decrementRetryCount) {
-                    --numNetworkErrorRetries;
-                    logMsgFull("Decrementing command network error retry count",
-                               `New count: ${numNetworkErrorRetries}`);
+                    --numNetworkErrorRetriesRemaining;
+                    logMsgFull(
+                        "Decrementing command network error retry count",
+                        `New count: ${numNetworkErrorRetriesRemaining}`,
+                    );
                 }
 
                 logErrorFull("Retrying on network error for command", cmdName, cmdObj, e);
-                inCommandNetworkErrorRetry = true;
                 continue;
             }
 
             throw e;
         }
-    } while (numNetworkErrorRetries >= 0);
+    } while (numNetworkErrorRetriesRemaining >= 0);
     throw new Error("MONGO UNREACHABLE");
 }
 
-// Top level runCommand override function.
-function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeFuncArgs) {
-    currentCommandID.push(newestCommandID++);
-    nestingLevel++;
+function networkRunCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeFuncArgs) {
+    if (!configuredForNetworkRetry() && !configuredForBackgroundReconfigs()) {
+        return clientFunction.apply(conn, makeFuncArgs(cmdObj));
+    }
+    return networkRetryOverrideBody(conn, cmdName, cmdObj, clientFunction, makeFuncArgs);
+}
 
-    // If the command is in a wrapped form, then we look for the actual command object
-    // inside the query/$query object.
-    if (cmdName === "query" || cmdName === "$query") {
-        cmdObj = cmdObj[cmdName];
-        cmdName = Object.keys(cmdObj)[0];
+function shouldRetryTxn(cmdName, cmdObj, result) {
+    try {
+        return shouldRetryTxnOnStatus(cmdName, cmdObj, result.unwrap());
+    } catch (e) {
+        return shouldRetryTxnOnException(cmdName, cmdObj, e);
+    }
+}
+
+function shouldRetryTxnOnStatus(cmdName, cmdObj, res) {
+    if (isSuccess(res)) {
+        return false;
     }
 
+    if (TxnUtil.isConflictingOperationInProgress(res)) {
+        // Other overrides, or session.js, may interfere, and retry an op which starts
+        // a transaction if it reported a failure e.g., on a network error, but succeeded
+        // server-side. Retry the transaction _again_, with a new txnNumber.
+        return true;
+    }
+
+    const logError = (msg) => logErrorFull(msg, cmdName, cmdObj, res);
+
+    // Transient transaction errors should retry the entire transaction. A
+    // TransientTransactionError on "abortTransaction" is considered a success.
+    if (TxnUtil.isTransientTransactionError(res) && cmdName !== "abortTransaction") {
+        logError("Retrying on TransientTransactionError response");
+        return true;
+    }
+
+    const failedOnCRUDStatement = !isCommitOrAbort(cmdName);
+    if (failedOnCRUDStatement) {
+        // If configured for BOTH txn override, and network error override, a network error
+        // will NOT retry a single op, instead it must retry the entire transaction.
+        if (configuredForNetworkRetry() && RetryableWritesUtil.isRetryableCode(res.code)) {
+            logError("Retrying on retryable error for transaction statement");
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function shouldRetryTxnOnException(cmdName, cmdObj, exception) {
+    const logError = (msg) => logErrorFull(msg, cmdName, cmdObj, exception);
+    if (TxnUtil.isTransientTransactionError(exception) && cmdName !== "abortTransaction") {
+        logError("Retrying on TransientTransactionError exception for command");
+        return true;
+    }
+
+    if (configuredForNetworkRetry() && isNetworkError(exception) && !canRetryNetworkErrorForCommand(cmdName, cmdObj)) {
+        // If configured for BOTH txn override, and network error override, a network error
+        // will NOT retry a single op, instead it must retry the entire transaction.
+        logError("Retrying on network exception for transaction statement");
+        return true;
+    }
+
+    return false;
+}
+
+// Maximum timeout until which a transaction can be retried within a given op.
+const kMaxTxnRetryTimeoutMS = 10 * 60 * 1000;
+
+function txnRetryOverrideBody(conn, dbName, cmdName, cmdObj, lsid, clientFunction, makeFuncArgs) {
+    assert(isCmdInTransaction(cmdObj));
+    const retryTracker = new RetryTracker(kMaxTxnRetryTimeoutMS);
+
+    const logResult = (res) => {
+        res.apply((value) =>
+            logMsgFull("Override got response", `res: ${tojsononeline(value)}, cmd: ${tojsononeline(cmdObj)}`),
+        );
+    };
+
+    // ==== Initial Attempt ====
+    let res = Result.wrap(() => clientFunction.apply(conn, makeFuncArgs(cmdObj)));
+    logResult(res);
+    if (res.ok()) {
+        return res.status;
+    }
+
+    if (!shouldRetryTxn(cmdName, cmdObj, res)) {
+        return res.unwrap();
+    }
+
+    if (!isCommitOrAbort(cmdName)) {
+        // Abort the transaction before trying again in a new transaction.
+        try {
+            // Abort returns in successful cases, or throws - if it fails,
+            // we will still retry the transaction anyway.
+            abortTransaction(conn, lsid, txnOptions.txnNumber);
+        } catch {}
+    }
+
+    // Stringified reason why the retries were aborted or not continued.
+    let retryFailureReason;
+
+    // On failure of a single request within a transaction, retry the entire transaction.
+    // This involves re-playing all preceding requests in the transaction.
+    // Note that commits/aborts may be individually retried by networkRunCommandOverride,
+    // but any other failed op will retry the whole transaction here.
+
+    // ==== Retry Loop ====
+    for (let retry of retryTracker) {
+        // Track the new transaction state.
+        const retriedTxnNumber = startNewTransaction(conn, {"ignored object": 1});
+
+        logMsgFull(
+            "Retrying entire transaction",
+            `txnNumber: ${retriedTxnNumber}, lsid: ${tojsononeline(lsid)},` +
+                ` remaining time: ${retry.remainingTime}, retry attempt: ${retry.retries}`,
+        );
+
+        for (let op of ops) {
+            logMsgFull(
+                "Retrying op",
+                `txnNumber: ${retriedTxnNumber}, lsid: ${tojsononeline(lsid)},` +
+                    ` db: ${op.dbName}, op: ${tojsononeline(op.cmdObj)}`,
+            );
+
+            // Running the command on conn will reenter from the top of `runCommandOverride`,
+            // this will re-enter `txnRunCommandOverride` but such ops bypass transaction
+            // retry logic, to avoid recursive retries.
+            cmdObj = {...op.cmdObj, txnNumber: retriedTxnNumber};
+            cmdName = Object.keys(cmdObj)[0];
+            appendReadAndWriteConcern(conn, op.dbName, cmdName, cmdObj);
+            res = Result.wrap(() => conn.getDB(op.dbName).runCommand(cmdObj));
+            logResult(res);
+
+            if (!res.ok()) {
+                // Failed while replaying operations for the transaction.
+                break;
+            }
+        }
+
+        if (res.ok()) {
+            // Replayed the entire transaction successfully.
+            break;
+        }
+
+        if (!shouldRetryTxn(cmdName, cmdObj, res)) {
+            retryFailureReason = `Intentionally not retrying transaction`;
+            break;
+        }
+        if (!isCommitOrAbort(cmdName)) {
+            // Abort the transaction before trying again in a new transaction.
+            // Abort returns in successful cases, or throws, re-starting the retry.
+            // In any case, the only way to progress is to retry again with a new
+            // transaction number.
+            try {
+                abortTransaction(conn, lsid, txnOptions.txnNumber);
+            } catch (e) {}
+        }
+    }
+
+    if (retryTracker.timeoutExceeded) {
+        retryFailureReason = `Retry timeout of ${retryTracker.timeout} ms exceeded`;
+    }
+    if (retryFailureReason) {
+        logMsgFull(`Retrying of transaction stopped: ${retryFailureReason}`);
+    }
+    return res.unwrap();
+}
+
+// Top level runCommand override function.
+function txnRunCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeFuncArgs) {
+    currentCommandID.push(newestCommandID);
+    newestCommandID++;
+    nestingLevel++;
+
     const lsid = cmdObj.lsid;
+    const passthrough = () => {
+        try {
+            // This request isn't eligible for transaction level retries,
+            // so pass it down to the next override directly.
+            const res = clientFunction.apply(conn, makeFuncArgs(cmdObj));
+
+            if (!isSuccess(res)) {
+                logMsgFull(
+                    "Txn override passthrough got error response",
+                    `res: ${tojsononeline(res)}, cmdName: ${cmdName} cmd: ${tojsononeline(cmdObj)}`,
+                );
+            }
+            // Record non-transaction agg cursor IDs so subsequent getMores for this cursor
+            // can also avoid being forced into an ongoing transaction.
+            if (isSuccess(res) && TxnUtil.commandIsNonTxnAggregation(cmdName, cmdObj)) {
+                nonTxnAggCursorSet[res.cursor.id] = true;
+            }
+            return res;
+        } catch (e) {
+            logErrorFull("Txn override passthrough got exception", cmdName, cmdObj, e);
+            throw e;
+        }
+    };
     try {
-        const res = runCommandOverrideBody(
-            conn, dbName, cmdName, cmdObj, lsid, clientFunction, makeFuncArgs);
+        if (!configuredForTxnOverride()) {
+            // Not currently enabled - but tests can change this at runtime, so it must be
+            // checked for each operation. It is down to the test to ensure changing the config is
+            // valid.
+            // No logging is performed on this path; tests with the override loaded but not
+            // enabled should not suffer performance hits from the logging.
+            return clientFunction.apply(conn, makeFuncArgs(cmdObj));
+        }
+
+        // Record this operation, starting a new transaction if not currently in one.
+        // If this command is not eligible for inclusion in the current transaction,
+        // it will commit the current transaction here.
+        if (!setupTransactionCommand(conn, dbName, cmdName, cmdObj, cmdObj.lsid)) {
+            // This is a command which does not support executing in a transaction,
+            // or a getMore for a cursor created by such a command.
+            logMsgFull(
+                "Operation cannot be wrapped in a transaction",
+                `Will not apply override to cmdName: ${cmdName} cmd: ${tojsononeline(cmdObj)}`,
+            );
+            return passthrough();
+        }
+
+        // A nested call means we have re-entered runCommand from _within_ an ongoing call to
+        // txnRunCommandOverride. This is either for retries, or "injecting" a commit to close
+        // a transaction (reached max ops, need to run a non-transaction command).
+        if (isTransactionRetry()) {
+            logMsgFull(
+                "Operation is a retry attempt from txn override",
+                `Will not apply override to cmdName: ${cmdName} cmd: ${tojsononeline(cmdObj)}`,
+            );
+            return passthrough();
+        }
+
+        let res;
+        try {
+            assert(!inTransactionRetry);
+            inTransactionRetry = true;
+
+            // Enter the override body, where retries will be handled at the transaction level.
+            res = txnRetryOverrideBody(conn, dbName, cmdName, cmdObj, lsid, clientFunction, makeFuncArgs);
+        } finally {
+            inTransactionRetry = false;
+        }
 
         // Many tests run queries that are expected to fail. In this case, when we wrap CRUD ops
         // in transactions, the transaction including the failed query will not be able to
         // commit. This override expects transactions to be able to commit. Rather than
         // denylisting all tests containing queries that are expected to fail, we clear the ops
         // list when we return an error to the test so we do not retry the failed query.
-        if (configuredForTxnOverride() && !isNested() && hasError(res) && (ops.length > 0)) {
-            logMsgFull("Clearing ops on failed command",
-                       `res: ${tojsononeline(res)}, cmd: ${tojsononeline(cmdObj)}`);
+        if (hasError(res) && ops.length > 0) {
+            logMsgFull("Clearing ops on failed command", `res: ${tojsononeline(res)}, cmd: ${tojsononeline(cmdObj)}`);
             clearOpsList();
             abortTransaction(conn, lsid, txnOptions.txnNumber);
         }
@@ -1115,14 +1231,13 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeF
         // Reset recursion and retry state tracking.
         nestingLevel--;
         currentCommandID.pop();
-        inCommandNetworkErrorRetry = false;
     }
 }
 
 if (configuredForNetworkRetry()) {
     const connectOriginal = connect;
 
-    connect = function(url, user, pass) {
+    globalThis.connect = function (url, user, pass) {
         let retVal;
 
         let connectionAttempts = 0;
@@ -1133,35 +1248,46 @@ if (configuredForNetworkRetry()) {
                     retVal = connectOriginal.apply(this, arguments);
                     return true;
                 } catch (e) {
-                    print(kLogPrefix + " Retrying connection to: " + url +
-                          ", attempts: " + connectionAttempts + ", failed with: " + tojson(e));
+                    jsTest.log.info(
+                        kLogPrefix + " Retrying connection to: " + url + " failed, attempts: " + connectionAttempts,
+                        {error: e},
+                    );
                 }
             },
             "Failed connecting to url: " + tojson(url),
-            undefined,  // Default timeout.
-            2000);      // 2 second interval.
+            undefined, // Default timeout.
+            2000,
+        ); // 2 second interval.
 
         return retVal;
     };
 
-    Mongo.prototype.logout = function() {
+    Mongo.prototype.logout = function () {
         throw new Error(
-            "logout() isn't resilient to network errors. Please add requires_non_retryable_commands to your test");
+            "logout() isn't resilient to network errors. Please add requires_non_retryable_commands to your test",
+        );
     };
 
-    startParallelShell = function() {
-        throw new Error("Cowardly refusing to run test with network retries enabled when it uses " +
-                        "startParallelShell()");
+    globalThis.startParallelShell = function () {
+        throw new Error(
+            "Cowardly refusing to run test with network retries enabled when it uses " + "startParallelShell()",
+        );
     };
 }
 
 if (configuredForTxnOverride()) {
-    startParallelShell = function() {
+    globalThis.startParallelShell = function () {
         throw new Error(
-            "Cowardly refusing to run test with transaction override enabled when it uses " +
-            "startParallelShell()");
+            "Cowardly refusing to run test with transaction override enabled when it uses " + "startParallelShell()",
+        );
     };
 }
 
-OverrideHelpers.overrideRunCommand(runCommandOverride);
-})();
+jsTest.log.info(
+    `${kLogPrefix} network_error_and_txn_override.js :: configuredForNetworkRetry:${Boolean(
+        configuredForNetworkRetry(),
+    )}, configuredForTxnOverride:${Boolean(configuredForTxnOverride())}`,
+);
+
+OverrideHelpers.overrideRunCommand(networkRunCommandOverride);
+OverrideHelpers.overrideRunCommand(txnRunCommandOverride);

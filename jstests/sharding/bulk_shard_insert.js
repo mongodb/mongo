@@ -4,65 +4,66 @@
  *
  * This test is labeled resource intensive because its total io_write is ~26MB compared to a median
  * of 5MB across all sharding tests in wiredTiger.
- * @tags: [resource_intensive]
+ * @tags: [
+ *      resource_intensive,
+ *      tsan_incompatible,
+ *      incompatible_aubsan,
+ * ]
  */
-(function() {
-'use strict';
 
-var st = new ShardingTest({shards: 4, chunkSize: 1});
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-// Double the balancer interval to produce fewer migrations per unit time so that the test does not
-// run out of stale shard version retries.
-st.forEachConfigServer((conn) => {
-    conn.adminCommand({
-        configureFailPoint: 'overrideBalanceRoundInterval',
-        mode: 'alwaysOn',
-        data: {intervalMs: 2000}
-    });
+let st = new ShardingTest({
+    shards: 4,
+    chunkSize: 1,
+    // Double the balancer interval to produce fewer migrations per unit time.
+    // Ensures that the test does not run out of stale shard version retries.
+    other: {
+        configOptions: {setParameter: {balancerMigrationsThrottlingMs: 2000}},
+        rsOptions: {setParameter: {useBatchedDeletesForRangeDeletion: true}},
+    },
 });
 
-assert.commandWorked(st.s0.adminCommand({enableSharding: 'TestDB'}));
-st.ensurePrimaryShard('TestDB', st.shard0.shardName);
-assert.commandWorked(st.s0.adminCommand({shardCollection: 'TestDB.TestColl', key: {Counter: 1}}));
+assert.commandWorked(st.s0.adminCommand({enableSharding: "TestDB", primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s0.adminCommand({shardCollection: "TestDB.TestColl", key: {Counter: 1}}));
 
-var db = st.s0.getDB('TestDB');
-var coll = db.TestColl;
+var db = st.s0.getDB("TestDB");
+let coll = db.TestColl;
 
 // Insert lots of bulk documents
-var numDocs = 250000;
+let numDocs = 250000;
 
-var bulkSize = 4000;
-var docSize = 128; /* bytes */
+let bulkSize = 4000;
+let docSize = 128; /* bytes */
 print("\n\n\nBulk size is " + bulkSize);
 
-var data = "x";
+let data = "x";
 while (Object.bsonsize({x: data}) < docSize) {
     data += data;
 }
 
 print("\n\n\nDocument size is " + Object.bsonsize({x: data}));
 
-var docsInserted = 0;
-var balancerOn = false;
+let docsInserted = 0;
+let balancerOn = false;
 
 /**
  * Ensures that the just inserted documents can be found.
  */
 function checkDocuments() {
-    var docsFound = coll.find({}, {_id: 0, Counter: 1}).toArray();
-    var count = coll.find().count();
+    let docsFound = coll.find({}, {_id: 0, Counter: 1}).toArray();
+    let count = coll.find().count();
 
     if (docsFound.length != docsInserted) {
-        print("Inserted " + docsInserted + " count : " + count +
-              " doc count : " + docsFound.length);
+        print("Inserted " + docsInserted + " count : " + count + " doc count : " + docsFound.length);
 
-        var allFoundDocsSorted = docsFound.sort(function(a, b) {
+        let allFoundDocsSorted = docsFound.sort(function (a, b) {
             return a.Counter - b.Counter;
         });
 
-        var missingValueInfo;
+        let missingValueInfo;
 
-        for (var i = 0; i < docsInserted; i++) {
+        for (let i = 0; i < docsInserted; i++) {
             if (i != allFoundDocsSorted[i].Counter) {
                 missingValueInfo = {expected: i, actual: allFoundDocsSorted[i].Counter};
                 break;
@@ -71,17 +72,15 @@ function checkDocuments() {
 
         st.printShardingStatus();
 
-        assert(
-            false,
-            'Inserted number of documents does not match the actual: ' + tojson(missingValueInfo));
+        assert(false, "Inserted number of documents does not match the actual: " + tojson(missingValueInfo));
     }
 }
 
 while (docsInserted < numDocs) {
-    var currBulkSize = (numDocs - docsInserted > bulkSize) ? bulkSize : (numDocs - docsInserted);
+    let currBulkSize = numDocs - docsInserted > bulkSize ? bulkSize : numDocs - docsInserted;
 
-    var bulk = [];
-    for (var i = 0; i < currBulkSize; i++) {
+    let bulk = [];
+    for (let i = 0; i < currBulkSize; i++) {
         bulk.push({Counter: docsInserted, hi: "there", i: i, x: data});
         docsInserted++;
     }
@@ -96,7 +95,7 @@ while (docsInserted < numDocs) {
     if (docsInserted > numDocs / 3 && !balancerOn) {
         // Do one check before we turn balancer on
         checkDocuments();
-        print('Turning on balancer after ' + docsInserted + ' documents inserted.');
+        print("Turning on balancer after " + docsInserted + " documents inserted.");
         st.startBalancer();
         balancerOn = true;
     }
@@ -105,4 +104,3 @@ while (docsInserted < numDocs) {
 checkDocuments();
 
 st.stop();
-})();

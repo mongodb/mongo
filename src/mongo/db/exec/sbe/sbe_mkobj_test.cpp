@@ -27,10 +27,28 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 #include "mongo/db/exec/sbe/stages/makeobj.h"
+#include "mongo/db/exec/sbe/stages/project.h"
+#include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/values/bson.h"
+#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
+#include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/unittest/unittest.h"
+
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
 
 namespace mongo::sbe {
 class MkObjStageTest : public PlanStageTestFixture {
@@ -50,7 +68,7 @@ public:
         be += 4;
         const char* end = be + obj.objsize();
         while (*be != 0) {
-            auto sv = bson::fieldNameView(be);
+            auto sv = bson::fieldNameAndLength(be);
             auto [tag, val] = bson::convertFrom<false>(be, end, sv.size());
             be = bson::advance(be, sv.size());
 
@@ -64,6 +82,8 @@ public:
         auto objOutSlotId = generateSlotId();
         auto makeStageFn = [objOutSlotId](value::SlotId scanSlot,
                                           std::unique_ptr<PlanStage> scanStage) {
+            MONGO_COMPILER_DIAGNOSTIC_PUSH
+            MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL("-Wuninitialized")
             auto mkobj = makeS<MkObjStageType>(std::move(scanStage),
                                                objOutSlotId,
                                                scanSlot,
@@ -74,6 +94,7 @@ public:
                                                false,  // force new
                                                false,  // return old
                                                kEmptyPlanNodeId);
+            MONGO_COMPILER_DIAGNOSTIC_POP
 
             return std::make_pair(objOutSlotId, std::move(mkobj));
         };
@@ -107,6 +128,8 @@ public:
         auto objOutSlotId = generateSlotId();
         auto makeStageFn = [objOutSlotId](value::SlotId scanSlot,
                                           std::unique_ptr<PlanStage> scanStage) {
+            MONGO_COMPILER_DIAGNOSTIC_PUSH
+            MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL("-Wuninitialized")
             auto mkobj = makeS<MkObjStageType>(std::move(scanStage),
                                                objOutSlotId,
                                                scanSlot,
@@ -117,6 +140,7 @@ public:
                                                false,  // force new
                                                false,  // return old
                                                kEmptyPlanNodeId);
+            MONGO_COMPILER_DIAGNOSTIC_POP
 
             return std::make_pair(objOutSlotId, std::move(mkobj));
         };
@@ -151,14 +175,14 @@ public:
         auto objOutSlotId = generateSlotId();
         auto slotVec = makeSV(generateSlotId(), generateSlotId());
 
-        value::SlotMap<std::unique_ptr<EExpression>> slotMap;
-        slotMap[slotVec[0]] = makeE<EConstant>("one");
-        slotMap[slotVec[1]] = makeE<EConstant>("two");
+        SlotExprPairVector slotExprVec;
+        slotExprVec.emplace_back(slotVec[0], makeE<EConstant>("one"));
+        slotExprVec.emplace_back(slotVec[1], makeE<EConstant>("two"));
 
-        auto makeStageFn = [objOutSlotId, &slotVec, &slotMap](
+        auto makeStageFn = [objOutSlotId, &slotVec, &slotExprVec](
                                value::SlotId scanSlot, std::unique_ptr<PlanStage> scanStage) {
             auto project =
-                makeS<ProjectStage>(std::move(scanStage), std::move(slotMap), kEmptyPlanNodeId);
+                makeS<ProjectStage>(std::move(scanStage), std::move(slotExprVec), kEmptyPlanNodeId);
 
             auto mkobj = makeS<MkObjStageType>(std::move(project),
                                                objOutSlotId,
@@ -182,14 +206,13 @@ public:
             addObjectToArray(inputView, BSON("a" << 1 << "b" << 2 << "c" << 3));
         }
 
-        auto [expectedTag, expectedVal] = stage_builder::makeValue(BSON_ARRAY(BSON("a"
-                                                                                   << "one"
-                                                                                   << "b"
-                                                                                   << "two")
-                                                                              << BSON("a"
-                                                                                      << "one"
-                                                                                      << "b"
-                                                                                      << "two")));
+        auto [expectedTag, expectedVal] =
+            stage_builder::makeValue(BSON_ARRAY(BSON("a" << "one"
+                                                         << "b"
+                                                         << "two")
+                                                << BSON("a" << "one"
+                                                            << "b"
+                                                            << "two")));
         value::ValueGuard expectedGuard{expectedTag, expectedVal};
 
         inputGuard.reset();
@@ -202,14 +225,14 @@ public:
         auto objOutSlotId = generateSlotId();
         auto slotVec = makeSV(generateSlotId(), generateSlotId());
 
-        value::SlotMap<std::unique_ptr<EExpression>> slotMap;
-        slotMap[slotVec[0]] = makeE<EConstant>("one");
-        slotMap[slotVec[1]] = makeE<EConstant>("two");
+        SlotExprPairVector slotExprVec;
+        slotExprVec.emplace_back(slotVec[0], makeE<EConstant>("one"));
+        slotExprVec.emplace_back(slotVec[1], makeE<EConstant>("two"));
 
-        auto makeStageFn = [objOutSlotId, &slotVec, &slotMap](
+        auto makeStageFn = [objOutSlotId, &slotVec, &slotExprVec](
                                value::SlotId scanSlot, std::unique_ptr<PlanStage> scanStage) {
             auto project =
-                makeS<ProjectStage>(std::move(scanStage), std::move(slotMap), kEmptyPlanNodeId);
+                makeS<ProjectStage>(std::move(scanStage), std::move(slotExprVec), kEmptyPlanNodeId);
 
             auto mkobj = makeS<MkObjStageType>(std::move(project),
                                                objOutSlotId,
@@ -239,21 +262,19 @@ public:
         }
 
         auto [expectedTag, expectedVal] =
-            stage_builder::makeValue(BSON_ARRAY(BSON("c" << 3 << "a"
-                                                         << "one"
+            stage_builder::makeValue(BSON_ARRAY(BSON("a" << "one"
                                                          << "b"
-                                                         << "two")
-                                                << BSON("c" << 2 << "a"
-                                                            << "one"
-                                                            << "b"
+                                                         << "two"
+                                                         << "c" << 3)
+                                                << BSON("a" << "one"
+                                                            << "c" << 2 << "b"
                                                             << "two")
-                                                << BSON("c" << 3 << "a"
-                                                            << "one"
+                                                << BSON("a" << "one"
                                                             << "b"
-                                                            << "two")
-                                                << BSON("c" << 2 << "a"
-                                                            << "one"
-                                                            << "b"
+                                                            << "two"
+                                                            << "c" << 3)
+                                                << BSON("a" << "one"
+                                                            << "c" << 2 << "b"
                                                             << "two")));
         value::ValueGuard expectedGuard{expectedTag, expectedVal};
 

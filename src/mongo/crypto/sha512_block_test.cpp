@@ -27,18 +27,27 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/crypto/sha512_block.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/crypto/symmetric_crypto.h"
+#include "mongo/platform/random.h"
 #include "mongo/unittest/unittest.h"
+
+#include <ostream>
+#include <string>
 
 namespace mongo {
 namespace {
 
 ConstDataRange makeTestItem(StringData sd) {
-    return ConstDataRange(sd.rawData(), sd.size());
+    return ConstDataRange(sd.data(), sd.size());
 }
 
 // SHA-512 test vectors from http://csrc.nist.gov/groups/ST/toolkit/documents/Examples/SHA_All.pdf
@@ -105,6 +114,19 @@ const struct {
                            0xae, 0xa3, 0xf4, 0xe4, 0xbe, 0x9d, 0x91, 0x4e, 0xeb, 0x61, 0xf1,
                            0x70, 0x2e, 0x69, 0x6c, 0x20, 0x3a, 0x12, 0x68, 0x54}},
 
+    // RFC test case 2
+    {{0x4a, 0x65, 0x66, 0x65},
+     4,
+     {0x77, 0x68, 0x61, 0x74, 0x20, 0x64, 0x6f, 0x20, 0x79, 0x61, 0x20, 0x77, 0x61, 0x6e,
+      0x74, 0x20, 0x66, 0x6f, 0x72, 0x20, 0x6e, 0x6f, 0x74, 0x68, 0x69, 0x6e, 0x67, 0x3f},
+     28,
+     SHA512Block::HashType{0x16, 0x4b, 0x7a, 0x7b, 0xfc, 0xf8, 0x19, 0xe2, 0xe3, 0x95, 0xfb,
+                           0xe7, 0x3b, 0x56, 0xe0, 0xa3, 0x87, 0xbd, 0x64, 0x22, 0x2e, 0x83,
+                           0x1f, 0xd6, 0x10, 0x27, 0x0c, 0xd7, 0xea, 0x25, 0x05, 0x54, 0x97,
+                           0x58, 0xbf, 0x75, 0xc0, 0x5a, 0x99, 0x4a, 0x6d, 0x03, 0x4f, 0x65,
+                           0xf8, 0xf0, 0xe6, 0xfd, 0xca, 0xea, 0xb1, 0xa3, 0x4d, 0x4a, 0x6b,
+                           0x4b, 0x63, 0x6e, 0x07, 0x0a, 0x38, 0xbc, 0xe7, 0x37}},
+
     // RFC test case 3
     {{0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa,
       0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa},
@@ -149,6 +171,59 @@ TEST(CryptoVectors, HMACSHA512) {
     }
 }
 
+TEST(CryptoVectors, HMACSHA512_ContextReuse) {
+    size_t numTests = sizeof(hmacSha512Tests) / sizeof(hmacSha512Tests[0]);
+    HmacContext ctx;
+    for (size_t i = 0; i < numTests; i++) {
+        SHA512Block result;
+        SHA512Block::computeHmacWithCtx(
+            &ctx,
+            hmacSha512Tests[i].key,
+            hmacSha512Tests[i].keyLen,
+            {ConstDataRange(&hmacSha512Tests[i].data[0], hmacSha512Tests[i].dataLen)},
+            &result);
+        ASSERT(hmacSha512Tests[i].hash == result) << "Failed HMAC-SHA512 iteration " << i;
+    }
+}
+
+/**
+ * This test runs 256 times.
+ *
+ * Each time, the test randomly generates a key and then generates a random string 256
+ * times. It attempts to hmac this same string using the randomly generated key using three
+ * different mechanisms - computeHmac, computeHmacWithCtx, and computeHmacWithCtx with key
+ * reuse. It asserts that the result is the same every time.
+ */
+TEST(CryptoVectors, HMACSHA1_KeyReuse) {
+    PseudoRandom random(12345);
+    for (size_t i = 0; i < 256; i++) {
+        const auto key =
+            crypto::aesGenerate(crypto::sym256KeySize, "randomKey" + std::to_string(i));
+        HmacContext nonKeyReuseContext;
+        HmacContext keyReuseContext;
+
+        SHA512Block noReuseResult;
+        SHA512Block noKeyReuseResult;
+        SHA512Block keyReuseResult;
+
+        keyReuseContext.setReuseKey(true);
+        for (size_t j = 0; j < 256; j++) {
+            unsigned char data[maxDataSize];
+            random.fill(&data, maxDataSize);
+            ConstDataRange cdr(data);
+            noReuseResult =
+                SHA512Block::computeHmac(key.getKey(), key.getKeySize(), data, maxDataSize);
+            SHA512Block::computeHmacWithCtx(
+                &nonKeyReuseContext, key.getKey(), key.getKeySize(), {cdr}, &noKeyReuseResult);
+            SHA512Block::computeHmacWithCtx(
+                &keyReuseContext, key.getKey(), key.getKeySize(), {cdr}, &keyReuseResult);
+            ASSERT_EQ(noReuseResult, noKeyReuseResult);
+            ASSERT_EQ(noKeyReuseResult, keyReuseResult);
+        }
+    }
+}
+
+
 TEST(SHA512Block, BinDataRoundTrip) {
     SHA512Block::HashType rawHash;
     rawHash.fill(0);
@@ -163,7 +238,7 @@ TEST(SHA512Block, BinDataRoundTrip) {
     auto newObj = builder.done();
 
     auto hashElem = newObj["hash"];
-    ASSERT_EQ(BinData, hashElem.type());
+    ASSERT_EQ(BSONType::binData, hashElem.type());
     ASSERT_EQ(BinDataGeneral, hashElem.binDataType());
 
     int binLen = 0;

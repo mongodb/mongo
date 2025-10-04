@@ -27,29 +27,38 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/db/pipeline/document_source_unwind.h"
 
-#include <boost/intrusive_ptr.hpp>
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/mock_stage.h"
+#include "mongo/db/exec/agg/unwind_stage.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
+#include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/document_source_mock.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/db/query/query_test_service_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+
 #include <deque>
 #include <memory>
 #include <string>
 #include <vector>
 
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/json.h"
-#include "mongo/db/exec/document_value/document_value_test_util.h"
-#include "mongo/db/exec/document_value/value_comparator.h"
-#include "mongo/db/pipeline/aggregate_command_gen.h"
-#include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/dependencies.h"
-#include "mongo/db/pipeline/document_source_mock.h"
-#include "mongo/db/pipeline/document_source_unwind.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/query/query_test_service_context.h"
-#include "mongo/db/service_context.h"
-#include "mongo/dbtests/dbtests.h"
-#include "mongo/unittest/unittest.h"
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace {
@@ -71,8 +80,10 @@ public:
     CheckResultsBase()
         : _queryServiceContext(std::make_unique<QueryTestServiceContext>()),
           _opCtx(_queryServiceContext->makeOperationContext()),
-          _ctx(new ExpressionContextForTest(_opCtx.get(),
-                                            AggregateCommandRequest(NamespaceString(ns), {}))) {}
+          _ctx(new ExpressionContextForTest(
+              _opCtx.get(),
+              AggregateCommandRequest(NamespaceString::createNamespaceString_forTest(ns),
+                                      std::vector<mongo::BSONObj>()))) {}
 
     virtual ~CheckResultsBase() {}
 
@@ -155,6 +166,8 @@ private:
         auto specObj = BSON("$unwind" << unwindFieldPath());
         _unwind = static_cast<DocumentSourceUnwind*>(
             DocumentSourceUnwind::createFromBson(specObj.firstElement(), ctx()).get());
+        _unwindStage =
+            boost::static_pointer_cast<exec::agg::UnwindStage>(exec::agg::buildStage(_unwind));
         checkBsonRepresentation(false, false);
     }
 
@@ -168,6 +181,8 @@ private:
                                         << (includeArrayIndex ? Value(indexPath()) : Value())));
         _unwind = static_cast<DocumentSourceUnwind*>(
             DocumentSourceUnwind::createFromBson(specObj.toBson().firstElement(), ctx()).get());
+        _unwindStage =
+            boost::static_pointer_cast<exec::agg::UnwindStage>(exec::agg::buildStage(_unwind));
         checkBsonRepresentation(preserveNullAndEmptyArrays, includeArrayIndex);
     }
 
@@ -178,11 +193,12 @@ private:
      * '_unwind' must be initialized before calling this method.
      */
     void assertResultsMatch(BSONObj expectedResults) {
-        auto source = DocumentSourceMock::createForTest(inputData(), ctx());
-        _unwind->setSource(source.get());
+        auto stage = exec::agg::MockStage::createForTest(inputData(), ctx());
+        _unwindStage->setSource(stage.get());
         // Load the results from the DocumentSourceUnwind.
         vector<Document> resultSet;
-        for (auto output = _unwind->getNext(); output.isAdvanced(); output = _unwind->getNext()) {
+        for (auto output = _unwindStage->getNext(); output.isAdvanced();
+             output = _unwindStage->getNext()) {
             // Get the current result.
             resultSet.push_back(output.releaseDocument());
         }
@@ -222,9 +238,9 @@ private:
 
     /** Assert that iterator state accessors consistently report the source is exhausted. */
     void assertEOF() const {
-        ASSERT(_unwind->getNext().isEOF());
-        ASSERT(_unwind->getNext().isEOF());
-        ASSERT(_unwind->getNext().isEOF());
+        ASSERT(_unwindStage->getNext().isEOF());
+        ASSERT(_unwindStage->getNext().isEOF());
+        ASSERT(_unwindStage->getNext().isEOF());
     }
 
     BSONObj expectedResultSet(bool preserveNullAndEmptyArrays, bool includeArrayIndex) const {
@@ -251,6 +267,7 @@ private:
     ServiceContext::UniqueOperationContext _opCtx;
     intrusive_ptr<ExpressionContextForTest> _ctx;
     intrusive_ptr<DocumentSourceUnwind> _unwind;
+    intrusive_ptr<exec::agg::UnwindStage> _unwindStage;
 };
 
 /** An empty collection produces no results. */
@@ -474,9 +491,7 @@ class SeveralMoreDocuments : public CheckResultsBase {
     deque<DocumentSource::GetNextResult> inputData() override {
         return {DOC("_id" << 0 << "a" << BSONNULL),
                 DOC("_id" << 1),
-                DOC("_id" << 2 << "a"
-                          << DOC_ARRAY("a"_sd
-                                       << "b"_sd)),
+                DOC("_id" << 2 << "a" << DOC_ARRAY("a"_sd << "b"_sd)),
                 DOC("_id" << 3),
                 DOC("_id" << 4 << "a" << DOC_ARRAY(1 << 2 << 3)),
                 DOC("_id" << 5 << "a" << DOC_ARRAY(4 << 5 << 6)),
@@ -689,24 +704,25 @@ TEST_F(UnwindStageTest, ShouldPropagatePauses) {
     const boost::optional<std::string> includeArrayIndex = boost::none;
     auto unwind = DocumentSourceUnwind::create(
         getExpCtx(), "array", includeNullIfEmptyOrMissing, includeArrayIndex);
-    auto source =
-        DocumentSourceMock::createForTest({Document{{"array", vector<Value>{Value(1), Value(2)}}},
-                                           DocumentSource::GetNextResult::makePauseExecution(),
-                                           Document{{"array", vector<Value>{Value(1), Value(2)}}}},
-                                          getExpCtx());
+    auto source = exec::agg::MockStage::createForTest(
+        {Document{{"array", vector<Value>{Value(1), Value(2)}}},
+         DocumentSource::GetNextResult::makePauseExecution(),
+         Document{{"array", vector<Value>{Value(1), Value(2)}}}},
+        getExpCtx());
+    auto unwindStage = exec::agg::buildStage(unwind);
 
-    unwind->setSource(source.get());
+    unwindStage->setSource(source.get());
 
-    ASSERT_TRUE(unwind->getNext().isAdvanced());
-    ASSERT_TRUE(unwind->getNext().isAdvanced());
+    ASSERT_TRUE(unwindStage->getNext().isAdvanced());
+    ASSERT_TRUE(unwindStage->getNext().isAdvanced());
 
-    ASSERT_TRUE(unwind->getNext().isPaused());
+    ASSERT_TRUE(unwindStage->getNext().isPaused());
 
-    ASSERT_TRUE(unwind->getNext().isAdvanced());
-    ASSERT_TRUE(unwind->getNext().isAdvanced());
+    ASSERT_TRUE(unwindStage->getNext().isAdvanced());
+    ASSERT_TRUE(unwindStage->getNext().isAdvanced());
 
-    ASSERT_TRUE(unwind->getNext().isEOF());
-    ASSERT_TRUE(unwind->getNext().isEOF());
+    ASSERT_TRUE(unwindStage->getNext().isEOF());
+    ASSERT_TRUE(unwindStage->getNext().isEOF());
 }
 
 TEST_F(UnwindStageTest, UnwindOnlyModifiesUnwoundPathWhenNotIncludingIndex) {
@@ -734,6 +750,84 @@ TEST_F(UnwindStageTest, UnwindIncludesIndexPathWhenIncludingIndex) {
     ASSERT_EQUALS(1U, modifiedPaths.paths.count("arrIndex"));
 }
 
+TEST_F(UnwindStageTest, Redaction) {
+    auto spec = fromjson(R"({
+        $unwind: {
+            path: "$foo.bar",
+            includeArrayIndex: "foo.baz",
+            preserveNullAndEmptyArrays: true
+        }
+    })");
+    auto docSource = DocumentSourceUnwind::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$unwind": {
+                "path": "$HASH<foo>.HASH<bar>",
+                "preserveNullAndEmptyArrays": "?bool",
+                "includeArrayIndex": "HASH<foo>.HASH<baz>"
+            }
+        })",
+        redact(*docSource));
+}
+
+TEST_F(UnwindStageTest, UnwindIndexPathIsSamePathAsArrayPath) {
+    const bool includeNullIfEmptyOrMissing = false;
+    const boost::optional<std::string> includeArrayIndex = std::string("array");
+    auto unwind = DocumentSourceUnwind::create(
+        getExpCtx(), "array", includeNullIfEmptyOrMissing, includeArrayIndex);
+    auto stage = exec::agg::MockStage::createForTest(
+        {Document{{"array", vector<Value>{Value(10), Value(20)}}},
+         Document{{"array", vector<Value>{Value(30), Value(40)}}}},
+        getExpCtx());
+    auto unwindStage = exec::agg::buildStage(unwind);
+
+    unwindStage->setSource(stage.get());
+
+    ASSERT_VALUE_EQ(unwindStage->getNext().getDocument()["array"], Value(0));
+    ASSERT_VALUE_EQ(unwindStage->getNext().getDocument()["array"], Value(1));
+    ASSERT_VALUE_EQ(unwindStage->getNext().getDocument()["array"], Value(0));
+    ASSERT_VALUE_EQ(unwindStage->getNext().getDocument()["array"], Value(1));
+}
+
+TEST_F(UnwindStageTest, UnwindIndexPathIsParentOfArrayPath) {
+    const bool includeNullIfEmptyOrMissing = false;
+    const boost::optional<std::string> includeArrayIndex = std::string("obj");
+    auto unwind = DocumentSourceUnwind::create(
+        getExpCtx(), "obj.array", includeNullIfEmptyOrMissing, includeArrayIndex);
+    auto stage = exec::agg::MockStage::createForTest(
+        {Document{{"obj", Document{{"array", vector<Value>{Value(10), Value(20)}}}}},
+         Document{{"obj", Document{{"array", vector<Value>{Value(30), Value(40)}}}}}},
+        getExpCtx());
+    auto unwindStage = exec::agg::buildStage(unwind);
+
+    unwindStage->setSource(stage.get());
+
+    Document res;
+    ASSERT_VALUE_EQ(unwindStage->getNext().getDocument()["obj"], Value(0));
+    ASSERT_VALUE_EQ(unwindStage->getNext().getDocument()["obj"], Value(1));
+    ASSERT_VALUE_EQ(unwindStage->getNext().getDocument()["obj"], Value(0));
+    ASSERT_VALUE_EQ(unwindStage->getNext().getDocument()["obj"], Value(1));
+}
+
+TEST_F(UnwindStageTest, UnwindIndexPathIsChildOfArrayPath) {
+    const bool includeNullIfEmptyOrMissing = false;
+    const boost::optional<std::string> includeArrayIndex = std::string("array.index");
+    auto unwind = DocumentSourceUnwind::create(
+        getExpCtx(), "array", includeNullIfEmptyOrMissing, includeArrayIndex);
+    auto stage = exec::agg::MockStage::createForTest(
+        {Document{{"array", vector<Value>{Value(10), Value(20)}}},
+         Document{{"array", vector<Value>{Value(30), Value(40)}}}},
+        getExpCtx());
+    auto unwindStage = exec::agg::buildStage(unwind);
+
+    unwindStage->setSource(stage.get());
+
+    ASSERT_VALUE_EQ(unwindStage->getNext().getDocument()["array"], Value(BSON("index" << 0)));
+    ASSERT_VALUE_EQ(unwindStage->getNext().getDocument()["array"], Value(BSON("index" << 1)));
+    ASSERT_VALUE_EQ(unwindStage->getNext().getDocument()["array"], Value(BSON("index" << 0)));
+    ASSERT_VALUE_EQ(unwindStage->getNext().getDocument()["array"], Value(BSON("index" << 1)));
+}
+
 //
 // Error cases.
 //
@@ -752,75 +846,64 @@ TEST_F(UnwindStageTest, ShouldRejectNonStringPath) {
 }
 
 TEST_F(UnwindStageTest, ShouldRejectNonDollarPrefixedPath) {
-    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind"
-                                         << "somePath")),
-                       AssertionException,
-                       28818);
-    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << BSON("path"
-                                                           << "somePath"))),
-                       AssertionException,
-                       28818);
+    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << "somePath")), AssertionException, 28818);
+    ASSERT_THROWS_CODE(
+        createUnwind(BSON("$unwind" << BSON("path" << "somePath"))), AssertionException, 28818);
 }
 
 TEST_F(UnwindStageTest, ShouldRejectNonBoolPreserveNullAndEmptyArrays) {
-    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << BSON("path"
-                                                           << "$x"
-                                                           << "preserveNullAndEmptyArrays" << 2))),
-                       AssertionException,
-                       28809);
+    ASSERT_THROWS_CODE(
+        createUnwind(BSON("$unwind" << BSON("path" << "$x"
+                                                   << "preserveNullAndEmptyArrays" << 2))),
+        AssertionException,
+        28809);
 }
 
 TEST_F(UnwindStageTest, ShouldRejectNonStringIncludeArrayIndex) {
-    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << BSON("path"
-                                                           << "$x"
-                                                           << "includeArrayIndex" << 2))),
+    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << BSON("path" << "$x"
+                                                                  << "includeArrayIndex" << 2))),
                        AssertionException,
                        28810);
 }
 
 TEST_F(UnwindStageTest, ShouldRejectEmptyStringIncludeArrayIndex) {
-    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << BSON("path"
-                                                           << "$x"
-                                                           << "includeArrayIndex"
-                                                           << ""))),
+    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << BSON("path" << "$x"
+                                                                  << "includeArrayIndex"
+                                                                  << ""))),
                        AssertionException,
                        28810);
 }
 
 TEST_F(UnwindStageTest, ShoudlRejectDollarPrefixedIncludeArrayIndex) {
-    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << BSON("path"
-                                                           << "$x"
-                                                           << "includeArrayIndex"
-                                                           << "$"))),
+    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << BSON("path" << "$x"
+                                                                  << "includeArrayIndex"
+                                                                  << "$"))),
                        AssertionException,
                        28822);
-    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << BSON("path"
-                                                           << "$x"
-                                                           << "includeArrayIndex"
-                                                           << "$path"))),
+    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << BSON("path" << "$x"
+                                                                  << "includeArrayIndex"
+                                                                  << "$path"))),
                        AssertionException,
                        28822);
 }
 
 TEST_F(UnwindStageTest, ShouldRejectUnrecognizedOption) {
-    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << BSON("path"
-                                                           << "$x"
-                                                           << "preserveNullAndEmptyArrays" << true
-                                                           << "foo" << 3))),
+    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << BSON("path" << "$x"
+                                                                  << "preserveNullAndEmptyArrays"
+                                                                  << true << "foo" << 3))),
                        AssertionException,
                        28811);
-    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << BSON("path"
-                                                           << "$x"
-                                                           << "foo" << 3))),
+    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << BSON("path" << "$x"
+                                                                  << "foo" << 3))),
                        AssertionException,
                        28811);
 }
 
-class All : public OldStyleSuiteSpecification {
+class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("DocumentSourceUnwindTests") {}
 
-    void setupTests() {
+    void setupTests() override {
         add<Empty>();
         add<EmptyArray>();
         add<MissingValue>();
@@ -843,7 +926,7 @@ public:
     }
 };
 
-OldStyleSuiteInitializer<All> myall;
+unittest::OldStyleSuiteInitializer<All> myall;
 
 }  // namespace
 }  // namespace mongo

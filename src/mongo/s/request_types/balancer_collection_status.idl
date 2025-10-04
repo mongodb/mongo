@@ -32,20 +32,27 @@ global:
     cpp_namespace: "mongo"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 structs:
     BalancerCollectionStatusResponse:
         description: "Response of the config server command"
         strict: false
         fields:
+            chunkSize:
+                type: safeDouble
+                description: "Configured chunk size in MiB for this collection"
             balancerCompliant:
                 type: bool
                 description: "true if there are no actions needed, if false, then firstComplianceViolation will contain the violation with the highest priority which will be addressed next"
             firstComplianceViolation:
                 type: string
                 optional: true
-                description: "One of the following: draining, zoneViolation, chunksImbalance or chunksMerging"
+                description: "One of the following: draining, zoneViolation, chunksImbalance or defragmentingChunks"
+            details:
+                type: object_owned
+                optional: true
+                description: "Extra information on the detected violation (if any)"
 
 commands:
     balancerCollectionStatus:

@@ -7,10 +7,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/sharding/libs/resharding_test_fixture.js");
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 const reshardingTest = new ReshardingTest();
 reshardingTest.setup();
@@ -20,9 +17,7 @@ const donorShardNames = reshardingTest.donorShardNames;
 const whileReshardingCollection = reshardingTest.createShardedCollection({
     ns: "test.whileResharding",
     shardKeyPattern: {oldKey: 1},
-    chunks: [
-        {min: {oldKey: MinKey}, max: {oldKey: MaxKey}, shard: donorShardNames[0]},
-    ],
+    chunks: [{min: {oldKey: MinKey}, max: {oldKey: MaxKey}, shard: donorShardNames[0]}],
 });
 
 assert.commandWorked(whileReshardingCollection.insert({_id: 0, oldKey: -20, newKey: 20}));
@@ -33,7 +28,7 @@ function awaitEstablishmentOfCloneTimestamp(inputCollection) {
     const mongos = inputCollection.getMongo();
     assert.soon(() => {
         const coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({
-            ns: inputCollection.getFullName()
+            ns: inputCollection.getFullName(),
         });
         return coordinatorDoc !== null && coordinatorDoc.cloneTimestamp !== undefined;
     });
@@ -44,7 +39,7 @@ reshardingTest.withReshardingInBackground(
         newShardKeyPattern: {newKey: 1},
         newChunks: [{min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardNames[0]}],
     },
-    (tempNs) => {
+    () => {
         awaitEstablishmentOfCloneTimestamp(whileReshardingCollection);
 
         const testDB = whileReshardingCollection.getDB();
@@ -55,29 +50,31 @@ reshardingTest.withReshardingInBackground(
         // value under both the current and new key patterns is valid.
         assert.commandFailedWithCode(
             sessionDB.whileResharding.update({_id: 0, oldKey: -20}, {$set: {newKey: [1, 2]}}),
-            ErrorCodes.ShardKeyNotFound);
+            ErrorCodes.ShardKeyNotFound,
+        );
 
         assert.commandFailedWithCode(
             sessionDB.whileResharding.insert({_id: 1, oldKey: -11, newKey: [1, 2]}),
-            ErrorCodes.ShardKeyNotFound);
-    });
+            ErrorCodes.ShardKeyNotFound,
+        );
+    },
+);
 
 const insertCollection = reshardingTest.createShardedCollection({
     ns: "test.insertTest",
     shardKeyPattern: {oldKey: 1},
-    chunks: [
-        {min: {oldKey: MinKey}, max: {oldKey: MaxKey}, shard: donorShardNames[0]},
-    ],
+    chunks: [{min: {oldKey: MinKey}, max: {oldKey: MaxKey}, shard: donorShardNames[0]}],
 });
 
 assert.commandWorked(insertCollection.insert({_id: 0, oldKey: -10, newKey: [1, 2]}));
 
-reshardingTest.withReshardingInBackground({
-    newShardKeyPattern: {newKey: 1},
-    newChunks: [{min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardNames[0]}],
-},
-                                          (tempNs) => {},
-                                          {expectedErrorCode: ErrorCodes.ShardKeyNotFound});
+reshardingTest.withReshardingInBackground(
+    {
+        newShardKeyPattern: {newKey: 1},
+        newChunks: [{min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardNames[0]}],
+    },
+    () => {},
+    {expectedErrorCode: ErrorCodes.ShardKeyNotFound},
+);
 
 reshardingTest.teardown();
-})();

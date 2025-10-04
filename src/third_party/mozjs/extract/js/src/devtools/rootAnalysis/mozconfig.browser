@@ -1,0 +1,19 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# This mozconfig is used when analyzing the source code of the Firefox browser
+# for GC rooting hazards. See
+# <https://wiki.mozilla.org/Javascript:SpiderMonkey:ExactStackRooting>.
+
+ac_add_options --enable-project=browser
+ac_add_options --enable-js-shell
+
+# the sixgill wrapper is not compatible with building wasm objects with clang.
+export WASM_SANDBOXED_LIBRARIES=
+
+# the hazard analysis is not happy with std::filesystem uses in relrhack host
+# tool.
+ac_add_options --disable-elf-hack
+
+. $topsrcdir/js/src/devtools/rootAnalysis/mozconfig.common

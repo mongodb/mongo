@@ -29,11 +29,10 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
+#include "mongo/base/status.h"
 
 #include <boost/filesystem.hpp>
-
-#include "mongo/base/status.h"
+#include <boost/filesystem/path.hpp>
 
 namespace mongo {
 

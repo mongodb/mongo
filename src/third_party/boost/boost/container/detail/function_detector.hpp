@@ -80,7 +80,7 @@ namespace function_detector {
       template <class U> \
       static NotFoundType Test( ... ); \
    public : \
-      static const int check = NotFound + (sizeof(Test<T>(0, 0)) - sizeof(NotFoundType));\
+      BOOST_STATIC_CONSTEXPR int check = NotFound + int(sizeof(Test<T>(0, 0)) - sizeof(NotFoundType));\
    };\
 }}} //namespace boost::container::function_detector {
 

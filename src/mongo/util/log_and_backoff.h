@@ -29,10 +29,13 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
+#include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_detail.h"
 #include "mongo/logv2/log_severity.h"
+
+#include <cstddef>
+#include <cstdint>
 
 namespace mongo {
 namespace log_backoff_detail {
@@ -40,8 +43,8 @@ void logAndBackoffImpl(size_t numAttempts);
 }  // namespace log_backoff_detail
 
 /**
- * Will log a message at 'logLevel' for the given 'logComponent' and will perform truncated
- * exponential backoff, with the backoff period based on 'numAttempts'.
+ * Will log a message at 'logLevel' for the given 'logComponent' and will perform an increasing
+ * backoff, with the backoff period based on 'numAttempts'.
  */
 template <size_t N, typename... Args>
 void logAndBackoff(int32_t logId,

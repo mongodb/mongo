@@ -1,0 +1,32 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+# Like the C++ SDK, we should do our best to minimize the dependencies of this adapter layer so
+# that it can be mostly self-contained. Any logic that relies on larger server libraries (like
+# "pipeline") should be in the host layer, not the host adapter layer.
+mongo_cc_library(
+    name = "extensions_host_adapter",
+    srcs = [
+        "aggregation_stage.cpp",
+        "query_shape_opts_adapter.cpp",
+    ],
+    hdrs = [
+        "aggregation_stage.h",
+        "byte_buf.h",
+        "extension_handle.h",
+        "extension_status.h",
+        "handle.h",
+        "query_shape_opts_adapter.h",
+        "//src/mongo/db/extension/host:host_portal.h",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//src/mongo/db/extension/public:api",
+        # Note, for the time being we are linking in the C++ SDK here to reduce code duplication.
+        # Eventually, we may decouple the C++ SDK from the server and remove this dependency.
+        "//src/mongo/db/extension/sdk:sdk_cpp",
+        "//src/mongo/db/pipeline:aggregation_request_helper",
+        "//src/mongo:base",
+    ],
+)

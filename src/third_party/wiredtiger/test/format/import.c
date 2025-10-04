@@ -37,13 +37,12 @@ static void verify_import(WT_SESSION *);
  * Import directory initialize command, remove and create import directory, to place new database
  * connection.
  */
-#define HOME_IMPORT_INIT_CMD "rm -rf %s/" IMPORT_DIR "&& mkdir %s/" IMPORT_DIR
 #define IMPORT_DIR "IMPORT"
 /*
  * The number of entries in the import table, primary use for validating contents after import.
  * There is no benefit to varying the number of entries in the import table.
  */
-#define IMPORT_ENTRIES 1000
+#define IMPORT_ENTRIES WT_THOUSAND
 #define IMPORT_TABLE_CONFIG "key_format=i,value_format=i"
 #define IMPORT_URI "table:import"
 #define IMPORT_URI_FILE "file:import.wt"
@@ -58,10 +57,9 @@ import(void *arg)
     WT_CONNECTION *conn, *import_conn;
     WT_DECL_RET;
     WT_SESSION *import_session, *session;
-    size_t cmd_len;
     uint32_t import_value;
     u_int period;
-    char buf[2048], *cmd;
+    char buf[2048];
     const char *file_config, *table_config;
 
     WT_UNUSED(arg);
@@ -72,18 +70,11 @@ import(void *arg)
     /*
      * Create a new database, primarily used for testing import.
      */
-    cmd_len = strlen(g.home) * 2 + strlen(HOME_IMPORT_INIT_CMD) + 1;
-    cmd = dmalloc(cmd_len);
-    testutil_check(__wt_snprintf(cmd, cmd_len, HOME_IMPORT_INIT_CMD, g.home, g.home));
-    testutil_checkfmt(system(cmd), "%s", "import directory creation failed");
-    free(cmd);
+    testutil_snprintf(buf, sizeof(buf), "%s/" IMPORT_DIR, g.home);
+    testutil_recreate_dir(buf);
 
-    cmd_len = strlen(g.home) + strlen(IMPORT_DIR) + 10;
-    cmd = dmalloc(cmd_len);
-    testutil_check(__wt_snprintf(cmd, cmd_len, "%s/%s", g.home, IMPORT_DIR));
     /* Open a connection to the database, creating it if necessary. */
-    create_database(cmd, &import_conn);
-    free(cmd);
+    create_database(buf, &import_conn);
 
     /*
      * Open two sessions, one for test/format database and one for the import database.
@@ -104,33 +95,61 @@ import(void *arg)
         copy_file_into_directory(import_session, "import.wt");
 
         /* Perform import with either repair or file metadata. */
-        import_value = mmrand(NULL, 0, 1);
-        if (import_value == 0)
-            testutil_check(__wt_snprintf(buf, sizeof(buf), "import=(enabled,repair=true)"));
-        else
-            testutil_check(__wt_snprintf(buf, sizeof(buf),
-              "%s,import=(enabled,repair=false,file_metadata=(%s))", table_config, file_config));
-        if ((ret = session->create(session, IMPORT_URI, buf)) != 0)
-            testutil_die(ret, "session.import", ret);
+        import_value = mmrand(&g.extra_rnd, 0, 3);
+        if (import_value == 0 || import_value == 1) {
+            if (import_value == 0)
+                testutil_snprintf(buf, sizeof(buf), "import=(enabled,repair=true)");
+            else
+                testutil_snprintf(buf, sizeof(buf),
+                  "%s,import=(enabled,repair=false,file_metadata=(%s))", table_config, file_config);
+            testutil_check(session->create(session, IMPORT_URI, buf));
+        } else {
+            /*
+             * Perform import in a manner similar to MongoDB with a 'dry run', alter, drop with
+             * keeping the file and then importing again. If the second import fails then don't
+             * panic the system and call a third time with repair.
+             */
+            testutil_snprintf(buf, sizeof(buf),
+              "%s,import=(enabled,repair=false,file_metadata=(%s))", table_config, file_config);
+            testutil_check(session->create(session, IMPORT_URI, buf));
+            testutil_check(session->checkpoint(session, NULL));
+            /* Set random access pattern hint as an innocent alter command. */
+            testutil_check(session->alter(session, IMPORT_URI, "access_pattern_hint=random"));
+            if (import_value == 2)
+                testutil_check(session->checkpoint(session, NULL));
+            else
+                testutil_check(session->checkpoint(session, "force=true"));
+            /* Checkpoint before drop. Sometimes with force. */
+            testutil_drop(session, IMPORT_URI, "remove_files=false");
+
+            /*
+             * Try the import again. It may work or it may fail. It is expected to fail if we forced
+             * checkpoints. When it fails, we retry the import with repair set to true. We only do
+             * that on failure because it is less efficient as it must read the entire table to find
+             * the latest checkpoint.
+             */
+            testutil_snprintf(buf, sizeof(buf),
+              "%s,import=(enabled,repair=false,panic_corrupt=false,file_metadata=(%s))",
+              table_config, file_config);
+            ret = session->create(session, IMPORT_URI, buf);
+            if (ret != 0) {
+                testutil_snprintf(buf, sizeof(buf), "import=(enabled,repair=true)");
+                testutil_check(session->create(session, IMPORT_URI, buf));
+            }
+        }
 
         verify_import(session);
 
-        /* Perform checkpoint, to make sure we perform drop */
-        session->checkpoint(session, NULL);
-
         /* Drop import table, so we can import the table again */
-        while ((ret = session->drop(session, IMPORT_URI, NULL)) == EBUSY) {
-            __wt_yield();
-        }
-        testutil_check(ret);
+        testutil_drop(session, IMPORT_URI, NULL);
 
-        period = mmrand(NULL, 1, 10);
+        period = mmrand(&g.extra_rnd, 1, 10);
         while (period > 0 && !g.workers_finished) {
             --period;
             __wt_sleep(1, 0);
         }
     }
-    wts_close(&import_conn, &import_session);
+    wts_close(&import_conn);
     testutil_check(session->close(session, NULL));
     return (WT_THREAD_RET_VALUE);
 }
@@ -150,9 +169,9 @@ verify_import(WT_SESSION *session)
     testutil_check(session->open_cursor(session, IMPORT_URI, NULL, NULL, &cursor));
 
     while ((ret = cursor->next(cursor)) == 0) {
-        error_check(cursor->get_key(cursor, &key));
+        testutil_check(cursor->get_key(cursor, &key));
         testutil_assert(key == iteration);
-        error_check(cursor->get_value(cursor, &value));
+        testutil_check(cursor->get_value(cursor, &value));
         testutil_assert(value == iteration);
         iteration++;
     }
@@ -214,6 +233,6 @@ copy_file_into_directory(WT_SESSION *session, const char *name)
     char to[64];
 
     buf_len = strlen(name) + 10;
-    testutil_check(__wt_snprintf(to, buf_len, "../%s", name));
+    testutil_snprintf(to, buf_len, "../%s", name);
     testutil_check(__wt_copy_and_sync(session, name, to));
 }

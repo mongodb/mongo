@@ -48,6 +48,11 @@ public:
         return nullptr;
     }
 
+
+    std::unique_ptr<HttpClient> createWithFirewall(const std::vector<CIDR>& cidrDenyList) final {
+        return nullptr;
+    }
+
     /**
      * Content for ServerStatus http_client section.
      */

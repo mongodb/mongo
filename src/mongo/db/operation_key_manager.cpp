@@ -27,17 +27,23 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/operation_key_manager.h"
-
-#include <fmt/format.h>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
+
 
 namespace mongo {
 namespace {
@@ -55,7 +61,6 @@ OperationKeyManager& OperationKeyManager::get(ServiceContext* serviceContext) {
 }
 
 void OperationKeyManager::add(const OperationKey& key, OperationId id) {
-    using namespace fmt::literals;
 
     LOGV2_DEBUG(4615636,
                 2,
@@ -66,8 +71,9 @@ void OperationKeyManager::add(const OperationKey& key, OperationId id) {
     stdx::lock_guard lk(_mutex);
     auto result = _idByOperationKey.emplace(key, id).second;
 
-    uassert(
-        ErrorCodes::BadValue, "OperationKey currently '{}' in use"_format(key.toString()), result);
+    uassert(ErrorCodes::BadValue,
+            fmt::format("OperationKey currently '{}' in use", key.toString()),
+            result);
 }
 
 bool OperationKeyManager::remove(const OperationKey& key) {

@@ -5,14 +5,13 @@
  * ]
  */
 
-(function() {
-"use strict";
-load("jstests/replsets/rslib.js");
-load('jstests/libs/fail_point_util.js');
+import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {assertVoteCount, isMemberNewlyAdded} from "jstests/replsets/rslib.js";
 
 const rst = new ReplSetTest({name: jsTestName(), nodes: 1});
 rst.startSet();
-rst.initiateWithHighElectionTimeout();
+rst.initiate();
 
 const primary = rst.getPrimary();
 
@@ -32,17 +31,19 @@ assertVoteCount(primary, {
 });
 
 const addNode = (id, {newlyAdded, force, shouldSucceed, failureCode} = {}) => {
-    jsTestLog(`Adding node ${id}, newlyAdded: ${newlyAdded}, force: ${force}, shouldSucceed: ${
-        shouldSucceed}, failureCode: ${failureCode}`);
+    jsTestLog(
+        `Adding node ${id}, newlyAdded: ${newlyAdded}, force: ${force}, shouldSucceed: ${
+            shouldSucceed
+        }, failureCode: ${failureCode}`,
+    );
 
     const newNode = rst.add({
         rsConfig: {priority: 0},
         setParameter: {
-            'failpoint.forceSyncSourceCandidate':
-                tojson({mode: 'alwaysOn', data: {"hostAndPort": primary.host}}),
-            'failpoint.initialSyncHangBeforeFinish': tojson({mode: 'alwaysOn'}),
-            'numInitialSyncAttempts': 1,
-        }
+            "failpoint.forceSyncSourceCandidate": tojson({mode: "alwaysOn", data: {"hostAndPort": primary.host}}),
+            "failpoint.initialSyncHangBeforeFinish": tojson({mode: "alwaysOn"}),
+            "numInitialSyncAttempts": 1,
+        },
     });
 
     let newNodeObj = {
@@ -62,8 +63,7 @@ const addNode = (id, {newlyAdded, force, shouldSucceed, failureCode} = {}) => {
     if (!shouldSucceed) {
         jsTestLog("Running reconfig with bad config " + tojsononeline(config));
 
-        assert.commandFailedWithCode(primary.adminCommand({replSetReconfig: config, force: force}),
-                                     failureCode);
+        assert.commandFailedWithCode(primary.adminCommand({replSetReconfig: config, force: force}), failureCode);
         rst.remove(newNode);
         return null;
     }
@@ -73,11 +73,13 @@ const addNode = (id, {newlyAdded, force, shouldSucceed, failureCode} = {}) => {
     assert.commandWorked(primary.adminCommand({replSetReconfig: config, force: force}));
     rst.waitForConfigReplication(primary, rst.nodes);
 
-    assert.commandWorked(newNode.adminCommand({
-        waitForFailPoint: "initialSyncHangBeforeFinish",
-        timesEntered: 1,
-        maxTimeMS: kDefaultWaitForFailPointTimeout,
-    }));
+    assert.commandWorked(
+        newNode.adminCommand({
+            waitForFailPoint: "initialSyncHangBeforeFinish",
+            timesEntered: 1,
+            maxTimeMS: kDefaultWaitForFailPointTimeout,
+        }),
+    );
 
     return newNode;
 };
@@ -87,7 +89,7 @@ addNode(2, {
     newlyAdded: true,
     force: true,
     shouldSucceed: false,
-    failureCode: ErrorCodes.InvalidReplicaSetConfig
+    failureCode: ErrorCodes.InvalidReplicaSetConfig,
 });
 assertVoteCount(primary, {
     votingMembersCount: 1,
@@ -102,7 +104,7 @@ addNode(2, {
     newlyAdded: true,
     force: false,
     shouldSucceed: false,
-    failureCode: ErrorCodes.InvalidReplicaSetConfig
+    failureCode: ErrorCodes.InvalidReplicaSetConfig,
 });
 assertVoteCount(primary, {
     votingMembersCount: 1,
@@ -135,8 +137,7 @@ assertVoteCount(primary, {
     totalMembersCount: 3,
 });
 
-jsTestLog(
-    "Add a new node without 'newlyAdded' with force reconfig, squashing old 'newlyAdded' fields");
+jsTestLog("Add a new node without 'newlyAdded' with force reconfig, squashing old 'newlyAdded' fields");
 const thirdNewNode = addNode(4, {newlyAdded: false, force: true, shouldSucceed: true});
 assert.eq(false, isMemberNewlyAdded(primary, 1, true /* force */));
 assert.eq(false, isMemberNewlyAdded(primary, 2, true /* force */));
@@ -149,21 +150,17 @@ assertVoteCount(primary, {
     totalMembersCount: 4,
 });
 
-assert.commandWorked(
-    firstNewNode.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
-assert.commandWorked(
-    secondNewNode.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
-assert.commandWorked(
-    thirdNewNode.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
+assert.commandWorked(firstNewNode.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
+assert.commandWorked(secondNewNode.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
+assert.commandWorked(thirdNewNode.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
 
-rst.waitForState(firstNewNode, ReplSetTest.State.SECONDARY);
-rst.waitForState(secondNewNode, ReplSetTest.State.SECONDARY);
-rst.waitForState(thirdNewNode, ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [firstNewNode]);
+rst.awaitSecondaryNodes(null, [secondNewNode]);
+rst.awaitSecondaryNodes(null, [thirdNewNode]);
 
 jsTestLog("Making sure the set can accept writes with write concerns");
 assert.commandWorked(primaryColl.insert({"steady": "state"}, {writeConcern: {w: 4}}));
-assert.commandWorked(
-    primaryColl.insert({"steady": "state_majority"}, {writeConcern: {w: 'majority'}}));
+assert.commandWorked(primaryColl.insert({"steady": "state_majority"}, {writeConcern: {w: "majority"}}));
 
 assertVoteCount(primary, {
     votingMembersCount: 4,
@@ -174,4 +171,3 @@ assertVoteCount(primary, {
 });
 
 rst.stopSet();
-})();

@@ -29,9 +29,17 @@
 
 #pragma once
 
-#include <queue>
-
+#include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/util/debug_print.h"
+#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
+
+#include <cstddef>
+#include <memory>
+#include <queue>
+#include <vector>
 
 namespace mongo::sbe {
 /**
@@ -53,7 +61,8 @@ public:
     UnionStage(PlanStage::Vector inputStages,
                std::vector<value::SlotVector> inputVals,
                value::SlotVector outputVals,
-               PlanNodeId planNodeId);
+               PlanNodeId planNodeId,
+               bool participateInTrialRunTracking = true);
 
     std::unique_ptr<PlanStage> clone() const final;
 
@@ -68,15 +77,23 @@ public:
     std::vector<DebugPrinter::Block> debugPrint() const final;
     size_t estimateCompileTimeSize() const final;
 
+protected:
+    bool shouldOptimizeSaveState(size_t idx) const final {
+        return _currentStageIndex == idx;
+    }
+
+    void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override {
+        return;
+    }
+
 private:
     struct UnionBranch {
-        PlanStage* stage{nullptr};
-        const bool reOpen{false};
+        PlanStage* const stage{nullptr};
         bool isOpen{false};
 
         void open() {
             if (!isOpen) {
-                stage->open(reOpen);
+                stage->open(false /*reOpen*/);
                 isOpen = true;
             }
         }

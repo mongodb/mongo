@@ -1,0 +1,116 @@
+# Copyright (C) 2018-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+# This IDL file describes the BSON format for a GenericCursor, and
+# handles the serialization to and deserialization from its BSON representation
+# for that class.
+
+global:
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/db/session/logical_session_id.idl"
+    - "mongo/db/repl/replication_types.idl"
+    - "mongo/db/basic_types.idl"
+
+structs:
+    GenericCursor:
+        description: "A struct representing a cursor in either mongod or mongos"
+        fields:
+            cursorId:
+                description: The cursor id of the cursor.
+                type: long
+                optional: true
+            ns:
+                description: The namespace of the cursor.
+                type: namespacestring
+                optional: true
+            createdDate:
+                description: The time and date the cursor was created.
+                type: date
+                optional: true
+            lastAccessDate:
+                description: The last time the cursor was used (was pinned).
+                type: date
+                optional: true
+            nDocsReturned:
+                description:
+                    "The number of docs returned by the cursor. Tracked for display in $currentOp
+                    output."
+                type: long
+                optional: true
+            nBatchesReturned:
+                description: The number of batches returned by the cursor.
+                type: long
+                optional: true
+            noCursorTimeout:
+                description: If true the cursor will not be timed out because of inactivity.
+                type: bool
+                optional: true
+            tailable:
+                description: Whether the cursor is tailable and remains open after exhausting all documents in the find.
+                type: bool
+                optional: true
+            awaitData:
+                description: Whether this is a tailable and awaitData cursor that will block waiting for new data to be inserted into a capped collection.
+                type: bool
+                optional: true
+            originatingCommand:
+                description: The bson object containing the command that created the cursor.
+                type: object
+                optional: true
+            lsid:
+                type: LogicalSessionId
+                optional: true
+            txnNumber:
+                type: TxnNumber
+                optional: true
+            planSummary:
+                description: The plan summary of this cursor's query.
+                type: string
+                optional: true
+            operationUsingCursorId:
+                description: The op ID of the operation pinning the cursor. Will be empty for idle cursors.
+                type: long
+                optional: true
+            lastKnownCommittedOpTime:
+                description:
+                    "The commit point known by the server at the time when the last batch was
+                    returned."
+                type: optime
+                optional: true
+            inUseTrackedMemBytes:
+                description: The number of bytes in use by the query associated with the cursor.
+                type: long
+                optional: true
+            peakTrackedMemBytes:
+                description:
+                    "The most number of bytes observed in use at any one time by the query
+                    associated with the cursor."
+                type: long
+                optional: true

@@ -26,7 +26,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest
+from rollback_to_stable_util import verify_rts_logs
+import wttest
 from wtscenario import make_scenarios
 
 # test_rollback_to_stable24.py
@@ -60,27 +61,39 @@ from wtscenario import make_scenarios
 #
 # Don't run it on FLCS because FLCS doesn't do RLE encoding so there's no point.
 class test_rollback_to_stable24(wttest.WiredTigerTestCase):
-    session_config = 'isolation=snapshot'
     conn_config = 'in_memory=false'
 
     key_format_values = [
         ('column', dict(key_format='r')),
-        ('integer_row', dict(key_format='i')),
+        ('row_integer', dict(key_format='i')),
     ]
 
-    scenarios = make_scenarios(key_format_values)
+    worker_thread_values = [
+        ('0', dict(threads=0)),
+        ('4', dict(threads=4)),
+        ('8', dict(threads=8))
+    ]
+
+    scenarios = make_scenarios(key_format_values, worker_thread_values)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.ignoreStdoutPattern('WT_VERB_RTS')
+        self.addTearDownAction(verify_rts_logs)
+
+    def conn_config(self):
+        return 'verbose=(rts:5)'
 
     def test_rollback_to_stable24(self):
         # Create a table without logging.
         uri = "table:rollback_to_stable24"
-        format = 'key_format={},value_format=S'.format(self.key_format)
-        self.session.create(uri, format + ', log=(enabled=false)')
+        self.session.create(uri, 'key_format={},value_format=S'.format(self.key_format))
 
-        # Pin oldest timestamp to 10.
-        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))
+        # Pin oldest timestamp to 5.
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(5))
 
-        # Start stable timestamp at 10.
-        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(10))
+        # Start stable timestamp at 5.
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(5))
 
         value_a = "aaaaa" * 100
         value_b = "bbbbb" * 100
@@ -124,7 +137,7 @@ class test_rollback_to_stable24(wttest.WiredTigerTestCase):
 
         # Roll back to 40.
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(40))
-        self.conn.rollback_to_stable()
+        self.conn.rollback_to_stable('threads=' + str(self.threads))
 
         # Now read at 40.
         cursor = s.open_cursor(uri)

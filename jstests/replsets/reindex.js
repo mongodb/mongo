@@ -7,12 +7,11 @@
  * ]
  */
 
-(function() {
-"use strict";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 jsTestLog("Testing that the reindex command cannot be run on a primary or secondary");
 
-const replTest = new ReplSetTest({name: 'reindexTest', nodes: 2});
+const replTest = new ReplSetTest({name: "reindexTest", nodes: 2});
 replTest.startSet();
 replTest.initiate();
 
@@ -32,22 +31,18 @@ assert.commandWorked(primaryColl.createIndex({a: 1}));
 replTest.awaitReplication();
 replTest.awaitReplication();
 
-assert.eq(2,
-          primaryColl.getIndexes().length,
-          "Primary didn't have expected number of indexes before reindex");
-assert.eq(2,
-          secondaryColl.getIndexes().length,
-          "Secondary didn't have expected number of indexes before reindex");
+assert.eq(2, primaryColl.getIndexes().length, "Primary didn't have expected number of indexes before reindex");
+assert.eq(2, secondaryColl.getIndexes().length, "Secondary didn't have expected number of indexes before reindex");
 
 assert.commandFailedWithCode(primaryColl.reIndex(), ErrorCodes.IllegalOperation);
 assert.commandFailedWithCode(secondaryColl.reIndex(), ErrorCodes.IllegalOperation);
 
-assert.eq(2,
-          primaryColl.getIndexes().length,
-          "Primary didn't have expected number of indexes after failed reindex");
-assert.eq(2,
-          secondaryColl.getIndexes().length,
-          "Secondary didn't have expected number of indexes after failed reindex");
+assert.eq(2, primaryColl.getIndexes().length, "Primary didn't have expected number of indexes after failed reindex");
+assert.eq(
+    2,
+    secondaryColl.getIndexes().length,
+    "Secondary didn't have expected number of indexes after failed reindex",
+);
 
 replTest.stopSet();
 
@@ -65,11 +60,9 @@ assert.eq(2, testColl.getIndexes().length, "Standalone didn't have proper indexe
 
 assert.commandWorked(testColl.reIndex());
 
-const nonExistentDb = standalone.getDB('does_not_exist');
-assert.commandFailedWithCode(nonExistentDb.getCollection('test').reIndex(),
-                             ErrorCodes.NamespaceNotFound);
+const nonExistentDb = standalone.getDB("does_not_exist");
+assert.commandFailedWithCode(nonExistentDb.getCollection("test").reIndex(), ErrorCodes.NamespaceNotFound);
 
 assert.eq(2, testColl.getIndexes().length, "Standalone didn't have proper indexes after reindex");
 
 MongoRunner.stopMongod(standalone);
-})();

@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include <cstring>
-#include <type_traits>
-
-#include "mongo/config.h"
-
 #include "mongo/base/data_type.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+
+#include <cstring>
+#include <iosfwd>
+#include <type_traits>
 
 namespace mongo {
 

@@ -26,7 +26,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest
+import wttest
+from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
+from wtscenario import make_scenarios
 
 pop_data = [
     ( 'USA', 1980, 226542250 ),
@@ -45,7 +47,10 @@ expected_out = [
 
 # test_schema01.py
 #    Test that tables are reconciled correctly when they are empty.
-class test_schema01(wttest.WiredTigerTestCase):
+class test_schema01(TieredConfigMixin, wttest.WiredTigerTestCase):
+    tiered_storage_sources = gen_tiered_storage_sources()
+    scenarios = make_scenarios(tiered_storage_sources)
+
     '''Test various tree types becoming empty'''
 
     basename = 'test_schema01'
@@ -66,13 +71,14 @@ class test_schema01(wttest.WiredTigerTestCase):
 
     def drop_table(self):
         self.pr('drop table')
-        self.session.drop(self.tablename)
+        self.dropUntilSuccess(self.session, self.tablename)
 
     def cursor(self, config=None):
         self.pr('open cursor')
         return self.session.open_cursor(self.tablename, None, config)
 
     def test_populate(self):
+
         '''Populate a table'''
         for reopen in (False, True):
             self.create_table()
@@ -93,6 +99,3 @@ class test_schema01(wttest.WiredTigerTestCase):
                 expectpos += 1
             c.close()
             self.drop_table()
-
-if __name__ == '__main__':
-    wttest.run()

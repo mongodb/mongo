@@ -27,14 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
+
+#include "mongo/util/assert_util.h"
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
 ReadWriteConcernDefaults::FetchDefaultsFn ReadWriteConcernDefaultsLookupMock::getFetchDefaultsFn() {
-    return [this](OperationContext* opCtx) { return lookup(opCtx); };
+    return [this](OperationContext* opCtx) {
+        return lookup(opCtx);
+    };
 }
 
 boost::optional<RWConcernDefault> ReadWriteConcernDefaultsLookupMock::lookup(

@@ -3,8 +3,7 @@
  * 'host' field that contains a connection string.
  */
 
-(function() {
-"use strict";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const rst = new ReplSetTest({nodes: 3});
 
@@ -25,17 +24,21 @@ const memberTwoHostValue = config.members[2].host;
 // Populate host field with connection string and expect a reconfig failure.
 config.members[2].host = "mongodb://host/?replicaSet=rs";
 config.version++;
-assert.commandFailedWithCode(primary.adminCommand({replSetReconfig: config}),
-                             ErrorCodes.InvalidReplicaSetConfig,
-                             "Reconfig Should Fail");
+assert.commandFailedWithCode(
+    primary.adminCommand({replSetReconfig: config}),
+    ErrorCodes.InvalidReplicaSetConfig,
+    "Reconfig Should Fail",
+);
 
 // Verify that using connection string for all members' host fields fails.
 config.members[1].host = "mongodb://host/?replicaSet=rs";
 config.members[0].host = "mongodb://host/?replicaSet=rs";
 config.version++;
-assert.commandFailedWithCode(primary.adminCommand({replSetReconfig: config}),
-                             ErrorCodes.InvalidReplicaSetConfig,
-                             "Reconfig Should Fail");
+assert.commandFailedWithCode(
+    primary.adminCommand({replSetReconfig: config}),
+    ErrorCodes.InvalidReplicaSetConfig,
+    "Reconfig Should Fail",
+);
 
 // Sanity check that resetting member's host fields to proper host value makes reconfig work.
 config.members[0].host = memberZeroHostValue;
@@ -44,4 +47,3 @@ config.members[2].host = memberTwoHostValue;
 config.version++;
 assert.commandWorked(primary.adminCommand({replSetReconfig: config}));
 rst.stopSet();
-})();

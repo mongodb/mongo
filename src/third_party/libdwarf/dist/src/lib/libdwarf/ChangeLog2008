@@ -1,0 +1,263 @@
+2008-12-29  DavidAnderson <davea42@earthlink.net>
+      * libdwarf.h: Add support for .debug_ranges with
+        dwarf_get_ranges() and dwarf_ranges_dealloc().
+      * dwarf_init_finish.c: Add support for .debug_ranges.
+      * dwarf_base_types.h: Add support for .debug_ranges functions.
+      * dwarf_alloc.c, dwarf_alloc.h: Add support for .debug_ranges
+        alloc/dealloc.
+      * dwarf_opaque.h: Add support for .debug_ranges.
+      * libdwarf2.1.mm: Documented dwarf_get_ranges() and
+        dwarf_ranges_dealloc() (rev 1.72).
+      * libdwarf2.1.pdf: Regenerated.
+2008-12-09  DavidAnderson <davea42@earthlink.net>
+      * dwarf_alloc.c: Remove useless comments and
+        tweak a few comments.
+2008-12-08  DavidAnderson <davea42@earthlink.net>
+      * dwarf_opaque.h: Add di_abbrev_code field to record
+        a DIE abbreviation value so consumers can report it.
+      * libdwarf.h: Add dwarf_die_abbrev_code() interface.
+      * dwarf_query.c: Add dwarf_die_abbrev_code() interface.
+      * dwarf_die_deliv.c: Set di_abbrev_code for consumers.
+      * libdwarf2.1.mm: Documented dwarf_die_abbrev_code().
+      * libdwarf2.1.pdf: Regenerated.
+      * pro_util.h: Removed gratuitous tabs. Used a space instead.
+2008-12-07  DavidAnderson <davea42@earthlink.net>
+      * dwarf.h: Entered DWARF4 defines known so far.
+      * dwarf_opaque.h: Updated dwarf 4 section-version comment
+        with the latest info.
+2008-12-07  DavidAnderson <davea42@earthlink.net>
+      * dwarf_original_elf_init.c: Delete unused local variables.
+      * pro_forms.c: Delete unused local variables and initialize
+        local variables at definition.
+      * dwarf_pubtypes.c, dwarf_line.c: Delete accidental
+        duplicated /* comment-start.
+      * malloc_check.c: In the 'do nothing' case, create
+        an extern declaration to eliminate a compiler warning.
+2008-11-19  DavidAnderson <davea42@earthlink.net>
+      * dwarf_die_deliv.c: Handle the case where DW_AT_sibling
+        uses DW_FORM_ref_addr.
+      * dwarf_util.c: Add a comment about DW_FORM_ref_addr.
+      * dwarf_opaque.h: Add a comment about CU fields,
+        comment out an unused CU header field.
+      * dwarf_query.c: Added dwarf_die_CU_offset_range()
+        so dwarfdump can check for additional errors.
+      * dwarf_form.c: Clarifying a comment.
+      * dwarf_print_lines.c: Add additional print detail on
+        line table headers (used by dwarfdump).
+      * libdwarf2.1.mm: Documenting the new function
+        dwarf_die_CU_offset_range().
+      * libdwarf2.1.pdf: Regenerated.
+      * libdwarf.h: Added dwarf_die_CU_offset_range() interface
+        declaration.
+2008-10-13  DavidAnderson <davea42@earthlink.net>
+      * dwarf_frame2.c: Removed last use of DW_FRAME_LAST_REG_NUM:
+        use dbg->de_frame_reg_rules_entry_count instead.
+2008-09-30  DavidAnderson <davea42@earthlink.net>
+      * dwarf_print_lines.c: Print corrected warning
+        about bogus prologue length.
+      * dwarf_line.c: Work around bogus prologue length
+        compiler bug.
+      * dwarf_line.h: Rename arguments.
+2008-09-29  DavidAnderson <davea42@earthlink.net>
+      * libdwarf2.1.mm: Documented requirement that
+        dwarf_get_fde_n() dwarf_get_fde_at_pc() pass a
+	pointer to an fde table that contains at least 1 entry.
+      * libdwarf2.1.pdf: regenerated.
+      * dwarf_opaque.h: Add new fields for cie/fde specific
+         fields for eh.
+      * dwarf_frame2.c: Initialize the new Dwarf_debug and
+        Dwarf_Fde fields.
+      * dwarf_frame.c: Access the new Dwarf_Fde fields.
+      * dwarf_frame.h: Define a new Dwarf_Fde field so we
+        keep eh and non-eh distinct.
+
+2008-09-29  DavidAnderson <davea42@earthlink.net>
+      * All .c files: Mechanically removed tab characters with
+        the expand tool.
+2008-09-29  DavidAnderson <davea42@earthlink.net>
+      * libdwarf.h: DW_DLE_LINE_SET_ADDR_ERROR no longer used.
+        The tests which generated it were bogus.
+      * dwarf_print_lines.c: Print a warning if there are any
+        apparently wasted bytes after the line prologue and before
+	the line table instructions. Match the new prologue reading
+	function prototype.
+      * dwarf_sort_line.c: Match the new prologue reading function
+        prototype.
+      * dwarf_line.c: Modify the prologue reading function so
+        it correctly finds the beginning of instructions even
+        when there are 'wasted' bytes after the prologue.
+	Drop bogus tests for minimum-instruction-size
+	matching the ABI pointer size.  Removing the tests removed
+	all uses of  DW_DLE_LINE_SET_ADDR_ERROR.
+      * dwarf_line.h: Modify the prototype for the prologue reading
+        function so it is possible for a caller to know about the
+	possibly wasted bytes after a prologue.
+2008-09-02  DavidAnderson <davea42@earthlink.net>
+      * dwarf_init_finish.c (_dwarf_setup): Delete unused local
+        variable 'section_error'.
+2008-08-14  DavidAnderson <davea42@earthlink.net>
+      * libdwarf2p.1.mm: Make it clearer that dwarf_get_pubnames, dwarf_get_varnames,
+        etc return a result across all compilation units (an entire section),
+        not just for a single compilation unit. Document version 1.68.
+      * libdwarf2p.1.pdf: Regenerated.
+2008-08-08  DavidAnderson <davea42@earthlink.net>
+      * libdwarf2p.1.mm: Removed some long time
+        spelling mistakes: no technical change in content.
+        Document version 1.67.
+      * libdwarf2p.1.pdf: Regenerated.
+2008-08-05  DavidAnderson <davea42@earthlink.net>
+      * libdwarf.h, dwarf_error.c:  DW_DLA_PUBTYPE_CONTEXT was a mistake,
+        DW_DLE_PUBTYPE_CONTEXT was intended and is now the spelling (neither
+        is used).
+      * dwarf_pubtypes.c dwarf_vars.c dwarf_funcs.c dwarf_global.c dwarf_weaks.c:
+        tabs removed and previous strange formatting generated by a tool
+        removed (4 space indent per level now present).
+
+2008-08-05  DavidAnderson <davea42@earthlink.net>
+      * libdwarf2.1.mm: There were numerous places the apostrophe
+        was used incorrectly, thru is now spelled through,
+        and a few other small typographical errors were corrected.
+        The document revision id printed is now 1.67.
+        There is no technical change in content.
+      * libdwarf2.1.pdf: Regenerated.
+2008-06-17  DavidAnderson <davea42@earthlink.net>
+      * libdwarf.h: Add DW_DLE_STRP_OFFSET_BAD error code.
+      * dwarf_form.c: Add runtime check for strp offset.
+      * dwarf_error.c: Add  DW_DLE_STRP_OFFSET_BAD error code string.
+      * dwarf_init_finish.c, dwarf_opaque.h, dwarf_elf_access.h: Remove
+        CR characters that crept in.
+2008-06-13  DavidAnderson <davea42@earthlink.net>
+      * libdwarf.h: Remove __SGI_FAST_LIBELF
+        dwarf_original_elf_init.c: Remove __SGI_FAST_LIBELF
+        and fix some indentation botches.
+      * dwarf_init_finish.c: Fix typo in variable name introduced
+        a few days ago.
+      * dwarf_elf_access.c:  Remove __SGI_FAST_LIBELF
+        and fix some indentation botches.
+
+2008-05-20  DavidAnderson <davea42@earthlink.net>
+      * dwarf_init_finish.c: Expand tabs to spaces.
+2008-05-20  DavidAnderson <davea42@earthlink.net>
+      * dwarf_init_finish.c(dwarf_object_init): When there is no
+        DWARF information return DW_DLV_NO_ENTRY gracefully.
+        Thanks to Carlos Alberto Enciso for pointing out
+        the bug.
+2008-04-12  DavidAnderson <davea42@earthlink.net>
+      * pro_section.c: Initialize local variables to zero.
+        Change leading tabs to spaces.
+      * pro_reloc_stream.c: Initialize local variables to zero.
+        Change leading tabs to spaces.
+      * pro_reloc.c: Initialize local variables to zero.
+        Change leading tabs to spaces.
+2008-04-04  DavidAnderson <davea42@earthlink.net>
+      * dwarf_base_types.h: Removed unused macro definition.
+      * dwarf_util.c: Altered abbreviations hash table for a small
+        performance improvement and space saving.
+      * dwarf_util.h: Changed declaration for space saving in dwarf
+        abbreviations table.
+2008-04-04  DavidAnderson <davea42@earthlink.net>
+      * libdwarf.h: A trivial change to make a declaration look better.
+      * dwarf_abbrev.h: We record tags in more than 16 bits now just in case
+        we encounter such a thing (increased ab_tag field size), though
+        we should not find such.
+      * dwarf_abbrev.c: Adding a comment about the dwarf TAG value.
+      * dwarf_util.c: Initialize local variables at declaration for safety.
+        Removed truncation of some values: internally record more bits.
+        Rewrote handling of the abbrev table as the old one did not scale
+        to large numbers of abbreviations (things got very slow).
+      * dwarf_util.h: Now has a larger field size in the argument to
+        _dwarf_get_abbrev_for_code (not quite necessary but not harmful).
+      * dwarf_die_deliv.c: Initializing local variables at declaration and
+        removing truncation of bits from some uleb values.
+      * dwarf_die_deliv.h: Increased size of ab_code field.
+      * dwarf_opaque.h: Added a comment about abbreviations.
+      * dwarf_base_types.h: Revised to match addition of new
+        allocation table entry.
+      * dwarf_alloc.h: Document macro definitions and increase one to
+        match new table size.
+      * dwarf_alloc.c: Arrange handling of new DW_DLA_HASH_TABLE_ENTRY
+        (most of the work done in dwarf_util.c).
+2008-02-27  DavidAnderson <davea42@earthlink.net>
+      * libdwarf.h: Fixed minor typo in latest libdwarf.h that gcc did not
+        complain about. Noted by Josh Fuhs.
+2008-02-26  DavidAnderson <davea42@earthlink.net>
+      * dwarf_alloc.h: Add comment giving placement of DWARF_SIMPLE_MALLOC.
+      * pro_opaque.h: Remove de_access field, it is never used.
+      * libdwarf.h: Add new data structures to allow reading of
+        non-Elf object files.
+      * dwarf_original_elf_init.c: dwarf_init(), dwarf_elf_init()
+        moved here from dwarf_init_finish.c.
+      * Makefile.in: Build new source files dwarf_original_elf_init.c
+        and dwarf_elf_access.c.
+      * dwarf_init_finish.c: All dependencies on libelf and elf
+        have been removed.
+      * dwarf_opaque.h: The elf related info is removed and Dwarf_Debug_s
+        now contains a new structure (from libdwarf.h) to hide object
+        information.
+      * dwarf_elf_access.c: All the Elf-using code is now in this
+        source file and elf details are kept in a struct defined and
+        used here.   Non-libelf and non-elf object access code would
+        write a new source file with their own details using this
+        as an example.
+      * dwarf_elf_access.h: Prototypes for calling between
+        dwarf_original_elf_init.c and dwarf_elf_access.c.
+2008-02-18  DavidAnderson <davea42@earthlink.net>
+      * libdwarf.h: Declare new object-access functions and structures.
+      * dwarf_original_elf_init.c: Traditional dwarf_init() and dwarf_elf_init()
+        are moved to this new source file.
+      * Makefile.in: Add new source files.
+      * dwarf_init_finish.c: Now uses the function pointers, not
+        libelf specific fields or ifdefs.
+      * pro_opaque.h:  Remove de_access field, it is unused.
+      * dwarf_opaque.h: New fields for new object-access functions.
+      * dwarf_elf_access.c: New implementation details for elf access functions
+        moved here from dwarf_init_finish.c.
+      * dwarf_elf_access.h: New function interface so  dwarf_elf_access.c
+        and dwarf_original_elf_init.c can communicate.
+2008-02-08  DavidAnderson <davea42@earthlink.net>
+     * dwarf_print_lines.c: Added commentary to clarify that
+       dwarf_print_lines() and _dwarf_print_lines are intentionally
+       identical.  Initialized local variables so they are alll
+       visibly set to some sensible value.
+2008-02-07  DavidAnderson <davea42@earthlink.net>
+     * dwarf_frame.c (_dwarf_fde_section_offset): A typo
+       in the last release made this an infinite loop.
+       A one character change fixed it. Thanks to Carlos Alberto
+       Enciso for noticing the bug.
+2008-02-04  DavidAnderson <davea42@earthlink.net>
+     * dwarf_incl.h, pro_incl.h: Moved #include of dwarf.h before libdwarf.h
+     * pro_forms.c: Some newer attributes are now handled.
+     * dwarf_print_lines.c: Removed unused #include.
+     * dwarf_sort_line.c: Removed alloca use in favor of
+       malloc and removed the alloca #include.
+     * dwarf_line.c: Removed unused #include.
+     * dwarf_line2.c: Removed unused #include.
+
+2008-02-04  DavidAnderson <davea42@earthlink.net>
+     * libdwarf.h: Fix commentary mistakes.
+2008-02-02  DavidAnderson <davea42@earthlink.net>
+     * libdwarf.h: Add DW_DLC_OFFSET_SIZE_64 for run-time
+       selection of DWARF3 64bit extension producer offset generation.
+     * libdwarf2p.1.mm: Document DW_DLC_OFFSET_SIZE_64.
+     * pro_init.c (dwarf_producer_init): Now standard DWARF3 is the default.
+     * configure.in: Add --enable-dwarf-format-sgi-irix for those
+       wanting IRIX offset-style DWARF2. Add --enable-dwarf-format-strict-32bit
+       for those wanting strictly 32bit offsets.
+       Otherwise default to generating 64bit offsets from the producer code,
+       but allow the DWARF3 extended 64bit offsets if the flag
+        DW_DLC_OFFSET_SIZE_64 is turned on in the call to dwarf_producer_init().
+     * config.h.in: Provide undefs for the offset macros.
+
+2008-01-25  DavidAnderson <davea42@earthlink.net>
+     * pro_die.c: Changed leading tabs to spaces.
+2008-01-23  DavidAnderson <davea42@earthlink.net>
+     * pro_die.c: Using di_last_child field dwarf_die_link
+       goes from O(N) to O(1) in adding a child.
+       Thanks to Daniel Gollub for the suggestion.
+       An omission in linking left/right children is fixed.
+       Changed some leading TABs to spaces.
+     * pro_opaque.h: Add di_last_child field.
+2008-01-14  DavidAnderson <davea42@earthlink.net>
+     * libdwarf2p.1.mm: Added missing backslash to correct formatting
+       error. Thanks to Daniel Golub for pointing out the ommission.
+     * libdwarf2.p1.pdf: Regenerated.

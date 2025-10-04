@@ -51,11 +51,11 @@ static const char *const list[] = {",cache_overhead=13", ",cache_overhead=27", "
   ",eviction=(threads_min=3,threads_max=7)", ",eviction=(threads_max=12,threads_min=10)",
   ",eviction=(threads_max=18,threads_min=16)", ",eviction=(threads_max=10,threads_min=9)",
 
-  ",eviction_dirty_target=45", ",eviction_dirty_target=87", ",eviction_dirty_target=8",
+  ",eviction_dirty_target=19", ",eviction_dirty_target=5", ",eviction_dirty_target=8",
 
-  ",eviction_dirty_trigger=37", ",eviction_dirty_trigger=98", ",eviction_dirty_trigger=7",
+  ",eviction_dirty_trigger=50", ",eviction_dirty_trigger=98", ",eviction_dirty_trigger=46",
 
-  ",eviction_target=22", ",eviction_target=84", ",eviction_target=30",
+  ",eviction_target=22", ",eviction_target=64", ",eviction_target=30",
 
   ",eviction_trigger=75", ",eviction_trigger=95", ",eviction_trigger=66",
 
@@ -65,11 +65,8 @@ static const char *const list[] = {",cache_overhead=13", ",cache_overhead=27", "
   ",file_manager=(close_idle_time=0)", ",file_manager=(close_scan_interval=50000)",
   ",file_manager=(close_scan_interval=59000)", ",file_manager=(close_scan_interval=3)",
 
-  ",log=(archive=0)", ",log=(archive=1)", ",log=(prealloc=0)", ",log=(prealloc=1)",
+  ",log=(prealloc=0)", ",log=(prealloc=1)", ",log=(remove=0)", ",log=(remove=1)",
   ",log=(zero_fill=0)", ",log=(zero_fill=1)",
-
-  ",lsm_manager=(merge=0)", ",lsm_manager=(merge=1)", ",lsm_manager=(worker_thread_max=5)",
-  ",lsm_manager=(worker_thread_max=18)", ",lsm_manager=(worker_thread_max=3)",
 
   ",shared_cache=(chunk=20MB)", ",shared_cache=(chunk=30MB)", ",shared_cache=(chunk=5MB)",
   ",shared_cache=(name=\"shared\")", ",shared_cache=(name=\"none\")", ",shared_cache=(quota=20MB)",
@@ -88,14 +85,17 @@ static const char *const list[] = {",cache_overhead=13", ",cache_overhead=27", "
   ",statistics_log=(wait=37)", ",statistics_log=(wait=0)",
 
   ",verbose=(\"api\")", ",verbose=(\"block\")", ",verbose=(\"checkpoint\")",
-  ",verbose=(\"compact\")", ",verbose=(\"evict\")", ",verbose=(\"evictserver\")",
-  ",verbose=(\"fileops\")", ",verbose=(\"handleops\")", ",verbose=(\"log\")", ",verbose=(\"lsm\")",
-  ",verbose=(\"lsm_manager\")", ",verbose=(\"metadata\")", ",verbose=(\"mutex\")",
-  ",verbose=(\"overflow\")", ",verbose=(\"read\")", ",verbose=(\"reconcile\")",
-  ",verbose=(\"recovery\")", ",verbose=(\"salvage\")", ",verbose=(\"shared_cache\")",
-  ",verbose=(\"split\")", ",verbose=(\"transaction\")", ",verbose=(\"verify\")",
-  ",verbose=(\"version\")", ",verbose=(\"write\")", ",verbose=()"};
+  ",verbose=(\"compact\")", ",verbose=(\"eviction\")", ",verbose=(\"fileops\")",
+  ",verbose=(\"handleops\")", ",verbose=(\"log\")", ",verbose=(\"metadata\")",
+  ",verbose=(\"mutex\")", ",verbose=(\"overflow\")", ",verbose=(\"read\")",
+  ",verbose=(\"reconcile\")", ",verbose=(\"recovery\")", ",verbose=(\"salvage\")",
+  ",verbose=(\"shared_cache\")", ",verbose=(\"split\")", ",verbose=(\"transaction\")",
+  ",verbose=(\"verify\")", ",verbose=(\"version\")", ",verbose=(\"write\")", ",verbose=()"};
 
+/*
+ * handle_message --
+ *     TODO: Add a comment describing this function.
+ */
 static int
 handle_message(WT_EVENT_HANDLER *handler, WT_SESSION *session, const char *message)
 {
@@ -107,11 +107,16 @@ handle_message(WT_EVENT_HANDLER *handler, WT_SESSION *session, const char *messa
     return (0);
 }
 
-static WT_EVENT_HANDLER event_handler = {NULL, handle_message, NULL, NULL};
+static WT_EVENT_HANDLER event_handler = {NULL, handle_message, NULL, NULL, NULL};
 
 static const char *current; /* Current test configuration */
 
 static void on_alarm(int) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+
+/*
+ * on_alarm --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 on_alarm(int signo)
 {
@@ -123,6 +128,10 @@ on_alarm(int signo)
     /* NOTREACHED */
 }
 
+/*
+ * reconfig --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 reconfig(TEST_OPTS *opts, WT_SESSION *session, const char *config)
 {
@@ -142,6 +151,10 @@ reconfig(TEST_OPTS *opts, WT_SESSION *session, const char *config)
     (void)alarm(0);
 }
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {
@@ -158,16 +171,14 @@ main(int argc, char *argv[])
     memset(opts, 0, sizeof(*opts));
     opts->table_type = TABLE_ROW;
     testutil_check(testutil_parse_opts(argc, argv, opts));
-    testutil_make_work_dir(opts->home);
+    testutil_recreate_dir(opts->home);
 
     testutil_check(wiredtiger_open(opts->home, &event_handler, "create", &opts->conn));
 
-    /* Open an LSM file so the LSM reconfiguration options make sense. */
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
-    testutil_check(session->create(session, opts->uri, "type=lsm,key_format=S,value_format=S"));
 
     /* Initialize the RNG. */
-    __wt_random_init_seed(NULL, &rnd);
+    __wt_random_init(NULL, &rnd);
 
     /* Allocate memory for the config. */
     len = WT_ELEMENTS(list) * 64;

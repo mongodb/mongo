@@ -29,7 +29,14 @@
 
 #pragma once
 
+#include "mongo/bson/timestamp.h"
+#include "mongo/scripting/mozjs/base.h"
 #include "mongo/scripting/mozjs/wraptype.h"
+#include "mongo/util/modules.h"
+
+#include <js/CallArgs.h>
+#include <js/PropertySpec.h>
+#include <js/TypeDecls.h>
 
 namespace mongo {
 namespace mozjs {
@@ -54,6 +61,8 @@ struct TimestampInfo : public BaseInfo {
     static const JSFunctionSpec methods[2];
 
     static const char* const className;
+
+    static Timestamp getValidatedValue(JSContext* cx, JS::HandleObject obj);
 };
 
 }  // namespace mozjs

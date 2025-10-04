@@ -1,0 +1,34 @@
+test_kind: benchmark_test
+
+selector:
+  root: bazel-bin/install/install-first_half_bm_test_list.txt
+
+  exclude_files:
+    # The trailing asterisk is for handling the .exe extension on Windows.
+    # Hash table benchmark is really slow, don't run on evergreen
+    - bazel-bin/**/hash_table_bm*
+    # These benchmarks are being run as part of the benchmarks_query.yml
+    - bazel-bin/**/query_bm*
+    - bazel-bin/**/plan_cache_classic_bm*
+    - bazel-bin/**/point_query_bm*
+    - bazel-bin/**/distinct_scan_bm*
+    # These benchmarks are being run as part of the benchmarks_expression*.yml
+    - bazel-bin/**/expression_bm*
+    - bazel-bin/**/sbe_expression_bm*
+    # These benchmarks are being run as part of the benchmarks_streams.yml test suite.
+    - bazel-bin/**/streams_operator_dag_bm*
+    - bazel-bin/**/streams_window_operator_bm*
+    # These benchmarks are only run when modifying or upgrading the immutable library.
+    - bazel-bin/**/immutable_absl_comparison_bm*
+    - bazel-bin/**/immutable_std_comparison_bm*
+    # These benchmarks are being run as part of the benchmarks_util.yml test suite.
+    - bazel-bin/**/tracking_allocator_bm*
+    # These benchmarks are being run as part of the benchmarks_sorter.yml test suite.
+    - bazel-bin/**/sorter_checksum_calculator_bm*
+    # These benchmarks are being run as part of the benchmarks_audit.yml test suite.
+    - bazel-bin/**/audit_bm*
+
+executor:
+  config: {}
+  hooks:
+    - class: GenerateAndCheckPerfResults

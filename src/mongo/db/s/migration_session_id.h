@@ -29,10 +29,11 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
+#include "mongo/base/string_data.h"
+
 #include <string>
 
-#include "mongo/base/string_data.h"
+#include <boost/optional.hpp>
 
 namespace mongo {
 
@@ -81,7 +82,7 @@ public:
     std::string toString() const;
 
     static MigrationSessionId fromString(StringData sessionId) {
-        MigrationSessionId id(sessionId.toString());
+        MigrationSessionId id(std::string{sessionId});
         return id;
     }
 

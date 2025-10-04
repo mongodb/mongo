@@ -35,7 +35,6 @@ void print_cursor(WT_CURSOR *);
 void print_database_stats(WT_SESSION *);
 void print_derived_stats(WT_SESSION *);
 void print_file_stats(WT_SESSION *);
-void print_join_cursor_stats(WT_SESSION *);
 void print_overflow_pages(WT_SESSION *);
 void print_session_stats(WT_SESSION *);
 
@@ -82,29 +81,6 @@ print_file_stats(WT_SESSION *session)
     print_cursor(cursor);
     error_check(cursor->close(cursor));
     /*! [statistics table function] */
-}
-
-void
-print_join_cursor_stats(WT_SESSION *session)
-{
-    WT_CURSOR *idx_cursor, *join_cursor, *stat_cursor;
-
-    error_check(session->create(session, "index:access:idx", "columns=(v)"));
-    error_check(session->open_cursor(session, "index:access:idx", NULL, NULL, &idx_cursor));
-    error_check(idx_cursor->next(idx_cursor));
-    error_check(session->open_cursor(session, "join:table:access", NULL, NULL, &join_cursor));
-    error_check(session->join(session, join_cursor, idx_cursor, "compare=gt"));
-    print_cursor(join_cursor);
-
-    /*! [statistics join cursor function] */
-    error_check(session->open_cursor(session, "statistics:join", join_cursor, NULL, &stat_cursor));
-
-    print_cursor(stat_cursor);
-    error_check(stat_cursor->close(stat_cursor));
-    /*! [statistics join cursor function] */
-
-    error_check(join_cursor->close(join_cursor));
-    error_check(idx_cursor->close(idx_cursor));
 }
 
 void
@@ -217,8 +193,6 @@ main(int argc, char *argv[])
     print_database_stats(session);
 
     print_file_stats(session);
-
-    print_join_cursor_stats(session);
 
     print_session_stats(session);
 

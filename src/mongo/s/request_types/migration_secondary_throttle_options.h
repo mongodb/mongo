@@ -29,9 +29,13 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-
+#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/util/assert_util.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -86,6 +90,14 @@ public:
      * Returns OK if the parse was successful.
      */
     static StatusWith<MigrationSecondaryThrottleOptions> createFromCommand(const BSONObj& obj);
+
+    /*
+     * Same as `createFromCommand`, but throwing in case of parsing exception
+     */
+    static MigrationSecondaryThrottleOptions parseFromBSON(const BSONObj& obj) {
+        return uassertStatusOK(createFromCommand(obj));
+    }
+
 
     /**
      * Extracts the secondary throttle settings from a balancer configuration document, which can

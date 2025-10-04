@@ -29,34 +29,41 @@
 
 #pragma once
 
-#include <cfloat>
-#include <cinttypes>
-#include <cstdint>
-#include <cstdio>
-#include <cstring>
-#include <sstream>
-#include <string>
-#include <type_traits>
-
-#include <boost/optional.hpp>
-
-#include "mongo/bson/util/builder_fwd.h"
-
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
+#include "mongo/base/error_codes.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/platform/bits.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concepts.h"
+#include "mongo/util/ctype.h"
 #include "mongo/util/itoa.h"
 #include "mongo/util/shared_buffer.h"
 #include "mongo/util/shared_buffer_fragment.h"
+#include "mongo/util/str_basic.h"
+#include "mongo/util/tracking/allocator.h"
+
+#include <cfloat>
+#include <cinttypes>
+#include <climits>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <sstream>
+#include <string>
+#include <type_traits>
+#include <utility>
+
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/static_assert.hpp>
 
 namespace mongo {
 
@@ -75,24 +82,33 @@ const int BSONObjMaxUserSize = 16 * 1024 * 1024;
 */
 const int BSONObjMaxInternalSize = BSONObjMaxUserSize + (16 * 1024);
 
-const int BufferMaxSize = 64 * 1024 * 1024;
+/**
+ * Maximum size of a builder buffer and for BSONObj with BsonLargeSizeTrait. Limiting it to 27 bits
+ * because SharedBuffer::Holder might bit pack information. Setting it to 125 MB to have some
+ * wiggle room before size crosses 27 bits.
+ */
+const int BufferMaxSize = 125 * 1024 * 1024;
+static_assert(BufferMaxSize < (1 << 27));
 
 /**
- * This is the maximum size size of a buffer needed for storing a BSON object in a response message.
+ * This is the maximum size of a buffer needed for storing a BSON object in a response message.
  */
-const int kOpMsgReplyBSONBufferMaxSize = BSONObjMaxUserSize + (64 * 1024);
+const int kOpMsgReplyBSONBufferMaxSize = BSONObjMaxUserSize * 2 + 64 * 1024;
 
+namespace allocator_aware {
+template <class Allocator = std::allocator<void>>
 class SharedBufferAllocator {
     SharedBufferAllocator(const SharedBufferAllocator&) = delete;
     SharedBufferAllocator& operator=(const SharedBufferAllocator&) = delete;
 
 public:
     SharedBufferAllocator() = default;
-    SharedBufferAllocator(size_t sz) {
+    explicit SharedBufferAllocator(const Allocator& allocator) : _buf(allocator) {}
+    SharedBufferAllocator(size_t sz, const Allocator& allocator = {}) : _buf(allocator) {
         if (sz > 0)
             malloc(sz);
     }
-    SharedBufferAllocator(SharedBuffer buf) : _buf(std::move(buf)) {
+    SharedBufferAllocator(SharedBuffer<Allocator> buf) : _buf(std::move(buf)) {
         invariant(!_buf.isShared());
     }
 
@@ -102,7 +118,7 @@ public:
     SharedBufferAllocator& operator=(SharedBufferAllocator&&) = default;
 
     void malloc(size_t sz) {
-        _buf = SharedBuffer::allocate(sz);
+        _buf = SharedBuffer<Allocator>::allocate(sz, _buf.allocator());
     }
 
     void realloc(size_t sz) {
@@ -110,10 +126,10 @@ public:
     }
 
     void free() {
-        _buf = {};
+        _buf = SharedBuffer<Allocator>{_buf.allocator()};
     }
 
-    SharedBuffer release() {
+    SharedBuffer<Allocator> release() {
         return std::move(_buf);
     }
 
@@ -125,12 +141,18 @@ public:
         return _buf.get();
     }
 
+    Allocator allocator() const {
+        return _buf.allocator();
+    }
+
     // The buffer holder size for 'SharedBufferAllocator' comes from 'SharedBuffer'
-    static constexpr size_t kBuffHolderSize = SharedBuffer::kHolderSize;
+    static constexpr size_t kBuffHolderSize = SharedBuffer<Allocator>::kHolderSize;
 
 private:
-    SharedBuffer _buf;
+    SharedBuffer<Allocator> _buf;
 };
+}  // namespace allocator_aware
+using SharedBufferAllocator = allocator_aware::SharedBufferAllocator<>;
 
 class SharedBufferFragmentAllocator {
     SharedBufferFragmentAllocator(const SharedBufferFragmentAllocator&) = delete;
@@ -251,29 +273,31 @@ public:
 
     void malloc(size_t sz) {
         if (sz > SZ) {
-            _ptr = mongoMalloc(sz);
+            _ptr = ::operator new(sz);
             _capacity = sz;
         }
     }
 
     void realloc(size_t sz) {
-        if (_ptr == _buf) {
-            if (sz > SZ) {
-                _ptr = mongoMalloc(sz);
-                memcpy(_ptr, _buf, SZ);
-                _capacity = sz;
-            } else {
-                _capacity = SZ;
-            }
-        } else {
-            _ptr = mongoRealloc(_ptr, sz);
-            _capacity = sz;
+        if (_ptr == _buf && sz <= SZ) {
+            _capacity = SZ;
+            return;
+        }
+
+        auto oldCap = _capacity;
+        auto oldPtr = _ptr;
+        _ptr = ::operator new(sz);
+        _capacity = sz;
+        std::memcpy(_ptr, oldPtr, std::min(oldCap, sz));
+
+        if (oldPtr != _buf) {
+            ::operator delete(oldPtr, oldCap);
         }
     }
 
     void free() {
         if (_ptr != _buf)
-            ::free(_ptr);
+            ::operator delete(_ptr, _capacity);
         _ptr = _buf;
         _capacity = SZ;
     }
@@ -325,7 +349,7 @@ public:
         @return point to region that was skipped.  pointer may change later (on realloc), so for
         immediate use only
     */
-    char* skip(int n) {
+    char* skip(size_t n) {
         return grow(n);
     }
 
@@ -380,7 +404,8 @@ public:
         appendNumImpl(high);
     }
 
-    REQUIRES_FOR_NON_TEMPLATE(!std::is_same_v<int64_t, long long>)
+    template <int...>
+    requires(!std::is_same_v<int64_t, long long>)
     void appendNum(int64_t j) {
         appendNumImpl(j);
     }
@@ -394,7 +419,7 @@ public:
     }
     void appendBuf(const void* src, size_t len) {
         if (len)
-            memcpy(grow((int)len), src, len);
+            memcpy(grow(len), src, len);
     }
 
     template <class T>
@@ -402,9 +427,36 @@ public:
         appendBuf(&s, sizeof(T));
     }
 
-    void appendStr(StringData str, bool includeEndingNull = true) {
-        const int len = str.size() + (includeEndingNull ? 1 : 0);
-        str.copyTo(grow(len), includeEndingNull);
+    /**
+     * Appends the raw bytes of str with no NUL terminator.
+     */
+    void appendStrBytes(StringData str) {
+        str.copy(grow(str.size()), str.size());
+    }
+
+    /**
+     * Appends the raw bytes of str followed by a final NUL byte.
+     *
+     * WARNING: only use this method for formats with explicit string lengths where the NUL byte is
+     * not used to find the end. This method does not check for embedded NUL bytes, so they can
+     * trick a parser into thinking the string has ended. Use appendCStr() instead for that use
+     * case.
+     */
+    void appendStrBytesAndNul(StringData str) {
+        auto dest = grow(str.size() + 1);
+        dest += str.copy(dest, str.size());
+        *dest = '\0';
+    }
+
+    /**
+     * Appends the raw bytes of str followed by a final NUL byte, throwing if str already has an
+     * embedded NUL byte.
+     *
+     * This method is intended to pair with BufReader::readCStr() on the parse side.
+     */
+    void appendCStr(StringData str) {
+        str::uassertNoEmbeddedNulBytes(str);
+        appendStrBytesAndNul(str);
     }
 
     /** Returns the length of data in the current buffer */
@@ -423,8 +475,8 @@ public:
     }
 
     /* returns the pre-grow write position */
-    char* grow(int by) {
-        if (MONGO_likely(_nextByte + by <= _end)) {
+    char* grow(size_t by) {
+        if (MONGO_likely(by <= static_cast<size_t>(_end - _nextByte))) {
             char* oldNextByte = _nextByte;
             _nextByte += by;
             return oldNextByte;
@@ -465,7 +517,8 @@ public:
      * Replaces the buffer backing this BufBuilder with the passed in SharedBuffer.
      * Only legal to call when this builder is empty and when the SharedBuffer isn't shared.
      */
-    REQUIRES_FOR_NON_TEMPLATE(std::is_same_v<BufferAllocator, SharedBufferAllocator>)
+    template <int...>
+    requires std::is_same_v<BufferAllocator, SharedBufferAllocator>
     void useSharedBuffer(SharedBuffer buf) {
         invariant(len() == 0);  // Can only do this while empty.
         invariant(reservedBytes() == 0);
@@ -506,7 +559,8 @@ protected:
         // Going beyond the maximum buffer size is not likely.
         if (MONGO_unlikely(minSize > BufferMaxSize)) {
             std::stringstream ss;
-            ss << "BufBuilder attempted to grow() to " << minSize << " bytes, past the 64MB limit.";
+            ss << "BufBuilder attempted to grow() to " << minSize << " bytes, past the "
+               << (BufferMaxSize / (1024 * 1024)) << "MB limit.";
             msgasserted(13548, ss.str().c_str());
         }
 
@@ -534,9 +588,9 @@ protected:
         } else if (MONGO_unlikely(reallocSize < 64)) {
             // The minimum allocation is 64 bytes.
             reallocSize = 64;
-        } else if (MONGO_unlikely(minSize > BufferMaxSize)) {
-            // If adding 'kBuffHolderSize' to 'minSize' pushes it beyond 'BufferMaxSize', then we'll
-            // allocate enough memory according to the 'BufferMaxSize'.
+        } else if (MONGO_unlikely(reallocSize + BufferAllocator::kBuffHolderSize > BufferMaxSize)) {
+            // If adding 'kBuffHolderSize' to 'reallocSize' pushes it beyond 'BufferMaxSize', then
+            // we'll allocate enough memory according to the 'BufferMaxSize'.
             reallocSize = BufferMaxSize + BufferAllocator::kBuffHolderSize;
         }
 
@@ -585,6 +639,36 @@ public:
         return _buf.release();
     }
 };
+
+// The following extern template declarations must follow BasicBufBuilder and come before their
+// instantiations as base classes for BufBuilder. Do not remove or re-order these lines w.r.t those
+// types without being sure that you are not undoing the advantages of the extern template
+// declarations.
+extern template class BasicBufBuilder<allocator_aware::SharedBufferAllocator<std::allocator<void>>>;
+extern template class BasicBufBuilder<
+    allocator_aware::SharedBufferAllocator<tracking::Allocator<void>>>;
+
+namespace allocator_aware {
+template <class Allocator = std::allocator<void>>
+class BufBuilder : public BasicBufBuilder<SharedBufferAllocator<Allocator>> {
+public:
+    static constexpr size_t kDefaultInitSizeBytes = mongo::BufBuilder::kDefaultInitSizeBytes;
+    BufBuilder(size_t size = kDefaultInitSizeBytes, const Allocator& allocator = {})
+        : BasicBufBuilder<SharedBufferAllocator<Allocator>>(size, allocator) {}
+
+    Allocator allocator() const {
+        return BasicBufBuilder<SharedBufferAllocator<Allocator>>::_buf.allocator();
+    }
+
+    /**
+     * Assume ownership of the buffer.
+     * Note: There should not be any other method calls on this object after a call to 'release'.
+     */
+    SharedBuffer<Allocator> release() {
+        return BasicBufBuilder<SharedBufferAllocator<Allocator>>::_buf.release();
+    }
+};
+}  // namespace allocator_aware
 
 // The following extern template declaration must follow
 // BasicBufBuilder and come before its instantiation as a base class
@@ -736,12 +820,12 @@ public:
         const int prev = _buf.len();
         const int maxSize = 32;
         char* start = _buf.grow(maxSize);
-        int z = snprintf(start, maxSize, "%.16g", x);
-        verify(z >= 0);
-        verify(z < maxSize);
+        int z = std::isnan(x) ? "nan\0"_sd.copy(start, maxSize) - 1
+                              : snprintf(start, maxSize, "%.16g", x);
+        MONGO_verify(z >= 0);
+        MONGO_verify(z < maxSize);
         _buf.setlen(prev + z);
-        if (strchr(start, '.') == nullptr && strchr(start, 'E') == nullptr &&
-            strchr(start, 'N') == nullptr) {
+        if (str::isAllDigits(*start == '-' ? start + 1 : start)) {
             write(".0", 2);
         }
     }
@@ -751,7 +835,7 @@ public:
     }
 
     void append(StringData str) {
-        str.copyTo(_buf.grow(str.size()), false);
+        _buf.appendStrBytes(str);
     }
 
     void reset(int maxSize = 0) {
@@ -760,15 +844,6 @@ public:
 
     std::string str() const {
         return std::string(_buf.buf(), _buf.len());
-    }
-
-    /**
-     * stringView() returns a view of this string without copying.
-     *
-     * WARNING: The view is invalidated when this StringBuilder is modified or destroyed.
-     */
-    std::string_view stringView() const {
-        return std::string_view(_buf.buf(), _buf.len());
     }
 
     /**
@@ -805,8 +880,8 @@ private:
     StringBuilderImpl& SBNUM(T val, int maxSize, const char* macro) {
         int prev = _buf.len();
         int z = snprintf(_buf.grow(maxSize), maxSize, macro, (val));
-        verify(z >= 0);
-        verify(z < maxSize);
+        MONGO_verify(z >= 0);
+        MONGO_verify(z < maxSize);
         _buf.setlen(prev + z);
         return *this;
     }

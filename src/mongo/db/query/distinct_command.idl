@@ -27,10 +27,13 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
+    mod_visibility: pub
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/query/hint.idl"
+    - "mongo/db/query/query_settings/query_settings.idl"
 
 commands:
     distinct:
@@ -45,11 +48,30 @@ commands:
                 description: "The field path for which to return distinct values."
                 type: string
             query:
-                description: "Optional query that filters the documents from which to retrieve the 
-                              distinct values."
-                type: object
+                description:
+                    "Optional query that filters the documents from which to retrieve the
+                    distinct values."
+                type: object_owned
                 optional: true
             collation:
                 description: "Optional collation for the command."
-                type: object
+                type: object_owned
                 optional: true
+            mirrored:
+                description: "Indicates whether the operation is a mirrored read"
+                type: optionalBool
+            sampleId:
+                description: "The unique sample id for the operation if it has been chosen for sampling."
+                type: uuid
+                optional: true
+            hint:
+                description: "The index name to use or the index specification document."
+                type: indexHint
+                default: BSONObj()
+            querySettings:
+                description: "Query settings for the given query"
+                type: QuerySettings
+                optional: true
+            includeQueryStatsMetrics:
+                description: "Determines whether or not to include query stats metrics in the response."
+                type: optionalBool

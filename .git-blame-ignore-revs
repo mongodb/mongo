@@ -1,0 +1,83 @@
+# SERVER-108478 Prettier JS format
+1adc32cdd5d6f7b8a9283d328bf7aa7d32caba6b
+
+# SERVER-72197 Clang format v12.0.1
+f63255ee677ecae5896d6f35dd712ed60ae8c39a
+ff917ea96cf91f76bbd73b0d88d626a8523c5ec0
+
+# SERVER-66490 Apply pylinters to build system code
+9ea1d6f0419938770eea612479c75838f75752b7
+ac953266322ad51ac712c1d7533af1848f6ee99b
+
+# SERVER-41772 Clang format v7.0.1
+134a4083953270e8a11430395357fb70a29047ad
+94b542762b5eed8dddd6964752436fc4c66dc2c1
+
+# SERVER-23971 Clang-Format code
+6dcdd23dd37ef12c87e71cf59ef01cd82432efe0
+53c007e02d0bd34c9e4f070829af74e00e8bbba2
+
+# SERVER-22470 Format JS code with approved style
+f5a6c794a0af1a5d57db2617c2e9464eaad9f221
+ccf5c5c4bbba2bfc99afd2fe13a4f35dc8618c2f
+
+# SERVER-22469 Format JS code with approved style in src/mongo/shell & src/mongo/scripting
+a025d43f3ce2efc1fb1282a718f5d286fa0a4dc1
+
+# SERVER-22340 Fix JS lint errors in src/mongo/shell & src/mongo/scripting with ESLint --fix
+c3996780b76316793758b43fa1fca5b9d0857b6c
+
+# SERVER-18579: Clang-Format - reformat code
+9c2ed42daa8fbbef4a919c21ec564e2db55e8d60
+a0b4965b391968a531bcc65a01882653238910ca
+
+# SERVER-79735 Convert jstest corpus to use es modules
+a4f458fe4d7a44eba056f5c150753e73067c8e4d
+41f32193f6464f9ec94294232d6fd9e46461fb3c
+
+# SERVER-78551 Migrate analyze_plan library to module
+1e98a0f23d62eb1f149658d190f0285879d91db5
+e7310f8ef1ec7817e00fef496611ca9c7086be17
+
+# SERVER-78419 Convert FSM to load workloads as modules
+1ce8128b8b286c2500ed8fdf6f7f18382b2cdd14
+30e8ed22011ec82011f69d28311a15b5c1fbb492
+
+# SERVER-74787 Prepare jstest corpus for implicit strict mode
+43b87324302209cbfa240d6c6b520007669e4ea6
+
+# SERVER-87034 Initally formatted all markdown using prettier
+64e388007ec1ac3744537253540995af628bcc00
+
+# SERVER-88970 Formatted all yaml using prettier
+35db3811d8f749edd5b79ba910adcbc1ceb54cc4
+
+# SERVER-90570: Ruff format buildscripts
+9d997a9f44cd43a8dec7c2a17fa2dbcd875e92f6
+
+# SERVER-90571: Ruff format buildscripts/idl
+a2fbc8ed83f576703cce96ebb5e680cc70aac4d8
+
+# SERVER-90572: Ruff format evergreen
+ec4a2cefe8cafee7bc9a5e91756c2e65f1ecf307
+
+# SERVER-90573: Ruff format bazel
+60af39291961535329b7ab6bec3b4f161dd1d0fa
+
+# SERVER-90615: Ruff format src
+af7d6593172a8a0ce01027a52d19de1d0215fb5b
+
+# SERVER-90616: Ruff format jstests
+9fc353de97f77520be552ddf8a6d44448f4e40d4
+
+# SERVER-90617: Ruff format site_scons
+0cd9cfa93f7cbfee24b19f6795ae366d5fa94625
+
+# SERVER-90719: Ruff format SConstruct
+c25ff7cb2f755b8b11b2b7b85189599b162a4059
+
+# SERVER-94150: v5 clang-format
+ff6b2194e3617a338d83597d96710b1b92a18940
+
+# SERVER-105050: IncludeBlocks: Regroup for clang-format
+5abd171fa9d539578d5f1d3d4417a4ca4606c078

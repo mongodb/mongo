@@ -22,6 +22,7 @@
 //  http://www.boost.org/LICENSE_1_0.txt
 //
 
+#include <boost/core/detail/lwt_unattended.hpp>
 #include <boost/current_function.hpp>
 #include <boost/config.hpp>
 #include <exception>
@@ -32,11 +33,6 @@
 #include <cstring>
 #include <cstddef>
 #include <cctype>
-#include <cstdio>
-
-#if defined(_MSC_VER) && defined(_CPPLIB_VER) && defined(_DEBUG)
-# include <crtdbg.h>
-#endif
 
 //  IDE's like Visual Studio perform better if output goes to std::cout or
 //  some other stream, so allow user to configure output stream:
@@ -46,42 +42,39 @@
 
 namespace boost
 {
-
 namespace detail
 {
 
-class test_result {
+class test_result
+{
 public:
-    test_result()
-        : report_(false)
-        , errors_(0) {
-#if defined(_MSC_VER) && (_MSC_VER > 1310)
-        // disable message boxes on assert(), abort()
-        ::_set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
-#endif
-#if defined(_MSC_VER) && defined(_CPPLIB_VER) && defined(_DEBUG)
-        // disable message boxes on iterator debugging violations
-        _CrtSetReportMode( _CRT_ASSERT, _CRTDBG_MODE_FILE );
-        _CrtSetReportFile( _CRT_ASSERT, _CRTDBG_FILE_STDERR );
-#endif
+
+    test_result(): report_( false ), errors_( 0 )
+    {
+        core::detail::lwt_unattended();
     }
 
-    ~test_result() {
-        if (!report_) {
+    ~test_result()
+    {
+        if( !report_ )
+        {
             BOOST_LIGHTWEIGHT_TEST_OSTREAM << "main() should return report_errors()" << std::endl;
             std::abort();
         }
     }
 
-    int& errors() {
+    int& errors()
+    {
         return errors_;
     }
 
-    void done() {
+    void done()
+    {
         report_ = true;
     }
 
 private:
+
     bool report_;
     int errors_;
 };
@@ -160,6 +153,7 @@ inline void no_throw_failed_impl(const char* expr, const char* what, const char*
 #elif defined(__GNUC__) && !(defined(__INTEL_COMPILER) || defined(__ICL) || defined(__ICC) || defined(__ECC)) && (__GNUC__ * 100 + __GNUC_MINOR__) >= 406
 # pragma GCC diagnostic push
 # pragma GCC diagnostic ignored "-Wsign-compare"
+# pragma GCC diagnostic ignored "-Wsign-conversion"
 #endif
 
 // specialize test output for char pointers to avoid printing as cstring
@@ -181,7 +175,13 @@ inline const void* test_output_impl(std::nullptr_t) { return nullptr; }
 inline int test_output_impl( signed char const& v ) { return v; }
 inline unsigned test_output_impl( unsigned char const& v ) { return v; }
 
-inline unsigned long test_output_impl( wchar_t const& v ) { return v; }
+// Whether wchar_t is signed is implementation-defined
+
+template<bool Signed> struct lwt_long_type {};
+template<> struct lwt_long_type<true> { typedef long type; };
+template<> struct lwt_long_type<false> { typedef unsigned long type; };
+
+inline lwt_long_type<(static_cast<wchar_t>(-1) < static_cast<wchar_t>(0))>::type test_output_impl( wchar_t const& v ) { return v; }
 
 #if !defined( BOOST_NO_CXX11_CHAR16_T )
 inline unsigned long test_output_impl( char16_t const& v ) { return v; }
@@ -189,11 +189,6 @@ inline unsigned long test_output_impl( char16_t const& v ) { return v; }
 
 #if !defined( BOOST_NO_CXX11_CHAR32_T )
 inline unsigned long test_output_impl( char32_t const& v ) { return v; }
-#endif
-
-#if defined(_MSC_VER)
-#pragma warning(push)
-#pragma warning(disable: 4996)
 #endif
 
 inline std::string test_output_impl( char const& v )
@@ -204,16 +199,16 @@ inline std::string test_output_impl( char const& v )
     }
     else
     {
-        char buffer[ 8 ];
-        std::sprintf( buffer, "\\x%02X", static_cast<unsigned char>( v ) );
+        static const char char_table[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
+        char buffer[ 4 ];
+        buffer[ 0 ] = '\\';
+        buffer[ 1 ] = 'x';
+        buffer[ 2 ] = char_table[ (static_cast<unsigned char>( v ) >> 4u) & 0x0f ];
+        buffer[ 3 ] = char_table[ static_cast<unsigned char>( v ) & 0x0f ];
 
-        return buffer;
+        return std::string( buffer, 4u );
     }
 }
-
-#if defined(_MSC_VER)
-#pragma warning(pop)
-#endif
 
 // predicates
 
@@ -524,6 +519,15 @@ inline int report_errors()
     return errors < 256? errors: 255;
 }
 
+namespace core
+{
+
+inline void lwt_init()
+{
+    boost::detail::test_results();
+}
+
+} // namespace core
 } // namespace boost
 
 #define BOOST_TEST(expr) ( ::boost::detail::test_impl(#expr, __FILE__, __LINE__, BOOST_CURRENT_FUNCTION, (expr)? true: false) )

@@ -26,6 +26,8 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#pragma once
+
 /*-
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -60,20 +62,11 @@
  * $FreeBSD: src/sys/sys/bitstring.h,v 1.5 2005/01/07 02:29:23 imp Exp $
  */
 
-				/* byte of the bitstring bit is in */
-#define	__bit_byte(bit)	((bit) >> 3)
-
-				/* mask for the bit within its byte */
-#define	__bit_mask(bit)	(1 << ((bit) & 0x7))
-
-				/* Bytes in a bitstring of nbits */
-#define	__bitstr_size(nbits) (((nbits) + 7) >> 3)
-
 /*
  * __bit_alloc --
  *	Allocate a bitstring.
  */
-static inline int
+static WT_INLINE int
 __bit_alloc(WT_SESSION_IMPL *session, uint64_t nbits, void *retp)
 {
 	return (__wt_calloc(
@@ -84,8 +77,9 @@ __bit_alloc(WT_SESSION_IMPL *session, uint64_t nbits, void *retp)
  * __bit_test --
  *	Test one bit in name.
  */
-static inline bool
-__bit_test(uint8_t *bitf, uint64_t bit)
+static WT_INLINE bool
+__bit_test(const uint8_t *bitf, uint64_t bit)
+
 {
 	return ((bitf[__bit_byte(bit)] & __bit_mask(bit)) != 0);
 }
@@ -94,7 +88,7 @@ __bit_test(uint8_t *bitf, uint64_t bit)
  * __bit_set --
  *	Set one bit in name.
  */
-static inline void
+static WT_INLINE void
 __bit_set(uint8_t *bitf, uint64_t bit)
 {
 	bitf[__bit_byte(bit)] |= __bit_mask(bit);
@@ -104,7 +98,7 @@ __bit_set(uint8_t *bitf, uint64_t bit)
  * __bit_clear --
  *	Clear one bit in name.
  */
-static inline void
+static WT_INLINE void
 __bit_clear(uint8_t *bitf, uint64_t bit)
 {
 	bitf[__bit_byte(bit)] &= ~__bit_mask(bit);
@@ -114,7 +108,7 @@ __bit_clear(uint8_t *bitf, uint64_t bit)
  * __bit_nclr --
  *	Clear bits start-to-stop in name.
  */
-static inline void
+static WT_INLINE void
 __bit_nclr(uint8_t *bitf, uint64_t start, uint64_t stop)
 {
 	uint64_t startbyte, stopbyte;
@@ -138,7 +132,7 @@ __bit_nclr(uint8_t *bitf, uint64_t start, uint64_t stop)
  * __bit_nset --
  *	Set bits start-to-stop in name.
  */
-static inline void
+static WT_INLINE void
 __bit_nset(uint8_t *bitf, uint64_t start, uint64_t stop)
 {
 	uint64_t startbyte, stopbyte;
@@ -160,8 +154,8 @@ __bit_nset(uint8_t *bitf, uint64_t start, uint64_t stop)
  * __bit_ffc --
  *	Find first clear bit in name, return 0 on success, -1 on no bit clear.
  */
-static inline int
-__bit_ffc(uint8_t *bitf, uint64_t nbits, uint64_t *retp)
+static WT_INLINE int
+__bit_ffc(const uint8_t *bitf, uint64_t nbits, uint64_t *retp)
 {
 	uint64_t byte, stopbyte, value;
 	uint8_t lb;
@@ -191,8 +185,8 @@ __bit_ffc(uint8_t *bitf, uint64_t nbits, uint64_t *retp)
  * __bit_ffs --
  *	Find first set bit in name, return 0 on success, -1 on no bit set.
  */
-static inline int
-__bit_ffs(uint8_t *bitf, uint64_t nbits, uint64_t *retp)
+static WT_INLINE int
+__bit_ffs(const uint8_t *bitf, uint64_t nbits, uint64_t *retp)
 {
 	uint64_t byte, stopbyte, value;
 	uint8_t lb;
@@ -222,8 +216,8 @@ __bit_ffs(uint8_t *bitf, uint64_t nbits, uint64_t *retp)
  * __bit_getv --
  *	Return a fixed-length column store bit-field value.
  */
-static inline uint8_t
-__bit_getv(uint8_t *bitf, uint64_t entry, uint8_t width)
+static WT_INLINE uint8_t
+__bit_getv(const uint8_t *bitf, uint64_t entry, uint8_t width)
 {
 	uint64_t bit;
 	uint8_t value;
@@ -287,8 +281,8 @@ __bit_getv(uint8_t *bitf, uint64_t entry, uint8_t width)
  * __bit_getv_recno --
  *	Return a record number's bit-field value.
  */
-static inline uint8_t
-__bit_getv_recno(WT_REF *ref, uint64_t recno, uint8_t width)
+static WT_INLINE uint8_t
+__bit_getv_recno(const WT_REF *ref, uint64_t recno, uint8_t width)
 {
 	return (__bit_getv(
 	    ref->page->pg_fix_bitf, recno - ref->ref_recno, width));
@@ -298,7 +292,7 @@ __bit_getv_recno(WT_REF *ref, uint64_t recno, uint8_t width)
  * __bit_setv --
  *	Set a fixed-length column store bit-field value.
  */
-static inline void
+static WT_INLINE void
 __bit_setv(uint8_t *bitf, uint64_t entry, uint8_t width, uint8_t value)
 {
 	uint64_t bit;
@@ -369,4 +363,52 @@ __bit_setv(uint8_t *bitf, uint64_t entry, uint8_t width, uint8_t value)
 		++bit;
 		break;
 	}
+}
+
+/*
+ * __bit_clear_end --
+ *     Clear the leftover end bits of a fixed-length column store bitstring.
+ */
+static WT_INLINE void
+__bit_clear_end(uint8_t *bitf, uint64_t numentries, uint8_t width)
+{
+	uint64_t byte, firstbit;
+        uint8_t mask;
+
+        /* Figure the first bit that's past the end of the data, and get its position. */
+	firstbit = numentries * width;
+        byte = __bit_byte(firstbit);
+        mask = (uint8_t)__bit_mask(firstbit);
+
+        /* If mask is the first bit of the byte, we fit evenly and don't need to do anything. */
+        if (mask == 0x01)
+            return;
+
+        /*
+         * We want to clear this bit and up in the byte. Convert first to the bits below this bit,
+         * then flip to get the bits to clear. That is, 0b00000100 -> 0b00000011 -> 0b11111100.
+         */
+        mask = (uint8_t)(~(mask - 1));
+        bitf[byte] &= ~mask;
+}
+
+/*
+ * __bit_end_is_clear --
+ *     Check the leftover end bits of a fixed-length column store bitstring.
+ */
+static WT_INLINE bool
+__bit_end_is_clear(const uint8_t *bitf, uint64_t numentries, uint8_t width)
+{
+	uint64_t byte, firstbit;
+        uint8_t mask;
+
+	firstbit = numentries * width;
+        byte = __bit_byte(firstbit);
+        mask = (uint8_t)__bit_mask(firstbit);
+
+        if (mask == 0x01)
+            return (true);
+
+        mask = (uint8_t)(~(mask - 1));
+        return ((bitf[byte] & mask) == 0);
 }

@@ -10,6 +10,10 @@
 
 #include <boost/type_traits/integral_constant.hpp>
 
+#ifndef BOOST_NO_CXX23_HDR_STDFLOAT
+#include <stdfloat>
+#endif
+
 namespace boost {
 
 //* is a type T a floating-point type described in the standard (3.9.1p8)
@@ -23,6 +27,24 @@ namespace boost {
    
 #if defined(BOOST_HAS_FLOAT128)
    template<> struct is_floating_point<__float128> : public true_type{};
+#endif
+
+#ifndef BOOST_NO_CXX23_HDR_STDFLOAT
+#if defined(__STDCPP_FLOAT16_T__)
+   template<> struct is_floating_point<std::float16_t> : public true_type {};
+#endif
+#if defined(__STDCPP_FLOAT32_T__)
+   template<> struct is_floating_point<std::float32_t> : public true_type {};
+#endif
+#if defined(__STDCPP_FLOAT64_T__)
+   template<> struct is_floating_point<std::float64_t> : public true_type {};
+#endif
+#if defined(__STDCPP_FLOAT128_T__)
+   template<> struct is_floating_point<std::float128_t> : public true_type {};
+#endif
+#if defined(__STDCPP_BFLOAT16_T__)
+   template<> struct is_floating_point<std::bfloat16_t> : public true_type {};
+#endif
 #endif
 
 } // namespace boost

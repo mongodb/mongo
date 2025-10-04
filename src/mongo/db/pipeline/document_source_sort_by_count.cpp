@@ -27,15 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/pipeline/document_source_sort_by_count.h"
 
-#include "mongo/db/jsobj.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/query/allowed_contexts.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -49,19 +56,21 @@ REGISTER_DOCUMENT_SOURCE(sortByCount,
 
 list<intrusive_ptr<DocumentSource>> DocumentSourceSortByCount::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
-    if (elem.type() == Object) {
+    if (elem.type() == BSONType::object) {
         // Make sure that the sortByCount field is an expression inside an object
         BSONObj innerObj = elem.embeddedObject();
         uassert(40147,
                 str::stream() << "the sortByCount field must be defined as a $-prefixed path or an "
                                  "expression inside an object",
                 innerObj.firstElementFieldName()[0] == '$');
-    } else if (elem.type() == String) {
-        // Make sure that the sortByCount field is a $-prefixed path
+    } else if (elem.type() == BSONType::string) {
+        // Make sure that the sortByCount field is a $-prefixed path.
         uassert(40148,
                 str::stream() << "the sortByCount field must be defined as a $-prefixed path or an "
                                  "expression inside an object",
-                (elem.valueStringData()[0] == '$'));
+                // The string length must be greater than 2 because we need a '$', at least one char
+                // for the field name and the final terminating 0.
+                (elem.valuestrsize() > 2 && elem.valueStringData()[0] == '$'));
     } else {
         uasserted(
             40149,
@@ -75,7 +84,6 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceSortByCount::createFromBson(
     BSONObj groupObj = BSON("$group" << groupExprBuilder.obj());
     BSONObj sortObj = BSON("$sort" << BSON("count" << -1));
 
-    pExpCtx->sbeCompatible = false;
     auto groupSource = DocumentSourceGroup::createFromBson(groupObj.firstElement(), pExpCtx);
     auto sortSource = DocumentSourceSort::createFromBson(sortObj.firstElement(), pExpCtx);
 

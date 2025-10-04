@@ -1,11 +1,14 @@
 /**
  * Verify that readConcern: snapshot is not permitted for writes outside transactions.
  *
- * @tags: [requires_persistence, uses_transactions]
+ * @tags: [
+ *   # The test runs commands that are not allowed with security token: endSession.
+ *   not_allowed_with_signed_security_token,
+ *   requires_persistence,
+ *   uses_transactions
+ * ]
  */
 
-(function() {
-"use strict";
 const dbName = "test";
 const collName = "no_read_concern_snapshot_outside_txn";
 const testDB = db.getSiblingDB(dbName);
@@ -17,7 +20,7 @@ assert.commandWorked(testDB.createCollection(collName, {writeConcern: {w: "major
 
 // Initiate the session.
 const sessionOptions = {
-    causalConsistency: false
+    causalConsistency: false,
 };
 let session = db.getMongo().startSession(sessionOptions);
 let sessionDb = session.getDatabase(dbName);
@@ -62,4 +65,3 @@ tryCommands({testDB: sessionDb, message: "in session."});
 tryCommands({testDB: testDB, message: "outside session."});
 
 session.endSession();
-}());

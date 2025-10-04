@@ -29,17 +29,35 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-
-#include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/oid.h"
+#include "mongo/client/connection_string.h"
+#include "mongo/db/local_catalog/shard_role_catalog/collection_metadata.h"
+#include "mongo/db/local_catalog/shard_role_catalog/collection_sharding_runtime.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/s/migration_chunk_cloner_source.h"
 #include "mongo/db/s/migration_coordinator.h"
-#include "mongo/s/request_types/move_chunk_request.h"
+#include "mongo/db/s/move_timing_helper.h"
+#include "mongo/db/versioning_protocol/chunk_version.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/s/request_types/move_range_request_gen.h"
+#include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/timer.h"
+#include "mongo/util/uuid.h"
+
+#include <memory>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
-class OperationContext;
 struct ShardingStatistics;
 
 /**
@@ -49,9 +67,8 @@ struct ShardingStatistics;
  * are held.
  *
  * The intended workflow is as follows:
- *  - Acquire a distributed lock on the collection whose chunk is about to be moved.
- *  - Instantiate a MigrationSourceManager on the stack. This will snapshot the latest collection
- *      metadata, which should stay stable because of the distributed collection lock.
+ *  - Instantiate a MigrationSourceManager on the stack.
+ *      This will perform preliminary checks and snapshot the latest collection
  *  - Call startClone to initiate background cloning of the chunk contents. This will perform the
  *      necessary registration of the cloner with the replication subsystem and will start listening
  *      for document changes, while at the same time responding to data fetch requests from the
@@ -76,31 +93,30 @@ public:
      * Retrieves the MigrationSourceManager pointer that corresponds to the given collection under
      * a CollectionShardingRuntime that has its ResourceMutex locked.
      */
-    static MigrationSourceManager* get(CollectionShardingRuntime* csr,
-                                       CollectionShardingRuntime::CSRLock& csrLock);
+    static MigrationSourceManager* get(const CollectionShardingRuntime& csr);
 
     /**
-     * Instantiates a new migration source manager with the specified migration parameters. Must be
-     * called with the distributed lock acquired in advance (not asserted).
+     * If the currently installed migration has reached the cloning stage (i.e., after startClone),
+     * returns the cloner currently in use.
+     */
+    static std::shared_ptr<MigrationChunkClonerSource> getCurrentCloner(
+        const CollectionShardingRuntime& csr);
+
+    /**
+     * Instantiates a new migration source manager with the specified migration parameters.
      *
-     * Loads the most up-to-date collection metadata and uses it as a starting point. It is assumed
-     * that because of the distributed lock, the collection's metadata will not change further.
+     * Loads the most up-to-date collection metadata and uses it as a starting point.
      *
      * May throw any exception. Known exceptions are:
      *  - InvalidOptions if the operation context is missing shard version
-     *  - StaleConfigException if the expected collection version does not match what we find it
-     *      to be after acquiring the distributed lock.
+     *  - StaleConfig if the expected placement version does not match the one known by this shard.
      */
-    MigrationSourceManager(OperationContext* opCtx,
-                           MoveChunkRequest request,
-                           ConnectionString donorConnStr,
-                           HostAndPort recipientHost);
+    static MigrationSourceManager createMigrationSourceManager(OperationContext* opCtx,
+                                                               ShardsvrMoveRange&& request,
+                                                               WriteConcernOptions&& writeConcern,
+                                                               ConnectionString donorConnStr,
+                                                               HostAndPort recipientHost);
     ~MigrationSourceManager();
-
-    /**
-     * Returns the namespace for which this source manager is active.
-     */
-    NamespaceString getNss() const;
 
     /**
      * Contacts the donor shard and tells it to start cloning the specified chunk. This method will
@@ -109,7 +125,7 @@ public:
      * Expected state: kCreated
      * Resulting state: kCloning on success, kDone on failure
      */
-    Status startClone();
+    void startClone();
 
     /**
      * Waits for the cloning to catch up sufficiently so we won't have to stay in the critical
@@ -119,7 +135,7 @@ public:
      * Expected state: kCloning
      * Resulting state: kCloneCaughtUp on success, kDone on failure
      */
-    Status awaitToCatchUp();
+    void awaitToCatchUp();
 
     /**
      * Waits for the active clone operation to catch up and enters critical section. Once this call
@@ -130,7 +146,7 @@ public:
      * Expected state: kCloneCaughtUp
      * Resulting state: kCriticalSection on success, kDone on failure
      */
-    Status enterCriticalSection();
+    void enterCriticalSection();
 
     /**
      * Tells the recipient of the chunk to commit the chunk contents, which it received.
@@ -138,7 +154,7 @@ public:
      * Expected state: kCriticalSection
      * Resulting state: kCloneCompleted on success, kDone on failure
      */
-    Status commitChunkOnRecipient();
+    void commitChunkOnRecipient();
 
     /**
      * Tells the recipient shard to fetch the latest portion of data from the donor and to commit it
@@ -152,43 +168,46 @@ public:
      * Expected state: kCloneCompleted
      * Resulting state: kDone
      */
-    Status commitChunkMetadataOnConfig();
-
-    /**
-     * May be called at any time. Unregisters the migration source manager from the collection,
-     * restores the committed metadata (if in critical section) and logs error in the change log to
-     * indicate that the migration has failed.
-     *
-     * Expected state: Any
-     * Resulting state: kDone
-     */
-    void cleanupOnError();
+    void commitChunkMetadataOnConfig();
 
     /**
      * Aborts the migration after observing a concurrent index operation by marking its operation
      * context as killed.
      */
-    void abortDueToConflictingIndexOperation(OperationContext* opCtx);
-
-    /**
-     * Returns the cloner which is being used for this migration. This value is available only if
-     * the migration source manager is currently in the clone phase (i.e. the previous call to
-     * startClone has succeeded).
-     *
-     * Must be called with a both a collection lock and the CSRLock.
-     */
-    std::shared_ptr<MigrationChunkClonerSource> getCloner() const {
-        return _cloneDriver;
-    }
+    SharedSemiFuture<void> abort();
 
     /**
      * Returns a report on the active migration.
      *
      * Must be called with some form of lock on the collection namespace.
      */
-    BSONObj getMigrationStatusReport() const;
+    BSONObj getMigrationStatusReport(
+        const CollectionShardingRuntime::ScopedSharedCollectionShardingRuntime& scopedCsrLock)
+        const;
+
+    const NamespaceString& nss() {
+        return _args.getCommandParameter();
+    }
+
+    boost::optional<UUID> getMigrationId() {
+        if (_coordinator) {
+            return _coordinator->getMigrationId();
+        }
+        return boost::none;
+    }
+
+    long long getOpTimeMillis() {
+        return _entireOpTimer.millis();
+    }
 
 private:
+    // Private constructor, use the buildMigrationSourceManager() factory method instead.
+    MigrationSourceManager(OperationContext* opCtx,
+                           ShardsvrMoveRange&& request,
+                           WriteConcernOptions&& writeConcern,
+                           ConnectionString donorConnStr,
+                           HostAndPort recipientHost);
+
     // Used to track the current state of the source manager. See the methods above, which have
     // comments explaining the various state transitions.
     enum State {
@@ -201,27 +220,33 @@ private:
         kDone
     };
 
-    CollectionMetadata _getCurrentMetadataAndCheckEpoch();
-
-    /**
-     * If this donation moves the first chunk to the recipient (i.e., the recipient didn't have any
-     * chunks), this function writes a no-op message to the oplog, so that change stream will notice
-     * that and close the cursor in order to notify mongos to target the new shard as well.
-     */
-    void _notifyChangeStreamsOnRecipientFirstChunk(const CollectionMetadata& metadata);
+    CollectionMetadata _getCurrentMetadataAndCheckForConflictingErrors();
 
     /**
      * Called when any of the states fails. May only be called once and will put the migration
      * manager into the kDone state.
      */
-    void _cleanup(bool completeMigration) noexcept;
+    void _cleanup(bool completeMigration);
+
+    /**
+     * May be called at any time. Unregisters the migration source manager from the collection,
+     * restores the committed metadata (if in critical section) and logs error in the change log to
+     * indicate that the migration has failed.
+     *
+     * Expected state: Any
+     * Resulting state: kDone
+     */
+    void _cleanupOnError();
 
     // This is the opCtx of the moveChunk request that constructed the MigrationSourceManager.
     // The caller must guarantee it outlives the MigrationSourceManager.
     OperationContext* const _opCtx;
 
-    // The parameters to the moveChunk command
-    const MoveChunkRequest _args;
+    // The parameters to the moveRange command
+    const ShardsvrMoveRange _args;
+
+    // The write concern received for the moveRange command
+    const WriteConcernOptions _writeConcern;
 
     // The resolved connection string of the donor shard
     const ConnectionString _donorConnStr;
@@ -232,8 +257,18 @@ private:
     // Stores a reference to the process sharding statistics object which needs to be updated
     ShardingStatistics& _stats;
 
+    // Information about the moveChunk to be used in the critical section.
+    const BSONObj _critSecReason;
+
     // Times the entire moveChunk operation
     const Timer _entireOpTimer;
+
+    // Utility for constructing detailed logs for the steps of the chunk migration
+    MoveTimingHelper _moveTimingHelper;
+
+    // Promise which will be signaled when the migration source manager has finished running and is
+    // ready to be destroyed
+    SharedPromise<void> _completion;
 
     // Starts counting from creation time and is used to time various parts from the lifetime of the
     // move chunk sequence
@@ -242,40 +277,47 @@ private:
     // The current state. Used only for diagnostics and validation.
     State _state{kCreated};
 
-    // The epoch of the collection being migrated and its UUID, as of the time the migration
-    // started. Values are boost::optional only up until the constructor runs, because UUID doesn't
-    // have a default constructor.
-    boost::optional<OID> _collectionEpoch;
+    // Responsible for registering and unregistering the MigrationSourceManager from the collection
+    // sharding runtime for the collection
+    class ScopedRegisterer {
+    public:
+        ScopedRegisterer(MigrationSourceManager* msm, CollectionShardingRuntime& csr);
+        ~ScopedRegisterer();
+
+    private:
+        MigrationSourceManager* const _msm;
+    };
+    boost::optional<ScopedRegisterer> _scopedRegisterer;
+
+    // The UUID and timesetamp of the collection being migrated. The UUID values is boost::optional
+    // only up until the constructor runs, because UUID doesn't have a default constructor.
     boost::optional<UUID> _collectionUUID;
 
+    Timestamp _collectionTimestamp;
+
     // The version of the chunk at the time the migration started.
-    ChunkVersion _chunkVersion;
+    boost::optional<ChunkVersion> _chunkVersion;
+
+    // The chunk cloner source. Only available if there is an active migration going on. To set and
+    // remove it, the CSRLock needs to be acquired in exclusive mode. To access it, the CSRlock has
+    // to be acquired at least in shared mode. Available after cloning stage has completed.
+    std::shared_ptr<MigrationChunkClonerSource> _cloneDriver;
 
     // Contains logic for ensuring the donor's and recipient's config.rangeDeletions entries are
     // correctly updated based on whether the migration committed or aborted.
-    std::unique_ptr<migrationutil::MigrationCoordinator> _coordinator;
+    boost::optional<migrationutil::MigrationCoordinator> _coordinator;
 
-    // The chunk cloner source. Only available if there is an active migration going on. To set and
-    // remove it, a collection lock and the CSRLock need to be acquired first in order to block all
-    // logOp calls and then the mutex. To access it, only the mutex is necessary. Available after
-    // cloning stage has completed.
-    std::shared_ptr<MigrationChunkClonerSource> _cloneDriver;
+    // Holds the in-memory critical section for the collection. Only set when migration has reached
+    // the critical section phase.
+    boost::optional<CollectionCriticalSection> _critSec;
 
     // The statistics about a chunk migration to be included in moveChunk.commit
-    BSONObj _recipientCloneCounts;
-
-    boost::optional<CollectionCriticalSection> _critSec;
+    boost::optional<BSONObj> _recipientCloneCounts;
 
     // Optional future that is populated if the migration succeeds and range deletion is scheduled
     // on this node. The future is set when the range deletion completes. Used if the moveChunk was
     // sent with waitForDelete.
-    boost::optional<SemiFuture<void>> _cleanupCompleteFuture;
-
-    // Information about the moveChunk to be used in the critical section.
-    const BSONObj _critSecReason;
-
-    // It states whether the critical section has to be acquired on the recipient.
-    const bool _acquireCSOnRecipient;
+    boost::optional<SharedSemiFuture<void>> _cleanupCompleteFuture;
 };
 
 }  // namespace mongo

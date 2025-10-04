@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-from helper import copy_wiredtiger_home
-import wiredtiger, wttest
+import wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
@@ -35,8 +34,7 @@ from wtscenario import make_scenarios
 # Test that truncate with history store entries and timestamps gives expected results.
 class test_hs02(wttest.WiredTigerTestCase):
     # Force a small cache.
-    conn_config = 'cache_size=50MB,log=(enabled)'
-    session_config = 'isolation=snapshot'
+    conn_config = 'cache_size=50MB'
 
     format_values = [
         ('string-row', dict(key_format='S', value_format='S')),
@@ -78,15 +76,12 @@ class test_hs02(wttest.WiredTigerTestCase):
     def test_hs(self):
         nrows = 10000
 
-        # Create a table without logging to ensure we get "skew_newest" history store eviction
-        # behavior.
-        uri = "table:las02_main"
-        ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
-            config='log=(enabled=false)')
+        # Create a table.
+        uri = "table:hs02_main"
+        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format)
         ds.populate()
 
-        uri2 = "table:las02_extra"
+        uri2 = "table:hs02_extra"
         ds2 = SimpleDataSet(
             self, uri2, 0, key_format=self.key_format, value_format=self.value_format)
         ds2.populate()
@@ -98,11 +93,12 @@ class test_hs02(wttest.WiredTigerTestCase):
             bigvalue = "aaaaa" * 100
             bigvalue2 = "ddddd" * 100
 
+        # Commit at timestamp 1.
+        self.large_updates(uri, bigvalue, ds, nrows // 3, 1)
+
         # Pin oldest and stable to timestamp 1.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
             ',stable_timestamp=' + self.timestamp_str(1))
-
-        self.large_updates(uri, bigvalue, ds, nrows // 3, 1)
 
         # Check that all updates are seen
         self.check(uri, [(bigvalue, nrows // 3)], 1)
@@ -139,6 +135,3 @@ class test_hs02(wttest.WiredTigerTestCase):
         # Repeat earlier checks
         self.check(uri, expect_1, 1)
         self.check(uri, [(bigvalue2, nrows)], 100)
-
-if __name__ == '__main__':
-    wttest.run()

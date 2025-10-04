@@ -7,15 +7,16 @@
  *     dropTarget: <if true, creates target collection that will be dropped. Default: false>,
  * }
  */
-var RenameAcrossDatabasesTest = function(options) {
-    'use strict';
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {reconfig} from "jstests/replsets/rslib.js";
 
+export var RenameAcrossDatabasesTest = function (options) {
     if (!(this instanceof RenameAcrossDatabasesTest)) {
         return new RenameAcrossDatabasesTest(options);
     }
 
     // Capture the 'this' reference
-    var self = this;
+    let self = this;
 
     self.options = options || {};
 
@@ -23,17 +24,14 @@ var RenameAcrossDatabasesTest = function(options) {
      * Log a message for 'RenameAcrossDatabasesTest'.
      */
     function _testLog(msg) {
-        jsTestLog('[RenameAcrossDatabasesTest] ' + msg);
+        jsTestLog("[RenameAcrossDatabasesTest] " + msg);
     }
 
     /**
      * Runs the test.
      */
-    this.run = function() {
+    this.run = function () {
         const options = this.options;
-
-        load('jstests/replsets/rslib.js');
-
         let nodes = [{}, {}, {}];
         if (options.nodes) {
             assert.eq(nodes.length, options.nodes.length);
@@ -41,7 +39,7 @@ var RenameAcrossDatabasesTest = function(options) {
                 nodes[i] = Object.merge(nodes[i], options.nodes[i]);
             }
         }
-        _testLog('replica set node options: ' + tojson(nodes));
+        _testLog("replica set node options: " + tojson(nodes));
 
         const replTest = new ReplSetTest({nodes: [nodes[0]], oplogSize: 1000});
         const testName = replTest.name;
@@ -51,17 +49,23 @@ var RenameAcrossDatabasesTest = function(options) {
         // This test performs a reconfig that will change the implicit default write concern
         // from {w: "majority"} to {w: 1}. In order for this reconfig to succeed, we must first
         // set the cluster-wide write concern.
-        assert.commandWorked(replTest.getPrimary().adminCommand({
-            setDefaultRWConcern: 1,
-            defaultWriteConcern: {w: "majority"},
-            writeConcern: {w: "majority"}
-        }));
+        assert.commandWorked(
+            replTest.getPrimary().adminCommand({
+                setDefaultRWConcern: 1,
+                defaultWriteConcern: {w: "majority"},
+                writeConcern: {w: "majority"},
+            }),
+        );
 
         // If provided in 'options', we set the featureCompatibilityVersion. We do this prior to
         // adding any other members to the replica set.
         if (options.setFeatureCompatibilityVersion) {
-            assert.commandWorked(replTest.getPrimary().adminCommand(
-                {setFeatureCompatibilityVersion: options.setFeatureCompatibilityVersion}));
+            assert.commandWorked(
+                replTest.getPrimary().adminCommand({
+                    setFeatureCompatibilityVersion: options.setFeatureCompatibilityVersion,
+                    confirm: true,
+                }),
+            );
         }
 
         for (let i = 1; i < nodes.length; ++i) {
@@ -101,15 +105,15 @@ var RenameAcrossDatabasesTest = function(options) {
         replTest.awaitReplication();
 
         const primary = replTest.getPrimary();
-        _testLog('Feature compatibility version: ' +
-                 assert
-                     .commandWorked(
-                         primary.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}))
-                     .featureCompatibilityVersion);
+        _testLog(
+            "Feature compatibility version: " +
+                assert.commandWorked(primary.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}))
+                    .featureCompatibilityVersion,
+        );
 
         // Rename a collection across databases that also drops the existing target collection.
-        const sourceColl = primary.getCollection('sourceDb.from');
-        const targetColl = primary.getCollection('targetDb.to');
+        const sourceColl = primary.getCollection("sourceDb.from");
+        const targetColl = primary.getCollection("targetDb.to");
 
         // Create target collection that will be dropped during the rename operation if
         // options.dropTarget is true.
@@ -124,50 +128,60 @@ var RenameAcrossDatabasesTest = function(options) {
         // Indexes are explicitly recreated during cross-database renames. We verify this by
         // checking the number of indexes in the target collection after the rename.
         const numDocs = 10;
-        _testLog('Inserting ' + numDocs + ' documents into source collection.');
+        _testLog("Inserting " + numDocs + " documents into source collection.");
         for (let i = 0; i < numDocs; ++i) {
             assert.commandWorked(sourceColl.insert({_id: i, source: 1}));
         }
         const numNonIdIndexes = 3;
-        _testLog('Creating ' + numNonIdIndexes + ' indexes.');
+        _testLog("Creating " + numNonIdIndexes + " indexes.");
         for (let i = 0; i < numNonIdIndexes; ++i) {
             let keys = {};
-            keys['x' + i] = 1;
-            assert.commandWorked(sourceColl.createIndex(Object.merge(keys, {'source': 1})));
+            keys["x" + i] = 1;
+            assert.commandWorked(sourceColl.createIndex(Object.merge(keys, {"source": 1})));
         }
         replTest.awaitReplication();
 
-        _testLog('Collections and indexes created. About to rename source collection ' +
-                 sourceColl.getFullName() + ' to ' + targetColl.getFullName() +
-                 ' with dropTarget set to ' + dropTarget);
-        var results = assert.commandWorked(primary.adminCommand({
-            renameCollection: sourceColl.getFullName(),
-            to: targetColl.getFullName(),
-            dropTarget: dropTarget,
-        }));
+        _testLog(
+            "Collections and indexes created. About to rename source collection " +
+                sourceColl.getFullName() +
+                " to " +
+                targetColl.getFullName() +
+                " with dropTarget set to " +
+                dropTarget,
+        );
+        let results = assert.commandWorked(
+            primary.adminCommand({
+                renameCollection: sourceColl.getFullName(),
+                to: targetColl.getFullName(),
+                dropTarget: dropTarget,
+            }),
+        );
 
-        assert.eq(0,
-                  sourceColl.getDB()
-                      .getCollectionInfos()
-                      .filter(coll => coll.name === sourceColl.getFullName())
-                      .length);
+        assert.eq(
+            0,
+            sourceColl
+                .getDB()
+                .getCollectionInfos()
+                .filter((coll) => coll.name === sourceColl.getFullName()).length,
+        );
         assert.eq(numDocs, targetColl.find().itcount());
         assert.eq(numNonIdIndexes + 1, targetColl.getIndexes().length);
-        _testLog('Rename across databases successful.');
+        _testLog("Rename across databases successful.");
 
         // Dump oplog entries. Do this before validating the server data because the verification
         // logic inserts additional oplog entries into the oplog collection.
         const numOplogEntriesToDump = 100;
-        _testLog('Dumping last ' + numOplogEntriesToDump + ' oplog entries.');
-        replTest.dumpOplog(primary, {op: {$ne: 'n'}}, numOplogEntriesToDump);
+        _testLog("Dumping last " + numOplogEntriesToDump + " oplog entries.");
+        replTest.dumpOplog(primary, {op: {$ne: "n"}}, numOplogEntriesToDump);
 
         // Make sure oplogs & dbHashes match
-        _testLog('Checking oplogs and dbhashes after renaming collection.');
+        _testLog("Checking oplogs and dbhashes after renaming collection.");
         replTest.awaitReplication();
         replTest.checkOplogs(testName);
+        replTest.checkPreImageCollection(testName);
         replTest.checkReplicatedDataHashes(testName);
 
-        _testLog('Test completed. Stopping replica set.');
+        _testLog("Test completed. Stopping replica set.");
         replTest.stopSet();
     };
 };

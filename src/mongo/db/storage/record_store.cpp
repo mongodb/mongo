@@ -27,36 +27,46 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/operation_context.h"
 #include "mongo/db/storage/record_store.h"
+
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/storage/damage_vector.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
-Status RecordStore::oplogDiskLocRegister(OperationContext* opCtx,
-                                         const Timestamp& opTime,
-                                         bool orderedCommit) {
-    // Callers should be updating visibility as part of a write operation. We want to ensure that
-    // we never get here while holding an uninterruptible, read-ticketed lock. That would indicate
-    // that we are operating with the wrong global lock semantics, and either hold too weak a lock
-    // (e.g. IS) or that we upgraded in a way we shouldn't (e.g. IS -> IX).
-    invariant(opCtx->lockState()->isNoop() || !opCtx->lockState()->hasReadTicket() ||
-              !opCtx->lockState()->uninterruptibleLocksRequested());
-
-    return oplogDiskLocRegisterImpl(opCtx, opTime, orderedCommit);
+void CappedInsertNotifier::notifyAll() const {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    ++_version;
+    _notifier.notify_all();
 }
 
-void RecordStore::waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx) const {
-    // Callers are waiting for other operations to finish updating visibility. We want to ensure
-    // that we never get here while holding an uninterruptible, write-ticketed lock. That could
-    // indicate we are holding a stronger lock than we need to, and that we could actually
-    // contribute to ticket-exhaustion. That could prevent the write we are waiting on from
-    // acquiring the lock it needs to update the oplog visibility.
-    invariant(opCtx->lockState()->isNoop() || !opCtx->lockState()->hasWriteTicket() ||
-              !opCtx->lockState()->uninterruptibleLocksRequested());
+uint64_t CappedInsertNotifier::getVersion() const {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _version;
+}
 
-    waitForAllEarlierOplogWritesToBeVisibleImpl(opCtx);
+void CappedInsertNotifier::waitUntil(OperationContext* opCtx,
+                                     uint64_t prevVersion,
+                                     Date_t deadline) const {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    opCtx->waitForConditionOrInterruptUntil(_notifier, lk, deadline, [this, prevVersion]() {
+        return _dead || prevVersion != _version;
+    });
+}
+
+void CappedInsertNotifier::kill() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _dead = true;
+    _notifier.notify_all();
+}
+
+bool CappedInsertNotifier::isDead() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _dead;
 }
 
 }  // namespace mongo

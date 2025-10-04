@@ -1354,6 +1354,7 @@ bool perl_matcher<BidiIterator, Allocator, traits>::unwind_alt(bool r)
 template <class BidiIterator, class Allocator, class traits>
 bool perl_matcher<BidiIterator, Allocator, traits>::unwind_repeater_counter(bool)
 {
+   ++used_block_count;
    saved_repeater<BidiIterator>* pmp = static_cast<saved_repeater<BidiIterator>*>(m_backup_state);
    boost::BOOST_REGEX_DETAIL_NS::inplace_destroy(pmp++);
    m_backup_state = pmp;

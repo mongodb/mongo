@@ -2,11 +2,7 @@
  * $replaceRoot can be used to extract parts of a document; here we test a simple address case.
  */
 
-(function() {
-"use strict";
-
-// For arrayEq.
-load("jstests/aggregation/extras/utils.js");
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
 Random.setRandomSeed();
 
@@ -44,7 +40,6 @@ function generateRandomDocument() {
     };
 }
 
-const dbName = "test";
 const collName = jsTest.name();
 const coll = db.getCollection(collName);
 coll.drop();
@@ -61,25 +56,26 @@ assert.commandWorked(bulk.execute());
 // with replaceRoot yields the correct answer.
 // First compute each separately, since we know all of the fields in the address,
 // to make sure we have the correct results.
-let addressPipe = [{
-    $project: {
-        "_id": 0,
-        "number": "$address.number",
-        "street": "$address.street",
-        "city": "$address.city",
-        "zip": "$address.zip"
-    }
-}];
+let addressPipe = [
+    {
+        $project: {
+            "_id": 0,
+            "number": "$address.number",
+            "street": "$address.street",
+            "city": "$address.city",
+            "zip": "$address.zip",
+        },
+    },
+];
 let correctAddresses = coll.aggregate(addressPipe).toArray();
 
 // Then compute the same results using $replaceRoot.
-let replaceWithResult = coll.aggregate([
-                                {$replaceRoot: {newRoot: "$address"}},
-                                {$sort: {city: 1, zip: 1, street: 1, number: 1}}
-                            ])
-                            .toArray();
+let replaceWithResult = coll
+    .aggregate([{$replaceRoot: {newRoot: "$address"}}, {$sort: {city: 1, zip: 1, street: 1, number: 1}}])
+    .toArray();
 
 // Then assert they are the same.
-assert(arrayEq(replaceWithResult, correctAddresses),
-       "$replaceRoot does not work the same as $project-ing the relevant fields to the top level");
-}());
+assert(
+    arrayEq(replaceWithResult, correctAddresses),
+    "$replaceRoot does not work the same as $project-ing the relevant fields to the top level",
+);

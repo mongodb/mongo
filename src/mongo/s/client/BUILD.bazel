@@ -1,0 +1,47 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "shard_interface",
+    srcs = [
+        "//src/mongo/db/sharding_environment/client:shard.cpp",
+        "//src/mongo/db/sharding_environment/client:shard_gen",
+    ],
+    hdrs = [
+        "//src/mongo/db/sharding_environment/client:shard.h",
+    ],
+    deps = [
+        "//src/mongo/client:remote_command_retry_scheduler",
+        "//src/mongo/client:retry_strategy",
+        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/s/write_ops:batch_write_types",
+    ],
+)
+
+mongo_cc_library(
+    name = "sharding_client",
+    srcs = [
+        "//src/mongo/db/sharding_environment/client:num_hosts_targeted_metrics.cpp",
+        "//src/mongo/db/sharding_environment/client:shard_remote.cpp",
+    ],
+    hdrs = [
+        "//src/mongo/db/sharding_environment/client:num_hosts_targeted_metrics.h",
+        "//src/mongo/db/sharding_environment/client:shard_remote.h",
+    ],
+    deps = [
+        ":shard_interface",
+        "//src/mongo/client:fetcher",
+        "//src/mongo/db:commands",
+        "//src/mongo/db:server_base",
+        "//src/mongo/executor:task_executor_pool",
+        "//src/mongo/s:grid",
+    ],
+)

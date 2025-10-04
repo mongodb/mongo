@@ -3,10 +3,7 @@
  *
  * @tags: [assumes_unsharded_collection]
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // for assertArrayEq()
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.name;
 coll.drop();
@@ -21,13 +18,18 @@ const pipeline = [
         $merge: {
             into: coll.getName(),
             whenMatched: [{$addFields: {a: {$add: ["$a", 3]}}}],
-            whenNotMatched: "insert"
-        }
-    }
+            whenNotMatched: "insert",
+        },
+    },
 ];
 
 assert.doesNotThrow(() => coll.aggregate(pipeline));
 
-assertArrayEq(
-    {actual: coll.find().toArray(), expected: [{_id: 0, a: 3}, {_id: 1, a: 1}, {_id: 2, a: 2}]});
-}());
+assertArrayEq({
+    actual: coll.find().toArray(),
+    expected: [
+        {_id: 0, a: 3},
+        {_id: 1, a: 1},
+        {_id: 2, a: 2},
+    ],
+});

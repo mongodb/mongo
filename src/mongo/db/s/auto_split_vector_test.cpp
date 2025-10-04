@@ -27,36 +27,67 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-#include "mongo/db/catalog/create_collection.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/s/auto_split_vector.h"
-#include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/s/shard_server_test_fixture.h"
-#include "mongo/db/s/split_vector.h"
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/local_catalog/create_collection.h"
+#include "mongo/db/local_catalog/shard_role_catalog/operation_sharding_state.h"
+#include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
+#include "mongo/unittest/unittest.h"
+
+#include <initializer_list>
+#include <memory>
+#include <string>
+#include <type_traits>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 
 namespace mongo {
 namespace {
 
-const NamespaceString kNss = NamespaceString("autosplitDB", "coll");
-const std::string kPattern = "_id";
+const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("autosplitDB", "coll");
+const std::string kPattern_id = "_id";
+const std::string kPattern_x = "x";
+
+CollectionAcquisition acquireCollectionForAutoSplit(OperationContext* opCtx,
+                                                    const NamespaceString& nss) {
+    auto& readConcern = repl::ReadConcernArgs::get(opCtx);
+    return acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest{nss,
+                                     PlacementConcern::kPretendUnsharded,
+                                     readConcern,
+                                     AcquisitionPrerequisites::OperationType::kRead},
+        MODE_IS);
+}
 
 /*
  * Call the autoSplitVector function of the test collection on a chunk with bounds [0, 100) and with
  * the specified `maxChunkSizeMB`.
  */
-std::vector<BSONObj> autoSplit(OperationContext* opCtx, int maxChunkSizeMB) {
+std::pair<std::vector<BSONObj>, bool> autoSplit(OperationContext* opCtx,
+                                                int maxChunkSizeMB,
+                                                boost::optional<int> limit = boost::none,
+                                                bool forward = true) {
+    auto acq = acquireCollectionForAutoSplit(opCtx, kNss);
     return autoSplitVector(opCtx,
-                           kNss,
-                           BSON(kPattern << 1) /* shard key pattern */,
-                           BSON(kPattern << 0) /* min */,
-                           BSON(kPattern << 1000) /* max */,
-                           maxChunkSizeMB * 1024 * 1024 /* max chunk size in bytes*/);
+                           acq,
+                           BSON(kPattern_id << 1) /* shard key pattern */,
+                           BSON(kPattern_id << 0) /* min */,
+                           BSON(kPattern_id << 1000) /* max */,
+                           maxChunkSizeMB * 1024 * 1024 /* max chunk size in bytes*/,
+                           limit,
+                           forward);
 }
 
 class AutoSplitVectorTest : public ShardServerTestFixture {
@@ -65,20 +96,15 @@ public:
      * Before each test case:
      * - Creates a sharded collection with shard key `_id`
      */
-    void setUp() {
+    void setUp() override {
         ShardServerTestFixture::setUp();
 
         auto opCtx = operationContext();
 
-        {
-            OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
-                unsafeCreateCollection(opCtx);
-            uassertStatusOK(createCollection(
-                operationContext(), kNss.db().toString(), BSON("create" << kNss.coll())));
-        }
+        createTestCollection(opCtx, kNss);
 
         DBDirectClient client(opCtx);
-        client.createIndex(kNss.ns(), BSON(kPattern << 1));
+        client.createIndex(kNss, BSON(kPattern_id << 1));
     }
 
     /*
@@ -91,11 +117,11 @@ public:
         std::string s(1024 * 1024 - 24, 'a');  // To get a 1MB document
         for (int i = 0; i < nDocs; i++) {
             BSONObjBuilder builder;
-            builder.append(kPattern, _nextShardKey++);
+            builder.append(kPattern_id, _nextShardKey++);
             builder.append("str", s);
             BSONObj obj = builder.obj();
             ASSERT(obj.objsize() == 1024 * 1024);  // 1 MB document
-            client.insert(kNss.toString(), obj);
+            client.insert(kNss, obj);
         }
     }
 
@@ -106,7 +132,7 @@ public:
         return _nextShardKey;
     }
 
-private:
+protected:
     int _nextShardKey = 0;
 };
 
@@ -116,41 +142,86 @@ class AutoSplitVectorTest10MB : public AutoSplitVectorTest {
      * - Creates a sharded collection with shard key `_id`
      * - Inserts `10` documents of ~1MB size (shard keys [0...9])
      */
-    void setUp() {
+    void setUp() override {
         AutoSplitVectorTest::setUp();
 
         auto opCtx = operationContext();
 
-        DBDirectClient client(opCtx);
-        client.createIndex(kNss.ns(), BSON(kPattern << 1));
-
         insertNDocsOf1MB(opCtx, 10 /* nDocs */);
+
+        DBDirectClient client(opCtx);
         ASSERT_EQUALS(10, client.count(kNss));
     }
 };
 
 // Throw exception upon calling autoSplitVector on dropped/unexisting collection
-TEST_F(AutoSplitVectorTest10MB, NoCollection) {
+TEST_F(AutoSplitVectorTest, NoCollection) {
+    auto acq = acquireCollectionForAutoSplit(
+        operationContext(), NamespaceString::createNamespaceString_forTest("dummy", "collection"));
     ASSERT_THROWS_CODE(autoSplitVector(operationContext(),
-                                       NamespaceString("dummy", "collection"),
-                                       BSON(kPattern << 1) /* shard key pattern */,
-                                       BSON(kPattern << 0) /* min */,
-                                       BSON(kPattern << 100) /* max */,
+                                       acq,
+                                       BSON(kPattern_id << 1) /* shard key pattern */,
+                                       BSON(kPattern_id << kMinBSONKey) /* min */,
+                                       BSON(kPattern_id << kMaxBSONKey) /* max */,
                                        1 * 1024 * 1024 /* max chunk size in bytes*/),
                        DBException,
                        ErrorCodes::NamespaceNotFound);
 }
 
+TEST_F(AutoSplitVectorTest, EmptyCollection) {
+    auto acq = acquireCollectionForAutoSplit(operationContext(), kNss);
+    const auto [splitKey, continuation] =
+        autoSplitVector(operationContext(),
+                        acq,
+                        BSON(kPattern_id << 1) /* shard key pattern */,
+                        BSON(kPattern_id << kMinBSONKey) /* min */,
+                        BSON(kPattern_id << kMaxBSONKey) /* max */,
+                        1 * 1024 * 1024 /* max chunk size in bytes*/);
+    ASSERT_EQ(0, splitKey.size());
+    ASSERT_FALSE(continuation);
+}
+
+TEST_F(AutoSplitVectorTest, EmptyCollectionBackwards) {
+    auto acq = acquireCollectionForAutoSplit(operationContext(), kNss);
+    const auto [splitKey, continuation] =
+        autoSplitVector(operationContext(),
+                        acq,
+                        BSON(kPattern_id << 1) /* shard key pattern */,
+                        BSON(kPattern_id << kMinBSONKey) /* min */,
+                        BSON(kPattern_id << kMaxBSONKey) /* max */,
+                        1 * 1024 * 1024 /* max chunk size in bytes*/,
+                        boost::none,
+                        false);
+    ASSERT_EQ(0, splitKey.size());
+    ASSERT_FALSE(continuation);
+}
+
+TEST_F(AutoSplitVectorTest10MB, EmptyRange) {
+    auto acq = acquireCollectionForAutoSplit(operationContext(), kNss);
+    const auto [splitKey, continuation] =
+        autoSplitVector(operationContext(),
+                        acq,
+                        BSON(kPattern_id << 1) /* shard key pattern */,
+                        BSON(kPattern_id << kMinBSONKey) /* min */,
+                        BSON(kPattern_id << -10) /* max */,
+                        1 * 1024 * 1024 /* max chunk size in bytes*/);
+    ASSERT_EQ(0, splitKey.size());
+    ASSERT_FALSE(continuation);
+}
+
+
 // No split points if estimated `data size < max chunk size`
 TEST_F(AutoSplitVectorTest10MB, NoSplitIfDataLessThanMaxChunkSize) {
-    std::vector<BSONObj> splitKeys = autoSplit(operationContext(), 11 /* maxChunkSizeMB */);
+    auto [splitKeys, continuation] = autoSplit(operationContext(), 11 /* maxChunkSizeMB */);
     ASSERT_EQ(splitKeys.size(), 0);
+    ASSERT_FALSE(continuation);
 }
 
 // Do not split in case of `chunk size == maxChunkSize`
 TEST_F(AutoSplitVectorTest10MB, NoSplitIfDataEqualMaxChunkSize) {
-    std::vector<BSONObj> splitKeys = autoSplit(operationContext(), 10 /* maxChunkSizeMB */);
+    auto [splitKeys, continuation] = autoSplit(operationContext(), 10 /* maxChunkSizeMB */);
     ASSERT_EQ(splitKeys.size(), 0);
+    ASSERT_FALSE(continuation);
 }
 
 // No split points if `chunk size > max chunk size` but threshold not reached
@@ -161,36 +232,185 @@ TEST_F(AutoSplitVectorTest10MB, NoSplitIfDataLessThanThreshold) {
         // different range to don't interfere with the chunk getting splitted.
         insertNDocsOf1MB(operationContext(), surplus /* nDocs */);
     }
-    std::vector<BSONObj> splitKeys = autoSplit(operationContext(), 10 /* maxChunkSizeMB */);
+    auto [splitKeys, continuation] = autoSplit(operationContext(), 10 /* maxChunkSizeMB */);
     ASSERT_EQ(splitKeys.size(), 0);
+    ASSERT_FALSE(continuation);
 }
 
 // One split point if `chunk size > max chunk size` and threshold reached
 TEST_F(AutoSplitVectorTest10MB, SplitIfDataSlightlyMoreThanThreshold) {
     const auto surplus = 4;
     insertNDocsOf1MB(operationContext(), surplus /* nDocs */);
-    std::vector<BSONObj> splitKeys = autoSplit(operationContext(), 10 /* maxChunkSizeMB */);
+    auto [splitKeys, continuation] = autoSplit(operationContext(), 10 /* maxChunkSizeMB */);
     ASSERT_EQ(splitKeys.size(), 1);
-    ASSERT_EQ(6, splitKeys.front().getIntField(kPattern));
+    ASSERT_EQ(6, splitKeys.front().getIntField(kPattern_id));
+    ASSERT_FALSE(continuation);
+}
+
+TEST_F(AutoSplitVectorTest10MB, SplitIfDataSlightlyMoreThanThresholdBackwards) {
+    const auto surplus = 4;
+    insertNDocsOf1MB(operationContext(), surplus /* nDocs */);
+    auto [splitKeys, continuation] =
+        autoSplit(operationContext(), 10 /* maxChunkSizeMB */, boost::none, false);
+    ASSERT_EQ(splitKeys.size(), 1);
+    ASSERT_EQ(7, splitKeys.front().getIntField(kPattern_id));
+    ASSERT_FALSE(continuation);
 }
 
 // Split points if `data size > max chunk size * 2` and threshold reached
 TEST_F(AutoSplitVectorTest10MB, SplitIfDataMoreThanThreshold) {
     const auto surplus = 14;
     insertNDocsOf1MB(operationContext(), surplus /* nDocs */);
-    std::vector<BSONObj> splitKeys = autoSplit(operationContext(), 10 /* maxChunkSizeMB */);
+    auto [splitKeys, continuation] = autoSplit(operationContext(), 10 /* maxChunkSizeMB */);
     ASSERT_EQ(splitKeys.size(), 2);
-    ASSERT_EQ(7, splitKeys.front().getIntField(kPattern));
-    ASSERT_EQ(15, splitKeys.back().getIntField(kPattern));
+    ASSERT_EQ(7, splitKeys.front().getIntField(kPattern_id));
+    ASSERT_EQ(15, splitKeys.back().getIntField(kPattern_id));
+    ASSERT_FALSE(continuation);
+}
+
+TEST_F(AutoSplitVectorTest10MB, SplitIfDataMoreThanThresholdBackwards) {
+    const auto surplus = 14;
+    insertNDocsOf1MB(operationContext(), surplus /* nDocs */);
+    auto [splitKeys, continuation] =
+        autoSplit(operationContext(), 10 /* maxChunkSizeMB */, boost::none, false);
+    ASSERT_EQ(splitKeys.size(), 2);
+    ASSERT_EQ(16, splitKeys.front().getIntField(kPattern_id));
+    ASSERT_EQ(8, splitKeys.back().getIntField(kPattern_id));
+    ASSERT_FALSE(continuation);
 }
 
 // Split points are not recalculated if the right-most chunk is at least `80% maxChunkSize`
 TEST_F(AutoSplitVectorTest10MB, NoRecalculateIfBigLastChunk) {
     const auto surplus = 8;
     insertNDocsOf1MB(operationContext(), surplus /* nDocs */);
-    std::vector<BSONObj> splitKeys = autoSplit(operationContext(), 10 /* maxChunkSizeMB */);
+    auto [splitKeys, continuation] = autoSplit(operationContext(), 10 /* maxChunkSizeMB */);
     ASSERT_EQ(splitKeys.size(), 1);
-    ASSERT_EQ(9, splitKeys.front().getIntField(kPattern));
+    ASSERT_EQ(9, splitKeys.front().getIntField(kPattern_id));
+    ASSERT_FALSE(continuation);
+}
+
+TEST_F(AutoSplitVectorTest10MB, NoRecalculateIfBigLastChunkBackwards) {
+    const auto surplus = 8;
+    insertNDocsOf1MB(operationContext(), surplus /* nDocs */);
+    auto [splitKeys, continuation] =
+        autoSplit(operationContext(), 10 /* maxChunkSizeMB */, boost::none, false);
+    ASSERT_EQ(splitKeys.size(), 1);
+    ASSERT_EQ(8, splitKeys.front().getIntField(kPattern_id));
+    ASSERT_FALSE(continuation);
+}
+
+// Test that the limit argument is honored and that split points are correctly repositioned
+TEST_F(AutoSplitVectorTest10MB, LimitArgIsRespected) {
+    const auto surplus = 4;
+    insertNDocsOf1MB(operationContext(), surplus /* nDocs */);
+
+    // Maximum split keys returned (no limit)
+    const auto numPossibleSplitKeys = [&]() {
+        auto [splitKeys, continuation] = autoSplit(operationContext(), 2 /* maxChunkSizeMB */);
+        return splitKeys.size();
+    }();
+
+    ASSERT_GT(numPossibleSplitKeys, 3);
+    for (auto limit : {1, 2, 3}) {
+        const auto [splitKeys, continuation] =
+            autoSplit(operationContext(), 2 /* maxChunkSizeMB */, limit);
+        ASSERT_EQ(splitKeys.size(), limit);
+    }
+}
+
+TEST_F(AutoSplitVectorTest10MB, LimitArgIsRespectedBackwards) {
+    const auto surplus = 4;
+    insertNDocsOf1MB(operationContext(), surplus /* nDocs */);
+
+    // Maximum split keys returned (no limit)
+    const auto numPossibleSplitKeys = [&]() {
+        auto [splitKeys, continuation] =
+            autoSplit(operationContext(), 2 /* maxChunkSizeMB */, boost::none, false);
+        return splitKeys.size();
+    }();
+
+    ASSERT_GT(numPossibleSplitKeys, 3);
+    for (auto limit : {1, 2, 3}) {
+        const auto [splitKeys, continuation] =
+            autoSplit(operationContext(), 2 /* maxChunkSizeMB */, limit, false);
+        ASSERT_EQ(splitKeys.size(), limit);
+    }
+}
+
+class AutoSplitVectorTestInvalidKey : public AutoSplitVectorTest {
+
+public:
+    void setUp() override {
+        AutoSplitVectorTest::setUp();
+
+        auto opCtx = operationContext();
+
+        DBDirectClient client(opCtx);
+        client.createIndex(kNss, BSON(kPattern_x << 1));
+    }
+
+    void insertNDocsKeyXOf1MB(OperationContext* opCtx, int nDocs) {
+        DBDirectClient client(opCtx);
+
+        std::string s(1024 * 1024 - 22, 'a');  // To get a 1MB document
+        for (int i = 0; i < nDocs; i++) {
+            BSONObjBuilder builder;
+            builder.append(kPattern_x, _nextShardKey++);
+            builder.append("str", s);
+            BSONObj obj = builder.obj();
+            ASSERT(obj.objsize() == 1024 * 1024);  // 1 MB document
+            client.insert(kNss, obj);
+        }
+    }
+
+    void insertNBadDocsKeyXOf1MB(OperationContext* opCtx, int nDocs) {
+        DBDirectClient client(opCtx);
+
+        std::string s(1024 * 1024 - 27, 'a');  // To get a 1MB document
+        for (int i = 0; i < nDocs; i++) {
+            BSONObjBuilder builder;
+            std::string regexPattern = "^ab" + std::to_string(i + 10) + ".*";
+            builder.appendRegex(kPattern_x, regexPattern);
+            builder.append("str", s);
+            BSONObj obj = builder.obj();
+            ASSERT(obj.objsize() == 1024 * 1024);  // 1 MB document
+            client.insert(kNss, obj);
+        }
+    }
+};
+
+TEST_F(AutoSplitVectorTestInvalidKey, NoSplitIfAllDataIsInvalid) {
+    insertNBadDocsKeyXOf1MB(operationContext(), 9);
+    DBDirectClient client(operationContext());
+    ASSERT_EQUALS(9, client.count(kNss));
+    auto acq = acquireCollectionForAutoSplit(operationContext(), kNss);
+    const auto [splitKey, continuation] =
+        autoSplitVector(operationContext(),
+                        acq,
+                        BSON(kPattern_x << 1) /* shard key pattern */,
+                        BSON(kPattern_x << MINKEY) /* min */,
+                        BSON(kPattern_x << MAXKEY) /* max */,
+                        1 * 1024 * 1024 /* max chunk size in bytes*/);
+
+    ASSERT_EQ(0, splitKey.size());
+    ASSERT_FALSE(continuation);
+}
+
+TEST_F(AutoSplitVectorTestInvalidKey, OnlySplitAtValidKey) {
+    insertNDocsKeyXOf1MB(operationContext(), 15);
+    insertNBadDocsKeyXOf1MB(operationContext(), 15);
+    auto acq = acquireCollectionForAutoSplit(operationContext(), kNss);
+    const auto [splitKey, continuation] =
+        autoSplitVector(operationContext(),
+                        acq,
+                        BSON(kPattern_x << 1) /* shard key pattern */,
+                        BSON(kPattern_x << MINKEY) /* min */,
+                        BSON(kPattern_x << MAXKEY) /* max */,
+                        10 * 1024 * 1024 /* max chunk size in bytes*/);
+
+    ASSERT_EQ(1, splitKey.size());
+    ASSERT_NE(BSONType::regEx, splitKey.front().getField(kPattern_x).type());
+    ASSERT_FALSE(continuation);
 }
 
 class RepositionLastSplitPointsTest : public AutoSplitVectorTest {
@@ -212,12 +432,12 @@ public:
 
         int expectedChunkSize =
             mustReposition ? getInsertedSize() / (nSplitPoints + 1) : maxDocsPerChunk;
-        std::vector<BSONObj> splitKeys =
+        auto [splitKeys, continuation] =
             autoSplit(operationContext(), maxDocsPerChunk /* maxChunkSizeMB */);
 
         int approximateNextMin = expectedChunkSize;
         for (const auto& splitKey : splitKeys) {
-            int _id = splitKey.getIntField(kPattern);
+            int _id = splitKey.getIntField(kPattern_id);
             // Expect an approximate match due to integers rounding in the split points algorithm.
             ASSERT(_id >= approximateNextMin - 2 && _id <= approximateNextMin + 2) << BSON(
                 "approximateNextMin"

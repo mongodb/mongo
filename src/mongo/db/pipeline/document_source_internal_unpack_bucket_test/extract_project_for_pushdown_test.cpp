@@ -27,16 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/json.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/document_source_project.h"
-#include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/query/util/make_data_structure.h"
-#include "mongo/unittest/bson_test_util.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/intrusive_counter.h"
+
+#include <memory>
+#include <vector>
+
 
 namespace mongo {
 namespace {

@@ -14,11 +14,6 @@
 //     <repeat for all other views that had to be resolved for the query>
 //   }
 // ],
-(function() {
-'use strict';
-
-load("jstests/libs/logv2_helpers.js");
-
 function resetProfiler(db) {
     assert.commandWorked(db.setProfilingLevel(0, {slowms: 0}));
     db.system.profile.drop();
@@ -55,9 +50,9 @@ assert.commandWorked(db.dropDatabase());
 assert.commandWorked(db.createCollection("base"));
 assert.commandWorked(db.createView("a_view", "base", [{$project: {"aa": 0}}, {$sort: {"a": 1}}]));
 assert.commandWorked(db.createView("b_view", "base", [{$project: {"bb": 0}}]));
-assert.commandWorked(db.createView("c_view", "a_view", [
-    {$lookup: {from: "b_view", localField: "x", foreignField: "x", as: "y"}}
-]));
+assert.commandWorked(
+    db.createView("c_view", "a_view", [{$lookup: {from: "b_view", localField: "x", foreignField: "x", as: "y"}}]),
+);
 
 // Run a simple query against the top view.
 assert.commandWorked(db.setProfilingLevel(1, {slowms: 0}));
@@ -66,25 +61,27 @@ checkProfilerLog(db);
 
 // Sanity-check the "slow query" log (we do it only once, because the data between the profiler
 // and "slow query" log are identical).
-checkLog.containsWithCount(conn,
-                           `"resolvedViews":[{"viewNamespace":"${db.getName()}.b_view",` +
-                               `"dependencyChain":["b_view","base"],"resolvedPipeline":[{"$project`,
-                           1);
+checkLog.containsWithCount(
+    conn,
+    `"resolvedViews":[{"viewNamespace":"${db.getName()}.b_view",` +
+        `"dependencyChain":["b_view","base"],"resolvedPipeline":[{"$project`,
+    1,
+);
 
 // Run an aggregate query against the top view which uses one of the views from its dependency
 // chain, so the logged data is the same as above.
 resetProfiler(db);
 const lookup = {
-    $lookup: {from: "b_view", localField: "x", foreignField: "x", as: "y"}
+    $lookup: {from: "b_view", localField: "x", foreignField: "x", as: "y"},
 };
 assert.commandWorked(db.runCommand({aggregate: "c_view", pipeline: [lookup], cursor: {}}));
 checkProfilerLog(db);
 
 // If a view is modified, the logs should reflect that.
 assert.commandWorked(db.runCommand({drop: "c_view"}));
-assert.commandWorked(db.createView("c_view", "b_view", [
-    {$lookup: {from: "a_view", localField: "x", foreignField: "x", as: "y"}}
-]));
+assert.commandWorked(
+    db.createView("c_view", "b_view", [{$lookup: {from: "a_view", localField: "x", foreignField: "x", as: "y"}}]),
+);
 resetProfiler(db);
 assert.commandWorked(db.runCommand({find: "c_view", filter: {}}));
 
@@ -99,4 +96,3 @@ assertResolvedView(resolvedViews[1], `${db.getName()}.c_view`, 3, 2);
 
 assert.commandWorked(db.dropDatabase());
 MongoRunner.stopMongod(conn);
-})();

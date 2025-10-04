@@ -28,8 +28,13 @@
  */
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/process_health/fault_manager_config.h"
 #include "mongo/db/process_health/health_check_status.h"
+#include "mongo/util/duration.h"
+
+#include <memory>
 
 namespace mongo {
 namespace process_health {
@@ -53,10 +58,20 @@ public:
      */
     virtual HealthCheckStatus getStatus() const = 0;
 
+    virtual Milliseconds getDuration() const = 0;
+
     /**
      * Change the state of this Facet with health check result.
      */
     virtual void update(HealthCheckStatus status) = 0;
+
+    virtual void appendDescription(BSONObjBuilder* builder) const = 0;
+
+    BSONObj toBSON() const {
+        BSONObjBuilder builder;
+        appendDescription(&builder);
+        return builder.obj();
+    }
 };
 
 using FaultFacetPtr = std::shared_ptr<FaultFacet>;

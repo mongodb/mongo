@@ -26,22 +26,25 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest
+import wttest
 from wtscenario import make_scenarios
+from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
 
 # test_alter01.py
 #    Smoke-test the session alter operations.
-class test_alter01(wttest.WiredTigerTestCase):
+class test_alter01(TieredConfigMixin, wttest.WiredTigerTestCase):
     name = "alter01"
     entries = 100
-    # Settings for access_pattern_hint
+
+    # Data source types
     types = [
         ('file', dict(uri='file:', use_cg=False, use_index=False)),
-        ('lsm', dict(uri='lsm:', use_cg=False, use_index=False)),
         ('table-cg', dict(uri='table:', use_cg=True, use_index=False)),
         ('table-index', dict(uri='table:', use_cg=False, use_index=True)),
         ('table-simple', dict(uri='table:', use_cg=False, use_index=False)),
     ]
+
+    # Settings for access_pattern_hint
     hints = [
         ('default', dict(acreate='')),
         ('none', dict(acreate='none')),
@@ -49,6 +52,7 @@ class test_alter01(wttest.WiredTigerTestCase):
         ('sequential', dict(acreate='sequential')),
     ]
     access_alter=('', 'none', 'random', 'sequential')
+
     # Settings for cache_resident
     resid = [
         ('default', dict(ccreate='')),
@@ -60,7 +64,10 @@ class test_alter01(wttest.WiredTigerTestCase):
         ('reopen', dict(reopen=True)),
     ]
     cache_alter=('', 'false', 'true')
-    scenarios = make_scenarios(types, hints, resid, reopen)
+
+    # Build all scenarios
+    tiered_storage_sources = gen_tiered_storage_sources()
+    scenarios = make_scenarios(tiered_storage_sources, types, hints, resid, reopen)
 
     def verify_metadata(self, metastr):
         if metastr == '':
@@ -76,8 +83,7 @@ class test_alter01(wttest.WiredTigerTestCase):
             if ret != 0:
                 break
             key = cursor.get_key()
-            check_meta = ((key.find("lsm:") != -1 or key.find("file:") != -1) \
-                and key.find(self.name) != -1)
+            check_meta = (key.find("file:") != -1 and key.find(self.name) != -1)
             if check_meta:
                 value = cursor[key]
                 found = True
@@ -87,6 +93,9 @@ class test_alter01(wttest.WiredTigerTestCase):
 
     # Alter: Change the access pattern hint after creation
     def test_alter01_access(self):
+        if self.is_tiered_scenario() and (self.uri == 'file:'):
+            self.skipTest('Tiered storage does not support file URIs.')
+
         uri = self.uri + self.name
         create_params = 'key_format=i,value_format=i,'
         complex_params = ''
@@ -164,6 +173,3 @@ class test_alter01(wttest.WiredTigerTestCase):
                         self.session.alter(suburi, alter_param)
                         self.verify_metadata(access_str)
                         self.verify_metadata(cache_str)
-
-if __name__ == '__main__':
-    wttest.run()

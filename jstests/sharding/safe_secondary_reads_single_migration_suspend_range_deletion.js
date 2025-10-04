@@ -22,12 +22,19 @@
  *                                     results for the command run with read concern 'available'.
  * - behavior: Must be one of "unshardedOnly", "targetsPrimaryUsesConnectionVersioning" or
  * "versioned". Determines what system profiler checks are performed.
+ * @tags: [
+ *    requires_scripting,
+ * ]
  */
-(function() {
-"use strict";
-
-load('jstests/libs/profiler.js');
-load('jstests/sharding/libs/last_lts_mongos_commands.js');
+import {
+    buildCommandProfile,
+    profilerHasSingleMatchingEntryOrThrow,
+    profilerHasZeroMatchingEntriesOrThrow,
+} from "jstests/libs/profiler.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {
+    commandsRemovedFromMongosSinceLastLTS
+} from "jstests/sharding/libs/last_lts_mongos_commands.js";
 
 let db = "test";
 let coll = "foo";
@@ -35,66 +42,86 @@ let nss = db + "." + coll;
 
 // Check that a test case is well-formed.
 let validateTestCase = function(test) {
-    assert(test.setUp && typeof (test.setUp) === "function");
-    assert(test.command && typeof (test.command) === "object");
-    assert(test.checkResults && typeof (test.checkResults) === "function");
+    assert(test.setUp && typeof test.setUp === "function");
+    assert(test.command && typeof test.command === "object");
+    assert(test.checkResults && typeof test.checkResults === "function");
     assert(test.checkAvailableReadConcernResults &&
-           typeof (test.checkAvailableReadConcernResults) === "function");
-    assert(test.behavior === "unshardedOnly" ||
-           test.behavior === "targetsPrimaryUsesConnectionVersioning" ||
-           test.behavior === "versioned");
+           typeof test.checkAvailableReadConcernResults === "function");
+    assert(
+        test.behavior === "unshardedOnly" ||
+            test.behavior === "targetsPrimaryUsesConnectionVersioning" ||
+            test.behavior === "versioned",
+    );
 };
 
 let testCases = {
     _addShard: {skip: "primary only"},
     _shardsvrCloneCatalogData: {skip: "primary only"},
+    _clusterQueryWithoutShardKey: {skip: "internal command"},
+    _clusterWriteWithoutShardKey: {skip: "internal command"},
     _configsvrAddShard: {skip: "primary only"},
     _configsvrAddShardToZone: {skip: "primary only"},
     _configsvrBalancerCollectionStatus: {skip: "primary only"},
     _configsvrBalancerStart: {skip: "primary only"},
     _configsvrBalancerStatus: {skip: "primary only"},
     _configsvrBalancerStop: {skip: "primary only"},
+    _configsvrCheckClusterMetadataConsistency: {skip: "internal command"},
+    _configsvrCheckMetadataConsistency: {skip: "internal command"},
     _configsvrClearJumboFlag: {skip: "primary only"},
     _configsvrCommitChunksMerge: {skip: "primary only"},
     _configsvrCommitChunkMigration: {skip: "primary only"},
     _configsvrCommitChunkSplit: {skip: "primary only"},
-    _configsvrCommitMovePrimary:
-        {skip: "primary only"},  // TODO SERVER-58843: Remove once 6.0 becomes last LTS
-    _configsvrConfigureAutoSplit: {skip: "primary only"},
-    _configsvrDropCollection:
-        {skip: "primary only"},  // TODO SERVER-58843: Remove once 6.0 becomes last LTS
-    _configsvrDropDatabase:
-        {skip: "primary only"},  // TODO SERVER-58843: Remove once 6.0 becomes last LTS
-    _configsvrMoveChunk: {skip: "primary only"},
-    _configsvrMovePrimary:
-        {skip: "primary only"},  // TODO SERVER-58843: Remove once 6.0 becomes last LTS
+    _configsvrCommitMergeAllChunksOnShard: {skip: "primary only"},
+    _configsvrConfigureCollectionBalancing: {skip: "primary only"},
+    _configsvrMoveRange: {skip: "primary only"},
     _configsvrRemoveChunks: {skip: "primary only"},
     _configsvrRemoveShardFromZone: {skip: "primary only"},
     _configsvrRemoveTags: {skip: "primary only"},
+    _configsvrResetPlacementHistory: {skip: "primary only"},
     _configsvrReshardCollection: {skip: "primary only"},
     _configsvrSetAllowMigrations: {skip: "primary only"},
-    _configsvrShardCollection:
-        {skip: "primary only"},  // TODO SERVER-58843: Remove once 6.0 becomes last LTS
+    _configsvrSetClusterParameter: {skip: "primary only"},
+    _configsvrSetUserWriteBlockMode: {skip: "primary only"},
+    _configsvrTransitionFromDedicatedConfigServer: {skip: "primary only"},
+    _configsvrTransitionToDedicatedConfigServer: {skip: "primary only"},
     _configsvrUpdateZoneKeyRange: {skip: "primary only"},
+    _dropConnectionsToMongot: {skip: "internal command"},
+    _dropMirrorMaestroConnections: {skip: "internal command"},
     _flushReshardingStateChange: {skip: "does not return user data"},
     _flushRoutingTableCacheUpdates: {skip: "does not return user data"},
     _flushRoutingTableCacheUpdatesWithWriteConcern: {skip: "does not return user data"},
-    _getAuditConfigGeneration: {skip: "does not return user data"},
     _getUserCacheGeneration: {skip: "does not return user data"},
     _hashBSONElement: {skip: "does not return user data"},
     _isSelf: {skip: "does not return user data"},
     _killOperations: {skip: "does not return user data"},
     _mergeAuthzCollections: {skip: "primary only"},
     _migrateClone: {skip: "primary only"},
+    _mirrorMaestroConnPoolStats: {skip: "internal command"},
+    _mongotConnPoolStats: {skip: "internal command"},
+    _shardsvrBeginMigrationBlockingOperation: {skip: "primary only"},
+    _shardsvrChangePrimary: {skip: "primary only"},
+    _shardsvrCheckMetadataConsistency: {skip: "internal command"},
+    _shardsvrCheckMetadataConsistencyParticipant: {skip: "internal command"},
+    _shardsvrCleanupStructuredEncryptionData: {skip: "primary only"},
+    _shardsvrCloneAuthoritativeMetadata: {skip: "primary only"},
+    _shardsvrCompactStructuredEncryptionData: {skip: "primary only"},
+    _shardsvrCoordinateMultiUpdate: {skip: "primary only"},
+    _shardsvrEndMigrationBlockingOperation: {skip: "primary only"},
+    _shardsvrMergeAllChunksOnShard: {skip: "primary only"},
     _shardsvrMovePrimary: {skip: "primary only"},
+    _shardsvrMovePrimaryEnterCriticalSection: {skip: "primary only"},
+    _shardsvrMovePrimaryExitCriticalSection: {skip: "primary only"},
+    _shardsvrMoveRange: {skip: "primary only"},
     _recvChunkAbort: {skip: "primary only"},
     _recvChunkCommit: {skip: "primary only"},
     _recvChunkReleaseCritSec: {skip: "primary only"},
     _recvChunkStart: {skip: "primary only"},
     _recvChunkStatus: {skip: "primary only"},
     _transferMods: {skip: "primary only"},
+    abortMoveCollection: {skip: "primary only"},
     abortReshardCollection: {skip: "primary only"},
     abortTransaction: {skip: "primary only"},
+    abortUnshardCollection: {skip: "primary only"},
     addShard: {skip: "primary only"},
     addShardToZone: {skip: "primary only"},
     aggregate: {
@@ -112,37 +139,57 @@ let testCases = {
             assert.commandWorked(res);
             assert.eq(1, res.cursor.firstBatch.length, tojson(res));
         },
-        behavior: "versioned"
+        behavior: "versioned",
     },
+    analyze: {skip: "primary only"},
+    analyzeShardKey: {skip: "only support readConcern 'local'"},
     appendOplogNote: {skip: "primary only"},
     applyOps: {skip: "primary only"},
     authSchemaUpgrade: {skip: "primary only"},
     authenticate: {skip: "does not return user data"},
-    availableQueryOptions: {skip: "does not return user data"},
+    autoSplitVector: {skip: "primary only"},
     balancerCollectionStatus: {skip: "primary only"},
     balancerStart: {skip: "primary only"},
     balancerStatus: {skip: "primary only"},
     balancerStop: {skip: "primary only"},
     buildInfo: {skip: "does not return user data"},
-    captrunc: {skip: "primary only"},
+    bulkWrite: {skip: "primary only"},
+    changePrimary: {skip: "primary only"},
+    checkMetadataConsistency: {skip: "primary only"},
     checkShardingIndex: {skip: "primary only"},
     cleanupOrphaned: {skip: "primary only"},
     cleanupReshardCollection: {skip: "primary only"},
+    cleanupStructuredEncryptionData: {skip: "does not return user data"},
     clearJumboFlag: {skip: "primary only"},
     clearLog: {skip: "does not return user data"},
     clone: {skip: "primary only"},
     cloneCollectionAsCapped: {skip: "primary only"},
+    clusterAbortTransaction: {skip: "already tested by 'abortTransaction' tests on mongos"},
+    clusterAggregate: {skip: "already tested by 'aggregate' tests on mongos"},
+    clusterBulkWrite: {skip: "already tested by 'bulkWrite' tests on mongos"},
+    clusterCommitTransaction: {skip: "already tested by 'commitTransaction' tests on mongos"},
+    clusterCount: {skip: "already tested by 'count' tests on mongos"},
+    clusterDelete: {skip: "already tested by 'delete' tests on mongos"},
+    clusterFind: {skip: "already tested by 'find' tests on mongos"},
+    clusterGetMore: {skip: "already tested by 'getMore' tests on mongos"},
+    clusterInsert: {skip: "already tested by 'insert' tests on mongos"},
+    clusterReleaseMemory: {skip: "already tested by 'releaseMemory' tests on mongos"},
+    clusterUpdate: {skip: "already tested by 'update' tests on mongos"},
     commitReshardCollection: {skip: "primary only"},
+    commitShardRemoval: {skip: "primary only"},
     commitTransaction: {skip: "primary only"},
-    configureCollectionAutoSplitter: {skip: "does not return user data"},
+    configureCollectionBalancing: {skip: "does not return user data"},
     collMod: {skip: "primary only"},
     collStats: {skip: "does not return user data"},
     compact: {skip: "does not return user data"},
+    compactStructuredEncryptionData: {skip: "does not return user data"},
     configureFailPoint: {skip: "does not return user data"},
+    configureQueryAnalyzer: {skip: "does not return user data"},
     connPoolStats: {skip: "does not return user data"},
     connPoolSync: {skip: "does not return user data"},
     connectionStatus: {skip: "does not return user data"},
     convertToCapped: {skip: "primary only"},
+    coordinateCommitTransaction: {skip: "unimplemented. Serves only as a stub."},
     count: {
         setUp: function(mongosConn) {
             assert.commandWorked(mongosConn.getCollection(nss).insert({x: 1}));
@@ -158,12 +205,14 @@ let testCases = {
             assert.commandWorked(res);
             assert.eq(1, res.n, tojson(res));
         },
-        behavior: "versioned"
+        behavior: "versioned",
     },
     cpuload: {skip: "does not return user data"},
     create: {skip: "primary only"},
     createIndexes: {skip: "primary only"},
     createRole: {skip: "primary only"},
+    createSearchIndexes: {skip: "does not return user data"},
+    createUnsplittableCollection: {skip: "primary only"},
     createUser: {skip: "primary only"},
     currentOp: {skip: "does not return user data"},
     dataSize: {skip: "does not return user data"},
@@ -185,9 +234,8 @@ let testCases = {
             assert.commandWorked(res);
             assert.eq(1, res.values.length, tojson(res));
         },
-        behavior: "versioned"
+        behavior: "versioned",
     },
-    driverOIDTest: {skip: "does not return user data"},
     drop: {skip: "primary only"},
     dropAllRolesFromDatabase: {skip: "primary only"},
     dropAllUsersFromDatabase: {skip: "primary only"},
@@ -195,12 +243,12 @@ let testCases = {
     dropDatabase: {skip: "primary only"},
     dropIndexes: {skip: "primary only"},
     dropRole: {skip: "primary only"},
+    dropSearchIndex: {skip: "does not return user data"},
     dropUser: {skip: "primary only"},
     echo: {skip: "does not return user data"},
-    emptycapped: {skip: "primary only"},
     enableSharding: {skip: "primary only"},
     endSessions: {skip: "does not return user data"},
-    explain: {skip: "TODO SERVER-30068"},
+    explain: {skip: "test case to be added"},
     features: {skip: "does not return user data"},
     filemd5: {skip: "does not return user data"},
     find: {
@@ -218,7 +266,7 @@ let testCases = {
             assert.commandWorked(res);
             assert.eq(1, res.cursor.firstBatch.length, tojson(res));
         },
-        behavior: "versioned"
+        behavior: "versioned",
     },
     findAndModify: {skip: "primary only"},
     flushRouterConfig: {skip: "does not return user data"},
@@ -226,16 +274,19 @@ let testCases = {
     fsync: {skip: "does not return user data"},
     fsyncUnlock: {skip: "does not return user data"},
     getAuditConfig: {skip: "does not return user data"},
+    getChangeStreamState: {skip: "does not return user data"},
+    getClusterParameter: {skip: "does not return user data"},
     getCmdLineOpts: {skip: "does not return user data"},
+    getDatabaseVersion: {skip: "does not return user data"},
     getDefaultRWConcern: {skip: "does not return user data"},
     getDiagnosticData: {skip: "does not return user data"},
-    getLastError: {skip: "primary only"},
     getLog: {skip: "does not return user data"},
     getMore: {skip: "shard version already established"},
     getParameter: {skip: "does not return user data"},
+    getQueryableEncryptionCountInfo: {skip: "primary only"},
     getShardMap: {skip: "does not return user data"},
     getShardVersion: {skip: "primary only"},
-    getnonce: {skip: "does not return user data"},
+    getTrafficRecordingStatus: {skip: "does not return user data"},
     godinsert: {skip: "for testing only"},
     grantPrivilegesToRole: {skip: "primary only"},
     grantRolesToRole: {skip: "primary only"},
@@ -256,8 +307,9 @@ let testCases = {
     listCommands: {skip: "does not return user data"},
     listDatabases: {skip: "primary only"},
     listIndexes: {skip: "primary only"},
+    listSearchIndexes: {skip: "does not return user data"},
     listShards: {skip: "does not return user data"},
-    lockInfo: {skip: "primary only"},
+    lockInfo: {skip: "does not return user data"},
     logApplicationMessage: {skip: "primary only"},
     logMessage: {skip: "does not return user data"},
     logRotate: {skip: "does not return user data"},
@@ -276,37 +328,73 @@ let testCases = {
             reduce: function(key, values) {
                 return Array.sum(values);
             },
-            out: {inline: 1}
+            out: {inline: 1},
         },
         filter: {
             aggregate: coll,
-            "pipeline": [
-                {
-                    "$project": {
-                        "emits": {
-                            "$_internalJsEmit": {
-                                "eval":
-                                    "function() {\n                emit(this.x, 1);\n            }",
-                                "this": "$$ROOT"
-                            }
+            "pipeline": {
+                $in: [
+                    // There are two possible versions of this pipeline; the only difference is the
+                    // presence/absence of the $willBeMerged field, which depends on whether or not
+                    // the pipeline needs to be merged on the router. We can't predict which case we
+                    // will get on upgrade/downgrade suites, so we allow either.
+                    [
+                        {
+                            "$project": {
+                                "emits": {
+                                    "$_internalJsEmit": {
+                                        "eval":
+                                            "function() {\n                emit(this.x, 1);\n            }",
+                                        "this": "$$ROOT",
+                                    },
+                                },
+                                "_id": false,
+                            },
                         },
-                        "_id": false
-                    }
-                },
-                {"$unwind": {"path": "$emits"}},
-                {
-                    "$group": {
-                        "_id": "$emits.k",
-                        "value": {
-                            "$_internalJsReduce": {
-                                "data": "$emits",
-                                "eval":
-                                    "function(key, values) {\n                return Array.sum(values);\n            }"
-                            }
-                        }
-                    }
-                }
-            ],
+                        {"$unwind": {"path": "$emits"}},
+                        {
+                            "$group": {
+                                "_id": "$emits.k",
+                                "value": {
+                                    "$_internalJsReduce": {
+                                        "data": "$emits",
+                                        "eval":
+                                            "function(key, values) {\n                return Array.sum(values);\n            }",
+                                    },
+                                },
+                            },
+                        },
+                    ],
+                    [
+                        {
+                            "$project": {
+                                "emits": {
+                                    "$_internalJsEmit": {
+                                        "eval":
+                                            "function() {\n                emit(this.x, 1);\n            }",
+                                        "this": "$$ROOT",
+                                    },
+                                },
+                                "_id": false,
+                            },
+                        },
+                        {"$unwind": {"path": "$emits"}},
+                        {
+                            "$group": {
+                                "_id": "$emits.k",
+                                "value": {
+                                    "$_internalJsReduce": {
+                                        "data": "$emits",
+                                        "eval":
+                                            "function(key, values) {\n                return Array.sum(values);\n            }",
+                                    },
+                                },
+                                "$willBeMerged": false,
+                            },
+                        },
+                    ],
+                ],
+            },
         },
         checkResults: function(res) {
             assert.commandWorked(res);
@@ -320,13 +408,18 @@ let testCases = {
             assert.eq(1, res.results[0]._id, tojson(res));
             assert.eq(2, res.results[0].value, tojson(res));
         },
-        behavior: "versioned"
+        behavior: "versioned",
     },
+    mergeAllChunksOnShard: {skip: "primary only"},
     mergeChunks: {skip: "primary only"},
     moveChunk: {skip: "primary only"},
+    moveCollection: {skip: "primary only"},
     movePrimary: {skip: "primary only"},
+    moveRange: {skip: "primary only"},
     multicast: {skip: "does not return user data"},
     netstat: {skip: "does not return user data"},
+    oidcListKeys: {skip: "does not return user data"},
+    oidcRefreshKeys: {skip: "does not return user data"},
     ping: {skip: "does not return user data"},
     planCacheClear: {skip: "does not return user data"},
     planCacheClearFilters: {skip: "does not return user data"},
@@ -337,10 +430,12 @@ let testCases = {
     refineCollectionShardKey: {skip: "primary only"},
     refreshLogicalSessionCacheNow: {skip: "does not return user data"},
     refreshSessions: {skip: "does not return user data"},
-    refreshSessionsInternal: {skip: "does not return user data"},
+    releaseMemory: {skip: "does not return user data"},
     removeShard: {skip: "primary only"},
     removeShardFromZone: {skip: "primary only"},
     renameCollection: {skip: "primary only"},
+    repairShardedCollectionChunksHistory: {skip: "does not return user data"},
+    replicateSearchIndexCommand: {skip: "internal command"},
     replSetAbortPrimaryCatchUp: {skip: "does not return user data"},
     replSetFreeze: {skip: "does not return user data"},
     replSetGetConfig: {skip: "does not return user data"},
@@ -357,6 +452,7 @@ let testCases = {
     replSetTest: {skip: "does not return user data"},
     replSetUpdatePosition: {skip: "does not return user data"},
     replSetResizeOplog: {skip: "does not return user data"},
+    resetPlacementHistory: {skip: "primary only"},
     reshardCollection: {skip: "primary only"},
     resync: {skip: "primary only"},
     revokePrivilegesFromRole: {skip: "primary only"},
@@ -364,49 +460,68 @@ let testCases = {
     revokeRolesFromUser: {skip: "primary only"},
     rolesInfo: {skip: "primary only"},
     rotateCertificates: {skip: "does not return user data"},
+    rotateFTDC: {skip: "does not return user data"},
     saslContinue: {skip: "primary only"},
     saslStart: {skip: "primary only"},
     sbe: {skip: "internal command"},
     serverStatus: {skip: "does not return user data"},
+    setAllowMigrations: {skip: "primary only"},
     setAuditConfig: {skip: "does not return user data"},
     setCommittedSnapshot: {skip: "does not return user data"},
     setDefaultRWConcern: {skip: "primary only"},
     setIndexCommitQuorum: {skip: "primary only"},
     setFeatureCompatibilityVersion: {skip: "primary only"},
-    setFreeMonitoring: {skip: "primary only"},
+    setProfilingFilterGlobally: {skip: "does not return user data"},
     setParameter: {skip: "does not return user data"},
     setShardVersion: {skip: "does not return user data"},
+    setChangeStreamState: {skip: "does not return user data"},
+    setClusterParameter: {skip: "does not return user data"},
+    setQuerySettings: {skip: "does not return user data"},
+    removeQuerySettings: {skip: "does not return user data"},
+    setUserWriteBlockMode: {skip: "primary only"},
     shardCollection: {skip: "primary only"},
+    shardDrainingStatus: {skip: "internal command"},
     shardingState: {skip: "does not return user data"},
     shutdown: {skip: "does not return user data"},
     sleep: {skip: "does not return user data"},
     split: {skip: "primary only"},
     splitChunk: {skip: "primary only"},
     splitVector: {skip: "primary only"},
-    stageDebug: {skip: "primary only"},
-    startRecordingTraffic: {skip: "does not return user data"},
+    startRecordingTraffic: {skip: "Renamed to startTrafficRecording"},
+    stopRecordingTraffic: {skip: "Renamed to stopTrafficRecording"},
+    startShardDraining: {skip: "primary only"},
+    startTrafficRecording: {skip: "does not return user data"},
     startSession: {skip: "does not return user data"},
-    stopRecordingTraffic: {skip: "does not return user data"},
+    stopShardDraining: {skip: "primary only"},
+    stopTrafficRecording: {skip: "does not return user data"},
+    sysprofile: {skip: "internal command"},
     testDeprecation: {skip: "does not return user data"},
     testDeprecationInVersion2: {skip: "does not return user data"},
+    testInternalTransactions: {skip: "primary only"},
     testRemoval: {skip: "does not return user data"},
     testVersions1And2: {skip: "does not return user data"},
     testVersion2: {skip: "does not return user data"},
     top: {skip: "does not return user data"},
+    transitionFromDedicatedConfigServer: {skip: "primary only"},
+    transitionToDedicatedConfigServer: {skip: "primary only"},
+    transitionToShardedCluster: {skip: "primary only"},
+    unshardCollection: {skip: "primary only"},
+    untrackUnshardedCollection: {skip: "primary only"},
     update: {skip: "primary only"},
     updateRole: {skip: "primary only"},
+    updateSearchIndex: {skip: "does not return user data"},
     updateUser: {skip: "primary only"},
     updateZoneKeyRange: {skip: "primary only"},
     usersInfo: {skip: "primary only"},
     validate: {skip: "does not return user data"},
     validateDBMetadata: {skip: "does not return user data"},
     waitForFailPoint: {skip: "does not return user data"},
-    waitForOngoingChunkSplits: {skip: "does not return user data"},
-    whatsmyuri: {skip: "does not return user data"}
+    getShardingReady: {skip: "does not return user data"},
+    whatsmyuri: {skip: "does not return user data"},
 };
 
 commandsRemovedFromMongosSinceLastLTS.forEach(function(cmd) {
-    testCases[cmd] = {skip: "must define test coverage for 4.4 backwards compatibility"};
+    testCases[cmd] = {skip: "must define test coverage for backwards compatibility"};
 });
 
 // Set the secondaries to priority 0 to prevent the primaries from stepping down.
@@ -438,8 +553,8 @@ for (let command of commands) {
 
     jsTest.log("testing command " + tojson(test.command));
 
-    assert.commandWorked(freshMongos.adminCommand({enableSharding: db}));
-    st.ensurePrimaryShard(db, st.shard0.shardName);
+    assert.commandWorked(
+        freshMongos.adminCommand({enableSharding: db, primaryShard: st.shard0.shardName}));
     assert.commandWorked(freshMongos.adminCommand({shardCollection: nss, key: {x: 1}}));
 
     // We do this because we expect staleMongos to see that the collection is sharded, which
@@ -454,8 +569,10 @@ for (let command of commands) {
     // routing table -- the first read to the primary will refresh the mongos' shardVersion,
     // which will then be used against the secondary to ensure the secondary is fresh.
     assert.commandWorked(staleMongos.getDB(db).runCommand({find: coll}));
-    assert.commandWorked(freshMongos.getDB(db).runCommand(
-        {find: coll, $readPreference: {mode: 'secondary'}, readConcern: {'level': 'local'}}));
+    assert.commandWorked(
+        freshMongos.getDB(db).runCommand(
+            {find: coll, $readPreference: {mode: "secondary"}, readConcern: {"level": "local"}}),
+    );
 
     // Do any test-specific setup.
     test.setUp(staleMongos);
@@ -470,25 +587,27 @@ for (let command of commands) {
     assert.commandWorked(recipientShardSecondary.getDB(db).setProfilingLevel(2));
 
     // Suspend range deletion on the donor shard.
-    donorShardPrimary.adminCommand({configureFailPoint: 'suspendRangeDeletion', mode: 'alwaysOn'});
+    donorShardPrimary.adminCommand({configureFailPoint: "suspendRangeDeletion", mode: "alwaysOn"});
 
     // Do a moveChunk from the fresh mongos to make the other mongos stale.
     // Use {w:2} (all) write concern so the metadata change gets persisted to the secondary
     // before stalely versioned commands are sent against the secondary.
-    assert.commandWorked(freshMongos.adminCommand({
-        moveChunk: nss,
-        find: {x: 0},
-        to: st.shard1.shardName,
-        _secondaryThrottle: true,
-        writeConcern: {w: 2},
-    }));
+    assert.commandWorked(
+        freshMongos.adminCommand({
+            moveChunk: nss,
+            find: {x: 0},
+            to: st.shard1.shardName,
+            _secondaryThrottle: true,
+            writeConcern: {w: 2},
+        }),
+    );
 
     let cmdReadPrefSecondary =
-        Object.assign({}, test.command, {$readPreference: {mode: 'secondary'}});
+        Object.assign({}, test.command, {$readPreference: {mode: "secondary"}});
     let cmdPrefSecondaryConcernAvailable =
-        Object.assign({}, cmdReadPrefSecondary, {readConcern: {level: 'available'}});
+        Object.assign({}, cmdReadPrefSecondary, {readConcern: {level: "available"}});
     let cmdPrefSecondaryConcernLocal =
-        Object.assign({}, cmdReadPrefSecondary, {readConcern: {level: 'local'}});
+        Object.assign({}, cmdReadPrefSecondary, {readConcern: {level: "local"}});
 
     let availableReadConcernRes =
         staleMongos.getDB(db).runCommand(cmdPrefSecondaryConcernAvailable);
@@ -520,59 +639,67 @@ for (let command of commands) {
         // field and returned success.
         profilerHasSingleMatchingEntryOrThrow({
             profileDB: recipientShardPrimary.getDB(db),
-            filter: Object.extend({
-                "command.shardVersion": {"$exists": false},
-                "command.$readPreference": {$exists: false},
-                "command.readConcern": {"level": "local"},
-                "errCode": {"$exists": false},
-            },
-                                  commandProfile)
+            filter: Object.extend(
+                {
+                    "command.shardVersion": {"$exists": false},
+                    "command.$readPreference": {$exists: false},
+                    "command.readConcern": {"level": "local"},
+                    "errCode": {"$exists": false},
+                },
+                commandProfile,
+                ),
         });
     } else if (test.behavior === "versioned") {
         // Check that the donor shard secondary received the 'available' read concern
         // request and returned success, despite the mongos' stale routing table.
         profilerHasSingleMatchingEntryOrThrow({
             profileDB: donorShardSecondary.getDB(db),
-            filter: Object.extend({
-                "command.shardVersion": {"$exists": true},
-                "command.$readPreference": {"mode": "secondary"},
-                "command.readConcern": {"level": "available"},
-                "errCode": {"$ne": ErrorCodes.StaleConfig},
-            },
-                                  commandProfile)
+            filter: Object.extend(
+                {
+                    "command.shardVersion": {"$exists": true},
+                    "command.$readPreference": {"mode": "secondary"},
+                    "command.readConcern": {"level": "available"},
+                    "errCode": {"$ne": ErrorCodes.StaleConfig},
+                },
+                commandProfile,
+                ),
         });
 
         // Check that the donor shard secondary then returned stale shardVersion for the request
         // that did not specify read concern, so used the implicit default of local.
         profilerHasSingleMatchingEntryOrThrow({
             profileDB: donorShardSecondary.getDB(db),
-            filter: Object.extend({
-                "command.shardVersion": {"$exists": true},
-                "command.$readPreference": {"mode": "secondary"},
-                "$or": [
-                    {"command.readConcern": {"$exists": false}},
-                    {"command.readConcern.provenance": "implicitDefault"},
-                ],
-                "errCode": ErrorCodes.StaleConfig,
-            },
-                                  commandProfile)
+            filter: Object.extend(
+                {
+                    "command.shardVersion": {"$exists": true},
+                    "command.$readPreference": {"mode": "secondary"},
+                    "$or": [
+                        {"command.readConcern": {"$exists": false}},
+                        {"command.readConcern.provenance": "implicitDefault"},
+                    ],
+                    "errCode": ErrorCodes.StaleConfig,
+                },
+                commandProfile,
+                ),
         });
 
         // Check that the recipient shard secondary received the request with local read concern
         // and returned success, since the previous command refreshed the metadata.
         profilerHasSingleMatchingEntryOrThrow({
             profileDB: recipientShardSecondary.getDB(db),
-            filter: Object.extend({
-                "command.shardVersion": {"$exists": true},
-                "command.$readPreference": {"mode": "secondary"},
-                "command.readConcern": {"level": "local"},
-                "errCode": {"$ne": ErrorCodes.StaleConfig},
-            },
-                                  commandProfile)
+            filter: Object.extend(
+                {
+                    "command.shardVersion": {"$exists": true},
+                    "command.$readPreference": {"mode": "secondary"},
+                    "command.readConcern": {"level": "local"},
+                    "errCode": {"$ne": ErrorCodes.StaleConfig},
+                },
+                commandProfile,
+                ),
         });
     }
 
-    donorShardPrimary.adminCommand({configureFailPoint: 'suspendRangeDeletion', mode: 'off'});
+    donorShardPrimary.adminCommand({configureFailPoint: "suspendRangeDeletion", mode: "off"});
 
     // Clean up the collection by dropping the DB. This also drops all associated indexes and
     // clears the profiler collection.
@@ -581,4 +708,3 @@ for (let command of commands) {
 }
 
 st.stop();
-})();

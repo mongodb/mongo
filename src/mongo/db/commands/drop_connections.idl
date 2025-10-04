@@ -32,7 +32,7 @@ global:
     cpp_namespace: "mongo"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
     - "mongo/util/net/hostandport.idl"
 
 commands:
@@ -41,7 +41,7 @@ commands:
         command_name: dropConnections
         namespace: ignored
         api_version: ""
-        fields: 
+        fields:
             hostAndPort:
-                description: "List of host and ports" 
+                description: "List of host and ports"
                 type: array<HostAndPort>

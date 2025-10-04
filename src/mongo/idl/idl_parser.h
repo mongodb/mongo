@@ -29,16 +29,37 @@
 
 #pragma once
 
-#include <string>
-#include <vector>
-
+#include "mongo/base/data_range.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/stdx/type_traits.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/serialization_context.h"
+#include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
+#include "mongo/util/version/releases.h"
+
+#include <cstdint>
+#include <span>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <variant>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -135,6 +156,39 @@ T preparsedValue(A&&... args) {
     return idlPreparsedValue(stdx::type_identity<T>{}, std::forward<A>(args)...);
 }
 
+enum DebugEnabled : bool {};
+
+constexpr inline DebugEnabled kIsDebug{kDebugBuild};
+
+/**
+ * HasMembers tracks the presence of required fields in debug mode, and is a noop class in
+ * production builds.
+ */
+template <size_t N, DebugEnabled = kIsDebug>
+class HasMembers;
+
+template <size_t N>
+class HasMembers<N, DebugEnabled{false}> {
+public:
+    void required() const {}
+    void markPresent(size_t pos) {}
+};
+
+template <size_t N>
+class HasMembers<N, DebugEnabled{true}> {
+public:
+    void required() const {
+        invariant(_hasField.all());
+    }
+
+    void markPresent(size_t pos) {
+        _hasField.set(pos, true);
+    }
+
+private:
+    std::bitset<N> _hasField;
+};
+
 /** Support routines for IDL-generated comparison operators */
 namespace relop {
 
@@ -165,7 +219,7 @@ struct Ordering {
     const T& _v;
 };
 template <typename T>
-Ordering(const T&)->Ordering<T>;
+Ordering(const T&) -> Ordering<T>;
 
 /** fallback case */
 template <typename T>
@@ -211,7 +265,7 @@ struct BasicOrderOps<boost::optional<T>> {
 }  // namespace idl
 
 /**
- * IDLParserErrorContext manages the current parser context for parsing BSON documents.
+ * IDLParserContext manages the current parser context for parsing BSON documents.
  *
  * The class stores the path to the current document to enable it provide more useful error
  * messages. The path is a dot delimited list of field names which is useful for nested struct
@@ -220,12 +274,12 @@ struct BasicOrderOps<boost::optional<T>> {
  * This class is responsible for throwing all error messages the IDL generated parsers throw,
  * and provide utility methods like checking a BSON type or set of BSON types.
  */
-class IDLParserErrorContext {
-    IDLParserErrorContext(const IDLParserErrorContext&) = delete;
-    IDLParserErrorContext& operator=(const IDLParserErrorContext&) = delete;
+class IDLParserContext {
+    IDLParserContext(const IDLParserContext&) = delete;
+    IDLParserContext& operator=(const IDLParserContext&) = delete;
 
     template <typename T>
-    friend void throwComparisonError(IDLParserErrorContext& ctxt,
+    friend void throwComparisonError(IDLParserContext& ctxt,
                                      StringData fieldName,
                                      StringData op,
                                      T actualValue,
@@ -237,12 +291,43 @@ public:
      */
     static constexpr auto kOpMsgDollarDB = "$db"_sd;
     static constexpr auto kOpMsgDollarDBDefault = "admin"_sd;
+    static constexpr auto kTenantIdField = "$tenant"_sd;
 
-    IDLParserErrorContext(StringData fieldName, bool apiStrict = false)
-        : _currentField(fieldName), _apiStrict(apiStrict), _predecessor(nullptr) {}
+    explicit IDLParserContext(StringData fieldName)
+        : IDLParserContext{fieldName,
+                           boost::optional<auth::ValidatedTenancyScope>{boost::none},
+                           boost::optional<TenantId>{boost::none},
+                           SerializationContext::stateDefault()} {}
 
-    IDLParserErrorContext(StringData fieldName, const IDLParserErrorContext* predecessor)
-        : _currentField(fieldName), _predecessor(predecessor) {}
+    IDLParserContext(StringData fieldName,
+                     const boost::optional<auth::ValidatedTenancyScope>& vts,
+                     boost::optional<TenantId> tenantId,
+                     const SerializationContext& serializationContext)
+        : _serializationContext(serializationContext),
+          _currentField(fieldName),
+          _tenantId(std::move(tenantId)),
+          _predecessor(nullptr),
+          _validatedTenancyScope(vts) {}
+
+    IDLParserContext(StringData fieldName, const IDLParserContext* predecessor)
+        : IDLParserContext(fieldName,
+                           predecessor,
+                           boost::optional<auth::ValidatedTenancyScope>{boost::none},
+                           SerializationContext::stateDefault(),
+                           boost::optional<TenantId>{boost::none}) {}
+
+    IDLParserContext(StringData fieldName,
+                     const IDLParserContext* predecessor,
+                     const boost::optional<auth::ValidatedTenancyScope>& vts,
+                     const SerializationContext& serializationContext,
+                     boost::optional<TenantId> tenantId)
+        : _serializationContext(serializationContext),
+          _currentField(fieldName),
+          _tenantId(std::move(tenantId)),
+          _predecessor(predecessor),
+          _validatedTenancyScope(vts) {
+        assertTenantIdMatchesPredecessor(predecessor);
+    }
 
     /**
      * Check that BSON element is a given type or whether the field should be skipped.
@@ -270,7 +355,7 @@ public:
      * Throws an exception if the BSON element's type is wrong.
      */
     bool checkAndAssertBinDataType(const BSONElement& element, BinDataType type) const {
-        if (MONGO_likely(element.type() == BinData && element.binDataType() == type)) {
+        if (MONGO_likely(element.type() == BSONType::binData && element.binDataType() == type)) {
             return true;
         }
 
@@ -285,7 +370,7 @@ public:
      * processed.
      * Throws an exception if the BSON element's type is wrong.
      */
-    bool checkAndAssertTypes(const BSONElement& element, const std::vector<BSONType>& types) const;
+    bool checkAndAssertTypes(const BSONElement& element, std::span<const BSONType> types) const;
 
     /**
      * Throw an error message about the BSONElement being a duplicate field.
@@ -308,15 +393,10 @@ public:
     MONGO_COMPILER_NORETURN void throwUnknownField(StringData fieldName) const;
 
     /**
-     * Throw an error message about an array field name not being a valid unsigned integer.
-     */
-    MONGO_COMPILER_NORETURN void throwBadArrayFieldNumberValue(StringData value) const;
-
-    /**
      * Throw an error message about the array field name not being the next number in the sequence.
      */
-    MONGO_COMPILER_NORETURN void throwBadArrayFieldNumberSequence(
-        std::uint32_t actualValue, std::uint32_t expectedValue) const;
+    MONGO_COMPILER_NORETURN void throwBadArrayFieldNumberSequence(StringData actualValue,
+                                                                  StringData expectedValue) const;
 
     /**
      * Throw an error message about an unrecognized enum value.
@@ -328,34 +408,27 @@ public:
      * Throw an error about a field having the wrong type.
      */
     MONGO_COMPILER_NORETURN void throwBadType(const BSONElement& element,
-                                              const std::vector<BSONType>& types) const;
+                                              std::span<const BSONType> types) const;
 
     /**
-     * Throw an 'APIStrictError' if the user command has 'apiStrict' field as true.
+     * Check that the collection name in 'element' is valid. Throws an exception if not valid.
+     * Returns the collection name otherwise.
      */
-    void throwAPIStrictErrorIfApplicable(StringData fieldName) const;
-    void throwAPIStrictErrorIfApplicable(BSONElement fieldName) const;
+    static StringData checkAndAssertCollectionName(const BSONElement& element,
+                                                   bool allowGlobalCollectionName);
 
     /**
-     * Equivalent to CommandHelpers::parseNsCollectionRequired.
-     * 'allowGlobalCollectionName' allows use of global collection name, e.g. {aggregate: 1}.
+     * Check that the collection name or UUID in 'element' is valid. Throws an exception if not
+     * valid. Returns either the collection name or UUID otherwise.
      */
-    static NamespaceString parseNSCollectionRequired(StringData dbName,
-                                                     const BSONElement& element,
-                                                     bool allowGlobalCollectionName);
+    static std::variant<UUID, StringData> checkAndAssertCollectionNameOrUUID(
+        const BSONElement& element);
 
-    /**
-     * Equivalent to CommandHelpers::parseNsOrUUID
-     */
-    static NamespaceStringOrUUID parseNsOrUUID(StringData dbname, const BSONElement& element);
+    const boost::optional<TenantId>& getTenantId() const;
 
-    /**
-     * Take all the well known command generic arguments from commandPassthroughFields, but ignore
-     * fields that are already part of the command and append the rest to builder.
-     */
-    static void appendGenericCommandArguments(const BSONObj& commandPassthroughFields,
-                                              const std::vector<StringData>& knownFields,
-                                              BSONObjBuilder* builder);
+    const SerializationContext& getSerializationContext() const;
+
+    const boost::optional<auth::ValidatedTenancyScope>& getValidatedTenancyScope() const;
 
 private:
     /**
@@ -379,28 +452,74 @@ private:
      */
     bool checkAndAssertBinDataTypeSlowPath(const BSONElement& element, BinDataType type) const;
 
+    void assertTenantIdMatchesPredecessor(const IDLParserContext* predecessor) {
+        if (!_tenantId || predecessor == nullptr) {
+            return;
+        }
+
+        auto& parentTenantId = predecessor->getTenantId();
+        iassert(8423379,
+                str::stream() << "The IDLParserContext tenantId " << _tenantId->toString()
+                              << " must match the predecessor's tenantId "
+                              << parentTenantId->toString(),
+                !parentTenantId || parentTenantId == _tenantId);
+    }
+
 private:
+    // Modifies serialization behavior to match request format, only accessed by IDL generated code
+    const SerializationContext _serializationContext;
+
     // Name of the current field that is being parsed.
     const StringData _currentField;
 
-    // Whether the 'apiStrict' parameter is set in the user request.
-    const bool _apiStrict = false;
+    const boost::optional<TenantId> _tenantId;
 
     // Pointer to a parent parser context.
     // This provides a singly linked list of parent pointers, and use to produce a full path to a
     // field with an error.
-    const IDLParserErrorContext* _predecessor;
+    const IDLParserContext* _predecessor;
+
+    const boost::optional<auth::ValidatedTenancyScope> _validatedTenancyScope;
+};
+
+/**
+ * This class is used to record information about deserialization which a caller can later use to
+ * perform extra parsing validation.
+ */
+class DeserializationContext {
+public:
+    /**
+     * Marks that an unstable struct field was parsed.
+     *
+     * This does not perform any validation whatsoever, including validating that this field is
+     * unstable or that it had already been marked present.
+     */
+    void markUnstableFieldPresent(StringData unstableFieldName) {
+        _unstableField = unstableFieldName;
+    }
+
+    /**
+     * Throws `ErrorCodes::APIStrictError` if an unstable field was encountered during
+     * deserialization.
+     */
+    void validateApiStrict() {
+        if (_unstableField) {
+            uasserted(ErrorCodes::APIStrictError,
+                      str::stream() << "BSON field '" << *_unstableField
+                                    << "' is not allowed with apiStrict:true.");
+        }
+    }
+
+private:
+    boost::optional<StringData> _unstableField;
 };
 
 /**
  * Throw an error when BSON validation fails during parse.
  */
 template <typename T>
-void throwComparisonError(IDLParserErrorContext& ctxt,
-                          StringData fieldName,
-                          StringData op,
-                          T actualValue,
-                          T expectedValue) {
+void throwComparisonError(
+    IDLParserContext& ctxt, StringData fieldName, StringData op, T actualValue, T expectedValue) {
     std::string path = ctxt.getElementPath(fieldName);
     throwComparisonError(path, op, actualValue, expectedValue);
 }
@@ -410,7 +529,7 @@ void throwComparisonError(IDLParserErrorContext& ctxt,
  */
 template <typename T>
 void throwComparisonError(StringData fieldName, StringData op, T actualValue, T expectedValue) {
-    uasserted(51024,
+    uasserted(ErrorCodes::BadValue,
               str::stream() << "BSON field '" << fieldName << "' value must be " << op << " "
                             << expectedValue << ", actual value '" << actualValue << "'");
 }
@@ -449,5 +568,56 @@ BSONObj parseOwnedBSON(BSONElement element);
  * break because of it.
  */
 bool parseBoolean(BSONElement element);
+
+/**
+ * Generated enums specialize this with their element count.
+ */
+template <typename E>
+constexpr inline size_t idlEnumCount = 0;
+
+namespace idl {
+
+/**
+ * Parse an IDL-defined struct from a document, throwing an exception if any unstable fields are
+ * encountered.
+ */
+template <typename T>
+T parseApiStrict(const BSONObj& cmdObj, const IDLParserContext& ctx) {
+    DeserializationContext dctx;
+    auto cmd = T::parse(cmdObj, ctx, &dctx);
+    dctx.validateApiStrict();
+    return cmd;
+}
+
+/**
+ * Parse an IDL-defined command from a command request document.
+ * If the request includes apiStrict: true along with any unstable fields, an exception will be
+ * thrown.
+ */
+template <typename T>
+T parseCommandDocument(const BSONObj& cmdObj, const IDLParserContext& ctx) {
+    DeserializationContext dctx;
+    auto cmd = T::parse(cmdObj, ctx, &dctx);
+    if (cmd.getGenericArguments().getApiStrict().value_or(false)) {
+        dctx.validateApiStrict();
+    }
+    return cmd;
+}
+
+/**
+ * Parse an IDL-defined command from a command request.
+ * If the request includes apiStrict: true along with any unstable fields, an exception will be
+ * thrown.
+ */
+template <typename T>
+T parseCommandRequest(const OpMsgRequest& req, const IDLParserContext& ctx) {
+    DeserializationContext dctx;
+    auto cmd = T::parse(req, ctx, &dctx);
+    if (cmd.getGenericArguments().getApiStrict().value_or(false)) {
+        dctx.validateApiStrict();
+    }
+    return cmd;
+}
+}  // namespace idl
 
 }  // namespace mongo

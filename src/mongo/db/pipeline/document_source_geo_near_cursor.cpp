@@ -27,38 +27,37 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/pipeline/document_source_geo_near_cursor.h"
 
-#include <boost/intrusive_ptr.hpp>
-#include <boost/optional.hpp>
-#include <list>
-#include <memory>
-
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
-#include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
+ALLOCATE_DOCUMENT_SOURCE_ID(geoNearCursor, DocumentSourceGeoNearCursor::id);
+
 boost::intrusive_ptr<DocumentSourceGeoNearCursor> DocumentSourceGeoNearCursor::create(
-    const CollectionPtr& collection,
+    const MultipleCollectionAccessor& collections,
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
+    const boost::intrusive_ptr<DocumentSourceCursor::CatalogResourceHandle>& catalogResourceHandle,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    FieldPath distanceField,
+    boost::optional<FieldPath> distanceField,
     boost::optional<FieldPath> locationField,
     double distanceMultiplier) {
-    return {new DocumentSourceGeoNearCursor(collection,
+    return {new DocumentSourceGeoNearCursor(collections,
                                             std::move(exec),
+                                            catalogResourceHandle,
                                             expCtx,
                                             std::move(distanceField),
                                             std::move(locationField),
@@ -66,50 +65,25 @@ boost::intrusive_ptr<DocumentSourceGeoNearCursor> DocumentSourceGeoNearCursor::c
 }
 
 DocumentSourceGeoNearCursor::DocumentSourceGeoNearCursor(
-    const CollectionPtr& collection,
+    const MultipleCollectionAccessor& collections,
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
+    const boost::intrusive_ptr<DocumentSourceCursor::CatalogResourceHandle>& catalogResourceHandle,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    FieldPath distanceField,
+    boost::optional<FieldPath> distanceField,
     boost::optional<FieldPath> locationField,
     double distanceMultiplier)
-    : DocumentSourceCursor(
-          collection, std::move(exec), expCtx, DocumentSourceCursor::CursorType::kRegular),
+    : DocumentSourceCursor(collections,
+                           std::move(exec),
+                           catalogResourceHandle,
+                           expCtx,
+                           DocumentSourceCursor::CursorType::kRegular),
       _distanceField(std::move(distanceField)),
       _locationField(std::move(locationField)),
       _distanceMultiplier(distanceMultiplier) {
-    invariant(_distanceMultiplier >= 0);
+    tassert(9911901, "", _distanceMultiplier >= 0);
 }
 
 const char* DocumentSourceGeoNearCursor::getSourceName() const {
-    return DocumentSourceGeoNearCursor::kStageName.rawData();
-}
-
-Document DocumentSourceGeoNearCursor::transformDoc(Document&& objInput) const {
-    MutableDocument output(std::move(objInput));
-
-    // Scale the distance by the requested factor.
-    invariant(output.peek().metadata().hasGeoNearDistance(),
-              str::stream()
-                  << "Query returned a document that is unexpectedly missing the geoNear distance: "
-                  << output.peek().toString());
-    const auto distance = output.peek().metadata().getGeoNearDistance() * _distanceMultiplier;
-
-    output.setNestedField(_distanceField, Value(distance));
-    if (_locationField) {
-        invariant(
-            output.peek().metadata().hasGeoNearPoint(),
-            str::stream()
-                << "Query returned a document that is unexpectedly missing the geoNear point: "
-                << output.peek().toString());
-        output.setNestedField(*_locationField, output.peek().metadata().getGeoNearPoint());
-    }
-
-    // In a cluster, $geoNear will be merged via $sort, so add the sort key.
-    if (pExpCtx->needsMerge) {
-        const bool isSingleElementKey = true;
-        output.metadata().setSortKey(Value(distance), isSingleElementKey);
-    }
-
-    return output.freeze();
+    return DocumentSourceGeoNearCursor::kStageName.data();
 }
 }  // namespace mongo

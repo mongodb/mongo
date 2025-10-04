@@ -27,131 +27,96 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/sorted_data_interface_test_harness.h"
-
-#include <memory>
-
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/db/storage/sorted_data_interface_test_harness.h"
 #include "mongo/unittest/unittest.h"
+
+#include <boost/none.hpp>
 
 namespace mongo {
 namespace {
-// Tests seekExact when it hits something.
-void testSeekExact_Hit(bool unique, bool forward) {
-    const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
-    auto opCtx = harnessHelper->newOperationContext();
-    auto sorted = harnessHelper->newSortedDataInterface(unique,
-                                                        /*partial=*/false,
-                                                        {
-                                                            {key1, loc1},
-                                                            {key2, loc1},
-                                                            {key3, loc1},
-                                                        });
 
-    auto cursor = sorted->newCursor(opCtx.get(), forward);
+enum class IndexType { kUnique, kNonUnique, kId };
 
-    ASSERT_EQ(cursor->seekExact(makeKeyString(sorted.get(), key2)), IndexKeyEntry(key2, loc1));
+// Tests findLoc when it hits something.
+void testFindLoc_Hit(OperationContext* opCtx,
+                     RecoveryUnit& ru,
+                     SortedDataInterfaceHarnessHelper* harnessHelper,
+                     IndexType type) {
+    std::unique_ptr<SortedDataInterface> sorted;
+    if (IndexType::kId == type) {
+        sorted = harnessHelper->newIdIndexSortedDataInterface(opCtx);
+    } else {
+        sorted = harnessHelper->newSortedDataInterface(opCtx,
+                                                       type == IndexType::kUnique,
+                                                       /*partial=*/false);
+    }
 
-    // Only return the requested RecordId.
+    insertToIndex(opCtx,
+                  sorted.get(),
+                  {
+                      {key1, loc1},
+                      {key2, loc1},
+                      {key3, loc1},
+                  },
+                  /* dupsAllowed*/ false);
+
+    auto loc =
+        sorted->findLoc(opCtx, ru, makeKeyStringForSeek(sorted.get(), key2).finishAndGetBuffer());
+    ASSERT_EQ(loc, loc1);
+}
+
+TEST_F(SortedDataInterfaceTest, SeekExact_Hit_Unique) {
+    testFindLoc_Hit(opCtx(), recoveryUnit(), harnessHelper(), IndexType::kUnique);
+}
+
+TEST_F(SortedDataInterfaceTest, SeekExact_Hit_Standard) {
+    testFindLoc_Hit(opCtx(), recoveryUnit(), harnessHelper(), IndexType::kNonUnique);
+}
+
+TEST_F(SortedDataInterfaceTest, SeekExact_Hit_Id) {
+    testFindLoc_Hit(opCtx(), recoveryUnit(), harnessHelper(), IndexType::kId);
+}
+
+// Tests findLoc when it doesn't hit the query.
+void testFindLoc_Miss(OperationContext* opCtx,
+                      RecoveryUnit& ru,
+                      SortedDataInterfaceHarnessHelper* harnessHelper,
+                      IndexType type) {
+    std::unique_ptr<SortedDataInterface> sorted;
+    if (IndexType::kId == type) {
+        sorted = harnessHelper->newIdIndexSortedDataInterface(opCtx);
+    } else {
+        sorted = harnessHelper->newSortedDataInterface(opCtx,
+                                                       type == IndexType::kUnique,
+                                                       /*partial=*/false);
+    }
+
+    insertToIndex(opCtx,
+                  sorted.get(),
+                  {
+                      {key1, loc1},
+                      // No key 2
+                      {key3, loc1},
+                  },
+                  /* dupsAllowed*/ false);
+
     ASSERT_EQ(
-        cursor->seekExact(makeKeyString(sorted.get(), key2), SortedDataInterface::Cursor::kWantLoc),
-        IndexKeyEntry({}, loc1));
-
-    // Make sure iterating works. We may consider loosening this requirement if it is a hardship
-    // for some storage engines.
-    ASSERT_EQ(cursor->next(), IndexKeyEntry(forward ? key3 : key1, loc1));
-    ASSERT_EQ(cursor->next(), boost::none);
-}
-TEST(SortedDataInterface, SeekExact_Hit_Unique_Forward) {
-    testSeekExact_Hit(true, true);
-}
-TEST(SortedDataInterface, SeekExact_Hit_Unique_Reverse) {
-    testSeekExact_Hit(true, false);
-}
-TEST(SortedDataInterface, SeekExact_Hit_Standard_Forward) {
-    testSeekExact_Hit(false, true);
-}
-TEST(SortedDataInterface, SeekExact_Hit_Standard_Reverse) {
-    testSeekExact_Hit(false, false);
+        sorted->findLoc(opCtx, ru, makeKeyStringForSeek(sorted.get(), key2).finishAndGetBuffer()),
+        boost::none);
 }
 
-// Tests seekExact when it doesn't hit the query.
-void testSeekExact_Miss(bool unique, bool forward) {
-    const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
-    auto opCtx = harnessHelper->newOperationContext();
-    auto sorted = harnessHelper->newSortedDataInterface(unique,
-                                                        /*partial=*/false,
-                                                        {
-                                                            {key1, loc1},
-                                                            // No key2.
-                                                            {key3, loc1},
-                                                        });
-
-    auto cursor = sorted->newCursor(opCtx.get(), forward);
-
-    ASSERT_EQ(cursor->seekExact(makeKeyString(sorted.get(), key2)), boost::none);
-
-    // Not testing iteration since the cursors position following a failed seekExact is
-    // undefined. However, you must be able to seek somewhere else.
-    ASSERT_EQ(cursor->seekExact(makeKeyString(sorted.get(), key1)), IndexKeyEntry(key1, loc1));
-}
-TEST(SortedDataInterface, SeekExact_Miss_Unique_Forward) {
-    testSeekExact_Miss(true, true);
-}
-TEST(SortedDataInterface, SeekExact_Miss_Unique_Reverse) {
-    testSeekExact_Miss(true, false);
-}
-TEST(SortedDataInterface, SeekExact_Miss_Standard_Forward) {
-    testSeekExact_Miss(false, true);
-}
-TEST(SortedDataInterface, SeekExact_Miss_Standard_Reverse) {
-    testSeekExact_Miss(false, false);
+TEST_F(SortedDataInterfaceTest, SeekExact_Miss_Unique) {
+    testFindLoc_Miss(opCtx(), recoveryUnit(), harnessHelper(), IndexType::kUnique);
 }
 
-// Tests seekExact on forward cursor when it hits something with dup keys. Doesn't make sense
-// for unique indexes.
-TEST(SortedDataInterface, SeekExact_HitWithDups_Forward) {
-    const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
-    auto opCtx = harnessHelper->newOperationContext();
-    auto sorted = harnessHelper->newSortedDataInterface(
-        /*unique=*/false,
-        /*partial=*/false,
-        {
-            {key1, loc1},
-            {key2, loc1},
-            {key2, loc2},
-            {key3, loc1},
-        });
-
-    auto cursor = sorted->newCursor(opCtx.get());
-
-    ASSERT_EQ(cursor->seekExact(makeKeyString(sorted.get(), key2)), IndexKeyEntry(key2, loc1));
-    ASSERT_EQ(cursor->next(), IndexKeyEntry(key2, loc2));
-    ASSERT_EQ(cursor->next(), IndexKeyEntry(key3, loc1));
-    ASSERT_EQ(cursor->next(), boost::none);
+TEST_F(SortedDataInterfaceTest, SeekExact_Miss_Standard) {
+    testFindLoc_Miss(opCtx(), recoveryUnit(), harnessHelper(), IndexType::kNonUnique);
 }
 
-// Tests seekExact on reverse cursor when it hits something with dup keys. Doesn't make sense
-// for unique indexes.
-TEST(SortedDataInterface, SeekExact_HitWithDups_Reverse) {
-    const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
-    auto opCtx = harnessHelper->newOperationContext();
-    auto sorted = harnessHelper->newSortedDataInterface(
-        /*unique=*/false,
-        /*partial=*/false,
-        {
-            {key1, loc1},
-            {key2, loc1},
-            {key2, loc2},
-            {key3, loc1},
-        });
-
-    auto cursor = sorted->newCursor(opCtx.get(), false);
-
-    ASSERT_EQ(cursor->seekExact(makeKeyString(sorted.get(), key2)), IndexKeyEntry(key2, loc2));
-    ASSERT_EQ(cursor->next(), IndexKeyEntry(key2, loc1));
-    ASSERT_EQ(cursor->next(), IndexKeyEntry(key1, loc1));
-    ASSERT_EQ(cursor->next(), boost::none);
+TEST_F(SortedDataInterfaceTest, SeekExact_Miss_Id) {
+    testFindLoc_Miss(opCtx(), recoveryUnit(), harnessHelper(), IndexType::kId);
 }
+
 }  // namespace
 }  // namespace mongo

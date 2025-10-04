@@ -29,12 +29,15 @@
 
 #pragma once
 
-#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/create_indexes_gen.h"
-#include "mongo/db/drop_indexes_gen.h"
+#include "mongo/db/local_catalog/ddl/create_indexes_gen.h"
+#include "mongo/db/local_catalog/ddl/drop_indexes_gen.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo::timeseries {
 
@@ -46,22 +49,8 @@ BSONObj makeTimeseriesCommand(const BSONObj& origCmd,
                               StringData nsFieldName,
                               boost::optional<StringData> appendTimeSeriesFlag);
 
-/*
- * Returns a CreateIndexesCommand for creating indexes on the bucket collection.
- */
-CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
-                                                        const CreateIndexesCommand& origCmd,
-                                                        const TimeseriesOptions& options);
-
-/**
- * Returns a DropIndexes for dropping indexes on the bucket collection.
- *
- * The 'index' dropIndexes parameter may refer to an index name, or array of names, or "*" for all
- * indexes, or an index spec key (an object). Only the index spec key has to be translated for the
- * bucket collection. The other forms of 'index' can be passed along unmodified.
- */
-DropIndexes makeTimeseriesDropIndexesCommand(OperationContext* opCtx,
-                                             const DropIndexes& origCmd,
-                                             const TimeseriesOptions& options);
-
+mongo::BSONObj translateIndexSpecFromLogicalToBuckets(OperationContext* opCtx,
+                                                      const NamespaceString& origNs,
+                                                      const BSONObj& origIndex,
+                                                      const TimeseriesOptions& options);
 }  // namespace mongo::timeseries

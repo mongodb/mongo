@@ -29,24 +29,27 @@
 
 #pragma once
 
-#include <memory>
-#include <sstream>
-#include <string>
-#include <vector>
-
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <compare>
+#include <memory>
+#include <mutex>
+#include <sstream>
+#include <string>
+#include <vector>
 
 namespace mongo {
 
 class ClientAPIVersionParameters;
 class DBClientBase;
 class MongoURI;
-struct TransientSSLParams;
+class TransientSSLParams;
 
 /**
  * ConnectionString handles parsing different ways to connect to mongo and determining method
@@ -86,21 +89,21 @@ public:
     /**
      * Creates a standalone connection string with the specified server.
      */
-    explicit ConnectionString(const HostAndPort& server);
+    explicit ConnectionString(HostAndPort server);
 
     /**
      * Creates a connection string from an unparsed list of servers, type, and replicaSetName.
      */
-    ConnectionString(ConnectionType type, const std::string& s, const std::string& replicaSetName);
+    ConnectionString(ConnectionType type, std::string s, std::string replicaSetName);
 
     /**
      * Creates a connection string from a pre-parsed list of servers, type, and replicaSetName.
      */
     ConnectionString(ConnectionType type,
                      std::vector<HostAndPort> servers,
-                     const std::string& replicaSetName);
+                     std::string replicaSetName);
 
-    ConnectionString(const std::string& s, ConnectionType connType);
+    ConnectionString(std::string s, ConnectionType connType);
 
     bool isValid() const {
         return _type != ConnectionType::kInvalid;
@@ -182,12 +185,12 @@ public:
     };
 
     static void setConnectionHook(ConnectionHook* hook) {
-        stdx::lock_guard<Latch> lk(_connectHookMutex);
+        stdx::lock_guard<stdx::mutex> lk(_connectHookMutex);
         _connectHook = hook;
     }
 
     static ConnectionHook* getConnectionHook() {
-        stdx::lock_guard<Latch> lk(_connectHookMutex);
+        stdx::lock_guard<stdx::mutex> lk(_connectHookMutex);
         return _connectHook;
     }
 
@@ -222,7 +225,7 @@ private:
     std::string _string;
     std::string _replicaSetName;
 
-    static Mutex _connectHookMutex;
+    static stdx::mutex _connectHookMutex;
     static ConnectionHook* _connectHook;
 };
 

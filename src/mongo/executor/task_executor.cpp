@@ -26,17 +26,21 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/platform/basic.h"
-#include "mongo/platform/mutex.h"
-
 #include "mongo/executor/task_executor.h"
+
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/future_impl.h"
+
+#include <string>
+#include <type_traits>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr.hpp>
 
 namespace mongo {
 namespace executor {
-
-namespace {
-
-MONGO_FAIL_POINT_DEFINE(pauseScheduleCallWithCancelTokenUntilCanceled);
 
 /**
  * Provides exclusive access to an underlying Promise at set-time, guaranteeing that the Promise
@@ -73,11 +77,11 @@ private:
     AtomicWord<bool> _completed;
 };
 
-template <typename T>
+namespace {
+
 Status wrapCallbackHandleWithCancelToken(
     const std::shared_ptr<TaskExecutor> executor,
     const StatusWith<TaskExecutor::CallbackHandle> swCallbackHandle,
-    std::shared_ptr<ExclusivePromiseAccess<T>> promise,
     const CancellationToken& token) {
     if (!swCallbackHandle.isOK()) {
         return swCallbackHandle.getStatus();
@@ -85,37 +89,36 @@ Status wrapCallbackHandleWithCancelToken(
 
     token.onCancel()
         .unsafeToInlineFuture()
-        .then(
-            [executor, promise, callbackHandle = std::move(swCallbackHandle.getValue())]() mutable {
-                executor->cancel(callbackHandle);
-                promise->setError(TaskExecutor::kCallbackCanceledErrorStatus);
-            })
+        .then([executor, callbackHandle = std::move(swCallbackHandle.getValue())]() mutable {
+            executor->cancel(callbackHandle);
+        })
         .getAsync([](auto) {});
     return Status::OK();
 }
 
 /**
- * Takes a schedule(Exhaust)RemoteCommand(OnAny)-style function and wraps it to return a future and
+ * Takes a scheduleRemoteCommand-style function and wraps it to return a future and
  * be cancelable with CancellationTokens.
  */
-template <typename Request, typename Response, typename ScheduleFn, typename CallbackFn>
-ExecutorFuture<Response> wrapScheduleCallWithCancelTokenAndFuture(
+template <typename ScheduleFn>
+ExecutorFuture<TaskExecutor::ResponseStatus> wrapScheduleCallWithCancelTokenAndFuture(
     const std::shared_ptr<TaskExecutor>& executor,
     ScheduleFn&& schedule,
-    const Request& request,
+    const RemoteCommandRequest& request,
     const CancellationToken& token,
     const BatonHandle& baton,
-    const CallbackFn& cb) {
+    const TaskExecutor::RemoteCommandCallbackFn& cb) {
     if (token.isCanceled()) {
-        return ExecutorFuture<Response>(executor, TaskExecutor::kCallbackCanceledErrorStatus);
+        return ExecutorFuture<TaskExecutor::ResponseStatus>(
+            executor, TaskExecutor::kCallbackCanceledErrorStatus);
     }
 
-    auto [promise, future] = makePromiseFuture<Response>();
+    auto [promise, future] = makePromiseFuture<TaskExecutor::ResponseStatus>();
 
     // This has to be made shared because otherwise we'd have to move the access into this
     // callback, and would be unable to use it in the case where scheduling the request fails below.
     auto exclusivePromiseAccess =
-        std::make_shared<ExclusivePromiseAccess<Response>>(std::move(promise));
+        std::make_shared<ExclusivePromiseAccess<TaskExecutor::ResponseStatus>>(std::move(promise));
     auto signalPromiseOnCompletion = [exclusivePromiseAccess,
                                       cb = std::move(cb)](const auto& args) mutable {
         // Upon completion, unconditionally run our callback.
@@ -135,20 +138,9 @@ ExecutorFuture<Response> wrapScheduleCallWithCancelTokenAndFuture(
         }
     };
 
-    // Fail point to make this method to wait until the token is canceled.
-    if (!token.isCanceled()) {
-        try {
-            pauseScheduleCallWithCancelTokenUntilCanceled.pauseWhileSetAndNotCanceled(
-                Interruptible::notInterruptible(), token);
-        } catch (ExceptionFor<ErrorCodes::Interrupted>&) {
-            // Swallow the interrupted exception that arrives from canceling a failpoint.
-        }
-    }
-
     auto scheduleStatus = wrapCallbackHandleWithCancelToken(
         executor,
         std::forward<ScheduleFn>(schedule)(request, std::move(signalPromiseOnCompletion), baton),
-        exclusivePromiseAccess,
         token);
 
     if (!scheduleStatus.isOK()) {
@@ -213,8 +205,8 @@ ExecutorFuture<void> TaskExecutor::sleepUntil(Date_t when, const CancellationTok
         when, [alarmState](const auto& args) mutable { alarmState->signal(args.status); });
 
     // Handle cancellation via the input CancellationToken.
-    auto scheduleStatus = wrapCallbackHandleWithCancelToken(
-        shared_from_this(), std::move(cbHandle), exclusivePromiseAccess, token);
+    auto scheduleStatus =
+        wrapCallbackHandleWithCancelToken(shared_from_this(), std::move(cbHandle), token);
 
     if (!scheduleStatus.isOK()) {
         // If scheduleStatus is not okay, then the callback passed to scheduleWorkAt should never
@@ -222,8 +214,6 @@ ExecutorFuture<void> TaskExecutor::sleepUntil(Date_t when, const CancellationTok
         alarmState->signal(scheduleStatus);
     }
 
-    // TODO (SERVER-51285): Optimize to avoid an additional call to schedule to run the callback
-    // chained by the caller of sleepUntil.
     return std::move(future).thenRunOn(shared_from_this());
 }
 
@@ -260,18 +250,11 @@ TaskExecutor::RemoteCommandCallbackArgs::RemoteCommandCallbackArgs(
     : executor(theExecutor), myHandle(theHandle), request(theRequest), response(theResponse) {}
 
 TaskExecutor::RemoteCommandCallbackArgs::RemoteCommandCallbackArgs(
-    const RemoteCommandOnAnyCallbackArgs& other, size_t idx)
+    const RemoteCommandCallbackArgs& other)
     : executor(other.executor),
       myHandle(other.myHandle),
-      request(other.request, idx),
+      request(other.request),
       response(other.response) {}
-
-TaskExecutor::RemoteCommandOnAnyCallbackArgs::RemoteCommandOnAnyCallbackArgs(
-    TaskExecutor* theExecutor,
-    const CallbackHandle& theHandle,
-    const RemoteCommandRequestOnAny& theRequest,
-    const ResponseOnAnyStatus& theResponse)
-    : executor(theExecutor), myHandle(theHandle), request(theRequest), response(theResponse) {}
 
 TaskExecutor::CallbackState* TaskExecutor::getCallbackFromHandle(const CallbackHandle& cbHandle) {
     return cbHandle.getCallback();
@@ -290,22 +273,9 @@ void TaskExecutor::setCallbackForHandle(CallbackHandle* cbHandle,
     cbHandle->setCallback(std::move(callback));
 }
 
-
-StatusWith<TaskExecutor::CallbackHandle> TaskExecutor::scheduleRemoteCommand(
-    const RemoteCommandRequest& request,
-    const RemoteCommandCallbackFn& cb,
-    const BatonHandle& baton) {
-    return scheduleRemoteCommandOnAny(request,
-                                      [cb](const RemoteCommandOnAnyCallbackArgs& args) {
-                                          cb({args, 0});
-                                      },
-                                      baton);
-}
-
 ExecutorFuture<TaskExecutor::ResponseStatus> TaskExecutor::scheduleRemoteCommand(
     const RemoteCommandRequest& request, const CancellationToken& token, const BatonHandle& baton) {
-    return wrapScheduleCallWithCancelTokenAndFuture<decltype(request),
-                                                    TaskExecutor::ResponseStatus>(
+    return wrapScheduleCallWithCancelTokenAndFuture(
         shared_from_this(),
         [this](const auto&... args) { return scheduleRemoteCommand(args...); },
         request,
@@ -314,55 +284,14 @@ ExecutorFuture<TaskExecutor::ResponseStatus> TaskExecutor::scheduleRemoteCommand
         [](const auto& args) {});
 }
 
-ExecutorFuture<TaskExecutor::ResponseOnAnyStatus> TaskExecutor::scheduleRemoteCommandOnAny(
-    const RemoteCommandRequestOnAny& request,
-    const CancellationToken& token,
-    const BatonHandle& baton) {
-    return wrapScheduleCallWithCancelTokenAndFuture<decltype(request),
-                                                    TaskExecutor::ResponseOnAnyStatus>(
-        shared_from_this(),
-        [this](const auto&... args) { return scheduleRemoteCommandOnAny(args...); },
-        request,
-        token,
-        baton,
-        [](const auto& args) {});
-}
-
-StatusWith<TaskExecutor::CallbackHandle> TaskExecutor::scheduleExhaustRemoteCommand(
-    const RemoteCommandRequest& request,
-    const RemoteCommandCallbackFn& cb,
-    const BatonHandle& baton) {
-    return scheduleExhaustRemoteCommandOnAny(request,
-                                             [cb](const RemoteCommandOnAnyCallbackArgs& args) {
-                                                 cb({args, 0});
-                                             },
-                                             baton);
-}
-
 ExecutorFuture<TaskExecutor::ResponseStatus> TaskExecutor::scheduleExhaustRemoteCommand(
     const RemoteCommandRequest& request,
     const RemoteCommandCallbackFn& cb,
     const CancellationToken& token,
     const BatonHandle& baton) {
-    return wrapScheduleCallWithCancelTokenAndFuture<decltype(request),
-                                                    TaskExecutor::ResponseStatus>(
+    return wrapScheduleCallWithCancelTokenAndFuture(
         shared_from_this(),
         [this](const auto&... args) { return scheduleExhaustRemoteCommand(args...); },
-        request,
-        token,
-        baton,
-        cb);
-}
-
-ExecutorFuture<TaskExecutor::ResponseOnAnyStatus> TaskExecutor::scheduleExhaustRemoteCommandOnAny(
-    const RemoteCommandRequestOnAny& request,
-    const RemoteCommandOnAnyCallbackFn& cb,
-    const CancellationToken& token,
-    const BatonHandle& baton) {
-    return wrapScheduleCallWithCancelTokenAndFuture<decltype(request),
-                                                    TaskExecutor::ResponseOnAnyStatus>(
-        shared_from_this(),
-        [this](const auto&... args) { return scheduleExhaustRemoteCommandOnAny(args...); },
         request,
         token,
         baton,

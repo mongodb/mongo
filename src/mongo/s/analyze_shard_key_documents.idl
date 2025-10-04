@@ -1,0 +1,151 @@
+# Copyright (C) 2022-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+    cpp_namespace: "mongo::analyze_shard_key"
+
+imports:
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/pipeline/legacy_runtime_constants.idl"
+    - "mongo/s/analyze_shard_key_common.idl"
+
+structs:
+    QueryAnalyzerDocument:
+        description:
+            "Represents a document storing the query analyzer configuration for a collection
+            as configured via the configureQueryAnalyzer command."
+        strict: false
+        fields:
+            _id:
+                type: namespacestring
+                description: "The namespace of the collection."
+                cpp_name: ns
+            collUuid:
+                type: uuid
+                description: "The UUID of the collection."
+                cpp_name: collectionUuid
+            startTime:
+                type: date
+                description: "The time at which query sampling began."
+            stopTime:
+                type: date
+                description: "The time at which query sampling ended."
+                optional: true
+        inline_chained_structs: true
+        chained_structs:
+            QueryAnalyzerConfiguration: configuration
+
+    SampledReadCommand:
+        description: "The command object for a sampled read query."
+        strict: false
+        fields:
+            filter:
+                type: object
+                description: "The filter for the read."
+            collation:
+                type: object
+                description: "The collation for the read."
+            let:
+                type: object
+                description: "The user-specified constants for the read."
+                optional: true
+
+    SampledQueryDocument:
+        description: "Represents a document storing a sampled read or write query."
+        strict: false
+        fields:
+            _id:
+                type: uuid
+                description: "The unique sample id for the read or write."
+                cpp_name: sampleId
+            ns:
+                type: namespacestring
+                description: "The namespace of the collection for the read or write."
+            collectionUuid:
+                type: uuid
+                description: "The UUID of the collection for the read or write."
+            cmdName:
+                type: SampledCommandName
+                description: "The command name for the read or write."
+            cmd:
+                type: object
+                description: "The command object for the read or write."
+            expireAt:
+                type: date
+                description: "The time at which the document should be deleted by the TTL monitor."
+
+    SampledQueryDiffDocument:
+        description: "Represents a document storing the diff for a sampled write query."
+        strict: false
+        fields:
+            _id:
+                type: uuid
+                description: "The unique sample id for the write."
+                cpp_name: sampleId
+            ns:
+                type: namespacestring
+                description: "The namespace of the collection for the write."
+            collectionUuid:
+                type: uuid
+                description: "The UUID of the collection for the write."
+            diff:
+                type: object
+                description: "The diff for the write."
+            expireAt:
+                type: date
+                description: "The time at which the document should be deleted by the TTL monitor."
+
+    AnalyzeShardKeySplitPointId:
+        description:
+            "Represents the unique id for a document storing one of the split points created
+            by an analyzeShardKey command."
+        strict: false
+        fields:
+            analyzeShardKeyId:
+                type: uuid
+                description: "The unique id for the command that generated this split point."
+            splitPointId:
+                type: uuid
+                description: "The unique id for this split point."
+
+    AnalyzeShardKeySplitPointDocument:
+        description:
+            "Represents a document storing one of the split points created by an
+            analyzeShardKey command."
+        strict: false
+        fields:
+            _id:
+                type: AnalyzeShardKeySplitPointId
+                cpp_name: id
+            ns:
+                type: namespacestring
+            splitPoint:
+                type: object
+            expireAt:
+                type: date
+                description: "The time at which the document should be deleted by the TTL monitor."

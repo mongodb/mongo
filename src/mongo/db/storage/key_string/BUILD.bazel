@@ -1,0 +1,108 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_binary", "mongo_cc_fuzzer_test", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "key_string",
+    srcs = [
+        "key_string.cpp",
+    ],
+    hdrs = [
+        "key_string.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/bson:bson_validate",
+    ],
+)
+
+mongo_cc_library(
+    name = "key_string_test_util",
+    srcs = [
+        "key_string_test_util.cpp",
+        "//src/mongo/bson:bsonobj_comparator.h",
+    ],
+    hdrs = [
+        "key_string_test_util.h",
+    ],
+    deps = [
+        "key_string",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "key_string_test",
+    srcs = [
+        "key_string_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_third_group",
+        "server-key-string",
+    ],
+    deps = [
+        ":key_string_test_util",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "key_string_long_running_test",
+    srcs = [
+        "key_string_long_running_test.cpp",
+    ],
+    minimum_test_resources = {
+        "cpu_cores": 2,
+    },
+    tags = [
+        "mongo_unittest_eighth_group",
+    ],
+    deps = [
+        ":key_string_test_util",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "storage_key_string_bm",
+    srcs = [
+        "key_string_bm.cpp",
+    ],
+    tags = ["storage_bm"],
+    deps = [
+        ":key_string",
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_binary(
+    name = "ksdecode",
+    srcs = [
+        "key_string_decode.cpp",
+    ],
+    tags = [
+        "dist_test",
+    ],
+    deps = [
+        "key_string",
+        "//src/mongo:base",
+        "//src/mongo/util/options_parser",
+    ],
+)
+
+mongo_cc_fuzzer_test(
+    name = "key_string_to_bson_fuzzer",
+    srcs = [
+        "key_string_to_bson_fuzzer.cpp",
+    ],
+    deps = [
+        "key_string",
+        "//src/mongo:base",
+        "//src/mongo/bson:bson_validate",
+    ],
+)

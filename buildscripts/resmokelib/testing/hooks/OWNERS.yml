@@ -1,0 +1,65 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/mongo-default-approvers
+  - "README.md":
+    approvers:
+      - 10gen/devprod-correctness
+  - "add_remove_shards.py":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
+  - "analyze_shard_key.py":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "queryable_server_hook.py":
+    approvers:
+      - 10gen/server-backup-restore
+  - "change_streams.py":
+    approvers:
+      - 10gen/query-execution-change-streams
+  - "enable_change_stream.py":
+    approvers:
+      - 10gen/query-execution-change-streams
+  - "run_query_stats.py":
+    approvers:
+      - 10gen/query-integration-observability
+  - "fcv_upgrade_downgrade.py":
+    approvers:
+      - 10gen/server-fcv
+  - "initialsync.py":
+    approvers:
+      - 10gen/server-initial-sync
+  - "magic_restore.py":
+    approvers:
+      - 10gen/server-recovery
+  - "maintenance.py":
+    approvers:
+      - 10gen/server-jstest-infra
+  - "oplog.py":
+    approvers:
+      - 10gen/server-jstest-infra
+  - "periodic_kill_secondaries.py":
+    approvers:
+      - 10gen/server-jstest-infra
+  - "reconfig_background.py":
+    approvers:
+      - 10gen/server-jstest-infra
+  - "secondary_lag.py":
+    approvers:
+      - 10gen/server-jstest-infra
+  - "stepdown.py":
+    approvers:
+      - 10gen/server-jstest-infra
+  - "wait_for_replication.py":
+    approvers:
+      - 10gen/server-jstest-infra
+  - "generate_and_check_perf_results.py":
+    approvers:
+      - 10gen/devprod-performance-analysis
+  - "replicaset_transition_to_and_from_csrs.py":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
+  - "drop_sessions_collection.py":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl

@@ -29,10 +29,34 @@
 
 #pragma once
 
-#include <type_traits>
-
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/exclusion_projection_executor.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/single_document_transformation_processor.h"
+#include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/transformer_interface.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+
+#include <list>
+#include <memory>
+#include <set>
+#include <string>
+#include <type_traits>
+#include <utility>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -44,12 +68,6 @@ namespace mongo {
  */
 class DocumentSourceSingleDocumentTransformation final : public DocumentSource {
 public:
-    virtual boost::intrusive_ptr<DocumentSource> clone() const {
-        auto list = DocumentSource::parse(pExpCtx, serialize().getDocument().toBson());
-        invariant(list.size() == 1);
-        return list.front();
-    }
-
     DocumentSourceSingleDocumentTransformation(
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
         std::unique_ptr<TransformerInterface> parsedTransform,
@@ -59,39 +77,36 @@ public:
     // virtuals from DocumentSource
     const char* getSourceName() const final;
 
-    boost::intrusive_ptr<DocumentSource> optimize() final;
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
-    DepsTracker::State getDependencies(DepsTracker* deps) const final;
-    GetModPathsReturn getModifiedPaths() const final;
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
-        StageConstraints constraints(StreamType::kStreaming,
-                                     PositionRequirement::kNone,
-                                     HostTypeRequirement::kNone,
-                                     DiskUseRequirement::kNoDiskUse,
-                                     FacetRequirement::kAllowed,
-                                     TransactionRequirement::kAllowed,
-                                     LookupRequirement::kAllowed,
-                                     UnionRequirement::kAllowed,
-                                     ChangeStreamRequirement::kAllowlist);
-        constraints.canSwapWithMatch = true;
-        constraints.canSwapWithSkippingOrLimitingStage = true;
-        constraints.isAllowedWithinUpdatePipeline = true;
-        // This transformation could be part of a 'collectionless' change stream on an entire
-        // database or cluster, mark as independent of any collection if so.
-        constraints.isIndependentOfAnyCollection = _isIndependentOfAnyCollection;
-        return constraints;
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
     }
+
+    boost::intrusive_ptr<DocumentSource> optimize() final;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+    DepsTracker::State getDependencies(DepsTracker* deps) const final;
+    void addVariableRefs(std::set<Variables::Id>* refs) const final;
+    GetModPathsReturn getModifiedPaths() const final;
+    StageConstraints constraints(PipelineSplitState pipeState) const final;
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
         return boost::none;
     }
 
-    TransformerInterface::TransformerType getType() const {
-        return _parsedTransform->getType();
+    TransformerInterface::TransformerType getTransformerType() const {
+        return _transformationProcessor->getTransformer().getType();
     }
 
     const auto& getTransformer() const {
-        return *_parsedTransform;
+        return _transformationProcessor->getTransformer();
+    }
+    auto& getTransformer() {
+        return _transformationProcessor->getTransformer();
+    }
+
+    SingleDocumentTransformationProcessor* getTransformationProcessor() {
+        return _transformationProcessor.get();
     }
 
     /**
@@ -111,10 +126,11 @@ public:
      * The function has no effect for exclusion projections, or if there are no computed
      * projections, or the computed expression depends on other fields than the oldName.
      */
-    std::pair<BSONObj, bool> extractComputedProjections(const StringData& oldName,
-                                                        const StringData& newName,
+    std::pair<BSONObj, bool> extractComputedProjections(StringData oldName,
+                                                        StringData newName,
                                                         const std::set<StringData>& reservedNames) {
-        return _parsedTransform->extractComputedProjections(oldName, newName, reservedNames);
+        return _transformationProcessor->getTransformer().extractComputedProjections(
+            oldName, newName, reservedNames);
     }
 
     /**
@@ -123,21 +139,30 @@ public:
      * entire project is extracted. In the extracted $project, 'oldName' is renamed to 'newName'.
      * 'oldName' should not be dotted.
      */
-    std::pair<BSONObj, bool> extractProjectOnFieldAndRename(const StringData& oldName,
-                                                            const StringData& newName) {
-        return _parsedTransform->extractProjectOnFieldAndRename(oldName, newName);
+    std::pair<BSONObj, bool> extractProjectOnFieldAndRename(StringData oldName,
+                                                            StringData newName) {
+        return _transformationProcessor->getTransformer().extractProjectOnFieldAndRename(oldName,
+                                                                                         newName);
     }
 
 protected:
-    GetNextResult doGetNext() final;
-    void doDispose() final;
-
-    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                     Pipeline::SourceContainer* container) final;
+    DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
+                                                   DocumentSourceContainer* container) final;
 
 private:
-    // Stores transformation logic.
-    std::unique_ptr<TransformerInterface> _parsedTransform;
+    friend boost::intrusive_ptr<exec::agg::Stage>
+    documentSourceSingleDocumentTransformationToStageFn(
+        const boost::intrusive_ptr<DocumentSource>&);
+
+    DocumentSourceContainer::iterator maybeCoalesce(
+        DocumentSourceContainer::iterator itr,
+        DocumentSourceContainer* container,
+        DocumentSourceSingleDocumentTransformation* nextSingleDocTransform);
+
+    // TODO SERVER-105521: Check if we can change from 'std::shared_ptr' to 'std::unique_ptr'.
+    std::shared_ptr<SingleDocumentTransformationProcessor> _transformationProcessor;
+
+    projection_executor::ExclusionNode& getExclusionNode();
 
     // Specific name of the transformation.
     std::string _name;
@@ -145,6 +170,7 @@ private:
     // Set to true if this transformation stage can be run on the collectionless namespace.
     bool _isIndependentOfAnyCollection;
 
+    // TODO SERVER-105521: Check if we can remove this and use just the '_transformationProcessor'.
     // Cached stage options in case this DocumentSource is disposed before serialized (e.g. explain
     // with a sort which will auto-dispose of the pipeline).
     Document _cachedStageOptions;

@@ -1,25 +1,26 @@
 // Check that buildIndexes config option is working
 
-(function() {
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 // Skip db hash check because secondary will have different number of indexes due to
 // buildIndexes=false on the secondary.
 TestData.skipCheckDBHashes = true;
-var name = "buildIndexes";
-var host = getHostName();
+let name = "buildIndexes";
+let host = getHostName();
 
-var replTest = new ReplSetTest({name: name, nodes: 3});
+let replTest = new ReplSetTest({name: name, nodes: 3});
 
-var nodes = replTest.startSet();
+let nodes = replTest.startSet();
 
-var config = replTest.getReplSetConfig();
+let config = replTest.getReplSetConfig();
 config.members[2].priority = 0;
 config.members[2].buildIndexes = false;
 
 replTest.initiate(config);
 
-var primary = replTest.getPrimary().getDB(name);
-var secondaryConns = replTest.getSecondaries();
-var secondaries = [];
+let primary = replTest.getPrimary().getDB(name);
+let secondaryConns = replTest.getSecondaries();
+let secondaries = [];
 for (var i in secondaryConns) {
     secondaryConns[i].setSecondaryOk();
     secondaries.push(secondaryConns[i].getDB(name));
@@ -28,11 +29,13 @@ replTest.awaitReplication();
 
 // Need to use a commitQuorum of 2 rather than the default of 'votingMembers', which includes the
 // buildIndexes:false node. The index build will otherwise fail early.
-assert.commandWorked(primary.runCommand({
-    createIndexes: 'x',
-    indexes: [{key: {y: 1}, name: 'y_1'}],
-    commitQuorum: 2,
-}));
+assert.commandWorked(
+    primary.runCommand({
+        createIndexes: "x",
+        indexes: [{key: {y: 1}, name: "y_1"}],
+        commitQuorum: 2,
+    }),
+);
 
 for (i = 0; i < 100; i++) {
     primary.x.insert({x: 1, y: "abc", c: 1});
@@ -42,15 +45,15 @@ replTest.awaitReplication();
 
 assert.commandWorked(secondaries[0].runCommand({count: "x"}));
 
-var indexes = secondaries[0].stats().indexes;
-assert.eq(indexes, 2, 'number of indexes');
+let indexes = secondaries[0].stats().indexes;
+assert.eq(indexes, 2, "number of indexes");
 
 indexes = secondaries[1].stats().indexes;
 assert.eq(indexes, 1);
 
 indexes = secondaries[0].x.stats().indexSizes;
 
-var count = 0;
+let count = 0;
 for (i in indexes) {
     count++;
     if (i == "_id_") {
@@ -71,4 +74,3 @@ for (i in indexes) {
 assert.eq(count, 1);
 
 replTest.stopSet();
-}());

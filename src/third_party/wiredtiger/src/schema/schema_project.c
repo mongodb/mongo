@@ -23,10 +23,11 @@ __wt_schema_project_in(WT_SESSION_IMPL *session, WT_CURSOR **cp, const char *pro
     WT_PACK_VALUE old_pv;
     size_t len, offset, old_len;
     u_long arg;
-    uint8_t *p, *end;
+    uint8_t *end, *p;
     const uint8_t *next;
     char *proj;
 
+    len = 0;
     p = end = NULL; /* -Wuninitialized */
 
     /* Reset any of the buffers we will be setting. */
@@ -54,16 +55,18 @@ __wt_schema_project_in(WT_SESSION_IMPL *session, WT_CURSOR **cp, const char *pro
             } else
                 WT_RET(__pack_init(session, &pack, c->key_format));
             buf = &c->key;
-            p = (uint8_t *)buf->data;
-            end = p + buf->size;
+            end = p = (uint8_t *)buf->data;
+            if (end != NULL)
+                end += buf->size;
             continue;
 
         case WT_PROJ_VALUE:
             c = cp[arg];
             WT_RET(__pack_init(session, &pack, c->value_format));
             buf = &c->value;
-            p = (uint8_t *)buf->data;
-            end = p + buf->size;
+            end = p = (uint8_t *)buf->data;
+            if (end != NULL)
+                end += buf->size;
             continue;
         }
 
@@ -144,7 +147,7 @@ __wt_schema_project_out(WT_SESSION_IMPL *session, WT_CURSOR **cp, const char *pr
     WT_DECL_PACK(pack);
     WT_DECL_PACK_VALUE(pv);
     u_long arg;
-    uint8_t *p, *end;
+    uint8_t *end, *p;
     char *proj;
 
     p = end = NULL; /* -Wuninitialized */
@@ -212,10 +215,11 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp, const char *
     size_t len, offset, old_len;
     u_long arg;
     uint8_t *end, *p;
-    const uint8_t *next, *vp, *vend;
+    const uint8_t *next, *vend, *vp;
     char *proj;
     bool skip;
 
+    len = 0;
     p = end = NULL; /* -Wuninitialized */
 
     WT_RET(__pack_init(session, &vpack, vformat));
@@ -249,8 +253,9 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp, const char *
             } else
                 WT_RET(__pack_init(session, &pack, c->key_format));
             buf = &c->key;
-            p = (uint8_t *)buf->data;
-            end = p + buf->size;
+            end = p = (uint8_t *)buf->data;
+            if (end != NULL)
+                end += buf->size;
             continue;
 
         case WT_PROJ_VALUE:
@@ -260,8 +265,9 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp, const char *
             c = cp[arg];
             WT_RET(__pack_init(session, &pack, c->value_format));
             buf = &c->value;
-            p = (uint8_t *)buf->data;
-            end = p + buf->size;
+            end = p = (uint8_t *)buf->data;
+            if (end != NULL)
+                end += buf->size;
             continue;
         }
 
@@ -334,13 +340,21 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp, const char *
                  */
                 if (len > old_len)
                     WT_RET(__wt_buf_grow(session, buf, buf->size + len - old_len));
-                p = (uint8_t *)buf->data + offset;
-                /* Make room if we're inserting out-of-order. */
-                if (offset + old_len < buf->size)
-                    memmove(p + len, p + old_len, buf->size - (offset + old_len));
-                WT_RET(__pack_write(session, &pv, &p, len));
-                buf->size += len - old_len;
-                end = (uint8_t *)buf->data + buf->size;
+
+                /*
+                 * The data reference should not be NULL, but static analyzers complain there's a
+                 * path to passing a NULL to memmove.
+                 */
+                end = p = (uint8_t *)buf->data;
+                if (p != NULL) {
+                    p += offset;
+                    /* Make room if we're inserting out-of-order. */
+                    if (offset + old_len < buf->size)
+                        memmove(p + len, p + old_len, buf->size - (offset + old_len));
+                    WT_RET(__pack_write(session, &pv, &p, len));
+                    buf->size += len - old_len;
+                    end = (uint8_t *)buf->data + buf->size;
+                }
                 break;
             default:
                 WT_RET_MSG(session, EINVAL, "unexpected projection plan: %c", (int)*proj);
@@ -372,6 +386,7 @@ __wt_schema_project_merge(WT_SESSION_IMPL *session, WT_CURSOR **cp, const char *
     const uint8_t *p, *end;
     char *proj;
 
+    len = 0;
     p = end = NULL; /* -Wuninitialized */
 
     WT_RET(__wt_buf_init(session, value, 0));

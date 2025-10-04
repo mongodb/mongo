@@ -27,11 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/matcher/expression_text_noop.h"
 
+#include "mongo/base/string_data.h"
+#include "mongo/db/fts/fts_util.h"
+
 #include <memory>
+#include <string>
+#include <utility>
 
 
 namespace mongo {
@@ -42,10 +45,10 @@ TextNoOpMatchExpression::TextNoOpMatchExpression(TextParams params)
     _ftsQuery.setLanguage(std::move(params.language));
     _ftsQuery.setCaseSensitive(params.caseSensitive);
     _ftsQuery.setDiacriticSensitive(params.diacriticSensitive);
-    invariant(_ftsQuery.parse(fts::TEXT_INDEX_VERSION_INVALID));
+    tassert(_ftsQuery.parse(fts::TEXT_INDEX_VERSION_INVALID));
 }
 
-std::unique_ptr<MatchExpression> TextNoOpMatchExpression::shallowClone() const {
+std::unique_ptr<MatchExpression> TextNoOpMatchExpression::clone() const {
     TextParams params;
     params.query = _ftsQuery.getQuery();
     params.language = _ftsQuery.getLanguage();

@@ -27,20 +27,25 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/bson/oid.h"
 
-#include <boost/functional/hash.hpp>
-#include <limits>
-#include <memory>
-
-#include "mongo/base/init.h"
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/hex.h"
+#include "mongo/util/str.h"
+
+#include <algorithm>
+#include <ctime>
+#include <limits>
+#include <memory>
+
+#include <boost/functional/hash.hpp>
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 
@@ -153,7 +158,7 @@ void OID::initFromTermNumber(int64_t term) {
 }
 
 void OID::init(StringData s) {
-    verify(s.size() == (2 * kOIDSize));
+    MONGO_verify(s.size() == (2 * kOIDSize));
     std::string blob = hexblob::decode(s.substr(0, 2 * kOIDSize));
     std::copy(blob.begin(), blob.end(), _data);
 }

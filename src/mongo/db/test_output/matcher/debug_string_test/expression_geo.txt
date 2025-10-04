@@ -1,0 +1,12 @@
+==== VARIATION: matchExpression=GeoMatchExpression
+GEO raw = { a: { loc: { $within: { $box: [ { x: 4, y: 4 }, [ 6, 6 ] ] } } } }
+
+==== VARIATION: taggedMatchExpression=GeoMatchExpression
+GEO raw = { a: { loc: { $within: { $box: [ { x: 4, y: 4 }, [ 6, 6 ] ] } } } } || Selected Index #2 pos 0 combine 1
+
+==== VARIATION: matchExpression=GeoNearMatchExpression
+GEONEAR  field= maxdist=100 isNearSphere=0
+
+==== VARIATION: taggedMatchExpression=GeoNearMatchExpression
+GEONEAR  field= maxdist=100 isNearSphere=0 || Selected Index #2 pos 0 combine 1
+

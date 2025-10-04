@@ -1,10 +1,11 @@
 /**
  * Test that the $changeStream stage cannot be used in a view definition pipeline.
+ *
+ * @tags: [
+ *   assumes_read_preference_unchanged,
+ * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
+import {assertDropAndRecreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 
 const coll = assertDropAndRecreateCollection(db, "change_stream_ban_from_views");
 assert.commandWorked(coll.insert({_id: 1}));
@@ -18,21 +19,22 @@ assertDropCollection(db, csViewName);
 const csPipe = [{$changeStream: {}}];
 
 // Create one valid view for testing purposes.
-assert.commandWorked(db.runCommand(
-    {create: normalViewName, viewOn: coll.getName(), pipeline: [{$match: {_id: 1}}]}));
+assert.commandWorked(db.runCommand({create: normalViewName, viewOn: coll.getName(), pipeline: [{$match: {_id: 1}}]}));
 
 // Verify that we cannot create a view using a pipeline which begins with $changeStream.
 assert.commandFailedWithCode(
     db.runCommand({create: csViewName, viewOn: coll.getName(), pipeline: csPipe}),
-    ErrorCodes.OptionNotSupportedOnView);
+    ErrorCodes.OptionNotSupportedOnView,
+);
 
 // We also cannot update an existing view to use a $changeStream pipeline.
 assert.commandFailedWithCode(
     db.runCommand({collMod: normalViewName, viewOn: coll.getName(), pipeline: csPipe}),
-    ErrorCodes.OptionNotSupportedOnView);
+    ErrorCodes.OptionNotSupportedOnView,
+);
 
 // Verify change streams cannot be created on views.
 assert.commandFailedWithCode(
     db.runCommand({aggregate: normalViewName, pipeline: [{$changeStream: {}}], cursor: {}}),
-    ErrorCodes.CommandNotSupportedOnView);
-})();
+    ErrorCodes.CommandNotSupportedOnView,
+);

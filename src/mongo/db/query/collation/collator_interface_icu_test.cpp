@@ -27,15 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/query/collation/collator_interface_icu.h"
 
-#include <iomanip>
-#include <iostream>
-#include <unicode/coll.h>
-
+#include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
+#include <string>
+#include <utility>
+
+#include <unicode/coll.h>
+#include <unicode/locid.h>
+#include <unicode/utypes.h>
 
 namespace {
 
@@ -133,7 +137,7 @@ TEST(CollatorInterfaceICUTest, ASCIIComparisonWorksUsingLocaleStringParsing) {
     Collation collationSpec;
     collationSpec.setLocale("en_US");
 
-    auto locale = icu::Locale::createFromName(collationSpec.getLocale().toString().c_str());
+    auto locale = icu::Locale::createFromName(std::string{collationSpec.getLocale()}.c_str());
     ASSERT_EQ(std::string("en"), locale.getLanguage());
     ASSERT_EQ(std::string("US"), locale.getCountry());
 
@@ -151,7 +155,7 @@ TEST(CollatorInterfaceICUTest, ASCIIComparisonWorksUsingComparisonKeys) {
     Collation collationSpec;
     collationSpec.setLocale("en_US");
 
-    auto locale = icu::Locale::createFromName(collationSpec.getLocale().toString().c_str());
+    auto locale = icu::Locale::createFromName(std::string{collationSpec.getLocale()}.c_str());
     ASSERT_EQ(std::string("en"), locale.getLanguage());
     ASSERT_EQ(std::string("US"), locale.getCountry());
 
@@ -217,7 +221,7 @@ TEST(CollatorInterfaceICUTest, EmptyNullTerminatedStringComparesCorrectly) {
     ASSERT(U_SUCCESS(status));
 
     StringData emptyString("");
-    ASSERT(emptyString.rawData());
+    ASSERT(emptyString.data());
     ASSERT_EQ(emptyString.size(), 0u);
 
     CollatorInterfaceICU icuCollator(collationSpec, std::move(coll));
@@ -236,7 +240,7 @@ TEST(CollatorInterfaceICUTest, EmptyNullTerminatedStringComparesCorrectlyUsingCo
     ASSERT(U_SUCCESS(status));
 
     StringData emptyString("");
-    ASSERT(emptyString.rawData());
+    ASSERT(emptyString.data());
     ASSERT_EQ(emptyString.size(), 0u);
 
     CollatorInterfaceICU icuCollator(collationSpec, std::move(coll));
@@ -257,7 +261,7 @@ TEST(CollatorInterfaceICUTest, LengthOneStringWithNullByteComparesCorrectly) {
     ASSERT(U_SUCCESS(status));
 
     const auto nullByte = "\0"_sd;
-    ASSERT_EQ(nullByte.rawData()[0], '\0');
+    ASSERT_EQ(nullByte.data()[0], '\0');
     ASSERT_EQ(nullByte.size(), 1u);
 
     CollatorInterfaceICU icuCollator(collationSpec, std::move(coll));
@@ -276,7 +280,7 @@ TEST(CollatorInterfaceICUTest, LengthOneStringWithNullByteComparesCorrectlyUsing
     ASSERT(U_SUCCESS(status));
 
     const auto nullByte = "\0"_sd;
-    ASSERT_EQ(nullByte.rawData()[0], '\0');
+    ASSERT_EQ(nullByte.data()[0], '\0');
     ASSERT_EQ(nullByte.size(), 1u);
 
     CollatorInterfaceICU icuCollator(collationSpec, std::move(coll));
@@ -332,7 +336,7 @@ TEST(CollatorInterfaceICUTest, StringsWithEmbeddedNullByteCompareCorrectlyUsingC
 TEST(CollatorInterfaceICUTest, TwoUSEnglishCollationsAreEqual) {
     Collation collationSpec;
     collationSpec.setLocale("en_US");
-    auto locale = icu::Locale::createFromName(collationSpec.getLocale().toString().c_str());
+    auto locale = icu::Locale::createFromName(std::string{collationSpec.getLocale()}.c_str());
 
     UErrorCode status = U_ZERO_ERROR;
     std::unique_ptr<icu::Collator> coll1(icu::Collator::createInstance(locale, status));
@@ -350,11 +354,11 @@ TEST(CollatorInterfaceICUTest, TwoUSEnglishCollationsAreEqual) {
 TEST(CollatorInterfaceICUTest, USEnglishAndBritishEnglishCollationsAreNotEqual) {
     Collation collationSpec1;
     collationSpec1.setLocale("en_US");
-    auto locale1 = icu::Locale::createFromName(collationSpec1.getLocale().toString().c_str());
+    auto locale1 = icu::Locale::createFromName(std::string{collationSpec1.getLocale()}.c_str());
 
     Collation collationSpec2;
     collationSpec2.setLocale("en_UK");
-    auto locale2 = icu::Locale::createFromName(collationSpec2.getLocale().toString().c_str());
+    auto locale2 = icu::Locale::createFromName(std::string{collationSpec2.getLocale()}.c_str());
 
     UErrorCode status = U_ZERO_ERROR;
     std::unique_ptr<icu::Collator> coll1(icu::Collator::createInstance(locale1, status));

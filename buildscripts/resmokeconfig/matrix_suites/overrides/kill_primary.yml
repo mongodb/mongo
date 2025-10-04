@@ -9,13 +9,49 @@
       config:
         shell_options:
           eval: >-
-            testingReplication = true;
-            load('jstests/libs/override_methods/network_error_and_txn_override.js');
-            db = connect(TestData.connectionString);
-            load("jstests/libs/override_methods/enable_sessions.js");
-            load("jstests/libs/override_methods/set_read_and_write_concerns.js");
-            load("jstests/libs/override_methods/fail_unclean_shutdown_incompatible_commands.js");
-            load("jstests/libs/override_methods/fail_unclean_shutdown_start_parallel_shell.js");
+            globalThis.testingReplication = true;
+            await import('jstests/libs/override_methods/network_error_and_txn_override.js');
+            globalThis.db = connect(TestData.connectionString);
+            await import("jstests/libs/override_methods/enable_sessions.js");
+            await import("jstests/libs/override_methods/set_read_and_write_concerns.js");
+            await import("jstests/libs/override_methods/fail_unclean_shutdown_incompatible_commands.js");
+            await import("jstests/libs/override_methods/fail_unclean_shutdown_start_parallel_shell.js");
+          global_vars:
+            TestData:
+              alwaysInjectTransactionNumber: true
+              defaultReadConcernLevel: "majority"
+              logRetryAttempts: true
+              networkErrorAndTxnOverrideConfig:
+                retryOnNetworkErrors: true
+              overrideRetryAttempts: 3
+              sessionOptions:
+                readConcern:
+                  level: "majority"
+                # Force DBClientRS to find the primary for non-write commands.
+                readPreference:
+                  mode: "primary"
+                retryWrites: true
+                # Probabilistically choose to use/not use causal consistency. As of SERVER-53813
+                # causal consistency should not be required to read your own writes on the new primary
+                # after the old one is killed.
+                maybeUseCausalConsistency: true
+          # We specify nodb so the shell used by each test will attempt to connect after loading the
+          # retry logic in auto_retry_on_network_error.js.
+          nodb: ""
+
+- name: replica_sets_shell_options_mixed_binary
+  value:
+    executor:
+      config:
+        shell_options:
+          eval: >-
+            globalThis.testingReplication = true;
+            await import('jstests/libs/override_methods/network_error_and_txn_override.js');
+            globalThis.db = connect(TestData.connectionString);
+            await import("jstests/libs/override_methods/enable_sessions.js");
+            await import("jstests/libs/override_methods/set_read_and_write_concerns.js");
+            await import("jstests/libs/override_methods/fail_unclean_shutdown_incompatible_commands.js");
+            await import("jstests/libs/override_methods/fail_unclean_shutdown_start_parallel_shell.js");
           global_vars:
             TestData:
               alwaysInjectTransactionNumber: true
@@ -35,7 +71,16 @@
           # retry logic in auto_retry_on_network_error.js.
           nodb: ""
 
-- name: replcia_sets_reconfig_shell_options_TestData
+- name: replica_sets_shell_options_retry_attempts
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              overrideRetryAttempts: 6
+
+- name: replica_sets_reconfig_shell_options_TestData
   value:
     executor:
       config:
@@ -58,6 +103,10 @@
                 readPreference:
                   mode: "primary"
                 retryWrites: true
+                # Probabilistically choose to use/not use causal consistency. As of SERVER-53813
+                # causal consistency should not be required to read your own writes on the new primary
+                # after the old one is killed.
+                maybeUseCausalConsistency: true
 
 ###
 # Fixture options.
@@ -68,8 +117,7 @@
       fixture:
         class: ReplicaSetFixture
         mongod_options:
-          enableMajorityReadConcern: ''
-          syncdelay: 5
+          syncdelay: 5 # set to a low value to increase coverage of timestamping code.
           wiredTigerEngineConfigString: "debug_mode=(table_logging=true)"
           set_parameters:
             enableTestCommands: 1
@@ -86,13 +134,62 @@
           settings:
             catchUpTimeoutMillis: 0
 
+- name: replica_sets_fixture_last_lts_new_new_old
+  value:
+    executor:
+      fixture:
+        class: ReplicaSetFixture
+        mongod_options:
+          syncdelay: 5 # set to a low value to increase coverage of timestamping code.
+          wiredTigerEngineConfigString: "debug_mode=(table_logging=true)"
+          set_parameters:
+            enableTestCommands: 1
+            enableElectionHandoff: 0
+            logComponentVerbosity:
+              replication:
+                heartbeats: 2
+                rollback: 2
+              storage:
+                recovery: 2
+        all_nodes_electable: true
+        num_nodes: 3
+        old_bin_version: last_lts
+        mixed_bin_versions: new_new_old
+        replset_config_options:
+          settings:
+            catchUpTimeoutMillis: 0
+
+- name: replica_sets_fixture_last_lts_new_old_old
+  value:
+    executor:
+      fixture:
+        class: ReplicaSetFixture
+        mongod_options:
+          syncdelay: 5 # set to a low value to increase coverage of timestamping code.
+          wiredTigerEngineConfigString: "debug_mode=(table_logging=true)"
+          set_parameters:
+            enableTestCommands: 1
+            enableElectionHandoff: 0
+            logComponentVerbosity:
+              replication:
+                heartbeats: 2
+                rollback: 2
+              storage:
+                recovery: 2
+        all_nodes_electable: true
+        num_nodes: 3
+        old_bin_version: last_lts
+        mixed_bin_versions: new_old_old
+        replset_config_options:
+          settings:
+            catchUpTimeoutMillis: 0
+
 - name: replica_sets_reconfig_fixture
   value:
     executor:
       fixture:
         class: ReplicaSetFixture
         mongod_options:
-          enableMajorityReadConcern: ''
           wiredTigerEngineConfigString: "debug_mode=(table_logging=true)"
           set_parameters:
             enableTestCommands: 1
@@ -152,6 +249,212 @@
         - class: CleanEveryN
           n: 20
 
+- name: replica_sets_oplog_application_lag_hooks
+  value:
+    executor:
+      hooks:
+        - class: LagOplogApplicationInBackground
+          shell_options:
+            nodb: ""
+        # We use a stepdown interval of 15 seconds because we will retry all commands in a transaction
+        # so we need to allow time for at most 10 operations to be re-run and then re-committed. If
+        # too many network errors occur when re-running a transaction we will run out of retries.
+        - class: ContinuousStepdown
+          kill: true
+
+        # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+        # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+        # validating the entire contents of the collection.
+        - class: CheckReplOplogs
+        - class: CheckReplDBHash
+        - class: ValidateCollections
+          shell_options:
+            global_vars:
+              TestData:
+                skipEnforceFastCountOnValidate: true
+        - class: CleanEveryN
+          n: 20
+
+- name: sharding_reconfig_hooks
+  value:
+    executor:
+      hooks:
+        # We use a stepdown interval of 15 seconds because we will retry all commands in a transaction
+        # so we need to allow time for at most 10 operations to be re-run and then re-committed. If
+        # too many network errors occur when re-running a transaction we will run out of retries.
+        - class: ContinuousStepdown
+          randomize_kill: true
+        - class: CheckReplDBHash
+        - class: CheckMetadataConsistencyInBackground
+        - class: ValidateCollections
+          shell_options:
+            global_vars:
+              TestData:
+                skipEnforceFastCountOnValidate: true
+        - class: CheckOrphansDeleted
+        - class: CleanEveryN
+          n: 20
+
+- name: sharding_reconfig_archive
+  value:
+    executor:
+      archive:
+        test: true
+        hooks:
+          - ContinuousStepdown
+          - CheckReplDBHash
+          - CheckMetadataConsistencyInBackground
+          - ValidateCollections
+          - CheckOrphansDeleted
+          - CleanEveryN
+
+- name: sharding_shell_options
+  value:
+    executor:
+      config:
+        shell_options:
+          eval: >-
+            await import('jstests/libs/override_methods/network_error_and_txn_override.js');
+            globalThis.db = connect(TestData.connectionString);
+            await import("jstests/libs/override_methods/enable_sessions.js");
+            await import("jstests/libs/override_methods/set_read_and_write_concerns.js");
+            await import("jstests/libs/override_methods/fail_unclean_shutdown_incompatible_commands.js");
+            await import("jstests/libs/override_methods/fail_unclean_shutdown_start_parallel_shell.js");
+          global_vars:
+            TestData:
+              alwaysInjectTransactionNumber: true
+              defaultReadConcernLevel: "majority"
+              logRetryAttempts: true
+              networkErrorAndTxnOverrideConfig:
+                retryOnNetworkErrors: true
+              overrideRetryAttempts: 3
+              sessionOptions:
+                readConcern:
+                  level: "majority"
+                # Force DBClientRS to find the primary for non-write commands.
+                readPreference:
+                  mode: "primary"
+                retryWrites: true
+                # Probabilistically choose to use/not use causal consistency. As of SERVER-53813
+                # causal consistency should not be required to read your own writes on the new primary
+                # after the old one is killed.
+                maybeUseCausalConsistency: true
+          # We specify nodb so the shell used by each test will attempt to connect after loading the
+          # retry logic in auto_retry_on_network_error.js.
+          nodb: ""
+
+- name: all_nodes_can_be_primary
+  value:
+    executor:
+      fixture:
+        mongod_options:
+          syncdelay: 5 # set to a low value to increase coverage of timestamping code.
+          set_parameters:
+            enableElectionHandoff: 0
+            enableTestCommands: 1
+        configsvr_options:
+          all_nodes_electable: true
+          replset_config_options:
+            settings:
+              catchUpTimeoutMillis: 0
+        shard_options:
+          all_nodes_electable: true
+          replset_config_options:
+            settings:
+              catchUpTimeoutMillis: 0
+
+###
+# Overrides for suites based on ShardedClusterFixture
+###
+
+# There is no way to override only one hook in the hook list. Thus, since we need to add 'skipEnforceFastCountOnValidate' to the ValidateCollections hook, we are forced to override all the hooks.
+- name: sharding_override_hooks
+  value:
+    executor:
+      archive:
+        test: true
+        hooks:
+          - CheckReplDBHash
+          - CheckMetadataConsistencyInBackground
+          - ValidateCollections
+          - CheckOrphansDeleted
+          - CleanEveryN
+      hooks:
+        - class: ContinuousStepdown
+          randomize_kill: true
+        - class: CheckReplDBHash
+        - class: CheckMetadataConsistencyInBackground
+        - class: ValidateCollections
+          shell_options:
+            global_vars:
+              TestData:
+                skipEnforceFastCountOnValidate: true
+        - class: CheckOrphansDeleted
+        - class: CleanEveryN
+          n: 20
+
+- name: sharding_override_shell_options
+  value:
+    executor:
+      config:
+        shell_options:
+          eval: >-
+            await import('jstests/libs/override_methods/network_error_and_txn_override.js');
+            globalThis.db = connect(TestData.connectionString);
+            await import("jstests/libs/override_methods/enable_sessions.js");
+            await import("jstests/libs/override_methods/set_read_and_write_concerns.js");
+            await import("jstests/libs/override_methods/fail_unclean_shutdown_incompatible_commands.js");
+            await import("jstests/libs/override_methods/fail_unclean_shutdown_start_parallel_shell.js");
+          global_vars:
+            TestData:
+              alwaysInjectTransactionNumber: true
+              defaultReadConcernLevel: "majority"
+              logRetryAttempts: true
+              networkErrorAndTxnOverrideConfig:
+                retryOnNetworkErrors: true
+              overrideRetryAttempts: 3
+              sessionOptions:
+                readConcern:
+                  level: "majority"
+                # Force DBClientRS to find the primary for non-write commands.
+                readPreference:
+                  mode: "primary"
+                retryWrites: true
+                # Probabilistically choose to use/not use causal consistency. As of SERVER-53813
+                # causal consistency should not be required to read your own writes on the new primary
+                # after the old one is killed.
+                maybeUseCausalConsistency: true
+              # Inform the tests that we are running with stepdown hook
+              runningWithConfigStepdowns: true
+              runningWithShardStepdowns: true
+              killShards: true
+          # We specify nodb so the shell used by each test will attempt to connect after loading the
+          # retry logic in auto_retry_on_network_error.js.
+          nodb: ""
+
+# Override sharding fixture to accomodate for ContinuousStepdown hook
+- name: sharding_override_fixture
+  value:
+    executor:
+      fixture:
+        mongod_options:
+          syncdelay: 5 # set to a low value to increase coverage of timestamping code.
+          set_parameters:
+            enableElectionHandoff: 0
+            enableTestCommands: 1
+        configsvr_options:
+          num_nodes: 3
+          all_nodes_electable: true
+          replset_config_options:
+            settings:
+              catchUpTimeoutMillis: 0
+        num_rs_nodes_per_shard: 3
+        shard_options:
+          all_nodes_electable: true
+          replset_config_options:
+            settings:
+              catchUpTimeoutMillis: 0
+
 ###
 # Archival options.
 ###
@@ -161,6 +464,17 @@
       archive:
         tests: true
         hooks:
+          - CheckReplDBHash
+          - CheckReplOplogs
+          - ValidateCollections
+
+- name: replica_sets_oplog_application_lag_archive
+  value:
+    executor:
+      archive:
+        tests: true
+        hooks:
+          - LagOplogApplicationInBackground
           - CheckReplDBHash
           - CheckReplOplogs
           - ValidateCollections

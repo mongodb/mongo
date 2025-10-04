@@ -1,17 +1,16 @@
 // check replica set authentication
 
-var name = "logpath";
-var token = "logpath_token";
+let name = "logpath";
+let token = "logpath_token";
 
-var dbdir = MongoRunner.dataPath + name + "/";  // this will work under windows as well as linux
-var basedir = MongoRunner.dataPath + name + "files" +
-    "/";
-var logdir = basedir + "logdir/";
-var testdir = basedir + "testdir/";
-var sfile = _isWindows() ? "NUL" : "/dev/null";
+let dbdir = MongoRunner.dataPath + name + "/"; // this will work under windows as well as linux
+let basedir = MongoRunner.dataPath + name + "files" + "/";
+let logdir = basedir + "logdir/";
+let testdir = basedir + "testdir/";
+let sfile = _isWindows() ? "NUL" : "/dev/null";
 
-var logs = [token + "1", token + "2"];
-var port = allocatePorts(6);
+let logs = [token + "1", token + "2"];
+let port = allocatePorts(6);
 
 print("------ Creating directories");
 
@@ -20,11 +19,11 @@ assert(mkdir(basedir));
 assert(mkdir(logdir));
 assert(mkdir(testdir));
 
-var cleanupFiles = function() {
-    var files = listFiles(logdir);
+let cleanupFiles = function () {
+    let files = listFiles(logdir);
 
-    for (f in files) {
-        var name = files[f].name;
+    for (let f in files) {
+        let name = files[f].name;
 
         // mostly here for safety
         if (name.indexOf(token) != -1) {
@@ -33,12 +32,12 @@ var cleanupFiles = function() {
     }
 };
 
-var logCount = function(fpattern, prefix) {
-    var files = listFiles(logdir);
-    var pat = RegExp(fpattern + (prefix ? "" : "$"));
-    var cnt = 0;
+let logCount = function (fpattern, prefix) {
+    let files = listFiles(logdir);
+    let pat = RegExp(fpattern + (prefix ? "" : "$"));
+    let cnt = 0;
 
-    for (f in files) {
+    for (let f in files) {
         if (pat.test(files[f].name)) {
             cnt++;
         }
@@ -78,19 +77,16 @@ if (false) {
     // only run forking test on *nix (not supported on Windows)
     if (_isWindows()) {
         print("------ Skipping fork tests... (Windows)");
-
     } else {
         print("------ Start mongod with logpath set to new file, fork");
-        var m = MongoRunner.runMongod(
-            {port: port[2], dbpath: dbdir, logpath: logdir + logs[1], fork: true});
+        var m = MongoRunner.runMongod({port: port[2], dbpath: dbdir, logpath: logdir + logs[1], fork: true});
 
         // log should now exist (and no rotations should exist)
         assert.eq(logCount(logs[1], true), 1);
         MongoRunner.stopMongod(m /*port[2]*/);
 
         print("------ Start mongod with logpath set to existing file, fork");
-        m = MongoRunner.runMongod(
-            {port: port[3], dbpath: dbdir, logpath: logdir + logs[1], fork: true});
+        m = MongoRunner.runMongod({port: port[3], dbpath: dbdir, logpath: logdir + logs[1], fork: true});
 
         // log should continue to exist
         assert.eq(logCount(logs[1]), 1);
@@ -105,12 +101,12 @@ if (false) {
     // the following tests depend on undefined behavior; assume that MongoRunner raises exception on
     // error
     print("------ Confirm that launch fails with directory");
-    assert.throws(function() {
+    assert.throws(function () {
         MongoRunner.runMongod({port: port[4], dbpath: dbdir, logpath: testdir});
     });
 
     print("------ Confirm that launch fails with special file");
-    assert.throws(function() {
+    assert.throws(function () {
         MongoRunner.runMongod({port: port[5], dbpath: dbdir, logpath: sfile});
     });
 }

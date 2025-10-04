@@ -1,0 +1,8 @@
+version: 1.0.0
+filters:
+  - "migration*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "rs_endpoint*":
+    approvers:
+      - 10gen/server-cluster-scalability

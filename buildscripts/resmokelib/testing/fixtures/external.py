@@ -1,6 +1,6 @@
 """External fixture for executing JSTests against."""
 
-import buildscripts.resmokelib.testing.fixtures.interface as interface
+from buildscripts.resmokelib.testing.fixtures import interface
 
 
 class ExternalFixture(interface.Fixture):
@@ -15,8 +15,10 @@ class ExternalFixture(interface.Fixture):
         interface.Fixture.__init__(self, logger, job_num, fixturelib)
 
         if shell_conn_string is None:
-            raise ValueError("The ExternalFixture must be specified with the resmoke option"
-                             " --shellConnString or --shellPort")
+            raise ValueError(
+                "The ExternalFixture must be specified with the resmoke option"
+                " --shellConnString or --shellPort"
+            )
 
         self.shell_conn_string = shell_conn_string
 
@@ -30,3 +32,6 @@ class ExternalFixture(interface.Fixture):
     def get_driver_connection_url(self):
         """Return the driver connection URL."""
         return self.shell_conn_string
+
+    def _all_mongo_d_s_t(self):
+        return [self]

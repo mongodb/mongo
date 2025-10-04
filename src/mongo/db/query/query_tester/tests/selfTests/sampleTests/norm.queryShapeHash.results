@@ -1,0 +1,57 @@
+norm
+norm
+norm.coll as fuzzer_coll
+
+0
+:queryShapeHash {aggregate: "fuzzer_coll", pipeline: [{$limit:5}], cursor: {}}
+[
+{"queryShapeHash":"AC1D49068097E4877191C6D4DFAE046B9D58D4767CF40BE4FE52E4880860044A"}
+]
+
+1
+:queryShapeHash {aggregate: "fuzzer_coll", pipeline: [{$limit:5}], cursor: {}}
+[
+{"queryShapeHash":"AC1D49068097E4877191C6D4DFAE046B9D58D4767CF40BE4FE52E4880860044A"}
+]
+
+2
+:queryShapeHash {aggregate: "fuzzer_coll", pipeline: [{$limit:1}], cursor: {}}
+[
+{"queryShapeHash":"AC1D49068097E4877191C6D4DFAE046B9D58D4767CF40BE4FE52E4880860044A"}
+]
+
+3
+:queryShapeHash {aggregate: "fuzzer_coll", pipeline: [{$limit:10}], cursor: {}}
+[
+{"queryShapeHash":"AC1D49068097E4877191C6D4DFAE046B9D58D4767CF40BE4FE52E4880860044A"}
+]
+
+4
+:queryShapeHash {aggregate: "fuzzer_coll", pipeline: [{$limit:2}], cursor: {}}
+[
+{"queryShapeHash":"AC1D49068097E4877191C6D4DFAE046B9D58D4767CF40BE4FE52E4880860044A"}
+]
+
+5
+:queryShapeHash {aggregate: "fuzzer_coll", pipeline: [{$limit:5}], cursor: {}}
+[
+{"queryShapeHash":"AC1D49068097E4877191C6D4DFAE046B9D58D4767CF40BE4FE52E4880860044A"}
+]
+
+6
+:queryShapeHash {aggregate: "fuzzer_coll", pipeline: [{$limit:2}], cursor: {}}
+[
+{"queryShapeHash":"AC1D49068097E4877191C6D4DFAE046B9D58D4767CF40BE4FE52E4880860044A"}
+]
+
+7
+:queryShapeHash {aggregate: "fuzzer_coll", pipeline: [{$limit:5}], cursor: {}}
+[
+{"queryShapeHash":"AC1D49068097E4877191C6D4DFAE046B9D58D4767CF40BE4FE52E4880860044A"}
+]
+
+8
+:queryShapeHash {aggregate: "fuzzer_coll", pipeline: [{$limit:10}], cursor: {}}
+[
+{"queryShapeHash":"AC1D49068097E4877191C6D4DFAE046B9D58D4767CF40BE4FE52E4880860044A"}
+]

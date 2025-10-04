@@ -27,19 +27,32 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/db/pipeline/document_source_limit.h"
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/limit_stage.h"
+#include "mongo/db/exec/agg/mock_stage.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/dependencies.h"
-#include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_project.h"
+#include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+
+#include <iterator>
+#include <list>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace {
@@ -47,18 +60,23 @@ namespace {
 // This provides access to getExpCtx(), but we'll use a different name for this test suite.
 using DocumentSourceLimitTest = AggregationContextFixture;
 
+boost::intrusive_ptr<mongo::exec::agg::LimitStage> createForTests(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, long long limit) {
+    return make_intrusive<mongo::exec::agg::LimitStage>("$limit", expCtx, limit);
+}
+
 TEST_F(DocumentSourceLimitTest, ShouldDisposeSourceWhenLimitIsReached) {
-    auto source = DocumentSourceMock::createForTest({"{a: 1}", "{a: 2}"}, getExpCtx());
-    auto limit = DocumentSourceLimit::create(getExpCtx(), 1);
-    limit->setSource(source.get());
-    // The limit's result is as expected.
-    auto next = limit->getNext();
+    auto stage = exec::agg::MockStage::createForTest({"{a: 1}", "{a: 2}"}, getExpCtx());
+    auto limitStage = createForTests(getExpCtx(), 1);
+    limitStage->setSource(stage.get());
+    // The limitStage's result is as expected.
+    auto next = limitStage->getNext();
     ASSERT(next.isAdvanced());
     ASSERT_VALUE_EQ(Value(1), next.getDocument().getField("a"));
-    // The limit is exhausted.
-    ASSERT(limit->getNext().isEOF());
-    // The source has been disposed
-    ASSERT_TRUE(source->isDisposed);
+    // The limitStage is exhausted.
+    ASSERT(limitStage->getNext().isEOF());
+    // The stage has been disposed
+    ASSERT_TRUE(stage->isDisposed);
 }
 
 TEST_F(DocumentSourceLimitTest, ShouldNotBeAbleToLimitToZeroDocuments) {
@@ -79,7 +97,7 @@ TEST_F(DocumentSourceLimitTest, ShouldRejectUserLimitOfZero) {
 }
 
 TEST_F(DocumentSourceLimitTest, TwoLimitStagesShouldCombineIntoOne) {
-    Pipeline::SourceContainer container;
+    DocumentSourceContainer container;
     auto firstLimit = DocumentSourceLimit::create(getExpCtx(), 10);
     auto secondLimit = DocumentSourceLimit::create(getExpCtx(), 5);
 
@@ -92,7 +110,7 @@ TEST_F(DocumentSourceLimitTest, TwoLimitStagesShouldCombineIntoOne) {
 }
 
 TEST_F(DocumentSourceLimitTest, DoesNotPushProjectBeforeSelf) {
-    Pipeline::SourceContainer container;
+    DocumentSourceContainer container;
     auto limit = DocumentSourceLimit::create(getExpCtx(), 10);
     auto project =
         DocumentSourceProject::create(BSON("fullDocument" << true), getExpCtx(), "$project"_sd);
@@ -109,23 +127,24 @@ TEST_F(DocumentSourceLimitTest, DoesNotPushProjectBeforeSelf) {
 }
 
 TEST_F(DocumentSourceLimitTest, DisposeShouldCascadeAllTheWayToSource) {
-    auto source = DocumentSourceMock::createForTest({"{a: 1}", "{a: 1}"}, getExpCtx());
+    auto stage = exec::agg::MockStage::createForTest({"{a: 1}", "{a: 1}"}, getExpCtx());
 
     // Create a DocumentSourceMatch.
     BSONObj spec = BSON("$match" << BSON("a" << 1));
     BSONElement specElement = spec.firstElement();
     auto match = DocumentSourceMatch::createFromBson(specElement, getExpCtx());
-    match->setSource(source.get());
+    auto matchStage = exec::agg::buildStage(match);
+    matchStage->setSource(stage.get());
 
-    auto limit = DocumentSourceLimit::create(getExpCtx(), 1);
-    limit->setSource(match.get());
-    // The limit is not exhauted.
-    auto next = limit->getNext();
+    auto limitStage = createForTests(getExpCtx(), 1);
+    limitStage->setSource(matchStage.get());
+    // The limitStage is not exhausted.
+    auto next = limitStage->getNext();
     ASSERT(next.isAdvanced());
     ASSERT_VALUE_EQ(Value(1), next.getDocument().getField("a"));
-    // The limit is exhausted.
-    ASSERT(limit->getNext().isEOF());
-    ASSERT_TRUE(source->isDisposed);
+    // The limitStage is exhausted.
+    ASSERT(limitStage->getNext().isEOF());
+    ASSERT_TRUE(stage->isDisposed);
 }
 
 TEST_F(DocumentSourceLimitTest, ShouldNotIntroduceAnyDependencies) {
@@ -138,27 +157,34 @@ TEST_F(DocumentSourceLimitTest, ShouldNotIntroduceAnyDependencies) {
 }
 
 TEST_F(DocumentSourceLimitTest, ShouldPropagatePauses) {
-    auto limit = DocumentSourceLimit::create(getExpCtx(), 2);
+    auto limitStage = createForTests(getExpCtx(), 2);
     auto mock =
-        DocumentSourceMock::createForTest({DocumentSource::GetNextResult::makePauseExecution(),
-                                           Document(),
-                                           DocumentSource::GetNextResult::makePauseExecution(),
-                                           Document(),
-                                           DocumentSource::GetNextResult::makePauseExecution(),
-                                           Document()},
-                                          getExpCtx());
-    limit->setSource(mock.get());
+        exec::agg::MockStage::createForTest({DocumentSource::GetNextResult::makePauseExecution(),
+                                             Document(),
+                                             DocumentSource::GetNextResult::makePauseExecution(),
+                                             Document(),
+                                             DocumentSource::GetNextResult::makePauseExecution(),
+                                             Document()},
+                                            getExpCtx());
+    limitStage->setSource(mock.get());
 
-    ASSERT_TRUE(limit->getNext().isPaused());
-    ASSERT_TRUE(limit->getNext().isAdvanced());
-    ASSERT_TRUE(limit->getNext().isPaused());
-    ASSERT_TRUE(limit->getNext().isAdvanced());
+    ASSERT_TRUE(limitStage->getNext().isPaused());
+    ASSERT_TRUE(limitStage->getNext().isAdvanced());
+    ASSERT_TRUE(limitStage->getNext().isPaused());
+    ASSERT_TRUE(limitStage->getNext().isAdvanced());
 
     // We've reached the limit.
     ASSERT_TRUE(mock->isDisposed);
-    ASSERT_TRUE(limit->getNext().isEOF());
-    ASSERT_TRUE(limit->getNext().isEOF());
-    ASSERT_TRUE(limit->getNext().isEOF());
+    ASSERT_TRUE(limitStage->getNext().isEOF());
+    ASSERT_TRUE(limitStage->getNext().isEOF());
+    ASSERT_TRUE(limitStage->getNext().isEOF());
+}
+
+TEST_F(DocumentSourceLimitTest, RedactsCorrectly) {
+    auto limit = DocumentSourceLimit::create(getExpCtx(), 2);
+    ASSERT_VALUE_EQ_AUTO(  // NOLINT
+        "{ $limit: \"?number\" }",
+        redact(*limit));
 }
 
 }  // namespace

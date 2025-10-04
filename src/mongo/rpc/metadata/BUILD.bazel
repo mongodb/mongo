@@ -1,0 +1,38 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+idl_generator(
+    name = "audit_metadata_gen",
+    src = "audit_metadata.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/auth:auth_types_gen",
+        "//src/mongo/util/net:hostandport_gen",
+    ],
+)
+
+idl_generator(
+    name = "client_metadata_gen",
+    src = "client_metadata.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "audit_attrs_gen",
+    src = "audit_attrs.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/auth:auth_types_gen",
+        "//src/mongo/util/net:hostandport_gen",
+    ],
+)

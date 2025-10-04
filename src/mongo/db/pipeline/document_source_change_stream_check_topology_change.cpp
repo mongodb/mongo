@@ -27,11 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/pipeline/document_source_change_stream_check_topology_change.h"
 
-#include "mongo/db/pipeline/change_stream_topology_change_info.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/pipeline/document_source_change_stream.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -39,59 +44,38 @@ REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalChangeStreamCheckTopologyChange,
                                   LiteParsedDocumentSourceChangeStreamInternal::parse,
                                   DocumentSourceChangeStreamCheckTopologyChange::createFromBson,
                                   true);
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalChangeStreamCheckTopologyChange,
+                            DocumentSourceChangeStreamCheckTopologyChange::id)
 
 StageConstraints DocumentSourceChangeStreamCheckTopologyChange::constraints(
-    Pipeline::SplitState pipeState) const {
-    return {StreamType::kStreaming,
-            PositionRequirement::kNone,
-            HostTypeRequirement::kAnyShard,
-            DiskUseRequirement::kNoDiskUse,
-            FacetRequirement::kNotAllowed,
-            TransactionRequirement::kNotAllowed,
-            LookupRequirement::kNotAllowed,
-            UnionRequirement::kNotAllowed,
-            ChangeStreamRequirement::kChangeStreamStage};
+    PipelineSplitState pipeState) const {
+    StageConstraints constraints(StreamType::kStreaming,
+                                 PositionRequirement::kNone,
+                                 HostTypeRequirement::kAnyShard,
+                                 DiskUseRequirement::kNoDiskUse,
+                                 FacetRequirement::kNotAllowed,
+                                 TransactionRequirement::kNotAllowed,
+                                 LookupRequirement::kNotAllowed,
+                                 UnionRequirement::kNotAllowed,
+                                 ChangeStreamRequirement::kChangeStreamStage);
+    constraints.consumesLogicalCollectionData = false;
+    return constraints;
 }
-
 
 boost::intrusive_ptr<DocumentSourceChangeStreamCheckTopologyChange>
 DocumentSourceChangeStreamCheckTopologyChange::createFromBson(
     const BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(5669601,
             str::stream() << "the '" << kStageName << "' spec must be an object",
-            elem.type() == Object && elem.Obj().isEmpty());
+            elem.type() == BSONType::object && elem.Obj().isEmpty());
     return new DocumentSourceChangeStreamCheckTopologyChange(expCtx);
 }
 
-DocumentSource::GetNextResult DocumentSourceChangeStreamCheckTopologyChange::doGetNext() {
-    auto nextInput = pSource->getNext();
-
-    if (!nextInput.isAdvanced()) {
-        return nextInput;
-    }
-
-    auto eventDoc = nextInput.getDocument();
-
-    const StringData eventOpType =
-        eventDoc[DocumentSourceChangeStream::kOperationTypeField].getStringData();
-
-    // Throw the 'ChangeStreamTopologyChangeInfo' exception, wrapping the topology change event
-    // along with its metadata. This will bypass the remainder of the pipeline and will be passed
-    // directly up to mongoS.
-    if (eventOpType == DocumentSourceChangeStream::kNewShardDetectedOpType) {
-        uasserted(ChangeStreamTopologyChangeInfo(eventDoc.toBsonWithMetaData()),
-                  "Collection migrated to new shard");
-    }
-
-    return nextInput;
-}
-
-Value DocumentSourceChangeStreamCheckTopologyChange::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
-    if (explain) {
+Value DocumentSourceChangeStreamCheckTopologyChange::doSerialize(
+    const SerializationOptions& opts) const {
+    if (opts.isSerializingForExplain()) {
         return Value(DOC(DocumentSourceChangeStream::kStageName
-                         << DOC("stage"
-                                << "internalCheckTopologyChange"_sd)));
+                         << DOC("stage" << "internalCheckTopologyChange"_sd)));
     }
 
     return Value(Document{{kStageName, Document()}});

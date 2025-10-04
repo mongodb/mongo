@@ -27,36 +27,55 @@
  *    it in the license file.
  */
 
+
+#include "mongo/s/sharding_task_executor_pool_controller.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/client/connection_string.h"
+#include "mongo/client/replica_set_monitor.h"
+#include "mongo/db/topology/shard_registry.h"
+#include "mongo/executor/connection_pool_stats.h"
+#include "mongo/logv2/log.h"
+#include "mongo/util/str.h"
+
+#include <algorithm>
+#include <set>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/container/node_hash_set.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kConnectionPool
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/client/replica_set_monitor.h"
-#include "mongo/executor/connection_pool_stats.h"
-#include "mongo/s/is_mongos.h"
-#include "mongo/s/sharding_task_executor_pool_controller.h"
 
 namespace mongo {
 
 namespace {
 
 template <typename Map, typename Key>
-auto& getOrInvariant(Map&& map, const Key& key) noexcept {
-    auto it = std::forward<Map>(map).find(key);
-    invariant(it != std::forward<Map>(map).end(), "Unable to find key in map");
+auto& getOrInvariant(Map&& map, const Key& key) {
+    auto it = map.find(key);
+    invariant(it != map.end(), "Unable to find key in map");
 
     return it->second;
 }
 
 template <typename Map, typename... Args>
-void emplaceOrInvariant(Map&& map, Args&&... args) noexcept {
+void emplaceOrInvariant(Map&& map, Args&&... args) {
     auto ret = std::forward<Map>(map).emplace(std::forward<Args>(args)...);
     invariant(ret.second, "Element already existed in map/set");
 }
 
+bool isConfigServer(const ShardRegistry* sr, const HostAndPort& peer) {
+    return sr && sr->isConfigServer(peer);
+}
+
 }  // namespace
 
-Status ShardingTaskExecutorPoolController::validateHostTimeout(const int& hostTimeoutMS) {
+Status ShardingTaskExecutorPoolController::validateHostTimeout(const int& hostTimeoutMS,
+                                                               const boost::optional<TenantId>&) {
     auto toRefreshTimeoutMS = gParameters.toRefreshTimeoutMS.load();
     auto pendingTimeoutMS = gParameters.pendingTimeoutMS.load();
     if (hostTimeoutMS >= (toRefreshTimeoutMS + pendingTimeoutMS)) {
@@ -70,7 +89,8 @@ Status ShardingTaskExecutorPoolController::validateHostTimeout(const int& hostTi
     return Status(ErrorCodes::BadValue, msg);
 }
 
-Status ShardingTaskExecutorPoolController::validatePendingTimeout(const int& pendingTimeoutMS) {
+Status ShardingTaskExecutorPoolController::validatePendingTimeout(
+    const int& pendingTimeoutMS, const boost::optional<TenantId>&) {
     auto toRefreshTimeoutMS = gParameters.toRefreshTimeoutMS.load();
     if (pendingTimeoutMS < toRefreshTimeoutMS) {
         return Status::OK();
@@ -83,9 +103,8 @@ Status ShardingTaskExecutorPoolController::validatePendingTimeout(const int& pen
 }
 
 Status ShardingTaskExecutorPoolController::onUpdateMatchingStrategy(const std::string& str) {
-    // TODO Fix up after SERVER-40224
     if (str == "automatic") {
-        if (isMongos()) {
+        if (serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer)) {
             gParameters.matchingStrategy.store(MatchingStrategy::kMatchPrimaryNode);
         } else {
             gParameters.matchingStrategy.store(MatchingStrategy::kDisabled);
@@ -162,22 +181,22 @@ public:
     explicit ReplicaSetChangeListener(ShardingTaskExecutorPoolController* controller)
         : _controller(controller) {}
 
-    void onFoundSet(const Key& key) noexcept override {
+    void onFoundSet(const Key& key) override {
         // Do nothing
     }
 
-    void onConfirmedSet(const State& state) noexcept override {
+    void onConfirmedSet(const State& state) override {
         stdx::lock_guard lk(_controller->_mutex);
 
         _controller->_removeGroup(lk, state.connStr.getSetName());
         _controller->_addGroup(lk, state);
     }
 
-    void onPossibleSet(const State& state) noexcept override {
+    void onPossibleSet(const State& state) override {
         // Do nothing
     }
 
-    void onDroppedSet(const Key& key) noexcept override {
+    void onDroppedSet(const Key& key) override {
         stdx::lock_guard lk(_controller->_mutex);
 
         _controller->_removeGroup(lk, key);
@@ -197,6 +216,7 @@ void ShardingTaskExecutorPoolController::addHost(PoolId id, const HostAndPort& h
 
     PoolData poolData;
     poolData.host = host;
+    poolData.isConfigServer = isConfigServer(_shardRegistry.lock().get(), host);
 
     // Set up the GroupAndId
     auto& groupAndId = _groupAndIds[host];
@@ -220,11 +240,29 @@ auto ShardingTaskExecutorPoolController::updateHost(PoolId id, const HostState& 
 
     auto& poolData = getOrInvariant(_poolDatas, id);
 
-    const size_t minConns = gParameters.minConnections.load();
-    const size_t maxConns = gParameters.maxConnections.load();
+    const auto [minConns, maxConns] = [&] {
+        size_t lo = gParameters.minConnections.load();
+        size_t hi = gParameters.maxConnections.load();
+        if (poolData.isConfigServer) {
+            auto maybeOverride = [](size_t& t, int val) {
+                if (val >= 0)
+                    t = val;
+            };
+            maybeOverride(lo, gParameters.minConnectionsForConfigServers.load());
+            maybeOverride(hi, gParameters.maxConnectionsForConfigServers.load());
+        }
+        return std::tuple(lo, hi);
+    }();
+    // conn_pool_csrs.js looks for this message in the log.
+    LOGV2_DEBUG(6265600,
+                5,
+                "Update connection pool",
+                "host"_attr = poolData.host,
+                "minConns"_attr = minConns,
+                "maxConns"_attr = maxConns);
 
     // Update the target for just the pool first
-    poolData.target = stats.requests + stats.active;
+    poolData.target = stats.requests + stats.active + stats.leased;
 
     if (poolData.target < minConns) {
         poolData.target = minConns;
@@ -232,7 +270,7 @@ auto ShardingTaskExecutorPoolController::updateHost(PoolId id, const HostState& 
         poolData.target = maxConns;
     }
 
-    poolData.isAbleToShutdown = stats.health.isExpired;
+    poolData.isAbleToShutdown = (stats.health == ConnectionPool::HostHealth::kExpired);
 
     // If the pool isn't in a groupData, we can return now
     auto groupData = poolData.groupData.lock();
@@ -319,9 +357,26 @@ Milliseconds ShardingTaskExecutorPoolController::toRefreshTimeout() const {
     return Milliseconds{gParameters.toRefreshTimeoutMS.load()};
 }
 
+size_t ShardingTaskExecutorPoolController::connectionRequestsMaxQueueDepth() const {
+    return gParameters.connectionRequestsMaxQueueDepth.load();
+}
+
+size_t ShardingTaskExecutorPoolController::maxConnections() const {
+    return gParameters.maxConnections.load();
+}
+
+Milliseconds ShardingTaskExecutorPoolController::baseEstablishmentBackoffMS() const {
+    return Milliseconds{gParameters.baseEstablishmentBackoffMS.load()};
+}
+
+Milliseconds ShardingTaskExecutorPoolController::maxEstablishmentBackoffMS() const {
+    return Milliseconds{gParameters.maxEstablishmentBackoffMS.load()};
+}
+
 void ShardingTaskExecutorPoolController::updateConnectionPoolStats(
     executor::ConnectionPoolStats* cps) const {
-    cps->strategy = gParameters.matchingStrategy.load();
+    cps->matchingStrategy =
+        std::string{matchingStrategyToString(gParameters.matchingStrategy.load())};
 }
 
 }  // namespace mongo

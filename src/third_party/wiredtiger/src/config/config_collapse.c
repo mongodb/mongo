@@ -32,22 +32,18 @@ __wt_config_collapse(WT_SESSION_IMPL *session, const char **cfg, char **config_r
 
     *config_ret = NULL;
 
-    WT_RET(__wt_scr_alloc(session, 0, &tmp));
+    WT_RET(__wt_scr_alloc(session, 1024, &tmp));
 
     __wt_config_init(session, &cparser, cfg[0]);
     while ((ret = __wt_config_next(&cparser, &k, &v)) == 0) {
         if (k.type != WT_CONFIG_ITEM_STRING && k.type != WT_CONFIG_ITEM_ID)
             WT_ERR_MSG(session, EINVAL, "Invalid configuration key found: '%s'", k.str);
-        WT_ERR(__wt_config_get(session, cfg, &k, &v));
+        WT_ERR(__wti_config_get(session, cfg, &k, &v));
         /* Include the quotes around string keys/values. */
-        if (k.type == WT_CONFIG_ITEM_STRING) {
-            --k.str;
-            k.len += 2;
-        }
-        if (v.type == WT_CONFIG_ITEM_STRING) {
-            --v.str;
-            v.len += 2;
-        }
+        if (k.type == WT_CONFIG_ITEM_STRING)
+            WT_CONFIG_PRESERVE_QUOTES(session, &k);
+        if (v.type == WT_CONFIG_ITEM_STRING)
+            WT_CONFIG_PRESERVE_QUOTES(session, &v);
         WT_ERR(__wt_buf_catfmt(session, tmp, "%.*s=%.*s,", (int)k.len, k.str, (int)v.len, v.str));
     }
 
@@ -110,10 +106,11 @@ __config_merge_scan(
     WT_DECL_ITEM(kb);
     WT_DECL_ITEM(vb);
     WT_DECL_RET;
-    size_t len;
+    size_t i, len;
+    bool is_struct;
 
-    WT_ERR(__wt_scr_alloc(session, 0, &kb));
-    WT_ERR(__wt_scr_alloc(session, 0, &vb));
+    WT_ERR(__wt_scr_alloc(session, 1024, &kb));
+    WT_ERR(__wt_scr_alloc(session, 1024, &vb));
 
     __wt_config_init(session, &cparser, value);
     while ((ret = __wt_config_next(&cparser, &k, &v)) == 0) {
@@ -121,14 +118,10 @@ __config_merge_scan(
             WT_ERR_MSG(session, EINVAL, "Invalid configuration key found: '%s'", k.str);
 
         /* Include the quotes around string keys/values. */
-        if (k.type == WT_CONFIG_ITEM_STRING) {
-            --k.str;
-            k.len += 2;
-        }
-        if (v.type == WT_CONFIG_ITEM_STRING) {
-            --v.str;
-            v.len += 2;
-        }
+        if (k.type == WT_CONFIG_ITEM_STRING)
+            WT_CONFIG_PRESERVE_QUOTES(session, &k);
+        if (v.type == WT_CONFIG_ITEM_STRING)
+            WT_CONFIG_PRESERVE_QUOTES(session, &v);
 
         /*
          * !!!
@@ -162,9 +155,30 @@ __config_merge_scan(
          * WT_CONFIG_ITEM_STRUCT, so we check for a field name in the
          * value.
          */
-        if (v.type == WT_CONFIG_ITEM_STRUCT && strchr(vb->data, '=') != NULL) {
-            WT_ERR(__config_merge_scan(session, kb->data, vb->data, strip, cp));
-            continue;
+        if (v.type == WT_CONFIG_ITEM_STRUCT) {
+            /*
+             * A value is a struct if it has field names, which we can easily check by the presence
+             * of the '=' separator, or if the previous version of the key was a struct. We need to
+             * check the latter to handle cases such as "log=(enabled)", which does not contain '='
+             * in its value.
+             */
+            if (strchr(vb->data, '=') != NULL)
+                is_struct = true;
+            else {
+                is_struct = false;
+                for (i = 0; i < cp->entries_next; i++) {
+                    if (strncmp(cp->entries[i].k, kb->data, kb->size) == 0 &&
+                      strncmp(cp->entries[i].k + kb->size, SEP, strlen(SEP)) == 0) {
+                        is_struct = true;
+                        break;
+                    }
+                }
+            }
+
+            if (is_struct) {
+                WT_ERR(__config_merge_scan(session, kb->data, vb->data, strip, cp));
+                continue;
+            }
         }
 
         /* Insert the value into the array. */
@@ -313,6 +327,20 @@ __config_merge_cmp(const void *a, const void *b)
     if ((cmp = strcmp(ae->k, be->k)) != 0)
         return (cmp);
     return (ae->gen > be->gen ? 1 : -1);
+}
+
+/*
+ * __wt_config_tiered_strip --
+ *     Strip any configuration options that should not be persisted in the metadata from the
+ *     configuration string.
+ */
+int
+__wt_config_tiered_strip(WT_SESSION_IMPL *session, const char **cfg, const char **config_ret)
+{
+    const char *strip;
+
+    strip = "tiered_storage=(shared=),";
+    return (__wt_config_merge(session, cfg, strip, config_ret));
 }
 
 /*

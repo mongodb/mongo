@@ -6,10 +6,7 @@
  *   uses_atclustertime,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/sharding/libs/resharding_test_fixture.js");
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 const reshardingTest = new ReshardingTest({enableElections: true});
 
@@ -23,7 +20,8 @@ const sourceCollection = reshardingTest.createShardedCollection({
 });
 
 const recipientShardNames = reshardingTest.recipientShardNames;
-reshardingTest.withReshardingInBackground(  //
+reshardingTest.withReshardingInBackground(
+    //
     {
         newShardKeyPattern: {newKey: 1},
         newChunks: [{min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardNames[0]}],
@@ -45,7 +43,7 @@ reshardingTest.withReshardingInBackground(  //
 
         reshardingTest.stepUpNewPrimaryOnShard(recipientShardNames[0]);
         assert.commandWorked(sourceCollection.remove({oldKey: 1, newKey: 2}, {justOne: true}));
-    });
+    },
+);
 
 reshardingTest.teardown();
-})();

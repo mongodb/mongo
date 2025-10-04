@@ -27,197 +27,150 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/document_source_out.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/client.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/raw_data_operation.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/timeseries/catalog_helper.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/logv2/log.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/namespace_string_util.h"
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <fmt/format.h>
 
-#include "mongo/db/curop_failpoint_helpers.h"
-#include "mongo/db/ops/write_ops.h"
-#include "mongo/db/pipeline/document_path_support.h"
-#include "mongo/logv2/log.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/util/destructor_guard.h"
-#include "mongo/util/fail_point.h"
-#include "mongo/util/uuid.h"
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
-using namespace fmt::literals;
 
-MONGO_FAIL_POINT_DEFINE(hangWhileBuildingDocumentSourceOutBatch);
-MONGO_FAIL_POINT_DEFINE(outWaitAfterTempCollectionCreation);
+
 REGISTER_DOCUMENT_SOURCE(out,
                          DocumentSourceOut::LiteParsed::parse,
                          DocumentSourceOut::createFromBson,
                          AllowedWithApiStrict::kAlways);
+ALLOCATE_DOCUMENT_SOURCE_ID(out, DocumentSourceOut::id)
 
-DocumentSourceOut::~DocumentSourceOut() {
-    DESTRUCTOR_GUARD(
-        // Make sure we drop the temp collection if anything goes wrong. Errors are ignored
-        // here because nothing can be done about them. Additionally, if this fails and the
-        // collection is left behind, it will be cleaned up next time the server is started.
-        if (_tempNs.size()) {
-            auto cleanupClient =
-                pExpCtx->opCtx->getServiceContext()->makeClient("$out_replace_coll_cleanup");
-            AlternativeClientRegion acr(cleanupClient);
-            // Create a new operation context so that any interrupts on the current operation will
-            // not affect the dropCollection operation below.
-            auto cleanupOpCtx = cc().makeOperationContext();
-
-            DocumentSourceWriteBlock writeBlock(cleanupOpCtx.get());
-
-            pExpCtx->mongoProcessInterface->dropCollection(cleanupOpCtx.get(), _tempNs);
-        });
+StageConstraints DocumentSourceOut::constraints(PipelineSplitState pipeState) const {
+    StageConstraints result{StreamType::kStreaming,
+                            PositionRequirement::kLast,
+                            HostTypeRequirement::kNone,
+                            DiskUseRequirement::kWritesPersistentData,
+                            FacetRequirement::kNotAllowed,
+                            TransactionRequirement::kNotAllowed,
+                            LookupRequirement::kNotAllowed,
+                            UnionRequirement::kNotAllowed};
+    if (pipeState == PipelineSplitState::kSplitForMerge) {
+        // If output collection resides on a single shard, we should route $out to it to perform
+        // local writes. Note that this decision is inherently racy and subject to become stale.
+        // This is okay because either choice will work correctly, we are simply applying a
+        // heuristic optimization.
+        result.mergeShardId = getMergeShardId();
+    }
+    return result;
 }
 
-NamespaceString DocumentSourceOut::parseNsFromElem(const BSONElement& spec,
-                                                   const StringData& defaultDB) {
-    if (spec.type() == BSONType::String) {
-        return NamespaceString(defaultDB, spec.valueStringData());
-    } else if (spec.type() == BSONType::Object) {
-        auto nsObj = spec.Obj();
-        uassert(16994,
-                str::stream() << "If an object is passed to " << kStageName
-                              << " it must have exactly 2 fields: 'db' and 'coll'",
-                nsObj.nFields() == 2 && nsObj.hasField("coll") && nsObj.hasField("db"));
-        return NamespaceString(nsObj["db"].String(), nsObj["coll"].String());
+DocumentSourceOutSpec DocumentSourceOut::parseOutSpecAndResolveTargetNamespace(
+    const BSONElement& spec, const DatabaseName& defaultDB) {
+    DocumentSourceOutSpec outSpec;
+    if (spec.type() == BSONType::string) {
+        outSpec.setColl(spec.valueStringData());
+        // TODO SERVER-77000: access a SerializationContext object to serialize properly
+        outSpec.setDb(defaultDB.serializeWithoutTenantPrefix_UNSAFE());
+    } else if (spec.type() == BSONType::object) {
+        // TODO SERVER-77000: access a SerializationContext object to pass into the IDLParserContext
+        outSpec = mongo::DocumentSourceOutSpec::parse(spec.embeddedObject(),
+                                                      IDLParserContext(kStageName));
     } else {
         uassert(16990,
-                "{} only supports a string or object argument, but found {}"_format(
-                    kStageName, typeName(spec.type())),
-                spec.type() == BSONType::String);
+                fmt::format("{} only supports a string or object argument, but found {}",
+                            kStageName,
+                            typeName(spec.type())),
+                spec.type() == BSONType::string);
     }
-    MONGO_UNREACHABLE;
+
+    return outSpec;
 }
 
 std::unique_ptr<DocumentSourceOut::LiteParsed> DocumentSourceOut::LiteParsed::parse(
-    const NamespaceString& nss, const BSONElement& spec) {
+    const NamespaceString& nss, const BSONElement& spec, const LiteParserOptions& options) {
+    auto outSpec = parseOutSpecAndResolveTargetNamespace(spec, nss.dbName());
+    NamespaceString targetNss = NamespaceStringUtil::deserialize(nss.dbName().tenantId(),
+                                                                 outSpec.getDb(),
+                                                                 outSpec.getColl(),
+                                                                 outSpec.getSerializationContext());
 
-    NamespaceString targetNss = parseNsFromElem(spec, nss.db());
-    uassert(ErrorCodes::InvalidNamespace,
-            "Invalid {} target namespace, {}"_format(kStageName, targetNss.ns()),
-            targetNss.isValid());
+    uassert(
+        ErrorCodes::InvalidNamespace,
+        fmt::format("Invalid {} target namespace, {}", kStageName, targetNss.toStringForErrorMsg()),
+        targetNss.isValid());
     return std::make_unique<DocumentSourceOut::LiteParsed>(spec.fieldName(), std::move(targetNss));
 }
 
-void DocumentSourceOut::initialize() {
-    DocumentSourceWriteBlock writeBlock(pExpCtx->opCtx);
-
-    const auto& outputNs = getOutputNs();
-    // We will write all results into a temporary collection, then rename the temporary collection
-    // to be the target collection once we are done.
-    // Note that this temporary collection name is used by MongoMirror and thus should not be
-    // changed without consultation.
-    _tempNs = NamespaceString(str::stream() << outputNs.db() << ".tmp.agg_out." << UUID::gen());
-
-    // Save the original collection options and index specs so we can check they didn't change
-    // during computation.
-    _originalOutOptions =
-        // The uuid field is considered an option, but cannot be passed to createCollection.
-        pExpCtx->mongoProcessInterface->getCollectionOptions(pExpCtx->opCtx, outputNs)
-            .removeField("uuid");
-    _originalIndexes = pExpCtx->mongoProcessInterface->getIndexSpecs(
-        pExpCtx->opCtx, outputNs, false /* includeBuildUUIDs */);
-
-    // Check if it's capped to make sure we have a chance of succeeding before we do all the work.
-    // If the collection becomes capped during processing, the collection options will have changed,
-    // and the $out will fail.
-    uassert(17152,
-            "namespace '{}' is capped so it can't be used for {}"_format(outputNs.ns(), kStageName),
-            _originalOutOptions["capped"].eoo());
-
-    {
-        BSONObjBuilder cmd;
-        cmd << "create" << _tempNs.coll();
-        cmd << "temp" << true;
-        cmd.appendElementsUnique(_originalOutOptions);
-
-        pExpCtx->mongoProcessInterface->createCollection(
-            pExpCtx->opCtx, _tempNs.db().toString(), cmd.done());
-    }
-
-    CurOpFailpointHelpers::waitWhileFailPointEnabled(
-        &outWaitAfterTempCollectionCreation,
-        pExpCtx->opCtx,
-        "outWaitAfterTempCollectionCreation",
-        []() {
-            LOGV2(20901,
-                  "Hanging aggregation due to 'outWaitAfterTempCollectionCreation' failpoint");
-        });
-    if (_originalIndexes.empty()) {
-        return;
-    }
-
-    // Copy the indexes of the output collection to the temp collection.
-    try {
-        std::vector<BSONObj> tempNsIndexes = {std::begin(_originalIndexes),
-                                              std::end(_originalIndexes)};
-        pExpCtx->mongoProcessInterface->createIndexesOnEmptyCollection(
-            pExpCtx->opCtx, _tempNs, tempNsIndexes);
-    } catch (DBException& ex) {
-        ex.addContext("Copying indexes for $out failed");
-        throw;
-    }
-}
-
-void DocumentSourceOut::finalize() {
-    DocumentSourceWriteBlock writeBlock(pExpCtx->opCtx);
-
-    const auto& outputNs = getOutputNs();
-    auto renameCommandObj =
-        BSON("renameCollection" << _tempNs.ns() << "to" << outputNs.ns() << "dropTarget" << true);
-
-    pExpCtx->mongoProcessInterface->renameIfOptionsAndIndexesHaveNotChanged(
-        pExpCtx->opCtx, renameCommandObj, outputNs, _originalOutOptions, _originalIndexes);
-
-    // The rename succeeded, so the temp collection no longer exists.
-    _tempNs = {};
-}
-
 boost::intrusive_ptr<DocumentSource> DocumentSourceOut::create(
-    NamespaceString outputNs, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-
+    NamespaceString outputNs,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    boost::optional<TimeseriesOptions> timeseries) {
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
-            "{} cannot be used in a transaction"_format(kStageName),
-            !expCtx->inMultiDocumentTransaction);
+            fmt::format("{} cannot be used in a transaction", kStageName),
+            !expCtx->getOperationContext()->inMultiDocumentTransaction());
 
-    uassert(ErrorCodes::InvalidNamespace,
-            "Invalid {} target namespace, {}"_format(kStageName, outputNs.ns()),
-            outputNs.isValid());
+    uassert(
+        ErrorCodes::InvalidNamespace,
+        fmt::format("Invalid {} target namespace, {}", kStageName, outputNs.toStringForErrorMsg()),
+        outputNs.isValid());
 
     uassert(17385,
-            "Can't {} to special collection: {}"_format(kStageName, outputNs.coll()),
+            fmt::format("Can't {} to special collection: {}", kStageName, outputNs.coll()),
             !outputNs.isSystem());
 
-    uassert(31321,
-            "Can't {} to internal database: {}"_format(kStageName, outputNs.db()),
-            !outputNs.isOnInternalDb());
+    uassert(
+        10203900,
+        fmt::format("Can't {} to collection: {} with rawData enabled", kStageName, outputNs.coll()),
+        !isRawDataOperation(expCtx->getOperationContext()));
 
-    return new DocumentSourceOut(std::move(outputNs), expCtx);
+    uassert(31321,
+            fmt::format("Can't {} to internal database: {}",
+                        kStageName,
+                        outputNs.dbName().toStringForErrorMsg()),
+            !outputNs.isOnInternalDb());
+    return new DocumentSourceOut(std::move(outputNs), std::move(timeseries), expCtx);
 }
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    auto targetNS = parseNsFromElem(elem, expCtx->ns.db());
-    return create(targetNS, expCtx);
+    auto outSpec =
+        parseOutSpecAndResolveTargetNamespace(elem, expCtx->getNamespaceString().dbName());
+    NamespaceString targetNss =
+        NamespaceStringUtil::deserialize(expCtx->getNamespaceString().dbName().tenantId(),
+                                         outSpec.getDb(),
+                                         outSpec.getColl(),
+                                         outSpec.getSerializationContext());
+    return create(std::move(targetNss), expCtx, std::move(outSpec.getTimeseries()));
 }
 
-Value DocumentSourceOut::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
-    return Value(DOC(kStageName << DOC("db" << _outputNs.db() << "coll" << _outputNs.coll())));
+Value DocumentSourceOut::serialize(const SerializationOptions& opts) const {
+    BSONObjBuilder bob;
+    DocumentSourceOutSpec spec;
+    // TODO SERVER-77000: use SerializatonContext from expCtx and DatabaseNameUtil to serialize
+    // spec.setDb(DatabaseNameUtil::serialize(
+    //     getOutputNs().dbName(),
+    //     SerializationContext::stateCommandReply(getExpCtx()->getSerializationContext())));
+    spec.setDb(getOutputNs().dbName().serializeWithoutTenantPrefix_UNSAFE());
+    spec.setColl(getOutputNs().coll());
+
+    spec.setTimeseries(_timeseries ? boost::optional<mongo::TimeseriesOptions>(*_timeseries)
+                                   : boost::none);
+    spec.serialize(&bob, opts);
+    return Value(Document{{kStageName, bob.done()}});
 }
 
-void DocumentSourceOut::waitWhileFailPointEnabled() {
-    CurOpFailpointHelpers::waitWhileFailPointEnabled(
-        &hangWhileBuildingDocumentSourceOutBatch,
-        pExpCtx->opCtx,
-        "hangWhileBuildingDocumentSourceOutBatch",
-        []() {
-            LOGV2(20902,
-                  "Hanging aggregation due to 'hangWhileBuildingDocumentSourceOutBatch' failpoint");
-        });
-}
 
 }  // namespace mongo

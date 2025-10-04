@@ -6,11 +6,15 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("./jstests/libs/chunk_manipulation_util.js");
+import {
+    moveChunkParallel,
+    moveChunkStepNames,
+    pauseMoveChunkAtStep,
+    unpauseMoveChunkAtStep,
+    waitForMoveChunkStep,
+} from "jstests/libs/chunk_manipulation_util.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 /**
  * @summary This function executes a count command with read preference "secondary" and returns the
@@ -33,7 +37,7 @@ const runReadCmdWithReadPrefSecondary = (db, collectionName, query, {readConcern
         query,
         $readPreference: {mode: "secondary"},
         readConcern,
-        maxTimeMS
+        maxTimeMS,
     });
 };
 
@@ -50,17 +54,20 @@ const runReadCmdWithReadPrefSecondary = (db, collectionName, query, {readConcern
  * @param {String} primaryShardName - Used to ensure the desired shard becomes the primary shard.
  */
 const setupShardedCollection = (shardingTest, dbName, collectionNamespace, primaryShardName) => {
-    assert.commandWorked(shardingTest.s.adminCommand({enableSharding: dbName}));
+    assert.commandWorked(shardingTest.s.adminCommand({enableSharding: dbName, primaryShard: primaryShardName}));
 
-    shardingTest.ensurePrimaryShard(dbName, primaryShardName);
-    assert.commandWorked(shardingTest.s.adminCommand({
-        shardCollection: collectionNamespace,
-        key: {_id: 1},
-    }));
-    assert.commandWorked(shardingTest.s.adminCommand({
-        split: collectionNamespace,
-        middle: {_id: 0},
-    }));
+    assert.commandWorked(
+        shardingTest.s.adminCommand({
+            shardCollection: collectionNamespace,
+            key: {_id: 1},
+        }),
+    );
+    assert.commandWorked(
+        shardingTest.s.adminCommand({
+            split: collectionNamespace,
+            middle: {_id: 0},
+        }),
+    );
 };
 
 const dbName1 = "alpha";
@@ -96,7 +103,13 @@ jsTest.log("Starting migration.");
 
 const staticMongod = MongoRunner.runMongod({});
 const joinMoveChunk = moveChunkParallel(
-    staticMongod, st.s.host, {_id: 1}, null, ns1, st.shard1.shardName, true /** expectSuccess */
+    staticMongod,
+    st.s.host,
+    {_id: 1},
+    null,
+    ns1,
+    st.shard1.shardName,
+    true /** expectSuccess */,
 );
 pauseMoveChunkAtStep(st.shard0, moveChunkStepNames.chunkDataCommitted);
 waitForMoveChunkStep(st.shard0, moveChunkStepNames.chunkDataCommitted);
@@ -110,8 +123,13 @@ jsTest.log("Sending a read query to donor shard's secondary.");
 
 assert.commandFailedWithCode(
     runReadCmdWithReadPrefSecondary(
-        mongos1AlphaDB, collName1, {_id: 1}, {maxTimeMS: 10000, readConcern: {level: "local"}}),
-    [ErrorCodes.MaxTimeMSExpired, ErrorCodes.StaleConfig]);
+        mongos1AlphaDB,
+        collName1,
+        {_id: 1},
+        {maxTimeMS: 10000, readConcern: {level: "local"}},
+    ),
+    [ErrorCodes.MaxTimeMSExpired, ErrorCodes.StaleConfig],
+);
 
 // Allow the migration to commit and pause it before the donor shard's primary refreshes from the
 // config server.
@@ -131,8 +149,9 @@ jsTest.log("Sending insert through mongos0.");
 st.configRS.awaitLastOpCommitted();
 
 assert.commandWorked(mongos0AlphaDB.adminCommand({flushRouterConfig: 1}));
-assert.commandWorked(mongos0AlphaDB.runCommand(
-    {insert: collName1, documents: [{_id: 2}], writeConcern: {w: 'majority'}}));
+assert.commandWorked(
+    mongos0AlphaDB.runCommand({insert: collName1, documents: [{_id: 2}], writeConcern: {w: "majority"}}),
+);
 
 // Bump the clusterTime of mongos1 to at least equal to the operationTime T for the
 // above write by writing to shard1. This is required for the afterClusterTime read
@@ -143,24 +162,32 @@ assert.commandWorked(mongos0AlphaDB.runCommand(
 // the afterClusterTime read.
 
 jsTest.log("Sending insert to other collection to bump cluster time.");
-assert.commandWorked(mongos1BetaDB.runCommand({
-    insert: collName2,
-    documents: [{_id: 1}],
-    writeConcern: {w: "majority"},
-}));
-assert.gt(bsonWoCompare(mongos1AlphaDB.getSession().getOperationTime(),
-                        mongos0AlphaDB.getSession().getOperationTime()),
-          0);
+assert.commandWorked(
+    mongos1BetaDB.runCommand({
+        insert: collName2,
+        documents: [{_id: 1}],
+        writeConcern: {w: "majority"},
+    }),
+);
+assert.gt(
+    bsonWoCompare(mongos1AlphaDB.getSession().getOperationTime(), mongos0AlphaDB.getSession().getOperationTime()),
+    0,
+);
 
 // If the secondary doesn't wait behind the critical section like it should,
 // this read will find no matching documents because mongos1 will target
 // shard0 instead of shard1 (since mongos1's cache is stale).
 jsTest.log("Sending read query to secondary of shard0.");
-const totalDocsFound = runReadCmdWithReadPrefSecondary(mongos1AlphaDB, collName1, {_id: 2}, {
-                           readConcern: {
-                               afterClusterTime: mongos0AlphaDB.getSession().getOperationTime(),
-                           },
-                       }).n;
+const totalDocsFound = runReadCmdWithReadPrefSecondary(
+    mongos1AlphaDB,
+    collName1,
+    {_id: 2},
+    {
+        readConcern: {
+            afterClusterTime: mongos0AlphaDB.getSession().getOperationTime(),
+        },
+    },
+).n;
 assert.neq(totalDocsFound, 0);
 
 jsTest.log("Completing chunk migration.");
@@ -169,4 +196,3 @@ joinMoveChunk();
 
 MongoRunner.stopMongod(staticMongod);
 st.stop();
-})();

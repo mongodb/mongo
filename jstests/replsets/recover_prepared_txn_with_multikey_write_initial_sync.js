@@ -10,9 +10,8 @@
  *   uses_transactions,
  * ]
  */
-(function() {
-"use strict";
-load("jstests/core/txns/libs/prepare_helpers.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const rst = new ReplSetTest({nodes: 1});
 
@@ -53,4 +52,3 @@ jsTestLog("Committing the prepared transaction.");
 assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
 
 rst.stopSet();
-}());

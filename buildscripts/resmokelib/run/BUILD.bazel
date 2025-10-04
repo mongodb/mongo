@@ -1,0 +1,22 @@
+load("@poetry//:dependencies.bzl", "dependency")
+
+py_library(
+    name = "run",
+    srcs = [
+        "__init__.py",
+        "generate_multiversion_exclude_tags.py",
+        "list_tags.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/ciconfig",
+        dependency(
+            "requests",
+            group = "core",
+        ),
+        dependency(
+            "pygithub",
+            group = "testing",
+        ),
+    ],
+)

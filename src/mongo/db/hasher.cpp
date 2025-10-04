@@ -33,13 +33,17 @@
 
 #include "mongo/db/hasher.h"
 
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/data_view.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/platform/endian.h"
+#include "mongo/util/md5.h"
 
-#include "mongo/db/jsobj.h"
-#include "mongo/util/md5.hpp"
+#include <cstddef>
+#include <memory>
 
 namespace mongo {
-
-using std::unique_ptr;
 
 namespace {
 
@@ -51,7 +55,7 @@ class Hasher {
 
 public:
     explicit Hasher(HashSeed seed);
-    ~Hasher(){};
+    ~Hasher() {};
 
     // pointer to next part of input key, length in bytes to read
     void addData(const void* keyData, size_t numBytes);
@@ -77,11 +81,10 @@ private:
     void addIntegerData(T number);
 
     md5_state_t _md5State;
-    HashSeed _seed;
 };
 
-Hasher::Hasher(HashSeed seed) : _seed(seed) {
-    md5_init(&_md5State);
+Hasher::Hasher(HashSeed seed) {
+    md5_init_state(&_md5State);
     addSeed(seed);
 }
 
@@ -122,17 +125,17 @@ void recursiveHash(Hasher* h, const BSONElement& e, bool includeFieldName) {
         // then each sub-element
         // then finish with the EOO element.
         BSONObj b;
-        if (e.type() == CodeWScope) {
+        if (e.type() == BSONType::codeWScope) {
             h->addData(e.codeWScopeCode(), e.codeWScopeCodeLen());
             b = e.codeWScopeObject();
         } else {
             b = e.embeddedObject();
         }
-        BSONObjIterator i(b);
-        while (i.moreWithEOO()) {
-            BSONElement el = i.next();
+        for (auto&& el : b) {
             recursiveHash(h, el, true);
         }
+        // Handle EOO case
+        recursiveHash(h, BSONElement{}, true);
     }
 }
 

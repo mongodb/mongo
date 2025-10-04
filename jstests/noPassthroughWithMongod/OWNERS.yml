@@ -1,0 +1,11 @@
+version: 1.0.0
+filters:
+  - "tcmalloc.js":
+    approvers:
+      - 10gen/server-workload-resilience
+  - "ftdc_params.js":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "log_component_helpers.js":
+    approvers:
+      - 10gen/server-networking-and-observability

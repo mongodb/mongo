@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/util/perfctr_collect.h"
 
@@ -39,6 +36,9 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/text.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
+
 
 namespace mongo {
 
@@ -54,10 +54,9 @@ MONGO_INITIALIZER(PdhInit)(InitializerContext* context) {
 
     hPdhLibrary = LoadLibraryW(L"pdh.dll");
     if (nullptr == hPdhLibrary) {
-        DWORD gle = GetLastError();
+        auto ec = lastSystemError();
         uasserted(ErrorCodes::WindowsPdhError,
-                  str::stream() << "LoadLibrary of pdh.dll failed with "
-                                << errnoWithDescription(gle));
+                  str::stream() << "LoadLibrary of pdh.dll failed with " << errorMessage(ec));
     }
 }
 
@@ -107,7 +106,7 @@ void transformStringDataVector(const std::vector<StringData>& input,
                                std::vector<std::string>* output) {
     output->reserve(input.size());
     for (const auto& str : input) {
-        output->emplace_back(str.toString());
+        output->emplace_back(str);
     }
 }
 
@@ -126,8 +125,8 @@ bool counterHasTickBasedTimeBase(uint32_t type) {
 StatusWith<std::vector<std::string>> PerfCounterCollection::checkCounters(
     StringData name, const std::vector<StringData>& paths) {
 
-    if (_counters.find(name.toString()) != _counters.end() ||
-        _nestedCounters.find(name.toString()) != _nestedCounters.end()) {
+    if (_counters.find(std::string{name}) != _counters.end() ||
+        _nestedCounters.find(std::string{name}) != _nestedCounters.end()) {
         return Status(ErrorCodes::BadValue, str::stream() << "Duplicate group name for " << name);
     }
 
@@ -153,7 +152,7 @@ Status PerfCounterCollection::addCountersGroup(StringData name,
         return swCounters.getStatus();
     }
 
-    _counters.emplace(name.toString(), std::move(swCounters.getValue()));
+    _counters.emplace(name, std::move(swCounters.getValue()));
 
     return Status::OK();
 }
@@ -166,7 +165,7 @@ Status PerfCounterCollection::addCountersGroupedByInstanceName(
         return swCounters.getStatus();
     }
 
-    _nestedCounters.emplace(name.toString(), std::move(swCounters.getValue()));
+    _nestedCounters.emplace(name, std::move(swCounters.getValue()));
 
     return Status::OK();
 }
@@ -228,7 +227,7 @@ PerfCounterCollector::addAndGetCounter(StringData path) {
     PDH_HCOUNTER counter{0};
 
     PDH_STATUS status = PdhAddEnglishCounterW(
-        _query, toNativeString(path.toString().c_str()).c_str(), NULL, &counter);
+        _query, toNativeString(std::string{path}.c_str()).c_str(), NULL, &counter);
 
     if (status != ERROR_SUCCESS) {
         return {ErrorCodes::WindowsPdhError,
@@ -365,7 +364,7 @@ StatusWith<std::vector<PerfCounterCollector::CounterInfo>> PerfCounterCollector:
 Status PerfCounterCollector::addCountersGroup(StringData groupName,
                                               const std::vector<std::string>& paths) {
     CounterGroup group;
-    group.name = groupName.toString();
+    group.name = std::string{groupName};
 
     for (const auto& path : paths) {
         auto swCounters = addCounters(path.c_str());
@@ -386,7 +385,7 @@ Status PerfCounterCollector::addCountersGroup(StringData groupName,
 Status PerfCounterCollector::addCountersGroupedByInstanceName(
     StringData groupName, const std::vector<std::string>& paths) {
     NestedCounterGroup group;
-    group.name = groupName.toString();
+    group.name = std::string{groupName};
 
     for (const auto& path : paths) {
         auto swCounters = addCounters(path.c_str());

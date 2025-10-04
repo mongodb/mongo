@@ -27,15 +27,35 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-#include "mongo/platform/basic.h"
+#include "mongo/crypto/symmetric_crypto.h"
 
-#include <queue>
-
+#include "mongo/base/data_range.h"
+#include "mongo/base/data_range_cursor.h"
+#include "mongo/base/secure_allocator.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/crypto/block_packer.h"
+#include "mongo/crypto/symmetric_key.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/hex.h"
+
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <initializer_list>
+#include <iterator>
+#include <memory>
+#include <numeric>
+#include <queue>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace crypto {
@@ -296,6 +316,72 @@ TEST(BlockPacker, AlignedThenOverfill) {
     ASSERT_EQ(1, leftovers.length());
 }
 
+#ifdef __linux__
+// (Only for OpenSSL, i.e. on Linux)
+// ... Try using insufficiently large output buffers for encryption and decryption
+TEST(SymmetricEncryptor, InsufficientOutputBuffer) {
+    SymmetricKey key = crypto::aesGenerate(crypto::sym256KeySize, "InsufficientOutputBufferTest");
+    constexpr auto plaintextMessage = "DOLOREM IPSUM"_sd;
+    std::vector<uint8_t> encodedPlaintext(plaintextMessage.begin(), plaintextMessage.end());
+    const std::array<uint8_t, 16> iv = {};
+    std::array<std::uint8_t, 1024> cryptoBuffer;
+    DataRange cryptoRange(cryptoBuffer.data(), cryptoBuffer.size());
+
+    auto swEnc = crypto::SymmetricEncryptor::create(key, crypto::aesMode::cbc, iv);
+    ASSERT_OK(swEnc.getStatus());
+    auto encryptor = std::move(swEnc.getValue());
+    DataRangeCursor cryptoCursor(cryptoRange);
+
+    // Validate that encryption with insufficient output buffer does not succeed
+    DataRange smallOutputBuffer(cryptoBuffer.data(), 1);
+    ASSERT_NOT_OK(encryptor->update(encodedPlaintext, smallOutputBuffer));
+
+    // Validate that encryption with zero output buffer does not succeed
+    DataRange zeroOutputBuffer(cryptoBuffer.data(), 0);
+    ASSERT_NOT_OK(
+        encryptor->update({plaintextMessage.data(), plaintextMessage.size()}, zeroOutputBuffer));
+
+    auto swSize = encryptor->update(encodedPlaintext, cryptoCursor);
+    ASSERT_OK(swSize);
+    cryptoCursor.advance(swSize.getValue());
+
+    swSize = encryptor->finalize(cryptoCursor);
+    ASSERT_OK(swSize);
+
+    // finalize is guaranteed to output at least 16 bytes for the CBC blockmode
+    ASSERT_GTE(swSize.getValue(), 16);
+    cryptoCursor.advance(swSize.getValue());
+
+    // Validate beginning of decryption process
+    auto swDec = crypto::SymmetricDecryptor::create(key, crypto::aesMode::cbc, iv);
+    ASSERT_OK(swDec.getStatus());
+    auto decryptor = std::move(swDec.getValue());
+
+    // Validate that decryption with insufficient output buffer does not succeed
+    std::array<uint8_t, 1> shortOutputBuffer;
+    DataRangeCursor shortOutputCursor(shortOutputBuffer);
+    ASSERT_NOT_OK(decryptor->update(
+        {cryptoRange.data(), cryptoRange.length() - cryptoCursor.length()}, shortOutputCursor));
+
+    // Validate that decryption with zero output buffer does not succeed
+    DataRangeCursor zeroOutputCursor(zeroOutputBuffer);
+    ASSERT_NOT_OK(decryptor->update(
+        {cryptoRange.data(), cryptoRange.length() - cryptoCursor.length()}, zeroOutputCursor));
+
+    // Validate that decryption update/finalize with sufficient output buffer succeeds
+    std::array<uint8_t, 1024> decryptionBuffer;
+    DataRangeCursor decryptionCursor(decryptionBuffer);
+    auto swUpdateSize = decryptor->update(
+        {cryptoRange.data(), cryptoRange.length() - cryptoCursor.length()}, decryptionCursor);
+    ASSERT_OK(swUpdateSize.getStatus());
+    decryptionCursor.advance(swUpdateSize.getValue());
+    auto swFinalizeSize = decryptor->finalize(decryptionCursor);
+    ASSERT_OK(swFinalizeSize.getStatus());
+
+    // Validate that the decrypted ciphertext matches the original plaintext
+    ASSERT(std::equal(plaintextMessage.begin(), plaintextMessage.end(), decryptionBuffer.begin()));
+}
+#endif
 
 // The following tests validate that SymmetricEncryptors function when called with inputs with
 // varying block alignments.
@@ -329,8 +415,7 @@ TEST(SymmetricEncryptor, PaddingLogic) {
     // We will loop through all of the test cases, ensuring no fatal errors,
     // and ensuring correct encryption and decryption.
     for (auto& testCase : testData) {
-        auto swEnc =
-            crypto::SymmetricEncryptor::create(key, crypto::aesMode::cbc, iv.data(), iv.size());
+        auto swEnc = crypto::SymmetricEncryptor::create(key, crypto::aesMode::cbc, iv);
         ASSERT_OK(swEnc.getStatus());
         auto encryptor = std::move(swEnc.getValue());
         DataRangeCursor cryptoCursor(cryptoRange);
@@ -339,15 +424,11 @@ TEST(SymmetricEncryptor, PaddingLogic) {
         for (auto& updateBytes : testCase) {
             std::vector<uint8_t> plainText(updateBytes, updateBytes);
             std::copy(plainText.begin(), plainText.end(), std::back_inserter(accumulatedPlaintext));
-            auto swSize = encryptor->update(plainText.data(),
-                                            plainText.size(),
-                                            const_cast<uint8_t*>(cryptoCursor.data<uint8_t>()),
-                                            cryptoCursor.length());
+            auto swSize = encryptor->update(plainText, cryptoCursor);
             ASSERT_OK(swSize);
             cryptoCursor.advance(swSize.getValue());
         }
-        auto swSize = encryptor->finalize(const_cast<uint8_t*>(cryptoCursor.data<uint8_t>()),
-                                          cryptoCursor.length());
+        auto swSize = encryptor->finalize(cryptoCursor);
         ASSERT_OK(swSize);
 
         // finalize is guaranteed to output at least 16 bytes for the CBC blockmode
@@ -360,21 +441,16 @@ TEST(SymmetricEncryptor, PaddingLogic) {
         ASSERT_EQ(totalBlocks * 16, cryptoRange.length() - cryptoCursor.length());
 
         // Validate that the ciphertext can be decrypted
-        auto swDec =
-            crypto::SymmetricDecryptor::create(key, crypto::aesMode::cbc, iv.data(), iv.size());
+        auto swDec = crypto::SymmetricDecryptor::create(key, crypto::aesMode::cbc, iv);
         ASSERT_OK(swDec.getStatus());
         auto decryptor = std::move(swDec.getValue());
         std::array<uint8_t, 1024> decryptionBuffer;
         DataRangeCursor decryptionCursor(decryptionBuffer);
-        auto swUpdateSize =
-            decryptor->update(cryptoRange.data<uint8_t>(),
-                              cryptoRange.length() - cryptoCursor.length(),
-                              const_cast<uint8_t*>(decryptionCursor.data<uint8_t>()),
-                              decryptionCursor.length());
+        auto swUpdateSize = decryptor->update(
+            {cryptoRange.data(), cryptoRange.length() - cryptoCursor.length()}, decryptionCursor);
         ASSERT_OK(swUpdateSize.getStatus());
         decryptionCursor.advance(swUpdateSize.getValue());
-        auto swFinalizeSize = decryptor->finalize(
-            const_cast<uint8_t*>(decryptionCursor.data<uint8_t>()), decryptionCursor.length());
+        auto swFinalizeSize = decryptor->finalize(decryptionCursor);
         ASSERT_OK(swUpdateSize.getStatus());
         decryptionCursor.advance(swUpdateSize.getValue());
         ASSERT_EQ(totalSize, swUpdateSize.getValue() + swFinalizeSize.getValue());
@@ -392,14 +468,10 @@ SymmetricKey aesGeneratePredictableKey256(StringData stringKey, StringData keyId
     SecureVector<uint8_t> key(keySize);
     std::copy(stringKey.begin(), stringKey.end(), key->begin());
 
-    return SymmetricKey(std::move(key), crypto::aesAlgorithm, keyId.toString());
+    return SymmetricKey(std::move(key), crypto::aesAlgorithm, std::string{keyId});
 }
 
 // Convenience wrappers to avoid line-wraps later.
-const std::uint8_t* asUint8(const char* str) {
-    return reinterpret_cast<const std::uint8_t*>(str);
-};
-
 const char* asChar(const std::uint8_t* data) {
     return reinterpret_cast<const char*>(data);
 };
@@ -420,21 +492,22 @@ void GCMAdditionalAuthenticatedDataHelper(bool succeed) {
     std::array<std::uint8_t, 12> iv;
     std::copy(kIV.begin(), kIV.end(), iv.begin());
 
-    auto encryptor =
-        uassertStatusOK(crypto::SymmetricEncryptor::create(key, mode, iv.data(), iv.size()));
+    auto encryptor = uassertStatusOK(crypto::SymmetricEncryptor::create(key, mode, iv));
 
     constexpr auto kAAD = "Hello World"_sd;
-    ASSERT_OK(encryptor->addAuthenticatedData(asUint8(kAAD.rawData()), kAAD.size()));
+    ASSERT_OK(encryptor->addAuthenticatedData({kAAD.data(), kAAD.size()}));
 
     constexpr auto kPlaintextMessage = "01234567012345670123456701234567"_sd;
     constexpr auto kBufferSize = kPlaintextMessage.size() + (2 * crypto::aesBlockSize);
     std::array<std::uint8_t, kBufferSize> cipherText;
-    auto cipherLen = uassertStatusOK(encryptor->update(asUint8(kPlaintextMessage.rawData()),
-                                                       kPlaintextMessage.size(),
-                                                       cipherText.data(),
-                                                       cipherText.size()));
-    cipherLen += uassertStatusOK(
-        encryptor->finalize(cipherText.data() + cipherLen, cipherText.size() - cipherLen));
+    std::size_t cipherLen = 0;
+    {
+        DataRangeCursor cipherTextCursor(cipherText);
+        cipherLen = uassertStatusOK(encryptor->update(
+            {kPlaintextMessage.data(), kPlaintextMessage.size()}, cipherTextCursor));
+        cipherTextCursor.advance(cipherLen);
+        cipherLen += uassertStatusOK(encryptor->finalize(cipherTextCursor));
+    }
 
     constexpr auto kExpectedCipherText =
         "\xF1\x87\x38\x92\xA3\x0E\x77\x27\x92\xB1\x3B\xA6\x27\xB5\xF5\x2B"
@@ -442,26 +515,25 @@ void GCMAdditionalAuthenticatedDataHelper(bool succeed) {
     ASSERT_EQ(StringData(asChar(cipherText.data()), cipherLen), kExpectedCipherText);
 
     std::array<std::uint8_t, 12> tag;
-    const auto taglen = uassertStatusOK(encryptor->finalizeTag(tag.data(), tag.size()));
+    const auto taglen = uassertStatusOK(encryptor->finalizeTag({tag}));
 
     constexpr auto kExpectedTag = "\xF9\xD6\xF9\x63\x21\x93\xE8\x5C\x42\xAA\x5E\x02"_sd;
     ASSERT_EQ(StringData(asChar(tag.data()), taglen), kExpectedTag);
 
-    auto decryptor =
-        uassertStatusOK(crypto::SymmetricDecryptor::create(key, mode, iv.data(), iv.size()));
-    ASSERT_OK(decryptor->addAuthenticatedData(asUint8(kAAD.rawData()), kAAD.size()));
+    auto decryptor = uassertStatusOK(crypto::SymmetricDecryptor::create(key, mode, iv));
+    ASSERT_OK(decryptor->addAuthenticatedData({kAAD.data(), kAAD.size()}));
 
     std::array<std::uint8_t, kBufferSize> plainText;
-    auto plainLen = uassertStatusOK(
-        decryptor->update(cipherText.data(), cipherLen, plainText.data(), plainText.size()));
+    auto plainLen = uassertStatusOK(decryptor->update({cipherText.data(), cipherLen}, plainText));
 
     if (!succeed) {
         // Corrupt the authenticated tag, which should cause a failure below.
         ++tag[0];
     }
 
-    ASSERT_OK(decryptor->updateTag(tag.data(), tag.size()));
-    auto swFinalize = decryptor->finalize(plainText.data() + plainLen, plainText.size() - plainLen);
+    ASSERT_OK(decryptor->updateTag(tag));
+    auto swFinalize =
+        decryptor->finalize({plainText.data() + plainLen, plainText.size() - plainLen});
 
     if (!succeed) {
         ASSERT_NOT_OK(swFinalize.getStatus());
@@ -479,7 +551,7 @@ TEST(AES, GCMAdditionalAuthenticatedData) {
     GCMAdditionalAuthenticatedDataHelper(false);
 }
 
-class AESGCMTestVectors : public unittest::Test {
+class AESTestVectors : public unittest::Test {
 public:
     class GCMTestVector {
     public:
@@ -505,6 +577,21 @@ public:
         std::string tag;
     };
 
+    class CTRTestVector {
+    public:
+        CTRTestVector(StringData key, StringData plaintext, StringData iv, StringData ciphertext) {
+            this->key = hexblob::decode(key);
+            this->plaintext = hexblob::decode(plaintext);
+            this->iv = hexblob::decode(iv);
+            this->ciphertext = hexblob::decode(ciphertext);
+        }
+
+        std::string key;
+        std::string plaintext;
+        std::string iv;
+        std::string ciphertext;
+    };
+
     void evaluate(GCMTestVector test) {
         constexpr auto mode = crypto::aesMode::gcm;
 
@@ -515,46 +602,104 @@ public:
         SymmetricKey key = aesGeneratePredictableKey256(test.key, "testID");
 
         // Validate encryption
-        auto encryptor = uassertStatusOK(crypto::SymmetricEncryptor::create(
-            key, mode, asUint8(test.iv.c_str()), test.iv.size()));
+        auto encryptor = uassertStatusOK(crypto::SymmetricEncryptor::create(key, mode, test.iv));
 
-        ASSERT_OK(encryptor->addAuthenticatedData(asUint8(test.a.c_str()), test.a.size()));
+        ASSERT_OK(encryptor->addAuthenticatedData(test.a));
 
         const size_t kBufferSize = test.plaintext.size();
         {
+            // Validate encryption
             std::vector<uint8_t> encryptionResult(kBufferSize);
-            auto cipherLen = uassertStatusOK(encryptor->update(asUint8(test.plaintext.c_str()),
-                                                               test.plaintext.size(),
-                                                               encryptionResult.data(),
-                                                               encryptionResult.size()));
-            cipherLen += uassertStatusOK(encryptor->finalize(encryptionResult.data() + cipherLen,
-                                                             encryptionResult.size() - cipherLen));
+            auto cipherLen = uassertStatusOK(encryptor->update(test.plaintext, encryptionResult));
+            cipherLen += uassertStatusOK(encryptor->finalize(
+                {encryptionResult.data() + cipherLen, encryptionResult.size() - cipherLen}));
 
             ASSERT_EQ(test.ciphertext.size(), cipherLen);
-            ASSERT_EQ(hexblob::encode(StringData(test.ciphertext.data(), test.ciphertext.size())),
+            ASSERT_EQ(hexblob::encode(test.ciphertext),
                       hexblob::encode(
                           StringData(asChar(encryptionResult.data()), encryptionResult.size())));
 
+            // The symmetric crypto framework uses 12 byte GCM tags. The tags used in NIST test
+            // vectors can be larger than 12 bytes, but may be truncated.
+
             std::array<std::uint8_t, 12> tag;
-            const auto taglen = uassertStatusOK(encryptor->finalizeTag(tag.data(), tag.size()));
+            const auto taglen = uassertStatusOK(encryptor->finalizeTag(tag));
             ASSERT_EQ(tag.size(), taglen);
-            ASSERT_EQ(hexblob::encode(StringData(test.tag.data(), test.tag.size())).substr(0, 24),
+            ASSERT_EQ(hexblob::encode(StringData(test.tag.data(), test.tag.size()))
+                          .substr(0, aesGCMTagSize * 2),
                       hexblob::encode(StringData(asChar(tag.data()), tag.size())));
         }
         {
             // Validate decryption
-            auto decryptor = uassertStatusOK(crypto::SymmetricDecryptor::create(
-                key, mode, asUint8(test.iv.c_str()), test.iv.size()));
-            uassertStatusOK(decryptor->updateTag(asUint8(test.tag.data()), 12));
+            auto decryptor =
+                uassertStatusOK(crypto::SymmetricDecryptor::create(key, mode, test.iv));
+            uassertStatusOK(decryptor->updateTag({test.tag.data(), aesGCMTagSize}));
 
-            ASSERT_OK(decryptor->addAuthenticatedData(asUint8(test.a.c_str()), test.a.size()));
+            ASSERT_OK(decryptor->addAuthenticatedData(test.a));
             std::vector<uint8_t> decryptionResult(kBufferSize);
-            auto decipherLen = uassertStatusOK(decryptor->update(asUint8(test.ciphertext.c_str()),
-                                                                 test.ciphertext.size(),
-                                                                 decryptionResult.data(),
-                                                                 decryptionResult.size()));
+            auto decipherLen =
+                uassertStatusOK(decryptor->update(test.ciphertext, decryptionResult));
             decipherLen += uassertStatusOK(decryptor->finalize(
-                decryptionResult.data() + decipherLen, decryptionResult.size() - decipherLen));
+                {decryptionResult.data() + decipherLen, decryptionResult.size() - decipherLen}));
+
+            ASSERT_EQ(test.plaintext.size(), decipherLen);
+            ASSERT_EQ(hexblob::encode(StringData(test.plaintext.data(), test.plaintext.size())),
+                      hexblob::encode(
+                          StringData(asChar(decryptionResult.data()), decryptionResult.size())));
+        }
+        {
+            // Validate that decryption with incorrect tag does not succeed
+            auto decryptor =
+                uassertStatusOK(crypto::SymmetricDecryptor::create(key, mode, test.iv));
+            auto tag = test.tag;
+            tag[0]++;
+            uassertStatusOK(decryptor->updateTag({tag.data(), aesGCMTagSize}));
+
+            ASSERT_OK(decryptor->addAuthenticatedData(test.a));
+            std::vector<uint8_t> decryptionResult(kBufferSize);
+            DataRangeCursor decryptionResultCursor(decryptionResult);
+            auto decipherLen =
+                uassertStatusOK(decryptor->update(test.ciphertext, decryptionResultCursor));
+            decryptionResultCursor.advance(decipherLen);
+            ASSERT_NOT_OK(decryptor->finalize(decryptionResultCursor));
+        }
+    }
+
+    void evaluate(CTRTestVector test) {
+        constexpr auto mode = crypto::aesMode::ctr;
+
+        if (getSupportedSymmetricAlgorithms().count(getStringFromCipherMode(mode)) == 0) {
+            return;
+        }
+
+        SymmetricKey key = aesGeneratePredictableKey256(test.key, "testID");
+
+        // Validate encryption
+        auto encryptor = uassertStatusOK(crypto::SymmetricEncryptor::create(key, mode, test.iv));
+
+        const size_t kBufferSize = test.plaintext.size();
+        {
+            // Validate encryption
+            std::vector<uint8_t> encryptionResult(kBufferSize);
+            auto cipherLen = uassertStatusOK(encryptor->update(test.plaintext, encryptionResult));
+            cipherLen += uassertStatusOK(encryptor->finalize(
+                {encryptionResult.data() + cipherLen, encryptionResult.size() - cipherLen}));
+
+            ASSERT_EQ(test.ciphertext.size(), cipherLen);
+            ASSERT_EQ(hexblob::encode(test.ciphertext),
+                      hexblob::encode(
+                          StringData(asChar(encryptionResult.data()), encryptionResult.size())));
+        }
+        {
+            // Validate decryption
+            auto decryptor =
+                uassertStatusOK(crypto::SymmetricDecryptor::create(key, mode, test.iv));
+
+            std::vector<uint8_t> decryptionResult(kBufferSize);
+            auto decipherLen =
+                uassertStatusOK(decryptor->update(test.ciphertext, decryptionResult));
+            decipherLen += uassertStatusOK(decryptor->finalize(
+                {decryptionResult.data() + decipherLen, decryptionResult.size() - decipherLen}));
 
             ASSERT_EQ(test.plaintext.size(), decipherLen);
             ASSERT_EQ(hexblob::encode(StringData(test.plaintext.data(), test.plaintext.size())),
@@ -567,7 +712,7 @@ public:
 /** Test vectors drawn from
  *  https://csrc.nist.rip/groups/ST/toolkit/BCM/documents/proposedmodes/gcm/gcm-spec.pdf
  */
-TEST_F(AESGCMTestVectors, TestCase13) {
+TEST_F(AESTestVectors, GCMTestCase13) {
     evaluate(
         GCMTestVector("00000000000000000000000000000000"
                       "00000000000000000000000000000000"_sd,
@@ -578,7 +723,7 @@ TEST_F(AESGCMTestVectors, TestCase13) {
                       "530f8afbc74536b9a963b4f1c4cb738b"_sd));
 }
 
-TEST_F(AESGCMTestVectors, TestCase14) {
+TEST_F(AESTestVectors, GCMTestCase14) {
     evaluate(
         GCMTestVector("00000000000000000000000000000000"
                       "00000000000000000000000000000000"_sd,
@@ -589,7 +734,7 @@ TEST_F(AESGCMTestVectors, TestCase14) {
                       "d0d1c8a799996bf0265b98b5d48ab919"_sd));
 }
 
-TEST_F(AESGCMTestVectors, TestCase15) {
+TEST_F(AESTestVectors, GCMTestCase15) {
     evaluate(
         GCMTestVector("feffe9928665731c6d6a8f9467308308"
                       "feffe9928665731c6d6a8f9467308308"_sd,
@@ -606,7 +751,7 @@ TEST_F(AESGCMTestVectors, TestCase15) {
                       "b094dac5d93471bdec1a502270e3cc6c"_sd));
 }
 
-TEST_F(AESGCMTestVectors, TestCase16) {
+TEST_F(AESTestVectors, GCMTestCase16) {
     evaluate(
         GCMTestVector("feffe9928665731c6d6a8f9467308308"
                       "feffe9928665731c6d6a8f9467308308"_sd,
@@ -623,6 +768,66 @@ TEST_F(AESGCMTestVectors, TestCase16) {
                       "c5f61e6393ba7a0abcc9f662"_sd,
                       "76fc6ece0f4e1768cddf8853bb2d551b"_sd));
 }
+
+// AES-CTR test vectors are obtained here:
+// https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-38a.pdf
+
+TEST_F(AESTestVectors, CTRTestCase1) {
+    evaluate(
+        CTRTestVector("603deb1015ca71be2b73aef0857d7781"
+                      "1f352c073b6108d72d9810a30914dff4",
+                      "6bc1bee22e409f96e93d7e117393172a",
+                      "f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+                      "601ec313775789a5b7a7f504bbf3d228"));
+}
+
+TEST_F(AESTestVectors, CTRTestCase2) {
+    evaluate(
+        CTRTestVector("603deb1015ca71be2b73aef0857d7781"
+                      "1f352c073b6108d72d9810a30914dff4",
+                      "ae2d8a571e03ac9c9eb76fac45af8e51",
+                      "f0f1f2f3f4f5f6f7f8f9fafbfcfdff00",
+                      "f443e3ca4d62b59aca84e990cacaf5c5"));
+}
+
+TEST_F(AESTestVectors, CTRTestCase3) {
+    evaluate(
+        CTRTestVector("603deb1015ca71be2b73aef0857d7781"
+                      "1f352c073b6108d72d9810a30914dff4",
+                      "30c81c46a35ce411e5fbc1191a0a52ef",
+                      "f0f1f2f3f4f5f6f7f8f9fafbfcfdff01",
+                      "2b0930daa23de94ce87017ba2d84988d"));
+}
+
+TEST_F(AESTestVectors, CTRTestCase4) {
+    evaluate(
+        CTRTestVector("603deb1015ca71be2b73aef0857d7781"
+                      "1f352c073b6108d72d9810a30914dff4",
+                      "f69f2445df4f9b17ad2b417be66c3710",
+                      "f0f1f2f3f4f5f6f7f8f9fafbfcfdff02",
+                      "dfc9c58db67aada613c2dd08457941a6"));
+}
+
+TEST_F(AESTestVectors, CTRTestCase1234) {
+    evaluate(
+        CTRTestVector("603deb1015ca71be2b73aef0857d7781"
+                      "1f352c073b6108d72d9810a30914dff4",
+
+                      "6bc1bee22e409f96e93d7e117393172a"
+                      "ae2d8a571e03ac9c9eb76fac45af8e51"
+                      "30c81c46a35ce411e5fbc1191a0a52ef"
+                      "f69f2445df4f9b17ad2b417be66c3710",
+
+                      "f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+
+                      "601ec313775789a5b7a7f504bbf3d228"
+                      "f443e3ca4d62b59aca84e990cacaf5c5"
+                      "2b0930daa23de94ce87017ba2d84988d"
+                      "dfc9c58db67aada613c2dd08457941a6"));
+}
+
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 
 }  // namespace crypto

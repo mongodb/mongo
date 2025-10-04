@@ -1,7 +1,5 @@
-(function() {
-'use strict';
-
-load("jstests/sharding/libs/find_chunks_util.js");
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 function placeCheck(num) {
     print("shard2 step: " + num);
@@ -17,25 +15,23 @@ function printAll() {
     print("---------------------");
 }
 
-var s = new ShardingTest({shards: 2});
+let s = new ShardingTest({shards: 2});
 var db = s.getDB("test");
 
-assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
-s.ensurePrimaryShard('test', s.shard1.shardName);
+assert.commandWorked(s.s0.adminCommand({enablesharding: "test", primaryShard: s.shard1.shardName}));
 assert.commandWorked(s.s0.adminCommand({shardcollection: "test.foo", key: {num: 1}}));
 assert.eq(1, findChunksUtil.countChunksForNs(s.config, "test.foo"), "sanity check 1");
 
 assert.commandWorked(s.s0.adminCommand({split: "test.foo", middle: {num: 0}}));
 assert.eq(2, findChunksUtil.countChunksForNs(s.config, "test.foo"), "should be 2 shards");
-var chunks = findChunksUtil.findChunksByNs(s.config, "test.foo").toArray();
+let chunks = findChunksUtil.findChunksByNs(s.config, "test.foo").toArray();
 assert.eq(chunks[0].shard, chunks[1].shard, "server should be the same after a split");
 
 assert.commandWorked(db.foo.save({num: 1, name: "eliot"}));
 assert.commandWorked(db.foo.save({num: 2, name: "sara"}));
 assert.commandWorked(db.foo.save({num: -1, name: "joe"}));
 
-assert.eq(
-    3, s.getPrimaryShard("test").getDB("test").foo.find().length(), "not right directly to db A");
+assert.eq(3, s.getPrimaryShard("test").getDB("test").foo.find().length(), "not right directly to db A");
 assert.eq(3, db.foo.find().length(), "not right on shard");
 
 var primary = s.getPrimaryShard("test").getDB("test");
@@ -50,17 +46,21 @@ placeCheck(2);
 // Test move shard to unexisting shard
 assert.commandFailedWithCode(
     s.s0.adminCommand({movechunk: "test.foo", find: {num: 1}, to: "adasd", _waitForDelete: true}),
-    ErrorCodes.ShardNotFound);
+    ErrorCodes.ShardNotFound,
+);
 
-assert.commandWorked(s.s0.adminCommand(
-    {movechunk: "test.foo", find: {num: 1}, to: secondary.getMongo().name, _waitForDelete: true}));
+assert.commandWorked(
+    s.s0.adminCommand({movechunk: "test.foo", find: {num: 1}, to: secondary.getMongo().name, _waitForDelete: true}),
+);
 assert.eq(2, secondary.foo.find().length(), "secondary should have 2 after move shard");
 assert.eq(1, primary.foo.find().length(), "primary should only have 1 after move shard");
 
-assert.eq(2,
-          findChunksUtil.countChunksForNs(s.config, "test.foo"),
-          "still should have 2 shards after move not:" + s.getChunksString());
-var chunks = findChunksUtil.findChunksByNs(s.config, "test.foo").toArray();
+assert.eq(
+    2,
+    findChunksUtil.countChunksForNs(s.config, "test.foo"),
+    "still should have 2 shards after move not:" + s.getChunksString(),
+);
+chunks = findChunksUtil.findChunksByNs(s.config, "test.foo").toArray();
 assert.neq(chunks[0].shard, chunks[1].shard, "servers should NOT be the same after the move");
 
 placeCheck(3);
@@ -86,8 +86,8 @@ assert.eq("funny man", db.foo.findOne({num: -2}).name);
 
 // getAll
 function sumQuery(c) {
-    var sum = 0;
-    c.toArray().forEach(function(z) {
+    let sum = 0;
+    c.toArray().forEach(function (z) {
         sum += z.num;
     });
     return sum;
@@ -112,11 +112,11 @@ placeCheck(6);
 
 // Sort by name
 function getNames(c) {
-    return c.toArray().map(function(z) {
+    return c.toArray().map(function (z) {
         return z.name;
     });
 }
-var correct = getNames(db.foo.find()).sort();
+let correct = getNames(db.foo.find()).sort();
 assert.eq(correct, getNames(db.foo.find().sort({name: 1})));
 correct = correct.reverse();
 assert.eq(correct, getNames(db.foo.find().sort({name: -1})));
@@ -126,23 +126,27 @@ assert.eq(3, sumQuery(db.foo.find().sort({name: -1})), "sharding query w/non-sha
 
 // sort by num multiple shards per server
 assert.commandWorked(s.s0.adminCommand({split: "test.foo", middle: {num: 2}}));
-assert.eq("funny man",
-          db.foo.find().sort({num: 1})[0].name,
-          "sharding query w/sort and another split 1 order wrong");
-assert.eq("bob",
-          db.foo.find().sort({num: -1})[0].name,
-          "sharding query w/sort and another split 2 order wrong");
-assert.eq("funny man",
-          db.foo.find({num: {$lt: 100}}).sort({num: 1}).arrayAccess(0).name,
-          "sharding query w/sort and another split 3 order wrong");
+assert.eq("funny man", db.foo.find().sort({num: 1})[0].name, "sharding query w/sort and another split 1 order wrong");
+assert.eq("bob", db.foo.find().sort({num: -1})[0].name, "sharding query w/sort and another split 2 order wrong");
+assert.eq(
+    "funny man",
+    db.foo
+        .find({num: {$lt: 100}})
+        .sort({num: 1})
+        .arrayAccess(0).name,
+    "sharding query w/sort and another split 3 order wrong",
+);
 
 placeCheck(7);
 
-db.foo.find().sort({_id: 1}).forEach(function(z) {
-    print(z._id);
-});
+db.foo
+    .find()
+    .sort({_id: 1})
+    .forEach(function (z) {
+        print(z._id);
+    });
 
-var zzz = db.foo.find().explain("executionStats").executionStats;
+let zzz = db.foo.find().explain("executionStats").executionStats;
 assert.eq(0, zzz.totalKeysExamined, "EX1a");
 assert.eq(6, zzz.nReturned, "EX1b");
 assert.eq(6, zzz.totalDocsExamined, "EX1c");
@@ -155,7 +159,7 @@ assert.eq(6, zzz.totalDocsExamined, "EX2c");
 // getMore
 assert.eq(4, db.foo.find().limit(-4).toArray().length, "getMore 1");
 function countCursor(c) {
-    var num = 0;
+    let num = 0;
     while (c.hasNext()) {
         c.next();
         num++;
@@ -166,14 +170,14 @@ assert.eq(6, countCursor(db.foo.find()._exec()), "getMore 2");
 assert.eq(6, countCursor(db.foo.find().batchSize(1)._exec()), "getMore 3");
 
 // find by non-shard-key
-db.foo.find().forEach(function(z) {
-    var y = db.foo.findOne({_id: z._id});
+db.foo.find().forEach(function (z) {
+    let y = db.foo.findOne({_id: z._id});
     assert(y, "_id check 1 : " + tojson(z));
     assert.eq(z.num, y.num, "_id check 2 : " + tojson(z));
 });
 
 // update
-var person = db.foo.findOne({num: 3});
+let person = db.foo.findOne({num: 3});
 assert.eq("bob", person.name, "update setup 1");
 person.name = "bob is gone";
 db.foo.update({num: 3}, person);
@@ -198,8 +202,8 @@ placeCheck(8);
 // more update stuff
 
 printAll();
-var total = db.foo.find().count();
-var res = assert.commandWorked(db.foo.update({}, {$inc: {x: 1}}, false, true));
+let total = db.foo.find().count();
+let res = assert.commandWorked(db.foo.update({}, {$inc: {x: 1}}, false, true));
 printAll();
 assert.eq(total, res.nModified, res.toString());
 
@@ -210,18 +214,19 @@ assert.eq(1, res.nModified, res.toString());
 
 assert.eq(2, s.onNumShards("test", "foo"), "on 2 shards");
 
-secondary.foo.insert({num: -3});
+db.foo.insert({num: -3});
 
-assert.commandWorked(s.s0.adminCommand(
-    {movechunk: "test.foo", find: {num: -2}, to: secondary.getMongo().name, _waitForDelete: true}));
+assert.commandWorked(
+    s.s0.adminCommand({movechunk: "test.foo", find: {num: -2}, to: secondary.getMongo().name, _waitForDelete: true}),
+);
 assert.eq(1, s.onNumShards("test", "foo"), "on 1 shards");
 
-assert.commandWorked(s.s0.adminCommand(
-    {movechunk: "test.foo", find: {num: -2}, to: primary.getMongo().name, _waitForDelete: true}));
+assert.commandWorked(
+    s.s0.adminCommand({movechunk: "test.foo", find: {num: -2}, to: primary.getMongo().name, _waitForDelete: true}),
+);
 assert.eq(2, s.onNumShards("test", "foo"), "on 2 shards again");
 assert.eq(3, findChunksUtil.countChunksForNs(s.config, "test.foo"), "only 3 chunks");
 
 print("YO : " + tojson(db.runCommand("serverStatus")));
 
 s.stop();
-})();

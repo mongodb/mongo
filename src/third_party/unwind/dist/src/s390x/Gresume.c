@@ -68,7 +68,7 @@ s390x_local_resume (unw_addr_space_t as, unw_cursor_t *cursor, void *arg)
       sp = c->sigcontext_sp;
       ip = c->sigcontext_pc;
       __asm__ __volatile__ (
-        "lgr 15, %[sp]\n"
+        "lgr %%r15, %[sp]\n"
         "br %[ip]\n"
         : : [sp] "r" (sp), [ip] "r" (ip)
       );
@@ -86,7 +86,7 @@ s390x_local_resume (unw_addr_space_t as, unw_cursor_t *cursor, void *arg)
       sp = c->sigcontext_sp;
       ip = c->sigcontext_pc;
       __asm__ __volatile__ (
-        "lgr 15, %[sp]\n"
+        "lgr %%r15, %[sp]\n"
         "br %[ip]\n"
         : : [sp] "r" (sp), [ip] "r" (ip)
       );

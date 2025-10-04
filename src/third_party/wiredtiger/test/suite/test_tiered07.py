@@ -27,47 +27,129 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import os, wiredtiger, wttest
+from helper_tiered import  TieredConfigMixin, gen_tiered_storage_sources, get_check
+from wtscenario import make_scenarios
+
 StorageSource = wiredtiger.StorageSource  # easy access to constants
 
 # test_tiered07.py
 #    Basic tiered storage API for schema operations.
-class test_tiered07(wttest.WiredTigerTestCase):
-    uri = "table:test_tiered07"
-    newuri = "table:tier_rename"
+class test_tiered07(wttest.WiredTigerTestCase, TieredConfigMixin):
 
-    auth_token = "test_token"
-    bucket = "my_bucket"
-    bucket_prefix = "my_prefix"
-    extension_name = "local_store"
+    storage_sources = gen_tiered_storage_sources(wttest.getss_random_prefix(), 'test_tiered07', tiered_only=True)
 
+    # Disabled S3 (only indexing dirstore in storage sources) as S3 directory listing
+    # is interpreting a directory to end in a '/', whereas the code in the tiered storage doesn't
+    # expect that.
+    flush_obj = [('ckpt', dict(first_ckpt=True)),
+                 ('no_ckpt', dict(first_ckpt=False)),
+                ]
+    tiered_storage_dirstore_source = storage_sources[:1]
+    scenarios = make_scenarios(flush_obj, tiered_storage_dirstore_source)
+
+    uri = "table:abc"
+    uri2 = "table:ab"
+    uri3 = "table:abcd"
+    uri4 = "table:abcde"
+    localuri = "table:local"
+    newuri = "table:tier_new"
+
+    # Load the storage store extension.
     def conn_extensions(self, extlist):
-        # Windows doesn't support dynamically loaded extension libraries.
-        if os.name == 'nt':
-            extlist.skip_if_missing = True
-        extlist.extension('storage_sources', self.extension_name)
+        TieredConfigMixin.conn_extensions(self, extlist)
 
     def conn_config(self):
-        os.mkdir(self.bucket)
-        return \
-          'tiered_storage=(auth_token=%s,' % self.auth_token + \
-          'bucket=%s,' % self.bucket + \
-          'bucket_prefix=%s,' % self.bucket_prefix + \
-          'name=%s,' % self.extension_name + \
-          'object_target_size=20M)'
+        return TieredConfigMixin.conn_config(self)
+
+    def check(self, tc, base, n):
+        get_check(self, tc, 0, n)
 
     # Test calling schema APIs with a tiered table.
     def test_tiered(self):
         # Create a new tiered table.
-        self.session.create(self.uri, 'key_format=S')
+        self.pr('create table')
+        self.session.create(self.uri, 'key_format=S,value_format=S')
+        self.pr('create table 2')
+        self.session.create(self.uri2, 'key_format=S,value_format=S')
+        self.pr('create table 3')
+        self.session.create(self.uri3, 'key_format=S,value_format=S')
+        self.pr('create table local')
+        self.session.create(self.localuri, 'key_format=S,value_format=S,tiered_storage=(name=none)')
 
-        # Rename is not supported for tiered tables.
-        msg = "/is not supported/"
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda:self.assertEquals(self.session.rename(self.uri, self.newuri, None), 0), msg)
+        # Add some data and flush tier.
+        self.pr('add one item to all tables')
+        c = self.session.open_cursor(self.uri)
+        c["0"] = "0"
+        self.check(c, 0, 1)
+        c.close()
+        c = self.session.open_cursor(self.uri2)
+        c["0"] = "0"
+        self.check(c, 0, 1)
+        c.close()
+        c = self.session.open_cursor(self.uri3)
+        c["0"] = "0"
+        self.check(c, 0, 1)
+        c.close()
+        c = self.session.open_cursor(self.localuri)
+        c["0"] = "0"
+        c.close()
+        if (self.first_ckpt):
+            self.session.checkpoint()
+        self.pr('After data, call flush_tier')
+        self.session.checkpoint('flush_tier=(enabled)')
+        if (not self.first_ckpt):
+            self.session.checkpoint()
 
-        # Add a test for drop when implemented:
-        # Add data and flush tier.
-        # Drop table. Create new table with same name.
+        # Drop table.
+        self.pr('call drop')
+        self.session.drop(self.localuri)
+        self.session.drop(self.uri)
 
-if __name__ == '__main__':
-    wttest.run()
+        # By default, the remove_files configuration for drop is true. This means that the
+        # drop operation for tiered tables should both remove the files from the metadata
+        # file and remove the corresponding local object files in the directory.
+        self.assertFalse(os.path.isfile("abc-0000000001.wtobj"))
+        self.assertFalse(os.path.isfile("abc-0000000002.wtobj"))
+
+        # Dropping a table using the force setting should succeed even if the table does not exist.
+        self.pr('drop with force')
+        self.session.drop(self.localuri, 'force=true')
+        self.session.drop(self.uri, 'force=true')
+
+        # Dropping a table should not succeed if the table does not exist.
+        # Test dropping a table that was previously dropped.
+        self.assertRaises(wiredtiger.WiredTigerError,
+            lambda: self.session.drop(self.localuri, None))
+        # Test dropping a table that does not exist.
+        self.assertRaises(wiredtiger.WiredTigerError,
+            lambda: self.session.drop("table:random_non_existent", None))
+
+        # Create new table with same name. This should error.
+        self.session.create(self.newuri, 'key_format=S')
+
+        # If we didn't do a checkpoint before the flush_tier then creating with the same name
+        # will succeed because no bucket objects were created.
+        if (self.first_ckpt):
+            self.pr('check cannot create with same name')
+            self.assertRaises(wiredtiger.WiredTigerError,
+                lambda:self.session.create(self.uri, 'key_format=S'))
+        else:
+            self.session.create(self.uri, 'key_format=S')
+
+        # Make sure there was no problem with overlapping table names.
+        self.pr('check original similarly named tables')
+        c = self.session.open_cursor(self.uri2)
+        self.check(c, 0, 1)
+        c.close()
+        c = self.session.open_cursor(self.uri3)
+        self.check(c, 0, 1)
+        c.close()
+
+        # Create new table with new name.
+        self.pr('create new table')
+        self.session.create(self.newuri, 'key_format=S')
+
+        # Test the drop operation without removing associated files.
+        self.session.create(self.uri4, 'key_format=S,value_format=S')
+        self.session.drop(self.uri4, 'remove_files=false')
+        self.assertTrue(os.path.isfile("abcde-0000000001.wtobj"))

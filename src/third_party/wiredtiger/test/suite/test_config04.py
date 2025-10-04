@@ -88,7 +88,7 @@ class test_config04(wttest.WiredTigerTestCase):
         cursor.close()
 
     def common_log_test(self, path, dirname):
-        self.common_test('log=(archive=false,enabled,' + path + ')')
+        self.common_test('log=(enabled,' + path + ',remove=false)')
         self.assertTrue(os.path.exists(dirname + os.sep + self.log1))
 
     def test_bad_config(self):
@@ -246,7 +246,13 @@ class test_config04(wttest.WiredTigerTestCase):
             '/eviction updates target must be lower than the eviction updates trigger/')
 
     def test_invalid_config(self):
-        msg = '/Unbalanced brackets/'
+        # The tiered/disagg hook modifies the wiredtiger_open configuration string.
+        # This may influence what particular error message occurs in certain cases.
+        if self.runningHook('tiered') or self.runningHook('disagg'):
+            msg = '/./'
+        else:
+            msg = '/Unbalanced brackets/'
+
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.wiredtiger_open('.', '}'), msg)
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
@@ -304,6 +310,3 @@ class test_config04(wttest.WiredTigerTestCase):
     def test_transactional(self):
         # Note: this will have functional tests in the future.
         self.common_test('')
-
-if __name__ == '__main__':
-    wttest.run()

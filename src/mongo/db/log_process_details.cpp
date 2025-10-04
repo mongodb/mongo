@@ -27,25 +27,31 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/log_process_details.h"
 
-#include <ostream>
-
-#include "mongo/bson/bsonobj.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/bson/oid.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_options_server_helpers.h"
+#include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/process_id.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/version.h"
+
+#include <ostream>
+#include <string>
+
+#include <fmt/format.h>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
+
 
 namespace mongo {
 
@@ -71,8 +77,7 @@ void logProcessDetails(std::ostream* os) {
                       .obj();
     vii.logBuildInfo(os);
     if (os) {
-        *os << format(FMT_STRING("Operating System: {}"),
-                      tojson(osInfo, ExtendedRelaxedV2_0_0, true))
+        *os << fmt::format("Operating System: {}", tojson(osInfo, ExtendedRelaxedV2_0_0, true))
             << std::endl;
     } else {
         LOGV2(51765, "Operating System", "os"_attr = osInfo);
@@ -89,8 +94,7 @@ void logProcessDetailsForLogRotate(ServiceContext* serviceContext) {
           "host"_attr = getHostNameCached());
 
     auto replCoord = repl::ReplicationCoordinator::get(serviceContext);
-    if (replCoord != nullptr &&
-        replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet) {
+    if (replCoord != nullptr && replCoord->getSettings().isReplSet()) {
         auto rsConfig = replCoord->getConfig();
 
         if (rsConfig.isInitialized()) {
@@ -103,14 +107,8 @@ void logProcessDetailsForLogRotate(ServiceContext* serviceContext) {
         }
     }
 
-    LOGV2(5853301,
-          "featureCompatibilityVersion on log rotation",
-          "featureCompatibilityVersion"_attr =
-              serverGlobalParams.featureCompatibility.isVersionInitialized()
-              ? multiversion::toString(serverGlobalParams.featureCompatibility.getVersion())
-              : multiversion::toString(
-                    multiversion::FeatureCompatibilityVersion::kUnsetDefaultLastLTSBehavior));
-
+    serverGlobalParams.featureCompatibility.acquireFCVSnapshot().logFCVWithContext(
+        "log rotation"_sd);
     logProcessDetails(nullptr);
 }
 

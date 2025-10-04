@@ -1,0 +1,72 @@
+version: 1.0.0
+filters:
+  - "*analyze_shard_key*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "*move*range*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "*query_analyzer*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "query_analysis*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "would_change_owning_shard_exception*":
+    approvers:
+      - 10gen/query-execution-router
+  - "*reshard*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "session_catalog_router*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "*transaction*":
+    approvers:
+      - 10gen/server-transactions
+  - "*txn*":
+    approvers:
+      - 10gen/server-transactions
+  - "mongos.cpp":
+    approvers:
+      - 10gen/server-programmability
+  - "mongos_main*":
+    approvers:
+      - 10gen/server-programmability
+  - "mongos_options_*":
+    approvers:
+      - 10gen/server-programmability
+  - "service_entry_point*":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
+      - 10gen/server-programmability
+  - "balancer_configuration*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "cluster_cursor_stats.cpp":
+    approvers:
+      - 10gen/query-execution-router
+  - "cluster_write*":
+    approvers:
+      - 10gen/query-execution-router
+  - "shard_targeting_helpers*":
+    approvers:
+      - 10gen/query-optimization
+  - "append_raw_responses_test.cpp":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "async_requests_sender*":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "async_rpc_shard*":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "load_balancer_support*":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "balancer_feature_flag*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "sharding_task_executor_pool*":
+    approvers:
+      - 10gen/server-networking-and-observability

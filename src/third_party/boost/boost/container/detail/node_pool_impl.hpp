@@ -26,13 +26,13 @@
 #include <boost/container/detail/mpl.hpp>
 #include <boost/container/detail/pool_common.hpp>
 #include <boost/move/detail/to_raw_pointer.hpp>
+#include <boost/move/detail/force_ptr.hpp>
 #include <boost/container/detail/type_traits.hpp>
 
 #include <boost/intrusive/pointer_traits.hpp>
 #include <boost/intrusive/set.hpp>
 #include <boost/intrusive/slist.hpp>
 
-#include <boost/core/no_exceptions_support.hpp>
 #include <boost/assert.hpp>
 #include <cstddef>
 
@@ -84,21 +84,21 @@ class private_node_pool_impl
    {}
 
    //!Destructor. Deallocates all allocated blocks. Never throws
-   ~private_node_pool_impl()
+   inline ~private_node_pool_impl()
    {  this->purge_blocks();  }
 
-   size_type get_real_num_node() const
+   inline size_type get_real_num_node() const
    {  return m_nodes_per_block; }
 
    //!Returns the segment manager. Never throws
-   segment_manager_base_type* get_segment_manager_base()const
+   inline segment_manager_base_type* get_segment_manager_base()const
    {  return boost::movelib::to_raw_pointer(mp_segment_mngr_base);  }
 
-   void *allocate_node()
+   inline void *allocate_node()
    {  return this->priv_alloc_node();  }
 
    //!Deallocates an array pointed by ptr. Never throws
-   void deallocate_node(void *ptr)
+   inline void deallocate_node(void *ptr)
    {  this->priv_dealloc_node(ptr); }
 
    //!Allocates a singly linked list of n nodes ending in null pointer.
@@ -205,7 +205,7 @@ class private_node_pool_impl
          , backup_list.size());
    }
 
-   size_type num_free_nodes()
+   inline size_type num_free_nodes()
    {  return m_freelist.size();  }
 
    //!Deallocates all used memory. Precondition: all nodes allocated from this pool should
@@ -309,7 +309,7 @@ class private_node_pool_impl
       size_type blocksize =
          (get_rounded_size)(m_real_node_size*m_nodes_per_block, (size_type)alignment_of<node_t>::value);
 
-      BOOST_TRY{
+      BOOST_CONTAINER_TRY{
          for(size_type i = 0; i != num_blocks; ++i){
             //We allocate a new NodeBlock and put it as first
             //element in the free Node list
@@ -325,11 +325,11 @@ class private_node_pool_impl
             }
          }
       }
-      BOOST_CATCH(...){
+      BOOST_CONTAINER_CATCH(...){
          //to-do: if possible, an efficient way to deallocate allocated blocks
-         BOOST_RETHROW
+         BOOST_CONTAINER_RETHROW
       }
-      BOOST_CATCH_END
+      BOOST_CONTAINER_CATCH_END
    }
 
    //!Deprecated, use deallocate_free_blocks
@@ -344,7 +344,7 @@ class private_node_pool_impl
    //!Returns a reference to the block hook placed in the end of the block
    static node_t & get_block_hook (void *block, size_type blocksize)
    {
-      return *reinterpret_cast<node_t*>(reinterpret_cast<char*>(block) + blocksize);
+      return *move_detail::force_ptr<node_t*>(reinterpret_cast<char*>(block) + blocksize);
    }
 
    //!Returns the starting address of the block reference to the block hook placed in the end of the block

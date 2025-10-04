@@ -17,9 +17,7 @@
 const char *
 __wt_wiredtiger_error(int error)
 {
-    /*
-     * Check for WiredTiger specific errors.
-     */
+    /* Check for WiredTiger specific errors. */
     switch (error) {
     case WT_ROLLBACK:
         return ("WT_ROLLBACK: conflict between concurrent operations");
@@ -41,6 +39,44 @@ __wt_wiredtiger_error(int error)
         return ("WT_PREPARE_CONFLICT: conflict with a prepared update");
     case WT_TRY_SALVAGE:
         return ("WT_TRY_SALVAGE: database corruption detected");
+    }
+
+    /* Check for WiredTiger specific sub-level errors. */
+    switch (error) {
+    case WT_NONE:
+        return ("WT_NONE: No additional context");
+    case WT_BACKGROUND_COMPACT_ALREADY_RUNNING:
+        return ("WT_BACKGROUND_COMPACT_ALREADY_RUNNING: Background compaction is already running");
+    case WT_CACHE_OVERFLOW:
+        return ("WT_CACHE_OVERFLOW: Cache capacity has overflown");
+    case WT_WRITE_CONFLICT:
+        return ("WT_WRITE_CONFLICT: Write conflict between concurrent operations");
+    case WT_OLDEST_FOR_EVICTION:
+        return ("WT_OLDEST_FOR_EVICTION: Transaction has the oldest pinned transaction ID");
+    case WT_CONFLICT_BACKUP:
+        return ("WT_CONFLICT_BACKUP: Conflict performing operation due to running backup");
+    case WT_CONFLICT_DHANDLE:
+        return ("WT_CONFLICT_DHANDLE: Another thread currently holds the data handle of the table");
+    case WT_CONFLICT_SCHEMA_LOCK:
+        return ("WT_CONFLICT_SCHEMA_LOCK: Conflict performing schema operation");
+    case WT_UNCOMMITTED_DATA:
+        return ("WT_UNCOMMITTED_DATA: Table has uncommitted data");
+    case WT_DIRTY_DATA:
+        return ("WT_DIRTY_DATA: Table has dirty data");
+    case WT_CONFLICT_TABLE_LOCK:
+        return ("WT_CONFLICT_TABLE_LOCK: Another thread currently holds the table lock");
+    case WT_CONFLICT_CHECKPOINT_LOCK:
+        return ("WT_CONFLICT_CHECKPOINT_LOCK: Another thread currently holds the checkpoint lock");
+    case WT_MODIFY_READ_UNCOMMITTED:
+        return (
+          "WT_MODIFY_READ_UNCOMMITTED: Read-uncommitted readers do not support reconstructing a "
+          "record with modifies");
+    case WT_CONFLICT_LIVE_RESTORE:
+        return (
+          "WT_CONFLICT_LIVE_RESTORE: Conflict performing operation due to an in-progress live "
+          "restore");
+    case WT_CONFLICT_DISAGG:
+        return ("WT_CONFLICT_DISAGG: Conflict with disaggregated storage");
     }
 
     /* Windows strerror doesn't support ENOTSUP. */
@@ -70,4 +106,15 @@ wiredtiger_strerror(int error)
     static char buf[128];
 
     return (__wt_strerror(NULL, error, buf, sizeof(buf)));
+}
+
+/*
+ * __wt_is_valid_sub_level_error --
+ *     Return true if the provided error falls within the valid range for sub level error codes,
+ *     return false otherwise.
+ */
+bool
+__wt_is_valid_sub_level_error(int sub_level_err)
+{
+    return (sub_level_err <= -32000 && sub_level_err > -32200);
 }

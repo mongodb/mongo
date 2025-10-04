@@ -28,19 +28,34 @@
  */
 #pragma once
 
-#include <absl/container/flat_hash_map.h>
-#include <absl/container/inlined_vector.h>
+#include <algorithm>
+#include <cstddef>
 #include <memory>
 #include <string>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
+#include <absl/container/flat_hash_map.h>
+#include <absl/container/inlined_vector.h>
+
+// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/stages/window.h"
+#include "mongo/db/exec/sbe/values/row.h"
 #include "mongo/db/exec/sbe/values/slot.h"
-#include "mongo/db/query/index_bounds.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
+#include "mongo/db/query/compiler/physical_model/interval/interval.h"
 #include "mongo/db/storage/index_entry_comparison.h"
+#include "mongo/util/string_listset.h"
 
 /**
  * Contains a set of functions for shallow estimating the size of allocated on the heap objects
@@ -84,12 +99,68 @@ inline size_t estimate(S) {
     return 0;
 }
 
+inline size_t estimate(StringData str) {
+    return 0;
+}
+
+inline size_t estimate(const AggExprPair& expr) {
+    size_t size = 0;
+    if (expr.init) {
+        size += expr.init->estimateSize();
+    }
+    size += expr.agg->estimateSize();
+    return size;
+}
+
+inline size_t estimate(const BlockAggExprTuple& tuple) {
+    size_t size = 0;
+
+    if (tuple.init) {
+        size += tuple.init->estimateSize();
+    }
+
+    if (tuple.blockAgg) {
+        size += tuple.blockAgg->estimateSize();
+    }
+
+    size += tuple.agg->estimateSize();
+
+    return size;
+}
+
+inline size_t estimate(const WindowStage::Window& window) {
+    size_t size = sizeof(window);
+    if (window.lowBoundExpr) {
+        size += size_estimator::estimate(window.lowBoundExpr);
+    }
+    if (window.highBoundExpr) {
+        size += size_estimator::estimate(window.highBoundExpr);
+    }
+    for (size_t i = 0; i < window.initExprs.size(); ++i) {
+        if (window.initExprs[i]) {
+            size += size_estimator::estimate(window.initExprs[i]);
+        }
+        if (window.addExprs[i]) {
+            size += size_estimator::estimate(window.addExprs[i]);
+        }
+        if (window.removeExprs[i]) {
+            size += size_estimator::estimate(window.removeExprs[i]);
+        }
+    }
+    return size;
+}
+
 // Calculate the size of a SpecificStats's derived class.
 // We need a template argument here rather than passing const SpecificStats&
 // as we need to know the exact type to properly compute the size of the object.
 template <typename S, std::enable_if_t<std::is_base_of_v<SpecificStats, S>, bool> = true>
 inline size_t estimate(const S& stats) {
     return stats.estimateObjectSizeInBytes() - sizeof(S);
+}
+
+template <typename A, typename B>
+inline size_t estimate(const std::pair<A, B>& pair) {
+    return estimate(pair.first) + estimate(pair.second);
 }
 
 // Calculate the size of the inlined vector's elements.
@@ -157,5 +228,20 @@ size_t estimate(const absl::flat_hash_map<K, V, Args...>& map) {
 template <class BufferAllocator>
 size_t estimate(const BasicBufBuilder<BufferAllocator>& ba) {
     return static_cast<size_t>(ba.capacity());
+}
+
+inline size_t estimate(const value::MaterializedRow& row) {
+    size_t size = 0;
+    for (size_t idx = 0; idx < row.size(); ++idx) {
+        auto [tag, val] = row.getViewOfValue(idx);
+        size += estimate(tag, val);
+    }
+    return size;
+}
+
+inline size_t estimate(const StringListSet& vec) {
+    size_t size = size_estimator::estimate(vec.getUnderlyingVector());
+    size += size_estimator::estimate(vec.getUnderlyingMap());
+    return size;
 }
 }  // namespace mongo::sbe::size_estimator

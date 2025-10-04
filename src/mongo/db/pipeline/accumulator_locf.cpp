@@ -27,26 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/accumulator_for_window_functions.h"
-
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/pipeline/accumulation_statement.h"
-#include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/accumulator_for_window_functions.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/window_function/window_function_expression.h"
+#include "mongo/db/query/allowed_contexts.h"
+#include "mongo/util/assert_util.h"
+
 
 namespace mongo {
 
-REGISTER_WINDOW_FUNCTION_CONDITIONALLY(
+REGISTER_WINDOW_FUNCTION(
     locf,
     mongo::window_function::ExpressionFromLeftUnboundedWindowFunction<AccumulatorLocf>::parse,
-    multiversion::FeatureCompatibilityVersion::kVersion_5_2,
-    feature_flags::gFlagFill.isEnabledAndIgnoreFCV());
+    AllowedWithApiStrict::kAlways);
 
 AccumulatorLocf::AccumulatorLocf(ExpressionContext* const expCtx)
     : AccumulatorForWindowFunctions(expCtx) {
-    _memUsageBytes = sizeof(*this) + _lastNonNull.getApproximateSize();
+    _memUsageTracker.set(sizeof(*this) + _lastNonNull.getApproximateSize());
 }
 
 void AccumulatorLocf::processInternal(const Value& input, bool merging) {
@@ -54,7 +54,7 @@ void AccumulatorLocf::processInternal(const Value& input, bool merging) {
 
     if (!input.nullish()) {
         _lastNonNull = input;
-        _memUsageBytes = sizeof(*this) + _lastNonNull.getApproximateSize();
+        _memUsageTracker.set(sizeof(*this) + _lastNonNull.getApproximateSize());
     }
 }
 
@@ -64,11 +64,8 @@ Value AccumulatorLocf::getValue(bool toBeMerged) {
 }
 
 void AccumulatorLocf::reset() {
-    _lastNonNull = Value();
-    _memUsageBytes = sizeof(*this) + _lastNonNull.getApproximateSize();
+    _lastNonNull = Value(BSONNULL);
+    _memUsageTracker.set(sizeof(*this) + _lastNonNull.getApproximateSize());
 }
 
-boost::intrusive_ptr<AccumulatorState> AccumulatorLocf::create(ExpressionContext* const expCtx) {
-    return new AccumulatorLocf(expCtx);
-}
 }  // namespace mongo

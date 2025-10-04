@@ -27,30 +27,78 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/exec/agg/pipeline_builder.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_mock.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
+#include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
+#include "mongo/db/repl/apply_ops_command_info.h"
+#include "mongo/db/repl/apply_ops_gen.h"
 #include "mongo/db/repl/image_collection_entry_gen.h"
 #include "mongo/db/repl/mock_repl_coord_server_fixture.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/s/resharding/donor_oplog_id_gen.h"
 #include "mongo/db/s/resharding/resharding_donor_oplog_iterator.h"
-#include "mongo/db/s/resharding_util.h"
-#include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/db/transaction_history_iterator.h"
+#include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/transaction/transaction_history_iterator.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <deque>
+#include <iostream>
+#include <iterator>
+#include <map>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {
 
-using namespace fmt::literals;
-
-const NamespaceString kRemoteOplogNss{"local.oplog.rs"};
-const NamespaceString kLocalOplogBufferNss{"{}.{}xxx.yyy"_format(
-    NamespaceString::kConfigDb, NamespaceString::kReshardingLocalOplogBufferPrefix)};
+const NamespaceString kLocalOplogBufferNss = NamespaceString::createNamespaceString_forTest(
+    fmt::format("config", "{}xxx.yyy", NamespaceString::kReshardingLocalOplogBufferPrefix));
 
 // A mock TransactionHistoryIterator to support DSReshardingIterateTransaction.
 class MockTransactionHistoryIterator : public TransactionHistoryIteratorBase {
@@ -61,13 +109,13 @@ public:
           _oplogIt(_oplogContents.rbegin()),
           _nextOpTime(std::move(startTime)) {}
 
-    virtual ~MockTransactionHistoryIterator() = default;
+    ~MockTransactionHistoryIterator() override = default;
 
-    bool hasNext() const {
+    bool hasNext() const override {
         return !_nextOpTime.isNull();
     }
 
-    repl::OplogEntry next(OperationContext* opCtx) {
+    repl::OplogEntry next(OperationContext* opCtx) override {
         BSONObj oplogBSON = findOneOplogEntry(_nextOpTime);
 
         auto oplogEntry = uassertStatusOK(repl::OplogEntry::parse(oplogBSON));
@@ -81,7 +129,7 @@ public:
         return oplogEntry;
     }
 
-    repl::OpTime nextOpTime(OperationContext* opCtx) {
+    repl::OpTime nextOpTime(OperationContext* opCtx) override {
         BSONObj oplogBSON = findOneOplogEntry(_nextOpTime);
 
         auto prevOpTime = oplogBSON[repl::OplogEntry::kPrevWriteOpTimeInTransactionFieldName];
@@ -121,20 +169,30 @@ public:
     MockMongoInterface(std::deque<DocumentSource::GetNextResult> mockResults)
         : _mockResults(std::move(mockResults)) {}
 
-    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
+    std::unique_ptr<Pipeline> preparePipelineForExecution(
         Pipeline* ownedPipeline,
         ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
         boost::optional<BSONObj> readConcern = boost::none) final {
-        std::unique_ptr<Pipeline, PipelineDeleter> pipeline(
-            ownedPipeline, PipelineDeleter(ownedPipeline->getContext()->opCtx));
+        std::unique_ptr<Pipeline> pipeline(ownedPipeline);
 
         pipeline->addInitialSource(
             DocumentSourceMock::createForTest(_mockResults, pipeline->getContext()));
         return pipeline;
     }
 
+    std::unique_ptr<Pipeline> preparePipelineForExecution(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const AggregateCommandRequest& aggRequest,
+        Pipeline* pipeline,
+        boost::optional<BSONObj> shardCursorsSortSpec = boost::none,
+        ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
+        boost::optional<BSONObj> readConcern = boost::none,
+        bool shouldUseDefaultCollectionCollator = false) final {
+        return preparePipelineForExecution(pipeline, shardTargetingPolicy, std::move(readConcern));
+    }
+
     std::unique_ptr<TransactionHistoryIteratorBase> createTransactionHistoryIterator(
-        repl::OpTime time) const {
+        repl::OpTime time) const override {
         return std::unique_ptr<TransactionHistoryIteratorBase>(
             new MockTransactionHistoryIterator(_mockResults, time));
     }
@@ -142,7 +200,7 @@ public:
     BSONObj getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) override {
         auto optionIter = _collectionOptions.find(nss);
         invariant(optionIter != _collectionOptions.end(),
-                  str::stream() << nss.ns() << " was not registered");
+                  str::stream() << nss.toStringForErrorMsg() << " was not registered");
 
         return optionIter->second;
     }
@@ -150,10 +208,10 @@ public:
     boost::optional<Document> lookupSingleDocument(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const NamespaceString& nss,
-        UUID collectionUUID,
+        boost::optional<UUID> collectionUUID,
         const Document& documentKey,
-        boost::optional<BSONObj> readConcern) {
-        DBDirectClient client(expCtx->opCtx);
+        boost::optional<BSONObj> readConcern) override {
+        DBDirectClient client(expCtx->getOperationContext());
         auto result = client.findOne(nss, documentKey.toBson());
         if (result.isEmpty()) {
             return boost::none;
@@ -210,12 +268,54 @@ repl::MutableOplogEntry makePrePostImageOplog(const NamespaceString& nss,
     return makeOplog(nss, timestamp, uuid, shardId, repl::OpTypeEnum::kNoop, prePostImage, {}, _id);
 }
 
+repl::DurableOplogEntry makeApplyOpsOplog(std::vector<BSONObj> operations,
+                                          repl::OpTime opTime,
+                                          repl::OpTime prevOpTime,
+                                          OperationSessionInfo sessionInfo,
+                                          bool isPrepare,
+                                          bool isPartial) {
+    BSONObjBuilder applyOpsBuilder;
+    BSONArrayBuilder opsArrayBuilder = applyOpsBuilder.subarrayStart("applyOps");
+    for (const auto& operation : operations) {
+        opsArrayBuilder.append(operation);
+    }
+    opsArrayBuilder.done();
+
+    if (isPrepare) {
+        applyOpsBuilder.append(repl::ApplyOpsCommandInfoBase::kPrepareFieldName, true);
+    }
+    if (isPartial) {
+        applyOpsBuilder.append(repl::ApplyOpsCommandInfoBase::kPartialTxnFieldName, true);
+    }
+
+    return {opTime,
+            repl::OpTypeEnum::kCommand,
+            {},
+            UUID::gen(),
+            false /* fromMigrate */,
+            boost::none,  // checkExistenceForDiffInsert
+            boost::none,  // versionContext
+            0 /* version */,
+            applyOpsBuilder.obj(), /* o */
+            boost::none,           /* o2 */
+            sessionInfo,
+            boost::none /* upsert */,
+            {} /* date */,
+            {}, /* statementIds */
+            prevOpTime /* prevWriteOpTime */,
+            boost::none /* preImage */,
+            boost::none /* postImage */,
+            boost::none /* destinedRecipient */,
+            boost::none /* idField */,
+            boost::none /* needsRetryImage */};
+}
+
 bool validateOplogId(const Timestamp& clusterTime,
                      const mongo::Document& sourceDoc,
                      const repl::OplogEntry& oplogEntry) {
     auto oplogIdExpected = ReshardingDonorOplogId{clusterTime, sourceDoc["ts"].getTimestamp()};
-    auto oplogId = ReshardingDonorOplogId::parse(IDLParserErrorContext("ReshardingAggTest"),
-                                                 oplogEntry.get_id()->getDocument().toBson());
+    auto oplogId = ReshardingDonorOplogId::parse(oplogEntry.get_id()->getDocument().toBson(),
+                                                 IDLParserContext("ReshardingAggTest"));
     return oplogIdExpected == oplogId;
 }
 
@@ -223,7 +323,8 @@ boost::intrusive_ptr<ExpressionContextForTest> createExpressionContext(Operation
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(
         new ExpressionContextForTest(opCtx, kLocalOplogBufferNss));
     expCtx->setResolvedNamespace(kLocalOplogBufferNss, {kLocalOplogBufferNss, {}});
-    expCtx->setResolvedNamespace(kRemoteOplogNss, {kRemoteOplogNss, {}});
+    expCtx->setResolvedNamespace(NamespaceString::kRsOplogNamespace,
+                                 {NamespaceString::kRsOplogNamespace, {}});
     return expCtx;
 }
 
@@ -306,76 +407,20 @@ protected:
                          deleteWithPreOplogId);
     }
 
-    /**
-     * Returns (postImageOplog, updateOplog) pair.
-     */
-    std::pair<repl::MutableOplogEntry, repl::MutableOplogEntry> makeUpdateWithPostImage() {
-        const Timestamp postImageTs(10, 5);
-        const ReshardingDonorOplogId postImageId(postImageTs, postImageTs);
-        auto postImageOplog = makePrePostImageOplog(_crudNss,
-                                                    postImageTs,
-                                                    _reshardingCollUUID,
-                                                    _destinedRecipient,
-                                                    postImageId,
-                                                    BSON("post" << 1 << "y" << 4));
-
-        auto updateWithPostOplog = makeUpdateOplog();
-        updateWithPostOplog.setPostImageOpTime(repl::OpTime(postImageTs, _term));
-        return std::make_pair(postImageOplog, updateWithPostOplog);
-    }
-
-    /**
-     * Returns (preImageOplog, deleteOplog) pair.
-     */
-    std::pair<repl::MutableOplogEntry, repl::MutableOplogEntry> makeDeleteWithPreImage() {
-        const Timestamp preImageTs(7, 35);
-        const ReshardingDonorOplogId preImageId(preImageTs, preImageTs);
-        auto preImageOplog = makePrePostImageOplog(_crudNss,
-                                                   preImageTs,
-                                                   _reshardingCollUUID,
-                                                   _destinedRecipient,
-                                                   preImageId,
-                                                   BSON("pre" << 1 << "z" << 4));
-
-        auto deleteWithPreOplog = makeDeleteOplog();
-        deleteWithPreOplog.setPreImageOpTime(repl::OpTime(preImageTs, _term));
-
-        return std::make_pair(preImageOplog, deleteWithPreOplog);
-    }
 
     ReshardingDonorOplogId getOplogId(const repl::MutableOplogEntry& oplog) {
-        return ReshardingDonorOplogId::parse(IDLParserErrorContext("ReshardingAggTest::getOplogId"),
-                                             oplog.get_id()->getDocument().toBson());
+        return ReshardingDonorOplogId::parse(oplog.get_id()->getDocument().toBson(),
+                                             IDLParserContext("ReshardingAggTest::getOplogId"));
     }
 
-    BSONObj addExpectedFields(const repl::MutableOplogEntry& op,
-                              const boost::optional<repl::MutableOplogEntry>& preImageOp,
-                              const boost::optional<repl::MutableOplogEntry>& postImageOp) {
-        BSONObjBuilder builder;
-
-        builder.append(ReshardingDonorOplogIterator::kActualOpFieldName, op.toBSON());
-
-        if (preImageOp) {
-            builder.append(ReshardingDonorOplogIterator::kPreImageOpFieldName,
-                           preImageOp->toBSON());
-        }
-
-        if (postImageOp) {
-            builder.append(ReshardingDonorOplogIterator::kPostImageOpFieldName,
-                           postImageOp->toBSON());
-        }
-
-        return builder.obj();
-    }
-
-    std::unique_ptr<Pipeline, PipelineDeleter> createPipeline(
+    std::unique_ptr<Pipeline> createPipeline(
         std::deque<DocumentSource::GetNextResult> pipelineSource) {
         // Set up the oplog collection state for $lookup and $graphLookup calls.
         auto expCtx = createExpressionContext();
-        expCtx->ns = kRemoteOplogNss;
-        expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(pipelineSource);
+        expCtx->setNamespaceString(NamespaceString::kRsOplogNamespace);
+        expCtx->setMongoProcessInterface(std::make_shared<MockMongoInterface>(pipelineSource));
 
-        auto pipeline = createOplogFetchingPipelineForResharding(
+        auto pipeline = resharding::createOplogFetchingPipelineForResharding(
             expCtx,
             ReshardingDonorOplogId(Timestamp::min(), Timestamp::min()),
             _reshardingCollUUID,
@@ -386,7 +431,7 @@ protected:
         return pipeline;
     }
 
-    const NamespaceString _crudNss{"test.foo"};
+    const NamespaceString _crudNss = NamespaceString::createNamespaceString_forTest("test.foo");
     // Use a constant value so unittests can store oplog entries as extended json strings in code.
     const UUID _reshardingCollUUID =
         fassert(5074001, UUID::parse("8926ba8e-611a-42c2-bb1a-3b7819f610ed"));
@@ -406,20 +451,18 @@ TEST_F(ReshardingAggTest, OplogPipelineBasicCRUDOnly) {
     mockResults.emplace_back(Document(deleteOplog.toBSON()));
 
     auto pipeline = makePipelineForReshardingDonorOplogIterator(std::move(mockResults));
+    auto execPipeline = exec::agg::buildPipeline(pipeline->freeze());
 
-    auto next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(insertOplog, boost::none, boost::none),
-                             next->toBson());
+    auto next = execPipeline->getNext();
+    ASSERT_BSONOBJ_BINARY_EQ(insertOplog.toBSON(), next->toBson());
 
-    next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(updateOplog, boost::none, boost::none),
-                             next->toBson());
+    next = execPipeline->getNext();
+    ASSERT_BSONOBJ_BINARY_EQ(updateOplog.toBSON(), next->toBson());
 
-    next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(deleteOplog, boost::none, boost::none),
-                             next->toBson());
+    next = execPipeline->getNext();
+    ASSERT_BSONOBJ_BINARY_EQ(deleteOplog.toBSON(), next->toBson());
 
-    ASSERT(!pipeline->getNext());
+    ASSERT(!execPipeline->getNext());
 }
 
 /**
@@ -437,16 +480,15 @@ TEST_F(ReshardingAggTest, OplogPipelineWithResumeToken) {
 
     auto pipeline = makePipelineForReshardingDonorOplogIterator(std::move(mockResults),
                                                                 getOplogId(insertOplog));
+    auto execPipeline = exec::agg::buildPipeline(pipeline->freeze());
 
-    auto next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(updateOplog, boost::none, boost::none),
-                             next->toBson());
+    auto next = execPipeline->getNext();
+    ASSERT_BSONOBJ_BINARY_EQ((updateOplog.toBSON()), next->toBson());
 
-    next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(deleteOplog, boost::none, boost::none),
-                             next->toBson());
+    next = execPipeline->getNext();
+    ASSERT_BSONOBJ_BINARY_EQ(deleteOplog.toBSON(), next->toBson());
 
-    ASSERT(!pipeline->getNext());
+    ASSERT(!execPipeline->getNext());
 }
 
 /**
@@ -473,187 +515,15 @@ TEST_F(ReshardingAggTest, OplogPipelineWithResumeTokenClusterTimeNotEqualTs) {
 
     auto pipeline = makePipelineForReshardingDonorOplogIterator(std::move(mockResults),
                                                                 getOplogId(insertOplog));
+    auto execPipeline = exec::agg::buildPipeline(pipeline->freeze());
 
-    auto next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(updateOplog, boost::none, boost::none),
-                             next->toBson());
+    auto next = execPipeline->getNext();
+    ASSERT_BSONOBJ_BINARY_EQ(updateOplog.toBSON(), next->toBson());
 
-    next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(deleteOplog, boost::none, boost::none),
-                             next->toBson());
+    next = execPipeline->getNext();
+    ASSERT_BSONOBJ_BINARY_EQ(deleteOplog.toBSON(), next->toBson());
 
-    ASSERT(!pipeline->getNext());
-}
-
-TEST_F(ReshardingAggTest, OplogPipelineWithPostImage) {
-    auto insertOplog = makeInsertOplog();
-
-    repl::MutableOplogEntry postImageOplog, updateWithPostOplog;
-    std::tie(postImageOplog, updateWithPostOplog) = makeUpdateWithPostImage();
-
-    std::deque<DocumentSource::GetNextResult> mockResults;
-    mockResults.emplace_back(Document(insertOplog.toBSON()));
-    mockResults.emplace_back(Document(postImageOplog.toBSON()));
-    mockResults.emplace_back(Document(updateWithPostOplog.toBSON()));
-
-    auto pipeline = makePipelineForReshardingDonorOplogIterator(std::move(mockResults));
-
-    auto next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(postImageOplog, boost::none, boost::none),
-                             next->toBson());
-
-    next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(insertOplog, boost::none, boost::none),
-                             next->toBson());
-
-    next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(updateWithPostOplog, boost::none, postImageOplog),
-                             next->toBson());
-
-    ASSERT(!pipeline->getNext());
-}
-
-TEST_F(ReshardingAggTest, OplogPipelineWithLargeBSONPostImage) {
-    auto insertOplog = makeInsertOplog();
-
-    repl::MutableOplogEntry postImageOplog, updateWithPostOplog;
-    std::tie(postImageOplog, updateWithPostOplog) = makeUpdateWithPostImage();
-
-    // Modify default fixture docs with large BSON documents.
-    const std::string::size_type bigSize = 12 * 1024 * 1024;
-    std::string bigStr(bigSize, 'x');
-    postImageOplog.setObject(BSON("bigVal" << bigStr));
-    updateWithPostOplog.setObject2(BSON("bigVal" << bigStr));
-
-    std::deque<DocumentSource::GetNextResult> mockResults;
-    mockResults.emplace_back(Document(insertOplog.toBSON()));
-    mockResults.emplace_back(Document(postImageOplog.toBSON()));
-    mockResults.emplace_back(Document(updateWithPostOplog.toBSON()));
-
-    auto pipeline = makePipelineForReshardingDonorOplogIterator(std::move(mockResults));
-
-    // Check only _id because attempting to call toBson will trigger BSON too large assertion.
-    auto next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(
-        postImageOplog.get_id()->getDocument().toBson(),
-        next->getNestedField(ReshardingDonorOplogIterator::kActualOpFieldName + "._id")
-            .getDocument()
-            .toBson());
-
-    next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(
-        insertOplog.get_id()->getDocument().toBson(),
-        next->getNestedField(ReshardingDonorOplogIterator::kActualOpFieldName + "._id")
-            .getDocument()
-            .toBson());
-
-    next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(
-        updateWithPostOplog.get_id()->getDocument().toBson(),
-        next->getNestedField(ReshardingDonorOplogIterator::kActualOpFieldName + "._id")
-            .getDocument()
-            .toBson());
-
-    ASSERT(!pipeline->getNext());
-}
-
-/**
- * Test with 3 oplog: postImage -> insert -> update, then resume from point after postImage.
- */
-TEST_F(ReshardingAggTest, OplogPipelineResumeAfterPostImage) {
-    auto insertOplog = makeInsertOplog();
-
-    repl::MutableOplogEntry postImageOplog, updateWithPostOplog;
-    std::tie(postImageOplog, updateWithPostOplog) = makeUpdateWithPostImage();
-
-    std::deque<DocumentSource::GetNextResult> mockResults;
-    mockResults.emplace_back(Document(insertOplog.toBSON()));
-    mockResults.emplace_back(Document(postImageOplog.toBSON()));
-    mockResults.emplace_back(Document(updateWithPostOplog.toBSON()));
-
-    auto pipeline = makePipelineForReshardingDonorOplogIterator(std::move(mockResults),
-                                                                getOplogId(postImageOplog));
-
-    auto next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(insertOplog, boost::none, boost::none),
-                             next->toBson());
-
-    next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(updateWithPostOplog, boost::none, postImageOplog),
-                             next->toBson());
-
-    ASSERT(!pipeline->getNext());
-}
-
-TEST_F(ReshardingAggTest, OplogPipelineWithPreImage) {
-    auto insertOplog = makeInsertOplog();
-
-    repl::MutableOplogEntry preImageOplog, deleteWithPreOplog;
-    std::tie(preImageOplog, deleteWithPreOplog) = makeDeleteWithPreImage();
-
-    std::deque<DocumentSource::GetNextResult> mockResults;
-    mockResults.emplace_back(Document(insertOplog.toBSON()));
-    mockResults.emplace_back(Document(preImageOplog.toBSON()));
-    mockResults.emplace_back(Document(deleteWithPreOplog.toBSON()));
-
-    auto pipeline = makePipelineForReshardingDonorOplogIterator(std::move(mockResults));
-
-    auto next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(preImageOplog, boost::none, boost::none),
-                             next->toBson());
-
-    next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(insertOplog, boost::none, boost::none),
-                             next->toBson());
-
-    next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(deleteWithPreOplog, preImageOplog, boost::none),
-                             next->toBson());
-
-    ASSERT(!pipeline->getNext());
-}
-
-/**
- * Oplog _id order in this test is:
- * delPreImage -> updatePostImage -> unrelatedInsert -> update -> delete
- */
-TEST_F(ReshardingAggTest, OplogPipelineWithPreAndPostImage) {
-    auto insertOplog = makeInsertOplog();
-
-    repl::MutableOplogEntry postImageOplog, updateWithPostOplog, preImageOplog, deleteWithPreOplog;
-    std::tie(postImageOplog, updateWithPostOplog) = makeUpdateWithPostImage();
-    std::tie(preImageOplog, deleteWithPreOplog) = makeDeleteWithPreImage();
-
-    std::deque<DocumentSource::GetNextResult> mockResults;
-    mockResults.emplace_back(Document(insertOplog.toBSON()));
-    mockResults.emplace_back(Document(postImageOplog.toBSON()));
-    mockResults.emplace_back(Document(updateWithPostOplog.toBSON()));
-    mockResults.emplace_back(Document(preImageOplog.toBSON()));
-    mockResults.emplace_back(Document(deleteWithPreOplog.toBSON()));
-
-    auto pipeline = makePipelineForReshardingDonorOplogIterator(std::move(mockResults));
-
-    auto next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(preImageOplog, boost::none, boost::none),
-                             next->toBson());
-
-    next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(postImageOplog, boost::none, boost::none),
-                             next->toBson());
-
-    next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(insertOplog, boost::none, boost::none),
-                             next->toBson());
-
-    next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(updateWithPostOplog, boost::none, postImageOplog),
-                             next->toBson());
-
-    next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(deleteWithPreOplog, preImageOplog, boost::none),
-                             next->toBson());
-
-    ASSERT(!pipeline->getNext());
+    ASSERT(!execPipeline->getNext());
 }
 
 TEST_F(ReshardingAggTest, VerifyPipelineReturnsStartIndexBuildEntry) {
@@ -678,8 +548,9 @@ TEST_F(ReshardingAggTest, VerifyPipelineReturnsStartIndexBuildEntry) {
     })");
 
     auto pipeline = createPipeline({Document(oplogBSON)});
+    auto execPipeline = exec::agg::buildPipeline(pipeline->freeze());
 
-    auto doc = pipeline->getNext();
+    auto doc = execPipeline->getNext();
     ASSERT(doc);
 
     auto oplogEntry = uassertStatusOK(repl::OplogEntry::parse(doc->toBson()));
@@ -689,7 +560,7 @@ TEST_F(ReshardingAggTest, VerifyPipelineReturnsStartIndexBuildEntry) {
     ASSERT_EQ(oplogBSON["ts"].timestamp(), oplogEntry.getTimestamp());
     ASSERT(validateOplogId(oplogBSON["ts"].timestamp(), Document(oplogBSON), oplogEntry));
 
-    doc = pipeline->getNext();
+    doc = execPipeline->getNext();
     ASSERT(!doc);
 }
 
@@ -712,10 +583,10 @@ TEST_F(ReshardingAggTest, VerifyPipelineOutputHasOplogSchema) {
                                                                 Document(deleteOplog.toBSON())};
 
     boost::intrusive_ptr<ExpressionContext> expCtx = createExpressionContext();
-    expCtx->ns = kRemoteOplogNss;
-    expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(pipelineSource);
+    expCtx->setNamespaceString(NamespaceString::kRsOplogNamespace);
+    expCtx->setMongoProcessInterface(std::make_shared<MockMongoInterface>(pipelineSource));
 
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline = createOplogFetchingPipelineForResharding(
+    std::unique_ptr<Pipeline> pipeline = resharding::createOplogFetchingPipelineForResharding(
         expCtx,
         // Use the test to also exercise the stages for resuming. The timestamp passed in is
         // excluded from the results.
@@ -732,7 +603,9 @@ TEST_F(ReshardingAggTest, VerifyPipelineOutputHasOplogSchema) {
     }
 
     pipeline->addInitialSource(DocumentSourceMock::createForTest(pipelineSource, expCtx));
-    boost::optional<Document> doc = pipeline->getNext();
+    auto execPipeline = exec::agg::buildPipeline(pipeline->freeze());
+
+    boost::optional<Document> doc = execPipeline->getNext();
     ASSERT(doc);
     auto bsonDoc = doc->toBson();
     if (debug) {
@@ -743,7 +616,7 @@ TEST_F(ReshardingAggTest, VerifyPipelineOutputHasOplogSchema) {
     // The insert oplog entry is excluded, we first expect the update oplog entry.
     ASSERT_EQ(updateOplog.getTimestamp(), oplogEntry.getTimestamp()) << bsonDoc;
 
-    doc = pipeline->getNext();
+    doc = execPipeline->getNext();
     ASSERT(doc);
     bsonDoc = doc->toBson();
     if (debug) {
@@ -753,7 +626,7 @@ TEST_F(ReshardingAggTest, VerifyPipelineOutputHasOplogSchema) {
     oplogEntry = uassertStatusOK(repl::OplogEntry::parse(bsonDoc));
     ASSERT_EQ(deleteOplog.getTimestamp(), oplogEntry.getTimestamp()) << bsonDoc;
 
-    ASSERT_FALSE(pipeline->getNext());
+    ASSERT_FALSE(execPipeline->getNext());
 }
 
 TEST_F(ReshardingAggTest, VerifyPipelinePreparedTxn) {
@@ -812,10 +685,10 @@ TEST_F(ReshardingAggTest, VerifyPipelinePreparedTxn) {
 
     boost::intrusive_ptr<ExpressionContext> expCtx = createExpressionContext();
     // Set up the oplog collection state for $lookup and $graphLookup calls.
-    expCtx->ns = kRemoteOplogNss;
-    expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(pipelineSource);
+    expCtx->setNamespaceString(NamespaceString::kRsOplogNamespace);
+    expCtx->setMongoProcessInterface(std::make_shared<MockMongoInterface>(pipelineSource));
 
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline = createOplogFetchingPipelineForResharding(
+    std::unique_ptr<Pipeline> pipeline = resharding::createOplogFetchingPipelineForResharding(
         expCtx,
         ReshardingDonorOplogId(Timestamp::min(), Timestamp::min()),
         _reshardingCollUUID,
@@ -823,7 +696,7 @@ TEST_F(ReshardingAggTest, VerifyPipelinePreparedTxn) {
     if (debug) {
         std::cout << "Pipeline stages:" << std::endl;
         // This is can be changed to process a prefix of the pipeline for debugging.
-        const std::size_t numStagesToKeep = pipeline->getSources().size();
+        const std::size_t numStagesToKeep = pipeline->size();
         pipeline->getSources().resize(numStagesToKeep);
         auto bsonPipeline = pipeline->serializeToBson();
         for (std::size_t idx = 0; idx < bsonPipeline.size(); ++idx) {
@@ -834,9 +707,10 @@ TEST_F(ReshardingAggTest, VerifyPipelinePreparedTxn) {
 
     // Set up the initial input into the pipeline.
     pipeline->addInitialSource(DocumentSourceMock::createForTest(pipelineSource, expCtx));
+    auto execPipeline = exec::agg::buildPipeline(pipeline->freeze());
 
     // The first document should be `prepare: true` and contain two inserts.
-    boost::optional<Document> doc = pipeline->getNext();
+    boost::optional<Document> doc = execPipeline->getNext();
     ASSERT(doc);
     auto bsonDoc = doc->toBson();
     if (debug) {
@@ -853,10 +727,10 @@ TEST_F(ReshardingAggTest, VerifyPipelinePreparedTxn) {
 
     // We should not see the `commitTransaction` entry, since DSReshardingIterateTransaction
     // swallows it.
-    ASSERT(!pipeline->getNext());
+    ASSERT(!execPipeline->getNext());
 }
 
-TEST_F(ReshardingAggTest, VerifyPipelineAtomicApplyOps) {
+TEST_F(ReshardingAggTest, VerifyPipelineApplyOps) {
     const auto oplogBSON = fromjson(R"({
         "op": "c",
         "ns": "test.$cmd",
@@ -893,9 +767,9 @@ TEST_F(ReshardingAggTest, VerifyPipelineAtomicApplyOps) {
     })");
 
     auto pipeline = createPipeline({Document(oplogBSON)});
+    auto execPipeline = exec::agg::buildPipeline(pipeline->freeze());
 
-    // We don't need to support atomic applyOps in the resharding pipeline; we filter them out.
-    ASSERT(!pipeline->getNext());
+    ASSERT(!execPipeline->getNext());
 }
 
 TEST_F(ReshardingAggTest, VerifyPipelineSmallTxn) {
@@ -935,8 +809,9 @@ TEST_F(ReshardingAggTest, VerifyPipelineSmallTxn) {
     })");
 
     auto pipeline = createPipeline({Document(oplogBSON)});
+    auto execPipeline = exec::agg::buildPipeline(pipeline->freeze());
 
-    auto doc = pipeline->getNext();
+    auto doc = execPipeline->getNext();
     ASSERT(doc);
 
     auto oplogEntry = uassertStatusOK(repl::OplogEntry::parse(doc->toBson()));
@@ -948,7 +823,7 @@ TEST_F(ReshardingAggTest, VerifyPipelineSmallTxn) {
     ASSERT_EQ(oplogBSON["ts"].timestamp(), oplogEntry.getTimestamp());
     ASSERT(validateOplogId(oplogBSON["ts"].timestamp(), Document(oplogBSON), oplogEntry));
 
-    doc = pipeline->getNext();
+    doc = execPipeline->getNext();
     ASSERT(!doc);
 }
 
@@ -1007,8 +882,9 @@ TEST_F(ReshardingAggTest, VerifyPipelineSmallPreparedTxn) {
 
     auto clusterTime = pipelineSource.back().getDocument()["ts"].getTimestamp();
     auto pipeline = createPipeline(pipelineSource);
+    auto execPipeline = exec::agg::buildPipeline(pipeline->freeze());
 
-    auto doc = pipeline->getNext();
+    auto doc = execPipeline->getNext();
     ASSERT(doc);
 
     auto oplogEntry = uassertStatusOK(repl::OplogEntry::parse(doc->toBson()));
@@ -1023,7 +899,7 @@ TEST_F(ReshardingAggTest, VerifyPipelineSmallPreparedTxn) {
 
     // We should not observe the 'commitTransaction' entry, since DSReshardingIterateTransaction
     // swallows it.
-    ASSERT(!pipeline->getNext());
+    ASSERT(!execPipeline->getNext());
 }
 
 // This test verifies that we don't return oplog entries that are not destined for the specified
@@ -1083,10 +959,11 @@ TEST_F(ReshardingAggTest, VerifyPipelinePreparedTxnNoReshardedDocs) {
         })"))};
 
     auto pipeline = createPipeline(pipelineSource);
+    auto execPipeline = exec::agg::buildPipeline(pipeline->freeze());
 
     // We don't see any results since there are no events for the requested destinedRecipient in the
     // 'applyOps' and we swallow the 'commitTransaction' event internally.
-    ASSERT(!pipeline->getNext());
+    ASSERT(!execPipeline->getNext());
 }
 
 TEST_F(ReshardingAggTest, VerifyPipelinePreparedTxnAbort) {
@@ -1133,8 +1010,9 @@ TEST_F(ReshardingAggTest, VerifyPipelinePreparedTxnAbort) {
 
     auto clusterTime = pipelineSource.back().getDocument()["ts"].getTimestamp();
     auto pipeline = createPipeline(pipelineSource);
+    auto execPipeline = exec::agg::buildPipeline(pipeline->freeze());
 
-    auto doc = pipeline->getNext();
+    auto doc = execPipeline->getNext();
     ASSERT(doc);
 
     auto oplogEntry = uassertStatusOK(repl::OplogEntry::parse(doc->toBson()));
@@ -1146,7 +1024,7 @@ TEST_F(ReshardingAggTest, VerifyPipelinePreparedTxnAbort) {
     ASSERT_EQ(pipelineSource[1].getDocument()["ts"].getTimestamp(), oplogEntry.getTimestamp());
     ASSERT(validateOplogId(clusterTime, pipelineSource[1].getDocument(), oplogEntry));
 
-    ASSERT(!pipeline->getNext());
+    ASSERT(!execPipeline->getNext());
 }
 
 TEST_F(ReshardingAggTest, VerifyPipelineLargePreparedTxn) {
@@ -1252,8 +1130,9 @@ TEST_F(ReshardingAggTest, VerifyPipelineLargePreparedTxn) {
 
     auto clusterTime = pipelineSource.back().getDocument()["ts"].getTimestamp();
     auto pipeline = createPipeline(pipelineSource);
+    auto execPipeline = exec::agg::buildPipeline(pipeline->freeze());
 
-    auto doc = pipeline->getNext();
+    auto doc = execPipeline->getNext();
     ASSERT(doc);
 
     auto oplogEntry = uassertStatusOK(repl::OplogEntry::parse(doc->toBson()));
@@ -1266,7 +1145,7 @@ TEST_F(ReshardingAggTest, VerifyPipelineLargePreparedTxn) {
     ASSERT_EQ(pipelineSource[0].getDocument()["ts"].getTimestamp(), oplogEntry.getTimestamp());
     ASSERT(validateOplogId(clusterTime, pipelineSource[0].getDocument(), oplogEntry));
 
-    doc = pipeline->getNext();
+    doc = execPipeline->getNext();
     ASSERT(doc);
 
     oplogEntry = uassertStatusOK(repl::OplogEntry::parse(doc->toBson()));
@@ -1281,7 +1160,7 @@ TEST_F(ReshardingAggTest, VerifyPipelineLargePreparedTxn) {
     ASSERT(validateOplogId(clusterTime, pipelineSource[1].getDocument(), oplogEntry));
 
     // We do not expect any further results because we swallow the 'commitTransaction' internally.
-    ASSERT(!pipeline->getNext());
+    ASSERT(!execPipeline->getNext());
 }
 
 TEST_F(ReshardingAggTest, VerifyPipelineLargePreparedTxnAbort) {
@@ -1370,8 +1249,9 @@ TEST_F(ReshardingAggTest, VerifyPipelineLargePreparedTxnAbort) {
 
     auto clusterTime = pipelineSource.back().getDocument()["ts"].getTimestamp();
     auto pipeline = createPipeline(pipelineSource);
+    auto execPipeline = exec::agg::buildPipeline(pipeline->freeze());
 
-    auto doc = pipeline->getNext();
+    auto doc = execPipeline->getNext();
     ASSERT(doc);
 
     auto oplogEntry = uassertStatusOK(repl::OplogEntry::parse(doc->toBson()));
@@ -1383,7 +1263,7 @@ TEST_F(ReshardingAggTest, VerifyPipelineLargePreparedTxnAbort) {
     ASSERT_EQ(pipelineSource[2].getDocument()["ts"].getTimestamp(), oplogEntry.getTimestamp());
     ASSERT(validateOplogId(clusterTime, pipelineSource[2].getDocument(), oplogEntry));
 
-    doc = pipeline->getNext();
+    doc = execPipeline->getNext();
     ASSERT(!doc);
 }
 
@@ -1454,8 +1334,9 @@ TEST_F(ReshardingAggTest, VerifyPipelineLargeTxn) {
 
     auto clusterTime = pipelineSource.back().getDocument()["ts"].getTimestamp();
     auto pipeline = createPipeline(pipelineSource);
+    auto execPipeline = exec::agg::buildPipeline(pipeline->freeze());
 
-    auto doc = pipeline->getNext();
+    auto doc = execPipeline->getNext();
     ASSERT(doc);
 
     auto oplogEntry = uassertStatusOK(repl::OplogEntry::parse(doc->toBson()));
@@ -1468,7 +1349,7 @@ TEST_F(ReshardingAggTest, VerifyPipelineLargeTxn) {
     ASSERT_EQ(pipelineSource[0].getDocument()["ts"].getTimestamp(), oplogEntry.getTimestamp());
     ASSERT(validateOplogId(clusterTime, pipelineSource[0].getDocument(), oplogEntry));
 
-    doc = pipeline->getNext();
+    doc = execPipeline->getNext();
     ASSERT(doc);
 
     oplogEntry = uassertStatusOK(repl::OplogEntry::parse(doc->toBson()));
@@ -1480,7 +1361,109 @@ TEST_F(ReshardingAggTest, VerifyPipelineLargeTxn) {
     ASSERT_EQ(pipelineSource[1].getDocument()["ts"].getTimestamp(), oplogEntry.getTimestamp());
     ASSERT(validateOplogId(clusterTime, pipelineSource[1].getDocument(), oplogEntry));
 
-    doc = pipeline->getNext();
+    doc = execPipeline->getNext();
+    ASSERT(!doc);
+}
+
+TEST_F(ReshardingAggTest, VerifyPipelineLargeBatchedRetryableWrite) {
+    std::deque<DocumentSource::GetNextResult> pipelineSource = {Document(fromjson(R"({
+        "lsid": {
+          "id": { "$binary": "+0TxuFyBSeqjfJzju2Xl+w==", "$type": "04" },
+          "uid": { "$binary": "47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=", "$type": "00" }
+        },
+        "txnNumber": { "$numberLong": "0" },
+        "op": "c",
+        "ns": "admin.$cmd",
+        "o": {
+          "applyOps": [ {
+              "op": "i",
+              "ns": "test.foo",
+              "ui": { "$binary": "iSa6jmEaQsK7Gjt4GfYQ7Q==", "$type": "04" },
+              "o": { "_id": 4, "x": -20, "y": 4 },
+              "destinedRecipient": "shard0"
+            },
+            {
+              "op": "i",
+              "ns": "test.foo",
+              "ui": { "$binary": "iSa6jmEaQsK7Gjt4GfYQ7Q==", "$type": "04" },
+              "o": { "_id": 5, "x": -30, "y": 11 },
+              "destinedRecipient": "shard1"
+            }
+          ]
+        },
+        "ts": { "$timestamp": { "t": 1609800491, "i": 1 } },
+        "t": { "$numberLong": "1" },
+        "wall": { "$date": "2021-01-04T17:48:11.237-05:00" },
+        "v": { "$numberLong": "2" },
+        "prevOpTime": {
+          "ts": { "$timestamp": { "t": 0, "i": 0 } },
+          "t": { "$numberLong": "-1" }
+        },
+        "multiOpType": 1
+    })")),
+                                                                Document(fromjson(R"({
+        "lsid": {
+          "id": { "$binary": "+0TxuFyBSeqjfJzju2Xl+w==", "$type": "04" },
+          "uid": { "$binary": "47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=", "$type": "00" }
+        },
+        "txnNumber": { "$numberLong": "0" },
+        "op": "c",
+        "ns": "admin.$cmd",
+        "o": {
+          "applyOps": [ {
+              "op": "i",
+              "ns": "test.foo",
+              "ui": { "$binary": "iSa6jmEaQsK7Gjt4GfYQ7Q==", "$type": "04" },
+              "o": { "_id": 6, "x": -40, "y": 11 },
+              "destinedRecipient": "shard1"
+            }
+          ],
+          "count": { "$numberLong": "3" }
+        },
+        "ts": { "$timestamp": { "t": 1609800491, "i": 2 } },
+        "t": { "$numberLong": "1" },
+        "wall": { "$date": "2021-01-04T17:48:11.240-05:00" },
+        "v": { "$numberLong": "2" },
+        "prevOpTime": {
+          "ts": { "$timestamp": { "t": 1609800491, "i": 1 } },
+          "t": { "$numberLong": "1" }
+        },
+        "multiOpType": 1
+    })"))};
+
+    auto pipeline = createPipeline(pipelineSource);
+    auto execPipeline = exec::agg::buildPipeline(pipeline->freeze());
+
+    auto doc = execPipeline->getNext();
+    ASSERT(doc);
+
+    auto oplogEntry = uassertStatusOK(repl::OplogEntry::parse(doc->toBson()));
+
+    ASSERT(oplogEntry.isCommand());
+    ASSERT(repl::OplogEntry::CommandType::kApplyOps == oplogEntry.getCommandType());
+    ASSERT_FALSE(oplogEntry.shouldPrepare());
+    ASSERT_FALSE(oplogEntry.isPartialTransaction());
+    ASSERT_EQ(repl::MultiOplogEntryType::kApplyOpsAppliedSeparately, oplogEntry.getMultiOpType());
+    ASSERT_EQ(1, oplogEntry.getObject()["applyOps"].Obj().nFields());
+    ASSERT_EQ(pipelineSource[0].getDocument()["ts"].getTimestamp(), oplogEntry.getTimestamp());
+    auto timestamp0 = pipelineSource[0].getDocument()["ts"].getTimestamp();
+    ASSERT(validateOplogId(timestamp0, pipelineSource[0].getDocument(), oplogEntry));
+
+    doc = execPipeline->getNext();
+    ASSERT(doc);
+
+    oplogEntry = uassertStatusOK(repl::OplogEntry::parse(doc->toBson()));
+    ASSERT(oplogEntry.isCommand());
+    ASSERT(repl::OplogEntry::CommandType::kApplyOps == oplogEntry.getCommandType());
+    ASSERT_FALSE(oplogEntry.shouldPrepare());
+    ASSERT_FALSE(oplogEntry.isPartialTransaction());
+    ASSERT_EQ(repl::MultiOplogEntryType::kApplyOpsAppliedSeparately, oplogEntry.getMultiOpType());
+    ASSERT_EQ(1, oplogEntry.getObject()["applyOps"].Obj().nFields());
+    ASSERT_EQ(pipelineSource[1].getDocument()["ts"].getTimestamp(), oplogEntry.getTimestamp());
+    auto timestamp1 = pipelineSource[1].getDocument()["ts"].getTimestamp();
+    ASSERT(validateOplogId(timestamp1, pipelineSource[1].getDocument(), oplogEntry));
+
+    doc = execPipeline->getNext();
     ASSERT(!doc);
 }
 
@@ -1545,8 +1528,9 @@ TEST_F(ReshardingAggTest, VerifyPipelineLargeTxnAbort) {
 
     auto clusterTime = pipelineSource.back().getDocument()["ts"].getTimestamp();
     auto pipeline = createPipeline(pipelineSource);
+    auto execPipeline = exec::agg::buildPipeline(pipeline->freeze());
 
-    auto doc = pipeline->getNext();
+    auto doc = execPipeline->getNext();
     ASSERT(doc);
 
     auto oplogEntry = uassertStatusOK(repl::OplogEntry::parse(doc->toBson()));
@@ -1558,7 +1542,7 @@ TEST_F(ReshardingAggTest, VerifyPipelineLargeTxnAbort) {
     ASSERT_EQ(pipelineSource[1].getDocument()["ts"].getTimestamp(), oplogEntry.getTimestamp());
     ASSERT(validateOplogId(clusterTime, pipelineSource[1].getDocument(), oplogEntry));
 
-    doc = pipeline->getNext();
+    doc = execPipeline->getNext();
     ASSERT(!doc);
 }
 
@@ -1600,8 +1584,9 @@ TEST_F(ReshardingAggTest, VerifyPipelineLargeTxnIncomplete) {
     })"))};
 
     auto pipeline = createPipeline(pipelineSource);
+    auto execPipeline = exec::agg::buildPipeline(pipeline->freeze());
 
-    auto doc = pipeline->getNext();
+    auto doc = execPipeline->getNext();
     ASSERT(!doc);
 }
 
@@ -1611,7 +1596,7 @@ using ReshardingAggWithStorageTest = MockReplCoordServerFixture;
 // with no-op pre/post image oplog.
 TEST_F(ReshardingAggWithStorageTest, RetryableFindAndModifyWithImageLookup) {
     repl::OpTime opTime(Timestamp(43, 56), 1);
-    const NamespaceString kCrudNs("foo", "bar");
+    const NamespaceString kCrudNs = NamespaceString::createNamespaceString_forTest("foo", "bar");
     const UUID kCrudUUID = UUID::gen();
     const ShardId kMyShardId{"shard1"};
     ReshardingDonorOplogId id(opTime.getTimestamp(), opTime.getTimestamp());
@@ -1632,14 +1617,15 @@ TEST_F(ReshardingAggWithStorageTest, RetryableFindAndModifyWithImageLookup) {
     imageEntry.setImage(preImage);
 
     DBDirectClient client(opCtx());
-    client.insert(NamespaceString::kConfigImagesNamespace.ns(), imageEntry.toBSON());
+    client.insert(NamespaceString::kConfigImagesNamespace, imageEntry.toBSON());
 
     repl::DurableOplogEntry oplog(opTime,
-                                  boost::none /* hash */,
                                   repl::OpTypeEnum::kUpdate,
                                   kCrudNs,
                                   kCrudUUID,
                                   false /* fromMigrate */,
+                                  boost::none,  // checkExistenceForDiffInsert
+                                  boost::none,  // versionContext
                                   0 /* version */,
                                   BSON("$set" << BSON("y" << 1)), /* o1 */
                                   BSON("_id" << 2),               /* o2 */
@@ -1656,7 +1642,7 @@ TEST_F(ReshardingAggWithStorageTest, RetryableFindAndModifyWithImageLookup) {
 
     std::deque<DocumentSource::GetNextResult> pipelineSource{Document(oplog.toBSON())};
     auto expCtx = createExpressionContext(opCtx());
-    expCtx->ns = NamespaceString::kRsOplogNamespace;
+    expCtx->setNamespaceString(NamespaceString::kRsOplogNamespace);
 
     {
         auto mockMongoInterface = std::make_shared<MockMongoInterface>(pipelineSource);
@@ -1664,15 +1650,16 @@ TEST_F(ReshardingAggWithStorageTest, RetryableFindAndModifyWithImageLookup) {
         // the UUID so it doesn't matter what the value here is.
         mockMongoInterface->setCollectionOptions(NamespaceString::kConfigImagesNamespace,
                                                  BSON("uuid" << UUID::gen()));
-        expCtx->mongoProcessInterface = std::move(mockMongoInterface);
+        expCtx->setMongoProcessInterface(std::move(mockMongoInterface));
     }
 
-    auto pipeline = createOplogFetchingPipelineForResharding(
+    auto pipeline = resharding::createOplogFetchingPipelineForResharding(
         expCtx, ReshardingDonorOplogId(Timestamp::min(), Timestamp::min()), kCrudUUID, kMyShardId);
 
     pipeline->addInitialSource(DocumentSourceMock::createForTest(pipelineSource, expCtx));
+    auto execPipeline = exec::agg::buildPipeline(pipeline->freeze());
 
-    auto preImageOplogDoc = pipeline->getNext();
+    auto preImageOplogDoc = execPipeline->getNext();
     ASSERT_TRUE(preImageOplogDoc);
     auto preImageOplogStatus = repl::DurableOplogEntry::parse(preImageOplogDoc->toBson());
     ASSERT_OK(preImageOplogStatus);
@@ -1682,13 +1669,14 @@ TEST_F(ReshardingAggWithStorageTest, RetryableFindAndModifyWithImageLookup) {
     ASSERT_EQ(OpType_serializer(repl::OpTypeEnum::kNoop),
               OpType_serializer(preImageOplog.getOpType()));
 
-    auto updateOplogDoc = pipeline->getNext();
+    auto updateOplogDoc = execPipeline->getNext();
     ASSERT_TRUE(updateOplogDoc);
     auto updateOplogStatus = repl::DurableOplogEntry::parse(updateOplogDoc->toBson());
 
     auto updateOplog = updateOplogStatus.getValue();
     ASSERT_LT(preImageOplog.getOpTime(), updateOplog.getOpTime());
     ASSERT_TRUE(updateOplog.getPreImageOpTime());
+    ASSERT_FALSE(updateOplog.getNeedsRetryImage());
     ASSERT_EQ(preImageOplog.getOpTime(), *updateOplog.getPreImageOpTime());
     ASSERT_EQ(OpType_serializer(repl::OpTypeEnum::kUpdate),
               OpType_serializer(updateOplog.getOpType()));
@@ -1701,7 +1689,153 @@ TEST_F(ReshardingAggWithStorageTest, RetryableFindAndModifyWithImageLookup) {
     ASSERT_BSONOBJ_EQ(oplog.getOperationSessionInfo().toBSON(),
                       updateOplog.getOperationSessionInfo().toBSON());
 
-    ASSERT_FALSE(pipeline->getNext());
+    ASSERT_FALSE(execPipeline->getNext());
+}
+
+TEST_F(ReshardingAggWithStorageTest,
+       RetryableFindAndModifyInsideInternalTransactionWithImageLookup) {
+    const NamespaceString kCrudNs = NamespaceString::createNamespaceString_forTest("foo", "bar");
+    const UUID kCrudUUID = UUID::gen();
+    const ShardId kMyShardId{"shard1"};
+
+    const auto lsid = makeLogicalSessionIdWithTxnNumberAndUUIDForTest();
+    const TxnNumber txnNum(45);
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(lsid);
+    sessionInfo.setTxnNumber(txnNum);
+
+    const repl::OpTime applyOpsOpTime1(Timestamp(1, 1), 1);
+    const repl::OpTime applyOpsOpTime2(Timestamp(2, 2), 1);  // applyOps with 'needsRetryImage'.
+    const repl::OpTime applyOpsOpTime3(Timestamp(3, 3), 1);
+
+    auto inputInnerOp1 = repl::MutableOplogEntry::makeInsertOperation(
+        kCrudNs, kCrudUUID, BSON("_id" << 1 << "a" << 1), BSON("_id" << 1));
+    inputInnerOp1.setDestinedRecipient(kMyShardId);
+    auto inputApplyOpsOplog1 = makeApplyOpsOplog(
+        {inputInnerOp1.toBSON()}, applyOpsOpTime1, repl::OpTime(), sessionInfo, false, true);
+
+    auto inputInnerOp2 = repl::MutableOplogEntry::makeUpdateOperation(
+        kCrudNs, kCrudUUID, BSON("$set" << BSON("a" << 2)), BSON("_id" << 2));
+    inputInnerOp2.setDestinedRecipient(kMyShardId);
+    inputInnerOp2.setNeedsRetryImage(repl::RetryImageEnum::kPreImage);
+    auto inputApplyOpsOplog2 = makeApplyOpsOplog(
+        {inputInnerOp2.toBSON()}, applyOpsOpTime2, applyOpsOpTime1, sessionInfo, false, true);
+
+    auto inputInnerOp3 = repl::MutableOplogEntry::makeInsertOperation(
+        kCrudNs, kCrudUUID, BSON("_id" << 3 << "a" << 3), BSON("_id" << 3));
+    inputInnerOp3.setDestinedRecipient(kMyShardId);
+    auto inputApplyOpsOplog3 = makeApplyOpsOplog(
+        {inputInnerOp3.toBSON()}, applyOpsOpTime3, applyOpsOpTime2, sessionInfo, false, false);
+
+    const BSONObj preImage(BSON("_id" << 2));
+    repl::ImageEntry imageEntry;
+    imageEntry.set_id(lsid);
+    imageEntry.setTxnNumber(txnNum);
+    imageEntry.setTs(applyOpsOpTime2.getTimestamp());
+    imageEntry.setImageKind(repl::RetryImageEnum::kPreImage);
+    imageEntry.setImage(preImage);
+
+    DBDirectClient client(opCtx());
+    client.insert(NamespaceString::kConfigImagesNamespace, imageEntry.toBSON());
+
+    auto createPipeline = [&](ReshardingDonorOplogId startAt) {
+        std::deque<DocumentSource::GetNextResult> pipelineSource{
+            Document{inputApplyOpsOplog1.toBSON()},
+            Document(inputApplyOpsOplog2.toBSON()),
+            Document{inputApplyOpsOplog3.toBSON()}};
+
+        auto expCtx = createExpressionContext(opCtx());
+        expCtx->setNamespaceString(NamespaceString::kRsOplogNamespace);
+        {
+            auto mockMongoInterface = std::make_shared<MockMongoInterface>(pipelineSource);
+            // Register a dummy uuid just to not make test crash. The stub for findSingleDoc ignores
+            // the UUID so it doesn't matter what the value here is.
+            mockMongoInterface->setCollectionOptions(NamespaceString::kConfigImagesNamespace,
+                                                     BSON("uuid" << UUID::gen()));
+            expCtx->setMongoProcessInterface(std::move(mockMongoInterface));
+        }
+
+        auto pipeline = resharding::createOplogFetchingPipelineForResharding(
+            expCtx, startAt, kCrudUUID, kMyShardId);
+        pipeline->addInitialSource(DocumentSourceMock::createForTest(pipelineSource, expCtx));
+        return pipeline;
+    };
+
+    // Create a pipeline and verify that it outputs the doc for the forged noop oplog entry
+    // immediately before the downcoverted doc for the applyOps with the 'needsRetryImage' field.
+    auto pipeline = createPipeline(ReshardingDonorOplogId(Timestamp::min(), Timestamp::min()));
+    auto execPipeline = exec::agg::buildPipeline(pipeline->freeze());
+
+    auto applyOpsOplogDoc1 = execPipeline->getNext();
+    ASSERT_TRUE(applyOpsOplogDoc1);
+    auto swOutputApplyOpsOplog1 = repl::DurableOplogEntry::parse(applyOpsOplogDoc1->toBson());
+    ASSERT_OK(swOutputApplyOpsOplog1);
+    auto outputApplyOpsOplog1 = swOutputApplyOpsOplog1.getValue();
+    ASSERT_BSONOBJ_EQ(inputApplyOpsOplog1.toBSON().removeField(repl::OplogEntry::kObjectFieldName),
+                      outputApplyOpsOplog1.toBSON().removeFields(StringDataSet{
+                          repl::OplogEntry::kObjectFieldName, repl::OplogEntry::k_idFieldName}));
+
+    auto preImageOplogDoc = execPipeline->getNext();
+    ASSERT_TRUE(preImageOplogDoc);
+    auto swPreImageOplog = repl::DurableOplogEntry::parse(preImageOplogDoc->toBson());
+    ASSERT_OK(swPreImageOplog);
+    auto preImageOplog = swPreImageOplog.getValue();
+    ASSERT_BSONOBJ_EQ(preImage, preImageOplog.getObject());
+    ASSERT_EQ(OpType_serializer(repl::OpTypeEnum::kNoop),
+              OpType_serializer(preImageOplog.getOpType()));
+
+    auto applyOpsOplogDoc2 = execPipeline->getNext();
+    ASSERT_TRUE(applyOpsOplogDoc2);
+    auto swOutputApplyOpsOplog2 = repl::DurableOplogEntry::parse(applyOpsOplogDoc2->toBson());
+    ASSERT_OK(swOutputApplyOpsOplog2);
+    auto outputApplyOpsOplog2 = swOutputApplyOpsOplog2.getValue();
+    ASSERT_BSONOBJ_EQ(inputApplyOpsOplog2.toBSON().removeField(repl::OplogEntry::kObjectFieldName),
+                      outputApplyOpsOplog2.toBSON().removeFields(StringDataSet{
+                          repl::OplogEntry::kObjectFieldName, repl::OplogEntry::k_idFieldName}));
+
+    auto applyOpsInfo = repl::ApplyOpsCommandInfo::parse(outputApplyOpsOplog2.getObject());
+    auto operationDocs = applyOpsInfo.getOperations();
+    ASSERT_EQ(operationDocs.size(), 1U);
+    auto outputInnerOp2 = repl::DurableReplOperation::parse(
+        operationDocs[0],
+        IDLParserContext{"RetryableFindAndModifyInsideInternalTransactionWithImageLookup"});
+    ASSERT_TRUE(outputInnerOp2.getPreImageOpTime());
+    ASSERT_FALSE(outputInnerOp2.getNeedsRetryImage());
+    ASSERT_EQ(preImageOplog.getOpTime(), *outputInnerOp2.getPreImageOpTime());
+    ASSERT_EQ(OpType_serializer(repl::OpTypeEnum::kUpdate),
+              OpType_serializer(outputInnerOp2.getOpType()));
+    ASSERT_BSONOBJ_EQ(inputInnerOp2.getObject(), outputInnerOp2.getObject());
+    ASSERT_TRUE(outputInnerOp2.getObject2());
+    ASSERT_BSONOBJ_EQ(*inputInnerOp2.getObject2(), *outputInnerOp2.getObject2());
+
+    auto applyOpsOplogDoc3 = execPipeline->getNext();
+    ASSERT_TRUE(applyOpsOplogDoc3);
+    auto swOutputApplyOpsOplog3 = repl::DurableOplogEntry::parse(applyOpsOplogDoc3->toBson());
+    ASSERT_OK(swOutputApplyOpsOplog3);
+    auto outputApplyOpsOplog3 = swOutputApplyOpsOplog3.getValue();
+    ASSERT_BSONOBJ_EQ(inputApplyOpsOplog3.toBSON().removeField(repl::OplogEntry::kObjectFieldName),
+                      outputApplyOpsOplog3.toBSON().removeFields(StringDataSet{
+                          repl::OplogEntry::kObjectFieldName, repl::OplogEntry::k_idFieldName}));
+
+    ASSERT_FALSE(execPipeline->getNext());
+
+    // Create another pipeline and start fetching from after the doc for the pre-image, and verify
+    // that the pipeline does not re-output the applyOps doc that comes before the pre-image doc.
+    const auto startAt = ReshardingDonorOplogId::parse(
+        preImageOplog.get_id()->getDocument().toBson(),
+        IDLParserContext{"RetryableFindAndModifyInsideInternalTransactionWithImageLookup"});
+    auto newPipeline = createPipeline(startAt);
+    auto newExecPipeline = exec::agg::buildPipeline(newPipeline->freeze());
+
+    auto next = newExecPipeline->getNext();
+    ASSERT_TRUE(next);
+    ASSERT_DOCUMENT_EQ(*next, *applyOpsOplogDoc2);
+
+    next = newExecPipeline->getNext();
+    ASSERT_TRUE(next);
+    ASSERT_DOCUMENT_EQ(*next, *applyOpsOplogDoc3);
+
+    ASSERT_FALSE(newExecPipeline->getNext());
 }
 
 }  // namespace

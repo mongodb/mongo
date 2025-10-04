@@ -29,9 +29,14 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/shard_filterer.h"
-#include "mongo/db/matcher/matchable.h"
-#include "mongo/db/s/scoped_collection_metadata.h"
+#include "mongo/db/keypattern.h"
+#include "mongo/db/local_catalog/shard_role_catalog/scoped_collection_metadata.h"
+
+#include <cstddef>
+#include <memory>
 
 namespace mongo {
 
@@ -52,14 +57,22 @@ public:
         return _collectionFilter.isSharded();
     }
 
+    ChunkManager::ChunkOwnership nearestOwnedChunk(const BSONObj& key,
+                                                   ChunkMap::Direction direction) const override {
+        return _collectionFilter.nearestOwnedChunk(key, direction);
+    }
+
     const KeyPattern& getKeyPattern() const override;
 
     size_t getApproximateSize() const override;
+
+    const ScopedCollectionFilter& getFilter() const {
+        return _collectionFilter;
+    }
 
 private:
     DocumentBelongsResult keyBelongsToMeHelper(const BSONObj& doc) const;
 
     ScopedCollectionFilter _collectionFilter;
-    boost::optional<ShardKeyPattern> _keyPattern;
 };
 }  // namespace mongo

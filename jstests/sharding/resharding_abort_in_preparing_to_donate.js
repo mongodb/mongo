@@ -7,10 +7,10 @@
  *   uses_atclustertime
  * ]
  */
-(function() {
-"use strict";
-load("jstests/libs/discover_topology.js");
-load("jstests/sharding/libs/resharding_test_fixture.js");
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 const originalCollectionNs = "reshardingDb.coll";
 
@@ -33,12 +33,11 @@ const mongos = sourceCollection.getMongo();
 const topology = DiscoverTopology.findConnectedNodes(mongos);
 const configsvr = new Mongo(topology.configsvr.nodes[0]);
 
-const pauseAfterPreparingToDonateFP =
-    configureFailPoint(configsvr, "reshardingPauseCoordinatorAfterPreparingToDonate");
+const pauseAfterPreparingToDonateFP = configureFailPoint(configsvr, "reshardingPauseCoordinatorAfterPreparingToDonate");
 
+let awaitAbort;
 reshardingTest.withReshardingInBackground(
     {
-
         newShardKeyPattern: {newKey: 1},
         newChunks: [
             {min: {newKey: MinKey}, max: {newKey: 0}, shard: recipientShardNames[0]},
@@ -47,13 +46,35 @@ reshardingTest.withReshardingInBackground(
     },
     () => {
         pauseAfterPreparingToDonateFP.wait();
-        assert.commandWorked(mongos.adminCommand({abortReshardCollection: originalCollectionNs}));
+        assert.neq(
+            null,
+            mongos.getCollection("config.reshardingOperations").findOne({
+                ns: originalCollectionNs,
+            }),
+        );
         // Signaling abort will cause the
         // pauseAfterPreparingToDonateFP to throw, implicitly
         // allowing the coordinator to make progress without
         // explicitly turning off the failpoint.
+        awaitAbort = startParallelShell(
+            funWithArgs(function (sourceNamespace) {
+                db.adminCommand({abortReshardCollection: sourceNamespace});
+            }, originalCollectionNs),
+            mongos.port,
+        );
+        // Wait for the coordinator to remove coordinator document from config.reshardingOperations
+        // as a result of the recipients and donors transitioning to done due to abort.
+        assert.soon(() => {
+            const coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({
+                ns: originalCollectionNs,
+            });
+            return coordinatorDoc === null || coordinatorDoc.state === "aborting";
+        });
     },
-    {expectedErrorCode: ErrorCodes.ReshardCollectionAborted});
+    {expectedErrorCode: ErrorCodes.ReshardCollectionAborted},
+);
+
+awaitAbort();
 pauseAfterPreparingToDonateFP.off();
+
 reshardingTest.teardown();
-})();

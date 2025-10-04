@@ -2,8 +2,7 @@
  * Tests that creating a database causes it to be written to the sharding catalog with a
  * databaseVersion if FCV > 3.6, but not if FCV <= 3.6.
  */
-(function() {
-'use strict';
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function createDatabase(mongos, dbName) {
     // A database is implicitly created when a collection inside it is created.
@@ -25,10 +24,10 @@ function assertDbVersionAssigned(mongos, dbName) {
     assert.eq(1, dbEntry.version.lastMod);
 
     // Check that the catalog cache on the mongos contains the same dbVersion.
-    const cachedDbEntry = mongos.adminCommand({getShardVersion: dbName});
+    const cachedDbEntry = mongos.adminCommand({getDatabaseVersion: dbName});
     assert.commandWorked(cachedDbEntry);
-    assert.eq(dbEntry.version.uuid, cachedDbEntry.version.uuid);
-    assert.eq(dbEntry.version.lastMod, cachedDbEntry.version.lastMod);
+    assert.eq(dbEntry.version.uuid, cachedDbEntry.dbVersion.uuid);
+    assert.eq(dbEntry.version.lastMod, cachedDbEntry.dbVersion.lastMod);
 
     cleanUp(mongos, dbName);
 
@@ -44,9 +43,9 @@ function assertDbVersionNotAssigned(mongos, dbName) {
     assert.eq(null, dbEntry.version);
 
     // Check that the catalog cache on the mongos *does not* contain a dbVersion.
-    const cachedDbEntry = mongos.adminCommand({getShardVersion: dbName});
+    const cachedDbEntry = mongos.adminCommand({getDatabaseVersion: dbName});
     assert.commandWorked(cachedDbEntry);
-    assert.eq(null, cachedDbEntry.version);
+    assert.eq(null, cachedDbEntry.dbVersion);
 
     cleanUp(mongos, dbName);
 
@@ -57,7 +56,7 @@ const dbName = "db1";
 const collName = "foo";
 const ns = dbName + "." + collName;
 
-var st = new ShardingTest({shards: 1});
+let st = new ShardingTest({shards: 1});
 
 // A new database is given a databaseVersion.
 let dbEntry1 = assertDbVersionAssigned(st.s, dbName);
@@ -67,4 +66,3 @@ let dbEntry2 = assertDbVersionAssigned(st.s, dbName);
 assert.neq(dbEntry1.version.uuid, dbEntry2.version.uuid);
 
 st.stop();
-})();

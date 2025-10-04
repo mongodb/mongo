@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
 
 #include "mongo/util/periodic_runner.h"
 
@@ -72,7 +71,7 @@ void PeriodicJobAnchor::setPeriod(Milliseconds ms) {
     _handle->setPeriod(ms);
 }
 
-Milliseconds PeriodicJobAnchor::getPeriod() {
+Milliseconds PeriodicJobAnchor::getPeriod() const {
     invariant(_handle);
     return _handle->getPeriod();
 }

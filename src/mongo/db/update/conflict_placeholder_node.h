@@ -29,13 +29,13 @@
 
 #pragma once
 
+#include "mongo/db/update/update_leaf_node.h"
+
 #include <map>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
-
-#include "mongo/db/update/update_leaf_node.h"
 
 namespace mongo {
 

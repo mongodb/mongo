@@ -27,13 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <benchmark/benchmark.h>
-
 #include "mongo/util/assert_util.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/time_support.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+
+#include <benchmark/benchmark.h>
 
 namespace mongo {
 namespace {
@@ -98,7 +100,7 @@ public:
 
     void SetUp(benchmark::State& state) override {
         if (state.thread_index == 0) {
-            fassert(data.get() == nullptr, "'data' is not null");
+            fassert(9097910, !data);
 
             /*
              * Create a circular list of pointers using a simple striding
@@ -125,7 +127,7 @@ public:
 
     void TearDown(benchmark::State& state) override {
         if (state.thread_index == 0) {
-            fassert(data.get() != nullptr, "'data' is null");
+            fassert(9097911, !!data);
             data.reset();
         }
     }

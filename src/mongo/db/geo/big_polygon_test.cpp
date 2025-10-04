@@ -29,15 +29,26 @@
 
 #include "mongo/db/geo/big_polygon.h"
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/util/builder.h"
+#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
+
+#include <cmath>
+#include <string>
+#include <vector>
+
+#include <s2.h>
+#include <s2latlng.h>
+#include <s2loop.h>
+#include <s2polygon.h>
+#include <s2polyline.h>
+
+#include <fmt/format.h>
+#include <util/math/vector3-inl.h>
 
 namespace {
 
 using namespace mongo;
 using std::string;
-using std::unique_ptr;
 using std::vector;
 
 // Helper to build a vector of S2Point

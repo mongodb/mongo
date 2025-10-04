@@ -1,0 +1,17 @@
+{key: {alpha: 1}, options: { }}
+{key: {beta: 1}, options: { "sparse" : true,  "collation" : {  "locale" : "en_US",  "strength" : 5 } }}
+{key: {_id: 1, alpha: 1}, options: { "unique" : true }}
+{alpha: 1, beta: 1}
+{key: {alpha: -1}}
+
+{_id: 0}
+{_id: 1}
+{_id: 3}
+{_id: 2}
+{_id: 4}
+{_id: 5}
+{_id: 6}
+{_id: 7}
+{_id: 8}
+{_id: 9}
+{_id: 10}

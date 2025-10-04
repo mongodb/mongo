@@ -27,14 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/repl/replication_auth.h"
 
-#include <string>
-
-#include "mongo/client/authenticate.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/client/internal_auth.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/service_context.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace repl {
@@ -42,20 +41,26 @@ namespace {
 
 // Gets the singleton AuthorizationManager object for this server process
 AuthorizationManager* getGlobalAuthorizationManager() {
-    AuthorizationManager* globalAuthManager = AuthorizationManager::get(getGlobalServiceContext());
+    auto shardService = getGlobalServiceContext()->getService(ClusterRole::ShardServer);
+    // We can assert here that a shard Service exists since this
+    // should only be called in a replication context.
+    invariant(shardService != nullptr);
+    AuthorizationManager* globalAuthManager = AuthorizationManager::get(shardService);
     fassert(16842, globalAuthManager != nullptr);
     return globalAuthManager;
 }
 
 }  // namespace
 
-Status replAuthenticate(DBClientBase* conn) {
-    if (auth::isInternalAuthSet())
-        return conn->authenticateInternalUser();
-    if (getGlobalAuthorizationManager()->isAuthEnabled())
+Status replAuthenticate(DBClientBase* conn) try {
+    if (auth::isInternalAuthSet()) {
+        conn->authenticateInternalUser();
+    } else if (getGlobalAuthorizationManager()->isAuthEnabled())
         return {ErrorCodes::AuthenticationFailed,
                 "Authentication is enabled but no internal authentication data is available."};
     return Status::OK();
+} catch (const DBException& e) {
+    return e.toStatus();
 }
 
 }  // namespace repl

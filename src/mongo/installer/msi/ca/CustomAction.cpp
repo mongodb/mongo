@@ -43,11 +43,11 @@
 #include <msiquery.h>
 // clang-format on
 
+#include "mongo/util/scopeguard.h"
+
 #include <memory>
 #include <string>
 #include <vector>
-
-#include "mongo/util/scopeguard.h"
 
 // UpdateMongoYAML CustomAction Constants
 constexpr wchar_t kBIN[] = L"BIN";
@@ -214,9 +214,11 @@ std::string toUtf8String(MSIHANDLE hInstall, const std::wstring& wide) {
         }                                                                                      \
     }
 
-#define LOG_INFO(...) \
-                      \
-    { LogMessage(hInstall, INSTALLMESSAGE_INFO, __VA_ARGS__); }
+#define LOG_INFO(...)                                           \
+                                                                \
+    {                                                           \
+        LogMessage(hInstall, INSTALLMESSAGE_INFO, __VA_ARGS__); \
+    }
 
 /**
  * UpdateMongoYAML - MSI custom action entry point
@@ -294,7 +296,9 @@ extern "C" UINT __stdcall UpdateMongoYAML(MSIHANDLE hInstall) {
             CHECKGLE_AND_LOG("Failed to open yaml file");
         }
 
-        const mongo::ScopeGuard handleGuard = [&] { CloseHandle(hFile); };
+        const mongo::ScopeGuard handleGuard = [&] {
+            CloseHandle(hFile);
+        };
 
         LARGE_INTEGER fileSize;
         if (GetFileSizeEx(hFile, &fileSize) == 0) {

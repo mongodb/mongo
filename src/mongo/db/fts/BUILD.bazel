@@ -1,0 +1,149 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+load("//bazel/config:render_template.bzl", "render_template")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "fts_query_noop",
+    srcs = ["fts_query_noop.cpp"],
+    hdrs = [
+        "fts_query.h",
+        "fts_query_noop.h",
+        "fts_util.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+STOP_WORD_LANGUAGES = [
+    "danish",
+    "dutch",
+    "english",
+    "finnish",
+    "french",
+    "german",
+    "hungarian",
+    "italian",
+    "norwegian",
+    "portuguese",
+    "romanian",
+    "russian",
+    "spanish",
+    "swedish",
+    "turkish",
+]
+
+render_template(
+    name = "stop_words_list_cpp_gen",
+    srcs = [
+        "stop_words_{}.txt".format(lang)
+        for lang in STOP_WORD_LANGUAGES
+    ] + [
+        "generate_stop_words.py",
+    ],
+    cmd = [
+        "$(location generate_stop_words.py)",
+    ] + [
+        "$(location stop_words_{}.txt)".format(lang)
+        for lang in STOP_WORD_LANGUAGES
+    ] + [
+        "$(location stop_words_list.cpp)",
+    ],
+    output = "stop_words_list.cpp",
+)
+
+mongo_cc_library(
+    name = "base_fts",
+    srcs = [
+        "fts_basic_phrase_matcher.cpp",
+        "fts_basic_tokenizer.cpp",
+        "fts_element_iterator.cpp",
+        "fts_index_format.cpp",
+        "fts_language.cpp",
+        "fts_matcher.cpp",
+        "fts_query_impl.cpp",
+        "fts_query_parser.cpp",
+        "fts_spec.cpp",
+        "fts_spec_legacy.cpp",
+        "fts_unicode_phrase_matcher.cpp",
+        "fts_unicode_tokenizer.cpp",
+        "fts_util.cpp",
+        "stemmer.cpp",
+        "stop_words.cpp",
+        "tokenizer.cpp",
+        ":stop_words_list_cpp_gen",
+    ],
+    hdrs = [
+        "fts_basic_phrase_matcher.h",
+        "fts_basic_tokenizer.h",
+        "fts_element_iterator.h",
+        "fts_index_format.h",
+        "fts_language.h",
+        "fts_matcher.h",
+        "fts_query_impl.h",
+        "fts_query_parser.h",
+        "fts_spec.h",
+        "fts_unicode_phrase_matcher.h",
+        "fts_unicode_tokenizer.h",
+        "fts_util.h",
+        "stemmer.h",
+        "stop_words.h",
+        "stop_words_list.h",
+        "tokenizer.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/bson/dotted_path:dotted_path_support",
+        "//src/mongo/db:common",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db/fts/unicode",
+        "//src/mongo/db/query/bson:multikey_dotted_path_support",
+        "//src/mongo/db/query/compiler/parsers/matcher:matcher_parser",
+        "//src/mongo/util:md5",
+    ],
+)
+
+mongo_cc_library(
+    name = "ftsmongod",
+    srcs = [
+        "ftsmongod.cpp",
+    ],
+    deps = [
+        ":base_fts",
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_fts_test",
+    srcs = [
+        "fts_basic_phrase_matcher_test.cpp",
+        "fts_basic_tokenizer_test.cpp",
+        "fts_element_iterator_test.cpp",
+        "fts_index_format_test.cpp",
+        "fts_language_test.cpp",
+        "fts_matcher_test.cpp",
+        "fts_query_impl_test.cpp",
+        "fts_query_noop_test.cpp",
+        "fts_spec_test.cpp",
+        "fts_unicode_phrase_matcher_test.cpp",
+        "fts_unicode_tokenizer_test.cpp",
+        "stemmer_test.cpp",
+        "stop_words_test.cpp",
+        "tokenizer_test.cpp",
+    ],
+    tags = ["mongo_unittest_fifth_group"],
+    deps = [
+        ":base_fts",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db/fts:fts_query_noop",
+    ],
+)

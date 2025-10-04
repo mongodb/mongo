@@ -29,14 +29,26 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
-#include <utility>
-
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/time_support.h"
+
+#include <cstdint>
+#include <cstdlib>
+#include <memory>
+#include <ostream>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 struct _timelib_error_container;
 struct _timelib_time;
@@ -46,8 +58,11 @@ struct _timelib_tzinfo;
 
 namespace mongo {
 
-using namespace std::string_literals;
-static constexpr StringData kISOFormatString = "%Y-%m-%dT%H:%M:%S.%LZ"_sd;
+/**
+ * Default format values for date-times, e.g. for $dateToString aggregations.
+ */
+static constexpr StringData kIsoFormatStringZ = "%Y-%m-%dT%H:%M:%S.%LZ"_sd;
+static constexpr StringData kIsoFormatStringNonZ = "%Y-%m-%dT%H:%M:%S.%L"_sd;
 
 /**
  * A set of standard measures of time used to express a length of time interval.
@@ -225,6 +240,16 @@ public:
     Seconds utcOffset(Date_t) const;
 
     /**
+     * Returns the full textual name of the month.
+     */
+    std::string fullMonthName(int) const;
+
+    /**
+     * Returns the full textual name of the month.
+     */
+    std::string threeLetterMonthName(int) const;
+
+    /**
      * Adjusts 'timelibTime' according to this time zone definition.
      */
     void adjustTimeZone(_timelib_time* timelibTime) const;
@@ -287,6 +312,16 @@ public:
                         status != Status::OK())
                         return status;
                     break;
+                case 'B':  // Full name of month
+                    if (auto status = insertString(os, fullMonthName(parts.month));
+                        status != Status::OK())
+                        return status;
+                    break;
+                case 'b':  // Three letter name of month
+                    if (auto status = insertString(os, threeLetterMonthName(parts.month));
+                        status != Status::OK())
+                        return status;
+                    break;
                 case 'j':  // Day of year
                     if (auto status = insertPadded(os, dayOfYear(date), 3); status != Status::OK())
                         return status;
@@ -340,13 +375,22 @@ public:
      * Verifies that any '%' is followed by a valid format character, and that 'format' string
      * ends with an even number of '%' symbols.
      */
+    static bool isValidToStringFormat(StringData format);
+    static bool isValidFromStringFormat(StringData format);
     static void validateToStringFormat(StringData format);
     static void validateFromStringFormat(StringData format);
     std::unique_ptr<_timelib_time, TimelibTimeDeleter> getTimelibTime(Date_t) const;
 
-    std::shared_ptr<_timelib_tzinfo> getTzInfo() const {
+    _timelib_tzinfo* getTzInfo() const {
         return _tzInfo;
     }
+
+    Seconds getUtcOffset() const {
+        return _utcOffset;
+    }
+
+    /** Returns the human readable string represenation of this time zone. */
+    std::string toString() const;
 
 private:
     /**
@@ -361,7 +405,7 @@ private:
         if ((number < 0) || (number > 9999))
             return Status{ErrorCodes::Error{18537},
                           "Could not convert date to string: date component was outside "
-                          "the supported range of 0-9999: "s +
+                          "the supported range of 0-9999: "_sd +
                               std::to_string(number)};
 
         int digits = 1;
@@ -381,12 +425,17 @@ private:
         return Status::OK();
     }
 
-    struct TimelibTZInfoDeleter {
-        void operator()(_timelib_tzinfo* tzInfo);
-    };
+    template <typename OutputStream>
+    static auto insertString(OutputStream& os, const std::string& str) {
+        if (str.length() == 0) {
+            return Status{ErrorCodes::Error{7340200}, "Cannot append empty string"};
+        }
+        os << str;
+        return Status::OK();
+    }
 
     // null if this TimeZone represents the default UTC time zone, or a UTC-offset time zone
-    std::shared_ptr<_timelib_tzinfo> _tzInfo;
+    _timelib_tzinfo* _tzInfo{nullptr};
 
     // represents the UTC offset in seconds if _tzInfo is null and it is not 0
     Seconds _utcOffset{0};
@@ -483,20 +532,22 @@ public:
 
     std::vector<std::string> getTimeZoneStrings() const;
 
-    std::string toString() const;
-
-private:
-    /**
-     * Populates '_timeZones' with parsed time zone rules for each timezone specified by
-     * 'timeZoneDatabase'.
-     */
-    void loadTimeZoneInfo(std::unique_ptr<_timelib_tzdb, TimeZoneDBDeleter> timeZoneDatabase);
-
     /**
      * Tries to find a UTC offset in 'offsetSpec' in an ISO8601 format (±HH, ±HHMM, or ±HH:MM) and
      * returns it as an offset to UTC in seconds.
      */
     boost::optional<Seconds> parseUtcOffset(StringData offsetSpec) const;
+
+private:
+    struct TimelibTZInfoDeleter {
+        void operator()(_timelib_tzinfo* tzInfo);
+    };
+
+    /**
+     * Populates '_timeZones' with parsed time zone rules for each timezone specified by
+     * 'timeZoneDatabase'.
+     */
+    void loadTimeZoneInfo(std::unique_ptr<_timelib_tzdb, TimeZoneDBDeleter> timeZoneDatabase);
 
     // A map from the time zone name to the struct describing the timezone. These are pre-populated
     // at startup to avoid reading the source files repeatedly.
@@ -504,6 +555,9 @@ private:
 
     // The timelib structure which provides timezone information.
     std::unique_ptr<_timelib_tzdb, TimeZoneDBDeleter> _timeZoneDatabase;
+
+    // The list of pre-load _timelib_tzinfo objects.
+    std::vector<std::unique_ptr<_timelib_tzinfo, TimelibTZInfoDeleter>> _timeZoneInfos;
 };
 
 /**
@@ -589,6 +643,20 @@ long long dateDiff(Date_t startDate,
                    DayOfWeek startOfWeek = kStartOfWeekDefault);
 
 /**
+ * Specialized version of dateDiff that compute the difference between two UTC dates in millisecond.
+ */
+long long dateDiffMillisecond(Date_t startDate, Date_t endDate);
+
+/**
+ * Specialized version of dateDiff that compute the difference between two timezone-aware dates
+ * using a provided time unit (that MUST NOT be millisecond).
+ */
+long long dateDiff(_timelib_time* startDateInTimeZone,
+                   _timelib_time* endDateInTimeZone,
+                   TimeUnit unit,
+                   DayOfWeek startOfWeek = kStartOfWeekDefault);
+
+/**
  * Add time interval to a date. The interval duration is given in 'amount' number of 'units'.
  * The amount can be a negative number in which case the interval is subtracted from the date.
  * The result date is always in UTC.
@@ -601,16 +669,24 @@ long long dateDiff(Date_t startDate,
 Date_t dateAdd(Date_t date, TimeUnit unit, long long amount, const TimeZone& timezone);
 
 /**
+ * Convert (approximately) a TimeUnit to a number of seconds. This function acts as a wrapper around
+ * 'timeUnitTypicalMilliseconds'.
+ */
+long long timeUnitValueInSeconds(TimeUnit unit);
+
+/**
  * Convert (approximately) a TimeUnit to a number of milliseconds.
  *
  * The answer is approximate because TimeUnit represents an amount of calendar time:
  * for example, some calendar days are 23 or 25 hours long due to daylight savings time.
  * This function assumes everything is "typical": days are 24 hours, minutes are 60 seconds.
  *
- * Large time units, 'month' or longer, are so variable that we don't try to pick a value: we
- * return a non-OK Status.
+ * For some callers, it is an error to call this function with units larger than 'week', since those
+ * TimeUnits are too variable to accurately estimate. It is the responsibility of the caller to
+ * validate the input to this function.
  */
-StatusWith<long long> timeUnitTypicalMilliseconds(TimeUnit unit);
+long long timeUnitTypicalMilliseconds(TimeUnit unit);
+
 
 /**
  * Returns the lower bound of a bin the 'date' falls into in the time axis, or, in other words,
@@ -631,4 +707,42 @@ Date_t truncateDate(Date_t date,
                     unsigned long long binSize,
                     const TimeZone& timezone,
                     DayOfWeek startOfWeek = kStartOfWeekDefault);
+
+/*
+ * A date reference point representation required in dateTrunc computation
+ */
+struct DateReferencePoint {
+    Date_t dateMillis;
+    long long year;
+    int month;
+    int dayOfMonth;
+};
+
+/**
+ * Returns the default reference point used in $dateTrunc computation that is tied to 'timezone'. It
+ * must be aligned to time unit 'unit'.
+ */
+DateReferencePoint defaultReferencePointForDateTrunc(const TimeZone& timezone,
+                                                     TimeUnit unit,
+                                                     DayOfWeek startOfWeek);
+
+/**
+ * The same as 'truncateDate(Date_t, TimeUnit, unsigned long long binSize, const TimeZone&,
+ * DayOfWeek)', but additionally accepts a reference point 'referencePoint', that is expected to be
+ * aligned to the given time unit.
+ */
+Date_t truncateDate(Date_t date,
+                    TimeUnit unit,
+                    unsigned long long binSize,
+                    DateReferencePoint referencePoint,
+                    const TimeZone& timezone,
+                    DayOfWeek startOfWeek);
+
+/**
+ * An optimized version of date truncation algorithm that works with bins in milliseconds, seconds,
+ * minutes and hours.
+ */
+Date_t truncateDateMillis(Date_t date, Date_t referencePoint, unsigned long long binSizeMillis);
+
+long long getBinSizeInMillis(unsigned long long binSize, TimeUnit unit);
 }  // namespace mongo

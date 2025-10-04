@@ -29,13 +29,17 @@
 
 #pragma once
 
-#include <map>
-#include <set>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
+
+#include <cstddef>
+#include <map>
+#include <set>
+
+#include <absl/container/flat_hash_map.h>
+#include <absl/container/flat_hash_set.h>
 
 namespace mongo {
 
@@ -98,7 +102,7 @@ public:
     /**
      * Constructs a value comparator with special string comparison semantics.
      */
-    ValueComparator(const StringData::ComparatorInterface* stringComparator)
+    ValueComparator(const StringDataComparator* stringComparator)
         : _stringComparator(stringComparator) {}
 
     /**
@@ -166,11 +170,11 @@ public:
     }
 
     /**
-     * Construct an empty unordered set of Values whose equivalence classes are given by this
+     * Construct an empty flat unordered set of Values whose equivalence classes are given by this
      * comparator. This comparator must outlive the returned set.
      */
-    stdx::unordered_set<Value, Hasher, EqualTo> makeUnorderedValueSet() const {
-        return stdx::unordered_set<Value, Hasher, EqualTo>(0, Hasher(this), EqualTo(this));
+    absl::flat_hash_set<Value, Hasher, EqualTo> makeFlatUnorderedValueSet() const {
+        return absl::flat_hash_set<Value, Hasher, EqualTo>(0, Hasher(this), EqualTo(this));
     }
 
     /**
@@ -200,8 +204,17 @@ public:
         return stdx::unordered_map<Value, T, Hasher, EqualTo>(0, Hasher(this), EqualTo(this));
     }
 
+    /**
+     * Construct an empty flat unordered map from Value to type T whose equivalence classes are
+     * given by this comparator. This comparator must outlive the returned set.
+     */
+    template <typename T>
+    absl::flat_hash_map<Value, T, Hasher, EqualTo> makeFlatUnorderedValueMap() const {
+        return absl::flat_hash_map<Value, T, Hasher, EqualTo>(0, Hasher(this), EqualTo(this));
+    }
+
 private:
-    const StringData::ComparatorInterface* _stringComparator = nullptr;
+    const StringDataComparator* _stringComparator = nullptr;
 };
 
 //
@@ -211,8 +224,8 @@ private:
 using ValueSet = std::set<Value, ValueComparator::LessThan>;
 using ValueMultiset = std::multiset<Value, ValueComparator::LessThan>;
 
-using ValueUnorderedSet =
-    stdx::unordered_set<Value, ValueComparator::Hasher, ValueComparator::EqualTo>;
+using ValueFlatUnorderedSet =
+    absl::flat_hash_set<Value, ValueComparator::Hasher, ValueComparator::EqualTo>;
 
 template <typename T>
 using ValueMap = std::map<Value, T, ValueComparator::LessThan>;
@@ -223,5 +236,9 @@ using ValueMultimap = std::multimap<Value, T, ValueComparator::LessThan>;
 template <typename T>
 using ValueUnorderedMap =
     stdx::unordered_map<Value, T, ValueComparator::Hasher, ValueComparator::EqualTo>;
+
+template <typename T>
+using ValueFlatUnorderedMap =
+    absl::flat_hash_map<Value, T, ValueComparator::Hasher, ValueComparator::EqualTo>;
 
 }  // namespace mongo

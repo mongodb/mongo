@@ -29,13 +29,55 @@
 
 #pragma once
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/oid.h"
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_out_gen.h"
 #include "mongo/db/pipeline/document_source_writer.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/db/pipeline/stage_constraints.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/db/query/write_ops/write_ops_gen.h"
+#include "mongo/db/read_concern_support_result.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/modules.h"
+
+#include <list>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 /**
  * Implementation for the $out aggregation stage.
  */
-class DocumentSourceOut final : public DocumentSourceWriter<BSONObj> {
+class DocumentSourceOut final : public DocumentSourceWriter {
 public:
     static constexpr StringData kStageName = "$out"_sd;
 
@@ -48,18 +90,21 @@ public:
         using LiteParsedDocumentSourceForeignCollection::LiteParsedDocumentSourceForeignCollection;
 
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
-                                                 const BSONElement& spec);
+                                                 const BSONElement& spec,
+                                                 const LiteParserOptions& options);
 
-        bool allowShardedForeignCollection(NamespaceString nss,
-                                           bool inMultiDocumentTransaction) const final {
-            return _foreignNss != nss;
+        Status checkShardedForeignCollAllowed(const NamespaceString& nss,
+                                              bool inMultiDocumentTransaction) const final {
+            if (_foreignNss != nss) {
+                return Status::OK();
+            }
+
+            return Status(ErrorCodes::NamespaceCannotBeSharded,
+                          "$out to a sharded collection is not allowed");
         }
 
-        bool allowedToPassthroughFromMongos() const final {
-            return false;
-        }
-
-        PrivilegeVector requiredPrivileges(bool isMongos, bool bypassDocumentValidation) const {
+        PrivilegeVector requiredPrivileges(bool isMongos,
+                                           bool bypassDocumentValidation) const override {
             ActionSet actions{ActionType::insert, ActionType::remove};
             if (bypassDocumentValidation) {
                 actions.addAction(ActionType::bypassDocumentValidation);
@@ -70,35 +115,29 @@ public:
 
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
                                                      bool isImplicitDefault) const final {
-            return {
-                {level == repl::ReadConcernLevel::kLinearizableReadConcern,
-                 {ErrorCodes::InvalidOptions,
-                  "{} cannot be used with a 'linearizable' read concern level"_format(kStageName)}},
-                Status::OK()};
+            return {{level == repl::ReadConcernLevel::kLinearizableReadConcern,
+                     {ErrorCodes::InvalidOptions,
+                      fmt::format("{} cannot be used with a 'linearizable' read concern level",
+                                  kStageName)}},
+                    Status::OK()};
+        }
+
+        bool isWriteStage() const override {
+            return true;
         }
     };
 
-    ~DocumentSourceOut() override;
+    StageConstraints constraints(PipelineSplitState pipeState) const final;
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final override {
-        return {StreamType::kStreaming,
-                PositionRequirement::kLast,
-                HostTypeRequirement::kPrimaryShard,
-                DiskUseRequirement::kWritesPersistentData,
-                FacetRequirement::kNotAllowed,
-                TransactionRequirement::kNotAllowed,
-                LookupRequirement::kNotAllowed,
-                UnionRequirement::kNotAllowed};
-    }
-
-    Value serialize(
-        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     /**
      * Creates a new $out stage from the given arguments.
      */
     static boost::intrusive_ptr<DocumentSource> create(
-        NamespaceString outputNs, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+        NamespaceString outputNs,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        boost::optional<TimeseriesOptions> timeseries = boost::none);
 
     /**
      * Parses a $out stage from the user-supplied BSON.
@@ -106,43 +145,51 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-    const char* getSourceName() const final override {
-        return kStageName.rawData();
+    const char* getSourceName() const final {
+        return kStageName.data();
     }
+
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
+    }
+
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
 private:
+    friend boost::intrusive_ptr<exec::agg::Stage> documentSourceOutToStageFn(
+        const boost::intrusive_ptr<DocumentSource>& documentSource);
+
+    /**
+     * Used to track the $out state for the destructor. $out should clean up different
+     * namespaces depending on when the stage was interrupted or failed.
+     */
+    enum class OutCleanUpProgress {
+        kTmpCollExists,
+        kRenameComplete,
+        kViewCreatedIfNeeded,
+        kComplete
+    };
+
     DocumentSourceOut(NamespaceString outputNs,
+                      boost::optional<TimeseriesOptions> timeseries,
                       const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : DocumentSourceWriter(kStageName.rawData(), std::move(outputNs), expCtx) {}
-
-    static NamespaceString parseNsFromElem(const BSONElement& spec, const StringData& defaultDB);
-
-    void initialize() override;
-
-    void finalize() override;
-
-    void spill(BatchedObjects&& batch) override {
-        DocumentSourceWriteBlock writeBlock(pExpCtx->opCtx);
-
-        auto targetEpoch = boost::none;
-        uassertStatusOK(pExpCtx->mongoProcessInterface->insert(
-            pExpCtx, _tempNs, std::move(batch), _writeConcern, targetEpoch));
+        : DocumentSourceWriter(kStageName.data(), std::move(outputNs), expCtx) {
+        if (timeseries) {
+            _timeseries = std::make_shared<TimeseriesOptions>(*timeseries);
+        }
     }
 
-    std::pair<BSONObj, int> makeBatchObject(Document&& doc) const override {
-        auto obj = doc.toBson();
-        return {obj, obj.objsize()};
-    }
+    static DocumentSourceOutSpec parseOutSpecAndResolveTargetNamespace(
+        const BSONElement& spec, const DatabaseName& defaultDB);
 
-    void waitWhileFailPointEnabled() override;
 
-    // Holds on to the original collection options and index specs so we can check they didn't
-    // change during computation.
-    BSONObj _originalOutOptions;
-    std::list<BSONObj> _originalIndexes;
-
-    // The temporary namespace for the $out writes.
-    NamespaceString _tempNs;
+    /**
+     * Set if $out is writing to a time-series collection. Its value is passed to the Stage class
+     * and not used in DocumentSource at all.
+     */
+    std::shared_ptr<TimeseriesOptions> _timeseries;
 };
 
 }  // namespace mongo

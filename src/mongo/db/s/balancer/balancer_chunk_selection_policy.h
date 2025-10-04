@@ -29,106 +29,97 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
+#include "mongo/db/global_catalog/type_chunk.h"
+#include "mongo/db/global_catalog/type_collection.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/s/balancer/balancer_policy.h"
+#include "mongo/db/s/balancer/cluster_statistics.h"
+#include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/stdx/unordered_set.h"
+
+#include <unordered_set>
 #include <vector>
 
-#include "mongo/db/s/balancer/balancer_policy.h"
-#include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/chunk_version.h"
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
-class ChunkType;
-class NamespaceString;
-class OperationContext;
-template <typename T>
-class StatusWith;
+namespace balancer_policy_utils {
+/*
+ * Helper to check if a collection is explicitly disabled for balancing
+ */
+bool canBalanceCollection(const CollectionType& coll);
 
+}  // namespace balancer_policy_utils
 /**
- * Interface used by the balancer for selecting chunks, which need to be moved around in order for
- * the sharded cluster to be balanced. It is up to the implementation to decide what exactly
- * 'balanced' means.
+ * Class used by the balancer for selecting chunks, which need to be moved around in order for
+ * the sharded cluster to be balanced.
  */
 class BalancerChunkSelectionPolicy {
     BalancerChunkSelectionPolicy(const BalancerChunkSelectionPolicy&) = delete;
     BalancerChunkSelectionPolicy& operator=(const BalancerChunkSelectionPolicy&) = delete;
 
 public:
-    /**
-     * Describes a chunk which needs to be split, because it violates the balancer policy.
-     */
-    struct SplitInfo {
-        SplitInfo(ShardId shardId,
-                  NamespaceString nss,
-                  ChunkVersion collectionVersion,
-                  ChunkVersion chunkVersion,
-                  const BSONObj& minKey,
-                  const BSONObj& maxKey,
-                  std::vector<BSONObj> splitKeys);
-
-        std::string toString() const;
-
-        ShardId shardId;
-        NamespaceString nss;
-        ChunkVersion collectionVersion;
-        ChunkVersion chunkVersion;
-        BSONObj minKey;
-        BSONObj maxKey;
-        std::vector<BSONObj> splitKeys;
-    };
-
-    typedef std::vector<SplitInfo> SplitInfoVector;
-
-    typedef std::vector<MigrateInfo> MigrateInfoVector;
-
-    virtual ~BalancerChunkSelectionPolicy();
+    explicit BalancerChunkSelectionPolicy(ClusterStatistics* clusterStats);
 
     /**
      * Potentially blocking method, which gives out a set of chunks, which need to be split because
      * they violate the policy for some reason. The reason is decided by the policy and may include
-     * chunk is too big or chunk straddles a tag range.
+     * chunk is too big or chunk straddles a zone range.
      */
-    virtual StatusWith<SplitInfoVector> selectChunksToSplit(OperationContext* opCtx) = 0;
+    StatusWith<SplitInfoVector> selectChunksToSplit(OperationContext* opCtx);
 
     /**
-     * Given a valid namespace returns all the splits the balancer would need to perform
-     * with the current state
+     * Given a valid namespace returns all the splits the balancer would need to perform with the
+     * current state
      */
-    virtual StatusWith<SplitInfoVector> selectChunksToSplit(OperationContext* opCtx,
-                                                            const NamespaceString& nss) = 0;
+    StatusWith<SplitInfoVector> selectChunksToSplit(OperationContext* opCtx,
+                                                    const NamespaceString& ns);
 
     /**
      * Potentially blocking method, which gives out a set of chunks to be moved.
      */
-    virtual StatusWith<MigrateInfoVector> selectChunksToMove(OperationContext* opCtx) = 0;
+    StatusWith<MigrateInfoVector> selectChunksToMove(
+        OperationContext* opCtx,
+        const std::vector<ClusterStatistics::ShardStatistics>& shardStats,
+        stdx::unordered_set<ShardId>* availableShards,
+        stdx::unordered_set<NamespaceString>* imbalancedCollectionsCachePtr);
 
     /**
-     * Given a valid namespace returns all the Migrations the balancer would need to perform
-     * with the current state
+     * Given a valid namespace returns all the Migrations the balancer would need to perform with
+     * the current state.
      */
-    virtual StatusWith<MigrateInfoVector> selectChunksToMove(OperationContext* opCtx,
-                                                             const NamespaceString& nss) = 0;
+    StatusWith<MigrateInfosWithReason> selectChunksToMove(OperationContext* opCtx,
+                                                          const NamespaceString& ns);
+
+private:
+    /**
+     * Synchronous method, which iterates the collection's chunks and uses the zones information to
+     * figure out whether some of them validate the zone range boundaries and need to be split.
+     */
+    StatusWith<SplitInfoVector> _getSplitCandidatesForCollection(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const ShardStatisticsVector& shardStats);
 
     /**
-     * Requests a single chunk to be relocated to a different shard, if possible. If some error
-     * occurs while trying to determine the best location for the chunk, a failed status is
-     * returned. If the chunk is already at the best shard that it can be, returns boost::none.
-     * Otherwise returns migration information for where the chunk should be moved.
+     * Synchronous method, which iterates the collection's size per shard  to figure out where to
+     * place them.
      */
-    virtual StatusWith<boost::optional<MigrateInfo>> selectSpecificChunkToMove(
-        OperationContext* opCtx, const NamespaceString& nss, const ChunkType& chunk) = 0;
+    StatusWith<MigrateInfosWithReason> _getMigrateCandidatesForCollection(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const ShardStatisticsVector& shardStats,
+        const CollectionDataSizeInfoForBalancing& collDataSizeInfo,
+        stdx::unordered_set<ShardId>* availableShards);
 
-    /**
-     * Asks the chunk selection policy to validate that the specified chunk migration is allowed
-     * given the current rules. Returns OK if the migration won't violate any rules or any other
-     * failed status otherwise.
-     */
-    virtual Status checkMoveAllowed(OperationContext* opCtx,
-                                    const ChunkType& chunk,
-                                    const ShardId& newShardId) = 0;
-
-protected:
-    BalancerChunkSelectionPolicy();
+    // Source for obtaining cluster statistics. Not owned and must not be destroyed before the
+    // policy object is destroyed.
+    ClusterStatistics* const _clusterStats;
 };
 
 }  // namespace mongo

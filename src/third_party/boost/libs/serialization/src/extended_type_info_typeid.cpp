@@ -98,7 +98,7 @@ extended_type_info_typeid_0::type_unregister()
         // note: previously this conditional was a runtime assertion with
         // BOOST_ASSERT.  We've changed it because we've discovered that at
         // least one platform is not guaranteed to destroy singletons in
-        // reverse order of distruction.
+        // reverse order of destruction.
         // BOOST_ASSERT(! singleton<tkmap>::is_destroyed());
         if(! singleton<tkmap>::is_destroyed()){
             tkmap & x = singleton<tkmap>::get_mutable_instance();

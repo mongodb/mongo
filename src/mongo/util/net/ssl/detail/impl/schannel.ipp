@@ -30,13 +30,14 @@
 
 #pragma once
 
+#include "mongo/base/init.h"
+#include "mongo/util/assert_util.h"
+
 #include <algorithm>
 #include <cstddef>
 #include <memory>
 
 #include "asio/detail/assert.hpp"
-#include "mongo/base/init.h"
-#include "mongo/util/assert_util.h"
 
 namespace asio {
 namespace ssl {

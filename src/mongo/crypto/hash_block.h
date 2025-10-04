@@ -29,26 +29,69 @@
 
 #pragma once
 
-#include <array>
-#include <cstddef>
-#include <string>
-#include <third_party/murmurhash3/MurmurHash3.h>
-#include <vector>
-
 #include "mongo/base/data_range.h"
 #include "mongo/base/secure_allocator.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/util/base64.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/secure_compare_memory.h"
+
+#include <array>
+#include <cstddef>
+#include <string>
+#include <vector>
+
+#include <absl/hash/hash.h>
+
+#if defined(MONGO_CONFIG_SSL) && (MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL)
+#include <openssl/hmac.h>
+#endif
 
 namespace mongo {
 
 struct BSONBinData;
 class BSONObjBuilder;
+
+/**
+ * For an OpenSSL optimization where a hash needs to be computed many times in succession,
+ * we can re-use the ctx object by calling init. However, this needs to be cross compatible
+ * with Windows and Apple, so we define a wrapping struct that is effectively a no-op on
+ * the other two platforms.
+ */
+class HmacContext {
+public:
+    /**
+     * When we reuse a key with the same hmac context, we can get a performance benefit by
+     * not setting the key during the HMAC_Init_ex function. To use this API, the user should
+     * identify the location where we will reuse a key. Before using the key for the first time,
+     * they should call setReuseKey(true). Before they change to a new key with the same
+     * HmacContext object, they must call setReuseKey(false), OR if they intend to reuse the
+     * next key, they may call resetCount().
+     */
+    void setReuseKey(bool val);
+    void resetCount();
+#if defined(MONGO_CONFIG_SSL) && (MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL)
+    int hmacCtxInitFn(const EVP_MD* md, const uint8_t* key, size_t keyLen);
+    HmacContext();
+    ~HmacContext();
+    HMAC_CTX* get();
+
+private:
+    // Because OpenSSL <= 1.0.2 does not define HMAC_CTX_free function,
+    // we cannot add a custom deleter for the unique pointer. Instead we
+    // have to manage the lifetime of the ctx object manually.
+    HMAC_CTX* hmac_ctx;
+#endif
+private:
+    bool getReuseKey();
+    int useCount();
+    bool _reuseKey = false;
+    int use = 0;
+};
 
 /**
  * Secure allocator wrapper for HashBlock Traits.
@@ -197,6 +240,20 @@ public:
         Traits::computeHmac(key, keyLen, input, &(output->_hash));
     }
 
+    /**
+     * This function is an alternative to computeHmac. It provides an optimization - when
+     * a single thread needs to compute a hash repeatedly on the OpenSSL platform, it can
+     * provide a ctx object of its own (which is an empty object in Apple and Windows)
+     * that will be re-used by being re-initialized when computing an Hmac.
+     */
+    static void computeHmacWithCtx(HmacContext* ctx,
+                                   const uint8_t* key,
+                                   size_t keyLen,
+                                   std::initializer_list<ConstDataRange> input,
+                                   HashBlock* const output) {
+        Traits::computeHmacWithCtx(ctx, key, keyLen, input, &(output->_hash));
+    }
+
     const uint8_t* data() const& {
         return _hash.data();
     }
@@ -301,14 +358,28 @@ public:
      * Custom hasher so HashBlocks can be used in unordered data structures.
      *
      * ex: std::unordered_set<HashBlock, HashBlock::Hash> shaSet;
+     *
+     * Cryptographically secure hashes are good hashes so no need to hash them again. Just truncate
+     * the hash and return it.
      */
     struct Hash {
         std::size_t operator()(const HashBlock& HashBlock) const {
-            uint32_t hash;
-            MurmurHash3_x86_32(HashBlock.data(), HashBlock::kHashLength, 0, &hash);
-            return hash;
+            static_assert(kHashLength >= sizeof(std::size_t));
+
+            return ConstDataView(reinterpret_cast<const char*>(HashBlock.data()))
+                .read<LittleEndian<std::size_t>>();
         }
     };
+
+    /**
+     * Hash function compatible with absl::Hash for absl::unordered_{map,set}
+     */
+    template <typename H>
+    friend H AbslHashValue(H h, const HashBlock& HashBlock) {
+        static_assert(kHashLength >= sizeof(std::size_t));
+
+        return H::combine(std::move(h), Hash()(HashBlock));
+    }
 
 private:
     // The backing array of bytes for the sha block

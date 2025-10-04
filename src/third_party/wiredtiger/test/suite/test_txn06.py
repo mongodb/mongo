@@ -31,7 +31,7 @@
 
 from suite_subprocess import suite_subprocess
 from wtdataset import SimpleDataSet
-import wiredtiger, wttest
+import wttest
 from wtscenario import make_scenarios
 
 class test_txn06(wttest.WiredTigerTestCase, suite_subprocess):
@@ -65,7 +65,4 @@ class test_txn06(wttest.WiredTigerTestCase, suite_subprocess):
             c[k] = v
 
         # We were trying to generate a message matching this pattern.
-        self.captureout.checkAdditionalPattern(self, "old snapshot")
-
-if __name__ == '__main__':
-    wttest.run()
+        self.captureout.checkAdditionalPattern(self, "pinned in session")

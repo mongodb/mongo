@@ -27,12 +27,29 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/transaction_coordinator_catalog.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/s/transaction_coordinator_futures_util.h"
 #include "mongo/db/s/transaction_coordinator_test_fixture.h"
+#include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/executor/network_interface_mock.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/future.h"
+#include "mongo/util/time_support.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {
@@ -53,6 +70,7 @@ protected:
 
     void tearDown() override {
         _coordinatorCatalog->onStepDown();
+        advanceClockAndExecuteScheduledTasks();
         _coordinatorCatalog.reset();
 
         TransactionCoordinatorTestFixture::tearDown();
@@ -67,6 +85,7 @@ protected:
             txnNumberAndRetryCounter,
             std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
             Date_t::max());
+        newCoordinator->start(operationContext());
 
         _coordinatorCatalog->insert(opCtx, lsid, txnNumberAndRetryCounter, newCoordinator);
     }
@@ -135,7 +154,6 @@ TEST_F(TransactionCoordinatorCatalogTest,
     LogicalSessionId lsid = makeLogicalSessionIdForTest();
     TxnNumberAndRetryCounter txnNumberAndRetryCounter1{1, 0};
     TxnNumberAndRetryCounter txnNumberAndRetryCounter2{1, 1};
-
     // Can only create a new TransactionCoordinator after the previous TransactionCoordinator with
     // the same txnNumber has reached abort decision.
     createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter1);
@@ -159,6 +177,7 @@ TEST_F(TransactionCoordinatorCatalogTest,
               *txnNumberAndRetryCounter2.getTxnRetryCounter());
 
     assertCommandSentAndRespondWith("abortTransaction", kOk, boost::none);
+    advanceClockAndExecuteScheduledTasks();
     ASSERT_THROWS_CODE(coordinator1InCatalog->onCompletion().get(),
                        AssertionException,
                        ErrorCodes::NoSuchTransaction);
@@ -228,6 +247,7 @@ TEST_F(TransactionCoordinatorCatalogTest,
               *txnNumberAndRetryCounter2.getTxnRetryCounter());
 
     assertCommandSentAndRespondWith("abortTransaction", kOk, boost::none);
+    advanceClockAndExecuteScheduledTasks();
     ASSERT_THROWS_CODE(coordinator1InCatalog->onCompletion().get(),
                        AssertionException,
                        ErrorCodes::NoSuchTransaction);
@@ -240,6 +260,7 @@ TEST_F(TransactionCoordinatorCatalogTest, CoordinatorsRemoveThemselvesFromCatalo
     auto coordinator = _coordinatorCatalog->get(operationContext(), lsid, txnNumberAndRetryCounter);
 
     coordinator->cancelIfCommitNotYetStarted();
+    advanceClockAndExecuteScheduledTasks();
     coordinator->onCompletion().wait();
 
     // Wait for the coordinator to be removed before attempting to call getLatestOnSession() since
@@ -300,6 +321,7 @@ TEST_F(
               *txnNumberAndRetryCounter2.getTxnRetryCounter());
 
     assertCommandSentAndRespondWith("abortTransaction", kOk, boost::none);
+    advanceClockAndExecuteScheduledTasks();
     ASSERT_THROWS_CODE(coordinator1InCatalog->onCompletion().get(),
                        AssertionException,
                        ErrorCodes::NoSuchTransaction);
@@ -323,6 +345,8 @@ TEST_F(
         txnNumberAndRetryCounter2,
         std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
         Date_t::max());
+    coordinator2->start(operationContext());
+
     ASSERT_THROWS_CODE(_coordinatorCatalog->insert(
                            operationContext(), lsid, txnNumberAndRetryCounter2, coordinator2),
                        AssertionException,
@@ -330,12 +354,16 @@ TEST_F(
 
     assertCommandSentAndRespondWith("prepareTransaction", kPrepareOk, boost::none);
     assertCommandSentAndRespondWith("commitTransaction", kOk, boost::none);
+    advanceClockAndExecuteScheduledTasks();
     coordinator1->onCompletion().get();
 
     coordinator2->cancelIfCommitNotYetStarted();
+    advanceClockAndExecuteScheduledTasks();
     ASSERT_THROWS_CODE(coordinator2->onCompletion().get(),
                        AssertionException,
                        ErrorCodes::TransactionCoordinatorCanceled);
+    coordinator2->shutdown();
+    advanceClockAndExecuteScheduledTasks();
 }
 
 TEST_F(TransactionCoordinatorCatalogTest,
@@ -357,18 +385,23 @@ TEST_F(TransactionCoordinatorCatalogTest,
         txnNumberAndRetryCounter2,
         std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
         Date_t::max());
+    coordinator2->start(operationContext());
+
     ASSERT_THROWS_CODE(_coordinatorCatalog->insert(
                            operationContext(), lsid, txnNumberAndRetryCounter2, coordinator2),
                        AssertionException,
                        6032301);
 
     assertCommandSentAndRespondWith("commitTransaction", kOk, boost::none);
+    advanceClockAndExecuteScheduledTasks();
     coordinator1->onCompletion().get();
 
     coordinator2->cancelIfCommitNotYetStarted();
+    advanceClockAndExecuteScheduledTasks();
     ASSERT_THROWS_CODE(coordinator2->onCompletion().get(),
                        AssertionException,
                        ErrorCodes::TransactionCoordinatorCanceled);
+    coordinator2->shutdown();
 }
 
 TEST_F(TransactionCoordinatorCatalogTest, StepDownBeforeCoordinatorInsertedIntoCatalog) {
@@ -384,6 +417,7 @@ TEST_F(TransactionCoordinatorCatalogTest, StepDownBeforeCoordinatorInsertedIntoC
                                                                 txnNumberAndRetryCounter,
                                                                 aws.makeChildScheduler(),
                                                                 network()->now() + Seconds{5});
+    coordinator->start(operationContext());
 
     aws.shutdown({ErrorCodes::TransactionCoordinatorSteppingDown, "Test step down"});
     catalog.onStepDown();
@@ -393,6 +427,7 @@ TEST_F(TransactionCoordinatorCatalogTest, StepDownBeforeCoordinatorInsertedIntoC
     catalog.insert(operationContext(), lsid, txnNumberAndRetryCounter, coordinator);
     catalog.join();
 
+    // No need to call coordinator->shutdown() as the catalog will ensure it runs.
     coordinator->onCompletion().wait();
 }
 

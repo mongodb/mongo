@@ -27,36 +27,54 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
-
-#include "mongo/platform/basic.h"
-
-#include <unordered_set>
-
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/client.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/protocol.h"
+#include "mongo/rpc/reply_interface.h"
+#include "mongo/rpc/unique_message.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/string_map.h"
 
-using namespace mongo;
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
+namespace mongo {
 namespace CommandTests {
 
 TEST(CommandTests, InputDocumentSequeceWorksEndToEnd) {
     const auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
 
-    NamespaceString nss("test", "doc_seq");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "doc_seq");
     DBDirectClient db(opCtx);
-    db.dropCollection(nss.ns());
+    db.dropCollection(nss);
     ASSERT_EQ(db.count(nss), 0u);
 
     OpMsgRequest request;
-    request.body = BSON("insert" << nss.coll() << "$db" << nss.db());
+    request.body = BSON("insert" << nss.coll() << "$db" << nss.db_forTest());
     request.sequences = {{"documents",
                           {
                               BSON("_id" << 1),
@@ -80,14 +98,14 @@ using std::string;
 class Base {
 public:
     Base() : db(&_opCtx) {
-        db.dropCollection(nss().ns());
+        db.dropCollection(nss());
     }
 
     NamespaceString nss() {
-        return NamespaceString("test.testCollection");
+        return NamespaceString::createNamespaceString_forTest("test.testCollection");
     }
-    const char* nsDb() {
-        return "test";
+    DatabaseName nsDb() {
+        return DatabaseName::createDatabaseName_forTest(boost::none, "test");
     }
     const char* nsColl() {
         return "testCollection";
@@ -102,12 +120,13 @@ public:
 namespace FileMD5 {
 struct Base {
     Base() : db(&_opCtx) {
-        db.dropCollection(nss().ns());
-        ASSERT_OK(dbtests::createIndex(&_opCtx, nss().ns(), BSON("files_id" << 1 << "n" << 1)));
+        db.dropCollection(nss());
+        ASSERT_OK(
+            dbtests::createIndex(&_opCtx, nss().ns_forTest(), BSON("files_id" << 1 << "n" << 1)));
     }
 
     NamespaceString nss() {
-        return NamespaceString("test.fs.chunks");
+        return NamespaceString::createNamespaceString_forTest("test.fs.chunks");
     }
 
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
@@ -122,7 +141,7 @@ struct Type0 : Base {
             b.append("files_id", 0);
             b.append("n", 0);
             b.appendBinData("data", 6, BinDataGeneral, "hello ");
-            db.insert(nss().ns(), b.obj());
+            db.insert(nss(), b.obj());
         }
         {
             BSONObjBuilder b;
@@ -130,12 +149,14 @@ struct Type0 : Base {
             b.append("files_id", 0);
             b.append("n", 1);
             b.appendBinData("data", 5, BinDataGeneral, "world");
-            db.insert(nss().ns(), b.obj());
+            db.insert(nss(), b.obj());
         }
 
         BSONObj result;
-        ASSERT(db.runCommand("test", BSON("filemd5" << 0), result));
-        ASSERT_EQUALS(string("5eb63bbbe01eeed093cb22bb8f5acdc3"), result["md5"].valuestr());
+        ASSERT(db.runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+                             BSON("filemd5" << 0),
+                             result));
+        ASSERT_EQUALS(string("5eb63bbbe01eeed093cb22bb8f5acdc3"), result.getStringField("md5"));
     }
 };
 struct Type2 : Base {
@@ -146,7 +167,7 @@ struct Type2 : Base {
             b.append("files_id", 0);
             b.append("n", 0);
             b.appendBinDataArrayDeprecated("data", "hello ", 6);
-            db.insert(nss().ns(), b.obj());
+            db.insert(nss(), b.obj());
         }
         {
             BSONObjBuilder b;
@@ -154,12 +175,14 @@ struct Type2 : Base {
             b.append("files_id", 0);
             b.append("n", 1);
             b.appendBinDataArrayDeprecated("data", "world", 5);
-            db.insert(nss().ns(), b.obj());
+            db.insert(nss(), b.obj());
         }
 
         BSONObj result;
-        ASSERT(db.runCommand("test", BSON("filemd5" << 0), result));
-        ASSERT_EQUALS(string("5eb63bbbe01eeed093cb22bb8f5acdc3"), result["md5"].valuestr());
+        ASSERT(db.runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+                             BSON("filemd5" << 0),
+                             result));
+        ASSERT_EQUALS(string("5eb63bbbe01eeed093cb22bb8f5acdc3"), result.getStringField("md5"));
     }
 };
 }  // namespace FileMD5
@@ -173,7 +196,7 @@ namespace SymbolArgument {
 class Drop : Base {
 public:
     void run() {
-        ASSERT(db.createCollection(nss().ns()));
+        ASSERT(db.createCollection(nss()));
         {
             BSONObjBuilder cmd;
             cmd.appendSymbol("drop", nsColl());  // Use Symbol for SERVER-16260
@@ -189,7 +212,7 @@ public:
 class DropIndexes : Base {
 public:
     void run() {
-        ASSERT(db.createCollection(nss().ns()));
+        ASSERT(db.createCollection(nss()));
 
         BSONObjBuilder cmd;
         cmd.appendSymbol("dropIndexes", nsColl());  // Use Symbol for SERVER-16260
@@ -205,7 +228,7 @@ public:
 class CreateIndexWithNoKey : Base {
 public:
     void run() {
-        ASSERT(db.createCollection(nss().ns()));
+        ASSERT(db.createCollection(nss()));
 
         BSONObjBuilder indexSpec;
 
@@ -226,7 +249,7 @@ public:
 class CreateIndexWithDuplicateKey : Base {
 public:
     void run() {
-        ASSERT(db.createCollection(nss().ns()));
+        ASSERT(db.createCollection(nss()));
 
         BSONObjBuilder indexSpec;
         indexSpec.append("key", BSON("a" << 1 << "a" << 1 << "b" << 1));
@@ -249,12 +272,10 @@ public:
 class CreateIndexWithEmptyStringAsValue : Base {
 public:
     void run() {
-        ASSERT(db.createCollection(nss().ns()));
+        ASSERT(db.createCollection(nss()));
 
         BSONObjBuilder indexSpec;
-        indexSpec.append("key",
-                         BSON("a"
-                              << ""));
+        indexSpec.append("key", BSON("a" << ""));
 
         BSONArrayBuilder indexes;
         indexes.append(indexSpec.obj());
@@ -273,13 +294,13 @@ public:
 class FindAndModify : Base {
 public:
     void run() {
-        ASSERT(db.createCollection(nss().ns()));
+        ASSERT(db.createCollection(nss()));
         {
             BSONObjBuilder b;
             b.genOID();
             b.append("name", "Tom");
             b.append("rating", 0);
-            db.insert(nss().ns(), b.obj());
+            db.insert(nss(), b.obj());
         }
 
         BSONObjBuilder cmd;
@@ -314,11 +335,11 @@ public:
     }
 };
 
-class All : public OldStyleSuiteSpecification {
+class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("commands") {}
 
-    void setupTests() {
+    void setupTests() override {
         add<FileMD5::Type0>();
         add<FileMD5::Type2>();
         add<FileMD5::Type2>();
@@ -332,5 +353,7 @@ public:
     }
 };
 
-OldStyleSuiteInitializer<All> all;
+unittest::OldStyleSuiteInitializer<All> all;
+
 }  // namespace CommandTests
+}  // namespace mongo

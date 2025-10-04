@@ -24,38 +24,77 @@
 # * Before you run the program on a new host, these are the
 # prerequisites:
 #
-# apt-get install dpkg-dev rpm debhelper fakeroot ia32-libs createrepo git-core libsnmp15
+# apt-get install dpkg-dev rpm debhelper fakeroot ia32-libs createrepo git-core
 # echo "Now put the dist gnupg signing keys in ~root/.gnupg"
 
 import errno
-from glob import glob
 import os
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 import time
+from glob import glob
+
+import git
 
 sys.path.append(os.getcwd())
 
-import packager  # pylint: disable=wrong-import-position
+import packager
 
 # The MongoDB names for the architectures we support.
 ARCH_CHOICES = ["x86_64", "ppc64le", "s390x", "arm64", "aarch64"]
 
 # Made up names for the flavors of distribution we package for.
-DISTROS = ["suse", "debian", "redhat", "ubuntu", "amazon", "amazon2"]
+DISTROS = ["suse", "debian", "redhat", "ubuntu", "amazon", "amazon2", "amazon2023"]
 
 
 class EnterpriseSpec(packager.Spec):
     """EnterpriseSpec class."""
 
     def suffix(self):
+        return packager.get_suffix(self.ver, "-enterprise", "-enterprise-unstable")
         """Suffix."""
-        if int(self.ver.split(".")[0]) >= 5:
-            return "-enterprise" if int(self.ver.split(".")[1]) == 0 else "-enterprise-unstable"
-        else:
-            return "-enterprise" if int(self.ver.split(".")[1]) % 2 == 0 else "-enterprise-unstable"
+
+    def move_required_contents(self):
+        """Move the required contents to the current working directory.
+
+        Below in the for loop it's the required list of files that needs
+        to be moved from the extracted tarball to the current working
+        directory. The root path of the tarball content starts with
+        mongodb-linux-<suffix> so we glob since the suffix of the root path
+        is not a fixed text.
+        """
+        release_dir = glob("mongodb-linux-*")[0]
+        for release_file in (
+            "bin",
+            "LICENSE-Enterprise.txt",
+            "README",
+            "THIRD-PARTY-NOTICES",
+            "MPL-2",
+        ):
+            os.rename("%s/%s" % (release_dir, release_file), release_file)
+        os.rmdir(release_dir)
+
+
+class EnterpriseCryptSpec(EnterpriseSpec):
+    """EnterpriseCryptSpec class."""
+
+    def suffix(self):
+        """Suffix."""
+        if int(self.ver.split(".")[1]) == 0:
+            return "-enterprise-crypt-v1"
+        return "-enterprise-unstable-crypt-v1"
+
+    def move_required_contents(self):
+        """Move the required contents to the current working directory
+
+        The files that were extracted from the tarball file are already
+        in the current working directory. It does not have a mongodb-linux-...
+        as the root content of the tarball file is flat.
+        """
+        pass
 
 
 class EnterpriseDistro(packager.Distro):
@@ -105,52 +144,86 @@ class EnterpriseDistro(packager.Distro):
 
         if re.search("^(debian|ubuntu)", self.dname):
             return "repo/apt/%s/dists/%s/mongodb-enterprise/%s/%s/binary-%s/" % (
-                self.dname, self.repo_os_version(build_os), repo_directory, self.repo_component(),
-                self.archname(arch))
+                self.dname,
+                self.repo_os_version(build_os),
+                repo_directory,
+                self.repo_component(),
+                self.archname(arch),
+            )
         elif re.search("(redhat|fedora|centos|amazon)", self.dname):
             return "repo/yum/%s/%s/mongodb-enterprise/%s/%s/RPMS/" % (
-                self.dname, self.repo_os_version(build_os), repo_directory, self.archname(arch))
+                self.dname,
+                self.repo_os_version(build_os),
+                repo_directory,
+                self.archname(arch),
+            )
         elif re.search("(suse)", self.dname):
             return "repo/zypper/%s/%s/mongodb-enterprise/%s/%s/RPMS/" % (
-                self.dname, self.repo_os_version(build_os), repo_directory, self.archname(arch))
+                self.dname,
+                self.repo_os_version(build_os),
+                repo_directory,
+                self.archname(arch),
+            )
         else:
             raise Exception("BUG: unsupported platform?")
 
-    def build_os(self, arch):  # pylint: disable=too-many-branches
+    def build_os(self, arch):
         """Return the build os label in the binary package to download.
 
-        The labels "rhel57", "rhel62", "rhel67", "rhel70", "rhel80" are for redhat,
+        The labels "rhel57", "rhel62", "rhel67", "rhel70", "rhel79", "rhel80", "rhel90" are for redhat,
         the others are delegated to the super class.
         """
-        # pylint: disable=too-many-return-statements
         if arch == "ppc64le":
-            if self.dname == 'ubuntu':
+            if self.dname == "ubuntu":
                 return ["ubuntu1604", "ubuntu1804"]
-            if self.dname == 'redhat':
-                return ["rhel71", "rhel81"]
+            if self.dname == "redhat":
+                return ["rhel71", "rhel81", "rhel9"]
             return []
         if arch == "s390x":
-            if self.dname == 'redhat':
-                return ["rhel67", "rhel72"]
-            if self.dname == 'suse':
+            if self.dname == "redhat":
+                return ["rhel67", "rhel72", "rhel83", "rhel9"]
+            if self.dname == "suse":
                 return ["suse11", "suse12", "suse15"]
-            if self.dname == 'ubuntu':
+            if self.dname == "ubuntu":
                 return ["ubuntu1604", "ubuntu1804"]
             return []
         if arch == "arm64":
-            if self.dname == 'ubuntu':
-                return ["ubuntu1804", "ubuntu2004"]
+            if self.dname == "ubuntu":
+                return ["ubuntu1804", "ubuntu2004", "ubuntu2204", "ubuntu2404"]
         if arch == "aarch64":
-            if self.dname == 'redhat':
-                return ["rhel82"]
-            if self.dname == 'amazon2':
+            if self.dname == "redhat":
+                return ["rhel82", "rhel88", "rhel90", "rhel93"]
+            if self.dname == "amazon2":
                 return ["amazon2"]
+            if self.dname == "amazon2023":
+                return ["amazon2023"]
             return []
 
         if re.search("(redhat|fedora|centos)", self.dname):
-            return ["rhel80", "rhel70", "rhel62", "rhel57"]
+            return ["rhel90", "rhel93", "rhel80", "rhel70", "rhel79", "rhel62", "rhel57", "rhel88"]
         return super(EnterpriseDistro, self).build_os(arch)
-        # pylint: enable=too-many-return-statements
+
+
+def verify_args(args):
+    # If the crypt spec is specified, the tarball file must include the crypt library.
+    if args.crypt_spec:
+        if (
+            "lib/mongo_crypt_v1.so"
+            not in subprocess.run(
+                [
+                    "tar",
+                    "-tzf",
+                    args.tarball,
+                ],
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.split()
+        ):
+            raise ValueError(
+                "The tarball file %s does not contain the crypt library. Please use a tarball that contains the crypt library."
+                % args.tarball
+            )
 
 
 def main():
@@ -159,8 +232,9 @@ def main():
     distros = [EnterpriseDistro(distro) for distro in DISTROS]
 
     args = packager.get_args(distros, ARCH_CHOICES)
+    verify_args(args)
 
-    spec = EnterpriseSpec(args.server_version, args.metadata_gitspec, args.release_number)
+    spec = get_enterprise_spec(args)
 
     oldcwd = os.getcwd()
     srcdir = oldcwd + "/../"
@@ -178,11 +252,9 @@ def main():
         made_pkg = False
         # Build a package for each distro/spec/arch tuple, and
         # accumulate the repository-layout directories.
-        for (distro, arch) in packager.crossproduct(distros, args.arches):
-
+        for distro, arch in packager.crossproduct(distros, args.arches):
             for build_os in distro.build_os(arch):
                 if build_os in args.distros or not args.distros:
-
                     filename = tarfile(build_os, arch, spec)
                     packager.ensure_dir(filename)
                     shutil.copyfile(args.tarball, filename)
@@ -199,6 +271,13 @@ def main():
         os.chdir(oldcwd)
 
 
+def get_enterprise_spec(args):
+    """Get the EnterpriseSpec."""
+    if args.crypt_spec:
+        return EnterpriseCryptSpec(args.server_version, args.metadata_gitspec, args.release_number)
+    return EnterpriseSpec(args.server_version, args.metadata_gitspec, args.release_number)
+
+
 def tarfile(build_os, arch, spec):
     """Return the location where we store the downloaded tarball for this package."""
     return "dl/mongodb-linux-%s-enterprise-%s-%s.tar.gz" % (spec.version(), build_os, arch)
@@ -212,13 +291,19 @@ def setupdir(distro, build_os, arch, spec):
     # the following format string is unclear, an example setupdir
     # would be dst/x86_64/debian-sysvinit/wheezy/mongodb-org-unstable/
     # or dst/x86_64/redhat/rhel57/mongodb-org-unstable/
-    return "dst/%s/%s/%s/%s%s-%s/" % (arch, distro.name(), build_os, distro.pkgbase(),
-                                      spec.suffix(), spec.pversion(distro))
+    return "dst/%s/%s/%s/%s%s-%s/" % (
+        arch,
+        distro.name(),
+        build_os,
+        distro.pkgbase(),
+        spec.suffix(),
+        spec.pversion(distro),
+    )
 
 
 def unpack_binaries_into(build_os, arch, spec, where):
     """Unpack the tarfile for (build_os, arch, spec) into directory where."""
-    rootdir = os.getcwd()
+    root_dir = os.getcwd()
     packager.ensure_dir(where)
     # Note: POSIX tar doesn't require support for gtar's "-C" option,
     # and Python's tarfile module prior to Python 2.7 doesn't have the
@@ -226,16 +311,13 @@ def unpack_binaries_into(build_os, arch, spec, where):
     # thing and chdir into where and run tar there.
     os.chdir(where)
     try:
-        packager.sysassert(["tar", "xvzf", rootdir + "/" + tarfile(build_os, arch, spec)])
-        release_dir = glob('mongodb-linux-*')[0]
-        for releasefile in "bin", "snmp", "LICENSE-Enterprise.txt", "README", "THIRD-PARTY-NOTICES", "MPL-2":
-            os.rename("%s/%s" % (release_dir, releasefile), releasefile)
-        os.rmdir(release_dir)
+        packager.sysassert(["tar", "xvzf", root_dir + "/" + tarfile(build_os, arch, spec)])
+        spec.move_required_contents()
     except Exception:
         exc = sys.exc_info()[1]
-        os.chdir(rootdir)
+        os.chdir(root_dir)
         raise exc
-    os.chdir(rootdir)
+    os.chdir(root_dir)
 
 
 def make_package(distro, build_os, arch, spec, srcdir):
@@ -251,13 +333,38 @@ def make_package(distro, build_os, arch, spec, srcdir):
     # innocuous in the debianoids' sdirs).
     for pkgdir in ["debian", "rpm"]:
         print("Copying packaging files from %s to %s" % ("%s/%s" % (srcdir, pkgdir), sdir))
+        git_repo = git.Repo(srcdir)
+        # get the original HEAD position of repo
+        head_commit_sha = git_repo.head.object.hexsha
+
+        # add and commit the uncommited changes
+        print("Commiting uncommited changes")
+        git_repo.git.add(all=True)
+        # only commit changes if there are any
+        if len(git_repo.index.diff("HEAD")) != 0:
+            with git_repo.git.custom_environment(
+                GIT_COMMITTER_NAME="Evergreen", GIT_COMMITTER_EMAIL="evergreen@mongodb.com"
+            ):
+                git_repo.git.commit("--author='Evergreen <>'", "-m", "temp commit")
+
+        # original command to preserve functionality
+        # FIXME: make consistent with the rest of the code when we have more packaging testing
         # FIXME: sh-dash-cee is bad. See if tarfile can do this.
-        packager.sysassert([
-            "sh", "-c",
-            "(cd \"%s\" && git archive %s %s/ ) | (cd \"%s\" && tar xvf -)" %
-            (srcdir, spec.metadata_gitspec(), pkgdir, sdir)
-        ])
-    # Splat the binaries and snmp files under sdir.  The "build" stages of the
+        print("Copying packaging files from specified gitspec:", spec.metadata_gitspec())
+        packager.sysassert(
+            [
+                "sh",
+                "-c",
+                '(cd "%s" && git archive %s %s/ ) | (cd "%s" && tar xvf -)'
+                % (srcdir, spec.metadata_gitspec(), pkgdir, sdir),
+            ]
+        )
+
+        # reset branch to original state
+        print("Resetting branch to original state")
+        git_repo.git.reset("--mixed", head_commit_sha)
+
+    # Splat the binaries under sdir.  The "build" stages of the
     # packaging infrastructure will move the files to wherever they
     # need to go.
     unpack_binaries_into(build_os, arch, spec, sdir)
@@ -284,7 +391,7 @@ def make_deb_repo(repo, distro, build_os):
     try:
         dirs = {
             os.path.dirname(deb)[2:]
-            for deb in packager.backtick(["find", ".", "-name", "*.deb"]).decode('utf-8').split()
+            for deb in packager.backtick(["find", ".", "-name", "*.deb"]).decode("utf-8").split()
         }
         for directory in dirs:
             st = packager.backtick(["dpkg-scanpackages", directory, "/dev/null"])
@@ -314,14 +421,14 @@ Description: MongoDB packages
     os.chdir(repo + "../../")
     s2 = packager.backtick(["apt-ftparchive", "release", "."])
     try:
-        with open("Release", 'wb') as fh:
-            fh.write(s1.encode('utf-8'))
+        with open("Release", "wb") as fh:
+            fh.write(s1.encode("utf-8"))
             fh.write(s2)
     finally:
         os.chdir(oldpwd)
 
 
-def move_repos_into_place(src, dst):  # pylint: disable=too-many-branches
+def move_repos_into_place(src, dst):
     """Move the repos into place."""
     # Find all the stuff in src/*, move it to a freshly-created
     # directory beside dst, then play some games with symlinks so that

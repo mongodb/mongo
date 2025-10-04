@@ -1,0 +1,117 @@
+/*! @arch_page arch-prefetch Pre-fetch
+
+@section prefetch_overview What is pre-fetching? When is pre-fetching useful?
+
+Database records must be in memory before WiredTiger can operate on them, but if
+that record is initially on disk, WiredTiger needs to perform an expensive I/O
+operation to fetch the record. Instead of performing I/O on demand, WiredTiger
+can be configured to predict which records are about to be accessed and
+speculatively load (pre-fetch) the corresponding page, hiding the I/O delays
+from the user.
+
+Applications access the database in different ways, and so it is not necessarily
+ideal to always enable pre-fetching. Pre-fetching is beneficial when an operation
+has locality of reference and it is reasonably likely that the application will
+access data in a sequential way. When future operations are likely to access data
+that is near the data currently being accessed, WiredTiger can predict which pages
+will be needed soon and pre-emptively read them into the cache.
+
+@section prefetch_algorithm Pre-fetch Algorithm
+
+1. The main application thread finds candidate pages for pre-fetching as it
+traverses the B-tree.
+2. It populates the pre-fetch queue with these candidate pages.
+3. Pre-fetch worker threads will pop off pages from the pre-fetch queue and read
+pages into the cache.
+
+@subsection prefetch_algorithm_find_pages Finding Candidate Pages
+
+Pre-fetch looks for potential candidate pages in two places: (1) while walking the
+B-tree (\c __tree_walk_internal) and (2) when verifying a tree (\c __verify_tree).
+The \c __wt_session_prefetch_check function contains a few checks to decide if
+pre-fetching should be performed for a given \c ref. Pre-fetching does not operate
+on internal pages, and should not be performed until we have triggered at least two leaf page reads from sequential read requests. Pre-fetching is also disabled for
+tiered tables, and special operations with the exception of verify.
+
+@subsection prefetch_algorithm_populate_queue Populating the Pre-fetch Queue
+
+The pre-fetch queue is a first-in-first-out (FIFO) data structure containing the
+page references of potential pre-fetch candidates.
+The \c __wti_btree_prefetch function is responsible for pushing candidate pages
+onto the queue. Given a \c ref, it will queue the next set of pages if they are leaf
+pages, not already in the cache, and not already on the pre-fetch queue. To prevent
+overloading the pre-fetch queue, there is a maximum number of candidate pages allowed
+in the queue (\c WT_MAX_PREFETCH_QUEUE), and a limit on the maximum number of pages
+we can add to the queue during a pre-fetch check (\c WT_PREFETCH_QUEUE_PER_TRIGGER).
+Pages will not be added to the queue if either of these conditions are met.
+
+@subsection prefetch_algorithm_process_pages Pre-fetching Content Into the Cache
+
+Pre-fetch worker threads are responsible for the work of reading page contents
+into the cache. The \c __wt_prefetch_thread_run function is the entry point for a
+pre-fetch thread, and threads will continue to run while the pre-fetch queue is not
+empty. When there are no more pre-fetch entries to process, pre-fetch worker threads
+wait on a condition variable that signals when an entry has been pushed onto the
+pre-fetch queue. Pre-fetch worker threads invoke the \c __wt_page_in function which
+reads the page from disk and builds an in-memory representation.
+
+@section prefetch_api Pre-fetch API
+
+@subsection prefetch_api_connection Connection-Level Configuration
+
+\c wiredtiger_open("prefetch=(available=true,default=false)")
+
+The \c available setting determines whether the pre-fetching functionality can be
+enabled for the given database, and starts up the pool of pre-fetching threads if
+it is turned on. The \c default setting determines whether pre-fetching is turned
+on or off for all sessions belonging to the connection.
+
+@subsection prefetch_api_session Session-Level Configuration
+
+\c WT_CONNECTION.open_session("prefetch=(enabled=true)")
+
+The session-level configuration can be used to override the connection-level
+configuration for specific sessions if desired.
+
+@section prefetch_other Interaction With Other Components
+
+@subsection prefetch_other_cache_busyness Considering Current Cache Busyness
+
+Cache busyness increases in proportion to the eviction workload and the rate of pages
+being read into the cache. It is important to consider how pre-fetch impacts cache
+utilization as it may leave the cache in a state that increases operational latency.
+Pre-fetch stops adding page references to the queue as soon as it detects that we are
+close to hitting the eviction clean trigger. It will also skip processing page
+references that are being retrieved from the queue until space in the cache clears up.
+
+@subsection prefetch_other_refs Ensuring References on the Pre-fetch Queue Remain Valid
+
+Page references on the pre-fetch queue may become invalid if other operations
+that modify page references are happening in parallel. Eviction is not allowed to
+operate on any page references that are on the pre-fetch queue, because it may
+split pages and free the underlying ref/s. Since eviction has no way to coordinate
+with the queue to indicate references are no longer valid and should be removed, we
+take a conservative approach by preventing eviction on these refs. This condition is
+checked with the \c WT_REF_FLAG_PREFETCH flag. On top of this, the pre-fetch flag
+also guarantees that the corresponding parent page cannot be evicted until pre-fetch
+has processed the leaf page.
+
+@subsection prefetch_other_concurrency Concurrency
+
+Pre-fetch is a highly concurrent module and we rely on a few mechanisms to ensure
+that it runs smoothly with the rest of the system.
+- A connection level lock \c prefetch_lock is used for the pre-fetch queue, and is
+needed when adding and removing \c WT_PREFETCH_QUEUE_ENTRY items from it.
+- Whenever we modify a \c ref structure, e.g. when adding it to the pre-fetch queue
+and setting the corresponding \c WT_REF_FLAG_PREFETCH flag, it must be in the
+\c WT_REF_LOCKED state.
+- There are scenarios which fall outside of the typical eviction flow, where pages
+can be forcibly removed from the cache if eviction has exclusive eviction access to
+that file (see \c __wt_evict_file_exclusive_on). When this occurs, we need to remove
+all page references associated with that file's tree from the pre-fetch queue because
+the system may evict internal pages which still have child pages present on the queue.
+The \c prefetch_busy variable on the \c WT_BTREE data structure keeps track of
+pre-fetch threads operating on that tree. When clearing pages from the pre-fetch queue
+belonging to a certain tree, we wait for any other concurrent pre-fetch activity to
+drain to prevent invalid ref accesses.
+*/

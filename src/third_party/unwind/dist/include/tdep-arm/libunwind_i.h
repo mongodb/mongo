@@ -30,6 +30,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 
 #include <stdlib.h>
 #include <libunwind.h>
+#include <stdatomic.h>
 
 #include "elf32.h"
 #include "mempool.h"
@@ -63,12 +64,11 @@ struct unw_addr_space
   {
     struct unw_accessors acc;
     int big_endian;
-    unw_caching_policy_t caching_policy;
-#ifdef HAVE_ATOMIC_OPS_H
-    AO_t cache_generation;
-#else
-    uint32_t cache_generation;
+#ifndef UNW_REMOTE_ONLY
+    unw_iterate_phdr_func_t iterate_phdr_function;
 #endif
+    unw_caching_policy_t caching_policy;
+    _Atomic uint32_t cache_generation;
     unw_word_t dyn_generation;          /* see dyn-common.h */
     unw_word_t dyn_info_list_addr;      /* (cached) dyn_info_list_addr */
     struct dwarf_rs_cache global_cache;
@@ -151,8 +151,14 @@ dwarf_put (struct dwarf_cursor *c, dwarf_loc_t loc, unw_word_t val)
 # define DWARF_LOC_TYPE_FP      (1 << 0)
 # define DWARF_LOC_TYPE_REG     (1 << 1)
 # define DWARF_NULL_LOC         DWARF_LOC (0, 0)
-# define DWARF_IS_NULL_LOC(l)                                           \
-                ({ dwarf_loc_t _l = (l); _l.val == 0 && _l.type == 0; })
+
+static inline int
+dwarf_is_null_loc(dwarf_loc_t l)
+{
+  return l.val == 0 && l.type == 0;
+}
+
+# define DWARF_IS_NULL_LOC(l)   dwarf_is_null_loc(l)
 # define DWARF_LOC(r, t)        ((dwarf_loc_t) { .val = (r), .type = (t) })
 # define DWARF_IS_REG_LOC(l)    (((l).type & DWARF_LOC_TYPE_REG) != 0)
 # define DWARF_IS_FP_LOC(l)     (((l).type & DWARF_LOC_TYPE_FP) != 0)
@@ -253,6 +259,7 @@ dwarf_put (struct dwarf_cursor *c, dwarf_loc_t loc, unw_word_t val)
 #define tdep_init_done                  UNW_OBJ(init_done)
 #define tdep_init                       UNW_OBJ(init)
 #define arm_find_proc_info              UNW_OBJ(find_proc_info)
+#define arm_find_proc_info2             UNW_OBJ(find_proc_info2)
 #define arm_put_unwind_info             UNW_OBJ(put_unwind_info)
 /* Platforms that support UNW_INFO_FORMAT_TABLE need to define
    tdep_search_unwind_table.  */
@@ -288,12 +295,15 @@ dwarf_put (struct dwarf_cursor *c, dwarf_loc_t loc, unw_word_t val)
 #define tdep_get_ip(c)                  ((c)->dwarf.ip)
 #define tdep_big_endian(as)             ((as)->big_endian)
 
-extern int tdep_init_done;
+extern atomic_bool tdep_init_done;
 
 extern void tdep_init (void);
 extern int arm_find_proc_info (unw_addr_space_t as, unw_word_t ip,
                                unw_proc_info_t *pi, int need_unwind_info,
                                void *arg);
+extern int arm_find_proc_info2 (unw_addr_space_t as, unw_word_t ip,
+                                unw_proc_info_t *pi, int need_unwind_info,
+                                void *arg, int methods);
 extern void arm_put_unwind_info (unw_addr_space_t as,
                                   unw_proc_info_t *pi, void *arg);
 extern int tdep_search_unwind_table (unw_addr_space_t as, unw_word_t ip,
@@ -317,6 +327,7 @@ extern void tdep_stash_frame (struct dwarf_cursor *c,
 #define UNW_ARM_METHOD_DWARF        0x01
 #define UNW_ARM_METHOD_FRAME        0x02
 #define UNW_ARM_METHOD_EXIDX        0x04
+#define UNW_ARM_METHOD_LR           0x08
 
 #define unwi_unwind_method   UNW_OBJ(unwind_method)
 extern int unwi_unwind_method;

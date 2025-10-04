@@ -27,13 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <algorithm>
-#include <memory>
-
 #include "mongo/db/service_liaison_mock.h"
+
 #include "mongo/util/periodic_runner_factory.h"
+
+#include <memory>
+#include <mutex>
+
+#include <absl/container/node_hash_set.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -43,12 +46,12 @@ MockServiceLiaisonImpl::MockServiceLiaisonImpl() {
 }
 
 LogicalSessionIdSet MockServiceLiaisonImpl::getActiveOpSessions() const {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     return _activeSessions;
 }
 
 LogicalSessionIdSet MockServiceLiaisonImpl::getOpenCursorSessions(OperationContext* opCtx) const {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     return _cursorSessions;
 }
 
@@ -65,32 +68,32 @@ void MockServiceLiaisonImpl::scheduleJob(PeriodicRunner::PeriodicJob job) {
 
 
 void MockServiceLiaisonImpl::addCursorSession(LogicalSessionId lsid) {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     _cursorSessions.insert(std::move(lsid));
 }
 
 void MockServiceLiaisonImpl::removeCursorSession(LogicalSessionId lsid) {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     _cursorSessions.erase(lsid);
 }
 
 void MockServiceLiaisonImpl::clearCursorSession() {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     _cursorSessions.clear();
 }
 
 void MockServiceLiaisonImpl::add(LogicalSessionId lsid) {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     _cursorSessions.insert(std::move(lsid));
 }
 
 void MockServiceLiaisonImpl::remove(LogicalSessionId lsid) {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     _activeSessions.erase(lsid);
 }
 
 void MockServiceLiaisonImpl::clear() {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     _activeSessions.clear();
 }
 
@@ -106,11 +109,11 @@ const KillAllSessionsByPattern* MockServiceLiaisonImpl::matchKilled(const Logica
     return _matcher->match(lsid);
 }
 
-std::pair<Status, int> MockServiceLiaisonImpl::killCursorsWithMatchingSessions(
-    OperationContext* opCtx, const SessionKiller::Matcher& matcher) {
+int MockServiceLiaisonImpl::killCursorsWithMatchingSessions(OperationContext* opCtx,
+                                                            const SessionKiller::Matcher& matcher) {
 
     _matcher = matcher;
-    return std::make_pair(Status::OK(), 0);
+    return 0;
 }
 
 }  // namespace mongo

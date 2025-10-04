@@ -1,0 +1,37 @@
+- name: enable
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              defaultReadConcernLevel: null
+              hashTestNamesForMultitenancy: true
+              tenantId: "636d957b2646ddfaf9b5e13f"
+              useResponsePrefixChecking: true
+      hooks:
+        - class: EnableChangeStream
+          tenant_id: "636d957b2646ddfaf9b5e13f"
+      fixture:
+        class: ReplicaSetFixture
+        replset_name: "ChangeStreamMultitenantReplSet"
+        mongod_options:
+          bind_ip_all: ""
+          serverless: true
+          noscripting: ""
+          set_parameters:
+            enableTestCommands: 1
+            featureFlagServerlessChangeStreams: true
+            featureFlagRequireTenantID: true
+            multitenancySupport: true
+
+- name: enable_change_stream_hook
+  value:
+    executor:
+      hooks:
+        - class: EnableChangeStream
+          tenant_id: "636d957b2646ddfaf9b5e13f"
+
+- name: shell_eval
+  value:
+    eval: await import("jstests/libs/override_methods/simulate_atlas_proxy.js");

@@ -30,7 +30,10 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authz_session_external_state.h"
+#include "mongo/db/client.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
 
@@ -43,14 +46,14 @@ class AuthzSessionExternalStateServerCommon : public AuthzSessionExternalState {
         delete;
 
 public:
-    virtual ~AuthzSessionExternalStateServerCommon();
+    ~AuthzSessionExternalStateServerCommon() override;
 
-    virtual bool shouldAllowLocalhost() const;
-    virtual bool shouldIgnoreAuthChecks() const;
-    virtual bool serverIsArbiter() const;
+    bool shouldAllowLocalhost() const override;
+    bool shouldIgnoreAuthChecks() const override;
+    bool serverIsArbiter() const override;
 
 protected:
-    AuthzSessionExternalStateServerCommon(AuthorizationManager* authzManager);
+    AuthzSessionExternalStateServerCommon(Client* client);
 
     // Checks whether or not localhost connections should be given full access and stores the
     // result in _allowLocalhost.  Currently localhost connections are only given full access

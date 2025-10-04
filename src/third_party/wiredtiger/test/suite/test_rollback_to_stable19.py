@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 from helper import simulate_crash_restart
-from test_rollback_to_stable01 import test_rollback_to_stable_base
+from rollback_to_stable_util import test_rollback_to_stable_base
 from wiredtiger import stat, WT_NOTFOUND
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
@@ -35,7 +35,6 @@ from wtscenario import make_scenarios
 # test_rollback_to_stable19.py
 # Test that rollback to stable aborts both insert and remove updates from a single prepared transaction
 class test_rollback_to_stable19(test_rollback_to_stable_base):
-    session_config = 'isolation=snapshot'
 
     in_memory_values = [
         ('no_inmem', dict(in_memory=False)),
@@ -45,7 +44,7 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
     format_values = [
         ('column', dict(key_format='r', value_format='S')),
         ('column_fix', dict(key_format='r', value_format='8t')),
-        ('integer_row', dict(key_format='i', value_format='S')),
+        ('row_integer', dict(key_format='i', value_format='S')),
     ]
 
     restart_options = [
@@ -56,22 +55,20 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
     scenarios = make_scenarios(in_memory_values, format_values, restart_options)
 
     def conn_config(self):
-        config = 'cache_size=50MB,statistics=(all),log=(enabled=false),eviction_dirty_trigger=10,' \
-                 'eviction_updates_trigger=10'
+        config = 'cache_size=50MB,statistics=(all),eviction_dirty_trigger=10,' \
+                 'eviction_updates_trigger=10,verbose=(rts:5)'
         if self.in_memory:
             config += ',in_memory=true'
-        else:
-            config += ',in_memory=false'
         return config
 
     def test_rollback_to_stable_no_history(self):
         nrows = 1000
 
-        # Create a table without logging.
+        # Create a table.
         uri = "table:rollback_to_stable19"
-        ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
-            config='log=(enabled=false)')
+        ds_config = ',log=(enabled=false)' if self.in_memory else ''
+        ds = SimpleDataSet(self, uri, 0,
+            key_format=self.key_format, value_format=self.value_format, config=ds_config)
         ds.populate()
 
         if self.value_format == '8t':
@@ -94,7 +91,8 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
         cursor.close()
         s.prepare_transaction('prepare_timestamp=' + self.timestamp_str(20))
 
-        # Configure debug behavior on a cursor to evict the page positioned on when the reset API is used.
+        # Configure debug behavior on a cursor to evict the page positioned on when the reset API
+        # is used.
         evict_cursor = self.session.open_cursor(uri, None, "debug=(release_evict)")
 
         # Search for the key so we position our cursor on the page that we want to evict.
@@ -102,10 +100,10 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
         evict_cursor.set_key(1)
         if self.value_format == '8t':
             # In FLCS deleted values read back as 0.
-            self.assertEquals(evict_cursor.search(), 0)
-            self.assertEquals(evict_cursor.get_value(), 0)
+            self.assertEqual(evict_cursor.search(), 0)
+            self.assertEqual(evict_cursor.get_value(), 0)
         else:
-            self.assertEquals(evict_cursor.search(), WT_NOTFOUND)
+            self.assertEqual(evict_cursor.search(), WT_NOTFOUND)
         evict_cursor.reset()
         evict_cursor.close()
         self.session.commit_transaction()
@@ -115,10 +113,10 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
         cursor2 = self.session.open_cursor(uri)
         cursor2.set_key(1)
         if self.value_format == '8t':
-            self.assertEquals(cursor2.search(), 0)
-            self.assertEquals(cursor2.get_value(), 0)
+            self.assertEqual(cursor2.search(), 0)
+            self.assertEqual(cursor2.get_value(), 0)
         else:
-            self.assertEquals(cursor2.search(), WT_NOTFOUND)
+            self.assertEqual(cursor2.search(), WT_NOTFOUND)
         self.session.commit_transaction()
         cursor2.close()
 
@@ -134,7 +132,6 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
                 # Close and reopen the connection
                 self.reopen_conn()
         else:
-            self.conn.rollback_to_stable()
             s.rollback_transaction()
 
         # Verify data is not visible.
@@ -148,7 +145,7 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
         # After restart (not crash) the stats for the aborted updates will be 0, as the updates
         # will be aborted during shutdown, and on startup there will be no updates to be aborted.
         # This is similar case with keys removed.
-        if not self.in_memory and not self.crash:
+        if self.in_memory or not self.crash:
             self.assertEqual(upd_aborted, 0)
             self.assertEqual(keys_removed, 0)
         else:
@@ -160,11 +157,11 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
     def test_rollback_to_stable_with_history(self):
         nrows = 1000
 
-        # Create a table without logging.
+        # Create a table.
         uri = "table:rollback_to_stable19"
-        ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
-            config='log=(enabled=false)')
+        ds_config = ',log=(enabled=false)' if self.in_memory else ''
+        ds = SimpleDataSet(self, uri, 0,
+            key_format=self.key_format, value_format=self.value_format, config=ds_config)
         ds.populate()
 
         if self.value_format == '8t':
@@ -195,7 +192,8 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
         cursor.close()
         s.prepare_transaction('prepare_timestamp=' + self.timestamp_str(40))
 
-        # Configure debug behavior on a cursor to evict the page positioned on when the reset API is used.
+        # Configure debug behavior on a cursor to evict the page positioned on when the reset API
+        # is used.
         evict_cursor = self.session.open_cursor(uri, None, "debug=(release_evict)")
 
         # Search for the key so we position our cursor on the page that we want to evict.
@@ -203,10 +201,10 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
         evict_cursor.set_key(1)
         if self.value_format == '8t':
             # In FLCS deleted values read back as 0.
-            self.assertEquals(evict_cursor.search(), 0)
-            self.assertEquals(evict_cursor.get_value(), 0)
+            self.assertEqual(evict_cursor.search(), 0)
+            self.assertEqual(evict_cursor.get_value(), 0)
         else:
-            self.assertEquals(evict_cursor.search(), WT_NOTFOUND)
+            self.assertEqual(evict_cursor.search(), WT_NOTFOUND)
         evict_cursor.reset()
         evict_cursor.close()
         self.session.commit_transaction()
@@ -216,10 +214,10 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
         cursor2 = self.session.open_cursor(uri)
         cursor2.set_key(1)
         if self.value_format == '8t':
-            self.assertEquals(cursor2.search(), 0)
-            self.assertEquals(cursor2.get_value(), 0)
+            self.assertEqual(cursor2.search(), 0)
+            self.assertEqual(cursor2.get_value(), 0)
         else:
-            self.assertEquals(cursor2.search(), WT_NOTFOUND)
+            self.assertEqual(cursor2.search(), WT_NOTFOUND)
         self.session.commit_transaction()
         cursor2.close()
 
@@ -235,7 +233,6 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
                 # Close and reopen the connection
                 self.reopen_conn()
         else:
-            self.conn.rollback_to_stable()
             s.rollback_transaction()
 
         # Verify data.
@@ -247,14 +244,12 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
         upd_aborted = stat_cursor[stat.conn.txn_rts_upd_aborted][2]
         hs_removed = stat_cursor[stat.conn.txn_rts_hs_removed][2]
 
-        # After restart (not crash) the stats for the aborted updates and history store removed will be 0,
-        # as the updates aborted and history store removed will occur during shutdown, and on startup there
-        # will be no updates to be removed.
-        if not self.in_memory:
-            if self.crash:
-                self.assertGreater(hs_removed, 0)
-            else:
-                self.assertEqual(hs_removed, 0)
-                self.assertEqual(upd_aborted, 0)
+        # After restart (not crash) the stats for the aborted updates and history store removed
+        # will be 0, as the updates aborted and history store removed will occur during shutdown,
+        # and on startup there will be no updates to be removed.
+        if self.in_memory or not self.crash:
+            self.assertEqual(hs_removed, 0)
+            self.assertEqual(upd_aborted, 0)
         else:
+            self.assertGreater(hs_removed, 0)
             self.assertGreater(upd_aborted, 0)

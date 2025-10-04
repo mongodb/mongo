@@ -28,7 +28,6 @@
 #include <limits>
 #include <boost/config.hpp>
 #include <boost/assert.hpp>
-#include <boost/static_assert.hpp>
 #include <boost/memory_order.hpp>
 #include <boost/atomic/capabilities.hpp>
 #include <boost/atomic/detail/config.hpp>
@@ -119,7 +118,7 @@ namespace {
 #if BOOST_ARCH_X86 && (defined(BOOST_ATOMIC_USE_SSE2) || defined(BOOST_ATOMIC_USE_SSE41)) && defined(BOOST_ATOMIC_DETAIL_SIZEOF_POINTER) && (BOOST_ATOMIC_DETAIL_SIZEOF_POINTER == 8 || BOOST_ATOMIC_DETAIL_SIZEOF_POINTER == 4)
 
 typedef atomics::detail::core_operations< sizeof(find_address_t*), false, false > func_ptr_operations;
-BOOST_STATIC_ASSERT_MSG(func_ptr_operations::is_always_lock_free, "Boost.Atomic unsupported target platform: native atomic operations not implemented for function pointers");
+static_assert(func_ptr_operations::is_always_lock_free, "Boost.Atomic unsupported target platform: native atomic operations not implemented for function pointers");
 
 #if defined(BOOST_ATOMIC_DETAIL_X86_USE_RUNTIME_DISPATCH)
 std::size_t find_address_dispatch(const volatile void* addr, const volatile void* const* addrs, std::size_t size);
@@ -395,7 +394,7 @@ inline void wait_state::wait(lock_state& state) BOOST_NOEXCEPT
 
 typedef atomics::detail::core_operations< 4u, false, false > futex_operations;
 // The storage type must be a 32-bit object, as required by futex API
-BOOST_STATIC_ASSERT_MSG(futex_operations::is_always_lock_free && sizeof(futex_operations::storage_type) == 4u, "Boost.Atomic unsupported target platform: native atomic operations not implemented for 32-bit integers");
+static_assert(futex_operations::is_always_lock_free && sizeof(futex_operations::storage_type) == 4u, "Boost.Atomic unsupported target platform: native atomic operations not implemented for 32-bit integers");
 typedef atomics::detail::extra_operations< futex_operations, futex_operations::storage_size, futex_operations::is_signed > futex_extra_operations;
 
 namespace mutex_bits {
@@ -639,7 +638,7 @@ inline void wait_state::wait(lock_state& state) BOOST_NOEXCEPT
 #else // BOOST_USE_WINAPI_VERSION >= BOOST_WINAPI_VERSION_WIN6
 
 typedef atomics::detail::core_operations< 4u, false, false > mutex_operations;
-BOOST_STATIC_ASSERT_MSG(mutex_operations::is_always_lock_free, "Boost.Atomic unsupported target platform: native atomic operations not implemented for 32-bit integers");
+static_assert(mutex_operations::is_always_lock_free, "Boost.Atomic unsupported target platform: native atomic operations not implemented for 32-bit integers");
 
 namespace fallback_mutex_bits {
 
@@ -1134,7 +1133,7 @@ void cleanup_lock_pool()
     }
 }
 
-BOOST_STATIC_ASSERT_MSG(once_flag_operations::is_always_lock_free, "Boost.Atomic unsupported target platform: native atomic operations not implemented for bytes");
+static_assert(once_flag_operations::is_always_lock_free, "Boost.Atomic unsupported target platform: native atomic operations not implemented for bytes");
 static once_flag g_pool_cleanup_registered = {};
 
 //! Returns index of the lock pool entry for the given pointer value
@@ -1253,11 +1252,11 @@ wait_state_list::header* wait_state_list::allocate_buffer(std::size_t new_capaci
 
         const volatile void** old_a = get_atomic_pointers(old_header);
         std::memcpy(a, old_a, old_header->size * sizeof(const volatile void*));
-        std::memset(a + old_header->size * sizeof(const volatile void*), 0, (new_capacity - old_header->size) * sizeof(const volatile void*));
+        std::memset(a + old_header->size, 0, (new_capacity - old_header->size) * sizeof(const volatile void*));
 
         wait_state** old_w = get_wait_states(old_a, old_header->capacity);
         std::memcpy(w, old_w, old_header->capacity * sizeof(wait_state*)); // copy spare wait state pointers
-        std::memset(w + old_header->capacity * sizeof(wait_state*), 0, (new_capacity - old_header->capacity) * sizeof(wait_state*));
+        std::memset(w + old_header->capacity, 0, (new_capacity - old_header->capacity) * sizeof(wait_state*));
     }
     else
     {

@@ -8,14 +8,18 @@
 
 #include "util.h"
 
+/*
+ * usage --
+ *     Display a usage message for the printlog command.
+ */
 static int
 usage(void)
 {
-    static const char *options[] = {"-f", "output to the specified file", "-x",
-      "display key and value items in hexadecimal format", "-l",
+    static const char *options[] = {"-f", "output to the specified file", "-l",
       "the start LSN from which the log will be printed, optionally the end LSN can also be "
       "specified",
-      "-m", "output log message records only", "-u", "print user data, don't redact", NULL, NULL};
+      "-m", "output log message records only", "-u", "print user data, don't redact", "-x",
+      "display key and value items in hexadecimal format", "-?", "show this message", NULL, NULL};
 
     util_usage(
       "printlog [-mux] [-f output-file] [-l start-file,start-offset]|[-l "
@@ -24,6 +28,10 @@ usage(void)
     return (1);
 }
 
+/*
+ * util_printlog --
+ *     The printlog command.
+ */
 int
 util_printlog(WT_SESSION *session, int argc, char *argv[])
 {
@@ -44,7 +52,7 @@ util_printlog(WT_SESSION *session, int argc, char *argv[])
      * it is redacted unless they make the effort to keep it in. It lessens the risk of doing the
      * wrong command.
      */
-    while ((ch = __wt_getopt(progname, argc, argv, "f:l:mux")) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "f:l:mux?")) != EOF)
         switch (ch) {
         case 'f': /* output file */
             ofile = __wt_optarg;
@@ -73,6 +81,8 @@ util_printlog(WT_SESSION *session, int argc, char *argv[])
             LF_SET(WT_TXN_PRINTLOG_HEX);
             break;
         case '?':
+            usage();
+            return (0);
         default:
             return (usage());
         }

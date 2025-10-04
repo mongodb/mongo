@@ -27,27 +27,27 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/rpc/metadata/client_metadata.h"
 
-#include <boost/filesystem.hpp>
-#include <map>
-
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/json.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/locker_noop_client_observer.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/s/is_mongos.h"
+#include "mongo/platform/process_id.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/processinfo.h"
-#include "mongo/util/scopeguard.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/testing_proctor.h"
+
+#include <memory>
+#include <string>
+
+#include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 
 namespace mongo {
 
@@ -90,7 +90,7 @@ TEST(ClientMetadataTest, TestLoopbackTest) {
         auto obj = builder.obj();
         auto swParseStatus = ClientMetadata::parse(obj[kMetadataDoc]);
         ASSERT_OK(swParseStatus.getStatus());
-        ASSERT_EQUALS("g", swParseStatus.getValue().get().getApplicationName());
+        ASSERT_EQUALS("g", swParseStatus.getValue().value().getApplicationName());
 
         auto pid = ProcessId::getCurrent().toString();
 
@@ -102,8 +102,9 @@ TEST(ClientMetadataTest, TestLoopbackTest) {
                             .append(kApplication,
                                     BOB{}
                                         .append(kName, "g")
-                                        .appendElements(kDebugBuild ? BOB{}.append(kPid, pid).obj()
-                                                                    : BOB{}.obj())
+                                        .appendElements(TestingProctor::instance().isEnabled()
+                                                            ? BOB{}.append(kPid, pid).obj()
+                                                            : BOB{}.obj())
                                         .obj())
                             .append(kDriver, BOB{}.append(kName, "a").append(kVersion, "b").obj())
                             .append(kOperatingSystem,
@@ -143,7 +144,7 @@ TEST(ClientMetadataTest, TestLoopbackTest) {
 
         auto swParse = ClientMetadata::parse(obj[kMetadataDoc]);
         ASSERT_OK(swParse.getStatus());
-        ASSERT_EQUALS("f", swParse.getValue().get().getApplicationName());
+        ASSERT_EQUALS("f", swParse.getValue().value().getApplicationName());
     }
 }
 
@@ -178,10 +179,9 @@ TEST(ClientMetadataTest, TestRequiredOnlyFields) {
 
 // Positive: test with app_name spelled wrong fields
 TEST(ClientMetadataTest, TestWithAppNameSpelledWrong) {
-    ASSERT_DOC_OK(kApplication << BSON("extra"
-                                       << "1")
-                               << kDriver << BSON(kName << "n1" << kVersion << "v1")
-                               << kOperatingSystem << BSON(kType << kUnknown));
+    ASSERT_DOC_OK(kApplication << BSON("extra" << "1") << kDriver
+                               << BSON(kName << "n1" << kVersion << "v1") << kOperatingSystem
+                               << BSON(kType << kUnknown));
 }
 
 // Positive: test with empty application document
@@ -260,10 +260,9 @@ TEST(ClientMetadataTest, TestNegativeWrongTypes) {
 
 // Negative: document larger than 512 bytes
 TEST(ClientMetadataTest, TestNegativeLargeDocument) {
-    bool savedMongos = isMongos();
-    ScopeGuard unsetMongoS([&] { setMongos(savedMongos); });
+    ScopeGuard unsetRouter([&] { serverGlobalParams.clusterRole = ClusterRole::None; });
 
-    setMongos(true);
+    serverGlobalParams.clusterRole = ClusterRole::RouterServer;
     {
         std::string str(350, 'x');
         ASSERT_DOC_OK(kApplication << BSON(kName << "1") << kDriver
@@ -308,16 +307,17 @@ TEST(ClientMetadataTest, TestMongoSAppend) {
     auto obj = builder.obj();
     auto swParseStatus = ClientMetadata::parse(obj[kMetadataDoc]);
     ASSERT_OK(swParseStatus.getStatus());
-    ASSERT_EQUALS("g", swParseStatus.getValue().get().getApplicationName());
+    auto metaObj = swParseStatus.getValue().value();
+    ASSERT_EQUALS("g", metaObj.getApplicationName());
+    auto docBeforeMongos = obj[kMetadataDoc].Obj();
+    ASSERT_BSONOBJ_EQ(metaObj.getDocument(), docBeforeMongos);
 
-    swParseStatus.getValue().get().setMongoSMetadata("h", "i", "j");
-    ASSERT_EQUALS("g", swParseStatus.getValue().get().getApplicationName());
+    metaObj.setMongoSMetadata("h", "i", "j");
+    ASSERT_BSONOBJ_NE(metaObj.getDocument(), docBeforeMongos);
+    ASSERT_EQUALS("g", metaObj.getApplicationName());
 
-    auto doc = swParseStatus.getValue().get().getDocument();
-
-    constexpr auto kMongos = "mongos"_sd;
-    constexpr auto kClient = "client"_sd;
-    constexpr auto kHost = "host"_sd;
+    auto docWithMongosInfo = metaObj.getDocument();
+    ASSERT_BSONOBJ_EQ(metaObj.documentWithoutMongosInfo(), docBeforeMongos);
 
     auto pid = ProcessId::getCurrent().toString();
 
@@ -327,7 +327,9 @@ TEST(ClientMetadataTest, TestMongoSAppend) {
             .append(kApplication,
                     BOB{}
                         .append(kName, "g")
-                        .appendElements(kDebugBuild ? BOB{}.append(kPid, pid).obj() : BOB{}.obj())
+                        .appendElements(TestingProctor::instance().isEnabled()
+                                            ? BOB{}.append(kPid, pid).obj()
+                                            : BOB{}.obj())
                         .obj())
             .append(kDriver, BOB{}.append(kName, "a").append(kVersion, "b").obj())
             .append(kOperatingSystem,
@@ -340,22 +342,71 @@ TEST(ClientMetadataTest, TestMongoSAppend) {
             .append(kMongos,
                     BOB{}.append(kHost, "h").append(kClient, "i").append(kVersion, "j").obj())
             .obj();
-    ASSERT_BSONOBJ_EQ(doc, outDoc);
+    ASSERT_BSONOBJ_EQ(docWithMongosInfo, outDoc);
+}
+
+// Test that if mongos information is present from the beginning, we can still request the document
+// without the mongos info.
+TEST(ClientMetadataTest, MongosMetaCanBeRemoved) {
+    BSONObjBuilder realBuilder;
+    BSONObjBuilder tmpBuilder;
+    ASSERT_OK(ClientMetadata::serializePrivate("a", "b", "c", "d", "e", "f", "g", &tmpBuilder));
+    auto objWithoutMongosMeta = tmpBuilder.obj();
+    const auto metaBsonNoMongosInfo = objWithoutMongosMeta[kMetadataDoc].Obj();
+    {
+        BSONObjBuilder metaBuilder = realBuilder.subobjStart(kMetadataDoc);
+        metaBuilder.appendElements(metaBsonNoMongosInfo);
+        metaBuilder.append("mongos", BSON(kHost << "h" << kClient << "i" << kVersion << "j"));
+        metaBuilder.doneFast();
+    }
+
+    const auto wrappingMetaBson = realBuilder.obj();
+    const auto metaElt = wrappingMetaBson[kMetadataDoc];
+    // Add this mongos info without calling 'setMongoSMetadata().'
+    ASSERT_BSONOBJ_NE(metaElt.Obj(), metaBsonNoMongosInfo);
+
+    auto swParseStatus = ClientMetadata::parse(metaElt);
+    ASSERT_OK(swParseStatus.getStatus());
+    const auto& metaObj = swParseStatus.getValue().value();
+    // Test the various copy/move constructors.
+    ClientMetadata copyConstructed(metaObj);
+    auto tmpThirdCopy = metaObj;
+    ClientMetadata moveConstructed(std::move(tmpThirdCopy));
+
+    auto tmpFourthCopy = metaObj;
+    auto moveAssigned = metaObj;  // copy for now, until next line.
+    moveAssigned = std::move(tmpFourthCopy);
+
+    const auto tmpFifthCopy = metaObj;
+    auto copyAssigned = metaObj;  // copy construct.
+    copyAssigned = tmpFifthCopy;  // copy assign.
+
+    ASSERT_BSONOBJ_EQ(metaObj.getDocument(), metaElt.Obj());
+    ASSERT_BSONOBJ_EQ(metaObj.documentWithoutMongosInfo(), metaBsonNoMongosInfo);
+    ASSERT_BSONOBJ_EQ(metaObj.documentWithoutMongosInfo(),
+                      copyConstructed.documentWithoutMongosInfo());
+    ASSERT_BSONOBJ_EQ(metaObj.documentWithoutMongosInfo(),
+                      moveConstructed.documentWithoutMongosInfo());
+    ASSERT_BSONOBJ_EQ(metaObj.documentWithoutMongosInfo(),
+                      copyAssigned.documentWithoutMongosInfo());
+    ASSERT_BSONOBJ_EQ(metaObj.documentWithoutMongosInfo(),
+                      moveAssigned.documentWithoutMongosInfo());
+
+    ASSERT_EQ(metaObj.hashWithoutMongosInfo(), copyConstructed.hashWithoutMongosInfo());
+    ASSERT_EQ(metaObj.hashWithoutMongosInfo(), moveConstructed.hashWithoutMongosInfo());
+    ASSERT_EQ(metaObj.hashWithoutMongosInfo(), copyAssigned.hashWithoutMongosInfo());
+    ASSERT_EQ(metaObj.hashWithoutMongosInfo(), moveAssigned.hashWithoutMongosInfo());
 }
 
 TEST(ClientMetadataTest, TestInvalidDocWhileSettingOpCtxMetadata) {
     auto svcCtx = ServiceContext::make();
-    svcCtx->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
-    auto client = svcCtx->makeClient("ClientMetadataTest");
+    auto client = svcCtx->getService()->makeClient("ClientMetadataTest");
     auto opCtx = client->makeOperationContext();
-    // metadataElem is of BSON type int
     auto obj = BSON("a" << 4);
-    auto metadataElem = obj["a"];
 
-    // We expect parsing to fail because metadata must be of BSON type "document"
-    ASSERT_THROWS_CODE(ClientMetadata::setFromMetadataForOperation(opCtx.get(), metadataElem),
+    ASSERT_THROWS_CODE(ClientMetadata::setFromMetadataForOperation(opCtx.get(), obj),
                        DBException,
-                       ErrorCodes::TypeMismatch);
+                       ErrorCodes::ClientMetadataMissingField);
 
     // Ensure we can still safely retrieve a ClientMetadata* from the opCtx, and that it was left
     // unset
@@ -363,22 +414,28 @@ TEST(ClientMetadataTest, TestInvalidDocWhileSettingOpCtxMetadata) {
     ASSERT_FALSE(clientMetaDataPtr);
 }
 
-TEST(ClientMetadataTest, TestEooElemAsValueToSetOpCtxMetadata) {
+TEST(ClientMetadataTest, InternalClientLimit) {
     auto svcCtx = ServiceContext::make();
-    svcCtx->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
-    auto client = svcCtx->makeClient("ClientMetadataTest");
-    auto opCtx = client->makeOperationContext();
-    // metadataElem is of BSON type eoo
-    auto metadataElem = BSONElement();
+    auto client = svcCtx->getService()->makeClient("ClientMetadataTest");
 
-    // BSON type "eoo" represents no data; we expect setting the metadata to be a no-op in this
-    // case.
-    ClientMetadata::setFromMetadataForOperation(opCtx.get(), metadataElem);
+    std::string tooLargeValue(600, 'x');
 
-    // Ensure we can still safely retrieve a ClientMetadata* from the opCtx, and that it was left
-    // unset
-    auto clientMetaDataPtr = ClientMetadata::getForOperation(opCtx.get());
-    ASSERT_FALSE(clientMetaDataPtr);
+    auto doc = BSON(kMetadataDoc << BSON(kDriver << BSON(kName << "n1" << kVersion << "v1")
+                                                 << kOperatingSystem << BSON(kType << kUnknown)
+                                                 << "extra" << tooLargeValue));
+    auto el = doc.firstElement();
+
+    // Succeeds because default limit is 1024 unless mongos (unit tests are not mongos)
+    ASSERT_OK(ClientMetadata::parse(el).getStatus());
+
+    // Throws since the document is too large
+    ASSERT_THROWS_CODE(ClientMetadata::setFromMetadata(client.get(), el, false),
+                       DBException,
+                       ErrorCodes::ClientMetadataDocumentTooLarge);
+
+
+    // Succeeds because internal client allows 1024
+    ASSERT_DOES_NOT_THROW(ClientMetadata::setFromMetadata(client.get(), el, true));
 }
 
 }  // namespace mongo

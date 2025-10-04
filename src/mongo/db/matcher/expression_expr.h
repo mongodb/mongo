@@ -29,15 +29,34 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <vector>
-
+#include "mongo/base/clonable_ptr.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/expression_tree.h"
-#include "mongo/db/matcher/rewrite_expr.h"
+#include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_walker.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/compiler/rewrites/matcher/rewrite_expr.h"
+#include "mongo/db/query/expression_walker.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/string_map.h"
+
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -55,26 +74,21 @@ public:
                         const boost::intrusive_ptr<ExpressionContext>& expCtx,
                         clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
-    bool matchesSingleElement(const BSONElement& e, MatchDetails* details = nullptr) const final {
-        MONGO_UNREACHABLE;
-    }
-
-    bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const final;
-
-    /**
-     * Evaluates the aggregation expression of this match expression on document 'doc' and returns
-     * the result.
-     */
-    Value evaluateExpression(const MatchableDocument* doc) const;
-
-    std::unique_ptr<MatchExpression> shallowClone() const final;
+    std::unique_ptr<MatchExpression> clone() const final;
 
     void debugString(StringBuilder& debug, int indentationLevel = 0) const final {
         _debugAddSpace(debug, indentationLevel);
-        debug << "$expr " << _expression->serialize(false).toString();
+        debug << "$expr " << _expression->serialize().toString();
+        _debugStringAttachTagInfo(&debug);
     }
 
-    void serialize(BSONObjBuilder* out, bool includePath) const final;
+    void serialize(BSONObjBuilder* out,
+                   const SerializationOptions& opts = {},
+                   bool includePath = true) const final;
+
+    bool isTriviallyTrue() const final;
+
+    bool isTriviallyFalse() const final;
 
     bool equivalent(const MatchExpression* other) const final;
 
@@ -87,7 +101,23 @@ public:
     }
 
     MatchExpression* getChild(size_t i) const final {
+        MONGO_UNREACHABLE_TASSERT(6400207);
+    }
+
+    void resetChild(size_t, MatchExpression*) override {
         MONGO_UNREACHABLE;
+    }
+
+    const boost::optional<RewriteExpr::RewriteResult>& getRewriteResult() const {
+        return _rewriteResult;
+    }
+
+    boost::optional<RewriteExpr::RewriteResult>& getRewriteResult() {
+        return _rewriteResult;
+    }
+
+    void setRewriteResult(boost::optional<RewriteExpr::RewriteResult> result) {
+        _rewriteResult = std::move(result);
     }
 
     std::vector<std::unique_ptr<MatchExpression>>* getChildVector() final {
@@ -99,6 +129,13 @@ public:
     }
 
     boost::intrusive_ptr<Expression> getExpression() const {
+        return _expression;
+    }
+
+    /**
+     * Use if the caller needs to modify the expression held by this $expr.
+     */
+    boost::intrusive_ptr<Expression>& getExpressionRef() {
         return _expression;
     }
 
@@ -121,16 +158,20 @@ public:
         expression_walker::walk<Expression>(_expression.get(), &substituteWalker);
     }
 
-private:
-    ExpressionOptimizerFunc getOptimizer() const final;
-
-    void _doSetCollator(const CollatorInterface* collator) final;
-
-    void _doAddDependencies(DepsTracker* deps) const final {
-        if (_expression) {
-            _expression->addDependencies(deps);
-        }
+    bool hasRenameablePath(const StringMap<std::string>& renameList) const {
+        bool hasRenameablePath = false;
+        FieldPathVisitor visitor([&](const ExpressionFieldPath* expr) {
+            hasRenameablePath =
+                hasRenameablePath || expr->isRenameableByAnyPrefixNameIn(renameList);
+        });
+        stage_builder::ExpressionWalker walker(
+            &visitor, nullptr /*inVisitor*/, nullptr /*postVisitor*/);
+        expression_walker::walk(_expression.get(), &walker);
+        return hasRenameablePath;
     }
+
+private:
+    void _doSetCollator(const CollatorInterface* collator) final;
 
     boost::intrusive_ptr<ExpressionContext> _expCtx;
 

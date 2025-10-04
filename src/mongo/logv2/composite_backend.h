@@ -31,11 +31,12 @@
 
 #include "mongo/stdx/mutex.h"
 
+#include <tuple>
+
 #include <boost/log/detail/fake_mutex.hpp>
 #include <boost/log/detail/locking_ptr.hpp>
 #include <boost/log/sinks/basic_sink_backend.hpp>
 #include <boost/log/sinks/frontend_requirements.hpp>
-#include <tuple>
 
 namespace mongo::logv2 {
 

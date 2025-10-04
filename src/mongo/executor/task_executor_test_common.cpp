@@ -27,27 +27,51 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/executor/task_executor_test_common.h"
 
-#include <memory>
-
-#include "mongo/db/concurrency/locker_noop_client_observer.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/executor/network_interface.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/client.h"
+#include "mongo/db/service_context.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_test_fixture.h"
 #include "mongo/logv2/log.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/cancellation.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/clock_source_mock.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/future.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <initializer_list>
+#include <list>
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <fmt/format.h>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 
 namespace mongo {
 namespace executor {
@@ -87,10 +111,8 @@ public:
     CetRegistrationAgent(const std::string& name, ExecutorTestCaseFactory makeTest) {
         auto& entry = executorTestCaseRegistry()[name];
         if (entry) {
-            LOGV2_FATAL(28713,
-                        "Multiple attempts to register ExecutorTest named {executor}",
-                        "Multiple attempts to register ExecutorTest",
-                        "executor"_attr = name);
+            LOGV2_FATAL(
+                28713, "Multiple attempts to register ExecutorTest", "executor"_attr = name);
         }
         entry = std::move(makeTest);
     }
@@ -113,7 +135,9 @@ public:
     void CET_##TEST_NAME::_doTest()
 
 auto makeSetStatusClosure(Status* target) {
-    return [target](const TaskExecutor::CallbackArgs& cbData) { *target = cbData.status; };
+    return [target](const TaskExecutor::CallbackArgs& cbData) {
+        *target = cbData.status;
+    };
 }
 
 auto makeSetStatusAndShutdownClosure(Status* target) {
@@ -148,10 +172,17 @@ auto makeScheduleSetStatusAndShutdownClosure(Status* outStatus1, Status* outStat
 auto makeSetStatusOnRemoteCommandCompletionClosure(const RemoteCommandRequest* expectedRequest,
                                                    Status* outStatus) {
     return [=](const TaskExecutor::RemoteCommandCallbackArgs& cbData) {
+        LOGV2(9311407,
+              "Callback invoked with response",
+              "expectedRequest"_attr = expectedRequest->toString(),
+              "request"_attr = cbData.request.toString(),
+              "response"_attr = cbData.response.toString());
+
         if (cbData.request != *expectedRequest) {
             auto desc = [](const RemoteCommandRequest& request) -> std::string {
-                return str::stream() << "Request(" << request.target.toString() << ", "
-                                     << request.dbname << ", " << request.cmdObj << ')';
+                return str::stream()
+                    << "Request(" << request.target.toString() << ", "
+                    << request.dbname.toString_forTest() << ", " << request.cmdObj << ')';
             };
             *outStatus = Status(ErrorCodes::BadValue,
                                 str::stream() << "Actual request: " << desc(cbData.request)
@@ -165,10 +196,17 @@ auto makeSetStatusOnRemoteCommandCompletionClosure(const RemoteCommandRequest* e
 auto makeSetStatusOnRemoteExhaustCommandCompletionClosure(
     const RemoteCommandRequest* expectedRequest, Status* outStatus, size_t* responseCount) {
     return [=](const TaskExecutor::RemoteCommandCallbackArgs& cbData) {
+        LOGV2(9311406,
+              "Callback invoked with response",
+              "expectedRequest"_attr = expectedRequest->toString(),
+              "request"_attr = cbData.request.toString(),
+              "response"_attr = cbData.response.toString());
+
         if (cbData.request != *expectedRequest) {
             auto desc = [](const RemoteCommandRequest& request) -> std::string {
-                return str::stream() << "Request(" << request.target.toString() << ", "
-                                     << request.dbname << ", " << request.cmdObj << ')';
+                return str::stream()
+                    << "Request(" << request.target.toString() << ", "
+                    << request.dbname.toString_forTest() << ", " << request.cmdObj << ')';
             };
             *outStatus = Status(ErrorCodes::BadValue,
                                 str::stream() << "Actual request: " << desc(cbData.request)
@@ -180,11 +218,11 @@ auto makeSetStatusOnRemoteExhaustCommandCompletionClosure(
     };
 }
 
-static inline const RemoteCommandRequest kDummyRequest{HostAndPort("localhost", 27017),
-                                                       "mydb",
-                                                       BSON("whatsUp"
-                                                            << "doc"),
-                                                       nullptr};
+static inline const RemoteCommandRequest kDummyRequest{
+    HostAndPort("localhost", 27017),
+    DatabaseName::createDatabaseName_forTest(boost::none, "mydb"),
+    BSON("whatsUp" << "doc"),
+    nullptr};
 
 COMMON_EXECUTOR_TEST(RunOne) {
     TaskExecutor& executor = getExecutor();
@@ -283,7 +321,8 @@ EventChainAndWaitingTest::~EventChainAndWaitingTest() {
 }
 
 void EventChainAndWaitingTest::run() {
-    executor->onEvent(goEvent, [=](const TaskExecutor::CallbackArgs& cbData) { onGo(cbData); })
+    executor
+        ->onEvent(goEvent, [=, this](const TaskExecutor::CallbackArgs& cbData) { onGo(cbData); })
         .status_with_transitional_ignore();
     executor->signalEvent(goEvent);
     executor->waitForEvent(goEvent);
@@ -336,8 +375,9 @@ void EventChainAndWaitingTest::onGo(const TaskExecutor::CallbackArgs& cbData) {
         return;
     }
 
-    cbHandle = executor->onEvent(
-        goEvent, [=](const TaskExecutor::CallbackArgs& cbData) { onGoAfterTriggered(cbData); });
+    cbHandle = executor->onEvent(goEvent, [=, this](const TaskExecutor::CallbackArgs& cbData) {
+        onGoAfterTriggered(cbData);
+    });
     if (!cbHandle.isOK()) {
         status1 = cbHandle.getStatus();
         executor->shutdown();
@@ -360,20 +400,18 @@ COMMON_EXECUTOR_TEST(EventWaitingWithTimeoutTest) {
 
     auto eventThatWillNeverBeTriggered = unittest::assertGet(executor.makeEvent());
 
-    auto serviceContext = ServiceContext::make();
+    auto serviceContext = ServiceContext::make(std::make_unique<ClockSourceMock>());
 
-    serviceContext->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
-    serviceContext->setFastClockSource(std::make_unique<ClockSourceMock>());
     auto mockClock = static_cast<ClockSourceMock*>(serviceContext->getFastClockSource());
 
-    auto client = serviceContext->makeClient("for testing");
+    auto client = serviceContext->getService()->makeClient("for testing");
     auto opCtx = client->makeOperationContext();
 
     auto deadline = mockClock->now() + Milliseconds{1};
     mockClock->advance(Milliseconds(2));
     ASSERT(stdx::cv_status::timeout ==
            executor.waitForEvent(opCtx.get(), eventThatWillNeverBeTriggered, deadline));
-    executor.shutdown();
+    shutdownExecutorThread();
     joinExecutorThread();
 }
 
@@ -383,13 +421,11 @@ COMMON_EXECUTOR_TEST(EventSignalWithTimeoutTest) {
 
     auto eventSignalled = unittest::assertGet(executor.makeEvent());
 
-    auto serviceContext = ServiceContext::make();
+    auto serviceContext = ServiceContext::make(std::make_unique<ClockSourceMock>());
 
-    serviceContext->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
-    serviceContext->setFastClockSource(std::make_unique<ClockSourceMock>());
     auto mockClock = static_cast<ClockSourceMock*>(serviceContext->getFastClockSource());
 
-    auto client = serviceContext->makeClient("for testing");
+    auto client = serviceContext->getService()->makeClient("for testing");
     auto opCtx = client->makeOperationContext();
 
     auto deadline = mockClock->now() + Milliseconds{1};
@@ -399,7 +435,7 @@ COMMON_EXECUTOR_TEST(EventSignalWithTimeoutTest) {
 
     ASSERT(stdx::cv_status::no_timeout ==
            executor.waitForEvent(opCtx.get(), eventSignalled, deadline));
-    executor.shutdown();
+    shutdownExecutorThread();
     joinExecutorThread();
 }
 
@@ -446,6 +482,8 @@ COMMON_EXECUTOR_TEST(SleepUntilReturnsReadyFutureWithCallbackCanceledWhenTokenAl
 
     ASSERT(alarm.isReady());
     ASSERT_EQ(alarm.getNoThrow().code(), ErrorCodes::CallbackCanceled);
+
+    launchExecutorThread();
 }
 
 COMMON_EXECUTOR_TEST(
@@ -465,13 +503,14 @@ COMMON_EXECUTOR_TEST(
     net->enterNetwork();
     // Run almost until the deadline. This isn't really necessary for the test since we could just
     // skip running the clock at all, so just doing this for some "realism".
-    net->runUntil(deadline - Milliseconds(1));
+    net->runUntil(deadline - Milliseconds(2));
     net->exitNetwork();
 
     // Cancel before deadline.
     cancelSource.cancel();
     // Required to process the cancellation.
     net->enterNetwork();
+    net->runUntil(deadline - Milliseconds(1));
     net->exitNetwork();
 
     ASSERT(alarm.isReady());
@@ -528,7 +567,7 @@ COMMON_EXECUTOR_TEST(SleepUntilResolvesOutputFutureWithSuccessWhenDeadlinePasses
     ASSERT(alarm.isReady());
     ASSERT_OK(alarm.getNoThrow());
 
-    executor.shutdown();
+    shutdownExecutorThread();
     joinExecutorThread();
 }
 
@@ -563,7 +602,7 @@ COMMON_EXECUTOR_TEST(ScheduleWorkAt) {
     executor.wait(cb2);
     ASSERT_OK(status1);
     ASSERT_OK(status2);
-    executor.shutdown();
+    shutdownExecutorThread();
     joinExecutorThread();
     ASSERT_EQUALS(status3, ErrorCodes::CallbackCanceled);
 }
@@ -578,12 +617,15 @@ COMMON_EXECUTOR_TEST(ScheduleRemoteCommand) {
     net->enterNetwork();
     ASSERT(net->hasReadyRequests());
     NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
-    net->scheduleResponse(noi, net->now(), {ErrorCodes::NoSuchKey, "I'm missing"});
+    net->scheduleResponse(
+        noi,
+        net->now(),
+        RemoteCommandResponse::make_forTest(Status(ErrorCodes::NoSuchKey, "I'm missing")));
     net->runReadyNetworkOperations();
     ASSERT(!net->hasReadyRequests());
     net->exitNetwork();
     executor.wait(cbHandle);
-    executor.shutdown();
+    shutdownExecutorThread();
     joinExecutorThread();
     ASSERT_EQUALS(ErrorCodes::NoSuchKey, status1);
 }
@@ -599,7 +641,7 @@ COMMON_EXECUTOR_TEST(ScheduleAndCancelRemoteCommand) {
     getNet()->runReadyNetworkOperations();
     getNet()->exitNetwork();
     executor.wait(cbHandle);
-    executor.shutdown();
+    shutdownExecutorThread();
     joinExecutorThread();
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, status1);
 }
@@ -627,6 +669,7 @@ COMMON_EXECUTOR_TEST(
 COMMON_EXECUTOR_TEST(
     ScheduleRemoteCommandWithCancellationTokenSuccessfullyCancelsRequestIfCanceledBeforeFunctionCallAndBeforeProcessing) {
     TaskExecutor& executor = getExecutor();
+    launchExecutorThread();
 
     CancellationSource cancelSource;
     // Cancel before calling scheduleRemoteCommand.
@@ -698,8 +741,11 @@ COMMON_EXECUTOR_TEST(RemoteCommandWithTimeout) {
     TaskExecutor& executor = getExecutor();
     Status status(ErrorCodes::InternalError, "");
     launchExecutorThread();
-    const RemoteCommandRequest request(
-        HostAndPort("lazy", 27017), "admin", BSON("sleep" << 1), nullptr, Milliseconds(1));
+    const RemoteCommandRequest request(HostAndPort("lazy", 27017),
+                                       DatabaseName::kAdmin,
+                                       BSON("sleep" << 1),
+                                       nullptr,
+                                       Milliseconds(1));
     TaskExecutor::CallbackHandle cbHandle = unittest::assertGet(executor.scheduleRemoteCommand(
         request, makeSetStatusOnRemoteCommandCompletionClosure(&request, &status)));
     net->enterNetwork();
@@ -719,7 +765,7 @@ COMMON_EXECUTOR_TEST(CallbackHandleComparison) {
     auto status1 = getDetectableErrorStatus();
     auto status2 = getDetectableErrorStatus();
     const RemoteCommandRequest request(
-        HostAndPort("lazy", 27017), "admin", BSON("cmd" << 1), nullptr);
+        HostAndPort("lazy", 27017), DatabaseName::kAdmin, BSON("cmd" << 1), nullptr);
     TaskExecutor::CallbackHandle cbHandle1 = unittest::assertGet(executor.scheduleRemoteCommand(
         request, makeSetStatusOnRemoteCommandCompletionClosure(&request, &status1)));
     TaskExecutor::CallbackHandle cbHandle2 = unittest::assertGet(executor.scheduleRemoteCommand(
@@ -752,7 +798,7 @@ COMMON_EXECUTOR_TEST(CallbackHandleComparison) {
     ASSERT_TRUE(cbs.end() != foundHandle);
     ASSERT_TRUE(cbHandle1 == *foundHandle);
     launchExecutorThread();
-    executor.shutdown();
+    shutdownExecutorThread();
     joinExecutorThread();
 }
 
@@ -775,16 +821,13 @@ COMMON_EXECUTOR_TEST(ScheduleExhaustRemoteCommandIsResolvedWhenMoreToComeFlagIsF
     net->enterNetwork();
     // Respond to the request.
     ASSERT(net->hasReadyRequests());
-    NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
-    const Date_t startTime = net->now();
-    std::list responses = {
-        std::make_pair(startTime, RemoteCommandResponse(BSONObj{}, Microseconds(), true)),
-        std::make_pair(startTime + Milliseconds(2),
-                       RemoteCommandResponse(BSONObj{}, Microseconds(), false))};
-    for (auto& [when, response] : responses) {
-        net->scheduleResponse(noi, when, response);
+    std::array responses = {RemoteCommandResponse::make_forTest(BSONObj{}, Microseconds(), true),
+                            RemoteCommandResponse::make_forTest(BSONObj{}, Microseconds(), false)};
+    for (auto&& response : responses) {
+        net->scheduleSuccessfulResponse(response);
     }
-    net->runUntil(startTime + Milliseconds(3));
+
+    net->runReadyNetworkOperations();
     ASSERT(!net->hasReadyRequests());
     net->exitNetwork();
 
@@ -816,35 +859,24 @@ COMMON_EXECUTOR_TEST(ScheduleExhaustRemoteCommandIsResolvedWhenCanceled) {
     net->enterNetwork();
     // Respond to the request.
     ASSERT(net->hasReadyRequests());
-    NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
-    const Date_t startTime = net->now();
-    std::list responses = {
-        std::make_pair(startTime, RemoteCommandResponse(BSONObj{}, Microseconds(), true)),
-        std::make_pair(startTime + Milliseconds(2),
-                       RemoteCommandResponse(BSONObj{}, Microseconds(), false))};
-    for (auto& [when, response] : responses) {
-        net->scheduleResponse(noi, when, response);
-    }
 
-    net->runUntil(startTime + Milliseconds(1));
+    // Schedule and process the first response only.
+    net->scheduleSuccessfulResponse(
+        RemoteCommandResponse::make_forTest(BSONObj{}, Microseconds(), true));
+    net->runReadyNetworkOperations();
     ASSERT_EQUALS(numTimesCallbackCalled, 1);
     ASSERT_OK(status);
 
     net->cancelCommand(cbHandle);
     net->runReadyNetworkOperations();
-    ASSERT_EQUALS(numTimesCallbackCalled, 2);
-    ASSERT_EQUALS(status, ErrorCodes::CallbackCanceled);
-
-    ASSERT(!net->hasReadyRequests());
-    net->exitNetwork();
 
     // Response should be ready.
     executor.wait(cbHandle);
 
-    net->enterNetwork();
-    // Since we canceled before T+2, we do not observe the final response.
-    net->runUntil(startTime + Milliseconds(2));
     ASSERT_EQUALS(numTimesCallbackCalled, 2);
+    ASSERT_EQUALS(status, ErrorCodes::CallbackCanceled);
+
+    ASSERT(!net->hasReadyRequests());
     net->exitNetwork();
 
     shutdownExecutorThread();
@@ -870,17 +902,15 @@ COMMON_EXECUTOR_TEST(ScheduleExhaustRemoteCommandSwallowsErrorsWhenMoreToComeFla
     net->enterNetwork();
     // Respond to the request.
     ASSERT(net->hasReadyRequests());
-    NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
-    const Date_t startTime = net->now();
-    RemoteCommandResponse error_response{ErrorCodes::NoSuchKey, "I'm missing"};
+    RemoteCommandResponse error_response =
+        RemoteCommandResponse::make_forTest(Status(ErrorCodes::NoSuchKey, "I'm missing"));
     error_response.moreToCome = true;
-    std::list responses = {std::make_pair(startTime, error_response),
-                           std::make_pair(startTime + Milliseconds(2),
-                                          RemoteCommandResponse(BSONObj{}, Microseconds(), false))};
-    for (auto& [when, response] : responses) {
-        net->scheduleResponse(noi, when, response);
+    std::array responses = {error_response,
+                            RemoteCommandResponse::make_forTest(BSONObj{}, Microseconds(), false)};
+    for (auto&& response : responses) {
+        net->scheduleSuccessfulResponse(response);
     }
-    net->runUntil(startTime + Milliseconds(3));
+    net->runReadyNetworkOperations();
     ASSERT(!net->hasReadyRequests());
     net->exitNetwork();
 
@@ -912,10 +942,9 @@ COMMON_EXECUTOR_TEST(
     net->enterNetwork();
     // Respond to the request.
     ASSERT(net->hasReadyRequests());
-    NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
-    const Date_t startTime = net->now();
-    net->scheduleResponse(noi, startTime, RemoteCommandResponse(BSONObj{}, Microseconds(), false));
-    net->runUntil(startTime + Milliseconds(1));
+    net->scheduleSuccessfulResponse(
+        RemoteCommandResponse::make_forTest(BSONObj{}, Microseconds(), false));
+    net->runReadyNetworkOperations();
 
     ASSERT_EQUALS(numTimesCallbackCalled, 1);
     ASSERT(!net->hasReadyRequests());
@@ -951,20 +980,12 @@ COMMON_EXECUTOR_TEST(ScheduleExhaustRemoteCommandFutureIsResolvedWhenMoreToComeF
     net->enterNetwork();
     // Respond to the request.
     ASSERT(net->hasReadyRequests());
-    NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
-    const Date_t startTime = net->now();
-    std::list responses = {
-        std::make_pair(startTime, RemoteCommandResponse(BSONObj{}, Microseconds(), true)),
-        std::make_pair(startTime + Milliseconds(2),
-                       RemoteCommandResponse(BSONObj{}, Microseconds(), false))};
-    for (auto& [when, response] : responses) {
-        net->scheduleResponse(noi, when, response);
+    std::array responses = {RemoteCommandResponse::make_forTest(BSONObj{}, Microseconds(), true),
+                            RemoteCommandResponse::make_forTest(BSONObj{}, Microseconds(), false)};
+    for (auto&& response : responses) {
+        net->scheduleSuccessfulResponse(response);
     }
-    net->runUntil(startTime + Milliseconds(1));
-
-    ASSERT_EQUALS(numTimesCallbackCalled, 1);
-
-    net->runUntil(startTime + Milliseconds(3));
+    net->runReadyNetworkOperations();
     ASSERT(!net->hasReadyRequests());
     net->exitNetwork();
 
@@ -998,8 +1019,8 @@ COMMON_EXECUTOR_TEST(ScheduleExhaustRemoteCommandFutureIsResolvedWhenErrorRespon
     net->enterNetwork();
     // Respond to the request.
     ASSERT(net->hasReadyRequests());
-    NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
-    net->scheduleResponse(noi, net->now(), {ErrorCodes::NoSuchKey, "I'm missing"});
+    net->scheduleSuccessfulResponse(
+        RemoteCommandResponse::make_forTest(Status(ErrorCodes::NoSuchKey, "I'm missing")));
     net->runReadyNetworkOperations();
 
     ASSERT_EQUALS(numTimesCallbackCalled, 1);
@@ -1034,24 +1055,18 @@ COMMON_EXECUTOR_TEST(ScheduleExhaustRemoteCommandFutureSwallowsErrorsWhenMoreToC
     auto net = getNet();
 
     net->enterNetwork();
-    const Date_t startTime = net->now();
 
     // Respond to the request.
     ASSERT(net->hasReadyRequests());
-    NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
-    RemoteCommandResponse error_response{ErrorCodes::NoSuchKey, "I'm missing"};
+    RemoteCommandResponse error_response =
+        RemoteCommandResponse::make_forTest(Status(ErrorCodes::NoSuchKey, "I'm missing"));
     error_response.moreToCome = true;
-    auto responses = {std::make_pair(startTime, error_response),
-                      std::make_pair(startTime + Milliseconds(2),
-                                     RemoteCommandResponse(BSONObj{}, Microseconds(), false))};
-    for (auto& [when, response] : responses) {
-        net->scheduleResponse(noi, when, response);
+    auto responses = {error_response,
+                      RemoteCommandResponse::make_forTest(BSONObj{}, Microseconds(), false)};
+    for (auto&& response : responses) {
+        net->scheduleSuccessfulResponse(response);
     }
-    net->runUntil(startTime + Milliseconds(1));
-
-    ASSERT_EQUALS(numTimesCallbackCalled, 1);
-
-    net->runUntil(startTime + Milliseconds(3));
+    net->runReadyNetworkOperations();
     ASSERT(!net->hasReadyRequests());
     net->exitNetwork();
 
@@ -1084,34 +1099,51 @@ COMMON_EXECUTOR_TEST(ScheduleExhaustRemoteCommandFutureIsResolvedWithErrorOnCanc
     net->enterNetwork();
     // Respond to the request.
     ASSERT(net->hasReadyRequests());
-    NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
-    const Date_t startTime = net->now();
-    std::list responses = {
-        std::make_pair(startTime, RemoteCommandResponse(BSONObj{}, Microseconds(), true)),
-        std::make_pair(startTime + Milliseconds(2),
-                       RemoteCommandResponse(BSONObj{}, Microseconds(), false))};
-    for (auto& [when, response] : responses) {
-        net->scheduleResponse(noi, when, response);
-    }
-    net->runUntil(startTime + Milliseconds(1));
+    net->scheduleSuccessfulResponse(
+        RemoteCommandResponse::make_forTest(BSONObj{}, Microseconds(), true));
+    net->runReadyNetworkOperations();
+    ASSERT(net->hasReadyRequests());
 
     cancelSource.cancel();
-
-    net->runUntil(startTime + Milliseconds(3));
+    net->runReadyNetworkOperations();
     ASSERT(!net->hasReadyRequests());
     net->exitNetwork();
     // Response should be cancelled.
     ASSERT_EQUALS(responseFuture.getNoThrow().getStatus().code(), ErrorCodes::CallbackCanceled);
-    ASSERT_EQUALS(numTimesCallbackCalled, 1);
+    ASSERT_EQUALS(numTimesCallbackCalled, 2);
 
     shutdownExecutorThread();
     joinExecutorThread();
+}
+
+COMMON_EXECUTOR_TEST(ScheduleRemoteCommandAfterNetworkInterfaceShutdown) {
+    FailPointEnableBlock fpb("networkInterfaceMockFailToSchedule");
+    TaskExecutor& executor = getExecutor();
+    Atomic<bool> cbRun{false};
+
+    auto cb = [&](auto) {
+        cbRun.store(true);
+    };
+
+    launchExecutorThread();
+    ASSERT_EQ(executor.scheduleRemoteCommand(kDummyRequest, cb).getStatus(),
+              ErrorCodes::ShutdownInProgress);
+    ASSERT_FALSE(cbRun.load());
+
+    ASSERT_EQ(executor.scheduleExhaustRemoteCommand(kDummyRequest, cb).getStatus(),
+              ErrorCodes::ShutdownInProgress);
+    ASSERT_FALSE(cbRun.load());
+
+    shutdownExecutorThread();
+    joinExecutorThread();
+
+    ASSERT_FALSE(cbRun.load());
 }
 }  // namespace
 
 void addTestsForExecutor(const std::string& suiteName, ExecutorFactory makeExecutor) {
     auto& suite = unittest::Suite::getSuite(suiteName);
-    for (auto testCase : executorTestCaseRegistry()) {
+    for (const auto& testCase : executorTestCaseRegistry()) {
         suite.add(str::stream() << suiteName << "::" << testCase.first,
                   __FILE__,
                   [testCase, makeExecutor] { testCase.second(makeExecutor)->run(); });

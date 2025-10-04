@@ -1,0 +1,181 @@
+load("@bazel_skylib//lib:selects.bzl", "selects")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary", "mongo_cc_library", "symlink")
+load("//bazel/config:generate_config_header.bzl", "generate_config_header")
+load(
+    "//src/third_party/wiredtiger:dist/filelist.bzl",
+    "WT_FILELIST",
+    "WT_FILELIST_ARM64_HOST",
+    "WT_FILELIST_DARWIN_HOST",
+    "WT_FILELIST_LINUX_HOST",
+    "WT_FILELIST_POSIX_HOST",
+    "WT_FILELIST_POWERPC_HOST",
+    "WT_FILELIST_WINDOWS_HOST",
+    "WT_FILELIST_X86_HOST",
+    "WT_FILELIST_ZSERIES_HOST",
+)
+
+package(default_visibility = ["//visibility:public"])
+
+selects.config_setting_group(
+    name = "windows_tcmalloc_gperf_enabled",
+    match_all = [
+        "@platforms//os:windows",
+        "//bazel/config:tcmalloc_gperf_enabled",
+    ],
+)
+
+WT_DEFINES = [
+    "HAVE_VERBOSE",
+    "HAVE_BUILTIN_EXTENSION_ZLIB",
+    "HAVE_BUILTIN_EXTENSION_SNAPPY",
+    "HAVE_BUILTIN_EXTENSION_ZSTD",
+] + select({
+    "@platforms//cpu:s390x": ["WORDS_BIGENDIAN=1"],
+    "//conditions:default": [],
+}) + select({
+    "//bazel/config:dbg_enabled": ["HAVE_DIAGNOSTIC"],
+    "//conditions:default": [],
+}) + select({
+    "//bazel/config:selected_disable_ref_track": [],
+    "//conditions:default": ["HAVE_REF_TRACK"],
+}) + select({
+    "//bazel/config:system_allocator_enabled": [],
+    "//conditions:default": ["HAVE_LIBTCMALLOC"],
+}) + select({
+    "@platforms//os:linux": ["_GNU_SOURCE"],
+    "//conditions:default": [],
+}) + select({
+    ":windows_tcmalloc_gperf_enabled": ["ENABLE_WINDOWS_TCMALLOC_COMMUNITY_SUPPORT"],
+    "//conditions:default": [],
+})
+
+WT_CCFLAGS = [
+    "-Isrc/third_party/wiredtiger/src/include",
+] + select({
+    "@platforms//os:windows": ["/wd4090"],
+    "//conditions:default": ["-Wno-implicit-fallthrough"],
+}) + select({
+    "@platforms//os:linux": ["-Isrc/third_party/wiredtiger/build_linux"],
+    "@platforms//os:windows": ["-Isrc/third_party/wiredtiger/build_win"],
+    "@platforms//os:macos": ["-Isrc/third_party/wiredtiger/build_darwin"],
+}) + select({
+    "@platforms//cpu:s390x": ["-Isrc/third_party/wiredtiger/src/checksum/zseries"],
+    "//conditions:default": [],
+}) + select({
+    "@platforms//os:linux": [
+        "-Wno-uninitialized",
+        "-Wno-array-bounds",
+        "-Wno-format-overflow",
+    ],
+    "//conditions:default": [],
+})
+
+generate_config_header(
+    name = "wt_config_header",
+    checks = ":wt_config_header.py",
+    extra_definitions = {},
+    logfile = "wt_config.log",
+    output = "wiredtiger_config.h",
+    template = select({
+        "@platforms//os:linux": "build_linux/wiredtiger_config.h.in",
+        "@platforms//os:windows": "build_win/wiredtiger_config.h.in",
+        "@platforms//os:macos": "build_darwin/wiredtiger_config.h.in",
+    }),
+)
+
+generate_config_header(
+    name = "wt_version_header",
+    additional_inputs = ["cmake/configs/version.cmake"],
+    checks = ":wt_version_header.py",
+    extra_definitions = {},
+    logfile = "wt_version.log",
+    output = "wiredtiger.h",
+    template = "src/include/wiredtiger.h.in",
+)
+
+symlink(
+    name = "wiredtiger_ext_header",
+    input = "src/include/wiredtiger_ext.h",
+    output = "wiredtiger_ext.h",
+)
+
+WT_PUBLIC_HEADERS = [
+    "wiredtiger_ext_header",
+    "wt_version_header",
+]
+
+# TODO(WT-13397): Remove once wiredtiger renames this file
+symlink(
+    name = "wiredtiger_s390x_checksum_index_1",
+    input = WT_FILELIST_ZSERIES_HOST[1],
+    output = "crc32le-vx.S",
+)
+
+mongo_cc_library(
+    name = "wiredtiger_checksum",
+    srcs = [
+        "src/checksum/software/checksum.c",
+    ] + select({
+        "@platforms//cpu:aarch64": WT_FILELIST_ARM64_HOST,
+        "@platforms//cpu:x86_64": WT_FILELIST_X86_HOST,
+        "@platforms//cpu:ppc": WT_FILELIST_POWERPC_HOST,
+        "@platforms//cpu:s390x": [
+            WT_FILELIST_ZSERIES_HOST[0],
+            ":wiredtiger_s390x_checksum_index_1",
+        ],
+    }) + glob(["**/*.h"]) + [
+        "wt_config_header",
+    ],
+    hdrs = WT_PUBLIC_HEADERS,
+    copts = WT_CCFLAGS,
+    includes = ["."],
+    local_defines = WT_DEFINES,
+)
+
+mongo_cc_library(
+    name = "wiredtiger",
+    srcs = [file for file in WT_FILELIST if file != "src/checksum/software/checksum.c"] + [
+        "ext/compressors/snappy/snappy_compress.c",
+        "ext/compressors/zlib/zlib_compress.c",
+        "ext/compressors/zstd/zstd_compress.c",
+    ] + select({
+        "//bazel/config:posix": WT_FILELIST_POSIX_HOST,
+        "@platforms//os:windows": [file for file in WT_FILELIST_WINDOWS_HOST if file != "src/os_win/os_futex.c"],
+    }) + glob(["**/*.h"]) + ["wt_config_header"],
+    hdrs = WT_PUBLIC_HEADERS,
+    copts = WT_CCFLAGS,
+    includes = ["."] + select({
+        "@platforms//os:macos": ["oss/apple"],
+        "//conditions:default": [],
+    }),
+    local_defines = WT_DEFINES,
+    non_transitive_dyn_linkopts = select({
+        "//bazel/config:posix": ["-ldl"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "wiredtiger_checksum",
+        "//src/third_party/snappy",
+        "//src/third_party/zlib",
+        "//src/third_party/zstandard:zstd",
+    ],
+)
+
+mongo_cc_binary(
+    name = "wt",
+    srcs = glob(["src/utilities/*.c"]) + glob(["**/*.h"]) + ["wt_config_header"],
+    copts = WT_CCFLAGS + select({
+        "@platforms//os:windows": ["/wd4996"],
+        "//conditions:default": [],
+    }),
+    linkopts = select({
+        "@platforms//os:linux": ["-ldl"],
+        "//conditions:default": [],
+    }),
+    local_defines = WT_DEFINES,
+    tags = [
+        "dist_test",
+        "wiredtiger",
+    ],
+    deps = ["wiredtiger"],
+)

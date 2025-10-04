@@ -42,13 +42,13 @@ enum allocation_type_v
 
 typedef unsigned int allocation_type;
 #endif   //#ifndef BOOST_CONTAINER_DOXYGEN_INVOKED
-static const allocation_type allocate_new       = (allocation_type)allocate_new_v;
-static const allocation_type expand_fwd         = (allocation_type)expand_fwd_v;
-static const allocation_type expand_bwd         = (allocation_type)expand_bwd_v;
-static const allocation_type shrink_in_place    = (allocation_type)shrink_in_place_v;
-static const allocation_type try_shrink_in_place= (allocation_type)try_shrink_in_place_v;
-static const allocation_type nothrow_allocation = (allocation_type)nothrow_allocation_v;
-static const allocation_type zero_memory        = (allocation_type)zero_memory_v;
+BOOST_CONTAINER_CONSTANT_VAR allocation_type allocate_new       = (allocation_type)allocate_new_v;
+BOOST_CONTAINER_CONSTANT_VAR allocation_type expand_fwd         = (allocation_type)expand_fwd_v;
+BOOST_CONTAINER_CONSTANT_VAR allocation_type expand_bwd         = (allocation_type)expand_bwd_v;
+BOOST_CONTAINER_CONSTANT_VAR allocation_type shrink_in_place    = (allocation_type)shrink_in_place_v;
+BOOST_CONTAINER_CONSTANT_VAR allocation_type try_shrink_in_place= (allocation_type)try_shrink_in_place_v;
+BOOST_CONTAINER_CONSTANT_VAR allocation_type nothrow_allocation = (allocation_type)nothrow_allocation_v;
+BOOST_CONTAINER_CONSTANT_VAR allocation_type zero_memory        = (allocation_type)zero_memory_v;
 
 }  //namespace container {
 }  //namespace boost {

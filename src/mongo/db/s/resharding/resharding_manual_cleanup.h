@@ -30,11 +30,18 @@
 #pragma once
 
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/persistent_task_store.h"
+#include "mongo/db/s/resharding/coordinator_document_gen.h"
+#include "mongo/db/s/resharding/donor_document_gen.h"
+#include "mongo/db/s/resharding/recipient_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
 #include "mongo/db/s/resharding/resharding_donor_service.h"
 #include "mongo/db/s/resharding/resharding_recipient_service.h"
 #include "mongo/util/uuid.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -70,17 +77,16 @@ private:
     PersistentTaskStore<ReshardingDocument> _store;
 };
 
-class ReshardingCoordinatorCleaner
-    : public ReshardingCleaner<ReshardingCoordinatorService,
-                               ReshardingCoordinatorService::ReshardingCoordinator,
-                               ReshardingCoordinatorDocument> {
+class ReshardingCoordinatorCleaner : public ReshardingCleaner<ReshardingCoordinatorService,
+                                                              ReshardingCoordinator,
+                                                              ReshardingCoordinatorDocument> {
 public:
     ReshardingCoordinatorCleaner(NamespaceString nss, UUID reshardingUUID);
 
 private:
     void _doClean(OperationContext* opCtx, const ReshardingCoordinatorDocument& doc) override;
 
-    void _abortMachine(ReshardingCoordinatorService::ReshardingCoordinator& machine) override;
+    void _abortMachine(ReshardingCoordinator& machine) override;
 
     void _cleanOnParticipantShards(OperationContext* opCtx,
                                    const ReshardingCoordinatorDocument& doc);

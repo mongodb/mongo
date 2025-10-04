@@ -1,4 +1,3 @@
-
 # Copyright (C) 2019-present MongoDB, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
@@ -28,35 +27,35 @@
 #
 
 global:
-  cpp_namespace: "mongo"
-  cpp_includes:
-    - "mongo/s/mongos_options.h"
-  configs:
-    section: "Sharding options"
-    source: [ yaml, cli, ini ]
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/s/mongos_options.h"
+    configs:
+        section: "Sharding options"
+        source: [yaml, cli, ini]
 
 configs:
-  "sharding.configDB":
-    description: >-
-      Connection string for communicating with config servers:
-      <config replset name>/<host1:port>,<host2:port>,[...]
-    short_name: configdb
-    arg_vartype: String
-  "replication.localPingThresholdMs":
-    description: "ping time (in ms) for a node to be considered local (default 15ms)"
-    short_name: "localThreshold"
-    cpp_varname: "serverGlobalParams.defaultLocalThresholdMillis"
-    arg_vartype: Int
-  "test":
-    description: "just run unit tests"
-    short_name: "test"
-    arg_vartype: Switch
-    source: [ cli, ini ]
-  "noscripting":
-    description: "Disable scripting engine"
-    arg_vartype: Switch
-    source: [ cli, ini ]
-  "security.javascriptEnabled":
-    description: "Enable javascript execution"
-    arg_vartype: Bool
-    source: [ yaml ]
+    "sharding.configDB":
+        description: >-
+            Connection string for communicating with config servers:
+            <config replset name>/<host1:port>,<host2:port>,[...]
+        short_name: configdb
+        arg_vartype: String
+    "replication.localPingThresholdMs":
+        description: "ping time (in ms) for a node to be considered local (default 15ms)"
+        short_name: "localThreshold"
+        cpp_varname: "serverGlobalParams.defaultLocalThresholdMillis"
+        arg_vartype: Int
+    "test":
+        description: "just run unit tests"
+        short_name: "test"
+        arg_vartype: Switch
+        source: [cli, ini]
+    "noscripting":
+        description: "Disable scripting engine"
+        arg_vartype: Switch
+        source: [cli, ini]
+    "security.javascriptEnabled":
+        description: "Enable javascript execution"
+        arg_vartype: Bool
+        source: [yaml]

@@ -1,0 +1,643 @@
+==== VARIATION: simple scalar key ====
+-- INPUTS:
+OUTER [value, key]:
+{"_id" : 1}, 1
+{"_id" : 2}, 2
+{"_id" : 3}, 2
+{"_id" : 4}, 7
+
+INNER [value, key]:
+{"_id" : 11}, 1
+{"_id" : 12}, 2
+{"_id" : 13}, 2
+{"_id" : 14}, 7
+
+--- First Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Second Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Third Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Fourth Stats
+dsk:1
+htRecs:3
+htIndices:155
+buffRecs:4
+buffBytes:124
+
+--- Fifth Stats
+dsk:1
+htRecs:6
+htIndices:310
+buffRecs:8
+buffBytes:248
+
+--- Sixth Stats
+dsk:1
+htRecs:9
+htIndices:465
+buffRecs:12
+buffBytes:372
+
+-- OUTPUT [outer_key, inner_agg]:
+1, {"_id" : 11}
+2, {"_id" : 12}
+2, {"_id" : 13}
+2, {"_id" : 12}
+2, {"_id" : 13}
+7, {"_id" : 14}
+
+==== VARIATION: no matches ====
+-- INPUTS:
+OUTER [value, key]:
+{"_id" : 1}, 1
+{"_id" : 2}, 4
+
+INNER [value, key]:
+{"_id" : 11}, 2
+{"_id" : 12}, 3
+
+--- First Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Second Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Third Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Fourth Stats
+dsk:1
+htRecs:2
+htIndices:98
+buffRecs:2
+buffBytes:62
+
+--- Fifth Stats
+dsk:1
+htRecs:4
+htIndices:196
+buffRecs:4
+buffBytes:124
+
+--- Sixth Stats
+dsk:1
+htRecs:6
+htIndices:294
+buffRecs:6
+buffBytes:186
+
+-- OUTPUT [outer_key, inner_agg]:
+
+==== VARIATION: simple array key ====
+-- INPUTS:
+OUTER [value, key]:
+{"_id" : 1}, 1
+{"_id" : 2}, [2, 3]
+{"_id" : 3}, [2, 4]
+{"_id" : 4}, []
+
+INNER [value, key]:
+{"_id" : 11}, 2
+{"_id" : 12}, 4
+{"_id" : 13}, [1, 2, 3]
+{"_id" : 14}, []
+
+--- First Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Second Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Third Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Fourth Stats
+dsk:1
+htRecs:4
+htIndices:204
+buffRecs:4
+buffBytes:124
+
+--- Fifth Stats
+dsk:1
+htRecs:8
+htIndices:408
+buffRecs:8
+buffBytes:248
+
+--- Sixth Stats
+dsk:1
+htRecs:12
+htIndices:612
+buffRecs:12
+buffBytes:372
+
+-- OUTPUT [outer_key, inner_agg]:
+1, {"_id" : 13}
+[2, 3], {"_id" : 11}
+[2, 3], {"_id" : 13}
+[2, 4], {"_id" : 11}
+[2, 4], {"_id" : 12}
+[2, 4], {"_id" : 13}
+
+==== VARIATION: nested array key ====
+-- INPUTS:
+OUTER [value, key]:
+{"_id" : 1}, 1
+{"_id" : 2}, 2
+{"_id" : 3}, 3
+{"_id" : 4}, [1]
+{"_id" : 5}, [3]
+{"_id" : 6}, [[3]]
+{"_id" : 7}, [2, [3]]
+
+INNER [value, key]:
+{"_id" : 11}, 1
+{"_id" : 12}, 2
+{"_id" : 13}, 3
+{"_id" : 14}, [1]
+{"_id" : 15}, [3]
+{"_id" : 16}, [[3]]
+{"_id" : 17}, [2, [3]]
+
+--- First Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Second Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Third Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Fourth Stats
+dsk:1
+htRecs:4
+htIndices:228
+buffRecs:7
+buffBytes:217
+
+--- Fifth Stats
+dsk:1
+htRecs:8
+htIndices:456
+buffRecs:14
+buffBytes:434
+
+--- Sixth Stats
+dsk:1
+htRecs:12
+htIndices:684
+buffRecs:21
+buffBytes:651
+
+-- OUTPUT [outer_key, inner_agg]:
+1, {"_id" : 11}
+1, {"_id" : 14}
+2, {"_id" : 12}
+2, {"_id" : 17}
+3, {"_id" : 13}
+3, {"_id" : 15}
+[1], {"_id" : 11}
+[1], {"_id" : 14}
+[3], {"_id" : 13}
+[3], {"_id" : 15}
+[[3]], {"_id" : 16}
+[[3]], {"_id" : 17}
+[2, [3]], {"_id" : 12}
+[2, [3]], {"_id" : 16}
+[2, [3]], {"_id" : 17}
+
+==== VARIATION: nested object key ====
+-- INPUTS:
+OUTER [value, key]:
+{"_id" : 1}, {"a" : 1}
+{"_id" : 2}, {"b" : 1}
+{"_id" : 3}, {"a" : 1, "b" : 1}
+{"_id" : 4}, {"b" : 1, "a" : 1}
+{"_id" : 5}, [{"a" : 1}]
+{"_id" : 6}, [{"a" : 1}, {"b" : 1}]
+{"_id" : 7}, [{"a" : 1, "b" : 1}]
+{"_id" : 8}, [{"b" : 1, "a" : 1}]
+
+INNER [value, key]:
+{"_id" : 11}, {"a" : 1}
+{"_id" : 12}, {"b" : 1}
+{"_id" : 13}, {"a" : 1, "b" : 1}
+{"_id" : 14}, {"b" : 1, "a" : 1}
+{"_id" : 15}, [{"a" : 1}]
+{"_id" : 16}, [{"a" : 1}, {"b" : 1}]
+{"_id" : 17}, [{"a" : 1, "b" : 1}]
+{"_id" : 18}, [{"b" : 1, "a" : 1}]
+
+--- First Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Second Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Third Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Fourth Stats
+dsk:1
+htRecs:4
+htIndices:236
+buffRecs:8
+buffBytes:248
+
+--- Fifth Stats
+dsk:1
+htRecs:8
+htIndices:472
+buffRecs:16
+buffBytes:496
+
+--- Sixth Stats
+dsk:1
+htRecs:12
+htIndices:708
+buffRecs:24
+buffBytes:744
+
+-- OUTPUT [outer_key, inner_agg]:
+{"a" : 1}, {"_id" : 11}
+{"a" : 1}, {"_id" : 15}
+{"a" : 1}, {"_id" : 16}
+{"b" : 1}, {"_id" : 12}
+{"b" : 1}, {"_id" : 16}
+{"a" : 1, "b" : 1}, {"_id" : 13}
+{"a" : 1, "b" : 1}, {"_id" : 17}
+{"b" : 1, "a" : 1}, {"_id" : 14}
+{"b" : 1, "a" : 1}, {"_id" : 18}
+[{"a" : 1}], {"_id" : 11}
+[{"a" : 1}], {"_id" : 15}
+[{"a" : 1}], {"_id" : 16}
+[{"a" : 1}, {"b" : 1}], {"_id" : 11}
+[{"a" : 1}, {"b" : 1}], {"_id" : 12}
+[{"a" : 1}, {"b" : 1}], {"_id" : 15}
+[{"a" : 1}, {"b" : 1}], {"_id" : 16}
+[{"a" : 1, "b" : 1}], {"_id" : 13}
+[{"a" : 1, "b" : 1}], {"_id" : 17}
+[{"b" : 1, "a" : 1}], {"_id" : 14}
+[{"b" : 1, "a" : 1}], {"_id" : 18}
+
+==== VARIATION: mixed key ====
+-- INPUTS:
+OUTER [value, key]:
+{"_id" : 1}, null
+{"_id" : 2}, 1
+{"_id" : 3}, "abc"
+{"_id" : 4}, NumberDecimal(1)
+{"_id" : 5}, [1]
+{"_id" : 6}, ["abc"]
+{"_id" : 7}, [null]
+{"_id" : 8}, [null, "1", "abc", NumberDecimal(1)]
+{"_id" : 9}, [{"x" : 1, "y" : "abc"}]
+
+INNER [value, key]:
+{"_id" : 11}, null
+{"_id" : 12}, 1
+{"_id" : 13}, "abc"
+{"_id" : 14}, NumberDecimal(1)
+{"_id" : 15}, [1]
+{"_id" : 16}, ["abc"]
+{"_id" : 17}, [null]
+{"_id" : 18}, [null, "1", "abc", NumberDecimal(1)]
+{"_id" : 19}, [{"x" : 1, "y" : "abc"}]
+
+--- First Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Second Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Third Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Fourth Stats
+dsk:1
+htRecs:5
+htIndices:301
+buffRecs:9
+buffBytes:279
+
+--- Fifth Stats
+dsk:1
+htRecs:10
+htIndices:602
+buffRecs:18
+buffBytes:558
+
+--- Sixth Stats
+dsk:1
+htRecs:15
+htIndices:903
+buffRecs:27
+buffBytes:837
+
+-- OUTPUT [outer_key, inner_agg]:
+null, {"_id" : 11}
+null, {"_id" : 17}
+null, {"_id" : 18}
+1, {"_id" : 12}
+1, {"_id" : 14}
+1, {"_id" : 15}
+1, {"_id" : 18}
+"abc", {"_id" : 13}
+"abc", {"_id" : 16}
+"abc", {"_id" : 18}
+NumberDecimal(1), {"_id" : 12}
+NumberDecimal(1), {"_id" : 14}
+NumberDecimal(1), {"_id" : 15}
+NumberDecimal(1), {"_id" : 18}
+[1], {"_id" : 12}
+[1], {"_id" : 14}
+[1], {"_id" : 15}
+[1], {"_id" : 18}
+["abc"], {"_id" : 13}
+["abc"], {"_id" : 16}
+["abc"], {"_id" : 18}
+[null], {"_id" : 11}
+[null], {"_id" : 17}
+[null], {"_id" : 18}
+[null, "1", "abc", NumberDecimal(1)], {"_id" : 11}
+[null, "1", "abc", NumberDecimal(1)], {"_id" : 12}
+[null, "1", "abc", NumberDecimal(1)], {"_id" : 13}
+[null, "1", "abc", NumberDecimal(1)], {"_id" : 14}
+[null, "1", "abc", NumberDecimal(1)], {"_id" : 15}
+[null, "1", "abc", NumberDecimal(1)], {"_id" : 16}
+[null, "1", "abc", NumberDecimal(1)], {"_id" : 17}
+[null, "1", "abc", NumberDecimal(1)], {"_id" : 18}
+[{"x" : 1, "y" : "abc"}], {"_id" : 19}
+
+==== VARIATION: with toLower collator ====
+COLLATOR: Collator({"locale" : "mock_to_lower_string", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})
+-- INPUTS:
+OUTER [value, key]:
+{"_id" : 1}, null
+{"_id" : 2}, "abc"
+{"_id" : 3}, "ABC"
+{"_id" : 4}, "Abc"
+{"_id" : 5}, "def"
+
+INNER [value, key]:
+{"_id" : 11}, null
+{"_id" : 12}, "abc"
+{"_id" : 13}, "ABC"
+{"_id" : 14}, "Abc"
+{"_id" : 15}, "def"
+
+--- First Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Second Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Third Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Fourth Stats
+dsk:1
+htRecs:3
+htIndices:163
+buffRecs:5
+buffBytes:155
+
+--- Fifth Stats
+dsk:1
+htRecs:6
+htIndices:326
+buffRecs:10
+buffBytes:310
+
+--- Sixth Stats
+dsk:1
+htRecs:9
+htIndices:489
+buffRecs:15
+buffBytes:465
+
+-- OUTPUT [outer_key, inner_agg]:
+null, {"_id" : 11}
+"abc", {"_id" : 12}
+"abc", {"_id" : 13}
+"abc", {"_id" : 14}
+"ABC", {"_id" : 12}
+"ABC", {"_id" : 13}
+"ABC", {"_id" : 14}
+"Abc", {"_id" : 12}
+"Abc", {"_id" : 13}
+"Abc", {"_id" : 14}
+"def", {"_id" : 15}
+
+==== VARIATION: empty ====
+-- INPUTS:
+OUTER [value, key]:
+
+INNER [value, key]:
+
+--- First Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Second Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Third Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Fourth Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+
+--- Fifth Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+
+--- Sixth Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+
+-- OUTPUT [outer_key, inner_agg]:
+
+==== VARIATION: empty outer ====
+-- INPUTS:
+OUTER [value, key]:
+
+INNER [value, key]:
+{"_id" : 11}, 2
+{"_id" : 12}, 3
+
+--- First Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Second Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Third Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Fourth Stats
+dsk:1
+htRecs:2
+htIndices:98
+buffRecs:2
+buffBytes:62
+
+--- Fifth Stats
+dsk:1
+htRecs:4
+htIndices:196
+buffRecs:4
+buffBytes:124
+
+--- Sixth Stats
+dsk:1
+htRecs:6
+htIndices:294
+buffRecs:6
+buffBytes:186
+
+-- OUTPUT [outer_key, inner_agg]:
+
+==== VARIATION: empty inner ====
+-- INPUTS:
+OUTER [value, key]:
+{"_id" : 1}, 1
+{"_id" : 2}, 2
+
+INNER [value, key]:
+
+--- First Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Second Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Third Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+--- Fourth Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+
+--- Fifth Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+
+--- Sixth Stats
+dsk:0
+htRecs:0
+htIndices:0
+buffRecs:0
+buffBytes:0
+
+-- OUTPUT [outer_key, inner_agg]:

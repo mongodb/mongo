@@ -157,18 +157,6 @@ data_source_error(int v)
 }
 
 static int
-data_source_notify(WT_TXN_NOTIFY *handler, WT_SESSION *session, uint64_t txnid, int committed)
-{
-    /* Unused parameters */
-    (void)handler;
-    (void)session;
-    (void)txnid;
-    (void)committed;
-
-    return (0);
-}
-
-static int
 my_cursor_next(WT_CURSOR *wtcursor)
 {
     (void)wtcursor;
@@ -206,53 +194,6 @@ my_cursor_insert(WT_CURSOR *wtcursor)
 
     /* Unused parameters */
     (void)wtcursor;
-
-    {
-        int is_snapshot_isolation, isolation_level;
-        /*! [WT_EXTENSION transaction isolation level] */
-        isolation_level = wt_api->transaction_isolation_level(wt_api, session);
-        if (isolation_level == WT_TXN_ISO_SNAPSHOT)
-            is_snapshot_isolation = 1;
-        else
-            is_snapshot_isolation = 0;
-        /*! [WT_EXTENSION transaction isolation level] */
-        (void)is_snapshot_isolation;
-    }
-
-    {
-        /*! [WT_EXTENSION transaction ID] */
-        uint64_t transaction_id;
-
-        transaction_id = wt_api->transaction_id(wt_api, session);
-        /*! [WT_EXTENSION transaction ID] */
-        (void)transaction_id;
-    }
-
-    {
-        /*! [WT_EXTENSION transaction oldest] */
-        uint64_t transaction_oldest;
-
-        transaction_oldest = wt_api->transaction_oldest(wt_api);
-        /*! [WT_EXTENSION transaction oldest] */
-        (void)transaction_oldest;
-    }
-
-    {
-        /*! [WT_EXTENSION transaction notify] */
-        WT_TXN_NOTIFY handler;
-        handler.notify = data_source_notify;
-        error_check(wt_api->transaction_notify(wt_api, session, &handler));
-        /*! [WT_EXTENSION transaction notify] */
-    }
-
-    {
-        uint64_t transaction_id = 1;
-        int is_visible;
-        /*! [WT_EXTENSION transaction visible] */
-        is_visible = wt_api->transaction_visible(wt_api, session, transaction_id);
-        /*! [WT_EXTENSION transaction visible] */
-        (void)is_visible;
-    }
 
     {
         const char *key1 = NULL, *key2 = NULL;
@@ -293,6 +234,13 @@ my_cursor_remove(WT_CURSOR *wtcursor)
     return (0);
 }
 static int
+my_cursor_bound(WT_CURSOR *wtcursor, const char *config)
+{
+    (void)wtcursor;
+    (void)config;
+    return (0);
+}
+static int
 my_cursor_close(WT_CURSOR *wtcursor)
 {
     (void)wtcursor;
@@ -330,7 +278,7 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session, const char *uri, WT_CO
     cursor->wtcursor.update = my_cursor_update;
     cursor->wtcursor.remove = my_cursor_remove;
     cursor->wtcursor.close = my_cursor_close;
-
+    cursor->wtcursor.bound = my_cursor_bound;
     /*
      * Configure local cursor information.
      */
@@ -583,19 +531,6 @@ my_terminate(WT_DATA_SOURCE *dsrc, WT_SESSION *session)
     return (0);
 }
 
-/*! [WT_DATA_SOURCE lsm_pre_merge] */
-static int
-my_lsm_pre_merge(WT_DATA_SOURCE *dsrc, WT_CURSOR *source, WT_CURSOR *dest)
-/*! [WT_DATA_SOURCE lsm_pre_merge] */
-{
-    /* Unused parameters */
-    (void)dsrc;
-    (void)source;
-    (void)dest;
-
-    return (0);
-}
-
 static const char *home;
 
 int
@@ -612,7 +547,7 @@ main(int argc, char *argv[])
         /*! [WT_DATA_SOURCE register] */
         static WT_DATA_SOURCE my_dsrc = {my_alter, my_create, my_compact, my_drop, my_open_cursor,
           my_rename, my_salvage, my_size, my_truncate, my_range_truncate, my_verify, my_checkpoint,
-          my_terminate, my_lsm_pre_merge};
+          my_terminate};
         error_check(conn->add_data_source(conn, "dsrc:", &my_dsrc, NULL));
         /*! [WT_DATA_SOURCE register] */
     }

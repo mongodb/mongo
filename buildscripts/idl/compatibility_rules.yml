@@ -1,0 +1,363 @@
+# All keys specified here can be accessed by the idl_check_compatibility.py script.
+ALLOW_ANY_TYPE_LIST:
+  # This list is only used in unit-tests.
+  - "commandAllowedAnyTypes"
+  - "commandAllowedAnyTypes-param-anyTypeParam"
+  - "commandAllowedAnyTypes-reply-anyTypeField"
+  - "oldTypeBsonAnyAllowList"
+  - "newTypeBsonAnyAllowList"
+  - "oldReplyFieldTypeBsonAnyAllowList-reply-oldBsonSerializationTypeAnyReplyField"
+  - "newReplyFieldTypeBsonAnyAllowList-reply-newBsonSerializationTypeAnyReplyField"
+  - "oldParamTypeBsonAnyAllowList-param-bsonTypeAnyParam"
+  - "newParamTypeBsonAnyAllowList-param-bsonTypeAnyParam"
+  - "commandAllowedAnyTypesWithVariant-reply-anyTypeField"
+  - "replyFieldTypeBsonAnyWithVariant-reply-bsonSerializationTypeAnyStructField"
+  - "replyFieldTypeBsonAnyWithVariantWithArray-reply-bsonSerializationTypeAnyStructField"
+  - "parameterFieldTypeBsonAnyWithVariant-param-bsonSerializationTypeAnyStructField"
+  - "parameterFieldTypeBsonAnyWithVariantWithArray-param-bsonSerializationTypeAnyStructField"
+  - "commandTypeBsonAnyWithVariant"
+  - "commandTypeBsonAnyWithVariantWithArray"
+  - "replyFieldCppTypeNotEqual-reply-cppTypeNotEqualReplyField"
+  - "commandCppTypeNotEqual"
+  - "commandParameterCppTypeNotEqual-param-cppTypeNotEqualParam"
+  - "replyFieldSerializerNotEqual-reply-serializerNotEqualReplyField"
+  - "commandSerializerNotEqual"
+  - "commandParameterSerializerNotEqual-param-serializerNotEqualParam"
+  - "replyFieldDeserializerNotEqual-reply-deserializerNotEqualReplyField"
+  - "commandDeserializerNotEqual"
+  - "commandParameterDeserializerNotEqual-param-deserializerNotEqualParam"
+  - "newlyAddedReplyFieldTypeBsonAnyAllowed-reply-newlyAddedBsonSerializationTypeAnyReplyField"
+  - "replyFieldTypeBsonAnyWithVariantUnstable-reply-bsonSerializationTypeWithVariantAnyUnstableReplyField"
+  - "newlyAddedParamBsonAnyAllowList-param-newlyAddedBsonAnyAllowListParam"
+  - "newlyAddedTypeFieldBsonAnyAllowList"
+  - "parameterFieldTypeBsonAnyWithVariantUnstable-param-bsonSerializationTypeAnyStructField"
+  - "commandTypeBsonAnyWithVariantUnstable"
+  - "commandParameterCppTypeNotEqualUnstable-param-cppTypeNotEqualParam"
+  - "replyFieldCppTypeNotEqualUnstable-reply-cppTypeNotEqualReplyUnstableField"
+  - "commandCppTypeNotEqualUnstable"
+  - "commandParameterSerializerNotEqualUnstable-param-serializerNotEqualParam"
+  - "replyFieldSerializerNotEqualUnstable-reply-serializerNotEqualReplyUnstableField"
+  - "commandSerializerNotEqualUnstable"
+  - "commandParameterDeserializerNotEqualUnstable-param-deserializerNotEqualParam"
+  - "replyFieldDeserializerNotEqualUnstable-reply-deserializerNotEqualReplyUnstableField"
+  - "commandDeserializerNotEqualUnstable"
+  - "create-param-backwards"
+  - "saslStart-param-payload"
+  - "saslStart-param-payload"
+  - "saslStart-reply-payload"
+  - "saslContinue-param-payload"
+  - "saslContinue-reply-payload"
+  # These commands (aggregate, find, update, delete, findAndModify, explain) might contain some
+  # fields with type `any`. Currently, it's not possible to avoid the `any` type in those cases.
+  # Instead, here are the preventive measures in-place to catch unintentional breaking changes:
+  # 1- Added comments on top of custom serializers/deserializers (related to these fields) to
+  #    let the future developers know that their modifications to these methods might lead to
+  #    a breaking change in the API.
+  # 2- Added proper unit-tests to catch accidental changes to the custom serializers/deserializers
+  #    by over-fitting on the current implementation of these custom serializers/deserializers.
+  # 3- Added further checks to the current script (idl_check_compatibility.py) to check for
+  #    changing a custom serializer/deserializer and considering it as a potential breaking
+  #    change.
+  - "aggregate-param-pipeline"
+  - "aggregate-param-explain"
+  - "aggregate-param-allowDiskUse"
+  - "aggregate-param-cursor"
+  - "aggregate-param-hint"
+  - "aggregate-param-comment"
+  - "aggregate-param-allowedIndexes"
+  - "aggregate-param-indexHints"
+  - "aggregate-param-needsMerge"
+  - "aggregate-param-fromMongos"
+  - "aggregate-param-$_requestReshardingResumeToken"
+  - "aggregate-param-isMapReduceCommand"
+  - "bulkWrite-param-shardVersion"
+  - "bulkWrite-reply-_id"
+  - "bulkWrite-reply-value"
+  - "count-param-hint"
+  - "count-param-limit"
+  - "count-param-maxTimeMS"
+  - "count-reply-n"
+  - "find-param-filter"
+  - "find-param-projection"
+  - "find-param-sort"
+  - "find-param-hint"
+  - "find-param-comment"
+  - "find-param-allowedIndexes"
+  - "find-param-indexHints"
+  - "find-param-collation"
+  - "find-param-singleBatch"
+  - "find-param-allowDiskUse"
+  - "find-param-min"
+  - "find-param-max"
+  - "find-param-returnKey"
+  - "find-param-showRecordId"
+  - "find-param-$queryOptions"
+  - "find-param-tailable"
+  - "find-param-oplogReplay"
+  - "find-param-noCursorTimeout"
+  - "find-param-awaitData"
+  - "find-param-allowPartialResults"
+  - "find-param-readOnce"
+  - "find-param-$_requestResumeToken"
+  - "find-param-$_resumeAfter"
+  - "find-param-$_startAt"
+  - "find-param-maxTimeMS"
+  - "update-param-u"
+  - "update-param-hint"
+  - "update-param-upsertSupplied"
+  - "update-reply-_id"
+  - "delete-param-limit"
+  - "delete-param-hint"
+  - "findAndModify-param-hint"
+  - "findAndModify-param-update"
+  - "findAndModify-reply-upserted"
+  - "insert-reply-opTime"
+  - "update-reply-opTime"
+  - "delete-reply-opTime"
+  - "aggregate-reply-partialResultsReturned"
+  - "aggregate-reply-invalidated"
+  - "find-reply-partialResultsReturned"
+  - "find-reply-invalidated"
+  - "getMore-reply-partialResultsReturned"
+  - "getMore-reply-invalidated"
+  - "listDatabasesForAllTenants-reply-tenant"
+  - "create-param-min"
+  - "create-param-max"
+  - "bulkWrite-param-updateMods"
+  - "bulkWrite-param-hint"
+  # No actual user-facing difference
+  - "bulkWrite-reply-opTime"
+  - "getMore-param-lastKnownCommittedOpTime"
+  - "hello-reply-opTime"
+  - "hello-reply-majorityOpTime"
+
+# Permit the cpp type of a parameter to change
+ALLOW_CPP_TYPE_CHANGE_LIST:
+  # maxTimeMS has been widened for consistency with
+  # equivalent params for other commands (aggregate)
+  - "find-param-maxTimeMS-std::int32_t-std::int64_t"
+  - "count-param-maxTimeMS-std::int32_t-std::int64_t"
+  - "aggregate-param-explain-mongo::ExplainOptions::Verbosity-bool"
+
+ALLOWED_NEW_COMPLEX_ACCESS_CHECKS:
+  # Do not add any command other the aggregate command or any access check that is not required
+  # only by an aggregation stage not present in previously released versions.
+  aggregate:
+    # Added in 6.3 due to the new $_analyzeShardKeyReadWriteDistribution stage.
+    - "check_cursor_session_privilege"
+    # Added in 8.1 due to the new $_internalListCollections stage.
+    - "is_authorized_for_any_action_on_any_resource_in_db"
+  count:
+    # Added in 8.1 because the count command was changed from a BasicCommand to an IDL
+    # Typed command. BasicCommands do not perform contract verification at the end of the
+    # request, but IDL Typed commands do. It turned out that when running the count
+    # command on a view, the shouldIgnoreAuthChecks() method is called, which previously
+    # went undetected because of the disabled contract checks.
+    - "should_ignore_auth_checks"
+  # The list below is only used in unit-tests.
+  complexChecksSupersetAllowed:
+    - "checkTwo"
+    - "checkThree"
+  complexChecksSupersetSomeAllowed:
+    - "checkTwo"
+
+# Once a field is part of the stable API, either by direct addition or by changing it from unstable
+# to stable, it cannot removed from the stable API within this API version. Given this impact, we
+# want to make sure such changes are always intentional. Therefore, the checker will throw errors
+# unless the field is also added to this list below, with which the author ackhowledges they are
+# aware of the above implications.
+# Additions to this list must be approved by the Stable API PM and code reviewed by the Query Optimization
+# team.
+ALLOWED_STABLE_FIELDS_LIST:
+  # This list is only used in unit-tests. These cases modify fields from unstable to stable.
+  - "oldReplyFieldTypeBsonAnyUnstable-reply-oldBsonSerializationTypeAnyUnstableReplyField"
+  - "newReplyFieldTypeBsonAnyUnstable-reply-newBsonSerializationTypeAnyUnstableReplyField"
+  - "replyFieldTypeBsonAnyNotAllowedUnstable-reply-bsonSerializationTypeAnyUnstableReplyField"
+  - "replyFieldCppTypeNotEqualUnstable-reply-cppTypeNotEqualReplyUnstableField"
+  - "newReplyFieldStable-reply-stableNewField"
+  - "importedReplyCommand-reply-stableNewField"
+  - "newReplyFieldTypeStructRecursiveOne-reply-stableNewField"
+  - "commandParameterStableRequiredNoDefault-param-newRequiredStableParam"
+  - "oldCommandParamTypeBsonAnyUnstable-param-bsonTypeAnyUnstableParam"
+  - "newCommandParamTypeBsonAnyUnstable-param-bsonTypeAnyUnstableParam"
+  - "commandParamTypeBsonAnyNotAllowedUnstable-param-bsonTypeAnyUnstableParam"
+  - "commandParameterCppTypeNotEqualUnstable-param-cppTypeNotEqualParam"
+  - "oldTypeBsonAnyUnstable-param-oldBsonSerializationTypeAnyUnstableStructField"
+  - "newTypeBsonAnyUnstable-param-newBsonSerializationTypeAnyUnstableStructField"
+  - "typeBsonAnyNotAllowedUnstable-param-bsonSerializationTypeAnyUnstableStructField"
+  - "commandCppTypeNotEqualUnstable-param-cppTypeNotEqualStructUnstableField"
+  - "newlyAddedTypeFieldBsonAnyNotAllowed-param-newlyAddedBsonSerializationTypeAnyStructField"
+  - "typeWithIncompatibleChainedStruct-param-newBsonSerializationTypeAnyUnstableStructField"
+  - "addedCommandParameterDefault-param-newStableParameter"
+  - "addedCommandParameterStable-param-newOptionalStableParam"
+  - "addedCommandParameterStableRequired-param-newStableParam"
+  - "addedCommandParameterStableWithDefault-param-newStableParamWithDefault"
+  - "newCommandParameterTypeStructRecursiveOne-param-unstableToStableOptionalField"
+  - "oldUnstableParamTypeChanges-param-oldUnstableTypeChangesParam"
+  - "oldUnstableTypeChanges-param-oldUnstableTypeChangesField"
+  - "newTypeFieldStableOptional-param-stableOptionalTypeField"
+  - "newTypeFieldStableWithDefault-param-stableWithDefaultTypeField"
+  # This list is only used in unit-tests. These cases add new fields as stable.
+  - "newlyAddedReplyFieldTypeBsonAnyNotAllowed-reply-newlyAddedBsonSerializationTypeAnyReplyField"
+  - "newReplyFieldAdded-reply-addedNewField"
+  - "replyFieldVariantDifferentStructIgnoreList-reply-fieldOne"
+  - "replyFieldNonEnumToEnumIgnoreList-reply-replyField"
+  - "newlyAddedReplyFieldTypeBsonAnyAllowed-reply-newlyAddedBsonSerializationTypeAnyReplyField"
+  - "newReplyOptionalBool-reply-ok2"
+  - "commandWithNewArrayTypeParameterAndArrayTypeReply-reply-newArrayTypeField"
+  - "commandWithNewNestedArrayTypeParameterAndNestedArrayTypeReply-reply-newStructWithArrayTypeField"
+  - "addedNewReplyFieldMissingUnstableField-reply-missingUnstableFieldAddedNewField"
+  - "newlyAddedParamBsonAnyNotAllowed-param-newlyAddedBsonAnyNotAllowedParam"
+  - "addedNewCommandParameterRequired-param-newRequiredParam"
+  - "newTypeFieldAddedRequired-param-addedRequiredTypeField"
+  - "arrayCommandParameterTypeError-param-fieldOne"
+  - "addedNewParameterMissingUnstableField-param-missingUnstableFieldAddedNewParameter"
+  - "addedNewCommandTypeFieldMissingUnstableField-param-missingUnstableFieldAddedNewField"
+  - "addedCommandParameter-param-newParameter"
+  - "newlyAddedParamBsonAnyAllowList-param-newlyAddedBsonAnyAllowListParam"
+  - "newlyAddedTypeFieldBsonAnyAllowList-param-newlyAddedBsonSerializationTypeAnyStructField"
+  - "newTypeFieldAddedOptional-param-addedOptionalTypeField"
+  - "newParameterOptionalBool-param-flag"
+  - "newCommandTypeOptionalBool-param-ok2"
+  - "commandWithNewArrayTypeParameterAndArrayTypeReply-param-newArrayTypeParameter"
+  - "commandWithNewNestedArrayTypeParameterAndNestedArrayTypeReply-param-newNestedArrayTypeParameter"
+  # Add real use cases for allowed new stable or unstable-to-stable fields after this line.
+  # Changes relative to 5.0:
+  - "collMod-param-isTimeseriesNamespace"
+  - "collMod-param-cappedSize"
+  - "collMod-param-cappedMax"
+  - "createIndexes-param-isTimeseriesNamespace"
+  - "dropIndexes-param-isTimeseriesNamespace"
+  - "listIndexes-param-isTimeseriesNamespace"
+  - "listIndexes-reply-clustered"
+  - "count-reply-n"
+  - "create-param-encryptedFields"
+  - "create-param-bucketRoundingSeconds"
+  - "create-param-temp"
+  - "renameCollection-param-to"
+  - "renameCollection-param-dropTarget"
+  - "renameCollection-param-collectionUUID"
+  - "endSessions-param-txnNumber"
+  - "endSessions-param-txnUUID"
+  - "refreshSessions-param-txnNumber"
+  - "refreshSessions-param-txnUUID"
+  - "insert-param-isTimeseriesNamespace"
+  - "update-param-isTimeseriesNamespace"
+  - "delete-param-isTimeseriesNamespace"
+  - "findAndModify-param-stmtId"
+  - "hello-param-loadBalanced"
+  - "hello-reply-serviceId"
+  - "hello-reply-isImplicitDefaultMajorityWC"
+  - "hello-reply-cwwc"
+  # BulkWrite fields
+  - "bulkWrite-param-ops"
+  - "bulkWrite-param-insert"
+  - "bulkWrite-param-document"
+  - "bulkWrite-param-update"
+  - "bulkWrite-param-filter"
+  - "bulkWrite-param-multi"
+  - "bulkWrite-param-updateMods"
+  - "bulkWrite-param-upsert"
+  - "bulkWrite-param-arrayFilters"
+  - "bulkWrite-param-hint"
+  - "bulkWrite-param-collation"
+  - "bulkWrite-param-delete"
+  - "bulkWrite-param-collation"
+  - "bulkWrite-param-nsInfo"
+  - "bulkWrite-param-ns"
+  - "bulkWrite-param-cursor"
+  - "bulkWrite-param-bypassDocumentValidation"
+  - "bulkWrite-param-constants"
+  - "bulkWrite-param-ordered"
+  - "bulkWrite-param-stmtId"
+  - "bulkWrite-param-stmtIds"
+  - "bulkWrite-param-let"
+  - "bulkWrite-param-errorsOnly"
+  - "bulkWrite-reply-cursor"
+  - "bulkWrite-reply-id"
+  - "bulkWrite-reply-firstBatch"
+  - "bulkWrite-reply-ns"
+  - "bulkWrite-reply-electionId"
+  - "bulkWrite-reply-opTime"
+  - "bulkWrite-reply-nErrors"
+  - "bulkWrite-reply-nInserted"
+  - "bulkWrite-reply-nMatched"
+  - "bulkWrite-reply-nModified"
+  - "bulkWrite-reply-nUpserted"
+  - "bulkWrite-reply-nDeleted"
+
+ALLOW_FIELD_VALUE_REMOVAL_LIST:
+  # This verbosity option was removed in 8.1, but it was never available to users prior to that,
+  # so it does not represent a real compatiblity change.
+  explain_param_verbosity_type_Verbosity:
+    - "kQueryPlannerDebug"
+
+CHANGED_ACCESS_CHECKS_TYPE:
+  # Changed access checks of update command from 'simple' to 'complex' in 8.1.
+  update:
+    - "simple"
+    - "complex"
+
+# Permit a parameter to move from bson serialisation type any
+# to a non-any serialisation type.
+IGNORE_ANY_TO_NON_ANY_LIST:
+  # These parameters were type-checked "by hand" previously;
+  # enforcing this from IDL instead does not narrow the range
+  # of permitted values
+  - "find-param-maxTimeMS"
+  - "count-param-maxTimeMS"
+
+# Do not add commands that were visible to users in previously released versions.
+IGNORE_COMMANDS_LIST:
+  # The following commands were released behind a feature flag in 5.3 but were shelved in
+  # favor of getClusterParameter and setClusterParameter. Since the feature flag was not enabled
+  # in 5.3, they were effectively unusable and so can be safely removed from the strict API.
+  - "getChangeStreamOptions"
+  - "setChangeStreamOptions"
+
+# Permit a parameter to move from a non-any bson serialisation type to any.
+IGNORE_NON_ANY_TO_ANY_LIST:
+  - "aggregate-param-indexHints"
+  - "bulkWrite-reply-opTime"
+  - "find-param-indexHints"
+  - "getMore-param-lastKnownCommittedOpTime"
+  - "hello-reply-opTime"
+  - "hello-reply-majorityOpTime"
+
+# Do not add user visible fields already released in earlier versions.
+# We generally don't allow changing a field from stable to unstable, but we permit it in special cases,
+# such as when we want to avoid making internal fields part of the stable API.
+# Additions to this list must be approved by the Stable API PM and code reviewed by the Query Optimization
+# team.
+IGNORE_STABLE_TO_UNSTABLE_LIST:
+  # This list is only used in unit-tests.
+  - "newReplyFieldUnstableIgnoreList-reply-unstableNewFieldIgnoreList"
+  - "newTypeFieldUnstableIgnoreList-param-unstableNewFieldIgnoreList"
+  - "newTypeEnumOrStructIgnoreList-reply-unstableNewFieldIgnoreList"
+  - "commandParameterUnstableIgnoreList-param-newUnstableParameterIgnoreList"
+  - "newReplyFieldUnstableOptionalIgnoreList-reply-unstableOptionalNewFieldIgnoreList"
+  - "newReplyTypeEnumOrStructIgnoreList-reply-newReplyTypeEnumOrStructIgnoreList"
+  - "newReplyFieldVariantNotSubsetIgnoreList-reply-variantNotSubsetReplyFieldIgnoreList"
+  - "replyFieldVariantDifferentStructIgnoreList-reply-variantStructRecursiveReplyFieldIgnoreList"
+  - "replyFieldNonVariantToVariantIgnoreList-reply-nonVariantToVariantReplyFieldIgnoreList"
+  - "replyFieldNonEnumToEnumIgnoreList-reply-nonEnumToEnumReplyIgnoreList"
+  - "newUnstableParamTypeChangesIgnoreList-param-newUnstableTypeChangesParamIgnoreList"
+  - "newUnstableTypeChangesIgnoreList"
+  - "newUnstableTypeChangesIgnoreList-param-newUnstableTypeChangesFieldIgnoreList"
+  - "newUnstableReplyFieldTypeChangesIgnoreList-reply-newUnstableTypeChangesReplyFieldIgnoreList"
+  - "newReplyFieldTypeStructIgnoreList-reply-structReplyField"
+  - "newReplyFieldTypeStructIgnoreList-reply-unstableNewFieldIgnoreList"
+  # Real use cases for changing a field from 'stable' to 'unstable'.
+  - "find-param-maxTimeMS"
+  - "count-param-maxTimeMS"
+  # No actual user-facing difference
+  - "bulkWrite-reply-opTime"
+  - "hello-reply-opTime"
+  - "hello-reply-majorityOpTime"
+  - "find-param-$_startAt"
+
+RENAMED_COMPLEX_ACCESS_CHECKS:
+  # Changed during 6.1 as part of removing multi-auth support.
+  get_single_user: "get_authenticated_user"
+  get_authenticated_usernames: "get_authenticated_username"
+  get_impersonated_usernames: "get_impersonated_username"

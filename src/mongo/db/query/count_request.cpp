@@ -27,13 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/query/count_request.h"
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/query/query_request_helper.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/util/assert_util.h"
+
+#include <limits>
 
 namespace mongo {
 namespace count_request {
@@ -54,15 +53,5 @@ long long countParseLimit(const BSONElement& element) {
     return limit;
 }
 
-long long countParseSkip(const BSONElement& element) {
-    uassert(ErrorCodes::BadValue, "skip value is not a valid number", element.isNumber());
-    auto skip = uassertStatusOK(element.parseIntegerElementToNonNegativeLong());
-    return skip;
-}
-
-long long countParseMaxTime(const BSONElement& element) {
-    auto maxTimeVal = uassertStatusOK(parseMaxTimeMS(element));
-    return static_cast<long long>(maxTimeVal);
-}
 }  // namespace count_request
 }  // namespace mongo

@@ -8,9 +8,9 @@
  *     multiversion_incompatible,
  * ]
  */
-(function() {
-"use strict";
-const replTest = new ReplSetTest({name: 'test', nodes: 3});
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
+const replTest = new ReplSetTest({name: "test", nodes: 3});
 replTest.startSet();
 const nodes = replTest.nodeList();
 let config = {
@@ -18,8 +18,8 @@ let config = {
     "members": [
         {"_id": 0, "host": nodes[0]},
         {"_id": 1, "host": nodes[1]},
-        {"_id": 2, "host": nodes[2], arbiterOnly: true}
-    ]
+        {"_id": 2, "host": nodes[2], arbiterOnly: true},
+    ],
 };
 replTest.initiate(config);
 
@@ -45,4 +45,3 @@ assert.commandWorked(primary.getDB("admin").runCommand({replSetReconfig: config}
 replTest.awaitReplication();
 replTest.awaitNodesAgreeOnConfigVersion();
 replTest.stopSet();
-}());

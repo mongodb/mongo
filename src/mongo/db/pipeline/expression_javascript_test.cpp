@@ -27,27 +27,40 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/expression_js_emit.h"
-
-#include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/expression_function.h"
+#include "mongo/db/pipeline/expression_js_emit.h"
 #include "mongo/db/pipeline/process_interface/standalone_process_interface.h"
+#include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+
+#include <memory>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace {
 
-class MapReduceFixture : public ServiceContextMongoDTest {
+class ExpressionJavascriptTest : public ServiceContextMongoDTest {
 protected:
-    MapReduceFixture()
+    ExpressionJavascriptTest()
         : _expCtx((new ExpressionContextForTest())), _vps(_expCtx->variablesParseState) {
-        _expCtx->mongoProcessInterface = std::make_shared<StandaloneProcessInterface>(nullptr);
+        _expCtx->setMongoProcessInterface(std::make_shared<StandaloneProcessInterface>(nullptr));
     }
 
     auto& getExpCtx() {
@@ -74,74 +87,71 @@ private:
 };
 
 
-void MapReduceFixture::setUp() {
+void ExpressionJavascriptTest::setUp() {
     ServiceContextMongoDTest::setUp();
-    ScriptEngine::setup(false);
+    ScriptEngine::setup(ExecutionEnvironment::Server);
 }
 
-void MapReduceFixture::tearDown() {
+void ExpressionJavascriptTest::tearDown() {
     ScriptEngine::dropScopeCache();
     ServiceContextMongoDTest::tearDown();
 }
 
-TEST_F(MapReduceFixture, ExpressionFunctionProducesExpectedResult) {
-    auto bsonExpr = BSON("expr" << BSON("body"
-                                        << "function(first, second) {return first + second;};"
-                                        << "args" << BSON_ARRAY("$a" << 4) << "lang"
-                                        << ExpressionFunction::kJavaScript));
+TEST_F(ExpressionJavascriptTest, ExpressionFunctionProducesExpectedResult) {
+    auto bsonExpr =
+        BSON("expr" << BSON("body" << "function(first, second) {return first + second;};"
+                                   << "args" << BSON_ARRAY("$a" << 4) << "lang"
+                                   << ExpressionFunction::kJavaScript));
 
     auto expr = ExpressionFunction::parse(getExpCtxRaw(), bsonExpr.firstElement(), getVPS());
 
     Value result = expr->evaluate(Document{BSON("a" << 2)}, getVariables());
     ASSERT_VALUE_EQ(result, Value(6));
 
-    bsonExpr =
-        BSON("expr" << BSON("body"
-                            << "function(first, second, third) {return first + second + third;};"
-                            << "args" << BSON_ARRAY(1 << 2 << 4) << "lang"
-                            << ExpressionFunction::kJavaScript));
+    bsonExpr = BSON(
+        "expr" << BSON("body" << "function(first, second, third) {return first + second + third;};"
+                              << "args" << BSON_ARRAY(1 << 2 << 4) << "lang"
+                              << ExpressionFunction::kJavaScript));
     expr = ExpressionFunction::parse(getExpCtxRaw(), bsonExpr.firstElement(), getVPS());
     result = expr->evaluate(Document{BSONObj{}}, getVariables());
     ASSERT_VALUE_EQ(result, Value(7));
 
-    bsonExpr = BSON("expr" << BSON("body"
-                                   << "function(first) {return first;};"
-                                   << "args" << BSON_ARRAY(1) << "lang"
-                                   << ExpressionFunction::kJavaScript));
+    bsonExpr = BSON("expr" << BSON("body" << "function(first) {return first;};"
+                                          << "args" << BSON_ARRAY(1) << "lang"
+                                          << ExpressionFunction::kJavaScript));
     expr = ExpressionFunction::parse(getExpCtxRaw(), bsonExpr.firstElement(), getVPS());
     result = expr->evaluate(Document{BSONObj{}}, getVariables());
     ASSERT_VALUE_EQ(result, Value(1));
 }
 
-TEST_F(MapReduceFixture, ExpressionFunctionFailsIfArgsDoesNotEvaluateToArray) {
-    auto bsonExpr = BSON("expr" << BSON("body"
-                                        << "function(first, second) {return first + second;};"
-                                        << "args" << BSON("a" << 1) << "lang"
-                                        << ExpressionFunction::kJavaScript));
+TEST_F(ExpressionJavascriptTest, ExpressionFunctionFailsIfArgsDoesNotEvaluateToArray) {
+    auto bsonExpr =
+        BSON("expr" << BSON("body" << "function(first, second) {return first + second;};"
+                                   << "args" << BSON("a" << 1) << "lang"
+                                   << ExpressionFunction::kJavaScript));
     auto expr = ExpressionFunction::parse(getExpCtxRaw(), bsonExpr.firstElement(), getVPS());
 
     ASSERT_THROWS_CODE(expr->evaluate({}, getVariables()), AssertionException, 31266);
 }
 
-TEST_F(MapReduceFixture, ExpressionFunctionFailsWithInvalidFunction) {
-    auto bsonExpr = BSON("expr" << BSON("body"
-                                        << "INVALID"
-                                        << "args" << BSON_ARRAY(1 << 2) << "lang"
-                                        << ExpressionFunction::kJavaScript));
+TEST_F(ExpressionJavascriptTest, ExpressionFunctionFailsWithInvalidFunction) {
+    auto bsonExpr = BSON("expr" << BSON("body" << "INVALID"
+                                               << "args" << BSON_ARRAY(1 << 2) << "lang"
+                                               << ExpressionFunction::kJavaScript));
     auto expr = ExpressionFunction::parse(getExpCtxRaw(), bsonExpr.firstElement(), getVPS());
 
     ASSERT_THROWS_CODE(
         expr->evaluate({}, getVariables()), AssertionException, ErrorCodes::JSInterpreterFailure);
 }
 
-TEST_F(MapReduceFixture, ExpressionFunctionFailsIfArgumentIsNotObject) {
+TEST_F(ExpressionJavascriptTest, ExpressionFunctionFailsIfArgumentIsNotObject) {
     auto bsonExpr = BSON("expr" << 1);
     ASSERT_THROWS_CODE(ExpressionFunction::parse(getExpCtxRaw(), bsonExpr.firstElement(), getVPS()),
                        AssertionException,
                        31260);
 }
 
-TEST_F(MapReduceFixture, ExpressionFunctionFailsIfBodyNotSpecified) {
+TEST_F(ExpressionJavascriptTest, ExpressionFunctionFailsIfBodyNotSpecified) {
     auto bsonExpr = BSON(
         "expr" << BSON("args" << BSON_ARRAY(1 << 2) << "lang" << ExpressionFunction::kJavaScript));
     ASSERT_THROWS_CODE(ExpressionFunction::parse(getExpCtxRaw(), bsonExpr.firstElement(), getVPS()),
@@ -149,15 +159,16 @@ TEST_F(MapReduceFixture, ExpressionFunctionFailsIfBodyNotSpecified) {
                        31261);
 }
 
-TEST_F(MapReduceFixture, ExpressionFunctionFailsIfBodyIsNotConstantExpression) {
-    auto bsonExpr = BSON("expr" << BSON("body" << BSONObj() << "args" << BSON_ARRAY(1 << 2)
-                                               << "lang" << ExpressionFunction::kJavaScript));
+TEST_F(ExpressionJavascriptTest, ExpressionFunctionFailsIfBodyIsNotConstantExpression) {
+    auto bsonExpr = BSON("expr" << BSON("body" << "$a"
+                                               << "args" << BSON_ARRAY(1 << 2) << "lang"
+                                               << ExpressionFunction::kJavaScript));
     ASSERT_THROWS_CODE(ExpressionFunction::parse(getExpCtxRaw(), bsonExpr.firstElement(), getVPS()),
                        AssertionException,
                        31432);
 }
 
-TEST_F(MapReduceFixture, ExpressionFunctionFailsIfBodyIsNotCorrectType) {
+TEST_F(ExpressionJavascriptTest, ExpressionFunctionFailsIfBodyIsNotCorrectType) {
     auto bsonExpr = BSON("expr" << BSON("body" << 1 << "args" << BSON_ARRAY(1 << 2) << "lang"
                                                << ExpressionFunction::kJavaScript));
     ASSERT_THROWS_CODE(ExpressionFunction::parse(getExpCtxRaw(), bsonExpr.firstElement(), getVPS()),
@@ -165,29 +176,27 @@ TEST_F(MapReduceFixture, ExpressionFunctionFailsIfBodyIsNotCorrectType) {
                        31262);
 }
 
-TEST_F(MapReduceFixture, ExpressionFunctionFailsIfArgsIsNotSpecified) {
-    auto bsonExpr = BSON("expr" << BSON("body"
-                                        << "function(first) {return first;};"
-                                        << "lang" << ExpressionFunction::kJavaScript));
+TEST_F(ExpressionJavascriptTest, ExpressionFunctionFailsIfArgsIsNotSpecified) {
+    auto bsonExpr = BSON("expr" << BSON("body" << "function(first) {return first;};"
+                                               << "lang" << ExpressionFunction::kJavaScript));
     ASSERT_THROWS_CODE(ExpressionFunction::parse(getExpCtxRaw(), bsonExpr.firstElement(), getVPS()),
                        AssertionException,
                        31263);
 }
 
-TEST_F(MapReduceFixture, ExpressionFunctionFailsIfLangIsNotSpecified) {
-    auto bsonExpr = BSON("expr" << BSON("body"
-                                        << "function(first) {return first;};"
-                                        << "args" << BSON_ARRAY(1 << 2)));
+TEST_F(ExpressionJavascriptTest, ExpressionFunctionFailsIfLangIsNotSpecified) {
+    auto bsonExpr = BSON("expr" << BSON("body" << "function(first) {return first;};"
+                                               << "args" << BSON_ARRAY(1 << 2)));
     ASSERT_THROWS_CODE(ExpressionFunction::parse(getExpCtxRaw(), bsonExpr.firstElement(), getVPS()),
                        AssertionException,
                        31418);
 }
 
-TEST_F(MapReduceFixture, ExpressionInternalJsEmitProducesExpectedResult) {
-    auto bsonExpr = BSON("expr" << BSON("this"
-                                        << "$$ROOT"
-                                        << "eval"
-                                        << "function() {emit(this.a, 1); emit(this.b, 1)};"));
+TEST_F(ExpressionJavascriptTest, ExpressionInternalJsEmitProducesExpectedResult) {
+    auto bsonExpr =
+        BSON("expr" << BSON("this" << "$$ROOT"
+                                   << "eval"
+                                   << "function() {emit(this.a, 1); emit(this.b, 1)};"));
 
     auto expr = ExpressionInternalJsEmit::parse(getExpCtxRaw(), bsonExpr.firstElement(), getVPS());
 
@@ -196,16 +205,16 @@ TEST_F(MapReduceFixture, ExpressionInternalJsEmitProducesExpectedResult) {
                     Value(BSON_ARRAY(BSON("k" << 3 << "v" << 1) << BSON("k" << 6 << "v" << 1))));
 }
 
-TEST_F(MapReduceFixture, ExpressionInternalJsEmitFailsIfThisArgumentNotSpecified) {
-    auto bsonExpr = BSON("expr" << BSON("eval"
-                                        << "function() {emit(this.a, 1); emit(this.b, 1)};"));
+TEST_F(ExpressionJavascriptTest, ExpressionInternalJsEmitFailsIfThisArgumentNotSpecified) {
+    auto bsonExpr =
+        BSON("expr" << BSON("eval" << "function() {emit(this.a, 1); emit(this.b, 1)};"));
     ASSERT_THROWS_CODE(
         ExpressionInternalJsEmit::parse(getExpCtxRaw(), bsonExpr.firstElement(), getVPS()),
         AssertionException,
         31223);
 }
 
-TEST_F(MapReduceFixture, ExpressionInternalJsEmitFailsIfThisArgumentIsNotAnObject) {
+TEST_F(ExpressionJavascriptTest, ExpressionInternalJsEmitFailsIfThisArgumentIsNotAnObject) {
     auto bsonExpr =
         BSON("expr" << BSON("this" << 123 << "eval"
                                    << "function() {emit(this.a, 1); emit(this.b, 1)};"));
@@ -214,29 +223,27 @@ TEST_F(MapReduceFixture, ExpressionInternalJsEmitFailsIfThisArgumentIsNotAnObjec
     ASSERT_THROWS_CODE(expr->evaluate({}, getVariables()), AssertionException, 31225);
 }
 
-TEST_F(MapReduceFixture, ExpressionInternalJsEmitFailsWithInvalidFunction) {
-    auto bsonExpr = BSON("expr" << BSON("this"
-                                        << "$$ROOT"
-                                        << "eval"
-                                        << "INVALID"));
+TEST_F(ExpressionJavascriptTest, ExpressionInternalJsEmitFailsWithInvalidFunction) {
+    auto bsonExpr = BSON("expr" << BSON("this" << "$$ROOT"
+                                               << "eval"
+                                               << "INVALID"));
     auto expr = ExpressionInternalJsEmit::parse(getExpCtxRaw(), bsonExpr.firstElement(), getVPS());
 
     ASSERT_THROWS_CODE(
         expr->evaluate({}, getVariables()), AssertionException, ErrorCodes::JSInterpreterFailure);
 }
 
-TEST_F(MapReduceFixture, ExpressionInternalJsEmitFailsWithInvalidNumberOfEvalArguments) {
-    auto bsonExpr = BSON("expr" << BSON("this"
-                                        << "$$ROOT"
-                                        << "eval"
-                                        << "function() {emit(this.a);};"));
+TEST_F(ExpressionJavascriptTest, ExpressionInternalJsEmitFailsWithInvalidNumberOfEvalArguments) {
+    auto bsonExpr = BSON("expr" << BSON("this" << "$$ROOT"
+                                               << "eval"
+                                               << "function() {emit(this.a);};"));
     auto expr = ExpressionInternalJsEmit::parse(getExpCtxRaw(), bsonExpr.firstElement(), getVPS());
 
     ASSERT_THROWS_CODE(
         expr->evaluate(Document{BSON("a" << 3)}, getVariables()), AssertionException, 31220);
 }
 
-TEST_F(MapReduceFixture, ExpressionInternalJsEmitFailsIfArgumentIsNotObject) {
+TEST_F(ExpressionJavascriptTest, ExpressionInternalJsEmitFailsIfArgumentIsNotObject) {
     auto bsonExpr = BSON("expr" << 1);
     ASSERT_THROWS_CODE(
         ExpressionInternalJsEmit::parse(getExpCtxRaw(), bsonExpr.firstElement(), getVPS()),
@@ -244,32 +251,30 @@ TEST_F(MapReduceFixture, ExpressionInternalJsEmitFailsIfArgumentIsNotObject) {
         31221);
 }
 
-TEST_F(MapReduceFixture, ExpressionInternalJsEmitFailsIfEvalNotSpecified) {
-    auto bsonExpr = BSON("expr" << BSON("this"
-                                        << "$$ROOT"));
+TEST_F(ExpressionJavascriptTest, ExpressionInternalJsEmitFailsIfEvalNotSpecified) {
+    auto bsonExpr = BSON("expr" << BSON("this" << "$$ROOT"));
     ASSERT_THROWS_CODE(
         ExpressionInternalJsEmit::parse(getExpCtxRaw(), bsonExpr.firstElement(), getVPS()),
         AssertionException,
         31222);
 }
 
-TEST_F(MapReduceFixture, ExpressionInternalJsEmitFailsIfEvalIsNotCorrectType) {
-    auto bsonExpr = BSON("expr" << BSON("this"
-                                        << "$$ROOT"
-                                        << "eval" << 12.3));
+TEST_F(ExpressionJavascriptTest, ExpressionInternalJsEmitFailsIfEvalIsNotCorrectType) {
+    auto bsonExpr = BSON("expr" << BSON("this" << "$$ROOT"
+                                               << "eval" << 12.3));
     ASSERT_THROWS_CODE(
         ExpressionInternalJsEmit::parse(getExpCtxRaw(), bsonExpr.firstElement(), getVPS()),
         AssertionException,
         31224);
 }
 
-TEST_F(MapReduceFixture, ExpressionInternalJsErrorsIfProducesTooManyDocumentsForNonDefaultValue) {
+TEST_F(ExpressionJavascriptTest,
+       ExpressionInternalJsErrorsIfProducesTooManyDocumentsForNonDefaultValue) {
     internalQueryMaxJsEmitBytes.store(1);
-    auto bsonExpr =
-        BSON("expr" << BSON("this"
-                            << "$$ROOT"
-                            << "eval"
-                            << "function() {for (var i = 0; i < this.val; ++i) {emit(i, 1);}}"));
+    auto bsonExpr = BSON(
+        "expr" << BSON("this" << "$$ROOT"
+                              << "eval"
+                              << "function() {for (var i = 0; i < this.val; ++i) {emit(i, 1);}}"));
     auto expr = ExpressionInternalJsEmit::parse(getExpCtxRaw(), bsonExpr.firstElement(), getVPS());
     ASSERT_THROWS_CODE(
         expr->evaluate(Document{BSON("val" << 1)}, getVariables()), AssertionException, 31292);

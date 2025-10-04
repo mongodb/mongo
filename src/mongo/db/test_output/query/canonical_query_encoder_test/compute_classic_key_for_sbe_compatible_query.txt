@@ -1,0 +1,75 @@
+==== VARIATION: cq=ns=test.collectionTree: $and
+Sort: {}
+Proj: {}
+an||||fs
+
+==== VARIATION: cq=ns=test.collectionTree: $or
+    a $eq 1
+    b $eq 2
+Sort: {}
+Proj: {}
+or[eqa,eqb]||||fs
+
+==== VARIATION: cq=ns=test.collectionTree: a $eq 1
+Sort: {}
+Proj: {}
+eqa||||fs
+
+==== VARIATION: cq=ns=test.collectionTree: b $eq 1
+Sort: {}
+Proj: {}
+eqb||||fs
+
+==== VARIATION: cq=ns=test.collectionTree: $and
+    a $eq 1
+    b $eq 1
+    c $eq 1
+Sort: {}
+Proj: {}
+an[eqa,eqb,eqc]||||fs
+
+==== VARIATION: cq=ns=test.collectionTree: $and
+Sort: { a: 1 }
+Proj: {}
+an|aa|||fs
+
+==== VARIATION: cq=ns=test.collectionTree: $and
+Sort: { a: -1 }
+Proj: {}
+an|da|||fs
+
+==== VARIATION: cq=ns=test.collectionTree: a $eq 1
+Sort: { a: 1 }
+Proj: {}
+eqa|aa|||fs
+
+==== VARIATION: cq=ns=test.collectionTree: a $eq 1
+Sort: { a: 1 }
+Proj: { a: 1 }
+eqa|aa|_id-a||fs
+
+==== VARIATION: cq=ns=test.collectionTree: $and
+Sort: { a: 1 }
+Proj: { a: 1 }
+an|aa|_id-a||fs
+
+==== VARIATION: cq=ns=test.collectionTree: $and
+Sort: { a: 1 }
+Proj: { a: 1 }
+an|aa|_id-a||fs
+
+==== VARIATION: cq=ns=test.collectionTree: $and
+Sort: {}
+Proj: { a: 1 }
+an||_id-a||fs
+
+==== VARIATION: cq=ns=test.collectionTree: $and
+Sort: {}
+Proj: { a: true }
+an||_id-a||fs
+
+==== VARIATION: cq=ns=test.collectionTree: $and
+Sort: {}
+Proj: { a: false }
+an||||fs
+

@@ -10,10 +10,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/aggregation/sources/densify/libs/parse_util.js");
+import {parseUtil} from "jstests/aggregation/sources/densify/libs/parse_util.js";
 
 const dbName = jsTestName();
 const testDB = db.getSiblingDB(dbName);
@@ -23,10 +20,12 @@ const collName = jsTestName();
 const testInternalClient = (function createInternalClient() {
     const connInternal = new Mongo(testDB.getMongo().host);
     const curDB = connInternal.getDB(dbName);
-    assert.commandWorked(curDB.runCommand({
-        ["hello"]: 1,
-        internalClient: {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(7)}
-    }));
+    assert.commandWorked(
+        curDB.runCommand({
+            ["hello"]: 1,
+            internalClient: {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(7)},
+        }),
+    );
     return connInternal;
 })();
 
@@ -35,5 +34,5 @@ const internalColl = internalDB[collName];
 
 parseUtil(internalDB, internalColl, "$_internalDensify", {
     writeConcern: {w: "majority"},
+    readConcern: {},
 });
-})();

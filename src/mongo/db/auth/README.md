@@ -2,35 +2,51 @@
 
 ## Table of Contents
 
-- [High Level Overview](#high-level-overview)
-- [Authentication](#authentication)
-  - [SASL](#sasl)
-    - [Speculative Auth](#speculative-authentication)
-    - [SASL Supported Mechs](#sasl-supported-mechs)
-  - [X509 Authentication](#x509-authentication)
-  - [Cluster Authentication](#cluster-authentication)
-  - [Localhost Auth Bypass](#localhost-auth-bypass)
-- [Authorization](#authorization)
-  - [Users](#users)
-    - [User Roles](#user-roles)
-    - [User Credentials](#user-credentials)
-    - [User Authentication Restrictions](#user-authentication-restrictions)
-  - [Roles](#roles)
-    - [Role subordinate Roles](#role-subordinate-roles)
-    - [Role Privileges](#role-privileges)
-    - [Role Authentication Restrictions](#role-authentication-restrictions)
-  - [User and Role Management](#user-and-role-management)
-    - [UMC Transactions](#umc-transactions)
-  - [Command Execution](#command-execution)
-  - [Authorization Caching](#authorization-caching)
-  - [Authorization Manager External State](#authorization-manager-external-state)
-  - [Types of Authorization](#types-of-authorization)
-    - [Local Authorization](#local-authorization)
-    - [LDAP Authorization](#ldap-authorization)
-    - [X.509 Authorization](#x509-authorization)
-  - [Cursors and Operations](#cursors-and-operations)
-  - [Contracts](#contracts)
-- [External References](#external-references)
+- [Identity And Access Management](#identity-and-access-management)
+  - [Table of Contents](#table-of-contents)
+  - [High Level Overview](#high-level-overview)
+  - [Authentication](#authentication)
+    - [SASL](#sasl)
+      - [Speculative Authentication](#speculative-authentication)
+      - [SASL Supported Mechs](#sasl-supported-mechs)
+    - [Cluster Authentication](#cluster-authentication)
+      - [X509 Intracluster Auth and Member Certificate Rotation](#x509-intracluster-auth-and-member-certificate-rotation)
+      - [Keyfile Intracluster Auth](#keyfile-intracluster-auth)
+      - [Special Case: Arbiter](#special-case-arbiter)
+    - [Sharding Authentication](#sharding-authentication)
+    - [Localhost Auth Bypass](#localhost-auth-bypass)
+  - [Authorization](#authorization)
+    - [AuthName](#authname)
+      - [Serializations](#serializations)
+      - [Multitenancy](#multitenancy)
+    - [Users](#users)
+      - [User Roles](#user-roles)
+      - [User Credentials](#user-credentials)
+      - [User Authentication Restrictions](#user-authentication-restrictions)
+      - [Any versus All criteria](#any-versus-all-criteria)
+    - [Roles](#roles)
+      - [Role subordinate roles](#role-subordinate-roles)
+      - [Role Privileges](#role-privileges)
+      - [Normal resources](#normal-resources)
+      - [Role Authentication Restrictions](#role-authentication-restrictions)
+    - [Privilege](#privilege)
+      - [ResourcePattern](#resourcepattern)
+        - [Normal Namespace](#normal-namespace)
+      - [ActionType](#actiontype)
+    - [User and Role Management](#user-and-role-management)
+      - [UMC Transactions](#umc-transactions)
+      - [Multitenancy](#multitenancy-1)
+    - [Command Execution](#command-execution)
+    - [Authorization Caching](#authorization-caching)
+    - [Authorization Router](#authorization-router)
+    - [Authorization Backend](#authorization-backend)
+    - [Types of Authorization](#types-of-authorization)
+      - [Local Authorization](#local-authorization)
+      - [LDAP Authorization](#ldap-authorization)
+      - [X.509 Authorization](#x509-authorization)
+    - [Cursors and Operations](#cursors-and-operations)
+    - [Contracts](#contracts)
+  - [External References](#external-references)
 
 ## High Level Overview
 
@@ -57,7 +73,7 @@ user credentials and roles. The authorization session is then used to check perm
 ## Authentication
 
 On a server with authentication enabled, all but a small handful of commands require clients to
-authenticate before performing any action.  This typically occurs with a 1 to 3 round trip
+authenticate before performing any action. This typically occurs with a 1 to 3 round trip
 conversation using the `saslStart` and `saslContinue` commands, or though a single call to the
 `authenticate` command. See [SASL](#SASL) and [X.509](#X509) below for the details of these
 exchanges.
@@ -103,8 +119,8 @@ encountered.
 
 To reduce connection overhead time, clients may begin and possibly complete their authentication
 exchange as part of the
-[`CmdHello`]((https://github.com/mongodb/mongo/blob/r4.7.0/src/mongo/db/repl/replication_info.cpp#L234))
-exchange.  In this mode, the body of the `saslStart` or `authenticate` command used for
+[`CmdHello`](<(https://github.com/mongodb/mongo/blob/r4.7.0/src/mongo/db/repl/replication_info.cpp#L234)>)
+exchange. In this mode, the body of the `saslStart` or `authenticate` command used for
 authentication may be embedded into the `hello` command under the field `{speculativeAuthenticate:
 $bodyOfAuthCmd}`.
 
@@ -116,14 +132,14 @@ included in the `hello` command response.
 #### SASL Supported Mechs
 
 When using the [SASL](#SASL) authentication workflow, it is necessary to select a specific mechanism
-to authenticate with (e.g. SCRAM-SHA-1, SCRAM-SHA-256, PLAIN, GSSAPI, etc...).  If the user has not
+to authenticate with (e.g. SCRAM-SHA-1, SCRAM-SHA-256, PLAIN, GSSAPI, etc...). If the user has not
 included the mechanism in the mongodb:// URI, then the client can ask the server what mechanisms are
 available on a per-user basis before attempting to authenticate.
 
 Therefore, during the initial handshake using
 [`CmdHello`](https://github.com/mongodb/mongo/blob/r4.7.0/src/mongo/db/repl/replication_info.cpp#L234),
 the client will notify the server of the user it is about to authenticate by including
-`{saslSupportedMechs: 'username'}` with the `hello` command.  The server will then include
+`{saslSupportedMechs: 'username'}` with the `hello` command. The server will then include
 `{saslSupportedMechs: [$listOfMechanisms]}` in the `hello` command's response.
 
 This allows clients to proceed with authentication by choosing an appropriate mechanism. The
@@ -156,7 +172,7 @@ the storage mechanism is listed as a sub-bullet below.
     SHA-256 so that the password is not stored in plaintext. Even when using the PLAIN mechanism,
     the same secrets as used for the SCRAM methods are stored and used for validation. The chief
     difference between using PLAIN and SCRAM-SHA-256 (or SCRAM-SHA-1) is that using SCRAM provides
-    mutual authentication and avoids transmitting the password to the server.  With PLAIN, it is
+    mutual authentication and avoids transmitting the password to the server. With PLAIN, it is
     less difficult for a MitM attacker to compromise original credentials.
   - **With local users**
     - When the PLAIN mechanism is used with internal users, the user information is stored in the
@@ -165,7 +181,7 @@ the storage mechanism is listed as a sub-bullet below.
       on the database. See [authorization](#authorization) for more information.
   - **With Native LDAP**
     - When the PLAIN mechanism uses `Native LDAP`, the credential information is sent to and
-      recieved from LDAP when creating and authorizing a user. The mongo server sends user
+      received from LDAP when creating and authorizing a user. The mongo server sends user
       credentials over the wire to the LDAP server and the LDAP server requests a password. The
       mongo server sends the password in plain text and LDAP responds with whether the password is
       correct. Here the communication with the driver and the mongod is the same, but the storage
@@ -180,30 +196,44 @@ the storage mechanism is listed as a sub-bullet below.
     authentication. GSSAPI is the communication method used to communicate with Kerberos servers and
     with clients. When initializing this auth mechanism, the server tries to acquire its credential
     information from the KDC by calling
-    [`tryAcquireServerCredential`](https://github.com/10gen/mongo-enterprise-modules/blob/r4.4.0/src/sasl/mongo_gssapi.h#L36).
+    [`tryAcquireServerCredential`](https://github.com/mongodb/mongo-enterprise-modules/blob/r4.4.0/src/sasl/mongo_gssapi.h#L36).
     If this is not approved, the server fasserts and the mechanism is not registered. On Windows,
     SChannel provides a `GSSAPI` library for the server to use. On other platforms, the Cyrus SASL
     library is used to make calls to the KDC (Kerberos key distribution center).
+- **MONGODB-X509**
+
+  - As of 8.1.0, `MONGODB-X509` is an authentication mechanism that is available under SASL. `MONGODB-X509`
+    is an authentication method that uses the x509 certificates from the SSL/TLS certificate key exchange.
+    When the peer certificate validation happens during the SSL handshake, an
+    [`SSLPeerInfo`](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/util/net/ssl_types.h#L113-L143)
+    is created and attached to the transport layer SessionHandle. During `MONGODB-X509` auth, the server
+    first determines whether or not the client is a driver or a peer server. The server inspects the
+    following criteria in this order to determine whether the connecting client is a peer server node:
+
+    1. `net.tls.clusterAuthX509.attributes` is set on the server and the parsed certificate's subject name
+       contains all of the attributes and values specified in that option.
+    2. `net.tls.clusterAuthX509.extensionValue` is set on the server and the parsed certificate contains
+       the OID 1.3.6.1.4.1.34601.2.1.2 with a value matching the one specified in that option. This OID
+       is reserved for the MongoDB cluster membership extension.
+    3. Neither of the above options are set on the server and the parsed certificate's subject name contains
+       the same DC, O, and OU as the certificate the server presents to inbound connections (`tls.certificateKeyFile`).
+    4. `tlsClusterAuthX509Override.attributes` is set on the server and the parsed certificate's subject name
+       contains all of the attributes and values specified in that option.
+    5. `tlsClusterAuthX509Override.extensionValue` is set on the server and the parsed certificate contains
+       the OID 1.3.6.1.4.1.34601.2.1.2 with a value matching the one specified in that option.
+       If all of these conditions fail, then the server grabs the client's username from the `SSLPeerInfo`
+       struct and verifies that the client name matches the username provided by the command object and exists
+       in the `$external` database. In that case, the client is authenticated as that user in `$external`.
+       Otherwise, authentication fails with ErrorCodes.UserNotFound.
 
 The specific properties that each SASL mechanism provides is outlined in this table below.
 
-|               | Mutual Auth | No Plain Text |
-|---------------|-------------|---------------|
-| SCRAM         | X           | X             |
-| PLAIN         |             |               |
-| GSS-API       | X           | X             |
-
-### <a name="x509atn"></a>X509 Authentication
-
-`MONGODB-X509` is an authentication method that uses the x509 certificates from the SSL/TLS
-certificate key exchange. When the peer certificate validation happens during the SSL handshake, an
-[`SSLPeerInfo`](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/util/net/ssl_types.h#L113-L143)
-is created and attached to the transport layer SessionHandle. During `MONGODB-X509` auth, the server
-grabs the client's username from the `SSLPeerInfo` struct and, if the client is a driver, verifies
-that the client name matches the username provided by the command object. If the client is
-performing intracluster authentication, see the details below in the authentication section and the
-code comments
-[here](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/commands/authentication_commands.cpp#L74-L139).
+|         | Mutual Auth | No Plain Text |
+| ------- | ----------- | ------------- |
+| SCRAM   | X           | X             |
+| PLAIN   |             |               |
+| GSS-API | X           | X             |
+| X509    | X           | X             |
 
 ### Cluster Authentication
 
@@ -213,8 +243,45 @@ a server, they can use any of the authentication mechanisms described [below in 
 section](#sasl). When a mongod or a mongos needs to authenticate to a mongodb server, it does not
 pass in distinguishing user credentials to authenticate (all servers authenticate to other servers
 as the `__system` user), so most of the options described below will not necessarily work. However,
-two options are available for authentication - keyfile auth and X509 auth. X509 auth is described in
-more detail above, but a precondition to using it is having TLS enabled.
+two options are available for authentication - keyfile auth and X509 auth.
+
+#### X509 Intracluster Auth and Member Certificate Rotation
+
+`X509` auth is described in more detail above, but a precondition to using it is having TLS enabled.
+It is possible for customers to rotate their certificates or change the criteria that is used to
+determine X.509 cluster membership without any downtime. When the server uses the default criteria
+(matching DC, O, and OU), its certificates can be rotated via the following procedure:
+
+1. Update server nodes' config files to contain the old certificate subject DN in
+   `setParameter.tlsX509ClusterAuthDNOverride`.
+2. Perform a rolling restart of server nodes so that they all load in the override value.
+3. Update server nodes' config files to contain the new certificates in `net.tls.clusterFile`
+   and `net.tls.certificateKeyFile`.
+4. Perform a rolling restart of server nodes. During this process, some nodes will use new certificates
+   while others will use old, but they will still all recognize each other as cluster members either
+   via the standard process or the override, respectively.
+5. Remove `setParameter.tlsX509ClusterAuthDNOverride` from all server node config files.
+6. Perform a rolling restart of server nodes so they stop treating clients presenting the old certificate
+   as peers.
+
+An administrator can update the criteria the server uses to determine cluster membership alongside
+certificate rotation without downtime via the following procedure:
+
+1. Update server nodes' config files to contain the old certificate subject DN attributes or extension
+   value in `setParameter.tlsClusterAuthX509Override` and the new certificate subject DN attributes
+   or extension value in `net.tls.clusterAuthX509.attributes` or `net.tls.clusterAuthX509.extensionValue`.
+2. Perform a rolling restart of server nodes so that they all load in the override value and new
+   config options.
+3. Update server nodes' config files to contain the new certificates in `net.tls.clusterFile`
+   and `net.tls.certificateKeyFile`.
+4. Perform a rolling restart of server nodes so that they start using the new certificates. During
+   this process, some nodes will use new certificates while others will use old, but they will still
+   recognize each other via the new config option or the override.
+5. Remove `setParameter.tlsClusterAuthX509Override` from all server node config files.
+6. Perform a rolling restart of server nodes so they stop treating clients presenting certificates
+   meeting the old criteria as peers.
+
+#### Keyfile Intracluster Auth
 
 `keyfile` auth instructors servers to authenticate to each other using the `SCRAM-SHA-256` mechanism
 as the `local.__system` user who's password can be found in the named key file. A keyfile is a file
@@ -258,7 +325,7 @@ While it is possible to create local users and roles on a data bearing shard (ma
 authentication possible), this should be avoided. All connecting clients should access members
 via mongos only.
 
-### <a name="lhabp">Localhost Auth Bypass
+### <a name="lhabp"></a>Localhost Auth Bypass
 
 When first setting up database authentication (using the `--auth` command to start a server), there
 is a feature called `localhostAuthBypass`. The `localhostAuthBypass` allows a client to connect over
@@ -285,7 +352,7 @@ empty AuthorizedRoles set), and is thus "unauthorized", also known as "pre-auth"
 
 When a client connects to a database and authorization is enabled, authentication sends a request to
 get the authorization information of a specific user by calling addAndAuthorizeUser() on the
-AuthorizationSession and passing in the `UserName` as an identifier.  The `AuthorizationSession` calls
+AuthorizationSession and passing in the `UserName` as an identifier. The `AuthorizationSession` calls
 functions defined in the
 [`AuthorizationManager`](https://github.com/mongodb/mongo/blob/r4.7.0/src/mongo/db/auth/authorization_manager.h)
 (described in the next paragraph) to both get the correct `User` object (defined below) from the
@@ -294,30 +361,46 @@ execute commands.
 [Here](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authorization_session_impl.cpp#L126)
 is the authorization session calling into the authorization manager to acquire a user.
 
-Clients are expected to authenticate at most one time on a connection, and a
-client which opts into API Version 1 will receive an error if it attempts to
-authenticate more than once.  However, legacy clients which have not opted into
-an API Version may authenticate multiple times.  If a legacy client
-authenticates as UserA on a database and then authenticates as UserB on the
-same database, its AuthorizationSession will implicitly logout UserA and
-replace its cached User object with that of UserB. Alternatively, if a legacy
-client authenticates as UserA on one database and then authenticates as UserB
-on a second database, its AuthorizationSession will store User objects for both
-UserA and UserB, and will consider itself authorized for the union of the two
-users' privileges.  Because modern drivers no longer allow applications to
-authenticate with multiple user identities, this behavior in
-AuthorizationSession is deprecated, and support for it will eventually be
-removed.
+Clients are expected to authenticate at most one time on a connection.
+Attempting to reauthenticate as the currently authenticated user results
+in a warning being emitted to the global log, but the operation succeeds.
+Attempting to authenticate as a new user on an already authenticated connection is an error.
 
+### AuthName
 
-### User
+The [AuthName](auth_name.h) template
+provides the generic implementation for `UserName` and `RoleName` implementations.
+Each of these objects is made up of three component pieces of information.
+
+| Field     | Accessor     | Use                                                                                            |
+| --------- | ------------ | ---------------------------------------------------------------------------------------------- |
+| `_name`   | `getName()`  | The symbolic name associated with the user or role, (e.g. 'Alice')                             |
+| `_db`     | `getDB()`    | The authentication database associated with the named auth identifier (e.g. 'admin' or 'test') |
+| `_tenant` | `tenantId()` | When used in multitenancy mode, this value retains a `TenantId` for authorization checking.    |
+
+[`UserName`](user_name.h) and [`RoleName`](role_name.h) specializations are CRTP defined
+to include additional `getUser()` and `getRole()` accessors which proxy to `getName()`,
+and provide a set of `constexpr StringData` identifiers relating to their type.
+
+#### Serializations
+
+- `getDisplayName()` and `toString()` create a new string of the form `name@db` for use in log messages.
+- `getUnambiguousName()` creates a new string of the form `db.name` for use in generating `_id` fields for authzn documents and generating unique hashes for logical session identifiers.
+
+#### Multitenancy
+
+`AuthName` objects may be associated with a `TenantId` either separately via `AuthName(StringData name, StringData db, boost::optional<TenantId> tenant = boost::none)` or using the compound `DatabaseName` type `AuthName(StringData name, DatabaseName db)`.
+
+When a `TenantId` is associated with an `AuthName`, it will NOT be included in `BSON` or `String` serializations unless explicitly requested with a boolean argument to these functions.
+
+### Users
 
 `User` objects contain authorization information with regards to a specific user in a database. The
 `AuthorizationManager` has control over creation, management, and deletion of a `UserHandle` object,
 which is a cache value object from the ReadThroughCache (described in [Authorization
 Caching](#authorization-caching)). There can be multiple authenticated users for a single `Client`
 object. The most important elements of a `User` document are the username and the roles set that the
-user has.  While each `AuthorizationManagerExternalState` implementation may define its own
+user has. While each `AuthorizationBackend` implementation may define its own
 storage mechanism for `User` object data, they all ultimately surface this data in a format
 compatible with the `Local` implementation, stored in the `admin.system.users` collection
 with a schema as follows:
@@ -364,20 +447,20 @@ with a schema as follows:
 
 In order to define a set of privileges (see [role privileges](#role-privileges) below)
 granted to a given user, the user must be granted one or more `roles` on their user document,
-or by their external authentication provider.  Again, a user with no roles has no privileges.
+or by their external authentication provider. Again, a user with no roles has no privileges.
 
 #### User Credentials
 
 The contents of the `credentials` field will depend on the configured authentication
-mechanisms enabled for the user.  For external authentication providers,
-this will simply contain `$external: 1`.  For `local` authentication providers,
+mechanisms enabled for the user. For external authentication providers,
+this will simply contain `$external: 1`. For `local` authentication providers,
 this will contain any necessary parameters for validating authentications
 such as the `SCRAM-SHA-256` example above.
 
 #### User Authentication Restrictions
 
 A user definition may optionally list any number of authentication restrictions.
-Currently, only endpoint based restrictions are permitted.  These require that a
+Currently, only endpoint based restrictions are permitted. These require that a
 connecting client must come from a specific IP address range (given in
 [CIDR notation](https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing)) and/or
 connect to a specific server address.
@@ -391,6 +474,15 @@ must be satisfied.
 Each of these restrictions types are considered to be satisfied when
 the client endpoint is in a range specified by either the string `CIDR`
 range, or any **one** of the elements of a list of ranges.
+
+The client endpoint that is considered when evaluating an authentication restriction
+depends on the `clientSourceAuthenticationRestrictionMode` startup server parameter.
+That parameter accepts exactly one of two possible string values; either `origin` or `peer` (default).
+When set to `peer`, the server considers the IP address of the directly-connected peer.
+When set to `origin`, the server evaluates the authentication restrictions against the
+source IP address presented in the proxy protocol header. This allows the server to enforce
+authentication restrictions against clients that connect behind proxy protocol-compliant
+load balancers.
 
 For example, a client connecting from `172.16.30.40` to a server at
 address `192.168.70.80` will satisfy (or not) the following individual rules.
@@ -469,21 +561,21 @@ For users possessing a given set of roles, their effective privileges and
 #### Role Privileges
 
 Each role imparts privileges in the form of a set of `actions` permitted
-against a given `resource`.  The strings in the `actions` list correspond
+against a given `resource`. The strings in the `actions` list correspond
 1:1 with `ActionType` values as specified [here](https://github.com/mongodb/mongo/blob/92cc84b0171942375ccbd2312a052bc7e9f159dd/src/mongo/db/auth/action_type.h).
 Resources may be specified in any of the following nine formats:
 
-| `resource` | Meaning |
-| --- | --- |
-| {} | Any `normal` collection |
-| { db: 'test', collection: '' } | All `normal` collections on the named DB |
-| { db: '', collection: 'system.views' } | The specific named collection on all DBs |
-| { db: 'test', collection: 'system.view' } | The specific namespace (db+collection) as written |
-| { cluster: true } | Used only by cluster-level actions such as `replsetConfigure`. |
-| { system_bucket: '' } | Any collection with a prefix of `system.buckets.` in any db|
-| { db: '', system_buckets: 'example' } | A collection named `system.buckets.example` in any db|
-| { db: 'test', system_buckets: '' } | Any collection with a prefix of `system.buckets.` in `test` db|
-| { db: 'test', system_buckets: 'example' } | A collected named `system.buckets.example` in `test` db|
+| `resource`                                | Meaning                                                        |
+| ----------------------------------------- | -------------------------------------------------------------- |
+| {}                                        | Any `normal` collection                                        |
+| { db: 'test', collection: '' }            | All `normal` collections on the named DB                       |
+| { db: '', collection: 'system.views' }    | The specific named collection on all DBs                       |
+| { db: 'test', collection: 'system.view' } | The specific namespace (db+collection) as written              |
+| { cluster: true }                         | Used only by cluster-level actions such as `replsetConfigure`. |
+| { system_bucket: '' }                     | Any collection with a prefix of `system.buckets.` in any db    |
+| { db: '', system_buckets: 'example' }     | A collection named `system.buckets.example` in any db          |
+| { db: 'test', system_buckets: '' }        | Any collection with a prefix of `system.buckets.` in `test` db |
+| { db: 'test', system_buckets: 'example' } | A collected named `system.buckets.example` in `test` db        |
 
 #### Normal resources
 
@@ -495,8 +587,67 @@ All other collections are considered `normal` collections.
 #### Role Authentication Restrictions
 
 Authentication restrictions defined on a role have the same meaning as
-those defined directly on users.  The effective set of `authenticationRestrictions`
+those defined directly on users. The effective set of `authenticationRestrictions`
 imposed on a user is the union of all direct and indirect authentication restrictions.
+
+### Privilege
+
+A [Privilege](privilege.h) represents a tuple of [ResourcePattern](resource_pattern.h) and
+[set](action_set.h) of [ActionType](action_type.idl)s which describe the resources which
+may be acted upon by a user, and what actions they may perform, respectively.
+
+A [PrivilegeVector](privilege.h) is an alias for `std::vector<Privilege>` and represents
+the full set of privileges across all resource and actionype conbinations for the user or role.
+
+#### ResourcePattern
+
+A resource pattern is a combination of a [MatchType](action_type.idl) with a `NamespaceString` to possibly narrow the scope of that `MatchType`. Most MatchTypes refer to some storage resource, such as a specific collection or database, however `kMatchClusterResource` refers to an entire host, replica set, or cluster.
+
+| MatchType                              | As encoded in a privilege doc                | Usage                                                                                                                                                         |
+| -------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `kMatchNever`                          | _Unexpressable_                              | A base type only used internally to indicate that the privilege specified by the ResourcePattern can not match any real resource                              |
+| `kMatchClusterResource`                | `{ cluster : true }`                         | Commonly used with host and cluster management actions such as `ActionType::addShard`, `ActionType::setParameter`, or `ActionType::shutdown`.                 |
+| `kMatchAnyResource`                    | `{ anyResource: true }`                      | Matches all storage resources, even [non-normal namespaces](#normal-namespace) such as `db.system.views`.                                                     |
+| `kMatchAnyNormalResource`              | `{ db: '', collection: '' }`                 | Matches all [normal](#normal-namespace) storage resources. Used with [builtin role](builtin_roles.cpp) `readWriteAnyDatabase`.                                |
+| `kMatchDatabaseName`                   | `{ db: 'dbname', collection: '' }`           | Matches all [normal](#normal-namespace) storage resources for a specific named database. Used with [builtin role](builtin_roles.cpp) `readWrite`.             |
+| `kMatchCollectionName`                 | `{ db: '', collection: 'collname' }`         | Matches all storage resources, normal or not, which have the exact collection suffix '`collname`'. For example, to provide read-only access to `*.system.js`. |
+| `kMatchExactNamespace`                 | `{ db: 'dbname', collection: 'collname' }`   | Matches the exact namespace '`dbname`.`collname`'.                                                                                                            |
+| `kMatchAnySystemBucketResource`        | `{ db: '', system_buckets: '' }`             | Matches the namespace pattern `*.system.buckets.*`.                                                                                                           |
+| `kMatchAnySystemBucketInDBResource`    | `{ db: 'dbname', system_buckets: '' }`       | Matches the namespace pattern `dbname.system.buckets.*`.                                                                                                      |
+| `kMatchAnySystemBucketInAnyDBResource` | `{ db: '', system_buckets: 'suffix' }`       | Matches the namespace pattern `*.system.buckets.suffix`.                                                                                                      |
+| `kMatchExactSystemBucketResource`      | `{ db: 'dbname', system_buckets: 'suffix' }` | Matches the exact namespace `dbname.system.buckets.suffix`.                                                                                                   |
+
+As `ResourcePattern`s are based on `NamespaceString`, they naturally include an optional `TenantId`,
+which scopes the pattern to a specific tenant in serverless. A user with a given `TenantId` can only
+be granted privileges on resource patterns with that `TenantId`, and non-tenant users can only be
+granted privileges on resource patterns with no `TenantId`. In general, tenant isolation is enforced
+-- for example, the exact namespace pattern `{ db: 'foo', collection: 'bar' }` for tenant A will
+match only tenant A's `<tenantIdA>_foo.bar` collection, and not the no-tenant `foo.bar` collection or
+tenant B's `<tenantIdB>_foo.bar` collection. The same namespace pattern with no `TenantId` will match
+the no-tenant `foo.bar` collection, but not tenant A's `<tenantIdA>_foo.bar` collection.
+
+The exceptions to this rule are the `kMatchClusterResource`, `kMatchAnyResource`, and
+`kMatchAnyNormalResource` resource patterns with no `TenantId` -- these will match across any tenant.
+For example, the any normal resource pattern `{ db: '', collection: '' }` with no `TenantId` will
+match not only the no-tenant `foo.bar` collection, but also tenant A's `<tenantIdA>_foo.bar`
+collection. Note that in order to actually perform operations on tenant data or settings, a
+non-tenant user must be privileged for the `useTenant` action on the `{ cluster : true }` resource
+with no `TenantId`.
+
+##### Normal Namespace
+
+A "normal" resource is a `namespace` which does not match either of the following patterns:
+
+| Namespace pattern | Examples                                   | Usage                                                         |
+| ----------------- | ------------------------------------------ | ------------------------------------------------------------- |
+| `local.replset.*` | `local.replset.initialSyncId`              | Namespaces used by Replication to manage per-host state.      |
+| `*.system.*`      | `admin.system.version` `myDB.system.views` | Collections used by the database to support user collections. |
+
+See also: [NamespaceString::isNormalCollection()](../namespace_string.h)
+
+#### ActionType
+
+An [ActionType](action_type.idl) is a task which a client may be expected to perform. These are combined with [ResourcePattern](#resourcepattern)s to produce a [Privilege](#privilege). Note that not all `ActionType`s make sense with all `ResourcePattern`s (e.g. `ActionType::shutdown` applied to `ResourcePattern` `{ db: 'test', collection: 'my.awesome.collection' }`), however the system will generally not prohibit declaring these combinations.
 
 ### User and Role Management
 
@@ -504,11 +655,11 @@ imposed on a user is the union of all direct and indirect authentication restric
 abstraction for mutating the contents of the local authentication database
 in the `admin.system.users` and `admin.system.roles` collections.
 These commands are implemented primarily for config and standalone nodes in
-[user\_management\_commands.cpp](https://github.com/mongodb/mongo/blob/92cc84b0171942375ccbd2312a052bc7e9f159dd/src/mongo/db/commands/user_management_commands.cpp),
+[user_management_commands.cpp](https://github.com/mongodb/mongo/blob/92cc84b0171942375ccbd2312a052bc7e9f159dd/src/mongo/db/commands/user_management_commands.cpp),
 and as passthrough proxies for mongos in
-[cluster\_user\_management\_commands.cpp](https://github.com/mongodb/mongo/blob/92cc84b0171942375ccbd2312a052bc7e9f159dd/src/mongo/s/commands/cluster_user_management_commands.cpp).
+[cluster_user_management_commands.cpp](https://github.com/mongodb/mongo/blob/92cc84b0171942375ccbd2312a052bc7e9f159dd/src/mongo/s/commands/cluster_user_management_commands.cpp).
 All command payloads and responses are defined via IDL in
-[user\_management\_commands.idl](https://github.com/mongodb/mongo/blob/92cc84b0171942375ccbd2312a052bc7e9f159dd/src/mongo/db/commands/user_management_commands.idl)
+[user_management_commands.idl](https://github.com/mongodb/mongo/blob/92cc84b0171942375ccbd2312a052bc7e9f159dd/src/mongo/db/commands/user_management_commands.idl)
 
 #### UMC Transactions
 
@@ -518,7 +669,7 @@ validating that the command's arguments refer to extant roles, actions,
 and other user-defined values.
 
 The `dropRole` and `dropAllRolesFromDatabase` commands can not be
-expressed as a single CRUD op.  Instead, they must issue all three of the following ops:
+expressed as a single CRUD op. Instead, they must issue all three of the following ops:
 
 1. `Update` the users collection to strip the role(s) from all users possessing it directly.
 1. `Update` the roles collection to strip the role(s) from all other roles possessing it as a subordinate.
@@ -529,6 +680,13 @@ these `UMC` commands leverage transactions through the `applyOps` command
 allowing a rollback.
 The [UMCTransaction](https://github.com/mongodb/mongo/blob/92cc84b0171942375ccbd2312a052bc7e9f159dd/src/mongo/db/commands/user_management_commands.cpp#L756)
 class provides an abstraction around this mechanism.
+
+#### Multitenancy
+
+When acting in multitenancy mode, each tenant uses distinct storage for their users and roles.
+For example, given a `TenantId` of `"012345678ABCDEF01234567"`, all users for that tenant will
+be found in the `012345678ABCDEF01234567_admin.system.users` collection, and all roles will be
+found in the `012345678ABCDEF01234567_admin.system.roles` collection.
 
 ### Command Execution
 
@@ -574,20 +732,25 @@ invalidates the cache for the authorization manager in the mongos. Direct writes
 `admin.system.users` and `admin.system.roles` collections will also result in invalidation via the
 `OpObserver` hook. Writing to these collections directly is strongly discouraged.
 
-### Authorization Manager External State
+### Authorization Router
 
-Implementations of the `AuthorizationManagerExternalState` interface define a way to get state
-information from external systems. For example, when the Authorization Manager needs to get
-information regarding the schema version of the Authorization System, information that is stored in
-the database that needs to be queried, the Authorization Manager will call
-[`getStoredAuthorizationVersion`](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authz_manager_external_state.h#L83).
-Because mongod and mongos processes have different ways of interacting with the data stored in the
-database, there is an
-[`authz_manager_external_state_d`](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authz_manager_external_state_d.h)
-and an
-[`authz_manager_external_state_s`](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authz_manager_external_state_s.h)
-version of the external state implementation, with the former referencing local values in the
-storage subsystem, while the latter delegates to remove cluster config servers.
+The AuthorizationManager sits as the entry way into the Auth subsystem. All calls for User Acquisition
+should happen through the AuthorizationManager. Supporting the AuthorizationManager is the
+`AuthorizationRouter`, which provides the interface with its implementations. The `AuthorizationRouter`
+is provided a `AuthorizationClientHandle` on initialization that prepares requests for
+`UserManagementCommands`. If the `AuthorizationRouter` is on the router, it uses the `Grid` client
+to route its requests to the config server. If it is on the shard (or in rare cases, the config),
+it uses the `DBDirectClient` to route its requests internally.
+
+### Authorization Backend
+
+Implementations of the `AuthorizationBackend` exist for shards and config servers to perform
+lookups on their user collections (Local Authorization) or externally sourced data (LDAP
+Authorization). The AuthorizationBackend should be used mainly from the
+[`UserManagementCommands`](https://github.com/mongodb/mongo/blob/r8.0.0/src/mongo/db/commands/user_management_commands.cpp).
+The `AuthorizationBackend` sits as a decoration on the Service, and only exists on shards and
+config servers. It exposes a few functions as part of its API, but all functions remain protected
+so the only accessors are the few friend classes such as the `UserManagementCommands`.
 
 ### Types of Authorization
 
@@ -607,30 +770,30 @@ The user must supply roles when running the `createUser` command. Roles are stor
 LDAP authorization is an external method of getting roles. When a user authenticates using LDAP,
 there are roles stored in the User document specified by the LDAP system. The LDAP system relies on
 the
-[`AuthzManagerExternalStateLDAP`](https://github.com/10gen/mongo-enterprise-modules/blob/r4.4.0/src/ldap/authz_manager_external_state_ldap.h)
-to make external requests to the LDAP server. The `AuthzManagerExternalStateLDAP` wraps the
-`AuthzManagerExternalStateLocal` for the current process, initially attempting to route all
+[`AuthorizationBackendLDAP`](https://github.com/mongodb/mongo-enterprise-modules/blob/r4.4.0/src/ldap/authz_manager_external_state_ldap.h)
+to make external requests to the LDAP server. The `AuthorizationBackendLDAP` overrides the
+`AuthorizationBackendLocal` for the current process, initially attempting to route all
 Authorization requests to LDAP and falling back on Local Authorization. LDAP queries are generated
 from
-[`UserRequest`](https://github.com/10gen/mongo-enterprise-modules/blob/r4.4.0/src/ldap/authz_manager_external_state_ldap.cpp#L75-L113)
+[`UserRequest`](https://github.com/mongodb/mongo-enterprise-modules/blob/r4.4.0/src/ldap/authz_manager_external_state_ldap.cpp#L75-L113)
 objects, passing just the username into the query. If a user has specified the `userToDNMapping`
 server parameter, the `AuthorizationManager` calls the LDAPManager to transform the usernames into
 names that the LDAP server can understand. The LDAP subsystem relies on a complicated string
 escaping sequence, which is handled by the LDAPQuery class. After LDAP has returned the `User`
 document, it resolves role names into privileges by dispatching a call to
-[`Local::getUserObject`](https://github.com/10gen/mongo-enterprise-modules/blob/r4.7.0/src/ldap/authz_manager_external_state_ldap.cpp#L110-L123)
+[`Local::getUserObject`](https://github.com/mongodb/mongo-enterprise-modules/blob/r4.7.0/src/ldap/authz_manager_external_state_ldap.cpp#L110-L123)
 with a `UserRequest` struct containing a set of roles to be resolved.
 
 Connections to LDAP servers are made by the `LDAPManager` through the
-[`LDAPRunner`](https://github.com/10gen/mongo-enterprise-modules/blob/r4.4.0/src/ldap/ldap_runner.h)
+[`LDAPRunner`](https://github.com/mongodb/mongo-enterprise-modules/blob/r4.4.0/src/ldap/ldap_runner.h)
 by calling `bindAsUser()`. `BindAsUser()` attempts to set up a connection to the LDAP server using
 connection parameters specified through the command line when starting the process.The
-[`LDAPConnectionFactory`](https://github.com/10gen/mongo-enterprise-modules/blob/r4.4.0/src/ldap/connections/ldap_connection_factory.h)
+[`LDAPConnectionFactory`](https://github.com/mongodb/mongo-enterprise-modules/blob/r4.4.0/src/ldap/connections/ldap_connection_factory.h)
 is the class that is actually tasked with establishing a connection and sending raw bytes over the
 wire to the LDAP server, all other classes decompose the information to send and use the factory to
 actually send the information. The `LDAPConnectionFactory` has its own thread pool and executor to
 drive throughput for authorization. LDAP has an
-[`LDAPUserCacheInvalidator`](https://github.com/10gen/mongo-enterprise-modules/blob/r4.4.0/src/ldap/ldap_user_cache_invalidator_job.h)
+[`LDAPUserCacheInvalidator`](https://github.com/mongodb/mongo-enterprise-modules/blob/r4.4.0/src/ldap/ldap_user_cache_invalidator_job.h)
 that periodically sweeps the `AuthorizationManager` and deletes user entries that have `$external` as
 their authentication database.
 
@@ -638,7 +801,7 @@ There are a few thread safety concerns when making connections to the LDAP serve
 LibLDAP to make connections to the LDAP server. LibLDAP comes without any thread safety guarantees,
 so all the calls to libLDAP are wrapped with mutexes to ensure thread safety when connecting to LDAP
 servers on certain distros. The logic to see whether libLDAP is thread-safe lives
-[here](https://github.com/10gen/mongo-enterprise-modules/blob/r4.4.0/src/ldap/connections/openldap_connection.cpp#L348-L378).
+[here](https://github.com/mongodb/mongo-enterprise-modules/blob/r4.4.0/src/ldap/connections/openldap_connection.cpp#L348-L378).
 
 #### <a name="x509azn"></a>X.509 Authorization
 
@@ -651,8 +814,11 @@ extension. The roles extension uses the OID described
 [here](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/util/net/ssl_manager.h#L163-L165). The
 roles are DER encoded in the certificate. They are read by the SSL manager and stored in the SSL
 Peer Info struct, which is eventually used by
-[`AcquireUser`](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authorization_manager_impl.cpp#L454-L465)
-if X509 authorization is used. A tunable parameter in X509 Authorization is tlsCATrusts. TLSCATrusts
+[`UserRequestX509`](https://github.com/mongodb/mongo/blob/287d6628f3d910890e2501cafb5b730fa3cc25e5/src/mongo/db/auth/user_request_x509.cpp#L60-L71)
+if X509 authorization is used. These roles are always resolved before sending the UsersInfo
+request to the AuthorizationBackend; in fact, they are resolved when the `UserRequest` is created
+before calling `addAndAuthorizeUser`.
+A tunable parameter in X509 Authorization is tlsCATrusts. TLSCATrusts
 is a setParameter that allows a user to specify a mapping of CAs that are trusted to use X509
 Authorization to a set of roles that are allowed to be specified by the CA.
 
@@ -692,6 +858,7 @@ and checks the current client's authorized users and authorized impersonated use
 Contracts](https://github.com/mongodb/mongo/blob/r4.9.0-rc0/src/mongo/db/auth/authorization_contract.h)
 were added in v5.0 to support API Version compatibility testing. Authorization contracts consist of
 three pieces:
+
 1. A list of privileges and checks a command makes against `AuthorizationSession` to check if a user
    is permitted to run the command. These privileges and checks are declared in an IDL file in the
    `access_check` section. The contract is compiled into the command definition and is available via
@@ -709,18 +876,18 @@ exceptions are `getMore` and `explain` since they inherit their checks from othe
 
 Refer to the following links for definitions of the Classes referenced in this document:
 
-| Class | File | Description |
-| --- | --- | --- |
-| `ActionType` | [mongo/db/auth/action\_type.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/action_type.h) | High level categories of actions which may be performed against a given resource (e.g. `find`, `insert`, `update`, etc...) |
-| `AuthenticationSession` | [mongo/db/auth/authentication\_session.h](https://github.com/mongodb/mongo/blob/master/src/mongo/db/auth/authentication_session.h) | Session object to persist Authentication state |
-| `AuthorizationContract` | [mongo/db/auth/authorization_contract.h](https://github.com/mongodb/mongo/blob/r4.9.0-rc0/src/mongo/db/auth/authorization_contract.h) | Contract generated by IDL|
-| `AuthorizationManager` | [mongo/db/auth/authorization\_manager.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authorization_manager.h) | Interface to external state providers |
-| `AuthorizationSession` | [mongo/db/auth/authorization\_session.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authorization_session.h) | Representation of currently authenticated and authorized users on the `Client` connection |
-| `AuthzManagerExternalStateLocal` | [.../authz\_manager\_external\_state\_local.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authz_manager_external_state_local.h) | `Local` implementation of user/role provider |
-| `AuthzManagerExternalStateLDAP` | [.../authz\_manager\_external\_state\_ldap.h](https://github.com/10gen/mongo-enterprise-modules/blob/r4.4.0/src/ldap/authz_manager_external_state_ldap.h) | `LDAP` implementation of users/role provider |
-| `Client` | [mongo/db/client.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/client.h) | An active client session, typically representing a remote driver or shell |
-| `Privilege` | [mongo/db/auth/privilege.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/privilege.h) | A set of `ActionType`s permitted on a particular `resource' |
-| `ResourcePattern` | [mongo/db/auth/resource\_pattern.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/resource_pattern.h) | A reference to a namespace, db, collection, or cluster to apply a set of `ActionType` privileges to |
-| `RoleName` | [mongo/db/auth/role\_name.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/role_name.h) | A typed tuple containing a named role on a particular database |
-| `User` | [mongo/db/auth/user.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/user.h) | A representation of a authorization user, including all direct and subordinte roles and their privileges and authentication restrictions |
-| `UserName` | [mongo/db/auth/user\_name.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/user_name.h) | A typed tuple containing a named user on a particular database |
+| Class                            | File                                                                                                                                                  | Description                                                                                                                              |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `ActionType`                     | [mongo/db/auth/action_type.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/action_type.h)                                           | High level categories of actions which may be performed against a given resource (e.g. `find`, `insert`, `update`, etc...)               |
+| `AuthenticationSession`          | [mongo/db/auth/authentication_session.h](https://github.com/mongodb/mongo/blob/master/src/mongo/db/auth/authentication_session.h)                     | Session object to persist Authentication state                                                                                           |
+| `AuthorizationContract`          | [mongo/db/auth/authorization_contract.h](https://github.com/mongodb/mongo/blob/r4.9.0-rc0/src/mongo/db/auth/authorization_contract.h)                 | Contract generated by IDL                                                                                                                |
+| `AuthorizationManager`           | [mongo/db/auth/authorization_manager.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authorization_manager.h)                       | Interface to external state providers                                                                                                    |
+| `AuthorizationSession`           | [mongo/db/auth/authorization_session.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authorization_session.h)                       | Representation of currently authenticated and authorized users on the `Client` connection                                                |
+| `AuthzManagerExternalStateLocal` | [.../authorization_baackend_local.h](https://github.com/mongodb/mongo/blob/master/src/mongo/db/auth/authorization_backend_local.h)                    | `Local` implementation of user/role provider                                                                                             |
+| `AuthzManagerExternalStateLDAP`  | [.../authorization_baackend_ldap.h](https://github.com/mongodb/mongo/blob/master/src/mongo/db/modules/enterprise/src/ldap/authorization_backend_ldap.h) | `LDAP` implementation of users/role provider                                                                                             |
+| `Client`                         | [mongo/db/client.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/client.h)                                                               | An active client session, typically representing a remote driver or shell                                                                |
+| `Privilege`                      | [mongo/db/auth/privilege.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/privilege.h)                                               | A set of `ActionType`s permitted on a particular `resource'                                                                              |
+| `ResourcePattern`                | [mongo/db/auth/resource_pattern.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/resource_pattern.h)                                 | A reference to a namespace, db, collection, or cluster to apply a set of `ActionType` privileges to                                      |
+| `RoleName`                       | [mongo/db/auth/role_name.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/role_name.h)                                               | A typed tuple containing a named role on a particular database                                                                           |
+| `User`                           | [mongo/db/auth/user.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/user.h)                                                         | A representation of a authorization user, including all direct and subordinte roles and their privileges and authentication restrictions |
+| `UserName`                       | [mongo/db/auth/user_name.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/user_name.h)                                               | A typed tuple containing a named user on a particular database                                                                           |

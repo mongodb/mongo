@@ -1,7 +1,5 @@
 // Tests resuming change streams based on cluster time.
-(function() {
-"use strict";
-load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
 const coll = assertDropAndRecreateCollection(db, jsTestName());
 
@@ -37,17 +35,18 @@ assert.eq(next.operationType, "update", tojson(next));
 assert.eq(next.documentKey._id, 1, tojson(next));
 
 // Test that startAtOperationTime is not allowed alongside resumeAfter.
-assert.commandFailedWithCode(db.runCommand({
-    aggregate: coll.getName(),
-    pipeline: [{$changeStream: {startAtOperationTime: timeOfFirstUpdate, resumeAfter: next._id}}],
-    cursor: {}
-}),
-                             40674);
+assert.commandFailedWithCode(
+    db.runCommand({
+        aggregate: coll.getName(),
+        pipeline: [{$changeStream: {startAtOperationTime: timeOfFirstUpdate, resumeAfter: next._id}}],
+        cursor: {},
+    }),
+    40674,
+);
 
 // Test that resuming from a time in the future will wait for that time to come.
 let resumeTimeFarFuture = db.runCommand({hello: 1}).$clusterTime.clusterTime;
-resumeTimeFarFuture =
-    new Timestamp(resumeTimeFarFuture.getTime() + 60 * 60 * 6, 1);  // 6 hours in the future
+resumeTimeFarFuture = new Timestamp(resumeTimeFarFuture.getTime() + 60 * 60 * 6, 1); // 6 hours in the future
 
 let changeStreamFuture = coll.watch([], {startAtOperationTime: resumeTimeFarFuture});
 
@@ -76,4 +75,3 @@ assert.eq(next.documentKey._id, 1, tojson(next));
 
 // Verify that the change stream resumed from far into the future does not see any changes.
 assert(!changeStreamFuture.hasNext());
-})();

@@ -8,10 +8,8 @@
  * ]
  */
 
-(function() {
-"use strict";
-load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/replsets/libs/rollback_test.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 const dbName = "test";
 const collName = "rollback_reconstructs_transactions_prepared_before_stable";
@@ -59,14 +57,13 @@ assert.eq(1, metrics.transactions.currentOpen);
 jsTestLog("Do a majority write to advance the stable timestamp past the prepareTimestamp");
 // Doing a majority write after preparing the transaction ensures that the stable timestamp is
 // past the prepare timestamp because this write must be in the committed snapshot.
-assert.commandWorked(
-    testColl.runCommand("insert", {documents: [{_id: 2}]}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(testColl.runCommand("insert", {documents: [{_id: 2}]}, {writeConcern: {w: "majority"}}));
 
 // Fastcount reflects the insert of a prepared transaction.
 assert.eq(testColl.count(), 3);
 
 // Check that we have one transaction in the transactions table.
-assert.eq(primary.getDB('config')['transactions'].find().itcount(), 1);
+assert.eq(primary.getDB("config")["transactions"].find().itcount(), 1);
 
 // The transaction should still be prepared after going through rollback.
 rollbackTest.transitionToRollbackOperations();
@@ -76,7 +73,7 @@ rollbackTest.transitionToSteadyStateOperations({skipDataConsistencyChecks: true}
 
 // Make sure there is still one transaction in the transactions table. This is because the
 // entry in the transactions table is made durable when a transaction is prepared.
-assert.eq(primary.getDB('config')['transactions'].find().itcount(), 1);
+assert.eq(primary.getDB("config")["transactions"].find().itcount(), 1);
 
 // Fastcount reflects the insert of the prepared transaction because was put back into prepare
 // at the end of rollback.
@@ -106,32 +103,35 @@ session.setTxnNumber_forTesting(0);
 const txnNumber = session.getTxnNumber_forTesting();
 
 // Make sure we cannot add any operations to a prepared transaction.
-assert.commandFailedWithCode(sessionDB.runCommand({
-    insert: collName,
-    txnNumber: NumberLong(txnNumber),
-    documents: [{_id: 10}],
-    autocommit: false,
-}),
-                             ErrorCodes.PreparedTransactionInProgress);
+assert.commandFailedWithCode(
+    sessionDB.runCommand({
+        insert: collName,
+        txnNumber: NumberLong(txnNumber),
+        documents: [{_id: 10}],
+        autocommit: false,
+    }),
+    ErrorCodes.PreparedTransactionInProgress,
+);
 
 // Make sure that writing to a document that was updated in the prepared transaction causes
 // a write conflict.
 assert.commandFailedWithCode(
-    sessionDB.runCommand(
-        {update: collName, updates: [{q: {_id: 0}, u: {$set: {a: 2}}}], maxTimeMS: 5 * 1000}),
-    ErrorCodes.MaxTimeMSExpired);
+    sessionDB.runCommand({update: collName, updates: [{q: {_id: 0}, u: {$set: {a: 2}}}], maxTimeMS: 5 * 1000}),
+    ErrorCodes.MaxTimeMSExpired,
+);
 
 // Commit the transaction.
-assert.commandWorked(sessionDB.adminCommand({
-    commitTransaction: 1,
-    commitTimestamp: prepareTimestamp,
-    txnNumber: NumberLong(txnNumber),
-    autocommit: false,
-}));
+assert.commandWorked(
+    sessionDB.adminCommand({
+        commitTransaction: 1,
+        commitTimestamp: prepareTimestamp,
+        txnNumber: NumberLong(txnNumber),
+        autocommit: false,
+    }),
+);
 
 // Make sure we can see the effects of the prepared transaction.
 assert.sameMembers(testColl.find().toArray(), [{_id: 0, a: 1}, {_id: 1}, {_id: 2}]);
 assert.eq(testColl.count(), 3);
 
 rollbackTest.stop();
-}());

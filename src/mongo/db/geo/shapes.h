@@ -29,19 +29,28 @@
 
 #pragma once
 
+#include "mongo/base/clonable_ptr.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/geo/big_polygon.h"
+#include "mongo/util/modules.h"
+
+#include <algorithm>
 #include <cmath>
+#include <memory>
 #include <string>
 #include <vector>
 
-#include "mongo/base/owned_pointer_vector.h"
-#include "mongo/db/geo/big_polygon.h"
-#include "mongo/db/geo/s2.h"
-#include "mongo/db/jsobj.h"
-#include "third_party/s2/s2cap.h"
-#include "third_party/s2/s2cell.h"
-#include "third_party/s2/s2latlng.h"
-#include "third_party/s2/s2polygon.h"
-#include "third_party/s2/s2polyline.h"
+#include <s2.h>
+#include <s2cap.h>
+#include <s2cell.h>
+#include <s2cellid.h>
+#include <s2latlng.h>
+#include <s2polygon.h>
+#include <s2polyline.h>
+
+#include <util/math/vector3-inl.h>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -233,9 +242,9 @@ public:
     bool contains(const Point& point) const;
 
     // R2Region interface
-    Box getR2Bounds() const;
-    bool fastContains(const Box& other) const;
-    bool fastDisjoint(const Box& other) const;
+    Box getR2Bounds() const override;
+    bool fastContains(const Box& other) const override;
+    bool fastDisjoint(const Box& other) const override;
 
     // For debugging
     std::string toString() const;
@@ -261,6 +270,7 @@ enum CRS {
 
 struct PointWithCRS {
     PointWithCRS() : crs(UNSET) {}
+    std::unique_ptr<PointWithCRS> clone() const;
 
     S2Point point;
     S2Cell cell;
@@ -270,6 +280,7 @@ struct PointWithCRS {
 
 struct LineWithCRS {
     LineWithCRS() : crs(UNSET) {}
+    std::unique_ptr<LineWithCRS> clone() const;
 
     S2Polyline line;
     CRS crs;
@@ -277,6 +288,7 @@ struct LineWithCRS {
 
 struct CapWithCRS {
     CapWithCRS() : crs(UNSET) {}
+    std::unique_ptr<CapWithCRS> clone() const;
 
     S2Cap cap;
     Circle circle;
@@ -285,6 +297,7 @@ struct CapWithCRS {
 
 struct BoxWithCRS {
     BoxWithCRS() : crs(UNSET) {}
+    std::unique_ptr<BoxWithCRS> clone() const;
 
     Box box;
     CRS crs;
@@ -292,6 +305,7 @@ struct BoxWithCRS {
 
 struct PolygonWithCRS {
     PolygonWithCRS() : crs(UNSET) {}
+    std::unique_ptr<PolygonWithCRS> clone() const;
 
     std::unique_ptr<S2Polygon> s2Polygon;
     // Simple polygons with strict winding order may be bigger or smaller than a hemisphere.
@@ -304,6 +318,7 @@ struct PolygonWithCRS {
 
 struct MultiPointWithCRS {
     MultiPointWithCRS() : crs(UNSET) {}
+    std::unique_ptr<MultiPointWithCRS> clone() const;
 
     std::vector<S2Point> points;
     std::vector<S2Cell> cells;
@@ -312,32 +327,35 @@ struct MultiPointWithCRS {
 
 struct MultiLineWithCRS {
     MultiLineWithCRS() : crs(UNSET) {}
+    std::unique_ptr<MultiLineWithCRS> clone() const;
 
-    OwnedPointerVector<S2Polyline> lines;
+    std::vector<std::unique_ptr<S2Polyline>> lines;
     CRS crs;
 };
 
 struct MultiPolygonWithCRS {
     MultiPolygonWithCRS() : crs(UNSET) {}
+    std::unique_ptr<MultiPolygonWithCRS> clone() const;
 
-    OwnedPointerVector<S2Polygon> polygons;
+    std::vector<std::unique_ptr<S2Polygon>> polygons;
     CRS crs;
 };
 
 struct GeometryCollection {
+    std::unique_ptr<GeometryCollection> clone() const;
+
     std::vector<PointWithCRS> points;
 
-    // The amount of indirection here is painful but we can't operator= unique_ptr or
-    // OwnedPointerVector.
-    OwnedPointerVector<LineWithCRS> lines;
-    OwnedPointerVector<PolygonWithCRS> polygons;
-    OwnedPointerVector<MultiPointWithCRS> multiPoints;
-    OwnedPointerVector<MultiLineWithCRS> multiLines;
-    OwnedPointerVector<MultiPolygonWithCRS> multiPolygons;
+    // The amount of indirection here is painful but we can't assign these geometric types.
+    std::vector<clonable_ptr<LineWithCRS>> lines;
+    std::vector<clonable_ptr<PolygonWithCRS>> polygons;
+    std::vector<clonable_ptr<MultiPointWithCRS>> multiPoints;
+    std::vector<clonable_ptr<MultiLineWithCRS>> multiLines;
+    std::vector<clonable_ptr<MultiPolygonWithCRS>> multiPolygons;
 
     bool supportsContains() {
         // Only polygons (and multiPolygons) support containment.
-        return (polygons.vector().size() > 0 || multiPolygons.vector().size() > 0);
+        return (!polygons.empty() || !multiPolygons.empty());
     }
 };
 

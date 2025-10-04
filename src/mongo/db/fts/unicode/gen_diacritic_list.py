@@ -2,8 +2,7 @@
 # -*- coding: utf-8 -*-
 import sys
 
-from gen_helper import getCopyrightNotice, openNamespaces, closeNamespaces, \
-    include
+from gen_helper import closeNamespaces, getCopyrightNotice, include, openNamespaces
 
 
 def generate(unicode_proplist_file, target):
@@ -21,22 +20,22 @@ def generate(unicode_proplist_file, target):
 
     diacritics = set()
 
-    proplist_file = open(unicode_proplist_file, 'r')
+    proplist_file = open(unicode_proplist_file, "r")
 
     for line in proplist_file:
         # Filter out blank lines and lines that start with #
-        data = line[:line.find('#')]
-        if (data == ""):
+        data = line[: line.find("#")]
+        if data == "":
             continue
 
         # Parse the data on the line
         values = data.split("; ")
-        assert (len(values) == 2)
+        assert len(values) == 2
 
         uproperty = values[1].strip()
         if uproperty in "Diacritic":
-            if len(values[0].split('..')) == 2:
-                codepoint_range = values[0].split('..')
+            if len(values[0].split("..")) == 2:
+                codepoint_range = values[0].split("..")
 
                 start = int(codepoint_range[0], 16)
                 end = int(codepoint_range[1], 16) + 1
@@ -52,11 +51,17 @@ def generate(unicode_proplist_file, target):
     switch (codepoint) {\n""")
 
     for diacritic in sorted(diacritics):
-        out.write("\
-    case " + str(hex(diacritic)) + ": return true;\n")
+        out.write(
+            "\
+    case "
+            + str(hex(diacritic))
+            + ": return true;\n"
+        )
 
-    out.write("\
-    default: return false;\n    }\n}")
+    out.write(
+        "\
+    default: return false;\n    }\n}"
+    )
 
     out.write(closeNamespaces())
 

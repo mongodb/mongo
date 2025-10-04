@@ -33,20 +33,37 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/local_catalog/collection.h"
+#include "mongo/db/local_catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/collection_bulk_loader.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/key_string/key_string.h"
+#include "mongo/util/modules.h"
+#include "mongo/util/uuid.h"
+
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace repl {
 
-class StorageInterfaceImpl : public StorageInterface {
+class MONGO_MOD_OPEN StorageInterfaceImpl : public StorageInterface {
     StorageInterfaceImpl(const StorageInterfaceImpl&) = delete;
     StorageInterfaceImpl& operator=(const StorageInterfaceImpl&) = delete;
 
 public:
-    static const char kDefaultRollbackIdNamespace[];
     static const char kRollbackIdFieldName[];
     static const char kRollbackIdDocumentId[];
 
@@ -91,6 +108,10 @@ public:
 
     Status dropCollection(OperationContext* opCtx, const NamespaceString& nss) override;
 
+    Status dropCollectionsWithPrefix(OperationContext* opCtx,
+                                     const DatabaseName& dbName,
+                                     const std::string& collectionNamePrefix) override;
+
     Status truncateCollection(OperationContext* opCtx, const NamespaceString& nss) override;
 
     Status renameCollection(OperationContext* opCtx,
@@ -128,10 +149,22 @@ public:
                         const NamespaceString& nss,
                         const TimestampedBSONObj& update) override;
 
+    Status putSingleton(OperationContext* opCtx,
+                        const NamespaceString& nss,
+                        const BSONObj& query,
+                        const TimestampedBSONObj& update) override;
+
     Status updateSingleton(OperationContext* opCtx,
                            const NamespaceString& nss,
                            const BSONObj& query,
                            const TimestampedBSONObj& update) override;
+
+    Status updateDocuments(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const BSONObj& query,
+        const TimestampedBSONObj& update,
+        const boost::optional<std::vector<BSONObj>>& arrayFilters = boost::none) override;
 
     StatusWith<BSONObj> findById(OperationContext* opCtx,
                                  const NamespaceStringOrUUID& nsOrUUID,
@@ -150,10 +183,10 @@ public:
                           const NamespaceString& nss,
                           const BSONObj& filter) override;
 
-    boost::optional<BSONObj> findOplogEntryLessThanOrEqualToTimestamp(
+    boost::optional<OpTimeAndWallTime> findOplogOpTimeLessThanOrEqualToTimestamp(
         OperationContext* opCtx, const CollectionPtr& oplog, const Timestamp& timestamp) override;
 
-    boost::optional<BSONObj> findOplogEntryLessThanOrEqualToTimestampRetryOnWCE(
+    boost::optional<OpTimeAndWallTime> findOplogOpTimeLessThanOrEqualToTimestampRetryOnWCE(
         OperationContext* opCtx, const CollectionPtr& oplog, const Timestamp& timestamp) override;
 
     Timestamp getEarliestOplogTimestamp(OperationContext* opCtx) override;
@@ -178,22 +211,17 @@ public:
 
     void setInitialDataTimestamp(ServiceContext* serviceCtx, Timestamp snapshotName) override;
 
+    Timestamp getInitialDataTimestamp(ServiceContext* serviceCtx) const override;
+
     Timestamp recoverToStableTimestamp(OperationContext* opCtx) override;
 
     bool supportsRecoverToStableTimestamp(ServiceContext* serviceCtx) const override;
 
     bool supportsRecoveryTimestamp(ServiceContext* serviceCtx) const override;
 
-    void initializeStorageControlsForReplication(ServiceContext* serviceCtx) const override;
-
     boost::optional<Timestamp> getRecoveryTimestamp(ServiceContext* serviceCtx) const override;
 
     Timestamp getAllDurableTimestamp(ServiceContext* serviceCtx) const override;
-
-    /**
-     * Checks that the "admin" database contains a supported version of the auth data schema.
-     */
-    Status isAdminDbValid(OperationContext* opCtx) override;
 
     void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx,
                                                  bool primaryOnly) override;

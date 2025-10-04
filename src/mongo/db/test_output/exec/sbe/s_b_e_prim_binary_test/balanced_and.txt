@@ -1,0 +1,32 @@
+# Golden test output of SBEPrimBinaryTest/BalancedAnd
+-- INPUT EXPRESSION:
+(((s1 && s2) && (s3 && s4)) && ((s5 && s6) && (s7 && s8))) 
+
+-- COMPILED EXPRESSION:
+[0x0000-0x009d] stackSize: 1, maxStackSize: 1
+0x0000: pushAccessVal(accessor: <accessor>);
+0x0009: jmpNothing(target: 0x009d);
+0x000e: jmpFalse(target: 0x0093);
+0x0013: pushAccessVal(accessor: <accessor>);
+0x001c: jmpNothing(target: 0x009d);
+0x0021: jmpFalse(target: 0x0093);
+0x0026: pushAccessVal(accessor: <accessor>);
+0x002f: jmpNothing(target: 0x009d);
+0x0034: jmpFalse(target: 0x0093);
+0x0039: pushAccessVal(accessor: <accessor>);
+0x0042: jmpNothing(target: 0x009d);
+0x0047: jmpFalse(target: 0x0093);
+0x004c: pushAccessVal(accessor: <accessor>);
+0x0055: jmpNothing(target: 0x009d);
+0x005a: jmpFalse(target: 0x0093);
+0x005f: pushAccessVal(accessor: <accessor>);
+0x0068: jmpNothing(target: 0x009d);
+0x006d: jmpFalse(target: 0x0093);
+0x0072: pushAccessVal(accessor: <accessor>);
+0x007b: jmpNothing(target: 0x009d);
+0x0080: jmpFalse(target: 0x0093);
+0x0085: pushAccessVal(accessor: <accessor>);
+0x008e: jmp(target: 0x009d);
+0x0093: pushConstVal(value: false);
+
+

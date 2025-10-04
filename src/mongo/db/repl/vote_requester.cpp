@@ -27,19 +27,31 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplicationElection
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/vote_requester.h"
 
-#include <memory>
-
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/repl/member_config.h"
 #include "mongo/db/repl/repl_set_request_votes_args.h"
 #include "mongo/db/repl/scatter_gather_runner.h"
+#include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/scopeguard.h"
+
+#include <algorithm>
+#include <memory>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplicationElection
+
 
 namespace mongo {
 namespace repl {
@@ -57,12 +69,14 @@ VoteRequester::Algorithm::Algorithm(const ReplSetConfig& rsConfig,
                                     long long candidateIndex,
                                     long long term,
                                     bool dryRun,
+                                    OpTime lastWrittenOpTime,
                                     OpTime lastAppliedOpTime,
                                     int primaryIndex)
     : _rsConfig(rsConfig),
       _candidateIndex(candidateIndex),
       _term(term),
       _dryRun(dryRun),
+      _lastWrittenOpTime(lastWrittenOpTime),
       _lastAppliedOpTime(lastAppliedOpTime) {
     // populate targets with all voting members that aren't this node
     long long index = 0;
@@ -92,7 +106,8 @@ std::vector<RemoteCommandRequest> VoteRequester::Algorithm::getRequests() const 
         requestVotesCmdBuilder.append("configTerm", _rsConfig.getConfigTerm());
     }
 
-    _lastAppliedOpTime.append(&requestVotesCmdBuilder, "lastAppliedOpTime");
+    _lastWrittenOpTime.append("lastWrittenOpTime", &requestVotesCmdBuilder);
+    _lastAppliedOpTime.append("lastAppliedOpTime", &requestVotesCmdBuilder);
 
     const BSONObj requestVotesCmd = requestVotesCmdBuilder.obj();
 
@@ -100,7 +115,7 @@ std::vector<RemoteCommandRequest> VoteRequester::Algorithm::getRequests() const 
     for (const auto& target : _targets) {
         requests.push_back(RemoteCommandRequest(
             target,
-            "admin",
+            DatabaseName::kAdmin,
             requestVotesCmd,
             nullptr,
             std::min(_rsConfig.getElectionTimeoutPeriod(), maximumVoteRequestTimeoutMS)));
@@ -211,10 +226,11 @@ StatusWith<executor::TaskExecutor::EventHandle> VoteRequester::start(
     long long candidateIndex,
     long long term,
     bool dryRun,
+    OpTime lastWrittenOpTime,
     OpTime lastAppliedOpTime,
     int primaryIndex) {
     _algorithm = std::make_shared<Algorithm>(
-        rsConfig, candidateIndex, term, dryRun, lastAppliedOpTime, primaryIndex);
+        rsConfig, candidateIndex, term, dryRun, lastWrittenOpTime, lastAppliedOpTime, primaryIndex);
     _runner = std::make_unique<ScatterGatherRunner>(_algorithm, executor, "vote request");
     return _runner->start();
 }

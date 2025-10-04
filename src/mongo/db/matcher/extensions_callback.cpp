@@ -27,18 +27,27 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/matcher/extensions_callback.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/util/assert_util.h"
+
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
 StatusWith<TextMatchExpressionBase::TextParams>
 ExtensionsCallback::extractTextMatchExpressionParams(BSONElement text) {
     TextMatchExpressionBase::TextParams params;
-    if (text.type() != Object) {
+    if (text.type() != BSONType::object) {
         return {ErrorCodes::BadValue, "$text expects an object"};
     }
     BSONObj queryObj = text.Obj();
@@ -64,7 +73,7 @@ ExtensionsCallback::extractTextMatchExpressionParams(BSONElement text) {
     } else if (languageStatus == ErrorCodes::NoSuchKey) {
         params.language = std::string();
     } else {
-        invariant(languageStatus);
+        tassert(languageStatus);
         expectedFieldCount++;
     }
 
@@ -75,7 +84,7 @@ ExtensionsCallback::extractTextMatchExpressionParams(BSONElement text) {
     } else if (caseSensitiveStatus == ErrorCodes::NoSuchKey) {
         params.caseSensitive = TextMatchExpressionBase::kCaseSensitiveDefault;
     } else {
-        invariant(caseSensitiveStatus);
+        tassert(caseSensitiveStatus);
         expectedFieldCount++;
     }
 
@@ -86,7 +95,7 @@ ExtensionsCallback::extractTextMatchExpressionParams(BSONElement text) {
     } else if (diacriticSensitiveStatus == ErrorCodes::NoSuchKey) {
         params.diacriticSensitive = TextMatchExpressionBase::kDiacriticSensitiveDefault;
     } else {
-        invariant(diacriticSensitiveStatus);
+        tassert(diacriticSensitiveStatus);
         expectedFieldCount++;
     }
 
@@ -110,11 +119,11 @@ ExtensionsCallback::extractWhereMatchExpressionParams(BSONElement where) {
     WhereMatchExpressionBase::WhereParams params;
 
     switch (where.type()) {
-        case mongo::String:
-        case mongo::Code:
+        case BSONType::string:
+        case BSONType::code:
             params.code = where._asCode();
             break;
-        case mongo::CodeWScope:
+        case BSONType::codeWScope:
             uasserted(4649201, "$where no longer supports deprecated BSON type CodeWScope");
             break;
         default:

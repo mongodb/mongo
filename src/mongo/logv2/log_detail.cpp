@@ -27,22 +27,91 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
-#include "mongo/platform/basic.h"
+#include <algorithm>
+#include <cerrno>
+#include <cstddef>
+#include <cstdint>
+#include <deque>
+#include <functional>
+#include <new>
+#include <string>
+#include <system_error>
+#include <utility>
+#include <variant>
 
+#include <boost/log/attributes/attribute_value.hpp>
+#include <boost/log/attributes/attribute_value_impl.hpp>
+#include <boost/log/attributes/attribute_value_set.hpp>
+#include <boost/log/core/record.hpp>
+#include <boost/smart_ptr/intrusive_ref_counter.hpp>
+#include <fmt/args.h>
 #include <fmt/format.h>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
+#ifdef _WIN32
+#include <io.h>
+#endif
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/attributes.h"
-#include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_detail.h"
 #include "mongo/logv2/log_domain.h"
 #include "mongo/logv2/log_domain_internal.h"
 #include "mongo/logv2/log_options.h"
+#include "mongo/logv2/log_severity.h"
 #include "mongo/logv2/log_source.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/debug_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/errno_util.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/testing_proctor.h"
 
-namespace mongo::logv2::detail {
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
+
+
+namespace mongo::logv2 {
+namespace {
+thread_local int loggingDepth = 0;
+}  // namespace
+
+bool loggingInProgress() {
+    return loggingDepth > 0;
+}
+
+void signalSafeWriteToStderr(StringData message) {
+    while (!message.empty()) {
+#if defined(_WIN32)
+        auto ret = _write(_fileno(stderr), message.data(), message.size());
+#else
+        auto ret = write(STDERR_FILENO, message.data(), message.size());
+#endif
+        if (ret == -1) {
+            if (lastPosixError() == posixError(EINTR)) {
+                continue;
+            }
+            return;
+        }
+        message = message.substr(ret);
+    }
+}
+
+namespace detail {
+
 namespace {
 GetTenantIDFn& getTenantID() {
     // Ensure that we avoid undefined initialization ordering
@@ -51,10 +120,19 @@ GetTenantIDFn& getTenantID() {
     static StaticImmortal<GetTenantIDFn> fn;
     return *fn;
 }
+LogCounterCallback& getLogCounterCallback() {
+    static StaticImmortal<LogCounterCallback> fn{[]() {
+    }};
+    return *fn;
+}
 }  // namespace
 
 void setGetTenantIDCallback(GetTenantIDFn&& fn) {
     getTenantID() = std::move(fn);
+}
+
+void setLogCounterCallback(LogCounterCallback cb) {
+    getLogCounterCallback() = std::move(cb);
 }
 
 struct UnstructuredValueExtractor {
@@ -69,7 +147,9 @@ struct UnstructuredValueExtractor {
         } else if (val.BSONAppend) {
             BSONObjBuilder builder;
             val.BSONAppend(builder, name);
-            BSONElement element = builder.done().getField(name);
+            // BSONObj must outlive BSONElement. See BSONElement, BSONObj::getField().
+            auto obj = builder.done();
+            BSONElement element = obj.getField(name);
             _addString(name, element.toString(false));
         } else if (val.BSONSerialize) {
             BSONObjBuilder builder;
@@ -133,18 +213,54 @@ static void checkUniqueAttrs(int32_t id, const TypeErasedAttributeStorage& attrs
         StringData sep;
         std::string msg;
         for (auto&& a : attrs) {
-            msg.append(format(FMT_STRING(R"({}"{}")"), sep, a.name));
+            msg.append(fmt::format(R"({}"{}")", sep, a.name));
             sep = ","_sd;
         }
-        uasserted(4793301, format(FMT_STRING("LOGV2 (id={}) attribute collision: [{}]"), id, msg));
+        uasserted(4793301, fmt::format("LOGV2 (id={}) attribute collision: [{}]", id, msg));
     }
 }
 
-void doLogImpl(int32_t id,
-               LogSeverity const& severity,
-               LogOptions const& options,
-               StringData message,
-               TypeErasedAttributeStorage const& attrs) {
+static void doSafeLog(StringData reason,
+                      int32_t id,
+                      LogSeverity const& severity,
+                      LogOptions const& options,
+                      StringData message,
+                      TypeErasedAttributeStorage const& attrs) {
+    std::string s;
+    s += fmt::format("SafeLog: {{\n");
+    s += fmt::format("    reason: {:?},\n", reason);
+    s += fmt::format("    loggingDepth: {},\n", loggingDepth);
+    s += fmt::format("    t: {:?},\n", Date_t::now().toString());
+    s += fmt::format("    severity: {:?},\n", severity.toStringData());
+    s += fmt::format("    id: {},\n", id);
+    s += fmt::format("    ctx: {:?},\n", getThreadName());
+    s += fmt::format("    message: {:?},\n", message);
+    if (!attrs.empty()) {
+        s += fmt::format("    attrs: {{\n");
+        attrs.apply([&]<typename T>(StringData name, const T& val) {
+            s += fmt::format("        {{\n");
+            s += fmt::format("            name: {:?},\n", name);
+            s += fmt::format("            type: {:?},\n", demangleName(typeid(T)));
+            if constexpr (std::is_integral_v<T>) {
+                s += fmt::format("            value: {},\n", val);
+            } else if constexpr (std::is_convertible_v<T, StringData>) {
+                s += fmt::format("            value: {:?},\n", StringData{val});
+            } else {
+                s += fmt::format("            value: {:?},\n", "<unsupported>");
+            }
+            s += fmt::format("        }},\n");
+        });
+        s += fmt::format("    }},\n");
+    }
+    s += fmt::format("}}\n");
+    signalSafeWriteToStderr(s);
+}
+
+void _doLogImpl(int32_t id,
+                LogSeverity const& severity,
+                LogOptions const& options,
+                StringData message,
+                TypeErasedAttributeStorage const& attrs) {
     dassert(options.component() != LogComponent::kNumLogComponents);
     // TestingProctor isEnabled cannot be called before it has been
     // initialized. But log statements occurring earlier than that still need
@@ -158,6 +274,7 @@ void doLogImpl(int32_t id,
     auto record = source.open_record(id,
                                      severity,
                                      options.component(),
+                                     options.service(),
                                      options.tags(),
                                      options.truncation(),
                                      options.uassertErrorCode());
@@ -174,15 +291,48 @@ void doLogImpl(int32_t id,
                     attrs)));
 
         if (auto fn = getTenantID()) {
-            if (auto tenant = fn()) {
+            auto tenant = fn();
+            if (!tenant.empty()) {
                 record.attribute_values().insert(
                     attributes::tenant(),
                     boost::log::attribute_value(
-                        new boost::log::attributes::attribute_value_impl<OID>(tenant.get())));
+                        new boost::log::attributes::attribute_value_impl<std::string>(tenant)));
             }
         }
 
         source.push_record(std::move(record));
+        getLogCounterCallback()();
+    }
+}
+
+void doLogImpl(int32_t id,
+               LogSeverity const& severity,
+               LogOptions const& options,
+               StringData message,
+               TypeErasedAttributeStorage const& attrs) {
+    if (loggingInProgress()) {
+        doSafeLog("Logging in Progress", id, severity, options, message, attrs);
+        return;
+    }
+
+    loggingDepth++;
+    ScopeGuard updateDepth = [] {
+        loggingDepth--;
+    };
+
+    try {
+        _doLogImpl(id, severity, options, message, attrs);
+    } catch (const fmt::format_error& ex) {
+        _doLogImpl(4638200,
+                   LogSeverity::Error(),
+                   LogOptions(LogComponent::kAssert),
+                   "Exception during log"_sd,
+                   AttributeStorage{"original_msg"_attr = message, "what"_attr = ex.what()});
+
+        invariant(!kDebugBuild, fmt::format("Exception during log: {}", ex.what()));
+    } catch (...) {
+        doSafeLog("Exception while creating log record", id, severity, options, message, attrs);
+        throw;
     }
 }
 
@@ -194,10 +344,11 @@ void doUnstructuredLogImpl(LogSeverity const& severity,  // NOLINT
     UnstructuredValueExtractor extractor;
     extractor.reserve(attrs.size());
     attrs.apply(extractor);
-    auto formatted =
-        fmt::vformat(std::string_view{message.rawData(), message.size()}, extractor.args());
+    auto formatted = fmt::vformat(toStdStringViewForInterop(message), extractor.args());
 
     doLogImpl(0, severity, options, formatted, TypeErasedAttributeStorage());
 }
 
-}  // namespace mongo::logv2::detail
+}  // namespace detail
+
+}  // namespace mongo::logv2

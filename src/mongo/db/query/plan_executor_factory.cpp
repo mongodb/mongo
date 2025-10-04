@@ -27,88 +27,112 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/query/plan_executor_factory.h"
 
-#include "mongo/db/exec/plan_stage.h"
+#include "mongo/base/status.h"
+#include "mongo/db/exec/classic/plan_stage.h"
+#include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/query/plan_executor_sbe.h"
 #include "mongo/db/query/query_planner_params.h"
-#include "mongo/db/query/util/make_data_structure.h"
+#include "mongo/db/query/sbe_plan_ranker.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/assert_util.h"
+
+#include <variant>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 
 namespace mongo::plan_executor_factory {
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     std::unique_ptr<CanonicalQuery> cq,
     std::unique_ptr<WorkingSet> ws,
-    std::unique_ptr<PlanStage> rt,
-    const CollectionPtr* collection,
+    std::unique_ptr<PlanStage> rootStage,
+    const boost::optional<CollectionAcquisition>& collection,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     size_t plannerOptions,
     NamespaceString nss,
-    std::unique_ptr<QuerySolution> qs) {
+    std::unique_ptr<QuerySolution> qs,
+    boost::optional<size_t> cachedPlanHash) {
     auto expCtx = cq->getExpCtx();
-    return make(expCtx->opCtx,
+    return make(expCtx->getOperationContext(),
                 std::move(ws),
-                std::move(rt),
+                std::move(rootStage),
                 std::move(qs),
                 std::move(cq),
                 expCtx,
                 collection,
                 plannerOptions,
-                nss,
-                yieldPolicy);
+                std::move(nss),
+                yieldPolicy,
+                cachedPlanHash,
+                QueryPlanner::CostBasedRankerResult{},
+                {} /* planStageQsnMap */,
+                {} /* cbrRejectedPlanStages */);
 }
+
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     std::unique_ptr<WorkingSet> ws,
-    std::unique_ptr<PlanStage> rt,
-    const CollectionPtr* collection,
+    std::unique_ptr<PlanStage> rootStage,
+    const boost::optional<CollectionAcquisition>& collection,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     size_t plannerOptions,
     NamespaceString nss,
     std::unique_ptr<QuerySolution> qs) {
-    return make(expCtx->opCtx,
+
+    return make(expCtx->getOperationContext(),
                 std::move(ws),
-                std::move(rt),
+                std::move(rootStage),
                 std::move(qs),
                 nullptr,
                 expCtx,
                 collection,
                 plannerOptions,
-                nss,
-                yieldPolicy);
+                std::move(nss),
+                yieldPolicy,
+                boost::none /* cachedPlanHash */,
+                QueryPlanner::CostBasedRankerResult{},
+                {} /* planStageQsnMap */,
+                {} /* cbrRejectedPlanStages */);
 }
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     OperationContext* opCtx,
     std::unique_ptr<WorkingSet> ws,
-    std::unique_ptr<PlanStage> rt,
+    std::unique_ptr<PlanStage> rootStage,
     std::unique_ptr<QuerySolution> qs,
     std::unique_ptr<CanonicalQuery> cq,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const CollectionPtr* collection,
+    const boost::optional<CollectionAcquisition>& collection,
     size_t plannerOptions,
     NamespaceString nss,
-    PlanYieldPolicy::YieldPolicy yieldPolicy) {
-    dassert(collection);
+    PlanYieldPolicy::YieldPolicy yieldPolicy,
+    boost::optional<size_t> cachedPlanHash,
+    QueryPlanner::CostBasedRankerResult cbrResult,
+    stage_builder::PlanStageToQsnMap planStageQsnMap,
+    std::vector<std::unique_ptr<PlanStage>> cbrRejectedPlanStages) {
     try {
         auto execImpl = new PlanExecutorImpl(opCtx,
                                              std::move(ws),
-                                             std::move(rt),
+                                             std::move(rootStage),
                                              std::move(qs),
                                              std::move(cq),
                                              expCtx,
-                                             *collection,
+                                             collection,
                                              plannerOptions & QueryPlannerParams::RETURN_OWNED_DATA,
                                              std::move(nss),
-                                             yieldPolicy);
+                                             yieldPolicy,
+                                             cachedPlanHash,
+                                             std::move(cbrResult),
+                                             std::move(planStageQsnMap),
+                                             std::move(cbrRejectedPlanStages));
         PlanExecutor::Deleter planDeleter(opCtx);
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec(execImpl, std::move(planDeleter));
         return {std::move(exec)};
@@ -122,68 +146,80 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     std::unique_ptr<CanonicalQuery> cq,
     std::unique_ptr<QuerySolution> solution,
     std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> root,
-    const CollectionPtr* collection,
+    const MultipleCollectionAccessor& collections,
     size_t plannerOptions,
     NamespaceString nss,
-    std::unique_ptr<PlanYieldPolicySBE> yieldPolicy) {
-    dassert(collection);
+    std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
+    bool planIsFromCache,
+    boost::optional<size_t> cachedPlanHash,
+    std::unique_ptr<RemoteCursorMap> remoteCursors,
+    std::unique_ptr<RemoteExplainVector> remoteExplains,
+    std::unique_ptr<MultiPlanStage> classicRuntimePlannerStage) {
     auto&& [rootStage, data] = root;
-
     LOGV2_DEBUG(4822860,
                 5,
                 "SBE plan",
-                "slots"_attr = data.debugString(),
-                "stages"_attr = sbe::DebugPrinter{}.print(*rootStage));
+                "slots"_attr = redact(data.debugString()),
+                "stages"_attr = redact(sbe::DebugPrinter{}.print(*rootStage)));
 
-    rootStage->prepare(data.ctx);
-
-    return {{new PlanExecutorSBE(
-                 opCtx,
-                 std::move(cq),
-                 {makeVector<sbe::plan_ranker::CandidatePlan>(sbe::plan_ranker::CandidatePlan{
-                      std::move(solution), std::move(rootStage), std::move(data)}),
-                  0},
-                 *collection,
-                 plannerOptions & QueryPlannerParams::RETURN_OWNED_DATA,
-                 std::move(nss),
-                 false,
-                 std::move(yieldPolicy)),
+    return {{new PlanExecutorSBE(opCtx,
+                                 std::move(cq),
+                                 sbe::plan_ranker::CandidatePlan{
+                                     std::move(solution),
+                                     std::move(rootStage),
+                                     sbe::plan_ranker::CandidatePlanData{std::move(data)},
+                                     false /*exitedEarly*/,
+                                     Status::OK(),
+                                     planIsFromCache},
+                                 plannerOptions & QueryPlannerParams::RETURN_OWNED_DATA,
+                                 std::move(nss),
+                                 false /*isOpen*/,
+                                 std::move(yieldPolicy),
+                                 cachedPlanHash,
+                                 std::move(remoteCursors),
+                                 std::move(remoteExplains),
+                                 std::move(classicRuntimePlannerStage),
+                                 collections),
              PlanExecutor::Deleter{opCtx}}};
 }
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     OperationContext* opCtx,
     std::unique_ptr<CanonicalQuery> cq,
-    sbe::CandidatePlans candidates,
-    const CollectionPtr* collection,
+    sbe::plan_ranker::CandidatePlan candidate,
+    const MultipleCollectionAccessor& collections,
     size_t plannerOptions,
     NamespaceString nss,
-    bool isOpen,
-    std::unique_ptr<PlanYieldPolicySBE> yieldPolicy) {
-    dassert(collection);
-
+    std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
+    std::unique_ptr<RemoteCursorMap> remoteCursors,
+    std::unique_ptr<RemoteExplainVector> remoteExplains,
+    boost::optional<size_t> cachedPlanHash) {
     LOGV2_DEBUG(4822861,
                 5,
                 "SBE plan",
-                "slots"_attr = candidates.winner().data.debugString(),
-                "stages"_attr = sbe::DebugPrinter{}.print(*candidates.winner().root));
+                "slots"_attr = redact(candidate.data.stageData.debugString()),
+                "stages"_attr = redact(sbe::DebugPrinter{}.print(*candidate.root)));
 
     return {{new PlanExecutorSBE(opCtx,
                                  std::move(cq),
-                                 std::move(candidates),
-                                 *collection,
+                                 std::move(candidate),
                                  plannerOptions & QueryPlannerParams::RETURN_OWNED_DATA,
                                  std::move(nss),
-                                 isOpen,
-                                 std::move(yieldPolicy)),
+                                 true, /*isOpen*/
+                                 std::move(yieldPolicy),
+                                 cachedPlanHash,
+                                 std::move(remoteCursors),
+                                 std::move(remoteExplains),
+                                 nullptr /*classicRuntimePlannerStage*/,
+                                 collections),
              PlanExecutor::Deleter{opCtx}}};
 }
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
     boost::intrusive_ptr<ExpressionContext> expCtx,
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+    std::unique_ptr<Pipeline> pipeline,
     PlanExecutorPipeline::ResumableScanType resumableScanType) {
-    auto* opCtx = expCtx->opCtx;
+    auto* opCtx = expCtx->getOperationContext();
     auto exec = new PlanExecutorPipeline(std::move(expCtx), std::move(pipeline), resumableScanType);
     return {exec, PlanExecutor::Deleter{opCtx}};
 }

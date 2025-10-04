@@ -27,9 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/query/tailable_mode.h"
+
+#include "mongo/base/error_codes.h"
+
 
 namespace mongo {
 

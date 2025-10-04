@@ -6,23 +6,17 @@
 # Where and how to store data.
 storage:
   dbPath: %MONGO_DATA_PATH%
-  journal:
-    enabled: true
-#  engine:
-#  wiredTiger:
 
 # where to write logging data.
 systemLog:
   destination: file
   logAppend: true
-  path:  %MONGO_LOG_PATH%\mongod.log
+  path: %MONGO_LOG_PATH%\mongod.log
 
 # network interfaces
 net:
   port: 27017
   bindIp: 127.0.0.1
-
-
 #processManagement:
 
 #security:
@@ -36,5 +30,3 @@ net:
 ## Enterprise-Only Options:
 
 #auditLog:
-
-#snmp:

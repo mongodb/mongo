@@ -29,15 +29,14 @@
 
 #include "mongo/db/update/modifier_table.h"
 
-#include <memory>
-
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
 
 namespace {
 
 using namespace mongo::modifiertable;
 
-using std::unique_ptr;
 
 TEST(getType, Normal) {
     ASSERT_EQUALS(getType("$set"), MOD_SET);

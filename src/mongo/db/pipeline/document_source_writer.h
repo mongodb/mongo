@@ -29,18 +29,17 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
-
-#include <fmt/format.h>
-
-#include "mongo/db/db_raii.h"
+#include "mongo/db/local_catalog/db_raii.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/util/modules.h"
+
+#include <fmt/format.h>
 
 namespace mongo {
-using namespace fmt::literals;
 
 /**
  * Manipulates the state of the OperationContext so that while this object is in scope, reads and
@@ -59,52 +58,40 @@ public:
     DocumentSourceWriteBlock(OperationContext* opCtx)
         : _opCtx(opCtx), _enforcePrepareConflictsBlock(opCtx) {
         _originalArgs = repl::ReadConcernArgs::get(_opCtx);
-        _originalSource = _opCtx->recoveryUnit()->getTimestampReadSource();
+        _originalSource = shard_role_details::getRecoveryUnit(_opCtx)->getTimestampReadSource();
         if (_originalSource == RecoveryUnit::ReadSource::kProvided) {
             // Storage engine operations require at least Global IS.
             Lock::GlobalLock lk(_opCtx, MODE_IS);
-            _originalTimestamp = *_opCtx->recoveryUnit()->getPointInTimeReadTimestamp(_opCtx);
+            _originalTimestamp =
+                *shard_role_details::getRecoveryUnit(_opCtx)->getPointInTimeReadTimestamp();
         }
 
         repl::ReadConcernArgs::get(_opCtx) = repl::ReadConcernArgs();
-        _opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
+        shard_role_details::getRecoveryUnit(_opCtx)->setTimestampReadSource(
+            RecoveryUnit::ReadSource::kNoTimestamp);
     }
 
     ~DocumentSourceWriteBlock() {
         repl::ReadConcernArgs::get(_opCtx) = _originalArgs;
         if (_originalSource == RecoveryUnit::ReadSource::kProvided) {
-            _opCtx->recoveryUnit()->setTimestampReadSource(_originalSource, _originalTimestamp);
+            shard_role_details::getRecoveryUnit(_opCtx)->setTimestampReadSource(_originalSource,
+                                                                                _originalTimestamp);
         } else {
-            _opCtx->recoveryUnit()->setTimestampReadSource(_originalSource);
+            shard_role_details::getRecoveryUnit(_opCtx)->setTimestampReadSource(_originalSource);
         }
     }
 };
 
 /**
- * This is a base abstract class for all stages performing a write operation into an output
- * collection. The writes are organized in batches in which elements are objects of the templated
- * type 'B'. A subclass must override two methods to be able to write into the output collection:
- *
- *    1. 'makeBatchObject()' - to create an object of type 'B' from the given 'Document', which is,
- *       essentially, a result of the input source's 'getNext()' .
- *    2. 'spill()' - to write the batch into the output collection.
- *
- * Two other virtual methods exist which a subclass may override: 'initialize()' and 'finalize()',
- * which are called before the first element is read from the input source, and after the last one
- * has been read, respectively.
+ * This is a base abstract class for all DocumentSources performing a write
+ * operation into an output collection.
  */
-template <typename B>
 class DocumentSourceWriter : public DocumentSource {
 public:
-    using BatchObject = B;
-    using BatchedObjects = std::vector<BatchObject>;
-
     DocumentSourceWriter(const char* stageName,
                          NamespaceString outputNs,
                          const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : DocumentSource(stageName, expCtx),
-          _outputNs(std::move(outputNs)),
-          _writeConcern(expCtx->opCtx->getWriteConcern()) {}
+        : DocumentSource(stageName, expCtx), _outputNs(std::move(outputNs)) {}
 
     DepsTracker::State getDependencies(DepsTracker* deps) const override {
         deps->needWholeDocument = true;
@@ -114,7 +101,7 @@ public:
     GetModPathsReturn getModifiedPaths() const override {
         // For purposes of tracking which fields come from where, the writer stage does not modify
         // any fields by default.
-        return {GetModPathsReturn::Type::kFiniteSet, std::set<std::string>{}, {}};
+        return {GetModPathsReturn::Type::kFiniteSet, OrderedPathSet{}, {}};
     }
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() override {
@@ -122,7 +109,7 @@ public:
     }
 
     bool canRunInParallelBeforeWriteStage(
-        const std::set<std::string>& nameOfShardKeyFieldsUponEntryToStage) const override {
+        const OrderedPathSet& nameOfShardKeyFieldsUponEntryToStage) const override {
         return true;
     }
 
@@ -130,114 +117,14 @@ public:
         return _outputNs;
     }
 
-protected:
-    GetNextResult doGetNext() final override;
-    /**
-     * Prepares the stage to be able to write incoming batches.
-     */
-    virtual void initialize() {}
-
-    /**
-     * Finalize the output collection, called when there are no more documents to write.
-     */
-    virtual void finalize() {}
-
-    /**
-     * Writes the documents in 'batch' to the output namespace.
-     */
-    virtual void spill(BatchedObjects&& batch) = 0;
-
-    /**
-     * Creates a batch object from the given document and returns it to the caller along with the
-     * object size.
-     */
-    virtual std::pair<B, int> makeBatchObject(Document&& doc) const = 0;
-
-    /**
-     * A subclass may override this method to enable a fail point right after a next input element
-     * has been retrieved, but not processed yet.
-     */
-    virtual void waitWhileFailPointEnabled() {}
-
-    // The namespace where the output will be written to.
-    const NamespaceString _outputNs;
-
-    // Stash the writeConcern of the original command as the operation context may change by the
-    // time we start to spill writes. This is because certain aggregations (e.g. $exchange)
-    // establish cursors with batchSize 0 then run subsequent getMore's which use a new operation
-    // context. The getMore's will not have an attached writeConcern however we still want to
-    // respect the writeConcern of the original command.
-    WriteConcernOptions _writeConcern;
+    boost::optional<ShardId> computeMergeShardId() const final {
+        return getExpCtx()->getMongoProcessInterface()->determineSpecificMergeShard(
+            getExpCtx()->getOperationContext(), getOutputNs());
+    }
 
 private:
-    bool _initialized{false};
-    bool _done{false};
+    const NamespaceString _outputNs;
 };
 
-template <typename B>
-DocumentSource::GetNextResult DocumentSourceWriter<B>::doGetNext() {
-    if (_done) {
-        return GetNextResult::makeEOF();
-    }
-
-    // Ignore writes and exhaust input if we are in explain mode.
-    if (pExpCtx->explain) {
-        auto nextInput = pSource->getNext();
-        for (; nextInput.isAdvanced(); nextInput = pSource->getNext()) {
-        }
-        _done = nextInput.getStatus() == GetNextResult::ReturnStatus::kEOF;
-        return nextInput;
-    } else {
-        // Ensure that the client's operationTime reflects the latest write even if the command
-        // fails.
-        ON_BLOCK_EXIT(
-            [&] { pExpCtx->mongoProcessInterface->updateClientOperationTime(pExpCtx->opCtx); });
-
-        if (!_initialized) {
-            initialize();
-            _initialized = true;
-        }
-
-        BatchedObjects batch;
-        int bufferedBytes = 0;
-
-        auto nextInput = pSource->getNext();
-        for (; nextInput.isAdvanced(); nextInput = pSource->getNext()) {
-            waitWhileFailPointEnabled();
-
-            auto doc = nextInput.releaseDocument();
-            auto [obj, objSize] = makeBatchObject(std::move(doc));
-
-            bufferedBytes += objSize;
-            if (!batch.empty() &&
-                (bufferedBytes > BSONObjMaxUserSize ||
-                 batch.size() >= write_ops::kMaxWriteBatchSize)) {
-                spill(std::move(batch));
-                batch.clear();
-                bufferedBytes = objSize;
-            }
-            batch.push_back(obj);
-        }
-        if (!batch.empty()) {
-            spill(std::move(batch));
-            batch.clear();
-        }
-
-        switch (nextInput.getStatus()) {
-            case GetNextResult::ReturnStatus::kAdvanced: {
-                MONGO_UNREACHABLE;  // We consumed all advances above.
-            }
-            case GetNextResult::ReturnStatus::kPauseExecution: {
-                return nextInput;  // Propagate the pause.
-            }
-            case GetNextResult::ReturnStatus::kEOF: {
-                _done = true;
-                finalize();
-                return nextInput;
-            }
-        }
-    }
-    MONGO_UNREACHABLE;
-}
 
 }  // namespace mongo

@@ -27,40 +27,42 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 #include "mongo/client/sdam/mock_topology_manager.h"
 
-#include <string>
+#include "mongo/client/sdam/topology_description.h"
+#include "mongo/util/assert_util.h"
 
-#include "mongo/client/sdam/topology_state_machine.h"
-#include "mongo/logv2/log.h"
-#include "mongo/rpc/topology_version_gen.h"
+#include <memory>
+#include <mutex>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
+
 
 namespace mongo::sdam {
 
 MockTopologyManager::MockTopologyManager() {}
 
 bool MockTopologyManager::onServerDescription(const HelloOutcome& helloOutcome) {
-    fassert(5429100, "MockTopologyManager does not support onServerDescription");
+    fasserted(5429100);  // MockTopologyManager does not support onServerDescription
     return true;
 }
 
-const std::shared_ptr<TopologyDescription> MockTopologyManager::getTopologyDescription() const {
-    stdx::lock_guard<mongo::Mutex> lock(_mutex);
+std::shared_ptr<TopologyDescription> MockTopologyManager::getTopologyDescription() const {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     return _topologyDescription;
 }
 
 void MockTopologyManager::onServerRTTUpdated(HostAndPort hostAndPort, HelloRTT rtt) {}
 
 void MockTopologyManager::setTopologyDescription(TopologyDescriptionPtr newDescription) {
-    stdx::lock_guard<mongo::Mutex> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     _topologyDescription = newDescription;
 }
 
 SemiFuture<std::vector<HostAndPort>> MockTopologyManager::executeWithLock(
     std::function<SemiFuture<std::vector<HostAndPort>>(const TopologyDescriptionPtr&)> func) {
-    stdx::lock_guard<mongo::Mutex> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     return func(_topologyDescription);
 }
 

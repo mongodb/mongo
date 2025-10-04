@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include <shared_mutex>
-
 #include "mongo/db/operation_id.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/rwmutex.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/unordered_set.h"
+#include "mongo/stdx/mutex.h"
+
+#include <memory>
 
 namespace mongo {
 
@@ -45,39 +45,20 @@ public:
     static StorageEngineChangeContext* get(ServiceContext* service);
 
     /**
-     * Token to be held by caller while changing the storage engine on the context.
-     */
-private:
-    class SharedSpinLock;
-
-public:
-    using StorageChangeToken = stdx::unique_lock<SharedSpinLock>;
-    // TODO(SERVER-59157): Replace two uses of std::shared_lock with stdx::shared_lock or remove
-    // NOLINT according to resolution of this ticket.
-    using SharedStorageChangeToken = std::shared_lock<SharedSpinLock>;  // NOLINT
-
-    /**
      * Start to change the storage engine for the associated ServiceContext.  This will kill all
      * OperationContexts that have a non-noop Recovery Unit with an InterruptedDueToStorageChange
      * code, free the existing storage engine, and block any new operation contexts from being
-     * created while the returned StorageChangeToken is in scope.
+     * created while the returned lock is in scope.
      */
-    StorageChangeToken killOpsForStorageEngineChange(ServiceContext* service);
+    WriteRarelyRWMutex::WriteLock killOpsForStorageEngineChange(ServiceContext* service);
 
     /**
      * Finish changing the storage engine for the associated ServiceContext.  This will change the
      * storage engine and allow operation contexts to again be created.
      */
     void changeStorageEngine(ServiceContext* service,
-                             StorageChangeToken token,
+                             WriteRarelyRWMutex::WriteLock,
                              std::unique_ptr<StorageEngine> engine);
-
-    /**
-     * Acquires the storage change lock in shared mode and returns an RAII lock object to it.
-     */
-    SharedStorageChangeToken acquireSharedStorageChangeToken() {
-        return std::shared_lock(_storageChangeSpinlock);  // NOLINT
-    }
 
     /**
      * Called by the decorator's destructor to tell us that an opCtx with the old storage engine has
@@ -86,30 +67,11 @@ public:
     void notifyOpCtxDestroyed() noexcept;
 
 private:
-    // Spin lock for storage change.  Needs to be fast for lock_shared and unlock_shared,
-    // not for the exclusive lock.  This lock has no fairness guarantees and is not re-entrant
-    // from shared -> exclusive (i.e. it cannot be upgraded), exclusive -> shared,
-    // or exclusive -> exclusive.
-    class SharedSpinLock {
-    public:
-        void lock();
-        void unlock();
-        void lock_shared();
-        void unlock_shared();
-
-    private:
-        AtomicWord<uint32_t> _lockWord;
-        static const uint32_t kExclusiveLock = 1 << 31;
-        static const int kLockPollIntervalMillis = 100;
-    };
-
-    Mutex _mutex = MONGO_MAKE_LATCH("StorageEngineChangeContext::_mutex");
+    stdx::mutex _mutex;
 
     // Keeps track of opCtxs associated with a storage engine that is being replaced.
     // Protected by _mutex
     int _numOpCtxtsToWaitFor = 0;
     stdx::condition_variable _allOldStorageOperationContextsReleased;
-
-    SharedSpinLock _storageChangeSpinlock;
 };
 }  // namespace mongo

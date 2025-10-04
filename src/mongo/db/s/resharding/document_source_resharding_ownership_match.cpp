@@ -27,32 +27,42 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/s/resharding/document_source_resharding_ownership_match.h"
 
-#include "mongo/db/s/resharding_util.h"
-#include "mongo/db/transaction_history_iterator.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/grid.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/s/resharding/common_types_gen.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
+#include <utility>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 namespace mongo {
 
 REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalReshardingOwnershipMatch,
-                                  LiteParsedDocumentSourceDefault::parse,
+                                  LiteParsedDocumentSourceInternal::parse,
                                   DocumentSourceReshardingOwnershipMatch::createFromBson,
                                   true);
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalReshardingOwnershipMatch,
+                            DocumentSourceReshardingOwnershipMatch::id)
 
 boost::intrusive_ptr<DocumentSourceReshardingOwnershipMatch>
 DocumentSourceReshardingOwnershipMatch::create(
     ShardId recipientShardId,
     ShardKeyPattern reshardingKey,
+    boost::optional<NamespaceString> temporaryReshardingNamespace,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    return new DocumentSourceReshardingOwnershipMatch(
-        std::move(recipientShardId), std::move(reshardingKey), expCtx);
+    return new DocumentSourceReshardingOwnershipMatch(std::move(recipientShardId),
+                                                      std::move(reshardingKey),
+                                                      std::move(temporaryReshardingNamespace),
+                                                      expCtx);
 }
 
 boost::intrusive_ptr<DocumentSourceReshardingOwnershipMatch>
@@ -60,25 +70,29 @@ DocumentSourceReshardingOwnershipMatch::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(8423307,
             str::stream() << "Argument to " << kStageName << " must be an object",
-            elem.type() == Object);
+            elem.type() == BSONType::object);
 
     auto parsed = DocumentSourceReshardingOwnershipMatchSpec::parse(
-        {"DocumentSourceReshardingOwnershipMatchSpec"}, elem.embeddedObject());
+        elem.embeddedObject(), IDLParserContext{"DocumentSourceReshardingOwnershipMatchSpec"});
 
-    return new DocumentSourceReshardingOwnershipMatch(
-        parsed.getRecipientShardId(), ShardKeyPattern(parsed.getReshardingKey()), expCtx);
+    return new DocumentSourceReshardingOwnershipMatch(parsed.getRecipientShardId(),
+                                                      ShardKeyPattern(parsed.getReshardingKey()),
+                                                      parsed.getTemporaryReshardingNamespace(),
+                                                      expCtx);
 }
 
 DocumentSourceReshardingOwnershipMatch::DocumentSourceReshardingOwnershipMatch(
     ShardId recipientShardId,
     ShardKeyPattern reshardingKey,
+    boost::optional<NamespaceString> temporaryReshardingNamespace,
     const boost::intrusive_ptr<ExpressionContext>& expCtx)
     : DocumentSource(kStageName, expCtx),
       _recipientShardId{std::move(recipientShardId)},
-      _reshardingKey{std::move(reshardingKey)} {}
+      _reshardingKey{std::make_shared<ShardKeyPattern>(std::move(reshardingKey))},
+      _temporaryReshardingNamespace{std::move(temporaryReshardingNamespace)} {}
 
 StageConstraints DocumentSourceReshardingOwnershipMatch::constraints(
-    Pipeline::SplitState pipeState) const {
+    PipelineSplitState pipeState) const {
     return StageConstraints(StreamType::kStreaming,
                             PositionRequirement::kNone,
                             HostTypeRequirement::kAnyShard,
@@ -90,18 +104,22 @@ StageConstraints DocumentSourceReshardingOwnershipMatch::constraints(
                             ChangeStreamRequirement::kDenylist);
 }
 
-Value DocumentSourceReshardingOwnershipMatch::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
-    return Value{Document{{kStageName,
-                           DocumentSourceReshardingOwnershipMatchSpec(
-                               _recipientShardId, _reshardingKey.getKeyPattern())
-                               .toBSON()}}};
+Value DocumentSourceReshardingOwnershipMatch::serialize(const SerializationOptions& opts) const {
+    auto spec = DocumentSourceReshardingOwnershipMatchSpec(_recipientShardId,
+                                                           _reshardingKey->getKeyPattern());
+    // TODO SERVER-92437 ensure this behavior is safe during FCV upgrade/downgrade
+    if (resharding::gFeatureFlagReshardingRelaxedMode.isEnabled(
+            VersionContext::getDecoration(getExpCtx()->getOperationContext()),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        spec.setTemporaryReshardingNamespace(_temporaryReshardingNamespace);
+    }
+    return Value{Document{{kStageName, spec.toBSON(opts)}}};
 }
 
 DepsTracker::State DocumentSourceReshardingOwnershipMatch::getDependencies(
     DepsTracker* deps) const {
-    for (const auto& skElem : _reshardingKey.toBSON()) {
-        deps->fields.insert(skElem.fieldNameStringData().toString());
+    for (const auto& skElem : _reshardingKey->toBSON()) {
+        deps->fields.insert(std::string{skElem.fieldNameStringData()});
     }
 
     return DepsTracker::State::SEE_NEXT;
@@ -109,34 +127,7 @@ DepsTracker::State DocumentSourceReshardingOwnershipMatch::getDependencies(
 
 DocumentSource::GetModPathsReturn DocumentSourceReshardingOwnershipMatch::getModifiedPaths() const {
     // This stage does not modify or rename any paths.
-    return {DocumentSource::GetModPathsReturn::Type::kFiniteSet, std::set<std::string>{}, {}};
-}
-
-DocumentSource::GetNextResult DocumentSourceReshardingOwnershipMatch::doGetNext() {
-    // TODO: Actually propagate the temporary resharding namespace from the recipient.
-    auto tempReshardingNss = constructTemporaryReshardingNss(pExpCtx->ns.db(), *pExpCtx->uuid);
-
-    auto* catalogCache = Grid::get(pExpCtx->opCtx)->catalogCache();
-    auto cm = catalogCache->getShardedCollectionRoutingInfo(pExpCtx->opCtx, tempReshardingNss);
-
-    auto nextInput = pSource->getNext();
-    for (; nextInput.isAdvanced(); nextInput = pSource->getNext()) {
-        auto shardKey =
-            _reshardingKey.extractShardKeyFromDocThrows(nextInput.getDocument().toBson());
-
-        if (cm.keyBelongsToShard(shardKey, _recipientShardId)) {
-            return nextInput;
-        }
-
-        // For performance reasons, a streaming stage must not keep references to documents across
-        // calls to getNext(). Such stages must retrieve a result from their child and then release
-        // it (or return it) before asking for another result. Failing to do so can result in extra
-        // work, since the Document/Value library must copy data on write when that data has a
-        // refcount above one.
-        nextInput.releaseDocument();
-    }
-
-    return nextInput;
+    return {DocumentSource::GetModPathsReturn::Type::kFiniteSet, OrderedPathSet{}, {}};
 }
 
 }  // namespace mongo

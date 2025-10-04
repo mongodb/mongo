@@ -2,7 +2,7 @@ test_kind: js_test
 
 selector:
   roots:
-  - jstests/libunwind/*.js
+    - jstests/libunwind/*.js
 
 executor:
   config: {}

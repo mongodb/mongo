@@ -1,0 +1,8 @@
+# This suite should not be run in evergreen, it is combined into
+# sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm
+# sharding_max_mirroring_opportunistic_secondary_targeting_ese
+# sharding_max_mirroring_opportunistic_secondary_targeting
+base_suite: sharding
+overrides:
+  - "opportunistic_secondary_targeting.enable"
+  - "archive.no_archive"

@@ -30,10 +30,8 @@
 # rollback_to_stable
 # [END_TAGS]
 
-import fnmatch, os, shutil, threading, time
-from wtthread import checkpoint_thread, op_thread
 from helper import simulate_crash_restart
-import wiredtiger, wttest
+import wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 from wiredtiger import stat
@@ -41,6 +39,9 @@ from wiredtiger import stat
 # test_checkpoint_snapshot03.py
 #   This test is to check RTS skips the unnecessary pages when the table has more than the
 #   checkpoint snapshot.
+
+# FIXME-WT-15487
+@wttest.skip_for_hook("disagg", "very long eviction can cause tests to time out")
 class test_checkpoint_snapshot03(wttest.WiredTigerTestCase):
 
     # Create a table.
@@ -50,13 +51,13 @@ class test_checkpoint_snapshot03(wttest.WiredTigerTestCase):
     format_values = [
         ('column_fix', dict(key_format='r', value_format='8t')),
         ('column', dict(key_format='r', value_format='S')),
-        ('string_row', dict(key_format='S', value_format='S')),
+        ('row_string', dict(key_format='S', value_format='S')),
     ]
 
     scenarios = make_scenarios(format_values)
 
     def conn_config(self):
-        config = 'cache_size=250MB,statistics=(all),statistics_log=(json,on_close,wait=1),log=(enabled=true)'
+        config = 'cache_size=250MB,statistics=(all),statistics_log=(json,on_close,wait=1)'
         return config
 
     def large_updates(self, uri, value, ds, nrows):
@@ -64,9 +65,7 @@ class test_checkpoint_snapshot03(wttest.WiredTigerTestCase):
         session = self.session
         cursor = session.open_cursor(uri)
         for i in range(1, nrows + 1):
-            session.begin_transaction()
             cursor[ds.key(i)] = value
-            session.commit_transaction()
         cursor.close()
 
     def check(self, check_value, uri, nrows):
@@ -91,10 +90,9 @@ class test_checkpoint_snapshot03(wttest.WiredTigerTestCase):
         self.assertEqual(count, nrows + 1 if flcs_tolerance else nrows)
 
     def test_checkpoint_snapshot(self):
-
         ds = SimpleDataSet(self, self.uri, 0, \
                 key_format=self.key_format, value_format=self.value_format, \
-                config='log=(enabled=false),leaf_page_max=4k')
+                config='leaf_page_max=4k')
         ds.populate()
 
         if self.value_format == '8t':
@@ -155,11 +153,11 @@ class test_checkpoint_snapshot03(wttest.WiredTigerTestCase):
         upd_aborted = stat_cursor[stat.conn.txn_rts_upd_aborted][2]
         stat_cursor.close()
 
-        self.assertGreater(inconsistent_ckpt, 0)
         self.assertEqual(upd_aborted, 0)
         self.assertGreaterEqual(keys_removed, 0)
         self.assertEqual(keys_restored, 0)
-        self.assertGreater(pages_skipped, 0)
+        if not self.runningHook('disagg'): # Disagg doesn't have inconsistent checkpoints or RTS.
+            self.assertGreater(inconsistent_ckpt, 0)
+            self.assertGreater(pages_skipped, 0)
 
-if __name__ == '__main__':
-    wttest.run()
+        self.ignoreStdoutPatternIfExists('Eviction took more than 1 minute') # FIXME-WT-15478

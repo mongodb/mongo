@@ -29,10 +29,13 @@
 
 #pragma once
 
-#include <map>
-
+#include "mongo/client/connection_string.h"
+#include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/remote_command_targeter_factory.h"
 #include "mongo/client/remote_command_targeter_mock.h"
+
+#include <map>
+#include <memory>
 
 namespace mongo {
 
@@ -43,7 +46,7 @@ namespace mongo {
 class RemoteCommandTargeterFactoryMock final : public RemoteCommandTargeterFactory {
 public:
     RemoteCommandTargeterFactoryMock();
-    ~RemoteCommandTargeterFactoryMock();
+    ~RemoteCommandTargeterFactoryMock() override;
 
     /**
      * If the input connection string matches one of the pre-defined targeters added through an

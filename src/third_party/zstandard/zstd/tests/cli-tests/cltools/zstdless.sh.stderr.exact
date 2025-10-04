@@ -1,0 +1,2 @@
+zstd: can't stat bad.zst : No such file or directory -- ignored 
+bad.zst: No such file or directory

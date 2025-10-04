@@ -27,17 +27,15 @@
  *    it in the license file.
  */
 
-#include <benchmark/benchmark.h>
-
-#include <algorithm>
-#include <string>
-#include <vector>
-
-#include <boost/intrusive_ptr.hpp>
-
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
-#include "mongo/util/processinfo.h"
+
+#include "mongo/base/error_codes.h"
+
+#include <atomic>
+#include <cstdint>
+
+#include <benchmark/benchmark.h>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace {

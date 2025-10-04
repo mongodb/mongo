@@ -9,5 +9,5 @@ based on history runtime of each test, and generate the Evergreen configuration
 dynamically before each Evergreen build variant run, so that no mental overhead
 is required when new tests is introduced into test/suite. (WT-4441)
 
-Before the above mentioned mechansim is put into place, please double check
+Before the above mentioned mechanism is put into place, please double check
 test/evergreen.yml and test run logs to make sure new test are covered.

@@ -27,28 +27,28 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/idl/command_generic_argument.h"
 
+#include "mongo/base/string_data.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/idl/generic_argument_gen.h"
+#include "mongo/idl/idl_parser.h"
 
 namespace mongo {
 
 bool isGenericArgument(StringData arg) {
-    return Generic_args_api_v1::hasField(arg) || Generic_args_unstable_v1::hasField(arg);
+    return GenericArguments::hasField(arg) || arg == IDLParserContext::kOpMsgDollarDB;
+}
+
+bool isGenericReply(StringData arg) {
+    return GenericReplyFields::hasField(arg);
 }
 
 bool shouldForwardToShards(StringData arg) {
-    return Generic_args_api_v1::shouldForwardToShards(arg) &&
-        Generic_args_unstable_v1::shouldForwardToShards(arg);
+    return GenericArguments::shouldForwardToShards(arg) && arg != IDLParserContext::kOpMsgDollarDB;
 }
 
 bool shouldForwardFromShards(StringData replyField) {
-    return Generic_reply_fields_api_v1::shouldForwardFromShards(replyField) &&
-        Generic_reply_fields_unstable_v1::shouldForwardFromShards(replyField);
+    return GenericReplyFields::shouldForwardFromShards(replyField);
 }
-
-bool isMongocryptdArgument(StringData arg) {
-    return arg == "jsonSchema"_sd;
-}
-
 }  // namespace mongo

@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # Build a WiredTiger release package.
 
 set -e
@@ -10,45 +10,32 @@ mkdir -p $RELEASE_DIR
 
 pkgver="$1"
 if test -z "$pkgver" ; then
-	pkgver="$WIREDTIGER_VERSION"
+    pkgver="$WIREDTIGER_VERSION"
 fi
 PKG="wiredtiger-$pkgver"
 DEST="$RELEASE_DIR/$PKG"
 
 rm -rf $DEST ; mkdir -p $DEST
-EXCLUSIONS=`sed -e '/^#/d' -e 's/^/--exclude /' < s_release.list`
 
-if [ -d ../.hg ] ; then
-	echo "Running 'hg archive' to copy the tree"
-	(cd .. && hg archive $EXCLUSIONS $DEST)
-elif [ -d ../.git ] ; then
-	echo "Running 'git archive' to copy the tree"
-	(cd .. && git archive HEAD) | (cd $DEST && tar xf - $EXCLUSIONS)
+if [ -d ../.git ] ; then
+    echo "Running 'git archive' to copy the tree"
+    (cd .. && git archive HEAD) | (cd $DEST && tar xf -)
 else
-	echo "$0 must be run in a Git or Mercurial tree"
-	exit 1
+    echo "$0 must be run in a Git tree"
+    exit 1
 fi
 
 echo "Running 'dist/s_all' in the release tree"
-(cd "$DEST/dist" && env WT_RELEASE_BUILD=yes sh s_all -A > /dev/null)
-
-echo "Running swig to generate the Python API"
-(cd "$DEST/build_posix" &&
-    ../configure --enable-python &&
-    (cd lang/python && make ../../../lang/python/wiredtiger_wrap.c) &&
-    make distclean &&
-    find . -type d -a -empty | xargs rmdir &&
-    find . -type d -a -empty | xargs rmdir &&
-    find . -type d -a -empty | xargs rmdir) > /dev/null
+(cd "$DEST/dist" && env WT_RELEASE_BUILD=yes bash s_all > /dev/null)
 
 echo "Building documentation"
-(cd "$DEST/dist" && sh s_docs > /dev/null)
+(cd "$DEST/dist" && bash s_docs > /dev/null)
 
 echo "Packing release into $RELEASE_DIR/$PKG.tar.bz2"
 (cd "$RELEASE_DIR" && tar cf - $PKG | bzip2 -9 > $PKG.tar.bz2)
 
 echo "Packing documentation into $RELEASE_DIR/$PKG-docs.tar.bz2"
-(cd "$RELEASE_DIR" && tar cf - $PKG/LICENSE $PKG/NEWS $PKG/README $PKG/docs | \
+(cd "$RELEASE_DIR" && tar cf - $PKG/LICENSE $PKG/README $PKG/docs | \
     bzip2 -9 > $PKG-docs.tar.bz2)
 
 rm -r $DEST

@@ -24,8 +24,7 @@
  * ]
  */
 
-(function() {
-"use strict";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 function incTs(ts) {
     return Timestamp(ts.t, ts.i + 1);
@@ -39,8 +38,8 @@ let replTest = new ReplSetTest({
             // Set the history window to zero to more aggressively advance the oldest timestamp.
             minSnapshotHistoryWindowInSeconds: 0,
             logComponentVerbosity: tojson({storage: {recovery: 2}}),
-        }
-    }
+        },
+    },
 });
 let nodes = replTest.startSet();
 replTest.initiate();
@@ -50,13 +49,14 @@ let primary = replTest.getPrimary();
 // write to the `mdb_testing.pinned_timestamp` collection is not logged/replayed during replication
 // recovery. Repinning across startup happens before replication recovery. Do a majority write for
 // predictability of the test.
-let result = assert.commandWorked(primary.adminCommand(
-    {"pinHistoryReplicated": Timestamp(100, 1), round: true, writeConcern: {w: "majority"}}));
+let result = assert.commandWorked(
+    primary.adminCommand({"pinHistoryReplicated": Timestamp(100, 1), round: true, writeConcern: {w: "majority"}}),
+);
 let origPinTs = result["pinTs"];
 jsTestLog({"First pin result": result});
 
 // Do some additional writes that would traditionally advance the oldest timestamp.
-for (var idx = 0; idx < 10; ++idx) {
+for (let idx = 0; idx < 10; ++idx) {
     assert.commandWorked(primary.getDB("test")["coll"].insert({}));
 }
 assert.commandWorked(primary.getDB("test")["coll"].insert({}, {writeConcern: {w: "majority"}}));
@@ -74,15 +74,15 @@ pinnedTs = serverStatus["wiredTiger"]["snapshot-window-settings"]["min pinned ti
 assert.eq(origPinTs, pinnedTs);
 
 // Create a new pin at "ts + 1". This should succeed, but have no effect.
-result = assert.commandWorked(
-    primary.adminCommand({"pinHistoryReplicated": incTs(result["pinTs"]), round: false}));
+result = assert.commandWorked(primary.adminCommand({"pinHistoryReplicated": incTs(result["pinTs"]), round: false}));
 jsTestLog({"Second pin result": result});
 let newPinTs = result["pinTs"];
 assert.eq(newPinTs, incTs(origPinTs));
 
 // Remove the old pin at "ts".
-assert.commandWorked(primary.getDB("mdb_testing")["pinned_timestamp"].remove(
-    {"pinTs": origPinTs}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.getDB("mdb_testing")["pinned_timestamp"].remove({"pinTs": origPinTs}, {writeConcern: {w: "majority"}}),
+);
 
 // Restarting the node should observe a pin at "ts + 1".
 replTest.restart(primary);
@@ -91,4 +91,3 @@ serverStatus = assert.commandWorked(primary.adminCommand("serverStatus"));
 pinnedTs = serverStatus["wiredTiger"]["snapshot-window-settings"]["min pinned timestamp"];
 assert.eq(newPinTs, pinnedTs);
 replTest.stopSet();
-})();

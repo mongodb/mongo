@@ -27,73 +27,123 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
-
-#include "mongo/platform/basic.h"
-
-#include <cstdio>
-#include <fmt/format.h>
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
 
-#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
-#include "mongo/util/errno_util.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_compiled_configuration.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/assert_util.h"
+
+#include <string>
+
+#include <wiredtiger.h>
+
+#include <fmt/format.h>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
+
 
 namespace mongo {
-using namespace fmt::literals;
+using NoReadTimestamp = WiredTigerBeginTxnBlock::NoReadTimestamp;
+
+static inline int getConfigOffset(int ignore_prepare,
+                                  int roundup_prepared,
+                                  int roundup_read,
+                                  int no_timestamp) {
+    static constexpr int roundup_read_factor = static_cast<int>(NoReadTimestamp::kMax);
+    static constexpr int roundup_prepared_factor =
+        static_cast<int>(RoundUpReadTimestamp::kMax) * roundup_read_factor;
+    static constexpr int ignore_prepare_factor =
+        static_cast<int>(RoundUpPreparedTimestamps::kMax) * roundup_prepared_factor;
+    return ignore_prepare * ignore_prepare_factor + roundup_prepared * roundup_prepared_factor +
+        roundup_read * roundup_read_factor + no_timestamp;
+}
+
+static std::vector<CompiledConfiguration>& makeCompiledConfigurations() {
+    static std::vector<CompiledConfiguration> compiledConfigurations;
+    std::string ignore_prepare_str[] = {"false", "true", "force"};
+    std::string false_true_str[] = {"false", "true"};
+    for (int ignore_prepare = static_cast<int>(PrepareConflictBehavior::kEnforce);
+         ignore_prepare < static_cast<int>(PrepareConflictBehavior::kMax);
+         ignore_prepare++)
+        for (int roundup_prepared = static_cast<int>(RoundUpPreparedTimestamps::kNoRound);
+             roundup_prepared < static_cast<int>(RoundUpPreparedTimestamps::kMax);
+             roundup_prepared++)
+            for (int roundup_read = static_cast<int>(RoundUpReadTimestamp::kNoRoundError);
+                 roundup_read < static_cast<int>(RoundUpReadTimestamp::kMax);
+                 roundup_read++)
+                for (int no_timestamp = static_cast<int>(NoReadTimestamp::kFalse);
+                     no_timestamp < static_cast<int>(NoReadTimestamp::kMax);
+                     no_timestamp++) {
+                    // not to compile default
+                    int config = getConfigOffset(
+                        ignore_prepare, roundup_prepared, roundup_read, no_timestamp);
+                    if (config == 0) {
+                        continue;
+                    }
+                    const std::string beginTxnConfigString = fmt::format(
+                        "ignore_prepare={},roundup_timestamps=(prepared={},read={}),no_timestamp={"
+                        "}",
+                        ignore_prepare_str[ignore_prepare],
+                        false_true_str[roundup_prepared],
+                        false_true_str[roundup_read],
+                        false_true_str[no_timestamp]);
+                    compiledConfigurations.emplace_back("WT_SESSION.begin_transaction",
+                                                        beginTxnConfigString.c_str());
+                }
+    return compiledConfigurations;
+}
+
+static std::vector<CompiledConfiguration>& compiledBeginTransactions = makeCompiledConfigurations();
 
 WiredTigerBeginTxnBlock::WiredTigerBeginTxnBlock(
-    WT_SESSION* session,
+    WiredTigerSession* session,
     PrepareConflictBehavior prepareConflictBehavior,
-    RoundUpPreparedTimestamps roundUpPreparedTimestamps,
-    RoundUpReadTimestamp roundUpReadTimestamp)
+    bool roundUpPreparedTimestamps,
+    RoundUpReadTimestamp roundUpReadTimestamp,
+    RecoveryUnit::UntimestampedWriteAssertionLevel allowUntimestampedWrite)
     : _session(session) {
     invariant(!_rollback);
 
-    str::stream builder;
-    if (prepareConflictBehavior == PrepareConflictBehavior::kIgnoreConflicts) {
-        builder << "ignore_prepare=true,";
-    } else if (prepareConflictBehavior == PrepareConflictBehavior::kIgnoreConflictsAllowWrites) {
-        builder << "ignore_prepare=force,";
-    }
-    if (roundUpPreparedTimestamps == RoundUpPreparedTimestamps::kRound ||
-        roundUpReadTimestamp == RoundUpReadTimestamp::kRound) {
-        builder << "roundup_timestamps=(";
-        if (roundUpPreparedTimestamps == RoundUpPreparedTimestamps::kRound) {
-            builder << "prepared=true,";
-        }
-        if (roundUpReadTimestamp == RoundUpReadTimestamp::kRound) {
-            builder << "read=true";
-        }
-        builder << "),";
-    }
-    if (roundUpReadTimestamp == RoundUpReadTimestamp::kNoRoundForce) {
-        builder << "read_before_oldest=true,";
+    NoReadTimestamp no_timestamp = NoReadTimestamp::kFalse;
+    if (allowUntimestampedWrite != RecoveryUnit::UntimestampedWriteAssertionLevel::kEnforce) {
+        no_timestamp = NoReadTimestamp::kTrue;
     }
 
-    const std::string beginTxnConfigString = builder;
-    invariantWTOK(_session->begin_transaction(_session, beginTxnConfigString.c_str()));
+    int config = getConfigOffset(static_cast<int>(prepareConflictBehavior),
+                                 static_cast<int>(roundUpPreparedTimestamps
+                                                      ? RoundUpPreparedTimestamps::kRound
+                                                      : RoundUpPreparedTimestamps::kNoRound),
+                                 static_cast<int>(roundUpReadTimestamp),
+                                 static_cast<int>(no_timestamp));
+    const char* compiled_config = nullptr;
+    if (config > 0) {
+        compiled_config = compiledBeginTransactions[config - 1].getConfig(_session);
+    }
+    invariantWTOK(_session->begin_transaction(compiled_config), *_session);
     _rollback = true;
 }
 
-WiredTigerBeginTxnBlock::WiredTigerBeginTxnBlock(WT_SESSION* session, const char* config)
+WiredTigerBeginTxnBlock::WiredTigerBeginTxnBlock(WiredTigerSession* session, const char* config)
     : _session(session) {
     invariant(!_rollback);
-    invariantWTOK(_session->begin_transaction(_session, config));
+    invariantWTOK(_session->begin_transaction(config), *_session);
     _rollback = true;
 }
 
 WiredTigerBeginTxnBlock::~WiredTigerBeginTxnBlock() {
     if (_rollback) {
-        invariant(_session->rollback_transaction(_session, nullptr) == 0);
+        invariant(_session->rollback_transaction(nullptr) == 0);
     }
 }
 
 Status WiredTigerBeginTxnBlock::setReadSnapshot(Timestamp readTimestamp) {
     invariant(_rollback);
-    std::string readTSConfigString = "read_timestamp={:x}"_format(readTimestamp.asULL());
-
-    return wtRCToStatus(_session->timestamp_transaction(_session, readTSConfigString.c_str()));
+    return wtRCToStatus(
+        _session->timestamp_transaction_uint(WT_TS_TXN_TYPE_READ, readTimestamp.asULL()),
+        *_session);
 }
 
 void WiredTigerBeginTxnBlock::done() {

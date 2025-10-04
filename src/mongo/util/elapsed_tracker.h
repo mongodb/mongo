@@ -29,23 +29,33 @@
 
 #pragma once
 
-#include <cstdint>
-
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
+
+#include <cstdint>
 
 namespace mongo {
 
 class ClockSource;
 
-/** Keep track of elapsed time. After a set amount of time, tells you to do something. */
+/**
+ * Keeps track of elapsed time. After a set amount of time, or a set number of iterations, tells you
+ * to do something.
+ */
 class ElapsedTracker {
 public:
+    /**
+     * Either 'hitsBetweenMarks' calls to intervalHasElapsed() occur before intervalHasElapsed()
+     * returns true, or 'msBetweenMarks' time must elapse before intervalHasElapsed() returns true.
+     */
     ElapsedTracker(ClockSource* cs, int32_t hitsBetweenMarks, Milliseconds msBetweenMarks);
 
     /**
      * Call this for every iteration.
-     * @return true if one of the triggers has gone off.
+     *
+     * Returns true after either _hitsBetweenMarks calls occur or _msBetweenMarks time has elapsed
+     * since that last true response. Both triggers are reset whenever true is returned.
      */
     bool intervalHasElapsed();
 
@@ -56,9 +66,9 @@ private:
     const int32_t _hitsBetweenMarks;
     const Milliseconds _msBetweenMarks;
 
-    AtomicWord<int32_t> _pings;
+    int32_t _pings;
 
-    AtomicWord<Date_t> _last;
+    Date_t _last;
 };
 
 }  // namespace mongo

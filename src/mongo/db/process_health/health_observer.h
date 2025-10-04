@@ -28,11 +28,18 @@
  */
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/process_health/fault_facet.h"
-#include "mongo/db/process_health/fault_facets_container.h"
 #include "mongo/db/process_health/fault_manager_config.h"
+#include "mongo/db/process_health/health_check_status.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/util/cancellation.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/future.h"
+#include "mongo/util/time_support.h"
+
+#include <memory>
 
 namespace mongo {
 namespace process_health {
@@ -53,12 +60,20 @@ struct HealthObserverLivenessStats {
     // Incremented when check completed with fault.
     // This doesn't take into account critical vs non-critical.
     int completedChecksWithFaultCount = 0;
+
+    BSONObj toBSON() const {
+        BSONObjBuilder builder;
+        builder.append("currentlyRunningHealthCheck", currentlyRunningHealthCheck);
+        builder.append("lastTimeCheckStarted", lastTimeCheckStarted);
+        builder.append("lastTimeCheckCompleted", lastTimeCheckCompleted);
+        builder.append("completedChecksCount", completedChecksCount);
+        builder.append("completedChecksWithFaultCount", completedChecksWithFaultCount);
+        return builder.obj();
+    }
 };
 
 /**
  * Interface to conduct periodic health checks.
- * Every instance of health observer is wired internally to update the state of the FaultManager
- * when a problem is detected.
  */
 class HealthObserver {
 public:
@@ -73,21 +88,32 @@ public:
     virtual FaultFacetType getType() const = 0;
 
     /**
-     * Triggers health check.
-     * It should be safe to invoke this method arbitrary often, the implementation
-     * should prorate the invocations to avoid DoS.
-     * The implementation may or may not block for the completion of the check, this remains
-     * unspecified.
-     * Note: no methods in this class should return any check results, the proper way to
-     * get result is to check facets in the FaultManager.
+     * Triggers health check. The implementation should not block to wait for the completion
+     * of this check.
      *
-     * @param factory Interface to get or create the factory of facets container.
+     * @param factory Interface to get or create the factory of faults.
      */
-    virtual void periodicCheck(FaultFacetsContainerFactory& factory,
-                               std::shared_ptr<executor::TaskExecutor> taskExecutor,
-                               CancellationToken token) = 0;
+    virtual SharedSemiFuture<HealthCheckStatus> periodicCheck(
+        std::shared_ptr<executor::TaskExecutor> taskExecutor, CancellationToken token) = 0;
 
     virtual HealthObserverLivenessStats getStats() const = 0;
+
+    /**
+     * Value used to introduce jitter between health check invocations.
+     */
+    virtual Milliseconds healthCheckJitter() const = 0;
+
+    /**
+     * Timeout value enforced on an individual health check.
+     */
+    virtual Milliseconds getObserverTimeout() const = 0;
+
+    /**
+     * Returns false if the health observer is missing some configuration it needs for its health
+     * checks. In the case of faulty configuration, make sure to log any helpful messages within
+     * this method.
+     */
+    virtual bool isConfigured() const = 0;
 };
 
 }  // namespace process_health

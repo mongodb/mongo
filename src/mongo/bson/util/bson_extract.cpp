@@ -29,7 +29,11 @@
 
 #include "mongo/bson/util/bson_extract.h"
 
-#include "mongo/db/jsobj.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -52,7 +56,7 @@ Status bsonExtractFieldImpl(const BSONObj& object,
         return kDefaultCase;
     }
     return Status(ErrorCodes::NoSuchKey,
-                  str::stream() << "Missing expected field \"" << fieldName.toString() << "\"");
+                  str::stream() << "Missing expected field \"" << std::string{fieldName} << "\"");
 }
 
 Status bsonExtractTypedFieldImpl(const BSONObj& object,
@@ -131,7 +135,7 @@ Status bsonExtractTypedField(const BSONObj& object,
 
 Status bsonExtractBooleanField(const BSONObj& object, StringData fieldName, bool* out) {
     BSONElement element;
-    Status status = bsonExtractTypedField(object, fieldName, Bool, &element);
+    Status status = bsonExtractTypedField(object, fieldName, BSONType::boolean, &element);
     if (status.isOK())
         *out = element.boolean();
     return status;
@@ -162,7 +166,7 @@ Status bsonExtractBooleanFieldWithDefault(const BSONObj& object,
 
 Status bsonExtractStringField(const BSONObj& object, StringData fieldName, std::string* out) {
     BSONElement element;
-    Status status = bsonExtractTypedField(object, fieldName, String, &element);
+    Status status = bsonExtractTypedField(object, fieldName, BSONType::string, &element);
     if (status.isOK())
         *out = element.str();
     return status;
@@ -170,7 +174,7 @@ Status bsonExtractStringField(const BSONObj& object, StringData fieldName, std::
 
 Status bsonExtractTimestampField(const BSONObj& object, StringData fieldName, Timestamp* out) {
     BSONElement element;
-    Status status = bsonExtractTypedField(object, fieldName, bsonTimestamp, &element);
+    Status status = bsonExtractTypedField(object, fieldName, BSONType::timestamp, &element);
     if (status.isOK())
         *out = element.timestamp();
     return status;
@@ -178,7 +182,7 @@ Status bsonExtractTimestampField(const BSONObj& object, StringData fieldName, Ti
 
 Status bsonExtractOIDField(const BSONObj& object, StringData fieldName, OID* out) {
     BSONElement element;
-    Status status = bsonExtractTypedField(object, fieldName, jstOID, &element);
+    Status status = bsonExtractTypedField(object, fieldName, BSONType::oid, &element);
     if (status.isOK())
         *out = element.OID();
     return status;
@@ -189,7 +193,7 @@ Status bsonExtractOIDFieldWithDefault(const BSONObj& object,
                                       const OID& defaultValue,
                                       OID* out) {
     BSONElement element;
-    Status status = bsonExtractTypedFieldImpl(object, fieldName, jstOID, &element, true);
+    Status status = bsonExtractTypedFieldImpl(object, fieldName, BSONType::oid, &element, true);
     if (status == ErrorCodes::NoSuchKey) {
         *out = defaultValue;
         return Status::OK();
@@ -204,9 +208,9 @@ Status bsonExtractStringFieldWithDefault(const BSONObj& object,
                                          StringData defaultValue,
                                          std::string* out) {
     BSONElement element;
-    Status status = bsonExtractTypedFieldImpl(object, fieldName, String, &element, true);
+    Status status = bsonExtractTypedFieldImpl(object, fieldName, BSONType::string, &element, true);
     if (status == ErrorCodes::NoSuchKey) {
-        *out = defaultValue.toString();
+        *out = std::string{defaultValue};
         return Status::OK();
     }
     if (status.isOK())

@@ -27,14 +27,22 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT mongo::logv2::LogComponent::kExecutor
 
-#include "mongo/platform/basic.h"
-
+// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/executor/thread_pool_mock.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/functional.h"
+
+#include <cstddef>
+#include <utility>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT mongo::logv2::LogComponent::kExecutor
+
 
 namespace mongo {
 namespace executor {
@@ -43,7 +51,7 @@ ThreadPoolMock::ThreadPoolMock(NetworkInterfaceMock* net, int32_t prngSeed, Opti
     : _options(std::move(options)), _prng(prngSeed), _net(net) {}
 
 ThreadPoolMock::~ThreadPoolMock() {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     if (_joining)
         return;
 
@@ -53,13 +61,13 @@ ThreadPoolMock::~ThreadPoolMock() {
 
 void ThreadPoolMock::startup() {
     LOGV2_DEBUG(22602, 1, "Starting pool");
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(!_started);
     invariant(!_worker.joinable());
     _started = true;
     _worker = stdx::thread([this] {
         _options.onCreateThread();
-        stdx::unique_lock<Latch> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
 
         LOGV2_DEBUG(22603, 1, "Starting to consume tasks");
         while (!_joining) {
@@ -77,17 +85,17 @@ void ThreadPoolMock::startup() {
 }
 
 void ThreadPoolMock::shutdown() {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     _shutdown(lk);
 }
 
 void ThreadPoolMock::join() {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     _join(lk);
 }
 
 void ThreadPoolMock::schedule(Task task) {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     if (_inShutdown) {
         lk.unlock();
 
@@ -96,9 +104,10 @@ void ThreadPoolMock::schedule(Task task) {
     }
 
     _tasks.emplace_back(std::move(task));
+    _net->signalWorkAvailable();
 }
 
-void ThreadPoolMock::_consumeOneTask(stdx::unique_lock<Latch>& lk) {
+void ThreadPoolMock::_consumeOneTask(stdx::unique_lock<stdx::mutex>& lk) {
     auto next = static_cast<size_t>(_prng.nextInt64(static_cast<int64_t>(_tasks.size())));
     if (next + 1 != _tasks.size()) {
         std::swap(_tasks[next], _tasks.back());
@@ -114,14 +123,14 @@ void ThreadPoolMock::_consumeOneTask(stdx::unique_lock<Latch>& lk) {
     lk.lock();
 }
 
-void ThreadPoolMock::_shutdown(stdx::unique_lock<Latch>& lk) {
+void ThreadPoolMock::_shutdown(stdx::unique_lock<stdx::mutex>& lk) {
     LOGV2_DEBUG(22605, 1, "Shutting down pool");
 
     _inShutdown = true;
     _net->signalWorkAvailable();
 }
 
-void ThreadPoolMock::_join(stdx::unique_lock<Latch>& lk) {
+void ThreadPoolMock::_join(stdx::unique_lock<stdx::mutex>& lk) {
     LOGV2_DEBUG(22606, 1, "Joining pool");
 
     _joining = true;

@@ -29,17 +29,24 @@
 
 #pragma once
 
-#include <algorithm>
-#include <boost/intrusive_ptr.hpp>
-
 #include "mongo/base/static_assert.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/stdx/utility.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/intrusive_counter.h"
+
+#include <algorithm>
+#include <cstdlib>
+#include <new>
+
+#include <boost/intrusive_ptr.hpp>
 
 
 namespace mongo {
@@ -47,13 +54,74 @@ class Document;
 class DocumentStorage;
 class Value;
 
+
+/** An immutable reference-counted string of inline data. */
+class RCString final : public RefCountable {
+public:
+    static boost::intrusive_ptr<const RCString> create(StringData s) {
+        static constexpr size_t sizeLimit = BSONObjMaxUserSize;
+        uassert(16493,
+                fmt::format("RCString too large. Requires size={} < limit={}", s.size(), sizeLimit),
+                s.size() < sizeLimit);
+        return boost::intrusive_ptr{new (s) RCString{s}};
+    }
+
+    explicit operator StringData() const noexcept {
+        return StringData{_data(), _size};
+    }
+
+    void* operator new(size_t, StringData s) {
+        return ::operator new(_allocSize(s.size()));
+    }
+
+    /** Used if constructor fails after placement `new (StringData)`. */
+    void operator delete(void* ptr, StringData s) {
+        ::operator delete(ptr, _allocSize(s.size()));
+    }
+
+#if __cpp_lib_destroying_delete >= 201806L
+    void operator delete(RCString* ptr, std::destroying_delete_t) {
+        size_t sz = _allocSize(ptr->_size);
+        ptr->~RCString();
+        ::operator delete(ptr, sz);
+    }
+#else   // !__cpp_lib_destroying_delete
+    /** Invoked by virtual destructor. */
+    void operator delete(void* ptr) {
+        ::operator delete(ptr);
+    }
+#endif  // __cpp_lib_destroying_delete
+
+private:
+    static size_t _allocSize(size_t stringSize) {
+        return sizeof(RCString) + stringSize + 1;  // Incl. '\0'-terminator
+    }
+
+    /** Use static `create()` instead. */
+    explicit RCString(StringData s) : _size{s.size()} {
+        if (_size)
+            memcpy(_data(), s.data(), _size);
+        _data()[_size] = '\0';
+    }
+
+    const char* _data() const noexcept {
+        return reinterpret_cast<const char*>(this + 1);
+    }
+    char* _data() noexcept {
+        return const_cast<char*>(std::as_const(*this)._data());
+    }
+
+    size_t _size; /** Excluding '\0' terminator. */
+};
+
 // TODO: a MutableVector, similar to MutableDocument
 /// A heap-allocated reference-counted std::vector
+template <typename T>
 class RCVector : public RefCountable {
 public:
     RCVector() {}
-    RCVector(std::vector<Value> v) : vec(std::move(v)) {}
-    std::vector<Value> vec;
+    RCVector(std::vector<T> v) : vec(std::move(v)) {}
+    std::vector<T> vec;
 };
 
 class RCCodeWScope : public RefCountable {
@@ -82,86 +150,86 @@ public:
     // constructor. Much code relies on every byte being predictably initialized to zero.
 
     // This is a "missing" Value
-    ValueStorage() : ValueStorage(EOO) {}
+    ValueStorage() : ValueStorage(BSONType::eoo) {}
 
     explicit ValueStorage(BSONType t) {
         zero();
-        type = t;
+        type = stdx::to_underlying(t);
     }
     ValueStorage(BSONType t, int i) {
         zero();
-        type = t;
+        type = stdx::to_underlying(t);
         intValue = i;
     }
     ValueStorage(BSONType t, long long l) {
         zero();
-        type = t;
+        type = stdx::to_underlying(t);
         longValue = l;
     }
     ValueStorage(BSONType t, double d) {
         zero();
-        type = t;
+        type = stdx::to_underlying(t);
         doubleValue = d;
     }
     ValueStorage(BSONType t, const Decimal128& d) {
         zero();
-        type = t;
+        type = stdx::to_underlying(t);
         putDecimal(d);
     }
     ValueStorage(BSONType t, Timestamp r) {
         zero();
-        type = t;
+        type = stdx::to_underlying(t);
         timestampValue = r.asULL();
     }
     ValueStorage(BSONType t, bool b) {
         zero();
-        type = t;
+        type = stdx::to_underlying(t);
         boolValue = b;
     }
     ValueStorage(BSONType t, const Document& d) {
         zero();
-        type = t;
+        type = stdx::to_underlying(t);
         putDocument(d);
     }
     ValueStorage(BSONType t, Document&& d) {
         zero();
-        type = t;
+        type = stdx::to_underlying(t);
         putDocument(std::move(d));
     }
-    ValueStorage(BSONType t, boost::intrusive_ptr<RCVector>&& a) {
+    ValueStorage(BSONType t, boost::intrusive_ptr<RCVector<Value>>&& a) {
         zero();
-        type = t;
+        type = stdx::to_underlying(t);
         putVector(std::move(a));
     }
     ValueStorage(BSONType t, StringData s) {
         zero();
-        type = t;
+        type = stdx::to_underlying(t);
         putString(s);
     }
     ValueStorage(BSONType t, const BSONBinData& bd) {
         zero();
-        type = t;
+        type = stdx::to_underlying(t);
         putBinData(bd);
     }
     ValueStorage(BSONType t, const BSONRegEx& re) {
         zero();
-        type = t;
+        type = stdx::to_underlying(t);
         putRegEx(re);
     }
     ValueStorage(BSONType t, const BSONCodeWScope& cs) {
         zero();
-        type = t;
+        type = stdx::to_underlying(t);
         putCodeWScope(cs);
     }
     ValueStorage(BSONType t, const BSONDBRef& dbref) {
         zero();
-        type = t;
+        type = stdx::to_underlying(t);
         putDBRef(dbref);
     }
 
     ValueStorage(BSONType t, const OID& o) {
         zero();
-        type = t;
+        type = stdx::to_underlying(t);
         memcpy(&oid, o.view().view(), OID::kOIDSize);
     }
 
@@ -231,7 +299,7 @@ public:
 
     /// These are only to be called during Value construction on an empty Value
     void putString(StringData s);
-    void putVector(boost::intrusive_ptr<RCVector>&& v);
+    void putVector(boost::intrusive_ptr<RCVector<Value>>&& v);
     void putDocument(const Document& d);
     void putDocument(Document&& d);
     void putRegEx(const BSONRegEx& re);
@@ -241,11 +309,11 @@ public:
     }
 
     void putDBRef(const BSONDBRef& dbref) {
-        putRefCountable(make_intrusive<RCDBRef>(dbref.ns.toString(), dbref.oid));
+        putRefCountable(make_intrusive<RCDBRef>(std::string{dbref.ns}, dbref.oid));
     }
 
     void putCodeWScope(const BSONCodeWScope& cws) {
-        putRefCountable(make_intrusive<RCCodeWScope>(cws.code.toString(), cws.scope));
+        putRefCountable(make_intrusive<RCCodeWScope>(std::string{cws.code}, cws.scope));
     }
 
     void putDecimal(const Decimal128& d) {
@@ -268,13 +336,13 @@ public:
         } else {
             dassert(typeid(*genericRCPtr) == typeid(const RCString));
             const RCString* stringPtr = static_cast<const RCString*>(genericRCPtr);
-            return StringData(stringPtr->c_str(), stringPtr->size());
+            return StringData{*stringPtr};
         }
     }
 
     const std::vector<Value>& getArray() const {
-        dassert(typeid(*genericRCPtr) == typeid(const RCVector));
-        const RCVector* arrayPtr = static_cast<const RCVector*>(genericRCPtr);
+        dassert(typeid(*genericRCPtr) == typeid(const RCVector<Value>));
+        const RCVector<Value>* arrayPtr = static_cast<const RCVector<Value>*>(genericRCPtr);
         return arrayPtr->vec;
     }
 
@@ -302,7 +370,7 @@ public:
     }
 
     BinDataType binDataType() const {
-        dassert(type == BinData);
+        dassert(type == stdx::to_underlying(BSONType::binData));
         return BinDataType(binSubType);
     }
 
@@ -310,7 +378,58 @@ public:
         memset(bytes, 0, sizeof(bytes));
     }
 
-    void verifyRefCountingIfShould() const;
+    void verifyRefCountingIfShould() const {
+        switch (type) {
+            case stdx::to_underlying(BSONType::minKey):
+            case stdx::to_underlying(BSONType::maxKey):
+            case stdx::to_underlying(BSONType::oid):
+            case stdx::to_underlying(BSONType::date):
+            case stdx::to_underlying(BSONType::timestamp):
+            case stdx::to_underlying(BSONType::eoo):
+            case stdx::to_underlying(BSONType::null):
+            case stdx::to_underlying(BSONType::undefined):
+            case stdx::to_underlying(BSONType::boolean):
+            case stdx::to_underlying(BSONType::numberInt):
+            case stdx::to_underlying(BSONType::numberLong):
+            case stdx::to_underlying(BSONType::numberDouble):
+                // the above types never reference external data
+                MONGO_verify(!refCounter);
+                break;
+
+            case stdx::to_underlying(BSONType::string):
+            case stdx::to_underlying(BSONType::regEx):
+            case stdx::to_underlying(BSONType::code):
+            case stdx::to_underlying(BSONType::symbol):
+                // If this is using the short-string optimization, it must not have a ref-counted
+                // pointer.
+                invariant(!shortStr || !refCounter);
+
+                // If this is _not_ using the short string optimization, it must be storing a
+                // ref-counted pointer. One exception: in the BSONElement constructor of Value, it
+                // is possible for this ValueStorage to get constructed as a type but never
+                // initialized; the ValueStorage gets left as a nullptr and not marked as
+                // ref-counted, which is ok (SERVER-43205).
+                invariant(shortStr || (refCounter || !genericRCPtr));
+                break;
+
+            case stdx::to_underlying(BSONType::numberDecimal):
+            case stdx::to_underlying(
+                BSONType::binData):  // TODO this should probably support short-string optimization
+            case stdx::to_underlying(
+                BSONType::array):  // TODO this should probably support empty-is-NULL optimization
+            case stdx::to_underlying(BSONType::dbRef):
+            case stdx::to_underlying(BSONType::codeWScope):
+                // the above types always reference external data.
+                invariant(refCounter);
+                invariant(bool(genericRCPtr));
+                break;
+
+            case stdx::to_underlying(BSONType::object):
+                // Objects either hold a NULL ptr or should be ref-counting
+                invariant(refCounter == bool(genericRCPtr));
+                break;
+        }
+    }
 
     // This data is public because this should only be used by Value which would be a friend
     union {

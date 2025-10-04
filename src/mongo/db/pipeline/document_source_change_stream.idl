@@ -30,27 +30,16 @@
 
 global:
     cpp_namespace: "mongo"
-    cpp_includes:
-        - "mongo/db/pipeline/resume_token.h"
 
 imports:
-    - "mongo/idl/basic_types.idl"
-
-types:
-    # A resume token is an opaque document we return to the user that contains all the information
-    # needed to resume a stream where they left off.  It also provides the ordering of streams
-    # from multiple shards.
-    resumeToken:
-        bson_serialization_type: object
-        description: An object representing a resume token for a change stream
-        cpp_type: ResumeToken
-        serializer: ResumeToken::toBSON
-        deserializer: ResumeToken::parse
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/pipeline/resume_token.idl"
 
 enums:
     FullDocumentBeforeChangeMode:
-        description: Possible modes for the 'fullDocumentBeforeChange' parameter of the
-                     $changeStream stage.
+        description:
+            Possible modes for the 'fullDocumentBeforeChange' parameter of the
+            $changeStream stage.
         type: string
         values:
             # Do not supply pre-images.
@@ -73,6 +62,15 @@ enums:
             # Post-images are required. Throw an exception if not available.
             kRequired: "required"
 
+    ChangeStreamReaderVersion:
+        description: Possible change stream reader versions, with respect to shard-targeting behavior.
+        type: string
+        values:
+            # Selects change stream reader version 1, in which all the shards in the cluster are tracked.
+            kV1: "v1"
+            # Selects change stream reader version 2 with precise shard-targeting, as introduced by SPM-1941.
+            kV2: "v2"
+
 structs:
     ResumeTokenClusterTime:
         description: The IDL type of cluster time
@@ -83,131 +81,251 @@ structs:
                 description: The timestamp of the logical time
 
     DocumentSourceChangeStreamSpec:
-        description: A document used to specify the $changeStream stage of an aggregation
-                     pipeline. The same spec is also used by the $_internalChangeStreamTransform
-                     stage.
+        description:
+            A document used to specify the $changeStream stage of an aggregation
+            pipeline. The same spec is also used by the $_internalChangeStreamTransform
+            stage.
+        query_shape_component: true
         fields:
             resumeAfter:
                 cpp_name: resumeAfter
                 type: resumeToken
                 optional: true
-                description: An object representing the point at which we should resume reporting
-                             changes from. Only one of resumeAfter, startAfter, and
-                             startAtOperationTime should be specified.
+                description:
+                    An object representing the point at which we should resume reporting
+                    changes from. Only one of resumeAfter, startAfter, and
+                    startAtOperationTime should be specified.
+                query_shape: custom
 
             startAfter:
                 cpp_name: startAfter
                 type: resumeToken
                 optional: true
-                description: An object representing the point at which we should start reporting
-                             changes from. This is allowed to be a token from an invalidating
-                             command. Only one of resumeAfter, startAfter, and startAtOperationTime
-                             should be specified.
+                description:
+                    An object representing the point at which we should start reporting
+                    changes from. This is allowed to be a token from an invalidating
+                    command. Only one of resumeAfter, startAfter, and startAtOperationTime
+                    should be specified.
+                query_shape: custom
 
             startAtOperationTime:
                 cpp_name: startAtOperationTime
                 type: timestamp
                 optional: true
-                description: The operation time after which we should start reporting changes.
-                             Only one of resumeAfter, startAfter, and startAtOperationTime should
-                             be specified.
+                description:
+                    The operation time after which we should start reporting changes.
+                    Only one of resumeAfter, startAfter, and startAtOperationTime should
+                    be specified.
+                query_shape: literal
 
             fullDocument:
                 cpp_name: fullDocument
                 type: FullDocumentMode
                 default: kDefault
-                description: A string '"updateLookup"' or '"default"', indicating whether or not we
-                             should return a full document or just changes for an update.
+                description:
+                    A string '"updateLookup"' or '"default"', indicating whether or not we
+                    should return a full document or just changes for an update.
+                query_shape: parameter
 
             fullDocumentBeforeChange:
                 cpp_name: fullDocumentBeforeChange
                 type: FullDocumentBeforeChangeMode
                 default: kOff
-                description: Valid values are "off", "whenAvailable", or "required". If set to
-                             "off", the "fullDocumentBeforeChange" field of the output document
-                             is always omitted. If set to "whenAvailable", the
-                             "fullDocumentBeforeChange" field will be populated with the
-                             pre-image of the document modified by the current change event if
-                             such a pre-image is available, and will be omitted otherwise. If
-                             set to "required", then the "fullDocumentBeforeChange" field is
-                             always populated and an exception is thrown if the pre-image is not
-                             available.
+                description:
+                    Valid values are "off", "whenAvailable", or "required". If set to
+                    "off", the "fullDocumentBeforeChange" field of the output document
+                    is always omitted. If set to "whenAvailable", the
+                    "fullDocumentBeforeChange" field will be populated with the
+                    pre-image of the document modified by the current change event if
+                    such a pre-image is available, and will be omitted otherwise. If
+                    set to "required", then the "fullDocumentBeforeChange" field is
+                    always populated and an exception is thrown if the pre-image is not
+                    available.
+                query_shape: parameter
 
             allChangesForCluster:
                 cpp_name: allChangesForCluster
                 type: optionalBool
-                description: A flag indicating whether the stream should report all changes that
-                             occur on the deployment, aside from those on internal databases or
-                             collections.
+                description:
+                    A flag indicating whether the stream should report all changes that
+                    occur on the deployment, aside from those on internal databases or
+                    collections.
+                query_shape: literal
 
             showMigrationEvents:
                 cpp_name: showMigrationEvents
                 type: optionalBool
-                description: A flag indicating whether the stream should report changes that occur
-                             on the deployment that are related to chunk migrations. These
-                             operations are reported like normal events. For example, inserts and
-                             deletes may appear that do not reflect actual deletions or insertions
-                             of data. Instead they reflect this data moving from one shard to
-                             another.
+                description:
+                    A flag indicating whether the stream should report changes that occur
+                    on the deployment that are related to chunk migrations. These
+                    operations are reported like normal events. For example, inserts and
+                    deletes may appear that do not reflect actual deletions or insertions
+                    of data. Instead they reflect this data moving from one shard to
+                    another.
+                query_shape: literal
+
+            showSystemEvents:
+                cpp_name: showSystemEvents
+                type: optionalBool
+                description:
+                    A flag indicating whether the stream should report events on system
+                    collections.
+                query_shape: literal
 
             allowToRunOnConfigDB:
                 cpp_name: allowToRunOnConfigDB
                 type: optionalBool
-                description: A flag indicating whether the change stream may be opened on the
-                             'config' database, which is usually banned. This flag is used
-                             internally to allow mongoS to open a stream on 'config.shards', in
-                             order to monitor for the addition of new shards to the cluster.
+                description:
+                    A flag indicating whether the change stream may be opened on the
+                    'config' database, which is usually banned. This flag is used
+                    internally to allow mongoS to open a stream on 'config.shards', in
+                    order to monitor for the addition of new shards to the cluster.
+                query_shape: literal
 
             allowToRunOnSystemNS:
                 cpp_name: allowToRunOnSystemNS
                 type: optionalBool
-                description: An internal flag indicating whether the change stream may be opened on
-                             a system collection.
+                description:
+                    An internal flag indicating whether the change stream may be opened on
+                    a system collection.
+                query_shape: literal
+
+            showExpandedEvents:
+                type: optionalBool
+                description:
+                    A flag indicating whether the change stream output should include the
+                    expanded events and parameters that may not be part of the stable API.
+                query_shape: literal
+
+            showCommitTimestamp:
+                type: optionalBool
+                description:
+                    A flag indicating whether the commit timestamp should be emitted for
+                    DML events inside prepared transactions.
+                    This is an internal fields and should not be documented for public use.
+                query_shape: literal
+
+            showRawUpdateDescription:
+                cpp_name: showRawUpdateDescription
+                type: optionalBool
+                description:
+                    An internal flag indicating whether each update event in a change
+                    stream should contain a "rawUpdateDescription" field that exposes the
+                    raw update description from the oplog entry for the corresponding
+                    update command. When this flag is set to true, the standard
+                    "updateDescription" field in update events will be omitted.
+                query_shape: literal
+
+            matchCollectionUUIDForUpdateLookup:
+                type: optionalBool
+                description:
+                    An internal flag that ensures that updateLookup is performed on the
+                    collection where UUID matches the one from the corresponding change
+                    event. In case of a mismatch, null document will be returned.
+                query_shape: literal
+
+            version:
+                type: ChangeStreamReaderVersion
+                description: Selects the change stream reader version.
+                optional: true
+                # This field is for internal purposes only and not supposed to be set by end users.
+                # The change stream reader version is not serialized as part of the query shape.
+                query_shape: parameter
+
+            ignoreRemovedShards:
+                type: optionalBool
+                description:
+                    Selects the change stream read mode w.r.t removed shards.
+                    If set to true, the change stream reader ignores shards that had
+                    relevant change events allocated to them but have been removed from
+                    the system. This makes the change stream to be read in
+                    Ignore-Removed-Shards mode.
+                    If set to false, the change stream reader fails if it cannot return
+                    a change event because a shard that holds the event has been removed
+                    from the system. This makes the change stream to be read in Strict mode.
+                query_shape: literal
+
+            supportedEvents:
+                type: array<string>
+                description:
+                    An array of additional events that can be produced by the change stream.
+                    These events can be created from "noop" oplog entries, which have any of the
+                    supported events as a field name inside their "o2" field value.
+                    All of these oplog entries must have the "uuid" field set as well.
+                optional: true
+                # This field is for internal purposes only and not supposed to be set by end users.
+                # The field is not serialized as part of the query shape
+                query_shape: literal
 
     DocumentSourceChangeStreamOplogMatchSpec:
         strict: true
-        description: A document used to specify the $_internalChangeStreamOplogMatch stage of an
-                     aggregation pipeline.
+        description:
+            A document used to specify the $_internalChangeStreamOplogMatch stage of an
+            aggregation pipeline.
         fields:
             filter: object_owned
 
     DocumentSourceChangeStreamUnwindTransactionSpec:
         strict: true
-        description: A document used to specify the $_internalChangeStreamUnwindTransaction stage of
-                     an aggregation pipeline.
+        description:
+            A document used to specify the $_internalChangeStreamUnwindTransaction stage of
+            an aggregation pipeline.
         fields:
             filter: object_owned
 
     DocumentSourceChangeStreamCheckInvalidateSpec:
         strict: true
-        description: A document used to specify the $_internalChangeStreamCheckInvalidate stage of
-                     an aggregation pipeline.
+        description:
+            A document used to specify the $_internalChangeStreamCheckInvalidate stage of
+            an aggregation pipeline.
         fields:
             startAfterInvalidate:
                 type: resumeToken
                 optional: true
-    
+
     DocumentSourceChangeStreamCheckResumabilitySpec:
         strict: true
-        description: A document used to specify the $_internalChangeStreamCheckResumability stage of
-                     an aggregation pipeline.
+        description:
+            A document used to specify the $_internalChangeStreamCheckResumability stage of
+            an aggregation pipeline.
         fields:
             resumeToken:
                 type: resumeToken
                 optional: false
 
+    DocumentSourceChangeStreamInjectControlEventsSpec:
+        strict: true
+        description:
+            A document used to specify the $_internalChangeStreamInjectControlEvents stage of
+            an aggregation pipeline.
+        fields:
+            actions:
+                type: object_owned
+
     DocumentSourceChangeStreamAddPreImageSpec:
         strict: true
-        description: A document used to specify the $_internalChangeStreamAddPreImage stage of
-                     an aggregation pipeline.
+        description:
+            A document used to specify the $_internalChangeStreamAddPreImage stage of
+            an aggregation pipeline.
         fields:
             fullDocumentBeforeChange:
                 type: FullDocumentBeforeChangeMode
 
     DocumentSourceChangeStreamAddPostImageSpec:
         strict: true
-        description: A document used to specify the $_internalChangeStreamAddPostImage stage of
-                     an aggregation pipeline.
+        description:
+            A document used to specify the $_internalChangeStreamAddPostImage stage of
+            an aggregation pipeline.
         fields:
             fullDocument:
                 type: FullDocumentMode
+
+    DocumentSourceChangeStreamHandleTopologyChangeSpec:
+        strict: true
+        description:
+            A document used to specify the $_internalChangeStreamHandleTopologyChange stage of
+            an aggregation pipeline.
+        fields:
+            originalAggregateCommand:
+                type: object
+                optional: true

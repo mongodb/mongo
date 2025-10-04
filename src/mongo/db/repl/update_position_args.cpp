@@ -27,14 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/repl/update_position_args.h"
 
 #include "mongo/base/status.h"
-#include "mongo/bson/util/bson_check.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/repl/bson_extract_optime.h"
 
 namespace mongo {
@@ -44,6 +43,8 @@ const char UpdatePositionArgs::kCommandFieldName[] = "replSetUpdatePosition";
 const char UpdatePositionArgs::kUpdateArrayFieldName[] = "optimes";
 const char UpdatePositionArgs::kAppliedOpTimeFieldName[] = "appliedOpTime";
 const char UpdatePositionArgs::kAppliedWallTimeFieldName[] = "appliedWallTime";
+const char UpdatePositionArgs::kWrittenOpTimeFieldName[] = "writtenOpTime";
+const char UpdatePositionArgs::kWrittenWallTimeFieldName[] = "writtenWallTime";
 const char UpdatePositionArgs::kDurableOpTimeFieldName[] = "durableOpTime";
 const char UpdatePositionArgs::kDurableWallTimeFieldName[] = "durableWallTime";
 const char UpdatePositionArgs::kMemberIdFieldName[] = "memberId";
@@ -51,12 +52,16 @@ const char UpdatePositionArgs::kConfigVersionFieldName[] = "cfgver";
 
 UpdatePositionArgs::UpdateInfo::UpdateInfo(const OpTime& applied,
                                            const Date_t& appliedWall,
+                                           const OpTime& written,
+                                           const Date_t& writtenWall,
                                            const OpTime& durable,
                                            const Date_t& durableWall,
                                            long long aCfgver,
                                            long long aMemberId)
     : appliedOpTime(applied),
       appliedWallTime(appliedWall),
+      writtenOpTime(written),
+      writtenWallTime(writtenWall),
       durableOpTime(durable),
       durableWallTime(durableWall),
       cfgver(aCfgver),
@@ -65,7 +70,8 @@ UpdatePositionArgs::UpdateInfo::UpdateInfo(const OpTime& applied,
 Status UpdatePositionArgs::initialize(const BSONObj& argsObj) {
     // grab the array of changes
     BSONElement updateArray;
-    Status status = bsonExtractTypedField(argsObj, kUpdateArrayFieldName, Array, &updateArray);
+    Status status =
+        bsonExtractTypedField(argsObj, kUpdateArrayFieldName, BSONType::array, &updateArray);
     if (!status.isOK())
         return status;
 
@@ -82,16 +88,36 @@ Status UpdatePositionArgs::initialize(const BSONObj& argsObj) {
         Date_t appliedWallTime = Date_t();
         BSONElement appliedWallTimeElement;
         status = bsonExtractTypedField(
-            entry, kAppliedWallTimeFieldName, BSONType::Date, &appliedWallTimeElement);
+            entry, kAppliedWallTimeFieldName, BSONType::date, &appliedWallTimeElement);
         if (!status.isOK()) {
             return status;
         }
         appliedWallTime = appliedWallTimeElement.Date();
 
+        OpTime writtenOpTime;
+        status = bsonExtractOpTimeField(entry, kWrittenOpTimeFieldName, &writtenOpTime);
+        if (status.code() == ErrorCodes::NoSuchKey) {
+            writtenOpTime = appliedOpTime;
+        } else if (!status.isOK()) {
+            return status;
+        }
+
+        Date_t writtenWallTime = Date_t();
+        BSONElement writtenWallTimeElement;
+        status = bsonExtractTypedField(
+            entry, kWrittenWallTimeFieldName, BSONType::date, &writtenWallTimeElement);
+        if (status.code() == ErrorCodes::NoSuchKey) {
+            writtenWallTime = appliedWallTime;
+        } else if (!status.isOK()) {
+            return status;
+        } else {
+            writtenWallTime = writtenWallTimeElement.Date();
+        }
+
         Date_t durableWallTime = Date_t();
         BSONElement durableWallTimeElement;
         status = bsonExtractTypedField(
-            entry, kDurableWallTimeFieldName, BSONType::Date, &durableWallTimeElement);
+            entry, kDurableWallTimeFieldName, BSONType::date, &durableWallTimeElement);
         if (!status.isOK()) {
             return status;
         }
@@ -114,8 +140,14 @@ Status UpdatePositionArgs::initialize(const BSONObj& argsObj) {
         if (!status.isOK())
             return status;
 
-        _updates.push_back(UpdateInfo(
-            appliedOpTime, appliedWallTime, durableOpTime, durableWallTime, cfgver, memberID));
+        _updates.push_back(UpdateInfo(appliedOpTime,
+                                      appliedWallTime,
+                                      writtenOpTime,
+                                      writtenWallTime,
+                                      durableOpTime,
+                                      durableWallTime,
+                                      cfgver,
+                                      memberID));
     }
 
     return Status::OK();
@@ -134,8 +166,9 @@ BSONObj UpdatePositionArgs::toBSON() const {
             BSONObjBuilder updateEntry(updateArray.subobjStart());
             updateEntry.append(kConfigVersionFieldName, update->cfgver);
             updateEntry.append(kMemberIdFieldName, update->memberId);
-            update->durableOpTime.append(&updateEntry, kDurableOpTimeFieldName);
-            update->appliedOpTime.append(&updateEntry, kAppliedOpTimeFieldName);
+            update->appliedOpTime.append(kAppliedOpTimeFieldName, &updateEntry);
+            update->writtenOpTime.append(kWrittenOpTimeFieldName, &updateEntry);
+            update->durableOpTime.append(kDurableOpTimeFieldName, &updateEntry);
         }
         updateArray.doneFast();
     }

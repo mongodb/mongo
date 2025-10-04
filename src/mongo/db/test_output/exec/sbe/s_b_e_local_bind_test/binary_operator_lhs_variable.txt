@@ -1,0 +1,21 @@
+# Golden test output of SBELocalBindTest/BinaryOperatorLhsVariable
+-- INPUT EXPRESSION:
+
+    let [
+        l10.0 = 10 
+    ] 
+    in (l10.0 - 20) 
+
+
+-- COMPILED EXPRESSION:
+[0x0000-0x001d] stackSize: 1, maxStackSize: 2
+0x0000: pushConstVal(value: 10);
+0x000a: pushConstVal(value: 20);
+0x0014: sub(popLhs: 0, moveFromLhs: 0, offsetLhs: 0, popRhs: 1, moveFromRhs: 1, offsetRhs: 0);
+0x001b: swap();
+0x001c: pop();
+
+
+-- EXECUTE VARIATION:
+RESULT: -10
+

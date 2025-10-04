@@ -1,11 +1,8 @@
 /**
  * This test simulates initial sync workflows which are performed by the Atlas automation agent.
- * @tags: [live_record_incompatible]
  */
-(function() {
-"use strict";
-
-load('jstests/replsets/rslib.js');  // waitForState.
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {disconnectSecondaries, reconnectSecondaries, waitForState} from "jstests/replsets/rslib.js";
 
 const testName = TestData.testName;
 // Set up a standard 3-node replica set.  Note the two secondaries are priority 0; this is
@@ -16,7 +13,7 @@ const rst = new ReplSetTest({
     useBridge: true,
     // We shorten the election timeout period so the tests with an unhealthy set run and recover
     // faster.
-    settings: {electionTimeoutMillis: 2000, heartbeatIntervalMillis: 400}
+    settings: {electionTimeoutMillis: 2000, heartbeatIntervalMillis: 400},
 });
 rst.startSet();
 rst.initiate();
@@ -33,7 +30,7 @@ function testAddWithInitialSync(secondariesDown) {
     const majorityDown = secondariesDown > 1;
     if (majorityDown) {
         // Wait for the set to become unhealthy.
-        rst.waitForState(primary, ReplSetTest.State.SECONDARY);
+        rst.awaitSecondaryNodes(null, [primary]);
     }
     // Atlas always adds nodes with 0 votes and priority
     const newNode = rst.add({rsConfig: {votes: 0, priority: 0}});
@@ -43,23 +40,24 @@ function testAddWithInitialSync(secondariesDown) {
     config.members = newConfig.members;
     config.version += 1;
     jsTestLog("Reconfiguring set to add node.");
-    assert.commandWorked(primary.adminCommand(
-        {replSetReconfig: config, maxTimeMS: ReplSetTest.kDefaultTimeoutMS, force: majorityDown}));
+    assert.commandWorked(
+        primary.adminCommand({replSetReconfig: config, maxTimeMS: ReplSetTest.kDefaultTimeoutMS, force: majorityDown}),
+    );
 
     jsTestLog("Waiting for node to sync.");
-    rst.waitForState(newNode, ReplSetTest.State.SECONDARY);
+    rst.awaitSecondaryNodes(null, [newNode]);
 
     jsTestLog("Reconfiguring added node to have votes");
     config = rst.getReplSetConfigFromNode(primary.nodeId);
     config.version += 1;
     config.members[3].votes = 1;
-    assert.commandWorked(primary.adminCommand(
-        {replSetReconfig: config, maxTimeMS: ReplSetTest.kDefaultTimeoutMS, force: majorityDown}));
+    assert.commandWorked(
+        primary.adminCommand({replSetReconfig: config, maxTimeMS: ReplSetTest.kDefaultTimeoutMS, force: majorityDown}),
+    );
     if (!majorityDown) {
         // Make sure we can replicate to it.  This only works if the set was healthy, otherwise we
         // can't.
-        assert.commandWorked(
-            testDb[testName].insert({addWithInitialSync: secondariesDown}, {writeConcern: {w: 1}}));
+        assert.commandWorked(testDb[testName].insert({addWithInitialSync: secondariesDown}, {writeConcern: {w: 1}}));
         rst.awaitReplication(undefined, undefined, [newNode]);
     }
 
@@ -85,7 +83,7 @@ function testReplaceWithInitialSync(secondariesDown) {
     disconnectSecondaries(rst, secondariesDown);
     if (majorityDown) {
         // Wait for the set to become unhealthy.
-        rst.waitForState(primary, ReplSetTest.State.SECONDARY);
+        rst.awaitSecondaryNodes(null, [primary]);
     }
 
     jsTestLog("Stopping node for replacement of data");
@@ -94,8 +92,9 @@ function testReplaceWithInitialSync(secondariesDown) {
         // Add some data.  We skip this if we have disconnected any nodes, since we may lose the
         // majority, and thus the primary, if we have one node disconnected and another node
         // stopped.
-        assert.commandWorked(testDb[testName].insert({replaceWithInitialSync: secondariesDown},
-                                                     {writeConcern: {w: 1}}));
+        assert.commandWorked(
+            testDb[testName].insert({replaceWithInitialSync: secondariesDown}, {writeConcern: {w: 1}}),
+        );
     }
 
     jsTestLog("Starting a new replacement node with empty data directory.");
@@ -140,4 +139,3 @@ jsTestLog("Test replacing a node with initial sync with two secondaries unreacha
 testReplaceWithInitialSync(2);
 
 rst.stopSet();
-})();

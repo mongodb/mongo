@@ -27,12 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/update/current_date_node.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/logical_time.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/vector_clock_mutable.h"
+#include "mongo/db/vector_clock/vector_clock_mutable.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -43,7 +53,7 @@ constexpr StringData kTimestamp = "timestamp"_sd;
 
 void setValue(ServiceContext* service, mutablebson::Element* element, bool typeIsDate) {
     if (typeIsDate) {
-        invariant(element->setValueDate(mongo::jsTime()));
+        invariant(element->setValueDate(mongo::Date_t::now()));
     } else {
         invariant(element->setValueTimestamp(
             VectorClockMutable::get(service)->tickClusterTime(1).asTimestamp()));
@@ -55,13 +65,13 @@ Status CurrentDateNode::init(BSONElement modExpr,
                              const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     invariant(modExpr.ok());
 
-    if (modExpr.type() == BSONType::Bool) {
+    if (modExpr.type() == BSONType::boolean) {
         _typeIsDate = true;
-    } else if (modExpr.type() == BSONType::Object) {
+    } else if (modExpr.type() == BSONType::object) {
         auto foundValidType = false;
         for (auto&& elem : modExpr.Obj()) {
             if (elem.fieldNameStringData() == kType) {
-                if (elem.type() == BSONType::String) {
+                if (elem.type() == BSONType::string) {
                     if (elem.valueStringData() == kDate) {
                         _typeIsDate = true;
                         foundValidType = true;
@@ -91,7 +101,7 @@ Status CurrentDateNode::init(BSONElement modExpr,
                                        " or a $type expression ({$type: 'timestamp/date'}).");
     }
 
-    _service = expCtx->opCtx->getServiceContext();
+    _service = expCtx->getOperationContext()->getServiceContext();
 
     return Status::OK();
 }

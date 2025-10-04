@@ -29,11 +29,11 @@
 # test_backup05.py
 #   Test that backups can be performed similar to MongoDB's fsyncLock.
 #   We assume writes are not being performed, a checkpoint is done and
-#   then we open a backup cursor to prevent log archiving and other file
+#   then we open a backup cursor to prevent log removal and other file
 #   manipulations.  Manually copy the directory and verify it.
 #
 
-import fnmatch, os, shutil, time
+import os
 from suite_subprocess import suite_subprocess
 from helper import copy_wiredtiger_home
 import wiredtiger, wttest
@@ -56,29 +56,17 @@ class test_backup05(wttest.WiredTigerTestCase, suite_subprocess):
         aligned = even or os.name == "nt"
         copy_wiredtiger_home(self, olddir, newdir, aligned)
 
-        # Half the time try to rename a table and the other half try
-        # to remove a table.  They should fail.
-        if not even:
-            self.assertRaises(wiredtiger.WiredTigerError,
-                lambda: self.session.rename(
-                self.emptyuri, self.newuri, None))
-        else:
-            self.assertRaises(wiredtiger.WiredTigerError,
-                lambda: self.session.drop(self.emptyuri, None))
+        # Try to remove a table. It should fail.
+        self.assertRaises(wiredtiger.WiredTigerError,
+            lambda: self.session.drop(self.emptyuri, None))
 
         # Now simulate fsyncUnlock by closing the backup cursor.
         cbkup.close()
 
         # Once the backup cursor is closed we should be able to perform
-        # schema operations.  Test that and then reset the files to their
-        # expected initial names.
-        if not even:
-            self.session.rename(self.emptyuri, self.newuri, None)
-            self.session.drop(self.newuri, None)
-            self.session.create(self.emptyuri, self.create_params)
-        else:
-            self.session.drop(self.emptyuri, None)
-            self.session.create(self.emptyuri, self.create_params)
+        # schema operations.
+        self.session.drop(self.emptyuri, None)
+        self.session.create(self.emptyuri, self.create_params)
 
         # Open the new directory and verify
         conn = self.setUpConnectionOpen(newdir)
@@ -112,11 +100,8 @@ class test_backup05(wttest.WiredTigerTestCase, suite_subprocess):
             if i % self.freq == 0:
                 self.check_manual_backup(i, ".", "RESTART")
             else:
-                self.session.verify(self.uri)
+                self.verifyUntilSuccess(self.session, self.uri)
 
     def test_backup(self):
         with self.expectedStdoutPattern('recreating metadata'):
             self.backup()
-
-if __name__ == '__main__':
-    wttest.run()

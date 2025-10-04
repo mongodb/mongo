@@ -30,8 +30,12 @@ eviction threads.
 
 It is possible to have just the eviction server and no worker threads. In such a case,
 the eviction server walks the tree to find pages to evict and evict these pages from the
-cache. Pages that are being marked for forced eviction go onto the urgent
-queue, and these pages take precedence over the pages from the ordinary eviction queues.
+cache. Pages that are being marked for forced eviction go onto the urgent queue if the following
+conditions are met; otherwise the page can be evicted by the application thread itself:
+- The operation has disabled eviction or splitting.
+- The session is preventing from reconciling.
+
+Pages in the urgent queue take precedence over the pages from the ordinary eviction queues.
 
 If there are other threads reading the content, the page cannot be evicted and the
 eviction server/worker threads check for that. Eviction has to lock and get exclusive
@@ -54,7 +58,7 @@ Sometimes the workload generates enough new data that eviction is unable to redu
 and more new content is put into cache that can be removed by eviction. In such a case application
 threads are also forced to do the work of eviction workers threads, before they can read or write more data.
 
-Eviction triggers and targets
+@section eviction_triggers Eviction triggers and targets
 
 WiredTiger provides several configuration options for tuning how pages are evicted from
 the cache.
@@ -85,5 +89,9 @@ cache contains at least this many bytes of updates.
 
 It is worth noting that for all eviction target and trigger sizes, the target size must be lower
 than its trigger size counterpart.
+
+@section eviction_related Related pages
+
+- @ref arch-locking-hierarchy-cache-and-eviction
 
 */

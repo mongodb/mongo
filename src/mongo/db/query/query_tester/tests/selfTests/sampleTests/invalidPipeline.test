@@ -1,0 +1,5 @@
+invalidPipeline
+test
+basic.coll as fuzzer_coll
+
+:results {aggregate: "fuzzer_coll", pipeline: [{$nonExistentStage:5}], cursor: {}}

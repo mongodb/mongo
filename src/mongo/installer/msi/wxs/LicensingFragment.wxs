@@ -5,7 +5,7 @@
     <DirectoryRef Id="INSTALLLOCATION">
       <?if $(var.Edition) = Enterprise ?>
         <Component Id="c_License" Guid="C0EF85E2-95F8-468B-BA95-2F739C63D2D7">
-          <File Id="f_License" Name="LICENSE-Enterprise.txt" Source="$(var.EnterpriseBase)\distsrc\LICENSE-Enterprise.txt"
+          <File Id="f_License" Name="LICENSE-Enterprise.txt" Source="$(var.EnterpriseLicenseSource)\LICENSE-Enterprise.txt"
                 DiskId ="1" KeyPath="yes" />
         </Component>
         <Component Id="c_Thirdparty" Guid="C45662A7-5C18-4A53-8D14-7C92DB38F13E">
@@ -13,7 +13,7 @@
                 DiskId ="1" KeyPath="yes" />
         </Component>
         <Component Id="c_ThirdpartyEnterprise" Guid="4D53FF2F-DB47-41F3-8C5C-4C397736724E">
-          <File Id="f_ThirdpartyEnterprise" Name="THIRD-PARTY-NOTICES.windows" Source="$(var.EnterpriseBase)\distsrc\THIRD-PARTY-NOTICES.windows"
+          <File Id="f_ThirdpartyEnterprise" Name="THIRD-PARTY-NOTICES.windows" Source="$(var.EnterpriseLicenseSource)\THIRD-PARTY-NOTICES.windows"
                 DiskId ="1" KeyPath="yes" />
         </Component>
 
@@ -56,7 +56,7 @@
     </ComponentGroup>
 
     <?if $(var.Edition) = Enterprise ?>
-    <WixVariable Id="WixUILicenseRtf" Value="$(var.EnterpriseBase)\distsrc\LICENSE-Enterprise.rtf" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(var.EnterpriseLicenseSource)\LICENSE-Enterprise.rtf" />
     <?else ?>
     <WixVariable Id="WixUILicenseRtf" Value="$(var.ProjectDir)LICENSE-Community.rtf" />
     <?endif ?>

@@ -1,0 +1,70 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/aggregation_mongos_pqs_fallback.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
+##########################################################
+description:
+  Test the correctness of the query settings fallback mechanism by introducing
+  planner failures and then expecting that the fallback-generated plan is identical
+  to the original plan. This suite runs aggregation tests using a sharded cluster
+  fixture.
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+  config:
+    shell_options:
+      eval:
+        await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");;
+        await import("jstests/libs/override_methods/implicit_query_settings_fallback.js");
+  fixture:
+    class: ShardedClusterFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+  hooks:
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: ValidateCollections
+    - class: CheckOrphansDeleted
+    - class: CleanEveryN
+      n: 20
+matrix_suite: true
+selector:
+  exclude_files:
+    - jstests/aggregation/extras/*.js
+    - jstests/aggregation/data/*.js
+    - jstests/aggregation/sources/group/groupMissing.js
+    - jstests/aggregation/accumulators/internal_js_reduce_with_scope.js
+    - jstests/aggregation/expressions/internal_js_emit_with_scope.js
+    - jstests/aggregation/sources/unionWith/unionWith_explain.js
+    - jstests/aggregation/accumulators/accumulator_js_size_limits.js
+    - jstests/aggregation/exec/query_limits_test.js
+    - jstests/aggregation/sources/geonear/geonear_hint.js
+    - jstests/aggregation/sources/lookup/lookup_query_stats.js
+    - jstests/aggregation/sources/unionWith/unionWith_query_stats.js
+    - jstests/aggregation/sources/lookup/lookup_single_solution_cache.js
+    - jstests/aggregation/sources/bucket/collation_bucket.js
+  exclude_with_any_tags:
+    - assumes_against_mongod_not_mongos
+    - requires_profiling
+    - requires_sharding
+    - requires_replication
+    - requires_2_or_more_shards
+    - assumes_standalone_mongod
+    - does_not_support_repeated_reads
+    - requires_profiling
+    - requires_fsync
+    - known_query_shape_computation_problem
+    - query_intensive_pbt
+  roots:
+    - jstests/aggregation/**/*.js
+test_kind: js_test

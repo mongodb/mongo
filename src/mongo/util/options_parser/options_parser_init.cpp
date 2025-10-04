@@ -27,16 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/util/options_parser/startup_options.h"
-
-#include <iostream>
-
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/exit_code.h"
-#include "mongo/util/options_parser/option_description.h"
-#include "mongo/util/options_parser/option_section.h"
+#include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/options_parser.h"
 #include "mongo/util/options_parser/startup_option_init.h"
+#include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/quick_exit.h"
+
+#include <iostream>
+#include <string>
+#include <vector>
 
 namespace mongo {
 namespace optionenvironment {
@@ -49,7 +53,7 @@ MONGO_STARTUP_OPTIONS_PARSE(StartupOptions)(InitializerContext* context) {
         std::cerr << ret.reason() << std::endl;
         // TODO: Figure out if there's a use case for this help message ever being different
         std::cerr << "try '" << context->args()[0] << " --help' for more information" << std::endl;
-        quickExit(EXIT_BADOPTIONS);
+        quickExit(ExitCode::badOptions);
     }
 }
 
@@ -62,7 +66,7 @@ MONGO_INITIALIZER_GENERAL(OutputConfig,
         uassertStatusOK(startupOptionsParsed.get(Key("outputConfig"), &output));
         if (output) {
             std::cout << startupOptionsParsed.toYAML() << std::endl;
-            quickExit(EXIT_CLEAN);
+            quickExit(ExitCode::clean);
         }
     }
 }

@@ -1,0 +1,201 @@
+# Copyright (C) 2022-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+
+global:
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/exec/document_value/value.h"
+        - "mongo/crypto/encryption_fields_validation.h"
+
+imports:
+    - "mongo/db/basic_types.idl"
+
+types:
+    encrypted_numeric:
+        bson_serialization_type:
+            - date
+            - decimal
+            - double
+            - int
+            - long
+        description: A value with any encrypted range numeric BSON type.
+        cpp_type: Value
+        serializer: Value::serializeForIDL
+        deserializer: Value::deserializeForIDL
+        is_view: false
+
+enums:
+    QueryType:
+        description: "query types"
+        type: string
+        values:
+            Equality: "equality"
+            # TODO SERVER-87670 Remove once 8.0 is lastLTS.
+            RangePreviewDeprecated: "rangePreview"
+            Range: "range"
+            SubstringPreview: "substringPreview"
+            SuffixPreview: "suffixPreview"
+            PrefixPreview: "prefixPreview"
+
+structs:
+    QueryTypeConfig:
+        description: "Information about query support for a field"
+        strict: true
+        fields:
+            queryType:
+                description: "Type of supported queries"
+                type: QueryType
+                stability: unstable
+            contention:
+                description: "Contention factor for field, 0 means it has extremely high set number of distinct values"
+                type: exactInt64
+                default: 8
+                stability: unstable
+                validator: {gte: 0}
+            min:
+                description: "Defines the lower bound for field values in this encrypted index. Only applicable for queryType range"
+                type: encrypted_numeric
+                optional: true
+                stability: unstable
+            max:
+                description: "Defines the upper bound for field values in this encrypted index. Only applicable for queryType range"
+                type: encrypted_numeric
+                optional: true
+                stability: unstable
+            sparsity:
+                description: "Lower value - higher storage overhead, faster query."
+                type: exactInt64
+                optional: true
+                stability: unstable
+                validator: {gte: 1, lte: 8}
+            precision:
+                description: >-
+                    Defines the number of digits after the decimal point for floating point numbers.
+                    Only applicable to floating point numbers and for queryType range.
+                type: safeInt
+                optional: true
+                stability: unstable
+                validator: {gte: 0}
+            trimFactor:
+                description: >-
+                    Number of root tree levels to cut. Increasing this value will decrease write conflicts and speed up inserts,
+                    but large range queries will slow down.
+                type: safeInt
+                optional: true
+                stability: unstable
+                validator: {gte: 0}
+            strMaxLength:
+                description: >-
+                    The maximum allowed length for a substring-indexed field. If the user inserts a
+                    longer string, then the string will not be indexed for substring search.
+                type: safeInt
+                optional: true
+                stability: unstable
+                validator: {gt: 0}
+            strMinQueryLength:
+                description: >-
+                    The minimum allowed length for inputs to prefix/suffix/substring lookups.
+                    (i.e. dictates the shortest string length we'll index)
+                type: safeInt
+                optional: true
+                stability: unstable
+                validator: {gt: 0}
+            strMaxQueryLength:
+                description: >-
+                    The maximum allowed length for inputs to prefix/suffix/substring lookups.
+                    (i.e. dictates the longest string length we'll index)
+                type: safeInt
+                optional: true
+                stability: unstable
+                validator: {gt: 0}
+            caseSensitive:
+                description: "Enables case folding in the StrEncode algorithm if set to false."
+                type: bool
+                optional: true
+                stability: unstable
+            diacriticSensitive:
+                description: "Enables diacritic folding in the StrEncode algorithm if set to false."
+                type: bool
+                optional: true
+                stability: unstable
+
+    EncryptedField:
+        description: "Information about encrypted fields"
+        strict: true
+        cpp_validator_func: "validateEncryptedField"
+        fields:
+            keyId:
+                description: "UUID of key in key vault to use for encryption"
+                type: uuid
+                stability: unstable
+            path:
+                description: "Path to field to encrypt"
+                type: string
+                stability: unstable
+            bsonType:
+                description: "BSON type of field to encrypt"
+                type: string
+                validator: {callback: "isValidBSONTypeName"}
+                optional: true
+                stability: unstable
+            queries:
+                description: "List of supported query types"
+                type:
+                    variant: [QueryTypeConfig, array<QueryTypeConfig>]
+                optional: true
+                stability: unstable
+
+    EncryptedFieldConfig:
+        description: "Information about encrypted fields and state collections"
+        strict: true
+        cpp_validator_func: "validateEncryptedFieldConfig"
+        fields:
+            escCollection:
+                description: "Encrypted State Collection name, defaults to <collection>.esc"
+                type: string
+                optional: true
+                stability: unstable
+            eccCollection:
+                description: "Encrypted Cache Collection name, defaults to <collection>.ecc"
+                type: string
+                optional: true
+                stability: unstable
+            ecocCollection:
+                description: "Encrypted Compaction Collection name, defaults to <collection>.ecoc"
+                type: string
+                optional: true
+                stability: unstable
+            fields:
+                description: "Array of encrypted fields"
+                type: array<EncryptedField>
+                stability: unstable
+            strEncodeVersion:
+                description: "Version of StrEncode. Should be included if any field has a text search queryType."
+                type: int
+                optional: true
+                stability: unstable
+                validator: {gt: 0}

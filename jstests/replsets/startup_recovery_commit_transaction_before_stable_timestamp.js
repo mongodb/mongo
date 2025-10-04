@@ -9,9 +9,8 @@
  * @tags: [requires_persistence, uses_transactions, uses_prepare_transaction]
  */
 
-(function() {
-"use strict";
-load("jstests/core/txns/libs/prepare_helpers.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const replTest = new ReplSetTest({nodes: 1});
 replTest.startSet();
@@ -28,7 +27,7 @@ const testColl = testDB.getCollection(collName);
 // 16MB limit, but that three such arrays in the same document are greater than 16MB. This will
 // be helpful in recreating an idempotency issue that exists when applying the operations from
 // a transaction after the data already reflects the transaction.
-const largeArray = new Array(7 * 1024 * 1024).join('x');
+const largeArray = "x".repeat(7 * 1024 * 1024);
 assert.commandWorked(testColl.insert([{_id: 1, "a": largeArray}]));
 
 // Start a transaction in a session that will be prepared and committed before node restart.
@@ -41,19 +40,20 @@ assert.commandWorked(sessionColl.update({_id: 1}, {$unset: {"b": 1}}));
 assert.commandWorked(sessionColl.update({_id: 1}, {$set: {"c": largeArray}}));
 let prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
-const recoveryTimestamp =
-    assert.commandWorked(testColl.runCommand("insert", {documents: [{_id: 2}]})).operationTime;
+const recoveryTimestamp = assert.commandWorked(testColl.runCommand("insert", {documents: [{_id: 2}]})).operationTime;
 
 jsTestLog("Holding back the stable timestamp to right after the prepareTimestamp");
 
 // Hold back the stable timestamp to be right after the prepareTimestamp, but before the
 // commitTransaction oplog entry so that the transaction will be replayed during startup
 // recovery.
-assert.commandWorked(testDB.adminCommand({
-    "configureFailPoint": 'holdStableTimestampAtSpecificTimestamp',
-    "mode": 'alwaysOn',
-    "data": {"timestamp": recoveryTimestamp}
-}));
+assert.commandWorked(
+    testDB.adminCommand({
+        "configureFailPoint": "holdStableTimestampAtSpecificTimestamp",
+        "mode": "alwaysOn",
+        "data": {"timestamp": recoveryTimestamp},
+    }),
+);
 
 jsTestLog("Committing the transaction");
 
@@ -90,4 +90,3 @@ assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp)
 assert.eq(testDB[collName].findOne({_id: 1}), {_id: 1, a: 1});
 
 replTest.stopSet();
-}());

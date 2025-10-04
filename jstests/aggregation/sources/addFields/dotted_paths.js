@@ -1,7 +1,6 @@
 /**
  * Test the behavior of $addFields in the presence of a dotted field path.
  */
-(function() {
 const coll = db.add_fields_dotted_paths;
 coll.drop();
 
@@ -9,7 +8,7 @@ let initObj = {
     _id: 1,
     arrayField: [1, {subField: [2, {}]}, [1]],
     objField: {p: {q: 1}, subArr: [1]},
-    otherField: "value"
+    otherField: "value",
 };
 assert.commandWorked(coll.insert(initObj));
 
@@ -26,29 +25,29 @@ assertAddFieldsResult({"objField.subArr": {$literal: "newValue"}}, initObj);
 // existing sibling fields are retained.
 initObj["objField"] = {
     p: {q: 1},
-    subArr: [1],  // Existing fields are retained.
-    newSubPath: {b: "newValue"}
+    subArr: [1], // Existing fields are retained.
+    newSubPath: {b: "newValue"},
 };
 assertAddFieldsResult({"objField.newSubPath.b": {$literal: "newValue"}}, initObj);
 assertAddFieldsResult({"objField.newSubPath.b": "newValue"}, initObj);
 
 // When the value is a nested object.
 const valueWithNestedObject = {
-    newSubObj: [{p: "newValue"}]
+    newSubObj: [{p: "newValue"}],
 };
 initObj["objField"]["newSubPath"] = {
-    b: valueWithNestedObject
+    b: valueWithNestedObject,
 };
 assertAddFieldsResult({"objField.newSubPath.b": valueWithNestedObject}, initObj);
 assertAddFieldsResult({"objField.newSubPath.b": {$literal: valueWithNestedObject}}, initObj);
 initObj["objField"] = {
     p: {q: 1},
-    subArr: [1]
-};  // Reset input object.
+    subArr: [1],
+}; // Reset input object.
 
 // When the top level field doesn"t exist, a new nested object is created based on the given path.
 initObj["newField"] = {
-    newSubPath: {b: "newValue"}
+    newSubPath: {b: "newValue"},
 };
 assertAddFieldsResult({"newField.newSubPath.b": {$literal: "newValue"}}, initObj);
 assertAddFieldsResult({"newField.newSubPath.b": "newValue"}, initObj);
@@ -56,43 +55,39 @@ assertAddFieldsResult({"newField.newSubPath.b": "newValue"}, initObj);
 // When the top level field doesn"t exist, a new nested object is created based on the given path
 // and the structure of the object in the value.
 initObj["newField"]["newSubPath"] = {
-    b: valueWithNestedObject
+    b: valueWithNestedObject,
 };
 assertAddFieldsResult({"newField.newSubPath.b": valueWithNestedObject}, initObj);
 assertAddFieldsResult({"newField.newSubPath.b": {$literal: valueWithNestedObject}}, initObj);
-delete initObj["newField"];  // Reset.
+delete initObj["newField"]; // Reset.
 
 // Test when the path encounters an array and the value is a scalar.
 initObj["arrayField"] = {
-    newSubPath: {b: "newValue"}
+    newSubPath: {b: "newValue"},
 };
 let expectedSubObj = {newSubPath: {b: "newValue"}};
-initObj["arrayField"] =
-    [expectedSubObj, Object.assign({subField: [2, {}]}, expectedSubObj), [expectedSubObj]];
+initObj["arrayField"] = [expectedSubObj, Object.assign({subField: [2, {}]}, expectedSubObj), [expectedSubObj]];
 assertAddFieldsResult({"arrayField.newSubPath.b": {$literal: "newValue"}}, initObj);
 assertAddFieldsResult({"arrayField.newSubPath.b": "newValue"}, initObj);
 
 // Test when the path encounters an array and the value is a nested object.
 expectedSubObj = {
-    newSubPath: {b: valueWithNestedObject}
+    newSubPath: {b: valueWithNestedObject},
 };
-initObj["arrayField"] =
-    [expectedSubObj, Object.assign({subField: [2, {}]}, expectedSubObj), [expectedSubObj]];
+initObj["arrayField"] = [expectedSubObj, Object.assign({subField: [2, {}]}, expectedSubObj), [expectedSubObj]];
 assertAddFieldsResult({"arrayField.newSubPath.b": valueWithNestedObject}, initObj);
 assertAddFieldsResult({"arrayField.newSubPath.b": {$literal: valueWithNestedObject}}, initObj);
 
 // Test when the path encounters multiple arrays and the value is a nested object.
 expectedSubObj = {
-    subField: {b: valueWithNestedObject}
+    subField: {b: valueWithNestedObject},
 };
 initObj["arrayField"] = [
     expectedSubObj,
     {
-        subField:
-            [{b: valueWithNestedObject}, {b: valueWithNestedObject}]  // Sub-array is also exploded.
+        subField: [{b: valueWithNestedObject}, {b: valueWithNestedObject}], // Sub-array is also exploded.
     },
-    [expectedSubObj]
+    [expectedSubObj],
 ];
 assertAddFieldsResult({"arrayField.subField.b": valueWithNestedObject}, initObj);
 assertAddFieldsResult({"arrayField.subField.b": {$literal: valueWithNestedObject}}, initObj);
-})();

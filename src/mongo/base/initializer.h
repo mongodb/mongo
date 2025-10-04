@@ -29,11 +29,13 @@
 
 #pragma once
 
-#include <functional>
-#include <string>
-#include <vector>
-
 #include "mongo/base/status.h"
+
+#include <functional>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 
@@ -158,6 +160,14 @@ private:
     std::vector<std::string> _sortedNodes;
     State _lifecycleState = State::kNeverInitialized;
 };
+
+/**
+ * In order to more easily debug failures in the dependency graph between initializers,
+ * the --initializerShuffleSeed option specifies the shuffle order used to sort the initializer
+ * graph. However, we have not yet parsed the server options, and so the parameter's value is
+ * extracted here.
+ */
+unsigned extractRandomSeedFromOptions(const std::vector<std::string>& argsList);
 
 /**
  * Get the process-global initializer object.

@@ -26,64 +26,39 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_min_items.h"
+
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
 namespace {
 
-TEST(InternalSchemaMinItemsMatchExpression, RejectsNonArrayElements) {
-    InternalSchemaMinItemsMatchExpression minItems("a", 1);
+DEATH_TEST_REGEX(InternalSchemaMinItemsMatchExpression,
+                 GetChildFailsIndexGreaterThanZero,
+                 "Tripwire assertion.*6400215") {
+    InternalSchemaMinItemsMatchExpression minItems("a"_sd, 2);
 
-    ASSERT(!minItems.matchesBSON(BSON("a" << BSONObj())));
-    ASSERT(!minItems.matchesBSON(BSON("a" << 1)));
-    ASSERT(!minItems.matchesBSON(BSON("a"
-                                      << "string")));
+    ASSERT_EQ(minItems.numChildren(), 0);
+    ASSERT_THROWS_CODE(minItems.getChild(0), AssertionException, 6400215);
 }
 
-TEST(InternalSchemaMinItemsMatchExpression, RejectsArraysWithTooFewElements) {
-    InternalSchemaMinItemsMatchExpression minItems("a", 2);
+TEST(InternalSchemaMinItemsMatchExpression, EquivalentTest) {
+    InternalSchemaMinItemsMatchExpression minItems1("a"_sd, 2);
+    InternalSchemaMinItemsMatchExpression minItems2("a"_sd, 5);
 
-    ASSERT(!minItems.matchesBSON(BSON("a" << BSONArray())));
-    ASSERT(!minItems.matchesBSON(BSON("a" << BSON_ARRAY(1))));
+    auto clone = minItems1.clone();
+    ASSERT_TRUE(minItems1.equivalent(clone.get()));
+    ASSERT_FALSE(minItems1.equivalent(&minItems2));
 }
-
-TEST(InternalSchemaMinItemsMatchExpression, AcceptsArrayWithAtLeastMinElements) {
-    InternalSchemaMinItemsMatchExpression minItems("a", 2);
-
-    ASSERT(minItems.matchesBSON(BSON("a" << BSON_ARRAY(1 << 2))));
-    ASSERT(minItems.matchesBSON(BSON("a" << BSON_ARRAY(1 << 2 << 3))));
-}
-
-TEST(InternalSchemaMinItemsMatchExpression, MinItemsZeroAllowsEmptyArrays) {
-    InternalSchemaMinItemsMatchExpression minItems("a", 0);
-
-    ASSERT(minItems.matchesBSON(BSON("a" << BSONArray())));
-}
-
-TEST(InternalSchemaMinItemsMatchExpression, NullArrayEntriesCountAsItems) {
-    InternalSchemaMinItemsMatchExpression minItems("a", 1);
-
-    ASSERT(minItems.matchesBSON(BSON("a" << BSON_ARRAY(BSONNULL))));
-    ASSERT(minItems.matchesBSON(BSON("a" << BSON_ARRAY(BSONNULL << 1))));
-}
-
-TEST(InternalSchemaMinItemsMatchExpression, NestedArraysAreNotUnwound) {
-    InternalSchemaMinItemsMatchExpression minItems("a", 2);
-
-    ASSERT(!minItems.matchesBSON(BSON("a" << BSON_ARRAY(BSON_ARRAY(1 << 2)))));
-}
-
-TEST(InternalSchemaMinItemsMatchExpression, NestedArraysWorkWithDottedPaths) {
-    InternalSchemaMinItemsMatchExpression minItems("a.b", 2);
-
-    ASSERT(minItems.matchesBSON(BSON("a" << BSON("b" << BSON_ARRAY(1 << 2)))));
-    ASSERT(!minItems.matchesBSON(BSON("a" << BSON("b" << BSON_ARRAY(1)))));
-}
-
 }  // namespace
 }  // namespace mongo

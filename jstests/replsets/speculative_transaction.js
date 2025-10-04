@@ -5,9 +5,8 @@
  *
  * @tags: [uses_transactions, requires_majority_read_concern]
  */
-(function() {
-"use strict";
-load("jstests/libs/write_concern_util.js");  // For stopServerReplication
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 const dbName = "test";
 const collName = "speculative_transaction";
@@ -18,11 +17,12 @@ rst.initiate();
 
 const primary = rst.getPrimary();
 const secondary = rst.getSecondary();
-var testDB = primary.getDB(dbName);
+let testDB = primary.getDB(dbName);
 const coll = testDB[collName];
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 function runTest(sessionOptions) {
     testDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
@@ -92,11 +92,9 @@ function runTest(sessionOptions) {
     assert.eq(sessionColl.findOne({_id: 1}), {_id: 1, y: 1});
 
     // But update fails
-    assert.commandFailedWithCode(sessionColl.update({_id: 1}, {$inc: {x: 1}}),
-                                 ErrorCodes.WriteConflict);
+    assert.commandFailedWithCode(sessionColl.update({_id: 1}, {$inc: {x: 1}}), ErrorCodes.WriteConflict);
 
-    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
-                                 ErrorCodes.NoSuchTransaction);
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
     // Restart server replication to allow majority commit point to advance.
     restartServerReplication(secondary);
@@ -125,4 +123,3 @@ function runTest(sessionOptions) {
 runTest({causalConsistency: false});
 runTest({causalConsistency: true});
 rst.stopSet();
-}());

@@ -1,0 +1,6 @@
+package(default_visibility = ["//visibility:public"])
+
+sh_binary(
+    name = "setup_node_env",
+    srcs = ["setup_node_env.sh"],
+)

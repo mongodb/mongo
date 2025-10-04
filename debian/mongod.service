@@ -8,8 +8,10 @@ Wants=network-online.target
 User=mongodb
 Group=mongodb
 EnvironmentFile=-/etc/default/mongod
+Environment="MONGODB_CONFIG_OVERRIDE_NOFORK=1"
+Environment="GLIBC_TUNABLES=glibc.pthread.rseq=0"
 ExecStart=/usr/bin/mongod --config /etc/mongod.conf
-PIDFile=/var/run/mongodb/mongod.pid
+RuntimeDirectory=mongodb
 # file size
 LimitFSIZE=infinity
 # cpu time

@@ -2,13 +2,12 @@
  * Test that adding invalid or duplicate shards will fail.
  *
  */
-(function() {
-
-"use strict";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 1});
 
-const configDB = st.s.getDB('config');
+const configDB = st.s.getDB("config");
 const shardDoc = configDB.shards.findOne();
 
 /**
@@ -70,8 +69,7 @@ executeOldBinaryTest("last-lts");
 executeOldBinaryTest("last-continuous");
 
 executeStandardTests((replicaSetConnectionURL) => {
-    const truncatedRSConnStr =
-        replicaSetConnectionURL.substring(0, replicaSetConnectionURL.indexOf(','));
+    const truncatedRSConnStr = replicaSetConnectionURL.substring(0, replicaSetConnectionURL.indexOf(","));
 
     return [
         {
@@ -81,24 +79,22 @@ executeStandardTests((replicaSetConnectionURL) => {
         {
             // Cannot add the same replSet shard host twice when using a unique shard name.
             addshard: replicaSetConnectionURL,
-            name: 'dupRS',
-            setup: () => (assert.commandWorked(
-                st.admin.runCommand({addshard: replicaSetConnectionURL, name: 'dummyRS'})))
+            name: "dupRS",
+            setup: () =>
+                assert.commandWorked(st.admin.runCommand({addshard: replicaSetConnectionURL, name: "dummyRS"})),
         },
         {
             // Cannot add a replica set connection string containing a member that isn't actually
             // part of the replica set.
-            addshard: truncatedRSConnStr + 'fakehost',
-            name: 'dummyRS'
+            addshard: truncatedRSConnStr + "fakehost",
+            name: "dummyRS",
         },
-        {addshard: shardDoc.host, name: 'dupShard'},
-        {addshard: st._configDB},  // Can't add config servers as shard.
+        {addshard: shardDoc.host, name: "dupShard"},
+        {addshard: st._configDB}, // Can't add config servers as shard.
     ];
 });
 
 // Can't add mongos as shard.
-assert.commandFailedWithCode(st.admin.runCommand({addshard: st.s.host}),
-                             ErrorCodes.IllegalOperation);
+assert.commandFailedWithCode(st.admin.runCommand({addshard: st.s.host}), ErrorCodes.IllegalOperation);
 
 st.stop();
-})();

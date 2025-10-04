@@ -6,11 +6,13 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load('jstests/replsets/rslib.js');
-load("jstests/libs/fail_point_util.js");
+import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {
+    assertVoteCount,
+    isMemberNewlyAdded,
+    waitForNewlyAddedRemovalForNodeToBeCommitted,
+} from "jstests/replsets/rslib.js";
 
 const testName = jsTestName();
 const dbName = "testdb";
@@ -18,7 +20,7 @@ const collName = "testcoll";
 
 const rst = new ReplSetTest({name: testName, nodes: 1});
 rst.startSet();
-rst.initiateWithHighElectionTimeout();
+rst.initiate();
 
 const primary = rst.getPrimary();
 const primaryDb = primary.getDB(dbName);
@@ -30,17 +32,19 @@ jsTestLog("Adding a new non-voting node to the replica set");
 const secondary0 = rst.add({
     rsConfig: {priority: 0, votes: 0},
     setParameter: {
-        'failpoint.initialSyncHangBeforeFinish': tojson({mode: 'alwaysOn'}),
-        'numInitialSyncAttempts': 1,
-    }
+        "failpoint.initialSyncHangBeforeFinish": tojson({mode: "alwaysOn"}),
+        "numInitialSyncAttempts": 1,
+    },
 });
 rst.reInitiate();
 
-assert.commandWorked(secondary0.adminCommand({
-    waitForFailPoint: "initialSyncHangBeforeFinish",
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+assert.commandWorked(
+    secondary0.adminCommand({
+        waitForFailPoint: "initialSyncHangBeforeFinish",
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout,
+    }),
+);
 
 jsTestLog("Checking that 'newlyAdded' field is not set");
 assert(!isMemberNewlyAdded(primary, 1));
@@ -54,9 +58,8 @@ assertVoteCount(primary, {
 });
 
 jsTestLog("Waiting for initial sync to complete");
-assert.commandWorked(
-    secondary0.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
-rst.waitForState(secondary0, ReplSetTest.State.SECONDARY);
+assert.commandWorked(secondary0.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
+rst.awaitSecondaryNodes(null, [secondary0]);
 
 jsTestLog("Checking that 'newlyAdded' field is still not set");
 assert(!isMemberNewlyAdded(primary, 1));
@@ -76,17 +79,19 @@ jsTestLog("Adding a new voting node to the replica set");
 const secondary1 = rst.add({
     rsConfig: {priority: 0},
     setParameter: {
-        'failpoint.initialSyncHangBeforeFinish': tojson({mode: 'alwaysOn'}),
-        'numInitialSyncAttempts': 1,
-    }
+        "failpoint.initialSyncHangBeforeFinish": tojson({mode: "alwaysOn"}),
+        "numInitialSyncAttempts": 1,
+    },
 });
 rst.reInitiate();
 
-assert.commandWorked(secondary1.adminCommand({
-    waitForFailPoint: "initialSyncHangBeforeFinish",
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+assert.commandWorked(
+    secondary1.adminCommand({
+        waitForFailPoint: "initialSyncHangBeforeFinish",
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout,
+    }),
+);
 
 jsTestLog("Checking that 'newlyAdded' field is set");
 assert.eq(0, rst.getReplSetConfigFromNode(primary.nodeId).members[1].votes);
@@ -105,8 +110,7 @@ jsTestLog("Reconfiguring new node to have 0 votes");
 let cfg = rst.getReplSetConfigFromNode(primary.nodeId);
 cfg.version += 1;
 cfg.members[2].votes = 0;
-assert.commandWorked(
-    primary.adminCommand({replSetReconfig: cfg, maxTimeMS: ReplSetTest.kDefaultTimeoutMS}));
+assert.commandWorked(primary.adminCommand({replSetReconfig: cfg, maxTimeMS: ReplSetTest.kDefaultTimeoutMS}));
 
 assert.eq(0, rst.getReplSetConfigFromNode(primary.nodeId).members[1].votes);
 assert.eq(0, rst.getReplSetConfigFromNode(primary.nodeId).members[2].votes);
@@ -121,9 +125,8 @@ assertVoteCount(primary, {
 });
 
 jsTestLog("Waiting for second initial sync to complete");
-assert.commandWorked(
-    secondary1.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
-rst.waitForState(secondary1, ReplSetTest.State.SECONDARY);
+assert.commandWorked(secondary1.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
+rst.awaitSecondaryNodes(null, [secondary1]);
 
 jsTestLog("Checking that 'newlyAdded' field was removed");
 waitForNewlyAddedRemovalForNodeToBeCommitted(primary, 2);
@@ -142,4 +145,3 @@ jsTestLog("Making sure the set can accept w:3 writes");
 assert.commandWorked(primaryColl.insert({a: 3}, {writeConcern: {w: 3}}));
 
 rst.stopSet();
-})();

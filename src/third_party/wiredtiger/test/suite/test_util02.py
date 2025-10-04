@@ -26,8 +26,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import string, os
-import wiredtiger, wttest
+import string
+import wttest
 from suite_subprocess import suite_subprocess
 from wtdataset import ComplexDataSet
 from wtscenario import make_scenarios
@@ -218,6 +218,3 @@ class test_load_commandline(wttest.WiredTigerTestCase, suite_subprocess):
         self.load_commandline(["table", "filename=bar"], False)
         self.load_commandline(["table", "source=bar"], False)
         self.load_commandline(["table", "version=(100,200)"], False)
-
-if __name__ == '__main__':
-    wttest.run()

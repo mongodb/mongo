@@ -27,18 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/client.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/admission/execution_admission_context.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_set_command.h"
 #include "mongo/db/repl/repl_set_request_votes_args.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/executor/network_interface.h"
-#include "mongo/transport/session.h"
-#include "mongo/transport/transport_layer.h"
-#include "mongo/util/scopeguard.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/admission_context.h"
 
 namespace mongo {
 namespace repl {
@@ -49,7 +48,7 @@ public:
 
 private:
     bool run(OperationContext* opCtx,
-             const std::string&,
+             const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) final {
         Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
@@ -59,8 +58,11 @@ private:
         status = parsedArgs.initialize(cmdObj);
         uassertStatusOK(status);
 
-        // Any writes that occur as part of an election should not be subject to Flow Control.
-        opCtx->setShouldParticipateInFlowControl(false);
+        // Operations that are part of Replica Set elections are crucial to the stability of the
+        // cluster. Marking it as having Immediate priority will make it skip waiting for ticket
+        // acquisition and Flow Control.
+        ScopedAdmissionPriority<ExecutionAdmissionContext> priority(
+            opCtx, AdmissionContext::Priority::kExempt);
         ReplSetRequestVotesResponse response;
         status = ReplicationCoordinator::get(opCtx)->processReplSetRequestVotes(
             opCtx, parsedArgs, &response);
@@ -69,7 +71,8 @@ private:
         response.addToBSON(&result);
         return true;
     }
-} cmdReplSetRequestVotes;
+};
+MONGO_REGISTER_COMMAND(CmdReplSetRequestVotes).forShard();
 
 }  // namespace repl
 }  // namespace mongo

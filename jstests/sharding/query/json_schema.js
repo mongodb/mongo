@@ -1,15 +1,13 @@
 /**
  * Tests for $jsonSchema queries in a sharded cluster.
  */
-(function() {
-"use strict";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = "json_schema_sharding";
 
-var st = new ShardingTest({shards: 2, mongos: 1});
+let st = new ShardingTest({shards: 2, mongos: 1});
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.name);
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 
 const testDB = st.s.getDB(dbName);
 const coll = testDB.json_schema_sharding;
@@ -24,10 +22,8 @@ assert.commandWorked(testDB.adminCommand({split: coll.getFullName(), middle: {_i
 assert.commandWorked(testDB.adminCommand({split: coll.getFullName(), middle: {_id: 100}}));
 
 // Move the [0, 100) and [100, MaxKey) chunks to st.shard1.shardName.
-assert.commandWorked(
-    testDB.adminCommand({moveChunk: coll.getFullName(), find: {_id: 50}, to: st.shard1.shardName}));
-assert.commandWorked(testDB.adminCommand(
-    {moveChunk: coll.getFullName(), find: {_id: 150}, to: st.shard1.shardName}));
+assert.commandWorked(testDB.adminCommand({moveChunk: coll.getFullName(), find: {_id: 50}, to: st.shard1.shardName}));
+assert.commandWorked(testDB.adminCommand({moveChunk: coll.getFullName(), find: {_id: 150}, to: st.shard1.shardName}));
 
 // Write one document into each of the chunks.
 assert.commandWorked(coll.insert({_id: -150, a: 1}));
@@ -45,13 +41,14 @@ assert.eq(1, coll.find({$jsonSchema: {properties: {_id: {minimum: 150}}}}).itcou
 let res = coll.update(
     {$jsonSchema: {properties: {_id: {type: "number", minimum: 100}, a: {type: "number"}}}},
     {$inc: {a: 1}},
-    {multi: true});
+    {multi: true},
+);
 assert.commandWorked(res);
 assert.eq(1, res.nModified);
 
 const schema = {
     properties: {_id: {type: "number", minimum: 100}},
-    required: ["_id"]
+    required: ["_id"],
 };
 res = coll.update({$jsonSchema: schema}, {$set: {b: 1}}, {multi: true});
 assert.commandWorked(res);
@@ -62,4 +59,3 @@ res = coll.findAndModify({query: {_id: 150, $jsonSchema: schema}, update: {$set:
 assert.eq(1, res.b);
 
 st.stop();
-})();

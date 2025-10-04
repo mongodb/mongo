@@ -3,8 +3,7 @@
  *
  * @tags: [requires_persistence, requires_replication]
  */
-(function() {
-'use strict';
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const rst = new ReplSetTest({
     nodes: 3,
@@ -12,20 +11,20 @@ const rst = new ReplSetTest({
     keyFile: "jstests/libs/key1",
 });
 rst.startSet();
-rst.initiateWithHighElectionTimeout();
+rst.initiate();
 
 jsTestLog("Running 'awaitReplication()' while not authenticated in the test");
 rst.awaitReplication();
 
 const primary = rst.getPrimary();
-const testNS = 'test.a';
+const testNS = "test.a";
 const testDoc = {
     _id: 1,
     a: 1,
-    str: 'authed_insert'
+    str: "authed_insert",
 };
 
-primary.getDB('admin').createUser({user: 'root', pwd: 'root', roles: ['root']}, {w: 3});
+primary.getDB("admin").createUser({user: "root", pwd: "root", roles: ["root"]}, {w: 3});
 primary.getDB("admin").auth("root", "root");
 assert.commandWorked(primary.getDB("admin").runCommand({hello: 1}));
 assert.commandWorked(primary.getCollection(testNS).insert(testDoc));
@@ -42,4 +41,3 @@ for (const secondary of rst.getSecondaries()) {
 }
 
 rst.stopSet();
-})();

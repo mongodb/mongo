@@ -27,11 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/platform/stack_locator.h"
 
 #include "mongo/util/assert_util.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -46,14 +48,14 @@ boost::optional<std::size_t> StackLocator::available() const {
     // see that it can elide the comparison here.
 
     const auto cbegin = reinterpret_cast<const char*>(begin());
-    const auto cthis = reinterpret_cast<const char*>(this);
     const auto cend = reinterpret_cast<const char*>(end());
+    const auto csp = reinterpret_cast<const char*>(_capturedStackPointer);
 
     // TODO: Assumes that stack grows downward
-    invariant(cthis <= cbegin);
-    invariant(cthis > cend);
+    invariant(csp <= cbegin);
+    invariant(csp > cend);
 
-    std::size_t avail = cthis - cend;
+    std::size_t avail = csp - cend;
 
     return avail;
 }

@@ -1,0 +1,47 @@
+version: 1.0.0
+filters:
+  - "*golden_overrides.js":
+    approvers:
+      - 10gen/query-optimization
+  - "*changestream*":
+    approvers:
+      - 10gen/query-execution-change-streams
+  - "*query_settings*":
+    approvers:
+      - 10gen/query-execution-query-settings
+  - "implicit_wildcard_indexes.js":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "implicitly_wrap_pipelines_in_facets.js":
+    approvers:
+      - 10gen/query-execution-classic
+  - "*bulk_write.js":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "implicit_timeseries_collections.js":
+    approvers:
+      - 10gen/query-integration-timeseries
+  - "query_shape_hash_stability.js":
+    approvers:
+      - 10gen/query-execution-query-settings
+      - 10gen/query-integration-observability
+  - "rerun_queries.js":
+    approvers:
+      - 10gen/query-optimization
+  - "set_api*":
+    approvers:
+      - 10gen/query-optimization
+  - "send_command_to_initial_sync_node*":
+    approvers:
+      - 10gen/server-initial-sync
+  - "txn_passthrough_cmd_massage.js":
+    approvers:
+      - 10gen/server-transactions
+  - "implicitly_retry_on_fcv_upgrade_downgrade.js":
+    approvers:
+      - 10gen/query-execution-query-settings
+      - 10gen/server-replication-reviewers
+      - 10gen/server-catalog-and-routing-routing-and-topology
+  - "implicit_identity_views.js":
+    approvers:
+      - 10gen/query-optimization

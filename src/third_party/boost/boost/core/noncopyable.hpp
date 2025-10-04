@@ -27,7 +27,7 @@ namespace noncopyable_  // protection from unintended ADL
 // whether a type derives from noncopyable without needing the definition
 // of noncopyable itself.
 //
-// The definition of base_token is macro-guarded so that Type Trais can
+// The definition of base_token is macro-guarded so that Type Traits can
 // define it locally without including this header, to avoid a dependency
 // on Core.
 

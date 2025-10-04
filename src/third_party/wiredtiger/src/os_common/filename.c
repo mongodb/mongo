@@ -9,22 +9,12 @@
 #include "wt_internal.h"
 
 /*
- * __wt_filename --
- *     Build a file name in a scratch buffer, automatically calculate the length of the file name.
- */
-int
-__wt_filename(WT_SESSION_IMPL *session, const char *name, char **path)
-{
-    return (__wt_nfilename(session, name, strlen(name), path));
-}
-
-/*
- * __wt_nfilename --
+ * __nfilename --
  *     Build a file name in a scratch buffer. If the name is already an absolute path duplicate it,
  *     otherwise generate a path relative to the connection home directory.
  */
-int
-__wt_nfilename(WT_SESSION_IMPL *session, const char *name, size_t namelen, char **path)
+static int
+__nfilename(WT_SESSION_IMPL *session, const char *name, size_t namelen, char **path)
 {
     WT_DECL_RET;
     size_t len;
@@ -52,6 +42,16 @@ err:
 }
 
 /*
+ * __wt_filename --
+ *     Build a file name in a scratch buffer, automatically calculate the length of the file name.
+ */
+int
+__wt_filename(WT_SESSION_IMPL *session, const char *name, char **path)
+{
+    return (__nfilename(session, name, strlen(name), path));
+}
+
+/*
  * __wt_filename_construct --
  *     Given unique identifiers, return a WT_ITEM of a generated file name of the given prefix type.
  *     Any identifier that is 0 will be skipped.
@@ -60,8 +60,12 @@ int
 __wt_filename_construct(WT_SESSION_IMPL *session, const char *path, const char *file_prefix,
   uintmax_t id_1, uint32_t id_2, WT_ITEM *buf)
 {
+    /*
+     * Don't concatenate to the buffer when a path is given. Callers providing a path may be in a
+     * loop and concatenation won't work in that case.
+     */
     if (path != NULL && path[0] != '\0')
-        WT_RET(__wt_buf_catfmt(session, buf, "%s%s", path, __wt_path_separator()));
+        WT_RET(__wt_buf_fmt(session, buf, "%s%s", path, __wt_path_separator()));
     WT_RET(__wt_buf_catfmt(session, buf, "%s", file_prefix));
     if (id_1 != UINTMAX_MAX)
         WT_RET(__wt_buf_catfmt(session, buf, ".%010" PRIuMAX, id_1));
@@ -85,7 +89,7 @@ __wt_remove_if_exists(WT_SESSION_IMPL *session, const char *name, bool durable)
         /* Modifications are not allowed on a read only database. */
         if (F_ISSET(S2C(session), WT_CONN_READONLY))
             return (EACCES);
-        WT_RET(__wt_fs_remove(session, name, durable));
+        WT_RET(__wt_fs_remove(session, name, durable, false));
     }
     return (0);
 }

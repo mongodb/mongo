@@ -27,31 +27,67 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/resharding/resharding_oplog_application.h"
 
-#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/index/index_access_method.h"
-#include "mongo/db/logical_session_cache.h"
+#include "mongo/db/global_catalog/shard_key_pattern.h"
+#include "mongo/db/local_catalog/catalog_raii.h"
+#include "mongo/db/local_catalog/index_catalog.h"
+#include "mongo/db/local_catalog/lock_manager/exception_util.h"
+#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
+#include "mongo/db/local_catalog/shard_role_catalog/operation_sharding_state.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/ops/delete.h"
-#include "mongo/db/ops/delete_request_gen.h"
-#include "mongo/db/ops/parsed_delete.h"
-#include "mongo/db/ops/update.h"
+#include "mongo/db/op_observer/batched_write_context.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_executor.h"
-#include "mongo/db/repl/oplog_applier_utils.h"
-#include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/s/resharding/resharding_metrics.h"
+#include "mongo/db/query/write_ops/delete.h"
+#include "mongo/db/query/write_ops/delete_request_gen.h"
+#include "mongo/db/query/write_ops/parsed_delete.h"
+#include "mongo/db/query/write_ops/update.h"
+#include "mongo/db/query/write_ops/update_request.h"
+#include "mongo/db/query/write_ops/update_result.h"
+#include "mongo/db/query/write_ops/write_ops_parsers.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
-#include "mongo/db/session_catalog_mongod.h"
-#include "mongo/db/stats/counters.h"
-#include "mongo/db/transaction_participant.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_cache.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/storage/exceptions.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction/transaction_operations.h"
+#include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/db/versioning_protocol/chunk_version.h"
+#include "mongo/db/versioning_protocol/database_version.h"
+#include "mongo/db/versioning_protocol/shard_version.h"
+#include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/functional.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
+
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 
 namespace mongo {
 namespace {
@@ -60,58 +96,20 @@ Date_t getDeadline(OperationContext* opCtx) {
         Milliseconds(resharding::gReshardingOplogApplierMaxLockRequestTimeoutMillis.load());
 }
 
-void runWithTransaction(OperationContext* opCtx,
-                        const NamespaceString& nss,
-                        unique_function<void(OperationContext*)> func) {
-    AlternativeSessionRegion asr(opCtx);
-    auto* const client = asr.opCtx()->getClient();
-    {
-        stdx::lock_guard<Client> lk(*client);
-        client->setSystemOperationKillableByStepdown(lk);
-    }
-    asr.opCtx()->setAlwaysInterruptAtStepDownOrUp();
+CollectionAcquisition acquireCollectionAndAssertExists(OperationContext* opCtx,
+                                                       const NamespaceString& collNss) {
+    auto acquiredColl =
+        acquireCollection(opCtx,
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              opCtx, collNss, AcquisitionPrerequisites::kWrite, getDeadline(opCtx)),
+                          MODE_IX);
 
-    AuthorizationSession::get(client)->grantInternalAuthorization(client);
-    TxnNumber txnNumber = 0;
-    asr.opCtx()->setTxnNumber(txnNumber);
-    asr.opCtx()->setInMultiDocumentTransaction();
+    uassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << "Failed to apply op during resharding due to missing collection "
+                          << collNss.toStringForErrorMsg(),
+            acquiredColl.exists());
 
-    // ReshardingOpObserver depends on the collection metadata being known when processing writes to
-    // the temporary resharding collection. We attach shard version IGNORED to the write operations
-    // and leave it to ReshardingOplogBatchApplier::applyBatch() to retry on a StaleConfig exception
-    // to allow the collection metadata information to be recovered.
-    auto& oss = OperationShardingState::get(asr.opCtx());
-    oss.initializeClientRoutingVersions(nss, ChunkVersion::IGNORED(), boost::none);
-
-    MongoDOperationContextSession ocs(asr.opCtx());
-    auto txnParticipant = TransactionParticipant::get(asr.opCtx());
-
-    ScopeGuard guard([opCtx = asr.opCtx(), &txnParticipant] {
-        try {
-            txnParticipant.abortTransaction(opCtx);
-        } catch (DBException& e) {
-            LOGV2_WARNING(4990200,
-                          "Failed to abort transaction in AlternativeSessionRegion",
-                          "error"_attr = redact(e));
-        }
-    });
-
-    txnParticipant.beginOrContinue(
-        asr.opCtx(), {txnNumber}, false /* autocommit */, true /* startTransaction */);
-    txnParticipant.unstashTransactionResources(asr.opCtx(), "reshardingOplogApplication");
-
-    func(asr.opCtx());
-
-    if (txnParticipant.retrieveCompletedTransactionOperations(asr.opCtx()).size() > 0) {
-        // Similar to the `isTimestamped` check in `applyOperation`, we only want to commit the
-        // transaction if we're doing replicated writes.
-        txnParticipant.commitUnpreparedTransaction(asr.opCtx());
-    } else {
-        txnParticipant.abortTransaction(asr.opCtx());
-    }
-    txnParticipant.stashTransactionResources(asr.opCtx());
-
-    guard.dismiss();
+    return acquiredColl;
 }
 
 }  // namespace
@@ -122,85 +120,48 @@ ReshardingOplogApplicationRules::ReshardingOplogApplicationRules(
     size_t myStashIdx,
     ShardId donorShardId,
     ChunkManager sourceChunkMgr,
-    ReshardingMetrics* metrics)
+    ReshardingOplogApplierMetrics* applierMetrics,
+    bool isCapped)
     : _outputNss(std::move(outputNss)),
       _allStashNss(std::move(allStashNss)),
       _myStashIdx(myStashIdx),
       _myStashNss(_allStashNss.at(_myStashIdx)),
       _donorShardId(std::move(donorShardId)),
       _sourceChunkMgr(std::move(sourceChunkMgr)),
-      _metrics(metrics) {}
+      _applierMetrics(applierMetrics),
+      _isCapped(isCapped) {}
 
 Status ReshardingOplogApplicationRules::applyOperation(OperationContext* opCtx,
                                                        const repl::OplogEntry& op) const {
     LOGV2_DEBUG(49901, 3, "Applying op for resharding", "op"_attr = redact(op.toBSONForLogging()));
 
-    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+    invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
     invariant(opCtx->writesAreReplicated());
 
-    return writeConflictRetry(opCtx, "applyOplogEntryCRUDOpResharding", op.getNss().ns(), [&] {
+    return writeConflictRetry(opCtx, "applyOplogEntryCRUDOpResharding", op.getNss(), [&] {
         try {
-            WriteUnitOfWork wuow(opCtx);
-
-            AutoGetCollection autoCollOutput(opCtx,
-                                             _outputNss,
-                                             MODE_IX,
-                                             AutoGetCollectionViewMode::kViewsForbidden,
-                                             getDeadline(opCtx));
-            uassert(
-                ErrorCodes::NamespaceNotFound,
-                str::stream() << "Failed to apply op during resharding due to missing collection "
-                              << _outputNss.ns(),
-                autoCollOutput);
-
-            AutoGetCollection autoCollStash(opCtx,
-                                            _myStashNss,
-                                            MODE_IX,
-                                            AutoGetCollectionViewMode::kViewsForbidden,
-                                            getDeadline(opCtx));
-            uassert(
-                ErrorCodes::NamespaceNotFound,
-                str::stream() << "Failed to apply op during resharding due to missing collection "
-                              << _myStashNss.ns(),
-                autoCollStash);
-
             auto opType = op.getOpType();
             switch (opType) {
                 case repl::OpTypeEnum::kInsert:
-                    _applyInsert_inlock(
-                        opCtx, autoCollOutput.getDb(), *autoCollOutput, *autoCollStash, op);
-                    break;
                 case repl::OpTypeEnum::kUpdate:
-                    _applyUpdate_inlock(
-                        opCtx, autoCollOutput.getDb(), *autoCollOutput, *autoCollStash, op);
+                    _applyInsertOrUpdate(opCtx, op);
                     break;
-                case repl::OpTypeEnum::kDelete:
-                    _applyDelete_inlock(
-                        opCtx, autoCollOutput.getDb(), *autoCollOutput, *autoCollStash, op);
+                case repl::OpTypeEnum::kDelete: {
+                    _applyDelete(opCtx, op);
+                    _applierMetrics->onDeleteApplied();
                     break;
+                }
                 default:
                     MONGO_UNREACHABLE;
             }
-
-            if (opCtx->recoveryUnit()->isTimestamped()) {
-                // Resharding oplog application does two kinds of writes:
-                //
-                // 1) The (obvious) write for applying oplog entries to documents being resharded.
-                // 2) An unreplicated no-op write that on a document in the output collection to
-                //    ensure serialization of concurrent transactions.
-                //
-                // Some of the code paths can end up where only the second kind of write is made. In
-                // that case, there is no timestamp associated with the write. This results in a
-                // mixed-mode update chain within WT that is problematic with durable history. We
-                // roll back those transactions by only committing the `WriteUnitOfWork` when there
-                // is a timestamp set.
-                wuow.commit();
-            }
-
             return Status::OK();
         } catch (const DBException& ex) {
-            if (ex.code() == ErrorCodes::WriteConflict || ex.code() == ErrorCodes::LockTimeout) {
-                throw WriteConflictException();
+            if (ex.code() == ErrorCodes::WriteConflict) {
+                throwWriteConflictException("Conflict when applying an oplog entry.");
+            }
+
+            if (ex.code() == ErrorCodes::LockTimeout) {
+                throwWriteConflictException("Timeout when applying an oplog entry.");
             }
 
             return ex.toStatus();
@@ -208,10 +169,65 @@ Status ReshardingOplogApplicationRules::applyOperation(OperationContext* opCtx,
     });
 }
 
+void ReshardingOplogApplicationRules::_applyInsertOrUpdate(OperationContext* opCtx,
+                                                           const repl::OplogEntry& op) const {
+
+    WriteUnitOfWork wuow(opCtx);
+
+    auto outputColl = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(
+            opCtx, _outputNss, AcquisitionPrerequisites::kWrite, getDeadline(opCtx)),
+        MODE_IX);
+    uassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << "Failed to apply op during resharding due to missing collection "
+                          << _outputNss.toStringForErrorMsg(),
+            outputColl.exists());
+    auto stashColl = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(
+            opCtx, _myStashNss, AcquisitionPrerequisites::kWrite, getDeadline(opCtx)),
+        MODE_IX);
+
+    uassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << "Failed to apply op during resharding due to missing collection "
+                          << _myStashNss.toStringForErrorMsg(),
+            stashColl.exists());
+
+    auto opType = op.getOpType();
+    switch (opType) {
+        case repl::OpTypeEnum::kInsert:
+            _applyInsert_inlock(opCtx, outputColl, stashColl, op);
+            _applierMetrics->onInsertApplied();
+            break;
+        case repl::OpTypeEnum::kUpdate:
+            _applyUpdate_inlock(opCtx, outputColl, stashColl, op);
+            _applierMetrics->onUpdateApplied();
+            break;
+        default:
+            MONGO_UNREACHABLE;
+    }
+
+    if (shard_role_details::getRecoveryUnit(opCtx)->isTimestamped()) {
+        // Resharding oplog application does two kinds of writes:
+        //
+        // 1) The (obvious) write for applying oplog entries to documents being resharded.
+        // 2) A find on document in the output collection transformed into an unreplicated no-op
+        // write on the same document to ensure serialization of concurrent oplog appliers reading
+        // on the same doc.
+        //
+        // Some of the code paths can end up where only the second kind of write is made. In
+        // that case, there is no timestamp associated with the write. This results in a
+        // mixed-mode update chain within WT that is problematic with durable history. We
+        // roll back those transactions by only committing the `WriteUnitOfWork` when there
+        // is a timestamp set.
+        wuow.commit();
+    }
+}
+
 void ReshardingOplogApplicationRules::_applyInsert_inlock(OperationContext* opCtx,
-                                                          Database* db,
-                                                          const CollectionPtr& outputColl,
-                                                          const CollectionPtr& stashColl,
+                                                          CollectionAcquisition& outputColl,
+                                                          CollectionAcquisition& stashColl,
                                                           const repl::OplogEntry& op) const {
     /**
      * The rules to apply ordinary insert operations are as follows:
@@ -229,7 +245,6 @@ void ReshardingOplogApplicationRules::_applyInsert_inlock(OperationContext* opCt
      * 4. If there exists a document with _id == [op _id] in the output collection and it is NOT
      * owned by this donor shard, insert the contents of 'op' into the conflict stash collection.
      */
-    _metrics->gotInsert();
 
     BSONObj oField = op.getObject();
 
@@ -245,17 +260,20 @@ void ReshardingOplogApplicationRules::_applyInsert_inlock(OperationContext* opCt
 
     // First, query the conflict stash collection using [op _id] as the query. If a doc exists,
     // apply rule #1 and run a replacement update on the stash collection.
-    auto stashCollDoc = _queryStashCollById(opCtx, db, stashColl, idQuery);
+    auto stashCollDoc = _queryStashCollById(opCtx, stashColl.getCollectionPtr(), idQuery);
     if (!stashCollDoc.isEmpty()) {
         auto request = UpdateRequest();
         request.setNamespaceString(_myStashNss);
         request.setQuery(idQuery);
-        request.setUpdateModification(updateMod);
+        request.setUpdateModification(std::move(updateMod));
         request.setUpsert(false);
         request.setFromOplogApplication(true);
+        request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
 
-        UpdateResult ur = update(opCtx, db, request);
+        UpdateResult ur = update(opCtx, stashColl, request);
         invariant(ur.numMatched != 0);
+
+        _applierMetrics->onWriteToStashCollections();
 
         return;
     }
@@ -263,11 +281,11 @@ void ReshardingOplogApplicationRules::_applyInsert_inlock(OperationContext* opCt
     // Query the output collection for a doc with _id == [op _id]. If a doc does not exist, apply
     // rule #2 and insert this doc into the output collection.
     BSONObj outputCollDoc;
-    auto foundDoc = Helpers::findByIdAndNoopUpdate(opCtx, outputColl, idQuery, outputCollDoc);
+    auto foundDoc = Helpers::findByIdAndNoopUpdate(
+        opCtx, outputColl.getCollectionPtr(), idQuery, outputCollDoc);
 
     if (!foundDoc) {
-        uassertStatusOK(outputColl->insertDocument(
-            opCtx, InsertStatement(oField), nullptr /* nullOpDebug*/, false /* fromMigrate */));
+        uassertStatusOK(Helpers::insert(opCtx, outputColl, oField));
 
         return;
     }
@@ -283,11 +301,12 @@ void ReshardingOplogApplicationRules::_applyInsert_inlock(OperationContext* opCt
         auto request = UpdateRequest();
         request.setNamespaceString(_outputNss);
         request.setQuery(idQuery);
-        request.setUpdateModification(updateMod);
+        request.setUpdateModification(std::move(updateMod));
         request.setUpsert(false);
         request.setFromOplogApplication(true);
+        request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
 
-        UpdateResult ur = update(opCtx, db, request);
+        UpdateResult ur = update(opCtx, outputColl, request);
         invariant(ur.numMatched != 0);
 
         return;
@@ -295,14 +314,14 @@ void ReshardingOplogApplicationRules::_applyInsert_inlock(OperationContext* opCt
 
     // The doc does not belong to '_donorShardId' under the original shard key, so apply rule #4
     // and insert the contents of 'op' to the stash collection.
-    uassertStatusOK(stashColl->insertDocument(
-        opCtx, InsertStatement(oField), nullptr /* nullOpDebug */, false /* fromMigrate */));
+    uassertStatusOK(Helpers::insert(opCtx, stashColl, oField));
+
+    _applierMetrics->onWriteToStashCollections();
 }
 
 void ReshardingOplogApplicationRules::_applyUpdate_inlock(OperationContext* opCtx,
-                                                          Database* db,
-                                                          const CollectionPtr& outputColl,
-                                                          const CollectionPtr& stashColl,
+                                                          CollectionAcquisition& outputColl,
+                                                          CollectionAcquisition& stashColl,
                                                           const repl::OplogEntry& op) const {
     /**
      * The rules to apply ordinary update operations are as follows:
@@ -318,12 +337,11 @@ void ReshardingOplogApplicationRules::_applyUpdate_inlock(OperationContext* opCt
      * 4. If there exists a document with _id == [op _id] in the output collection and it is owned
      * by this donor shard, update the document from this collection.
      */
-    _metrics->gotUpdate();
 
     BSONObj oField = op.getObject();
     BSONObj o2Field;
     if (op.getObject2())
-        o2Field = op.getObject2().get();
+        o2Field = op.getObject2().value();
 
     // If the 'o2' field does not have an _id, the oplog entry is corrupted.
     auto idField = o2Field["_id"];
@@ -338,7 +356,7 @@ void ReshardingOplogApplicationRules::_applyUpdate_inlock(OperationContext* opCt
 
     // First, query the conflict stash collection using [op _id] as the query. If a doc exists,
     // apply rule #1 and update the doc from the stash collection.
-    auto stashCollDoc = _queryStashCollById(opCtx, db, stashColl, idQuery);
+    auto stashCollDoc = _queryStashCollById(opCtx, stashColl.getCollectionPtr(), idQuery);
     if (!stashCollDoc.isEmpty()) {
         auto request = UpdateRequest();
         request.setNamespaceString(_myStashNss);
@@ -346,16 +364,20 @@ void ReshardingOplogApplicationRules::_applyUpdate_inlock(OperationContext* opCt
         request.setUpdateModification(std::move(updateMod));
         request.setUpsert(false);
         request.setFromOplogApplication(true);
-        UpdateResult ur = update(opCtx, db, request);
+        request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
+        UpdateResult ur = update(opCtx, stashColl, request);
 
         invariant(ur.numMatched != 0);
+
+        _applierMetrics->onWriteToStashCollections();
 
         return;
     }
 
     // Query the output collection for a doc with _id == [op _id].
     BSONObj outputCollDoc;
-    auto foundDoc = Helpers::findByIdAndNoopUpdate(opCtx, outputColl, idQuery, outputCollDoc);
+    auto foundDoc = Helpers::findByIdAndNoopUpdate(
+        opCtx, outputColl.getCollectionPtr(), idQuery, outputCollDoc);
 
     if (!foundDoc ||
         !_sourceChunkMgr.keyBelongsToShard(
@@ -377,16 +399,14 @@ void ReshardingOplogApplicationRules::_applyUpdate_inlock(OperationContext* opCt
     request.setUpdateModification(std::move(updateMod));
     request.setUpsert(false);
     request.setFromOplogApplication(true);
-    UpdateResult ur = update(opCtx, db, request);
+    request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
+    UpdateResult ur = update(opCtx, outputColl, request);
 
     invariant(ur.numMatched != 0);
 }
 
-void ReshardingOplogApplicationRules::_applyDelete_inlock(OperationContext* opCtx,
-                                                          Database* db,
-                                                          const CollectionPtr& outputColl,
-                                                          const CollectionPtr& stashColl,
-                                                          const repl::OplogEntry& op) const {
+void ReshardingOplogApplicationRules::_applyDelete(OperationContext* opCtx,
+                                                   const repl::OplogEntry& op) const {
     /**
      * The rules to apply ordinary delete operations are as follows:
      *
@@ -403,7 +423,6 @@ void ReshardingOplogApplicationRules::_applyDelete_inlock(OperationContext* opCt
      * _id == [op _id] arbitrarily from among all resharding conflict stash collections to delete
      * from that resharding conflict stash collection and insert into the output collection.
      */
-    _metrics->gotDelete();
 
     BSONObj oField = op.getObject();
 
@@ -417,34 +436,65 @@ void ReshardingOplogApplicationRules::_applyDelete_inlock(OperationContext* opCt
     BSONObj idQuery = idField.wrap();
     const NamespaceString outputNss = op.getNss();
 
-    // First, query the conflict stash collection using [op _id] as the query. If a doc exists,
-    // apply rule #1 and delete the doc from the stash collection.
-    auto stashCollDoc = _queryStashCollById(opCtx, db, stashColl, idQuery);
-    if (!stashCollDoc.isEmpty()) {
-        auto nDeleted = deleteObjects(opCtx, stashColl, _myStashNss, idQuery, true /* justOne */);
+    /*
+     * Capped collections are unsplittable collections which exist on a single shard, so stash
+     * collections are redundant for them since they can't have duplicate _id values.
+     * TODO (SERVER-90821): Use this for all unsplittable collections.
+     */
+    if (_isCapped) {
+        WriteUnitOfWork wuow(opCtx);
+        const auto outputCappedColl = acquireCollectionAndAssertExists(opCtx, _outputNss);
+
+        BSONObj outputCollDoc;
+        auto foundDoc = Helpers::findByIdAndNoopUpdate(
+            opCtx, outputCappedColl.getCollectionPtr(), idQuery, outputCollDoc);
+
+        if (!foundDoc) {
+            return;
+        }
+
+        // Delete from the output collection
+        invariant(!outputCollDoc.isEmpty());
+        auto nDeleted = deleteObjects(opCtx, outputCappedColl, idQuery, true /* justOne */);
         invariant(nDeleted != 0);
+        invariant(shard_role_details::getRecoveryUnit(opCtx)->isTimestamped());
+        wuow.commit();
+
         return;
+    }
+
+    {
+        // First, query the conflict stash collection using [op _id] as the query. If a doc exists,
+        // apply rule #1 and delete the doc from the stash collection.
+        WriteUnitOfWork wuow(opCtx);
+        const auto stashColl = acquireCollectionAndAssertExists(opCtx, _myStashNss);
+
+        auto stashCollDoc = _queryStashCollById(opCtx, stashColl.getCollectionPtr(), idQuery);
+        if (!stashCollDoc.isEmpty()) {
+            auto nDeleted = deleteObjects(opCtx, stashColl, idQuery, true /* justOne */);
+            invariant(nDeleted != 0);
+
+            _applierMetrics->onWriteToStashCollections();
+
+            invariant(shard_role_details::getRecoveryUnit(opCtx)->isTimestamped());
+            wuow.commit();
+
+            return;
+        }
     }
 
     // Now run 'findByIdAndNoopUpdate' to figure out which of rules #2, #3, and #4 we must apply.
     // We must run 'findByIdAndNoopUpdate' in the same storage transaction as the ops run in the
     // single replica set transaction that is executed if we apply rule #4, so we therefore must run
     // 'findByIdAndNoopUpdate' as a part of the single replica set transaction.
-    runWithTransaction(opCtx, _outputNss, [this, idQuery](OperationContext* opCtx) {
-        AutoGetCollection autoCollOutput(opCtx,
-                                         _outputNss,
-                                         MODE_IX,
-                                         AutoGetCollectionViewMode::kViewsForbidden,
-                                         getDeadline(opCtx));
-        uassert(ErrorCodes::NamespaceNotFound,
-                str::stream() << "Failed to apply op during resharding due to missing collection "
-                              << _outputNss.ns(),
-                autoCollOutput);
+    {
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+        const auto outputColl = acquireCollectionAndAssertExists(opCtx, _outputNss);
 
         // Query the output collection for a doc with _id == [op _id].
         BSONObj outputCollDoc;
-        auto foundDoc =
-            Helpers::findByIdAndNoopUpdate(opCtx, *autoCollOutput, idQuery, outputCollDoc);
+        auto foundDoc = Helpers::findByIdAndNoopUpdate(
+            opCtx, outputColl.getCollectionPtr(), idQuery, outputCollDoc);
 
         if (!foundDoc ||
             !_sourceChunkMgr.keyBelongsToShard(
@@ -461,17 +511,16 @@ void ReshardingOplogApplicationRules::_applyDelete_inlock(OperationContext* opCt
         // A doc with _id == [op _id] exists and is owned by '_donorShardId'. Apply rule #4 and
         // atomically:
         // 1. Delete the doc from '_outputNss'
-        // 2. Choose a document with _id == [op _id] arbitrarily from among all resharding conflict
-        // stash collections to delete from that resharding conflict stash collection
+        // 2. Choose a document with _id == [op _id] arbitrarily from among all resharding
+        // conflict stash collections to delete from that resharding conflict stash collection
         // 3. Insert the doc just deleted into the output collection
 
         // Delete from the output collection
-        auto nDeleted =
-            deleteObjects(opCtx, *autoCollOutput, _outputNss, idQuery, true /* justOne */);
+        auto nDeleted = deleteObjects(opCtx, outputColl, idQuery, true /* justOne */);
         invariant(nDeleted != 0);
 
-        // Attempt to delete a doc from one of the stash collections. Once we've matched a doc in
-        // one collection, we'll break.
+        // Attempt to delete a doc from one of the stash collections. Once we've matched a doc
+        // in one collection, we'll break.
         BSONObj doc;
         size_t i = 0;
         for (const auto& coll : _allStashNss) {
@@ -480,16 +529,20 @@ void ReshardingOplogApplicationRules::_applyDelete_inlock(OperationContext* opCt
                 continue;
             }
 
-            AutoGetCollection autoCollStash(opCtx,
-                                            coll,
-                                            MODE_IX,
-                                            AutoGetCollectionViewMode::kViewsForbidden,
-                                            getDeadline(opCtx));
+            const auto stashColl =
+                acquireCollection(opCtx,
+                                  CollectionAcquisitionRequest::fromOpCtx(
+                                      opCtx,
+                                      coll,
+                                      AcquisitionPrerequisites::OperationType::kWrite,
+                                      getDeadline(opCtx)),
+                                  MODE_IX);
+
             uassert(
                 ErrorCodes::NamespaceNotFound,
                 str::stream() << "Failed to apply op during resharding due to missing collection "
-                              << coll.ns(),
-                autoCollStash);
+                              << coll.toStringForErrorMsg(),
+                stashColl.exists());
 
             auto request = DeleteRequest{};
             request.setNsString(coll);
@@ -497,15 +550,18 @@ void ReshardingOplogApplicationRules::_applyDelete_inlock(OperationContext* opCt
             request.setMulti(false);
             request.setReturnDeleted(true);
 
-            ParsedDelete parsedDelete(opCtx, &request);
+            ParsedDelete parsedDelete(opCtx, &request, stashColl.getCollectionPtr());
             uassertStatusOK(parsedDelete.parseRequest());
 
             auto exec = uassertStatusOK(getExecutorDelete(&CurOp::get(opCtx)->debug(),
-                                                          &(*autoCollStash),
+                                                          stashColl,
                                                           &parsedDelete,
                                                           boost::none /* verbosity */));
             BSONObj res;
             auto state = exec->getNext(&res, nullptr);
+
+            _applierMetrics->onWriteToStashCollections();
+
             if (PlanExecutor::ADVANCED == state) {
                 // We matched a document and deleted it, so break.
                 doc = std::move(res);
@@ -519,23 +575,27 @@ void ReshardingOplogApplicationRules::_applyDelete_inlock(OperationContext* opCt
         // Insert the doc we just deleted from one of the stash collections into the output
         // collection.
         if (!doc.isEmpty()) {
-            uassertStatusOK(autoCollOutput->insertDocument(
-                opCtx, InsertStatement(doc), nullptr /* nullOpDebug */, false /* fromMigrate */));
+            uassertStatusOK(Helpers::insert(opCtx, outputColl, doc));
         }
-    });
+
+        // Because we called findByIdAndNoopUpdate in this wuow, we have to ensure that this wuow
+        // contains some replicated writes.
+        invariant(!BatchedWriteContext::get(opCtx).getBatchedOperations(opCtx)->isEmpty());
+        wuow.commit();
+    }
 }
 
 BSONObj ReshardingOplogApplicationRules::_queryStashCollById(OperationContext* opCtx,
-                                                             Database* db,
                                                              const CollectionPtr& coll,
                                                              const BSONObj& idQuery) const {
     const IndexCatalog* indexCatalog = coll->getIndexCatalog();
     uassert(4990100,
-            str::stream() << "Missing _id index for collection " << _myStashNss.ns(),
+            str::stream() << "Missing _id index for collection "
+                          << _myStashNss.toStringForErrorMsg(),
             indexCatalog->haveIdIndex(opCtx));
 
     BSONObj result;
-    Helpers::findById(opCtx, db, _myStashNss.ns(), idQuery, result);
+    Helpers::findById(opCtx, _myStashNss, idQuery, result);
     return result;
 }
 }  // namespace mongo

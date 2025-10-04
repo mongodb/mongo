@@ -8,7 +8,7 @@
           "a:27017",
           {
             "ok": 1,
-            "ismaster": true,
+            "isWritablePrimary": true,
             "hosts": [
               "a:27017",
               "b:27017",
@@ -57,7 +57,7 @@
           "d:27017",
           {
             "ok": 1,
-            "ismaster": false,
+            "isWritablePrimary": false,
             "isreplicaset": true,
             "setVersion": 1,
             "electionId": {
@@ -98,7 +98,7 @@
           "e:27017",
           {
             "ok": 1,
-            "ismaster": false,
+            "isWritablePrimary": false,
             "hosts": [
               "a:27017",
               "b:27017",
@@ -144,7 +144,7 @@
           "b:27017",
           {
             "ok": 1,
-            "ismaster": false,
+            "isWritablePrimary": false,
             "secondary": true,
             "hosts": [
               "a:27017",
@@ -192,7 +192,7 @@
           "c:27017",
           {
             "ok": 1,
-            "ismaster": false,
+            "isWritablePrimary": false,
             "setName": "rs",
             "hidden": true,
             "logicalSessionTimeoutMinutes": 1,
@@ -234,7 +234,7 @@
           "b:27017",
           {
             "ok": 1,
-            "ismaster": false,
+            "isWritablePrimary": false,
             "secondary": true,
             "hosts": [
               "a:27017",

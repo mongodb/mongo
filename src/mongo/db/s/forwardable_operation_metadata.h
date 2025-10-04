@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/forwardable_operation_metadata_gen.h"
 
@@ -38,18 +39,17 @@ namespace mongo {
  * Stores metadata of an operation context that needs to be forwarded to other nodes in the cluster.
  *
  * The metadata are captured from the original operation context through the constructor and can be
- * attached to a new operation context by mean of the `attachTo` member function.
+ * attached to a new operation context by mean of the `setOn` member function.
  *
  * example:
  * 		auto opMetadata = ForwardableOperationMetadata(opCtx);
- * 		setOn(newOpCtx);
+ * 		opMetadata.setOn(newOpCtx);
  */
 class ForwardableOperationMetadata : public ForwardableOperationMetadataBase {
 public:
     ForwardableOperationMetadata() = default;
     explicit ForwardableOperationMetadata(const BSONObj& obj);
     explicit ForwardableOperationMetadata(OperationContext* opCtx);
-
 
     void setOn(OperationContext* opCtx) const;
 };

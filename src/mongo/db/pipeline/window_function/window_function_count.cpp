@@ -28,7 +28,25 @@
  */
 
 #include "mongo/db/pipeline/window_function/window_function_count.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/pipeline/accumulator.h"
+#include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/window_function/window_bounds.h"
+#include "mongo/db/pipeline/window_function/window_function_expression.h"
 #include "mongo/db/pipeline/window_function/window_function_sum.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
+
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::window_function {
 
@@ -41,18 +59,14 @@ boost::intrusive_ptr<window_function::Expression> parseCountWindowFunction(
     for (const auto& arg : obj) {
         auto argName = arg.fieldNameStringData();
         if (argName == Expression::kWindowArg) {
-            uassert(ErrorCodes::FailedToParse,
-                    "'window' field must be an object",
-                    arg.type() == BSONType::Object);
-
-            bounds = WindowBounds::parse(arg.embeddedObject(), sortBy, expCtx);
+            bounds = WindowBounds::parse(arg, sortBy, expCtx);
         } else if (Expression::isFunction(argName)) {
             uassert(ErrorCodes::FailedToParse,
                     "Cannot specify multiple functions in window function spec",
                     !accumulatorName);
             uassert(ErrorCodes::FailedToParse,
                     "$count only accepts an empty object as input",
-                    arg.type() == BSONType::Object && arg.Obj().isEmpty());
+                    arg.type() == BSONType::object && arg.Obj().isEmpty());
 
             accumulatorName = argName;
         } else {

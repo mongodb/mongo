@@ -29,13 +29,24 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/hedging_mode_gen.h"
 #include "mongo/client/read_preference_gen.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/util/duration.h"
+
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 template <typename T>
@@ -46,12 +57,15 @@ using ReadPreference = ReadPreferenceEnum;
 /**
  * Validate a ReadPreference string. This is intended for use as an IDL validator callback.
  */
-Status validateReadPreferenceMode(const std::string& prefStr);
+Status validateReadPreferenceMode(const std::string& prefStr, const boost::optional<TenantId>&);
 
 /**
  * A simple object for representing the list of tags requested by a $readPreference.
  */
 class TagSet {
+private:
+    static const BSONArray kMatchAny;
+
 public:
     /**
      * Creates a TagSet that matches any nodes. This is the TagSet represented by the BSON
@@ -91,6 +105,21 @@ public:
         return !(*this == other);
     }
 
+    /**
+     * Primary only is defined as a empty BSON Array. See comments on primaryOnly().
+     */
+    bool isPrimaryOnly() const {
+        return _tags.isEmpty();
+    }
+
+    /**
+     * Match any node is defined as array with one element which is an empty BSON document. See
+     * comments on default constructor.
+     */
+    bool isMatchAnyNode() const {
+        return _tags.binaryEqual(kMatchAny);
+    }
+
 private:
     BSONArray _tags;
 };
@@ -101,7 +130,7 @@ struct ReadPreferenceSetting {
     /**
      * The minimal value maxStalenessSeconds can have.
      */
-    static const Seconds kMinimalMaxStalenessValue;
+    static constexpr Seconds kMinimalMaxStalenessValue = Seconds(90);
 
     /**
      * An object representing the metadata generated for a SecondaryPreferred read preference:
@@ -119,11 +148,14 @@ struct ReadPreferenceSetting {
     ReadPreferenceSetting(ReadPreference pref,
                           TagSet tags,
                           Seconds maxStalenessSeconds,
-                          boost::optional<HedgingMode> hedgingMode = boost::none);
+                          boost::optional<HedgingMode> hedgingMode = boost::none,
+                          bool isPretargeted = false);
     ReadPreferenceSetting(ReadPreference pref, Seconds maxStalenessSeconds);
     ReadPreferenceSetting(ReadPreference pref, TagSet tags);
     explicit ReadPreferenceSetting(ReadPreference pref);
-    ReadPreferenceSetting() : ReadPreferenceSetting(ReadPreference::PrimaryOnly) {}
+    ReadPreferenceSetting() : ReadPreferenceSetting(ReadPreference::PrimaryOnly) {
+        _usedDefaultReadPrefValue = true;
+    }
 
     inline bool equals(const ReadPreferenceSetting& other) const {
         auto hedgingModeEquals = [](const boost::optional<HedgingMode>& hedgingModeA,
@@ -137,7 +169,7 @@ struct ReadPreferenceSetting {
         return (pref == other.pref) && (tags == other.tags) &&
             (maxStalenessSeconds == other.maxStalenessSeconds) &&
             hedgingModeEquals(hedgingMode, other.hedgingMode) &&
-            (minClusterTime == other.minClusterTime);
+            (minClusterTime == other.minClusterTime) && (isPretargeted == other.isPretargeted);
     }
 
     /**
@@ -152,13 +184,18 @@ struct ReadPreferenceSetting {
     }
 
     /**
+     * Returns the IDL-struct representation of this object's inner BSON serialized form.
+     */
+    ReadPreferenceIdl toReadPreferenceIdl() const;
+
+    /**
      * Serializes this ReadPreferenceSetting as a containing BSON document. (The document containing
      * a $readPreference element)
      *
      * Will not add the $readPreference element if the read preference is PrimaryOnly.
      */
     void toContainingBSON(BSONObjBuilder* builder) const {
-        if (!canRunOnSecondary())
+        if (!canRunOnSecondary() && !isPretargeted)
             return;  // Write nothing since default is fine.
         BSONObjBuilder inner(builder->subobjStart("$readPreference"));
         toInnerBSON(&inner);
@@ -168,7 +205,9 @@ struct ReadPreferenceSetting {
         toContainingBSON(&bob);
         return bob.obj();
     }
-
+    bool usedDefaultReadPrefValue() const {
+        return _usedDefaultReadPrefValue;
+    }
     /**
      * Parses a ReadPreferenceSetting from a BSON document of the form:
      * { mode: <mode>, tags: <array of tags>, maxStalenessSeconds: Number, hedge: <hedgingMode>}.
@@ -180,6 +219,14 @@ struct ReadPreferenceSetting {
      */
     static StatusWith<ReadPreferenceSetting> fromInnerBSON(const BSONObj& readPrefSettingObj);
     static StatusWith<ReadPreferenceSetting> fromInnerBSON(const BSONElement& readPrefSettingObj);
+
+    /**
+     * Parse a ReadPreferenceSetting from an IDL-struct representation of a read preference's inner
+     * BSON document.
+     *
+     * This method validates the combination of fields specified on the provided IDL-struct.
+     */
+    static StatusWith<ReadPreferenceSetting> fromReadPreferenceIdl(const ReadPreferenceIdl& rp);
 
     /**
         Utilized by IDL types in order to get the unwrapped ReadPreferenceSetting object.
@@ -226,6 +273,14 @@ struct ReadPreferenceSetting {
      * Either way, it must be that a node opTime of X implies ClusterTime >= X.
      */
     Timestamp minClusterTime{};
+
+    // Set to true if this is a shardsvr mongod and the readPreference has been pre-targeted by
+    // the client connected to it. Used by the replica set endpoint in sharding to mark commands
+    // that it forces to go through the router as needing to target the local mongod.
+    bool isPretargeted = false;
+
+private:
+    bool _usedDefaultReadPrefValue = false;
 };
 
 }  // namespace mongo

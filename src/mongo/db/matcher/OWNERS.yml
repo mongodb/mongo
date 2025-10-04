@@ -1,0 +1,51 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/query-optimization
+  - "OWNERS.yml":
+    approvers:
+      - 10gen/query-execution-staff-leads
+      - 10gen/query-optimization-staff-leads
+      - 10gen/query-integration-staff-leads
+  - "expression_*geo*":
+    approvers:
+      - 10gen/query-integration-features
+  - "expression_text*":
+    approvers:
+      - 10gen/query-integration-search
+  # The JS engine is owned by QI.
+  - "expression_where*":
+    approvers:
+      - 10gen/query-integration-features
+  # 'ExtensionsCallbackReal' is tied to $text and $where parsing, and is therefore owned by QI.
+  - "extensions_callback*":
+    approvers:
+      - 10gen/query-integration-search
+  - "expression_internal_bucket_geo*":
+    approvers:
+      - 10gen/query-integration-features
+  - "match_expression_util*":
+    approvers:
+      - 10gen/query-execution
+  - "matchable*":
+    approvers:
+      - 10gen/query-execution
+  - "matcher.cpp":
+    approvers:
+      - 10gen/query-execution
+  - "matcher.h":
+    approvers:
+      - 10gen/query-execution
+  - "path_internal*":
+    approvers:
+      - 10gen/query-execution
+  - "path.cpp":
+    approvers:
+      - 10gen/query-execution
+  - "path.h":
+    approvers:
+      - 10gen/query-execution
+  - "path_test.cpp":
+    approvers:
+      - 10gen/query-execution

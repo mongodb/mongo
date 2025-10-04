@@ -1,0 +1,8 @@
+# This file is meant to add any feature flags needed for testing to
+# resmoke
+feature_flags:
+    featureFlagToaster:
+        description: "Create a feature flag"
+        cpp_varname: gFeatureFlagToaster
+        default: false
+        fcv_gated: true

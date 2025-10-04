@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
+#include "mongo/db/repl/last_vote.h"
 #include "mongo/db/repl/multiapplier.h"
 #include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/oplog_buffer.h"
@@ -41,10 +42,10 @@
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
-#include "mongo/util/time_support.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 namespace executor {
 class TaskExecutor;
@@ -65,7 +66,7 @@ using OpTimeWithTerm = OpTimeWith<long long>;
  * dependencies on large sections of the server code and thus break the unit testability of
  * InitialSyncer should be moved here.
  */
-class DataReplicatorExternalState {
+class MONGO_MOD_PUB DataReplicatorExternalState {
     DataReplicatorExternalState(const DataReplicatorExternalState&) = delete;
     DataReplicatorExternalState& operator=(const DataReplicatorExternalState&) = delete;
 
@@ -90,7 +91,7 @@ public:
      * Forwards the parsed metadata in the query results to the replication system.
      */
     virtual void processMetadata(const rpc::ReplSetMetadata& replMetadata,
-                                 rpc::OplogQueryMetadata oqMetadata) = 0;
+                                 const rpc::OplogQueryMetadata& oqMetadata) = 0;
 
     /**
      * Evaluates quality of sync source. Accepts the current sync source; the last optime on this
@@ -101,7 +102,14 @@ public:
                                                       const rpc::ReplSetMetadata& replMetadata,
                                                       const rpc::OplogQueryMetadata& oqMetadata,
                                                       const OpTime& previousOpTimeFetched,
-                                                      const OpTime& lastOpTimeFetched) = 0;
+                                                      const OpTime& lastOpTimeFetched) const = 0;
+
+    /**
+     * Evaluates quality of sync source. This is intended to be called on error when no
+     * current metadata is available.
+     */
+    virtual ChangeSyncSourceAction shouldStopFetchingOnError(
+        const HostAndPort& source, const OpTime& lastOpTimeFetched) const = 0;
 
     /**
      * This function creates an oplog buffer of the type specified at server startup.
@@ -118,7 +126,7 @@ public:
         ReplicationConsistencyMarkers* consistencyMarkers,
         StorageInterface* storageInterface,
         const OplogApplier::Options& options,
-        ThreadPool* writerPool) = 0;
+        ThreadPool* workerPool) = 0;
 
     /**
      * Returns the current in-memory replica set config if there is one, or an error why there
@@ -137,10 +145,16 @@ public:
     virtual Status storeLocalConfigDocument(OperationContext* opCtx, const BSONObj& config) = 0;
 
     /**
+     * Returns the current stored replica set "last vote" if there is one, or an error why there
+     * isn't.
+     */
+    virtual StatusWith<LastVote> loadLocalLastVoteDocument(OperationContext* opCtx) const = 0;
+
+    /**
      * Returns the replication journal listener.
      */
     virtual JournalListener* getReplicationJournalListener() = 0;
 };
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

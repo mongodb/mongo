@@ -29,29 +29,23 @@
 
 #pragma once
 
-#include <functional>
-
 #include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_interface.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/storage/remove_saver.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/modules.h"
+#include "mongo/util/time_support.h"
+
+#include <functional>
+#include <memory>
 
 namespace mongo {
 namespace repl {
 
-// It is necessary to have this forward declare for the mongo fail point
-// at this location because of the splitting of the rollback algorithms into
-// two separate files, rs_rollback and rs_rollback_no_uuid. However, after
-// MongoDB 3.8 is released, we no longer need to maintain rs_rollback_no_uuid
-// code and these forward declares can be removed. See SERVER-29766.
-extern FailPoint rollbackHangBeforeFinish;
-extern FailPoint rollbackHangThenFailAfterWritingMinValid;
-
-// This is needed by rs_rollback and rollback_impl.
+// This is needed by rollback_impl.
 extern FailPoint rollbackHangAfterTransitionToRollback;
 
 class RollBackLocalOperations {
@@ -109,7 +103,9 @@ public:
      * Returns ErrorCodes::NoSuchKey if common point has not been found and
      * additional operations have to be read from the remote oplog.
      */
-    StatusWith<RollbackCommonPoint> onRemoteOperation(const BSONObj& operation);
+    StatusWith<RollbackCommonPoint> onRemoteOperation(const BSONObj& operation,
+                                                      RemoveSaver& removeSaver,
+                                                      bool shouldCreateDataFiles);
 
 private:
     std::unique_ptr<OplogInterface::Iterator> _localOplogIterator;
@@ -130,7 +126,8 @@ private:
 StatusWith<RollBackLocalOperations::RollbackCommonPoint> syncRollBackLocalOperations(
     const OplogInterface& localOplog,
     const OplogInterface& remoteOplog,
-    const RollBackLocalOperations::RollbackOperationFn& rollbackOperation);
+    const RollBackLocalOperations::RollbackOperationFn& rollbackOperation,
+    bool shouldCreateDataFiles);
 
 }  // namespace repl
 }  // namespace mongo

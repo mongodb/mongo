@@ -29,12 +29,25 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <map>
-
+#include "mongo/base/status.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/s/transaction_coordinator.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
+
+#include <functional>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -129,7 +142,7 @@ private:
      * Blocks in an interruptible wait until the catalog is not marked as having a stepup in
      * progress.
      */
-    void _waitForStepUpToComplete(stdx::unique_lock<Latch>& lk, OperationContext* opCtx);
+    void _waitForStepUpToComplete(stdx::unique_lock<stdx::mutex>& lk, OperationContext* opCtx);
 
     /**
      * Removes the coordinator with the given session id and transaction number from the catalog, if
@@ -147,7 +160,7 @@ private:
     std::string _toString(WithLock wl) const;
 
     // Protects the state below.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("TransactionCoordinatorCatalog::_mutex");
+    mutable stdx::mutex _mutex;
 
     // Contains TransactionCoordinator objects by session id and transaction number. May contain
     // more than one coordinator per session. All coordinators for a session that do not correspond

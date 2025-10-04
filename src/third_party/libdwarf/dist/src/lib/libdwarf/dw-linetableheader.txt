@@ -1,0 +1,44 @@
+Copyright (C) 2021.  David Anderson.
+This simple file is hereby placed in the Public Domain.
+
+This file documents the arrangement of line table headers
+across all Standard versions of DWARF and some special
+experimental line tables.
+
+Line Table Header variations.
+The experimental version has a distinct version
+number of 0xf006 so cannot be confused with DWARF4 or 5.
+
+DWversion
+2,3,4,5 meaning the DWARF standards
+x meaning gcc's experimental two level line table.
+
+2345x  1. unit_length (4 or 12 bytes)
+2345x  2. version (2 bytes, for x is 0xF006)
+5      2.1  address_size
+5      2.2  segment_selector_size
+2345x  3. header_length (4 or 8 bytes)
+2345x  4. minimum_instruction_length (1 byte)
+45  x  5. maximum_operations_per_instruction (1 byte)
+2345x  6. default_is_stmt (1 byte)
+2345x  7. line_base (1 byte)
+2345x  8. line_range (1 byte)
+2345x  9. opcode_base (1 byte)
+2345x 10. standard_opcode_lengths (array of length opcode_base - 1)
+234 x 11. include directories (for x just one NUL byte(empty list))
+234 x 12. file_names (for x just one NUL byte(empty list))
+x     13. fake_extended_op (5 bytes: 00 FF FF 7F 7F)
+x     14. logicals_table_offset (4 or 8 bytes)
+x     15. actuals_table_offset (4 or 8 bytes)
+x5    16. directory_entry_format_count (1 byte)
+x5    17. directory_entry_format (sequence of unsigned LEB128 pairs)
+x5    18. directories_count (unsigned LEB128)
+x5    19. directories (sequence of directory entries)
+x5    20. file_name_entry_format_count (1 byte)
+x5    21. file_name_entry_format (sequence of unsigned LEB128 pairs)
+x5    22. file_names_count (unsigned LEB128)
+x5    23. file_names (sequence of directory entries)
+x     24. subprogram_entry_format_count (1 byte)
+x     25. subprogram_entry_format (sequence of unsigned LEB128 pairs)
+x     26. subprograms_count (unsigned LEB128)
+x     27. subprograms (sequence of directory entries)

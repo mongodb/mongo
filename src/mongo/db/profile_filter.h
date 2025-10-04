@@ -30,7 +30,11 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/util/modules.h"
+
+#include <memory>
 
 namespace mongo {
 
@@ -49,14 +53,16 @@ public:
         const CurOp& curop;
     };
 
-    virtual bool matches(OperationContext*, const OpDebug&, const CurOp&) const = 0;
-    virtual BSONObj serialize() const = 0;
     virtual ~ProfileFilter() = default;
 
-    static std::shared_ptr<ProfileFilter> getDefault();
+    virtual bool matches(OperationContext*, const OpDebug&, const CurOp&) const = 0;
+    virtual BSONObj serialize() const = 0;
 
-    // Not thread-safe: should only be called during initialization.
-    static void setDefault(std::shared_ptr<ProfileFilter>);
+    /**
+     * Returns true if the profile filter depends on the given top-level field name and false
+     * otherwise.
+     */
+    virtual bool dependsOn(StringData topLevelField) const = 0;
 };
 
 }  // namespace mongo

@@ -27,16 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/server_transaction_coordinators_metrics.h"
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/s/transaction_coordinator.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/decorable.h"
+
+#include <utility>
 
 namespace mongo {
 
-TransactionCoordinatorsSSS transactionCoordinatorsSSS;
+auto& transactionCoordinatorSSS =
+    *ServerStatusSectionBuilder<TransactionCoordinatorsSSS>("twoPhaseCommitCoordinator").forShard();
 
 namespace {
 const auto ServerTransactionCoordinatorsMetricsDecoration =
@@ -51,6 +54,12 @@ ServerTransactionCoordinatorsMetrics* ServerTransactionCoordinatorsMetrics::get(
 ServerTransactionCoordinatorsMetrics* ServerTransactionCoordinatorsMetrics::get(
     OperationContext* opCtx) {
     return get(opCtx->getServiceContext());
+}
+
+ServerTransactionCoordinatorsMetrics::ServerTransactionCoordinatorsMetrics() {
+    for (auto& totalInStep : _totalInStep) {
+        totalInStep.store(0);
+    }
 }
 
 std::int64_t ServerTransactionCoordinatorsMetrics::getTotalCreated() {
@@ -83,54 +92,17 @@ void ServerTransactionCoordinatorsMetrics::incrementTotalSuccessfulTwoPhaseCommi
     _totalSuccessfulTwoPhaseCommit.fetchAndAdd(1);
 }
 
-std::int64_t ServerTransactionCoordinatorsMetrics::getCurrentWritingParticipantList() {
-    return _totalWritingParticipantList.load();
+std::int64_t ServerTransactionCoordinatorsMetrics::getCurrentInStep(
+    TransactionCoordinator::Step step) {
+    return _totalInStep[static_cast<size_t>(step)].load();
 }
-void ServerTransactionCoordinatorsMetrics::incrementCurrentWritingParticipantList() {
-    _totalWritingParticipantList.fetchAndAdd(1);
+void ServerTransactionCoordinatorsMetrics::incrementCurrentInStep(
+    TransactionCoordinator::Step step) {
+    _totalInStep[static_cast<size_t>(step)].fetchAndAdd(1);
 }
-void ServerTransactionCoordinatorsMetrics::decrementCurrentWritingParticipantList() {
-    _totalWritingParticipantList.fetchAndSubtract(1);
-}
-
-std::int64_t ServerTransactionCoordinatorsMetrics::getCurrentWaitingForVotes() {
-    return _totalWaitingForVotes.load();
-}
-void ServerTransactionCoordinatorsMetrics::incrementCurrentWaitingForVotes() {
-    _totalWaitingForVotes.fetchAndAdd(1);
-}
-void ServerTransactionCoordinatorsMetrics::decrementCurrentWaitingForVotes() {
-    _totalWaitingForVotes.fetchAndSubtract(1);
-}
-
-std::int64_t ServerTransactionCoordinatorsMetrics::getCurrentWritingDecision() {
-    return _totalWritingDecision.load();
-}
-void ServerTransactionCoordinatorsMetrics::incrementCurrentWritingDecision() {
-    _totalWritingDecision.fetchAndAdd(1);
-}
-void ServerTransactionCoordinatorsMetrics::decrementCurrentWritingDecision() {
-    _totalWritingDecision.fetchAndSubtract(1);
-}
-
-std::int64_t ServerTransactionCoordinatorsMetrics::getCurrentWaitingForDecisionAcks() {
-    return _totalWaitingForDecisionAcks.load();
-}
-void ServerTransactionCoordinatorsMetrics::incrementCurrentWaitingForDecisionAcks() {
-    _totalWaitingForDecisionAcks.fetchAndAdd(1);
-}
-void ServerTransactionCoordinatorsMetrics::decrementCurrentWaitingForDecisionAcks() {
-    _totalWaitingForDecisionAcks.fetchAndSubtract(1);
-}
-
-std::int64_t ServerTransactionCoordinatorsMetrics::getCurrentDeletingCoordinatorDoc() {
-    return _totalDeletingCoordinatorDoc.load();
-}
-void ServerTransactionCoordinatorsMetrics::incrementCurrentDeletingCoordinatorDoc() {
-    _totalDeletingCoordinatorDoc.fetchAndAdd(1);
-}
-void ServerTransactionCoordinatorsMetrics::decrementCurrentDeletingCoordinatorDoc() {
-    _totalDeletingCoordinatorDoc.fetchAndSubtract(1);
+void ServerTransactionCoordinatorsMetrics::decrementCurrentInStep(
+    TransactionCoordinator::Step step) {
+    _totalInStep[static_cast<size_t>(step)].fetchAndSubtract(1);
 }
 
 void ServerTransactionCoordinatorsMetrics::updateStats(TransactionCoordinatorsStats* stats) {
@@ -140,11 +112,18 @@ void ServerTransactionCoordinatorsMetrics::updateStats(TransactionCoordinatorsSt
     stats->setTotalCommittedTwoPhaseCommit(_totalSuccessfulTwoPhaseCommit.load());
 
     CurrentInSteps currentInSteps;
-    currentInSteps.setWritingParticipantList(_totalWritingParticipantList.load());
-    currentInSteps.setWaitingForVotes(_totalWaitingForVotes.load());
-    currentInSteps.setWritingDecision(_totalWritingDecision.load());
-    currentInSteps.setWaitingForDecisionAcks(_totalWaitingForDecisionAcks.load());
-    currentInSteps.setDeletingCoordinatorDoc(_totalDeletingCoordinatorDoc.load());
+    currentInSteps.setWritingParticipantList(
+        getCurrentInStep(TransactionCoordinator::Step::kWritingParticipantList));
+    currentInSteps.setWaitingForVotes(
+        getCurrentInStep(TransactionCoordinator::Step::kWaitingForVotes));
+    currentInSteps.setWritingDecision(
+        getCurrentInStep(TransactionCoordinator::Step::kWritingDecision));
+    currentInSteps.setWaitingForDecisionAcks(
+        getCurrentInStep(TransactionCoordinator::Step::kWaitingForDecisionAcks));
+    currentInSteps.setWritingEndOfTransaction(
+        getCurrentInStep(TransactionCoordinator::Step::kWritingEndOfTransaction));
+    currentInSteps.setDeletingCoordinatorDoc(
+        getCurrentInStep(TransactionCoordinator::Step::kDeletingCoordinatorDoc));
     stats->setCurrentInSteps(currentInSteps);
 }
 

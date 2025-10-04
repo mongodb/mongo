@@ -29,11 +29,13 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #if defined(_MSC_VER)
 #include <intrin.h>
 #endif
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * Returns the number of leading 0-bits in num. Returns 64 if num is 0.
@@ -162,4 +164,4 @@ int countTrailingZerosNonZero32(unsigned int num) {
 #else
 #error "No bit-ops definitions for your platform"
 #endif
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

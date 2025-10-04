@@ -29,16 +29,28 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/oplog_buffer.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/interruptible.h"
+#include "mongo/util/modules.h"
+#include "mongo/util/time_support.h"
+
+#include <cstddef>
 #include <queue>
 #include <tuple>
 
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/oplog_buffer.h"
-#include "mongo/platform/mutex.h"
-#include "mongo/util/queue.h"
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
-namespace repl {
+namespace MONGO_MOD_OPEN repl {
 
 class StorageInterface;
 
@@ -102,17 +114,30 @@ public:
 
     void startup(OperationContext* opCtx) override;
     void shutdown(OperationContext* opCtx) override;
-    void push(OperationContext* opCtx,
-              Batch::const_iterator begin,
-              Batch::const_iterator end) override;
-    void waitForSpace(OperationContext* opCtx, std::size_t size) override;
+
+    // --- CAUTION: Push() and preload() are legal to be called only after startup() ---
+
+    MONGO_MOD_PRIVATE void push(OperationContext* opCtx,
+                                Batch::const_iterator begin,
+                                Batch::const_iterator end,
+                                boost::optional<const Cost&> cost = boost::none) override;
+    /**
+     * Like push(), but allows the operations in the batch to be out of order with
+     * respect to themselves and to the buffer. Legal to be called only before reading anything,
+     * or immediately after a clear().
+     */
+    MONGO_MOD_PRIVATE void preload(OperationContext* opCtx,
+                                   Batch::const_iterator begin,
+                                   Batch::const_iterator end);
+
+    void waitForSpace(OperationContext* opCtx, const Cost& cost) override;
     bool isEmpty() const override;
-    std::size_t getMaxSize() const override;
     std::size_t getSize() const override;
     std::size_t getCount() const override;
     void clear(OperationContext* opCtx) override;
     bool tryPop(OperationContext* opCtx, Value* value) override;
-    bool waitForData(Seconds waitDuration) override;
+    bool waitForDataFor(Milliseconds waitDuration, Interruptible* interruptible) override;
+    bool waitForDataUntil(Date_t deadline, Interruptible* interruptible) override;
     bool peek(OperationContext* opCtx, Value* value) override;
     boost::optional<Value> lastObjectPushed(OperationContext* opCtx) const override;
 
@@ -122,16 +147,6 @@ public:
     Status seekToTimestamp(OperationContext* opCtx,
                            const Timestamp& ts,
                            SeekStrategy exact = SeekStrategy::kExact) final;
-
-    // Only currently used by the TenantMigrationRecipientService, so not part of a parent API.
-    Timestamp getLastPushedTimestamp() const;
-
-    /**
-     * Like push(), but allows the operations in the batch to be out of order with
-     * respect to themselves and to the buffer. Legal to be called only before reading anything,
-     * or immediately after a clear().
-     */
-    void preload(OperationContext* opCtx, Batch::const_iterator begin, Batch::const_iterator end);
 
     // ---- Testing API ----
     Timestamp getLastPoppedTimestamp_forTest() const;
@@ -153,7 +168,7 @@ private:
      * Returns the oldest oplog entry in the buffer.
      * Assumes the buffer is not empty.
      */
-    BSONObj _peek_inlock(OperationContext* opCtx, PeekMode peekMode);
+    BSONObj _peek(WithLock lk, OperationContext* opCtx, PeekMode peekMode);
 
     // Storage interface used to perform storage engine level functions on the collection.
     StorageInterface* _storageInterface;
@@ -161,7 +176,7 @@ private:
     /**
      * Pops an entry off the buffer in a lock.
      */
-    bool _pop_inlock(OperationContext* opCtx, Value* value);
+    bool _pop(WithLock lk, OperationContext* opCtx, Value* value);
 
     /**
      * Puts documents in collection without checking for order and without updating
@@ -175,7 +190,7 @@ private:
      * Returns the last document pushed onto the collection. This does not remove the `_id` field
      * of the document. If the collection is empty, this returns boost::none.
      */
-    boost::optional<Value> _lastDocumentPushed_inlock(OperationContext* opCtx) const;
+    boost::optional<Value> _lastDocumentPushed(WithLock lk, OperationContext* opCtx) const;
 
     /**
      * Updates '_lastPushedTimestamp' based on the last document in the collection.
@@ -203,7 +218,7 @@ private:
     stdx::condition_variable _cvNoLongerEmpty;
 
     // Protects member data below and synchronizes it with the underlying collection.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("OplogBufferCollection::_mutex");
+    mutable stdx::mutex _mutex;
 
     // Number of documents in buffer.
     std::size_t _count = 0;
@@ -215,7 +230,7 @@ private:
 
     BSONObj _lastPoppedKey;
 
-    // Used by _peek_inlock() to hold results of the read ahead query that will be used for pop/peek
+    // Used by _peek() to hold results of the read ahead query that will be used for pop/peek
     // results.
     std::queue<BSONObj> _peekCache;
 
@@ -224,5 +239,5 @@ private:
     bool _sizeIsValid = true;
 };
 
-}  // namespace repl
+}  // namespace MONGO_MOD_OPEN repl
 }  // namespace mongo

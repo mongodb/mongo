@@ -41,6 +41,7 @@
 .file "make_arm_aapcs_elf_gas.S"
 .text
 .globl make_fcontext
+.hidden make_fcontext
 .align 2
 .type make_fcontext,%function
 .syntax unified

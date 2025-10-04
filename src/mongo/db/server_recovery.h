@@ -29,11 +29,13 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/db/service_context.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/util/string_map.h"
+
 #include <set>
 #include <string>
-
-#include "mongo/db/service_context.h"
-#include "mongo/platform/mutex.h"
 
 namespace mongo {
 /**
@@ -60,18 +62,18 @@ public:
      *
      * If the system is not currently undergoing replication recovery, always returns true.
      */
-    bool collectionNeedsSizeAdjustment(const std::string& ident) const;
+    bool collectionNeedsSizeAdjustment(StringData ident) const;
 
     /**
      * Returns whether 'ident' has been specifically marked as requiring adjustment even during
      * recovery.
      */
-    bool collectionAlwaysNeedsSizeAdjustment(const std::string& ident) const;
+    bool collectionAlwaysNeedsSizeAdjustment(StringData ident) const;
 
     /**
      * Mark 'ident' as always requiring size adjustment, even if replication recovery is ongoing.
      */
-    void markCollectionAsAlwaysNeedsSizeAdjustment(const std::string& ident);
+    void markCollectionAsAlwaysNeedsSizeAdjustment(StringData ident);
 
     /**
      * Clears all internal state. This method should be called before calling 'recover to a stable
@@ -79,9 +81,22 @@ public:
      */
     void clearStateBeforeRecovery();
 
+    /**
+     * Informs the SizeRecoveryState that record stores should always check their size information.
+     */
+    void setRecordStoresShouldAlwaysCheckSize(bool);
+
+    /**
+     * Returns whether record stores should always check their size information. This can either be
+     * due to setRecordStoresShouldAlwaysCheckSize being called or due to being in replication
+     * recovery.
+     */
+    bool shouldRecordStoresAlwaysCheckSize() const;
+
 private:
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("SizeRecoveryState::_mutex");
+    mutable stdx::mutex _mutex;
     StringSet _collectionsAlwaysNeedingSizeAdjustment;
+    bool _recordStoresShouldAlwayCheckSize = false;
 };
 
 /**
@@ -90,8 +105,32 @@ private:
 SizeRecoveryState& sizeRecoveryState(ServiceContext* serviceCtx);
 
 /**
- * Returns a mutable reference to a boolean decoration on 'serviceCtx', which indicates whether or
- * not the server is currently undergoing replication recovery.
+ * The "in replication recovery" flag. Provided by a thread-safe decorator on ServiceContext, this
+ * class provides an RAII utility around setting the flag value and allowing it to be checked by
+ * readers. Note that this flag is advisory-only: writers will not check for readers and no further
+ * synchronization is performed.
  */
-bool& inReplicationRecovery(ServiceContext* serviceCtx);
+class InReplicationRecovery final {
+    InReplicationRecovery(const InReplicationRecovery&) = delete;
+    InReplicationRecovery(InReplicationRecovery&&) = delete;
+    InReplicationRecovery& operator=(const InReplicationRecovery&) = delete;
+    InReplicationRecovery& operator=(InReplicationRecovery&&) = delete;
+
+    ServiceContext* _serviceContext{nullptr};
+
+public:
+    /**
+     * Constructing this class increments the `inReplicationRecovery` flag on
+     * the provided ServiceContext. The flag will be decremented upon
+     * destruction.
+     */
+    explicit InReplicationRecovery(ServiceContext*);
+    ~InReplicationRecovery();
+
+    /**
+     * Checks whether the flag is non-zero, indicating at least 1 context has
+     * declared that replication recovery is happening.
+     */
+    static bool isSet(ServiceContext*);
+};
 }  // namespace mongo

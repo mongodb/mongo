@@ -1,102 +1,97 @@
+import {getPython3Binary} from "jstests/libs/python.js";
+import {SelinuxBaseTest} from "jstests/selinux/lib/selinux_base_test.js";
 
-'use strict';
+// Helper function to find all .js files recursively in a directory
+function findAllTests(dir, tests) {
+    const entries = ls(dir).sort();
 
-load('jstests/selinux/lib/selinux_base_test.js');
-
-class TestDefinition extends SelinuxBaseTest {
-    get config() {
-        return {
-            "systemLog":
-                {"destination": "file", "logAppend": true, "path": "/var/log/mongodb/mongod.log"},
-            "storage": {"dbPath": "/var/lib/mongo", "journal": {"enabled": true}},
-            "processManagement": {
-                "fork": true,
-                "pidFilePath": "/var/run/mongodb/mongod.pid",
-                "timeZoneInfo": "/usr/share/zoneinfo"
-            },
-            "net": {"port": 27017, "bindIp": "127.0.0.1"}
-        };
+    for (let entry of entries) {
+        if (
+            entry === "jstests/core/txns/" ||
+            entry === "jstests/core/query/queryable_encryption/" ||
+            entry === "jstests/core/query/query_settings/"
+        ) {
+            // Skip exclude_files in buildscripts/resmokeconfig/suites/core.yml
+            continue;
+        }
+        if (entry.endsWith("/")) {
+            // Recursively gather tests in subdirectories
+            findAllTests(entry, tests);
+        } else if (entry.endsWith(".js")) {
+            // Add .js files to the list of tests
+            tests.push(entry);
+        }
     }
+}
 
-    run() {
-        let dirs = ["jstests/core", "jstests/core_standalone"];
+export class TestDefinition extends SelinuxBaseTest {
+    async run() {
+        const python = getPython3Binary();
 
-        // Tests in jstests/core weren't specifically made to pass in this very scenario, so we
-        // will not be fixing what is not working, and instead exclude them from running as
-        // "known" to not work
-        const exclude = new Set([
-            "jstests/core/api_version_parameters.js",
-            "jstests/core/api_version_test_expression.js",
-            "jstests/core/basic6.js",
-            "jstests/core/capped_empty.js",
-            "jstests/core/capped_update.js",
-            "jstests/core/check_shard_index.js",
-            "jstests/core/collection_truncate.js",
-            "jstests/core/commands_namespace_parsing.js",
-            "jstests/core/comment_field.js",
-            "jstests/core/compound_index_max_fields.js",
-            "jstests/core/crud_ops_do_not_throw_locktimeout.js",
-            "jstests/core/currentop_cursors.js",
-            "jstests/core/currentop_shell.js",
-            "jstests/core/currentop_waiting_for_latch.js",
-            "jstests/core/datasize2.js",
-            "jstests/core/doc_validation_options.js",
-            "jstests/core/double_decimal_compare.js",
-            "jstests/core/drop_collection.js",
-            "jstests/core/explain_uuid.js",
-            "jstests/core/failcommand_failpoint.js",
-            "jstests/core/geo_near_point_query.js",
-            "jstests/core/getlog2.js",
-            "jstests/core/hash.js",
-            "jstests/core/indexj.js",
-            "jstests/core/jssymbol.js",
-            "jstests/core/latch_analyzer.js",
-            "jstests/core/list_all_sessions.js",
-            "jstests/core/list_sessions.js",
-            "jstests/core/logprocessdetails.js",
-            "jstests/core/mr_killop.js",
-            "jstests/core/profile_hide_index.js",
-            "jstests/core/rename_collection_capped.js",
-            "jstests/core/resume_query.js",
-            "jstests/core/splitvector.js",
-            "jstests/core/sort_with_update_between_getmores.js",
-            "jstests/core/stages_and_hash.js",
-            "jstests/core/stages_and_sorted.js",
-            "jstests/core/stages_collection_scan.js",
-            "jstests/core/stages_delete.js",
-            "jstests/core/stages_fetch.js",
-            "jstests/core/stages_ixscan.js",
-            "jstests/core/stages_limit_skip.js",
-            "jstests/core/stages_mergesort.js",
-            "jstests/core/stages_or.js",
-            "jstests/core/type8.js",
-            "jstests/core/validate_db_metadata_command.js",
-            "jstests/core/version_api_list_commands_verification.js",
-            "jstests/core/wildcard_index_distinct_scan.js",
-            "jstests/core/wildcard_index_projection.js"
-        ]);
+        const dirs = ["jstests/core", "jstests/core_standalone"];
 
-        for (let id = 0; id < dirs.length; ++id) {
-            const dir = dirs[id];
+        const TestData = {isHintsToQuerySettingsSuite: false};
+
+        for (let dir of dirs) {
             jsTest.log("Running tests in " + dir);
 
-            const all_tests = ls(dir).filter(d => !d.endsWith("/") && !exclude.has(d)).sort();
+            let all_tests = [];
+            findAllTests(dir, all_tests);
             assert(all_tests);
             assert(all_tests.length);
 
-            for (let i = 0; i < all_tests.length; ++i) {
-                let t = all_tests[i];
-                if (t.endsWith("/")) {
+            for (let t of all_tests) {
+                // Tests in jstests/core weren't specifically made to pass in this very scenario, so
+                // we will not be fixing what is not working, and instead exclude them from running
+                // as "known" to not work. This is done by the means of "no_selinux" tag
+                const HAS_TAG = 0;
+                const NO_TAG = 1;
+                let checkTagRc = runNonMongoProgram(
+                    python,
+                    "buildscripts/resmokelib/utils/check_has_tag.py",
+                    t,
+                    "^no_selinux$",
+                );
+                if (HAS_TAG == checkTagRc) {
+                    jsTest.log("Skipping test due to no_selinux tag: " + t);
                     continue;
                 }
-                jsTest.log("Running test: " + t);
-                if (!load(t)) {
-                    throw ("failed to load test " + t);
+                if (NO_TAG != checkTagRc) {
+                    throw "Failure occurred while checking tags of test: " + t;
                 }
+
+                // Tests relying on featureFlagXXX will not work
+                checkTagRc = runNonMongoProgram(
+                    python,
+                    "buildscripts/resmokelib/utils/check_has_tag.py",
+                    t,
+                    "^featureFlag.+$",
+                );
+                if (HAS_TAG == checkTagRc) {
+                    jsTest.log("Skipping test due to feature flag tag: " + t);
+                    continue;
+                }
+                if (NO_TAG != checkTagRc) {
+                    throw "Failure occurred while checking tags of test: " + t;
+                }
+
+                TestData.testName = t.substring(t.lastIndexOf("/") + 1, t.length - ".js".length);
+
+                jsTest.log("Running test: " + t);
+                try {
+                    let evalString = `TestData = ${tojson(TestData)}; load(${tojson(t)});`;
+                    let handle = startParallelShell(evalString, db.getMongo().port);
+                    let rc = handle();
+                    assert.eq(rc, 0);
+                } catch (e) {
+                    print(tojson(e));
+                    throw "failed to load test " + t;
+                }
+
                 jsTest.log("Successful test: " + t);
             }
         }
 
-        jsTest.log("code test suite ran successfully");
+        jsTest.log("core test suite ran successfully");
     }
 }

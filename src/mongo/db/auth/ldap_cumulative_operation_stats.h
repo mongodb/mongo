@@ -29,14 +29,15 @@
 
 #pragma once
 
-#include <cstdint>
-#include <memory>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/tick_source.h"
+
+#include <cstdint>
+#include <memory>
 
 namespace mongo {
 
@@ -70,9 +71,8 @@ public:
 
     /**
      * Record stats for an LDAP operation.
-     * Parameter "isUnbind" is true when we record disconnection, false otherwise
      */
-    void recordOpStats(const LDAPOperationStats& stats, bool isUnbind);
+    void recordOpStats(const LDAPOperationStats& stats);
 
     /**
      * Gets pointer to a global instance or nullptr if not initialized.
@@ -81,7 +81,7 @@ public:
 
 private:
     /**
-     * Struct Stats is used to contain information about the bind, search, and unbind stats
+     * Struct Stats is used to contain information about the bind and search stats
      * of the LDAP Operations.
      */
     struct Stats {
@@ -90,21 +90,24 @@ private:
     };
 
     /**
-     * Number of referrals to other LDAP servers
+     * Number of successful referrals to other LDAP servers
      */
-    int64_t _numReferrals{0};
+    int64_t _numSuccessfulReferrals{0};
 
     /**
-     * Metrics associated with binding, search/query, and unbinding from an LDAP server.
+     * Number of failed referrals to other LDAP servers
+     */
+    int64_t _numFailedReferrals{0};
+
+    /**
+     * Metrics associated with binding or search/query against an LDAP server.
      */
     Stats _bindStats;
     Stats _searchStats;
-    Stats _unbindStats;
 
     /**
      * Protects access to member variables.
      */
-    mutable Mutex _memberAccessMutex =
-        MONGO_MAKE_LATCH("LDAPCumulativeOperationStats::_memberAccessMutex");
+    mutable stdx::mutex _memberAccessMutex;
 };
 }  // namespace mongo

@@ -27,13 +27,15 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTransaction
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/s/transaction_coordinator_structures.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTransaction
+
 
 namespace mongo {
 namespace txn {
@@ -72,15 +74,6 @@ StringData toString(PrepareVote prepareVote) {
             return "kAbort"_sd;
     };
     MONGO_UNREACHABLE;
-}
-
-Status readStatusProperty(const BSONElement& statusBSON) {
-    return Status(ErrorCodes::Error(statusBSON["code"].Int()), statusBSON["errmsg"].String());
-}
-
-void writeStatusProperty(const Status& status, StringData fieldName, BSONObjBuilder* builder) {
-    BSONObjBuilder statusBuilder(builder->subobjStart(fieldName));
-    status.serializeErrorToBSON(&statusBuilder);
 }
 
 }  // namespace txn

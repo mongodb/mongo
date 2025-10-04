@@ -8,13 +8,23 @@
 
 #include "util.h"
 
+/*
+ * usage --
+ *     Display a usage message for the truncate command.
+ */
 static int
 usage(void)
 {
-    util_usage("truncate uri", NULL, NULL);
+    static const char *options[] = {"-?", "show this message", NULL, NULL};
+
+    util_usage("truncate uri", "options:", options);
     return (1);
 }
 
+/*
+ * util_truncate --
+ *     The truncate command.
+ */
 int
 util_truncate(WT_SESSION *session, int argc, char *argv[])
 {
@@ -23,9 +33,11 @@ util_truncate(WT_SESSION *session, int argc, char *argv[])
     char *uri;
 
     uri = NULL;
-    while ((ch = __wt_getopt(progname, argc, argv, "")) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "?")) != EOF)
         switch (ch) {
         case '?':
+            usage();
+            return (0);
         default:
             return (usage());
         }
@@ -42,6 +54,6 @@ util_truncate(WT_SESSION *session, int argc, char *argv[])
     if ((ret = session->truncate(session, uri, NULL, NULL, NULL)) != 0)
         (void)util_err(session, ret, "session.truncate: %s", uri);
 
-    free(uri);
+    util_free(uri);
     return (ret);
 }

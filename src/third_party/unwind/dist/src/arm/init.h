@@ -45,7 +45,24 @@ common_init (struct cursor *c, unsigned use_prev_instr)
   c->dwarf.loc[UNW_ARM_R13] = DWARF_REG_LOC (&c->dwarf, UNW_ARM_R13);
   c->dwarf.loc[UNW_ARM_R14] = DWARF_REG_LOC (&c->dwarf, UNW_ARM_R14);
   c->dwarf.loc[UNW_ARM_R15] = DWARF_REG_LOC (&c->dwarf, UNW_ARM_R15);
-  for (i = UNW_ARM_R15 + 1; i < DWARF_NUM_PRESERVED_REGS; ++i)
+  c->dwarf.loc[UNW_ARM_S0] = DWARF_REG_LOC (&c->dwarf, UNW_ARM_S0);
+  c->dwarf.loc[UNW_ARM_S1] = DWARF_REG_LOC (&c->dwarf, UNW_ARM_S1);
+  c->dwarf.loc[UNW_ARM_S2] = DWARF_REG_LOC (&c->dwarf, UNW_ARM_S2);
+  c->dwarf.loc[UNW_ARM_S3] = DWARF_REG_LOC (&c->dwarf, UNW_ARM_S3);
+  c->dwarf.loc[UNW_ARM_S4] = DWARF_REG_LOC (&c->dwarf, UNW_ARM_S4);
+  c->dwarf.loc[UNW_ARM_S5] = DWARF_REG_LOC (&c->dwarf, UNW_ARM_S5);
+  c->dwarf.loc[UNW_ARM_S6] = DWARF_REG_LOC (&c->dwarf, UNW_ARM_S6);
+  c->dwarf.loc[UNW_ARM_S7] = DWARF_REG_LOC (&c->dwarf, UNW_ARM_S7);
+  c->dwarf.loc[UNW_ARM_S8] = DWARF_REG_LOC (&c->dwarf, UNW_ARM_S8);
+  c->dwarf.loc[UNW_ARM_S9] = DWARF_REG_LOC (&c->dwarf, UNW_ARM_S9);
+  c->dwarf.loc[UNW_ARM_S10] = DWARF_REG_LOC (&c->dwarf, UNW_ARM_S10);
+  c->dwarf.loc[UNW_ARM_S11] = DWARF_REG_LOC (&c->dwarf, UNW_ARM_S11);
+  c->dwarf.loc[UNW_ARM_S12] = DWARF_REG_LOC (&c->dwarf, UNW_ARM_S12);
+  c->dwarf.loc[UNW_ARM_S13] = DWARF_REG_LOC (&c->dwarf, UNW_ARM_S13);
+  c->dwarf.loc[UNW_ARM_S14] = DWARF_REG_LOC (&c->dwarf, UNW_ARM_S14);
+  c->dwarf.loc[UNW_ARM_S15] = DWARF_REG_LOC (&c->dwarf, UNW_ARM_S15);
+
+  for (i = UNW_ARM_S15 + 1; i < DWARF_NUM_PRESERVED_REGS; ++i)
     c->dwarf.loc[i] = DWARF_NULL_LOC;
 
   ret = dwarf_get (&c->dwarf, c->dwarf.loc[UNW_ARM_R15], &c->dwarf.ip);

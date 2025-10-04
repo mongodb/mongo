@@ -27,16 +27,25 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/base/init.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/client.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/ftdc/controller.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/ftdc/ftdc_commands_gen.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+
+#include <string>
 
 namespace mongo {
 namespace {
@@ -66,22 +75,19 @@ public:
         return false;
     }
 
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) const override {
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const DatabaseName& dbName,
+                                 const BSONObj& cmdObj) const override {
+        auto* client = opCtx->getClient();
 
         if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                ResourcePattern::forClusterResource(), ActionType::serverStatus)) {
+                ResourcePattern::forClusterResource(dbName.tenantId()),
+                {ActionType::serverStatus, ActionType::replSetGetStatus})) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
 
         if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                ResourcePattern::forClusterResource(), ActionType::replSetGetStatus)) {
-            return Status(ErrorCodes::Unauthorized, "Unauthorized");
-        }
-
-        if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                ResourcePattern::forExactNamespace(NamespaceString("local", "oplog.rs")),
+                ResourcePattern::forExactNamespace(NamespaceString::kRsOplogNamespace),
                 ActionType::collStats)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
@@ -90,7 +96,7 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const std::string& db,
+             const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
 
@@ -101,12 +107,57 @@ public:
         return true;
     }
 };
+MONGO_REGISTER_COMMAND(GetDiagnosticDataCommand).forShard();
 
-Command* ftdcCommand;
+/**
+ * Triggers a rotate of the FTDC file
+ */
+class TriggerRotateFTDCCmd : public TypedCommand<TriggerRotateFTDCCmd> {
+public:
+    using Request = TriggerRotateFTDC;
 
-MONGO_INITIALIZER(CreateDiagnosticDataCommand)(InitializerContext* context) {
-    ftdcCommand = new GetDiagnosticDataCommand();
-}
+    class Invocation : public InvocationBase {
+    public:
+        using InvocationBase::InvocationBase;
+
+        void typedRun(OperationContext* opCtx) {
+            FTDCController::get(opCtx->getServiceContext())->triggerRotate();
+        }
+
+    private:
+        void doCheckAuthorization(OperationContext* opCtx) const override {
+            auto* client = opCtx->getClient();
+
+            auto checkAuth = [&](auto&& resource, auto&&... actions) {
+                auto ok = AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
+                    resource, {actions...});
+                uassert(ErrorCodes::Unauthorized, "Unauthorized", ok);
+            };
+            checkAuth(ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                      ActionType::serverStatus,
+                      ActionType::replSetGetStatus);
+            checkAuth(ResourcePattern::forExactNamespace(NamespaceString::kRsOplogNamespace),
+                      ActionType::collStats);
+        }
+
+        bool supportsWriteConcern() const override {
+            return false;
+        }
+
+        NamespaceString ns() const override {
+            return NamespaceString(request().getDbName());
+        }
+    };
+
+    bool adminOnly() const override {
+        return true;
+    }
+
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return AllowedOnSecondary::kAlways;
+    }
+};
+MONGO_REGISTER_COMMAND(TriggerRotateFTDCCmd).forRouter().forShard();
 
 }  // namespace
 

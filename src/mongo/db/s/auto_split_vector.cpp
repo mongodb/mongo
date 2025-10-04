@@ -27,34 +27,56 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/auto_split_vector.h"
 
-#include "mongo/base/status_with.h"
-#include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog_raii.h"
+#include "mongo/bson/dotted_path/dotted_path_support.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/global_catalog/ddl/shard_key_index_util.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/db/local_catalog/catalog_raii.h"
+#include "mongo/db/local_catalog/collection.h"
+#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/str.h"
+#include "mongo/util/timer.h"
+
+#include <cstddef>
+#include <memory>
+#include <set>
+#include <string>
+#include <tuple>
+
+#include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
 namespace {
 
-constexpr int estimatedAdditionalBytesPerItemInBSONArray{2};
+/*
+ * BSON arrays are serialized as BSON objects with the index of each element as a string key: for
+ * example, the array ["a","b","c"] is going to be serialized as {"0":"a","1":"b","2":"c"}. The
+ * minimum size for a BSON object is `BSONObj::kMinBSONLength`.
+ *
+ * Given that the `vector<BSONObj>` returned by `autoSplitVector` can't be greater than 16MB when
+ * serialized, pessimistically assume that each key occupies the highest possible number of bytes.
+ */
+const int estimatedAdditionalBytesPerItemInBSONArray{
+    (int)std::to_string(BSONObjMaxUserSize / BSONObj::kMinBSONLength).length()};
 
 constexpr int kMaxSplitPointsToReposition{3};
 
 BSONObj prettyKey(const BSONObj& keyPattern, const BSONObj& key) {
-    return key.replaceFieldNames(keyPattern).clientReadable();
+    return BSONObjBuilder().appendElementsRenamed(key, keyPattern).obj().clientReadable();
 }
 
 /*
@@ -62,10 +84,10 @@ BSONObj prettyKey(const BSONObj& keyPattern, const BSONObj& key) {
  * object extended to cover the entire shardKey. See KeyPattern::extendRangeBound documentation for
  * some examples.
  */
-const std::tuple<BSONObj, BSONObj> getMinMaxExtendedBounds(const IndexDescriptor* shardKeyIdx,
-                                                           const BSONObj& min,
-                                                           const BSONObj& max) {
-    KeyPattern kp(shardKeyIdx->keyPattern());
+std::tuple<BSONObj, BSONObj> getMinMaxExtendedBounds(const ShardKeyIndex& shardKeyIdx,
+                                                     const BSONObj& min,
+                                                     const BSONObj& max) {
+    KeyPattern kp(shardKeyIdx.keyPattern());
 
     // Extend min to get (min, MinKey, MinKey, ....)
     BSONObj minKey = Helpers::toKeyFormat(kp.extendRangeBound(min, false /* upperInclusive */));
@@ -82,65 +104,31 @@ const std::tuple<BSONObj, BSONObj> getMinMaxExtendedBounds(const IndexDescriptor
 }
 
 /*
- * Returns true if the final key in the range is the same as the first key, false otherwise.
- */
-bool maxKeyEqualToMinKey(OperationContext* opCtx,
-                         const CollectionPtr* collection,
-                         const IndexDescriptor* shardKeyIdx,
-                         const BSONObj& minBound,
-                         const BSONObj& maxBound,
-                         const BSONObj& minKeyInChunk) {
-    BSONObj maxKeyInChunk;
-    {
-        auto backwardIdxScanner =
-            InternalPlanner::indexScan(opCtx,
-                                       collection,
-                                       shardKeyIdx,
-                                       maxBound,
-                                       minBound,
-                                       BoundInclusion::kIncludeEndKeyOnly,
-                                       PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                       InternalPlanner::BACKWARD);
-
-        PlanExecutor::ExecState state = backwardIdxScanner->getNext(&maxKeyInChunk, nullptr);
-        uassert(ErrorCodes::OperationFailed,
-                "can't open a cursor to find final key in range (desired range is possibly empty)",
-                state == PlanExecutor::ADVANCED);
-    }
-
-    if (minKeyInChunk.woCompare(maxKeyInChunk) == 0) {
-        // Range contains only documents with a single key value.  So we cannot possibly find a
-        // split point, and there is no need to scan any further.
-        LOGV2_WARNING(
-            5865001,
-            "Possible low cardinality key detected in range. Range contains only a single key.",
-            "namespace"_attr = collection->get()->ns(),
-            "minKey"_attr = redact(prettyKey(shardKeyIdx->keyPattern(), minBound)),
-            "maxKey"_attr = redact(prettyKey(shardKeyIdx->keyPattern(), maxBound)),
-            "key"_attr = redact(prettyKey(shardKeyIdx->keyPattern(), minKeyInChunk)));
-        return true;
-    }
-
-    return false;
-}
-
-/*
  * Reshuffle fields according to the shard key pattern.
  */
-auto orderShardKeyFields(const BSONObj& keyPattern, BSONObj& key) {
-    return dotted_path_support::extractElementsBasedOnTemplate(
-        prettyKey(keyPattern, key.getOwned()), keyPattern);
+auto orderShardKeyFields(const BSONObj& keyPattern, const BSONObj& key) {
+    // Note: It is correct to hydrate the indexKey 'key' with 'keyPattern', because the index key
+    // pattern is a prefix of 'keyPattern'.
+    return BSONObjBuilder().appendElementsRenamed(key, keyPattern, false).obj();
 }
 
 }  // namespace
 
-std::vector<BSONObj> autoSplitVector(OperationContext* opCtx,
-                                     const NamespaceString& nss,
-                                     const BSONObj& keyPattern,
-                                     const BSONObj& min,
-                                     const BSONObj& max,
-                                     long long maxChunkSizeBytes) {
+std::pair<std::vector<BSONObj>, bool> autoSplitVector(OperationContext* opCtx,
+                                                      const CollectionAcquisition& acquisition,
+                                                      const BSONObj& keyPattern,
+                                                      const BSONObj& min,
+                                                      const BSONObj& max,
+                                                      long long maxChunkSizeBytes,
+                                                      boost::optional<int> limit,
+                                                      bool forward) {
+    const auto& nss = acquisition.nss();
+    if (limit) {
+        uassert(ErrorCodes::InvalidOptions, "autoSplitVector expects a positive limit", *limit > 0);
+    }
+
     std::vector<BSONObj> splitKeys;
+    bool reachedMaxBSONSize = false;  // True if the split points vector becomes too big
 
     int elapsedMillisToFindSplitPoints;
 
@@ -148,13 +136,15 @@ std::vector<BSONObj> autoSplitVector(OperationContext* opCtx,
     auto tooFrequentKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
 
     {
-        AutoGetCollection collection(opCtx, nss, MODE_IS);
 
-        uassert(ErrorCodes::NamespaceNotFound, "ns not found", collection);
+        uassert(ErrorCodes::NamespaceNotFound,
+                str::stream() << "namespace " << nss.toStringForErrorMsg() << " does not exists",
+                acquisition.exists());
 
         // Get the size estimate for this namespace
-        const long long totalLocalCollDocuments = collection->numRecords(opCtx);
-        const long long dataSize = collection->dataSize(opCtx);
+        const auto& collPtr = acquisition.getCollectionPtr();
+        const long long totalLocalCollDocuments = collPtr->numRecords(opCtx);
+        const long long dataSize = collPtr->dataSize(opCtx);
 
         // Return empty vector if current estimated data size is less than max chunk size
         if (dataSize < maxChunkSizeBytes || totalLocalCollDocuments == 0) {
@@ -163,52 +153,98 @@ std::vector<BSONObj> autoSplitVector(OperationContext* opCtx,
 
         // Allow multiKey based on the invariant that shard keys must be single-valued. Therefore,
         // any multi-key index prefixed by shard key cannot be multikey over the shard key fields.
-        auto catalog = collection->getIndexCatalog();
-        auto shardKeyIdx = catalog->findShardKeyPrefixedIndex(
-            opCtx, *collection, keyPattern, /*requireSingleKey=*/false);
+        const auto shardKeyIdx = findShardKeyPrefixedIndex(opCtx,
+                                                           collPtr,
+                                                           keyPattern,
+                                                           /*requireSingleKey=*/false);
         uassert(ErrorCodes::IndexNotFound,
                 str::stream() << "couldn't find index over splitting key "
                               << keyPattern.clientReadable().toString(),
                 shardKeyIdx);
 
-        const auto [minKey, maxKey] = getMinMaxExtendedBounds(shardKeyIdx, min, max);
+        const auto [minKey, maxKey] = getMinMaxExtendedBounds(*shardKeyIdx, min, max);
+
+        auto getIdxScanner = [&](const BSONObj& minKey,
+                                 const BSONObj& maxKey,
+                                 BoundInclusion inclusion,
+                                 PlanYieldPolicy::YieldPolicy yieldPolicy,
+                                 InternalPlanner::Direction direction) {
+            return InternalPlanner::shardKeyIndexScan(opCtx,
+                                                      acquisition,
+                                                      *shardKeyIdx,
+                                                      minKey,
+                                                      maxKey,
+                                                      inclusion,
+                                                      yieldPolicy,
+                                                      direction);
+        };
 
         // Setup the index scanner that will be used to find the split points
-        auto forwardIdxScanner =
-            InternalPlanner::indexScan(opCtx,
-                                       &(*collection),
-                                       shardKeyIdx,
-                                       minKey,
-                                       maxKey,
-                                       BoundInclusion::kIncludeStartKeyOnly,
-                                       PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                       InternalPlanner::FORWARD);
-
-        // Get minimum key belonging to the chunk
-        BSONObj minKeyInOriginalChunk;
+        auto idxScanner = forward ? getIdxScanner(minKey,
+                                                  maxKey,
+                                                  BoundInclusion::kIncludeStartKeyOnly,
+                                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                  InternalPlanner::FORWARD)
+                                  : getIdxScanner(maxKey,
+                                                  minKey,
+                                                  BoundInclusion::kIncludeEndKeyOnly,
+                                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                  InternalPlanner::BACKWARD);
+        // Get first key belonging to the chunk
+        BSONObj firstKeyInOriginalChunk;
         {
-            PlanExecutor::ExecState state =
-                forwardIdxScanner->getNext(&minKeyInOriginalChunk, nullptr);
-            uassert(ErrorCodes::OperationFailed,
-                    "can't open a cursor to scan the range (desired range is possibly empty)",
-                    state == PlanExecutor::ADVANCED);
+            PlanExecutor::ExecState state = idxScanner->getNext(&firstKeyInOriginalChunk, nullptr);
+            if (state == PlanExecutor::IS_EOF) {
+                // Range is empty
+                return {};
+            }
         }
 
-        // Return empty vector if chunk's min and max keys are the same.
-        if (maxKeyEqualToMinKey(opCtx,
-                                &collection.getCollection(),
-                                shardKeyIdx,
+        // Compare the first and last document belonging to the range; if they have the same shard
+        // key value, no split point can be found.
+        bool chunkCanBeSplit = true;
+        {
+            BSONObj lastKeyInChunk;
+            // Use INTERRUPT_ONLY since it just fetches the last key. Using YIELD_AUTO could
+            // invalidate idxScanner below.
+            auto rangeEndIdxScanner = forward
+                ? getIdxScanner(maxKey,
                                 minKey,
+                                BoundInclusion::kIncludeEndKeyOnly,
+                                PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                InternalPlanner::BACKWARD)
+                : getIdxScanner(minKey,
                                 maxKey,
-                                minKeyInOriginalChunk)) {
+                                BoundInclusion::kIncludeStartKeyOnly,
+                                PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                InternalPlanner::FORWARD);
+
+            PlanExecutor::ExecState state = rangeEndIdxScanner->getNext(&lastKeyInChunk, nullptr);
+            if (state == PlanExecutor::IS_EOF) {
+                // Range is empty
+                return {};
+            }
+
+            chunkCanBeSplit = firstKeyInOriginalChunk.woCompare(lastKeyInChunk) != 0;
+        }
+
+        if (!chunkCanBeSplit) {
+            LOGV2_WARNING(
+                5865001,
+                "Possible low cardinality key detected in range. Range contains only a single key.",
+                logAttrs(nss),
+                "minKey"_attr = redact(prettyKey(keyPattern, minKey)),
+                "maxKey"_attr = redact(prettyKey(keyPattern, maxKey)),
+                "key"_attr = redact(prettyKey(shardKeyIdx->keyPattern(), firstKeyInOriginalChunk)));
             return {};
         }
 
-        LOGV2(5865000,
-              "Requested split points lookup for chunk",
-              "namespace"_attr = nss,
+        LOGV2(6492600,
+              "Requested split points lookup for range",
+              logAttrs(nss),
               "minKey"_attr = redact(prettyKey(keyPattern, minKey)),
-              "maxKey"_attr = redact(prettyKey(keyPattern, maxKey)));
+              "maxKey"_attr = redact(prettyKey(keyPattern, maxKey)),
+              "direction"_attr = forward ? "forwards" : "backwards");
 
         // Use the average document size and number of documents to find the approximate number of
         // keys each chunk should contain
@@ -218,9 +254,8 @@ std::vector<BSONObj> autoSplitVector(OperationContext* opCtx,
         long long maxDocsPerChunk = maxChunkSizeBytes / avgDocSize;
 
         BSONObj currentKey;               // Last key seen during the index scan
-        long long numScannedKeys = 1;     // minKeyInOriginalChunk has already been scanned
+        long long numScannedKeys = 1;     // firstKeyInOriginalChunk has already been scanned
         std::size_t resultArraySize = 0;  // Approximate size in bytes of the split points array
-        bool reachedMaxBSONSize = false;  // True if the split points vector becomes too big
 
         // Lambda to check whether the split points vector would exceed BSONObjMaxUserSize in case
         // of additional split key of the specified size.
@@ -230,17 +265,32 @@ std::vector<BSONObj> autoSplitVector(OperationContext* opCtx,
 
         // Reference to last split point that needs to be checked in order to avoid adding duplicate
         // split points. Initialized to the min of the first chunk being split.
-        auto minKeyElement = orderShardKeyFields(keyPattern, minKeyInOriginalChunk);
-        auto lastSplitPoint = minKeyElement;
+        auto firstKeyElement = orderShardKeyFields(keyPattern, firstKeyInOriginalChunk);
+        auto lastSplitPoint = firstKeyElement;
 
         Timer timer;  // To measure time elapsed while searching split points
 
         // Traverse the index and add the maxDocsPerChunk-th key to the result vector
-        while (forwardIdxScanner->getNext(&currentKey, nullptr) == PlanExecutor::ADVANCED) {
+        while (idxScanner->getNext(&currentKey, nullptr) == PlanExecutor::ADVANCED) {
             if (++numScannedKeys >= maxDocsPerChunk) {
                 currentKey = orderShardKeyFields(keyPattern, currentKey);
+                if (!ShardKeyPattern::checkShardKeyIsValidForMetadataStorage(currentKey).isOK()) {
+                    continue;
+                }
 
-                if (currentKey.woCompare(lastSplitPoint) == 0) {
+                const auto compareWithPreviousSplitPoint = currentKey.woCompare(lastSplitPoint);
+                if (forward) {
+                    dassert(compareWithPreviousSplitPoint >= 0,
+                            str::stream()
+                                << "Found split key smaller than the last one in forwards lookup: "
+                                << currentKey << " < " << lastSplitPoint);
+                } else {
+                    dassert(compareWithPreviousSplitPoint <= 0,
+                            str::stream()
+                                << "Found split key larger than the last one in backwards lookup: "
+                                << currentKey << " > " << lastSplitPoint);
+                }
+                if (compareWithPreviousSplitPoint == 0) {
                     // Do not add again the same split point in case of frequent shard key.
                     tooFrequentKeys.insert(currentKey.getOwned());
                     continue;
@@ -263,6 +313,12 @@ std::vector<BSONObj> autoSplitVector(OperationContext* opCtx,
                 splitKeys.push_back(currentKey.getOwned());
                 lastSplitPoint = splitKeys.back();
                 numScannedKeys = 0;
+
+                if (limit && splitKeys.size() == static_cast<size_t>(*limit) + 1) {
+                    // If the user has specified a limit, calculate the first `limit + 1` split
+                    // points (avoid creating small chunks)
+                    break;
+                }
 
                 LOGV2_DEBUG(5865003, 4, "Picked a split key", "key"_attr = redact(currentKey));
             }
@@ -291,26 +347,47 @@ std::vector<BSONObj> autoSplitVector(OperationContext* opCtx,
                 // Fairly recalculate the last `nSplitPointsToReposition` split points.
                 splitKeys.erase(splitKeys.end() - nSplitPointsToReposition, splitKeys.end());
 
-                auto forwardIdxScanner =
-                    InternalPlanner::indexScan(opCtx,
-                                               &collection.getCollection(),
-                                               shardKeyIdx,
-                                               splitKeys.empty() ? minKeyElement : splitKeys.back(),
-                                               maxKey,
-                                               BoundInclusion::kIncludeStartKeyOnly,
-                                               PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                               InternalPlanner::FORWARD);
+                // Since the previous idxScanner is finished, we are not violating the requirement
+                // that only one yieldable plan is active.
+                idxScanner = forward
+                    ? getIdxScanner(splitKeys.empty() ? firstKeyElement : splitKeys.back(),
+                                    maxKey,
+                                    BoundInclusion::kIncludeStartKeyOnly,
+                                    PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                    InternalPlanner::FORWARD)
+                    : getIdxScanner(splitKeys.empty() ? firstKeyElement : splitKeys.back(),
+                                    minKey,
+                                    BoundInclusion::kIncludeBothStartAndEndKeys,
+                                    PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                    InternalPlanner::BACKWARD);
 
                 numScannedKeys = 0;
 
-                auto previousSplitPoint = splitKeys.empty() ? minKeyElement : splitKeys.back();
-                while (forwardIdxScanner->getNext(&currentKey, nullptr) == PlanExecutor::ADVANCED) {
+                auto previousSplitPoint = splitKeys.empty() ? firstKeyElement : splitKeys.back();
+                while (idxScanner->getNext(&currentKey, nullptr) == PlanExecutor::ADVANCED) {
                     if (++numScannedKeys >= maxDocsPerNewChunk) {
                         currentKey = orderShardKeyFields(keyPattern, currentKey);
+                        if (!ShardKeyPattern::checkShardKeyIsValidForMetadataStorage(currentKey)
+                                 .isOK()) {
+                            continue;
+                        }
 
                         const auto compareWithPreviousSplitPoint =
                             currentKey.woCompare(previousSplitPoint);
-                        if (compareWithPreviousSplitPoint > 0) {
+
+                        if (forward) {
+                            dassert(compareWithPreviousSplitPoint >= 0,
+                                    str::stream() << "Found split key smaller than the last one in "
+                                                     "forwards lookup: "
+                                                  << currentKey << " < " << previousSplitPoint);
+                        } else {
+                            dassert(compareWithPreviousSplitPoint <= 0,
+                                    str::stream() << "Found split key larger than the previous one "
+                                                     "in backwards lookup: "
+                                                  << currentKey << " > " << previousSplitPoint);
+                        }
+                        if ((forward && compareWithPreviousSplitPoint > 0) ||
+                            (!forward && compareWithPreviousSplitPoint < 0)) {
                             const auto additionalKeySize =
                                 currentKey.objsize() + estimatedAdditionalBytesPerItemInBSONArray;
                             if (checkMaxBSONSize(additionalKeySize)) {
@@ -339,7 +416,7 @@ std::vector<BSONObj> autoSplitVector(OperationContext* opCtx,
         if (reachedMaxBSONSize) {
             LOGV2(5865002,
                   "Max BSON response size reached for split vector before the end of chunk",
-                  "namespace"_attr = nss,
+                  logAttrs(nss),
                   "minKey"_attr = redact(prettyKey(shardKeyIdx->keyPattern(), minKey)),
                   "maxKey"_attr = redact(prettyKey(shardKeyIdx->keyPattern(), maxKey)));
         }
@@ -349,25 +426,24 @@ std::vector<BSONObj> autoSplitVector(OperationContext* opCtx,
     for (const auto& frequentKey : tooFrequentKeys) {
         LOGV2_WARNING(5865004,
                       "Possible low cardinality key detected",
-                      "namespace"_attr = nss,
+                      logAttrs(nss),
                       "key"_attr = redact(prettyKey(keyPattern, frequentKey)));
     }
 
-    if (elapsedMillisToFindSplitPoints > serverGlobalParams.slowMS) {
+    if (elapsedMillisToFindSplitPoints > serverGlobalParams.slowMS.load()) {
         LOGV2_WARNING(5865005,
                       "Finding the auto split vector completed",
-                      "namespace"_attr = nss,
+                      logAttrs(nss),
                       "keyPattern"_attr = redact(keyPattern),
                       "numSplits"_attr = splitKeys.size(),
                       "duration"_attr = Milliseconds(elapsedMillisToFindSplitPoints));
     }
 
-    // TODO SERVER-58750: investigate if it is really needed to sort the vector
-    // Make sure splitKeys is in ascending order
-    std::sort(
-        splitKeys.begin(), splitKeys.end(), SimpleBSONObjComparator::kInstance.makeLessThan());
+    if (limit && splitKeys.size() > static_cast<size_t>(*limit)) {
+        splitKeys.resize(*limit);
+    }
 
-    return splitKeys;
+    return std::make_pair(std::move(splitKeys), reachedMaxBSONSize);
 }
 
 }  // namespace mongo

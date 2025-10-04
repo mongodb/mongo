@@ -1,0 +1,10 @@
+# Bazel build definitions used to test bazel features during build system development.
+
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary")
+
+package(default_visibility = ["//visibility:public"])
+
+mongo_cc_binary(
+    name = "unit_test",
+    srcs = ["unit_test.cpp"],
+)

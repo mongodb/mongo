@@ -29,11 +29,26 @@
 
 #pragma once
 
-#include <jsapi.h>
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/scripting/engine.h"
+#include "mongo/scripting/mozjs/jsstringwrapper.h"
+#include "mongo/scripting/mozjs/objectwrapper.h"
+#include "mongo/util/modules.h"
+
+#include <cstdint>
+#include <functional>
 #include <string>
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/scripting/mozjs/objectwrapper.h"
+#include <jsapi.h>
+
+#include <js/RootingAPI.h>
+#include <js/TypeDecls.h>
 
 namespace mongo {
 namespace mozjs {
@@ -44,7 +59,7 @@ namespace mozjs {
  * originalBSON is a hack to keep integer types in their original type when
  * they're read out, manipulated in js and saved back.
  */
-class ValueWriter {
+class MONGO_MOD_PUB ValueWriter {
 public:
     ValueWriter(JSContext* cx, JS::HandleValue value);
 
@@ -62,6 +77,11 @@ public:
     int64_t toInt64();
     Decimal128 toDecimal128();
     bool toBoolean();
+    OID toOID();
+    // Note: The resulting BSONBinData is only valid within the scope of the 'withBinData' callback.
+    void toBinData(std::function<void(const BSONBinData&)> withBinData);
+    Timestamp toTimestamp();
+    JSRegEx toRegEx();
 
     /**
      * Provides the type of the value. For objects, it fetches the class name if possible.

@@ -27,19 +27,29 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
 
-#include "mongo/db/auth/security_key.h"
-
-#include <algorithm>
-#include <string>
-#include <sys/stat.h>
-#include <vector>
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
-#include "yaml-cpp/yaml.h"
+#include <algorithm>
+#include <cerrno>
+#include <cstring>
+#include <functional>
+#include <iterator>
+#include <string>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <sys/stat.h>
+#include <yaml-cpp/exceptions.h>
+#include <yaml-cpp/node/detail/iterator.h>
+#include <yaml-cpp/node/impl.h>
+#include <yaml-cpp/node/iterator.h>
+#include <yaml-cpp/node/node.h>
+#include <yaml-cpp/node/parse.h>
 
 namespace mongo {
 namespace {

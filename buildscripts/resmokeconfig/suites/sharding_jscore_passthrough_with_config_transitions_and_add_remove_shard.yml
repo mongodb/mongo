@@ -1,0 +1,145 @@
+# Based on the sharding_jscore_passthrough suite. Runs continuous config transitions
+# from a config shard to a dedicated config server.
+config_variables:
+  - &movePrimaryComment continuousConfigShardTransitionMovePrimary
+
+test_kind: js_test
+
+selector:
+  roots:
+    - jstests/core/**/*.js
+    - jstests/core_sharding/**/*.js
+    - jstests/fle2/**/*.js
+    - src/mongo/db/modules/*/jstests/fle2/**/*.js
+  exclude_files:
+    # These tests move chunks, and they expect the balancer to be disabled.
+    - jstests/core_sharding/chunk_migration/*.js
+    # These tests are run in sharded_jscore_txns.
+    - jstests/core/txns/**/*.js
+    # The following tests fail because a certain command or functionality is not supported on
+    # mongos. This command or functionality is placed in a comment next to the failing test.
+    - jstests/core/**/apitest_db.js # serverStatus output doesn't have storageEngine.
+    - jstests/core/**/check_shard_index.js # checkShardingIndex.
+    - jstests/core/**/compact_keeps_indexes.js # compact.
+    - jstests/core/**/currentop.js # uses fsync.
+    - jstests/core/**/dbhash.js # dbhash.
+    - jstests/core/**/fsync.js # uses fsync.
+    - jstests/core/**/geo_s2cursorlimitskip.js # profiling.
+    - jstests/core/**/geo_update_btree2.js # notablescan.
+    - jstests/core/**/queryoptimizera.js # "local" database.
+    - jstests/core/**/startup_log.js # "local" database.
+    - jstests/core/**/query/top/top.js # top.
+    # The following tests fail because mongos behaves differently from mongod when testing certain
+    # functionality. The differences are in a comment next to the failing test.
+    - jstests/core/**/geo_2d_explain.js # executionSuccess in different spot in explain().
+    - jstests/core/**/geo_s2explain.js # inputStage in different spot in explain().
+    - jstests/core/**/geo_s2sparse.js # keysPerIndex in different spot in validate().
+    - jstests/core/**/operation_latency_histogram.js # Stats are counted differently on mongos, SERVER-24880.
+
+    # The following tests are excluded specifically for this passthrough suite.
+    # TransitionTo/FromDedicated runs remove/addShard which implicitly will set a cluster parameter, which
+    # will conflict with tests that explicitly set cluster parameters.
+    - jstests/core/query/query_settings/**/*.js
+
+    # If we get a MovePrimaryInProgress error while trying to implicitly create
+    # a collection during a movePrimary while we also set up a failCommand with
+    # a writeConcernError, we will get the writeConcernError from the failpoint
+    # along with the MovePrimaryInProgress error. Since this test sets times: n
+    # for some of the failpoints, by the time we retry, the failpoint will no
+    # longer be active and the test will fail.
+    - jstests/core/testing/failcommand_failpoint.js
+
+    # TODO (SERVER-90646): Re-enable background_unique_indexes.js in config transition suites.
+    - jstests/core/ddl/background_unique_indexes.js
+
+    # Exclude tests that run cleanupOrphaned, which can fail running on a config shard if a
+    # concurrent migration fails due to the config shard transitioning to dedicated.
+    - jstests/core/administrative/cleanup_orphaned.js
+    - jstests/core/catalog/views/views_all_commands.js
+    - jstests/core/repro/commands_namespace_parsing.js
+    # TODO SERVER-96199 Re-enable this test once FLE updates to a document's shard key work
+    - src/mongo/db/modules/enterprise/jstests/fle2/find_and_modify_replace.js
+    # Timeseries updates are not retryable unless the collection is tracked.
+    - jstests/core/timeseries/write/timeseries_update_arbitrary_updates_not_enabled.js
+
+    # The resharding core tests expect the sharding topology to remain constant.
+    - jstests/core_sharding/resharding/**/*.js
+
+    # The resharding core tests expect the sharding topology to remain constant.
+    - jstests/core_sharding/resharding/**/*.js
+
+    # The resharding core tests expect the sharding topology to remain constant.
+    - jstests/core_sharding/resharding/**/*.js
+
+  exclude_with_any_tags:
+    - assumes_standalone_mongod
+    - assumes_against_mongod_not_mongos
+    # system.profile collection doesn't exist on mongos.
+    - requires_profiling
+
+    # The following tags are excluded specifically for this suite.
+    - config_shard_incompatible
+    # Currently this passthrough enables the balancer to allow the config transition to successfully complete.
+    - assumes_balancer_off
+    # MoveCollection changes the collection uuid.
+    - assumes_stable_collection_uuid
+    - does_not_support_retryable_writes
+    - requires_non_retryable_writes
+    - assumes_stable_shard_list
+    # implicitly_retry_on_migration_in_progress.js alters find/aggregate commands
+    # so that the whole result set is returned through a single batch
+    - assumes_no_implicit_cursor_exhaustion
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: >-
+        await import("jstests/libs/override_methods/enable_sessions.js");
+        await import("jstests/libs/override_methods/implicitly_retry_on_shard_transition_errors.js");
+      global_vars:
+        TestData:
+          alwaysInjectTransactionNumber: true
+          runningWithBalancer: true
+          shardsAddedRemoved: true
+          hasRandomShardsAddedRemoved: true
+          sessionOptions:
+            retryWrites: true
+  hooks:
+    - class: ContinuousAddRemoveShard
+      random_balancer_on: false
+      transition_configsvr: true
+      add_remove_random_shards: true
+      move_primary_comment: *movePrimaryComment
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+      shell_options:
+        global_vars:
+          TestData:
+            shardsAddedRemoved: true
+            hasRandomShardsAddedRemoved: true
+    - class: ValidateCollections
+    - class: CheckOrphansDeleted
+    - class: CleanEveryN
+      n: 20
+  fixture:
+    class: ShardedClusterFixture
+    config_shard: "any"
+    num_shards: 3
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        featureFlagReshardingForTimeseries: true
+        reshardingMinimumOperationDurationMillis: 0
+        failpoint.movePrimaryFailIfNeedToCloneMovableCollections:
+          data:
+            comment: *movePrimaryComment
+          mode: alwaysOn
+    num_rs_nodes_per_shard: 1

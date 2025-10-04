@@ -8,13 +8,23 @@
 
 #include "util.h"
 
+/*
+ * usage --
+ *     Display a usage message for the drop command.
+ */
 static int
 usage(void)
 {
-    util_usage("drop uri", NULL, NULL);
+    static const char *options[] = {"-?", "show this message", NULL, NULL};
+
+    util_usage("drop uri", "options:", options);
     return (1);
 }
 
+/*
+ * util_drop --
+ *     The drop command.
+ */
 int
 util_drop(WT_SESSION *session, int argc, char *argv[])
 {
@@ -23,9 +33,11 @@ util_drop(WT_SESSION *session, int argc, char *argv[])
     char *uri;
 
     uri = NULL;
-    while ((ch = __wt_getopt(progname, argc, argv, "")) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "?")) != EOF)
         switch (ch) {
         case '?':
+            usage();
+            return (0);
         default:
             return (usage());
         }
@@ -42,6 +54,6 @@ util_drop(WT_SESSION *session, int argc, char *argv[])
     if ((ret = session->drop(session, uri, "force")) != 0)
         (void)util_err(session, ret, "session.drop: %s", uri);
 
-    free(uri);
+    util_free(uri);
     return (ret);
 }

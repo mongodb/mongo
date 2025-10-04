@@ -29,40 +29,47 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
-
-#include <boost/intrusive_ptr.hpp>
-#include <boost/optional.hpp>
-#include <functional>
-#include <list>
-#include <memory>
-#include <string>
-#include <vector>
-
-#include "mongo/base/init.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/collection_index_usage_tracker.h"
-#include "mongo/db/commands.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/exec/plan_stats.h"
-#include "mongo/db/exec/scoped_timer.h"
-#include "mongo/db/generic_cursor.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_split_state.h"
 #include "mongo/db/pipeline/stage_constraints.h"
-#include "mongo/db/query/allowed_contexts.h"
-#include "mongo/db/query/explain_options.h"
-#include "mongo/util/intrusive_counter.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
+
+#include <cstddef>
+#include <functional>
+#include <iterator>
+#include <list>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/intrusive_ptr.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
-
-class Document;
 
 /**
  * Registers a DocumentSource to have the name 'key'.
@@ -93,22 +100,22 @@ class Document;
                                            fullParser,                              \
                                            allowedWithApiStrict,                    \
                                            AllowedWithClientType::kAny,             \
-                                           boost::none,                             \
+                                           nullptr, /* featureFlag */               \
                                            true)
 
 /**
- * Like REGISTER_DOCUMENT_SOURCE, except the parser will only be enabled when FCV >= minVersion.
- * We store minVersion in the parserMap, so that changing FCV at runtime correctly enables/disables
- * the parser.
+ * Like REGISTER_DOCUMENT_SOURCE, except the parser will only be registered when featureFlag is
+ * enabled. We store featureFlag in the parserMap, so that it can be checked at runtime
+ * to correctly enable/disable the parser.
  */
-#define REGISTER_DOCUMENT_SOURCE_WITH_MIN_VERSION(                      \
-    key, liteParser, fullParser, allowedWithApiStrict, minVersion)      \
+#define REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(                     \
+    key, liteParser, fullParser, allowedWithApiStrict, featureFlag)     \
     REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(key,                         \
                                            liteParser,                  \
                                            fullParser,                  \
                                            allowedWithApiStrict,        \
                                            AllowedWithClientType::kAny, \
-                                           minVersion,                  \
+                                           featureFlag,                 \
                                            true)
 
 /**
@@ -120,12 +127,12 @@ class Document;
                                            fullParser,                            \
                                            AllowedWithApiStrict::kInternal,       \
                                            AllowedWithClientType::kInternal,      \
-                                           boost::none,                           \
+                                           nullptr, /* featureFlag*/              \
                                            condition)
 
 /**
- * Like REGISTER_DOCUMENT_SOURCE_WITH_MIN_VERSION, except you can also specify a condition,
- * evaluated during startup, that decides whether to register the parser.
+ * You can specify a condition, evaluated during startup,
+ * that decides whether to register the parser.
  *
  * For example, you could check a feature flag, and register the parser only when it's enabled.
  *
@@ -135,23 +142,28 @@ class Document;
  *
  * This is the most general REGISTER_DOCUMENT_SOURCE* macro, which all others should delegate to.
  */
-#define REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(                                                  \
-    key, liteParser, fullParser, allowedWithApiStrict, clientType, minVersion, ...)              \
-    MONGO_INITIALIZER_GENERAL(addToDocSourceParserMap_##key,                                     \
-                              ("BeginDocumentSourceRegistration"),                               \
-                              ("EndDocumentSourceRegistration"))                                 \
-    (InitializerContext*) {                                                                      \
-        if (!__VA_ARGS__) {                                                                      \
-            DocumentSource::registerParser("$" #key, DocumentSource::parseDisabled, minVersion); \
-            LiteParsedDocumentSource::registerParser("$" #key,                                   \
-                                                     LiteParsedDocumentSource::parseDisabled,    \
-                                                     allowedWithApiStrict,                       \
-                                                     clientType);                                \
-            return;                                                                              \
-        }                                                                                        \
-        LiteParsedDocumentSource::registerParser(                                                \
-            "$" #key, liteParser, allowedWithApiStrict, clientType);                             \
-        DocumentSource::registerParser("$" #key, fullParser, minVersion);                        \
+#define REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(                                                   \
+    key, liteParser, fullParser, allowedWithApiStrict, clientType, featureFlag, ...)              \
+    MONGO_INITIALIZER_GENERAL(addToDocSourceParserMap_##key,                                      \
+                              ("BeginDocumentSourceRegistration"),                                \
+                              ("EndDocumentSourceRegistration"))                                  \
+    (InitializerContext*) {                                                                       \
+        /* Require 'featureFlag' to be a constexpr. */                                            \
+        constexpr FeatureFlag* constFeatureFlag{featureFlag};                                     \
+        /* This non-constexpr variable works around a bug in GCC when 'featureFlag' is null. */   \
+        FeatureFlag* featureFlagValue{constFeatureFlag};                                          \
+        bool evaluatedCondition{__VA_ARGS__};                                                     \
+        if (!evaluatedCondition || (featureFlagValue && !featureFlagValue->canBeEnabled())) {     \
+            DocumentSource::registerParser("$" #key, DocumentSource::parseDisabled, featureFlag); \
+            LiteParsedDocumentSource::registerParser("$" #key,                                    \
+                                                     LiteParsedDocumentSource::parseDisabled,     \
+                                                     allowedWithApiStrict,                        \
+                                                     clientType);                                 \
+            return;                                                                               \
+        }                                                                                         \
+        LiteParsedDocumentSource::registerParser(                                                 \
+            "$" #key, liteParser, allowedWithApiStrict, clientType);                              \
+        DocumentSource::registerParser("$" #key, fullParser, featureFlag);                        \
     }
 
 /**
@@ -163,14 +175,40 @@ class Document;
                                            fullParser,                             \
                                            AllowedWithApiStrict::kNeverInVersion1, \
                                            AllowedWithClientType::kAny,            \
-                                           boost::none,                            \
+                                           nullptr, /* featureFlag */              \
                                            ::mongo::getTestCommandsEnabled())
+
+/**
+ * Allocates a new, unique DocumentSource::Id value.
+ * Assigns it to a private variable (in an anonymous namespace) based on the given `name`, and
+ * declares a const reference named `constName` to the private variable.
+ */
+#define ALLOCATE_DOCUMENT_SOURCE_ID(name, constName)                  \
+    namespace {                                                       \
+    DocumentSource::Id _dsid_##name = DocumentSource::kUnallocatedId; \
+    MONGO_INITIALIZER_GENERAL(allocateDocSourceId_##name,             \
+                              ("BeginDocumentSourceIdAllocation"),    \
+                              ("EndDocumentSourceIdAllocation"))      \
+    (InitializerContext*) {                                           \
+        _dsid_##name = DocumentSource::allocateId(#name);             \
+    }                                                                 \
+    }                                                                 \
+    const DocumentSource::Id& constName = _dsid_##name;
+
+class DocumentSource;
+using DocumentSourceContainer = std::list<boost::intrusive_ptr<DocumentSource>>;
+
+class Pipeline;
+
+namespace exec::agg {
+class ListMqlEntitiesStage;
+}  // namespace exec::agg
 
 class DocumentSource : public RefCountable {
 public:
-    // In general a parser returns a list of DocumentSources, to accomodate "multi-stage aliases"
+    // In general a parser returns a list of DocumentSources, to accommodate "multi-stage aliases"
     // like $bucket.
-    using Parser = std::function<std::list<boost::intrusive_ptr<DocumentSource>>(
+    using Parser = std::function<DocumentSourceContainer(
         BSONElement, const boost::intrusive_ptr<ExpressionContext>&)>;
     // But in the common case a parser returns only one DocumentSource.
     using SimpleParser = std::function<boost::intrusive_ptr<DocumentSource>(
@@ -185,80 +223,19 @@ public:
     using TransactionRequirement = StageConstraints::TransactionRequirement;
     using LookupRequirement = StageConstraints::LookupRequirement;
     using UnionRequirement = StageConstraints::UnionRequirement;
+    using GetNextResult = exec::agg::GetNextResult;
 
     /**
-     * This is what is returned from the main DocumentSource API: getNext(). It is essentially a
-     * (ReturnStatus, Document) pair, with the first entry being used to communicate information
-     * about the execution of the DocumentSource, such as whether or not it has been exhausted.
+     * Used to identify different DocumentSource sub-classes, without requiring RTTI.
      */
-    class GetNextResult {
-    public:
-        enum class ReturnStatus {
-            // There is a result to be processed.
-            kAdvanced,
-            // There will be no further results.
-            kEOF,
-            // There is not a result to be processed yet, but there may be more results in the
-            // future. If a DocumentSource retrieves this status from its child, it must propagate
-            // it without doing any further work.
-            kPauseExecution,
-        };
+    using Id = unsigned long;
 
-        static GetNextResult makeEOF() {
-            return GetNextResult(ReturnStatus::kEOF);
-        }
+    // Using 0 for "unallocated id" makes it easy to check if an Id has been allocated.
+    static constexpr Id kUnallocatedId{0};
 
-        static GetNextResult makePauseExecution() {
-            return GetNextResult(ReturnStatus::kPauseExecution);
-        }
-
-        /**
-         * Shortcut constructor for the common case of creating an 'advanced' GetNextResult from the
-         * given 'result'. Accepts only an rvalue reference as an argument, since DocumentSources
-         * will want to move 'result' into this GetNextResult, and should have to opt in to making a
-         * copy.
-         */
-        /* implicit */ GetNextResult(Document&& result)
-            : _status(ReturnStatus::kAdvanced), _result(std::move(result)) {}
-
-        /**
-         * Gets the result document. It is an error to call this if isAdvanced() returns false.
-         */
-        const Document& getDocument() const {
-            dassert(isAdvanced());
-            return _result;
-        }
-
-        /**
-         * Releases the result document, transferring ownership to the caller. It is an error to
-         * call this if isAdvanced() returns false.
-         */
-        Document releaseDocument() {
-            dassert(isAdvanced());
-            return std::move(_result);
-        }
-
-        ReturnStatus getStatus() const {
-            return _status;
-        }
-
-        bool isAdvanced() const {
-            return _status == ReturnStatus::kAdvanced;
-        }
-
-        bool isEOF() const {
-            return _status == ReturnStatus::kEOF;
-        }
-
-        bool isPaused() const {
-            return _status == ReturnStatus::kPauseExecution;
-        }
-
-    private:
-        GetNextResult(ReturnStatus status) : _status(status) {}
-
-        ReturnStatus _status;
-        Document _result;
+    struct ParserRegistration {
+        DocumentSource::Parser parser;
+        FeatureFlag* featureFlag;
     };
 
     /**
@@ -266,35 +243,84 @@ public:
      * collection. Describes how a pipeline should be split for sharded execution.
      */
     struct DistributedPlanLogic {
+        DistributedPlanLogic() = default;
+
+        /**
+         * Convenience constructor for the common case where there is at most one merging stage. Can
+         * pass nullptr for the merging stage which means "no merging required."
+         */
+        DistributedPlanLogic(boost::intrusive_ptr<DocumentSource> shardsStageIn,
+                             boost::intrusive_ptr<DocumentSource> mergeStage,
+                             boost::optional<BSONObj> mergeSortPatternIn = boost::none)
+            : shardsStage(std::move(shardsStageIn)),
+              mergeSortPattern(std::move(mergeSortPatternIn)) {
+            if (mergeStage) {
+                mergingStages.emplace_back(std::move(mergeStage));
+            }
+        }
+
+        typedef std::function<bool(const DocumentSource&)> movePastFunctionType;
         // A stage which executes on each shard in parallel, or nullptr if nothing can be done in
         // parallel. For example, a partial $group before a subsequent global $group.
         boost::intrusive_ptr<DocumentSource> shardsStage = nullptr;
 
-        // A stage which executes after merging all the results together, or nullptr if nothing is
-        // necessary after merging. For example, a $limit stage.
-        boost::intrusive_ptr<DocumentSource> mergingStage = nullptr;
+        // A stage or stages which function to merge all the results together, or an empty list if
+        // nothing is necessary after merging. For example, a $limit stage.
+        DocumentSourceContainer mergingStages = {};
 
         // If set, each document is expected to have sort key metadata which will be serialized in
-        // the '$sortKey' field. 'inputSortPattern' will then be used to describe which fields are
+        // the '$sortKey' field. 'mergeSortPattern' will then be used to describe which fields are
         // ascending and which fields are descending when merging the streams together.
-        boost::optional<BSONObj> inputSortPattern = boost::none;
+        boost::optional<BSONObj> mergeSortPattern = boost::none;
+
+        // If mergeSortPattern is specified and needsSplit is false, the split point will be
+        // deferred to the next stage that would split the pipeline. The sortPattern will be taken
+        // into account at that split point. Should be true if a stage specifies 'shardsStage' or
+        // 'mergingStage'. Does not mean anything if the sort pattern is not set.
+        bool needsSplit = true;
+
+        // If needsSplit is false and this plan has anything that must run on the merging half of
+        // the pipeline, it will be deferred until the next stage that sets any non-default value on
+        // 'DistributedPlanLogic' or until a following stage causes the given validation
+        // function to return false. By default this will not allow swapping with any
+        // following stages.
+        movePastFunctionType canMovePast = [](const DocumentSource&) {
+            return false;
+        };
     };
 
-    virtual ~DocumentSource() {}
+    /**
+     * Describes context pipelineDependentDistributedPlanLogic() should take into account to make a
+     * decision about whether or not a document source can be pushed down to shards.
+     */
+    struct DistributedPlanContext {
+        // The pipeline up to but not including the current document source.
+        const Pipeline& pipelinePrefix;
+        // The pipeline after and not including the document source.
+        const Pipeline& pipelineSuffix;
+        // The set of paths provided by the shard key.
+        const boost::optional<OrderedPathSet>& shardKeyPaths;
+    };
+
+    ~DocumentSource() override {}
 
     /**
      * Makes a deep clone of the DocumentSource by serializing and re-parsing it. DocumentSources
-     * that cannot be safely cloned this way should override this method.
+     * that cannot be safely cloned this way should override this method. Callers can optionally
+     * specify 'newExpCtx' to construct the deep clone with it instead of defaulting to the
+     * original's 'ExpressionContext'.
      */
-    virtual boost::intrusive_ptr<DocumentSource> clone() const {
+    virtual boost::intrusive_ptr<DocumentSource> clone(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
+        tassert(7406001, "expCtx passed to clone must not be null", expCtx);
         std::vector<Value> serializedDoc;
-        serializeToArray(serializedDoc);
+        serializeToArray(serializedDoc, SerializationOptions{.serializeForCloning = true});
         tassert(5757900,
                 str::stream() << "DocumentSource " << getSourceName()
                               << " should have serialized to exactly one document. This stage may "
                                  "need a custom clone() implementation",
-                serializedDoc.size() == 1 && serializedDoc[0].getType() == BSONType::Object);
-        auto dsList = parse(pExpCtx, Document(serializedDoc[0].getDocument()).toBson());
+                serializedDoc.size() == 1 && serializedDoc[0].getType() == BSONType::object);
+        auto dsList = parse(expCtx, Document(serializedDoc[0].getDocument()).toBson());
         // Cloning should only happen once the pipeline has been fully built, after desugaring from
         // one stage to multiple stages has occurred. When cloning desugared stages we expect each
         // stage to re-parse to one stage.
@@ -307,99 +333,42 @@ public:
     }
 
     /**
-     * The main execution API of a DocumentSource. Returns an intermediate query result generated by
-     * this DocumentSource.
-     *
-     * For performance reasons, a streaming stage must not keep references to documents across calls
-     * to getNext(). Such stages must retrieve a result from their child and then release it (or
-     * return it) before asking for another result. Failing to do so can result in extra work, since
-     * the Document/Value library must copy data on write when that data has a refcount above one.
-     */
-    GetNextResult getNext() {
-        pExpCtx->checkForInterrupt();
-
-        if (MONGO_likely(!pExpCtx->shouldCollectDocumentSourceExecStats())) {
-            return doGetNext();
-        }
-
-        auto serviceCtx = pExpCtx->opCtx->getServiceContext();
-        invariant(serviceCtx);
-        auto fcs = serviceCtx->getFastClockSource();
-        invariant(fcs);
-
-        invariant(_commonStats.executionTimeMillis);
-        ScopedTimer timer(fcs, _commonStats.executionTimeMillis.get_ptr());
-        ++_commonStats.works;
-
-        GetNextResult next = doGetNext();
-        if (next.isAdvanced()) {
-            ++_commonStats.advanced;
-        }
-        return next;
-    }
-
-    /**
      * Returns a struct containing information about any special constraints imposed on using this
-     * stage. Input parameter Pipeline::SplitState is used by stages whose requirements change
+     * stage. Input parameter PipelineSplitState is used by stages whose requirements change
      * depending on whether they are in a split or unsplit pipeline.
      */
     virtual StageConstraints constraints(
-        Pipeline::SplitState = Pipeline::SplitState::kUnsplit) const = 0;
+        PipelineSplitState = PipelineSplitState::kUnsplit) const = 0;
 
     /**
-     * Informs the stage that it is no longer needed and can release its resources. After dispose()
-     * is called the stage must still be able to handle calls to getNext(), but can return kEOF.
-     *
-     * This is a non-virtual public interface to ensure dispose() is threaded through the entire
-     * pipeline. Subclasses should override doDispose() to implement their disposal.
+     * If a stage's StageConstraints::PositionRequirement is kCustom, then it should also override
+     * this method, which will be called by the validation process.
      */
-    void dispose() {
-        doDispose();
-        if (pSource) {
-            pSource->dispose();
-        }
-    }
-
-    /**
-     * Get the CommonStats for this DocumentSource.
-     */
-    const CommonStats& getCommonStats() const {
-        return _commonStats;
-    }
-
-    /**
-     * Get the stats specific to the DocumentSource. It is legal for the DocumentSource to return
-     * nullptr to indicate that no specific stats are available.
-     */
-    virtual const SpecificStats* getSpecificStats() const {
-        return nullptr;
+    virtual void validatePipelinePosition(bool alreadyOptimized,
+                                          DocumentSourceContainer::const_iterator pos,
+                                          const DocumentSourceContainer& container) const {
+        MONGO_UNIMPLEMENTED_TASSERT(7183905);
     }
 
     /**
      * Get the stage's name.
      */
-    virtual const char* getSourceName() const;
+    virtual const char* getSourceName() const = 0;
 
     /**
-     * Set the underlying source this source should use to get Documents from. Must not throw
-     * exceptions.
+     * Returns the DocumentSource::Id value of a given stage object.
+     * Each child class should override this and return that class's static `id` value.
      */
-    virtual void setSource(DocumentSource* source) {
-        pSource = source;
-    }
+    virtual Id getId() const = 0;
 
     /**
      * In the default case, serializes the DocumentSource and adds it to the std::vector<Value>.
      *
      * A subclass may choose to overwrite this, rather than serialize, if it should output multiple
      * stages (eg, $sort sometimes also outputs a $limit).
-     *
-     * The 'explain' parameter indicates the explain verbosity mode, or is equal boost::none if no
-     * explain is requested.
      */
-    virtual void serializeToArray(
-        std::vector<Value>& array,
-        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const;
+    virtual void serializeToArray(std::vector<Value>& array,
+                                  const SerializationOptions& opts = SerializationOptions{}) const;
 
     /**
      * Shortcut method to get a BSONObj for debugging. Often useful in log messages, but is not
@@ -414,19 +383,11 @@ public:
     virtual void addInvolvedCollections(
         stdx::unordered_set<NamespaceString>* collectionNames) const {}
 
-    virtual void detachFromOperationContext() {}
-
-    virtual void reattachToOperationContext(OperationContext* opCtx) {}
-
-    virtual bool usedDisk() {
-        return false;
-    };
-
     /**
      * Create a DocumentSource pipeline stage from 'stageObj'.
      */
-    static std::list<boost::intrusive_ptr<DocumentSource>> parse(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, BSONObj stageObj);
+    static DocumentSourceContainer parse(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                         BSONObj stageObj);
 
     /**
      * Function that will be used as an alternate parser for a document source that has been
@@ -440,17 +401,21 @@ public:
                           << " is not allowed with the current configuration. You may need to "
                              "enable the corresponding feature flag");
     }
+
     /**
      * Registers a DocumentSource with a parsing function, so that when a stage with the given name
      * is encountered, it will call 'parser' to construct that stage.
      *
+     * If skipIfExists is true, and there is already a parser registered with the given name, the
+     * registration is silently skipped.
+     *
      * DO NOT call this method directly. Instead, use the REGISTER_DOCUMENT_SOURCE macro defined in
      * this file.
      */
-    static void registerParser(
-        std::string name,
-        Parser parser,
-        boost::optional<multiversion::FeatureCompatibilityVersion> requiredMinVersion);
+    static void registerParser(std::string name,
+                               Parser parser,
+                               FeatureFlag* featureFlag = nullptr,
+                               bool skipIfExists = false);
     /**
      * Convenience wrapper for the common case, when DocumentSource::Parser returns a list of one
      * DocumentSource.
@@ -458,10 +423,18 @@ public:
      * DO NOT call this method directly. Instead, use the REGISTER_DOCUMENT_SOURCE macro defined in
      * this file.
      */
-    static void registerParser(
-        std::string name,
-        SimpleParser simpleParser,
-        boost::optional<multiversion::FeatureCompatibilityVersion> requiredMinVersion);
+    static void registerParser(std::string name,
+                               SimpleParser simpleParser,
+                               FeatureFlag* featureFlag = nullptr,
+                               bool skipIfExists = false);
+
+    /**
+     * Allocate and return a new, unique DocumentSource::Id value.
+     *
+     * DO NOT call this method directly. Instead, use the ALLOCATE_DOCUMENT_SOURCE_ID macro defined
+     * in this file.
+     */
+    static Id allocateId(StringData name);
 
     /**
      * Returns true if the DocumentSource has a query.
@@ -473,44 +446,52 @@ public:
      */
     virtual BSONObj getQuery() const;
 
+    /**
+     * Utility which allows for accessing and computing a ShardId to act as a merger.
+     */
+    boost::optional<ShardId> getMergeShardId() const {
+        return mergeShardId.get();
+    }
+
 private:
     /**
-     * Attempt to push a match stage from directly ahead of the current stage given by itr to before
-     * the current stage. Returns whether the optimization was performed.
+     * itr is pointing to some stage `A`. Fetch stage `B`, the stage after A in itr. If B is a
+     * $match stage, attempt to push B before A. Returns whether this optimization was
+     * performed.
      */
-    bool pushMatchBefore(Pipeline::SourceContainer::iterator itr,
-                         Pipeline::SourceContainer* container);
+    bool pushMatchBefore(DocumentSourceContainer::iterator itr, DocumentSourceContainer* container);
 
     /**
-     * Attempt to push a sample stage from directly ahead of the current stage given by itr to
-     * before the current stage. Returns whether the optimization was performed.
+     * itr is pointing to some stage `A`. Fetch stage `B`, the stage after A in itr. If B is a
+     * $sample stage, attempt to push B before A. Returns whether this optimization was
+     * performed.
      */
-    bool pushSampleBefore(Pipeline::SourceContainer::iterator itr,
-                          Pipeline::SourceContainer* container);
+    bool pushSampleBefore(DocumentSourceContainer::iterator itr,
+                          DocumentSourceContainer* container);
 
     /**
-     * Attempts to push any kind of 'DocumentSourceSingleDocumentTransformation' stage directly
-     * ahead of the stage present at the 'itr' position if matches the constraints. Returns true if
-     * optimization was performed, false otherwise.
+     * Attempts to push any kind of 'DocumentSourceSingleDocumentTransformation' stage or a $redact
+     * stage directly ahead of the stage present at the 'itr' position if matches the constraints.
+     * Returns true if optimization was performed, false otherwise.
      *
      * Note that this optimization is oblivious to the transform function. The only stages that are
      * eligible to swap are those that can safely swap with any transform.
      */
-    bool pushSingleDocumentTransformBefore(Pipeline::SourceContainer::iterator itr,
-                                           Pipeline::SourceContainer* container);
+    bool pushSingleDocumentTransformOrRedactBefore(DocumentSourceContainer::iterator itr,
+                                                   DocumentSourceContainer* container);
 
     /**
      * Wraps various optimization methods and returns the call immediately if any one of them
      * returns true.
      */
-    bool attemptToPushStageBefore(Pipeline::SourceContainer::iterator itr,
-                                  Pipeline::SourceContainer* container) {
+    bool attemptToPushStageBefore(DocumentSourceContainer::iterator itr,
+                                  DocumentSourceContainer* container) {
         if (std::next(itr) == container->end()) {
             return false;
         }
 
         return pushMatchBefore(itr, container) || pushSampleBefore(itr, container) ||
-            pushSingleDocumentTransformBefore(itr, container);
+            pushSingleDocumentTransformOrRedactBefore(itr, container);
     }
 
 public:
@@ -522,8 +503,8 @@ public:
      * Subclasses should override doOptimizeAt() if they can apply some optimization(s) based on
      * subsequent stages in the pipeline.
      */
-    Pipeline::SourceContainer::iterator optimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                   Pipeline::SourceContainer* container);
+    DocumentSourceContainer::iterator optimizeAt(DocumentSourceContainer::iterator itr,
+                                                 DocumentSourceContainer* container);
 
     /**
      * Returns an optimized DocumentSource that is semantically equivalent to this one, or
@@ -548,6 +529,9 @@ public:
     //
 
     struct GetModPathsReturn {
+        // Note that renaming a path does NOT count as a modification (see `renames` struct member).
+        // Modification can be, in the context of the query: the removal of a path, the creation of
+        // a new path, etc.
         enum class Type {
             // No information is available about which paths are modified.
             kNotSupported,
@@ -558,19 +542,24 @@ public:
 
             // A finite set of paths will be modified by this stage. This is true for something like
             // {$project: {a: 0, b: 0}}, which will only modify 'a' and 'b', and leave all other
-            // paths unmodified.
+            // paths unmodified. Other examples include: $lookup, $unwind.
             kFiniteSet,
 
             // This stage will modify an infinite set of paths, but we know which paths it will not
             // modify. For example, the stage {$project: {_id: 1, a: 1}} will leave only the fields
-            // '_id' and 'a' unmodified, but all other fields will be projected out.
+            // '_id' and 'a' unmodified, but all other fields will be projected out. Other examples
+            // include: $group.
             kAllExcept,
         };
 
         GetModPathsReturn(Type type,
-                          std::set<std::string>&& paths,
-                          StringMap<std::string>&& renames)
-            : type(type), paths(std::move(paths)), renames(std::move(renames)) {}
+                          OrderedPathSet&& paths,
+                          StringMap<std::string>&& renames,
+                          StringMap<std::string>&& complexRenames = {})
+            : type(type),
+              paths(std::move(paths)),
+              renames(std::move(renames)),
+              complexRenames(std::move(complexRenames)) {}
 
         std::set<std::string> getNewNames() {
             std::set<std::string> newNames;
@@ -583,8 +572,43 @@ public:
             return newNames;
         }
 
+        bool canModify(const FieldPath& fieldPath) const {
+            switch (type) {
+                case Type::kAllPaths:
+                    return true;
+                case Type::kNotSupported:
+                    return true;
+                case Type::kFiniteSet:
+                    // If there's a subpath that is modified this path may be modified.
+                    for (size_t i = 0; i < fieldPath.getPathLength(); i++) {
+                        if (paths.count(std::string{fieldPath.getSubpath(i)}))
+                            return true;
+                    }
+
+                    for (auto&& path : paths) {
+                        // If there's a superpath that is modified this path may be modified.
+                        if (expression::isPathPrefixOf(fieldPath.fullPath(), path)) {
+                            return true;
+                        }
+                    }
+
+                    return false;
+                case Type::kAllExcept:
+                    // If one of the subpaths is unmodified return false.
+                    for (size_t i = 0; i < fieldPath.getPathLength(); i++) {
+                        if (paths.count(std::string{fieldPath.getSubpath(i)}))
+                            return false;
+                    }
+
+                    // Otherwise return true;
+                    return true;
+            }
+            // Cannot hit.
+            MONGO_UNREACHABLE_TASSERT(6434902);
+        }
+
         Type type;
-        std::set<std::string> paths;
+        OrderedPathSet paths;
 
         // Stages may fill out 'renames' to contain information about path renames. Each entry in
         // 'renames' maps from the new name of the path (valid in documents flowing *out* of this
@@ -597,6 +621,11 @@ public:
         // This stage should return kAllExcept, since it modifies all paths other than "a". It can
         // also fill out 'renames' with the mapping "b" => "c".
         StringMap<std::string> renames;
+
+        // Including space for returning renames which include dotted paths.
+        // i.e., "a.b" => c
+        //
+        StringMap<std::string> complexRenames;
     };
 
     /**
@@ -607,14 +636,15 @@ public:
      * See GetModPathsReturn above for the possible return values and what they mean.
      */
     virtual GetModPathsReturn getModifiedPaths() const {
-        return {GetModPathsReturn::Type::kNotSupported, std::set<std::string>{}, {}};
+        return {GetModPathsReturn::Type::kNotSupported, OrderedPathSet{}, {}};
     }
 
     /**
      * Returns the expression context from the stage's context.
+     * TODO SPM-4106: Consider renaming to getContext() once the refactoring is done.
      */
-    const boost::intrusive_ptr<ExpressionContext>& getContext() const {
-        return pExpCtx;
+    const boost::intrusive_ptr<ExpressionContext>& getExpCtx() const {
+        return _expCtx;
     }
 
     /**
@@ -622,11 +652,23 @@ public:
      * all paths needed to apply their transformation to 'deps->fields', and call
      * 'deps->setNeedsMetadata()' to indicate what metadata (e.g. text score), if any, is required.
      *
+     * getDependencies() is also used to implement validation / error reporting for $meta
+     * dependencies. There may be some incomplete implementations of getDependencies() that return
+     * NOT_SUPPORTED even though they call to 'deps->setMetadataAvailable()'. This is because
+     * they've been implemented correctly for error reporting but not for dependency analysis.
+     * TODO SERVER-100902 Split $meta validation separate from dependency analysis.
+     *
      * See DepsTracker::State for the possible return values and what they mean.
      */
     virtual DepsTracker::State getDependencies(DepsTracker* deps) const {
         return DepsTracker::State::NOT_SUPPORTED;
     }
+
+    /**
+     * Populate 'refs' with the variables referred to by this stage, including user and system
+     * variables but excluding $$ROOT. Note that field path references are not considered variables.
+     */
+    virtual void addVariableRefs(std::set<Variables::Id>* refs) const = 0;
 
     /**
      * If this stage can be run in parallel across a distributed collection, returns boost::none.
@@ -639,24 +681,53 @@ public:
     virtual boost::optional<DistributedPlanLogic> distributedPlanLogic() = 0;
 
     /**
+     * Check if a source is able to run in parallel across a distributed collection, given
+     * sharding context and that it will be evaluated _after_ pipelinePrefix, and _before_
+     * pipelineSuffix.
+     *
+     * For stages which do not have any pipeline-dependent behaviour, the default impl
+     * calls distributedPlanLogic.
+     *
+     * See distributedPlanLogic() for conditions and return values.
+     */
+    virtual boost::optional<DistributedPlanLogic> pipelineDependentDistributedPlanLogic(
+        const DistributedPlanContext& ctx) {
+        return distributedPlanLogic();
+    }
+
+    /**
      * Returns true if it would be correct to execute this stage in parallel across the shards in
      * cases where the final stage is a stage which can perform a write operation, such as $merge.
      * For example, a $group stage which is just merging the groups from the shards can be run in
      * parallel since it will preserve the shard key.
      */
     virtual bool canRunInParallelBeforeWriteStage(
-        const std::set<std::string>& nameOfShardKeyFieldsUponEntryToStage) const {
+        const OrderedPathSet& nameOfShardKeyFieldsUponEntryToStage) const {
         return false;
+    }
+
+    /**
+     * For stages that have sub-pipelines returns the source container holding the stages of that
+     * pipeline. Otherwise returns a nullptr.
+     */
+    virtual const DocumentSourceContainer* getSubPipeline() const {
+        return nullptr;
+    }
+
+    virtual void detachSourceFromOperationContext() {}
+
+    virtual void reattachSourceToOperationContext(OperationContext* opCtx) {}
+
+    /**
+     * Validate that all operation contexts associated with this document source, including any
+     * subpipelines, match the argument.
+     */
+    virtual bool validateSourceOperationContext(const OperationContext* opCtx) const {
+        return _expCtx->getOperationContext() == opCtx;
     }
 
 protected:
     DocumentSource(StringData stageName, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
-
-    /**
-     * The main execution API of a DocumentSource. Returns an intermediate query result generated by
-     * this DocumentSource. See comment at getNext().
-     */
-    virtual GetNextResult doGetNext() = 0;
 
     /**
      * Attempt to perform an optimization with the following source in the pipeline. 'container'
@@ -669,31 +740,52 @@ protected:
      * directly preceding 'itr', if such a position exists, since the stage at that position may be
      * able to perform further optimizations with its new neighbor.
      */
-    virtual Pipeline::SourceContainer::iterator doOptimizeAt(
-        Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    virtual DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
+                                                           DocumentSourceContainer* container) {
         return std::next(itr);
-    };
+    }
 
     /**
-     * Release any resources held by this stage. After doDispose() is called the stage must still be
-     * able to handle calls to getNext(), but can return kEOF.
+     * Utility which describes when a stage needs to nominate a merging shard.
      */
-    virtual void doDispose() {}
+    virtual boost::optional<ShardId> computeMergeShardId() const {
+        return boost::none;
+    }
 
-    /*
-      Most DocumentSources have an underlying source they get their data
-      from.  This is a convenience for them.
+    /**
+     * Tracks this stage's merge ShardId, if one exists.
+     */
+    DeferredFn<boost::optional<ShardId>> mergeShardId{[this]() -> boost::optional<ShardId> {
+        auto shardId = this->computeMergeShardId();
+        tassert(9514400,
+                str::stream() << "ShardId must be either boost::none or valid, but got "
+                              << (shardId ? shardId->toString() : "boost::none"),
+                !shardId || shardId->isValid());
+        return shardId;
+    }};
 
-      The default implementation of setSource() sets this; if you don't
-      need a source, override that to verify().  The default is to
-      verify() if this has already been set.
-    */
-    DocumentSource* pSource;
+    /**
+     * unregisterParser_forTest is only meant to be used in the context of unit tests. This is
+     * because the parserMap is not thread safe, so modifying it at runtime is unsafe.
+     */
 
-    boost::intrusive_ptr<ExpressionContext> pExpCtx;
+    static void unregisterParser_forTest(const std::string& name);
 
 private:
-    CommonStats _commonStats;
+    // Give access to 'getParserMap()' for the implementation of $listMqlEntities but hiding
+    // it from all other stages.
+    friend class exec::agg::ListMqlEntitiesStage;
+
+    // Used to keep track of which DocumentSources are registered under which name. Initialized
+    // during process initialization and const thereafter.
+    static StringMap<ParserRegistration> parserMap;
+
+    /**
+     * Return the map of currently registered parsers.
+     */
+    static const StringMap<ParserRegistration>& getParserMap() {
+        return parserMap;
+    }
 
     /**
      * Create a Value that represents the document source.
@@ -701,19 +793,10 @@ private:
      * This is used by the default implementation of serializeToArray() to add this object
      * to a pipeline being serialized. Returning a missing() Value results in no entry
      * being added to the array for this stage (DocumentSource).
-     *
-     * The 'explain' parameter indicates the explain verbosity mode, or is equal boost::none if no
-     * explain is requested.
      */
-    virtual Value serialize(
-        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const = 0;
-};
+    virtual Value serialize(const SerializationOptions& opts = SerializationOptions{}) const = 0;
 
-/**
- * Method to accumulate the plan summary stats from all stages of the pipeline into the given
- * `planSummaryStats` object.
- */
-void accumulatePipelinePlanSummaryStats(const Pipeline& pipeline,
-                                        PlanSummaryStats& planSummaryStats);
+    boost::intrusive_ptr<ExpressionContext> _expCtx;
+};
 
 }  // namespace mongo

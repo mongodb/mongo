@@ -29,19 +29,49 @@
 
 #include "mongo/db/storage/kv/kv_engine_test_harness.h"
 
-#include "mongo/db/catalog/collection_impl.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/operation_context_noop.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/client.h"
+#include "mongo/db/local_catalog/collection_options.h"
+#include "mongo/db/local_catalog/durable_catalog.h"
+#include "mongo/db/local_catalog/durable_catalog_entry_metadata.h"
+#include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
+#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
+#include "mongo/db/multitenancy_gen.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/db/storage/durable_catalog_impl.h"
+#include "mongo/db/storage/key_format.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/mdb_catalog.h"
+#include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
-#include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/sorted_data_interface_test_assert.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/clock_source_mock.h"
-#include "mongo/util/scopeguard.h"
+#include "mongo/util/uuid.h"
+
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -62,7 +92,7 @@ public:
     ServiceContext::UniqueOperationContext _opCtx;
 };
 
-class DurableCatalogImplTest : public ServiceContextTest {
+class MDBCatalogTest : public ServiceContextTest {
 protected:
     void setUp() override {
         helper = KVHarnessHelper::create(getServiceContext());
@@ -70,41 +100,82 @@ protected:
     }
 
     ClientAndCtx makeClientAndCtx(const std::string& clientName) {
-        auto client = getGlobalServiceContext()->makeClient(clientName);
+        auto client = getGlobalServiceContext()->getService()->makeClient(clientName);
         auto opCtx = client->makeOperationContext();
-        opCtx->setRecoveryUnit(
-            std::unique_ptr<RecoveryUnit>(helper->getEngine()->newRecoveryUnit()),
-            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+        shard_role_details::setRecoveryUnit(opCtx.get(),
+                                            helper->getEngine()->newRecoveryUnit(),
+                                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
         return {std::move(client), std::move(opCtx)};
     }
 
-    RecordId newCollection(OperationContext* opCtx,
-                           const NamespaceString& ns,
-                           const CollectionOptions& options,
-                           DurableCatalogImpl* catalog) {
-        Lock::DBLock dbLk(opCtx, ns.db(), MODE_IX);
-        auto swEntry = catalog->_addEntry(opCtx, ns, options);
+    // Callers are responsible for managing the lifetime of 'catalogRS'.
+    std::unique_ptr<MDBCatalog> createMDBCatalog(RecordStore* catalogRS) {
+        return std::make_unique<MDBCatalog>(catalogRS, helper->getEngine());
+    }
+
+    std::unique_ptr<RecordStore> createCatalogRS() {
+        auto clientAndCtx = makeClientAndCtx("opCtx");
+        auto opCtx = clientAndCtx.opCtx();
+        KVEngine* engine = helper->getEngine();
+        auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+        ASSERT_OK(
+            engine->createRecordStore(provider,
+                                      NamespaceString::createNamespaceString_forTest("catalog"),
+                                      "collection-catalog",
+                                      RecordStore::Options{}));
+
+        return engine->getRecordStore(opCtx,
+                                      NamespaceString::createNamespaceString_forTest("catalog"),
+                                      "collection-catalog",
+                                      RecordStore::Options{},
+                                      UUID::gen());
+    }
+
+    // Adds a new entry to the MDBCatalog without initializing a backing RecordStore.
+    RecordId addNewCatalogEntry(OperationContext* opCtx,
+                                const NamespaceString& nss,
+                                const CollectionOptions& collectionOptions,
+                                MDBCatalog* mdbCatalog) {
+        Lock::DBLock dbLk(opCtx, nss.dbName(), MODE_IX);
+
+        const auto ident = ident::generateNewCollectionIdent(nss.dbName(), false, false);
+        auto md = durable_catalog::internal::createMetaDataForNewCollection(nss, collectionOptions);
+        auto rawMDBCatalogEntry = durable_catalog::internal::buildRawMDBCatalogEntry(
+            ident, BSONObj() /* idxIdent */, md, nss);
+
+        // An 'orphaned' entry is one without a RecordStore explicitly created to back it.
+        auto swEntry = mdbCatalog->addEntry(
+            opCtx, ident, nss, rawMDBCatalogEntry, mdbCatalog->reserveCatalogId(opCtx));
         ASSERT_OK(swEntry.getStatus());
         return swEntry.getValue().catalogId;
     }
 
-    Status dropCollection(OperationContext* opCtx,
-                          RecordId catalogId,
-                          DurableCatalogImpl* catalog) {
+    StatusWith<MDBCatalog::EntryIdentifier> addEntry(OperationContext* opCtx,
+                                                     const std::string& ident,
+                                                     const NamespaceString& nss,
+                                                     const BSONObj& catalogEntryObj,
+                                                     const RecordId& catalogId,
+                                                     MDBCatalog* mdbCatalog) {
+        Lock::DBLock dbLk(opCtx, nss.dbName(), MODE_IX);
+        return mdbCatalog->addEntry(opCtx, ident, nss, catalogEntryObj, catalogId);
+    }
+
+    Status dropCollection(OperationContext* opCtx, RecordId catalogId, MDBCatalog* catalog) {
         Lock::GlobalLock globalLk(opCtx, MODE_IX);
-        return catalog->_removeEntry(opCtx, catalogId);
+        return catalog->removeEntry(opCtx, catalogId);
     }
 
     void putMetaData(OperationContext* opCtx,
-                     DurableCatalogImpl* catalog,
+                     MDBCatalog* mdbCatalog,
                      RecordId catalogId,
-                     BSONCollectionCatalogEntry::MetaData& md) {
+                     durable_catalog::CatalogEntryMetaData& md,
+                     boost::optional<BSONObj> indexIdents = boost::none) {
         Lock::GlobalLock globalLk(opCtx, MODE_IX);
-        catalog->putMetaData(opCtx, catalogId, md);
+        durable_catalog::putMetaData(opCtx, catalogId, md, mdbCatalog, indexIdents);
     }
 
     std::string getIndexIdent(OperationContext* opCtx,
-                              DurableCatalogImpl* catalog,
+                              MDBCatalog* catalog,
                               RecordId catalogId,
                               StringData idxName) {
         Lock::GlobalLock globalLk(opCtx, MODE_IS);
@@ -117,15 +188,23 @@ protected:
 namespace {
 
 std::function<std::unique_ptr<KVHarnessHelper>(ServiceContext*)> basicFactory =
-    [](ServiceContext*) -> std::unique_ptr<KVHarnessHelper> { fassertFailed(40355); };
+    [](ServiceContext*) -> std::unique_ptr<KVHarnessHelper> {
+    fassertFailed(40355);
+};
 
 class KVEngineTestHarness : public ServiceContextTest {
 protected:
+    const NamespaceString kNss =
+        NamespaceString::createNamespaceString_forTest("defaultDB.defaultColl");
+    const std::string kIdent = "collection-defaultIdent";
+    const UUID kUUID = UUID::gen();
+    const RecordStore::Options kRecordStoreOptions{};
+
     ServiceContext::UniqueOperationContext _makeOperationContext(KVEngine* engine) {
         auto opCtx = makeOperationContext();
-        opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(engine->newRecoveryUnit()),
-                               WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
-        opCtx->swapLockState(std::make_unique<LockerNoop>(), WithLock::withoutLock());
+        shard_role_details::setRecoveryUnit(opCtx.get(),
+                                            engine->newRecoveryUnit(),
+                                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
         return opCtx;
     }
 
@@ -136,42 +215,50 @@ protected:
         opCtxs.reserve(num);
 
         for (unsigned i = 0; i < num; ++i) {
-            auto client = getServiceContext()->makeClient(std::to_string(i));
+            auto client = getServiceContext()->getService()->makeClient(std::to_string(i));
 
             auto opCtx = client->makeOperationContext();
-            opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(engine->newRecoveryUnit()),
-                                   WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
-            opCtx->swapLockState(std::make_unique<LockerNoop>(), WithLock::withoutLock());
-
+            shard_role_details::setRecoveryUnit(
+                opCtx.get(),
+                engine->newRecoveryUnit(),
+                WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
             opCtxs.emplace_back(std::move(client), std::move(opCtx));
         }
 
         return opCtxs;
     }
-};
 
-const std::unique_ptr<ClockSource> clock = std::make_unique<ClockSourceMock>();
+    std::unique_ptr<RecordStore> newRecordStore(KVEngine* engine,
+                                                const NamespaceString& nss,
+                                                StringData ident,
+                                                const RecordStore::Options& recordStoreOptions,
+                                                boost::optional<UUID> uuid) {
+        auto opCtx = _makeOperationContext(engine);
+        auto& provider = rss::ReplicatedStorageService::get(opCtx.get()).getPersistenceProvider();
+        ASSERT_OK(engine->createRecordStore(provider, nss, ident, recordStoreOptions));
+        auto rs = engine->getRecordStore(opCtx.get(), nss, ident, recordStoreOptions, uuid);
+        ASSERT(rs);
+        return rs;
+    }
+
+    std::unique_ptr<RecordStore> newRecordStore(KVEngine* engine) {
+        return newRecordStore(engine, kNss, kIdent, kRecordStoreOptions, kUUID);
+    }
+};
 
 TEST_F(KVEngineTestHarness, SimpleRS1) {
     std::unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create(getServiceContext()));
     KVEngine* engine = helper->getEngine();
     ASSERT(engine);
 
-    std::string ns = "a.b";
-    std::unique_ptr<RecordStore> rs;
-    {
-        auto opCtx = _makeOperationContext(engine);
-        ASSERT_OK(engine->createRecordStore(opCtx.get(), ns, ns, CollectionOptions()));
-        rs = engine->getRecordStore(opCtx.get(), ns, ns, CollectionOptions());
-        ASSERT(rs);
-    }
-
-
+    std::unique_ptr<RecordStore> rs = newRecordStore(engine);
+    const auto& ident = rs->getIdent();
     RecordId loc;
     {
         auto opCtx = _makeOperationContext(engine);
         WriteUnitOfWork uow(opCtx.get());
-        StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "abc", 4, Timestamp());
+        StatusWith<RecordId> res = rs->insertRecord(
+            opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), "abc", 4, Timestamp());
         ASSERT_OK(res.getStatus());
         loc = res.getValue();
         uow.commit();
@@ -179,14 +266,21 @@ TEST_F(KVEngineTestHarness, SimpleRS1) {
 
     {
         auto opCtx = _makeOperationContext(engine);
-        ASSERT_EQUALS(std::string("abc"), rs->dataFor(opCtx.get(), loc).data());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
+        ASSERT_EQUALS(
+            std::string("abc"),
+            rs->dataFor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), loc)
+                .data());
     }
 
     {
         auto opCtx = _makeOperationContext(engine);
-        std::vector<std::string> all = engine->getAllIdents(opCtx.get());
-        ASSERT_EQUALS(1U, all.size());
-        ASSERT_EQUALS(ns, all[0]);
+        std::vector<std::string> all =
+            engine->getAllIdents(*shard_role_details::getRecoveryUnit(opCtx.get()));
+
+        // This includes the _mdb_catalog.
+        ASSERT_EQUALS(2U, all.size());
+        ASSERT_EQUALS(ident, all[1]);
     }
 }
 
@@ -195,23 +289,22 @@ TEST_F(KVEngineTestHarness, Restart1) {
     KVEngine* engine = helper->getEngine();
     ASSERT(engine);
 
-    std::string ns = "a.b";
-
     // 'loc' holds location of "abc" and is referenced after restarting engine.
     RecordId loc;
     {
-        std::unique_ptr<RecordStore> rs;
-        {
-            auto opCtx = _makeOperationContext(engine);
-            ASSERT_OK(engine->createRecordStore(opCtx.get(), ns, ns, CollectionOptions()));
-            rs = engine->getRecordStore(opCtx.get(), ns, ns, CollectionOptions());
-            ASSERT(rs);
-        }
+        // Using default RecordStore parameters before and after restart.
+        std::unique_ptr<RecordStore> rs =
+            newRecordStore(engine, kNss, kIdent, kRecordStoreOptions, kUUID);
 
         {
             auto opCtx = _makeOperationContext(engine);
             WriteUnitOfWork uow(opCtx.get());
-            StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "abc", 4, Timestamp());
+            StatusWith<RecordId> res =
+                rs->insertRecord(opCtx.get(),
+                                 *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                 "abc",
+                                 4,
+                                 Timestamp());
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
             uow.commit();
@@ -219,7 +312,11 @@ TEST_F(KVEngineTestHarness, Restart1) {
 
         {
             auto opCtx = _makeOperationContext(engine);
-            ASSERT_EQUALS(std::string("abc"), rs->dataFor(opCtx.get(), loc).data());
+            Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
+            ASSERT_EQUALS(
+                std::string("abc"),
+                rs->dataFor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), loc)
+                    .data());
         }
     }
 
@@ -228,69 +325,65 @@ TEST_F(KVEngineTestHarness, Restart1) {
     {
         std::unique_ptr<RecordStore> rs;
         auto opCtx = _makeOperationContext(engine);
-        rs = engine->getRecordStore(opCtx.get(), ns, ns, CollectionOptions());
-        ASSERT_EQUALS(std::string("abc"), rs->dataFor(opCtx.get(), loc).data());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
+        rs = engine->getRecordStore(opCtx.get(), kNss, kIdent, kRecordStoreOptions, kUUID);
+        ASSERT_EQUALS(
+            std::string("abc"),
+            rs->dataFor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), loc)
+                .data());
     }
 }
-
 
 TEST_F(KVEngineTestHarness, SimpleSorted1) {
     std::unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create(getServiceContext()));
     KVEngine* engine = helper->getEngine();
     ASSERT(engine);
-
-    std::string ident = "abc";
-    auto ns = NamespaceString("mydb.mycoll");
-
-    CollectionOptions options;
-    options.uuid = UUID::gen();
-
-    std::unique_ptr<RecordStore> rs;
-    {
-        auto opCtx = _makeOperationContext(engine);
-        WriteUnitOfWork uow(opCtx.get());
-        ASSERT_OK(engine->createRecordStore(opCtx.get(), "catalog", "catalog", options));
-        rs = engine->getRecordStore(opCtx.get(), "catalog", "catalog", options);
-        uow.commit();
-    }
-
-
-    std::unique_ptr<Collection> collection;
-    {
-        auto opCtx = _makeOperationContext(engine);
-        WriteUnitOfWork uow(opCtx.get());
-        collection =
-            std::make_unique<CollectionImpl>(opCtx.get(), ns, RecordId(0), options, std::move(rs));
-        uow.commit();
-    }
-
-    IndexDescriptor desc("",
-                         BSON("v" << static_cast<int>(IndexDescriptor::kLatestIndexVersion) << "key"
-                                  << BSON("a" << 1)));
+    std::string indexName = "name";
+    auto spec = BSON("v" << static_cast<int>(IndexConfig::kLatestIndexVersion) << "key"
+                         << BSON("a" << 1) << "name" << indexName);
+    auto ordering = Ordering::allAscending();
+    IndexConfig config{false /* isIdIndex */,
+                       false /* unique */,
+                       IndexConfig::kLatestIndexVersion,
+                       spec,
+                       indexName,
+                       ordering};
     std::unique_ptr<SortedDataInterface> sorted;
     {
         auto opCtx = _makeOperationContext(engine);
-        ASSERT_OK(
-            engine->createSortedDataInterface(opCtx.get(), CollectionOptions(), ident, &desc));
-        sorted = engine->getSortedDataInterface(opCtx.get(), CollectionOptions(), ident, &desc);
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+        auto& provider = rss::ReplicatedStorageService::get(opCtx.get()).getPersistenceProvider();
+        ASSERT_OK(engine->createSortedDataInterface(provider,
+                                                    ru,
+                                                    kNss,
+                                                    kUUID,
+                                                    kIdent,
+                                                    config,
+                                                    boost::none /* storageEngineIndexOptions */));
+        sorted = engine->getSortedDataInterface(
+            opCtx.get(), ru, kNss, kUUID, kIdent, config, kRecordStoreOptions.keyFormat);
         ASSERT(sorted);
     }
 
     {
         auto opCtx = _makeOperationContext(engine);
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         WriteUnitOfWork uow(opCtx.get());
         const RecordId recordId(6, 4);
-        const KeyString::Value keyString =
-            KeyString::HeapBuilder(
+        const key_string::Value keyString =
+            key_string::HeapBuilder(
                 sorted->getKeyStringVersion(), BSON("" << 5), sorted->getOrdering(), recordId)
                 .release();
-        ASSERT_OK(sorted->insert(opCtx.get(), keyString, true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx.get(), ru, keyString, true));
         uow.commit();
     }
 
     {
         auto opCtx = _makeOperationContext(engine);
-        ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
+        ASSERT_EQUALS(1, sorted->numEntries(opCtx.get(), ru));
     }
 }
 
@@ -299,11 +392,12 @@ TEST_F(KVEngineTestHarness, TemporaryRecordStoreSimple) {
     KVEngine* engine = helper->getEngine();
     ASSERT(engine);
 
-    std::string ident = "temptemp";
+    std::string ident = "collection-temptemp";
     std::unique_ptr<RecordStore> rs;
     {
         auto opCtx = _makeOperationContext(engine);
-        rs = engine->makeTemporaryRecordStore(opCtx.get(), ident, KeyFormat::Long);
+        rs = engine->makeTemporaryRecordStore(
+            *shard_role_details::getRecoveryUnit(opCtx.get()), ident, KeyFormat::Long);
         ASSERT(rs);
     }
 
@@ -311,7 +405,8 @@ TEST_F(KVEngineTestHarness, TemporaryRecordStoreSimple) {
     {
         auto opCtx = _makeOperationContext(engine);
         WriteUnitOfWork uow(opCtx.get());
-        StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "abc", 4, Timestamp());
+        StatusWith<RecordId> res = rs->insertRecord(
+            opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), "abc", 4, Timestamp());
         ASSERT_OK(res.getStatus());
         loc = res.getValue();
         uow.commit();
@@ -319,14 +414,25 @@ TEST_F(KVEngineTestHarness, TemporaryRecordStoreSimple) {
 
     {
         auto opCtx = _makeOperationContext(engine);
-        ASSERT_EQUALS(std::string("abc"), rs->dataFor(opCtx.get(), loc).data());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
+        ASSERT_EQUALS(
+            std::string("abc"),
+            rs->dataFor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), loc)
+                .data());
 
-        std::vector<std::string> all = engine->getAllIdents(opCtx.get());
-        ASSERT_EQUALS(1U, all.size());
-        ASSERT_EQUALS(ident, all[0]);
+        std::vector<std::string> all =
+            engine->getAllIdents(*shard_role_details::getRecoveryUnit(opCtx.get()));
+
+        // This includes the _mdb_catalog.
+        ASSERT_EQUALS(2U, all.size());
+        ASSERT_EQUALS(ident, all[1]);
+
+        // Dropping a collection might fail if we haven't checkpointed the data
+        engine->checkpoint();
 
         WriteUnitOfWork wuow(opCtx.get());
-        ASSERT_OK(engine->dropIdent(opCtx->recoveryUnit(), ident));
+        ASSERT_OK(engine->dropIdent(
+            *shard_role_details::getRecoveryUnit(opCtx.get()), ident, /*identHasSizeInfo=*/true));
         wuow.commit();
     }
 }
@@ -334,72 +440,38 @@ TEST_F(KVEngineTestHarness, TemporaryRecordStoreSimple) {
 TEST_F(KVEngineTestHarness, AllDurableTimestamp) {
     std::unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create(getServiceContext()));
     KVEngine* engine = helper->getEngine();
+    std::unique_ptr<RecordStore> rs = newRecordStore(engine);
+    auto opCtxs = _makeOperationContexts(engine, 2);
 
-    std::unique_ptr<RecordStore> rs;
-    {
-        auto opCtx = _makeOperationContext(engine);
-        WriteUnitOfWork uow(opCtx.get());
-        CollectionOptions options;
-        options.capped = true;
-        options.cappedSize = 10240;
-        options.cappedMaxDocs = -1;
+    Timestamp t51(5, 1);
+    Timestamp t52(5, 2);
+    Timestamp t61(6, 1);
 
-        NamespaceString oplogNss("local.oplog.rs");
-        ASSERT_OK(engine->createRecordStore(opCtx.get(), oplogNss.ns(), "ident", options));
-        rs = engine->getRecordStore(opCtx.get(), oplogNss.ns(), "ident", options);
-        ASSERT(rs);
-    }
-    {
-        auto opCtxs = _makeOperationContexts(engine, 2);
+    ASSERT_EQ(engine->getAllDurableTimestamp(), Timestamp(StorageEngine::kMinimumTimestamp));
 
-        Timestamp t11(1, 1);
-        Timestamp t12(1, 2);
-        Timestamp t21(2, 1);
+    auto opCtx1 = opCtxs[0].second.get();
+    WriteUnitOfWork uow1(opCtx1);
+    ASSERT_OK(
+        rs->insertRecord(opCtx1, *shard_role_details::getRecoveryUnit(opCtx1), "abc", 4, t51));
 
-        auto t11Doc = BSON("ts" << t11);
-        auto t12Doc = BSON("ts" << t12);
-        auto t21Doc = BSON("ts" << t21);
+    ASSERT_EQ(engine->getAllDurableTimestamp(), Timestamp(StorageEngine::kMinimumTimestamp));
 
-        Timestamp allDurable = engine->getAllDurableTimestamp();
-        auto opCtx1 = opCtxs[0].second.get();
-        WriteUnitOfWork uow1(opCtx1);
-        ASSERT_EQ(invariant(rs->insertRecord(
-                      opCtx1, t11Doc.objdata(), t11Doc.objsize(), Timestamp::min())),
-                  RecordId(1, 1));
+    auto opCtx2 = opCtxs[1].second.get();
+    WriteUnitOfWork uow2(opCtx2);
+    ASSERT_OK(
+        rs->insertRecord(opCtx2, *shard_role_details::getRecoveryUnit(opCtx2), "abc", 4, t61));
+    uow2.commit();
 
-        Timestamp lastAllDurable = allDurable;
-        allDurable = engine->getAllDurableTimestamp();
-        ASSERT_GTE(allDurable, lastAllDurable);
-        ASSERT_LT(allDurable, t11);
+    ASSERT_EQ(engine->getAllDurableTimestamp(), t51 - 1);
 
-        auto opCtx2 = opCtxs[1].second.get();
-        WriteUnitOfWork uow2(opCtx2);
-        ASSERT_EQ(invariant(rs->insertRecord(
-                      opCtx2, t21Doc.objdata(), t21Doc.objsize(), Timestamp::min())),
-                  RecordId(2, 1));
-        uow2.commit();
+    ASSERT_OK(
+        rs->insertRecord(opCtx1, *shard_role_details::getRecoveryUnit(opCtx1), "abc", 4, t52));
 
-        lastAllDurable = allDurable;
-        allDurable = engine->getAllDurableTimestamp();
-        ASSERT_GTE(allDurable, lastAllDurable);
-        ASSERT_LT(allDurable, t11);
+    ASSERT_EQ(engine->getAllDurableTimestamp(), t51 - 1);
 
-        ASSERT_EQ(invariant(rs->insertRecord(
-                      opCtx1, t12Doc.objdata(), t12Doc.objsize(), Timestamp::min())),
-                  RecordId(1, 2));
+    uow1.commit();
 
-        lastAllDurable = allDurable;
-        allDurable = engine->getAllDurableTimestamp();
-        ASSERT_GTE(allDurable, lastAllDurable);
-        ASSERT_LT(allDurable, t11);
-
-        uow1.commit();
-
-        lastAllDurable = allDurable;
-        allDurable = engine->getAllDurableTimestamp();
-        ASSERT_GTE(allDurable, lastAllDurable);
-        ASSERT_LTE(allDurable, t21);
-    }
+    ASSERT_EQ(engine->getAllDurableTimestamp(), t61);
 }
 
 /*
@@ -423,51 +495,43 @@ TEST_F(KVEngineTestHarness, AllDurableTimestamp) {
 TEST_F(KVEngineTestHarness, PinningOldestWithAnotherSession) {
     std::unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create(getServiceContext()));
     KVEngine* engine = helper->getEngine();
-    // TODO SERVER-48314: Remove after implementing correct behavior on biggie.
-    if (engine->isEphemeral())
-        return;
-
-    std::string ns = "a.b";
-    std::unique_ptr<RecordStore> rs;
-    {
-        auto opCtx = _makeOperationContext(engine);
-        ASSERT_OK(engine->createRecordStore(opCtx.get(), ns, ns, CollectionOptions()));
-        rs = engine->getRecordStore(opCtx.get(), ns, ns, CollectionOptions());
-        ASSERT(rs);
-    }
-
+    std::unique_ptr<RecordStore> rs = newRecordStore(engine);
     auto opCtxs = _makeOperationContexts(engine, 2);
 
     auto opCtx1 = opCtxs[0].second.get();
+    Lock::GlobalLock globalLk1(opCtx1, MODE_IX);
     WriteUnitOfWork uow1(opCtx1);
-    StatusWith<RecordId> res = rs->insertRecord(opCtx1, "abc", 4, Timestamp(10, 10));
+    StatusWith<RecordId> res = rs->insertRecord(
+        opCtx1, *shard_role_details::getRecoveryUnit(opCtx1), "abc", 4, Timestamp(10, 10));
     RecordId rid = res.getValue();
     uow1.commit();
 
     RecordData rd;
-    opCtx1->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
-                                                   Timestamp(15, 15));
+    shard_role_details::getRecoveryUnit(opCtx1)->setTimestampReadSource(
+        RecoveryUnit::ReadSource::kProvided, Timestamp(15, 15));
 
     auto opCtx2 = opCtxs[1].second.get();
+    Lock::GlobalLock globalLk2(opCtx2, MODE_IX);
     WriteUnitOfWork uow2(opCtx2);
 
-    ASSERT(rs->findRecord(opCtx1, rid, &rd));
-    ASSERT_OK(opCtx2->recoveryUnit()->setTimestamp(Timestamp(20, 20)));
-    ASSERT_OK(rs->updateRecord(opCtx2, rid, "updated", 8));
+    ASSERT(rs->findRecord(opCtx1, *shard_role_details::getRecoveryUnit(opCtx1), rid, &rd));
+    ASSERT_OK(shard_role_details::getRecoveryUnit(opCtx2)->setTimestamp(Timestamp(20, 20)));
+    ASSERT_OK(
+        rs->updateRecord(opCtx2, *shard_role_details::getRecoveryUnit(opCtx2), rid, "updated", 8));
 
-    ASSERT(rs->findRecord(opCtx1, rid, &rd));
+    ASSERT(rs->findRecord(opCtx1, *shard_role_details::getRecoveryUnit(opCtx1), rid, &rd));
     ASSERT_EQUALS(std::string("abc"), rd.data());
 
     uow2.commit();
 
-    opCtx1->recoveryUnit()->abandonSnapshot();
-    ASSERT(rs->findRecord(opCtx1, rid, &rd));
+    shard_role_details::getRecoveryUnit(opCtx1)->abandonSnapshot();
+    ASSERT(rs->findRecord(opCtx1, *shard_role_details::getRecoveryUnit(opCtx1), rid, &rd));
     ASSERT_EQUALS(std::string("abc"), rd.data());
 
 
-    opCtx2->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
-                                                   Timestamp(15, 15));
-    ASSERT(rs->findRecord(opCtx2, rid, &rd));
+    shard_role_details::getRecoveryUnit(opCtx2)->setTimestampReadSource(
+        RecoveryUnit::ReadSource::kProvided, Timestamp(15, 15));
+    ASSERT(rs->findRecord(opCtx2, *shard_role_details::getRecoveryUnit(opCtx2), rid, &rd));
     ASSERT_EQUALS(std::string("abc"), rd.data());
 }
 
@@ -476,11 +540,12 @@ TEST_F(KVEngineTestHarness, PinningOldestWithAnotherSession) {
  * | Session 1            | Session 2            | GlobalActor                      |
  * |----------------------+----------------------+----------------------------------|
  * | Begin                |                      |                                  |
- * | Commit :commit 10    |                      |                                  |
+ * | Timestamp :commit 10 |                      |                                  |
+ * | Commit               |                      |                                  |
  * |                      |                      | QueryTimestamp :all_durable (10) |
  * | Begin                |                      |                                  |
  * | Timestamp :commit 20 |                      |                                  |
- * |                      |                      | QueryTimestamp :all_durable (19) |
+ * |                      |                      | QueryTimestamp :all_durable (10) |
  * |                      | Begin                |                                  |
  * |                      | Timestamp :commit 30 |                                  |
  * |                      | Commit               |                                  |
@@ -489,80 +554,58 @@ TEST_F(KVEngineTestHarness, PinningOldestWithAnotherSession) {
  * |                      |                      | QueryTimestamp :all_durable (30) |
  * | Begin                |                      |                                  |
  * | Timestamp :commit 25 |                      |                                  |
- * |                      |                      | QueryTimestamp :all_durable (30) |
+ * |                      |                      | QueryTimestamp :all_durable (24) |
  */
 TEST_F(KVEngineTestHarness, AllDurable) {
     std::unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create(getServiceContext()));
     KVEngine* engine = helper->getEngine();
+    std::unique_ptr<RecordStore> rs = newRecordStore(engine);
+    auto opCtxs = _makeOperationContexts(engine, 4);
 
-    std::string ns = "a.b";
-    std::unique_ptr<RecordStore> rs;
-    {
-        auto opCtx = _makeOperationContext(engine);
-        ASSERT_OK(engine->createRecordStore(opCtx.get(), ns, ns, CollectionOptions()));
-        rs = engine->getRecordStore(opCtx.get(), ns, ns, CollectionOptions());
-        ASSERT(rs);
-    }
+    const Timestamp kInsertTimestamp1 = Timestamp(10, 10);
+    const Timestamp kInsertTimestamp2 = Timestamp(20, 20);
+    const Timestamp kInsertTimestamp3 = Timestamp(30, 30);
+    const Timestamp kInsertTimestamp4 = Timestamp(25, 25);
 
-    {
-        auto opCtxs = _makeOperationContexts(engine, 4);
+    auto opCtx1 = opCtxs[0].second.get();
+    WriteUnitOfWork uow1(opCtx1);
+    auto swRid = rs->insertRecord(
+        opCtx1, *shard_role_details::getRecoveryUnit(opCtx1), "abc", 4, kInsertTimestamp1);
+    ASSERT_OK(swRid);
+    uow1.commit();
 
-        const Timestamp kInsertTimestamp1 = Timestamp(10, 10);
-        const Timestamp kInsertTimestamp2 = Timestamp(20, 20);
-        const Timestamp kInsertTimestamp3 = Timestamp(30, 30);
-        const Timestamp kInsertTimestamp4 = Timestamp(25, 25);
+    ASSERT_EQ(engine->getAllDurableTimestamp(), kInsertTimestamp1);
 
-        Timestamp allDurable = engine->getAllDurableTimestamp();
-        auto opCtx1 = opCtxs[0].second.get();
-        WriteUnitOfWork uow1(opCtx1);
-        auto swRid = rs->insertRecord(opCtx1, "abc", 4, kInsertTimestamp1);
-        ASSERT_OK(swRid);
-        uow1.commit();
+    auto opCtx2 = opCtxs[1].second.get();
+    WriteUnitOfWork uow2(opCtx2);
+    swRid = rs->insertRecord(
+        opCtx2, *shard_role_details::getRecoveryUnit(opCtx2), "abc", 4, kInsertTimestamp2);
+    ASSERT_OK(swRid);
 
-        Timestamp lastAllDurable = allDurable;
-        allDurable = engine->getAllDurableTimestamp();
-        ASSERT_GTE(allDurable, lastAllDurable);
-        ASSERT_LTE(allDurable, kInsertTimestamp1);
+    ASSERT_EQ(engine->getAllDurableTimestamp(), kInsertTimestamp1);
 
-        auto opCtx2 = opCtxs[1].second.get();
-        WriteUnitOfWork uow2(opCtx2);
-        swRid = rs->insertRecord(opCtx2, "abc", 4, kInsertTimestamp2);
-        ASSERT_OK(swRid);
+    auto opCtx3 = opCtxs[2].second.get();
+    WriteUnitOfWork uow3(opCtx3);
+    swRid = rs->insertRecord(
+        opCtx3, *shard_role_details::getRecoveryUnit(opCtx3), "abc", 4, kInsertTimestamp3);
+    ASSERT_OK(swRid);
+    uow3.commit();
 
-        lastAllDurable = allDurable;
-        allDurable = engine->getAllDurableTimestamp();
-        ASSERT_GTE(allDurable, lastAllDurable);
-        ASSERT_LT(allDurable, kInsertTimestamp2);
+    ASSERT_EQ(engine->getAllDurableTimestamp(), kInsertTimestamp2 - 1);
 
-        auto opCtx3 = opCtxs[2].second.get();
-        WriteUnitOfWork uow3(opCtx3);
-        swRid = rs->insertRecord(opCtx3, "abc", 4, kInsertTimestamp3);
-        ASSERT_OK(swRid);
-        uow3.commit();
+    uow2.commit();
 
-        lastAllDurable = allDurable;
-        allDurable = engine->getAllDurableTimestamp();
-        ASSERT_GTE(allDurable, lastAllDurable);
-        ASSERT_LT(allDurable, kInsertTimestamp2);
+    ASSERT_EQ(engine->getAllDurableTimestamp(), kInsertTimestamp3);
 
-        uow2.commit();
+    auto opCtx4 = opCtxs[3].second.get();
+    WriteUnitOfWork uow4(opCtx4);
+    swRid = rs->insertRecord(
+        opCtx4, *shard_role_details::getRecoveryUnit(opCtx4), "abc", 4, kInsertTimestamp4);
+    ASSERT_OK(swRid);
 
-        lastAllDurable = allDurable;
-        allDurable = engine->getAllDurableTimestamp();
-        ASSERT_GTE(allDurable, lastAllDurable);
-        ASSERT_LTE(allDurable, kInsertTimestamp3);
+    ASSERT_EQ(engine->getAllDurableTimestamp(), kInsertTimestamp4 - 1);
 
-        auto opCtx4 = opCtxs[3].second.get();
-        WriteUnitOfWork uow4(opCtx4);
-        swRid = rs->insertRecord(opCtx4, "abc", 4, kInsertTimestamp4);
-        ASSERT_OK(swRid);
-
-        lastAllDurable = allDurable;
-        allDurable = engine->getAllDurableTimestamp();
-        ASSERT_GTE(allDurable, lastAllDurable);
-        ASSERT_LTE(allDurable, kInsertTimestamp3);
-        uow4.commit();
-    }
+    uow4.commit();
 }
 
 /*
@@ -583,18 +626,7 @@ TEST_F(KVEngineTestHarness, AllDurable) {
 TEST_F(KVEngineTestHarness, BasicTimestampSingle) {
     std::unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create(getServiceContext()));
     KVEngine* engine = helper->getEngine();
-    // TODO SERVER-48314: Remove after implementing correct behavior on biggie.
-    if (engine->isEphemeral())
-        return;
-
-    std::string ns = "a.b";
-    std::unique_ptr<RecordStore> rs;
-    {
-        auto opCtx = _makeOperationContext(engine);
-        ASSERT_OK(engine->createRecordStore(opCtx.get(), ns, ns, CollectionOptions()));
-        rs = engine->getRecordStore(opCtx.get(), ns, ns, CollectionOptions());
-        ASSERT(rs);
-    }
+    std::unique_ptr<RecordStore> rs = newRecordStore(engine);
 
     const Timestamp kReadTimestamp = Timestamp(9, 9);
     const Timestamp kInsertTimestamp = Timestamp(10, 10);
@@ -603,17 +635,21 @@ TEST_F(KVEngineTestHarness, BasicTimestampSingle) {
 
     // Start a read transaction.
     auto opCtx1 = opCtxs[0].second.get();
+    Lock::GlobalLock globalLk(opCtx1, MODE_IS);
 
-    opCtx1->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
-                                                   kReadTimestamp);
-    ASSERT(!rs->findRecord(opCtx1, RecordId::minLong(), nullptr));
+    shard_role_details::getRecoveryUnit(opCtx1)->setTimestampReadSource(
+        RecoveryUnit::ReadSource::kProvided, kReadTimestamp);
+    ASSERT(!rs->findRecord(
+        opCtx1, *shard_role_details::getRecoveryUnit(opCtx1), RecordId::minLong(), nullptr));
 
     // Insert a record at a later time.
     RecordId rid;
     {
         auto opCtx2 = opCtxs[1].second.get();
+        Lock::GlobalLock globalLk(opCtx2, MODE_IX);
         WriteUnitOfWork wuow(opCtx2);
-        auto swRid = rs->insertRecord(opCtx2, "abc", 4, kInsertTimestamp);
+        auto swRid = rs->insertRecord(
+            opCtx2, *shard_role_details::getRecoveryUnit(opCtx2), "abc", 4, kInsertTimestamp);
         ASSERT_OK(swRid);
         rid = swRid.getValue();
         wuow.commit();
@@ -621,16 +657,16 @@ TEST_F(KVEngineTestHarness, BasicTimestampSingle) {
 
     // Should not see the record, even if we abandon the snapshot as the read timestamp is still
     // earlier than the insert timestamp.
-    ASSERT(!rs->findRecord(opCtx1, rid, nullptr));
-    opCtx1->recoveryUnit()->abandonSnapshot();
-    ASSERT(!rs->findRecord(opCtx1, rid, nullptr));
+    ASSERT(!rs->findRecord(opCtx1, *shard_role_details::getRecoveryUnit(opCtx1), rid, nullptr));
+    shard_role_details::getRecoveryUnit(opCtx1)->abandonSnapshot();
+    ASSERT(!rs->findRecord(opCtx1, *shard_role_details::getRecoveryUnit(opCtx1), rid, nullptr));
 
 
-    opCtx1->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
-                                                   kInsertTimestamp);
-    opCtx1->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(opCtx1)->setTimestampReadSource(
+        RecoveryUnit::ReadSource::kProvided, kInsertTimestamp);
+    shard_role_details::getRecoveryUnit(opCtx1)->abandonSnapshot();
     RecordData rd;
-    ASSERT(rs->findRecord(opCtx1, rid, &rd));
+    ASSERT(rs->findRecord(opCtx1, *shard_role_details::getRecoveryUnit(opCtx1), rid, &rd));
     ASSERT_EQ(std::string("abc"), rd.data());
 }
 
@@ -655,18 +691,7 @@ TEST_F(KVEngineTestHarness, BasicTimestampSingle) {
 TEST_F(KVEngineTestHarness, BasicTimestampMultiple) {
     std::unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create(getServiceContext()));
     KVEngine* engine = helper->getEngine();
-    // TODO SERVER-48314: Remove after implementing correct behavior on biggie.
-    if (engine->isEphemeral())
-        return;
-
-    std::string ns = "a.b";
-    std::unique_ptr<RecordStore> rs;
-    {
-        auto opCtx = _makeOperationContext(engine);
-        ASSERT_OK(engine->createRecordStore(opCtx.get(), ns, ns, CollectionOptions()));
-        rs = engine->getRecordStore(opCtx.get(), ns, ns, CollectionOptions());
-        ASSERT(rs);
-    }
+    std::unique_ptr<RecordStore> rs = newRecordStore(engine);
 
     const Timestamp t10 = Timestamp(10, 10);
     const Timestamp t20 = Timestamp(20, 20);
@@ -675,83 +700,36 @@ TEST_F(KVEngineTestHarness, BasicTimestampMultiple) {
     {
         // Initial insert of record.
         auto opCtx = _makeOperationContext(engine);
+        Lock::GlobalLock globalLk(opCtx.get(), MODE_X);
         WriteUnitOfWork wuow(opCtx.get());
-        auto swRid = rs->insertRecord(opCtx.get(), "abc", 4, t10);
+        auto swRid = rs->insertRecord(
+            opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), "abc", 4, t10);
         ASSERT_OK(swRid);
         rid = swRid.getValue();
 
         // Update a record at a later time.
-        ASSERT_OK(opCtx->recoveryUnit()->setTimestamp(t20));
-        auto res = rs->updateRecord(opCtx.get(), rid, "updated", 8);
+        ASSERT_OK(shard_role_details::getRecoveryUnit(opCtx.get())->setTimestamp(t20));
+        auto res = rs->updateRecord(
+            opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), rid, "updated", 8);
         ASSERT_OK(res);
         wuow.commit();
     }
 
     RecordData rd;
     auto opCtx = _makeOperationContext(engine);
-    opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, t10);
-    ASSERT(rs->findRecord(opCtx.get(), rid, &rd));
+    Lock::GlobalLock globalLk(opCtx.get(), MODE_S);
+    shard_role_details::getRecoveryUnit(opCtx.get())
+        ->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, t10);
+    ASSERT(
+        rs->findRecord(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), rid, &rd));
     ASSERT_EQUALS(std::string("abc"), rd.data());
 
-    opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, t20);
-    opCtx->recoveryUnit()->abandonSnapshot();
-    ASSERT(rs->findRecord(opCtx.get(), rid, &rd));
+    shard_role_details::getRecoveryUnit(opCtx.get())
+        ->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, t20);
+    shard_role_details::getRecoveryUnit(opCtx.get())->abandonSnapshot();
+    ASSERT(
+        rs->findRecord(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), rid, &rd));
     ASSERT_EQUALS(std::string("updated"), rd.data());
-}
-
-/*
- * Concurrent operations under snapshot isolation blocks visibility
- * | Session 1         | Session 2                            |
- * |-------------------+--------------------------------------|
- * | Begin             |                                      |
- * |                   | Begin :readAt 20 :isolation snapshot |
- * | Write A 1         |                                      |
- * | Commit :commit 10 |                                      |
- * |                   | Read A (NOT_FOUND)                   |
- * |                   | Abandon Snapshot                     |
- * |                   | Read A (1)                           |
- */
-TEST_F(KVEngineTestHarness, SingleReadWithConflict) {
-    std::unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create(getServiceContext()));
-    KVEngine* engine = helper->getEngine();
-    // TODO SERVER-48314: Remove after implementing correct behavior on biggie.
-    if (engine->isEphemeral())
-        return;
-
-    std::string ns = "a.b";
-    std::unique_ptr<RecordStore> rs;
-    {
-        auto opCtx = _makeOperationContext(engine);
-        ASSERT_OK(engine->createRecordStore(opCtx.get(), ns, ns, CollectionOptions()));
-        rs = engine->getRecordStore(opCtx.get(), ns, ns, CollectionOptions());
-        ASSERT(rs);
-    }
-
-    auto opCtxs = _makeOperationContexts(engine, 2);
-
-    auto opCtx2 = opCtxs[1].second.get();
-    opCtx2->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
-                                                   Timestamp(20, 20));
-
-    auto opCtx1 = opCtxs[0].second.get();
-    WriteUnitOfWork uow1(opCtx1);
-    StatusWith<RecordId> res = rs->insertRecord(opCtx1, "abc", 4, Timestamp(10, 10));
-    ASSERT_OK(res);
-    RecordId loc = res.getValue();
-
-    // Cannot find record before commit.
-    RecordData rd;
-    ASSERT(!rs->findRecord(opCtx2, loc, &rd));
-
-    // Cannot find record after commit due to snapshot isolation.
-    uow1.commit();
-    ASSERT(!rs->findRecord(opCtx2, loc, &rd));
-
-    // Abandon snapshot for visibility.
-    opCtx2->recoveryUnit()->abandonSnapshot();
-
-    ASSERT(rs->findRecord(opCtx2, loc, &rd));
-    ASSERT_EQUALS(std::string("abc"), rs->dataFor(opCtx2, loc).data());
 }
 
 /*
@@ -769,38 +747,31 @@ TEST_F(KVEngineTestHarness, SingleReadWithConflict) {
 DEATH_TEST_REGEX_F(KVEngineTestHarness, SnapshotHidesVisibility, ".*item not found.*") {
     std::unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create(getServiceContext()));
     KVEngine* engine = helper->getEngine();
-    // TODO: Remove after implementing correct behavior on biggie.
-    if (engine->isEphemeral())
-        invariant(false, "item not found");
-
-    std::string ns = "a.b";
-    std::unique_ptr<RecordStore> rs;
-    {
-        auto opCtx = _makeOperationContext(engine);
-        ASSERT_OK(engine->createRecordStore(opCtx.get(), ns, ns, CollectionOptions()));
-        rs = engine->getRecordStore(opCtx.get(), ns, ns, CollectionOptions());
-        ASSERT(rs);
-    }
+    std::unique_ptr<RecordStore> rs = newRecordStore(engine);
 
     auto opCtxs = _makeOperationContexts(engine, 2);
 
     auto opCtx1 = opCtxs[0].second.get();
+    Lock::GlobalLock globalLk1(opCtx1, MODE_IX);
     WriteUnitOfWork uow1(opCtx1);
-    StatusWith<RecordId> res = rs->insertRecord(opCtx1, "abc", 4, Timestamp(10, 10));
+    StatusWith<RecordId> res = rs->insertRecord(
+        opCtx1, *shard_role_details::getRecoveryUnit(opCtx1), "abc", 4, Timestamp(10, 10));
     ASSERT_OK(res);
     RecordId loc = res.getValue();
     uow1.commit();
 
     // Snapshot was taken before the insert and will not find the record even after the commit.
-    RecordData rd;
     auto opCtx2 = opCtxs[1].second.get();
-    opCtx2->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
-                                                   Timestamp(9, 9));
-    ASSERT(!rs->findRecord(opCtx2, loc, &rd));
+    Lock::GlobalLock globalLk2(opCtx2, MODE_IX);
+    shard_role_details::getRecoveryUnit(opCtx2)->setTimestampReadSource(
+        RecoveryUnit::ReadSource::kProvided, Timestamp(9, 9));
+    RecordData rd;
+    ASSERT(!rs->findRecord(opCtx2, *shard_role_details::getRecoveryUnit(opCtx2), loc, &rd));
 
     // Trying to write in an outdated snapshot will cause item not found.
     WriteUnitOfWork uow2(opCtx2);
-    auto swRid = rs->updateRecord(opCtx2, loc, "updated", 8);
+    auto swRid =
+        rs->updateRecord(opCtx2, *shard_role_details::getRecoveryUnit(opCtx2), loc, "updated", 8);
     uow2.commit();
 }
 
@@ -826,28 +797,19 @@ DEATH_TEST_REGEX_F(KVEngineTestHarness, SnapshotHidesVisibility, ".*item not fou
 TEST_F(KVEngineTestHarness, SingleReadWithConflictWithOplog) {
     std::unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create(getServiceContext()));
     KVEngine* engine = helper->getEngine();
-    // TODO SERVER-48314: Remove after implementing correct behavior on biggie.
-    if (engine->isEphemeral())
-        return;
 
-    std::string ns = "a.b";
     std::unique_ptr<RecordStore> collectionRs;
     std::unique_ptr<RecordStore> oplogRs;
     {
-        auto opCtx = _makeOperationContext(engine);
-        ASSERT_OK(engine->createRecordStore(opCtx.get(), ns, ns, CollectionOptions()));
-        collectionRs = engine->getRecordStore(opCtx.get(), ns, ns, CollectionOptions());
-        ASSERT(collectionRs);
+        collectionRs = newRecordStore(engine);
 
-        CollectionOptions options;
-        options.capped = true;
-        options.cappedSize = 10240;
-        options.cappedMaxDocs = -1;
-
-        NamespaceString oplogNss("local.oplog.rs");
-        ASSERT_OK(engine->createRecordStore(opCtx.get(), oplogNss.ns(), "ident", options));
-        oplogRs = engine->getRecordStore(opCtx.get(), oplogNss.ns(), "ident", options);
-        ASSERT(oplogRs);
+        RecordStore::Options oplogRecordStoreOptions;
+        oplogRecordStoreOptions.isCapped = true;
+        oplogRecordStoreOptions.isOplog = true;
+        oplogRecordStoreOptions.oplogMaxSize = 10240;
+        NamespaceString oplogNss = NamespaceString::createNamespaceString_forTest("local.oplog.rs");
+        oplogRs = newRecordStore(
+            engine, oplogNss, "collection-oplog", oplogRecordStoreOptions, UUID::gen());
     }
 
     RecordData rd;
@@ -860,29 +822,40 @@ TEST_F(KVEngineTestHarness, SingleReadWithConflictWithOplog) {
         WriteUnitOfWork uow(opCtx.get());
 
         // Insert into collectionRs.
-        StatusWith<RecordId> res = collectionRs->insertRecord(opCtx.get(), "abc", 4, t10);
+        StatusWith<RecordId> res = collectionRs->insertRecord(
+            opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), "abc", 4, t10);
         ASSERT_OK(res);
         locCollection = res.getValue();
 
         // Insert into oplogRs.
         auto t11Doc = BSON("ts" << t10);
 
-        ASSERT_EQ(invariant(oplogRs->insertRecord(
-                      opCtx.get(), t11Doc.objdata(), t11Doc.objsize(), Timestamp::min())),
+        ASSERT_EQ(invariant(oplogRs->insertRecord(opCtx.get(),
+                                                  *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                                  t11Doc.objdata(),
+                                                  t11Doc.objsize(),
+                                                  Timestamp::min())),
                   RecordId(10, 10));
         locOplog = RecordId(10, 10);
         uow.commit();
     }
 
     auto opCtx = _makeOperationContext(engine);
-    opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, t9);
-    ASSERT(!collectionRs->findRecord(opCtx.get(), locCollection, &rd));
-    ASSERT(!oplogRs->findRecord(opCtx.get(), locOplog, &rd));
+    Lock::GlobalLock globalLk(opCtx.get(), MODE_S);
+    shard_role_details::getRecoveryUnit(opCtx.get())
+        ->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, t9);
+    ASSERT(!collectionRs->findRecord(
+        opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), locCollection, &rd));
+    ASSERT(!oplogRs->findRecord(
+        opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), locOplog, &rd));
 
-    opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, t10);
-    opCtx->recoveryUnit()->abandonSnapshot();
-    ASSERT(collectionRs->findRecord(opCtx.get(), locCollection, &rd));
-    ASSERT(oplogRs->findRecord(opCtx.get(), locOplog, &rd));
+    shard_role_details::getRecoveryUnit(opCtx.get())
+        ->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, t10);
+    shard_role_details::getRecoveryUnit(opCtx.get())->abandonSnapshot();
+    ASSERT(collectionRs->findRecord(
+        opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), locCollection, &rd));
+    ASSERT(oplogRs->findRecord(
+        opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), locOplog, &rd));
 }
 
 /*
@@ -903,35 +876,32 @@ TEST_F(KVEngineTestHarness, SingleReadWithConflictWithOplog) {
 TEST_F(KVEngineTestHarness, PinningOldestTimestampWithReadConflict) {
     std::unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create(getServiceContext()));
     KVEngine* engine = helper->getEngine();
-    // TODO SERVER-48314: Remove after implementing correct behavior on biggie.
-    if (engine->isEphemeral())
-        return;
-
-    std::string ns = "a.b";
-    std::unique_ptr<RecordStore> rs;
-    {
-        auto opCtx = _makeOperationContext(engine);
-        ASSERT_OK(engine->createRecordStore(opCtx.get(), ns, ns, CollectionOptions()));
-        rs = engine->getRecordStore(opCtx.get(), ns, ns, CollectionOptions());
-        ASSERT(rs);
-    }
-
+    std::unique_ptr<RecordStore> rs = newRecordStore(engine);
     auto opCtx = _makeOperationContext(engine);
+
+    Lock::GlobalLock globalLk(opCtx.get(), MODE_X);
     WriteUnitOfWork uow(opCtx.get());
-    StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "abc", 4, Timestamp(10, 10));
+    StatusWith<RecordId> res = rs->insertRecord(opCtx.get(),
+                                                *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                                "abc",
+                                                4,
+                                                Timestamp(10, 10));
     RecordId rid = res.getValue();
     uow.commit();
 
     RecordData rd;
-    opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
-                                                  Timestamp(15, 15));
-    ASSERT(rs->findRecord(opCtx.get(), rid, &rd));
+    shard_role_details::getRecoveryUnit(opCtx.get())
+        ->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, Timestamp(15, 15));
+    ASSERT(
+        rs->findRecord(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), rid, &rd));
 
     engine->setOldestTimestamp(Timestamp(20, 20), false);
 
-    opCtx->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(opCtx.get())->abandonSnapshot();
     ASSERT_THROWS_CODE(
-        rs->findRecord(opCtx.get(), rid, &rd), DBException, ErrorCodes::SnapshotTooOld);
+        rs->findRecord(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), rid, &rd),
+        DBException,
+        ErrorCodes::SnapshotTooOld);
 }
 
 
@@ -946,28 +916,22 @@ TEST_F(KVEngineTestHarness, PinningOldestTimestampWithReadConflict) {
  */
 DEATH_TEST_REGEX_F(KVEngineTestHarness,
                    PinningOldestTimestampWithWriteConflict,
-                   ".*commit timestamp.*is less than the oldest timestamp.*") {
+                   "Fatal assertion.*39001") {
     std::unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create(getServiceContext()));
     KVEngine* engine = helper->getEngine();
-    // TODO SERVER-48314: Remove after implementing correct behavior on biggie.
-    if (engine->isEphemeral())
-        invariant(false, "commit timestamp is less than the oldest timestamp");
-
-    std::string ns = "a.b";
-    std::unique_ptr<RecordStore> rs;
-    {
-        auto opCtx = _makeOperationContext(engine);
-        ASSERT_OK(engine->createRecordStore(opCtx.get(), ns, ns, CollectionOptions()));
-        rs = engine->getRecordStore(opCtx.get(), ns, ns, CollectionOptions());
-        ASSERT(rs);
-    }
+    std::unique_ptr<RecordStore> rs = newRecordStore(engine);
 
     {
         // A write transaction cannot insert records before the oldest timestamp.
         engine->setOldestTimestamp(Timestamp(2, 2), false);
         auto opCtx = _makeOperationContext(engine);
         WriteUnitOfWork uow2(opCtx.get());
-        StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "abc", 4, Timestamp(1, 1));
+        StatusWith<RecordId> res =
+            rs->insertRecord(opCtx.get(),
+                             *shard_role_details::getRecoveryUnit(opCtx.get()),
+                             "abc",
+                             4,
+                             Timestamp(1, 1));
         uow2.commit();
     }
 }
@@ -990,30 +954,24 @@ DEATH_TEST_REGEX_F(KVEngineTestHarness,
 TEST_F(KVEngineTestHarness, RollingBackToLastStable) {
     std::unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create(getServiceContext()));
     KVEngine* engine = helper->getEngine();
-    // TODO SERVER-48314: Remove after implementing correct behavior on biggie.
-    if (engine->isEphemeral())
-        return;
 
     // The initial data timestamp has to be set to take stable checkpoints.
     engine->setInitialDataTimestamp(Timestamp(1, 1));
-    std::string ns = "a.b";
-    std::unique_ptr<RecordStore> rs;
-    {
-        auto opCtx = _makeOperationContext(engine);
-        ASSERT_OK(engine->createRecordStore(opCtx.get(), ns, ns, CollectionOptions()));
-        rs = engine->getRecordStore(opCtx.get(), ns, ns, CollectionOptions());
-        ASSERT(rs);
-    }
+    std::unique_ptr<RecordStore> rs = newRecordStore(engine);
 
     RecordId ridA;
     {
         auto opCtx = _makeOperationContext(engine);
         WriteUnitOfWork uow(opCtx.get());
-        auto res = rs->insertRecord(opCtx.get(), "abc", 4, Timestamp(1, 1));
+        auto res = rs->insertRecord(opCtx.get(),
+                                    *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                    "abc",
+                                    4,
+                                    Timestamp(1, 1));
         ASSERT_OK(res);
         ridA = res.getValue();
         uow.commit();
-        ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
+        ASSERT_EQUALS(1, rs->numRecords());
     }
 
     {
@@ -1035,28 +993,36 @@ TEST_F(KVEngineTestHarness, RollingBackToLastStable) {
         // Insert a record after the stable timestamp.
         auto opCtx = _makeOperationContext(engine);
         WriteUnitOfWork uow(opCtx.get());
-        StatusWith<RecordId> swRid = rs->insertRecord(opCtx.get(), "def", 4, Timestamp(3, 3));
+        StatusWith<RecordId> swRid =
+            rs->insertRecord(opCtx.get(),
+                             *shard_role_details::getRecoveryUnit(opCtx.get()),
+                             "def",
+                             4,
+                             Timestamp(3, 3));
         ASSERT_OK(swRid);
         ridB = swRid.getValue();
-        ASSERT_EQUALS(2, rs->numRecords(opCtx.get()));
+        ASSERT_EQUALS(2, rs->numRecords());
         uow.commit();
     }
 
     {
         // Rollback to the last stable timestamp.
         auto opCtx = _makeOperationContext(engine);
-        StatusWith<Timestamp> swTimestamp = engine->recoverToStableTimestamp(opCtx.get());
+        Lock::GlobalLock globalLk(opCtx.get(), MODE_X);
+        StatusWith<Timestamp> swTimestamp = engine->recoverToStableTimestamp(*opCtx.get());
         ASSERT_EQ(swTimestamp.getValue(), Timestamp(1, 1));
 
         // Verify that we can find record A and can't find the record B inserted at Timestamp(3, 3)
         // in the collection any longer. 'numRecords' will still show two as it's the fast count and
         // doesn't get reflected during the rollback.
         RecordData rd;
-        opCtx->recoveryUnit()->abandonSnapshot();
-        ASSERT(rs->findRecord(opCtx.get(), ridA, &rd));
+        shard_role_details::getRecoveryUnit(opCtx.get())->abandonSnapshot();
+        ASSERT(rs->findRecord(
+            opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), ridA, &rd));
         ASSERT_EQ(std::string("abc"), rd.data());
-        ASSERT_FALSE(rs->findRecord(opCtx.get(), ridB, nullptr));
-        ASSERT_EQUALS(2, rs->numRecords(opCtx.get()));
+        ASSERT_FALSE(rs->findRecord(
+            opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), ridB, nullptr));
+        ASSERT_EQUALS(2, rs->numRecords());
     }
 }
 
@@ -1069,25 +1035,13 @@ TEST_F(KVEngineTestHarness, RollingBackToLastStable) {
  * | Write A 1                       |                            |
  * | Timestamp :commit 1  (ROLLBACK) |                            |
  */
-DEATH_TEST_REGEX_F(KVEngineTestHarness,
-                   CommitBehindStable,
-                   ".*commit timestamp.*is less than the stable timestamp.*") {
+DEATH_TEST_REGEX_F(KVEngineTestHarness, CommitBehindStable, "Fatal assertion.*39001") {
     std::unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create(getServiceContext()));
     KVEngine* engine = helper->getEngine();
-    // TODO SERVER-48314: Remove after implementing correct behavior on biggie.
-    if (engine->isEphemeral())
-        invariant(false, "commit timestamp is less than the stable timestamp");
 
     // The initial data timestamp has to be set to take stable checkpoints.
     engine->setInitialDataTimestamp(Timestamp(1, 1));
-    std::string ns = "a.b";
-    std::unique_ptr<RecordStore> rs;
-    {
-        auto opCtx = _makeOperationContext(engine);
-        ASSERT_OK(engine->createRecordStore(opCtx.get(), ns, ns, CollectionOptions()));
-        rs = engine->getRecordStore(opCtx.get(), ns, ns, CollectionOptions());
-        ASSERT(rs);
-    }
+    std::unique_ptr<RecordStore> rs = newRecordStore(engine);
 
     {
         // Set the stable timestamp to (2, 2).
@@ -1102,101 +1056,30 @@ DEATH_TEST_REGEX_F(KVEngineTestHarness,
     }
 
     {
-        // Committing a behind the stable timestamp is not allowed.
+        // Committing at or behind the stable timestamp is not allowed.
         auto opCtx = _makeOperationContext(engine);
         WriteUnitOfWork uow(opCtx.get());
-        auto swRid = rs->insertRecord(opCtx.get(), "abc", 4, Timestamp(1, 1));
+        auto swRid = rs->insertRecord(opCtx.get(),
+                                      *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                      "abc",
+                                      4,
+                                      Timestamp(1, 1));
         uow.commit();
     }
 }
 
-/*
- * Commit at stable
- * | Session                         | GlobalActor                |
- * |---------------------------------+----------------------------|
- * |                                 | GlobalTimestamp :stable 2  |
- * | Begin                           |                            |
- * | Write A 1                       |                            |
- * | Timestamp :commit 2             |                            |
- */
-TEST_F(KVEngineTestHarness, CommitAtStable) {
-    std::unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create(getServiceContext()));
-    KVEngine* engine = helper->getEngine();
-    // TODO SERVER-48314: Remove after implementing correct behavior on biggie.
-    if (engine->isEphemeral())
-        return;
-
-    // The initial data timestamp has to be set to take stable checkpoints.
-    engine->setInitialDataTimestamp(Timestamp(1, 1));
-    std::string ns = "a.b";
-    std::unique_ptr<RecordStore> rs;
-    {
-        auto opCtx = _makeOperationContext(engine);
-        ASSERT_OK(engine->createRecordStore(opCtx.get(), ns, ns, CollectionOptions()));
-        rs = engine->getRecordStore(opCtx.get(), ns, ns, CollectionOptions());
-        ASSERT(rs);
-    }
-
-    {
-        // Set the stable timestamp to (2, 2).
-        ASSERT(!engine->getLastStableRecoveryTimestamp());
-        engine->setStableTimestamp(Timestamp(2, 2), false);
-        ASSERT(!engine->getLastStableRecoveryTimestamp());
-
-        // Force a checkpoint to be taken. This should advance the last stable timestamp.
-        auto opCtx = _makeOperationContext(engine);
-        engine->flushAllFiles(opCtx.get(), false);
-        ASSERT_EQ(engine->getLastStableRecoveryTimestamp(), Timestamp(2, 2));
-    }
-
-    RecordId rid;
-    {
-        // For a non-prepared transaction, the commit timestamp can be equal to the stable
-        // timestamp.
-        auto opCtx = _makeOperationContext(engine);
-        WriteUnitOfWork uow(opCtx.get());
-        auto swRid = rs->insertRecord(opCtx.get(), "abc", 4, Timestamp(2, 2));
-        ASSERT_OK(swRid);
-        rid = swRid.getValue();
-        uow.commit();
-    }
-
-    {
-        // Rollback to the last stable timestamp.
-        auto opCtx = _makeOperationContext(engine);
-        StatusWith<Timestamp> swTimestamp = engine->recoverToStableTimestamp(opCtx.get());
-        ASSERT_EQ(swTimestamp.getValue(), Timestamp(2, 2));
-
-        // Transaction with timestamps equal to lastStable will not be rolled back.
-        opCtx->recoveryUnit()->abandonSnapshot();
-        RecordData data;
-        ASSERT_TRUE(rs->findRecord(opCtx.get(), rid, &data));
-        ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
-    }
-}
-
-TEST_F(DurableCatalogImplTest, Coll1) {
-    KVEngine* engine = helper->getEngine();
-
-    std::unique_ptr<RecordStore> rs;
-    std::unique_ptr<DurableCatalogImpl> catalog;
-    {
-        auto clientAndCtx = makeClientAndCtx("opCtx");
-        auto opCtx = clientAndCtx.opCtx();
-        WriteUnitOfWork uow(opCtx);
-        ASSERT_OK(engine->createRecordStore(opCtx, "catalog", "catalog", CollectionOptions()));
-        rs = engine->getRecordStore(opCtx, "catalog", "catalog", CollectionOptions());
-        catalog = std::make_unique<DurableCatalogImpl>(rs.get(), false, false, nullptr);
-        uow.commit();
-    }
-
+TEST_F(MDBCatalogTest, Coll1) {
+    std::unique_ptr<RecordStore> catalogRS = createCatalogRS();
+    std::unique_ptr<MDBCatalog> catalog = createMDBCatalog(catalogRS.get());
     RecordId catalogId;
     {
         auto clientAndCtx = makeClientAndCtx("opCtx");
         auto opCtx = clientAndCtx.opCtx();
         WriteUnitOfWork uow(opCtx);
-        catalogId =
-            newCollection(opCtx, NamespaceString("a.b"), CollectionOptions(), catalog.get());
+        catalogId = addNewCatalogEntry(opCtx,
+                                       NamespaceString::createNamespaceString_forTest("a.b"),
+                                       CollectionOptions(),
+                                       catalog.get());
         ASSERT_NOT_EQUALS("a.b", catalog->getEntry(catalogId).ident);
         uow.commit();
     }
@@ -1208,7 +1091,7 @@ TEST_F(DurableCatalogImplTest, Coll1) {
         Lock::GlobalLock globalLk(opCtx, MODE_IX);
 
         WriteUnitOfWork uow(opCtx);
-        catalog = std::make_unique<DurableCatalogImpl>(rs.get(), false, false, nullptr);
+        catalog = createMDBCatalog(catalogRS.get());
         catalog->init(opCtx);
         uow.commit();
     }
@@ -1220,72 +1103,58 @@ TEST_F(DurableCatalogImplTest, Coll1) {
         auto opCtx = clientAndCtx.opCtx();
         WriteUnitOfWork uow(opCtx);
         dropCollection(opCtx, catalogId, catalog.get()).transitional_ignore();
-        newCatalogId =
-            newCollection(opCtx, NamespaceString("a.b"), CollectionOptions(), catalog.get());
+        newCatalogId = addNewCatalogEntry(opCtx,
+                                          NamespaceString::createNamespaceString_forTest("a.b"),
+                                          CollectionOptions(),
+                                          catalog.get());
         uow.commit();
     }
     ASSERT_NOT_EQUALS(ident, catalog->getEntry(newCatalogId).ident);
 }
 
-TEST_F(DurableCatalogImplTest, Idx1) {
-    KVEngine* engine = helper->getEngine();
-
-    std::unique_ptr<RecordStore> rs;
-    std::unique_ptr<DurableCatalogImpl> catalog;
-    {
-        auto clientAndCtx = makeClientAndCtx("opCtx");
-        auto opCtx = clientAndCtx.opCtx();
-        WriteUnitOfWork uow(opCtx);
-        ASSERT_OK(engine->createRecordStore(opCtx, "catalog", "catalog", CollectionOptions()));
-        rs = engine->getRecordStore(opCtx, "catalog", "catalog", CollectionOptions());
-        catalog = std::make_unique<DurableCatalogImpl>(rs.get(), false, false, nullptr);
-        uow.commit();
-    }
+TEST_F(MDBCatalogTest, Idx1) {
+    std::unique_ptr<RecordStore> catalogRS = createCatalogRS();
+    std::unique_ptr<MDBCatalog> catalog = createMDBCatalog(catalogRS.get());
 
     RecordId catalogId;
     {
         auto clientAndCtx = makeClientAndCtx("opCtx");
         auto opCtx = clientAndCtx.opCtx();
         WriteUnitOfWork uow(opCtx);
-        catalogId =
-            newCollection(opCtx, NamespaceString("a.b"), CollectionOptions(), catalog.get());
+        catalogId = addNewCatalogEntry(opCtx,
+                                       NamespaceString::createNamespaceString_forTest("a.b"),
+                                       CollectionOptions(),
+                                       catalog.get());
         ASSERT_NOT_EQUALS("a.b", catalog->getEntry(catalogId).ident);
-        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getEntry(catalogId).ident));
+        ASSERT_TRUE(ident::isCollectionOrIndexIdent(catalog->getEntry(catalogId).ident));
         uow.commit();
     }
 
+    std::string idxIdent;
     {
         auto clientAndCtx = makeClientAndCtx("opCtx");
         auto opCtx = clientAndCtx.opCtx();
         WriteUnitOfWork uow(opCtx);
 
-        BSONCollectionCatalogEntry::MetaData md;
-        md.ns = "a.b";
+        durable_catalog::CatalogEntryMetaData md;
+        md.nss = NamespaceString::createNamespaceString_forTest(boost::none, "a.b");
 
-        BSONCollectionCatalogEntry::IndexMetaData imd;
-        imd.spec = BSON("name"
-                        << "foo");
+        durable_catalog::CatalogEntryMetaData::IndexMetaData imd;
+        imd.spec = BSON("name" << "foo");
         imd.ready = false;
         imd.multikey = false;
-        imd.isBackgroundSecondaryBuild = false;
+        idxIdent = ident::generateNewIndexIdent(md.nss.dbName(), false, false);
         md.indexes.push_back(imd);
-        putMetaData(opCtx, catalog.get(), catalogId, md);
+        putMetaData(opCtx, catalog.get(), catalogId, md, BSON("foo" << idxIdent));
         uow.commit();
     }
 
-    std::string idxIndent;
     {
         auto clientAndCtx = makeClientAndCtx("opCtx");
         auto opCtx = clientAndCtx.opCtx();
-        idxIndent = getIndexIdent(opCtx, catalog.get(), catalogId, "foo");
-    }
-
-    {
-        auto clientAndCtx = makeClientAndCtx("opCtx");
-        auto opCtx = clientAndCtx.opCtx();
-        ASSERT_EQUALS(idxIndent, getIndexIdent(opCtx, catalog.get(), catalogId, "foo"));
+        ASSERT_EQUALS(idxIdent, getIndexIdent(opCtx, catalog.get(), catalogId, "foo"));
         ASSERT_TRUE(
-            catalog->isUserDataIdent(getIndexIdent(opCtx, catalog.get(), catalogId, "foo")));
+            ident::isCollectionOrIndexIdent(getIndexIdent(opCtx, catalog.get(), catalogId, "foo")));
     }
 
     {
@@ -1293,234 +1162,114 @@ TEST_F(DurableCatalogImplTest, Idx1) {
         auto opCtx = clientAndCtx.opCtx();
         WriteUnitOfWork uow(opCtx);
 
-        BSONCollectionCatalogEntry::MetaData md;
-        md.ns = "a.b";
+        durable_catalog::CatalogEntryMetaData md;
+        md.nss = NamespaceString::createNamespaceString_forTest(boost::none, "a.b");
         putMetaData(opCtx, catalog.get(), catalogId, md);  // remove index
 
-        BSONCollectionCatalogEntry::IndexMetaData imd;
-        imd.spec = BSON("name"
-                        << "foo");
+        durable_catalog::CatalogEntryMetaData::IndexMetaData imd;
+        imd.spec = BSON("name" << "foo");
         imd.ready = false;
         imd.multikey = false;
-        imd.isBackgroundSecondaryBuild = false;
         md.indexes.push_back(imd);
-        putMetaData(opCtx, catalog.get(), catalogId, md);
+        putMetaData(opCtx,
+                    catalog.get(),
+                    catalogId,
+                    md,
+                    BSON("foo" << ident::generateNewIndexIdent(md.nss.dbName(), false, false)));
         uow.commit();
     }
 
     {
         auto clientAndCtx = makeClientAndCtx("opCtx");
         auto opCtx = clientAndCtx.opCtx();
-        ASSERT_NOT_EQUALS(idxIndent, getIndexIdent(opCtx, catalog.get(), catalogId, "foo"));
+        ASSERT_NOT_EQUALS(idxIdent, getIndexIdent(opCtx, catalog.get(), catalogId, "foo"));
     }
 }
 
-TEST_F(DurableCatalogImplTest, DirectoryPerDb1) {
-    KVEngine* engine = helper->getEngine();
-
-    std::unique_ptr<RecordStore> rs;
-    std::unique_ptr<DurableCatalogImpl> catalog;
-    {
-        auto clientAndCtx = makeClientAndCtx("opCtx");
-        auto opCtx = clientAndCtx.opCtx();
-        WriteUnitOfWork uow(opCtx);
-        ASSERT_OK(engine->createRecordStore(opCtx, "catalog", "catalog", CollectionOptions()));
-        rs = engine->getRecordStore(opCtx, "catalog", "catalog", CollectionOptions());
-        catalog = std::make_unique<DurableCatalogImpl>(rs.get(), true, false, nullptr);
-        uow.commit();
-    }
-
-    RecordId catalogId;
-    {  // collection
-        auto clientAndCtx = makeClientAndCtx("opCtx");
-        auto opCtx = clientAndCtx.opCtx();
-        WriteUnitOfWork uow(opCtx);
-        catalogId =
-            newCollection(opCtx, NamespaceString("a.b"), CollectionOptions(), catalog.get());
-        ASSERT_STRING_CONTAINS(catalog->getEntry(catalogId).ident, "a/");
-        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getEntry(catalogId).ident));
-        uow.commit();
-    }
-
-    {  // index
-        auto clientAndCtx = makeClientAndCtx("opCtx");
-        auto opCtx = clientAndCtx.opCtx();
-        WriteUnitOfWork uow(opCtx);
-
-        BSONCollectionCatalogEntry::MetaData md;
-        md.ns = "a.b";
-
-        BSONCollectionCatalogEntry::IndexMetaData imd;
-        imd.spec = BSON("name"
-                        << "foo");
-        imd.ready = false;
-        imd.multikey = false;
-        imd.isBackgroundSecondaryBuild = false;
-        md.indexes.push_back(imd);
-        putMetaData(opCtx, catalog.get(), catalogId, md);
-        ASSERT_STRING_CONTAINS(getIndexIdent(opCtx, catalog.get(), catalogId, "foo"), "a/");
-        ASSERT_TRUE(
-            catalog->isUserDataIdent(getIndexIdent(opCtx, catalog.get(), catalogId, "foo")));
-        uow.commit();
-    }
-}
-
-TEST_F(DurableCatalogImplTest, Split1) {
-    KVEngine* engine = helper->getEngine();
-
-    std::unique_ptr<RecordStore> rs;
-    std::unique_ptr<DurableCatalogImpl> catalog;
-    {
-        auto clientAndCtx = makeClientAndCtx("opCtx");
-        auto opCtx = clientAndCtx.opCtx();
-        WriteUnitOfWork uow(opCtx);
-        ASSERT_OK(engine->createRecordStore(opCtx, "catalog", "catalog", CollectionOptions()));
-        rs = engine->getRecordStore(opCtx, "catalog", "catalog", CollectionOptions());
-        catalog = std::make_unique<DurableCatalogImpl>(rs.get(), false, true, nullptr);
-        uow.commit();
-    }
-
-    RecordId catalogId;
-    {
-        auto clientAndCtx = makeClientAndCtx("opCtx");
-        auto opCtx = clientAndCtx.opCtx();
-        WriteUnitOfWork uow(opCtx);
-        catalogId =
-            newCollection(opCtx, NamespaceString("a.b"), CollectionOptions(), catalog.get());
-        ASSERT_STRING_CONTAINS(catalog->getEntry(catalogId).ident, "collection/");
-        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getEntry(catalogId).ident));
-        uow.commit();
-    }
-
-    {  // index
-        auto clientAndCtx = makeClientAndCtx("opCtx");
-        auto opCtx = clientAndCtx.opCtx();
-        WriteUnitOfWork uow(opCtx);
-
-        BSONCollectionCatalogEntry::MetaData md;
-        md.ns = "a.b";
-
-        BSONCollectionCatalogEntry::IndexMetaData imd;
-        imd.spec = BSON("name"
-                        << "foo");
-        imd.ready = false;
-        imd.multikey = false;
-        imd.isBackgroundSecondaryBuild = false;
-        md.indexes.push_back(imd);
-        putMetaData(opCtx, catalog.get(), catalogId, md);
-        ASSERT_STRING_CONTAINS(getIndexIdent(opCtx, catalog.get(), catalogId, "foo"), "index/");
-        ASSERT_TRUE(
-            catalog->isUserDataIdent(getIndexIdent(opCtx, catalog.get(), catalogId, "foo")));
-        uow.commit();
-    }
-}
-
-TEST_F(DurableCatalogImplTest, DirectoryPerAndSplit1) {
-    KVEngine* engine = helper->getEngine();
-
-    std::unique_ptr<RecordStore> rs;
-    std::unique_ptr<DurableCatalogImpl> catalog;
-    {
-        auto clientAndCtx = makeClientAndCtx("opCtx");
-        auto opCtx = clientAndCtx.opCtx();
-        WriteUnitOfWork uow(opCtx);
-        ASSERT_OK(engine->createRecordStore(opCtx, "catalog", "catalog", CollectionOptions()));
-        rs = engine->getRecordStore(opCtx, "catalog", "catalog", CollectionOptions());
-        catalog = std::make_unique<DurableCatalogImpl>(rs.get(), true, true, nullptr);
-        uow.commit();
-    }
-
-    RecordId catalogId;
-    {
-        auto clientAndCtx = makeClientAndCtx("opCtx");
-        auto opCtx = clientAndCtx.opCtx();
-        WriteUnitOfWork uow(opCtx);
-        catalogId =
-            newCollection(opCtx, NamespaceString("a.b"), CollectionOptions(), catalog.get());
-        ASSERT_STRING_CONTAINS(catalog->getEntry(catalogId).ident, "a/collection/");
-        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getEntry(catalogId).ident));
-        uow.commit();
-    }
-
-    {  // index
-        auto clientAndCtx = makeClientAndCtx("opCtx");
-        auto opCtx = clientAndCtx.opCtx();
-        WriteUnitOfWork uow(opCtx);
-
-        BSONCollectionCatalogEntry::MetaData md;
-        md.ns = "a.b";
-
-        BSONCollectionCatalogEntry::IndexMetaData imd;
-        imd.spec = BSON("name"
-                        << "foo");
-        imd.ready = false;
-        imd.multikey = false;
-        imd.isBackgroundSecondaryBuild = false;
-        md.indexes.push_back(imd);
-        putMetaData(opCtx, catalog.get(), catalogId, md);
-        ASSERT_STRING_CONTAINS(getIndexIdent(opCtx, catalog.get(), catalogId, "foo"), "a/index/");
-        ASSERT_TRUE(
-            catalog->isUserDataIdent(getIndexIdent(opCtx, catalog.get(), catalogId, "foo")));
-        uow.commit();
-    }
-}
-
-TEST_F(DurableCatalogImplTest, BackupImplemented) {
+TEST_F(MDBCatalogTest, BackupImplemented) {
     KVEngine* engine = helper->getEngine();
     ASSERT(engine);
-
-    {
-        auto clientAndCtx = makeClientAndCtx("opCtx");
-        auto opCtx = clientAndCtx.opCtx();
-        ASSERT_OK(engine->beginBackup(opCtx));
-        engine->endBackup(opCtx);
-    }
+    ASSERT_OK(engine->beginBackup());
+    engine->endBackup();
 }
 
-DEATH_TEST_REGEX_F(DurableCatalogImplTest,
-                   TerminateOnNonNumericIndexVersion,
-                   "Fatal assertion.*50942") {
-    KVEngine* engine = helper->getEngine();
-    ASSERT(engine);
+TEST_F(MDBCatalogTest, AddRemoveAddRollBack) {
+    std::unique_ptr<RecordStore> catalogRS = createCatalogRS();
+    std::unique_ptr<MDBCatalog> catalog = createMDBCatalog(catalogRS.get());
 
-    std::string ident = "abc";
-    auto ns = NamespaceString("mydb.mycoll");
-
-    CollectionOptions options;
-    options.uuid = UUID::gen();
-
-    std::unique_ptr<RecordStore> rs;
+    RecordId catalogId;
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
     {
         auto clientAndCtx = makeClientAndCtx("opCtx");
         auto opCtx = clientAndCtx.opCtx();
         WriteUnitOfWork uow(opCtx);
-        ASSERT_OK(engine->createRecordStore(opCtx, "catalog", "catalog", options));
-        rs = engine->getRecordStore(opCtx, "catalog", "catalog", options);
-        uow.commit();
+        catalogId = addNewCatalogEntry(opCtx, nss, CollectionOptions(), catalog.get());
+        auto entry = catalog->getEntry(catalogId);
+        auto rawEntry = catalog->getRawCatalogEntry(opCtx, catalogId);
+        ASSERT_OK(catalog->removeEntry(opCtx, catalogId));
+        ASSERT_OK(addEntry(opCtx, entry.ident, entry.nss, rawEntry, catalogId, catalog.get()));
     }
+    ASSERT_FALSE(catalog->getEntry_forTest(catalogId).has_value());
+}
 
-    std::unique_ptr<CollectionImpl> collection;
+TEST_F(MDBCatalogTest, AddRemoveAddCommit) {
+    std::unique_ptr<RecordStore> catalogRS = createCatalogRS();
+    std::unique_ptr<MDBCatalog> catalog = createMDBCatalog(catalogRS.get());
+
+    RecordId catalogId;
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    {
+        auto clientAndCtx = makeClientAndCtx("opCtx");
+        auto opCtx = clientAndCtx.opCtx();
+        WriteUnitOfWork wuow(opCtx);
+        catalogId = addNewCatalogEntry(opCtx, nss, CollectionOptions(), catalog.get());
+        auto entry = catalog->getEntry(catalogId);
+        auto rawEntry = catalog->getRawCatalogEntry(opCtx, catalogId);
+        ASSERT_OK(catalog->removeEntry(opCtx, catalogId));
+        ASSERT_OK(addEntry(opCtx, entry.ident, entry.nss, rawEntry, catalogId, catalog.get()));
+        wuow.commit();
+    }
+    ASSERT_TRUE(catalog->getEntry_forTest(catalogId).has_value());
+}
+
+TEST_F(MDBCatalogTest, EntryIncludesTenantIdInMultitenantEnv) {
+    gMultitenancySupport = true;
+    std::unique_ptr<RecordStore> catalogRS = createCatalogRS();
+    std::unique_ptr<MDBCatalog> catalog = createMDBCatalog(catalogRS.get());
+
+    // Insert an entry into the MDBCatalog, and ensure the tenantId is stored on the nss in the
+    // entry.
+    RecordId catalogId;
+    auto tenantId = TenantId(OID::gen());
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest(tenantId, "a.b");
     {
         auto clientAndCtx = makeClientAndCtx("opCtx");
         auto opCtx = clientAndCtx.opCtx();
         WriteUnitOfWork uow(opCtx);
-        collection =
-            std::make_unique<CollectionImpl>(opCtx, ns, RecordId(0), options, std::move(rs));
+        catalogId = addNewCatalogEntry(opCtx, nss, CollectionOptions(), catalog.get());
         uow.commit();
     }
+    ASSERT_EQUALS(nss.tenantId(), catalog->getEntry(catalogId).nss.tenantId());
+    ASSERT_EQUALS(nss, catalog->getEntry(catalogId).nss);
 
-    IndexDescriptor desc("",
-                         BSON("v"
-                              << "1"
-                              << "key" << BSON("a" << 1)));
-    std::unique_ptr<SortedDataInterface> sorted;
+    // Re-initialize the MDBCatalog (as if it read from disk). Ensure the tenantId is still
+    // stored on the nss in the entry.
+    std::string ident = catalog->getEntry(catalogId).ident;
     {
         auto clientAndCtx = makeClientAndCtx("opCtx");
         auto opCtx = clientAndCtx.opCtx();
-        ASSERT_OK(engine->createSortedDataInterface(opCtx, CollectionOptions(), ident, &desc));
-        sorted = engine->getSortedDataInterface(opCtx, CollectionOptions(), ident, &desc);
-        ASSERT(sorted);
+        Lock::GlobalLock globalLk(opCtx, MODE_IX);
+
+        WriteUnitOfWork uow(opCtx);
+        createMDBCatalog(catalogRS.get());
+        catalog->init(opCtx);
+        uow.commit();
     }
+    ASSERT_EQUALS(ident, catalog->getEntry(catalogId).ident);
+    ASSERT_EQUALS(nss.tenantId(), catalog->getEntry(catalogId).nss.tenantId());
+    ASSERT_EQUALS(nss, catalog->getEntry(catalogId).nss);
+
+    gMultitenancySupport = false;
 }
 
 }  // namespace

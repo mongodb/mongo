@@ -6,10 +6,12 @@
 //  Distributed under the Boost Software License, Version 1.0.
 //  See http://www.boost.org/LICENSE_1_0.txt
 
-// define BOOST_CHRONO_SOURCE so that <boost/filesystem/config.hpp> knows
+// define BOOST_CHRONO_SOURCE so that <boost/chrono/config.hpp> knows
 // the library is being built (possibly exporting rather than importing code)
 
-#define BOOST_CHRONO_SOURCE
+#ifndef BOOST_CHRONO_SOURCE
+# define BOOST_CHRONO_SOURCE
+#endif
 
 #include <boost/chrono/detail/inlined/chrono.hpp>
 

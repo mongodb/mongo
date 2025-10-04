@@ -29,9 +29,59 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/client.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/shard_filterer.h"
+#include "mongo/db/local_catalog/shard_role_api/resource_yielder.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/common_process_interface.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
+#include "mongo/db/pipeline/storage_stats_spec_gen.h"
+#include "mongo/db/query/client_cursor/generic_cursor_gen.h"
+#include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/write_ops/write_ops_gen.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/storage/backup_cursor_state.h"
+#include "mongo/db/storage/key_format.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/temporary_record_store.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/db/versioning_protocol/chunk_version.h"
+#include "mongo/db/versioning_protocol/database_version.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
+#include "mongo/util/uuid.h"
+
+#include <deque>
+#include <list>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -43,14 +93,22 @@ class MongosProcessInterface : public CommonProcessInterface {
 public:
     using CommonProcessInterface::CommonProcessInterface;
 
-    virtual ~MongosProcessInterface() = default;
+    ~MongosProcessInterface() override = default;
+
+    std::unique_ptr<WriteSizeEstimator> getWriteSizeEstimator(
+        OperationContext* opCtx, const NamespaceString& ns) const final;
 
     boost::optional<Document> lookupSingleDocument(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const NamespaceString& nss,
-        UUID collectionUUID,
+        boost::optional<UUID> collectionUUID,
         const Document& documentKey,
         boost::optional<BSONObj> readConcern) final;
+
+    boost::optional<Document> lookupSingleDocumentLocally(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const NamespaceString& nss,
+        const Document& documentKey) final;
 
     std::vector<GenericCursor> getIdleCursors(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                               CurrentOpUserMode userMode) const final;
@@ -60,19 +118,36 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    std::vector<FieldPath> collectDocumentKeyFieldsActingAsRouter(OperationContext*,
+                                                                  const NamespaceString&,
+                                                                  RoutingContext*) const final;
+
     bool isSharded(OperationContext* opCtx, const NamespaceString& nss) final;
+
+    boost::optional<ShardId> determineSpecificMergeShard(OperationContext* opCtx,
+                                                         const NamespaceString& ns) const final {
+        return CommonProcessInterface::findOwningShard(opCtx, ns);
+    }
 
     Status insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                   const NamespaceString& ns,
-                  std::vector<BSONObj>&& objs,
+                  std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
                   const WriteConcernOptions& wc,
                   boost::optional<OID>) final {
         MONGO_UNREACHABLE;
     }
 
+    Status insertTimeseries(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                            const NamespaceString& ns,
+                            std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
+                            const WriteConcernOptions& wc,
+                            boost::optional<OID> targetEpoch) final {
+        MONGO_UNREACHABLE;
+    }
+
     StatusWith<UpdateResult> update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                     const NamespaceString& ns,
-                                    BatchedObjects&& batch,
+                                    std::unique_ptr<write_ops::UpdateCommandRequest> updateCommand,
                                     const WriteConcernOptions& wc,
                                     UpsertType upsert,
                                     bool multi,
@@ -87,9 +162,19 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    std::list<BSONObj> getIndexSpecs(OperationContext* opCtx,
-                                     const NamespaceString& ns,
-                                     bool includeBuildUUIDs) final {
+    std::vector<BSONObj> getIndexSpecs(OperationContext* opCtx,
+                                       const NamespaceString& ns,
+                                       bool includeBuildUUIDs) final {
+        MONGO_UNREACHABLE;
+    }
+
+    std::deque<BSONObj> listCatalog(OperationContext* opCtx) const final {
+        MONGO_UNREACHABLE;
+    }
+
+    boost::optional<BSONObj> getCatalogEntry(OperationContext* opCtx,
+                                             const NamespaceString& ns,
+                                             const boost::optional<UUID>& collUUID) const final {
         MONGO_UNREACHABLE;
     }
 
@@ -100,10 +185,11 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    Status appendStorageStats(OperationContext* opCtx,
+    Status appendStorageStats(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                               const NamespaceString& nss,
                               const StorageStatsSpec& spec,
-                              BSONObjBuilder* builder) const final {
+                              BSONObjBuilder* builder,
+                              const boost::optional<BSONObj>& filterObj) const final {
         MONGO_UNREACHABLE;
     }
 
@@ -119,21 +205,53 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    void appendOperationStats(OperationContext* opCtx,
+                              const NamespaceString& nss,
+                              BSONObjBuilder* builder) const final {
+        MONGO_UNREACHABLE;
+    }
+
     BSONObj getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) final {
         MONGO_UNREACHABLE;
     }
 
-    void renameIfOptionsAndIndexesHaveNotChanged(OperationContext* opCtx,
-                                                 const BSONObj& renameCommandObj,
-                                                 const NamespaceString& targetNs,
-                                                 const BSONObj& originalCollectionOptions,
-                                                 const std::list<BSONObj>& originalIndexes) final {
+    UUID fetchCollectionUUIDFromPrimary(OperationContext* opCtx, const NamespaceString& nss) final {
+        MONGO_UNREACHABLE;
+    }
+
+    query_shape::CollectionType getCollectionType(OperationContext* opCtx,
+                                                  const NamespaceString& nss) final {
+        MONGO_UNREACHABLE;
+    }
+
+    void renameIfOptionsAndIndexesHaveNotChanged(
+        OperationContext* opCtx,
+        const NamespaceString& sourceNs,
+        const NamespaceString& targetNs,
+        bool dropTarget,
+        bool stayTemp,
+        const BSONObj& originalCollectionOptions,
+        const std::vector<BSONObj>& originalIndexes) final {
         MONGO_UNREACHABLE;
     }
 
     void createCollection(OperationContext* opCtx,
-                          const std::string& dbName,
+                          const DatabaseName& dbName,
                           const BSONObj& cmdObj) final {
+        MONGO_UNREACHABLE;
+    }
+
+    void createTempCollection(OperationContext* opCtx,
+                              const NamespaceString& nss,
+                              const BSONObj& collectionOptions,
+                              boost::optional<ShardId> dataShard) final {
+        MONGO_UNREACHABLE;
+    }
+
+    void createTimeseriesView(OperationContext* opCtx,
+                              const NamespaceString& ns,
+                              const BSONObj& cmdObj,
+                              const TimeseriesOptions& userOpts) final {
         MONGO_UNREACHABLE;
     }
 
@@ -147,27 +265,46 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    void dropTempCollection(OperationContext* opCtx, const NamespaceString& nss) final {
+        MONGO_UNREACHABLE;
+    }
+
     BSONObj preparePipelineAndExplain(Pipeline* ownedPipeline,
                                       ExplainOptions::Verbosity verbosity) final;
 
-    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipelineForLocalRead(
-        Pipeline* pipeline) final {
+    std::unique_ptr<Pipeline> attachCursorSourceToPipelineForLocalRead(
+        Pipeline* pipeline,
+        boost::optional<const AggregateCommandRequest&> aggRequest = boost::none,
+        bool shouldUseCollectionDefaultCollator = false,
+        ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{}) final {
         // It is not meaningful to perform a "local read" on mongos.
         MONGO_UNREACHABLE;
     }
 
-    std::unique_ptr<ShardFilterer> getShardFilterer(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx) const override {
-        return nullptr;
+    std::unique_ptr<Pipeline> finalizeAndAttachCursorToPipelineForLocalRead(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        Pipeline* ownedPipeline,
+        bool attachCursorAfterOptimizing,
+        std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                           Pipeline* pipeline,
+                           CollectionMetadata collData)> finalizePipeline = nullptr,
+        bool shouldUseCollectionDefaultCollator = false,
+        boost::optional<const AggregateCommandRequest&> aggRequest = boost::none,
+        ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{}) final {
+        // It is not meaningful to perform a "local read" on mongos.
+        MONGO_UNREACHABLE;
     }
 
     std::string getShardName(OperationContext* opCtx) const final {
         MONGO_UNREACHABLE;
     }
 
-    std::pair<std::vector<FieldPath>, bool> collectDocumentKeyFieldsForHostedCollection(
-        OperationContext* opCtx, const NamespaceString&, UUID) const final {
-        MONGO_UNREACHABLE;
+    boost::optional<ShardId> getShardId(OperationContext*) const final {
+        return {};
+    }
+
+    bool inShardedEnvironment(OperationContext* opCtx) const final {
+        return true;
     }
 
     /**
@@ -200,9 +337,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    bool fieldsHaveSupportingUniqueIndex(const boost::intrusive_ptr<ExpressionContext>&,
-                                         const NamespaceString&,
-                                         const std::set<FieldPath>& fieldPaths) const;
+    SupportingUniqueIndex fieldsHaveSupportingUniqueIndex(
+        const boost::intrusive_ptr<ExpressionContext>&,
+        const NamespaceString&,
+        const std::set<FieldPath>& fieldPaths) const override;
 
     void checkRoutingInfoEpochOrThrow(const boost::intrusive_ptr<ExpressionContext>&,
                                       const NamespaceString&,
@@ -210,35 +348,18 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    void setExpectedShardVersion(OperationContext* opCtx,
-                                 const NamespaceString& nss,
-                                 boost::optional<ChunkVersion> chunkVersion) override {
+    std::unique_ptr<ScopedExpectUnshardedCollection> expectUnshardedCollectionInScope(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const boost::optional<DatabaseVersion>& dbVersion) override {
         MONGO_UNREACHABLE;
     }
 
-    bool setExpectedDbVersion(OperationContext* opCtx,
-                              const NamespaceString& nss,
-                              DatabaseVersion dbVersion) override {
-        MONGO_UNREACHABLE;
-    }
-
-    void unsetExpectedDbVersion(OperationContext* opCtx, const NamespaceString& nss) override {
-        MONGO_UNREACHABLE;
-    }
-
-    void checkOnPrimaryShardForDb(OperationContext* opCtx, const NamespaceString& nss) override {
-        MONGO_UNREACHABLE;
-    }
-
-    std::unique_ptr<ResourceYielder> getResourceYielder() const override {
-        return nullptr;
-    }
-
-    std::pair<std::set<FieldPath>, boost::optional<ChunkVersion>>
-    ensureFieldsUniqueOrResolveDocumentKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                           boost::optional<std::set<FieldPath>> fieldPaths,
-                                           boost::optional<ChunkVersion> targetCollectionVersion,
-                                           const NamespaceString& outputNs) const override;
+    DocumentKeyResolutionMetadata ensureFieldsUniqueOrResolveDocumentKey(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        boost::optional<std::set<FieldPath>> fieldPaths,
+        boost::optional<ChunkVersion> targetCollectionPlacementVersion,
+        const NamespaceString& outputNs) const override;
 
     /**
      * If 'allowTargetingShards' is true, splits the pipeline and dispatch half to the shards,
@@ -246,44 +367,75 @@ public:
      * retry on network errors and also on StaleConfig errors to avoid restarting the entire
      * operation.
      */
-    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
+    std::unique_ptr<Pipeline> finalizeAndMaybePreparePipelineForExecution(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        Pipeline* ownedPipeline,
+        bool attachCursorAfterOptimizing,
+        std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                           Pipeline* pipeline,
+                           CollectionMetadata collData)> finalizePipeline = nullptr,
+        ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
+        boost::optional<BSONObj> readConcern = boost::none,
+        bool shouldUseCollectionDefaultCollator = false) final;
+
+    std::unique_ptr<Pipeline> preparePipelineForExecution(
         Pipeline* pipeline,
         ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
         boost::optional<BSONObj> readConcern = boost::none) final;
 
-    std::unique_ptr<TemporaryRecordStore> createTemporaryRecordStore(
+    std::unique_ptr<Pipeline> preparePipelineForExecution(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const AggregateCommandRequest& aggRequest,
+        Pipeline* pipeline,
+        boost::optional<BSONObj> shardCursorsSortSpec = boost::none,
+        ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
+        boost::optional<BSONObj> readConcern = boost::none,
+        bool shouldUseCollectionDefaultCollator = false) final;
+
+    std::unique_ptr<SpillTable> createSpillTable(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, KeyFormat keyFormat) const final {
         MONGO_UNREACHABLE;
     }
-    void writeRecordsToRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                   RecordStore* rs,
-                                   std::vector<Record>* records,
-                                   const std::vector<Timestamp>& ts) const final {
+    void writeRecordsToSpillTable(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                  SpillTable& spillTable,
+                                  std::vector<Record>* records) const final {
         MONGO_UNREACHABLE;
     }
 
-    Document readRecordFromRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                       RecordStore* rs,
-                                       RecordId rID) const final {
+    Document readRecordFromSpillTable(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                      const SpillTable& spillTable,
+                                      RecordId rID) const final {
         MONGO_UNREACHABLE;
     }
 
-    void deleteRecordFromRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                     RecordStore* rs,
-                                     RecordId rID) const final {
+    bool checkRecordInSpillTable(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                 const SpillTable& spillTable,
+                                 RecordId rID) const final {
         MONGO_UNREACHABLE;
     }
 
-    void truncateRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                             RecordStore* rs) const final {
+    void deleteRecordFromSpillTable(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                    SpillTable& spillTable,
+                                    RecordId rID) const final {
         MONGO_UNREACHABLE;
     }
+
+    void truncateSpillTable(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                            SpillTable& spillTable) const final {
+        MONGO_UNREACHABLE;
+    }
+
+    std::vector<DatabaseName> getAllDatabases(OperationContext* opCtx,
+                                              boost::optional<TenantId> tenantId) final;
+
+    std::vector<BSONObj> runListCollections(OperationContext* opCtx,
+                                            const DatabaseName& db,
+                                            bool addPrimaryShard) final;
 
 protected:
-    BSONObj _reportCurrentOpForClient(OperationContext* opCtx,
+    BSONObj _reportCurrentOpForClient(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                       Client* client,
-                                      CurrentOpTruncateMode truncateOps,
-                                      CurrentOpBacktraceMode backtraceMode) const final;
+                                      CurrentOpTruncateMode truncateOps) const final;
 
     void _reportCurrentOpsForIdleSessions(OperationContext* opCtx,
                                           CurrentOpUserMode userMode,
@@ -297,6 +449,9 @@ protected:
                                                  CurrentOpConnectionsMode connMode,
                                                  CurrentOpSessionsMode sessionMode,
                                                  std::vector<BSONObj>* ops) const final;
+
+    void _reportCurrentOpsForQueryAnalysis(OperationContext* opCtx,
+                                           std::vector<BSONObj>* ops) const final;
 };
 
 }  // namespace mongo

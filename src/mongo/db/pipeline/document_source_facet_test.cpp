@@ -27,25 +27,40 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/pipeline/document_source_facet.h"
 
-#include <deque>
-#include <vector>
-
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/mock_stage.h"
+#include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_skip.h"
+#include "mongo/db/pipeline/explain_util.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+
+#include <bitset>
+#include <deque>
+#include <vector>
+
+#include <boost/none.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 using std::deque;
@@ -65,8 +80,7 @@ using DocumentSourceFacetTest = AggregationContextFixture;
 
 TEST_F(DocumentSourceFacetTest, ShouldRejectNonObjectSpec) {
     auto ctx = getExpCtx();
-    auto spec = BSON("$facet"
-                     << "string");
+    auto spec = BSON("$facet" << "string");
     ASSERT_THROWS(DocumentSourceFacet::createFromBson(spec.firstElement(), ctx),
                   AssertionException);
 
@@ -116,49 +130,45 @@ TEST_F(DocumentSourceFacetTest, ShouldSucceedWhenNamespaceIsCollectionless) {
     auto ctx = getExpCtx();
     auto spec = fromjson("{$facet: {a: [{$match: {}}]}}");
 
-    ctx->ns = NamespaceString::makeCollectionlessAggregateNSS("unittests");
+    ctx->setNamespaceString(NamespaceString::makeCollectionlessAggregateNSS(
+        DatabaseName::createDatabaseName_forTest(boost::none, "unittests")));
 
     ASSERT_TRUE(DocumentSourceFacet::createFromBson(spec.firstElement(), ctx).get());
 }
 
 TEST_F(DocumentSourceFacetTest, ShouldRejectFacetsContainingAnOutStage) {
     auto ctx = getExpCtx();
-    auto spec = BSON("$facet" << BSON("a" << BSON_ARRAY(BSON("$out"
-                                                             << "out_collection"))));
+    auto spec = BSON("$facet" << BSON("a" << BSON_ARRAY(BSON("$out" << "out_collection"))));
     ASSERT_THROWS(DocumentSourceFacet::createFromBson(spec.firstElement(), ctx),
                   AssertionException);
 
-    spec =
-        BSON("$facet" << BSON("a" << BSON_ARRAY(BSON("$skip" << 1) << BSON("$out"
-                                                                           << "out_collection"))));
+    spec = BSON("$facet" << BSON(
+                    "a" << BSON_ARRAY(BSON("$skip" << 1) << BSON("$out" << "out_collection"))));
     ASSERT_THROWS(DocumentSourceFacet::createFromBson(spec.firstElement(), ctx),
                   AssertionException);
 
-    spec = BSON("$facet" << BSON("a" << BSON_ARRAY(BSON("$out"
-                                                        << "out_collection")
-                                                   << BSON("$skip" << 1))));
+    spec = BSON("$facet" << BSON(
+                    "a" << BSON_ARRAY(BSON("$out" << "out_collection") << BSON("$skip" << 1))));
     ASSERT_THROWS(DocumentSourceFacet::createFromBson(spec.firstElement(), ctx),
                   AssertionException);
 }
 
 TEST_F(DocumentSourceFacetTest, ShouldRejectFacetsContainingAMergeStage) {
     auto ctx = getExpCtx();
-    auto spec =
-        BSON("$facet" << BSON("a" << BSON_ARRAY(BSON("$merge" << BSON("into"
-                                                                      << "merge_collection")))));
+    auto spec = BSON(
+        "$facet" << BSON("a" << BSON_ARRAY(BSON("$merge" << BSON("into" << "merge_collection")))));
+    ASSERT_THROWS(DocumentSourceFacet::createFromBson(spec.firstElement(), ctx),
+                  AssertionException);
+
+    spec = BSON("$facet" << BSON(
+                    "a" << BSON_ARRAY(BSON("$skip" << 1)
+                                      << BSON("$merge" << BSON("into" << "merge_collection")))));
     ASSERT_THROWS(DocumentSourceFacet::createFromBson(spec.firstElement(), ctx),
                   AssertionException);
 
     spec =
-        BSON("$facet" << BSON("a" << BSON_ARRAY(BSON("$skip" << 1)
-                                                << BSON("$merge" << BSON("into"
-                                                                         << "merge_collection")))));
-    ASSERT_THROWS(DocumentSourceFacet::createFromBson(spec.firstElement(), ctx),
-                  AssertionException);
-
-    spec = BSON("$facet" << BSON("a" << BSON_ARRAY(BSON("$merge" << BSON("into"
-                                                                         << "merge_collection"))
-                                                   << BSON("$skip" << 1))));
+        BSON("$facet" << BSON("a" << BSON_ARRAY(BSON("$merge" << BSON("into" << "merge_collection"))
+                                                << BSON("$skip" << 1))));
     ASSERT_THROWS(DocumentSourceFacet::createFromBson(spec.firstElement(), ctx),
                   AssertionException);
 }
@@ -186,13 +196,23 @@ TEST_F(DocumentSourceFacetTest, ShouldAcceptLegalSpecification) {
     ASSERT_TRUE(facetStage.get());
 }
 
+/*
+ * Override the stub interface to allow full execution in these tests.
+ */
+class ExecutableStubMongoProcessInterface : public StubMongoProcessInterface {
+    bool isExpectedToExecuteQueries() override {
+        return true;
+    }
+};
+
 TEST_F(DocumentSourceFacetTest, ShouldRejectConflictingHostTypeRequirementsWithinSinglePipeline) {
     auto ctx = getExpCtx();
-    ctx->inMongos = true;
+    ctx->setInRouter(true);
+    ctx->setMongoProcessInterface(std::make_unique<ExecutableStubMongoProcessInterface>());
 
     auto spec = fromjson(
         "{$facet: {badPipe: [{$_internalSplitPipeline: {mergeType: 'anyShard'}}, "
-        "{$_internalSplitPipeline: {mergeType: 'mongos'}}]}}");
+        "{$_internalSplitPipeline: {mergeType: 'router'}}]}}");
 
     ASSERT_THROWS_CODE(DocumentSourceFacet::createFromBson(spec.firstElement(), ctx),
                        AssertionException,
@@ -201,11 +221,12 @@ TEST_F(DocumentSourceFacetTest, ShouldRejectConflictingHostTypeRequirementsWithi
 
 TEST_F(DocumentSourceFacetTest, ShouldRejectConflictingHostTypeRequirementsAcrossPipelines) {
     auto ctx = getExpCtx();
-    ctx->inMongos = true;
+    ctx->setInRouter(true);
+    ctx->setMongoProcessInterface(std::make_unique<ExecutableStubMongoProcessInterface>());
 
     auto spec = fromjson(
         "{$facet: {shardPipe: [{$_internalSplitPipeline: {mergeType: 'anyShard'}}], mongosPipe: "
-        "[{$_internalSplitPipeline: {mergeType: 'mongos'}}]}}");
+        "[{$_internalSplitPipeline: {mergeType: 'router'}}]}}");
 
     ASSERT_THROWS_CODE(DocumentSourceFacet::createFromBson(spec.firstElement(), ctx),
                        AssertionException,
@@ -224,7 +245,7 @@ public:
     DocumentSourcePassthrough(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSourceMock({}, expCtx) {}
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const override {
+    StageConstraints constraints(PipelineSplitState pipeState) const override {
         return {StreamType::kStreaming,
                 PositionRequirement::kNone,
                 HostTypeRequirement::kNone,
@@ -235,15 +256,43 @@ public:
                 UnionRequirement::kAllowed};
     }
 
-    DocumentSource::GetNextResult doGetNext() final {
-        return pSource->getNext();
-    }
-
     static boost::intrusive_ptr<DocumentSourcePassthrough> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx) {
         return new DocumentSourcePassthrough(expCtx);
     }
+
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
+    }
 };
+
+class PassthroughStage final : public exec::agg::Stage {
+public:
+    PassthroughStage(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : Stage("passthroughStage", expCtx) {}
+
+private:
+    exec::agg::GetNextResult doGetNext() final {
+        return pSource->getNext();
+    }
+};
+
+ALLOCATE_DOCUMENT_SOURCE_ID(mockPassthrough, DocumentSourcePassthrough::id)
+
+// Create a mapping function from DocumentSourcePassthrough to PassthroughStage.
+boost::intrusive_ptr<exec::agg::Stage> documentSourcePassthroughToStageFn(
+    const boost::intrusive_ptr<DocumentSource>& documentSource) {
+    auto* dsMock = dynamic_cast<DocumentSourcePassthrough*>(documentSource.get());
+    tassert(10812601, "expected 'DocumentSourcePassthrough' type", dsMock);
+    return make_intrusive<PassthroughStage>(dsMock->getExpCtx());
+}
+
+REGISTER_AGG_STAGE_MAPPING(mockPassthroughStage,
+                           DocumentSourcePassthrough::id,
+                           documentSourcePassthroughToStageFn)
+
 
 TEST_F(DocumentSourceFacetTest, PassthroughFacetDoesntRequireDiskAndIsOKInaTxn) {
     auto ctx = getExpCtx();
@@ -254,9 +303,9 @@ TEST_F(DocumentSourceFacetTest, PassthroughFacetDoesntRequireDiskAndIsOKInaTxn) 
     facets.emplace_back("passthrough", std::move(passthroughPipe));
 
     auto facetStage = DocumentSourceFacet::create(std::move(facets), ctx);
-    ASSERT(facetStage->constraints(Pipeline::SplitState::kUnsplit).diskRequirement ==
+    ASSERT(facetStage->constraints(PipelineSplitState::kUnsplit).diskRequirement ==
            DocumentSource::DiskUseRequirement::kNoDiskUse);
-    ASSERT(facetStage->constraints(Pipeline::SplitState::kUnsplit).transactionRequirement ==
+    ASSERT(facetStage->constraints(PipelineSplitState::kUnsplit).transactionRequirement ==
            DocumentSource::TransactionRequirement::kAllowed);
 }
 
@@ -267,7 +316,7 @@ class DocumentSourceWritesPersistentData final : public DocumentSourcePassthroug
 public:
     DocumentSourceWritesPersistentData(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSourcePassthrough(expCtx) {}
-    StageConstraints constraints(Pipeline::SplitState) const final {
+    StageConstraints constraints(PipelineSplitState) const final {
         return {
             StreamType::kStreaming,
             PositionRequirement::kNone,
@@ -295,9 +344,9 @@ TEST_F(DocumentSourceFacetTest, FacetWithChildThatWritesDataAlsoReportsWritingDa
     facets.emplace_back("writes", std::move(pipeline));
 
     auto facetStage = DocumentSourceFacet::create(std::move(facets), ctx);
-    ASSERT(facetStage->constraints(Pipeline::SplitState::kUnsplit).diskRequirement ==
+    ASSERT(facetStage->constraints(PipelineSplitState::kUnsplit).diskRequirement ==
            DocumentSource::DiskUseRequirement::kWritesPersistentData);
-    ASSERT(facetStage->constraints(Pipeline::SplitState::kUnsplit).transactionRequirement ==
+    ASSERT(facetStage->constraints(PipelineSplitState::kUnsplit).transactionRequirement ==
            DocumentSource::TransactionRequirement::kNotAllowed);
 }
 
@@ -306,7 +355,7 @@ TEST_F(DocumentSourceFacetTest, SingleFacetShouldReceiveAllDocuments) {
 
     deque<DocumentSource::GetNextResult> inputs = {
         Document{{"_id", 0}}, Document{{"_id", 1}}, Document{{"_id", 2}}};
-    auto mock = DocumentSourceMock::createForTest(inputs, getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest(inputs, getExpCtx());
 
     auto dummy = DocumentSourcePassthrough::create(ctx);
 
@@ -314,7 +363,8 @@ TEST_F(DocumentSourceFacetTest, SingleFacetShouldReceiveAllDocuments) {
 
     std::vector<DocumentSourceFacet::FacetPipeline> facets;
     facets.emplace_back("results", std::move(pipeline));
-    auto facetStage = DocumentSourceFacet::create(std::move(facets), ctx);
+    auto facetSource = DocumentSourceFacet::create(std::move(facets), ctx);
+    auto facetStage = exec::agg::buildStage(facetSource);
     facetStage->setSource(mock.get());
 
     auto output = facetStage->getNext();
@@ -333,7 +383,7 @@ TEST_F(DocumentSourceFacetTest, MultipleFacetsShouldSeeTheSameDocuments) {
 
     deque<DocumentSource::GetNextResult> inputs = {
         Document{{"_id", 0}}, Document{{"_id", 1}}, Document{{"_id", 2}}};
-    auto mock = DocumentSourceMock::createForTest(inputs, getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest(inputs, getExpCtx());
 
     auto firstDummy = DocumentSourcePassthrough::create(ctx);
     auto firstPipeline = Pipeline::create({firstDummy}, ctx);
@@ -344,7 +394,8 @@ TEST_F(DocumentSourceFacetTest, MultipleFacetsShouldSeeTheSameDocuments) {
     std::vector<DocumentSourceFacet::FacetPipeline> facets;
     facets.emplace_back("first", std::move(firstPipeline));
     facets.emplace_back("second", std::move(secondPipeline));
-    auto facetStage = DocumentSourceFacet::create(std::move(facets), ctx);
+    auto facetSource = DocumentSourceFacet::create(std::move(facets), ctx);
+    auto facetStage = exec::agg::buildStage(facetSource);
 
     facetStage->setSource(mock.get());
 
@@ -372,9 +423,10 @@ TEST_F(DocumentSourceFacetTest, ShouldAcceptEmptyPipelines) {
 
     deque<DocumentSource::GetNextResult> inputs = {
         Document{{"_id", 0}}, Document{{"_id", 1}}, Document{{"_id", 2}}};
-    auto mock = DocumentSourceMock::createForTest(inputs, ctx);
+    auto mock = exec::agg::MockStage::createForTest(inputs, ctx);
 
-    auto facetStage = DocumentSourceFacet::createFromBson(spec.firstElement(), ctx);
+    auto facetSource = DocumentSourceFacet::createFromBson(spec.firstElement(), ctx);
+    auto facetStage = exec::agg::buildStage(facetSource);
     facetStage->setSource(mock.get());
 
     auto output = facetStage->getNext();
@@ -397,10 +449,11 @@ TEST_F(DocumentSourceFacetTest, ShouldAcceptEmptyPipelines) {
 TEST_F(DocumentSourceFacetTest,
        ShouldCorrectlyHandleSubPipelinesYieldingDifferentNumbersOfResults) {
     auto ctx = getExpCtx();
+    ctx->setExplain(ExplainOptions::Verbosity::kQueryPlanner);
 
     deque<DocumentSource::GetNextResult> inputs = {
         Document{{"_id", 0}}, Document{{"_id", 1}}, Document{{"_id", 2}}, Document{{"_id", 3}}};
-    auto mock = DocumentSourceMock::createForTest(inputs, getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest(inputs, getExpCtx());
 
     auto passthrough = DocumentSourcePassthrough::create(ctx);
     auto passthroughPipe = Pipeline::create({passthrough}, ctx);
@@ -411,7 +464,8 @@ TEST_F(DocumentSourceFacetTest,
     std::vector<DocumentSourceFacet::FacetPipeline> facets;
     facets.emplace_back("all", std::move(passthroughPipe));
     facets.emplace_back("first", std::move(limitedPipe));
-    auto facetStage = DocumentSourceFacet::create(std::move(facets), ctx);
+    auto facetSource = DocumentSourceFacet::create(std::move(facets), ctx);
+    auto facetStage = exec::agg::buildStage(facetSource);
 
     facetStage->setSource(mock.get());
 
@@ -432,13 +486,30 @@ TEST_F(DocumentSourceFacetTest,
     ASSERT(facetStage->getNext().isEOF());
     ASSERT(facetStage->getNext().isEOF());
     ASSERT(facetStage->getNext().isEOF());
+
+    vector<Value> serialization;
+    facetSource->serializeToArray(
+        serialization, SerializationOptions{.verbosity = ExplainOptions::Verbosity::kExecStats});
+
+    ASSERT_EQ(serialization.size(), 1UL);
+    ASSERT_EQ(serialization[0].getType(), BSONType::object);
+
+    // The fields are in no guaranteed order, so we can't make a simple Document comparison.
+    ASSERT_EQ(serialization[0].getDocument().computeSize(), 1ULL);
+    ASSERT_EQ(serialization[0].getDocument()["$facet"].getType(), BSONType::object);
+
+    // Should have two fields: "all" and "first".
+    auto serializedStage = serialization[0].getDocument()["$facet"].getDocument();
+    ASSERT_EQ(serializedStage.computeSize(), 2ULL);
+    ASSERT_EQ(serializedStage["all"][0]["nReturned"].getLong(), inputs.size());
+    ASSERT_EQ(serializedStage["first"][0]["nReturned"].getLong(), 1ULL);
 }
 
 TEST_F(DocumentSourceFacetTest, ShouldBeAbleToEvaluateMultipleStagesWithinOneSubPipeline) {
     auto ctx = getExpCtx();
 
     deque<DocumentSource::GetNextResult> inputs = {Document{{"_id", 0}}, Document{{"_id", 1}}};
-    auto mock = DocumentSourceMock::createForTest(inputs, getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest(inputs, getExpCtx());
 
     auto firstDummy = DocumentSourcePassthrough::create(ctx);
     auto secondDummy = DocumentSourcePassthrough::create(ctx);
@@ -446,7 +517,8 @@ TEST_F(DocumentSourceFacetTest, ShouldBeAbleToEvaluateMultipleStagesWithinOneSub
 
     std::vector<DocumentSourceFacet::FacetPipeline> facets;
     facets.emplace_back("subPipe", std::move(pipeline));
-    auto facetStage = DocumentSourceFacet::create(std::move(facets), ctx);
+    auto facetSource = DocumentSourceFacet::create(std::move(facets), ctx);
+    auto facetStage = exec::agg::buildStage(facetSource);
 
     facetStage->setSource(mock.get());
 
@@ -458,7 +530,7 @@ TEST_F(DocumentSourceFacetTest, ShouldBeAbleToEvaluateMultipleStagesWithinOneSub
 TEST_F(DocumentSourceFacetTest, ShouldPropagateDisposeThroughToSource) {
     auto ctx = getExpCtx();
 
-    auto mockSource = DocumentSourceMock::createForTest(getExpCtx());
+    auto mockSource = exec::agg::MockStage::createForTest({}, getExpCtx());
 
     auto firstDummy = DocumentSourcePassthrough::create(ctx);
     auto firstPipe = Pipeline::create({firstDummy}, ctx);
@@ -468,7 +540,8 @@ TEST_F(DocumentSourceFacetTest, ShouldPropagateDisposeThroughToSource) {
     std::vector<DocumentSourceFacet::FacetPipeline> facets;
     facets.emplace_back("firstPipe", std::move(firstPipe));
     facets.emplace_back("secondPipe", std::move(secondPipe));
-    auto facetStage = DocumentSourceFacet::create(std::move(facets), ctx);
+    auto facetSource = DocumentSourceFacet::create(std::move(facets), ctx);
+    auto facetStage = exec::agg::buildStage(facetSource);
 
     facetStage->setSource(mockSource.get());
 
@@ -481,15 +554,16 @@ DEATH_TEST_REGEX_F(DocumentSourceFacetTest,
                    ShouldFailIfGivenPausedInput,
                    R"#(Invariant failure.*!input.isPaused\(\))#") {
     auto ctx = getExpCtx();
-    auto mock = DocumentSourceMock::createForTest(
-        DocumentSource::GetNextResult::makePauseExecution(), getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest(
+        {exec::agg::GetNextResult::makePauseExecution()}, getExpCtx());
 
     auto firstDummy = DocumentSourcePassthrough::create(ctx);
     auto pipeline = Pipeline::create({firstDummy}, ctx);
 
     std::vector<DocumentSourceFacet::FacetPipeline> facets;
     facets.emplace_back("subPipe", std::move(pipeline));
-    auto facetStage = DocumentSourceFacet::create(std::move(facets), ctx);
+    auto facetSource = DocumentSourceFacet::create(std::move(facets), ctx);
+    auto facetStage = exec::agg::buildStage(facetSource);
 
     facetStage->setSource(mock.get());
 
@@ -523,11 +597,11 @@ TEST_F(DocumentSourceFacetTest, ShouldBeAbleToReParseSerializedStage) {
     vector<Value> serialization;
     facetStage->serializeToArray(serialization);
     ASSERT_EQ(serialization.size(), 1UL);
-    ASSERT_EQ(serialization[0].getType(), BSONType::Object);
+    ASSERT_EQ(serialization[0].getType(), BSONType::object);
 
     // The fields are in no guaranteed order, so we can't make a simple Document comparison.
     ASSERT_EQ(serialization[0].getDocument().computeSize(), 1ULL);
-    ASSERT_EQ(serialization[0].getDocument()["$facet"].getType(), BSONType::Object);
+    ASSERT_EQ(serialization[0].getDocument()["$facet"].getType(), BSONType::object);
 
     // Should have two fields: "skippedOne" and "skippedTwo".
     auto serializedStage = serialization[0].getDocument()["$facet"].getDocument();
@@ -565,9 +639,9 @@ TEST_F(DocumentSourceFacetTest, ShouldOptimizeInnerPipelines) {
 
 TEST_F(DocumentSourceFacetTest, ShouldPropagateDetachingAndReattachingOfOpCtx) {
     auto ctx = getExpCtx();
-    // We're going to be changing the OperationContext, so we need to use a MongoProcessInterface
-    // that won't throw when we do so.
-    ctx->mongoProcessInterface = std::make_unique<StubMongoProcessInterface>();
+    // We're going to be changing the OperationContext, so we need to use a
+    // MongoProcessInterface that won't throw when we do so.
+    ctx->setMongoProcessInterface(std::make_unique<StubMongoProcessInterface>());
 
     auto firstDummy = DocumentSourcePassthrough::create(ctx);
     auto firstPipeline = Pipeline::create({firstDummy}, ctx);
@@ -583,12 +657,12 @@ TEST_F(DocumentSourceFacetTest, ShouldPropagateDetachingAndReattachingOfOpCtx) {
     // Test detaching.
     ASSERT_FALSE(firstDummy->isDetachedFromOpCtx);
     ASSERT_FALSE(secondDummy->isDetachedFromOpCtx);
-    facetStage->detachFromOperationContext();
+    facetStage->detachSourceFromOperationContext();
     ASSERT_TRUE(firstDummy->isDetachedFromOpCtx);
     ASSERT_TRUE(secondDummy->isDetachedFromOpCtx);
 
     // Test reattaching.
-    facetStage->reattachToOperationContext(ctx->opCtx);
+    facetStage->reattachSourceToOperationContext(ctx->getOperationContext());
     ASSERT_FALSE(firstDummy->isDetachedFromOpCtx);
     ASSERT_FALSE(secondDummy->isDetachedFromOpCtx);
 }
@@ -709,7 +783,7 @@ public:
     DocumentSourceNeedsOnlyTextScore(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSourcePassthrough(expCtx) {}
     DepsTracker::State getDependencies(DepsTracker* deps) const override {
-        deps->setNeedsMetadata(DocumentMetadataFields::kTextScore, true);
+        deps->setNeedsMetadata(DocumentMetadataFields::kTextScore);
         return DepsTracker::State::EXHAUSTIVE_ALL;
     }
     static boost::intrusive_ptr<DocumentSourceNeedsOnlyTextScore> create(
@@ -736,7 +810,7 @@ TEST_F(DocumentSourceFacetTest, ShouldRequireTextScoreIfAnyPipelineRequiresTextS
     facets.emplace_back("needsTextScore", std::move(thirdPipeline));
     auto facetStage = DocumentSourceFacet::create(std::move(facets), ctx);
 
-    DepsTracker deps(DepsTracker::kAllMetadata & ~DepsTracker::kOnlyTextScore);
+    DepsTracker deps(DepsTracker::kOnlyTextScore);
     ASSERT_EQ(facetStage->getDependencies(&deps), DepsTracker::State::EXHAUSTIVE_ALL);
     ASSERT_TRUE(deps.needWholeDocument);
     ASSERT_TRUE(deps.getNeedsMetadata(DocumentMetadataFields::kTextScore));
@@ -756,57 +830,65 @@ TEST_F(DocumentSourceFacetTest, ShouldThrowIfAnyPipelineRequiresTextScoreButItIs
     facets.emplace_back("needsTextScore", std::move(secondPipeline));
     auto facetStage = DocumentSourceFacet::create(std::move(facets), ctx);
 
-    DepsTracker deps(DepsTracker::kAllMetadata);
+    DepsTracker deps(DepsTracker::kNoMetadata);
     ASSERT_THROWS(facetStage->getDependencies(&deps), AssertionException);
 }
 
 /**
- * A dummy DocumentSource which needs to run on the primary shard.
+ * A dummy DocumentSource which needs to be run on a specific shard as a merger.
  */
-class DocumentSourceNeedsPrimaryShard final : public DocumentSourcePassthrough {
+class DocumentSourceNeedsSpecificShardMerger final : public DocumentSourcePassthrough {
 public:
-    DocumentSourceNeedsPrimaryShard(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+    static const ShardId kMergeShard;
+    DocumentSourceNeedsSpecificShardMerger(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSourcePassthrough(expCtx) {}
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
-        return {StreamType::kStreaming,
-                PositionRequirement::kNone,
-                HostTypeRequirement::kPrimaryShard,
-                DiskUseRequirement::kNoDiskUse,
-                FacetRequirement::kAllowed,
-                TransactionRequirement::kAllowed,
-                LookupRequirement::kAllowed,
-                UnionRequirement::kAllowed};
+    StageConstraints constraints(PipelineSplitState pipeState) const final {
+        StageConstraints constraints{StreamType::kStreaming,
+                                     PositionRequirement::kNone,
+                                     HostTypeRequirement::kNone,
+                                     DiskUseRequirement::kNoDiskUse,
+                                     FacetRequirement::kAllowed,
+                                     TransactionRequirement::kAllowed,
+                                     LookupRequirement::kAllowed,
+                                     UnionRequirement::kAllowed};
+        constraints.mergeShardId = kMergeShard;
+        return constraints;
     }
 
-    static boost::intrusive_ptr<DocumentSourceNeedsPrimaryShard> create(
+    static boost::intrusive_ptr<DocumentSourceNeedsSpecificShardMerger> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-        return new DocumentSourceNeedsPrimaryShard(expCtx);
+        return new DocumentSourceNeedsSpecificShardMerger(expCtx);
     }
 };
+const ShardId DocumentSourceNeedsSpecificShardMerger::kMergeShard = ShardId("merge_shard_name");
 
-TEST_F(DocumentSourceFacetTest, ShouldRequirePrimaryShardIfAnyStageRequiresPrimaryShard) {
+TEST_F(DocumentSourceFacetTest, ShouldRequirePrimaryShardIfAnyStageRequiresSpecificShardMerger) {
     auto ctx = getExpCtx();
 
     auto passthrough = DocumentSourcePassthrough::create(ctx);
     auto firstPipeline = Pipeline::create({passthrough}, ctx);
 
-    auto needsPrimaryShard = DocumentSourceNeedsPrimaryShard::create(ctx);
-    auto secondPipeline = Pipeline::create({needsPrimaryShard}, ctx);
+    auto needsSpecificShardMerger = DocumentSourceNeedsSpecificShardMerger::create(ctx);
+    auto secondPipeline = Pipeline::create({needsSpecificShardMerger}, ctx);
 
     std::vector<DocumentSourceFacet::FacetPipeline> facets;
     facets.emplace_back("passthrough", std::move(firstPipeline));
-    facets.emplace_back("needsPrimaryShard", std::move(secondPipeline));
+    facets.emplace_back("needsSpecificShardMerger", std::move(secondPipeline));
     auto facetStage = DocumentSourceFacet::create(std::move(facets), ctx);
 
-    ASSERT(facetStage->constraints(Pipeline::SplitState::kUnsplit).hostRequirement ==
-           StageConstraints::HostTypeRequirement::kPrimaryShard);
-    ASSERT(facetStage->constraints(Pipeline::SplitState::kUnsplit).diskRequirement ==
+    ASSERT(facetStage->constraints(PipelineSplitState::kUnsplit).hostRequirement ==
+           StageConstraints::HostTypeRequirement::kNone);
+    ASSERT(facetStage->constraints(PipelineSplitState::kUnsplit).diskRequirement ==
            StageConstraints::DiskUseRequirement::kNoDiskUse);
-    ASSERT(facetStage->constraints(Pipeline::SplitState::kUnsplit).transactionRequirement ==
+    ASSERT(facetStage->constraints(PipelineSplitState::kUnsplit).transactionRequirement ==
            StageConstraints::TransactionRequirement::kAllowed);
+    auto msi = facetStage->constraints(PipelineSplitState::kUnsplit).mergeShardId;
+    ASSERT(msi.has_value());
+    ASSERT(*msi == DocumentSourceNeedsSpecificShardMerger::kMergeShard);
 }
 
-TEST_F(DocumentSourceFacetTest, ShouldNotRequirePrimaryShardIfNoStagesRequiresPrimaryShard) {
+TEST_F(DocumentSourceFacetTest,
+       ShouldNotRequireSpecificShardMergerIfNoStagesRequiresSpecificShardMerger) {
     auto ctx = getExpCtx();
 
     auto firstPassthrough = DocumentSourcePassthrough::create(ctx);
@@ -820,38 +902,47 @@ TEST_F(DocumentSourceFacetTest, ShouldNotRequirePrimaryShardIfNoStagesRequiresPr
     facets.emplace_back("second", std::move(secondPipeline));
     auto facetStage = DocumentSourceFacet::create(std::move(facets), ctx);
 
-    ASSERT(facetStage->constraints(Pipeline::SplitState::kUnsplit).hostRequirement ==
+    ASSERT(facetStage->constraints(PipelineSplitState::kUnsplit).hostRequirement ==
            StageConstraints::HostTypeRequirement::kNone);
-    ASSERT(facetStage->constraints(Pipeline::SplitState::kUnsplit).diskRequirement ==
+    ASSERT(facetStage->constraints(PipelineSplitState::kUnsplit).diskRequirement ==
            StageConstraints::DiskUseRequirement::kNoDiskUse);
-    ASSERT(facetStage->constraints(Pipeline::SplitState::kUnsplit).transactionRequirement ==
+    ASSERT(facetStage->constraints(PipelineSplitState::kUnsplit).transactionRequirement ==
            StageConstraints::TransactionRequirement::kAllowed);
+    ASSERT_FALSE(facetStage->constraints(PipelineSplitState::kUnsplit).mergeShardId.has_value());
 }
 
 /**
- * A dummy DocumentSource that must run on the primary shard, can write temporary data and can't be
- * used in a transaction.
+ * A dummy DocumentSource that must run on a specific shard as a merger, can write temporary data
+ * and can't be used in a transaction.
  */
-class DocumentSourcePrimaryShardTmpDataNoTxn final : public DocumentSourcePassthrough {
+class DocumentSourceNeedsSpecificShardMergerTmpDataNoTxn final : public DocumentSourcePassthrough {
 public:
-    DocumentSourcePrimaryShardTmpDataNoTxn(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+    static const ShardId kMergeShard;
+
+    DocumentSourceNeedsSpecificShardMergerTmpDataNoTxn(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSourcePassthrough(expCtx) {}
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
-        return {StreamType::kStreaming,
-                PositionRequirement::kNone,
-                HostTypeRequirement::kPrimaryShard,
-                DiskUseRequirement::kWritesTmpData,
-                FacetRequirement::kAllowed,
-                TransactionRequirement::kNotAllowed,
-                LookupRequirement::kAllowed,
-                UnionRequirement::kAllowed};
+    StageConstraints constraints(PipelineSplitState pipeState) const final {
+        StageConstraints constraints{StreamType::kStreaming,
+                                     PositionRequirement::kNone,
+                                     HostTypeRequirement::kNone,
+                                     DiskUseRequirement::kWritesTmpData,
+                                     FacetRequirement::kAllowed,
+                                     TransactionRequirement::kNotAllowed,
+                                     LookupRequirement::kAllowed,
+                                     UnionRequirement::kAllowed};
+        constraints.mergeShardId = kMergeShard;
+        return constraints;
     }
 
-    static boost::intrusive_ptr<DocumentSourcePrimaryShardTmpDataNoTxn> create(
+    static boost::intrusive_ptr<DocumentSourceNeedsSpecificShardMergerTmpDataNoTxn> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-        return new DocumentSourcePrimaryShardTmpDataNoTxn(expCtx);
+        return new DocumentSourceNeedsSpecificShardMergerTmpDataNoTxn(expCtx);
     }
 };
+
+const ShardId DocumentSourceNeedsSpecificShardMergerTmpDataNoTxn::kMergeShard =
+    ShardId("merge_shard_name_no_txn");
 
 /**
  * A DocumentSource which cannot be used in a $lookup pipeline.
@@ -860,7 +951,7 @@ class DocumentSourceBannedInLookup final : public DocumentSourcePassthrough {
 public:
     DocumentSourceBannedInLookup(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSourcePassthrough(expCtx) {}
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
+    StageConstraints constraints(PipelineSplitState pipeState) const final {
         return {StreamType::kStreaming,
                 PositionRequirement::kNone,
                 HostTypeRequirement::kAnyShard,
@@ -883,7 +974,7 @@ TEST_F(DocumentSourceFacetTest, ShouldSurfaceStrictestRequirementsOfEachConstrai
     auto firstPassthrough = DocumentSourcePassthrough::create(ctx);
     auto firstPipeline = Pipeline::create({firstPassthrough}, ctx);
 
-    auto secondPassthrough = DocumentSourcePrimaryShardTmpDataNoTxn::create(ctx);
+    auto secondPassthrough = DocumentSourceNeedsSpecificShardMergerTmpDataNoTxn::create(ctx);
     auto secondPipeline = Pipeline::create({secondPassthrough}, ctx);
 
     auto thirdPassthrough = DocumentSourceBannedInLookup::create(ctx);
@@ -895,14 +986,176 @@ TEST_F(DocumentSourceFacetTest, ShouldSurfaceStrictestRequirementsOfEachConstrai
     facets.emplace_back("third", std::move(thirdPipeline));
     auto facetStage = DocumentSourceFacet::create(std::move(facets), ctx);
 
-    ASSERT(facetStage->constraints(Pipeline::SplitState::kUnsplit).hostRequirement ==
-           StageConstraints::HostTypeRequirement::kPrimaryShard);
-    ASSERT(facetStage->constraints(Pipeline::SplitState::kUnsplit).diskRequirement ==
+    ASSERT(facetStage->constraints(PipelineSplitState::kUnsplit).hostRequirement ==
+           StageConstraints::HostTypeRequirement::kAnyShard);
+    ASSERT(facetStage->constraints(PipelineSplitState::kUnsplit).diskRequirement ==
            StageConstraints::DiskUseRequirement::kWritesTmpData);
-    ASSERT(facetStage->constraints(Pipeline::SplitState::kUnsplit).transactionRequirement ==
+    ASSERT(facetStage->constraints(PipelineSplitState::kUnsplit).transactionRequirement ==
            StageConstraints::TransactionRequirement::kNotAllowed);
-    ASSERT_FALSE(
-        facetStage->constraints(Pipeline::SplitState::kUnsplit).isAllowedInLookupPipeline());
+    ASSERT_FALSE(facetStage->constraints(PipelineSplitState::kUnsplit).isAllowedInLookupPipeline());
+    auto msi = facetStage->constraints(PipelineSplitState::kUnsplit).mergeShardId;
+    ASSERT(msi.has_value());
+    ASSERT(*msi == DocumentSourceNeedsSpecificShardMergerTmpDataNoTxn::kMergeShard);
+}
+
+TEST_F(DocumentSourceFacetTest, RedactsCorrectly) {
+    auto spec = fromjson(R"({
+        $facet: {
+            a: [
+                { $unwind: "$foo" },
+                { $sortByCount: "$foo" }
+            ],
+            b: [
+                {
+                    $match: {
+                        bar: { $exists: 1 }
+                    }
+                },
+                {
+                    $bucket: {
+                        groupBy: "$bar.foo",
+                        boundaries: [0, 50, 100, 200],
+                        output: {
+                            z: { $sum : 1 }
+                        }
+                    }
+                }
+            ],
+            c: [
+                {
+                    $bucketAuto: {
+                        groupBy: "$bar.baz",
+                        buckets: 4
+                    }
+                }
+            ]
+        }
+    })");
+    auto docSource = DocumentSourceFacet::createFromBson(spec.firstElement(), getExpCtx());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$facet": {
+                "HASH<a>": [
+                    {
+                        "$unwind": {
+                            "path": "$HASH<foo>"
+                        }
+                    },
+                    {
+                        "$group": {
+                            "_id": "$HASH<foo>",
+                            "HASH<count>": {
+                                "$sum": "?number"
+                            }
+                        }
+                    },
+                    {
+                        "$sort": {
+                            "HASH<count>": -1
+                        }
+                    }
+                ],
+                "HASH<b>": [
+                    {
+                        "$match": {
+                            "HASH<bar>": {
+                                "$exists": "?bool"
+                            }
+                        }
+                    },
+                    {
+                        "$group": {
+                            "_id": {
+                                "$switch": {
+                                    "branches": [
+                                        {
+                                            "case": {
+                                                "$and": [
+                                                    {
+                                                        "$gte": [
+                                                            "$HASH<bar>.HASH<foo>",
+                                                            "?number"
+                                                        ]
+                                                    },
+                                                    {
+                                                        "$lt": [
+                                                            "$HASH<bar>.HASH<foo>",
+                                                            "?number"
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            "then": "?number"
+                                        },
+                                        {
+                                            "case": {
+                                                "$and": [
+                                                    {
+                                                        "$gte": [
+                                                            "$HASH<bar>.HASH<foo>",
+                                                            "?number"
+                                                        ]
+                                                    },
+                                                    {
+                                                        "$lt": [
+                                                            "$HASH<bar>.HASH<foo>",
+                                                            "?number"
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            "then": "?number"
+                                        },
+                                        {
+                                            "case": {
+                                                "$and": [
+                                                    {
+                                                        "$gte": [
+                                                            "$HASH<bar>.HASH<foo>",
+                                                            "?number"
+                                                        ]
+                                                    },
+                                                    {
+                                                        "$lt": [
+                                                            "$HASH<bar>.HASH<foo>",
+                                                            "?number"
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            "then": "?number"
+                                        }
+                                    ]
+                                }
+                            },
+                            "HASH<z>": {
+                                "$sum": "?number"
+                            }
+                        }
+                    },
+                    {
+                        "$sort": {
+                            "HASH<_id>": 1
+                        }
+                    }
+                ],
+                "HASH<c>": [
+                    {
+                        "$bucketAuto": {
+                            "groupBy": "$HASH<bar>.HASH<baz>",
+                            "buckets": "?number",
+                            "output": {
+                                "HASH<count>": {
+                                    "$sum": "?number"
+                                }
+                            }
+                        }
+                    }
+                ]
+            }
+        })",
+        redact(*docSource));
 }
 }  // namespace
 }  // namespace mongo

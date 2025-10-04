@@ -11,18 +11,12 @@
  * entrypoints.
  */
 
-#include "mongo/platform/basic.h"
+#include <cstdint>
 
-#include <array>
-#include <js/Utility.h>
+#include <jspubtd.h>
+
+#include <mozilla/Assertions.h>
 #include <vm/PosixNSPR.h>
-
-#include "mongo/platform/mutex.h"
-#include "mongo/stdx/chrono.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/thread.h"
-#include "mongo/util/concurrency/thread_name.h"
-#include "mongo/util/time_support.h"
 
 #define MONGO_MOZ_UNIMPLEMENTED(ReturnType, funcName, ...) \
     ReturnType funcName(__VA_ARGS__) {                     \

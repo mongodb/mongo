@@ -1,0 +1,50 @@
+version: 1.0.0
+filters:
+  # QO owns most of the query commands, so by default files will be owned by QO.
+  - "*":
+    approvers:
+      - 10gen/query-optimization
+  - "OWNERS.yml":
+    approvers:
+      - 10gen/query-execution-staff-leads
+      - 10gen/query-optimization-staff-leads
+      - 10gen/query-integration-staff-leads
+  - "change_stream_state_command.cpp":
+    approvers:
+      - 10gen/query-execution-change-streams
+  - "current_op*":
+    approvers:
+      - 10gen/query-integration-observability
+  - "index_filter_commands.*":
+    approvers:
+      - 10gen/query-execution-query-settings
+  - "query_settings_cmds.*":
+    approvers:
+      - 10gen/query-execution-query-settings
+  - "search_*":
+    approvers:
+      - 10gen/query-integration-search
+  - "external_data_source_commands*":
+    approvers:
+      - 10gen/query-integration-features
+  - "getmore_cmd.cpp":
+    approvers:
+      - 10gen/query-execution
+  - "index_filter_commands_test.cpp":
+    approvers:
+      - 10gen/query-execution
+  - "killcursors*":
+    approvers:
+      - 10gen/query-execution
+  - "map_reduce*":
+    approvers:
+      - 10gen/query-integration-features
+  - "mr_*":
+    approvers:
+      - 10gen/query-integration-features
+  - "release_memory_cmd.*":
+    approvers:
+      - 10gen/query-execution
+  - "update_metrics.*":
+    approvers:
+      - 10gen/query-execution

@@ -1,0 +1,151 @@
+test_kind: js_test
+
+selector:
+  roots:
+    - jstests/core/**/*.js
+    - jstests/fle2/**/*.js
+    - src/mongo/db/modules/*/jstests/fle2/**/*.js
+  exclude_files:
+    # These tests run in the sharded_collections_txns_uninitialized_fcv passthrough suite.
+    - jstests/core/txns/**/*.js
+
+    ### Tests that are excluded because of initial sync (from replica_sets_initsync_jscore_passthrough.yml)
+    # Tests that query the system.profile collection cannot run in this suite since an initial sync
+    # may insert unexpected operations into the profile collection.
+    - jstests/core/**/profile_list_collections.js
+    - jstests/core/**/profile_list_indexes.js
+    - jstests/core/**/query/recursion.js
+    - jstests/core/**/system_profile.js
+    # The following test examines the SBE plan cache, which initial sync may change the contents of.
+    - jstests/core/query/plan_cache/plan_cache_sbe.js
+    # operation_latency_histogram.js and geo_s2cursorlimitskip.js do not expect concurrent reads
+    # against their test collections.
+    - jstests/core/**/operation_latency_histogram.js
+    - jstests/core/**/geo_s2cursorlimitskip.js
+    # Having duplicate namespaces is not supported and will cause initial sync to fail.
+    - jstests/core/catalog/views/duplicate_ns.js
+    # These tests run getLatestProfilerEntry(). The downstream syncing node affects the profiler.
+    - jstests/core/**/profile_agg.js
+    - jstests/core/**/profile_count.js
+    - jstests/core/**/profile_delete.js
+    - jstests/core/**/profile_distinct.js
+    - jstests/core/**/profile_find.js
+    - jstests/core/**/profile_findandmodify.js
+    - jstests/core/**/profile_getmore.js
+    - jstests/core/**/profile_insert.js
+    - jstests/core/**/profile_mapreduce.js
+    - jstests/core/**/profile_sampling.js
+    - jstests/core/**/profile_update.js
+    - jstests/core/txns/transactions_profiling.js
+    # The downstream syncing node affects the top output.
+    - jstests/core/**/query/top/top.js
+    # Change stream pre-images are not cloned during initial sync.
+    - jstests/core/**/write_change_stream_pit_preimage.js
+
+    ### Tests that are excluded because of sharding (from sharded_collections_jscore_passthrough.yml)
+    # The following tests fail because a certain command or functionality is not supported by
+    # mongos. This command or functionality is placed in a comment next to the failing test.
+    - jstests/core/**/apitest_db.js # serverStatus output doesn't have storageEngine.
+    - jstests/core/**/awaitdata_getmore_cmd.js # capped collections.
+    - jstests/core/**/bypass_doc_validation.js # sharded $out output not permitted
+    - jstests/core/**/check_shard_index.js # checkShardingIndex.
+    - jstests/core/**/compact_keeps_indexes.js # compact.
+    - jstests/core/**/currentop.js # uses fsync.
+    - jstests/core/**/dbhash.js # dbhash.
+    - jstests/core/**/fsync.js # uses fsync.
+    - jstests/core/**/geo_s2cursorlimitskip.js # profiling.
+    - jstests/core/**/geo_update_btree2.js # notablescan.
+    - jstests/core/**/queryoptimizera.js # "local" database.
+    - jstests/core/**/startup_log.js # "local" database.
+    - jstests/core/**/tailable_cursor_invalidation.js # capped collections.
+    - jstests/core/**/tailable_getmore_batch_size.js # capped collections.
+    - jstests/core/**/tailable_skip_limit.js # capped collections.
+    - jstests/core/**/query/top/top.js # top.
+    # The following tests fail because mongos behaves differently from mongod when testing certain
+    # functionality. The differences are in a comment next to the failing test.
+    - jstests/core/**/geo_2d_explain.js # executionSuccess in different spot in explain().
+    - jstests/core/**/geo_s2explain.js # inputStage in different spot in explain().
+    - jstests/core/**/geo_s2sparse.js # keysPerIndex in different spot in validate().
+    - jstests/core/**/operation_latency_histogram.js # Stats are counted differently on mongos, SERVER-24880.
+    # The following tests fail because they count indexes. These counts do not take into account the
+    # additional hashed shard key indexes that are automatically added by this passthrough.
+    - jstests/core/**/apitest_dbcollection.js
+    - jstests/core/**/bad_index_plugin.js
+    - jstests/core/**/create_indexes.js
+    - jstests/core/**/list_indexes_non_existent_ns.js
+    - jstests/core/**/mr_preserve_indexes.js
+    # TODO: Remove after fixing SERVER-103278. executionStats.nReturned is incorrect for sharded distinct commands.
+    - jstests/core/**/distinct_index1.js
+    # TODO SERVER-32311: These tests use plan stage helpers which can't handle sharded explain output.
+    - jstests/core/**/expr_index_use.js
+    - jstests/core/**/index_multikey.js
+    - jstests/core/**/query/explain/optimized_match_explain.js
+    - jstests/core/**/sort_array.js
+
+    # Will fail all commands including those needed to forward command to initial sync node.
+    - jstests/core/testing/failcommand_failpoint.js
+    # Starts MongoCryptD instead of mongod nodes
+    - src/mongo/db/modules/*/jstests/fle2/fle2_bulk_write.js
+
+    # TODO SERVER-110217: Investigate why query_settings_backfill.js is failing in sharded_collections_uninitialized_fcv_jscore_passthrough suite.
+    - jstests/core/query/query_settings/query_settings_backfill.js
+
+  exclude_with_any_tags:
+    - assumes_standalone_mongod
+    - assumes_against_mongod_not_mongos
+    # Transactions are not allowed to operate on capped collections.
+    - requires_capped
+    # Prepare is not a command on mongos.
+    - uses_prepare_transaction
+    # system.profile collection doesn't exist on mongos.
+    - requires_profiling
+    # This passthrough implicitly shards the accessed collections. Do not run tests where collections
+    # can't be created on `getCollection` call.
+    - assumes_no_implicit_collection_creation_on_get_collection
+    # Tests tagged with the following will fail because they assume collections are not sharded.
+    - assumes_no_implicit_collection_creation_after_drop
+    - assumes_no_implicit_index_creation
+    - assumes_unsharded_collection
+    - cannot_create_unique_index_when_using_hashed_shard_key
+    # an initial sync node is not a fully initialized shard server
+    - assumes_sharding_initialized
+    # These tests run many aggregations, and the override slows them down enough to hit the evergreen timeout.
+    - query_intensive_pbt
+
+executor:
+  hooks:
+    - class: CleanEveryN
+      n: 20
+  config:
+    shell_options:
+      eval: >-
+        globalThis.testingReplication = true;
+        await import('jstests/libs/override_methods/send_command_to_initial_sync_node_sharded_cluster.js');
+        await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
+  fixture:
+    class: ShardedClusterFixture
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        collectionClonerBatchSize: 10
+        initialSyncOplogFetcherBatchSize: 10
+    num_shards: 2
+    num_rs_nodes_per_shard: 2
+    shard_options:
+      start_initial_sync_node: True
+      initial_sync_uninitialized_fcv: True
+      # The ReplicaSetFixture automatically sets initial sync nodes as hidden,
+      # which causes a mismatch when the replica set is added to the sharded cluster
+      # through addShard, because the replica set's internal connection string does
+      # include the initial sync node, but the list of hosts in the replica set from
+      # running `hello`/`isMaster` does not include it. This parameter force-hides it
+      # from the connection string.
+      hide_initial_sync_node_from_conn_string: True
+    configsvr_options:
+      num_nodes: 2
+      start_initial_sync_node: True
+      initial_sync_uninitialized_fcv: True
+      hide_initial_sync_node_from_conn_string: True

@@ -29,17 +29,8 @@
 
 #pragma once
 
-#include <cstdint>
-#include <functional>
-#include <initializer_list>
-#include <memory>
-
-#include "mongo/db/jsobj.h"
-#include "mongo/db/operation_context_noop.h"
-#include "mongo/db/record_id.h"
-#include "mongo/db/service_context.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/db/storage/sorted_data_interface.h"
 
 namespace mongo {
 
@@ -53,13 +44,14 @@ namespace mongo {
  */
 class HarnessHelper : public ScopedGlobalServiceContextForTest {
 public:
-    virtual ~HarnessHelper() = default;
-    explicit HarnessHelper() : _threadClient(getGlobalServiceContext()) {}
+    ~HarnessHelper() override = default;
+    explicit HarnessHelper()
+        : _threadClient(getGlobalServiceContext()->getService(ClusterRole::ShardServer)) {}
 
     virtual ServiceContext::UniqueOperationContext newOperationContext(Client* const client) {
         auto opCtx = client->makeOperationContext();
-        opCtx->setRecoveryUnit(newRecoveryUnit(),
-                               WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+        shard_role_details::setRecoveryUnit(
+            opCtx.get(), newRecoveryUnit(), WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
         return opCtx;
     }
 
@@ -84,22 +76,5 @@ public:
 protected:
     ThreadClient _threadClient;
 };
-
-namespace harness_helper_detail {
-template <typename Target, typename Current>
-std::unique_ptr<Target> noexcept_ptr_conversion(std::unique_ptr<Current>&& p, Target& t) noexcept {
-    p.release();
-    return std::unique_ptr<Target>(std::addressof(t));
-}
-}  // namespace harness_helper_detail
-
-template <typename Target, typename Current>
-std::unique_ptr<Target> dynamic_ptr_cast(std::unique_ptr<Current>&& p) {
-    if (!p) {
-        throw std::runtime_error("Must not be null.");
-    }
-    Target& target = dynamic_cast<Target&>(*p);
-    return harness_helper_detail::noexcept_ptr_conversion(std::move(p), target);
-}
 
 }  // namespace mongo

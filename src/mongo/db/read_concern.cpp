@@ -28,8 +28,11 @@
  */
 
 #include "mongo/db/read_concern.h"
+
 #include "mongo/base/shim.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
+
+#include <string>
 
 namespace mongo {
 
@@ -42,13 +45,13 @@ void setPrepareConflictBehaviorForReadConcern(OperationContext* opCtx,
 
 Status waitForReadConcern(OperationContext* opCtx,
                           const repl::ReadConcernArgs& readConcernArgs,
-                          StringData dbName,
+                          const DatabaseName& dbName,
                           bool allowAfterClusterTime) {
     static auto w = MONGO_WEAK_FUNCTION_DEFINITION(waitForReadConcern);
     return w(opCtx, readConcernArgs, dbName, allowAfterClusterTime);
 }
 
-Status waitForLinearizableReadConcern(OperationContext* opCtx, int readConcernTimeout) {
+Status waitForLinearizableReadConcern(OperationContext* opCtx, Milliseconds readConcernTimeout) {
     static auto w = MONGO_WEAK_FUNCTION_DEFINITION(waitForLinearizableReadConcern);
     return w(opCtx, readConcernTimeout);
 }

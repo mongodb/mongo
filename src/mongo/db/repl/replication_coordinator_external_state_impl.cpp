@@ -27,120 +27,154 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/repl/replication_coordinator_external_state_impl.h"
 
-#include <functional>
-#include <memory>
-#include <string>
-
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
-#include "mongo/bson/oid.h"
-#include "mongo/bson/util/bson_extract.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/admission/execution_admission_context.h"
+#include "mongo/db/admission/flow_control.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/coll_mod.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog/local_oplog_info.h"
+#include "mongo/db/change_stream_pre_images_collection_manager.h"
+#include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/rwc_defaults_commands_gen.h"
-#include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/free_mon/free_mon_mongod.h"
-#include "mongo/db/index_builds_coordinator.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/kill_sessions_local.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/global_catalog/ddl/drop_agg_temp_collections.h"
+#include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
+#include "mongo/db/global_catalog/index_on_config.h"
+#include "mongo/db/global_catalog/metadata_consistency_validation/periodic_sharded_index_consistency_checker.h"
+#include "mongo/db/global_catalog/type_chunk.h"
+#include "mongo/db/index_builds/index_builds_coordinator.h"
+#include "mongo/db/local_catalog/catalog_raii.h"
+#include "mongo/db/local_catalog/collection_catalog.h"
+#include "mongo/db/local_catalog/collection_options.h"
+#include "mongo/db/local_catalog/drop_collection.h"
+#include "mongo/db/local_catalog/local_oplog_info.h"
+#include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
+#include "mongo/db/local_catalog/lock_manager/exception_util.h"
+#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
+#include "mongo/db/local_catalog/shard_role_catalog/shard_filtering_metadata_refresh.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/logical_time_validator.h"
-#include "mongo/db/op_observer.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer/op_observer.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/query_settings/query_settings_service.h"
+#include "mongo/db/read_write_concern_defaults_gen.h"
 #include "mongo/db/repl/always_allow_non_local_writes.h"
 #include "mongo/db/repl/bgsync.h"
-#include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/last_vote.h"
-#include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/noop_writer.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_applier_impl.h"
+#include "mongo/db/repl/oplog_buffer_batched_queue.h"
 #include "mongo/db/repl/oplog_buffer_blocking_queue.h"
+#include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/oplog_writer_impl.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
-#include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_metrics.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/s/balancer/balancer.h"
-#include "mongo/db/s/chunk_splitter.h"
-#include "mongo/db/s/config/sharding_catalog_manager.h"
-#include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/s/migration_util.h"
-#include "mongo/db/s/periodic_balancer_config_refresher.h"
-#include "mongo/db/s/periodic_sharded_index_consistency_checker.h"
+#include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
-#include "mongo/db/s/sharding_initialization_mongod.h"
-#include "mongo/db/s/sharding_state_recovery.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/session_catalog_mongod.h"
+#include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/sharding_environment/client/shard.h"
+#include "mongo/db/sharding_environment/cluster_identity_loader.h"
+#include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/sharding_environment/sharding_initialization_mongod.h"
+#include "mongo/db/sharding_environment/sharding_ready.h"
 #include "mongo/db/storage/control/journal_flusher.h"
-#include "mongo/db/storage/flow_control.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/system_index.h"
-#include "mongo/db/vector_clock.h"
-#include "mongo/db/vector_clock_metadata_hook.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/db/topology/cluster_role.h"
+#include "mongo/db/topology/shard_registry.h"
+#include "mongo/db/topology/sharding_state.h"
+#include "mongo/db/user_write_block/write_block_bypass.h"
+#include "mongo/db/vector_clock/vector_clock.h"
+#include "mongo/db/vector_clock/vector_clock_metadata_hook.h"
+#include "mongo/db/vector_clock/vector_clock_mutable.h"
+#include "mongo/db/version_context.h"
+#include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/executor/network_connection_hook.h"
-#include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
-#include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/catalog_cache_loader.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/cluster_identity_loader.h"
-#include "mongo/s/grid.h"
+#include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/service_entry_point.h"
+#include "mongo/transport/session_manager.h"
+#include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/concurrency/thread_pool.h"
-#include "mongo/util/exit.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/functional.h"
 #include "mongo/util/net/hostandport.h"
-#include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
+
+#include <functional>
+#include <memory>
+#include <string>
+#include <vector>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
 namespace mongo {
 namespace repl {
 namespace {
 
-const char localDbName[] = "local";
-const char configCollectionName[] = "local.system.replset";
-const auto configDatabaseName = localDbName;
-const auto lastVoteDatabaseName = localDbName;
-const char meCollectionName[] = "local.me";
-const auto meDatabaseName = localDbName;
-const char tsFieldName[] = "ts";
+MONGO_FAIL_POINT_DEFINE(skipDurableTimestampUpdates);
 
-MONGO_FAIL_POINT_DEFINE(dropPendingCollectionReaperHang);
+// The maximum size of the oplog write buffer is set to 256MB.
+constexpr std::size_t kOplogWriteBufferSize = 256 * 1024 * 1024;
 
-// The count of items in the buffer
-OplogBuffer::Counters bufferGauge;
-ServerStatusMetricField<Counter64> displayBufferCount("repl.buffer.count", &bufferGauge.count);
-// The size (bytes) of items in the buffer
-ServerStatusMetricField<Counter64> displayBufferSize("repl.buffer.sizeBytes", &bufferGauge.size);
-// The max size (bytes) of the buffer. If the buffer does not have a size constraint, this is
-// set to 0.
-ServerStatusMetricField<Counter64> displayBufferMaxSize("repl.buffer.maxSizeBytes",
-                                                        &bufferGauge.maxSize);
+// The maximum size of the oplog apply buffer is set to 100MB,
+// equal to the maximum value of 'replBatchLimitBytes'.
+constexpr std::size_t kOplogApplyBufferSize = 100 * 1024 * 1024;
+
+// The maximum count of the oplog apply buffer is set to 10000,
+// equal to 2 * default value of 'replBatchLimitOperations'.
+constexpr std::size_t kOplogApplyBufferCount = 10 * 1000;
+
+// The maximum size of the oplog apply buffer is set to 256MB,
+// for the old architecture with no oplog write buffer.
+constexpr std::size_t kOplogApplyBufferSizeLegacy = 256 * 1024 * 1024;
+
+// The count of items in the oplog application buffer
+OplogBufferMetrics& oplogBufferMetrics = *MetricBuilder<OplogBufferMetrics>("repl.buffer");
 
 /**
  * Returns new thread pool for thread pool task executor.
@@ -150,8 +184,12 @@ auto makeThreadPool(const std::string& poolName, const std::string& threadName) 
     threadPoolOptions.threadNamePrefix = threadName + "-";
     threadPoolOptions.poolName = poolName;
     threadPoolOptions.onCreateThread = [](const std::string& threadName) {
-        Client::initThread(threadName.c_str());
-        AuthorizationSession::get(cc())->grantInternalAuthorization(&cc());
+        Client::initThread(threadName,
+                           getGlobalServiceContext()->getService(ClusterRole::ShardServer),
+                           Client::noSession(),
+                           ClientOperationKillableByStepdown{false});
+
+        AuthorizationSession::get(cc())->grantInternalAuthorization();
     };
     return std::make_unique<ThreadPool>(threadPoolOptions);
 }
@@ -165,7 +203,7 @@ auto makeTaskExecutor(ServiceContext* service,
     auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
     hookList->addHook(std::make_unique<rpc::VectorClockMetadataHook>(service));
     auto networkName = threadName + "Network";
-    return std::make_unique<executor::ThreadPoolTaskExecutor>(
+    return executor::ThreadPoolTaskExecutor::create(
         makeThreadPool(poolName, threadName),
         executor::makeNetworkInterface(networkName, nullptr, std::move(hookList)));
 }
@@ -191,11 +229,9 @@ void scheduleWork(executor::TaskExecutor* executor, executor::TaskExecutor::Call
 
 ReplicationCoordinatorExternalStateImpl::ReplicationCoordinatorExternalStateImpl(
     ServiceContext* service,
-    DropPendingCollectionReaper* dropPendingCollectionReaper,
     StorageInterface* storageInterface,
     ReplicationProcess* replicationProcess)
     : _service(service),
-      _dropPendingCollectionReaper(dropPendingCollectionReaper),
       _storageInterface(storageInterface),
       _replicationProcess(replicationProcess) {
     uassert(ErrorCodes::BadValue, "A StorageInterface is required.", _storageInterface);
@@ -211,71 +247,124 @@ bool ReplicationCoordinatorExternalStateImpl::isInitialSyncFlagSet(OperationCont
 void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
     OperationContext* opCtx, ReplicationCoordinator* replCoord) {
 
-    stdx::lock_guard<Latch> lk(_threadMutex);
+    stdx::unique_lock<stdx::mutex> lk(_threadMutex);
 
     // We've shut down the external state, don't start again.
     if (_inShutdown)
         return;
 
     invariant(replCoord);
-    _oplogBuffer = std::make_unique<OplogBufferBlockingQueue>(&bufferGauge);
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    invariant(storageEngine);
 
-    // No need to log OplogBuffer::startup because the blocking queue implementation
-    // does not start any threads or access the storage layer.
-    _oplogBuffer->startup(opCtx);
+    const auto useOplogWriter = feature_flags::gReduceMajorityWriteLatency.isEnabled();
+    const auto applyBufferSize =
+        useOplogWriter ? kOplogApplyBufferSize : kOplogApplyBufferSizeLegacy;
 
+    if (useOplogWriter) {
+        _oplogWriteBuffer = std::make_unique<OplogBufferBatchedQueue>(
+            kOplogWriteBufferSize, oplogBufferMetrics.getWriteBufferCounter());
+    }
+
+    // When featureFlagReduceMajorityWriteLatency is enabled, we must drain the apply buffer on
+    // clean shutdown in order to make sure that every oplog that has been written is applied
+    // and thus recovery after clean shutdown does not need to apply any oplog, which is needed
+    // for downgrades to work.
+    OplogBufferBlockingQueue::Options bufferOptions;
+    bufferOptions.clearOnShutdown = !useOplogWriter;
+    std::size_t maxCount =
+        useOplogWriter ? kOplogApplyBufferCount : std::numeric_limits<std::size_t>::max();
+    _oplogApplyBuffer = std::make_unique<OplogBufferBlockingQueue>(
+        applyBufferSize, maxCount, oplogBufferMetrics.getApplyBufferCounter(), bufferOptions);
+
+    // No need to log OplogBuffer::startup because the blocking queue and batched queue
+    // implementations does not start any threads or access the storage layer.
+    if (useOplogWriter) {
+        _oplogWriteBuffer->startup(opCtx);
+    }
+    _oplogApplyBuffer->startup(opCtx);
+
+    invariant(!_oplogWriter);
     invariant(!_oplogApplier);
 
-    // Using noop observer now that BackgroundSync no longer implements the
-    // OplogApplier::Observer interface. During steady state replication, there is no need to
-    // log details on every batch we apply.
+    // Using noop observer for both writer and applier. During steady state replication,
+    // there is no need to log details on every batch we apply.
+    if (useOplogWriter) {
+        _oplogWriter = std::make_unique<OplogWriterImpl>(
+            _oplogWriterTaskExecutor.get(),
+            _oplogWriteBuffer.get(),
+            _oplogApplyBuffer.get(),
+            nullptr,
+            replCoord,
+            _storageInterface,
+            _replicationProcess->getConsistencyMarkers(),
+            &noopOplogWriterObserver,
+            OplogWriter::Options(false /* skipWritesToOplogColl */,
+                                 true /* skipWritesToChangeColl */));
+    }
+
     _oplogApplier = std::make_unique<OplogApplierImpl>(
         _oplogApplierTaskExecutor.get(),
-        _oplogBuffer.get(),
+        _oplogApplyBuffer.get(),
         &noopOplogApplierObserver,
         replCoord,
         _replicationProcess->getConsistencyMarkers(),
         _storageInterface,
         OplogApplier::Options(OplogApplication::Mode::kSecondary),
-        _writerPool.get());
+        _workerPool.get());
 
     invariant(!_bgSync);
-    _bgSync =
-        std::make_unique<BackgroundSync>(replCoord, this, _replicationProcess, _oplogApplier.get());
+    _bgSync = std::make_unique<BackgroundSync>(
+        replCoord, this, _replicationProcess, _oplogWriter.get(), _oplogApplier.get());
 
     LOGV2(21299, "Starting replication fetcher thread");
     _bgSync->startup(opCtx);
+
+    if (useOplogWriter) {
+        LOGV2(8569800, "Starting replication writer thread");
+        _oplogWriterShutdownFuture = _oplogWriter->startup();
+    }
 
     LOGV2(21300, "Starting replication applier thread");
     _oplogApplierShutdownFuture = _oplogApplier->startup();
 
     LOGV2(21301, "Starting replication reporter thread");
     invariant(!_syncSourceFeedbackThread);
-    // Get the pointer while holding the lock so that _stopDataReplication_inlock() won't
+    // Get the pointer while holding the lock so that _stopDataReplication() won't
     // leave the unique pointer empty if the _syncSourceFeedbackThread's function starts
-    // after _stopDataReplication_inlock's move.
+    // after _stopDataReplication's move.
     auto bgSyncPtr = _bgSync.get();
     _syncSourceFeedbackThread = std::make_unique<stdx::thread>([this, bgSyncPtr, replCoord] {
         _syncSourceFeedback.run(_taskExecutor.get(), bgSyncPtr, replCoord);
     });
+
+    // Release the thread mutex before notifying the storage engine to avoid deadlock.
+    lk.unlock();
+
+    // Notify the storage engine that we have completed startup recovery and are transitioning to
+    // steady state replication.
+    storageEngine->notifyReplStartupRecoveryComplete(*shard_role_details::getRecoveryUnit(opCtx));
 }
 
-void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(
-    OperationContext* opCtx, stdx::unique_lock<Latch>& lock) {
+void ReplicationCoordinatorExternalStateImpl::_stopDataReplication(
+    OperationContext* opCtx, stdx::unique_lock<stdx::mutex>& lock) {
     // Make sue no other _stopDataReplication calls are in progress.
     _dataReplicationStopped.wait(lock, [this]() { return !_stoppingDataReplication; });
     _stoppingDataReplication = true;
 
     auto oldSSF = std::move(_syncSourceFeedbackThread);
-    auto oldOplogBuffer = std::move(_oplogBuffer);
+    auto oldWriteBuffer = std::move(_oplogWriteBuffer);
+    auto oldApplyBuffer = std::move(_oplogApplyBuffer);
     auto oldBgSync = std::move(_bgSync);
+    auto oldWriter = std::move(_oplogWriter);
     auto oldApplier = std::move(_oplogApplier);
-    auto oldWriterPool = std::move(_writerPool);
+    auto oldWorkerPool = std::move(_workerPool);
+    auto oldWriterExecutor = std::move(_oplogWriterTaskExecutor);
     auto oldApplierExecutor = std::move(_oplogApplierTaskExecutor);
     lock.unlock();
 
-    // _syncSourceFeedbackThread should be joined before _bgSync's shutdown because it has
-    // a pointer of _bgSync.
+    // The _syncSourceFeedbackThread should be joined before _bgSync's shutdown because it
+    // has a pointer of _bgSync.
     if (oldSSF) {
         LOGV2(21302, "Stopping replication reporter thread");
         _syncSourceFeedback.shutdown();
@@ -287,40 +376,65 @@ void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(
         oldBgSync->shutdown(opCtx);
     }
 
-    if (oldApplier) {
-        LOGV2(21304, "Stopping replication applier thread");
+    if (oldWriter) {
+        LOGV2(8569801, "Stopping replication writer thread");
+        oldWriter->shutdown();
+    } else if (oldApplier) {
+        LOGV2(8569806, "Stopping replication applier thread");
         oldApplier->shutdown();
     }
 
-    // Clear the buffer. This unblocks the OplogFetcher if it is blocked with a full queue, but
-    // ensures that it won't add anything. It will also unblock the OplogApplier pipeline if it
-    // is waiting for an operation to be past the secondaryDelaySecs point.
-    if (oldOplogBuffer) {
-        oldOplogBuffer->clear(opCtx);
+    // Shutdown the buffer. This unblocks the OplogFetcher if it is blocked with a full
+    // queue, but ensures that it won't add anything. This also unblocks the downstream
+    // pipeline if it is waiting for an operation to be past secondaryDelaySecs.
+    if (oldWriteBuffer) {
+        oldWriteBuffer->shutdown(opCtx);
+    } else if (oldApplyBuffer) {
+        oldApplyBuffer->shutdown(opCtx);
     }
 
     if (oldBgSync) {
         oldBgSync->join(opCtx);
     }
 
-    if (oldApplier) {
+    // Since OplogApplier needs to drain the buffer on clean shutdown, we need to wait
+    // for OplogWriter to finish before shutting down the OplogApplier and its buffer,
+    // to make sure that no more oplog entries will be written.
+    if (oldWriter) {
+        _oplogWriterShutdownFuture.get();
+    } else if (oldApplier) {
         _oplogApplierShutdownFuture.get();
     }
 
-    if (oldOplogBuffer) {
-        oldOplogBuffer->shutdown(opCtx);
+    if (oldWriter && oldApplier) {
+        LOGV2(8569807, "Stopping replication applier thread");
+        oldApplier->shutdown();
+    }
+
+    if (oldWriteBuffer && oldApplyBuffer) {
+        oldApplyBuffer->shutdown(opCtx);
+    }
+
+    if (oldWriter && oldApplier) {
+        _oplogApplierShutdownFuture.get();
     }
 
     // Once the writer pool's shutdown() is called, scheduling new tasks will return error, so
     // we shutdown writer pool after the applier exits to avoid new tasks being scheduled.
-    if (oldWriterPool) {
+    if (oldWorkerPool) {
         LOGV2(5698300, "Stopping replication applier writer pool");
-        oldWriterPool->shutdown();
-        oldWriterPool->join();
+        oldWorkerPool->shutdown();
+        oldWorkerPool->join();
+    }
+
+    if (oldWriterExecutor) {
+        LOGV2(8569802, "Stopping replication writer executor threads");
+        oldWriterExecutor->shutdown();
+        oldWriterExecutor->join();
     }
 
     if (oldApplierExecutor) {
-        LOGV2(21307, "Stopping replication storage threads");
+        LOGV2(8569803, "Stopping replication applier executor threads");
         oldApplierExecutor->shutdown();
         oldApplierExecutor->join();
     }
@@ -336,7 +450,7 @@ JournalListener* ReplicationCoordinatorExternalStateImpl::getReplicationJournalL
 }
 
 void ReplicationCoordinatorExternalStateImpl::startThreads() {
-    stdx::lock_guard<Latch> lk(_threadMutex);
+    stdx::lock_guard<stdx::mutex> lk(_threadMutex);
     if (_startedThreads) {
         return;
     }
@@ -349,62 +463,31 @@ void ReplicationCoordinatorExternalStateImpl::startThreads() {
     LOGV2(21306, "Starting replication storage threads");
     _service->getStorageEngine()->setJournalListener(this);
 
+    _oplogWriterTaskExecutor = makeTaskExecutor(_service, "OplogWriterExecutorPool", "OplogWriter");
+    _oplogWriterTaskExecutor->startup();
+
     _oplogApplierTaskExecutor =
-        makeTaskExecutor(_service, "OplogApplierThreadPool", "OplogApplier");
+        makeTaskExecutor(_service, "OplogApplierExecutorPool", "OplogApplier");
     _oplogApplierTaskExecutor->startup();
 
-    _taskExecutor = makeTaskExecutor(_service, "ReplCoordExternThreadPool", "ReplCoordExtern");
+    _taskExecutor = makeTaskExecutor(_service, "ReplCoordExternExecutorPool", "ReplCoordExtern");
     _taskExecutor->startup();
 
-    _writerPool = makeReplWriterPool();
+    _workerPool = makeReplWorkerPool();
 
     _startedThreads = true;
 }
 
-void ReplicationCoordinatorExternalStateImpl::clearAppliedThroughIfCleanShutdown(
-    OperationContext* opCtx) {
-    {
-        stdx::lock_guard<Latch> lk(_threadMutex);
-        if (!_startedThreads) {
-            return;
-        }
-        invariant(_inShutdown);
-    }
-
-    // Ensure that all writes are visible before reading. If we failed mid-batch, it would be
-    // possible to read from a kNoOverlap ReadSource where not all writes to the minValid
-    // document are visible, generating a writeConflict that would not resolve.
-    invariant(RecoveryUnit::ReadSource::kNoTimestamp ==
-              opCtx->recoveryUnit()->getTimestampReadSource());
-
-    auto loadLastOpTimeAndWallTimeResult = loadLastOpTimeAndWallTime(opCtx);
-    if (_replicationProcess->getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx).isNull() &&
-        loadLastOpTimeAndWallTimeResult.isOK() &&
-        loadLastOpTimeAndWallTimeResult.getValue().opTime ==
-            _replicationProcess->getConsistencyMarkers()->getAppliedThrough(opCtx)) {
-        // Clear the appliedThrough marker to indicate we are consistent with the top of the
-        // oplog.
-        //
-        // TODO SERVER-53642: We used to record this update at the 'lastAppliedOpTime'. If there
-        // are any outstanding checkpoints being taken, they should only reflect this write if
-        // they see all writes up to our 'lastAppliedOpTime'. But with Lock Free Reads we can
-        // have readers on that timestamp, making it not safe to write to, even as we're holding
-        // the RSTL in exclusive mode.
-
-        invariant(opCtx->lockState()->isRSTLExclusive());
-        _replicationProcess->getConsistencyMarkers()->clearAppliedThrough(opCtx, Timestamp());
-    }
-}
-
 void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* opCtx) {
-    stdx::unique_lock<Latch> lk(_threadMutex);
+    stdx::unique_lock<stdx::mutex> lk(_threadMutex);
     _inShutdown = true;
     if (!_startedThreads) {
         return;
     }
 
-    _stopDataReplication_inlock(opCtx, lk);
+    _stopDataReplication(opCtx, lk);
 
+    LOGV2(21307, "Stopping replication storage threads");
     _taskExecutor->shutdown();
     lk.unlock();
 
@@ -417,10 +500,9 @@ void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* opCtx) 
     LOGV2_DEBUG(21308, 1, "Stopping noop writer");
     _noopWriter->stopWritingPeriodicNoops();
 
-    // We must wait for _taskExecutor outside of _threadMutex, since _taskExecutor is used to
-    // run the dropPendingCollectionReaper, which takes database locks. It is safe to access
-    // _taskExecutor outside of _threadMutex because once _startedThreads is set to true, the
-    // _taskExecutor pointer never changes.
+    // We should wait for _taskExecutor outside of _threadMutex, in case some of its task would take
+    // data base locks. It is safe to access _taskExecutor outside of _threadMutex because once
+    // _startedThreads is set to true, the _taskExecutor pointer never changes.
     _taskExecutor->join();
 
     // The oplog truncate after point must be cleared, if we are still primary for shutdown, so
@@ -428,8 +510,7 @@ void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* opCtx) 
     // primary shutdown. Stepdown is similarly safe from holes and halts updates to and clears
     // the truncate point. The other replication states do need truncation if the truncate point
     // is set: e.g. interruption mid batch application can leave oplog holes.
-    if (!storageGlobalParams.readOnly &&
-        _replicationProcess->getConsistencyMarkers()
+    if (_replicationProcess->getConsistencyMarkers()
             ->isOplogTruncateAfterPointBeingUsedForPrimary()) {
         _stopAsyncUpdatesOfAndClearOplogTruncateAfterPoint();
     }
@@ -445,7 +526,7 @@ ReplicationCoordinatorExternalStateImpl::getSharedTaskExecutor() const {
 }
 
 ThreadPool* ReplicationCoordinatorExternalStateImpl::getDbWorkThreadPool() const {
-    return _writerPool.get();
+    return _workerPool.get();
 }
 
 Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(OperationContext* opCtx,
@@ -455,15 +536,23 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
 
         writeConflictRetry(opCtx,
                            "initiate oplog entry",
-                           NamespaceString::kRsOplogNamespace.toString(),
+                           NamespaceString::kRsOplogNamespace,
                            [this, &opCtx, &config] {
                                // Permit writing to the oplog before we step up to primary.
                                AllowNonLocalWritesBlock allowNonLocalWrites(opCtx);
                                Lock::GlobalWrite globalWrite(opCtx);
+                               auto coll = acquireCollection(
+                                   opCtx,
+                                   CollectionAcquisitionRequest(
+                                       NamespaceString::kSystemReplSetNamespace,
+                                       PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                       repl::ReadConcernArgs::get(opCtx),
+                                       AcquisitionPrerequisites::kWrite),
+                                   MODE_X);
                                {
                                    // Writes to 'local.system.replset' must be untimestamped.
                                    WriteUnitOfWork wuow(opCtx);
-                                   Helpers::putSingleton(opCtx, configCollectionName, config);
+                                   Helpers::putSingleton(opCtx, coll, config);
                                    wuow.commit();
                                }
                                {
@@ -481,8 +570,8 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
         _storageInterface->waitForAllEarlierOplogWritesToBeVisible(opCtx);
 
         // Take an unstable checkpoint to ensure that the FCV document is persisted to disk.
-        opCtx->recoveryUnit()->waitUntilUnjournaledWritesDurable(opCtx,
-                                                                 false /* stableCheckpoint */);
+        _service->getStorageEngine()->waitUntilUnjournaledWritesDurable(
+            opCtx, false /* stableCheckpoint */);
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
@@ -490,20 +579,43 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
     return Status::OK();
 }
 
-void ReplicationCoordinatorExternalStateImpl::onDrainComplete(OperationContext* opCtx) {
-    invariant(!opCtx->lockState()->isLocked());
-    invariant(!opCtx->shouldParticipateInFlowControl());
+void ReplicationCoordinatorExternalStateImpl::onWriterDrainComplete(OperationContext* opCtx) {
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
+    invariant(ExecutionAdmissionContext::get(opCtx).getPriority() ==
+                  AdmissionContext::Priority::kExempt,
+              "Replica Set state changes are critical to the cluster and should not be throttled");
 
-    if (_oplogBuffer) {
-        _oplogBuffer->exitDrainMode();
+    if (_oplogApplyBuffer) {
+        _oplogApplyBuffer->enterDrainMode();
+    }
+}
+
+void ReplicationCoordinatorExternalStateImpl::onApplierDrainComplete(OperationContext* opCtx) {
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
+    invariant(ExecutionAdmissionContext::get(opCtx).getPriority() ==
+                  AdmissionContext::Priority::kExempt,
+              "Replica Set state changes are critical to the cluster and should not be throttled");
+
+    // When _oplogWriteBuffer is not null, featureFlagReduceMajorityWriteLatency is enabled.
+    // We call exitDrainMode() on both buffers, since onWriterDrainComplete() does not call
+    // exitDrainMode() on the write buffer.
+    if (_oplogWriteBuffer) {
+        _oplogWriteBuffer->exitDrainMode();
+    }
+    if (_oplogApplyBuffer) {
+        _oplogApplyBuffer->exitDrainMode();
     }
 }
 
 OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationContext* opCtx) {
-    invariant(opCtx->lockState()->isRSTLExclusive());
-    invariant(!opCtx->shouldParticipateInFlowControl());
+    invariant(shard_role_details::getLocker(opCtx)->isRSTLExclusive() ||
+              gFeatureFlagIntentRegistration.isEnabled());
+    invariant(ExecutionAdmissionContext::get(opCtx).getPriority() ==
+                  AdmissionContext::Priority::kExempt,
+              "Replica Set state changes are critical to the cluster and should not be throttled");
 
-    MongoDSessionCatalog::onStepUp(opCtx);
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+    mongoDSessionCatalog->onStepUp(opCtx);
 
     invariant(
         _replicationProcess->getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx).isNull());
@@ -527,24 +639,21 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
 
     // Clear the appliedThrough marker so on startup we'll use the top of the oplog. This must
     // be done before we add anything to our oplog.
-    //
-    // TODO SERVER-53642: We used to record this update at the 'lastAppliedOpTime'. If there are
-    // any outstanding checkpoints being taken, they should only reflect this write if they see
-    // all writes up to our 'lastAppliedOpTime'. But with Lock Free Reads we can have readers on
-    // that timestamp, making it not safe to write to, even as we're holding the RSTL in
-    // exclusive mode.
-    _replicationProcess->getConsistencyMarkers()->clearAppliedThrough(opCtx, Timestamp());
+    _replicationProcess->getConsistencyMarkers()->clearAppliedThrough(opCtx);
 
     LOGV2(6015309, "Logging transition to primary to oplog on stepup");
-    writeConflictRetry(opCtx, "logging transition to primary to oplog", "local.oplog.rs", [&] {
-        AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
-        WriteUnitOfWork wuow(opCtx);
-        opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(
-            opCtx,
-            BSON(ReplicationCoordinator::newPrimaryMsgField
-                 << ReplicationCoordinator::newPrimaryMsg));
-        wuow.commit();
-    });
+    writeConflictRetry(
+        opCtx, "logging transition to primary to oplog", NamespaceString::kRsOplogNamespace, [&] {
+            AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kWrite);
+            WriteUnitOfWork wuow(opCtx);
+            opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(
+                opCtx, BSON(kNewPrimaryMsgField << kNewPrimaryMsg));
+            wuow.commit();
+        });
+    // As far as the storage system is concerned, we're still secondary here, and will be until we
+    // change readWriteAbility.  So new and resumed lock-free reads will read from lastApplied.  We
+    // just advanced lastApplied by writing the no-op, so we need to signal oplog waiters.
+    signalOplogWaiters();
     const auto loadLastOpTimeAndWallTimeResult = loadLastOpTimeAndWallTime(opCtx);
     fassert(28665, loadLastOpTimeAndWallTimeResult);
     auto opTimeToReturn = loadLastOpTimeAndWallTimeResult.getValue().opTime;
@@ -564,46 +673,74 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
     auto replCoord = ReplicationCoordinator::get(opCtx);
     replCoord->createWMajorityWriteAvailabilityDateWaiter(opTimeToReturn);
 
-    _shardingOnTransitionToPrimaryHook(opCtx);
+    // Enable write blocking bypass to allow dropping tmp collections when user writes are blocked.
+    WriteBlockBypass::get(opCtx).set(true);
+
+    _shardingOnTransitionToPrimaryHook(opCtx, replCoord->getTerm());
 
     _dropAllTempCollections(opCtx);
 
     IndexBuildsCoordinator::get(opCtx)->onStepUp(opCtx);
 
-    notifyFreeMonitoringOnTransitionToPrimary();
-
     // It is only necessary to check the system indexes on the first transition to primary.
     // On subsequent transitions to primary the indexes will have already been created.
     static std::once_flag verifySystemIndexesOnce;
     std::call_once(verifySystemIndexesOnce, [opCtx] {
-        const auto globalAuthzManager = AuthorizationManager::get(opCtx->getServiceContext());
+        const auto globalAuthzManager = AuthorizationManager::get(opCtx->getService());
         if (globalAuthzManager->shouldValidateAuthSchemaOnStartup()) {
             fassert(50877, verifySystemIndexes(opCtx));
         }
     });
+
+    if (!change_stream_serverless_helpers::isChangeCollectionsModeActive(
+            VersionContext::getDecoration(opCtx))) {
+        // TODO(SERVER-111008): The change collection feature is deprecated.
+        // We should remove this code.
+
+        // Create the pre-images collection if it doesn't exist yet. Pre-images are not supported in
+        // serverless environments.
+        ChangeStreamPreImagesCollectionManager::get(opCtx).createPreImagesCollection(opCtx);
+    }
+
+    // Ensure that 'queryShapeRepresentativeQueries' collection exists only:
+    // - in plain replica sets or
+    // - on configsvr in sharded cluster deployments.
+    auto role = ShardingState::get(opCtx)->pollClusterRole();
+    const bool isConfigsvr = role && role->has(ClusterRole::ConfigServer);
+    const bool isReplSet = !role.has_value();
+    if (::mongo::feature_flags::gFeatureFlagPQSBackfill.isEnabled(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+        (isConfigsvr || isReplSet)) {
+        query_settings::QuerySettingsService::get(opCtx)
+            .createQueryShapeRepresentativeQueriesCollection(opCtx);
+    }
 
     serverGlobalParams.validateFeaturesAsPrimary.store(true);
 
     return opTimeToReturn;
 }
 
-void ReplicationCoordinatorExternalStateImpl::forwardSecondaryProgress() {
-    _syncSourceFeedback.forwardSecondaryProgress();
+void ReplicationCoordinatorExternalStateImpl::forwardSecondaryProgress(bool prioritized) {
+    _syncSourceFeedback.forwardSecondaryProgress(prioritized);
 }
 
 StatusWith<BSONObj> ReplicationCoordinatorExternalStateImpl::loadLocalConfigDocument(
     OperationContext* opCtx) {
     try {
-        return writeConflictRetry(opCtx, "load replica set config", configCollectionName, [opCtx] {
-            BSONObj config;
-            if (!Helpers::getSingleton(opCtx, configCollectionName, config)) {
-                return StatusWith<BSONObj>(
-                    ErrorCodes::NoMatchingDocument,
-                    str::stream() << "Did not find replica set configuration document in "
-                                  << configCollectionName);
-            }
-            return StatusWith<BSONObj>(config);
-        });
+        return writeConflictRetry(
+            opCtx, "load replica set config", NamespaceString::kSystemReplSetNamespace, [opCtx] {
+                BSONObj config;
+                if (!Helpers::getSingleton(
+                        opCtx, NamespaceString::kSystemReplSetNamespace, config)) {
+                    return StatusWith<BSONObj>(
+                        ErrorCodes::NoMatchingDocument,
+                        fmt::format(
+                            "Did not find replica set configuration document in {}",
+                            NamespaceString::kSystemReplSetNamespace.toStringForErrorMsg()));
+                }
+                return StatusWith<BSONObj>(config);
+            });
     } catch (const DBException& ex) {
         return StatusWith<BSONObj>(ex.toStatus());
     }
@@ -613,33 +750,62 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalConfigDocument(Operati
                                                                          const BSONObj& config,
                                                                          bool writeOplog) {
     try {
-        writeConflictRetry(opCtx, "save replica set config", configCollectionName, [&] {
-            {
-                // Writes to 'local.system.replset' must be untimestamped.
-                WriteUnitOfWork wuow(opCtx);
-                Lock::DBLock dbWriteLock(opCtx, configDatabaseName, MODE_X);
-                Helpers::putSingleton(opCtx, configCollectionName, config);
-                wuow.commit();
-            }
+        writeConflictRetry(
+            opCtx, "save replica set config", NamespaceString::kSystemReplSetNamespace, [&] {
+                {
+                    // Writes to 'local.system.replset' must be untimestamped.
+                    WriteUnitOfWork wuow(opCtx);
+                    auto coll = acquireCollection(
+                        opCtx,
+                        CollectionAcquisitionRequest(
+                            NamespaceString::kSystemReplSetNamespace,
+                            PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                            repl::ReadConcernArgs::get(opCtx),
+                            AcquisitionPrerequisites::kWrite),
+                        MODE_X);
+                    Helpers::putSingleton(opCtx, coll, config);
+                    wuow.commit();
+                }
 
-            if (writeOplog) {
-                // The no-op write doesn't affect the correctness of the safe reconfig protocol and
-                // so it doesn't have to be written in the same WUOW as the config write. In fact,
-                // the no-op write is only needed for some corner cases where the committed snapshot
-                // is dropped after a force reconfig that changes the config content or a safe
-                // reconfig that changes writeConcernMajorityJournalDefault.
-                WriteUnitOfWork wuow(opCtx);
-                auto msgObj = BSON("msg"
-                                   << "Reconfig set"
-                                   << "version" << config["version"]);
-                _service->getOpObserver()->onOpMessage(opCtx, msgObj);
-                wuow.commit();
-            }
-        });
+                if (writeOplog) {
+                    // The no-op write doesn't affect the correctness of the safe reconfig protocol
+                    // and so it doesn't have to be written in the same WUOW as the config write. In
+                    // fact, the no-op write is only needed for some corner cases where the
+                    // committed snapshot is dropped after a force reconfig that changes the config
+                    // content or a safe reconfig that changes writeConcernMajorityJournalDefault.
+                    WriteUnitOfWork wuow(opCtx);
+                    auto msgObj = BSON("msg" << "Reconfig set"
+                                             << "version" << config["version"]);
+                    _service->getOpObserver()->onOpMessage(opCtx, msgObj);
+                    wuow.commit();
+                }
+            });
         return Status::OK();
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
+}
+
+Status ReplicationCoordinatorExternalStateImpl::replaceLocalConfigDocument(
+    OperationContext* opCtx, const BSONObj& config) try {
+    writeConflictRetry(
+        opCtx, "replace replica set config", NamespaceString::kSystemReplSetNamespace, [&] {
+            WriteUnitOfWork wuow(opCtx);
+            auto coll =
+                acquireCollection(opCtx,
+                                  CollectionAcquisitionRequest(
+                                      NamespaceString::kSystemReplSetNamespace,
+                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      repl::ReadConcernArgs::get(opCtx),
+                                      AcquisitionPrerequisites::kWrite),
+                                  MODE_X);
+            Helpers::emptyCollection(opCtx, coll);
+            Helpers::putSingleton(opCtx, coll, config);
+            wuow.commit();
+        });
+    return Status::OK();
+} catch (const DBException& ex) {
+    return ex.toStatus();
 }
 
 Status ReplicationCoordinatorExternalStateImpl::createLocalLastVoteCollection(
@@ -649,27 +815,32 @@ Status ReplicationCoordinatorExternalStateImpl::createLocalLastVoteCollection(
     if (!status.isOK() && status.code() != ErrorCodes::NamespaceExists) {
         return {ErrorCodes::CannotCreateCollection,
                 str::stream() << "Failed to create local last vote collection. Ns: "
-                              << NamespaceString::kLastVoteNamespace.toString()
+                              << NamespaceString::kLastVoteNamespace.toStringForErrorMsg()
                               << " Error: " << status.toString()};
     }
 
     // Make sure there's always a last vote document.
     try {
-        writeConflictRetry(
-            opCtx,
-            "create initial replica set lastVote",
-            NamespaceString::kLastVoteNamespace.toString(),
-            [opCtx] {
-                AutoGetCollection coll(opCtx, NamespaceString::kLastVoteNamespace, MODE_X);
-                BSONObj result;
-                bool exists = Helpers::getSingleton(
-                    opCtx, NamespaceString::kLastVoteNamespace.ns().c_str(), result);
-                if (!exists) {
-                    LastVote lastVote{OpTime::kInitialTerm, -1};
-                    Helpers::putSingleton(
-                        opCtx, NamespaceString::kLastVoteNamespace.ns().c_str(), lastVote.toBSON());
-                }
-            });
+        writeConflictRetry(opCtx,
+                           "create initial replica set lastVote",
+                           NamespaceString::kLastVoteNamespace,
+                           [opCtx] {
+                               auto coll = acquireCollection(
+                                   opCtx,
+                                   CollectionAcquisitionRequest(
+                                       NamespaceString::kLastVoteNamespace,
+                                       PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                       repl::ReadConcernArgs::get(opCtx),
+                                       AcquisitionPrerequisites::kWrite),
+                                   MODE_X);
+
+                               BSONObj result;
+                               bool exists = Helpers::getSingleton(opCtx, coll.nss(), result);
+                               if (!exists) {
+                                   LastVote lastVote{OpTime::kInitialTerm, -1};
+                                   Helpers::putSingleton(opCtx, coll, lastVote.toBSON());
+                               }
+                           });
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
@@ -681,18 +852,14 @@ StatusWith<LastVote> ReplicationCoordinatorExternalStateImpl::loadLocalLastVoteD
     OperationContext* opCtx) {
     try {
         return writeConflictRetry(
-            opCtx,
-            "load replica set lastVote",
-            NamespaceString::kLastVoteNamespace.toString(),
-            [opCtx] {
+            opCtx, "load replica set lastVote", NamespaceString::kLastVoteNamespace, [opCtx] {
                 BSONObj lastVoteObj;
-                if (!Helpers::getSingleton(opCtx,
-                                           NamespaceString::kLastVoteNamespace.toString().c_str(),
-                                           lastVoteObj)) {
+                if (!Helpers::getSingleton(
+                        opCtx, NamespaceString::kLastVoteNamespace, lastVoteObj)) {
                     return StatusWith<LastVote>(
                         ErrorCodes::NoMatchingDocument,
                         str::stream() << "Did not find replica set lastVote document in "
-                                      << NamespaceString::kLastVoteNamespace.toString());
+                                      << NamespaceString::kLastVoteNamespace.toStringForErrorMsg());
                 }
                 return LastVote::readFromLastVote(lastVoteObj);
             });
@@ -705,27 +872,36 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalLastVoteDocument(
     OperationContext* opCtx, const LastVote& lastVote) {
     BSONObj lastVoteObj = lastVote.toBSON();
 
-    // Writes that are part of elections should not be throttled.
-    invariant(!opCtx->shouldParticipateInFlowControl());
+    invariant(ExecutionAdmissionContext::get(opCtx).getPriority() ==
+                  AdmissionContext::Priority::kExempt,
+              "Writes that are part of elections should not be throttled");
 
     try {
         // If we are casting a vote in a new election immediately after stepping down, we
         // don't want to have this process interrupted due to us stepping down, since we
         // want to be able to cast our vote for a new primary right away. Both the write's lock
         // acquisition and the "waitUntilDurable" lock acquisition must be uninterruptible.
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+        //
+        // It is not safe to take an uninterruptible lock during STARTUP2, so we only take this lock
+        // if we are primary or secondary.  We do not have the RSTL but that is OK because we never
+        // move in to STARTUP2 from PRIMARY or SECONDARY, so the consequence of a stale state is
+        // only that we don't take an uninterruptible lock when we should.
+        auto* replCoord = ReplicationCoordinator::get(opCtx);
+
+        boost::optional<UninterruptibleLockGuard> noInterrupt;
+        if (replCoord->isInPrimaryOrSecondaryState_UNSAFE())
+            noInterrupt.emplace(opCtx);
 
         Status status = writeConflictRetry(
-            opCtx,
-            "save replica set lastVote",
-            NamespaceString::kLastVoteNamespace.toString(),
-            [&] {
-                // Writes to non-replicated collections do not need concurrency control with the
-                // OplogApplier that never accesses them. Skip taking the PBWM.
-                ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
-                    opCtx->lockState());
-
-                AutoGetCollection coll(opCtx, NamespaceString::kLastVoteNamespace, MODE_IX);
+            opCtx, "save replica set lastVote", NamespaceString::kLastVoteNamespace, [&] {
+                auto coll =
+                    acquireCollection(opCtx,
+                                      CollectionAcquisitionRequest(
+                                          NamespaceString::kLastVoteNamespace,
+                                          PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                          repl::ReadConcernArgs::get(opCtx),
+                                          AcquisitionPrerequisites::kWrite),
+                                      MODE_IX);
                 WriteUnitOfWork wunit(opCtx);
 
                 // We only want to replace the last vote document if the new last vote document
@@ -734,16 +910,15 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalLastVoteDocument(
                 // operations. We have already ensured at startup time that there is an old
                 // document.
                 BSONObj result;
-                bool exists = Helpers::getSingleton(
-                    opCtx, NamespaceString::kLastVoteNamespace.ns().c_str(), result);
+                bool exists =
+                    Helpers::getSingleton(opCtx, NamespaceString::kLastVoteNamespace, result);
                 fassert(51241, exists);
                 StatusWith<LastVote> oldLastVoteDoc = LastVote::readFromLastVote(result);
                 if (!oldLastVoteDoc.isOK()) {
                     return oldLastVoteDoc.getStatus();
                 }
                 if (lastVote.getTerm() > oldLastVoteDoc.getValue().getTerm()) {
-                    Helpers::putSingleton(
-                        opCtx, NamespaceString::kLastVoteNamespace.ns().c_str(), lastVoteObj);
+                    Helpers::putSingleton(opCtx, coll, lastVoteObj);
                 }
                 wunit.commit();
                 return Status::OK();
@@ -772,7 +947,7 @@ Timestamp ReplicationCoordinatorExternalStateImpl::getGlobalTimestamp(ServiceCon
 }
 
 bool ReplicationCoordinatorExternalStateImpl::oplogExists(OperationContext* opCtx) {
-    return static_cast<bool>(LocalOplogInfo::get(opCtx)->getCollection());
+    return static_cast<bool>(LocalOplogInfo::get(opCtx)->getRecordStore());
 }
 
 StatusWith<OpTimeAndWallTime> ReplicationCoordinatorExternalStateImpl::loadLastOpTimeAndWallTime(
@@ -786,15 +961,13 @@ StatusWith<OpTimeAndWallTime> ReplicationCoordinatorExternalStateImpl::loadLastO
 
         BSONObj oplogEntry;
 
-        if (!writeConflictRetry(
-                opCtx, "Load last opTime", NamespaceString::kRsOplogNamespace.ns().c_str(), [&] {
-                    return Helpers::getLast(
-                        opCtx, NamespaceString::kRsOplogNamespace.ns().c_str(), oplogEntry);
-                })) {
-            return StatusWith<OpTimeAndWallTime>(ErrorCodes::NoMatchingDocument,
-                                                 str::stream()
-                                                     << "Did not find any entries in "
-                                                     << NamespaceString::kRsOplogNamespace.ns());
+        if (!writeConflictRetry(opCtx, "Load last opTime", NamespaceString::kRsOplogNamespace, [&] {
+                return Helpers::getLast(opCtx, NamespaceString::kRsOplogNamespace, oplogEntry);
+            })) {
+            return StatusWith<OpTimeAndWallTime>(
+                ErrorCodes::NoMatchingDocument,
+                str::stream() << "Did not find any entries in "
+                              << NamespaceString::kRsOplogNamespace.toStringForErrorMsg());
         }
 
         return OpTimeAndWallTime::parseOpTimeAndWallTimeFromOplogEntry(oplogEntry);
@@ -808,13 +981,23 @@ bool ReplicationCoordinatorExternalStateImpl::isSelf(const HostAndPort& host, Se
     return repl::isSelf(host, ctx);
 }
 
+bool ReplicationCoordinatorExternalStateImpl::isSelfFastPath(const HostAndPort& host) {
+    return repl::isSelfFastPath(host);
+}
+
+bool ReplicationCoordinatorExternalStateImpl::isSelfSlowPath(const HostAndPort& host,
+                                                             ServiceContext* ctx,
+                                                             Milliseconds timeout) {
+    return repl::isSelfSlowPath(host, ctx, timeout);
+}
+
 HostAndPort ReplicationCoordinatorExternalStateImpl::getClientHostAndPort(
     const OperationContext* opCtx) {
     return HostAndPort(opCtx->getClient()->clientAddress(true));
 }
 
 void ReplicationCoordinatorExternalStateImpl::closeConnections() {
-    _service->getServiceEntryPoint()->endAllSessions(transport::Session::kKeepOpen);
+    _service->getTransportLayerManager()->endAllSessions(Client::kKeepOpen);
 }
 
 void ReplicationCoordinatorExternalStateImpl::onStepDownHook() {
@@ -824,16 +1007,18 @@ void ReplicationCoordinatorExternalStateImpl::onStepDownHook() {
 }
 
 void ReplicationCoordinatorExternalStateImpl::_shardingOnStepDownHook() {
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         PeriodicShardedIndexConsistencyChecker::get(_service).onStepDown();
-        TransactionCoordinatorService::get(_service)->onStepDown();
-    } else if (ShardingState::get(_service)->enabled()) {
-        ChunkSplitter::get(_service).onStepDown();
-        CatalogCacheLoader::get(_service).onStepDown();
-        PeriodicBalancerConfigRefresher::get(_service).onStepDown();
-        TransactionCoordinatorService::get(_service)->onStepDown();
+        TransactionCoordinatorService::get(_service)->interrupt();
     }
+    if (ShardingState::get(_service)->enabled()) {
+        if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
+            // Called earlier for config servers.
+            TransactionCoordinatorService::get(_service)->interrupt();
+        }
 
+        FilteringMetadataCache::get(_service)->onStepDown();
+    }
     if (auto validator = LogicalTimeValidator::get(_service)) {
         auto opCtx = cc().getOperationContext();
 
@@ -852,7 +1037,11 @@ void ReplicationCoordinatorExternalStateImpl::_stopAsyncUpdatesOfAndClearOplogTr
     // available, which may have to wait for the ticket refresher to run, which in turn blocks
     // on the repl _mutex to check whether we are primary or not: this is a deadlock because
     // stepdown already holds the repl _mutex!
-    FlowControl::Bypass flowControlBypass(opCtx);
+    // As opCtx does not expose a method to allow skipping flow control on purpose we mark the
+    // operation as having Immediate priority. This will skip flow control and ticket acquisition.
+    // It is fine to do this since the system is essentially shutting down at this point.
+    ScopedAdmissionPriority<ExecutionAdmissionContext> priority(
+        opCtx, AdmissionContext::Priority::kExempt);
 
     // Tell the system to stop updating the oplogTruncateAfterPoint asynchronously and to go
     // back to using last applied to update repl's durable timestamp instead of the truncate
@@ -876,18 +1065,14 @@ void ReplicationCoordinatorExternalStateImpl::_stopAsyncUpdatesOfAndClearOplogTr
     // above, if writing is imminent, so we must make sure that the code completes fully.
     JournalFlusher::get(_service)->waitForJournalFlush();
 
-    // Writes to non-replicated collections do not need concurrency control with the
-    // OplogApplier that never accesses them. Skip taking the PBWM.
-    ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(opCtx->lockState());
-
     // We can clear the oplogTruncateAfterPoint because we know there are no user writes during
     // stepdown and therefore presently no oplog holes.
     _replicationProcess->getConsistencyMarkers()->setOplogTruncateAfterPoint(opCtx, Timestamp());
 }
 
 void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook(
-    OperationContext* opCtx) {
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+    OperationContext* opCtx, long long term) {
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         Status status = ShardingCatalogManager::get(opCtx)->initializeConfigDatabaseIfNeeded(opCtx);
         if (!status.isOK() && status != ErrorCodes::AlreadyInitialized) {
             // If the node is shutting down or it lost quorum just as it was becoming primary,
@@ -906,15 +1091,17 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
 
         if (status.isOK()) {
             // Load the clusterId into memory. Use local readConcern, since we can't use
-            // majority readConcern in drain mode because the global lock prevents replication.
-            // This is safe, since if the clusterId write is rolled back, any writes that depend
-            // on it will also be rolled back.
+            // majority/snapshot readConcern in drain mode because the global lock prevents
+            // replication. This is safe, since if the clusterId write is rolled back, any writes
+            // that depend on it will also be rolled back.
             //
             // Since we *just* wrote the cluster ID to the config.version document (via the call
             // to ShardingCatalogManager::initializeConfigDatabaseIfNeeded above), this read can
             // only meaningfully fail if the node is shutting down.
             status = ClusterIdentityLoader::get(opCtx)->loadClusterId(
-                opCtx, repl::ReadConcernLevel::kLocalReadConcern);
+                opCtx,
+                ShardingCatalogManager::get(opCtx)->localCatalogClient(),
+                repl::ReadConcernLevel::kLocalReadConcern);
 
             if (ErrorCodes::isShutdownError(status.code())) {
                 return;
@@ -922,82 +1109,162 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
             fassert(40217, status);
         }
 
-        // Free any leftover locks from previous instantiations.
-        DistLockManager::get(opCtx)->unlockAll(opCtx);
-
         if (auto validator = LogicalTimeValidator::get(_service)) {
             validator->enableKeyGenerator(opCtx, true);
         }
 
         PeriodicShardedIndexConsistencyChecker::get(_service).onStepUp(_service);
-        TransactionCoordinatorService::get(_service)->onStepUp(opCtx);
-    } else if (ShardingState::get(opCtx)->enabled()) {
-        Status status = ShardingStateRecovery::recover(opCtx);
+        TransactionCoordinatorService::get(_service)->initializeIfNeeded(opCtx, term);
 
-        // If the node is shutting down or it lost quorum just as it was becoming primary, don't
-        // run the sharding onStepUp machinery. The onStepDown counterpart to these methods is
-        // already idempotent, so the machinery will remain in the stepped down state.
-        if (ErrorCodes::isShutdownError(status.code()) ||
-            ErrorCodes::isNotPrimaryError(status.code())) {
-            return;
+        FilteringMetadataCache::get(_service)->onStepUp();
+
+        ShardingCatalogManager::get(opCtx)->scheduleAsyncUnblockDDLCoordinators(opCtx);
+    }
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
+        if (ShardingState::get(opCtx)->enabled()) {
+            VectorClockMutable::get(opCtx)->recoverDirect(opCtx);
+
+            if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
+                // Called earlier for config servers.
+                TransactionCoordinatorService::get(_service)->initializeIfNeeded(opCtx, term);
+                FilteringMetadataCache::get(opCtx)->onStepUp();
+            }
+
+            const auto configsvrConnStr =
+                Grid::get(opCtx)->shardRegistry()->getConfigShard()->getConnString();
+            ShardingInitializationMongoD::get(opCtx)->updateShardIdentityConfigString(
+                opCtx, configsvrConnStr);
+
+            // Note, these must be done after the configTime is recovered via
+            // VectorClockMutable::recoverDirect above, because they may trigger filtering metadata
+            // refreshes which should use the recovered configTime.
+            migrationutil::resumeMigrationCoordinationsOnStepUp(opCtx);
+            migrationutil::resumeMigrationRecipientsOnStepUp(opCtx);
+
+            const bool scheduleAsyncRefresh = true;
+            resharding::clearFilteringMetadata(opCtx, scheduleAsyncRefresh);
+
+            // Schedule a drop of the temporary collections used by aggregations ($out
+            // specifically).
+            dropAggTempCollections(opCtx);
         }
-        fassert(40107, status);
 
-        const auto configsvrConnStr =
-            Grid::get(opCtx)->shardRegistry()->getConfigShard()->getConnString();
-        ShardingInitializationMongoD::get(opCtx)->updateShardIdentityConfigString(opCtx,
-                                                                                  configsvrConnStr);
-
-        CatalogCacheLoader::get(_service).onStepUp();
-        ChunkSplitter::get(_service).onStepUp();
-        PeriodicBalancerConfigRefresher::get(_service).onStepUp(_service);
-        TransactionCoordinatorService::get(_service)->onStepUp(opCtx);
-
-        // Note, these must be done after the configOpTime is recovered via
-        // ShardingStateRecovery::recover above, because they may trigger filtering metadata
-        // refreshes which should use the recovered configOpTime.
-        migrationutil::resubmitRangeDeletionsOnStepUp(_service);
-        migrationutil::resumeMigrationCoordinationsOnStepUp(opCtx);
-        migrationutil::resumeMigrationRecipientsOnStepUp(opCtx);
-
-        const bool scheduleAsyncRefresh = true;
-        resharding::clearFilteringMetadata(opCtx, scheduleAsyncRefresh);
-    } else {  // unsharded
+        // The code above will only be executed after a stepdown happens, however the code below
+        // needs to be executed also on startup, and the enabled check might fail in shards during
+        // startup. Create uuid index on config.rangeDeletions if needed
+        const auto minKeyFieldName =
+            RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinFieldName;
+        const auto maxKeyFieldName =
+            RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxFieldName;
+        Status indexStatus = createIndexOnConfigCollection(
+            opCtx,
+            NamespaceString::kRangeDeletionNamespace,
+            BSON(RangeDeletionTask::kCollectionUuidFieldName << 1 << minKeyFieldName << 1
+                                                             << maxKeyFieldName << 1),
+            false);
+        if (!indexStatus.isOK()) {
+            // If the node is shutting down or it lost quorum just as it was becoming primary,
+            // don't run the sharding onStepUp machinery. The onStepDown counterpart to these
+            // methods is already idempotent, so the machinery will remain in the stepped down
+            // state.
+            if (ErrorCodes::isShutdownError(indexStatus.code()) ||
+                ErrorCodes::isNotPrimaryError(indexStatus.code())) {
+                return;
+            }
+            fassertFailedWithStatus(
+                64285,
+                indexStatus.withContext("Failed to create index on config.rangeDeletions on "
+                                        "shard's first transition to primary"));
+        }
+    }
+    if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {  // unsharded
         if (auto validator = LogicalTimeValidator::get(_service)) {
             validator->enableKeyGenerator(opCtx, true);
+        }
+    }
+
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
+        !ShardingState::get(opCtx)->enabled()) {
+        // Note this must be called after the config server has created the cluster ID and also
+        // after the onStepUp logic for the shard role because this triggers sharding state
+        // initialization which will transition some components into the "primary" state, like
+        // the TransactionCoordinatorService, and they would fail if the onStepUp logic
+        // attempted the same transition.
+        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        // TODO: SERVER-82965 Remove condition after v8.0 becomes last-lts.
+        if (!serverGlobalParams.doAutoBootstrapSharding ||
+            gFeatureFlagAllMongodsAreSharded.isEnabled(VersionContext::getDecoration(opCtx),
+                                                       fcvSnapshot)) {
+            // We only want to install the shard identity if we don't have one yet. Otherwise the
+            // field in the shard identity representing the replicaSetConfigShardMaintenanceMode
+            // might differ from the actual startup value, and we try to install a shard identity
+            // that differs from the existing one, which is prohibited. Since that field is
+            // responsible for the deferred sharding initialization, we should trust the persisted
+            // field instead of the startup flag (which will be reset by transforming to a sharded
+            // cluster).
+            if (!ShardingInitializationMongoD::getShardIdentityDoc(opCtx)) {
+                ShardingCatalogManager::get(opCtx)->installConfigShardIdentityDocument(
+                    opCtx, serverGlobalParams.replicaSetConfigShardMaintenanceMode);
+            }
+        }
+
+        if (gFeatureFlagAllMongodsAreSharded.isEnabled(VersionContext::getDecoration(opCtx),
+                                                       fcvSnapshot)) {
+            ShardingReady::get(opCtx)->scheduleTransitionToConfigShard(opCtx);
         }
     }
 }
 
 void ReplicationCoordinatorExternalStateImpl::signalApplierToChooseNewSyncSource() {
-    stdx::lock_guard<Latch> lk(_threadMutex);
+    stdx::lock_guard<stdx::mutex> lk(_threadMutex);
     if (_bgSync) {
         _bgSync->clearSyncTarget();
     }
 }
 
 void ReplicationCoordinatorExternalStateImpl::stopProducer() {
-    stdx::lock_guard<Latch> lk(_threadMutex);
+    stdx::lock_guard<stdx::mutex> lk(_threadMutex);
     if (_bgSync) {
         _bgSync->stop(false);
     }
-    if (_oplogBuffer) {
-        _oplogBuffer->enterDrainMode();
+
+    // When _oplogWriteBuffer is not null, featureFlagReduceMajorityWriteLatency is enabled.
+    // We only need to put write buffer in drain mode in this case as the apply buffer will
+    // be put into drain mode by the writer when it sees that the write buffer is drained.
+    if (_oplogWriteBuffer) {
+        _oplogWriteBuffer->enterDrainMode();
+    } else if (_oplogApplyBuffer) {
+        _oplogApplyBuffer->enterDrainMode();
     }
 }
 
 void ReplicationCoordinatorExternalStateImpl::startProducerIfStopped() {
-    stdx::lock_guard<Latch> lk(_threadMutex);
-    if (_oplogBuffer) {
-        _oplogBuffer->exitDrainMode();
+    stdx::lock_guard<stdx::mutex> lk(_threadMutex);
+    // When _oplogWriteBuffer is not null, featureFlagReduceMajorityWriteLatency is enabled.
+    // We call exitDrainMode() on both buffers, but it is possible that the apply buffer is
+    // not even in drain mode when exitDrainMode() is called, which can happen if the node
+    // steps down in the middle of a step-up.
+    if (_oplogWriteBuffer) {
+        _oplogWriteBuffer->exitDrainMode();
     }
+    if (_oplogApplyBuffer) {
+        _oplogApplyBuffer->exitDrainMode();
+    }
+
     if (_bgSync) {
         _bgSync->startProducerIfStopped();
     }
 }
 
+void ReplicationCoordinatorExternalStateImpl::notifyOtherMemberDataChanged() {
+    stdx::lock_guard<stdx::mutex> lk(_threadMutex);
+    if (_bgSync) {
+        _bgSync->notifySyncSourceSelectionDataChanged();
+    }
+}
+
 bool ReplicationCoordinatorExternalStateImpl::tooStale() {
-    stdx::lock_guard<Latch> lk(_threadMutex);
+    stdx::lock_guard<stdx::mutex> lk(_threadMutex);
     if (_bgSync) {
         return _bgSync->tooStale();
     }
@@ -1006,26 +1273,27 @@ bool ReplicationCoordinatorExternalStateImpl::tooStale() {
 }
 
 void ReplicationCoordinatorExternalStateImpl::_dropAllTempCollections(OperationContext* opCtx) {
-    // Acquire the GlobalLock in mode IS to conflict with database drops which acquire the
-    // GlobalLock in mode X.
-    Lock::GlobalLock lk(opCtx, MODE_IS);
+    // Acquire the GlobalLock in mode IX to conflict with database drops which acquire the
+    // GlobalLock in mode X. Additionally, acquire the GlobalLock in IX instead of IS to prevent
+    // lock upgrade when removing the temporary collections.
+    Lock::GlobalLock lk(opCtx, MODE_IX);
 
-    StorageEngine* storageEngine = _service->getStorageEngine();
-    std::vector<std::string> dbNames = storageEngine->listDatabases();
-
-    for (std::vector<std::string>::iterator it = dbNames.begin(); it != dbNames.end(); ++it) {
+    std::vector<DatabaseName> dbNames = catalog::listDatabases();
+    for (const auto& dbName : dbNames) {
         // The local db is special because it isn't replicated. It is cleared at startup even on
         // replica set members.
-        if (*it == "local")
+        if (dbName == DatabaseName::kLocal)
             continue;
-        LOGV2_DEBUG(21309,
-                    2,
-                    "Removing temporary collections from {db}",
-                    "Removing temporary collections",
-                    "db"_attr = *it);
-        AutoGetDb autoDb(opCtx, *it, MODE_IX);
-        invariant(autoDb.getDb(), str::stream() << "Unable to get reference to database " << *it);
-        autoDb.getDb()->clearTmpCollections(opCtx);
+
+        LOGV2_DEBUG(21309, 2, "Removing temporary collections", logAttrs(dbName));
+        Lock::DBLock dbLock(
+            opCtx,
+            dbName,
+            MODE_IX,
+            Date_t::max(),
+            Lock::DBLockSkipOptions{
+                false, false, false, rss::consensus::IntentRegistry::Intent::LocalWrite});
+        clearTempCollections(opCtx, dbName);
     }
 }
 
@@ -1059,50 +1327,12 @@ bool ReplicationCoordinatorExternalStateImpl::snapshotsEnabled() const {
 void ReplicationCoordinatorExternalStateImpl::notifyOplogMetadataWaiters(
     const OpTime& committedOpTime) {
     signalOplogWaiters();
-
-    // Notify the DropPendingCollectionReaper if there are any drop-pending collections with
-    // drop optimes before or at the committed optime.
-    if (auto earliestDropOpTime = _dropPendingCollectionReaper->getEarliestDropOpTime()) {
-        if (committedOpTime >= *earliestDropOpTime) {
-            auto reaper = _dropPendingCollectionReaper;
-            scheduleWork(
-                _taskExecutor.get(),
-                [committedOpTime, reaper](const executor::TaskExecutor::CallbackArgs& args) {
-                    if (MONGO_unlikely(dropPendingCollectionReaperHang.shouldFail())) {
-                        LOGV2(21310,
-                              "fail point dropPendingCollectionReaperHang enabled. "
-                              "Blocking until fail point is disabled. "
-                              "committedOpTime: {committedOpTime}",
-                              "fail point dropPendingCollectionReaperHang enabled. "
-                              "Blocking until fail point is disabled",
-                              "committedOpTime"_attr = committedOpTime);
-                        dropPendingCollectionReaperHang.pauseWhileSet();
-                    }
-                    auto opCtx = cc().makeOperationContext();
-                    reaper->dropCollectionsOlderThan(opCtx.get(), committedOpTime);
-                    auto replCoord = ReplicationCoordinator::get(opCtx.get());
-                    replCoord->signalDropPendingCollectionsRemovedFromStorage();
-                });
-        }
-    }
-}
-
-boost::optional<OpTime> ReplicationCoordinatorExternalStateImpl::getEarliestDropPendingOpTime()
-    const {
-    return _dropPendingCollectionReaper->getEarliestDropOpTime();
 }
 
 double ReplicationCoordinatorExternalStateImpl::getElectionTimeoutOffsetLimitFraction() const {
     return replElectionTimeoutOffsetLimitFraction;
 }
 
-bool ReplicationCoordinatorExternalStateImpl::isReadCommittedSupportedByStorageEngine(
-    OperationContext* opCtx) const {
-    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    // This should never be called if the storage engine has not been initialized.
-    invariant(storageEngine);
-    return storageEngine->supportsReadConcernMajority();
-}
 
 bool ReplicationCoordinatorExternalStateImpl::isReadConcernSnapshotSupportedByStorageEngine(
     OperationContext* opCtx) const {
@@ -1122,41 +1352,51 @@ std::size_t ReplicationCoordinatorExternalStateImpl::getOplogFetcherInitialSyncM
     return oplogFetcherInitialSyncMaxFetcherRestarts.load();
 }
 
-JournalListener::Token ReplicationCoordinatorExternalStateImpl::getToken(OperationContext* opCtx) {
+std::unique_ptr<JournalListener::Token> ReplicationCoordinatorExternalStateImpl::getToken(
+    OperationContext* opCtx) {
     // If in state PRIMARY, the oplogTruncateAfterPoint must be used for the Durable timestamp
     // in order to avoid majority confirming any writes that could later be truncated.
-    //
-    // TODO (SERVER-45847): temporary hack for the ephemeral storage engine that passes in a
-    // nullptr for the opCtx. The ephemeral engine does not do parallel writes to cause oplog
-    // holes, therefore it is safe to skip updating the oplogTruncateAfterPoint that tracks
-    // oplog holes.
-    if (MONGO_likely(opCtx)) {
-        auto truncatePoint = repl::ReplicationProcess::get(opCtx)
+    if (auto truncatePoint = repl::ReplicationProcess::get(opCtx)
                                  ->getConsistencyMarkers()
-                                 ->refreshOplogTruncateAfterPointIfPrimary(opCtx);
-        if (truncatePoint) {
-            return truncatePoint.get();
-        }
+                                 ->refreshOplogTruncateAfterPointIfPrimary(opCtx)) {
+        return std::make_unique<ReplDurabilityToken>(*truncatePoint, true /*isPrimary*/);
     }
 
-    // All other repl states use the 'lastApplied'.
+    // All other repl states use the 'lastWritten'.
     //
-    // Setting 'rollbackSafe' will ensure that a safe lastApplied value is returned if we're in
-    // ROLLBACK state. 'lastApplied' may be momentarily set to an opTime from a divergent branch
+    // Setting 'rollbackSafe' will ensure that a safe lastWritten value is returned if we're in
+    // ROLLBACK state. 'lastWritten' may be momentarily set to an opTime from a divergent branch
     // of history during rollback, so a benign default value will be returned instead to prevent
-    // a divergent 'lastApplied' from being used to forward the 'lastDurable' after rollback.
+    // a divergent 'lastWritten' from being used to forward the 'lastDurable' after rollback.
     //
     // No concurrency control is necessary and it is still safe if the node goes into ROLLBACK
     // after getting the token because the JournalFlusher is shut down during rollback, before a
-    // divergent 'lastApplied' value is present. The JournalFlusher will start up again in
+    // divergent 'lastWritten' value is present. The JournalFlusher will start up again in
     // ROLLBACK and never transition from non-ROLLBACK to ROLLBACK with a divergent
-    // 'lastApplied' value.
-    return repl::ReplicationCoordinator::get(_service)->getMyLastAppliedOpTimeAndWallTime(
-        /*rollbackSafe=*/true);
+    // 'lastWritten' value.
+    return std::make_unique<ReplDurabilityToken>(
+        repl::ReplicationCoordinator::get(_service)->getMyLastWrittenOpTimeAndWallTime(
+            /*rollbackSafe=*/true),
+        false /*isPrimary*/);
 }
 
-void ReplicationCoordinatorExternalStateImpl::onDurable(const JournalListener::Token& token) {
-    repl::ReplicationCoordinator::get(_service)->setMyLastDurableOpTimeAndWallTimeForward(token);
+void ReplicationCoordinatorExternalStateImpl::onDurable(const JournalListener::Token& t) {
+    if (MONGO_unlikely(skipDurableTimestampUpdates.shouldFail())) {
+        return;
+    }
+    auto& token = dynamic_cast<const ReplDurabilityToken&>(t);
+    // The isPrimary value in the token means whether this token was acquired when this node was a
+    // primary. On primary, the lastWritten OpTime is updated by the storage transaction's
+    // onCommit() hook, which has a chance to be called later than this onDurable(). In that case,
+    // we want to advance lastWritten here as well to maintain the property that lastWritten >=
+    // lastDurable. However, on secondary, we should always have lastWritten being advanced first.
+    if (token.isPrimary) {
+        repl::ReplicationCoordinator::get(_service)
+            ->setMyLastDurableAndLastWrittenOpTimeAndWallTimeForward(token.opTimeAndWallTime);
+    } else {
+        repl::ReplicationCoordinator::get(_service)->setMyLastDurableOpTimeAndWallTimeForward(
+            token.opTimeAndWallTime);
+    }
 }
 
 void ReplicationCoordinatorExternalStateImpl::startNoopWriter(OpTime opTime) {
@@ -1177,20 +1417,20 @@ void ReplicationCoordinatorExternalStateImpl::setupNoopWriter(Seconds waitTime) 
 
 bool ReplicationCoordinatorExternalStateImpl::isShardPartOfShardedCluster(
     OperationContext* opCtx) const {
-    return serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
+    return serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
         ShardingState::get(opCtx)->enabled();
 }
 
 bool ReplicationCoordinatorExternalStateImpl::isCWWCSetOnConfigShard(
     OperationContext* opCtx) const {
     GetDefaultRWConcern configsvrRequest;
-    configsvrRequest.setDbName(NamespaceString::kAdminDb.toString());
-    auto cmdResponse = uassertStatusOK(
-        Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
+    configsvrRequest.setDbName(DatabaseName::kAdmin);
+    auto cmdResponse =
+        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommand(
             opCtx,
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-            NamespaceString::kAdminDb.toString(),
-            configsvrRequest.toBSON({}),
+            DatabaseName::kAdmin,
+            configsvrRequest.toBSON(),
             Shard::RetryPolicy::kIdempotent));
 
     bool isCWWCSet = false;

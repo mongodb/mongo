@@ -27,17 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/scripting/mozjs/jsstringwrapper.h"
-
-#include <js/CharacterEncoding.h>
-#include <jsapi.h>
-#include <utility>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/scripting/mozjs/exception.h"
 #include "mongo/util/assert_util.h"
+
+#include <cstring>
+
+#include <fmt/format.h>
+#include <js/CharacterEncoding.h>
+#include <js/String.h>
+#include <js/TypeDecls.h>
 
 namespace mongo {
 namespace mozjs {
@@ -57,8 +58,8 @@ JSStringWrapper::JSStringWrapper(JSContext* cx, JSString* str) : _isSet(true) {
     // how long the utf8 strings we get out are.
     //
     // Well, at least js/CharacterEncoding's GetDeflatedUTF8StringLength
-    // and JS_flattenString are all in the public headers...
-    JSFlatString* flat = JS_FlattenString(cx, str);
+    // and StringToLinearString are all in the public headers...
+    JSLinearString* flat = JS::StringToLinearString(cx, str);
     if (!flat)
         throwCurrentJSException(cx, ErrorCodes::InternalError, "Failed to flatten JSString");
 
@@ -72,7 +73,7 @@ JSStringWrapper::JSStringWrapper(JSContext* cx, JSString* str) : _isSet(true) {
         out = _str.get();
     }
 
-    JS::DeflateStringToUTF8Buffer(flat, mozilla::RangedPtr<char>(out, _length));
+    JS::DeflateStringToUTF8Buffer(flat, mozilla::Span(out, _length));
     out[_length] = '\0';
 }
 
@@ -82,7 +83,7 @@ StringData JSStringWrapper::toStringData() const {
 }
 
 std::string JSStringWrapper::toString() const {
-    return toStringData().toString();
+    return std::string{toStringData()};
 }
 
 JSStringWrapper::operator bool() const {

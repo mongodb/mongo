@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest
+import wiredtiger, wttest, sys
 from wtdataset import SimpleDataSet, ComplexDataSet, simple_key, simple_value
 from wtscenario import make_scenarios
 
@@ -42,6 +42,7 @@ class test_cursor_random(wttest.WiredTigerTestCase):
         ('not-sample', dict(config='next_random=true'))
     ]
     scenarios = make_scenarios(types, config)
+    expected_warning_msg = 'Eviction took more than 1 minute'
 
     # Check that opening a random cursor on a row-store returns not-supported
     # for methods other than next, reconfigure and reset, and next returns
@@ -67,8 +68,8 @@ class test_cursor_random(wttest.WiredTigerTestCase):
             wiredtiger.WiredTigerError, lambda: cursor.update(), msg)
 
         self.assertTrue(cursor.next(), wiredtiger.WT_NOTFOUND)
-        self.assertEquals(cursor.reconfigure(), 0)
-        self.assertEquals(cursor.reset(), 0)
+        self.assertEqual(cursor.reconfigure(), 0)
+        self.assertEqual(cursor.reset(), 0)
         cursor.close()
 
     # Check that next_random fails with an empty tree, repeatedly.
@@ -89,8 +90,8 @@ class test_cursor_random(wttest.WiredTigerTestCase):
         cursor.close()
         cursor = self.session.open_cursor(uri, None, self.config)
         for i in range(1,5):
-            self.assertEquals(cursor.next(), 0)
-            self.assertEquals(cursor.get_key(), 'AAA')
+            self.assertEqual(cursor.next(), 0)
+            self.assertEqual(cursor.get_key(), 'AAA')
         cursor.close
 
     # Check that next_random works in the presence of a larger set of values,
@@ -103,12 +104,18 @@ class test_cursor_random(wttest.WiredTigerTestCase):
 
         # Assert we only see 20% matches. We expect to see less than that, but we don't want
         # to chase random test failures, either.
-        cursor = self.session.open_cursor(uri, None, self.config)
+        cursor = ds.open_cursor(uri, None, self.config)
         list=[]
         for i in range(1,100):
             self.assertEqual(cursor.next(), 0)
             list.append(cursor.get_key())
         self.assertGreater(len(set(list)), 80)
+
+        # Ignore the eviction generation drain warning as it is possible for eviction to
+        # take longer to evict pages due to overflow items on the page.
+        self.conn.close()
+        if (sys.platform.startswith('darwin')):
+            self.ignoreStdoutPatternIfExists(self.expected_warning_msg)
 
     def test_cursor_random_multiple_insert_records_small(self):
         self.cursor_random_multiple_insert_records(2000)
@@ -130,12 +137,18 @@ class test_cursor_random(wttest.WiredTigerTestCase):
 
         # Assert we only see 20% matches. We expect to see less than that, but we don't want
         # to chase random test failures, either.
-        cursor = self.session.open_cursor(uri, None, self.config)
+        cursor = ds.open_cursor(uri, None, self.config)
         list=[]
         for i in range(1, 100):
             self.assertEqual(cursor.next(), 0)
             list.append(cursor.get_key())
         self.assertGreater(len(set(list)), 80)
+
+        # Ignore the eviction generation drain warning as it is possible for eviction to
+        # take longer to evict pages due to overflow items on the page.
+        self.conn.close()
+        if (sys.platform.startswith('darwin')):
+            self.ignoreStdoutPatternIfExists(self.expected_warning_msg)
 
     def test_cursor_random_multiple_page_records_reopen_small(self):
         self.cursor_random_multiple_page_records(2000, True)
@@ -157,17 +170,23 @@ class test_cursor_random(wttest.WiredTigerTestCase):
         # Close the connection so everything is forced to disk.
         self.reopen_conn()
 
-        start = self.session.open_cursor(uri, None)
+        start = ds.open_cursor(uri, None)
         start.set_key(ds.key(10))
-        end = self.session.open_cursor(uri, None)
+        end = ds.open_cursor(uri, None)
         end.set_key(ds.key(10000-10))
-        self.session.truncate(None, start, end, None)
+        ds.truncate(None, start, end, None)
         self.assertEqual(start.close(), 0)
         self.assertEqual(end.close(), 0)
 
-        cursor = self.session.open_cursor(uri, None, self.config)
+        cursor = ds.open_cursor(uri, None, self.config)
         for i in range(1,10):
             self.assertEqual(cursor.next(), 0)
+
+        # Ignore the eviction generation drain warning as it is possible for eviction to
+        # take longer to evict pages due to overflow items on the page.
+        self.conn.close()
+        if (sys.platform.startswith('darwin')):
+            self.ignoreStdoutPatternIfExists(self.expected_warning_msg)
 
     # Check that next_random fails in the presence of a set of values, all of
     # which are deleted.
@@ -180,11 +199,17 @@ class test_cursor_random(wttest.WiredTigerTestCase):
         # Close the connection so everything is forced to disk.
         self.reopen_conn()
 
-        self.session.truncate(uri, None, None, None)
+        ds.truncate(uri, None, None, None)
 
-        cursor = self.session.open_cursor(uri, None, self.config)
+        cursor = ds.open_cursor(uri, None, self.config)
         for i in range(1,10):
             self.assertTrue(cursor.next(), wiredtiger.WT_NOTFOUND)
+
+        # Ignore the eviction generation drain warning as it is possible for eviction to
+        # take longer to evict pages due to overflow items on the page.
+        self.conn.close()
+        if (sys.platform.startswith('darwin')):
+            self.ignoreStdoutPatternIfExists(self.expected_warning_msg)
 
 # Check that opening a random cursor on column-store returns not-supported.
 class test_cursor_random_column(wttest.WiredTigerTestCase):
@@ -250,7 +275,7 @@ class test_cursor_random_invisible(wttest.WiredTigerTestCase):
         # return the only possible record.
         s = self.conn.open_session()
         cursor = s.open_cursor(uri, None, self.config)
-        self.assertEquals(cursor.next(), 0)
+        self.assertEqual(cursor.next(), 0)
         self.assertEqual(cursor.get_key(), simple_key(cursor, 1))
 
     def test_cursor_random_invisible_before(self):
@@ -270,8 +295,5 @@ class test_cursor_random_invisible(wttest.WiredTigerTestCase):
         # return the only possible record.
         s = self.conn.open_session()
         cursor = s.open_cursor(uri, None, self.config)
-        self.assertEquals(cursor.next(), 0)
+        self.assertEqual(cursor.next(), 0)
         self.assertEqual(cursor.get_key(), simple_key(cursor, 99))
-
-if __name__ == '__main__':
-    wttest.run()

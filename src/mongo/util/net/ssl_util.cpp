@@ -28,6 +28,7 @@
  */
 
 #include "mongo/util/net/ssl_util.h"
+
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -59,7 +60,23 @@ StatusWith<StringData> findPEMBlob(StringData blob,
 
     trailerPosition += trailer.size();
 
-    return StringData(blob.rawData() + headerPosition, trailerPosition - headerPosition);
+    return StringData(blob.data() + headerPosition, trailerPosition - headerPosition);
+}
+
+
+StatusWith<std::string> readPEMFile(StringData fileName) {
+    // Calling `toString()` is necessary as `fileName` does not have to be null-terminated.
+    std::ifstream pemFile(std::string{fileName}, std::ios::binary);
+    if (!pemFile.is_open()) {
+        return Status(ErrorCodes::InvalidSSLConfiguration,
+                      fmt::format("Failed to open PEM file: {}", fileName));
+    }
+
+    std::string buf((std::istreambuf_iterator<char>(pemFile)), std::istreambuf_iterator<char>());
+
+    pemFile.close();
+
+    return buf;
 }
 
 }  // namespace ssl_util

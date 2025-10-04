@@ -27,16 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/sessions_commands_gen.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/logical_session_cache.h"
-#include "mongo/db/logical_session_id_helpers.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_cache.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_helpers.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <set>
+#include <string>
+
+#include <absl/container/node_hash_set.h>
 
 namespace mongo {
 namespace {
@@ -72,9 +78,7 @@ public:
         void doCheckAuthorization(OperationContext* opCtx) const final {
             // It is always ok to run this command, as long as you are authenticated
             // as some user, if auth is enabled.
-            uassert(ErrorCodes::Unauthorized,
-                    "Not authorized to run refreshSessions command",
-                    AuthorizationSession::get(opCtx->getClient())->getSingleUser());
+            // requiresAuth() => true covers this for us.
         }
 
         Reply typedRun(OperationContext* opCtx) final {
@@ -87,8 +91,8 @@ public:
             return Reply();
         }
     };
-
-} refreshSessionsCommand;
+};
+MONGO_REGISTER_COMMAND(RefreshSessionsCommand).forRouter().forShard();
 
 }  // namespace
 }  // namespace mongo

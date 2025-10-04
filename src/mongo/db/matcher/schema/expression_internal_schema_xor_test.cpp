@@ -27,88 +27,39 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
 
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
-#include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/intrusive_counter.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace {
 
-using std::unique_ptr;
-
-TEST(InternalSchemaXorOp, MatchesNothingWhenHasNoClauses) {
-    InternalSchemaXorMatchExpression internalSchemaXorOp;
-    ASSERT_FALSE(internalSchemaXorOp.matchesBSON(BSONObj()));
-}
-
-TEST(InternalSchemaXorOp, MatchesSingleClause) {
-    BSONObj matchPredicate = fromjson("{$_internalSchemaXor: [{a: { $ne: 5 }}]}");
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto expr = MatchExpressionParser::parse(matchPredicate, expCtx);
-
-    ASSERT_OK(expr.getStatus());
-    ASSERT_TRUE(expr.getValue()->matchesBSON(BSON("a" << 4)));
-    ASSERT_TRUE(expr.getValue()->matchesBSON(BSON("a" << BSON_ARRAY(4 << 6))));
-    ASSERT_FALSE(expr.getValue()->matchesBSON(BSON("a" << 5)));
-    ASSERT_FALSE(expr.getValue()->matchesBSON(BSON("a" << BSON_ARRAY(4 << 5))));
-}
-
-TEST(InternalSchemaXorOp, MatchesThreeClauses) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    BSONObj matchPredicate =
-        fromjson("{$_internalSchemaXor: [{a: { $gt: 10 }}, {a: { $lt: 0 }}, {b: 0}]}");
-
-    auto expr = MatchExpressionParser::parse(matchPredicate, expCtx);
-
-    ASSERT_OK(expr.getStatus());
-    ASSERT_TRUE(expr.getValue()->matchesBSON(BSON("a" << -1)));
-    ASSERT_TRUE(expr.getValue()->matchesBSON(BSON("a" << 11)));
-    ASSERT_FALSE(expr.getValue()->matchesBSON(BSON("a" << 5)));
-    ASSERT_FALSE(expr.getValue()->matchesBSON(BSON("b" << 100)));
-    ASSERT_FALSE(expr.getValue()->matchesBSON(BSON("b" << 101)));
-    ASSERT_FALSE(expr.getValue()->matchesBSON(BSONObj()));
-    ASSERT_TRUE(expr.getValue()->matchesBSON(BSON("a" << 11 << "b" << 100)));
-    ASSERT_FALSE(expr.getValue()->matchesBSON(BSON("a" << 11 << "b" << 0)));
-}
-
-TEST(InternalSchemaXorOp, DoesNotUseElemMatchKey) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-
-    BSONObj matchPredicate = fromjson("{$_internalSchemaXor: [{a: 1}, {b: 2}]}");
-
-    auto expr = MatchExpressionParser::parse(matchPredicate, expCtx);
-    MatchDetails details;
-    details.requestElemMatchKey();
-    ASSERT_OK(expr.getStatus());
-    ASSERT_TRUE(expr.getValue()->matchesBSON(BSON("a" << 1), &details));
-    ASSERT_FALSE(details.hasElemMatchKey());
-    ASSERT_TRUE(expr.getValue()->matchesBSON(BSON("a" << BSON_ARRAY(1) << "b" << BSON_ARRAY(10)),
-                                             &details));
-    ASSERT_FALSE(details.hasElemMatchKey());
-    ASSERT_FALSE(
-        expr.getValue()->matchesBSON(BSON("a" << BSON_ARRAY(3) << "b" << BSON_ARRAY(4)), &details));
-    ASSERT_FALSE(details.hasElemMatchKey());
-}
-
 TEST(InternalSchemaXorOp, Equivalent) {
     BSONObj baseOperand1 = BSON("a" << 1);
     BSONObj baseOperand2 = BSON("b" << 2);
-    EqualityMatchExpression sub1("a", baseOperand1["a"]);
-    EqualityMatchExpression sub2("b", baseOperand2["b"]);
+    EqualityMatchExpression sub1("a"_sd, baseOperand1["a"]);
+    EqualityMatchExpression sub2("b"_sd, baseOperand2["b"]);
 
     InternalSchemaXorMatchExpression e1;
-    e1.add(sub1.shallowClone());
-    e1.add(sub2.shallowClone());
+    e1.add(sub1.clone());
+    e1.add(sub2.clone());
 
     InternalSchemaXorMatchExpression e2;
-    e2.add(sub1.shallowClone());
+    e2.add(sub1.clone());
 
     ASSERT(e1.equivalent(&e1));
     ASSERT_FALSE(e1.equivalent(&e2));

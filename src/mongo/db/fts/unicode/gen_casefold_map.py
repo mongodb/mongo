@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-import os
 import sys
 
-from gen_helper import getCopyrightNotice, openNamespaces, closeNamespaces, \
-    include
+from gen_helper import closeNamespaces, getCopyrightNotice, include, openNamespaces
 
 
 def generate(unicode_casefold_file, target):
@@ -14,7 +12,7 @@ def generate(unicode_casefold_file, target):
     The case folding function contains a switch statement with cases for every
     Unicode codepoint that has a case folding mapping.
     """
-    out = open(target, "w", encoding='utf-8')
+    out = open(target, "w", encoding="utf-8")
 
     out.write(getCopyrightNotice())
     out.write(include("mongo/db/fts/unicode/codepoints.h"))
@@ -23,30 +21,30 @@ def generate(unicode_casefold_file, target):
 
     case_mappings = {}
 
-    cf_file = open(unicode_casefold_file, 'r', encoding='utf-8')
+    cf_file = open(unicode_casefold_file, "r", encoding="utf-8")
 
     for line in cf_file:
         # Filter out blank lines and lines that start with #
-        data = line[:line.find('#')]
-        if(data == ""):
+        data = line[: line.find("#")]
+        if data == "":
             continue
 
         # Parse the data on the line
         values = data.split("; ")
-        assert(len(values) == 4)
+        assert len(values) == 4
 
         status = values[1]
-        if status == 'C' or status == 'S':
+        if status == "C" or status == "S":
             # We only include the "Common" and "Simple" mappings. "Full" case
             # folding mappings expand certain letters to multiple codepoints,
             # which we currently do not support.
             original_codepoint = int(values[0], 16)
-            codepoint_mapping  = int(values[2], 16)
+            codepoint_mapping = int(values[2], 16)
             case_mappings[original_codepoint] = codepoint_mapping
 
     turkishMapping = {
         0x49: 0x131,  # I -> ı
-        0x130: 0x069,   # İ -> i
+        0x130: 0x069,  # İ -> i
     }
 
     out.write(
@@ -60,7 +58,8 @@ def generate(unicode_casefold_file, target):
                    return codepoint;
                }
 
-               switch (codepoint) {\n""")
+               switch (codepoint) {\n"""
+    )
 
     mappings_list = []
 
@@ -76,17 +75,21 @@ def generate(unicode_casefold_file, target):
     sorted_mappings = sorted(mappings_list, key=lambda mapping: mapping[0])
 
     for mapping in sorted_mappings:
-        if mapping[0] <= 0x7f:
+        if mapping[0] <= 0x7F:
             continue  # ascii is special cased above.
 
         if mapping[0] in turkishMapping:
-            out.write("case 0x%x: return mode == CaseFoldMode::kTurkish ? 0x%x : 0x%x;\n" %
-                      (mapping[0], turkishMapping[mapping[0]], mapping[1]))
+            out.write(
+                "case 0x%x: return mode == CaseFoldMode::kTurkish ? 0x%x : 0x%x;\n"
+                % (mapping[0], turkishMapping[mapping[0]], mapping[1])
+            )
         else:
             out.write("case 0x%x: return 0x%x;\n" % mapping)
 
-    out.write("\
-    default: return codepoint;\n    }\n}")
+    out.write(
+        "\
+    default: return codepoint;\n    }\n}"
+    )
 
     out.write(closeNamespaces())
 

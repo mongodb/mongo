@@ -4,23 +4,22 @@
  * so we allow initial sync to retry 3 times.
  */
 
-(function() {
-var name = 'initial_sync_fail_insert_once';
-var replSet = new ReplSetTest(
-    {name: name, nodes: 2, nodeOptions: {setParameter: "numInitialSyncAttempts=3"}});
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
+let name = "initial_sync_fail_insert_once";
+let replSet = new ReplSetTest({name: name, nodes: 2, nodeOptions: {setParameter: "numInitialSyncAttempts=3"}});
 
 replSet.startSet();
 replSet.initiate();
-var primary = replSet.getPrimary();
-var secondary = replSet.getSecondary();
+let primary = replSet.getPrimary();
+let secondary = replSet.getSecondary();
 
-var coll = primary.getDB('test').getCollection(name);
+let coll = primary.getDB("test").getCollection(name);
 assert.commandWorked(coll.insert({_id: 0, x: 1}, {writeConcern: {w: 2}}));
 
 jsTest.log("Re-syncing " + tojson(secondary));
 const params = {
-    'failpoint.failCollectionInserts':
-        tojson({mode: {times: 2}, data: {collectionNS: coll.getFullName()}})
+    "failpoint.failCollectionInserts": tojson({mode: {times: 2}, data: {collectionNS: coll.getFullName()}}),
 };
 
 secondary = replSet.restart(secondary, {startClean: true, setParameter: params});
@@ -32,4 +31,3 @@ assert.docEq({_id: 0, x: 1}, secondary.getDB("test")[name].findOne());
 
 jsTest.log("Stopping repl set test; finished.");
 replSet.stopSet();
-})();

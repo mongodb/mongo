@@ -29,16 +29,17 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <string>
-#include <vector>
-
 #include "mongo/base/data_range_cursor.h"
 #include "mongo/base/data_type_validated.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/client/sasl_aws_protocol_common_gen.h"
 #include "mongo/rpc/object_check.h"
+
+#include <string>
+#include <vector>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 
@@ -75,11 +76,11 @@ static constexpr auto kXAmzDateHeader = "X-Amz-Date"_sd;
  */
 template <typename T>
 T convertFromByteString(StringData rawString) {
-    ConstDataRange cdr(rawString.rawData(), rawString.size());
+    ConstDataRange cdr(rawString.data(), rawString.size());
 
     auto clientFirstBson = cdr.read<Validated<BSONObj>>();
 
-    return T::parse(IDLParserErrorContext("sasl"), clientFirstBson);
+    return T::parse(clientFirstBson, IDLParserContext("sasl"));
 }
 
 /**

@@ -1,7 +1,7 @@
 #ifndef BOOST_MP11_SET_HPP_INCLUDED
 #define BOOST_MP11_SET_HPP_INCLUDED
 
-// Copyright 2015, 2019 Peter Dimov.
+// Copyright 2015, 2019, 2024 Peter Dimov.
 //
 // Distributed under the Boost Software License, Version 1.0.
 //
@@ -10,9 +10,11 @@
 
 #include <boost/mp11/utility.hpp>
 #include <boost/mp11/function.hpp>
+#include <boost/mp11/detail/config.hpp>
 #include <boost/mp11/detail/mp_list.hpp>
 #include <boost/mp11/detail/mp_append.hpp>
 #include <boost/mp11/detail/mp_copy_if.hpp>
+#include <boost/mp11/detail/mp_fold.hpp>
 #include <boost/mp11/detail/mp_remove_if.hpp>
 #include <boost/mp11/detail/mp_is_list.hpp>
 #include <type_traits>
@@ -94,6 +96,34 @@ template<class S, class... T> using mp_set_push_front = typename detail::mp_set_
 namespace detail
 {
 
+#if !BOOST_MP11_WORKAROUND( BOOST_MP11_MSVC, < 1900 )
+
+struct mp_is_set_helper_start
+{
+    static constexpr bool value = true;
+    template<class T> static mp_false contains( T );
+};
+
+template<class Base, class T>
+struct mp_is_set_helper: Base
+{
+    static constexpr bool value = Base::value && !decltype( Base::contains( mp_identity<T>{} ) )::value;
+    using Base::contains;
+    static mp_true contains( mp_identity<T> );
+};
+
+template<class S> struct mp_is_set_impl
+{
+    using type = mp_false;
+};
+
+template<template<class...> class L, class... T> struct mp_is_set_impl<L<T...>>
+{
+    using type = mp_bool<mp_fold<mp_list<T...>, detail::mp_is_set_helper_start, detail::mp_is_set_helper>::value>;
+};
+
+#else
+
 template<class S> struct mp_is_set_impl
 {
     using type = mp_false;
@@ -103,6 +133,8 @@ template<template<class...> class L, class... T> struct mp_is_set_impl<L<T...>>
 {
     using type = mp_to_bool<std::is_same<mp_list<T...>, mp_set_push_back<mp_list<>, T...> > >;
 };
+
+#endif // !BOOST_MP11_WORKAROUND( BOOST_MP11_MSVC, < 1900 )
 
 } // namespace detail
 

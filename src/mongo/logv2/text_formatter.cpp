@@ -29,15 +29,18 @@
 
 #include "mongo/logv2/text_formatter.h"
 
+#include "mongo/base/string_data.h"
 #include "mongo/logv2/attributes.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/logv2/log_tag.h"
 #include "mongo/util/time_support.h"
 
+#include <boost/exception/exception.hpp>
 #include <boost/log/attributes/value_extraction.hpp>
+#include <boost/log/core/record_view.hpp>
 #include <boost/log/utility/formatting_ostream.hpp>
-
+#include <boost/log/utility/formatting_ostream_fwd.hpp>
 #include <fmt/format.h>
 
 namespace mongo::logv2 {
@@ -47,7 +50,7 @@ void TextFormatter::operator()(boost::log::record_view const& rec,
     using boost::log::extract;
 
     fmt::memory_buffer buffer;
-    fmt::format_to(buffer,
+    fmt::format_to(std::back_inserter(buffer),
                    "{} {:<2} {:<8} [{}] ",
                    StringData{DateStringBuffer{}.iso8601(
                        extract<Date_t>(attributes::timeStamp(), rec).get(),

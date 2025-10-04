@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  *
  * ex_col_store.c
- *	This is an example application that demonstrates
- *	how to perform operations with column store.
+ *	This is an example application that demonstrates column-store operations.
  */
 
 #include <test_util.h>
@@ -199,21 +198,21 @@ generate_data(WEATHER *w_array)
             assert(false);
         }
         /* 24-hour-time 0-2400. */
-        w.hour = rand() % 2401;
+        w.hour = (uint16_t)(rand() % 2401);
         /* Temperature range: 0-50C.  */
-        w.temp = rand() % 51;
+        w.temp = (uint8_t)(rand() % 51);
         /* Feels like temperature range 0-50C */
-        w.feels_like_temp = rand() % 51;
+        w.feels_like_temp = (uint8_t)(rand() % 51);
         /* Humidity range: 0-100%. */
-        w.humidity = rand() % 101;
+        w.humidity = (uint8_t)(rand() % 101);
         /* Pressure range: 900-1100pa */
-        w.pressure = (rand() % (1100 + 1 - 900)) + 900;
+        w.pressure = (uint16_t)((rand() % (1100 + 1 - 900)) + 900);
         /* Wind range: 0-200 km/hr. */
-        w.wind = rand() % 201;
+        w.wind = (uint8_t)(rand() % 201);
         /* latitude: 0-180 degrees. */
-        w.loc_lat = rand() % 181;
+        w.loc_lat = (uint16_t)(rand() % 181);
         /* longitude: 0-90 degrees. */
-        w.loc_long = rand() % 91;
+        w.loc_long = (uint16_t)(rand() % 91);
 
         country = rand() % 7;
         switch (country) {
@@ -256,72 +255,36 @@ static int
 find_min_and_max_temp(
   WT_SESSION *session, uint16_t start_time, uint16_t end_time, int *min_temp, int *max_temp)
 {
-    WT_CURSOR *end_time_cursor, *join_cursor, *start_time_cursor;
+    WT_CURSOR *cursor;
     WT_DECL_RET;
     uint64_t recno;
-    int exact;
     uint16_t hour;
     uint8_t temp;
 
-    /*! [col-store join] */
-
-    /* Open cursors needed by the join. */
-    error_check(
-      session->open_cursor(session, "join:table:weather(hour,temp)", NULL, NULL, &join_cursor));
-    error_check(
-      session->open_cursor(session, "index:weather:hour", NULL, NULL, &start_time_cursor));
-    error_check(session->open_cursor(session, "index:weather:hour", NULL, NULL, &end_time_cursor));
-
-    /*
-     * Select values WHERE (hour >= start AND hour <= end). Find the starting record closest to
-     * desired start time.
-     */
-    start_time_cursor->set_key(start_time_cursor, start_time);
-    error_check(start_time_cursor->search_near(start_time_cursor, &exact));
-    if (exact == -1) {
-        ret = start_time_cursor->next(start_time_cursor);
-        if (ret == WT_NOTFOUND)
-            return ret;
-        else
-            error_check(ret);
-    }
-
-    error_check(session->join(session, join_cursor, start_time_cursor, "compare=ge"));
-
-    /* Find the ending record closest to desired end time. */
-    end_time_cursor->set_key(end_time_cursor, end_time);
-    error_check(end_time_cursor->search_near(end_time_cursor, &exact));
-    if (exact == 1) {
-        ret = end_time_cursor->prev(end_time_cursor);
-        if (ret == WT_NOTFOUND)
-            return ret;
-        else
-            error_check(ret);
-    }
-
-    error_check(session->join(session, join_cursor, end_time_cursor, "compare=le"));
+    /* Open the cursor. */
+    error_check(session->open_cursor(session, "table:weather(hour,temp)", NULL, NULL, &cursor));
 
     /* Initialize minimum temperature and maximum temperature to temperature of the first record. */
-    ret = join_cursor->next(join_cursor);
+    ret = cursor->next(cursor);
     if (ret == WT_NOTFOUND)
         return ret;
     else
         error_check(ret);
 
-    error_check(join_cursor->get_key(join_cursor, &recno));
-    error_check(join_cursor->get_value(join_cursor, &hour, &temp));
+    error_check(cursor->get_key(cursor, &recno));
+    error_check(cursor->get_value(cursor, &hour, &temp));
     *min_temp = temp;
     *max_temp = temp;
 
-    /* Iterating through found records between start and end time to find the min & max temps. */
-    while ((ret = join_cursor->next(join_cursor)) == 0) {
-        error_check(join_cursor->get_value(join_cursor, &hour, &temp));
-
-        *min_temp = WT_MIN(*min_temp, temp);
-        *max_temp = WT_MAX(*max_temp, temp);
+    /* Iterating through all records selecting records between start and end time to find the min &
+     * max temps. */
+    while ((ret = cursor->next(cursor)) == 0) {
+        error_check(cursor->get_value(cursor, &hour, &temp));
+        if ((start_time <= hour) && (hour <= end_time)) {
+            *min_temp = WT_MIN(*min_temp, temp);
+            *max_temp = WT_MAX(*max_temp, temp);
+        }
     }
-
-    /*! [col-store join] */
 
     /*
      * If WT_NOTFOUND is hit at this point, it is because we have traversed through all temperature

@@ -1,11 +1,9 @@
 /**
  * Test that initial sync works without error when the sync source has an oplog hole.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/replsets/rslib.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {waitForState} from "jstests/replsets/rslib.js";
 
 // Set up replica set. Disallow chaining so nodes always sync from primary.
 const testName = "initial_sync_oplog_hole";
@@ -16,7 +14,7 @@ const dbName = testName;
 const replTest = new ReplSetTest({
     name: testName,
     nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}],
-    settings: {chainingAllowed: false}
+    settings: {chainingAllowed: false},
 });
 replTest.startSet();
 replTest.initiate();
@@ -33,8 +31,9 @@ TestData.testName = testName;
 TestData.collectionName = collName;
 
 // The default WC is majority and this test can't satisfy majority writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 jsTestLog("Writing data before oplog hole to collection.");
 assert.commandWorked(primaryColl.insert({_id: "a"}));
@@ -42,14 +41,14 @@ assert.commandWorked(primaryColl.insert({_id: "a"}));
 assert.eq(primaryColl.find({_id: "a"}).itcount(), 1);
 
 jsTest.log("Create the uncommitted write.");
-const failPoint = configureFailPoint(primaryDB,
-                                     "hangAfterCollectionInserts",
-                                     {collectionNS: primaryColl.getFullName(), first_id: "b"});
+const failPoint = configureFailPoint(primaryDB, "hangAfterCollectionInserts", {
+    collectionNS: primaryColl.getFullName(),
+    first_id: "b",
+});
 
 const db = primaryDB;
 const joinHungWrite = startParallelShell(() => {
-    assert.commandWorked(
-        db.getSiblingDB(TestData.testName)[TestData.collectionName].insert({_id: "b"}));
+    assert.commandWorked(db.getSiblingDB(TestData.testName)[TestData.collectionName].insert({_id: "b"}));
 }, primary.port);
 failPoint.wait();
 
@@ -74,8 +73,7 @@ checkLog.contains(secondaryDB.getMongo(), "Starting initial sync");
 jsTestLog("Allow the uncommitted write to finish in 5 seconds.");
 const joinDisableFailPoint = startParallelShell(() => {
     sleep(5000);
-    assert.commandWorked(
-        db.adminCommand({configureFailPoint: "hangAfterCollectionInserts", mode: "off"}));
+    assert.commandWorked(db.adminCommand({configureFailPoint: "hangAfterCollectionInserts", mode: "off"}));
 }, primary.port);
 
 jsTestLog("Waiting for initial sync to complete.");
@@ -87,11 +85,10 @@ joinHungWrite();
 
 jsTestLog("Checking that primary has all data items.");
 // Make sure the primary collection has all three data items.
-assert.docEq(primaryColl.find().toArray(), [{"_id": "a"}, {"_id": "b"}, {"_id": "c"}]);
+assert.docEq([{"_id": "a"}, {"_id": "b"}, {"_id": "c"}], primaryColl.find().toArray());
 
 jsTestLog("Checking that secondary has all data items.");
 replTest.awaitReplication();
-assert.docEq(secondaryColl.find().toArray(), [{"_id": "a"}, {"_id": "b"}, {"_id": "c"}]);
+assert.docEq([{"_id": "a"}, {"_id": "b"}, {"_id": "c"}], secondaryColl.find().toArray());
 
 replTest.stopSet();
-})();

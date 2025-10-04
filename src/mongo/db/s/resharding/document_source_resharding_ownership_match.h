@@ -29,9 +29,23 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/s/shard_id.h"
-#include "mongo/s/shard_key_pattern.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/stage_constraints.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/db/sharding_environment/shard_id.h"
+
+#include <memory>
+#include <set>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -48,6 +62,7 @@ public:
     static boost::intrusive_ptr<DocumentSourceReshardingOwnershipMatch> create(
         ShardId recipientShardId,
         ShardKeyPattern reshardingKey,
+        boost::optional<NamespaceString> temporaryReshardingNamespace,
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     static boost::intrusive_ptr<DocumentSourceReshardingOwnershipMatch> createFromBson(
@@ -55,29 +70,43 @@ public:
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
 
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {}
+
     DocumentSource::GetModPathsReturn getModifiedPaths() const final;
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final;
+    StageConstraints constraints(PipelineSplitState pipeState) const final;
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
         return boost::none;
     }
 
     const char* getSourceName() const final {
-        return DocumentSourceReshardingOwnershipMatch::kStageName.rawData();
+        return DocumentSourceReshardingOwnershipMatch::kStageName.data();
+    }
+
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
     }
 
 private:
-    DocumentSourceReshardingOwnershipMatch(ShardId recipientShardId,
-                                           ShardKeyPattern reshardingKey,
-                                           const boost::intrusive_ptr<ExpressionContext>& expCtx);
+    friend boost::intrusive_ptr<exec::agg::Stage> documentSourceReshardingOwnershipMatchToStageFn(
+        const boost::intrusive_ptr<DocumentSource>& documentSource);
 
-    DocumentSource::GetNextResult doGetNext() final;
+    DocumentSourceReshardingOwnershipMatch(
+        ShardId recipientShardId,
+        ShardKeyPattern reshardingKey,
+        boost::optional<NamespaceString> temporaryReshardingNamespace,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     const ShardId _recipientShardId;
-    const ShardKeyPattern _reshardingKey;
+    // This is a shared_ptr because ReshardingOwnershipMatchStage needs a copy of it too, but it's
+    // not copyable.
+    std::shared_ptr<ShardKeyPattern> _reshardingKey;
+    const boost::optional<NamespaceString> _temporaryReshardingNamespace;
 };
 
 }  // namespace mongo

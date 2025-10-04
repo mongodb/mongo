@@ -1,35 +1,44 @@
 #!/usr/bin/env python3
 """Collect system resource information on processes running in Evergreen on a given interval."""
 
-from datetime import datetime
 import optparse
 import os
 import sys
 import time
+from datetime import datetime
 
-from bson.json_util import dumps
 import requests
+from bson.json_util import dumps
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from buildscripts.resmokelib import utils  # pylint: disable=wrong-import-position
+from buildscripts.resmokelib import utils
 
 
 def main():
-    """Main."""
+    """Collect system resources."""
     usage = "usage: %prog [options]"
     parser = optparse.OptionParser(description=__doc__, usage=usage)
     parser.add_option(
-        "-i", "--interval", dest="interval", default=5, type="int",
+        "-i",
+        "--interval",
+        dest="interval",
+        default=5,
+        type="int",
         help="Collect system resource information every <interval> seconds. "
-        "Default is every 5 seconds.")
+        "Default is every 5 seconds.",
+    )
     parser.add_option(
-        "-o", "--output-file", dest="outfile", default="-",
+        "-o",
+        "--output-file",
+        dest="outfile",
+        default="-",
         help="If '-', then the file is written to stdout."
         " Any other value is treated as the output file name. By default,"
-        " output is written to stdout.")
+        " output is written to stdout.",
+    )
 
     (options, _) = parser.parse_args()
 
@@ -40,8 +49,11 @@ def main():
                 response = requests.get("http://localhost:2285/status")
                 if response.status_code != requests.codes.ok:
                     print(
-                        "Received a {} HTTP response: {}".format(response.status_code,
-                                                                 response.text), file=sys.stderr)
+                        "Received a {} HTTP response: {}".format(
+                            response.status_code, response.text
+                        ),
+                        file=sys.stderr,
+                    )
                     time.sleep(options.interval)
                     continue
 
@@ -49,8 +61,10 @@ def main():
                 try:
                     res_json = response.json()
                 except ValueError:
-                    print("Invalid JSON object returned with response: {}".format(response.text),
-                          file=sys.stderr)
+                    print(
+                        "Invalid JSON object returned with response: {}".format(response.text),
+                        file=sys.stderr,
+                    )
                     time.sleep(options.interval)
                     continue
 

@@ -1,0 +1,22 @@
+==== VARIATION: matchExpression=ElemMatchObjectExpression
+a $elemMatch (obj)
+    1 $eq 5
+
+==== VARIATION: taggedMatchExpression=ElemMatchObjectExpression
+a $elemMatch (obj) || Selected Index #2 pos 0 combine 1
+    1 $eq 5
+
+==== VARIATION: matchExpression=ElemMatchValueExpression
+a $elemMatch (value)
+     $gt 5
+
+==== VARIATION: taggedMatchExpression=ElemMatchValueExpression
+a $elemMatch (value) || Selected Index #2 pos 0 combine 1
+     $gt 5
+
+==== VARIATION: matchExpression=SizeMatchExpression
+a $size : 5
+
+==== VARIATION: taggedMatchExpression=SizeMatchExpression
+a $size : 5 || Selected Index #2 pos 0 combine 1
+

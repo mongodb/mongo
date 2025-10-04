@@ -27,24 +27,28 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/base/init.h"
 #include "mongo/config.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/scopeguard.h"
 
 #include <memory>
-#include <openssl/err.h>
-#include <openssl/ssl.h>
 #include <stack>
 #include <vector>
+
+#include <openssl/err.h>
+#include <openssl/ssl.h>
+
+#if OPENSSL_VERSION_NUMBER > 0x30000000L
+#include <openssl/provider.h>
+#endif
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
+
 
 namespace mongo {
 namespace {
@@ -115,7 +119,7 @@ private:
     class ThreadIDManager {
     public:
         unsigned long reserveID() {
-            stdx::unique_lock<Latch> lock(_idMutex);
+            stdx::unique_lock<stdx::mutex> lock(_idMutex);
             if (!_idLast.empty()) {
                 unsigned long ret = _idLast.top();
                 _idLast.pop();
@@ -125,14 +129,13 @@ private:
         }
 
         void releaseID(unsigned long id) {
-            stdx::unique_lock<Latch> lock(_idMutex);
+            stdx::unique_lock<stdx::mutex> lock(_idMutex);
             _idLast.push(id);
         }
 
     private:
         // Machinery for producing IDs that are unique for the life of a thread.
-        Mutex _idMutex =
-            MONGO_MAKE_LATCH("ThreadIDManager::_idMutex");  // Protects _idNext and _idLast.
+        stdx::mutex _idMutex;       // Protects _idNext and _idLast.
         unsigned long _idNext = 0;  // Stores the next thread ID to use, if none already allocated.
         std::stack<unsigned long, std::vector<unsigned long>>
             _idLast;  // Stores old thread IDs, for reuse.
@@ -144,21 +147,69 @@ private:
     }
 };
 
-void setupFIPS() {
-// Turn on FIPS mode if requested, OPENSSL_FIPS must be defined by the OpenSSL headers
-#if defined(MONGO_CONFIG_HAVE_FIPS_MODE_SET)
+#if OPENSSL_VERSION_NUMBER > 0x30000000L
+#define _SUPPORT_FIPS 1
+
+OSSL_PROVIDER* fipsProvider;
+OSSL_PROVIDER* baseProvider;
+
+void initFIPS() {
+    // OpenSSL 3 has a different FIPS design then previous OpenSSL. To load FIPS, we use the FIPS
+    // algorithm provider which we load into the "default" library context.
+    fipsProvider = OSSL_PROVIDER_load(NULL, "fips");
+    if (fipsProvider == NULL) {
+        LOGV2_FATAL_NOTRACE(
+            7585801,
+            "Failed to load OpenSSL 3 FIPS provider. OpenSSL was not compiled with FIPS support.",
+            "error"_attr = SSLManagerInterface::getSSLErrorMessage(ERR_get_error()));
+    }
+
+    // Base provide has non-cryptographic algorihms (like encoding/decoding keys)
+    baseProvider = OSSL_PROVIDER_load(NULL, "base");
+    if (baseProvider == NULL) {
+        LOGV2_FATAL_NOTRACE(7585802,
+                            "Failed to load OpenSSL 3 Base provider",
+                            "error"_attr =
+                                SSLManagerInterface::getSSLErrorMessage(ERR_get_error()));
+    }
+
+    if (!EVP_default_properties_enable_fips(nullptr, 1)) {
+        LOGV2_FATAL_NOTRACE(10788001,
+                            "Failed to set FIPS as default OpenSSL 3 provider",
+                            "error"_attr =
+                                SSLManagerInterface::getSSLErrorMessage(ERR_get_error()));
+    };
+}
+#elif defined(MONGO_CONFIG_HAVE_FIPS_MODE_SET)
+
+#define _SUPPORT_FIPS 1
+
+void initFIPS() {
     int status = FIPS_mode_set(1);
     if (!status) {
-        LOGV2_FATAL(23173,
-                    "can't activate FIPS mode: {error}",
-                    "Can't activate FIPS mode",
-                    "error"_attr = SSLManagerInterface::getSSLErrorMessage(ERR_get_error()));
-        fassertFailedNoTrace(16703);
+        LOGV2_FATAL_NOTRACE(23173,
+                            "Can't activate FIPS mode",
+                            "error"_attr =
+                                SSLManagerInterface::getSSLErrorMessage(ERR_get_error()));
     }
-    LOGV2(23172, "FIPS 140-2 mode activated");
+}
+#endif
+
+void setupFIPS() {
+// Turn on FIPS mode if requested, OPENSSL_FIPS must be defined by the OpenSSL headers
+#if defined(_SUPPORT_FIPS)
+    initFIPS();
+
+#if OPENSSL_VERSION_NUMBER > 0x30000000L
+#define _FIPS_ACTIVATED_MSG "FIPS 140 mode activated"
 #else
-    LOGV2_FATAL(23174, "this version of mongodb was not compiled with FIPS support");
-    fassertFailedNoTrace(17089);
+#define _FIPS_ACTIVATED_MSG "FIPS 140-2 mode activated"
+#endif
+
+    LOGV2(23172, _FIPS_ACTIVATED_MSG);
+
+#else
+    LOGV2_FATAL_NOTRACE(23174, "this version of mongodb was not compiled with FIPS support");
 #endif
 }
 

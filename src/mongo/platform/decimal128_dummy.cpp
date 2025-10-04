@@ -27,10 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
 
 #include "mongo/platform/decimal128.h"
-
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

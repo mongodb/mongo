@@ -27,17 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/transport/session.h"
 
-#include "mongo/config.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
+#include "mongo/transport/session_manager.h"
 #include "mongo/transport/transport_layer.h"
-#ifdef MONGO_CONFIG_SSL
-#include "mongo/util/net/ssl_manager.h"
-#include "mongo/util/net/ssl_types.h"
-#endif
 
 namespace mongo {
 namespace transport {
@@ -48,29 +42,37 @@ AtomicWord<unsigned long long> sessionIdCounter(0);
 
 }  // namespace
 
-Session::Session() : _id(sessionIdCounter.addAndFetch(1)), _tags(kPending) {}
-
-void Session::setTags(TagMask tagsToSet) {
-    mutateTags([tagsToSet](TagMask originalTags) { return (originalTags | tagsToSet); });
+Session::Session() : _id(sessionIdCounter.addAndFetch(1)) {}
+Session::~Session() {
+    if (_opCounters && _inOperation) {
+        _opCounters->completed.fetchAndAddRelaxed(1);
+    }
 }
 
-void Session::unsetTags(TagMask tagsToUnset) {
-    mutateTags([tagsToUnset](TagMask originalTags) { return (originalTags & ~tagsToUnset); });
-}
+void Session::setInOperation(bool state) {
+    if (MONGO_unlikely(!_opCounters)) {
+        // We should only take this path once for each connection in production, so we are opting
+        // for readability over performance here.
+        auto tl = getTransportLayer();
+        if (MONGO_unlikely(!tl))
+            return;
 
-void Session::mutateTags(const std::function<TagMask(TagMask)>& mutateFunc) {
-    TagMask oldValue, newValue;
-    do {
-        oldValue = _tags.load();
-        newValue = mutateFunc(oldValue);
+        auto sm = tl->getSessionManager();
+        if (MONGO_unlikely(!sm))
+            return;
 
-        // Any change to the session tags automatically clears kPending status.
-        newValue &= ~kPending;
-    } while (!_tags.compareAndSwap(&oldValue, newValue));
-}
+        _opCounters = sm->getOpCounters();
+    }
 
-Session::TagMask Session::getTags() const {
-    return _tags.load();
+    auto oldState = std::exchange(_inOperation, state);
+    if (state) {
+        uassert(ErrorCodes::InvalidOptions,
+                "Operation started on session already in an active operation",
+                !oldState);
+        _opCounters->total.fetchAndAddRelaxed(1);
+    } else if (oldState) {
+        _opCounters->completed.fetchAndAddRelaxed(1);
+    }
 }
 
 }  // namespace transport

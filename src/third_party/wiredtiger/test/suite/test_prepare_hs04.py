@@ -108,12 +108,12 @@ class test_prepare_hs04(wttest.WiredTigerTestCase):
         # Insert a key at timestamp 1.
         cursor = self.session.open_cursor(self.uri)
         for i in range(1, self.nsessions * self.nkeys):
-            self.session.begin_transaction('isolation=snapshot')
+            self.session.begin_transaction()
             key = commit_key + ds.key(self.nrows + i)
             cursor.set_key(key)
             cursor.set_value(commit_value)
-            self.assertEquals(cursor.insert(), 0)
-            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
+            self.assertEqual(cursor.insert(), 0)
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
         cursor.close()
 
         # Call checkpoint.
@@ -121,10 +121,10 @@ class test_prepare_hs04(wttest.WiredTigerTestCase):
 
         cursor = self.session.open_cursor(self.uri)
         for i in range(1, self.nsessions * self.nkeys):
-            self.session.begin_transaction('isolation=snapshot')
+            self.session.begin_transaction()
             key = commit_key + ds.key(self.nrows + i)
             cursor.set_key(key)
-            self.assertEquals(cursor.remove(), 0)
+            self.assertEqual(cursor.remove(), 0)
             self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(10))
         cursor.close()
 
@@ -138,7 +138,7 @@ class test_prepare_hs04(wttest.WiredTigerTestCase):
         cursors = [0] * self.nsessions
         for j in range (0, self.nsessions):
             sessions[j] = self.conn.open_session()
-            sessions[j].begin_transaction('isolation=snapshot')
+            sessions[j].begin_transaction()
             cursors[j] = sessions[j].open_cursor(self.uri)
             # Each session will update many consecutive keys.
             start = (j * self.nkeys)
@@ -146,7 +146,7 @@ class test_prepare_hs04(wttest.WiredTigerTestCase):
             for i in range(start, end):
                 cursors[j].set_key(commit_key + ds.key(self.nrows + i))
                 cursors[j].set_value(prepare_value)
-                self.assertEquals(cursors[j].insert(), 0)
+                self.assertEqual(cursors[j].insert(), 0)
             sessions[j].prepare_transaction('prepare_timestamp=' + self.timestamp_str(20))
 
         hs_writes = self.get_stat(stat.conn.cache_write_hs) - hs_writes_start
@@ -241,13 +241,10 @@ class test_prepare_hs04(wttest.WiredTigerTestCase):
         for i in range(1, 10000):
             cursor.set_key(ds.key(self.nrows + i))
             cursor.set_value(bigvalue)
-            self.assertEquals(cursor.insert(), 0)
+            self.assertEqual(cursor.insert(), 0)
         cursor.close()
         self.session.checkpoint()
 
         # We put prepared updates in multiple sessions so that we do not hang
         # because of cache being full with uncommitted updates.
         self.prepare_updates(ds)
-
-if __name__ == '__main__':
-    wttest.run()

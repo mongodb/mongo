@@ -27,18 +27,33 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <algorithm>
+#include <iterator>
+#include <memory>
+#include <set>
 
+#include <boost/container/small_vector.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/exec/projection_executor_builder.h"
-#include "mongo/db/exec/projection_executor_utils.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/query/projection_parser.h"
+#include "mongo/db/pipeline/transformer_interface.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection_parser.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection_policies.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo::projection_executor {
 namespace {
@@ -74,7 +89,7 @@ std::unique_ptr<ProjectionExecutor> makeProjectionWithDefaultIdExclusionAndNeste
     return createProjectionExecutor(projSpec, policies);
 }
 
-std::set<FieldRef> toFieldRefs(const std::set<std::string>& stringPaths) {
+std::set<FieldRef> toFieldRefs(const OrderedPathSet& stringPaths) {
     std::set<FieldRef> fieldRefs;
     std::transform(stringPaths.begin(),
                    stringPaths.end(),

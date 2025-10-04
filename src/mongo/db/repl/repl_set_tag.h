@@ -29,16 +29,19 @@
 
 #pragma once
 
+#include "mongo/base/error_extra_info.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/util/modules.h"
+
+#include <cstddef>
 #include <cstdint>
 #include <iosfwd>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
-
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 class BSONObjBuilder;
 
 namespace repl {
@@ -152,6 +155,37 @@ public:
      */
     ConstraintIterator constraintsEnd() const {
         return _constraints.end();
+    }
+
+    /**
+     * Gets the number of constraints in this pattern.
+     */
+    size_t getNumConstraints() const {
+        return _constraints.size();
+    }
+
+    bool operator==(const ReplSetTagPattern& other) const {
+        if (getNumConstraints() != other.getNumConstraints()) {
+            return false;
+        }
+
+        for (auto itrA = constraintsBegin(); itrA != constraintsEnd(); itrA++) {
+            bool same = false;
+            for (auto itrB = other.constraintsBegin(); itrB != other.constraintsEnd(); itrB++) {
+                if (*itrA == *itrB) {
+                    same = true;
+                    break;
+                }
+            }
+            if (!same) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    bool operator!=(const ReplSetTagPattern& other) const {
+        return !operator==(other);
     }
 
 private:
@@ -320,4 +354,4 @@ private:
 };
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

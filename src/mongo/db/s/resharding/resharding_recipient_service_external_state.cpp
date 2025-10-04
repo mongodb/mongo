@@ -27,26 +27,38 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
-
 #include "mongo/db/s/resharding/resharding_recipient_service_external_state.h"
 
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/global_catalog/catalog_cache/catalog_cache.h"
+#include "mongo/db/global_catalog/chunk_manager.h"
+#include "mongo/db/global_catalog/sharding_catalog_client.h"
+#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
+#include "mongo/db/local_catalog/shard_role_catalog/collection_sharding_runtime.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
-#include "mongo/db/s/sharding_state.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
+#include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/grid.h"
 #include "mongo/s/resharding/common_types_gen.h"
-#include "mongo/s/stale_shard_version_helpers.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+
+#include <utility>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 
 namespace mongo {
-
-namespace {
-const WriteConcernOptions kMajorityWriteConcern{
-    WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, Seconds(0)};
-}
 
 void ReshardingRecipientService::RecipientStateMachineExternalState::
     ensureTempReshardingCollectionExistsWithIndexes(OperationContext* opCtx,
@@ -78,22 +90,24 @@ void ReshardingRecipientService::RecipientStateMachineExternalState::
     // Set the temporary resharding collection's UUID to the resharding UUID. Note that
     // BSONObj::addFields() replaces any fields that already exist.
     collOptions = collOptions.addFields(BSON("uuid" << metadata.getReshardingUUID()));
+    CollectionOptionsAndIndexes collOptionsAndIndexes{metadata.getReshardingUUID(),
+                                                      std::move(indexes),
+                                                      std::move(idIndex),
+                                                      std::move(collOptions)};
+    // The indexSpecs are cleared here so we don't create those indexes when creating temp
+    // collections. These indexes will be fetched and built during building-index stage.
+    collOptionsAndIndexes.indexSpecs = {};
     MigrationDestinationManager::cloneCollectionIndexesAndOptions(
-        opCtx,
-        metadata.getTempReshardingNss(),
-        CollectionOptionsAndIndexes{metadata.getReshardingUUID(),
-                                    std::move(indexes),
-                                    std::move(idIndex),
-                                    std::move(collOptions)});
-}
+        opCtx, metadata.getTempReshardingNss(), collOptionsAndIndexes);
 
-template <typename Callable>
-auto RecipientStateMachineExternalStateImpl::_withShardVersionRetry(OperationContext* opCtx,
-                                                                    const NamespaceString& nss,
-                                                                    StringData reason,
-                                                                    Callable&& callable) {
-    auto catalogCache = Grid::get(opCtx)->catalogCache();
-    return shardVersionRetry(opCtx, catalogCache, nss, reason, std::move(callable));
+    const auto coll = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(
+            opCtx, metadata.getTempReshardingNss(), AcquisitionPrerequisites::kWrite),
+        MODE_IX);
+    CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
+        opCtx, metadata.getTempReshardingNss())
+        ->clearFilteringMetadata(opCtx);
 }
 
 ShardId RecipientStateMachineExternalStateImpl::myShardId(ServiceContext* serviceContext) const {
@@ -102,58 +116,92 @@ ShardId RecipientStateMachineExternalStateImpl::myShardId(ServiceContext* servic
 
 void RecipientStateMachineExternalStateImpl::refreshCatalogCache(OperationContext* opCtx,
                                                                  const NamespaceString& nss) {
-    auto catalogCache = Grid::get(opCtx)->catalogCache();
-    uassertStatusOK(catalogCache->getShardedCollectionRoutingInfoWithRefresh(opCtx, nss));
+    uassertStatusOK(
+        Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss));
 }
 
-ChunkManager RecipientStateMachineExternalStateImpl::getShardedCollectionRoutingInfo(
+CollectionRoutingInfo RecipientStateMachineExternalStateImpl::getTrackedCollectionRoutingInfo(
     OperationContext* opCtx, const NamespaceString& nss) {
-    auto catalogCache = Grid::get(opCtx)->catalogCache();
-    return catalogCache->getShardedCollectionRoutingInfo(opCtx, nss);
+    auto cri =
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+
+    uassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << "Expected collection " << nss.toStringForErrorMsg()
+                          << " to be tracked",
+            cri.hasRoutingTable());
+    return cri;
 }
 
 MigrationDestinationManager::CollectionOptionsAndUUID
-RecipientStateMachineExternalStateImpl::getCollectionOptions(OperationContext* opCtx,
-                                                             const NamespaceString& nss,
-                                                             const CollectionUUID& uuid,
-                                                             Timestamp afterClusterTime,
-                                                             StringData reason) {
+RecipientStateMachineExternalStateImpl::getCollectionOptions(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const UUID& uuid,
+    boost::optional<Timestamp> afterClusterTime,
+    StringData reason) {
     // Load the collection options from the primary shard for the database.
-    return _withShardVersionRetry(opCtx, nss, reason, [&] {
-        auto cm = getShardedCollectionRoutingInfo(opCtx, nss);
+    sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), nss.dbName());
+    return router.route(opCtx, reason, [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
         return MigrationDestinationManager::getCollectionOptions(
             opCtx,
-            NamespaceStringOrUUID{nss.db().toString(), uuid},
-            cm.dbPrimary(),
-            cm,
+            NamespaceStringOrUUID{nss.dbName(), uuid},
+            cdb->getPrimary(),
+            cdb->getVersion(),
             afterClusterTime);
     });
+}
+
+MigrationDestinationManager::CollectionOptionsAndUUID
+RecipientStateMachineExternalStateImpl::getCollectionOptions(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const UUID& uuid,
+    boost::optional<Timestamp> afterClusterTime,
+    StringData reason,
+    const ShardId& fromShardId) {
+    // Load the collection options from the specified shard for the database.
+    const auto nssOrUUID = NamespaceStringOrUUID{nss.dbName(), uuid};
+    return MigrationDestinationManager::getCollectionOptions(
+        opCtx, nssOrUUID, fromShardId, boost::none, afterClusterTime);
 }
 
 MigrationDestinationManager::IndexesAndIdIndex
 RecipientStateMachineExternalStateImpl::getCollectionIndexes(OperationContext* opCtx,
                                                              const NamespaceString& nss,
-                                                             const CollectionUUID& uuid,
+                                                             const UUID& uuid,
                                                              Timestamp afterClusterTime,
-                                                             StringData reason) {
+                                                             StringData reason,
+                                                             bool expandSimpleCollation) {
     // Load the list of indexes from the shard which owns the global minimum chunk.
-    return _withShardVersionRetry(opCtx, nss, reason, [&] {
-        auto cm = getShardedCollectionRoutingInfo(opCtx, nss);
-        return MigrationDestinationManager::getCollectionIndexes(
-            opCtx,
-            NamespaceStringOrUUID{nss.db().toString(), uuid},
-            cm.getMinKeyShardIdWithSimpleCollation(),
-            cm,
-            afterClusterTime);
-    });
+    sharding::router::CollectionRouter router(opCtx->getServiceContext(), nss);
+    return router.route(
+        opCtx, reason, [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
+            uassert(ErrorCodes::NamespaceNotFound,
+                    str::stream() << "Expected collection " << nss.toStringForErrorMsg()
+                                  << " to be tracked",
+                    cri.hasRoutingTable());
+            return MigrationDestinationManager::getCollectionIndexes(
+                opCtx,
+                nss,
+                cri.getChunkManager().getMinKeyShardIdWithSimpleCollation(),
+                cri,
+                afterClusterTime,
+                expandSimpleCollation);
+        });
 }
 
-void RecipientStateMachineExternalStateImpl::withShardVersionRetry(
+/**
+ * A wrapper method that routes to `CollectionRouter`, primarily intended for use within
+ * `RecipientStateMachineExternalState`. It facilitates testing and mocking scenarios,
+ * particularly in unit tests such as `resharding_recipient_service_test.cpp`.
+ */
+void RecipientStateMachineExternalStateImpl::route(
     OperationContext* opCtx,
     const NamespaceString& nss,
     StringData reason,
-    unique_function<void()> callback) {
-    _withShardVersionRetry(opCtx, nss, reason, std::move(callback));
+    unique_function<void(OperationContext* opCtx, const CollectionRoutingInfo& cri)> callback) {
+    sharding::router::CollectionRouter router(opCtx->getServiceContext(), nss);
+    router.route(opCtx, reason, callback);
 }
 
 void RecipientStateMachineExternalStateImpl::updateCoordinatorDocument(OperationContext* opCtx,
@@ -166,7 +214,7 @@ void RecipientStateMachineExternalStateImpl::updateCoordinatorDocument(Operation
                                             query,
                                             update,
                                             false, /* upsert */
-                                            kMajorityWriteConcern,
+                                            resharding::kMajorityWriteConcern,
                                             Milliseconds::max()));
 
     if (!docWasModified) {
@@ -180,8 +228,62 @@ void RecipientStateMachineExternalStateImpl::updateCoordinatorDocument(Operation
     }
 }
 
-void RecipientStateMachineExternalStateImpl::clearFilteringMetadata(OperationContext* opCtx) {
-    resharding::clearFilteringMetadata(opCtx, true /* scheduleAsyncRefresh */);
+void RecipientStateMachineExternalStateImpl::clearFilteringMetadataOnTempReshardingCollection(
+    OperationContext* opCtx, const NamespaceString& tempReshardingNss) {
+    stdx::unordered_set<NamespaceString> namespacesToRefresh{tempReshardingNss};
+    resharding::clearFilteringMetadata(opCtx, namespacesToRefresh, true /* scheduleAsyncRefresh */);
+}
+
+void RecipientStateMachineExternalStateImpl::ensureReshardingStashCollectionsEmpty(
+    OperationContext* opCtx,
+    const UUID& sourceUUID,
+    const std::vector<DonorShardFetchTimestamp>& donorShards) {
+    for (const auto& donor : donorShards) {
+        auto stashNss = resharding::getLocalConflictStashNamespace(sourceUUID, donor.getShardId());
+        const auto stashColl =
+            acquireCollection(opCtx,
+                              CollectionAcquisitionRequest::fromOpCtx(
+                                  opCtx, stashNss, AcquisitionPrerequisites::kRead),
+                              MODE_IS);
+        uassert(5356800,
+                "Resharding completed with non-empty stash collections",
+                !stashColl.exists() || stashColl.getCollectionPtr()->isEmpty(opCtx));
+    }
+}
+
+std::unique_ptr<ReshardingDataReplicationInterface>
+RecipientStateMachineExternalStateImpl::makeDataReplication(
+    OperationContext* opCtx,
+    ReshardingMetrics* metrics,
+    ReshardingApplierMetricsMap* applierMetrics,
+    const CommonReshardingMetadata& metadata,
+    const std::vector<DonorShardFetchTimestamp>& donorShards,
+    std::size_t oplogBatchTaskCount,
+    Timestamp cloneTimestamp,
+    bool cloningDone,
+    bool storeOplogFetcherProgress,
+    bool relaxed) {
+
+    // We refresh the routing information for the source collection to ensure the
+    // ReshardingOplogApplier is making its decisions according to the chunk distribution after the
+    // sharding metadata was frozen.
+    refreshCatalogCache(opCtx, metadata.getSourceNss());
+
+    auto sourceChunkMgr =
+        getTrackedCollectionRoutingInfo(opCtx, metadata.getSourceNss()).getChunkManager();
+
+    return ReshardingDataReplication::make(opCtx,
+                                           metrics,
+                                           applierMetrics,
+                                           oplogBatchTaskCount,
+                                           metadata,
+                                           donorShards,
+                                           cloneTimestamp,
+                                           cloningDone,
+                                           myShardId(opCtx->getServiceContext()),
+                                           std::move(sourceChunkMgr),
+                                           storeOplogFetcherProgress,
+                                           relaxed);
 }
 
 }  // namespace mongo

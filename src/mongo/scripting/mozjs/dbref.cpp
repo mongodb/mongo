@@ -27,15 +27,25 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/scripting/mozjs/dbref.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/scripting/mozjs/bson.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/internedstring.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
-#include "mongo/scripting/mozjs/valuewriter.h"
+#include "mongo/scripting/mozjs/wraptype.h"
+#include "mongo/util/assert_util.h"
+
+#include <utility>
+
+#include <jsapi.h>
+
+#include <js/CallArgs.h>
+#include <js/Class.h>
+#include <js/Object.h>
+#include <js/RootingAPI.h>
+#include <js/TypeDecls.h>
 
 namespace mongo {
 namespace mozjs {
@@ -68,13 +78,13 @@ void DBRefInfo::construct(JSContext* cx, JS::CallArgs args) {
     args.rval().setObjectOrNull(out);
 }
 
-void DBRefInfo::finalize(js::FreeOp* fop, JSObject* obj) {
-    BSONInfo::finalize(fop, obj);
+void DBRefInfo::finalize(JS::GCContext* gcCtx, JSObject* obj) {
+    BSONInfo::finalize(gcCtx, obj);
 }
 
 void DBRefInfo::enumerate(JSContext* cx,
                           JS::HandleObject obj,
-                          JS::AutoIdVector& properties,
+                          JS::MutableHandleIdVector properties,
                           bool enumerableOnly) {
     BSONInfo::enumerate(cx, obj, properties, enumerableOnly);
 }
@@ -108,8 +118,12 @@ void DBRefInfo::make(
     auto scope = getScope(cx);
 
     scope->getProto<DBRefInfo>().newObject(obj);
-    JS_SetPrivate(obj, JS_GetPrivate(local));
-    JS_SetPrivate(local, nullptr);
+
+    JS::SetReservedSlot(
+        obj,
+        BSONHolderSlot,
+        JS::PrivateValue(JS::GetMaybePtrFromReservedSlot<void>(local, BSONInfo::BSONHolderSlot)));
+    JS::SetReservedSlot(local, BSONInfo::BSONHolderSlot, JS::UndefinedValue());
 }
 
 }  // namespace mozjs

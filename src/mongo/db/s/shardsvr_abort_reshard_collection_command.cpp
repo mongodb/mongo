@@ -27,21 +27,44 @@
  *    it in the license file.
  */
 
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/persistent_task_store.h"
+#include "mongo/db/s/resharding/donor_document_gen.h"
+#include "mongo/db/s/resharding/recipient_document_gen.h"
+#include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
+#include "mongo/db/s/resharding/resharding_donor_service.h"
+#include "mongo/db/s/resharding/resharding_recipient_service.h"
+#include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/topology/cluster_role.h"
+#include "mongo/db/vector_clock/vector_clock_mutable.h"
+#include "mongo/logv2/log.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/s/request_types/abort_reshard_collection_gen.h"
+#include "mongo/s/resharding/common_types_gen.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/future.h"
+#include "mongo/util/uuid.h"
+
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/persistent_task_store.h"
-#include "mongo/db/s/config/sharding_catalog_manager.h"
-#include "mongo/db/s/resharding/resharding_coordinator_service.h"
-#include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
-#include "mongo/db/s/resharding_util.h"
-#include "mongo/logv2/log.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/request_types/abort_reshard_collection_gen.h"
-#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 
 namespace mongo {
 namespace {
@@ -56,18 +79,21 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            opCtx->setAlwaysInterruptAtStepDownOrUp();
+            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
             uassert(ErrorCodes::IllegalOperation,
                     "_shardsvrAbortReshardCollection can only be run on shard servers",
-                    serverGlobalParams.clusterRole == ClusterRole::ShardServer);
-            uassert(ErrorCodes::InvalidOptions,
-                    "_shardsvrAbortReshardCollection must be called with majority writeConcern",
-                    opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+                    serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
+            CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
+                                                          opCtx->getWriteConcern());
+
+            // Persist the config time to ensure that in case of stepdown next filtering metadata
+            // refresh on the new primary will always fetch the latest information.
+            VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
 
             std::vector<SharedSemiFuture<void>> futuresToWait;
 
-            if (auto machine = resharding::tryGetReshardingStateMachine<
+            if (auto machine = resharding::tryGetReshardingStateMachineAndThrowIfShuttingDown<
                     ReshardingRecipientService,
                     ReshardingRecipientService::RecipientStateMachine,
                     ReshardingRecipientDocument>(opCtx, uuid())) {
@@ -79,7 +105,7 @@ public:
                 (*machine)->abort(isUserCanceled());
             }
 
-            if (auto machine = resharding::tryGetReshardingStateMachine<
+            if (auto machine = resharding::tryGetReshardingStateMachineAndThrowIfShuttingDown<
                     ReshardingDonorService,
                     ReshardingDonorService::DonorStateMachine,
                     ReshardingDonorDocument>(opCtx, uuid())) {
@@ -91,14 +117,14 @@ public:
                 (*machine)->abort(isUserCanceled());
             }
 
-            for (auto doneFuture : futuresToWait) {
-                doneFuture.wait(opCtx);
+            for (const auto& doneFuture : futuresToWait) {
+                doneFuture.get(opCtx);
             }
 
             // If abort actually went through, the resharding documents should be cleaned up.
             // If they still exists, it could be because that it was interrupted or it is no
             // longer primary.
-            doNoopWrite(opCtx, "_shardsvrAbortReshardCollection no-op", ns());
+            resharding::doNoopWrite(opCtx, "_shardsvrAbortReshardCollection no-op", ns());
             PersistentTaskStore<CommonReshardingMetadata> donorReshardingOpStore(
                 NamespaceString::kDonorReshardingOperationsNamespace);
             uassert(5563802,
@@ -138,8 +164,9 @@ public:
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",
                     AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                           ActionType::internal));
+                        ->isAuthorizedForActionsOnResource(
+                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                            ActionType::internal));
         }
     };
 
@@ -160,7 +187,8 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
-} shardsvrAbortReshardCollectionCmd;
+};
+MONGO_REGISTER_COMMAND(ShardsvrAbortReshardCollectionCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

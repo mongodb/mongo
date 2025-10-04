@@ -1,34 +1,33 @@
-//
-// Tests upgrading then downgrading a replica set
-//
+import "jstests/multiVersion/libs/multi_rs.js";
 
-load('./jstests/multiVersion/libs/multi_rs.js');
-load('./jstests/libs/test_background_ops.js');
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {isFinished, startParallelOps} from "jstests/libs/test_background_ops.js";
+import {reconnect} from "jstests/replsets/rslib.js";
 
 for (let oldVersion of ["last-lts", "last-continuous"]) {
     jsTest.log("Testing upgrade/downgrade with " + oldVersion);
 
-    var nodes = {
+    let nodes = {
         n1: {binVersion: oldVersion},
         n2: {binVersion: oldVersion},
-        a3: {binVersion: oldVersion}
+        a3: {binVersion: oldVersion},
     };
 
-    var rst = new ReplSetTest({nodes: nodes});
+    let rst = new ReplSetTest({nodes: nodes});
 
     rst.startSet();
-    rst.initiate();
+    rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
     // Wait for a primary node...
     var primary = rst.getPrimary();
-    var otherOpConn = new Mongo(rst.getURL());
-    var insertNS = "test.foo";
+    let otherOpConn = new Mongo(rst.getURL());
+    let insertNS = "test.foo";
 
     jsTest.log("Starting parallel operations during upgrade...");
 
     function findAndInsert(rsURL, coll) {
         var coll = new Mongo(rsURL).getCollection(coll + "");
-        var count = 0;
+        let count = 0;
 
         jsTest.log("Starting finds and inserts...");
 
@@ -47,10 +46,11 @@ for (let oldVersion of ["last-lts", "last-continuous"]) {
         return count;
     }
 
-    var joinFindInsert =
-        startParallelOps(primary,  // The connection where the test info is passed and stored
-                         findAndInsert,
-                         [rst.getURL(), insertNS]);
+    let joinFindInsert = startParallelOps(
+        primary, // The connection where the test info is passed and stored
+        findAndInsert,
+        [rst.getURL(), insertNS],
+    );
 
     jsTest.log("Upgrading replica set from " + oldVersion + " to latest");
 
@@ -61,7 +61,7 @@ for (let oldVersion of ["last-lts", "last-continuous"]) {
     // We save a reference to the old primary so that we can call reconnect() on it before
     // joinFindInsert() would attempt to send the node an update operation that signals the parallel
     // shell running the background operations to stop.
-    var oldPrimary = primary;
+    let oldPrimary = primary;
 
     // Wait for primary
     var primary = rst.getPrimary();
@@ -88,8 +88,8 @@ for (let oldVersion of ["last-lts", "last-continuous"]) {
     // Since the primary from after the upgrade took place was restarted as part of the downgrade
     // process, we explicitly reconnect to it.
     reconnect(primary.getDB("admin"));
-    var totalInserts = primary.getCollection(insertNS).find().sort({_id: -1}).next()._id + 1;
-    var dataFound = primary.getCollection(insertNS).count();
+    let totalInserts = primary.getCollection(insertNS).find().sort({_id: -1}).next()._id + 1;
+    let dataFound = primary.getCollection(insertNS).count();
 
     jsTest.log("Found " + dataFound + " docs out of " + tojson(totalInserts) + " inserted.");
 

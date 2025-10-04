@@ -32,30 +32,30 @@ global:
         - "mongo/db/server_options.h"
         - "mongo/db/server_options_base.h"
     configs:
-        section: 'General options'
-        source: [ cli ]
+        section: "General options"
+        source: [cli]
         initializer:
             register: addCliOptions
 
 configs:
     help:
-        description: 'Show this usage information'
+        description: "Show this usage information"
         single_name: h
         arg_vartype: Switch
-        source: [ cli ]
+        source: [cli]
     filter:
-        description: 'Filter by test file name'
+        description: "Filter by test file name"
         single_name: f
         arg_vartype: StringVector
-        source: [ cli ]
+        source: [cli]
     source-dir:
-        description: 'The directory containing the json test files'
+        description: "The directory containing the json test files"
         single_name: s
         arg_vartype: String
-        source: [ cli ]
+        source: [cli]
     verbose:
-        description: 'The verbosity level'
+        description: "The verbosity level"
         single_name: v
         arg_vartype: String
-        source: [ cli ]
+        source: [cli]
         implicit: v

@@ -29,11 +29,10 @@
 # [TEST_TAGS]
 # cursors:statistics
 # [END_TAGS]
-import itertools, wiredtiger, wttest
-from suite_subprocess import suite_subprocess
+import wttest
 from wiredtiger import stat
 
-from wtdataset import SimpleDataSet, ComplexDataSet, ComplexLSMDataSet
+from wtdataset import SimpleDataSet, ComplexDataSet
 from wtscenario import make_scenarios
 
 # test_stat03.py
@@ -50,8 +49,6 @@ class test_stat_cursor_reset(wttest.WiredTigerTestCase):
         # The complex data sets ignore any passed-in value format.
         ('table-complex-row', dict(uri='table:' + pfx, dataset=ComplexDataSet, kf='S', vf=None)),
         ('table-complex-var', dict(uri='table:' + pfx, dataset=ComplexDataSet, kf='r', vf=None)),
-        ('table-complex-lsm', dict(uri='table:' + pfx,
-            dataset=ComplexLSMDataSet, kf='S', vf=None))
     ]
 
     scenarios = make_scenarios(uri)
@@ -97,6 +94,3 @@ class test_stat_cursor_reset(wttest.WiredTigerTestCase):
             statc = self.stat_cursor(ds.colgroup_name(0))
             self.assertEqual(statc[stat.dsrc.btree_entries][2], n)
         statc.close()
-
-if __name__ == '__main__':
-    wttest.run()

@@ -1,0 +1,18 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator")
+
+package(default_visibility = ["//visibility:public"])
+
+idl_generator(
+    name = "window_function_expression_gen",
+    src = "window_function_expression.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)

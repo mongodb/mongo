@@ -4,10 +4,7 @@
  *
  * @tags: [uses_transactions]
  */
-(function() {
-"use strict";
-
-load("jstests/replsets/libs/rollback_test.js");
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 const testName = "rollback_transactions_count";
 const dbName = testName;
@@ -25,8 +22,7 @@ assert.commandWorked(sessionColl1.insert({b: 1}));
 assert.commandWorked(session1.commitTransaction_forTesting());
 
 rollbackTest.awaitLastOpCommitted();
-assert.commandWorked(
-    primary.adminCommand({configureFailPoint: 'disableSnapshotting', mode: 'alwaysOn'}));
+assert.commandWorked(primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "alwaysOn"}));
 
 const session2 = primary.startSession();
 const sessionDb2 = session2.getDatabase(dbName);
@@ -55,12 +51,10 @@ rollbackTest.transitionToSyncSourceOperationsDuringRollback();
 try {
     rollbackTest.transitionToSteadyStateOperations();
 } finally {
-    assert.commandWorked(
-        primary.adminCommand({configureFailPoint: 'disableSnapshotting', mode: 'off'}));
+    assert.commandWorked(primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "off"}));
 }
 
 assert.eq(sessionColl1.find().itcount(), 3);
-assert.eq(primary.getDB('config')['transactions'].find().itcount(), 2);
+assert.eq(primary.getDB("config")["transactions"].find().itcount(), 2);
 
 rollbackTest.stop();
-})();

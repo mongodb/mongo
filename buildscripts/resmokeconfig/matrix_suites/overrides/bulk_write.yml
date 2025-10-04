@@ -1,0 +1,110 @@
+- name: single_op_override
+  value:
+    eval: await import('jstests/libs/override_methods/single_crud_op_as_bulk_write.js');
+
+- name: causal_consistency
+  value:
+    eval: await import('jstests/libs/override_methods/enable_causal_consistency.js');
+
+- name: single_op_core_excluded_files
+  value:
+    exclude_files:
+      # The following timeseries tests use failpoints that bulkWrite doesn't support.
+      - jstests/core/timeseries/write/timeseries_delete_hint.js
+      # The set_param1.js test attempts to compare the response from running the {getParameter: "*"}
+      # command multiple times, which may observe the change to the "transactionLifetimeLimitSeconds"
+      # server parameter.
+      - jstests/core/**/set_param1.js
+      # BulkWrite profiling and currentOp output format is not the same as normal writes.
+      - jstests/core/**/profile*.js
+      - jstests/core/query/comment_field.js
+      - jstests/core/administrative/fsync/fsync.js
+      # Runs an update with illegal format (no 'updates'). We could work around this in the override
+      # but it is very annoying.
+      - jstests/core/write/insert/batch_write_command_insert.js
+      - jstests/core/query/batch_write/batch_write_command_update.js
+      - jstests/core/query/batch_write/batch_write_command_delete.js
+      # Requires specific commands to be run to trigger failpoint (i.e. requires insert, we run bulkWrite).
+      - jstests/core/testing/failcommand_failpoint.js
+      # This test adds unknown fields to insert/update/delete ops which we ignore
+      - jstests/core/query/parsing/write_commands_reject_unknown_fields.js
+      # Expects explain to fail for using UUID instead of collection name.
+      - jstests/core/query/explain/explain_uuid.js
+      # Checks for specific name in the command that was executed that we override.
+      - jstests/core/query/explain/explain_includes_command.js
+      - jstests/core/query/distinct/distinct_collator.js
+
+- name: single_op_txns_excluded_files
+  value:
+    exclude_files:
+      # Checks for op names which bulkWrite will not show up as
+      - jstests/core/txns/transactions_profiling.js
+      - jstests/core/txns/currentop_blocked_operations.js
+      # Checks for collation at top level in profile
+      - jstests/core/txns/transactions_profiling_with_drops.js
+      # The conditions of this test returns a different error for delete compared to the function bulkWrite uses.
+      # bulkWrite is consistent with the other CRUD operations here.
+      - jstests/core/txns/multi_statement_transaction_write_error.js
+
+- name: single_op_fle_excluded_files
+  value:
+    exclude_files:
+      # Asserts a location specific error code failure that happens after we fail out in bulkWrite.
+      - src/mongo/db/modules/enterprise/jstests/fle2/basic_update.js
+      - src/mongo/db/modules/enterprise/jstests/fle2/basic_delete.js
+      # The way we override explain doesn't work with FLE tests.
+      - src/mongo/db/modules/enterprise/jstests/fle2/query/explain*.js
+      # This file is an end to end test for both CSFLE and QE. CSFLE is not supported in bulk_write mode,
+      # and any writes performed are simply for setting up the test collection.
+      - src/mongo/db/modules/enterprise/jstests/fle2/query/aggregate_lookupMultiSchema.js
+
+- name: txn_passthrough_runner_selftest
+  value:
+    exclude_files:
+      # BulkWrite profiling output format is not the same as normal writes.
+      - jstests/libs/txns/txn_passthrough_runner_selftest.js
+
+- name: causal_consistency_exclude_tags
+  value:
+    exclude_with_any_tags:
+      ##
+      # The next tag corresponds to the special error thrown by the set_read_preference_secondary.js
+      # override when it refuses to replace the readPreference of a particular command. Above each tag
+      # are the message(s) that cause the tag to be warranted.
+      ##
+      # "Cowardly refusing to override read preference of command: ..."
+      # "Cowardly refusing to run test with overridden read preference when it reads from a
+      #  non-replicated collection: ..."
+      - assumes_read_preference_unchanged
+      - does_not_support_causal_consistency
+      - requires_collstats
+      - uses_transactions
+      # The system.profile collection is not replicated. So the reads from secondaries will not be
+      # consistent with primary.
+      - requires_profiling
+      # Parallel shell is not causally consistent because it uses a different session.
+      - uses_parallel_shell
+
+- name: kill_stepdown_hooks
+  value:
+    executor:
+      hooks:
+        # We use a stepdown interval of 15 seconds because we will retry all commands in a transaction
+        # so we need to allow time for at most 10 operations to be re-run and then re-committed. If
+        # too many network errors occur when re-running a transaction we will run out of retries.
+        - class: ContinuousStepdown
+          randomize_kill: true
+          stepdown_interval_ms: 15000
+
+        # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+        # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+        # validating the entire contents of the collection.
+        - class: CheckReplOplogs
+        - class: CheckReplDBHash
+        - class: ValidateCollections
+          shell_options:
+            global_vars:
+              TestData:
+                skipEnforceFastCountOnValidate: true
+        - class: CleanEveryN
+          n: 20

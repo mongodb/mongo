@@ -5,19 +5,16 @@ import threading
 import unittest
 
 import mock
+from opentelemetry.context.context import Context
 
 from buildscripts.resmokelib import errors
-from buildscripts.resmokelib.testing import job
-from buildscripts.resmokelib.testing import queue_element
+from buildscripts.resmokelib.testing import job, queue_element
 from buildscripts.resmokelib.testing.fixtures import interface as _fixtures
 from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
 from buildscripts.resmokelib.utils import queue as _queue
 
-# pylint: disable=missing-docstring,protected-access
-
 
 class TestJob(unittest.TestCase):
-
     TESTS = ["jstests/core/and.js", "jstests/core/or.js"]
 
     @staticmethod
@@ -35,8 +32,12 @@ class TestJob(unittest.TestCase):
         return interrupt_flag
 
     @staticmethod
-    def get_suite_options(num_repeat_tests=None, time_repeat_tests_secs=None,
-                          num_repeat_tests_min=None, num_repeat_tests_max=None):
+    def get_suite_options(
+        num_repeat_tests=None,
+        time_repeat_tests_secs=None,
+        num_repeat_tests_min=None,
+        num_repeat_tests_max=None,
+    ):
         suite_options = mock.Mock()
         suite_options.num_repeat_tests = num_repeat_tests
         suite_options.time_repeat_tests_secs = time_repeat_tests_secs
@@ -53,7 +54,7 @@ class TestJob(unittest.TestCase):
     @staticmethod
     def expected_run_num(time_repeat_tests_secs, test_time_secs):
         """Return the number of times a test is expected to run."""
-        return time_repeat_tests_secs / test_time_secs
+        return time_repeat_tests_secs / test_time_secs + 1
 
     def test__run_num_repeat(self):
         num_repeat_tests = 1
@@ -89,8 +90,9 @@ class TestJob(unittest.TestCase):
         num_repeat_tests_max = 100
         expected_tests_run = self.expected_run_num(time_repeat_tests_secs, increment)
         queue = _queue.Queue()
-        suite_options = self.get_suite_options(time_repeat_tests_secs=time_repeat_tests_secs,
-                                               num_repeat_tests_max=num_repeat_tests_max)
+        suite_options = self.get_suite_options(
+            time_repeat_tests_secs=time_repeat_tests_secs, num_repeat_tests_max=num_repeat_tests_max
+        )
         mock_time = MockTime(increment)
         job_object = UnitJob(suite_options)
         self.queue_tests(self.TESTS, queue, queue_element.QueueElemRepeatTime, suite_options)
@@ -106,8 +108,9 @@ class TestJob(unittest.TestCase):
         num_repeat_tests_min = 1
         expected_tests_run = self.expected_run_num(time_repeat_tests_secs, increment)
         queue = _queue.Queue()
-        suite_options = self.get_suite_options(time_repeat_tests_secs=time_repeat_tests_secs,
-                                               num_repeat_tests_min=num_repeat_tests_min)
+        suite_options = self.get_suite_options(
+            time_repeat_tests_secs=time_repeat_tests_secs, num_repeat_tests_min=num_repeat_tests_min
+        )
         mock_time = MockTime(increment)
         job_object = UnitJob(suite_options)
         self.queue_tests(self.TESTS, queue, queue_element.QueueElemRepeatTime, suite_options)
@@ -124,9 +127,11 @@ class TestJob(unittest.TestCase):
         num_repeat_tests_max = 100
         expected_tests_run = self.expected_run_num(time_repeat_tests_secs, increment)
         queue = _queue.Queue()
-        suite_options = self.get_suite_options(time_repeat_tests_secs=time_repeat_tests_secs,
-                                               num_repeat_tests_min=num_repeat_tests_min,
-                                               num_repeat_tests_max=num_repeat_tests_max)
+        suite_options = self.get_suite_options(
+            time_repeat_tests_secs=time_repeat_tests_secs,
+            num_repeat_tests_min=num_repeat_tests_min,
+            num_repeat_tests_max=num_repeat_tests_max,
+        )
         mock_time = MockTime(increment)
         job_object = UnitJob(suite_options)
         self.queue_tests(self.TESTS, queue, queue_element.QueueElemRepeatTime, suite_options)
@@ -143,9 +148,11 @@ class TestJob(unittest.TestCase):
         num_repeat_tests_min = 3
         num_repeat_tests_max = 100
         queue = _queue.Queue()
-        suite_options = self.get_suite_options(time_repeat_tests_secs=time_repeat_tests_secs,
-                                               num_repeat_tests_min=num_repeat_tests_min,
-                                               num_repeat_tests_max=num_repeat_tests_max)
+        suite_options = self.get_suite_options(
+            time_repeat_tests_secs=time_repeat_tests_secs,
+            num_repeat_tests_min=num_repeat_tests_min,
+            num_repeat_tests_max=num_repeat_tests_max,
+        )
         mock_time = MockTime(increment)
         job_object = UnitJob(suite_options)
         self.queue_tests(self.TESTS, queue, queue_element.QueueElemRepeatTime, suite_options)
@@ -162,9 +169,11 @@ class TestJob(unittest.TestCase):
         num_repeat_tests_max = 10
         expected_time_repeat_tests = self.expected_run_num(time_repeat_tests_secs, increment)
         queue = _queue.Queue()
-        suite_options = self.get_suite_options(time_repeat_tests_secs=time_repeat_tests_secs,
-                                               num_repeat_tests_min=num_repeat_tests_min,
-                                               num_repeat_tests_max=num_repeat_tests_max)
+        suite_options = self.get_suite_options(
+            time_repeat_tests_secs=time_repeat_tests_secs,
+            num_repeat_tests_min=num_repeat_tests_min,
+            num_repeat_tests_max=num_repeat_tests_max,
+        )
         mock_time = MockTime(increment)
         job_object = UnitJob(suite_options)
         self.queue_tests(self.TESTS, queue, queue_element.QueueElemRepeatTime, suite_options)
@@ -191,10 +200,18 @@ class MockTime(object):
         return cur_time
 
 
-class UnitJob(job.Job):  # pylint: disable=too-many-instance-attributes
-    def __init__(self, suite_options):  #pylint: disable=super-init-not-called
-        super(UnitJob, self).__init__(0, logging.getLogger("job_unittest"), None, [], None, None,
-                                      suite_options, logging.getLogger("job_unittest"))
+class UnitJob(job.Job):
+    def __init__(self, suite_options):
+        super(UnitJob, self).__init__(
+            0,
+            logging.getLogger("job_unittest"),
+            None,
+            [],
+            None,
+            None,
+            suite_options,
+            logging.getLogger("job_unittest"),
+        )
         self.total_test_num = 0
         self.tests = {}
 
@@ -210,8 +227,17 @@ class TestFixtureSetupAndTeardown(unittest.TestCase):
 
     def setUp(self):
         logger = logging.getLogger("job_unittest")
-        self.__job_object = job.Job(job_num=0, logger=logger, fixture=None, hooks=[], report=None,
-                                    archival=None, suite_options=None, test_queue_logger=logger)
+        self.__job_object = job.Job(
+            job_num=0,
+            logger=logger,
+            fixture=None,
+            hooks=[],
+            report=None,
+            archival=None,
+            suite_options=None,
+            test_queue_logger=logger,
+        )
+        self.__context = Context(trace_id=0, span_id=0, is_remote=False)
 
         # Initialize the Job instance such that its setup_fixture() and teardown_fixture() methods
         # always indicate success. The settings for these mocked method will be changed in the
@@ -225,7 +251,7 @@ class TestFixtureSetupAndTeardown(unittest.TestCase):
         setup_flag = threading.Event()
         teardown_flag = threading.Event()
 
-        self.__job_object(queue, interrupt_flag, setup_flag, teardown_flag)
+        self.__job_object.start(queue, interrupt_flag, self.__context, setup_flag, teardown_flag)
 
         self.assertEqual(setup_succeeded, not interrupt_flag.is_set())
         self.assertEqual(setup_succeeded, not setup_flag.is_set())
@@ -244,12 +270,14 @@ class TestFixtureSetupAndTeardown(unittest.TestCase):
 
     def test_setup_raises_logging_config_exception(self):
         self.__job_object.manager.setup_fixture.side_effect = errors.LoggerRuntimeConfigError(
-            "Logging configuration error intentionally raised in unit test")
+            "Logging configuration error intentionally raised in unit test"
+        )
         self.__assert_when_run_tests(setup_succeeded=False)
 
     def test_setup_raises_unexpected_exception(self):
         self.__job_object.manager.setup_fixture.side_effect = Exception(
-            "Generic error intentionally raised in unit test")
+            "Generic error intentionally raised in unit test"
+        )
         self.__assert_when_run_tests(setup_succeeded=False)
 
     def test_teardown_returns_failure(self):
@@ -258,12 +286,14 @@ class TestFixtureSetupAndTeardown(unittest.TestCase):
 
     def test_teardown_raises_logging_config_exception(self):
         self.__job_object.manager.teardown_fixture.side_effect = errors.LoggerRuntimeConfigError(
-            "Logging configuration error intentionally raised in unit test")
+            "Logging configuration error intentionally raised in unit test"
+        )
         self.__assert_when_run_tests(teardown_succeeded=False)
 
     def test_teardown_raises_unexpected_exception(self):
         self.__job_object.manager.teardown_fixture.side_effect = Exception(
-            "Generic error intentionally raised in unit test")
+            "Generic error intentionally raised in unit test"
+        )
         self.__assert_when_run_tests(teardown_succeeded=False)
 
 
@@ -273,17 +303,25 @@ class TestNoOpFixtureSetupAndTeardown(unittest.TestCase):
     def setUp(self):
         self.logger = logging.getLogger("job_unittest")
         fixturelib = FixtureLib()
-        self.__noop_fixture = _fixtures.NoOpFixture(logger=self.logger, job_num=0,
-                                                    fixturelib=fixturelib)
+        self.__noop_fixture = _fixtures.NoOpFixture(
+            logger=self.logger, job_num=0, fixturelib=fixturelib
+        )
         self.__noop_fixture.setup = mock.Mock()
         self.__noop_fixture.teardown = mock.Mock()
 
         test_report = mock.Mock()
         test_report.find_test_info().status = "pass"
 
-        self.__job_object = job.Job(job_num=0, logger=self.logger, fixture=self.__noop_fixture,
-                                    hooks=[], report=test_report, archival=None, suite_options=None,
-                                    test_queue_logger=self.logger)
+        self.__job_object = job.Job(
+            job_num=0,
+            logger=self.logger,
+            fixture=self.__noop_fixture,
+            hooks=[],
+            report=test_report,
+            archival=None,
+            suite_options=None,
+            test_queue_logger=self.logger,
+        )
 
     def test_setup_called_for_noop_fixture(self):
         self.assertTrue(self.__job_object.manager.setup_fixture(self.logger))

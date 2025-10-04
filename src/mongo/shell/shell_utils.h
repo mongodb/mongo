@@ -29,15 +29,19 @@
 
 #pragma once
 
-#include <boost/filesystem.hpp>
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/client/connection_string.h"
+#include "mongo/client/mongo_uri.h"
+#include "mongo/stdx/mutex.h"
+
 #include <map>
 #include <set>
 #include <string>
 
-#include "mongo/client/mongo_uri.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/platform/mutex.h"
-#include "mongo/util/concurrency/mutex.h"
+#include <boost/filesystem.hpp>
+#include <boost/filesystem/path.hpp>
 
 namespace mongo {
 
@@ -85,17 +89,86 @@ public:
 
 private:
     std::map<std::string, std::set<std::string>> _connectionUris;
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ConnectionRegistry::_mutex");
+    mutable stdx::mutex _mutex;
 };
 
 extern ConnectionRegistry connectionRegistry;
 
-// This mutex helps the shell serialize output on exit, to avoid deadlocks at shutdown. So
-// it also protects the global dbexitCalled.
-extern Mutex& mongoProgramOutputMutex;
-
 // Helper to tell if a file exists cross platform
 // TODO: Remove this when we have a cross platform file utility library
 bool fileExists(const std::string& file);
+
+// If the test began a GoldenTestContext, end it and compare actual/expected results.
+void closeGoldenTestContext();
+
+/**
+ * Thrown when a GoldenTestContextShell test fails.
+ */
+struct GoldenTestContextShellFailure {
+    std::string message;
+    std::string actualOutputFile;
+    std::string expectedOutputFile;
+
+    std::string toString() const;
+    void diff() const;
+};
+
+void closeMochaStyleTestContext(Scope& scope);
+
+enum class NormalizationOpts : uint32_t {
+    kResults = 0,
+    // Set this bit to sort an array of results. Used in QueryTester.
+    kSortResults = 1 << 0,
+    // Set this bit to sort fields in the BSONObj.
+    kSortBSON = 1 << 1,
+    // Set this bit to sort arrays in the BSONObj.
+    kSortArrays = 1 << 2,
+    // Set this bit to normalize numerics.
+    kNormalizeNumerics = 1 << 3,
+    // Set this bit to treat null and missing as the same value.
+    kConflateNullAndMissing = 1 << 4,
+    // Set this bit to round floating points to 15 digits of precision.
+    kRoundFloatingPointNumerics = 1 << 5,
+    // Set this bit to run explain of the original query instead.
+    kExplain = 1 << 6,
+    // Set this bit to compare only the 'queryShapeHash' results.
+    kQueryShapeHash = 1 << 7,
+};
+using NormalizationOptsSet = NormalizationOpts;
+
+inline NormalizationOpts operator&(NormalizationOpts lhs, NormalizationOpts rhs) {
+    return static_cast<NormalizationOpts>(static_cast<uint32_t>(lhs) & static_cast<uint32_t>(rhs));
+}
+
+inline NormalizationOpts operator|(NormalizationOpts lhs, NormalizationOpts rhs) {
+    return static_cast<NormalizationOpts>(static_cast<uint32_t>(lhs) | static_cast<uint32_t>(rhs));
+}
+
+inline bool isSet(NormalizationOpts opts, NormalizationOpts flag) {
+    return (opts & flag) != NormalizationOpts::kResults;
+}
+
+// Sorts a vector of BSON objects by their fields as they appear in the BSON.
+void sortQueryResults(std::vector<BSONObj>& input);
+
+/**
+ * Normalizes a BSONObj for more flexible results comparison. By default, this will return the
+ * BSONObj with no changes.
+ *
+ * If the kSortBSON bit, this method will return a new BSON with the same field/value
+ * pairings, but recursively sorted by the fields. If the kSortArrays bit is set, this method will
+ * also recursively sort the BSONObj's arrays. If the kNormalizeNumerics bit is set, this method
+ * will normalize numerics by casting them to the widest type, Decimal128, and normalizing them to
+ * the maximum precision. If the kConflateNullAndMissing bit is set, this method will treat null,
+ * undefined, and missing fields as the same by removing null and undefined values.
+ */
+BSONObj normalizeBSONObj(const BSONObj& input,
+                         NormalizationOptsSet opts = NormalizationOpts::kResults);
+
+
+std::string getURIFromArgs(const std::string& arg,
+                           const std::string& host,
+                           const std::string& port);
+
 }  // namespace shell_utils
 }  // namespace mongo

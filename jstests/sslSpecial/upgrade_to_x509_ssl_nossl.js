@@ -1,6 +1,6 @@
 /**
  * This test checks the upgrade path for mixed mode ssl + x509 auth
- * from disabled/keyfiles up to preferSSL/x509
+ * from disabled/keyfiles up to preferTLS/x509
  *
  * NOTE: This test is similar to upgrade_to_x509_ssl.js in the
  * ssl test suite. This test cannot use ssl communication
@@ -10,124 +10,127 @@
  * @tags: [requires_persistence]
  */
 
-load("jstests/ssl/libs/ssl_helpers.js");
-
-function authAllNodes() {
-    for (var n = 0; n < rst.nodes.length; n++) {
-        var status = rst.nodes[n].getDB("admin").auth("root", "pwd");
-        assert.eq(status, 1);
-    }
-}
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {CA_CERT, CLIENT_CERT, KEYFILE, SERVER_CERT} from "jstests/ssl/libs/ssl_helpers.js";
 
 // The mongo shell cannot authenticate as the internal __system user in tests that use x509 for
 // cluster authentication. Choosing the default value for wcMajorityJournalDefault in
 // ReplSetTest cannot be done automatically without the shell performing such authentication, so
 // in this test we must make the choice explicitly, based on the global test options.
-var wcMajorityJournalDefault;
-if (jsTestOptions().noJournal || jsTestOptions().storageEngine == "ephemeralForTest" ||
-    jsTestOptions().storageEngine == "inMemory") {
-    wcMajorityJournalDefault = false;
-} else {
-    wcMajorityJournalDefault = true;
-}
+const wcMajorityJournalDefault = jsTestOptions().storageEngine != "inMemory";
 
-opts = {
-    sslMode: "disabled",
+const opts = {
+    tlsMode: "disabled",
     clusterAuthMode: "keyFile",
 };
-var NUM_NODES = 3;
-var rst = new ReplSetTest(
-    {name: 'sslSet', nodes: NUM_NODES, waitForKeys: false, keyFile: KEYFILE, nodeOptions: opts});
+const NUM_NODES = 3;
+const rst = new ReplSetTest({
+    name: "tlsSet",
+    nodes: NUM_NODES,
+    waitForKeys: false,
+    keyFile: KEYFILE,
+    nodeOptions: opts,
+});
 rst.startSet();
+rst.initiate(
+    Object.extend(rst.getReplSetConfig(), {
+        writeConcernMajorityJournalDefault: wcMajorityJournalDefault,
+    }),
+    null,
+    {allNodesAuthorizedToRunRSGetStatus: false},
+);
 
-// ReplSetTest.initiate() requires all nodes to be to be authorized to run replSetGetStatus.
-// TODO(SERVER-14017): Remove this in favor of using initiate() everywhere.
-rst.initiateWithAnyNodeAsPrimary(Object.extend(
-    rst.getReplSetConfig(), {writeConcernMajorityJournalDefault: wcMajorityJournalDefault}));
+// Make administrative user other than local.__system
+rst.getPrimary()
+    .getDB("admin")
+    .createUser({user: "root", pwd: "pwd", roles: ["root"]}, {w: NUM_NODES});
 
-// Connect to master and do some basic operations
-var rstConn1 = rst.getPrimary();
-rstConn1.getDB("admin").createUser({user: "root", pwd: "pwd", roles: ["root"]}, {w: NUM_NODES});
-rstConn1.getDB("admin").auth("root", "pwd");
-rstConn1.getDB("test").a.insert({a: 1, str: "TESTTESTTEST"});
-assert.eq(1, rstConn1.getDB("test").a.find().itcount(), "Error interacting with replSet");
+let entriesWritten = 0;
+function testWrite(str) {
+    const entry = ++entriesWritten;
 
-print("===== UPGRADE disabled,keyFile -> allowSSL,sendKeyfile =====");
-authAllNodes();
-rst.upgradeSet({
-    sslMode: "allowSSL",
-    sslPEMKeyFile: SERVER_CERT,
-    sslAllowInvalidCertificates: "",
-    clusterAuthMode: "sendKeyFile",
-    keyFile: KEYFILE,
-    sslCAFile: CA_CERT
-},
-               "root",
-               "pwd");
-authAllNodes();
-rst.awaitReplication();
+    const conn = rst.getPrimary();
+    assert(conn.getDB("admin").auth("root", "pwd"));
+    const test = conn.getDB("test");
+    assert.writeOK(test.a.insert({a: entry, str: str}));
+    assert.eq(entry, test.a.find().itcount(), "Error interacting with replSet");
+}
 
-var rstConn2 = rst.getPrimary();
-rstConn2.getDB("test").a.insert({a: 2, str: "CHECKCHECKCHECK"});
-assert.eq(2, rstConn2.getDB("test").a.find().itcount(), "Error interacting with replSet");
+function authAllNodes(nodes) {
+    for (let n = 0; n < nodes.length; n++) {
+        assert(rst.nodes[n].getDB("admin").auth("root", "pwd"));
+    }
+}
 
-print("===== UPGRADE allowSSL,sendKeyfile -> preferSSL,sendX509 =====");
-rst.upgradeSet({
-    sslMode: "preferSSL",
-    sslPEMKeyFile: SERVER_CERT,
-    sslAllowInvalidCertificates: "",
-    clusterAuthMode: "sendX509",
-    keyFile: KEYFILE,
-    sslCAFile: CA_CERT
-},
-               "root",
-               "pwd");
-authAllNodes();
-rst.awaitReplication();
+function upgradeAndWrite(newOpts, str) {
+    authAllNodes(rst.nodes);
+    rst.upgradeSet(newOpts, "root", "pwd");
+    authAllNodes(rst.nodes);
+    rst.awaitReplication();
+    testWrite(str);
+}
 
-var rstConn3 = rst.getPrimary();
-rstConn3.getDB("test").a.insert({a: 3, str: "PEASandCARROTS"});
-assert.eq(3, rstConn3.getDB("test").a.find().itcount(), "Error interacting with replSet");
+function upgradeWriteAndConnect(newOpts, str) {
+    upgradeAndWrite(newOpts, str);
 
-var canConnectSSL = runMongoProgram("mongo",
-                                    "--port",
-                                    rst.ports[0],
-                                    "--ssl",
-                                    "--sslAllowInvalidCertificates",
-                                    "--sslPEMKeyFile",
-                                    CLIENT_CERT,
-                                    "--eval",
-                                    ";");
-assert.eq(0, canConnectSSL, "SSL Connection attempt failed when it should succeed");
+    assert.eq(
+        0,
+        runMongoProgram(
+            "mongo",
+            "--port",
+            rst.ports[0],
+            "--ssl",
+            "--tlsCAFile",
+            CA_CERT,
+            "--tlsCertificateKeyFile",
+            CLIENT_CERT,
+            "--eval",
+            ";",
+        ),
+        "SSL Connection attempt failed when it should succeed",
+    );
+}
 
-print("===== UPGRADE preferSSL,sendX509 -> preferSSL,x509 =====");
-// we cannot upgrade past preferSSL here because it will break the test client
-rst.upgradeSet({
-    sslMode: "preferSSL",
-    sslPEMKeyFile: SERVER_CERT,
-    sslAllowInvalidCertificates: "",
-    clusterAuthMode: "x509",
-    keyFile: KEYFILE,
-    sslCAFile: CA_CERT
-},
-               "root",
-               "pwd");
-authAllNodes();
-rst.awaitReplication();
-var rstConn4 = rst.getPrimary();
-rstConn4.getDB("test").a.insert({a: 4, str: "BEEP BOOP"});
-rst.awaitReplication();
-assert.eq(4, rstConn4.getDB("test").a.find().itcount(), "Error interacting with replSet");
+testWrite(rst.getPrimary(), "TESTTESTTEST");
 
-// Test that an ssl connection can still be made
-var canConnectSSL = runMongoProgram("mongo",
-                                    "--port",
-                                    rst.ports[0],
-                                    "--ssl",
-                                    "--sslAllowInvalidCertificates",
-                                    "--sslPEMKeyFile",
-                                    CLIENT_CERT,
-                                    "--eval",
-                                    ";");
-assert.eq(0, canConnectSSL, "SSL Connection attempt failed when it should succeed");
+jsTest.log("===== UPGRADE disabled,keyFile -> allowTLS,sendKeyfile =====");
+upgradeAndWrite(
+    {
+        tlsMode: "allowTLS",
+        tlsCertificateKeyFile: SERVER_CERT,
+        tlsAllowInvalidCertificates: "",
+        clusterAuthMode: "sendKeyFile",
+        keyFile: KEYFILE,
+        tlsCAFile: CA_CERT,
+    },
+    "CHECKCHECKCHECK",
+);
+
+jsTest.log("===== UPGRADE allowTLS,sendKeyfile -> preferTLS,sendX509 =====");
+upgradeWriteAndConnect(
+    {
+        tlsMode: "preferTLS",
+        tlsCertificateKeyFile: SERVER_CERT,
+        tlsAllowInvalidCertificates: "",
+        clusterAuthMode: "sendX509",
+        keyFile: KEYFILE,
+        tlsCAFile: CA_CERT,
+    },
+    "PEASandCARROTS",
+);
+
+jsTest.log("===== UPGRADE preferTLS,sendX509 -> preferTLS,x509 =====");
+// we cannot upgrade past preferTLS here because it will break the test client
+upgradeWriteAndConnect(
+    {
+        tlsMode: "preferTLS",
+        tlsCertificateKeyFile: SERVER_CERT,
+        tlsAllowInvalidCertificates: "",
+        clusterAuthMode: "x509",
+        keyFile: KEYFILE,
+        tlsCAFile: CA_CERT,
+    },
+    "BEEP BOOP",
+);
+
 rst.stopSet();

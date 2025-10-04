@@ -16,6 +16,10 @@
 // the header defines the macro unconditionally and if the user includes both Boost.WinAPI and Cygwin WinAPI headers there will be conflict.
 #include <_cygwin.h>
 #endif
+#if defined(__MINGW32__)
+// MinGW and MinGW-w64 define __MINGW32_VERSION_MAJOR/MINOR and __MINGW64_VERSION_MAJOR/MINOR macros in a private header.
+#include <_mingw.h>
+#endif
 
 // BOOST_WINAPI_IS_MINGW indicates that the target Windows SDK is provided by MinGW (http://mingw.org/).
 // BOOST_WINAPI_IS_MINGW_W64 indicates that the target Windows SDK is provided by MinGW-w64 (http://mingw-w64.org).
@@ -104,13 +108,19 @@
 #elif defined(WINVER)
 #define BOOST_USE_WINAPI_VERSION WINVER
 #else
-// By default use Windows 7 API on compilers that support it and Vista or XP on the others
+// By default use Windows 10 API on compilers that support it and latest versions on the others
 #if (defined(_MSC_VER) && _MSC_VER < 1500) || defined(BOOST_WINAPI_IS_MINGW)
 #define BOOST_USE_WINAPI_VERSION BOOST_WINAPI_VERSION_WINXP
 #elif (defined(_MSC_VER) && _MSC_VER < 1600)
 #define BOOST_USE_WINAPI_VERSION BOOST_WINAPI_VERSION_WIN6
-#else
+#elif (defined(_MSC_VER) && _MSC_VER < 1700)
 #define BOOST_USE_WINAPI_VERSION BOOST_WINAPI_VERSION_WIN7
+#elif (defined(_MSC_VER) && _MSC_VER < 1800)
+#define BOOST_USE_WINAPI_VERSION BOOST_WINAPI_VERSION_WIN8
+#elif (defined(_MSC_VER) && _MSC_VER < 1900)
+#define BOOST_USE_WINAPI_VERSION BOOST_WINAPI_VERSION_WINBLUE
+#else
+#define BOOST_USE_WINAPI_VERSION BOOST_WINAPI_VERSION_WIN10
 #endif
 #endif
 #endif

@@ -29,9 +29,11 @@
 
 #pragma once
 
-#include <cstring>
-
 #include "mongo/base/data_type.h"
+#include "mongo/base/status.h"
+
+#include <cstring>
+#include <iosfwd>
 
 namespace mongo {
 

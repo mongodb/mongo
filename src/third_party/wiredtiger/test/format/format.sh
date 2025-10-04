@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/bin/bash
 
 [ -z $BASH_VERSION ] && {
 	echo "$0 is a bash script: \$BASH_VERSION not set, exiting"
@@ -7,12 +7,32 @@
 
 name=$(basename $0)
 
-quit=0
+msg()
+{
+    echo "$name: $@"
+}
+fatal_msg()
+{
+    msg "$@"
+    exit 1
+}
+verbose=0
+verbose()
+{
+    [[ $verbose -ne 0 ]] && msg "$@"
+}
+
 force_quit=0
+force_quit_reason()
+{
+    msg "$@"
+    msg "ending run"
+    force_quit=1
+}
+
 onintr()
 {
-	echo "$name: interrupted, cleaning up..."
-	force_quit=1
+	force_quit_reason "interrupted"
 }
 trap 'onintr' 2
 
@@ -21,9 +41,10 @@ usage() {
 	echo "    [-e env-var] [-h home] [-j parallel-jobs] [-n total-jobs] [-r live-record-binary]"
 	echo "    [-t minutes] [format-configuration]"
 	echo
-	echo "    -a           add configuration for abort/recovery testing (defaults to off)"
+	echo "    -a           configure format abort/recovery testing (defaults to off)"
 	echo "    -b binary    format binary (defaults to "./t")"
 	echo "    -c config    format configuration file (defaults to CONFIG.stress)"
+	echo "    -d directory directory of format binary"
 	echo "    -D directory directory of format configuration files (named \"CONFIG.*\")"
 	echo "    -E           skip known errors (defaults to off)"
 	echo "    -e envvar    Environment variable setting (default to none)"
@@ -32,8 +53,9 @@ usage() {
 	echo "    -j parallel  jobs to execute in parallel (defaults to 8)"
 	echo "    -n total     total jobs to execute (defaults to no limit)"
 	echo "    -R           add configuration for randomized split stress (defaults to none)"
-	echo "    -r binary    record with UndoDB binary (defaults to no recording)"
+	echo "    -r binary    record with the given binary (defaults to no recording)"
 	echo "    -S           run smoke-test configurations (defaults to off)"
+	echo "    -T           turn on format tracing (defaults to off)"
 	echo "    -t minutes   minutes to run (defaults to no limit)"
 	echo "    -v           verbose output (defaults to off)"
 	echo "    --           separates $name arguments from additional format arguments"
@@ -47,17 +69,8 @@ smoke_base_2="$smoke_base_1 leaf_page_max=9 internal_page_max=9"
 smoke_list=(
 	# Three access methods.
 	"$smoke_base_1 file_type=row"
-    # Temporarily disabled: FIXME FLCS
-	# "$smoke_base_1 file_type=fix"
+	"$smoke_base_1 file_type=fix"
 	"$smoke_base_1 file_type=var"
-
-	# Huffman value encoding.
-	"$smoke_base_1 file_type=row huffman_value=1"
-	"$smoke_base_1 file_type=var huffman_value=1"
-
-	# LSM
-    # Temporarily disabled: FIXME LSM
-	# "$smoke_base_1 file_type=row runs.source=lsm"
 
 	# Force the statistics server.
 	"$smoke_base_1 file_type=row statistics_server=1"
@@ -83,11 +96,15 @@ format_binary="./t"
 home="."
 live_record_binary=""
 minutes=0
+out_of_space_detected=0
 parallel_jobs=8
+quit=0
 skip_errors=0
 stress_split_test=0
 total_jobs=0
-verbose=0
+trace=""
+# Default to format.sh directory (assumed to be in a WiredTiger build tree).
+format_bin_dir=`dirname $0`
 
 while :; do
 	case "$1" in
@@ -100,16 +117,17 @@ while :; do
 	-c)
 		config="$2"
 		shift ; shift ;;
+	-d)
+		format_bin_dir="$2"
+		shift ; shift ;;
 	-D)
 		# Format changes directories, get absolute paths to the CONFIG files.
 		dir="$2"
 		[[ "$dir" == /* ]] || dir="$PWD/$dir"
 		directory_list=($dir/CONFIG.*)
 		directory_total=${#directory_list[@]}
-		[[ -f "${directory_list[0]}" ]] || {
-		    echo "$name: no CONFIG files found in $2"
-		    exit 1
-		}
+		[[ -f "${directory_list[0]}" ]] ||
+		    fatal_msg "no CONFIG files found in $2"
 		shift ; shift ;;
 	-E)
 		skip_errors=1
@@ -125,38 +143,46 @@ while :; do
 		shift ; shift ;;
 	-j)
 		parallel_jobs="$2"
-		[[ "$parallel_jobs" =~ ^[1-9][0-9]*$ ]] || {
-			echo "$name: -j option argument must be a non-zero integer"
-			exit 1
-		}
+		[[ "$parallel_jobs" =~ ^[1-9][0-9]*$ ]] ||
+			fatal_msg "-j option argument must be a non-zero integer"
 		shift ; shift ;;
 	-n)
 		total_jobs="$2"
-		[[ "$total_jobs" =~ ^[1-9][0-9]*$ ]] || {
-			echo "$name: -n option argument must be an non-zero integer"
-			exit 1
-		}
+		[[ "$total_jobs" =~ ^[1-9][0-9]*$ ]] ||
+			fatal_msg "-n option argument must be an non-zero integer"
 		shift ; shift ;;
 	-R)
 		stress_split_test=1
 		shift ;;
-        -r)
+	-r)
 		live_record_binary="$2"
 		if [ ! $(command -v "$live_record_binary") ]; then
-			echo "$name: -r option argument \"${live_record_binary}\" does not exist in path"
-			echo "$name: usage and setup instructions can be found at: https://wiki.corp.mongodb.com/display/KERNEL/UndoDB+Usage"
+			msg "-r option argument \"${live_record_binary}\" does not exist in path"
+			msg "usage and setup instructions can be found at:"
+			msg "  https://wiki.corp.mongodb.com/display/KERNEL/UndoDB+Usage"
+			msg "  https://wiki.corp.mongodb.com/display/WT/Using+Record+Replay+for+Debugging"
 			exit 1
 		fi
 		shift; shift ;;
 	-S)
 		smoke_test=1
 		shift ;;
+	-T)
+		trace='-T'
+		trace_args="$2"
+		case "$trace_args" in
+		-*)
+			trace+=","
+			;;
+		*)
+			trace+="$trace_args,"
+			shift;;
+		esac
+		shift ;;
 	-t)
 		minutes="$2"
-		[[ "$minutes" =~ ^[1-9][0-9]*$ ]] || {
-			echo "$name: -t option argument must be a non-zero integer"
-			exit 1
-		}
+		[[ "$minutes" =~ ^[1-9][0-9]*$ ]] ||
+			fatal_msg "-t option argument must be a non-zero integer"
 		shift ; shift ;;
 	-v)
 		verbose=1
@@ -171,19 +197,12 @@ while :; do
 done
 format_args="$*"
 
-verbose()
-{
-	[[ $verbose -ne 0 ]] && echo "$@"
-}
-
-verbose "$name: run starting at $(date)"
+msg "run starting at $(date)"
 
 # Home is possibly relative to our current directory and we're about to change directories.
 # Get an absolute path for home.
-[[ -d "$home" ]] || {
-	echo "$name: directory \"$home\" not found"
-	exit 1
-}
+[[ -d "$home" ]] ||
+	fatal_msg "directory \"$home\" not found"
 home=$(cd $home > /dev/null || exit 1 && echo $PWD)
 
 # From the Bash FAQ, shuffle an array.
@@ -218,7 +237,7 @@ config_found=0
 }
 
 # Move to the format.sh directory (assumed to be in a WiredTiger build tree).
-cd $(dirname $0) || exit 1
+cd $format_bin_dir || exit 1
 
 # If we haven't already found it, check for the config file (by default it's CONFIG.stress which
 # lives in the same directory of the WiredTiger build tree as format.sh. We're about to change
@@ -229,42 +248,33 @@ cd $(dirname $0) || exit 1
     config_found=1
 }
 
-# Find the last part of format_binary, which is format binary file. Builds are normally in the
-# WiredTiger source tree, in which case it's in the same directory as format.sh, else it's in
-# the build_posix tree. If the build is in the build_posix tree, move there, we have to run in
-# the directory where the format binary lives because the format binary "knows" the wt utility
-# is two directory levels above it.
-[[ -x ${format_binary##* } ]] || {
-	build_posix_directory="../../build_posix/test/format"
-	[[ ! -d $build_posix_directory ]] || cd $build_posix_directory || exit 1
-	[[ -x ${format_binary##* } ]] || {
-		echo "$name: format program \"${format_binary##* }\" not found"
-		exit 1
-	}
-}
+# Check for the existence of the format_binary. This script is usually copied by CMake into the
+# build directory, in which case we can expect to find the binary in the same directory as
+# format.sh (being the default path value assigned to 'format_bin_dir'). If we can't detect the format
+# binary, raise an error, as we expect the user to either execute the 'format.sh' script under the
+# build directory or by passing the format build directory as an argument.
+[[ -x ${format_binary##* } ]] ||
+	fatal_msg "format program \"${format_binary##* }\" not found"
 
 # Find the wt binary (required for abort/recovery testing).
 wt_binary="../../wt"
-[[ -x $wt_binary ]] || {
-	echo "$name: wt program \"$wt_binary\" not found"
-	exit 1
-}
+[[ -x $wt_binary ]] ||
+	fatal_msg "wt program \"$wt_binary\" not found"
 
 # We tested for the CONFIG file in the original directory, then in the WiredTiger source directory,
 # the last place to check is in the WiredTiger build directory. Fail if we don't find it.
 [[ $config_found -eq 0 ]] && {
-    [[ -f "$config" ]] || {
-	echo "$name: configuration file \"$config\" not found"
-	exit 1
-    }
+    [[ -f "$config" ]] ||
+	fatal_msg "configuration file \"$config\" not found"
 }
 
-verbose "$name configuration: $format_binary [-c $config]\
+msg "configuration: $format_binary [-c $config]\
 [-h $home] [-j $parallel_jobs] [-n $total_jobs] [-t $minutes] $format_args"
 
 failure=0
 success=0
 running=0
+timeouts=0
 status="format.sh-status"
 
 # skip_known_errors
@@ -293,10 +303,8 @@ skip_known_errors()
 
 		grep -q "${err_tokens[0]}" $log && grep -q "${err_tokens[1]}" $log
 
-		[[ $? -eq 0 ]] && {
-			echo "Skip error :  { ${err_tokens[0]} && ${err_tokens[1]} }"
-			return 0
-		}
+		[[ $? -eq 0 ]] &&
+			fatal_msg "Skip error :  { ${err_tokens[0]} && ${err_tokens[1]} }"
 	done
 	return 1
 }
@@ -349,7 +357,7 @@ report_failure()
 	# Forcibly quit if first-failure configured.
 	[[ $first_failure -ne 0 ]] && force_quit=1
 
-	echo "$name: job in $dir failed"
+	msg "job in $dir failed"
 	sed 's/^/    /' < $log
 
 	# Note the directory may not yet exist, only the log file. If the directory doesn't exist,
@@ -357,11 +365,10 @@ report_failure()
 	# not worth the effort to try and figure one out, in all likelihood the configuration is
 	# invalid.
 	[[ -d "$dir" ]] || {
-	    echo "$name: $dir does not exist, $name unable to continue"
-	    force_quit=1
+	    force_quit_reason "$dir does not exist, $name unable to continue"
 	    return
 	}
-	echo "$name: $dir/CONFIG:"
+	echo "$dir/CONFIG:"
 	sed 's/^/    /' < $dir/CONFIG
 
 	categorize_failure $log
@@ -369,15 +376,63 @@ report_failure()
 	echo "$name: failure status reported" > $dir/$status
 }
 
+# Report all running CONFIGs
+report_running_configs()
+{
+	echo "############################################"
+	echo "Out of disk space detected, outputting non-failed CONFIGs"
+	echo "############################################"
+	list=$(ls $home | grep '^RUNDIR.[0-9]*.log')
+	for i in $list; do
+		dir="$home/${i%.*}"
+
+		# Note the directory may not yet exist, only the log file
+		[[ -d "$dir" ]] || continue
+
+		echo "$dir/CONFIG:"
+		sed 's/^/    /' < $dir/CONFIG
+	done
+}
+
+# Wait for a process to die. Handle both child and non-child processes.
+# $1 pid
+# Return <exit code> of process if child or 117 if non-child
+wait_for_process()
+{
+	pid=$1
+	ret=117
+
+	if [ `pstree -p $$ | grep -w $pid | wc -l` -gt "0" ]; then
+		# Can still produce "wait: pid XXXX is not a child of this shell" due to process
+		# ending between the steps, can be safely ignored.
+		wait $pid
+		ret=$?
+	else
+		while [ -d "/proc/$pid/" ]; do
+			sleep 1
+		done
+	fi
+
+	return $ret
+}
+
 # Resolve/cleanup completed jobs.
 resolve()
 {
 	running=0
+
 	list=$(ls $home | grep '^RUNDIR.[0-9]*.log')
 	for i in $list; do
+		check_timer
 		# Note the directory may not yet exist, only the log file.
 		dir="$home/${i%.*}"
 		log="$home/$i"
+		rec_dir=""
+
+		if [[ ! -z $live_record_binary ]]; then
+			[[ "$i" =~ ^.+\.([0-9]+)\..+$ ]]
+			rec_dir="$home/rec.${BASH_REMATCH[1]}"
+		fi
 
 		# Skip failures we've already reported.
 		[[ -f "$dir/$status" ]] && continue
@@ -401,30 +456,51 @@ resolve()
 			}
 
 			# Kill the process group to catch any child processes.
-			kill -KILL -- -$pid
-			wait $pid
+			if [ `ps -eo ppid | grep -w $pid | wc -l` -gt "0" ]; then
+				kill -KILL -- -$pid
+			fi
+			# Kill the process.
+			kill -KILL $pid
+			wait_for_process $pid
+
+			# give the parent recording binary a chance to complete if we are using it
+			[[ ! -z $live_record_binary ]] && sleep 2
+
+			msg "job in $dir killed"
 
 			# Remove jobs we killed, they count as neither success or failure.
-			rm -rf $dir $log
-			verbose "$name: job in $dir killed"
+			rm -rf $dir $log $rec_dir
 			continue
 		}
-		wait $pid
+		wait_for_process $pid
 		eret=$?
+
+		# give the parent recording binary a chance to complete if we are using it
+		[[ ! -z $live_record_binary ]] && sleep 2
+
+		# Process group leader core dump indicates a bug, in contrast to any spurious cores
+		# from killing zombified child processes. This is to guard against spuriously
+		# missing memory sanitizer errors, which has occured historically even when
+		# abort_on_error=1 was passed to MSan.
+		[[ -f "dump_t.${pid}.core" ]] && {
+		    report_failure $dir
+		    continue
+		}
 
 		# Remove successful jobs.
 		grep 'successful run completed' $log > /dev/null && {
-			rm -rf $dir $log
+			rm -rf $dir $log $rec_dir
 			success=$(($success + 1))
-			verbose "$name: job in $dir successfully completed"
+			msg "job in $dir successfully completed"
 			continue
 		}
 
-		# Check for Evergreen running out of disk space, and forcibly quit.
+		# Check for running out of disk space and forcibly quit.
 		grep -E -i 'no space left on device' $log > /dev/null && {
-			rm -rf $dir $log
-			force_quit=1
-			echo "$name: job in $dir ran out of disk space"
+			out_of_space_detected=1
+			report_failure $dir
+			rm -rf $dir $log $rec_dir
+			force_quit_reason "job in $dir ran out of disk space"
 			continue
 		}
 
@@ -437,41 +513,18 @@ resolve()
 			 echo "$name: original directory copied into $dir.RECOVER"
 			 echo) >> $log
 
-			# Verify the objects. In current format, it's a list of files named with a
-			# leading F or tables named with a leading T. Historically, it was a file
-			# or table named "wt".
-			verify_failed=0
-			for i in $(ls $dir | sed -e 's/.*\///'); do
-			    case $i in
-			    F*) uri="file:$i";;
-			    T*) uri="table:${i%.wt}";;
-			    wt) uri="file:wt";;
-			    wt.wt) uri="table:wt";;
-			    *) continue;;
-			    esac
-
-			    # Use the wt utility to recover & verify the object.
-			    echo "verify: $wt_binary -m -R -h $dir verify $uri" >> $log
-			    if  $($wt_binary -m -R -h $dir verify $uri >> $log 2>&1); then
-				continue
-			    fi
-
-			    verify_failed=1
-			    break
-			done
-
-			if [[ $verify_failed -eq 0 ]]; then
-			    rm -rf $dir $dir.RECOVER $log
+			if $format_binary -Rqv -h $dir $trace > $log 2>&1; then
+			    rm -rf $dir $dir.RECOVER $log $rec_dir
 			    success=$(($success + 1))
-			    verbose "$name: job in $dir successfully completed"
+			    msg "job in $dir successfully completed"
 			else
-			    echo "$name: job in $dir failed abort/recovery testing"
+			    msg "job in $dir failed abort/recovery testing"
 			    report_failure $dir
 			fi
 			continue
 		}
 
-		# Check for the library abort message, or an error from format.
+		# Check for the library abort message or an error from format.
 		grep -E \
 		    'aborting WiredTiger library|format alarm timed out|run FAILED' \
 		    $log > /dev/null && {
@@ -488,6 +541,8 @@ resolve()
 		# process exited with a likely failure, call it a failure.
 		signame=""
 		case $eret in
+		117)
+			signame="FORMAT_FAILED_TO_KILL_PARENT_THREAD";;
 		$((128 + 3)))
 			signame="SIGQUIT";;
 		$((128 + 4)))
@@ -498,6 +553,9 @@ resolve()
 			signame="SIGBUS";;
 		$((128 + 8)))
 			signame="SIGFPE";;
+		$((128 + 9)))
+			# SIGKILL is the Linux out-of-memory kill signal.
+			signame="SIGKILL (suspected Linux OOM failure)";;
 		$((128 + 11)))
 			signame="SIGSEGV";;
 		$((128 + 24)))
@@ -513,8 +571,8 @@ resolve()
 			 echo "$name: there may be a core dump associated with this failure"
 			 echo) >> $log
 
-			echo "$name: job in $dir killed with signal $signame"
-			echo "$name: there may be a core dump associated with this failure"
+			msg "job in $dir killed with signal $signame"
+			msg "there may be a core dump associated with this failure"
 
 			report_failure $dir
 			continue
@@ -522,8 +580,8 @@ resolve()
 
 		# If we don't understand why the job exited, report it as a failure and flag
 		# a problem in this script.
-		echo "$name: job in $dir exited with status $eret for an unknown reason"
-		echo "$name: reporting job in $dir as a failure"
+		msg "job in $dir exited with status $eret for an unknown reason"
+		msg "reporting job in $dir as a failure"
 		report_failure $dir
 	done
 	return 0
@@ -536,6 +594,7 @@ format()
 	count_jobs=$(($count_jobs + 1))
 	dir="$home/RUNDIR.$count_jobs"
 	log="$dir.log"
+	live_record_command=""
 
 	args=""
 	if [[ $smoke_test -ne 0 ]]; then
@@ -550,23 +609,27 @@ format()
 		args+=" format.abort=1"
 	fi
 	if [[ $stress_split_test -ne 0 ]]; then
-		for k in {1..8}; do
-			args+=" stress_split_$k=$(($RANDOM%2))"
+		for k in {1..7}; do
+			args+=" stress.split_$k=$(($RANDOM%2))"
 		done
 	fi
 	args+=" $format_args"
-	echo "$name: starting job in $dir ($(date))"
+	msg "starting job in $dir ($(date))"
 
-	# If we're using UndoDB, append our default arguments.
+	# If we're using recording, append our default arguments.
 	#
 	# This script is typically left running until a failure is hit. To avoid filling up the
 	# disk, we should avoid keeping recordings from successful runs.
 	if [[ ! -z $live_record_binary ]]; then
-		live_record_binary="$live_record_binary --save-on=error"
+		if [[ $live_record_binary =~ ^rr.*$ ]]; then
+			live_record_command="$live_record_binary -E record -o $home/rec.$count_jobs -h"
+		else
+			live_record_command="$live_record_binary --save-on error"
+		fi
 	fi
 
-	cmd="$live_record_binary $format_binary -c "$config" -h "$dir" $args quiet=1"
-	echo "$name: $cmd"
+	cmd="$live_record_command $format_binary -c "$config" -h "$dir" $trace $args quiet=1"
+	msg "$cmd"
 
 	# Disassociate the command from the shell script so we can exit and let the command
 	# continue to run.
@@ -580,25 +643,31 @@ format()
 	sleep 1
 	grep -E -i 'setsid: failed to execute' $log > /dev/null && {
 		failure=$(($failure + 1))
-		force_quit=1
-		echo "$name: job in $dir failed to execute"
+		force_quit_reason "job in $dir failed to execute"
 	}
 }
 
 seconds=$((minutes * 60))
 start_time="$(date -u +%s)"
-while :; do
-	# Check if our time has expired.
+elapsed=0
+
+# Check if our time has expired. Updates force_quit if the timer has expired.
+check_timer()
+{
 	[[ $seconds -ne 0 ]] && {
 		now="$(date -u +%s)"
 		elapsed=$(($now - $start_time))
 
 		# If we've run out of time, terminate all running jobs.
 		[[ $elapsed -ge $seconds ]] && {
-			verbose "$name: run timed out at $(date)"
-			force_quit=1
+			timeouts="$(($timeouts + 1))"
+			force_quit_reason "run timed out at $(date), after $elapsed seconds"
 		}
 	}
+}
+
+while :; do
+	check_timer
 
 	# Check if we're only running the smoke-tests and we're done.
 	[[ $smoke_test -ne 0 ]] && [[ $smoke_next -ge ${#smoke_list[@]} ]] && quit=1
@@ -626,7 +695,7 @@ while :; do
 	failure_save=$failure
 	resolve
 	[[ $success -ne $success_save ]] || [[ $failure -ne $failure_save ]] &&
-	    echo "$name: $success successful jobs, $failure failed jobs"
+	    msg "$success successful jobs, $failure failed jobs"
 
 	# Quit if we're done and there aren't any jobs left to wait for.
 	[[ $quit -ne 0 ]] || [[ $force_quit -ne 0 ]] && [[ $running -eq 0 ]] && break
@@ -637,9 +706,11 @@ while :; do
 	sleep 2
 done
 
-echo "$name: $success successful jobs, $failure failed jobs"
+[[ $out_of_space_detected -eq 1 ]] && report_running_configs
 
-verbose "$name: run ending at $(date)"
+msg "$success successful jobs, $failure failed jobs"
+
+msg "run ending at $(date)"
 [[ $failure -ne 0 ]] && exit 1
-[[ $success -eq 0 ]] && exit 1
+[[ $success -eq 0 && $timeouts -eq 0 ]] && exit 1
 exit 0

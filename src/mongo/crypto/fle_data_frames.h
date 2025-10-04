@@ -30,9 +30,8 @@
 #pragma once
 
 #include "mongo/base/data_range.h"
+#include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/crypto/symmetric_crypto.h"
-#include "mongo/db/matcher/schema/encrypt_schema_gen.h"
-#include "mongo/shell/kms_gen.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -45,6 +44,35 @@ constexpr size_t kHmacOutSize = 32;
 inline StatusWith<size_t> aeadGetMaximumPlainTextLength(size_t cipherTextLen) {
     if (cipherTextLen > (crypto::aesCBCIVSize + kHmacOutSize)) {
         return cipherTextLen - crypto::aesCBCIVSize - kHmacOutSize;
+    }
+
+    return Status(ErrorCodes::BadValue, "Invalid cipher text length");
+}
+
+/**
+ * Returns the maximum expected length of the plaintext output given the ciphertext length.
+ * Only for FLE2 AEAD. Valid for modes aesMode::ctr and aesMode::cbc.
+ */
+inline StatusWith<size_t> fle2AeadGetMaximumPlainTextLength(size_t cipherTextLen) {
+
+    // For CTR mode, the expected plaintext length is always equal to the length of the
+    // ciphertext after the IV and HMAC signature are removed.
+    // For CBC mode, the expected plaintext length is bounded above by the length of the
+    // ciphertext (always block aligned) after the IV and HMAC signature are removed.
+    static_assert(crypto::aesCTRIVSize == crypto::aesCBCIVSize);
+    if (cipherTextLen > (crypto::aesCTRIVSize + kHmacOutSize)) {
+        return cipherTextLen - crypto::aesCTRIVSize - kHmacOutSize;
+    }
+
+    return Status(ErrorCodes::BadValue, "Invalid cipher text length");
+}
+
+/**
+ * Returns the length of the plaintext output given the ciphertext length. Only for FLE2.
+ */
+inline StatusWith<size_t> fle2GetPlainTextLength(size_t cipherTextLen) {
+    if (cipherTextLen > (crypto::aesCTRIVSize)) {
+        return cipherTextLen - crypto::aesCTRIVSize;
     }
 
     return Status(ErrorCodes::BadValue, "Invalid cipher text length");
@@ -72,6 +100,13 @@ public:
         //      - either a 1 or a 2 depending on whether the iv is provided.
         // associatedData[1-16] = the uuid in bytes
         // associatedData[17] = the bson type
+        if (BSONType::binData == type) {
+            BinDataType subType = BSONElement::binDataType(plaintext.data(), plaintext.length());
+            uassert(6409402,
+                    "Encrypting already encrypted data prohibited",
+                    BinDataType::Encrypt != subType);
+        }
+
         _data.resize(kAssociatedDataLength + cipherLength);
         _data[0] = FleAlgorithmInt_serializer(algorithm);
         auto uuidCDR = uuid.toCDR();
@@ -81,9 +116,9 @@ public:
         _data[17] = static_cast<uint8_t>(type);
     }
 
-    FLEEncryptionFrame() : _plaintext(ConstDataRange(nullptr, 0)){};
+    FLEEncryptionFrame() : _plaintext(ConstDataRange(nullptr, 0)) {};
 
-    const ConstDataRange get() const& {
+    ConstDataRange get() const& {
         return ConstDataRange(_data);
     }
 
@@ -91,11 +126,11 @@ public:
         return _key;
     }
 
-    const ConstDataRange getPlaintext() const {
+    ConstDataRange getPlaintext() const {
         return _plaintext;
     }
 
-    const ConstDataRange getAssociatedData() const {
+    ConstDataRange getAssociatedData() const {
         return ConstDataRange(_data.data(), kAssociatedDataLength);
     }
 
@@ -107,7 +142,7 @@ public:
     uint8_t* getCiphertextMutable() && = delete;
 
     FleAlgorithmInt getFLEAlgorithmType() {
-        return FleAlgorithmInt_parse(IDLParserErrorContext("root"), _data[0]);
+        return FleAlgorithmInt_parse(_data[0], IDLParserContext("root"));
     }
 
     size_t getDataLength() const {
@@ -148,7 +183,7 @@ public:
         return _key;
     }
 
-    const ConstDataRange getAssociatedData() const {
+    ConstDataRange getAssociatedData() const {
         return ConstDataRange(_data.data(), kAssociatedDataLength);
     }
 
@@ -175,7 +210,7 @@ public:
 
 private:
     FleAlgorithmInt getFLEAlgorithmType() const {
-        return FleAlgorithmInt_parse(IDLParserErrorContext("root"), *_data.data<uint8_t>());
+        return FleAlgorithmInt_parse(*_data.data<uint8_t>(), IDLParserContext("root"));
     }
 
     size_t getDataLength() const {

@@ -1,0 +1,312 @@
+load(
+    "//bazel:mongo_src_rules.bzl",
+    "idl_generator",
+    "mongo_cc_grpc_library",
+    "mongo_cc_integration_test",
+    "mongo_cc_library",
+    "mongo_cc_proto_library",
+    "mongo_cc_unit_test",
+    "mongo_proto_library",
+)
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+GRPC_TARGET_COMPATIBLE_WITH = select({
+    "//bazel/config:build_grpc_enabled": [],
+    "//conditions:default": ["@platforms//:incompatible"],
+})
+
+idl_generator(
+    name = "grpc_feature_flag_gen",
+    src = "grpc_feature_flag.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "grpc_transport_layer",
+    srcs = [
+        "client.cpp",
+        "client_cache.cpp",
+        "grpc_session.cpp",
+        "grpc_session_manager.cpp",
+        "grpc_transport_layer_impl.cpp",
+        "reactor.cpp",
+        "server.cpp",
+        "service.cpp",
+        "util.cpp",
+        "wire_version_provider.cpp",
+        ":grpc_feature_flag_gen",
+    ],
+    hdrs = [
+        "channel_pool.h",
+        "client.h",
+        "client_cache.h",
+        "client_context.h",
+        "client_stream.h",
+        "grpc_client_context.h",
+        "grpc_client_stream.h",
+        "grpc_server_context.h",
+        "grpc_server_stream.h",
+        "grpc_session.h",
+        "grpc_session_manager.h",
+        "grpc_transport_layer.h",
+        "grpc_transport_layer_impl.h",
+        "metadata.h",
+        "reactor.h",
+        "serialization.h",
+        "server.h",
+        "server_context.h",
+        "server_stream.h",
+        "service.h",
+        "util.h",
+        "wire_version_provider.h",
+    ],
+    target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,
+    deps = [
+        "//src/mongo/client:connection_string",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:wire_version",
+        "//src/mongo/db/commands/server_status:server_status_core",
+        "//src/mongo/rpc:client_metadata",
+        "//src/mongo/transport:grpc_connection_stats",
+        "//src/mongo/transport:service_executor",
+        "//src/mongo/transport:session_manager",
+        "//src/mongo/transport:transport_layer_common",
+        "//src/mongo/util:executor_stats",
+        "//src/mongo/util/net:network",
+        "//src/mongo/util/net:ssl_util",
+        "//src/mongo/util/options_parser",
+        "//src/third_party/grpc:grpc++_reflection",
+    ],
+)
+
+mongo_cc_library(
+    name = "grpc_async_client_factory",
+    srcs = [
+        "async_client_factory.cpp",
+    ],
+    hdrs = [
+        "async_client_factory.h",
+    ],
+    target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,
+    deps = [
+        ":grpc_transport_layer",
+        "//src/mongo/db:service_context",
+        "//src/mongo/executor:async_client_factory",
+        "//src/mongo/transport:transport_layer_common",
+        "//src/mongo/util/net:network",
+    ],
+)
+
+idl_generator(
+    name = "grpc_parameters_gen",
+    src = "grpc_parameters.idl",
+)
+
+# Note: The naming convention for a proto called foo.proto is:
+#   proto_library      -> "foo_proto"
+#   grpc_proto_library -> "foo"
+#   cc_proto_library   -> "foo_cc_proto"
+#   cc_grpc_library    -> "foo_cc_grpc"
+
+mongo_proto_library(
+    name = "core_test_proto",
+    srcs = [
+        "core_test.proto",
+    ],
+    target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,
+)
+
+mongo_cc_proto_library(
+    name = "core_test_cc_proto",
+    target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,
+    deps = [":core_test_proto"],
+)
+
+mongo_cc_grpc_library(
+    name = "core_test_cc_grpc",
+    srcs = [":core_test_proto"],
+    cc_proto = ":core_test_cc_proto",
+    generate_mocks = True,
+    no_undefined_ref_DO_NOT_USE = False,
+    target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,
+)
+
+mongo_proto_library(
+    name = "core_test_strip_prefix_proto",
+    srcs = [
+        "core_test_strip_prefix.proto",
+    ],
+    import_prefix = "cool/import/replacement",
+    strip_import_prefix = "/src/mongo/transport/grpc",
+    target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,
+)
+
+mongo_cc_proto_library(
+    name = "core_test_strip_prefix_cc_proto",
+    target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,
+    deps = [":core_test_strip_prefix_proto"],
+)
+
+mongo_cc_grpc_library(
+    name = "core_test_strip_prefix_cc_grpc",
+    srcs = [":core_test_strip_prefix_proto"],
+    cc_proto = ":core_test_strip_prefix_cc_proto",
+    generate_mocks = True,
+    no_undefined_ref_DO_NOT_USE = False,
+    target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,
+)
+
+mongo_cc_library(
+    name = "grpc_transport_server_options",
+    srcs = [
+        ":grpc_parameters_gen",
+    ],
+    target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",
+        "//src/mongo/util/options_parser",
+    ],
+)
+
+mongo_cc_library(
+    name = "grpc_transport_mock",
+    srcs = [
+        "grpc_transport_layer_mock.cpp",
+        "mock_client.cpp",
+        "mock_client_stream.cpp",
+        "mock_server_context.cpp",
+        "mock_server_stream.cpp",
+        "//src/mongo/db:service_context_test_fixture.h",
+        "//src/mongo/transport:test_fixtures.h",
+        "//src/mongo/transport:transport_layer_mock.h",
+        "//src/mongo/unittest:join_thread.h",
+        "//src/mongo/util:clock_source_mock.h",
+    ],
+    hdrs = [
+        "bidirectional_pipe.h",
+        "grpc_transport_layer_mock.h",
+        "mock_client.h",
+        "mock_client_context.h",
+        "mock_client_stream.h",
+        "mock_server_context.h",
+        "mock_server_stream.h",
+        "mock_stub.h",
+        "mock_util.h",
+        "mock_wire_version_provider.h",
+        "test_fixtures.h",
+    ],
+    header_deps = [
+        "//src/mongo/unittest",
+    ],
+    deps = [
+        ":grpc_transport_layer",
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/rpc:client_metadata",
+        "//src/mongo/transport:transport_layer_manager",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "grpc_transport_layer_test",
+    srcs = [
+        "async_client_factory_test.cpp",
+        "channel_pool_test.cpp",
+        "client_cache_test.cpp",
+        "grpc_client_test.cpp",
+        "grpc_session_test.cpp",
+        "grpc_transport_layer_test.cpp",
+        "mock_client_test.cpp",
+        "mock_server_stream_test.cpp",
+        "mock_stub_test.cpp",
+        "reactor_test.cpp",
+        "server_test.cpp",
+        "service_test.cpp",
+        "//src/mongo/transport:reactor_test_fixture.h",
+        "//src/mongo/transport:session_workflow_test_util.h",
+        "//src/mongo/transport:transport_layer_manager_grpc_test.cpp",
+    ],
+    data = [
+        "//jstests/libs:test_crt_files",
+        "//jstests/libs:test_pem_files",
+    ],
+    tags = [
+        "incompatible_with_bazel_remote_test",
+        "mongo_unittest_second_group",
+    ],
+    target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH + select({
+        "//bazel/config:remote_test_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":grpc_async_client_factory",
+        ":grpc_transport_layer",
+        ":grpc_transport_mock",
+        "//src/mongo:base",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db:wire_version",
+        "//src/mongo/rpc:message",
+        "//src/mongo/transport:grpc_connection_stats",
+        "//src/mongo/transport:service_executor",
+        "//src/mongo/transport:session_manager",
+        "//src/mongo/transport:transport_layer",
+        "//src/mongo/transport:transport_layer_common",
+        "//src/mongo/transport:transport_layer_manager",
+        "//src/mongo/transport:transport_layer_mock",
+        "//src/mongo/util:clock_source_mock",
+        "//src/mongo/util:periodic_runner_factory",
+        "//src/third_party/grpc:grpc++_reflection",
+        "//src/third_party/protobuf",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "grpc_core_test",
+    srcs = [
+        "core_test.cpp",
+    ],
+    tags = [
+        "incompatible_with_bazel_remote_test",
+        "mongo_unittest_first_group",
+    ],
+    target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH + select({
+        "//bazel/config:remote_test_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "core_test_cc_grpc",
+        "core_test_strip_prefix_cc_grpc",
+        "//src/mongo:base",
+        "//src/third_party/abseil-cpp:absl_status",
+        "//src/third_party/grpc:grpc++_reflection",
+        "//src/third_party/protobuf",
+    ],
+)
+
+mongo_cc_integration_test(
+    name = "grpc_transport_integration_test",
+    srcs = [
+        "grpc_transport_layer_integration_test.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/transport:transport_layer_egress_init",
+        "//src/mongo/transport:transport_layer_integration_test_fixture",
+        "//src/mongo/util/net:ssl_options_server",
+        "//src/third_party/grpc:grpc++_reflection",
+        "//src/third_party/protobuf",
+    ],
+)

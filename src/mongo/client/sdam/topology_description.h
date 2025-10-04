@@ -28,19 +28,28 @@
  */
 
 #pragma once
-#include <memory>
-#include <string>
-#include <unordered_set>
 
-#include "boost/optional/optional.hpp"
-
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/sdam/election_id_set_version_pair.h"
 #include "mongo/client/sdam/sdam_configuration.h"
 #include "mongo/client/sdam/sdam_datatypes.h"
 #include "mongo/client/sdam/server_description.h"
-#include "mongo/platform/basic.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/uuid.h"
+
+#include <functional>
+#include <memory>
+#include <string>
+#include <tuple>
+#include <unordered_set>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo::sdam {
 class TopologyDescription : public std::enable_shared_from_this<TopologyDescription> {
@@ -77,7 +86,7 @@ public:
     const boost::optional<int>& getLogicalSessionTimeoutMinutes() const;
     const Milliseconds& getHeartBeatFrequency() const;
 
-    const boost::optional<ServerDescriptionPtr> findServerByAddress(HostAndPort address) const;
+    boost::optional<ServerDescriptionPtr> findServerByAddress(HostAndPort address) const;
     bool containsServerAddress(const HostAndPort& address) const;
     std::vector<ServerDescriptionPtr> findServers(
         std::function<bool(const ServerDescriptionPtr&)> predicate) const;
@@ -128,7 +137,7 @@ private:
      * Source:
      * https://github.com/mongodb/specifications/blob/master/source/wireversion-featurelist.rst
      */
-    const std::string minimumRequiredMongoVersionString(int version);
+    std::string minimumRequiredMongoVersionString(int version);
 
     /**
      * From Server Discovery and Monitoring:

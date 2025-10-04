@@ -29,8 +29,26 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/db/exec/agg/stage.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/sequential_document_cache.h"
+#include "mongo/db/pipeline/stage_constraints.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+
+#include <memory>
+#include <set>
+
+#include <boost/none.hpp>
+#include <boost/none_t.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -44,13 +62,20 @@ namespace mongo {
  */
 class DocumentSourceSequentialDocumentCache final : public DocumentSource {
 public:
+    using SequentialDocumentCachePtr = std::shared_ptr<SequentialDocumentCache>;
     static constexpr StringData kStageName = "$sequentialCache"_sd;
 
     const char* getSourceName() const final {
-        return DocumentSourceSequentialDocumentCache::kStageName.rawData();
+        return DocumentSourceSequentialDocumentCache::kStageName.data();
     }
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const {
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
+    }
+
+    StageConstraints constraints(PipelineSplitState pipeState) const override {
         StageConstraints constraints(StreamType::kStreaming,
                                      _cache->isServing() ? PositionRequirement::kFirst
                                                          : PositionRequirement::kNone,
@@ -61,7 +86,11 @@ public:
                                      LookupRequirement::kAllowed,
                                      UnionRequirement::kAllowed);
 
-        constraints.requiresInputDocSource = (_cache->isBuilding());
+        if (_cache->isBuilding()) {
+            constraints.requiresInputDocSource = true;
+        } else {
+            constraints.setConstraintsForNoInputSources();
+        }
         return constraints;
     }
 
@@ -70,7 +99,7 @@ public:
     }
 
     static boost::intrusive_ptr<DocumentSourceSequentialDocumentCache> create(
-        const boost::intrusive_ptr<ExpressionContext>& pExpCtx, SequentialDocumentCache* cache) {
+        const boost::intrusive_ptr<ExpressionContext>& pExpCtx, SequentialDocumentCachePtr cache) {
         return new DocumentSourceSequentialDocumentCache(pExpCtx, cache);
     }
 
@@ -88,32 +117,35 @@ public:
      * that is being cloned. It is expected that only one of the DocumentSourceSequentialCache
      * copies will be used, and therefore only one will actively be using the cache.
      */
-    boost::intrusive_ptr<DocumentSource> clone() const final {
-        auto newStage = create(pExpCtx, _cache);
+    boost::intrusive_ptr<DocumentSource> clone(
+        const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const final {
+        auto newStage = create(newExpCtx ? newExpCtx : getExpCtx(), _cache);
         // Keep the position flag so in case the containing pipeline is cloned post-optimization.
         newStage->_hasOptimizedPos = _hasOptimizedPos;
-        newStage->_cacheIsEOF = _cacheIsEOF;
         return newStage;
     }
 
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {}
+
+    bool hasOptimizedPos() const {
+        return _hasOptimizedPos;
+    }
+
 protected:
-    GetNextResult doGetNext() final;
-    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                     Pipeline::SourceContainer* container) final;
+    DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
+                                                   DocumentSourceContainer* container) final;
 
 private:
     DocumentSourceSequentialDocumentCache(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                          SequentialDocumentCache* cache);
+                                          SequentialDocumentCachePtr cache);
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
-    SequentialDocumentCache* _cache;
-
-    // This flag is set to prevent the cache stage from immediately serving from the cache after it
-    // has exhausted input from its source for the first time.
-    bool _cacheIsEOF = false;
-
+    SequentialDocumentCachePtr _cache;
     bool _hasOptimizedPos = false;
+
+    friend boost::intrusive_ptr<exec::agg::Stage> documentSourceSequentialDocumentCacheToStageFn(
+        const boost::intrusive_ptr<DocumentSource>&);
 };
 
 }  // namespace mongo

@@ -48,13 +48,25 @@ uc_addr (ucontext_t *uc, int reg)
   void *addr;
 
   if ((unsigned) (reg - UNW_PPC64_R0) < 32)
+#if defined(__linux__)
     addr = &uc->uc_mcontext.gp_regs[reg - UNW_PPC64_R0];
+#elif defined(__FreeBSD__)
+    addr = &uc->uc_mcontext.mc_gpr[reg - UNW_PPC64_R0];
+#endif
 
   else if ((unsigned) (reg - UNW_PPC64_F0) < 32)
+#if defined(__linux__)
     addr = &uc->uc_mcontext.fp_regs[reg - UNW_PPC64_F0];
+#elif defined(__FreeBSD__)
+    addr = &uc->uc_mcontext.mc_fpreg[reg - UNW_PPC64_F0];
+#endif
 
   else if ((unsigned) (reg - UNW_PPC64_V0) < 32)
+#if defined(__linux__)
     addr = (uc->uc_mcontext.v_regs == 0) ? NULL : &uc->uc_mcontext.v_regs->vrregs[reg - UNW_PPC64_V0][0];
+#elif defined(__FreeBSD__)
+    addr = &uc->uc_mcontext.mc_avec[(reg - UNW_PPC64_V0)*2];
+#endif
 
   else
     {
@@ -80,7 +92,11 @@ uc_addr (ucontext_t *uc, int reg)
         default:
           return NULL;
         }
+#if defined(__linux__)
       addr = &uc->uc_mcontext.gp_regs[gregs_idx];
+#elif defined(__FreeBSD__)
+      addr = &uc->uc_mcontext.mc_gpr[gregs_idx];
+#endif
     }
   return addr;
 }
@@ -119,14 +135,20 @@ static int
 access_mem (unw_addr_space_t as, unw_word_t addr, unw_word_t *val, int write,
             void *arg)
 {
+  if (unlikely (as->validate) && unlikely (!unw_address_is_valid (addr, sizeof(unw_word_t))))
+    {
+      Debug (16, "mem[%#010lx] invalid\n", (long)addr);
+      return -1;
+    }
+
   if (write)
     {
       Debug (12, "mem[%lx] <- %lx\n", addr, *val);
-      *(unw_word_t *) addr = *val;
+      memcpy ((void *) addr, val, sizeof(unw_word_t));
     }
   else
     {
-      *val = *(unw_word_t *) addr;
+      memcpy (val, (void *) addr, sizeof(unw_word_t));
       Debug (12, "mem[%lx] -> %lx\n", addr, *val);
     }
   return 0;
@@ -150,12 +172,12 @@ access_reg (unw_addr_space_t as, unw_regnum_t reg, unw_word_t *val,
 
   if (write)
     {
-      *(unw_word_t *) addr = *val;
+      memcpy ((void *) addr, val, sizeof(unw_word_t));
       Debug (12, "%s <- %lx\n", unw_regname (reg), *val);
     }
   else
     {
-      *val = *(unw_word_t *) addr;
+      memcpy (val, (void *) addr, sizeof(unw_word_t));
       Debug (12, "%s -> %lx\n", unw_regname (reg), *val);
     }
   return 0;
@@ -207,15 +229,28 @@ get_static_proc_name (unw_addr_space_t as, unw_word_t ip,
   return _Uelf64_get_proc_name (as, getpid (), ip, buf, buf_len, offp);
 }
 
+static int
+get_static_elf_filename (unw_addr_space_t as, unw_word_t ip,
+                         char *buf, size_t buf_len, unw_word_t *offp,
+                         void *arg)
+{
+  return _Uelf64_get_elf_filename (as, getpid (), ip, buf, buf_len, offp);
+}
+
 HIDDEN void
 ppc64_local_addr_space_init (void)
 {
   memset (&local_addr_space, 0, sizeof (local_addr_space));
-  local_addr_space.big_endian = (__BYTE_ORDER == __BIG_ENDIAN);
+  local_addr_space.big_endian = target_is_big_endian();
 #if _CALL_ELF == 2
   local_addr_space.abi = UNW_PPC64_ABI_ELFv2;
 #else
   local_addr_space.abi = UNW_PPC64_ABI_ELFv1;
+#endif
+#ifndef UNW_REMOTE_ONLY
+# if defined(HAVE_DL_ITERATE_PHDR)
+  local_addr_space.iterate_phdr_function = dl_iterate_phdr;
+# endif
 #endif
   local_addr_space.caching_policy = UNWI_DEFAULT_CACHING_POLICY;
   local_addr_space.acc.find_proc_info = dwarf_find_proc_info;
@@ -226,6 +261,7 @@ ppc64_local_addr_space_init (void)
   local_addr_space.acc.access_fpreg = access_fpreg;
   local_addr_space.acc.resume = ppc64_local_resume;
   local_addr_space.acc.get_proc_name = get_static_proc_name;
+  local_addr_space.acc.get_elf_filename = get_static_elf_filename;
   unw_flush_cache (&local_addr_space, 0, 0);
 }
 

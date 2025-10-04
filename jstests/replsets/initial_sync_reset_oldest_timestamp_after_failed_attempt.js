@@ -9,20 +9,17 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/libs/fail_point_util.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Set the number of initial sync attempts to 2 so that the test fails on unplanned failures.
-const replTest =
-    new ReplSetTest({nodes: 2, nodeOptions: {setParameter: "numInitialSyncAttempts=2"}});
+const replTest = new ReplSetTest({nodes: 2, nodeOptions: {setParameter: "numInitialSyncAttempts=2"}});
 replTest.startSet();
 
 // Increase the election timeout to 24 hours so that we do not accidentally trigger an election
 // while the secondary is restarting.
-replTest.initiateWithHighElectionTimeout();
+replTest.initiate();
 
 const primary = replTest.getPrimary();
 let secondary = replTest.getSecondary();
@@ -39,8 +36,9 @@ const sessionDB = session.getDatabase(dbName);
 const sessionColl = sessionDB.getCollection(collName);
 
 // The default WC is majority and this test can't satisfy majority writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 session.startTransaction();
 assert.commandWorked(sessionColl.insert({_id: 2}));
@@ -66,16 +64,19 @@ secondary = replTest.start(
             // Allow the syncing node to write the prepare oplog entry and apply the first update
             // before failing initial sync.
             "failpoint.failInitialSyncBeforeApplyingBatch": tojson({mode: {skip: 2}}),
-        }
+        },
     },
-    true /* wait */);
+    true /* wait */,
+);
 
 // Wait for failpoint to be reached so we know that collection cloning is paused.
-assert.commandWorked(secondary.adminCommand({
-    waitForFailPoint: "initialSyncHangAfterDataCloning",
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+assert.commandWorked(
+    secondary.adminCommand({
+        waitForFailPoint: "initialSyncHangAfterDataCloning",
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout,
+    }),
+);
 
 jsTestLog("Running operations while collection cloning is paused");
 
@@ -90,27 +91,26 @@ assert.commandWorked(testColl.update({_id: 1}, {_id: 1, b: 2}));
 
 jsTestLog("Resuming initial sync");
 
-assert.commandWorked(
-    secondary.adminCommand({configureFailPoint: "initialSyncHangAfterDataCloning", mode: "off"}));
+assert.commandWorked(secondary.adminCommand({configureFailPoint: "initialSyncHangAfterDataCloning", mode: "off"}));
 
 // Wait for this failpoint to be hit before turning it off and causing initial sync to fail.
-assert.commandWorked(secondary.adminCommand({
-    waitForFailPoint: "failInitialSyncBeforeApplyingBatch",
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+assert.commandWorked(
+    secondary.adminCommand({
+        waitForFailPoint: "failInitialSyncBeforeApplyingBatch",
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout,
+    }),
+);
 
 jsTestLog("Failing first initial sync attempt");
 
 // Turn the failpoint off and cause initial sync to fail.
-assert.commandWorked(secondary.adminCommand(
-    {configureFailPoint: "failInitialSyncBeforeApplyingBatch", mode: "off"}));
+assert.commandWorked(secondary.adminCommand({configureFailPoint: "failInitialSyncBeforeApplyingBatch", mode: "off"}));
 
-replTest.waitForState(secondary, ReplSetTest.State.SECONDARY);
+replTest.awaitSecondaryNodes(null, [secondary]);
 
 jsTestLog("Initial sync completed");
 
 assert.commandWorked(session.abortTransaction_forTesting());
 
 replTest.stopSet();
-})();

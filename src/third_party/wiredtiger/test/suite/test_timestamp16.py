@@ -31,14 +31,12 @@
 #   end of a txn.
 #
 
-import random
 from suite_subprocess import suite_subprocess
-import wiredtiger, wttest
+import wttest
 
 class test_timestamp16(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_timestamp16'
     uri = 'table:' + tablename
-    session_config = 'isolation=snapshot'
 
     def test_read_timestamp_cleared(self):
         # Ensure that the read timestamp doesn't move our checkpoint.
@@ -61,6 +59,3 @@ class test_timestamp16(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.commit_transaction()
         self.session.checkpoint('use_timestamp=true')
         self.assertTimestampsEqual('2', self.conn.query_timestamp('get=last_checkpoint'))
-
-if __name__ == '__main__':
-    wttest.run()

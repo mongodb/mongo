@@ -27,45 +27,73 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/server_recovery.h"
 
-#include "mongo/db/namespace_string.h"
+#include "mongo/base/string_data.h"
+#include "mongo/util/decorable.h"
+
+#include <mutex>
+#include <utility>
+
+#include <absl/container/node_hash_set.h>
 
 namespace mongo {
 namespace {
-const auto getInReplicationRecovery = ServiceContext::declareDecoration<bool>();
+const auto getInReplicationRecovery = ServiceContext::declareDecoration<AtomicWord<int32_t>>();
 const auto getSizeRecoveryState = ServiceContext::declareDecoration<SizeRecoveryState>();
 }  // namespace
 
-bool SizeRecoveryState::collectionNeedsSizeAdjustment(const std::string& ident) const {
-    if (!inReplicationRecovery(getGlobalServiceContext())) {
+bool SizeRecoveryState::collectionNeedsSizeAdjustment(StringData ident) const {
+    if (!InReplicationRecovery::isSet(getGlobalServiceContext())) {
         return true;
     }
 
     return collectionAlwaysNeedsSizeAdjustment(ident);
 }
 
-bool SizeRecoveryState::collectionAlwaysNeedsSizeAdjustment(const std::string& ident) const {
-    stdx::lock_guard<Latch> lock(_mutex);
+bool SizeRecoveryState::collectionAlwaysNeedsSizeAdjustment(StringData ident) const {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     return _collectionsAlwaysNeedingSizeAdjustment.count(ident) > 0;
 }
 
-void SizeRecoveryState::markCollectionAsAlwaysNeedsSizeAdjustment(const std::string& ident) {
-    stdx::lock_guard<Latch> lock(_mutex);
-    _collectionsAlwaysNeedingSizeAdjustment.insert(ident);
+void SizeRecoveryState::markCollectionAsAlwaysNeedsSizeAdjustment(StringData ident) {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    _collectionsAlwaysNeedingSizeAdjustment.insert(std::string{ident});
 }
 
 void SizeRecoveryState::clearStateBeforeRecovery() {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     _collectionsAlwaysNeedingSizeAdjustment.clear();
 }
-}  // namespace mongo
 
-bool& mongo::inReplicationRecovery(ServiceContext* serviceCtx) {
-    return getInReplicationRecovery(serviceCtx);
+void SizeRecoveryState::setRecordStoresShouldAlwaysCheckSize(bool shouldAlwayCheckSize) {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    _recordStoresShouldAlwayCheckSize = shouldAlwayCheckSize;
 }
+
+bool SizeRecoveryState::shouldRecordStoresAlwaysCheckSize() const {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    // Regardless of whether the _recordStoresShouldAlwayCheckSize flag is set, if we are in
+    // replication recovery then sizes should always be checked. This is in case the size storer
+    // information is no longer accurate. This may be necessary if a collection creation was not
+    // part of a stable checkpoint.
+    return _recordStoresShouldAlwayCheckSize ||
+        InReplicationRecovery::isSet(getGlobalServiceContext());
+}
+
+InReplicationRecovery::InReplicationRecovery(ServiceContext* serviceContext)
+    : _serviceContext(serviceContext) {
+    getInReplicationRecovery(_serviceContext).fetchAndAdd(1);
+}
+
+InReplicationRecovery::~InReplicationRecovery() {
+    getInReplicationRecovery(_serviceContext).fetchAndSubtract(1);
+}
+
+bool InReplicationRecovery::isSet(ServiceContext* serviceContext) {
+    return getInReplicationRecovery(serviceContext).load();
+}
+}  // namespace mongo
 
 mongo::SizeRecoveryState& mongo::sizeRecoveryState(ServiceContext* serviceCtx) {
     return getSizeRecoveryState(serviceCtx);

@@ -1,6 +1,6 @@
 test_kind: mongos_test
 
 selector:
-  test: ''
+  test: ""
 
 executor: {}

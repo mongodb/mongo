@@ -29,6 +29,9 @@
 
 #pragma once
 
+#include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
+#include "mongo/util/modules.h"
+
 namespace mongo {
 
 /**
@@ -68,7 +71,7 @@ struct WindowBounds {
     struct Unbounded {};
     struct Current {};
     template <class T>
-    using Bound = stdx::variant<Unbounded, Current, T>;
+    using Bound = std::variant<Unbounded, Current, T>;
 
     struct DocumentBased {
         Bound<int> lower;
@@ -80,7 +83,7 @@ struct WindowBounds {
         boost::optional<TimeUnit> unit;
     };
 
-    stdx::variant<DocumentBased, RangeBased> bounds;
+    std::variant<DocumentBased, RangeBased> bounds;
 
     static WindowBounds defaultBounds() {
         return WindowBounds{DocumentBased{Unbounded{}, Unbounded{}}};
@@ -117,11 +120,11 @@ struct WindowBounds {
      * doesn't make sense with time-based bounds. The 'sortBy' argument lets us check these
      * constraints during parsing.
      */
-    static WindowBounds parse(BSONObj args,
+    static WindowBounds parse(BSONElement args,
                               const boost::optional<SortPattern>& sortBy,
                               ExpressionContext* expCtx);
 
-    void serialize(MutableDocument& args) const;
+    void serialize(MutableDocument& args, const SerializationOptions& opts) const;
 };
 
 }  // namespace mongo

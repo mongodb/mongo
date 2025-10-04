@@ -30,8 +30,9 @@
 
 #pragma once
 
-#include <boost/program_options.hpp>
 #include <string>
+
+#include <boost/program_options.hpp>
 
 namespace mongo {
 

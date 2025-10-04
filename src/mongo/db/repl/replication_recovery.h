@@ -30,7 +30,11 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/util/modules.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -45,7 +49,7 @@ class ReplicationConsistencyMarkers;
  * This class is used by the replication system to recover after an unclean shutdown, a rollback or
  * during initial sync.
  */
-class ReplicationRecovery {
+class MONGO_MOD_OPEN ReplicationRecovery {
 public:
     ReplicationRecovery() = default;
     virtual ~ReplicationRecovery() = default;
@@ -53,9 +57,12 @@ public:
     /**
      * Recovers the data on disk from the oplog. If the provided stable timestamp is not "none",
      * this function assumes the data reflects that timestamp.
+     * Returns the provided stable timestamp. If the provided stable timestamp is "none", this
+     * function might try to ask storage for the last stable timestamp if it exists before doing
+     * recovery which will be returned after performing successful recovery.
      */
-    virtual void recoverFromOplog(OperationContext* opCtx,
-                                  boost::optional<Timestamp> stableTimestamp) = 0;
+    virtual boost::optional<Timestamp> recoverFromOplog(
+        OperationContext* opCtx, boost::optional<Timestamp> stableTimestamp) = 0;
 
     /**
      *  Recovers the data on disk from the oplog and puts the node in readOnly mode. If
@@ -69,9 +76,23 @@ public:
      * Recovers the data on disk from the oplog up to and including the given timestamp.
      */
     virtual void recoverFromOplogUpTo(OperationContext* opCtx, Timestamp endPoint) = 0;
+
+    /**
+     * Truncates the oplog after the entry with the 'truncateAfterTimestamp'.
+     */
+    virtual void truncateOplogToTimestamp(OperationContext* opCtx,
+                                          Timestamp truncateAfterTimestamp) = 0;
+
+    /**
+     * Performs oplog application for magic restore. This function expects the caller to correctly
+     * truncate oplog the oplog application start point. Callers must be using a storage engine that
+     * supports recover to stable timestamp.
+     */
+    virtual void applyOplogEntriesForRestore(OperationContext* opCtx,
+                                             Timestamp stableTimestamp) = 0;
 };
 
-class ReplicationRecoveryImpl : public ReplicationRecovery {
+class MONGO_MOD_PUB ReplicationRecoveryImpl : public ReplicationRecovery {
     ReplicationRecoveryImpl(const ReplicationRecoveryImpl&) = delete;
     ReplicationRecoveryImpl& operator=(const ReplicationRecoveryImpl&) = delete;
 
@@ -79,13 +100,18 @@ public:
     ReplicationRecoveryImpl(StorageInterface* storageInterface,
                             ReplicationConsistencyMarkers* consistencyMarkers);
 
-    void recoverFromOplog(OperationContext* opCtx,
-                          boost::optional<Timestamp> stableTimestamp) override;
+    boost::optional<Timestamp> recoverFromOplog(
+        OperationContext* opCtx, boost::optional<Timestamp> stableTimestamp) override;
 
     void recoverFromOplogAsStandalone(OperationContext* opCtx,
                                       bool duringInitialSync = false) override;
 
     void recoverFromOplogUpTo(OperationContext* opCtx, Timestamp endPoint) override;
+
+    void truncateOplogToTimestamp(OperationContext* opCtx,
+                                  Timestamp truncateAfterTimestamp) override;
+
+    void applyOplogEntriesForRestore(OperationContext* opCtx, Timestamp stableTimestamp) override;
 
 private:
     enum class RecoveryMode {
@@ -164,7 +190,7 @@ private:
      * potentially be starved.
      *
      * If the stable timestamp is at a hole, this will move the stable timestamp back to the new
-     * top of oplog.  This can happen on primaries when EMRC=false or in single-node replica sets.
+     * top of oplog.  This can happen on primaries in single-node replica sets.
      */
     void _truncateOplogIfNeededAndThenClearOplogTruncateAfterPoint(
         OperationContext* opCtx, boost::optional<Timestamp>* stableTimestamp);

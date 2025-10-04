@@ -28,14 +28,32 @@
  */
 
 #include "mongo/db/geo/hash.h"
-#include "mongo/config.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bson_field.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/field_parser.h"
 #include "mongo/db/geo/shapes.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/platform/endian.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 #include <algorithm>  // for max()
+#include <cmath>
+#include <cstdint>
+#include <cstring>
 #include <iostream>
+#include <limits>
+#include <utility>
+
+#include <s2cellid.h>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 
@@ -154,16 +172,58 @@ void GeoHash::initFromString(const char* s) {
             setBit(i, 1);
 }
 
+namespace {
+// Extends a 32 bit value into a 64 bit value interleaved with zeros.
+std::uint64_t interleaveWithZeros(std::uint32_t input) {
+    // The following example is an extension to 32-bits of the following bit manipulation for 16-bit
+    // numbers.
+    //
+    //    0000 0000 0000 0000  abcd efgh ijkl mnop
+    // -> 0000 0000 abcd efgh  0000 0000 ijkl mnop
+    // -> 0000 abcd 0000 efgh  0000 ijkl 0000 mnop
+    // -> 00ab 00cd 00ef 00gh  00ij 00kl 00mn 00op
+    // -> 0a0b 0c0d 0e0f 0g0h  0i0j 0k0l 0m0n 0o0p
+    uint64_t word = input;
+    word = (word ^ (word << 16)) & 0x0000ffff0000ffff;
+    word = (word ^ (word << 8)) & 0x00ff00ff00ff00ff;
+    word = (word ^ (word << 4)) & 0x0f0f0f0f0f0f0f0f;
+    word = (word ^ (word << 2)) & 0x3333333333333333;
+    word = (word ^ (word << 1)) & 0x5555555555555555;
+    return word;
+}
+
+std::uint32_t deinterleaveZeros(std::uint64_t input) {
+    // The following example is an extension to 32-bits of the following bit manipulation for
+    // 16-bit numbers. Note that the following operations are a result of applying the inverse of
+    // interleaveWithZeros operations.
+    //
+    //    0a0b 0c0d 0e0f 0g0h  0i0j 0k0l 0m0n 0o0p
+    // -> 00ab 00cd 00ef 00gh  00ij 00kl 00mn 00op
+    // -> 0000 abcd 0000 efgh  0000 ijkl 0000 mnop
+    // -> 0000 0000 abcd efgh  0000 0000 ijkl mnop
+    // -> 0000 0000 0000 0000  abcd efgh ijkl mnop
+
+    uint64_t word = input;
+    word &= 0x5555555555555555;
+    word = (word ^ (word >> 1)) & 0x3333333333333333;
+    word = (word ^ (word >> 2)) & 0x0f0f0f0f0f0f0f0f;
+    word = (word ^ (word >> 4)) & 0x00ff00ff00ff00ff;
+    word = (word ^ (word >> 8)) & 0x0000ffff0000ffff;
+    word = (word ^ (word >> 16)) & 0x00000000ffffffff;
+    return word;
+}
+}  // namespace
+
 GeoHash::GeoHash(unsigned x, unsigned y, unsigned bits) {
-    verify(bits <= 32);
-    _hash = 0;
+    MONGO_verify(bits <= 32);
     _bits = bits;
-    for (unsigned i = 0; i < bits; i++) {
-        if (isBitSet(x, i))
-            _hash |= mask64For(i * 2);
-        if (isBitSet(y, i))
-            _hash |= mask64For((i * 2) + 1);
-    }
+    auto interleavedX = interleaveWithZeros(x);
+    auto interleavedY = interleaveWithZeros(y);
+    auto fullHash = (interleavedX << 1) | interleavedY;
+    // bits * 2 number of significant bits set to 1 leaving the rest set at 0.
+    auto bitMask = (std::numeric_limits<std::uint64_t>::max() << (64 - (bits * 2)));
+    fullHash = fullHash & bitMask;
+    _hash = fullHash;
 }
 
 GeoHash::GeoHash(const GeoHash& old) {
@@ -175,95 +235,10 @@ GeoHash::GeoHash(long long hash, unsigned bits) : _hash(hash), _bits(bits) {
     clearUnusedBits();
 }
 
-/**
- * Explanation & Example:
- * bitset<64>(_hash) = "00000001 00000010 00000100 00001000 00010000 00100000 01000000 10000000";
- *
- * the reinterpret_cast() of _hash results in:
- * c[0] = 10000000 (the last 8 bits of _hash)
- * c[1] = 01000000 (the second to last 8 bits of _hash)
- * ...
- * c[6] = 00000010 (the second 8 bits of _hash)
- * c[7] = 00000001 (the first 8 bits of _hash)
- *
- * Calculating the Value of Y:
- * in the for loop,
- * t is c[i] but with all the even bits turned off:
- * t = 00000000 (when i is even)
- * t = 01000000 (i = 1)
- * t = 00010000 (i = 3)
- * t = 00000100 (i = 5)
- * t = 00000001 (i = 7)
- *
- * then for each t,
- * get the hashedToNormal(t):
- * hashedToNormal(t) = 0 = 00000000 (when i is even)
- * hashedToNormal(t) = 8 = 00001000 (i = 1)
- * hashedToNormal(t) = 4 = 00000100 (i = 3)
- * hashedToNormal(t) = 2 = 00000010 (i = 5)
- * hashedToNormal(t) = 1 = 00000001 (i = 7)
- * then shift it by (4 * i) (Little Endian) then
- * bitwise OR it with y
- *
- * visually, all together it looks like:
- * y =       00000000000000000000000000000000 (32 bits)
- * y |=                              00000000 (hashedToNormal(t) when i = 0)
- * y |=                          00001000     (hashedToNormal(t) when i = 1)
- * y |=                      00000000         (hashedToNormal(t) when i = 2)
- * y |=                  00000100             (hashedToNormal(t) when i = 3)
- * y |=              00000000                 (hashedToNormal(t) when i = 4)
- * y |=          00000010                     (hashedToNormal(t) when i = 5)
- * y |=      00000000                         (hashedToNormal(t) when i = 6)
- * y |=  00000001                             (hashedToNormal(t) when i = 7)
- * ---------------------------------------------
- * y =       00010000001000000100000010000000
- *
- * Calculating the Value of X:
- * in the for loop,
- * t is c[i] right shifted by 1 with all the even bits turned off:
- * t = 00000000 (when i is odd)
- * t = 01000000 (i = 0)
- * t = 00010000 (i = 2)
- * t = 00000100 (i = 4)
- * t = 00000001 (i = 6)
- *
- * then for each t,
- * get the hashedToNormal(t) and shift it by (4 * i) (Little Endian) then
- * bitwise OR it with x
- */
-void GeoHash::unhash_fast(unsigned* x, unsigned* y) const {
-    *x = 0;
-    *y = 0;
-    const char* c = reinterpret_cast<const char*>(&_hash);
-    for (int i = 0; i < 8; i++) {
-        // 0x55 in binary is "01010101",
-        // it's an odd bitmask that we use to turn off all the even bits
-        unsigned t = (unsigned)(c[i]) & 0x55;
-        const int leftShift = 4 * (kNativeLittle ? i : (7 - i));
-        *y |= geoBitSets.hashedToNormal[t] << leftShift;
-
-        t = ((unsigned)(c[i]) >> 1) & 0x55;
-        *x |= geoBitSets.hashedToNormal[t] << leftShift;
-    }
-}
-
-void GeoHash::unhash_slow(unsigned* x, unsigned* y) const {
-    *x = 0;
-    *y = 0;
-    for (unsigned i = 0; i < _bits; i++) {
-        if (getBitX(i))
-            *x |= mask32For(i);
-        if (getBitY(i))
-            *y |= mask32For(i);
-    }
-}
-
 void GeoHash::unhash(unsigned* x, unsigned* y) const {
-    if constexpr (kNativeLittle) {
-        unhash_fast(x, y);
-    } else {
-        unhash_slow(x, y);
-    }
+    // Order goes XYXYXY... Shift Xs to Y position as that's how the algorithm expects the input.
+    *x = deinterleaveZeros(_hash >> 1);
+    *y = deinterleaveZeros(_hash);
 }
 
 /** Is the 'bit'-th most significant bit set?  (NOT the least significant) */
@@ -271,13 +246,8 @@ bool GeoHash::isBitSet(unsigned val, unsigned bit) {
     return mask32For(bit) & val;
 }
 
-/** Return a GeoHash with one bit of precision lost. */
-GeoHash GeoHash::up() const {
-    return GeoHash(_hash, _bits - 1);
-}
-
 bool GeoHash::hasPrefix(const GeoHash& other) const {
-    verify(other._bits <= _bits);
+    MONGO_verify(other._bits <= _bits);
     if (other._bits == 0)
         return true;
 
@@ -302,7 +272,7 @@ string GeoHash::toStringHex1() const {
 }
 
 void GeoHash::setBit(unsigned pos, bool value) {
-    verify(pos < _bits * 2);
+    MONGO_verify(pos < _bits * 2);
     const long long mask = mask64For(pos);
     if (value)
         _hash |= mask;
@@ -312,36 +282,6 @@ void GeoHash::setBit(unsigned pos, bool value) {
 
 bool GeoHash::getBit(unsigned pos) const {
     return _hash & mask64For(pos);
-}
-
-bool GeoHash::getBitX(unsigned pos) const {
-    verify(pos < 32);
-    return getBit(pos * 2);
-}
-
-bool GeoHash::getBitY(unsigned pos) const {
-    verify(pos < 32);
-    return getBit((pos * 2) + 1);
-}
-
-// TODO(hk): Comment this.
-BSONObj GeoHash::wrap(const char* name) const {
-    BSONObjBuilder b(20);
-    appendHashMin(&b, name);
-    BSONObj o = b.obj();
-    if ('\0' == name[0])
-        verify(o.objsize() == 20);
-    return o;
-}
-
-// Do we have a non-trivial GeoHash?
-bool GeoHash::constrains() const {
-    return _bits > 0;
-}
-
-// Could our GeoHash have higher precision?
-bool GeoHash::canRefine() const {
-    return _bits < 32;
 }
 
 /**
@@ -375,7 +315,7 @@ bool GeoHash::atMaxY() const {
 
 // TODO(hk): comment better
 void GeoHash::move(int x, int y) {
-    verify(_bits);
+    MONGO_verify(_bits);
     _move(0, x);
     _move(1, y);
 }
@@ -384,7 +324,7 @@ void GeoHash::move(int x, int y) {
 void GeoHash::_move(unsigned offset, int d) {
     if (d == 0)
         return;
-    verify(d <= 1 && d >= -1);  // TEMP
+    MONGO_verify(d <= 1 && d >= -1);  // TEMP
 
     bool from, to;
     if (d > 0) {
@@ -416,7 +356,7 @@ void GeoHash::_move(unsigned offset, int d) {
         pos -= 2;
     }
 
-    verify(0);
+    MONGO_verify(0);
 }
 
 GeoHash& GeoHash::operator=(const GeoHash& h) {
@@ -439,31 +379,6 @@ bool GeoHash::operator<(const GeoHash& h) const {
     }
 
     return _bits < h._bits;
-}
-
-// Append the hash in s to our current hash.  We expect s to be '0' or '1' or '\0',
-// though we also treat non-'1' values as '0'.
-GeoHash& GeoHash::operator+=(const char* s) {
-    unsigned pos = _bits * 2;
-    _bits += strlen(s) / 2;
-    verify(_bits <= 32);
-    while ('\0' != s[0]) {
-        if (s[0] == '1')
-            setBit(pos, 1);
-        pos++;
-        s++;
-    }
-    return *this;
-}
-
-GeoHash GeoHash::operator+(const char* s) const {
-    GeoHash n = *this;
-    n += s;
-    return n;
-}
-
-GeoHash GeoHash::operator+(const std::string& s) const {
-    return operator+(s.c_str());
 }
 
 // Keep the most significant _bits*2 bits of _hash, clear the least significant bits. If shorter
@@ -518,12 +433,7 @@ void GeoHash::appendHashMin(BSONObjBuilder* builder, const char* fieldName) cons
     appendHashToBuilder(_hash, builder, fieldName);
 }
 
-void GeoHash::appendHashMin(KeyString::Builder* ks) const {
-    // The min bound of a GeoHash region has all the unused suffix bits set to 0
-    appendHashToKeyString(_hash, ks);
-}
-
-void GeoHash::appendHashMin(KeyString::PooledBuilder* ks) const {
+void GeoHash::appendHashMin(key_string::PooledBuilder* ks) const {
     // The min bound of a GeoHash region has all the unused suffix bits set to 0
     appendHashToKeyString(_hash, ks);
 }
@@ -543,18 +453,6 @@ long long GeoHash::getHash() const {
 unsigned GeoHash::getBits() const {
     return _bits;
 }
-
-GeoHash GeoHash::commonPrefix(const GeoHash& other) const {
-    unsigned i = 0;
-    for (; i < _bits && i < other._bits; i++) {
-        if (getBitX(i) == other.getBitX(i) && getBitY(i) == other.getBitY(i))
-            continue;
-        break;
-    }
-    // i is how many bits match between this and other.
-    return GeoHash(_hash, i);
-}
-
 
 bool GeoHash::subdivide(GeoHash children[4]) const {
     if (_bits == 32) {
@@ -579,13 +477,13 @@ GeoHash GeoHash::parent(unsigned int level) const {
 }
 
 GeoHash GeoHash::parent() const {
-    verify(_bits > 0);
+    MONGO_verify(_bits > 0);
     return GeoHash(_hash, _bits - 1);
 }
 
 
 void GeoHash::appendVertexNeighbors(unsigned level, vector<GeoHash>* output) const {
-    invariant(level >= 0 && level < _bits);
+    tassert(9911940, "", level >= 0 && level < _bits);
 
     // Parent at the given level.
     GeoHash parentHash = parent(level);
@@ -669,6 +567,7 @@ static BSONField<double> minField("min", -180.0);
 // the last place).  For double-precision numbers, this works out to 2**-53
 // (about 1.11e-16) times the magnitude of the result.
 double const GeoHashConverter::kMachinePrecision = 0.5 * std::numeric_limits<double>::epsilon();
+double const GeoHashConverter::kNumBuckets = 4.0 * 1024 * 1024 * 1024;
 
 StatusWith<std::unique_ptr<GeoHashConverter>> GeoHashConverter::createFromDoc(
     const BSONObj& paramDoc) {
@@ -704,13 +603,12 @@ StatusWith<std::unique_ptr<GeoHashConverter>> GeoHashConverter::createFromDoc(
                                     << "was specified");
     }
 
-    constexpr double numBuckets = 4.0 * 1024 * 1024 * 1024;
-    params.scaling = numBuckets / (params.max - params.min);
+    params.scaling = kNumBuckets / (params.max - params.min);
     const bool scalingValid = params.scaling > 0;
     if (!scalingValid || std::isinf(params.scaling)) {
         return Status(ErrorCodes::InvalidOptions,
-                      str::stream()
-                          << "range [" << params.min << ", " << params.max << "] is too small.");
+                      str::stream() << "range [" << params.min << ", " << params.max
+                                    << "] is either extremely small or large.");
     }
 
     return createFromParams(params);
@@ -719,21 +617,11 @@ StatusWith<std::unique_ptr<GeoHashConverter>> GeoHashConverter::createFromDoc(
 StatusWith<std::unique_ptr<GeoHashConverter>> GeoHashConverter::createFromParams(
     const Parameters& params) {
     std::unique_ptr<GeoHashConverter> converter(new GeoHashConverter(params));
-
-    const bool errorValid = params.max - params.min >= converter->_error / 2;
-    if (!errorValid) {
-        return Status(ErrorCodes::InvalidOptions,
-                      str::stream() << "invalid computed error: " << converter->_error
-                                    << " on range [" << params.min << ", " << params.max << "].");
-    }
-
     return {std::move(converter)};
 }
 
 GeoHashConverter::GeoHashConverter(const Parameters& params) : _params(params) {
     init();
-    uassert(
-        4799400, "Invalid GeoHashConverter parameters", _params.max - _params.min >= _error / 2);
 }
 
 void GeoHashConverter::init() {
@@ -748,6 +636,16 @@ void GeoHashConverter::init() {
     // TODO:  Can we actually find error bounds for the sqrt function?
     double epsilon = 0.001 / _params.scaling;
     _error = distanceBetweenHashes(a, b) + epsilon;
+
+    // Ensure that the error factor is not too large for the given range.
+    const bool errorValid = !std::isinf(_error) && _params.max - _params.min >= _error / 2;
+    uassert(4799400,
+            str::stream() << "invalid computed geohash error factor: " << _error << " on range ["
+                          << _params.min << ", " << _params.max << "]"
+                          << " with bit precision: " << _params.bits << "."
+                          << " Try increasing the range between min and max field and/or "
+                             "increasing the bit precision field.",
+            errorValid);
 
     // Error in radians
     _errorSphere = deg2rad(_error);
@@ -764,7 +662,7 @@ double GeoHashConverter::distanceBetweenHashes(const GeoHash& a, const GeoHash& 
     double dx = bx - ax;
     double dy = by - ay;
 
-    return sqrt((dx * dx) + (dy * dy));
+    return std::hypot(dx, dy);
 }
 
 /**
@@ -775,13 +673,8 @@ double GeoHashConverter::distanceBetweenHashes(const GeoHash& a, const GeoHash& 
  * Point
  * double, double
  */
-
 GeoHash GeoHashConverter::hash(const Point& p) const {
     return hash(p.x, p.y);
-}
-
-GeoHash GeoHashConverter::hash(const BSONObj& o) const {
-    return hash(o, nullptr);
 }
 
 // src is printed out as debugging information.  Maybe it is actually somehow the 'source' of o?
@@ -830,22 +723,12 @@ GeoHash GeoHashConverter::hash(double x, double y) const {
  * Possible outputs:
  * double, double
  * Point
- * BSONObj
  */
 // TODO(hk): these should have consistent naming
 Point GeoHashConverter::unhashToPoint(const GeoHash& h) const {
     Point point;
     unhash(h, &point.x, &point.y);
     return point;
-}
-
-BSONObj GeoHashConverter::unhashToBSONObj(const GeoHash& h) const {
-    unsigned x, y;
-    h.unhash(&x, &y);
-    BSONObjBuilder b;
-    b.append("x", convertFromHashScale(x));
-    b.append("y", convertFromHashScale(y));
-    return b.obj();
 }
 
 void GeoHashConverter::unhash(const GeoHash& h, double* x, double* y) const {
@@ -875,18 +758,11 @@ double GeoHashConverter::calcUnhashToBoxError(const GeoHashConverter::Parameters
     return std::max(fabs(params.min), fabs(params.max)) * GeoHashConverter::kMachinePrecision * 8;
 }
 
-double GeoHashConverter::sizeOfDiag(const GeoHash& a) const {
-    GeoHash b = a;
-    b.move(1, 1);
-    return distanceBetweenHashes(a, b);
-}
-
-
 // Relative error = epsilon_(max-min). ldexp() is just a direct translation to
 // floating point exponent, and should be exact.
 double GeoHashConverter::sizeEdge(unsigned level) const {
-    invariant(level >= 0);
-    invariant((int)level <= _params.bits);
+    tassert(9911941, "", level >= 0);
+    tassert(9911942, "", (int)level <= _params.bits);
 #pragma warning(push)
 // C4146: unary minus operator applied to unsigned type, result still unsigned
 #pragma warning(disable : 4146)
@@ -908,22 +784,23 @@ double GeoHashConverter::convertFromHashScale(unsigned in) const {
 
 // Convert from a double that is [min, max] to a double in [0, (max-min)*scaling]
 double GeoHashConverter::convertToDoubleHashScale(double in) const {
-    verify(in <= _params.max && in >= _params.min);
-
-    if (in == _params.max) {
-        // prevent aliasing with _min by moving inside the "box"
-        // makes 180 == 179.999 (roughly)
-        in -= _error / 2;
-    }
-
+    MONGO_verify(in <= _params.max && in >= _params.min);
     in -= _params.min;
-    verify(in >= 0);
+    MONGO_verify(in >= 0);
     return in * _params.scaling;
 }
 
 // Convert from a double that is [min, max] to an unsigned in [0, (max-min)*scaling]
 unsigned GeoHashConverter::convertToHashScale(double in) const {
-    return static_cast<unsigned>(convertToDoubleHashScale(in));
+    double ret = convertToDoubleHashScale(in);
+
+    // Clip the return value to the highest index bucket hash (kNumBuckets - 1). The max value will
+    // scale to kNumBuckets, but because 2d indexes do not wrap, we must make sure max and min are
+    // not treated as equal, in case max overflows to 0 on downcasting from double to unsigned int.
+    // It's possible a value very close to max would have a similar issue, so we just clip the value
+    // to the highest index bucket hash.
+    ret = std::min(ret, kNumBuckets - 1);
+    return static_cast<unsigned>(ret);
 }
 
 

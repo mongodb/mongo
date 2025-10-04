@@ -27,16 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/matcher/schema/expression_internal_schema_object_match.h"
+
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/matcher/path.h"
+
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
 constexpr StringData InternalSchemaObjectMatchExpression::kName;
 
 InternalSchemaObjectMatchExpression::InternalSchemaObjectMatchExpression(
-    StringData path,
+    boost::optional<StringData> path,
     std::unique_ptr<MatchExpression> expr,
     clonable_ptr<ErrorAnnotation> annotation)
     : PathMatchExpression(INTERNAL_SCHEMA_OBJECT_MATCH,
@@ -46,27 +54,17 @@ InternalSchemaObjectMatchExpression::InternalSchemaObjectMatchExpression(
                           std::move(annotation)),
       _sub(std::move(expr)) {}
 
-bool InternalSchemaObjectMatchExpression::matchesSingleElement(const BSONElement& elem,
-                                                               MatchDetails* details) const {
-    if (elem.type() != BSONType::Object) {
-        return false;
-    }
-    return _sub->matchesBSON(elem.Obj());
-}
-
 void InternalSchemaObjectMatchExpression::debugString(StringBuilder& debug,
                                                       int indentationLevel) const {
     _debugAddSpace(debug, indentationLevel);
-    debug << kName << "\n";
+    debug << kName;
+    _debugStringAttachTagInfo(&debug);
     _sub->debugString(debug, indentationLevel + 1);
 }
 
-BSONObj InternalSchemaObjectMatchExpression::getSerializedRightHandSide() const {
-    BSONObjBuilder objMatchBob;
-    BSONObjBuilder subBob(objMatchBob.subobjStart(kName));
-    _sub->serialize(&subBob, true);
-    subBob.doneFast();
-    return objMatchBob.obj();
+void InternalSchemaObjectMatchExpression::appendSerializedRightHandSide(
+    BSONObjBuilder* bob, const SerializationOptions& opts, bool includePath) const {
+    bob->append(kName, _sub->serialize(opts, includePath));
 }
 
 bool InternalSchemaObjectMatchExpression::equivalent(const MatchExpression* other) const {
@@ -77,23 +75,13 @@ bool InternalSchemaObjectMatchExpression::equivalent(const MatchExpression* othe
     return _sub->equivalent(other->getChild(0));
 }
 
-std::unique_ptr<MatchExpression> InternalSchemaObjectMatchExpression::shallowClone() const {
+std::unique_ptr<MatchExpression> InternalSchemaObjectMatchExpression::clone() const {
     auto clone = std::make_unique<InternalSchemaObjectMatchExpression>(
-        path(), _sub->shallowClone(), _errorAnnotation);
+        path(), _sub->clone(), _errorAnnotation);
     if (getTag()) {
         clone->setTag(getTag()->clone());
     }
     return std::move(clone);
 }
 
-MatchExpression::ExpressionOptimizerFunc InternalSchemaObjectMatchExpression::getOptimizer() const {
-    return [](std::unique_ptr<MatchExpression> expression) {
-        auto& objectMatchExpression =
-            static_cast<InternalSchemaObjectMatchExpression&>(*expression);
-        objectMatchExpression._sub =
-            MatchExpression::optimize(std::move(objectMatchExpression._sub));
-
-        return expression;
-    };
-}
 }  // namespace mongo

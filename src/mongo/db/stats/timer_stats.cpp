@@ -29,6 +29,8 @@
 
 #include "mongo/db/stats/timer_stats.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
+
 namespace mongo {
 
 TimerHolder::TimerHolder(TimerStats* stats) : _stats(stats), _recorded(false) {}

@@ -27,17 +27,25 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
-#include "mongo/platform/basic.h"
-
+// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/db/storage/storage_engine_change_context.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/db/client.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/storage/recovery_unit_noop.h"
+#include "mongo/db/operation_id.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/time_support.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+
+#include <mutex>
+#include <utility>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
+
 
 namespace mongo {
 namespace {
@@ -87,11 +95,11 @@ void StorageEngineChangeOperationContextDoneNotifier::setNotifyWhenDone(ServiceC
     _service = service;
 }
 
-StorageEngineChangeContext::StorageChangeToken
-StorageEngineChangeContext::killOpsForStorageEngineChange(ServiceContext* service) {
+WriteRarelyRWMutex::WriteLock StorageEngineChangeContext::killOpsForStorageEngineChange(
+    ServiceContext* service) {
     invariant(this == StorageEngineChangeContext::get(service));
     // Prevent new operations from being created.
-    stdx::unique_lock storageChangeLk(_storageChangeSpinlock);
+    auto storageChangeLk = service->getStorageChangeMutex().writeLock();
     stdx::unique_lock lk(_mutex);
     {
         ServiceContext::LockedClientsCursor clientCursor(service);
@@ -101,21 +109,23 @@ StorageEngineChangeContext::killOpsForStorageEngineChange(ServiceContext* servic
                 continue;
             OperationId killedOperationId;
             {
-                stdx::lock_guard<Client> lk(*client);
+                ClientLock lk(client);
                 auto opCtxToKill = client->getOperationContext();
-                if (!opCtxToKill || !opCtxToKill->recoveryUnit() ||
-                    opCtxToKill->recoveryUnit()->isNoop())
+                if (!opCtxToKill || !shard_role_details::getRecoveryUnit(opCtxToKill) ||
+                    shard_role_details::getRecoveryUnit(opCtxToKill)->isNoop())
                     continue;
                 service->killOperation(lk, opCtxToKill, ErrorCodes::InterruptedDueToStorageChange);
                 auto& doneNotifier =
                     StorageEngineChangeOperationContextDoneNotifier::get(opCtxToKill);
                 doneNotifier.setNotifyWhenDone(service);
                 ++_numOpCtxtsToWaitFor;
+                killedOperationId = opCtxToKill->getOpID();
             }
             LOGV2_DEBUG(5781190,
                         1,
                         "Killed OpCtx for storage change",
-                        "killedOperationId"_attr = killedOperationId);
+                        "killedOperationId"_attr = killedOperationId,
+                        "client"_attr = client->desc());
         }
     }
 
@@ -127,12 +137,11 @@ StorageEngineChangeContext::killOpsForStorageEngineChange(ServiceContext* servic
 }
 
 void StorageEngineChangeContext::changeStorageEngine(ServiceContext* service,
-                                                     StorageChangeToken token,
+                                                     WriteRarelyRWMutex::WriteLock lk,
                                                      std::unique_ptr<StorageEngine> engine) {
     invariant(this == StorageEngineChangeContext::get(service));
     service->setStorageEngine(std::move(engine));
-    // Token -- which is a lock -- is released at end of scope, allowing OperationContexts to be
-    // created again.
+    // The lock is released at end of scope, allowing OperationContexts to be created again.
 }
 
 void StorageEngineChangeContext::notifyOpCtxDestroyed() noexcept {
@@ -145,55 +154,4 @@ void StorageEngineChangeContext::notifyOpCtxDestroyed() noexcept {
     if (_numOpCtxtsToWaitFor == 0)
         _allOldStorageOperationContextsReleased.notify_one();
 }
-
-/**
- * SharedSpinLock routines.
- *
- * The spin lock's lock word is logically divided into a bit (kExclusiveLock) and an unsigned
- * integer value for the rest of the word.  The meanings are as follows:
- *
- * kExclusiveLock not set, rest of word 0: Lock not held nor waited on.
- *
- * kExclusiveLock not set, rest of word non-zero: Lock held in shared mode by the number of holders
- * specified in the rest of the word.
- *
- * kExclusiveLock set, rest of word 0: Lock held in exclusive mode, no shared waiters.
- *
- * kExclusiveLock set, rest of word non-zero: Lock held in exclusive mode, number of waiters for the
- * shared lock specified in the rest of the word.
- *
- * Note that if there are shared waiters when the exclusive lock is released, they will obtain the
- * lock before another exclusive lock can be obtained.  This should be considered an implementation
- * detail and not a guarantee.
- *
- */
-void StorageEngineChangeContext::SharedSpinLock::lock() {
-    uint32_t expected = 0;
-    while (!_lockWord.compareAndSwap(&expected, kExclusiveLock)) {
-        expected = 0;
-        mongo::sleepmillis(100);
-    }
-}
-
-void StorageEngineChangeContext::SharedSpinLock::unlock() {
-    uint32_t prevLockWord = _lockWord.fetchAndBitAnd(~kExclusiveLock);
-    invariant(prevLockWord & kExclusiveLock);
-}
-
-void StorageEngineChangeContext::SharedSpinLock::lock_shared() {
-    uint32_t prevLockWord = _lockWord.fetchAndAdd(1);
-    // If the shared part of the lock word was all-ones, we just overflowed it.  This requires
-    // 2^31 threads creating an opCtx at once, which shouldn't happen.
-    invariant((prevLockWord & ~kExclusiveLock) != ~kExclusiveLock);
-    while (MONGO_unlikely(prevLockWord & kExclusiveLock)) {
-        mongo::sleepmillis(kLockPollIntervalMillis);
-        prevLockWord = _lockWord.load();
-    }
-}
-
-void StorageEngineChangeContext::SharedSpinLock::unlock_shared() {
-    uint32_t prevLockWord = _lockWord.fetchAndSubtract(1);
-    invariant(!(prevLockWord & kExclusiveLock));
-}
-
 }  // namespace mongo

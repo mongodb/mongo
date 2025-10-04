@@ -1,11 +1,16 @@
 /**
  * Tests adding shard to sharded cluster will fail if CWWC on shard disagrees with existing CWWC on
  * cluster.
- * @tags: [requires_majority_read_concern, requires_persistence]
+ * @tags: [
+ *    requires_majority_read_concern,
+ *    requires_persistence,
+ *    does_not_support_stepdowns,
+ * ]
  */
 
-(function() {
-"use strict";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
 // TODO SERVER-50144 Remove this and allow orphan checking.
 // This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
@@ -13,60 +18,49 @@
 TestData.skipCheckOrphans = true;
 
 const st = new ShardingTest({shards: 1, mongos: 1});
-const admin = st.getDB('admin');
+const admin = st.getDB("admin");
 let shardServer;
 
 function createNewShard() {
+    jsTest.log("Creating new shard");
+    let start = new Date();
     if (shardServer) {
-        shardServer.stopSet();
+        shardServer.stopSet({skipValidation: true});
+        jsTest.log("Stop set took: " + (new Date() - start));
     }
 
-    shardServer = new ReplSetTest({name: "shardServer", nodes: 3, useHostName: true});
+    shardServer = new ReplSetTest({name: "shardServer", nodes: 1, useHostName: true});
     shardServer.startSet();
     shardServer.initiate();
+    jsTest.log("Create new shard took: " + (new Date() - start));
 }
 
 function convertShardToRS() {
     jsTestLog("Converting shard server to replicaSet.");
-    shardServer.nodes.forEach(function(node) {
+    let start = new Date();
+    shardServer.nodes.forEach(function (node) {
         delete node.fullOptions.shardsvr;
     });
 
-    shardServer.restart(shardServer.nodes);
-    shardServer.awaitNodesAgreeOnPrimary();
+    shardServer.nodes.forEach((node) => shardServer.restart(node, {skipValidation: true}));
+    jsTest.log("Coversion shard -> RS took: " + (new Date() - start));
 }
 
 function convertRSToShard() {
+    let start = new Date();
     jsTestLog("Converting replicaSet server to shardServer.");
-    shardServer.restart(shardServer.nodes, {shardsvr: ""});
-    shardServer.awaitNodesAgreeOnPrimary();
-}
+    shardServer.nodes.forEach((node) => shardServer.restart(node, {shardsvr: "", skipValidation: true}));
 
-function removeShardAndWait() {
-    jsTestLog("Removing the shard from the cluster should succeed.");
-    const removeShardCmd = {removeShard: shardServer.getURL()};
-    const res = st.s.adminCommand(removeShardCmd);
-
-    assert.commandWorked(res);
-    assert(res.state === "started");
-
-    assert.soon(function() {
-        let res = st.s.adminCommand(removeShardCmd);
-        if (res.state === "completed") {
-            return true;
-        } else {
-            jsTestLog("Still waiting for shard removal to complete:");
-            printjson(res);
-            return false;
-        }
-    });
-
-    jsTestLog("Shard removal completed.");
+    jsTest.log("Coversion RS -> Shard took: " + (new Date() - start));
 }
 
 function testAddShard(cwwcOnShard, cwwcOnCluster, shouldSucceed, fixCWWCOnShard) {
-    jsTestLog("Running addShard test with CWWCOnShard: " + tojson(cwwcOnShard) +
-              " and CWWCOnCluster: " + tojson(cwwcOnCluster));
+    jsTestLog(
+        "Running addShard test with CWWCOnShard: " +
+            tojson(cwwcOnShard) +
+            " and CWWCOnCluster: " +
+            tojson(cwwcOnCluster),
+    );
 
     let cwwcOnShardCmd, cwwcOnClusterCmd;
 
@@ -75,10 +69,9 @@ function testAddShard(cwwcOnShard, cwwcOnCluster, shouldSucceed, fixCWWCOnShard)
         cwwcOnShardCmd = {
             setDefaultRWConcern: 1,
             defaultWriteConcern: cwwcOnShard,
-            writeConcern: {w: "majority"}
+            writeConcern: {w: "majority"},
         };
         assert.commandWorked(shardServer.getPrimary().adminCommand(cwwcOnShardCmd));
-        shardServer.awaitReplication();
     }
 
     if (cwwcOnCluster) {
@@ -86,7 +79,7 @@ function testAddShard(cwwcOnShard, cwwcOnCluster, shouldSucceed, fixCWWCOnShard)
         cwwcOnClusterCmd = {
             setDefaultRWConcern: 1,
             defaultWriteConcern: cwwcOnCluster,
-            writeConcern: {w: "majority"}
+            writeConcern: {w: "majority"},
         };
         assert.commandWorked(st.s.adminCommand(cwwcOnClusterCmd));
     }
@@ -102,7 +95,6 @@ function testAddShard(cwwcOnShard, cwwcOnCluster, shouldSucceed, fixCWWCOnShard)
             convertShardToRS();
             jsTestLog("Setting the CWWC on shard to match CWWC on cluster.");
             assert.commandWorked(shardServer.getPrimary().adminCommand(cwwcOnClusterCmd));
-            shardServer.awaitReplication();
             convertRSToShard();
         } else {
             jsTestLog("Setting the CWWC on cluster to match CWWC on shard.");
@@ -114,45 +106,46 @@ function testAddShard(cwwcOnShard, cwwcOnCluster, shouldSucceed, fixCWWCOnShard)
     assert.commandWorked(admin.runCommand({addshard: shardServer.getURL()}));
 
     // Cleanup.
-    removeShardAndWait();
+    let start = new Date();
+    jsTestLog("Removing the shard from the cluster should succeed.");
+    removeShard(st, shardServer.getURL());
+    jsTestLog("Shard removal completed. took: " + (new Date() - start));
     convertShardToRS();
 }
 
-const cwwc = [
-    {w: 1},
-    {w: "majority"},
-    {w: "majority", wtimeout: 0, j: false},
-    {w: "majority", wtimeout: 0, j: true}
-];
+const cwwc = [{w: 1}, {w: "majority"}, {w: "majority", wtimeout: 0, j: false}, {w: "majority", wtimeout: 0, j: true}];
 
 createNewShard();
 // No CWWC set neither on shard nor cluster should succeed.
 testAddShard(undefined /* cwwcOnShard */, undefined /* cwwcOnCluster */, true /* shouldSucceed */);
 
 // No CWWC set on cluster while shard has CWWC should fail.
-testAddShard(cwwc[0] /* cwwcOnShard */,
-             undefined /* cwwcOnCluster */,
-             false /* shouldSucceed */,
-             false /* fixCWWCOnShard */);
+testAddShard(
+    cwwc[0] /* cwwcOnShard */,
+    undefined /* cwwcOnCluster */,
+    false /* shouldSucceed */,
+    false /* fixCWWCOnShard */,
+);
 
 createNewShard();
 // No CWWC set on shard while cluster has CWWC should succeed.
 testAddShard(undefined /* cwwcOnShard */, cwwc[0] /* cwwcOnCluster */, true /* shouldSucceed */);
 
-for (var i = 0; i < cwwc.length; i++) {
+for (let i = 0; i < cwwc.length; i++) {
     // Setting the same CWWC on shard and cluster should succeed.
     testAddShard(cwwc[i] /* cwwcOnShard */, cwwc[i] /* cwwcOnCluster */, true /* shouldSucceed */);
-    for (var j = i + 1; j < cwwc.length; j++) {
+    for (let j = i + 1; j < cwwc.length; j++) {
         for (const fixCWWCOnShard of [true, false]) {
             // Setting different CWWC on shard and cluster should fail.
-            testAddShard(cwwc[i] /* cwwcOnShard */,
-                         cwwc[j] /* cwwcOnCluster */,
-                         false /* shouldSucceed */,
-                         fixCWWCOnShard);
+            testAddShard(
+                cwwc[i] /* cwwcOnShard */,
+                cwwc[j] /* cwwcOnCluster */,
+                false /* shouldSucceed */,
+                fixCWWCOnShard,
+            );
         }
     }
 }
 
 st.stop();
-shardServer.stopSet();
-})();
+shardServer.stopSet({skipValidation: true});

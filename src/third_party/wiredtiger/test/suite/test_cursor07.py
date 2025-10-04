@@ -30,9 +30,7 @@
 # Log cursors
 #
 
-import fnmatch, os, shutil, run, time
 from suite_subprocess import suite_subprocess
-from wiredtiger import stat
 from wtscenario import make_scenarios
 import wttest
 
@@ -54,7 +52,7 @@ class test_cursor07(wttest.WiredTigerTestCase, suite_subprocess):
     ])
     # Enable logging for this test.
     def conn_config(self):
-        return 'log=(archive=false,enabled,file_max=%s),' % self.logmax + \
+        return 'log=(enabled,file_max=%s,remove=false),' % self.logmax + \
             'transaction_sync="(method=dsync,enabled)"'
 
     def test_log_cursor(self):
@@ -100,13 +98,10 @@ class test_cursor07(wttest.WiredTigerTestCase, suite_subprocess):
             keys = c.get_key()
             # txnid, rectype, optype, fileid, logrec_key, logrec_value
             values = c.get_value()
-            # We are only looking for log records that that have a key/value
+            # We are only looking for log records that have a key/value
             # pair.
             if values[4] != b'':
                 if value in values[5]:     # logrec_value
                     count += 1
         c.close()
         self.assertEqual(count, self.nkeys)
-
-if __name__ == '__main__':
-    wttest.run()

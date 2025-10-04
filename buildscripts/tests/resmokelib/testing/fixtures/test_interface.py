@@ -1,4 +1,5 @@
 """Unit tests for the resmokelib.testing.fixtures.interface module."""
+
 import logging
 import unittest
 
@@ -6,11 +7,9 @@ from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing.fixtures import interface
 from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
 
-# pylint: disable=missing-docstring,protected-access
-
 
 class TestFixture(unittest.TestCase):
-    def test_teardown_ok(self):  # pylint: disable=no-self-use
+    def test_teardown_ok(self):
         raising_fixture = UnitTestFixture(should_raise=False)
         raising_fixture.teardown()
 
@@ -44,7 +43,7 @@ class TestFixtureTeardownHandler(unittest.TestCase):
         self.assertEqual(expected_msg, handler.get_error_message())
 
 
-class UnitTestFixture(interface.Fixture):  # pylint: disable=abstract-method
+class UnitTestFixture(interface.Fixture):
     ERROR_MESSAGE = "Failed"
 
     def __init__(self, should_raise=False):
@@ -53,6 +52,6 @@ class UnitTestFixture(interface.Fixture):  # pylint: disable=abstract-method
         interface.Fixture.__init__(self, logger, 99, fixturelib)
         self._should_raise = should_raise
 
-    def _do_teardown(self, mode=None):
+    def _do_teardown(self, finished=False, mode=None):
         if self._should_raise:
             raise errors.ServerFailure(self.ERROR_MESSAGE)

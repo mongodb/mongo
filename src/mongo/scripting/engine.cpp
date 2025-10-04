@@ -27,26 +27,50 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/scripting/engine.h"
 
-#include <algorithm>
-#include <boost/filesystem/operations.hpp>
-
+#include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/client/dbclient_base.h"
 #include "mongo/client/dbclient_cursor.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/scripting/dbdirectclient_factory.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/ctype.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/file.h"
-#include "mongo/util/text.h"
+#include "mongo/util/str.h"
+#include "mongo/util/text.h"  // IWYU pragma: keep
+
+#include <algorithm>
+#include <chrono>
+#include <cstring>
+#include <deque>
+#include <mutex>
+
+#include <boost/filesystem/directory.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/type_traits/decay.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 
 namespace mongo {
 
@@ -70,13 +94,10 @@ static std::unique_ptr<ScriptEngine> globalScriptEngine;
 
 }  // namespace
 
-ScriptEngine::ScriptEngine(bool disableLoadStored)
-    : _disableLoadStored(disableLoadStored), _scopeInitCallback() {}
-
-ScriptEngine::~ScriptEngine() {}
+ScriptEngine::ScriptEngine() : _scopeInitCallback() {}
 
 Scope::Scope()
-    : _localDBName(""),
+    : _localDBName(DatabaseName::kEmpty),
       _loadedVersion(0),
       _createTime(Date_t::now()),
       _lastRetIsNativeCode(false) {}
@@ -86,41 +107,63 @@ Scope::~Scope() {}
 void Scope::append(BSONObjBuilder& builder, const char* fieldName, const char* scopeName) {
     int t = type(scopeName);
     switch (t) {
-        case Object:
+        case stdx::to_underlying(BSONType::object):
             builder.append(fieldName, getObject(scopeName));
             break;
-        case Array:
+        case stdx::to_underlying(BSONType::array):
             builder.appendArray(fieldName, getObject(scopeName));
             break;
-        case NumberDouble:
+        case stdx::to_underlying(BSONType::numberDouble):
             builder.append(fieldName, getNumber(scopeName));
             break;
-        case NumberInt:
+        case stdx::to_underlying(BSONType::numberInt):
             builder.append(fieldName, getNumberInt(scopeName));
             break;
-        case NumberLong:
+        case stdx::to_underlying(BSONType::numberLong):
             builder.append(fieldName, getNumberLongLong(scopeName));
             break;
-        case NumberDecimal:
+        case stdx::to_underlying(BSONType::numberDecimal):
             builder.append(fieldName, getNumberDecimal(scopeName));
             break;
-        case String:
+        case stdx::to_underlying(BSONType::string):
             builder.append(fieldName, getString(scopeName));
             break;
-        case Bool:
+        case stdx::to_underlying(BSONType::boolean):
             builder.appendBool(fieldName, getBoolean(scopeName));
             break;
-        case jstNULL:
-        case Undefined:
+        case stdx::to_underlying(BSONType::null):
+        case stdx::to_underlying(BSONType::undefined):
             builder.appendNull(fieldName);
             break;
-        case Date:
+        case stdx::to_underlying(BSONType::date):
             builder.appendDate(fieldName,
                                Date_t::fromMillisSinceEpoch(getNumberLongLong(scopeName)));
             break;
-        case Code:
+        case stdx::to_underlying(BSONType::code):
             builder.appendCode(fieldName, getString(scopeName));
             break;
+        case stdx::to_underlying(BSONType::oid):
+            builder.append(fieldName, getOID(scopeName));
+            break;
+        case stdx::to_underlying(BSONType::binData):
+            getBinData(scopeName, [&fieldName, &builder](const BSONBinData& binData) {
+                builder.append(fieldName, binData);
+            });
+            break;
+        case stdx::to_underlying(BSONType::timestamp):
+            builder.append(fieldName, getTimestamp(scopeName));
+            break;
+        case stdx::to_underlying(BSONType::minKey):
+            builder.appendMinKey(fieldName);
+            break;
+        case stdx::to_underlying(BSONType::maxKey):
+            builder.appendMaxKey(fieldName);
+            break;
+        case stdx::to_underlying(BSONType::regEx): {
+            auto regEx = getRegEx(scopeName);
+            builder.append(fieldName, BSONRegEx{regEx.pattern, regEx.flags});
+            break;
+        }
         default:
             uassert(10206, str::stream() << "can't append type from: " << t, 0);
     }
@@ -196,8 +239,8 @@ bool Scope::execFile(const string& filename, bool printResult, bool reportError,
 }
 
 void Scope::storedFuncMod(OperationContext* opCtx) {
-    opCtx->recoveryUnit()->onCommit(
-        [](boost::optional<Timestamp>) { _lastVersion.fetchAndAdd(1); });
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+        [](OperationContext*, boost::optional<Timestamp>) { _lastVersion.fetchAndAdd(1); });
 }
 
 void Scope::validateObjectIdString(const string& str) {
@@ -209,9 +252,7 @@ void Scope::validateObjectIdString(const string& str) {
 }
 
 void Scope::loadStored(OperationContext* opCtx, bool ignoreNotConnected) {
-    if (!getGlobalScriptEngine()->_disableLoadStored)
-        return;
-    if (_localDBName.size() == 0) {
+    if (_localDBName.isEmpty()) {
         if (ignoreNotConnected)
             return;
         uassert(10208, "need to have locallyConnected already", _localDBName.size());
@@ -221,12 +262,12 @@ void Scope::loadStored(OperationContext* opCtx, bool ignoreNotConnected) {
     if (_loadedVersion == lastVersion)
         return;
 
-    NamespaceString coll(_localDBName, "system.js");
+    const auto collNss = NamespaceStringUtil::deserialize(_localDBName, "system.js");
 
     auto directDBClient = DBDirectClientFactory::get(opCtx).create(opCtx);
 
-    unique_ptr<DBClientCursor> c =
-        directDBClient->query(coll, BSONObj{}, Query(), 0, 0, nullptr, QueryOption_SecondaryOk, 0);
+    std::unique_ptr<DBClientCursor> c = directDBClient->find(
+        FindCommandRequest{collNss}, ReadPreferenceSetting{ReadPreference::SecondaryPreferred});
     massert(16669, "unable to get db client cursor from query", c.get());
 
     set<string> thisTime;
@@ -236,14 +277,14 @@ void Scope::loadStored(OperationContext* opCtx, bool ignoreNotConnected) {
         BSONElement v = o["value"];
 
         uassert(
-            10209, str::stream() << "name has to be a string: " << n, n.type() == BSONType::String);
-        uassert(10210, "value has to be set", v.type() != BSONType::EOO);
+            10209, str::stream() << "name has to be a string: " << n, n.type() == BSONType::string);
+        uassert(10210, "value has to be set", v.type() != BSONType::eoo);
 
         uassert(4546000,
                 str::stream() << "BSON type 'CodeWithScope' not supported in system.js scripts. As "
                                  "an alternative use 'Code'. Script _id value: '"
                               << n.String() << "'",
-                v.type() != BSONType::CodeWScope);
+                v.type() != BSONType::codeWScope);
 
         if (MONGO_unlikely(mr_killop_test_fp.shouldFail())) {
             LOGV2(5062200, "Pausing mr_killop_test_fp for system.js entry", "entryName"_attr = n);
@@ -256,9 +297,9 @@ void Scope::loadStored(OperationContext* opCtx, bool ignoreNotConnected) {
         }
 
         try {
-            setElement(n.valuestr(), v, o);
-            thisTime.insert(n.valuestr());
-            _storedNames.insert(n.valuestr());
+            setElement(n.valueStringDataSafe().data(), v, o);
+            thisTime.insert(n.str());
+            _storedNames.insert(n.str());
         } catch (const DBException& setElemEx) {
             if (setElemEx.code() == ErrorCodes::Interrupted) {
                 throw;
@@ -266,7 +307,7 @@ void Scope::loadStored(OperationContext* opCtx, bool ignoreNotConnected) {
 
             LOGV2_ERROR(22781,
                         "unable to load stored JavaScript function {n_valuestr}(): {setElemEx}",
-                        "n_valuestr"_attr = n.valuestr(),
+                        "n_valuestr"_attr = n.valueStringDataSafe(),
                         "setElemEx"_attr = redact(setElemEx));
         }
     }
@@ -310,44 +351,76 @@ ScriptingFunction Scope::createFunction(const char* code) {
 }
 
 namespace JSFiles {
-extern const JSFile collection;
+extern const JSFile bulk_api;
+extern const JSFile bulk_api_global;
 extern const JSFile check_log;
+extern const JSFile check_log_global;
+extern const JSFile collection;
 extern const JSFile crud_api;
 extern const JSFile db;
-extern const JSFile explain_query;
-extern const JSFile explainable;
-extern const JSFile mongo;
-extern const JSFile session;
-extern const JSFile query;
-extern const JSFile utils;
-extern const JSFile utils_sh;
-extern const JSFile utils_auth;
-extern const JSFile bulk_api;
+extern const JSFile db_global;
 extern const JSFile error_codes;
+extern const JSFile explain_query;
+extern const JSFile explain_query_global;
+extern const JSFile explainable;
+extern const JSFile explainable_global;
+extern const JSFile mongo;
+extern const JSFile prelude;
+extern const JSFile query;
+extern const JSFile session;
+extern const JSFile session_global;
+extern const JSFile query_global;
+extern const JSFile utils;
+extern const JSFile utils_global;
+extern const JSFile utils_sh;
+extern const JSFile utils_sh_global;
+extern const JSFile utils_auth;
+extern const JSFile utils_auth_global;
 }  // namespace JSFiles
 
 void Scope::execCoreFiles() {
-    execSetup(JSFiles::utils);
-    execSetup(JSFiles::utils_sh);
-    execSetup(JSFiles::utils_auth);
-    execSetup(JSFiles::db);
-    execSetup(JSFiles::mongo);
-    execSetup(JSFiles::session);
-    execSetup(JSFiles::query);
+    // modules
     execSetup(JSFiles::bulk_api);
-    execSetup(JSFiles::error_codes);
     execSetup(JSFiles::check_log);
-    execSetup(JSFiles::collection);
-    execSetup(JSFiles::crud_api);
+    execSetup(JSFiles::db);
     execSetup(JSFiles::explain_query);
     execSetup(JSFiles::explainable);
+    execSetup(JSFiles::query);
+    execSetup(JSFiles::session);
+    execSetup(JSFiles::utils);
+    execSetup(JSFiles::utils_auth);
+    execSetup(JSFiles::utils_sh);
+
+    // globals
+    execSetup(JSFiles::bulk_api_global);
+    execSetup(JSFiles::check_log_global);
+    execSetup(JSFiles::db_global);
+    execSetup(JSFiles::explain_query_global);
+    execSetup(JSFiles::explainable_global);
+    execSetup(JSFiles::query_global);
+    execSetup(JSFiles::session_global);
+    execSetup(JSFiles::utils_global);
+    execSetup(JSFiles::utils_auth_global);
+    execSetup(JSFiles::utils_sh_global);
+
+    // scripts
+    execSetup(JSFiles::mongo);
+    execSetup(JSFiles::error_codes);
+    execSetup(JSFiles::collection);
+    execSetup(JSFiles::crud_api);
+}
+
+void Scope::execPrelude() {
+    execSetup(JSFiles::prelude);
 }
 
 namespace {
+
 class ScopeCache {
 public:
-    void release(const string& poolName, const std::shared_ptr<Scope>& scope) {
-        stdx::lock_guard<Latch> lk(_mutex);
+    using PoolName = std::tuple<DatabaseName, string>;
+    void release(const PoolName& poolName, const std::shared_ptr<Scope>& scope) {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         if (scope->hasOutOfMemoryException()) {
             // make some room
@@ -374,8 +447,8 @@ public:
         _pools.push_front(toStore);
     }
 
-    std::shared_ptr<Scope> tryAcquire(OperationContext* opCtx, const string& poolName) {
-        stdx::lock_guard<Latch> lk(_mutex);
+    std::shared_ptr<Scope> tryAcquire(OperationContext* opCtx, const PoolName& poolName) {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         for (Pools::iterator it = _pools.begin(); it != _pools.end(); ++it) {
             if (it->poolName == poolName) {
@@ -391,7 +464,7 @@ public:
     }
 
     void clear() {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         _pools.clear();
     }
@@ -399,7 +472,7 @@ public:
 private:
     struct ScopeAndPool {
         std::shared_ptr<Scope> scope;
-        string poolName;
+        std::tuple<DatabaseName, string /*scopeType*/> poolName;
     };
 
     // Note: if these numbers change, reconsider choice of datastructure for _pools
@@ -408,7 +481,7 @@ private:
 
     typedef std::deque<ScopeAndPool> Pools;  // More-recently used Scopes are kept at the front.
     Pools _pools;                            // protected by _mutex
-    Mutex _mutex = MONGO_MAKE_LATCH("ScopeCache::_mutex");
+    stdx::mutex _mutex;
 };
 
 ScopeCache scopeCache;
@@ -420,10 +493,10 @@ void ScriptEngine::dropScopeCache() {
 
 class PooledScope : public Scope {
 public:
-    PooledScope(const std::string& pool, const std::shared_ptr<Scope>& real)
+    PooledScope(const ScopeCache::PoolName& pool, const std::shared_ptr<Scope>& real)
         : _pool(pool), _real(real) {}
 
-    virtual ~PooledScope() {
+    ~PooledScope() override {
         // SERVER-53671: Sometimes, ScopeCache::release() will generate an 'InterruptedAtShutdown'
         // exception. We catch and ignore such exceptions here to prevent them from crashing the
         // server while it is shutting down.
@@ -435,98 +508,114 @@ public:
     }
 
     // wrappers for the derived (_real) scope
-    void reset() {
+    void reset() override {
         _real->reset();
     }
-    void registerOperation(OperationContext* opCtx) {
+    void registerOperation(OperationContext* opCtx) override {
         _real->registerOperation(opCtx);
     }
-    void unregisterOperation() {
+    void unregisterOperation() override {
         _real->unregisterOperation();
     }
-    void init(const BSONObj* data) {
+    void init(const BSONObj* data) override {
         _real->init(data);
     }
-    void setLocalDB(StringData dbName) {
+    void setLocalDB(const DatabaseName& dbName) override {
         _real->setLocalDB(dbName);
     }
-    void loadStored(OperationContext* opCtx, bool ignoreNotConnected = false) {
+    void loadStored(OperationContext* opCtx, bool ignoreNotConnected = false) override {
         _real->loadStored(opCtx, ignoreNotConnected);
     }
-    void externalSetup() {
+    void externalSetup() override {
         _real->externalSetup();
     }
-    void gc() {
+    void gc() override {
         _real->gc();
     }
-    void advanceGeneration() {
+    void advanceGeneration() override {
         _real->advanceGeneration();
     }
     void requireOwnedObjects() override {
         _real->requireOwnedObjects();
     }
-    void kill() {
+    void kill() override {
         _real->kill();
     }
-    bool isKillPending() const {
+    bool isKillPending() const override {
         return _real->isKillPending();
     }
-    int type(const char* field) {
+    int type(const char* field) override {
         return _real->type(field);
     }
-    string getError() {
+    string getError() override {
         return _real->getError();
     }
-    bool hasOutOfMemoryException() {
+    string getBaseURL() const override {
+        return _real->getBaseURL();
+    }
+    bool hasOutOfMemoryException() override {
         return _real->hasOutOfMemoryException();
     }
-    void rename(const char* from, const char* to) {
+    void rename(const char* from, const char* to) override {
         _real->rename(from, to);
     }
-    double getNumber(const char* field) {
+    double getNumber(const char* field) override {
         return _real->getNumber(field);
     }
-    int getNumberInt(const char* field) {
+    int getNumberInt(const char* field) override {
         return _real->getNumberInt(field);
     }
-    long long getNumberLongLong(const char* field) {
+    long long getNumberLongLong(const char* field) override {
         return _real->getNumberLongLong(field);
     }
-    Decimal128 getNumberDecimal(const char* field) {
+    Decimal128 getNumberDecimal(const char* field) override {
         return _real->getNumberDecimal(field);
     }
-    string getString(const char* field) {
+    string getString(const char* field) override {
         return _real->getString(field);
     }
-    bool getBoolean(const char* field) {
+    bool getBoolean(const char* field) override {
         return _real->getBoolean(field);
     }
-    BSONObj getObject(const char* field) {
+    BSONObj getObject(const char* field) override {
         return _real->getObject(field);
     }
-    void setNumber(const char* field, double val) {
+    OID getOID(const char* field) override {
+        return _real->getOID(field);
+    };
+    void getBinData(const char* field,
+                    std::function<void(const BSONBinData&)> withBinData) override {
+        _real->getBinData(field, std::move(withBinData));
+    }
+    Timestamp getTimestamp(const char* field) override {
+        return _real->getTimestamp(field);
+    };
+    JSRegEx getRegEx(const char* field) override {
+        return _real->getRegEx(field);
+    };
+    void setNumber(const char* field, double val) override {
         _real->setNumber(field, val);
     }
-    void setString(const char* field, StringData val) {
+    void setString(const char* field, StringData val) override {
         _real->setString(field, val);
     }
-    void setElement(const char* field, const BSONElement& val, const BSONObj& parent) {
+    void setElement(const char* field, const BSONElement& val, const BSONObj& parent) override {
         _real->setElement(field, val, parent);
     }
-    void setObject(const char* field, const BSONObj& obj, bool readOnly = true) {
+    void setObject(const char* field, const BSONObj& obj, bool readOnly = true) override {
         _real->setObject(field, obj, readOnly);
     }
-    bool isLastRetNativeCode() {
+    bool isLastRetNativeCode() override {
         return _real->isLastRetNativeCode();
     }
 
-    void setBoolean(const char* field, bool val) {
+    void setBoolean(const char* field, bool val) override {
         _real->setBoolean(field, val);
     }
-    void setFunction(const char* field, const char* code) {
+    void setFunction(const char* field, const char* code) override {
         _real->setFunction(field, code);
     }
-    ScriptingFunction createFunction(const char* code) {
+    ScriptingFunction createFunction(const char* code) override {
         return _real->createFunction(code);
     }
     int invoke(ScriptingFunction func,
@@ -535,7 +624,7 @@ public:
                int timeoutMs,
                bool ignoreReturn,
                bool readOnlyArgs,
-               bool readOnlyRecv) {
+               bool readOnlyRecv) override {
         return _real->invoke(func, args, recv, timeoutMs, ignoreReturn, readOnlyArgs, readOnlyRecv);
     }
     bool exec(StringData code,
@@ -543,34 +632,37 @@ public:
               bool printResult,
               bool reportError,
               bool assertOnError,
-              int timeoutMs = 0) {
+              int timeoutMs = 0) override {
         return _real->exec(code, name, printResult, reportError, assertOnError, timeoutMs);
     }
-    bool execFile(const string& filename, bool printResult, bool reportError, int timeoutMs = 0) {
+    bool execFile(const string& filename,
+                  bool printResult,
+                  bool reportError,
+                  int timeoutMs = 0) override {
         return _real->execFile(filename, printResult, reportError, timeoutMs);
     }
-    void injectNative(const char* field, NativeFunction func, void* data) {
+    void injectNative(const char* field, NativeFunction func, void* data) override {
         _real->injectNative(field, func, data);
     }
-    void append(BSONObjBuilder& builder, const char* fieldName, const char* scopeName) {
+    void append(BSONObjBuilder& builder, const char* fieldName, const char* scopeName) override {
         _real->append(builder, fieldName, scopeName);
     }
 
 protected:
-    ScriptingFunction _createFunction(const char* code) {
+    ScriptingFunction _createFunction(const char* code) override {
         return _real->_createFunction(code);
     }
 
 private:
-    string _pool;
+    ScopeCache::PoolName _pool;
     std::shared_ptr<Scope> _real;
 };
 
 /** Get a scope from the pool of scopes matching the supplied pool name */
 unique_ptr<Scope> ScriptEngine::getPooledScope(OperationContext* opCtx,
-                                               const string& db,
+                                               const DatabaseName& db,
                                                const string& scopeType) {
-    const string fullPoolName = db + scopeType;
+    const auto fullPoolName = std::make_tuple(db, scopeType);
     std::shared_ptr<Scope> s = scopeCache.tryAcquire(opCtx, fullPoolName);
     if (!s) {
         s.reset(newScope());

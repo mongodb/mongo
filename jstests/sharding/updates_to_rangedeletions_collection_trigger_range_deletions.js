@@ -3,10 +3,9 @@
  * config.rangeDeletions collection.
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/uuid_util.js");
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {getUUIDFromConfigCollections} from "jstests/libs/uuid_util.js";
+import {ShardVersioningUtil} from "jstests/sharding/libs/shard_versioning_util.js";
 
 const dbName = "test";
 const collName = "foo";
@@ -16,14 +15,12 @@ const ns = dbName + "." + collName;
 let st = new ShardingTest({shards: {rs0: {nodes: 3}, rs1: {nodes: 3}}});
 
 // Create a sharded collection with two chunks: [-inf, 50), [50, inf)
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 50}}));
 
 // Move chunk [50, inf) to shard1.
-assert.commandWorked(st.s.adminCommand(
-    {moveChunk: ns, find: {x: 50}, to: st.shard1.shardName, _waitForDelete: true}));
+assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 50}, to: st.shard1.shardName, _waitForDelete: true}));
 
 let testDB = st.s.getDB(dbName);
 let testColl = testDB.foo;
@@ -74,8 +71,10 @@ let testColl = testDB.foo;
         collectionUuid: collectionUuid,
         donorShardId: "unused",
         pending: true,
+        numOrphanDocs: orphanCount,
         range: {min: {x: 70}, max: {x: 90}},
-        whenToClean: "now"
+        whenToClean: "now",
+        preMigrationShardVersion: ShardVersioningUtil.kIgnoredShardVersion,
     };
 
     const rangeDeletionNs = "config.rangeDeletions";
@@ -126,8 +125,10 @@ let testColl = testDB.foo;
         collectionUuid: UUID(),
         donorShardId: "unused",
         pending: true,
+        numOrphanDocs: 0,
         range: {min: {x: 70}, max: {x: 90}},
-        whenToClean: "now"
+        whenToClean: "now",
+        preMigrationShardVersion: ShardVersioningUtil.kIgnoredShardVersion,
     };
 
     const rangeDeletionNs = "config.rangeDeletions";
@@ -140,7 +141,7 @@ let testColl = testDB.foo;
     assert.commandWorked(deletionsColl.update(deletionTask, {$unset: {pending: ""}}));
 
     // Verify that the deletion task gets deleted after being processed.
-    assert.soon(function() {
+    assert.soon(function () {
         return deletionsColl.find().itcount() === 0;
     });
 
@@ -153,4 +154,3 @@ let testColl = testDB.foo;
 })();
 
 st.stop();
-})();

@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import os
-import wiredtiger, wttest
+import wttest
 
 # test_isnew
 #    database is-new method
@@ -36,12 +36,12 @@ class test_isnew(wttest.WiredTigerTestCase):
     # Test is-new of a connection.
     def test_isnew(self):
         # We just created a connection, is_new should return True.
-        self.assertEquals(self.conn.is_new(), True)
+        self.assertEqual(self.conn.is_new(), True)
 
         # Close and re-open the connection, is_new should return False.
         self.conn.close()
         self.conn = self.setUpConnectionOpen(".")
-        self.assertEquals(self.conn.is_new(), False)
+        self.assertEqual(self.conn.is_new(), False)
 
 # test_gethome
 #    database get-home method
@@ -49,7 +49,7 @@ class test_gethome(wttest.WiredTigerTestCase):
 
     # Test gethome of a connection, the initially created one is ".".
     def test_gethome_default(self):
-        self.assertEquals(self.conn.get_home(), '.')
+        self.assertEqual(self.conn.get_home(), '.')
 
     # Create a new database directory, open it and check its name.
     def test_gethome_new(self):
@@ -57,7 +57,7 @@ class test_gethome(wttest.WiredTigerTestCase):
         os.mkdir(name)
         self.conn.close()
         self.conn = self.setUpConnectionOpen(name)
-        self.assertEquals(self.conn.get_home(), name)
+        self.assertEqual(self.conn.get_home(), name)
 
 # test_base_config
 #       test base configuration file config.
@@ -71,6 +71,3 @@ class test_base_config(wttest.WiredTigerTestCase):
         conn = self.wiredtiger_open("A", "create,config_base=false")
         self.assertFalse(os.path.exists("A/WiredTiger.basecfg"))
         conn.close()
-
-if __name__ == '__main__':
-    wttest.run()

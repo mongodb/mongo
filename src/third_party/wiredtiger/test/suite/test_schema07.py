@@ -26,14 +26,19 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest
+import wttest
+from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
+from wtscenario import make_scenarios
 
 # test_schema07.py
 #    Test that long-running tests don't fill the cache with metadata
-class test_schema07(wttest.WiredTigerTestCase):
+class test_schema07(TieredConfigMixin, wttest.WiredTigerTestCase):
     tablename = 'table:test_schema07'
 
     conn_config = 'cache_size=10MB'
+
+    tiered_storage_sources = gen_tiered_storage_sources()
+    scenarios = make_scenarios(tiered_storage_sources)
 
     @wttest.longtest("Creating many tables shouldn't fill the cache")
     def test_many_tables(self):
@@ -47,7 +52,4 @@ class test_schema07(wttest.WiredTigerTestCase):
             # This will block if the metadata fills the cache
             c["key"] = "value"
             c.close()
-            self.session.drop(uri)
-
-if __name__ == '__main__':
-    wttest.run()
+            self.dropUntilSuccess(self.session, uri)

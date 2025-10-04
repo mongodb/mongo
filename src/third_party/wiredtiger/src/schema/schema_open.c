@@ -9,12 +9,12 @@
 #include "wt_internal.h"
 
 /*
- * __wt_schema_colgroup_name --
+ * __schema_colgroup_name --
  *     Get the URI for a column group. This is used for metadata lookups. The only complexity here
  *     is that simple tables (with a single column group) use a simpler naming scheme.
  */
-int
-__wt_schema_colgroup_name(
+static int
+__schema_colgroup_name(
   WT_SESSION_IMPL *session, WT_TABLE *table, const char *cgname, size_t len, WT_ITEM *buf)
 {
     const char *tablename;
@@ -28,11 +28,23 @@ __wt_schema_colgroup_name(
 }
 
 /*
- * __wt_schema_open_colgroups --
+ * __wt_schema_tiered_shared_colgroup_name --
+ *     Get the URI for a tiered storage shared column group. This is used for metadata lookups.
+ */
+int
+__wt_schema_tiered_shared_colgroup_name(
+  WT_SESSION_IMPL *session, const char *tablename, bool active, WT_ITEM *buf)
+{
+    WT_PREFIX_SKIP(tablename, "table:");
+    return (__wt_buf_fmt(session, buf, "colgroup:%s.%s", tablename, active ? "active" : "shared"));
+}
+
+/*
+ * __wti_schema_open_colgroups --
  *     Open the column groups for a table.
  */
 int
-__wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
+__wti_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 {
     WT_COLGROUP *colgroup;
     WT_CONFIG cparser;
@@ -65,10 +77,14 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
          * Always open from scratch: we may have failed part of the way through opening a table, or
          * column groups may have changed.
          */
-        __wt_schema_destroy_colgroup(session, &table->cgroups[i]);
+        __wti_schema_destroy_colgroup(session, &table->cgroups[i]);
 
         WT_ERR(__wt_buf_init(session, buf, 0));
-        WT_ERR(__wt_schema_colgroup_name(session, table, ckey.str, ckey.len, buf));
+        if (table->is_tiered_shared)
+            WT_ERR(__wt_schema_tiered_shared_colgroup_name(
+              session, table->iface.name, i == 0 ? true : false, buf));
+        else
+            WT_ERR(__schema_colgroup_name(session, table, ckey.str, ckey.len, buf));
         if ((ret = __wt_metadata_search(session, buf->data, &cgconfig)) != 0) {
             /* It is okay if the table is incomplete. */
             if (ret == WT_NOTFOUND)
@@ -88,7 +104,7 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
     }
 
     if (!table->is_simple) {
-        WT_ERR(__wt_table_check(session, table));
+        WT_ERR(__wti_table_check(session, table));
 
         WT_ERR(__wt_buf_init(session, buf, 0));
         WT_ERR(__wt_struct_plan(session, table, table->colconf.str, table->colconf.len, true, buf));
@@ -99,7 +115,7 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 
 err:
     __wt_scr_free(session, &buf);
-    __wt_schema_destroy_colgroup(session, &colgroup);
+    __wti_schema_destroy_colgroup(session, &colgroup);
     __wt_free(session, cgconfig);
     return (ret);
 }
@@ -116,7 +132,7 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
     WT_DECL_ITEM(buf);
     WT_DECL_ITEM(plan);
     WT_DECL_RET;
-    u_int npublic_cols, i;
+    u_int i, npublic_cols;
 
     WT_ERR(__wt_scr_alloc(session, 0, &buf));
 
@@ -142,9 +158,6 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
           session, idx->name, &cval, &metadata, &idx->collator, &idx->collator_owned));
     }
 
-    WT_ERR(__wt_extractor_config(
-      session, idx->name, idx->config, &idx->extractor, &idx->extractor_owned));
-
     WT_ERR(__wt_config_getones(session, idx->config, "key_format", &cval));
     WT_ERR(__wt_strndup(session, cval.str, cval.len, &idx->key_format));
 
@@ -165,18 +178,6 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
         WT_ERR(__wt_buf_catfmt(session, buf, "%.*s,", (int)ckey.len, ckey.str));
     if (ret != WT_NOTFOUND)
         goto err;
-
-    /*
-     * If we didn't find any columns, the index must have an extractor. We don't rely on this
-     * unconditionally because it was only added to the metadata after version 2.3.1.
-     */
-    if (npublic_cols == 0) {
-        WT_ERR(__wt_config_getones(session, idx->config, "index_key_columns", &cval));
-        npublic_cols = (u_int)cval.val;
-        WT_ASSERT(session, npublic_cols != 0);
-        for (i = 0; i < npublic_cols; i++)
-            WT_ERR(__wt_buf_catfmt(session, buf, "\"bad col\","));
-    }
 
     /*
      * Now add any primary key columns from the table that are not already part of the index key.
@@ -206,15 +207,8 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 
     /* Set up the cursor key format (the visible columns). */
     WT_ERR(__wt_buf_init(session, buf, 0));
-    WT_ERR(__wt_struct_truncate(session, idx->key_format, npublic_cols, buf));
+    WT_ERR(__wti_struct_truncate(session, idx->key_format, npublic_cols, buf));
     WT_ERR(__wt_strndup(session, buf->data, buf->size, &idx->idxkey_format));
-
-    /*
-     * Add a trailing padding byte to the format. This ensures that there will be no special
-     * optimization of the last column, so the primary key columns can be simply appended.
-     */
-    WT_ERR(__wt_buf_catfmt(session, buf, "x"));
-    WT_ERR(__wt_strndup(session, buf->data, buf->size, &idx->exkey_format));
 
     /* By default, index cursor values are the table value columns. */
     /* TODO Optimize to use index columns in preference to table lookups. */
@@ -236,6 +230,7 @@ static int
 __schema_open_index(
   WT_SESSION_IMPL *session, WT_TABLE *table, const char *idxname, size_t len, WT_INDEX **indexp)
 {
+    struct timespec tsp;
     WT_CURSOR *cursor;
     WT_DECL_ITEM(tmp);
     WT_DECL_RET;
@@ -245,13 +240,14 @@ __schema_open_index(
     const char *idxconf, *name, *tablename, *uri;
     bool match;
 
-    /* Check if we've already done the work. */
-    if (idxname == NULL && table->idx_complete)
-        return (0);
-
     cursor = NULL;
     idx = NULL;
     match = false;
+
+    /* Add a 2 second wait to simulate open index slowness. */
+    tsp.tv_sec = 2;
+    tsp.tv_nsec = 0;
+    __wt_timing_stress(session, WT_TIMING_STRESS_OPEN_INDEX_SLOW, &tsp);
 
     /* Build a search key. */
     tablename = table->iface.name;
@@ -274,7 +270,7 @@ __schema_open_index(
              * longer exist.
              */
             while (i < table->nindices) {
-                WT_TRET(__wt_schema_destroy_index(session, &table->indices[table->nindices - 1]));
+                WT_TRET(__wti_schema_destroy_index(session, &table->indices[table->nindices - 1]));
                 table->indices[--table->nindices] = NULL;
             }
             break;
@@ -294,7 +290,7 @@ __schema_open_index(
         cmp = 0;
         while (table->indices[i] != NULL && (cmp = strcmp(uri, table->indices[i]->name)) > 0) {
             /* Index no longer exists, remove it. */
-            WT_ERR(__wt_schema_destroy_index(session, &table->indices[i]));
+            WT_ERR(__wti_schema_destroy_index(session, &table->indices[i]));
             memmove(&table->indices[i], &table->indices[i + 1],
               (table->nindices - i) * sizeof(WT_INDEX *));
             table->indices[--table->nindices] = NULL;
@@ -322,7 +318,7 @@ __schema_open_index(
              * save the index: it will need to be reopened once the table is complete.
              */
             if (!table->cg_complete) {
-                WT_ERR(__wt_schema_destroy_index(session, &idx));
+                WT_ERR(__wti_schema_destroy_index(session, &idx));
                 if (idxname != NULL)
                     break;
                 continue;
@@ -356,7 +352,7 @@ __schema_open_index(
 
 err:
     WT_TRET(__wt_metadata_cursor_release(session, &cursor));
-    WT_TRET(__wt_schema_destroy_index(session, &idx));
+    WT_TRET(__wti_schema_destroy_index(session, &idx));
 
     __wt_scr_free(session, &tmp);
     return (ret);
@@ -372,6 +368,10 @@ __wt_schema_open_index(
 {
     WT_DECL_RET;
 
+    /* Check if we've already done the work. */
+    if (idxname == NULL && table->idx_complete)
+        return (0);
+
     WT_WITH_TABLE_WRITE_LOCK(session,
       WT_WITH_TXN_ISOLATION(session, WT_ISO_READ_UNCOMMITTED,
         ret = __schema_open_index(session, table, idxname, len, indexp)));
@@ -386,6 +386,58 @@ int
 __wt_schema_open_indices(WT_SESSION_IMPL *session, WT_TABLE *table)
 {
     return (__wt_schema_open_index(session, table, NULL, 0, NULL));
+}
+
+/*
+ * __wt_schema_open_page_log --
+ *     Return a page log if configured. This doesn't really belong here, but it's shared between
+ *     btree and tiered handle configuration, so I could not think of somewhere better.
+ */
+int
+__wt_schema_open_page_log(
+  WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name, WT_NAMED_PAGE_LOG **npage_logp)
+{
+    WT_CONNECTION_IMPL *conn;
+    WT_NAMED_PAGE_LOG *npage_log;
+
+    *npage_logp = NULL;
+
+    if (name->len == 0 || WT_CONFIG_LIT_MATCH("none", *name))
+        return (0);
+
+    conn = S2C(session);
+    TAILQ_FOREACH (npage_log, &conn->pagelogqh, q)
+        if (WT_CONFIG_MATCH(npage_log->name, *name)) {
+            *npage_logp = npage_log;
+            return (0);
+        }
+    WT_RET_MSG(session, EINVAL, "unknown page log '%.*s'", (int)name->len, name->str);
+}
+
+/*
+ * __wt_schema_open_storage_source --
+ *     Return a storage source if configured. This doesn't really belong here, but it's shared
+ *     between btree and tiered handle configuration, so I could not think of somewhere better.
+ */
+int
+__wt_schema_open_storage_source(
+  WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name, WT_NAMED_STORAGE_SOURCE **nstoragep)
+{
+    WT_CONNECTION_IMPL *conn;
+    WT_NAMED_STORAGE_SOURCE *nstorage;
+
+    *nstoragep = NULL;
+
+    if (name->len == 0 || WT_CONFIG_LIT_MATCH("none", *name))
+        return (0);
+
+    conn = S2C(session);
+    TAILQ_FOREACH (nstorage, &conn->storagesrcqh, q)
+        if (WT_CONFIG_MATCH(nstorage->name, *name)) {
+            *nstoragep = nstorage;
+            return (0);
+        }
+    WT_RET_MSG(session, EINVAL, "unknown storage source '%.*s'", (int)name->len, name->str);
 }
 
 /*
@@ -428,7 +480,7 @@ __schema_open_table(WT_SESSION_IMPL *session)
 
     /* Check that the columns match the key and value formats. */
     if (!table->is_simple)
-        WT_RET(__wt_schema_colcheck(session, table->key_format, table->value_format,
+        WT_RET(__wti_schema_colcheck(session, table->key_format, table->value_format,
           &table->colconf, &table->nkey_columns, NULL));
 
     WT_RET(__wt_config_gets(session, table_cfg, "colgroups", &table->cgconf));
@@ -443,8 +495,12 @@ __schema_open_table(WT_SESSION_IMPL *session)
     if (table->ncolgroups > 0 && table->is_simple)
         WT_RET_MSG(session, EINVAL, "%s requires a table with named columns", tablename);
 
+    if ((ret = __wt_config_gets(session, table_cfg, "shared", &cval)) == 0)
+        table->is_tiered_shared = true;
+    WT_RET_NOTFOUND_OK(ret);
+
     WT_RET(__wt_calloc_def(session, WT_COLGROUPS(table), &table->cgroups));
-    WT_RET(__wt_schema_open_colgroups(session, table));
+    WT_RET(__wti_schema_open_colgroups(session, table));
 
     return (0);
 }
@@ -495,11 +551,11 @@ __wt_schema_get_colgroup(
 }
 
 /*
- * __wt_schema_get_index --
+ * __wti_schema_get_index --
  *     Find an index by URI.
  */
 int
-__wt_schema_get_index(
+__wti_schema_get_index(
   WT_SESSION_IMPL *session, const char *uri, bool invalidate, bool quiet, WT_INDEX **indexp)
 {
     WT_DECL_RET;
@@ -558,4 +614,105 @@ __wt_schema_open_table(WT_SESSION_IMPL *session)
       WT_WITH_TXN_ISOLATION(session, WT_ISO_READ_UNCOMMITTED, ret = __schema_open_table(session)));
 
     return (ret);
+}
+
+/*
+ * __schema_open_layered_ingest --
+ *     Open the ingest table for a layered table.
+ */
+static int
+__schema_open_layered_ingest(WT_SESSION_IMPL *session, WT_LAYERED_TABLE *layered, const char *uri)
+{
+    WT_BTREE *ingest_btree;
+
+    WT_RET(__wt_session_get_dhandle(session, uri, NULL, NULL, 0));
+
+    /*
+     * This is a bit of a hack. The problem is that during shutdown, all dhandles are closed. But as
+     * part of closing a layered table, we need to get the IDs of the B-Trees backing the
+     * constituent tables (to remove them from the manager thread). This involves dereferencing the
+     * dhandle pointer, but that's been freed.
+     */
+    ingest_btree = (WT_BTREE *)session->dhandle->handle;
+    layered->ingest_btree_id = ingest_btree->id;
+
+    /* Flag the ingest btree as participating in automatic garbage collection */
+    F_SET(ingest_btree, WT_BTREE_GARBAGE_COLLECT);
+
+    /* FIXME-WT-15192: Consider setting `prune_timestamp` to `last_checkpoint_timestamp` */
+    ingest_btree->prune_timestamp = WT_TS_NONE;
+
+    WT_RET(__wt_session_release_dhandle(session));
+    return (0);
+}
+
+/*
+ * __schema_open_layered --
+ *     Open the data handle for a layered table (internal version).
+ */
+static int
+__schema_open_layered(WT_SESSION_IMPL *session)
+{
+    WT_CONFIG_ITEM cval;
+    WT_LAYERED_TABLE *layered;
+    const char **layered_cfg;
+
+    WT_ASSERT_ALWAYS(session, session->dhandle->type == WT_DHANDLE_TYPE_LAYERED,
+      "handle type doesn't match layered");
+    layered = (WT_LAYERED_TABLE *)session->dhandle;
+    layered_cfg = layered->iface.cfg;
+
+    WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_TABLE));
+
+    /* FIXME-WT-14738: Setup collator information. */
+    layered->collator = NULL;
+    layered->collator_owned = 0;
+
+    WT_RET(__wt_config_gets(session, layered_cfg, "key_format", &cval));
+    WT_RET(__wt_strndup(session, cval.str, cval.len, &layered->key_format));
+    WT_RET(__wt_config_gets(session, layered_cfg, "value_format", &cval));
+    WT_RET(__wt_strndup(session, cval.str, cval.len, &layered->value_format));
+
+    WT_RET(__wt_config_gets(session, layered_cfg, "ingest", &cval));
+    WT_RET(__wt_strndup(session, cval.str, cval.len, &layered->ingest_uri));
+    WT_RET(__wt_config_gets(session, layered_cfg, "stable", &cval));
+    WT_RET(__wt_strndup(session, cval.str, cval.len, &layered->stable_uri));
+
+    return (0);
+}
+
+/*
+ * __wt_schema_open_layered --
+ *     Open a layered table.
+ */
+int
+__wt_schema_open_layered(WT_SESSION_IMPL *session)
+{
+    WT_DECL_RET;
+    WT_LAYERED_TABLE *layered;
+
+    if (!__wt_conn_is_disagg(session)) {
+        __wt_err(session, EINVAL, "layered table is only supported for disaggregated storage");
+        return (EINVAL);
+    }
+
+    /* This needs to hold the table write lock, so the handle doesn't get swept and closed */
+    WT_WITH_TABLE_WRITE_LOCK(session, ret = __schema_open_layered(session));
+    WT_RET(ret);
+
+    layered = (WT_LAYERED_TABLE *)session->dhandle;
+    WT_ASSERT_ALWAYS(session, session->dhandle->type == WT_DHANDLE_TYPE_LAYERED,
+      "Handle type doesn't match layered");
+    /*
+     * Open the ingest table after releasing the table write lock. That is safe, since if multiple
+     * threads are opening a layered table, the regular handle open scheme handles races of getting
+     * these sub-handles into the connection.
+     */
+    WT_SAVE_DHANDLE(
+      session, ret = __schema_open_layered_ingest(session, layered, layered->ingest_uri));
+    WT_RET(ret);
+
+    WT_RET(__wt_layered_table_manager_add_table(session, layered->ingest_btree_id));
+
+    return (0);
 }

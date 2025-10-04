@@ -1,0 +1,44 @@
+version: 2.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/mongo-default-approvers
+  - "README.md":
+    approvers:
+      - 10gen/devprod-correctness
+  - "/generated_suites/*viewless_timeseries.yml":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
+  - "/generated_suites/*legacy_timeseries_no_rawdata.yml":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
+  - "/generated_suites/*injected_catalog_metadata.yml":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
+  - "/generated_suites/sharding_task_executor_pool_size*":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "/generated_suites/change_streams_*":
+    approvers:
+      - 10gen/query-execution-change-streams
+  - "/generated_suites/*ingress_request_rate_limiter*":
+    approvers:
+      - 10gen/server-workload-resilience
+  - "/generated_suites/bulk_write_*":
+    approvers:
+      - 10gen/query-execution-router
+  - "generated_suites/sharding_auth_audit.yml":
+    approvers:
+      - 10gen/server-security
+  - "generated_suites/fcv_upgrade_downgrade_primary_step_down_passthrough.yml":
+    approvers:
+      - 10gen/server-replication-reviewers
+  - "generated_suites/*primary_driven_index_builds.yml":
+    approvers:
+      - 10gen/server-index-builds
+  - "generated_suites/*query_shape_hash_stability*":
+    approvers:
+      - 10gen/query-execution-query-settings
+  - "generated_suites/replica_sets_recordids_replicated_jscore_passthrough.yml":
+    approvers:
+      - 10gen/server-collection-write-path

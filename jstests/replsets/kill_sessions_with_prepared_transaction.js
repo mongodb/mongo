@@ -3,10 +3,8 @@
  *
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
-(function() {
-"use strict";
-
-load("jstests/core/txns/libs/prepare_helpers.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
@@ -36,7 +34,7 @@ const session3Coll = session3Db[collName];
 function preparedTxnOpFilter(session) {
     return {
         "lsid.id": session.getSessionId().id,
-        "transaction.timePreparedMicros": {$exists: true}
+        "transaction.timePreparedMicros": {$exists: true},
     };
 }
 
@@ -88,8 +86,7 @@ assert.eq(primaryDB.currentOp(preparedTxnOpFilter(session)).inprog.length, 1);
 assert.eq(primaryDB.currentOp(preparedTxnOpFilter(session2)).inprog.length, 1);
 
 // The unprepared transaction should have been aborted when its session was killed.
-assert.commandFailedWithCode(session3Db.adminCommand({commitTransaction: 1}),
-                             ErrorCodes.NoSuchTransaction);
+assert.commandFailedWithCode(session3Db.adminCommand({commitTransaction: 1}), ErrorCodes.NoSuchTransaction);
 
 // Commit each transaction.
 assert.commandWorked(PrepareHelpers.commitTransaction(session, commitTs1));
@@ -99,4 +96,3 @@ assert.commandWorked(PrepareHelpers.commitTransaction(session2, commitTs2));
 assert.sameMembers([{_id: 1}, {_id: 2}], sessionColl.find().toArray());
 
 rst.stopSet();
-}());

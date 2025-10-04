@@ -29,34 +29,52 @@
 
 #pragma once
 
-#include <string>
-
-#include "mongo/db/namespace_string.h"
+#include "mongo/db/service_context.h"
 #include "mongo/util/background.h"
 
 namespace mongo {
 
 /**
- * Responsible for deleting oplog stones once their max capacity has been reached.
+ * Responsible for deleting oplog truncate markers once their max capacity has been reached.
  */
 class OplogCapMaintainerThread : public BackgroundJob {
 public:
-    OplogCapMaintainerThread() : BackgroundJob(true /* deleteSelf */) {}
+    OplogCapMaintainerThread() : BackgroundJob(false /* deleteSelf */) {}
 
-    virtual std::string name() const {
+    static OplogCapMaintainerThread* get(ServiceContext* serviceCtx);
+    static OplogCapMaintainerThread* get(OperationContext* opCtx);
+    static void set(ServiceContext* serviceCtx,
+                    std::unique_ptr<OplogCapMaintainerThread> oplogCapMaintainerThread);
+
+    std::string name() const override {
         return _name;
     }
 
-    virtual void run();
+    void run() override;
+
+    /**
+     * Waits until the maintainer thread finishes. Must not be called concurrently with start().
+     */
+    void shutdown(const Status& reason);
 
 private:
     /**
      * Returns true iff there was an oplog to delete from.
      */
-    bool _deleteExcessDocuments();
+    bool _deleteExcessDocuments(OperationContext* opCtx);
 
-    std::string _name =
-        std::string("OplogCapMaintainerThread-") + NamespaceString::kRsOplogNamespace.toString();
+    // Serializes setting/resetting _uniqueCtx and marking _uniqueCtx killed.
+    mutable stdx::mutex _opCtxMutex;
+
+    // Saves a reference to the cap maintainer thread's operation context.
+    boost::optional<ServiceContext::UniqueOperationContext> _uniqueCtx;
+
+    mutable stdx::mutex _stateMutex;
+    bool _shuttingDown = false;
+    Status _shutdownReason = Status::OK();
+
+    std::string _name = std::string("OplogCapMaintainerThread-") +
+        toStringForLogging(NamespaceString::kRsOplogNamespace);
 };
 
 }  // namespace mongo

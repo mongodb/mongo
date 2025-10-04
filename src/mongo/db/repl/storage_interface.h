@@ -30,30 +30,39 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <cstddef>
-#include <iosfwd>
-#include <string>
-
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/local_catalog/collection.h"
+#include "mongo/db/local_catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/index_bounds.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/collection_bulk_loader.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/key_string/key_string.h"
+#include "mongo/util/modules.h"
+#include "mongo/util/uuid.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <iosfwd>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
-
-class Collection;
-class CollectionPtr;
-struct CollectionOptions;
-class OperationContext;
-
 namespace repl {
 
-struct TimestampedBSONObj {
+struct MONGO_MOD_PUB TimestampedBSONObj {
     BSONObj obj;
     Timestamp timestamp;
 };
@@ -70,7 +79,7 @@ struct TimestampedBSONObj {
  *      * Drop a collection
  *      * Insert documents into a collection
  */
-class StorageInterface {
+class MONGO_MOD_OPEN StorageInterface {
     StorageInterface(const StorageInterface&) = delete;
     StorageInterface& operator=(const StorageInterface&) = delete;
 
@@ -189,6 +198,14 @@ public:
     virtual Status dropCollection(OperationContext* opCtx, const NamespaceString& nss) = 0;
 
     /**
+     * Drops all collections with a name starting with the prefix in the database.
+     * To drop all collections regardless of prefix, use an empty string.
+     */
+    virtual Status dropCollectionsWithPrefix(OperationContext* opCtx,
+                                             const DatabaseName& dbName,
+                                             const std::string& collectionNamePrefix) = 0;
+
+    /**
      * Truncates a collection.
      */
     virtual Status truncateCollection(OperationContext* opCtx, const NamespaceString& nss) = 0;
@@ -217,11 +234,6 @@ public:
      * Drops all databases except "local".
      */
     virtual Status dropReplicatedDatabases(OperationContext* opCtx) = 0;
-
-    /**
-     * Validates that the admin database is valid during initial sync.
-     */
-    virtual Status isAdminDbValid(OperationContext* opCtx) = 0;
 
     /**
      * Finds at most "limit" documents returned by a collection or index scan on the collection in
@@ -284,6 +296,20 @@ public:
                                 const TimestampedBSONObj& update) = 0;
 
     /**
+     * Updates a singleton document in a collection. Upserts the document if it does not exist. If
+     * the document is upserted and no '_id' is provided, one will be generated.
+     * If the collection has more than 1 document matching the query, the update will only be
+     * performed on the first one found. The upsert is performed at the given timestamp. Returns
+     * 'NamespaceNotFound' if the collection does not exist. This does not implicitly create the
+     * collection so that the caller can create the collection with any collection options they want
+     * (ex: capped, temp, collation, etc.).
+     */
+    virtual Status putSingleton(OperationContext* opCtx,
+                                const NamespaceString& nss,
+                                const BSONObj& query,
+                                const TimestampedBSONObj& update) = 0;
+
+    /**
      * Updates a singleton document in a collection. Never upsert.
      *
      * If the collection has more than 1 document, the update will only be performed on the first
@@ -296,6 +322,22 @@ public:
                                    const NamespaceString& nss,
                                    const BSONObj& query,
                                    const TimestampedBSONObj& update) = 0;
+
+    /**
+     * Updates all matching documents in a collection. Never upsert.
+     *
+     * If the collection has more than 1 document, the update will be performed on all the documents
+     * found. The update is performed at the given timestamp.
+     * Returns 'NamespaceNotFound' if the collection does not exist. This does not implicitly
+     * create the collection so that the caller can create the collection with any collection
+     * options they want (ex: capped, temp, collation, etc.).
+     */
+    virtual Status updateDocuments(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const BSONObj& query,
+        const TimestampedBSONObj& update,
+        const boost::optional<std::vector<BSONObj>>& arrayFilters = boost::none) = 0;
 
     /**
      * Finds a single document in the collection referenced by the specified _id.
@@ -339,21 +381,21 @@ public:
                                   const BSONObj& filter) = 0;
 
     /**
-     * Searches for an oplog entry with a timestamp <= 'timestamp'. Returns boost::none if no
+     * Searches for an oplog optime with a timestamp <= 'timestamp'. Returns boost::none if no
      * matches are found.
      */
-    virtual boost::optional<BSONObj> findOplogEntryLessThanOrEqualToTimestamp(
+    virtual boost::optional<OpTimeAndWallTime> findOplogOpTimeLessThanOrEqualToTimestamp(
         OperationContext* opCtx, const CollectionPtr& oplog, const Timestamp& timestamp) = 0;
 
     /**
-     * Calls findOplogEntryLessThanOrEqualToTimestamp with endless WriteConflictException retries.
+     * Calls findOplogOpTimeLessThanOrEqualToTimestamp with endless WriteConflictException retries.
      * Other errors get thrown. Concurrent oplog reads with the validate cmd on the same collection
      * may throw WCEs. Obeys opCtx interrupts.
      *
-     * Call this function instead of findOplogEntryLessThanOrEqualToTimestamp if the caller cannot
+     * Call this function instead of findOplogOpTimeLessThanOrEqualToTimestamp if the caller cannot
      * fail, say for correctness.
      */
-    virtual boost::optional<BSONObj> findOplogEntryLessThanOrEqualToTimestampRetryOnWCE(
+    virtual boost::optional<OpTimeAndWallTime> findOplogOpTimeLessThanOrEqualToTimestampRetryOnWCE(
         OperationContext* opCtx, const CollectionPtr& oplog, const Timestamp& timestamp) = 0;
 
     /**
@@ -411,6 +453,11 @@ public:
     virtual void setInitialDataTimestamp(ServiceContext* serviceCtx, Timestamp snapshotName) = 0;
 
     /**
+     * Returns the initial timestamp of data at startup.
+     */
+    virtual Timestamp getInitialDataTimestamp(ServiceContext* serviceCtx) const = 0;
+
+    /**
      * Reverts the state of all database data to the last stable timestamp.
      *
      * The "local" database is exempt and none of its state should be reverted except for
@@ -431,14 +478,6 @@ public:
      * Returns whether the storage engine can provide a recovery timestamp.
      */
     virtual bool supportsRecoveryTimestamp(ServiceContext* serviceCtx) const = 0;
-
-    /**
-     * Responsible for initializing independent processes for replication that manage
-     * and interact with the storage layer.
-     *
-     * Initializes the OplogCapMaintainerThread to control deletion of oplog stones.
-     */
-    virtual void initializeStorageControlsForReplication(ServiceContext* serviceCtx) const = 0;
 
     /**
      * Returns the stable timestamp that the storage engine recovered to on startup. If the

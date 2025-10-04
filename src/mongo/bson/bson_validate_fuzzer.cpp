@@ -26,12 +26,15 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bson_validate_old.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/hex.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 
 extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
     using namespace mongo;
@@ -56,6 +59,8 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
     // This will effectively cause the fuzer to find differences between both implementations
     // (as they'd lead to crashes), while using edge cases leading to interesting control flow
     // paths in both implementations.
-    invariant(oldRet.isOK() == ret.isOK());
+    //
+    // Ignore changes due to column validation failing additional entries
+    invariant(oldRet.isOK() == ret.isOK() || ret.code() == ErrorCodes::NonConformantBSON);
     return 0;
 }

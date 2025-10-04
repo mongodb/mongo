@@ -29,13 +29,14 @@
 
 #pragma once
 
-#include <fmt/format.h>
+#include "mongo/bson/util/builder.h"
+#include "mongo/db/tenant_id.h"
+
 #include <iosfwd>
 #include <string>
 
 #include <boost/optional.hpp>
-
-#include "mongo/bson/util/builder.h"
+#include <fmt/format.h>
 
 namespace mongo {
 
@@ -43,6 +44,12 @@ class Status;
 template <typename T>
 class StatusWith;
 class StringData;
+
+/**
+ * Validate that a string is either empty or is parseable to a HostAndPort. This is intended for use
+ * as an IDL validator callback.
+ */
+Status validateHostAndPort(const std::string& hostAndPortStr, const boost::optional<TenantId>&);
 
 /**
  * Name of a process on the network.
@@ -194,7 +201,7 @@ struct formatter<mongo::HostAndPort> {
         return ctx.begin();
     }
     template <typename FormatContext>
-    auto format(const mongo::HostAndPort& hp, FormatContext& ctx) {
+    auto format(const mongo::HostAndPort& hp, FormatContext& ctx) const {
         auto&& it = ctx.out();
         hp._appendToPolymorphicFunc([&](const auto& v) { it = fmt::format_to(it, "{}", v); });
         return it;

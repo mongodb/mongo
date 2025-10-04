@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest
+import wttest
 from wtscenario import make_scenarios
 
 # test_metadata_cursor02.py
@@ -35,6 +35,7 @@ from wtscenario import make_scenarios
 # Test metadata cursor semantics when the underlying metadata is invalid.
 # This can happen after a crash, or if part of a table is dropped separate
 # from dropping the whole table.
+@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_metadata_cursor02(wttest.WiredTigerTestCase):
     """
     Test metadata cursor operations with invalid metadata
@@ -85,6 +86,3 @@ class test_metadata_cursor02(wttest.WiredTigerTestCase):
 
             # Should include the metadata and the two valid tables
             self.assertEqual(count, self.metauri.endswith('create') and 2 or 3)
-
-if __name__ == '__main__':
-    wttest.run()

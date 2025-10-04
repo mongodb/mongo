@@ -18,8 +18,29 @@ volumes of data,
 - WiredTiger stores are not corrupted by torn writes, reverting to the
 last checkpoint after system failure,
 
-- WiredTiger supports petabyte tables, records up to 4GB, and record
-numbers up to 64-bits.
+- WiredTiger supports both checkpoint-level and commit-level durability, as well
+as an additional timestamp mode which gives applications fine-grained control
+over database durability,
+
+- WiredTiger supports petabyte tables, records up to 4GB, and record numbers up
+to 64-bits.
+
+@section quality Production quality
+
+WiredTiger is production quality, supported software, engineered for the most
+demanding application environments. WiredTiger is the primary storage engine
+under the MongoDB Database and the MongoDB  Atlas product line.
+
+As a no-overwrite data engine, WiredTiger is safe from operating system and
+hardware-level torn writes. Additionally, WiredTiger includes end-to-end
+checksums and verification support so you can verify data sets, and salvage
+support as a last-ditch protection: data can be retrieved even if it somehow
+becomes corrupted.
+
+@section nosql NoSQL and Open Source
+
+WiredTiger is an Open Source, NoSQL data engine.  See the @ref license for
+details.
 
 WiredTiger's design is focused on a few core principles:
 
@@ -48,12 +69,6 @@ memory requirements.  Finally, row-and column-stores can be
 mixed-and-matched at the table level: for example, a row-store index can
 be created on a column-store table.
 
-WiredTiger supports @ref lsm, where updates are buffered in small files
-that fit in cache for fast random updates, then automatically merged into
-larger files in the background so that read latency approaches that of
-traditional Btree files.  LSM trees automatically create Bloom filters to
-avoid unnecessary reads from files that cannot containing matching keys.
-
 WiredTiger supports different-sized Btree internal and leaf pages in the
 same file.  Applications can maximize the amount of data transferred in
 each I/O by configuring large leaf pages, and still minimize CPU cache
@@ -61,10 +76,6 @@ misses when searching the tree.
 
 WiredTiger supports key prefix compression and value dictionaries,
 reducing the amount of memory keys and values require.
-
-WiredTiger supports static encoding with a configurable Huffman engine,
-which typically reduces the amount of information maintained in memory
-by 20-50%.
 
 @section io Making I/O more valuable
 
@@ -95,20 +106,5 @@ Also, as noted in the @ref cache section, WiredTiger supports
 column-store formats, prefix compression and static encoding.  While
 each of these features makes WiredTiger's use of memory more efficient,
 they also maximize the amount of useful data transferred per disk I/O.
-
-@section quality Production quality
-
-WiredTiger is production quality, supported software, engineered for the
-most demanding application environments.  For example, as a no-overwrite
-data engine, torn writes can never corrupt a WiredTiger data store.
-
-WiredTiger includes verification support so you can verify data sets,
-and salvage support as a last-ditch protection: data can be retrieved
-even if it somehow becomes corrupted.
-
-@section nosql NoSQL and Open Source
-
-WiredTiger is an Open Source, NoSQL data engine.  See the @ref license
-for details.
 
 */

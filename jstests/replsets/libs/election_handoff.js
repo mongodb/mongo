@@ -1,15 +1,11 @@
-"use strict";
-
 /**
  * This file is used for testing election handoff.
  */
 
-var ElectionHandoffTest = (function() {
-    load("jstests/replsets/rslib.js");
-    load("jstests/libs/logv2_helpers.js");
-
+export var ElectionHandoffTest = (function () {
     const kStepDownPeriodSecs = 30;
     const kSIGTERM = 15;
+    const kTimeoutMS = 5 * 60 * 1000; // 5 minutes
 
     /**
      * Exercises and validates an election handoff scenario by stepping down the primary and
@@ -29,10 +25,8 @@ var ElectionHandoffTest = (function() {
         const numNodes = config.members.length;
         const memberInfo = config.members[expectedCandidateId];
 
-        assert.neq(
-            true, memberInfo["arbiterOnly"], "Election handoff candidate cannot be an arbiter.");
-        assert.neq(
-            0, memberInfo["priority"], "Election handoff candidate cannot have zero priority");
+        assert.neq(true, memberInfo["arbiterOnly"], "Election handoff candidate cannot be an arbiter.");
+        assert.neq(0, memberInfo["priority"], "Election handoff candidate cannot have zero priority");
 
         rst.awaitNodesAgreeOnPrimary();
         const primary = rst.getPrimary();
@@ -53,49 +47,63 @@ var ElectionHandoffTest = (function() {
         // Make sure all secondaries are ready before stepping down. We must additionally
         // make sure that the primary is aware that the secondaries are ready and caught up
         // to the primary's lastApplied, so we issue a dummy write and wait on its optime.
-        assert.commandWorked(primary.getDB("test").secondariesMustBeCaughtUpToHere.insert(
-            {"a": 1}, {writeConcern: {w: rst.nodes.length}}));
+        assert.commandWorked(
+            primary
+                .getDB("test")
+                .secondariesMustBeCaughtUpToHere.insert({"a": 1}, {writeConcern: {w: rst.nodes.length}}),
+        );
         rst.awaitNodesAgreeOnAppliedOpTime();
+
+        // Make sure we clear any logs of RST setup, which can involve stepping up the original
+        // primary, before checking for stepup logs from the expected candidate node.
+        clearRawMongoProgramOutput();
 
         // Step down the current primary. Skip validation since it prevents election handoff.
         if (options["stepDownBySignal"]) {
             rst.stop(initialPrimaryId, kSIGTERM, {skipValidation: true}, {forRestart: true});
             rst.start(initialPrimaryId, {}, true);
         } else {
-            assert.commandWorked(primary.adminCommand({
-                replSetStepDown: options.stepDownPeriodSecs || kStepDownPeriodSecs,
-                secondaryCatchUpPeriodSecs:
-                    options.secondaryCatchUpPeriodSecs || kStepDownPeriodSecs / 2
-            }));
+            assert.commandWorked(
+                primary.adminCommand({
+                    replSetStepDown: options.stepDownPeriodSecs || kStepDownPeriodSecs,
+                    secondaryCatchUpPeriodSecs: options.secondaryCatchUpPeriodSecs || kStepDownPeriodSecs / 2,
+                }),
+            );
         }
 
         jsTestLog(`Checking that the secondary with id ${expectedCandidateId} is stepped up...`);
 
         const expectedCandidate = rst.nodes[expectedCandidateId];
 
-        // The checkLog() function blocks until the log line appears.
-        checkLog.contains(expectedCandidate, "Starting an election due to step up request");
+        let subStr = "Starting an election due to step up request";
+        assert.soon(
+            function () {
+                return rawMongoProgramOutput(".*").includes(subStr);
+            },
+            "Secondary should have stepped up via step up request",
+            kTimeoutMS,
+        );
 
-        if (isJsonLog(expectedCandidate)) {
-            // If there are only two nodes in the set, verify that the old primary voted "yes".
-            if (numNodes === 2) {
-                checkLog.contains(
-                    expectedCandidate,
-                    `Skipping dry run and running for election","attr":{"newTerm":${term + 1}}}`);
-                checkLog.checkContainsOnceJson(
-                    expectedCandidate,
-                    51799,
-                    {"term": term + 1, vote: "yes", "from": primary.host});
-            }
-        } else {
-            // If there are only two nodes in the set, verify that the old primary voted "yes".
-            if (numNodes === 2) {
-                checkLog.contains(expectedCandidate,
-                                  `skipping dry run and running for election in term ${term + 1}`);
-                checkLog.contains(
-                    expectedCandidate,
-                    `VoteRequester(term ${term + 1}) received a yes vote from ${primary.host}`);
-            }
+        // If there are only two nodes in the set, verify that the old primary voted "yes".
+        if (numNodes === 2) {
+            subStr = `Skipping dry run and running for election","attr":{"newTerm":${term + 1}}}`;
+            assert.soon(
+                function () {
+                    return rawMongoProgramOutput(".*").includes(subStr);
+                },
+                "Secondary should have run for an election in term: " + (term + 1),
+                kTimeoutMS,
+            );
+
+            subStr = `{"term":${term + 1},"dryRun":false,"vote":"yes","from":"${primary.host}"`;
+            jsTestLog(subStr);
+            assert.soon(
+                function () {
+                    return rawMongoProgramOutput(".*").includes(subStr);
+                },
+                "Primary should have voted yes for secondary",
+                kTimeoutMS,
+            );
         }
 
         rst.awaitNodesAgreeOnPrimary();

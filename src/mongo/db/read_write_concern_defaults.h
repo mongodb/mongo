@@ -29,19 +29,30 @@
 
 #pragma once
 
-#include <map>
-
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/read_write_concern_defaults_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/thread_pool.h"
-#include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/concurrency/thread_pool_interface.h"
+#include "mongo/util/functional.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/read_through_cache.h"
+#include "mongo/util/time_support.h"
 
-namespace mongo {
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * Class to manage Read Concern and Write Concern (RWC) defaults.
@@ -62,11 +73,11 @@ public:
     // The _id of the persisted default read/write concern document.
     static constexpr StringData kPersistedDocumentId = "ReadWriteConcernDefaults"_sd;
 
-    static ReadWriteConcernDefaults& get(ServiceContext* service);
+    static ReadWriteConcernDefaults& get(Service* service);
     static ReadWriteConcernDefaults& get(OperationContext* opCtx);
-    static void create(ServiceContext* service, FetchDefaultsFn fetchDefaultsFn);
+    static void create(Service* service, FetchDefaultsFn fetchDefaultsFn);
 
-    ReadWriteConcernDefaults(ServiceContext* service, FetchDefaultsFn fetchDefaultsFn);
+    ReadWriteConcernDefaults(Service* service, FetchDefaultsFn fetchDefaultsFn);
     ~ReadWriteConcernDefaults();
 
     /**
@@ -112,7 +123,8 @@ public:
      * Checks if the given RWC is suitable to use as a default, and uasserts if not.
      */
     static void checkSuitabilityAsDefault(const ReadConcern& rc);
-    static void checkSuitabilityAsDefault(const WriteConcern& wc);
+    static void checkSuitabilityAsDefault(const WriteConcern& wc,
+                                          bool writeConcernMajorityShouldJournal);
 
     /**
      * Examines a document key affected by a write to config.settings and will register a WUOW
@@ -162,7 +174,7 @@ public:
 
     /**
      * Sets implicit default write concern whether it should be majority or not.
-     * Should be called once on startup.
+     * Should be called only once on startup (except in testing).
      */
     void setImplicitDefaultWriteConcernMajority(bool newImplicitDefaultWCMajority);
 
@@ -170,7 +182,7 @@ public:
      * Gets a bool indicating whether the implicit default write concern is majority.
      * This function should only be used for testing purposes.
      */
-    boost::optional<bool> getImplicitDefaultWriteConcernMajority_forTest();
+    MONGO_MOD_PARENT_PRIVATE bool getImplicitDefaultWriteConcernMajority_forTest();
 
     /**
      * Gets the cluster-wide write concern (CWWC) persisted on disk.
@@ -190,15 +202,13 @@ private:
         Cache& operator=(const Cache&) = delete;
 
     public:
-        Cache(ServiceContext* service,
-              ThreadPoolInterface& threadPool,
-              FetchDefaultsFn fetchDefaultsFn);
-        virtual ~Cache() = default;
+        Cache(Service* service, ThreadPoolInterface& threadPool, FetchDefaultsFn fetchDefaultsFn);
+        ~Cache() override = default;
 
         boost::optional<RWConcernDefault> lookup(OperationContext* opCtx);
 
     private:
-        Mutex _mutex = MONGO_MAKE_LATCH("ReadWriteConcernDefaults::Cache");
+        stdx::mutex _mutex;
 
         FetchDefaultsFn _fetchDefaultsFn;
     };
@@ -209,7 +219,7 @@ private:
     ThreadPool _threadPool;
 
     // Indicate whether implicit default write concern should be majority or not.
-    boost::optional<bool> _implicitDefaultWriteConcernMajority;
+    AtomicWord<bool> _implicitDefaultWriteConcernMajority;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

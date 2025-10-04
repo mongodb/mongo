@@ -1,0 +1,10 @@
+#!/bin/bash
+
+# This tool formats WT config in a nicer readable way,
+# Can be used on a standalone config string or entire Turtle file.
+#
+# Usage:
+# $ echo "config" | /path/to/wt-config-format
+# $ /path/to/wt-config-format WiredTiger.turtle
+
+perl -npE '$i=0; /=/ && /[\(\{\[]/ && s/(,)|([\(\{\[])|([\)\}\]])/$1 ? "$1\n".("  "x$i) : $2 ? "$2\n".("  "x(++$i)) : (--$i, $3)/eg;' "$@"

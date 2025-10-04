@@ -29,11 +29,14 @@
 
 #pragma once
 
-#include <cstdint>
-#include <limits>
-
 #include "mongo/base/string_data.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/util/itoa.h"
+
+#include <cstdint>
+#include <cstring>
+#include <limits>
+#include <type_traits>
 
 namespace mongo {
 /**
@@ -105,7 +108,7 @@ private:
         }
         ItoA startItoA(start);
         StringData startStr(startItoA);
-        std::memcpy(_digits, startStr.rawData(), startStr.size());
+        std::memcpy(_digits, startStr.data(), startStr.size());
         return startStr.size() - 1;
     }
 

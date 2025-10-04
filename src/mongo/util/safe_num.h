@@ -29,11 +29,15 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/platform/decimal128.h"
+
+#include <cstdint>
 #include <iosfwd>
 #include <string>
-
-#include "mongo/base/string_data.h"
-#include "mongo/db/jsobj.h"
 
 namespace mongo {
 
@@ -41,6 +45,7 @@ namespace mutablebson {
 class Element;
 class Document;
 }  // namespace mutablebson
+class Value;
 
 /**
  * SafeNum holds and does arithmetic on a number in a safe way, handling overflow
@@ -156,6 +161,7 @@ public:
 
     friend class mutablebson::Element;
     friend class mutablebson::Document;
+    friend class Value;
 
     /**
      * Appends contents to given BSONObjBuilder.
@@ -242,7 +248,7 @@ private:
 // Convenience method for unittest code. Please use accessors otherwise.
 std::ostream& operator<<(std::ostream& os, const SafeNum& snum);
 
-inline SafeNum::SafeNum() : _type(EOO) {}
+inline SafeNum::SafeNum() : _type(BSONType::eoo) {}
 
 inline SafeNum::~SafeNum() {}
 
@@ -254,19 +260,19 @@ inline SafeNum& SafeNum::operator=(const SafeNum& rhs) {
     return *this;
 }
 
-inline SafeNum::SafeNum(int32_t num) : _type(NumberInt) {
+inline SafeNum::SafeNum(int32_t num) : _type(BSONType::numberInt) {
     _value.int32Val = num;
 }
 
-inline SafeNum::SafeNum(int64_t num) : _type(NumberLong) {
+inline SafeNum::SafeNum(int64_t num) : _type(BSONType::numberLong) {
     _value.int64Val = num;
 }
 
-inline SafeNum::SafeNum(double num) : _type(NumberDouble) {
+inline SafeNum::SafeNum(double num) : _type(BSONType::numberDouble) {
     _value.doubleVal = num;
 }
 
-inline SafeNum::SafeNum(Decimal128 num) : _type(NumberDecimal) {
+inline SafeNum::SafeNum(Decimal128 num) : _type(BSONType::numberDecimal) {
     _value.decimalVal = num.getValue();
 }
 
@@ -331,7 +337,7 @@ inline SafeNum& SafeNum::operator^=(const SafeNum& rhs) {
 }
 
 inline bool SafeNum::isValid() const {
-    return _type != EOO;
+    return _type != BSONType::eoo;
 }
 
 inline BSONType SafeNum::type() const {

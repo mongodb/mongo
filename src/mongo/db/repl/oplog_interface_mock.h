@@ -29,10 +29,21 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/repl/oplog_interface.h"
-#include <initializer_list>
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/transaction/transaction_history_iterator.h"
+#include "mongo/util/modules.h"
+#include "mongo/util/net/hostandport.h"
 
-namespace mongo {
+#include <initializer_list>
+#include <list>
+#include <memory>
+#include <string>
+#include <utility>
+
+namespace MONGO_MOD_PARENT_PRIVATE mongo {
 class TransactionHistoryIteratorBase;
 
 namespace repl {
@@ -62,4 +73,4 @@ private:
 };
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_PARENT_PRIVATE mongo

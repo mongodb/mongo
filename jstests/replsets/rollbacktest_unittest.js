@@ -1,22 +1,18 @@
 /**
  * Test of the RollbackTest helper library.
  */
-(function() {
-"use strict";
-
-load("jstests/replsets/rslib.js");
-load("jstests/replsets/libs/rollback_test.js");
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 let checkDataConsistencyCallCount = 0;
 let stopSetCallCount = 0;
 
 const rollbackTest = new RollbackTest("rollbacktest_unittest");
-rollbackTest._checkDataConsistencyImpl = function() {
+rollbackTest._checkDataConsistencyImpl = function () {
     ++checkDataConsistencyCallCount;
 };
 
 const rst = rollbackTest.getTestFixture();
-rst.stopSet = function(signal, forRestart, opts) {
+rst.stopSet = function (signal, forRestart, opts) {
     // Unconditionally skip in rst.stopSet because rbt.stop does its own validation.
     assert.eq(opts, {"skipCheckDBHashes": true, "skipValidation": true});
     ++stopSetCallCount;
@@ -36,4 +32,3 @@ rollbackTest.stop();
 
 assert.eq(checkDataConsistencyCallCount, 1);
 assert.eq(stopSetCallCount, 1);
-})();

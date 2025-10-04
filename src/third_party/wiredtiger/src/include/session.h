@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 /*
  * WT_DATA_HANDLE_CACHE --
  *	Per-session cache of handles to avoid synchronization when opening
@@ -23,7 +25,7 @@ struct __wt_data_handle_cache {
  *	A hazard pointer.
  */
 struct __wt_hazard {
-    WT_REF *ref; /* Page reference */
+    wt_shared WT_REF *ref; /* Page reference */
 #ifdef HAVE_DIAGNOSTIC
     const char *func; /* Function/line hazard acquired */
     int line;
@@ -31,29 +33,48 @@ struct __wt_hazard {
 };
 
 /*
- * WT_HAZARD_WEAK --
- *	A weak hazard pointer.
+ * WT_HAZARD_ARRAY --
+ *   An array of all hazard pointers held by the session.
+ *   New hazard pointers are added on a first-fit basis, and on removal their entry
+ *   in the array is set to null. As such this array may contain holes.
  */
-struct __wt_hazard_weak {
-    WT_REF *ref; /* Page reference */
-    bool valid;  /* Is the weak hazard pointer still valid? */
+struct __wt_hazard_array {
+/* The hazard pointer array grows as necessary, initialize with 250 slots. */
+#define WT_SESSION_INITIAL_HAZARD_SLOTS 250
+
+    wt_shared WT_HAZARD *arr; /* The hazard pointer array */
+    wt_shared uint32_t inuse; /* Number of array slots potentially in-use. We only need to iterate
+                                 this many slots to find all active pointers */
+    wt_shared uint32_t num_active; /* Number of array slots containing an active hazard pointer */
+    uint32_t size;                 /* Allocated size of the array */
 };
 
 /*
- * WT_HAZARD_WEAK_ARRAY --
- *	A per-session array of weak hazard pointers. These are grown by adding a new array, and are
- *  only freed when the session is closed.
+ * WT_PREFETCH --
+ *	Pre-fetch structure containing useful information for pre-fetch.
  */
-struct __wt_hazard_weak_array {
-    uint32_t hazard_size;  /* Weak hazard pointer array slots */
-    uint32_t hazard_inuse; /* Weak hazard pointer array slots in-use */
-    uint32_t nhazard;      /* Count of active weak hazard pointers */
-    WT_HAZARD_WEAK_ARRAY *next;
-    WT_HAZARD_WEAK hazard[0]; /* Weak hazard pointer array */
+struct __wt_prefetch {
+    WT_PAGE *prefetch_prev_ref_home;
+    uint64_t prefetch_disk_read_count; /* Sequential cache requests that caused a leaf read */
+    uint64_t prefetch_skipped_with_parent;
 };
 
+/*
+ * WT_ERROR_INFO --
+ *  An error structure containing verbose information about an error from a session API call.
+ */
+struct __wt_error_info {
+    int err;
+    int sub_level_err;
+    const char *err_msg;
+    WT_ITEM err_msg_buf;
+};
+
+#define WT_ERROR_INFO_EMPTY ""
+#define WT_ERROR_INFO_SUCCESS "last API call was successful"
+
 /* Get the connection implementation for a session */
-#define S2C(session) ((WT_CONNECTION_IMPL *)(session)->iface.connection)
+#define S2C(session) ((WT_CONNECTION_IMPL *)((WT_SESSION_IMPL *)(session))->iface.connection)
 
 /* Get the btree for a session */
 #define S2BT(session) ((WT_BTREE *)(session)->dhandle->handle)
@@ -69,11 +90,28 @@ typedef TAILQ_HEAD(__wt_cursor_list, __wt_cursor) WT_CURSOR_LIST;
 /* Number of cursors cached to trigger cursor sweep. */
 #define WT_SESSION_CURSOR_SWEEP_COUNTDOWN 40
 
-/* Minimum number of buckets to visit during cursor sweep. */
+/* Minimum number of buckets to visit during a regular cursor sweep. */
 #define WT_SESSION_CURSOR_SWEEP_MIN 5
 
-/* Maximum number of buckets to visit during cursor sweep. */
-#define WT_SESSION_CURSOR_SWEEP_MAX 32
+/* Maximum number of buckets to visit during a regular cursor sweep. */
+#define WT_SESSION_CURSOR_SWEEP_MAX 64
+
+/* Initial session ID. */
+#define WT_SESSION_ID_INITIAL 0
+
+/*
+ * Check if the session is the default session. A default session is a special session created
+ * during the initialization of a WiredTiger connection. It serves as the initial session for the
+ * connection before any user sessions are created.
+ */
+#define WT_SESSION_IS_DEFAULT(s) ((s)->id == WT_SESSION_ID_INITIAL)
+
+/* Invalid session ID. */
+#define WT_SESSION_ID_INVALID 0xffffffff
+
+/* A fake session ID for when we need to refer to a session that is actually NULL. */
+#define WT_SESSION_ID_NULL 0xfffffffe
+
 /*
  * WT_SESSION_IMPL --
  *	Implementation of WT_SESSION.
@@ -83,6 +121,9 @@ struct __wt_session_impl {
     WT_EVENT_HANDLER *event_handler; /* Application's event handlers */
 
     void *lang_private; /* Language specific private storage */
+
+    void (*format_private)(WT_CURSOR *, int, void *); /* Format test program private callback. */
+    void *format_private_arg;
 
     u_int active; /* Non-zero if the session is in-use */
 
@@ -95,32 +136,43 @@ struct __wt_session_impl {
     uint64_t operation_timeout_us; /* Maximum operation period before rollback */
     u_int api_call_counter;        /* Depth of api calls */
 
-    WT_DATA_HANDLE *dhandle;           /* Current data handle */
+    wt_shared WT_DATA_HANDLE *dhandle; /* Current data handle */
     WT_BUCKET_STORAGE *bucket_storage; /* Current bucket storage and file system */
 
     /*
      * Each session keeps a cache of data handles. The set of handles can grow quite large so we
      * maintain both a simple list and a hash table of lists. The hash table key is based on a hash
-     * of the data handle's URI. The hash table list is kept in allocated memory that lives across
-     * session close - so it is declared further down.
+     * of the data handle's URI. Though all hash entries are discarded on session close, the hash
+     * table list itself is kept in allocated memory that lives across session close - so it is
+     * declared further down.
      */
     /* Session handle reference list */
     TAILQ_HEAD(__dhandles, __wt_data_handle_cache) dhandles;
-    uint64_t last_sweep;        /* Last sweep for dead handles */
-    struct timespec last_epoch; /* Last epoch time returned */
+    wt_shared uint64_t last_sweep; /* Last sweep for dead handles */
+    struct timespec last_epoch;    /* Last epoch time returned */
 
     WT_CURSOR_LIST cursors;          /* Cursors closed with the session */
     u_int ncursors;                  /* Count of active file cursors. */
-    uint32_t cursor_sweep_position;  /* Position in cursor_cache for sweep */
     uint32_t cursor_sweep_countdown; /* Countdown to cursor sweep */
-    uint64_t last_cursor_sweep;      /* Last sweep for dead cursors */
+    uint32_t cursor_sweep_position;  /* Position in cursor_cache for sweep */
+    uint64_t last_cursor_big_sweep;  /* Last big sweep for dead cursors */
+    uint64_t last_cursor_sweep;      /* Last regular sweep for dead cursors */
+    u_int sweep_warning_5min;        /* Whether the session was without sweep for 5 min. */
+    u_int sweep_warning_60min;       /* Whether the session was without sweep for 60 min. */
+
+#ifdef HAVE_DIAGNOSTIC
+    bool cursor_open_timer_running; /* Flag used to track timer across nested calls. */
+#endif
 
     WT_CURSOR_BACKUP *bkp_cursor; /* Hot backup cursor */
 
     WT_COMPACT_STATE *compact; /* Compaction information */
     enum { WT_COMPACT_NONE = 0, WT_COMPACT_RUNNING, WT_COMPACT_SUCCESS } compact_state;
 
-    u_int hs_cursor_counter; /* Number of open history store cursors */
+    WT_IMPORT_LIST *import_list; /* List of metadata entries to import from file. */
+
+    u_int hs_cursor_counter;   /* Number of open history store cursors */
+    uint64_t hs_checkpoint_id; /* The checkpoint ID of the last opened HS cursor */
 
     WT_CURSOR *meta_cursor;  /* Metadata file */
     void *meta_track;        /* Metadata operation tracking */
@@ -134,16 +186,19 @@ struct __wt_session_impl {
     WT_RWLOCK *current_rwlock;
     uint8_t current_rwticket;
 
-    WT_ITEM **scratch;     /* Temporary memory for any function */
-    u_int scratch_alloc;   /* Currently allocated */
-    size_t scratch_cached; /* Scratch bytes cached */
+    WT_ITEM **scratch;        /* Temporary memory for any function */
+    u_int scratch_alloc;      /* Currently allocated */
+    size_t scratch_cached;    /* Scratch bytes cached */
+    WT_SPINLOCK scratch_lock; /* Scratch buffer lock */
 #ifdef HAVE_DIAGNOSTIC
-    /*
-     * Variables used to look for violations of the contract that a session is only used by a single
-     * session at once.
-     */
-    volatile uintmax_t api_tid;
-    volatile uint32_t api_enter_refcnt;
+
+    /* Enforce the contract that a session is only used by a single thread at a time. */
+    struct __wt_thread_check {
+        WT_SPINLOCK lock;
+        uintmax_t owning_thread;
+        uint32_t entry_count;
+    } thread_check;
+
     /*
      * It's hard to figure out from where a buffer was allocated after it's leaked, so in diagnostic
      * mode we track them; DIAGNOSTIC can't simply add additional fields to WT_ITEM structures
@@ -155,18 +210,48 @@ struct __wt_session_impl {
     } * scratch_track;
 #endif
 
+    /* Record the important timestamps of each stage in an reconciliation. */
+    struct __wt_reconcile_timeline {
+        uint64_t reconcile_start;
+        uint64_t image_build_start;
+        uint64_t image_build_finish;
+        uint64_t hs_wrapup_start;
+        uint64_t hs_wrapup_finish;
+        uint64_t reconcile_finish;
+        uint64_t total_reentry_hs_eviction_time;
+    } reconcile_timeline;
+
+    /* Record statistics in an reconciliation. */
+    struct __wt_reconcile_stats {
+        uint64_t hs_wrapup_next_prev_calls;
+    } reconcile_stats;
+
+    /*
+     * Record the important timestamps of each stage in an eviction. If an eviction takes a long
+     * time and times out, we can trace the time usage of each stage from this information.
+     */
+    struct __wt_evict_timeline {
+        uint64_t evict_start;
+        uint64_t reentry_hs_evict_start;
+        uint64_t reentry_hs_evict_finish;
+        uint64_t evict_finish;
+        bool reentry_hs_eviction;
+    } evict_timeline;
+
     WT_ITEM err; /* Error buffer */
+    WT_ERROR_INFO err_info;
 
     WT_TXN_ISOLATION isolation;
     WT_TXN *txn; /* Transaction state */
 
+    WT_PREFETCH pf; /* Pre-fetch structure */
+
     void *block_manager; /* Block-manager support */
     int (*block_manager_cleanup)(WT_SESSION_IMPL *);
 
-    /* Checkpoint handles */
-    WT_DATA_HANDLE **ckpt_handle; /* Handle list */
-    u_int ckpt_handle_next;       /* Next empty slot */
-    size_t ckpt_handle_allocated; /* Bytes allocated */
+    const char *hs_checkpoint; /* History store checkpoint name, during checkpoint cursor ops */
+
+    WT_CKPT_SESSION ckpt; /* Checkpoint-related data */
 
     /*
      * Operations acting on handles.
@@ -187,11 +272,22 @@ struct __wt_session_impl {
     void *salvage_track;
 
     /* Sessions have an associated statistics bucket based on its ID. */
-    u_int stat_bucket;          /* Statistics bucket offset */
+    u_int stat_conn_bucket;     /* Statistics connection bucket offset */
+    u_int stat_dsrc_bucket;     /* Statistics data source bucket offset */
     uint64_t cache_max_wait_us; /* Maximum time an operation waits for space in cache */
 
 #ifdef HAVE_DIAGNOSTIC
     uint8_t dump_raw; /* Configure debugging page dump */
+#endif
+
+#ifdef HAVE_UNITTEST_ASSERTS
+/*
+ * Unit testing assertions requires overriding abort logic and instead capturing this information to
+ * be checked by the unit test.
+ */
+#define WT_SESSION_UNITTEST_BUF_LEN 100
+    bool unittest_assert_hit;
+    char unittest_assert_msg[WT_SESSION_UNITTEST_BUF_LEN];
 #endif
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
@@ -200,37 +296,50 @@ struct __wt_session_impl {
 #define WT_SESSION_LOCKED_HANDLE_LIST_WRITE 0x0004u
 #define WT_SESSION_LOCKED_HOTBACKUP_READ 0x0008u
 #define WT_SESSION_LOCKED_HOTBACKUP_WRITE 0x0010u
-#define WT_SESSION_LOCKED_METADATA 0x0020u
-#define WT_SESSION_LOCKED_PASS 0x0040u
-#define WT_SESSION_LOCKED_SCHEMA 0x0080u
-#define WT_SESSION_LOCKED_SLOT 0x0100u
-#define WT_SESSION_LOCKED_TABLE_READ 0x0200u
-#define WT_SESSION_LOCKED_TABLE_WRITE 0x0400u
-#define WT_SESSION_LOCKED_TURTLE 0x0800u
-#define WT_SESSION_NO_SCHEMA_LOCK 0x1000u
+#define WT_SESSION_LOCKED_LIVE_RESTORE_STATE 0x0020u
+#define WT_SESSION_LOCKED_METADATA 0x0040u
+#define WT_SESSION_LOCKED_PASS 0x0080u
+#define WT_SESSION_LOCKED_SCHEMA 0x0100u
+#define WT_SESSION_LOCKED_SLOT 0x0200u
+#define WT_SESSION_LOCKED_TABLE_READ 0x0400u
+#define WT_SESSION_LOCKED_TABLE_WRITE 0x0800u
+#define WT_SESSION_LOCKED_TURTLE 0x1000u
+#define WT_SESSION_NO_SCHEMA_LOCK 0x2000u
     /*AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t lock_flags;
 
+/*
+ * Note: The WT_SESSION_PREFETCH_THREAD flag is set for prefetch server threads whereas the
+ * WT_SESSION_PREFETCH_ENABLED flag is set when prefetch has been enabled on the session.
+ */
+
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_SESSION_BACKUP_CURSOR 0x00001u
-#define WT_SESSION_BACKUP_DUP 0x00002u
-#define WT_SESSION_CACHE_CURSORS 0x00004u
-#define WT_SESSION_CAN_WAIT 0x00008u
-#define WT_SESSION_EVICTION 0x00010u
-#define WT_SESSION_IGNORE_CACHE_SIZE 0x00020u
-#define WT_SESSION_IMPORT 0x00040u
-#define WT_SESSION_IMPORT_REPAIR 0x00080u
-#define WT_SESSION_INTERNAL 0x00100u
-#define WT_SESSION_LOGGING_INMEM 0x00200u
-#define WT_SESSION_NO_DATA_HANDLES 0x00400u
-#define WT_SESSION_NO_LOGGING 0x00800u
-#define WT_SESSION_NO_RECONCILE 0x01000u
-#define WT_SESSION_QUIET_CORRUPT_FILE 0x02000u
-#define WT_SESSION_QUIET_TIERED 0x04000u
-#define WT_SESSION_READ_WONT_NEED 0x08000u
-#define WT_SESSION_RESOLVING_TXN 0x10000u
-#define WT_SESSION_ROLLBACK_TO_STABLE 0x20000u
-#define WT_SESSION_SCHEMA_TXN 0x40000u
+#define WT_SESSION_BACKUP_CURSOR 0x0000001u
+#define WT_SESSION_BACKUP_DUP 0x0000002u
+#define WT_SESSION_CACHE_CURSORS 0x0000004u
+#define WT_SESSION_CAN_WAIT 0x0000008u
+#define WT_SESSION_DEBUG_CHECKPOINT_FAIL_BEFORE_TURTLE_UPDATE 0x0000010u
+#define WT_SESSION_DEBUG_DO_NOT_CLEAR_TXN_ID 0x0000020u
+#define WT_SESSION_DEBUG_RELEASE_EVICT 0x0000040u
+#define WT_SESSION_DUMPING_EXTLIST 0x0000080u
+#define WT_SESSION_EVICTION 0x0000100u
+#define WT_SESSION_HS_WRAPUP 0x0000200u
+#define WT_SESSION_IGNORE_CACHE_SIZE 0x0000400u
+#define WT_SESSION_IMPORT 0x0000800u
+#define WT_SESSION_IMPORT_REPAIR 0x0001000u
+#define WT_SESSION_INTERNAL 0x0002000u
+#define WT_SESSION_LOGGING_INMEM 0x0004000u
+#define WT_SESSION_NO_DATA_HANDLES 0x0008000u
+#define WT_SESSION_NO_RECONCILE 0x0010000u
+#define WT_SESSION_PREFETCH_ENABLED 0x0020000u
+#define WT_SESSION_PREFETCH_THREAD 0x0040000u
+#define WT_SESSION_QUIET_CORRUPT_FILE 0x0080000u
+#define WT_SESSION_QUIET_OPEN_FILE 0x0100000u
+#define WT_SESSION_READ_WONT_NEED 0x0200000u
+#define WT_SESSION_RESOLVING_TXN 0x0400000u
+#define WT_SESSION_ROLLBACK_TO_STABLE 0x0800000u
+#define WT_SESSION_SAVE_ERRORS 0x1000000u
+#define WT_SESSION_SCHEMA_TXN 0x2000000u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;
 
@@ -238,13 +347,19 @@ struct __wt_session_impl {
  * All of the following fields live at the end of the structure so it's easier to clear everything
  * but the fields that persist.
  */
-#define WT_SESSION_CLEAR_SIZE (offsetof(WT_SESSION_IMPL, rnd))
+#define WT_SESSION_CLEAR_SIZE (offsetof(WT_SESSION_IMPL, rnd_random))
 
     /*
      * The random number state persists past session close because we don't want to repeatedly use
-     * the same values for skiplist depth when the application isn't caching sessions.
+     * the same values. This RNG is used for general purpose random number generation.
      */
-    WT_RAND_STATE rnd; /* Random number generation state */
+    wt_shared WT_RAND_STATE rnd_random;
+    /*
+     * The random number state persists past session close because we don't want to repeatedly use
+     * the same values for skiplist depth when the application isn't caching sessions. This RNG
+     * supposedly uses a specially crafted seed suitable for skiplists.
+     */
+    wt_shared WT_RAND_STATE rnd_skiplist;
 
     /*
      * Hash tables are allocated lazily as sessions are used to keep the size of this structure from
@@ -256,13 +371,19 @@ struct __wt_session_impl {
     TAILQ_HEAD(__dhandles_hash, __wt_data_handle_cache) * dhhash;
 
 /* Generations manager */
-#define WT_GEN_CHECKPOINT 0 /* Checkpoint generation */
-#define WT_GEN_COMMIT 1     /* Commit generation */
-#define WT_GEN_EVICT 2      /* Eviction generation */
-#define WT_GEN_HAZARD 3     /* Hazard pointer */
-#define WT_GEN_SPLIT 4      /* Page splits */
-#define WT_GENERATIONS 5    /* Total generation manager entries */
-    volatile uint64_t generations[WT_GENERATIONS];
+#define WT_GEN_CHECKPOINT 0   /* Checkpoint generation */
+#define WT_GEN_EVICT 1        /* Eviction generation */
+#define WT_GEN_HAS_SNAPSHOT 2 /* Snapshot generation */
+#define WT_GEN_HAZARD 3       /* Hazard pointer */
+#define WT_GEN_SPLIT 4        /* Page splits */
+#define WT_GEN_TXN_COMMIT 5   /* Commit generation */
+#define WT_GENERATIONS 6      /* Total generation manager entries */
+    wt_shared volatile uint64_t generations[WT_GENERATIONS];
+
+    /*
+     * Bindings for compiled configurations.
+     */
+    WT_CONF_BINDINGS conf_bindings;
 
     /*
      * Session memory persists past session close because it's accessed by threads of control other
@@ -286,21 +407,11 @@ struct __wt_session_impl {
  * Hazard information persists past session close because it's accessed by threads of control other
  * than the thread owning the session.
  *
- * Use the non-NULL state of the hazard field to know if the session has previously been
+ * Use the non-NULL state of the hazard array to know if the session has previously been
  * initialized.
  */
-#define WT_SESSION_FIRST_USE(s) ((s)->hazard == NULL)
-
-/*
- * The hazard pointer array grows as necessary, initialize with 250 slots.
- */
-#define WT_SESSION_INITIAL_HAZARD_SLOTS 250
-    uint32_t hazard_size;  /* Hazard pointer array slots */
-    uint32_t hazard_inuse; /* Hazard pointer array slots in-use */
-    uint32_t nhazard;      /* Count of active hazard pointers */
-    WT_HAZARD *hazard;     /* Hazard pointer array */
-
-    WT_HAZARD_WEAK_ARRAY *hazard_weak;
+#define WT_SESSION_FIRST_USE(s) ((s)->hazards.arr == NULL)
+    WT_HAZARD_ARRAY hazards;
 
     /*
      * Operation tracking.
@@ -312,3 +423,8 @@ struct __wt_session_impl {
 
     WT_SESSION_STATS stats;
 };
+
+/* Consider moving this to session_inline.h if it ever appears. */
+#define WT_READING_CHECKPOINT(s)                                       \
+    ((s)->dhandle != NULL && F_ISSET((s)->dhandle, WT_DHANDLE_OPEN) && \
+      WT_DHANDLE_IS_CHECKPOINT((s)->dhandle))

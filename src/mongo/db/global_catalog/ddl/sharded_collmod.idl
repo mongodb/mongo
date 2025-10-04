@@ -1,0 +1,65 @@
+# Copyright (C) 2018-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+global:
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/db/local_catalog/ddl/coll_mod.idl"
+    - "mongo/db/basic_types.idl"
+
+commands:
+    _configsvrCollMod:
+        command_name: _configsvrCollMod
+        cpp_name: ConfigsvrCollMod
+        description: "Internal command sent to config server to update routing related information"
+        strict: false
+        api_version: ""
+        namespace: concatenate_with_db
+        fields:
+            collModRequest:
+                type: CollModRequest
+                description: "Initial collMod request"
+
+    _shardsvrCollModParticipant:
+        command_name: _shardsvrCollModParticipant
+        cpp_name: ShardsvrCollModParticipant
+        description: "Internal command sent to all shards to implement collMod locally"
+        strict: false
+        api_version: ""
+        namespace: concatenate_with_db
+        fields:
+            collModRequest:
+                type: CollModRequest
+                description: "Initial collMod request"
+            needsUnblock:
+                type: optionalBool
+                description: "If needs to refresh the shard filtering information and unblock CRUD operations"
+            performViewChange:
+                type: optionalBool
+                description: "Whether should perform view catalog change, set only for commands sent to the primary shard"
+        reply_type: CollModReply

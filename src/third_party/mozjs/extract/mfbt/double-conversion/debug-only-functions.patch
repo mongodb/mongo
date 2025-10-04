@@ -1,0 +1,39 @@
+diff --git a/double-conversion/strtod.cc b/double-conversion/strtod.cc
+--- a/double-conversion/strtod.cc
++++ b/double-conversion/strtod.cc
+@@ -436,16 +436,17 @@ static bool ComputeGuess(Vector<const ch
+     return true;
+   }
+   if (*guess == Double::Infinity()) {
+     return true;
+   }
+   return false;
+ }
+ 
++#ifdef DEBUG
+ static bool IsDigit(const char d) {
+   return ('0' <= d) && (d <= '9');
+ }
+ 
+ static bool IsNonZeroDigit(const char d) {
+   return ('1' <= d) && (d <= '9');
+ }
+ 
+@@ -457,16 +458,17 @@ static bool IsNonZeroDigit(const char d)
+ static bool AssertTrimmedDigits(const Vector<const char>& buffer) {
+   for(int i = 0; i < buffer.length(); ++i) {
+     if(!IsDigit(buffer[i])) {
+       return false;
+     }
+   }
+   return (buffer.length() == 0) || (IsNonZeroDigit(buffer[0]) && IsNonZeroDigit(buffer[buffer.length()-1]));
+ }
++#endif
+ 
+ double StrtodTrimmed(Vector<const char> trimmed, int exponent) {
+   DOUBLE_CONVERSION_ASSERT(trimmed.length() <= kMaxSignificantDecimalDigits);
+   DOUBLE_CONVERSION_ASSERT(AssertTrimmedDigits(trimmed));
+   double guess;
+   const bool is_correct = ComputeGuess(trimmed, exponent, &guess);
+   if (is_correct) {
+     return guess;

@@ -28,12 +28,15 @@
  */
 
 #pragma once
-
-#include <functional>
-#include <vector>
-
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
+
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace mongo {
 
@@ -134,7 +137,7 @@ private:
         executor::TaskExecutor::EventHandle _sufficientResponsesReceived;
         std::vector<executor::TaskExecutor::CallbackHandle> _callbacks;
         bool _started = false;
-        Mutex _mutex = MONGO_MAKE_LATCH("RunnerImpl::_mutex");
+        stdx::mutex _mutex;
     };
 
     executor::TaskExecutor* _executor;  // Not owned here.

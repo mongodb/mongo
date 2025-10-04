@@ -7,40 +7,45 @@
  * node2. Eventually after catchUpTakeoverDelayMillis has passed, node1 should be able
  * get the vote from node2 which has a lower config, and finish the catchup takeover.
  */
-
-(function() {
-'use strict';
-
-load("jstests/libs/write_concern_util.js");
-load('jstests/replsets/libs/election_metrics.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {verifyServerStatusElectionReasonCounterChange} from "jstests/replsets/libs/election_metrics.js";
 
 // Get the current config from the node and compare it with the provided config.
-const getNodeConfigAndCompare = function(node, config, cmp) {
+const getNodeConfigAndCompare = function (node, config, cmp) {
     const currentConfig = assert.commandWorked(node.adminCommand({replSetGetConfig: 1})).config;
-    if (cmp === '=') {
+    if (cmp === "=") {
         return currentConfig.term === config.term && currentConfig.version === config.version;
-    } else if (cmp === '>') {
-        return currentConfig.term > config.term ||
-            (currentConfig.term === config.term && currentConfig.version > config.version);
-    } else if (cmp === '<') {
-        return currentConfig.term < config.term ||
-            (currentConfig.term === config.term && currentConfig.version < config.version);
+    } else if (cmp === ">") {
+        return (
+            currentConfig.term > config.term ||
+            (currentConfig.term === config.term && currentConfig.version > config.version)
+        );
+    } else if (cmp === "<") {
+        return (
+            currentConfig.term < config.term ||
+            (currentConfig.term === config.term && currentConfig.version < config.version)
+        );
     } else {
         assert(false);
     }
 };
 
 // Wait for all nodes to acknowledge that the node at nodeIndex is in the specified state.
-const waitForNodeState = function(nodes, nodeIndex, state, timeout) {
-    assert.soon(() => {
-        for (const node of nodes) {
-            const status = assert.commandWorked(node.adminCommand({replSetGetStatus: 1}));
-            if (status.members[nodeIndex].state !== state) {
-                return false;
+const waitForNodeState = function (nodes, nodeIndex, state, timeout) {
+    assert.soon(
+        () => {
+            for (const node of nodes) {
+                const status = assert.commandWorked(node.adminCommand({replSetGetStatus: 1}));
+                if (status.members[nodeIndex].state !== state) {
+                    return false;
+                }
             }
-        }
-        return true;
-    }, `Failed to agree on node ${nodes[nodeIndex].host} in state ${state}`, timeout);
+            return true;
+        },
+        `Failed to agree on node ${nodes[nodeIndex].host} in state ${state}`,
+        timeout,
+    );
 };
 
 const replSet = new ReplSetTest({name: jsTestName(), nodes: 3});
@@ -50,12 +55,16 @@ let config = replSet.getReplSetConfig();
 config.settings = {
     chainingAllowed: false,
 };
-replSet.initiateWithHighElectionTimeout(config);
+replSet.initiate(config);
 replSet.awaitReplication();
 assert.eq(replSet.getPrimary(), nodes[0]);
 
-const statusBeforeTakeover =
-    assert.commandWorked(nodes[1].adminCommand({serverStatus: 1, wiredTiger: 0}));
+const statusBeforeTakeover = assert.commandWorked(nodes[1].adminCommand({serverStatus: 1, wiredTiger: 0}));
+
+for (const node of nodes) {
+    // Disable nodes from fasserting due to RSTL timeout
+    node.adminCommand({setParameter: 1, fassertOnLockTimeoutForStepUpDown: 0});
+}
 
 // Failpoint to hang node1 before the automatic reconfig on stepup bumps the config term.
 const hangBeforeTermBumpFpNode1 = configureFailPoint(nodes[1], "hangBeforeReconfigOnDrainComplete");
@@ -67,10 +76,10 @@ hangBeforeTermBumpFpNode1.wait();
 
 // Wait for all nodes to acknowledge that node1 has become primary.
 jsTestLog(`Waiting for all nodes to agree on ${nodes[1].host} being primary`);
-replSet.awaitNodesAgreeOnPrimary(replSet.kDefaultTimeoutMS, nodes, nodes[1]);
+replSet.awaitNodesAgreeOnPrimary(replSet.timeoutMS, nodes, nodes[1]);
 
 // Check that the failpoint worked and the config has not changed.
-assert(getNodeConfigAndCompare(nodes[1], initialConfig, '='));
+assert(getNodeConfigAndCompare(nodes[1], initialConfig, "="));
 
 // Stepup node2 and wait to hang before bumping the config term as well.
 const hangBeforeTermBumpFpNode2 = configureFailPoint(nodes[2], "hangBeforeReconfigOnDrainComplete");
@@ -99,31 +108,34 @@ hangBeforeTermBumpFpNode1.off();
 jsTestLog(`Waiting for ${nodes[1].host} to step down before doing catchup takeover.`);
 waitForNodeState(nodes, 1, ReplSetTest.State.SECONDARY, 30 * 1000);
 
-jsTestLog(
-    `Waiting for ${nodes[1].host} to finish config term bump and propagate to ${nodes[0].host}`);
-assert.soon(() => getNodeConfigAndCompare(nodes[0], initialConfig, '>'));
-assert.soon(() => getNodeConfigAndCompare(nodes[1], initialConfig, '>'));
+jsTestLog(`Waiting for ${nodes[1].host} to finish config term bump and propagate to ${nodes[0].host}`);
+assert.soon(() => getNodeConfigAndCompare(nodes[0], initialConfig, ">"));
+assert.soon(() => getNodeConfigAndCompare(nodes[1], initialConfig, ">"));
 // Check that node2 is still in catchup mode, so it cannot install a new config.
-assert(getNodeConfigAndCompare(nodes[2], initialConfig, '='));
+assert(getNodeConfigAndCompare(nodes[2], initialConfig, "="));
 
 // Wait for node1 to catchup takeover node2 after the default catchup takeover delay.
 jsTestLog(`Waiting for ${nodes[1].host} to catchup takeover ${nodes[2].host}`);
 waitForNodeState(nodes, 1, ReplSetTest.State.PRIMARY, 60 * 1000);
 
 // Check again that node2 is still in catchup mode and has not installed a new config.
-assert(getNodeConfigAndCompare(nodes[2], initialConfig, '='));
+assert(getNodeConfigAndCompare(nodes[2], initialConfig, "="));
 
 // Lift the failpoint on node2 and wait for all nodes to see node1 as the only primary.
 hangBeforeTermBumpFpNode2.off();
-replSet.awaitNodesAgreeOnPrimary(replSet.kDefaultTimeoutMS, nodes, nodes[1]);
+replSet.awaitNodesAgreeOnPrimary(replSet.timeoutMS, nodes, nodes[1]);
 
 // Check that election metrics has been updated with the new reason counter.
-const statusAfterTakeover =
-    assert.commandWorked(nodes[1].adminCommand({serverStatus: 1, wiredTiger: 0}));
-verifyServerStatusElectionReasonCounterChange(statusBeforeTakeover.electionMetrics,
-                                              statusAfterTakeover.electionMetrics,
-                                              "catchUpTakeover",
-                                              1);
+const statusAfterTakeover = assert.commandWorked(nodes[1].adminCommand({serverStatus: 1, wiredTiger: 0}));
+verifyServerStatusElectionReasonCounterChange(
+    statusBeforeTakeover.electionMetrics,
+    statusAfterTakeover.electionMetrics,
+    "catchUpTakeover",
+    1,
+);
 
+// This test produces a rollback and the above is expected to be robust to the network error
+// it causes, but stopSet below is not so we await before it is called.
+replSet.awaitSecondaryNodes();
+replSet.awaitReplication();
 replSet.stopSet();
-})();

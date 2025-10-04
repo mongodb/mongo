@@ -27,11 +27,23 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
 #include "mongo/db/repl/oplog_fetcher_mock.h"
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/db/client.h"
+#include "mongo/db/repl/replication_process.h"
+#include "mongo/util/assert_util.h"
+
+#include <functional>
+#include <mutex>
 #include <utility>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
 
 namespace mongo {
@@ -43,15 +55,16 @@ OplogFetcherMock::OplogFetcherMock(
     EnqueueDocumentsFn enqueueDocumentsFn,
     OnShutdownCallbackFn onShutdownCallbackFn,
     Config config)
-    : OplogFetcher(executor,
-                   // Pass a dummy OplogFetcherRestartDecision to the base OplogFetcher.
-                   std::make_unique<OplogFetcherRestartDecisionDefault>(0),
-                   dataReplicatorExternalState,
-                   // Pass a dummy EnqueueDocumentsFn to the base OplogFetcher.
-                   [](const auto& a1, const auto& a2, const auto& a3) { return Status::OK(); },
-                   // Pass a dummy OnShutdownCallbackFn to the base OplogFetcher.
-                   [](const auto& a, const int b) {},
-                   config),
+    : OplogFetcher(
+          executor,
+          // Pass a dummy OplogFetcherRestartDecision to the base OplogFetcher.
+          std::make_unique<OplogFetcherRestartDecisionDefault>(0),
+          dataReplicatorExternalState,
+          // Pass a dummy EnqueueDocumentsFn to the base OplogFetcher.
+          [](const auto& a1, const auto& a2, const auto& a3) { return Status::OK(); },
+          // Pass a dummy OnShutdownCallbackFn to the base OplogFetcher.
+          [](const auto& a) {},
+          config),
       _oplogFetcherRestartDecision(std::move(oplogFetcherRestartDecision)),
       _onShutdownCallbackFn(std::move(onShutdownCallbackFn)),
       _enqueueDocumentsFn(std::move(enqueueDocumentsFn)),
@@ -74,15 +87,15 @@ void OplogFetcherMock::receiveBatch(CursorId cursorId,
                                     boost::optional<Timestamp> resumeToken) {
     TestCodeBlock tcb(this);
     {
-        stdx::lock_guard<Latch> lock(_mutex);
-        if (!_isActive_inlock()) {
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        if (!_isActive(lock)) {
             return;
         }
         _oplogFetcherRestartDecision->fetchSuccessful(this);
     }
 
     auto validateResult = OplogFetcher::validateDocuments(
-        documents, _first, _getLastOpTimeFetched().getTimestamp(), _startingPoint);
+        documents, _first, getLastOpTimeFetched().getTimestamp(), _startingPoint);
 
     // Set _first to false after receiving the first batch.
     _first = false;
@@ -102,7 +115,7 @@ void OplogFetcherMock::receiveBatch(CursorId cursorId,
     // is to avoid interfering the thread local client in the test thread.
     Status status = Status::OK();
     stdx::thread enqueueDocumentThread([&]() {
-        Client::initThread("enqueueDocumentThread");
+        Client::initThread("enqueueDocumentThread", getGlobalServiceContext()->getService());
         status = _enqueueDocumentsFn(documents.cbegin(), documents.cend(), info);
     });
     // Wait until the enqueue finishes.
@@ -123,7 +136,7 @@ void OplogFetcherMock::receiveBatch(CursorId cursorId,
         }
         auto lastDoc = lastDocRes.getValue();
 
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         _lastFetched = lastDoc;
     }
 
@@ -144,9 +157,9 @@ void OplogFetcherMock::simulateResponseError(Status status) {
 
 void OplogFetcherMock::shutdownWith(Status status) {
     {
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         // Noop if the OplogFetcher is not active or is already shutting down.
-        if (!_isActive_inlock() || _isShuttingDown_inlock()) {
+        if (!_isActive(lock) || _isShuttingDown(lock)) {
             return;
         }
 
@@ -170,28 +183,27 @@ void OplogFetcherMock::waitForshutdown() {
     }
 }
 
-Status OplogFetcherMock::_doStartup_inlock() noexcept {
+void OplogFetcherMock::_doStartup(WithLock) {
     // Create a thread that waits on the _finishPromise and call _finishCallback once with the
     // finish status. This is to synchronize the OplogFetcher shutdown between the test thread and
     // the OplogFetcher's owner. For example, the OplogFetcher could be shut down by the test thread
     // by simulating an error response while the owner of the OplogFetcher (e.g. InitialSyncer) is
-    // also trying to shut it down via shutdown() and _doShutdown_inlock(). Thus, by having
+    // also trying to shut it down via shutdown() and _doShutdown(). Thus, by having
     // _waitForFinishThread as the only place that calls _finishCallback, we can make sure that
     // _finishCallback is called only once (outside of the mutex) on shutdown.
     _waitForFinishThread = stdx::thread([this]() {
         auto future = [&] {
-            Client::initThread("OplogFetcherMock");
-            stdx::lock_guard<Latch> lock(_mutex);
+            Client::initThread("OplogFetcherMock", getGlobalServiceContext()->getService());
+            stdx::lock_guard<stdx::mutex> lock(_mutex);
             return _finishPromise->getFuture();
         }();
         // Wait for the finish signal and call _finishCallback once.
         auto status = future.getNoThrow();
         _finishCallback(status);
     });
-    return Status::OK();
 }
 
-void OplogFetcherMock::_doShutdown_inlock() noexcept {
+void OplogFetcherMock::_doShutdown(WithLock) noexcept {
     // Fulfill the finish promise so _finishCallback is called (outside of the mutex).
     if (!_finishPromise->getFuture().isReady()) {
         _finishPromise->setError(
@@ -199,12 +211,12 @@ void OplogFetcherMock::_doShutdown_inlock() noexcept {
     }
 }
 
-Mutex* OplogFetcherMock::_getMutex() noexcept {
+stdx::mutex* OplogFetcherMock::_getMutex() noexcept {
     return &_mutex;
 }
 
-OpTime OplogFetcherMock::_getLastOpTimeFetched() const {
-    stdx::lock_guard<Latch> lock(_mutex);
+OpTime OplogFetcherMock::getLastOpTimeFetched() const {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     return _lastFetched;
 }
 
@@ -212,12 +224,12 @@ void OplogFetcherMock::_finishCallback(Status status) {
     invariant(isActive());
 
     // Call _onShutdownCallbackFn outside of the mutex.
-    _onShutdownCallbackFn(status, ReplicationProcess::kUninitializedRollbackId);
+    _onShutdownCallbackFn(status);
 
     decltype(_onShutdownCallbackFn) onShutdownCallbackFn;
     decltype(_oplogFetcherRestartDecision) oplogFetcherRestartDecision;
-    stdx::lock_guard<Latch> lock(_mutex);
-    _transitionToComplete_inlock();
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    _transitionToComplete(lock);
 
     // Release any resources that might be held by the '_onShutdownCallbackFn' function object.
     // The function object will be destroyed outside the lock since the temporary variable

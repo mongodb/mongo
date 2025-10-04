@@ -29,14 +29,32 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/db/auth/validated_tenancy_scope_factory.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/rpc/message.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/database_name_util.h"
+#include "mongo/util/serialization_context.h"
+#include "mongo/util/shared_buffer.h"
+
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/rpc/message.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -120,13 +138,13 @@ struct OpMsg {
     /**
      * Parses and returns an OpMsg containing unowned BSON.
      */
-    static OpMsg parse(const Message& message);
+    static OpMsg parse(const Message& message, Client* client = nullptr);
 
     /**
      * Parses and returns an OpMsg containing owned BSON.
      */
-    static OpMsg parseOwned(const Message& message) {
-        auto msg = parse(message);
+    static OpMsg parseOwned(const Message& message, Client* client = nullptr) {
+        auto msg = parse(message, client);
         msg.shareOwnershipWith(message.sharedBuffer());
         return msg;
     }
@@ -157,8 +175,16 @@ struct OpMsg {
     }
 
     BSONObj body;
-    BSONObj securityToken;
     std::vector<DocumentSequence> sequences;
+
+    boost::optional<auth::ValidatedTenancyScope> validatedTenancyScope = boost::none;
+
+    boost::optional<TenantId> getValidatedTenantId() const {
+        if (!validatedTenancyScope) {
+            return boost::none;
+        }
+        return validatedTenancyScope->tenantId();
+    }
 };
 
 /**
@@ -170,36 +196,32 @@ struct OpMsgRequest : public OpMsg {
     OpMsgRequest() = default;
     explicit OpMsgRequest(OpMsg&& generic) : OpMsg(std::move(generic)) {}
 
-    static OpMsgRequest parse(const Message& message) {
-        return OpMsgRequest(OpMsg::parse(message));
+    static OpMsgRequest parse(const Message& message, Client* client = nullptr) {
+        return OpMsgRequest(OpMsg::parse(message, client));
     }
 
-    static OpMsgRequest parseOwned(const Message& message) {
-        return OpMsgRequest(OpMsg::parseOwned(message));
+    static OpMsgRequest parseOwned(const Message& message, Client* client = nullptr) {
+        return OpMsgRequest(OpMsg::parseOwned(message, client));
     }
 
-    static OpMsgRequest fromDBAndBody(StringData db,
-                                      BSONObj body,
-                                      const BSONObj& extraFields = {}) {
-        OpMsgRequest request;
-        request.body = ([&] {
-            BSONObjBuilder bodyBuilder(std::move(body));
-            bodyBuilder.appendElements(extraFields);
-            bodyBuilder.append("$db", db);
-            return bodyBuilder.obj();
-        }());
-        return request;
+    /**
+     * Gets the "$db" field of the command request if specified.
+     * If the field is omitted, an empty string is returned.
+     *
+     * No validation of the value is performed. This method should only be used for logging or
+     * error messages, particularly in contexts where the command request has not been parsed yet.
+     */
+    StringData readDatabaseForLogging() const {
+        return body["$db"].valueStringDataSafe();
     }
 
-    StringData getDatabase() const {
-        if (auto elem = body["$db"])
-            return elem.checkAndGetStringData();
-        uasserted(40571, "OP_MSG requests require a $db argument");
-    }
+    DatabaseName parseDbName() const;
 
     StringData getCommandName() const {
         return body.firstElementFieldName();
     }
+
+    SerializationContext getSerializationContext() const;
 
     // DO NOT ADD MEMBERS!  Since this type is essentially a strong typedef (see the class comment),
     // it should not hold more data than an OpMsg. It should be freely interconvertible with OpMsg
@@ -252,10 +274,7 @@ public:
         resumeBody().appendElements(body);
     }
 
-    BSONObjBuilder beginSecurityToken();
-    void setSecurityToken(const BSONObj& token) {
-        beginSecurityToken().appendElements(token);
-    }
+    void setSecurityToken(StringData token);
 
     /**
      * Finish building and return a Message ready to give to the networking layer for transmission.
@@ -318,7 +337,6 @@ private:
         kEmpty,
         kDocSequence,
         kBody,
-        kSecurityToken,
         kDone,
     };
 
@@ -405,6 +423,20 @@ private:
     BufBuilder* _buf;
     OpMsgBuilder* const _msgBuilder;
     const int _sizeOffset;
+};
+
+/**
+ * Builds an OpMsgRequest object.
+ */
+struct OpMsgRequestBuilder {
+public:
+    /**
+     * Creates an OpMsgRequest object and directly sets a validated tenancy scope on it.
+     */
+    static OpMsgRequest create(boost::optional<auth::ValidatedTenancyScope> validatedTenancyScope,
+                               const DatabaseName& dbName,
+                               BSONObj body,
+                               const BSONObj& extraFields = {});
 };
 
 }  // namespace mongo

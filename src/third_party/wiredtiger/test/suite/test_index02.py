@@ -124,6 +124,3 @@ class test_index02(wttest.WiredTigerTestCase):
         else:
             cur.set_key(3, 1)
         self.assertEqual(cur.search_near(), wiredtiger.WT_NOTFOUND)
-
-if __name__ == '__main__':
-    wttest.run()

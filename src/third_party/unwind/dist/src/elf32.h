@@ -1,8 +1,8 @@
 #ifndef elf32_h
 #define elf32_h
 
-#ifndef ELF_CLASS
-#define ELF_CLASS       ELFCLASS32
+#ifndef UNW_ELF_CLASS
+# define UNW_ELF_CLASS UNW_ELFCLASS32
 #endif
 #include "elfxx.h"
 

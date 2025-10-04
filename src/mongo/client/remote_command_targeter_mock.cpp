@@ -27,9 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/client/remote_command_targeter_mock.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/future_impl.h"
+
+#include <mutex>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 
@@ -50,8 +57,10 @@ ConnectionString RemoteCommandTargeterMock::connectionString() {
     return _connectionStringReturnValue;
 }
 
-StatusWith<HostAndPort> RemoteCommandTargeterMock::findHost(OperationContext* opCtx,
-                                                            const ReadPreferenceSetting& readPref) {
+StatusWith<HostAndPort> RemoteCommandTargeterMock::findHost(
+    OperationContext* opCtx,
+    const ReadPreferenceSetting& readPref,
+    const TargetingMetadata& targetingMetadata) {
     if (!_findHostReturnValue.isOK()) {
         return _findHostReturnValue.getStatus();
     }
@@ -60,7 +69,8 @@ StatusWith<HostAndPort> RemoteCommandTargeterMock::findHost(OperationContext* op
 }
 
 SemiFuture<HostAndPort> RemoteCommandTargeterMock::findHost(const ReadPreferenceSetting&,
-                                                            const CancellationToken&) {
+                                                            const CancellationToken&,
+                                                            const TargetingMetadata&) {
     if (!_findHostReturnValue.isOK()) {
         return _findHostReturnValue.getStatus();
     }
@@ -75,22 +85,22 @@ SemiFuture<std::vector<HostAndPort>> RemoteCommandTargeterMock::findHosts(
 }
 
 void RemoteCommandTargeterMock::markHostNotPrimary(const HostAndPort& host, const Status& status) {
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
     _hostsMarkedDown.insert(host);
 }
 
 void RemoteCommandTargeterMock::markHostUnreachable(const HostAndPort& host, const Status& status) {
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
     _hostsMarkedDown.insert(host);
 }
 
 void RemoteCommandTargeterMock::markHostShuttingDown(const HostAndPort& host,
                                                      const Status& status) {
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
     _hostsMarkedDown.insert(host);
 }
 
-void RemoteCommandTargeterMock::setConnectionStringReturnValue(const ConnectionString returnValue) {
+void RemoteCommandTargeterMock::setConnectionStringReturnValue(ConnectionString returnValue) {
     _connectionStringReturnValue = std::move(returnValue);
 }
 
@@ -108,7 +118,7 @@ void RemoteCommandTargeterMock::setFindHostsReturnValue(
 }
 
 std::set<HostAndPort> RemoteCommandTargeterMock::getAndClearMarkedDownHosts() {
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
     auto hostsMarkedDown = _hostsMarkedDown;
     _hostsMarkedDown.clear();
     return hostsMarkedDown;

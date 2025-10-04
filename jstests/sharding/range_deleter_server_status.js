@@ -2,18 +2,16 @@
  * Basic test to demonstrate that the range deleter section in shardingStatistics is displayed
  * correctly.
  */
-(function() {
-"use strict";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 let st = new ShardingTest({shards: 2});
 
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: 'test', primaryShard: st.shard0.shardName}));
-assert.commandWorked(st.s.adminCommand({shardCollection: 'test.foo', key: {x: 1}}));
-assert.commandWorked(st.s.adminCommand({split: 'test.foo', middle: {x: 0}}));
-assert.commandWorked(st.s.adminCommand({shardCollection: 'test.bar', key: {x: 1}}));
+assert.commandWorked(st.s.adminCommand({enableSharding: "test", primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({shardCollection: "test.foo", key: {x: 1}}));
+assert.commandWorked(st.s.adminCommand({split: "test.foo", middle: {x: 0}}));
+assert.commandWorked(st.s.adminCommand({shardCollection: "test.bar", key: {x: 1}}));
 
-let testDB = st.s.getDB('test');
+let testDB = st.s.getDB("test");
 
 let bulk = testDB.foo.initializeUnorderedBulkOp();
 for (let x = -5; x < 5; x++) {
@@ -37,19 +35,12 @@ fooPositiveCursor.next();
 let barCursor = testDB.bar.find().batchSize(2);
 barCursor.next();
 
-assert.commandWorked(
-    st.s.adminCommand({moveChunk: 'test.foo', find: {x: 0}, to: st.shard1.shardName}));
-assert.commandWorked(
-    st.s.adminCommand({moveChunk: 'test.foo', find: {x: -1}, to: st.shard1.shardName}));
-assert.commandWorked(
-    st.s.adminCommand({moveChunk: 'test.bar', find: {x: 0}, to: st.shard1.shardName}));
+assert.commandWorked(st.s.adminCommand({moveChunk: "test.foo", find: {x: 0}, to: st.shard1.shardName}));
+assert.commandWorked(st.s.adminCommand({moveChunk: "test.foo", find: {x: -1}, to: st.shard1.shardName}));
+assert.commandWorked(st.s.adminCommand({moveChunk: "test.bar", find: {x: 0}, to: st.shard1.shardName}));
 
 assert.soon(() => {
-    return 3 ===
-        st.rs0.getPrimary()
-            .getDB('test')
-            .runCommand({serverStatus: 1})
-            .shardingStatistics.rangeDeleterTasks;
+    return 3 === st.rs0.getPrimary().getDB("test").runCommand({serverStatus: 1}).shardingStatistics.rangeDeleterTasks;
 });
 
 // Close the cursors so the range deleter tasks can proceed and so there won't be tasks that
@@ -59,4 +50,3 @@ fooPositiveCursor.close();
 barCursor.close();
 
 st.stop();
-})();

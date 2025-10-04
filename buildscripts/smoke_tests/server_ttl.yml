@@ -1,0 +1,24 @@
+# This is a smoke test suite for the server-ttl component. It is meant to be run locally
+# in a relatively short period of time and is meant to give feedback on whether a given change
+# broke any major feature functionality of the server-ttl component.
+# It is not meant to replace a full patch build, but rather to provide a means to receive
+# feedback during iterative development.
+#
+# The unit tests and integration tests can be run with the following:
+# bazel test --test_tag_filters=server-tll --test_output=summary //src/mongo/...
+# bazel build install-dist-test && python buildscripts/run_smoke_tests.py --suites=server_ttl
+
+suites:
+  no_passthrough:
+    - jstests/noPassthrough/ttl/ttlMonitorSleepSecs_parameter.js
+    - jstests/noPassthrough/ttl/ttl_batch_deletes.js
+    - jstests/noPassthrough/ttl/ttl_changes_are_immediate.js
+    - jstests/noPassthrough/ttl/ttl_expire_nan_warning_on_startup.js
+    - jstests/noPassthrough/ttl/ttl_hidden_index.js
+    - jstests/noPassthrough/ttl/ttl_non_int_expire_after_seconds.js
+    - jstests/noPassthrough/ttl/ttl_partial_index.js
+    - jstests/noPassthrough/ttl/ttl_resharding_collection.js
+    - jstests/noPassthrough/ttl/ttl_with_dropIndex.js
+    - jstests/noPassthrough/ttl/ttl_with_renameCollection.js
+    - jstests/noPassthrough/ttl/ttl_with_restart.js
+    - jstests/noPassthrough/ttl/user_write_blocking_ttl_index.js

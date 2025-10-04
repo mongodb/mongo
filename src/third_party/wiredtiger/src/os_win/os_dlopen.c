@@ -33,7 +33,7 @@ __wt_dlopen(WT_SESSION_IMPL *session, const char *path, WT_DLH **dlhp)
             WT_ERR(ret);
         }
     } else {
-        // TODO: load dll here
+        /* TODO: load dll here */
         DebugBreak();
     }
 

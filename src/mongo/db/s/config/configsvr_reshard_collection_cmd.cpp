@@ -27,55 +27,76 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
-#include "mongo/platform/basic.h"
-
+#include "mongo/base/checked_cast.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
+#include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/global_catalog/catalog_cache/catalog_cache.h"
+#include "mongo/db/global_catalog/chunk_manager.h"
+#include "mongo/db/global_catalog/ddl/shard_key_util.h"
+#include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
+#include "mongo/db/global_catalog/shard_key_pattern.h"
+#include "mongo/db/global_catalog/sharding_catalog_client.h"
+#include "mongo/db/global_catalog/type_collection.h"
+#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/repl/primary_only_service.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/replication_state_transition_lock_guard.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
+#include "mongo/db/s/resharding/resharding_coordinator.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
-#include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
-#include "mongo/db/s/resharding_util.h"
-#include "mongo/db/vector_clock.h"
-#include "mongo/logv2/log.h"
-#include "mongo/s/catalog/type_tags.h"
-#include "mongo/s/grid.h"
+#include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
+#include "mongo/db/topology/cluster_role.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/s/request_types/reshard_collection_gen.h"
+#include "mongo/s/resharding/common_types_gen.h"
+#include "mongo/s/resharding/resharding_coordinator_service_conflicting_op_in_progress_info.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
+#include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
+
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(reshardCollectionJoinedExistingOperation);
 
 namespace {
-
-// Returns a resharding instance if one exists for the same collection and shard key already.
-boost::optional<std::shared_ptr<ReshardingCoordinatorService::ReshardingCoordinator>>
-getExistingInstanceToJoin(OperationContext* opCtx,
-                          const NamespaceString& nss,
-                          const BSONObj& newShardKey) {
-    auto reshardingCoordinatorService = checked_cast<ReshardingCoordinatorService*>(
-        repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
-            ->lookupServiceByName(ReshardingCoordinatorService::kServiceName));
-    auto instances = reshardingCoordinatorService->getAllReshardingInstances(opCtx);
-    for (auto& instance : instances) {
-        auto reshardingCoordinator =
-            checked_pointer_cast<ReshardingCoordinatorService::ReshardingCoordinator>(instance);
-
-        auto instanceMetadata = reshardingCoordinator->getMetadata();
-        if (SimpleBSONObjComparator::kInstance.evaluate(
-                instanceMetadata.getReshardingKey().toBSON() == newShardKey) &&
-            instanceMetadata.getSourceNss() == nss) {
-            return reshardingCoordinator;
-        };
-    }
-
-    return boost::none;
-}
 
 class ConfigsvrReshardCollectionCommand final
     : public TypedCommand<ConfigsvrReshardCollectionCommand> {
@@ -89,24 +110,38 @@ public:
         void typedRun(OperationContext* opCtx) {
             uassert(ErrorCodes::IllegalOperation,
                     "_configsvrReshardCollection can only be run on config servers",
-                    serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
-            uassert(ErrorCodes::InvalidOptions,
-                    "_configsvrReshardCollection must be called with majority writeConcern",
-                    opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+                    serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
+            CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
+                                                          opCtx->getWriteConcern());
+            const NamespaceString& nss = ns();
+
+            // Declaring Write intent ensures we are the primary node and this operation will be
+            // interrupted by StepDown.
+            boost::optional<rss::consensus::WriteIntentGuard> writeGuard;
+            if (gFeatureFlagIntentRegistration.isEnabled()) {
+                writeGuard.emplace(opCtx);
+            }
+
+            {
+                repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
+                auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
+                uassert(ErrorCodes::InterruptedDueToReplStateChange,
+                        "node is not primary",
+                        replCoord->canAcceptWritesForDatabase(opCtx, nss.dbName()));
+                opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+            }
+
             repl::ReadConcernArgs::get(opCtx) =
                 repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
-            const NamespaceString& nss = ns();
-
-            const auto catalogClient = Grid::get(opCtx)->catalogClient();
-            try {
-                const auto collEntry = catalogClient->getCollection(opCtx, nss);
-                uassert(ErrorCodes::NotImplemented,
+            const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
+            const auto collEntry = catalogClient->getCollection(opCtx, nss);
+            if (!mongo::resharding::gFeatureFlagReshardingForTimeseries.isEnabled(
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                uassert(ErrorCodes::IllegalOperation,
                         "reshardCollection command of a sharded time-series collection is not "
                         "supported",
                         !collEntry.getTimeseriesFields());
-            } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-                // collection doesn't exist or not sharded, skip check for time-series collection.
             }
 
             uassert(ErrorCodes::BadValue,
@@ -114,7 +149,7 @@ public:
                     !request().getUnique().get_value_or(false));
 
             if (request().getCollation()) {
-                auto& collation = request().getCollation().get();
+                auto& collation = request().getCollation().value();
                 auto collator =
                     uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
                                         ->makeFromBSON(collation));
@@ -125,9 +160,9 @@ public:
                         !collator);
             }
 
-            const auto& authoritativeTags =
-                uassertStatusOK(catalogClient->getTagsForCollection(opCtx, nss));
-            if (!authoritativeTags.empty()) {
+            const auto& authoritativeTagsExist =
+                !uassertStatusOK(catalogClient->getTagsForCollection(opCtx, nss, 1)).empty();
+            if (authoritativeTagsExist && !request().getForceRedistribution()) {
                 uassert(ErrorCodes::BadValue,
                         "Must specify value for zones field",
                         request().getZones());
@@ -143,75 +178,67 @@ public:
                         "Must specify only one of _presetReshardedChunks or numInitialChunks",
                         !(bool(request().getNumInitialChunks())));
 
-                validateReshardedChunks(
+                resharding::validateReshardedChunks(
                     *presetChunks, opCtx, ShardKeyPattern(request().getKey()).getKeyPattern());
             }
 
+            if (const auto& shardDistribution = request().getShardDistribution()) {
+                resharding::validateShardDistribution(
+                    *shardDistribution, opCtx, ShardKeyPattern(request().getKey()));
+            }
+            resharding::validatePerformVerification(VersionContext::getDecoration(opCtx),
+                                                    request().getPerformVerification());
+
             // Returns boost::none if there isn't any work to be done by the resharding operation.
-            auto instance = ([&]() -> boost::optional<std::shared_ptr<
-                                       ReshardingCoordinatorService::ReshardingCoordinator>> {
+            auto instance = ([&]()
+                                 -> boost::optional<std::shared_ptr<const ReshardingCoordinator>> {
                 FixedFCVRegion fixedFcv(opCtx);
 
+                const auto fcvSnapshot = (*fixedFcv).acquireFCVSnapshot();
+                // (Generic FCV reference): To run this command and ensure the consistency of
+                // the metadata we need to make sure we are on a stable state.
                 uassert(ErrorCodes::CommandNotSupported,
-                        "reshardCollection command not enabled",
-                        resharding::gFeatureFlagResharding.isEnabled(
-                            serverGlobalParams.featureCompatibility));
+                        "Resharding is not supported for this version, please update the FCV to "
+                        "latest.",
+                        !fcvSnapshot.isUpgradingOrDowngrading());
 
-                if (auto existingInstance =
-                        getExistingInstanceToJoin(opCtx, nss, request().getKey())) {
-                    // Join the existing resharding operation to prevent generating a new resharding
-                    // instance if the same command is issued consecutively due to client disconnect
-                    // etc.
-                    opCtx->setAlwaysInterruptAtStepDownOrUp();
-                    reshardCollectionJoinedExistingOperation.pauseWhileSet(opCtx);
-                    existingInstance.get()->getCoordinatorDocWrittenFuture().get(opCtx);
-                    return existingInstance;
+                // We only want to use provenance in resharding if FCV is latest but it's still
+                // possible for a mongos on a higher fcv to send a reshard collection request to a
+                // configsvr on a lower fcv. We ignore the reshardCollection provenance in this
+                // case.
+                bool setProvenance = true;
+                if (resharding::gFeatureFlagMoveCollection.isEnabled(fcvSnapshot) ||
+                    resharding::gFeatureFlagUnshardCollection.isEnabled(fcvSnapshot)) {
+                    uassert(ErrorCodes::InvalidOptions,
+                            "Expected provenance to be specified",
+                            request().getProvenance().has_value());
+                } else if (request().getProvenance().has_value()) {
+                    if (request().getProvenance().get() ==
+                        ReshardingProvenanceEnum::kReshardCollection) {
+                        setProvenance = false;
+                    } else {
+                        uassert(
+                            ErrorCodes::CommandNotSupported,
+                            "Unexpected moveCollection or unshardCollection provenance specified",
+                            true);
+                    }
                 }
-
-                const auto cm = uassertStatusOK(
-                    Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
-                        opCtx, nss));
-
-                const auto currentShardKey = cm.getShardKeyPattern().getKeyPattern();
-                if (SimpleBSONObjComparator::kInstance.evaluate(currentShardKey.toBSON() ==
-                                                                request().getKey())) {
-                    // There isn't any work to be done by the resharding operation since the
-                    // existing shard key matches the desired new shard key.
-                    return boost::none;
-                }
-
-                auto tempReshardingNss = constructTemporaryReshardingNss(nss.db(), cm.getUUID());
-
 
                 if (auto zones = request().getZones()) {
-                    checkForOverlappingZones(*zones);
+                    resharding::checkForOverlappingZones(*zones);
+
+                    for (const auto& zone : *zones) {
+                        uassertStatusOK(
+                            ShardKeyPattern::checkShardKeyIsValidForMetadataStorage(zone.getMin()));
+                        uassertStatusOK(
+                            ShardKeyPattern::checkShardKeyIsValidForMetadataStorage(zone.getMax()));
+                        uassertStatusOK(ChunkRange::validate(zone.getMin(), zone.getMax()));
+                    }
                 }
 
-                auto coordinatorDoc =
-                    ReshardingCoordinatorDocument(std::move(CoordinatorStateEnum::kUnused),
-                                                  {},   // donorShards
-                                                  {});  // recipientShards
-
-                // Generate the resharding metadata for the ReshardingCoordinatorDocument.
-                auto reshardingUUID = UUID::gen();
-                auto existingUUID = cm.getUUID();
-                auto commonMetadata = CommonReshardingMetadata(std::move(reshardingUUID),
-                                                               ns(),
-                                                               std::move(existingUUID),
-                                                               std::move(tempReshardingNss),
-                                                               request().getKey());
-                coordinatorDoc.setCommonReshardingMetadata(std::move(commonMetadata));
-                coordinatorDoc.setZones(request().getZones());
-                coordinatorDoc.setPresetReshardedChunks(request().get_presetReshardedChunks());
-                coordinatorDoc.setNumInitialChunks(request().getNumInitialChunks());
-
-                opCtx->setAlwaysInterruptAtStepDownOrUp();
-                auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
-                auto service =
-                    registry->lookupServiceByName(ReshardingCoordinatorService::kServiceName);
-                auto instance = ReshardingCoordinatorService::ReshardingCoordinator::getOrCreate(
-                    opCtx, service, coordinatorDoc.toBSON());
-
+                auto coordinatorDoc = resharding::createReshardingCoordinatorDoc(
+                    opCtx, request(), collEntry, nss, setProvenance);
+                auto instance = getOrCreateReshardingCoordinator(opCtx, coordinatorDoc);
                 instance->getCoordinatorDocWrittenFuture().get(opCtx);
                 return instance;
             })();
@@ -219,9 +246,18 @@ public:
             if (instance) {
                 // There is work to be done in order to have the collection's shard key match the
                 // requested shard key. Wait until the work is complete.
-                instance.get()->getCompletionFuture().get(opCtx);
+                instance.value()->getCompletionFuture().get(opCtx);
             }
+            repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
         }
+
+        /**
+         * Helper function to create a new instance or join the existing resharding operation to
+         * prevent generating a new resharding instance if the same command is issued consecutively
+         * due to client disconnect etc.
+         */
+        std::shared_ptr<const ReshardingCoordinator> getOrCreateReshardingCoordinator(
+            OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc);
 
     private:
         NamespaceString ns() const override {
@@ -236,8 +272,9 @@ public:
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",
                     AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                           ActionType::internal));
+                        ->isAuthorizedForActionsOnResource(
+                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                            ActionType::internal));
         }
     };
 
@@ -258,7 +295,30 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
-} configsvrReshardCollectionCmd;
+};
+MONGO_REGISTER_COMMAND(ConfigsvrReshardCollectionCommand).forShard();
+
+std::shared_ptr<const ReshardingCoordinator>
+ConfigsvrReshardCollectionCommand::Invocation::getOrCreateReshardingCoordinator(
+    OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) {
+    try {
+        auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
+        auto service = registry->lookupServiceByName(ReshardingCoordinatorService::kServiceName);
+        auto instance = ReshardingCoordinator::getOrCreate(opCtx, service, coordinatorDoc.toBSON());
+
+        return std::shared_ptr<const ReshardingCoordinator>(instance);
+    } catch (
+        const ExceptionFor<ErrorCodes::ReshardingCoordinatorServiceConflictingOperationInProgress>&
+            ex) {
+        reshardCollectionJoinedExistingOperation.pauseWhileSet(opCtx);
+        return checked_pointer_cast<const ReshardingCoordinator>(
+            ex.extraInfo<ReshardingCoordinatorServiceConflictingOperationInProgressInfo>()
+                ->getInstance());
+
+    } catch (const ExceptionFor<ErrorCodes::ConflictingOperationInProgress>& ex) {
+        uasserted(ErrorCodes::ReshardCollectionInProgress, ex.toStatus().reason());
+    }
+}
 
 }  // namespace
 }  // namespace mongo

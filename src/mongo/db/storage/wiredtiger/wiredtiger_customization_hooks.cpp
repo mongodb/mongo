@@ -27,15 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 
-#include <memory>
-
-#include "mongo/base/init.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/string_data.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/str.h"
+
+#include <memory>
+#include <utility>
 
 namespace mongo {
 namespace {
@@ -48,13 +50,38 @@ ServiceContext::ConstructorActionRegisterer setWiredTigerCustomizationHooks{
 
 const auto getCustomizationHooks =
     ServiceContext::declareDecoration<std::unique_ptr<WiredTigerCustomizationHooks>>();
+
+const auto getWiredTigerCustomizationHooksRegistry =
+    ServiceContext::declareDecoration<WiredTigerCustomizationHooksRegistry>();
+
 }  // namespace
 
+
+WiredTigerCustomizationHooksRegistry& WiredTigerCustomizationHooksRegistry::get(
+    ServiceContext* service) {
+    return getWiredTigerCustomizationHooksRegistry(service);
+}
+
+
+void WiredTigerCustomizationHooksRegistry::addHook(
+    std::unique_ptr<WiredTigerCustomizationHooks> custHook) {
+    invariant(custHook);
+    _hooks.push_back(std::move(custHook));
+}
+
+std::string WiredTigerCustomizationHooksRegistry::getTableCreateConfig(StringData tableName) const {
+    str::stream config;
+    for (const auto& h : _hooks) {
+        config << h->getTableCreateConfig(tableName);
+    }
+    return config;
+}
+
 void WiredTigerCustomizationHooks::set(ServiceContext* service,
-                                       std::unique_ptr<WiredTigerCustomizationHooks> custHooks) {
+                                       std::unique_ptr<WiredTigerCustomizationHooks> customHooks) {
     auto& hooks = getCustomizationHooks(service);
-    invariant(custHooks);
-    hooks = std::move(custHooks);
+    invariant(customHooks);
+    hooks = std::move(customHooks);
 }
 
 WiredTigerCustomizationHooks* WiredTigerCustomizationHooks::get(ServiceContext* service) {

@@ -1,0 +1,18 @@
+==== VARIATION: sbe pipeline: {$match: {a: 1}}, {}
+fGVxAGE/AAAAAA==
+==== VARIATION: sbe pipeline: {$match: {a: 2}}, {}
+fGVxAGE/AAAAAA==
+==== VARIATION: sbe pipeline: {$match: {b: 1}}, {}
+fGVxAGI/AAAAAA==
+==== VARIATION: sbe pipeline: {$match: {$and: [{a: 1}, {b: 1}]}}, {}
+fGFuAFtlcQBhPwAAAAAsZXEAYj8BAAAAXQ==
+==== VARIATION: sbe pipeline: {$match: {$or: [{a: 1}, {b: 1}]}}, {}
+fG9yAFtlcQBhPwAAAAAsZXEAYj8BAAAAXQ==
+==== VARIATION: sbe pipeline: {$match: {a: 1}}, {$project: {a: 1}}
+fGVxAGE/AAAAAHweAAAAAyRwcm9qZWN0AA8AAAAIX2lkAAEIYQABAAA=
+==== VARIATION: sbe pipeline: {$match: {b: 1}}, {$project: {b: 1}}
+fGVxAGI/AAAAAHweAAAAAyRwcm9qZWN0AA8AAAAIX2lkAAEIYgABAAA=
+==== VARIATION: sbe pipeline: {$match: {$and: [{a: 1}, {b: 1}]}}, {$project: {a: 1, b: 1}}
+fGFuAFtlcQBhPwAAAAAsZXEAYj8BAAAAXXwiAAAAAyRwcm9qZWN0ABMAAAAIX2lkAAEIYQABCGIAAQAA
+==== VARIATION: sbe pipeline: {$match: {$or: [{a: 1}, {b: 1}]}}, {$project: {a: 1, b: 1}}
+fG9yAFtlcQBhPwAAAAAsZXEAYj8BAAAAXXwiAAAAAyRwcm9qZWN0ABMAAAAIX2lkAAEIYQABCGIAAQAA

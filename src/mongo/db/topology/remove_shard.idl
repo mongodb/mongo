@@ -1,0 +1,189 @@
+# Copyright (C) 2024-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+# removeShard IDL File
+
+global:
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/sharding_environment/sharding_types.idl"
+    - "mongo/db/topology/remove_shard_draining_progress.idl"
+
+structs:
+    RemoveShardRequestBase:
+        description: "The removeShard request fields shared by the remove shard commands"
+        strict: false
+        fields:
+            destinationShard:
+                type: shard_id
+                # TODO SERVER-84564: Remove the non operational label once this ticket is completed
+                description: "(Non operational yet) Shard serving as the destination for un-sharded collections"
+                optional: true
+                validator:
+                    callback: "ShardId::validate"
+
+    RemoveShardResponse:
+        description: "Response of the removeShard command."
+        strict: false
+        is_command_reply: true
+        chained_structs:
+            RemoveShardProgress: removeShardDrainingProgress
+        inline_chained_structs: true
+        fields:
+            msg:
+                type: string
+                description: "Message describing shard draining status."
+            shard:
+                type: string
+                description: "The ID of the shard being removed."
+                optional: true
+            dbsToMove:
+                type: array<string>
+                description: "Remaining databases left to move."
+                optional: true
+            note:
+                type: string
+                description: "Additional notes."
+                optional: true
+            collectionsToMove:
+                type: array<string>
+                description: "Remaining unsharded collections left to move."
+                optional: true
+
+commands:
+    removeShard:
+        command_name: removeShard
+        command_alias: removeshard
+        description: "The public removeShard command on mongos"
+        cpp_name: RemoveShard
+        namespace: type
+        type: shard_id
+        api_version: ""
+        strict: false
+        chained_structs:
+            RemoveShardRequestBase: RemoveShardRequestBase
+
+    _configsvrRemoveShard:
+        command_name: _configsvrRemoveShard
+        description: "The internal removeShard command on config server"
+        cpp_name: ConfigSvrRemoveShard
+        namespace: type
+        type: shard_id
+        api_version: ""
+        strict: false
+        chained_structs:
+            RemoveShardRequestBase: RemoveShardRequestBase
+
+    startShardDraining:
+        command_name: startShardDraining
+        description: "The public startShardDraining command on mongos"
+        cpp_name: StartShardDraining
+        namespace: type
+        type: shard_id
+        api_version: ""
+        strict: false
+        chained_structs:
+            RemoveShardRequestBase: RemoveShardRequestBase
+
+    _configsvrStartShardDraining:
+        command_name: _configsvrStartShardDraining
+        description: "The internal startShardDraining command on config server"
+        cpp_name: ConfigSvrStartShardDraining
+        namespace: type
+        type: shard_id
+        api_version: ""
+        strict: false
+        chained_structs:
+            RemoveShardRequestBase: RemoveShardRequestBase
+    shardDrainingStatus:
+        command_name: shardDrainingStatus
+        description: "The public shardDrainingStatus command on mongos"
+        cpp_name: ShardDrainingStatus
+        namespace: type
+        type: shard_id
+        api_version: ""
+        strict: false
+        chained_structs:
+            RemoveShardRequestBase: RemoveShardRequestBase
+
+    _configsvrShardDrainingStatus:
+        command_name: _configsvrShardDrainingStatus
+        description: "The internal shardDrainingStatus command on config server"
+        cpp_name: ConfigSvrShardDrainingStatus
+        namespace: type
+        type: shard_id
+        api_version: ""
+        strict: false
+        chained_structs:
+            RemoveShardRequestBase: RemoveShardRequestBase
+
+    stopShardDraining:
+        command_name: stopShardDraining
+        description: "The public stopShardDraining on mongos"
+        cpp_name: StopShardDraining
+        namespace: type
+        type: shard_id
+        api_version: ""
+        strict: false
+        chained_structs:
+            RemoveShardRequestBase: RemoveShardRequestBase
+
+    _configsvrStopShardDraining:
+        command_name: _configsvrStopShardDraining
+        description: "The internal stopShardDraining command on config server"
+        cpp_name: ConfigSvrStopShardDraining
+        namespace: type
+        type: shard_id
+        api_version: ""
+        strict: false
+        chained_structs:
+            RemoveShardRequestBase: RemoveShardRequestBase
+
+    commitShardRemoval:
+        command_name: commitShardRemoval
+        description: "The public commitShardRemoval command on mongos"
+        cpp_name: CommitShardRemoval
+        namespace: type
+        type: shard_id
+        api_version: ""
+        strict: false
+        chained_structs:
+            RemoveShardRequestBase: RemoveShardRequestBase
+
+    _configsvrCommitShardRemoval:
+        command_name: _configsvrCommitShardRemoval
+        description: "The internal commitShardRemoval command on config server"
+        cpp_name: ConfigSvrCommitShardRemoval
+        namespace: type
+        type: shard_id
+        api_version: ""
+        strict: false
+        chained_structs:
+            RemoveShardRequestBase: RemoveShardRequestBase

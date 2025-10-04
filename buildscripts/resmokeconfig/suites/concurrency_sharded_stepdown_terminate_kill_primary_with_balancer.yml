@@ -1,0 +1,152 @@
+test_kind: fsm_workload_test
+
+selector:
+  roots:
+    - jstests/concurrency/fsm_workloads/**/*.js
+    - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*.js
+  exclude_files:
+    # SERVER-14669 Multi-removes that use $where miscount removed documents
+
+    # Disabled because MapReduce can lose cursors if the primary goes down during the operation.
+
+    # Disabled due to MongoDB restrictions and/or workload restrictions
+
+    # These workloads sometimes trigger 'Could not lock auth data update lock'
+    # errors because the AuthorizationManager currently waits for only five
+    # seconds to acquire the lock for authorization documents
+
+    # uses >100MB of data, which can overwhelm test hosts
+
+    # compact can only be run against a standalone mongod
+
+    # can cause OOM kills on test hosts
+
+    # cannot createIndex after dropDatabase without sharding first
+
+    # The WTWriteConflictException failpoint is not supported on mongos.
+
+    # SERVER-20361 Improve the behaviour of multi-update/delete against a sharded collection
+
+    # ChunkHelper directly talks to the config servers and doesn't support retries for network errors
+
+    # These workloads frequently time out waiting for the distributed lock to drop a sharded
+    # collection.
+
+    # Uses getmores.
+
+    # Uses non retryable writes.
+
+    # Uses non retryable commands.
+    - jstests/concurrency/fsm_workloads/ddl/collMod/collMod.js
+    - jstests/concurrency/fsm_workloads/ddl/collMod/collMod_separate_collections.js
+    - jstests/concurrency/fsm_workloads/view_catalog/view_catalog.js
+    - jstests/concurrency/fsm_workloads/view_catalog/view_catalog_cycle_lookup.js
+    - jstests/concurrency/fsm_workloads/view_catalog/view_catalog_cycle_with_drop.js
+
+    # The aggregation stage $currentOp cannot run with a readConcern other than 'local'.
+    - jstests/concurrency/fsm_workloads/txns/multi_statement_transaction/multi_statement_transaction_current_op.js
+
+    # The auto_retry_on_network_error.js override needs to overwrite the response from drop on
+    # NamespaceNotFound, and since this workload only creates and drops collections there isn't
+    # much value in running it.
+    - jstests/concurrency/fsm_workloads/ddl/drop_collection/drop_collection.js
+
+    # serverStatus does not include transaction metrics on mongos.
+
+    # Uses the same transaction id across different routers, which is not allowed because when either
+    # router tries to commit, it may not know the full participant list.
+
+    # Use non-retryable commands not allowed by the network retry helper.
+
+    # This test runs a large number of inserts, which can cause moveCollection to take a long time
+    # to finish. This can cause the CheckMetadataConsistency hook to hit LockBusy errors.
+    - jstests/concurrency/fsm_workloads/timeseries/timeseries_insert_idle_bucket_expiration.js
+
+  exclude_with_any_tags:
+    - requires_standalone
+    - assumes_balancer_off
+    - assumes_against_mongod_not_mongos
+    - requires_replication
+    - requires_non_retryable_writes
+    # mongos has no system.profile collection.
+    - requires_profiling
+    - does_not_support_stepdowns
+    - assumes_unsharded_collection
+    # implicitly_retry_on_migration_in_progress.js alters find/aggregate commands
+    # so that the whole result set is returned through a single batch
+    - assumes_no_implicit_cursor_exhaustion
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+    tests: true
+  config:
+    shell_options:
+      eval: >-
+        await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
+        await import("jstests/libs/override_methods/implicitly_retry_crud_on_no_progress_made.js");
+        await import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
+      global_vars:
+        TestData:
+          runningWithConfigStepdowns: true
+          runningWithShardStepdowns: true
+          killShards: true
+          useActionPermittedFile: [ContinuousStepdown]
+          runningWithBalancer: true
+          implicitlyShardOnCreateCollectionOnly: true
+  hooks:
+    - class: ContinuousStepdown
+      config_stepdown: true
+      shard_stepdown: true
+      is_fsm_workload: true
+      randomize_kill: true
+    - class: CheckShardFilteringMetadata
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: CheckOrphansDeleted
+    - class: CheckRoutingTableConsistency
+    - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
+      shell_options:
+        global_vars:
+          TestData:
+            skipEnforceFastCountOnValidate: true
+    - class: CleanupConcurrencyWorkloads
+  fixture:
+    class: ShardedClusterFixture
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+    configsvr_options:
+      num_nodes: 3
+      all_nodes_electable: true
+      replset_config_options:
+        settings:
+          catchUpTimeoutMillis: 0
+      mongod_options:
+        set_parameters:
+          reshardingMinimumOperationDurationMillis: 30000 # 30 seconds
+    shard_options:
+      all_nodes_electable: true
+      mongod_options:
+        oplogSize: 1024
+      replset_config_options:
+        settings:
+          catchUpTimeoutMillis: 0
+    mongod_options:
+      wiredTigerEngineConfigString: "debug_mode=(table_logging=true)"
+      set_parameters:
+        enableTestCommands: 1
+        enableElectionHandoff: 0
+        roleGraphInvalidationIsFatal: 1
+        queryAnalysisWriterIntervalSecs: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+        skipDroppingHashedShardKeyIndex: true
+    num_rs_nodes_per_shard: 3
+    num_shards: 2
+    num_mongos: 2
+    enable_balancer: true
+    random_migrations: true

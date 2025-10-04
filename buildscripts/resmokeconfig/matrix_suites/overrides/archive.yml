@@ -1,0 +1,10 @@
+- name: no_archive
+  value:
+    executor:
+      archive: null
+
+- name: tests
+  value:
+    executor:
+      archive:
+        tests: true

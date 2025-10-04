@@ -27,36 +27,54 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <boost/optional.hpp>
-#include <memory>
-
-#include "mongo/db/exec/mock_stage.h"
-#include "mongo/db/exec/trial_stage.h"
-#include "mongo/db/exec/working_set.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/client.h"
+#include "mongo/db/exec/classic/mock_stage.h"
+#include "mongo/db/exec/classic/plan_stage.h"
+#include "mongo/db/exec/classic/trial_stage.h"
+#include "mongo/db/exec/classic/working_set.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/mock_yield_policies.h"
-#include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/snapshot.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/intrusive_counter.h"
+
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
 namespace {
 
-const NamespaceString kTestNss = NamespaceString("db.dummy");
+const NamespaceString kTestNss = NamespaceString::createNamespaceString_forTest("db.dummy");
 
 class TrialStageTest : public unittest::Test {
 public:
     TrialStageTest()
         : _opCtx(cc().makeOperationContext()),
-          _expCtx(make_intrusive<ExpressionContext>(_opCtx.get(), nullptr, kTestNss)) {}
+          _expCtx(ExpressionContextBuilder{}.opCtx(_opCtx.get()).ns(kTestNss).build()) {}
 
 protected:
     // Pushes BSONObjs from the given vector into the given MockStage. Each empty BSONObj in
     // the vector causes a NEED_TIME to be queued up at that point instead of a result.
     void queueData(const std::vector<BSONObj>& results, MockStage* mockStage) {
-        for (auto result : results) {
+        for (const auto& result : results) {
             if (result.isEmpty()) {
                 mockStage->enqueueStateCode(PlanStage::NEED_TIME);
                 continue;
@@ -87,8 +105,7 @@ protected:
     }
 
     std::unique_ptr<PlanYieldPolicy> yieldPolicy() {
-        return std::make_unique<NoopYieldPolicy>(
-            opCtx()->getServiceContext()->getFastClockSource());
+        return std::make_unique<NoopYieldPolicy>(opCtx(), &opCtx()->fastClockSource());
     }
 
     OperationContext* opCtx() {
@@ -130,7 +147,7 @@ TEST_F(TrialStageTest, AdoptsTrialPlanIfTrialSucceeds) {
     ASSERT_FALSE(trialStage->pickedBackupPlan());
 
     // Confirm that we see the full trialPlan results when we iterate the trialStage.
-    for (auto result : trialResults) {
+    for (const auto& result : trialResults) {
         ASSERT_BSONOBJ_EQ(result, *nextResult(trialStage.get()));
     }
     ASSERT_FALSE(nextResult(trialStage.get()));
@@ -165,7 +182,7 @@ TEST_F(TrialStageTest, AdoptsTrialPlanIfTrialPlanHitsEOF) {
     ASSERT_EQ(stats->trialWorks, 5U);
 
     // Confirm that we see the full trialPlan results when we iterate the trialStage.
-    for (auto result : trialResults) {
+    for (const auto& result : trialResults) {
         ASSERT_BSONOBJ_EQ(result, *nextResult(trialStage.get()));
     }
     ASSERT_FALSE(nextResult(trialStage.get()));
@@ -203,7 +220,7 @@ TEST_F(TrialStageTest, AdoptsBackupPlanIfTrialDoesNotSucceed) {
     ASSERT_TRUE(trialStage->pickedBackupPlan());
 
     // Confirm that we see the full backupPlan results when we iterate the trialStage.
-    for (auto result : backupResults) {
+    for (const auto& result : backupResults) {
         ASSERT_BSONOBJ_EQ(result, *nextResult(trialStage.get()));
     }
     ASSERT_FALSE(nextResult(trialStage.get()));

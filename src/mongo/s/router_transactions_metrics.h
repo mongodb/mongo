@@ -31,9 +31,18 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/s/router_transactions_stats_gen.h"
 #include "mongo/s/transaction_router.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/hierarchical_acquisition.h"
+
+#include <cstdint>
+#include <map>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 
@@ -148,8 +157,7 @@ private:
     CommitStats _recoverWithTokenCommitStats;
 
     // Mutual exclusion for _abortCauseMap
-    Mutex _abortCauseMutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0),
-                                              "RouterTransactionsMetrics::_abortCauseMutex");
+    stdx::mutex _abortCauseMutex;
 
     // Map tracking the total number of each abort cause for any multi-statement transaction that
     // was aborted through this router.

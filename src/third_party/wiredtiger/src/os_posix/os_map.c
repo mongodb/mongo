@@ -9,12 +9,12 @@
 #include "wt_internal.h"
 
 /*
- * __wt_posix_map --
+ * __wti_posix_map --
  *     Map a file into memory.
  */
 int
-__wt_posix_map(WT_FILE_HANDLE *fh, WT_SESSION *wt_session, void *mapped_regionp, size_t *lenp,
-  void *mapped_cookiep)
+__wti_posix_map(WT_FILE_HANDLE *fh, WT_SESSION *wt_session, void **mapped_regionp, size_t *lenp,
+  void **mapped_cookiep)
 {
     WT_FILE_HANDLE_POSIX *pfh;
     WT_SESSION_IMPL *session;
@@ -28,42 +28,37 @@ __wt_posix_map(WT_FILE_HANDLE *fh, WT_SESSION *wt_session, void *mapped_regionp,
     pfh = (WT_FILE_HANDLE_POSIX *)fh;
 
     /*
-     * Mapping isn't possible if direct I/O configured for the file, the Linux open(2) documentation
-     * says applications should avoid mixing mmap(2) of files with direct I/O to the same files.
-     */
-    if (pfh->direct_io)
-        return (__wt_set_return(session, ENOTSUP));
-
-    /*
      * There's no locking here to prevent the underlying file from changing underneath us, our
      * caller needs to ensure consistency of the mapped region vs. any other file activity.
      */
     WT_RET(fh->fh_size(fh, wt_session, &file_size));
     len = (size_t)file_size;
 
-    __wt_verbose(
-      session, WT_VERB_HANDLEOPS, "%s: memory-map: %" WT_SIZET_FMT " bytes", fh->name, len);
+    __wt_verbose(session, WT_VERB_HANDLEOPS,
+      "%s: memory-map: %" WT_SIZET_FMT " bytes, read=%s, write=%s", fh->name, len,
+      pfh->mmap_prot & PROT_READ ? "true" : "false",
+      pfh->mmap_prot & PROT_WRITE ? "true" : "false");
 
-    if ((map = mmap(NULL, len, PROT_READ,
+    if ((map = mmap(NULL, len, pfh->mmap_prot,
 #ifdef MAP_NOCORE
            MAP_NOCORE |
 #endif
-             MAP_PRIVATE,
+             pfh->mmap_flags,
            pfh->fd, (wt_off_t)0)) == MAP_FAILED)
         WT_RET_MSG(session, __wt_errno(), "%s: memory-map: mmap", fh->name);
 
-    *(void **)mapped_regionp = map;
+    *mapped_regionp = map;
     *lenp = len;
     return (0);
 }
 
 #ifdef HAVE_POSIX_MADVISE
 /*
- * __wt_posix_map_preload --
+ * __wti_posix_map_preload --
  *     Cause a section of a memory map to be faulted in.
  */
 int
-__wt_posix_map_preload(
+__wti_posix_map_preload(
   WT_FILE_HANDLE *fh, WT_SESSION *wt_session, const void *map, size_t length, void *mapped_cookie)
 {
     WT_BM *bm;
@@ -111,11 +106,11 @@ __wt_posix_map_preload(
 
 #ifdef HAVE_POSIX_MADVISE
 /*
- * __wt_posix_map_discard --
+ * __wti_posix_map_discard --
  *     Discard a chunk of the memory map.
  */
 int
-__wt_posix_map_discard(
+__wti_posix_map_discard(
   WT_FILE_HANDLE *fh, WT_SESSION *wt_session, void *map, size_t length, void *mapped_cookie)
 {
     WT_CONNECTION_IMPL *conn;
@@ -142,11 +137,11 @@ __wt_posix_map_discard(
 #endif
 
 /*
- * __wt_posix_unmap --
+ * __wti_posix_unmap --
  *     Remove a memory mapping.
  */
 int
-__wt_posix_unmap(
+__wti_posix_unmap(
   WT_FILE_HANDLE *fh, WT_SESSION *wt_session, void *mapped_region, size_t len, void *mapped_cookie)
 {
     WT_SESSION_IMPL *session;

@@ -1,0 +1,82 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# 12.1.7 PartitionNotationSubPattern ( numberFormat, x, n, exponent )
+#
+# Numbering systems with simple digit mappings
+#
+# https://tc39.es/ecma402/#table-numbering-system-digits
+
+# Run |make_intl_data numbering| to regenerate all files which reference this list
+# of numbering systems.
+
+- adlm
+- ahom
+- arab
+- arabext
+- bali
+- beng
+- bhks
+- brah
+- cakm
+- cham
+- deva
+- diak
+- fullwide
+- gong
+- gonm
+- gujr
+- guru
+- hanidec
+- hmng
+- hmnp
+- java
+- kali
+- kawi
+- khmr
+- knda
+- lana
+- lanatham
+- laoo
+- latn
+- lepc
+- limb
+- mathbold
+- mathdbl
+- mathmono
+- mathsanb
+- mathsans
+- mlym
+- modi
+- mong
+- mroo
+- mtei
+- mymr
+- mymrshan
+- mymrtlng
+- nagm
+- newa
+- nkoo
+- olck
+- orya
+- osma
+- rohg
+- saur
+- segment
+- shrd
+- sind
+- sinh
+- sora
+- sund
+- takr
+- talu
+- tamldec
+- telu
+- thai
+- tibt
+- tirh
+- tnsa
+- vaii
+- wara
+- wcho

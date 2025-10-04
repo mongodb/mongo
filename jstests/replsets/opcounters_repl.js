@@ -5,8 +5,7 @@
  * secondary.
  */
 
-(function() {
-"use strict";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const testName = "opcounters_repl";
 const dbName = testName;
@@ -19,7 +18,7 @@ const primaryDB = primary.getDB(dbName);
 const secondary = rst.getSecondary();
 
 const collName = "coll";
-const collNs = dbName + '.' + collName;
+const collNs = dbName + "." + collName;
 const primaryColl = primaryDB[collName];
 
 function getOpCounters(node) {
@@ -43,8 +42,7 @@ function getOpCountersDiff(cmdFn) {
     const secondaryOpCountersReplAfter = getOpCountersRepl(secondary);
 
     assert(!primaryOpCountersAfter.hasOwnProperty("constraintsRelaxed"), primaryOpCountersAfter);
-    assert(!secondaryOpCountersReplAfter.hasOwnProperty("constraintsRelaxed"),
-           secondaryOpCountersReplAfter);
+    assert(!secondaryOpCountersReplAfter.hasOwnProperty("constraintsRelaxed"), secondaryOpCountersReplAfter);
 
     // Calculate the diff
     let primaryDiff = {};
@@ -89,10 +87,11 @@ diff = getOpCountersDiff(() => {
 assert.eq(diff.primary.delete, 1);
 assert.eq(diff.secondary.delete, 1);
 
-// 5. Atomic insert operation via applyOps cmd.
+// 5. Insert operation via applyOps cmd.
 diff = getOpCountersDiff(() => {
-    assert.commandWorked(primaryColl.runCommand(
-        {applyOps: [{op: "i", ns: collNs, o: {_id: 1}}], writeConcern: {w: 2}}));
+    assert.commandWorked(
+        primaryColl.runCommand({applyOps: [{op: "i", ns: collNs, o: {_id: 1}}], writeConcern: {w: 2}}),
+    );
 });
 // On primary, the command counter accounts for applyOps command and for other internal
 // commands like replSetUpdatePosition, replSetHeartbeat, serverStatus, etc.
@@ -102,4 +101,3 @@ assert.eq(diff.primary.insert, 1);
 assert.eq(diff.secondary.insert, 1);
 
 rst.stopSet();
-})();

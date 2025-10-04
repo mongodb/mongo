@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/util/duration.h"
+
 namespace mongo {
 
 enum class LogFileStatus {
@@ -46,10 +48,18 @@ void setupSignalHandlers();
 /**
  * Starts the thread to handle asynchronous signals.
  *
- * This must be the first thread started from the main thread. Call this immediately after
- * initializeServerGlobalState().
+ * This must be the first thread started from the main thread.
  */
 void startSignalProcessingThread(LogFileStatus rotate = LogFileStatus::kNeedToRotateLogFile);
+
+/**
+ * Starts a thread that randomly picks a victim thread at randomized intervals and sends a signal
+ * to that thread in an effort to cause system calls to randomly fail with EINTR. Only works
+ * on linux, does nothing on other platforms.
+ *
+ * The given period is the average interval at which victim threads are signalled.
+ */
+void startSignalTestingThread(Milliseconds period);
 
 /*
  * Uninstall the Control-C handler

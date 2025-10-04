@@ -35,9 +35,12 @@
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
 
+#include <memory>
+
 namespace mongo {
 
 class ReshardingOplogApplicationRules;
+
 class ReshardingOplogSessionApplication;
 
 /**

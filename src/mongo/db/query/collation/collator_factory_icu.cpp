@@ -27,21 +27,31 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/query/collation/collator_factory_icu.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/basic_types_gen.h"
+#include "mongo/db/query/collation/collation_spec.h"
+#include "mongo/db/query/collation/collator_interface_icu.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
 #include <memory>
+#include <string>
+#include <utility>
 
 #include <unicode/coll.h>
 #include <unicode/errorcode.h>
+#include <unicode/locid.h>
 #include <unicode/ucol.h>
+#include <unicode/uloc.h>
+#include <unicode/utypes.h>
 #include <unicode/uvernum.h>
-
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/query/collation/collator_interface_icu.h"
-#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -261,7 +271,8 @@ Status updateCollationSpecFromICUCollator(const BSONObj& spec,
         try {
             // For backwards compatibility, "strength" is parsed from any int, long, or double.
             // Check it matches an enum value.
-            CollationStrength_parse({"collation.strength"}, collation->getStrength());
+            CollationStrength_parse(collation->getStrength(),
+                                    IDLParserContext{"collation.strength"});
         } catch (const DBException& exc) {
             return exc.toStatus();
         }
@@ -498,7 +509,7 @@ StatusWith<std::unique_ptr<CollatorInterface>> CollatorFactoryICU::makeFromBSON(
 
     Collation collation;
     try {
-        collation = Collation::parse({"collation"}, spec);
+        collation = Collation::parse(spec, IDLParserContext{"collation"});
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
@@ -516,7 +527,7 @@ StatusWith<std::unique_ptr<CollatorInterface>> CollatorFactoryICU::makeFromBSON(
     }
 
     // Construct an icu::Locale.
-    auto userLocale = icu::Locale::createFromName(collation.getLocale().toString().c_str());
+    auto userLocale = icu::Locale::createFromName(std::string{collation.getLocale()}.c_str());
     if (userLocale.isBogus()) {
         return {ErrorCodes::BadValue,
                 str::stream() << "Field '" << Collation::kLocaleFieldName

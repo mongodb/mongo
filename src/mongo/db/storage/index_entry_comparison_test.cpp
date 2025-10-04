@@ -27,24 +27,41 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/bson/bsontypes.h"
-#include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/storage/index_entry_comparison.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/hex.h"
 
+#include <memory>
+
 namespace mongo {
 
-TEST(IndexEntryComparison, BuildDupKeyErrorStatusProducesExpectedErrorObject) {
-    NamespaceString collNss("test.foo");
+void buildDupKeyErrorStatusProducesExpectedErrorObject(
+    DuplicateKeyErrorInfo::FoundValue&& foundValue) {
+    NamespaceString collNss = NamespaceString::createNamespaceString_forTest("test.foo");
     std::string indexName("a_1_b_1");
     auto keyPattern = BSON("a" << 1 << "b" << 1);
     auto keyValue = BSON("" << 10 << ""
                             << "abc");
+    auto keyValueWithFieldName = BSON("a" << 10 << "b"
+                                          << "abc");
 
-    auto dupKeyStatus = buildDupKeyErrorStatus(keyValue, collNss, indexName, keyPattern, BSONObj{});
+    BSONObjBuilder expectedObjBuilder;
+    expectedObjBuilder.append("keyPattern", keyPattern);
+    expectedObjBuilder.append("keyValue", keyValueWithFieldName);
+    visit(OverloadedVisitor{
+              [](std::monostate) {},
+              [&](const RecordId& rid) { rid.serializeToken("foundValue", &expectedObjBuilder); },
+              [&](const BSONObj& obj) { expectedObjBuilder.append("foundValue", obj); },
+          },
+          foundValue);
+    auto expectedObj = expectedObjBuilder.obj();
+
+    auto dupKeyStatus = buildDupKeyErrorStatus(
+        keyValue, collNss, indexName, keyPattern, BSONObj{}, std::move(foundValue));
     ASSERT_NOT_OK(dupKeyStatus);
     ASSERT_EQUALS(dupKeyStatus.code(), ErrorCodes::DuplicateKey);
 
@@ -52,15 +69,25 @@ TEST(IndexEntryComparison, BuildDupKeyErrorStatusProducesExpectedErrorObject) {
     ASSERT(extraInfo);
 
     ASSERT_BSONOBJ_EQ(extraInfo->getKeyPattern(), keyPattern);
-
-    auto keyValueWithFieldName = BSON("a" << 10 << "b"
-                                          << "abc");
     ASSERT_BSONOBJ_EQ(extraInfo->getDuplicatedKeyValue(), keyValueWithFieldName);
 
     BSONObjBuilder objBuilder;
     extraInfo->serialize(&objBuilder);
-    ASSERT_BSONOBJ_EQ(objBuilder.obj(),
-                      BSON("keyPattern" << keyPattern << "keyValue" << keyValueWithFieldName));
+    auto obj = objBuilder.obj();
+    ASSERT_BSONOBJ_EQ(obj, expectedObj);
+
+    // Ensure the object is the same after parsing and serializing again.
+    auto parsedExtraInfo =
+        std::dynamic_pointer_cast<const DuplicateKeyErrorInfo>(DuplicateKeyErrorInfo::parse(obj));
+    BSONObjBuilder afterParseObjBuilder;
+    parsedExtraInfo->serialize(&afterParseObjBuilder);
+    ASSERT_BSONOBJ_EQ(afterParseObjBuilder.obj(), expectedObj);
+}
+
+TEST(IndexEntryComparison, BuildDupKeyErrorStatusProducesExpectedErrorObject) {
+    buildDupKeyErrorStatusProducesExpectedErrorObject(std::monostate{});
+    buildDupKeyErrorStatusProducesExpectedErrorObject(RecordId{1});
+    buildDupKeyErrorStatusProducesExpectedErrorObject(BSON("c" << 1));
 }
 
 void duplicateKeyErrorSerializationAndParseReturnTheSameObject(
@@ -69,7 +96,7 @@ void duplicateKeyErrorSerializationAndParseReturnTheSameObject(
     BSONObj collation,
     BSONObj keyValueWithFieldName,
     BSONObj expectedEncodedKeyValueField) {
-    NamespaceString collNss("test.foo");
+    NamespaceString collNss = NamespaceString::createNamespaceString_forTest("test.foo");
     std::string indexName("a_1_b_1");
 
     auto dupKeyStatus = buildDupKeyErrorStatus(keyValue, collNss, indexName, keyPattern, collation);
@@ -96,13 +123,11 @@ void duplicateKeyErrorSerializationAndParseReturnTheSameObject(
 
 TEST(IndexEntryComparison, BuildDupKeyErrorSerializeAndParseReturnTheSameObjectWithCollation) {
     auto keyPattern = BSON("a" << 1 << "b" << 1);
-    auto str = "abc";
+    auto str = "abc"_sd;
     auto keyValue = BSON("" << 10 << "" << str);
-    auto collation = BSON("x"
-                          << "y");
+    auto collation = BSON("x" << 'y');
     auto keyValueWithFieldName = BSON("a" << 10 << "b" << str);
-    auto expectedEncodedKeyValueField =
-        BSON("a" << 10 << "b" << StringData(hexblob::encodeLower(str)));
+    auto expectedEncodedKeyValueField = BSON("a" << 10 << "b" << hexblob::encodeLower(str));
     duplicateKeyErrorSerializationAndParseReturnTheSameObject(
         keyPattern, keyValue, collation, keyValueWithFieldName, expectedEncodedKeyValueField);
 }
@@ -113,8 +138,7 @@ TEST(IndexEntryComparison, BuildDupKeyErrorSerializeAndParseReturnTheSameObjectF
     auto keyValue = BSON("" << 10 << "" << str);
     auto collation = BSONObj();
     auto keyValueWithFieldName = BSON("a" << 10 << "b" << str);
-    auto expectedEncodedKeyValueField =
-        BSON("a" << 10 << "b" << StringData(hexblob::encodeLower(str)));
+    auto expectedEncodedKeyValueField = BSON("a" << 10 << "b" << hexblob::encodeLower(str));
     duplicateKeyErrorSerializationAndParseReturnTheSameObject(
         keyPattern, keyValue, collation, keyValueWithFieldName, expectedEncodedKeyValueField);
 }
@@ -122,12 +146,11 @@ TEST(IndexEntryComparison, BuildDupKeyErrorSerializeAndParseReturnTheSameObjectF
 TEST(IndexEntryComparison, BuildDupKeyErrorMessageIncludesCollationAndHexEncodedCollationKey) {
     StringData mockCollationKey("bar");
 
-    NamespaceString collNss("test.foo");
+    NamespaceString collNss = NamespaceString::createNamespaceString_forTest("test.foo");
     std::string indexName("a_1");
     auto keyPattern = BSON("a" << 1);
     auto keyValue = BSON("" << mockCollationKey);
-    auto collation = BSON("locale"
-                          << "en_US");
+    auto collation = BSON("locale" << "en_US");
 
     auto dupKeyStatus = buildDupKeyErrorStatus(keyValue, collNss, indexName, keyPattern, collation);
     ASSERT_NOT_OK(dupKeyStatus);
@@ -147,15 +170,14 @@ TEST(IndexEntryComparison, BuildDupKeyErrorMessageIncludesCollationAndHexEncoded
 }
 
 TEST(IndexEntryComparison, BuildDupKeyErrorMessageHexEncodesInvalidUTF8ForIndexWithoutCollation) {
-    NamespaceString collNss("test.foo");
+    NamespaceString collNss = NamespaceString::createNamespaceString_forTest("test.foo");
     std::string indexName("a_1");
     auto keyPattern = BSON("a" << 1);
 
     // The byte sequence c0 16 is invalid UTF-8 since this is an overlong encoding of the letter
     // "a", which should be represented as simply 0x16. The byte 0xc0 is always illegal in UTF-8
     // since it would only ever be used for an overload two-byte encoding of an ASCII character.
-    auto keyValue = BSON(""
-                         << "\xc0\x16");
+    auto keyValue = BSON("" << "\xc0\x16");
     auto dupKeyStatus = buildDupKeyErrorStatus(keyValue, collNss, indexName, keyPattern, BSONObj{});
     ASSERT_NOT_OK(dupKeyStatus);
     ASSERT_EQUALS(dupKeyStatus.code(), ErrorCodes::DuplicateKey);
@@ -168,9 +190,7 @@ TEST(IndexEntryComparison, BuildDupKeyErrorMessageHexEncodesInvalidUTF8ForIndexW
     auto extraInfo = dupKeyStatus.extraInfo<DuplicateKeyErrorInfo>();
     ASSERT(extraInfo);
     ASSERT_BSONOBJ_EQ(extraInfo->getKeyPattern(), keyPattern);
-    ASSERT_BSONOBJ_EQ(extraInfo->getDuplicatedKeyValue(),
-                      BSON("a"
-                           << "\xc0\x16"));
+    ASSERT_BSONOBJ_EQ(extraInfo->getDuplicatedKeyValue(), BSON("a" << "\xc0\x16"));
 }
 
 }  // namespace mongo

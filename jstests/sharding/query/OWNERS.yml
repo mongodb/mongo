@@ -1,0 +1,53 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/query
+  - "bulk_write*":
+    approvers:
+      - 10gen/query-execution-router
+  - "log_remote_op_wait*":
+    approvers:
+      - 10gen/query-execution-router
+  - "*plan_cache*":
+    approvers:
+      - 10gen/query-optimization
+  - "*target*":
+    approvers:
+      - 10gen/query-optimization
+  - "exact_shard_key_target.js":
+    approvers:
+      - 10gen/query-optimization
+  - "hidden_index.js":
+    approvers:
+      - 10gen/query-optimization
+  - "sharded_profile.js":
+    approvers:
+      - 10gen/query-integration-observability
+  - "authwhere.js":
+    approvers:
+      - 10gen/query-integration-features
+  - "batch_write_command_sharded.js":
+    approvers:
+      - 10gen/query-execution-router
+  - "clustered_coll_scan.js":
+    approvers:
+      - 10gen/query-execution
+  - "is_not_primary_error_does_not_leak_shard_cursor.js":
+    approvers:
+      - 10gen/query-execution-router
+  - "lookup_from_config_cache_chunks.js":
+    approvers:
+      - 10gen/query-optimization
+  - "stats.js":
+    approvers:
+      - 10gen/query-integration-observability
+  - "unowned_doc_filtering.js":
+    approvers:
+      - 10gen/query-execution-router
+  - "update_delete_many_metrics.js":
+    approvers:
+      - 10gen/query-integration-observability
+  - "release_memory*":
+    approvers:
+      - 10gen/query-execution

@@ -1,0 +1,12 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "OWNERS.yml":
+    approvers:
+      - 10gen/query-execution-staff-leads
+      - 10gen/query-integration-staff-leads
+  - "bulk_write_profile.js":
+    approvers:
+      - 10gen/query-integration-observability

@@ -1,0 +1,8 @@
+# A reasonable configuration for stress testing.
+cache.minimum=20
+runs.rows=1000000:5000000
+runs.tables=3:10
+runs.threads=4:32
+runs.timer=6:30
+# MemorySanitizer requires that all program code is instrumented, otherwise it may generate false reports.
+disk.encryption=none

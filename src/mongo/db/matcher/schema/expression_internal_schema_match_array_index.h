@@ -29,11 +29,24 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <memory>
-
+#include "mongo/base/clonable_ptr.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_array.h"
+#include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/db/matcher/expression_with_placeholder.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/util/assert_util.h"
+
+#include <cstddef>
+#include <memory>
+#include <vector>
+
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -43,9 +56,10 @@ namespace mongo {
 class InternalSchemaMatchArrayIndexMatchExpression final : public ArrayMatchingMatchExpression {
 public:
     static constexpr StringData kName = "$_internalSchemaMatchArrayIndex"_sd;
+    static constexpr int kNumChildren = 1;
 
     InternalSchemaMatchArrayIndexMatchExpression(
-        StringData path,
+        boost::optional<StringData> path,
         long long index,
         std::unique_ptr<ExpressionWithPlaceholder> expression,
         clonable_ptr<ErrorAnnotation> annotation = nullptr);
@@ -54,40 +68,28 @@ public:
 
     bool equivalent(const MatchExpression* expr) const final;
 
-    /**
-     * Matches 'array' if the element at '_index' matches '_expression', or if its size is less than
-     * '_index'.
-     */
-    bool matchesArray(const BSONObj& array, MatchDetails* details) const final {
-        BSONElement element;
-        auto iterator = BSONObjIterator(array);
+    void appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                       const SerializationOptions& opts = {},
+                                       bool includePath = true) const final;
 
-        // Skip ahead to the element we want, bailing early if there aren't enough elements.
-        for (auto i = 0LL; i <= _index; ++i) {
-            if (!iterator.more()) {
-                return true;
-            }
-            element = iterator.next();
-        }
-
-        return _expression->matchesBSONElement(element, details);
-    }
-
-    BSONObj getSerializedRightHandSide() const final;
-
-    std::unique_ptr<MatchExpression> shallowClone() const final;
+    std::unique_ptr<MatchExpression> clone() const final;
 
     std::vector<std::unique_ptr<MatchExpression>>* getChildVector() final {
         return nullptr;
     }
 
     size_t numChildren() const final {
-        return 1;
+        return kNumChildren;
     }
 
     MatchExpression* getChild(size_t i) const final {
-        invariant(i == 0);
+        tassert(6400214, "Out-of-bounds access to child of MatchExpression.", i < kNumChildren);
         return _expression->getFilter();
+    }
+
+    void resetChild(size_t i, MatchExpression* other) final {
+        tassert(6329409, "Out-of-bounds access to child of MatchExpression.", i < kNumChildren);
+        _expression->resetFilter(other);
     }
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
@@ -104,9 +106,15 @@ public:
         return _index;
     }
 
-private:
-    ExpressionOptimizerFunc getOptimizer() const final;
+    const ExpressionWithPlaceholder* getExpression() const {
+        return _expression.get();
+    }
 
+    ExpressionWithPlaceholder* getExpression() {
+        return _expression.get();
+    }
+
+private:
     long long _index = 0;
     std::unique_ptr<ExpressionWithPlaceholder> _expression;
 };

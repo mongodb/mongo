@@ -27,11 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/update/update_object_node.h"
-
-#include <memory>
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/update/field_checker.h"
@@ -40,53 +37,19 @@
 #include "mongo/db/update/update_leaf_node.h"
 #include "mongo/util/str.h"
 
+#include <memory>
+
 namespace mongo {
 
 namespace {
 
 /**
- * Parses a field of the form $[<identifier>] into <identifier>. 'field' must be of the form
- * $[<identifier>]. Returns a non-ok status if 'field' is in the first position in the path or the
- * array filter identifier does not have a corresponding filter in 'arrayFilters'. Adds the
- * identifier to 'foundIdentifiers'.
- */
-StatusWith<std::string> parseArrayFilterIdentifier(
-    StringData field,
-    size_t position,
-    const FieldRef& fieldRef,
-    const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters,
-    std::set<std::string>& foundIdentifiers) {
-    dassert(fieldchecker::isArrayFilterIdentifier(field));
-
-    if (position == 0) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "Cannot have array filter identifier (i.e. '$[<id>]') "
-                                       "element in the first position in path '"
-                                    << fieldRef.dottedField() << "'");
-    }
-
-    auto identifier = field.substr(2, field.size() - 3);
-
-    if (!identifier.empty() && arrayFilters.find(identifier) == arrayFilters.end()) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "No array filter found for identifier '" << identifier
-                                    << "' in path '" << fieldRef.dottedField() << "'");
-    }
-
-    if (!identifier.empty()) {
-        foundIdentifiers.emplace(identifier.toString());
-    }
-
-    return identifier.toString();
-}
-
-/**
  * Gets the child of 'element' named 'field', if it exists. Otherwise returns a non-ok element.
  */
 mutablebson::Element getChild(mutablebson::Element element, StringData field) {
-    if (element.getType() == BSONType::Object) {
+    if (element.getType() == BSONType::object) {
         return element[field];
-    } else if (element.getType() == BSONType::Array) {
+    } else if (element.getType() == BSONType::array) {
         auto indexFromField = str::parseUnsignedBase10Integer(field);
         if (indexFromField) {
             return element.findNthChild(*indexFromField);
@@ -127,7 +90,7 @@ void applyChild(const UpdateNode& child,
         // updating the 'pathTaken' FieldRef.
         updateNodeApplyParams->pathTaken->append(
             field,
-            applyParams->element.getType() == BSONType::Array
+            applyParams->element.getType() == BSONType::array
                 ? RuntimeUpdatePath::ComponentType::kArrayIndex
                 : RuntimeUpdatePath::ComponentType::kFieldName);
     } else {
@@ -145,7 +108,6 @@ void applyChild(const UpdateNode& child,
     UpdateNode::UpdateNodeApplyParams childUpdateNodeApplyParams = *updateNodeApplyParams;
     auto childApplyResult = child.apply(childApplyParams, childUpdateNodeApplyParams);
 
-    applyResult->indexesAffected = applyResult->indexesAffected || childApplyResult.indexesAffected;
     applyResult->noop = applyResult->noop && childApplyResult.noop;
     applyResult->containsDotsAndDollarsField =
         applyResult->containsDotsAndDollarsField || childApplyResult.containsDotsAndDollarsField;
@@ -160,7 +122,7 @@ void applyChild(const UpdateNode& child,
     // If the child is an internal node, it may have created 'pathToCreate' and moved 'pathToCreate'
     // to the end of 'pathTaken'. We should advance 'element' to the end of 'pathTaken'.
     if (updateNodeApplyParams->pathTaken->size() > pathTakenSizeBefore) {
-        for (auto i = pathTakenSizeBefore; i < updateNodeApplyParams->pathTaken->size(); ++i) {
+        for (size_t i = pathTakenSizeBefore; i < updateNodeApplyParams->pathTaken->size(); ++i) {
             applyParams->element = getChild(
                 applyParams->element, updateNodeApplyParams->pathTaken->fieldRef().getPart(i));
             invariant(applyParams->element.ok());
@@ -176,7 +138,7 @@ void applyChild(const UpdateNode& child,
             applyParams->element = childElement;
             updateNodeApplyParams->pathTaken->append(
                 updateNodeApplyParams->pathToCreate->getPart(0),
-                applyParams->element.getType() == BSONType::Array
+                applyParams->element.getType() == BSONType::array
                     ? RuntimeUpdatePath::ComponentType::kArrayIndex
                     : RuntimeUpdatePath::ComponentType::kFieldName);
 
@@ -188,7 +150,7 @@ void applyChild(const UpdateNode& child,
                 invariant(applyParams->element.ok());
                 updateNodeApplyParams->pathTaken->append(
                     updateNodeApplyParams->pathToCreate->getPart(i),
-                    parentType == BSONType::Array ? RuntimeUpdatePath::ComponentType::kArrayIndex
+                    parentType == BSONType::array ? RuntimeUpdatePath::ComponentType::kArrayIndex
                                                   : RuntimeUpdatePath::ComponentType::kFieldName);
             }
 
@@ -235,7 +197,7 @@ StatusWith<bool> UpdateObjectNode::parseAndMerge(
 
         // 2) a RenameNode at the path specified by the value of the "modExpr" element, which must
         //    be a string value.
-        if (BSONType::String != modExpr.type()) {
+        if (BSONType::string != modExpr.type()) {
             return Status(ErrorCodes::BadValue,
                           str::stream()
                               << "The 'to' field for $rename must be a string: " << modExpr);
@@ -293,7 +255,7 @@ StatusWith<bool> UpdateObjectNode::parseAndMerge(
             }
             childName = status.getValue();
         } else {
-            childName = fieldRef.getPart(i).toString();
+            childName = std::string{fieldRef.getPart(i)};
         }
 
         auto child = current->getChild(childName);
@@ -336,7 +298,7 @@ StatusWith<bool> UpdateObjectNode::parseAndMerge(
         }
         childName = status.getValue();
     } else {
-        childName = fieldRef.getPart(fieldRef.numParts() - 1).toString();
+        childName = std::string{fieldRef.getPart(fieldRef.numParts() - 1)};
     }
 
     if (current->getChild(childName)) {
@@ -348,6 +310,37 @@ StatusWith<bool> UpdateObjectNode::parseAndMerge(
     current->setChild(std::move(childName), std::move(leaf));
 
     return positional;
+}
+
+// static
+StatusWith<std::string> UpdateObjectNode::parseArrayFilterIdentifier(
+    StringData field,
+    size_t position,
+    const FieldRef& fieldRef,
+    const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters,
+    std::set<std::string>& foundIdentifiers) {
+    dassert(fieldchecker::isArrayFilterIdentifier(field));
+
+    if (position == 0) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Cannot have array filter identifier (i.e. '$[<id>]') "
+                                       "element in the first position in path '"
+                                    << fieldRef.dottedField() << "'");
+    }
+
+    auto identifier = field.substr(2, field.size() - 3);
+
+    if (!identifier.empty() && arrayFilters.find(identifier) == arrayFilters.end()) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "No array filter found for identifier '" << identifier
+                                    << "' in path '" << fieldRef.dottedField() << "'");
+    }
+
+    if (!identifier.empty()) {
+        foundIdentifiers.emplace(std::string{identifier});
+    }
+
+    return std::string{identifier};
 }
 
 // static

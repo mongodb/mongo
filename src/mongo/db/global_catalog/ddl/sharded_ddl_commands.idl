@@ -1,0 +1,947 @@
+# Copyright (C) 2020-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+# Contains internal DDL commands which are exchanged between Router and Shard/ConfigServer role and are linked both on MongoD and MongoS
+
+global:
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/global_catalog/type_collection.h"
+        - "mongo/db/versioning_protocol/shard_version.h"
+
+imports:
+    - "mongo/db/local_catalog/ddl/create.idl"
+    - "mongo/db/local_catalog/ddl/rename_collection.idl"
+    - "mongo/db/user_write_block/set_user_write_block_mode.idl"
+    - "mongo/db/local_catalog/ddl/drop_indexes.idl"
+    - "mongo/db/local_catalog/ddl/drop_database.idl"
+    - "mongo/db/keypattern.idl"
+    - "mongo/db/local_catalog/ddl/coll_mod.idl"
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/global_catalog/type_database.idl"
+    - "mongo/db/sharding_environment/sharding_types.idl"
+    - "mongo/s/resharding/common_types.idl"
+    - "mongo/db/timeseries/timeseries.idl"
+    - "mongo/db/query/client_cursor/cursor_response.idl"
+    - "mongo/db/global_catalog/metadata_consistency_validation/metadata_consistency_types.idl"
+
+types:
+    CollectionType:
+        description: "Information of a sharded collection."
+        bson_serialization_type: object
+        cpp_type: CollectionType
+        serializer: "mongo::CollectionType::toBSON"
+        deserializer: "mongo::CollectionType"
+        is_view: false
+
+enums:
+    ShardsvrSetUserWriteBlockModePhase:
+        description: "Phase for the _shardsvrSetUserWriteBlockMode command."
+        type: string
+        values:
+            # When enabling user write blocking, kPrepare means the shard will start blocking
+            # sharded DDL operations. When disabling user write blocking, kPrepare means the shard
+            # will to start accepting user writes again.
+            kPrepare: "prepare"
+            # When enabling user write blocking, kComplete means the shard will start blocking
+            # user writes. When disabling user write blocking, kComplete means the shard
+            # will to start accepting sharded DDL operations again.
+            kComplete: "complete"
+
+structs:
+    ConfigsvrCreateDatabaseResponse:
+        description: "Response for the create database command"
+        strict: false
+        is_command_reply: true
+        fields:
+            databaseVersion:
+                type: database_version
+                description: "The version of the newly-created or already existing database"
+                optional: false
+
+    RenameCollectionRequest:
+        description: "Request for the rename collection command"
+        strict: false
+        fields:
+            to:
+                type: namespacestring
+                description: "The new namespace for the collection being renamed."
+            dropTarget:
+                type: bool
+                description: "If true, mongod will drop the target of renameCollection prior to renaming the collection."
+                default: false
+            stayTemp:
+                type: bool
+                description: "If true, the original collection will remain temp if it was temp before the rename."
+                default: false
+            expectedSourceUUID:
+                type: uuid
+                description: "The expected UUID of the source collection."
+                optional: true
+            expectedTargetUUID:
+                type: uuid
+                description: "The expected UUID of the target collection."
+                optional: true
+            expectedIndexes:
+                type: array<object>
+                description:
+                    "The expected indexes on the target collection. Rename will fail if
+                    they don't match. An array in the form
+                    {indexName: {spec}, indexName: {spec}, ...}."
+                optional: true
+            expectedCollectionOptions:
+                type: object
+                description:
+                    "The expected collection options on the target collection. Rename will
+                    fail if they don't match. Same format as the options from the
+                    listCollections command."
+                optional: true
+            targetMustNotBeSharded:
+                type: bool
+                description:
+                    "If true, then the command will error out if the target collection is
+                    sharded. If false or not set, no restriction is imposed."
+                optional: true
+
+    RenameCollectionResponse:
+        description: "Response for the rename collection command"
+        strict: false
+        is_command_reply: true
+        fields:
+            collectionVersion:
+                type: shard_version
+                description: "Latest version of the collection"
+                optional: false
+
+    ShardsvrCreateCollectionRequest:
+        description: "All the parameters sent by the router."
+        generate_comparison_operators: false
+        strict: false
+        fields:
+            #TODO SERVER-81447: rewrite this Request as a chained struct of
+            #CreateCollectionRequest and ShardCollectionRequest + unsplittable
+            shardKey:
+                type: object_owned
+                description: "The index specification document to use as the shard key."
+                optional: true
+            unique:
+                type: bool
+                description: "Whether the shard key index should enforce a unique constraint."
+                optional: true
+            # TODO SERVER-83006: remove deprecated numInitialChunks parameter.
+            numInitialChunks:
+                type: safeInt64
+                description: >-
+                    The number of chunks to create initially when sharding an empty collection with
+                    a hashed shard key.
+                optional: true
+            presplitHashedZones:
+                type: bool
+                description: >-
+                    True if the chunks should be pre-split based on the existing zones when
+                    sharding a collection with hashed shard key.
+                optional: true
+            collectionUUID:
+                type: uuid
+                description: "The expected UUID of the collection."
+                optional: true
+            implicitlyCreateIndex:
+                description: "Creates an index on the shard key pattern if the collection is empty."
+                type: optionalBool
+            enforceUniquenessCheck:
+                description: >-
+                    Controls whether this command verifies that any unique indexes are prefixed by
+                    the shard key pattern if unique is true. If true then it will verify and if
+                    false then it won't.
+                type: optionalBool
+            capped:
+                description:
+                    "Specify true to create a capped collection. If you specify true, you
+                    must also set a maximum size in the 'size' field."
+                type: safeBool
+                default: false
+            idIndex:
+                description: "Specify the default _id index specification."
+                type: object
+                optional: true
+            size:
+                description: "Specify a maximum size in bytes for the capped collection."
+                type: safeInt64
+                optional: true
+                validator:
+                    gte: 1
+                    lte: 1125899906842624 # 1 PB
+            max:
+                description:
+                    "The maximum number of documents allowed in the capped collection. The
+                    'size' limit takes precedence over this limit."
+                type: safeInt64
+                optional: true
+                validator:
+                    lt: 2147483648 # 2^31
+            storageEngine:
+                description:
+                    "Specify a configuration to the storage engine on a per-collection
+                    basis when creating a collection."
+                type: object
+                optional: true
+            validator:
+                description: "Specify validation rules or expressions for the collection."
+                type: object
+                optional: true
+            validationLevel:
+                description:
+                    "Determines how strictly to apply the validation rules to existing
+                    documents during an update.
+                    Can be one of following values: 'off', 'strict' or 'moderate'."
+                type: ValidationLevel
+                optional: true
+            validationAction:
+                description:
+                    "Determines whether to error on invalid documents or just warn about
+                    the violations but allow invalid documents to be inserted.
+                    Can be either 'warn' or 'error'."
+                type: ValidationAction
+                optional: true
+            indexOptionDefaults:
+                description:
+                    "Allows users to specify a default configuration for indexes when
+                    creating a collection."
+                type: IndexOptionDefaults
+                optional: true
+            viewOn:
+                description:
+                    "The name of the source collection or view from which to create the
+                    view."
+                type: string
+                optional: true
+                validator:
+                    callback: create_command_validation::validateViewOnNotEmpty
+            pipeline:
+                description:
+                    "An array that consists of the aggregation pipeline. Creates the view
+                    by applying the specified pipeline to the 'viewOn' collection or
+                    view."
+                type: array<object>
+                optional: true
+            collation:
+                description: "Specifies the default collation for the collection or the view."
+                type: object_owned
+                optional: true
+            changeStreamPreAndPostImages:
+                description: "The options for point-in-time pre- and post-images in change streams opened on this collection."
+                type: ChangeStreamPreAndPostImagesOptions
+                optional: true
+            timeseries:
+                description: "The options to create the time-series collection with."
+                type: TimeseriesOptions
+                optional: true
+            clusteredIndex:
+                description:
+                    "Specifies whether this collection should have a clusteredIndex.
+                    Boolean is accepted as the legacy clustered index format for specific internal
+                    collections - and implies clustering by _id. Otherwise, clusters according to
+                    the ClusteredIndexSpec."
+                type:
+                    variant: [safeBool, ClusteredIndexSpec]
+                optional: true
+            recordIdsReplicated:
+                description:
+                    "Specifies whether this collection should utilize the same recordId for a given document
+                    across all nodes in a replica set."
+                type: safeBool
+                optional: true
+            expireAfterSeconds:
+                description: "The number of seconds after which old data should be deleted."
+                type: safeInt64
+                optional: true
+            encryptedFields:
+                description: "Specifies the fields that are encrypted by client-side FLE."
+                type: EncryptedFieldConfig
+                optional: true
+            temp:
+                description: "Internal field that can be used in the $out aggregation code."
+                type: safeBool
+                optional: true
+            flags:
+                description: "DEPRECATED"
+                type: safeInt64
+                optional: true
+
+            unsplittable:
+                type: optionalBool
+                description:
+                    "Flag that identifies whether the collection is splittable in multiple
+                    chunks. If unsplittable, the collection is always equivalent to a 1
+                    chunk collection. The shardKey must be set to {_id:1} in case this
+                    flag is enabled"
+            dataShard:
+                description: >-
+                    If set, specify shard where the collection should be created, if the collection
+                    doesn't already exist. Only allowed if `unsplittable` is true.
+                type: shard_id
+                optional: true
+            # TODO SERVER-85395 Remove this parameter once the test command is removed.
+            isFromCreateUnsplittableCollectionTestCommand:
+                description: "Temporary field to differentiate calls originating from the createUnsplittableCollection test command."
+                type: optionalBool
+            registerExistingCollectionInGlobalCatalog:
+                type: optionalBool
+                description: "True when instantiating a coordiantor to track an existing collection on the sharding catalog"
+
+    CreateCollectionResponse:
+        description: "Response of the create collection command"
+        strict: false
+        is_command_reply: true
+        fields:
+            collectionUUID:
+                type: uuid
+                description: "UUID of the created collection"
+                optional: true
+            collectionVersion:
+                type: shard_version
+                description: "Latest version of the collection"
+                optional: false
+
+    RefineCollectionShardKeyRequest:
+        description: "Parameters sent by the router"
+        strict: false
+        fields:
+            newShardKey:
+                type: KeyPattern
+                description: "The index specification document to use as the new shard key."
+                optional: false
+            collectionUUID:
+                type: uuid
+                description: "The expected UUID of the collection."
+                optional: true
+            enforceUniquenessCheck:
+                description: >-
+                    Controls whether this command verifies that any unique indexes are prefixed by
+                    the shard key pattern if unique is true. If true then it will verify and if
+                    false then it won't.
+                type: optionalBool
+
+    CommitRefineCollectionShardKeyRequest:
+        description: "Parameters sent to commit refineCollectionShardKey"
+        strict: false
+        fields:
+            key:
+                type: KeyPattern
+                description: "Index specification to use as the new shard key."
+                optional: false
+            newEpoch:
+                type: objectid
+                description: "The new epoch for the namespace."
+                optional: false
+            newTimestamp:
+                type: timestamp
+                description: "The new timestamp in the collection"
+                optional: false
+            oldTimestamp:
+                type: timestamp
+                description: "Previous collection timestamp, necessary to make the command idempotent"
+                optional: false
+
+    ReshardCollectionRequest:
+        description: "Parameters for the reshard collection command"
+        strict: false
+        fields:
+            key:
+                type: object
+                description: "The index specification document to use as the new shard key."
+                optional: false
+            unique:
+                type: bool
+                description: "Whether the shard key index should enforce a unique constraint."
+                optional: true
+            numInitialChunks:
+                type: safeInt64
+                description: "The number of chunks to create initially."
+                optional: true
+            collation:
+                type: object
+                description: "The collation to use for the shard key index."
+                optional: true
+            zones:
+                type: array<ReshardingZoneType>
+                description: "The zones associated with the new shard key."
+                optional: true
+            _presetReshardedChunks:
+                type: array<ReshardedChunk>
+                description: >-
+                    "Mapping of chunk ranges to be used as the initial split output. This is only
+                    for testing purposes."
+                optional: true
+            collectionUUID:
+                type: uuid
+                description: "The expected UUID of the collection."
+                optional: true
+            shardDistribution:
+                type: array<ShardKeyRange>
+                description: "The key ranges for the new shard key. This should be continuous and complete."
+                optional: true
+            forceRedistribution:
+                type: bool
+                description: "Whether initiate reshardCollection if the shardKey doesn't change."
+                optional: true
+            reshardingUUID:
+                type: uuid
+                description: >-
+                    "A user-provided identifier used to identify this resharding operation for
+                    retryability purposes."
+                optional: true
+            provenance:
+                type: ReshardingProvenance
+                description: "The source operation that called this resharding operation."
+                optional: true
+            performVerification:
+                type: bool
+                description: "Whether to perform data comparison verification."
+                optional: true
+            recipientOplogBatchTaskCount:
+                type: safeInt64
+                description: >-
+                    "The number of subtasks to divide a single oplog batch into, so that it may be applied
+                    concurrently by multiple threads on the recipient."
+                validator:
+                    gte: 1
+                    lte: 256
+                optional: true
+            relaxed:
+                type: optionalBool
+                description: >-
+                    "Runs the cloner aggregation without specifying a collection
+                    uuid to avoid errors in a scenario where the collection UUIDs
+                    are inconsistent among shards."
+            numSamplesPerChunk:
+                type: safeInt64
+                description: "The number of documents to sample on new chunks"
+                optional: true
+            demoMode:
+                type: optionalBool
+                description: >-
+                    "When set to true, overrides reshardingMinimumOperationDurationMillis 
+                    and reshardingDelayBeforeRemainingOperationTimeQueryMillis values to 0 
+                    for quick demo of reshardCollection operation"
+
+    SetAllowMigrationsRequest:
+        description: "Parameters sent for the set allow migrations command"
+        strict: false
+        fields:
+            allowMigrations:
+                type: bool
+                description: "If false balancer rounds should be disabled and migrations commit prohibited."
+                optional: false
+
+    ShardsvrConvertToCappedRequest:
+        description: "convertToCapped command parameters"
+        strict: false
+        fields:
+            size:
+                type: safeInt64
+                description: "Maximum number of documents in the capped collection"
+
+commands:
+    _shardsvrCreateCollection:
+        command_name: _shardsvrCreateCollection
+        cpp_name: ShardsvrCreateCollection
+        description: "The internal createCollection command for a shard."
+        strict: false
+        namespace: concatenate_with_db
+        api_version: ""
+        chained_structs:
+            ShardsvrCreateCollectionRequest: ShardsvrCreateCollectionRequest
+
+    _shardsvrCreateCollectionParticipant:
+        command_name: _shardsvrCreateCollectionParticipant
+        cpp_name: ShardsvrCreateCollectionParticipant
+        description: "Command to create a collection on participant shards, when called, assumes the primary shard is under the critical section for that namespace."
+        strict: false
+        namespace: concatenate_with_db
+        api_version: ""
+        fields:
+            indexes:
+                type: array<object>
+                description: "Collection indexes."
+            options:
+                type: object
+                description: "Collection options."
+            collectionUUID:
+                type: uuid
+                description: "Collection uuid."
+                optional: true
+            idIndex:
+                type: object
+                description: "Id index."
+
+    _shardsvrDropDatabase:
+        description: "Internal command sent to the primary shard of a database to drop it."
+        command_name: _shardsvrDropDatabase
+        namespace: ignored
+        api_version: ""
+        cpp_name: ShardsvrDropDatabase
+
+    _shardsvrDropDatabaseParticipant:
+        description: "Internal command sent to participants shards to drop a database."
+        command_name: _shardsvrDropDatabaseParticipant
+        namespace: ignored
+        api_version: ""
+        cpp_name: ShardsvrDropDatabaseParticipant
+        strict: false
+        reply_type: OkReply
+        fields:
+            fromMigrate:
+                type: optionalBool
+                description:
+                    "When set to true, the recipient is expected to generate
+                    a not user visible version of the op entry that marks the completion of the request."
+                default: false
+
+    _shardsvrDropCollection:
+        description: "Parser for the _shardsvrDropCollection command"
+        command_name: _shardsvrDropCollection
+        namespace: concatenate_with_db
+        api_version: ""
+        cpp_name: ShardsvrDropCollection
+        strict: false
+        fields:
+            collectionUUID:
+                type: uuid
+                description: "The expected UUID of the collection."
+                optional: true
+
+    _shardsvrDropCollectionParticipant:
+        description: "Parser for the _shardsvrDropCollectionParticipant command"
+        command_name: _shardsvrDropCollectionParticipant
+        namespace: concatenate_with_db
+        api_version: ""
+        cpp_name: ShardsvrDropCollectionParticipant
+        strict: false
+        fields:
+            fromMigrate:
+                type: bool
+                description: "Whether the drop comes as a result of an interrupted migration process."
+                optional: true
+            dropSystemCollections:
+                type: bool
+                description: "Allow dropping a system collection. False if no value is present."
+                optional: true
+            collectionUUID:
+                type: uuid
+                description: "The expected UUID of the collection."
+                optional: true
+            requireCollectionEmpty:
+                type: optionalBool
+                description: "If true, the drop operation will only proceed if the collection has no documents."
+
+        reply_type: OkReply
+
+    _shardsvrRenameCollection:
+        command_name: _shardsvrRenameCollection
+        cpp_name: ShardsvrRenameCollection
+        description: "Internal renameCollection command for a shard."
+        strict: false
+        namespace: concatenate_with_db
+        api_version: ""
+        chained_structs:
+            RenameCollectionRequest: RenameCollectionRequest
+        fields:
+            allowEncryptedCollectionRename:
+                description:
+                    "Encrypted Collection renames are usually disallowed to minimize user error.
+                    C2C needs to do the renames to replicate create collection."
+                type: bool
+                optional: true
+        reply_type: OkReply
+
+    _shardsvrSetAllowMigrations:
+        command_name: _shardsvrSetAllowMigrations
+        cpp_name: shardsvrSetAllowMigrations
+        description: "Internal setAllowMigrations command for a shard."
+        strict: false
+        namespace: concatenate_with_db
+        api_version: ""
+        chained_structs:
+            SetAllowMigrationsRequest: SetAllowMigrationsRequest
+
+    _shardsvrReshardCollection:
+        command_name: _shardsvrReshardCollection
+        cpp_name: ShardsvrReshardCollection
+        description: "The internal reshardCollection command on the shard."
+        strict: false
+        namespace: type
+        api_version: ""
+        type: namespacestring
+        chained_structs:
+            ReshardCollectionRequest: ReshardCollectionRequest
+
+    _shardsvrRefineCollectionShardKey:
+        description: "Parser for the _shardsvrRefineCollectionShardKey command"
+        command_name: _shardsvrRefineCollectionShardKey
+        cpp_name: ShardsvrRefineCollectionShardKey
+        namespace: concatenate_with_db
+        api_version: ""
+        strict: false
+        chained_structs:
+            RefineCollectionShardKeyRequest: RefineCollectionShardKeyRequest
+
+    _shardsvrValidateShardKeyCandidate:
+        description: "Command run on shards to ensure we have a viable key to refine the shard key."
+        command_name: _shardsvrValidateShardKeyCandidate
+        cpp_name: ShardsvrValidateShardKeyCandidate
+        strict: false
+        namespace: type
+        api_version: ""
+        type: namespacestring
+        fields:
+            key:
+                type: KeyPattern
+                description: "The index specification document to use as the new shard key."
+                optional: false
+            enforceUniquenessCheck:
+                description: >-
+                    Verifies that the shard key index has the same unique setting as the command.
+                type: optionalBool
+
+    _configsvrCommitRefineCollectionShardKey:
+        command_name: _configsvrCommitRefineCollectionShardKey
+        cpp_name: ConfigsvrCommitRefineCollectionShardKey
+        description: "Internal refineCollectionShardKey commit command on the configsvr."
+        strict: false
+        namespace: type
+        api_version: ""
+        type: namespacestring
+        chained_structs:
+            CommitRefineCollectionShardKeyRequest: CommitRefineCollectionShardKeyRequest
+
+    _shardsvrDropIndexes:
+        description: "Parser for the _shardsvrDropIndexes command"
+        command_name: _shardsvrDropIndexes
+        cpp_name: ShardsvrDropIndexes
+        namespace: concatenate_with_db
+        api_version: ""
+        strict: false
+        chained_structs:
+            DropIndexesRequest: DropIndexesRequest
+
+    _shardsvrDropIndexesParticipant:
+        description: "Internal command sent to participant shards to drop indexes of a collection"
+        command_name: _shardsvrDropIndexesParticipant
+        cpp_name: ShardsvrDropIndexesParticipant
+        namespace: concatenate_with_db
+        api_version: ""
+        reply_type: DropIndexesReply
+        strict: false
+        chained_structs:
+            DropIndexesRequest: DropIndexesRequest
+        fields:
+            dryRun:
+                type: optionalBool
+                description: "Run dropIndexes in dryRun mode."
+            shardKeyPattern:
+                type: object_owned
+                description: "The shard key pattern of the collection in case it is sharded."
+                optional: true
+
+    _configsvrCreateDatabase:
+        description: "The internal createDatabase command on the config server"
+        api_version: ""
+        command_name: _configsvrCreateDatabase
+        cpp_name: ConfigsvrCreateDatabase
+        namespace: type
+        type: string
+        reply_type: ConfigsvrCreateDatabaseResponse
+        strict: false
+        fields:
+            primaryShardId:
+                type: shard_id
+                description:
+                    "If set, indicates to the system which shard should be used as the
+                    primary for the database (if not already created). Otherwise, the
+                    system will use the balancer in order to select a primary."
+                optional: true
+
+    _shardsvrCollMod:
+        command_name: _shardsvrCollMod
+        cpp_name: ShardsvrCollMod
+        description: "Internal command sent to the primary shard in a collMod procedure"
+        strict: false
+        api_version: ""
+        namespace: concatenate_with_db
+        chained_structs:
+            CollModRequest: CollModRequest
+
+    _configsvrSetUserWriteBlockMode:
+        command_name: _configsvrSetUserWriteBlockMode
+        cpp_name: ConfigsvrSetUserWriteBlockMode
+        description: "internal _configsvrSetUserWriteBlockMode command"
+        namespace: ignored
+        api_version: ""
+        strict: false
+        chained_structs:
+            SetUserWriteBlockModeRequest: SetUserWriteBlockModeRequest
+
+    _shardsvrSetUserWriteBlockMode:
+        command_name: _shardsvrSetUserWriteBlockMode
+        cpp_name: ShardsvrSetUserWriteBlockMode
+        description: "internal _shardsvrSetUserWriteBlockMode command"
+        namespace: ignored
+        api_version: ""
+        strict: false
+        chained_structs:
+            SetUserWriteBlockModeRequest: SetUserWriteBlockModeRequest
+        fields:
+            phase:
+                type: ShardsvrSetUserWriteBlockModePhase
+                description:
+                    "Determines the phase of the blocking/unblocking procedure to be
+                    executed."
+
+    _shardsvrSetClusterParameter:
+        command_name: _shardsvrSetClusterParameter
+        cpp_name: ShardsvrSetClusterParameter
+        description: "internal _shardsvrSetClusterParameter command"
+        namespace: type
+        type: object
+        api_version: ""
+        strict: false
+        fields:
+            clusterParameterTime:
+                type: timestamp
+                description: "Time that will be associated with the cluster parameter"
+
+    _shardsvrCheckMetadataConsistency:
+        description:
+            "Internal command sent to the primary shard of a database to check metadata
+            consistency."
+        command_name: _shardsvrCheckMetadataConsistency
+        cpp_name: ShardsvrCheckMetadataConsistency
+        namespace: concatenate_with_db
+        allow_global_collection_name: true
+        api_version: ""
+        reply_type: CursorInitialReply
+        strict: false
+        inline_chained_structs: true
+        chained_structs:
+            CommonCheckMetadataRequestFields: commonFields
+        fields:
+            cursor:
+                type: SimpleCursorOptions
+                optional: true
+
+    _shardsvrCheckMetadataConsistencyParticipant:
+        description: "Internal command sent to participants shards to check metadata consistency."
+        command_name: _shardsvrCheckMetadataConsistencyParticipant
+        cpp_name: ShardsvrCheckMetadataConsistencyParticipant
+        namespace: concatenate_with_db
+        allow_global_collection_name: true
+        api_version: ""
+        reply_type: CursorInitialReply
+        strict: false
+        inline_chained_structs: true
+        chained_structs:
+            CommonCheckMetadataRequestFields: commonFields
+        fields:
+            cursor:
+                type: SimpleCursorOptions
+                optional: true
+            primaryShardId:
+                description: "The shard id of the db primary shard"
+                type: shard_id
+
+    _configsvrCheckClusterMetadataConsistency:
+        description:
+            "Internal command sent to the config server to check cluster metadata
+            consistency."
+        command_name: _configsvrCheckClusterMetadataConsistency
+        cpp_name: ConfigsvrCheckClusterMetadataConsistency
+        namespace: ignored
+        api_version: ""
+        reply_type: CursorInitialReply
+        strict: false
+        fields:
+            cursor:
+                type: SimpleCursorOptions
+                optional: true
+
+    _configsvrCheckMetadataConsistency:
+        description: "Internal command sent to the config server to check metadata consistency."
+        command_name: _configsvrCheckMetadataConsistency
+        cpp_name: ConfigsvrCheckMetadataConsistency
+        namespace: concatenate_with_db
+        allow_global_collection_name: true
+        api_version: ""
+        reply_type: CursorInitialReply
+        strict: false
+        fields:
+            cursor:
+                type: SimpleCursorOptions
+                optional: true
+
+    _configsvrSetClusterParameter:
+        command_name: _configsvrSetClusterParameter
+        cpp_name: ConfigsvrSetClusterParameter
+        description:
+            "Internal command sent to the config server to start a coordinator and set the
+            cluster parameter."
+        namespace: type
+        type: object_owned
+        api_version: ""
+        strict: false
+        fields:
+            previousTime:
+                type: logicalTime
+                description: >-
+                    "Expected current cluster parameter time for this parameter before the
+                    'setClusterParameter' invocation. If this current time does not match the
+                    'previousTime' persisted in the 'config.clusterParameters' collection then
+                    'setClusterParameter' will fail."
+                optional: true
+            _compatibleWithTopologyChange:
+                type: bool
+                description:
+                    "If true, this cluster parameter change can run during a topology
+                    change"
+                default: false
+
+    _configsvrClearJumboFlag:
+        command_name: _configsvrClearJumboFlag
+        cpp_name: ConfigsvrClearJumboFlag
+        description: "internal clearJumboFlag command for config server"
+        namespace: type
+        api_version: ""
+        type: namespacestring
+        strict: false
+        fields:
+            epoch:
+                type: objectid
+                description: "The expected epoch of the namespace provided to
+                    clearJumboFlag."
+                optional: false
+            minKey:
+                type: object
+                description: "The lower bound key value of the chunk."
+            maxKey:
+                type: object
+                description: "The upper bound key value of the chunk."
+
+    _shardsvrConvertToCapped:
+        command_name: _shardsvrConvertToCapped
+        cpp_name: ShardsvrConvertToCapped
+        description: "The internal convertToCapped command for a shard."
+        strict: false
+        namespace: concatenate_with_db
+        api_version: ""
+        chained_structs:
+            ShardsvrConvertToCappedRequest: ShardsvrConvertToCappedRequest
+
+    _shardsvrConvertToCappedParticipant:
+        command_name: _shardsvrConvertToCappedParticipant
+        cpp_name: ShardsvrConvertToCappedParticipant
+        description: "Internal command sent to the data shard to convert a collection to capped"
+        strict: false
+        api_version: ""
+        namespace: concatenate_with_db
+        chained_structs:
+            ShardsvrConvertToCappedRequest: ShardsvrConvertToCappedRequest
+        fields:
+            targetUUID:
+                type: uuid
+                description: "UUID of the new capped collection"
+        reply_type: OkReply
+
+    _shardsvrUntrackUnsplittableCollection:
+        command_name: _shardsvrUntrackUnsplittableCollection
+        cpp_name: ShardsvrUntrackUnsplittableCollection
+        description: "Internal command to untrack unsplittable collections"
+        strict: false
+        namespace: type
+        type: namespacestring
+        api_version: ""
+        reply_type: OkReply
+
+    _shardsvrCommitCreateDatabaseMetadata:
+        command_name: _shardsvrCommitCreateDatabaseMetadata
+        cpp_name: ShardsvrCommitCreateDatabaseMetadata
+        description: "Internal command to commit a createDatabase operation to the shard catalog"
+        strict: false
+        namespace: ignored
+        api_version: ""
+        fields:
+            dbVersion:
+                type: database_version
+                description: "The database version to commit."
+        reply_type: OkReply
+
+    _shardsvrCommitDropDatabaseMetadata:
+        command_name: _shardsvrCommitDropDatabaseMetadata
+        cpp_name: ShardsvrCommitDropDatabaseMetadata
+        description: "Internal command to commit a dropDatabase operation to the shard catalog"
+        strict: false
+        namespace: ignored
+        api_version: ""
+        reply_type: OkReply
+
+    _shardsvrCloneAuthoritativeMetadata:
+        command_name: _shardsvrCloneAuthoritativeMetadata
+        cpp_name: ShardsvrCloneAuthoritativeMetadata
+        description: "Internal command to clone metadata from global catalog to the shard catalog"
+        strict: false
+        namespace: ignored
+        api_version: ""
+        reply_type: OkReply
+
+    _shardsvrFetchCollMetadata:
+        command_name: _shardsvrFetchCollMetadata
+        cpp_name: ShardsvrFetchCollMetadata
+        description: "Internal command to fetch collection metadata from the config server and install it into shard catalog."
+        strict: false
+        namespace: type
+        type: namespacestring
+        api_version: ""
+        reply_type: OkReply
+
+    # TODO (SERVER-105110): Remove this command.
+    _shardsvrRenameIndexMetadata:
+        command_name: _shardsvrRenameIndexMetadata
+        cpp_name: ShardsvrRenameIndexMetadata
+        description: "DEPRECATED command. Supported only for multiversion scenarios."
+        api_version: ""
+        namespace: type
+        type: namespacestring
+        strict: false
+        reply_type: OkReply
+
+    _shardsvrDrainOngoingDDLOperations:
+        command_name: _shardsvrDrainOngoingDDLOperations
+        cpp_name: ShardsvrDrainOngoingDDLOperations
+        description: "Internal command invoked by the config server to drain any ongoing DDL operation executed by the shard before initializing sharding during promotion to sharded cluster."
+        strict: false
+        namespace: ignored
+        api_version: ""

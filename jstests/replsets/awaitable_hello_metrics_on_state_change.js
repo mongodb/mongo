@@ -2,17 +2,18 @@
  * Tests that the server status metrics correctly reflect the number of waiting hello/isMaster
  * requests before and after a state change.
  */
-(function() {
-"use strict";
-load("jstests/libs/parallel_shell_helpers.js");
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 function runAwaitableCmd(cmd, topologyVersionField) {
-    const res = assert.commandWorked(db.runCommand({
-        [cmd]: 1,
-        topologyVersion: topologyVersionField,
-        maxAwaitTimeMS: 99999999,
-    }));
+    const res = assert.commandWorked(
+        db.runCommand({
+            [cmd]: 1,
+            topologyVersion: topologyVersionField,
+            maxAwaitTimeMS: 99999999,
+        }),
+    );
     assert.eq(topologyVersionField.counter + 1, res.topologyVersion.counter);
 }
 
@@ -37,8 +38,7 @@ function runTest(cmd) {
     let failPoint = configureFailPoint(node, "waitForHelloResponse");
     // Send an awaitable hello/isMaster request. This will block until maxAwaitTimeMS has elapsed or
     // a topology change happens.
-    let firstCmdBeforeStepDown =
-        startParallelShell(funWithArgs(runAwaitableCmd, cmd, topologyVersionField), node.port);
+    let firstCmdBeforeStepDown = startParallelShell(funWithArgs(runAwaitableCmd, cmd, topologyVersionField), node.port);
     failPoint.wait();
     // awaitingTopologyChanges should increment once.
     let numAwaitingTopologyChange = db.serverStatus().connections.awaitingTopologyChanges;
@@ -46,8 +46,10 @@ function runTest(cmd) {
 
     // Reconfigure failpoint to refresh the number of times entered.
     failPoint = configureFailPoint(node, "waitForHelloResponse");
-    let secondCmdBeforeStepdown =
-        startParallelShell(funWithArgs(runAwaitableCmd, cmd, topologyVersionField), node.port);
+    let secondCmdBeforeStepdown = startParallelShell(
+        funWithArgs(runAwaitableCmd, cmd, topologyVersionField),
+        node.port,
+    );
     failPoint.wait();
     numAwaitingTopologyChange = db.serverStatus().connections.awaitingTopologyChanges;
     assert.eq(2, numAwaitingTopologyChange);
@@ -66,4 +68,3 @@ function runTest(cmd) {
 runTest("hello");
 runTest("isMaster");
 runTest("ismaster");
-})();

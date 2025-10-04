@@ -1,0 +1,335 @@
+# vi: ft=tcl sw=2 ts=2 et
+
+include "WT/_Utils.tcl-inc"
+include "WT/_Consts.tcl-inc"
+include "WT/_Impl.tcl-inc"
+include "WT/_intpack.tcl-inc"
+
+# cell.h
+# /*
+#  * WT_CELL --
+#  *  Variable-length, on-page cell header.
+#  */
+# struct __wt_cell {
+#     /*
+#      * Maximum of 98 bytes:
+#      *  1: cell descriptor byte
+#      *  1: prefix compression count
+#      *  1: secondary descriptor byte
+#      * 36: 4 timestamps   (uint64_t encoding, max 9 bytes)
+#      * 18: 2 transaction IDs  (uint64_t encoding, max 9 bytes)
+#      *  9: associated 64-bit value  (uint64_t encoding, max 9 bytes)
+#      * 27: fast-delete information (transaction ID, 2 timestamps)
+#      *  5: data length    (uint32_t encoding, max 5 bytes)
+#      *
+#      * This calculation is pessimistic: the prefix compression count and 64V value overlap, and the
+#      * validity window, 64V value, fast-delete information and data length are all optional in some
+#      * or even most cases.
+#      */
+#     uint8_t __chunk[98];
+# };
+#
+# wt_binary_decode.py: row_decode:
+#   Maximum of 71 bytes:
+#    1: cell descriptor byte
+#    1: prefix compression count
+#    1: secondary descriptor byte
+#   36: 4 timestamps (uint64_t encoding, max 9 bytes)
+#   18: 2 transaction IDs (uint64_t encoding, max 9 bytes)
+#    9: associated 64-bit value (uint64_t encoding, max 9 bytes)
+#    5: data length (uint32_t encoding, max 5 bytes)
+
+proc long_cell_data_len {} { expr {[vuint] + 64} }
+
+proc __wt_cell {} {
+  globals WT_*
+  set ret 1
+  ssection -collapsed cell {
+      set cell_start [pos]
+      set desc [uint8]
+      set short [expr {$desc & 3}]
+      if {$short} {
+        # Short: WT_CELL_KEY_SHORT_PFX, WT_CELL_KEY_SHORT, WT_CELL_VALUE_SHORT
+        set len [expr {$desc >> 2}]
+        set desc_fmt [format_enum $short $WT_CELL_short_n]
+        sectionname "[strcut $desc_fmt WT_CELL_]"
+        entry "desc" [xd $desc] 1 [expr {[pos] - 1}]
+        entry "short desc" $desc_fmt 1 [expr {[pos] - 1}]
+        entry "len" $len 1 [expr {[pos] - 1}]
+
+        if {$short == $WT_CELL_KEY_SHORT_PFX} {
+          uint8 -hex prefix
+        }
+        sectionvalue [unpack_key $len]
+      } else {
+        # Not short
+        set desc_n [expr {$desc & 0xf0}]
+        set desc_b [expr {$desc & 0x0c}]
+        set desc_fmt_enum [format_enum $desc_n $WT_CELL_type_n]
+        set desc_fmt_bits [format_bits $desc_b $WT_CELL_b]
+        entry "desc" "$desc_fmt_enum | $desc_fmt_bits" 1 [expr {[pos] - 1}]
+        sectionname "[strcut "$desc_fmt_enum | $desc_fmt_bits" WT_CELL_]"
+
+        set extra 0
+        if {$desc & $WT_CELL_SECOND_DESC} {
+          # Valid only for WT_CELL_ADDR_LEAF_NO and WT_CELL_VALUE_OVFL_RM
+          ssection extra {
+            xentry extra { format_bits [set extra [uint8]] $WT_CELL_extra_b }
+            if {$extra & $WT_CELL_PREPARE} { entry "prepared" "prepared" 1 [expr {[pos] - 1}] }
+            if {$extra & $WT_CELL_TS_START} { xentry "start ts" vuint }
+            if {$extra & $WT_CELL_TXN_START} { xentry "start txn" vuint }
+            if {$extra & $WT_CELL_TS_DURABLE_START} { xentry "durable start ts" vuint }
+            if {$extra & $WT_CELL_TS_STOP} { xentry "stop ts" vuint }
+            if {$extra & $WT_CELL_TXN_STOP} { xentry "stop txn" vuint }
+            if {$extra & $WT_CELL_TS_DURABLE_STOP} { xentry "durable stop ts" vuint }
+          }
+        }
+
+        if {$desc_n == $WT_CELL_ADDR_DEL} { ;# && page flag & WT_PAGE_FT_UPDATE
+          # cell_inline.h:881  __wt_cell_unpack_safe()
+          xentry txnid vuint
+          xentry timestamp vuint
+          xentry durable_timestamp vuint
+        }
+
+        # RLE count or record number that optionally follows the cell descriptor byte on column-store variable-length pages.
+        if {$desc & $WT_CELL_64V} { xentry 64v vuint }
+
+        set len 0
+        nswitch $desc_n {
+          $WT_CELL_ADDR_DEL | $WT_CELL_ADDR_INT | $WT_CELL_ADDR_LEAF | $WT_CELL_ADDR_LEAF_NO |
+          $WT_CELL_KEY | $WT_CELL_VALUE | $WT_CELL_KEY_PFX {
+            if {$desc_n == $WT_CELL_KEY_PFX} { uint8 -hex prefix }
+            xentry -var len {
+              # ... the way WT_CELL_SIZE_ADJUST is done in __wt_cell_unpack_safe
+              expr {
+                ($desc_n == $WT_CELL_KEY ||
+                 $desc_n == $WT_CELL_KEY_PFX ||
+                 ($desc_n == $WT_CELL_VALUE && !$extra && !($desc & $WT_CELL_64V))) ?
+                [long_cell_data_len] :
+                [vuint]
+              }
+            }
+          }
+          $WT_CELL_KEY | $WT_CELL_ADDR_LEAF_NO { xentry -var len long_cell_data_len }
+          $WT_CELL_KEY_OVFL {
+            #TODO: support RLE
+            #TODO: decode the address cookie
+            xentry -var len long_cell_data_len
+          }
+          $WT_CELL_VALUE_OVFL {
+            #TODO: support SECOND DESC and RLE
+            #TODO: decode the address cookie
+            xentry -var len long_cell_data_len
+          }
+          $WT_CELL_VALUE_COPY {
+            set pos0 [pos]
+            xentry -var cell_rel_offset_negative vuint
+            set pos1 [pos]
+            entry "cell_abs_offset" [xd [expr {$cell_start - $cell_rel_offset_negative}]] [expr {$pos1 - $pos0}] $pos0
+          }
+          $WT_CELL_ADDR_DEL |
+          $WT_CELL_ADDR_INT | $WT_CELL_ADDR_LEAF | $WT_CELL_ADDR_LEAF_NO {}
+          $WT_CELL_DEL |
+          $WT_CELL_KEY_OVFL_RM |
+          $WT_CELL_VALUE_OVFL_RM |
+          default {}
+        }
+
+        if {$len} {
+          set pos_data [pos]
+          #sectionvalue [ascii $len data]
+          #set pos_afterdata [pos]
+          set pos_afterdata [endpos $pos_data $len]
+
+          if {$desc_n == $WT_CELL_ADDR_LEAF_NO} {
+            goto $pos_data
+            # __wt_rec_row_int -> __wt_ref_key
+            set desc ""
+            ssection -collapsed ref {
+              xentry -var offset vuint
+              xentry -var len vuint
+              xentry -var checksum { hx [vuint] }
+              sectionvalue [set desc "offset [xd $offset]  len [xd $len]  cksum $checksum"]
+            } || {}
+            goto $pos_afterdata
+            if {$desc ne ""} { sectionvalue $desc }
+          } else {
+            sectionvalue [ascii $len data]
+          }
+        }
+      }
+  } || {set ret 0}
+  return $ret
+}
+
+proc __block_addr_unpack__bm {name} {
+  global allocsize
+  ssection -collapsed $name {
+    xentry -var offset { expr {([vuint] + 1) * $allocsize} }
+    xentry -var size { expr {[vuint] * $allocsize} }
+    xentry -var checksum { hx [vuint] }
+    if {$size} { sectionvalue "offset [xd $offset]  size [xd $size]  cksum $checksum" }
+  }
+}
+
+proc wt_page {{allocsize 4096}} {
+  globals WT_* errorInfo
+  ssection -collapsed block {
+    set block_start [pos]
+    set block_size $allocsize
+    set title "block"
+    set compressed 0
+
+    ssection __wt_page_header {
+      uint64 recno
+      uint64 write_gen
+      xentry -var mem_size uint32
+      union {
+        { xentry -var entries uint32 }
+        { xentry -var datalen uint32 }
+      };
+      xentry type {
+        set type_fmt [format_enum [set type [uint8]] $WT_PAGE_n]
+      }
+      set title [strcut $type_fmt WT_PAGE_]
+      xentry flags { format_bits [set flags [uint8]] $WT_PAGE_f }
+      set compressed [expr {$flags & $WT_PAGE_COMPRESSED}]
+      bytes 1 unused
+      xentry version { format_enum [uint8] $WT_PAGE_VERSION_n }
+    }
+
+    ssection -collapsed __wt_block_header {
+      xentry -var disk_size { uint32 }
+      set alloc_count [expr {int(ceil($disk_size / $allocsize))}]
+      set block_size [expr {$alloc_count * $allocsize}]
+      uint32 -hex checksum
+      xentry flags { format_bits [uint8] WT_BLOCK_DATA_CKSUM }
+      bytes 3 unused
+    }
+
+    set headers_end [pos]
+    set payload_size [expr {$mem_size - ($headers_end - $block_start)}]
+    if {$payload_size > 0} {
+      #peek { bytes $payload_size payload }
+    } else {
+      entry "--ERROR--" "mem_size < headers size" 1 [pos]
+    }
+
+    if {!$compressed} {
+      # __wt_cell
+      if {$type == $WT_PAGE_BLOCK_MANAGER} {
+        ssection "block manager: extlist" {
+          # __wt_block_extlist_write __wt_block_extlist_read
+          ssection -collapsed "pair (magic)" {
+            xentry -var offset vuint
+            xentry -var size vuint
+            sectionvalue "offset: $offset, size: $size (magic $WT_BLOCK_EXTLIST_MAGIC => [pack_vuint $WT_BLOCK_EXTLIST_MAGIC])"
+          }
+          while {$offset != 0 && [peek uint8] != 0} {
+            ssection -collapsed "pair" {
+              xentry -var offset vuint
+              xentry -var size vuint
+              sectionvalue "offset: $offset, size: $size"
+              nswitch $offset {
+                $WT_BLOCK_EXTLIST_MAGIC { sectionname "pair (magic)" }
+                0 {
+                  sectionname "pair (closing)"
+                  sectionvalue "final_ckpt: [format_enum $size $WT_BLOCK_EXTLIST_VERSION_n]"
+                }
+                default {}
+              }
+            }
+          }
+        }
+        if {$size} {
+          peek {
+            # __ckpt_update: If this is the final block, we append an incomplete copy of the checkpoint information to the avail list for standalone retrieval.
+            # __wt_block_checkpoint_final:
+            ssection "final_ckpt hack" {
+              xentry -var write_gen vuint
+              set title "$title ckpt: $write_gen"
+              union {
+                { xentry final_file_size { dx [vuint] } }
+                { bytes 9 }
+              }
+
+              ssection -collapsed metadata {
+                xentry -var metadata_len vuint
+                sectionvalue [ascii $metadata_len metadata]
+              }
+
+              ssection -collapsed checkpoints_text {
+                xentry -var ckpts_len vuint
+                sectionvalue [ascii $ckpts_len ckpts]
+              }
+              ssection -collapsed checkpoint_raw {
+                xentry -varname ckpt_raw_len len vuint ;#not-quite-right_len
+                set ckpt_raw_start [pos]
+                union {
+                  { bytes ${ckpt_raw_len} bytes }
+                  { ssection __block_ckpt_unpack {
+                    # comment next to WT_BM_CHECKPOINT_VERSION:
+                    #   [1] [root addr] [alloc addr] [avail addr] [discard addr]
+                    #       [file size] [checkpoint size] [write generation]
+                    xentry version { format_enum [uint8] WT_BM_CHECKPOINT_VERSION }
+                    __block_addr_unpack__bm root
+                    __block_addr_unpack__bm alloc
+                    __block_addr_unpack__bm avail
+                    __block_addr_unpack__bm discard
+                    xentry file_size { xd [vuint] }
+                    xentry ckpt_size { xd [vuint] }
+                    if {[remaining $ckpt_raw_start $ckpt_raw_len] > 0 && [peek uint8]} {
+                      xentry objectid vuint
+                    }
+                  }}
+                }
+              }
+            } || {}
+            if {[pos] > $block_start + $disk_size} {
+              set sz [expr {[pos] - ($block_start + $disk_size)}]
+              entry "-ERROR-" "Metadata overflows the block by $sz bytes" $sz [expr {[pos] - $sz}]
+            }
+          }
+        }
+      } else {
+        if {$entries} {
+          ssection -collapsed cells {
+            #__wt_cell
+            sectionvalue $entries
+            for {set cell_idx 0} {$cell_idx < $entries} {incr cell_idx} {
+              if {![__wt_cell]} {
+                sectionvalue "$cell_idx of $entries"
+                entry "ERROR in cell" $errorInfo 1 [expr {[pos] - 1}]
+                break
+              }
+            }
+          }
+        }
+      }
+
+      set mem_size_check [expr {[pos] - $block_start}]
+      if {$mem_size_check > $mem_size} {
+        set extra [expr {$mem_size_check - $mem_size}]
+        entry "--ERROR--" "mem_size incorrect? Used $mem_size_check bytes out of $mem_size ($extra extra)" 1 [expr {[pos] - $extra}]
+      } elseif {$mem_size_check < $mem_size} {
+        set extra [expr {$mem_size - $mem_size_check}]
+        entry "--ERROR--" "mem_size incorrect: Used $mem_size_check bytes out of $mem_size ($extra left)" $extra [pos]
+      }
+    } else {
+      bytes [remaining $block_start $block_size] "compressed_data"
+    }
+
+    #bytes [expr {$allocsize - ([pos] - $block_start)}] data
+    ############ goto $mem_size
+    #set size [expr {$block_size - $mem_size_check}]
+    #bytes $size "extra_data\[[xd $size]\]"
+    gotoend $block_start $mem_size
+    pad $block_start $block_size
+
+    sectionname $title
+    sectionvalue "block size: [hx $block_size] ($alloc_count allocs)"
+  }
+  gotoend $block_start $block_size
+}
+

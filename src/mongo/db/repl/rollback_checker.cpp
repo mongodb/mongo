@@ -27,18 +27,25 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/rollback_checker.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <mutex>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
 
 namespace mongo {
 namespace repl {
 
 using RemoteCommandCallbackArgs = executor::TaskExecutor::RemoteCommandCallbackArgs;
-using UniqueLock = stdx::unique_lock<Latch>;
+using UniqueLock = stdx::unique_lock<stdx::mutex>;
 
 RollbackChecker::RollbackChecker(executor::TaskExecutor* executor, HostAndPort syncSource)
     : _executor(executor), _syncSource(syncSource), _baseRBID(-1), _lastRBID(-1) {
@@ -58,7 +65,7 @@ StatusWith<RollbackChecker::CallbackHandle> RollbackChecker::checkForRollback(
             int remoteRBID = rbidElement.numberInt();
 
             UniqueLock lk(_mutex);
-            bool hadRollback = _checkForRollback_inlock(remoteRBID);
+            bool hadRollback = _checkForRollback(lk, remoteRBID);
             lk.unlock();
             nextAction(hadRollback);
         } else {
@@ -91,7 +98,7 @@ StatusWith<RollbackChecker::CallbackHandle> RollbackChecker::reset(const Callbac
             int newRBID = rbidElement.numberInt();
 
             UniqueLock lk(_mutex);
-            _setRBID_inlock(newRBID);
+            _setRBID(lk, newRBID);
             lk.unlock();
 
             // Actual bool value does not matter because reset_sync()
@@ -119,16 +126,16 @@ Status RollbackChecker::reset_sync() {
 }
 
 int RollbackChecker::getBaseRBID() {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _baseRBID;
 }
 
 int RollbackChecker::getLastRBID_forTest() {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _lastRBID;
 }
 
-bool RollbackChecker::_checkForRollback_inlock(int remoteRBID) {
+bool RollbackChecker::_checkForRollback(WithLock lk, int remoteRBID) {
     _lastRBID = remoteRBID;
     return remoteRBID != _baseRBID;
 }
@@ -136,11 +143,11 @@ bool RollbackChecker::_checkForRollback_inlock(int remoteRBID) {
 StatusWith<RollbackChecker::CallbackHandle> RollbackChecker::_scheduleGetRollbackId(
     const RemoteCommandCallbackFn& nextAction) {
     executor::RemoteCommandRequest getRollbackIDReq(
-        _syncSource, "admin", BSON("replSetGetRBID" << 1), nullptr);
+        _syncSource, DatabaseName::kAdmin, BSON("replSetGetRBID" << 1), nullptr);
     return _executor->scheduleRemoteCommand(getRollbackIDReq, nextAction);
 }
 
-void RollbackChecker::_setRBID_inlock(int rbid) {
+void RollbackChecker::_setRBID(WithLock lk, int rbid) {
     _baseRBID = rbid;
     _lastRBID = rbid;
 }

@@ -1,23 +1,28 @@
 // Check that OCSP verification works
 // @tags: [requires_http_client, requires_ocsp_stapling]
 
-load("jstests/ocsp/lib/mock_ocsp.js");
-
-(function() {
-"use strict";
+import {FAULT_REVOKED, MockOCSPServer} from "jstests/ocsp/lib/mock_ocsp.js";
+import {
+    assertClientConnectFails,
+    assertClientConnectSucceeds,
+    OCSP_CA_PEM,
+    OCSP_REVOKED,
+    OCSP_SERVER_CERT,
+    supportsStapling,
+} from "jstests/ocsp/lib/ocsp_helpers.js";
 
 if (!supportsStapling()) {
-    return;
+    quit();
 }
 
 let mock_ocsp = new MockOCSPServer("", 20);
 mock_ocsp.start();
 
 const ocsp_options = {
-    sslMode: "requireSSL",
-    sslPEMKeyFile: OCSP_SERVER_CERT,
-    sslCAFile: OCSP_CA_PEM,
-    sslAllowInvalidHostnames: "",
+    tlsMode: "requireTLS",
+    tlsCertificateKeyFile: OCSP_SERVER_CERT,
+    tlsCAFile: OCSP_CA_PEM,
+    tlsAllowInvalidHostnames: "",
     setParameter: {
         "ocspEnabled": "true",
     },
@@ -37,24 +42,19 @@ mock_ocsp.start();
 // saying that it's revoked.
 sleep(15000);
 
-assert.throws(() => {
-    new Mongo(conn.host);
-});
+assertClientConnectFails(conn, OCSP_REVOKED);
 
 mock_ocsp.stop();
 mock_ocsp = new MockOCSPServer("", 1000);
 mock_ocsp.start();
 
 // This ensures that the client was viewing a stapled response.
-assert.throws(() => {
-    new Mongo(conn.host);
-});
+assertClientConnectFails(conn, OCSP_REVOKED);
 
 MongoRunner.stopMongod(conn);
 
 // have the server refresh its response every 10 seconds
-Object.extend(ocsp_options,
-              {setParameter: {ocspEnabled: true, ocspValidationRefreshPeriodSecs: 10}});
+Object.extend(ocsp_options, {setParameter: {ocspEnabled: true, ocspValidationRefreshPeriodSecs: 10}});
 assert.doesNotThrow(() => {
     conn = MongoRunner.runMongod(ocsp_options);
 });
@@ -66,9 +66,7 @@ mock_ocsp = new MockOCSPServer(FAULT_REVOKED, 10);
 mock_ocsp.start();
 sleep(30000);
 // the client should be trying to connect after its certificate has been revoked.
-assert.throws(() => {
-    new Mongo(conn.host);
-});
+assertClientConnectFails(conn, OCSP_REVOKED);
 MongoRunner.stopMongod(conn);
 
 // The mongoRunner spawns a new Mongo Object to validate the collections which races
@@ -93,19 +91,17 @@ mock_ocsp.stop();
 // If the server stapled an expired response, then the client would refuse to connect.
 // We now check that the server has not stapled a response.
 sleep(NEXT_UPDATE * 1000);
-assert.doesNotThrow(() => {
-    new Mongo(conn.host);
-});
+assertClientConnectSucceeds(conn);
 
 MongoRunner.stopMongod(conn);
 
 // Make sure that the refresh period is set to a very large value so that we can
 // make sure that the period defined by the mock OCSP responder overrides it.
 let ocsp_options_high_refresh = {
-    sslMode: "requireSSL",
-    sslPEMKeyFile: OCSP_SERVER_CERT,
-    sslCAFile: OCSP_CA_PEM,
-    sslAllowInvalidHostnames: "",
+    tlsMode: "requireTLS",
+    tlsCertificateKeyFile: OCSP_SERVER_CERT,
+    tlsCAFile: OCSP_CA_PEM,
+    tlsAllowInvalidHostnames: "",
     setParameter: {
         "ocspEnabled": "true",
         "ocspStaplingRefreshPeriodSecs": 300000,
@@ -130,9 +126,7 @@ sleep(20000);
 // By asserting here that a new connection cannot be established to the
 // mongod, we prove that the server has refreshed its stapled response sooner
 // than the refresh period indicated.
-assert.throws(() => {
-    new Mongo(conn.host);
-});
+assertClientConnectFails(conn, OCSP_REVOKED);
 
 MongoRunner.stopMongod(conn);
 
@@ -141,4 +135,3 @@ MongoRunner.stopMongod(conn);
 // sleep to make sure that the threads don't interfere with each other.
 sleep(1000);
 mock_ocsp.stop();
-}());

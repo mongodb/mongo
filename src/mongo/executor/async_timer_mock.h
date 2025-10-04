@@ -29,11 +29,16 @@
 
 #pragma once
 
-#include <vector>
-
 #include "mongo/executor/async_timer_interface.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/time_support.h"
+
+#include <memory>
+#include <mutex>
+#include <system_error>
+#include <vector>
 
 namespace mongo {
 namespace executor {
@@ -84,7 +89,7 @@ public:
 private:
     void _callAllHandlers(std::error_code ec);
 
-    Mutex _mutex = MONGO_MAKE_LATCH("AsyncTimerMockImpl::_mutex");
+    stdx::mutex _mutex;
     Milliseconds _timeLeft;
     std::vector<AsyncTimerInterface::Handler> _handlers;
 };
@@ -143,7 +148,7 @@ public:
     int jobs();
 
 private:
-    stdx::recursive_mutex _timersMutex;
+    std::recursive_mutex _timersMutex;  // NOLINT
     stdx::unordered_set<std::shared_ptr<AsyncTimerMockImpl>> _timers;
     Milliseconds _curTime;
 };

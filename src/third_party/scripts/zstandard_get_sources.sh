@@ -18,7 +18,7 @@ if grep -q Microsoft /proc/version; then
 fi
 
 NAME=zstandard
-REVISION=1.4.4
+VERSION=1.5.5
 if grep -q Microsoft /proc/version; then
     SRC_ROOT=$(wslpath -u $(powershell.exe -Command "Get-ChildItem Env:TEMP | Get-Content | Write-Host"))
     SRC_ROOT+="$(mktemp -u /zstandard.XXXXXX)"
@@ -27,13 +27,13 @@ else
     SRC_ROOT=$(mktemp -d /tmp/zstandard.XXXXXX)
 fi
 
-SRC=${SRC_ROOT}/${NAME}_${REVISION}
+SRC=${SRC_ROOT}/${NAME}
 CLONE_DEST=$SRC
 if grep -q Microsoft /proc/version; then
     CLONE_DEST=$(wslpath -m $SRC)
 fi
-DEST_DIR=$($GIT_EXE rev-parse --show-toplevel)/src/third_party/$NAME-$REVISION
-PATCH_DIR=$($GIT_EXE rev-parse --show-toplevel)/src/third_party/$NAME-$REVISION/patches
+DEST_DIR=$($GIT_EXE rev-parse --show-toplevel)/src/third_party/$NAME
+PATCH_DIR=$($GIT_EXE rev-parse --show-toplevel)/src/third_party/$NAME/patches
 if grep -q Microsoft /proc/version; then
     DEST_DIR=$(wslpath -u "$DEST_DIR")
     PATCH_DIR=$(wslpath -w $(wslpath -u "$PATCH_DIR"))
@@ -46,7 +46,7 @@ if [ ! -d $SRC ]; then
     $GIT_EXE clone https://github.com/facebook/zstd.git $CLONE_DEST
 
     pushd $SRC
-    $GIT_EXE checkout v$REVISION
+    $GIT_EXE checkout v$VERSION
     
     popd
 fi
@@ -84,6 +84,7 @@ env.Library(
         'zstd/lib/compress/zstd_compress.c',
         'zstd/lib/compress/zstd_compress_literals.c',
         'zstd/lib/compress/zstd_compress_sequences.c',
+        'zstd/lib/compress/zstd_compress_superblock.c',
         'zstd/lib/compress/zstd_double_fast.c',
         'zstd/lib/compress/zstd_fast.c',
         'zstd/lib/compress/zstd_lazy.c',
@@ -91,6 +92,7 @@ env.Library(
         'zstd/lib/compress/zstd_opt.c',
         'zstd/lib/compress/zstdmt_compress.c',
         'zstd/lib/decompress/huf_decompress.c',
+        'zstd/lib/decompress/huf_decompress_amd64.S' if not env.TargetOSIs('windows') else [],
         'zstd/lib/decompress/zstd_ddict.c',
         'zstd/lib/decompress/zstd_decompress.c',
         'zstd/lib/decompress/zstd_decompress_block.c',
@@ -101,12 +103,14 @@ env.Library(
         'zstd/lib/dictBuilder/divsufsort.c',
         'zstd/lib/dictBuilder/fastcover.c',
         'zstd/lib/dictBuilder/zdict.c',
-        
     ],
     LIBDEPS_TAGS=[
         'init-no-global-side-effects',
     ],
 )
+
+if env.ToolchainIs('gcc'):
+    env.Append(CCFLAGS=["-Wno-stringop-overflow"])
 ___EOF___
 
 echo "Done"

@@ -29,7 +29,17 @@
 
 #pragma once
 
+#include "mongo/bson/bsonelement.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_visitor.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/util/modules.h"
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 /**
@@ -42,13 +52,15 @@ public:
     static constexpr auto kUnstableField = "unstable";
     static constexpr auto kDeprecatedField = "deprecated";
 
+    ExpressionTestApiVersion(ExpressionContext* expCtx, bool unstable, bool deprecated);
+
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
                                                   BSONElement expr,
                                                   const VariablesParseState& vps);
 
     Value evaluate(const Document& root, Variables* variables) const final;
 
-    Value serialize(bool explain) const final;
+    Value serialize(const SerializationOptions& options) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -58,10 +70,12 @@ public:
         return visitor->visit(this);
     }
 
-private:
-    ExpressionTestApiVersion(ExpressionContext* expCtx, bool unstable, bool deprecated);
-    void _doAddDependencies(DepsTracker* deps) const final override;
+    boost::intrusive_ptr<Expression> clone() const final {
+        return make_intrusive<ExpressionTestApiVersion>(
+            getExpressionContext(), _unstable, _deprecated);
+    }
 
+private:
     bool _unstable;
     bool _deprecated;
 };

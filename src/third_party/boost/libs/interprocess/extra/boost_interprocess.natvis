@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+Copyright 2024 Braden Ganetsky.
+Distributed under the Boost Software License, Version 1.0. (See accompanying
+file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
+-->
+
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+
+    <Type Name="boost::interprocess::offset_ptr&lt;*&gt;" Inheritable="false">
+        <!-- This is a simplified and inlined version of `offset_ptr::get()` -->
+        <Intrinsic Name="get" Expression="(internal.m_offset == 1) ? (pointer)nullptr : (pointer)((unsigned char*)this + internal.m_offset)" />
+        <Intrinsic Name="boost_to_address" ReturnType="pointer" Expression="get()" />
+
+        <!-- This is a simplified and inlined version of `offset_ptr::operator+=()` -->
+        <Intrinsic Name="boost_next" ReturnType="pointer" Expression="(pointer)( (unsigned char*)(ptr) + (offset_type)(offset * (difference_type)sizeof(element_type)) )">
+            <Parameter Name="ptr" Type="pointer" />
+            <Parameter Name="offset" Type="difference_type" />
+        </Intrinsic>
+
+        <DisplayString>{get()}</DisplayString>
+        <Expand>
+            <ExpandedItem>get()</ExpandedItem>
+        </Expand>
+    </Type>
+
+</AutoVisualizer>

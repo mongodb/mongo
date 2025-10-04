@@ -1,0 +1,74 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_pre_images_replica_sets_kill_secondary_jscore_passthrough.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
+##########################################################
+executor:
+  archive:
+    hooks:
+      - PeriodicKillSecondaries
+    tests: true
+  config:
+    shell_options:
+      eval: globalThis.testingReplication = true;
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        expiredChangeStreamPreImageRemovalJobSleepSecs: 1
+        failpoint.preImagesEnabledOnAllCollectionsByDefault: "{mode: 'alwaysOn'}"
+        failpoint.preImagesTruncateOnlyOnSecondaries: "{mode: 'alwaysOn'}"
+        logComponentVerbosity:
+          replication:
+            heartbeats: 2
+            rollback: 2
+          storage:
+            recovery: 2
+        preImagesCollectionTruncateMarkersMinBytes: 4096
+        resumableIndexBuildMajorityOpTimeTimeoutMillis: 10
+      syncdelay: 5
+      wiredTigerCollectionConfigString: allocation_size=1k,leaf_page_max=1k
+      wiredTigerEngineConfigString: debug_mode=(table_logging=true)
+    num_nodes: 2
+    replset_config_options:
+      settings:
+        electionTimeoutMillis: 5000
+    voting_secondaries: false
+  hooks:
+    - class: PeriodicKillSecondaries
+    - class: ClusterParameter
+      key: changeStreamOptions
+      value:
+        preAndPostImages:
+          expireAfterSeconds: 10
+matrix_suite: true
+selector:
+  exclude_files:
+    - jstests/core/**/geo_update_btree.js
+    - jstests/core/**/query/max_doc_size.js
+    - jstests/core/**/mr_bigobject.js
+    - jstests/core/**/capped_large_docs.js
+    - jstests/core/**/capped_resize.js
+    - jstests/core/**/query/exhaust.js
+    - jstests/core/query/index_correctness_pbt.js
+    - jstests/core/query/plan_cache/cache_correctness_pbt.js
+    - jstests/core/query/run_all_plans_pbt.js
+    - jstests/core/query/partial_index_pbt.js
+    - jstests/core/query/query_knob_correctness_pbt.js
+    - jstests/core/query/or/subplanning_pbt.js
+    - jstests/core/**/geo_circle_spilling.js
+    - jstests/core/**/explain_execution_error.js
+    - jstests/core/**/sortb.js
+    - jstests/core/**/sortg.js
+    - jstests/core/**/sortj.js
+  exclude_with_any_tags:
+    - assumes_standalone_mongod
+    - requires_profiling
+    - incompatible_with_preimages_by_default
+  roots:
+    - jstests/core/**/*.js
+test_kind: js_test

@@ -27,17 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
 
 #include "mongo/client/cyrus_sasl_client_session.h"
 
 #include "mongo/base/init.h"
+#include "mongo/client/authenticate.h"
 #include "mongo/client/native_sasl_client_session.h"
+#include "mongo/logv2/log.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/signal_handlers_synchronous.h"
 #include "mongo/util/str.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 
 namespace mongo {
 namespace {
@@ -47,7 +50,9 @@ void saslSetError(sasl_conn_t* conn, const std::string& msg) {
 }
 
 SaslClientSession* createCyrusSaslClientSession(const std::string& mech) {
-    if ((mech == "SCRAM-SHA-1") || (mech == "SCRAM-SHA-256") || mech == "MONGODB-AWS") {
+    if ((mech == auth::kMechanismScramSha1) || (mech == auth::kMechanismScramSha256) ||
+        (mech == auth::kMechanismSaslPlain) || (mech == auth::kMechanismMongoAWS) ||
+        (mech == auth::kMechanismMongoOIDC)) {
         return new NativeSaslClientSession();
     }
     return new CyrusSaslClientSession();
@@ -89,35 +94,57 @@ void* saslOurRealloc(void* ptr, SaslAllocSize sz) {
  */
 
 void* saslMutexAlloc(void) {
-    return new SimpleMutex;
+    return new stdx::mutex;
 }
 
 int saslMutexLock(void* mutex) {
-    static_cast<SimpleMutex*>(mutex)->lock();
+    static_cast<stdx::mutex*>(mutex)->lock();
     return SASL_OK;
 }
 
 int saslMutexUnlock(void* mutex) {
-    static_cast<SimpleMutex*>(mutex)->unlock();
+    static_cast<stdx::mutex*>(mutex)->unlock();
     return SASL_OK;
 }
 
 void saslMutexFree(void* mutex) {
-    delete static_cast<SimpleMutex*>(mutex);
+    delete static_cast<stdx::mutex*>(mutex);
 }
 
 /**
  * Configures the SASL library to use allocator and mutex functions we specify,
  * unless the client application has previously initialized the SASL library.
  */
-MONGO_INITIALIZER(CyrusSaslAllocatorsAndMutexes)(InitializerContext*) {
+MONGO_INITIALIZER(CyrusSaslAllocatorsAndMutexesClient)(InitializerContext*) {
     sasl_set_alloc(saslOurMalloc, saslOurCalloc, saslOurRealloc, free);
 
     sasl_set_mutex(saslMutexAlloc, saslMutexLock, saslMutexUnlock, saslMutexFree);
 }
 
-int saslClientLogSwallow(void* context, int priority, const char* message) throw() {
+int saslClientLogSwallow(void* context, int priority, const char* message) {
     return SASL_OK;  // do nothing
+}
+
+/**
+ * Implements the Cyrus SASL default_verifyfile_cb interface registered in the
+ * Cyrus SASL library to verify, and then accept or reject, the loading of
+ * plugin libraries from the target directory.
+ *
+ * On Windows environments, disable loading of plugin files.
+ */
+int saslClientVerifyPluginFile(void*, const char*, sasl_verify_type_t type) {
+
+    if (type != SASL_VRFY_PLUGIN) {
+        return SASL_OK;
+    }
+
+#ifdef _WIN32
+    return SASL_CONTINUE;  // A non-SASL_OK response indicates to Cyrus SASL that it
+                           // should not load a file. This effectively disables
+                           // loading plugins from path on Windows.
+#else
+    return SASL_OK;
+#endif
 }
 
 /**
@@ -126,16 +153,18 @@ int saslClientLogSwallow(void* context, int priority, const char* message) throw
  *
  * If a client wishes to override this initialization but keep the allocator and mutex
  * initialization, it should implement a MONGO_INITIALIZER_GENERAL with
- * CyrusSaslAllocatorsAndMutexes as a prerequisite and CyrusSaslClientContext as a
+ * CyrusSaslAllocatorsAndMutexesClient as a prerequisite and CyrusSaslClientContext as a
  * dependent.  If it wishes to override both, it should implement a MONGO_INITIALIZER_GENERAL
- * with CyrusSaslAllocatorsAndMutexes and CyrusSaslClientContext as dependents, or
+ * with CyrusSaslAllocatorsAndMutexesClient and CyrusSaslClientContext as dependents, or
  * initialize the library before calling mongo::runGlobalInitializersOrDie().
  */
 MONGO_INITIALIZER_WITH_PREREQUISITES(CyrusSaslClientContext,
-                                     ("NativeSaslClientContext", "CyrusSaslAllocatorsAndMutexes"))
+                                     ("NativeSaslClientContext",
+                                      "CyrusSaslAllocatorsAndMutexesClient"))
 (InitializerContext* context) {
     static sasl_callback_t saslClientGlobalCallbacks[] = {
         {SASL_CB_LOG, SaslCallbackFn(saslClientLogSwallow), nullptr /* context */},
+        {SASL_CB_VERIFYFILE, SaslCallbackFn(saslClientVerifyPluginFile), nullptr /*context*/},
         {SASL_CB_LIST_END}};
 
     // If the client application has previously called sasl_client_init(), the callbacks passed
@@ -159,7 +188,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CyrusSaslClientContext,
  * Note that in Mongo, the authentication and authorization ids (authid and authzid) are always
  * the same.  These correspond to SASL_CB_AUTHNAME and SASL_CB_USER.
  */
-int saslClientGetSimple(void* context, int id, const char** result, unsigned* resultLen) throw() {
+int saslClientGetSimple(void* context, int id, const char** result, unsigned* resultLen) {
     try {
         CyrusSaslClientSession* session = static_cast<CyrusSaslClientSession*>(context);
         if (!session || !result)
@@ -178,7 +207,7 @@ int saslClientGetSimple(void* context, int id, const char** result, unsigned* re
         if (!session->hasParameter(requiredParameterId))
             return SASL_FAIL;
         StringData value = session->getParameter(requiredParameterId);
-        *result = value.rawData();
+        *result = value.data();
         if (resultLen)
             *resultLen = static_cast<unsigned>(value.size());
         return SASL_OK;
@@ -191,10 +220,7 @@ int saslClientGetSimple(void* context, int id, const char** result, unsigned* re
  * Callback registered on the sasl_conn_t underlying a CyrusSaslClientSession to allow
  * the Cyrus SASL library to query for the password data.
  */
-int saslClientGetPassword(sasl_conn_t* conn,
-                          void* context,
-                          int id,
-                          sasl_secret_t** outSecret) throw() {
+int saslClientGetPassword(sasl_conn_t* conn, void* context, int id, sasl_secret_t** outSecret) {
     try {
         CyrusSaslClientSession* session = static_cast<CyrusSaslClientSession*>(context);
         if (!session || !outSecret)
@@ -240,7 +266,7 @@ void CyrusSaslClientSession::setParameter(Parameter id, StringData value) {
         _secret.reset(new char[sizeof(sasl_secret_t) + value.size() + 1]);
         sasl_secret_t* secret = static_cast<sasl_secret_t*>(static_cast<void*>(_secret.get()));
         secret->len = value.size();
-        value.copyTo(static_cast<char*>(static_cast<void*>(&secret->data[0])), false);
+        value.copy(static_cast<char*>(static_cast<void*>(&secret->data[0])), value.size());
     }
     SaslClientSession::setParameter(id, value);
 }
@@ -255,8 +281,8 @@ Status CyrusSaslClientSession::initialize() {
         return Status(ErrorCodes::AlreadyInitialized,
                       "Cannot reinitialize CyrusSaslClientSession.");
 
-    int result = sasl_client_new(getParameter(parameterServiceName).toString().c_str(),
-                                 getParameter(parameterServiceHostname).toString().c_str(),
+    int result = sasl_client_new(std::string{getParameter(parameterServiceName)}.c_str(),
+                                 std::string{getParameter(parameterServiceHostname)}.c_str(),
                                  nullptr,
                                  nullptr,
                                  _callbacks,
@@ -279,14 +305,14 @@ Status CyrusSaslClientSession::step(StringData inputData, std::string* outputDat
     if (_step == 0) {
         const char* actualMechanism;
         result = sasl_client_start(_saslConnection,
-                                   getParameter(parameterMechanism).toString().c_str(),
+                                   std::string{getParameter(parameterMechanism)}.c_str(),
                                    nullptr,
                                    &output,
                                    &outputSize,
                                    &actualMechanism);
     } else {
         result = sasl_client_step(_saslConnection,
-                                  inputData.rawData(),
+                                  inputData.data(),
                                   static_cast<unsigned>(inputData.size()),
                                   nullptr,
                                   &output,
@@ -296,7 +322,7 @@ Status CyrusSaslClientSession::step(StringData inputData, std::string* outputDat
     switch (result) {
         case SASL_OK:
             _success = true;
-        // Fall through
+            [[fallthrough]];
         case SASL_CONTINUE:
             *outputData = std::string(output, outputSize);
             return Status::OK();

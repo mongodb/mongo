@@ -1,13 +1,12 @@
 // Check that OCSP verification works
 // @tags: [requires_http_client, requires_ocsp_stapling]
 
-load("jstests/ocsp/lib/mock_ocsp.js");
-
-(function() {
-"use strict";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {FAULT_REVOKED, MockOCSPServer} from "jstests/ocsp/lib/mock_ocsp.js";
+import {OCSP_CA_PEM, OCSP_SERVER_CERT, supportsStapling} from "jstests/ocsp/lib/ocsp_helpers.js";
 
 if (!supportsStapling()) {
-    return;
+    quit();
 }
 
 let mock_ocsp = new MockOCSPServer("", 10);
@@ -22,16 +21,16 @@ ReplSetTest.kDefaultTimeoutMS = 1 * 30 * 1000;
 MongoRunner.runHangAnalyzer.disable();
 
 const ocsp_options = {
-    sslMode: "requireSSL",
-    sslPEMKeyFile: OCSP_SERVER_CERT,
-    sslCAFile: OCSP_CA_PEM,
-    sslAllowInvalidHostnames: "",
+    tlsMode: "requireTLS",
+    tlsCertificateKeyFile: OCSP_SERVER_CERT,
+    tlsCAFile: OCSP_CA_PEM,
+    tlsAllowInvalidHostnames: "",
     setParameter: {
         "ocspEnabled": "true",
     },
 };
 
-const rstest = ReplSetTest({
+const rstest = new ReplSetTest({
     name: "OCSP Servers Test",
     nodes: 2,
     nodeOptions: ocsp_options,
@@ -78,4 +77,3 @@ MongoRunner.stopMongod(conn);
 
 sleep(1000);
 mock_ocsp.stop();
-}());

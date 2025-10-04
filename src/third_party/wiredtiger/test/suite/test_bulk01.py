@@ -31,8 +31,9 @@
 #
 
 import wiredtiger, wttest
-from wtdataset import SimpleDataSet, simple_key, simple_value
+from wtdataset import simple_key, simple_value
 from wtscenario import make_scenarios
+from wiredtiger import stat
 
 # Smoke test bulk-load.
 class test_bulk_load(wttest.WiredTigerTestCase):
@@ -54,14 +55,27 @@ class test_bulk_load(wttest.WiredTigerTestCase):
     ]
     scenarios = make_scenarios(types, keyfmt, valfmt)
 
+    def get_stat(self, stat):
+        stat_cursor = self.session.open_cursor('statistics:')
+        val = stat_cursor[stat][2]
+        stat_cursor.close()
+        return val
+
     # Test a simple bulk-load
     def test_bulk_load(self):
         uri = self.type + self.name
         self.session.create(uri,
             'key_format=' + self.keyfmt + ',value_format=' + self.valfmt)
+
+        self.assertEqual(self.get_stat(stat.conn.cursor_bulk_count), 0)
         cursor = self.session.open_cursor(uri, None, "bulk")
+        self.assertEqual(self.get_stat(stat.conn.cursor_bulk_count), 1)
+
         for i in range(1, 1000):
             cursor[simple_key(cursor, i)] = simple_value(cursor, i)
+        cursor.close()
+
+        self.assertEqual(self.get_stat(stat.conn.cursor_bulk_count), 0)
 
     # Test a bulk-load triggers variable-length column-store RLE correctly.
     def test_bulk_load_var_rle(self):
@@ -162,7 +176,7 @@ class test_bulk_load(wttest.WiredTigerTestCase):
         for i in [1, 9, 10]:
             cursor.set_key(simple_key(cursor, 1))
             cursor.set_value(simple_value(cursor, 1))
-            msg = '/than previously inserted key/'
+            msg = '/less than or equal to the previously inserted key/'
             self.assertRaisesWithMessage(
                 wiredtiger.WiredTigerError, lambda: cursor.insert(), msg)
 
@@ -200,6 +214,7 @@ class test_bulk_load(wttest.WiredTigerTestCase):
         cursor[simple_key(cursor, 1)] = simple_value(cursor, 1)
         # Close the insert cursor, else we'll get EBUSY.
         cursor.close()
+        self.session.checkpoint()
         msg = '/bulk-load is only supported on newly created objects/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.open_cursor(uri, None, "bulk"), msg)
@@ -213,6 +228,3 @@ class test_bulk_load(wttest.WiredTigerTestCase):
         # Don't close the insert cursor, we want EBUSY.
         self.assertRaises(wiredtiger.WiredTigerError,
             lambda: self.session.open_cursor(uri, None, "bulk"))
-
-if __name__ == '__main__':
-    wttest.run()

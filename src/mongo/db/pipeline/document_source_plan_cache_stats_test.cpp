@@ -27,20 +27,37 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/db/pipeline/document_source_plan_cache_stats.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/pipeline_builder.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/matcher/matcher.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
+#include "mongo/db/query/explain_options.h"
+#include "mongo/unittest/unittest.h"
 
 #include <algorithm>
+#include <iterator>
 
-#include "mongo/bson/json.h"
-#include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/document_source_plan_cache_stats.h"
-#include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
-#include "mongo/unittest/unittest.h"
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
 using DocumentSourcePlanCacheStatsTest = AggregationContextFixture;
 
+static const BSONObj kEmptySpecObj = fromjson("{$planCacheStats: {}}");
+static const BSONObj kAllHostsFalseSpecObj = fromjson("{$planCacheStats: {allHosts: false}}");
+static const BSONObj kAllHostsTrueSpecObj = fromjson("{$planCacheStats: {allHosts: true}}");
+static const SerializationOptions kExplain = SerializationOptions{
+    .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)};
 /**
  * A MongoProcessInterface used for testing which returns artificial plan cache stats.
  */
@@ -61,7 +78,9 @@ public:
         std::copy_if(_planCacheStats.begin(),
                      _planCacheStats.end(),
                      std::back_inserter(filteredStats),
-                     [&matchExpr](const BSONObj& obj) { return matchExpr->matchesBSON(obj); });
+                     [&matchExpr](const BSONObj& obj) {
+                         return exec::matcher::matchesBSON(matchExpr, obj);
+                     });
         return filteredStats;
     }
 
@@ -93,152 +112,220 @@ TEST_F(DocumentSourcePlanCacheStatsTest, ShouldFailToParseIfSpecIsANonEmptyObjec
         ErrorCodes::FailedToParse);
 }
 
+TEST_F(DocumentSourcePlanCacheStatsTest, ShouldFailToParseIfAllHostsTrueInNonShardedContext) {
+    ASSERT_THROWS_CODE(DocumentSourcePlanCacheStats::createFromBson(
+                           kAllHostsTrueSpecObj.firstElement(), getExpCtx()),
+                       AssertionException,
+                       4503200);
+}
+
 TEST_F(DocumentSourcePlanCacheStatsTest, CanParseAndSerializeSuccessfully) {
-    const auto specObj = fromjson("{$planCacheStats: {}}");
-    auto stage = DocumentSourcePlanCacheStats::createFromBson(specObj.firstElement(), getExpCtx());
+    auto stage =
+        DocumentSourcePlanCacheStats::createFromBson(kEmptySpecObj.firstElement(), getExpCtx());
     std::vector<Value> serialized;
     stage->serializeToArray(serialized);
     ASSERT_EQ(1u, serialized.size());
-    ASSERT_BSONOBJ_EQ(specObj, serialized[0].getDocument().toBson());
+    ASSERT_BSONOBJ_EQ(kAllHostsFalseSpecObj, serialized[0].getDocument().toBson());
 }
 
 TEST_F(DocumentSourcePlanCacheStatsTest, CanParseAndSerializeAsExplainSuccessfully) {
-    const auto specObj = fromjson("{$planCacheStats: {}}");
-    auto stage = DocumentSourcePlanCacheStats::createFromBson(specObj.firstElement(), getExpCtx());
+    auto stage =
+        DocumentSourcePlanCacheStats::createFromBson(kEmptySpecObj.firstElement(), getExpCtx());
     std::vector<Value> serialized;
-    stage->serializeToArray(serialized, ExplainOptions::Verbosity::kQueryPlanner);
+    stage->serializeToArray(serialized,
+                            SerializationOptions{.verbosity = boost::make_optional(
+                                                     ExplainOptions::Verbosity::kQueryPlanner)});
     ASSERT_EQ(1u, serialized.size());
-    ASSERT_BSONOBJ_EQ(specObj, serialized[0].getDocument().toBson());
+    ASSERT_BSONOBJ_EQ(kAllHostsFalseSpecObj, serialized[0].getDocument().toBson());
+}
+
+TEST_F(DocumentSourcePlanCacheStatsTest, CanParseAndSerializeAllHostsSuccessfully) {
+    getExpCtx()->setFromRouter(true);
+    auto stage = DocumentSourcePlanCacheStats::createFromBson(kAllHostsTrueSpecObj.firstElement(),
+                                                              getExpCtx());
+    std::vector<Value> serialized;
+    stage->serializeToArray(serialized);
+    ASSERT_EQ(1u, serialized.size());
+    ASSERT_BSONOBJ_EQ(kAllHostsTrueSpecObj, serialized[0].getDocument().toBson());
+}
+
+TEST_F(DocumentSourcePlanCacheStatsTest, CanParseAndSerializeAsExplainAllHostsSuccessfully) {
+    getExpCtx()->setFromRouter(true);
+    auto stage = DocumentSourcePlanCacheStats::createFromBson(kAllHostsTrueSpecObj.firstElement(),
+                                                              getExpCtx());
+    std::vector<Value> serialized;
+    stage->serializeToArray(serialized,
+                            SerializationOptions{.verbosity = boost::make_optional(
+                                                     ExplainOptions::Verbosity::kQueryPlanner)});
+    ASSERT_EQ(1u, serialized.size());
+    ASSERT_BSONOBJ_EQ(kAllHostsTrueSpecObj, serialized[0].getDocument().toBson());
 }
 
 TEST_F(DocumentSourcePlanCacheStatsTest, SerializesSuccessfullyAfterAbsorbingMatch) {
-    const auto specObj = fromjson("{$planCacheStats: {}}");
     auto planCacheStats =
-        DocumentSourcePlanCacheStats::createFromBson(specObj.firstElement(), getExpCtx());
+        DocumentSourcePlanCacheStats::createFromBson(kEmptySpecObj.firstElement(), getExpCtx());
     auto match = DocumentSourceMatch::create(fromjson("{foo: 'bar'}"), getExpCtx());
     auto pipeline = Pipeline::create({planCacheStats, match}, getExpCtx());
-    ASSERT_EQ(2u, pipeline->getSources().size());
+    ASSERT_EQ(2u, pipeline->size());
 
     pipeline->optimizePipeline();
-    ASSERT_EQ(1u, pipeline->getSources().size());
+    ASSERT_EQ(1u, pipeline->size());
 
     auto serialized = pipeline->serialize();
     ASSERT_EQ(2u, serialized.size());
-    ASSERT_BSONOBJ_EQ(specObj, serialized[0].getDocument().toBson());
+    ASSERT_BSONOBJ_EQ(kAllHostsFalseSpecObj, serialized[0].getDocument().toBson());
     ASSERT_BSONOBJ_EQ(fromjson("{$match: {foo: 'bar'}}"), serialized[1].getDocument().toBson());
 }
 
 TEST_F(DocumentSourcePlanCacheStatsTest, SerializesSuccessfullyAfterAbsorbingMatchForExplain) {
-    const auto specObj = fromjson("{$planCacheStats: {}}");
     auto planCacheStats =
-        DocumentSourcePlanCacheStats::createFromBson(specObj.firstElement(), getExpCtx());
+        DocumentSourcePlanCacheStats::createFromBson(kEmptySpecObj.firstElement(), getExpCtx());
     auto match = DocumentSourceMatch::create(fromjson("{foo: 'bar'}"), getExpCtx());
     auto pipeline = Pipeline::create({planCacheStats, match}, getExpCtx());
-    ASSERT_EQ(2u, pipeline->getSources().size());
+    ASSERT_EQ(2u, pipeline->size());
 
     pipeline->optimizePipeline();
-    ASSERT_EQ(1u, pipeline->getSources().size());
+    ASSERT_EQ(1u, pipeline->size());
 
-    auto serialized = pipeline->writeExplainOps(ExplainOptions::Verbosity::kQueryPlanner);
+    auto serialized = pipeline->writeExplainOps(kExplain);
     ASSERT_EQ(1u, serialized.size());
-    ASSERT_BSONOBJ_EQ(fromjson("{$planCacheStats: {match: {foo: 'bar'}}}"),
+    ASSERT_BSONOBJ_EQ(fromjson("{$planCacheStats: {match: {foo: 'bar'}, allHosts: false}}"),
                       serialized[0].getDocument().toBson());
 }
 
+TEST_F(DocumentSourcePlanCacheStatsTest, SerializesAllHostsSuccessfullyAfterAbsorbingMatch) {
+    getExpCtx()->setFromRouter(true);
+    auto planCacheStats = DocumentSourcePlanCacheStats::createFromBson(
+        kAllHostsTrueSpecObj.firstElement(), getExpCtx());
+    auto match = DocumentSourceMatch::create(fromjson("{foo: 'bar'}"), getExpCtx());
+    auto pipeline = Pipeline::create({planCacheStats, match}, getExpCtx());
+    ASSERT_EQ(2u, pipeline->size());
+
+    pipeline->optimizePipeline();
+    ASSERT_EQ(1u, pipeline->size());
+
+    auto serialized = pipeline->serialize();
+    ASSERT_EQ(2u, serialized.size());
+    ASSERT_BSONOBJ_EQ(kAllHostsTrueSpecObj, serialized[0].getDocument().toBson());
+    ASSERT_BSONOBJ_EQ(fromjson("{$match: {foo: 'bar'}}"), serialized[1].getDocument().toBson());
+}
+
+TEST_F(DocumentSourcePlanCacheStatsTest,
+       SerializesAllHostsSuccessfullyAfterAbsorbingMatchForExplain) {
+    getExpCtx()->setFromRouter(true);
+    auto planCacheStats = DocumentSourcePlanCacheStats::createFromBson(
+        kAllHostsTrueSpecObj.firstElement(), getExpCtx());
+    auto match = DocumentSourceMatch::create(fromjson("{foo: 'bar'}"), getExpCtx());
+    auto pipeline = Pipeline::create({planCacheStats, match}, getExpCtx());
+    ASSERT_EQ(2u, pipeline->size());
+
+    pipeline->optimizePipeline();
+    ASSERT_EQ(1u, pipeline->size());
+
+    auto serialized = pipeline->writeExplainOps(kExplain);
+    ASSERT_EQ(1u, serialized.size());
+    ASSERT_BSONOBJ_EQ(fromjson("{$planCacheStats: {match: {foo: 'bar'}, allHosts: true}}"),
+                      serialized[0].getDocument().toBson());
+}
+
+TEST_F(DocumentSourcePlanCacheStatsTest, RedactsSuccessfullyAfterAbsorbingMatch) {
+    auto planCacheStats =
+        DocumentSourcePlanCacheStats::createFromBson(kEmptySpecObj.firstElement(), getExpCtx());
+    auto match = DocumentSourceMatch::create(fromjson("{foo: 'bar'}"), getExpCtx());
+    auto pipeline = Pipeline::create({planCacheStats, match}, getExpCtx());
+    ASSERT_EQ(2u, pipeline->size());
+
+    pipeline->optimizePipeline();
+    ASSERT_EQ(1u, pipeline->size());
+    auto serialized = redactToArray(*pipeline->getSources().front());
+    ASSERT_EQ(2u, serialized.size());
+
+    ASSERT_BSONOBJ_EQ(kAllHostsFalseSpecObj, serialized[0].getDocument().toBson());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({"$match":{"HASH<foo>":{"$eq":"?string"}}})",
+        serialized[1].getDocument().toBson().getOwned());
+}
+
 TEST_F(DocumentSourcePlanCacheStatsTest, ReturnsImmediateEOFWithEmptyPlanCache) {
-    getExpCtx()->mongoProcessInterface =
-        std::make_shared<PlanCacheStatsMongoProcessInterface>(std::vector<BSONObj>{});
-    const auto specObj = fromjson("{$planCacheStats: {}}");
-    auto stage = DocumentSourcePlanCacheStats::createFromBson(specObj.firstElement(), getExpCtx());
+    getExpCtx()->setMongoProcessInterface(
+        std::make_shared<PlanCacheStatsMongoProcessInterface>(std::vector<BSONObj>{}));
+    auto source =
+        DocumentSourcePlanCacheStats::createFromBson(kEmptySpecObj.firstElement(), getExpCtx());
+    auto stage = exec::agg::buildStage(source);
     ASSERT(stage->getNext().isEOF());
     ASSERT(stage->getNext().isEOF());
 }
 
 TEST_F(DocumentSourcePlanCacheStatsTest, ReturnsOnlyMatchingStatsAfterAbsorbingMatch) {
     std::vector<BSONObj> stats{BSONObj(),
-                               BSON("foo"
-                                    << "bar"),
-                               BSON("foo"
-                                    << "baz"),
-                               BSON("foo"
-                                    << "bar"
-                                    << "match" << true)};
-    getExpCtx()->mongoProcessInterface =
-        std::make_shared<PlanCacheStatsMongoProcessInterface>(stats);
+                               BSON("foo" << "bar"),
+                               BSON("foo" << "baz"),
+                               BSON("foo" << "bar"
+                                          << "match" << true)};
+    getExpCtx()->setMongoProcessInterface(
+        std::make_shared<PlanCacheStatsMongoProcessInterface>(stats));
 
-    const auto specObj = fromjson("{$planCacheStats: {}}");
     auto planCacheStats =
-        DocumentSourcePlanCacheStats::createFromBson(specObj.firstElement(), getExpCtx());
+        DocumentSourcePlanCacheStats::createFromBson(kEmptySpecObj.firstElement(), getExpCtx());
     auto match = DocumentSourceMatch::create(fromjson("{foo: 'bar'}"), getExpCtx());
     auto pipeline = Pipeline::create({planCacheStats, match}, getExpCtx());
     pipeline->optimizePipeline();
+    auto execPipeline = exec::agg::buildPipeline(pipeline->freeze());
 
-    ASSERT_BSONOBJ_EQ(pipeline->getNext()->toBson(),
-                      BSON("foo"
-                           << "bar"
-                           << "host"
-                           << "testHostName"));
-    ASSERT_BSONOBJ_EQ(pipeline->getNext()->toBson(),
-                      BSON("foo"
-                           << "bar"
-                           << "match" << true << "host"
-                           << "testHostName"));
-    ASSERT(!pipeline->getNext());
+    ASSERT_BSONOBJ_EQ(execPipeline->getNext()->toBson(),
+                      BSON("foo" << "bar"
+                                 << "host"
+                                 << "testHostName"));
+    ASSERT_BSONOBJ_EQ(execPipeline->getNext()->toBson(),
+                      BSON("foo" << "bar"
+                                 << "match" << true << "host"
+                                 << "testHostName"));
+    ASSERT(!execPipeline->getNext());
 }
 
 TEST_F(DocumentSourcePlanCacheStatsTest, ReturnsHostNameWhenNotFromMongos) {
-    std::vector<BSONObj> stats{BSON("foo"
-                                    << "bar"),
-                               BSON("foo"
-                                    << "baz")};
-    getExpCtx()->mongoProcessInterface =
-        std::make_shared<PlanCacheStatsMongoProcessInterface>(stats);
+    std::vector<BSONObj> stats{BSON("foo" << "bar"), BSON("foo" << "baz")};
+    getExpCtx()->setMongoProcessInterface(
+        std::make_shared<PlanCacheStatsMongoProcessInterface>(stats));
 
-    const auto specObj = fromjson("{$planCacheStats: {}}");
     auto planCacheStats =
-        DocumentSourcePlanCacheStats::createFromBson(specObj.firstElement(), getExpCtx());
+        DocumentSourcePlanCacheStats::createFromBson(kEmptySpecObj.firstElement(), getExpCtx());
     auto pipeline = Pipeline::create({planCacheStats}, getExpCtx());
-    ASSERT_BSONOBJ_EQ(pipeline->getNext()->toBson(),
-                      BSON("foo"
-                           << "bar"
-                           << "host"
-                           << "testHostName"));
-    ASSERT_BSONOBJ_EQ(pipeline->getNext()->toBson(),
-                      BSON("foo"
-                           << "baz"
-                           << "host"
-                           << "testHostName"));
-    ASSERT(!pipeline->getNext());
+    auto execPipeline = exec::agg::buildPipeline(pipeline->freeze());
+    ASSERT_BSONOBJ_EQ(execPipeline->getNext()->toBson(),
+                      BSON("foo" << "bar"
+                                 << "host"
+                                 << "testHostName"));
+    ASSERT_BSONOBJ_EQ(execPipeline->getNext()->toBson(),
+                      BSON("foo" << "baz"
+                                 << "host"
+                                 << "testHostName"));
+    ASSERT(!execPipeline->getNext());
 }
 
 TEST_F(DocumentSourcePlanCacheStatsTest, ReturnsShardAndHostNameWhenFromMongos) {
-    std::vector<BSONObj> stats{BSON("foo"
-                                    << "bar"),
-                               BSON("foo"
-                                    << "baz")};
-    getExpCtx()->mongoProcessInterface =
-        std::make_shared<PlanCacheStatsMongoProcessInterface>(stats);
-    getExpCtx()->fromMongos = true;
+    std::vector<BSONObj> stats{BSON("foo" << "bar"), BSON("foo" << "baz")};
+    getExpCtx()->setMongoProcessInterface(
+        std::make_shared<PlanCacheStatsMongoProcessInterface>(stats));
+    getExpCtx()->setFromRouter(true);
 
-    const auto specObj = fromjson("{$planCacheStats: {}}");
     auto planCacheStats =
-        DocumentSourcePlanCacheStats::createFromBson(specObj.firstElement(), getExpCtx());
+        DocumentSourcePlanCacheStats::createFromBson(kEmptySpecObj.firstElement(), getExpCtx());
     auto pipeline = Pipeline::create({planCacheStats}, getExpCtx());
-    ASSERT_BSONOBJ_EQ(pipeline->getNext()->toBson(),
-                      BSON("foo"
-                           << "bar"
-                           << "host"
-                           << "testHostName"
-                           << "shard"
-                           << "testShardName"));
-    ASSERT_BSONOBJ_EQ(pipeline->getNext()->toBson(),
-                      BSON("foo"
-                           << "baz"
-                           << "host"
-                           << "testHostName"
-                           << "shard"
-                           << "testShardName"));
-    ASSERT(!pipeline->getNext());
+    auto execPipeline = exec::agg::buildPipeline(pipeline->freeze());
+    ASSERT_BSONOBJ_EQ(execPipeline->getNext()->toBson(),
+                      BSON("foo" << "bar"
+                                 << "host"
+                                 << "testHostName"
+                                 << "shard"
+                                 << "testShardName"));
+    ASSERT_BSONOBJ_EQ(execPipeline->getNext()->toBson(),
+                      BSON("foo" << "baz"
+                                 << "host"
+                                 << "testHostName"
+                                 << "shard"
+                                 << "testShardName"));
+    ASSERT(!execPipeline->getNext());
 }
 
 }  // namespace mongo

@@ -29,8 +29,26 @@
 
 #pragma once
 
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/local_catalog/collection_catalog.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/write_ops/parsed_writes_common.h"
+#include "mongo/db/query/write_ops/write_ops_gen.h"
+#include "mongo/db/query/write_ops/write_ops_parsers.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/db/timeseries/timeseries_options.h"
+#include "mongo/util/assert_util.h"
+
+#include <cstddef>
+#include <functional>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::timeseries {
 /**
@@ -45,13 +63,40 @@ BSONObj translateQuery(const BSONObj& query, StringData metaField);
  * Translates the given update on the time-series collection to an update on the time-series
  * collection's underlying buckets collection. Creates and returns a translated UpdateModification
  * where all occurrences of metaField in updateMod are replaced with the literal "meta". Requires
- * that updateMod is an update document and that the given metaField is not empty.
+ * that updateMod is an update document and that the given metaField is not empty. Returns an
+ * invalid status if the update cannot be translated.
  */
-write_ops::UpdateModification translateUpdate(const write_ops::UpdateModification& updateMod,
-                                              StringData metaField);
+StatusWith<write_ops::UpdateModification> translateUpdate(
+    const write_ops::UpdateModification& updateMod, boost::optional<StringData> metaField);
 
 /**
  * Returns the function to use to count the number of documents updated or deleted.
  */
 std::function<size_t(const BSONObj&)> numMeasurementsForBucketCounter(StringData timeField);
+
+/**
+ * Translates the query into a query on the time-series collection's underlying buckets collection
+ * and splits out the meta field predicate out of the query and renames it to 'meta'.
+ */
+BSONObj getBucketLevelPredicateForRouting(const BSONObj& originalQuery,
+                                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                          const TimeseriesOptions& tsOptions,
+                                          bool allowArbitraryWrites);
+
+/**
+ * Returns the match expressions for the bucket and residual filters for a timeseries write
+ * operation.
+ */
+TimeseriesWritesQueryExprs getMatchExprsForWrites(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const TimeseriesOptions& tsOptions,
+    const BSONObj& writeQuery,
+    bool fixedBuckets);
+
+/**
+ * Returns a basic match expression checking against closed buckets for meta-only updates/deletes
+ */
+std::unique_ptr<MatchExpression> addClosedBucketExclusionExpr(
+    std::unique_ptr<MatchExpression> base);
+
 }  // namespace mongo::timeseries

@@ -9,10 +9,8 @@
  * ]
  */
 
-(function() {
-'use strict';
-
-load("jstests/replsets/rslib.js");
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {isConfigCommitted} from "jstests/replsets/rslib.js";
 
 function runTest(hasArbiter) {
     jsTestLog("Running test with hasArbiter: " + tojson(hasArbiter));
@@ -56,4 +54,3 @@ function runTest(hasArbiter) {
 
 runTest(false /* hasArbiter */);
 runTest(true /* hasArbiter */);
-})();

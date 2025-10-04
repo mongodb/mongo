@@ -1,6 +1,9 @@
 // Verify that an aggregate with $geoNear always uses the index hinted to the aggregate command.
-(function() {
-"use strict";
+// @tags: [
+//  does_not_support_repeated_reads,
+// ]
+
+import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const collName = jsTest.name();
 const coll = db[collName];
@@ -11,8 +14,7 @@ const simpleGeoNearIndexName = "simpleGeoNearIndex";
 const compoundGeoNearIndexName = "compoundGeoNearIndex";
 
 assert.commandWorked(coll.insert({_id: "1", state: "ACTIVE", location: [106, 10], name: "TEST"}));
-assert.commandWorked(
-    coll.createIndex({_id: 1, location: "2dsphere", state: 1}, {name: compoundGeoNearIndexName}));
+assert.commandWorked(coll.createIndex({_id: 1, location: "2dsphere", state: 1}, {name: compoundGeoNearIndexName}));
 assert.commandWorked(coll.createIndex({location: "2dsphere"}, {name: simpleGeoNearIndexName}));
 
 const pipeline = [
@@ -22,10 +24,10 @@ const pipeline = [
             spherical: true,
             near: {coordinates: [106.65589, 10.787627], type: "Point"},
             distanceField: "distance",
-            key: "location"
-        }
+            key: "location",
+        },
     },
-    {$project: {id: 1, name: 1, distance: 1}}
+    {$project: {id: 1, name: 1, distance: 1}},
 ];
 
 // Run the aggregate with two different hinted indexes and confirm that the hinted index gets
@@ -37,6 +39,12 @@ for (const indexHint of [simpleGeoNearIndexName, compoundGeoNearIndexName]) {
     const aggResult = coll.aggregate(pipeline, {hint: indexHint});
     assert.eq(1, aggResult.itcount());
 
+    const explain = coll.explain("executionStats").aggregate(pipeline, {hint: indexHint});
+    const winningPlan = getWinningPlanFromExplain(explain);
+    for (let indexScan of getPlanStages(winningPlan, "IXSCAN")) {
+        assert.eq(indexScan.indexName, indexHint, indexScan);
+    }
+
     // Run $indexStats and limit the results to the hinted index.
     const indexStats = coll.aggregate([{$indexStats: {}}, {$match: {name: indexHint}}]).toArray();
 
@@ -47,7 +55,6 @@ for (const indexHint of [simpleGeoNearIndexName, compoundGeoNearIndexName]) {
         assert(indexEntry.hasOwnProperty("accesses"), indexStats);
         const indexAccesses = indexEntry["accesses"];
         assert(indexAccesses.hasOwnProperty("ops"), indexStats);
-        assert.eq(1, indexAccesses["ops"], indexStats);
+        assert.gte(indexAccesses["ops"], 1, indexStats);
     }
 }
-}());

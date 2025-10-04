@@ -5,22 +5,22 @@ All but the last argument are input tracefiles or .txt files which list tracefil
 The last argument is the tracefile to which the output will be written.
 """
 
-import subprocess
 import os
+import subprocess
 import sys
 from optparse import OptionParser
 
 
 def aggregate(inputs, output):
     """Aggregate the tracefiles given in inputs to a tracefile given by output."""
-    args = ['lcov']
+    args = ["lcov"]
 
     for name in inputs:
-        args += ['-a', name]
+        args += ["-a", name]
 
-    args += ['-o', output]
+    args += ["-o", output]
 
-    print(' '.join(args))
+    print(" ".join(args))
 
     return subprocess.call(args)
 
@@ -46,11 +46,11 @@ def main():
     for path in args[:-1]:
         _, ext = os.path.splitext(path)
 
-        if ext == '.info':
+        if ext == ".info":
             if getfilesize(path) > 0:
                 inputs.append(path)
 
-        elif ext == '.txt':
+        elif ext == ".txt":
             inputs += [line.strip() for line in open(path) if getfilesize(line.strip()) > 0]
         else:
             return "unrecognized file type"
@@ -58,5 +58,5 @@ def main():
     return aggregate(inputs, args[-1])
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

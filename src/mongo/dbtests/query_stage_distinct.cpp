@@ -27,46 +27,64 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/client/dbclient_cursor.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/index_catalog.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/exec/distinct_scan.h"
-#include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/json.h"
+#include "mongo/db/exec/classic/distinct_scan.h"
+#include "mongo/db/exec/classic/plan_stage.h"
+#include "mongo/db/exec/classic/working_set.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/index_bounds_builder.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
+#include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
+#include "mongo/db/query/compiler/physical_model/interval/interval.h"
 #include "mongo/db/query/plan_executor.h"
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/db/service_context.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+
+#include <cstddef>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 /**
  * This file tests db/exec/distinct.cpp
  */
 
+namespace mongo {
 namespace QueryStageDistinct {
 
-static const NamespaceString nss{"unittests.QueryStageDistinct"};
+static const NamespaceString nss =
+    NamespaceString::createNamespaceString_forTest("unittests.QueryStageDistinct");
 
 class DistinctBase {
 public:
     DistinctBase()
-        : _expCtx(make_intrusive<ExpressionContext>(&_opCtx, nullptr, nss)), _client(&_opCtx) {}
+        : _expCtx(ExpressionContextBuilder{}.opCtx(&_opCtx).ns(nss).build()), _client(&_opCtx) {}
 
     virtual ~DistinctBase() {
-        _client.dropCollection(nss.ns());
+        _client.dropCollection(nss);
     }
 
     void addIndex(const BSONObj& obj) {
-        ASSERT_OK(dbtests::createIndex(&_opCtx, nss.ns(), obj));
+        ASSERT_OK(dbtests::createIndex(&_opCtx, nss.ns_forTest(), obj));
     }
 
     void insert(const BSONObj& obj) {
-        _client.insert(nss.ns(), obj);
+        _client.insert(nss, obj);
     }
 
     /**
@@ -105,11 +123,20 @@ private:
     DBDirectClient _client;
 };
 
+CollectionAcquisition acquireCollForRead(OperationContext* opCtx, const NamespaceString& nss) {
+    return acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(nss,
+                                     PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kRead),
+        MODE_IS);
+}
 
 // Tests distinct with single key indices.
 class QueryStageDistinctBasic : public DistinctBase {
 public:
-    virtual ~QueryStageDistinctBasic() {}
+    ~QueryStageDistinctBasic() override {}
 
     void run() {
         // Insert a ton of documents with a: 1
@@ -125,15 +152,16 @@ public:
         // Make an index on a:1
         addIndex(BSON("a" << 1));
 
-        AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
-        const CollectionPtr& coll = ctx.getCollection();
+        const auto collection = acquireCollForRead(&_opCtx, nss);
+        const CollectionPtr& collPtr = collection.getCollectionPtr();
 
         // Set up the distinct stage.
         std::vector<const IndexDescriptor*> indexes;
-        coll->getIndexCatalog()->findIndexesByKeyPattern(&_opCtx, BSON("a" << 1), false, &indexes);
+        collPtr->getIndexCatalog()->findIndexesByKeyPattern(
+            &_opCtx, BSON("a" << 1), IndexCatalog::InclusionPolicy::kReady, &indexes);
         ASSERT_EQ(indexes.size(), 1U);
 
-        DistinctParams params{&_opCtx, coll, indexes[0]};
+        DistinctParams params{&_opCtx, collPtr, indexes[0]};
         params.scanDirection = 1;
         // Distinct-ing over the 0-th field of the keypattern.
         params.fieldNo = 0;
@@ -144,7 +172,7 @@ public:
         params.bounds.fields.push_back(oil);
 
         WorkingSet ws;
-        DistinctScan distinct(_expCtx.get(), coll, std::move(params), &ws);
+        DistinctScan distinct(_expCtx.get(), collection, std::move(params), &ws);
 
         WorkingSetID wsid;
         // Get our first result.
@@ -175,7 +203,7 @@ public:
 // Tests distinct with multikey indices.
 class QueryStageDistinctMultiKey : public DistinctBase {
 public:
-    virtual ~QueryStageDistinctMultiKey() {}
+    ~QueryStageDistinctMultiKey() override {}
 
     void run() {
         // Insert a ton of documents with a: [1, 2, 3]
@@ -191,15 +219,15 @@ public:
         // Make an index on a:1
         addIndex(BSON("a" << 1));
 
-        AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
-        const CollectionPtr& coll = ctx.getCollection();
+        const auto coll = acquireCollForRead(&_opCtx, nss);
 
         // Set up the distinct stage.
         std::vector<const IndexDescriptor*> indexes;
-        coll->getIndexCatalog()->findIndexesByKeyPattern(&_opCtx, BSON("a" << 1), false, &indexes);
-        verify(indexes.size() == 1);
+        coll.getCollectionPtr()->getIndexCatalog()->findIndexesByKeyPattern(
+            &_opCtx, BSON("a" << 1), IndexCatalog::InclusionPolicy::kReady, &indexes);
+        MONGO_verify(indexes.size() == 1);
 
-        DistinctParams params{&_opCtx, coll, indexes[0]};
+        DistinctParams params{&_opCtx, coll.getCollectionPtr(), indexes[0]};
         ASSERT_TRUE(params.isMultiKey);
 
         params.scanDirection = 1;
@@ -258,15 +286,14 @@ public:
 
         addIndex(BSON("a" << 1 << "b" << 1));
 
-        AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
-        const CollectionPtr& coll = ctx.getCollection();
+        const auto coll = acquireCollForRead(&_opCtx, nss);
 
         std::vector<const IndexDescriptor*> indices;
-        coll->getIndexCatalog()->findIndexesByKeyPattern(
-            &_opCtx, BSON("a" << 1 << "b" << 1), false, &indices);
+        coll.getCollectionPtr()->getIndexCatalog()->findIndexesByKeyPattern(
+            &_opCtx, BSON("a" << 1 << "b" << 1), IndexCatalog::InclusionPolicy::kReady, &indices);
         ASSERT_EQ(1U, indices.size());
 
-        DistinctParams params{&_opCtx, coll, indices[0]};
+        DistinctParams params{&_opCtx, coll.getCollectionPtr(), indices[0]};
 
         params.scanDirection = 1;
         params.fieldNo = 1;
@@ -305,17 +332,18 @@ public:
 // XXX: add a test case with bounds where skipping to the next key gets us a result that's not
 // valid w.r.t. our query.
 
-class All : public OldStyleSuiteSpecification {
+class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("query_stage_distinct") {}
 
-    void setupTests() {
+    void setupTests() override {
         add<QueryStageDistinctBasic>();
         add<QueryStageDistinctMultiKey>();
         add<QueryStageDistinctCompoundIndex>();
     }
 };
 
-OldStyleSuiteInitializer<All> queryStageDistinctAll;
+unittest::OldStyleSuiteInitializer<All> queryStageDistinctAll;
 
 }  // namespace QueryStageDistinct
+}  // namespace mongo

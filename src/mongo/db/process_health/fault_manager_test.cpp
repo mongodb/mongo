@@ -37,22 +37,21 @@ namespace mongo {
 namespace process_health {
 
 using test::FaultManagerTest;
-using test::FaultManagerTestImpl;
 
 namespace {
 
-TEST(FaultManagerTest, Registration) {
+TEST(SimpleFaultManagerTest, Registration) {
     auto serviceCtx = ServiceContext::make();
     ASSERT_TRUE(FaultManager::get(serviceCtx.get()));
 }
 
 // Tests the default health observer intensity of non-critical
 TEST_F(FaultManagerTest, GetHealthObserverIntensity) {
-    auto config = manager().getConfig();
+    auto& config = manager().getConfig();
     ASSERT(config.getHealthObserverIntensity(FaultFacetType::kLdap) ==
-           HealthObserverIntensityEnum::kNonCritical);
+           HealthObserverIntensityEnum::kOff);
     ASSERT(config.getHealthObserverIntensity(FaultFacetType::kDns) ==
-           HealthObserverIntensityEnum::kNonCritical);
+           HealthObserverIntensityEnum::kOff);
 }
 
 }  // namespace

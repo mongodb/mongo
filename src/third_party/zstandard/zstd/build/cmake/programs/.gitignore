@@ -1,0 +1,5 @@
+# produced by make
+zstd
+zstd-frugal
+unzstd
+zstdcat

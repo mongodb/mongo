@@ -1,0 +1,13 @@
+# Temporary suites to assists the development of new viewless timeseries collection.
+# Run all timeseries tests in the noPassthrough suite with
+# CreateViewlessTimeseriesCollection feature flag enabled.
+#
+# TODO SERVER-101590: remove this temporary suite and all its usages.
+base_suite: no_passthrough
+overrides:
+  - "viewless_timeseries.only_validated_no_passthrough_timeseries_tests_selector"
+  - "viewless_timeseries.enable_viewless_timeseries_feature_flag_testdata_parameter_mongod"
+  - "viewless_timeseries.enable_viewless_timeseries_feature_flag_testdata_parameter_mongos"
+
+excludes:
+  - "viewless_timeseries.exclude_viewless_timeseries_incompabile_tag"

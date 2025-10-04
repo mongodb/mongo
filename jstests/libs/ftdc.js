@@ -1,73 +1,114 @@
 /**
  * Utility test functions for FTDC
  */
-'use strict';
+
+import {isClusterNode, isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
+export function getParameter(adminDb, field) {
+    let q = {getParameter: 1};
+    q[field] = 1;
+
+    let ret = adminDb.runCommand(q);
+    return ret[field];
+}
+
+export function setParameter(adminDb, obj) {
+    let o = Object.extend({setParameter: 1}, obj, true);
+    return adminDb.runCommand(Object.extend({setParameter: 1}, obj));
+}
+
+/**
+ * `has(obj, "foo", "bar", "baz")` returns whether `obj.foo.bar.baz` exists.
+ */
+function has(object, ...properties) {
+    if (properties.length === 0) {
+        return true;
+    }
+    const [prop, ...rest] = properties;
+    return object.hasOwnProperty(prop) && has(object[prop], ...rest);
+}
+
+/**
+ * Returns an array of predicate functions used by `verifyGetDiagnosticData` to
+ * determine whether the response returned for "getDiagnosticData" is as
+ * expected.
+ */
+function getCriteriaForGetDiagnosticData(data) {
+    let criteria = [];
+
+    criteria.push(() => has(data, "start"));
+    criteria.push(() => has(data, "serverStatus"));
+    criteria.push(() => has(data, "end"));
+
+    return criteria;
+}
 
 /**
  * Verify that getDiagnosticData is working correctly.
  */
-function verifyGetDiagnosticData(adminDb) {
-    // We need to retry a few times if run this test immediately after mongod is started as FTDC may
-    // not have run yet.
-    var foundGoodDocument = false;
-
-    for (var i = 0; i < 60 && foundGoodDocument == false; ++i) {
-        var result = adminDb.runCommand("getDiagnosticData");
+export function verifyGetDiagnosticData(adminDb, logData = true) {
+    const maxAttempts = 60;
+    const retryMillis = 500;
+    // We need to retry a few times in case we're running this test immediately
+    // after mongod is started. FTDC may not have run yet, or some collectors
+    // might have timed out initially and so be missing from the response.
+    for (let attempt = 1; ; ++attempt) {
+        const result = adminDb.runCommand("getDiagnosticData");
         assert.commandWorked(result);
-
-        var data = result.data;
-
-        if (!data.hasOwnProperty("start")) {
-            // Wait a little longer for FTDC to start
-            jsTestLog("Running getDiagnosticData: " + tojson(result));
-
-            sleep(500);
-        } else {
-            // Check for a few common properties to ensure we got data
-            assert(data.hasOwnProperty("serverStatus"),
-                   "does not have 'serverStatus' in '" + tojson(data) + "'");
-            assert(data.hasOwnProperty("end"), "does not have 'end' in '" + tojson(data) + "'");
-
-            foundGoodDocument = true;
-
-            jsTestLog("Got good getDiagnosticData: " + tojson(result));
+        const data = result.data;
+        const criteria = getCriteriaForGetDiagnosticData(data);
+        // results :: {[some predicate]: bool result, ...}
+        const results = criteria.reduce((results, predicate) => {
+            results[predicate.toString()] = predicate();
+            return results;
+        }, {});
+        if (Object.values(results).indexOf(false) === -1) {
+            // all predicates are satisfied
+            if (logData) {
+                jsTestLog("getDiagnosticData response met all criteria: " + tojson({criteria: results}));
+            }
+            return data;
         }
+
+        assert(
+            attempt < maxAttempts,
+            `getDiagnosticData response failed to satisfy criteria after ${maxAttempts} attempts: ` +
+                tojson({criteria: results, data}),
+        );
+
+        jsTestLog(
+            `getDiagnosticData response did not satisfy one or more criteria. Trying again in ${
+                retryMillis
+            } milliseconds (attempt ${attempt}/${maxAttempts}). Criteria: ` + tojson(results),
+        );
+        sleep(retryMillis);
     }
-
-    assert(foundGoodDocument,
-           "getDiagnosticData failed to return a non-empty command, is FTDC running?");
-
-    return data;
 }
 
 /**
  * Validate all the common FTDC parameters are set correctly and can be manipulated.
  */
-function verifyCommonFTDCParameters(adminDb, isEnabled) {
+export function verifyCommonFTDCParameters(adminDb, isEnabled) {
     // Are we running against MongoS?
-    var isMongos = ("isdbgrid" == adminDb.runCommand("ismaster").msg);
+    let isMongos = "isdbgrid" == adminDb.runCommand("ismaster").msg;
 
     // Check the defaults are correct
     //
     function getparam(field) {
-        var q = {getParameter: 1};
-        q[field] = 1;
-
-        var ret = adminDb.runCommand(q);
-        return ret[field];
+        return getParameter(adminDb, field);
     }
 
     // Verify the defaults are as we documented them
     assert.eq(getparam("diagnosticDataCollectionEnabled"), isEnabled);
     assert.eq(getparam("diagnosticDataCollectionPeriodMillis"), 1000);
-    assert.eq(getparam("diagnosticDataCollectionDirectorySizeMB"), 200);
+    assert.eq(getparam("diagnosticDataCollectionDirectorySizeMB"), 250);
     assert.eq(getparam("diagnosticDataCollectionFileSizeMB"), 10);
     assert.eq(getparam("diagnosticDataCollectionSamplesPerChunk"), 300);
     assert.eq(getparam("diagnosticDataCollectionSamplesPerInterimUpdate"), 10);
 
     function setparam(obj) {
-        var ret = adminDb.runCommand(Object.extend({setParameter: 1}, obj));
-        return ret;
+        return setParameter(adminDb, obj);
     }
 
     if (!isMongos) {
@@ -98,8 +139,20 @@ function verifyCommonFTDCParameters(adminDb, isEnabled) {
 
     // Reset
     assert.commandWorked(setparam({"diagnosticDataCollectionFileSizeMB": 10}));
-    assert.commandWorked(setparam({"diagnosticDataCollectionDirectorySizeMB": 200}));
+    assert.commandWorked(setparam({"diagnosticDataCollectionDirectorySizeMB": 250}));
     assert.commandWorked(setparam({"diagnosticDataCollectionPeriodMillis": 1000}));
     assert.commandWorked(setparam({"diagnosticDataCollectionSamplesPerChunk": 300}));
     assert.commandWorked(setparam({"diagnosticDataCollectionSamplesPerInterimUpdate": 10}));
+}
+
+export function waitFailedToStart(pid, exitCode) {
+    assert.soon(
+        function () {
+            return !checkProgram(pid).alive;
+        },
+        `Failed to wait for ${pid} to die`,
+        30 * 1000,
+    );
+
+    assert.eq(exitCode, checkProgram(pid).exitCode, `Failed to wait for ${pid} to die with exit code ${exitCode}`);
 }

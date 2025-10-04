@@ -52,7 +52,7 @@ BUG REPORTS
 
 PACKAGING
 
-  Packages are created dynamically by the package.py script located in the
+  Packages are created dynamically by the packager.py script located in the
   buildscripts directory. This will generate RPM and Debian packages.
 
 DOCUMENTATION
@@ -83,5 +83,6 @@ LICENSE
   2018 are published under the AGPL. All versions released after October
   16, 2018, including patch fixes for prior versions, are published under
   the Server Side Public License (SSPL) v1. See individual files for
-  details.
+  details which will specify the license applicable to each file. Files
+  subject to the SSPL will be noted in their headers.
 

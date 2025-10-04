@@ -1,0 +1,133 @@
+/*! @page durability_checkpoint Checkpoint-level durability
+
+WiredTiger supports checkpoint durability by default, and optionally
+commit-level durability when logging is enabled.  In most applications,
+commit-level durability impacts performance more than checkpoint
+durability; checkpoints offer basic operation durability across
+application or system failure without impacting performance (although
+the creation of each checkpoint is a relatively heavy-weight operation).
+See @ref durability_log for information on commit-level durability.
+
+Checkpoints can be taken by the application via the WT_SESSION::checkpoint API.
+Alternatively checkpoints can be taken automatically by WiredTiger by
+providing the \c checkpoint configuration to
+::wiredtiger_open. The frequency of automatic checkpoints is controlled by
+two additional API settings: \c wait and \c log_size.
+The \c wait setting defines the interval, in seconds, between the end of the current
+checkpoint and the start of the next checkpoint. The \c log_size setting
+instructs WiredTiger to take a checkpoint when the number of bytes written
+to the log since the last checkpoint exceeds the size threshold. Both configurations
+can be used at the same time and a checkpoint will be taken whenever either
+threshold is met.  If using \c log_size to scheduled automatic checkpoints, we
+recommend the size selected be a multiple of the physical size of the underlying log
+file to more easily support automatic log file removal.
+
+@section checkpoint_snapshot Checkpoints vs. snapshots
+
+Here is a brief explanation of the terms "checkpoint" and "snapshot", as
+they are widely used in this manual. A checkpoint is an on-disk entity that
+captures the persistent state of some or all of the database, while a snapshot
+is a lightweight in-memory entity that captures the current state of pending
+updates in the cache. Isolation refers to snapshots, because isolation is about
+runtime state and which updates can be seen by other threads' transactions
+as they run. Durability refers to checkpoints, because durability is about
+on-disk persistence.  The two concepts are closely connected, of course;
+when a checkpoint is created the code involved uses a snapshot to determine
+which updates should and should not appear in the checkpoint.
+
+@section checkpoint_checkpoints Checkpoints
+
+A checkpoint is automatically created for each individual file whenever the last
+reference to a modified data source is closed.
+
+Checkpoints of the entire database can be explicitly created with the
+WT_SESSION::checkpoint method. Automatic database-wide checkpoints can be
+scheduled based on elapsed time or data size with the ::wiredtiger_open \c
+checkpoint configuration. In this mode of operation, an internal server thread
+is created to perform these checkpoints.
+
+All transactional updates committed before a checkpoint are made durable
+by the checkpoint, therefore the frequency of checkpoints limits the
+volume of data that may be lost due to application or system failure.
+
+Data sources that are involved in an exclusive operation when the checkpoint
+starts, including bulk load or salvage, will be skipped by the checkpoint.
+
+When a data source is first opened, it appears in the same state it was
+in when it was most recently checkpointed. In other words, updates after
+the most recent checkpoint (for example, in the case of failure), will not
+appear in the data source at checkpoint-level durability.  If no checkpoint
+is found when the data source is opened, the data source will appear empty.
+
+@section checkpoint_cursors Checkpoint cursors
+
+Cursors are normally opened in the live version of a data source.
+However, it is also possible to open a read-only, static view of the
+data source as of a checkpoint.
+This is done by passing the \c checkpoint configuration string to
+WT_SESSION::open_cursor. Checkpoint cursors can only be opened on application
+named checkpoints or on the latest checkpoint using "WiredTigerCheckpoint".
+This provides a limited form of time-travel, as the static
+view is not changed by subsequent checkpoints and will persist until
+the checkpoint cursor is closed.
+Checkpoint cursors ignore the currently running transaction; they are (in a
+sense) their own transactions.
+When timestamps are in use, a checkpoint cursor reads at the time
+associated with the checkpoint, which is normally the stable timestamp
+as of the time the checkpoint was taken.
+
+@section checkpoint_naming Checkpoint naming
+
+Checkpoints may optionally be given names by the application.
+Checkpoints named by the application persist until explicitly
+discarded or replaced with a new checkpoint by the same name.  (If an
+application attempts to replace an existing checkpoint, and it cannot be
+removed, either because a cursor is reading from the previous checkpoint, or
+because backups are in progress, the new checkpoint will fail and the previous
+checkpoint will remain.) Because named checkpoints persist until discarded or
+replaced, they can be used to save the state of the data for later use.
+
+Internal checkpoints, that is, checkpoints not named by the application, use the
+reserved name \c WiredTigerCheckpoint. (All checkpoint names beginning with this
+string are reserved.) Applications can open the most recent checkpoint (whether
+internal or named) by specifying \c WiredTigerCheckpoint as the checkpoint name to
+WT_SESSION::open_cursor.
+
+The name "all" is also reserved as it is used when dropping checkpoints.
+
+\warning
+Applications wanting a consistent view of the data in two separate tables must
+either use named checkpoints or explicitly control when checkpoints are taken,
+as there is a race between opening the default checkpoints in two different
+tables and a checkpoint operation replacing the default checkpoint in one of
+those tables.
+
+The \c -c option to the \c wt command line utility \c list command will list a
+data source's checkpoints, with time stamp, in a human-readable format.
+
+@section checkpoint_backup Checkpoint durability and backups
+
+Backups are done using backup cursors (see @ref backup for more information).
+
+\warning
+When applications are using checkpoint-level durability, checkpoints taken
+while a backup cursor is open are not durable. That is, if a crash occurs
+when a backup cursor is open, then the system will be restored to the most
+recent checkpoint prior to the opening of the backup cursor, even if later
+database checkpoints were completed. As soon as the backup cursor is closed,
+the system will again be restored to the most recent checkpoint taken.
+
+Applications using commit-level durability retain durability via the write-ahead
+log even though checkpoints taken while a backup cursor is open are not durable.
+All log files are retained once the backup cursor is opened and, in the event of
+a crash, all operations will be replayed to provide durability.
+
+@section checkpoint_compaction Checkpoints and file compaction
+
+Checkpoints share file blocks, and dropping a checkpoint may or may not
+make file blocks available for re-use, depending on whether the dropped
+checkpoint contained the last reference to those file blocks.  Because named
+checkpoints are not discarded until explicitly discarded or replaced, they may
+prevent WT_SESSION::compact from reducing file size due to shared file blocks.
+
+*/

@@ -29,11 +29,13 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/rpc/message.h"
+
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo::rpc {
 
@@ -85,10 +87,10 @@ public:
      *     This will happen with failpoint-induced errors or with "hello" commands,
      *     both of which are exempt from state change error rewriting.
      *
-     *   - doc contains no error nodes that need rewriting.
-     *       - NotPrimaryError codes always need rewriting.
-     *       - ShutdownError codes need rewriting unless this server is
-     *         shutting down.
+     *   - `doc` contains error nodes that need rewriting.
+     *       - Codes in the `NotPrimaryError` category always need rewriting.
+     *       - Codes in the `ShutdownError` category need rewriting unless this
+     *         server is shutting down.
      *
      * Any rewritten `code` is replaced by `HostUnreachable`, and associated
      * `codeName` replaced to be consistent with the new code. Additionally, the

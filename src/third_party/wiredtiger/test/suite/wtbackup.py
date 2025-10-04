@@ -29,6 +29,7 @@ import os, glob, shutil
 import wttest, wiredtiger
 from suite_subprocess import suite_subprocess
 from helper import compare_files
+from wiredtiger import stat
 
 # Shared base class used by backup tests.
 class backup_base(wttest.WiredTigerTestCase, suite_subprocess):
@@ -39,7 +40,8 @@ class backup_base(wttest.WiredTigerTestCase, suite_subprocess):
     # We use counter to produce unique backup ids for multiple iterations
     # of incremental backup.
     bkup_id = 0
-    # Setup some of the backup tests, and increments the backup id.
+    # Setup some of the backup tests, and increments the backup id. This should be updated in the
+    # test itself.
     initial_backup = False
     # Used for populate function.
     rows = 100
@@ -49,6 +51,15 @@ class backup_base(wttest.WiredTigerTestCase, suite_subprocess):
     logpath=''
     # Temporary directory used to verify consistent data between multiple incremental backups.
     home_tmp = "WT_TEST_TMP"
+
+    def backup_get_stat(self, stat_name, uri = None):
+        if uri == None:
+            stat_cursor = self.session.open_cursor('statistics:', None, None)
+        else:
+            stat_cursor = self.session.open_cursor('statistics:file:' + uri, None, None)
+        value = stat_cursor[stat_name][2]
+        stat_cursor.close()
+        return value
 
     #
     # Add data to the given uri.
@@ -74,12 +85,10 @@ class backup_base(wttest.WiredTigerTestCase, suite_subprocess):
     #
     # Populate a set of objects.
     #
-    def populate(self, objs, do_checkpoint=False, skiplsm=False):
+    def populate(self, objs, do_checkpoint=False):
         cg_config = ''
         for i in objs:
             if len(i) > 2:
-                if i[2] and skiplsm:
-                    continue
                 if i[2] == self.populate_big:
                     self.rows = 50000 # Big Object
                 else:
@@ -115,7 +124,7 @@ class backup_base(wttest.WiredTigerTestCase, suite_subprocess):
         # such that the test can now perform further incremental backups on the directory.
         if os.path.exists(home_incr):
             shutil.rmtree(home_incr)
-            shutil.copytree(self.home_tmp, self.home_incr)
+            shutil.copytree(self.home_tmp, home_incr)
         else:
             os.makedirs(home_incr + '/' + self.logpath)
 
@@ -147,16 +156,13 @@ class backup_base(wttest.WiredTigerTestCase, suite_subprocess):
         shutil.copy(copy_from, copy_to)
 
     #
-    # Uses a backup cursor to perform a full backup, by iterating through the cursor
-    # grabbing files to copy over into a given directory. When dealing with a test
-    # that performs multiple incremental backups, we initially perform a full backup
-    # on each incremental directory as a starting base.
-    # Optional arguments:
-    # backup_cur: A backup cursor that can be given into the function, but function caller
-    #    holds reponsibility of closing the cursor.
+    # Uses a backup cursor to perform a selective backup, by iterating through the cursor
+    # grabbing files that do not exist in the remove list to copy over into a given directory.
+    # When dealing with a test that performs multiple incremental backups, we need to perform a
+    # proper backup on each incremental directory as a starting base.
     #
-    def take_full_backup(self, backup_dir, backup_cur=None):
-        self.pr('Full backup to ' + backup_dir + ': ')
+    def take_selective_backup(self, backup_dir, remove_list, backup_cur=None):
+        self.pr('Selective backup to ' + backup_dir + ': ')
         bkup_c = backup_cur
         if backup_cur == None:
             config = None
@@ -164,13 +170,50 @@ class backup_base(wttest.WiredTigerTestCase, suite_subprocess):
                 config = 'incremental=(granularity=1M,enabled=true,this_id=ID0)'
             bkup_c = self.session.open_cursor('backup:', None, config)
         all_files = []
+
         # We cannot use 'for newfile in bkup_c:' usage because backup cursors don't have
         # values and adding in get_values returns ENOTSUP and causes the usage to fail.
         # If that changes then this, and the use of the duplicate below can change.
         while bkup_c.next() == 0:
             newfile = bkup_c.get_key()
             sz = os.path.getsize(newfile)
+            if (newfile in remove_list):
+                continue
             self.pr('Copy from: ' + newfile + ' (' + str(sz) + ') to ' + self.dir)
+            self.copy_file(newfile, backup_dir)
+            all_files.append(newfile)
+
+        if backup_cur == None:
+            bkup_c.close()
+        return all_files
+
+    #
+    # Uses a backup cursor to perform a full backup, by iterating through the cursor
+    # grabbing files to copy over into a given directory. When dealing with a test
+    # that performs multiple incremental backups, we initially perform a full backup
+    # on each incremental directory as a starting base.
+    # Optional arguments:
+    # backup_cur: A backup cursor that can be given into the function, but function caller
+    #    holds responsibility of closing the cursor.
+    #
+    def take_full_backup(self, backup_dir, backup_cur=None, home=None):
+        assert os.path.exists(backup_dir), f"The directory '{backup_dir}' does not exist"
+        self.pr(f"Full backup to '{backup_dir}'")
+        bkup_c = backup_cur
+        if backup_cur == None:
+            config = None
+            if self.initial_backup:
+                config = 'incremental=(granularity=1M,enabled=true,this_id=ID0)'
+            bkup_c = self.session.open_cursor('backup:', None, config)
+        all_files = []
+        self.assertEqual(1, self.backup_get_stat(stat.conn.backup_cursor_open))
+        # We cannot use 'for newfile in bkup_c:' usage because backup cursors don't have
+        # values and adding in get_values returns ENOTSUP and causes the usage to fail.
+        # If that changes then this, and the use of the duplicate below can change.
+        while bkup_c.next() == 0:
+            newfile = bkup_c.get_key() if home is None else f'{self.conn.get_home()}/{bkup_c.get_key()}'
+            sz = os.path.getsize(newfile)
+            self.pr(f'Copy from: {newfile} ({sz}) to {backup_dir}')
             self.copy_file(newfile, backup_dir)
             all_files.append(newfile)
         if backup_cur == None:
@@ -189,13 +232,18 @@ class backup_base(wttest.WiredTigerTestCase, suite_subprocess):
         if os.path.exists(base_out):
             os.remove(base_out)
 
-        # Run wt dump on base backup directory
+        # Run wt dump and verify on base directory.
         self.runWt(['-R', '-h', base_dir, 'dump', uri], outfilename=base_out)
+        self.runWt(['-R', '-h', base_dir, 'verify', '-S', uri])
+
         other_out = "./backup_other" + sfx
         if os.path.exists(other_out):
             os.remove(other_out)
-        # Run wt dump on incremental backup
+
+        # Run the same commands on the second directory.
         self.runWt(['-R', '-h', other_dir, 'dump', uri], outfilename=other_out)
+        self.runWt(['-R', '-h', other_dir, 'verify', '-S', uri])
+
         self.pr("compare_files: " + base_out + ", " + other_out)
         self.assertEqual(True, compare_files(self, base_out, other_out))
 
@@ -248,11 +296,14 @@ class backup_base(wttest.WiredTigerTestCase, suite_subprocess):
         self.pr('Open incremental cursor with ' + config)
         # For each file listed, open a duplicate backup cursor and copy the blocks.
         incr_c = self.session.open_cursor(None, bkup_c, config)
-        # For consolidate
+        self.assertEqual(1, self.backup_get_stat(stat.conn.backup_dup_open))
+        # Array of lengths used for consolidate.
         lens = []
         # We cannot use 'for newfile in incr_c:' usage because backup cursors don't have
         # values and adding in get_values returns ENOTSUP and causes the usage to fail.
         # If that changes then this, and the use of the duplicate below can change.
+        did_work = False
+        first = True
         while incr_c.next() == 0:
             incrlist = incr_c.get_keys()
             offset = incrlist[0]
@@ -261,15 +312,50 @@ class backup_base(wttest.WiredTigerTestCase, suite_subprocess):
             self.assertTrue(curtype == wiredtiger.WT_BACKUP_FILE or curtype == wiredtiger.WT_BACKUP_RANGE)
             if curtype == wiredtiger.WT_BACKUP_FILE:
                 sz = os.path.getsize(newfile)
-                self.pr('Copy from: ' + newfile + ' (' + str(sz) + ') to ' + backup_incr_dir)
+                self.pr(f'Copy from: {newfile} ({sz}) to {backup_incr_dir}')
                 # Copy the whole file.
                 self.copy_file(newfile, backup_incr_dir)
             else:
+                # We can count backup dsrc statistics in the range case. Initialize here.
+                if first:
+                    # Get connection statistic before walking the cursor.
+                    last_blocks = self.backup_get_stat(stat.conn.backup_blocks)
+                    last_comp = self.backup_get_stat(stat.dsrc.backup_blocks_compressed, newfile)
+                    last_uncomp = self.backup_get_stat(stat.dsrc.backup_blocks_uncompressed, newfile)
+                    first = False
                 # Copy the block range.
-                self.pr('Range copy file ' + newfile + ' offset ' + str(offset) + ' len ' + str(size))
+                self.pr(f"Range copy file '{newfile}' offset {offset} len {size}")
                 self.range_copy(newfile, offset, size, backup_incr_dir, consolidate)
                 lens.append(size)
+                did_work = True
+                # Check backup stats.
+                blocks = self.backup_get_stat(stat.conn.backup_blocks)
+                blocks_diff = blocks - last_blocks
+                self.pr(f"{newfile}: Start {last_blocks} range copy end {blocks}, total blocks {blocks_diff}")
+
+                # Connection stats should track for compressed and uncompressed should
+                # track the total changed.
+                comp = self.backup_get_stat(stat.conn.backup_blocks_compressed)
+                uncomp = self.backup_get_stat(stat.conn.backup_blocks_uncompressed)
+                self.assertEqual(blocks, comp + uncomp)
+                # Now check the same data source stats. The change for this range copy
+                # should track the difference for this file.
+                comp = self.backup_get_stat(stat.dsrc.backup_blocks_compressed, newfile)
+                uncomp = self.backup_get_stat(stat.dsrc.backup_blocks_uncompressed, newfile)
+                comp_diff = comp - last_comp
+                uncomp_diff = uncomp - last_uncomp
+                self.assertEqual(blocks_diff, comp_diff + uncomp_diff)
+                last_blocks = blocks
+                last_comp = comp
+                last_uncomp = uncomp
         incr_c.close()
+        self.assertEqual(0, self.backup_get_stat(stat.conn.backup_dup_open))
+        if did_work:
+            blocks = self.backup_get_stat(stat.conn.backup_blocks)
+            self.assertNotEqual(0, blocks)
+            comp = self.backup_get_stat(stat.conn.backup_blocks_compressed)
+            uncomp = self.backup_get_stat(stat.conn.backup_blocks_uncompressed)
+            self.assertEqual(blocks, comp + uncomp)
         return lens
 
     #
@@ -282,13 +368,14 @@ class backup_base(wttest.WiredTigerTestCase, suite_subprocess):
         if log_cursor == None:
             config = 'target=("log:")'
             dupc = self.session.open_cursor(None, bkup_c, config)
+            self.assertEqual(1, self.backup_get_stat(stat.conn.backup_dup_open))
         dup_logs = []
         while dupc.next() == 0:
             newfile = dupc.get_key()
             self.assertTrue("WiredTigerLog" in newfile)
             sz = os.path.getsize(newfile)
-            if (newfile not in orig_logs):
-                self.pr('DUP: Copy from: ' + newfile + ' (' + str(sz) + ') to ' + backup_dir)
+            if newfile not in orig_logs:
+                self.pr(f'DUP: Copy from: {newfile} ({sz}) to {backup_dir}')
                 shutil.copy(newfile, backup_dir)
             # Record all log files returned for later verification.
             dup_logs.append(newfile)
@@ -297,19 +384,22 @@ class backup_base(wttest.WiredTigerTestCase, suite_subprocess):
         return dup_logs
 
     #
-    # Open incremental backup cursor, with an id and iterate through all the files
-    # and perform incremental block copy for each of them. Returns the information about
+    # Open incremental backup cursor, with a source ID and a destination ID and iterate through all
+    # the files and perform incremental block copy for each of them. Returns the information about
     # the backup files.
     #
     # Optional arguments:
+    #   src_id: Read an existing incremental backup ID to use as the source for incremental backup.
+    #   dest_id: ID to track the any new incremental backup information.
     #   consolidate: Add consolidate option to the cursor.
     #
-    def take_incr_backup(self, backup_incr_dir, id=0, consolidate=False):
-        self.assertTrue(id > 0 or self.bkup_id > 0)
-        if id == 0:
-            id = self.bkup_id
+    def take_incr_backup(self, backup_incr_dir, src_id=0, dest_id=0, consolidate=False):
+        self.assertTrue(dest_id > 0 or self.bkup_id > 0)
+        if src_id == 0 and dest_id == 0:
+            src_id = self.bkup_id - 1
+            dest_id =  self.bkup_id
         # Open the backup data source for incremental backup.
-        config = 'incremental=(src_id="ID' +  str(id - 1) + '",this_id="ID' + str(id) + '"'
+        config = f'incremental=(src_id="ID{src_id}",this_id="ID{dest_id}"'
         if consolidate:
             config += ',consolidate=true'
         config += ')'
@@ -318,6 +408,9 @@ class backup_base(wttest.WiredTigerTestCase, suite_subprocess):
 
         file_sizes = []
         file_names = []
+        self.assertEqual(1, self.backup_get_stat(stat.conn.backup_cursor_open))
+        self.assertEqual(0, self.backup_get_stat(stat.conn.backup_dup_open))
+        self.assertEqual(1, self.backup_get_stat(stat.conn.backup_incremental))
 
         # We cannot use 'for newfile in bkup_c:' usage because backup cursors don't have
         # values and adding in get_values returns ENOTSUP and causes the usage to fail.

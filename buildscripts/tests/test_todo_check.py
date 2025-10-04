@@ -6,12 +6,9 @@ import os
 import textwrap
 import unittest
 from tempfile import TemporaryDirectory
-
 from typing import Iterable
 
 import buildscripts.todo_check as under_test
-
-# pylint: disable=missing-docstring,invalid-name,unused-argument,no-self-use,protected-access
 
 
 def create_file_iterator(file_contents: str) -> Iterable[str]:
@@ -253,7 +250,8 @@ class TestWalkFs(unittest.TestCase):
             write_file(os.path.join(tmpdir, "file1.txt"), expected_files["file1.txt"])
             os.makedirs(os.path.join(tmpdir, "dir0", "dir1"))
             write_file(
-                os.path.join(tmpdir, "dir0", "dir1", "file2.txt"), expected_files["file2.txt"])
+                os.path.join(tmpdir, "dir0", "dir1", "file2.txt"), expected_files["file2.txt"]
+            )
 
             seen_files = {}
 

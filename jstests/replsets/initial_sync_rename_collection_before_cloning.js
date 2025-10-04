@@ -4,14 +4,12 @@
  * See SERVER-4941.
  */
 
-(function() {
-'use strict';
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-load("jstests/libs/fail_point_util.js");
-load('jstests/replsets/rslib.js');
-const basename = 'initial_sync_rename_collection_before_cloning';
+const basename = "initial_sync_rename_collection_before_cloning";
 
-jsTestLog('Bring up a replica set');
+jsTestLog("Bring up a replica set");
 const rst = new ReplSetTest({name: basename, nodes: 1});
 rst.startSet();
 rst.initiate();
@@ -26,76 +24,95 @@ const primary_db0 = primary.getDB(db0_name);
 const primary_db1 = primary.getDB(db1_name);
 
 jsTestLog("Create collections on primary");
-const collRenameWithinDB_name = 'coll_1';
-const collRenameAcrossDBs_name = 'coll_2';
-const collWithinFinal_name = 'renamed';
-const collAcrossFinal_name = 'renamed_across';
+const collRenameWithinDB_name = "coll_1";
+const collRenameAcrossDBs_name = "coll_2";
+const collWithinFinal_name = "renamed";
+const collAcrossFinal_name = "renamed_across";
 
 // Create two collections on the same database. One will be renamed within the database
 // and the other will be renamed to a different database.
 assert.commandWorked(primary_db0[collRenameWithinDB_name].save({}));
 assert.commandWorked(primary_db0[collRenameAcrossDBs_name].save({}));
 
-jsTestLog('Waiting for replication');
+jsTestLog("Waiting for replication");
 rst.awaitReplication();
 
-jsTestLog('Bring up a new node');
-const secondary = rst.add({setParameter: 'numInitialSyncAttempts=1'});
+jsTestLog("Bring up a new node");
+const secondary = rst.add({setParameter: "numInitialSyncAttempts=1"});
 
 // Add a fail point that causes the secondary's initial sync to hang before
 // copying databases.
-const failPoint = configureFailPoint(secondary, 'initialSyncHangBeforeCopyingDatabases');
+const failPoint = configureFailPoint(secondary, "initialSyncHangBeforeCopyingDatabases");
 
-jsTestLog('Begin initial sync on secondary');
-let conf = rst.getPrimary().getDB('admin').runCommand({replSetGetConfig: 1}).config;
+jsTestLog("Begin initial sync on secondary");
+let conf = rst.getPrimary().getDB("admin").runCommand({replSetGetConfig: 1}).config;
 conf.members.push({_id: 1, host: secondary.host, priority: 0, votes: 0});
 conf.version++;
-assert.commandWorked(rst.getPrimary().getDB('admin').runCommand({replSetReconfig: conf}));
-assert.eq(primary, rst.getPrimary(), 'Primary changed after reconfig');
+assert.commandWorked(rst.getPrimary().getDB("admin").runCommand({replSetReconfig: conf}));
+assert.eq(primary, rst.getPrimary(), "Primary changed after reconfig");
 
 // Confirm that initial sync started on the secondary node.
-jsTestLog('Waiting for initial sync to start');
+jsTestLog("Waiting for initial sync to start");
 failPoint.wait();
 
 // Start renaming collections while initial sync is hanging.
-jsTestLog('Rename collection ' + db0_name + '.' + collRenameWithinDB_name + ' to ' + db0_name +
-          '.' + collWithinFinal_name + ' on the sync source ' + db0_name);
+jsTestLog(
+    "Rename collection " +
+        db0_name +
+        "." +
+        collRenameWithinDB_name +
+        " to " +
+        db0_name +
+        "." +
+        collWithinFinal_name +
+        " on the sync source " +
+        db0_name,
+);
 assert.commandWorked(primary_db0[collRenameWithinDB_name].renameCollection(collWithinFinal_name));
 
-jsTestLog('Rename collection ' + db0_name + '.' + collRenameAcrossDBs_name + ' to ' + db1_name +
-          '.' + collAcrossFinal_name + ' on the sync source ' + db0_name);
-assert.commandWorked(primary.adminCommand({
-    renameCollection: primary_db0[collRenameAcrossDBs_name].getFullName(),
-    to: primary_db1[collAcrossFinal_name]
-            .getFullName()  // Collection 'renamed_across' is implicitly created.
-}));
+jsTestLog(
+    "Rename collection " +
+        db0_name +
+        "." +
+        collRenameAcrossDBs_name +
+        " to " +
+        db1_name +
+        "." +
+        collAcrossFinal_name +
+        " on the sync source " +
+        db0_name,
+);
+assert.commandWorked(
+    primary.adminCommand({
+        renameCollection: primary_db0[collRenameAcrossDBs_name].getFullName(),
+        to: primary_db1[collAcrossFinal_name].getFullName(), // Collection 'renamed_across' is implicitly created.
+    }),
+);
 
 // Disable fail point so that the secondary can finish its initial sync.
 failPoint.off();
 
-jsTestLog('Wait for both nodes to be up-to-date');
+jsTestLog("Wait for both nodes to be up-to-date");
 rst.awaitSecondaryNodes();
 rst.awaitReplication();
 
 const secondary_db0 = secondary.getDB(db0_name);
 const secondary_db1 = secondary.getDB(db1_name);
 
-jsTestLog('Check that collection was renamed correctly on the secondary');
-assert.eq(
-    secondary_db0[collWithinFinal_name].find().itcount(), 1, 'renamed collection does not exist');
-assert.eq(secondary_db1[collAcrossFinal_name].find().itcount(),
-          1,
-          'renamed_across collection does not exist');
+jsTestLog("Check that collection was renamed correctly on the secondary");
+assert.eq(secondary_db0[collWithinFinal_name].find().itcount(), 1, "renamed collection does not exist");
+assert.eq(secondary_db1[collAcrossFinal_name].find().itcount(), 1, "renamed_across collection does not exist");
 assert.eq(
     secondary_db0[collRenameWithinDB_name].find().itcount(),
     0,
-    'collection ' + collRenameWithinDB_name + ' still exists after it was supposed to be renamed');
+    "collection " + collRenameWithinDB_name + " still exists after it was supposed to be renamed",
+);
 assert.eq(
     secondary_db0[collRenameAcrossDBs_name].find().itcount(),
     0,
-    'collection ' + collRenameAcrossDBs_name + ' still exists after it was supposed to be renamed');
+    "collection " + collRenameAcrossDBs_name + " still exists after it was supposed to be renamed",
+);
 
 rst.checkReplicatedDataHashes();
 rst.checkOplogs();
 rst.stopSet();
-})();

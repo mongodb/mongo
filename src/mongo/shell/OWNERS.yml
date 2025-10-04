@@ -1,0 +1,20 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/devprod-correctness
+  - "kms*":
+    approvers:
+      - 10gen/server-security
+  - "encrypted*":
+    approvers:
+      - 10gen/server-security
+  - "keyvault.js":
+    approvers:
+      - 10gen/server-security
+  - "named_pipe_test_helper*":
+    approvers:
+      - 10gen/query-integration-features
+  - "feature_compatibility_version.js":
+    approvers:
+      - 10gen/server-fcv

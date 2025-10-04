@@ -1,0 +1,14 @@
+test_kind: js_test
+
+selector:
+  roots:
+    - jstests/serverless/*.js
+    - src/mongo/db/modules/*/jstests/serverless/**/*.js
+
+executor:
+  config:
+    shell_options:
+      nodb: ""
+      global_vars:
+        TestData:
+          hashTestNamesForMultitenancy: true

@@ -1,0 +1,54 @@
+# This file defines the set of JS smoke tests covering the main user commands owned by the 'Catalog & Routing' team.
+# The whole list can be executed by running the command below:
+# python buildscripts/run_smoke_tests.py --suites ./buildscripts/smoke_tests/catalog_and_routing.yml
+suites:
+  sharding_jscore_passthrough:
+    - jstests/core/catalog/agg_list_cluster_catalog.js
+    - jstests/core/catalog/agg_list_cluster_catalog_sharding_fields.js
+    - jstests/core/catalog/db_stats.js
+    - jstests/core/catalog/list_catalog.js
+    - jstests/core/catalog/list_catalog_stage_consistency.js
+    - jstests/core/catalog/list_collections.js
+    - jstests/core/catalog/list_databases.js
+    - jstests/core/catalog/list_indexes.js
+    - jstests/core/cluster_parameters/cluster_parameter_commands.js
+    - jstests/core/ddl/coll_mod.js
+    - jstests/core/ddl/convert_to_capped.js
+    - jstests/core/ddl/drop_collection.js
+    - jstests/core/ddl/drop_database.js
+    - jstests/core/ddl/rename_collection.js
+    - jstests/core/ddl/rename_collection_view.js
+    - jstests/core_sharding/ddl/enable_sharding.js
+    - jstests/core_sharding/ddl/move_primary.js
+    - jstests/core_sharding/ddl/move_primary_basic.js
+    - jstests/core_sharding/ddl/move_primary_db_metadata.js
+    - jstests/core_sharding/ddl/move_primary_preserve_data.js
+    - jstests/core_sharding/ddl/move_primary_preserve_metadata.js
+    - jstests/core_sharding/ddl/refine_collection_shard_key.js
+    - jstests/core_sharding/ddl/rename_collection.js
+    - jstests/core_sharding/ddl/rename_collection_sharded.js
+    - jstests/core_sharding/ddl/rename_collection_unsharded.js
+    - jstests/core_sharding/ddl/rename_collection_unsplittable.js
+    - jstests/core_sharding/ddl/shard_collection_basic.js
+    - jstests/core_sharding/ddl/untrack_unsharded_collection_basic.js
+    - jstests/core_sharding/global_catalog/sharded_data_distribution.js
+    - jstests/core_sharding/sharded_cluster_topology/add_remove_shard.js
+    - jstests/core_sharding/sharded_cluster_topology/list_shards_vs_get_shard_map.js
+    - jstests/core_sharding/versioning_protocol/get_database_version.js
+    - jstests/core_sharding/versioning_protocol/get_shard_version.js
+
+  # Run topology-agnostic test files to explicitly cover their behavior
+  # against sharded collections.
+  sharded_collections_jscore_passthrough:
+    - jstests/core/ddl/drop_database.js
+
+  replica_sets_jscore_passthrough:
+    - jstests/core/catalog/list_collections.js
+    - jstests/core/ddl/clone_collection_as_capped.js
+
+  no_passthrough:
+    - jstests/noPassthrough/ddl/set_allow_migrations.js
+    - jstests/noPassthrough/global_catalog/repair_sharded_collection_history.js
+    - jstests/noPassthrough/global_catalog/reset_placement_history_snapshot_read.js
+    - jstests/noPassthrough/versioning_protocol/_flush_cache_update_commands.js
+    - jstests/noPassthrough/versioning_protocol/flush_router_config.js

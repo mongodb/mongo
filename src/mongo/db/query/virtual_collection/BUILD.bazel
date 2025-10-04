@@ -1,0 +1,42 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "virtual_collection",
+    srcs = [
+        "external_record_store.cpp",
+        "multi_bson_stream_cursor.cpp",
+    ],
+    hdrs = [
+        "external_record_store.h",
+        "input_stream.h",
+        "multi_bson_stream_cursor.h",
+        "//src/mongo/db/local_catalog:virtual_collection_options.h",
+        "//src/mongo/db/pipeline:external_data_source_option_gen",
+    ],
+    deps = [
+        "//src/mongo/db/storage:record_store_base",
+        "//src/mongo/db/storage:stub_container",
+        "//src/mongo/transport/named_pipe",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "virtual_collection_test",
+    srcs = [
+        "external_record_store_test.cpp",
+    ],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        ":virtual_collection",
+        "//src/mongo/db/storage:record_store_base",
+    ],
+)

@@ -29,6 +29,8 @@
 
 #include "mongo/util/future_util.h"
 
+#include <boost/move/utility_core.hpp>
+
 namespace mongo {
 
 ExecutorFuture<void> sleepUntil(std::shared_ptr<executor::TaskExecutor> executor,

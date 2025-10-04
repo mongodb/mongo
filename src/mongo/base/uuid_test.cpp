@@ -27,14 +27,25 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/util/uuid.h"
 
+#include "mongo/base/data_range.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/uuid.h"
+
+#include <cstdint>
+#include <memory>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
 
 namespace mongo {
 namespace {
@@ -51,6 +62,8 @@ TEST(UUIDTest, UUIDCollisionTest) {
 }
 
 TEST(UUIDTest, isUUIDStringTest) {
+    ASSERT(!UUID::isUUIDString(""));
+
     // Several valid strings
     ASSERT(UUID::isUUIDString("00000000-0000-4000-8000-000000000000"));
     ASSERT(UUID::isUUIDString("01234567-9abc-4def-9012-3456789abcde"));
@@ -168,11 +181,9 @@ TEST(UUIDTest, toAndFromBSON) {
     ASSERT_EQUALS(uuidBSON.woCompare(uuidBSON2), 0);
 
     // UUIDs cannot be constructed from invalid BSON elements
-    auto bson2 = BSON("uuid"
-                      << "sam");
+    auto bson2 = BSON("uuid" << "sam");
     ASSERT_EQUALS(ErrorCodes::InvalidUUID, UUID::parse(bson2.getField("uuid")));
-    auto bson3 = BSON("uuid"
-                      << "dddddddd-eeee-4fff-aaaa-bbbbbbbbbbbb");
+    auto bson3 = BSON("uuid" << "dddddddd-eeee-4fff-aaaa-bbbbbbbbbbbb");
     ASSERT_EQUALS(ErrorCodes::InvalidUUID, UUID::parse(bson3.getField("uuid")));
     auto bson4 = BSON("uuid" << 14);
     ASSERT_EQUALS(ErrorCodes::InvalidUUID, UUID::parse(bson4.getField("uuid")));
@@ -187,6 +198,38 @@ TEST(UUIDTest, toBSONUsingBSONMacro) {
     auto expectedBson = bob.obj();
 
     ASSERT_BSONOBJ_EQ(expectedBson, bson);
+}
+
+TEST(UUIDTest, allBitsFlipForHashes) {
+    // The Hash function is generated using bytes from the UUID itself, which are already randomly
+    // generated (except for two bytes, which are set to the same value for all UUIDs). This test
+    // ensures that each bit of the generated hashes is set and unset at least once.
+    UUID::Hash hashGenerator = UUID::Hash{};
+    auto startingHash = hashGenerator(UUID::gen());
+    size_t accumulator = 0;
+    size_t target = std::numeric_limits<uint32_t>::max();
+
+    // Running this test locally usually results in the loop terminating after about 7-10
+    // iterations, maxIterations is set to be about 50x this amount to give some wiggle room for
+    // tests.
+    int maxIterations = 500;
+    int counter = 0;
+
+    while (accumulator != target && counter++ < maxIterations) {
+        size_t difference = startingHash ^ hashGenerator(UUID::gen());
+        accumulator |= difference;
+    }
+    // Fail the test if all bits are not changed at least once after 'maxIterations'.
+    ASSERT_EQUALS(accumulator, target);
+}
+
+TEST(UUIDTest, UUIDConsistentHash) {
+    auto uuid = UUID::gen();
+    size_t hash = UUID::Hash{}(uuid);
+
+    // Note this may fail in the future if the hash is changed, but this test will serve as a
+    // safeguard to signal that the behavior has changed.
+    ASSERT_EQUALS(uuid.toCDR().read<BigEndian<uint32_t>>(), hash);
 }
 
 }  // namespace

@@ -27,44 +27,54 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <memory>
-#include <utility>
-
+#include "mongo/base/string_data.h"
+#include "mongo/db/auth/authorization_backend_interface.h"
+#include "mongo/db/auth/authorization_client_handle.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/cluster_auth_mode.h"
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/authentication_commands.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/sequence_util.h"
+
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {
 
 const auto getAuthorizationManager =
-    ServiceContext::declareDecoration<std::unique_ptr<AuthorizationManager>>();
-
-const auto getAuthorizationSession =
-    Client::declareDecoration<std::unique_ptr<AuthorizationSession>>();
+    Service::declareDecoration<std::unique_ptr<AuthorizationManager>>();
 
 struct DisabledAuthMechanisms {
     bool x509 = false;
 };
 
-const auto getDisabledAuthMechanisms = ServiceContext::declareDecoration<DisabledAuthMechanisms>();
+const auto getAuthorizationSession =
+    Client::declareDecoration<std::unique_ptr<AuthorizationSession>>();
 
-const auto getClusterAuthMode =
-    ServiceContext::declareDecoration<synchronized_value<ClusterAuthMode>>();
+const auto getDisabledAuthMechanisms = Service::declareDecoration<DisabledAuthMechanisms>();
+
+const auto getClusterAuthMode = ServiceContext::declareDecoration<AtomicWord<ClusterAuthMode>>();
+
+const auto getAuthorizationBackendInterface =
+    Service::declareDecoration<std::unique_ptr<auth::AuthorizationBackendInterface>>();
 
 class AuthzClientObserver final : public ServiceContext::ClientObserver {
 public:
     void onCreateClient(Client* client) override {
-        if (auto authzManager = AuthorizationManager::get(client->getServiceContext())) {
-            AuthorizationSession::set(client, authzManager->makeAuthorizationSession());
+        if (auto authzManager = AuthorizationManager::get(client->getService())) {
+            AuthorizationSession::set(client, authzManager->makeAuthorizationSession(client));
         }
     }
 
@@ -72,7 +82,7 @@ public:
         // Logout before the client is destroyed.
         auto& authzSession = getAuthorizationSession(client);
         if (authzSession) {
-            authzSession->logoutAllDatabases(client, "Client has disconnected");
+            authzSession->logoutAllDatabases("Client has disconnected");
         }
     }
 
@@ -80,37 +90,32 @@ public:
     void onDestroyOperationContext(OperationContext* opCtx) override {}
 };
 
-auto disableAuthMechanismsRegisterer = ServiceContext::ConstructorActionRegisterer{
-    "DisableAuthMechanisms", [](ServiceContext* service) {
-        if (!sequenceContains(saslGlobalParams.authenticationMechanisms, kX509AuthMechanism)) {
-            disableX509Auth(service);
-        }
-    }};
 
 ServiceContext::ConstructorActionRegisterer authzClientObserverRegisterer{
-    "AuthzClientObserver", [](ServiceContext* service) {
-        service->registerClientObserver(std::make_unique<AuthzClientObserver>());
+    "AuthzClientObserver", [](ServiceContext* svCtx) {
+        svCtx->registerClientObserver(std::make_unique<AuthzClientObserver>());
     }};
-
-ServiceContext::ConstructorActionRegisterer destroyAuthorizationManagerRegisterer(
-    "DestroyAuthorizationManager",
-    [](ServiceContext* service) {
-        // Intentionally empty, since construction happens through different code paths depending on
-        // the binary
-    },
-    [](ServiceContext* service) { AuthorizationManager::set(service, nullptr); });
 
 }  // namespace
 
-AuthorizationManager* AuthorizationManager::get(ServiceContext* service) {
+AuthorizationManager* AuthorizationManager::get(Service* service) {
     return getAuthorizationManager(service).get();
 }
 
-AuthorizationManager* AuthorizationManager::get(ServiceContext& service) {
+AuthorizationManager* AuthorizationManager::get(Service& service) {
     return getAuthorizationManager(service).get();
 }
 
-void AuthorizationManager::set(ServiceContext* service,
+auth::AuthorizationBackendInterface* auth::AuthorizationBackendInterface::get(Service* service) {
+    return getAuthorizationBackendInterface(service).get();
+}
+
+void auth::AuthorizationBackendInterface::set(
+    Service* service, std::unique_ptr<AuthorizationBackendInterface> backendInterface) {
+    getAuthorizationBackendInterface(service) = std::move(backendInterface);
+}
+
+void AuthorizationManager::set(Service* service,
                                std::unique_ptr<AuthorizationManager> authzManager) {
     getAuthorizationManager(service) = std::move(authzManager);
 }
@@ -133,31 +138,24 @@ void AuthorizationSession::set(Client* client,
                                std::unique_ptr<AuthorizationSession> authorizationSession) {
     auto& authzSession = getAuthorizationSession(client);
     invariant(authorizationSession);
-    invariant(!authzSession);
     authzSession = std::move(authorizationSession);
 }
 
 ClusterAuthMode ClusterAuthMode::get(ServiceContext* svcCtx) {
-    return getClusterAuthMode(svcCtx).get();
+    return getClusterAuthMode(svcCtx).loadRelaxed();
 }
 
-ClusterAuthMode ClusterAuthMode::set(ServiceContext* svcCtx, const ClusterAuthMode& mode) {
-    auto sv = getClusterAuthMode(svcCtx).synchronize();
-    if (!sv->canTransitionTo(mode)) {
-        uasserted(5579202,
-                  fmt::format("Illegal state transition for clusterAuthMode from '{}' to '{}'",
-                              sv->toString(),
-                              mode.toString()));
-    }
-    return std::exchange(*sv, mode);
-}
-
-void disableX509Auth(ServiceContext* svcCtx) {
-    getDisabledAuthMechanisms(svcCtx).x509 = true;
-}
-
-bool isX509AuthDisabled(ServiceContext* svcCtx) {
-    return getDisabledAuthMechanisms(svcCtx).x509;
+ClusterAuthMode ClusterAuthMode::set(ServiceContext* svcCtx, const ClusterAuthMode& newMode) {
+    auto& authMode = getClusterAuthMode(svcCtx);
+    auto current = authMode.load();
+    do {
+        uassert(5579202,
+                fmt::format("Illegal state transition for clusterAuthMode from '{}' to '{}'",
+                            current.toString(),
+                            newMode.toString()),
+                current.canTransitionTo(newMode));
+    } while (!authMode.compareAndSwap(&current, newMode));
+    return current;
 }
 
 }  // namespace mongo

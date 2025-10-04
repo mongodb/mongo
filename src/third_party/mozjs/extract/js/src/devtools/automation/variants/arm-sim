@@ -1,0 +1,7 @@
+{
+    "__comment1": "Bug 1700372: --disable-clang-plugin is needed to avoid a warning (that we treat as an error) for comparing a number to itself to test for NaN",
+    "configure-args": "--enable-simulator=arm --target=i686-pc-linux --enable-rust-simd --disable-clang-plugin",
+    "optimize": true,
+    "debug": true,
+    "bits": 32
+}

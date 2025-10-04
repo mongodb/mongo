@@ -15,14 +15,18 @@
 # include "tdep-ppc32/dwarf-config.h"
 #elif defined __powerpc64__
 # include "tdep-ppc64/dwarf-config.h"
+#elif defined __s390x__
+# include "tdep-s390x/dwarf-config.h"
 #elif defined __sh__
 # include "tdep-sh/dwarf-config.h"
 #elif defined __i386__
 # include "tdep-x86/dwarf-config.h"
 #elif defined __x86_64__ || defined __amd64__
 # include "tdep-x86_64/dwarf-config.h"
-#elif defined __tilegx__
-# include "tdep-tilegx/dwarf-config.h"
+#elif defined __riscv || defined __riscv__
+# include "tdep-riscv/dwarf-config.h"
+#elif defined __loongarch64
+# include "tdep-loongarch64/dwarf-config.h"
 #else
 # error "Unsupported arch"
 #endif

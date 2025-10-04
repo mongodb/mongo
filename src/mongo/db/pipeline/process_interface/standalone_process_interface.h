@@ -29,7 +29,16 @@
 
 #pragma once
 
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/process_interface/common_process_interface.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/process_interface/non_shardsvr_process_interface.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/util/modules.h"
+
+#include <memory>
+#include <utility>
 
 namespace mongo {
 
@@ -41,7 +50,12 @@ public:
     StandaloneProcessInterface(std::shared_ptr<executor::TaskExecutor> exec)
         : NonShardServerProcessInterface(std::move(exec)) {}
 
-    virtual ~StandaloneProcessInterface() = default;
+    std::unique_ptr<MongoProcessInterface::WriteSizeEstimator> getWriteSizeEstimator(
+        OperationContext* opCtx, const NamespaceString& ns) const final {
+        return std::make_unique<LocalWriteSizeEstimator>();
+    }
+
+    ~StandaloneProcessInterface() override = default;
 };
 
 }  // namespace mongo

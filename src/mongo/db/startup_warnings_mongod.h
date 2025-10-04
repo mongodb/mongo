@@ -27,37 +27,56 @@
  *    it in the license file.
  */
 
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
+#pragma once
+
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/storage_options.h"
 
 namespace mongo {
-
-struct StorageGlobalParams;
-struct ServerGlobalParams;
-
-class StartupWarningsMongod {
-private:
-    StartupWarningsMongod();
-
-public:
-    /**
-     * Reads Transparent HugePages kernel parameter in sysfs directory.
-     * Linux only.
-     */
-    static StatusWith<std::string> readTransparentHugePagesParameter(const std::string& parameter);
-
-    /**
-     * For testing only.
-     * Supports alternate directory for transparent huge pages files.
-     */
-    static StatusWith<std::string> readTransparentHugePagesParameter(const std::string& parameter,
-                                                                     const std::string& directory);
-};
 
 // Checks various startup conditions and logs any necessary warnings that
 // are specific to the mongod process.
 void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
                               const ServerGlobalParams& serverParams,
                               ServiceContext* svcCtx);
+
+namespace startup_warning_detail {
+#ifdef __linux__
+
+enum class THPEnablementWarningLogCase {
+    kWronglyEnabled,
+    kWronglyDisabledViaOptOut,
+    kWronglyDisabledOnSystem,
+    kSystemValueError,
+    kSystemValueErrorWithWrongOptOut,
+    kSystemValueErrorWithOptOutError,
+    kOptOutError,
+    kNone
+};
+
+enum class THPDefragWarningLogCase { kWronglyNotUsingDeferMadvise, kError, kNone };
+
+/**
+ * Verify that the system max_ptes_none parameter is properly set.
+ */
+bool verifyMaxPtesNoneIsCorrect(bool usingGoogleTCMallocAllocator, unsigned value);
+
+/**
+ * Return the right THP enablement warning based on system conditions.
+ */
+THPEnablementWarningLogCase getTHPEnablementWarningCase(
+    bool usingGoogleTCMallocAllocator,
+    const StatusWith<std::string>& thpEnabled,
+    const std::variant<std::error_code, bool>& optingOutOfTHPForProcess);
+
+/**
+ * Return the right defrag warning case based on system conditions.
+ */
+THPDefragWarningLogCase getDefragWarningCase(bool usingGoogleTCMallocAllocator,
+                                             const StatusWith<std::string>& thpDefragSettings);
+
+#endif  // __linux__
+}  // namespace startup_warning_detail
+
 }  // namespace mongo

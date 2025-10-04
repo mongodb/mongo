@@ -27,11 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/shell/mongo_main.h"
 #include "mongo/util/quick_exit.h"
-#include "mongo/util/text.h"
+#include "mongo/util/text.h"  // IWYU pragma: keep
 
 #ifdef _WIN32
 int wmain(int argc, wchar_t* argvW[]) {

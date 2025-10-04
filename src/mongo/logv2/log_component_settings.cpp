@@ -27,11 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/logv2/log_component_settings.h"
 
 #include "mongo/util/assert_util.h"
+#include "mongo/util/debug_util.h"
+
+#include <mutex>
 
 namespace mongo::logv2 {
 
@@ -60,7 +61,7 @@ LogSeverity LogComponentSettings::getMinimumLogSeverity(LogComponent component) 
 
 void LogComponentSettings::setMinimumLoggedSeverity(LogComponent component, LogSeverity severity) {
     dassert(int(component) >= 0 && int(component) < LogComponent::kNumLogComponents);
-    stdx::lock_guard<Latch> lk(_mtx);
+    stdx::lock_guard<stdx::mutex> lk(_mtx);
     _setMinimumLoggedSeverityInLock(component, severity);
 }
 
@@ -98,7 +99,7 @@ void LogComponentSettings::_setMinimumLoggedSeverityInLock(LogComponent componen
 void LogComponentSettings::clearMinimumLoggedSeverity(LogComponent component) {
     dassert(int(component) >= 0 && int(component) < LogComponent::kNumLogComponents);
 
-    stdx::lock_guard<Latch> lk(_mtx);
+    stdx::lock_guard<stdx::mutex> lk(_mtx);
 
     // LogComponent::kDefault must always be configured.
     if (component == LogComponent::kDefault) {

@@ -5,9 +5,12 @@
  * This is not storage-engine specific.
  */
 
-(function() {
-
-load('jstests/disk/libs/wt_file_helper.js');
+import {
+    assertErrorOnStartupAfterIncompleteRepair,
+    assertRepairFailsWithFailpoint,
+    assertRepairSucceeds,
+    assertStartAndStopStandaloneOnExistingDbpath,
+} from "jstests/disk/libs/wt_file_helper.js";
 
 const exitBeforeRepairParameter = "exitBeforeDataRepair";
 const exitBeforeRepairInvalidatesConfigParameter = "exitBeforeRepairInvalidatesConfig";
@@ -38,7 +41,7 @@ assertErrorOnStartupAfterIncompleteRepair(dbpath, port);
 
 assertRepairSucceeds(dbpath, port);
 
-assertStartAndStopStandaloneOnExistingDbpath(dbpath, port, function(node) {
+assertStartAndStopStandaloneOnExistingDbpath(dbpath, port, function (node) {
     let nodeDB = node.getDB(dbName);
     assert(nodeDB[collName].exists());
     assert.eq(nodeDB[collName].find().itcount(), 1);
@@ -54,9 +57,8 @@ assertErrorOnStartupAfterIncompleteRepair(dbpath, port);
 
 assertRepairSucceeds(dbpath, port);
 
-assertStartAndStopStandaloneOnExistingDbpath(dbpath, port, function(node) {
+assertStartAndStopStandaloneOnExistingDbpath(dbpath, port, function (node) {
     let nodeDB = node.getDB(dbName);
     assert(nodeDB[collName].exists());
     assert.eq(nodeDB[collName].find().itcount(), 1);
 });
-})();

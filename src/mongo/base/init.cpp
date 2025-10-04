@@ -27,13 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/base/init.h"
-
-#include <cstdlib>
-#include <iostream>
+#include "mongo/base/init.h"  // IWYU pragma: keep
 
 #include "mongo/base/initializer.h"
 #include "mongo/util/assert_util.h"
+
+#include <cstdlib>
+#include <iostream>
+#include <utility>
 
 namespace mongo {
 

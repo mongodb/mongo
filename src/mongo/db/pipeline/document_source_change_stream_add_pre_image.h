@@ -29,19 +29,37 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
+#include "mongo/db/pipeline/document_source_change_stream_gen.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/stage_constraints.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/util/assert_util.h"
+
+#include <set>
+#include <string>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
 /**
  * Part of the change stream API machinery used to look up the pre-image of a document.
  *
- * After a document that should have its pre-image included is transformed from the oplog,
- * its "fullDocumentBeforeChange" field shall be the optime of the noop oplog entry containing the
- * pre-image. This stage replaces that field with the actual pre-image document.
+ * The identifier of pre-image is in "preImageId" field of the incoming document. The pre-image is
+ * set to "fullDocumentBeforeChange" field of the returned document.
  */
-class DocumentSourceChangeStreamAddPreImage final : public DocumentSource {
+class DocumentSourceChangeStreamAddPreImage final : public DocumentSourceInternalChangeStreamStage {
 public:
     static constexpr StringData kStageName = "$_internalChangeStreamAddPreImage"_sd;
     static constexpr StringData kFullDocumentBeforeChangeFieldName =
@@ -58,14 +76,10 @@ public:
     static boost::intrusive_ptr<DocumentSourceChangeStreamAddPreImage> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
-    // Retrieves the pre-image document given the specified 'preImageId'. Returns boost::none if no
-    // such pre-image is available.
-    static boost::optional<Document> lookupPreImage(boost::intrusive_ptr<ExpressionContext> pExpCtx,
-                                                    const Document& preImageId);
-
     DocumentSourceChangeStreamAddPreImage(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                           FullDocumentBeforeChangeModeEnum mode)
-        : DocumentSource(kStageName, expCtx), _fullDocumentBeforeChangeMode(mode) {
+        : DocumentSourceInternalChangeStreamStage(kStageName, expCtx),
+          _fullDocumentBeforeChangeMode(mode) {
         // This stage should never be created with FullDocumentBeforeChangeMode::kOff.
         invariant(_fullDocumentBeforeChangeMode != FullDocumentBeforeChangeModeEnum::kOff);
     }
@@ -74,13 +88,14 @@ public:
      * Only modifies: "fullDocumentBeforeChange" and "preImageId".
      */
     GetModPathsReturn getModifiedPaths() const final {
-        return {GetModPathsReturn::Type::kFiniteSet,
-                {kFullDocumentBeforeChangeFieldName.toString(), kPreImageIdFieldName.toString()},
-                {}};
+        return {
+            GetModPathsReturn::Type::kFiniteSet,
+            {std::string{kFullDocumentBeforeChangeFieldName}, std::string{kPreImageIdFieldName}},
+            {}};
     }
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
-        invariant(pipeState != Pipeline::SplitState::kSplitForShards);
+    StageConstraints constraints(PipelineSplitState pipeState) const final {
+        invariant(pipeState != PipelineSplitState::kSplitForShards);
         StageConstraints constraints(StreamType::kStreaming,
                                      PositionRequirement::kNone,
                                      HostTypeRequirement::kAnyShard,
@@ -91,6 +106,7 @@ public:
                                      UnionRequirement::kNotAllowed,
                                      ChangeStreamRequirement::kChangeStreamStage);
         constraints.canSwapWithMatch = true;
+        constraints.consumesLogicalCollectionData = false;
         return constraints;
     }
 
@@ -98,24 +114,30 @@ public:
         return boost::none;
     }
 
-    DepsTracker::State getDependencies(DepsTracker* deps) const {
-        deps->fields.insert(DocumentSourceChangeStream::kPreImageIdField.toString());
+    DepsTracker::State getDependencies(DepsTracker* deps) const override {
+        deps->fields.insert(std::string{DocumentSourceChangeStream::kPreImageIdField});
         // This stage does not restrict the output fields to a finite set, and has no impact on
         // whether metadata is available or needed.
         return DepsTracker::State::SEE_NEXT;
     }
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {}
+
+    Value doSerialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     const char* getSourceName() const final {
-        return kStageName.rawData();
+        return kStageName.data();
+    }
+
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
     }
 
 private:
-    /**
-     * Performs the lookup to retrieve the full pre-image document for applicable operations.
-     */
-    GetNextResult doGetNext() final;
+    friend boost::intrusive_ptr<exec::agg::Stage> documentSourceChangeStreamAddPreImageToStageFn(
+        const boost::intrusive_ptr<DocumentSource>& documentSource);
 
     // Determines whether pre-images are strictly required or may be included only when available.
     FullDocumentBeforeChangeModeEnum _fullDocumentBeforeChangeMode =

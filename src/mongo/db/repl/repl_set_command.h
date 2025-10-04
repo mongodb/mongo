@@ -28,10 +28,17 @@
  */
 
 #pragma once
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/util/modules.h"
 
 #include <string>
-
-#include "mongo/db/commands.h"
 
 namespace mongo {
 
@@ -44,7 +51,7 @@ namespace repl {
 /**
  * Base class for repl set commands.
  */
-class ReplSetCommand : public BasicCommand {
+class MONGO_MOD_OPEN ReplSetCommand : public BasicCommand {
 protected:
     ReplSetCommand(const char* s) : BasicCommand(s) {}
 
@@ -56,16 +63,21 @@ protected:
         return true;
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) const override;
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override;
 
     virtual ActionSet getAuthActionSet() const {
         return ActionSet{ActionType::internal};
+    }
+
+public:
+    bool enableDiagnosticPrintingOnFailure() const override {
+        return true;
     }
 };
 

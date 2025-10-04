@@ -27,23 +27,29 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 
 #include "mongo/db/s/resharding/resharding_coordinator_observer.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/db/s/resharding/coordinator_document_gen.h"
+#include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/s/resharding/common_types_gen.h"
+#include "mongo/util/assert_util.h"
+
+#include <mutex>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 
-#include "mongo/db/s/resharding/coordinator_document_gen.h"
-#include "mongo/db/s/resharding_util.h"
-#include "mongo/db/service_context.h"
-#include "mongo/logv2/log.h"
-#include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/shard_id.h"
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
+
 
 namespace mongo {
 namespace {
-
-using namespace fmt::literals;
 
 /**
  * Retrieves the participants corresponding to the expectedState type.
@@ -108,9 +114,10 @@ bool stateTransistionsComplete(WithLock lk,
 template <class TParticipant>
 Status getStatusFromAbortReasonWithShardInfo(const TParticipant& participant,
                                              StringData participantType) {
-    return getStatusFromAbortReason(participant.getMutableState())
-        .withContext("{} shard {} reached an unrecoverable error"_format(
-            participantType, participant.getId().toString()));
+    return resharding::getStatusFromAbortReason(participant.getMutableState())
+        .withContext(fmt::format("{} shard {} reached an unrecoverable error",
+                                 participantType,
+                                 participant.getId().toString()));
 }
 
 /**
@@ -124,7 +131,7 @@ boost::optional<Status> getAbortReasonIfExists(
     if (updatedStateDoc.getAbortReason()) {
         // Note: the absence of context specifying which shard the abortReason originates from
         // implies the abortReason originates from the coordinator.
-        return getStatusFromAbortReason(updatedStateDoc);
+        return resharding::getStatusFromAbortReason(updatedStateDoc);
     }
 
     for (const auto& donorShard : updatedStateDoc.getDonorShards()) {
@@ -146,7 +153,14 @@ boost::optional<Status> getAbortReasonIfExists(
 ReshardingCoordinatorObserver::ReshardingCoordinatorObserver() = default;
 
 ReshardingCoordinatorObserver::~ReshardingCoordinatorObserver() {
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
+
+    // Rarely, when there is a short period of time between stepdown and stepup, the
+    // ReshardingCoordinator::run() method is not called causing the invariants below
+    // to fire. If this method hasn't been called, we skip the checks.
+    if (!_reshardingCoordinatorRunCalled) {
+        return;
+    }
     invariant(_allDonorsReportedMinFetchTimestamp.getFuture().isReady());
     invariant(_allRecipientsFinishedCloning.getFuture().isReady());
     invariant(_allRecipientsReportedStrictConsistencyTimestamp.getFuture().isReady());
@@ -156,9 +170,9 @@ ReshardingCoordinatorObserver::~ReshardingCoordinatorObserver() {
 
 void ReshardingCoordinatorObserver::onReshardingParticipantTransition(
     const ReshardingCoordinatorDocument& updatedStateDoc) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (auto abortReason = getAbortReasonIfExists(updatedStateDoc)) {
-        _onAbortOrStepdown(lk, abortReason.get());
+        _onAbortOrStepdown(lk, abortReason.value());
         // Don't exit early since the coordinator waits for all participants to report state 'done'.
     }
 
@@ -193,31 +207,36 @@ void ReshardingCoordinatorObserver::onReshardingParticipantTransition(
 
 SharedSemiFuture<ReshardingCoordinatorDocument>
 ReshardingCoordinatorObserver::awaitAllDonorsReadyToDonate() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _allDonorsReportedMinFetchTimestamp.getFuture();
 }
 
 SharedSemiFuture<ReshardingCoordinatorDocument>
 ReshardingCoordinatorObserver::awaitAllRecipientsFinishedCloning() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _allRecipientsFinishedCloning.getFuture();
 }
 
 SharedSemiFuture<ReshardingCoordinatorDocument>
 ReshardingCoordinatorObserver::awaitAllRecipientsInStrictConsistency() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _allRecipientsReportedStrictConsistencyTimestamp.getFuture();
 }
 
 SharedSemiFuture<ReshardingCoordinatorDocument>
 ReshardingCoordinatorObserver::awaitAllDonorsDone() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _allDonorsDone.getFuture();
 }
 
 SharedSemiFuture<ReshardingCoordinatorDocument>
 ReshardingCoordinatorObserver::awaitAllRecipientsDone() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _allRecipientsDone.getFuture();
 }
 
 void ReshardingCoordinatorObserver::interrupt(Status status) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _onAbortOrStepdown(lk, status);
 
     if (!_allRecipientsDone.getFuture().isReady()) {
@@ -229,8 +248,22 @@ void ReshardingCoordinatorObserver::interrupt(Status status) {
     }
 }
 
+void ReshardingCoordinatorObserver::fulfillPromisesBeforePersistingStateDoc() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    invariant(!_allDonorsReportedMinFetchTimestamp.getFuture().isReady());
+    invariant(!_allRecipientsFinishedCloning.getFuture().isReady());
+    invariant(!_allRecipientsReportedStrictConsistencyTimestamp.getFuture().isReady());
+    invariant(!_allRecipientsDone.getFuture().isReady());
+    invariant(!_allDonorsDone.getFuture().isReady());
+    _allDonorsReportedMinFetchTimestamp.emplaceValue();
+    _allRecipientsFinishedCloning.emplaceValue();
+    _allRecipientsReportedStrictConsistencyTimestamp.emplaceValue();
+    _allRecipientsDone.emplaceValue();
+    _allDonorsDone.emplaceValue();
+}
+
 void ReshardingCoordinatorObserver::onCriticalSectionTimeout() {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (!_allRecipientsReportedStrictConsistencyTimestamp.getFuture().isReady()) {
         _allRecipientsReportedStrictConsistencyTimestamp.setError(
             Status{ErrorCodes::ReshardingCriticalSectionTimeout,

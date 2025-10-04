@@ -1,6 +1,7 @@
 """Utility to support file operations."""
+
 import os
-from typing import Dict, Any
+from typing import Any, Dict
 
 import yaml
 
@@ -69,5 +70,5 @@ def read_yaml_file(path: str) -> Dict[str, Any]:
     :param path: Path to file to read.
     :return: Contents of given file.
     """
-    with open(path) as file_handle:
+    with open(path, encoding="utf8") as file_handle:
         return yaml.safe_load(file_handle)

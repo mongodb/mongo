@@ -34,8 +34,8 @@
 #   Encryption using passwords
 #
 
-import os, run, random
-import wiredtiger, wttest
+import random
+import wttest
 from suite_subprocess import suite_subprocess
 from wtscenario import make_scenarios
 
@@ -108,7 +108,7 @@ class test_encrypt02(wttest.WiredTigerTestCase, suite_subprocess):
             val = self.bigvalue[start:r.randint(0,10000)] + str(idx)
             cursor.set_key(key)
             self.assertEqual(cursor.search(), 0)
-            self.assertEquals(cursor.get_value(), val)
+            self.assertEqual(cursor.get_value(), val)
         cursor.close()
 
         wtargs = []
@@ -117,6 +117,3 @@ class test_encrypt02(wttest.WiredTigerTestCase, suite_subprocess):
         wtargs += ['dump', self.uri]
         self.runWt(wtargs, outfilename='dump.out')
         self.check_non_empty_file('dump.out')
-
-if __name__ == '__main__':
-    wttest.run()

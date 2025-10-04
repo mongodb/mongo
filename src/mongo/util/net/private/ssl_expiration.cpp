@@ -27,14 +27,16 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
 #include "mongo/util/net/private/ssl_expiration.h"
 
-#include <string>
-
 #include "mongo/logv2/log.h"
 #include "mongo/util/time_support.h"
+
+#include <string>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
+
 
 namespace mongo {
 
@@ -43,7 +45,7 @@ static const auto oneDay = Hours(24);
 CertificateExpirationMonitor* theCertificateExpirationMonitor;
 
 void CertificateExpirationMonitor::updateExpirationDeadline(Date_t date) {
-    stdx::lock_guard<Mutex> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     _certExpiration = date;
 }
 
@@ -55,25 +57,29 @@ CertificateExpirationMonitor* CertificateExpirationMonitor::get() {
 }
 
 void CertificateExpirationMonitor::start(ServiceContext* service) {
-    stdx::lock_guard<Mutex> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
 
     auto periodicRunner = service->getPeriodicRunner();
     invariant(periodicRunner);
 
+    // The certificate expiration monitor is technically killable, but since it never creates an
+    // operation context, it will never actually be interrupted.
     PeriodicRunner::PeriodicJob job(
-        "CertificateExpirationMonitor", [this](Client* client) { return run(client); }, oneDay);
+        "CertificateExpirationMonitor",
+        [this](Client* client) { return run(client); },
+        oneDay,
+        true /*isKillableByStepdown*/);
 
     _job = std::make_unique<PeriodicJobAnchor>(periodicRunner->makeJob(std::move(job)));
     _job->start();
 }
 
-void CertificateExpirationMonitor::run(Client* client) {
+void CertificateExpirationMonitor::run(Client*) {
     const Date_t now = Date_t::now();
-    stdx::lock_guard<Mutex> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     if (_certExpiration <= now) {
         // The certificate has expired.
         LOGV2_WARNING(23785,
-                      "Server certificate is now invalid. It expired on {certExpiration}",
                       "Server certificate has expired",
                       "certExpiration"_attr = dateToISOStringUTC(_certExpiration));
         return;
@@ -84,8 +90,6 @@ void CertificateExpirationMonitor::run(Client* client) {
     if (remainingValidDuration <= 30 * oneDay) {
         // The certificate will expire in the next 30 days
         LOGV2_WARNING(23786,
-                      "Server certificate will expire on {certExpiration} in "
-                      "{validDuration}.",
                       "Server certificate will expire soon",
                       "certExpiration"_attr = dateToISOStringUTC(_certExpiration),
                       "validDuration"_attr = durationCount<Hours>(remainingValidDuration));

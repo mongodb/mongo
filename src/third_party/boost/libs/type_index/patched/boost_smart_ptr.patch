@@ -1,0 +1,26 @@
+From 03194eefcb9c3314054855d28bd9a90d3188768d Mon Sep 17 00:00:00 2001
+From: Antony Polukhin <antoshkka@gmail.com>
+Date: Thu, 20 Feb 2014 18:50:10 +0400
+Subject: [PATCH] Use TypeIndex features in Boost.SharedPtr to avoid type_info
+ related bugs
+
+---
+ include/boost/smart_ptr/detail/sp_counted_impl.hpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/include/boost/smart_ptr/detail/sp_counted_impl.hpp b/include/boost/smart_ptr/detail/sp_counted_impl.hpp
+index a7b43ae..5955036 100644
+--- a/include/boost/smart_ptr/detail/sp_counted_impl.hpp
++++ b/include/boost/smart_ptr/detail/sp_counted_impl.hpp
+@@ -155,7 +155,7 @@ public:
+ 
+     virtual void * get_deleter( detail::sp_typeinfo const & ti )
+     {
+-        return ti == BOOST_SP_TYPEID(D)? &reinterpret_cast<char&>( del ): 0;
++        return ti == boost::typeind::type_id<D>()? &reinterpret_cast<char&>( del ): 0;
+     }
+ 
+     virtual void * get_untyped_deleter()
+-- 
+1.8.5.3
+

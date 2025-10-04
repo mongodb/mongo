@@ -1,0 +1,2 @@
+Checks: '-*,mongo-rwmutex-check'
+WarningsAsErrors: '*'

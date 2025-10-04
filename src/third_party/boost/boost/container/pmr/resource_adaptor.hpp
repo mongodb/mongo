@@ -36,19 +36,19 @@ namespace pmr_dtl {
 template<class T>
 struct max_allocator_alignment
 {
-   static const std::size_t value = 1;
+   BOOST_STATIC_CONSTEXPR std::size_t value = 1;
 };
 
 template<class T>
 struct max_allocator_alignment< ::boost::container::new_allocator<T> >
 {
-   static const std::size_t value = boost::move_detail::alignment_of<boost::move_detail::max_align_t>::value;
+   BOOST_STATIC_CONSTEXPR std::size_t value = boost::move_detail::alignment_of<boost::move_detail::max_align_t>::value;
 };
 
 template<class T>
 struct max_allocator_alignment< std::allocator<T> >
 {
-   static const std::size_t value = boost::move_detail::alignment_of<boost::move_detail::max_align_t>::value;
+   BOOST_STATIC_CONSTEXPR std::size_t value = boost::move_detail::alignment_of<boost::move_detail::max_align_t>::value;
 };
 
 }  //namespace pmr_dtl
@@ -87,7 +87,7 @@ class resource_adaptor_imp
    void static_assert_if_not_char_allocator() const
    {
       //This class can only be used with allocators type char
-      BOOST_STATIC_ASSERT((boost::container::dtl::is_same<typename Allocator::value_type, char>::value));
+      BOOST_CONTAINER_STATIC_ASSERT((boost::container::dtl::is_same<typename Allocator::value_type, char>::value));
    }
    #endif
 
@@ -144,7 +144,7 @@ class resource_adaptor_imp
    protected:
    //! <b>Returns</b>: Allocated memory obtained by calling m_alloc.allocate. The size and alignment
    //!   of the allocated memory shall meet the requirements for a class derived from memory_resource.
-   virtual void* do_allocate(std::size_t bytes, std::size_t alignment)
+   virtual void* do_allocate(std::size_t bytes, std::size_t alignment) BOOST_OVERRIDE
    {
       if (alignment <= priv_guaranteed_allocator_alignment())
          return this->ebo_alloc_t::get().allocate(bytes);
@@ -156,7 +156,7 @@ class resource_adaptor_imp
    //!   subsequently deallocated. 
    //!
    //! <b>Effects</b>: Returns memory to the allocator using m_alloc.deallocate().
-   virtual void do_deallocate(void* p, std::size_t bytes, std::size_t alignment)
+   virtual void do_deallocate(void* p, std::size_t bytes, std::size_t alignment) BOOST_OVERRIDE
    {
       if (alignment <= priv_guaranteed_allocator_alignment())
          this->ebo_alloc_t::get().deallocate((char*)p, bytes);
@@ -167,7 +167,7 @@ class resource_adaptor_imp
    //! Let p be dynamic_cast<const resource_adaptor_imp*>(&other).
    //!
    //! <b>Returns</b>: false if p is null, otherwise the value of m_alloc == p->m_alloc.
-   virtual bool do_is_equal(const memory_resource& other) const BOOST_NOEXCEPT
+   virtual bool do_is_equal(const memory_resource& other) const BOOST_NOEXCEPT BOOST_OVERRIDE
    {
       const resource_adaptor_imp* p = dynamic_cast<const resource_adaptor_imp*>(&other);
       return p && p->ebo_alloc_t::get() == this->ebo_alloc_t::get();

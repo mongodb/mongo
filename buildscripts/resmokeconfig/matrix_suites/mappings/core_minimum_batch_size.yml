@@ -1,0 +1,7 @@
+# This suite should not be run in evergreen, it is combined into
+# core_min_batch_repeat_queries_multiplan_single_solutions_ese_gsm
+base_suite: core
+overrides:
+  - "minimum_batch_size.enable_override"
+excludes:
+  - "minimum_batch_size.excluded_files"

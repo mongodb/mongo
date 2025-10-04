@@ -1,0 +1,34 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+idl_generator(
+    name = "document_source_list_search_indexes_gen",
+    src = "document_source_list_search_indexes.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "plan_sharded_search_gen",
+    src = "plan_sharded_search.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "document_source_internal_search_id_lookup_gen",
+    src = "document_source_internal_search_id_lookup.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)

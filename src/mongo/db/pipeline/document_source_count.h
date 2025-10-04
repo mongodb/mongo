@@ -29,7 +29,14 @@
 
 #pragma once
 
+#include "mongo/bson/bsonelement.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/util/modules.h"
+
+#include <list>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

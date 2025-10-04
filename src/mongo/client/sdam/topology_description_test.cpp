@@ -27,18 +27,29 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/oid.h"
 #include "mongo/client/sdam/sdam_test_base.h"
-#include "mongo/client/sdam/topology_description.h"
-
-#include <boost/optional/optional_io.hpp>
-
 #include "mongo/client/sdam/server_description.h"
 #include "mongo/client/sdam/server_description_builder.h"
+#include "mongo/client/sdam/topology_description.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/logv2/log.h"
-#include "mongo/unittest/death_test.h"
+#include "mongo/rpc/topology_version_gen.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+
+#include <algorithm>
+#include <cstddef>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 
 namespace mongo {
 
@@ -55,6 +66,10 @@ protected:
     SdamConfiguration makeSdamConfig(std::vector<HostAndPort> servers,
                                      TopologyType topologyType,
                                      boost::optional<std::string> setName) {
+        auto serviceContext = ServiceContext::make();
+        WireSpec::getWireSpec(serviceContext.get()).initialize(WireSpec::Specification{});
+        setGlobalServiceContext(std::move(serviceContext));
+
         return SdamConfiguration(
             servers, topologyType, kNotUsedMs, kNotUsedMs, kNotUsedMs, setName);
     }
@@ -69,11 +84,14 @@ protected:
     static inline const std::vector<HostAndPort> kThreeServers{
         HostAndPort("foo:1234"), HostAndPort("bar:1234"), HostAndPort("baz:1234")};
 
-    static inline const auto kDefaultConfig = SdamConfiguration();
-    static inline const auto kSingleSeedConfig =
-        SdamConfiguration(kOneServer, TopologyType::kSingle);
-
     static inline const auto kNotUsedMs = Milliseconds{1000};
+
+    const SdamConfiguration kDefaultConfig;
+    const SdamConfiguration kSingleSeedConfig;
+
+    TopologyDescriptionTestFixture()
+        : kDefaultConfig(SdamConfiguration()),
+          kSingleSeedConfig(SdamConfiguration(kOneServer, TopologyType::kSingle)) {}
 };
 
 void TopologyDescriptionTestFixture::assertDefaultConfig(
@@ -158,10 +176,7 @@ TEST_F(TopologyDescriptionTestFixture, ShouldOnlyAllowSingleAndRsNoPrimaryWithSe
                         topologyTypes.end());
 
     for (const auto topologyType : topologyTypes) {
-        LOGV2(20217,
-              "Check TopologyType {topologyType} with setName value.",
-              "Check TopologyType with setName value",
-              "topologyType"_attr = topologyType);
+        LOGV2(20217, "Check TopologyType with setName value", "topologyType"_attr = topologyType);
         ASSERT_THROWS_CODE(makeSdamConfig(kOneServer, topologyType, kSetName),
                            DBException,
                            ErrorCodes::InvalidTopologyType);
@@ -190,7 +205,8 @@ TEST_F(TopologyDescriptionTestFixture, ShouldNotAllowChangingTheHeartbeatFrequen
 
 TEST_F(TopologyDescriptionTestFixture,
        ShouldSetWireCompatibilityErrorForMinWireVersionWhenMinWireVersionIsGreater) {
-    const auto outgoingMaxWireVersion = WireSpec::instance().get()->outgoing.maxWireVersion;
+    const auto outgoingMaxWireVersion =
+        WireSpec::getWireSpec(getGlobalServiceContext()).getOutgoing().maxWireVersion;
     const auto config = SdamConfiguration(kOneServer, TopologyType::kUnknown);
     const auto topologyDescription = std::make_shared<TopologyDescription>(config);
     const auto serverDescriptionMinVersion = ServerDescriptionBuilder()
@@ -207,7 +223,8 @@ TEST_F(TopologyDescriptionTestFixture,
 
 TEST_F(TopologyDescriptionTestFixture,
        ShouldSetWireCompatibilityErrorForMinWireVersionWhenMaxWireVersionIsLess) {
-    const auto outgoingMinWireVersion = WireSpec::instance().get()->outgoing.minWireVersion;
+    const auto outgoingMinWireVersion =
+        WireSpec::getWireSpec(getGlobalServiceContext()).getOutgoing().minWireVersion;
     const auto config = SdamConfiguration(kOneServer, TopologyType::kUnknown);
     const auto topologyDescription = std::make_shared<TopologyDescription>(config);
     const auto serverDescriptionMaxVersion = ServerDescriptionBuilder()
@@ -223,7 +240,8 @@ TEST_F(TopologyDescriptionTestFixture,
 }
 
 TEST_F(TopologyDescriptionTestFixture, ShouldNotSetWireCompatibilityErrorWhenServerTypeIsUnknown) {
-    const auto outgoingMinWireVersion = WireSpec::instance().get()->outgoing.minWireVersion;
+    const auto outgoingMinWireVersion =
+        WireSpec::getWireSpec(getGlobalServiceContext()).getOutgoing().minWireVersion;
     const auto config = SdamConfiguration(kOneServer, TopologyType::kUnknown);
     const auto topologyDescription = std::make_shared<TopologyDescription>(config);
     const auto serverDescriptionMaxVersion =
@@ -251,7 +269,7 @@ TEST_F(TopologyDescriptionTestFixture, ShouldSetLogicalSessionTimeoutToMinOfAllS
             return newInstanceBuilder.instance();
         });
 
-    for (auto description : serverDescriptionsWithTimeouts) {
+    for (const auto& description : serverDescriptionsWithTimeouts) {
         topologyDescription->installServerDescription(description);
     }
 
@@ -286,7 +304,7 @@ TEST_F(TopologyDescriptionTestFixture,
             return newInstance;
         });
 
-    for (auto description : serverDescriptionsWithTimeouts) {
+    for (const auto& description : serverDescriptionsWithTimeouts) {
         topologyDescription->installServerDescription(description);
     }
 

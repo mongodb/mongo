@@ -28,8 +28,6 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/client/authenticate.h"
 #include "mongo/config.h"
 #include "mongo/db/auth/cluster_auth_mode.h"
@@ -40,13 +38,15 @@
 
 namespace mongo {
 void ClusterAuthModeServerParameter::append(OperationContext*,
-                                            BSONObjBuilder& builder,
-                                            const std::string& fieldName) {
+                                            BSONObjBuilder* builder,
+                                            StringData fieldName,
+                                            const boost::optional<TenantId>&) {
     const auto clusterAuthMode = ClusterAuthMode::get(getGlobalServiceContext());
-    builder.append(fieldName, clusterAuthMode.toString());
+    builder->append(fieldName, clusterAuthMode.toString());
 }
 
-Status ClusterAuthModeServerParameter::setFromString(const std::string& strMode) try {
+Status ClusterAuthModeServerParameter::setFromString(StringData strMode,
+                                                     const boost::optional<TenantId>&) try {
     auto mode = uassertStatusOK(ClusterAuthMode::parse(strMode));
 
     auto sslMode = sslGlobalParams.sslMode.load();

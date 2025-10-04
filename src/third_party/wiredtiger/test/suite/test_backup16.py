@@ -27,11 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
-import os, shutil
-from helper import compare_files
 from wtbackup import backup_base
-from wtdataset import simple_key
-from wtscenario import make_scenarios
 
 # test_backup16.py
 # Ensure incremental backup doesn't copy unnecessary files.
@@ -146,9 +142,11 @@ class test_backup16(backup_base):
         self.add_data(self.uri5, self.bigkey, self.bigval, True)
         self.session.checkpoint()
 
-        # Validate these three files are included in the incremental.
+        # Validate these files are included in the incremental.
         # Both new tables should appear in the incremental and the old table with
-        # new data.
+        # new data. The old table with old data also appears because the full incremental
+        # forces a full checkpoint and that leads to a block in the existing file to
+        # change from writing new internal checkpoint information to the table itself.
         files_to_backup = [self.file1, self.file4, self.file5]
         self.verify_incr_backup(files_to_backup)
 
@@ -167,6 +165,3 @@ class test_backup16(backup_base):
         # see one file, the file that does not have any checkpoint information.
         files_to_backup = [self.file4]
         self.verify_incr_backup(files_to_backup)
-
-if __name__ == '__main__':
-    wttest.run()

@@ -1,11 +1,3 @@
-#
-# Public Domain 2014-present MongoDB, Inc.
-# Public Domain 2008-2014 WiredTiger, Inc.
-#  All rights reserved.
-#
-# See the file LICENSE for redistribution information.
-#
-
 include(cmake/strict/strict_flags_helpers.cmake)
 
 # Get common GNU flags.
@@ -22,7 +14,7 @@ list(APPEND gcc_flags "-Wsign-conversion")
 
 # Specific C flags:
 list(APPEND gcc_flags "-Wbad-function-cast")
-list(APPEND gcc_flags "-Wdeclaration-after-statement")
+list(APPEND gcc_flags "-Wno-declaration-after-statement")
 list(APPEND gcc_flags "-Wjump-misses-init")
 list(APPEND gcc_flags "-Wmissing-prototypes")
 list(APPEND gcc_flags "-Wnested-externs")
@@ -39,5 +31,11 @@ elseif(${CMAKE_C_COMPILER_VERSION} VERSION_EQUAL 5)
 elseif(${CMAKE_C_COMPILER_VERSION} VERSION_EQUAL 6)
     list(APPEND gcc_flags "-Wunsafe-loop-optimizations")
 endif()
+
+# In code coverage builds inline functions may not be inlined, which can result in additional
+# unused copies of those functions, so the unused-function warning much be turned off.
+if(CODE_COVERAGE_MEASUREMENT)
+    list(APPEND gcc_flags "-Wno-unused-function")
+endif ()
 
 set(COMPILER_DIAGNOSTIC_C_FLAGS ${gcc_flags})

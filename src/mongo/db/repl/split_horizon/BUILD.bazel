@@ -1,0 +1,40 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "split_horizon",
+    srcs = [
+        "split_horizon.cpp",
+    ],
+    hdrs = [
+        "split_horizon.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/util/concurrency:spin_lock",
+        "//src/mongo/util/net:network",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_repl_split_horizon_test",
+    srcs = [
+        "split_horizon_test.cpp",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    target_compatible_with = select({
+        "//bazel/config:use_wiredtiger_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":split_horizon",
+    ],
+)

@@ -1,0 +1,4 @@
+base_suite: jstestfuzz_replication
+overrides:
+  - "multiversion.replica_fixture_last_continuous_new_new_old"
+  - "multiversion.jstestfuzz_replication_multiversion_hooks"

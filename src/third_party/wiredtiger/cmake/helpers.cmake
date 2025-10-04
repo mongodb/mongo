@@ -1,11 +1,3 @@
-#
-# Public Domain 2014-present MongoDB, Inc.
-# Public Domain 2008-2014 WiredTiger, Inc.
-#  All rights reserved.
-#
-#  See the file LICENSE for redistribution information
-#
-
 include(CheckIncludeFiles)
 include(CheckSymbolExists)
 include(CheckLibraryExists)
@@ -14,7 +6,7 @@ include(CheckTypeSize)
 # Helper function for evaluating a list of dependencies. Mostly used by the
 # "config_X" helpers to evaluate the dependencies required to enable the config
 # option.
-#   depends - a list (semicolon seperated) of dependencies to evaluate.
+#   depends - a list (semicolon separated) of dependencies to evaluate.
 #   enabled - name of the output variable set with either 'ON' or 'OFF' (based
 #             on evaluated dependencies). Output variable is set in the callers scope.
 function(eval_dependency depends enabled)
@@ -42,7 +34,7 @@ endfunction()
 #   description - docstring to describe the configuration option (viewable in the cmake-gui).
 #   DEFAULT <default string> -  Default value of the configuration string. Used when not manually set
 #       by a cmake script or in the cmake-gui.
-#   DEPENDS <deps> - list of dependencies (semicolon seperated) required for the configuration string
+#   DEPENDS <deps> - list of dependencies (semicolon separated) required for the configuration string
 #       to be present and set in the cache. If any of the dependencies aren't met, the
 #       configuration value won't be present in the cache.
 #   INTERNAL - hides the configuration option from the cmake-gui by default. Useful if you don't want
@@ -92,7 +84,7 @@ endfunction()
 #   config_name - name of the configuration option.
 #   description - docstring to describe the configuration option (viewable in the cmake-gui).
 #   OPTIONS - a list of option values that the configuration option can be set to. Each option is itself a semicolon
-#       seperated list consisting of "<option-name>;<config-name>;<option-dependencies>".
+#       separated list consisting of "<option-name>;<config-name>;<option-dependencies>".
 #       * option-name: name of the given option stored in the ${config_name} cache variable and presented
 #           to users in the gui (usually something understandable).
 #       * config-name: an additional cached configuration variable that is made available if the option is selected.
@@ -180,7 +172,7 @@ endfunction()
 #   description - docstring to describe the configuration option (viewable in the cmake-gui).
 #   DEFAULT <default-value> -  default value of the configuration bool (ON/OFF). Used when not manually set
 #       by a cmake script or in the cmake-gui or when dependencies aren't met.
-#   DEPENDS <deps> - list of dependencies (semicolon seperated) required for the configuration bool
+#   DEPENDS <deps> - list of dependencies (semicolon separated) required for the configuration bool
 #       to be set to the desired value. If any of the dependencies aren't met the configuration value
 #       will be set to its default value.
 #   DEPENDS_ERROR <config-val> <error-string> - specifically throw a fatal error when the configuration option is set to
@@ -230,9 +222,9 @@ function(config_bool config_name description)
         # We want to ensure we capture a transition from a disabled to enabled state when dependencies are met.
         if(${config_name}_DISABLED)
             unset(${config_name}_DISABLED CACHE)
-            set(${config_name} ${CONFIG_BOOL_DEFAULT} CACHE STRING "${description}" FORCE)
+            set(${config_name} ${CONFIG_BOOL_DEFAULT} CACHE BOOL "${description}" FORCE)
         else()
-            set(${config_name} ${CONFIG_BOOL_DEFAULT} CACHE STRING "${description}")
+            set(${config_name} ${CONFIG_BOOL_DEFAULT} CACHE BOOL "${description}")
         endif()
     else()
         set(config_value "0")
@@ -247,7 +239,7 @@ function(config_bool config_name description)
             endif()
         endif()
         # Config doesn't meet dependency requirements, set its default state and flag it as disabled.
-        set(${config_name} OFF CACHE STRING "${description}" FORCE)
+        set(${config_name} OFF CACHE BOOL "${description}" FORCE)
         set(${config_name}_DISABLED ON CACHE INTERNAL "" FORCE)
     endif()
 endfunction()
@@ -259,7 +251,7 @@ endfunction()
 #   description - docstring to describe the configuration option (viewable in the cmake-gui).
 #   FUNC <function-symbol> - function symbol we want to search for.
 #   FILE <include-header> - header we expect the function symbol to be defined e.g a std header.
-#   DEPENDS <deps> - list of dependencies (semicolon seperated) required for the configuration to be evaluated.
+#   DEPENDS <deps> - list of dependencies (semicolon separated) required for the configuration to be evaluated.
 #       If any of the dependencies aren't met the configuration value will be set to '0' (false).
 #   LIBS <library-dependencies> - a list of any additional library dependencies needed to successfully link with the function symbol.
 function(config_func config_name description)
@@ -305,16 +297,16 @@ function(config_func config_name description)
         # We want to ensure we capture a transition from a disabled to enabled state when dependencies are met.
         if(${config_name}_DISABLED)
             unset(${config_name}_DISABLED CACHE)
-            set(${config_name} ${has_symbol} CACHE STRING "${description}" FORCE)
+            set(${config_name} ${has_symbol} CACHE BOOL "${description}" FORCE)
         else()
-            set(${config_name} ${has_symbol} CACHE STRING "${description}")
+            set(${config_name} ${has_symbol} CACHE BOOL "${description}")
         endif()
         # 'check_symbol_exists' sets our given temp variable into the cache. Clear this so it doesn't persist between
         # configuration runs.
         unset(has_symbol_${config_name} CACHE)
     else()
         # Config doesn't meet dependency requirements, set a disabled state.
-        set(${config_name} 0 CACHE INTERNAL "" FORCE)
+        set(${config_name} OFF CACHE INTERNAL "" FORCE)
         set(${config_name}_DISABLED ON CACHE INTERNAL "" FORCE)
     endif()
 endfunction()
@@ -326,7 +318,7 @@ endfunction()
 #   config_name - name of the configuration option.
 #   description - docstring to describe the configuration option (viewable in the cmake-gui).
 #   FILE <include-header> - header we want to search for e.g a std header.
-#   DEPENDS <deps> - list of dependencies (semicolon seperated) required for the configuration to be evaluated.
+#   DEPENDS <deps> - list of dependencies (semicolon separated) required for the configuration to be evaluated.
 #       If any of the dependencies aren't met the configuration value will be set to '0' (false).
 function(config_include config_name description)
     cmake_parse_arguments(
@@ -365,9 +357,9 @@ function(config_include config_name description)
         # We want to ensure we capture a transition from a disabled to enabled state when dependencies are met.
         if(${config_name}_DISABLED)
             unset(${config_name}_DISABLED CACHE)
-            set(${config_name} ${has_include} CACHE STRING "${description}" FORCE)
+            set(${config_name} ${has_include} CACHE BOOL "${description}" FORCE)
         else()
-            set(${config_name} ${has_include} CACHE STRING "${description}")
+            set(${config_name} ${has_include} CACHE BOOL "${description}")
         endif()
         # 'check_include_files' sets our given temp variable into the cache. Clear this so it doesn't persist between
         # configuration runs.
@@ -389,7 +381,7 @@ endfunction()
 #   description - docstring to describe the configuration option (viewable in the cmake-gui).
 #   LIB <library> - library we are searching for (defined as if we are linking against it e.g -lpthread).
 #   FUNC <function-symbol> - function symbol we expect to be available to link against within the library.
-#   DEPENDS <deps> - list of dependencies (semicolon seperated) required for the configuration to be evaluated.
+#   DEPENDS <deps> - list of dependencies (semicolon separated) required for the configuration to be evaluated.
 #       If any of the dependencies aren't met the configuration value will be set to '0' (false).
 function(config_lib config_name description)
     cmake_parse_arguments(
@@ -412,7 +404,7 @@ function(config_lib config_name description)
     # Check that the configs dependencies are enabled before setting it to a visible enabled state.
     eval_dependency("${CONFIG_LIB_DEPENDS}" enabled)
     if(enabled)
-        message("-- Looking for library ${CONFIG_LIB_LIB}")
+        message(CHECK_START "Looking for library ${CONFIG_LIB_LIB}")
         # 'check_library_exists' won't use our current cache when test compiling the library.
         # To get around this we need to ensure we manually forward WT_ARCH and WT_OS as a minimum. This is particularly
         # needed if 'check_library_exists' will leverage one of our toolchain files.
@@ -428,17 +420,17 @@ function(config_lib config_name description)
             if (CONFIG_LIB_HEADER)
                 find_path(include_path_${config_name} ${CONFIG_LIB_HEADER})
                 if (include_path_${config_name})
-                    message("-- Looking for library ${CONFIG_LIB_LIB}: found ${has_lib_${config_name}}, include path ${include_path_${config_name}}")
+                    message(CHECK_PASS "found ${has_lib_${config_name}}, include path ${include_path_${config_name}}")
                     set(has_include ${include_path_${config_name}})
                 else()
-                    message("-- Looking for library ${CONFIG_LIB_LIB}: found ${has_lib_${config_name}}")
+                    message(CHECK_PASS "found ${has_lib_${config_name}}")
                 endif()
                 unset(include_path_${config_name} CACHE)
             else()
-                message("-- Looking for library ${CONFIG_LIB_LIB}: found ${has_lib_${config_name}}")
+                message(CHECK_PASS "found ${has_lib_${config_name}}")
             endif()
         else()
-            message("-- Looking for library ${CONFIG_LIB_LIB}: NOT found")
+            message(CHECK_FAIL "not found")
         endif()
         # Set an internal cache variable "${config_name}_DISABLED" to capture its enabled/disabled state.
         # We want to ensure we capture a transition from a disabled to enabled state when dependencies are met.
@@ -454,7 +446,7 @@ function(config_lib config_name description)
         # configuration runs.
         unset(has_lib_${config_name} CACHE)
     else()
-        message("-- Not looking for library ${CONFIG_LIB_LIB}: disabled")
+        message(STATUS "Not looking for library ${CONFIG_LIB_LIB}: disabled")
         set(${config_name} 0 CACHE INTERNAL "" FORCE)
         set(${config_name}_DISABLED ON CACHE INTERNAL "" FORCE)
     endif()
@@ -468,7 +460,7 @@ endfunction()
 #   config_name - name of the configuration option.
 #   description - docstring to describe the configuration option (viewable in the cmake-gui).
 #   SOURCE <source-file> - specific source file we want to test compile.
-#   DEPENDS <deps> - list of dependencies (semicolon seperated) required for the configuration to be evaluated.
+#   DEPENDS <deps> - list of dependencies (semicolon separated) required for the configuration to be evaluated.
 #       If any of the dependencies aren't met the configuration value will be set to '0' (false).
 #   LIBS <library-dependencies> - a list of any additional library dependencies needed to successfully compile the source.
 function(config_compile config_name description)
@@ -523,74 +515,6 @@ function(config_compile config_name description)
     endif()
 endfunction()
 
-# test_type_size(type output_size)
-# Helper function that tests for a given types size and returns its value if found.
-#   type - name of the type to test.
-#   output_size - name of the output variable, set with either the types size or "" (empty string)
-#       if not found.
-#   EXTRA_INCLUDES - extra/optional include files to access the given type e.g. a custom typedef in an include header.
-function(test_type_size type output_size)
-    cmake_parse_arguments(
-        PARSE_ARGV
-        2
-        "TEST_TYPE"
-        ""
-        ""
-        "EXTRA_INCLUDES"
-    )
-
-    if (NOT "${TEST_TYPE_UNPARSED_ARGUMENTS}" STREQUAL "")
-        message(FATAL_ERROR "Unknown arguments to assert_type: ${TEST_TYPE_UNPARSED_ARGUMENTS}")
-    endif()
-
-    set(CMAKE_EXTRA_INCLUDE_FILES "${TEST_TYPE_EXTRA_INCLUDES}")
-    check_type_size(${type} TEST_TYPE)
-    set(CMAKE_EXTRA_INCLUDE_FILES)
-
-    if(NOT HAVE_TEST_TYPE)
-        set(${output_size} "" PARENT_SCOPE)
-    else()
-        set(${output_size} ${TEST_TYPE} PARENT_SCOPE)
-    endif()
-endfunction()
-
-# assert_type_size(type size)
-# Wrapper function around 'test_type_size' that additionally asserts whether the given types meets an expected size.
-# Throws a fatal error if the type is not found or doesn't equal the expected size.
-#   type - name of the type to test.
-#   size - expected size of the type.
-#   EXTRA_INCLUDES - extra/optional include files to access the given type e.g. a custom typedef in an include header.
-function(assert_type_size type size)
-    cmake_parse_arguments(
-        PARSE_ARGV
-        2
-        "ASSERT_TYPE"
-        ""
-        ""
-        "EXTRA_INCLUDES"
-    )
-
-    if (NOT "${ASSERT_TYPE_UNPARSED_ARGUMENTS}" STREQUAL "")
-        message(FATAL_ERROR "Unknown arguments to assert_type: ${ASSERT_TYPE_UNPARSED_ARGUMENTS}")
-    endif()
-
-    set(additional_args "")
-    if(${ASSERT_TYPE_EXTRA_INCLUDES})
-        set(additional_args "EXTRA_INCLUDES ${ASSERT_TYPE_EXTRA_INCLUDES}")
-    endif()
-    test_type_size(${type} output_type_size ${additional_args})
-
-    if(${output_type_size} EQUAL "")
-        # Type does not exist.
-        message(FATAL_ERROR "Type assertion failed: ${type} does not exists")
-    endif()
-
-    if((NOT ${size} EQUAL 0) AND (NOT ${output_type_size} EQUAL ${size}))
-        # Type does not meet size assertion.
-        message(FATAL_ERROR "Type assertion failed: ${type} does not equal size ${size}")
-    endif()
-endfunction()
-
 # parse_filelist_source(filelist output_var)
 # A helper function that parses the list of sources (usually found in "dist/filelist"). This returning a list of
 # sources that can then be used to generate the necessary build rules for the wiredtiger library. Additionally
@@ -610,10 +534,16 @@ function(parse_filelist_source filelist output_var)
         set(arch_host "POWERPC_HOST")
     elseif(WT_S390X)
         set(arch_host "ZSERIES_HOST")
+    elseif(WT_RISCV64)
+        set(arch_host "RISCV64_HOST")
+    elseif(WT_LOONGARCH64)
+        set(arch_host "LOONGARCH64_HOST")
     endif()
-    # Determine platform host for our filelist parse.
-    if(WT_POSIX)
-        set(plat_host "POSIX_HOST")
+
+    if(WT_LINUX)
+        set(plat_host "LINUX_HOST;POSIX_HOST")
+    elseif(WT_DARWIN)
+        set(plat_host "DARWIN_HOST;POSIX_HOST")
     elseif(WT_WIN)
         set(plat_host "WINDOWS_HOST")
     endif()
@@ -633,13 +563,22 @@ function(parse_filelist_source filelist output_var)
         elseif(file_contents_len EQUAL 2)
             list(GET file_contents 0 file_name)
             list(GET file_contents 1 file_group)
-            if ((${file_group} STREQUAL "${plat_host}") OR (${file_group} STREQUAL "${arch_host}"))
+
+            # CMake does not support testing for membership in a list.
+            set(plat_index "-1")
+            list(FIND plat_host "${file_group}" plat_index)
+            if (("${plat_index}" GREATER_EQUAL "0") OR (${file_group} STREQUAL "${arch_host}"))
                 list(APPEND output_files ${file_name})
                 get_filename_component(file_ext ${file_name} EXT)
                 # POWERPC and ZSERIES hosts use the '.sx' extension for their ASM files. We need to
                 # manually tell CMake to ASM compile these files otherwise it will ignore them during
                 # compilation process.
                 if("${file_ext}" STREQUAL ".sx")
+                    if("${CMAKE_C_COMPILER_ID}" MATCHES "[Cc]lang")
+                        # If compiling PPC and ZSERIES assembly with Clang, we need to explicitly pass the language
+                        # type onto the compiler, since the 'sx' extension is unknown.
+                        set_source_files_properties(${file_name} PROPERTIES COMPILE_FLAGS "-x assembler-with-cpp")
+                    endif()
                     set_source_files_properties(${file_name} PROPERTIES LANGUAGE ASM)
                 endif()
             endif()
@@ -650,34 +589,143 @@ function(parse_filelist_source filelist output_var)
     set(${output_var} ${output_files} PARENT_SCOPE)
 endfunction()
 
-macro(source_python3_package python_libs python_version python_executable)
-    set(required_version)
-    if(PYTHON3_REQUIRED_VERSION)
-        if(NOT PYTHON3_REQUIRED_VERSION MATCHES "^([0-9]+)(\\.[0-9]+(\\.[0-9]+)?)?$")
-            message(FATAL_ERROR "Invalid value for PYTHON3_REQUIRED_VERSION: Requires a valid version string \
-                Provide a version number following the format: major[.minor[.patch]]")
-        endif()
-        if ("${PYTHON3_REQUIRED_VERSION}" VERSION_LESS 3)
-            message(FATAL_ERROR "Invalid value for PYTHON3_REQUIRED_VERSION: Requires a Python version >= 3")
-        endif()
-        set(required_version ${PYTHON3_REQUIRED_VERSION} EXACT)
+# add_cmake_flag(dest_var flag)
+# A helper function that adds a CMake flag to a list of included flags if it's not already present.
+function(add_cmake_flag included_flags flag)
+    # Add extra spaces to ensure we only match whole flags.
+    # This avoids partial matches and ensures correct match at the start/end of the string.
+    string(FIND " ${${included_flags}} " " ${flag} " flag_position)
+    if(flag_position EQUAL -1)
+        set(${included_flags} "${${included_flags}} ${flag}" CACHE STRING "" FORCE)
     endif()
-    if("${CMAKE_VERSION}" VERSION_LESS "3.12.0")
-        # This method of finding python libs has been deprecated since version 3.12.
-        # If we are running with a greater CMake version, opt to use the Python3 package.
-        set(Python_ADDITIONAL_VERSIONS 3.9 3.8 3.7 3.6 3.5)
-        find_package(PythonInterp ${required_version} REQUIRED)
-        find_package(PythonLibs ${required_version} REQUIRED)
-        include_directories(${PYTHON_INCLUDE_DIRS})
-        set(${python_libs} ${PYTHON_LIBRARIES})
-        set(${python_version} ${PYTHON_VERSION_STRING})
-        set(${python_executable} ${PYTHON_EXECUTABLE})
-    else()
-        find_package(Python3 ${required_version} COMPONENTS Interpreter Development REQUIRED)
-        include_directories(${Python3_INCLUDE_DIRS})
-        set(${python_libs} ${Python3_LIBRARIES})
-        set(${python_version} ${Python3_VERSION})
-        set(${python_executable} ${Python3_EXECUTABLE})
+endfunction()
+
+# add_cmake_compiler_flags(FLAGS <flags...> LANGUAGES <languages...> BUILD_TYPES <build_types...>)
+# A helper function that adds one or more compiler flags to specified languages and build types,
+# avoiding duplication by using the existing add_cmake_flag function.
+#   FLAGS <flags...> - one or more compilation flags to add
+#   LANGUAGES <languages...> - one or more languages (C, CXX, etc.)
+#   BUILD_TYPES <build_types...> - one or more build types (Debug, RelWithDebInfo, Release, etc.)
+function(add_cmake_compiler_flags)
+    cmake_parse_arguments(
+        PARSE_ARGV
+        0
+        "COMPILER_FLAGS"
+        ""
+        ""
+        "FLAGS;LANGUAGES;BUILD_TYPES"
+    )
+
+    # Validate required arguments
+    if(NOT COMPILER_FLAGS_FLAGS)
+        message(FATAL_ERROR "add_cmake_compiler_flags: FLAGS argument is required")
+    endif()
+    if(NOT COMPILER_FLAGS_LANGUAGES)
+        message(FATAL_ERROR "add_cmake_compiler_flags: LANGUAGES argument is required")
+    endif()
+    if(NOT COMPILER_FLAGS_BUILD_TYPES)
+        message(FATAL_ERROR "add_cmake_compiler_flags: BUILD_TYPES argument is required")
     endif()
 
-endmacro()
+    # Add each flag to each language/build_type combination
+    foreach(lang ${COMPILER_FLAGS_LANGUAGES})
+        foreach(build_type ${COMPILER_FLAGS_BUILD_TYPES})
+            # Convert build type to uppercase for CMAKE variable names
+            string(TOUPPER "${build_type}" build_type_upper)
+
+            # Initialize the flags variable if not already defined
+            if(NOT DEFINED CMAKE_${lang}_FLAGS_${build_type_upper})
+                set(CMAKE_${lang}_FLAGS_${build_type_upper} "")
+            endif()
+
+            # Add each flag while avoiding duplication
+            foreach(flag ${COMPILER_FLAGS_FLAGS})
+                add_cmake_flag(CMAKE_${lang}_FLAGS_${build_type_upper} "${flag}")
+            endforeach()
+        endforeach()
+    endforeach()
+endfunction()
+
+# add_cmake_linker_flags(FLAGS <flags...> BINARIES <binaries...> BUILD_TYPES <build_types...>)
+# A helper function that adds one or more linker flags to specified binary types and build types,
+# avoiding duplication by using the existing add_cmake_flag function.
+#   FLAGS <flags...> - one or more linker flags to add
+#   BINARIES <binaries...> - one or more binary types (EXE, SHARED, MODULE, etc.)
+#   BUILD_TYPES <build_types...> - one or more build types (Debug, RelWithDebInfo, Release, etc.)
+function(add_cmake_linker_flags)
+    cmake_parse_arguments(
+        PARSE_ARGV
+        0
+        "LINKER_FLAGS"
+        ""
+        ""
+        "FLAGS;BINARIES;BUILD_TYPES"
+    )
+
+    # Validate required arguments
+    if(NOT LINKER_FLAGS_FLAGS)
+        message(FATAL_ERROR "add_cmake_linker_flags: FLAGS argument is required")
+    endif()
+    if(NOT LINKER_FLAGS_BINARIES)
+        message(FATAL_ERROR "add_cmake_linker_flags: BINARIES argument is required")
+    endif()
+    if(NOT LINKER_FLAGS_BUILD_TYPES)
+        message(FATAL_ERROR "add_cmake_linker_flags: BUILD_TYPES argument is required")
+    endif()
+
+    # Add each flag to each binary_type/build_type combination
+    foreach(binary ${LINKER_FLAGS_BINARIES})
+        foreach(build_type ${LINKER_FLAGS_BUILD_TYPES})
+            # Convert build type to uppercase for CMAKE variable names
+            string(TOUPPER "${build_type}" build_type_upper)
+
+            # Initialize the flags variable if not already defined
+            if(NOT DEFINED CMAKE_${binary}_LINKER_FLAGS_${build_type_upper})
+                set(CMAKE_${binary}_LINKER_FLAGS_${build_type_upper} "")
+            endif()
+
+            # Add each flag while avoiding duplication
+            foreach(flag ${LINKER_FLAGS_FLAGS})
+                add_cmake_flag(CMAKE_${binary}_LINKER_FLAGS_${build_type_upper} "${flag}")
+            endforeach()
+        endforeach()
+    endforeach()
+endfunction()
+
+
+# replace_compile_options(flag_var [REMOVE <flags...>] [ADD <flags...>])
+# A helper function that removes specified compiler flags from a flag variable and optionally adds new ones.
+# This is useful for replacing default compiler flags with custom ones while maintaining clean flag strings.
+#   flag_var - name of the variable containing compiler flags to modify (modified in parent scope)
+#   REMOVE <flags...> - list of flags to remove from the flag variable
+#   ADD <flags...> - list of flags to add to the flag variable after removal
+function(replace_compile_options flag_var)
+    cmake_parse_arguments(
+        PARSE_ARGV
+        1
+        "REPLACE"
+        ""
+        ""
+        "REMOVE;ADD"
+    )
+
+    # Remove existing flags
+    foreach(flag ${REPLACE_REMOVE})
+        # Add extra spaces to ensure we only match whole flags.
+        # This avoids partial matches and ensures correct match at the start/end of the string.
+        string(REPLACE " ${flag} " "" ${flag_var} " ${${flag_var}} ")
+    endforeach()
+
+    # Clean up extra spaces
+    string(STRIP "${${flag_var}}" ${flag_var})
+
+    # Add custom flags if provided
+    foreach(flag ${REPLACE_ADD})
+        set(${flag_var} "${${flag_var}} ${flag}")
+    endforeach()
+
+    # Clean up extra spaces
+    string(STRIP "${${flag_var}}" ${flag_var})
+
+    set(${flag_var} "${${flag_var}}" CACHE STRING "" FORCE)
+endfunction()

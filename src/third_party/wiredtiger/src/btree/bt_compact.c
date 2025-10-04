@@ -21,6 +21,8 @@ __compact_page_inmem_check_addrs(WT_SESSION_IMPL *session, WT_REF *ref, bool *sk
     WT_PAGE_MODIFY *mod;
     uint32_t i;
 
+    WT_ASSERT_SPINLOCK_OWNED(session, &S2BT(session)->flush_lock);
+
     *skipp = true; /* Default skip. */
 
     bm = S2BT(session)->bm;
@@ -37,14 +39,15 @@ __compact_page_inmem_check_addrs(WT_SESSION_IMPL *session, WT_REF *ref, bool *sk
      */
     mod = ref->page->modify;
     if (mod->rec_result == WT_PM_REC_REPLACE)
-        return (
-          bm->compact_page_skip(bm, session, mod->mod_replace.addr, mod->mod_replace.size, skipp));
+        return (bm->compact_page_skip(
+          bm, session, mod->mod_replace.block_cookie, mod->mod_replace.block_cookie_size, skipp));
 
     if (mod->rec_result == WT_PM_REC_MULTIBLOCK)
         for (multi = mod->mod_multi, i = 0; i < mod->mod_multi_entries; ++multi, ++i) {
-            if (multi->addr.addr == NULL)
+            if (multi->addr.block_cookie == NULL)
                 continue;
-            WT_RET(bm->compact_page_skip(bm, session, multi->addr.addr, multi->addr.size, skipp));
+            WT_RET(bm->compact_page_skip(
+              bm, session, multi->addr.block_cookie, multi->addr.block_cookie_size, skipp));
             if (!*skipp)
                 break;
         }
@@ -60,6 +63,8 @@ static int
 __compact_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 {
     *skipp = true; /* Default skip. */
+
+    WT_ASSERT_SPINLOCK_OWNED(session, &S2BT(session)->flush_lock);
 
     /*
      * Ignore dirty pages, checkpoint will likely write them. There are cases where checkpoint can
@@ -99,6 +104,8 @@ __compact_page_replace_addr(WT_SESSION_IMPL *session, WT_REF *ref, WT_ADDR_COPY 
     WT_CELL_UNPACK_ADDR unpack;
     WT_DECL_RET;
 
+    WT_ASSERT_SPINLOCK_OWNED(session, &S2BT(session)->flush_lock);
+
     /*
      * If there's no address at all (the page has never been written), allocate a new WT_ADDR
      * structure, otherwise, the address has already been instantiated, replace the cookie.
@@ -107,7 +114,7 @@ __compact_page_replace_addr(WT_SESSION_IMPL *session, WT_REF *ref, WT_ADDR_COPY 
     WT_ASSERT(session, addr != NULL);
 
     if (__wt_off_page(ref->home, addr))
-        __wt_free(session, addr->addr);
+        __wti_ref_addr_safe_free(session, addr->block_cookie, addr->block_cookie_size);
     else {
         __wt_cell_unpack_addr(session, ref->home->dsk, (WT_CELL *)addr, &unpack);
 
@@ -119,6 +126,9 @@ __compact_page_replace_addr(WT_SESSION_IMPL *session, WT_REF *ref, WT_ADDR_COPY 
         addr->ta.newest_stop_ts = unpack.ta.newest_stop_ts;
         addr->ta.newest_stop_txn = unpack.ta.newest_stop_txn;
         switch (unpack.raw) {
+        case WT_CELL_ADDR_DEL:
+            addr->type = WT_ADDR_LEAF_NO;
+            break;
         case WT_CELL_ADDR_INT:
             addr->type = WT_ADDR_INT;
             break;
@@ -131,8 +141,8 @@ __compact_page_replace_addr(WT_SESSION_IMPL *session, WT_REF *ref, WT_ADDR_COPY 
         }
     }
 
-    WT_ERR(__wt_strndup(session, copy->addr, copy->size, &addr->addr));
-    addr->size = copy->size;
+    WT_ERR(__wt_strndup(session, copy->addr, copy->size, &addr->block_cookie));
+    addr->block_cookie_size = copy->size;
 
     ref->addr = addr;
     return (0);
@@ -153,32 +163,37 @@ __compact_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
     WT_ADDR_COPY copy;
     WT_BM *bm;
     WT_DECL_RET;
+    WT_REF_STATE previous_state;
     size_t addr_size;
-    uint8_t previous_state;
 
     *skipp = true; /* Default skip. */
+
+    WT_ASSERT_SPINLOCK_OWNED(session, &S2BT(session)->flush_lock);
 
     /* Lock the WT_REF. */
     WT_REF_LOCK(session, ref, &previous_state);
 
     /*
-     * Skip deleted pages but consider them progress (the on-disk block is discarded by the next
-     * checkpoint).
+     * Don't bother rewriting deleted pages but also don't skip. The on-disk block with an address
+     * is discarded by the next checkpoint, if it has not already been freed.
      */
-    if (previous_state == WT_REF_DELETED)
+    if (previous_state == WT_REF_DELETED && ref->page_del == NULL && ref->addr != NULL)
         *skipp = false;
 
     /*
-     * If it's on-disk, get a copy of the address and ask the block manager to rewrite the block if
+     * If it's on disk, get a copy of the address and ask the block manager to rewrite the block if
      * it's useful. This is safe because we're holding the WT_REF locked, so nobody can read the
-     * page giving eviction a chance to modify the address.
+     * page giving eviction a chance to modify the address. Note that a deleted ref that is not
+     * globally visible is still on disk.
      *
      * In this path, we are holding the WT_REF lock across two OS buffer cache I/Os (the read of the
      * original block and the write of the new block), plus whatever overhead that entails. It's not
      * ideal, we could release the lock, but then we'd have to deal with the block having been read
      * into memory while we were moving it.
      */
-    if (previous_state == WT_REF_DISK && __wt_ref_addr_copy(session, ref, &copy)) {
+    if ((previous_state == WT_REF_DISK ||
+          (previous_state == WT_REF_DELETED && ref->page_del != NULL)) &&
+      __wt_ref_addr_copy(session, ref, &copy)) {
         bm = S2BT(session)->bm;
         addr_size = copy.size;
         WT_ERR(bm->compact_page_rewrite(bm, session, copy.addr, &addr_size, skipp));
@@ -201,9 +216,8 @@ __compact_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
      * application's worker threads: we could release the lock, but then we'd have to acquire a
      * hazard pointer to ensure eviction didn't select the page.
      */
-    if (previous_state == WT_REF_MEM) {
+    if (previous_state == WT_REF_MEM)
         WT_ERR(__compact_page_inmem(session, ref, skipp));
-    }
 
 err:
     WT_REF_UNLOCK(ref, previous_state);
@@ -222,16 +236,34 @@ __compact_walk_internal(WT_SESSION_IMPL *session, WT_REF *parent)
     WT_REF *ref;
     bool overall_progress, skipp;
 
+    WT_ASSERT(session, F_ISSET(parent, WT_REF_FLAG_INTERNAL));
+
     ref = NULL; /* [-Wconditional-uninitialized] */
 
     /*
      * We could corrupt a checkpoint if we moved a block that's part of the checkpoint, that is, if
      * we race with checkpoint's review of the tree. Get the tree's flush lock which blocks threads
-     * writing pages for checkpoints, and hold it long enough to review a single internal page. Quit
-     * working the file if checkpoint is holding the lock, checkpoint holds the lock for relatively
-     * long periods.
+     * writing pages for checkpoints, and hold it long enough to review a single internal page. If
+     * checkpoint has the lock, check for a compact interrupt and cache stuck before trying again.
      */
-    WT_RET(__wt_spin_trylock(session, &S2BT(session)->flush_lock));
+    while ((ret = __wt_spin_trylock(session, &S2BT(session)->flush_lock)) == EBUSY) {
+        WT_STAT_CONN_INCR(session, session_table_compact_conflicting_checkpoint);
+
+        __wt_verbose_level(session, WT_VERB_COMPACT, WT_VERBOSE_DEBUG_1,
+          "The compaction of the data handle %s returned EBUSY due to an in-progress "
+          "conflicting checkpoint. Compaction of this data handle will resume after checkpoint "
+          "completes.",
+          session->dhandle->name);
+
+        WT_RET(__wt_session_compact_check_interrupted(session));
+
+        if (__wt_evict_cache_stuck(session))
+            WT_RET(EBUSY);
+
+        __wt_sleep(1, 0);
+    }
+
+    WT_ERR(ret);
 
     /*
      * Walk the internal page and check any leaf pages it references; skip internal pages, we'll
@@ -276,10 +308,12 @@ err:
  *     Skip leaf pages, all we want are internal pages.
  */
 static int
-__compact_walk_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, void *context, bool *skipp)
+__compact_walk_page_skip(
+  WT_SESSION_IMPL *session, WT_REF *ref, void *context, bool visible_all, bool *skipp)
 {
     WT_UNUSED(context);
     WT_UNUSED(session);
+    WT_UNUSED(visible_all);
 
     /* All we want are the internal pages. */
     *skipp = F_ISSET(ref, WT_REF_FLAG_LEAF) ? true : false;
@@ -296,17 +330,15 @@ __wt_compact(WT_SESSION_IMPL *session)
     WT_BM *bm;
     WT_DECL_RET;
     WT_REF *ref;
-    u_int i, msg_count;
-    bool skip;
+    u_int i;
+    bool eviction_happened, first, skip;
 
-    uint64_t stats_pages_rewritten; /* Pages rewritten */
-    uint64_t stats_pages_reviewed;  /* Pages reviewed */
-    uint64_t stats_pages_skipped;   /* Pages skipped */
+    uint64_t stats_pages_reviewed; /* Pages reviewed */
 
     bm = S2BT(session)->bm;
     ref = NULL;
 
-    WT_STAT_DATA_INCR(session, session_compact);
+    WT_STAT_DSRC_INCR(session, session_compact);
 
     /*
      * Check if compaction might be useful (the API layer will quit trying to compact the data
@@ -315,31 +347,37 @@ __wt_compact(WT_SESSION_IMPL *session)
     WT_RET(bm->compact_skip(bm, session, &skip));
     if (skip) {
         WT_STAT_CONN_INCR(session, session_table_compact_skipped);
-        WT_STAT_DATA_INCR(session, btree_compact_skipped);
+        WT_STAT_DSRC_INCR(session, btree_compact_skipped);
+
+        /*
+         * Print the "skipping compaction" message only if this is the first time we are working on
+         * this table.
+         */
+        __wt_block_compact_get_progress_stats(session, bm, &stats_pages_reviewed);
+        if (stats_pages_reviewed == 0)
+            __wt_verbose_info(session, WT_VERB_COMPACT,
+              "%s: there is no useful work to do - skipping compaction", bm->block->name);
+
         return (0);
     }
 
     /* Walk the tree reviewing pages to see if they should be re-written. */
+    first = true;
     for (i = 0;;) {
 
-        /* Track progress. */
-        __wt_block_compact_get_progress_stats(
-          session, bm, &stats_pages_reviewed, &stats_pages_skipped, &stats_pages_rewritten);
-        WT_STAT_DATA_SET(session, btree_compact_pages_reviewed, stats_pages_reviewed);
-        WT_STAT_DATA_SET(session, btree_compact_pages_skipped, stats_pages_skipped);
-        WT_STAT_DATA_SET(session, btree_compact_pages_rewritten, stats_pages_rewritten);
-
         /*
-         * Periodically check if we've timed out or eviction is stuck. Quit if eviction is stuck,
-         * we're making the problem worse.
+         * Periodically check if compaction has been interrupted or if eviction is stuck, quit if
+         * this is the case.
          */
-        if (++i > 100) {
-            bm->compact_progress(bm, session, &msg_count);
-            WT_ERR(__wt_session_compact_check_timeout(session));
+        if (first || ++i > 100) {
+            if (!first)
+                bm->compact_progress(bm, session);
+            WT_ERR(__wt_session_compact_check_interrupted(session));
 
-            if (__wt_cache_stuck(session))
+            if (__wt_evict_cache_stuck(session))
                 WT_ERR(EBUSY);
 
+            first = false;
             i = 0;
         }
 
@@ -347,19 +385,35 @@ __wt_compact(WT_SESSION_IMPL *session)
          * Compact pulls pages into cache during the walk without checking whether the cache is
          * full. Check now to throttle compact to match eviction speed.
          */
-        WT_ERR(__wt_cache_eviction_check(session, false, false, NULL));
+        WT_ERR(
+          __wt_evict_app_assist_worker_check(session, false, false, false, &eviction_happened));
+        if (eviction_happened)
+            WT_STAT_CONN_INCR(session, session_table_compact_eviction);
 
         /*
          * Pages read for compaction aren't "useful"; don't update the read generation of pages
          * already in memory, and if a page is read, set its generation to a low value so it is
          * evicted quickly.
          */
-        WT_ERR(__wt_tree_walk_custom_skip(
-          session, &ref, __compact_walk_page_skip, NULL, WT_READ_NO_GEN | WT_READ_WONT_NEED));
+        WT_ERR(__wt_tree_walk_custom_skip(session, &ref, __compact_walk_page_skip, NULL,
+          WT_READ_INTERNAL_OP | WT_READ_VISIBLE_ALL | WT_READ_WONT_NEED));
         if (ref == NULL)
             break;
 
-        WT_WITH_PAGE_INDEX(session, ret = __compact_walk_internal(session, ref));
+        /*
+         * The compact walk only flags internal pages for review, but there is a rare case where an
+         * WT_REF in the WT_REF_DISK state pointing to an internal page, can transition to a leaf
+         * page when it is being read in. Handle that here, by re-checking the page type now that
+         * the page is in memory.
+         */
+        if (F_ISSET(ref, WT_REF_FLAG_INTERNAL)) {
+            bm->block->compact_internal_pages_reviewed++;
+            WT_WITH_PAGE_INDEX(session, ret = __compact_walk_internal(session, ref));
+        }
+
+        /* Track progress. */
+        __wt_block_compact_get_progress_stats(session, bm, &stats_pages_reviewed);
+
         WT_ERR(ret);
     }
 

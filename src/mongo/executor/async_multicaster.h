@@ -29,13 +29,18 @@
 
 #pragma once
 
-#include <memory>
-#include <vector>
-
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <tuple>
+#include <vector>
 
 namespace mongo {
 namespace executor {
@@ -67,7 +72,7 @@ public:
      *   timeoutMillis * (servers.size() / maxConcurrency) - if not
      */
     std::vector<Reply> multicast(std::vector<HostAndPort> servers,
-                                 const std::string& theDbName,
+                                 const DatabaseName& theDbName,
                                  const BSONObj& theCmdObj,
                                  OperationContext* opCtx,
                                  Milliseconds timeoutMillis);

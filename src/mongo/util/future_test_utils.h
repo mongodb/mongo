@@ -29,16 +29,17 @@
 
 #pragma once
 
-#include "mongo/util/future.h"
-
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/concepts.h"
 #include "mongo/util/executor_test_util.h"
+#include "mongo/util/future.h"
 
-#if !defined(__has_feature)
-#define __has_feature(x) 0
+/** Workaround for bug in MSVC 2022's lambda processor. See SERVER-62480. */
+#ifdef _MSC_VER
+#define FTU_LAMBDA_R(...) ->__VA_ARGS__
+#else
+#define FTU_LAMBDA_R(...)
 #endif
 
 namespace mongo {
@@ -63,12 +64,6 @@ class DummyInterruptible final : public Interruptible {
     Status checkForInterruptNoAssert() noexcept override {
         // Must be implemented because it's called by Interruptible::waitForConditionOrInterrupt.
         return Status::OK();
-    }
-    IgnoreInterruptsState pushIgnoreInterrupts() override {
-        MONGO_UNREACHABLE;
-    }
-    void popIgnoreInterrupts(IgnoreInterruptsState iis) override {
-        MONGO_UNREACHABLE;
     }
     DeadlineState pushArtificialDeadline(Date_t deadline, ErrorCodes::Error error) override {
         MONGO_UNREACHABLE;
@@ -112,8 +107,7 @@ Future<Result> async(Func&& func) {
         } catch (const DBException& ex) {
             promise.setError(ex.toStatus());
         }
-    })
-        .detach();
+    }).detach();
 
     return std::move(pf.future);
 }

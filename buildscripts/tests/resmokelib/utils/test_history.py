@@ -1,11 +1,8 @@
-"""Unit tests for buildscripts/resmokelib/utils/scheduler.py."""
+"""Unit tests for buildscripts/resmokelib/utils/history.py."""
 
-import sched
 import unittest
 
 from buildscripts.resmokelib.utils.history import HistoryDict, make_historic
-
-# pylint: disable=missing-docstring
 
 
 class TestHistory(unittest.TestCase):
@@ -200,5 +197,5 @@ History:
         self.assertTrue(test_dict.write_equals(second_dict))
 
         # Reads aren't counted
-        gotten_value = second_dict["foo"]  # pylint: disable=unused-variable
+        _ = second_dict["foo"]
         self.assertTrue(test_dict.write_equals(second_dict))

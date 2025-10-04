@@ -27,28 +27,36 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 #include "mongo/db/pipeline/document_source_match.h"
-
-#include <algorithm>
-#include <memory>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_leaf.h"
-#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
-#include "mongo/db/pipeline/document_path_support.h"
-#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/semantic_analysis.h"
-#include "mongo/util/ctype.h"
+#include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/query/compiler/dependency_analysis/match_expression_dependencies.h"
+#include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
+#include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
+#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <cstddef>
+#include <iterator>
+#include <list>
+#include <memory>
+#include <type_traits>
+#include <vector>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -63,15 +71,60 @@ REGISTER_DOCUMENT_SOURCE(match,
                          DocumentSourceMatch::createFromBson,
                          AllowedWithApiStrict::kAlways);
 
-const char* DocumentSourceMatch::getSourceName() const {
-    return kStageName.rawData();
+ALLOCATE_DOCUMENT_SOURCE_ID(match, DocumentSourceMatch::id)
+
+bool DocumentSourceMatch::containsTextOperator(const MatchExpression& expr) {
+    if (expr.matchType() == MatchExpression::MatchType::TEXT)
+        return true;
+    for (auto child : expr) {
+        if (containsTextOperator(*child))
+            return true;
+    }
+    return false;
 }
 
-Value DocumentSourceMatch::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
-    if (explain) {
-        BSONObjBuilder builder;
-        _expression->serialize(&builder);
-        return Value(DOC(getSourceName() << Document(builder.obj())));
+DocumentSourceMatch::DocumentSourceMatch(std::unique_ptr<MatchExpression> expr,
+                                         const boost::intrusive_ptr<ExpressionContext>& expCtx)
+    : DocumentSource(kStageName, expCtx) {
+    auto bsonObj = expr->serialize();
+    rebuild(std::move(bsonObj), std::move(expr));
+}
+
+DocumentSourceMatch::DocumentSourceMatch(const BSONObj& query,
+                                         const intrusive_ptr<ExpressionContext>& expCtx)
+    : DocumentSource(kStageName, expCtx) {
+    rebuild(query);
+}
+
+void DocumentSourceMatch::rebuild(BSONObj predicate) {
+    predicate = predicate.getOwned();
+    SbeCompatibility originalSbeCompatibility =
+        getExpCtx()->sbeCompatibilityExchange(SbeCompatibility::noRequirements);
+    ON_BLOCK_EXIT([&] { getExpCtx()->setSbeCompatibility(originalSbeCompatibility); });
+    std::unique_ptr<MatchExpression> expr = uassertStatusOK(MatchExpressionParser::parse(
+        predicate, getExpCtx(), ExtensionsCallbackNoop(), Pipeline::kAllowedMatcherFeatures));
+    _sbeCompatibility = getExpCtx()->getSbeCompatibility();
+    rebuild(std::move(predicate), std::move(expr));
+}
+
+void DocumentSourceMatch::rebuild(BSONObj predicate, std::unique_ptr<MatchExpression> expr) {
+    invariant(predicate.isOwned());
+    _isTextQuery = containsTextOperator(*expr);
+    DepsTracker dependencies =
+        DepsTracker(_isTextQuery ? DepsTracker::kOnlyTextScore : DepsTracker::kNoMetadata);
+    getDependencies(expr.get(), &dependencies);
+    _matchProcessor = std::make_shared<MatchProcessor>(
+        std::move(expr), std::move(dependencies), std::move(predicate));
+}
+
+const char* DocumentSourceMatch::getSourceName() const {
+    return kStageName.data();
+}
+
+Value DocumentSourceMatch::serialize(const SerializationOptions& opts) const {
+    if (opts.isSerializingForExplain() || opts.isSerializingForQueryStats()) {
+        return Value(
+            DOC(getSourceName() << Document(_matchProcessor->getExpression()->serialize(opts))));
     }
     return Value(DOC(getSourceName() << Document(getQuery())));
 }
@@ -81,41 +134,15 @@ intrusive_ptr<DocumentSource> DocumentSourceMatch::optimize() {
         return nullptr;
     }
 
-    _expression = MatchExpression::optimize(std::move(_expression));
+    _matchProcessor->setExpression(
+        optimizeMatchExpression(std::move(_matchProcessor->getExpression()),
+                                /* enableSimplification */ false));
 
     return this;
 }
 
-DocumentSource::GetNextResult DocumentSourceMatch::doGetNext() {
-    // The user facing error should have been generated earlier.
-    massert(17309, "Should never call getNext on a $match stage with $text clause", !_isTextQuery);
-
-    auto nextInput = pSource->getNext();
-    for (; nextInput.isAdvanced(); nextInput = pSource->getNext()) {
-        // MatchExpression only takes BSON documents, so we have to make one. As an optimization,
-        // only serialize the fields we need to do the match.
-        BSONObj toMatch = _dependencies.needWholeDocument
-            ? nextInput.getDocument().toBson()
-            : document_path_support::documentToBsonWithPaths(nextInput.getDocument(),
-                                                             _dependencies.fields);
-
-        if (_expression->matchesBSON(toMatch)) {
-            return nextInput;
-        }
-
-        // For performance reasons, a streaming stage must not keep references to documents across
-        // calls to getNext(). Such stages must retrieve a result from their child and then release
-        // it (or return it) before asking for another result. Failing to do so can result in extra
-        // work, since the Document/Value library must copy data on write when that data has a
-        // refcount above one.
-        nextInput.releaseDocument();
-    }
-
-    return nextInput;
-}
-
-Pipeline::SourceContainer::iterator DocumentSourceMatch::doOptimizeAt(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+DocumentSourceContainer::iterator DocumentSourceMatch::doOptimizeAt(
+    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     invariant(*itr == this);
 
     if (std::next(itr) == container->end()) {
@@ -133,7 +160,7 @@ Pipeline::SourceContainer::iterator DocumentSourceMatch::doOptimizeAt(
         invariant(!nextMatch->_isTextQuery);
 
         // Merge 'nextMatch' into this stage.
-        joinMatchWith(nextMatch);
+        joinMatchWith(nextMatch, MatchExpression::MatchType::AND);
 
         // Erase 'nextMatch'.
         container->erase(std::next(itr));
@@ -149,32 +176,27 @@ namespace {
 // the Match expression has been successfully parsed so they can assume that
 // input is well formed.
 
-bool isAllDigits(StringData str) {
-    return !str.empty() &&
-        std::all_of(str.begin(), str.end(), [](char c) { return ctype::isDigit(c); });
-}
-
 bool isFieldnameRedactSafe(StringData fieldName) {
     // Can't have numeric elements in the dotted path since redacting elements from an array
     // would change the indexes.
 
     const size_t dotPos = fieldName.find('.');
     if (dotPos == string::npos)
-        return !isAllDigits(fieldName);
+        return fieldName.empty() || !str::isAllDigits(fieldName);
 
     const StringData part = fieldName.substr(0, dotPos);
     const StringData rest = fieldName.substr(dotPos + 1);
-    return !isAllDigits(part) && isFieldnameRedactSafe(rest);
+    return (part.empty() || !str::isAllDigits(part)) && isFieldnameRedactSafe(rest);
 }
 
 bool isTypeRedactSafeInComparison(BSONType type) {
-    if (type == Array)
+    if (type == BSONType::array)
         return false;
-    if (type == Object)
+    if (type == BSONType::object)
         return false;
-    if (type == jstNULL)
+    if (type == BSONType::null)
         return false;
-    if (type == Undefined)
+    if (type == BSONType::undefined)
         return false;  // Currently a parse error.
 
     return true;
@@ -187,7 +209,7 @@ Document redactSafePortionTopLevel(BSONObj query);  // mutually recursive with n
 // expression can safely be promoted in front of a $redact.
 Document redactSafePortionDollarOps(BSONObj expr) {
     MutableDocument output;
-    BSONForEach(field, expr) {
+    for (auto&& field : expr) {
         if (field.fieldName()[0] != '$')
             continue;
 
@@ -222,7 +244,7 @@ Document redactSafePortionDollarOps(BSONObj expr) {
             // $in must be all-or-nothing (like $or). Can't include subset of elements.
             case PathAcceptingKeyword::IN_EXPR: {
                 bool allOk = true;
-                BSONForEach(elem, field.Obj()) {
+                for (auto&& elem : field.Obj()) {
                     if (!isTypeRedactSafeInComparison(elem.type())) {
                         allOk = false;
                         break;
@@ -238,7 +260,7 @@ Document redactSafePortionDollarOps(BSONObj expr) {
             case PathAcceptingKeyword::ALL: {
                 // $all can include subset of elements (like $and).
                 vector<Value> matches;
-                BSONForEach(elem, field.Obj()) {
+                for (auto&& elem : field.Obj()) {
                     // NOTE this currently doesn't allow {$all: [{$elemMatch: {...}}]}
                     if (isTypeRedactSafeInComparison(elem.type())) {
                         matches.push_back(Value(elem));
@@ -274,6 +296,7 @@ Document redactSafePortionDollarOps(BSONObj expr) {
             case PathAcceptingKeyword::INTERNAL_EXPR_GTE:
             case PathAcceptingKeyword::INTERNAL_EXPR_LT:
             case PathAcceptingKeyword::INTERNAL_EXPR_LTE:
+            case PathAcceptingKeyword::INTERNAL_EQ_HASHED_KEY:
             case PathAcceptingKeyword::INTERNAL_SCHEMA_ALL_ELEM_MATCH_FROM_INDEX:
             case PathAcceptingKeyword::INTERNAL_SCHEMA_BIN_DATA_ENCRYPTED_TYPE:
             case PathAcceptingKeyword::INTERNAL_SCHEMA_BIN_DATA_SUBTYPE:
@@ -304,11 +327,11 @@ Document redactSafePortionTopLevel(BSONObj query) {
     MutableDocument output;
     for (BSONElement field : query) {
         StringData fieldName = field.fieldNameStringData();
-        if (fieldName.startsWith("$")) {
+        if (fieldName.starts_with("$")) {
             if (fieldName == "$or") {
                 // $or must be all-or-nothing (line $in). Can't include subset of elements.
                 vector<Value> okClauses;
-                BSONForEach(elem, field.Obj()) {
+                for (auto&& elem : field.Obj()) {
                     Document clause = redactSafePortionTopLevel(elem.Obj());
                     if (clause.empty()) {
                         okClauses.clear();
@@ -322,7 +345,7 @@ Document redactSafePortionTopLevel(BSONObj query) {
             } else if (fieldName == "$and") {
                 // $and can include subset of elements (like $all).
                 vector<Value> okClauses;
-                BSONForEach(elem, field.Obj()) {
+                for (auto&& elem : field.Obj()) {
                     Document clause = redactSafePortionTopLevel(elem.Obj());
                     if (!clause.empty())
                         okClauses.push_back(Value(clause));
@@ -338,14 +361,14 @@ Document redactSafePortionTopLevel(BSONObj query) {
             continue;
 
         switch (field.type()) {
-            case Array:
+            case BSONType::array:
                 continue;  // exact matches on arrays are never allowed
-            case jstNULL:
+            case BSONType::null:
                 continue;  // can't look for missing fields
-            case Undefined:
+            case BSONType::undefined:
                 continue;  // Currently a parse error.
 
-            case Object: {
+            case BSONType::object: {
                 Document sub = redactSafePortionDollarOps(field.Obj());
                 if (!sub.empty())
                     output[field.fieldNameStringData()] = Value(sub);
@@ -368,7 +391,7 @@ BSONObj DocumentSourceMatch::redactSafePortion() const {
 }
 
 bool DocumentSourceMatch::isTextQuery(const BSONObj& query) {
-    BSONForEach(e, query) {
+    for (auto&& e : query) {
         const StringData fieldName = e.fieldNameStringData();
         if (fieldName == "$text"_sd)
             return true;
@@ -379,19 +402,29 @@ bool DocumentSourceMatch::isTextQuery(const BSONObj& query) {
     return false;
 }
 
-void DocumentSourceMatch::joinMatchWith(intrusive_ptr<DocumentSourceMatch> other) {
-    BSONObjBuilder bob;
-    BSONArrayBuilder arrBob(bob.subarrayStart("$and"));
+void DocumentSourceMatch::joinMatchWith(intrusive_ptr<DocumentSourceMatch> other,
+                                        MatchExpression::MatchType joinPred) {
+    tassert(9912100,
+            "joinPred must be MatchExpression::MatchType::AND or MatchExpression::MatchType::OR",
+            joinPred == MatchExpression::MatchType::AND ||
+                joinPred == MatchExpression::MatchType::OR);
 
+    BSONObjBuilder bob;
+    BSONArrayBuilder arrBob(
+        bob.subarrayStart(joinPred == MatchExpression::MatchType::AND ? "$and" : "$or"));
     auto addPredicates = [&](const auto& predicates) {
         if (predicates.isEmpty()) {
             arrBob.append(predicates);
         }
-
         for (auto&& pred : predicates) {
-            // If 'pred' is an $and, add its children directly to the new top-level $and to avoid
-            // nesting $and's. Otherwise, add 'pred' itself as a child.
-            if (pred.fieldNameStringData() == "$and") {
+            // For 'joinPred' == $and: If 'pred' is an $and, add its children directly to the
+            // new top-level $and to avoid nesting $and's. For 'joinPred' == $or: If 'pred' is a
+            // $or, add its children directly to the new top-level $or to avoid nesting $or's.
+            // Otherwise, add 'pred' itself as a child.
+            if ((joinPred == MatchExpression::MatchType::AND &&
+                 pred.fieldNameStringData() == "$and") ||
+                (joinPred == MatchExpression::MatchType::OR &&
+                 pred.fieldNameStringData() == "$or")) {
                 for (auto& child : pred.Array()) {
                     arrBob.append(child);
                 }
@@ -401,39 +434,32 @@ void DocumentSourceMatch::joinMatchWith(intrusive_ptr<DocumentSourceMatch> other
             }
         }
     };
-
-    addPredicates(_predicate);
-    addPredicates(other->_predicate);
+    addPredicates(_matchProcessor->getPredicate());
+    addPredicates(other->_matchProcessor->getPredicate());
 
     arrBob.doneFast();
     rebuild(bob.obj());
 }
-
 pair<intrusive_ptr<DocumentSourceMatch>, intrusive_ptr<DocumentSourceMatch>>
-DocumentSourceMatch::splitSourceBy(const std::set<std::string>& fields,
+DocumentSourceMatch::splitSourceBy(const OrderedPathSet& fields,
                                    const StringMap<std::string>& renames) && {
     return std::move(*this).splitSourceByFunc(fields, renames, expression::isIndependentOf);
 }
 
 pair<intrusive_ptr<DocumentSourceMatch>, intrusive_ptr<DocumentSourceMatch>>
-DocumentSourceMatch::extractMatchOnFieldsAndRemainder(const std::set<std::string>& fields,
-                                                      const StringMap<std::string>& renames) && {
-    return std::move(*this).splitSourceByFunc(fields, renames, expression::isOnlyDependentOn);
-}
-
-pair<intrusive_ptr<DocumentSourceMatch>, intrusive_ptr<DocumentSourceMatch>>
-DocumentSourceMatch::splitSourceByFunc(const std::set<std::string>& fields,
+DocumentSourceMatch::splitSourceByFunc(const OrderedPathSet& fields,
                                        const StringMap<std::string>& renames,
                                        expression::ShouldSplitExprFunc func) && {
     pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> newExpr(
-        expression::splitMatchExpressionBy(std::move(_expression), fields, renames, func));
+        expression::splitMatchExpressionBy(
+            std::move(_matchProcessor->getExpression()), fields, renames, func));
 
     invariant(newExpr.first || newExpr.second);
 
     if (!newExpr.first) {
         // The entire $match depends on 'fields'. It cannot be split or moved, so we return this
         // stage without modification as the second stage in the pair.
-        _expression = std::move(newExpr.second);
+        _matchProcessor->setExpression(std::move(newExpr.second));
         return {nullptr, this};
     }
 
@@ -441,7 +467,7 @@ DocumentSourceMatch::splitSourceByFunc(const std::set<std::string>& fields,
         // This $match is entirely independent of 'fields' and there were no renames to apply. In
         // this case, the current stage can swap with its predecessor without modification. We
         // simply return this as the first stage in the pair.
-        _expression = std::move(newExpr.first);
+        _matchProcessor->setExpression(std::move(newExpr.first));
         return {this, nullptr};
     }
 
@@ -454,50 +480,50 @@ DocumentSourceMatch::splitSourceByFunc(const std::set<std::string>& fields,
     // the corresponding BSONObj may not exist. Therefore, we take each of these expressions,
     // serialize them, and then re-parse them, constructing new BSON that is owned by the
     // DocumentSourceMatch.
-    BSONObjBuilder firstBob;
-    newExpr.first->serialize(&firstBob);
-    auto firstMatch = DocumentSourceMatch::create(firstBob.obj(), pExpCtx);
+    auto firstMatch = DocumentSourceMatch::create(newExpr.first->serialize(), getExpCtx());
 
     intrusive_ptr<DocumentSourceMatch> secondMatch;
     if (newExpr.second) {
-        BSONObjBuilder secondBob;
-        newExpr.second->serialize(&secondBob);
-        secondMatch = DocumentSourceMatch::create(secondBob.obj(), pExpCtx);
+        secondMatch = DocumentSourceMatch::create(newExpr.second->serialize(), getExpCtx());
     }
 
     return {std::move(firstMatch), std::move(secondMatch)};
 }
 
 boost::intrusive_ptr<DocumentSourceMatch> DocumentSourceMatch::descendMatchOnPath(
-    MatchExpression* matchExpr,
+    const MatchExpression* matchExpr,
     const std::string& descendOn,
     const intrusive_ptr<ExpressionContext>& expCtx) {
-    expression::mapOver(matchExpr, [&descendOn](MatchExpression* node, std::string path) -> void {
-        // Cannot call this method on a $match including a $elemMatch.
-        invariant(node->matchType() != MatchExpression::ELEM_MATCH_OBJECT &&
-                  node->matchType() != MatchExpression::ELEM_MATCH_VALUE);
-        // Only leaf and array match expressions have a path.
-        if (node->getCategory() != MatchExpression::MatchCategory::kLeaf &&
-            node->getCategory() != MatchExpression::MatchCategory::kArrayMatching) {
-            return;
-        }
+    std::unique_ptr<MatchExpression> meCopy = matchExpr->clone();
+    expression::mapOver(
+        meCopy.get(), [&descendOn](MatchExpression* node, std::string path) -> void {
+            // Cannot call this method on a $match including a $elemMatch.
+            tassert(9224700,
+                    "The given match expression has a node that represents a partial path.",
+                    !MatchExpression::isInternalNodeWithPath(node->matchType()));
+            // Only leaf and array match expressions have a path.
+            if (node->getCategory() != MatchExpression::MatchCategory::kLeaf &&
+                node->getCategory() != MatchExpression::MatchCategory::kArrayMatching) {
+                return;
+            }
 
-        auto leafPath = node->path();
-        invariant(expression::isPathPrefixOf(descendOn, leafPath));
+            auto leafPath = node->path();
+            tassert(9224701,
+                    str::stream() << "Expected '" << redact(descendOn) << "' to be a prefix of '"
+                                  << redact(leafPath) << "', but it is not.",
+                    expression::isPathPrefixOf(descendOn, leafPath));
 
-        auto newPath = leafPath.substr(descendOn.size() + 1);
-        if (node->getCategory() == MatchExpression::MatchCategory::kLeaf) {
-            auto leafNode = static_cast<LeafMatchExpression*>(node);
-            leafNode->setPath(newPath);
-        } else if (node->getCategory() == MatchExpression::MatchCategory::kArrayMatching) {
-            auto arrayNode = static_cast<ArrayMatchingMatchExpression*>(node);
-            arrayNode->setPath(newPath);
-        }
-    });
+            auto newPath = leafPath.substr(descendOn.size() + 1);
+            if (node->getCategory() == MatchExpression::MatchCategory::kLeaf) {
+                auto leafNode = static_cast<LeafMatchExpression*>(node);
+                leafNode->setPath(newPath);
+            } else if (node->getCategory() == MatchExpression::MatchCategory::kArrayMatching) {
+                auto arrayNode = static_cast<ArrayMatchingMatchExpression*>(node);
+                arrayNode->setPath(newPath);
+            }
+        });
 
-    BSONObjBuilder query;
-    matchExpr->serialize(&query);
-    return new DocumentSourceMatch(query.obj(), expCtx);
+    return new DocumentSourceMatch(meCopy->serialize(), expCtx);
 }
 
 std::pair<boost::intrusive_ptr<DocumentSourceMatch>, boost::intrusive_ptr<DocumentSourceMatch>>
@@ -505,7 +531,24 @@ DocumentSourceMatch::splitMatchByModifiedFields(
     const boost::intrusive_ptr<DocumentSourceMatch>& match,
     const DocumentSource::GetModPathsReturn& modifiedPathsRet) {
     // Attempt to move some or all of this $match before this stage.
-    std::set<std::string> modifiedPaths;
+    OrderedPathSet modifiedPaths = modifiedPathsRet.paths;
+    auto renames = modifiedPathsRet.renames;
+
+    // A "complex rename" is a rename-like operation which involves a dotted path, such as
+    // "a":"$b.c". If "b" is an array, then this is not a rename but a reshaping operation.
+    // Therefore, the typical behavior of getModifiedPaths() is to report "a" as a modified path and
+    // "a" -> "b.c" as a complex rename.
+    //
+    // When match swapping is permitted for complex renames we must reclassify "a":"$b.c" as a
+    // regular rename. This is done by removing "a" from the set of modified paths and adding "a" ->
+    // "b.c" to the renames map.
+    if (internalQueryPermitMatchSwappingForComplexRenames.load()) {
+        for (auto&& complexRename : modifiedPathsRet.complexRenames) {
+            renames[complexRename.first] = complexRename.second;
+            modifiedPaths.erase(complexRename.first);
+        }
+    }
+
     switch (modifiedPathsRet.type) {
         case DocumentSource::GetModPathsReturn::Type::kNotSupported:
             // We don't know what paths this stage might modify, so refrain from swapping.
@@ -514,21 +557,21 @@ DocumentSourceMatch::splitMatchByModifiedFields(
             // This stage modifies all paths, so cannot be swapped with a $match at all.
             return {nullptr, match};
         case DocumentSource::GetModPathsReturn::Type::kFiniteSet:
-            modifiedPaths = std::move(modifiedPathsRet.paths);
             break;
         case DocumentSource::GetModPathsReturn::Type::kAllExcept: {
             DepsTracker depsTracker;
             match->getDependencies(&depsTracker);
 
-            auto preservedPaths = modifiedPathsRet.paths;
-            for (auto&& rename : modifiedPathsRet.renames) {
+            auto preservedPaths = modifiedPaths;
+            for (auto&& rename : renames) {
                 preservedPaths.insert(rename.first);
             }
             modifiedPaths =
-                semantic_analysis::extractModifiedDependencies(depsTracker.fields, preservedPaths);
+                semantic_analysis::extractModifiedDependencies(depsTracker.fields, preservedPaths)
+                    .modified;
         }
     }
-    return std::move(*match).splitSourceBy(modifiedPaths, modifiedPathsRet.renames);
+    return std::move(*match).splitSourceBy(modifiedPaths, renames);
 }
 
 intrusive_ptr<DocumentSourceMatch> DocumentSourceMatch::create(
@@ -539,7 +582,9 @@ intrusive_ptr<DocumentSourceMatch> DocumentSourceMatch::create(
 
 intrusive_ptr<DocumentSource> DocumentSourceMatch::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
-    uassert(15959, "the match filter must be an expression in an object", elem.type() == Object);
+    uassert(15959,
+            "the match filter must be an expression in an object",
+            elem.type() == BSONType::object);
 
     return DocumentSourceMatch::create(elem.Obj(), pExpCtx);
 }
@@ -549,39 +594,75 @@ bool DocumentSourceMatch::hasQuery() const {
 }
 
 BSONObj DocumentSourceMatch::getQuery() const {
-    return _predicate;
+    // Note that we must return the backing BSON of the MatchExpression. This is because we use
+    // the result of 'getQuery' during pushdown to the find layer in order to keep alive the
+    // MatchExpression's backing BSON, since we use the MatchExpression to construct the
+    // CanonicalQuery and require that it holds pointers into valid BSON during execution.
+    return _matchProcessor->getPredicate();
 }
 
 DepsTracker::State DocumentSourceMatch::getDependencies(DepsTracker* deps) const {
+    return getDependencies(_matchProcessor->getExpression().get(), deps);
+}
+
+DepsTracker::State DocumentSourceMatch::getDependencies(const MatchExpression* expr,
+                                                        DepsTracker* deps) const {
     // Get all field or variable dependencies.
-    _expression->addDependencies(deps);
+    dependency_analysis::addDependencies(expr, deps);
 
     if (isTextQuery()) {
         // A $text aggregation field should return EXHAUSTIVE_FIELDS, since we don't necessarily
         // know what field it will be searching without examining indices.
         deps->needWholeDocument = true;
-        deps->setNeedsMetadata(DocumentMetadataFields::kTextScore, true);
+
+        // This may look confusing, but we must call two setters on the DepsTracker for different
+        // purposes. We mark "textScore" as available metadata that can be consumed by any
+        // downstream stage for $meta field validation. We also also mark that this stage does
+        // require "textScore" so that the executor knows to produce the metadata.
+        // TODO SERVER-100902 Split $meta validation out of dependency tracking.
+        deps->setMetadataAvailable(DocumentMetadataFields::kTextScore);
+        deps->setNeedsMetadata(DocumentMetadataFields::kTextScore);
         return DepsTracker::State::EXHAUSTIVE_FIELDS;
     }
 
     return DepsTracker::State::SEE_NEXT;
 }
 
-DocumentSourceMatch::DocumentSourceMatch(const BSONObj& query,
-                                         const intrusive_ptr<ExpressionContext>& expCtx)
-    : DocumentSource(kStageName, expCtx) {
-    rebuild(query);
+void DocumentSourceMatch::addVariableRefs(std::set<Variables::Id>* refs) const {
+    dependency_analysis::addVariableRefs(_matchProcessor->getExpression().get(), refs);
 }
 
-void DocumentSourceMatch::rebuild(BSONObj filter) {
-    _predicate = filter.getOwned();
-    _expression = uassertStatusOK(MatchExpressionParser::parse(
-        _predicate, pExpCtx, ExtensionsCallbackNoop(), Pipeline::kAllowedMatcherFeatures));
-    _isTextQuery = isTextQuery(_predicate);
-    _dependencies =
-        DepsTracker(_isTextQuery ? DepsTracker::kAllMetadata & ~DepsTracker::kOnlyTextScore
-                                 : DepsTracker::kAllMetadata);
-    getDependencies(&_dependencies);
+Value DocumentSourceInternalChangeStreamMatch::serialize(const SerializationOptions& opts) const {
+    if (opts.isSerializingForQueryStats()) {
+        // Stages made internally by 'DocumentSourceChangeStream' should not be serialized for
+        // query stats. For query stats we will serialize only the user specified $changeStream
+        // stage.
+        return Value();
+    }
+    return doSerialize(opts);
+}
+
+StageConstraints DocumentSourceInternalChangeStreamMatch::constraints(
+    PipelineSplitState pipeState) const {
+    StageConstraints constraints{StreamType::kStreaming,
+                                 PositionRequirement::kNone,
+                                 HostTypeRequirement::kNone,
+                                 DiskUseRequirement::kNoDiskUse,
+                                 FacetRequirement::kAllowed,
+                                 TransactionRequirement::kAllowed,
+                                 LookupRequirement::kAllowed,
+                                 UnionRequirement::kAllowed,
+                                 ChangeStreamRequirement::kAllowlist};
+    constraints.consumesLogicalCollectionData = false;
+    return constraints;
+}
+
+intrusive_ptr<DocumentSourceInternalChangeStreamMatch>
+DocumentSourceInternalChangeStreamMatch::create(BSONObj filter,
+                                                const intrusive_ptr<ExpressionContext>& expCtx) {
+    intrusive_ptr<DocumentSourceInternalChangeStreamMatch> internalMatch(
+        new DocumentSourceInternalChangeStreamMatch(filter, expCtx));
+    return internalMatch;
 }
 
 }  // namespace mongo

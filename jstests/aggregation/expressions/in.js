@@ -3,17 +3,37 @@
 // @tags: [
 //   assumes_no_implicit_collection_creation_after_drop,
 // ]
-load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
+import "jstests/libs/query/sbe_assert_error_override.js";
 
-(function() {
-"use strict";
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
+
+const caseSensitive = {
+    locale: "en",
+    strength: 3,
+};
 
 const caseInsensitive = {
     locale: "en_US",
-    strength: 2
+    strength: 2,
 };
-var coll = db.in;
+let coll = db.in;
 coll.drop();
+
+// To call testExpressionWithIntersection, the options must have a array1 and array2 field.
+function testExpressionWithIntersection(options) {
+    coll.drop();
+    let pipeline = {
+        $project: {
+            included: {
+                $in: ["$elementField", {$setIntersection: [{$literal: options.array1}, {$literal: options.array2}]}],
+            },
+        },
+    };
+    assert.commandWorked(coll.insert({elementField: options.element}));
+    let res = coll.aggregate(pipeline).toArray();
+    testExpressionEquivalence(res, options);
+    testQueryFormEquivalence(res, options);
+}
 
 function testExpression(options) {
     coll.drop();
@@ -33,14 +53,21 @@ function testExpressionCollectionCollation(options, collationSpec) {
 }
 
 function testExpressionInternal(options) {
-    var pipeline = {$project: {included: {$in: ["$elementField", {$literal: options.array}]}}};
+    let pipeline = {$project: {included: {$in: ["$elementField", {$literal: options.array}]}}};
     assert.commandWorked(coll.insert({elementField: options.element}));
-    var res = coll.aggregate(pipeline).toArray();
+    let res = coll.aggregate(pipeline).toArray();
+    testExpressionEquivalence(res, options);
+    testQueryFormEquivalence(res, options);
+}
+
+function testExpressionEquivalence(res, options) {
     assert.eq(res.length, 1);
     assert.eq(res[0].included, options.elementIsIncluded);
+}
 
+function testQueryFormEquivalence(res, options) {
     if (options.queryFormShouldBeEquivalent) {
-        var query = {elementField: {$in: options.array}};
+        let query = {elementField: {$in: options.array}};
         res = coll.find(query).toArray();
 
         if (options.elementIsIncluded) {
@@ -51,42 +78,43 @@ function testExpressionInternal(options) {
     }
 }
 
-testExpression(
-    {element: 1, array: [1, 2, 3], elementIsIncluded: true, queryFormShouldBeEquivalent: true});
+testExpression({element: 1, array: [1, 2, 3], elementIsIncluded: true, queryFormShouldBeEquivalent: true});
 
 testExpression({
     element: "A",
     array: ["a", "A", "a"],
     elementIsIncluded: true,
-    queryFormShouldBeEquivalent: true
+    queryFormShouldBeEquivalent: true,
 });
 
 testExpression({
     element: {a: 1},
     array: [{b: 1}, 2],
     elementIsIncluded: false,
-    queryFormShouldBeEquivalent: true
+    queryFormShouldBeEquivalent: true,
 });
 
-testExpression(
-    {element: {a: 1}, array: [{a: 1}], elementIsIncluded: true, queryFormShouldBeEquivalent: true});
+/* ------------------------ Nested Objects Tests ------------------------ */
+
+testExpression({element: {a: 1}, array: [{a: 1}], elementIsIncluded: true, queryFormShouldBeEquivalent: true});
 
 testExpression({
     element: [1, 2],
     array: [[2, 1]],
     elementIsIncluded: false,
-    queryFormShouldBeEquivalent: true
+    queryFormShouldBeEquivalent: true,
 });
 
-testExpression(
-    {element: [1, 2], array: [[1, 2]], elementIsIncluded: true, queryFormShouldBeEquivalent: true});
+testExpression({element: [1, 2], array: [[1, 2]], elementIsIncluded: true, queryFormShouldBeEquivalent: true});
+
+/* ------------------------ Duplicated Elements Tests ------------------------ */
 
 // Test $in with duplicated target element.
 testExpression({
     element: 7,
     array: [3, 5, 7, 7, 9],
     elementIsIncluded: true,
-    queryFormShouldBeEquivalent: true
+    queryFormShouldBeEquivalent: true,
 });
 
 // Test $in with other element within array duplicated.
@@ -94,15 +122,17 @@ testExpression({
     element: 7,
     array: [3, 5, 7, 9, 9],
     elementIsIncluded: true,
-    queryFormShouldBeEquivalent: true
+    queryFormShouldBeEquivalent: true,
 });
+
+/* ------------------------ Unsorted Array Tests ------------------------ */
 
 // Test $in on unsorted array.
 testExpression({
     element: 7,
     array: [3, 10, 5, 7, 8, 9],
     elementIsIncluded: true,
-    queryFormShouldBeEquivalent: true
+    queryFormShouldBeEquivalent: true,
 });
 
 // Test matching $in on unsorted array with duplicates.
@@ -110,7 +140,7 @@ testExpression({
     element: 7,
     array: [7, 10, 7, 10, 2, 5, 3, 7],
     elementIsIncluded: true,
-    queryFormShouldBeEquivalent: true
+    queryFormShouldBeEquivalent: true,
 });
 
 // Test non-matching $in on unsorted array with duplicates.
@@ -118,28 +148,100 @@ testExpression({
     element: 8,
     array: [10, 7, 2, 5, 3],
     elementIsIncluded: false,
-    queryFormShouldBeEquivalent: true
+    queryFormShouldBeEquivalent: true,
 });
 
+/* ------------------------ Collator Tests ------------------------ */
+
 // Test $in with success due to collation on source collection.
-testExpressionCollectionCollation({
-    element: "abcd",
-    array: ["aBcD", "ABCD"],
+testExpressionCollectionCollation(
+    {
+        element: "abcd",
+        array: ["aBcD", "ABCD"],
+        elementIsIncluded: true,
+        queryFormShouldBeEquivalent: true,
+    },
+    caseInsensitive,
+);
+
+// Test $in with failure with collation
+testExpressionCollectionCollation(
+    {
+        element: "abcd",
+        array: ["aBcD", "ABCD"],
+        elementIsIncluded: false,
+        queryFormShouldBeEquivalent: true,
+    },
+    caseSensitive,
+);
+
+testExpressionWithIntersection({
+    element: 1,
+    array1: [1, 2, 3],
+    array2: [2, 3, 4],
+    elementIsIncluded: false,
+    queryFormShouldBeEquivalent: false,
+});
+
+testExpressionWithIntersection({
+    element: 2,
+    array1: [1, 2, 3],
+    array2: [2, 3, 4],
     elementIsIncluded: true,
-    queryFormShouldBeEquivalent: true
-},
-                                  caseInsensitive);
+    queryFormShouldBeEquivalent: false,
+});
+
+testExpressionWithIntersection({
+    element: 1,
+    array1: [1, 2, 3],
+    array2: [4, 5, 6],
+    elementIsIncluded: false,
+    queryFormShouldBeEquivalent: false,
+});
+
+testExpressionWithIntersection({
+    element: 1,
+    array1: [1, 2, 3],
+    array2: [],
+    elementIsIncluded: false,
+    queryFormShouldBeEquivalent: false,
+});
+
+testExpressionWithIntersection({
+    element: 1,
+    array1: [],
+    array2: [4, 5, 6],
+    elementIsIncluded: false,
+    queryFormShouldBeEquivalent: false,
+});
+
+/* ------------------------ Mismatched Types Tests ------------------------ */
+
+testExpression({
+    element: 1,
+    array: [1, "a", 32.04],
+    elementIsIncluded: true,
+    queryFormShouldBeEquivalent: true,
+});
+
+testExpression({
+    element: 1,
+    array: [2, "a", 32.04],
+    elementIsIncluded: false,
+    queryFormShouldBeEquivalent: true,
+});
+
+/* ------------------------ Miscellaneous Tests ------------------------ */
 
 // Test $in with a source collection that has a hash index on the relevant field.
 testExpressionHashIndex({
     element: 5,
     array: [10, 7, 2, 5, 3],
     elementIsIncluded: true,
-    queryFormShouldBeEquivalent: true
+    queryFormShouldBeEquivalent: true,
 });
 
-testExpression(
-    {element: 1, array: [], elementIsIncluded: false, queryFormShouldBeEquivalent: true});
+testExpression({element: 1, array: [], elementIsIncluded: false, queryFormShouldBeEquivalent: true});
 
 // Aggregation's $in has parity with query's $in except with regexes matching string values and
 // equality semantics with array values.
@@ -148,62 +250,61 @@ testExpression({
     element: "abc",
     array: [/a/, /b/, /c/],
     elementIsIncluded: false,
-    queryFormShouldBeEquivalent: false
+    queryFormShouldBeEquivalent: false,
 });
 
 testExpression({
     element: /a/,
     array: ["a", "b", "c"],
     elementIsIncluded: false,
-    queryFormShouldBeEquivalent: false
+    queryFormShouldBeEquivalent: false,
 });
 
-testExpression(
-    {element: [], array: [1, 2, 3], elementIsIncluded: false, queryFormShouldBeEquivalent: false});
+testExpression({element: [], array: [1, 2, 3], elementIsIncluded: false, queryFormShouldBeEquivalent: false});
 
-testExpression(
-    {element: [1], array: [1, 2, 3], elementIsIncluded: false, queryFormShouldBeEquivalent: false});
+testExpression({element: [1], array: [1, 2, 3], elementIsIncluded: false, queryFormShouldBeEquivalent: false});
 
 testExpression({
     element: [1, 2],
     array: [1, 2, 3],
     elementIsIncluded: false,
-    queryFormShouldBeEquivalent: false
+    queryFormShouldBeEquivalent: false,
 });
 
 coll.drop();
 coll.insert({});
 
-var pipeline = {$project: {included: {$in: [[1, 2], 1]}}};
+/* ------------------------ Assertion Failure Tests ------------------------ */
+
+let pipeline = {$project: {included: {$in: [[1, 2], 1]}}};
 assertErrorCode(coll, pipeline, 40081, "$in requires an array as a second argument");
 
 pipeline = {
-    $project: {included: {$in: [1, null]}}
+    $project: {included: {$in: [1, null]}},
 };
 assertErrorCode(coll, pipeline, 40081, "$in requires an array as a second argument");
 
 pipeline = {
-    $project: {included: {$in: [1, "$notAField"]}}
+    $project: {included: {$in: [1, "$notAField"]}},
 };
 assertErrorCode(coll, pipeline, 40081, "$in requires an array as a second argument");
 
 pipeline = {
-    $project: {included: {$in: null}}
+    $project: {included: {$in: null}},
 };
 assertErrorCode(coll, pipeline, 16020, "$in requires two arguments");
 
 pipeline = {
-    $project: {included: {$in: [1]}}
+    $project: {included: {$in: [1]}},
 };
 assertErrorCode(coll, pipeline, 16020, "$in requires two arguments");
 
 pipeline = {
-    $project: {included: {$in: []}}
+    $project: {included: {$in: []}},
 };
 assertErrorCode(coll, pipeline, 16020, "$in requires two arguments");
 
 pipeline = {
-    $project: {included: {$in: [1, 2, 3]}}
+    $project: {included: {$in: [1, 2, 3]}},
 };
 assertErrorCode(coll, pipeline, 16020, "$in requires two arguments");
-}());

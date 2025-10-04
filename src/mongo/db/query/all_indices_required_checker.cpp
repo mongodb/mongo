@@ -29,26 +29,61 @@
 
 #include "mongo/db/query/all_indices_required_checker.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/db/local_catalog/index_catalog.h"
+#include "mongo/db/local_catalog/index_catalog_entry.h"
+#include "mongo/db/local_catalog/index_descriptor.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
+#include <utility>
+
 namespace mongo {
 
-AllIndicesRequiredChecker::AllIndicesRequiredChecker(const CollectionPtr& collection) {
-    auto allEntriesShared = collection->getIndexCatalog()->getAllReadyEntriesShared();
-    _indexCatalogEntries.reserve(allEntriesShared.size());
-    _indexNames.reserve(allEntriesShared.size());
-    for (auto&& index : allEntriesShared) {
-        _indexCatalogEntries.emplace_back(index);
-        _indexNames.push_back(index->descriptor()->indexName());
+AllIndicesRequiredChecker::AllIndicesRequiredChecker(
+    const MultipleCollectionAccessor& collections) {
+    saveIndicesForCollection(collections.getMainCollection());
+    for (auto& [_, collection] : collections.getSecondaryCollections()) {
+        saveIndicesForCollection(collection);
     }
 }
 
-void AllIndicesRequiredChecker::check() const {
-    size_t i = 0;
-    for (auto&& index : _indexCatalogEntries) {
-        auto indexCatalogEntry = index.lock();
+void AllIndicesRequiredChecker::saveIndicesForCollection(const CollectionPtr& collection) {
+    if (collection) {
+        auto allEntriesShared = collection->getIndexCatalog()->getAllReadyEntriesShared();
+        auto& indexMap = _identEntries[collection->uuid()];
+        for (auto&& index : allEntriesShared) {
+            indexMap[index->descriptor()->indexName()] = index->getIdent();
+        }
+    }
+}
+
+void AllIndicesRequiredChecker::checkIndicesForCollection(OperationContext* opCtx,
+                                                          const CollectionPtr& collection) const {
+    invariant(collection);
+
+    auto it = _identEntries.find(collection->uuid());
+    invariant(it != _identEntries.end());
+
+    for (const auto& [name, ident] : it->second) {
+        // Structured bindings cannot be captured by closures (the uassert below).
+        auto& nameRef = name;
+        auto indexDesc = collection->getIndexCatalog()->findIndexByIdent(opCtx, ident);
         uassert(ErrorCodes::QueryPlanKilled,
-                str::stream() << "query plan killed :: index '" << _indexNames[i] << "' dropped",
-                indexCatalogEntry && !indexCatalogEntry->isDropped());
-        ++i;
+                str::stream() << "query plan killed :: index '" << nameRef << "' for collection '"
+                              << collection->ns().toStringForErrorMsg() << "' dropped",
+                indexDesc);
+    }
+}
+
+void AllIndicesRequiredChecker::check(OperationContext* opCtx,
+                                      const MultipleCollectionAccessor& collections) const {
+    checkIndicesForCollection(opCtx, collections.getMainCollection());
+    for (auto& [_, collection] : collections.getSecondaryCollections()) {
+        if (collection) {
+            checkIndicesForCollection(opCtx, collection);
+        }
     }
 }
 

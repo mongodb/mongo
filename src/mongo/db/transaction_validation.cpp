@@ -27,61 +27,49 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/transaction_validation.h"
 
-#include <fmt/format.h>
-
+#include "mongo/base/error_codes.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/commands/txn_two_phase_commit_cmds_gen.h"
-#include "mongo/db/logical_session_id.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 
-using namespace fmt::literals;
 
-namespace {
-
-const StringMap<int> retryableWriteCommands = {{"delete", 1},
-                                               {"findandmodify", 1},
-                                               {"findAndModify", 1},
-                                               {"insert", 1},
-                                               {"update", 1},
-                                               {"_recvChunkStart", 1},
-                                               {"_configsvrRemoveChunks", 1},
-                                               {"_configsvrRemoveTags", 1},
-                                               {"_shardsvrCreateCollectionParticipant", 1},
-                                               {"_shardsvrDropCollectionParticipant", 1},
-                                               {"_shardsvrRenameCollectionParticipant", 1},
-                                               {"_shardsvrRenameCollectionParticipantUnblock", 1},
-                                               {"_configsvrRenameCollectionMetadata", 1}};
-
-// Commands that can be sent with session info but should not check out a session.
-const StringMap<int> skipSessionCheckoutList = {
-    {"coordinateCommitTransaction", 1}, {"_recvChunkStart", 1}, {"replSetStepDown", 1}};
-
-const StringMap<int> transactionCommands = {{"commitTransaction", 1},
-                                            {"coordinateCommitTransaction", 1},
-                                            {"abortTransaction", 1},
-                                            {"prepareTransaction", 1}};
-
-bool isRetryableWriteCommand(StringData cmdName) {
-    return retryableWriteCommands.find(cmdName) != retryableWriteCommands.cend();
+bool isRetryableWriteCommand(Service* service, StringData cmdName) {
+    auto command = CommandHelpers::findCommand(service, cmdName);
+    uassert(ErrorCodes::CommandNotFound,
+            str::stream() << "Encountered unknown command during retryability check: " << cmdName,
+            command);
+    return command->supportsRetryableWrite();
 }
 
-}  // namespace
+bool isTransactionCommand(Service* service, StringData cmdName) {
+    // TODO SERVER-82282 refactor: This code runs when commands are invoked from both mongod and
+    // mongos and the latter does not know _shardsvrCreateCommand.
+    if (cmdName == "_shardsvrCreateCollection")
+        return false;
 
-bool isTransactionCommand(StringData cmdName) {
-    return transactionCommands.find(cmdName) != transactionCommands.cend();
+    auto command = CommandHelpers::findCommand(service, cmdName);
+    uassert(ErrorCodes::CommandNotFound,
+            str::stream() << "Encountered unknown command during isTransactionCommand check: "
+                          << cmdName,
+            command);
+    return command->isTransactionCommand();
 }
 
-void validateWriteConcernForTransaction(const WriteConcernOptions& wcResult, StringData cmdName) {
+void validateWriteConcernForTransaction(const WriteConcernOptions& wcResult, const Command* cmd) {
     uassert(ErrorCodes::InvalidOptions,
             "writeConcern is not allowed within a multi-statement transaction",
-            wcResult.usedDefaultConstructedWC || isTransactionCommand(cmdName));
+            wcResult.usedDefaultConstructedWC || cmd->isTransactionCommand());
 }
 
 bool isReadConcernLevelAllowedInTransaction(repl::ReadConcernLevel readConcernLevel) {
@@ -90,43 +78,63 @@ bool isReadConcernLevelAllowedInTransaction(repl::ReadConcernLevel readConcernLe
         readConcernLevel == repl::ReadConcernLevel::kLocalReadConcern;
 }
 
-bool shouldCommandSkipSessionCheckout(StringData cmdName) {
-    return skipSessionCheckoutList.find(cmdName) != skipSessionCheckoutList.cend();
-}
+namespace {
+const CommandNameAtom killCursorsAtom("killCursors");
+const CommandNameAtom prepareTransactionAtom(PrepareTransaction::kCommandName);
+const CommandNameAtom commitTransactionAtom(CommitTransaction::kCommandName);
+const CommandNameAtom abortTransactionAtom(AbortTransaction::kCommandName);
+}  // namespace
 
 void validateSessionOptions(const OperationSessionInfoFromClient& sessionOptions,
-                            StringData cmdName,
-                            const NamespaceString& nss,
+                            Command* command,
+                            const std::vector<NamespaceString>& namespaces,
                             bool allowTransactionsOnConfigDatabase) {
+
     if (sessionOptions.getAutocommit()) {
-        CommandHelpers::canUseTransactions(nss, cmdName, allowTransactionsOnConfigDatabase);
+        CommandHelpers::canUseTransactions(namespaces, command, allowTransactionsOnConfigDatabase);
     }
 
     if (!sessionOptions.getAutocommit() && sessionOptions.getTxnNumber()) {
         uassert(ErrorCodes::NotARetryableWriteCommand,
-                "txnNumber may only be provided for multi-document transactions and retryable "
-                "write commands. autocommit:false was not provided, and {} is not a retryable "
-                "write command."_format(cmdName),
-                isRetryableWriteCommand(cmdName));
+                fmt::format(
+                    "txnNumber may only be provided for multi-document transactions and retryable "
+                    "write commands. autocommit:false was not provided, and {} is not a retryable "
+                    "write command.",
+                    command->getName()),
+                command->supportsRetryableWrite());
     }
 
     if (sessionOptions.getStartTransaction()) {
+        auto atom = command->getNameAtom();
         uassert(ErrorCodes::OperationNotSupportedInTransaction,
                 "Cannot run killCursors as the first operation in a multi-document transaction.",
-                cmdName != "killCursors");
+                atom != killCursorsAtom);
 
         uassert(ErrorCodes::OperationNotSupportedInTransaction,
                 "Cannot start a transaction with a prepare",
-                cmdName != PrepareTransaction::kCommandName);
+                atom != prepareTransactionAtom);
 
         uassert(ErrorCodes::OperationNotSupportedInTransaction,
                 "Cannot start a transaction with a commit",
-                cmdName != CommitTransaction::kCommandName);
+                atom != commitTransactionAtom);
 
         uassert(ErrorCodes::OperationNotSupportedInTransaction,
                 "Cannot start a transaction with an abort",
-                cmdName != AbortTransaction::kCommandName);
+                atom != abortTransactionAtom);
     }
 }
 
+void doTransactionValidationForWrites(OperationContext* opCtx, const NamespaceString& ns) {
+    if (!opCtx->inMultiDocumentTransaction())
+        return;
+    uassert(50791,
+            str::stream() << "Cannot write to system collection " << ns.toStringForErrorMsg()
+                          << " within a transaction.",
+            !ns.isSystem() || ns.isPrivilegeCollection() || ns.isTimeseriesBucketsCollection());
+    const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    uassert(50790,
+            str::stream() << "Cannot write to unreplicated collection " << ns.toStringForErrorMsg()
+                          << " within a transaction.",
+            !replCoord->isOplogDisabledFor(opCtx, ns));
+}
 }  // namespace mongo

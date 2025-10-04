@@ -27,13 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+// IWYU pragma: no_include "cxxabi.h"
+// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/db/exec/sbe/stages/exchange.h"
 
-#include "mongo/base/init.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
+#include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
+#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
+#include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/future_impl.h"
+
+#include <functional>
+#include <mutex>
+#include <string>
+
 
 namespace mongo::sbe {
 std::unique_ptr<ThreadPool> s_globalThreadPool;
@@ -43,7 +54,9 @@ MONGO_INITIALIZER(s_globalThreadPool)(InitializerContext* context) {
     options.threadNamePrefix = "ExchProd";
     options.minThreads = 0;
     options.maxThreads = 128;
-    options.onCreateThread = [](const std::string& name) { Client::initThread(name); };
+    options.onCreateThread = [](const std::string& name) {
+        Client::initThread(name, getGlobalServiceContext()->getService(ClusterRole::ShardServer));
+    };
     s_globalThreadPool = std::make_unique<ThreadPool>(options);
     s_globalThreadPool->startup();
 }
@@ -170,8 +183,10 @@ ExchangeConsumer::ExchangeConsumer(std::unique_ptr<PlanStage> input,
                                    ExchangePolicy policy,
                                    std::unique_ptr<EExpression> partition,
                                    std::unique_ptr<EExpression> orderLess,
-                                   PlanNodeId planNodeId)
-    : PlanStage("exchange"_sd, planNodeId) {
+                                   PlanNodeId planNodeId,
+                                   bool participateInTrialRunTracking)
+    : PlanStage(
+          "exchange"_sd, nullptr /* yieldPolicy */, planNodeId, participateInTrialRunTracking) {
     _children.emplace_back(std::move(input));
     _state = std::make_shared<ExchangeState>(
         numOfProducers, std::move(fields), policy, std::move(partition), std::move(orderLess));
@@ -185,13 +200,18 @@ ExchangeConsumer::ExchangeConsumer(std::unique_ptr<PlanStage> input,
         uassert(5922202, "partition expression must not be present", !_state->partitionExpr());
     }
 }
-ExchangeConsumer::ExchangeConsumer(std::shared_ptr<ExchangeState> state, PlanNodeId planNodeId)
-    : PlanStage("exchange"_sd, planNodeId), _state(state) {
+ExchangeConsumer::ExchangeConsumer(std::shared_ptr<ExchangeState> state,
+                                   PlanNodeId planNodeId,
+                                   bool participateInTrialRunTracking)
+    : PlanStage(
+          "exchange"_sd, nullptr /* yieldPolicy */, planNodeId, participateInTrialRunTracking),
+      _state(state) {
     _tid = _state->addConsumer(this);
     _orderPreserving = _state->isOrderPreserving();
 }
 std::unique_ptr<PlanStage> ExchangeConsumer::clone() const {
-    return std::make_unique<ExchangeConsumer>(_state, _commonStats.nodeId);
+    return std::make_unique<ExchangeConsumer>(
+        _state, _commonStats.nodeId, participateInTrialRunTracking());
 }
 void ExchangeConsumer::prepare(CompileCtx& ctx) {
     for (size_t idx = 0; idx < _state->fields().size(); ++idx) {
@@ -272,7 +292,9 @@ void ExchangeConsumer::open(bool reOpen) {
             }
 
             // Start n producers.
-            invariant(_state->producerCompileCtxs().size() == _state->numOfProducers());
+            tassert(11093503,
+                    "Number of producer contexts doesn't match the number of producers",
+                    _state->producerCompileCtxs().size() == _state->numOfProducers());
             for (size_t idx = 0; idx < _state->numOfProducers(); ++idx) {
                 auto pf = makePromiseFuture<void>();
                 s_globalThreadPool->schedule(
@@ -389,7 +411,10 @@ void ExchangeConsumer::close() {
 
 std::unique_ptr<PlanStageStats> ExchangeConsumer::getStats(bool includeDebugInfo) const {
     auto ret = std::make_unique<PlanStageStats>(_commonStats);
-    ret->children.emplace_back(_children[0]->getStats(includeDebugInfo));
+    if (!_children.empty()) {
+        // TODO: handle empty _children.
+        ret->children.emplace_back(_children[0]->getStats(includeDebugInfo));
+    }
     return ret;
 }
 
@@ -428,8 +453,11 @@ std::vector<DebugPrinter::Block> ExchangeConsumer::debugPrint() const {
             uasserted(4822835, "policy not yet implemented");
     }
 
-    DebugPrinter::addNewLine(ret);
-    DebugPrinter::addBlocks(ret, _children[0]->debugPrint());
+    if (!_children.empty()) {
+        // TODO: handle empty _children.
+        DebugPrinter::addNewLine(ret);
+        DebugPrinter::addBlocks(ret, _children[0]->debugPrint());
+    }
 
     return ret;
 }
@@ -479,8 +507,11 @@ void ExchangeProducer::closePipes() {
 
 ExchangeProducer::ExchangeProducer(std::unique_ptr<PlanStage> input,
                                    std::shared_ptr<ExchangeState> state,
-                                   PlanNodeId planNodeId)
-    : PlanStage("exchangep"_sd, planNodeId), _state(state) {
+                                   PlanNodeId planNodeId,
+                                   bool participateInTrialRunTracking)
+    : PlanStage(
+          "exchangep"_sd, nullptr /* yieldPolicy */, planNodeId, participateInTrialRunTracking),
+      _state(state) {
     _children.emplace_back(std::move(input));
 
     _tid = _state->addProducer(this);
@@ -496,6 +527,12 @@ void ExchangeProducer::start(OperationContext* opCtx,
                              CompileCtx& ctx,
                              std::unique_ptr<PlanStage> producer) {
     ExchangeProducer* p = static_cast<ExchangeProducer*>(producer.get());
+
+    // TODO: SERVER-62925. Rationalize this lock.
+    // Also review if the threads should remain killable. Currently threads with IS mode global
+    // lock would not be made kill target but if this lock mode changes, the initialization of
+    // s_globalThreadPool should be reviewed.
+    Lock::GlobalLock lock(opCtx, MODE_IS);
 
     p->attachToOperationContext(opCtx);
 
@@ -610,7 +647,7 @@ PlanState ExchangeProducer::getNext() {
                 }
             } break;
             default:
-                MONGO_UNREACHABLE;
+                MONGO_UNREACHABLE_TASSERT(11122907);
                 break;
         }
     }
@@ -648,7 +685,7 @@ const SpecificStats* ExchangeProducer::getSpecificStats() const {
 bool ExchangeBuffer::appendData(std::vector<value::SlotAccessor*>& data) {
     ++_count;
     for (auto accesor : data) {
-        auto [tag, val] = accesor->copyOrMoveValue();
+        auto [tag, val] = accesor->getCopyOfValue();
         value::ValueGuard guard{tag, val};
         _typeTags.push_back(tag);
         _values.push_back(val);

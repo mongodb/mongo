@@ -1,0 +1,41 @@
+/*! @page portability General information on portability
+
+@section cpu Supported CPU architectures
+
+The supported list of CPU target architectures may be found by inspecting the \c WT_ARCH variable
+present in the \c cmake configuration. Note that the \c loongarch64 platform is community-supported.
+
+@section posix POSIX compliance
+
+WiredTiger aims to be generally portable to any 64-bit system supporting the ANSI C11 and POSIX
+1003.1 standards. Unfortunately, the real world is a little messier than the standards dictate, so
+WiredTiger may not compile (or work correctly) on every POSIX platform.
+
+If WiredTiger does fail to compile (or work correctly) on your platform, we welcome either a
+<a href="https://github.com/wiredtiger/wiredtiger/wiki/Creating-tickets-that-are-likely-to-be-actioned">bug report</a>
+or a
+<a href="https://github.com/wiredtiger/wiredtiger/wiki/Contributing-to-WiredTiger">pull request</a>.
+
+@section testing Testing
+
+To see a list of the CPU and operating system combinations WiredTiger is currently tested on, please
+visit <a href="https://evergreen.mongodb.com/waterfall/wiredtiger">our test results page</a>. This
+list is determined by the availability of suitable machines. The lack of an operating system or CPU
+architecture on this page does not make it unsupported.
+
+@section hardware-requirements Hardware requirements of WiredTiger
+
+@subsection atomic-reads-writes Atomic reads and writes
+WiredTiger requires that pointers (void *) and variables that are 8, 16, 32 and 64 bits to be
+read/written to atomically.  For example if the first 8 bits of a 32 bit write took place and then
+separately the remaining 24 bits were written, another thread of control could read the memory
+location after the first 8 bits were written but before the subsequent 24 bits, seeing an invalid
+state. If two threads of control attempt to write to the same location simultaneously, the result
+must be one of the two values, not some combination of the both.
+
+As WiredTiger uses unmarked atomic reads it requires that the compiler does not insert additional
+writes to memory, even if that write matches the value recently loaded. These writes are often
+referred to as invented stores. WiredTiger does not rely on unaligned reads and writes being atomic,
+nor any writes greater than 8 bytes.
+
+*/

@@ -29,16 +29,23 @@
 
 #pragma once
 
-#include <functional>
-#include <string>
-
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/ftdc/collector.h"
 #include "mongo/db/ftdc/config.h"
 #include "mongo/db/ftdc/controller.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/rpc/op_msg.h"
+
+#include <cstdint>
+#include <functional>
+#include <string>
+
+#include <boost/filesystem/path.hpp>
 
 namespace mongo {
 
@@ -64,14 +71,15 @@ enum class FTDCStartMode {
 };
 
 /**
- * Start Full Time Data Capture
+ * Start Full Time Data Capture.
  * Starts 1 thread.
  *
  * See MongoD and MongoS specific functions.
  */
-void startFTDC(boost::filesystem::path& path,
+void startFTDC(ServiceContext* serviceContext,
+               boost::filesystem::path& path,
                FTDCStartMode startupMode,
-               RegisterCollectorsFunction registerCollectors);
+               std::vector<RegisterCollectorsFunction> registerCollectorsFns);
 
 /**
  * Stop Full Time Data Capture
@@ -81,13 +89,18 @@ void startFTDC(boost::filesystem::path& path,
 void stopFTDC();
 
 /**
+ * Register collectors wanted by all server roles.
+ */
+void registerServerCollectors(FTDCController* controller);
+
+/**
  * A simple FTDC Collector that runs Commands.
  */
 class FTDCSimpleInternalCommandCollector : public FTDCCollectorInterface {
 public:
     FTDCSimpleInternalCommandCollector(StringData command,
                                        StringData name,
-                                       StringData ns,
+                                       const DatabaseName& db,
                                        BSONObj cmdObj);
 
     void collect(OperationContext* opCtx, BSONObjBuilder& builder) override;
@@ -106,6 +119,10 @@ private:
 struct FTDCStartupParams {
     AtomicWord<bool> enabled;
     AtomicWord<int> periodMillis;
+    AtomicWord<int> metadataCaptureFrequency;
+    AtomicWord<int> sampleTimeoutMillis;
+    AtomicWord<int> minThreads;
+    AtomicWord<int> maxThreads;
 
     AtomicWord<int> maxDirectorySizeMB;
     AtomicWord<int> maxFileSizeMB;
@@ -115,6 +132,10 @@ struct FTDCStartupParams {
     FTDCStartupParams()
         : enabled(FTDCConfig::kEnabledDefault),
           periodMillis(FTDCConfig::kPeriodMillisDefault),
+          metadataCaptureFrequency(FTDCConfig::kMetadataCaptureFrequencyDefault),
+          sampleTimeoutMillis(FTDCConfig::kSampleTimeoutMillisDefault),
+          minThreads(FTDCConfig::kMinThreadsDefault),
+          maxThreads(FTDCConfig::kMaxThreadsDefault),
           // Scale the values down since are defaults are in bytes, but the user interface is MB
           maxDirectorySizeMB(FTDCConfig::kMaxDirectorySizeBytesDefault / (1024 * 1024)),
           maxFileSizeMB(FTDCConfig::kMaxFileSizeBytesDefault / (1024 * 1024)),
@@ -129,10 +150,15 @@ extern FTDCStartupParams ftdcStartupParams;
  */
 Status onUpdateFTDCEnabled(bool value);
 Status onUpdateFTDCPeriod(std::int32_t value);
+Status onUpdateFTDCMetadataCaptureFrequency(std::int32_t value);
 Status onUpdateFTDCDirectorySize(std::int32_t value);
 Status onUpdateFTDCFileSize(std::int32_t value);
 Status onUpdateFTDCSamplesPerChunk(std::int32_t value);
 Status onUpdateFTDCPerInterimUpdate(std::int32_t value);
+Status onUpdateFTDCSampleTimeout(std::int32_t value);
+Status onUpdateFTDCMinThreads(std::int32_t value);
+Status onUpdateFTDCMaxThreads(std::int32_t value);
+Status validateSampleTimeoutMillis(std::int32_t, const boost::optional<TenantId>&);
 
 /**
  * Server Parameter accessors

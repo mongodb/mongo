@@ -31,7 +31,9 @@
  * Unit tests of the unittest framework itself.
  */
 
-#include "mongo/unittest/unittest.h"
+#include "mongo/base/string_data.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace {
 
@@ -41,12 +43,12 @@ protected:
     static int _num_set_ups;
     static int _num_tear_downs;
 
-    void setUp() {
+    void setUp() override {
         _num_set_ups++;
         _myVar = 10;
     }
 
-    void tearDown() {
+    void tearDown() override {
         _num_tear_downs++;
         _myVar = 0;
     }

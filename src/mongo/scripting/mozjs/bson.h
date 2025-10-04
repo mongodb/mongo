@@ -29,10 +29,16 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/scripting/mozjs/base.h"
+#include "mongo/scripting/mozjs/wraptype.h"
+#include "mongo/util/modules.h"
+
 #include <tuple>
 
-#include "mongo/db/jsobj.h"
-#include "mongo/scripting/mozjs/wraptype.h"
+#include <js/Class.h>
+#include <js/PropertySpec.h>
+#include <js/TypeDecls.h>
 
 namespace mongo {
 namespace mozjs {
@@ -48,15 +54,17 @@ namespace mozjs {
  * ::make() from C++.
  */
 struct BSONInfo : public BaseInfo {
+    enum Slots { BSONHolderSlot, BSONInfoSlotCount };
+
     static void delProperty(JSContext* cx,
                             JS::HandleObject obj,
                             JS::HandleId id,
                             JS::ObjectOpResult& result);
     static void enumerate(JSContext* cx,
                           JS::HandleObject obj,
-                          JS::AutoIdVector& properties,
+                          JS::MutableHandleIdVector properties,
                           bool enumerableOnly);
-    static void finalize(js::FreeOp* fop, JSObject* obj);
+    static void finalize(JS::GCContext* gcCtx, JSObject* obj);
     static void resolve(JSContext* cx, JS::HandleObject obj, JS::HandleId id, bool* resolvedp);
     static void setProperty(JSContext* cx,
                             JS::HandleObject obj,
@@ -66,7 +74,8 @@ struct BSONInfo : public BaseInfo {
                             JS::ObjectOpResult& result);
 
     static const char* const className;
-    static const unsigned classFlags = JSCLASS_HAS_PRIVATE;
+    static const unsigned classFlags =
+        JSCLASS_HAS_RESERVED_SLOTS(BSONInfoSlotCount) | BaseInfo::finalizeFlag;
     static const InstallType installType = InstallType::Private;
     static void postInstall(JSContext* cx, JS::HandleObject global, JS::HandleObject proto);
 

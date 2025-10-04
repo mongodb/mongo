@@ -27,20 +27,36 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
+#include <cmath>
+#include <cstddef>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/geo/geometry_container.h"
+#include "mongo/db/geo/r2_region_coverer.h"
+#include "mongo/db/geo/shapes.h"
+#include "mongo/logv2/log.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+
+#include <algorithm>
 #include <chrono>
+#include <iterator>
+#include <limits>
+#include <map>
 #include <memory>
 #include <random>
 
-#include "mongo/db/geo/r2_region_coverer.h"
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-#include "mongo/base/init.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/db/geo/geometry_container.h"
-#include "mongo/logv2/log.h"
-#include "mongo/platform/random.h"
-#include "mongo/unittest/unittest.h"
 
 namespace {
 
@@ -153,15 +169,15 @@ GeoHashConverter::Parameters getConverterParams() {
 class HashBoxRegion : public R2Region {
 public:
     HashBoxRegion(Box box) : _box(box) {}
-    Box getR2Bounds() const {
+    Box getR2Bounds() const override {
         return _box;
     }
 
-    bool fastContains(const Box& other) const {
+    bool fastContains(const Box& other) const override {
         return _box.contains(other);
     }
 
-    bool fastDisjoint(const Box& other) const {
+    bool fastDisjoint(const Box& other) const override {
         if (!_box.intersects(other))
             return true;
 
@@ -200,7 +216,7 @@ TEST(R2RegionCoverer, RandomCells) {
 }
 
 double randDouble(double lowerBound, double upperBound) {
-    verify(lowerBound <= upperBound);
+    MONGO_verify(lowerBound <= upperBound);
     const int NUMBITS = 53;
     // Random double in [0, 1)
     long long randLong =
@@ -784,7 +800,7 @@ TEST(R2CellUnion, Contains) {
         generateRandomCells(GeoHash(), false, &unnormalized, &normalized);
         R2CellUnion cellUnion;
         cellUnion.init(normalized);
-        for (auto cellId : normalized) {
+        for (const auto& cellId : normalized) {
             testContains(cellUnion, cellId, 100);
         }
     }
@@ -792,7 +808,7 @@ TEST(R2CellUnion, Contains) {
 
 // Naive implementation of intersects to test correctness
 bool intersects(const R2CellUnion& cellUnion, GeoHash cellId) {
-    for (auto unionCellId : cellUnion.cellIds()) {
+    for (const auto& unionCellId : cellUnion.cellIds()) {
         // Two cells will only intersect if one contains the other
         if (unionCellId.contains(cellId) || cellId.contains(unionCellId)) {
             return true;
@@ -826,7 +842,7 @@ TEST(R2CellUnion, Intersects) {
 
         // An R2CellUnion should intersect with every cell that contains a member of the union.
         // It should also intersect with cells it contains
-        for (auto cellId : randomUnion.cellIds()) {
+        for (const auto& cellId : randomUnion.cellIds()) {
             for (unsigned level = 0; level <= 32; ++level) {
                 ASSERT_TRUE(randomUnion.intersects(GeoHash(cellId.getHash(), level)));
             }
@@ -886,14 +902,14 @@ void testDifference(std::vector<GeoHash>& xCellIds, std::vector<GeoHash>& yCellI
     xUnionY.init(x.cellIds());
     xUnionY.add(y.cellIds());
 
-    for (auto cellId : xUnionY.cellIds()) {
+    for (const auto& cellId : xUnionY.cellIds()) {
         ASSERT_TRUE(xMinusYPlusY.contains(cellId));
         ASSERT_TRUE(yMinusXPlusX.contains(cellId));
     }
-    for (auto cellId : xMinusYPlusY.cellIds()) {
+    for (const auto& cellId : xMinusYPlusY.cellIds()) {
         ASSERT_TRUE(xUnionY.contains(cellId));
     }
-    for (auto cellId : yMinusXPlusX.cellIds()) {
+    for (const auto& cellId : yMinusXPlusX.cellIds()) {
         ASSERT_TRUE(xUnionY.contains(cellId));
     }
 }

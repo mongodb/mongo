@@ -1,11 +1,13 @@
 // Test that commands other than retryable writes may not use txnNumber outside transactions.
+//
 // @tags: [
+//   # The test runs commands that are not allowed with security token: applyOps,
+//   # coordinateCommitTransaction, endSession, killCursors, mapReduce, prepareTransaction.
+//   not_allowed_with_signed_security_token,
 //   uses_map_reduce_with_temp_collections,
 // ]
-(function() {
-"use strict";
 
-const isMongos = assert.commandWorked(db.runCommand("hello")).msg === "isdbgrid";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const session = db.getMongo().startSession();
 const sessionDb = session.getDatabase("admin");
@@ -17,7 +19,7 @@ const nonRetryableWriteCommands = [
     {distinct: "c"},
     {find: "c"},
     {getMore: NumberLong(1), collection: "c"},
-    {killCursors: 'system.users', cursors: []},
+    {killCursors: "system.users", cursors: []},
     // A selection of commands that are not allowed in transactions.
     {count: 1},
     {explain: {find: "c"}},
@@ -29,7 +31,7 @@ const nonRetryableWriteCommands = [
     {create: "c"},
     {drop: "c"},
     {createIndexes: "c", indexes: []},
-    {mapReduce: "c"}
+    {mapReduce: "c"},
 ];
 
 const nonRetryableWriteCommandsMongodOnly = [
@@ -37,24 +39,27 @@ const nonRetryableWriteCommandsMongodOnly = [
     {coordinateCommitTransaction: 1, participants: []},
     {prepareTransaction: 1},
     // A selection of commands that are not allowed in transactions.
-    {applyOps: 1}
+    {applyOps: 1},
 ];
 
-nonRetryableWriteCommands.forEach(function(command) {
+nonRetryableWriteCommands.forEach(function (command) {
     jsTest.log("Testing command: " + tojson(command));
-    assert.commandFailedWithCode(
-        sessionDb.runCommand(Object.assign({}, command, {txnNumber: NumberLong(0)})),
-        [50768, 50889]);
+    assert.commandFailedWithCode(sessionDb.runCommand(Object.assign({}, command, {txnNumber: NumberLong(0)})), [
+        50768,
+        50889,
+        ErrorCodes.TypeMismatch,
+        ErrorCodes.InvalidNamespace,
+    ]);
 });
 
-if (!isMongos) {
-    nonRetryableWriteCommandsMongodOnly.forEach(function(command) {
+if (!FixtureHelpers.isMongos(db)) {
+    nonRetryableWriteCommandsMongodOnly.forEach(function (command) {
         jsTest.log("Testing command: " + tojson(command));
         assert.commandFailedWithCode(
             sessionDb.runCommand(Object.assign({}, command, {txnNumber: NumberLong(0)})),
-            [50768, 50889]);
+            [50768, 50889],
+        );
     });
 }
 
 session.endSession();
-}());

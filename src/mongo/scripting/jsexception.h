@@ -29,11 +29,16 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/error_extra_info.h"
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
+
+#include <memory>
+#include <string>
+#include <utility>
 
 namespace mongo {
 
@@ -44,21 +49,25 @@ namespace mongo {
  * This class wraps an existing error and serializes it in a lossless way, so any other metadata
  * about the JavaScript exception is also preserved.
  */
-class JSExceptionInfo final : public ErrorExtraInfo {
+class MONGO_MOD_PUB JSExceptionInfo final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::JSInterpreterFailureWithStack;
 
     void serialize(BSONObjBuilder*) const override;
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
 
-    explicit JSExceptionInfo(std::string stack_, Status originalError_)
-        : stack(std::move(stack_)), originalError(std::move(originalError_)) {
+    explicit JSExceptionInfo(std::string stack_, Status originalError_, BSONObj extraAttr_ = {})
+        : stack(std::move(stack_)),
+          originalError(std::move(originalError_)),
+          extraAttr(std::move(extraAttr_)) {
         invariant(!stack.empty());
         invariant(!originalError.isOK());
     }
 
     const std::string stack;
     const Status originalError;
+    // Stores optional extra attributes of an error.
+    const BSONObj extraAttr;
 };
 
 }  // namespace mongo

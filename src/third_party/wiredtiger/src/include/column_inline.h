@@ -6,18 +6,28 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 /*
  * __col_insert_search_gt --
  *     Search a column-store insert list for the next larger record.
  */
-static inline WT_INSERT *
+static WT_INLINE WT_INSERT *
 __col_insert_search_gt(WT_INSERT_HEAD *ins_head, uint64_t recno)
 {
     WT_INSERT *ins, **insp, *ret_ins;
     int i;
 
+    /*
+     * Compiler may replace the following usage of the variable with another read.
+     *
+     * Place an acquire barrier to avoid this issue.
+     */
+    ins = WT_SKIP_LAST(ins_head);
+    WT_ACQUIRE_BARRIER();
+
     /* If there's no insert chain to search, we're done. */
-    if ((ins = WT_SKIP_LAST(ins_head)) == NULL)
+    if (ins == NULL)
         return (NULL);
 
     /* Fast path check for targets past the end of the skiplist. */
@@ -31,10 +41,10 @@ __col_insert_search_gt(WT_INSERT_HEAD *ins_head, uint64_t recno)
     ret_ins = NULL;
     for (i = WT_SKIP_MAXDEPTH - 1, insp = &ins_head->head[i]; i >= 0;) {
         /*
-         * Use a local variable to access the insert because the skip list can change across
-         * references.
+         * CPUs with weak memory ordering may reorder the reads which may lead us to read a stale
+         * and inconsistent value in the lower level. Place an acquire barrier to avoid this issue.
          */
-        WT_ORDERED_READ(ins, *insp);
+        WT_ACQUIRE_READ_WITH_BARRIER(ins, *insp);
         if (ins != NULL && recno >= WT_INSERT_RECNO(ins)) {
             /* GTE: keep going at this level */
             insp = &ins->next[i];
@@ -58,7 +68,15 @@ __col_insert_search_gt(WT_INSERT_HEAD *ins_head, uint64_t recno)
     if ((ins = ret_ins) == NULL)
         ins = WT_SKIP_FIRST(ins_head);
     while (recno >= WT_INSERT_RECNO(ins))
-        ins = WT_SKIP_NEXT(ins);
+        /*
+         * CPUs with weak memory ordering may reorder the read and we may read a stale next value
+         * and incorrectly skip a key that is concurrently inserted. For example, if we have A -> C
+         * -> E initially, D is inserted, then B is inserted. If the current thread sees B, it would
+         * be consistent to not see D.
+         *
+         * Place an acquire barrier to avoid this issue.
+         */
+        WT_ACQUIRE_READ_WITH_BARRIER(ins, WT_SKIP_NEXT(ins));
     return (ins);
 }
 
@@ -66,14 +84,22 @@ __col_insert_search_gt(WT_INSERT_HEAD *ins_head, uint64_t recno)
  * __col_insert_search_lt --
  *     Search a column-store insert list for the next smaller record.
  */
-static inline WT_INSERT *
+static WT_INLINE WT_INSERT *
 __col_insert_search_lt(WT_INSERT_HEAD *ins_head, uint64_t recno)
 {
     WT_INSERT *ins, **insp, *ret_ins;
     int i;
 
+    /*
+     * Compiler may replace the following usage of the variable with another read.
+     *
+     * Place an acquire barrier to avoid this issue.
+     */
+    ins = WT_SKIP_FIRST(ins_head);
+    WT_ACQUIRE_BARRIER();
+
     /* If there's no insert chain to search, we're done. */
-    if ((ins = WT_SKIP_FIRST(ins_head)) == NULL)
+    if (ins == NULL)
         return (NULL);
 
     /* Fast path check for targets before the skiplist. */
@@ -87,10 +113,10 @@ __col_insert_search_lt(WT_INSERT_HEAD *ins_head, uint64_t recno)
     ret_ins = NULL;
     for (i = WT_SKIP_MAXDEPTH - 1, insp = &ins_head->head[i]; i >= 0;) {
         /*
-         * Use a local variable to access the insert because the skip list can change across
-         * references.
+         * CPUs with weak memory ordering may reorder the reads which may lead us to read a stale
+         * and inconsistent value in the lower level. Place an acquire barrier to avoid this issue.
          */
-        WT_ORDERED_READ(ins, *insp);
+        WT_ACQUIRE_READ_WITH_BARRIER(ins, *insp);
         if (ins != NULL && recno > WT_INSERT_RECNO(ins)) {
             /* GT: keep going at this level */
             insp = &ins->next[i];
@@ -108,15 +134,23 @@ __col_insert_search_lt(WT_INSERT_HEAD *ins_head, uint64_t recno)
  * __col_insert_search_match --
  *     Search a column-store insert list for an exact match.
  */
-static inline WT_INSERT *
+static WT_INLINE WT_INSERT *
 __col_insert_search_match(WT_INSERT_HEAD *ins_head, uint64_t recno)
 {
     WT_INSERT *ins, **insp;
     uint64_t ins_recno;
     int cmp, i;
 
+    /*
+     * Compiler may replace the following usage of the variable with another read.
+     *
+     * Place an acquire barrier to avoid this issue.
+     */
+    ins = WT_SKIP_LAST(ins_head);
+    WT_ACQUIRE_BARRIER();
+
     /* If there's no insert chain to search, we're done. */
-    if ((ins = WT_SKIP_LAST(ins_head)) == NULL)
+    if (ins == NULL)
         return (NULL);
 
     /* Fast path the check for values at the end of the skiplist. */
@@ -131,10 +165,10 @@ __col_insert_search_match(WT_INSERT_HEAD *ins_head, uint64_t recno)
      */
     for (i = WT_SKIP_MAXDEPTH - 1, insp = &ins_head->head[i]; i >= 0;) {
         /*
-         * Use a local variable to access the insert because the skip list can change across
-         * references.
+         * CPUs with weak memory ordering may reorder the reads which may lead us to read a stale
+         * and inconsistent value in the lower level. Place an acquire barrier to avoid this issue.
          */
-        WT_ORDERED_READ(ins, *insp);
+        WT_ACQUIRE_READ_WITH_BARRIER(ins, *insp);
         if (ins == NULL) {
             --i;
             --insp;
@@ -161,7 +195,7 @@ __col_insert_search_match(WT_INSERT_HEAD *ins_head, uint64_t recno)
  * __col_insert_search --
  *     Search a column-store insert list, creating a skiplist stack as we go.
  */
-static inline WT_INSERT *
+static WT_INLINE WT_INSERT *
 __col_insert_search(
   WT_INSERT_HEAD *ins_head, WT_INSERT ***ins_stack, WT_INSERT **next_stack, uint64_t recno)
 {
@@ -169,16 +203,24 @@ __col_insert_search(
     uint64_t ins_recno;
     int cmp, i;
 
+    /*
+     * Compiler may replace the following usage of the variable with another read.
+     *
+     * Place an acquire barrier to avoid this issue.
+     */
+    ret_ins = WT_SKIP_LAST(ins_head);
+    WT_ACQUIRE_BARRIER();
+
     /* If there's no insert chain to search, we're done. */
-    if ((ret_ins = WT_SKIP_LAST(ins_head)) == NULL)
+    if (ret_ins == NULL)
         return (NULL);
 
     /* Fast path appends. */
     if (recno >= WT_INSERT_RECNO(ret_ins)) {
         for (i = 0; i < WT_SKIP_MAXDEPTH; i++) {
-            ins_stack[i] = (i == 0) ?
-              &ret_ins->next[0] :
-              (ins_head->tail[i] != NULL) ? &ins_head->tail[i]->next[i] : &ins_head->head[i];
+            ins_stack[i] = (i == 0)       ? &ret_ins->next[0] :
+              (ins_head->tail[i] != NULL) ? &ins_head->tail[i]->next[i] :
+                                            &ins_head->head[i];
             next_stack[i] = NULL;
         }
         return (ret_ins);
@@ -189,7 +231,16 @@ __col_insert_search(
      * at each level before stepping down to the next.
      */
     for (i = WT_SKIP_MAXDEPTH - 1, insp = &ins_head->head[i]; i >= 0;) {
-        if ((ret_ins = *insp) == NULL) {
+        /*
+         * Compiler and CPUs with weak memory ordering may reorder the reads causing us to read a
+         * stale value here. Different to the row store version, it is generally OK here to read a
+         * stale value as we don't have prefix search optimization for column store. Therefore, we
+         * cannot wrongly skip the prefix comparison. However, we should still place an acquire
+         * barrier here to ensure we see consistent values in the lower levels to prevent any
+         * unexpected behavior.
+         */
+        WT_ACQUIRE_READ_WITH_BARRIER(ret_ins, *insp);
+        if (ret_ins == NULL) {
             next_stack[i] = NULL;
             ins_stack[i--] = insp--;
             continue;
@@ -210,7 +261,12 @@ __col_insert_search(
             insp = &ret_ins->next[i];
         else if (cmp == 0) /* Exact match: return */
             for (; i >= 0; i--) {
-                next_stack[i] = ret_ins->next[i];
+                /*
+                 * It is possible that we read an old value that is inconsistent to the higher
+                 * levels of the skip list due to read reordering on CPUs with weak memory ordering.
+                 * Add an acquire barrier to avoid this issue.
+                 */
+                WT_ACQUIRE_READ_WITH_BARRIER(next_stack[i], ret_ins->next[i]);
                 ins_stack[i] = &ret_ins->next[i];
             }
         else { /* Drop down a level */
@@ -225,7 +281,7 @@ __col_insert_search(
  * __col_var_last_recno --
  *     Return the last record number for a variable-length column-store page.
  */
-static inline uint64_t
+static WT_INLINE uint64_t
 __col_var_last_recno(WT_REF *ref)
 {
     WT_COL_RLE *repeat;
@@ -238,7 +294,7 @@ __col_var_last_recno(WT_REF *ref)
      * records, our callers must handle that explicitly, if they care.
      */
     if (!WT_COL_VAR_REPEAT_SET(page))
-        return (page->entries == 0 ? 0 : ref->ref_recno + (page->entries - 1));
+        return (page->entries == 0 ? WT_RECNO_OOB : ref->ref_recno + (page->entries - 1));
 
     repeat = &page->pg_var_repeats[page->pg_var_nrepeats - 1];
     return ((repeat->recno + repeat->rle) - 1 + (page->entries - (repeat->indx + 1)));
@@ -248,7 +304,7 @@ __col_var_last_recno(WT_REF *ref)
  * __col_fix_last_recno --
  *     Return the last record number for a fixed-length column-store page.
  */
-static inline uint64_t
+static WT_INLINE uint64_t
 __col_fix_last_recno(WT_REF *ref)
 {
     WT_PAGE *page;
@@ -259,14 +315,14 @@ __col_fix_last_recno(WT_REF *ref)
      * If there's an append list, there may be more records on the page. This function ignores those
      * records, our callers must handle that explicitly, if they care.
      */
-    return (page->entries == 0 ? 0 : ref->ref_recno + (page->entries - 1));
+    return (page->entries == 0 ? WT_RECNO_OOB : ref->ref_recno + (page->entries - 1));
 }
 
 /*
  * __col_var_search --
  *     Search a variable-length column-store page for a record.
  */
-static inline WT_COL *
+static WT_INLINE WT_COL *
 __col_var_search(WT_REF *ref, uint64_t recno, uint64_t *start_recnop)
 {
     WT_COL_RLE *repeat;

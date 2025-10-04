@@ -1,0 +1,185 @@
+# Copyright (C) 2022-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/admission/ticketing_system.h"
+        - "mongo/db/admission/concurrency_adjustment_validator.h"
+
+enums:
+    StorageEngineConcurrencyAdjustmentAlgorithm:
+        description: "Algorithm for adjusting the number of concurrent storage engine transactions"
+        type: string
+        # 'kFixedConcurrentTransactions': Number of concurrent transactions are controlled by
+        # storageEngineConcurrentWriteTransactions/storageEngineConcurrentReadTransactions and will
+        # not be adjusted automatically based on overall system throughput.
+        #
+        # 'kFixedConcurrentTransactionsWithPrioritization': The number of concurrent transactions is
+        # controlled by server parameters and divided into two pools based on operation priority
+        # (normal and low priority). These values are not adjusted automatically based on overall
+        # system throughput. Instead, this algorithm is intended for use with an external server-side
+        # policy (e.g., mongotune) that dynamically adjusts the number of concurrent transactions in
+        # each pool.
+        #
+        # 'kThroughputProbing': Number of concurrent transactions are dynamically adjusted, either
+        # increasing or decreasing concurrency in the storage engine, based on system throughput.
+        values:
+            kFixedConcurrentTransactions: "fixedConcurrentTransactions"
+            kFixedConcurrentTransactionsWithPrioritization: "fixedConcurrentTransactionsWithPrioritization"
+            kThroughputProbing: "throughputProbing"
+
+server_parameters:
+    storageEngineConcurrentWriteTransactions:
+        description: "Storage Engine Concurrent Write Transactions"
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int32_t>
+        cpp_varname: gConcurrentWriteTransactions
+        on_update: "admission::TicketingSystem::NormalPrioritySettings::updateConcurrentWriteTransactions"
+        deprecated_name:
+            - wiredTigerConcurrentWriteTransactions
+        default:
+            {expr: "admission::TicketingSystem::kDefaultConcurrentTransactions"}
+        validator:
+            callback: "admission::TicketingSystem::NormalPrioritySettings::validateConcurrentWriteTransactions"
+        redact: false
+
+    storageEngineConcurrentWriteLowPriorityTransactions:
+        description: "Storage Engine Concurrent Write Low Priority Transactions"
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int32_t>
+        cpp_varname: gConcurrentWriteLowPriorityTransactions
+        on_update: "admission::TicketingSystem::LowPrioritySettings::updateConcurrentWriteTransactions"
+        default:
+            {
+                expr: "admission::TicketingSystem::kDefaultLowPriorityConcurrentTransactions",
+            }
+        validator: {gte: 0}
+        redact: false
+
+    storageEngineConcurrentReadTransactions:
+        description: "Storage Engine Concurrent Read Transactions"
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int32_t>
+        cpp_varname: gConcurrentReadTransactions
+        on_update: "admission::TicketingSystem::NormalPrioritySettings::updateConcurrentReadTransactions"
+        deprecated_name:
+            - wiredTigerConcurrentReadTransactions
+        default:
+            {expr: "admission::TicketingSystem::kDefaultConcurrentTransactions"}
+        validator:
+            callback: "admission::TicketingSystem::NormalPrioritySettings::validateConcurrentReadTransactions"
+        redact: false
+
+    storageEngineConcurrentReadLowPriorityTransactions:
+        description: "Storage Engine Concurrent Read Low Priority Transactions"
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int32_t>
+        cpp_varname: gConcurrentReadLowPriorityTransactions
+        on_update: "admission::TicketingSystem::LowPrioritySettings::updateConcurrentReadTransactions"
+        default:
+            {
+                expr: "admission::TicketingSystem::kDefaultLowPriorityConcurrentTransactions",
+            }
+        validator: {gte: 0}
+        redact: false
+
+    storageEngineReadMaxQueueDepth:
+        description: >-
+            Controls the maximum number of read transactions waiting in queue for a thread to be free.
+            Setting this number to 0 will not allow any transaction above the max concurrency amount.
+            Reducing this value will only affect new enqueued read transactions
+        set_at: [startup, runtime]
+        cpp_vartype: Atomic<std::int32_t>
+        cpp_varname: gReadMaxQueueDepth
+        on_update: "admission::TicketingSystem::NormalPrioritySettings::updateReadMaxQueueDepth"
+        default: {expr: "TicketHolder::kDefaultMaxQueueDepth"}
+        validator: {gte: 0}
+        redact: false
+
+    storageEngineReadLowPriorityMaxQueueDepth:
+        description: >-
+            Controls the maximum number of read low priority transactions waiting in queue for a thread to be free.
+            Setting this number to 0 will not allow any transaction above the max concurrency amount.
+            Reducing this value will only affect new enqueued read transactions
+        set_at: [startup, runtime]
+        cpp_vartype: Atomic<std::int32_t>
+        cpp_varname: gReadLowPriorityMaxQueueDepth
+        on_update: "admission::TicketingSystem::LowPrioritySettings::updateReadMaxQueueDepth"
+        default: {expr: "TicketHolder::kDefaultMaxQueueDepth"}
+        validator: {gte: 0}
+        redact: false
+
+    storageEngineWriteMaxQueueDepth:
+        description: >-
+            Controls the maximum number of write transactions waiting in queue for a thread to be free.
+            Setting this number to 0 will not allow any transaction above the max concurrency amount.
+            Reducing this value will only affect new enqueued write transactions
+        set_at: [startup, runtime]
+        cpp_vartype: Atomic<std::int32_t>
+        cpp_varname: gWriteMaxQueueDepth
+        on_update: "admission::TicketingSystem::NormalPrioritySettings::updateWriteMaxQueueDepth"
+        default: {expr: "TicketHolder::kDefaultMaxQueueDepth"}
+        validator: {gte: 0}
+        redact: false
+
+    storageEngineWriteLowPriorityMaxQueueDepth:
+        description: >-
+            Controls the maximum number of write low priority transactions waiting in queue for a thread to be free.
+            Setting this number to 0 will not allow any transaction above the max concurrency amount.
+            Reducing this value will only affect new enqueued write transactions
+        set_at: [startup, runtime]
+        cpp_vartype: Atomic<std::int32_t>
+        cpp_varname: gWriteLowPriorityMaxQueueDepth
+        on_update: "admission::TicketingSystem::LowPrioritySettings::updateWriteMaxQueueDepth"
+        default: {expr: "TicketHolder::kDefaultMaxQueueDepth"}
+        validator: {gte: 0}
+        redact: false
+
+    storageEngineConcurrencyAdjustmentAlgorithm:
+        description: >-
+            The algorithm to be used for adjusting the number of concurrent storage engine transactions.
+        set_at: startup
+        cpp_vartype: std::string
+        cpp_varname: gStorageEngineConcurrencyAdjustmentAlgorithm
+        default: "throughputProbing"
+        validator:
+            callback: validateConcurrencyAdjustmentAlgorithm
+        redact: false
+
+    storageEngineConcurrencyAdjustmentIntervalMillis:
+        description: >-
+            The interval in milliseconds in which to run the concurrency adjustment algorithm, if it is
+            not set to fixedConcurrentTransactions.
+        set_at: startup
+        cpp_vartype: int32_t
+        cpp_varname: gStorageEngineConcurrencyAdjustmentIntervalMillis
+        default: 100
+        validator:
+            gte: 10
+        redact: false

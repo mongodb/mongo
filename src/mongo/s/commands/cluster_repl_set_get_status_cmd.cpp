@@ -27,11 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/not_primary_error_tracker.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/util/decorable.h"
+
+#include <string>
 
 namespace mongo {
 namespace {
@@ -44,12 +53,12 @@ public:
         return AllowedOnSecondary::kAlways;
     }
 
-    virtual bool adminOnly() const {
+    bool adminOnly() const override {
         return true;
     }
 
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
@@ -57,18 +66,18 @@ public:
         return "Not supported through mongos";
     }
 
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) const {
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
         // Require no auth since this command isn't supported in mongos
         return Status::OK();
     }
 
-    virtual bool errmsgRun(OperationContext* opCtx,
-                           const std::string& dbname,
-                           const BSONObj& cmdObj,
-                           std::string& errmsg,
-                           BSONObjBuilder& result) {
+    bool errmsgRun(OperationContext* opCtx,
+                   const DatabaseName& dbName,
+                   const BSONObj& cmdObj,
+                   std::string& errmsg,
+                   BSONObjBuilder& result) override {
         if (cmdObj["forShell"].trueValue()) {
             NotPrimaryErrorTracker::get(cc()).disable();
         }
@@ -78,8 +87,8 @@ public:
 
         return false;
     }
-
-} cmdReplSetGetStatus;
+};
+MONGO_REGISTER_COMMAND(CmdReplSetGetStatus).forRouter();
 
 }  // namespace
 }  // namespace mongo

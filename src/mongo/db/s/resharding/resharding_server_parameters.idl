@@ -30,9 +30,11 @@
 
 global:
     cpp_namespace: "mongo::resharding"
+    cpp_includes:
+        - "mongo/client/read_preference_validators.h"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 server_parameters:
     reshardingCoordinatorServiceMaxThreadCount:
@@ -44,6 +46,7 @@ server_parameters:
         validator:
             gte: 1
             lte: 256
+        redact: false
 
     reshardingDonorServiceMaxThreadCount:
         description: The max number of threads in the resharding donor's thread pool.
@@ -54,6 +57,7 @@ server_parameters:
         validator:
             gte: 1
             lte: 256
+        redact: false
 
     reshardingRecipientServiceMaxThreadCount:
         description: The max number of threads in the resharding recipient's thread pool.
@@ -64,18 +68,48 @@ server_parameters:
         validator:
             gte: 1
             lte: 256
+        redact: false
 
-    reshardingCollectionClonerBatchSizeInBytes:
+    reshardingCollectionClonerMaxStalenessSeconds:
         description: >-
-            Limit for the number of bytes of data inserted per storage transaction (WriteUnitOfWork)
+            The maximum replication lag on a donor shard's secondary node for it to be eligible
+            for being targeted by the ReshardingCollectionCloner. This is used to avoid fetching
+            from a secondary that has fallen overly behind in replication and might transition to
+            the "RECOVERING" state.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gReshardingCollectionClonerMaxStalenessSeconds
+        default:
+            expr: 5 * 60
+        validator:
+            callback: validateMaxStalenessSecondsExternal
+            gt: 0
+        redact: false
+
+    reshardingCollectionClonerBatchSizeCount:
+        description: >-
+            Limit for the number of documents inserted per storage transaction (WriteUnitOfWork)
             by ReshardingCollectionCloner.
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
-        cpp_varname: gReshardingCollectionClonerBatchSizeInBytes
+        cpp_varname: gReshardingCollectionClonerBatchSizeCount
         default:
-            expr: 100 * 1024
+            expr: 100
+        validator:
+            gt: 0
+        redact: false
+
+    reshardingCollectionClonerWriteThreadCount:
+        description: >-
+            Number of writer threads used by ReshardingCollectionCloner.
+        set_at: runtime
+        cpp_vartype: int
+        cpp_varname: gReshardingCollectionClonerWriteThreadCount
+        default:
+            expr: 2
         validator:
             gte: 1
+        redact: false
 
     reshardingTxnClonerProgressBatchSize:
         description: >-
@@ -87,6 +121,76 @@ server_parameters:
         default: 1000
         validator:
             gte: 1
+        redact: false
+
+    reshardingOplogFetcherInsertBatchLimitOperations:
+        description: >-
+            The maximum number of operations for ReshardingOplogFetcher to insert in a single batch.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gReshardingOplogFetcherInsertBatchLimitOperations
+        default:
+            expr: 5 * 1000
+        validator:
+            gte: 1
+            lte:
+                expr: 1000 * 1000
+        redact: false
+
+    reshardingOplogFetcherInsertBatchLimitBytes:
+        description: >-
+            The maximum size in bytes for ReshardingOplogFetcher to insert in a single batch.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gReshardingOplogFetcherInsertBatchLimitBytes
+        default:
+            expr: 15 * 1024 * 1024
+        validator:
+            lte:
+                expr: 16 * 1024 * 1024
+        redact: false
+
+    reshardingOplogFetcherSleepMillisBeforeCriticalSection:
+        description: >-
+            The amount of time that the ReshardingOplogFetcher should wait for before running the
+            next aggregate command after it has exhausted the oplog entries returned by the previous
+            one before the critical section. The default 1-second value was chosen to match the
+            default awaitData timeout that would have been used if the aggregation cursor was
+            TailableModeEnum::kTailableAndAwaitData.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gReshardingOplogFetcherSleepMillisBeforeCriticalSection
+        default:
+            expr: 1 * 1000
+        validator:
+            gte: 0
+        redact: false
+
+    reshardingOplogFetcherSleepMillisDuringCriticalSection:
+        description: >-
+            The amount of time that the ReshardingOplogFetcher should wait for before running the
+            next aggregate command after it has exhausted the oplog entries returned by the previous
+            one during the critical section.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gReshardingOplogFetcherSleepMillisDuringCriticalSection
+        default:
+            expr: 5
+        validator:
+            gte: 0
+        redact: false
+
+    reshardingOplogFetcherTargetPrimaryDuringCriticalSection:
+        description: >-
+            Controls whether the ReshardingOplogFetcher should start fetching oplog entries from
+            the primary node instead of the "nearest" node when the critical section starts since
+            a nearest node could be a lagged secondary so fetching from it could lead to critical
+            section timeout.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: gReshardingOplogFetcherTargetPrimaryDuringCriticalSection
+        default: true
+        redact: false
 
     reshardingOplogBatchTaskCount:
         description: >-
@@ -101,6 +205,7 @@ server_parameters:
         validator:
             gte: 1
             lte: 256
+        redact: false
 
     reshardingOplogBatchLimitOperations:
         description: >-
@@ -114,6 +219,7 @@ server_parameters:
             gte: 1
             lte:
                 expr: 1000 * 1000
+        redact: false
 
     reshardingOplogBatchLimitBytes:
         description: >-
@@ -128,6 +234,7 @@ server_parameters:
                 expr: 16 * 1024 * 1024
             lte:
                 expr: 100 * 1024 * 1024
+        redact: false
 
     reshardingOplogApplierMaxLockRequestTimeoutMillis:
         description: >-
@@ -137,12 +244,14 @@ server_parameters:
         cpp_vartype: AtomicWord<int>
         cpp_varname: gReshardingOplogApplierMaxLockRequestTimeoutMillis
         default: 5
+        redact: false
 
     reshardingMinimumOperationDurationMillis:
         description: >-
-            Controls the minimum duration of resharding operations, and allows transactions and 
-            retryable writes started after the current resharding operation to complete within the 
-            period defined by the parameter.
+            Controls the minimum duration of resharding operations, and allows transactions and
+            retryable writes started after the current resharding operation to complete within the
+            period defined by the parameter. If this value is lowered then you will likely want to lower
+            reshardingDelayBeforeRemainingOperationTimeQueryMillis as well.
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: gReshardingMinimumOperationDurationMillis
@@ -150,7 +259,35 @@ server_parameters:
             expr: 5 * 60 * 1000
         validator:
             gte: 0
-    
+        redact: false
+
+    reshardingDelayBeforeRemainingOperationTimeQueryMillis:
+        description: >-
+            The initial delay before querying for remaining operation time from participant shards.
+            The delay allows for applying more oplog entries before calculating time remaining, giving
+            a more accurate value.
+            Note we will have this delay every time we happen to have a failover occur.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gReshardingDelayBeforeRemainingOperationTimeQueryMillis
+        default:
+            expr: 30 * 1000
+        validator:
+            gte: 0
+        redact: false
+
+    reshardingMaxDelayBetweenRemainingOperationTimeQueriesMillis:
+        description: >-
+            The maximum delay between remaining operation time queries.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gReshardingMaxDelayBetweenRemainingOperationTimeQueriesMillis
+        default:
+            expr: 30 * 1000
+        validator:
+            gte: 0
+        redact: false
+
     reshardingCriticalSectionTimeoutMillis:
         description: >-
             The upper limit on how long to wait to hear back from recipient shards reaching strict
@@ -162,16 +299,194 @@ server_parameters:
             expr: 5 * 1000
         validator:
             gte: 0
+        redact: false
 
     remainingReshardingOperationTimeThresholdMillis:
         description: >-
-            Controls the threshold for engaging the critical section of resharding operations. 
-            Once the remaining operation time on all recipients falls below this threshold, the 
+            Controls the threshold for engaging the critical section of resharding operations.
+            Once the remaining operation time on all recipients falls below this threshold, the
             resharding coordinator will engage the critical section and block incoming writes.
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: gRemainingReshardingOperationTimeThresholdMillis
         default:
-            expr: 2 * 1000
+            expr: 500
         validator:
             gte: 0
+        redact: false
+
+    remainingReshardingOperationTimePrepareThresholdMillis:
+        description: >-
+            Controls the threshold for resharding recipients to start prepare for the critical
+            section, for example, by expediting the oplog fetching.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gRemainingReshardingOperationTimePrepareThresholdMillis
+        default:
+            expr: 60 * 1000
+        validator:
+            gte: 0
+        redact: false
+
+    reshardingRemainingTimeEstimateAccountsForDonorReplicationLag:
+        description: >-
+            Controls whether the remaining time estimate on the resharding coordinator, when trying
+            to engage the critical section and block incoming writes, should account for the
+            replication lag on the donors.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: gReshardingRemainingTimeEstimateAccountsForDonorReplicationLag
+        default: true
+        redact: false
+
+    reshardingRemainingTimeEstimateAccountsForRecipientReplicationLag:
+        description: >-
+            Controls whether the remaining time estimate on the resharding coordinator, when trying
+            to engage the critical section and block incoming writes, should account for the
+            replication lag on the recipients.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: gReshardingRemainingTimeEstimateAccountsForRecipientReplicationLag
+        default: true
+        redact: false
+
+    reshardingRemainingTimeEstimateBasedOnMovingAverage:
+        description: >-
+            Controls whether the remaining time estimate on a resharding recipient should be
+            based on the exponential moving average for the time it takes to fetch and apply an
+            oplog entry.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: gReshardingRemainingTimeEstimateBasedOnMovingAverage
+        default: true
+        redact: false
+
+    reshardingExponentialMovingAverageTimeToFetchAndApplySmoothingFactor:
+        description:
+            The smoothing factor for the exponential moving average calculation for the remaining
+            time estimate on a resharding recipient. The factor ranges between 0 and 1. The closer
+            to 1 it is, the more weight is given to recent data points.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<double>
+        cpp_varname: gReshardingExponentialMovingAverageTimeToFetchAndApplySmoothingFactor
+        default: 0.4
+        validator:
+            gt: 0
+            lt: 1
+        redact: false
+
+    reshardingExponentialMovingAverageTimeToFetchAndApplyIntervalMillis:
+        description:
+            The minimum interval for updating the exponential moving average for the time it takes
+            to fetch and apply an oplog entry.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gReshardingExponentialMovingAverageTimeToFetchAndApplyIntervalMillis
+        default:
+            expr: 2000
+        validator:
+            gt: 0
+        redact: false
+
+    reshardingCoordinatorQuiescePeriodMillis:
+        description: >-
+            Controls the amount of time a resharding operation will remain in a quiesced state on
+            the coordinator, after it completes or aborts, to allow a user to reconnect to it and
+            retrieve the result. This applies only to resharding operations where the user
+            provided a reshardingUUID; if no UUID is provided there is no quiesce period.
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: gReshardingCoordinatorQuiescePeriodMillis
+        default:
+            expr: 15 * 60 * 1000
+        validator:
+            gte: 0
+        redact: false
+
+    reshardingVerificationChangeStreamsEventsBatchSizeLimit:
+        description: >-
+            The maximum number of events to process during verification before updating the change
+            in the number of documents and the resume token for the change stream.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gReshardingVerificationChangeStreamsEventsBatchSizeLimit
+        default:
+            expr: 1000
+        validator:
+            gte: 0
+        redact: false
+
+    reshardingVerificationChangeStreamsEventsBatchTimeLimitSeconds:
+        description: >-
+            The maximum number of seconds to process events during verification before updating the
+            change in the number of documents and the resume token for the change stream.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gReshardingVerificationChangeStreamsEventsBatchTimeLimitSeconds
+        default:
+            expr: 5 * 60
+        validator:
+            gte: 0
+        redact: false
+
+    reshardingVerificationChangeStreamsSleepMS:
+        description: >-
+            The amount of time in milliseconds to wait before sending the next getMore command after
+            the previous one did not return any change events.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gReshardingVerificationChangeStreamsSleepMS
+        default:
+            expr: 50
+        validator:
+            gte: 0
+        redact: false
+
+    reshardingWaitForReplicationIntervalMilliseconds:
+        description: >-
+            The amount of time to wait before retrying after a failed replication lag wait.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gReshardingWaitForReplicationIntervalMilliseconds
+        default:
+            expr: 1000
+        validator:
+            gte: 0
+        redact: false
+
+    reshardingWaitForReplicationTimeoutSeconds:
+        description: >-
+            The amount of time to wait during each replication lag wait.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gReshardingWaitForReplicationTimeoutSeconds
+        default:
+            expr: 60
+        validator:
+            gte: 0
+        redact: false
+
+    reshardingMaxReplicationLagSecondsBeforeBuildingIndexes:
+        description: >-
+            The maximum replication lag across all nodes when a recipient shard starts building
+            indexes.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gReshardingMaxReplicationLagSecondsBeforeBuildingIndexes
+        default:
+            expr: 5
+        validator:
+            gte: 0
+        redact: false
+
+    reshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites:
+        description: >-
+            Controls whether a resharding donor should abort in-progress unprepared transactions
+            after transitioning to the "preparing-to-block-writes" state. Aborting unprepared
+            transactions helps prevent the donor from not being to acquire the critical section
+            within the critical section timeout when there are long-running transactions.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: gReshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites
+        default: true
+        redact: false

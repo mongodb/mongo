@@ -1,0 +1,37 @@
+From 3ff81206c68e7402d65623165e215558b84cb835 Mon Sep 17 00:00:00 2001
+From: Benety Goh <benety@mongodb.com>
+Date: Fri, 11 Jul 2025 19:41:06 +0000
+Subject: [PATCH] SERVER-100604 update otel_rules.bzl with intermediate library
+ tag
+
+---
+ src/third_party/opentelemetry-proto/dist/otel_rules.bzl | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/src/third_party/opentelemetry-proto/dist/otel_rules.bzl b/src/third_party/opentelemetry-proto/dist/otel_rules.bzl
+index 31feebb9fb7..611db43259f 100644
+--- a/src/third_party/opentelemetry-proto/dist/otel_rules.bzl
++++ b/src/third_party/opentelemetry-proto/dist/otel_rules.bzl
+@@ -37,7 +37,6 @@ OTEL_TARGET_COMPATIBLE_WITH = select({
+ 
+ def mongo_cc_proto_lib(
+         name,
+-        srcs,
+         deps):
+     proto_cc_name = name + "_raw_proto"
+     mongo_cc_proto_library(
+@@ -47,10 +46,10 @@ def mongo_cc_proto_lib(
+ 
+     mongo_cc_library(
+         name = name,
+-        srcs = srcs,
+         cc_deps = [":" + proto_cc_name],
+         copts = OTEL_COPTS,
+         deps = [
+             "//src/third_party/protobuf",
+         ],
++        no_undefined_ref_DO_NOT_USE = False,
+     )
+-- 
+2.34.1
+

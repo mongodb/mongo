@@ -5,11 +5,8 @@
  *   uses_atclustertime,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/discover_topology.js");
-load("jstests/sharding/libs/resharding_test_fixture.js");
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 const reshardingTest = new ReshardingTest({numDonors: 2, numRecipients: 2, reshardInPlace: true});
 
@@ -25,12 +22,14 @@ const inputCollection = reshardingTest.createShardedCollection({
     ],
 });
 
-assert.commandWorked(inputCollection.insert([
-    {_id: "stays on shard0", oldKey: -10, newKey: -10},
-    {_id: "moves to shard0", oldKey: 10, newKey: -10},
-    {_id: "moves to shard1", oldKey: -10, newKey: 10},
-    {_id: "stays on shard1", oldKey: 10, newKey: 10},
-]));
+assert.commandWorked(
+    inputCollection.insert([
+        {_id: "stays on shard0", oldKey: -10, newKey: -10},
+        {_id: "moves to shard0", oldKey: 10, newKey: -10},
+        {_id: "moves to shard1", oldKey: -10, newKey: 10},
+        {_id: "stays on shard1", oldKey: 10, newKey: 10},
+    ]),
+);
 
 const recipientShardNames = reshardingTest.recipientShardNames;
 reshardingTest.withReshardingInBackground({
@@ -43,9 +42,7 @@ reshardingTest.withReshardingInBackground({
 
 function assertClonedContents(shardConn, expectedDocs) {
     // We sort by oldKey so the order of `expectedDocs` can be deterministic.
-    assert.eq(
-        expectedDocs,
-        shardConn.getCollection(inputCollection.getFullName()).find().sort({oldKey: 1}).toArray());
+    assert.eq(expectedDocs, shardConn.getCollection(inputCollection.getFullName()).find().sort({oldKey: 1}).toArray());
 }
 
 const mongos = inputCollection.getMongo();
@@ -64,4 +61,3 @@ assertClonedContents(recipient1, [
 ]);
 
 reshardingTest.teardown();
-})();

@@ -1,0 +1,17 @@
+# This suite tests the find functionality with a default batchSize of 2.
+# The purpose of this is to ensure that setting the batch size to a small number has no
+# effect on find functionality.
+- name: enable_override
+  value:
+    executor:
+      fixture:
+        mongod_options:
+          set_parameters:
+            internalQueryFindCommandBatchSize: 2 # Changes the default batchSize of db.coll.find() from 101 to 2.
+
+- name: excluded_files
+  value:
+    exclude_files:
+      - jstests/core/**/express.js # Assumes default batch size.
+      - jstests/core/query/sort/sortk.js # Limit is not reached due to batch size.
+      - jstests/core/query/sort/sorth.js # Limit is not reached due to batch size.

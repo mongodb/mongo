@@ -1,0 +1,11 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/server-programmability
+  - "decimal_find*":
+    approvers:
+      - 10gen/query-execution
+  - "decimal_update.js":
+    approvers:
+      - 10gen/query-execution-write-exec

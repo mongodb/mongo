@@ -8,9 +8,11 @@
 // @tags: [multiversion_incompatible]
 //
 
-var configRS = new ReplSetTest({name: "configRS", nodes: 3, useHostName: true});
-configRS.startSet({configsvr: '', journal: "", storageEngine: 'wiredTiger'});
-var replConfig = configRS.getReplSetConfig();
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
+let configRS = new ReplSetTest({name: "configRS", nodes: 3, useHostName: true});
+configRS.startSet({configsvr: "", storageEngine: "wiredTiger"});
+let replConfig = configRS.getReplSetConfig();
 replConfig.configsvr = true;
 configRS.initiate(replConfig);
 
@@ -20,28 +22,31 @@ configRS.initiate(replConfig);
 
 jsTest.log("Starting first set of mongoses in parallel...");
 
-var mongoses = [];
+let mongoses = [];
 for (var i = 0; i < 3; i++) {
-    var mongos = MongoRunner.runMongos(
-        {binVersion: "latest", configdb: configRS.getURL(), waitForConnect: false});
+    var mongos = MongoRunner.runMongos({binVersion: "latest", configdb: configRS.getURL(), waitForConnect: false});
     mongoses.push(mongos);
 }
 
 // Eventually connect to a mongo host, to be sure that the config upgrade happened
 // (This can take longer on extremely slow bbots or VMs)
-var mongosConn = null;
-assert.soon(function() {
-    try {
-        mongosConn = new Mongo(mongoses[0].host);
-        return true;
-    } catch (e) {
-        print("Waiting for connect...");
-        printjson(e);
-        return false;
-    }
-}, "Mongos " + mongoses[0].host + " did not start.", 5 * 60 * 1000);
+let mongosConn = null;
+assert.soon(
+    function () {
+        try {
+            mongosConn = new Mongo(mongoses[0].host);
+            return true;
+        } catch (e) {
+            print("Waiting for connect...");
+            printjson(e);
+            return false;
+        }
+    },
+    "Mongos " + mongoses[0].host + " did not start.",
+    5 * 60 * 1000,
+);
 
-var version = mongosConn.getCollection("config.version").findOne();
+let version = mongosConn.getCollection("config.version").findOne();
 
 //
 // Start a second set of mongoses which should respect the initialized version
@@ -50,23 +55,26 @@ var version = mongosConn.getCollection("config.version").findOne();
 jsTest.log("Starting second set of mongoses...");
 
 for (var i = 0; i < 3; i++) {
-    var mongos = MongoRunner.runMongos(
-        {binVersion: "latest", configdb: configRS.getURL(), waitForConnect: false});
+    var mongos = MongoRunner.runMongos({binVersion: "latest", configdb: configRS.getURL(), waitForConnect: false});
     mongoses.push(mongos);
 }
 
-var connectToMongos = function(host) {
+let connectToMongos = function (host) {
     // Eventually connect to a host
-    assert.soon(function() {
-        try {
-            mongosConn = new Mongo(host);
-            return true;
-        } catch (e) {
-            print("Waiting for connect to " + host);
-            printjson(e);
-            return false;
-        }
-    }, "mongos " + host + " did not start.", 5 * 60 * 1000);
+    assert.soon(
+        function () {
+            try {
+                mongosConn = new Mongo(host);
+                return true;
+            } catch (e) {
+                print("Waiting for connect to " + host);
+                printjson(e);
+                return false;
+            }
+        },
+        "mongos " + host + " did not start.",
+        5 * 60 * 1000,
+    );
 };
 
 for (var i = 0; i < mongoses.length; i++) {
@@ -82,13 +90,10 @@ for (var i = 0; i < mongoses.length; i++) {
 // Check version and that the version was only updated once
 //
 
-assert.eq(5, version.minCompatibleVersion);
-assert.eq(6, version.currentVersion);
-assert(version.clusterId);
-assert.eq(undefined, version.excluding);
+assert.hasFields(version, ["clusterId"], "Version document does not contain cluster ID");
 
-var oplog = configRS.getPrimary().getDB('local').oplog.rs;
-var updates = oplog.find({ns: "config.version"}).toArray();
-assert.eq(1, updates.length, 'ops to config.version: ' + tojson(updates));
+let oplog = configRS.getPrimary().getDB("local").oplog.rs;
+let updates = oplog.find({ns: "config.version"}).toArray();
+assert.eq(1, updates.length, "ops to config.version: " + tojson(updates));
 
 configRS.stopSet(15);

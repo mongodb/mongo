@@ -1,0 +1,110 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "cluster_find_util",
+    hdrs = [
+        "cluster_find_util.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/auth:authprivilege",
+        "//src/mongo/db/pipeline",
+        "//src/mongo/db/pipeline:aggregation_request_helper",
+        "//src/mongo/db/pipeline/process_interface:mongo_process_interface",
+        "//src/mongo/db/query/query_settings",
+        "//src/mongo/s/query/planner:cluster_aggregate",
+    ],
+)
+
+mongo_cc_library(
+    name = "jparse_util",
+    srcs = [
+        "jparse_util.cpp",
+    ],
+    hdrs = [
+        "jparse_util.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/query/datetime:date_time_support",
+    ],
+)
+
+mongo_cc_library(
+    name = "query_string_util",
+    srcs = [
+        "string_util.cpp",
+    ],
+    hdrs = [
+        "string_util.h",
+    ],
+)
+
+mongo_cc_library(
+    name = "stop_token",
+    srcs = [
+    ],
+    hdrs = [
+        "stop_token.h",
+    ],
+)
+
+mongo_cc_library(
+    name = "validate_id",
+    srcs = [
+        "validate_id.cpp",
+    ],
+    hdrs = [
+        "validate_id.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "rank_fusion_util",
+    srcs = [
+        "rank_fusion_util.cpp",
+    ],
+    hdrs = [
+        "rank_fusion_util.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo:core_headers_library",
+        "//src/mongo/db/query:query_knobs",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "query_util_test",
+    srcs = [
+        "cartesian_product.h",
+        "cartesian_product_test.cpp",
+        "deferred_test.cpp",
+        "hash_roaring_set_test.cpp",
+        "jparse_util_test.cpp",
+        "memory_util_test.cpp",
+        "string_util_test.cpp",
+        "validate_id_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_third_group",
+    ],
+    deps = [
+        ":jparse_util",
+        "//src/mongo/db:query_exec",
+    ],
+)

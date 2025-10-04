@@ -2,10 +2,8 @@
  * Tests that the recipient shard uses the UUID obtained from the donor shard when creating the
  * collection on itself as part of a migration.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/uuid_util.js");
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {getUUIDFromConfigCollections, getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 
 let db = "test";
 let coll = "foo";
@@ -16,9 +14,8 @@ let st = new ShardingTest({shards: {rs0: {nodes: 1}, rs1: {nodes: 1}}, other: {c
 let donor = st.shard0;
 let recipient = st.shard1;
 
-let setUp = function() {
-    assert.commandWorked(st.s.adminCommand({enableSharding: db}));
-    st.ensurePrimaryShard(db, donor.shardName);
+let setUp = function () {
+    assert.commandWorked(st.s.adminCommand({enableSharding: db, primaryShard: donor.shardName}));
     assert.commandWorked(st.s.adminCommand({shardCollection: nss, key: {_id: 1}}));
 };
 
@@ -42,4 +39,3 @@ assert.neq(undefined, collEntryUUID);
 assert.eq(donorUUID, collEntryUUID);
 
 st.stop();
-})();

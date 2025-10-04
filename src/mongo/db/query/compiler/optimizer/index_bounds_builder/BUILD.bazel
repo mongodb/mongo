@@ -1,0 +1,73 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+idl_generator(
+    name = "expression_geo_index_knobs_gen",
+    src = "expression_geo_index_knobs.idl",
+)
+
+mongo_cc_library(
+    name = "index_bounds_builder",
+    srcs = [
+        "expression_geo_index_mapping.cpp",
+        "index_bounds_builder.cpp",
+        "interval_evaluation_tree.cpp",
+        ":expression_geo_index_knobs_gen",
+    ],
+    hdrs = [
+        "expression_geo_index_mapping.h",
+        "index_bounds_builder.h",
+        "interval_evaluation_tree.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/geo:geometry",
+        "//src/mongo/db/index:expression_params",
+        "//src/mongo/db/query:index_multikey_helpers",
+        "//src/mongo/db/query/compiler/metadata:query_metadata",
+        "//src/mongo/db/query/compiler/physical_model/index_bounds",
+        "//src/third_party/s2",
+    ],
+)
+
+mongo_cc_library(
+    name = "index_bounds_builder_test_fixture",
+    srcs = [
+        "index_bounds_builder_test_fixture.h",
+    ],
+    deps = [
+        ":index_bounds_builder",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "index_bounds_builder_test",
+    srcs = [
+        "index_bounds_builder_collator_test.cpp",
+        "index_bounds_builder_eq_null_test.cpp",
+        "index_bounds_builder_interval_test.cpp",
+        "index_bounds_builder_regex_test.cpp",
+        "index_bounds_builder_test.cpp",
+        "index_bounds_builder_type_test.cpp",
+        "interval_evaluation_tree_test.cpp",
+    ],
+    tags = ["mongo_unittest_sixth_group"],
+    deps = [
+        "//src/mongo/db/query/collation:collator_interface_mock",
+        "//src/mongo/db/query/compiler/metadata:query_metadata",
+        "//src/mongo/db/query/compiler/optimizer/index_bounds_builder:index_bounds_builder_test_fixture",
+        "//src/mongo/db/query/compiler/physical_model/index_bounds",
+        "//src/third_party/s2",
+    ],
+)

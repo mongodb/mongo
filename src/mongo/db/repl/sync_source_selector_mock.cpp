@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/repl/sync_source_selector_mock.h"
 
 namespace mongo {
@@ -61,7 +59,12 @@ ChangeSyncSourceAction SyncSourceSelectorMock::shouldChangeSyncSource(
     const rpc::ReplSetMetadata&,
     const rpc::OplogQueryMetadata& oqMetadata,
     const OpTime& previousOpTimeFetched,
-    const OpTime& lastOpTimeFetched) {
+    const OpTime& lastOpTimeFetched) const {
+    return ChangeSyncSourceAction::kContinueSyncing;
+}
+
+ChangeSyncSourceAction SyncSourceSelectorMock::shouldChangeSyncSourceOnError(
+    const HostAndPort&, const OpTime& lastOpTimeFetched) const {
     return ChangeSyncSourceAction::kContinueSyncing;
 }
 

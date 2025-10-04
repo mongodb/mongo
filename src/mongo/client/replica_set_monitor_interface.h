@@ -29,17 +29,17 @@
 
 #pragma once
 
-#include <functional>
-#include <memory>
-#include <set>
-#include <string>
-
 #include "mongo/client/mongo_uri.h"
 #include "mongo/client/replica_set_change_notifier.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
+
+#include <functional>
+#include <memory>
+#include <set>
+#include <string>
 
 namespace mongo {
 
@@ -48,12 +48,6 @@ struct ReadPreferenceSetting;
 class ReplicaSetMonitorInterface {
 public:
     virtual ~ReplicaSetMonitorInterface() = default;
-
-    /**
-     * The default timeout, which will be used for finding a replica set host if the caller does
-     * not explicitly specify it.
-     */
-    static constexpr Seconds kDefaultFindHostTimeout{15};
 
     /**
      * Schedules the initial refresh task into task executor.
@@ -77,6 +71,33 @@ public:
     virtual SemiFuture<HostAndPort> getHostOrRefresh(const ReadPreferenceSetting& readPref,
                                                      const std::vector<HostAndPort>& excludedHosts,
                                                      const CancellationToken& cancelToken) = 0;
+
+    /**
+     * Returns at least one suitable host matching the given read preference, with support for
+     * server deprioritization or an error, if no host matches.
+     *
+     * This function performs host selection based on the provided read preference criteria while
+     * respecting server deprioritization preferences. It follows a two-tier selection strategy:
+     * 1. First priority: Select the first available host that is NOT in the deprioritized set
+     * 2. Fallback: If all matching hosts are deprioritized, select the first host from the results
+     *
+     * @param readPref The read preference settings (e.g., primary, secondary, nearest) that
+     *                 determine which hosts are eligible for selection
+     * @param deprioritizedServers A set of hosts that should be avoided if other options exist.
+     *                            These hosts will only be selected if no non-deprioritized hosts
+     *                            are available that match the criteria.
+     * @param cancelToken Token used to cancel the operation if needed
+     *
+     * @param readPref Read preference to match against
+     * @param excludedHosts List of hosts that are not eligible to be chosen.
+     *
+     * Known errors are:
+     *  FailedToSatisfyReadPreference, if node cannot be found, which matches the read preference.
+     */
+    virtual SemiFuture<HostAndPort> getAtLeastOneHostOrRefresh(
+        const ReadPreferenceSetting& readPref,
+        const stdx::unordered_set<HostAndPort>& deprioritizedServers,
+        const CancellationToken& cancelToken) = 0;
 
     SemiFuture<HostAndPort> getHostOrRefresh(const ReadPreferenceSetting& readPref,
                                              const CancellationToken& cancelToken) {
@@ -179,6 +200,11 @@ public:
      * continuing.
      */
     virtual void runScanForMockReplicaSet() = 0;
+
+    /**
+     * Returns the ping time of `server` if available.
+     */
+    virtual boost::optional<Microseconds> pingTime(const HostAndPort& server) const = 0;
 };
 
 }  // namespace mongo

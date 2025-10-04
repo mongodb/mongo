@@ -41,7 +41,6 @@ class test_cursor02(TestCursorTracker):
     """
     scenarios = make_scenarios([
         ('row', dict(tablekind='row', uri='table')),
-        ('lsm-row', dict(tablekind='row', uri='lsm')),
         ('col', dict(tablekind='col', uri='table')),
         ('fix', dict(tablekind='fix', uri='table'))
     ])
@@ -149,6 +148,3 @@ class test_cursor02(TestCursorTracker):
         self.cur_check_backward(cursor, -1)
         self.cur_check_forward(cursor, -1)
         cursor.close()
-
-if __name__ == '__main__':
-    wttest.run()

@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest
+import wttest
 
 # test_debug_mode05.py
 #     As per WT-5046, the debug table logging settings prevent rollback to
@@ -35,7 +35,6 @@ import wiredtiger, wttest
 #     This test is to confirm the fix and prevent similar regressions.
 class test_debug_mode05(wttest.WiredTigerTestCase):
     conn_config = 'log=(enabled),debug_mode=(table_logging=true)'
-    session_config = 'isolation=snapshot'
     uri = 'file:test_debug_mode05'
 
     def test_table_logging_rollback_to_stable(self):
@@ -89,6 +88,3 @@ class test_debug_mode05(wttest.WiredTigerTestCase):
         cursor.close()
 
         self.conn.rollback_to_stable()
-
-if __name__ == '__main__':
-    wttest.run()

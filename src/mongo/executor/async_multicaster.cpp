@@ -27,19 +27,21 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/executor/async_multicaster.h"
 
-#include <memory>
-
-#include "mongo/base/status.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/executor/remote_command_request.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <mutex>
+#include <utility>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 
 namespace mongo {
 namespace executor {
@@ -50,7 +52,7 @@ AsyncMulticaster::AsyncMulticaster(std::shared_ptr<executor::TaskExecutor> execu
 
 std::vector<AsyncMulticaster::Reply> AsyncMulticaster::multicast(
     const std::vector<HostAndPort> servers,
-    const std::string& theDbName,
+    const DatabaseName& theDbName,
     const BSONObj& theCmdObj,
     OperationContext* opCtx,
     Milliseconds timeoutMillis) {
@@ -60,7 +62,7 @@ std::vector<AsyncMulticaster::Reply> AsyncMulticaster::multicast(
     struct State {
         State(size_t leftToDo) : leftToDo(leftToDo) {}
 
-        Mutex mutex = MONGO_MAKE_LATCH("State::mutex");
+        stdx::mutex mutex;
         stdx::condition_variable cv;
         size_t leftToDo;
         size_t running = 0;
@@ -71,7 +73,7 @@ std::vector<AsyncMulticaster::Reply> AsyncMulticaster::multicast(
 
     auto state = std::make_shared<State>(servers.size());
     for (const auto& server : servers) {
-        stdx::unique_lock<Latch> lk(state->mutex);
+        stdx::unique_lock<stdx::mutex> lk(state->mutex);
         // spin up no more than maxConcurrency tasks at once
         opCtx->waitForConditionOrInterrupt(
             state->cv, lk, [&] { return state->running < _options.maxConcurrency; });
@@ -80,7 +82,7 @@ std::vector<AsyncMulticaster::Reply> AsyncMulticaster::multicast(
         uassertStatusOK(_executor->scheduleRemoteCommand(
             RemoteCommandRequest{server, theDbName, theCmdObj, opCtx, timeoutMillis},
             [state](const TaskExecutor::RemoteCommandCallbackArgs& cbData) {
-                stdx::lock_guard<Latch> lk(state->mutex);
+                stdx::lock_guard<stdx::mutex> lk(state->mutex);
 
                 state->out.emplace_back(
                     std::forward_as_tuple(cbData.request.target, cbData.response));
@@ -96,7 +98,7 @@ std::vector<AsyncMulticaster::Reply> AsyncMulticaster::multicast(
             }));
     }
 
-    stdx::unique_lock<Latch> lk(state->mutex);
+    stdx::unique_lock<stdx::mutex> lk(state->mutex);
     opCtx->waitForConditionOrInterrupt(state->cv, lk, [&] { return state->leftToDo == 0; });
 
     return std::move(state->out);

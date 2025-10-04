@@ -1,0 +1,31 @@
+# Configuration for cursor_bound_03.
+# The configuration creates:
+# - threads that continuously insert random keys and values.
+# - threads that continuously perform prefix search_near calls on random keys.
+duration_seconds=60,
+cache_size_mb=500,
+timestamp_manager=
+(
+    # This will let us randomly pick a read timestamp in a bigger range to trigger visibility
+    # checks.
+    oldest_lag=10,
+),
+workload_manager=
+(
+    populate_config=
+    (
+        collection_count=10,
+    ),
+    insert_config=
+    (
+        key_size=5,
+        op_rate=100ms,
+        thread_count=10
+    ),
+    read_config=
+    (
+        key_size=5,
+        op_rate=250ms,
+        thread_count=10
+    )
+)

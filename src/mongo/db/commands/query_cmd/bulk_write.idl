@@ -1,0 +1,416 @@
+# Copyright (C) 2022-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,b
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/client/read_preference.h"
+        - "mongo/db/commands/query_cmd/bulk_write_parser.h"
+        - "mongo/db/repl/optime.h"
+        - "mongo/db/versioning_protocol/database_version.h"
+        - "mongo/db/versioning_protocol/shard_version.h"
+
+imports:
+    - "mongo/client/read_preference_setting.idl"
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/query/write_ops/write_ops.idl"
+    - "mongo/db/repl/read_concern_args.idl"
+    - "mongo/db/repl/replication_types.idl"
+    - "mongo/db/write_concern_options.idl"
+    - "mongo/db/sharding_environment/sharding_types.idl"
+
+types:
+    BulkWriteReplyItem:
+        bson_serialization_type: object
+        description:
+            "Structure used to report a single reply resulting from a batch write
+            command."
+        cpp_type: "mongo::BulkWriteReplyItem"
+        serializer: "mongo::BulkWriteReplyItem::serialize"
+        deserializer: "mongo::BulkWriteReplyItem::parse"
+        # Deserializer uses getOwned.
+        is_view: false
+
+structs:
+    BulkWriteInsertOp:
+        description: "A struct representing inserts in the 'bulkWrite' command."
+        strict: true
+        fields:
+            insert:
+                description: "references the namespace index in 'nsInfo'."
+                cpp_name: nsInfoIdx
+                type: safeInt
+                validator: {gte: 0}
+                stability: stable
+            document:
+                description: "The document to insert into the given collection"
+                type: object
+                stability: stable
+
+    BulkWriteUpdateOp:
+        description: "A struct representing updates in the 'bulkWrite' command."
+        strict: true
+        fields:
+            update:
+                description: "references the namespace index in 'nsInfo'."
+                cpp_name: nsInfoIdx
+                type: safeInt
+                validator: {gte: 0}
+                stability: stable
+            filter:
+                description:
+                    "The query that matches documents to update. Uses the same query
+                    selectors as used in the 'find' operation."
+                type: object
+                stability: stable
+            sort:
+                description:
+                    "Determines which document the operation modifies if the query selects
+                    multiple documents."
+                type: object
+                optional: true
+                stability: unstable
+            multi:
+                description:
+                    "If true, updates all documents that meet the query criteria. If false,
+                    limits the update to one document which meets the query criteria."
+                type: bool
+                default: false
+                stability: stable
+            updateMods:
+                description: "Set of modifications to apply."
+                type: update_modification
+                stability: stable
+            upsert:
+                description:
+                    "If true, perform an insert if no documents match the query. If both
+                    upsert and multi are true and no documents match the query, the update
+                    operation inserts only a single document."
+                type: bool
+                default: false
+                stability: stable
+            upsertSupplied:
+                description:
+                    "Only applicable when upsert is true. If set, and if no documents match
+                    the query, the update subsystem will insert the document supplied as
+                    'constants.new' rather than generating a new document from the update spec."
+                type: optionalBool
+                stability: internal
+            arrayFilters:
+                description: "Specifies which array elements an update modifier should apply to"
+                type: array<object>
+                optional: true
+                stability: stable
+            hint:
+                description: "Specifies the hint to use for the operation."
+                type: indexHint
+                default: mongo::BSONObj()
+                stability: stable
+            constants:
+                description:
+                    "Specifies constant values that can be referred to in the pipeline
+                    performing a custom update."
+                type: object
+                optional: true
+                stability: stable
+            collation:
+                description: "Specifies the collation to use for the operation."
+                type: object
+                optional: true
+                stability: stable
+            sampleId:
+                description: "The unique sample id for the operation if it has been chosen for sampling."
+                type: uuid
+                optional: true
+                stability: internal
+            $_allowShardKeyUpdatesWithoutFullShardKeyInQuery:
+                description:
+                    "Set to true if shard key updates are allowed without the full shard
+                    key in the query."
+                type: optionalBool
+                cpp_name: allowShardKeyUpdatesWithoutFullShardKeyInQuery
+                stability: internal
+
+    BulkWriteDeleteOp:
+        description: "A struct representing deletes in the 'bulkWrite' command."
+        strict: true
+        fields:
+            delete:
+                description: "references the namespace index in 'nsInfo'."
+                cpp_name: nsInfoIdx
+                type: safeInt
+                validator: {gte: 0}
+                stability: stable
+            filter:
+                description:
+                    "The query that matches documents to delete. Uses the same query
+                    selectors as used in the 'find' operation."
+                type: object
+                stability: stable
+            multi:
+                description:
+                    "If true, deletes all documents that meet the query criteria. If false,
+                    limits the delete to one document which meets the query criteria."
+                type: bool
+                default: false
+                stability: stable
+            hint:
+                description: "Specifies the hint to use for the operation."
+                type: indexHint
+                default: mongo::BSONObj()
+                stability: stable
+            collation:
+                description: "Specifies the collation to use for the operation."
+                type: object
+                optional: true
+                stability: stable
+            sampleId:
+                description: "The unique sample id for the operation if it has been chosen for sampling."
+                type: uuid
+                optional: true
+                stability: internal
+
+    # TODO (SERVER-77798): Get rid of this struct that duplicates the definition of a WriteConcernError.
+    BulkWriteWriteConcernError:
+        description: "WriteConcernError structure shared by all commands."
+        strict: true
+        fields:
+            code:
+                type: int
+                stability: unstable
+            codeName:
+                type: string
+                optional: true
+                stability: unstable
+            errmsg:
+                type: string
+                stability: unstable
+            errInfo:
+                type: object
+                optional: true
+                stability: unstable
+
+    NamespaceInfoEntry:
+        description: "Holds information about each namespace in the bulk write"
+        strict: true
+        fields:
+            ns:
+                description: "The namespace for the entry"
+                type: namespacestring
+                stability: stable
+            collectionUUID:
+                description: "The expected UUID of the collection."
+                type: uuid
+                optional: true
+                stability: unstable
+            encryptionInformation:
+                description: "Encryption Information schema and other tokens for CRUD commands"
+                type: EncryptionInformation
+                optional: true
+                stability: unstable
+            isTimeseriesNamespace:
+                description:
+                    "This flag is set to true when the command was originally sent to
+                    mongos on the time-series view, but got rewritten to target
+                    time-series buckets namespace before being sent to shards."
+                type: optionalBool
+                stability: internal
+            shardVersion:
+                description:
+                    "The shard version of the collection. This is to be attached by
+                    mongos before being sent to a shard."
+                type: shard_version
+                optional: true
+                stability: internal
+            databaseVersion:
+                description:
+                    "The database version of the collection. This is to be attached by
+                    mongos before being sent to a shard."
+                type: database_version
+                optional: true
+                stability: internal
+
+    BulkWriteCommandResponseCursor:
+        description: "Cursor holding results for a successful 'bulkWrite' command."
+        fields:
+            id:
+                type: long
+                stability: stable
+            firstBatch:
+                type: array<BulkWriteReplyItem>
+                stability: stable
+            ns:
+                description: "The namespace of the cursor."
+                type: namespacestring
+                stability: stable
+
+    BulkWriteCommandReply:
+        description: "Holds reply information for the 'bulkWrite' command."
+        strict: false
+        is_command_reply: true
+        fields:
+            cursor:
+                type: BulkWriteCommandResponseCursor
+                stability: stable
+            nErrors:
+                type: int
+                stability: stable
+            nInserted:
+                type: int
+                stability: stable
+            nMatched:
+                type: int
+                stability: stable
+            nModified:
+                type: int
+                stability: stable
+            nUpserted:
+                type: int
+                stability: stable
+            nDeleted:
+                type: int
+                stability: stable
+            electionId:
+                type: objectid
+                optional: true
+                stability: stable
+            opTime:
+                description: "Operation time for the 'bulkWrite' command."
+                type: optime
+                optional: true
+                stability: stable
+            retriedStmtIds:
+                description:
+                    "The statement numbers for the write statements that had already been
+                    executed, thus were not executed by this command."
+                type: array<int>
+                optional: true
+                stability: unstable
+            writeConcernError:
+                description:
+                    "WriteConcernError returned when this command was run. In case multiple
+                    errors were returned from various shards, the errors are concatenated
+                    in the error message."
+                type: BulkWriteWriteConcernError
+                optional: true
+                stability: unstable
+
+commands:
+    bulkWrite:
+        description: "Parser for the 'bulkWrite' command."
+        command_name: bulkWrite
+        cpp_name: BulkWriteCommandRequest
+        strict: true
+        namespace: ignored
+        api_version: "1"
+        access_check:
+            simple:
+                privilege:
+                    resource_pattern: exact_namespace
+                    action_type:
+                        [bypassDocumentValidation, find, insert, update, remove]
+        reply_type: BulkWriteCommandReply
+        fields:
+            ops:
+                description: "An array of CRUD ops in the bulk write."
+                type: array<variant<BulkWriteInsertOp, BulkWriteUpdateOp, BulkWriteDeleteOp>>
+                supports_doc_sequence: true
+                stability: stable
+            nsInfo:
+                description: "An array of namespaces this bulk write operates on."
+                type: array<NamespaceInfoEntry>
+                supports_doc_sequence: true
+                stability: stable
+            cursor:
+                description: "Cursor info struct that holds batch size setting."
+                type: SimpleCursorOptions
+                optional: true
+                stability: stable
+            bypassDocumentValidation:
+                description:
+                    "Enables the operation to bypass document validation. This lets you
+                    write documents that do not meet the validation requirements."
+                type: safeBool
+                default: false
+                stability: stable
+            ordered:
+                description:
+                    "If true, then when a write statement fails, the bulkWrite command returns
+                    without executing the remaining statements. If false, then statements
+                    are allowed to be executed in parallel and if a statement fails,
+                    continue with the remaining statements, if any."
+                type: bool
+                default: true
+                stability: stable
+            stmtId:
+                description: "A statement number relative to the transaction."
+                type: int
+                optional: true
+                stability: stable
+            stmtIds:
+                description: "An array of statement numbers relative to the transaction."
+                type: array<int>
+                optional: true
+                stability: stable
+            let:
+                description: "Specifies constant values."
+                type: object
+                optional: true
+                stability: stable
+            errorsOnly:
+                description: "Only return error responses and not all detailed results."
+                type: bool
+                default: false
+                stability: stable
+            bypassEmptyTsReplacement:
+                description:
+                    "Only applicable for inserts and replacement updates. If set to true,
+                    any empty timestamps (Timestamp(0,0)) in 'documents' or 'u' will not
+                    be replaced by the current time and instead will be preserved as-is."
+                type: optionalBool
+                stability: unstable
+            $_originalQuery:
+                description:
+                    "The original write query. This is used for updateOne/deleteOne
+                    without shard key during the write phase of the two phase protocol in
+                    order to make sure the shard key query analysis stores the correct
+                    client query."
+                type: object
+                optional: true
+                cpp_name: originalQuery
+                stability: internal
+            $_originalCollation:
+                description:
+                    "The original write query. This is used for updateOne/deleteOne
+                    without shard key during the write phase of the two phase protocol in
+                    order to make sure the shard key query analysis stores the correct
+                    client collation."
+                type: object
+                optional: true
+                cpp_name: originalCollation
+                stability: internal

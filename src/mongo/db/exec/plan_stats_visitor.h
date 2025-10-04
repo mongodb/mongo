@@ -43,6 +43,11 @@ struct BranchStats;
 struct CheckBoundsStats;
 struct LoopJoinStats;
 struct TraverseStats;
+struct HashAggStats;
+struct HashLookupStats;
+struct WindowStats;
+struct SearchStats;
+struct TsBucketToBlockStats;
 }  // namespace sbe
 
 struct AndHashStats;
@@ -73,11 +78,19 @@ struct TextOrStats;
 struct TrialStats;
 struct GroupStats;
 struct DocumentSourceCursorStats;
+struct DocumentSourceMergeCursorsStats;
 struct DocumentSourceLookupStats;
 struct UnionWithStats;
 struct DocumentSourceFacetStats;
 struct UnpackTimeseriesBucketStats;
+struct TimeseriesModifyStats;
 struct SampleFromTimeseriesBucketStats;
+struct SpoolStats;
+struct EofStats;
+struct DocumentSourceIdLookupStats;
+struct DocumentSourceGraphLookupStats;
+struct DocumentSourceBucketAutoStats;
+struct DocumentSourceSetWindowFieldsStats;
 
 /**
  * Visitor pattern for PlanStageStats.
@@ -102,6 +115,11 @@ public:
     virtual void visit(tree_walker::MaybeConstPtr<IsConst, sbe::CheckBoundsStats> stats) = 0;
     virtual void visit(tree_walker::MaybeConstPtr<IsConst, sbe::LoopJoinStats> stats) = 0;
     virtual void visit(tree_walker::MaybeConstPtr<IsConst, sbe::TraverseStats> stats) = 0;
+    virtual void visit(tree_walker::MaybeConstPtr<IsConst, sbe::HashAggStats> stats) = 0;
+    virtual void visit(tree_walker::MaybeConstPtr<IsConst, sbe::HashLookupStats> stats) = 0;
+    virtual void visit(tree_walker::MaybeConstPtr<IsConst, sbe::WindowStats> stats) = 0;
+    virtual void visit(tree_walker::MaybeConstPtr<IsConst, sbe::SearchStats> stats) = 0;
+    virtual void visit(tree_walker::MaybeConstPtr<IsConst, sbe::TsBucketToBlockStats> stats) = 0;
 
     virtual void visit(tree_walker::MaybeConstPtr<IsConst, AndHashStats> stats) = 0;
     virtual void visit(tree_walker::MaybeConstPtr<IsConst, AndSortedStats> stats) = 0;
@@ -131,12 +149,24 @@ public:
     virtual void visit(tree_walker::MaybeConstPtr<IsConst, TrialStats> stats) = 0;
     virtual void visit(tree_walker::MaybeConstPtr<IsConst, GroupStats> stats) = 0;
     virtual void visit(tree_walker::MaybeConstPtr<IsConst, DocumentSourceCursorStats> stats) = 0;
+    virtual void visit(
+        tree_walker::MaybeConstPtr<IsConst, DocumentSourceMergeCursorsStats> stats) = 0;
     virtual void visit(tree_walker::MaybeConstPtr<IsConst, DocumentSourceLookupStats> stats) = 0;
     virtual void visit(tree_walker::MaybeConstPtr<IsConst, UnionWithStats> stats) = 0;
     virtual void visit(tree_walker::MaybeConstPtr<IsConst, DocumentSourceFacetStats> stats) = 0;
     virtual void visit(tree_walker::MaybeConstPtr<IsConst, UnpackTimeseriesBucketStats> stats) = 0;
+    virtual void visit(tree_walker::MaybeConstPtr<IsConst, TimeseriesModifyStats> stats) = 0;
     virtual void visit(
         tree_walker::MaybeConstPtr<IsConst, SampleFromTimeseriesBucketStats> stats) = 0;
+    virtual void visit(tree_walker::MaybeConstPtr<IsConst, SpoolStats> stats) = 0;
+    virtual void visit(tree_walker::MaybeConstPtr<IsConst, EofStats> stats) = 0;
+    virtual void visit(tree_walker::MaybeConstPtr<IsConst, DocumentSourceIdLookupStats> stats) = 0;
+    virtual void visit(
+        tree_walker::MaybeConstPtr<IsConst, DocumentSourceGraphLookupStats> stats) = 0;
+    virtual void visit(
+        tree_walker::MaybeConstPtr<IsConst, DocumentSourceBucketAutoStats> stats) = 0;
+    virtual void visit(
+        tree_walker::MaybeConstPtr<IsConst, DocumentSourceSetWindowFieldsStats> stats) = 0;
 };
 
 /**
@@ -154,6 +184,11 @@ struct PlanStatsVisitorBase : public PlanStatsVisitor<IsConst> {
     void visit(tree_walker::MaybeConstPtr<IsConst, sbe::CheckBoundsStats> stats) override {}
     void visit(tree_walker::MaybeConstPtr<IsConst, sbe::LoopJoinStats> stats) override {}
     void visit(tree_walker::MaybeConstPtr<IsConst, sbe::TraverseStats> stats) override {}
+    void visit(tree_walker::MaybeConstPtr<IsConst, sbe::HashAggStats> stats) override {}
+    void visit(tree_walker::MaybeConstPtr<IsConst, sbe::HashLookupStats> stats) override {}
+    void visit(tree_walker::MaybeConstPtr<IsConst, sbe::WindowStats> stats) override {}
+    void visit(tree_walker::MaybeConstPtr<IsConst, sbe::SearchStats> stats) override {}
+    void visit(tree_walker::MaybeConstPtr<IsConst, sbe::TsBucketToBlockStats> stats) override {}
 
     void visit(tree_walker::MaybeConstPtr<IsConst, AndHashStats> stats) override {}
     void visit(tree_walker::MaybeConstPtr<IsConst, AndSortedStats> stats) override {}
@@ -183,12 +218,23 @@ struct PlanStatsVisitorBase : public PlanStatsVisitor<IsConst> {
     void visit(tree_walker::MaybeConstPtr<IsConst, TrialStats> stats) override {}
     void visit(tree_walker::MaybeConstPtr<IsConst, GroupStats> stats) override {}
     void visit(tree_walker::MaybeConstPtr<IsConst, DocumentSourceCursorStats> stats) override {}
+    void visit(
+        tree_walker::MaybeConstPtr<IsConst, DocumentSourceMergeCursorsStats> stats) override {}
     void visit(tree_walker::MaybeConstPtr<IsConst, DocumentSourceLookupStats> stats) override {}
     void visit(tree_walker::MaybeConstPtr<IsConst, UnionWithStats> stats) override {}
     void visit(tree_walker::MaybeConstPtr<IsConst, DocumentSourceFacetStats> stats) override {}
     void visit(tree_walker::MaybeConstPtr<IsConst, UnpackTimeseriesBucketStats> stats) override {}
+    void visit(tree_walker::MaybeConstPtr<IsConst, TimeseriesModifyStats> stats) override {}
     void visit(
         tree_walker::MaybeConstPtr<IsConst, SampleFromTimeseriesBucketStats> stats) override {}
+    void visit(tree_walker::MaybeConstPtr<IsConst, SpoolStats> stats) override {}
+    void visit(tree_walker::MaybeConstPtr<IsConst, EofStats> stats) override {}
+    void visit(tree_walker::MaybeConstPtr<IsConst, DocumentSourceIdLookupStats> stats) override {}
+    void visit(tree_walker::MaybeConstPtr<IsConst, DocumentSourceGraphLookupStats> stats) override {
+    }
+    void visit(tree_walker::MaybeConstPtr<IsConst, DocumentSourceBucketAutoStats> stats) override {}
+    void visit(
+        tree_walker::MaybeConstPtr<IsConst, DocumentSourceSetWindowFieldsStats> stats) override {}
 };
 
 using PlanStatsMutableVisitor = PlanStatsVisitor<false>;

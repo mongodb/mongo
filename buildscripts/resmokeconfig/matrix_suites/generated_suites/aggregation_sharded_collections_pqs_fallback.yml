@@ -1,0 +1,77 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/aggregation_sharded_collections_pqs_fallback.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
+##########################################################
+description:
+  Test the correctness of the query settings fallback mechanism by introducing
+  planner failures and then expecting that the fallback-generated plan is identical
+  to the original plan. This suite runs aggregation tests using a sharded cluster
+  fixture which implicitly shards accessed collections.
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+  config:
+    shell_options:
+      eval:
+        await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
+        await import("jstests/libs/override_methods/implicit_query_settings_fallback.js");
+  fixture:
+    class: ShardedClusterFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+    num_shards: 2
+  hooks:
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: ValidateCollections
+    - class: CheckOrphansDeleted
+    - class: CleanEveryN
+      n: 20
+matrix_suite: true
+selector:
+  exclude_files:
+    - jstests/aggregation/extras/*.js
+    - jstests/aggregation/data/*.js
+    - jstests/aggregation/exec/spill_to_disk.js
+    - jstests/aggregation/optimization/match_swapping_renamed_fields.js
+    - jstests/aggregation/optimization/use_query_project_and_sort.js
+    - jstests/aggregation/optimization/use_query_projection.js
+    - jstests/aggregation/optimization/use_query_sort.js
+    - jstests/aggregation/sources/group/groupMissing.js
+    - jstests/aggregation/sources/graphLookup/variables.js
+    - jstests/aggregation/accumulators/accumulator_js_size_limits.js
+    - jstests/aggregation/exec/query_limits_test.js
+    - jstests/aggregation/sources/geonear/geonear_hint.js
+    - jstests/aggregation/sources/lookup/lookup_query_stats.js
+    - jstests/aggregation/sources/unionWith/unionWith_query_stats.js
+    - jstests/aggregation/sources/lookup/lookup_single_solution_cache.js
+    - jstests/aggregation/sources/bucket/collation_bucket.js
+  exclude_with_any_tags:
+    - assumes_no_implicit_collection_creation_on_get_collection
+    - assumes_against_mongod_not_mongos
+    - assumes_no_implicit_collection_creation_after_drop
+    - assumes_no_implicit_index_creation
+    - assumes_unsharded_collection
+    - cannot_create_unique_index_when_using_hashed_shard_key
+    - requires_sharding
+    - requires_profiling
+    - assumes_standalone_mongod
+    - does_not_support_repeated_reads
+    - requires_profiling
+    - requires_fsync
+    - known_query_shape_computation_problem
+    - query_intensive_pbt
+  roots:
+    - jstests/aggregation/**/*.js
+test_kind: js_test

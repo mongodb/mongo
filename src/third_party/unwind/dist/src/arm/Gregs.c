@@ -78,6 +78,35 @@ HIDDEN int
 tdep_access_fpreg (struct cursor *c, unw_regnum_t reg, unw_fpreg_t *valp,
                    int write)
 {
-  Debug (1, "bad register number %u\n", reg);
-  return -UNW_EBADREG;
+  dwarf_loc_t loc = DWARF_NULL_LOC;
+  switch (reg)
+  {
+    case UNW_ARM_D0:
+    case UNW_ARM_D1:
+    case UNW_ARM_D2:
+    case UNW_ARM_D3:
+    case UNW_ARM_D4:
+    case UNW_ARM_D5:
+    case UNW_ARM_D6:
+    case UNW_ARM_D7:
+    case UNW_ARM_D8:
+    case UNW_ARM_D9:
+    case UNW_ARM_D10:
+    case UNW_ARM_D11:
+    case UNW_ARM_D12:
+    case UNW_ARM_D13:
+    case UNW_ARM_D14:
+    case UNW_ARM_D15:
+      loc = c->dwarf.loc[UNW_ARM_S0 + (reg - UNW_ARM_D0)];
+      break;
+
+    default:
+      Debug (1, "bad register number %u\n", reg);
+      return -UNW_EBADREG;
+  }
+
+  if (write)
+    return dwarf_putfp (&c->dwarf, loc, *valp);
+  else
+    return dwarf_getfp (&c->dwarf, loc, valp);
 }

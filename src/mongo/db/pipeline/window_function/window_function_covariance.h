@@ -29,10 +29,15 @@
 
 #pragma once
 
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/window_function/window_function.h"
 #include "mongo/db/pipeline/window_function/window_function_avg.h"
 #include "mongo/db/pipeline/window_function/window_function_sum.h"
-#include "mongo/platform/decimal128.h"
+#include "mongo/util/modules.h"
+
+#include <memory>
 
 namespace mongo {
 
@@ -48,7 +53,7 @@ public:
 
     void reset() override;
 
-    Value getValue() const override;
+    Value getValue(boost::optional<Value> current = boost::none) const override;
 
     bool isSample() const {
         return _isSamp;

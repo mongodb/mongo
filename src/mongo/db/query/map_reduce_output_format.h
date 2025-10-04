@@ -29,7 +29,13 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/util/modules.h"
+
+#include <string>
+
+#include <boost/optional/optional.hpp>
 
 /**
  * A collection of functions responsible for building a mapReduce command response from a result

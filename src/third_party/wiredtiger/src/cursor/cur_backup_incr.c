@@ -35,20 +35,22 @@ __curbackup_incr_blkmod(WT_SESSION_IMPL *session, WT_BTREE *btree, WT_CURSOR_BAC
     WT_CONFIG blkconf;
     WT_CONFIG_ITEM b, k, v;
     WT_DECL_RET;
-    char *config;
 
     WT_ASSERT(session, btree != NULL);
     WT_ASSERT(session, btree->dhandle != NULL);
     WT_ASSERT(session, cb->incr_src != NULL);
 
-    WT_RET(__wt_metadata_search(session, btree->dhandle->name, &config));
     /* Check if this is a file with no checkpointed content. */
-    ret = __wt_meta_checkpoint(session, btree->dhandle->name, 0, &ckpt);
+    ret = __wt_meta_checkpoint(session, btree->dhandle->name, 0, &ckpt, NULL);
     if (ret == 0 && ckpt.addr.size == 0)
         F_SET(cb, WT_CURBACKUP_CKPT_FAKE);
-    __wt_meta_checkpoint_free(session, &ckpt);
+    __wt_checkpoint_free(session, &ckpt);
 
-    WT_ERR(__wt_config_getones(session, config, "checkpoint_backup_info", &v));
+    WT_ASSERT(session, cb->cfg_current != NULL);
+    WT_ERR(__wt_config_getones(session, cb->cfg_current, "block_compressor", &v));
+    if (v.len)
+        F_SET(cb, WT_CURBACKUP_COMPRESSED);
+    WT_ERR(__wt_config_getones(session, cb->cfg_current, "checkpoint_backup_info", &v));
     if (v.len)
         F_SET(cb, WT_CURBACKUP_HAS_CB_INFO);
     __wt_config_subinit(session, &blkconf, &v);
@@ -56,7 +58,7 @@ __curbackup_incr_blkmod(WT_SESSION_IMPL *session, WT_BTREE *btree, WT_CURSOR_BAC
         /*
          * First see if we have information for this source identifier.
          */
-        if (WT_STRING_MATCH(cb->incr_src->id_str, k.str, k.len) == 0)
+        if (WT_CONFIG_MATCH(cb->incr_src->id_str, k) == 0)
             continue;
 
         /*
@@ -71,10 +73,11 @@ __curbackup_incr_blkmod(WT_SESSION_IMPL *session, WT_BTREE *btree, WT_CURSOR_BAC
         WT_ERR(__wt_config_subgets(session, &v, "offset", &b));
         cb->offset = (uint64_t)b.val;
 
-        __wt_verbose(session, WT_VERB_BACKUP,
+        __wt_verbose_debug2(session, WT_VERB_BACKUP,
           "Found modified incr block gran %" PRIu64 " nbits %" PRIu64 " offset %" PRIu64,
           cb->granularity, cb->nbits, cb->offset);
-        __wt_verbose(session, WT_VERB_BACKUP, "Modified incr block config: \"%s\"", config);
+        __wt_verbose_debug2(
+          session, WT_VERB_BACKUP, "Modified incr block config: \"%s\"", cb->cfg_current);
 
         /*
          * The rename configuration string component was added later. So don't error if we don't
@@ -105,7 +108,6 @@ __curbackup_incr_blkmod(WT_SESSION_IMPL *session, WT_BTREE *btree, WT_CURSOR_BAC
     WT_ERR_NOTFOUND_OK(ret, false);
 
 err:
-    __wt_free(session, config);
     return (ret == WT_NOTFOUND ? 0 : ret);
 }
 
@@ -122,15 +124,17 @@ __curbackup_incr_next(WT_CURSOR *cursor)
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
     wt_off_t size;
-    uint64_t start_bitoff, total_len;
-    uint32_t raw;
+    uint64_t raw, start_bitoff, total_len;
     const char *file;
     bool found;
 
     cb = (WT_CURSOR_BACKUP *)cursor;
     btree = cb->incr_cursor == NULL ? NULL : CUR2BT(cb->incr_cursor);
     raw = F_MASK(cursor, WT_CURSTD_RAW);
-    CURSOR_API_CALL(cursor, session, get_value, btree);
+
+    /* FIXME-WT-14789: we can probably replace the NULL check with something tidier. */
+    CURSOR_API_CALL(cursor, session, ret, next,
+      btree == NULL ? NULL : ((WT_CURSOR_BTREE *)cb->incr_cursor)->dhandle);
     F_CLR(cursor, WT_CURSTD_RAW);
 
     if (!F_ISSET(cb, WT_CURBACKUP_INCR_INIT) &&
@@ -155,7 +159,7 @@ __curbackup_incr_next(WT_CURSOR *cursor)
          * incremental cursor below and return WT_NOTFOUND.
          */
         F_SET(cb, WT_CURBACKUP_INCR_INIT);
-        __wt_verbose(session, WT_VERB_BACKUP, "Set key WT_BACKUP_FILE %s size %" PRIuMAX,
+        __wt_verbose_debug2(session, WT_VERB_BACKUP, "Set key WT_BACKUP_FILE %s size %" PRIuMAX,
           cb->incr_file, (uintmax_t)size);
         __wt_cursor_set_key(cursor, 0, size, WT_BACKUP_FILE);
     } else {
@@ -184,7 +188,7 @@ __curbackup_incr_next(WT_CURSOR *cursor)
                 if (F_ISSET(cb, WT_CURBACKUP_RENAME) ||
                   (F_ISSET(cb, WT_CURBACKUP_CKPT_FAKE) && F_ISSET(cb, WT_CURBACKUP_HAS_CB_INFO))) {
                     WT_ERR(__wt_fs_size(session, cb->incr_file, &size));
-                    __wt_verbose(session, WT_VERB_BACKUP,
+                    __wt_verbose_debug2(session, WT_VERB_BACKUP,
                       "Set key WT_BACKUP_FILE %s size %" PRIuMAX, cb->incr_file, (uintmax_t)size);
                     __wt_cursor_set_key(cursor, 0, size, WT_BACKUP_FILE);
                     goto done;
@@ -202,15 +206,31 @@ __curbackup_incr_next(WT_CURSOR *cursor)
         while (cb->bit_offset < cb->nbits)
             if (__bit_test(cb->bitstring.mem, cb->bit_offset)) {
                 found = true;
+                WT_STAT_CONN_INCR(session, backup_blocks);
+                if (F_ISSET(cb, WT_CURBACKUP_COMPRESSED))
+                    WT_WITH_DHANDLE(session, btree->dhandle,
+                      WT_STAT_CONN_DSRC_INCR(session, backup_blocks_compressed));
+                else
+                    WT_WITH_DHANDLE(session, btree->dhandle,
+                      WT_STAT_CONN_DSRC_INCR(session, backup_blocks_uncompressed));
                 /*
                  * Care must be taken to leave the bit_offset field set to the next offset bit so
                  * that the next call is set to the correct offset.
                  */
                 start_bitoff = cb->bit_offset++;
                 if (F_ISSET(cb, WT_CURBACKUP_CONSOLIDATE)) {
-                    while (
-                      cb->bit_offset < cb->nbits && __bit_test(cb->bitstring.mem, cb->bit_offset++))
+                    while (cb->bit_offset < cb->nbits &&
+                      __bit_test(cb->bitstring.mem, cb->bit_offset++)) {
                         total_len += cb->granularity;
+                        /* Count all the blocks even if we return them consolidated. */
+                        WT_STAT_CONN_INCR(session, backup_blocks);
+                        if (F_ISSET(cb, WT_CURBACKUP_COMPRESSED))
+                            WT_WITH_DHANDLE(session, btree->dhandle,
+                              WT_STAT_CONN_DSRC_INCR(session, backup_blocks_compressed));
+                        else
+                            WT_WITH_DHANDLE(session, btree->dhandle,
+                              WT_STAT_CONN_DSRC_INCR(session, backup_blocks_uncompressed));
+                    }
                 }
                 break;
             } else
@@ -221,7 +241,7 @@ __curbackup_incr_next(WT_CURSOR *cursor)
             WT_ERR(WT_NOTFOUND);
         WT_ASSERT(session, cb->granularity != 0);
         WT_ASSERT(session, total_len != 0);
-        __wt_verbose(session, WT_VERB_BACKUP,
+        __wt_verbose_debug2(session, WT_VERB_BACKUP,
           "Set key WT_BACKUP_RANGE %s offset %" PRIu64 " length %" PRIu64, cb->incr_file,
           cb->offset + cb->granularity * start_bitoff, total_len);
         __wt_cursor_set_key(
@@ -236,11 +256,11 @@ err:
 }
 
 /*
- * __wt_curbackup_free_incr --
+ * __wti_curbackup_free_incr --
  *     Free the duplicate backup cursor for a file-based incremental backup.
  */
 int
-__wt_curbackup_free_incr(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
+__wti_curbackup_free_incr(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
 {
     WT_DECL_RET;
 
@@ -253,41 +273,42 @@ __wt_curbackup_free_incr(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
 }
 
 /*
- * __wt_curbackup_open_incr --
+ * __wti_curbackup_open_incr --
  *     Initialize the duplicate backup cursor for a file-based incremental backup.
  */
 int
-__wt_curbackup_open_incr(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other,
+__wti_curbackup_open_incr(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other,
   WT_CURSOR *cursor, const char *cfg[], WT_CURSOR **cursorp)
 {
-    WT_CURSOR_BACKUP *cb, *other_cb;
+    WT_CURSOR_BACKUP *cb, *othercb;
     WT_DECL_ITEM(open_uri);
     WT_DECL_RET;
-    uint64_t session_cache_flags;
+    uint32_t session_cache_flags;
 
     cb = (WT_CURSOR_BACKUP *)cursor;
-    other_cb = (WT_CURSOR_BACKUP *)other;
+    othercb = (WT_CURSOR_BACKUP *)other;
     cursor->key_format = WT_UNCHECKED_STRING(qqq);
     cursor->value_format = "";
 
-    WT_ASSERT(session, other_cb->incr_src != NULL);
+    WT_ASSERT(session, othercb->incr_src != NULL);
 
     /*
      * Inherit from the backup cursor but reset specific functions for incremental.
      */
     cursor->next = __curbackup_incr_next;
     cursor->get_key = __wt_cursor_get_key;
-    cursor->get_value = __wt_cursor_get_value_notsup;
-    cb->incr_src = other_cb->incr_src;
+    cursor->get_value = __wti_cursor_get_value_notsup;
+    cb->incr_src = othercb->incr_src;
+    cb->cfg_current = othercb->cfg_current;
 
     /* All WiredTiger owned files are full file copies. */
-    if (F_ISSET(other_cb->incr_src, WT_BLKINCR_FULL) ||
+    if (F_ISSET(othercb->incr_src, WT_BLKINCR_FULL) ||
       WT_PREFIX_MATCH(cb->incr_file, "WiredTiger")) {
         __wt_verbose(session, WT_VERB_BACKUP, "Forcing full file copies for %s for id %s",
-          cb->incr_file, other_cb->incr_src->id_str);
+          cb->incr_file, othercb->incr_src->id_str);
         F_SET(cb, WT_CURBACKUP_FORCE_FULL);
     }
-    if (F_ISSET(other_cb, WT_CURBACKUP_CONSOLIDATE))
+    if (F_ISSET(othercb, WT_CURBACKUP_CONSOLIDATE))
         F_SET(cb, WT_CURBACKUP_CONSOLIDATE);
     else
         F_CLR(cb, WT_CURBACKUP_CONSOLIDATE);
@@ -312,7 +333,7 @@ __wt_curbackup_open_incr(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *o
 
 err:
     if (ret != 0)
-        WT_TRET(__wt_curbackup_free_incr(session, cb));
+        WT_TRET(__wti_curbackup_free_incr(session, cb));
     __wt_scr_free(session, &open_uri);
     return (ret);
 }

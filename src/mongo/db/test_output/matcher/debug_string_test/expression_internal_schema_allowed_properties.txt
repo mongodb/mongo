@@ -1,0 +1,6 @@
+==== VARIATION: matchExpression=InternalSchemaAllowedPropertiesMatchExpression
+{ $_internalSchemaAllowedProperties: { properties: [ "a", "b" ], namePlaceholder: "i", patternProperties: [], otherwise: { i: { $eq: 0 } } } }
+
+==== VARIATION: taggedMatchExpression=InternalSchemaAllowedPropertiesMatchExpression
+{ $_internalSchemaAllowedProperties: { properties: [ "a", "b" ], namePlaceholder: "i", patternProperties: [], otherwise: { i: { $eq: 0 } } } } || Selected Index #2 pos 0 combine 1
+

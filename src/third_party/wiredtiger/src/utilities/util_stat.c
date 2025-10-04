@@ -8,16 +8,24 @@
 
 #include "util.h"
 
+/*
+ * usage --
+ *     Display a usage message for the stat command.
+ */
 static int
 usage(void)
 {
-    static const char *options[] = {
-      "-f", "include only \"fast\" statistics in the output", NULL, NULL};
+    static const char *options[] = {"-f", "include only \"fast\" statistics in the output", "-?",
+      "show this message", NULL, NULL};
 
     util_usage("stat [-f] [uri]", "options:", options);
     return (1);
 }
 
+/*
+ * util_stat --
+ *     The stat command.
+ */
 int
 util_stat(WT_SESSION *session, int argc, char *argv[])
 {
@@ -32,7 +40,7 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
     objname_free = false;
     objname = uri = NULL;
     config = NULL;
-    while ((ch = __wt_getopt(progname, argc, argv, "af")) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "af?")) != EOF)
         switch (ch) {
         case 'a':
             /*
@@ -46,6 +54,8 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
             config = "statistics=(fast)";
             break;
         case '?':
+            usage();
+            return (0);
         default:
             return (usage());
         }
@@ -54,7 +64,7 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
 
     /*
      * If there are no arguments, the statistics cursor operates on the connection, otherwise, the
-     * optional remaining argument is a file or LSM name.
+     * optional remaining argument is a file.
      */
     switch (argc) {
     case 0:
@@ -70,7 +80,7 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
     }
 
     urilen = strlen("statistics:") + strlen(objname) + 1;
-    if ((uri = calloc(urilen, 1)) == NULL) {
+    if ((uri = util_calloc(urilen, 1)) == NULL) {
         fprintf(stderr, "%s: %s\n", progname, strerror(errno));
         goto err;
     }
@@ -106,8 +116,8 @@ err:
         ret = 1;
     }
     if (objname_free)
-        free(objname);
-    free(uri);
+        util_free(objname);
+    util_free(uri);
 
     return (ret);
 }

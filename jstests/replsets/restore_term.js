@@ -1,5 +1,3 @@
-load("jstests/replsets/rslib.js");
-
 // Tests that the replica set's term increases once per election, and persists across a restart of
 // the entire set.
 //
@@ -9,33 +7,33 @@ load("jstests/replsets/rslib.js");
 // so cannot elect a primary. This test induces such a scenario, so cannot be run on ephemeral
 // storage engines.
 // @tags: [requires_persistence]
-(function() {
-"use strict";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {getLatestOp} from "jstests/replsets/rslib.js";
 
 function getCurrentTerm(primary) {
-    var res = primary.adminCommand({replSetGetStatus: 1});
+    let res = primary.adminCommand({replSetGetStatus: 1});
     assert.commandWorked(res);
     return res.term;
 }
 
-var name = "restore_term";
-var rst = new ReplSetTest({name: name, nodes: 2});
+let name = "restore_term";
+let rst = new ReplSetTest({name: name, nodes: 2});
 
 rst.startSet();
 rst.initiate();
 rst.awaitSecondaryNodes();
 
-var primary = rst.getPrimary();
-var primaryColl = primary.getDB("test").coll;
+let primary = rst.getPrimary();
+let primaryColl = primary.getDB("test").coll;
 
 // Current term may be greater than 1 if election race happens.
-var firstSuccessfulTerm = getCurrentTerm(primary);
+let firstSuccessfulTerm = getCurrentTerm(primary);
 assert.gte(firstSuccessfulTerm, 1);
 assert.commandWorked(primaryColl.insert({x: 1}, {writeConcern: {w: "majority"}}));
 assert.eq(getCurrentTerm(primary), firstSuccessfulTerm);
 
 // Check that the insert op has the initial term.
-var latestOp = getLatestOp(primary);
+let latestOp = getLatestOp(primary);
 assert.eq(latestOp.op, "i");
 assert.eq(latestOp.t, firstSuccessfulTerm);
 
@@ -58,4 +56,3 @@ assert.eq(primary.getDB("test").coll.find().itcount(), 1);
 assert.gte(getCurrentTerm(primary), firstSuccessfulTerm + 1);
 
 rst.stopSet();
-})();

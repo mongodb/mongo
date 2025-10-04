@@ -27,22 +27,46 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
-#include "mongo/platform/basic.h"
+#include <boost/filesystem/exception.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "bits/types/struct_rusage.h"
+#include <algorithm>
+#include <climits>
+#include <compare>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <fstream>  // IWYU pragma: keep
+#include <functional>
+#include <initializer_list>
+#include <memory>
+#include <new>
+#include <set>
+#include <stdexcept>
+#include <string>
+#include <system_error>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
 #include "processinfo.h"
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
-#include <iostream>
-#include <malloc.h>
-#include <pcrecpp.h>
+#ifndef _WIN32
 #include <sched.h>
-#include <stdio.h>
-#include <sys/mman.h>
+
 #include <sys/resource.h>
+#include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/utsname.h>
-#include <unistd.h>
+#endif
+
 #ifdef __BIONIC__
 #include <android/api-level.h>
 #elif __UCLIBC__
@@ -51,31 +75,43 @@
 #include <gnu/libc-version.h>
 #endif
 
-#include <boost/filesystem.hpp>
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <fmt/format.h>
-#include <pcrecpp.h>
-
+#include "mongo/base/parse_number.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
+#include "mongo/platform/process_id.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
+#include "mongo/util/errno_util.h"
 #include "mongo/util/file.h"
+#include "mongo/util/pcre.h"
+#include "mongo/util/procparser.h"
+#include "mongo/util/static_immortal.h"
+#include "mongo/util/str.h"
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
+
 
 #define KLONG long
 #define KLF "l"
 
 namespace mongo {
 
-using namespace fmt::literals;
-
 class LinuxProc {
 public:
     LinuxProc(ProcessId pid) {
-        auto name = "/proc/{}/stat"_format(pid.asUInt32());
+        auto name = fmt::format("/proc/{}/stat", pid.asUInt32());
         FILE* f = fopen(name.c_str(), "r");
         if (!f) {
-            auto e = errno;
-            msgasserted(13538, "couldn't open [{}] {}"_format(name, errnoWithDescription(e)));
+            auto ec = lastSystemError();
+            msgasserted(13538, fmt::format("couldn't open [{}] {}", name, errorMessage(ec)));
         }
         int found = fscanf(f,
                            "%d %127s %c "
@@ -135,7 +171,7 @@ public:
                              &_rtprio, &_sched
                            */
         );
-        massert(13539, "couldn't parse [{}]"_format(name).c_str(), found != 0);
+        massert(13539, fmt::format("couldn't parse [{}]", name).c_str(), found != 0);
         fclose(f);
     }
 
@@ -253,21 +289,34 @@ namespace {
 // (1)(2)(3:4)(5)   (6)   (7)        (8)        (9)   (10)   (11)
 struct MountRecord {
     bool parseLine(const std::string& line) {
-        static const pcrecpp::RE kRe{
-            //   (1)   (2)   (3)   (4)   (5)   (6)   (7)   (8)                (9)   (10)  (11)
-            R"re((\d+) (\d+) (\d+):(\d+) (\S+) (\S+) (\S+) ((?:\S+:\S+ ?)*) - (\S+) (\S+) (\S+))re"};
-        return kRe.FullMatch(line,
-                             &mountId,
-                             &parentId,
-                             &major,
-                             &minor,
-                             &root,
-                             &mountPoint,
-                             &options,
-                             &fields,
-                             &type,
-                             &source,
-                             &superOpt);
+        static const pcre::Regex kRe{
+            //    (1)   (2)   (3)   (4)   (5)   (6)   (7)   (8)                (9)   (10)  (11)
+            R"re(^(\d+) (\d+) (\d+):(\d+) (\S+) (\S+) (\S+) ((?:\S+:\S+ ?)*) - (\S+) (\S+) (\S+)$)re"};
+        auto m = kRe.matchView(line);
+        if (!m)
+            return false;
+        size_t i = 1;
+        auto load = [&](auto& var) {
+            using T = std::decay_t<decltype(var)>;
+            std::string nextString{m[i++]};
+            if constexpr (std::is_same_v<T, int>) {
+                var = std::stoi(nextString);
+            } else {
+                var = std::move(nextString);
+            }
+        };
+        load(mountId);
+        load(parentId);
+        load(major);
+        load(minor);
+        load(root);
+        load(mountPoint);
+        load(options);
+        load(fields);
+        load(type);
+        load(source);
+        load(superOpt);
+        return true;
     }
 
     void appendBSON(BSONObjBuilder& bob) const {
@@ -297,17 +346,99 @@ struct MountRecord {
     std::string superOpt;    //  (11) per-superblock options (see mount(2))
 };
 
+struct DiskStat {
+    int major;
+    int minor;
+    // See https://www.kernel.org/doc/Documentation/ABI/testing/procfs-diskstats
+    const std::vector<std::string> statsLabels = {"deviceName",
+                                                  "reads",
+                                                  "readsMerged",
+                                                  "readsSectors",
+                                                  "readsMs",
+                                                  "writes",
+                                                  "writesMerged",
+                                                  "writesSectors",
+                                                  "writesMs",
+                                                  "ioInProgress",
+                                                  "ioMs",
+                                                  "ioMsWeighted",
+                                                  "discards",
+                                                  "discardsMerged",
+                                                  "discardsSectors",
+                                                  "discardsMs",
+                                                  "flushes",
+                                                  "flushesMs"};
+    std::vector<std::string> statsValues;
+
+    void appendBSON(BSONObjBuilder& bob) const {
+        int iterations = std::min(statsLabels.size(), statsValues.size());
+        for (int i = 0; i < iterations; ++i) {
+            bob.append(statsLabels[i], statsValues[i]);
+        }
+    }
+
+    bool readLine(const std::string& line) {
+        std::istringstream iss(line);
+
+        iss >> major;
+        iss >> minor;
+        if (iss.fail()) {
+            LOGV2(5963301, "Malformed diskstats line", "line"_attr = line);
+            return false;
+        }
+
+        std::string val;
+        while (iss >> val) {
+            statsValues.push_back(val);
+        }
+        return true;
+    }
+};
+
 void appendMountInfo(BSONObjBuilder& bob) {
-    std::ifstream ifs("/proc/self/mountinfo");
-    if (!ifs)
-        return;
-    BSONArrayBuilder arr = bob.subarrayStart("mountInfo");
+    std::set<std::pair<int, int>> majorMinors;
+    std::map<std::pair<int, int>, DiskStat> diskStats;
+    std::ifstream ifs;
+
     std::string line;
-    MountRecord rec;
-    while (ifs && getline(ifs, line)) {
-        if (rec.parseLine(line)) {
-            auto bob = BSONObjBuilder(arr.subobjStart());
-            rec.appendBSON(bob);
+    ifs.open("/proc/diskstats");
+    if (ifs) {
+        while (ifs && getline(ifs, line)) {
+            DiskStat ds;
+            if (ds.readLine(line)) {
+                std::pair<int, int> majorMinor = std::make_pair(ds.major, ds.minor);
+                majorMinors.insert(majorMinor);
+                diskStats.insert({majorMinor, ds});
+            }
+        }
+    }
+    ifs.close();
+
+    std::map<std::pair<int, int>, MountRecord> mountRecords;
+    ifs.open("/proc/self/mountinfo");
+    if (ifs) {
+        while (ifs && getline(ifs, line)) {
+            MountRecord mr;
+            mr.parseLine(line);
+            std::pair<int, int> majorMinor = std::make_pair(mr.major, mr.minor);
+            majorMinors.insert(majorMinor);
+            mountRecords.insert({majorMinor, mr});
+        }
+    }
+    ifs.close();
+
+    BSONArrayBuilder arr = bob.subarrayStart("mountInfo");
+    for (const auto& majorMinor : majorMinors) {
+        auto arrBob = BSONObjBuilder(arr.subobjStart());
+
+        auto mr = mountRecords.find(majorMinor);
+        if (mr != mountRecords.end()) {
+            mr->second.appendBSON(arrBob);
+        }
+
+        auto ds = diskStats.find(majorMinor);
+        if (ds != diskStats.end()) {
+            ds->second.appendBSON(arrBob);
         }
     }
 }
@@ -315,7 +446,9 @@ void appendMountInfo(BSONObjBuilder& bob) {
 class CpuInfoParser {
 public:
     struct LineProcessor {
-        pcrecpp::RE regex;
+        LineProcessor(std::string pattern, std::function<void(const std::string&)> f)
+            : regex{std::make_shared<pcre::Regex>(std::move(pattern))}, f{std::move(f)} {}
+        std::shared_ptr<pcre::Regex> regex;
         std::function<void(const std::string&)> f;
     };
     std::vector<LineProcessor> lineProcessors;
@@ -327,17 +460,18 @@ public:
 
         bool readSuccess;
         bool unprocessed = false;
-        static StaticImmortal<pcrecpp::RE> lineRegex(R"re((.*?)\s*:\s*(.*))re");
+        static StaticImmortal<pcre::Regex> lineRegex(R"re(^(.*?)\s*:\s*(.*)$)re");
         do {
             std::string fstr;
             readSuccess = f && std::getline(f, fstr);
             if (readSuccess && !fstr.empty()) {
-                std::string key;
-                std::string value;
-                if (!lineRegex->FullMatch(fstr, &key, &value))
+                auto m = lineRegex->matchView(fstr);
+                if (!m)
                     continue;
+                std::string key{m[1]};
+                std::string value{m[2]};
                 for (auto&& [lpr, lpf] : lineProcessors) {
-                    if (lpr.FullMatch(key))
+                    if (lpr->matchView(key, pcre::ANCHORED | pcre::ENDANCHORED))
                         lpf(value);
                 }
                 unprocessed = true;
@@ -349,14 +483,12 @@ public:
     }
 };
 
-}  // namespace
-
 class LinuxSysHelper {
 public:
     /**
      * Read the first 1023 bytes from a file
      */
-    static std::string readLineFromFile(const char* fname) {
+    static std::string parseLineFromFile(const char* fname) {
         FILE* f;
         char fstr[1024] = {0};
 
@@ -386,45 +518,123 @@ public:
         CpuId parsedCpuId;
 
         auto cmp = [](auto&& a, auto&& b) {
-            auto tupLens = [](auto&& o) { return std::tie(o.core, o.physical); };
+            auto tupLens = [](auto&& o) {
+                return std::tie(o.core, o.physical);
+            };
             return tupLens(a) < tupLens(b);
         };
         std::set<CpuId, decltype(cmp)> cpuIds(cmp);
 
-        CpuInfoParser cpuInfoParser{
-            {
-                {"physical id", [&](const std::string& value) { parsedCpuId.physical = value; }},
-                {"core id", [&](const std::string& value) { parsedCpuId.core = value; }},
-            },
-            [&]() {
-                cpuIds.insert(parsedCpuId);
-                parsedCpuId = CpuId{};
-            }};
+        CpuInfoParser cpuInfoParser{{
+                                        {"physical id",
+                                         [&](const std::string& value) {
+                                             parsedCpuId.physical = value;
+                                         }},
+                                        {"core id",
+                                         [&](const std::string& value) {
+                                             parsedCpuId.core = value;
+                                         }},
+                                    },
+                                    [&]() {
+                                        cpuIds.insert(parsedCpuId);
+                                        parsedCpuId = CpuId{};
+                                    }};
         cpuInfoParser.run();
 
         physicalCores = cpuIds.size();
     }
 
     /**
+     * count the number of processor packages
+     */
+    static int getNumCpuSockets() {
+        std::set<std::string> socketIds;
+
+        CpuInfoParser cpuInfoParser{{
+                                        {"physical id",
+                                         [&](const std::string& value) {
+                                             socketIds.insert(value);
+                                         }},
+                                    },
+                                    []() {
+                                    }};
+        cpuInfoParser.run();
+
+        // On ARM64, the "physical id" field is unpopulated, causing there to be 0 sockets found. In
+        // this case, we default to 1.
+        return std::max(socketIds.size(), 1ul);
+    }
+
+    /**
      * Get some details about the CPU
      */
-    static void getCpuInfo(int& procCount, std::string& freq, std::string& features) {
+    static void getCpuInfo(int& procCount,
+                           std::string& modelString,
+                           std::string& freq,
+                           std::string& features,
+                           std::string& cpuImplementer,
+                           std::string& cpuArchitecture,
+                           std::string& cpuVariant,
+                           std::string& cpuPart,
+                           std::string& cpuRevision) {
 
         procCount = 0;
 
-        CpuInfoParser cpuInfoParser{
-            {
+        CpuInfoParser cpuInfoParser{{
 #ifdef __s390x__
-                {R"re(processor\s+\d+)re", [&](const std::string& value) { procCount++; }},
-                {"cpu MHz static", [&](const std::string& value) { freq = value; }},
-                {"features", [&](const std::string& value) { features = value; }},
+                                        {R"re(processor\s+\d+)re",
+                                         [&](const std::string& value) {
+                                             procCount++;
+                                         }},
+                                        {"cpu MHz static",
+                                         [&](const std::string& value) {
+                                             freq = value;
+                                         }},
+                                        {"features",
+                                         [&](const std::string& value) {
+                                             features = value;
+                                         }},
 #else
-                {"processor", [&](const std::string& value) { procCount++; }},
-                {"cpu MHz", [&](const std::string& value) { freq = value; }},
-                {"flags", [&](const std::string& value) { features = value; }},
+                                        {"processor",
+                                         [&](const std::string& value) {
+                                             procCount++;
+                                         }},
+                                        {"model name",
+                                         [&](const std::string& value) {
+                                             modelString = value;
+                                         }},
+                                        {"cpu MHz",
+                                         [&](const std::string& value) {
+                                             freq = value;
+                                         }},
+                                        {"flags",
+                                         [&](const std::string& value) {
+                                             features = value;
+                                         }},
+                                        {"CPU implementer",
+                                         [&](const std::string& value) {
+                                             cpuImplementer = value;
+                                         }},
+                                        {"CPU architecture",
+                                         [&](const std::string& value) {
+                                             cpuArchitecture = value;
+                                         }},
+                                        {"CPU variant",
+                                         [&](const std::string& value) {
+                                             cpuVariant = value;
+                                         }},
+                                        {"CPU part",
+                                         [&](const std::string& value) {
+                                             cpuPart = value;
+                                         }},
+                                        {"CPU revision",
+                                         [&](const std::string& value) {
+                                             cpuRevision = value;
+                                         }},
 #endif
-            },
-            []() {}};
+                                    },
+                                    []() {
+                                    }};
         cpuInfoParser.run();
     }
 
@@ -522,14 +732,14 @@ public:
 
         // There is no standard format for name and version so use the kernel version.
         version = "Kernel ";
-        version += LinuxSysHelper::readLineFromFile("/proc/sys/kernel/osrelease");
+        version += LinuxSysHelper::parseLineFromFile("/proc/sys/kernel/osrelease");
     }
 
     /**
      * Get system memory total
      */
     static unsigned long long getSystemMemorySize() {
-        std::string meminfo = readLineFromFile("/proc/meminfo");
+        std::string meminfo = parseLineFromFile("/proc/meminfo");
         size_t lineOff = 0;
         if (!meminfo.empty() && (lineOff = meminfo.find("MemTotal")) != std::string::npos) {
             // found MemTotal line.  capture everything between 'MemTotal:' and ' kB'.
@@ -558,16 +768,179 @@ public:
      * return the actual memory we'll have available to the process.
      */
     static unsigned long long getMemorySizeLimit() {
-        unsigned long long systemMemBytes = getSystemMemorySize();
-        unsigned long long cgroupMemBytes = 0;
-        std::string cgmemlimit = readLineFromFile("/sys/fs/cgroup/memory/memory.limit_in_bytes");
-        if (!cgmemlimit.empty() && mongo::NumberParser{}(cgmemlimit, &cgroupMemBytes).isOK()) {
-            return std::min(systemMemBytes, cgroupMemBytes);
+        const unsigned long long systemMemBytes = getSystemMemorySize();
+        for (const char* file : {
+                 "/sys/fs/cgroup/memory.max",                   // cgroups v2
+                 "/sys/fs/cgroup/memory/memory.limit_in_bytes"  // cgroups v1
+             }) {
+            unsigned long long groupMemBytes = 0;
+            std::string groupLimit = parseLineFromFile(file);
+            if (!groupLimit.empty() && NumberParser{}(groupLimit, &groupMemBytes).isOK()) {
+                return std::min(systemMemBytes, groupMemBytes);
+            }
         }
         return systemMemBytes;
     }
+
+    /**
+     * Get Cgroup path of the process.
+     * return string path of cgrouop. If no cgroup v2, return an empty string.
+     */
+    static std::string getCgroupV2Path(const ProcessId& pid) {
+        const auto line = LinuxSysHelper::parseLineFromFile(
+            fmt::format("/proc/{}/cgroup", pid.asUInt32()).c_str());
+        if (line.empty()) {
+            return {};
+        }
+        // The entry for cgroup v2 is always in the format “0::$PATH”.
+        const StringData prefixV2 = "0::"_sd;
+        const size_t prefixLength = prefixV2.length();
+
+        // Check if the input starts with the prefix
+        if (StringData{line}.starts_with(prefixV2)) {
+            // cgroup v2.
+            return fmt::format("/sys/fs/cgroup{}", line.substr(prefixLength));
+        } else {
+            // cgroup v1.
+            return {};
+        }
+    }
+
+    static void getCpuCgroupV2Info(const ProcessId& pid,
+                                   std::string& cpuMax,
+                                   std::string& cpuMaxBurst,
+                                   std::string& cpuUclampMin,
+                                   std::string& cpuUclampMax,
+                                   std::string& cpuWeight) {
+        auto path = getCgroupV2Path(pid);
+        if (path.empty()) {
+            return;
+        }
+        auto parseLineOrDefault = [](const std::string& fileName) {
+            auto lineStr = parseLineFromFile(fileName.c_str());
+            return lineStr.empty() ? "default" : lineStr;
+        };
+        cpuMax = parseLineOrDefault(fmt::format("{}/cpu.max", path));
+        cpuMaxBurst = parseLineOrDefault(fmt::format("{}/cpu.max.burst", path));
+        cpuUclampMin = parseLineOrDefault(fmt::format("{}/cpu.uclamp.min", path));
+        cpuUclampMax = parseLineOrDefault(fmt::format("{}/cpu.uclamp.max", path));
+        cpuWeight = parseLineOrDefault(fmt::format("{}/cpu.weight", path));
+    }
+
+    static int parseProcIntWithDefault(const char* path, int defaultValue) {
+        std::ifstream proc{path};
+        if (!proc) {
+            LOGV2(10181001,
+                  "Unable to open procfs path, falling back to default value",
+                  "path"_attr = path,
+                  "default"_attr = defaultValue);
+            return defaultValue;
+        }
+        int value;
+        if (!(proc >> value)) {
+            LOGV2(10181002,
+                  "Unable to read an integer from procfs file, falling back to default value",
+                  "path"_attr = path,
+                  "default"_attr = defaultValue);
+            return defaultValue;
+        }
+        std::string remainingNonWhitespace;
+        if (proc >> remainingNonWhitespace) {
+            LOGV2(10181003,
+                  "procfs file contains trailing non-integer data, falling back to default "
+                  "value",
+                  "path"_attr = path,
+                  "int_data"_attr = value,
+                  "extra_data"_attr = remainingNonWhitespace,
+                  "default"_attr = defaultValue);
+            return defaultValue;
+        }
+        return value;
+    }
 };
 
+void appendIfExists(BSONObjBuilder* bob, StringData key, StringData value) {
+    if (!value.empty()) {
+        bob->append(key, value);
+    }
+}
+
+void collectPressureStallInfo(BSONObjBuilder& builder) {
+
+    auto parsePressureFile = [](StringData key, StringData filename, BSONObjBuilder& bob) {
+        BSONObjBuilder psiParseBuilder;
+        auto status = procparser::parseProcPressureFile(key, filename, &psiParseBuilder);
+        if (status.isOK()) {
+            bob.appendElements(psiParseBuilder.obj());
+        }
+        return status.isOK();
+    };
+
+    BSONObjBuilder psiBuilder;
+    bool parseStatus = false;
+
+    parseStatus |= parsePressureFile("memory", "/proc/pressure/memory"_sd, psiBuilder);
+    parseStatus |= parsePressureFile("cpu", "/proc/pressure/cpu"_sd, psiBuilder);
+    parseStatus |= parsePressureFile("io", "/proc/pressure/io"_sd, psiBuilder);
+
+    if (parseStatus) {
+        builder.append("pressure"_sd, psiBuilder.obj());
+    }
+}
+
+/**
+ * If the process is running with (cc)NUMA enabled, return the number of NUMA nodes. Else, return 0.
+ */
+unsigned long countNumaNodes() {
+    bool hasMultipleNodes = false;
+    bool hasNumaMaps = false;
+
+    try {
+        hasMultipleNodes = boost::filesystem::exists("/sys/devices/system/node/node1");
+        hasNumaMaps = boost::filesystem::exists("/proc/self/numa_maps");
+
+        if (hasMultipleNodes && hasNumaMaps) {
+            // proc is populated with numa entries
+
+            // read the second column of first line to determine numa state
+            // ('default' = enabled, 'interleave' = disabled).  Logic from version.cpp's warnings.
+            std::string line =
+                LinuxSysHelper::parseLineFromFile("/proc/self/numa_maps").append(" \0");
+            size_t pos = line.find(' ');
+            if (pos != std::string::npos &&
+                line.substr(pos + 1, 10).find("interleave") == std::string::npos) {
+                // interleave not found, count NUMA nodes by finding the highest numbered node file
+                unsigned long i = 2;
+                while (boost::filesystem::exists(
+                    std::string(str::stream() << "/sys/devices/system/node/node" << i++)))
+                    ;
+                return i - 1;
+            }
+        }
+    } catch (boost::filesystem::filesystem_error& e) {
+        LOGV2(23340,
+              "WARNING: Cannot detect if NUMA interleaving is enabled. Failed to probe",
+              "path"_attr = e.path1().string(),
+              "reason"_attr = e.code().message());
+    }
+    return 0;
+}
+
+/**
+ * Append CPU Cgroup v2 info of the current process.
+ */
+void appendCpuCgrouopV2Info(BSONObjBuilder& bob) {
+    std::string cpuMax, cpuMaxBurst, cpuUclampMin, cpuUclampMax, cpuWeight;
+    LinuxSysHelper::getCpuCgroupV2Info(
+        ProcessId::getCurrent(), cpuMax, cpuMaxBurst, cpuUclampMin, cpuUclampMax, cpuWeight);
+    appendIfExists(&bob, "cpuMax"_sd, cpuMax);
+    appendIfExists(&bob, "cpuMaxBurst"_sd, cpuMaxBurst);
+    appendIfExists(&bob, "cpuUclampMin"_sd, cpuUclampMin);
+    appendIfExists(&bob, "cpuUclampMax"_sd, cpuUclampMax);
+    appendIfExists(&bob, "cpuWeight"_sd, cpuWeight);
+}
+
+}  // namespace
 
 ProcessInfo::ProcessInfo(ProcessId pid) : _pid(pid) {}
 
@@ -594,6 +967,11 @@ boost::optional<unsigned long> ProcessInfo::getNumCoresForProcess() {
 #endif
     }
 
+    auto ec = lastSystemError();
+    LOGV2(8366600,
+          "sched_getaffinity failed to collect cpu_set info",
+          "error"_attr = errorMessage(ec));
+
     return boost::none;
 }
 
@@ -605,6 +983,67 @@ int ProcessInfo::getVirtualMemorySize() {
 int ProcessInfo::getResidentSize() {
     LinuxProc p(_pid);
     return (int)((p.getResidentSizeInPages() * getPageSize()) / (1024.0 * 1024));
+}
+
+StatusWith<std::string> ProcessInfo::readTransparentHugePagesParameter(StringData parameter,
+                                                                       StringData directory) {
+    auto line =
+        LinuxSysHelper::parseLineFromFile(fmt::format("{}/{}", directory, parameter).c_str());
+    if (line.empty()) {
+        return {ErrorCodes::NonExistentPath,
+                fmt::format("Empty or non-existent file at {}/{}", directory, parameter)};
+    }
+
+    std::string opMode;
+    std::string::size_type posBegin = line.find('[');
+    std::string::size_type posEnd = line.find(']');
+    if (posBegin == std::string::npos || posEnd == std::string::npos || posBegin >= posEnd) {
+        return {ErrorCodes::FailedToParse, fmt::format("Cannot parse line: '{}'", line)};
+    }
+
+    opMode = line.substr(posBegin + 1, posEnd - posBegin - 1);
+    if (opMode.empty()) {
+        return {ErrorCodes::BadValue,
+                fmt::format("Invalid mode in {}/{}: '{}'", directory, parameter, line)};
+    }
+
+    // Check against acceptable values of opMode.
+    static constexpr std::array acceptableValues{
+        "always"_sd,
+        "defer"_sd,
+        "defer+madvise"_sd,
+        "madvise"_sd,
+        "never"_sd,
+    };
+    if (std::find(acceptableValues.begin(), acceptableValues.end(), opMode) ==
+        acceptableValues.end()) {
+        return {
+            ErrorCodes::BadValue,
+            fmt::format(
+                "** WARNING: unrecognized transparent Huge Pages mode of operation in {}/{}: '{}'",
+                directory,
+                parameter,
+                opMode)};
+    }
+
+    return std::move(opMode);
+}
+
+bool ProcessInfo::checkGlibcRseqTunable() {
+    StringData glibcEnv = getenv(kGlibcTunableEnvVar);
+    auto foundIndex = glibcEnv.find(kRseqKey);
+
+    if (foundIndex != std::string::npos) {
+        try {
+            auto rseqSetting = glibcEnv.at(foundIndex + strlen(kRseqKey) + 1);
+
+            return std::stoi(std::string{rseqSetting}) == 0;
+        } catch (std::exception const&) {
+            return false;
+        }
+    }
+
+    return false;
 }
 
 void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {
@@ -640,6 +1079,14 @@ void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {
 
     appendNumber("voluntary_context_switches", ru.ru_nvcsw);
     appendNumber("involuntary_context_switches", ru.ru_nivcsw);
+
+    LinuxProc p(_pid);
+
+    // Append the number of thread in use
+    appendNumber("threads", p._nlwp);
+
+    // Append Pressure Stall Information (PSI)
+    collectPressureStallInfo(info);
 }
 
 /**
@@ -648,20 +1095,31 @@ void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {
 void ProcessInfo::SystemInfo::collectSystemInfo() {
     utsname unameData;
     std::string distroName, distroVersion;
-    std::string cpuFreq, cpuFeatures;
+    std::string cpuString, cpuFreq, cpuFeatures;
+    std::string cpuImplementer, cpuArchitecture, cpuVariant, cpuPart, cpuRevision;
     int cpuCount;
     int physicalCores;
+    int cpuSockets;
 
-    std::string verSig = LinuxSysHelper::readLineFromFile("/proc/version_signature");
-    LinuxSysHelper::getCpuInfo(cpuCount, cpuFreq, cpuFeatures);
+    std::string verSig = LinuxSysHelper::parseLineFromFile("/proc/version_signature");
+    LinuxSysHelper::getCpuInfo(cpuCount,
+                               cpuString,
+                               cpuFreq,
+                               cpuFeatures,
+                               cpuImplementer,
+                               cpuArchitecture,
+                               cpuVariant,
+                               cpuPart,
+                               cpuRevision);
     LinuxSysHelper::getNumPhysicalCores(physicalCores);
+    cpuSockets = LinuxSysHelper::getNumCpuSockets();
     LinuxSysHelper::getLinuxDistro(distroName, distroVersion);
 
     if (uname(&unameData) == -1) {
-        auto e = errno;
+        auto ec = lastSystemError();
         LOGV2(23339,
               "Unable to collect detailed system information",
-              "error"_attr = errnoWithDescription(e));
+              "error"_attr = errorMessage(ec));
     }
 
     osType = "Linux";
@@ -671,12 +1129,17 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     memLimit = LinuxSysHelper::getMemorySizeLimit();
     addrSize = sizeof(void*) * CHAR_BIT;
     numCores = cpuCount;
+    numPhysicalCores = physicalCores;
+    numCpuSockets = cpuSockets;
     pageSize = static_cast<unsigned long long>(sysconf(_SC_PAGESIZE));
     cpuArch = unameData.machine;
-    hasNuma = checkNumaEnabled();
+    numNumaNodes = countNumaNodes();
+    hasNuma = numNumaNodes;
+    defaultListenBacklog =
+        LinuxSysHelper::parseProcIntWithDefault("/proc/sys/net/core/somaxconn", SOMAXCONN);
 
     BSONObjBuilder bExtra;
-    bExtra.append("versionString", LinuxSysHelper::readLineFromFile("/proc/version"));
+    bExtra.append("versionString", LinuxSysHelper::parseLineFromFile("/proc/version"));
 #ifdef __BIONIC__
     std::stringstream ss;
     ss << "bionic (android api " << __ANDROID_API__ << ")";
@@ -693,49 +1156,51 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
         bExtra.append("versionSignature", verSig);
 
     bExtra.append("kernelVersion", unameData.release);
+    bExtra.append("cpuString", cpuString);
     bExtra.append("cpuFrequencyMHz", cpuFreq);
     bExtra.append("cpuFeatures", cpuFeatures);
     bExtra.append("pageSize", static_cast<long long>(pageSize));
     bExtra.append("numPages", static_cast<int>(sysconf(_SC_PHYS_PAGES)));
     bExtra.append("maxOpenFiles", static_cast<int>(sysconf(_SC_OPEN_MAX)));
-    bExtra.append("physicalCores", physicalCores);
+
+    // Append ARM-specific fields, if they exist.
+    // Can be mapped to model name by referencing sys-utils/lscpu-arm.c
+    appendIfExists(&bExtra, "cpuImplementer", cpuImplementer);
+    appendIfExists(&bExtra, "cpuArchitecture", cpuArchitecture);
+    appendIfExists(&bExtra, "cpuVariant", cpuVariant);
+    appendIfExists(&bExtra, "cpuPart", cpuPart);
+    appendIfExists(&bExtra, "cpuRevision", cpuRevision);
+
+    // Append CPU Cgroup v2 information, if they exist.
+    appendCpuCgrouopV2Info(bExtra);
+
+    if (auto res = ProcessInfo::readTransparentHugePagesParameter("enabled"); res.isOK()) {
+        appendIfExists(&bExtra, "thp_enabled", res.getValue());
+    }
+
+    if (auto res = ProcessInfo::readTransparentHugePagesParameter("defrag"); res.isOK()) {
+        appendIfExists(&bExtra, "thp_defrag", res.getValue());
+    }
+
+    appendIfExists(
+        &bExtra,
+        "thp_max_ptes_none",
+        LinuxSysHelper::parseLineFromFile(
+            fmt::format("{}/khugepaged/max_ptes_none", kTranparentHugepageDirectory).c_str()));
+    appendIfExists(&bExtra,
+                   "overcommit_memory",
+                   LinuxSysHelper::parseLineFromFile("/proc/sys/vm/overcommit_memory"));
+
+#if defined(MONGO_CONFIG_GLIBC_RSEQ)
+    bExtra.append("glibc_rseq_present", true);
+    bExtra.append("glibc_pthread_rseq_disabled", checkGlibcRseqTunable());
+#else
+    bExtra.append("glibc_rseq_present", false);
+#endif
 
     appendMountInfo(bExtra);
 
     _extraStats = bExtra.obj();
-}
-
-/**
- * Determine if the process is running with (cc)NUMA
- */
-bool ProcessInfo::checkNumaEnabled() {
-    bool hasMultipleNodes = false;
-    bool hasNumaMaps = false;
-
-    try {
-        hasMultipleNodes = boost::filesystem::exists("/sys/devices/system/node/node1");
-        hasNumaMaps = boost::filesystem::exists("/proc/self/numa_maps");
-    } catch (boost::filesystem::filesystem_error& e) {
-        LOGV2(23340,
-              "WARNING: Cannot detect if NUMA interleaving is enabled. Failed to probe",
-              "path"_attr = e.path1().string(),
-              "reason"_attr = e.code().message());
-        return false;
-    }
-
-    if (hasMultipleNodes && hasNumaMaps) {
-        // proc is populated with numa entries
-
-        // read the second column of first line to determine numa state
-        // ('default' = enabled, 'interleave' = disabled).  Logic from version.cpp's warnings.
-        std::string line = LinuxSysHelper::readLineFromFile("/proc/self/numa_maps").append(" \0");
-        size_t pos = line.find(' ');
-        if (pos != std::string::npos &&
-            line.substr(pos + 1, 10).find("interleave") == std::string::npos)
-            // interleave not found;
-            return true;
-    }
-    return false;
 }
 
 }  // namespace mongo

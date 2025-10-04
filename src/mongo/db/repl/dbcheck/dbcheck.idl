@@ -1,0 +1,322 @@
+# Copyright (C) 2018-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+# IDL basic types
+
+global:
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/repl/dbcheck/dbcheck_idl.h"
+
+imports:
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/write_concern_options.idl"
+    - "mongo/db/record_id.idl"
+    - "mongo/bson/bson_validate.idl"
+
+server_parameters:
+    dbCheckHealthLogEveryNBatches:
+        description: "Emit an info-severity health log batch every N batches processed"
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<int>"
+        cpp_varname: gDbCheckHealthLogEveryNBatches
+        default: 25
+        validator:
+            gte: 1
+            lte: 10000
+        redact: false
+
+    maxDbCheckMBperSec:
+        description:
+            "Max MB per second that a single dbCheck process running in the background will
+            process in order to limit I/O and CPU usage.
+            Setting it to 0 turns off throttling."
+        set_at: [startup, runtime]
+        cpp_varname: gMaxDbCheckMBperSec
+        cpp_vartype: AtomicWord<int>
+        validator: {gte: 0}
+        default: 1
+        redact: false
+
+    dbCheckMaxRunsOnQueue:
+        description: "Parameter for how many dbcheck runs can be in the queue."
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<int>"
+        cpp_varname: gDbCheckMaxRunsOnQueue
+        default: 5
+        validator:
+            gte: 1
+            lte: 100
+        redact: false
+
+# TODO SERVER-78399: Remove once secondaryIndexChecksInDbCheck feature flag is removed.
+types:
+    _id_key:
+        bson_serialization_type: any
+        description: "An _id value."
+        cpp_type: "mongo::BSONKey"
+        serializer: "mongo::BSONKey::serializeToBSON"
+        deserializer: "mongo::BSONKey::parseFromBSON"
+        is_view: false
+
+enums:
+    OplogEntries:
+        description: "The type of dbCheck oplog entry."
+        type: string
+        values:
+            Batch: "batch"
+            Collection: "collection"
+            Start: "start"
+            Stop: "stop"
+    DbCheckValidationMode:
+        description: "The type of consistency check that dbCheck will run."
+        type: string
+        # dataConsistency: Runs the existing data consistency checks between nodes of a replica set.
+        # This is intended for cases where running secondary index checks is too expensive, and we
+        # want to just test data consistency between nodes in a replica set.
+        #
+        # dataConsistencyAndMissingIndexKeysCheck: Runs the existing data consistency checks between
+        # nodes of a replica set and verifies that there are no missing index keys in all index tables.
+        #
+        # extraIndexKeysCheck: Verifies that there are no extra index keys in the index table.
+        values:
+            dataConsistency: "dataConsistency"
+            dataConsistencyAndMissingIndexKeysCheck: "dataConsistencyAndMissingIndexKeysCheck"
+            extraIndexKeysCheck: "extraIndexKeysCheck"
+
+structs:
+    SecondaryIndexCheckParameters:
+        description: "User-specified parameters for secondary index checks"
+        fields:
+            validateMode:
+                type: DbCheckValidationMode
+                default: dataConsistency
+            secondaryIndex:
+                type: string
+                default: StringData("")
+            skipLookupForExtraKeys:
+                type: safeBool
+                default: false
+            bsonValidateMode:
+                type: BSONValidateMode
+                default: kDefault
+
+    DbCheckSingleInvocation:
+        description: "Command object for dbCheck invocation"
+        fields:
+            dbCheck:
+                type: string
+                cpp_name: coll
+            # TODO SERVER-78399: Remove minKey and maxKey once secondaryIndexChecksInDbCheck feature flag
+            # is removed.
+            # start and end replace minKey and maxKey when secondaryIndexChecksInDbCheck feature
+            # flag is enabled. It still represents the min/start and max/end of the whole dbcheck invocation, but they
+            # a BSONObj such as {_id: 5} for the collection data consistency check or {a: "test"} for the
+            # extra index keys check.
+            minKey:
+                type: _id_key
+                default: "BSONKey::min()"
+            maxKey:
+                type: _id_key
+                default: "BSONKey::max()"
+            # TODO SERVER-78399: Remove optional: true and set default to kMinBSONKey / kMaxBSONKey
+            start:
+                type: object
+                optional: true
+            end:
+                type: object
+                optional: true
+            maxCount:
+                type: safeInt64
+                default: "std::numeric_limits<int64_t>::max()"
+            maxSize:
+                type: safeInt64
+                default: "std::numeric_limits<int64_t>::max()"
+            maxDocsPerBatch:
+                description: Controls the number of records and index entries checked in a batch.
+                type: safeInt64
+                default: 5000
+                validator:
+                    gte: 1
+                    lte: 10000
+            maxBatchTimeMillis:
+                type: safeInt64
+                default: 1000
+                validator:
+                    gte: 10
+                    lte: 20000
+            snapshotRead:
+                type: safeBool
+                default: true
+            batchWriteConcern:
+                description: Wait for this writeConcern at the end of every batch.
+                type: WriteConcern
+                # Set to default write concern if not set.
+                optional: true
+            validateMode:
+                description: The type of consistency checks that dbCheck will run.
+                type: DbCheckValidationMode
+                optional: true
+            secondaryIndex:
+                description: The name of the index to run extra index keys check on.
+                type: string
+                optional: true
+            skipLookupForExtraKeys:
+                description: Controls whether or not to run the reverse lookup portion of the extra index keys check.
+                type: safeBool
+                default: false
+            bsonValidateMode:
+                description: The validate mode that dbCheck will run for BSON consistency checks
+                type: BSONValidateMode
+                optional: true
+
+    DbCheckAllInvocation:
+        description: "Command object for database-wide form of dbCheck invocation"
+        fields:
+            dbCheck:
+                type: safeInt64
+                cpp_name: tag
+            maxDocsPerBatch:
+                description: Controls the number of records and index entries checked in a batch.
+                type: safeInt64
+                default: 5000
+                validator:
+                    gte: 1
+                    lte: 10000
+            maxBatchTimeMillis:
+                type: safeInt64
+                default: 1000
+                validator:
+                    gte: 10
+                    lte: 20000
+            snapshotRead:
+                type: safeBool
+                default: true
+            batchWriteConcern:
+                description: Wait for this writeConcern at the end of every batch.
+                type: WriteConcern
+                # Set to default write concern if not set.
+                optional: true
+
+    DbCheckOplogBatch:
+        description: "Oplog entry for a dbCheck batch"
+        fields:
+            dbCheck:
+                type: namespacestring
+                cpp_name: nss
+            type:
+                type: OplogEntries
+                cpp_name: type
+            md5:
+                type: string
+                cpp_name: md5
+            # TODO SERVER-78399: Remove minKey and maxKey once secondaryIndexChecksInDbCheck feature flag
+            # is removed.
+            # batchStart and batchEnd replace minKey and maxKey when secondaryIndexChecksInDbCheck feature
+            # flag is enabled. It still represents the min/start and max/end of a dbcheck batch, but is
+            # a BSONObj such as {_id: 5} for the collection data consistency check or {a: "test"} for the
+            # extra index keys check.
+            # Note that minKey/maxKey here are different types from minKey/maxKey in DbCheckSingleInvocation,
+            # and they represent the min/start and max/end of an individual dbCheck batch, not the whole
+            # command invocation.
+            minKey:
+                type: _id_key
+                default: "BSONKey::min()"
+            maxKey:
+                type: _id_key
+                default: "BSONKey::max()"
+            # TODO SERVER-78399: Remove optional: true and set default to kMinBSONKey / kMaxBSONKey
+            batchStart:
+                type: object
+                cpp_name: batchStart
+                optional: true
+            batchEnd:
+                type: object
+                cpp_name: batchEnd
+                optional: true
+            readTimestamp:
+                type: timestamp
+                optional: false
+            secondaryIndexCheckParameters:
+                type: SecondaryIndexCheckParameters
+                cpp_name: secondaryIndexCheckParameters
+                optional: true
+            logBatchToHealthLog:
+                type: safeBool
+                optional: true
+            batchId:
+                type: uuid
+                optional: true
+            lastKeyChecked:
+                type: object
+                optional: true
+
+    DbCheckOplogCollection:
+        description: "Oplog entry for dbCheck collection metadata"
+        fields:
+            dbCheck:
+                type: namespacestring
+                cpp_name: nss
+            type:
+                type: OplogEntries
+                cpp_name: type
+            uuid:
+                type: uuid
+                cpp_name: uuid
+            prev:
+                optional: true
+                type: uuid
+                cpp_name: prev
+            next:
+                optional: true
+                type: uuid
+                cpp_name: next
+            indexes:
+                type: array<object>
+                cpp_name: indexes
+            options:
+                type: object
+                cpp_name: options
+
+    DbCheckOplogStartStop:
+        description: "Oplog entry for dbCheck start and stop"
+        fields:
+            dbCheck:
+                type: namespacestring
+                cpp_name: nss
+            type:
+                type: OplogEntries
+                cpp_name: type
+            secondaryIndexCheckParameters:
+                type: SecondaryIndexCheckParameters
+                cpp_name: secondaryIndexCheckParameters
+                optional: true
+            uuid:
+                type: uuid
+                cpp_name: uuid
+                optional: true

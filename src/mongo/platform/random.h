@@ -29,14 +29,17 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
 #include <limits>
 #include <memory>
 #include <random>
+#include <utility>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * A uniform random bit generator based on XorShift.
@@ -94,7 +97,7 @@ private:
 
 // Provides mongo-traditional functions around a pluggable UniformRandomBitGenerator.
 template <typename Urbg>
-class RandomBase {
+class MONGO_MOD_FILE_PRIVATE RandomBase {
 public:
     using urbg_type = Urbg;
 
@@ -102,37 +105,68 @@ public:
     explicit RandomBase(urbg_type u) : _urbg{std::move(u)} {}
 
     /** The underlying generator */
-    urbg_type& urbg() {
+    MONGO_MOD_PUB urbg_type& urbg() {
         return _urbg;
     }
 
     /** A random number in the range [0, 1). */
-    double nextCanonicalDouble() {
+    // TODO
+    MONGO_MOD_PUB double nextCanonicalDouble() {
         return std::uniform_real_distribution<double>{0, 1}(_urbg);
     }
 
     /** A number uniformly distributed over all possible values. */
-    int32_t nextInt32() {
+    MONGO_MOD_PUB int32_t nextInt32() {
         return _nextAny<int32_t>();
     }
 
     /** A number uniformly distributed over all possible values. */
-    int64_t nextInt64() {
+    MONGO_MOD_PUB uint32_t nextUInt32() {
+        return _nextAny<uint32_t>();
+    }
+
+    /** A number uniformly distributed over all possible values. */
+    MONGO_MOD_PUB int64_t nextInt64() {
         return _nextAny<int64_t>();
     }
 
+    /** A number uniformly distributed over all possible values. */
+    MONGO_MOD_PUB uint64_t nextUInt64() {
+        return _nextAny<uint64_t>();
+    }
+
     /** A number in the half-open interval [0, max) */
-    int32_t nextInt32(int32_t max) {
+    MONGO_MOD_PUB int32_t nextInt32(int32_t max) {
         return std::uniform_int_distribution<int32_t>(0, max - 1)(_urbg);
     }
 
     /** A number in the half-open interval [0, max) */
-    int64_t nextInt64(int64_t max) {
+    MONGO_MOD_PUB uint32_t nextUInt32(uint32_t max) {
+        return std::uniform_int_distribution<uint32_t>(0, max - 1)(_urbg);
+    }
+
+    /** A number in the half-open interval [0, max) */
+    MONGO_MOD_PUB int64_t nextInt64(int64_t max) {
         return std::uniform_int_distribution<int64_t>(0, max - 1)(_urbg);
     }
 
+    /** A number in the half-open interval [0, max) */
+    MONGO_MOD_PUB uint64_t nextUInt64(uint64_t max) {
+        return std::uniform_int_distribution<uint64_t>(0, max - 1)(_urbg);
+    }
+
+    /**
+     A number uniformly distributed over all possible values that can be safely represented as
+     double without loosing precision.
+    */
+    MONGO_MOD_PUB int64_t nextInt64SafeDoubleRepresentable() {
+        const int64_t maxRepresentableLimit =
+            static_cast<int64_t>(std::ldexp(1, std::numeric_limits<double>::digits)) + 1;
+        return nextInt64(maxRepresentableLimit);
+    }
+
     /** Fill array `buf` with `n` random bytes. */
-    void fill(void* buf, size_t n) {
+    MONGO_MOD_PUB void fill(void* buf, size_t n) {
         const auto p = static_cast<uint8_t*>(buf);
         size_t written = 0;
         while (written < n) {
@@ -179,4 +213,4 @@ public:
     using Base::Base;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

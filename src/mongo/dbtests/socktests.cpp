@@ -31,13 +31,16 @@
  * sock.{h,cpp} unit tests.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/repl/isself.h"
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/base/string_data.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/socket_utils.h"
 
+#include <string>
+#include <vector>
+
+namespace mongo {
 namespace SockTests {
 
 class HostByName {
@@ -52,14 +55,15 @@ public:
     }
 };
 
-class All : public OldStyleSuiteSpecification {
+class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("sock") {}
-    void setupTests() {
+    void setupTests() override {
         add<HostByName>();
     }
 };
 
-OldStyleSuiteInitializer<All> myall;
+unittest::OldStyleSuiteInitializer<All> myall;
 
 }  // namespace SockTests
+}  // namespace mongo

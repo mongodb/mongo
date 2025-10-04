@@ -27,17 +27,53 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
-#include "mongo/platform/basic.h"
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/cluster_commands_helpers.h"
-#include "mongo/s/grid.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/global_catalog/chunk_manager.h"
+#include "mongo/db/global_catalog/router_role_api/cluster_commands_helpers.h"
+#include "mongo/db/global_catalog/router_role_api/router_role.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/sharding_environment/client/shard.h"
+#include "mongo/db/topology/shard_registry.h"
+#include "mongo/db/versioning_protocol/database_version.h"
+#include "mongo/db/versioning_protocol/shard_version.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/database_name_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/str.h"
+
+#include <memory>
+#include <utility>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 namespace mongo {
 namespace {
+
+std::string rangeString(const BSONObj& min, const BSONObj& max) {
+    return "{min: " + min.toString() + " , max" + max.toString() + " }";
+}
+
+std::string shardSetString(const std::set<ShardId>& shardIds) {
+    std::string result = "[";
+    for (auto& shardid : shardIds) {
+        result += shardid + ", ";
+    }
+    return result += "]";
+}
 
 class SplitVectorCmd : public BasicCommand {
 public:
@@ -47,74 +83,80 @@ public:
         return AllowedOnSecondary::kAlways;
     }
 
-    std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
-        return CommandHelpers::parseNsFullyQualified(cmdObj);
+    NamespaceString parseNs(const DatabaseName& dbName, const BSONObj& cmdObj) const override {
+        return NamespaceStringUtil::deserialize(dbName.tenantId(),
+                                                CommandHelpers::parseNsFullyQualified(cmdObj),
+                                                SerializationContext::stateDefault());
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) const override {
-        if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                ResourcePattern::forExactNamespace(NamespaceString(parseNs(dbname, cmdObj))),
-                ActionType::splitVector)) {
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const DatabaseName& dbName,
+                                 const BSONObj& cmdObj) const override {
+        if (!AuthorizationSession::get(opCtx->getClient())
+                 ->isAuthorizedForActionsOnResource(
+                     ResourcePattern::forExactNamespace(parseNs(dbName, cmdObj)),
+                     ActionType::splitVector)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
         return Status::OK();
     }
 
     bool run(OperationContext* opCtx,
-             const std::string& dbName,
+             const DatabaseName& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbName, cmdObj));
         uassert(ErrorCodes::IllegalOperation,
                 "Performing splitVector across dbs isn't supported via mongos",
-                nss.db() == dbName);
+                nss.dbName() == dbName);
 
-        const auto cm =
-            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
-        uassert(ErrorCodes::IllegalOperation,
-                str::stream() << "can't do command: " << getName() << " on sharded collection",
-                !cm.isSharded());
+        sharding::router::CollectionRouter router{opCtx->getServiceContext(), nss};
+        return router.routeWithRoutingContext(
+            opCtx, getName(), [&](OperationContext* opCtx, RoutingContext& routingCtx) {
+                BSONObj min = cmdObj.getObjectField("min");
+                BSONObj max = cmdObj.getObjectField("max");
+                BSONObj keyPattern = cmdObj.getObjectField("keyPattern");
 
-        // Here, we first filter the command before appending an UNSHARDED shardVersion, because
-        // "shardVersion" is one of the fields that gets filtered out.
-        BSONObj filteredCmdObj(applyReadWriteConcern(
-            opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)));
-        BSONObj filteredCmdObjWithVersion(
-            appendShardVersion(filteredCmdObj, ChunkVersion::UNSHARDED()));
+                BSONObj filteredCmdObj = CommandHelpers::filterCommandRequestForPassthrough(cmdObj);
+                // splitVector is allowed to run on a sharded cluster only if the range requested
+                // belongs to one shard. We target the shard owning the input min chunk and we let
+                // the targetted shard figure whether the range is fully owned by itself. In case
+                // the constraint is not respected we will get a InvalidOptions as part of the
+                // response.
+                auto query = [&]() {
+                    if (!min.isEmpty()) {
+                        return min;
+                    }
+                    // if no min is passed as input, we assume it's the global min of the keyPattern
+                    // passed as input
+                    return KeyPattern::fromBSON(keyPattern).globalMin();
+                }();
+                auto response =
+                    scatterGatherVersionedTargetByRoutingTable(opCtx,
+                                                               routingCtx,
+                                                               nss,
+                                                               filteredCmdObj,
+                                                               ReadPreferenceSetting::get(opCtx),
+                                                               Shard::RetryPolicy::kIdempotent,
+                                                               query,
+                                                               {} /*collation*/,
+                                                               boost::none /*letParameters*/,
+                                                               boost::none /*runtimeConstants*/)
+                        .front();
 
-        auto shard =
-            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, cm.dbPrimary()));
-        auto commandResponse = uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
-            opCtx,
-            ReadPreferenceSetting::get(opCtx),
-            dbName,
-            cm.dbPrimary() == ShardId::kConfigServerId ? filteredCmdObj : filteredCmdObjWithVersion,
-            Shard::RetryPolicy::kIdempotent));
-
-        uassert(ErrorCodes::IllegalOperation,
-                str::stream() << "can't do command: " << getName() << " on a sharded collection",
-                !ErrorCodes::isStaleShardVersionError(commandResponse.commandStatus.code()));
-
-        uassertStatusOK(commandResponse.commandStatus);
-
-        if (!commandResponse.writeConcernStatus.isOK()) {
-            appendWriteConcernErrorToCmdResponse(
-                cm.dbPrimary(), commandResponse.response["writeConcernError"], result);
-        }
-        result.appendElementsUnique(
-            CommandHelpers::filterCommandReplyForPassthrough(std::move(commandResponse.response)));
-
-        return true;
+                auto status = AsyncRequestsSender::Response::getEffectiveStatus(response);
+                uassertStatusOK(status);
+                result.appendElementsUnique(CommandHelpers::filterCommandReplyForPassthrough(
+                    std::move(response.swResponse.getValue().data)));
+                return true;
+            });
     }
-
-} splitVectorCmd;
-
+};
+MONGO_REGISTER_COMMAND(SplitVectorCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

@@ -10,37 +10,42 @@
 // 6. Unpause the thread performing the insert from step 1. If it continues to insert batches even
 //    though there was a rollback, those inserts will violate the {ordered: true} option.
 
-(function() {
-"use strict";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
-load("jstests/libs/fail_point_util.js");
-load('jstests/libs/parallelTester.js');
-load("jstests/replsets/rslib.js");
+let name = "interrupted_batch_insert";
+let replTest = new ReplSetTest({name: name, nodes: 3, useBridge: true});
+let nodes = replTest.nodeList();
 
-var name = "interrupted_batch_insert";
-var replTest = new ReplSetTest({name: name, nodes: 3, useBridge: true});
-var nodes = replTest.nodeList();
-
-var conns = replTest.startSet();
-replTest.initiate({
-    _id: name,
-    members:
-        [{_id: 0, host: nodes[0]}, {_id: 1, host: nodes[1]}, {_id: 2, host: nodes[2], priority: 0}]
-});
+let conns = replTest.startSet();
+replTest.initiate(
+    {
+        _id: name,
+        members: [
+            {_id: 0, host: nodes[0]},
+            {_id: 1, host: nodes[1]},
+            {_id: 2, host: nodes[2], priority: 0},
+        ],
+    },
+    null,
+    {initiateWithDefaultElectionTimeout: true},
+);
 
 // The test starts with node 0 as the primary.
 replTest.waitForState(replTest.nodes[0], ReplSetTest.State.PRIMARY);
-var primary = replTest.nodes[0];
-var collName = primary.getDB("db")[name].getFullName();
+let primary = replTest.nodes[0];
+let collName = primary.getDB("db")[name].getFullName();
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 replTest.awaitReplication();
 
-var getParameterResult =
-    primary.getDB("admin").runCommand({getParameter: 1, internalInsertMaxBatchSize: 1});
-assert.commandWorked(getParameterResult);
-const batchSize = getParameterResult.internalInsertMaxBatchSize;
+const batchSize = 500;
+const setParameterResult = primary.getDB("admin").runCommand({setParameter: 1, internalInsertMaxBatchSize: batchSize});
+assert.commandWorked(setParameterResult);
 
 // Prevent any writes to node 0 (the primary) from replicating to nodes 1 and 2.
 stopServerReplication(conns[1]);
@@ -49,20 +54,30 @@ stopServerReplication(conns[2]);
 // Allow the primary to insert the first 5 batches of documents. After that, the fail point
 // activates, and the client thread hangs until the fail point gets turned off.
 let failPoint = configureFailPoint(
-    primary.getDB("db"), "hangDuringBatchInsert", {shouldCheckForInterrupt: true}, {skip: 5});
+    primary.getDB("db"),
+    "hangDuringBatchInsert",
+    {shouldCheckForInterrupt: true},
+    {skip: 5},
+);
 
 // In a background thread, issue an insert command to the primary that will insert 10 batches of
 // documents.
-var worker = new Thread((host, collName, numToInsert) => {
-    // Insert elements [{idx: 0}, {idx: 1}, ..., {idx: numToInsert - 1}].
-    const docsToInsert = Array.from({length: numToInsert}, (_, i) => {
-        return {idx: i};
-    });
-    var coll = new Mongo(host).getCollection(collName);
-    assert.commandFailedWithCode(
-        coll.insert(docsToInsert, {writeConcern: {w: "majority", wtimeout: 5000}, ordered: true}),
-        ErrorCodes.InterruptedDueToReplStateChange);
-}, primary.host, collName, 10 * batchSize);
+let worker = new Thread(
+    (host, collName, numToInsert) => {
+        // Insert elements [{idx: 0}, {idx: 1}, ..., {idx: numToInsert - 1}].
+        const docsToInsert = Array.from({length: numToInsert}, (_, i) => {
+            return {idx: i};
+        });
+        let coll = new Mongo(host).getCollection(collName);
+        assert.commandFailedWithCode(
+            coll.insert(docsToInsert, {writeConcern: {w: "majority", wtimeout: 5000}, ordered: true}),
+            ErrorCodes.InterruptedDueToReplStateChange,
+        );
+    },
+    primary.host,
+    collName,
+    10 * batchSize,
+);
 worker.start();
 
 // Wait long enough to guarantee that all 5 batches of inserts have executed and the primary is
@@ -83,7 +98,7 @@ assert.eq(replTest.nodes[1], replTest.getPrimary());
 restartServerReplication(conns[2]);
 
 // Issue a write to the new primary.
-var collOnNewPrimary = replTest.nodes[1].getCollection(collName);
+let collOnNewPrimary = replTest.nodes[1].getCollection(collName);
 assert.commandWorked(collOnNewPrimary.insert({singleDoc: 1}, {writeConcern: {w: "majority"}}));
 
 // Isolate node 1, forcing it to step down as primary, and reconnect node 0, allowing it to step
@@ -99,13 +114,15 @@ assert.eq(replTest.nodes[0], replTest.getPrimary());
 failPoint.off();
 
 // Wait until the insert command is done.
-assert.soon(
-    () =>
-        primary.getDB("db").currentOp({"command.insert": name, active: true}).inprog.length === 0);
+assert.soon(() => primary.getDB("db").currentOp({"command.insert": name, active: true}).inprog.length === 0);
 
 worker.join();
 
-var docs = primary.getDB("db")[name].find({idx: {$exists: 1}}).sort({idx: 1}).toArray();
+let docs = primary
+    .getDB("db")
+    [name].find({idx: {$exists: 1}})
+    .sort({idx: 1})
+    .toArray();
 
 // Any discontinuity in the "idx" values is an error. If an "idx" document failed to insert, all
 // the of "idx" documents after it should also have failed to insert, because the insert
@@ -120,4 +137,3 @@ conns[1].reconnect(conns[2]);
 restartServerReplication(conns[1]);
 
 replTest.stopSet(15);
-}());

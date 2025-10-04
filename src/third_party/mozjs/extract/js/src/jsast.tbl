@@ -1,0 +1,95 @@
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+/* AST_ERROR = -1 */
+
+ASTDEF(AST_PROGRAM,               "Program")
+
+ASTDEF(AST_IDENTIFIER,            "Identifier")
+ASTDEF(AST_LITERAL,               "Literal")
+ASTDEF(AST_PROPERTY,              "Property")
+ASTDEF(AST_PROTOTYPEMUTATION,     "PrototypeMutation")
+
+ASTDEF(AST_MODULE_DECL,           "ModuleDeclaration")
+ASTDEF(AST_FUNC_DECL,             "FunctionDeclaration")
+ASTDEF(AST_VAR_DECL,              "VariableDeclaration")
+ASTDEF(AST_VAR_DTOR,              "VariableDeclarator")
+
+ASTDEF(AST_LIST_EXPR,             "SequenceExpression")
+ASTDEF(AST_COND_EXPR,             "ConditionalExpression")
+ASTDEF(AST_UNARY_EXPR,            "UnaryExpression")
+ASTDEF(AST_BINARY_EXPR,           "BinaryExpression")
+ASTDEF(AST_ASSIGN_EXPR,           "AssignmentExpression")
+ASTDEF(AST_LOGICAL_EXPR,          "LogicalExpression")
+ASTDEF(AST_UPDATE_EXPR,           "UpdateExpression")
+ASTDEF(AST_NEW_EXPR,              "NewExpression")
+ASTDEF(AST_CALL_EXPR,             "CallExpression")
+ASTDEF(AST_OPT_CALL_EXPR,         "OptionalCallExpression")
+ASTDEF(AST_MEMBER_EXPR,           "MemberExpression")
+ASTDEF(AST_OPT_MEMBER_EXPR,       "OptionalMemberExpression")
+ASTDEF(AST_FUNC_EXPR,             "FunctionExpression")
+ASTDEF(AST_ARROW_EXPR,            "ArrowFunctionExpression")
+ASTDEF(AST_ARRAY_EXPR,            "ArrayExpression")
+ASTDEF(AST_DELETE_OPTIONAL_EXPR,  "DeleteOptionalExpression")
+ASTDEF(AST_OPTIONAL_EXPR,         "OptionalExpression")
+ASTDEF(AST_SPREAD_EXPR,           "SpreadExpression")
+ASTDEF(AST_OBJECT_EXPR,           "ObjectExpression")
+ASTDEF(AST_THIS_EXPR,             "ThisExpression")
+ASTDEF(AST_YIELD_EXPR,            "YieldExpression")
+ASTDEF(AST_CLASS_EXPR,            "ClassExpression")
+ASTDEF(AST_METAPROPERTY,          "MetaProperty")
+ASTDEF(AST_SUPER,                 "Super")
+ASTDEF(AST_CALL_IMPORT,           "CallImport")
+#ifdef ENABLE_RECORD_TUPLE
+ASTDEF(AST_RECORD_EXPR,           "RecordExpression")
+ASTDEF(AST_TUPLE_EXPR,            "TupleExpression")
+#endif
+
+ASTDEF(AST_EMPTY_STMT,            "EmptyStatement")
+ASTDEF(AST_BLOCK_STMT,            "BlockStatement")
+ASTDEF(AST_EXPR_STMT,             "ExpressionStatement")
+ASTDEF(AST_LAB_STMT,              "LabeledStatement")
+ASTDEF(AST_IF_STMT,               "IfStatement")
+ASTDEF(AST_SWITCH_STMT,           "SwitchStatement")
+ASTDEF(AST_WHILE_STMT,            "WhileStatement")
+ASTDEF(AST_DO_STMT,               "DoWhileStatement")
+ASTDEF(AST_FOR_STMT,              "ForStatement")
+ASTDEF(AST_FOR_IN_STMT,           "ForInStatement")
+ASTDEF(AST_FOR_OF_STMT,           "ForOfStatement")
+ASTDEF(AST_BREAK_STMT,            "BreakStatement")
+ASTDEF(AST_CONTINUE_STMT,         "ContinueStatement")
+ASTDEF(AST_WITH_STMT,             "WithStatement")
+ASTDEF(AST_RETURN_STMT,           "ReturnStatement")
+ASTDEF(AST_TRY_STMT,              "TryStatement")
+ASTDEF(AST_THROW_STMT,            "ThrowStatement")
+ASTDEF(AST_DEBUGGER_STMT,         "DebuggerStatement")
+ASTDEF(AST_LET_STMT,              "LetStatement")
+ASTDEF(AST_MODULE_REQUEST,        "ModuleRequest")
+ASTDEF(AST_IMPORT_ATTRIBUTE,      "ImportAttribute")
+ASTDEF(AST_IMPORT_DECL,           "ImportDeclaration")
+ASTDEF(AST_IMPORT_SPEC,           "ImportSpecifier")
+ASTDEF(AST_IMPORT_NAMESPACE_SPEC, "ImportNamespaceSpecifier")
+ASTDEF(AST_EXPORT_DECL,           "ExportDeclaration")
+ASTDEF(AST_EXPORT_SPEC,           "ExportSpecifier")
+ASTDEF(AST_EXPORT_NAMESPACE_SPEC, "ExportNamespaceSpecifier")
+ASTDEF(AST_EXPORT_BATCH_SPEC,     "ExportBatchSpecifier")
+
+ASTDEF(AST_CASE,                  "SwitchCase")
+ASTDEF(AST_CATCH,                 "CatchClause")
+
+ASTDEF(AST_ARRAY_PATT,            "ArrayPattern")
+ASTDEF(AST_OBJECT_PATT,           "ObjectPattern")
+ASTDEF(AST_PROP_PATT,             "Property")
+ASTDEF(AST_TEMPLATE_LITERAL,      "TemplateLiteral")
+ASTDEF(AST_TAGGED_TEMPLATE,       "TaggedTemplate")
+ASTDEF(AST_CALL_SITE_OBJ,         "CallSiteObject")
+ASTDEF(AST_COMPUTED_NAME,         "ComputedName")
+
+ASTDEF(AST_CLASS_STMT,            "ClassStatement")
+ASTDEF(AST_CLASS_METHOD,          "ClassMethod")
+ASTDEF(AST_CLASS_FIELD,           "ClassField")
+ASTDEF(AST_STATIC_CLASS_BLOCK,    "StaticClassBlock")
+/* AST_LIMIT = last + 1 */

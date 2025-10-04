@@ -32,14 +32,12 @@
 # [END_TAGS]
 #
 
-import glob
 import os
 import shutil
-import string
 import time
 from wtbackup import backup_base
 import wiredtiger
-from wtdataset import SimpleDataSet, ComplexDataSet, ComplexLSMDataSet
+from wtdataset import SimpleDataSet, ComplexDataSet
 from helper import compare_files
 
 # test_backup.py
@@ -56,8 +54,6 @@ class test_backup(backup_base):
         ('table:' + pfx + '.4', SimpleDataSet, 0),
         ('table:' + pfx + '.5', ComplexDataSet, 0),
         ('table:' + pfx + '.6', ComplexDataSet, 0),
-        ('table:' + pfx + '.7', ComplexLSMDataSet, 1),
-        ('table:' + pfx + '.8', ComplexLSMDataSet, 1),
     ]
 
     # Test simple backup cursor open/close.
@@ -145,8 +141,7 @@ class test_backup(backup_base):
 
     # Test interaction between checkpoints and a backup cursor.
     def test_checkpoint_delete(self):
-        # You cannot name checkpoints including LSM tables, skip those.
-        self.populate(self.objs, False, True)
+        self.populate(self.objs, False)
 
         # Confirm checkpoints are being deleted.
         self.session.checkpoint("name=one")
@@ -186,6 +181,3 @@ class test_backup(backup_base):
         self.assertRaises(wiredtiger.WiredTigerError,
             lambda: self.session.open_cursor(
             self.objs[0][0], None, "checkpoint=two"))
-
-if __name__ == '__main__':
-    wttest.run()

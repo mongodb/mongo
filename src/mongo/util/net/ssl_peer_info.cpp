@@ -27,20 +27,33 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
 
 #include "mongo/util/net/ssl_peer_info.h"
 
 namespace mongo {
 namespace {
-const transport::Session::Decoration<SSLPeerInfo> peerInfoForSession =
-    transport::Session::declareDecoration<SSLPeerInfo>();
+const auto peerInfoForSession =
+    transport::Session::declareDecoration<std::shared_ptr<const SSLPeerInfo>>();
 }
-SSLPeerInfo& SSLPeerInfo::forSession(const transport::SessionHandle& session) {
+
+std::shared_ptr<const SSLPeerInfo>& SSLPeerInfo::forSession(
+    const std::shared_ptr<transport::Session>& session) {
     return peerInfoForSession(session.get());
 }
 
-const SSLPeerInfo& SSLPeerInfo::forSession(const transport::ConstSessionHandle& session) {
+std::shared_ptr<const SSLPeerInfo> SSLPeerInfo::forSession(
+    const std::shared_ptr<const transport::Session>& session) {
     return peerInfoForSession(session.get());
 }
+
+void SSLPeerInfo::appendPeerInfoToVector(std::vector<std::string>& elements) const {
+    elements.push_back(_subjectName.toString());
+    if (_sniName) {
+        elements.push_back(*_sniName);
+    }
+    if (_clusterMembership) {
+        elements.push_back(*_clusterMembership);
+    }
+}
+
 }  // namespace mongo

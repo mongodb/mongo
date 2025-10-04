@@ -27,29 +27,38 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <iostream>
-#include <string>
-
-#include "mongo/db/client.h"
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
+#include "mongo/util/debug_util.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/queue.h"
 #include "mongo/util/str.h"
-#include "mongo/util/text.h"
+#include "mongo/util/text.h"  // IWYU pragma: keep
 #include "mongo/util/timer.h"
 
+#include <cstddef>
+#include <iostream>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <absl/strings/str_join.h>
+#include <absl/strings/str_split.h>
+
+namespace mongo {
 namespace BasicTests {
 
 using std::cout;
 using std::dec;
 using std::endl;
 using std::hex;
-using std::shared_ptr;
 using std::string;
 using std::stringstream;
-using std::unique_ptr;
 using std::vector;
 
 class RarelyTest {
@@ -159,7 +168,7 @@ public:
 };
 
 class simple1 : public Base {
-    void pop() {
+    void pop() override {
         SBTGB(1);
         SBTGB("yo");
         SBTGB(2);
@@ -167,7 +176,7 @@ class simple1 : public Base {
 };
 
 class simple2 : public Base {
-    void pop() {
+    void pop() override {
         SBTGB(1);
         SBTGB("yo");
         SBTGB(2);
@@ -241,8 +250,8 @@ public:
 
 struct StringSplitterTest {
     void test(string s) {
-        vector<string> v = StringSplitter::split(s, ",");
-        ASSERT_EQUALS(s, StringSplitter::join(v, ","));
+        vector<string> v = absl::StrSplit(s, ",");
+        ASSERT_EQUALS(s, absl::StrJoin(v, ","));
     }
 
     void run() {
@@ -250,13 +259,19 @@ struct StringSplitterTest {
         test("a,b");
         test("a,b,c");
 
-        vector<string> x = StringSplitter::split("axbxc", "x");
+        vector<string> x = absl::StrSplit("axbxc", "x", absl::SkipEmpty());
         ASSERT_EQUALS(3, (int)x.size());
         ASSERT_EQUALS("a", x[0]);
         ASSERT_EQUALS("b", x[1]);
         ASSERT_EQUALS("c", x[2]);
 
-        x = StringSplitter::split("axxbxxc", "xx");
+        x = absl::StrSplit("axxbxxc", "xx", absl::SkipEmpty());
+        ASSERT_EQUALS(3, (int)x.size());
+        ASSERT_EQUALS("a", x[0]);
+        ASSERT_EQUALS("b", x[1]);
+        ASSERT_EQUALS("c", x[2]);
+
+        x = absl::StrSplit("xxaxxxxbxxcxx", "xx", absl::SkipEmpty());
         ASSERT_EQUALS(3, (int)x.size());
         ASSERT_EQUALS("a", x[0]);
         ASSERT_EQUALS("b", x[1]);
@@ -331,11 +346,11 @@ public:
     }
 };
 
-class All : public OldStyleSuiteSpecification {
+class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("basic") {}
 
-    void setupTests() {
+    void setupTests() override {
         add<RarelyTest>();
         add<Base64Tests>();
 
@@ -357,6 +372,7 @@ public:
     }
 };
 
-OldStyleSuiteInitializer<All> myall;
+unittest::OldStyleSuiteInitializer<All> myall;
 
 }  // namespace BasicTests
+}  // namespace mongo

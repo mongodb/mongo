@@ -12,7 +12,7 @@
 namespace boost { namespace mpl { namespace aux {
 template< int N > struct arity_tag
 {
-    typedef char (&type)[N + 1];
+    typedef char (&type)[(unsigned)N + 1];
 };
 
 template<

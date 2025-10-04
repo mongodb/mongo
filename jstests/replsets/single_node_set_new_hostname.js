@@ -6,10 +6,8 @@
  *     requires_persistence,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/replsets/rslib.js");
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {waitForState} from "jstests/replsets/rslib.js";
 
 const replTest = new ReplSetTest({nodes: 1});
 replTest.startSet();
@@ -46,11 +44,9 @@ jsTestLog(`New config: ${tojson(config)}`);
 // The connection to the mongod may have been closed after reaching the REMOVED state. In case of a
 // network error, retry the command until it succeeds.
 assert.soonNoExcept(() => {
-    assert.commandWorked(
-        restartedNode.getDB("admin").runCommand({replSetReconfig: config, force: true}));
+    assert.commandWorked(restartedNode.getDB("admin").runCommand({replSetReconfig: config, force: true}));
     return true;
 }, `Couldn't run 'replSetReconfig' with config ${config} on the node ${newHostAndPort}`);
 waitForState(restartedNode, ReplSetTest.State.PRIMARY);
 
 replTest.stopSet();
-}());

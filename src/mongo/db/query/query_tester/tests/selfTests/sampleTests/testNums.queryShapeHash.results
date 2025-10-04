@@ -1,0 +1,35 @@
+testNums
+test
+basic.coll as fuzzer_coll
+
+1
+:queryShapeHash {aggregate: "fuzzer_coll", pipeline: [{$limit:5}], cursor: {}}
+[
+{"queryShapeHash":"9B479A1A978ABC2E692C7FF12E1F8D743CE5751D4E670D1C25EDE33E4ADA88FB"}
+]
+
+// In --mode run, this will be assigned a default value of 2 (1 greater than the prev testNum)
+2
+:queryShapeHash {aggregate: "fuzzer_coll", pipeline: [{$limit:5}], cursor: {}}
+[
+{"queryShapeHash":"9B479A1A978ABC2E692C7FF12E1F8D743CE5751D4E670D1C25EDE33E4ADA88FB"}
+]
+
+3
+:queryShapeHash {aggregate: "fuzzer_coll", pipeline: [{$limit:1}], cursor: {}}
+[
+{"queryShapeHash":"9B479A1A978ABC2E692C7FF12E1F8D743CE5751D4E670D1C25EDE33E4ADA88FB"}
+]
+
+// Each testNum just needs to be greater than the previous, not consecutive.
+5
+:queryShapeHash {aggregate: "fuzzer_coll", pipeline: [{$limit:5}], cursor: {}}
+[
+{"queryShapeHash":"9B479A1A978ABC2E692C7FF12E1F8D743CE5751D4E670D1C25EDE33E4ADA88FB"}
+]
+
+6
+:queryShapeHash {aggregate: "fuzzer_coll", pipeline: [{$limit:1}], cursor: {}}
+[
+{"queryShapeHash":"9B479A1A978ABC2E692C7FF12E1F8D743CE5751D4E670D1C25EDE33E4ADA88FB"}
+]

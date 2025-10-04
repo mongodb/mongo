@@ -29,7 +29,14 @@
 
 #pragma once
 
+#include "mongo/scripting/mozjs/base.h"
 #include "mongo/scripting/mozjs/wraptype.h"
+#include "mongo/util/modules.h"
+
+#include <js/CallArgs.h>
+#include <js/Class.h>
+#include <js/PropertySpec.h>
+#include <js/TypeDecls.h>
 
 namespace mongo {
 namespace mozjs {
@@ -39,9 +46,11 @@ namespace mozjs {
  *
  * It offers some simple methods and a handful of specialized constructors
  */
-struct BinDataInfo : public BaseInfo {
+struct MONGO_MOD_PUB BinDataInfo : public BaseInfo {
+    enum Slots { BinDataStringSlot, BinDataSlotCount };
+
     static void construct(JSContext* cx, JS::CallArgs args);
-    static void finalize(js::FreeOp* fop, JSObject* obj);
+    static void finalize(JS::GCContext* gcCtx, JSObject* obj);
 
     struct Functions {
         MONGO_DECLARE_JS_FUNCTION(base64);
@@ -58,7 +67,8 @@ struct BinDataInfo : public BaseInfo {
     static const JSFunctionSpec freeFunctions[4];
 
     static const char* const className;
-    static const unsigned classFlags = JSCLASS_HAS_PRIVATE;
+    static const unsigned classFlags =
+        JSCLASS_HAS_RESERVED_SLOTS(BinDataSlotCount) | BaseInfo::finalizeFlag;
 };
 
 }  // namespace mozjs

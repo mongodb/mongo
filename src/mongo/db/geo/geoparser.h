@@ -29,32 +29,67 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/geo/shapes.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/util/modules.h"
+
+#include <string>
+
+#include <s2cellid.h>
 
 namespace mongo {
 
 // This field must be present, and...
-static const string GEOJSON_TYPE = "type";
+static constexpr StringData GEOJSON_TYPE = "type"_sd;
 // Have one of these values:
-static const string GEOJSON_TYPE_POINT = "Point";
-static const string GEOJSON_TYPE_LINESTRING = "LineString";
-static const string GEOJSON_TYPE_POLYGON = "Polygon";
-static const string GEOJSON_TYPE_MULTI_POINT = "MultiPoint";
-static const string GEOJSON_TYPE_MULTI_LINESTRING = "MultiLineString";
-static const string GEOJSON_TYPE_MULTI_POLYGON = "MultiPolygon";
-static const string GEOJSON_TYPE_GEOMETRY_COLLECTION = "GeometryCollection";
+static constexpr StringData GEOJSON_TYPE_POINT = "Point"_sd;
+static constexpr StringData GEOJSON_TYPE_LINESTRING = "LineString"_sd;
+static constexpr StringData GEOJSON_TYPE_POLYGON = "Polygon"_sd;
+static constexpr StringData GEOJSON_TYPE_MULTI_POINT = "MultiPoint"_sd;
+static constexpr StringData GEOJSON_TYPE_MULTI_LINESTRING = "MultiLineString"_sd;
+static constexpr StringData GEOJSON_TYPE_MULTI_POLYGON = "MultiPolygon"_sd;
+static constexpr StringData GEOJSON_TYPE_GEOMETRY_COLLECTION = "GeometryCollection"_sd;
 // This field must also be present.  The value depends on the type.
-static const string GEOJSON_COORDINATES = "coordinates";
-static const string GEOJSON_GEOMETRIES = "geometries";
+static constexpr StringData GEOJSON_COORDINATES = "coordinates"_sd;
+static constexpr StringData GEOJSON_GEOMETRIES = "geometries"_sd;
 
 // Coordinate System Reference
 // see http://portal.opengeospatial.org/files/?artifact_id=24045
 // and http://spatialreference.org/ref/epsg/4326/
 // and http://www.geojson.org/geojson-spec.html#named-crs
-static const string CRS_CRS84 = "urn:ogc:def:crs:OGC:1.3:CRS84";
-static const string CRS_EPSG_4326 = "EPSG:4326";
-static const string CRS_STRICT_WINDING = "urn:x-mongodb:crs:strictwinding:EPSG:4326";
+static constexpr StringData CRS_CRS84 = "urn:ogc:def:crs:OGC:1.3:CRS84"_sd;
+static constexpr StringData CRS_EPSG_4326 = "EPSG:4326"_sd;
+static constexpr StringData CRS_STRICT_WINDING = "urn:x-mongodb:crs:strictwinding:EPSG:4326"_sd;
+
+// String constants for field names.
+static constexpr StringData kBoxField = "$box"_sd;
+static constexpr StringData kCenterField = "$center"_sd;
+static constexpr StringData kPolygonField = "$polygon"_sd;
+static constexpr StringData kCenterSphereField = "$centerSphere"_sd;
+static constexpr StringData kGeometryField = "$geometry"_sd;
+static constexpr StringData kGeoWithinField = "$geoWithin"_sd;
+static constexpr StringData kUniqueDocsField = "$uniqueDocs"_sd;
+static constexpr StringData kNearField = "$near"_sd;
+static constexpr StringData kGeoNearField = "$geoNear"_sd;
+static constexpr StringData kNearSphereField = "$nearSphere"_sd;
+static constexpr StringData kMaxDistanceField = "$maxDistance"_sd;
+static constexpr StringData kMinDistanceField = "$minDistance"_sd;
+// "crs": {
+//   "type": "name",
+//   "properties": {
+//     "name": "urn:ogc:def:crs:OGC:1.3:CRS84"
+//    }
+// }
+static constexpr StringData kCrsField = "crs"_sd;
+static constexpr StringData kCrsTypeField = "type"_sd;
+static constexpr StringData kCrsNameField = "name"_sd;
+static constexpr StringData kCrsPropertiesField = "properties"_sd;
+static constexpr StringData kPropertiesNameField = "name"_sd;
+// { "type": "Point", "coordinates": [100.0, 0.0] }
+static constexpr StringData kGeometryTypeField = "type"_sd;
+static constexpr StringData kGeometryCoordinatesField = "coordinates"_sd;
 
 // This class parses geographic data.
 // It parses a subset of GeoJSON and creates S2 shapes from it.
@@ -92,12 +127,26 @@ public:
 
     static GeoSpecifier parseGeoSpecifier(const BSONElement& elem);
     static GeoJSONType parseGeoJSONType(const BSONObj& obj);
+    // Throw an assertion if the passed in object has an invalid 'type', whether the value is
+    // non-string or not recognized.
+    static void assertValidGeoJSONType(const BSONObj& obj);
+    static GeoJSONType geoJSONTypeStringToEnum(StringData type);
+    static StringData geoJSONTypeEnumToString(GeoParser::GeoJSONType type);
 
     // Legacy points can contain extra data as extra fields - these are valid to index
     // e.g. { x: 1, y: 1, z: 1 }
     static Status parseLegacyPoint(const BSONElement& elem,
                                    PointWithCRS* out,
                                    bool allowAddlFields = false);
+    static Status parseFlatPointCoordinates(const BSONElement& elem,
+                                            BSONElement& x,
+                                            BSONElement& y,
+                                            bool allowAddlFields = false);
+    static Status parseLegacyPointWithMaxDistance(const BSONElement& elem,
+                                                  BSONElement& lat,
+                                                  BSONElement& lng,
+                                                  BSONElement& maxDist);
+
     // Parse the BSON object after $box, $center, etc.
     static Status parseLegacyBox(const BSONObj& obj, BoxWithCRS* out);
     static Status parseLegacyCenter(const BSONObj& obj, CapWithCRS* out);
@@ -118,7 +167,9 @@ public:
     // For geo near
     static Status parseQueryPoint(const BSONElement& elem, PointWithCRS* out);
     static Status parseStoredPoint(const BSONElement& elem, PointWithCRS* out);
-    static bool parsePointWithMaxDistance(const BSONObj& obj, PointWithCRS* out, double* maxOut);
+    static Status parsePointWithMaxDistance(const BSONElement& elem,
+                                            PointWithCRS* out,
+                                            double* maxOut);
 };
 
 }  // namespace mongo

@@ -1,0 +1,10 @@
+# Golden test output of SBENumericTest/CompileOnly
+-- INPUT EXPRESSION:
+convert ( NumberDecimal(123), int64) 
+
+-- COMPILED EXPRESSION:
+[0x0000-0x000c]
+0x0000: pushConstVal(value: NumberDecimal(123));
+0x000a: numConvert(tag: NumberInt64);
+
+

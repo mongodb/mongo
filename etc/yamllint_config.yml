@@ -1,12 +1,19 @@
 extends: default
 
 rules:
-  line-length: disable
-  indentation: disable
-  document-start: disable
+  anchors:
+    forbid-duplicated-anchors: true
+    forbid-unused-anchors: true
   comments: disable
   comments-indentation: disable
+  document-start: disable
+  indentation: disable
+  line-length: disable
   truthy: disable
 
-ignore: |
-  buildscripts/packaging/msi/mongod.yaml
+ignore:
+  - buildscripts/packaging/msi/mongod.yaml
+  - etc/evaluated_evergreen.yml
+  - etc/evaluated_evergreen_nightly.yml
+  - etc/evaluated_system_perf.yml
+  - etc/trimmed_system_perf.yml

@@ -27,14 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <cstddef>
-
-#include "mongo/bson/json.h"
-#include "mongo/db/jsobj.h"
+// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/db/repl/idempotency_document_structure.h"
+
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/unittest/unittest.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <memory>
 
 namespace mongo {
 namespace {
@@ -79,7 +84,7 @@ TEST(DocGenTest, SomePreChosenDocExists) {
     DocumentStructureEnumerator enumerator({fields, depth, length}, &trivialScalarGenerator);
     BSONObj start;
     bool docFound = false;
-    for (auto doc : enumerator) {
+    for (const auto& doc : enumerator) {
         if (doc.binaryEqual(specialDoc)) {
             docFound = true;
             break;

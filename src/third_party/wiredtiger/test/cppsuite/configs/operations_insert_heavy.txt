@@ -1,0 +1,45 @@
+# Used as a stress test for the framework.
+duration_seconds=300,
+cache_size_mb=2000,
+timestamp_manager=
+(
+    enabled=true,
+    oldest_lag=30,
+    op_rate=1s,
+    stable_lag=10
+),
+workload_manager=
+(
+    checkpoint_config=
+    (
+        op_rate=20s,
+    ),
+    populate_config=
+    (
+        collection_count=100,
+        key_count_per_collection=500,
+        key_size=100,
+        thread_count=20,
+        value_size=2000
+    ),
+    insert_config=
+    (
+        key_size=100,
+        op_rate=10ms,
+        ops_per_transaction=(max=100,min=0),
+        thread_count=50,
+        value_size=2000
+    ),
+    read_config=
+    (
+        op_rate=3ms,
+        ops_per_transaction=(max=100,min=50),
+        thread_count=10
+    ),
+),
+# Tracking is currently disabled as verification can't handle rollbacks.
+operation_tracker=
+(
+    enabled=false,
+    op_rate=30s
+)

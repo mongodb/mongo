@@ -3,94 +3,40 @@
 #include <stddef.h>
 
 #if defined(__powerpc64__) && !defined(HAVE_NO_CRC32_HARDWARE)
-#define CRC_TABLE
-#include "crc32_constants.h"
 
-#define VMX_ALIGN 16U
-#define VMX_ALIGN_MASK (VMX_ALIGN - 1)
-
-/*
- * crc32_align --
- *     Align helper for CRC32 functions.
- */
-static unsigned int
-crc32_align(unsigned int crc, const unsigned char *p, unsigned long len)
-{
-#ifdef REFLECT
-    while (len--)
-        crc = crc_table[(crc ^ *p++) & 0xff] ^ (crc >> 8);
-    return crc;
-#else
-    while (len--)
-        crc = crc_table[((crc >> 24) ^ *p++) & 0xff] ^ (crc << 8);
-    return crc;
-#endif
-}
-
-unsigned int __crc32_vpmsum(unsigned int crc, const unsigned char *p, unsigned long len);
-
-/* -Werror=missing-prototypes */
 unsigned int crc32_vpmsum(unsigned int crc, const unsigned char *p, unsigned long len);
 
 /*
- * crc32_vpmsum --
- *     VPM sum helper for CRC32 functions.
+ * __checksum_with_seed_hw --
+ *     WiredTiger: return a checksum for a chunk of memory when given a starting seed.
  */
-unsigned int
-crc32_vpmsum(unsigned int crc, const unsigned char *p, unsigned long len)
+static uint32_t
+__checksum_with_seed_hw(uint32_t seed, const void *chunk, size_t len)
 {
-    unsigned int prealign;
-    unsigned int tail;
-
-#ifdef CRC_XOR
-    crc ^= 0xffffffff;
-#endif
-
-    if (len < VMX_ALIGN + VMX_ALIGN_MASK) {
-        crc = crc32_align(crc, p, len);
-        goto out;
-    }
-
-    if ((unsigned long)p & VMX_ALIGN_MASK) {
-        prealign = VMX_ALIGN - ((unsigned long)p & VMX_ALIGN_MASK);
-        crc = crc32_align(crc, p, prealign);
-        len -= prealign;
-        p += prealign;
-    }
-
-    crc = __crc32_vpmsum(crc, p, len & ~VMX_ALIGN_MASK);
-
-    tail = len & VMX_ALIGN_MASK;
-    if (tail) {
-        p += len & ~VMX_ALIGN_MASK;
-        crc = crc32_align(crc, p, tail);
-    }
-
-out:
-#ifdef CRC_XOR
-    crc ^= 0xffffffff;
-#endif
-
-    return crc;
+    return (crc32_vpmsum(seed, chunk, len));
 }
 
 /*
- * __wt_checksum_hw --
+ * __checksum_hw --
  *     WiredTiger: return a checksum for a chunk of memory.
  */
 static uint32_t
-__wt_checksum_hw(const void *chunk, size_t len)
+__checksum_hw(const void *chunk, size_t len)
 {
     return (crc32_vpmsum(0, chunk, len));
 }
 #endif
 
 extern uint32_t __wt_checksum_sw(const void *chunk, size_t len);
+extern uint32_t __wt_checksum_with_seed_sw(uint32_t, const void *chunk, size_t len);
 #if defined(__GNUC__)
 extern uint32_t (*wiredtiger_crc32c_func(void))(const void *, size_t)
   __attribute__((visibility("default")));
+extern uint32_t (*wiredtiger_crc32c_with_seed_func(void))(uint32_t, const void *, size_t)
+  __attribute__((visibility("default")));
 #else
 extern uint32_t (*wiredtiger_crc32c_func(void))(const void *, size_t);
+extern uint32_t (*wiredtiger_crc32c_with_seed_func(void))(uint32_t, const void *, size_t);
 #endif
 
 /*
@@ -100,8 +46,22 @@ extern uint32_t (*wiredtiger_crc32c_func(void))(const void *, size_t);
 uint32_t (*wiredtiger_crc32c_func(void))(const void *, size_t)
 {
 #if defined(__powerpc64__) && !defined(HAVE_NO_CRC32_HARDWARE)
-    return (__wt_checksum_hw);
+    return (__checksum_hw);
 #else
     return (__wt_checksum_sw);
+#endif
+}
+
+/*
+ * wiredtiger_crc32c_with_seed_func --
+ *     WiredTiger: detect CRC hardware and return the checksum function that accepts a starting
+ *     seed.
+ */
+uint32_t (*wiredtiger_crc32c_with_seed_func(void))(uint32_t, const void *, size_t)
+{
+#if defined(__powerpc64__) && !defined(HAVE_NO_CRC32_HARDWARE)
+    return (__checksum_with_seed_hw);
+#else
+    return (__wt_checksum_with_seed_sw);
 #endif
 }

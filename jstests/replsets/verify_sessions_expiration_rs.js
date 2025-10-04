@@ -13,19 +13,17 @@
 //    during a currently running operation, the logical session cache should vivify the session and
 //    replace it in the config.system.sessions collection.
 
-(function() {
-"use strict";
-
 // This test makes assertions about the number of logical session records.
 TestData.disableImplicitSessions = true;
 
-load("jstests/libs/pin_getmore_cursor.js");  // For "withPinnedCursor".
+import {withPinnedCursor} from "jstests/libs/pin_getmore_cursor.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const refresh = {
-    refreshLogicalSessionCacheNow: 1
+    refreshLogicalSessionCacheNow: 1,
 };
 const startSession = {
-    startSession: 1
+    startSession: 1,
 };
 const failPointName = "waitAfterPinningCursorBeforeGetMoreBatch";
 
@@ -35,13 +33,13 @@ function refreshSessionsAndVerifyCount(config, expectedCount) {
 }
 
 function getSessions(config) {
-    return config.system.sessions.aggregate([{'$listSessions': {allUsers: true}}]).toArray();
+    return config.system.sessions.aggregate([{"$listSessions": {allUsers: true}}]).toArray();
 }
 
 const dbName = "test";
 const testCollName = "verify_sessions_find_get_more";
 
-let replTest = new ReplSetTest({name: 'refresh', nodes: 2});
+let replTest = new ReplSetTest({name: "refresh", nodes: 2});
 replTest.startSet();
 replTest.initiate();
 
@@ -71,8 +69,7 @@ for (let i = 0; i < 10; i++) {
 let cursors = [];
 for (let i = 0; i < 5; i++) {
     let session = db.getMongo().startSession({});
-    assert.commandWorked(session.getDatabase("admin").runCommand({usersInfo: 1}),
-                         "initialize the session");
+    assert.commandWorked(session.getDatabase("admin").runCommand({usersInfo: 1}), "initialize the session");
     cursors.push(session.getDatabase(dbName)[testCollName].find({b: 1}).batchSize(1));
     assert(cursors[i].hasNext());
 }
@@ -111,7 +108,8 @@ for (let i = 0; i < cursors.length; i++) {
     assert.commandFailedWithCode(
         db.runCommand({getMore: cursors[i]._cursor._cursorid, collection: testCollName}),
         ErrorCodes.CursorNotFound,
-        'expected getMore to fail because the cursor was killed');
+        "expected getMore to fail because the cursor was killed",
+    );
 }
 
 // 4. Verify that an expired session (simulated by manual deletion) that has a currently running
@@ -129,12 +127,11 @@ withPinnedCursor({
         let db = coll.getDB();
         assert.commandWorked(db.runCommand({killCursors: coll.getName(), cursors: [cursorId]}));
     },
-    runGetMoreFunc: () => {
+    runGetMoreFunc: (collName, cursorId) => {
         db.runCommand({getMore: cursorId, collection: collName});
     },
-    failPointName: failPointName
-},
-                 /* assertEndCounts */ false);
+    failPointName: failPointName,
+    assertEndCounts: false,
+});
 
 replTest.stopSet();
-})();

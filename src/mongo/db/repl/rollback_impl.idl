@@ -28,17 +28,19 @@
 
 global:
     cpp_namespace: "mongo"
+    mod_visibility: private
 
 server_parameters:
     createRollbackDataFiles:
         description: >-
             Control whether or not the server will write out data files containing deleted documents during
-            rollback. This server parameter affects both rollback via refetch and rollback via recovery to
-            stable timestamp.
+            rollback, and data files containing rolled back oplog entries. This server parameter affects 
+            rollback via recovery to stable timestamp.
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<bool>
         cpp_varname: gCreateRollbackDataFiles
         default: true
+        redact: false
 
     rollbackTimeLimitSecs:
         description: >-
@@ -49,6 +51,7 @@ server_parameters:
         cpp_vartype: AtomicWord<int>
         cpp_varname: gRollbackTimeLimitSecs
         default:
-            expr: '60 * 60 * 24' # Default 1 day
+            expr: "60 * 60 * 24" # Default 1 day
         validator:
             gt: 0
+        redact: false

@@ -29,25 +29,26 @@
 
 
 #include "mongo/platform/decimal128.h"
-#include "mongo/platform/basic.h"
 
 #include <algorithm>
 #include <cmath>
-#include <cstdlib>
 #include <iostream>
-#include <memory>
 #include <string>
-#include <utility>
+
+
 // The Intel C library typedefs wchar_t, but it is a distinct fundamental type
 // in C++, so we #define _WCHAR_T here to prevent the library from trying to typedef.
 #define _WCHAR_T
-#include <third_party/IntelRDFPMathLib20U1/LIBRARY/src/bid_conf.h>
-#include <third_party/IntelRDFPMathLib20U1/LIBRARY/src/bid_functions.h>
+#include <bid_conf.h>
+#include <bid_functions.h>
+
 #undef _WCHAR_T
 
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/data_view.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/base/string_data.h"
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/platform/endian.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
@@ -57,22 +58,33 @@ namespace mongo {
 
 namespace {
 
-// Returns the number of characters consumed from input string. If unable to parse,
-// it returns 0.
+/**
+ * Returns the number of characters consumed from input string. If unable to parse,
+ * it returns 0.
+ *
+ * Input must be of these forms:
+ *  - Valid decimal (standard or scientific notation): /(?i)^[+-]?\d*(.\d+)?(e[+-]?\d+)?$/
+ *  - NaN: /(?i)^[+-]?nan$/
+ *  - Infinity: /(?i)^[+-]?inf(inity)?$)
+ */
 size_t validateInputString(StringData input, std::uint32_t* signalingFlags) {
-    // Input must be of these forms:
-    // * Valid decimal (standard or scientific notation):
-    //      /[-+]?\d*(.\d+)?([e][+\-]?\d+)?/
-    // * NaN: /[-+]?[[Nn][Aa][Nn]]/
-    // * Infinity: /[+\-]?(inf|infinity)
-
+    if (input.empty()) {
+        *signalingFlags = Decimal128::SignalingFlag::kInvalid;
+        return 0;
+    }
     bool isSigned = input[0] == '-' || input[0] == '+';
 
     // Check for NaN and Infinity
     size_t start = (isSigned) ? 1 : 0;
     size_t charsConsumed = start;
     StringData noSign = input.substr(start);
-    bool isNanOrInf = noSign == "nan" || noSign == "inf" || noSign == "infinity";
+    if (noSign.empty()) {
+        *signalingFlags = Decimal128::SignalingFlag::kInvalid;
+        return 0;
+    }
+    bool isNanOrInf = str::equalCaseInsensitive(noSign, "nan") ||
+        str::equalCaseInsensitive(noSign, "inf") || str::equalCaseInsensitive(noSign, "infinity");
+
     if (isNanOrInf)
         return start + noSign.size();
 
@@ -130,7 +142,7 @@ size_t validateInputString(StringData input, std::uint32_t* signalingFlags) {
     // Check exponent
     StringData exponent = noSign.substr(i);
 
-    if (exponent[0] != 'e' || exponent.size() < 2) {
+    if ((exponent[0] != 'e' && exponent[0] != 'E') || exponent.size() < 2) {
         *signalingFlags = Decimal128::SignalingFlag::kInvalid;
         return 0;
     }
@@ -146,7 +158,7 @@ size_t validateInputString(StringData input, std::uint32_t* signalingFlags) {
         ++charsConsumed;
     }
 
-    if (!std::all_of(exponent.begin(), exponent.end(), [](char c) { return ctype::isDigit(c); })) {
+    if (!str::isAllDigits(exponent)) {
         *signalingFlags = Decimal128::SignalingFlag::kInvalid;
         return 0;
     }
@@ -236,9 +248,8 @@ BID_UINT128 decimal128ToLibraryType(Decimal128::Value value) {
 Decimal128::Decimal128(double doubleValue,
                        RoundingPrecision roundPrecision,
                        RoundingMode roundMode) {
-    std::uint32_t throwAwayFlag = 0;
     Decimal128 convertedDoubleValue(
-        libraryTypeToValue(binary64_to_bid128(doubleValue, roundMode, &throwAwayFlag)));
+        libraryTypeToValue(binary64_to_bid128(doubleValue, roundMode, ThrowawayFlag{})));
 
     // If the original number was zero, infinity, or NaN, there's no need to quantize
     if (doubleValue == 0.0 || std::isinf(doubleValue) || std::isnan(doubleValue) ||
@@ -290,21 +301,21 @@ Decimal128::Decimal128(double doubleValue,
     invariant(getCoefficientLow() <= kLargest15DigitInt);
 }
 
-Decimal128::Decimal128(std::string stringValue, RoundingMode roundMode, size_t* charsConsumed) {
-    std::uint32_t throwAwayFlag = 0;
-    *this = Decimal128(stringValue, &throwAwayFlag, roundMode, charsConsumed);
+Decimal128::Decimal128(const std::string& stringValue,
+                       RoundingMode roundMode,
+                       size_t* charsConsumed) {
+    *this = Decimal128(stringValue, ThrowawayFlag{}, roundMode, charsConsumed);
 }
 
-Decimal128::Decimal128(std::string stringValue,
+Decimal128::Decimal128(const std::string& stringValue,
                        std::uint32_t* signalingFlags,
                        RoundingMode roundMode,
                        size_t* charsConsumed) {
-    std::string lower = str::toLower(stringValue);
     BID_UINT128 dec128;
     // The intel library function requires a char * while c_str() returns a const char*.
     // We're using const_cast here since the library function should not modify the input.
-    dec128 = bid128_from_string(const_cast<char*>(lower.c_str()), roundMode, signalingFlags);
-    size_t consumed = validateInputString(lower, signalingFlags);
+    dec128 = bid128_from_string(const_cast<char*>(stringValue.c_str()), roundMode, signalingFlags);
+    size_t consumed = validateInputString(stringValue, signalingFlags);
     if (charsConsumed)
         *charsConsumed = consumed;
     _value = libraryTypeToValue(dec128);
@@ -314,66 +325,6 @@ Decimal128 Decimal128::toAbs() const {
     BID_UINT128 dec128 = decimal128ToLibraryType(_value);
     dec128 = bid128_abs(dec128);
     return Decimal128(libraryTypeToValue(dec128));
-}
-
-Decimal128 Decimal128::acos(RoundingMode roundMode) const {
-    std::uint32_t throwAwayFlag = 0;
-    return acos(&throwAwayFlag, roundMode);
-}
-
-Decimal128 Decimal128::acos(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
-    BID_UINT128 current = decimal128ToLibraryType(_value);
-    current = bid128_acos(current, roundMode, signalingFlags);
-    return Decimal128{libraryTypeToValue(current)};
-}
-
-Decimal128 Decimal128::acosh(RoundingMode roundMode) const {
-    std::uint32_t throwAwayFlag = 0;
-    return acosh(&throwAwayFlag, roundMode);
-}
-
-Decimal128 Decimal128::acosh(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
-    BID_UINT128 current = decimal128ToLibraryType(_value);
-    current = bid128_acosh(current, roundMode, signalingFlags);
-    return Decimal128{libraryTypeToValue(current)};
-}
-
-Decimal128 Decimal128::asin(RoundingMode roundMode) const {
-    std::uint32_t throwAwayFlag = 0;
-    return asin(&throwAwayFlag, roundMode);
-}
-
-Decimal128 Decimal128::asin(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
-    BID_UINT128 current = decimal128ToLibraryType(_value);
-    current = bid128_asin(current, roundMode, signalingFlags);
-    return Decimal128{libraryTypeToValue(current)};
-}
-
-Decimal128 Decimal128::asinh(RoundingMode roundMode) const {
-    std::uint32_t throwAwayFlag = 0;
-    return asinh(&throwAwayFlag, roundMode);
-}
-
-Decimal128 Decimal128::asinh(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
-    BID_UINT128 current = decimal128ToLibraryType(_value);
-    current = bid128_asinh(current, roundMode, signalingFlags);
-    return Decimal128{libraryTypeToValue(current)};
-}
-
-Decimal128 Decimal128::atan(RoundingMode roundMode) const {
-    std::uint32_t throwAwayFlag = 0;
-    return atan(&throwAwayFlag, roundMode);
-}
-
-Decimal128 Decimal128::atan(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
-    BID_UINT128 current = decimal128ToLibraryType(_value);
-    current = bid128_atan(current, roundMode, signalingFlags);
-    return Decimal128{libraryTypeToValue(current)};
-}
-
-Decimal128 Decimal128::atan2(const Decimal128& other, RoundingMode roundMode) const {
-    std::uint32_t throwAwayFlag = 0;
-    return atan2(other, &throwAwayFlag, roundMode);
 }
 
 Decimal128 Decimal128::atan2(const Decimal128& other,
@@ -387,42 +338,8 @@ Decimal128 Decimal128::atan2(const Decimal128& other,
     return result;
 }
 
-Decimal128 Decimal128::atanh(RoundingMode roundMode) const {
-    std::uint32_t throwAwayFlag = 0;
-    return atanh(&throwAwayFlag, roundMode);
-}
-
-Decimal128 Decimal128::atanh(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
-    BID_UINT128 current = decimal128ToLibraryType(_value);
-    current = bid128_atanh(current, roundMode, signalingFlags);
-    return Decimal128{libraryTypeToValue(current)};
-}
-
-Decimal128 Decimal128::cosh(RoundingMode roundMode) const {
-    std::uint32_t throwAwayFlag = 0;
-    return cosh(&throwAwayFlag, roundMode);
-}
-
-Decimal128 Decimal128::cosh(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
-    BID_UINT128 current = decimal128ToLibraryType(_value);
-    current = bid128_cosh(current, roundMode, signalingFlags);
-    return Decimal128{libraryTypeToValue(current)};
-}
-
-Decimal128 Decimal128::cos(RoundingMode roundMode) const {
-    std::uint32_t throwAwayFlag = 0;
-    return cos(&throwAwayFlag, roundMode);
-}
-
-Decimal128 Decimal128::cos(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
-    BID_UINT128 current = decimal128ToLibraryType(_value);
-    current = bid128_cos(current, roundMode, signalingFlags);
-    return Decimal128{libraryTypeToValue(current)};
-}
-
 Decimal128 Decimal128::round(RoundingMode roundMode) const {
-    std::uint32_t throwAwayFlag = 0;
-    return round(&throwAwayFlag, roundMode);
+    return round(ThrowawayFlag{}, roundMode);
 }
 
 Decimal128 Decimal128::round(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
@@ -447,8 +364,7 @@ Decimal128 Decimal128::round(std::uint32_t* signalingFlags, RoundingMode roundMo
 }
 
 std::int32_t Decimal128::toInt(RoundingMode roundMode) const {
-    std::uint32_t throwAwayFlag = 0;
-    return toInt(&throwAwayFlag, roundMode);
+    return toInt(ThrowawayFlag{}, roundMode);
 }
 
 std::int32_t Decimal128::toInt(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
@@ -470,8 +386,7 @@ std::int32_t Decimal128::toInt(std::uint32_t* signalingFlags, RoundingMode round
 }
 
 std::int64_t Decimal128::toLong(RoundingMode roundMode) const {
-    std::uint32_t throwAwayFlag = 0;
-    return toLong(&throwAwayFlag, roundMode);
+    return toLong(ThrowawayFlag{}, roundMode);
 }
 
 std::int64_t Decimal128::toLong(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
@@ -493,8 +408,7 @@ std::int64_t Decimal128::toLong(std::uint32_t* signalingFlags, RoundingMode roun
 }
 
 std::int32_t Decimal128::toIntExact(RoundingMode roundMode) const {
-    std::uint32_t throwAwayFlag = 0;
-    return toIntExact(&throwAwayFlag, roundMode);
+    return toIntExact(ThrowawayFlag{}, roundMode);
 }
 
 std::int32_t Decimal128::toIntExact(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
@@ -516,8 +430,7 @@ std::int32_t Decimal128::toIntExact(std::uint32_t* signalingFlags, RoundingMode 
 }
 
 std::int64_t Decimal128::toLongExact(RoundingMode roundMode) const {
-    std::uint32_t throwAwayFlag = 0;
-    return toLongExact(&throwAwayFlag, roundMode);
+    return toLongExact(ThrowawayFlag{}, roundMode);
 }
 
 std::int64_t Decimal128::toLongExact(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
@@ -539,8 +452,7 @@ std::int64_t Decimal128::toLongExact(std::uint32_t* signalingFlags, RoundingMode
 }
 
 std::uint64_t Decimal128::toULongExact(RoundingMode roundMode) const {
-    std::uint32_t throwAwayFlag = 0;
-    return toLongExact(&throwAwayFlag, roundMode);
+    return toLongExact(ThrowawayFlag{}, roundMode);
 }
 
 std::uint64_t Decimal128::toULongExact(std::uint32_t* signalingFlags,
@@ -563,35 +475,12 @@ std::uint64_t Decimal128::toULongExact(std::uint32_t* signalingFlags,
 }
 
 double Decimal128::toDouble(RoundingMode roundMode) const {
-    std::uint32_t throwAwayFlag = 0;
-    return toDouble(&throwAwayFlag, roundMode);
+    return toDouble(ThrowawayFlag{}, roundMode);
 }
 
 double Decimal128::toDouble(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
     BID_UINT128 dec128 = decimal128ToLibraryType(_value);
     return bid128_to_binary64(dec128, roundMode, signalingFlags);
-}
-
-Decimal128 Decimal128::sin(RoundingMode roundMode) const {
-    std::uint32_t throwAwayFlag = 0;
-    return sin(&throwAwayFlag, roundMode);
-}
-
-Decimal128 Decimal128::sin(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
-    BID_UINT128 current = decimal128ToLibraryType(_value);
-    current = bid128_sin(current, roundMode, signalingFlags);
-    return Decimal128{libraryTypeToValue(current)};
-}
-
-Decimal128 Decimal128::sinh(RoundingMode roundMode) const {
-    std::uint32_t throwAwayFlag = 0;
-    return sinh(&throwAwayFlag, roundMode);
-}
-
-Decimal128 Decimal128::sinh(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
-    BID_UINT128 current = decimal128ToLibraryType(_value);
-    current = bid128_sinh(current, roundMode, signalingFlags);
-    return Decimal128{libraryTypeToValue(current)};
 }
 
 std::string Decimal128::toString() const {
@@ -660,28 +549,6 @@ std::string Decimal128::toString() const {
     return result;
 }
 
-Decimal128 Decimal128::tanh(RoundingMode roundMode) const {
-    std::uint32_t throwAwayFlag = 0;
-    return tanh(&throwAwayFlag, roundMode);
-}
-
-Decimal128 Decimal128::tanh(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
-    BID_UINT128 current = decimal128ToLibraryType(_value);
-    current = bid128_tanh(current, roundMode, signalingFlags);
-    return Decimal128{libraryTypeToValue(current)};
-}
-
-Decimal128 Decimal128::tan(RoundingMode roundMode) const {
-    std::uint32_t throwAwayFlag = 0;
-    return tan(&throwAwayFlag, roundMode);
-}
-
-Decimal128 Decimal128::tan(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
-    BID_UINT128 current = decimal128ToLibraryType(_value);
-    current = bid128_tan(current, roundMode, signalingFlags);
-    return Decimal128{libraryTypeToValue(current)};
-}
-
 std::string Decimal128::_convertToScientificNotation(StringData coefficient,
                                                      int adjustedExponent) const {
     int cLength = coefficient.size();
@@ -703,7 +570,7 @@ std::string Decimal128::_convertToScientificNotation(StringData coefficient,
 std::string Decimal128::_convertToStandardDecimalNotation(StringData coefficient,
                                                           int exponent) const {
     if (exponent == 0) {
-        return coefficient.toString();
+        return std::string{coefficient};
     } else {
         invariant(exponent < 0);
         std::string result;
@@ -753,8 +620,7 @@ bool Decimal128::isNegative() const {
 }
 
 Decimal128 Decimal128::add(const Decimal128& other, RoundingMode roundMode) const {
-    std::uint32_t throwAwayFlag = 0;
-    return add(other, &throwAwayFlag, roundMode);
+    return add(other, ThrowawayFlag{}, roundMode);
 }
 
 Decimal128 Decimal128::add(const Decimal128& other,
@@ -769,8 +635,7 @@ Decimal128 Decimal128::add(const Decimal128& other,
 }
 
 Decimal128 Decimal128::subtract(const Decimal128& other, RoundingMode roundMode) const {
-    std::uint32_t throwAwayFlag = 0;
-    return subtract(other, &throwAwayFlag, roundMode);
+    return subtract(other, ThrowawayFlag{}, roundMode);
 }
 
 Decimal128 Decimal128::subtract(const Decimal128& other,
@@ -785,8 +650,7 @@ Decimal128 Decimal128::subtract(const Decimal128& other,
 }
 
 Decimal128 Decimal128::multiply(const Decimal128& other, RoundingMode roundMode) const {
-    std::uint32_t throwAwayFlag = 0;
-    return multiply(other, &throwAwayFlag, roundMode);
+    return multiply(other, ThrowawayFlag{}, roundMode);
 }
 
 Decimal128 Decimal128::multiply(const Decimal128& other,
@@ -801,8 +665,7 @@ Decimal128 Decimal128::multiply(const Decimal128& other,
 }
 
 Decimal128 Decimal128::divide(const Decimal128& other, RoundingMode roundMode) const {
-    std::uint32_t throwAwayFlag = 0;
-    return divide(other, &throwAwayFlag, roundMode);
+    return divide(other, ThrowawayFlag{}, roundMode);
 }
 
 Decimal128 Decimal128::divide(const Decimal128& other,
@@ -816,52 +679,8 @@ Decimal128 Decimal128::divide(const Decimal128& other,
     return result;
 }
 
-Decimal128 Decimal128::exponential(RoundingMode roundMode) const {
-    std::uint32_t throwAwayFlag = 0;
-    return exponential(&throwAwayFlag, roundMode);
-}
-
-Decimal128 Decimal128::exponential(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
-    BID_UINT128 current = decimal128ToLibraryType(_value);
-    current = bid128_exp(current, roundMode, signalingFlags);
-    return Decimal128{libraryTypeToValue(current)};
-}
-
-Decimal128 Decimal128::logarithm(RoundingMode roundMode) const {
-    std::uint32_t throwAwayFlag = 0;
-    return logarithm(&throwAwayFlag, roundMode);
-}
-
-Decimal128 Decimal128::logarithm(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
-    BID_UINT128 current = decimal128ToLibraryType(_value);
-    current = bid128_log(current, roundMode, signalingFlags);
-    return Decimal128{libraryTypeToValue(current)};
-}
-
-Decimal128 Decimal128::logarithm(const Decimal128& other, RoundingMode roundMode) const {
-    std::uint32_t throwAwayFlag = 0;
-    if (other.isEqual(Decimal128(2))) {
-        BID_UINT128 current = decimal128ToLibraryType(_value);
-        current = bid128_log2(current, roundMode, &throwAwayFlag);
-        return Decimal128{libraryTypeToValue(current)};
-    }
-    if (other.isEqual(Decimal128(10))) {
-        BID_UINT128 current = decimal128ToLibraryType(_value);
-        current = bid128_log10(current, roundMode, &throwAwayFlag);
-        return Decimal128{libraryTypeToValue(current)};
-    }
-    return logarithm(other, &throwAwayFlag);
-}
-
-Decimal128 Decimal128::logarithm(const Decimal128& other,
-                                 std::uint32_t* signalingFlags,
-                                 RoundingMode roundMode) const {
-    return logarithm(signalingFlags, roundMode).divide(other);
-}
-
 Decimal128 Decimal128::modulo(const Decimal128& other) const {
-    std::uint32_t throwAwayFlag = 0;
-    return modulo(other, &throwAwayFlag);
+    return modulo(other, ThrowawayFlag{});
 }
 
 Decimal128 Decimal128::modulo(const Decimal128& other, std::uint32_t* signalingFlags) const {
@@ -872,8 +691,7 @@ Decimal128 Decimal128::modulo(const Decimal128& other, std::uint32_t* signalingF
 }
 
 Decimal128 Decimal128::power(const Decimal128& other, RoundingMode roundMode) const {
-    std::uint32_t throwAwayFlag = 0;
-    return power(other, &throwAwayFlag, roundMode);
+    return power(other, ThrowawayFlag{}, roundMode);
 }
 
 Decimal128 Decimal128::power(const Decimal128& other,
@@ -893,10 +711,17 @@ Decimal128 Decimal128::power(const Decimal128& other,
     return Decimal128{libraryTypeToValue(result)}.add(kLargestNegativeExponentZero);
 }
 
+Decimal128 Decimal128::scale(int n, RoundingMode roundMode) const {
+    BID_UINT128 x = decimal128ToLibraryType(_value);
+
+    BID_UINT128 result = bid128_scalbn(x, n, roundMode, ThrowawayFlag{});
+    return Decimal128{libraryTypeToValue(result)};
+    ;
+}
+
 Decimal128 Decimal128::nonNormalizingQuantize(const Decimal128& other,
                                               RoundingMode roundMode) const {
-    std::uint32_t throwAwayFlag = 0;
-    return nonNormalizingQuantize(other, &throwAwayFlag, roundMode);
+    return nonNormalizingQuantize(other, ThrowawayFlag{}, roundMode);
 }
 
 Decimal128 Decimal128::nonNormalizingQuantize(const Decimal128& reference,
@@ -911,8 +736,7 @@ Decimal128 Decimal128::nonNormalizingQuantize(const Decimal128& reference,
 }
 
 Decimal128 Decimal128::quantize(const Decimal128& other, RoundingMode roundMode) const {
-    std::uint32_t throwAwayFlag = 0;
-    return quantize(other, &throwAwayFlag, roundMode);
+    return quantize(other, ThrowawayFlag{}, roundMode);
 }
 
 Decimal128 Decimal128::quantize(const Decimal128& reference,
@@ -930,58 +754,55 @@ Decimal128 Decimal128::quantize(const Decimal128& reference,
     return nonNormalizingQuantize(reference, signalingFlags, roundMode);
 }
 
-Decimal128 Decimal128::squareRoot(RoundingMode roundMode) const {
-    std::uint32_t throwAwayFlag = 0;
-    return squareRoot(&throwAwayFlag, roundMode);
-}
+#define MONGO_DECIMAL128_DEFINE_CMP_OP(member, bidFunction)           \
+    bool Decimal128::member(const Decimal128& other) const {          \
+        return bidFunction(decimal128ToLibraryType(_value),           \
+                           decimal128ToLibraryType(other.getValue()), \
+                           ThrowawayFlag{});                          \
+    }
 
-Decimal128 Decimal128::squareRoot(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
-    BID_UINT128 current = decimal128ToLibraryType(_value);
-    current = bid128_sqrt(current, roundMode, signalingFlags);
-    return Decimal128{libraryTypeToValue(current)};
-}
+MONGO_DECIMAL128_DEFINE_CMP_OP(isEqual, bid128_quiet_equal)
+MONGO_DECIMAL128_DEFINE_CMP_OP(isNotEqual, bid128_quiet_not_equal)
+MONGO_DECIMAL128_DEFINE_CMP_OP(isGreater, bid128_quiet_greater)
+MONGO_DECIMAL128_DEFINE_CMP_OP(isGreaterEqual, bid128_quiet_greater_equal)
+MONGO_DECIMAL128_DEFINE_CMP_OP(isLess, bid128_quiet_less)
+MONGO_DECIMAL128_DEFINE_CMP_OP(isLessEqual, bid128_quiet_less_equal)
 
-bool Decimal128::isEqual(const Decimal128& other) const {
-    std::uint32_t throwAwayFlag = 0;
-    BID_UINT128 current = decimal128ToLibraryType(_value);
-    BID_UINT128 compare = decimal128ToLibraryType(other.getValue());
-    return bid128_quiet_equal(current, compare, &throwAwayFlag);
-}
+#undef MONGO_DECIMAL128_DEFINE_CMP_OP
 
-bool Decimal128::isNotEqual(const Decimal128& other) const {
-    std::uint32_t throwAwayFlag = 0;
-    BID_UINT128 current = decimal128ToLibraryType(_value);
-    BID_UINT128 compare = decimal128ToLibraryType(other.getValue());
-    return bid128_quiet_not_equal(current, compare, &throwAwayFlag);
-}
+#define MONGO_DECIMAL128_DEFINE_UNARY_OP(op, f)                                                 \
+    Decimal128 Decimal128::op(std::uint32_t* signalingFlags, RoundingMode roundMode) const {    \
+        return Decimal128{                                                                      \
+            libraryTypeToValue(f(decimal128ToLibraryType(_value), roundMode, signalingFlags))}; \
+    }
 
-bool Decimal128::isGreater(const Decimal128& other) const {
-    std::uint32_t throwAwayFlag = 0;
-    BID_UINT128 current = decimal128ToLibraryType(_value);
-    BID_UINT128 compare = decimal128ToLibraryType(other.getValue());
-    return bid128_quiet_greater(current, compare, &throwAwayFlag);
-}
+MONGO_DECIMAL128_DEFINE_UNARY_OP(sqrt, bid128_sqrt)
 
-bool Decimal128::isGreaterEqual(const Decimal128& other) const {
-    std::uint32_t throwAwayFlag = 0;
-    BID_UINT128 current = decimal128ToLibraryType(_value);
-    BID_UINT128 compare = decimal128ToLibraryType(other.getValue());
-    return bid128_quiet_greater_equal(current, compare, &throwAwayFlag);
-}
+MONGO_DECIMAL128_DEFINE_UNARY_OP(exp, bid128_exp)
+MONGO_DECIMAL128_DEFINE_UNARY_OP(exp2, bid128_exp2)
+MONGO_DECIMAL128_DEFINE_UNARY_OP(exp10, bid128_exp10)
 
-bool Decimal128::isLess(const Decimal128& other) const {
-    std::uint32_t throwAwayFlag = 0;
-    BID_UINT128 current = decimal128ToLibraryType(_value);
-    BID_UINT128 compare = decimal128ToLibraryType(other.getValue());
-    return bid128_quiet_less(current, compare, &throwAwayFlag);
-}
+MONGO_DECIMAL128_DEFINE_UNARY_OP(log, bid128_log)
+MONGO_DECIMAL128_DEFINE_UNARY_OP(log2, bid128_log2)
+MONGO_DECIMAL128_DEFINE_UNARY_OP(log10, bid128_log10)
 
-bool Decimal128::isLessEqual(const Decimal128& other) const {
-    std::uint32_t throwAwayFlag = 0;
-    BID_UINT128 current = decimal128ToLibraryType(_value);
-    BID_UINT128 compare = decimal128ToLibraryType(other.getValue());
-    return bid128_quiet_less_equal(current, compare, &throwAwayFlag);
-}
+MONGO_DECIMAL128_DEFINE_UNARY_OP(sin, bid128_sin)
+MONGO_DECIMAL128_DEFINE_UNARY_OP(cos, bid128_cos)
+MONGO_DECIMAL128_DEFINE_UNARY_OP(tan, bid128_tan)
+
+MONGO_DECIMAL128_DEFINE_UNARY_OP(asin, bid128_asin)
+MONGO_DECIMAL128_DEFINE_UNARY_OP(acos, bid128_acos)
+MONGO_DECIMAL128_DEFINE_UNARY_OP(atan, bid128_atan)
+
+MONGO_DECIMAL128_DEFINE_UNARY_OP(sinh, bid128_sinh)
+MONGO_DECIMAL128_DEFINE_UNARY_OP(cosh, bid128_cosh)
+MONGO_DECIMAL128_DEFINE_UNARY_OP(tanh, bid128_tanh)
+
+MONGO_DECIMAL128_DEFINE_UNARY_OP(asinh, bid128_asinh)
+MONGO_DECIMAL128_DEFINE_UNARY_OP(acosh, bid128_acosh)
+MONGO_DECIMAL128_DEFINE_UNARY_OP(atanh, bid128_atanh)
+
+#undef MONGO_DECIMAL128_DEFINE_UNARY_OP
 
 /**
  * The following static const variables are used to mathematically produce
@@ -1042,6 +863,33 @@ const Decimal128 Decimal128::k180OverPi(Decimal128("180").divide(Decimal128::kPi
 
 std::ostream& operator<<(std::ostream& stream, const Decimal128& value) {
     return stream << value.toString();
+}
+
+void DataType::Handler<Decimal128>::unsafeLoad(Decimal128* valueOut,
+                                               const char* ptr,
+                                               size_t* advanced) {
+    if (valueOut) {
+        ConstDataView decimalView(ptr);
+        uint64_t low = decimalView.read<LittleEndian<uint64_t>>();
+        uint64_t high = decimalView.read<LittleEndian<uint64_t>>(sizeof(uint64_t));
+        *valueOut = Decimal128(Decimal128::Value{low, high});
+    }
+
+    if (advanced) {
+        *advanced = kSizeOfDecimal;
+    }
+}
+
+void DataType::Handler<Decimal128>::unsafeStore(const Decimal128& valueIn,
+                                                char* ptr,
+                                                size_t* advanced) {
+    DataView decimalView(ptr);
+    decimalView.write<LittleEndian<uint64_t>>(valueIn.getValue().low64, 0);
+    decimalView.write<LittleEndian<uint64_t>>(valueIn.getValue().high64, sizeof(uint64_t));
+
+    if (advanced) {
+        *advanced = kSizeOfDecimal;
+    }
 }
 
 }  // namespace mongo

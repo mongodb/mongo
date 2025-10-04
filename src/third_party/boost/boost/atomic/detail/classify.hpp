@@ -3,7 +3,7 @@
  * (See accompanying file LICENSE_1_0.txt or copy at
  * http://www.boost.org/LICENSE_1_0.txt)
  *
- * Copyright (c) 2020 Andrey Semashev
+ * Copyright (c) 2020-2021 Andrey Semashev
  */
 /*!
  * \file   atomic/detail/classify.hpp
@@ -15,6 +15,7 @@
 #define BOOST_ATOMIC_DETAIL_CLASSIFY_HPP_INCLUDED_
 
 #include <boost/atomic/detail/config.hpp>
+#include <boost/atomic/detail/type_traits/is_enum.hpp>
 #include <boost/atomic/detail/type_traits/is_integral.hpp>
 #include <boost/atomic/detail/type_traits/is_function.hpp>
 #include <boost/atomic/detail/type_traits/is_floating_point.hpp>
@@ -40,37 +41,45 @@ struct classify_pointer< T, true >
     typedef void type;
 };
 
-template< typename T, bool IsInt = atomics::detail::is_integral< T >::value, bool IsFloat = atomics::detail::is_floating_point< T >::value >
+template<
+    typename T,
+    bool IsInt = atomics::detail::is_integral< T >::value,
+    bool IsFloat = atomics::detail::is_floating_point< T >::value,
+    bool IsEnum = atomics::detail::is_enum< T >::value
+>
 struct classify
 {
     typedef void type;
 };
 
 template< typename T >
-struct classify< T, true, false > { typedef int type; };
+struct classify< T, true, false, false > { typedef int type; };
 
 #if !defined(BOOST_ATOMIC_NO_FLOATING_POINT)
 template< typename T >
-struct classify< T, false, true > { typedef float type; };
+struct classify< T, false, true, false > { typedef float type; };
 #endif
 
 template< typename T >
-struct classify< T*, false, false > { typedef typename classify_pointer< T >::type type; };
+struct classify< T, false, false, true > { typedef const int type; };
+
+template< typename T >
+struct classify< T*, false, false, false > { typedef typename classify_pointer< T >::type type; };
 
 template< >
-struct classify< void*, false, false > { typedef void type; };
+struct classify< void*, false, false, false > { typedef void type; };
 
 template< >
-struct classify< const void*, false, false > { typedef void type; };
+struct classify< const void*, false, false, false > { typedef void type; };
 
 template< >
-struct classify< volatile void*, false, false > { typedef void type; };
+struct classify< volatile void*, false, false, false > { typedef void type; };
 
 template< >
-struct classify< const volatile void*, false, false > { typedef void type; };
+struct classify< const volatile void*, false, false, false > { typedef void type; };
 
 template< typename T, typename U >
-struct classify< T U::*, false, false > { typedef void type; };
+struct classify< T U::*, false, false, false > { typedef void type; };
 
 } // namespace detail
 } // namespace atomics

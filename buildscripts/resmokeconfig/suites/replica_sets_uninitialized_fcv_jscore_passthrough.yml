@@ -1,0 +1,84 @@
+test_kind: js_test
+
+selector:
+  roots:
+    - jstests/core/**/*.js
+    - jstests/fle2/**/*.js
+    - src/mongo/db/modules/*/jstests/fle2/**/*.js
+  exclude_files:
+    ### Tests that are excluded because of initial sync (from replica_sets_initsync_jscore_passthrough.yml)
+    # Tests that query the system.profile collection cannot run in this suite since an initial sync
+    # may insert unexpected operations into the profile collection.
+    - jstests/core/**/profile_list_collections.js
+    - jstests/core/**/profile_list_indexes.js
+    - jstests/core/**/query/recursion.js
+    - jstests/core/**/system_profile.js
+    # The following test examines the SBE plan cache, which initial sync may change the contents of.
+    - jstests/core/query/plan_cache/plan_cache_sbe.js
+    # operation_latency_histogram.js and geo_s2cursorlimitskip.js do not expect concurrent reads
+    # against their test collections.
+    - jstests/core/**/operation_latency_histogram.js
+    - jstests/core/**/geo_s2cursorlimitskip.js
+    # Having duplicate namespaces is not supported and will cause initial sync to fail.
+    - jstests/core/catalog/views/duplicate_ns.js
+    # These tests run getLatestProfilerEntry(). The downstream syncing node affects the profiler.
+    - jstests/core/**/profile_agg.js
+    - jstests/core/**/profile_count.js
+    - jstests/core/**/profile_delete.js
+    - jstests/core/**/profile_distinct.js
+    - jstests/core/**/profile_find.js
+    - jstests/core/**/profile_findandmodify.js
+    - jstests/core/**/profile_getmore.js
+    - jstests/core/**/profile_insert.js
+    - jstests/core/**/profile_mapreduce.js
+    - jstests/core/**/profile_sampling.js
+    - jstests/core/**/profile_update.js
+    - jstests/core/txns/transactions_profiling.js
+    # The downstream syncing node affects the top output.
+    - jstests/core/**/query/top/top.js
+    # Change stream pre-images are not cloned during initial sync.
+    - jstests/core/**/write_change_stream_pit_preimage.js
+
+    # Will fail all commands including those needed to forward command to initial sync node.
+    - jstests/core/testing/failcommand_failpoint.js
+    # Starts MongoCryptD instead of mongod nodes
+    - src/mongo/db/modules/*/jstests/fle2/fle2_bulk_write.js
+
+    # Time-outs waiting for the response to a ServerStatus request because
+    # the node in init sync state ignores it and never responds to it.
+    - jstests/core/query/release_memory/hash_lookup.js
+    - jstests/core/query/release_memory/hash_lookup_unwind.js
+    - jstests/core/query/release_memory/graph_lookup.js
+    - jstests/core/query/release_memory/group.js
+    - jstests/core/query/release_memory/set_window_fields.js
+    - jstests/core/query/release_memory/sort.js
+    - jstests/core/query/release_memory/text_or.js
+    - jstests/core/timeseries/query/timeseries_internal_bounded_sort_release_memory.js
+    # Time-outs waiting for a response to setServerParameter command because
+    # the node in init sync state ignores it and never responds to it.
+    - jstests/core/timeseries/query/timeseries_raw_data_internal_getmore.js
+
+  exclude_with_any_tags:
+    - assumes_standalone_mongod
+    # These tests run many aggregations, and the override slows them down enough to hit the evergreen timeout.
+    - query_intensive_pbt
+
+executor:
+  hooks:
+    - class: CleanEveryN
+      n: 20
+  config:
+    shell_options:
+      eval: >-
+        globalThis.testingReplication = true;
+        await import('jstests/libs/override_methods/send_command_to_initial_sync_node_replica_set.js');
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        collectionClonerBatchSize: 10
+        initialSyncOplogFetcherBatchSize: 10
+    num_nodes: 2
+    start_initial_sync_node: True
+    initial_sync_uninitialized_fcv: True

@@ -2,12 +2,19 @@ global:
     cpp_namespace: "mongo"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
+
+enums:
+    SorterChecksumVersion:
+        description: "The version of checksum that dictates what hash was used to calculate it."
+        type: int
+        values:
+            v1: 1
+            v2: 2
 
 structs:
     SorterRange:
         description: "The range of data that was sorted and spilled to disk."
-        strict: true
         fields:
             startOffset:
                 description: "Tracks where in the file we started writing this data range."
@@ -18,4 +25,23 @@ structs:
             checksum:
                 description: "Tracks the hash of all data objects spilled to disk."
                 type: long
-                validator: { gte: 0 }
+            checksumVersion:
+                description: "The version of checksum that dictates what hash was used to calculate it."
+                type: SorterChecksumVersion
+                optional: true
+
+server_parameters:
+    maxIteratorsMemoryUsagePercentage:
+        description:
+            "Limits the amount of memory the sorter can use to store file iterators to spilled chunks of sorted data
+            with maximum 1MB and minimum enough to store one file iterator."
+        set_at:
+            - runtime
+            - startup
+        cpp_varname: maxIteratorsMemoryUsagePercentage
+        cpp_vartype: AtomicWord<double>
+        default: 0.1
+        validator:
+            gte: 0.0
+            lte: 1.0
+        redact: false

@@ -3,12 +3,11 @@
 // Start replica set. Ensure that highest priority node becomes primary eventually.
 // Shut down the primary and confirm that the next highest priority node becomes primary.
 // Repeat until 3 nodes are left standing.
-(function() {
-'use strict';
-load('jstests/replsets/rslib.js');
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {waitUntilAllNodesCaughtUp} from "jstests/replsets/rslib.js";
 
-var name = 'priority_takeover_cascading_priorities';
-var replSet = new ReplSetTest({
+let name = "priority_takeover_cascading_priorities";
+let replSet = new ReplSetTest({
     name: name,
     nodes: [
         {rsConfig: {priority: 5}},
@@ -16,10 +15,10 @@ var replSet = new ReplSetTest({
         {rsConfig: {priority: 3}},
         {rsConfig: {priority: 2}},
         {rsConfig: {priority: 1}},
-    ]
+    ],
 });
 replSet.startSet();
-replSet.initiate();
+replSet.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 replSet.waitForState(0, ReplSetTest.State.PRIMARY);
 // Wait until all nodes get the "no-op" of "new primary" after initial sync.
@@ -33,4 +32,3 @@ replSet.waitForState(2, ReplSetTest.State.PRIMARY);
 
 // Cannot stop any more nodes because we will not have a majority.
 replSet.stopSet();
-})();

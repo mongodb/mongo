@@ -26,17 +26,27 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 #include "mongo/client/streamable_replica_set_monitor_error_handler.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/scopeguard.h"
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
+
 
 namespace mongo {
 SdamErrorHandler::ErrorActions SdamErrorHandler::computeErrorActions(const HostAndPort& host,
                                                                      const Status& status,
                                                                      HandshakeStage handshakeStage,
                                                                      bool isApplicationOperation,
-                                                                     BSONObj bson) noexcept {
+                                                                     BSONObj bson) {
     // Initial state: don't drop connections, no immediate check, and don't generate an error server
     // description.
     ErrorActions result;
@@ -56,8 +66,12 @@ SdamErrorHandler::ErrorActions SdamErrorHandler::computeErrorActions(const HostA
     const auto setCreateServerDescriptionAction = [this, &result, &host, &status, bson]() {
         result.helloOutcome = _createErrorHelloOutcome(host, bson, status);
     };
-    const auto setImmediateCheckAction = [&result]() { result.requestImmediateCheck = true; };
-    const auto setDropConnectionsAction = [&result]() { result.dropConnections = true; };
+    const auto setImmediateCheckAction = [&result]() {
+        result.requestImmediateCheck = true;
+    };
+    const auto setDropConnectionsAction = [&result]() {
+        result.dropConnections = true;
+    };
 
     if (!_isNetworkError(status) && !_isNotMasterOrNodeRecovering(status)) {
         setCreateServerDescriptionAction();

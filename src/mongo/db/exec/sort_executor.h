@@ -29,13 +29,21 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sort_key_comparator.h"
-#include "mongo/db/exec/working_set.h"
-#include "mongo/db/pipeline/expression.h"
-#include "mongo/db/query/sort_pattern.h"
+#include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 #include "mongo/db/sorter/sorter.h"
+#include "mongo/db/sorter/sorter_stats.h"
+
+#include <cstdint>
+#include <memory>
+#include <utility>
+
+#include <boost/filesystem.hpp>
 
 namespace mongo {
 /**
@@ -55,9 +63,8 @@ public:
     class Comparator {
     public:
         Comparator(const SortPattern& sortPattern) : _sortKeyComparator(sortPattern) {}
-        int operator()(const typename DocumentSorter::Data& lhs,
-                       const typename DocumentSorter::Data& rhs) const {
-            return _sortKeyComparator(lhs.first, rhs.first);
+        int operator()(const Value& lhs, const Value& rhs) const {
+            return _sortKeyComparator(lhs, rhs);
         }
 
     private:
@@ -70,15 +77,20 @@ public:
     SortExecutor(SortPattern sortPattern,
                  uint64_t limit,
                  uint64_t maxMemoryUsageBytes,
-                 std::string tempDir,
-                 bool allowDiskUse)
+                 boost::filesystem::path tempDir,
+                 bool allowDiskUse,
+                 bool moveSortedDataIntoIterator = false)
         : _sortPattern(std::move(sortPattern)),
           _tempDir(std::move(tempDir)),
-          _diskUseAllowed(allowDiskUse) {
+          _diskUseAllowed(allowDiskUse),
+          _moveSortedDataIntoIterator(moveSortedDataIntoIterator) {
         _stats.sortPattern =
             _sortPattern.serialize(SortPattern::SortKeySerialization::kForExplain).toBson();
         _stats.limit = limit;
         _stats.maxMemoryUsageBytes = maxMemoryUsageBytes;
+        if (allowDiskUse) {
+            _sorterFileStats = std::make_unique<SorterFileStats>(nullptr);
+        }
     }
 
     const SortPattern& sortPattern() const {
@@ -103,7 +115,7 @@ public:
     }
 
     bool wasDiskUsed() const {
-        return _stats.spills > 0;
+        return _stats.spillingStats.getSpills() > 0;
     }
 
     /**
@@ -115,7 +127,30 @@ public:
     }
 
     const SortStats& stats() const {
+        if (_sorter) {
+            _stats.memoryUsageBytes = _sorter->stats().memUsage();
+            _stats.peakTrackedMemBytes =
+                std::max(_stats.peakTrackedMemBytes, _stats.memoryUsageBytes);
+        }
         return _stats;
+    }
+
+    SorterFileStats* getSorterFileStats() const {
+        return _sorterFileStats.get();
+    }
+
+    long long spilledBytes() const {
+        if (!_sorterFileStats) {
+            return 0;
+        }
+        return _sorterFileStats->bytesSpilledUncompressed();
+    }
+
+    long long spilledDataStorageSize() const {
+        if (!_sorterFileStats) {
+            return 0;
+        }
+        return _sorterFileStats->bytesSpilled();
     }
 
     /**
@@ -123,9 +158,7 @@ public:
      * Should only be called before 'loadingDone()' is called.
      */
     void add(const Value& sortKey, const T& data) {
-        if (!_sorter) {
-            _sorter.reset(DocumentSorter::make(makeSortOptions(), Comparator(_sortPattern)));
-        }
+        ensureSorter();
         _sorter->add(sortKey, data);
     }
 
@@ -133,14 +166,15 @@ public:
      * Signals to the sort executor that there will be no more input documents.
      */
     void loadingDone() {
-        // This conditional should only pass if no documents were added to the sorter.
-        if (!_sorter) {
-            _sorter.reset(DocumentSorter::make(makeSortOptions(), Comparator(_sortPattern)));
-        }
-        _output.reset(_sorter->done());
-        _stats.keysSorted += _sorter->numSorted();
-        _stats.spills += _sorter->numSpills();
-        _stats.totalDataSizeBytes += _sorter->totalDataSizeSorted();
+        ensureSorter();
+        _output = _sorter->done();
+        _stats.keysSorted += _sorter->stats().numSorted();
+        _stats.spillingStats.incrementSpills(_sorter->stats().spilledRanges());
+        _stats.spillingStats.incrementSpilledBytes(spilledBytes());
+        _stats.spillingStats.incrementSpilledDataStorageSize(spilledDataStorageSize());
+        _stats.spillingStats.incrementSpilledRecords(_sorter->stats().spilledKeyValuePairs());
+        _stats.totalDataSizeBytes += _sorter->stats().bytesSorted();
+        _stats.memoryUsageBytes = 0;
         _sorter.reset();
     }
 
@@ -154,7 +188,7 @@ public:
         }
 
         if (!_output->more()) {
-            _output.reset();
+            clearSortTable();
             _isEOF = true;
             return false;
         }
@@ -175,31 +209,103 @@ public:
         return _stats.maxMemoryUsageBytes;
     }
 
+    /**
+     * Pauses Loading and creates an iterator which can be used to get the current state in
+     * read-only mode. The stream code needs this to pause and get the current internal state which
+     * can be used to store it to a persistent storage which will constitute a checkpoint for
+     * streaming processing.
+     */
+    void pauseLoading() {
+        invariant(!_paused);
+        _paused = true;
+        ensureSorter();
+        _output = _sorter->pause();
+    }
+
+    /**
+     * Resumes Loading. This will remove the iterator created in pauseLoading().
+     */
+    void resumeLoading() {
+        invariant(_paused);
+        _paused = false;
+        ensureSorter();
+        clearSortTable();
+        _sorter->resume();
+        _isEOF = false;
+    }
+
+    void forceSpill() {
+        if (_sorter) {
+            _sorter->spill();
+        } else if (_output) {
+            if (_output->spillable()) {
+                SorterTracker tracker;
+                auto opts = makeSortOptions();
+                opts.Tracker(&tracker);
+
+                _output = _output->spill(opts, typename DocumentSorter::Settings());
+
+                _stats.spillingStats.incrementSpills(tracker.spilledRanges.loadRelaxed());
+                _stats.spillingStats.incrementSpilledRecords(
+                    tracker.spilledKeyValuePairs.loadRelaxed());
+                _stats.spillingStats.setSpilledBytes(spilledBytes());
+                _stats.spillingStats.updateSpilledDataStorageSize(spilledDataStorageSize());
+            }
+        }
+    }
+
 private:
+    /*
+     * '_output' is a DocumentSorter::Iterator that can have the following iterator values:
+     * (1) InMemIterator, (2) InMemReadOnlyIterator, (3) FileIterator, or (4) MergeIterator
+     * If '_output' is an InMemIterator or an InMemReadOnlyIterator, the sort table will be cleared
+     * in memory. If '_output' is an MergeIterator, the  spilled sorted data will be cleared.
+     * However, the sort table needs to be cleared through a call to reset(). Otherwise, '_output'
+     * is a FileIterator and the sort table needs to be cleared through a call to reset().
+     */
+    void clearSortTable() {
+        _output.reset();
+    }
+
     SortOptions makeSortOptions() const {
         SortOptions opts;
+        opts.MoveSortedDataIntoIterator(_moveSortedDataIntoIterator);
         if (_stats.limit) {
-            opts.limit = _stats.limit;
+            opts.Limit(_stats.limit);
         }
 
-        opts.maxMemoryUsageBytes = _stats.maxMemoryUsageBytes;
+        opts.MaxMemoryUsageBytes(_stats.maxMemoryUsageBytes);
         if (_diskUseAllowed) {
-            opts.extSortAllowed = true;
-            opts.tempDir = _tempDir;
+            opts.TempDir(_tempDir);
+            opts.FileStats(_sorterFileStats.get());
         }
 
         return opts;
     }
 
-    const SortPattern _sortPattern;
-    const std::string _tempDir;
-    const bool _diskUseAllowed;
+    void ensureSorter() {
+        // This conditional should only pass if no documents were added to the sorter.
+        if (!_sorter) {
+            _sorter = DocumentSorter::make(makeSortOptions(), Comparator(_sortPattern));
+        }
+    }
 
+    const SortPattern _sortPattern;
+    const boost::filesystem::path _tempDir;
+    const bool _diskUseAllowed;
+    const bool _moveSortedDataIntoIterator;
+
+    std::unique_ptr<SorterFileStats> _sorterFileStats;
     std::unique_ptr<DocumentSorter> _sorter;
     std::unique_ptr<typename DocumentSorter::Iterator> _output;
 
-    SortStats _stats;
+    mutable SortStats _stats;
 
     bool _isEOF = false;
+    bool _paused = false;
 };
+
+extern template class SortExecutor<Document>;
+extern template class SortExecutor<SortableWorkingSetMember>;
+extern template class SortExecutor<BSONObj>;
 }  // namespace mongo

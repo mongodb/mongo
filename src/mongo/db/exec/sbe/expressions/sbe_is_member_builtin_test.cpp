@@ -27,8 +27,21 @@
  *    it in the license file.
  */
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
-#include "mongo/db/exec/sbe/values/bson.h"
+#include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/unittest/unittest.h"
+
+#include <cstdint>
+#include <memory>
+#include <tuple>
+#include <utility>
 
 namespace mongo::sbe {
 
@@ -80,17 +93,11 @@ TEST_F(SBEBuiltinIsMemberTest, IsMemberArraySet) {
 
     auto [smallStrTag, smallStrVal] = value::makeNewString("foo");
     inputSlotAccessor.reset(smallStrTag, smallStrVal);
-    runAndAssertExpression(inputSlot,
-                           makeArraySet(BSON_ARRAY("foo"
-                                                   << "bar")),
-                           true);
+    runAndAssertExpression(inputSlot, makeArraySet(BSON_ARRAY("foo" << "bar")), true);
 
     std::tie(smallStrTag, smallStrVal) = value::makeNewString("baz");
     inputSlotAccessor.reset(smallStrTag, smallStrVal);
-    runAndAssertExpression(inputSlot,
-                           makeArraySet(BSON_ARRAY("foo"
-                                                   << "bar")),
-                           false);
+    runAndAssertExpression(inputSlot, makeArraySet(BSON_ARRAY("foo" << "bar")), false);
 
     // Test that isMember can find composite values.
     auto [arrTag, arrVal] = makeArray(BSON_ARRAY(2 << 3));
@@ -144,17 +151,11 @@ TEST_F(SBEBuiltinIsMemberTest, IsMemberArray) {
 
     auto [smallStrTag, smallStrVal] = value::makeNewString("foo");
     inputSlotAccessor.reset(smallStrTag, smallStrVal);
-    runAndAssertExpression(inputSlot,
-                           makeArray(BSON_ARRAY("foo"
-                                                << "bar")),
-                           true);
+    runAndAssertExpression(inputSlot, makeArray(BSON_ARRAY("foo" << "bar")), true);
 
     std::tie(smallStrTag, smallStrVal) = value::makeNewString("baz");
     inputSlotAccessor.reset(smallStrTag, smallStrVal);
-    runAndAssertExpression(inputSlot,
-                           makeArray(BSON_ARRAY("foo"
-                                                << "bar")),
-                           false);
+    runAndAssertExpression(inputSlot, makeArray(BSON_ARRAY("foo" << "bar")), false);
 
     // Test that isMember can find composite values.
     auto [arrTag, arrVal] = makeArray(BSON_ARRAY(2 << 3));
@@ -209,17 +210,11 @@ TEST_F(SBEBuiltinIsMemberTest, IsMemberBSONArray) {
 
     auto [smallStrTag, smallStrVal] = value::makeNewString("foo");
     inputSlotAccessor.reset(smallStrTag, smallStrVal);
-    runAndAssertExpression(inputSlot,
-                           makeBsonArray(BSON_ARRAY("foo"
-                                                    << "bar")),
-                           true);
+    runAndAssertExpression(inputSlot, makeBsonArray(BSON_ARRAY("foo" << "bar")), true);
 
     std::tie(smallStrTag, smallStrVal) = value::makeNewString("baz");
     inputSlotAccessor.reset(smallStrTag, smallStrVal);
-    runAndAssertExpression(inputSlot,
-                           makeBsonArray(BSON_ARRAY("foo"
-                                                    << "bar")),
-                           false);
+    runAndAssertExpression(inputSlot, makeBsonArray(BSON_ARRAY("foo" << "bar")), false);
 
     // Test that isMember can find composite values.
     auto [arrTag, arrVal] = makeArray(BSON_ARRAY(2 << 3));

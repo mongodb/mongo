@@ -27,24 +27,44 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTransaction
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/curop_failpoint_helpers.h"
-#include "mongo/db/op_observer.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/read_concern_support_result.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/transaction_participant.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/topology/cluster_role.h"
+#include "mongo/db/topology/sharding_state.h"
+#include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction_validation.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/s/transaction_router.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/fail_point.h"
+
+#include <memory>
+#include <set>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTransaction
+
 
 namespace mongo {
 namespace {
@@ -76,6 +96,19 @@ public:
     std::string help() const final {
         return "Commits a transaction";
     }
+
+    bool isTransactionCommand() const final {
+        return true;
+    }
+
+    bool allowedInTransactions() const final {
+        return true;
+    }
+
+    bool allowedWithSecurityToken() const final {
+        return true;
+    }
+
     class Invocation final : public InvocationBaseGen {
     public:
         using InvocationBaseGen::InvocationBaseGen;
@@ -99,8 +132,6 @@ public:
 
             LOGV2_DEBUG(20507,
                         3,
-                        "Received commitTransaction for transaction with "
-                        "{txnNumberAndRetryCounter} on session {sessionId}",
                         "Received commitTransaction",
                         "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter,
                         "sessionId"_attr = opCtx->getLogicalSessionId()->toBSON());
@@ -124,17 +155,29 @@ public:
             uassert(ErrorCodes::NoSuchTransaction,
                     "Transaction isn't in progress",
                     txnParticipant.transactionIsOpen());
-
-            CurOpFailpointHelpers::waitWhileFailPointEnabled(
-                &hangBeforeCommitingTxn, opCtx, "hangBeforeCommitingTxn");
+            hangBeforeCommitingTxn.executeIf(
+                [&](const BSONObj& data) {
+                    CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                        &hangBeforeCommitingTxn, opCtx, "hangBeforeCommitingTxn");
+                },
+                [&](const BSONObj& data) {
+                    // Hang if we don't provide a txnNumber to the fail point. If we do, only hang
+                    // if the txnNumber matches the current running txnNumber.
+                    if (data.hasField("uuid")) {
+                        auto uuid = UUID::parse(data);
+                        return uuid == opCtx->getLogicalSessionId()->getId();
+                    }
+                    return true;
+                });
 
             auto optionalCommitTimestamp = request().getCommitTimestamp();
             if (optionalCommitTimestamp) {
                 // commitPreparedTransaction will throw if the transaction is not prepared.
-                txnParticipant.commitPreparedTransaction(opCtx, optionalCommitTimestamp.get(), {});
+                txnParticipant.commitPreparedTransaction(
+                    opCtx, optionalCommitTimestamp.value(), {});
             } else {
-                if (ShardingState::get(opCtx)->canAcceptShardedCommands().isOK() ||
-                    serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+                if (auto role = ShardingState::get(opCtx)->pollClusterRole(); role &&
+                    (role->has(ClusterRole::ConfigServer) || role->has(ClusterRole::ShardServer))) {
                     TransactionCoordinatorService::get(opCtx)->cancelIfCommitNotYetStarted(
                         opCtx, *opCtx->getLogicalSessionId(), txnNumberAndRetryCounter);
                 }
@@ -152,8 +195,8 @@ public:
             return Reply();
         }
     };
-
-} commitTxn;
+};
+MONGO_REGISTER_COMMAND(CmdCommitTxn).forShard();
 
 static const Status kOnlyTransactionsReadConcernsSupported{
     ErrorCodes::InvalidOptions, "only read concerns valid in transactions are supported"};
@@ -178,6 +221,18 @@ public:
 
     std::string help() const final {
         return "Aborts a transaction";
+    }
+
+    bool isTransactionCommand() const final {
+        return true;
+    }
+
+    bool allowedInTransactions() const final {
+        return true;
+    }
+
+    bool allowedWithSecurityToken() const final {
+        return true;
     }
 
     class Invocation final : public InvocationBaseGen {
@@ -215,8 +270,6 @@ public:
 
             LOGV2_DEBUG(20508,
                         3,
-                        "Received abortTransaction for transaction with {txnNumberAndRetryCounter} "
-                        "on session {sessionId}",
                         "Received abortTransaction",
                         "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter,
                         "sessionId"_attr = opCtx->getLogicalSessionId()->toBSON());
@@ -228,13 +281,16 @@ public:
             CurOpFailpointHelpers::waitWhileFailPointEnabled(
                 &hangBeforeAbortingTxn, opCtx, "hangBeforeAbortingTxn");
 
-            if (!MONGO_unlikely(dontRemoveTxnCoordinatorOnAbort.shouldFail()) &&
-                (ShardingState::get(opCtx)->canAcceptShardedCommands().isOK() ||
-                 serverGlobalParams.clusterRole == ClusterRole::ConfigServer)) {
-                TransactionCoordinatorService::get(opCtx)->cancelIfCommitNotYetStarted(
-                    opCtx, *opCtx->getLogicalSessionId(), txnNumberAndRetryCounter);
+            if (!MONGO_unlikely(dontRemoveTxnCoordinatorOnAbort.shouldFail())) {
+                if (auto role = ShardingState::get(opCtx)->pollClusterRole(); role &&
+                    (role->has(ClusterRole::ConfigServer) || role->has(ClusterRole::ShardServer))) {
+                    TransactionCoordinatorService::get(opCtx)->cancelIfCommitNotYetStarted(
+                        opCtx, *opCtx->getLogicalSessionId(), txnNumberAndRetryCounter);
+                }
             }
-
+            // Instruct the storage engine to not do any extra eviction while aborting transactions
+            // so that resources will not get stuck.
+            shard_role_details::getRecoveryUnit(opCtx)->setNoEvictionAfterCommitOrRollback();
             txnParticipant.abortTransaction(opCtx);
 
             if (MONGO_unlikely(
@@ -246,7 +302,8 @@ public:
             return Reply();
         }
     };
-} abortTxn;
+};
+MONGO_REGISTER_COMMAND(CmdAbortTxn).forShard();
 
 }  // namespace
 }  // namespace mongo

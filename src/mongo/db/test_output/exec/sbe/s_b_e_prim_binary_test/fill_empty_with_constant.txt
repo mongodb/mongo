@@ -1,0 +1,107 @@
+# Golden test output of SBEPrimBinaryTest/FillEmptyWithConstant
+== VARIATION rhs constant: Nothing
+-- INPUT EXPRESSION:
+(s1 ?: Nothing) 
+
+-- COMPILED EXPRESSION:
+[0x0000-0x0019] stackSize: 1, maxStackSize: 1
+0x0000: pushAccessVal(accessor: <accessor>);
+0x0009: jmpNotNothing(target: 0x0019);
+0x000e: pop();
+0x000f: pushConstVal(value: Nothing);
+
+
+-- EXECUTE VARIATION:
+SLOTS: [1: Nothing]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: null]
+RESULT: null
+
+-- EXECUTE VARIATION:
+SLOTS: [1: true]
+RESULT: true
+
+-- EXECUTE VARIATION:
+SLOTS: [1: true]
+RESULT: true
+
+== VARIATION rhs constant: null
+-- INPUT EXPRESSION:
+(s2 ?: null) 
+
+-- COMPILED EXPRESSION:
+[0x0000-0x000b] stackSize: 1, maxStackSize: 1
+0x0000: pushAccessVal(accessor: <accessor>);
+0x0009: fillEmptyImm(k: Null);
+
+
+-- EXECUTE VARIATION:
+SLOTS: [1: Nothing, 2: Nothing]
+RESULT: null
+
+-- EXECUTE VARIATION:
+SLOTS: [1: null, 2: null]
+RESULT: null
+
+-- EXECUTE VARIATION:
+SLOTS: [1: true, 2: true]
+RESULT: true
+
+-- EXECUTE VARIATION:
+SLOTS: [1: true, 2: true]
+RESULT: true
+
+== VARIATION rhs constant: true
+-- INPUT EXPRESSION:
+(s3 ?: true) 
+
+-- COMPILED EXPRESSION:
+[0x0000-0x000b] stackSize: 1, maxStackSize: 1
+0x0000: pushAccessVal(accessor: <accessor>);
+0x0009: fillEmptyImm(k: True);
+
+
+-- EXECUTE VARIATION:
+SLOTS: [1: Nothing, 2: Nothing, 3: Nothing]
+RESULT: true
+
+-- EXECUTE VARIATION:
+SLOTS: [1: null, 2: null, 3: null]
+RESULT: null
+
+-- EXECUTE VARIATION:
+SLOTS: [1: true, 2: true, 3: true]
+RESULT: true
+
+-- EXECUTE VARIATION:
+SLOTS: [1: true, 2: true, 3: true]
+RESULT: true
+
+== VARIATION rhs constant: true
+-- INPUT EXPRESSION:
+(s4 ?: true) 
+
+-- COMPILED EXPRESSION:
+[0x0000-0x000b] stackSize: 1, maxStackSize: 1
+0x0000: pushAccessVal(accessor: <accessor>);
+0x0009: fillEmptyImm(k: True);
+
+
+-- EXECUTE VARIATION:
+SLOTS: [1: Nothing, 2: Nothing, 3: Nothing, 4: Nothing]
+RESULT: true
+
+-- EXECUTE VARIATION:
+SLOTS: [1: null, 2: null, 3: null, 4: null]
+RESULT: null
+
+-- EXECUTE VARIATION:
+SLOTS: [1: true, 2: true, 3: true, 4: true]
+RESULT: true
+
+-- EXECUTE VARIATION:
+SLOTS: [1: true, 2: true, 3: true, 4: true]
+RESULT: true
+

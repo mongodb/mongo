@@ -27,35 +27,45 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/db/views/view_graph.h"
 
-#include <memory>
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/query_test_service_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/db/views/view.h"
-#include "mongo/db/views/view_graph.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 
 namespace mongo {
 namespace {
 constexpr auto kEmptyPipelineSize = 0;
-constexpr auto kTestDb = "test"_sd;
+const auto kTestDb = DatabaseName::createDatabaseName_forTest(boost::none, "test");
 constexpr auto kFooName = "foo"_sd;
 constexpr auto kBarName = "bar"_sd;
 constexpr auto kQuxName = "qux"_sd;
-const auto kFooNamespace = NamespaceString(kTestDb, kFooName);
-const auto kBarNamespace = NamespaceString(kTestDb, kBarName);
-const auto kQuxNamespace = NamespaceString(kTestDb, kQuxName);
+const auto kFooNamespace = NamespaceString::createNamespaceString_forTest(kTestDb, kFooName);
+const auto kBarNamespace = NamespaceString::createNamespaceString_forTest(kTestDb, kBarName);
+const auto kQuxNamespace = NamespaceString::createNamespaceString_forTest(kTestDb, kQuxName);
 const auto kEmptyPipeline = BSONArray();
 const auto kBinaryCollation = BSONObj();
-const auto kFilipinoCollation = BSON("locale"
-                                     << "fil");
+const auto kFilipinoCollation = BSON("locale" << "fil");
 
 class ViewGraphFixture : public unittest::Test {
 public:
@@ -70,7 +80,7 @@ public:
         return &_viewGraph;
     }
 
-    ViewDefinition makeViewDefinition(StringData db,
+    ViewDefinition makeViewDefinition(const DatabaseName& dbName,
                                       StringData view,
                                       StringData viewOn,
                                       BSONArray pipeline,
@@ -83,7 +93,7 @@ public:
             collator = std::move(factoryCollator.getValue());
         }
 
-        return {db, view, viewOn, pipeline, std::move(collator)};
+        return {dbName, view, viewOn, pipeline, std::move(collator)};
     }
 
 private:
@@ -243,6 +253,33 @@ TEST_F(ViewGraphFixture, DroppingViewPreservesNodeInGraphIfDependedOnByOtherView
     ASSERT_OK(viewGraph()->insertAndValidate(
         viewWithDifferentCollation, {kBarNamespace}, kEmptyPipelineSize));
     ASSERT_EQ(viewGraph()->size(), 5UL);
+}
+
+TEST_F(ViewGraphFixture, DifferentTenantsCanCreateViewWithConflictingNamespaces) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+
+    DatabaseName db1 = DatabaseName::createDatabaseName_forTest(TenantId(OID::gen()), "test");
+    DatabaseName db2 = DatabaseName::createDatabaseName_forTest(TenantId(OID::gen()), "test");
+
+    NamespaceString viewOn1 = NamespaceString::createNamespaceString_forTest(db1, kBarName);
+    NamespaceString viewOn2 = NamespaceString::createNamespaceString_forTest(db2, kBarName);
+
+    // Create a view "foo" on tenant1's collection "test.bar".
+    const auto fooView1 =
+        makeViewDefinition(db1, kFooName, kBarName, kEmptyPipeline, kBinaryCollation);
+    ASSERT_OK(viewGraph()->insertAndValidate(fooView1, {viewOn1}, kEmptyPipelineSize));
+    ASSERT_EQ(viewGraph()->size(), 2UL);
+
+    // Create a view "foo" on tenant2's collection "test.bar".
+    const auto fooView2 =
+        makeViewDefinition(db2, kFooName, kBarName, kEmptyPipeline, kBinaryCollation);
+    ASSERT_OK(viewGraph()->insertAndValidate(fooView2, {viewOn2}, kEmptyPipelineSize));
+    ASSERT_EQ(viewGraph()->size(), 4UL);
+
+    // Remove tenant1's view "foo".
+    NamespaceString viewToRemove = NamespaceString::createNamespaceString_forTest(db1, kFooName);
+    viewGraph()->remove(viewToRemove);
+    ASSERT_EQ(viewGraph()->size(), 2UL);
 }
 }  // namespace
 }  // namespace mongo

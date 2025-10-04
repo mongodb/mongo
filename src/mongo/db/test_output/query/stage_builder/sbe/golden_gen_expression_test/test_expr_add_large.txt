@@ -1,0 +1,362 @@
+# Golden test output of GoldenGenExpressionTest/TestExprAddLarge
+ExpressionAdd
+
+    let [
+        l2.0 = getField(s1, "bar") 
+        l2.1 = getField(s1, "bar") 
+        l2.2 = getField(s1, "bar") 
+        l2.3 = getField(s1, "bar") 
+        l2.4 = getField(s1, "bar") 
+        l2.5 = getField(s1, "bar") 
+        l2.6 = getField(s1, "bar") 
+        l2.7 = getField(s1, "bar") 
+        l2.8 = getField(s1, "bar") 
+        l2.9 = getField(s1, "bar") 
+        l2.10 = getField(s1, "bar") 
+        l2.11 = getField(s1, "bar") 
+        l2.12 = getField(s1, "bar") 
+        l2.13 = getField(s1, "bar") 
+        l2.14 = getField(s1, "bar") 
+        l2.15 = getField(s1, "bar") 
+        l2.16 = getField(s1, "bar") 
+        l2.17 = getField(s1, "bar") 
+        l2.18 = getField(s1, "bar") 
+        l2.19 = getField(s1, "bar") 
+        l2.20 = getField(s1, "bar") 
+        l2.21 = getField(s1, "bar") 
+        l2.22 = getField(s1, "bar") 
+        l2.23 = getField(s1, "bar") 
+        l2.24 = getField(s1, "bar") 
+        l2.25 = getField(s1, "bar") 
+        l2.26 = getField(s1, "bar") 
+        l2.27 = getField(s1, "bar") 
+        l2.28 = getField(s1, "bar") 
+        l2.29 = getField(s1, "bar") 
+        l2.30 = getField(s1, "bar") 
+        l2.31 = getField(s1, "bar") 
+        l2.32 = getField(s1, "bar") 
+        l2.33 = getField(s1, "bar") 
+        l2.34 = getField(s1, "bar") 
+        l2.35 = getField(s1, "bar") 
+        l2.36 = getField(s1, "bar") 
+        l2.37 = getField(s1, "bar") 
+        l2.38 = getField(s1, "bar") 
+        l2.39 = getField(s1, "bar") 
+        l2.40 = getField(s1, "bar") 
+        l2.41 = getField(s1, "bar") 
+        l2.42 = getField(s1, "bar") 
+        l2.43 = getField(s1, "bar") 
+        l2.44 = getField(s1, "bar") 
+        l2.45 = getField(s1, "bar") 
+        l2.46 = getField(s1, "bar") 
+        l2.47 = getField(s1, "bar") 
+        l2.48 = getField(s1, "bar") 
+        l2.49 = getField(s1, "bar") 
+    ] 
+    in 
+        if ((typeMatch(l2.0, 1088) ?: true) || (typeMatch(l2.1, 1088) ?: true) || (typeMatch(l2.2, 1088) ?: true) || (typeMatch(l2.3, 1088) ?: true) || (typeMatch(l2.4, 1088) ?: true) || (typeMatch(l2.5, 1088) ?: true) || (typeMatch(l2.6, 1088) ?: true) || (typeMatch(l2.7, 1088) ?: true) || (typeMatch(l2.8, 1088) ?: true) || (typeMatch(l2.9, 1088) ?: true) || (typeMatch(l2.10, 1088) ?: true) || (typeMatch(l2.11, 1088) ?: true) || (typeMatch(l2.12, 1088) ?: true) || (typeMatch(l2.13, 1088) ?: true) || (typeMatch(l2.14, 1088) ?: true) || (typeMatch(l2.15, 1088) ?: true) || (typeMatch(l2.16, 1088) ?: true) || (typeMatch(l2.17, 1088) ?: true) || (typeMatch(l2.18, 1088) ?: true) || (typeMatch(l2.19, 1088) ?: true) || (typeMatch(l2.20, 1088) ?: true) || (typeMatch(l2.21, 1088) ?: true) || (typeMatch(l2.22, 1088) ?: true) || (typeMatch(l2.23, 1088) ?: true) || (typeMatch(l2.24, 1088) ?: true) || (typeMatch(l2.25, 1088) ?: true) || (typeMatch(l2.26, 1088) ?: true) || (typeMatch(l2.27, 1088) ?: true) || (typeMatch(l2.28, 1088) ?: true) || (typeMatch(l2.29, 1088) ?: true) || (typeMatch(l2.30, 1088) ?: true) || (typeMatch(l2.31, 1088) ?: true) || (typeMatch(l2.32, 1088) ?: true) || (typeMatch(l2.33, 1088) ?: true) || (typeMatch(l2.34, 1088) ?: true) || (typeMatch(l2.35, 1088) ?: true) || (typeMatch(l2.36, 1088) ?: true) || (typeMatch(l2.37, 1088) ?: true) || (typeMatch(l2.38, 1088) ?: true) || (typeMatch(l2.39, 1088) ?: true) || (typeMatch(l2.40, 1088) ?: true) || (typeMatch(l2.41, 1088) ?: true) || (typeMatch(l2.42, 1088) ?: true) || (typeMatch(l2.43, 1088) ?: true) || (typeMatch(l2.44, 1088) ?: true) || (typeMatch(l2.45, 1088) ?: true) || (typeMatch(l2.46, 1088) ?: true) || (typeMatch(l2.47, 1088) ?: true) || (typeMatch(l2.48, 1088) ?: true) || (typeMatch(l2.49, 1088) ?: true)) 
+        then null 
+        elif ((0 + 
+            if isNumber(l2.0) 
+            then 0 
+            elif isDate(l2.0) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.1) 
+            then 0 
+            elif isDate(l2.1) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.2) 
+            then 0 
+            elif isDate(l2.2) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.3) 
+            then 0 
+            elif isDate(l2.3) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.4) 
+            then 0 
+            elif isDate(l2.4) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.5) 
+            then 0 
+            elif isDate(l2.5) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.6) 
+            then 0 
+            elif isDate(l2.6) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.7) 
+            then 0 
+            elif isDate(l2.7) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.8) 
+            then 0 
+            elif isDate(l2.8) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.9) 
+            then 0 
+            elif isDate(l2.9) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.10) 
+            then 0 
+            elif isDate(l2.10) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.11) 
+            then 0 
+            elif isDate(l2.11) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.12) 
+            then 0 
+            elif isDate(l2.12) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.13) 
+            then 0 
+            elif isDate(l2.13) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.14) 
+            then 0 
+            elif isDate(l2.14) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.15) 
+            then 0 
+            elif isDate(l2.15) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.16) 
+            then 0 
+            elif isDate(l2.16) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.17) 
+            then 0 
+            elif isDate(l2.17) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.18) 
+            then 0 
+            elif isDate(l2.18) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.19) 
+            then 0 
+            elif isDate(l2.19) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.20) 
+            then 0 
+            elif isDate(l2.20) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.21) 
+            then 0 
+            elif isDate(l2.21) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.22) 
+            then 0 
+            elif isDate(l2.22) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.23) 
+            then 0 
+            elif isDate(l2.23) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.24) 
+            then 0 
+            elif isDate(l2.24) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.25) 
+            then 0 
+            elif isDate(l2.25) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.26) 
+            then 0 
+            elif isDate(l2.26) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.27) 
+            then 0 
+            elif isDate(l2.27) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.28) 
+            then 0 
+            elif isDate(l2.28) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.29) 
+            then 0 
+            elif isDate(l2.29) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.30) 
+            then 0 
+            elif isDate(l2.30) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.31) 
+            then 0 
+            elif isDate(l2.31) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.32) 
+            then 0 
+            elif isDate(l2.32) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.33) 
+            then 0 
+            elif isDate(l2.33) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.34) 
+            then 0 
+            elif isDate(l2.34) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.35) 
+            then 0 
+            elif isDate(l2.35) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.36) 
+            then 0 
+            elif isDate(l2.36) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.37) 
+            then 0 
+            elif isDate(l2.37) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.38) 
+            then 0 
+            elif isDate(l2.38) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.39) 
+            then 0 
+            elif isDate(l2.39) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.40) 
+            then 0 
+            elif isDate(l2.40) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.41) 
+            then 0 
+            elif isDate(l2.41) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.42) 
+            then 0 
+            elif isDate(l2.42) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.43) 
+            then 0 
+            elif isDate(l2.43) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.44) 
+            then 0 
+            elif isDate(l2.44) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.45) 
+            then 0 
+            elif isDate(l2.45) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.46) 
+            then 0 
+            elif isDate(l2.46) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.47) 
+            then 0 
+            elif isDate(l2.47) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.48) 
+            then 0 
+            elif isDate(l2.48) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0 + 
+            if isNumber(l2.49) 
+            then 0 
+            elif isDate(l2.49) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+       ) > 1) 
+        then fail(7157722, "only one date allowed in an $add expression") 
+        else (0ll + move(l2.0) + 1ll + move(l2.1) + 2ll + move(l2.2) + 3ll + move(l2.3) + 4ll + move(l2.4) + 5ll + move(l2.5) + 6ll + move(l2.6) + 7ll + move(l2.7) + 8ll + move(l2.8) + 9ll + move(l2.9) + 10ll + move(l2.10) + 11ll + move(l2.11) + 12ll + move(l2.12) + 13ll + move(l2.13) + 14ll + move(l2.14) + 15ll + move(l2.15) + 16ll + move(l2.16) + 17ll + move(l2.17) + 18ll + move(l2.18) + 19ll + move(l2.19) + 20ll + move(l2.20) + 21ll + move(l2.21) + 22ll + move(l2.22) + 23ll + move(l2.23) + 24ll + move(l2.24) + 25ll + move(l2.25) + 26ll + move(l2.26) + 27ll + move(l2.27) + 28ll + move(l2.28) + 29ll + move(l2.29) + 30ll + move(l2.30) + 31ll + move(l2.31) + 32ll + move(l2.32) + 33ll + move(l2.33) + 34ll + move(l2.34) + 35ll + move(l2.35) + 36ll + move(l2.36) + 37ll + move(l2.37) + 38ll + move(l2.38) + 39ll + move(l2.39) + 40ll + move(l2.40) + 41ll + move(l2.41) + 42ll + move(l2.42) + 43ll + move(l2.43) + 44ll + move(l2.44) + 45ll + move(l2.45) + 46ll + move(l2.46) + 47ll + move(l2.47) + 48ll + move(l2.48) + 49ll + move(l2.49)) 
+

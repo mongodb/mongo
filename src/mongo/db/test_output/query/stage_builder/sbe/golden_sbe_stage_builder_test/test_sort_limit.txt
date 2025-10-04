@@ -1,0 +1,6 @@
+# Golden test output of GoldenSbeStageBuilderTest/TestSortLimit
+[2] sort [s4] [desc] [s2] s5 
+[2] project [s4 = getSortKeyDesc(s3)] 
+[1] project [s3 = getField(s2, "a")] 
+[1] project [s2 = getElement(s1, 0)] 
+[1] virtualscan s1 {[[{"a" : 1, "b" : 2}], [{"a" : 2, "b" : 2}], [{"a" : 3, "b" : 2}]]} 

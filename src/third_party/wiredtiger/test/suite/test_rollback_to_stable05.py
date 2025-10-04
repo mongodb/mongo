@@ -26,23 +26,20 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import time
-from helper import copy_wiredtiger_home
-import wiredtiger, wttest
+import wttest
 from wtdataset import SimpleDataSet
 from wiredtiger import stat
 from wtscenario import make_scenarios
-from test_rollback_to_stable01 import test_rollback_to_stable_base
+from rollback_to_stable_util import test_rollback_to_stable_base
 
 # test_rollback_to_stable05.py
 # Test that rollback to stable cleans history store for non-timestamp tables.
 class test_rollback_to_stable05(test_rollback_to_stable_base):
-    session_config = 'isolation=snapshot'
 
     format_values = [
         ('column', dict(key_format='r', value_format='S')),
         ('column_fix', dict(key_format='r', value_format='8t')),
-        ('integer_row', dict(key_format='i', value_format='S')),
+        ('row_integer', dict(key_format='i', value_format='S')),
     ]
 
     in_memory_values = [
@@ -55,30 +52,32 @@ class test_rollback_to_stable05(test_rollback_to_stable_base):
         ('prepare', dict(prepare=True))
     ]
 
-    scenarios = make_scenarios(format_values, in_memory_values, prepare_values)
+    worker_thread_values = [
+        ('0', dict(threads=0)),
+        ('4', dict(threads=4)),
+        ('8', dict(threads=8))
+    ]
+
+    scenarios = make_scenarios(format_values, in_memory_values, prepare_values, worker_thread_values)
 
     def conn_config(self):
-        config = 'cache_size=50MB,statistics=(all)'
+        config = 'cache_size=50MB,statistics=(all),verbose=(rts:5)'
         if self.in_memory:
             config += ',in_memory=true'
-        else:
-            config += ',log=(enabled),in_memory=false'
         return config
 
     def test_rollback_to_stable(self):
         nrows = 1000
 
-        # Create two tables without logging.
+        # Create two tables.
         uri_1 = "table:rollback_to_stable05_1"
         ds_1 = SimpleDataSet(
-            self, uri_1, 0, key_format=self.key_format, value_format=self.value_format,
-            config='log=(enabled=false)')
+            self, uri_1, 0, key_format=self.key_format, value_format=self.value_format)
         ds_1.populate()
 
         uri_2 = "table:rollback_to_stable05_2"
         ds_2 = SimpleDataSet(
-            self, uri_2, 0, key_format=self.key_format, value_format=self.value_format,
-            config='log=(enabled=false)')
+            self, uri_2, 0, key_format=self.key_format, value_format=self.value_format)
         ds_2.populate()
 
         if self.value_format == '8t':
@@ -100,7 +99,7 @@ class test_rollback_to_stable05(test_rollback_to_stable_base):
 
         # Start a long running transaction and keep it open.
         session_2 = self.conn.open_session()
-        session_2.begin_transaction('isolation=snapshot')
+        session_2.begin_transaction()
 
         self.large_updates(uri_1, valueb, ds_1, nrows, self.prepare, 0)
         self.check(valueb, uri_1, nrows, None, 0)
@@ -129,7 +128,7 @@ class test_rollback_to_stable05(test_rollback_to_stable_base):
         session_2.commit_transaction()
         session_2.close()
 
-        self.conn.rollback_to_stable()
+        self.conn.rollback_to_stable('threads=' + str(self.threads))
         self.check(valued, uri_1, nrows, None, 0)
         self.check(valued, uri_2, nrows, None, 0)
 
@@ -151,7 +150,4 @@ class test_rollback_to_stable05(test_rollback_to_stable_base):
             self.assertEqual(hs_removed, 0)
         else:
             self.assertEqual(upd_aborted, 0)
-            self.assertEqual(hs_removed, 0)
-
-if __name__ == '__main__':
-    wttest.run()
+            self.assertGreaterEqual(hs_removed, 0)

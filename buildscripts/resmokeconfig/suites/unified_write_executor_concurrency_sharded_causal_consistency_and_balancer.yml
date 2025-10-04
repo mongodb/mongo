@@ -1,0 +1,109 @@
+test_kind: fsm_workload_test
+
+selector:
+  roots:
+    - jstests/concurrency/fsm_workloads/**/*.js
+    - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*.js
+  exclude_files:
+    # SERVER-14669 Multi-removes that use $where miscount removed documents
+
+    # Disabled due to MongoDB restrictions and/or workload restrictions
+
+    # These workloads sometimes trigger 'Could not lock auth data update lock'
+    # errors because the AuthorizationManager currently waits for only five
+    # seconds to acquire the lock for authorization documents
+
+    # uses >100MB of data, which can overwhelm test hosts
+
+    # compact can only be run against a standalone mongod
+
+    # can cause OOM kills on test hosts
+
+    # cannot createIndex after dropDatabase without sharding first
+
+    # The WTWriteConflictException failpoint is not supported on mongos.
+
+    # SERVER-20361 Improve the behaviour of multi-update/delete against a sharded collection
+    - jstests/concurrency/fsm_workloads/query/update/update_where.js
+
+    # This test runs a large number of inserts, which can cause moveCollection to take a long time
+    # to finish. This can cause the CheckMetadataConsistency hook to hit LockBusy errors.
+    - jstests/concurrency/fsm_workloads/timeseries/timeseries_insert_idle_bucket_expiration.js
+
+    # Exclusions because of unimplemented functionalities in the unified write executor.
+    # TODO: SERVER-104139 Support write commands against timeseries collections in UWE.
+    - jstests/concurrency/fsm_workloads/timeseries/**/*.js
+    - jstests/concurrency/fsm_workloads/query/timeseries/**/*.js
+
+  exclude_with_any_tags:
+    - requires_standalone
+    - does_not_support_causal_consistency
+    # This suite uses secondary read preference, which isn't currently compatible with transactions.
+    - uses_transactions
+    - assumes_balancer_off
+    - requires_replication
+    # Tests which use $currentOp. Running an aggregation with $currentOp and read preference
+    # secondary doesn't make much sense, since there's no guarantee *which* secondary you get results
+    # from.
+    - uses_curop_agg_stage
+    # mongos has no system.profile collection.
+    - requires_profiling
+    - assumes_against_mongod_not_mongos
+    - assumes_unsharded_collection
+    # implicitly_retry_on_migration_in_progress.js alters find/aggregate commands
+    # so that the whole result set is returned through a single batch
+    - assumes_no_implicit_cursor_exhaustion
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHashInBackground
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+    tests: true
+  config:
+    shell_options:
+      eval: >-
+        await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
+        await import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
+      global_vars:
+        TestData:
+          runningWithCausalConsistency: true
+          runningWithBalancer: true
+          implicitlyShardOnCreateCollectionOnly: true
+          internalQueryUnifiedWriteExecutor: true
+
+  hooks:
+    - class: CheckShardFilteringMetadata
+    - class: CheckReplDBHashInBackground
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: CheckOrphansDeleted
+    - class: CheckRoutingTableConsistency
+    - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
+    - class: CleanupConcurrencyWorkloads
+  fixture:
+    class: ShardedClusterFixture
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+        internalQueryUnifiedWriteExecutor: true
+    shard_options:
+      mongod_options:
+        oplogSize: 1024
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        roleGraphInvalidationIsFatal: 1
+        queryAnalysisWriterIntervalSecs: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+        skipDroppingHashedShardKeyIndex: true
+        reshardingMinimumOperationDurationMillis: 0
+        internalQueryUnifiedWriteExecutor: true
+    num_rs_nodes_per_shard: 3
+    num_shards: 2
+    num_mongos: 2
+    enable_balancer: true
+    random_migrations: true

@@ -1,0 +1,62 @@
+Tests cases where progress information should be printed
+args = --progress
+compress file to file
+*Read:*hello*hello.zst*
+compress pipe to pipe
+*Read:*stdin*stdout*
+compress pipe to file
+*Read:*stdin*hello.zst*
+compress file to pipe
+*Read:*hello*stdout*
+compress 2 files
+*Read*2 files compressed*
+decompress file to file
+*hello.zst*hello.zst*
+decompress pipe to pipe
+*stdin*stdin*
+decompress pipe to file
+*stdin*stdin*
+decompress file to pipe
+*hello.zst*hello.zst*
+decompress 2 files
+*hello.zst*2 files decompressed*
+
+args = --fake-stderr-is-console
+compress file to file
+*Read:*hello*hello.zst*
+compress pipe to pipe
+compress pipe to file
+*Read:*stdin*hello.zst*
+compress file to pipe
+compress 2 files
+*Read*2 files compressed*
+decompress file to file
+*hello.zst*hello.zst*
+decompress pipe to pipe
+decompress pipe to file
+*stdin*stdin*
+decompress file to pipe
+decompress 2 files
+*hello.zst*2 files decompressed*
+
+args = --progress --fake-stderr-is-console -q
+compress file to file
+*Read:*hello*hello.zst*
+compress pipe to pipe
+*Read:*stdin*stdout*
+compress pipe to file
+*Read:*stdin*hello.zst*
+compress file to pipe
+*Read:*hello*stdout*
+compress 2 files
+*Read*2 files compressed*
+decompress file to file
+*hello.zst*hello.zst*
+decompress pipe to pipe
+*stdin*stdin*
+decompress pipe to file
+*stdin*stdin*
+decompress file to pipe
+*hello.zst*hello.zst*
+decompress 2 files
+*hello.zst*2 files decompressed*

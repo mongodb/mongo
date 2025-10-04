@@ -27,23 +27,35 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/scripting/mozjs/global.h"
 
-#include <js/Conversions.h>
-
-#include "mongo/base/init.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/logv2/log.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/jsstringwrapper.h"
-#include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/buildinfo.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/version.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <ostream>
+
+#include <js/CallArgs.h>
+#include <js/Conversions.h>
+#include <js/PropertySpec.h>
+#include <js/RootingAPI.h>
+#include <js/TypeDecls.h>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 
 namespace mongo {
 namespace mozjs {
@@ -96,7 +108,7 @@ void GlobalInfo::Functions::version::call(JSContext* cx, JS::CallArgs args) {
 
 void GlobalInfo::Functions::buildInfo::call(JSContext* cx, JS::CallArgs args) {
     BSONObjBuilder b;
-    VersionInfoInterface::instance().appendBuildInfo(&b);
+    getBuildInfo().serialize(&b);
     ValueReader(cx, args.rval()).fromBSON(b.obj(), nullptr, false);
 }
 

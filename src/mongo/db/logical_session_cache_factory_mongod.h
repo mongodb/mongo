@@ -29,15 +29,15 @@
 
 #pragma once
 
-#include <memory>
+#include "mongo/db/session/logical_session_cache.h"
 
-#include "mongo/db/logical_session_cache.h"
-#include "mongo/db/service_liaison.h"
+#include <memory>
 
 namespace mongo {
 
 enum class LogicalSessionCacheServer { kSharded, kConfigServer, kReplicaSet, kStandalone };
 
-std::unique_ptr<LogicalSessionCache> makeLogicalSessionCacheD(LogicalSessionCacheServer state);
+std::unique_ptr<LogicalSessionCache> makeLogicalSessionCacheD(LogicalSessionCacheServer state,
+                                                              bool isRouterServer);
 
 }  // namespace mongo

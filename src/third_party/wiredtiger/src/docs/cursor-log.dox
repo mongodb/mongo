@@ -7,15 +7,16 @@ that have been configured for logging using the \c log configuration for
 ::wiredtiger_open.  In databases with log files, a log cursor provides
 access to the log records.  Although log cursors are read-only,
 applications may store records in the log using WT_SESSION::log_printf.
-While the log cursor is open automatic log file archiving, even if
+While the log cursor is open automatic log file removal, even if
 enabled, will not reclaim any log files.
 
 Each physical WiredTiger log record represents one or more operations
 in the database.  When a log record represents more than a single
 operation in the database, all of the operations in a log record will
-be part of the same transaction, however, there is no corresponding
-guarantee that all operations in a transaction must appear in the same
-log record.
+be part of the same transaction. Using a log cursor, walking a transaction
+commit log record will return each operation of the transaction in the
+record individually.  If a transaction updates both logged and not logged
+tables, only the operations on the logged tables appear in the record.
 
 The following examples are taken from the complete example program
 @ex_ref{ex_log.c}.
@@ -45,7 +46,7 @@ Here is an example of getting the log cursor's key:
 
 @snippet ex_log.c log cursor get_key
 
-The log cursor's value is comprised of six fields:
+The log cursor's value is composed of six fields:
 
 - a \c uint64_t transaction ID (set for commit records only, otherwise 0),
 - a \c uint32_t log record type
@@ -104,7 +105,7 @@ the results:
 @snippet ex_log.c log cursor walk
 
 The log cursor's key can be used to search for specific records in the
-log (assuming the record still exists and has not been archived), by
+log (assuming the record still exists and has not been removed), by
 setting the key and calling WT_CURSOR::search.  However, it is not
 possible to search for a specific operation within a log record, and the
 key's operation counter is ignored when the key is set.  The result of

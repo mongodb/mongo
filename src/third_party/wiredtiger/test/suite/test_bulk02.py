@@ -29,11 +29,10 @@
 # test_bulk02.py
 #       Bulk-load testing.
 
-import shutil, os
+import time
 import wiredtiger, wttest
-from helper import confirm_empty
 from suite_subprocess import suite_subprocess
-from wtdataset import SimpleDataSet, simple_key, simple_value
+from wtdataset import simple_key, simple_value
 from wtscenario import make_scenarios
 
 # test_bulkload_checkpoint
@@ -75,8 +74,8 @@ class test_bulkload_checkpoint(wttest.WiredTigerTestCase, suite_subprocess):
         # Close the bulk cursor.
         cursor.close()
 
-        # In the case of named checkpoints, verify they're still there,
-        # reflecting an empty file.
+        # Because the checkpoint skipped the table (because of the open bulk cursor), the
+        # checkpoint may exist (appears to) but the table isn't in it and can't be opened.
         if self.ckpt_type == 'named':
             self.assertRaises(wiredtiger.WiredTigerError,
                 lambda: self.session.open_cursor(self.uri, None, 'checkpoint=myckpt'))
@@ -139,5 +138,46 @@ class test_bulkload_backup(wttest.WiredTigerTestCase, suite_subprocess):
         else:
             self.check_backup(self.conn.open_session())
 
-if __name__ == '__main__':
-    wttest.run()
+
+
+# test_bulk_checkpoint_in_txn
+#       Test a bulk cursor with checkpoint while cursor and txn open.
+class test_bulk_checkpoint_in_txn(wttest.WiredTigerTestCase, suite_subprocess):
+    tablebase = 'test_bulk02'
+    uri = 'table:' + tablebase
+
+    def test_bulk_checkpoint_in_txn(self):
+        # The following unusual sequence of operations will create an abort/crash without a check to prevent
+        # opening a bulk cursor inside a transaction.
+        #
+        # Uncomment the whole of this method, and test it against a version of WiredTiger that does
+        # not have the check against opening a bulk cursor inside a transaction to reproduce an abort.
+
+        test_uri = '%s.%s' % (self.uri, "force_bulk_checkpoint_in_txn_test")
+
+        self.session.create(test_uri, "")
+        self.session.begin_transaction()
+    #
+    #     c = self.session.open_cursor(test_uri, None, 'bulk')
+    #     for k in range(5):
+    #         c["key{}".format(k)] = "value".format(k)
+    #
+    #     self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+    #                                  lambda: self.session.checkpoint('name=ckpt'),
+    #                                  '/not permitted in a running transaction/')
+    #
+    #     c.close()
+    #
+    #     self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+    #                                  lambda: self.session.commit_transaction(),
+    #                                  '/transaction requires rollback/')
+
+    def test_bulk_cursor_in_txn(self):
+        test_uri = '%s.%s' % (self.uri, "force_bulk_checkpoint_in_txn_test")
+
+        self.session.create(test_uri, "")
+        self.session.begin_transaction()
+
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+                                     lambda: self.session.open_cursor(test_uri, None, 'bulk'),
+                                     "/Bulk cursors can't be opened inside a transaction/")

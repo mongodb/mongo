@@ -1,0 +1,116 @@
+# Copyright 2016, 2017 Peter Dimov
+# Copyright 2017 - 2019 James E. King III
+# Copyright 2019 - 2021 Alexander Grund
+# Distributed under the Boost Software License, Version 1.0.
+# (See accompanying file LICENSE_1_0.txt or copy at http://boost.org/LICENSE_1_0.txt)
+
+#
+# Generic Appveyor build script for boostorg repositories
+# See: https://github.com/boostorg/boost-ci/
+#
+# Instructions for customizing this script for your library:
+#
+# 1. Customize the compilers and language levels you want.
+# 2. If you have more than include/, src/, test/, example/, examples/,
+#    benchmark/ or tools/ directories, set the environment variable DEPINST.
+#    For example if your build uses code in "bench/" and "fog/" directories:
+#      - DEPINST: --include bench --include fog
+# 3. Enable pull request builds in your boostorg/<library> account.
+#
+# That's it - the script will do everything else for you.
+#
+
+version: 1.0.{build}-{branch}
+
+shallow_clone: true
+
+branches:
+  only:
+    - master
+    - develop
+    - /bugfix\/.*/
+    - /feature\/.*/
+    - /fix\/.*/
+    - /pr\/.*/
+
+matrix:
+  fast_finish: false
+  # Adding MAYFAIL to any matrix job allows it to fail but the build stays green:
+  allow_failures:
+    - MAYFAIL: true
+
+environment:
+  global:
+    B2_CI_VERSION: 1
+    GIT_FETCH_JOBS: 4
+    # see: http://www.boost.org/build/doc/html/bbv2/overview/invocation.html#bbv2.overview.invocation.properties
+    # to use the default for a given environment, comment it out; recommend you build debug and release however:
+    # on Windows it is important to exercise all the possibilities, especially shared vs static, however most
+    # libraries that care about this exercise it in their Jamfiles...
+    B2_ADDRESS_MODEL: 32,64
+    B2_LINK: shared,static
+    # B2_THREADING: threading=multi,single
+    B2_VARIANT: release
+    BOOST_DATE_TIME_TEST_WITHOUT_SELF_CONTAINED_HEADER_TESTS: 1
+
+  matrix:
+    - FLAVOR: Visual Studio 2017 C++2a Strict
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+      B2_CXXFLAGS: -permissive-
+      B2_CXXSTD: 2a
+      B2_TOOLSET: msvc-14.1
+
+    - FLAVOR: Visual Studio 2017 C++14/17
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+      B2_CXXSTD: 14,17
+      B2_TOOLSET: msvc-14.1
+
+    - FLAVOR: clang-cl
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+      B2_ADDRESS_MODEL: 64
+      B2_CXXSTD: 11,14,17
+      B2_TOOLSET: clang-win
+
+    - FLAVOR: Visual Studio 2015, 2013
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+      B2_TOOLSET: msvc-12.0,msvc-14.0
+
+    - FLAVOR: Visual Studio 2008, 2010, 2012
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+      B2_TOOLSET: msvc-9.0,msvc-10.0,msvc-11.0
+      B2_ADDRESS_MODEL: 32 # No 64bit support
+
+    - FLAVOR: cygwin (32-bit)
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+      ADDPATH: C:\cygwin\bin;
+      B2_ADDRESS_MODEL: 32
+      B2_CXXSTD: 03,11,14,1z
+      B2_THREADING: threadapi=pthread
+      B2_TOOLSET: gcc
+
+    - FLAVOR: cygwin (64-bit)
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+      ADDPATH: C:\cygwin64\bin;
+      B2_ADDRESS_MODEL: 64
+      B2_CXXSTD: 03,11,14,1z
+      B2_THREADING: threadapi=pthread
+      B2_TOOLSET: gcc
+
+    - FLAVOR: mingw64
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+      ADDPATH: C:\mingw-w64\x86_64-8.1.0-posix-seh-rt_v6-rev0\mingw64\bin;
+      B2_ADDRESS_MODEL: 64
+      B2_CXXSTD: 03,11,14,17,2a
+      B2_TOOLSET: gcc
+
+install:
+  - git clone --depth 1 https://github.com/boostorg/boost-ci.git C:\boost-ci-cloned
+  # Copy ci folder if not testing Boost.CI
+  - if NOT "%APPVEYOR_PROJECT_NAME%" == "boost-ci" xcopy /s /e /q /i /y C:\boost-ci-cloned\ci .\ci
+  - rmdir /s /q C:\boost-ci-cloned
+  - ci\appveyor\install.bat
+
+build: off
+
+test_script: ci\build.bat
+

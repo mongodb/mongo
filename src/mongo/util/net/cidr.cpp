@@ -30,7 +30,7 @@
 #include "mongo/util/net/cidr.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/platform/basic.h"
+#include "mongo/util/ctype.h"
 
 #ifdef _WIN32
 #include <Ws2tcpip.h>
@@ -88,26 +88,46 @@ T& append(T& s, int family, const std::array<uint8_t, 16> ip, int len) {
 
 }  // namespace
 
-StatusWith<CIDR> CIDR::parse(BSONElement from) noexcept {
-    if (from.type() != String) {
+StatusWith<CIDR> CIDR::parse(BSONElement from) {
+    if (from.type() != BSONType::string) {
         return {ErrorCodes::UnsupportedFormat, "CIDR range must be a string"};
     }
     return parse(from.valueStringData());
 }
 
-StatusWith<CIDR> CIDR::parse(StringData s) noexcept {
+StatusWith<CIDR> CIDR::parse(StringData s) {
     CIDR value;
     auto slash = find(begin(s), end(s), '/');
-    auto ip = (slash == end(s)) ? s.toString() : s.substr(0, slash - begin(s)).toString();
+    auto ip = (slash == end(s)) ? std::string{s} : std::string{s.substr(0, slash - begin(s))};
 
     if (inet_pton(AF_INET, ip.c_str(), value._ip.data())) {
         value._family = AF_INET;
         value._len = kIPv4Bits;
-    } else if (inet_pton(AF_INET6, ip.c_str(), value._ip.data())) {
-        value._family = AF_INET6;
-        value._len = kIPv6Bits;
     } else {
-        return Status(ErrorCodes::UnsupportedFormat, "Invalid IP address in CIDR string");
+        // If this is a IPv6 link-local address, it may have a zone id embedded in the address. The
+        // inet_pton() function does not handle that. We need to strip off the zone id before
+        // calling inet_pton(). The splitIPv6String() function does that by returning the IPv6
+        // address without the zone id and the zone id in a separate field.
+        CIDR::ipv6WithZone_t ipv6cidr = value._splitIPv6String(ip.c_str());
+        // We expect to get back either one or two elements:
+        // - If we get back one element, then this is the IPv6 address with an optional mask
+        // - If we get back two elements, then the first element is the IPv6 address without the
+        // zone id, and the second element is the zone id
+        if (ipv6cidr.ip.empty()) {
+            return Status(ErrorCodes::UnsupportedFormat, "Invalid IP address format");
+        }
+
+        if (inet_pton(AF_INET6, ipv6cidr.ip.c_str(), value._ip.data())) {
+            value._family = AF_INET6;
+            value._len = kIPv6Bits;
+            if (ipv6cidr.zone.size() > 0) {
+                // We have a zone id. Save it
+                value._isLinkLocal = true;
+                value._scopeStr = ipv6cidr.zone;
+            }
+        } else {
+            return Status(ErrorCodes::UnsupportedFormat, "Invalid IP address in CIDR string");
+        }
     }
 
     if (slash == end(s)) {
@@ -129,6 +149,96 @@ StatusWith<CIDR> CIDR::parse(StringData s) noexcept {
     return value;
 }
 
+std::vector<std::string> CIDR::_splitString(const std::string& s, char delimiter) {
+    std::vector<std::string> tokens;
+    std::string token;
+    std::stringstream ss(s);  // Create a stringstream from the input string
+
+    // Read tokens from the stringstream, separated by the delimiter
+    while (std::getline(ss, token, delimiter)) {
+        tokens.push_back(token);
+    }
+    return tokens;
+}
+
+std::string CIDR::_toLower(std::string s) {
+    std::transform(s.begin(), s.end(), s.begin(), [](auto c) { return mongo::ctype::toLower(c); });
+    return s;
+}
+
+bool CIDR::_ipv6LinkLocalAddress(const std::string& ipv6string) {
+    if (ipv6string.size() < 4) {
+        return false;
+    }
+    std::string prefix = ipv6string.substr(0, 4);
+    return _toLower(prefix) == "fe80";
+}
+
+
+// We may get an IPv6 string like this:
+// Not link-local 1234:5678:9abc:def0:1234:5678:9abc:def0/123";
+// Link-local without zone fe80:5678:9abc:def0:1234:5678:9abc:def0/123";
+// Link-local with zone: fe80:5678:9abc:def0:1234:5678:9abc:def0%ens5/123";
+//
+CIDR::ipv6WithZone_t CIDR::_splitIPv6String(const std::string& ipv6) {
+    CIDR::ipv6WithZone_t result;
+    if (ipv6.empty()) {
+        return result;
+    }
+    // If the IPv6 address does not start with "fe80" (case-insensitive), it is not a
+    // link-local address. Return the original string
+    if (!_ipv6LinkLocalAddress(ipv6)) {
+        result.ip = ipv6;
+        return result;
+    }
+    // If this is a IPv6 link-local address, it should be one of the following formats:
+    // - Without the zone identifier, for example fe80:5678:9abc:def0:1234:5678:9abc:def0/123";
+    // - With the zone identifier, for example
+    // fe80:5678:9abc:def0:1234:5678:9abc:def0%ens5/123";
+    //
+    // In general, the format is:
+    // fe80:xxx[%zoneid][/mask]
+    //
+    // First, we extract the IPv6 address with the optional zone
+    std::vector<std::string> workingIPv6withoutMask = _splitString(ipv6, '/');
+
+    // We expect to get back at least one element. If we don't, this is probably an invalid
+    // format, but we leave the caller to validate the IPv6 address
+    if (workingIPv6withoutMask.empty()) {
+        return result;
+    }
+
+    // At this stage, we have the IP address with the mask stripped. That is, we have either
+    // - Ipv6 without the zone identifier, for example fe80:5678:9abc:def0:1234:5678:9abc:def0";
+    // - Ipv6 with zone identifier, for example fe80:5678:9abc:def0:1234:5678:9abc:def0%ens5";
+    //
+    // The zone identifier is delimited by an ampersand ('%'). See if it has a zone identifier
+    std::vector<std::string> workingIPv6withOptionalZone =
+        _splitString(workingIPv6withoutMask[0], '%');
+
+    // If we get only one element, then it does not have a zone identifier. Just return the
+    // original IPv6 address
+    if (workingIPv6withOptionalZone.size() == 1) {
+        result.ip = ipv6;
+        return result;
+    }
+
+    // If we get to this stage, we have a zone identifier:
+    // 1. Concatenate the IPv6 address without the zone identifier with the mask. Place this in the
+    // first element
+    // 2. Place the zone identifier in the second element. Since the numeric zone identifier can
+    // change across system configurations and reboots, we leave the zone identifier in its original
+    // form until it is actually used
+    if (workingIPv6withoutMask.size() >= 2) {
+        result.ip = workingIPv6withOptionalZone[0] + "/" + workingIPv6withoutMask[1];
+    } else {
+        result.ip = workingIPv6withOptionalZone[0];
+    }
+    result.zone = workingIPv6withOptionalZone[1];
+
+    return result;
+}
+
 CIDR::CIDR(StringData s) {
     auto status = parse(s);
     uassertStatusOK(status);
@@ -139,19 +249,12 @@ CIDR::CIDR() : _family(AF_UNSPEC), _len(0) {
     _ip.fill(0);
 }
 
-template <>
-BSONObjBuilder& BSONObjBuilderValueStream::operator<<<CIDR>(CIDR value) {
-    _builder->append(_fieldName, value.toString());
-    _fieldName = StringData();
-    return *_builder;
+std::ostream& operator<<(std::ostream& s, const CIDR& cidr) {
+    return append(s, cidr._family, cidr._ip, cidr._len);
+}
+
+StringBuilder& operator<<(StringBuilder& s, const CIDR& cidr) {
+    return append(s, cidr._family, cidr._ip, cidr._len);
 }
 
 }  // namespace mongo
-
-std::ostream& mongo::operator<<(std::ostream& s, const CIDR& cidr) {
-    return append(s, cidr._family, cidr._ip, cidr._len);
-}
-
-mongo::StringBuilder& mongo::operator<<(StringBuilder& s, const CIDR& cidr) {
-    return append(s, cidr._family, cidr._ip, cidr._len);
-}

@@ -94,24 +94,24 @@ class FSM(object):
 
 class Doxypy(object):
 	def __init__(self):
-		string_prefixes = "[uU]?[rR]?"
+		string_prefixes = r"[uU]?[rR]?"
 
-		self.start_single_comment_re = re.compile("^\s*%s(''')" % string_prefixes)
-		self.end_single_comment_re = re.compile("(''')\s*$")
+		self.start_single_comment_re = re.compile(r"^\s*%s(''')" % string_prefixes)
+		self.end_single_comment_re = re.compile(r"(''')\s*$")
 
-		self.start_double_comment_re = re.compile("^\s*%s(\"\"\")" % string_prefixes)
-		self.end_double_comment_re = re.compile("(\"\"\")\s*$")
+		self.start_double_comment_re = re.compile(r'^\s*%s(""")' % string_prefixes)
+		self.end_double_comment_re = re.compile(r'(""")\s*$')
 
-		self.single_comment_re = re.compile("^\s*%s(''').*(''')\s*$" % string_prefixes)
-		self.double_comment_re = re.compile("^\s*%s(\"\"\").*(\"\"\")\s*$" % string_prefixes)
+		self.single_comment_re = re.compile(r"^\s*%s(''').*(''')\s*$" % string_prefixes)
+		self.double_comment_re = re.compile(r'^\s*%s(""").*(""")\s*$' % string_prefixes)
 
-		self.defclass_re = re.compile("^(\s*)(def .+:|class .+:)")
-		self.empty_re = re.compile("^\s*$")
-		self.hashline_re = re.compile("^\s*#.*$")
-		self.importline_re = re.compile("^\s*(import |from .+ import)")
+		self.defclass_re = re.compile(r"^(\s*)(def .+:|class .+:)")
+		self.empty_re = re.compile(r"^\s*$")
+		self.hashline_re = re.compile(r"^\s*#.*$")
+		self.importline_re = re.compile(r"^\s*(import |from .+ import)")
 
-		self.multiline_defclass_start_re = re.compile("^(\s*)(def|class)(\s.*)?$")
-		self.multiline_defclass_end_re = re.compile(":\s*$")
+		self.multiline_defclass_start_re = re.compile(r"^(\s*)(def|class)(\s.*)?$")
+		self.multiline_defclass_end_re = re.compile(r":\s*$")
 
 		## Transition list format
 		#  ["FROM", "TO", condition, action]

@@ -29,6 +29,8 @@
 
 #include "mongo/db/exec/sbe/size_estimator.h"
 
+#include "mongo/bson/bsonelement.h"
+
 namespace mongo::sbe::size_estimator {
 
 size_t estimate(const IndexBounds& indexBounds) {
@@ -54,7 +56,6 @@ size_t estimate(const Interval& interval) {
 size_t estimate(const IndexSeekPoint& indexSeekPoint) {
     size_t size = estimate(indexSeekPoint.keyPrefix);
     size += estimate(indexSeekPoint.keySuffix);
-    size += estimate(indexSeekPoint.suffixInclusive);
     return size;
 }
 

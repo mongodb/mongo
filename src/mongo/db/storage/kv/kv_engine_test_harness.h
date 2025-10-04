@@ -29,10 +29,11 @@
 
 #pragma once
 
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/kv/kv_engine.h"
+
 #include <functional>
 #include <memory>
-
-#include "mongo/db/storage/kv/kv_engine.h"
 
 namespace mongo {
 

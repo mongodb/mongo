@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include <vector>
-
 #include "mongo/base/status.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/hierarchical_acquisition.h"
+
+#include <vector>
 
 namespace mongo {
 
@@ -56,7 +56,6 @@ public:
         _registry.emplace_back(std::move(observer));
     }
 
-    // TODO SERVER-40224: remove the Status return when on_update is changed to return void
     Status operator()(const T& t) {
         stdx::lock_guard lk(_mutex);
         for (const auto& observer : _registry) {
@@ -67,8 +66,7 @@ public:
     }
 
 private:
-    Mutex _mutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "MutableObserverRegistry::_mutex");
+    stdx::mutex _mutex;
     std::vector<unique_function<void(const T&)>> _registry;
 };
 

@@ -1,0 +1,23 @@
+# Overrides for testing unreplicated truncates.
+
+###
+# Fixture options.
+###
+- name: replica_sets_fixture
+  value:
+    executor:
+      fixture:
+        mongod_options:
+          # Modify default allocation size and leaf page size so that there are more pages on disk
+          # susceptible to fast truncates.
+          wiredTigerCollectionConfigString: "allocation_size=1k,leaf_page_max=1k"
+
+- name: pre_images_truncate_only_secondaries
+  value:
+    executor:
+      fixture:
+        mongod_options:
+          set_parameters:
+            # We do not truncate on the primary in order to maintain a full record of all preimages.
+            # That way we can easily detect any pre-image holes on the secondaries.
+            failpoint.preImagesTruncateOnlyOnSecondaries: "{mode: 'alwaysOn'}"

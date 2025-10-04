@@ -1,0 +1,124 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+idl_generator(
+    name = "sorter_gen",
+    src = "sorter.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "sorter_stats",
+    srcs = [
+        "sorter_stats.cpp",
+    ],
+    hdrs = [
+        "sorter_stats.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "sorter_base",
+    srcs = [
+        "sorter_checksum_calculator.cpp",
+        "sorter_file_name.cpp",
+        "sorter_gen",
+    ],
+    hdrs = [
+        "sorter.h",
+        "sorter_checksum_calculator.h",
+        "sorter_file_name.h",
+        "sorter_template_defs.h",
+        "//src/mongo/db/query/util:spill_util.h",
+    ],
+    deps = [
+        ":sorter_stats",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_feature_flags",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/stats:counters_sort",  # TODO(SERVER-93876): Remove.
+    ] + select({
+        "//bazel/config:use_wiredtiger_enabled": [
+            "//src/third_party/wiredtiger:wiredtiger_checksum",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+mongo_cc_library(
+    name = "sorter_test_utils",
+    srcs = [
+        "sorter_test_utils.h",
+    ],
+    hdrs = [
+        "sorter_test_utils.h",
+    ],
+    deps = [
+        ":sorter_base",
+        "//src/mongo/db/storage:encryption_hooks",
+        "//src/mongo/unittest",
+        "//src/third_party/snappy",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_sorter_test",
+    srcs = [
+        "sorter_checksum_calculator_test.cpp",
+        "sorter_stats_test.cpp",
+        "sorter_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_second_group",
+        "server-external-sorter",
+    ],
+    deps = [
+        ":sorter_base",
+        ":sorter_stats",
+        ":sorter_test_utils",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/exec/document_value",
+        "//src/mongo/db/local_catalog/lock_manager",
+        "//src/mongo/db/query:query_knobs",
+        "//src/mongo/db/query:spill_util",
+        "//src/mongo/db/storage:encryption_hooks",
+        "//src/mongo/db/storage:storage_options",
+        "//src/third_party/snappy",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_sorter_long_running_test",
+    srcs = [
+        "sorter_long_running_test.cpp",
+    ],
+    tags = ["mongo_unittest_fifth_group"],
+    deps = [
+        ":sorter_base",
+        ":sorter_stats",
+        ":sorter_test_utils",
+        "//src/mongo/db/query:query_knobs",
+        "//src/mongo/db/query:spill_util",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "sorter_checksum_calculator_bm",
+    srcs = [
+        "sorter_checksum_calculator_bm.cpp",
+    ],
+    deps = [
+        ":sorter_base",
+    ],
+)

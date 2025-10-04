@@ -1,0 +1,19 @@
+# This suite tests that secondaries getting abruptly killed while performing preimage removal do
+# not display consistency holes when recovering. The primary is prevented from performing any
+# removal so that a secondary containing a hole is detected as the documents when read in descending
+# order (most recent -> oldest) wouldn't match.
+base_suite: replica_sets_jscore_passthrough
+overrides:
+  - "replica_sets_kill_secondary.selector"
+  - "replica_sets_kill_secondary.executor"
+  - "replica_sets_kill_secondary.hooks"
+  - "change_streams_truncate.replica_sets_fixture"
+  - "change_streams_truncate.pre_images_truncate_only_secondaries"
+  - "change_streams_pre_images_remover.replica_sets_fixture"
+
+extends:
+  - "change_streams_pre_images_remover.enable_pre_images_hook"
+
+excludes:
+  - "replica_sets_kill_secondary.exclusions"
+  - "change_streams_pre_images_remover.exclusion_tags"

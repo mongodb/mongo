@@ -1,22 +1,16 @@
 /**
  * Test that fetching oplog from a new sync source that is in quiesce mode fails to establish a
  * connection, causing the server to reenter sync source selection.
- *
- * @tags: [
- *   live_record_incompatible,
- * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/write_concern_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 const rst = new ReplSetTest({
     name: "new_sync_source_in_quiesce_mode",
     nodes: 3,
-    nodeOptions: {setParameter: "shutdownTimeoutMillisForSignaledShutdown=5000"}
+    nodeOptions: {setParameter: "shutdownTimeoutMillisForSignaledShutdown=5000"},
 });
 rst.startSet();
 const syncSource = rst.nodes[1];
@@ -24,17 +18,20 @@ const syncingNode = rst.nodes[2];
 
 // Make sure the syncSource syncs only from the new primary. This is so that we prevent
 // syncingNode from denylisting syncSource because it isn't syncing from anyone.
-assert.commandWorked(syncSource.adminCommand({
-    configureFailPoint: "forceSyncSourceCandidate",
-    mode: "alwaysOn",
-    data: {hostAndPort: rst.nodes[0].host}
-}));
-rst.initiateWithHighElectionTimeout();
+assert.commandWorked(
+    syncSource.adminCommand({
+        configureFailPoint: "forceSyncSourceCandidate",
+        mode: "alwaysOn",
+        data: {hostAndPort: rst.nodes[0].host},
+    }),
+);
+rst.initiate();
 
 const primary = rst.getPrimary();
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 rst.awaitReplication();
 
 // Stop replication on the syncingNode so that the primary and syncSource will both
@@ -65,4 +62,3 @@ rst.awaitSecondaryNodes();
 
 jsTestLog("Finish test.");
 rst.stopSet();
-})();

@@ -1,17 +1,15 @@
 // Storage Node Watchdog common test code
 //
-load("jstests/watchdog/lib/charybdefs_lib.js");
+import {EXIT_WATCHDOG} from "jstests/watchdog/lib/charybdefs_lib.js";
 
-function testMongoDHang(control, mongod_options) {
-    'use strict';
-
+export function testMongoDHang(control, mongod_options) {
     // Now start MongoD with it enabled at startup
     //
     if (mongod_options.hasOwnProperty("dbPath")) {
         resetDbpath(mongod_options.dbPath);
     }
 
-    var options = {
+    let options = {
         setParameter: "watchdogPeriodSeconds=" + control.getWatchdogPeriodSeconds(),
         verbose: 1,
     };
@@ -19,7 +17,7 @@ function testMongoDHang(control, mongod_options) {
     options = Object.extend(mongod_options, options);
 
     const conn = MongoRunner.runMongod(options);
-    assert.neq(null, conn, 'mongod was unable to start up');
+    assert.neq(null, conn, "mongod was unable to start up");
 
     // Wait for watchdog to get running
     const admin = conn.getDB("admin");
@@ -37,9 +35,7 @@ function testMongoDHang(control, mongod_options) {
     MongoRunner.stopMongod(conn, undefined, {allowedExitCode: EXIT_WATCHDOG});
 }
 
-function testFuseAndMongoD(control, mongod_options) {
-    'use strict';
-
+export function testFuseAndMongoD(control, mongod_options) {
     // Cleanup previous runs
     control.cleanup();
 

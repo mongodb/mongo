@@ -27,19 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/rpc/legacy_reply_builder.h"
 
-#include <iterator>
-#include <memory>
-
 #include "mongo/db/dbmessage.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/rpc/metadata.h"
-#include "mongo/s/stale_exception.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/str.h"
+
+#include <utility>
 
 namespace mongo {
 namespace rpc {

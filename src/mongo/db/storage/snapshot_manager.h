@@ -29,13 +29,7 @@
 
 #pragma once
 
-#include <limits>
-#include <string>
-
-#include "mongo/base/status.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

@@ -31,58 +31,67 @@
  * Connect to a Mongo database as a database, from C++.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/client/dbclient_base.h"
 
-#include <algorithm>
-#include <utility>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/bson/util/builder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/client/authenticate.h"
 #include "mongo/client/client_api_version_parameters_gen.h"
-#include "mongo/client/constants.h"
 #include "mongo/client/dbclient_cursor.h"
-#include "mongo/config.h"
+#include "mongo/client/internal_auth.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/api_parameters_gen.h"
-#include "mongo/db/auth/security_token.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/json.h"
+#include "mongo/db/auth/user_name.h"
+#include "mongo/db/client.h"
+#include "mongo/db/dbmessage.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/kill_cursors_gen.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/client_cursor/cursor_id.h"
+#include "mongo/db/query/client_cursor/kill_cursors_gen.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_gen.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/remote_command_request.h"
-#include "mongo/executor/remote_command_response.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata.h"
-#include "mongo/rpc/metadata/client_metadata.h"
+#include "mongo/rpc/protocol.h"
 #include "mongo/rpc/reply_interface.h"
-#include "mongo/s/stale_exception.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/mutex.h"
-#include "mongo/util/debug_util.h"
-#include "mongo/util/net/ssl_manager.h"
-#include "mongo/util/net/ssl_options.h"
+#include "mongo/util/database_name_util.h"
+#include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
+
+#include <limits>
+#include <ostream>
+#include <utility>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
+
 
 namespace mongo {
 
-using std::endl;
 using std::list;
 using std::string;
 using std::stringstream;
 using std::unique_ptr;
 using std::vector;
-
-using executor::RemoteCommandRequest;
-using executor::RemoteCommandResponse;
 
 AtomicWord<long long> DBClientBase::ConnectionIdSequence;
 
@@ -96,8 +105,9 @@ bool DBClientBase::isOk(const BSONObj& o) {
 }
 
 bool DBClientBase::isNotPrimaryErrorString(const BSONElement& e) {
-    return e.type() == String &&
-        (str::contains(e.valuestr(), "not primary") || str::contains(e.valuestr(), "not master"));
+    return e.type() == BSONType::string &&
+        (str::contains(e.valueStringData(), "not primary") ||
+         str::contains(e.valueStringData(), "not master"));
 }
 
 void DBClientBase::setRequestMetadataWriter(rpc::RequestMetadataWriter writer) {
@@ -125,11 +135,7 @@ rpc::UniqueReply DBClientBase::parseCommandReplyMessage(const std::string& host,
         uassertStatusOK(_metadataReader(opCtx, commandReply->getCommandReply(), host));
     }
 
-    // StaleConfig is thrown because clients acting as routers handle the exception at a higher
-    // level. Routing clients only expect StaleConfig from shards, so the exception should not be
-    // thrown when connected to a mongos, which allows StaleConfig to be returned to clients that
-    // connect to a mongos with DBClient, e.g. the shell.
-    if (!isMongos()) {
+    if (_shouldThrowOnStaleConfigError) {
         auto status = getStatusFromCommandResult(commandReply->getCommandReply());
         if (status == ErrorCodes::StaleConfig) {
             uassertStatusOK(status.withContext("stale config in runCommand"));
@@ -185,15 +191,21 @@ void appendMetadata(OperationContext* opCtx,
     }
 
     request.body = bob.obj();
-    if (auto securityToken = auth::getSecurityToken(opCtx)) {
-        request.securityToken = securityToken->toBSON();
-    }
 }
 }  // namespace
 
+auth::ValidatedTenancyScope DBClientBase::_createInnerRequestVTS(
+    const boost::optional<TenantId>& tenantId) const {
+    if (tenantId) {
+        return auth::ValidatedTenancyScopeFactory::create(
+            tenantId.get(), auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{});
+    }
+    return auth::ValidatedTenancyScope::kNotRequired;
+}
+
 DBClientBase* DBClientBase::runFireAndForgetCommand(OpMsgRequest request) {
     // Make sure to reconnect if needed before building our request.
-    checkConnection();
+    ensureConnection();
 
     auto opCtx = haveClient() ? cc().getOperationContext() : nullptr;
     appendMetadata(opCtx, _metadataWriter, _apiParameters, request);
@@ -206,25 +218,25 @@ DBClientBase* DBClientBase::runFireAndForgetCommand(OpMsgRequest request) {
 std::pair<rpc::UniqueReply, DBClientBase*> DBClientBase::runCommandWithTarget(
     OpMsgRequest request) {
     // Make sure to reconnect if needed before building our request.
-    checkConnection();
+    ensureConnection();
 
     // call() oddly takes this by pointer, so we need to put it on the stack.
     auto host = getServerAddress();
 
     auto opCtx = haveClient() ? cc().getOperationContext() : nullptr;
     appendMetadata(opCtx, _metadataWriter, _apiParameters, request);
-    auto requestMsg = request.serialize();
 
+    auto requestMsg = request.serialize();
     Message replyMsg;
 
-    // We always want to throw if there was a network error, we do it here
-    // instead of passing 'true' for the 'assertOk' parameter so we can construct a
-    // more helpful error message. Note that call() can itself throw a socket exception.
-    uassert(ErrorCodes::HostUnreachable,
-            str::stream() << "network error while attempting to run "
-                          << "command '" << request.getCommandName() << "' "
-                          << "on host '" << host << "' ",
-            call(requestMsg, replyMsg, false, &host));
+    try {
+        replyMsg = call(requestMsg, &host);
+    } catch (DBException& e) {
+        e.addContext(str::stream() << str::stream() << "network error while attempting to run "
+                                   << "command '" << request.getCommandName() << "' "
+                                   << "on host '" << host << "' ");
+        throw;
+    }
 
     auto commandReply = parseCommandReplyMessage(host, replyMsg);
 
@@ -244,45 +256,76 @@ std::pair<rpc::UniqueReply, std::shared_ptr<DBClientBase>> DBClientBase::runComm
     return {std::move(out.first), std::move(me)};
 }
 
-std::tuple<bool, DBClientBase*> DBClientBase::runCommandWithTarget(const string& dbname,
+std::tuple<bool, DBClientBase*> DBClientBase::runCommandWithTarget(const DatabaseName& dbName,
                                                                    BSONObj cmd,
                                                                    BSONObj& info,
                                                                    int options) {
     // TODO: This will be downconverted immediately if the underlying
     // requestBuilder is a legacyRequest builder. Not sure what the best
     // way to get around that is without breaking the abstraction.
-    auto result = runCommandWithTarget(rpc::upconvertRequest(dbname, std::move(cmd), options));
+    auto request =
+        rpc::upconvertRequest(dbName, cmd, options, _createInnerRequestVTS(dbName.tenantId()));
+    auto result = runCommandWithTarget(std::move(request));
 
     info = result.first->getCommandReply().getOwned();
     return std::make_tuple(isOk(info), result.second);
 }
 
-std::tuple<bool, std::shared_ptr<DBClientBase>> DBClientBase::runCommandWithTarget(
-    const string& dbname,
-    BSONObj cmd,
-    BSONObj& info,
-    std::shared_ptr<DBClientBase> me,
-    int options) {
-    auto result =
-        runCommandWithTarget(rpc::upconvertRequest(dbname, std::move(cmd), options), std::move(me));
-
-    info = result.first->getCommandReply().getOwned();
-    return std::make_tuple(isOk(info), result.second);
-}
-
-bool DBClientBase::runCommand(const string& dbname, BSONObj cmd, BSONObj& info, int options) {
-    auto res = runCommandWithTarget(dbname, std::move(cmd), info, options);
+bool DBClientBase::runCommand(const DatabaseName& dbName, BSONObj cmd, BSONObj& info, int options) {
+    auto res = runCommandWithTarget(dbName, std::move(cmd), info, options);
     return std::get<0>(res);
 }
 
-long long DBClientBase::count(const NamespaceStringOrUUID nsOrUuid,
+StatusWith<std::list<BSONObj>> DBClientBase::runExhaustiveCursorCommand(const DatabaseName& dbName,
+                                                                        const BSONObj& cmd,
+                                                                        int options) {
+    list<BSONObj> docs;
+
+    BSONObj res;
+    if (runCommand(dbName, cmd, res, options)) {
+        BSONObj cursorObj = res["cursor"].Obj();
+        BSONObjIterator it(cursorObj["firstBatch"].Obj());
+        while (it.more()) {
+            BSONElement e = it.next();
+            docs.push_back(e.Obj().getOwned());
+        }
+
+        if (res.hasField(LogicalTime::kOperationTimeFieldName)) {
+            setOperationTime(LogicalTime::fromOperationTime(res).asTimestamp());
+        }
+
+        const long long id = cursorObj["id"].Long();
+
+        if (id != 0) {
+            const NamespaceString nss = NamespaceStringUtil::deserialize(
+                dbName.tenantId(), cursorObj["ns"].String(), SerializationContext::stateDefault());
+            unique_ptr<DBClientCursor> cursor = getMore(nss, id);
+            while (cursor->more()) {
+                docs.push_back(cursor->nextSafe().getOwned());
+            }
+
+            if (cursor->getOperationTime()) {
+                setOperationTime(*(cursor->getOperationTime()));
+            }
+        }
+
+        return docs;
+    }
+
+    // command failed
+    auto status = getStatusFromCommandResult(res);
+    return status.withContext(str::stream() << cmd.firstElementFieldName() << " fails:");
+}
+
+long long DBClientBase::count(const NamespaceStringOrUUID& nsOrUuid,
                               const BSONObj& query,
                               int options,
                               int limit,
                               int skip,
-                              boost::optional<BSONObj> readConcernObj) {
-    auto dbName = (nsOrUuid.uuid() ? nsOrUuid.dbname() : (*nsOrUuid.nss()).db().toString());
-    BSONObj cmd = _countCmd(nsOrUuid, query, options, limit, skip, readConcernObj);
+                              const boost::optional<repl::ReadConcernArgs>& readConcern) {
+    const auto& dbName = nsOrUuid.dbName();
+
+    BSONObj cmd = _countCmd(nsOrUuid, query, options, limit, skip, readConcern);
     BSONObj res;
     if (!runCommand(dbName, cmd, res, options)) {
         auto status = getStatusFromCommandResult(res);
@@ -292,27 +335,28 @@ long long DBClientBase::count(const NamespaceStringOrUUID nsOrUuid,
     return res["n"].numberLong();
 }
 
-BSONObj DBClientBase::_countCmd(const NamespaceStringOrUUID nsOrUuid,
+BSONObj DBClientBase::_countCmd(const NamespaceStringOrUUID& nsOrUuid,
                                 const BSONObj& query,
                                 int options,
                                 int limit,
                                 int skip,
-                                boost::optional<BSONObj> readConcernObj) {
+                                const boost::optional<repl::ReadConcernArgs>& readConcern) {
     BSONObjBuilder b;
-    if (nsOrUuid.uuid()) {
-        const auto uuid = *nsOrUuid.uuid();
+    if (nsOrUuid.isUUID()) {
+        const auto uuid = nsOrUuid.uuid();
         uuid.appendToBuilder(&b, "count");
     } else {
-        b.append("count", (*nsOrUuid.nss()).coll());
+        b.append("count", nsOrUuid.nss().coll());
     }
     b.append("query", query);
     if (limit)
         b.append("limit", limit);
     if (skip)
         b.append("skip", skip);
-    if (readConcernObj) {
-        b.append(repl::ReadConcernArgs::kReadConcernFieldName, *readConcernObj);
+    if (readConcern) {
+        b.append(repl::ReadConcernArgs::kReadConcernFieldName, readConcern->toBSONInner());
     }
+
     return b.obj();
 }
 
@@ -344,7 +388,7 @@ auth::RunCommandHook DBClientBase::_makeAuthRunCommandHook() {
             if (!status.isOK()) {
                 return status;
             }
-            return Future<BSONObj>::makeReady(std::move(ret->getCommandReply()));
+            return Future<BSONObj>::makeReady(ret->getCommandReply());
         } catch (const DBException& e) {
             return Future<BSONObj>::makeReady(e.toStatus());
         }
@@ -367,14 +411,14 @@ void DBClientBase::_auth(const BSONObj& params) {
     auth::authenticateClient(params, remote, clientName, _makeAuthRunCommandHook()).get();
 }
 
-Status DBClientBase::authenticateInternalUser(auth::StepDownBehavior stepDownBehavior) {
+void DBClientBase::authenticateInternalUser(auth::StepDownBehavior stepDownBehavior) {
     ScopedMetadataWriterRemover remover{this};
     if (!auth::isInternalAuthSet()) {
         if (!serverGlobalParams.quiet.load()) {
             LOGV2(20116, "ERROR: No authentication parameters set for internal user");
         }
-        return {ErrorCodes::AuthenticationFailed,
-                "No authentication parameters set for internal user"};
+        uasserted(ErrorCodes::AuthenticationFailed,
+                  "No authentication parameters set for internal user");
     }
 
     // We will only have a client name if SSL is enabled
@@ -387,83 +431,77 @@ Status DBClientBase::authenticateInternalUser(auth::StepDownBehavior stepDownBeh
 #endif
 
     auto authProvider = auth::createDefaultInternalAuthProvider();
-    auto status = auth::authenticateInternalClient(clientName,
-                                                   HostAndPort(getServerAddress()),
-                                                   boost::none,
-                                                   stepDownBehavior,
-                                                   _makeAuthRunCommandHook(),
-                                                   authProvider)
-                      .getNoThrow();
-    if (status.isOK()) {
-        return status;
+    try {
+        auth::authenticateInternalClient(clientName,
+                                         HostAndPort(getServerAddress()),
+                                         boost::none,
+                                         stepDownBehavior,
+                                         _makeAuthRunCommandHook(),
+                                         authProvider)
+            .get();
+    } catch (const DBException& e) {
+        if (!serverGlobalParams.quiet.load()) {
+            LOGV2(20117,
+                  "Can't authenticate as internal user",
+                  "connString"_attr = toString(),
+                  "error"_attr = e.toStatus());
+        }
+        throw;
     }
-
-    if (!serverGlobalParams.quiet.load()) {
-        LOGV2(20117,
-              "Can't authenticate to {connString} as internal user, error: {error}",
-              "Can't authenticate as internal user",
-              "connString"_attr = toString(),
-              "error"_attr = status);
-    }
-
-    return status;
 }
 
 void DBClientBase::auth(const BSONObj& params) {
     _auth(params);
 }
 
-bool DBClientBase::auth(const string& dbname,
-                        const string& username,
-                        const string& password_text,
-                        string& errmsg,
-                        bool digestPassword) {
-    try {
-        const auto authParams =
-            auth::buildAuthParams(dbname, username, password_text, digestPassword);
-        auth(authParams);
-        return true;
-    } catch (const AssertionException& ex) {
-        if (ex.code() != ErrorCodes::AuthenticationFailed)
-            throw;
-        errmsg = ex.what();
-        return false;
-    }
+void DBClientBase::auth(const DatabaseName& dbname, StringData username, StringData password_text) {
+    UserName user{username, dbname};
+
+    StatusWith<string> mechResult =
+        auth::negotiateSaslMechanism(_makeAuthRunCommandHook(),
+                                     user,
+                                     boost::none,
+                                     auth::StepDownBehavior::kKeepConnectionOpen)
+            .getNoThrow();
+
+    // To prevent unexpected behavior for existing clients, default to SCRAM-SHA-1 if the SASL
+    // negotiation does not succeeed for some reason.
+    StringData mech = mechResult.isOK() ? mechResult.getValue() : "SCRAM-SHA-1"_sd;
+
+    const auto authParams = auth::buildAuthParams(dbname, username, password_text, mech);
+    auth(authParams);
 }
 
-void DBClientBase::logout(const string& dbname, BSONObj& info) {
-    runCommand(dbname, BSON("logout" << 1), info);
+void DBClientBase::logout(const DatabaseName& dbName, BSONObj& info) {
+    runCommand(dbName, BSON("logout" << 1), info);
 }
 
 bool DBClientBase::isPrimary(bool& isPrimary, BSONObj* info) {
     BSONObjBuilder bob;
-    bob.append(_apiParameters.getVersion() ? "hello" : "ismaster", 1);
-    if (auto wireSpec = WireSpec::instance().get(); wireSpec->isInternalClient) {
-        WireSpec::appendInternalClientWireVersion(wireSpec->outgoing, &bob);
-    }
+    bob.append("hello", 1);
+    ServiceContext* sc = haveClient() ? cc().getServiceContext() : getGlobalServiceContext();
+    WireSpec::getWireSpec(sc).appendInternalClientWireVersionIfNeeded(&bob);
 
     BSONObj o;
     if (info == nullptr)
         info = &o;
-    bool ok = runCommand("admin", bob.obj(), *info);
-    isPrimary =
-        info->getField(_apiParameters.getVersion() ? "isWritablePrimary" : "ismaster").trueValue();
+    bool ok = runCommand(DatabaseName::kAdmin, bob.obj(), *info);
+    isPrimary = info->getField("isWritablePrimary").trueValue();
     return ok;
 }
 
-bool DBClientBase::createCollection(const string& ns,
+bool DBClientBase::createCollection(const NamespaceString& nss,
                                     long long size,
                                     bool capped,
                                     int max,
                                     BSONObj* info,
                                     boost::optional<BSONObj> writeConcernObj) {
-    verify(!capped || size);
+    MONGO_verify(!capped || size);
     BSONObj o;
     if (info == nullptr)
         info = &o;
     BSONObjBuilder b;
-    string db = nsToDatabase(ns);
-    b.append("create", ns.c_str() + db.length() + 1);
+    b.append("create", nss.coll());
     if (size)
         b.append("size", size);
     if (capped)
@@ -473,71 +511,39 @@ bool DBClientBase::createCollection(const string& ns,
     if (writeConcernObj) {
         b.append(WriteConcernOptions::kWriteConcernField, *writeConcernObj);
     }
-    return runCommand(db.c_str(), b.done(), *info);
+    return runCommand(nss.dbName(), b.done(), *info);
 }
 
-list<BSONObj> DBClientBase::getCollectionInfos(const string& db, const BSONObj& filter) {
-    list<BSONObj> infos;
-
-    BSONObj res;
-    if (runCommand(db,
-                   BSON("listCollections" << 1 << "filter" << filter << "cursor" << BSONObj()),
-                   res,
-                   QueryOption_SecondaryOk)) {
-        BSONObj cursorObj = res["cursor"].Obj();
-        BSONObj collections = cursorObj["firstBatch"].Obj();
-        BSONObjIterator it(collections);
-        while (it.more()) {
-            BSONElement e = it.next();
-            infos.push_back(e.Obj().getOwned());
-        }
-
-        if (res.hasField(LogicalTime::kOperationTimeFieldName)) {
-            setOperationTime(LogicalTime::fromOperationTime(res).asTimestamp());
-        }
-
-        const long long id = cursorObj["id"].Long();
-
-        if (id != 0) {
-            const std::string ns = cursorObj["ns"].String();
-            unique_ptr<DBClientCursor> cursor = getMore(ns, id);
-            while (cursor->more()) {
-                infos.push_back(cursor->nextSafe().getOwned());
-            }
-
-            if (cursor->getOperationTime()) {
-                setOperationTime(*(cursor->getOperationTime()));
-            }
-        }
-
-        return infos;
-    }
-
-    // command failed
-    uassertStatusOKWithContext(getStatusFromCommandResult(res), "'listCollections' failed: ");
-    MONGO_UNREACHABLE;
+list<BSONObj> DBClientBase::getCollectionInfos(const DatabaseName& dbName,
+                                               const BSONObj& filter,
+                                               bool secondaryOk) {
+    BSONObj cmdObj = BSON("listCollections" << 1 << "filter" << filter << "cursor" << BSONObj());
+    return uassertStatusOK(
+        runExhaustiveCursorCommand(dbName, cmdObj, secondaryOk ? QueryOption_SecondaryOk : 0));
 }
 
 vector<BSONObj> DBClientBase::getDatabaseInfos(const BSONObj& filter,
                                                const bool nameOnly,
-                                               const bool authorizedDatabases) {
+                                               const bool authorizedDatabases,
+                                               const bool useListDatabasesForAllTenants) {
     vector<BSONObj> infos;
 
     BSONObjBuilder bob;
-    bob.append("listDatabases", 1);
+    useListDatabasesForAllTenants ? bob.append("listDatabasesForAllTenants", 1)
+                                  : bob.append("listDatabases", 1);
     bob.append("filter", filter);
 
     if (nameOnly) {
         bob.append("nameOnly", 1);
     }
     if (authorizedDatabases) {
-        bob.append("authorizedDatabases", 1);
+        bob.appendBool("authorizedDatabases", 1);
     }
 
     BSONObj cmd = bob.done();
 
     BSONObj res;
-    if (runCommand("admin", cmd, res, QueryOption_SecondaryOk)) {
+    if (runCommand(DatabaseName::kAdmin, cmd, res, QueryOption_SecondaryOk)) {
         BSONObj dbs = res["databases"].Obj();
         BSONObjIterator it(dbs);
         while (it.more()) {
@@ -558,85 +564,27 @@ vector<BSONObj> DBClientBase::getDatabaseInfos(const BSONObj& filter,
     MONGO_UNREACHABLE;
 }
 
-bool DBClientBase::exists(const string& ns) {
-    BSONObj filter = BSON("name" << nsToCollectionSubstring(ns));
-    list<BSONObj> results = getCollectionInfos(nsToDatabase(ns), filter);
-    return !results.empty();
-}
-
-std::pair<BSONObj, NamespaceString> DBClientBase::findOneByUUID(
-    const std::string& db,
-    UUID uuid,
-    const BSONObj& filter,
-    boost::optional<BSONObj> readConcernObj) {
-    list<BSONObj> results;
-    BSONObj res;
-
-    BSONObjBuilder cmdBuilder;
-    uuid.appendToBuilder(&cmdBuilder, "find");
-    cmdBuilder.append("filter", filter);
-    cmdBuilder.append("limit", 1);
-    cmdBuilder.append("singleBatch", true);
-    if (readConcernObj) {
-        cmdBuilder.append(repl::ReadConcernArgs::kReadConcernFieldName, *readConcernObj);
-    }
-
-    BSONObj cmd = cmdBuilder.obj();
-
-    if (runCommand(db, cmd, res, QueryOption_SecondaryOk)) {
-        BSONObj cursorObj = res.getObjectField("cursor");
-        BSONObj docs = cursorObj.getObjectField("firstBatch");
-        BSONObjIterator it(docs);
-        while (it.more()) {
-            BSONElement e = it.next();
-            results.push_back(e.Obj().getOwned());
-        }
-        invariant(results.size() <= 1);
-        NamespaceString resNss(cursorObj["ns"].valueStringData());
-        if (results.empty()) {
-            return {BSONObj(), resNss};
-        }
-        return {results.front(), resNss};
-    }
-
-    uassertStatusOKWithContext(getStatusFromCommandResult(res),
-                               str::stream() << "find command using UUID failed. Command: " << cmd);
-    MONGO_UNREACHABLE;
-}
-
 const uint64_t DBClientBase::INVALID_SOCK_CREATION_TIME = std::numeric_limits<uint64_t>::max();
 
-unique_ptr<DBClientCursor> DBClientBase::query(const NamespaceStringOrUUID& nsOrUuid,
-                                               const BSONObj& filter,
-                                               const Query& querySettings,
-                                               int limit,
-                                               int nToSkip,
-                                               const BSONObj* fieldsToReturn,
-                                               int queryOptions,
-                                               int batchSize,
-                                               boost::optional<BSONObj> readConcernObj) {
-    unique_ptr<DBClientCursor> c(new DBClientCursor(this,
-                                                    nsOrUuid,
-                                                    filter,
-                                                    querySettings,
-                                                    limit,
-                                                    nToSkip,
-                                                    fieldsToReturn,
-                                                    queryOptions,
-                                                    batchSize,
-                                                    readConcernObj));
-    if (c->init())
-        return c;
-    return nullptr;
-}
-
 std::unique_ptr<DBClientCursor> DBClientBase::find(FindCommandRequest findRequest,
-                                                   const ReadPreferenceSetting& readPref) {
-    auto cursor = std::make_unique<DBClientCursor>(this, std::move(findRequest), readPref);
+                                                   const ReadPreferenceSetting& readPref,
+                                                   ExhaustMode exhaustMode) {
+    auto cursor = std::make_unique<DBClientCursor>(
+        this, std::move(findRequest), readPref, exhaustMode == ExhaustMode::kOn);
     if (cursor->init()) {
         return cursor;
     }
     return nullptr;
+}
+
+void DBClientBase::find(FindCommandRequest findRequest,
+                        const ReadPreferenceSetting& readPref,
+                        ExhaustMode exhaustMode,
+                        std::function<void(const BSONObj&)> callback) {
+    auto cursor = this->find(std::move(findRequest), readPref, exhaustMode);
+    while (cursor->more()) {
+        callback(cursor->nextSafe());
+    }
 }
 
 BSONObj DBClientBase::findOne(FindCommandRequest findRequest,
@@ -645,7 +593,7 @@ BSONObj DBClientBase::findOne(FindCommandRequest findRequest,
             "caller cannot provide a limit when calling DBClientBase::findOne()",
             !findRequest.getLimit());
     findRequest.setLimit(1);
-    auto cursor = this->find(std::move(findRequest), readPref);
+    auto cursor = this->find(std::move(findRequest), readPref, ExhaustMode::kOff);
 
     uassert(5951201, "DBClientBase::findOne() could not produce cursor", cursor);
 
@@ -658,109 +606,44 @@ BSONObj DBClientBase::findOne(const NamespaceStringOrUUID& nssOrUuid, BSONObj fi
     return findOne(std::move(findRequest));
 }
 
-unique_ptr<DBClientCursor> DBClientBase::getMore(const string& ns, long long cursorId) {
-    unique_ptr<DBClientCursor> c(
-        new DBClientCursor(this, NamespaceString(ns), cursorId, 0 /* limit */, 0 /* options */));
+unique_ptr<DBClientCursor> DBClientBase::getMore(const NamespaceString& nss, long long cursorId) {
+    unique_ptr<DBClientCursor> c(new DBClientCursor(this, nss, cursorId, false /*isExhaust*/));
     if (c->init())
         return c;
     return nullptr;
 }
 
-struct DBClientFunConvertor {
-    void operator()(DBClientCursorBatchIterator& i) {
-        while (i.moreInCurrentBatch()) {
-            _f(i.nextSafe());
-        }
-    }
-    std::function<void(const BSONObj&)> _f;
-};
-
-unsigned long long DBClientBase::query(std::function<void(const BSONObj&)> f,
-                                       const NamespaceStringOrUUID& nsOrUuid,
-                                       const BSONObj& filter,
-                                       const Query& querySettings,
-                                       const BSONObj* fieldsToReturn,
-                                       int queryOptions,
-                                       int batchSize,
-                                       boost::optional<BSONObj> readConcernObj) {
-    DBClientFunConvertor fun;
-    fun._f = f;
-    std::function<void(DBClientCursorBatchIterator&)> ptr(fun);
-    return this->query(ptr,
-                       nsOrUuid,
-                       filter,
-                       querySettings,
-                       fieldsToReturn,
-                       queryOptions,
-                       batchSize,
-                       readConcernObj);
-}
-
-unsigned long long DBClientBase::query(std::function<void(DBClientCursorBatchIterator&)> f,
-                                       const NamespaceStringOrUUID& nsOrUuid,
-                                       const BSONObj& filter,
-                                       const Query& querySettings,
-                                       const BSONObj* fieldsToReturn,
-                                       int queryOptions,
-                                       int batchSize,
-                                       boost::optional<BSONObj> readConcernObj) {
-    // mask options
-    queryOptions &= (int)(QueryOption_NoCursorTimeout | QueryOption_SecondaryOk);
-
-    unique_ptr<DBClientCursor> c(this->query(nsOrUuid,
-                                             filter,
-                                             querySettings,
-                                             0,
-                                             0,
-                                             fieldsToReturn,
-                                             queryOptions,
-                                             batchSize,
-                                             readConcernObj));
-    // query() throws on network error so OK to uassert with numeric code here.
-    uassert(16090, "socket error for mapping query", c.get());
-
-    unsigned long long n = 0;
-
-    while (c->more()) {
-        DBClientCursorBatchIterator i(*c);
-        f(i);
-        n += i.n();
-    }
-    return n;
-}
-
 namespace {
-OpMsgRequest createInsertRequest(const string& ns,
+OpMsgRequest createInsertRequest(const auth::ValidatedTenancyScope& vts,
+                                 const NamespaceString& nss,
                                  const vector<BSONObj>& v,
                                  bool ordered,
                                  boost::optional<BSONObj> writeConcernObj) {
-    auto nss = NamespaceString(ns);
     BSONObjBuilder cmdBuilder;
     cmdBuilder.append("insert", nss.coll());
     cmdBuilder.append("ordered", ordered);
     if (writeConcernObj) {
         cmdBuilder.append(WriteConcernOptions::kWriteConcernField, *writeConcernObj);
     }
-    auto request = OpMsgRequest::fromDBAndBody(nss.db(), cmdBuilder.obj());
+    auto request = OpMsgRequestBuilder::create(vts, nss.dbName(), cmdBuilder.obj());
     request.sequences.push_back({"documents", v});
 
     return request;
 }
 
-OpMsgRequest createUpdateRequest(const string& ns,
+OpMsgRequest createUpdateRequest(const auth::ValidatedTenancyScope& vts,
+                                 const NamespaceString& nss,
                                  const BSONObj& filter,
                                  BSONObj updateSpec,
                                  bool upsert,
                                  bool multi,
                                  boost::optional<BSONObj> writeConcernObj) {
-    auto nss = NamespaceString(ns);
-
     BSONObjBuilder cmdBuilder;
     cmdBuilder.append("update", nss.coll());
     if (writeConcernObj) {
         cmdBuilder.append(WriteConcernOptions::kWriteConcernField, *writeConcernObj);
     }
-    auto request = OpMsgRequest::fromDBAndBody(nss.db(), cmdBuilder.obj());
+    auto request = OpMsgRequestBuilder::create(vts, nss.dbName(), cmdBuilder.obj());
     request.sequences.push_back(
         {"updates",
          {BSON("q" << filter << "u" << updateSpec << "upsert" << upsert << "multi" << multi)}});
@@ -768,90 +651,108 @@ OpMsgRequest createUpdateRequest(const string& ns,
     return request;
 }
 
-OpMsgRequest createRemoveRequest(const string& ns,
+OpMsgRequest createRemoveRequest(const auth::ValidatedTenancyScope& vts,
+                                 const NamespaceString& nss,
                                  const BSONObj& filter,
                                  bool removeMany,
                                  boost::optional<BSONObj> writeConcernObj) {
     const int limit = removeMany ? 0 : 1;
-    auto nss = NamespaceString(ns);
 
     BSONObjBuilder cmdBuilder;
     cmdBuilder.append("delete", nss.coll());
     if (writeConcernObj) {
         cmdBuilder.append(WriteConcernOptions::kWriteConcernField, *writeConcernObj);
     }
-    auto request = OpMsgRequest::fromDBAndBody(nss.db(), cmdBuilder.obj());
+    auto request = OpMsgRequestBuilder::create(vts, nss.dbName(), cmdBuilder.obj());
     request.sequences.push_back({"deletes", {BSON("q" << filter << "limit" << limit)}});
 
     return request;
 }
 }  // namespace
 
-BSONObj DBClientBase::insertAcknowledged(const string& ns,
+BSONObj DBClientBase::insertAcknowledged(const NamespaceString& nss,
                                          const vector<BSONObj>& v,
                                          bool ordered,
                                          boost::optional<BSONObj> writeConcernObj) {
-    OpMsgRequest request = createInsertRequest(ns, v, ordered, writeConcernObj);
+    OpMsgRequest request = createInsertRequest(
+        _createInnerRequestVTS(nss.tenantId()), nss, v, ordered, writeConcernObj);
     rpc::UniqueReply reply = runCommand(std::move(request));
     return reply->getCommandReply();
 }
 
-void DBClientBase::insert(const string& ns,
+void DBClientBase::insert(const NamespaceString& nss,
                           BSONObj obj,
                           bool ordered,
                           boost::optional<BSONObj> writeConcernObj) {
-    insert(ns, std::vector<BSONObj>{obj}, ordered, writeConcernObj);
+    insert(nss, std::vector<BSONObj>{obj}, ordered, writeConcernObj);
 }
 
-void DBClientBase::insert(const string& ns,
+void DBClientBase::insert(const NamespaceString& nss,
                           const vector<BSONObj>& v,
                           bool ordered,
                           boost::optional<BSONObj> writeConcernObj) {
-    auto request = createInsertRequest(ns, v, ordered, writeConcernObj);
+    auto request = createInsertRequest(
+        _createInnerRequestVTS(nss.tenantId()), nss, v, ordered, writeConcernObj);
     runFireAndForgetCommand(std::move(request));
 }
 
-BSONObj DBClientBase::removeAcknowledged(const string& ns,
+BSONObj DBClientBase::removeAcknowledged(const NamespaceString& nss,
                                          const BSONObj& filter,
                                          bool removeMany,
                                          boost::optional<BSONObj> writeConcernObj) {
-    OpMsgRequest request = createRemoveRequest(ns, filter, removeMany, writeConcernObj);
+    OpMsgRequest request = createRemoveRequest(
+        _createInnerRequestVTS(nss.tenantId()), nss, filter, removeMany, writeConcernObj);
     rpc::UniqueReply reply = runCommand(std::move(request));
     return reply->getCommandReply();
 }
 
-void DBClientBase::remove(const string& ns,
+void DBClientBase::remove(const NamespaceString& nss,
                           const BSONObj& filter,
                           bool removeMany,
                           boost::optional<BSONObj> writeConcernObj) {
-    auto request = createRemoveRequest(ns, filter, removeMany, writeConcernObj);
+    auto request = createRemoveRequest(
+        _createInnerRequestVTS(nss.tenantId()), nss, filter, removeMany, writeConcernObj);
     runFireAndForgetCommand(std::move(request));
 }
 
-BSONObj DBClientBase::updateAcknowledged(const string& ns,
+BSONObj DBClientBase::updateAcknowledged(const NamespaceString& nss,
                                          const BSONObj& filter,
                                          BSONObj updateSpec,
                                          bool upsert,
                                          bool multi,
                                          boost::optional<BSONObj> writeConcernObj) {
-    auto request = createUpdateRequest(ns, filter, updateSpec, upsert, multi, writeConcernObj);
+    auto request = createUpdateRequest(_createInnerRequestVTS(nss.tenantId()),
+                                       nss,
+                                       filter,
+                                       updateSpec,
+                                       upsert,
+                                       multi,
+                                       writeConcernObj);
     rpc::UniqueReply reply = runCommand(std::move(request));
     return reply->getCommandReply();
 }
 
-void DBClientBase::update(const string& ns,
+void DBClientBase::update(const NamespaceString& nss,
                           const BSONObj& filter,
                           BSONObj updateSpec,
                           bool upsert,
                           bool multi,
                           boost::optional<BSONObj> writeConcernObj) {
-    auto request = createUpdateRequest(ns, filter, updateSpec, upsert, multi, writeConcernObj);
+    auto request = createUpdateRequest(_createInnerRequestVTS(nss.tenantId()),
+                                       nss,
+                                       filter,
+                                       updateSpec,
+                                       upsert,
+                                       multi,
+                                       writeConcernObj);
     runFireAndForgetCommand(std::move(request));
 }
 
-void DBClientBase::killCursor(const NamespaceString& ns, long long cursorId) {
-    runFireAndForgetCommand(OpMsgRequest::fromDBAndBody(
-        ns.db(), KillCursorsCommandRequest(ns, {cursorId}).toBSON(BSONObj{})));
+void DBClientBase::killCursor(const NamespaceString& nss, long long cursorId) {
+    runFireAndForgetCommand(
+        OpMsgRequestBuilder::create(_createInnerRequestVTS(nss.tenantId()),
+                                    nss.dbName(),
+                                    KillCursorsCommandRequest(nss, {cursorId}).toBSON()));
 }
 
 namespace {
@@ -861,17 +762,18 @@ namespace {
  */
 BSONObj makeListIndexesCommand(const NamespaceStringOrUUID& nsOrUuid, bool includeBuildUUIDs) {
     BSONObjBuilder bob;
-    if (nsOrUuid.nss()) {
-        bob.append("listIndexes", (*nsOrUuid.nss()).coll());
+    if (nsOrUuid.isNamespaceString()) {
+        bob.append("listIndexes", nsOrUuid.nss().coll());
         bob.append("cursor", BSONObj());
     } else {
-        const auto uuid = (*nsOrUuid.uuid());
+        const auto& uuid = nsOrUuid.uuid();
         uuid.appendToBuilder(&bob, "listIndexes");
         bob.append("cursor", BSONObj());
     }
     if (includeBuildUUIDs) {
         bob.appendBool("includeBuildUUIDs", true);
     }
+
     return bob.obj();
 }
 
@@ -880,100 +782,60 @@ BSONObj makeListIndexesCommand(const NamespaceStringOrUUID& nsOrUuid, bool inclu
 std::list<BSONObj> DBClientBase::getIndexSpecs(const NamespaceStringOrUUID& nsOrUuid,
                                                bool includeBuildUUIDs,
                                                int options) {
-    return _getIndexSpecs(nsOrUuid, makeListIndexesCommand(nsOrUuid, includeBuildUUIDs), options);
-}
-
-std::list<BSONObj> DBClientBase::_getIndexSpecs(const NamespaceStringOrUUID& nsOrUuid,
-                                                const BSONObj& cmd,
-                                                int options) {
-    list<BSONObj> specs;
-    auto dbName = (nsOrUuid.uuid() ? nsOrUuid.dbname() : (*nsOrUuid.nss()).db().toString());
-    BSONObj res;
-    if (runCommand(dbName, cmd, res, options)) {
-        BSONObj cursorObj = res["cursor"].Obj();
-        BSONObjIterator i(cursorObj["firstBatch"].Obj());
-        while (i.more()) {
-            specs.push_back(i.next().Obj().getOwned());
-        }
-
-        if (res.hasField(LogicalTime::kOperationTimeFieldName)) {
-            setOperationTime(LogicalTime::fromOperationTime(res).asTimestamp());
-        }
-
-        const long long id = cursorObj["id"].Long();
-
-        if (id != 0) {
-            const auto cursorNs = cursorObj["ns"].String();
-            if (nsOrUuid.nss()) {
-                invariant((*nsOrUuid.nss()).toString() == cursorNs);
-            }
-            unique_ptr<DBClientCursor> cursor = getMore(cursorNs, id);
-            while (cursor->more()) {
-                specs.push_back(cursor->nextSafe().getOwned());
-            }
-
-            if (cursor->getOperationTime()) {
-                setOperationTime(*(cursor->getOperationTime()));
-            }
-        }
-
-        return specs;
-    }
-    Status status = getStatusFromCommandResult(res);
+    auto cmd = makeListIndexesCommand(nsOrUuid, includeBuildUUIDs);
+    auto res = runExhaustiveCursorCommand(nsOrUuid.dbName(), cmd, options);
 
     // "NamespaceNotFound" is an error for UUID but returns an empty list for NamespaceString; this
     // matches the behavior for other commands such as 'find' and 'count'.
-    if (nsOrUuid.nss() && status.code() == ErrorCodes::NamespaceNotFound) {
-        return specs;
+    if (nsOrUuid.isNamespaceString() && res == ErrorCodes::NamespaceNotFound) {
+        return {};
     }
-    uassertStatusOK(status.withContext(str::stream() << "listIndexes failed: " << res));
-    MONGO_UNREACHABLE;
+
+    return uassertStatusOK(res);
 }
 
-
-void DBClientBase::dropIndex(const string& ns,
+void DBClientBase::dropIndex(const NamespaceString& nss,
                              BSONObj keys,
                              boost::optional<BSONObj> writeConcernObj) {
-    dropIndex(ns, genIndexName(keys), writeConcernObj);
+    dropIndex(nss, genIndexName(keys), writeConcernObj);
 }
 
 
-void DBClientBase::dropIndex(const string& ns,
+void DBClientBase::dropIndex(const NamespaceString& nss,
                              const string& indexName,
                              boost::optional<BSONObj> writeConcernObj) {
     BSONObjBuilder cmdBuilder;
-    cmdBuilder.append("dropIndexes", nsToCollectionSubstring(ns));
+    cmdBuilder.append("dropIndexes", nss.coll());
     cmdBuilder.append("index", indexName);
     if (writeConcernObj) {
         cmdBuilder.append(WriteConcernOptions::kWriteConcernField, *writeConcernObj);
     }
+
     BSONObj info;
-    if (!runCommand(nsToDatabase(ns), cmdBuilder.obj(), info)) {
-        LOGV2_DEBUG(20118,
-                    _logLevel.toInt(),
-                    "dropIndex failed: {info}",
-                    "dropIndex failed",
-                    "info"_attr = info);
+    if (!runCommand(nss.dbName(), cmdBuilder.obj(), info)) {
+        LOGV2_DEBUG(20118, _logLevel.toInt(), "dropIndex failed", "info"_attr = info);
         uassert(10007, "dropIndex failed", 0);
     }
 }
 
-void DBClientBase::dropIndexes(const string& ns, boost::optional<BSONObj> writeConcernObj) {
+void DBClientBase::dropIndexes(const NamespaceString& nss,
+                               boost::optional<BSONObj> writeConcernObj) {
     BSONObjBuilder cmdBuilder;
-    cmdBuilder.append("dropIndexes", nsToCollectionSubstring(ns));
+    cmdBuilder.append("dropIndexes", nss.coll());
     cmdBuilder.append("index", "*");
     if (writeConcernObj) {
         cmdBuilder.append(WriteConcernOptions::kWriteConcernField, *writeConcernObj);
     }
+
     BSONObj info;
-    uassert(10008, "dropIndexes failed", runCommand(nsToDatabase(ns), cmdBuilder.obj(), info));
+    uassert(10008, "dropIndexes failed", runCommand(nss.dbName(), cmdBuilder.obj(), info));
 }
 
-void DBClientBase::reIndex(const string& ns) {
+void DBClientBase::reIndex(const NamespaceString& nss) {
     BSONObj info;
     uassert(18908,
             str::stream() << "reIndex failed: " << info,
-            runCommand(nsToDatabase(ns), BSON("reIndex" << nsToCollectionSubstring(ns)), info));
+            runCommand(nss.dbName(), BSON("reIndex" << nss.coll()), info));
 }
 
 
@@ -998,11 +860,12 @@ string DBClientBase::genIndexName(const BSONObj& keys) {
     return ss.str();
 }
 
-void DBClientBase::createIndexes(StringData ns,
+void DBClientBase::createIndexes(const NamespaceString& nss,
                                  const std::vector<const IndexSpec*>& descriptors,
                                  boost::optional<BSONObj> writeConcernObj) {
     BSONObjBuilder command;
-    command.append("createIndexes", nsToCollectionSubstring(ns));
+    command.append("createIndexes", nss.coll());
+
     {
         BSONArrayBuilder indexes(command.subarrayStart("indexes"));
         for (const auto& desc : descriptors) {
@@ -1015,18 +878,19 @@ void DBClientBase::createIndexes(StringData ns,
     const BSONObj commandObj = command.done();
 
     BSONObj infoObj;
-    if (!runCommand(nsToDatabase(ns), commandObj, infoObj)) {
+    if (!runCommand(nss.dbName(), commandObj, infoObj)) {
         Status runCommandStatus = getStatusFromCommandResult(infoObj);
         invariant(!runCommandStatus.isOK());
         uassertStatusOK(runCommandStatus);
     }
 }
 
-void DBClientBase::createIndexes(StringData ns,
+void DBClientBase::createIndexes(const NamespaceString& nss,
                                  const std::vector<BSONObj>& specs,
                                  boost::optional<BSONObj> writeConcernObj) {
     BSONObjBuilder command;
-    command.append("createIndexes", nsToCollectionSubstring(ns));
+    command.append("createIndexes", nss.coll());
+
     {
         BSONArrayBuilder indexes(command.subarrayStart("indexes"));
         for (const auto& spec : specs) {
@@ -1039,7 +903,7 @@ void DBClientBase::createIndexes(StringData ns,
     const BSONObj commandObj = command.done();
 
     BSONObj infoObj;
-    if (!runCommand(nsToDatabase(ns), commandObj, infoObj)) {
+    if (!runCommand(nss.dbName(), commandObj, infoObj)) {
         Status runCommandStatus = getStatusFromCommandResult(infoObj);
         invariant(!runCommandStatus.isOK());
         uassertStatusOK(runCommandStatus);
@@ -1056,7 +920,7 @@ bool hasErrField(const BSONObj& o) {
 
 /** @return the database name portion of an ns string */
 string nsGetDB(const string& ns) {
-    string::size_type pos = ns.find(".");
+    string::size_type pos = ns.find('.');
     if (pos == string::npos)
         return ns;
 
@@ -1065,7 +929,7 @@ string nsGetDB(const string& ns) {
 
 /** @return the collection name portion of an ns string */
 string nsGetCollection(const string& ns) {
-    string::size_type pos = ns.find(".");
+    string::size_type pos = ns.find('.');
     if (pos == string::npos)
         return "";
 

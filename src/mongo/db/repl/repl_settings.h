@@ -29,25 +29,24 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #include <string>
 
-#include "mongo/db/jsobj.h"
-#include "mongo/db/repl/repl_server_parameters_gen.h"
-#include "mongo/db/repl/repl_set_config_params_gen.h"
-
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace repl {
 
 class ReplSettings {
 public:
     std::string ourSetName() const;
-    bool usingReplSets() const;
+    bool isReplSet() const;
 
     /**
      * Getters
      */
     long long getOplogSizeBytes() const;
     std::string getReplSetString() const;
+    bool shouldAutoInitiate() const;
 
     /**
      * Static getter for the 'recoverFromOplogAsStandalone' server parameter.
@@ -55,16 +54,22 @@ public:
     static bool shouldRecoverFromOplogAsStandalone();
 
     /**
+     * Static getter for the 'skipOplogSampling' server parameter.
+     */
+    static bool shouldSkipOplogSampling();
+
+    /**
      * Setters
      */
     void setOplogSizeBytes(long long oplogSizeBytes);
     void setReplSetString(std::string replSetString);
+    void setShouldAutoInitiate();
 
 private:
     long long _oplogSizeBytes = 0;  // --oplogSize
-
+    bool _shouldAutoInitiate = false;
     std::string _replSetString;  // --replSet[/<seedlist>]
 };
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

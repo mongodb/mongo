@@ -27,13 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/db/query/collation/collator_factory_icu.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/service_context.h"
 
 #include <memory>
-
-#include "mongo/base/init.h"
-#include "mongo/db/query/collation/collator_factory_icu.h"
-#include "mongo/db/service_context.h"
+#include <string>
 
 namespace mongo {
 namespace {

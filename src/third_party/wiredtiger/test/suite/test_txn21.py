@@ -33,14 +33,6 @@
 import wiredtiger, wttest
 
 class test_txn21(wttest.WiredTigerTestCase):
-
-    # Connection-level configuration.
-    def test_operation_timeout_conn(self):
-        # Close the automatically opened connection and open one with the timeout configuration.
-        conn_config = 'operation_timeout_ms=2000'
-        self.conn.close()
-        self.conn = wiredtiger.wiredtiger_open(self.home, conn_config)
-
     # Transaction-level configuration.
     def test_operation_timeout_txn(self):
         # Test during begin.
@@ -54,6 +46,3 @@ class test_txn21(wttest.WiredTigerTestCase):
         # Test during commit.
         self.session.begin_transaction()
         self.session.commit_transaction('operation_timeout_ms=2000')
-
-if __name__ == '__main__':
-    wttest.run()

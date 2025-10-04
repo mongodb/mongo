@@ -219,6 +219,7 @@
 #  define BOOST_NO_CXX11_LOCAL_CLASS_TEMPLATE_PARAMETERS
 #  define BOOST_NO_CXX11_RAW_LITERALS
 #  define BOOST_NO_CXX11_UNICODE_LITERALS
+#  define BOOST_NO_CXX11_ALIGNOF
 #endif
 
 // C++0x features in 4.5.1 and later
@@ -318,14 +319,18 @@
 #if !defined(__cpp_if_constexpr) || (__cpp_if_constexpr < 201606)
 #  define BOOST_NO_CXX17_IF_CONSTEXPR
 #endif
+#if (__GNUC__ < 7) || (__cplusplus < 201703L)
+#  define BOOST_NO_CXX17_AUTO_NONTYPE_TEMPLATE_PARAMS
+#endif
 
 #if __GNUC__ >= 7
 #  define BOOST_FALLTHROUGH __attribute__((fallthrough))
 #endif
 
-#if defined(__MINGW32__) && !defined(__MINGW64__)
-// Currently (March 2019) thread_local is broken on mingw for all current 32bit compiler releases, see
+#if (__GNUC__ < 11) && defined(__MINGW32__) && !defined(__MINGW64__)
+// thread_local was broken on mingw for all 32bit compiler releases prior to 11.x, see
 // https://sourceforge.net/p/mingw-w64/bugs/527/
+// https://gcc.gnu.org/bugzilla/show_bug.cgi?id=83562
 // Not setting this causes program termination on thread exit.
 #define BOOST_NO_CXX11_THREAD_LOCAL
 #endif
@@ -339,10 +344,16 @@
 // Type aliasing hint. Supported since gcc 3.3.
 #define BOOST_MAY_ALIAS __attribute__((__may_alias__))
 
-//
-// __builtin_unreachable:
+// Unreachable code markup
 #if BOOST_GCC_VERSION >= 40500
 #define BOOST_UNREACHABLE_RETURN(x) __builtin_unreachable();
+#endif
+
+// Deprecated symbol markup
+#if BOOST_GCC_VERSION >= 40500
+#define BOOST_DEPRECATED(msg) __attribute__((deprecated(msg)))
+#else
+#define BOOST_DEPRECATED(msg) __attribute__((deprecated))
 #endif
 
 #ifndef BOOST_COMPILER
@@ -358,7 +369,7 @@
 
 // versions check:
 // we don't know gcc prior to version 3.30:
-#if (BOOST_GCC_VERSION< 30300)
+#if (BOOST_GCC_VERSION < 30300)
 #  error "Compiler not configured - please reconfigure"
 #endif
 //

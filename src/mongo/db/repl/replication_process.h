@@ -30,17 +30,15 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/repl/replication_recovery.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+#include <memory>
+
+namespace MONGO_MOD_PUB mongo {
 
 class OperationContext;
 class ServiceContext;
@@ -103,7 +101,7 @@ private:
     // (M)  Reads and writes guarded by _mutex.
 
     // Guards access to member variables.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ReplicationProcess::_mutex");
+    mutable stdx::mutex _mutex;
 
     // Used to access the storage layer.
     StorageInterface* const _storageInterface;  // (R)
@@ -119,4 +117,4 @@ private:
 };
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

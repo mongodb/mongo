@@ -1,34 +1,39 @@
 /**
  * Tests that various forms of normal and abnormal shutdown write to the log files as expected.
  * @tags: [
- *   live_record_incompatible,
  *   requires_sharding,
+ *   incompatible_aubsan,
  * ]
  */
 
-(function() {
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
+// Because this test intentionally crashes the server, we instruct the
+// the shell to clean up after us and remove the core dump.
+TestData.cleanUpCoreDumpsFromExpectedCrash = true;
 
 function makeShutdownByCrashFn(crashHow) {
-    return function(conn) {
-        var admin = conn.getDB("admin");
-        assert.commandWorked(admin.runCommand(
-            {configureFailPoint: "crashOnShutdown", mode: "alwaysOn", data: {how: crashHow}}));
+    return function (conn) {
+        let admin = conn.getDB("admin");
+        assert.commandWorked(
+            admin.runCommand({configureFailPoint: "crashOnShutdown", mode: "alwaysOn", data: {how: crashHow}}),
+        );
         admin.shutdownServer();
     };
 }
 
 function makeRegExMatchFn(pattern) {
-    return function(text) {
+    return function (text) {
         return pattern.test(text);
     };
 }
 
 function testShutdownLogging(launcher, crashFn, matchFn, expectedExitCode) {
     clearRawMongoProgramOutput();
-    var conn = launcher.start({});
+    let conn = launcher.start({});
 
     function checkOutput() {
-        var logContents = rawMongoProgramOutput();
+        let logContents = rawMongoProgramOutput(".*");
         function printLog() {
             // We can't just return a string because it will be well over the max
             // line length.
@@ -52,60 +57,64 @@ function testShutdownLogging(launcher, crashFn, matchFn, expectedExitCode) {
 function runAllTests(launcher) {
     const SIGSEGV = 11;
     const SIGABRT = 6;
-    testShutdownLogging(launcher, function(conn) {
-        conn.getDB('admin').shutdownServer();
-    }, makeRegExMatchFn(/Terminating via shutdown command/), MongoRunner.EXIT_CLEAN);
+    testShutdownLogging(
+        launcher,
+        function (conn) {
+            conn.getDB("admin").shutdownServer();
+        },
+        makeRegExMatchFn(/Terminating via shutdown command/),
+        MongoRunner.EXIT_CLEAN,
+    );
 
-    testShutdownLogging(launcher,
-                        makeShutdownByCrashFn('fault'),
-                        makeRegExMatchFn(/Invalid access at address[\s\S]*printStackTrace/),
-                        -SIGSEGV);
+    testShutdownLogging(
+        launcher,
+        makeShutdownByCrashFn("fault"),
+        makeRegExMatchFn(/Invalid access at address[\s\S]*printStackTrace/),
+        SIGSEGV,
+    );
 
-    testShutdownLogging(launcher,
-                        makeShutdownByCrashFn('abort'),
-                        makeRegExMatchFn(/Got signal[\s\S]*printStackTrace/),
-                        -SIGABRT);
+    testShutdownLogging(
+        launcher,
+        makeShutdownByCrashFn("abort"),
+        makeRegExMatchFn(/Got signal[\s\S]*printStackTrace/),
+        SIGABRT,
+    );
 }
 
 if (_isWindows()) {
     print("SKIPPING TEST ON WINDOWS");
-    return;
-}
-
-if (_isAddressSanitizerActive()) {
-    print("SKIPPING TEST ON ADDRESS SANITIZER BUILD");
-    return;
+    quit();
 }
 
 (function testMongod() {
     print("********************\nTesting exit logging in mongod\n********************");
 
     runAllTests({
-        start: function(opts) {
-            var actualOpts = {nojournal: ""};
-            Object.extend(actualOpts, opts);
-            return MongoRunner.runMongod(actualOpts);
+        start: function (opts) {
+            return MongoRunner.runMongod(opts);
         },
 
-        stop: MongoRunner.stopMongod
+        stop: MongoRunner.stopMongod,
     });
-}());
+})();
 
 (function testMongos() {
     print("********************\nTesting exit logging in mongos\n********************");
 
-    var st = new ShardingTest({shards: 1});
-    var mongosLauncher = {
-        start: function(opts) {
-            var actualOpts = {configdb: st._configDB};
+    let st = new ShardingTest({
+        shards: 1,
+        configOptions: {setParameter: {transactionLifetimeLimitSeconds: 10}},
+    });
+    let mongosLauncher = {
+        start: function (opts) {
+            let actualOpts = {configdb: st._configDB};
             Object.extend(actualOpts, opts);
             return MongoRunner.runMongos(actualOpts);
         },
 
-        stop: MongoRunner.stopMongos
+        stop: MongoRunner.stopMongos,
     };
 
     runAllTests(mongosLauncher);
     st.stop();
-}());
-}());
+})();

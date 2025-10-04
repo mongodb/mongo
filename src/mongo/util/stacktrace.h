@@ -32,13 +32,18 @@
  */
 #pragma once
 
-#include <array>
-#include <iosfwd>
-#include <string>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/util/future.h"
+#include "mongo/util/synchronized_value.h"
+
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <iosfwd>
+#include <string>
+#include <utility>
 
 /**
  * All-thread backtrace is only implemented on Linux. Even on Linux, it's only AS-safe
@@ -85,10 +90,50 @@ public:
 
 private:
     void doWrite(StringData v) override {
-        _s.append(v.rawData(), v.size());
+        _s.append(v.data(), v.size());
     }
 
     std::string& _s;
+};
+
+/**
+ * A `StackTrace` object also encapsulates any errors encountered while attaining stacktrace
+ * information. Oddly, a `StackTrace` object can be in an error state (`hasError` returns true) and
+ * have non-empty stacktrace information via `getBSONRepresentation`. It is legal to call
+ * `getBSONRepresentation` even when in an error state.
+ *
+ * Likewise, it is always safe to call `log` or `sink`, regardless of error state. Those output
+ * methods will write out any errors along with any available stacktrace information.
+ *
+ * Disabling log truncation is strongly recommended when logging a BSONObj returned from
+ * `getBSONRepresentation` by hand.
+ */
+class StackTrace {
+public:
+    explicit StackTrace(BSONObj stacktrace) : _stacktrace(stacktrace) {}
+
+    StackTrace(BSONObj stacktrace, std::string error)
+        : _stacktrace(stacktrace), _error(std::move(error)) {}
+
+    void log(bool withHumanReadable = true) const;
+
+    void sink(StackTraceSink* sink, bool withHumanReadable = true) const;
+
+    BSONObj getBSONRepresentation() const {
+        return _stacktrace;
+    }
+
+    bool hasError() const {
+        return !_error.empty();
+    }
+
+    std::string getError() const {
+        return _error;
+    }
+
+private:
+    BSONObj _stacktrace;
+    std::string _error;
 };
 
 namespace stack_trace_detail {
@@ -142,6 +187,64 @@ private:
 };
 
 void logBacktraceObject(const BSONObj& bt, StackTraceSink* sink, bool withHumanReadable);
+
+/**
+ * Multiple waiters can register their interest in the next stack trace,
+ * by calling `waiter()` and obtaining a waiter object, which will block
+ * in its destructor until the next stack trace completes.
+ * On the "producer side", each stack trace collection calls `notifier()`
+ * to become that next stack trace. It will signal the end of the collection
+ * by destroying the notifier object returned by that `notifier` call.
+ */
+class PrintAllStacksSession {
+public:
+    /** Notifies observers on its destruction. */
+    class Notifier {
+    public:
+        explicit Notifier(std::unique_ptr<SharedPromise<void>> prom) : _prom{std::move(prom)} {}
+        ~Notifier() {
+            if (_prom)
+                _prom->emplaceValue();
+        }
+
+        Notifier(Notifier&&) = default;
+        Notifier& operator=(Notifier&&) = default;
+
+    private:
+        std::unique_ptr<SharedPromise<void>> _prom;
+    };
+
+    /** Blocks in its destructor waiting for a session to complete. */
+    class Waiter {
+    public:
+        explicit Waiter(SharedSemiFuture<void> fut) : _fut{std::move(fut)} {}
+        ~Waiter() {
+            if (_fut.valid())
+                _fut.get();
+        }
+
+        Waiter(Waiter&&) = default;
+        Waiter& operator=(Waiter&&) = default;
+
+    private:
+        SharedSemiFuture<void> _fut;
+    };
+
+    Notifier notifier() {
+        // Consume and retain the current SharedPromise from _promise.
+        return Notifier{std::exchange(**_promise, {})};
+    }
+
+    Waiter waiter() {
+        auto updateGuard = _promise.synchronize();
+        if (!*updateGuard)
+            *updateGuard = std::make_unique<SharedPromise<void>>();
+        return Waiter{(*updateGuard)->getFuture()};
+    }
+
+private:
+    synchronized_value<std::unique_ptr<SharedPromise<void>>> _promise;
+};
 
 }  // namespace stack_trace_detail
 
@@ -279,6 +382,7 @@ size_t rawBacktrace(void** addrs, size_t capacity);
 void printStackTrace(StackTraceSink& sink);
 void printStackTrace(std::ostream& os);
 void printStackTrace();
+StackTrace getStackTrace();
 
 #if defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
 
@@ -302,6 +406,9 @@ void markAsStackTraceProcessingThread();
  */
 void printAllThreadStacks();
 void printAllThreadStacks(StackTraceSink& sink);
+
+/** Calls `printAllThreadStacks` and blocks until it is completed. */
+void printAllThreadStacksBlocking();
 
 #endif  // defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
 

@@ -29,23 +29,39 @@
 
 #pragma once
 
-#include <cstdlib>
-#include <string>
-#include <typeinfo>
-
-#include "mongo/base/status.h"  // NOTE: This is safe as utils depend on base
+#include "mongo/base/error_codes.h"
+#include "mongo/base/error_extra_info.h"
+#include "mongo/base/static_assert.h"
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/source_location.h"
+#include "mongo/util/assert_util_core.h"  // IWYU pragma: export
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/exit_code.h"
 
-#define MONGO_ALLOW_INCLUDE_INVARIANT_H
-#include "mongo/util/invariant.h"
-#undef MONGO_ALLOW_INCLUDE_INVARIANT_H
+#include <algorithm>
+#include <cstdlib>
+#include <exception>
+#include <iterator>
+#include <memory>
+#include <string>
+#include <type_traits>
+#include <typeinfo>
+#include <utility>
+#include <vector>
+
+#include <fmt/format.h>
 
 namespace mongo {
+
+/**
+ * Sets the appropriate state to enable/disable diagnostic logging based on `newVal`.
+ */
+void setDiagnosticLoggingInAssertUtil(bool newVal);
 
 class AssertionCount {
 public:
@@ -63,13 +79,11 @@ public:
 
 extern AssertionCount assertionCount;
 class DBException;
-std::string causedBy(const DBException& e);
-std::string causedBy(const std::string& e);
 
 /** Most mongo exceptions inherit from this; this is commonly caught in most threads */
 class DBException : public std::exception {
 public:
-    const char* what() const throw() final {
+    const char* what() const noexcept final {
         return reason().c_str();
     }
 
@@ -115,7 +129,7 @@ public:
     /**
      * Returns the generic ErrorExtraInfo if present.
      */
-    const std::shared_ptr<const ErrorExtraInfo> extraInfo() const {
+    std::shared_ptr<const ErrorExtraInfo> extraInfo() const {
         return _status.extraInfo();
     }
 
@@ -127,7 +141,14 @@ public:
         return _status.extraInfo<ErrorDetail>();
     }
 
-    static AtomicWord<bool> traceExceptions;
+    static inline AtomicWord<bool> traceExceptions{false};
+
+    /**
+     * Allows handling `ErrorCodes::WriteConflict` as a special case and if true, will call
+     * `printStackTrace` on every `WriteConflict` error. Can be set via the
+     * `traceWriteConflictExceptions` server parameter.
+     */
+    static inline AtomicWord<bool> traceWriteConflictExceptions{false};
 
 protected:
     DBException(const Status& status) : _status(status) {
@@ -153,6 +174,58 @@ public:
 };
 
 /**
+ * Encompasses a class of exceptions due to lack of resources or conflicting resources. Can be used
+ * to conveniently catch all derived exceptions instead of enumerating each of them individually.
+ */
+class StorageUnavailableException : public DBException {
+public:
+    using DBException::DBException;
+};
+
+/**
+ * Use `throwWriteConflictException()` instead of throwing `WriteConflictException` directly.
+ */
+class WriteConflictException final : public StorageUnavailableException {
+public:
+    WriteConflictException(const Status& status) : StorageUnavailableException(status) {}
+
+private:
+    void defineOnlyInFinalSubclassToPreventSlicing() final {}
+};
+
+/**
+ * Use `throwTemporarilyUnavailableException()` instead of throwing
+ * `TemporarilyUnavailableException` directly.
+ */
+class TemporarilyUnavailableException final : public StorageUnavailableException {
+public:
+    TemporarilyUnavailableException(const Status& status) : StorageUnavailableException(status) {}
+
+private:
+    void defineOnlyInFinalSubclassToPreventSlicing() final {}
+};
+
+/**
+ * Use `throwTransactionTooLargeForCache()` instead of throwing
+ * `TransactionTooLargeForCache` directly.
+ */
+class TransactionTooLargeForCacheException final : public StorageUnavailableException {
+public:
+    TransactionTooLargeForCacheException(const Status& status)
+        : StorageUnavailableException(status) {}
+
+private:
+    void defineOnlyInFinalSubclassToPreventSlicing() final {}
+};
+
+
+/**
+ * This namespace contains implementation details for our error handling code and should not be used
+ * directly in general code.
+ */
+namespace error_details {
+
+/**
  * The base class of all DBExceptions for codes of the given ErrorCategory to allow catching by
  * category.
  */
@@ -168,19 +241,12 @@ protected:
     }
 };
 
-
-/**
- * This namespace contains implementation details for our error handling code and should not be used
- * directly in general code.
- */
-namespace error_details {
-
 template <ErrorCodes::Error kCode, typename... Bases>
-class ExceptionForImpl final : public Bases... {
+class ExceptionForCode final : public Bases... {
 public:
     MONGO_STATIC_ASSERT(isNamedCode<kCode>);
 
-    ExceptionForImpl(const Status& status) : AssertionException(status) {
+    ExceptionForCode(const Status& status) : AssertionException(status) {
         invariant(status.code() == kCode);
     }
 
@@ -197,129 +263,231 @@ private:
 };
 
 template <ErrorCodes::Error code, typename categories = ErrorCategoriesFor<code>>
-struct ExceptionForDispatcher;
+struct ExceptionForCodeDispatcher;
 
 template <ErrorCodes::Error code, ErrorCategory... categories>
-struct ExceptionForDispatcher<code, CategoryList<categories...>> {
+struct ExceptionForCodeDispatcher<code, CategoryList<categories...>> {
     using type = std::conditional_t<sizeof...(categories) == 0,
-                                    ExceptionForImpl<code, AssertionException>,
-                                    ExceptionForImpl<code, ExceptionForCat<categories>...>>;
+                                    ExceptionForCode<code, AssertionException>,
+                                    ExceptionForCode<code, ExceptionForCat<categories>...>>;
+};
+
+// Note: second template parameter shouldn't be necessary but is on MSVC.
+// It seems to be unable to disambiguate the partial specializations of an auto NTTP
+// with concrete types and needs a dummy type template parameter to do so.
+template <auto codeOrCat, typename = decltype(codeOrCat)>
+struct ExceptionForDispatcher;
+
+template <ErrorCodes::Error code>
+struct ExceptionForDispatcher<code, ErrorCodes::Error> : ExceptionForCodeDispatcher<code> {};
+
+template <>
+struct ExceptionForDispatcher<ErrorCodes::WriteConflict, ErrorCodes::Error> {
+    using type = WriteConflictException;
+};
+
+template <>
+struct ExceptionForDispatcher<ErrorCodes::TemporarilyUnavailable, ErrorCodes::Error> {
+    using type = TemporarilyUnavailableException;
+};
+
+template <>
+struct ExceptionForDispatcher<ErrorCodes::TransactionTooLargeForCache, ErrorCodes::Error> {
+    using type = TransactionTooLargeForCacheException;
+};
+
+template <ErrorCategory category>
+struct ExceptionForDispatcher<category, ErrorCategory> {
+    using type = ExceptionForCat<category>;
 };
 
 }  // namespace error_details
 
 
 /**
- * Resolves to the concrete exception type for the given error code.
+ * Resolves to the concrete exception type for the given ErrorCode or ErrorCategory.
  *
- * It will be a subclass of both AssertionException, along with ExceptionForCat<> of every category
- * that the code belongs to.
- *
- * TODO in C++17 we can combine this with ExceptionForCat by doing something like:
- * template <auto codeOrCategory> using ExceptionFor = typename
- *      error_details::ExceptionForDispatcher<decltype(codeOrCategory)>::type;
+ * It will be a subclass of AssertionException, and when passed an error code, it will also be a
+ * subclass of ExceptionFor<ErrorCategory> of every category that the code belongs to.
  */
-template <ErrorCodes::Error code>
-using ExceptionFor = typename error_details::ExceptionForDispatcher<code>::type;
+template <auto codeOrCatagory>
+requires std::is_same_v<decltype(codeOrCatagory), ErrorCodes::Error> ||
+    std::is_same_v<decltype(codeOrCatagory), ErrorCategory>
+using ExceptionFor = typename error_details::ExceptionForDispatcher<codeOrCatagory>::type;
 
-MONGO_COMPILER_NORETURN void verifyFailed(const char* expr, const char* file, unsigned line);
-MONGO_COMPILER_NORETURN void invariantOKFailed(const char* expr,
-                                               const Status& status,
-                                               const char* file,
-                                               unsigned line) noexcept;
-MONGO_COMPILER_NORETURN void invariantOKFailedWithMsg(const char* expr,
-                                                      const Status& status,
-                                                      const std::string& msg,
-                                                      const char* file,
-                                                      unsigned line) noexcept;
 
-#define fassertFailed MONGO_fassertFailed
-#define MONGO_fassertFailed(...) ::mongo::fassertFailedWithLocation(__VA_ARGS__, __FILE__, __LINE__)
-MONGO_COMPILER_NORETURN void fassertFailedWithLocation(int msgid,
-                                                       const char* file,
-                                                       unsigned line) noexcept;
+MONGO_COMPILER_NORETURN void verifyFailed(const char* expr,
+                                          SourceLocation loc = MONGO_SOURCE_LOCATION());
+MONGO_COMPILER_NORETURN void invariantOKFailed(
+    const char* expr, const Status& status, SourceLocation loc = MONGO_SOURCE_LOCATION()) noexcept;
+MONGO_COMPILER_NORETURN void invariantOKFailedWithMsg(
+    const char* expr,
+    const Status& status,
+    const std::string& msg,
+    SourceLocation loc = MONGO_SOURCE_LOCATION()) noexcept;
 
-#define fassertFailedNoTrace MONGO_fassertFailedNoTrace
-#define MONGO_fassertFailedNoTrace(...) \
-    ::mongo::fassertFailedNoTraceWithLocation(__VA_ARGS__, __FILE__, __LINE__)
-MONGO_COMPILER_NORETURN void fassertFailedNoTraceWithLocation(int msgid,
-                                                              const char* file,
-                                                              unsigned line) noexcept;
+namespace fassert_detail {
 
-#define fassertFailedWithStatus MONGO_fassertFailedWithStatus
-#define MONGO_fassertFailedWithStatus(...) \
-    ::mongo::fassertFailedWithStatusWithLocation(__VA_ARGS__, __FILE__, __LINE__)
-MONGO_COMPILER_NORETURN void fassertFailedWithStatusWithLocation(int msgid,
-                                                                 const Status& status,
-                                                                 const char* file,
-                                                                 unsigned line) noexcept;
+/** Convertible from exactly `int`, but not from bool or other types that convert to int. */
+struct MsgId {
+    /** Allow exactly int */
+    constexpr explicit(false) MsgId(int id) : id{id} {}
 
-#define fassertFailedWithStatusNoTrace MONGO_fassertFailedWithStatusNoTrace
-#define MONGO_fassertFailedWithStatusNoTrace(...) \
-    ::mongo::fassertFailedWithStatusNoTraceWithLocation(__VA_ARGS__, __FILE__, __LINE__)
-MONGO_COMPILER_NORETURN void fassertFailedWithStatusNoTraceWithLocation(int msgid,
-                                                                        const Status& status,
-                                                                        const char* file,
-                                                                        unsigned line) noexcept;
+    /** Allow copy */
+    constexpr MsgId(const MsgId&) = default;
+    constexpr MsgId& operator=(const MsgId&) = default;
 
-/* convert various types of exceptions to strings */
-std::string causedBy(StringData e);
-std::string causedBy(const char* e);
-std::string causedBy(const DBException& e);
-std::string causedBy(const std::exception& e);
-std::string causedBy(const std::string& e);
-std::string causedBy(const std::string* e);
-std::string causedBy(const Status& e);
+    /** Reject everything else. */
+    template <typename T, std::enable_if_t<!std::is_same_v<std::decay_t<T>, MsgId>, int> = 0>
+    explicit(false) MsgId(T&&) = delete;
 
-#define fassert MONGO_fassert
-#define MONGO_fassert(...) ::mongo::fassertWithLocation(__VA_ARGS__, __FILE__, __LINE__)
+    int id;
+};
 
-/** aborts on condition failure */
-inline void fassertWithLocation(int msgid, bool testOK, const char* file, unsigned line) {
-    if (MONGO_unlikely(!testOK)) {
-        fassertFailedWithLocation(msgid, file, line);
+MONGO_COMPILER_NORETURN void failed(MsgId msgid,
+                                    SourceLocation loc = MONGO_SOURCE_LOCATION()) noexcept;
+MONGO_COMPILER_NORETURN void failed(MsgId msgid,
+                                    const Status& status,
+                                    SourceLocation loc = MONGO_SOURCE_LOCATION()) noexcept;
+MONGO_COMPILER_NORETURN void failedNoTrace(MsgId msgid,
+                                           SourceLocation loc = MONGO_SOURCE_LOCATION()) noexcept;
+MONGO_COMPILER_NORETURN void failedNoTrace(MsgId msgid,
+                                           const Status& status,
+                                           SourceLocation loc = MONGO_SOURCE_LOCATION()) noexcept;
+
+/** Aborts if `cond` is false. */
+constexpr void check(MsgId msgid, bool cond, SourceLocation loc = MONGO_SOURCE_LOCATION()) {
+    if (MONGO_unlikely(!cond)) {
+        failed(msgid, loc);
+    }
+}
+
+constexpr void check(MsgId msgid,
+                     const Status& status,
+                     SourceLocation loc = MONGO_SOURCE_LOCATION()) {
+    if (MONGO_unlikely(!status.isOK())) {
+        failed(msgid, status, loc);
     }
 }
 
 template <typename T>
-inline T fassertWithLocation(int msgid, StatusWith<T> sw, const char* file, unsigned line) {
+constexpr T check(MsgId msgid, StatusWith<T> sw, SourceLocation loc = MONGO_SOURCE_LOCATION()) {
     if (MONGO_unlikely(!sw.isOK())) {
-        fassertFailedWithStatusWithLocation(msgid, sw.getStatus(), file, line);
+        failed(msgid, sw.getStatus(), loc);
     }
     return std::move(sw.getValue());
 }
 
-inline void fassertWithLocation(int msgid, const Status& status, const char* file, unsigned line) {
-    if (MONGO_unlikely(!status.isOK())) {
-        fassertFailedWithStatusWithLocation(msgid, status, file, line);
+/** Reject anything stringlike from being used as a bool cond by mistake. */
+template <typename T, std::enable_if_t<std::is_convertible_v<T, StringData>, int> = 0>
+void check(MsgId msgid, T&& cond, SourceLocation loc = MONGO_SOURCE_LOCATION()) = delete;
+
+constexpr void checkNoTrace(MsgId msgid, bool cond, SourceLocation loc = MONGO_SOURCE_LOCATION()) {
+    if (MONGO_unlikely(!cond)) {
+        failedNoTrace(msgid, loc);
     }
 }
 
-#define fassertNoTrace MONGO_fassertNoTrace
+/** Reject anything stringlike from being used as a bool cond by mistake. */
+template <typename T, std::enable_if_t<std::is_convertible_v<T, StringData>, int> = 0>
+void checkNoTrace(MsgId msgid, T&& cond, SourceLocation loc = MONGO_SOURCE_LOCATION()) = delete;
+
+constexpr void checkNoTrace(MsgId msgid,
+                            const Status& status,
+                            SourceLocation loc = MONGO_SOURCE_LOCATION()) {
+    if (MONGO_unlikely(!status.isOK())) {
+        failedNoTrace(msgid, status, loc);
+    }
+}
+
+template <typename T>
+constexpr T checkNoTrace(MsgId msgid,
+                         StatusWith<T> sw,
+                         SourceLocation loc = MONGO_SOURCE_LOCATION()) {
+    if (MONGO_unlikely(!sw.isOK())) {
+        failedNoTrace(msgid, sw.getStatus(), loc);
+    }
+    return std::move(sw.getValue());
+}
+}  // namespace fassert_detail
+
+#define MONGO_fasserted(...) mongo::fassert_detail::failed(__VA_ARGS__, MONGO_SOURCE_LOCATION())
+#define MONGO_fassertedNoTrace(...) \
+    mongo::fassert_detail::failedNoTrace(__VA_ARGS__, MONGO_SOURCE_LOCATION())
+#define MONGO_fassert(...) mongo::fassert_detail::check(__VA_ARGS__, MONGO_SOURCE_LOCATION())
 #define MONGO_fassertNoTrace(...) \
-    ::mongo::fassertNoTraceWithLocation(__VA_ARGS__, __FILE__, __LINE__)
-inline void fassertNoTraceWithLocation(int msgid, bool testOK, const char* file, unsigned line) {
-    if (MONGO_unlikely(!testOK)) {
-        fassertFailedNoTraceWithLocation(msgid, file, line);
-    }
-}
+    mongo::fassert_detail::checkNoTrace(__VA_ARGS__, MONGO_SOURCE_LOCATION())
 
-template <typename T>
-inline T fassertNoTraceWithLocation(int msgid, StatusWith<T> sw, const char* file, unsigned line) {
-    if (MONGO_unlikely(!sw.isOK())) {
-        fassertFailedWithStatusNoTraceWithLocation(msgid, sw.getStatus(), file, line);
-    }
-    return std::move(sw.getValue());
-}
+/**
+ * `fassert` failures will terminate the entire process; this is used for
+ * low-level checks where continuing might lead to corrupt data or loss of data
+ * on disk. Additionally, `fassert` will log the assertion message with fatal
+ * severity and add a breakpoint before terminating.
+ *
+ * Each `fassert` call site must have a unique `msgid` as the first argument.
+ * These are chosen using the same convention as logv2 log IDs.
+ *
+ * To log a custom assert message with process-fatal semantics, use LOGV2_FATAL.
+ * Consider using this variant if there is only one way to reach the fatal point in code.
+ *
+ * The second argument is a condition. `fassert` invocations are forwarded to an
+ * overload set of handlers such that it can accept a `bool`, `const Status&`,
+ * or `StatusWith` as a condition.
+ *
+ *     void fassert(int msgid, bool cond);
+ *     void fassert(int msgid, const Status& status);
+ *     T fassert(int msgid, StatusWith<T> statusWith);
+ *
+ * `fassert` also supports a StatusWith<T> argument.
+ * In that case, `fassert` returns the extracted `sw.getValue()`.
+ * Because the argument is passed by value, this is best used
+ * to wrap a function call directly to avoid copies:
+ *
+ *     T value = fassert(9079702, someStatusWithFunc());
+ *
+ * See the `docs/exception_architecture.md` guide for more,
+ * including guidance on choosing a `msgid` number.
+ */
+#define fassert MONGO_fassert
 
-inline void fassertNoTraceWithLocation(int msgid,
-                                       const Status& status,
-                                       const char* file,
-                                       unsigned line) {
-    if (MONGO_unlikely(!status.isOK())) {
-        fassertFailedWithStatusNoTraceWithLocation(msgid, status, file, line);
-    }
-}
+/**
+ * Same usage and arguments as `fassert`, but performs
+ * a quickExit instead of a stacktrace-dumping abort.
+ * Use LOGV2_FATAL_NO_TRACE to supply a custom error message.
+ * Consider using this variant if there is only one way to reach the fatal point in code.
+ */
+#define fassertNoTrace MONGO_fassertNoTrace
+
+/**
+ * Like `fassert`, without a condition argument.
+ * Use when failure was already determined, and needs to be reported.
+ *
+ * Though `fasserted` doesn't use a condition to determine whether
+ * to fire, it can still accept an optional diagnostic `Status`
+ * argument which will be emitted in the log.
+ *
+ *     fasserted(9079703);
+ *     fasserted(9079704, status);
+ *     fasserted(9079705, {ErrorCodes::Overflow, "too much foo"});
+ *
+ * `fasserted` can also be spelled `fassertFailed`.
+ */
+#define fasserted MONGO_fasserted
+
+/**
+ * Like `fasserted`, but performs a quickExit instead of a
+ * stacktrace-dumping abort.
+ */
+#define fassertedNoTrace MONGO_fassertedNoTrace
+
+/**
+ * To match other assert macros, we'll prefer `fasserted` over the older
+ * `fassertFailed` spelling, but they're the same thing.
+ */
+#define fassertFailed fasserted
+#define fassertFailedWithStatus fasserted
+#define fassertFailedNoTrace fassertedNoTrace
+#define fassertFailedWithStatusNoTrace fassertedNoTrace
 
 namespace error_details {
 
@@ -356,13 +524,16 @@ Status makeStatus(ErrorDetail&& detail, StringLike&& message) {
  * and out-of-line the error path. This is most helpful when the error path involves building a
  * complex error message in the expansion of msg. The call to the lambda is followed by
  * MONGO_COMPILER_UNREACHABLE as it is impossible to mark a lambda noreturn.
+ * The source location is captured outside of the lambda, so that it represents
+ * the function name of the macro invocation site.
  */
-#define MONGO_BASE_ASSERT_FAILED(fail_func, code, msg)                                    \
-    do {                                                                                  \
-        [&]() MONGO_COMPILER_COLD_FUNCTION {                                              \
-            fail_func(::mongo::error_details::makeStatus(code, msg), __FILE__, __LINE__); \
-        }();                                                                              \
-        MONGO_COMPILER_UNREACHABLE;                                                       \
+#define MONGO_BASE_ASSERT_FAILED(fail_func, ...)                             \
+    do {                                                                     \
+        auto loc = MONGO_SOURCE_LOCATION();                                  \
+        [&]() MONGO_COMPILER_COLD_FUNCTION {                                 \
+            fail_func(::mongo::error_details::makeStatus(__VA_ARGS__), loc); \
+        }();                                                                 \
+        MONGO_COMPILER_UNREACHABLE;                                          \
     } while (false)
 
 #define MONGO_BASE_ASSERT(fail_func, code, msg, cond)       \
@@ -381,19 +552,22 @@ Status makeStatus(ErrorDetail&& detail, StringLike&& message) {
     MONGO_BASE_ASSERT(::mongo::uassertedWithLocation, msgid, msg, expr)
 
 MONGO_COMPILER_NORETURN void uassertedWithLocation(const Status& status,
-                                                   const char* file,
-                                                   unsigned line);
+                                                   SourceLocation loc = MONGO_SOURCE_LOCATION());
 
-#define uassertStatusOK(...) ::mongo::uassertStatusOKWithLocation(__VA_ARGS__, __FILE__, __LINE__)
-inline void uassertStatusOKWithLocation(const Status& status, const char* file, unsigned line) {
+#define uassertStatusOK(...) \
+    ::mongo::uassertStatusOKWithLocation(__VA_ARGS__, MONGO_SOURCE_LOCATION())
+
+constexpr void uassertStatusOKWithLocation(const Status& status,
+                                           SourceLocation loc = MONGO_SOURCE_LOCATION()) {
     if (MONGO_unlikely(!status.isOK())) {
-        uassertedWithLocation(status, file, line);
+        uassertedWithLocation(status, loc);
     }
 }
 
 template <typename T>
-inline T uassertStatusOKWithLocation(StatusWith<T> sw, const char* file, unsigned line) {
-    uassertStatusOKWithLocation(sw.getStatus(), file, line);
+constexpr T uassertStatusOKWithLocation(StatusWith<T> sw,
+                                        SourceLocation loc = MONGO_SOURCE_LOCATION()) {
+    uassertStatusOKWithLocation(sw.getStatus(), loc);
     return std::move(sw.getValue());
 }
 
@@ -404,25 +578,23 @@ inline T uassertStatusOKWithLocation(StatusWith<T> sw, const char* file, unsigne
  */
 #define uassertStatusOKWithContext(status, contextExpr) \
     ::mongo::uassertStatusOKWithContextAndLocation(     \
-        status, [&]() -> std::string { return (contextExpr); }, __FILE__, __LINE__)
+        status, [&]() -> std::string { return (contextExpr); }, MONGO_SOURCE_LOCATION())
+
 template <typename ContextExpr>
-inline void uassertStatusOKWithContextAndLocation(const Status& status,
-                                                  ContextExpr&& contextExpr,
-                                                  const char* file,
-                                                  unsigned line) {
+constexpr void uassertStatusOKWithContextAndLocation(const Status& status,
+                                                     ContextExpr&& contextExpr,
+                                                     SourceLocation loc = MONGO_SOURCE_LOCATION()) {
     if (MONGO_unlikely(!status.isOK())) {
-        uassertedWithLocation(
-            status.withContext(std::forward<ContextExpr>(contextExpr)()), file, line);
+        uassertedWithLocation(status.withContext(std::forward<ContextExpr>(contextExpr)()), loc);
     }
 }
 
 template <typename T, typename ContextExpr>
-inline T uassertStatusOKWithContextAndLocation(StatusWith<T> sw,
-                                               ContextExpr&& contextExpr,
-                                               const char* file,
-                                               unsigned line) {
+constexpr T uassertStatusOKWithContextAndLocation(StatusWith<T> sw,
+                                                  ContextExpr&& contextExpr,
+                                                  SourceLocation loc = MONGO_SOURCE_LOCATION()) {
     uassertStatusOKWithContextAndLocation(
-        sw.getStatus(), std::forward<ContextExpr>(contextExpr), file, line);
+        sw.getStatus(), std::forward<ContextExpr>(contextExpr), loc);
     return std::move(sw.getValue());
 }
 
@@ -435,38 +607,45 @@ inline T uassertStatusOKWithContextAndLocation(StatusWith<T> sw,
 #define msgasserted(msgid, msg) \
     MONGO_BASE_ASSERT_FAILED(::mongo::msgassertedWithLocation, msgid, msg)
 MONGO_COMPILER_NORETURN void msgassertedWithLocation(const Status& status,
-                                                     const char* file,
-                                                     unsigned line);
+                                                     SourceLocation loc = MONGO_SOURCE_LOCATION());
 
-#define massertStatusOK(...) ::mongo::massertStatusOKWithLocation(__VA_ARGS__, __FILE__, __LINE__)
-inline void massertStatusOKWithLocation(const Status& status, const char* file, unsigned line) {
+#define massertStatusOK(...) \
+    ::mongo::massertStatusOKWithLocation(__VA_ARGS__, MONGO_SOURCE_LOCATION())
+
+constexpr void massertStatusOKWithLocation(const Status& status,
+                                           SourceLocation loc = MONGO_SOURCE_LOCATION()) {
     if (MONGO_unlikely(!status.isOK())) {
-        msgassertedWithLocation(status, file, line);
+        msgassertedWithLocation(status, loc);
     }
 }
 
-#define MONGO_BASE_ASSERT_VA_FAILED(fail_func, ...)                                              \
-    do {                                                                                         \
-        [&]() MONGO_COMPILER_COLD_FUNCTION {                                                     \
-            fail_func(::mongo::error_details::makeStatus(__VA_ARGS__), MONGO_SOURCE_LOCATION()); \
-        }();                                                                                     \
-        MONGO_COMPILER_UNREACHABLE;                                                              \
-    } while (false)
+template <typename T>
+constexpr T massertStatusOKWithLocation(StatusWith<T> sw,
+                                        SourceLocation loc = MONGO_SOURCE_LOCATION()) {
+    massertStatusOKWithLocation(sw.getStatus(), loc);
+    return std::move(sw.getValue());
+}
 
-#define MONGO_BASE_ASSERT_VA_4(fail_func, code, msg, cond)         \
-    do {                                                           \
-        if (MONGO_unlikely(!(cond)))                               \
-            MONGO_BASE_ASSERT_VA_FAILED(fail_func, (code), (msg)); \
+#define MONGO_BASE_ASSERT_VA_4(fail_func, code, msg, cond)      \
+    do {                                                        \
+        if (MONGO_unlikely(!(cond)))                            \
+            MONGO_BASE_ASSERT_FAILED(fail_func, (code), (msg)); \
     } while (false)
 
 #define MONGO_BASE_ASSERT_VA_2(fail_func, statusExpr)                              \
     do {                                                                           \
         if (const auto& stLocal_ = (statusExpr); MONGO_unlikely(!stLocal_.isOK())) \
-            MONGO_BASE_ASSERT_VA_FAILED(fail_func, stLocal_);                      \
+            MONGO_BASE_ASSERT_FAILED(fail_func, stLocal_);                         \
     } while (false)
 
-#define MONGO_BASE_ASSERT_VA_DISPATCH(...) \
-    MONGO_expand(MONGO_expand(BOOST_PP_OVERLOAD(MONGO_BASE_ASSERT_VA_, __VA_ARGS__))(__VA_ARGS__))
+#define MONGO_BASE_ASSERT_VA_EXPAND(x) x /**< MSVC workaround */
+#define MONGO_BASE_ASSERT_VA_PICK(_1, _2, _3, _4, x, ...) x
+#define MONGO_BASE_ASSERT_VA_DISPATCH(...)                                        \
+    MONGO_BASE_ASSERT_VA_EXPAND(MONGO_BASE_ASSERT_VA_PICK(__VA_ARGS__,            \
+                                                          MONGO_BASE_ASSERT_VA_4, \
+                                                          MONGO_BASE_ASSERT_VA_3, \
+                                                          MONGO_BASE_ASSERT_VA_2, \
+                                                          MONGO_BASE_ASSERT_VA_1)(__VA_ARGS__))
 
 /**
  * `iassert` is provided as an alternative for `uassert` variants (e.g., `uassertStatusOK`)
@@ -477,8 +656,9 @@ inline void massertStatusOKWithLocation(const Status& status, const char* file, 
  * overloading to expand type support as needed.
  */
 #define iassert(...) MONGO_BASE_ASSERT_VA_DISPATCH(::mongo::iassertFailed, __VA_ARGS__)
-#define iasserted(...) MONGO_BASE_ASSERT_VA_FAILED(::mongo::iassertFailed, __VA_ARGS__)
-MONGO_COMPILER_NORETURN void iassertFailed(const Status& status, SourceLocation loc);
+#define iasserted(...) MONGO_BASE_ASSERT_FAILED(::mongo::iassertFailed, __VA_ARGS__)
+MONGO_COMPILER_NORETURN void iassertFailed(const Status& status,
+                                           SourceLocation loc = MONGO_SOURCE_LOCATION());
 
 /**
  * "tripwire/test assert". Like uassert, but with a deferred-fatality tripwire that gets
@@ -486,8 +666,9 @@ MONGO_COMPILER_NORETURN void iassertFailed(const Status& status, SourceLocation 
  * operation and also cause a test suite failure.
  */
 #define tassert(...) MONGO_BASE_ASSERT_VA_DISPATCH(::mongo::tassertFailed, __VA_ARGS__)
-#define tasserted(...) MONGO_BASE_ASSERT_VA_FAILED(::mongo::tassertFailed, __VA_ARGS__)
-MONGO_COMPILER_NORETURN void tassertFailed(const Status& status, SourceLocation loc);
+#define tasserted(...) MONGO_BASE_ASSERT_FAILED(::mongo::tassertFailed, __VA_ARGS__)
+MONGO_COMPILER_NORETURN void tassertFailed(const Status& status,
+                                           SourceLocation loc = MONGO_SOURCE_LOCATION());
 
 /**
  * Return true if tripwire conditions have occurred.
@@ -500,78 +681,75 @@ bool haveTripwireAssertionsOccurred();
 void warnIfTripwireAssertionsOccurred();
 
 /**
- * verify is deprecated. It is like invariant() in debug builds and massert() in release builds.
+ * MONGO_verify is deprecated. It is like invariant() in debug builds and massert() in release
+ * builds.
  */
-#define verify(expression) MONGO_verify(expression)
-#define MONGO_verify(_Expression)                                    \
-    do {                                                             \
-        if (MONGO_unlikely(!(_Expression))) {                        \
-            ::mongo::verifyFailed(#_Expression, __FILE__, __LINE__); \
-        }                                                            \
+#define MONGO_verify(expression_)                                         \
+    do {                                                                  \
+        if (MONGO_unlikely(!(expression_))) {                             \
+            ::mongo::verifyFailed(#expression_, MONGO_SOURCE_LOCATION()); \
+        }                                                                 \
     } while (false)
 
-inline void invariantWithLocation(const Status& status,
-                                  const char* expr,
-                                  const char* file,
-                                  unsigned line) {
+constexpr void invariantWithLocation(const Status& status,
+                                     const char* expr,
+                                     SourceLocation loc = MONGO_SOURCE_LOCATION()) {
     if (MONGO_unlikely(!status.isOK())) {
-        ::mongo::invariantOKFailed(expr, status, file, line);
+        ::mongo::invariantOKFailed(expr, status, loc);
     }
 }
 
 template <typename T>
-inline T invariantWithLocation(StatusWith<T> sw,
-                               const char* expr,
-                               const char* file,
-                               unsigned line) {
+constexpr T invariantWithLocation(StatusWith<T> sw,
+                                  const char* expr,
+                                  SourceLocation loc = MONGO_SOURCE_LOCATION()) {
     if (MONGO_unlikely(!sw.isOK())) {
-        ::mongo::invariantOKFailed(expr, sw.getStatus(), file, line);
+        ::mongo::invariantOKFailed(expr, sw.getStatus(), loc);
     }
     return std::move(sw.getValue());
 }
 
 template <typename ContextExpr>
-inline void invariantWithContextAndLocation(const Status& status,
-                                            const char* expr,
-                                            ContextExpr&& contextExpr,
-                                            const char* file,
-                                            unsigned line) {
+constexpr void invariantWithContextAndLocation(const Status& status,
+                                               const char* expr,
+                                               ContextExpr&& contextExpr,
+                                               SourceLocation loc = MONGO_SOURCE_LOCATION()) {
     if (MONGO_unlikely(!status.isOK())) {
         ::mongo::invariantOKFailedWithMsg(
-            expr, status, std::forward<ContextExpr>(contextExpr)(), file, line);
+            expr, status, std::forward<ContextExpr>(contextExpr)(), loc);
     }
 }
 
 template <typename T, typename ContextExpr>
-inline T invariantWithContextAndLocation(StatusWith<T> sw,
-                                         const char* expr,
-                                         ContextExpr&& contextExpr,
-                                         const char* file,
-                                         unsigned line) {
+constexpr T invariantWithContextAndLocation(StatusWith<T> sw,
+                                            const char* expr,
+                                            ContextExpr&& contextExpr,
+                                            SourceLocation loc = MONGO_SOURCE_LOCATION()) {
     if (MONGO_unlikely(!sw.isOK())) {
-        ::mongo::invariantOKFailedWithMsg(expr, sw.getStatus(), contextExpr(), file, line);
+        ::mongo::invariantOKFailedWithMsg(expr, sw.getStatus(), contextExpr(), loc);
     }
     return std::move(sw.getValue());
 }
 
-MONGO_COMPILER_NORETURN void invariantStatusOKFailed(const Status& status,
-                                                     const char* file,
-                                                     unsigned line) noexcept;
+MONGO_COMPILER_NORETURN void invariantStatusOKFailed(
+    const Status& status, SourceLocation loc = MONGO_SOURCE_LOCATION()) noexcept;
 
 /**
  * Like uassertStatusOK(status), but for checking if an invariant holds on a status.
  */
 #define invariantStatusOK(...) \
-    ::mongo::invariantStatusOKWithLocation(__VA_ARGS__, __FILE__, __LINE__)
-inline void invariantStatusOKWithLocation(const Status& status, const char* file, unsigned line) {
+    ::mongo::invariantStatusOKWithLocation(__VA_ARGS__, MONGO_SOURCE_LOCATION())
+constexpr void invariantStatusOKWithLocation(const Status& status,
+                                             SourceLocation loc = MONGO_SOURCE_LOCATION()) {
     if (MONGO_unlikely(!status.isOK())) {
-        invariantStatusOKFailed(status, file, line);
+        invariantStatusOKFailed(status, loc);
     }
 }
 
 template <typename T>
-inline T invariantStatusOKWithLocation(StatusWith<T> sw, const char* file, unsigned line) {
-    invariantStatusOKWithLocation(sw.getStatus(), file, line);
+constexpr T invariantStatusOKWithLocation(StatusWith<T> sw,
+                                          SourceLocation loc = MONGO_SOURCE_LOCATION()) {
+    invariantStatusOKWithLocation(sw.getStatus(), loc);
     return std::move(sw.getValue());
 }
 
@@ -582,25 +760,21 @@ inline T invariantStatusOKWithLocation(StatusWith<T> sw, const char* file, unsig
  */
 #define invariantStatusOKWithContext(status, contextExpr) \
     ::mongo::invariantStatusOKWithContextAndLocation(     \
-        status, [&]() -> std::string { return (contextExpr); }, __FILE__, __LINE__)
+        status, [&]() -> std::string { return (contextExpr); }, MONGO_SOURCE_LOCATION())
 template <typename ContextExpr>
-inline void invariantStatusOKWithContextAndLocation(const Status& status,
-                                                    ContextExpr&& contextExpr,
-                                                    const char* file,
-                                                    unsigned line) {
+constexpr void invariantStatusOKWithContextAndLocation(
+    const Status& status, ContextExpr&& contextExpr, SourceLocation loc = MONGO_SOURCE_LOCATION()) {
     if (MONGO_unlikely(!status.isOK())) {
-        invariantStatusOKFailed(
-            status.withContext(std::forward<ContextExpr>(contextExpr)()), file, line);
+        invariantStatusOKFailed(status.withContext(std::forward<ContextExpr>(contextExpr)()), loc);
     }
 }
 
 template <typename T, typename ContextExpr>
-inline T invariantStatusOKWithContextAndLocation(StatusWith<T> sw,
-                                                 ContextExpr&& contextExpr,
-                                                 const char* file,
-                                                 unsigned line) {
+constexpr T invariantStatusOKWithContextAndLocation(StatusWith<T> sw,
+                                                    ContextExpr&& contextExpr,
+                                                    SourceLocation loc = MONGO_SOURCE_LOCATION()) {
     invariantStatusOKWithContextAndLocation(
-        sw.getStatus(), std::forward<ContextExpr>(contextExpr), file, line);
+        sw.getStatus(), std::forward<ContextExpr>(contextExpr), loc);
     return std::move(sw.getValue());
 }
 
@@ -631,31 +805,7 @@ std::string demangleName(const std::type_info& typeinfo);
  *       }
  *   }
  */
-Status exceptionToStatus() noexcept;
-
-}  // namespace mongo
-
-#define MONGO_ASSERT_ON_EXCEPTION(expression)                                         \
-    try {                                                                             \
-        expression;                                                                   \
-    } catch (const std::exception& e) {                                               \
-        std::stringstream ss;                                                         \
-        ss << "caught exception: " << e.what() << ' ' << __FILE__ << ' ' << __LINE__; \
-        msgasserted(13294, ss.str());                                                 \
-    } catch (...) {                                                                   \
-        massert(10437, "unknown exception", false);                                   \
-    }
-
-#define MONGO_ASSERT_ON_EXCEPTION_WITH_MSG(expression, msg)         \
-    try {                                                           \
-        expression;                                                 \
-    } catch (const std::exception& e) {                             \
-        std::stringstream ss;                                       \
-        ss << msg << " caught exception exception: " << e.what();   \
-        msgasserted(14043, ss.str());                               \
-    } catch (...) {                                                 \
-        msgasserted(14044, std::string("unknown exception") + msg); \
-    }
+Status exceptionToStatus();
 
 /**
  * Produces an invariant failure if executed. Use when reaching this statement indicates a
@@ -667,9 +817,153 @@ Status exceptionToStatus() noexcept;
  *     default:
  *         MONGO_UNREACHABLE;
  */
-#define MONGO_UNREACHABLE ::mongo::invariantFailed("Hit a MONGO_UNREACHABLE!", __FILE__, __LINE__);
+#define MONGO_UNREACHABLE \
+    ::mongo::invariantFailed("Hit a MONGO_UNREACHABLE!", MONGO_SOURCE_LOCATION());
 
 /**
  * Like `MONGO_UNREACHABLE`, but triggers a `tassert` instead of an `invariant`
  */
 #define MONGO_UNREACHABLE_TASSERT(msgid) tasserted(msgid, "Hit a MONGO_UNREACHABLE_TASSERT!")
+
+/**
+ * Produces an invariant failure if executed. Subset of MONGO_UNREACHABLE, but specifically
+ * to indicate that the program has reached a function that is unimplemented and should be
+ * unreachable from production.
+ * Example:
+ *
+ *   void myFuncToDo() {
+ *       MONGO_UNIMPLEMENTED;
+ *   }
+ */
+#define MONGO_UNIMPLEMENTED \
+    ::mongo::invariantFailed("Hit a MONGO_UNIMPLEMENTED!", MONGO_SOURCE_LOCATION());
+
+/**
+ * Like `MONGO_UNIMPLEMENTED`, but triggers a `tassert` instead of an `invariant`
+ */
+#define MONGO_UNIMPLEMENTED_TASSERT(msgid) tasserted(msgid, "Hit a MONGO_UNIMPLEMENTED_TASSERT!")
+
+/**
+ * A stack of auxiliary information to be dumped on invariant failure.
+ * These are intended to carry only very lightweight objects like short strings
+ * and numbers, to give some basic clue as to what was going on when a thread
+ * suffered an invariant failure.
+ */
+class ScopedDebugInfoStack {
+public:
+    struct Rec {
+        virtual ~Rec() = default;
+        virtual std::string toString() const = 0;
+        virtual StringData label() const = 0;
+    };
+
+    void push(const Rec* rec) {
+        _stack.push_back(rec);
+    }
+    void pop() {
+        _stack.pop_back();
+    }
+
+    /**
+     * Returns the result of calling `toString` on every element in the stack in a way that prevents
+     * re-entry by keeping track of how many times we have recursively called this function. This
+     * prevents an infinite loop from occurring during a call to `getAll` via any exceptions thrown.
+     * Note that it is not correct to write a `ScopedDebugInfo` that throws an exception, and that
+     * the behavior described here is just a failsafe backstop against buggy formatters.
+     */
+    std::vector<std::string> getAll();
+
+private:
+    std::vector<const Rec*> _stack;
+    int _loggingDepth = 0;
+};
+
+/** Each thread has its own stack of scoped debug info. */
+inline ScopedDebugInfoStack& scopedDebugInfoStack() {
+    thread_local ScopedDebugInfoStack tls;
+    return tls;
+}
+
+/**
+ * An RAII type that attaches a datum to a ScopedDebugInfoStack, intended as a
+ * broad hint as to what the thread is doing. Pops that datum at scope
+ * exit. By default, attaches to the thread_local ScopedDebugInfoStack.
+ * If the thread encounters a fatal error, the thread's ScopedDebugInfoStack
+ * is logged. The formatting of the data is done lazily during failure handling.
+ *
+ * Example:
+ *
+ *     void doSomethingAsUser(const User& currentUser) {
+ *         ScopedDebugInfo userNameDbg("userName", currentUser.nameStringData());
+ *         ScopedDebugInfo userIdDbg("userId", currentUser.id());
+ *         somethingThatMightCrash(currentUser);
+ *     }
+ *
+ * ScopedDebugInfo must only be used with trivially formattable values. Since it's diagnostic
+ * information, formatted during error handling, formatting must not itself fail. For example,
+ * formatting should not require synchronization or reading from disk. Since the result is logged,
+ * the formatting must follow the usual log redaction guidance.
+ *
+ * The lifetime of the ScopedDebugInfo must be carefully considered. By default, a ScopedDebugInfo
+ * is attached to a thread_local stack, so it must not outlive the thread that created it.
+ */
+template <typename T>
+class ScopedDebugInfo {
+public:
+    ScopedDebugInfo(StringData label, T v, ScopedDebugInfoStack* stack = &scopedDebugInfoStack())
+        : label(label), v(std::move(v)), stack(stack) {
+        stack->push(&rec);
+    }
+    ~ScopedDebugInfo() {
+        stack->pop();
+    }
+    ScopedDebugInfo(const ScopedDebugInfo&) noexcept = delete;
+    ScopedDebugInfo& operator=(const ScopedDebugInfo&) noexcept = delete;
+
+private:
+    struct ThisRec : ScopedDebugInfoStack::Rec {
+        explicit ThisRec(const ScopedDebugInfo* owner) : owner(owner) {}
+        std::string toString() const override {
+            return fmt::format("{}: {}", owner->label, owner->v);
+        }
+        StringData label() const override {
+            return owner->label;
+        }
+        const ScopedDebugInfo* owner;
+    };
+
+    StringData label;
+    T v;
+    ScopedDebugInfoStack* stack;
+    ThisRec rec{this};
+};
+
+/** Convert string-likes, exceptions, and Status to formatted "caused by" strings. */
+std::string causedBy(StringData e);
+
+inline std::string causedBy(const std::exception& e) {
+    return causedBy(e.what());
+}
+
+inline std::string causedBy(const DBException& e) {
+    return causedBy(e.toString());
+}
+
+inline std::string causedBy(const Status& e) {
+    return causedBy(e.toString());
+}
+
+/**
+ * Catch and swallow all exceptions, leaving a uniform log message.
+ * Should be used only in destructors, to prevent termination.
+ *
+ * Usage:
+ *     try {
+ *         block
+ *     } catch (...) {
+ *         reportFailedDestructor(MONGO_SOURCE_LOCATION());
+ *     }
+ */
+void reportFailedDestructor(SourceLocation loc = MONGO_SOURCE_LOCATION());
+
+}  // namespace mongo

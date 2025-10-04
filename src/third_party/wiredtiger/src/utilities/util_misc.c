@@ -8,6 +8,29 @@
 
 #include "util.h"
 
+#ifdef ENABLE_WINDOWS_TCMALLOC_COMMUNITY_SUPPORT
+
+#ifndef _WIN32
+#error "Manual TCMalloc integration supported only on Windows."
+#endif
+
+/*
+ * Include the TCMalloc header with the "-Wundef" diagnostic flag disabled. Compiling with strict
+ * (where the 'Wundef' diagnostic flag is enabled), generates compilation errors where the
+ * '__cplusplus' CPP macro is not defined. This being employed by the TCMalloc header to
+ * differentiate C & C++ compilation environments. We don't want to define '__cplusplus' when
+ * compiling C sources.
+ */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wundef"
+#include <gperftools/tcmalloc.h>
+#pragma GCC diagnostic pop
+#endif
+
+/*
+ * util_cerr --
+ *     Report an error for a cursor operation.
+ */
 int
 util_cerr(WT_CURSOR *cursor, const char *op, int ret)
 {
@@ -53,7 +76,7 @@ util_read_line(WT_SESSION *session, ULINE *l, bool eof_expected, bool *eofp)
     *eofp = false;
 
     if (l->memsize == 0) {
-        if ((l->mem = realloc(l->mem, l->memsize + 1024)) == NULL)
+        if ((l->mem = util_realloc(l->mem, l->memsize + 1024)) == NULL)
             return (util_err(session, errno, NULL));
         l->memsize = 1024;
     }
@@ -75,7 +98,7 @@ util_read_line(WT_SESSION *session, ULINE *l, bool eof_expected, bool *eofp)
          * means we always need one extra byte at the end.
          */
         if (len >= l->memsize - 1) {
-            if ((l->mem = realloc(l->mem, l->memsize + 1024)) == NULL)
+            if ((l->mem = util_realloc(l->mem, l->memsize + 1024)) == NULL)
                 return (util_err(session, errno, NULL));
             l->memsize += 1024;
         }
@@ -124,25 +147,13 @@ format:
 
 /*
  * util_flush --
- *     Flush the file successfully, or drop it.
+ *     Flush the database successfully, or drop the file.
  */
 int
 util_flush(WT_SESSION *session, const char *uri)
 {
     WT_DECL_RET;
-    size_t len;
-    char *buf;
-
-    len = strlen(uri) + 100;
-    if ((buf = malloc(len)) == NULL)
-        return (util_err(session, errno, NULL));
-
-    if ((ret = __wt_snprintf(buf, len, "target=(\"%s\")", uri)) != 0) {
-        free(buf);
-        return (util_err(session, ret, NULL));
-    }
-    ret = session->checkpoint(session, buf);
-    free(buf);
+    ret = session->checkpoint(session, NULL);
 
     if (ret == 0)
         return (0);
@@ -169,4 +180,107 @@ util_usage(const char *usage, const char *tag, const char *list[])
     if (list != NULL)
         for (p = list; *p != NULL; p += 2)
             fprintf(stderr, "    %s%s%s\n", p[0], strlen(p[0]) > 2 ? "\n        " : "  ", p[1]);
+}
+
+/*
+ * util_malloc --
+ *     Convenience and correctness wrapper for memory allocations. Pairs with util_free.
+ */
+void *
+util_malloc(size_t len)
+{
+#ifdef ENABLE_WINDOWS_TCMALLOC_COMMUNITY_SUPPORT
+    return (tc_malloc(len));
+#else
+    return (malloc(len));
+#endif
+}
+
+/*
+ * util_calloc --
+ *     Convenience and correctness wrapper for array allocations. Pairs with util_free.
+ */
+void *
+util_calloc(size_t members, size_t sz)
+{
+#ifdef ENABLE_WINDOWS_TCMALLOC_COMMUNITY_SUPPORT
+    return (tc_calloc(members, sz));
+#else
+    return (calloc(members, sz));
+#endif
+}
+
+/*
+ * util_realloc --
+ *     Convenience and correctness wrapper for memory reallocations. Pairs with util_free.
+ */
+void *
+util_realloc(void *p, size_t len)
+{
+#ifdef ENABLE_WINDOWS_TCMALLOC_COMMUNITY_SUPPORT
+    return (tc_realloc(p, len));
+#else
+    return (realloc(p, len));
+#endif
+}
+
+/*
+ * util_free --
+ *     Convenience and correctness wrapper for freeing memory. Pairs with
+ *     util_malloc/util_realloc/util_calloc.
+ */
+void
+util_free(void *p)
+{
+#ifdef ENABLE_WINDOWS_TCMALLOC_COMMUNITY_SUPPORT
+    tc_free(p);
+#else
+    free(p);
+#endif
+}
+
+/*
+ * util_strdup --
+ *     Convenience and correctness wrapper for strdup. Free allocated memory with util_free.
+ */
+char *
+util_strdup(const char *s)
+{
+#ifdef ENABLE_WINDOWS_TCMALLOC_COMMUNITY_SUPPORT
+    char *new = util_malloc(strlen(s) + 1);
+    if (new == NULL)
+        return (NULL);
+
+    strcpy(new, s);
+
+    return (new);
+#else
+    return (strdup(s));
+#endif
+}
+
+/*
+ * util_open_output_file --
+ *     Open custom output file, return `stdout` if no file name provided.
+ */
+FILE *
+util_open_output_file(const char *ofile)
+{
+    if (ofile == NULL)
+        return (stdout);
+
+    return (fopen(ofile, "w"));
+}
+
+/*
+ * util_close_output_file --
+ *     Close custom output file if one was provided.
+ */
+int
+util_close_output_file(FILE *fp)
+{
+    if (fp != stdout)
+        return (fclose(fp));
+
+    return (0);
 }

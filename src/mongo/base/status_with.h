@@ -29,20 +29,21 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <iosfwd>
-#include <type_traits>
-#include <utility>
-
+#include "mongo/base/error_codes.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/unittest/stringify.h"
+#include "mongo/util/assert_util_core.h"
 
-#define MONGO_ALLOW_INCLUDE_INVARIANT_H
-#include "mongo/util/invariant.h"
-#undef MONGO_ALLOW_INCLUDE_INVARIANT_H
+#include <iosfwd>
+#include <string>
+#include <type_traits>
+#include <utility>
 
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -78,22 +79,10 @@ using StatusOrStatusWith = std::conditional_t<std::is_void_v<T>, Status, StatusW
  * }
  */
 template <typename T>
-class MONGO_WARN_UNUSED_RESULT_CLASS StatusWith {
+class [[nodiscard]] StatusWith {
 private:
     MONGO_STATIC_ASSERT_MSG(!isStatusOrStatusWith<T>,
                             "StatusWith<Status> and StatusWith<StatusWith<T>> are banned.");
-    // `TagTypeBase` is used as a base for the `TagType` type, to prevent it from being an
-    // aggregate.
-    struct TagTypeBase {
-    protected:
-        TagTypeBase() = default;
-    };
-    // `TagType` is used as a placeholder type in parameter lists for `enable_if` clauses.  They
-    // have to be real parameters, not template parameters, due to MSVC limitations.
-    class TagType : TagTypeBase {
-        TagType() = default;
-        friend StatusWith;
-    };
 
 public:
     using value_type = T;
@@ -120,143 +109,35 @@ public:
     /**
      * for the OK case
      */
-    StatusWith(T t) : _status(Status::OK()), _t(std::move(t)) {}
+    constexpr StatusWith(T t) : _status(Status::OK()), _t(std::move(t)) {}
 
-    template <typename Alien>
-    StatusWith(Alien&& alien,
-               typename std::enable_if_t<std::is_convertible<Alien, T>::value, TagType> = makeTag(),
-               typename std::enable_if_t<!std::is_same<Alien, T>::value, TagType> = makeTag())
-        : StatusWith(static_cast<T>(std::forward<Alien>(alien))) {}
+    template <std::convertible_to<T> U>
+    requires(!std::is_same_v<U, T>)
+    constexpr StatusWith(U&& other) : StatusWith(static_cast<T>(std::forward<U>(other))) {}
 
-    template <typename Alien>
-    StatusWith(StatusWith<Alien> alien,
-               typename std::enable_if_t<std::is_convertible<Alien, T>::value, TagType> = makeTag(),
-               typename std::enable_if_t<!std::is_same<Alien, T>::value, TagType> = makeTag())
-        : _status(std::move(alien.getStatus())) {
-        if (alien.isOK())
-            this->_t = std::move(alien.getValue());
+    template <std::convertible_to<T> U>
+    requires(!std::is_same_v<U, T>)
+    constexpr StatusWith(StatusWith<U> other) : _status(std::move(other.getStatus())) {
+        if (other.isOK())
+            this->_t = std::move(other.getValue());
     }
 
-    const T& getValue() const {
+    constexpr const T& getValue() const {
         dassert(isOK());
         return *_t;
     }
 
-    T& getValue() {
+    constexpr T& getValue() {
         dassert(isOK());
         return *_t;
     }
 
-    const Status& getStatus() const {
+    constexpr const Status& getStatus() const {
         return _status;
     }
 
-    bool isOK() const {
+    constexpr bool isOK() const {
         return _status.isOK();
-    }
-
-    /**
-     * For any type U returned by a function f, transform creates a StatusWith<U> by either applying
-     * the function to the _t member or forwarding the _status. This is the lvalue overload.
-     */
-    template <typename F>
-    StatusWith<std::invoke_result_t<F&&, T&>> transform(F&& f) & {
-        if (_t)
-            return {std::forward<F>(f)(*_t)};
-        else
-            return {_status};
-    }
-
-    /**
-     * For any type U returned by a function f, transform creates a StatusWith<U> by either applying
-     * the function to the _t member or forwarding the _status. This is the const overload.
-     */
-    template <typename F>
-    StatusWith<std::invoke_result_t<F&&, const T&>> transform(F&& f) const& {
-        if (_t)
-            return {std::forward<F>(f)(*_t)};
-        else
-            return {_status};
-    }
-
-    /**
-     * For any type U returned by a function f, transform creates a StatusWith<U> by either applying
-     * the function to the _t member or forwarding the _status. This is the rvalue overload.
-     */
-    template <typename F>
-    StatusWith<std::invoke_result_t<F&&, T&&>> transform(F&& f) && {
-        if (_t)
-            return {std::forward<F>(f)(*std::move(_t))};
-        else
-            return {std::move(_status)};
-    }
-
-    /**
-     * For any type U returned by a function f, transform creates a StatusWith<U> by either applying
-     * the function to the _t member or forwarding the _status. This is the const rvalue overload.
-     */
-    template <typename F>
-    StatusWith<std::invoke_result_t<F&&, const T&&>> transform(F&& f) const&& {
-        if (_t)
-            return {std::forward<F>(f)(*std::move(_t))};
-        else
-            return {std::move(_status)};
-    }
-
-    /**
-     * For any type U returned inside a StatusWith<U> by a function f, andThen directly produces a
-     * StatusWith<U> by applying the function to the _t member or creates one by forwarding the
-     * _status. andThen performs the same function as transform but for a function f with a return
-     * type of StatusWith. This is the lvalue overload.
-     */
-    template <typename F>
-    StatusWith<typename std::invoke_result_t<F&&, T&>::value_type> andThen(F&& f) & {
-        if (_t)
-            return {std::forward<F>(f)(*_t)};
-        else
-            return {_status};
-    }
-
-    /**
-     * For any type U returned inside a StatusWith<U> by a function f, andThen directly produces a
-     * StatusWith<U> by applying the function to the _t member or creates one by forwarding the
-     * _status. andThen performs the same function as transform but for a function f with a return
-     * type of StatusWith. This is the const overload.
-     */
-    template <typename F>
-    StatusWith<typename std::invoke_result_t<F&&, const T&>::value_type> andThen(F&& f) const& {
-        if (_t)
-            return {std::forward<F>(f)(*_t)};
-        else
-            return {_status};
-    }
-
-    /**
-     * For any type U returned inside a StatusWith<U> by a function f, andThen directly produces a
-     * StatusWith<U> by applying the function to the _t member or creates one by forwarding the
-     * _status. andThen performs the same function as transform but for a function f with a return
-     * type of StatusWith. This is the rvalue overload.
-     */
-    template <typename F>
-    StatusWith<typename std::invoke_result_t<F&&, T&&>::value_type> andThen(F&& f) && {
-        if (_t)
-            return {std::forward<F>(f)(*std::move(_t))};
-        else
-            return {std::move(_status)};
-    }
-
-    /**
-     * For any type U returned inside a StatusWith<U> by a function f, andThen directly produces a
-     * StatusWith<U> by applying the function to the _t member or creates one by forwarding the
-     * _status. andThen performs the same function as transform but for a function f with a return
-     * type of StatusWith. This is the const rvalue overload.
-     */
-    template <typename F>
-    StatusWith<typename std::invoke_result_t<F&&, const T&&>::value_type> andThen(F&& f) const&& {
-        if (_t)
-            return {std::forward<F>(f)(*std::move(_t))};
-        else
-            return {std::move(_status)};
     }
 
     /**
@@ -274,16 +155,32 @@ public:
     void status_with_transitional_ignore() && noexcept {};
     void status_with_transitional_ignore() const& noexcept = delete;
 
-private:
-    // The `TagType` type cannot be constructed as a default function-parameter in Clang.  So we use
-    // a static member function that initializes that default parameter.
-    static TagType makeTag() {
-        return {};
+    constexpr bool operator==(const T& val) const {
+        return isOK() && getValue() == val;
     }
 
+    constexpr bool operator==(const Status& status) const {
+        return getStatus() == status;
+    }
+
+    constexpr bool operator==(ErrorCodes::Error code) const {
+        return getStatus() == code;
+    }
+
+private:
     Status _status;
-    boost::optional<T> _t;
+    // Using std::optional because boost::optional isn't constexpr-friendly.
+    std::optional<T> _t;  // NOLINT not used in public API, so no interop issues.
 };
+
+template <typename T>
+std::string stringify_forTest(const StatusWith<T>& sw) {
+    if (sw.isOK()) {
+        return unittest::stringify::invoke(sw.getValue());
+    } else {
+        return unittest::stringify::invoke(sw.getStatus());
+    }
+}
 
 template <typename T>
 auto operator<<(std::ostream& stream, const StatusWith<T>& sw)
@@ -303,76 +200,5 @@ auto operator<<(StringBuilderImpl<Allocator>& stream, const StatusWith<T>& sw)
     return stream << sw.getStatus();
 }
 
-//
-// EqualityComparable(StatusWith<T>, T). Intentionally not providing an ordering relation.
-//
-
-template <typename T>
-bool operator==(const StatusWith<T>& sw, const T& val) {
-    return sw.isOK() && sw.getValue() == val;
-}
-
-template <typename T>
-bool operator==(const T& val, const StatusWith<T>& sw) {
-    return sw.isOK() && val == sw.getValue();
-}
-
-template <typename T>
-bool operator!=(const StatusWith<T>& sw, const T& val) {
-    return !(sw == val);
-}
-
-template <typename T>
-bool operator!=(const T& val, const StatusWith<T>& sw) {
-    return !(val == sw);
-}
-
-//
-// EqualityComparable(StatusWith<T>, Status)
-//
-
-template <typename T>
-bool operator==(const StatusWith<T>& sw, const Status& status) {
-    return sw.getStatus() == status;
-}
-
-template <typename T>
-bool operator==(const Status& status, const StatusWith<T>& sw) {
-    return status == sw.getStatus();
-}
-
-template <typename T>
-bool operator!=(const StatusWith<T>& sw, const Status& status) {
-    return !(sw == status);
-}
-
-template <typename T>
-bool operator!=(const Status& status, const StatusWith<T>& sw) {
-    return !(status == sw);
-}
-
-//
-// EqualityComparable(StatusWith<T>, ErrorCode)
-//
-
-template <typename T>
-bool operator==(const StatusWith<T>& sw, const ErrorCodes::Error code) {
-    return sw.getStatus() == code;
-}
-
-template <typename T>
-bool operator==(const ErrorCodes::Error code, const StatusWith<T>& sw) {
-    return code == sw.getStatus();
-}
-
-template <typename T>
-bool operator!=(const StatusWith<T>& sw, const ErrorCodes::Error code) {
-    return !(sw == code);
-}
-
-template <typename T>
-bool operator!=(const ErrorCodes::Error code, const StatusWith<T>& sw) {
-    return !(code == sw);
-}
 
 }  // namespace mongo

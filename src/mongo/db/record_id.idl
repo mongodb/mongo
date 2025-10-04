@@ -37,3 +37,5 @@ types:
         description: RecordId value
         serializer: RecordId::serializeToken
         deserializer: RecordId::deserializeToken
+        # Deserializer does not construct RecordId as a view.
+        is_view: false

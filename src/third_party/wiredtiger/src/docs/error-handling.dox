@@ -4,66 +4,159 @@ WiredTiger operations return a value of 0 on success and a non-zero
 value on error.  Error codes may be either positive or negative:
 positive error codes are standard error codes as described for
 POSIX-like systems (for example, \c EINVAL or \c EBUSY), negative error
-codes are WiredTiger-specific (for example, \c WT_ROLLBACK).
+codes are WiredTiger-specific (for example, \c WT_ROLLBACK). WiredTiger
+makes no guarantees about which error codes can be returned its APIs.
 
-WiredTiger-specific error codes always appear in the -31,800 to -31,999
-range, inclusive.
+@section error_ebusy EBUSY errors
 
 WiredTiger returns \c EBUSY for operations requiring exclusive access, when
-an object is not available for exclusive access. For example, the
-WT_SESSION::drop or WT_SESSION::verify methods will fail if the object
-has open cursors. Note that internal WiredTiger threads may temporarily
-open cursors on objects (for example, threads performing operations like
-statistics logging), and operations may temporarily fail and return \c EBUSY
-when there are no application cursors open on the object.
+an object is not available for exclusive access. These operations include the
+WT_SESSION::alter, WT_SESSION::drop, WT_SESSION::salvage and WT_SESSION::verify
+methods, all of which will return \c EBUSY and fail if there are open cursors
+on the target object. Internal WiredTiger threads may temporarily open cursors
+on objects (for example, threads performing operations like statistics
+logging), and in that case operations may temporarily fail and return \c EBUSY
+when there are no application cursors open on the object. In this case, simply
+retrying the operation should be sufficient.
 
-The following is a complete list of the WiredTiger-specific return
-values:
+Additionally, unwritten data in the WiredTiger cache will prevent exclusive
+access to objects. In this case, calling the WT_SESSION:checkpoint method to
+perform a database checkpoint should resolve the problem, allowing a subsequent
+retry of the operation requiring exclusive access to succeed. Further
+failures imply other threads of control simultaneously updating the object
+in cache. Repeatedly calling checkpoint will race with those threads,
+and it's unspecified when or even if exclusive access to the object will be
+granted. Generally, applications will not call WiredTiger methods requiring
+exclusive access when the objects might be in active use by other threads.
+
+@section error_sub_level Sub-level errors
+
+From the addition of WT_SESSION::get_last_error function and sub-level error codes, users
+can get more detailed information about the last session API call. The information includes an
+error code, a sub-level error code and message. The intended usage of the sub-level error code
+is to allow users to programmatically make decisions on the application level.
+
+The sub-level error code is optional and defaults to WT_NONE. When the prior API call succeeds or
+no other API call has been made a default success message is returned. When the prior API call
+fails, the error message is optional and defaults to an empty message. The error message string is
+owned by the session, and is invalidated after each session API call.
+
+@section error_list WiredTiger-specific errors
+
+WiredTiger-specific error codes are allocated from -31,800 to -31,999,
+inclusive. The following is a list of the WiredTiger-specific return values:
 
 @if IGNORE_BUILT_BY_API_ERR_BEGIN
 @endif
 
-@par <code>WT_ROLLBACK</code>
+@par \c WT_ROLLBACK
 This error is generated when an operation cannot be completed due to a conflict with concurrent
 operations. The operation may be retried; if a transaction is in progress, it should be rolled back
 and the operation retried in a new transaction.
 
-@par <code>WT_DUPLICATE_KEY</code>
+@par \c WT_DUPLICATE_KEY
 This error is generated when the application attempts to insert a record with the same key as an
 existing record without the 'overwrite' configuration to WT_SESSION::open_cursor.
 
-@par <code>WT_ERROR</code>
-This error is returned when an error is not covered by a specific error return.
+@par \c WT_ERROR
+This error is returned when an error is not covered by a specific error return. The operation may be
+retried; if a transaction is in progress, it should be rolled back and the operation retried in a
+new transaction.
 
-@par <code>WT_NOTFOUND</code>
+@par \c WT_NOTFOUND
 This error indicates an operation did not find a value to return. This includes cursor search and
 other operations where no record matched the cursor's search key such as WT_CURSOR::update or
 WT_CURSOR::remove.
 
-@par <code>WT_PANIC</code>
+@par \c WT_PANIC
 This error indicates an underlying problem that requires a database restart. The application may
 exit immediately, no further WiredTiger calls are required (and further calls will themselves
 immediately fail).
 
-@par <code>WT_RUN_RECOVERY</code>
-This error is generated when wiredtiger_open is configured to return an error if recovery is
+@par \c WT_RUN_RECOVERY
+This error is generated when ::wiredtiger_open is configured to return an error if recovery is
 required to use the database.
 
-@par <code>WT_CACHE_FULL</code>
-This error is only generated when wiredtiger_open is configured to run in-memory, and an insert or
-update operation requires more than the configured cache size to complete, or when an application
-thread fails to do eviction within cache_max_wait_ms. The operation may be retried; if a transaction
-is in progress, it should be rolled back and the operation retried in a new transaction.
+@par \c WT_CACHE_FULL
+This error is generated when wiredtiger_open is configured to run in-memory, and a data modification
+operation requires more than the configured cache size to complete. The operation may be retried; if
+a transaction is in progress, it should be rolled back and the operation retried in a new
+transaction.
 
-@par <code>WT_PREPARE_CONFLICT</code>
-This error is generated when the application attempts to update an already updated record which is
-in prepared state. An updated record will be in prepared state, when the transaction that performed
-the update is in prepared state.
+@par \c WT_PREPARE_CONFLICT
+This error is generated when the application attempts to read an updated record which is part of a
+transaction that has been prepared but not yet resolved.
 
-@par <code>WT_TRY_SALVAGE</code>
+@par \c WT_TRY_SALVAGE
 This error is generated when corruption is detected in an on-disk file. During normal operations,
 this may occur in rare circumstances as a result of a system crash. The application may choose to
 salvage the file or retry wiredtiger_open with the 'salvage=true' configuration setting.
+
+@if IGNORE_BUILT_BY_API_SUB_ERR_END
+@endif
+
+@section sub_error_list WiredTiger-specific sub-level errors
+
+WiredTiger-specific sub-level error codes are allocated from -32,000 to -32,199,
+inclusive. These are used in the session level API. The following is a list of the
+WiredTiger-specific return values:
+
+@if IGNORE_BUILT_BY_API_SUB_ERR_BEGIN
+@endif
+
+@par \c WT_NONE
+This sub-level error code is returned by default and indicates that no further context exists or is
+necessary.
+
+@par \c WT_BACKGROUND_COMPACT_ALREADY_RUNNING
+This sub-level error returns when the user tries to reconfigure background compaction while it is
+already running.
+
+@par \c WT_CACHE_OVERFLOW
+This sub-level error indicates that the configured cache has exceeded full capacity.
+
+@par \c WT_WRITE_CONFLICT
+This sub-level error indicates that there is a write conflict on the same page between concurrent
+operations.
+
+@par \c WT_OLDEST_FOR_EVICTION
+This sub-level error indicates that a given transaction has the oldest transaction ID and needs to
+be rolled back.
+
+@par \c WT_CONFLICT_BACKUP
+This sub-level error indicates that there is a conflict performing the operation because of a
+running backup in the system.
+
+@par \c WT_CONFLICT_DHANDLE
+This sub-level error indicates that a concurrent operation is holding the data handle of the table.
+
+@par \c WT_CONFLICT_SCHEMA_LOCK
+This sub-level error indicates that a concurrent operation is performing a schema type operation or
+currently holds the schema lock.
+
+@par \c WT_UNCOMMITTED_DATA
+This sub-level error returns when the table has uncommitted data.
+
+@par \c WT_DIRTY_DATA
+This sub-level error returns when the table has dirty content.
+
+@par \c WT_CONFLICT_TABLE_LOCK
+This sub-level error indicates that a concurrent operation is performing a table operation.
+
+@par \c WT_CONFLICT_CHECKPOINT_LOCK
+This sub-level error indicates that a concurrent operation is performing a checkpoint.
+
+@par \c WT_MODIFY_READ_UNCOMMITTED
+This sub-level error indicates that a reader with uncommitted isolation is trying to reconstruct a
+record with modifies. This is not supported.
+
+@par \c WT_CONFLICT_LIVE_RESTORE
+This sub-level error indicates that there is a conflict performing the operation because of a
+running live restore in the system.
+
+@par \c WT_CONFLICT_DISAGG
+This sub-level error indicates that an operation or configuration conflicts with disaggregated
+storage.
 
 @if IGNORE_BUILT_BY_API_ERR_END
 @endif
@@ -79,30 +172,5 @@ standard API.
 @snippet ex_all.c Display an error
 
 Note that ::wiredtiger_strerror is not thread-safe.
-
-@section event_message_handling Message handling using the WT_EVENT_HANDLER
-
-Specific error and other message handling can be configured by passing an
-implementation of WT_EVENT_HANDLER to ::wiredtiger_open or
-WT_CONNECTION::open_session.
-
-For example, both informational and error messages might be passed to an
-application-specific logging function that added a timestamp and logged
-the message to a file, and error messages might additionally be output to
-the \c stderr file stream.
-
-Additionally, applications will normally handle \c WT_PANIC as a special
-case.  WiredTiger will always call the error handler callback with
-\c WT_PANIC in the case of a fatal error requiring database restart,
-however, WiredTiger cannot guarantee applications will see an application
-thread return \c WT_PANIC from a WiredTiger API call. For this reason, a
-correctly-written WiredTiger application will likely specify at least an
-error handler which will immediately exit or otherwise handle fatal errors.
-Note that no further WiredTiger calls are required after an error handler
-is called with \c WT_PANIC (and further calls will themselves immediately
-fail).
-
-@snippet ex_event_handler.c Function event_handler
-@snippet ex_event_handler.c Configure event_handler
 
 */

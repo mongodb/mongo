@@ -27,11 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/matcher/expression_text_base.h"
 
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/fts/fts_query.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -46,22 +50,20 @@ void TextMatchExpressionBase::debugString(StringBuilder& debug, int indentationL
     _debugAddSpace(debug, indentationLevel);
     debug << "TEXT : query=" << ftsQuery.getQuery() << ", language=" << ftsQuery.getLanguage()
           << ", caseSensitive=" << ftsQuery.getCaseSensitive()
-          << ", diacriticSensitive=" << ftsQuery.getDiacriticSensitive() << ", tag=";
-    MatchExpression::TagData* td = getTag();
-    if (nullptr != td) {
-        td->debugString(&debug);
-    } else {
-        debug << "NULL";
-    }
-    debug << "\n";
+          << ", diacriticSensitive=" << ftsQuery.getDiacriticSensitive();
+    _debugStringAttachTagInfo(&debug);
 }
 
-void TextMatchExpressionBase::serialize(BSONObjBuilder* out, bool includePath) const {
+void TextMatchExpressionBase::serialize(BSONObjBuilder* out,
+                                        const SerializationOptions& opts,
+                                        bool includePath) const {
     const fts::FTSQuery& ftsQuery = getFTSQuery();
     out->append("$text",
-                BSON("$search" << ftsQuery.getQuery() << "$language" << ftsQuery.getLanguage()
-                               << "$caseSensitive" << ftsQuery.getCaseSensitive()
-                               << "$diacriticSensitive" << ftsQuery.getDiacriticSensitive()));
+                BSON("$search" << opts.serializeLiteral(ftsQuery.getQuery()) << "$language"
+                               << opts.serializeLiteral(ftsQuery.getLanguage()) << "$caseSensitive"
+                               << opts.serializeLiteral(ftsQuery.getCaseSensitive())
+                               << "$diacriticSensitive"
+                               << opts.serializeLiteral(ftsQuery.getDiacriticSensitive())));
 }
 
 bool TextMatchExpressionBase::equivalent(const MatchExpression* other) const {

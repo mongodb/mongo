@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include <vector>
-
 #include "mongo/logv2/log_component.h"
+
+#include <vector>
 
 namespace mongo {
 

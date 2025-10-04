@@ -27,15 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/pipeline/document_source_add_fields.h"
 
-#include <boost/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/add_fields_projection_executor.h"
+#include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/transformer_interface.h"
+#include "mongo/db/query/allowed_contexts.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
+
+#include <memory>
+#include <string>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 using boost::intrusive_ptr;
@@ -63,7 +70,7 @@ intrusive_ptr<DocumentSource> DocumentSourceAddFields::create(
                     return projection_executor::AddFieldsProjectionExecutor::create(expCtx,
                                                                                     addFieldsSpec);
                 } catch (DBException& ex) {
-                    ex.addContext("Invalid " + userSpecifiedName.toString());
+                    ex.addContext("Invalid " + std::string{userSpecifiedName});
                     throw;
                 }
             }(),
@@ -78,11 +85,12 @@ intrusive_ptr<DocumentSource> DocumentSourceAddFields::create(
     const intrusive_ptr<ExpressionContext>& expCtx) {
 
     const bool isIndependentOfAnyCollection = false;
-    return make_intrusive<DocumentSourceSingleDocumentTransformation>(
+    auto docSrc = make_intrusive<DocumentSourceSingleDocumentTransformation>(
         expCtx,
         projection_executor::AddFieldsProjectionExecutor::create(expCtx, fieldPath, expr),
         kStageName,
         isIndependentOfAnyCollection);
+    return docSrc;
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceAddFields::createFromBson(
@@ -93,7 +101,7 @@ intrusive_ptr<DocumentSource> DocumentSourceAddFields::createFromBson(
     uassert(40272,
             str::stream() << specifiedName << " specification stage must be an object, got "
                           << typeName(elem.type()),
-            elem.type() == Object);
+            elem.type() == BSONType::object);
 
     return DocumentSourceAddFields::create(elem.Obj(), expCtx, specifiedName);
 }

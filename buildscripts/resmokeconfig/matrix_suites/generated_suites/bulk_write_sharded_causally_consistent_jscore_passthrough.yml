@@ -1,0 +1,116 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/bulk_write_sharded_causally_consistent_jscore_passthrough.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
+##########################################################
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHashInBackground
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+  config:
+    shell_options:
+      eval:
+        'await import("jstests/libs/override_methods/enable_causal_consistency.js");
+
+        await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
+
+        ; await import(''jstests/libs/override_methods/single_crud_op_as_bulk_write.js'');'
+  fixture:
+    class: ShardedClusterFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        logComponentVerbosity:
+          command: 1
+          network:
+            asio: 2
+            verbosity: 1
+          replication:
+            heartbeats: 2
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+        logComponentVerbosity:
+          command: 1
+          network:
+            asio: 2
+            verbosity: 1
+    num_rs_nodes_per_shard: 2
+  hooks:
+    - class: CheckReplDBHashInBackground
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: ValidateCollections
+    - class: CheckOrphansDeleted
+    - class: CleanEveryN
+      n: 20
+matrix_suite: true
+selector:
+  exclude_files:
+    - jstests/core/**/apitest_db.js
+    - jstests/core/**/bypass_doc_validation.js
+    - jstests/core/**/check_shard_index.js
+    - jstests/core/**/compact_keeps_indexes.js
+    - jstests/core/**/currentop.js
+    - jstests/core/**/dbhash.js
+    - jstests/core/**/fsync.js
+    - jstests/core/**/geo_update_btree2.js
+    - jstests/core/**/queryoptimizera.js
+    - jstests/core/**/tailable_cursor_invalidation.js
+    - jstests/core/**/tailable_getmore_batch_size.js
+    - jstests/core/**/tailable_skip_limit.js
+    - jstests/core/**/geo_2d_explain.js
+    - jstests/core/**/geo_s2explain.js
+    - jstests/core/**/geo_s2sparse.js
+    - jstests/core/**/bad_index_plugin.js
+    - jstests/core/**/create_indexes.js
+    - jstests/core/**/list_indexes_non_existent_ns.js
+    - jstests/core/**/mr_preserve_indexes.js
+    - jstests/core/**/benchrun_pipeline_updates.js
+    - jstests/core/timeseries/write/timeseries_delete_hint.js
+    - jstests/core/**/set_param1.js
+    - jstests/core/**/profile*.js
+    - jstests/core/query/comment_field.js
+    - jstests/core/administrative/fsync/fsync.js
+    - jstests/core/write/insert/batch_write_command_insert.js
+    - jstests/core/query/batch_write/batch_write_command_update.js
+    - jstests/core/query/batch_write/batch_write_command_delete.js
+    - jstests/core/testing/failcommand_failpoint.js
+    - jstests/core/query/parsing/write_commands_reject_unknown_fields.js
+    - jstests/core/query/explain/explain_uuid.js
+    - jstests/core/query/explain/explain_includes_command.js
+    - jstests/core/query/distinct/distinct_collator.js
+    - jstests/core/txns/transactions_profiling.js
+    - jstests/core/txns/currentop_blocked_operations.js
+    - jstests/core/txns/transactions_profiling_with_drops.js
+    - jstests/core/txns/multi_statement_transaction_write_error.js
+    - src/mongo/db/modules/enterprise/jstests/fle2/basic_update.js
+    - src/mongo/db/modules/enterprise/jstests/fle2/basic_delete.js
+    - src/mongo/db/modules/enterprise/jstests/fle2/query/explain*.js
+    - src/mongo/db/modules/enterprise/jstests/fle2/query/aggregate_lookupMultiSchema.js
+  exclude_with_any_tags:
+    - assumes_no_implicit_collection_creation_on_get_collection
+    - assumes_against_mongod_not_mongos
+    - assumes_standalone_mongod
+    - assumes_no_implicit_collection_creation_after_drop
+    - assumes_no_implicit_index_creation
+    - assumes_unsharded_collection
+    - cannot_create_unique_index_when_using_hashed_shard_key
+    - assumes_read_preference_unchanged
+    - does_not_support_causal_consistency
+    - requires_profiling
+    - uses_transactions
+    - uses_parallel_shell
+    - requires_capped
+    - requires_2_or_more_shards
+  roots:
+    - jstests/core/**/*.js
+    - jstests/fle2/**/*.js
+    - src/mongo/db/modules/*/jstests/fle2/**/*.js
+test_kind: js_test

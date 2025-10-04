@@ -31,16 +31,31 @@
  * Unit tests of the UserName and RoleName types.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <string>
-
+// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/auth/auth_name.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
+#include <iosfwd>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {
@@ -61,13 +76,17 @@ std::string stream(const T& obj) {
 }
 
 template <typename T, typename Name, typename Db>
-void checkValueAssertions(const T& obj, Name name, Db db) {
-    const bool expectEmpty = StringData(name).empty() && StringData(db).empty();
+void checkValueAssertions(const T& obj,
+                          Name name,
+                          Db db,
+                          const boost::optional<TenantId>& tenant = boost::none) {
+    const bool expectEmpty = StringData(name).empty() && StringData(db).empty() && !tenant;
     ASSERT_EQ(obj.empty(), expectEmpty);
 
     ASSERT_EQ(obj.getDB(), db);
     ASSERT_EQ(obj.getName(), name);
     ASSERT_EQ(getName(obj), name);
+    ASSERT_EQ(obj.tenantId(), tenant);
 
     std::string expectDisplay, expectUnique;
     if (!expectEmpty) {
@@ -78,6 +97,12 @@ void checkValueAssertions(const T& obj, Name name, Db db) {
     ASSERT_EQ(stream<StringBuilder>(obj), expectDisplay);
     ASSERT_EQ(stream<std::ostringstream>(obj), expectDisplay);
     ASSERT_EQ(obj.getUnambiguousName(), expectUnique);
+
+    T same(name, db, tenant);
+    ASSERT_EQ(obj, same);
+
+    T bigger("zzzz", "zzzz", tenant);
+    ASSERT_LT(obj, bigger);
 }
 
 template <typename T>
@@ -101,10 +126,17 @@ TEST(AuthName, ConstructorTest) {
 
 template <typename T, typename Name, typename Db>
 void doBSONParseTest(Name name, Db db) {
+    // Without TenantId.
     auto obj = BSON(T::kFieldName << name << "db" << db);
     checkValueAssertions(T::parseFromBSON(BSON("" << obj).firstElement()), name, db);
-
     checkValueAssertions(T::parseFromBSONObj(obj), name, db);
+
+    // With TenantId.
+    auto oid = OID::gen();
+    auto tenant = TenantId(oid);
+    auto tobj = BSON(T::kFieldName << name << "db" << db << "tenant" << oid);
+    checkValueAssertions(T::parseFromBSON(BSON("" << tobj).firstElement()), name, db, tenant);
+    checkValueAssertions(T::parseFromBSONObj(tobj), name, db, tenant);
 }
 
 template <typename T, typename Name, typename Db>

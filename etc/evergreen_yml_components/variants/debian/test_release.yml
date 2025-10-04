@@ -1,0 +1,104 @@
+# Debian build variants for testing release environments
+#
+# After the branching variants in this file
+# should continue to run on a new rapid release (v7.1, v7.2 etc.)
+# and LTS release (v7.0, v6.0 etc.) branch projects
+
+buildvariants:
+  - name: debian12
+    display_name: Debian 12
+    tags: ["bazel_check", "forbid_tasks_tagged_with_experimental"]
+    cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - debian12-small
+    expansions:
+      push_path: linux
+      push_bucket: downloads.mongodb.org
+      push_bucket_new: cdn-origin-mongodb-server-community
+      push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-community
+      push_name: linux
+      push_arch: x86_64-debian12
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=debian12
+        --build_enterprise=False
+      compile_all_but_not_unittests_flags: >-
+        --linkopt=-s
+      test_flags: >-
+        --excludeWithAnyTags=requires_external_data_source,requires_updated_oscrypto
+        --modules=none
+      multiversion_platform: debian12
+      multiversion_edition: targeted
+      has_packages: true
+      packager_script: packager.py
+      packager_arch: x86_64
+      packager_distro: debian12
+      repo_edition: org
+      large_distro_name: debian12-large
+      compile_variant: debian12
+    tasks:
+      - name: compile_test_and_package_serial_TG
+        distros:
+          - debian12-large
+      - name: run_unit_tests_TG
+        distros:
+          - debian12-large
+      - name: test_packages
+        distros:
+          - ubuntu2204-large
+      - name: .development_critical !.requires_large_host !.incompatible_community !.incompatible_debian !.incompatible_oscrypto
+      - name: .development_critical .requires_large_host !.incompatible_community !.incompatible_debian !.incompatible_oscrypto
+        distros:
+          - debian12-large
+      - name: .release_critical !.requires_large_host !.incompatible_community !.incompatible_debian !.incompatible_oscrypto
+      - name: .release_critical .requires_large_host !.incompatible_community !.incompatible_debian !.incompatible_oscrypto
+        distros:
+          - debian12-large
+
+  - name: enterprise-debian12-64
+    display_name: Enterprise Debian 12
+    tags: ["forbid_tasks_tagged_with_experimental"]
+    cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - debian12-small
+    expansions:
+      additional_package_targets: >-
+        archive-mongocryptd-stripped
+        archive-mongocryptd-debug
+      push_path: linux
+      push_bucket: downloads.10gen.com
+      push_bucket_new: cdn-origin-mongodb-server-enterprise
+      push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
+      push_name: linux
+      push_arch: x86_64-enterprise-debian12
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=debian12
+      compile_all_but_not_unittests_flags: >-
+        --linkopt=-s
+      test_flags: --excludeWithAnyTags=requires_external_data_source,requires_updated_oscrypto
+      multiversion_platform: debian12
+      multiversion_edition: enterprise
+      has_packages: true
+      packager_script: packager_enterprise.py
+      packager_arch: x86_64
+      packager_distro: debian12
+      repo_edition: enterprise
+      large_distro_name: debian12-large
+      compile_variant: enterprise-debian12-64
+    tasks:
+      - name: compile_test_and_package_serial_TG
+        distros:
+          - debian12-large
+      - name: run_unit_tests_TG
+        distros:
+          - debian12-large
+      - name: test_packages
+        distros:
+          - ubuntu2204-large
+      - name: .development_critical !.requires_large_host !.incompatible_debian !.incompatible_oscrypto
+      - name: .development_critical .requires_large_host !.incompatible_debian !.incompatible_oscrypto
+        distros:
+          - debian12-large
+      - name: .release_critical !.requires_large_host !.incompatible_debian !.incompatible_oscrypto
+      - name: .release_critical .requires_large_host !.incompatible_debian !.incompatible_oscrypto
+        distros:
+          - debian12-large

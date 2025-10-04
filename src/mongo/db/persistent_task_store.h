@@ -29,27 +29,35 @@
 
 #pragma once
 
-#include <fmt/format.h>
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/write_ops/write_ops.h"
+#include "mongo/db/query/write_ops/write_ops_gen.h"
+#include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/write_concern.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+
+#include <cstddef>
+#include <functional>
+#include <memory>
+#include <utility>
+
+#include <fmt/format.h>
 
 namespace mongo {
-
-using namespace fmt::literals;
-
-namespace WriteConcerns {
-
-const WriteConcernOptions kMajorityWriteConcern{WriteConcernOptions::kMajority,
-                                                WriteConcernOptions::SyncMode::UNSET,
-                                                WriteConcernOptions::kWriteConcernTimeoutSharding};
-
-}
 
 template <typename T>
 class PersistentTaskStore {
@@ -61,13 +69,13 @@ public:
      */
     void add(OperationContext* opCtx,
              const T& task,
-             const WriteConcernOptions& writeConcern = WriteConcerns::kMajorityWriteConcern) {
+             const WriteConcernOptions& writeConcern = defaultMajorityWriteConcernDoNotUse()) {
         DBDirectClient dbClient(opCtx);
 
         const auto commandResponse = dbClient.runCommand([&] {
             write_ops::InsertCommandRequest insertOp(_storageNss);
             insertOp.setDocuments({task.toBSON()});
-            return insertOp.serialize({});
+            return insertOp.serialize();
         }());
 
         const auto commandReply = commandResponse->getCommandReply();
@@ -85,7 +93,7 @@ public:
     void update(OperationContext* opCtx,
                 const BSONObj& filter,
                 const BSONObj& update,
-                const WriteConcernOptions& writeConcern = WriteConcerns::kMajorityWriteConcern) {
+                const WriteConcernOptions& writeConcern = defaultMajorityWriteConcernDoNotUse()) {
         _update(opCtx, filter, update, /* upsert */ false, writeConcern);
     }
 
@@ -96,7 +104,7 @@ public:
     void upsert(OperationContext* opCtx,
                 const BSONObj& filter,
                 const BSONObj& update,
-                const WriteConcernOptions& writeConcern = WriteConcerns::kMajorityWriteConcern) {
+                const WriteConcernOptions& writeConcern = defaultMajorityWriteConcernDoNotUse()) {
         _update(opCtx, filter, update, /* upsert */ true, writeConcern);
     }
 
@@ -105,7 +113,7 @@ public:
      */
     void remove(OperationContext* opCtx,
                 const BSONObj& filter,
-                const WriteConcernOptions& writeConcern = WriteConcerns::kMajorityWriteConcern) {
+                const WriteConcernOptions& writeConcern = defaultMajorityWriteConcernDoNotUse()) {
         DBDirectClient dbClient(opCtx);
 
         auto commandResponse = dbClient.runCommand([&] {
@@ -120,7 +128,7 @@ public:
                 return entry;
             }()});
 
-            return deleteOp.serialize({});
+            return deleteOp.serialize();
         }());
 
         const auto commandReply = commandResponse->getCommandReply();
@@ -141,12 +149,14 @@ public:
                  std::function<bool(const T&)> handler) {
         DBDirectClient dbClient(opCtx);
 
-        auto cursor = dbClient.query(_storageNss, filter);
+        FindCommandRequest findRequest{_storageNss};
+        findRequest.setFilter(filter);
+        auto cursor = dbClient.find(std::move(findRequest));
 
         while (cursor->more()) {
             auto bson = cursor->next();
             auto t = T::parse(
-                IDLParserErrorContext("PersistentTaskStore:" + _storageNss.toString()), bson);
+                bson, IDLParserContext("PersistentTaskStore:" + _storageNss.toStringForErrorMsg()));
 
             if (bool shouldContinue = handler(t); !shouldContinue)
                 return;
@@ -159,8 +169,10 @@ public:
     size_t count(OperationContext* opCtx, const BSONObj& filter = BSONObj{}) {
         DBDirectClient client(opCtx);
 
-        auto projection = BSON("_id" << 1);
-        auto cursor = client.query(_storageNss, filter, Query(), 0, 0, &projection);
+        FindCommandRequest findRequest{_storageNss};
+        findRequest.setFilter(filter);
+        findRequest.setProjection(BSON("_id" << 1));
+        auto cursor = client.find(std::move(findRequest));
 
         return cursor->itcount();
     }
@@ -170,10 +182,10 @@ private:
                  const BSONObj& filter,
                  const BSONObj& update,
                  bool upsert,
-                 const WriteConcernOptions& writeConcern = WriteConcerns::kMajorityWriteConcern) {
+                 const WriteConcernOptions& writeConcern = defaultMajorityWriteConcernDoNotUse()) {
         DBDirectClient dbClient(opCtx);
 
-        auto commandResponse = dbClient.update([&] {
+        auto commandResponse = write_ops::checkWriteErrors(dbClient.update([&] {
             write_ops::UpdateCommandRequest updateOp(_storageNss);
             auto updateModification = write_ops::UpdateModification::parseFromClassicUpdate(update);
             write_ops::UpdateOpEntry updateEntry(filter, updateModification);
@@ -181,24 +193,19 @@ private:
             updateEntry.setUpsert(upsert);
             updateOp.setUpdates({updateEntry});
             return updateOp;
-        }());
-
-        auto writeErrors = commandResponse.getWriteErrors();
-        if (writeErrors) {
-            BSONObj firstWriteError = writeErrors->front();
-            uasserted(ErrorCodes::Error(firstWriteError.getIntField("code")),
-                      firstWriteError.getStringField("errmsg"));
-        }
+        }()));
 
         uassert(ErrorCodes::NoMatchingDocument,
-                "No matching document found for query {} on namespace {}"_format(
-                    filter.toString(), _storageNss.toString()),
+                fmt::format("No matching document found for query {} on namespace {}",
+                            filter.toString(),
+                            _storageNss.toStringForErrorMsg()),
                 upsert || commandResponse.getN() > 0);
 
         WriteConcernResult ignoreResult;
         auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
         uassertStatusOK(waitForWriteConcern(opCtx, latestOpTime, writeConcern, &ignoreResult));
     }
+
     NamespaceString _storageNss;
 };
 

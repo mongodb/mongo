@@ -27,11 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/curop_failpoint_helpers.h"
 
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/client.h"
 #include "mongo/db/curop.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/time_support.h"
+
+#include <mutex>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 
 namespace mongo {
@@ -40,7 +53,7 @@ std::string CurOpFailpointHelpers::updateCurOpFailPointMsg(OperationContext* opC
                                                            const std::string& newMsg) {
     stdx::lock_guard<Client> lk(*opCtx->getClient());
     auto oldMsg = CurOp::get(opCtx)->getFailPointMessage();
-    CurOp::get(opCtx)->setFailPointMessage_inlock(newMsg.c_str());
+    CurOp::get(opCtx)->setFailPointMessage(lk, newMsg.c_str());
     return oldMsg;
 }
 
@@ -48,7 +61,7 @@ void CurOpFailpointHelpers::waitWhileFailPointEnabled(FailPoint* failPoint,
                                                       OperationContext* opCtx,
                                                       const std::string& failpointMsg,
                                                       const std::function<void()>& whileWaiting,
-                                                      boost::optional<NamespaceString> nss) {
+                                                      const NamespaceString& nss) {
     invariant(failPoint);
     failPoint->executeIf(
         [&](const BSONObj& data) {
@@ -56,8 +69,11 @@ void CurOpFailpointHelpers::waitWhileFailPointEnabled(FailPoint* failPoint,
 
             const bool shouldCheckForInterrupt = data["shouldCheckForInterrupt"].booleanSafe();
             const bool shouldContinueOnInterrupt = data["shouldContinueOnInterrupt"].booleanSafe();
+            const Milliseconds sleepForMs = data.hasField("sleepFor")
+                ? Milliseconds(data["sleepFor"].numberInt())
+                : Milliseconds(10);
             while (MONGO_unlikely(failPoint->shouldFail())) {
-                sleepFor(Milliseconds(10));
+                sleepFor(sleepForMs);
                 if (whileWaiting) {
                     whileWaiting();
                 }
@@ -74,15 +90,18 @@ void CurOpFailpointHelpers::waitWhileFailPointEnabled(FailPoint* failPoint,
                 } else if (shouldCheckForInterrupt) {
                     opCtx->checkForInterrupt();
                 }
+                if (data.hasField("sleepFor")) {
+                    break;
+                }
             }
             updateCurOpFailPointMsg(opCtx, origCurOpFailpointMsg);
         },
         [&](const BSONObj& data) {
-            StringData fpNss = data.getStringField("nss");
-            if (nss && !fpNss.empty() && fpNss != nss.get().toString()) {
-                return false;
+            if (data.hasField("comment") && opCtx->getComment()) {
+                return opCtx->getComment()->String() == data.getStringField("comment");
             }
-            return true;
+            const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "nss"_sd);
+            return nss.isEmpty() || fpNss.isEmpty() || fpNss == nss;
         });
 }
 }  // namespace mongo

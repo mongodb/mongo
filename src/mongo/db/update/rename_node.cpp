@@ -27,17 +27,30 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/update/rename_node.h"
-
+#include <boost/container/small_vector.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/mutable/algorithm.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/mutable_bson/algorithm.h"
+#include "mongo/db/exec/mutable_bson/const_element.h"
+#include "mongo/db/exec/mutable_bson/document.h"
+#include "mongo/db/exec/mutable_bson/element.h"
+#include "mongo/db/field_ref_set.h"
 #include "mongo/db/update/field_checker.h"
 #include "mongo/db/update/modifier_node.h"
 #include "mongo/db/update/path_support.h"
-#include "mongo/db/update/storage_validation.h"
+#include "mongo/db/update/rename_node.h"
+#include "mongo/db/update/runtime_update_path.h"
 #include "mongo/db/update/unset_node.h"
+#include "mongo/db/update/update_executor.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
+#include <cstddef>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -64,7 +77,8 @@ public:
 
     void setCollator(const CollatorInterface* collator) final {}
 
-    Status init(BSONElement modExpr, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    Status init(BSONElement modExpr,
+                const boost::intrusive_ptr<ExpressionContext>& expCtx) override {
         return Status::OK();
     }
 
@@ -114,21 +128,20 @@ private:
 Status RenameNode::init(BSONElement modExpr,
                         const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     invariant(modExpr.ok());
-    invariant(BSONType::String == modExpr.type());
+    invariant(BSONType::string == modExpr.type());
 
     FieldRef fromFieldRef(modExpr.fieldName());
     FieldRef toFieldRef(modExpr.String());
 
-    if (modExpr.valueStringData().find('\0') != std::string::npos) {
-        return Status(ErrorCodes::BadValue,
-                      "The 'to' field for $rename cannot contain an embedded null byte");
-    }
+    tassert(9867601,
+            "The 'to' field for $rename cannot contain an embedded null byte",
+            modExpr.valueStringData().find('\0') == std::string::npos);
 
     // Parsing {$rename: {'from': 'to'}} places nodes in the UpdateNode tree for both the "from" and
     // "to" paths via UpdateObjectNode::parseAndMerge(), which will enforce this isUpdatable
     // property.
-    dassert(fieldchecker::isUpdatable(fromFieldRef).isOK());
-    dassert(fieldchecker::isUpdatable(toFieldRef).isOK());
+    dassert(fieldchecker::isUpdatable(fromFieldRef));
+    dassert(fieldchecker::isUpdatable(toFieldRef));
 
     // Though we could treat this as a no-op, it is illegal in the current implementation.
     if (fromFieldRef == toFieldRef) {
@@ -199,7 +212,7 @@ UpdateExecutor::ApplyResult RenameNode::apply(ApplyParams applyParams,
     for (auto currentElement = fromElement.parent(); currentElement != document.root();
          currentElement = currentElement.parent()) {
         invariant(currentElement.ok());
-        if (BSONType::Array == currentElement.getType()) {
+        if (BSONType::array == currentElement.getType()) {
             auto idElem = mutablebson::findFirstChildNamed(document.root(), "_id");
             uasserted(ErrorCodes::BadValue,
                       str::stream() << "The source field cannot be an array element, '"
@@ -219,7 +232,7 @@ UpdateExecutor::ApplyResult RenameNode::apply(ApplyParams applyParams,
          currentElement != document.root();
          currentElement = currentElement.parent()) {
         invariant(currentElement.ok());
-        if (BSONType::Array == currentElement.getType()) {
+        if (BSONType::array == currentElement.getType()) {
             auto idElem = mutablebson::findFirstChildNamed(document.root(), "_id");
             uasserted(ErrorCodes::BadValue,
                       str::stream() << "The destination field cannot be an array element, '"
@@ -256,16 +269,11 @@ UpdateExecutor::ApplyResult RenameNode::apply(ApplyParams applyParams,
     UnsetNode unsetElement;
     auto unsetElementApplyResult = unsetElement.apply(unsetParams, unsetUpdateNodeApplyParams);
 
-    // Determine the final result based on the results of the $set and $unset.
-    ApplyResult applyResult;
-    applyResult.indexesAffected =
-        setElementApplyResult.indexesAffected || unsetElementApplyResult.indexesAffected;
-
     // The $unset would only be a no-op if the source element did not exist, in which case we would
     // have exited early with a no-op result.
     invariant(!unsetElementApplyResult.noop);
 
-    return applyResult;
+    return {};
 }
 
 }  // namespace mongo

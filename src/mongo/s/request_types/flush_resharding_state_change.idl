@@ -32,7 +32,7 @@ global:
     cpp_namespace: "mongo"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 commands:
     _flushReshardingStateChange:
@@ -42,8 +42,9 @@ commands:
         namespace: type
         api_version: ""
         type: namespacestring
+        reply_type: OkReply
         fields:
-          reshardingUUID:
-            type: uuid
-            optional: false
-            description: "The UUID for this resharding operation"
+            reshardingUUID:
+                type: uuid
+                optional: false
+                description: "The UUID for this resharding operation"

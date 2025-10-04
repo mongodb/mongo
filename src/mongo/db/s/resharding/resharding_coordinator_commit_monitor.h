@@ -29,23 +29,24 @@
 
 #pragma once
 
-#include <memory>
-#include <vector>
-
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/s/resharding/resharding_metrics.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/s/shard_id.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
+
+#include <memory>
+#include <vector>
 
 namespace mongo {
 namespace resharding {
 
 /**
- * Allows blocking the coordinator of a resharding operation until all recipient shards can finish
- * within a predefined threshold. The monitoring is achieved by periodically querying the estimated
- * remaining operation time for each recipient shard.
+ * Used by the coordinator of a resharding operation to wait until the critical section can be
+ * entered and exited within same predefined threshold. The monitoring is achieved by periodically
+ * querying donor and recipient shards.
  *
  * The threshold is decided at the time of constructing a new `CoordinatorCommitMonitor`, and by
  * atomically fetching the value of `remainingReshardingOperationTimeThresholdMillis`.
@@ -68,11 +69,13 @@ public:
         Milliseconds max;
     };
 
-    CoordinatorCommitMonitor(NamespaceString ns,
+    CoordinatorCommitMonitor(std::shared_ptr<ReshardingMetrics> metrics,
+                             NamespaceString ns,
+                             std::vector<ShardId> donorShards,
                              std::vector<ShardId> recipientShards,
                              TaskExecutorPtr executor,
                              CancellationToken cancelToken,
-                             Milliseconds maxDelayBetweenQueries = kMaxDelayBetweenQueries);
+                             int delayBeforeInitialQueryMillis);
 
     SemiFuture<void> waitUntilRecipientsAreWithinCommitThreshold() const;
 
@@ -85,20 +88,22 @@ public:
      */
     void setNetworkExecutorForTest(TaskExecutorPtr networkExecutor);
 
-    RemainingOperationTimes queryRemainingOperationTimeForRecipients() const;
+    RemainingOperationTimes queryRemainingOperationTime() const;
 
 private:
-    ExecutorFuture<void> _makeFuture() const;
+    ExecutorFuture<void> _makeFuture(Milliseconds delayBetweenQueries) const;
 
     static constexpr auto kDiagnosticLogLevel = 0;
-    static constexpr auto kMaxDelayBetweenQueries = Seconds(30);
 
+    std::shared_ptr<ReshardingMetrics> _metrics;
     const NamespaceString _ns;
-    const std::vector<ShardId> _recipientShards;
+    const std::set<ShardId> _donorShards;
+    const std::set<ShardId> _recipientShards;
+    const std::set<ShardId> _participantShards;
     const TaskExecutorPtr _executor;
     const CancellationToken _cancelToken;
-    const Milliseconds _threshold;
-    const Milliseconds _maxDelayBetweenQueries;
+
+    const Milliseconds _delayBeforeInitialQueryMillis;
 
     TaskExecutorPtr _networkExecutor;
 };

@@ -6,12 +6,9 @@
  *   uses_atclustertime
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/discover_topology.js");
-load("jstests/libs/fail_point_util.js");
-load("jstests/sharding/libs/resharding_test_fixture.js");
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 const reshardingTest = new ReshardingTest();
 
@@ -38,7 +35,8 @@ const configPrimary = new Mongo(topology.configsvr.primary);
 const fp = configureFailPoint(configPrimary, "reshardingPauseCoordinatorBeforeCloning");
 
 const recipientShardNames = reshardingTest.recipientShardNames;
-reshardingTest.withReshardingInBackground(  //
+reshardingTest.withReshardingInBackground(
+    //
     {
         newShardKeyPattern: {newKey: 1},
         newChunks: [{min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardNames[0]}],
@@ -52,7 +50,7 @@ reshardingTest.withReshardingInBackground(  //
         triggerShardVersionRefreshOnSecondary(tempColl);
 
         fp.off();
-    });
+    },
+);
 
 reshardingTest.teardown();
-})();

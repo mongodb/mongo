@@ -29,8 +29,17 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/client/dbclient_base.h"
+#include "mongo/scripting/mozjs/base.h"
 #include "mongo/scripting/mozjs/wraptype.h"
+#include "mongo/util/modules.h"
+
+#include <memory>
+
+#include <js/Class.h>
+#include <js/PropertySpec.h>
+#include <js/TypeDecls.h>
 
 namespace mongo {
 namespace mozjs {
@@ -42,7 +51,9 @@ namespace mozjs {
  * from C++. Current callers are all via the Mongo object.
  */
 struct SessionInfo : public BaseInfo {
-    static void finalize(js::FreeOp* fop, JSObject* obj);
+    enum Slots { SessionHolderSlot, SessionInfoSlotCount };
+
+    static void finalize(JS::GCContext* gcCtx, JSObject* obj);
 
     struct Functions {
         MONGO_DECLARE_JS_FUNCTION(end);
@@ -57,7 +68,8 @@ struct SessionInfo : public BaseInfo {
     static const JSFunctionSpec methods[8];
 
     static const char* const className;
-    static const unsigned classFlags = JSCLASS_HAS_PRIVATE;
+    static const unsigned classFlags =
+        JSCLASS_HAS_RESERVED_SLOTS(SessionInfoSlotCount) | BaseInfo::finalizeFlag;
     static const InstallType installType = InstallType::Private;
 
     static void make(JSContext* cx,

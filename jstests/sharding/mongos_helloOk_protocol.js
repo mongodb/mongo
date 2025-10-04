@@ -6,8 +6,8 @@
  * In practice, drivers will send "helloOk: true" in the initial handshake when
  * opening a connection to the database.
  */
-(function() {
-"use strict";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({shards: 1, mongos: 1});
 const mongos = st.s;
 
@@ -23,4 +23,3 @@ assert.eq("boolean", typeof res.helloOk, "helloOk field is not a boolean" + tojs
 assert.eq(res.helloOk, true);
 
 st.stop();
-})();

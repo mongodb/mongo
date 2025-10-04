@@ -1,0 +1,15 @@
+conn_config="statistics=(all),statistics_log=(json=true,on_close=true,wait=1),cache_size=50MB,eviction=(threads_max=8),tiered_storage=(auth_token=Secret,bucket=bucket2,bucket_prefix=pfx_,name=dir_store),chunk_cache=[enabled=true,chunk_size=100MB,capacity=25GB,type=DRAM]"
+table_count=5
+icount=2500000
+key_sz=1024
+value_sz=1024
+run_time=120
+checkpoint_interval=10
+checkpoint_threads=1
+populate_threads=4
+reopen_connection=true
+threads=((count=10,reads=1))
+tiered="dir_store"
+tiered_bucket="bucket2"
+tiered_flush_interval=22
+verbose=2

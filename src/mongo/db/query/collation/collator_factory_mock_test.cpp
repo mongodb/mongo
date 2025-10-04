@@ -27,11 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/db/query/collation/collator_factory_mock.h"
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/query/collation/collator_factory_mock.h"
+#include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
@@ -40,8 +42,7 @@ using namespace mongo;
 
 TEST(CollatorFactoryMockTest, CollatorFactoryMockReturnsNullCollatorIfLocaleSimple) {
     CollatorFactoryMock factory;
-    auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "simple"));
+    auto collator = factory.makeFromBSON(BSON("locale" << "simple"));
     ASSERT_OK(collator.getStatus());
     ASSERT_FALSE(collator.getValue());
 }

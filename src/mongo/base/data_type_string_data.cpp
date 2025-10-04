@@ -28,14 +28,19 @@
  */
 
 #include "mongo/base/data_type.h"
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/util/str.h"
+
+#include <cstddef>
+#include <cstring>
 
 namespace mongo {
 
 namespace {
 
-Status makeStoreStatus(const StringData& sdata, size_t length, std::ptrdiff_t debug_offset) {
+Status makeStoreStatus(StringData sdata, size_t length, std::ptrdiff_t debug_offset) {
     str::stream ss;
     ss << "buffer size too small to write StringData(" << sdata.size() << ") bytes into buffer["
        << length << "] at offset: " << debug_offset;
@@ -59,17 +64,14 @@ Status DataType::Handler<StringData>::load(StringData* sdata,
     return Status::OK();
 }
 
-Status DataType::Handler<StringData>::store(const StringData& sdata,
-                                            char* ptr,
-                                            size_t length,
-                                            size_t* advanced,
-                                            std::ptrdiff_t debug_offset) {
+Status DataType::Handler<StringData>::store(
+    StringData sdata, char* ptr, size_t length, size_t* advanced, std::ptrdiff_t debug_offset) {
     if (sdata.size() > length) {
         return makeStoreStatus(sdata, length, debug_offset);
     }
 
     if (ptr) {
-        std::memcpy(ptr, sdata.rawData(), sdata.size());
+        std::memcpy(ptr, sdata.data(), sdata.size());
     }
 
     if (advanced) {

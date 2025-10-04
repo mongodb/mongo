@@ -29,19 +29,22 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <wiredtiger.h>
-
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
+
+#include <wiredtiger.h>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
+class WiredTigerSession;
 using RoundUpPreparedTimestamps = WiredTigerBeginTxnBlock::RoundUpPreparedTimestamps;
-
-class WiredTigerOplogManager;
 
 class WiredTigerSnapshotManager final : public SnapshotManager {
     WiredTigerSnapshotManager(const WiredTigerSnapshotManager&) = delete;
@@ -65,9 +68,10 @@ public:
      * Throws if there is currently no committed snapshot.
      */
     Timestamp beginTransactionOnCommittedSnapshot(
-        WT_SESSION* session,
+        WiredTigerSession* session,
         PrepareConflictBehavior prepareConflictBehavior,
-        RoundUpPreparedTimestamps roundUpPreparedTimestamps) const;
+        bool roundUpPreparedTimestamps,
+        RecoveryUnit::UntimestampedWriteAssertionLevel untimestampedWriteAssertion) const;
 
     /**
      * Returns lowest SnapshotName that could possibly be used by a future call to
@@ -81,13 +85,11 @@ public:
 
 private:
     // Snapshot to use for reads at a commit timestamp.
-    mutable Mutex _committedSnapshotMutex =  // Guards _committedSnapshot.
-        MONGO_MAKE_LATCH("WiredTigerSnapshotManager::_committedSnapshotMutex");
+    mutable stdx::mutex _committedSnapshotMutex;  // Guards _committedSnapshot.
     boost::optional<Timestamp> _committedSnapshot;
 
     // Timestamp to use for reads at a the lastApplied timestamp.
-    mutable Mutex _lastAppliedMutex =  // Guards _lastApplied.
-        MONGO_MAKE_LATCH("WiredTigerSnapshotManager::_lastAppliedMutex");
+    mutable stdx::mutex _lastAppliedMutex;  // Guards _lastApplied.
     boost::optional<Timestamp> _lastApplied;
 };
 }  // namespace mongo

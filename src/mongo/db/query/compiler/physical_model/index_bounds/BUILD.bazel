@@ -1,0 +1,37 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "index_bounds",
+    srcs = [
+        "index_bounds.cpp",
+    ],
+    hdrs = [
+        "index_bounds.h",
+        "//src/mongo/db/storage:index_entry_comparison.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/query/compiler/physical_model/interval",
+        "//src/mongo/db/storage:index_entry_comparison",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "index_bounds_test",
+    srcs = [
+        "index_bounds_test.cpp",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        ":index_bounds",
+    ],
+)

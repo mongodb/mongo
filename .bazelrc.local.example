@@ -1,0 +1,17 @@
+# Developer profiles defined in .bazelrc - uncomment the one you want to be using when calling "bazel build" 
+# most commands like 'test' or 'run' inherit from build so they will also get applied
+
+# Fastest build, some debug information
+common --config=fastbuild
+
+# Slower and larger build, best for using debugger
+#common --config=dbg
+
+# Debug with thread sanitizers, dynamic instead of static build
+#common --config=dbg_tsan
+
+# Debug with address and undefined sanitizers
+#common --config=dbg_aubsan
+
+# Fastest runtime, has debug info, no debug asserts
+#common --config=opt

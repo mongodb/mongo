@@ -27,19 +27,25 @@
 #
 
 global:
-  cpp_namespace: "mongo"
-  cpp_includes:
-    - "mongo/db/commands/feature_compatibility_version_parser.h"
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/feature_compatibility_version_parser.h"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 enums:
     SetFCVPhase:
-        description: "Enum that defines the phases of the 2-phase setFCV protocol."
+        description: "Enum that defines the phases of the 3-phase setFCV protocol."
         type: string
         values:
+            # Tells shards to transition to kUpgrading/kDowngrading FCV.
             kStart: "start"
+            # Tells shards to perform upgrade-ability/downgrade-ability checks and any actions needed
+            # before transitioning to the fully upgraded/downgraded state.
+            kPrepare: "prepare"
+            # Tells shards to execute possibly metadata-changing upgrade/downgrade actions and
+            # transition to the fully upgraded/downgraded FCV.
             kComplete: "complete"
 
 commands:
@@ -52,33 +58,54 @@ commands:
         api_version: ""
         type: fcv_string
         fields:
-            downgradeOnDiskChanges:
-                description: "A boolean that indicates whether we should rollback all possible
-                              on-disk changes associated with the upgraded
-                              featureCompatibilityVersion. This should only be called with a
-                              downgraded featureCompatibilityVersion."
+            confirm:
+                description: "A required parameter that ensures that the user is
+                    upgrading/downgrading with support assistance. Internal setFCV
+                    commands issue from the config svr will not require this parameter.
+                    If this parameter is not specified from a user command, the setFCV
+                    command will error out. This parameter is declared optional so that
+                    we can provide the user with a custom error message if it is not
+                    specified."
                 type: safeBool
                 optional: true
             fromConfigServer:
-                description: "A boolean that indicates whether the command is being requested by a
-                              config server. Normally FCV upgrades between last-lts and anything
-                              less than latest are not allowed, but in a sharded cluster, newly
-                              started shard nodes start in lastLTS and this parameter is required in
-                              order to be able to add such a shard to a cluster, which is currently
-                              running at last-continuous."
+                description:
+                    "A boolean that indicates whether the command is being requested by a
+                    config server. Normally FCV upgrades between last-lts and anything
+                    less than latest are not allowed, but in a sharded cluster, newly
+                    started shard nodes start in lastLTS and this parameter is required in
+                    order to be able to add such a shard to a cluster, which is currently
+                    running at last-continuous."
                 type: safeBool
                 optional: true
             phase:
-                description: "An enum that indicates whether the the command is requesting the shard
-                              to enter phase-1 (kStart) or phase-2 (kComplete) of the 2-phase setFCV
-                              protocol. Only valid to be specified for shards. If not specified on a
-                              shard, it will run the full setFCV sequence (both phases)."
+                description:
+                    "An enum that indicates whether the the command is requesting the shard
+                    to enter phase-1 (kStart) or phase-2 (kComplete) of the 2-phase setFCV
+                    protocol. Only valid to be specified for shards. If not specified on a
+                    shard, it will run the full setFCV sequence (both phases)."
                 type: SetFCVPhase
                 optional: true
             changeTimestamp:
-                description: "Timestamp used to identify the 2-phase setFCV request. Both phases
-                              (kStart and kComplete) must have the same timestamp for the entire
-                              sequence, and every new sequence started must strictly have
-                              incrementing timestamp."
+                description:
+                    "Timestamp used to identify the 2-phase setFCV request. Both phases
+                    (kStart and kComplete) must have the same timestamp for the entire
+                    sequence, and every new sequence started must strictly have
+                    incrementing timestamp."
                 type: timestamp
+                optional: true
+            dryRun:
+                description:
+                    "If true, performs a dry-run of the FCV transition (upgrade or
+                    downgrade) without making changes or persisting updates to FCV. Dry-run
+                    mode checks for incompatible features across collections and cluster metadata.
+                    Any detected incompatibilities will result in errors, indicating that the
+                    FCV upgrade or downgrade would fail if it were to be executed."
+                type: safeBool
+                optional: true
+            skipDryRun:
+                description:
+                    "Internal parameter that skips the automatic dry-run validation performed
+                    upon starting an upgrade or downgrade"
+                type: safeBool
                 optional: true

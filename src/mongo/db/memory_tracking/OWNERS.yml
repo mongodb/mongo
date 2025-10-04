@@ -1,0 +1,16 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/query-execution-classic
+      - 10gen/query-integration-observability
+  - "OWNERS.yml":
+    approvers:
+      - 10gen/query-execution-staff-leads
+      - 10gen/query-integration-staff-leads
+  - "memory_usage_tracker*":
+    approvers:
+      - 10gen/query-execution-classic
+  - "operation_memory_usage_tracker*":
+    approvers:
+      - 10gen/query-integration-observability

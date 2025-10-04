@@ -1,0 +1,143 @@
+#    Copyright (C) 2023-present MongoDB, Inc.
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the Server Side Public License, version 1,
+#    as published by MongoDB, Inc.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    Server Side Public License for more details.
+#
+#    You should have received a copy of the Server Side Public License
+#    along with this program. If not, see
+#    <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+#    As a special exception, the copyright holders give permission to link the
+#    code of portions of this program with the OpenSSL library under certain
+#    conditions as described in each individual source file and distribute
+#    linked combinations including the program with the OpenSSL library. You
+#    must comply with the Server Side Public License in all respects for
+#    all of the code used other than as permitted herein. If you modify file(s)
+#    with this exception, you may extend this exception to your version of the
+#    file(s), but you are not obligated to do so. If you do not wish to do so,
+#    delete this exception statement from your version. If you delete this
+#    exception statement from all source files in the program, then also delete
+#    it in the license file.
+#
+
+global:
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/db/cluster_parameters/cluster_server_parameter.idl"
+
+structs:
+    FLECompactionOptions:
+        description:
+            "Options related to compaction or cleanup operations in Queryable Encryption
+            protocol version 2"
+        strict: false
+        inline_chained_structs: true
+        chained_structs:
+            ClusterServerParameter: clusterServerParameter
+        fields:
+            maxCompactionSize:
+                description:
+                    "Limits the total size of the set of ESC documents that will be removed by
+                    each compactStructuredEncryptionData operation"
+                type: int
+                default: 268435456 # 256 MB
+                validator:
+                    gt: 0
+            maxAnchorCompactionSize:
+                description:
+                    "Limits the total size of the set of ESC anchors that will be removed by
+                    each cleanupStructuredEncryptionData operation"
+                type: int
+                default: 268435456 # 256 MB
+                validator:
+                    gt: 0
+            maxESCEntriesPerCompactionDelete:
+                description:
+                    "Limits the number of ESC non-anchor documents that will be removed by each
+                    delete operation performed by the compactStructuredEncryptionData operation"
+                type: int
+                default: 350000
+                validator:
+                    gt: 0
+                    lte: 350000 # Limit the tags in the $in query to just under 15 MB per request
+            compactAnchorPaddingFactor:
+                description: "Default value for {compactStructuredEncryptionData.anchorPaddingFactor: %f}"
+                type: double
+                optional: true
+                validator:
+                    gte: 0.0
+                    lte: 1.0
+
+    FLEOverrideTagOverheadData:
+        description: "Container for the fleAllowTotalTagOverheadToExceedBSONLimit CSP"
+        strict: false
+        inline_chained_structs: true
+        chained_structs:
+            ClusterServerParameter: clusterServerParameter
+        fields:
+            shouldOverride:
+                description: "Flag indicating whether or not the tag storage limit should be overridden"
+                type: bool
+                default: false
+
+    FLEOverrideSubstringPreviewLimits:
+        description: "Container for the fleDisableSubstringPreviewParameterLimits CSP"
+        strict: false
+        inline_chained_structs: true
+        chained_structs:
+            ClusterServerParameter: clusterServerParameter
+        fields:
+            shouldOverride:
+                description: "Flag indicating whether or not the substring preview limits should be overridden"
+                type: bool
+                default: false
+
+server_parameters:
+    unsupportedDangerousTestingFLEDiagnosticsEnabled:
+        description: "Start with test-only FLE statistics behavior enabled"
+        set_at: startup
+        cpp_vartype: bool
+        cpp_varname: gUnsupportedDangerousTestingFLEDiagnosticsEnabledAtStartup
+        default: false
+        redact: false
+
+    fleCompactionOptions:
+        description:
+            "Options related to compaction or cleanup operations in Queryable Encryption
+            protocol version 2"
+        set_at: cluster
+        cpp_varname: "fleCompactionOptions"
+        cpp_vartype: FLECompactionOptions
+        redact: false
+        omit_in_ftdc: false
+
+    fleAllowTotalTagOverheadToExceedBSONLimit:
+        description:
+            "If set to true, allows QE collection creation to succeed even if the total
+            worst-case tag count for all encrypted fields exceeds the 16MiB BSON limit"
+        set_at: cluster
+        cpp_varname: "fleOverrideTagOverheadParameter"
+        cpp_vartype: FLEOverrideTagOverheadData
+        condition:
+            min_fcv: 8.2
+        redact: false
+        omit_in_ftdc: false
+
+    fleDisableSubstringPreviewParameterLimits:
+        description:
+            "If set to true, allows QE collection creation to succeed if there exists
+            substringPreview fields whose parameters exceed the preview soft limits."
+        set_at: cluster
+        cpp_varname: "fleOverrideParameterLimits"
+        cpp_vartype: FLEOverrideSubstringPreviewLimits
+        condition:
+            min_fcv: 8.2
+        redact: false
+        omit_in_ftdc: false

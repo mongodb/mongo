@@ -14,26 +14,27 @@
  * Check that it syncs.
  */
 
-load("jstests/replsets/rslib.js");
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {reconnect} from "jstests/replsets/rslib.js";
 
-var name = "sync_passive";
-var host = getHostName();
+let name = "sync_passive";
+let host = getHostName();
 
-var replTest = new ReplSetTest({name: name, nodes: 3});
+let replTest = new ReplSetTest({name: name, nodes: 3});
 
-var nodes = replTest.startSet();
+let nodes = replTest.startSet();
 
 // make sure node 0 becomes primary initially and that node 2 never will
-var config = replTest.getReplSetConfig();
+let config = replTest.getReplSetConfig();
 config.members[0].priority = 2;
 config.members[2].priority = 0;
 
-replTest.initiate(config);
+replTest.initiate(config, null, {initiateWithDefaultElectionTimeout: true});
 replTest.waitForState(replTest.nodes[0], ReplSetTest.State.PRIMARY);
 
-var primary = replTest.getPrimary().getDB("test");
-var server0 = primary;
-var server1 = replTest.getSecondary();
+let primary = replTest.getPrimary().getDB("test");
+let server0 = primary;
+let server1 = replTest.getSecondary();
 
 print("Initial sync");
 for (var i = 0; i < 100; i++) {

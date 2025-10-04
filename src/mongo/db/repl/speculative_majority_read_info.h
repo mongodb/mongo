@@ -29,10 +29,14 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/client.h"
+#include "mongo/util/modules.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -64,7 +68,7 @@ namespace repl {
  * be majority committed. This, for example, could be the timestamp of the read source chosen by the
  * storage engine.
  */
-class SpeculativeMajorityReadInfo {
+class MONGO_MOD_PUB SpeculativeMajorityReadInfo {
 public:
     static SpeculativeMajorityReadInfo& get(OperationContext* opCtx);
 

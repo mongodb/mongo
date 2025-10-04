@@ -29,37 +29,41 @@
 
 #pragma once
 
+#include "mongo/config.h"
+#include "mongo/util/modules.h"
+
 #include <type_traits>
 
-#include "mongo/config.h"
-
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace stdx {
 
 using ::std::enable_if_t;
 
 }  // namespace stdx
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo
 
 // TODO: Deal with importing this from C++20, when the time comes.
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace stdx {
 
-template <typename T>
-struct type_identity {
-    using type = T;
+using std::type_identity;
+using std::type_identity_t;
+
+template <class T>
+struct remove_cvref {
+    using type = std::remove_cv_t<std::remove_reference_t<T>>;
 };
 
 template <typename T>
-using type_identity_t = typename type_identity<T>::type;
+using remove_cvref_t = typename remove_cvref<T>::type;
 
 }  // namespace stdx
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo
 
 
 // TODO: Re-evaluate which of these we need when making the cutover to C++17.
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace stdx {
 
 namespace detail {
@@ -92,41 +96,8 @@ struct conjunction<B> : B {};
 template <typename B1, typename... B>
 struct conjunction<B1, B...> : std::conditional_t<bool(B1::value), stdx::conjunction<B...>, B1> {};
 
-namespace detail {
-template <typename Func,
-          typename... Args,
-          typename = typename std::result_of<Func && (Args && ...)>::type>
-auto is_invocable_impl(Func&& func, Args&&... args) -> std::true_type;
-auto is_invocable_impl(...) -> std::false_type;
-}  // namespace detail
-
-template <typename Func, typename... Args>
-struct is_invocable
-    : decltype(detail::is_invocable_impl(std::declval<Func>(), std::declval<Args>()...)) {};
-
-namespace detail {
-
-// This helps solve the lack of regular void problem, when passing a 'conversion target' as a
-// parameter.
-
-template <typename R,
-          typename Func,
-          typename... Args,
-          typename ComputedResult = typename std::result_of<Func && (Args && ...)>::type>
-auto is_invocable_r_impl(stdx::type_identity<R>, Func&& func, Args&&... args) ->
-    typename stdx::disjunction<std::is_void<R>,
-                               std::is_same<ComputedResult, R>,
-                               std::is_convertible<ComputedResult, R>>::type;
-auto is_invocable_r_impl(...) -> std::false_type;
-}  // namespace detail
-
-template <typename R, typename Func, typename... Args>
-struct is_invocable_r
-    : decltype(detail::is_invocable_r_impl(
-          stdx::type_identity<R>(), std::declval<Func>(), std::declval<Args>()...)) {};
-
 }  // namespace stdx
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo
 
 // TS2's `std::experimental::is_detected` and related traits.
 // See https://en.cppreference.com/w/cpp/experimental/is_detected
@@ -156,7 +127,8 @@ struct is_invocable_r
 // here until such time as it's available in `std::` or the trait
 // creation niche is filled by simpler language features (e.g.
 // `concept`) and we all migrate off of direct SFINAE.
-namespace mongo::stdx {
+namespace MONGO_MOD_PUB mongo {
+namespace stdx {
 namespace detail {
 template <typename Default, typename AlwaysVoid, template <class...> class Op, typename... Args>
 struct Detector {
@@ -204,4 +176,5 @@ using is_detected_convertible = std::is_convertible<detected_t<Op, Args...>, To>
 template <typename To, template <class...> class Op, typename... Args>
 constexpr bool is_detected_convertible_v = is_detected_convertible<To, Op, Args...>::value;
 
-}  // namespace mongo::stdx
+}  // namespace stdx
+}  // namespace MONGO_MOD_PUB mongo

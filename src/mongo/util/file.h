@@ -34,7 +34,6 @@
 #include <cstdint>
 #include <string>
 
-#include "mongo/platform/basic.h"
 
 namespace mongo {
 

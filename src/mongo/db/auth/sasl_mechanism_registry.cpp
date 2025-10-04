@@ -26,45 +26,54 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/sasl_mechanism_registry.h"
 
-#include "mongo/base/init.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/client/authenticate.h"
+#include "mongo/db/auth/auth_name.h"
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/user.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/exit_code.h"
-#include "mongo/util/icu.h"
-#include "mongo/util/net/socket_utils.h"
 #include "mongo/util/quick_exit.h"
-#include "mongo/util/scopeguard.h"
 #include "mongo/util/sequence_util.h"
+#include "mongo/util/str.h"
+
+#include <algorithm>
+#include <iterator>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
+
 
 namespace mongo {
 
 namespace {
 const auto getSASLServerMechanismRegistry =
-    ServiceContext::declareDecoration<std::unique_ptr<SASLServerMechanismRegistry>>();
+    Service::declareDecoration<std::unique_ptr<SASLServerMechanismRegistry>>();
 }  // namespace
 
-SASLServerMechanismRegistry& SASLServerMechanismRegistry::get(ServiceContext* serviceContext) {
-    auto& uptr = getSASLServerMechanismRegistry(serviceContext);
+SASLServerMechanismRegistry& SASLServerMechanismRegistry::get(Service* service) {
+    auto& uptr = getSASLServerMechanismRegistry(service);
     invariant(uptr);
     return *uptr;
 }
 
-void SASLServerMechanismRegistry::set(ServiceContext* service,
+void SASLServerMechanismRegistry::set(Service* service,
                                       std::unique_ptr<SASLServerMechanismRegistry> registry) {
     getSASLServerMechanismRegistry(service) = std::move(registry);
 }
 
-SASLServerMechanismRegistry::SASLServerMechanismRegistry(ServiceContext* svcCtx,
+SASLServerMechanismRegistry::SASLServerMechanismRegistry(Service* service,
                                                          std::vector<std::string> enabledMechanisms)
-    : _svcCtx(svcCtx), _enabledMechanisms(std::move(enabledMechanisms)) {}
+    : _service(service), _enabledMechanisms(std::move(enabledMechanisms)) {}
 
 void SASLServerMechanismRegistry::setEnabledMechanisms(std::vector<std::string> enabledMechanisms) {
     _enabledMechanisms = std::move(enabledMechanisms);
@@ -98,10 +107,10 @@ void SASLServerMechanismRegistry::advertiseMechanismNamesForUser(OperationContex
         userName = (*systemUser)->getName();
     }
 
-    AuthorizationManager* authManager = AuthorizationManager::get(opCtx->getServiceContext());
+    AuthorizationManager* authManager = AuthorizationManager::get(opCtx->getService());
+    const auto swUser = authManager->acquireUser(
+        opCtx, std::make_unique<UserRequestGeneral>(userName, boost::none));
 
-    UserHandle user;
-    const auto swUser = authManager->acquireUser(opCtx, userName);
     if (!swUser.isOK()) {
         auto& status = swUser.getStatus();
         if (status.code() == ErrorCodes::UserNotFound) {
@@ -113,7 +122,7 @@ void SASLServerMechanismRegistry::advertiseMechanismNamesForUser(OperationContex
         uassertStatusOK(status);
     }
 
-    user = std::move(swUser.getValue());
+    UserHandle user = std::move(swUser.getValue());
     BSONArrayBuilder mechanismsBuilder;
     const auto& mechList = _getMapRef(userName.getDB());
 
@@ -148,7 +157,7 @@ void appendMechs(const std::vector<std::unique_ptr<ServerFactoryBase>>& mechs,
                    mechs.cend(),
                    std::back_inserter(*pNames),
                    [](const std::unique_ptr<mongo::ServerFactoryBase>& factory) {
-                       return factory->mechanismName().toString();
+                       return std::string{factory->mechanismName()};
                    });
 }
 
@@ -176,32 +185,31 @@ StringData ServerMechanismBase::getAuthenticationDatabase() const {
 }
 
 namespace {
-ServiceContext::ConstructorActionRegisterer SASLServerMechanismRegistryInitializer{
-    "CreateSASLServerMechanismRegistry", {"EndStartupOptionStorage"}, [](ServiceContext* service) {
+Service::ConstructorActionRegisterer SASLServerMechanismRegistryInitializer{
+    "CreateSASLServerMechanismRegistry", {"EndStartupOptionStorage"}, [](Service* service) {
         SASLServerMechanismRegistry::set(service,
                                          std::make_unique<SASLServerMechanismRegistry>(
                                              service, saslGlobalParams.authenticationMechanisms));
     }};
 
-ServiceContext::ConstructorActionRegisterer SASLServerMechanismRegistryValidationInitializer{
-    "ValidateSASLServerMechanismRegistry", [](ServiceContext* service) {
+Service::ConstructorActionRegisterer SASLServerMechanismRegistryValidationInitializer{
+    "ValidateSASLServerMechanismRegistry",
+    {"CreateSASLServerMechanismRegistry"},
+    [](Service* service) {
         auto supportedMechanisms = SASLServerMechanismRegistry::get(service).getMechanismNames();
 
         // Manually include MONGODB-X509 since there is no factory for it since it not a SASL
         // mechanism
-        supportedMechanisms.push_back(auth::kMechanismMongoX509.toString());
+        supportedMechanisms.push_back(std::string{auth::kMechanismMongoX509});
 
         // Error if the user tries to use a SASL mechanism that does not exist
         for (const auto& mech : saslGlobalParams.authenticationMechanisms) {
             auto it = std::find(supportedMechanisms.cbegin(), supportedMechanisms.cend(), mech);
             if (it == supportedMechanisms.end()) {
-                LOGV2_ERROR(4742901,
-                            "SASL Mechanism '{mechanism}' is not supported",
-                            "Unsupported SASL mechanism",
-                            "mechanism"_attr = mech);
+                LOGV2_ERROR(4742901, "Unsupported SASL mechanism", "mechanism"_attr = mech);
 
                 // Quick Exit since we are in the middle of setting up ServiceContext
-                quickExit(EXIT_BADOPTIONS);
+                quickExit(ExitCode::badOptions);
             }
         }
     }};

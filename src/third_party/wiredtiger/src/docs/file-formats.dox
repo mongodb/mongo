@@ -5,8 +5,9 @@
 WiredTiger supports three underlying file formats: row-store and
 column-store, with an underlying special case of column-store for
 bit-field values. All three formats are B+tree implementations of
-key/value stores. WiredTiger also supports @ref lsm, implemented as a
-tree of B+trees.
+key/value stores. In addition, there is experimental support for
+@ref tiered_storage, allowing a B+tree to span multiple files and
+cloud objects.
 
 In a row-store, both keys and data are variable-length byte strings.  In
 a column-store, keys are 64-bit record numbers (key_format type 'r'),
@@ -48,19 +49,11 @@ the primary key is a record number, there are advantages to storing
 columns in separate files, or the underlying data is a set of bits,
 column-store format may be a better choice.
 
-Both row- and column-store formats can maintain high volumes of writes,
-but for data sets requiring sustained, extreme write throughput,
-@ref lsm are usually a better choice.  For applications that do not
-require extreme write throughput, row- or column-store is likely to be
-a better choice because the read throughput is better than with LSM trees
-(an effect that becomes more pronounced as additional read threads are
-added).
+Both row- and column-store formats can maintain high volumes of writes.
 
 Applications with complex schemas may also benefit from using multiple
 storage formats, that is, using a combination of different formats in
-the database, and even in individual tables (for example, a sparse, wide
-table configured with a column-store primary, where indexes are stored
-in an LSM tree).
+the database, and even in individual tables.
 
 Finally, as WiredTiger makes it easy to switch back-and-forth between
 storage configurations, it's usually worthwhile benchmarking possible
@@ -69,7 +62,7 @@ configurations when there is any question.
 @section file_formats_compression File formats and compression
 
 Row-stores support four types of compression: key prefix compression,
-dictionary compression, Huffman encoding and block compression.
+dictionary compression and block compression.
 
 - Key prefix compression reduces the size requirement of both in-memory
 and on-disk objects by storing any identical key prefix only once per
@@ -99,15 +92,6 @@ pages to disk.
 
   Dictionary compression is disabled by default.
 
-- Huffman encoding reduces the size requirement of both the in-memory
-and on-disk objects by compressing individual value items.  The cost is
-additional CPU and memory use when returning values from the in-memory
-tree and when writing pages to disk.  Note the additional CPU cost of
-Huffman encoding can be high, and should be considered. (See
-@subpage_single huffman for details.)
-
-  Huffman encoding is disabled by default.
-
 - Block compression reduces the size requirement of on-disk objects by
 compressing blocks of the backing object's file.  The cost is additional
 CPU and memory use when reading and writing pages to disk.  Note the
@@ -116,9 +100,8 @@ considered.   (See @ref compression_considerations for details.)
 
   Block compression is disabled by default.
 
-Variable-length column stores support four types of compression:
-run-length encoding, dictionary compression, Huffman encoding and
-block compression.
+Variable-length column stores support three types of compression:
+run-length encoding, dictionary compression and block compression.
 
 - Run-length encoding reduces the size requirement of both the in-memory
 and on-disk objects by storing sequential, duplicate values in the store
@@ -134,15 +117,6 @@ per page.  The cost is minor additional CPU and memory use when
 returning values from the in-memory tree and when writing pages to disk.
 
   Dictionary compression is disabled by default.
-
-- Huffman encoding reduces the size requirement of both the in-memory
-and on-disk objects by compressing individual value items.  The cost is
-additional CPU and memory use when returning values from the in-memory
-tree and when writing pages to disk.  Note the additional CPU cost of
-Huffman encoding can be high, and should be considered.
-(See @ref_single huffman for details.)
-
-  Huffman encoding is disabled by default.
 
 - Block compression reduces the size requirement of on-disk objects by
 compressing blocks of the backing object's file.  The cost is additional

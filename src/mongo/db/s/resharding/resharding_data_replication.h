@@ -29,26 +29,42 @@
 
 #pragma once
 
-#include <functional>
-#include <memory>
-#include <vector>
-
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/cancelable_operation_context.h"
+#include "mongo/db/global_catalog/chunk_manager.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
-#include "mongo/s/chunk_manager.h"
+#include "mongo/db/s/resharding/resharding_collection_cloner.h"
+#include "mongo/db/s/resharding/resharding_metrics.h"
+#include "mongo/db/s/resharding/resharding_oplog_applier.h"
+#include "mongo/db/s/resharding/resharding_oplog_applier_metrics.h"
+#include "mongo/db/s/resharding/resharding_oplog_fetcher.h"
+#include "mongo/db/s/resharding/resharding_txn_cloner.h"
+#include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/s/resharding/common_types_gen.h"
-#include "mongo/s/shard_id.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
+
+#include <cstddef>
+#include <functional>
+#include <map>
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 
 class OperationContext;
 class ReshardingOplogApplier;
 class ReshardingCollectionCloner;
-class ReshardingMetrics;
 class ReshardingOplogFetcher;
 class ReshardingTxnCloner;
 class ServiceContext;
@@ -59,6 +75,9 @@ namespace executor {
 class TaskExecutor;
 
 }  // namespace executor
+
+using ReshardingApplierMetricsMap =
+    std::map<ShardId, std::unique_ptr<ReshardingOplogApplierMetrics>>;
 
 /**
  * Manages the full sequence of data replication in resharding on the recipient.
@@ -111,6 +130,11 @@ public:
     virtual void startOplogApplication() = 0;
 
     /**
+     * Makes the data replication machinery prepare for the critical section.
+     */
+    virtual void prepareForCriticalSection() = 0;
+
+    /**
      * Returns a future that becomes ready when either
      *   (a) the recipient has finished cloning both the collection being resharded and the
      *       config.transactions records from before the resharding operation started, or
@@ -135,15 +159,20 @@ private:
     struct TrustedInitTag {};
 
 public:
+    ~ReshardingDataReplication() override;
     static std::unique_ptr<ReshardingDataReplicationInterface> make(
         OperationContext* opCtx,
         ReshardingMetrics* metrics,
+        ReshardingApplierMetricsMap* applierMetricsMap,
+        std::size_t oplogBatchTaskCount,
         CommonReshardingMetadata metadata,
         const std::vector<DonorShardFetchTimestamp>& donorShards,
         Timestamp cloneTimestamp,
         bool cloningDone,
         ShardId myShardId,
-        ChunkManager sourceChunkMgr);
+        ChunkManager sourceChunkMgr,
+        bool storeOplogFetcherProgress,
+        bool relaxed);
 
     // The TrustedInitTag being a private class makes this constructor effectively private. However,
     // it needs to technically be a public constructor for std::make_unique to be able to call it.
@@ -154,6 +183,7 @@ public:
                               std::vector<std::unique_ptr<ReshardingOplogFetcher>> oplogFetchers,
                               std::shared_ptr<executor::TaskExecutor> oplogFetcherExecutor,
                               std::vector<std::unique_ptr<ReshardingOplogApplier>> oplogAppliers,
+                              std::shared_ptr<executor::TaskExecutor> collectionClonerExecutor,
                               TrustedInitTag);
 
     SemiFuture<void> runUntilStrictlyConsistent(
@@ -164,6 +194,8 @@ public:
         const mongo::Date_t& startConfigTxnCloneTime) override;
 
     void startOplogApplication() override;
+
+    void prepareForCriticalSection() override;
 
     SharedSemiFuture<void> awaitCloningDone() override;
 
@@ -195,7 +227,8 @@ private:
         ReshardingMetrics* metrics,
         const CommonReshardingMetadata& metadata,
         const ShardId& myShardId,
-        Timestamp cloneTimestamp);
+        Timestamp cloneTimestamp,
+        bool relaxed);
 
     static std::vector<std::unique_ptr<ReshardingTxnCloner>> _makeTxnCloners(
         const CommonReshardingMetadata& metadata,
@@ -206,19 +239,23 @@ private:
         ReshardingMetrics* metrics,
         const CommonReshardingMetadata& metadata,
         const std::vector<DonorShardFetchTimestamp>& donorShards,
-        const ShardId& myShardId);
+        const ShardId& myShardId,
+        bool storeProgress);
 
     static std::shared_ptr<executor::TaskExecutor> _makeOplogFetcherExecutor(size_t numDonors);
 
     static std::vector<std::unique_ptr<ReshardingOplogApplier>> _makeOplogAppliers(
         OperationContext* opCtx,
-        ReshardingMetrics* metrics,
+        ReshardingApplierMetricsMap* applierMetricsMap,
+        std::size_t oplogBatchTaskCount,
         const CommonReshardingMetadata& metadata,
         const std::vector<DonorShardFetchTimestamp>& donorShards,
         Timestamp cloneTimestamp,
         ChunkManager sourceChunkMgr,
         const std::vector<NamespaceString>& stashCollections,
         const std::vector<std::unique_ptr<ReshardingOplogFetcher>>& oplogFetchers);
+
+    static std::shared_ptr<executor::TaskExecutor> _makeCollectionClonerExecutor(size_t numDonors);
 
     SharedSemiFuture<void> _runCollectionCloner(
         std::shared_ptr<executor::TaskExecutor> executor,
@@ -254,6 +291,8 @@ private:
     const std::shared_ptr<executor::TaskExecutor> _oplogFetcherExecutor;
 
     const std::vector<std::unique_ptr<ReshardingOplogApplier>> _oplogAppliers;
+
+    const std::shared_ptr<executor::TaskExecutor> _collectionClonerExecutor;
 
     // Promise fulfilled by startOplogApplication() to signal that oplog application can begin.
     SharedPromise<void> _startOplogApplication;

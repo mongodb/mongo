@@ -29,19 +29,29 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/base/status.h"
+#include "mongo/util/str.h"
+
+#include <string>
 
 namespace mongo {
 
 inline Status validateShardingClusterRoleSetting(const std::string& value) {
-    constexpr auto kConfigSvr = "configsvr"_sd;
-    constexpr auto kShardSvr = "shardsvr"_sd;
-
-    if (!kConfigSvr.equalCaseInsensitive(value) && !kShardSvr.equalCaseInsensitive(value)) {
+    if (!(str::equalCaseInsensitive(value, "configsvr"_sd) ||
+          str::equalCaseInsensitive(value, "shardsvr"_sd))) {
         return {ErrorCodes::BadValue,
                 "sharding.clusterRole must be one of 'configsvr' or 'shardsvr'"};
+    }
+
+    return Status::OK();
+}
+
+inline Status validateMaintenanceModeSetting(const std::string& value) {
+    constexpr auto kReplicaSet = "replicaSet"_sd;
+    constexpr auto kStandalone = "standalone"_sd;
+    if (kStandalone != value && kReplicaSet != value) {
+        return {ErrorCodes::BadValue,
+                "maintenanceMode must be one of 'replicaSet' or 'standalone'"};
     }
 
     return Status::OK();

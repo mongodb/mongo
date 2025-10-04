@@ -1,0 +1,73 @@
+# Copyright (C) 2022-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+    cpp_namespace: "mongo::auth"
+    cpp_includes: []
+
+imports:
+    - "mongo/db/basic_types.idl"
+
+structs:
+    OIDCMechanismClientStep1:
+        description: Client's opening request in saslStart or
+            hello.speculativeAuthenticate
+        strict: false
+        fields:
+            n:
+                description: "Principal name of client"
+                cpp_name: principalName
+                type: string
+                optional: true
+
+    OIDCMechanismServerStep1:
+        description: "Server's reply to clientStep1"
+        strict: false
+        fields:
+            issuer:
+                description: >-
+                    URL which describes the Authorization Server. This identifier should be
+                    the iss of provided access tokens, and be viable for RFC8414
+                    metadata discovery and RFC9207 identification.
+                type: string
+            clientId:
+                description: "Unique client ID for this OIDC client"
+                type: string
+                optional: true # Omitted if an IdP is intended for machine flows only
+            requestScopes:
+                description: "Additional scopes to request from IDP"
+                type: array<string>
+                optional: true
+    OIDCMechanismClientStep2:
+        description: "Client's request with signed token"
+        strict: false
+        fields:
+            jwt:
+                description: "Compact serialized JWT with signature"
+                cpp_name: JWT
+                type: string

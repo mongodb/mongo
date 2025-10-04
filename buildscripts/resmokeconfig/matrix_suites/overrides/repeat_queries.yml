@@ -1,0 +1,15 @@
+# This test suite runs the tests with 'rerun_queries.js' override. By rerunning queries
+# multiple times, this tests that any caches involved in query processing -- in particular the plan
+# cache -- do not affect correctness.
+- name: enable_eval
+  value:
+    eval: await import("jstests/libs/override_methods/rerun_queries.js");
+
+- name: excluded_files
+  value:
+    exclude_with_any_tags:
+      # Used to tag tests which cannot run in the 'repeat_queries' suites.
+      - does_not_support_repeated_reads
+      # By repeating queries when the profiler is enabled, we end up writing additional profiler entries.
+      # Most tests using profiling are not prepared for these additional profiler entries.
+      - requires_profiling

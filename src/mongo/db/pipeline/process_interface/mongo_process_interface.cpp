@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 
 #include "mongo/base/shim.h"

@@ -27,12 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/exec/shard_filterer_impl.h"
 
-#include "mongo/db/exec/filter.h"
-#include "mongo/db/matcher/matchable.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/global_catalog/shard_key_pattern.h"
+#include "mongo/db/storage/snapshot.h"
+#include "mongo/util/assert_util.h"
+
+#include <utility>
+#include <vector>
 
 namespace mongo {
 
@@ -40,11 +43,8 @@ std::unique_ptr<ShardFilterer> ShardFiltererImpl::clone() const {
     return std::make_unique<ShardFiltererImpl>(_collectionFilter);
 }
 
-ShardFiltererImpl::ShardFiltererImpl(ScopedCollectionFilter cf) : _collectionFilter(std::move(cf)) {
-    if (_collectionFilter.isSharded()) {
-        _keyPattern = ShardKeyPattern(_collectionFilter.getKeyPattern());
-    }
-}
+ShardFiltererImpl::ShardFiltererImpl(ScopedCollectionFilter cf)
+    : _collectionFilter(std::move(cf)) {}
 
 ShardFilterer::DocumentBelongsResult ShardFiltererImpl::keyBelongsToMeHelper(
     const BSONObj& shardKey) const {
@@ -63,7 +63,8 @@ ShardFilterer::DocumentBelongsResult ShardFiltererImpl::documentBelongsToMe(
     }
 
     if (wsm.hasObj()) {
-        return keyBelongsToMeHelper(_keyPattern->extractShardKeyFromDoc(wsm.doc.value().toBson()));
+        return keyBelongsToMeHelper(_collectionFilter.getShardKeyPattern().extractShardKeyFromDoc(
+            wsm.doc.value().toBson()));
     }
     // Transform 'IndexKeyDatum' provided by 'wsm' into 'IndexKeyData' to call
     // extractShardKeyFromIndexKeyData().
@@ -73,7 +74,8 @@ ShardFilterer::DocumentBelongsResult ShardFiltererImpl::documentBelongsToMe(
     for (auto&& indexKeyData : wsm.keyData) {
         indexKeyDataVector.push_back({indexKeyData.keyData, indexKeyData.indexKeyPattern});
     }
-    return keyBelongsToMeHelper(_keyPattern->extractShardKeyFromIndexKeyData(indexKeyDataVector));
+    return keyBelongsToMeHelper(
+        _collectionFilter.getShardKeyPattern().extractShardKeyFromIndexKeyData(indexKeyDataVector));
 }
 
 ShardFilterer::DocumentBelongsResult ShardFiltererImpl::documentBelongsToMe(
@@ -81,19 +83,16 @@ ShardFilterer::DocumentBelongsResult ShardFiltererImpl::documentBelongsToMe(
     if (!_collectionFilter.isSharded()) {
         return DocumentBelongsResult::kBelongs;
     }
-    return keyBelongsToMeHelper(_keyPattern->extractShardKeyFromDoc(doc));
+    return keyBelongsToMeHelper(_collectionFilter.getShardKeyPattern().extractShardKeyFromDoc(doc));
 }
 
 const KeyPattern& ShardFiltererImpl::getKeyPattern() const {
-    invariant(_keyPattern);
-    return _keyPattern->getKeyPattern();
+    return _collectionFilter.getShardKeyPattern().getKeyPattern();
 }
 
 size_t ShardFiltererImpl::getApproximateSize() const {
-    // _collectionFilter contains a shared_ptr to metadata, but it does not own this metadata,
-    // so we don't account for the size of the metadata here.
-    auto size = sizeof(ShardFiltererImpl);
-    size += _keyPattern ? _keyPattern->getApproximateSize() - sizeof(ShardKeyPattern) : 0;
-    return 0;
+    // _collectionFilter contains a pointer to metadata but it doesn't own this metadata, so we
+    // don't account for the size of the metadata here.
+    return sizeof(ShardFiltererImpl);
 }
 }  // namespace mongo

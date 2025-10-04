@@ -31,24 +31,20 @@
 #
 import wttest
 import wiredtiger
-from wtdataset import SimpleDataSet, ComplexDataSet, ComplexLSMDataSet
+from wtdataset import SimpleDataSet, ComplexDataSet
 from wtscenario import make_scenarios
 
 class test_cursor17(wttest.WiredTigerTestCase):
     tablename = 'test_cursor17'
 
-    # Enable the lsm tests once it is supported.
     types = [
         ('file-row', dict(type='file:', keyformat='i', valueformat='i', dataset=SimpleDataSet)),
         ('table-row', dict(type='table:', keyformat='i', valueformat='i', dataset=SimpleDataSet)),
         ('file-var', dict(type='file:', keyformat='r', valueformat='i', dataset=SimpleDataSet)),
         ('table-var', dict(type='table:', keyformat='r', valueformat='i', dataset=SimpleDataSet)),
         ('file-fix', dict(type='file:', keyformat='r', valueformat='8t', dataset=SimpleDataSet)),
-        # ('lsm', dict(type='lsm:', keyformat='i', valueformat='i', dataset=SimpleDataSet)),
         ('table-r-complex', dict(type='table:', keyformat='r', valueformat=None,
             dataset=ComplexDataSet)),
-        # ('table-i-complex-lsm', dict(type='table:', keyformat='i', valueformat=None,
-        #   dataset=ComplexLSMDataSet)),
     ]
 
     scenarios = make_scenarios(types)
@@ -60,11 +56,12 @@ class test_cursor17(wttest.WiredTigerTestCase):
             self.ds = self.dataset(self, self.type + self.tablename, rownum, key_format=self.keyformat)
         self.ds.populate()
 
+    @wttest.skip_for_hook("timestamp", "Fails assertion 99")
     def test_globally_deleted_key(self):
         self.populate(100)
 
         # Delete the largest key.
-        cursor = self.session.open_cursor(self.type + self.tablename, None)
+        cursor = self.ds.open_cursor(self.type + self.tablename, None)
         self.session.begin_transaction()
         cursor.set_key(100)
         self.assertEqual(cursor.remove(), 0)
@@ -95,12 +92,12 @@ class test_cursor17(wttest.WiredTigerTestCase):
         self.session.rollback_transaction()
 
         # Use evict cursor to evict the key from memory.
-        evict_cursor = self.session.open_cursor(self.type + self.tablename, None, "debug=(release_evict)")
+        evict_cursor = self.ds.open_cursor(self.type + self.tablename, None, "debug=(release_evict)")
         evict_cursor.set_key(100)
         if self.valueformat != '8t':
-            self.assertEquals(evict_cursor.search(), wiredtiger.WT_NOTFOUND)
+            self.assertEqual(evict_cursor.search(), wiredtiger.WT_NOTFOUND)
         else:
-            self.assertEquals(evict_cursor.search(), 0)
+            self.assertEqual(evict_cursor.search(), 0)
         evict_cursor.close()
 
         # Verify the largest key changed.
@@ -109,7 +106,7 @@ class test_cursor17(wttest.WiredTigerTestCase):
         if self.valueformat != '8t':
             self.assertEqual(cursor.get_key(), 99)
         else:
-            self.assertEquals(cursor.get_key(), 100)
+            self.assertEqual(cursor.get_key(), 100)
         self.session.rollback_transaction()
 
     def test_uncommitted_insert(self):
@@ -141,9 +138,9 @@ class test_cursor17(wttest.WiredTigerTestCase):
         # Verify the largest key.
         self.session.begin_transaction()
         self.assertEqual(cursor.largest_key(), 0)
-        self.assertEquals(cursor.get_key(), 200)
+        self.assertEqual(cursor.get_key(), 200)
         self.session.rollback_transaction()
-    
+
     def test_invisible_timestamp(self):
         self.populate(100)
 
@@ -157,7 +154,7 @@ class test_cursor17(wttest.WiredTigerTestCase):
         self.assertEqual(cursor.largest_key(), 0)
         self.assertEqual(cursor.get_key(), 200)
         self.session.rollback_transaction()
-    
+
     def test_prepared_update(self):
         self.populate(100)
 
@@ -220,9 +217,10 @@ class test_cursor17(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(self.type + self.tablename, None)
         # Verify the largest key.
         self.session.begin_transaction()
-        self.assertEquals(cursor.largest_key(), wiredtiger.WT_NOTFOUND)
+        self.assertEqual(cursor.largest_key(), wiredtiger.WT_NOTFOUND)
         self.session.rollback_transaction()
 
+    @wttest.prevent(["timestamp"])  # this test uses timestamps, hooks should not
     def test_fast_truncate(self):
         self.populate(100)
 
@@ -231,7 +229,7 @@ class test_cursor17(wttest.WiredTigerTestCase):
         self.session.begin_transaction()
         for i in range(1, 101):
             evict_cursor.set_key(i)
-            self.assertEquals(evict_cursor.search(), 0)
+            self.assertEqual(evict_cursor.search(), 0)
         self.session.rollback_transaction()
         evict_cursor.close()
 
@@ -248,6 +246,7 @@ class test_cursor17(wttest.WiredTigerTestCase):
         self.assertEqual(cursor.get_key(), 100)
         self.session.rollback_transaction()
 
+    @wttest.prevent(["timestamp"])  # this test uses timestamps, hooks should not
     def test_slow_truncate(self):
         self.populate(100)
 

@@ -6,8 +6,7 @@
  * This is a regression test for SERVER-44938.
  */
 
-(function() {
-"use strict";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const dbName = "test";
 const collName = "coll";
@@ -23,8 +22,7 @@ const primaryColl = primaryDB[collName];
 const collNss = primaryColl.getFullName();
 
 jsTestLog("Do an insert");
-const time =
-    assert.commandWorked(primaryColl.runCommand('insert', {documents: [{_id: 0}]})).operationTime;
+const time = assert.commandWorked(primaryColl.runCommand("insert", {documents: [{_id: 0}]})).operationTime;
 jsTestLog("Inserted with time " + tojson(time));
 assert.commandWorked(primaryColl.insert({_id: 1}));
 
@@ -35,17 +33,17 @@ const doc = {
     ns: collNss,
     o: {_id: 3},
     ts: time,
-    t: NumberLong(2)
+    t: NumberLong(2),
 };
 
 jsTestLog("Run an applyOps command");
 
 // Run an applyOps command with an inner "ts" field.
-assert.commandWorked(primaryDB.runCommand({
-    applyOps: [
-        doc,
-    ]
-}));
+assert.commandWorked(
+    primaryDB.runCommand({
+        applyOps: [doc],
+    }),
+);
 
 rst.awaitReplication();
 
@@ -55,4 +53,3 @@ assert.sameMembers(primaryColl.find({_id: 3}).toArray(), [{_id: 3}]);
 assert.sameMembers(secondary.getDB(dbName)[collName].find({_id: 3}).toArray(), [{_id: 3}]);
 
 rst.stopSet();
-})();

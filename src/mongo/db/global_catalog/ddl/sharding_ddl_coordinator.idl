@@ -1,0 +1,148 @@
+# Copyright (C) 2021-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+# This file defines the format of documents stored in config.DDL.Operations.
+
+global:
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/s/forwardable_operation_metadata.h"
+
+imports:
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/session/logical_session_id.idl"
+    - "mongo/db/versioning_protocol/database_version.idl"
+
+enums:
+    DDLCoordinatorType:
+        description: "Type of the sharding DDL Operation."
+        type: string
+        values:
+            kMovePrimary: "movePrimary"
+            kDropDatabase: "dropDatabase_V2"
+            kDropCollection: "dropCollection_V2"
+            kDropIndexes: "dropIndexes"
+            kRenameCollection: "renameCollection_V2"
+            kCreateCollection: "createCollection_V4"
+            kRefineCollectionShardKey: "refineCollectionShardKey_V2"
+            kSetAllowMigrations: "setAllowMigrations"
+            kCollMod: "collMod_V3"
+            kReshardCollection: "reshardCollection"
+            # Note: the V3 refers to the coordinator version, not the FLE2 protocol version
+            kCompactStructuredEncryptionData: "compactStructuredEncryptionData_V3"
+            kCleanupStructuredEncryptionData: "cleanupStructuredEncryptionData"
+            kMigrationBlockingOperation: "migrationBlockingOperation"
+            kConvertToCapped: "convertToCapped"
+            kUntrackUnsplittableCollection: "untrackUnsplittableCollection"
+            kCreateDatabase: "createDatabase"
+            kRemoveShardCommit: "removeShardCommit"
+            kAddShard: "addShard"
+            kCloneAuthoritativeMetadata: "cloneAuthoritativeMetadata"
+            kInitializePlacementHistory: "initializePlacementHistory"
+
+    # TODO (SERVER-98118): Remove this enum once v9.0 become last-lts.
+    AuthoritativeMetadataAccessLevel:
+        description: >-
+            Indicates the level of access to authoritative metadata granted by the FCV state at the
+            time of DDL document creation. The possible values are:
+                - `kNone`: No access to authoritative metadata. The DDL operates in a
+                    non-authoritative mode.
+                - `kWritesAllowed`: Write operations are permitted on authoritative metadata, but
+                    read access remains restricted. In this phase, the DDL is responsible for
+                    cloning the authoritative metadata from the global catalog to the shard catalog
+                    and committing changes to both catalogs.
+                - `kWritesAndReadsAllowed`: Both read and write operations are fully enabled. The
+                    DDL must still commit to both catalogs, but cloning is no longer required, as
+                    authoritative metadata is already present and reliable.
+        type: string
+        values:
+            kNone: "none"
+            kWritesAllowed: "writesAllowed"
+            kWritesAndReadsAllowed: "writesAndReadsAllowed"
+
+types:
+    ForwardableOperationMetadata:
+        description: "Forwardable operation metadata assiociated with this coordinator."
+        cpp_type: ForwardableOperationMetadata
+        bson_serialization_type: object
+        serializer: "mongo::ForwardableOperationMetadata::toBSON"
+        deserializer: "mongo::ForwardableOperationMetadata"
+        # ForwardableOperationMetadata has only non view members.
+        is_view: false
+
+structs:
+    ShardingDDLCoordinatorId:
+        description: "Identifier for a specific sharding DDL Coordinator."
+        generate_comparison_operators: false
+        strict: false
+        fields:
+            namespace:
+                description: "The target namespace of the DDL operation."
+                cpp_name: nss
+                type: namespacestring
+            operationType:
+                description: "Type of the sharding DDL coordinator."
+                type: DDLCoordinatorType
+
+    ShardingDDLSession:
+        description: "Container for DDL coordinator session."
+        strict: true
+        fields:
+            lsid:
+                type: LogicalSessionId
+            txnNumber:
+                type: TxnNumber
+
+    ShardingDDLCoordinatorMetadata:
+        description: "Commong metadata for all sharding DDL coordinator."
+        generate_comparison_operators: false
+        strict: false
+        fields:
+            _id:
+                type: ShardingDDLCoordinatorId
+                cpp_name: id
+            recoveredFromDisk:
+                type: bool
+                default: false
+            forwardableOpMetadata:
+                type: ForwardableOperationMetadata
+                optional: true
+            databaseVersion:
+                type: DatabaseVersion
+                optional: true
+            session:
+                type: ShardingDDLSession
+                optional: true
+            bucketNss:
+                description: "In case of sharded timeseries this variable will hold the underlying bucket namespace"
+                type: namespacestring
+                optional: true
+            abortReason:
+                description: "Error triggering the cleanup pipeline"
+                type: error_status
+                optional: true

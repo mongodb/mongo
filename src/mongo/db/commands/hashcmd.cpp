@@ -31,38 +31,46 @@
  * Defines a shell command for hashing a BSONElement value
  */
 
-#include <string>
-#include <vector>
-
-#include "mongo/base/init.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/status.h"
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/privilege.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/hasher.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+
+#include <iosfwd>
+#include <string>
 
 namespace mongo {
 
 using std::string;
 using std::stringstream;
 
-// Testing only, enabled via command-line.
-class CmdHashElt : public ErrmsgCommandDeprecated {
+// Test-only, enabled via command-line. See docs/test_commands.md.
+class CmdHashElt : public BasicCommand {
 public:
-    CmdHashElt() : ErrmsgCommandDeprecated("_hashBSONElement"){};
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    CmdHashElt() : BasicCommand("_hashBSONElement") {}
+
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
+
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
+
     // No auth needed because it only works when enabled via command line.
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {}
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
+        return Status::OK();
+    }
+
     std::string help() const override {
         return "returns the hash of the first BSONElement val in a BSONObj";
     }
@@ -79,20 +87,20 @@ public:
      *>  "out" : NumberLong(6271151123721111923),
      *>  "ok" : 1 }
      **/
-    bool errmsgRun(OperationContext* opCtx,
-                   const string& db,
-                   const BSONObj& cmdObj,
-                   string& errmsg,
-                   BSONObjBuilder& result) {
+    bool run(OperationContext* opCtx,
+             const DatabaseName&,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
         result.appendAs(cmdObj.firstElement(), "key");
 
         int seed = 0;
         if (cmdObj.hasField("seed")) {
             if (!cmdObj["seed"].isNumber()) {
-                errmsg += "seed must be a number";
+                CommandHelpers::appendSimpleCommandStatus(
+                    result, false /* ok */, "seed must be a number" /* errmsg */);
                 return false;
             }
-            seed = cmdObj["seed"].numberInt();
+            seed = cmdObj["seed"].safeNumberInt();
         }
         result.append("seed", seed);
 
@@ -100,5 +108,5 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_TEST_COMMAND(CmdHashElt);
+MONGO_REGISTER_COMMAND(CmdHashElt).testOnly().forRouter().forShard();
 }  // namespace mongo

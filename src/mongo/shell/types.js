@@ -1,110 +1,109 @@
+/**
+ * Shims and polyfills for various types.
+ */
+
 // Date and time types
-if (typeof (Timestamp) != "undefined") {
-    Timestamp.prototype.tojson = function() {
-        return this.toStringIncomparable();
-    };
-
-    Timestamp.prototype.getTime = function() {
-        return this.t;
-    };
-
-    Timestamp.prototype.getInc = function() {
-        return this.i;
-    };
-
-    Timestamp.prototype.toString = function() {
-        // Resmoke overrides `toString` to throw an error to prevent accidental operator
-        // comparisons, e.g: >, -, etc...
-        return this.toStringIncomparable();
-    };
-
-    Timestamp.prototype.toStringIncomparable = function() {
-        return "Timestamp(" + this.t + ", " + this.i + ")";
-    };
-} else {
-    print("warning: no Timestamp class");
-}
-
-Date.timeFunc = function(theFunc, numTimes) {
-    var start = new Date();
-    numTimes = numTimes || 1;
-    for (var i = 0; i < numTimes; i++) {
-        theFunc.apply(null, Array.from(arguments).slice(2));
-    }
-
-    return (new Date()).getTime() - start.getTime();
+/**
+ * The return value is not a valid JSON string. See 'tojson()' function comment for details.
+ */
+Timestamp.prototype.tojson = function () {
+    return this.toStringIncomparable();
 };
 
-Date.prototype.tojson = function() {
+Timestamp.prototype.getTime = function () {
+    return this.t;
+};
+
+Timestamp.prototype.getInc = function () {
+    return this.i;
+};
+
+Timestamp.prototype.toString = function () {
+    // Resmoke overrides `toString` to throw an error to prevent accidental operator
+    // comparisons, e.g: >, -, etc...
+    return this.toStringIncomparable();
+};
+
+Timestamp.prototype.toStringIncomparable = function () {
+    return `Timestamp(${this.t}, ${this.i})`;
+};
+
+Date.timeFunc = function (theFunc, numTimes = 1, ...args) {
+    let start = new Date();
+    for (let i = 0; i < numTimes; i++) {
+        theFunc(...args);
+    }
+
+    return new Date().getTime() - start.getTime();
+};
+
+/**
+ * The return value is not a valid JSON string. See 'tojson()' function comment for details.
+ */
+Date.prototype.tojson = function () {
+    let time;
     try {
         // If this === Date.prototype or this is a Date instance created from
         // Object.create(Date.prototype), then the [[DateValue]] internal slot won't be set and will
-        // lead to a TypeError. We instead treat it as though the [[DateValue]] internal slot is NaN
-        // in order to be consistent with the ES5 behavior in MongoDB 3.2 and earlier.
-        this.getTime();
+        // lead to a TypeError. We instead treat it as though the [[DateValue]] internal slot is
+        // NaN.
+        time = this.getTime();
     } catch (e) {
-        if (e instanceof TypeError &&
-            e.message.includes("getTime method called on incompatible Object")) {
+        if (e instanceof TypeError && e.message.includes("Date.prototype.getTime called on incompatible")) {
             return new Date(NaN).tojson();
         }
         throw e;
     }
 
-    var UTC = 'UTC';
-    var year = this['get' + UTC + 'FullYear']().zeroPad(4);
-    var month = (this['get' + UTC + 'Month']() + 1).zeroPad(2);
-    var date = this['get' + UTC + 'Date']().zeroPad(2);
-    var hour = this['get' + UTC + 'Hours']().zeroPad(2);
-    var minute = this['get' + UTC + 'Minutes']().zeroPad(2);
-    var sec = this['get' + UTC + 'Seconds']().zeroPad(2);
+    if (isNaN(time)) {
+        // backwards compatibility based on a custom parser that wasn't graceful here
+        return 'ISODate("0NaN-NaN-NaNTNaN:NaN:NaNZ")';
+    }
 
-    if (this['get' + UTC + 'Milliseconds']())
-        sec += '.' + this['get' + UTC + 'Milliseconds']().zeroPad(3);
+    let str = this.toISOString();
+    str = str.replace(".000", ""); // backwards compatibility
 
-    var ofs = 'Z';
-    // // print a non-UTC time
-    // var ofsmin = this.getTimezoneOffset();
-    // if (ofsmin != 0){
-    //     ofs = ofsmin > 0 ? '-' : '+'; // This is correct
-    //     ofs += (ofsmin/60).zeroPad(2)
-    //     ofs += (ofsmin%60).zeroPad(2)
-    // }
-    return 'ISODate("' + year + '-' + month + '-' + date + 'T' + hour + ':' + minute + ':' + sec +
-        ofs + '")';
+    return `ISODate("${str}")`;
 };
 
-ISODate = function(isoDateStr) {
-    if (!isoDateStr)
-        return new Date();
+// eslint-disable-next-line
+ISODate = function (isoDateStr) {
+    if (!isoDateStr) return new Date();
 
-    var isoDateRegex =
+    // This format is more flexible than what Date.parse provides.
+    // Allows optional dashes, colons, and rounds ms
+    const isoDateRegex =
         /^(\d{4})-?(\d{2})-?(\d{2})([T ](\d{2})(:?(\d{2})(:?(\d{2}(\.\d+)?))?)?(Z|([+-])(\d{2}):?(\d{2})?)?)?$/;
-    var res = isoDateRegex.exec(isoDateStr);
+    let res = isoDateRegex.exec(isoDateStr);
 
-    if (!res)
-        throw Error("invalid ISO date: " + isoDateStr);
+    if (!res) throw Error("invalid ISO date: " + isoDateStr);
 
-    var year = parseInt(res[1], 10);
-    var month = (parseInt(res[2], 10)) - 1;
-    var date = parseInt(res[3], 10);
-    var hour = parseInt(res[5], 10) || 0;
-    var min = parseInt(res[7], 10) || 0;
-    var sec = parseInt((res[9] && res[9].substr(0, 2)), 10) || 0;
-    var ms = Math.round((parseFloat(res[10]) || 0) * 1000);
+    /*
+     * Note that we use `a || b` instead of `a ?? b` as fallthroughs because a might be NaN,
+     * which is falsey but not nullish, and we want to convert those to zeros.
+     */
+    const year = parseInt(res[1], 10);
+    const month = parseInt(res[2], 10) - 1;
+    const date = parseInt(res[3], 10);
+    const hour = parseInt(res[5], 10) || 0;
+    const min = parseInt(res[7], 10) || 0;
+    const sec = parseInt(res[9]?.substring(0, 2), 10) || 0;
+    const ms = Math.round((parseFloat(res[10]) || 0) * 1_000);
 
-    var dateTime = new Date();
+    let dateTime = new Date();
 
     dateTime.setUTCFullYear(year, month, date);
     dateTime.setUTCHours(hour);
     dateTime.setUTCMinutes(min);
     dateTime.setUTCSeconds(sec);
-    var time = dateTime.setUTCMilliseconds(ms);
+    let time = dateTime.setUTCMilliseconds(ms);
 
-    if (res[11] && res[11] != 'Z') {
-        var ofs = 0;
-        ofs += (parseInt(res[13], 10) || 0) * 60 * 60 * 1000;  // hours
-        ofs += (parseInt(res[14], 10) || 0) * 60 * 1000;       // mins
-        if (res[12] == '+')                                    // if ahead subtract
+    if (res[11] && res[11] != "Z") {
+        let ofs = 0;
+        ofs += (parseInt(res[13], 10) || 0) * 60 * 60 * 1_000; // hours
+        ofs += (parseInt(res[14], 10) || 0) * 60 * 1_000; // mins
+        if (res[12] == "+")
+            // if ahead subtract
             ofs *= -1;
 
         time += ofs;
@@ -122,145 +121,145 @@ ISODate = function(isoDateStr) {
 };
 
 // Regular Expression
-RegExp.escape = function(text) {
+RegExp.escape = function (text) {
+    // Supported since Firefox 134; polyfill until then.
+    // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/escape
     return text.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&");
 };
 
+/**
+ * The return value is not a valid JSON string. See 'tojson()' function comment for details.
+ */
 RegExp.prototype.tojson = RegExp.prototype.toString;
 
 // Array
-Array.contains = function(a, x) {
+Array.contains = function (a, x) {
     if (!Array.isArray(a)) {
         throw new Error("The first argument to Array.contains must be an array");
     }
 
-    for (var i = 0; i < a.length; i++) {
-        if (a[i] == x)
-            return true;
-    }
-    return false;
+    return a.includes(x);
 };
 
-Array.unique = function(a) {
+Array.unique = function (a) {
     if (!Array.isArray(a)) {
         throw new Error("The first argument to Array.unique must be an array");
     }
 
-    var u = [];
-    for (var i = 0; i < a.length; i++) {
-        var o = a[i];
-        if (!Array.contains(u, o)) {
-            u.push(o);
-        }
-    }
-    return u;
+    return [...new Set(a)];
 };
 
-Array.shuffle = function(arr) {
+Array.shuffle = function (arr) {
     if (!Array.isArray(arr)) {
         throw new Error("The first argument to Array.shuffle must be an array");
     }
 
-    for (var i = 0; i < arr.length - 1; i++) {
-        var pos = i + Random.randInt(arr.length - i);
-        var save = arr[i];
-        arr[i] = arr[pos];
-        arr[pos] = save;
+    for (let i = 0; i < arr.length - 1; i++) {
+        const j = i + Random.randInt(arr.length - i);
+        [arr[i], arr[j]] = [arr[j], arr[i]];
     }
     return arr;
 };
 
-Array.tojson = function(a, indent, nolint, depth) {
+/**
+ * The return value is not always a valid JSON string. See 'tojson()' function comment for details.
+ */
+Array.tojson = function (a, indent, nolint, depth = 0, sortKeys) {
     if (!Array.isArray(a)) {
         throw new Error("The first argument to Array.tojson must be an array");
     }
 
-    if (typeof depth !== 'number') {
-        depth = 0;
-    }
     if (depth > tojson.MAX_DEPTH) {
         return "[Array]";
     }
-
-    var elementSeparator = nolint ? " " : "\n";
-
-    if (!indent)
-        indent = "";
-    if (nolint)
-        indent = "";
 
     if (a.length == 0) {
         return "[ ]";
     }
 
-    var s = "[" + elementSeparator;
+    if (globalThis.TestData?.logFormat === "json" && typeof nolint !== "boolean") {
+        nolint = true;
+        indent = "";
+    }
 
-    // add to indent if we are pretty
-    if (!nolint)
+    if (nolint) {
+        indent = "";
+    } else {
+        // add to indent if we are pretty
         indent += "\t";
+    }
 
-    for (var i = 0; i < a.length; i++) {
-        s += indent + tojson(a[i], indent, nolint, depth + 1);
+    let elementSeparator = nolint ? " " : "\n";
+    let s = "[" + elementSeparator;
+
+    for (let i = 0; i < a.length; i++) {
+        s += indent + tojson(a[i], indent, nolint, depth + 1, sortKeys);
         if (i < a.length - 1) {
             s += "," + elementSeparator;
         }
     }
 
     // remove from indent if we are pretty
-    if (!nolint)
-        indent = indent.substring(1);
+    if (!nolint) indent = indent.substring(1);
 
     s += elementSeparator + indent + "]";
     return s;
 };
 
-Array.fetchRefs = function(arr, coll) {
+/**
+ * The return value is not a valid JSON string. See 'tojson()' function comment for details.
+ */
+Set.tojson = function (s, indent, nolint, depth) {
+    return `new Set(${Array.tojson(Array.from(s), indent, nolint, depth)})`;
+};
+
+/**
+ * The return value is not a valid JSON string. See 'tojson()' function comment for details.
+ */
+Map.tojson = function (m, indent, nolint, depth) {
+    return `new Map(${Array.tojson(Array.from(m.entries()), indent, nolint, depth)})`;
+};
+
+Array.fetchRefs = function (arr, coll) {
     if (!Array.isArray(arr)) {
         throw new Error("The first argument to Array.fetchRefs must be an array");
     }
 
-    var n = [];
-    for (var i = 0; i < arr.length; i++) {
-        var z = arr[i];
-        if (coll && coll != z.getCollection())
-            continue;
-        n.push(z.fetch());
-    }
-    return n;
+    return arr.filter((z) => !coll || coll == z.getCollection()).map((z) => z.fetch());
 };
 
-Array.sum = function(arr) {
+Array.sum = function (arr) {
     if (!Array.isArray(arr)) {
         throw new Error("The first argument to Array.sum must be an array");
     }
 
-    if (arr.length == 0)
-        return null;
-    var s = arr[0];
-    for (var i = 1; i < arr.length; i++)
-        s += arr[i];
+    const L = arr.length;
+    if (L == 0) return null;
+
+    // prefer native for-loop (instead of reduce) for performance on large arrays
+    let s = arr[0];
+    for (let i = 1; i < L; i++) s += arr[i];
     return s;
 };
 
-Array.avg = function(arr) {
+Array.avg = function (arr) {
     if (!Array.isArray(arr)) {
         throw new Error("The first argument to Array.avg must be an array");
     }
 
-    if (arr.length == 0)
-        return null;
+    if (arr.length == 0) return null;
     return Array.sum(arr) / arr.length;
 };
 
-Array.stdDev = function(arr) {
+Array.stdDev = function (arr) {
     if (!Array.isArray(arr)) {
         throw new Error("The first argument to Array.stdDev must be an array");
     }
 
-    var avg = Array.avg(arr);
-    var sum = 0;
+    let avg = Array.avg(arr);
+    let sum = 0;
 
-    for (var i = 0; i < arr.length; i++) {
+    for (let i = 0; i < arr.length; i++) {
         sum += Math.pow(arr[i] - avg, 2);
     }
 
@@ -268,16 +267,21 @@ Array.stdDev = function(arr) {
 };
 
 // Object
-Object.extend = function(dst, src, deep) {
-    for (var k in src) {
-        var v = src[k];
-        if (deep && typeof (v) == "object" && v !== null) {
-            if (v.constructor === ObjectId) {  // convert ObjectId properly
+Object.extend = function (dst, src, deep) {
+    for (let k in src) {
+        let v = src[k];
+        if (deep && typeof v == "object" && v !== null) {
+            if (v.constructor === ObjectId) {
+                // convert ObjectId properly
                 eval("v = " + tojson(v));
-            } else if ("floatApprox" in v) {  // convert NumberLong properly
+            } else if ("floatApprox" in v) {
+                // convert NumberLong properly
+                eval("v = " + tojson(v));
+            } else if (v.constructor === Date) {
+                // convert Date properly
                 eval("v = " + tojson(v));
             } else {
-                v = Object.extend(typeof (v.length) == "number" ? [] : {}, v, true);
+                v = Object.extend(typeof v.length == "number" ? [] : {}, v, true);
             }
         }
         dst[k] = v;
@@ -285,14 +289,42 @@ Object.extend = function(dst, src, deep) {
     return dst;
 };
 
-Object.merge = function(dst, src, deep) {
-    var clone = Object.extend({}, dst, deep);
+Object.merge = function (dst, src, deep) {
+    let clone = Object.extend({}, dst, deep);
     return Object.extend(clone, src, deep);
 };
 
-Object.keySet = function(o) {
-    var ret = new Array();
-    for (var i in o) {
+// If there is a conflict in values of a key for two objects being merged, the second value will
+// override the first one in the merged object
+Object.deepMerge = function (...objects) {
+    const isObject = (obj) => obj && typeof obj === "object";
+
+    // Create new object prev to hold combination of all object fields.
+    return objects.reduce((prev, obj = {}) => {
+        Object.keys(obj).forEach((key) => {
+            const pVal = prev[key]; // Get the values for key from the two objects being merged.
+            const oVal = obj[key];
+
+            if (Array.isArray(pVal) && Array.isArray(oVal)) {
+                // If both are arrays then concatenate them into a new
+                // array and add it to prev.
+                prev[key] = pVal.concat(...oVal);
+            } else if (isObject(pVal) && isObject(oVal)) {
+                // If both are objects then recursively merge again.
+                prev[key] = Object.deepMerge(pVal, oVal);
+            } else {
+                // In all other cases set prev[key] to obj[key].
+                prev[key] = oVal;
+            }
+        });
+
+        return prev;
+    }, {});
+};
+
+Object.keySet = function (o) {
+    let ret = new Array();
+    for (let i in o) {
         if (!(i in o.__proto__ && o[i] === o.__proto__[i])) {
             ret.push(i);
         }
@@ -301,42 +333,10 @@ Object.keySet = function(o) {
 };
 
 // String
-if (String.prototype.trim === undefined) {
-    String.prototype.trim = function() {
-        return this.replace(/^\s+|\s+$/g, "");
-    };
-}
-if (String.prototype.trimLeft === undefined) {
-    String.prototype.trimLeft = function() {
-        return this.replace(/^\s+/, "");
-    };
-}
-if (String.prototype.trimRight === undefined) {
-    String.prototype.trimRight = function() {
-        return this.replace(/\s+$/, "");
-    };
-}
 
 // always provide ltrim and rtrim for backwards compatibility
-String.prototype.ltrim = String.prototype.trimLeft;
-String.prototype.rtrim = String.prototype.trimRight;
-
-String.prototype.startsWith = function(str) {
-    return this.indexOf(str) == 0;
-};
-
-String.prototype.endsWith = function(str) {
-    return this.indexOf(str, this.length - str.length) !== -1;
-};
-
-// Polyfill taken from
-// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/includes
-if (!String.prototype.includes) {
-    String.prototype.includes = function() {
-        'use strict';
-        return String.prototype.indexOf.apply(this, arguments) !== -1;
-    };
-}
+String.prototype.ltrim = String.prototype.trimStart;
+String.prototype.rtrim = String.prototype.trimEnd;
 
 // Returns a copy padded with the provided character _chr_ so it becomes (at least) _length_
 // characters long.
@@ -345,289 +345,272 @@ if (!String.prototype.includes) {
 // @param right if falsy add leading whitespace, otherwise add trailing whitespace
 // @param chr character to be used for padding, defaults to whitespace
 // @return the padded string
-String.prototype.pad = function(length, right, chr) {
-    if (typeof chr == 'undefined')
-        chr = ' ';
-    var str = this;
-    for (var i = length - str.length; i > 0; i--) {
-        if (right) {
-            str = str + chr;
-        } else {
-            str = chr + str;
-        }
-    }
-    return str;
+String.prototype.pad = function (length, right, chr) {
+    return right ? this.padEnd(length, chr) : this.padStart(length, chr);
 };
 
 // Number
-Number.prototype.toPercentStr = function() {
+Number.prototype.toPercentStr = function () {
     return (this * 100).toFixed(2) + "%";
 };
 
-Number.prototype.zeroPad = function(width) {
-    return ('' + this).pad(width, false, '0');
+Number.prototype.zeroPad = function (width) {
+    return ("" + this).pad(width, false, "0");
 };
 
 // NumberLong
-if (!NumberLong.prototype) {
-    NumberLong.prototype = {};
-}
 
-NumberLong.prototype.tojson = function() {
+/**
+ * The return value is not a valid JSON string. See 'tojson()' function comment for details.
+ */
+NumberLong.prototype.tojson = function () {
     return this.toString();
 };
 
 // NumberInt
-if (!NumberInt.prototype) {
-    NumberInt.prototype = {};
-}
 
-NumberInt.prototype.tojson = function() {
+/**
+ * The return value is not a valid JSON string. See 'tojson()' function comment for details.
+ */
+NumberInt.prototype.tojson = function () {
     return this.toString();
 };
 
 // NumberDecimal
-if (typeof NumberDecimal !== 'undefined') {
-    if (!NumberDecimal.prototype) {
-        NumberDecimal.prototype = {};
-    }
 
-    NumberDecimal.prototype.tojson = function() {
-        return this.toString();
-    };
-
-    NumberDecimal.prototype.equals = function(other) {
-        return compareNumberDecimals(this, other);
-    };
-}
-
-// ObjectId
-if (!ObjectId.prototype)
-    ObjectId.prototype = {};
-
-ObjectId.prototype.toString = function() {
-    return "ObjectId(" + tojson(this.str) + ")";
-};
-
-ObjectId.prototype.tojson = function() {
+/**
+ * The return value is not a valid JSON string. See 'tojson()' function comment for details.
+ */
+NumberDecimal.prototype.tojson = function () {
     return this.toString();
 };
 
-ObjectId.prototype.valueOf = function() {
+NumberDecimal.prototype.equals = function (other) {
+    return numberDecimalsEqual(this, other);
+};
+
+// ObjectId
+
+ObjectId.prototype.toString = function () {
+    return "ObjectId(" + tojson(this.str) + ")";
+};
+
+/**
+ * The return value is not a valid JSON string. See 'tojson()' function comment for details.
+ */
+ObjectId.prototype.tojson = function () {
+    return this.toString();
+};
+
+ObjectId.prototype.valueOf = function () {
     return this.str;
 };
 
 ObjectId.prototype.isObjectId = true;
 
-ObjectId.prototype.getTimestamp = function() {
-    return new Date(parseInt(this.valueOf().slice(0, 8), 16) * 1000);
+ObjectId.prototype.getTimestamp = function () {
+    return new Date(parseInt(this.valueOf().slice(0, 8), 16) * 1_000);
 };
 
-ObjectId.prototype.equals = function(other) {
+ObjectId.prototype.equals = function (other) {
     return this.str == other.str;
 };
 
 // Creates an ObjectId from a Date.
 // Based on solution discussed here:
 //     http://stackoverflow.com/questions/8749971/can-i-query-mongodb-objectid-by-date
-ObjectId.fromDate = function(source) {
+ObjectId.fromDate = function (source) {
     if (!source) {
         throw Error("date missing or undefined");
     }
 
-    var sourceDate;
-
     // Extract Date from input.
     // If input is a string, assume ISO date string and
     // create a Date from the string.
-    if (source instanceof Date) {
-        sourceDate = source;
-    } else {
-        throw Error("Cannot create ObjectId from " + typeof (source) + ": " + tojson(source));
+    if (!(source instanceof Date)) {
+        throw Error("Cannot create ObjectId from " + typeof source + ": " + tojson(source));
     }
 
     // Convert date object to seconds since Unix epoch.
-    var seconds = Math.floor(sourceDate.getTime() / 1000);
+    let seconds = Math.floor(source.getTime() / 1_000);
 
     // Generate hex timestamp with padding.
-    var hexTimestamp = seconds.toString(16).pad(8, false, '0') + "0000000000000000";
+    let hexTimestamp = seconds.toString(16).pad(8, false, "0") + "0000000000000000";
 
     // Create an ObjectId with hex timestamp.
-    var objectId = ObjectId(hexTimestamp);
+    let objectId = ObjectId(hexTimestamp);
 
     return objectId;
 };
 
 // DBPointer
-if (typeof (DBPointer) != "undefined") {
-    DBPointer.prototype.fetch = function() {
-        assert(this.ns, "need a ns");
-        assert(this.id, "need an id");
-        return db[this.ns].findOne({_id: this.id});
-    };
 
-    DBPointer.prototype.tojson = function(indent) {
-        return this.toString();
-    };
+DBPointer.prototype.fetch = function () {
+    assert(this.ns, "need a ns");
+    assert(this.id, "need an id");
+    return globalThis.db[this.ns].findOne({_id: this.id});
+};
 
-    DBPointer.prototype.getCollection = function() {
-        return this.ns;
-    };
+/**
+ * The return value is not a valid JSON string. See 'tojson()' function comment for details.
+ */
+DBPointer.prototype.tojson = function () {
+    return this.toString();
+};
 
-    DBPointer.prototype.getId = function() {
-        return this.id;
-    };
+DBPointer.prototype.getCollection = function () {
+    return this.ns;
+};
 
-    DBPointer.prototype.toString = function() {
-        return "DBPointer(" + tojson(this.ns) + ", " + tojson(this.id) + ")";
-    };
-} else {
-    print("warning: no DBPointer");
-}
+DBPointer.prototype.getId = function () {
+    return this.id;
+};
+
+DBPointer.prototype.toString = function () {
+    return `DBPointer(${tojson(this.ns)}, ${tojson(this.id)})`;
+};
 
 // DBRef
-if (typeof (DBRef) != "undefined") {
-    DBRef.prototype.fetch = function() {
-        assert(this.$ref, "need a ns");
-        assert(this.$id, "need an id");
-        var coll = this.$db ? db.getSiblingDB(this.$db).getCollection(this.$ref) : db[this.$ref];
-        return coll.findOne({_id: this.$id});
-    };
+DBRef.prototype.fetch = function () {
+    assert(this.$ref, "need a ns");
+    assert(this.$id, "need an id");
+    let coll = this.$db ? globalThis.db.getSiblingDB(this.$db).getCollection(this.$ref) : globalThis.db[this.$ref];
+    return coll.findOne({_id: this.$id});
+};
 
-    DBRef.prototype.tojson = function(indent) {
-        return this.toString();
-    };
+/**
+ * The return value is not a valid JSON string. See 'tojson()' function comment for details.
+ */
+DBRef.prototype.tojson = function () {
+    return this.toString();
+};
 
-    DBRef.prototype.getDb = function() {
-        return this.$db || undefined;
-    };
+DBRef.prototype.getDb = function () {
+    return this.$db ?? undefined;
+};
 
-    DBRef.prototype.getCollection = function() {
-        return this.$ref;
-    };
+DBRef.prototype.getCollection = function () {
+    return this.$ref;
+};
 
-    DBRef.prototype.getRef = function() {
-        return this.$ref;
-    };
+DBRef.prototype.getRef = function () {
+    return this.$ref;
+};
 
-    DBRef.prototype.getId = function() {
-        return this.$id;
-    };
+DBRef.prototype.getId = function () {
+    return this.$id;
+};
 
-    DBRef.prototype.toString = function() {
-        return "DBRef(" + tojson(this.$ref) + ", " + tojson(this.$id) +
-            (this.$db ? ", " + tojson(this.$db) : "") + ")";
-    };
-} else {
-    print("warning: no DBRef");
-}
+DBRef.prototype.toString = function () {
+    return "DBRef(" + tojson(this.$ref) + ", " + tojson(this.$id) + (this.$db ? ", " + tojson(this.$db) : "") + ")";
+};
 
 // BinData
-if (typeof (BinData) != "undefined") {
-    BinData.prototype.tojson = function() {
-        return this.toString();
-    };
+/**
+ * The return value is not a valid JSON string. See 'tojson()' function comment for details.
+ */
+BinData.prototype.tojson = function () {
+    return this.toString();
+};
 
-    BinData.prototype.subtype = function() {
-        return this.type;
-    };
-    BinData.prototype.length = function() {
-        return this.len;
-    };
-} else {
-    print("warning: no BinData class");
-}
+BinData.prototype.subtype = function () {
+    return this.type;
+};
+BinData.prototype.length = function () {
+    return this.len;
+};
 
-// Map
-if (typeof (Map) == "undefined") {
-    Map = function() {
-        this._data = {};
-    };
-}
+// BSONAwareMap
+BSONAwareMap = function () {
+    this._data = {};
+};
 
-Map.hash = function(val) {
-    if (!val)
-        return val;
+BSONAwareMap.hash = function (val) {
+    if (!val) return val;
 
-    switch (typeof (val)) {
-        case 'string':
-        case 'number':
-        case 'date':
+    switch (typeof val) {
+        case "string":
+        case "number":
+        case "date":
             return val.toString();
-        case 'object':
-        case 'array':
-            var s = "";
-            for (var k in val) {
+        case "object":
+        case "array": {
+            let s = "";
+            for (let k in val) {
                 s += k + val[k];
             }
             return s;
+        }
     }
 
-    throw Error("can't hash : " + typeof (val));
+    throw Error("can't hash : " + typeof val);
 };
 
-Map.prototype.put = function(key, value) {
-    var o = this._get(key);
-    var old = o.value;
+BSONAwareMap.prototype.put = function (key, value) {
+    let o = this._get(key);
+    let old = o.value;
     o.value = value;
     return old;
 };
 
-Map.prototype.get = function(key) {
+BSONAwareMap.prototype.get = function (key) {
     return this._get(key).value;
 };
 
-Map.prototype._get = function(key) {
-    var h = Map.hash(key);
-    var a = this._data[h];
+BSONAwareMap.prototype._get = function (key) {
+    let h = BSONAwareMap.hash(key);
+    let a = this._data[h];
     if (!a) {
         a = [];
         this._data[h] = a;
     }
-    for (var i = 0; i < a.length; i++) {
+    for (let i = 0; i < a.length; i++) {
         if (friendlyEqual(key, a[i].key)) {
             return a[i];
         }
     }
-    var o = {key: key, value: null};
+    let o = {key, value: null};
     a.push(o);
     return o;
 };
 
-Map.prototype.values = function() {
-    var all = [];
-    for (var k in this._data) {
-        this._data[k].forEach(function(z) {
+BSONAwareMap.prototype.values = function () {
+    let all = [];
+    for (let k in this._data) {
+        this._data[k].forEach(function (z) {
             all.push(z.value);
         });
     }
     return all;
 };
 
-if (typeof (gc) == "undefined") {
-    gc = function() {
-        print("warning: using noop gc()");
-    };
-}
-
 // Free Functions
-tojsononeline = function(x) {
+
+/**
+ * The return value is not always a valid JSON string. See 'tojson()' function comment for details.
+ */
+tojsononeline = function (x) {
     return tojson(x, " ", true);
 };
 
-tojson = function(x, indent, nolint, depth) {
-    if (x === null)
-        return "null";
+/**
+ * Serializes the given argument 'x' to a string that can be used to deserialize it with 'eval()'.
+ * The return value is not always a valid JSON string. Use 'toJsonForLog()' for valid JSON output
+ * and for printing values into the logs.
+ */
+tojson = function (x, indent, nolint, depth = 0, sortKeys) {
+    // Note that `nolint` is used as a tri-state: not providing it IS specifying behavior
+    if (x === null) return "null";
 
-    if (x === undefined)
-        return "undefined";
+    if (x === undefined) return "undefined";
 
-    if (!indent)
+    if (globalThis.TestData?.logFormat === "json" && typeof nolint !== "boolean") {
+        nolint = true;
         indent = "";
-
-    if (typeof depth !== 'number') {
-        depth = 0;
     }
+
+    // can be undefined, null, or empty string, and even false
+    indent ||= "";
 
     switch (typeof x) {
         case "string":
@@ -636,45 +619,46 @@ tojson = function(x, indent, nolint, depth) {
         case "boolean":
             return "" + x;
         case "object": {
-            var s = tojsonObject(x, indent, nolint, depth);
-            if ((nolint == null || nolint == true) && s.length < 80 &&
-                (indent == null || indent.length == 0)) {
+            let s = tojsonObject(x, indent, nolint, depth, sortKeys);
+            if ((nolint == null || nolint == true) && s.length < 80 && indent.length == 0) {
                 s = s.replace(/[\t\r\n]+/gm, " ");
             }
             return s;
         }
         case "function":
-            if (x === MinKey || x === MaxKey)
-                return x.tojson();
+            if (x === MinKey || x === MaxKey) return x.tojson();
             return x.toString();
         default:
-            throw Error("tojson can't handle type " + (typeof x));
+            throw Error("tojson can't handle type " + typeof x);
     }
 };
 tojson.MAX_DEPTH = 100;
 
-tojsonObject = function(x, indent, nolint, depth) {
-    if (typeof depth !== 'number') {
-        depth = 0;
-    }
-    var lineEnding = nolint ? " " : "\n";
-    var tabSpace = nolint ? "" : "\t";
-    assert.eq((typeof x), "object", "tojsonObject needs object, not [" + (typeof x) + "]");
-
-    if (!indent)
+/**
+ * Serializes the given object argument 'x' to a string, which can be used to deserialize it with
+ * 'eval()'. The return value is not always a valid JSON string. Use 'toJsonForLog()' for valid JSON
+ * output and for printing values into the logs.
+ */
+tojsonObject = function (x, indent, nolint, depth = 0, sortKeys = false) {
+    // Note that `nolint` is used as a tri-state: not providing it IS specifying behavior
+    if (globalThis.TestData?.logFormat === "json" && typeof nolint !== "boolean") {
+        nolint = true;
         indent = "";
+    }
+    let lineEnding = nolint ? " " : "\n";
+    let tabSpace = nolint ? "" : "\t";
+    assert.eq(typeof x, "object", "tojsonObject needs object, not [" + typeof x + "]");
 
-    if (typeof (x.tojson) == "function" && x.tojson != tojson) {
-        return x.tojson(indent, nolint, depth);
+    if (typeof x.tojson == "function" && x.tojson != tojson) {
+        return x.tojson(indent, nolint, depth, sortKeys);
     }
 
-    if (x.constructor && typeof (x.constructor.tojson) == "function" &&
-        x.constructor.tojson != tojson) {
-        return x.constructor.tojson(x, indent, nolint, depth);
+    if (x.constructor && typeof x.constructor.tojson == "function" && x.constructor.tojson != tojson) {
+        return x.constructor.tojson(x, indent, nolint, depth, sortKeys);
     }
 
     if (x instanceof Error) {
-        return x.toString();
+        return `new ${x.name}(${JSON.stringify(x.message)})`;
     }
 
     try {
@@ -688,25 +672,28 @@ tojsonObject = function(x, indent, nolint, depth) {
         return "[Object]";
     }
 
-    var s = "{" + lineEnding;
+    let s = "{" + lineEnding;
 
     // push one level of indent
     indent += tabSpace;
 
-    var keys = x;
-    if (typeof (x._simpleKeys) == "function")
-        keys = x._simpleKeys();
-    var fieldStrings = [];
-    for (var k in keys) {
-        var val = x[k];
+    let keys = x;
+    if (typeof x._simpleKeys == "function") keys = x._simpleKeys();
+    let keyNames = [];
+    for (let k in keys) {
+        keyNames.push(k);
+    }
+    if (sortKeys) keyNames.sort();
+
+    let fieldStrings = [];
+    for (const k of keyNames) {
+        let val = x[k];
 
         // skip internal DB types to avoid issues with interceptors
-        if (typeof DB != 'undefined' && val == DB.prototype)
-            continue;
-        if (typeof DBCollection != 'undefined' && val == DBCollection.prototype)
-            continue;
+        if (val == globalThis.DB?.prototype) continue;
+        if (val == globalThis.DBCollection?.prototype) continue;
 
-        fieldStrings.push(indent + "\"" + k + "\" : " + tojson(val, indent, nolint, depth + 1));
+        fieldStrings.push(indent + '"' + k + '" : ' + tojson(val, indent, nolint, depth + 1, sortKeys));
     }
 
     if (fieldStrings.length > 0) {
@@ -721,23 +708,90 @@ tojsonObject = function(x, indent, nolint, depth) {
     return s + indent + "}";
 };
 
-printjson = function(x) {
+/**
+ * Serializes the given argument 'x' to a valid JSON string suitable for logging. The
+ * results of 'toJsonForLog()' and 'tostrictjson()' should be equal for BSON objects and arrays.
+ * Unlike 'tostrictjson()', 'toJsonForLog()' also accepts non-object types, recognizes recursive
+ * objects, and provides more detailed serializations for commonly used JavaScript classes, for
+ * instance:
+ *  - Set instances serialize to {"$set": [<elem1>,...]}
+ *  - Map instances serialize to {"$map": [[<key1>, <value1>],...]}
+ *  - Errors instances serialize to {"$error": "<error_message>"}
+ *
+ * 'toJsonForLog()' must be used when serializing JavaScript values into JSON logs to adhere to the
+ * format requirements.
+ *
+ * Unlike 'tojson()', the result of 'eval(toJsonForLog(x))' will not always evaluate into an object
+ * equivalent to 'x' and may throw a syntax error.
+ */
+toJsonForLog = function (x) {
+    function ensureEJSONAndStopOnRecursion() {
+        // Stack of ancestors (objects) of the current 'value'.
+        // eg, For {"x": 1, "y": {"z": 2}} and value = 2,
+        // ancestors = [{"x": 1, "y": {"z": 2}}, {"z": 2}]
+        let ancestors = [];
+        return function (key, value) {
+            if (value === undefined) {
+                return {"$undefined": true};
+            }
+            if (value instanceof Error) {
+                return {"$error": value.message};
+            }
+            if (value instanceof Map) {
+                return {"$map": [...value]};
+            }
+            if (value instanceof Set) {
+                return {"$set": [...value]};
+            }
+            // 'value' is a a pre-transformed property value (of type string in case of Dates),
+            // so we use 'this[key]' instead to get the original value.
+            if (this[key] instanceof Date) {
+                return {"$date": this[key].toISOString().replace("Z", "+00:00")};
+            }
+            if (typeof value !== "object" || value === null) {
+                return value;
+            }
+            // Remove ancestors not part of the path to current 'value' anymore.
+            // `this` is the object that value is contained in,
+            // i.e., its direct parent.
+            while (ancestors.length > 0 && ancestors.at(-1) !== this) {
+                ancestors.pop();
+            }
+            // 'value' is an object at this point. If it has already been seen, prune the traversal
+            // to avoid a 'TypeError' due to self-referencing objects.
+            if (ancestors.includes(value)) {
+                return "[recursive]";
+            }
+            ancestors.push(value);
+            return value;
+        };
+    }
+    return JSON.stringify(x, ensureEJSONAndStopOnRecursion());
+};
+
+/**
+ * The printed value is not always a valid JSON string. See 'tojson()' function comment for details.
+ */
+printjson = function (x) {
     print(tojson(x));
 };
 
-printjsononeline = function(x) {
+/**
+ * The printed value is not always a valid JSON string. See 'tojson()' function comment for details.
+ */
+printjsononeline = function (x) {
     print(tojsononeline(x));
 };
 
-isString = function(x) {
-    return typeof (x) == "string";
+isString = function (x) {
+    return typeof x == "string";
 };
 
-isNumber = function(x) {
-    return typeof (x) == "number";
+isNumber = function (x) {
+    return typeof x == "number";
 };
 
 // This function returns true even if the argument is an array.  See SERVER-14220.
-isObject = function(x) {
-    return typeof (x) == "object";
+isObject = function (x) {
+    return typeof x == "object";
 };

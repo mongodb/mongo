@@ -26,10 +26,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-from helper import copy_wiredtiger_home
-import wiredtiger, wttest
+import wttest
 from wtdataset import ComplexDataSet
-import os, shutil
+import os
 
 # test_bug025.py
 # WT-7208: After a missing index is accessed, we return an error.
@@ -79,6 +78,3 @@ class test_bug025(wttest.WiredTigerTestCase):
                 self.pr('Exception in second access: ' + str(e))
 
             cursor.close()
-
-if __name__ == '__main__':
-    wttest.run()

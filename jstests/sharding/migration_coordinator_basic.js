@@ -5,14 +5,25 @@
  * entries for the migration.
  */
 
-(function() {
-'use strict';
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {ShardVersioningUtil} from "jstests/sharding/libs/shard_versioning_util.js";
 
-load("jstests/libs/fail_point_util.js");
-load('jstests/libs/parallel_shell_helpers.js');
+function is81orAbove() {
+    // Requires all primary shard nodes to be running the fcvRequired version.
+    let isFcvGreater = true;
+    st.forEachConnection(function (conn) {
+        const fcvDoc = conn.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
+        if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, "8.1") < 0) {
+            isFcvGreater = false;
+        }
+    });
+    return isFcvGreater;
+}
 
 function getNewNs(dbName) {
-    if (typeof getNewNs.counter == 'undefined') {
+    if (typeof getNewNs.counter == "undefined") {
         getNewNs.counter = 0;
     }
     getNewNs.counter++;
@@ -24,8 +35,7 @@ const dbName = "test";
 
 var st = new ShardingTest({shards: 2});
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
 function getCollectionUuidAndEpoch(ns) {
     const collectionDoc = st.s.getDB("config").getCollection("collections").findOne({_id: ns});
@@ -43,15 +53,23 @@ function assertHasMigrationCoordinatorDoc({conn, ns, uuid, epoch}) {
         recipientShardId: st.shard1.shardName,
         "range.min._id": MinKey,
         "range.max._id": MaxKey,
-        "preMigrationChunkVersion.0": Timestamp(1, 0),
-        "preMigrationChunkVersion.1": epoch
+        $or: [
+            {"preMigrationChunkVersion.0": Timestamp(1, 0)},
+            {"preMigrationChunkVersion.1": epoch},
+            {"preMigrationChunkVersion.v": Timestamp(1, 0)},
+            {"preMigrationChunkVersion.e": epoch},
+        ],
     };
     assert.neq(
         null,
         conn.getDB("config").getCollection("migrationCoordinators").findOne(query),
-        "did not find document matching query " + tojson(query) +
-            ", contents of config.migrationCoordinators on " + conn + ": " +
-            tojson(conn.getDB("config").getCollection("migrationCoordinators").find().toArray()));
+        "did not find document matching query " +
+            tojson(query) +
+            ", contents of config.migrationCoordinators on " +
+            conn +
+            ": " +
+            tojson(conn.getDB("config").getCollection("migrationCoordinators").find().toArray()),
+    );
 }
 
 function assertEventuallyDoesNotHaveMigrationCoordinatorDoc(conn) {
@@ -60,21 +78,58 @@ function assertEventuallyDoesNotHaveMigrationCoordinatorDoc(conn) {
     });
 }
 
-function assertHasRangeDeletionDoc({conn, pending, whenToClean, ns, uuid}) {
+function assertHasRangeDeletionDoc({conn, pending, whenToClean, ns, uuid, processing, preMigrationShardVersion}) {
     const query = {
         nss: ns,
         collectionUuid: uuid,
         donorShardId: st.shard0.shardName,
         "range.min._id": MinKey,
         "range.max._id": MaxKey,
-        pending: (pending ? true : {$exists: false}),
-        whenToClean: whenToClean
+        whenToClean: whenToClean,
     };
-    assert.neq(null,
-               conn.getDB("config").getCollection("rangeDeletions").findOne(query),
-               "did not find document matching query " + tojson(query) +
-                   ", contents of config.rangeDeletions on " + conn + ": " +
-                   tojson(conn.getDB("config").getCollection("rangeDeletions").find().toArray()));
+
+    const doc = conn.getDB("config").getCollection("rangeDeletions").findOne(query);
+    assert.neq(
+        null,
+        doc,
+        "did not find document matching query " +
+            tojson(query) +
+            ", contents of config.rangeDeletions on " +
+            conn +
+            ": " +
+            tojson(conn.getDB("config").getCollection("rangeDeletions").find().toArray()),
+    );
+    if (pending) {
+        assert.eq(
+            pending,
+            doc.pending,
+            "Unexpected value on `pending` field. Range deletion doc found: " + tojson(doc),
+        );
+    } else {
+        assert(
+            !doc.hasOwnProperty("pending"),
+            "Field `pending` was not expected to be present. Range deletion doc found: " + tojson(doc),
+        );
+    }
+    if (processing) {
+        assert.eq(
+            processing,
+            doc.processing,
+            "Unexpected value on `processing` field. Range deletion doc found: " + tojson(doc),
+        );
+    } else {
+        assert(
+            !doc.hasOwnProperty("processing"),
+            "Field `processing` was not expected to be present. Range deletion doc found: " + tojson(doc),
+        );
+    }
+    if (is81orAbove()) {
+        assert.eq(
+            preMigrationShardVersion,
+            doc.preMigrationShardVersion,
+            "Unexpected value on `preMigrationShardVersion` field. Range deletion doc found: " + tojson(doc),
+        );
+    }
 }
 
 function assertEventuallyDoesNotHaveRangeDeletionDoc(conn) {
@@ -89,8 +144,8 @@ function assertEventuallyDoesNotHaveRangeDeletionDoc(conn) {
 
     // Insert some docs into the collection.
     const numDocs = 1000;
-    var bulk = st.s.getDB(dbName).getCollection(collName).initializeUnorderedBulkOp();
-    for (var i = 0; i < numDocs; i++) {
+    let bulk = st.s.getDB(dbName).getCollection(collName).initializeUnorderedBulkOp();
+    for (let i = 0; i < numDocs; i++) {
         bulk.insert({_id: i});
     }
     assert.commandWorked(bulk.execute());
@@ -98,27 +153,50 @@ function assertEventuallyDoesNotHaveRangeDeletionDoc(conn) {
     // Shard the collection.
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
     const [uuid, epoch] = getCollectionUuidAndEpoch(ns);
+    const preMigrationShardVersion = ShardVersioningUtil.getShardVersion(st.shard0, ns, true /* waitForRefresh */);
 
     // Run the moveChunk asynchronously, pausing during cloning to allow the test to make
     // assertions.
     let step4Failpoint = configureFailPoint(st.shard0, "moveChunkHangAtStep4");
     const awaitResult = startParallelShell(
-        funWithArgs(function(ns, toShardName) {
-            assert.commandWorked(db.adminCommand({moveChunk: ns, find: {_id: 0}, to: toShardName}));
-        }, ns, st.shard1.shardName), st.s.port);
+        funWithArgs(
+            function (ns, toShardName) {
+                assert.commandWorked(db.adminCommand({moveChunk: ns, find: {_id: 0}, to: toShardName}));
+            },
+            ns,
+            st.shard1.shardName,
+        ),
+        st.s.port,
+    );
 
     // Assert that the durable state for coordinating the migration was written correctly.
     step4Failpoint.wait();
     assertHasMigrationCoordinatorDoc({conn: st.shard0, ns, uuid, epoch});
-    assertHasRangeDeletionDoc({conn: st.shard0, pending: true, whenToClean: "delayed", ns, uuid});
-    assertHasRangeDeletionDoc({conn: st.shard1, pending: true, whenToClean: "now", ns, uuid});
+    assertHasRangeDeletionDoc({
+        conn: st.shard0,
+        pending: true,
+        whenToClean: "delayed",
+        ns,
+        uuid,
+        processing: false,
+        preMigrationShardVersion,
+    });
+    assertHasRangeDeletionDoc({
+        conn: st.shard1,
+        pending: true,
+        whenToClean: "now",
+        ns,
+        uuid,
+        processing: false,
+        preMigrationShardVersion: ShardVersioningUtil.kIgnoredShardVersion,
+    });
     step4Failpoint.off();
 
     // Allow the moveChunk to finish.
     awaitResult();
 
     // Donor shard eventually cleans up the orphans.
-    assert.soon(function() {
+    assert.soon(function () {
         return st.shard0.getDB(dbName).getCollection(collName).count() === 0;
     });
     assert.eq(numDocs, st.s.getDB(dbName).getCollection(collName).find().itcount());
@@ -131,13 +209,12 @@ function assertEventuallyDoesNotHaveRangeDeletionDoc(conn) {
 
 (() => {
     const [collName, ns] = getNewNs(dbName);
-    jsTest.log("Test end-to-end migration when migration commit fails due to StaleConfig, ns is " +
-               ns);
+    jsTest.log("Test end-to-end migration when migration commit fails due to StaleConfig, ns is " + ns);
 
     // Insert some docs into the collection.
     const numDocs = 1000;
-    var bulk = st.s.getDB(dbName).getCollection(collName).initializeUnorderedBulkOp();
-    for (var i = 0; i < numDocs; i++) {
+    let bulk = st.s.getDB(dbName).getCollection(collName).initializeUnorderedBulkOp();
+    for (let i = 0; i < numDocs; i++) {
         bulk.insert({_id: i});
     }
     assert.commandWorked(bulk.execute());
@@ -145,28 +222,54 @@ function assertEventuallyDoesNotHaveRangeDeletionDoc(conn) {
     // Shard the collection.
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
     const [uuid, epoch] = getCollectionUuidAndEpoch(ns);
+    const preMigrationShardVersion = ShardVersioningUtil.getShardVersion(st.shard0, ns, true /* waitForRefresh */);
 
     // Turn on a failpoint to make the migration commit fail on the config server.
-    let migrationCommitVersionErrorFailpoint =
-        configureFailPoint(st.configRS.getPrimary(), "migrationCommitVersionError");
+    let migrationCommitVersionErrorFailpoint = configureFailPoint(
+        st.configRS.getPrimary(),
+        "migrationCommitVersionError",
+    );
 
     // Run the moveChunk asynchronously, pausing during cloning to allow the test to make
     // assertions.
     let step4Failpoint = configureFailPoint(st.shard0, "moveChunkHangAtStep4");
     let step5Failpoint = configureFailPoint(st.shard0, "moveChunkHangAtStep5");
     const awaitResult = startParallelShell(
-        funWithArgs(function(ns, toShardName) {
-            // Expect StaleEpoch because of the failpoint that will make the migration commit fail.
-            assert.commandFailedWithCode(
-                db.adminCommand({moveChunk: ns, find: {_id: 0}, to: toShardName}),
-                ErrorCodes.StaleEpoch);
-        }, ns, st.shard1.shardName), st.s.port);
+        funWithArgs(
+            function (ns, toShardName) {
+                // Expect StaleEpoch because of the failpoint that will make the migration commit fail.
+                assert.commandFailedWithCode(
+                    db.adminCommand({moveChunk: ns, find: {_id: 0}, to: toShardName}),
+                    ErrorCodes.StaleEpoch,
+                );
+            },
+            ns,
+            st.shard1.shardName,
+        ),
+        st.s.port,
+    );
 
     // Assert that the durable state for coordinating the migration was written correctly.
     step4Failpoint.wait();
     assertHasMigrationCoordinatorDoc({conn: st.shard0, ns, uuid, epoch});
-    assertHasRangeDeletionDoc({conn: st.shard0, pending: true, whenToClean: "delayed", ns, uuid});
-    assertHasRangeDeletionDoc({conn: st.shard1, pending: true, whenToClean: "now", ns, uuid});
+    assertHasRangeDeletionDoc({
+        conn: st.shard0,
+        pending: true,
+        whenToClean: "delayed",
+        ns,
+        uuid,
+        processing: false,
+        preMigrationShardVersion,
+    });
+    assertHasRangeDeletionDoc({
+        conn: st.shard1,
+        pending: true,
+        whenToClean: "now",
+        ns,
+        uuid,
+        processing: false,
+        preMigrationShardVersion: ShardVersioningUtil.kIgnoredShardVersion,
+    });
     step4Failpoint.off();
 
     // Assert that the recipient has 'numDocs' orphans.
@@ -178,7 +281,7 @@ function assertEventuallyDoesNotHaveRangeDeletionDoc(conn) {
     awaitResult();
 
     // Recipient shard eventually cleans up the orphans.
-    assert.soon(function() {
+    assert.soon(function () {
         return st.shard1.getDB(dbName).getCollection(collName).count() === 0;
     });
     assert.eq(numDocs, st.s.getDB(dbName).getCollection(collName).find().itcount());
@@ -193,20 +296,17 @@ function assertEventuallyDoesNotHaveRangeDeletionDoc(conn) {
 
 (() => {
     const [collName, ns] = getNewNs(dbName);
-    jsTest.log(
-        "Test end-to-end migration when migration commit fails to due to invalid chunk query, ns is " +
-        ns);
+    jsTest.log("Test end-to-end migration when migration commit fails to due to invalid chunk query, ns is " + ns);
 
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
-    const invalidChunkQueryFailPoint =
-        configureFailPoint(st.configRS.getPrimary(), "migrateCommitInvalidChunkQuery");
+    const invalidChunkQueryFailPoint = configureFailPoint(st.configRS.getPrimary(), "migrateCommitInvalidChunkQuery");
 
     assert.commandFailedWithCode(
         st.s.adminCommand({moveChunk: ns, find: {x: MinKey}, to: st.shard1.shardName}),
-        ErrorCodes.UpdateOperationFailed);
+        ErrorCodes.UpdateOperationFailed,
+    );
 
     invalidChunkQueryFailPoint.off();
 })();
 
 st.stop();
-})();

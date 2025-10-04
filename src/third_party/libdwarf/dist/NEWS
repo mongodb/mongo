@@ -1,0 +1,221 @@
+2021-07-15:
+  libdwarf, dwarfdump, etc all now use a semantic version
+  number rather than a date string. As of today the
+  current version is "0.1.1".
+2021-02-15:
+  dwarfdump given -ku now prints brief lists counting
+  the uses of every TAG, ATtribute, and FORM,
+  a concise summary of the basic building blocks of DWARF.
+2021-01-23:
+  dwarfdump now reports and checks-for-sensible-values
+  the expression block offsets that DW_OP_bra and
+  DW_OP_skip use.  If an expression does not use either of
+  those operators dwarfdump does not report the individual DW_OP
+  expression offsets.
+2020-12-23:
+  dwarfdump --print-macinfo now follows DW_MACRO_imports
+  and does several additional checks on .debug_macro section
+  data. --check-macros skips printing most entries but does
+  all that and reports even more about that section. Since
+  .debug_macro does not reproduce all macro operations in
+  the original source the MACRONOTEs printed are indications
+  of things to consider, not errors.
+
+2020-11-21:
+  dwarfdump now prints DWARF expression operators each on
+  its own line.  This makes viewing DWARF expressions much
+  nicer given the increased use of much longer expressions.
+  Those expression operators that reference DIES are now
+  followed, verified, and the target DW_TAG and DW_AT_name
+  are printed.  A new dwarfdump.conf command 'option:' lets
+  one specify option: --format-expr-ops-joined in case you
+  want the old style DWARF expression operators-on-one-line.
+  Where the DWARF DIE children nest > nine-deep dwarfdump
+  switches from indentation by spaces to a nest-level number.
+
+2020-09-08:
+  libdwarf/dwarfdump work well with DWARF4 and DWARF5,
+  including DWP files.
+
+2020-07-08:
+  libdwarf now reads .debug_gnu_pubtypes & pubnames
+  (non-standard but gcc creates them in DWARF5) via a small
+  number of new functions and dwarfdump  --print-debug-gnu
+  prints both sections.  Verifying the .debug_info offsets
+  is not yet done.
+
+2020-06-29:
+  Dwarfdump now dumps DWARF5 .debug_rnglists and
+  .debug_loclists.  To handle DWARF5 there are a small
+  number of new functions. All existing functions are
+  still supported, but to read DWARF5 some small changes
+  are required.  In libdwarf see libdwarf2.1.pdf and also
+  see libdwarf/ChangeLog for details.
+
+2020-05-23:
+  dwarfdump now takes much less malloc() to work, as
+  measured by valgrind --tool=massif  and massif-visualizer.
+  A dwarfdump run that did 2.2Gib of malloc/free before the
+  changes now does 1.4GiB.
+
+2020-05-19:
+  libdwarf and dwarfdump now support DWARF5 .debug_rnglists.
+  The new interfaces are documented in libdwarf/libdwarf2.1.pdf.
+  The new option to dwarfdump is "--print-raw-rnglists".
+2019-11-04:
+  The code (dwarfdump/libdwarf), regressiontests,
+  and readelfobj directories and all their tests
+  are known to work on Linux(Ubuntu on x86_64 and i686),
+  FreeBSD, MacOS Catalina (with Apple Command Line Tools),
+  and IBM s390 (Big Endian!) running Ubuntu Linux.
+  On Windows-MinGW the full regression tests
+  have not been tested, but 'make check' works
+  for dwarfdump/libdwarf (the current dwarfdump
+  make check actually does run dwarfdump and
+  checks that dwarfdump basically works).
+2019-04-16:
+  Now a --disable-libelf configure/build of libdwarf/dwarfdump
+  can read elf, mach-o DSYM, and PE executable/dll object files.
+  Such a build will not need or use libelf or elf.h .
+  The dwarfdump options that display Elf section headers
+  or relocation record data are not available in a
+  --disable-libelf build.
+  Nor is dwarfdump's support of reading archive files
+  available in a --disable-libelf build.
+  This libdwarf detects corrupt Elf object files much sooner
+  than before, but does not explain what the corruption
+  really is. Use GNU readelf (or readelfobj, a project
+  on sourceforge) to get more detail about the problems found.
+  See https://www.prevanders.net/dwarf.html for the git clone
+  command for readelfobj.
+  With --disable-libelf the --enable-dwarfgen option
+  does not work: the dwarfgen build will fail.
+2019-02-18:
+  For building on machines without a usable elf.h or libelf
+  but possibly with a libelf.h visible, --disable-libelf
+  ensures the build won't use libelf or elf.h anywhere.
+  -lz will be done if zlib.h is visible, independent of
+  libelf, libelf.h, and elf.h
+2019-02-08:
+  If one has a standard Bourne shell (sh) available
+  (such as sh on MacOS and sh in MinGW on Windows)
+  one may be able to build libdwarf and dwarfdump natively
+  and they can read Mach-o dSYM and PE object files
+  to access DWARF information.
+  This has NOT been tested under MacOS, so will likely
+  fail on MacOS.
+  No elf.h, libelf.h or zlib.h should be present.
+  For example, the following
+  is known to work under MinGW and this general plan
+  applies to all builds including all builds with elf.h
+  and libelf:
+    mkdir test
+    cd test
+    #(copy the source tree into test, if from git
+    #the name of the top level will likely be 'code')
+    cd code
+    sh -x scripts/FIX-CONFIGURE-TIMES
+    cd ..
+    mkdir bld
+    cd bld
+    ../code/configure (choose your preferred options here)
+    make
+
+2019-01-15:
+  The pre-build dwarf_names.[hc] and the tag related
+  files are now part of the standard build so there is
+  no longer any two-stage aspect of the build.
+  The build simply compiles files in the distribution.
+  If you use git to access the source be sure to
+  sh scripts/FIX-CONFIGURE-TIMES
+  to adjust the file timestamps as having timestamps
+  in the right relationships is vital and git
+  does not maintain timestamps.
+  The script is always safe to run. It takes about 30 seconds.
+2018-12-22:
+  The complicated process of building certain .c and .h
+  files has been relegated to the few people updating
+  files libdwarf/libdwarf.h.in, libdwarf/dwarf_errmsg_list.h,
+  dwarfdump/tag_attr_ext.list,dwarfdump/tag_attr.list,
+  dwarfdump/tag_tree_ext.list, and dwarfdump/tag_tree.list.
+  For everyone else the build is simply compiling
+  the .c and .h files in the distribution. Simpler.
+    sh scripts/buildstandardsource.sh
+  creates these files.
+2018-10-22:
+  dwarfdump can now dump mach-o (MacOS) dSYM dwarf.
+  All the usual libdwarf interfaces work.
+  A new libdwarf initialization call dwarf_init_path()
+  may be convenient for you to use.
+2018-08-05:
+  dwarfdump.conf is now installed by make install
+  in <install prefix>/shared/libdwarf/dwarfdump  .
+  Any  dwarfdump.conf or .dwarfdump.conf in your
+  $HOME directory will be found before the
+  one in shared.  The file is only opened when
+  one wants a more accurate register naming in frame
+  reports (the default is just to name things r54
+  etc, choosing the right abi with -x abi=<something>
+  can be helpful at times).
+2018-06-24:
+  The configure has been completely rewritten to follow
+  current standards and practices. For simple builds
+  the standard
+    ./configure
+    make
+  works as always, but the generated libdwarf.a appears
+  in libdwarf/.libs/libdwarf.a , as does the shared object
+  if "./configure --enable-shared" is used.
+
+  To build dwarfgen one adds the configure option --enable-dwarfgen
+    instead of using 'make all'.
+  To build the example code one adds the configure option
+    --enable-dwarfexample  instead of using 'make all'.
+
+  "mkdir /tmp/bld ; cd /tmp/bld ; <sourcebase>/configure"
+  continues to work, as does configure --host=<name>  .
+2018-06-14:
+  A small simplification of build options simplifies building
+  across different environments.  If your environment needs
+  to use the non-standard elf_open() call instead of unix/linux open()
+  then do <path>/configure --enable-elf-open which sets
+  HAVE_ELF_OPEN in config.h.
+2018-03-27:
+  All the DWARF5 FORMs appear to be dealt with.
+  It's now possible to cross-compile libdwarf and dwarfdump.
+  See the README.
+2016-11-30:
+  An alternative build mechanism using cmake is now in the source tree.
+  The builds for product testing continue to be done using configure && make.
+2016-09-20:
+  --enable-sanitize option added to configure. This builds
+  with -fsanitize=address to check for out of bounds
+  memory access.
+2016-09-05:
+  dwarfexample/simpleexample.c now has a simple option letting one
+  extract all .debug_info, .debug_types strings into a file by
+  themselves in case one wanted to examine string frequencies,
+  for example.
+2016-06-01:  Now we use DW_VERSION_DATE_STR for
+  dates everywhere instead of __DATE__ __TIME__
+  so a repeated build gets identical object output.
+  DW_VERSION_DATE_STR is updated by UPDATEDWARFDUMPVERSION.sh
+  wherever that string is needed.
+
+2015-11-26:  If DWARF section data you intend to read
+  with libdwarf is compressed by zlib (a section name
+  like  .zdebug_info indicates such compression) libdwarf etc
+  will need zlib's headers and archive or shared-library
+  at build and link time. If you  do not have zlib
+  everything will compile fine and will work
+  on ordinary DWARF sections but libdwarf will not be
+  able to read .zdebug_ compressed sections.
+  zlib.h is the main zlib header and libz.a is the
+  most likely zlib library you will encounter.
+
+2015-11-15:  It is now possible to build
+  outside of the source tree. See README.
+  So configure.in changed a little.
+2015-01-13:  Removed dwarfdump2 and references to it.
+  dwarfdump has the (tsearch) features needed so the C++
+  version no longer a benefit.

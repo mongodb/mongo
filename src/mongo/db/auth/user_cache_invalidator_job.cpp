@@ -27,24 +27,38 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/user_cache_invalidator_job.h"
 
-#include <string>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/user_cache_invalidator_job_parameters_gen.h"
 #include "mongo/db/client.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/global_catalog/sharding_catalog_client.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/sharding_environment/grid.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/grid.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/time_support.h"
+
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
+
 
 namespace mongo {
 namespace {
@@ -62,7 +76,7 @@ StatusWith<OIDorTimestamp> getCurrentCacheGeneration(OperationContext* opCtx) {
     try {
         BSONObjBuilder result;
         const bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(
-            opCtx, "admin", BSON("_getUserCacheGeneration" << 1), &result);
+            opCtx, DatabaseName::kAdmin, BSON("_getUserCacheGeneration" << 1), &result);
         if (!ok) {
             return getStatusFromCommandResult(result.obj());
         }
@@ -77,8 +91,9 @@ StatusWith<OIDorTimestamp> getCurrentCacheGeneration(OperationContext* opCtx) {
         if (cacheGenerationElem)
             return OIDorTimestamp(cacheGenerationElem.OID());
 
-        uassert(
-            4664501, "Must include 'authInfoOpTime'", authInfoOpTimeElem.type() == bsonTimestamp);
+        uassert(4664501,
+                "Must include 'authInfoOpTime'",
+                authInfoOpTimeElem.type() == BSONType::timestamp);
         return authInfoOpTimeElem.timestamp();
     } catch (const DBException& e) {
         return e.toStatus();
@@ -87,21 +102,50 @@ StatusWith<OIDorTimestamp> getCurrentCacheGeneration(OperationContext* opCtx) {
 
 std::string oidOrTimestampToString(const OIDorTimestamp& oidOrTimestamp) {
     if (oidOrTimestamp.index() == 0) {  // OID
-        return stdx::get<OID>(oidOrTimestamp).toString();
+        return get<OID>(oidOrTimestamp).toString();
     } else if (oidOrTimestamp.index() == 1) {  // Timestamp
-        return stdx::get<Timestamp>(oidOrTimestamp).toString();
+        return get<Timestamp>(oidOrTimestamp).toString();
     }
     MONGO_UNREACHABLE;
+}
+
+/**
+ * TODO: SERVER-86458 - remove.
+ *
+ * RAII type for making the OperationContext it is instantiated with use the router service util it
+ * goes out of scope.
+ */
+class ScopedSetRouterService {
+public:
+    ScopedSetRouterService(OperationContext* opCtx);
+    ~ScopedSetRouterService();
+
+private:
+    OperationContext* const _opCtx;
+    Service* const _originalService;
+};
+
+ScopedSetRouterService::ScopedSetRouterService(OperationContext* opCtx)
+    : _opCtx(opCtx), _originalService(opCtx->getService()) {
+    // Verify that the opCtx is not using the router service already.
+    ClientLock lk(_opCtx->getClient());
+
+    auto service = opCtx->getServiceContext()->getService(ClusterRole::RouterServer);
+    invariant(service);
+    _opCtx->getClient()->setService(service);
+}
+
+ScopedSetRouterService::~ScopedSetRouterService() {
+    // Verify that the opCtx is still using the router service.
+    ClientLock lk(_opCtx->getClient());
+    invariant(_opCtx->getService()->role().has(ClusterRole::RouterServer));
+    _opCtx->getClient()->setService(_originalService);
 }
 
 }  // namespace
 
 Status userCacheInvalidationIntervalSecsNotify(const int& value) {
-    LOGV2_DEBUG(20259,
-                5,
-                "setInterval: new={newInterval}",
-                "setInterval",
-                "newInterval"_attr = loadInterval());
+    LOGV2_DEBUG(20259, 5, "setInterval", "newInterval"_attr = loadInterval());
     if (hasGlobalServiceContext()) {
         auto service = getGlobalServiceContext();
         if (getUserCacheInvalidator(service)) {
@@ -133,17 +177,23 @@ void UserCacheInvalidator::initialize(OperationContext* opCtx) {
 }
 
 void UserCacheInvalidator::start(ServiceContext* serviceCtx, OperationContext* opCtx) {
+    // UserCacheInvalidator should only run on a router.
+    invariant(serverGlobalParams.clusterRole.has(ClusterRole::RouterServer));
+    ScopedSetRouterService guard(opCtx);
     auto invalidator =
-        std::make_unique<UserCacheInvalidator>(AuthorizationManager::get(serviceCtx));
+        std::make_unique<UserCacheInvalidator>(AuthorizationManager::get(opCtx->getService()));
     invalidator->initialize(opCtx);
 
     auto periodicRunner = serviceCtx->getPeriodicRunner();
     invariant(periodicRunner);
 
+    // This job is killable. When interrupted, we will warn, and retry after the configured
+    // interval.
     PeriodicRunner::PeriodicJob job(
         "UserCacheInvalidator",
         [serviceCtx](Client* client) { getUserCacheInvalidator(serviceCtx)->run(); },
-        loadInterval());
+        loadInterval(),
+        true /*isKillableByStepdown*/);
 
     invalidator->_job =
         std::make_unique<PeriodicJobAnchor>(periodicRunner->makeJob(std::move(job)));
@@ -153,8 +203,20 @@ void UserCacheInvalidator::start(ServiceContext* serviceCtx, OperationContext* o
     getUserCacheInvalidator(serviceCtx)->_job->start();
 }
 
-void UserCacheInvalidator::run() {
+void UserCacheInvalidator::stop(ServiceContext* serviceCtx) {
+    const auto& invalidator = getUserCacheInvalidator(serviceCtx);
+    if (invalidator == nullptr) {
+        return;
+    }
+
+    invalidator->_job->stop();
+}
+
+void UserCacheInvalidator::run() try {
     auto opCtx = cc().makeOperationContext();
+    ScopedSetRouterService guard(opCtx.get());
+
+    // Get current cache generation from the config server.
     auto swCurrentGeneration = getCurrentCacheGeneration(opCtx.get());
     if (!swCurrentGeneration.isOK()) {
         LOGV2_WARNING(20266,
@@ -164,7 +226,7 @@ void UserCacheInvalidator::run() {
 
         // When in doubt, invalidate the cache
         try {
-            _authzManager->invalidateUserCache(opCtx.get());
+            AuthorizationManager::get(opCtx->getService())->invalidateUserCache();
         } catch (const DBException& e) {
             LOGV2_WARNING(20267, "Error invalidating user cache", "error"_attr = e.toStatus());
         }
@@ -173,13 +235,12 @@ void UserCacheInvalidator::run() {
 
     if (swCurrentGeneration.getValue() != _previousGeneration) {
         LOGV2(20263,
-              "User cache generation changed from {previousGeneration} to "
-              "{currentGeneration}; invalidating user cache",
               "User cache generation changed; invalidating user cache",
               "previousGeneration"_attr = oidOrTimestampToString(_previousGeneration),
               "currentGeneration"_attr = oidOrTimestampToString(swCurrentGeneration.getValue()));
         try {
-            _authzManager->invalidateUserCache(opCtx.get());
+            // Invalidate user cache from router server.
+            AuthorizationManager::get(opCtx->getService())->invalidateUserCache();
         } catch (const DBException& e) {
             LOGV2_WARNING(20268, "Error invalidating user cache", "error"_attr = e.toStatus());
         }
@@ -195,7 +256,8 @@ void UserCacheInvalidator::run() {
                           "users in cache",
                           "error"_attr = refreshStatus);
             try {
-                _authzManager->invalidateUsersFromDB(opCtx.get(), "$external"_sd);
+                AuthorizationManager::get(opCtx->getService())
+                    ->invalidateUsersFromDB(DatabaseName::kExternal);
             } catch (const DBException& e) {
                 LOGV2_WARNING(5914805,
                               "Error invalidating $external users from user cache",
@@ -203,6 +265,8 @@ void UserCacheInvalidator::run() {
             }
         }
     }
+} catch (const DBException& e) {
+    LOGV2_WARNING(7466000, "Error invalidating user cache", "error"_attr = e.toStatus());
 }
 
 }  // namespace mongo

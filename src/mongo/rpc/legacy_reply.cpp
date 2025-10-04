@@ -27,19 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/rpc/legacy_reply.h"
 
-#include <tuple>
-#include <utility>
-
-#include "mongo/bson/bson_validate.h"
-#include "mongo/rpc/legacy_reply_builder.h"
-#include "mongo/rpc/metadata.h"
-#include "mongo/rpc/object_check.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/error_extra_info.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/dbmessage.h"
+#include "mongo/rpc/object_check.h"  // IWYU pragma: keep
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <memory>
 
 namespace mongo {
 namespace rpc {

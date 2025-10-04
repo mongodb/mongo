@@ -79,6 +79,26 @@ __alter_file(WT_SESSION_IMPL *session, const char *newcfg[])
 }
 
 /*
+ * __alter_tier --
+ *     Alter a tier.
+ */
+static int
+__alter_tier(WT_SESSION_IMPL *session, const char *newcfg[])
+{
+    const char *uri;
+
+    /*
+     * We know that we have exclusive access to the tier. So it will be closed after we're done with
+     * it and the next open will see the updated metadata.
+     */
+    uri = session->dhandle->name;
+    if (!WT_PREFIX_MATCH(uri, "tier:"))
+        return (__wt_unexpected_object_type(session, uri, "tier:"));
+
+    return (__alter_apply(session, uri, newcfg, WT_CONFIG_BASE(session, tier_meta)));
+}
+
+/*
  * __alter_object --
  *     Alter a tiered object. There are no object dhandles.
  */
@@ -89,6 +109,173 @@ __alter_object(WT_SESSION_IMPL *session, const char *uri, const char *newcfg[])
         return (__wt_unexpected_object_type(session, uri, "object:"));
 
     return (__alter_apply(session, uri, newcfg, WT_CONFIG_BASE(session, object_meta)));
+}
+
+/*
+ * __alter_get_object_id_range --
+ *     Get current and oldest object IDs for the tiered object.
+ */
+static int
+__alter_get_object_id_range(WT_SESSION_IMPL *session, WT_TIERED *tiered, const char *uri,
+  uint32_t *current_idp, uint32_t *oldest_idp)
+{
+    WT_CONFIG_ITEM cval;
+    WT_DECL_RET;
+    uint32_t current_id, oldest_id;
+    char *value;
+
+    *current_idp = *oldest_idp = WT_TIERED_OBJECTID_NONE;
+    value = NULL;
+    /*
+     * First try to get oldest and current object IDs from the tiered object. If it's not
+     * initialized, get this information from the metadata.
+     */
+    current_id = tiered->current_id;
+    oldest_id = tiered->oldest_id;
+    if (current_id == WT_TIERED_OBJECTID_NONE) {
+        WT_RET(__wt_metadata_search(session, uri, &value));
+
+        WT_ERR(__wt_config_getones(session, value, "oldest", &cval));
+        oldest_id = (uint32_t)cval.val;
+
+        WT_ERR(__wt_config_getones(session, value, "last", &cval));
+        current_id = (uint32_t)cval.val;
+    }
+
+    *current_idp = current_id;
+    *oldest_idp = oldest_id;
+err:
+    __wt_free(session, value);
+
+    return (ret);
+}
+
+/*
+ * __alter_objects --
+ *     Alter all objects in the oldest-current range.
+ */
+static int
+__alter_objects(WT_SESSION_IMPL *session, WT_TIERED *tiered, const char *newcfg[],
+  uint32_t current_id, uint32_t oldest_id)
+{
+    WT_DECL_RET;
+    uint32_t object_id;
+    char *value;
+    const char *name;
+
+    value = NULL;
+    name = NULL;
+
+    /*
+     * Iterate over all objects in the range oldest-current object IDs and alter metadata of each of
+     * them.
+     */
+    for (object_id = oldest_id; object_id < current_id; object_id++) {
+        WT_ERR(__wt_tiered_name(session, &tiered->iface, object_id, WT_TIERED_NAME_OBJECT, &name));
+
+        /*
+         * Check if this object present in the metadata. Skip it if not found. It is expected for
+         * the range of objects to be not contiguous, because some objects may have been deleted.
+         */
+        ret = __wt_metadata_search(session, name, &value);
+        __wt_free(session, value);
+        WT_ERR_NOTFOUND_OK(ret, true);
+        if (ret == 0) {
+            WT_WITH_DHANDLE(session, NULL, ret = __schema_alter(session, name, newcfg));
+            WT_ERR(ret);
+        }
+        __wt_free(session, name);
+    }
+err:
+    __wt_free(session, name);
+
+    return (ret);
+}
+
+/*
+ * __alter_tiered --
+ *     Alter a tiered metadata.
+ */
+static int
+__alter_tiered(WT_SESSION_IMPL *session, const char *uri, const char *newcfg[], uint32_t flags)
+{
+    WT_DATA_HANDLE *dhandle;
+    WT_DECL_RET;
+    WT_TIERED *tiered;
+    uint32_t current_id, name_flag, oldest_id;
+    u_int i;
+    char *value;
+    const char *name;
+
+    dhandle = NULL;
+    value = NULL;
+    name = NULL;
+
+    if (!WT_PREFIX_MATCH(uri, "tiered:"))
+        return (__wt_unexpected_object_type(session, uri, "tiered:"));
+
+    /*
+     * If the operation requires exclusive access, close any open handles, including checkpoints.
+     */
+    if (FLD_ISSET(flags, WT_DHANDLE_EXCLUSIVE)) {
+        WT_WITH_HANDLE_LIST_WRITE_LOCK(
+          session, ret = __wt_conn_dhandle_close_all(session, uri, false, false, false));
+        WT_RET(ret);
+    }
+
+    WT_RET(__wt_session_get_dhandle(session, uri, NULL, NULL, flags));
+    tiered = (WT_TIERED *)session->dhandle;
+
+    WT_ERR(__alter_get_object_id_range(session, tiered, uri, &current_id, &oldest_id));
+
+    /* Alter each tier. */
+    for (i = 0; i < WT_TIERED_MAX_TIERS; i++) {
+        dhandle = tiered->tiers[i].tier;
+        if (dhandle == NULL) {
+            /*
+             * Tiers may not be initialized because we open tiered handle with lock only flag. In
+             * this case we need to find the names of the tiers manually.
+             */
+            if (i == WT_TIERED_INDEX_LOCAL)
+                name_flag = WT_TIERED_NAME_LOCAL;
+            else if (i == WT_TIERED_INDEX_SHARED)
+                name_flag = WT_TIERED_NAME_SHARED;
+            else
+                continue;
+
+            WT_ERR(__wt_tiered_name(session, &tiered->iface, current_id, name_flag, &name));
+
+            /* Check if metadata has entry for this tier. */
+            ret = __wt_metadata_search(session, name, &value);
+            __wt_free(session, value);
+            WT_ERR_NOTFOUND_OK(ret, true);
+            if (ret != 0) {
+                /*
+                 * Not found in the metadata. Skip it. This is expected, for instance, in the
+                 * scenario when tier hasn't been flushed and there's no shared tier yet.
+                 */
+                __wt_free(session, name);
+                continue;
+            }
+        }
+
+        WT_WITH_DHANDLE(session, NULL,
+          ret = __schema_alter(session, name == NULL ? dhandle->name : name, newcfg));
+        __wt_free(session, name);
+        WT_ERR(ret);
+    }
+
+    /* Alter all objects. */
+    WT_ERR(__alter_objects(session, tiered, newcfg, current_id, oldest_id));
+
+    /* Apply change to the tiered metadata. */
+    WT_ERR(__alter_apply(session, uri, newcfg, WT_CONFIG_BASE(session, tiered_meta)));
+
+err:
+    WT_TRET(__wt_session_release_dhandle(session));
+    __wt_free(session, name);
+
+    return (ret);
 }
 
 /*
@@ -113,9 +300,10 @@ __alter_tree(WT_SESSION_IMPL *session, const char *name, const char *newcfg[])
     /* Read the schema value. */
     WT_ERR(__wt_metadata_search(session, name, &value));
 
-    /* Get the data source URI. */
+    /* Get the data source URI, converting not-found errors to EINVAL for the application. */
     if ((ret = __wt_config_getones(session, value, "source", &cval)) != 0)
-        WT_ERR_MSG(session, EINVAL, "index or column group has no data source: %s", value);
+        WT_ERR_MSG(session, ret == WT_NOTFOUND ? EINVAL : ret,
+          "index or column group has no data source: %s", value);
 
     WT_ERR(__wt_scr_alloc(session, 0, &data_source));
     WT_ERR(__wt_buf_fmt(session, data_source, "%.*s", (int)cval.len, cval.str));
@@ -206,6 +394,9 @@ __schema_alter(WT_SESSION_IMPL *session, const char *uri, const char *newcfg[])
     const char *cfg[] = {WT_CONFIG_BASE(session, WT_SESSION_alter), newcfg[0], NULL};
     bool exclusive_refreshed;
 
+    WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->checkpoint_lock);
+    WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->schema_lock);
+
     /*
      * Determine what configuration says about exclusive access. A non exclusive alter that doesn't
      * refresh in-memory configuration is only valid for the table objects.
@@ -219,25 +410,23 @@ __schema_alter(WT_SESSION_IMPL *session, const char *uri, const char *newcfg[])
           "is applicable only on simple tables");
 
     /*
-     * The alter flag is used so LSM can apply some special logic, the exclusive flag avoids
-     * conflicts with other operations and the lock only flag is required because we don't need to
-     * have a handle to update the metadata and opening the handle causes problems when meta
-     * tracking is enabled.
+     * The exclusive flag avoids conflicts with other operations and the lock only flag is required
+     * because we don't need to have a handle to update the metadata and opening the handle causes
+     * problems when meta tracking is enabled.
      */
-    flags = WT_BTREE_ALTER | WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_LOCK_ONLY;
+    flags = WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_LOCK_ONLY;
     if (WT_PREFIX_MATCH(uri, "file:"))
-        return (__wt_exclusive_handle_operation(session, uri, __alter_file, newcfg, flags));
+        return (__wti_execute_handle_operation(session, uri, __alter_file, newcfg, flags));
     if (WT_PREFIX_MATCH(uri, "colgroup:") || WT_PREFIX_MATCH(uri, "index:"))
         return (__alter_tree(session, uri, newcfg));
-    if (WT_PREFIX_MATCH(uri, "lsm:"))
-        return (__wt_lsm_tree_worker(session, uri, __alter_file, NULL, newcfg, flags));
     if (WT_PREFIX_MATCH(uri, "object:"))
         return (__alter_object(session, uri, newcfg));
     if (WT_PREFIX_MATCH(uri, "table:"))
         return (__alter_table(session, uri, newcfg, exclusive_refreshed));
+    if (WT_PREFIX_MATCH(uri, "tier:"))
+        return (__wti_execute_handle_operation(session, uri, __alter_tier, newcfg, flags));
     if (WT_PREFIX_MATCH(uri, "tiered:"))
-        return (__wt_schema_tiered_worker(session, uri, __alter_file, NULL, newcfg, flags));
-
+        return (__alter_tiered(session, uri, newcfg, flags));
     return (__wt_bad_object_type(session, uri));
 }
 
@@ -248,14 +437,23 @@ __schema_alter(WT_SESSION_IMPL *session, const char *uri, const char *newcfg[])
 int
 __wt_schema_alter(WT_SESSION_IMPL *session, const char *uri, const char *newcfg[])
 {
+    struct timespec tsp;
     WT_DECL_RET;
     WT_SESSION_IMPL *int_session;
 
-    WT_RET(__wt_schema_internal_session(session, &int_session));
+    WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->checkpoint_lock);
+    WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->schema_lock);
+
+    /* Add a 2 second wait to simulate session alter slowness. */
+    tsp.tv_sec = 2;
+    tsp.tv_nsec = 0;
+    __wt_timing_stress(session, WT_TIMING_STRESS_SESSION_ALTER_SLOW, &tsp);
+
+    WT_RET(__wti_schema_internal_session(session, &int_session));
     WT_ERR(__wt_meta_track_on(int_session));
     ret = __schema_alter(int_session, uri, newcfg);
     WT_TRET(__wt_meta_track_off(int_session, true, ret != 0));
 err:
-    WT_TRET(__wt_schema_session_release(session, int_session));
+    WT_TRET(__wti_schema_session_release(session, int_session));
     return (ret);
 }

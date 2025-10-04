@@ -26,23 +26,32 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 #include "mongo/client/sdam/topology_description.h"
 
-#include <algorithm>
-#include <cstring>
-#include <iterator>
-#include <memory>
-
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/type_traits/decay.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/sdam/sdam_datatypes.h"
 #include "mongo/client/sdam/server_description.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 
-// Checkpoint to track when election Id and Set version is changed.
-MONGO_FAIL_POINT_DEFINE(maxElectionIdSetVersionPairUpdated);
+#include <algorithm>
+#include <climits>
+#include <iterator>
+#include <memory>
+#include <ostream>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
+
 
 namespace mongo::sdam {
 MONGO_FAIL_POINT_DEFINE(topologyDescriptionInstallServerDescription);
@@ -54,7 +63,7 @@ TopologyDescription::TopologyDescription(SdamConfiguration config)
     : _type(config.getInitialType()), _setName(config.getSetName()) {
     if (auto seeds = config.getSeedList()) {
         _servers.clear();
-        for (auto address : *seeds) {
+        for (const auto& address : *seeds) {
             _servers.push_back(std::make_shared<ServerDescription>(address));
         }
     }
@@ -97,16 +106,6 @@ ElectionIdSetVersionPair TopologyDescription::getMaxElectionIdSetVersionPair() c
 }
 
 void TopologyDescription::updateMaxElectionIdSetVersionPair(const ElectionIdSetVersionPair& pair) {
-    if (MONGO_unlikely(maxElectionIdSetVersionPairUpdated.shouldFail())) {
-        LOGV2(5940906,
-              "Fail point maxElectionIdSetVersionPairUpdated",
-              "topologyId"_attr = _id,
-              "primaryForSet"_attr = _setName ? *_setName : std::string("Unknown"),
-              "incomingElectionId"_attr = pair.electionId,
-              "currentMaxElectionId"_attr = _maxElectionIdSetVersionPair.electionId,
-              "incomingSetVersion"_attr = pair.setVersion,
-              "currentMaxSetVersion"_attr = _maxElectionIdSetVersionPair.setVersion);
-    }
     _maxElectionIdSetVersionPair = pair;
 }
 
@@ -141,7 +140,7 @@ std::vector<ServerDescriptionPtr> TopologyDescription::findServers(
     return result;
 }
 
-const boost::optional<ServerDescriptionPtr> TopologyDescription::findServerByAddress(
+boost::optional<ServerDescriptionPtr> TopologyDescription::findServerByAddress(
     HostAndPort address) const {
     auto results = findServers([address](const ServerDescriptionPtr& serverDescription) {
         return serverDescription->getAddress() == address;
@@ -223,7 +222,7 @@ void TopologyDescription::checkWireCompatibilityVersions() {
     _compatibleError = (_compatible) ? boost::none : boost::make_optional(errorOss.str());
 }
 
-const std::string TopologyDescription::minimumRequiredMongoVersionString(int version) {
+std::string TopologyDescription::minimumRequiredMongoVersionString(int version) {
     switch (version) {
         case RESUMABLE_INITIAL_SYNC:
             return "4.4";
@@ -256,7 +255,7 @@ void TopologyDescription::calculateLogicalSessionTimeout() {
     bool hasDataBearingServer = false;
 
     invariant(_servers.size() > 0);
-    for (auto description : _servers) {
+    for (const auto& description : _servers) {
         if (!description->isDataBearingServer()) {
             continue;
         }
@@ -280,7 +279,7 @@ BSONObj TopologyDescription::toBSON() {
     bson << "topologyType" << mongo::sdam::toString(_type);
 
     BSONObjBuilder bsonServers;
-    for (auto server : this->getServers()) {
+    for (const auto& server : this->getServers()) {
         bsonServers << server->getAddress().toString() << server->toBson();
     }
     bson.append("servers", bsonServers.obj());

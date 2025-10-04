@@ -25,6 +25,7 @@ __wt_btree_stat_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
     WT_BM *bm;
     WT_BTREE *btree;
     WT_DSRC_STATS **stats;
+    uint64_t avg_internal_chain, avg_leaf_chain;
 
     btree = S2BT(session);
     bm = btree->bm;
@@ -32,24 +33,42 @@ __wt_btree_stat_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
 
     WT_RET(bm->stat(bm, session, stats[0]));
 
-    WT_STAT_SET(session, stats, btree_fixed_len, btree->bitcnt);
-    WT_STAT_SET(session, stats, btree_maximum_depth, btree->maximum_depth);
-    WT_STAT_SET(session, stats, btree_maxintlpage, btree->maxintlpage);
-    WT_STAT_SET(session, stats, btree_maxleafkey, btree->maxleafkey);
-    WT_STAT_SET(session, stats, btree_maxleafpage, btree->maxleafpage);
-    WT_STAT_SET(session, stats, btree_maxleafvalue, btree->maxleafvalue);
-    WT_STAT_SET(session, stats, rec_multiblock_max, btree->rec_multiblock_max);
+    WT_STATP_DSRC_SET(session, stats, btree_fixed_len, btree->bitcnt);
+    WT_STATP_DSRC_SET(session, stats, btree_maximum_depth, btree->maximum_depth);
+    WT_STATP_DSRC_SET(session, stats, btree_maxintlpage, btree->maxintlpage);
+    WT_STATP_DSRC_SET(session, stats, btree_maxleafkey, btree->maxleafkey);
+    WT_STATP_DSRC_SET(session, stats, btree_maxleafpage, btree->maxleafpage);
+    WT_STATP_DSRC_SET(session, stats, btree_maxleafvalue, btree->maxleafvalue);
+    WT_STATP_DSRC_SET(session, stats, rec_multiblock_max, btree->rec_multiblock_max);
 
-    WT_STAT_SET(session, stats, cache_bytes_dirty, __wt_btree_dirty_inuse(session));
-    WT_STAT_SET(session, stats, cache_bytes_dirty_total,
-      __wt_cache_bytes_plus_overhead(S2C(session)->cache, btree->bytes_dirty_total));
-    WT_STAT_SET(session, stats, cache_bytes_inuse, __wt_btree_bytes_inuse(session));
+    WT_STATP_DSRC_SET(session, stats, cache_bytes_dirty, __wt_btree_dirty_inuse(session));
+    WT_STATP_DSRC_SET(session, stats, cache_bytes_dirty_leaf, __wt_btree_dirty_leaf_inuse(session));
+    WT_STATP_DSRC_SET(
+      session, stats, cache_bytes_dirty_internal, __wt_btree_dirty_intl_inuse(session));
+    WT_STATP_DSRC_SET(session, stats, cache_bytes_dirty_total,
+      __wt_cache_bytes_plus_overhead(
+        S2C(session)->cache, __wt_atomic_load64(&btree->bytes_dirty_total)));
+    WT_STATP_DSRC_SET(session, stats, cache_bytes_inuse, __wt_btree_bytes_inuse(session));
 
-    WT_STAT_SET(session, stats, compress_precomp_leaf_max_page_size, btree->maxleafpage_precomp);
-    WT_STAT_SET(session, stats, compress_precomp_intl_max_page_size, btree->maxintlpage_precomp);
+    WT_STATP_DSRC_SET(
+      session, stats, compress_precomp_leaf_max_page_size, btree->maxleafpage_precomp);
+    WT_STATP_DSRC_SET(
+      session, stats, compress_precomp_intl_max_page_size, btree->maxintlpage_precomp);
+
+    avg_internal_chain = (uint64_t)WT_STAT_DSRC_READ(stats, rec_pages_with_internal_deltas) == 0 ?
+      0 :
+      (uint64_t)WT_STAT_DSRC_READ(stats, rec_page_delta_internal) /
+        (uint64_t)WT_STAT_DSRC_READ(stats, rec_pages_with_internal_deltas);
+    avg_leaf_chain = (uint64_t)WT_STAT_DSRC_READ(stats, rec_pages_with_leaf_deltas) == 0 ?
+      0 :
+      (uint64_t)WT_STAT_DSRC_READ(stats, rec_page_delta_leaf) /
+        (uint64_t)WT_STAT_DSRC_READ(stats, rec_pages_with_leaf_deltas);
+    WT_STATP_DSRC_SET(
+      session, stats, rec_average_internal_page_delta_chain_length, avg_internal_chain);
+    WT_STATP_DSRC_SET(session, stats, rec_average_leaf_page_delta_chain_length, avg_leaf_chain);
 
     if (F_ISSET(cst, WT_STAT_TYPE_CACHE_WALK))
-        __wt_curstat_cache_walk(session);
+        __wt_evict_cache_stat_walk(session);
 
     if (F_ISSET(cst, WT_STAT_TYPE_TREE_WALK))
         WT_RET(__stat_tree_walk(session));
@@ -75,21 +94,32 @@ __stat_tree_walk(WT_SESSION_IMPL *session)
     /*
      * Clear the statistics we're about to count.
      */
-    WT_STAT_SET(session, stats, btree_column_deleted, 0);
-    WT_STAT_SET(session, stats, btree_column_fix, 0);
-    WT_STAT_SET(session, stats, btree_column_internal, 0);
-    WT_STAT_SET(session, stats, btree_column_rle, 0);
-    WT_STAT_SET(session, stats, btree_column_variable, 0);
-    WT_STAT_SET(session, stats, btree_entries, 0);
-    WT_STAT_SET(session, stats, btree_overflow, 0);
-    WT_STAT_SET(session, stats, btree_row_internal, 0);
-    WT_STAT_SET(session, stats, btree_row_leaf, 0);
+    WT_STATP_DSRC_SET(session, stats, btree_column_deleted, 0);
+    WT_STATP_DSRC_SET(session, stats, btree_column_fix, 0);
+    WT_STATP_DSRC_SET(session, stats, btree_column_internal, 0);
+    WT_STATP_DSRC_SET(session, stats, btree_column_rle, 0);
+    WT_STATP_DSRC_SET(session, stats, btree_column_variable, 0);
+    WT_STATP_DSRC_SET(session, stats, btree_entries, 0);
+    WT_STATP_DSRC_SET(session, stats, btree_overflow, 0);
+    WT_STATP_DSRC_SET(session, stats, btree_row_internal, 0);
+    WT_STATP_DSRC_SET(session, stats, btree_row_leaf, 0);
 
     next_walk = NULL;
-    while ((ret = __wt_tree_walk(session, &next_walk, 0)) == 0 && next_walk != NULL) {
+
+    /*
+     * Pages read for statistics aren't "useful"; don't update the read generation of pages already
+     * in memory, and if a page is read, set its generation to a low value so it is evicted quickly.
+     * Same as with compact.
+     */
+    while ((ret = __wt_tree_walk(session, &next_walk,
+              WT_READ_INTERNAL_OP | WT_READ_VISIBLE_ALL | WT_READ_WONT_NEED)) == 0 &&
+      next_walk != NULL) {
         WT_WITH_PAGE_INDEX(session, ret = __stat_page(session, next_walk->page, stats));
-        WT_RET(ret);
+        WT_ERR(ret);
     }
+
+err:
+    WT_IGNORE_RET(__wt_page_release(session, next_walk, 0));
     return (ret == WT_NOTFOUND ? 0 : ret);
 }
 
@@ -108,7 +138,7 @@ __stat_page(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSRC_STATS **stats)
         __stat_page_col_fix(session, page, stats);
         break;
     case WT_PAGE_COL_INT:
-        WT_STAT_INCR(session, stats, btree_column_internal);
+        WT_STATP_DSRC_INCR(session, stats, btree_column_internal);
         break;
     case WT_PAGE_COL_VAR:
         __stat_page_col_var(session, page, stats);
@@ -137,7 +167,7 @@ __stat_page_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSRC_STATS **sta
     WT_INSERT *ins;
     uint32_t numtws, stat_entries, stat_tws, tw;
 
-    WT_STAT_INCR(session, stats, btree_column_fix);
+    WT_STATP_DSRC_INCR(session, stats, btree_column_fix);
 
     /*
      * Iterate the page to count time windows. For now at least, don't try to reason about whether
@@ -161,8 +191,8 @@ __stat_page_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSRC_STATS **sta
     WT_SKIP_FOREACH (ins, WT_COL_APPEND(page))
         stat_entries++;
 
-    WT_STAT_INCRV(session, stats, btree_column_tws, stat_tws);
-    WT_STAT_INCRV(session, stats, btree_entries, stat_entries);
+    WT_STATP_DSRC_INCRV(session, stats, btree_column_tws, stat_tws);
+    WT_STATP_DSRC_INCRV(session, stats, btree_entries, stat_entries);
 }
 
 /*
@@ -183,7 +213,7 @@ __stat_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSRC_STATS **sta
     unpack = &_unpack;
     deleted_cnt = entry_cnt = ovfl_cnt = rle_cnt = 0;
 
-    WT_STAT_INCR(session, stats, btree_column_variable);
+    WT_STATP_DSRC_INCR(session, stats, btree_column_variable);
 
     /*
      * Walk the page counting regular items, adjusting if the item has been subsequently deleted or
@@ -194,7 +224,8 @@ __stat_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSRC_STATS **sta
     WT_COL_FOREACH (page, cip, i) {
         cell = WT_COL_PTR(page, cip);
         __wt_cell_unpack_kv(session, page->dsk, cell, unpack);
-        if (unpack->type == WT_CELL_DEL) {
+        /* A stop time point is a delete. */
+        if (unpack->type == WT_CELL_DEL || WT_TIME_WINDOW_HAS_STOP(&unpack->tw)) {
             orig_deleted = true;
             deleted_cnt += __wt_cell_rle(unpack);
         } else {
@@ -240,14 +271,13 @@ __stat_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSRC_STATS **sta
         case WT_UPDATE_RESERVE:
             break;
         case WT_UPDATE_TOMBSTONE:
-            ++deleted_cnt;
             break;
         }
 
-    WT_STAT_INCRV(session, stats, btree_column_deleted, deleted_cnt);
-    WT_STAT_INCRV(session, stats, btree_column_rle, rle_cnt);
-    WT_STAT_INCRV(session, stats, btree_entries, entry_cnt);
-    WT_STAT_INCRV(session, stats, btree_overflow, ovfl_cnt);
+    WT_STATP_DSRC_INCRV(session, stats, btree_column_deleted, deleted_cnt);
+    WT_STATP_DSRC_INCRV(session, stats, btree_column_rle, rle_cnt);
+    WT_STATP_DSRC_INCRV(session, stats, btree_entries, entry_cnt);
+    WT_STATP_DSRC_INCRV(session, stats, btree_overflow, ovfl_cnt);
 }
 
 /*
@@ -262,7 +292,7 @@ __stat_page_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSRC_STATS **sta
 
     ovfl_cnt = 0;
 
-    WT_STAT_INCR(session, stats, btree_row_internal);
+    WT_STATP_DSRC_INCR(session, stats, btree_row_internal);
 
     /*
      * Overflow keys are hard: we have to walk the disk image to count them, the in-memory
@@ -276,7 +306,7 @@ __stat_page_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSRC_STATS **sta
         WT_CELL_FOREACH_END;
     }
 
-    WT_STAT_INCRV(session, stats, btree_overflow, ovfl_cnt);
+    WT_STATP_DSRC_INCRV(session, stats, btree_overflow, ovfl_cnt);
 }
 
 /*
@@ -295,7 +325,7 @@ __stat_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSRC_STATS **st
 
     empty_values = entry_cnt = ovfl_cnt = 0;
 
-    WT_STAT_INCR(session, stats, btree_row_leaf);
+    WT_STATP_DSRC_INCR(session, stats, btree_row_leaf);
 
     /*
      * Walk any K/V pairs inserted into the page before the first from-disk key on the page.
@@ -316,6 +346,9 @@ __stat_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSRC_STATS **st
             __wt_row_leaf_value_cell(session, page, rip, &unpack);
             if (unpack.type == WT_CELL_VALUE_OVFL)
                 ++ovfl_cnt;
+            /* A stop time point is a delete. */
+            if (WT_TIME_WINDOW_HAS_STOP(&unpack.tw))
+                --entry_cnt;
         }
 
         /* Walk K/V pairs inserted after the on-page K/V pair. */
@@ -353,7 +386,7 @@ __stat_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSRC_STATS **st
             ++empty_values;
     }
 
-    WT_STAT_INCRV(session, stats, btree_row_empty_values, empty_values);
-    WT_STAT_INCRV(session, stats, btree_entries, entry_cnt);
-    WT_STAT_INCRV(session, stats, btree_overflow, ovfl_cnt);
+    WT_STATP_DSRC_INCRV(session, stats, btree_row_empty_values, empty_values);
+    WT_STATP_DSRC_INCRV(session, stats, btree_entries, entry_cnt);
+    WT_STATP_DSRC_INCRV(session, stats, btree_overflow, ovfl_cnt);
 }

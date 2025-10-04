@@ -44,7 +44,8 @@ op = Operation(Operation.OP_INSERT, table)
 thread = Thread(op * 500000)
 pop_workload = Workload(context, thread)
 print('populate:')
-pop_workload.run(conn)
+ret = pop_workload.run(conn)
+assert ret == 0, ret
 
 op = Operation(Operation.OP_SEARCH, table)
 t = Thread(op)
@@ -52,4 +53,5 @@ workload = Workload(context, t * 8)
 workload.options.run_time = 120
 workload.options.report_interval = 5
 print('read workload:')
-workload.run(conn)
+ret = workload.run(conn)
+assert ret == 0, ret

@@ -1,0 +1,12 @@
+py_library(
+    name = "logging",
+    srcs = [
+        "__init__.py",
+        "flush.py",
+        "formatters.py",
+        "handlers.py",
+        "loggers.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [],
+)

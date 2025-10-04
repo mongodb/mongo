@@ -27,454 +27,160 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <boost/intrusive_ptr.hpp>
-#include <memory>
-#include <vector>
+#include "mongo/db/pipeline/document_source_change_stream.h"
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/bson/bson_helper.h"
-#include "mongo/db/catalog/collection_catalog.h"
-#include "mongo/db/catalog/collection_mock.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/exec/agg/change_stream_transform_stage.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/exec/document_value/value_comparator.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_object_match.h"
-#include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/change_stream_rewrite_helpers.h"
+#include "mongo/db/index/index_constants.h"
+#include "mongo/db/local_catalog/collection.h"
+#include "mongo/db/local_catalog/collection_catalog.h"
+#include "mongo/db/local_catalog/collection_mock.h"
+#include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
+#include "mongo/db/pipeline/change_stream_filter_helpers.h"
+#include "mongo/db/pipeline/change_stream_helpers.h"
+#include "mongo/db/pipeline/change_stream_read_mode.h"
+#include "mongo/db/pipeline/change_stream_reader_builder.h"
+#include "mongo/db/pipeline/change_stream_reader_builder_mock.h"
+#include "mongo/db/pipeline/change_stream_stage_test_fixture.h"
+#include "mongo/db/pipeline/data_to_shards_allocation_query_service_mock.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_pre_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_invalidate.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_resumability.h"
+#include "mongo/db/pipeline/document_source_change_stream_check_topology_change.h"
 #include "mongo/db/pipeline/document_source_change_stream_ensure_resume_token_present.h"
+#include "mongo/db/pipeline/document_source_change_stream_handle_topology_change.h"
+#include "mongo/db/pipeline/document_source_change_stream_inject_control_events.h"
 #include "mongo/db/pipeline/document_source_change_stream_oplog_match.h"
+#include "mongo/db/pipeline/document_source_change_stream_split_large_event.h"
 #include "mongo/db/pipeline/document_source_change_stream_transform.h"
 #include "mongo/db/pipeline/document_source_change_stream_unwind_transaction.h"
-#include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_match.h"
-#include "mongo/db/pipeline/document_source_mock.h"
-#include "mongo/db/pipeline/document_source_sort.h"
-#include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/pipeline/document_source_project.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/resume_token.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/resharding/resharding_change_event_o2_field_gen.h"
-#include "mongo/db/s/resharding_util.h"
-#include "mongo/db/transaction_history_iterator.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
+
+#include <array>
+#include <deque>
+#include <initializer_list>
+#include <iterator>
+#include <memory>
+#include <set>
+#include <vector>
+
+// #include <boost/cstdint.hpp>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {
+using namespace change_stream_test_helper;
 
 using boost::intrusive_ptr;
 using repl::OplogEntry;
 using repl::OpTypeEnum;
-using std::list;
-using std::string;
-using std::vector;
 
 using D = Document;
 using V = Value;
 
 using DSChangeStream = DocumentSourceChangeStream;
 
-static const Timestamp kDefaultTs(100, 1);
-static const repl::OpTime kDefaultOpTime(kDefaultTs, 1);
-static const NamespaceString nss("unittests.change_stream");
-static const BSONObj kDefaultSpec = fromjson("{$changeStream: {}}");
+// Deterministic values used for testing
+const UUID testConstUuid = UUID::parse("6948DF80-14BD-4E04-8842-7668D9C001F5").getValue();
 
-class ChangeStreamStageTestNoSetup : public AggregationContextFixture {
-public:
-    ChangeStreamStageTestNoSetup() : ChangeStreamStageTestNoSetup(nss) {}
-    explicit ChangeStreamStageTestNoSetup(NamespaceString nsString)
-        : AggregationContextFixture(nsString) {}
-};
+// RAII scopeguard for creating a 'ChangeStreamReaderBuilder' mock instance.
+struct ScopedChangeStreamReaderBuilderMock {
+    ScopedChangeStreamReaderBuilderMock(const ScopedChangeStreamReaderBuilderMock&) = delete;
+    ScopedChangeStreamReaderBuilderMock& operator=(const ScopedChangeStreamReaderBuilderMock&) =
+        delete;
 
-struct MockMongoInterface final : public StubMongoProcessInterface {
-
-    // Used by operations which need to obtain the oplog's UUID.
-    static const UUID& oplogUuid() {
-        static const UUID* oplog_uuid = new UUID(UUID::gen());
-        return *oplog_uuid;
+    explicit ScopedChangeStreamReaderBuilderMock(
+        std::unique_ptr<ChangeStreamReaderBuilder> readerBuilder) {
+        ChangeStreamReaderBuilder::set(getGlobalServiceContext(), std::move(readerBuilder));
     }
 
-    // This mock iterator simulates a traversal of transaction history in the oplog by returning
-    // mock oplog entries from a list.
-    struct MockTransactionHistoryIterator : public TransactionHistoryIteratorBase {
-        bool hasNext() const final {
-            return (mockEntriesIt != mockEntries.end());
-        }
-
-        repl::OplogEntry next(OperationContext* opCtx) final {
-            ASSERT(hasNext());
-            return *(mockEntriesIt++);
-        }
-
-        repl::OpTime nextOpTime(OperationContext* opCtx) final {
-            ASSERT(hasNext());
-            return (mockEntriesIt++)->getOpTime();
-        }
-
-        std::vector<repl::OplogEntry> mockEntries;
-        std::vector<repl::OplogEntry>::const_iterator mockEntriesIt;
-    };
-
-    MockMongoInterface(std::vector<FieldPath> fields,
-                       std::vector<repl::OplogEntry> transactionEntries = {},
-                       std::vector<Document> documentsForLookup = {})
-        : _fields(std::move(fields)),
-          _transactionEntries(std::move(transactionEntries)),
-          _documentsForLookup{std::move(documentsForLookup)} {}
-
-    // For tests of transactions that involve multiple oplog entries.
-    std::unique_ptr<TransactionHistoryIteratorBase> createTransactionHistoryIterator(
-        repl::OpTime time) const {
-        auto iterator = std::make_unique<MockTransactionHistoryIterator>();
-
-        // Simulate a lookup on the oplog timestamp by manually advancing the iterator until we
-        // reach the desired timestamp.
-        iterator->mockEntries = _transactionEntries;
-        ASSERT(iterator->mockEntries.size() > 0);
-        for (iterator->mockEntriesIt = iterator->mockEntries.begin();
-             iterator->mockEntriesIt->getOpTime() != time;
-             ++iterator->mockEntriesIt) {
-            ASSERT(iterator->mockEntriesIt != iterator->mockEntries.end());
-        }
-
-        return iterator;
-    }
-
-    // Called by DocumentSourceAddPreImage to obtain the UUID of the oplog. Since that's the only
-    // piece of collection info we need for now, just return a BSONObj with the mock oplog UUID.
-    BSONObj getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) {
-        return BSON("uuid" << oplogUuid());
-    }
-
-    boost::optional<Document> lookupSingleDocument(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const NamespaceString& nss,
-        UUID collectionUUID,
-        const Document& documentKey,
-        boost::optional<BSONObj> readConcern) final {
-        Matcher matcher(documentKey.toBson(), expCtx);
-        auto it = std::find_if(_documentsForLookup.begin(),
-                               _documentsForLookup.end(),
-                               [&](const Document& lookedUpDoc) {
-                                   return matcher.matches(lookedUpDoc.toBson(), nullptr);
-                               });
-        return (it != _documentsForLookup.end() ? *it : boost::optional<Document>{});
-    }
-
-    // For "insert" tests.
-    std::pair<std::vector<FieldPath>, bool> collectDocumentKeyFieldsForHostedCollection(
-        OperationContext*, const NamespaceString&, UUID) const final {
-        return {_fields, false};
-    }
-
-    std::vector<FieldPath> _fields;
-
-    // Stores oplog entries associated with a commit operation, including the oplog entries that a
-    // real DocumentSourceChangeStream would not see, because they are marked with a "prepare" or
-    // "partialTxn" flag. When the DocumentSourceChangeStream sees the commit for the transaction,
-    // either an explicit "commitCommand" or an implicit commit represented by an "applyOps" that is
-    // not marked with the "prepare" or "partialTxn" flag, it uses a TransactionHistoryIterator to
-    // go back and look up these entries.
-    //
-    // These entries are stored in the order they would be returned by the
-    // TransactionHistoryIterator, which is the _reverse_ of the order they appear in the oplog.
-    std::vector<repl::OplogEntry> _transactionEntries;
-
-    // These documents are used to feed the 'lookupSingleDocument' method.
-    std::vector<Document> _documentsForLookup;
-};
-
-class ChangeStreamStageTest : public ChangeStreamStageTestNoSetup {
-public:
-    ChangeStreamStageTest() : ChangeStreamStageTest(nss) {
-        // Initialize the UUID on the ExpressionContext, to allow tests with a resumeToken.
-        getExpCtx()->uuid = testUuid();
-    };
-
-    explicit ChangeStreamStageTest(NamespaceString nsString)
-        : ChangeStreamStageTestNoSetup(nsString) {
-        repl::ReplicationCoordinator::set(getExpCtx()->opCtx->getServiceContext(),
-                                          std::make_unique<repl::ReplicationCoordinatorMock>(
-                                              getExpCtx()->opCtx->getServiceContext()));
-    }
-
-    void checkTransformation(const OplogEntry& entry,
-                             const boost::optional<Document> expectedDoc,
-                             std::vector<FieldPath> docKeyFields = {},
-                             const BSONObj& spec = kDefaultSpec,
-                             const boost::optional<Document> expectedInvalidate = {},
-                             const std::vector<repl::OplogEntry> transactionEntries = {},
-                             std::vector<Document> documentsForLookup = {}) {
-        vector<intrusive_ptr<DocumentSource>> stages = makeStages(entry.getEntry().toBSON(), spec);
-        auto lastStage = stages.back();
-
-        getExpCtx()->mongoProcessInterface = std::make_unique<MockMongoInterface>(
-            docKeyFields, transactionEntries, std::move(documentsForLookup));
-
-        auto next = lastStage->getNext();
-        // Match stage should pass the doc down if expectedDoc is given.
-        ASSERT_EQ(next.isAdvanced(), static_cast<bool>(expectedDoc));
-        if (expectedDoc) {
-            ASSERT_DOCUMENT_EQ(next.releaseDocument(), *expectedDoc);
-        }
-
-        if (expectedInvalidate) {
-            next = lastStage->getNext();
-            ASSERT_TRUE(next.isAdvanced());
-            ASSERT_DOCUMENT_EQ(next.releaseDocument(), *expectedInvalidate);
-
-            // Then throw an exception on the next call of getNext().
-            ASSERT_THROWS(lastStage->getNext(), ExceptionFor<ErrorCodes::ChangeStreamInvalidated>);
-        }
-    }
-
-    /**
-     * Returns a list of stages expanded from a $changStream specification, starting with a
-     * DocumentSourceMock which contains a single document representing 'entry'.
-     */
-    vector<intrusive_ptr<DocumentSource>> makeStages(const BSONObj& entry, const BSONObj& spec) {
-        list<intrusive_ptr<DocumentSource>> result =
-            DSChangeStream::createFromBson(spec.firstElement(), getExpCtx());
-        vector<intrusive_ptr<DocumentSource>> stages(std::begin(result), std::end(result));
-        getExpCtx()->mongoProcessInterface =
-            std::make_unique<MockMongoInterface>(std::vector<FieldPath>{});
-
-        // This match stage is a DocumentSourceChangeStreamOplogMatch, which we explicitly disallow
-        // from executing as a safety mechanism, since it needs to use the collection-default
-        // collation, even if the rest of the pipeline is using some other collation. To avoid ever
-        // executing that stage here, we'll up-convert it from the non-executable
-        // DocumentSourceChangeStreamOplogMatch to a fully-executable DocumentSourceMatch. This is
-        // safe because all of the unit tests will use the 'simple' collation.
-        auto match = dynamic_cast<DocumentSourceMatch*>(stages[0].get());
-        ASSERT(match);
-        auto executableMatch = DocumentSourceMatch::create(match->getQuery(), getExpCtx());
-        // Replace the original match with the executable one.
-        stages[0] = executableMatch;
-
-        // Check the oplog entry is transformed correctly.
-        auto transform = stages[2].get();
-        ASSERT(transform);
-        ASSERT(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform));
-
-        // Create mock stage and insert at the front of the stages.
-        auto mock = DocumentSourceMock::createForTest(D(entry), getExpCtx());
-        stages.insert(stages.begin(), mock);
-
-        // Remove the DSEnsureResumeTokenPresent stage since it will swallow the result.
-        auto newEnd = std::remove_if(stages.begin(), stages.end(), [](auto& stage) {
-            return dynamic_cast<DocumentSourceChangeStreamEnsureResumeTokenPresent*>(stage.get());
-        });
-        stages.erase(newEnd, stages.end());
-
-        // Wire up the stages by setting the source stage.
-        auto prevIt = stages.begin();
-        for (auto stageIt = stages.begin() + 1; stageIt != stages.end(); stageIt++) {
-            auto stage = (*stageIt).get();
-            stage->setSource((*prevIt).get());
-            prevIt = stageIt;
-        }
-
-        return stages;
-    }
-
-    vector<intrusive_ptr<DocumentSource>> makeStages(const OplogEntry& entry) {
-        return makeStages(entry.getEntry().toBSON(), kDefaultSpec);
-    }
-
-    OplogEntry createCommand(const BSONObj& oField,
-                             const boost::optional<UUID> uuid = boost::none,
-                             const boost::optional<bool> fromMigrate = boost::none,
-                             boost::optional<repl::OpTime> opTime = boost::none) {
-        return makeOplogEntry(OpTypeEnum::kCommand,  // op type
-                              nss.getCommandNS(),    // namespace
-                              oField,                // o
-                              uuid,                  // uuid
-                              fromMigrate,           // fromMigrate
-                              boost::none,           // o2
-                              opTime);               // opTime
-    }
-
-    Document makeResumeToken(Timestamp ts,
-                             ImplicitValue uuid = Value(),
-                             ImplicitValue docKey = Value(),
-                             ResumeTokenData::FromInvalidate fromInvalidate =
-                                 ResumeTokenData::FromInvalidate::kNotFromInvalidate,
-                             size_t txnOpIndex = 0) {
-        ResumeTokenData tokenData;
-        tokenData.clusterTime = ts;
-        tokenData.documentKey = docKey;
-        tokenData.fromInvalidate = fromInvalidate;
-        tokenData.txnOpIndex = txnOpIndex;
-        if (!uuid.missing())
-            tokenData.uuid = uuid.getUuid();
-        return ResumeToken(tokenData).toDocument();
-    }
-
-    /**
-     * Helper for running an applyOps through the pipeline, and getting all of the results.
-     */
-    std::vector<Document> getApplyOpsResults(const Document& applyOpsDoc,
-                                             const LogicalSessionFromClient& lsid) {
-        BSONObj applyOpsObj = applyOpsDoc.toBson();
-
-        // Create an oplog entry and then glue on an lsid and txnNumber
-        auto baseOplogEntry = makeOplogEntry(OpTypeEnum::kCommand,
-                                             nss.getCommandNS(),
-                                             applyOpsObj,
-                                             testUuid(),
-                                             boost::none,  // fromMigrate
-                                             BSONObj());
-        BSONObjBuilder builder(baseOplogEntry.getEntry().toBSON());
-        builder.append("lsid", lsid.toBSON());
-        builder.append("txnNumber", 0LL);
-        BSONObj oplogEntry = builder.done();
-
-        // Create the stages and check that the documents produced matched those in the applyOps.
-        vector<intrusive_ptr<DocumentSource>> stages = makeStages(oplogEntry, kDefaultSpec);
-        auto transform = stages[3].get();
-        invariant(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform) != nullptr);
-
-        std::vector<Document> res;
-        auto next = transform->getNext();
-        while (next.isAdvanced()) {
-            res.push_back(next.releaseDocument());
-            next = transform->getNext();
-        }
-        return res;
-    }
-
-
-    /**
-     * This method is required to avoid a static initialization fiasco resulting from calling
-     * UUID::gen() in file static scope.
-     */
-    static const UUID& testUuid() {
-        static const UUID* uuid_gen = new UUID(UUID::gen());
-        return *uuid_gen;
-    }
-
-    static LogicalSessionFromClient testLsid() {
-        // Required to avoid static initialization fiasco.
-        static const UUID* uuid = new UUID(UUID::gen());
-        LogicalSessionFromClient lsid{};
-        lsid.setId(*uuid);
-        return lsid;
-    }
-
-    /**
-     * Creates an OplogEntry with given parameters and preset defaults for this test suite.
-     */
-    static repl::OplogEntry makeOplogEntry(
-        repl::OpTypeEnum opType,
-        NamespaceString nss,
-        BSONObj object,
-        boost::optional<UUID> uuid = testUuid(),
-        boost::optional<bool> fromMigrate = boost::none,
-        boost::optional<BSONObj> object2 = boost::none,
-        boost::optional<repl::OpTime> opTime = boost::none,
-        OperationSessionInfo sessionInfo = {},
-        boost::optional<repl::OpTime> prevOpTime = {},
-        boost::optional<repl::OpTime> preImageOpTime = boost::none) {
-        long long hash = 1LL;
-        return {
-            repl::DurableOplogEntry(opTime ? *opTime : kDefaultOpTime,  // optime
-                                    hash,                               // hash
-                                    opType,                             // opType
-                                    nss,                                // namespace
-                                    uuid,                               // uuid
-                                    fromMigrate,                        // fromMigrate
-                                    repl::OplogEntry::kOplogVersion,    // version
-                                    object,                             // o
-                                    object2,                            // o2
-                                    sessionInfo,                        // sessionInfo
-                                    boost::none,                        // upsert
-                                    Date_t(),                           // wall clock time
-                                    {},                                 // statement ids
-                                    prevOpTime,  // optime of previous write within same transaction
-                                    preImageOpTime,  // pre-image optime
-                                    boost::none,     // post-image optime
-                                    boost::none,     // ShardId of resharding recipient
-                                    boost::none,     // _id
-                                    boost::none)};   // needsRetryImage
-    }
-
-    /**
-     * Helper function to do a $v:2 delta oplog test.
-     */
-    void runUpdateV2OplogTest(BSONObj diff, Document updateModificationEntry) {
-        BSONObj o2 = BSON("_id" << 1);
-        auto deltaOplog = makeOplogEntry(OpTypeEnum::kUpdate,                // op type
-                                         nss,                                // namespace
-                                         BSON("diff" << diff << "$v" << 2),  // o
-                                         testUuid(),                         // uuid
-                                         boost::none,                        // fromMigrate
-                                         o2);                                // o2
-        // Update fields
-        Document expectedUpdateField{
-            {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid(), o2)},
-            {DSChangeStream::kOperationTypeField, DSChangeStream::kUpdateOpType},
-            {DSChangeStream::kClusterTimeField, kDefaultTs},
-            {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
-            {DSChangeStream::kDocumentKeyField, D{{"_id", 1}}},
-            {
-                "updateDescription",
-                updateModificationEntry,
-            },
-        };
-        checkTransformation(deltaOplog, expectedUpdateField);
-    }
-
-    /**
-     * Helper to create change stream pipeline for testing.
-     */
-    std::unique_ptr<Pipeline, PipelineDeleter> buildTestPipeline(
-        const std::vector<BSONObj>& rawPipeline) {
-        auto expCtx = getExpCtx();
-        expCtx->ns = NamespaceString("a.collection");
-        expCtx->inMongos = true;
-
-        auto pipeline = Pipeline::parse(rawPipeline, expCtx);
-        pipeline->optimizePipeline();
-
-        return pipeline;
-    }
-
-    /**
-     * Helper to verify if the change stream pipeline contains expected stages.
-     */
-    void assertStagesNameOrder(std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
-                               const std::vector<std::string> expectedStages) {
-        ASSERT_EQ(pipeline->getSources().size(), expectedStages.size());
-
-        auto stagesItr = pipeline->getSources().begin();
-        auto expectedStagesItr = expectedStages.begin();
-
-        while (expectedStagesItr != expectedStages.end()) {
-            ASSERT_EQ(*expectedStagesItr, stagesItr->get()->getSourceName());
-            ++expectedStagesItr;
-            ++stagesItr;
-        }
+    ~ScopedChangeStreamReaderBuilderMock() {
+        ChangeStreamReaderBuilder::set(getGlobalServiceContext(), nullptr);
     }
 };
 
-bool getCSRewriteFeatureFlagValue() {
-    return feature_flags::gFeatureFlagChangeStreamsRewrite.isEnabledAndIgnoreFCV();
+// RAII scopeguard for creating a 'DataToShardsAllocationQueryService' mock instance.
+struct ScopedDataToShardsAllocationQueryServiceMock {
+    ScopedDataToShardsAllocationQueryServiceMock(
+        const ScopedDataToShardsAllocationQueryServiceMock&) = delete;
+    ScopedDataToShardsAllocationQueryServiceMock& operator=(
+        const ScopedDataToShardsAllocationQueryServiceMock&) = delete;
+
+    ScopedDataToShardsAllocationQueryServiceMock(std::nullptr_t) {
+        DataToShardsAllocationQueryServiceMock::set(getGlobalServiceContext(), nullptr);
+    }
+
+    ScopedDataToShardsAllocationQueryServiceMock() {
+        std::vector<DataToShardsAllocationQueryServiceMock::Response> responses;
+
+        // The actual cluster time used here does not matter, as we are using
+        // 'allowAnyClusterTime()' later.
+        responses.emplace_back(Timestamp(42, 0), AllocationToShardsStatus::kOk);
+
+        auto queryService = std::make_unique<DataToShardsAllocationQueryServiceMock>();
+        queryService->allowAnyClusterTime();
+        queryService->bufferResponses(std::move(responses));
+
+        DataToShardsAllocationQueryServiceMock::set(getGlobalServiceContext(),
+                                                    std::move(queryService));
+    }
+
+    ~ScopedDataToShardsAllocationQueryServiceMock() {
+        DataToShardsAllocationQueryServiceMock::set(getGlobalServiceContext(), nullptr);
+    }
+};
+
+// Extract a stage from the pipeline by type. Returns nullptr if the pipeline does not contain a
+// stage of that type.
+template <typename Stage>
+const Stage* getStageFromPipeline(const Pipeline* pipeline) {
+    for (const auto& stage : pipeline->getSources()) {
+        if (stage->getId() == Stage::id) {
+            return dynamic_cast<const Stage*>(stage.get());
+        }
+    }
+    return nullptr;
 }
 
-bool isChangeStreamPreAndPostImagesEnabled() {
-    return feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabledAndIgnoreFCV();
+void assertCommitTimestamp(bool showCommitTimestamp, const Document& doc) {
+    if (showCommitTimestamp) {
+        ASSERT_EQ(kDefaultCommitTs, doc[DSChangeStream::kCommitTimestampField].getTimestamp());
+    } else {
+        ASSERT_TRUE(doc[DSChangeStream::kCommitTimestampField].missing());
+    }
 }
 
 TEST_F(ChangeStreamStageTest, ShouldRejectNonObjectArg) {
@@ -524,88 +230,65 @@ TEST_F(ChangeStreamStageTest, ShouldRejectNonStringFullDocumentOption) {
 TEST_F(ChangeStreamStageTest, ShouldRejectUnrecognizedFullDocumentOption) {
     auto expCtx = getExpCtx();
 
-    ASSERT_THROWS_CODE(
-        DSChangeStream::createFromBson(BSON(DSChangeStream::kStageName << BSON("fullDocument"
-                                                                               << "unrecognized"))
-                                           .firstElement(),
-                                       expCtx),
-        AssertionException,
-        ErrorCodes::BadValue);
-}
-
-TEST_F(ChangeStreamStageTest, ShouldRejectUnsupportedFullDocumentOption) {
-    auto expCtx = getExpCtx();
-
-    // New modes that are supposed to be working only when pre-/post-images feature flag is on.
-    FullDocumentModeEnum modes[] = {FullDocumentModeEnum::kWhenAvailable,
-                                    FullDocumentModeEnum::kRequired};
-
-    for (const auto& mode : modes) {
-        auto spec =
-            BSON("$changeStream: " << DocumentSourceChangeStreamAddPostImageSpec(mode).toBSON());
-
-        // TODO SERVER-58584: remove the feature flag.
-        {
-            RAIIServerParameterControllerForTest controller(
-                "featureFlagChangeStreamPreAndPostImages", false);
-            ASSERT_FALSE(isChangeStreamPreAndPostImagesEnabled());
-
-            // 'DSChangeStream' is not allowed to be instantiated with new document modes when
-            // pre-/post-images feature flag is disabled.
-            ASSERT_THROWS_CODE(DSChangeStream::createFromBson(spec.firstElement(), expCtx),
-                               AssertionException,
-                               ErrorCodes::BadValue);
-        }
-        {
-            RAIIServerParameterControllerForTest controller(
-                "featureFlagChangeStreamPreAndPostImages", true);
-            ASSERT(isChangeStreamPreAndPostImagesEnabled());
-
-            // 'DSChangeStream' is allowed to be instantiated with new document modes when
-            // pre-/post-images feature flag is enabled.
-            DSChangeStream::createFromBson(spec.firstElement(), expCtx);
-        }
-    }
+    ASSERT_THROWS_CODE(DSChangeStream::createFromBson(BSON(DSChangeStream::kStageName << BSON(
+                                                               "fullDocument" << "unrecognized"))
+                                                          .firstElement(),
+                                                      expCtx),
+                       AssertionException,
+                       ErrorCodes::BadValue);
 }
 
 TEST_F(ChangeStreamStageTest, ShouldRejectBothStartAtOperationTimeAndResumeAfterOptions) {
     auto expCtx = getExpCtx();
 
     // Need to put the collection in the collection catalog so the resume token is valid.
-    std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
-    CollectionCatalog::write(expCtx->opCtx, [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(expCtx->opCtx, testUuid(), std::move(collection));
-    });
+    {
+        Lock::GlobalWrite lk(expCtx->getOperationContext());
+        std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
+        CollectionCatalog::write(expCtx->getOperationContext(), [&](CollectionCatalog& catalog) {
+            catalog.registerCollection(
+                expCtx->getOperationContext(), std::move(collection), /*ts=*/boost::none);
+        });
+    }
 
-    ASSERT_THROWS_CODE(
-        DSChangeStream::createFromBson(
-            BSON(DSChangeStream::kStageName
-                 << BSON("resumeAfter"
-                         << makeResumeToken(kDefaultTs, testUuid(), BSON("x" << 2 << "_id" << 1))
-                         << "startAtOperationTime" << kDefaultTs))
-                .firstElement(),
-            expCtx),
-        AssertionException,
-        40674);
+    ASSERT_THROWS_CODE(DSChangeStream::createFromBson(
+                           BSON(DSChangeStream::kStageName << BSON(
+                                    "resumeAfter" << makeResumeToken(kDefaultTs,
+                                                                     testUuid(),
+                                                                     BSON("x" << 2 << "_id" << 1),
+                                                                     DSChangeStream::kInsertOpType)
+                                                  << "startAtOperationTime" << kDefaultTs))
+                               .firstElement(),
+                           expCtx),
+                       AssertionException,
+                       40674);
 }
 
 TEST_F(ChangeStreamStageTest, ShouldRejectBothStartAfterAndResumeAfterOptions) {
     auto expCtx = getExpCtx();
-    auto opCtx = expCtx->opCtx;
+    auto opCtx = expCtx->getOperationContext();
 
     // Need to put the collection in the collection catalog so the resume token is validcollection
-    std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
-    CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(opCtx, testUuid(), std::move(collection));
-    });
+    {
+        Lock::GlobalWrite lk(opCtx);
+        std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
+        CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
+            catalog.registerCollection(opCtx, std::move(collection), /*ts=*/boost::none);
+        });
+    }
 
     ASSERT_THROWS_CODE(
         DSChangeStream::createFromBson(
             BSON(DSChangeStream::kStageName
-                 << BSON("resumeAfter"
-                         << makeResumeToken(kDefaultTs, testUuid(), BSON("x" << 2 << "_id" << 1))
-                         << "startAfter"
-                         << makeResumeToken(kDefaultTs, testUuid(), BSON("x" << 2 << "_id" << 1))))
+                 << BSON("resumeAfter" << makeResumeToken(kDefaultTs,
+                                                          testUuid(),
+                                                          BSON("x" << 2 << "_id" << 1),
+                                                          DSChangeStream::kInsertOpType)
+                                       << "startAfter"
+                                       << makeResumeToken(kDefaultTs,
+                                                          testUuid(),
+                                                          BSON("x" << 2 << "_id" << 1),
+                                                          DSChangeStream::kInsertOpType)))
                 .firstElement(),
             expCtx),
         AssertionException,
@@ -614,39 +297,48 @@ TEST_F(ChangeStreamStageTest, ShouldRejectBothStartAfterAndResumeAfterOptions) {
 
 TEST_F(ChangeStreamStageTest, ShouldRejectBothStartAtOperationTimeAndStartAfterOptions) {
     auto expCtx = getExpCtx();
-    auto opCtx = expCtx->opCtx;
+    auto opCtx = expCtx->getOperationContext();
 
     // Need to put the collection in the collection catalog so the resume token is valid.
-    std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
-    CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(opCtx, testUuid(), std::move(collection));
-    });
+    {
+        Lock::GlobalWrite lk(opCtx);
+        std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
+        CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
+            catalog.registerCollection(opCtx, std::move(collection), /*ts=*/boost::none);
+        });
+    }
 
-    ASSERT_THROWS_CODE(
-        DSChangeStream::createFromBson(
-            BSON(DSChangeStream::kStageName
-                 << BSON("startAfter"
-                         << makeResumeToken(kDefaultTs, testUuid(), BSON("x" << 2 << "_id" << 1))
-                         << "startAtOperationTime" << kDefaultTs))
-                .firstElement(),
-            expCtx),
-        AssertionException,
-        40674);
+    ASSERT_THROWS_CODE(DSChangeStream::createFromBson(
+                           BSON(DSChangeStream::kStageName << BSON(
+                                    "startAfter" << makeResumeToken(kDefaultTs,
+                                                                    testUuid(),
+                                                                    BSON("x" << 2 << "_id" << 1),
+                                                                    DSChangeStream::kInsertOpType)
+                                                 << "startAtOperationTime" << kDefaultTs))
+                               .firstElement(),
+                           expCtx),
+                       AssertionException,
+                       40674);
 }
 
 TEST_F(ChangeStreamStageTest, ShouldRejectResumeAfterWithResumeTokenMissingUUID) {
     auto expCtx = getExpCtx();
-    auto opCtx = expCtx->opCtx;
+    auto opCtx = expCtx->getOperationContext();
 
     // Need to put the collection in the collection catalog so the resume token is valid.
-    std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
-    CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(opCtx, testUuid(), std::move(collection));
-    });
+    {
+        Lock::GlobalWrite lk(opCtx);
+        std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
+        CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
+            catalog.registerCollection(opCtx, std::move(collection), /*ts=*/boost::none);
+        });
+    }
 
     ASSERT_THROWS_CODE(
         DSChangeStream::createFromBson(
-            BSON(DSChangeStream::kStageName << BSON("resumeAfter" << makeResumeToken(kDefaultTs)))
+            BSON(DSChangeStream::kStageName
+                 << BSON("resumeAfter" << makeResumeToken(
+                             kDefaultTs, Value(), Value(), DSChangeStream::kInsertOpType)))
                 .firstElement(),
             expCtx),
         AssertionException,
@@ -663,7 +355,8 @@ TEST_F(ChangeStreamStageTestNoSetup, FailsWithNoReplicationCoordinator) {
 
 TEST_F(ChangeStreamStageTest, CannotCreateStageForSystemCollection) {
     auto expressionContext = getExpCtx();
-    expressionContext->ns = NamespaceString{"db", "system.namespace"};
+    expressionContext->setNamespaceString(
+        NamespaceString::createNamespaceString_forTest("db", "system.namespace"));
     const auto spec = fromjson("{$changeStream: {allowToRunOnSystemNS: false}}");
     ASSERT_THROWS_CODE(DocumentSourceChangeStream::createFromBson(spec.firstElement(), getExpCtx()),
                        AssertionException,
@@ -672,8 +365,9 @@ TEST_F(ChangeStreamStageTest, CannotCreateStageForSystemCollection) {
 
 TEST_F(ChangeStreamStageTest, CanCreateStageForSystemCollectionWhenAllowToRunOnSystemNSIsTrue) {
     auto expressionContext = getExpCtx();
-    expressionContext->ns = NamespaceString{"db", "system.namespace"};
-    expressionContext->inMongos = false;
+    expressionContext->setNamespaceString(
+        NamespaceString::createNamespaceString_forTest("db", "system.namespace"));
+    expressionContext->setInRouter(false);
     const auto spec = fromjson("{$changeStream: {allowToRunOnSystemNS: true}}");
     DocumentSourceChangeStream::createFromBson(spec.firstElement(), getExpCtx());
 }
@@ -681,8 +375,9 @@ TEST_F(ChangeStreamStageTest, CanCreateStageForSystemCollectionWhenAllowToRunOnS
 TEST_F(ChangeStreamStageTest,
        CannotCreateStageForSystemCollectionWhenAllowToRunOnSystemNSIsTrueAndInMongos) {
     auto expressionContext = getExpCtx();
-    expressionContext->ns = NamespaceString{"db", "system.namespace"};
-    expressionContext->inMongos = true;
+    expressionContext->setNamespaceString(
+        NamespaceString::createNamespaceString_forTest("db", "system.namespace"));
+    expressionContext->setInRouter(true);
     const auto spec = fromjson("{$changeStream: {allowToRunOnSystemNS: true}}");
     ASSERT_THROWS_CODE(DocumentSourceChangeStream::createFromBson(spec.firstElement(), getExpCtx()),
                        AssertionException,
@@ -696,31 +391,900 @@ TEST_F(ChangeStreamStageTest, CanCreateStageForNonSystemCollection) {
 
 TEST_F(ChangeStreamStageTest, ShowMigrationsFailsOnMongos) {
     auto expCtx = getExpCtx();
-    expCtx->inMongos = true;
+    expCtx->setInRouter(true);
     auto spec = fromjson("{$changeStream: {showMigrationEvents: true}}");
 
     ASSERT_THROWS_CODE(
         DSChangeStream::createFromBson(spec.firstElement(), expCtx), AssertionException, 31123);
 }
 
+TEST_F(ChangeStreamStageTest, ChangeStreamBuiltInRegexesSingleCollection) {
+    auto expCtx = getExpCtx();
+
+    auto nss = NamespaceString::createNamespaceString_forTest("unittest"_sd, "someCollection"_sd);
+    expCtx->setNamespaceString(nss);
+
+    ASSERT_EQ("^unittest\\.someCollection$",
+              DocumentSourceChangeStream::getNsRegexForChangeStream(expCtx));
+    ASSERT_BSONOBJ_EQ(BSON("" << BSONRegEx("^unittest\\.someCollection$")),
+                      DocumentSourceChangeStream::getNsMatchObjForChangeStream(expCtx));
+
+    ASSERT_EQ("^someCollection$", DocumentSourceChangeStream::getCollRegexForChangeStream(expCtx));
+    ASSERT_BSONOBJ_EQ(BSON("" << BSONRegEx("^someCollection$")),
+                      DocumentSourceChangeStream::getCollMatchObjForChangeStream(expCtx));
+
+    ASSERT_EQ("^unittest\\.\\$cmd$",
+              DocumentSourceChangeStream::getCmdNsRegexForChangeStream(expCtx));
+    ASSERT_BSONOBJ_EQ(BSON("" << BSONRegEx("^unittest\\.\\$cmd$")),
+                      DocumentSourceChangeStream::getCmdNsMatchObjForChangeStream(expCtx));
+}
+
+TEST_F(ChangeStreamStageTest, ChangeStreamBuiltInRegexesSingleDatabase) {
+    auto expCtx = getExpCtx();
+
+    auto nss = NamespaceString::makeCollectionlessAggregateNSS(
+        NamespaceString::createNamespaceString_forTest("unittest"_sd).dbName());
+    expCtx->setNamespaceString(nss);
+
+    ASSERT_EQ(fmt::format("^unittest\\.{}", DocumentSourceChangeStream::kRegexAllCollections),
+              DocumentSourceChangeStream::getNsRegexForChangeStream(expCtx));
+    ASSERT_BSONOBJ_EQ(
+        BSON("" << BSONRegEx(
+                 fmt::format("^unittest\\.{}", DocumentSourceChangeStream::kRegexAllCollections))),
+        DocumentSourceChangeStream::getNsMatchObjForChangeStream(expCtx));
+
+    ASSERT_EQ("^unittest\\.system\\.views$",
+              DocumentSourceChangeStream::getViewNsRegexForChangeStream(expCtx));
+    ASSERT_BSONOBJ_EQ(BSON("" << BSONRegEx("^unittest\\.system\\.views$")),
+                      DocumentSourceChangeStream::getViewNsMatchObjForChangeStream(expCtx));
+
+    ASSERT_EQ(fmt::format("^{}", DocumentSourceChangeStream::kRegexAllCollections),
+              DocumentSourceChangeStream::getCollRegexForChangeStream(expCtx));
+    ASSERT_BSONOBJ_EQ(
+        BSON("" << BSONRegEx(fmt::format("^{}", DocumentSourceChangeStream::kRegexAllCollections))),
+        DocumentSourceChangeStream::getCollMatchObjForChangeStream(expCtx));
+
+    ASSERT_EQ("^unittest\\.\\$cmd$",
+              DocumentSourceChangeStream::getCmdNsRegexForChangeStream(expCtx));
+    ASSERT_BSONOBJ_EQ(BSON("" << BSONRegEx("^unittest\\.\\$cmd$")),
+                      DocumentSourceChangeStream::getCmdNsMatchObjForChangeStream(expCtx));
+}
+
+TEST_F(ChangeStreamStageTest, ChangeStreamBuiltInRegexesWholeCluster) {
+    auto expCtx = getExpCtx();
+
+    auto nss = NamespaceString::createNamespaceString_forTest("admin"_sd);
+    expCtx->setNamespaceString(nss);
+
+    ASSERT_EQ(fmt::format("{}\\.{}",
+                          DocumentSourceChangeStream::kRegexAllDBs,
+                          DocumentSourceChangeStream::kRegexAllCollections),
+              DocumentSourceChangeStream::getNsRegexForChangeStream(expCtx));
+    ASSERT_BSONOBJ_EQ(
+        BSON("" << BSONRegEx(fmt::format("{}\\.{}",
+                                         DocumentSourceChangeStream::kRegexAllDBs,
+                                         DocumentSourceChangeStream::kRegexAllCollections))),
+        DocumentSourceChangeStream::getNsMatchObjForChangeStream(expCtx));
+
+    ASSERT_EQ(fmt::format("{}\\.system\\.views$", DocumentSourceChangeStream::kRegexAllDBs),
+              DocumentSourceChangeStream::getViewNsRegexForChangeStream(expCtx));
+    ASSERT_BSONOBJ_EQ(
+        BSON("" << BSONRegEx(fmt::format(
+                 "{}\\.system\\.views$",
+                 DocumentSourceChangeStream::DocumentSourceChangeStream::kRegexAllDBs))),
+        DocumentSourceChangeStream::getViewNsMatchObjForChangeStream(expCtx));
+
+    ASSERT_EQ(fmt::format("^{}", DocumentSourceChangeStream::kRegexAllCollections),
+              DocumentSourceChangeStream::getCollRegexForChangeStream(expCtx));
+    ASSERT_BSONOBJ_EQ(
+        BSON("" << BSONRegEx(fmt::format("^{}", DocumentSourceChangeStream::kRegexAllCollections))),
+        DocumentSourceChangeStream::getCollMatchObjForChangeStream(expCtx));
+
+    ASSERT_EQ(fmt::format("{}\\.{}",
+                          DocumentSourceChangeStream::kRegexAllDBs,
+                          DocumentSourceChangeStream::kRegexCmdColl),
+              DocumentSourceChangeStream::getCmdNsRegexForChangeStream(expCtx));
+    ASSERT_BSONOBJ_EQ(BSON("" << BSONRegEx(fmt::format("{}\\.{}",
+                                                       DocumentSourceChangeStream::kRegexAllDBs,
+                                                       DocumentSourceChangeStream::kRegexCmdColl))),
+                      DocumentSourceChangeStream::getCmdNsMatchObjForChangeStream(expCtx));
+}
+
+TEST_F(ChangeStreamStageTest, CreatingChangeStreamSucceedsWithValidVersions) {
+    getExpCtx()->setInRouter(true);
+
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+    ScopedChangeStreamReaderBuilderMock readerBuilder(
+        std::make_unique<ChangeStreamReaderBuilderMock>());
+
+    // Versions "v1", "v2" are supported.
+    std::array<boost::optional<StringData>, 3> versions = {boost::none, "v1"_sd, "v2"_sd};
+
+    for (auto version : versions) {
+        BSONObj spec;
+        if (version.has_value()) {
+            spec = BSON("$changeStream" << BSON("version" << *version));
+        } else {
+            spec = BSON("$changeStream" << BSONObj());
+        }
+
+        auto pipeline = DSChangeStream::createFromBson(spec.firstElement(), getExpCtx());
+        ASSERT_FALSE(pipeline.empty());
+
+        bool found = false;
+        for (auto& stage : pipeline) {
+            if (stage->getSourceName() == DocumentSourceChangeStreamTransform::kStageName) {
+                // Serialize the stage to BSON and read back the "version" field.
+                std::vector<Value> serialization;
+                stage->serializeToArray(serialization);
+
+                ASSERT_EQ(serialization.size(), 1UL);
+                ASSERT_EQ(serialization[0].getType(), BSONType::object);
+
+                if (version.has_value()) {
+                    ASSERT_EQ(*version,
+                              serialization[0]
+                                  .getDocument()
+                                  .getField(DocumentSourceChangeStreamTransform::kStageName)
+                                  .getDocument()
+                                  .getField("version"_sd)
+                                  .getStringData());
+                    ASSERT_EQ(ChangeStreamReaderVersion_parse(*version),
+                              getExpCtx()->getChangeStreamSpec()->getVersion());
+                } else {
+                    ASSERT_EQ("v1",
+                              serialization[0]
+                                  .getDocument()
+                                  .getField(DocumentSourceChangeStreamTransform::kStageName)
+                                  .getDocument()
+                                  .getField("version"_sd)
+                                  .getStringData());
+                    ASSERT_EQ(ChangeStreamReaderVersionEnum::kV1,
+                              getExpCtx()->getChangeStreamSpec()->getVersion());
+                }
+                found = true;
+            }
+        }
+        ASSERT_TRUE(found);
+    }
+}
+
+TEST_F(ChangeStreamStageTest, CreatingChangeStreamSucceedsWithoutAnyVersion) {
+    // Do not specify "version" at all.
+    auto spec = BSON("$changeStream" << BSONObj());
+
+    auto pipeline = DSChangeStream::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_FALSE(pipeline.empty());
+
+    ASSERT_EQ(ChangeStreamReaderVersionEnum::kV1, getExpCtx()->getChangeStreamSpec()->getVersion());
+}
+
+TEST_F(ChangeStreamStageTest, CreatingChangestreamFailsWithInvalidVersions) {
+    // Test a bunch of unsupported versions.
+    for (auto version : {"v3", "v0", "V1", "", "1", "2"}) {
+        auto spec = BSON("$changeStream" << BSON("version" << version));
+
+        ASSERT_THROWS_CODE(DSChangeStream::createFromBson(spec.firstElement(), getExpCtx()),
+                           AssertionException,
+                           ErrorCodes::BadValue);
+    }
+}
+
+// Tests that change stream reader version v1 is selected when the change stream is not opened on a
+// router, despite "v2" being explicitly requested.
+TEST_F(ChangeStreamStageTest, SelectsChangeStreamReaderVersionV1WhenNotOnRouter) {
+    getExpCtx()->setInRouter(false);
+
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+
+    const BSONObj spec = BSON("$changeStream" << BSON("version" << "v2"));
+
+    auto pipeline = DSChangeStream::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_FALSE(pipeline.empty());
+    ASSERT_EQ(ChangeStreamReaderVersionEnum::kV1, getExpCtx()->getChangeStreamSpec()->getVersion());
+}
+
+// Tests that change stream reader version v1 is selected when the feature flag for SPM-1941 is not
+// enabled, despite "v2" being explicitly requested.
+TEST_F(ChangeStreamStageTest, SelectsChangeStreamReaderVersionV1WhenFeatureFlagIsDisabled) {
+    getExpCtx()->setInRouter(true);
+
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", false);
+
+    const BSONObj spec = BSON("$changeStream" << BSON("version" << "v2"));
+
+    auto pipeline = DSChangeStream::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_FALSE(pipeline.empty());
+    ASSERT_EQ(ChangeStreamReaderVersionEnum::kV1, getExpCtx()->getChangeStreamSpec()->getVersion());
+}
+
+// Tests that change stream reader version v1 is selected when an all-database change stream is
+// opened, despite "v2" being explicitly requested.
+TEST_F(ChangeStreamStageTest, SelectsChangeStreamReaderVersionV1ForAllDatabasesChangeStream) {
+    getExpCtx()->setInRouter(true);
+
+    // Opening a change stream on the "admin" namespace triggers opening an all-databases change
+    // stream.
+    getExpCtx()->setNamespaceString(
+        NamespaceString::createNamespaceString_forTest("admin.$cmd.aggregate"));
+
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+
+    const BSONObj spec =
+        BSON("$changeStream" << BSON("version" << "v2" << "allChangesForCluster" << true));
+
+    auto pipeline = DSChangeStream::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_FALSE(pipeline.empty());
+    ASSERT_EQ(ChangeStreamReaderVersionEnum::kV1, getExpCtx()->getChangeStreamSpec()->getVersion());
+}
+
+// Tests that change stream reader version v1 is selected when a database-level change stream is
+// opened, despite "v2" being explicitly requested.
+TEST_F(ChangeStreamStageTest, SelectsChangeStreamReaderVersionV1ForDatabaseLevelChangeStream) {
+    getExpCtx()->setInRouter(true);
+
+    getExpCtx()->setNamespaceString(
+        NamespaceString::createNamespaceString_forTest("testDB.$cmd.aggregate"));
+
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+
+    const BSONObj spec = BSON("$changeStream" << BSON("version" << "v2"));
+
+    auto pipeline = DSChangeStream::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_FALSE(pipeline.empty());
+    ASSERT_EQ(ChangeStreamReaderVersionEnum::kV1, getExpCtx()->getChangeStreamSpec()->getVersion());
+}
+
+// Test that creating a v2 change stream reader pipeline will fail if no valid
+// 'ChangeStreamReaderBuilder' instance is set in the global ServiceContext.
+DEATH_TEST_REGEX_F(ChangeStreamStageTest,
+                   CreatingChangeStreamFailsWithV2VersionWithoutReaderBuilderInstance,
+                   "Tripwire assertion.*10743904") {
+    getExpCtx()->setInRouter(true);
+
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+
+    // Intentionally set the global 'ChangeStreamReaderBuilder' instance to a nullptr.
+    ScopedChangeStreamReaderBuilderMock readerBuilder(nullptr);
+
+    auto spec = BSON("$changeStream" << BSON("version" << "v2"));
+
+    ASSERT_THROWS_CODE(DSChangeStream::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       10743904);
+}
+
+// Test that creating a v2 change stream reader pipeline will fail if no valid
+// 'DataToShardsAllocationQueryService' instance is set in the global ServiceContext.
+DEATH_TEST_REGEX_F(
+    ChangeStreamStageTest,
+    CreatingChangeStreamFailsWithV2VersionWithoutDataToShardsAllocationQueryServiceInstance,
+    "Tripwire assertion.*10743906") {
+    getExpCtx()->setInRouter(true);
+
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+
+    // Intentionally set the global 'DataToShardsAllocationQueryService' instance to a nullptr.
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock(nullptr);
+
+    ScopedChangeStreamReaderBuilderMock readerBuilder(
+        std::make_unique<ChangeStreamReaderBuilderMock>());
+
+    auto spec = BSON("$changeStream" << BSON("version" << "v2"));
+
+    ASSERT_THROWS_CODE(DSChangeStream::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       10743906);
+}
+
+// Test that 'supportedEvents' are registered in the change stream transform stage for v2 change
+// stream readers.
+TEST_F(ChangeStreamStageTest, CreatingV2ChangeStreamRegistersSupportedEvents) {
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+
+    const ChangeStreamEventTransformation::SupportedEvents expectedEvents = {
+        "moveChunk"_sd, "namespacePlacementChanged"_sd, "movePrimary"_sd};
+
+    ScopedChangeStreamReaderBuilderMock readerBuilder(
+        std::make_unique<ChangeStreamReaderBuilderMock>(
+            [](OperationContext* opCtx, const ChangeStream& changeStream) { return nullptr; },
+            [](OperationContext* opCtx, const ChangeStream& changeStream) { return BSONObj(); },
+            [&](OperationContext* opCtx, const ChangeStream& changeStream) {
+                return std::set<std::string>{expectedEvents.begin(), expectedEvents.end()};
+            }));
+
+    const StringDataSet noopEvents = {DocumentSourceChangeStream::kShardCollectionOpType,
+                                      DocumentSourceChangeStream::kMigrateLastChunkFromShardOpType,
+                                      DocumentSourceChangeStream::kRefineCollectionShardKeyOpType,
+                                      DocumentSourceChangeStream::kReshardCollectionOpType,
+                                      DocumentSourceChangeStream::kNewShardDetectedOpType,
+                                      DocumentSourceChangeStream::kReshardBeginOpType,
+                                      DocumentSourceChangeStream::kReshardBlockingWritesOpType,
+                                      DocumentSourceChangeStream::kReshardDoneCatchUpOpType,
+                                      DocumentSourceChangeStream::kEndOfTransactionOpType};
+
+    const std::vector<BSONObj> rawPipeline = {
+        BSON("$changeStream" << BSON("version" << "v2")),
+    };
+
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
+
+    auto transformStage = getStageFromPipeline<DocumentSourceChangeStreamTransform>(pipeline.get());
+    ASSERT_NE(nullptr, transformStage);
+
+    const auto& actualEvents = transformStage->getSupportedEvents_forTest();
+    ASSERT_GTE(actualEvents.size(), expectedEvents.size());
+
+    for (auto& eventName : actualEvents) {
+        ASSERT_TRUE(noopEvents.contains(eventName) || expectedEvents.contains(eventName))
+            << "unknown event " << eventName;
+    }
+}
+
+// Test that the match expression for the supportedEvents is registered in the change stream oplog
+// match stage for v2 change stream readers.
+TEST_F(ChangeStreamStageTest, CreatingV2ChangeStreamRegistersOplogMatchFilterForSupportedEvents) {
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+
+    const ChangeStreamEventTransformation::SupportedEvents expectedEvents = {
+        "moveChunk"_sd, "namespacePlacementChanged"_sd, "movePrimary"_sd};
+
+    // Build oplog match expression for supported events.
+    BSONObj filter = [&]() {
+        BSONArrayBuilder bab;
+        for (auto& eventName : expectedEvents) {
+            bab.append(BSON("o2." + eventName << BSON("$exists" << true)));
+        }
+        bab.done();
+        return BSON(
+            "$and" << BSON_ARRAY(BSON("op" << BSON("$eq" << "n")) << BSON("$or" << bab.arr())));
+    }();
+    const auto filterMatchExpression =
+        MatchExpressionParser::parseAndNormalize(filter, getExpCtx());
+
+    ScopedChangeStreamReaderBuilderMock readerBuilder(
+        std::make_unique<ChangeStreamReaderBuilderMock>(
+            [](OperationContext* opCtx, const ChangeStream& changeStream) { return nullptr; },
+            [&](OperationContext* opCtx, const ChangeStream& changeStream) { return filter; },
+            [&](OperationContext* opCtx, const ChangeStream& changeStream) {
+                return std::set<std::string>{expectedEvents.begin(), expectedEvents.end()};
+            }));
+
+    const std::vector<BSONObj> rawPipeline = {
+        BSON("$changeStream" << BSON("version" << "v2")),
+    };
+
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
+
+    auto oplogMatchStage =
+        getStageFromPipeline<DocumentSourceChangeStreamOplogMatch>(pipeline.get());
+    ASSERT_NE(nullptr, oplogMatchStage);
+
+    // Check that the overall oplog match expression contains the expected match expression as a
+    // subpart. We use the stringified versions of the match expressions for testing here, which is
+    // not great but should be good enough for testing purposes.
+    ASSERT_TRUE(str::contains(oplogMatchStage->getMatchExpression()->serialize().toString(),
+                              filterMatchExpression->serialize().toString()));
+}
+
+// Test that the control events filter for data shards is correctly registered in the change stream
+// unwind transaction stage for v2 change stream readers.
+TEST_F(ChangeStreamStageTest, CreatingV2ChangeStreamRegistersUnwindFilterForDataShard) {
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+
+    // Build control events filter.
+    BSONObj filter = BSON("$or" << BSON_ARRAY(BSON("a" << 1 << "b" << 2) << BSON("foo" << "bar")));
+
+    const auto filterMatchExpression =
+        MatchExpressionParser::parseAndNormalize(filter, getExpCtx());
+    ASSERT_EQ(MatchExpression::MatchType::OR, filterMatchExpression->matchType());
+
+    // Set up a set of match expressions we want to find later.
+    stdx::unordered_set<std::string> branchesToFind;
+    for (auto& child :
+         static_cast<const OrMatchExpression*>(filterMatchExpression.get())->getChildren()) {
+        branchesToFind.insert(child->serialize().toString());
+    }
+
+    ScopedChangeStreamReaderBuilderMock readerBuilder(
+        std::make_unique<ChangeStreamReaderBuilderMock>(
+            [](OperationContext* opCtx, const ChangeStream& changeStream) { return nullptr; },
+            [&](OperationContext* opCtx, const ChangeStream& changeStream) { return filter; },
+            [&](OperationContext* opCtx, const ChangeStream& changeStream) {
+                return std::set<std::string>{};
+            }));
+
+    const std::vector<BSONObj> rawPipeline = {
+        BSON("$changeStream" << BSON("version" << "v2")),
+    };
+
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
+
+    auto unwindTransactionStage =
+        getStageFromPipeline<DocumentSourceChangeStreamUnwindTransaction>(pipeline.get());
+    ASSERT_NE(nullptr, unwindTransactionStage);
+
+    // The overall match expression must be a logical OR.
+    auto matchExpression = unwindTransactionStage->getMatchExpression();
+    ASSERT_EQ(MatchExpression::MatchType::OR, matchExpression->matchType());
+
+    // Assert that one of the logical OR's branches is equal to the control events filter above.
+    auto orMatchExpression = static_cast<const OrMatchExpression*>(matchExpression);
+    for (auto& child : orMatchExpression->getChildren()) {
+        branchesToFind.erase(child->serialize().toString());
+    }
+
+    // All sub-branches of the control events filter's logical OR should have been found.
+    ASSERT_EQ(stdx::unordered_set<std::string>{}, branchesToFind);
+}
+
+// Test that the calling 'buildControlEventsFilterForDataShard' fails for change stream reader
+// versions unequal to v2.
+DEATH_TEST_REGEX_F(ChangeStreamStageTest,
+                   BuildControlEventsFilterForDataShardFailsWhenCallingForNonV2ChangeStreamReaders,
+                   "Tripwire assertion.*10743901") {
+    // Set version v1 in the change stream spec of the ExpressionContext. Unfortunately
+    // 'getChangeStreamSpec()' returns a copy, not a reference.
+    auto spec = getExpCtx()->getChangeStreamSpec();
+    spec->setVersion(ChangeStreamReaderVersionEnum::kV1);
+    getExpCtx()->setChangeStreamSpec(spec);
+
+    ASSERT_THROWS_CODE(change_stream_filter::buildControlEventsFilterForDataShard(getExpCtx()),
+                       AssertionException,
+                       10743901);
+}
+
+// Test that the control events filter for a data shard in v2 change stream readers is as expected.
+TEST_F(ChangeStreamStageTest,
+       BuildControlEventsFilterForDataShardReturnsCorrectFilterForV2ChangeStream) {
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+
+    BSONObj expectedFilter =
+        BSON("$or" << BSON_ARRAY(BSON("a" << 1 << "b" << 2) << BSON("foo" << "bar")));
+
+    ScopedChangeStreamReaderBuilderMock readerBuilder(
+        std::make_unique<ChangeStreamReaderBuilderMock>(
+            [](OperationContext* opCtx, const ChangeStream& changeStream) { return nullptr; },
+            [&](OperationContext* opCtx, const ChangeStream& changeStream) {
+                return expectedFilter;
+            }));
+
+    // Set version v2 in the change stream spec of the ExpressionContext. Unfortunately
+    // 'getChangeStreamSpec()' returns a copy, not a reference.
+    auto spec = getExpCtx()->getChangeStreamSpec();
+    spec->setVersion(ChangeStreamReaderVersionEnum::kV2);
+    getExpCtx()->setChangeStreamSpec(spec);
+
+    BSONObj actualFilter = change_stream_filter::buildControlEventsFilterForDataShard(getExpCtx());
+    ASSERT_BSONOBJ_EQ(expectedFilter, actualFilter);
+}
+
+// Test that the transaction filter for v1 change streams is as expected.
+TEST_F(ChangeStreamStageTest, BuildTransactionFilterForV1ChangeStream) {
+    // Set version v1 in the change stream spec of the ExpressionContext. Unfortunately
+    // 'getChangeStreamSpec()' returns a copy, not a reference.
+    auto spec = getExpCtx()->getChangeStreamSpec();
+    spec->setVersion(ChangeStreamReaderVersionEnum::kV1);
+    getExpCtx()->setChangeStreamSpec(spec);
+
+    std::vector<BSONObj> backingBsonObjs;
+    auto actualFilter =
+        change_stream_filter::buildTransactionFilter(getExpCtx(), nullptr, backingBsonObjs);
+
+    std::string expected = R"(
+{
+    "$or": [
+        {
+            "$and": [
+                {
+                    "$or": [
+                        {
+                            "o.applyOps": {
+                                "$elemMatch": {
+                                    "$and": [
+                                        {
+                                            "$or": [
+                                                {
+                                                    "o.create": {
+                                                        "$regex": "^change_stream$"
+                                                    }
+                                                },
+                                                {
+                                                    "o.createIndexes": {
+                                                        "$regex": "^change_stream$"
+                                                    }
+                                                }
+                                            ]
+                                        },
+                                        {
+                                            "ns": {
+                                                "$regex": "^unittests\\.\\$cmd$"
+                                            }
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "o.applyOps.ns": {
+                                "$regex": "^unittests\\.change_stream$"
+                            }
+                        },
+                        {
+                            "prevOpTime": {
+                                "$not": {
+                                    "$eq": {
+                                        "ts": {"$timestamp":{"t":0,"i":0}},
+                                        "t": -1
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "op": {
+                        "$eq": "c"
+                    }
+                },
+                {
+                    "o.partialTxn": {
+                        "$not": {
+                            "$eq": true
+                        }
+                    }
+                },
+                {
+                    "o.prepare": {
+                        "$not": {
+                            "$eq": true
+                        }
+                    }
+                },
+                {
+                    "o.applyOps": {
+                        "$type": [
+                            4
+                        ]
+                    }
+                }
+            ]
+        },
+        {
+            "$and": [
+                {
+                    "o.commitTransaction": {
+                        "$eq": 1
+                    }
+                },
+                {
+                    "op": {
+                        "$eq": "c"
+                    }
+                }
+            ]
+        },
+        {
+            "$and": [
+                {
+                    "op": {
+                        "$eq": "n"
+                    }
+                },
+                {
+                    "o2.endOfTransaction": {
+                        "$regex": "^unittests\\.change_stream$"
+                    }
+                }
+            ]
+        }
+    ]
+}
+    )";
+
+    ASSERT_BSONOBJ_EQ_AUTO(expected, actualFilter->serialize());
+}
+
+// Test that the transaction filter for v2 change streams is as expected, including the filter for
+// the control events.
+TEST_F(ChangeStreamStageTest, BuildTransactionFilterForV2ChangeStream) {
+    getExpCtx()->setInRouter(true);
+
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+
+    BSONObj expectedFilter =
+        BSON("$or" << BSON_ARRAY(BSON("a" << 1 << "b" << 2) << BSON("foo" << "bar")));
+
+    ScopedChangeStreamReaderBuilderMock readerBuilder(
+        std::make_unique<ChangeStreamReaderBuilderMock>(
+            [](OperationContext* opCtx, const ChangeStream& changeStream) { return nullptr; },
+            [&](OperationContext* opCtx, const ChangeStream& changeStream) {
+                return expectedFilter;
+            }));
+
+    // Set version v2 in the change stream spec of the ExpressionContext. Unfortunately
+    // 'getChangeStreamSpec()' returns a copy, not a reference.
+    auto spec = getExpCtx()->getChangeStreamSpec();
+    spec->setVersion(ChangeStreamReaderVersionEnum::kV2);
+    getExpCtx()->setChangeStreamSpec(spec);
+
+    std::vector<BSONObj> backingBsonObjs;
+    auto actualFilter =
+        change_stream_filter::buildTransactionFilter(getExpCtx(), nullptr, backingBsonObjs);
+
+    std::string expected = R"(
+{
+    "$or": [
+        {
+            "$or": [
+                {
+                    "$and": [
+                        {
+                            "$or": [
+                                {
+                                    "o.applyOps": {
+                                        "$elemMatch": {
+                                            "$and": [
+                                                {
+                                                    "$or": [
+                                                        {
+                                                            "o.create": {
+                                                                "$regex": "^change_stream$"
+                                                            }
+                                                        },
+                                                        {
+                                                            "o.createIndexes": {
+                                                                "$regex": "^change_stream$"
+                                                            }
+                                                        }
+                                                    ]
+                                                },
+                                                {
+                                                    "ns": {
+                                                        "$regex": "^unittests\\.\\$cmd$"
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                },
+                                {
+                                    "o.applyOps.ns": {
+                                        "$regex": "^unittests\\.change_stream$"
+                                    }
+                                },
+                                {
+                                    "prevOpTime": {
+                                        "$not": {
+                                            "$eq": {
+                                                "ts": {"$timestamp":{"t":0,"i":0}},
+                                                "t": -1
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "op": {
+                                "$eq": "c"
+                            }
+                        },
+                        {
+                            "o.partialTxn": {
+                                "$not": {
+                                    "$eq": true
+                                }
+                            }
+                        },
+                        {
+                            "o.prepare": {
+                                "$not": {
+                                    "$eq": true
+                                }
+                            }
+                        },
+                        {
+                            "o.applyOps": {
+                                "$type": [
+                                    4
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "$and": [
+                        {
+                            "o.commitTransaction": {
+                                "$eq": 1
+                            }
+                        },
+                        {
+                            "op": {
+                                "$eq": "c"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "$and": [
+                        {
+                            "op": {
+                                "$eq": "n"
+                            }
+                        },
+                        {
+                            "o2.endOfTransaction": {
+                                "$regex": "^unittests\\.change_stream$"
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "$and": [
+                {
+                    "o.applyOps": {
+                        "$elemMatch": {
+                            "$or": [
+                                {
+                                    "$and": [
+                                        {
+                                            "a": {
+                                                "$eq": 1
+                                            }
+                                        },
+                                        {
+                                            "b": {
+                                                "$eq": 2
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "foo": {
+                                        "$eq": "bar"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "op": {
+                        "$eq": "c"
+                    }
+                },
+                {
+                    "o.partialTxn": {
+                        "$not": {
+                            "$eq": true
+                        }
+                    }
+                },
+                {
+                    "o.prepare": {
+                        "$not": {
+                            "$eq": true
+                        }
+                    }
+                },
+                {
+                    "o.applyOps": {
+                        "$type": [
+                            4
+                        ]
+                    }
+                }
+            ]
+        }
+    ]
+}
+    )";
+
+    ASSERT_BSONOBJ_EQ_AUTO(expected, actualFilter->serialize());
+}
+
+// Test different values for 'ignoreRemovedShards' when creating a change stream.
+TEST_F(ChangeStreamStageTest, SetIgnoreRemovedShards) {
+    std::array<boost::optional<bool>, 3> values = {boost::none, true, false};
+
+    for (auto ignoreRemovedShards : values) {
+        BSONObj spec;
+        if (ignoreRemovedShards.has_value()) {
+            spec = BSON("$changeStream" << BSON("ignoreRemovedShards" << *ignoreRemovedShards));
+        } else {
+            spec = BSON("$changeStream" << BSONObj());
+        }
+
+        auto pipeline = DSChangeStream::createFromBson(spec.firstElement(), getExpCtx());
+        ASSERT_FALSE(pipeline.empty());
+
+        bool found = false;
+        for (auto& stage : pipeline) {
+            if (stage->getSourceName() == DocumentSourceChangeStreamTransform::kStageName) {
+                // Serialize the stage to BSON and read back the "version" field.
+                std::vector<Value> serialization;
+                stage->serializeToArray(serialization);
+
+                ASSERT_EQ(serialization.size(), 1UL);
+                ASSERT_EQ(serialization[0].getType(), BSONType::object);
+
+                if (ignoreRemovedShards.has_value()) {
+                    ASSERT_EQ(*ignoreRemovedShards,
+                              serialization[0]
+                                  .getDocument()
+                                  .getField(DocumentSourceChangeStreamTransform::kStageName)
+                                  .getDocument()
+                                  .getField("ignoreRemovedShards"_sd)
+                                  .getBool());
+                } else {
+                    ASSERT_TRUE(serialization[0]
+                                    .getDocument()
+                                    .getField(DocumentSourceChangeStreamTransform::kStageName)
+                                    .getDocument()
+                                    .getField("ignoreRemovedShards"_sd)
+                                    .missing());
+                }
+                found = true;
+
+                // Also test conversion from optional<bool> to 'ChangeStreamReadMode' enum value.
+                ChangeStreamReadMode readMode =
+                    fromIgnoreRemovedShardsParameter(ignoreRemovedShards);
+                ASSERT_EQ(ignoreRemovedShards.value_or(false)
+                              ? ChangeStreamReadMode::kIgnoreRemovedShards
+                              : ChangeStreamReadMode::kStrict,
+                          readMode);
+            }
+        }
+        ASSERT_TRUE(found);
+    }
+}
+
 TEST_F(ChangeStreamStageTest, TransformInsertDocKeyXAndId) {
-    auto insert = makeOplogEntry(OpTypeEnum::kInsert,           // op type
-                                 nss,                           // namespace
-                                 BSON("_id" << 1 << "x" << 2),  // o
-                                 testUuid(),                    // uuid
-                                 boost::none,                   // fromMigrate
-                                 boost::none);                  // o2
+    auto insert = makeOplogEntry(OpTypeEnum::kInsert,            // op type
+                                 nss,                            // namespace
+                                 BSON("_id" << 1 << "x" << 2),   // o
+                                 testUuid(),                     // uuid
+                                 boost::none,                    // fromMigrate
+                                 BSON("x" << 2 << "_id" << 1));  // o2
 
     Document expectedInsert{
         {DSChangeStream::kIdField,
-         makeResumeToken(kDefaultTs, testUuid(), BSON("x" << 2 << "_id" << 1))},
+         makeResumeToken(
+             kDefaultTs, testUuid(), BSON("x" << 2 << "_id" << 1), DSChangeStream::kInsertOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kInsertOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kWallTimeField, Date_t()},
         {DSChangeStream::kFullDocumentField, D{{"_id", 1}, {"x", 2}}},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"x", 2}, {"_id", 1}}},  // Note _id <-> x reversal.
     };
-    checkTransformation(insert, expectedInsert, {{"x"}, {"_id"}});
+    checkTransformation(insert, expectedInsert);
     bool fromMigrate = false;  // also check actual "fromMigrate: false" not filtered
     auto insert2 = makeOplogEntry(insert.getOpType(),    // op type
                                   insert.getNss(),       // namespace
@@ -728,27 +1292,29 @@ TEST_F(ChangeStreamStageTest, TransformInsertDocKeyXAndId) {
                                   insert.getUuid(),      // uuid
                                   fromMigrate,           // fromMigrate
                                   insert.getObject2());  // o2
-    checkTransformation(insert2, expectedInsert, {{"x"}, {"_id"}});
+    checkTransformation(insert2, expectedInsert);
 }
 
 TEST_F(ChangeStreamStageTest, TransformInsertDocKeyIdAndX) {
-    auto insert = makeOplogEntry(OpTypeEnum::kInsert,           // op type
-                                 nss,                           // namespace
-                                 BSON("x" << 2 << "_id" << 1),  // o
-                                 testUuid(),                    // uuid
-                                 boost::none,                   // fromMigrate
-                                 boost::none);                  // o2
+    auto insert = makeOplogEntry(OpTypeEnum::kInsert,            // op type
+                                 nss,                            // namespace
+                                 BSON("x" << 2 << "_id" << 1),   // o
+                                 testUuid(),                     // uuid
+                                 boost::none,                    // fromMigrate
+                                 BSON("_id" << 1 << "x" << 2));  // o2
 
     Document expectedInsert{
         {DSChangeStream::kIdField,
-         makeResumeToken(kDefaultTs, testUuid(), BSON("_id" << 1 << "x" << 2))},
+         makeResumeToken(
+             kDefaultTs, testUuid(), BSON("_id" << 1 << "x" << 2), DSChangeStream::kInsertOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kInsertOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kWallTimeField, Date_t()},
         {DSChangeStream::kFullDocumentField, D{{"x", 2}, {"_id", 1}}},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 1}, {"x", 2}}},  // _id first
     };
-    checkTransformation(insert, expectedInsert, {{"_id"}, {"x"}});
+    checkTransformation(insert, expectedInsert);
 }
 
 TEST_F(ChangeStreamStageTest, TransformInsertDocKeyJustId) {
@@ -757,17 +1323,19 @@ TEST_F(ChangeStreamStageTest, TransformInsertDocKeyJustId) {
                                  BSON("_id" << 1 << "x" << 2),  // o
                                  testUuid(),                    // uuid
                                  boost::none,                   // fromMigrate
-                                 boost::none);                  // o2
+                                 BSON("_id" << 1));             // o2
 
     Document expectedInsert{
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid(), BSON("_id" << 1))},
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), BSON("_id" << 1), DSChangeStream::kInsertOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kInsertOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kWallTimeField, Date_t()},
         {DSChangeStream::kFullDocumentField, D{{"_id", 1}, {"x", 2}}},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 1}}},
     };
-    checkTransformation(insert, expectedInsert, {{"_id"}});
+    checkTransformation(insert, expectedInsert);
 }
 
 TEST_F(ChangeStreamStageTest, TransformInsertFromMigrate) {
@@ -784,28 +1352,31 @@ TEST_F(ChangeStreamStageTest, TransformInsertFromMigrate) {
 
 TEST_F(ChangeStreamStageTest, TransformInsertFromMigrateShowMigrations) {
     bool fromMigrate = true;
-    auto insert = makeOplogEntry(OpTypeEnum::kInsert,           // op type
-                                 nss,                           // namespace
-                                 BSON("x" << 2 << "_id" << 1),  // o
-                                 testUuid(),                    // uuid
-                                 fromMigrate,                   // fromMigrate
-                                 boost::none);                  // o2
+    auto insert = makeOplogEntry(OpTypeEnum::kInsert,            // op type
+                                 nss,                            // namespace
+                                 BSON("x" << 2 << "_id" << 1),   // o
+                                 testUuid(),                     // uuid
+                                 fromMigrate,                    // fromMigrate
+                                 BSON("_id" << 1 << "x" << 2));  // o2
 
     auto spec = fromjson("{$changeStream: {showMigrationEvents: true}}");
     Document expectedInsert{
         {DSChangeStream::kIdField,
-         makeResumeToken(kDefaultTs, testUuid(), BSON("_id" << 1 << "x" << 2))},
+         makeResumeToken(
+             kDefaultTs, testUuid(), BSON("_id" << 1 << "x" << 2), DSChangeStream::kInsertOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kInsertOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kWallTimeField, Date_t()},
         {DSChangeStream::kFullDocumentField, D{{"x", 2}, {"_id", 1}}},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 1}, {"x", 2}}},  // _id first
     };
-    checkTransformation(insert, expectedInsert, {{"_id"}, {"x"}}, spec);
+    checkTransformation(insert, expectedInsert, spec);
 }
 
 TEST_F(ChangeStreamStageTest, TransformUpdateFields) {
-    BSONObj o = BSON("$set" << BSON("y" << 1));
+    BSONObj diff = BSON("u" << BSON("y" << 1));
+    BSONObj o = BSON("diff" << diff << "$v" << 2);
     BSONObj o2 = BSON("_id" << 1 << "x" << 2);
     auto updateField = makeOplogEntry(OpTypeEnum::kUpdate,  // op type
                                       nss,                  // namespace
@@ -814,19 +1385,38 @@ TEST_F(ChangeStreamStageTest, TransformUpdateFields) {
                                       boost::none,          // fromMigrate
                                       o2);                  // o2
 
-    // Update fields
-    Document expectedUpdateField{
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid(), o2)},
-        {DSChangeStream::kOperationTypeField, DSChangeStream::kUpdateOpType},
-        {DSChangeStream::kClusterTimeField, kDefaultTs},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
-        {DSChangeStream::kDocumentKeyField, D{{"_id", 1}, {"x", 2}}},
-        {
-            "updateDescription",
-            D{{"updatedFields", D{{"y", 1}}}, {"removedFields", vector<V>()}},
-        },
-    };
+    const auto expectedUpdateField =
+        makeExpectedUpdateEvent(kDefaultTs,
+                                nss,
+                                o2,
+                                D{{"updatedFields", D{{"y", 1}}},
+                                  {"removedFields", std::vector<V>()},
+                                  {"truncatedArrays", std::vector<V>()}});
+
     checkTransformation(updateField, expectedUpdateField);
+}
+
+TEST_F(ChangeStreamStageTest, TransformUpdateFieldsShowExpandedEvents) {
+    BSONObj diff = BSON("u" << BSON("y" << 1));
+    BSONObj o = BSON("diff" << diff << "$v" << 2);
+    BSONObj o2 = BSON("_id" << 1 << "x" << 2);
+    auto updateField = makeOplogEntry(OpTypeEnum::kUpdate,  // op type
+                                      nss,                  // namespace
+                                      o,                    // o
+                                      testUuid(),           // uuid
+                                      boost::none,          // fromMigrate
+                                      o2);                  // o2
+
+    const auto expectedUpdateField =
+        makeExpectedUpdateEvent(kDefaultTs,
+                                nss,
+                                o2,
+                                D{{"updatedFields", D{{"y", 1}}},
+                                  {"removedFields", std::vector<V>()},
+                                  {"truncatedArrays", std::vector<V>()},
+                                  {"disambiguatedPaths", D{}}},
+                                true);
+    checkTransformation(updateField, expectedUpdateField, kShowExpandedEventsSpec);
 }
 
 TEST_F(ChangeStreamStageTest, TransformSimpleDeltaOplogUpdatedFields) {
@@ -835,8 +1425,8 @@ TEST_F(ChangeStreamStageTest, TransformSimpleDeltaOplogUpdatedFields) {
 
     runUpdateV2OplogTest(diff,
                          D{{"updatedFields", D{{"a", 1}, {"b", "updated"_sd}}},
-                           {"removedFields", vector<V>{}},
-                           {"truncatedArrays", vector<V>{}}});
+                           {"removedFields", std::vector<V>{}},
+                           {"truncatedArrays", std::vector<V>{}}});
 }
 
 TEST_F(ChangeStreamStageTest, TransformSimpleDeltaOplogInsertFields) {
@@ -845,8 +1435,8 @@ TEST_F(ChangeStreamStageTest, TransformSimpleDeltaOplogInsertFields) {
 
     runUpdateV2OplogTest(diff,
                          D{{"updatedFields", D{{"a", 1}, {"b", "updated"_sd}}},
-                           {"removedFields", vector<V>{}},
-                           {"truncatedArrays", vector<V>{}}});
+                           {"removedFields", std::vector<V>{}},
+                           {"truncatedArrays", std::vector<V>{}}});
 }
 
 TEST_F(ChangeStreamStageTest, TransformSimpleDeltaOplogRemovedFields) {
@@ -854,8 +1444,8 @@ TEST_F(ChangeStreamStageTest, TransformSimpleDeltaOplogRemovedFields) {
 
     runUpdateV2OplogTest(diff,
                          D{{"updatedFields", D{}},
-                           {"removedFields", vector<V>{V("a"_sd), V("b"_sd)}},
-                           {"truncatedArrays", vector<V>{}}});
+                           {"removedFields", std::vector<V>{V("a"_sd), V("b"_sd)}},
+                           {"truncatedArrays", std::vector<V>{}}});
 }
 
 TEST_F(ChangeStreamStageTest, TransformComplexDeltaOplog) {
@@ -868,8 +1458,8 @@ TEST_F(ChangeStreamStageTest, TransformComplexDeltaOplog) {
 
     runUpdateV2OplogTest(diff,
                          D{{"updatedFields", D{{"c", 1}, {"d", "updated"_sd}, {"e", 2}, {"f", 3}}},
-                           {"removedFields", vector<V>{V("a"_sd), V("b"_sd)}},
-                           {"truncatedArrays", vector<V>{}}});
+                           {"removedFields", std::vector<V>{V("a"_sd), V("b"_sd)}},
+                           {"truncatedArrays", std::vector<V>{}}});
 }
 
 TEST_F(ChangeStreamStageTest, TransformDeltaOplogSubObjectDiff) {
@@ -886,8 +1476,8 @@ TEST_F(ChangeStreamStageTest, TransformDeltaOplogSubObjectDiff) {
         diff,
         D{{"updatedFields",
            D{{"c", 1}, {"d", "updated"_sd}, {"subObj.c", 1}, {"subObj.d", "updated"_sd}}},
-          {"removedFields", vector<V>{V("subObj.a"_sd), V("subObj.b"_sd)}},
-          {"truncatedArrays", vector<V>{}}});
+          {"removedFields", std::vector<V>{V("subObj.a"_sd), V("subObj.b"_sd)}},
+          {"truncatedArrays", std::vector<V>{}}});
 }
 
 TEST_F(ChangeStreamStageTest, TransformDeltaOplogSubArrayDiff) {
@@ -897,15 +1487,14 @@ TEST_F(ChangeStreamStageTest, TransformDeltaOplogSubArrayDiff) {
         "           u0: 1,"
         "           u1: {a: 1}},"
         "   sarrField2: {a: true, l: 20}"
-        "   }"
         "}");
 
     runUpdateV2OplogTest(diff,
                          D{{"updatedFields", D{{"arrField.0", 1}, {"arrField.1", D{{"a", 1}}}}},
-                           {"removedFields", vector<V>{}},
+                           {"removedFields", std::vector<V>{}},
                            {"truncatedArrays",
-                            vector<V>{V{D{{"field", "arrField"_sd}, {"newSize", 10}}},
-                                      V{D{{"field", "arrField2"_sd}, {"newSize", 20}}}}}});
+                            std::vector<V>{V{D{{"field", "arrField"_sd}, {"newSize", 10}}},
+                                           V{D{{"field", "arrField2"_sd}, {"newSize", 20}}}}}});
 }
 
 TEST_F(ChangeStreamStageTest, TransformDeltaOplogSubArrayDiffWithEmptyStringField) {
@@ -919,8 +1508,8 @@ TEST_F(ChangeStreamStageTest, TransformDeltaOplogSubArrayDiffWithEmptyStringFiel
     runUpdateV2OplogTest(
         diff,
         D{{"updatedFields", D{{".0", 1}, {".1", D{{"a", 1}}}}},
-          {"removedFields", vector<V>{}},
-          {"truncatedArrays", vector<V>{V{D{{"field", ""_sd}, {"newSize", 10}}}}}});
+          {"removedFields", std::vector<V>{}},
+          {"truncatedArrays", std::vector<V>{V{D{{"field", ""_sd}, {"newSize", 10}}}}}});
 }
 
 TEST_F(ChangeStreamStageTest, TransformDeltaOplogNestedComplexSubDiffs) {
@@ -951,14 +1540,15 @@ TEST_F(ChangeStreamStageTest, TransformDeltaOplogNestedComplexSubDiffs) {
                {"arrField.6", 2},
                {"subObj.a", 1},
            }},
-          {"removedFields", vector<V>{V("subObj.b"_sd)}},
-          {"truncatedArrays", vector<V>{V{D{{"field", "arrField"_sd}, {"newSize", 10}}}}}});
+          {"removedFields", std::vector<V>{V("subObj.b"_sd)}},
+          {"truncatedArrays", std::vector<V>{V{D{{"field", "arrField"_sd}, {"newSize", 10}}}}}});
 }
 
 // Legacy documents might not have an _id field; then the document key is the full (post-update)
 // document.
 TEST_F(ChangeStreamStageTest, TransformUpdateFieldsLegacyNoId) {
-    BSONObj o = BSON("$set" << BSON("y" << 1));
+    BSONObj diff = BSON("u" << BSON("y" << 1));
+    BSONObj o = BSON("diff" << diff << "$v" << 2);
     BSONObj o2 = BSON("x" << 1 << "y" << 1);
     auto updateField = makeOplogEntry(OpTypeEnum::kUpdate,  // op type
                                       nss,                  // namespace
@@ -967,23 +1557,19 @@ TEST_F(ChangeStreamStageTest, TransformUpdateFieldsLegacyNoId) {
                                       boost::none,          // fromMigrate
                                       o2);                  // o2
 
-    // Update fields
-    Document expectedUpdateField{
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid(), o2)},
-        {DSChangeStream::kOperationTypeField, DSChangeStream::kUpdateOpType},
-        {DSChangeStream::kClusterTimeField, kDefaultTs},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
-        {DSChangeStream::kDocumentKeyField, D{{"x", 1}, {"y", 1}}},
-        {
-            "updateDescription",
-            D{{"updatedFields", D{{"y", 1}}}, {"removedFields", vector<V>()}},
-        },
-    };
+    const auto expectedUpdateField =
+        makeExpectedUpdateEvent(kDefaultTs,
+                                nss,
+                                o2,
+                                D{{"updatedFields", D{{"y", 1}}},
+                                  {"removedFields", std::vector<V>()},
+                                  {"truncatedArrays", std::vector<V>()}});
     checkTransformation(updateField, expectedUpdateField);
 }
 
 TEST_F(ChangeStreamStageTest, TransformRemoveFields) {
-    BSONObj o = BSON("$unset" << BSON("y" << 1));
+    BSONObj diff = BSON("d" << BSON("y" << false));
+    BSONObj o = BSON("diff" << diff << "$v" << 2);
     BSONObj o2 = BSON("_id" << 1 << "x" << 2);
     auto removeField = makeOplogEntry(OpTypeEnum::kUpdate,  // op type
                                       nss,                  // namespace
@@ -992,18 +1578,14 @@ TEST_F(ChangeStreamStageTest, TransformRemoveFields) {
                                       boost::none,          // fromMigrate
                                       o2);                  // o2
 
-    // Remove fields
-    Document expectedRemoveField{
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid(), o2)},
-        {DSChangeStream::kOperationTypeField, DSChangeStream::kUpdateOpType},
-        {DSChangeStream::kClusterTimeField, kDefaultTs},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
-        {DSChangeStream::kDocumentKeyField, Document{{"_id", 1}, {"x", 2}}},
-        {
-            "updateDescription",
-            D{{"updatedFields", D{}}, {"removedFields", {"y"_sd}}},
-        }};
-    checkTransformation(removeField, expectedRemoveField);
+    const auto expectedUpdateField =
+        makeExpectedUpdateEvent(kDefaultTs,
+                                nss,
+                                o2,
+                                D{{"updatedFields", D{}},
+                                  {"removedFields", {"y"_sd}},
+                                  {"truncatedArrays", std::vector<V>()}});
+    checkTransformation(removeField, expectedUpdateField);
 }  // namespace
 
 TEST_F(ChangeStreamStageTest, TransformReplace) {
@@ -1018,14 +1600,41 @@ TEST_F(ChangeStreamStageTest, TransformReplace) {
 
     // Replace
     Document expectedReplace{
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid(), o2)},
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), o2, DSChangeStream::kReplaceOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kReplaceOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kWallTimeField, Date_t()},
         {DSChangeStream::kFullDocumentField, D{{"_id", 1}, {"x", 2}, {"y", 1}}},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 1}, {"x", 2}}},
     };
     checkTransformation(replace, expectedReplace);
+}
+
+TEST_F(ChangeStreamStageTest, TransformReplaceShowExpandedEvents) {
+    BSONObj o = BSON("_id" << 1 << "x" << 2 << "y" << 1);
+    BSONObj o2 = BSON("_id" << 1 << "x" << 2);
+    auto replace = makeOplogEntry(OpTypeEnum::kUpdate,  // op type
+                                  nss,                  // namespace
+                                  o,                    // o
+                                  testUuid(),           // uuid
+                                  boost::none,          // fromMigrate
+                                  o2);                  // o2
+
+    // Replace
+    Document expectedReplace{
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), o2, DSChangeStream::kReplaceOpType)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kReplaceOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kCollectionUuidField, testUuid()},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kFullDocumentField, D{{"_id", 1}, {"x", 2}, {"y", 1}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kDocumentKeyField, D{{"_id", 1}, {"x", 2}}},
+    };
+    checkTransformation(replace, expectedReplace, kShowExpandedEventsSpec);
 }
 
 TEST_F(ChangeStreamStageTest, TransformDelete) {
@@ -1039,10 +1648,12 @@ TEST_F(ChangeStreamStageTest, TransformDelete) {
 
     // Delete
     Document expectedDelete{
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid(), o)},
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), o, DSChangeStream::kDeleteOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kDeleteOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 1}, {"x", 2}}},
     };
     checkTransformation(deleteEntry, expectedDelete);
@@ -1056,6 +1667,39 @@ TEST_F(ChangeStreamStageTest, TransformDelete) {
                                        deleteEntry.getObject2());  // o2
 
     checkTransformation(deleteEntry2, expectedDelete);
+}
+
+TEST_F(ChangeStreamStageTest, TransformDeleteShowExpandedEvents) {
+    BSONObj o = BSON("_id" << 1 << "x" << 2);
+    auto deleteEntry = makeOplogEntry(OpTypeEnum::kDelete,  // op type
+                                      nss,                  // namespace
+                                      o,                    // o
+                                      testUuid(),           // uuid
+                                      boost::none,          // fromMigrate
+                                      boost::none);         // o2
+
+    // Delete
+    Document expectedDelete{
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), o, DSChangeStream::kDeleteOpType)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kDeleteOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kCollectionUuidField, testUuid()},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kDocumentKeyField, D{{"_id", 1}, {"x", 2}}},
+    };
+    checkTransformation(deleteEntry, expectedDelete, kShowExpandedEventsSpec);
+
+    bool fromMigrate = false;  // also check actual "fromMigrate: false" not filtered
+    auto deleteEntry2 = makeOplogEntry(deleteEntry.getOpType(),    // op type
+                                       deleteEntry.getNss(),       // namespace
+                                       deleteEntry.getObject(),    // o
+                                       deleteEntry.getUuid(),      // uuid
+                                       fromMigrate,                // fromMigrate
+                                       deleteEntry.getObject2());  // o2
+
+    checkTransformation(deleteEntry2, expectedDelete, kShowExpandedEventsSpec);
 }
 
 TEST_F(ChangeStreamStageTest, TransformDeleteFromMigrate) {
@@ -1078,66 +1722,171 @@ TEST_F(ChangeStreamStageTest, TransformDeleteFromMigrateShowMigrations) {
                                       o,                    // o
                                       testUuid(),           // uuid
                                       fromMigrate,          // fromMigrate
-                                      boost::none);         // o2
+                                      BSON("_id" << 1));    // o2
 
     auto spec = fromjson("{$changeStream: {showMigrationEvents: true}}");
     Document expectedDelete{
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid(), o)},
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), o, DSChangeStream::kDeleteOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kDeleteOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 1}}},
     };
 
-    checkTransformation(deleteEntry, expectedDelete, {}, spec);
+    checkTransformation(deleteEntry, expectedDelete, spec);
 }
 
 TEST_F(ChangeStreamStageTest, TransformDrop) {
     OplogEntry dropColl = createCommand(BSON("drop" << nss.coll()), testUuid());
 
     Document expectedDrop{
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid())},
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), Value(), DSChangeStream::kDropCollectionOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kDropCollectionOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
     };
     Document expectedInvalidate{
         {DSChangeStream::kIdField,
-         makeResumeToken(
-             kDefaultTs, testUuid(), Value(), ResumeTokenData::FromInvalidate::kFromInvalidate)},
+         makeResumeToken(kDefaultTs,
+                         testUuid(),
+                         Value(),
+                         DSChangeStream::kDropCollectionOpType,
+                         ResumeTokenData::FromInvalidate::kFromInvalidate)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kWallTimeField, Date_t()},
     };
 
-    checkTransformation(dropColl, expectedDrop, {}, kDefaultSpec, expectedInvalidate);
+    checkTransformation(dropColl, expectedDrop, kDefaultSpec, expectedInvalidate);
+}
+
+TEST_F(ChangeStreamStageTest, TransformDropShowExpandedEvents) {
+    OplogEntry dropColl = createCommand(BSON("drop" << nss.coll()), testUuid());
+
+    Document expectedDrop{
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), Value(), DSChangeStream::kDropCollectionOpType)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kDropCollectionOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kCollectionUuidField, testUuid()},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+    };
+
+    Document expectedInvalidate{
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs,
+                         testUuid(),
+                         Value(),
+                         DSChangeStream::kDropCollectionOpType,
+                         ResumeTokenData::FromInvalidate::kFromInvalidate)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kWallTimeField, Date_t()},
+    };
+
+    checkTransformation(dropColl, expectedDrop, kShowExpandedEventsSpec, expectedInvalidate);
+}
+
+TEST_F(ChangeStreamStageTest, TransformCreate) {
+    OplogEntry create = createCommand(BSON("create" << nss.coll() << "idIndex"
+                                                    << BSON("v" << 2 << "key" << BSON("id" << 1))
+                                                    << "name" << IndexConstants::kIdIndexName),
+                                      testUuid());
+
+    const auto expectedOpDescription = fromjson("{idIndex: {v: 2, key: {id: 1}}, name: '_id_'}");
+    Document expectedCreate{
+        {DSChangeStream::kIdField,
+         makeResumeToken(
+             kDefaultTs, testUuid(), expectedOpDescription, DSChangeStream::kCreateOpType)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kCreateOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kCollectionUuidField, testUuid()},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kOperationDescriptionField, Value(expectedOpDescription)},
+        {DSChangeStream::kNsTypeField, "collection"_sd}};
+
+    checkTransformation(create, expectedCreate, kShowExpandedEventsSpec);
 }
 
 TEST_F(ChangeStreamStageTest, TransformRename) {
-    NamespaceString otherColl("test.bar");
-    OplogEntry rename =
-        createCommand(BSON("renameCollection" << nss.ns() << "to" << otherColl.ns()), testUuid());
+    NamespaceString otherColl = NamespaceString::createNamespaceString_forTest("test.bar");
+    OplogEntry rename = createCommand(
+        BSON("renameCollection" << nss.ns_forTest() << "to" << otherColl.ns_forTest()), testUuid());
 
+    const auto opDesc =
+        Value(D{{"to", D{{"db", otherColl.db_forTest()}, {"coll", otherColl.coll()}}}});
     Document expectedRename{
         {DSChangeStream::kRenameTargetNssField,
-         D{{"db", otherColl.db()}, {"coll", otherColl.coll()}}},
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid())},
+         D{{"db", otherColl.db_forTest()}, {"coll", otherColl.coll()}}},
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), opDesc, DSChangeStream::kRenameCollectionOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kRenameCollectionOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
     };
     Document expectedInvalidate{
         {DSChangeStream::kIdField,
-         makeResumeToken(
-             kDefaultTs, testUuid(), Value(), ResumeTokenData::FromInvalidate::kFromInvalidate)},
+         makeResumeToken(kDefaultTs,
+                         testUuid(),
+                         opDesc,
+                         DSChangeStream::kRenameCollectionOpType,
+                         ResumeTokenData::FromInvalidate::kFromInvalidate)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kWallTimeField, Date_t()},
     };
 
-    checkTransformation(rename, expectedRename, {}, kDefaultSpec, expectedInvalidate);
+    checkTransformation(rename, expectedRename, kDefaultSpec, expectedInvalidate);
+}
+
+TEST_F(ChangeStreamStageTest, TransformRenameShowExpandedEvents) {
+    NamespaceString otherColl = NamespaceString::createNamespaceString_forTest("test.bar");
+    auto dropTarget = UUID::gen();
+    OplogEntry rename =
+        createCommand(BSON("renameCollection" << nss.ns_forTest() << "to" << otherColl.ns_forTest()
+                                              << "dropTarget" << dropTarget),
+                      testUuid());
+
+    const auto opDesc = V{
+        D{{"to", D{{"db", otherColl.db_forTest()}, {"coll", otherColl.coll()}}},
+          {"dropTarget", dropTarget}},
+    };
+    Document expectedRename{
+        {DSChangeStream::kRenameTargetNssField,
+         D{{"db", otherColl.db_forTest()}, {"coll", otherColl.coll()}}},
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), opDesc, DSChangeStream::kRenameCollectionOpType)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kRenameCollectionOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kCollectionUuidField, testUuid()},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kOperationDescriptionField, opDesc},
+    };
+    Document expectedInvalidate{
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs,
+                         testUuid(),
+                         opDesc,
+                         DSChangeStream::kRenameCollectionOpType,
+                         ResumeTokenData::FromInvalidate::kFromInvalidate)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kWallTimeField, Date_t()},
+    };
+
+    checkTransformation(rename, expectedRename, kShowExpandedEventsSpec, expectedInvalidate);
 }
 
 TEST_F(ChangeStreamStageTest, TransformInvalidateFromMigrate) {
-    NamespaceString otherColl("test.bar");
+    NamespaceString otherColl = NamespaceString::createNamespaceString_forTest("test.bar");
 
     bool dropCollFromMigrate = true;
     OplogEntry dropColl =
@@ -1145,10 +1894,10 @@ TEST_F(ChangeStreamStageTest, TransformInvalidateFromMigrate) {
     bool dropDBFromMigrate = true;
     OplogEntry dropDB = createCommand(BSON("dropDatabase" << 1), boost::none, dropDBFromMigrate);
     bool renameFromMigrate = true;
-    OplogEntry rename =
-        createCommand(BSON("renameCollection" << nss.ns() << "to" << otherColl.ns()),
-                      boost::none,
-                      renameFromMigrate);
+    OplogEntry rename = createCommand(
+        BSON("renameCollection" << nss.ns_forTest() << "to" << otherColl.ns_forTest()),
+        boost::none,
+        renameFromMigrate);
 
     for (auto& entry : {dropColl, dropDB, rename}) {
         checkTransformation(entry, boost::none);
@@ -1156,26 +1905,34 @@ TEST_F(ChangeStreamStageTest, TransformInvalidateFromMigrate) {
 }
 
 TEST_F(ChangeStreamStageTest, TransformRenameTarget) {
-    NamespaceString otherColl("test.bar");
-    OplogEntry rename =
-        createCommand(BSON("renameCollection" << otherColl.ns() << "to" << nss.ns()), testUuid());
+    NamespaceString otherColl = NamespaceString::createNamespaceString_forTest("test.bar");
+    OplogEntry rename = createCommand(
+        BSON("renameCollection" << otherColl.ns_forTest() << "to" << nss.ns_forTest()), testUuid());
 
+    const auto opDesc = Value(D{{"to", D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}}});
     Document expectedRename{
-        {DSChangeStream::kRenameTargetNssField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid())},
+        {DSChangeStream::kRenameTargetNssField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), opDesc, DSChangeStream::kRenameCollectionOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kRenameCollectionOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
-        {DSChangeStream::kNamespaceField, D{{"db", otherColl.db()}, {"coll", otherColl.coll()}}},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField,
+         D{{"db", otherColl.db_forTest()}, {"coll", otherColl.coll()}}},
     };
     Document expectedInvalidate{
         {DSChangeStream::kIdField,
-         makeResumeToken(
-             kDefaultTs, testUuid(), Value(), ResumeTokenData::FromInvalidate::kFromInvalidate)},
+         makeResumeToken(kDefaultTs,
+                         testUuid(),
+                         opDesc,
+                         DSChangeStream::kRenameCollectionOpType,
+                         ResumeTokenData::FromInvalidate::kFromInvalidate)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kWallTimeField, Date_t()},
     };
 
-    checkTransformation(rename, expectedRename, {}, kDefaultSpec, expectedInvalidate);
+    checkTransformation(rename, expectedRename, kDefaultSpec, expectedInvalidate);
 }
 
 TEST_F(ChangeStreamStageTest, MatchFiltersDropDatabaseCommand) {
@@ -1184,7 +1941,9 @@ TEST_F(ChangeStreamStageTest, MatchFiltersDropDatabaseCommand) {
 }
 
 TEST_F(ChangeStreamStageTest, TransformNewShardDetected) {
-    auto o2Field = D{{"type", "migrateChunkToNewShard"_sd}};
+    auto o2Field = D{{"migrateChunkToNewShard", nss.toString_forTest()},
+                     {"fromShardId", "fromShard"_sd},
+                     {"toShardId", "toShard"_sd}};
     auto newShardDetected = makeOplogEntry(OpTypeEnum::kNoop,
                                            nss,
                                            BSONObj(),
@@ -1192,22 +1951,88 @@ TEST_F(ChangeStreamStageTest, TransformNewShardDetected) {
                                            boost::none,  // fromMigrate
                                            o2Field.toBson());
 
+    const auto opDesc = Value(D{{"fromShardId", "fromShard"_sd}, {"toShardId", "toShard"_sd}});
     Document expectedNewShardDetected{
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid(), BSON("_id" << o2Field))},
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), opDesc, DSChangeStream::kNewShardDetectedOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kNewShardDetectedOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kCollectionUuidField, testUuid()},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kOperationDescriptionField, opDesc},
     };
 
-    getExpCtx()->needsMerge = true;
+    getExpCtx()->setNeedsMerge(true);
 
-    checkTransformation(newShardDetected, expectedNewShardDetected);
+    checkTransformation(newShardDetected, expectedNewShardDetected, kShowExpandedEventsSpec);
+}
+
+TEST_F(ChangeStreamStageTest, TransformShardingEvents) {
+    auto uuid = UUID::gen();
+
+    for (auto eventType : {DSChangeStream::kShardCollectionOpType,
+                           DSChangeStream::kMigrateLastChunkFromShardOpType,
+                           DSChangeStream::kRefineCollectionShardKeyOpType,
+                           DSChangeStream::kReshardCollectionOpType,
+                           DSChangeStream::kNewShardDetectedOpType,
+                           DSChangeStream::kReshardBeginOpType,
+                           DSChangeStream::kReshardBlockingWritesOpType,
+                           DSChangeStream::kReshardDoneCatchUpOpType}) {
+
+        const bool hasReshardingUuid = eventType == DSChangeStream::kReshardBeginOpType ||
+            eventType == DSChangeStream::kReshardBlockingWritesOpType ||
+            eventType == DSChangeStream::kReshardDoneCatchUpOpType;
+
+        BSONObjBuilder bob;
+        bob.appendBool(eventType, 1);
+        if (hasReshardingUuid) {
+            bob.append(DSChangeStream::kReshardingUuidField, uuid.toBSON());
+        }
+
+        auto entry = makeOplogEntry(OpTypeEnum::kNoop,
+                                    nss,
+                                    BSONObj(),
+                                    uuid,
+                                    false,  // fromMigrate
+                                    bob.obj());
+
+        Value opDesc = V{D{}};
+        if (hasReshardingUuid) {
+            opDesc = V{D{{DSChangeStream::kReshardingUuidField, D{{"uuid"_sd, uuid}}}}};
+        }
+
+        Document expectedDoc{
+            {DSChangeStream::kReshardingUuidField,
+             hasReshardingUuid ? V{D{{"uuid"_sd, uuid}}} : V{}},
+            {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, uuid, opDesc, eventType)},
+            {DSChangeStream::kOperationTypeField, eventType},
+            {DSChangeStream::kClusterTimeField, kDefaultTs},
+            {DSChangeStream::kCollectionUuidField, uuid},
+            {DSChangeStream::kWallTimeField, Date_t()},
+            {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+            {DSChangeStream::kOperationDescriptionField, opDesc},
+        };
+
+        if (eventType == DSChangeStream::kNewShardDetectedOpType) {
+            // Need to set this because the event is only emitted on the router.
+            getExpCtx()->setNeedsMerge(true);
+        }
+
+        // Using 'show...Events' here in order to see all relevant events.
+        checkTransformation(
+            entry,
+            expectedDoc,
+            BSON("$changeStream" << BSON("showSystemEvents" << true << "showExpandedEvents" << true
+                                                            << "showMigrationEvents" << true)));
+    }
 }
 
 TEST_F(ChangeStreamStageTest, TransformReshardBegin) {
     auto uuid = UUID::gen();
     auto reshardingUuid = UUID::gen();
 
-    ReshardingChangeEventO2Field o2Field{reshardingUuid, ReshardingChangeEventEnum::kReshardBegin};
+    ReshardBeginChangeEventO2Field o2Field{nss, reshardingUuid};
     auto reshardingBegin = makeOplogEntry(OpTypeEnum::kNoop,
                                           nss,
                                           BSONObj(),
@@ -1215,25 +2040,61 @@ TEST_F(ChangeStreamStageTest, TransformReshardBegin) {
                                           true,  // fromMigrate
                                           o2Field.toBSON());
 
-    auto spec = fromjson("{$changeStream: {showMigrationEvents: true}}");
+    auto spec = fromjson("{$changeStream: {showMigrationEvents: true, showExpandedEvents: true}}");
 
+    const auto opDesc = V{D{{"reshardingUUID", reshardingUuid}}};
     Document expectedReshardingBegin{
         {DSChangeStream::kReshardingUuidField, reshardingUuid},
         {DSChangeStream::kIdField,
-         makeResumeToken(kDefaultTs, uuid, BSON("_id" << o2Field.toBSON()))},
+         makeResumeToken(kDefaultTs, uuid, opDesc, DSChangeStream::kReshardBeginOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kReshardBeginOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kCollectionUuidField, uuid},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kOperationDescriptionField, opDesc},
     };
-    checkTransformation(reshardingBegin, expectedReshardingBegin, {}, spec);
+    checkTransformation(reshardingBegin, expectedReshardingBegin, spec);
+}
+
+TEST_F(ChangeStreamStageTest, TransformReshardBlockingWrites) {
+    auto uuid = UUID::gen();
+    auto reshardingUuid = UUID::gen();
+
+    ReshardBlockingWritesChangeEventO2Field o2Field{
+        nss, reshardingUuid, std::string{resharding::kReshardFinalOpLogType}};
+    auto reshardingBlockingWrites = makeOplogEntry(OpTypeEnum::kNoop,
+                                                   nss,
+                                                   BSONObj(),
+                                                   uuid,
+                                                   false,  // fromMigrate
+                                                   o2Field.toBSON());
+
+    auto spec = fromjson("{$changeStream: {showSystemEvents: true, showExpandedEvents: true}}");
+
+    const auto opDesc =
+        D{{"reshardingUUID", reshardingUuid}, {"type", resharding::kReshardFinalOpLogType}};
+
+    Document expectedReshardingBlockingWrites{
+        {DSChangeStream::kReshardingUuidField, reshardingUuid},
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, uuid, opDesc, DSChangeStream::kReshardBlockingWritesOpType)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kReshardBlockingWritesOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kCollectionUuidField, uuid},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kOperationDescriptionField, opDesc},
+    };
+    checkTransformation(reshardingBlockingWrites, expectedReshardingBlockingWrites, spec);
 }
 
 TEST_F(ChangeStreamStageTest, TransformReshardDoneCatchUp) {
     auto existingUuid = UUID::gen();
     auto reshardingUuid = UUID::gen();
-    auto temporaryNs = constructTemporaryReshardingNss(nss.db(), existingUuid);
+    auto temporaryNs = resharding::constructTemporaryReshardingNss(nss, existingUuid);
 
-    ReshardingChangeEventO2Field o2Field{reshardingUuid,
-                                         ReshardingChangeEventEnum::kReshardDoneCatchUp};
+    ReshardDoneCatchUpChangeEventO2Field o2Field{temporaryNs, reshardingUuid};
     auto reshardDoneCatchUp = makeOplogEntry(OpTypeEnum::kNoop,
                                              temporaryNs,
                                              BSONObj(),
@@ -1241,27 +2102,35 @@ TEST_F(ChangeStreamStageTest, TransformReshardDoneCatchUp) {
                                              true,  // fromMigrate
                                              o2Field.toBSON());
 
-    auto spec =
-        fromjson("{$changeStream: {showMigrationEvents: true, allowToRunOnSystemNS: true}}");
+    auto spec = fromjson(
+        "{$changeStream: {showMigrationEvents: true, allowToRunOnSystemNS: true, "
+        "showExpandedEvents: true}}");
     auto expCtx = getExpCtx();
-    expCtx->ns = temporaryNs;
+    expCtx->setNamespaceString(temporaryNs);
 
+    const auto opDesc = V{D{{"reshardingUUID", reshardingUuid}}};
     Document expectedReshardingDoneCatchUp{
         {DSChangeStream::kReshardingUuidField, reshardingUuid},
         {DSChangeStream::kIdField,
-         makeResumeToken(kDefaultTs, reshardingUuid, BSON("_id" << o2Field.toBSON()))},
+         makeResumeToken(
+             kDefaultTs, reshardingUuid, opDesc, DSChangeStream::kReshardDoneCatchUpOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kReshardDoneCatchUpOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kCollectionUuidField, reshardingUuid},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField,
+         D{{"db", temporaryNs.db_forTest()}, {"coll", temporaryNs.coll()}}},
+        {DSChangeStream::kOperationDescriptionField, opDesc},
     };
 
-    checkTransformation(reshardDoneCatchUp, expectedReshardingDoneCatchUp, {}, spec);
+    checkTransformation(reshardDoneCatchUp, expectedReshardingDoneCatchUp, spec);
 }
 
 TEST_F(ChangeStreamStageTest, TransformEmptyApplyOps) {
     Document applyOpsDoc{{"applyOps", Value{std::vector<Document>{}}}};
 
     LogicalSessionFromClient lsid = testLsid();
-    vector<Document> results = getApplyOpsResults(applyOpsDoc, lsid);
+    std::vector<Document> results = getApplyOpsResults(applyOpsDoc, lsid);
 
     // Should not return anything.
     ASSERT_EQ(results.size(), 0u);
@@ -1272,7 +2141,7 @@ DEATH_TEST_F(ChangeStreamStageTest, ShouldCrashWithNoopInsideApplyOps, "Unexpect
         Document{{"applyOps",
                   Value{std::vector<Document>{
                       Document{{"op", "n"_sd},
-                               {"ns", nss.ns()},
+                               {"ns", nss.ns_forTest()},
                                {"ui", testUuid()},
                                {"o", Value{Document{{"_id", 123}, {"x", "hallo"_sd}}}}}}}}};
     LogicalSessionFromClient lsid = testLsid();
@@ -1285,7 +2154,7 @@ DEATH_TEST_F(ChangeStreamStageTest,
     Document applyOpsDoc =
         Document{{"applyOps",
                   Value{std::vector<Document>{
-                      Document{{"ns", nss.ns()},
+                      Document{{"ns", nss.ns_forTest()},
                                {"ui", testUuid()},
                                {"o", Value{Document{{"_id", 123}, {"x", "hallo"_sd}}}}}}}}};
     LogicalSessionFromClient lsid = testLsid();
@@ -1299,33 +2168,70 @@ DEATH_TEST_F(ChangeStreamStageTest,
         Document{{"applyOps",
                   Value{std::vector<Document>{
                       Document{{"op", 2},
-                               {"ns", nss.ns()},
+                               {"ns", nss.ns_forTest()},
                                {"ui", testUuid()},
                                {"o", Value{Document{{"_id", 123}, {"x", "hallo"_sd}}}}}}}}};
     LogicalSessionFromClient lsid = testLsid();
     getApplyOpsResults(applyOpsDoc, lsid);  // Should crash.
 }
 
-TEST_F(ChangeStreamStageTest, TransformNonTransactionApplyOps) {
-    BSONObj applyOpsObj = Document{{"applyOps",
-                                    Value{std::vector<Document>{Document{
-                                        {"op", "i"_sd},
-                                        {"ns", nss.ns()},
-                                        {"ui", testUuid()},
-                                        {"o", Value{Document{{"_id", 123}, {"x", "hallo"_sd}}}}}}}}}
-                              .toBson();
+TEST_F(ChangeStreamStageTest, TransformNonTxnNumberApplyOps) {
+    Document applyOpsDoc =
+        Document{{"applyOps",
+                  Value{std::vector<Document>{
+                      Document{{"op", "i"_sd},
+                               {"ns", nss.ns_forTest()},
+                               {"ui", testUuid()},
+                               {"o", Value{Document{{"_id", 123}, {"x", "hallo"_sd}}}}}}}}};
 
-    // Don't append lsid or txnNumber
+    LogicalSessionFromClient lsid = testLsid();
+    std::vector<Document> results =
+        getApplyOpsResults(applyOpsDoc, lsid, kDefaultSpec, false /* hasTxnNumber */);
 
-    auto oplogEntry = makeOplogEntry(OpTypeEnum::kCommand,
-                                     nss.getCommandNS(),
-                                     applyOpsObj,
-                                     testUuid(),
-                                     boost::none,  // fromMigrate
-                                     BSONObj());
+    ASSERT_EQ(results.size(), 1u);
 
+    const auto nextDoc = results[0];
+    ASSERT(nextDoc.getField("txnNumber").missing());
+    ASSERT_EQ(nextDoc[DSChangeStream::kOperationTypeField].getString(),
+              DSChangeStream::kInsertOpType);
+    ASSERT_EQ(nextDoc[DSChangeStream::kFullDocumentField]["_id"].getInt(), 123);
+    ASSERT_EQ(nextDoc[DSChangeStream::kFullDocumentField]["x"].getString(), "hallo");
+    ASSERT_EQ(nextDoc["lsid"].getDocument().toBson().woCompare(lsid.toBSON()), 0);
+}
 
-    checkTransformation(oplogEntry, boost::none);
+TEST_F(ChangeStreamStageTest, TransformNonTxnNumberBatchedDeleteApplyOps) {
+
+    Document applyOpsDoc{
+        {"applyOps",
+         Value{std::vector<Document>{
+             Document{{"op", "d"_sd},
+                      {"ns", nss.ns_forTest()},
+                      {"ui", testUuid()},
+                      {"o", Value{Document{{"_id", 10}}}}},
+             Document{{"op", "d"_sd},
+                      {"ns", nss.ns_forTest()},
+                      {"ui", testUuid()},
+                      {"o", Value{Document{{"_id", 11}}}}},
+             Document{{"op", "d"_sd},
+                      {"ns", nss.ns_forTest()},
+                      {"ui", testUuid()},
+                      {"o", Value{Document{{"_id", 12}}}}},
+         }}},
+    };
+    LogicalSessionFromClient lsid = testLsid();
+    std::vector<Document> results =
+        getApplyOpsResults(applyOpsDoc, lsid, kDefaultSpec, false /* hasTxnNumber */);
+
+    ASSERT_EQ(results.size(), 3u);
+
+    int i = 0;
+    for (const auto& nextDoc : results) {
+        ASSERT(nextDoc.getField("txnNumber").missing());
+        ASSERT_EQ(nextDoc[DSChangeStream::kOperationTypeField].getString(),
+                  DSChangeStream::kDeleteOpType);
+        ASSERT_EQ(nextDoc[DSChangeStream::kDocumentKeyField]["_id"].getInt(), 10 + i++);
+        ASSERT_EQ(nextDoc["lsid"].getDocument().toBson().woCompare(lsid.toBSON()), 0);
+    }
 }
 
 TEST_F(ChangeStreamStageTest, TransformApplyOpsWithEntriesOnDifferentNs) {
@@ -1348,7 +2254,7 @@ TEST_F(ChangeStreamStageTest, TransformApplyOpsWithEntriesOnDifferentNs) {
          }}},
     };
     LogicalSessionFromClient lsid = testLsid();
-    vector<Document> results = getApplyOpsResults(applyOpsDoc, lsid);
+    std::vector<Document> results = getApplyOpsResults(applyOpsDoc, lsid);
 
     // All documents should be skipped.
     ASSERT_EQ(results.size(), 0u);
@@ -1359,12 +2265,12 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionApplyOpsEntriesAreIgnored) {
         Document{{"applyOps",
                   Value{std::vector<Document>{
                       Document{{"op", "i"_sd},
-                               {"ns", nss.ns()},
+                               {"ns", nss.ns_forTest()},
                                {"ui", testUuid()},
                                {"o", Value{Document{{"_id", 123}, {"x", "hallo"_sd}}}}}}}},
                  {"prepare", true}};
     LogicalSessionFromClient lsid = testLsid();
-    vector<Document> results = getApplyOpsResults(applyOpsDoc, lsid);
+    std::vector<Document> results = getApplyOpsResults(applyOpsDoc, lsid);
 
     // applyOps entries that are part of a prepared transaction are ignored. These entries will be
     // fetched for changeStreams delivery as part of transaction commit.
@@ -1376,7 +2282,11 @@ TEST_F(ChangeStreamStageTest, CommitCommandReturnsOperationsFromPreparedTransact
     Document preparedApplyOps{
         {"applyOps",
          Value{std::vector<Document>{
-             D{{"op", "i"_sd}, {"ns", nss.ns()}, {"ui", testUuid()}, {"o", V{D{{"_id", 123}}}}},
+             D{{"op", "i"_sd},
+               {"ns", nss.ns_forTest()},
+               {"ui", testUuid()},
+               {"o", V{D{{"_id", 123}}}},
+               {"o2", V{D{}}}},
          }}},
         {"prepare", true},
     };
@@ -1396,41 +2306,72 @@ TEST_F(ChangeStreamStageTest, CommitCommandReturnsOperationsFromPreparedTransact
     OperationSessionInfo sessionInfo;
     sessionInfo.setTxnNumber(1);
     sessionInfo.setSessionId(makeLogicalSessionIdForTest());
-    auto oplogEntry =
-        repl::DurableOplogEntry(kDefaultOpTime,                   // optime
-                                1LL,                              // hash
-                                OpTypeEnum::kCommand,             // opType
-                                nss.getCommandNS(),               // namespace
-                                boost::none,                      // uuid
-                                boost::none,                      // fromMigrate
-                                repl::OplogEntry::kOplogVersion,  // version
-                                BSON("commitTransaction" << 1),   // o
-                                boost::none,                      // o2
-                                sessionInfo,                      // sessionInfo
-                                boost::none,                      // upsert
-                                Date_t(),                         // wall clock time
-                                {},                               // statement ids
-                                applyOpsOpTime,  // optime of previous write within same transaction
-                                boost::none,     // pre-image optime
-                                boost::none,     // post-image optime
-                                boost::none,     // ShardId of resharding recipient
-                                boost::none,     // _id
-                                boost::none);    // needsRetryImage
+    auto oplogEntry = repl::DurableOplogEntry(
+        kDefaultOpTime,                   // optime
+        OpTypeEnum::kCommand,             // opType
+        nss.getCommandNS(),               // namespace
+        boost::none,                      // uuid
+        boost::none,                      // fromMigrate
+        boost::none,                      // checkExistenceForDiffInsert
+        boost::none,                      // versionContext
+        repl::OplogEntry::kOplogVersion,  // version
+        BSON("commitTransaction" << 1 << "commitTimestamp" << kDefaultCommitTs),  // o
+        boost::none,                                                              // o2
+        sessionInfo,                                                              // sessionInfo
+        boost::none,                                                              // upsert
+        Date_t(),                                                                 // wall clock time
+        {},                                                                       // statement ids
+        applyOpsOpTime,  // optime of previous write within same transaction
+        boost::none,     // pre-image optime
+        boost::none,     // post-image optime
+        boost::none,     // ShardId of resharding recipient
+        boost::none,     // _id
+        boost::none);    // needsRetryImage
 
-    // When the DocumentSourceChangeStreamTransform sees the "commitTransaction" oplog entry, we
-    // expect it to return the insert op within our 'preparedApplyOps' oplog entry.
-    Document expectedResult{
-        {DSChangeStream::kTxnNumberField, static_cast<int>(*sessionInfo.getTxnNumber())},
-        {DSChangeStream::kLsidField, Document{{sessionInfo.getSessionId()->toBSON()}}},
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid(), BSONObj())},
-        {DSChangeStream::kOperationTypeField, DSChangeStream::kInsertOpType},
-        {DSChangeStream::kClusterTimeField, kDefaultTs},
-        {DSChangeStream::kFullDocumentField, D{{"_id", 123}}},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
-        {DSChangeStream::kDocumentKeyField, D{}},
-    };
+    {
+        // No expanded events.
 
-    checkTransformation(oplogEntry, expectedResult, {}, kDefaultSpec, {}, {preparedTransaction});
+        // When the DocumentSourceChangeStreamTransform sees the "commitTransaction" oplog entry, we
+        // expect it to return the insert op within our 'preparedApplyOps' oplog entry.
+        Document expectedResult{
+            {DSChangeStream::kTxnNumberField, static_cast<int>(*sessionInfo.getTxnNumber())},
+            {DSChangeStream::kLsidField, Document{{sessionInfo.getSessionId()->toBSON()}}},
+            {DSChangeStream::kIdField,
+             makeResumeToken(kDefaultTs, testUuid(), BSONObj(), DSChangeStream::kInsertOpType)},
+            {DSChangeStream::kOperationTypeField, DSChangeStream::kInsertOpType},
+            {DSChangeStream::kClusterTimeField, kDefaultTs},
+            {DSChangeStream::kWallTimeField, Date_t()},
+            {DSChangeStream::kFullDocumentField, D{{"_id", 123}}},
+            {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+            {DSChangeStream::kDocumentKeyField, D{}},
+        };
+
+        checkTransformation(oplogEntry, expectedResult, kDefaultSpec, {}, {preparedTransaction});
+    }
+
+    {
+        // Expanded events: this will additionally emit the 'commitTimestamp' and 'collectionUUID'
+        // fields.
+
+        // When the DocumentSourceChangeStreamTransform sees the "commitTransaction" oplog entry, we
+        // expect it to return the insert op within our 'preparedApplyOps' oplog entry.
+        Document expectedResult{
+            {DSChangeStream::kTxnNumberField, static_cast<int>(*sessionInfo.getTxnNumber())},
+            {DSChangeStream::kLsidField, Document{{sessionInfo.getSessionId()->toBSON()}}},
+            {DSChangeStream::kIdField,
+             makeResumeToken(kDefaultTs, testUuid(), BSONObj(), DSChangeStream::kInsertOpType)},
+            {DSChangeStream::kOperationTypeField, DSChangeStream::kInsertOpType},
+            {DSChangeStream::kClusterTimeField, kDefaultTs},
+            {DSChangeStream::kCommitTimestampField, kDefaultCommitTs},
+            {DSChangeStream::kWallTimeField, Date_t()},
+            {DSChangeStream::kFullDocumentField, D{{"_id", 123}}},
+            {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+            {DSChangeStream::kDocumentKeyField, D{}},
+        };
+
+        checkTransformation(
+            oplogEntry, expectedResult, kShowCommitTimestampSpec, {}, {preparedTransaction});
+    }
 }
 
 TEST_F(ChangeStreamStageTest, TransactionWithMultipleOplogEntries) {
@@ -1444,13 +2385,15 @@ TEST_F(ChangeStreamStageTest, TransactionWithMultipleOplogEntries) {
         {"applyOps",
          V{std::vector<Document>{
              D{{"op", "i"_sd},
-               {"ns", nss.ns()},
+               {"ns", nss.ns_forTest()},
                {"ui", testUuid()},
-               {"o", V{Document{{"_id", 123}}}}},
+               {"o", V{Document{{"_id", 123}}}},
+               {"o2", V{Document{{"_id", 123}}}}},
              D{{"op", "i"_sd},
-               {"ns", nss.ns()},
+               {"ns", nss.ns_forTest()},
                {"ui", testUuid()},
-               {"o", V{Document{{"_id", 456}}}}},
+               {"o", V{Document{{"_id", 456}}}},
+               {"o2", V{Document{{"_id", 456}}}}},
          }}},
         {"partialTxn", true},
     };
@@ -1469,7 +2412,11 @@ TEST_F(ChangeStreamStageTest, TransactionWithMultipleOplogEntries) {
     Document applyOps2{
         {"applyOps",
          V{std::vector<Document>{
-             D{{"op", "i"_sd}, {"ns", nss.ns()}, {"ui", testUuid()}, {"o", V{D{{"_id", 789}}}}},
+             D{{"op", "i"_sd},
+               {"ns", nss.ns_forTest()},
+               {"ui", testUuid()},
+               {"o", V{D{{"_id", 789}}}},
+               {"o2", V{D{{"_id", 789}}}}},
          }}},
         /* The absence of the "partialTxn" and "prepare" fields indicates that this command commits
            the transaction. */
@@ -1485,16 +2432,15 @@ TEST_F(ChangeStreamStageTest, TransactionWithMultipleOplogEntries) {
                                             sessionInfo,
                                             applyOpsOpTime1);
 
-    // We do not use the checkTransformation() pattern that other tests use since we expect multiple
-    // documents to be returned from one applyOps.
-    auto stages = makeStages(transactionEntry2);
-    auto transform = stages[3].get();
-    invariant(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform) != nullptr);
+    // We do not use the checkTransformation() pattern that other tests use since we expect
+    // multiple documents to be returned from one applyOps.
+    auto execPipeline = makeExecPipeline(transactionEntry2, kDefaultSpec);
+    auto transform = execPipeline->getStages()[3].get();
+    invariant(dynamic_cast<exec::agg::ChangeStreamTransformStage*>(transform) != nullptr);
 
     // Populate the MockTransactionHistoryEditor in reverse chronological order.
-    getExpCtx()->mongoProcessInterface = std::make_unique<MockMongoInterface>(
-        std::vector<FieldPath>{},
-        std::vector<repl::OplogEntry>{transactionEntry2, transactionEntry1});
+    getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>(
+        std::vector<repl::OplogEntry>{transactionEntry2, transactionEntry1}));
 
     // We should get three documents from the change stream, based on the documents in the two
     // applyOps entries.
@@ -1505,13 +2451,17 @@ TEST_F(ChangeStreamStageTest, TransactionWithMultipleOplogEntries) {
     ASSERT_EQ(nextDoc[DSChangeStream::kOperationTypeField].getString(),
               DSChangeStream::kInsertOpType);
     ASSERT_EQ(nextDoc[DSChangeStream::kFullDocumentField]["_id"].getInt(), 123);
+    // Note that we never expect to see a 'commitTimestamp' event field because the events are
+    // not from a prepared transaction.
+    assertCommitTimestamp(false /* showCommitTimestamp */, nextDoc);
     ASSERT_EQ(
         nextDoc["lsid"].getDocument().toBson().woCompare(sessionInfo.getSessionId()->toBSON()), 0);
     auto resumeToken = ResumeToken::parse(nextDoc["_id"].getDocument()).toDocument();
     ASSERT_DOCUMENT_EQ(resumeToken,
                        makeResumeToken(applyOpsOpTime2.getTimestamp(),
                                        testUuid(),
-                                       V{D{}},
+                                       V{D{{"_id", 123}}},
+                                       DSChangeStream::kInsertOpType,
                                        ResumeTokenData::FromInvalidate::kNotFromInvalidate,
                                        0));
 
@@ -1522,13 +2472,17 @@ TEST_F(ChangeStreamStageTest, TransactionWithMultipleOplogEntries) {
     ASSERT_EQ(nextDoc[DSChangeStream::kOperationTypeField].getString(),
               DSChangeStream::kInsertOpType);
     ASSERT_EQ(nextDoc[DSChangeStream::kFullDocumentField]["_id"].getInt(), 456);
+    // Note that we never expect to see a 'commitTimestamp' event field because the events are
+    // not from a prepared transaction.
+    assertCommitTimestamp(false /* showCommitTimestamp */, nextDoc);
     ASSERT_EQ(
         nextDoc["lsid"].getDocument().toBson().woCompare(sessionInfo.getSessionId()->toBSON()), 0);
     resumeToken = ResumeToken::parse(nextDoc["_id"].getDocument()).toDocument();
     ASSERT_DOCUMENT_EQ(resumeToken,
                        makeResumeToken(applyOpsOpTime2.getTimestamp(),
                                        testUuid(),
-                                       V{D{}},
+                                       V{D{{"_id", 456}}},
+                                       DSChangeStream::kInsertOpType,
                                        ResumeTokenData::FromInvalidate::kNotFromInvalidate,
                                        1));
 
@@ -1539,13 +2493,17 @@ TEST_F(ChangeStreamStageTest, TransactionWithMultipleOplogEntries) {
     ASSERT_EQ(nextDoc[DSChangeStream::kOperationTypeField].getString(),
               DSChangeStream::kInsertOpType);
     ASSERT_EQ(nextDoc[DSChangeStream::kFullDocumentField]["_id"].getInt(), 789);
+    // Note that we never expect to see a 'commitTimestamp' event field because the events are
+    // not from a prepared transaction.
+    assertCommitTimestamp(false /* showCommitTimestamp */, nextDoc);
     ASSERT_EQ(
         nextDoc["lsid"].getDocument().toBson().woCompare(sessionInfo.getSessionId()->toBSON()), 0);
     resumeToken = ResumeToken::parse(nextDoc["_id"].getDocument()).toDocument();
     ASSERT_DOCUMENT_EQ(resumeToken,
                        makeResumeToken(applyOpsOpTime2.getTimestamp(),
                                        testUuid(),
-                                       V{D{}},
+                                       V{D{{"_id", 789}}},
+                                       DSChangeStream::kInsertOpType,
                                        ResumeTokenData::FromInvalidate::kNotFromInvalidate,
                                        2));
 }
@@ -1581,9 +2539,10 @@ TEST_F(ChangeStreamStageTest, TransactionWithEmptyOplogEntries) {
         {"applyOps",
          V{std::vector<Document>{
              D{{"op", "i"_sd},
-               {"ns", nss.ns()},
+               {"ns", nss.ns_forTest()},
                {"ui", testUuid()},
-               {"o", V{Document{{"_id", 123}}}}},
+               {"o", V{Document{{"_id", 123}}}},
+               {"o2", V{Document{{"_id", 123}}}}},
          }}},
         {"partialTxn", true},
     };
@@ -1618,9 +2577,10 @@ TEST_F(ChangeStreamStageTest, TransactionWithEmptyOplogEntries) {
     Document applyOps4{
         {"applyOps",
          V{std::vector<Document>{D{{"op", "i"_sd},
-                                   {"ns", nss.ns()},
+                                   {"ns", nss.ns_forTest()},
                                    {"ui", testUuid()},
-                                   {"o", V{Document{{"_id", 456}}}}}}}},
+                                   {"o", V{Document{{"_id", 456}}}},
+                                   {"o2", V{Document{{"_id", 456}}}}}}}},
         {"partialTxn", true},
     };
 
@@ -1653,18 +2613,17 @@ TEST_F(ChangeStreamStageTest, TransactionWithEmptyOplogEntries) {
 
     // We do not use the checkTransformation() pattern that other tests use since we expect multiple
     // documents to be returned from one applyOps.
-    auto stages = makeStages(transactionEntry5);
-    auto transform = stages[3].get();
-    invariant(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform) != nullptr);
+    auto execPipeline = makeExecPipeline(transactionEntry5);
+    auto transform = execPipeline->getStages()[3].get();
+    invariant(dynamic_cast<exec::agg::ChangeStreamTransformStage*>(transform) != nullptr);
 
     // Populate the MockTransactionHistoryEditor in reverse chronological order.
-    getExpCtx()->mongoProcessInterface =
-        std::make_unique<MockMongoInterface>(std::vector<FieldPath>{},
-                                             std::vector<repl::OplogEntry>{transactionEntry5,
+    getExpCtx()->setMongoProcessInterface(
+        std::make_unique<MockMongoInterface>(std::vector<repl::OplogEntry>{transactionEntry5,
                                                                            transactionEntry4,
                                                                            transactionEntry3,
                                                                            transactionEntry2,
-                                                                           transactionEntry1});
+                                                                           transactionEntry1}));
 
     // We should get three documents from the change stream, based on the documents in the two
     // applyOps entries.
@@ -1681,7 +2640,8 @@ TEST_F(ChangeStreamStageTest, TransactionWithEmptyOplogEntries) {
     ASSERT_DOCUMENT_EQ(resumeToken,
                        makeResumeToken(applyOpsOpTime5.getTimestamp(),
                                        testUuid(),
-                                       V{D{}},
+                                       V{D{{"_id", 123}}},
+                                       DSChangeStream::kInsertOpType,
                                        ResumeTokenData::FromInvalidate::kNotFromInvalidate,
                                        0));
 
@@ -1698,7 +2658,8 @@ TEST_F(ChangeStreamStageTest, TransactionWithEmptyOplogEntries) {
     ASSERT_DOCUMENT_EQ(resumeToken,
                        makeResumeToken(applyOpsOpTime5.getTimestamp(),
                                        testUuid(),
-                                       V{D{}},
+                                       V{D{{"_id", 456}}},
+                                       DSChangeStream::kInsertOpType,
                                        ResumeTokenData::FromInvalidate::kNotFromInvalidate,
                                        1));
 }
@@ -1745,14 +2706,13 @@ TEST_F(ChangeStreamStageTest, TransactionWithOnlyEmptyOplogEntries) {
 
     // We do not use the checkTransformation() pattern that other tests use since we expect multiple
     // documents to be returned from one applyOps.
-    auto stages = makeStages(transactionEntry2);
-    auto transform = stages[3].get();
-    invariant(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform) != nullptr);
+    auto execPipeline = makeExecPipeline(transactionEntry2);
+    auto transform = execPipeline->getStages()[3].get();
+    invariant(dynamic_cast<exec::agg::ChangeStreamTransformStage*>(transform) != nullptr);
 
     // Populate the MockTransactionHistoryEditor in reverse chronological order.
-    getExpCtx()->mongoProcessInterface = std::make_unique<MockMongoInterface>(
-        std::vector<FieldPath>{},
-        std::vector<repl::OplogEntry>{transactionEntry2, transactionEntry1});
+    getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>(
+        std::vector<repl::OplogEntry>{transactionEntry2, transactionEntry1}));
 
     // We should get three documents from the change stream, based on the documents in the two
     // applyOps entries.
@@ -1770,8 +2730,16 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionWithMultipleOplogEntries) {
     Document applyOps1{
         {"applyOps",
          V{std::vector<Document>{
-             D{{"op", "i"_sd}, {"ns", nss.ns()}, {"ui", testUuid()}, {"o", V{D{{"_id", 123}}}}},
-             D{{"op", "i"_sd}, {"ns", nss.ns()}, {"ui", testUuid()}, {"o", V{D{{"_id", 456}}}}},
+             D{{"op", "i"_sd},
+               {"ns", nss.ns_forTest()},
+               {"ui", testUuid()},
+               {"o", V{D{{"_id", 123}}}},
+               {"o2", V{D{{"_id", 123}}}}},
+             D{{"op", "i"_sd},
+               {"ns", nss.ns_forTest()},
+               {"ui", testUuid()},
+               {"o", V{D{{"_id", 456}}}},
+               {"o2", V{D{{"_id", 456}}}}},
          }}},
         {"partialTxn", true},
     };
@@ -1790,7 +2758,11 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionWithMultipleOplogEntries) {
     Document applyOps2{
         {"applyOps",
          V{std::vector<Document>{
-             D{{"op", "i"_sd}, {"ns", nss.ns()}, {"ui", testUuid()}, {"o", V{D{{"_id", 789}}}}},
+             D{{"op", "i"_sd},
+               {"ns", nss.ns_forTest()},
+               {"ui", testUuid()},
+               {"o", V{D{{"_id", 789}}}},
+               {"o2", V{D{{"_id", 789}}}}},
          }}},
         {"prepare", true},
     };
@@ -1808,35 +2780,35 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionWithMultipleOplogEntries) {
     // Create an oplog entry representing the commit for the prepared transaction.
     auto commitEntry = repl::DurableOplogEntry(
         kDefaultOpTime,                   // optime
-        1LL,                              // hash
         OpTypeEnum::kCommand,             // opType
         nss.getCommandNS(),               // namespace
         boost::none,                      // uuid
         boost::none,                      // fromMigrate
+        boost::none,                      // checkExistenceForDiffInsert
+        boost::none,                      // versionContext
         repl::OplogEntry::kOplogVersion,  // version
-        BSON("commitTransaction" << 1),   // o
-        boost::none,                      // o2
-        sessionInfo,                      // sessionInfo
-        boost::none,                      // upsert
-        Date_t(),                         // wall clock time
-        {},                               // statement ids
-        applyOpsOpTime2,                  // optime of previous write within same transaction
-        boost::none,                      // pre-image optime
-        boost::none,                      // post-image optime
-        boost::none,                      // ShardId of resharding recipient
-        boost::none,                      // _id
-        boost::none);                     // needsRetryImage
+        BSON("commitTransaction" << 1 << "commitTimestamp" << kDefaultCommitTs),  // o
+        boost::none,                                                              // o2
+        sessionInfo,                                                              // sessionInfo
+        boost::none,                                                              // upsert
+        Date_t(),                                                                 // wall clock time
+        {},                                                                       // statement ids
+        applyOpsOpTime2,  // optime of previous write within same transaction
+        boost::none,      // pre-image optime
+        boost::none,      // post-image optime
+        boost::none,      // ShardId of resharding recipient
+        boost::none,      // _id
+        boost::none);     // needsRetryImage
 
     // We do not use the checkTransformation() pattern that other tests use since we expect multiple
     // documents to be returned from one applyOps.
-    auto stages = makeStages(commitEntry);
-    auto transform = stages[3].get();
-    invariant(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform) != nullptr);
+    auto execPipeline = makeExecPipeline(commitEntry);
+    auto transform = execPipeline->getStages()[3].get();
+    invariant(dynamic_cast<exec::agg::ChangeStreamTransformStage*>(transform) != nullptr);
 
     // Populate the MockTransactionHistoryEditor in reverse chronological order.
-    getExpCtx()->mongoProcessInterface = std::make_unique<MockMongoInterface>(
-        std::vector<FieldPath>{},
-        std::vector<repl::OplogEntry>{commitEntry, transactionEntry2, transactionEntry1});
+    getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>(
+        std::vector<repl::OplogEntry>{commitEntry, transactionEntry2, transactionEntry1}));
 
     // We should get three documents from the change stream, based on the documents in the two
     // applyOps entries.
@@ -1854,7 +2826,8 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionWithMultipleOplogEntries) {
         resumeToken,
         makeResumeToken(kDefaultOpTime.getTimestamp(),  // Timestamp of the commitCommand.
                         testUuid(),
-                        V{D{}},
+                        V{D{{"_id", 123}}},
+                        DSChangeStream::kInsertOpType,
                         ResumeTokenData::FromInvalidate::kNotFromInvalidate,
                         0));
 
@@ -1872,7 +2845,8 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionWithMultipleOplogEntries) {
         resumeToken,
         makeResumeToken(kDefaultOpTime.getTimestamp(),  // Timestamp of the commitCommand.
                         testUuid(),
-                        V{D{}},
+                        V{D{{"_id", 456}}},
+                        DSChangeStream::kInsertOpType,
                         ResumeTokenData::FromInvalidate::kNotFromInvalidate,
                         1));
 
@@ -1890,7 +2864,8 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionWithMultipleOplogEntries) {
         resumeToken,
         makeResumeToken(kDefaultOpTime.getTimestamp(),  // Timestamp of the commitCommand.
                         testUuid(),
-                        V{D{}},
+                        V{D{{"_id", 789}}},
+                        DSChangeStream::kInsertOpType,
                         ResumeTokenData::FromInvalidate::kNotFromInvalidate,
                         2));
 
@@ -1908,8 +2883,16 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionEndingWithEmptyApplyOps) {
     Document applyOps1{
         {"applyOps",
          V{std::vector<Document>{
-             D{{"op", "i"_sd}, {"ns", nss.ns()}, {"ui", testUuid()}, {"o", V{D{{"_id", 123}}}}},
-             D{{"op", "i"_sd}, {"ns", nss.ns()}, {"ui", testUuid()}, {"o", V{D{{"_id", 456}}}}},
+             D{{"op", "i"_sd},
+               {"ns", nss.ns_forTest()},
+               {"ui", testUuid()},
+               {"o", V{D{{"_id", 123}}}},
+               {"o2", V{D{{"_id", 123}}}}},
+             D{{"op", "i"_sd},
+               {"ns", nss.ns_forTest()},
+               {"ui", testUuid()},
+               {"o", V{D{{"_id", 456}}}},
+               {"o2", V{D{{"_id", 456}}}}},
          }}},
         {"partialTxn", true},
     };
@@ -1944,38 +2927,38 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionEndingWithEmptyApplyOps) {
     // Create an oplog entry representing the commit for the prepared transaction.
     auto commitEntry = repl::DurableOplogEntry(
         kDefaultOpTime,                   // optime
-        1LL,                              // hash
         OpTypeEnum::kCommand,             // opType
         nss.getCommandNS(),               // namespace
         boost::none,                      // uuid
         boost::none,                      // fromMigrate
+        boost::none,                      // checkExistenceForDiffInsert
+        boost::none,                      // versionContext
         repl::OplogEntry::kOplogVersion,  // version
-        BSON("commitTransaction" << 1),   // o
-        boost::none,                      // o2
-        sessionInfo,                      // sessionInfo
-        boost::none,                      // upsert
-        Date_t(),                         // wall clock time
-        {},                               // statement ids
-        applyOpsOpTime2,                  // optime of previous write within same transaction
-        boost::none,                      // pre-image optime
-        boost::none,                      // post-image optime
-        boost::none,                      // ShardId of resharding recipient
-        boost::none,                      // _id
-        boost::none);                     // needsRetryImage
+        BSON("commitTransaction" << 1 << "commitTimestamp" << kDefaultCommitTs),  // o
+        boost::none,                                                              // o2
+        sessionInfo,                                                              // sessionInfo
+        boost::none,                                                              // upsert
+        Date_t(),                                                                 // wall clock time
+        {},                                                                       // statement ids
+        applyOpsOpTime2,  // optime of previous write within same transaction
+        boost::none,      // pre-image optime
+        boost::none,      // post-image optime
+        boost::none,      // ShardId of resharding recipient
+        boost::none,      // _id
+        boost::none);     // needsRetryImage
 
-    // We do not use the checkTransformation() pattern that other tests use since we expect multiple
-    // documents to be returned from one applyOps.
-    auto stages = makeStages(commitEntry);
-    auto transform = stages[3].get();
-    invariant(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform) != nullptr);
+    // We do not use the checkTransformation() pattern that other tests use since we expect
+    // multiple documents to be returned from one applyOps.
+    auto execPipeline = makeExecPipeline(commitEntry, kDefaultSpec);
+    auto transform = execPipeline->getStages()[3].get();
+    invariant(dynamic_cast<exec::agg::ChangeStreamTransformStage*>(transform) != nullptr);
 
     // Populate the MockTransactionHistoryEditor in reverse chronological order.
-    getExpCtx()->mongoProcessInterface = std::make_unique<MockMongoInterface>(
-        std::vector<FieldPath>{},
-        std::vector<repl::OplogEntry>{commitEntry, transactionEntry2, transactionEntry1});
+    getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>(
+        std::vector<repl::OplogEntry>{commitEntry, transactionEntry2, transactionEntry1}));
 
-    // We should get two documents from the change stream, based on the documents in the non-empty
-    // applyOps entry.
+    // We should get two documents from the change stream, based on the documents in the
+    // non-empty applyOps entry.
     auto next = transform->getNext();
     ASSERT(next.isAdvanced());
     auto nextDoc = next.releaseDocument();
@@ -1983,6 +2966,7 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionEndingWithEmptyApplyOps) {
     ASSERT_EQ(nextDoc[DSChangeStream::kOperationTypeField].getString(),
               DSChangeStream::kInsertOpType);
     ASSERT_EQ(nextDoc[DSChangeStream::kFullDocumentField]["_id"].getInt(), 123);
+    assertCommitTimestamp(false /* showCommitTimestamp */, nextDoc);
     ASSERT_EQ(
         nextDoc["lsid"].getDocument().toBson().woCompare(sessionInfo.getSessionId()->toBSON()), 0);
     auto resumeToken = ResumeToken::parse(nextDoc["_id"].getDocument()).toDocument();
@@ -1990,7 +2974,8 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionEndingWithEmptyApplyOps) {
         resumeToken,
         makeResumeToken(kDefaultOpTime.getTimestamp(),  // Timestamp of the commitCommand.
                         testUuid(),
-                        V{D{}},
+                        V{D{{"_id", 123}}},
+                        DSChangeStream::kInsertOpType,
                         ResumeTokenData::FromInvalidate::kNotFromInvalidate,
                         0));
 
@@ -2001,6 +2986,7 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionEndingWithEmptyApplyOps) {
     ASSERT_EQ(nextDoc[DSChangeStream::kOperationTypeField].getString(),
               DSChangeStream::kInsertOpType);
     ASSERT_EQ(nextDoc[DSChangeStream::kFullDocumentField]["_id"].getInt(), 456);
+    assertCommitTimestamp(false /* showCommitTimestamp */, nextDoc);
     ASSERT_EQ(
         nextDoc["lsid"].getDocument().toBson().woCompare(sessionInfo.getSessionId()->toBSON()), 0);
     resumeToken = ResumeToken::parse(nextDoc["_id"].getDocument()).toDocument();
@@ -2008,7 +2994,8 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionEndingWithEmptyApplyOps) {
         resumeToken,
         makeResumeToken(kDefaultOpTime.getTimestamp(),  // Timestamp of the commitCommand.
                         testUuid(),
-                        V{D{}},
+                        V{D{{"_id", 456}}},
+                        DSChangeStream::kInsertOpType,
                         ResumeTokenData::FromInvalidate::kNotFromInvalidate,
                         1));
 
@@ -2019,18 +3006,20 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionEndingWithEmptyApplyOps) {
 TEST_F(ChangeStreamStageTest, TransformApplyOps) {
     // Doesn't use the checkTransformation() pattern that other tests use since we expect multiple
     // documents to be returned from one applyOps.
-
     Document applyOpsDoc{
         {"applyOps",
          Value{std::vector<Document>{
              Document{{"op", "i"_sd},
-                      {"ns", nss.ns()},
+                      {"ns", nss.ns_forTest()},
                       {"ui", testUuid()},
                       {"o", Value{Document{{"_id", 123}, {"x", "hallo"_sd}}}}},
              Document{{"op", "u"_sd},
-                      {"ns", nss.ns()},
+                      {"ns", nss.ns_forTest()},
                       {"ui", testUuid()},
-                      {"o", Value{Document{{"$set", Value{Document{{"x", "hallo 2"_sd}}}}}}},
+                      {"o",
+                       Value{Document{
+                           {"diff", Value{Document{{"u", Value{Document{{"x", "hallo 2"_sd}}}}}}},
+                           {"$v", 2}}}},
                       {"o2", Value{Document{{"_id", 123}}}}},
              // Operation on another namespace which should be skipped.
              Document{{"op", "i"_sd},
@@ -2040,7 +3029,7 @@ TEST_F(ChangeStreamStageTest, TransformApplyOps) {
          }}},
     };
     LogicalSessionFromClient lsid = testLsid();
-    vector<Document> results = getApplyOpsResults(applyOpsDoc, lsid);
+    std::vector<Document> results = getApplyOpsResults(applyOpsDoc, lsid);
 
     // The third document should be skipped.
     ASSERT_EQ(results.size(), 2u);
@@ -2067,13 +3056,83 @@ TEST_F(ChangeStreamStageTest, TransformApplyOps) {
     // The third document is skipped.
 }
 
+TEST_F(ChangeStreamStageTest, TransformApplyOpsWithCreateOperation) {
+    // Enable the endOfTransaction feature flag so this test produces an EOT change event.
+    RAIIServerParameterControllerForTest controller("featureFlagEndOfTransactionChangeEvent", true);
+    // Doesn't use the checkTransformation() pattern that other tests use since we expect multiple
+    // documents to be returned from one applyOps.
+    Document idIndexDef = Document{{"v", 2}, {"key", D{{"_id", 1}}}};
+    Document applyOpsDoc{
+        {"applyOps",
+         Value{std::vector<Document>{
+             Document{{"op", "c"_sd},
+                      {"ns", nss.db_forTest() + ".$cmd"},
+                      {"ui", testUuid()},
+                      {"o", Value{Document{{"create", nss.coll()}, {"idIndex", idIndexDef}}}},
+                      {"ts", Timestamp(0, 1)}},
+             Document{{"op", "i"_sd},
+                      {"ns", nss.ns_forTest()},
+                      {"ui", testUuid()},
+                      {"o", Value{Document{{"_id", 123}, {"x", "hallo"_sd}}}}},
+             Document{
+                 {"op", "c"_sd},
+                 {"ns", nss.db_forTest() + ".$cmd"},
+                 {"ui", UUID::gen()},
+                 // Operation on another collection which should be skipped.
+                 {"o", Value{Document{{"create", "otherCollection"_sd}, {"idIndex", idIndexDef}}}}},
+         }}},
+    };
+    LogicalSessionFromClient lsid = testLsid();
+    std::vector<Document> results = getApplyOpsResults(applyOpsDoc, lsid, kShowExpandedEventsSpec);
+
+    size_t expectedSize = 3;
+
+    // The create operation should be skipped.
+    ASSERT_EQ(results.size(), expectedSize);
+
+    // Check that the first document is correct.
+    auto nextDoc = results[0];
+    ASSERT_EQ(nextDoc["txnNumber"].getLong(), 0LL);
+    ASSERT_EQ(nextDoc[DSChangeStream::kOperationTypeField].getString(),
+              DSChangeStream::kCreateOpType);
+    ASSERT_VALUE_EQ(nextDoc[DSChangeStream::kOperationDescriptionField],
+                    Value(Document{{"idIndex", idIndexDef}}));
+    ASSERT_EQ(nextDoc["lsid"].getDocument().toBson().woCompare(lsid.toBSON()), 0);
+    ASSERT_EQ(nextDoc[DSChangeStream::kNsTypeField].getString(), "collection"_sd);
+    ASSERT_EQ(ResumeToken::parse(nextDoc["_id"].getDocument()).getData().txnOpIndex, 0);
+
+    // Check the second document.
+    nextDoc = results[1];
+    ASSERT_EQ(nextDoc["txnNumber"].getLong(), 0LL);
+    ASSERT_EQ(nextDoc[DSChangeStream::kOperationTypeField].getString(),
+              DSChangeStream::kInsertOpType);
+    ASSERT_EQ(nextDoc[DSChangeStream::kFullDocumentField]["_id"].getInt(), 123);
+    ASSERT_EQ(nextDoc[DSChangeStream::kFullDocumentField]["x"].getString(), "hallo");
+    ASSERT_EQ(nextDoc["lsid"].getDocument().toBson().woCompare(lsid.toBSON()), 0);
+    ASSERT_EQ(ResumeToken::parse(nextDoc["_id"].getDocument()).getData().txnOpIndex, 1);
+
+    // The third document in applyOps is skipped, so the third document of the result is
+    // endOfTransaction.
+    nextDoc = results[2];
+    ASSERT_EQ(nextDoc[DSChangeStream::kOperationTypeField].getString(),
+              DSChangeStream::kEndOfTransactionOpType);
+    ASSERT_EQ(nextDoc["txnNumber"].getLong(), 0LL);
+    ASSERT_EQ(nextDoc["lsid"].getDocument().toBson().woCompare(lsid.toBSON()), 0);
+    auto operationDescription = nextDoc[DSChangeStream::kOperationDescriptionField];
+    ASSERT_EQ(operationDescription["txnNumber"].getLong(), 0LL);
+    ASSERT_EQ(operationDescription["lsid"].getDocument().toBson().woCompare(lsid.toBSON()), 0);
+    // Third document (with txnOpIndex == 2) is skipped, so EOT should have txnOpIndex == 3.
+    ASSERT_EQ(ResumeToken::parse(nextDoc["_id"].getDocument()).getData().txnOpIndex, 3);
+}
+
 TEST_F(ChangeStreamStageTest, ClusterTimeMatchesOplogEntry) {
     const Timestamp ts(3, 45);
     const long long term = 4;
     const auto opTime = repl::OpTime(ts, term);
 
     // Test the 'clusterTime' field is copied from the oplog entry for an update.
-    BSONObj o = BSON("$set" << BSON("y" << 1));
+    BSONObj diff = BSON("u" << BSON("y" << 1));
+    BSONObj o = BSON("diff" << diff << "$v" << 2);
     BSONObj o2 = BSON("_id" << 1 << "x" << 2);
     auto updateField = makeOplogEntry(OpTypeEnum::kUpdate,  // op type
                                       nss,                  // namespace
@@ -2083,17 +3142,13 @@ TEST_F(ChangeStreamStageTest, ClusterTimeMatchesOplogEntry) {
                                       o2,                   // o2
                                       opTime);              // opTime
 
-    Document expectedUpdateField{
-        {DSChangeStream::kIdField, makeResumeToken(ts, testUuid(), o2)},
-        {DSChangeStream::kOperationTypeField, DSChangeStream::kUpdateOpType},
-        {DSChangeStream::kClusterTimeField, ts},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
-        {DSChangeStream::kDocumentKeyField, D{{"_id", 1}, {"x", 2}}},
-        {
-            "updateDescription",
-            D{{"updatedFields", D{{"y", 1}}}, {"removedFields", vector<V>()}},
-        },
-    };
+    const auto expectedUpdateField =
+        makeExpectedUpdateEvent(ts,
+                                nss,
+                                o2,
+                                D{{"updatedFields", D{{"y", 1}}},
+                                  {"removedFields", std::vector<V>()},
+                                  {"truncatedArrays", std::vector<V>()}});
     checkTransformation(updateField, expectedUpdateField);
 
     // Test the 'clusterTime' field is copied from the oplog entry for a collection drop.
@@ -2101,36 +3156,42 @@ TEST_F(ChangeStreamStageTest, ClusterTimeMatchesOplogEntry) {
         createCommand(BSON("drop" << nss.coll()), testUuid(), boost::none, opTime);
 
     Document expectedDrop{
-        {DSChangeStream::kIdField, makeResumeToken(ts, testUuid())},
+        {DSChangeStream::kIdField,
+         makeResumeToken(ts, testUuid(), Value(), DSChangeStream::kDropCollectionOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kDropCollectionOpType},
         {DSChangeStream::kClusterTimeField, ts},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
     };
     checkTransformation(dropColl, expectedDrop);
 
     // Test the 'clusterTime' field is copied from the oplog entry for a collection rename.
-    NamespaceString otherColl("test.bar");
-    OplogEntry rename =
-        createCommand(BSON("renameCollection" << nss.ns() << "to" << otherColl.ns()),
-                      testUuid(),
-                      boost::none,
-                      opTime);
+    NamespaceString otherColl = NamespaceString::createNamespaceString_forTest("test.bar");
+    OplogEntry rename = createCommand(
+        BSON("renameCollection" << nss.ns_forTest() << "to" << otherColl.ns_forTest()),
+        testUuid(),
+        boost::none,
+        opTime);
 
+    const auto opDesc =
+        Value(D{{"to", D{{"db", otherColl.db_forTest()}, {"coll", otherColl.coll()}}}});
     Document expectedRename{
         {DSChangeStream::kRenameTargetNssField,
-         D{{"db", otherColl.db()}, {"coll", otherColl.coll()}}},
-        {DSChangeStream::kIdField, makeResumeToken(ts, testUuid())},
+         D{{"db", otherColl.db_forTest()}, {"coll", otherColl.coll()}}},
+        {DSChangeStream::kIdField,
+         makeResumeToken(ts, testUuid(), opDesc, DSChangeStream::kRenameCollectionOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kRenameCollectionOpType},
         {DSChangeStream::kClusterTimeField, ts},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
     };
     checkTransformation(rename, expectedRename);
 }
 
-TEST_F(ChangeStreamStageTest, MatchFiltersCreateCollection) {
+TEST_F(ChangeStreamStageTest, MatchFiltersCreateCollectionWhenShowExpandedEventsOff) {
     auto collSpec =
         D{{"create", "foo"_sd},
-          {"idIndex", D{{"v", 2}, {"key", D{{"_id", 1}}}, {"name", "_id_"_sd}, {"ns", nss.ns()}}}};
+          {"idIndex", D{{"v", 2}, {"key", D{{"_id", 1}}}, {"name", IndexConstants::kIdIndexName}}}};
     OplogEntry createColl = createCommand(collSpec.toBson(), testUuid());
     checkTransformation(createColl, boost::none);
 }
@@ -2138,24 +3199,345 @@ TEST_F(ChangeStreamStageTest, MatchFiltersCreateCollection) {
 TEST_F(ChangeStreamStageTest, MatchFiltersNoOp) {
     auto noOp = makeOplogEntry(OpTypeEnum::kNoop,  // op type
                                {},                 // namespace
-                               BSON(repl::ReplicationCoordinator::newPrimaryMsgField
-                                    << repl::ReplicationCoordinator::newPrimaryMsg));  // o
+                               BSON(repl::kNewPrimaryMsgField << repl::kNewPrimaryMsg));  // o
 
     checkTransformation(noOp, boost::none);
+}
+
+
+TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformParseValidSupportedEvents) {
+    auto expCtx = getExpCtx();
+    expCtx->setForPerShardCursor(true);
+
+    for (const auto& supportedEvents :
+         {BSONArray(),
+          BSON_ARRAY("singleEvent"),
+          BSON_ARRAY("CASE" << "case"
+                            << "Case"
+                            << "insensitive"),  //< Test case sensitivity.
+          BSON_ARRAY("someEvent" << "someOtherEvent"
+                                 << "yetAnotherEvent")}) {
+        BSONObj spec =
+            BSON(DocumentSourceChangeStreamTransform::kStageName << BSON(
+                     "resumeAfter"
+                     << makeResumeToken(kDefaultTs, Value(), Value(), DSChangeStream::kInsertOpType)
+                     << "supportedEvents" << supportedEvents));
+
+        auto expected = Value(supportedEvents).getArray();
+
+        auto stage =
+            DocumentSourceChangeStreamTransform::createFromBson(spec.firstElement(), expCtx);
+        std::vector<Value> serialization;
+        stage->serializeToArray(serialization);
+        ASSERT_EQ(serialization.size(), 1UL);
+        ASSERT_EQ(serialization[0].getType(), BSONType::object);
+
+        auto actualSupportedEvents = serialization[0]
+                                         .getDocument()
+                                         .getField(DocumentSourceChangeStreamTransform::kStageName)
+                                         .getDocument()
+                                         .getField("supportedEvents"_sd);
+        ASSERT_TRUE(actualSupportedEvents.isArray());
+        ASSERT_VALUE_EQ(Value(expected), Value(actualSupportedEvents.getArray()));
+    }
+}
+
+TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformParseInvalidSupportedEvents) {
+    auto expCtx = getExpCtx();
+    expCtx->setForPerShardCursor(true);
+
+    for (const auto& supportedEvents : {
+             BSON_ARRAY("singleEvent" << "singleEvent"),
+             BSON_ARRAY("a" << "b"
+                            << "c"
+                            << "d"
+                            << "a"),
+             BSON_ARRAY(""),  //< Test invalid name.
+             BSON_ARRAY("a" << "b"
+                            << ""),
+         }) {
+        BSONObj spec =
+            BSON(DocumentSourceChangeStreamTransform::kStageName << BSON(
+                     "resumeAfter"
+                     << makeResumeToken(kDefaultTs, Value(), Value(), DSChangeStream::kInsertOpType)
+                     << "supportedEvents" << supportedEvents));
+
+        ASSERT_THROWS_CODE(
+            DocumentSourceChangeStreamTransform::createFromBson(spec.firstElement(), getExpCtx()),
+            AssertionException,
+            10498500);
+    }
+}
+
+TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformCannotSetSupportedEventsOnRouter) {
+    auto expCtx = getExpCtx();
+    expCtx->setInRouter(true);
+
+    BSONObj spec =
+        BSON(DocumentSourceChangeStreamTransform::kStageName
+             << BSON("resumeAfter"
+                     << makeResumeToken(kDefaultTs, Value(), Value(), DSChangeStream::kInsertOpType)
+                     << "supportedEvents" << BSON_ARRAY("eventType1")));
+
+    ASSERT_THROWS_CODE(
+        DocumentSourceChangeStreamTransform::createFromBson(spec.firstElement(), getExpCtx()),
+        AssertionException,
+        10498501);
+}
+
+TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformTransformSingleSupportedEvent) {
+    getExpCtx()->setForPerShardCursor(true);
+
+    BSONObj spec =
+        BSON(DocumentSourceChangeStreamTransform::kStageName
+             << BSON("resumeAfter" << makeResumeToken(kDefaultTs, Value(), Value(), "eventType1"_sd)
+                                   << "supportedEvents" << BSON_ARRAY("eventType1")));
+
+    BSONObj operationDescription = BSON("foo" << "bar"
+                                              << "baz"
+                                              << "qux"
+                                              << "sub" << BSON("sub1" << true << "sub2" << false));
+
+    auto entry =
+        makeOplogEntry(OpTypeEnum::kNoop,
+                       nss,
+                       BSONObj(),
+                       testUuid(),
+                       false,
+                       BSON("eventType1" << "willBeRemoved").addFields(operationDescription));
+
+    Document expectedDoc{
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), operationDescription, "eventType1"_sd)},
+        {DSChangeStream::kOperationTypeField, "eventType1"_sd},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}}};
+
+    auto stage =
+        exec::agg::MockStage::createForTest({Document{entry.getEntry().toBSON()}}, getExpCtx());
+    auto transformDS =
+        DocumentSourceChangeStreamTransform::createFromBson(spec.firstElement(), getExpCtx());
+    auto transformStage = exec::agg::buildStage(transformDS);
+    transformStage->setSource(stage.get());
+
+    auto next = transformStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), expectedDoc);
+
+    next = transformStage->getNext();
+    ASSERT_TRUE(next.isEOF());
+}
+
+TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformTransformMultipleSupportedEvents) {
+    getExpCtx()->setForPerShardCursor(true);
+
+    BSONObj spec = BSON(DocumentSourceChangeStreamTransform::kStageName
+                        << BSON("resumeAfter"
+                                << makeResumeToken(kDefaultTs, Value(), Value(), "eventType1"_sd)
+                                << "supportedEvents" << BSON_ARRAY("eventType1" << "eventType2")));
+
+    BSONObj operationDescriptionEvent1 =
+        BSON("foo" << "bar"
+                   << "baz"
+                   << "qux"
+                   << "sub" << BSON("sub1" << true << "sub2" << false));
+    BSONObj operationDescriptionEvent2 = BSON("some" << BSON("that" << "will"
+                                                                    << "end"
+                                                                    << "up"
+                                                                    << "in"
+                                                                    << "result"));
+
+    auto entry1 = makeOplogEntry(OpTypeEnum::kNoop,
+                                 nss,
+                                 BSONObj(),
+                                 testUuid(),
+                                 false,
+                                 BSON("eventType1" << BSON("will" << "be"
+                                                                  << "removed"
+                                                                  << "too"))
+                                     .addFields(operationDescriptionEvent1));
+
+    auto entry2 = makeOplogEntry(OpTypeEnum::kNoop,
+                                 nss,
+                                 BSONObj(),
+                                 testUuid(),
+                                 false,
+                                 BSON("eventType2" << true).addFields(operationDescriptionEvent2));
+
+    Document expectedDoc1{
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), operationDescriptionEvent1, "eventType1"_sd)},
+        {DSChangeStream::kOperationTypeField, "eventType1"_sd},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}}};
+
+    Document expectedDoc2{
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), operationDescriptionEvent2, "eventType2"_sd)},
+        {DSChangeStream::kOperationTypeField, "eventType2"_sd},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}}};
+
+    std::deque<exec::agg::GetNextResult> docs;
+    docs.push_back(Document{entry1.getEntry().toBSON()});
+    docs.push_back(Document{entry2.getEntry().toBSON()});
+    docs.push_back(Document{entry1.getEntry().toBSON()});
+    auto stage = exec::agg::MockStage::createForTest(std::move(docs), getExpCtx());
+    auto transformDS =
+        DocumentSourceChangeStreamTransform::createFromBson(spec.firstElement(), getExpCtx());
+    auto transformStage = exec::agg::buildStage(transformDS);
+
+    transformStage->setSource(stage.get());
+
+    auto next = transformStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), expectedDoc1);
+
+    next = transformStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), expectedDoc2);
+
+    next = transformStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), expectedDoc1);
+
+    next = transformStage->getNext();
+    ASSERT_TRUE(next.isEOF());
+}
+
+TEST_F(ChangeStreamStageTest,
+       DocumentSourceChangeStreamTransformTransformMultipleSupportedEventsExpandedEvents) {
+    getExpCtx()->setForPerShardCursor(true);
+
+    BSONObj spec =
+        BSON(DocumentSourceChangeStreamTransform::kStageName
+             << BSON("resumeAfter" << makeResumeToken(kDefaultTs, Value(), Value(), "eventType1"_sd)
+                                   << "showExpandedEvents" << true << "supportedEvents"
+                                   << BSON_ARRAY("eventType1" << "eventType2")));
+
+    BSONObj operationDescriptionEvent1 =
+        BSON("foo" << "bar"
+                   << "baz"
+                   << "qux"
+                   << "sub" << BSON("sub1" << true << "sub2" << false));
+    BSONObj operationDescriptionEvent2 = BSON("some" << BSON("that" << "will"
+                                                                    << "end"
+                                                                    << "up"
+                                                                    << "in"
+                                                                    << "result"));
+
+    auto entry1 = makeOplogEntry(OpTypeEnum::kNoop,
+                                 nss,
+                                 BSONObj(),
+                                 testUuid(),
+                                 false,
+                                 BSON("eventType1" << BSON("will" << "be"
+                                                                  << "removed"
+                                                                  << "too"))
+                                     .addFields(operationDescriptionEvent1));
+
+    auto entry2 = makeOplogEntry(OpTypeEnum::kNoop,
+                                 nss,
+                                 BSONObj(),
+                                 testUuid(),
+                                 false,
+                                 BSON("eventType2" << true).addFields(operationDescriptionEvent2));
+
+    Document expectedDoc1{
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), operationDescriptionEvent1, "eventType1"_sd)},
+        {DSChangeStream::kOperationTypeField, "eventType1"_sd},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kCollectionUuidField, testUuid()},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kOperationDescriptionField, operationDescriptionEvent1}};
+
+    Document expectedDoc2{
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), operationDescriptionEvent2, "eventType2"_sd)},
+        {DSChangeStream::kOperationTypeField, "eventType2"_sd},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kCollectionUuidField, testUuid()},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kOperationDescriptionField, operationDescriptionEvent2}};
+
+    std::deque<exec::agg::GetNextResult> docs;
+    docs.push_back(Document{entry1.getEntry().toBSON()});
+    docs.push_back(Document{entry2.getEntry().toBSON()});
+    docs.push_back(Document{entry1.getEntry().toBSON()});
+    auto stage = exec::agg::MockStage::createForTest(std::move(docs), getExpCtx());
+    auto transformDS =
+        DocumentSourceChangeStreamTransform::createFromBson(spec.firstElement(), getExpCtx());
+    auto transformStage = exec::agg::buildStage(transformDS);
+
+    transformStage->setSource(stage.get());
+
+    auto next = transformStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), expectedDoc1);
+
+    next = transformStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), expectedDoc2);
+
+    next = transformStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), expectedDoc1);
+
+    next = transformStage->getNext();
+    ASSERT_TRUE(next.isEOF());
+}
+
+DEATH_TEST_REGEX_F(ChangeStreamStageTest,
+                   DocumentSourceChangeStreamTransformTransformUnknownSupportedEvent,
+                   "Tripwire assertion.*5052201") {
+    getExpCtx()->setForPerShardCursor(true);
+
+    BSONObj spec = BSON(DocumentSourceChangeStreamTransform::kStageName
+                        << BSON("resumeAfter"
+                                << makeResumeToken(kDefaultTs, Value(), Value(), "eventType1"_sd)
+                                << "supportedEvents" << BSON_ARRAY("eventType1" << "eventType2")));
+
+    auto entry = makeOplogEntry(OpTypeEnum::kNoop,
+                                nss,
+                                BSONObj(),
+                                testUuid(),
+                                false,
+                                BSON("unsupportedEventType" << BSONObj()));
+
+    auto stage =
+        exec::agg::MockStage::createForTest({Document{entry.getEntry().toBSON()}}, getExpCtx());
+    auto transformDS =
+        DocumentSourceChangeStreamTransform::createFromBson(spec.firstElement(), getExpCtx());
+    auto transformStage = exec::agg::buildStage(transformDS);
+    transformStage->setSource(stage.get());
+
+    ASSERT_THROWS_CODE(transformStage->getNext(), AssertionException, 5052201);
 }
 
 TEST_F(ChangeStreamStageTest, TransformationShouldBeAbleToReParseSerializedStage) {
     auto expCtx = getExpCtx();
 
     DocumentSourceChangeStreamSpec spec;
+
+    // Need to set version number here, because if missing, the change stream reader version will be
+    // injected by the pipeline building later and then serialized. This would create a difference
+    // between the serializations.
+    spec.setVersion(ChangeStreamReaderVersionEnum::kV1);
     spec.setStartAtOperationTime(kDefaultTs);
     auto originalSpec = BSON("" << spec.toBSON());
 
     auto result = DSChangeStream::createFromBson(originalSpec.firstElement(), expCtx);
 
-    vector<intrusive_ptr<DocumentSource>> allStages(std::begin(result), std::end(result));
+    std::vector<boost::intrusive_ptr<DocumentSource>> allStages(std::begin(result),
+                                                                std::end(result));
 
-    ASSERT_EQ(allStages.size(), 5);
+    ASSERT_EQ(allStages.size(), 6);
 
     auto stage = allStages[2];
     ASSERT(dynamic_cast<DocumentSourceChangeStreamTransform*>(stage.get()));
@@ -2163,10 +3545,10 @@ TEST_F(ChangeStreamStageTest, TransformationShouldBeAbleToReParseSerializedStage
     //
     // Serialize the stage and confirm contents.
     //
-    vector<Value> serialization;
+    std::vector<Value> serialization;
     stage->serializeToArray(serialization);
     ASSERT_EQ(serialization.size(), 1UL);
-    ASSERT_EQ(serialization[0].getType(), BSONType::Object);
+    ASSERT_EQ(serialization[0].getType(), BSONType::object);
     auto serializedDoc = serialization[0].getDocument();
     ASSERT_BSONOBJ_EQ(
         serializedDoc[DocumentSourceChangeStreamTransform::kStageName].getDocument().toBson(),
@@ -2181,7 +3563,7 @@ TEST_F(ChangeStreamStageTest, TransformationShouldBeAbleToReParseSerializedStage
         DSChangeStream::createFromBson(serializedBson.firstElement(), expCtx), expCtx);
     auto newSerialization = roundTripped->serialize();
 
-    ASSERT_EQ(newSerialization.size(), 5UL);
+    ASSERT_EQ(newSerialization.size(), 6UL);
 
     // DSCSTransform stage should be the third stage after DSCSOplogMatch and
     // DSCSUnwindTransactions stages.
@@ -2193,26 +3575,27 @@ TEST_F(ChangeStreamStageTest, DSCSTransformStageEmptySpecSerializeResumeAfter) {
     auto originalSpec = BSON(DSChangeStream::kStageName << BSONObj());
 
     // Verify that the 'initialPostBatchResumeToken' is populated while parsing.
-    ASSERT(expCtx->initialPostBatchResumeToken.isEmpty());
+    ASSERT(expCtx->getInitialPostBatchResumeToken().isEmpty());
     ON_BLOCK_EXIT([&expCtx] {
         // Reset for the next run.
-        expCtx->initialPostBatchResumeToken = BSONObj();
+        expCtx->setInitialPostBatchResumeToken(BSONObj());
     });
 
     auto result = DSChangeStream::createFromBson(originalSpec.firstElement(), expCtx);
-    ASSERT(!expCtx->initialPostBatchResumeToken.isEmpty());
+    ASSERT(!expCtx->getInitialPostBatchResumeToken().isEmpty());
 
-    vector<intrusive_ptr<DocumentSource>> allStages(std::begin(result), std::end(result));
-    ASSERT_EQ(allStages.size(), 5);
-    auto transformStage = allStages[2];
-    ASSERT(dynamic_cast<DocumentSourceChangeStreamTransform*>(transformStage.get()));
+    std::vector<boost::intrusive_ptr<DocumentSource>> allStages(std::begin(result),
+                                                                std::end(result));
+    ASSERT_EQ(allStages.size(), 6);
+    auto transformDS = allStages[2];
+    ASSERT(dynamic_cast<DocumentSourceChangeStreamTransform*>(transformDS.get()));
 
 
     // Verify that an additional start point field is populated while serializing.
-    vector<Value> serialization;
-    transformStage->serializeToArray(serialization);
+    std::vector<Value> serialization;
+    transformDS->serializeToArray(serialization);
     ASSERT_EQ(serialization.size(), 1UL);
-    ASSERT_EQ(serialization[0].getType(), BSONType::Object);
+    ASSERT_EQ(serialization[0].getType(), BSONType::object);
     ASSERT(!serialization[0]
                 .getDocument()[DocumentSourceChangeStreamTransform::kStageName]
                 .getDocument()[DocumentSourceChangeStreamSpec::kStartAtOperationTimeFieldName]
@@ -2221,26 +3604,28 @@ TEST_F(ChangeStreamStageTest, DSCSTransformStageEmptySpecSerializeResumeAfter) {
 
 TEST_F(ChangeStreamStageTest, DSCSTransformStageWithResumeTokenSerialize) {
     auto expCtx = getExpCtx();
+    expCtx->setForPerShardCursor(true);
 
     DocumentSourceChangeStreamSpec spec;
-    spec.setResumeAfter(ResumeToken::parse(makeResumeToken(kDefaultTs, testUuid())));
+    spec.setResumeAfter(ResumeToken::parse(
+        makeResumeToken(kDefaultTs, testUuid(), Value(), DSChangeStream::kDropCollectionOpType)));
     auto originalSpec = BSON("" << spec.toBSON());
 
     // Verify that the 'initialPostBatchResumeToken' is populated while parsing.
-    ASSERT(expCtx->initialPostBatchResumeToken.isEmpty());
+    ASSERT(expCtx->getInitialPostBatchResumeToken().isEmpty());
     ON_BLOCK_EXIT([&expCtx] {
         // Reset for the next run.
-        expCtx->initialPostBatchResumeToken = BSONObj();
+        expCtx->setInitialPostBatchResumeToken(BSONObj());
     });
 
     auto stage =
         DocumentSourceChangeStreamTransform::createFromBson(originalSpec.firstElement(), expCtx);
-    ASSERT(!expCtx->initialPostBatchResumeToken.isEmpty());
+    ASSERT(!expCtx->getInitialPostBatchResumeToken().isEmpty());
 
-    vector<Value> serialization;
+    std::vector<Value> serialization;
     stage->serializeToArray(serialization);
     ASSERT_EQ(serialization.size(), 1UL);
-    ASSERT_EQ(serialization[0].getType(), BSONType::Object);
+    ASSERT_EQ(serialization[0].getType(), BSONType::object);
     ASSERT_BSONOBJ_EQ(serialization[0]
                           .getDocument()[DocumentSourceChangeStreamTransform::kStageName]
                           .getDocument()
@@ -2252,13 +3637,390 @@ template <typename Stage, typename StageSpec>
 void validateDocumentSourceStageSerialization(
     StageSpec spec, BSONObj specAsBSON, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     auto stage = Stage::createFromBson(specAsBSON.firstElement(), expCtx);
-    vector<Value> serialization;
+    std::vector<Value> serialization;
     stage->serializeToArray(serialization);
 
     ASSERT_EQ(serialization.size(), 1UL);
-    ASSERT_EQ(serialization[0].getType(), BSONType::Object);
+    ASSERT_EQ(serialization[0].getType(), BSONType::object);
     ASSERT_BSONOBJ_EQ(serialization[0].getDocument().toBson(),
                       BSON(Stage::kStageName << spec.toBSON()));
+}
+
+std::pair<DocumentSourceChangeStreamInjectControlEventsSpec, BSONObj>
+buildControlEventsSpecFromBSON(const BSONObj& actions) {
+    DocumentSourceChangeStreamInjectControlEventsSpec spec;
+    spec.setActions(actions);
+    return std::make_pair(spec, BSON("" << spec.toBSON()));
+}
+
+TEST_F(ChangeStreamStageTest, DSCSInjectControlEventsStageSerialization) {
+    // No actions specified.
+    {
+        auto [spec, stageSpecAsBSON] = buildControlEventsSpecFromBSON(BSONObj());
+        validateDocumentSourceStageSerialization<DocumentSourceChangeStreamInjectControlEvents>(
+            std::move(spec), stageSpecAsBSON, getExpCtx());
+    }
+
+    // Test some valid actions.
+    {
+        auto [spec, stageSpecAsBSON] =
+            buildControlEventsSpecFromBSON(BSON("event1" << "transformToControlEvent"
+                                                         << "event2"
+                                                         << "injectControlEvent"));
+        validateDocumentSourceStageSerialization<DocumentSourceChangeStreamInjectControlEvents>(
+            std::move(spec), stageSpecAsBSON, getExpCtx());
+    }
+
+    // Test serializing for explain.
+    {
+        auto actions = BSON("event1" << "transformToControlEvent"
+                                     << "event2"
+                                     << "injectControlEvent");
+        auto [spec, stageSpecAsBSON] = buildControlEventsSpecFromBSON(actions);
+        auto stage = DocumentSourceChangeStreamInjectControlEvents::createFromBson(
+            stageSpecAsBSON.firstElement(), getExpCtx());
+        std::vector<Value> serialization;
+        SerializationOptions options;
+        options.verbosity = ExplainOptions::Verbosity::kQueryPlanner;
+        stage->serializeToArray(serialization, options);
+
+        ASSERT_EQ(serialization.size(), 1UL);
+        ASSERT_EQ(serialization[0].getType(), BSONType::object);
+
+        ASSERT_BSONOBJ_EQ(serialization[0].getDocument().toBson(),
+                          BSON("$changeStream"
+                               << BSON("stage"
+                                       << DocumentSourceChangeStreamInjectControlEvents::kStageName
+                                       << "actions" << actions)));
+    }
+}
+
+DEATH_TEST_REGEX_F(ChangeStreamStageTest,
+                   DSCSInjectControlEventsStageSerializationInvalidInputType,
+                   "Tripwire assertion.*10384001") {
+    // Test invalid top-level BSON type.
+    auto [spec, stageSpecAsBSON] = buildControlEventsSpecFromBSON(BSON_ARRAY(1));
+    ASSERT_THROWS_CODE(
+        validateDocumentSourceStageSerialization<DocumentSourceChangeStreamInjectControlEvents>(
+            std::move(spec), stageSpecAsBSON, getExpCtx()),
+        AssertionException,
+        10384001);
+}
+
+DEATH_TEST_REGEX_F(ChangeStreamStageTest,
+                   DSCSInjectControlEventsStageSerializationInvalidActionInputs,
+                   "Tripwire assertion.*10384001") {
+    // Test invalid actions types.
+    {
+        for (const BSONObj& value : {BSON("" << 1234), BSON("" << true), BSONObj()}) {
+            auto [spec, stageSpecAsBSON] =
+                buildControlEventsSpecFromBSON(BSON("event" << value.firstElement()));
+            ASSERT_THROWS_CODE(validateDocumentSourceStageSerialization<
+                                   DocumentSourceChangeStreamInjectControlEvents>(
+                                   std::move(spec), stageSpecAsBSON, getExpCtx()),
+                               AssertionException,
+                               10384001);
+        }
+    }
+
+    // Test invalid actions values.
+    {
+        for (StringData value : {"", " ", "foo", "dum dee dum", "INJECTCONTROLEVENT"}) {
+            auto [spec, stageSpecAsBSON] = buildControlEventsSpecFromBSON(BSON("event" << value));
+            ASSERT_THROWS_CODE(validateDocumentSourceStageSerialization<
+                                   DocumentSourceChangeStreamInjectControlEvents>(
+                                   std::move(spec), stageSpecAsBSON, getExpCtx()),
+                               AssertionException,
+                               10384001);
+        }
+    }
+}
+
+DEATH_TEST_REGEX_F(ChangeStreamStageTest,
+                   DSCSInjectControlEventsStageSerializationDuplicateEvents,
+                   "Tripwire assertion.*10384002") {
+    // Test duplicate events in spec.
+    auto [spec, stageSpecAsBSON] =
+        buildControlEventsSpecFromBSON(BSON("event1" << "injectControlEvent"
+                                                     << "event1"
+                                                     << "transformToControlEvent"));
+    ASSERT_THROWS_CODE(
+        validateDocumentSourceStageSerialization<DocumentSourceChangeStreamInjectControlEvents>(
+            std::move(spec), stageSpecAsBSON, getExpCtx()),
+        AssertionException,
+        10384002);
+}
+
+TEST_F(ChangeStreamStageTest, InjectControlEventsHandlesNonMatchingInputsCorrectly) {
+    auto expCtx = getExpCtx();
+
+    const BSONObj doc1 = BSON("operationType" << "test1"
+                                              << "foo"
+                                              << "bar");
+    const BSONObj doc2 = BSON("operationType" << "test2"
+                                              << "test"
+                                              << "value");
+
+    // Test the control events stage with different configurations.
+    for (const BSONObj& config : {
+             BSONObj(),
+             BSON("eventType1" << "injectControlEvent"
+                               << "eventType2"
+                               << "transformToControlEvent"),
+         }) {
+        auto [_, stageSpecAsBSON] = buildControlEventsSpecFromBSON(config);
+
+        auto injectControlEvents = DocumentSourceChangeStreamInjectControlEvents::createFromBson(
+            stageSpecAsBSON.firstElement(), expCtx);
+
+        std::deque<DocumentSource::GetNextResult> inputDocs = {
+            DocumentSource::GetNextResult::makePauseExecution(),
+            Document::fromBsonWithMetaData(doc1),
+            DocumentSource::GetNextResult::makePauseExecution(),
+            Document::fromBsonWithMetaData(doc2),
+            DocumentSource::GetNextResult::makeEOF(),
+        };
+
+        auto stage = exec::agg::MockStage::createForTest(inputDocs, expCtx);
+        auto injectControlEventsStage = exec::agg::buildStage(injectControlEvents);
+        injectControlEventsStage->setSource(stage.get());
+
+        auto next = injectControlEventsStage->getNext();
+        ASSERT_TRUE(next.isPaused());
+
+        next = injectControlEventsStage->getNext();
+        ASSERT_TRUE(next.isAdvanced());
+        ASSERT_DOCUMENT_EQ(Document::fromBsonWithMetaData(doc1), next.getDocument());
+
+        next = injectControlEventsStage->getNext();
+        ASSERT_TRUE(next.isPaused());
+
+        next = injectControlEventsStage->getNext();
+        ASSERT_TRUE(next.isAdvanced());
+        ASSERT_DOCUMENT_EQ(Document::fromBsonWithMetaData(doc2), next.getDocument());
+
+        next = injectControlEventsStage->getNext();
+        ASSERT_TRUE(next.isEOF());
+    }
+}
+
+TEST_F(ChangeStreamStageTest, InjectControlEventsHandlesMatchingInputsCorrectly) {
+    auto expCtx = getExpCtx();
+
+    auto [_, stageSpecAsBSON] =
+        buildControlEventsSpecFromBSON(BSON("eventType1" << "injectControlEvent"
+                                                         << "eventType2"
+                                                         << "transformToControlEvent"));
+
+    auto injectControlEvents = DocumentSourceChangeStreamInjectControlEvents::createFromBson(
+        stageSpecAsBSON.firstElement(), expCtx);
+
+    BSONObj doc1 = BSON("operationType" << "test1"
+                                        << "foo"
+                                        << "bar");
+    BSONObj doc2 = BSON("operationType" << "test2"
+                                        << "test"
+                                        << "value");
+    BSONObj doc3 = BSON("operationType" << "test3"
+                                        << "baz"
+                                        << "qux");
+    BSONObj ctrl1 = BSON("operationType" << "eventType1"
+                                         << "value" << 1234);
+    BSONObj ctrl2 = BSON("operationType" << "eventType2"
+                                         << "value"
+                                         << "test");
+    BSONObj ctrl3 = BSON("operationType" << "eventType1"
+                                         << "value" << BSONObj());
+
+    std::deque<DocumentSource::GetNextResult> inputDocs = {
+        DocumentSource::GetNextResult::makePauseExecution(),
+        Document::fromBsonWithMetaData(doc1),
+        Document::fromBsonWithMetaData(ctrl1),
+        DocumentSource::GetNextResult::makePauseExecution(),
+        Document::fromBsonWithMetaData(doc2),
+        Document::fromBsonWithMetaData(ctrl2),
+        Document::fromBsonWithMetaData(doc3),
+        Document::fromBsonWithMetaData(ctrl3),
+        DocumentSource::GetNextResult::makeEOF(),
+    };
+
+    auto stage = exec::agg::MockStage::createForTest(inputDocs, expCtx);
+    auto injectControlEventsStage = exec::agg::buildStage(injectControlEvents);
+    injectControlEventsStage->setSource(stage.get());
+
+    auto next = injectControlEventsStage->getNext();
+    ASSERT_TRUE(next.isPaused());
+
+    next = injectControlEventsStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(Document::fromBsonWithMetaData(doc1), next.getDocument());
+
+    // This document leads to injecting a follow-up control event.
+    next = injectControlEventsStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(Document::fromBsonWithMetaData(ctrl1), next.getDocument());
+
+    // The injected control event.
+    next = injectControlEventsStage->getNext();
+    ASSERT_TRUE(next.isAdvancedControlDocument());
+    ASSERT_DOCUMENT_EQ(Document::fromBsonWithMetaData(ctrl1), next.getDocument());
+
+    next = injectControlEventsStage->getNext();
+    ASSERT_TRUE(next.isPaused());
+
+    next = injectControlEventsStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(Document::fromBsonWithMetaData(doc2), next.getDocument());
+
+    // This document gets transformed into a control event.
+    next = injectControlEventsStage->getNext();
+    ASSERT_TRUE(next.isAdvancedControlDocument());
+    ASSERT_DOCUMENT_EQ(Document::fromBsonWithMetaData(ctrl2), next.getDocument());
+
+    next = injectControlEventsStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(Document::fromBsonWithMetaData(doc3), next.getDocument());
+
+    // This document leads to injecting a follow-up control event.
+    next = injectControlEventsStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(Document::fromBsonWithMetaData(ctrl3), next.getDocument());
+
+    // The injected control event.
+    next = injectControlEventsStage->getNext();
+    ASSERT_TRUE(next.isAdvancedControlDocument());
+    ASSERT_DOCUMENT_EQ(Document::fromBsonWithMetaData(ctrl3), next.getDocument());
+
+    next = injectControlEventsStage->getNext();
+    ASSERT_TRUE(next.isEOF());
+}
+
+// Test that a change stream control event is returned unmodified by a $match stage.
+TEST_F(ChangeStreamStageTest, ControlEventsAreReturnedByMatchStageUnmodified) {
+    auto expCtx = getExpCtx();
+
+    // Create a control event that does not the $match expression.
+    BSONObj bson = BSON("some" << "value");
+    MutableDocument doc(Document{bson});
+    doc.metadata().setChangeStreamControlEvent();
+
+    std::deque<DocumentSource::GetNextResult> inputDocs = {
+        exec::agg::GetNextResult::makeAdvancedControlDocument(doc.freeze()),
+    };
+
+    auto stage = exec::agg::MockStage::createForTest(inputDocs, expCtx);
+
+    auto match = DocumentSourceMatch::create(BSON("foo" << "bar"), expCtx);
+    auto matchStage = exec::agg::buildStage(match);
+    matchStage->setSource(stage.get());
+
+    auto result = matchStage->getNext();
+    ASSERT_TRUE(result.isAdvancedControlDocument());
+    ASSERT_BSONOBJ_EQ(bson, result.getDocument().toBson());
+
+    result = matchStage->getNext();
+    ASSERT_TRUE(result.isEOF());
+}
+
+// Test that a change stream control event is returned unmodified by a $project stage.
+TEST_F(ChangeStreamStageTest, ControlEventsAreReturnedByProjectStageUnmodified) {
+    auto expCtx = getExpCtx();
+
+    // Create a control event that does not the $match expression.
+    BSONObj bson = BSON("some" << "value");
+    MutableDocument doc(Document{bson});
+    doc.metadata().setChangeStreamControlEvent();
+
+    std::deque<DocumentSource::GetNextResult> inputDocs = {
+        exec::agg::GetNextResult::makeAdvancedControlDocument(doc.freeze()),
+    };
+
+    // Test exclusion and inclusion projections.
+    for (int projectType : {0, 1}) {
+        auto stage = exec::agg::MockStage::createForTest(inputDocs, expCtx);
+
+        auto project =
+            DocumentSourceProject::create(BSON("foo" << projectType), expCtx, "$project"_sd);
+        auto projectStage = exec::agg::buildStage(project);
+        projectStage->setSource(stage.get());
+
+        auto result = projectStage->getNext();
+        ASSERT_TRUE(result.isAdvancedControlDocument());
+        ASSERT_BSONOBJ_EQ(bson, result.getDocument().toBson());
+
+        result = projectStage->getNext();
+        ASSERT_TRUE(result.isEOF());
+    }
+}
+
+// Test the control events mapping for a v2 change stream reader.
+TEST_F(ChangeStreamStageTest, InjectControlEventsBuildForDataShard) {
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+    ScopedChangeStreamReaderBuilderMock readerBuilder(
+        std::make_unique<ChangeStreamReaderBuilderMock>(
+            [](OperationContext* opCtx, const ChangeStream& changeStream) { return nullptr; },
+            [](OperationContext* opCtx, const ChangeStream& changeStream) { return BSONObj(); },
+            [](OperationContext* opCtx, const ChangeStream& changeStream) {
+                return std::set<std::string>{
+                    "moveChunk", "namespacePlacementChanged", "movePrimary"};
+            }));
+
+    const std::vector<BSONObj> rawPipeline = {
+        BSON("$changeStream" << BSON("version" << "v2")),
+    };
+
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
+
+    auto injectControlEvents =
+        getStageFromPipeline<DocumentSourceChangeStreamInjectControlEvents>(pipeline.get());
+    ASSERT_NE(nullptr, injectControlEvents);
+
+    const auto& actionsMap = injectControlEvents->getActionsMap_forTest();
+    ASSERT_EQ(actionsMap.at("moveChunk"),
+              DocumentSourceChangeStreamInjectControlEvents::Action::kTransformToControlEvent);
+    ASSERT_EQ(actionsMap.at("movePrimary"),
+              DocumentSourceChangeStreamInjectControlEvents::Action::kTransformToControlEvent);
+    ASSERT_EQ(actionsMap.at("movePrimary"),
+              DocumentSourceChangeStreamInjectControlEvents::Action::kTransformToControlEvent);
+    ASSERT_FALSE(actionsMap.contains("foo"));
+}
+
+// Test the control events for a v2 change stream reader.
+TEST_F(ChangeStreamStageTest, InjectControlEventsBuildForDataShardShowSystemEvents) {
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+    ScopedChangeStreamReaderBuilderMock readerBuilder(
+        std::make_unique<ChangeStreamReaderBuilderMock>(
+            [](OperationContext* opCtx, const ChangeStream& changeStream) { return nullptr; },
+            [](OperationContext* opCtx, const ChangeStream& changeStream) { return BSONObj(); },
+            [](OperationContext* opCtx, const ChangeStream& changeStream) {
+                return std::set<std::string>{
+                    "moveChunk", "namespacePlacementChanged", "movePrimary"};
+            }));
+
+    const std::vector<BSONObj> rawPipeline = {
+        BSON("$changeStream" << BSON("showSystemEvents" << true << "version" << "v2")),
+    };
+
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
+
+    auto injectControlEvents =
+        getStageFromPipeline<DocumentSourceChangeStreamInjectControlEvents>(pipeline.get());
+    ASSERT_NE(nullptr, injectControlEvents);
+
+    const auto& actionsMap = injectControlEvents->getActionsMap_forTest();
+    ASSERT_EQ(actionsMap.at("moveChunk"),
+              DocumentSourceChangeStreamInjectControlEvents::Action::kInjectControlEvent);
+    ASSERT_EQ(actionsMap.at("movePrimary"),
+              DocumentSourceChangeStreamInjectControlEvents::Action::kTransformToControlEvent);
+    ASSERT_EQ(actionsMap.at("movePrimary"),
+              DocumentSourceChangeStreamInjectControlEvents::Action::kTransformToControlEvent);
+    ASSERT_FALSE(actionsMap.contains("foo"));
 }
 
 TEST_F(ChangeStreamStageTest, DSCSOplogMatchStageSerialization) {
@@ -2276,9 +4038,8 @@ TEST_F(ChangeStreamStageTest, DSCSOplogMatchStageSerialization) {
 TEST_F(ChangeStreamStageTest, DSCSUnwindTransactionStageSerialization) {
     auto expCtx = getExpCtx();
 
-    auto filter = BSON("ns" << BSON("$regex"
-                                    << "^db\\.coll$"));
-    DocumentSourceChangeStreamUnwindTransactionSpec spec(filter);
+    auto filter = BSON("ns" << BSON("$regex" << "^db\\.coll$"));
+    DocumentSourceChangeStreamUnwindTransactionSpec spec{std::move(filter)};
     auto stageSpecAsBSON = BSON("" << spec.toBSON());
 
     validateDocumentSourceStageSerialization<DocumentSourceChangeStreamUnwindTransaction>(
@@ -2289,8 +4050,12 @@ TEST_F(ChangeStreamStageTest, DSCSCheckInvalidateStageSerialization) {
     auto expCtx = getExpCtx();
 
     DocumentSourceChangeStreamCheckInvalidateSpec spec;
-    spec.setStartAfterInvalidate(ResumeToken::parse(makeResumeToken(
-        kDefaultTs, testUuid(), Value(), ResumeTokenData::FromInvalidate::kFromInvalidate)));
+    spec.setStartAfterInvalidate(
+        ResumeToken::parse(makeResumeToken(kDefaultTs,
+                                           testUuid(),
+                                           Value(),
+                                           DSChangeStream::kDropCollectionOpType,
+                                           ResumeTokenData::FromInvalidate::kFromInvalidate)));
     auto stageSpecAsBSON = BSON("" << spec.toBSON());
 
     validateDocumentSourceStageSerialization<DocumentSourceChangeStreamCheckInvalidate>(
@@ -2301,7 +4066,8 @@ TEST_F(ChangeStreamStageTest, DSCSResumabilityStageSerialization) {
     auto expCtx = getExpCtx();
 
     DocumentSourceChangeStreamCheckResumabilitySpec spec;
-    spec.setResumeToken(ResumeToken::parse(makeResumeToken(kDefaultTs, testUuid())));
+    spec.setResumeToken(ResumeToken::parse(
+        makeResumeToken(kDefaultTs, testUuid(), Value(), DSChangeStream::kDropCollectionOpType)));
     auto stageSpecAsBSON = BSON("" << spec.toBSON());
 
     validateDocumentSourceStageSerialization<DocumentSourceChangeStreamCheckResumability>(
@@ -2330,21 +4096,27 @@ TEST_F(ChangeStreamStageTest, DSCSLookupChangePostImageStageSerialization) {
 
 TEST_F(ChangeStreamStageTest, CloseCursorOnInvalidateEntries) {
     OplogEntry dropColl = createCommand(BSON("drop" << nss.coll()), testUuid());
-    auto stages = makeStages(dropColl);
-    auto lastStage = stages.back();
+    auto execPipeline = makeExecPipeline(dropColl);
+    auto lastStage = execPipeline->getStages().back();
 
     Document expectedDrop{
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid())},
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), Value(), DSChangeStream::kDropCollectionOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kDropCollectionOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
     };
     Document expectedInvalidate{
         {DSChangeStream::kIdField,
-         makeResumeToken(
-             kDefaultTs, testUuid(), Value(), ResumeTokenData::FromInvalidate::kFromInvalidate)},
+         makeResumeToken(kDefaultTs,
+                         testUuid(),
+                         Value(),
+                         DSChangeStream::kDropCollectionOpType,
+                         ResumeTokenData::FromInvalidate::kFromInvalidate)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kWallTimeField, Date_t()},
     };
 
     auto next = lastStage->getNext();
@@ -2360,30 +4132,37 @@ TEST_F(ChangeStreamStageTest, CloseCursorOnInvalidateEntries) {
 
 TEST_F(ChangeStreamStageTest, CloseCursorEvenIfInvalidateEntriesGetFilteredOut) {
     OplogEntry dropColl = createCommand(BSON("drop" << nss.coll()), testUuid());
-    auto stages = makeStages(dropColl);
-    auto lastStage = stages.back();
+    auto execPipeline = makeExecPipeline(dropColl);
+    auto lastStage = execPipeline->getStages().back();
     // Add a match stage after change stream to filter out the invalidate entries.
     auto match = DocumentSourceMatch::create(fromjson("{operationType: 'insert'}"), getExpCtx());
-    match->setSource(lastStage.get());
+
+    auto matchStage = exec::agg::buildStage(match);
+    matchStage->setSource(lastStage.get());
 
     // Throw an exception on the call of getNext().
-    ASSERT_THROWS(match->getNext(), ExceptionFor<ErrorCodes::ChangeStreamInvalidated>);
+    ASSERT_THROWS(matchStage->getNext(), ExceptionFor<ErrorCodes::ChangeStreamInvalidated>);
 }
 
-TEST_F(ChangeStreamStageTest, DocumentKeyShouldIncludeShardKeyFromResumeToken) {
+TEST_F(ChangeStreamStageTest, DocumentKeyShouldNotIncludeShardKeyWhenNoO2FieldInOplog) {
     const Timestamp ts(3, 45);
     const long long term = 4;
     const auto opTime = repl::OpTime(ts, term);
     const auto uuid = testUuid();
 
-    std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
-    CollectionCatalog::write(getExpCtx()->opCtx, [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(getExpCtx()->opCtx, uuid, std::move(collection));
-    });
+    {
+        Lock::GlobalWrite lk(getExpCtx()->getOperationContext());
+        std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(uuid, nss);
+        CollectionCatalog::write(
+            getExpCtx()->getOperationContext(), [&](CollectionCatalog& catalog) {
+                catalog.registerCollection(
+                    getExpCtx()->getOperationContext(), std::move(collection), /*ts=*/boost::none);
+            });
+    }
 
 
-    BSONObj o2 = BSON("_id" << 1 << "shardKey" << 2);
-    auto resumeToken = makeResumeToken(ts, uuid, o2);
+    BSONObj docKey = BSON("_id" << 1 << "shardKey" << 2);
+    auto resumeToken = makeResumeToken(ts, uuid, docKey, DSChangeStream::kInsertOpType);
 
     BSONObj insertDoc = BSON("_id" << 2 << "shardKey" << 3);
     auto insertEntry = makeOplogEntry(OpTypeEnum::kInsert,  // op type
@@ -2394,87 +4173,90 @@ TEST_F(ChangeStreamStageTest, DocumentKeyShouldIncludeShardKeyFromResumeToken) {
                                       boost::none,          // o2
                                       opTime);              // opTime
 
+    // The documentKey should have just an _id in this case.
     Document expectedInsert{
-        {DSChangeStream::kIdField, makeResumeToken(ts, uuid, insertDoc)},
+        {DSChangeStream::kIdField,
+         makeResumeToken(ts, uuid, D{{"_id", 2}}, DSChangeStream::kInsertOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kInsertOpType},
         {DSChangeStream::kClusterTimeField, ts},
+        {DSChangeStream::kWallTimeField, Date_t()},
         {DSChangeStream::kFullDocumentField, D{{"_id", 2}, {"shardKey", 3}}},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
-        {DSChangeStream::kDocumentKeyField, D{{"_id", 2}, {"shardKey", 3}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kDocumentKeyField, D{{"_id", 2}}},
     };
-    // Although the chunk manager and sharding catalog are not aware of the shard key in this test,
-    // the expectation is for the $changeStream stage to infer the shard key from the resume token.
     checkTransformation(
-        insertEntry,
-        expectedInsert,
-        {{"_id"}},  // Mock the 'collectDocumentKeyFieldsForHostedCollection' response.
-        BSON("$changeStream" << BSON("resumeAfter" << resumeToken)));
+        insertEntry, expectedInsert, BSON("$changeStream" << BSON("resumeAfter" << resumeToken)));
 
     // Verify the same behavior with resuming using 'startAfter'.
     checkTransformation(
-        insertEntry,
-        expectedInsert,
-        {{"_id"}},  // Mock the 'collectDocumentKeyFieldsForHostedCollection' response.
-        BSON("$changeStream" << BSON("startAfter" << resumeToken)));
+        insertEntry, expectedInsert, BSON("$changeStream" << BSON("startAfter" << resumeToken)));
 }
 
-TEST_F(ChangeStreamStageTest, DocumentKeyShouldNotIncludeShardKeyFieldsIfNotPresentInOplogEntry) {
+TEST_F(ChangeStreamStageTest, DocumentKeyShouldUseO2FieldInOplog) {
     const Timestamp ts(3, 45);
     const long long term = 4;
     const auto opTime = repl::OpTime(ts, term);
     const auto uuid = testUuid();
 
-    std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
-    CollectionCatalog::write(getExpCtx()->opCtx, [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(getExpCtx()->opCtx, uuid, std::move(collection));
-    });
+    {
+        Lock::GlobalWrite lk(getExpCtx()->getOperationContext());
+        std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(uuid, nss);
+        CollectionCatalog::write(
+            getExpCtx()->getOperationContext(), [&](CollectionCatalog& catalog) {
+                catalog.registerCollection(
+                    getExpCtx()->getOperationContext(), std::move(collection), /*ts=*/boost::none);
+            });
+    }
 
-    BSONObj o2 = BSON("_id" << 1 << "shardKey" << 2);
-    auto resumeToken = makeResumeToken(ts, uuid, o2);
 
-    // Note that the 'o' field in the oplog entry does not contain the shard key field.
-    BSONObj insertDoc = BSON("_id" << 2);
+    BSONObj docKey = BSON("_id" << 1);
+    auto resumeToken = makeResumeToken(ts, uuid, docKey, DSChangeStream::kInsertOpType);
+
+    BSONObj insertDoc = BSON("_id" << 2 << "shardKey" << 3);
+    BSONObj o2 = BSON("_id" << 2 << "shardKey" << 3);
     auto insertEntry = makeOplogEntry(OpTypeEnum::kInsert,  // op type
                                       nss,                  // namespace
                                       insertDoc,            // o
                                       uuid,                 // uuid
                                       boost::none,          // fromMigrate
-                                      boost::none,          // o2
+                                      o2,                   // o2
                                       opTime);              // opTime
 
     Document expectedInsert{
-        {DSChangeStream::kIdField, makeResumeToken(ts, uuid, insertDoc)},
+        {DSChangeStream::kIdField,
+         makeResumeToken(ts, uuid, insertDoc, DSChangeStream::kInsertOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kInsertOpType},
         {DSChangeStream::kClusterTimeField, ts},
-        {DSChangeStream::kFullDocumentField, D{{"_id", 2}}},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
-        {DSChangeStream::kDocumentKeyField, D{{"_id", 2}}},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kFullDocumentField, D{{"_id", 2}, {"shardKey", 3}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kDocumentKeyField, D{{"_id", 2}, {"shardKey", 3}}},
     };
+    // When o2 is present in the oplog entry, we should use its value for the document key, even if
+    // the resume token doesn't contain shard key.
     checkTransformation(
-        insertEntry,
-        expectedInsert,
-        {{"_id"}},  // Mock the 'collectDocumentKeyFieldsForHostedCollection' response.
-        BSON("$changeStream" << BSON("resumeAfter" << resumeToken)));
+        insertEntry, expectedInsert, BSON("$changeStream" << BSON("resumeAfter" << resumeToken)));
 
     // Verify the same behavior with resuming using 'startAfter'.
     checkTransformation(
-        insertEntry,
-        expectedInsert,
-        {{"_id"}},  // Mock the 'collectDocumentKeyFieldsForHostedCollection' response.
-        BSON("$changeStream" << BSON("startAfter" << resumeToken)));
+        insertEntry, expectedInsert, BSON("$changeStream" << BSON("startAfter" << resumeToken)));
 }
 
 TEST_F(ChangeStreamStageTest, ResumeAfterFailsIfResumeTokenDoesNotContainUUID) {
     const Timestamp ts(3, 45);
-    const auto uuid = testUuid();
 
-    std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
-    CollectionCatalog::write(getExpCtx()->opCtx, [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(getExpCtx()->opCtx, uuid, std::move(collection));
-    });
+    {
+        Lock::GlobalWrite lk(getExpCtx()->getOperationContext());
+        std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
+        CollectionCatalog::write(
+            getExpCtx()->getOperationContext(), [&](CollectionCatalog& catalog) {
+                catalog.registerCollection(
+                    getExpCtx()->getOperationContext(), std::move(collection), /*ts=*/boost::none);
+            });
+    }
 
     // Create a resume token from only the timestamp.
-    auto resumeToken = makeResumeToken(ts);
+    auto resumeToken = makeResumeToken(ts, Value(), Value(), DSChangeStream::kDropCollectionOpType);
 
     ASSERT_THROWS_CODE(
         DSChangeStream::createFromBson(
@@ -2486,35 +4268,47 @@ TEST_F(ChangeStreamStageTest, ResumeAfterFailsIfResumeTokenDoesNotContainUUID) {
 
 TEST_F(ChangeStreamStageTest, RenameFromSystemToUserCollectionShouldIncludeNotification) {
     // Renaming to a non-system collection will include a notification in the stream.
-    NamespaceString systemColl(nss.db() + ".system.users");
-    OplogEntry rename =
-        createCommand(BSON("renameCollection" << systemColl.ns() << "to" << nss.ns()), testUuid());
+    NamespaceString systemColl =
+        NamespaceString::createNamespaceString_forTest(nss.dbName(), "system.users");
+    OplogEntry rename = createCommand(
+        BSON("renameCollection" << systemColl.ns_forTest() << "to" << nss.ns_forTest()),
+        testUuid());
 
     // Note that the collection rename does *not* have the queued invalidated field.
+    const auto opDesc = Value(D{{"to", D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}}});
     Document expectedRename{
-        {DSChangeStream::kRenameTargetNssField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid())},
+        {DSChangeStream::kRenameTargetNssField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), opDesc, DSChangeStream::kRenameCollectionOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kRenameCollectionOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
-        {DSChangeStream::kNamespaceField, D{{"db", systemColl.db()}, {"coll", systemColl.coll()}}},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField,
+         D{{"db", systemColl.db_forTest()}, {"coll", systemColl.coll()}}},
     };
     checkTransformation(rename, expectedRename);
 }
 
 TEST_F(ChangeStreamStageTest, RenameFromUserToSystemCollectionShouldIncludeNotification) {
     // Renaming to a system collection will include a notification in the stream.
-    NamespaceString systemColl(nss.db() + ".system.users");
-    OplogEntry rename =
-        createCommand(BSON("renameCollection" << nss.ns() << "to" << systemColl.ns()), testUuid());
+    NamespaceString systemColl =
+        NamespaceString::createNamespaceString_forTest(nss.dbName(), "system.users");
+    OplogEntry rename = createCommand(
+        BSON("renameCollection" << nss.ns_forTest() << "to" << systemColl.ns_forTest()),
+        testUuid());
 
     // Note that the collection rename does *not* have the queued invalidated field.
+    const auto opDesc =
+        Value(D{{"to", D{{"db", systemColl.db_forTest()}, {"coll", systemColl.coll()}}}});
     Document expectedRename{
         {DSChangeStream::kRenameTargetNssField,
-         D{{"db", systemColl.db()}, {"coll", systemColl.coll()}}},
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid())},
+         D{{"db", systemColl.db_forTest()}, {"coll", systemColl.coll()}}},
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), opDesc, DSChangeStream::kRenameCollectionOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kRenameCollectionOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
     };
     checkTransformation(rename, expectedRename);
 }
@@ -2523,15 +4317,20 @@ TEST_F(ChangeStreamStageTest, ResumeAfterWithTokenFromInvalidateShouldFail) {
     auto expCtx = getExpCtx();
 
     // Need to put the collection in the collection catalog so the resume token is valid.
-    std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
-    CollectionCatalog::write(expCtx->opCtx, [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(getExpCtx()->opCtx, testUuid(), std::move(collection));
-    });
+    {
+        Lock::GlobalWrite lk(getExpCtx()->getOperationContext());
+        std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
+        CollectionCatalog::write(expCtx->getOperationContext(), [&](CollectionCatalog& catalog) {
+            catalog.registerCollection(
+                getExpCtx()->getOperationContext(), std::move(collection), /*ts=*/boost::none);
+        });
+    }
 
     const auto resumeTokenInvalidate =
         makeResumeToken(kDefaultTs,
                         testUuid(),
                         BSON("x" << 2 << "_id" << 1),
+                        DSChangeStream::kInsertOpType,
                         ResumeTokenData::FromInvalidate::kFromInvalidate);
 
     ASSERT_THROWS_CODE(
@@ -2544,23 +4343,23 @@ TEST_F(ChangeStreamStageTest, ResumeAfterWithTokenFromInvalidateShouldFail) {
 }
 
 TEST_F(ChangeStreamStageTest, UsesResumeTokenAsSortKeyIfNeedsMergeIsFalse) {
-    auto insert = makeOplogEntry(OpTypeEnum::kInsert,           // op type
-                                 nss,                           // namespace
-                                 BSON("x" << 2 << "_id" << 1),  // o
-                                 testUuid(),                    // uuid
-                                 boost::none,                   // fromMigrate
-                                 boost::none);                  // o2
+    auto insert = makeOplogEntry(OpTypeEnum::kInsert,            // op type
+                                 nss,                            // namespace
+                                 BSON("x" << 2 << "_id" << 1),   // o
+                                 testUuid(),                     // uuid
+                                 boost::none,                    // fromMigrate
+                                 BSON("x" << 2 << "_id" << 1));  // o2
 
-    auto stages = makeStages(insert.getEntry().toBSON(), kDefaultSpec);
+    auto execPipeline = makeExecPipeline(insert.getEntry().toBSON(), kDefaultSpec);
 
-    getExpCtx()->mongoProcessInterface =
-        std::make_unique<MockMongoInterface>(std::vector<FieldPath>{{"x"}, {"_id"}});
+    getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>());
 
-    getExpCtx()->needsMerge = false;
+    getExpCtx()->setNeedsMerge(false);
 
-    auto next = stages.back()->getNext();
+    auto next = execPipeline->getStages().back()->getNext();
 
-    auto expectedSortKey = makeResumeToken(kDefaultTs, testUuid(), BSON("x" << 2 << "_id" << 1));
+    auto expectedSortKey = makeResumeToken(
+        kDefaultTs, testUuid(), BSON("x" << 2 << "_id" << 1), DSChangeStream::kInsertOpType);
 
     ASSERT_TRUE(next.isAdvanced());
     ASSERT_VALUE_EQ(next.releaseDocument().metadata().getSortKey(), Value(expectedSortKey));
@@ -2572,52 +4371,90 @@ TEST_F(ChangeStreamStageTest, UsesResumeTokenAsSortKeyIfNeedsMergeIsFalse) {
 class ChangeStreamStageDBTest : public ChangeStreamStageTest {
 public:
     ChangeStreamStageDBTest()
-        : ChangeStreamStageTest(NamespaceString::makeCollectionlessAggregateNSS(nss.db())) {}
+        : ChangeStreamStageTest(NamespaceString::makeCollectionlessAggregateNSS(nss.dbName())) {}
 };
 
 TEST_F(ChangeStreamStageDBTest, TransformInsert) {
-    auto insert = makeOplogEntry(OpTypeEnum::kInsert, nss, BSON("_id" << 1 << "x" << 2));
+    auto insert = makeOplogEntry(OpTypeEnum::kInsert,
+                                 nss,
+                                 BSON("_id" << 1 << "x" << 2),
+                                 testUuid(),
+                                 boost::none,
+                                 BSON("x" << 2 << "_id" << 1));
 
     Document expectedInsert{
         {DSChangeStream::kIdField,
-         makeResumeToken(kDefaultTs, testUuid(), BSON("x" << 2 << "_id" << 1))},
+         makeResumeToken(
+             kDefaultTs, testUuid(), BSON("x" << 2 << "_id" << 1), DSChangeStream::kInsertOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kInsertOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kWallTimeField, Date_t()},
         {DSChangeStream::kFullDocumentField, D{{"_id", 1}, {"x", 2}}},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"x", 2}, {"_id", 1}}},  // Note _id <-> x reversal.
     };
-    checkTransformation(insert, expectedInsert, {{"x"}, {"_id"}});
+    checkTransformation(insert, expectedInsert);
+}
+
+TEST_F(ChangeStreamStageDBTest, TransformInsertShowExpandedEvents) {
+    auto insert = makeOplogEntry(OpTypeEnum::kInsert,
+                                 nss,
+                                 BSON("_id" << 1 << "x" << 2),
+                                 testUuid(),
+                                 boost::none,
+                                 BSON("x" << 2 << "_id" << 1));
+
+    Document expectedInsert{
+        {DSChangeStream::kIdField,
+         makeResumeToken(
+             kDefaultTs, testUuid(), BSON("x" << 2 << "_id" << 1), DSChangeStream::kInsertOpType)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kInsertOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kCollectionUuidField, testUuid()},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kFullDocumentField, D{{"_id", 1}, {"x", 2}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kDocumentKeyField, D{{"x", 2}, {"_id", 1}}},  // Note _id <-> x reversal.
+    };
+    checkTransformation(insert, expectedInsert, kShowExpandedEventsSpec);
 }
 
 TEST_F(ChangeStreamStageDBTest, InsertOnOtherCollections) {
-    NamespaceString otherNss("unittests.other_collection.");
-    auto insertOtherColl =
-        makeOplogEntry(OpTypeEnum::kInsert, otherNss, BSON("_id" << 1 << "x" << 2));
+    NamespaceString otherNss =
+        NamespaceString::createNamespaceString_forTest("unittests.other_collection.");
+    auto insertOtherColl = makeOplogEntry(OpTypeEnum::kInsert,
+                                          otherNss,
+                                          BSON("_id" << 1 << "x" << 2),
+                                          testUuid(),
+                                          boost::none,
+                                          BSON("x" << 2 << "_id" << 1));
 
     // Insert on another collection in the same database.
     Document expectedInsert{
         {DSChangeStream::kIdField,
-         makeResumeToken(kDefaultTs, testUuid(), BSON("x" << 2 << "_id" << 1))},
+         makeResumeToken(
+             kDefaultTs, testUuid(), BSON("x" << 2 << "_id" << 1), DSChangeStream::kInsertOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kInsertOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kWallTimeField, Date_t()},
         {DSChangeStream::kFullDocumentField, D{{"_id", 1}, {"x", 2}}},
-        {DSChangeStream::kNamespaceField, D{{"db", otherNss.db()}, {"coll", otherNss.coll()}}},
+        {DSChangeStream::kNamespaceField,
+         D{{"db", otherNss.db_forTest()}, {"coll", otherNss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"x", 2}, {"_id", 1}}},  // Note _id <-> x reversal.
     };
-    checkTransformation(insertOtherColl, expectedInsert, {{"x"}, {"_id"}});
+    checkTransformation(insertOtherColl, expectedInsert);
 }
 
 TEST_F(ChangeStreamStageDBTest, MatchFiltersChangesOnOtherDatabases) {
     std::set<NamespaceString> unmatchedNamespaces = {
         // Namespace starts with the db name, but is longer.
-        NamespaceString("unittests2.coll"),
+        NamespaceString::createNamespaceString_forTest("unittests2.coll"),
         // Namespace contains the db name, but not at the front.
-        NamespaceString("test.unittests"),
+        NamespaceString::createNamespaceString_forTest("test.unittests"),
         // Namespace contains the db name + dot.
-        NamespaceString("test.unittests.coll"),
+        NamespaceString::createNamespaceString_forTest("test.unittests.coll"),
         // Namespace contains the db name + dot but is followed by $.
-        NamespaceString("unittests.$cmd"),
+        NamespaceString::createNamespaceString_forTest("unittests.$cmd"),
     };
 
     // Insert into another database.
@@ -2628,62 +4465,114 @@ TEST_F(ChangeStreamStageDBTest, MatchFiltersChangesOnOtherDatabases) {
 }
 
 TEST_F(ChangeStreamStageDBTest, MatchFiltersAllSystemDotCollections) {
-    auto nss = NamespaceString("unittests.system.coll");
+    auto nss = NamespaceString::createNamespaceString_forTest("unittests.system.coll");
     auto insert = makeOplogEntry(OpTypeEnum::kInsert, nss, BSON("_id" << 1));
     checkTransformation(insert, boost::none);
 
-    nss = NamespaceString("unittests.system.users");
+    nss = NamespaceString::createNamespaceString_forTest("unittests.system.users");
     insert = makeOplogEntry(OpTypeEnum::kInsert, nss, BSON("_id" << 1));
     checkTransformation(insert, boost::none);
 
-    nss = NamespaceString("unittests.system.roles");
+    nss = NamespaceString::createNamespaceString_forTest("unittests.system.roles");
     insert = makeOplogEntry(OpTypeEnum::kInsert, nss, BSON("_id" << 1));
     checkTransformation(insert, boost::none);
 
-    nss = NamespaceString("unittests.system.keys");
+    nss = NamespaceString::createNamespaceString_forTest("unittests.system.keys");
     insert = makeOplogEntry(OpTypeEnum::kInsert, nss, BSON("_id" << 1));
     checkTransformation(insert, boost::none);
 }
 
 TEST_F(ChangeStreamStageDBTest, TransformsEntriesForLegalClientCollectionsWithSystem) {
     std::set<NamespaceString> allowedNamespaces = {
-        NamespaceString("unittests.coll.system"),
-        NamespaceString("unittests.coll.system.views"),
-        NamespaceString("unittests.systemx"),
+        NamespaceString::createNamespaceString_forTest("unittests.coll.system"),
+        NamespaceString::createNamespaceString_forTest("unittests.coll.system.views"),
+        NamespaceString::createNamespaceString_forTest("unittests.systemx"),
     };
 
     for (auto& ns : allowedNamespaces) {
-        auto insert = makeOplogEntry(OpTypeEnum::kInsert, ns, BSON("_id" << 1));
+        auto insert = makeOplogEntry(
+            OpTypeEnum::kInsert, ns, BSON("_id" << 1), testUuid(), boost::none, BSON("_id" << 1));
         Document expectedInsert{
-            {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid(), BSON("_id" << 1))},
+            {DSChangeStream::kIdField,
+             makeResumeToken(
+                 kDefaultTs, testUuid(), BSON("_id" << 1), DSChangeStream::kInsertOpType)},
             {DSChangeStream::kOperationTypeField, DSChangeStream::kInsertOpType},
             {DSChangeStream::kClusterTimeField, kDefaultTs},
+            {DSChangeStream::kWallTimeField, Date_t()},
             {DSChangeStream::kFullDocumentField, D{{"_id", 1}}},
-            {DSChangeStream::kNamespaceField, D{{"db", ns.db()}, {"coll", ns.coll()}}},
+            {DSChangeStream::kNamespaceField, D{{"db", ns.db_forTest()}, {"coll", ns.coll()}}},
             {DSChangeStream::kDocumentKeyField, D{{"_id", 1}}},
         };
-        checkTransformation(insert, expectedInsert, {{"_id"}});
+        checkTransformation(insert, expectedInsert);
     }
 }
 
-TEST_F(ChangeStreamStageDBTest, TransformUpdateFields) {
+TEST_F(ChangeStreamStageDBTest, TransformUpdateFieldsVMissing) {
+    // A missing $v field in the update oplog entry implies $v:1, which is no longer supported.
     BSONObj o = BSON("$set" << BSON("y" << 1));
+    BSONObj o2 = BSON("_id" << 1 << "x" << 2);
+    auto replace = makeOplogEntry(OpTypeEnum::kUpdate, nss, o, testUuid(), boost::none, o2);
+
+    Document expectedReplace{
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), o2, DSChangeStream::kReplaceOpType)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kReplaceOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kFullDocumentField, D{{"$set", D{{"y", 1}}}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kDocumentKeyField, D{{"_id", 1}, {"x", 2}}},
+    };
+
+    checkTransformation(replace, expectedReplace);
+}
+
+TEST_F(ChangeStreamStageDBTest, TransformUpdateFieldsDeltaUpdateNonV2NotSupported) {
+    BSONObj diff = BSON("u" << BSON("y" << 1));
+    BSONObj o = BSON("diff" << diff << "$v" << 3);
+    BSONObj o2 = BSON("_id" << 1 << "x" << 2);
+    auto updateField = makeOplogEntry(OpTypeEnum::kUpdate, nss, o, testUuid(), boost::none, o2);
+    checkTransformation(updateField, boost::none, kDefaultSpec, {}, {}, {}, 6741200);
+}
+
+TEST_F(ChangeStreamStageDBTest, TransformUpdateFieldsDeltaUpdate) {
+    BSONObj diff = BSON("u" << BSON("y" << 1));
+    BSONObj o = BSON("diff" << diff << "$v" << 2);
     BSONObj o2 = BSON("_id" << 1 << "x" << 2);
     auto updateField = makeOplogEntry(OpTypeEnum::kUpdate, nss, o, testUuid(), boost::none, o2);
 
-    Document expectedUpdateField{
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid(), o2)},
-        {DSChangeStream::kOperationTypeField, DSChangeStream::kUpdateOpType},
-        {DSChangeStream::kClusterTimeField, kDefaultTs},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
-        {DSChangeStream::kDocumentKeyField, D{{"_id", 1}, {"x", 2}}},
-        {"updateDescription", D{{"updatedFields", D{{"y", 1}}}, {"removedFields", vector<V>()}}},
-    };
+    const auto expectedUpdateField =
+        makeExpectedUpdateEvent(kDefaultTs,
+                                nss,
+                                o2,
+                                D{{"updatedFields", D{{"y", 1}}},
+                                  {"removedFields", std::vector<V>()},
+                                  {"truncatedArrays", std::vector<V>()}});
     checkTransformation(updateField, expectedUpdateField);
 }
 
+TEST_F(ChangeStreamStageDBTest, TransformUpdateFieldsModifierUpdate) {
+    BSONObj o = BSON("x" << 2 << "y" << 1);
+    BSONObj o2 = BSON("_id" << 1);
+    auto replace = makeOplogEntry(OpTypeEnum::kUpdate, nss, o, testUuid(), boost::none, o2);
+
+    Document expectedReplace{
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), o2, DSChangeStream::kReplaceOpType)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kReplaceOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kFullDocumentField, D{{"x", 2}, {"y", 1}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kDocumentKeyField, D{{"_id", 1}}},
+    };
+
+    checkTransformation(replace, expectedReplace);
+}
+
 TEST_F(ChangeStreamStageDBTest, TransformRemoveFields) {
-    BSONObj o = BSON("$unset" << BSON("y" << 1));
+    BSONObj diff = BSON("d" << BSON("y" << false));
+    BSONObj o = BSON("diff" << diff << "$v" << 2);
     BSONObj o2 = BSON("_id" << 1 << "x" << 2);
     auto removeField = makeOplogEntry(OpTypeEnum::kUpdate,  // op type
                                       nss,                  // namespace
@@ -2692,17 +4581,13 @@ TEST_F(ChangeStreamStageDBTest, TransformRemoveFields) {
                                       boost::none,          // fromMigrate
                                       o2);                  // o2
 
-    // Remove fields
-    Document expectedRemoveField{
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid(), o2)},
-        {DSChangeStream::kOperationTypeField, DSChangeStream::kUpdateOpType},
-        {DSChangeStream::kClusterTimeField, kDefaultTs},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
-        {DSChangeStream::kDocumentKeyField, D{{"_id", 1}, {"x", 2}}},
-        {
-            "updateDescription",
-            D{{"updatedFields", D{}}, {"removedFields", {"y"_sd}}},
-        }};
+    const auto expectedRemoveField =
+        makeExpectedUpdateEvent(kDefaultTs,
+                                nss,
+                                o2,
+                                D{{"updatedFields", D{}},
+                                  {"removedFields", {"y"_sd}},
+                                  {"truncatedArrays", std::vector<V>()}});
     checkTransformation(removeField, expectedRemoveField);
 }
 
@@ -2718,12 +4603,38 @@ TEST_F(ChangeStreamStageDBTest, TransformReplace) {
 
     // Replace
     Document expectedReplace{
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid(), o2)},
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), o2, DSChangeStream::kReplaceOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kReplaceOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kWallTimeField, Date_t()},
         {DSChangeStream::kFullDocumentField, D{{"_id", 1}, {"x", 2}, {"y", 1}}},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 1}, {"x", 2}}},
+    };
+    checkTransformation(replace, expectedReplace);
+}
+
+TEST_F(ChangeStreamStageDBTest, TransformReplaceWithVField) {
+    BSONObj o = BSON("_id" << 1 << "x" << 2 << "y" << 1 << "$v" << 2);
+    BSONObj o2 = BSON("_id" << 1);
+    auto replace = makeOplogEntry(OpTypeEnum::kUpdate,  // op type
+                                  nss,                  // namespace
+                                  o,                    // o
+                                  testUuid(),           // uuid
+                                  boost::none,          // fromMigrate
+                                  o2);                  // o2
+
+    // Replace
+    Document expectedReplace{
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), o2, DSChangeStream::kReplaceOpType)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kReplaceOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kFullDocumentField, D{{"_id", 1}, {"x", 2}, {"y", 1}, {"$v", 2}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kDocumentKeyField, D{{"_id", 1}}},
     };
     checkTransformation(replace, expectedReplace);
 }
@@ -2739,10 +4650,12 @@ TEST_F(ChangeStreamStageDBTest, TransformDelete) {
 
     // Delete
     Document expectedDelete{
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid(), o)},
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), o, DSChangeStream::kDeleteOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kDeleteOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 1}, {"x", 2}}},
     };
     checkTransformation(deleteEntry, expectedDelete);
@@ -2783,39 +4696,47 @@ TEST_F(ChangeStreamStageDBTest, TransformDeleteFromMigrateShowMigrations) {
     // Delete
     auto spec = fromjson("{$changeStream: {showMigrationEvents: true}}");
     Document expectedDelete{
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid(), o)},
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), o, DSChangeStream::kDeleteOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kDeleteOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 1}, {"x", 2}}},
     };
 
-    checkTransformation(deleteEntry, expectedDelete, {}, spec);
+    checkTransformation(deleteEntry, expectedDelete, spec);
 }
 
 TEST_F(ChangeStreamStageDBTest, TransformDrop) {
     OplogEntry dropColl = createCommand(BSON("drop" << nss.coll()), testUuid());
     Document expectedDrop{
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid())},
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), Value(), DSChangeStream::kDropCollectionOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kDropCollectionOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
     };
     checkTransformation(dropColl, expectedDrop);
 }
 
 TEST_F(ChangeStreamStageDBTest, TransformRename) {
-    NamespaceString otherColl("test.bar");
-    OplogEntry rename =
-        createCommand(BSON("renameCollection" << nss.ns() << "to" << otherColl.ns()), testUuid());
+    NamespaceString otherColl = NamespaceString::createNamespaceString_forTest("test.bar");
+    OplogEntry rename = createCommand(
+        BSON("renameCollection" << nss.ns_forTest() << "to" << otherColl.ns_forTest()), testUuid());
 
+    const auto opDesc =
+        Value(D{{"to", D{{"db", otherColl.db_forTest()}, {"coll", otherColl.coll()}}}});
     Document expectedRename{
         {DSChangeStream::kRenameTargetNssField,
-         D{{"db", otherColl.db()}, {"coll", otherColl.coll()}}},
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid())},
+         D{{"db", otherColl.db_forTest()}, {"coll", otherColl.coll()}}},
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), opDesc, DSChangeStream::kRenameCollectionOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kRenameCollectionOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
     };
     checkTransformation(rename, expectedRename);
 }
@@ -2825,309 +4746,58 @@ TEST_F(ChangeStreamStageDBTest, TransformDropDatabase) {
 
     // Drop database entry doesn't have a UUID.
     Document expectedDropDatabase{
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs)},
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, Value(), Value(), DSChangeStream::kDropDatabaseOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kDropDatabaseOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}}},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}}},
     };
     Document expectedInvalidate{
         {DSChangeStream::kIdField,
-         makeResumeToken(
-             kDefaultTs, Value(), Value(), ResumeTokenData::FromInvalidate::kFromInvalidate)},
+         makeResumeToken(kDefaultTs,
+                         Value(),
+                         Value(),
+                         DSChangeStream::kDropDatabaseOpType,
+                         ResumeTokenData::FromInvalidate::kFromInvalidate)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kWallTimeField, Date_t()},
     };
 
-    checkTransformation(dropDB, expectedDropDatabase, {}, kDefaultSpec, expectedInvalidate);
+    checkTransformation(dropDB, expectedDropDatabase, kDefaultSpec, expectedInvalidate);
 }
 
-TEST_F(ChangeStreamStageTest, TransformPreImageForDelete) {
-    // Set the pre-image opTime to 1 second prior to the default event optime.
-    repl::OpTime preImageOpTime{Timestamp(kDefaultTs.getSecs() - 1, 1), 1};
-    const auto preImageObj = BSON("_id" << 1 << "x" << 2);
+TEST_F(ChangeStreamStageDBTest, TransformDropDatabaseShowExpandedEvents) {
+    OplogEntry dropDB = createCommand(BSON("dropDatabase" << 1), boost::none, false);
 
-    // The documentKey for the main change stream event.
-    const auto documentKey = BSON("_id" << 1);
-
-    // The mock oplog UUID used by MockMongoInterface.
-    auto oplogUUID = MockMongoInterface::oplogUuid();
-
-    // Create an oplog entry for the pre-image no-op event.
-    auto preImageEntry = makeOplogEntry(OpTypeEnum::kNoop,
-                                        NamespaceString::kRsOplogNamespace,
-                                        preImageObj,    // o
-                                        oplogUUID,      // uuid
-                                        boost::none,    // fromMigrate
-                                        boost::none,    // o2
-                                        preImageOpTime  // opTime
-    );
-
-    // Create an oplog entry for the delete event that will look up the pre-image.
-    auto deleteEntry = makeOplogEntry(OpTypeEnum::kDelete,
-                                      nss,
-                                      documentKey,     // o
-                                      testUuid(),      // uuid
-                                      boost::none,     // fromMigrate
-                                      boost::none,     // o2
-                                      kDefaultOpTime,  // opTime
-                                      {},              // sessionInfo
-                                      {},              // prevOpTime
-                                      preImageOpTime   // preImageOpTime
-    );
-
-    // Add the preImage oplog entry into a vector of documents that will be looked up. Add a dummy
-    // entry before it so that we know we are finding the pre-image based on the given timestamp.
-    repl::OpTime dummyOpTime{preImageOpTime.getTimestamp(), repl::OpTime::kInitialTerm};
-    std::vector<Document> documentsForLookup = {Document{dummyOpTime.toBSON()},
-                                                Document{preImageEntry.getEntry().toBSON()}};
-
-    // When run with {fullDocumentBeforeChange: "off"}, we do not see a pre-image even if available.
-    auto spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
-                                             << "off"));
-    Document expectedDeleteNoPreImage{
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid(), documentKey)},
-        {DSChangeStream::kOperationTypeField, DSChangeStream::kDeleteOpType},
+    // Drop database entry doesn't have a UUID.
+    Document expectedDropDatabase{
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, Value(), Value(), DSChangeStream::kDropDatabaseOpType)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kDropDatabaseOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
-        {DSChangeStream::kDocumentKeyField, documentKey},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}}},
     };
-    checkTransformation(
-        deleteEntry, expectedDeleteNoPreImage, {}, spec, boost::none, {}, documentsForLookup);
-
-    // When run with {fullDocumentBeforeChange: "whenAvailable"}, we see the pre-image.
-    spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
-                                        << "whenAvailable"));
-    Document expectedDeleteWithPreImage{
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid(), documentKey)},
-        {DSChangeStream::kOperationTypeField, DSChangeStream::kDeleteOpType},
+    Document expectedInvalidate{
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs,
+                         Value(),
+                         Value(),
+                         DSChangeStream::kDropDatabaseOpType,
+                         ResumeTokenData::FromInvalidate::kFromInvalidate)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
-        {DSChangeStream::kDocumentKeyField, documentKey},
-        {DSChangeStream::kFullDocumentBeforeChangeField, preImageObj},
+        {DSChangeStream::kWallTimeField, Date_t()},
     };
-    checkTransformation(
-        deleteEntry, expectedDeleteWithPreImage, {}, spec, boost::none, {}, documentsForLookup);
 
-    // When run with {fullDocumentBeforeChange: "required"}, we see the pre-image.
-    spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
-                                        << "required"));
-    checkTransformation(
-        deleteEntry, expectedDeleteWithPreImage, {}, spec, boost::none, {}, documentsForLookup);
-
-    // When run with {fullDocumentBeforeChange: "whenAvailable"} but no pre-image is available, the
-    // output 'fullDocumentBeforeChange' field is explicitly set to 'null'.
-    spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
-                                        << "whenAvailable"));
-    MutableDocument expectedDeleteWithNullPreImage(expectedDeleteNoPreImage);
-    expectedDeleteWithNullPreImage.addField(DSChangeStream::kFullDocumentBeforeChangeField,
-                                            Value(BSONNULL));
-    checkTransformation(deleteEntry, expectedDeleteWithNullPreImage.freeze(), {}, spec);
-
-    // When run with {fullDocumentBeforeChange: "required"} but we cannot find the pre-image, we
-    // throw NoMatchingDocument.
-    spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
-                                        << "required"));
-    ASSERT_THROWS_CODE(checkTransformation(deleteEntry, boost::none, {}, spec),
-                       AssertionException,
-                       ErrorCodes::NoMatchingDocument);
-}
-
-TEST_F(ChangeStreamStageTest, TransformPreImageForUpdate) {
-    // Set the pre-image opTime to 1 second prior to the default event optime.
-    repl::OpTime preImageOpTime{Timestamp(kDefaultTs.getSecs() - 1, 1), 1};
-
-    // Define the pre-image object, the update operation spec, and the document key.
-    const auto updateSpec = BSON("$unset" << BSON("x" << 1));
-    const auto preImageObj = BSON("_id" << 1 << "x" << 2);
-    const auto documentKey = BSON("_id" << 1);
-
-    // The mock oplog UUID used by MockMongoInterface.
-    auto oplogUUID = MockMongoInterface::oplogUuid();
-
-    // Create an oplog entry for the pre-image no-op event.
-    auto preImageEntry = makeOplogEntry(OpTypeEnum::kNoop,
-                                        NamespaceString::kRsOplogNamespace,
-                                        preImageObj,    // o
-                                        oplogUUID,      // uuid
-                                        boost::none,    // fromMigrate
-                                        boost::none,    // o2
-                                        preImageOpTime  // opTime
-    );
-
-    // Create an oplog entry for the update event that will look up the pre-image.
-    auto updateEntry = makeOplogEntry(OpTypeEnum::kUpdate,
-                                      nss,
-                                      updateSpec,      // o
-                                      testUuid(),      // uuid
-                                      boost::none,     // fromMigrate
-                                      documentKey,     // o2
-                                      kDefaultOpTime,  // opTime
-                                      {},              // sessionInfo
-                                      {},              // prevOpTime
-                                      preImageOpTime   // preImageOpTime
-    );
-
-    // Add the preImage oplog entry into a vector of documents that will be looked up. Add a dummy
-    // entry before it so that we know we are finding the pre-image based on the given timestamp.
-    repl::OpTime dummyOpTime{preImageOpTime.getTimestamp(), repl::OpTime::kInitialTerm};
-    std::vector<Document> documentsForLookup = {Document{dummyOpTime.toBSON()},
-                                                Document{preImageEntry.getEntry().toBSON()}};
-
-    // When run with {fullDocumentBeforeChange: "off"}, we do not see a pre-image even if available.
-    auto spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
-                                             << "off"));
-    Document expectedUpdateNoPreImage{
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid(), documentKey)},
-        {DSChangeStream::kOperationTypeField, DSChangeStream::kUpdateOpType},
-        {DSChangeStream::kClusterTimeField, kDefaultTs},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
-        {DSChangeStream::kDocumentKeyField, documentKey},
-        {
-            "updateDescription",
-            D{{"updatedFields", D{}}, {"removedFields", vector<V>{V("x"_sd)}}},
-        },
-    };
-    checkTransformation(
-        updateEntry, expectedUpdateNoPreImage, {}, spec, boost::none, {}, documentsForLookup);
-
-    // When run with {fullDocumentBeforeChange: "whenAvailable"}, we see the pre-image.
-    spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
-                                        << "whenAvailable"));
-    Document expectedUpdateWithPreImage{
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid(), documentKey)},
-        {DSChangeStream::kOperationTypeField, DSChangeStream::kUpdateOpType},
-        {DSChangeStream::kClusterTimeField, kDefaultTs},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
-        {DSChangeStream::kDocumentKeyField, documentKey},
-        {
-            "updateDescription",
-            D{{"updatedFields", D{}}, {"removedFields", vector<V>{V("x"_sd)}}},
-        },
-        {DSChangeStream::kFullDocumentBeforeChangeField, preImageObj},
-    };
-    checkTransformation(
-        updateEntry, expectedUpdateWithPreImage, {}, spec, boost::none, {}, documentsForLookup);
-
-    // When run with {fullDocumentBeforeChange: "required"}, we see the pre-image.
-    spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
-                                        << "required"));
-    checkTransformation(
-        updateEntry, expectedUpdateWithPreImage, {}, spec, boost::none, {}, documentsForLookup);
-
-    // When run with {fullDocumentBeforeChange: "whenAvailable"} but no pre-image is available, the
-    // output 'fullDocumentBeforeChange' field is explicitly set to 'null'.
-    spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
-                                        << "whenAvailable"));
-    MutableDocument expectedUpdateWithNullPreImage(expectedUpdateNoPreImage);
-    expectedUpdateWithNullPreImage.addField(DSChangeStream::kFullDocumentBeforeChangeField,
-                                            Value(BSONNULL));
-    checkTransformation(updateEntry, expectedUpdateWithNullPreImage.freeze(), {}, spec);
-
-    // When run with {fullDocumentBeforeChange: "required"} but we cannot find the pre-image, we
-    // throw NoMatchingDocument.
-    spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
-                                        << "required"));
-    ASSERT_THROWS_CODE(checkTransformation(updateEntry, boost::none, {}, spec),
-                       AssertionException,
-                       ErrorCodes::NoMatchingDocument);
-}
-
-TEST_F(ChangeStreamStageTest, TransformPreImageForReplace) {
-    // Set the pre-image opTime to 1 second prior to the default event optime.
-    repl::OpTime preImageOpTime{Timestamp(kDefaultTs.getSecs() - 1, 1), 1};
-
-    // Define the pre-image object, the replacement document, and the document key.
-    const auto replacementDoc = BSON("_id" << 1 << "y" << 3);
-    const auto preImageObj = BSON("_id" << 1 << "x" << 2);
-    const auto documentKey = BSON("_id" << 1);
-
-    // The mock oplog UUID used by MockMongoInterface.
-    auto oplogUUID = MockMongoInterface::oplogUuid();
-
-    // Create an oplog entry for the pre-image no-op event.
-    auto preImageEntry = makeOplogEntry(OpTypeEnum::kNoop,
-                                        NamespaceString::kRsOplogNamespace,
-                                        preImageObj,    // o
-                                        oplogUUID,      // uuid
-                                        boost::none,    // fromMigrate
-                                        boost::none,    // o2
-                                        preImageOpTime  // opTime
-    );
-
-    // Create an oplog entry for the replacement event that will look up the pre-image.
-    auto replaceEntry = makeOplogEntry(OpTypeEnum::kUpdate,
-                                       nss,
-                                       replacementDoc,  // o
-                                       testUuid(),      // uuid
-                                       boost::none,     // fromMigrate
-                                       documentKey,     // o2
-                                       kDefaultOpTime,  // opTime
-                                       {},              // sessionInfo
-                                       {},              // prevOpTime
-                                       preImageOpTime   // preImageOpTime
-    );
-
-    // Add the preImage oplog entry into a vector of documents that will be looked up. Add a dummy
-    // entry before it so that we know we are finding the pre-image based on the given timestamp.
-    repl::OpTime dummyOpTime{preImageOpTime.getTimestamp(), repl::OpTime::kInitialTerm};
-    std::vector<Document> documentsForLookup = {Document{dummyOpTime.toBSON()},
-                                                Document{preImageEntry.getEntry().toBSON()}};
-
-    // When run with {fullDocumentBeforeChange: "off"}, we do not see a pre-image even if available.
-    auto spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
-                                             << "off"));
-    Document expectedReplaceNoPreImage{
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid(), documentKey)},
-        {DSChangeStream::kOperationTypeField, DSChangeStream::kReplaceOpType},
-        {DSChangeStream::kClusterTimeField, kDefaultTs},
-        {DSChangeStream::kFullDocumentField, replacementDoc},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
-        {DSChangeStream::kDocumentKeyField, documentKey},
-    };
-    checkTransformation(
-        replaceEntry, expectedReplaceNoPreImage, {}, spec, boost::none, {}, documentsForLookup);
-
-    // When run with {fullDocumentBeforeChange: "whenAvailable"}, we see the pre-image.
-    spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
-                                        << "whenAvailable"));
-    Document expectedReplaceWithPreImage{
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid(), documentKey)},
-        {DSChangeStream::kOperationTypeField, DSChangeStream::kReplaceOpType},
-        {DSChangeStream::kClusterTimeField, kDefaultTs},
-        {DSChangeStream::kFullDocumentField, replacementDoc},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
-        {DSChangeStream::kDocumentKeyField, documentKey},
-        {DSChangeStream::kFullDocumentBeforeChangeField, preImageObj},
-    };
-    checkTransformation(
-        replaceEntry, expectedReplaceWithPreImage, {}, spec, boost::none, {}, documentsForLookup);
-
-    // When run with {fullDocumentBeforeChange: "required"}, we see the pre-image.
-    spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
-                                        << "required"));
-    checkTransformation(
-        replaceEntry, expectedReplaceWithPreImage, {}, spec, boost::none, {}, documentsForLookup);
-
-    // When run with {fullDocumentBeforeChange: "whenAvailable"} but no pre-image is available, the
-    // output 'fullDocumentBeforeChange' field is explicitly set to 'null'.
-    spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
-                                        << "whenAvailable"));
-    MutableDocument expectedReplaceWithNullPreImage(expectedReplaceNoPreImage);
-    expectedReplaceWithNullPreImage.addField(DSChangeStream::kFullDocumentBeforeChangeField,
-                                             Value(BSONNULL));
-    checkTransformation(replaceEntry, expectedReplaceWithNullPreImage.freeze(), {}, spec);
-
-    // When run with {fullDocumentBeforeChange: "required"} but we cannot find the pre-image, we
-    // throw NoMatchingDocument.
-    spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
-                                        << "required"));
-    ASSERT_THROWS_CODE(checkTransformation(replaceEntry, boost::none, {}, spec),
-                       AssertionException,
-                       ErrorCodes::NoMatchingDocument);
+    checkTransformation(dropDB, expectedDropDatabase, kShowExpandedEventsSpec, expectedInvalidate);
 }
 
 TEST_F(ChangeStreamStageDBTest, MatchFiltersOperationsOnSystemCollections) {
-    NamespaceString systemColl(nss.db() + ".system.users");
+    NamespaceString systemColl =
+        NamespaceString::createNamespaceString_forTest(nss.dbName(), "system.users");
     OplogEntry insert = makeOplogEntry(OpTypeEnum::kInsert, systemColl, BSON("_id" << 1));
     checkTransformation(insert, boost::none);
 
@@ -3136,70 +4806,89 @@ TEST_F(ChangeStreamStageDBTest, MatchFiltersOperationsOnSystemCollections) {
 
     // Rename from a 'system' collection to another 'system' collection should not include a
     // notification.
-    NamespaceString renamedSystemColl(nss.db() + ".system.views");
-    OplogEntry rename = createCommand(
-        BSON("renameCollection" << systemColl.ns() << "to" << renamedSystemColl.ns()), testUuid());
+    NamespaceString renamedSystemColl(NamespaceString::makeSystemDotViewsNamespace(nss.dbName()));
+    OplogEntry rename = createCommand(BSON("renameCollection" << systemColl.ns_forTest() << "to"
+                                                              << renamedSystemColl.ns_forTest()),
+                                      testUuid());
     checkTransformation(rename, boost::none);
 }
 
 TEST_F(ChangeStreamStageDBTest, RenameFromSystemToUserCollectionShouldIncludeNotification) {
     // Renaming to a non-system collection will include a notification in the stream.
-    NamespaceString systemColl(nss.db() + ".system.users");
-    NamespaceString renamedColl(nss.db() + ".non_system_coll");
+    NamespaceString systemColl =
+        NamespaceString::createNamespaceString_forTest(nss.dbName(), "system.users");
+    NamespaceString renamedColl =
+        NamespaceString::createNamespaceString_forTest(nss.dbName(), "non_system_coll");
     OplogEntry rename = createCommand(
-        BSON("renameCollection" << systemColl.ns() << "to" << renamedColl.ns()), testUuid());
+        BSON("renameCollection" << systemColl.ns_forTest() << "to" << renamedColl.ns_forTest()),
+        testUuid());
 
     // Note that the collection rename does *not* have the queued invalidated field.
+    const auto opDesc =
+        Value(D{{"to", D{{"db", renamedColl.db_forTest()}, {"coll", renamedColl.coll()}}}});
     Document expectedRename{
         {DSChangeStream::kRenameTargetNssField,
-         D{{"db", renamedColl.db()}, {"coll", renamedColl.coll()}}},
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid())},
+         D{{"db", renamedColl.db_forTest()}, {"coll", renamedColl.coll()}}},
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), opDesc, DSChangeStream::kRenameCollectionOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kRenameCollectionOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
-        {DSChangeStream::kNamespaceField, D{{"db", systemColl.db()}, {"coll", systemColl.coll()}}},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField,
+         D{{"db", systemColl.db_forTest()}, {"coll", systemColl.coll()}}},
     };
     checkTransformation(rename, expectedRename);
 }
 
 TEST_F(ChangeStreamStageDBTest, RenameFromUserToSystemCollectionShouldIncludeNotification) {
     // Renaming to a system collection will include a notification in the stream.
-    NamespaceString systemColl(nss.db() + ".system.users");
-    OplogEntry rename =
-        createCommand(BSON("renameCollection" << nss.ns() << "to" << systemColl.ns()), testUuid());
+    NamespaceString systemColl =
+        NamespaceString::createNamespaceString_forTest(nss.dbName(), "system.users");
+    OplogEntry rename = createCommand(
+        BSON("renameCollection" << nss.ns_forTest() << "to" << systemColl.ns_forTest()),
+        testUuid());
 
     // Note that the collection rename does *not* have the queued invalidated field.
+    const auto opDesc =
+        Value(D{{"to", D{{"db", systemColl.db_forTest()}, {"coll", systemColl.coll()}}}});
     Document expectedRename{
         {DSChangeStream::kRenameTargetNssField,
-         D{{"db", systemColl.db()}, {"coll", systemColl.coll()}}},
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid())},
+         D{{"db", systemColl.db_forTest()}, {"coll", systemColl.coll()}}},
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), opDesc, DSChangeStream::kRenameCollectionOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kRenameCollectionOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
     };
     checkTransformation(rename, expectedRename);
 }
 
 TEST_F(ChangeStreamStageDBTest, MatchFiltersNoOp) {
     OplogEntry noOp = makeOplogEntry(OpTypeEnum::kNoop,
-                                     NamespaceString(),
-                                     BSON(repl::ReplicationCoordinator::newPrimaryMsgField
-                                          << repl::ReplicationCoordinator::newPrimaryMsg));
+                                     NamespaceString::kEmpty,
+                                     BSON(repl::kNewPrimaryMsgField << repl::kNewPrimaryMsg));
     checkTransformation(noOp, boost::none);
 }
 
-TEST_F(ChangeStreamStageDBTest, DocumentKeyShouldIncludeShardKeyFromResumeToken) {
+TEST_F(ChangeStreamStageDBTest, DocumentKeyShouldNotIncludeShardKeyWhenNoO2FieldInOplog) {
     const Timestamp ts(3, 45);
     const long long term = 4;
     const auto opTime = repl::OpTime(ts, term);
     const auto uuid = testUuid();
 
-    std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
-    CollectionCatalog::write(getExpCtx()->opCtx, [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(getExpCtx()->opCtx, uuid, std::move(collection));
-    });
+    {
+        Lock::GlobalWrite lk(getExpCtx()->getOperationContext());
+        std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(uuid, nss);
+        CollectionCatalog::write(
+            getExpCtx()->getOperationContext(), [&](CollectionCatalog& catalog) {
+                catalog.registerCollection(
+                    getExpCtx()->getOperationContext(), std::move(collection), /*ts=*/boost::none);
+            });
+    }
 
-    BSONObj o2 = BSON("_id" << 1 << "shardKey" << 2);
-    auto resumeToken = makeResumeToken(ts, uuid, o2);
+    BSONObj docKey = BSON("_id" << 1 << "shardKey" << 2);
+    auto resumeToken = makeResumeToken(ts, uuid, docKey, DSChangeStream::kInsertOpType);
 
     BSONObj insertDoc = BSON("_id" << 2 << "shardKey" << 3);
     auto insertEntry = makeOplogEntry(OpTypeEnum::kInsert,  // op type
@@ -3210,113 +4899,84 @@ TEST_F(ChangeStreamStageDBTest, DocumentKeyShouldIncludeShardKeyFromResumeToken)
                                       boost::none,          // o2
                                       opTime);              // opTime
 
+    // The documentKey should just have an _id in this case.
     Document expectedInsert{
-        {DSChangeStream::kIdField, makeResumeToken(ts, uuid, insertDoc)},
+        {DSChangeStream::kIdField,
+         makeResumeToken(ts, uuid, D{{"_id", 2}}, DSChangeStream::kInsertOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kInsertOpType},
         {DSChangeStream::kClusterTimeField, ts},
+        {DSChangeStream::kWallTimeField, Date_t()},
         {DSChangeStream::kFullDocumentField, D{{"_id", 2}, {"shardKey", 3}}},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kDocumentKeyField, D{{"_id", 2}}},
+    };
+    checkTransformation(
+        insertEntry, expectedInsert, BSON("$changeStream" << BSON("resumeAfter" << resumeToken)));
+}
+
+TEST_F(ChangeStreamStageDBTest, DocumentKeyShouldUseO2FieldInOplog) {
+    const Timestamp ts(3, 45);
+    const long long term = 4;
+    const auto opTime = repl::OpTime(ts, term);
+    const auto uuid = testUuid();
+
+    {
+        Lock::GlobalWrite lk(getExpCtx()->getOperationContext());
+        std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(uuid, nss);
+        CollectionCatalog::write(
+            getExpCtx()->getOperationContext(), [&](CollectionCatalog& catalog) {
+                catalog.registerCollection(
+                    getExpCtx()->getOperationContext(), std::move(collection), /*ts=*/boost::none);
+            });
+    }
+
+    BSONObj docKey = BSON("_id" << 1);
+    auto resumeToken = makeResumeToken(ts, uuid, docKey, DSChangeStream::kInsertOpType);
+
+    BSONObj insertDoc = BSON("_id" << 2 << "shardKey" << 3);
+    BSONObj o2 = BSON("_id" << 2 << "shardKey" << 3);
+    auto insertEntry = makeOplogEntry(OpTypeEnum::kInsert,  // op type
+                                      nss,                  // namespace
+                                      insertDoc,            // o
+                                      uuid,                 // uuid
+                                      boost::none,          // fromMigrate
+                                      o2,                   // o2
+                                      opTime);              // opTime
+
+    Document expectedInsert{
+        {DSChangeStream::kIdField,
+         makeResumeToken(ts, uuid, insertDoc, DSChangeStream::kInsertOpType)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kInsertOpType},
+        {DSChangeStream::kClusterTimeField, ts},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kFullDocumentField, D{{"_id", 2}, {"shardKey", 3}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 2}, {"shardKey", 3}}},
     };
+    // When o2 is present in the oplog entry, we should use its value for the document key, even if
+    // the resume token doesn't contain shard key.
     checkTransformation(
-        insertEntry,
-        expectedInsert,
-        {{"_id"}},  // Mock the 'collectDocumentKeyFieldsForHostedCollection' response.
-        BSON("$changeStream" << BSON("resumeAfter" << resumeToken)));
-}
-
-TEST_F(ChangeStreamStageDBTest, DocumentKeyShouldNotIncludeShardKeyFieldsIfNotPresentInOplogEntry) {
-    const Timestamp ts(3, 45);
-    const long long term = 4;
-    const auto opTime = repl::OpTime(ts, term);
-    const auto uuid = testUuid();
-
-    std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
-    CollectionCatalog::write(getExpCtx()->opCtx, [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(getExpCtx()->opCtx, uuid, std::move(collection));
-    });
-
-    BSONObj o2 = BSON("_id" << 1 << "shardKey" << 2);
-    auto resumeToken = makeResumeToken(ts, uuid, o2);
-
-    // Note that the 'o' field in the oplog entry does not contain the shard key field.
-    BSONObj insertDoc = BSON("_id" << 2);
-    auto insertEntry = makeOplogEntry(OpTypeEnum::kInsert,  // op type
-                                      nss,                  // namespace
-                                      insertDoc,            // o
-                                      uuid,                 // uuid
-                                      boost::none,          // fromMigrate
-                                      boost::none,          // o2
-                                      opTime);              // opTime
-
-    Document expectedInsert{
-        {DSChangeStream::kIdField, makeResumeToken(ts, uuid, insertDoc)},
-        {DSChangeStream::kOperationTypeField, DSChangeStream::kInsertOpType},
-        {DSChangeStream::kClusterTimeField, ts},
-        {DSChangeStream::kFullDocumentField, D{{"_id", 2}}},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
-        {DSChangeStream::kDocumentKeyField, D{{"_id", 2}}},
-    };
-    checkTransformation(
-        insertEntry,
-        expectedInsert,
-        {{"_id"}},  // Mock the 'collectDocumentKeyFieldsForHostedCollection' response.
-        BSON("$changeStream" << BSON("resumeAfter" << resumeToken)));
-}
-
-TEST_F(ChangeStreamStageDBTest, DocumentKeyShouldNotIncludeShardKeyIfResumeTokenDoesntContainUUID) {
-    const Timestamp ts(3, 45);
-    const long long term = 4;
-    const auto opTime = repl::OpTime(ts, term);
-    const auto uuid = testUuid();
-
-    std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
-    CollectionCatalog::write(getExpCtx()->opCtx, [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(getExpCtx()->opCtx, uuid, std::move(collection));
-    });
-
-    // Create a resume token from only the timestamp.
-    auto resumeToken = makeResumeToken(ts);
-
-    // Insert oplog entry contains shardKey, however we are not able to extract the shard key from
-    // the resume token.
-    BSONObj insertDoc = BSON("_id" << 2 << "shardKey" << 3);
-    auto insertEntry = makeOplogEntry(OpTypeEnum::kInsert,  // op type
-                                      nss,                  // namespace
-                                      insertDoc,            // o
-                                      uuid,                 // uuid
-                                      boost::none,          // fromMigrate
-                                      boost::none,          // o2
-                                      opTime);              // opTime
-
-    Document expectedInsert{
-        {DSChangeStream::kIdField, makeResumeToken(ts, uuid, BSON("_id" << 2))},
-        {DSChangeStream::kOperationTypeField, DSChangeStream::kInsertOpType},
-        {DSChangeStream::kClusterTimeField, ts},
-        {DSChangeStream::kFullDocumentField, D{{"_id", 2}, {"shardKey", 3}}},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
-        {DSChangeStream::kDocumentKeyField, D{{"_id", 2}}},
-    };
-    checkTransformation(
-        insertEntry,
-        expectedInsert,
-        {{"_id"}},  // Mock the 'collectDocumentKeyFieldsForHostedCollection' response.
-        BSON("$changeStream" << BSON("resumeAfter" << resumeToken)));
+        insertEntry, expectedInsert, BSON("$changeStream" << BSON("resumeAfter" << resumeToken)));
 }
 
 TEST_F(ChangeStreamStageDBTest, ResumeAfterWithTokenFromInvalidateShouldFail) {
     auto expCtx = getExpCtx();
 
     // Need to put the collection in the collection catalog so the resume token is valid.
-    std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
-    CollectionCatalog::write(expCtx->opCtx, [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(getExpCtx()->opCtx, testUuid(), std::move(collection));
-    });
+    {
+        Lock::GlobalWrite lk(getExpCtx()->getOperationContext());
+        std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
+        CollectionCatalog::write(expCtx->getOperationContext(), [&](CollectionCatalog& catalog) {
+            catalog.registerCollection(
+                getExpCtx()->getOperationContext(), std::move(collection), /*ts=*/boost::none);
+        });
+    }
 
     const auto resumeTokenInvalidate =
         makeResumeToken(kDefaultTs,
                         testUuid(),
                         BSON("x" << 2 << "_id" << 1),
+                        DSChangeStream::kInsertOpType,
                         ResumeTokenData::FromInvalidate::kFromInvalidate);
 
     ASSERT_THROWS_CODE(
@@ -3331,73 +4991,256 @@ TEST_F(ChangeStreamStageDBTest, ResumeAfterWithTokenFromInvalidateShouldFail) {
 TEST_F(ChangeStreamStageDBTest, ResumeAfterWithTokenFromDropDatabase) {
     const auto uuid = testUuid();
 
-    std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
-    CollectionCatalog::write(getExpCtx()->opCtx, [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(getExpCtx()->opCtx, uuid, std::move(collection));
-    });
+    {
+        Lock::GlobalWrite lk(getExpCtx()->getOperationContext());
+        std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(uuid, nss);
+        CollectionCatalog::write(
+            getExpCtx()->getOperationContext(), [&](CollectionCatalog& catalog) {
+                catalog.registerCollection(
+                    getExpCtx()->getOperationContext(), std::move(collection), /*ts=*/boost::none);
+            });
+    }
 
     // Create a resume token from only the timestamp, similar to a 'dropDatabase' entry.
-    auto resumeToken = makeResumeToken(
-        kDefaultTs, Value(), Value(), ResumeTokenData::FromInvalidate::kNotFromInvalidate);
+    auto resumeToken = makeResumeToken(kDefaultTs,
+                                       Value(),
+                                       Value(),
+                                       DSChangeStream::kInsertOpType,
+                                       ResumeTokenData::FromInvalidate::kNotFromInvalidate);
 
     BSONObj insertDoc = BSON("_id" << 2);
-    auto insertEntry = makeOplogEntry(OpTypeEnum::kInsert, nss, insertDoc);
+    auto insertEntry =
+        makeOplogEntry(OpTypeEnum::kInsert, nss, insertDoc, testUuid(), boost::none, insertDoc);
 
     Document expectedInsert{
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid(), insertDoc)},
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), insertDoc, DSChangeStream::kInsertOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kInsertOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kWallTimeField, Date_t()},
         {DSChangeStream::kFullDocumentField, D{{"_id", 2}}},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 2}}},
     };
     checkTransformation(
-        insertEntry,
-        expectedInsert,
-        {{"_id"}},  // Mock the 'collectDocumentKeyFieldsForHostedCollection' response.
-        BSON("$changeStream" << BSON("resumeAfter" << resumeToken)));
+        insertEntry, expectedInsert, BSON("$changeStream" << BSON("resumeAfter" << resumeToken)));
 }
 
 
 TEST_F(ChangeStreamStageDBTest, StartAfterSucceedsEvenIfResumeTokenDoesNotContainUUID) {
     const auto uuid = testUuid();
 
-    std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
-    CollectionCatalog::write(getExpCtx()->opCtx, [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(getExpCtx()->opCtx, uuid, std::move(collection));
-    });
+    {
+        Lock::GlobalWrite lk(getExpCtx()->getOperationContext());
+        std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(uuid, nss);
+        CollectionCatalog::write(
+            getExpCtx()->getOperationContext(), [&](CollectionCatalog& catalog) {
+                catalog.registerCollection(
+                    getExpCtx()->getOperationContext(), std::move(collection), /*ts=*/boost::none);
+            });
+    }
 
     // Create a resume token from only the timestamp, similar to a 'dropDatabase' entry.
-    auto resumeToken = makeResumeToken(kDefaultTs);
+    auto resumeToken =
+        makeResumeToken(kDefaultTs, Value(), Value(), DSChangeStream::kDropDatabaseOpType);
 
     BSONObj insertDoc = BSON("_id" << 2);
-    auto insertEntry = makeOplogEntry(OpTypeEnum::kInsert, nss, insertDoc);
+    auto insertEntry =
+        makeOplogEntry(OpTypeEnum::kInsert, nss, insertDoc, uuid, boost::none, insertDoc);
 
     Document expectedInsert{
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, uuid, insertDoc)},
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, uuid, insertDoc, DSChangeStream::kInsertOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kInsertOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kWallTimeField, Date_t()},
         {DSChangeStream::kFullDocumentField, D{{"_id", 2}}},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 2}}},
     };
     checkTransformation(
-        insertEntry,
-        expectedInsert,
-        {{"_id"}},  // Mock the 'collectDocumentKeyFieldsForHostedCollection' response.
-        BSON("$changeStream" << BSON("startAfter" << resumeToken)));
+        insertEntry, expectedInsert, BSON("$changeStream" << BSON("startAfter" << resumeToken)));
 }
 
-TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleMatch) {
-    //
-    // Tests that the single '$match' gets promoted before the '$_internalUpdateOnAddShard'.
-    //
+//
+// Tests the stages in a basic collection-level change stream without any additional pipeline steps.
+//
+TEST_F(ChangeStreamStageTest, BasicCollectionChangeStreamStagesOrder) {
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
     const std::vector<BSONObj> rawPipeline = {
-        fromjson("{$changeStream: {}}"),
+        change_stream_test_helper::kShowExpandedEventsSpec,
+    };
+
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
+    ASSERT_TRUE(getExpCtx()->isSingleNamespaceAggregation());
+    ASSERT_FALSE(getExpCtx()->isClusterAggregation());
+
+    assertStagesNameOrder(std::move(pipeline),
+                          {"$_internalChangeStreamOplogMatch",
+                           "$_internalChangeStreamUnwindTransaction",
+                           "$_internalChangeStreamTransform",
+                           "$_internalChangeStreamCheckInvalidate",
+                           "$_internalChangeStreamCheckResumability",
+                           "$_internalChangeStreamCheckTopologyChange",
+                           "$_internalChangeStreamHandleTopologyChange"});
+}
+
+//
+// Tests the stages in a basic database-level change stream without any additional pipeline steps.
+//
+TEST_F(ChangeStreamStageTest, BasicDatabaseChangeStreamStagesOrder) {
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
+    const std::vector<BSONObj> rawPipeline = {
+        change_stream_test_helper::kShowExpandedEventsSpec,
+    };
+
+    auto pipeline = buildTestPipelineForDatabase(rawPipeline);
+    ASSERT_FALSE(getExpCtx()->isSingleNamespaceAggregation());
+    ASSERT_FALSE(getExpCtx()->isClusterAggregation());
+
+    assertStagesNameOrder(std::move(pipeline),
+                          {"$_internalChangeStreamOplogMatch",
+                           "$_internalChangeStreamUnwindTransaction",
+                           "$_internalChangeStreamTransform",
+                           "$_internalChangeStreamCheckInvalidate",
+                           "$_internalChangeStreamCheckResumability",
+                           "$_internalChangeStreamCheckTopologyChange",
+                           "$_internalChangeStreamHandleTopologyChange"});
+}
+
+//
+// Tests the stages in a basic all-cluster change stream without any additional pipeline steps.
+// Notably in this case the pipeline will not contain the 'checkInvalidate' stage.
+//
+TEST_F(ChangeStreamStageTest, BasicAllClusterChangeStreamStagesOrder) {
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
+    const std::vector<BSONObj> rawPipeline = {
+        BSON("$changeStream" << BSON("showExpandedEvents" << true << "allChangesForCluster"
+                                                          << true)),
+    };
+
+    auto pipeline = buildTestPipelineForCluster(rawPipeline);
+    ASSERT_FALSE(getExpCtx()->isSingleNamespaceAggregation());
+    ASSERT_TRUE(getExpCtx()->isClusterAggregation());
+
+    assertStagesNameOrder(std::move(pipeline),
+                          {"$_internalChangeStreamOplogMatch",
+                           "$_internalChangeStreamUnwindTransaction",
+                           "$_internalChangeStreamTransform",
+                           "$_internalChangeStreamCheckResumability",
+                           "$_internalChangeStreamCheckTopologyChange",
+                           "$_internalChangeStreamHandleTopologyChange"});
+}
+
+//
+// Tests the stages in a basic collection-level v2 change stream without any additional pipeline
+// steps.
+//
+TEST_F(ChangeStreamStageTest, BasicCollectionChangeStreamV2StagesOrder) {
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+    ScopedChangeStreamReaderBuilderMock readerBuilder(
+        std::make_unique<ChangeStreamReaderBuilderMock>());
+
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
+    const std::vector<BSONObj> rawPipeline = {
+        BSON("$changeStream" << BSON("showExpandedEvents" << true << "version" << "v2")),
+    };
+
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
+
+    assertStagesNameOrder(std::move(pipeline),
+                          {"$_internalChangeStreamOplogMatch",
+                           "$_internalChangeStreamUnwindTransaction",
+                           "$_internalChangeStreamTransform",
+                           "$_internalChangeStreamCheckInvalidate",
+                           "$_internalChangeStreamCheckResumability",
+                           "$_internalChangeStreamInjectControlEvents",
+                           "$_internalChangeStreamHandleTopologyChangeV2"});
+}
+
+//
+// Tests the stages in a basic database-level v2 change stream without any additional pipeline
+// steps.
+//
+TEST_F(ChangeStreamStageTest, BasicDatabaseChangeStreamV2StagesOrder) {
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+    ScopedChangeStreamReaderBuilderMock readerBuilder(
+        std::make_unique<ChangeStreamReaderBuilderMock>());
+
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
+    const std::vector<BSONObj> rawPipeline = {
+        BSON("$changeStream" << BSON("showExpandedEvents" << true << "version" << "v2")),
+    };
+
+    auto pipeline = buildTestPipelineForDatabase(rawPipeline);
+
+    // TODO SERVER-111325: adjust the following pipeline once database-level change streams are
+    // supported by V2 change stream readers.
+    assertStagesNameOrder(std::move(pipeline),
+                          {"$_internalChangeStreamOplogMatch",
+                           "$_internalChangeStreamUnwindTransaction",
+                           "$_internalChangeStreamTransform",
+                           "$_internalChangeStreamCheckInvalidate",
+                           "$_internalChangeStreamCheckResumability",
+                           "$_internalChangeStreamCheckTopologyChange",
+                           "$_internalChangeStreamHandleTopologyChange"});
+}
+
+//
+// Tests the stages in a basic all-cluster v2 change stream without any additional pipeline steps.
+//
+TEST_F(ChangeStreamStageTest, BasicAllClusterChangeStreamV2StagesOrder) {
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+    ScopedChangeStreamReaderBuilderMock readerBuilder(
+        std::make_unique<ChangeStreamReaderBuilderMock>());
+
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
+    const std::vector<BSONObj> rawPipeline = {
+        BSON("$changeStream" << BSON("showExpandedEvents" << true << "version" << "v2"
+                                                          << "allChangesForCluster" << true)),
+    };
+
+    auto pipeline = buildTestPipelineForCluster(rawPipeline);
+
+    // TODO SERVER-111381: adjust the following pipeline once all-cluster change streams are
+    // supported by V2 change stream readers.
+    assertStagesNameOrder(std::move(pipeline),
+                          {"$_internalChangeStreamOplogMatch",
+                           "$_internalChangeStreamUnwindTransaction",
+                           "$_internalChangeStreamTransform",
+                           "$_internalChangeStreamCheckResumability",
+                           "$_internalChangeStreamCheckTopologyChange",
+                           "$_internalChangeStreamHandleTopologyChange"});
+}
+
+//
+// Tests that the single '$match' gets promoted before the
+// '$_internalChangeStreamHandleTopologyChange'.
+//
+TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleMatch) {
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
+    const std::vector<BSONObj> rawPipeline = {
+        kShowExpandedEventsSpec,
         fromjson("{$match: {operationType: 'insert'}}"),
     };
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -3410,16 +5253,50 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleMatch) {
                            "$_internalChangeStreamHandleTopologyChange"});
 }
 
+//
+// Tests that the single '$match' gets promoted before the
+// '$_internalChangeStreamHandleTopologyChange' in a v2 change stream.
+//
+TEST_F(ChangeStreamStageTest, ChangeStreamV2WithSingleMatch) {
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+    ScopedChangeStreamReaderBuilderMock readerBuilder(
+        std::make_unique<ChangeStreamReaderBuilderMock>());
+
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
+    const std::vector<BSONObj> rawPipeline = {
+        BSON("$changeStream" << BSON("showExpandedEvents" << true << "version" << "v2")),
+        fromjson("{$match: {operationType: 'insert'}}"),
+    };
+
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
+
+    assertStagesNameOrder(std::move(pipeline),
+                          {"$_internalChangeStreamOplogMatch",
+                           "$_internalChangeStreamUnwindTransaction",
+                           "$_internalChangeStreamTransform",
+                           "$_internalChangeStreamCheckInvalidate",
+                           "$_internalChangeStreamCheckResumability",
+                           "$_internalChangeStreamInjectControlEvents",
+                           "$match",
+                           "$_internalChangeStreamHandleTopologyChangeV2"});
+}
+
+//
+// Tests that multiple '$match' gets merged and promoted before the
+// '$_internalChangeStreamHandleTopologyChange'.
+//
 TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleMatch) {
-    //
-    // Tests that multiple '$match' gets merged and promoted before the
-    // '$_internalUpdateOnAddShard'.
-    //
-    const std::vector<BSONObj> rawPipeline = {fromjson("{$changeStream: {}}"),
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
+    const std::vector<BSONObj> rawPipeline = {kShowExpandedEventsSpec,
                                               fromjson("{$match: {operationType: 'insert'}}"),
                                               fromjson("{$match: {operationType: 'delete'}}")};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -3432,21 +5309,55 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleMatch) {
                            "$_internalChangeStreamHandleTopologyChange"});
 }
 
-TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleMatchAndResumeToken) {
-    //
-    // Tests that multiple '$match' gets merged and promoted before the
-    // '$_internalUpdateOnAddShard' if resume token if present.
-    //
-    auto resumeToken = makeResumeToken(kDefaultTs, testUuid());
+//
+// Tests that multiple '$match' gets merged and promoted before the
+// '$_internalChangeStreamHandleTopologyChange' in a v2 change stream.
+//
+TEST_F(ChangeStreamStageTest, ChangeStreamV2WithMultipleMatch) {
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
 
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+    ScopedChangeStreamReaderBuilderMock readerBuilder(
+        std::make_unique<ChangeStreamReaderBuilderMock>());
+
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
     const std::vector<BSONObj> rawPipeline = {
-        BSON("$changeStream" << BSON("resumeAfter" << resumeToken)),
-        BSON("$match" << BSON("operationType"
-                              << "insert")),
-        BSON("$match" << BSON("operationType"
-                              << "insert"))};
+        BSON("$changeStream" << BSON("showExpandedEvents" << true << "version" << "v2")),
+        fromjson("{$match: {operationType: 'insert'}}"),
+        fromjson("{$match: {operationType: 'delete'}}")};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
+
+    assertStagesNameOrder(std::move(pipeline),
+                          {"$_internalChangeStreamOplogMatch",
+                           "$_internalChangeStreamUnwindTransaction",
+                           "$_internalChangeStreamTransform",
+                           "$_internalChangeStreamCheckInvalidate",
+                           "$_internalChangeStreamCheckResumability",
+                           "$_internalChangeStreamInjectControlEvents",
+                           "$match",
+                           "$_internalChangeStreamHandleTopologyChangeV2"});
+}
+
+//
+// Tests that multiple '$match' gets merged and promoted before the
+// '$_internalChangeStreamCheckTopologyChange' when resume token is present.
+//
+TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleMatchAndResumeToken) {
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
+    const std::vector<BSONObj> rawPipeline = {
+        BSON("$changeStream"
+             << BSON("resumeAfter"
+                     << makeResumeToken(
+                            kDefaultTs, testUuid(), Value(), DSChangeStream::kDropCollectionOpType)
+                     << DocumentSourceChangeStreamSpec::kShowExpandedEventsFieldName << true)),
+        BSON("$match" << BSON("operationType" << "insert")),
+        BSON("$match" << BSON("operationType" << "insert"))};
+
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -3460,14 +5371,55 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleMatchAndResumeToken) {
                            "$_internalChangeStreamEnsureResumeTokenPresent"});
 }
 
+//
+// Tests that multiple '$match' gets merged and promoted before the
+// '$_internalChangeStreamCheckTopologyChange' in a v2 change stream when resume token is present.
+//
+TEST_F(ChangeStreamStageTest, ChangeStreamV2WithMultipleMatchAndResumeToken) {
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+    ScopedChangeStreamReaderBuilderMock readerBuilder(
+        std::make_unique<ChangeStreamReaderBuilderMock>());
+
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
+    const std::vector<BSONObj> rawPipeline = {
+        BSON("$changeStream" << BSON(
+                 "version"
+                 << "v2" << "resumeAfter"
+                 << makeResumeToken(
+                        kDefaultTs, testUuid(), Value(), DSChangeStream::kDropCollectionOpType)
+                 << DocumentSourceChangeStreamSpec::kShowExpandedEventsFieldName << true)),
+        BSON("$match" << BSON("operationType" << "insert")),
+        BSON("$match" << BSON("operationType" << "insert"))};
+
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
+
+    assertStagesNameOrder(std::move(pipeline),
+                          {"$_internalChangeStreamOplogMatch",
+                           "$_internalChangeStreamUnwindTransaction",
+                           "$_internalChangeStreamTransform",
+                           "$_internalChangeStreamCheckInvalidate",
+                           "$_internalChangeStreamCheckResumability",
+                           "$_internalChangeStreamInjectControlEvents",
+                           "$match",
+                           "$_internalChangeStreamHandleTopologyChangeV2",
+                           "$_internalChangeStreamEnsureResumeTokenPresent"});
+}
+
+//
+// Tests that the single '$project' gets promoted before the
+// '$_internalChangeStreamHandleTopologyChange'.
+//
 TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleProject) {
-    //
-    // Tests that the single'$project' gets promoted before the '$_internalUpdateOnAddShard'.
-    //
-    const std::vector<BSONObj> rawPipeline = {fromjson("{$changeStream: {}}"),
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
+    const std::vector<BSONObj> rawPipeline = {kShowExpandedEventsSpec,
                                               fromjson("{$project: {operationType: 1}}")};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -3480,15 +5432,49 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleProject) {
                            "$_internalChangeStreamHandleTopologyChange"});
 }
 
+//
+// Tests that the single '$project' gets promoted before the
+// '$_internalChangeStreamHandleTopologyChange' in a v2 change stream.
+//
+TEST_F(ChangeStreamStageTest, ChangeStreamV2WithSingleProject) {
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+    ScopedChangeStreamReaderBuilderMock readerBuilder(
+        std::make_unique<ChangeStreamReaderBuilderMock>());
+
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
+    const std::vector<BSONObj> rawPipeline = {
+        BSON("$changeStream" << BSON("showExpandedEvents" << true << "version" << "v2")),
+        fromjson("{$project: {operationType: 1}}")};
+
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
+
+    assertStagesNameOrder(std::move(pipeline),
+                          {"$_internalChangeStreamOplogMatch",
+                           "$_internalChangeStreamUnwindTransaction",
+                           "$_internalChangeStreamTransform",
+                           "$_internalChangeStreamCheckInvalidate",
+                           "$_internalChangeStreamCheckResumability",
+                           "$_internalChangeStreamInjectControlEvents",
+                           "$project",
+                           "$_internalChangeStreamHandleTopologyChangeV2"});
+}
+
+//
+// Tests that multiple '$project' gets promoted before the
+// '$_internalChangeStreamHandleTopologyChange'.
+//
 TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleProject) {
-    //
-    // Tests that multiple '$project' gets promoted before the '$_internalUpdateOnAddShard'.
-    //
-    const std::vector<BSONObj> rawPipeline = {fromjson("{$changeStream: {}}"),
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
+    const std::vector<BSONObj> rawPipeline = {kShowExpandedEventsSpec,
                                               fromjson("{$project: {operationType: 1}}"),
                                               fromjson("{$project: {fullDocument: 1}}")};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -3502,19 +5488,56 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleProject) {
                            "$_internalChangeStreamHandleTopologyChange"});
 }
 
-TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleProjectAndResumeToken) {
-    //
-    // Tests that multiple '$project' gets promoted before the '$_internalUpdateOnAddShard' if
-    // resume token is present.
-    //
-    auto resumeToken = makeResumeToken(kDefaultTs, testUuid());
+//
+// Tests that multiple '$project' gets promoted before the
+// '$_internalChangeStreamHandleTopologyChangeV2'.
+//
+TEST_F(ChangeStreamStageTest, ChangeStreamV2WithMultipleProject) {
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
 
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+    ScopedChangeStreamReaderBuilderMock readerBuilder(
+        std::make_unique<ChangeStreamReaderBuilderMock>());
+
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
     const std::vector<BSONObj> rawPipeline = {
-        BSON("$changeStream" << BSON("resumeAfter" << resumeToken)),
+        BSON("$changeStream" << BSON("showExpandedEvents" << true << "version" << "v2")),
+        fromjson("{$project: {operationType: 1}}"),
+        fromjson("{$project: {fullDocument: 1}}")};
+
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
+
+    assertStagesNameOrder(std::move(pipeline),
+                          {"$_internalChangeStreamOplogMatch",
+                           "$_internalChangeStreamUnwindTransaction",
+                           "$_internalChangeStreamTransform",
+                           "$_internalChangeStreamCheckInvalidate",
+                           "$_internalChangeStreamCheckResumability",
+                           "$_internalChangeStreamInjectControlEvents",
+                           "$project",
+                           "$project",
+                           "$_internalChangeStreamHandleTopologyChangeV2"});
+}
+
+//
+// Tests that multiple '$project' gets promoted before the
+// '$_internalChangeStreamHandleTopologyChange' if resume token is present.
+//
+TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleProjectAndResumeToken) {
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
+    const std::vector<BSONObj> rawPipeline = {
+        BSON("$changeStream"
+             << BSON("resumeAfter"
+                     << makeResumeToken(
+                            kDefaultTs, testUuid(), Value(), DSChangeStream::kDropCollectionOpType)
+                     << DocumentSourceChangeStreamSpec::kShowExpandedEventsFieldName << true)),
         BSON("$project" << BSON("operationType" << 1)),
         BSON("$project" << BSON("fullDocument" << 1))};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -3529,20 +5552,23 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleProjectAndResumeToken) {
                            "$_internalChangeStreamEnsureResumeTokenPresent"});
 }
 
+//
+// Tests that a '$project' followed by a '$match' gets optimized and they get promoted before
+// the '$_internalChangeStreamHandleTopologyChange'.
+//
 TEST_F(ChangeStreamStageTest, ChangeStreamWithProjectMatchAndResumeToken) {
-    //
-    // Tests that a '$project' followed by a '$match' gets optimized and they get promoted before
-    // the '$_internalUpdateOnAddShard'.
-    //
-    auto resumeToken = makeResumeToken(kDefaultTs, testUuid());
-
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
     const std::vector<BSONObj> rawPipeline = {
-        BSON("$changeStream" << BSON("resumeAfter" << resumeToken)),
+        BSON("$changeStream"
+             << BSON("resumeAfter"
+                     << makeResumeToken(
+                            kDefaultTs, testUuid(), Value(), DSChangeStream::kDropCollectionOpType)
+                     << DocumentSourceChangeStreamSpec::kShowExpandedEventsFieldName << true)),
         BSON("$project" << BSON("operationType" << 1)),
-        BSON("$match" << BSON("operationType"
-                              << "insert"))};
+        BSON("$match" << BSON("operationType" << "insert"))};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -3557,15 +5583,18 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithProjectMatchAndResumeToken) {
                            "$_internalChangeStreamEnsureResumeTokenPresent"});
 }
 
+//
+// Tests that the single '$unset' gets promoted before the
+// '$_internalChangeStreamCheckTopologyChange' as
+// '$project'.
+//
 TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleUnset) {
-    //
-    // Tests that the single'$unset' gets promoted before the '$_internalUpdateOnAddShard' as
-    // '$project'.
-    //
-    const std::vector<BSONObj> rawPipeline = {fromjson("{$changeStream: {}}"),
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
+    const std::vector<BSONObj> rawPipeline = {kShowExpandedEventsSpec,
                                               fromjson("{$unset: 'operationType'}")};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -3578,16 +5607,18 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleUnset) {
                            "$_internalChangeStreamHandleTopologyChange"});
 }
 
+//
+// Tests that multiple '$unset' gets promoted before the '$_internalChangeStreamCheckTopologyChange'
+// as '$project'.
+//
 TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleUnset) {
-    //
-    // Tests that multiple '$unset' gets promoted before the '$_internalUpdateOnAddShard' as
-    // '$project'.
-    //
-    const std::vector<BSONObj> rawPipeline = {fromjson("{$changeStream: {}}"),
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
+    const std::vector<BSONObj> rawPipeline = {kShowExpandedEventsSpec,
                                               fromjson("{$unset: 'operationType'}"),
                                               fromjson("{$unset: 'fullDocument'}")};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -3596,24 +5627,27 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleUnset) {
                            "$_internalChangeStreamCheckInvalidate",
                            "$_internalChangeStreamCheckResumability",
                            "$_internalChangeStreamCheckTopologyChange",
-                           "$project",
+                           // The two '$unset' stages are coalesced.
                            "$project",
                            "$_internalChangeStreamHandleTopologyChange"});
 }
 
+//
+// Tests that the '$unset' gets promoted before the '$_internalChangeStreamCheckTopologyChange' as
+// '$project' even if resume token is present.
+//
 TEST_F(ChangeStreamStageTest, ChangeStreamWithUnsetAndResumeToken) {
-    //
-    // Tests that the '$unset' gets promoted before the '$_internalUpdateOnAddShard' as '$project'
-    // even if resume token is present.
-    //
-    auto resumeToken = makeResumeToken(kDefaultTs, testUuid());
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
+    const std::vector<BSONObj> rawPipeline = {
+        BSON("$changeStream"
+             << BSON("resumeAfter"
+                     << makeResumeToken(
+                            kDefaultTs, testUuid(), Value(), DSChangeStream::kDropCollectionOpType)
+                     << DocumentSourceChangeStreamSpec::kShowExpandedEventsFieldName << true)),
+        BSON("$unset" << "operationType")};
 
-    const std::vector<BSONObj> rawPipeline = {BSON("$changeStream"
-                                                   << BSON("resumeAfter" << resumeToken)),
-                                              BSON("$unset"
-                                                   << "operationType")};
-
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -3627,14 +5661,17 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithUnsetAndResumeToken) {
                            "$_internalChangeStreamEnsureResumeTokenPresent"});
 }
 
+//
+// Tests that the single'$addFields' gets promoted before the
+// '$_internalChangeStreamHandleTopologyChange'.
+//
 TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleAddFields) {
-    //
-    // Tests that the single'$addFields' gets promoted before the '$_internalUpdateOnAddShard'.
-    //
-    const std::vector<BSONObj> rawPipeline = {fromjson("{$changeStream: {}}"),
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
+    const std::vector<BSONObj> rawPipeline = {kShowExpandedEventsSpec,
                                               fromjson("{$addFields: {stockPrice: 100}}")};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -3647,15 +5684,18 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleAddFields) {
                            "$_internalChangeStreamHandleTopologyChange"});
 }
 
+//
+// Tests that multiple '$addFields' gets promoted before the
+// '$_internalChangeStreamHandleTopologyChange'.
+//
 TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleAddFields) {
-    //
-    // Tests that multiple '$addFields' gets promoted before the '$_internalUpdateOnAddShard'.
-    //
-    const std::vector<BSONObj> rawPipeline = {fromjson("{$changeStream: {}}"),
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
+    const std::vector<BSONObj> rawPipeline = {kShowExpandedEventsSpec,
                                               fromjson("{$addFields: {stockPrice: 100}}"),
                                               fromjson("{$addFields: {quarter: 'Q1'}}")};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -3669,18 +5709,22 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleAddFields) {
                            "$_internalChangeStreamHandleTopologyChange"});
 }
 
+//
+// Tests that the '$addFields' gets promoted before the '$_internalChangeStreamCheckTopologyChange'
+// if resume token is present.
+//
 TEST_F(ChangeStreamStageTest, ChangeStreamWithAddFieldsAndResumeToken) {
-    //
-    // Tests that the '$addFields' gets promoted before the '$_internalUpdateOnAddShard' if
-    // resume token is present.
-    //
-    auto resumeToken = makeResumeToken(kDefaultTs, testUuid());
-
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
     const std::vector<BSONObj> rawPipeline = {
-        BSON("$changeStream" << BSON("resumeAfter" << resumeToken)),
+        BSON("$changeStream"
+             << BSON("resumeAfter"
+                     << makeResumeToken(
+                            kDefaultTs, testUuid(), Value(), DSChangeStream::kDropCollectionOpType)
+                     << DocumentSourceChangeStreamSpec::kShowExpandedEventsFieldName << true)),
         BSON("$addFields" << BSON("stockPrice" << 100))};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -3694,14 +5738,17 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithAddFieldsAndResumeToken) {
                            "$_internalChangeStreamEnsureResumeTokenPresent"});
 }
 
+//
+// Tests that the single '$set' gets promoted before the
+// '$_internalChangeStreamHandleTopologyChange'.
+//
 TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleSet) {
-    //
-    // Tests that the single'$set' gets promoted before the '$_internalUpdateOnAddShard'.
-    //
-    const std::vector<BSONObj> rawPipeline = {fromjson("{$changeStream: {}}"),
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
+    const std::vector<BSONObj> rawPipeline = {kShowExpandedEventsSpec,
                                               fromjson("{$set: {stockPrice: 100}}")};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -3714,15 +5761,17 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleSet) {
                            "$_internalChangeStreamHandleTopologyChange"});
 }
 
+//
+// Tests that multiple '$set' gets promoted before the '$_internalChangeStreamHandleTopologyChange'.
+//
 TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleSet) {
-    //
-    // Tests that multiple '$set' gets promoted before the '$_internalUpdateOnAddShard'.
-    //
-    const std::vector<BSONObj> rawPipeline = {fromjson("{$changeStream: {}}"),
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
+    const std::vector<BSONObj> rawPipeline = {kShowExpandedEventsSpec,
                                               fromjson("{$set: {stockPrice: 100}}"),
                                               fromjson("{$set: {quarter: 'Q1'}}")};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -3736,18 +5785,22 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleSet) {
                            "$_internalChangeStreamHandleTopologyChange"});
 }
 
+//
+// Tests that the '$set' gets promoted before the '$_internalChangeStreamCheckTopologyChange' if
+// resume token is present.
+//
 TEST_F(ChangeStreamStageTest, ChangeStreamWithSetAndResumeToken) {
-    //
-    // Tests that the '$set' gets promoted before the '$_internalUpdateOnAddShard' if
-    // resume token is present.
-    //
-    auto resumeToken = makeResumeToken(kDefaultTs, testUuid());
-
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
     const std::vector<BSONObj> rawPipeline = {
-        BSON("$changeStream" << BSON("resumeAfter" << resumeToken)),
+        BSON("$changeStream"
+             << BSON("resumeAfter"
+                     << makeResumeToken(
+                            kDefaultTs, testUuid(), Value(), DSChangeStream::kDropCollectionOpType)
+                     << DocumentSourceChangeStreamSpec::kShowExpandedEventsFieldName << true)),
         BSON("$set" << BSON("stockPrice" << 100))};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -3761,14 +5814,17 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithSetAndResumeToken) {
                            "$_internalChangeStreamEnsureResumeTokenPresent"});
 }
 
+//
+// Tests that the single '$replaceRoot' gets promoted before the
+// '$_internalChangeStreamHandleTopologyChange'.
+//
 TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleReplaceRoot) {
-    //
-    // Tests that the single'$replaceRoot' gets promoted before the '$_internalUpdateOnAddShard'.
-    //
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
     const std::vector<BSONObj> rawPipeline = {
-        fromjson("{$changeStream: {}}"), fromjson("{$replaceRoot: {newRoot: '$fullDocument'}}")};
+        kShowExpandedEventsSpec, fromjson("{$replaceRoot: {newRoot: '$fullDocument'}}")};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -3781,19 +5837,22 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleReplaceRoot) {
                            "$_internalChangeStreamHandleTopologyChange"});
 }
 
+//
+// Tests that the '$replaceRoot' gets promoted before the
+// '$_internalChangeStreamCheckTopologyChange' if resume token is present.
+//
 TEST_F(ChangeStreamStageTest, ChangeStreamWithReplaceRootAndResumeToken) {
-    //
-    // Tests that the '$replaceRoot' gets promoted before the '$_internalUpdateOnAddShard' if
-    // resume token is present.
-    //
-    auto resumeToken = makeResumeToken(kDefaultTs, testUuid());
-
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
     const std::vector<BSONObj> rawPipeline = {
-        BSON("$changeStream" << BSON("resumeAfter" << resumeToken)),
-        BSON("$replaceRoot" << BSON("newRoot"
-                                    << "$fullDocument"))};
+        BSON("$changeStream"
+             << BSON("resumeAfter"
+                     << makeResumeToken(
+                            kDefaultTs, testUuid(), Value(), DSChangeStream::kDropCollectionOpType)
+                     << DocumentSourceChangeStreamSpec::kShowExpandedEventsFieldName << true)),
+        BSON("$replaceRoot" << BSON("newRoot" << "$fullDocument"))};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -3807,15 +5866,18 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithReplaceRootAndResumeToken) {
                            "$_internalChangeStreamEnsureResumeTokenPresent"});
 }
 
+//
+// Tests that the single '$replaceWith' gets promoted before the
+// '$_internalChangeStreamCheckTopologyChange' as
+// '$replaceRoot'.
+//
 TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleReplaceWith) {
-    //
-    // Tests that the single '$replaceWith' gets promoted before the '$_internalUpdateOnAddShard' as
-    // '$replaceRoot'.
-    //
-    const std::vector<BSONObj> rawPipeline = {fromjson("{$changeStream: {}}"),
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
+    const std::vector<BSONObj> rawPipeline = {kShowExpandedEventsSpec,
                                               fromjson("{$replaceWith: '$fullDocument'}")};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -3828,19 +5890,22 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleReplaceWith) {
                            "$_internalChangeStreamHandleTopologyChange"});
 }
 
+//
+// Tests that the '$replaceWith' gets promoted before the
+// '$_internalChangeStreamCheckTopologyChange' if resume token is present as '$replaceRoot'.
+//
 TEST_F(ChangeStreamStageTest, ChangeStreamWithReplaceWithAndResumeToken) {
-    //
-    // Tests that the '$replaceWith' gets promoted before the '$_internalUpdateOnAddShard' if
-    // resume token is present as '$replaceRoot'.
-    //
-    auto resumeToken = makeResumeToken(kDefaultTs, testUuid());
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
+    const std::vector<BSONObj> rawPipeline = {
+        BSON("$changeStream"
+             << BSON("resumeAfter"
+                     << makeResumeToken(
+                            kDefaultTs, testUuid(), Value(), DSChangeStream::kDropCollectionOpType)
+                     << DocumentSourceChangeStreamSpec::kShowExpandedEventsFieldName << true)),
+        BSON("$replaceWith" << "$fullDocument")};
 
-    const std::vector<BSONObj> rawPipeline = {BSON("$changeStream"
-                                                   << BSON("resumeAfter" << resumeToken)),
-                                              BSON("$replaceWith"
-                                                   << "$fullDocument")};
-
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -3854,29 +5919,114 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithReplaceWithAndResumeToken) {
                            "$_internalChangeStreamEnsureResumeTokenPresent"});
 }
 
+//
+//  Tests that when 'showExpandedEvents' is true, we do not inject any additional stages.
+//
+TEST_F(ChangeStreamStageTest, ChangeStreamWithShowExpandedEventsTrueDoesNotInjectMatchStage) {
+    const std::vector<BSONObj> rawPipeline = {kShowExpandedEventsSpec};
+
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
+
+    assertStagesNameOrder(std::move(pipeline),
+                          {"$_internalChangeStreamOplogMatch",
+                           "$_internalChangeStreamUnwindTransaction",
+                           "$_internalChangeStreamTransform",
+                           "$_internalChangeStreamCheckInvalidate",
+                           "$_internalChangeStreamCheckResumability",
+                           "$_internalChangeStreamCheckTopologyChange",
+                           "$_internalChangeStreamHandleTopologyChange"});
+}
+
+//
+// Tests that when 'showExpandedEvents' is unset, we inject an additional $match stage and promote
+// it before the '$_internalChangeStreamHandleTopologyChange'.
+//
+TEST_F(ChangeStreamStageTest, ChangeStreamWithShowExpandedEventsFalseInjectsMatchStage) {
+    const std::vector<BSONObj> rawPipeline = {kDefaultSpec};
+
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
+
+    assertStagesNameOrder(std::move(pipeline),
+                          {"$_internalChangeStreamOplogMatch",
+                           "$_internalChangeStreamUnwindTransaction",
+                           "$_internalChangeStreamTransform",
+                           "$_internalChangeStreamCheckInvalidate",
+                           "$_internalChangeStreamCheckResumability",
+                           "$_internalChangeStreamCheckTopologyChange",
+                           "$match",
+                           "$_internalChangeStreamHandleTopologyChange"});
+}
+
+//
+// Tests that when 'showExpandedEvents' is false, the injected match stage gets merged with the user
+// match stage and gets promoted before the '$_internalChangeStreamHandleTopologyChange'.
+//
+TEST_F(ChangeStreamStageTest, ChangeStreamWithShowExpandedEventsFalseAndUserMatch) {
+    const std::vector<BSONObj> rawPipeline = {
+        fromjson("{$changeStream: {showExpandedEvents: false}}"),
+        BSON("$match" << BSON("operationType" << "insert"))};
+
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
+
+    assertStagesNameOrder(std::move(pipeline),
+                          {"$_internalChangeStreamOplogMatch",
+                           "$_internalChangeStreamUnwindTransaction",
+                           "$_internalChangeStreamTransform",
+                           "$_internalChangeStreamCheckInvalidate",
+                           "$_internalChangeStreamCheckResumability",
+                           "$_internalChangeStreamCheckTopologyChange",
+                           "$match",
+                           "$_internalChangeStreamHandleTopologyChange"});
+}
+
+//
+// Tests that when 'showExpandedEvents' is false, the injected match stage can be merged with the
+// user match stage and can be promoted before the user '$project' and
+// '$_internalChangeStreamHandleTopologyChange'.
+//
+TEST_F(ChangeStreamStageTest, ChangeStreamWithShowExpandedEventsFalseAndUserProjectMatch) {
+    const std::vector<BSONObj> rawPipeline = {
+        fromjson("{$changeStream: {showExpandedEvents: false}}"),
+        BSON("$project" << BSON("operationType" << 1)),
+        BSON("$match" << BSON("operationType" << "insert")),
+    };
+
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
+
+    assertStagesNameOrder(std::move(pipeline),
+                          {"$_internalChangeStreamOplogMatch",
+                           "$_internalChangeStreamUnwindTransaction",
+                           "$_internalChangeStreamTransform",
+                           "$_internalChangeStreamCheckInvalidate",
+                           "$_internalChangeStreamCheckResumability",
+                           "$_internalChangeStreamCheckTopologyChange",
+                           "$match",
+                           "$project",
+                           "$_internalChangeStreamHandleTopologyChange"});
+}
+
+//
+// Tests that when all allowed stages are included along with the resume token, the final
+// pipeline gets optimized.
+//
 TEST_F(ChangeStreamStageTest, ChangeStreamWithAllStagesAndResumeToken) {
-    //
-    // Tests that when all allowed stages are included along with the resume token, the final
-    // pipeline gets optimized.
-    //
-    auto resumeToken = makeResumeToken(kDefaultTs, testUuid());
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
+    const std::vector<BSONObj> rawPipeline = {
+        BSON("$changeStream"
+             << BSON("resumeAfter"
+                     << makeResumeToken(
+                            kDefaultTs, testUuid(), Value(), DSChangeStream::kDropCollectionOpType)
+                     << DocumentSourceChangeStreamSpec::kShowExpandedEventsFieldName << true)),
+        BSON("$project" << BSON("operationType" << 1)),
+        BSON("$unset" << "_id"),
+        BSON("$addFields" << BSON("stockPrice" << 100)),
+        BSON("$set" << BSON("fullDocument.stockPrice" << 100)),
+        BSON("$match" << BSON("operationType" << "insert")),
+        BSON("$replaceRoot" << BSON("newRoot" << "$fullDocument")),
+        BSON("$replaceWith" << "fullDocument.stockPrice")};
 
-    const std::vector<BSONObj> rawPipeline = {BSON("$changeStream"
-                                                   << BSON("resumeAfter" << resumeToken)),
-                                              BSON("$project" << BSON("operationType" << 1)),
-                                              BSON("$unset"
-                                                   << "_id"),
-                                              BSON("$addFields" << BSON("stockPrice" << 100)),
-                                              BSON("$set"
-                                                   << BSON("fullDocument.stockPrice" << 100)),
-                                              BSON("$match" << BSON("operationType"
-                                                                    << "insert")),
-                                              BSON("$replaceRoot" << BSON("newRoot"
-                                                                          << "$fullDocument")),
-                                              BSON("$replaceWith"
-                                                   << "fullDocument.stockPrice")};
-
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -3896,2775 +6046,546 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithAllStagesAndResumeToken) {
                            "$_internalChangeStreamEnsureResumeTokenPresent"});
 }
 
-class ChangeStreamRewriteTest : public AggregationContextFixture {
-public:
-    std::string getNsDbRegexMatchExpr(const std::string& field, const std::string& regex) {
-        return str::stream()
-            << "{$expr: {$let: {vars: {oplogField: {$cond: [{ $eq: [{ $type: ['" << field
-            << "']}, {$const: 'string'}]}, '" << field
-            << "', '$$REMOVE']}}, in: {$regexMatch: {input: {$substrBytes: ['$$oplogField', "
-               "{$const: 0}, {$ifNull: [{$indexOfBytes: ['$$oplogField', {$const: "
-               "'.'}]}, {$const: 0}]}]}, regex: {$const: '"
-            << regex << "'}, options: {$const: ''}}}}}}";
-    }
+BSONObj makeAnOplogEntry(const Timestamp& ts, Document docKey) {
+    const auto uuid = testUuid();
 
-    std::string getNsCollRegexMatchExpr(const std::string& field, const std::string& regex) {
-        if (field == "$o.drop") {
-            return str::stream()
-                << "{$expr: {$let: {vars: {oplogField: {$cond: [{ $eq: [{ $type: ['" << field
-                << "']}, {$const: 'string'}]}, '" << field
-                << "', '$$REMOVE']}}, in: {$regexMatch: {input: '$$oplogField', regex: {$const: '"
-                << regex << "'}, options: {$const: ''}}}}}}";
-        }
-
-        return str::stream()
-            << "{$expr: {$let: {vars: {oplogField: {$cond: [{ $eq: [{ $type: ['" << field
-            << "']}, {$const: 'string'}]}, '" << field
-            << "', '$$REMOVE']}}, in: {$regexMatch: {input: {$substrBytes: ['$$oplogField', {$add: "
-               "[{$const: 1}, "
-               "{$ifNull: [{$indexOfBytes: ['$$oplogField', {$const: '.'}]}, {$const: 0}]}]}, "
-               "{$const: -1}]}, regex: {$const: '"
-            << regex << "'}, options: {$const: ''}} }}}}";
-    }
-};
-
-TEST_F(ChangeStreamRewriteTest, RewriteOrPredicateOnRenameableFields) {
-    auto spec = fromjson("{$or: [{clusterTime: {$type: [17]}}, {lsid: {$type: [16]}}]}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"clusterTime", "lsid"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
-                      fromjson("{$or: [{ts: {$type: [17]}}, {lsid: {$type: [16]}}]}"));
+    auto updateField = change_stream_test_helper::makeOplogEntry(
+        repl::OpTypeEnum::kUpdate,                                 // op type
+        change_stream_test_helper::nss,                            // namespace
+        BSON("$v" << 2 << "diff" << BSON("u" << BSON("y" << 2))),  // o
+        uuid,                                                      // uuid
+        boost::none,                                               // fromMigrate
+        docKey.toBson(),                                           // o2
+        repl::OpTime(ts, 1));                                      // opTime
+    return updateField.getEntry().toBSON();
 }
 
-TEST_F(ChangeStreamRewriteTest, InexactRewriteOfAndWithUnrewritableChild) {
-    // Note that rewrite of {operationType: {$gt: ...}} is currently not supported.
-    auto spec = fromjson("{$and: [{lsid: {$type: [16]}}, {operationType: {$gt: 0}}]}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
+using MultiTokenFormatVersionTest = ChangeStreamStageTest;
 
-    auto rewrittenMatchExpression =
-        change_stream_rewrite::rewriteFilterForFields(getExpCtx(),
-                                                      statusWithMatchExpression.getValue().get(),
-                                                      {"clusterTime", "lsid", "operationType"});
-    ASSERT(rewrittenMatchExpression);
+TEST_F(MultiTokenFormatVersionTest, CanResumeFromV2Token) {
+    const auto beforeResumeTs = Timestamp(100, 1);
+    const auto resumeTs = Timestamp(100, 2);
+    const auto afterResumeTs = Timestamp(100, 3);
+    const auto uuid = testUuid();
 
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate, fromjson("{$and: [{lsid: {$type: [16]}}]}"));
+    const auto lowerDocumentKey = Document{{"x", 1}, {"y", 0}};
+    const auto midDocumentKey = Document{{"x", 1}, {"y", 1}};
+    const auto higherDocumentKey = Document{{"x", 1}, {"y", 2}};
+
+    auto oplogBeforeResumeTime = makeAnOplogEntry(beforeResumeTs, midDocumentKey);
+    auto oplogAtResumeTimeLowerDocKey = makeAnOplogEntry(resumeTs, lowerDocumentKey);
+    auto oplogResumeTime = makeAnOplogEntry(resumeTs, midDocumentKey);
+    auto oplogAtResumeTimeHigherDocKey = makeAnOplogEntry(resumeTs, higherDocumentKey);
+    auto oplogAfterResumeTime = makeAnOplogEntry(afterResumeTs, midDocumentKey);
+
+    // Create a resume token matching the 'oplogResumeTime' above.
+    ResumeTokenData resumeToken{
+        resumeTs, 2 /* version */, 0, uuid, "update"_sd, Value(midDocumentKey), Value()};
+
+    // Create a change stream spec that resumes after 'resumeToken'.
+    const auto spec =
+        BSON("$changeStream" << BSON("resumeAfter" << ResumeToken(resumeToken).toBSON()));
+
+    // Make a pipeline from this spec and seed it with the oplog entries in order.
+    auto execPipeline = makeExecPipeline({oplogBeforeResumeTime,
+                                          oplogAtResumeTimeLowerDocKey,
+                                          oplogResumeTime,
+                                          oplogAtResumeTimeHigherDocKey,
+                                          oplogAfterResumeTime},
+                                         spec);
+    auto lastStage = execPipeline->getStages().back();
+
+    // The stream will swallow everything up to and including the resume token. The first event we
+    // get back has the same clusterTime as the resume token, and should therefore use the client
+    // token's version, which is 2. Similarly, the eventIdentifier should use the v2 token format.
+    auto next = lastStage->getNext();
+    ASSERT(next.isAdvanced());
+    const auto sameTsResumeToken =
+        ResumeToken::parse(next.releaseDocument()["_id"].getDocument()).getData();
+    ASSERT_EQ(sameTsResumeToken.clusterTime, resumeTs);
+    ASSERT_EQ(sameTsResumeToken.version, 2);
+    ASSERT_VALUE_EQ(
+        sameTsResumeToken.eventIdentifier,
+        Value(Document{{"operationType", "update"_sd}, {"documentKey", higherDocumentKey}}));
+
+    // The next event has a clusterTime later than the resume point, and should therefore start
+    // using the default token version, which is 2.
+    next = lastStage->getNext();
+    ASSERT(next.isAdvanced());
+    const auto afterResumeTsResumeToken =
+        ResumeToken::parse(next.releaseDocument()["_id"].getDocument()).getData();
+    ASSERT_EQ(afterResumeTsResumeToken.clusterTime, afterResumeTs);
+    ASSERT_EQ(afterResumeTsResumeToken.version, ResumeTokenData::kDefaultTokenVersion);
+    ASSERT_VALUE_EQ(
+        afterResumeTsResumeToken.eventIdentifier,
+        Value(Document{{"operationType", "update"_sd}, {"documentKey", midDocumentKey}}));
+
+    // Verify that no other events are returned.
+    next = lastStage->getNext();
+    ASSERT_FALSE(next.isAdvanced());
 }
 
-TEST_F(ChangeStreamRewriteTest, CannotRewriteOrWithUnrewritableChild) {
-    // Note that rewrite of {operationType: {$gt: ...}} is currently not supported.
-    auto spec = fromjson(
-        "{$and: [{clusterTime: {$type: [17]}}, "
-        "{$or: [{lsid: {$type: [16]}}, {operationType: {$gt: 0}}]}]}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
+TEST_F(MultiTokenFormatVersionTest, CanResumeFromV1Token) {
+    const auto beforeResumeTs = Timestamp(100, 1);
+    const auto resumeTs = Timestamp(100, 2);
+    const auto afterResumeTs = Timestamp(100, 3);
+    const auto uuid = testUuid();
 
-    auto rewrittenMatchExpression =
-        change_stream_rewrite::rewriteFilterForFields(getExpCtx(),
-                                                      statusWithMatchExpression.getValue().get(),
-                                                      {"clusterTime", "lsid", "operationType"});
-    ASSERT(rewrittenMatchExpression);
+    const auto lowerDocumentKey = Document{{"x", 1}, {"y", 0}};
+    const auto midDocumentKey = Document{{"x", 1}, {"y", 1}};
+    const auto higherDocumentKey = Document{{"x", 1}, {"y", 2}};
 
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate, fromjson("{$and: [{ts: {$type: [17]}}]}"));
+    auto oplogBeforeResumeTime = makeAnOplogEntry(beforeResumeTs, midDocumentKey);
+    auto oplogAtResumeTimeLowerDocKey = makeAnOplogEntry(resumeTs, lowerDocumentKey);
+    auto oplogResumeTime = makeAnOplogEntry(resumeTs, midDocumentKey);
+    auto oplogAtResumeTimeHigherDocKey = makeAnOplogEntry(resumeTs, higherDocumentKey);
+    auto oplogAfterResumeTime = makeAnOplogEntry(afterResumeTs, midDocumentKey);
+
+    // Create a resume token matching the 'oplogResumeTime' above.
+    ResumeTokenData resumeToken{
+        resumeTs, 1 /* version */, 0, uuid, "update"_sd, Value(midDocumentKey), Value()};
+
+    // Create a change stream spec that resumes after 'resumeToken'.
+    const auto spec =
+        BSON("$changeStream" << BSON("resumeAfter" << ResumeToken(resumeToken).toBSON()));
+
+    // Make a pipeline from this spec and seed it with the oplog entries in order.
+    auto execPipeline = makeExecPipeline({oplogBeforeResumeTime,
+                                          oplogAtResumeTimeLowerDocKey,
+                                          oplogResumeTime,
+                                          oplogAtResumeTimeHigherDocKey,
+                                          oplogAfterResumeTime},
+                                         spec);
+    auto lastStage = execPipeline->getStages().back();
+
+    // The stream will swallow everything up to and including the resume token. The first event we
+    // get back has the same clusterTime as the resume token, and should therefore use the client
+    // token's version, which is 1. Similarly, the eventIdentifier should use the v1 token format.
+    auto next = lastStage->getNext();
+    ASSERT(next.isAdvanced());
+    const auto sameTsResumeToken =
+        ResumeToken::parse(next.releaseDocument()["_id"].getDocument()).getData();
+    ASSERT_EQ(sameTsResumeToken.clusterTime, resumeTs);
+    ASSERT_EQ(sameTsResumeToken.version, 1);
+    ASSERT_VALUE_EQ(sameTsResumeToken.eventIdentifier, Value(higherDocumentKey));
+
+    // The next event has a clusterTime later than the resume point, and should therefore start
+    // using the default token version.
+    next = lastStage->getNext();
+    ASSERT(next.isAdvanced());
+    const auto afterResumeTsResumeToken =
+        ResumeToken::parse(next.releaseDocument()["_id"].getDocument()).getData();
+    ASSERT_EQ(afterResumeTsResumeToken.clusterTime, afterResumeTs);
+    ASSERT_EQ(afterResumeTsResumeToken.version, ResumeTokenData::kDefaultTokenVersion);
+    ASSERT_VALUE_EQ(
+        afterResumeTsResumeToken.eventIdentifier,
+        Value(Document{{"operationType", "update"_sd}, {"documentKey", midDocumentKey}}));
+
+    // Verify that no other events are returned.
+    next = lastStage->getNext();
+    ASSERT_FALSE(next.isAdvanced());
 }
 
-TEST_F(ChangeStreamRewriteTest, InexactRewriteOfNorWithUnrewritableChild) {
-    // Note that rewrite of {operationType: {$gt: ...}} is currently not supported.
-    auto spec = fromjson(
-        "{$and: [{clusterTime: {$type: [17]}}, "
-        "{$nor: [{lsid: {$type: [16]}}, {operationType: {$gt: 0}}]}]}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
+TEST_F(MultiTokenFormatVersionTest, CanResumeFromV1HighWaterMark) {
+    const auto beforeResumeTs = Timestamp(100, 1);
+    const auto resumeTs = Timestamp(100, 2);
+    const auto afterResumeTs = Timestamp(100, 3);
 
-    auto rewrittenMatchExpression =
-        change_stream_rewrite::rewriteFilterForFields(getExpCtx(),
-                                                      statusWithMatchExpression.getValue().get(),
-                                                      {"clusterTime", "lsid", "operationType"});
-    ASSERT(rewrittenMatchExpression);
+    const auto documentKey = Document{{"x", 1}, {"y", 1}};
+    const auto higherDocumentKey = Document{{"x", 1}, {"y", 2}};
 
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
-                      fromjson("{$and: [{ts: {$type: [17]}}, {$nor: [{lsid: {$type: [16]}}]}]}"));
+    auto oplogBeforeResumeTime = makeAnOplogEntry(beforeResumeTs, documentKey);
+    auto firstOplogAtResumeTime = makeAnOplogEntry(resumeTs, documentKey);
+    auto secondOplogAtResumeTime = makeAnOplogEntry(resumeTs, higherDocumentKey);
+    auto oplogAfterResumeTime = makeAnOplogEntry(afterResumeTs, documentKey);
+
+    // Create a v2 high water mark token which sorts immediately before 'firstOplogAtResumeTime'.
+    ResumeTokenData resumeToken = ResumeToken::makeHighWaterMarkToken(resumeTs, 2).getData();
+    resumeToken.version = 1;
+    auto expCtx = getExpCtxRaw();
+    expCtx->setNamespaceString(NamespaceString::makeCollectionlessAggregateNSS(
+        DatabaseName::createDatabaseName_forTest(boost::none, "unittests")));
+
+    // Create a change stream spec that resumes after 'resumeToken'.
+    const auto spec =
+        BSON("$changeStream" << BSON("resumeAfter" << ResumeToken(resumeToken).toBSON()));
+
+    // Make a pipeline from this spec and seed it with the oplog entries in order.
+    auto execPipeline = makeExecPipeline({oplogBeforeResumeTime,
+                                          firstOplogAtResumeTime,
+                                          secondOplogAtResumeTime,
+                                          oplogAfterResumeTime},
+                                         spec);
+
+    // The high water mark token should be order ahead of every other entry with the same
+    // clusterTime. So we should see both entries that match the resumeToken's clusterTime.
+    // Even though the high watermark token has version 1, the resulting events should have
+    // the default resume token version.
+    auto lastStage = execPipeline->getStages().back();
+    auto next = lastStage->getNext();
+    ASSERT(next.isAdvanced());
+    const auto sameTsResumeToken1 =
+        ResumeToken::parse(next.releaseDocument()["_id"].getDocument()).getData();
+    ASSERT_EQ(sameTsResumeToken1.clusterTime, resumeTs);
+    ASSERT_EQ(sameTsResumeToken1.version, 2);
+    ASSERT_VALUE_EQ(sameTsResumeToken1.eventIdentifier,
+                    Value(Document{{"operationType", "update"_sd}, {"documentKey", documentKey}}));
+
+    next = lastStage->getNext();
+    ASSERT(next.isAdvanced());
+    const auto sameTsResumeToken2 =
+        ResumeToken::parse(next.releaseDocument()["_id"].getDocument()).getData();
+    ASSERT_EQ(sameTsResumeToken2.clusterTime, resumeTs);
+    ASSERT_EQ(sameTsResumeToken2.version, 2);
+    ASSERT_VALUE_EQ(
+        sameTsResumeToken2.eventIdentifier,
+        Value(Document{{"operationType", "update"_sd}, {"documentKey", higherDocumentKey}}));
+
+    // The resumeToken after the current clusterTime should start using the default version, and
+    // corresponding 'eventIdentifier' format.
+    next = lastStage->getNext();
+    ASSERT(next.isAdvanced());
+    const auto afterResumeTsResumeToken =
+        ResumeToken::parse(next.releaseDocument()["_id"].getDocument()).getData();
+    ASSERT_EQ(afterResumeTsResumeToken.clusterTime, afterResumeTs);
+    ASSERT_EQ(afterResumeTsResumeToken.version, ResumeTokenData::kDefaultTokenVersion);
+    ASSERT_VALUE_EQ(afterResumeTsResumeToken.eventIdentifier,
+                    Value(Document{{"operationType", "update"_sd}, {"documentKey", documentKey}}));
+
+    // Verify that no other events are returned.
+    next = lastStage->getNext();
+    ASSERT_FALSE(next.isAdvanced());
 }
 
-TEST_F(ChangeStreamRewriteTest, CannotInexactlyRewriteNegatedPredicate) {
-    // Note that rewrite of {operationType: {$gt: ...}} is currently not supported. The rewrite must
-    // discard the _entire_ $and, because it is the child of $nor, and the rewrite cannot use
-    // inexact rewrites of any children of $not or $nor.
-    auto spec = fromjson(
-        "{$nor: [{clusterTime: {$type: [17]}}, "
-        "{$and: [{lsid: {$type: [16]}}, {operationType: {$gt: 0}}]}]}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
+TEST_F(ChangeStreamStageTestNoSetup, DocumentSourceChangeStreamAddPostImageEmptyForQueryStats) {
+    auto spec = DocumentSourceChangeStreamSpec();
+    spec.setFullDocument(FullDocumentModeEnum::kUpdateLookup);
 
-    auto rewrittenMatchExpression =
-        change_stream_rewrite::rewriteFilterForFields(getExpCtx(),
-                                                      statusWithMatchExpression.getValue().get(),
-                                                      {"operationType", "clusterTime", "lsid"});
+    auto docSource = DocumentSourceChangeStreamAddPostImage::create(getExpCtx(), spec);
 
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate, fromjson("{$nor: [{ts: {$type: [17]}}]}"));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({"$_internalChangeStreamAddPostImage":{"fullDocument":"updateLookup"}})",
+        docSource->serialize().getDocument().toBson());
+
+    auto opts = SerializationOptions{
+        .literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue};
+    ASSERT(docSource->serialize(opts).missing());
 }
 
-TEST_F(ChangeStreamRewriteTest, DoesNotRewriteUnrequestedField) {
-    // This 'operationType' predicate could be rewritten but will be discarded in this test because
-    // the 'operationType' field is not requested in the call to the 'rewriteFilterForFields()'
-    // function.
-    auto spec = fromjson("{operationType: 'insert', clusterTime: {$type: [17]}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
+TEST_F(ChangeStreamStageTestNoSetup, DocumentSourceChangeStreamAddPreImageEmptyForQueryStats) {
+    auto docSource = DocumentSourceChangeStreamAddPreImage{
+        getExpCtx(), FullDocumentBeforeChangeModeEnum::kWhenAvailable};
 
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"clusterTime", "lsid"});
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$_internalChangeStreamAddPreImage": {
+                "fullDocumentBeforeChange": "whenAvailable"
+            }
+        })",
+        docSource.serialize().getDocument().toBson());
 
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate, fromjson("{$and: [{ts: {$type: [17]}}]}"));
+
+    auto opts = SerializationOptions{
+        .literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue};
+    ASSERT(docSource.serialize(opts).missing());
 }
 
-TEST_F(ChangeStreamRewriteTest, CanRewriteExprWhenAllFieldsAreRenameable) {
-    auto spec = fromjson(
-        "{$expr: {$and: [{$eq: [{$tsSecond: '$clusterTime'}, 0]}, {$isNumber: '$lsid'}]}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
+TEST_F(ChangeStreamStageTestNoSetup, DocumentSourceChangeStreamCheckInvalidateEmptyForQueryStats) {
+    DocumentSourceChangeStreamSpec spec;
+    spec.setResumeAfter(
+        ResumeToken::parse(makeResumeToken(Timestamp(),
+                                           testConstUuid,
+                                           BSON("_id" << 1 << "x" << 2),
+                                           DocumentSourceChangeStream::kInsertOpType,
+                                           ResumeTokenData::kFromInvalidate)));
 
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"clusterTime", "lsid"});
-    ASSERT(rewrittenMatchExpression);
+    auto docSource = DocumentSourceChangeStreamCheckInvalidate::create(getExpCtx(), spec);
 
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
-                      fromjson("{$expr: {$and: [{$eq: [{$tsSecond: ['$ts']}, {$const: 0}]}, "
-                               "{$isNumber: ['$lsid']}]}}"));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteExprWithOperationType) {
-    auto spec = fromjson("{$expr: {$eq: ['$operationType', 'insert']}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"operationType"});
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-
-    const string expectedRewrite = R"(
-{
-    $expr: {
-        $eq: [
-            {
-                $switch: {
-                    branches: [
-                        {case: {$eq: ['$op', {$const: 'i'}]}, then: {$const: 'insert'}},
-                        {
-                            case: {
-                                $and:
-                                    [{$eq: ['$op', {$const: 'u'}]}, {$eq: ['$o._id', '$$REMOVE']}]
-                            },
-                            then: {$const: 'update'}
-                        },
-                        {
-                            case: {
-                                $and:
-                                    [{$eq: ['$op', {$const: 'u'}]}, {$ne: ['$o._id', '$$REMOVE']}]
-                            },
-                            then: {$const: 'replace'}
-                        },
-                        {case: {$eq: ['$op', {$const: 'd'}]}, then: {$const: 'delete'}},
-                        {case: {$ne: ['$op', {$const: 'c'}]}, then: '$$REMOVE'},
-                        {case: {$ne: ['$o.drop', '$$REMOVE']}, then: {$const: 'drop'}},
-                        {
-                            case: {$ne: ['$o.dropDatabase', '$$REMOVE']},
-                            then: {$const: 'dropDatabase'}
-                        },
-                        {case: {$ne: ['$o.renameCollection', '$$REMOVE']}, then: {$const: 'rename'}}
-                    ],
-                    default: '$$REMOVE'
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$_internalChangeStreamCheckInvalidate": {
+                "startAfterInvalidate": {
+                    "_data": "8200000000000000002B042C0100296F5A10046948DF8014BD4E0488427668D9C001F5463C6F7065726174696F6E54797065003C696E736572740046646F63756D656E744B657900461E5F6964002B021E78002B04000004"
                 }
-            },
-            {$const: 'insert'}
-        ]
+            }
+        })",
+        docSource->serialize().getDocument().toBson());
+
+    auto opts = SerializationOptions{
+        .literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue};
+    ASSERT(docSource->serialize(opts).missing());
+}
+
+TEST_F(ChangeStreamStageTestNoSetup,
+       DocumentSourceChangeStreamCheckResumabilityEmptyForQueryStats) {
+    DocumentSourceChangeStreamSpec spec;
+    spec.setResumeAfter(
+        ResumeToken::parse(makeResumeToken(Timestamp(),
+                                           testConstUuid,
+                                           BSON("_id" << 1 << "x" << 2),
+                                           DocumentSourceChangeStream::kInsertOpType)));
+
+    auto docSource = DocumentSourceChangeStreamCheckResumability::create(getExpCtx(), spec);
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$_internalChangeStreamCheckResumability": {
+                "resumeToken": {
+                    "_data": "8200000000000000002B042C0100296E5A10046948DF8014BD4E0488427668D9C001F5463C6F7065726174696F6E54797065003C696E736572740046646F63756D656E744B657900461E5F6964002B021E78002B04000004"
+                }
+            }
+        })",
+        docSource->serialize().getDocument().toBson());
+
+    auto opts = SerializationOptions{
+        .literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue};
+    ASSERT(docSource->serialize(opts).missing());
+}
+
+TEST_F(ChangeStreamStageTestNoSetup,
+       DocumentSourceChangeStreamCheckTopologyChangeEmptyForQueryStats) {
+    auto docSource = DocumentSourceChangeStreamCheckTopologyChange::create(getExpCtx());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({"$_internalChangeStreamCheckTopologyChange":{}})",
+        docSource->serialize().getDocument().toBson());
+
+    auto opts = SerializationOptions{
+        .literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue};
+    ASSERT(docSource->serialize(opts).missing());
+}
+
+TEST_F(ChangeStreamStageTestNoSetup,
+       DocumentSourceChangeStreamEnsureResumeTokenPresentEmptyForQueryStats) {
+    DocumentSourceChangeStreamSpec spec;
+    spec.setResumeAfter(
+        ResumeToken::parse(makeResumeToken(Timestamp(),
+                                           testConstUuid,
+                                           BSON("_id" << 1 << "x" << 2),
+                                           DocumentSourceChangeStream::kInsertOpType)));
+
+    auto docSource = DocumentSourceChangeStreamEnsureResumeTokenPresent::create(getExpCtx(), spec);
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$_internalChangeStreamEnsureResumeTokenPresent": {
+                "resumeToken": {
+                    "_data": "8200000000000000002B042C0100296E5A10046948DF8014BD4E0488427668D9C001F5463C6F7065726174696F6E54797065003C696E736572740046646F63756D656E744B657900461E5F6964002B021E78002B04000004"
+                }
+            }
+        })",
+        docSource->serialize().getDocument().toBson());
+
+    auto opts = SerializationOptions{
+        .literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue};
+    ASSERT(docSource->serialize(opts).missing());
+}
+
+TEST_F(ChangeStreamStageTestNoSetup,
+       DocumentSourceChangeStreamHandleTopologyChangeEmptyForQueryStats) {
+    auto docSource = DocumentSourceChangeStreamHandleTopologyChange::create(getExpCtx());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({"$_internalChangeStreamHandleTopologyChange":{}})",
+        docSource->serialize().getDocument().toBson());
+
+    auto opts = SerializationOptions{
+        .literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue};
+    ASSERT(docSource->serialize(opts).missing());
+}
+
+TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamSplitLargeEvent) {
+    DocumentSourceChangeStreamSpec spec;
+    spec.setResumeAfter(
+        ResumeToken::parse(makeResumeToken(Timestamp(),
+                                           testConstUuid,
+                                           BSON("_id" << 1 << "x" << 2),
+                                           DocumentSourceChangeStream::kInsertOpType)));
+
+    auto docSource = DocumentSourceChangeStreamSplitLargeEvent::create(getExpCtx(), spec);
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({"$changeStreamSplitLargeEvent":{}})",
+        docSource->serialize().getDocument().toBson());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({"$changeStreamSplitLargeEvent":{}})",
+        redact(*docSource));
+}
+
+TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamTransform) {
+    DocumentSourceChangeStreamSpec spec;
+    spec.setResumeAfter(
+        ResumeToken::parse(makeResumeToken(Timestamp(),
+                                           testConstUuid,
+                                           BSON("_id" << 1 << "x" << 2),
+                                           DocumentSourceChangeStream::kInsertOpType)));
+
+    auto docSource = DocumentSourceChangeStreamTransform::create(getExpCtx(), spec);
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$_internalChangeStreamTransform": {
+                "resumeAfter": {
+                    "_data": "8200000000000000002B042C0100296E5A10046948DF8014BD4E0488427668D9C001F5463C6F7065726174696F6E54797065003C696E736572740046646F63756D656E744B657900461E5F6964002B021E78002B04000004"
+                },
+                "fullDocument": "default",
+                "fullDocumentBeforeChange": "off"
+            }
+        })",
+        docSource->serialize().getDocument().toBson());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$changeStream": {
+                "resumeAfter": {
+                    "_data": "?string"
+                },
+                "fullDocument": "default",
+                "fullDocumentBeforeChange": "off"
+            }
+        })",
+        redact(*docSource));
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$changeStream": {
+                "resumeAfter": {
+                    "_data": "8200000000000000002B0229296E04"
+                },
+                "fullDocument": "default",
+                "fullDocumentBeforeChange": "off"
+            }
+        })",
+        docSource
+            ->serialize(SerializationOptions{
+                .literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue})
+            .getDocument()
+            .toBson());
+}
+
+
+TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamTransformMoreFields) {
+    DocumentSourceChangeStreamSpec spec;
+    spec.setStartAfter(
+        ResumeToken::parse(makeResumeToken(Timestamp(),
+                                           testConstUuid,
+                                           BSON("_id" << 1 << "x" << 2),
+                                           DocumentSourceChangeStream::kInsertOpType)));
+    spec.setFullDocument(FullDocumentModeEnum::kRequired);
+    spec.setFullDocumentBeforeChange(FullDocumentBeforeChangeModeEnum::kWhenAvailable);
+    spec.setShowExpandedEvents(true);
+
+    auto docSource = DocumentSourceChangeStreamTransform::create(getExpCtx(), spec);
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$_internalChangeStreamTransform": {
+                "startAfter": {
+                    "_data": "8200000000000000002B042C0100296E5A10046948DF8014BD4E0488427668D9C001F5463C6F7065726174696F6E54797065003C696E736572740046646F63756D656E744B657900461E5F6964002B021E78002B04000004"
+                },
+                "fullDocument": "required",
+                "fullDocumentBeforeChange": "whenAvailable",
+                "showExpandedEvents": true
+            }
+        })",
+        docSource->serialize().getDocument().toBson());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+                "$changeStream": {
+                    "startAfter": {
+                        "_data": "?string"
+                    },
+                    "fullDocument": "required",
+                    "fullDocumentBeforeChange": "whenAvailable",
+                    "showExpandedEvents": true
+                }
+            })",
+        redact(*docSource));
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+                "$changeStream": {
+                    "startAfter": {
+                        "_data": "8200000000000000002B0229296E04"
+                    },
+                    "fullDocument": "required",
+                    "fullDocumentBeforeChange": "whenAvailable",
+                    "showExpandedEvents": true
+                }
+            })",
+        docSource
+            ->serialize(SerializationOptions{
+                .literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue})
+            .getDocument()
+            .toBson());
+}
+
+// For DocumentSource types which contain an arbitrarily internal
+// MatchExpression, we don't want match the entire structure. This
+// assertion allows us to check some basic structure.
+void assertRedactedMatchExpressionContainsOperatorsAndRedactedFieldPaths(BSONElement el) {
+    // Walk the redacted BSON and assert that we have some ops and
+    // redacted field paths.
+    auto opCount = 0;
+    auto redactedFieldPaths = 0;
+    while (true) {
+        if (el.type() == BSONType::array) {
+            auto array = el.Array();
+            if (array.empty()) {
+                break;
+            }
+            el = array[0];
+        } else if (el.type() == BSONType::object) {
+            auto obj = el.Obj();
+            if (obj.begin() == obj.end()) {
+                break;
+            }
+            el = obj.firstElement();
+
+            // Field name should be an operator or a redacted field path.
+            if (el.fieldName()[0] == '$') {
+                opCount++;
+            } else if (!strcmp(el.fieldName(), "$regularExpression")) {
+                opCount++;
+                // Skip $regularExpression.
+                continue;
+            } else {
+                if (strstr(el.fieldName(), "HASH<") != el.fieldName()) {
+                    FAIL(std::string("Expected redacted field path: ") + el.fieldName());
+                }
+                redactedFieldPaths++;
+            }
+        } else {
+            break;
+        }
     }
-})";
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate, fromjson(expectedRewrite));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanInexactlyRewriteExprAndWithUnrewritableChild) {
-    // Note that rewrite of "$$ROOT" without a path is unsupported.
-    auto spec = fromjson("{$expr: {$and: [{$isNumber: '$lsid'}, {$isArray: '$$ROOT'}]}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"lsid"});
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate, fromjson("{$expr: {$and: [{$isNumber: ['$lsid']}]}}"));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanInexactlyRewriteExprAndWithUnknownField) {
-    // $expr cannot be split into individual expressions based on dependency analysis, but because
-    // we rewrite the entire tree and discard expressions which we cannot rewrite or which the user
-    // did not request, we are able to produce a correct output expression even when unknown fields
-    // exist.
-    auto spec = fromjson("{$expr: {$and: [{$isNumber: '$lsid'}, {$isArray: '$unknown'}]}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"lsid"});
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate, fromjson("{$expr: {$and: [{$isNumber: ['$lsid']}]}}"));
-}
-
-TEST_F(ChangeStreamRewriteTest, CannotRewriteExprOrWithUnrewritableChild) {
-    // Note that rewrite of "$$ROOT" without a path is unsupported.
-    auto spec = fromjson(
-        "{$expr: {$and: [{$isNumber: '$clusterTime'}, "
-        "{$or: [{$isNumber: '$lsid'}, {$isArray: '$$ROOT'}]}]}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"clusterTime", "lsid"});
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate, fromjson("{$expr: {$and: [{$isNumber: ['$ts']}]}}"));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanInexactlyRewriteExprNorWithUnrewritableChild) {
-    // Note that rewrite of "$$ROOT" without a path is unsupported.
-    auto spec = fromjson(
-        "{$expr: {$and: [{$isNumber: '$clusterTime'},"
-        "{$not: {$or: [{$isNumber: '$lsid'}, {$isArray: '$$ROOT'}]}}]}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"clusterTime", "lsid"});
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        fromjson(
-            "{$expr: {$and: [{$isNumber: ['$ts']}, {$not: [{$or: [{$isNumber: ['$lsid']}]}]}]}}"));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanInexactlyRewriteExprNorWithUnknownField) {
-    // Note that rewrite of "$$ROOT" without a path is unsupported.
-    auto spec = fromjson(
-        "{$expr: {$and: [{$isNumber: '$clusterTime'},"
-        "{$not: {$or: [{$isNumber: '$lsid'}, {$isArray: '$unknown'}]}}]}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"clusterTime", "lsid"});
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        fromjson(
-            "{$expr: {$and: [{$isNumber: ['$ts']}, {$not: [{$or: [{$isNumber: ['$lsid']}]}]}]}}"));
-}
-
-TEST_F(ChangeStreamRewriteTest, CannotInexactlyRewriteNegatedExprPredicate) {
-    // Note that rewrite of "$$ROOT" without a path is unsupported.
-    auto spec = fromjson("{$expr: {$not: {$and: [{$isNumber: '$lsid'}, {$isArray: '$$ROOT'}]}}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"lsid"});
-
-    ASSERT(!rewrittenMatchExpression);
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteExprLet) {
-    auto spec = fromjson("{$expr: {$let: {vars: {v: '$clusterTime'}, in: {$isNumber: '$$v'}}}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"clusterTime", "lsid"});
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
-                      fromjson("{$expr: {$let: {vars: {v: '$ts'}, in: {$isNumber: ['$$v']}}}}"));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteExprFieldRefWithCurrentPrefix) {
-    auto spec = fromjson("{$expr: {$isNumber: '$$CURRENT.clusterTime'}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"clusterTime"});
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate, fromjson("{$expr: {$isNumber: ['$ts']}}"));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteExprFieldRefWithRootPrefix) {
-    auto spec = fromjson("{$expr: {$isNumber: '$$ROOT.clusterTime'}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"clusterTime"});
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate, fromjson("{$expr: {$isNumber: ['$ts']}}"));
-}
-
-TEST_F(ChangeStreamRewriteTest, CannotRewriteExprFieldRefWithReassignedCurrentPrefix) {
-    auto spec =
-        fromjson("{$expr: {$let: {vars: {CURRENT: '$operationType'}, in: {$isNumber: '$lsid'}}}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"operationType", "lsid"});
-
-    ASSERT(!rewrittenMatchExpression);
-}
-
-TEST_F(ChangeStreamRewriteTest, DoesNotRewriteUnrequestedFieldInExpr) {
-    // The 'operationType' predicate could be rewritten but will be discarded in this test because
-    // the 'operationType' field is not requested in the call to the 'rewriteFilterForFields()'
-    // function.
-    auto spec = fromjson(
-        "{$expr: {$and: [{$eq: ['$operationType', 'insert']}, {$isNumber: '$clusterTime'}]}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"clusterTime", "lsid"});
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate, fromjson("{$expr: {$and: [{$isNumber: ['$ts']}]}}"));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteEqPredicateOnOperationTypeWithInvalidOperandType) {
-    auto statusWithMatchExpression =
-        MatchExpressionParser::parse(BSON("operationType" << 1), getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"operationType"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate, fromjson("{$alwaysFalse: 1}"));
-}
-
-TEST_F(ChangeStreamRewriteTest, CannotRewriteEqPredicateOnOperationTypeWithUnknownOpType) {
-    auto statusWithMatchExpression = MatchExpressionParser::parse(BSON("operationType"
-                                                                       << "nonExisting"),
-                                                                  getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"operationType"});
-    ASSERT_FALSE(rewrittenMatchExpression);
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteEqPredicateOnOperationTypeInsert) {
-    auto spec = fromjson("{operationType: 'insert'}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"operationType"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate, fromjson("{op: {$eq: 'i'}}"));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteEqPredicateOnOperationTypeReplace) {
-    auto spec = fromjson("{operationType: 'replace'}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"operationType"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
-                      fromjson("{$and: [{op: {$eq: 'u'}}, {'o._id': {$exists: true}}]}"));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteEqPredicateOnOperationTypeDrop) {
-    auto spec = fromjson("{operationType: 'drop'}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"operationType"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
-                      fromjson("{$and: [{op: {$eq: 'c'}}, {'o.drop': {$exists: true}}]}"));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteEqPredicateOnOperationTypeRename) {
-    auto spec = fromjson("{operationType: 'rename'}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"operationType"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        fromjson("{$and: [{op: {$eq: 'c'}}, {'o.renameCollection': {$exists: true}}]}"));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteEqPredicateOnOperationTypeDropDatabase) {
-    auto spec = fromjson("{operationType: 'dropDatabase'}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"operationType"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
-                      fromjson("{$and: [{op: {$eq: 'c'}}, {'o.dropDatabase': {$exists: true}}]}"));
-}
-
-TEST_F(ChangeStreamRewriteTest, CannotRewriteInequalityPredicateOnOperationType) {
-    auto spec = fromjson("{operationType: {$gt: 'insert'}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"operationType"});
-    ASSERT_FALSE(rewrittenMatchExpression);
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteEqPredicateOnOperationTypeSubField) {
-    auto spec = fromjson("{'operationType.subField': 'subOp'}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"operationType"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate, fromjson("{$alwaysFalse: 1}"));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteInPredicateOnOperationType) {
-    auto expr = BSON("operationType" << BSON("$in" << BSON_ARRAY("drop"
-                                                                 << "insert")));
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"operationType"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
-                      BSON(OR(fromjson("{$and: [{op: {$eq: 'c'}}, {'o.drop': {$exists: true}}]}"),
-                              fromjson("{op: {$eq: 'i'}}"))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CannotRewriteInPredicateWithRegexOnOperationType) {
-    auto expr = BSON("operationType" << BSON("$in" << BSON_ARRAY("/^in*sert")));
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"operationType"});
-    ASSERT_FALSE(rewrittenMatchExpression);
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteInPredicateOnOperationTypeWithInvalidOperandType) {
-    auto expr = BSON("operationType" << BSON("$in" << BSON_ARRAY(1)));
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"operationType"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate, BSON(OR(fromjson("{$alwaysFalse: 1}"))));
-}
-
-TEST_F(ChangeStreamRewriteTest,
-       CanRewriteInPredicateOnOperationTypeWithInvalidAndValidOperandTypes) {
-    auto expr = BSON("operationType" << BSON("$in" << BSON_ARRAY(1 << "insert")));
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"operationType"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
-                      BSON(OR(fromjson("{$alwaysFalse: 1}"), fromjson("{op: {$eq: 'i'}}"))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CannotRewriteInPredicateOnOperationTypeWithUnknownOpType) {
-    auto expr = BSON("operationType" << BSON("$in" << BSON_ARRAY("unknown"
-                                                                 << "insert")));
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"operationType"});
-    ASSERT_FALSE(rewrittenMatchExpression);
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteEmptyInPredicateOnOperationType) {
-    auto spec = fromjson("{operationType: {$in: []}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"operationType"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate, fromjson("{$alwaysFalse: 1}"));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteNinPredicateOnOperationType) {
-    auto expr = BSON("operationType" << BSON("$nin" << BSON_ARRAY("drop"
-                                                                  << "insert")));
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"operationType"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        BSON(NOR(BSON(OR(fromjson("{$and: [{op: {$eq: 'c'}}, {'o.drop': {$exists: true}}]}"),
-                         fromjson("{op: {$eq: 'i'}}"))))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteEqPredicateOnFieldDocumentKey) {
-    auto spec = fromjson("{documentKey: {_id: 'bar', foo: 'baz'}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"documentKey"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
-                      fromjson("{$or: ["
-                               "  {$and: ["
-                               "    {op: {$eq: 'u'}},"
-                               "    {o2: {$eq: {_id: 'bar', foo: 'baz'}}}"
-                               "  ]},"
-                               "  {$and: ["
-                               "    {op: {$eq: 'd'}},"
-                               "    {o: {$eq: {_id: 'bar', foo: 'baz'}}}"
-                               "  ]},"
-                               "  {$and: ["
-                               "    {op: {$eq: 'i'}},"
-                               "    {$and: ["
-                               "      {'o._id': {$eq: 'bar'}},"
-                               "      {'o.foo': {$eq: 'baz'}}"
-                               "    ]}"
-                               "  ]}"
-                               "]}"));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteInPredicateOnFieldDocumentKey) {
-    auto spec = fromjson("{documentKey: {$in: [{}, {_id: 'bar'}, {_id: 'bar', foo: 'baz'}]}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"documentKey"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
-                      fromjson("{$or: ["
-                               "  {$and: ["
-                               "    {op: {$eq: 'u'}},"
-                               "    {o2: {$in: [{}, {_id: 'bar'}, {_id: 'bar', foo: 'baz'}]}}"
-                               "  ]},"
-                               "  {$and: ["
-                               "    {op: {$eq: 'd'}},"
-                               "    {o: {$in: [{}, {_id: 'bar'}, {_id: 'bar', foo: 'baz'}]}}"
-                               "  ]},"
-                               "  {$and: ["
-                               "    {op: {$eq: 'i'}},"
-                               "    {$or: ["
-                               "      {$alwaysFalse: 1},"
-                               "      {$and: ["
-                               "        {'o._id': {$eq: 'bar'}}"
-                               "      ]},"
-                               "      {$and: ["
-                               "        {'o._id': {$eq: 'bar'}},"
-                               "        {'o.foo': {$eq: 'baz'}}"
-                               "      ]}"
-                               "    ]}"
-                               "  ]}"
-                               "]}"));
-}
-
-TEST_F(ChangeStreamRewriteTest, CannotInexactlyRewriteExprPredicateOnFieldDocumentKey) {
-    auto spec = fromjson("{$expr: {$or: ['$documentKey']}}");
-
-    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"documentKey"});
-
-    // $expr predicates that refer to the full 'documentKey' field (and not a subfield thereof)
-    // cannot be rewritten (exactly or inexactly).
-    ASSERT(rewrittenMatchExpression == nullptr);
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteArbitraryPredicateOnFieldDocumentKeyId) {
-    auto spec = fromjson("{'documentKey._id': {$lt: 'bar'}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"documentKey"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
-                      fromjson("{$or: ["
-                               "  {$and: ["
-                               "    {op: {$eq: 'u'}},"
-                               "    {'o2._id': {$lt: 'bar'}}"
-                               "  ]},"
-                               "  {$and: ["
-                               "    {op: {$eq: 'd'}},"
-                               "    {'o._id': {$lt: 'bar'}}"
-                               "  ]},"
-                               "  {$and: ["
-                               "    {op: {$eq: 'i'}},"
-                               "    {'o._id': {$lt: 'bar'}}"
-                               "  ]}"
-                               "]}"));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanExactlyRewriteExprPredicateOnFieldDocumentKeyId) {
-    auto spec = fromjson("{$expr: {$lt: ['$documentKey._id', 'bar']}}");
-
-    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"documentKey"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        fromjson("{$expr:"
-                 "  {$lt: ["
-                 "    {$switch: {"
-                 "      branches: ["
-                 "        {case: {$in: ['$op', [{$const: 'i'}, {$const: 'd'}]]}, then: '$o._id'},"
-                 "        {case: {$eq: ['$op', {$const: 'u'}]}, then: '$o2._id'}"
-                 "      ],"
-                 "      default: '$$REMOVE'"
-                 "    }},"
-                 "    {$const: 'bar'}"
-                 "  ]}"
-                 "}"));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteArbitraryPredicateOnFieldDocumentKeyFoo) {
-    auto spec = fromjson("{'documentKey.foo': {$gt: 'bar'}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"documentKey"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
-                      fromjson("{$or: ["
-                               "  {$and: ["
-                               "    {op: {$eq: 'u'}},"
-                               "    {'o2.foo': {$gt: 'bar'}}"
-                               "  ]},"
-                               "  {$and: ["
-                               "    {op: {$eq: 'd'}},"
-                               "    {'o.foo': {$gt: 'bar'}}"
-                               "  ]},"
-                               "  {$and: ["
-                               "    {op: {$eq: 'i'}},"
-                               "    {'o.foo': {$gt: 'bar'}}"
-                               "  ]}"
-                               "]}"));
-}
-
-TEST_F(ChangeStreamRewriteTest, CannotExactlyRewritePredicateOnFieldDocumentKey) {
-    auto spec = fromjson("{documentKey: {$not: {$eq: {_id: 'bar'}}}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"documentKey"});
-
-    // Insert events do not have a specific documentKey field in the oplog, so filters on the full
-    // documentKey field cannot be exactly rewritten.
-    ASSERT(rewrittenMatchExpression == nullptr);
-}
-
-TEST_F(ChangeStreamRewriteTest, CanExactlyRewritePredicateOnFieldDocumentKeyId) {
-    auto spec = fromjson("{'documentKey._id': {$not: {$eq: 'bar'}}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"documentKey"});
-    ASSERT(rewrittenMatchExpression);
-
-    // Every documentKey must have an _id field, so a predicate on this field can always be exactly
-    // rewritten.
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
-                      fromjson("{$nor: ["
-                               "  {$or: ["
-                               "    {$and: ["
-                               "      {op: {$eq: 'u'}},"
-                               "      {'o2._id': {$eq: 'bar'}}"
-                               "    ]},"
-                               "    {$and: ["
-                               "      {op: {$eq: 'd'}},"
-                               "      {'o._id': {$eq: 'bar'}}"
-                               "    ]},"
-                               "    {$and: ["
-                               "      {op: {$eq: 'i'}},"
-                               "      {'o._id': {$eq: 'bar'}}"
-                               "    ]}"
-                               "  ]}"
-                               "]}"));
-}
-
-TEST_F(ChangeStreamRewriteTest, CannotExactlyRewritePredicateOnFieldDocumentKeyFoo) {
-    auto spec = fromjson("{'documentKey.foo': {$not: {$eq: 'bar'}}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"documentKey"});
-
-    // We cannot be sure that the path for this predicate is actually a valid field in the
-    // documentKey. Therefore, we cannot exactly rewrite a predicate on this field.
-    ASSERT(rewrittenMatchExpression == nullptr);
-}
-
-TEST_F(ChangeStreamRewriteTest, CanInexactlyRewriteExprPredicateOnFieldDocumentKeyFoo) {
-    auto spec = fromjson("{$expr: {$or: ['$documentKey.foo']}}");
-
-    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"documentKey"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        fromjson("{$expr:"
-                 "  {$or: ["
-                 "    {$switch: {"
-                 "      branches: ["
-                 "        {case: {$in: ['$op', [{$const: 'i'}, {$const: 'd'}]]}, then: '$o.foo'},"
-                 "        {case: {$eq: ['$op', {$const: 'u'}]}, then: '$o2.foo'}"
-                 "      ],"
-                 "      default: '$$REMOVE'"
-                 "    }}"
-                 "  ]}"
-                 "}"));
-}
-
-TEST_F(ChangeStreamRewriteTest, CannotExactlyRewriteExprPredicateOnFieldDocumentKeyFoo) {
-    auto spec = fromjson("{$expr: {$lt: ['$documentKey.foo', 'bar']}}");
-
-    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"documentKey"});
-
-    // We cannot be sure that the field path is actually a valid field in the documentKey.
-    // Therefore, we cannot exactly rewrite this expression.
-    ASSERT(rewrittenMatchExpression == nullptr);
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteArbitraryPredicateOnFieldFullDocumentFoo) {
-    auto spec = fromjson("{'fullDocument.foo': {$lt: 'bar'}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"fullDocument"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
-                      fromjson("{$or: ["
-                               "  {$and: ["
-                               "    {op: {$eq: 'u'}},"
-                               "    {'o._id': {$not: {$exists: true}}}"
-                               "  ]},"
-                               "  {$and: ["
-                               "    {$or: ["
-                               "      {op: {$eq: 'i'}},"
-                               "      {op: {$eq: 'u'}}"
-                               "    ]},"
-                               "    {'o.foo': {$lt: 'bar'}}"
-                               "  ]}"
-                               "]}"));
-}
-
-TEST_F(ChangeStreamRewriteTest, CannotExactlyRewritePredicateOnFieldFullDocumentFoo) {
-    auto spec = fromjson("{'fullDocument.foo': {$not: {$eq: 'bar'}}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"fullDocument"});
-
-    // Because the 'fullDocument' field can be populated later in the pipeline for update events
-    // (via the '{fullDocument: "updateLookup"}' option), it's impractical to try to generate a
-    // rewritten predicate that matches exactly.
-    ASSERT(rewrittenMatchExpression == nullptr);
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteFullNamespaceObject) {
-    auto expCtx = getExpCtx();
-    auto statusWithMatchExpression = MatchExpressionParser::parse(
-        BSON("ns" << BSON("db" << expCtx->ns.db() << "coll" << expCtx->ns.coll())), expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"ns"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    const std::string ns = expCtx->ns.db().toString() + "." + expCtx->ns.coll().toString();
-    const std::string cmdNs = expCtx->ns.db().toString() + ".$cmd";
-
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        BSON(OR(BSON(AND(fromjson("{op: {$not: {$eq: 'c'}}}"), BSON("ns" << BSON("$eq" << ns)))),
-                BSON(AND(fromjson("{op: {$eq: 'c'}}"),
-                         BSON(OR(BSON("o.renameCollection" << BSON("$eq" << ns)),
-                                 BSON(AND(BSON("ns" << BSON("$eq" << cmdNs)),
-                                          BSON("o.drop" << BSON("$eq" << expCtx->ns.coll())))),
-                                 BSON(AND(fromjson("{$alwaysFalse: 1}"),
-                                          fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceObjectWithSwappedField) {
-    auto expCtx = getExpCtx();
-    auto statusWithMatchExpression = MatchExpressionParser::parse(
-        BSON("ns" << BSON("coll" << expCtx->ns.coll() << "db" << expCtx->ns.db())), expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"ns"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        BSON(OR(BSON(AND(fromjson("{op: {$not: {$eq: 'c'}}}"), fromjson("{$alwaysFalse: 1 }"))),
-                BSON(AND(fromjson("{op: {$eq: 'c'}}"),
-                         BSON(OR(fromjson("{$alwaysFalse: 1 }"),
-                                 fromjson("{$alwaysFalse: 1 }"),
-                                 BSON(AND(fromjson("{$alwaysFalse: 1}"),
-                                          fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceObjectWithOnlyDbField) {
-    auto expCtx = getExpCtx();
-    auto statusWithMatchExpression =
-        MatchExpressionParser::parse(BSON("ns" << BSON("db" << expCtx->ns.db())), expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"ns"});
-    ASSERT(rewrittenMatchExpression);
-
-    const std::string cmdNs = expCtx->ns.db().toString() + ".$cmd";
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        BSON(OR(BSON(AND(fromjson("{op: {$not: {$eq: 'c'}}}"), fromjson("{$alwaysFalse: 1}"))),
-                BSON(AND(fromjson("{op: {$eq: 'c'}}"),
-                         BSON(OR(fromjson("{$alwaysFalse: 1 }"),
-                                 fromjson("{$alwaysFalse: 1 }"),
-                                 BSON(AND(BSON(AND(BSON("ns" << BSON("$eq" << cmdNs)))),
-                                          fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceObjectWithOnlyCollectionField) {
-    auto expCtx = getExpCtx();
-    auto statusWithMatchExpression =
-        MatchExpressionParser::parse(BSON("ns" << BSON("coll" << expCtx->ns.coll())), expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"ns"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        BSON(OR(BSON(AND(fromjson("{op: {$not: {$eq: 'c'}}}"), fromjson("{$alwaysFalse: 1 }"))),
-                BSON(AND(fromjson("{op: {$eq: 'c'}}"),
-                         BSON(OR(fromjson("{$alwaysFalse: 1 }"),
-                                 fromjson("{$alwaysFalse: 1 }"),
-                                 BSON(AND(fromjson("{$alwaysFalse: 1}"),
-                                          fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceObjectWithInvalidDbField) {
-    auto expCtx = getExpCtx();
-    auto statusWithMatchExpression = MatchExpressionParser::parse(
-        BSON("ns" << BSON("db" << 1 << "coll" << expCtx->ns.coll())), expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"ns"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        BSON(OR(BSON(AND(fromjson("{op: {$not: {$eq: 'c'}}}"), fromjson("{$alwaysFalse: 1 }"))),
-                BSON(AND(fromjson("{op: {$eq: 'c'}}"),
-                         BSON(OR(fromjson("{$alwaysFalse: 1 }"),
-                                 fromjson("{$alwaysFalse: 1 }"),
-                                 BSON(AND(fromjson("{$alwaysFalse: 1}"),
-                                          fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceObjectWithInvalidCollField) {
-    auto expCtx = getExpCtx();
-    auto statusWithMatchExpression = MatchExpressionParser::parse(
-        BSON("ns" << BSON("db" << expCtx->ns.db() << "coll" << 1)), expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"ns"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        BSON(OR(BSON(AND(fromjson("{op: {$not: {$eq: 'c'}}}"), fromjson("{$alwaysFalse: 1 }"))),
-                BSON(AND(fromjson("{op: {$eq: 'c'}}"),
-                         BSON(OR(fromjson("{$alwaysFalse: 1 }"),
-                                 fromjson("{$alwaysFalse: 1 }"),
-                                 BSON(AND(fromjson("{$alwaysFalse: 1}"),
-                                          fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceObjectWithExtraField) {
-    auto expCtx = getExpCtx();
-    auto statusWithMatchExpression = MatchExpressionParser::parse(
-        fromjson("{ns: {db: 'db', coll: 'coll', extra: 'extra'}}"), expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"ns"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        BSON(OR(BSON(AND(fromjson("{op: {$not: {$eq: 'c'}}}"), fromjson("{$alwaysFalse: 1 }"))),
-                BSON(AND(fromjson("{op: {$eq: 'c'}}"),
-                         BSON(OR(fromjson("{$alwaysFalse: 1 }"),
-                                 fromjson("{$alwaysFalse: 1 }"),
-                                 BSON(AND(fromjson("{$alwaysFalse: 1}"),
-                                          fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithStringDbFieldPath) {
-    auto expCtx = getExpCtx();
-    auto statusWithMatchExpression =
-        MatchExpressionParser::parse(BSON("ns.db" << expCtx->ns.db()), expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"ns"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    const std::string regexNs = "^" + expCtx->ns.db().toString() + "\\." +
-        DocumentSourceChangeStream::kRegexAllCollections.toString();
-    const std::string cmdNs = expCtx->ns.db().toString() + ".$cmd";
-
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        BSON(OR(BSON(AND(fromjson("{op: {$not: {$eq: 'c'}}}"),
-                         BSON("ns" << BSON("$regex" << regexNs)))),
-                BSON(AND(fromjson("{op: {$eq: 'c'}}"),
-                         BSON(OR(BSON("o.renameCollection" << BSON("$regex" << regexNs)),
-                                 BSON("ns" << BSON("$eq" << cmdNs)),
-                                 BSON(AND(BSON("ns" << BSON("$eq" << cmdNs)),
-                                          fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithCollectionFieldPath) {
-    auto expCtx = getExpCtx();
-    auto statusWithMatchExpression =
-        MatchExpressionParser::parse(BSON("ns.coll" << expCtx->ns.coll()), expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"ns"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    const std::string regexNs = DocumentSourceChangeStream::kRegexAllDBs.toString() + "\\." +
-        expCtx->ns.coll().toString() + "$";
-
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        BSON(OR(BSON(AND(fromjson("{op: {$not: {$eq: 'c'}}}"),
-                         BSON("ns" << BSON("$regex" << regexNs)))),
-                BSON(AND(fromjson("{op: {$eq: 'c'}}"),
-                         BSON(OR(BSON("o.renameCollection" << BSON("$regex" << regexNs)),
-                                 BSON("o.drop" << BSON("$eq" << expCtx->ns.coll())),
-                                 BSON(AND(fromjson("{$alwaysFalse: 1}"),
-                                          fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithRegexDbFieldPath) {
-    auto expCtx = getExpCtx();
-    auto statusWithMatchExpression =
-        MatchExpressionParser::parse(BSON("ns.db" << BSONRegEx(R"(^unit.*$)")), expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"ns"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        BSON(OR(
-            BSON(AND(fromjson("{op: {$not: {$eq: 'c'}}}"),
-                     fromjson(getNsDbRegexMatchExpr("$ns", R"(^unit.*$)")))),
-            BSON(AND(fromjson("{op: {$eq: 'c'}}"),
-                     BSON(OR(fromjson(getNsDbRegexMatchExpr("$o.renameCollection", R"(^unit.*$)")),
-                             fromjson(getNsDbRegexMatchExpr("$ns", R"(^unit.*$)")),
-                             BSON(AND(fromjson(getNsDbRegexMatchExpr("$ns", R"(^unit.*$)")),
-                                      fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithRegexCollectionFieldPath) {
-    auto expCtx = getExpCtx();
-    auto statusWithMatchExpression =
-        MatchExpressionParser::parse(BSON("ns.coll" << BSONRegEx(R"(^pipeline.*$)")), expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"ns"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        BSON(OR(BSON(AND(fromjson("{op: {$not: {$eq: 'c'}}}"),
-                         fromjson(getNsCollRegexMatchExpr("$ns", R"(^pipeline.*$)")))),
-                BSON(AND(fromjson("{op: {$eq: 'c'}}"),
-                         BSON(OR(fromjson(getNsCollRegexMatchExpr("$o.renameCollection",
-                                                                  R"(^pipeline.*$)")),
-                                 fromjson(getNsCollRegexMatchExpr("$o.drop", R"(^pipeline.*$)")),
-                                 BSON(AND(fromjson("{ $alwaysFalse: 1 }"),
-                                          fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CannotRewriteNamespaceWithInvalidDbFieldPath) {
-    auto expCtx = getExpCtx();
-    auto statusWithMatchExpression = MatchExpressionParser::parse(BSON("ns.db" << 1), expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"ns"});
-    ASSERT_FALSE(rewrittenMatchExpression);
-}
-
-TEST_F(ChangeStreamRewriteTest, CannotRewriteNamespaceWithInvalidCollectionFieldPath) {
-    auto expCtx = getExpCtx();
-    auto statusWithMatchExpression = MatchExpressionParser::parse(BSON("ns.coll" << 1), expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"ns"});
-    ASSERT_FALSE(rewrittenMatchExpression);
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithExtraDbFieldPath) {
-    auto expCtx = getExpCtx();
-    auto statusWithMatchExpression = MatchExpressionParser::parse(BSON("ns.db.subField"
-                                                                       << "subDb"),
-                                                                  expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"ns"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        BSON(OR(BSON(AND(fromjson("{op: {$not: {$eq: 'c'}}}"), fromjson("{$alwaysFalse: 1 }"))),
-                BSON(AND(fromjson("{op: {$eq: 'c'}}"),
-                         BSON(OR(fromjson("{$alwaysFalse: 1 }"),
-                                 fromjson("{$alwaysFalse: 1 }"),
-                                 BSON(AND(fromjson("{$alwaysFalse: 1 }"),
-                                          fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithExtraCollectionFieldPath) {
-    auto expCtx = getExpCtx();
-    auto statusWithMatchExpression = MatchExpressionParser::parse(BSON("ns.coll.subField"
-                                                                       << "subColl"),
-                                                                  expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"ns"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        BSON(OR(BSON(AND(fromjson("{op: {$not: {$eq: 'c'}}}"), fromjson("{$alwaysFalse: 1 }"))),
-                BSON(AND(fromjson("{op: {$eq: 'c'}}"),
-                         BSON(OR(fromjson("{$alwaysFalse: 1 }"),
-                                 fromjson("{$alwaysFalse: 1 }"),
-                                 BSON(AND(fromjson("{$alwaysFalse: 1 }"),
-                                          fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithInvalidFieldPath) {
-    auto expCtx = getExpCtx();
-    auto statusWithMatchExpression = MatchExpressionParser::parse(BSON("ns.unknown"
-                                                                       << "test"),
-                                                                  expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"ns"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        BSON(OR(BSON(AND(fromjson("{op: {$not: {$eq: 'c'}}}"), fromjson("{$alwaysFalse: 1 }"))),
-                BSON(AND(fromjson("{op: {$eq: 'c'}}"),
-                         BSON(OR(fromjson("{$alwaysFalse: 1 }"),
-                                 fromjson("{$alwaysFalse: 1 }"),
-                                 BSON(AND(fromjson("{$alwaysFalse: 1 }"),
-                                          fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithInExpressionOnDb) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'ns.db': {$in: ['test', 'news']}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"ns"});
-    ASSERT(rewrittenMatchExpression);
-
-    const std::string firstRegexNs = std::string("^") + "news" + "\\." +
-        DocumentSourceChangeStream::kRegexAllCollections.toString();
-    const std::string secondRegexNs = std::string("^") + "test" + "\\." +
-        DocumentSourceChangeStream::kRegexAllCollections.toString();
-    const std::string firstCmdNs = "news.$cmd";
-    const std::string secondCmdNs = "test.$cmd";
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        BSON(OR(BSON(AND(fromjson("{op: {$not: {$eq: 'c'}}}"),
-                         BSON(OR(BSON("ns" << BSON("$regex" << firstRegexNs)),
-                                 BSON("ns" << BSON("$regex" << secondRegexNs)))))),
-                BSON(AND(
-                    fromjson("{op: {$eq: 'c'}}"),
-                    BSON(OR(BSON(OR(BSON("o.renameCollection" << BSON("$regex" << firstRegexNs)),
-                                    BSON("o.renameCollection" << BSON("$regex" << secondRegexNs)))),
-                            BSON(OR(BSON("ns" << BSON("$eq" << firstCmdNs)),
-                                    BSON("ns" << BSON("$eq" << secondCmdNs)))),
-                            BSON(AND(BSON(OR(BSON("ns" << BSON("$eq" << firstCmdNs)),
-                                             BSON("ns" << BSON("$eq" << secondCmdNs)))),
-                                     fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithNinExpressionOnDb) {
-    auto expCtx = getExpCtx();
-    auto expr = BSON("ns.db" << BSON("$nin" << BSON_ARRAY("test"
-                                                          << "news")));
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"ns"});
-    ASSERT(rewrittenMatchExpression);
-
-    const std::string firstRegexNs = std::string("^") + "test" + "\\." +
-        DocumentSourceChangeStream::kRegexAllCollections.toString();
-    const std::string secondRegexNs = std::string("^") + "news" + "\\." +
-        DocumentSourceChangeStream::kRegexAllCollections.toString();
-    const std::string firstCmdNs = "test.$cmd";
-    const std::string secondCmdNs = "news.$cmd";
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        BSON(NOR(BSON(OR(
-            BSON(AND(fromjson("{op: {$not: {$eq: 'c'}}}"),
-                     BSON(OR(BSON("ns" << BSON("$regex" << secondRegexNs)),
-                             BSON("ns" << BSON("$regex" << firstRegexNs)))))),
-            BSON(AND(fromjson("{op: {$eq: 'c'}}"),
-                     BSON(OR(BSON(OR(BSON("o.renameCollection" << BSON("$regex" << secondRegexNs)),
-                                     BSON("o.renameCollection" << BSON("$regex" << firstRegexNs)))),
-                             BSON(OR(BSON("ns" << BSON("$eq" << secondCmdNs)),
-                                     BSON("ns" << BSON("$eq" << firstCmdNs)))),
-                             BSON(AND(BSON(OR(BSON("ns" << BSON("$eq" << secondCmdNs)),
-                                              BSON("ns" << BSON("$eq" << firstCmdNs)))),
-                                      fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithInExpressionOnCollection) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'ns.coll': {$in: ['test', 'news']}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"ns"});
-    ASSERT(rewrittenMatchExpression);
-
-    const std::string firstRegexNs =
-        DocumentSourceChangeStream::kRegexAllDBs.toString() + "\\." + "news" + "$";
-    const std::string secondRegexNs =
-        DocumentSourceChangeStream::kRegexAllDBs.toString() + "\\." + "test" + "$";
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        BSON(OR(BSON(AND(fromjson("{op: {$not: {$eq: 'c'}}}"),
-                         BSON(OR(BSON("ns" << BSON("$regex" << firstRegexNs)),
-                                 BSON("ns" << BSON("$regex" << secondRegexNs)))))),
-                BSON(AND(
-                    fromjson("{op: {$eq: 'c'}}"),
-                    BSON(OR(BSON(OR(BSON("o.renameCollection" << BSON("$regex" << firstRegexNs)),
-                                    BSON("o.renameCollection" << BSON("$regex" << secondRegexNs)))),
-                            BSON(OR(BSON("o.drop" << BSON("$eq"
-                                                          << "news")),
-                                    BSON("o.drop" << BSON("$eq"
-                                                          << "test")))),
-                            BSON(AND(BSON(OR(fromjson("{$alwaysFalse: 1}"),
-                                             fromjson("{$alwaysFalse: 1}"))),
-                                     fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithNinExpressionOnCollection) {
-    auto expCtx = getExpCtx();
-    auto expr = BSON("ns.coll" << BSON("$nin" << BSON_ARRAY("test"
-                                                            << "news")));
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"ns"});
-    ASSERT(rewrittenMatchExpression);
-
-    const std::string firstRegexNs =
-        DocumentSourceChangeStream::kRegexAllDBs.toString() + "\\." + "test" + "$";
-    const std::string secondRegexNs =
-        DocumentSourceChangeStream::kRegexAllDBs.toString() + "\\." + "news" + "$";
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        BSON(NOR(BSON(OR(
-            BSON(AND(fromjson("{op: {$not: {$eq: 'c'}}}"),
-                     BSON(OR(BSON("ns" << BSON("$regex" << secondRegexNs)),
-                             BSON("ns" << BSON("$regex" << firstRegexNs)))))),
-            BSON(AND(fromjson("{op: {$eq: 'c'}}"),
-                     BSON(OR(BSON(OR(BSON("o.renameCollection" << BSON("$regex" << secondRegexNs)),
-                                     BSON("o.renameCollection" << BSON("$regex" << firstRegexNs)))),
-                             BSON(OR(BSON("o.drop" << BSON("$eq"
-                                                           << "news")),
-                                     BSON("o.drop" << BSON("$eq"
-                                                           << "test")))),
-                             BSON(AND(BSON(OR(fromjson("{$alwaysFalse: 1}"),
-                                              fromjson("{$alwaysFalse: 1}"))),
-                                      fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithInRegexExpressionOnDb) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'ns.db': {$in: [/^test.*$/, /^news$/]}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"ns"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        BSON(OR(
-            BSON(AND(fromjson("{op: {$not: {$eq: 'c'}}}"),
-                     BSON(OR(fromjson(getNsDbRegexMatchExpr("$ns", R"(^test.*$)")),
-                             fromjson(getNsDbRegexMatchExpr("$ns", R"(^news$)")))))),
-            BSON(AND(
-                fromjson("{op: {$eq: 'c'}}"),
-                BSON(OR(
-                    BSON(OR(fromjson(getNsDbRegexMatchExpr("$o.renameCollection", R"(^test.*$)")),
-                            fromjson(getNsDbRegexMatchExpr("$o.renameCollection", R"(^news$)")))),
-                    BSON(OR(fromjson(getNsDbRegexMatchExpr("$ns", R"(^test.*$)")),
-                            fromjson(getNsDbRegexMatchExpr("$ns", R"(^news$)")))),
-                    BSON(AND(BSON(OR(fromjson(getNsDbRegexMatchExpr("$ns", R"(^test.*$)")),
-                                     fromjson(getNsDbRegexMatchExpr("$ns", R"(^news$)")))),
-                             fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithNinRegexExpressionOnDb) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'ns.db': {$nin: [/^test.*$/, /^news$/]}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"ns"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        BSON(NOR(BSON(OR(
-            BSON(AND(fromjson("{op: {$not: {$eq: 'c'}}}"),
-                     BSON(OR(fromjson(getNsDbRegexMatchExpr("$ns", R"(^test.*$)")),
-                             fromjson(getNsDbRegexMatchExpr("$ns", R"(^news$)")))))),
-            BSON(AND(
-                fromjson("{op: {$eq: 'c'}}"),
-                BSON(OR(
-                    BSON(OR(fromjson(getNsDbRegexMatchExpr("$o.renameCollection", R"(^test.*$)")),
-                            fromjson(getNsDbRegexMatchExpr("$o.renameCollection", R"(^news$)")))),
-                    BSON(OR(fromjson(getNsDbRegexMatchExpr("$ns", R"(^test.*$)")),
-                            fromjson(getNsDbRegexMatchExpr("$ns", R"(^news$)")))),
-                    BSON(AND(BSON(OR(fromjson(getNsDbRegexMatchExpr("$ns", R"(^test.*$)")),
-                                     fromjson(getNsDbRegexMatchExpr("$ns", R"(^news$)")))),
-                             fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithInRegexExpressionOnCollection) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'ns.coll': {$in: [/^test.*$/, /^news$/]}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"ns"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        BSON(OR(
-            BSON(AND(fromjson("{op: {$not: {$eq: 'c'}}}"),
-                     BSON(OR(fromjson(getNsCollRegexMatchExpr("$ns", R"(^test.*$)")),
-                             fromjson(getNsCollRegexMatchExpr("$ns", R"(^news$)")))))),
-            BSON(AND(
-                fromjson("{op: {$eq: 'c'}}"),
-                BSON(OR(
-                    BSON(OR(fromjson(getNsCollRegexMatchExpr("$o.renameCollection", R"(^test.*$)")),
-                            fromjson(getNsCollRegexMatchExpr("$o.renameCollection", R"(^news$)")))),
-                    BSON(OR(fromjson(getNsCollRegexMatchExpr("$o.drop", R"(^test.*$)")),
-                            fromjson(getNsCollRegexMatchExpr("$o.drop", R"(^news$)")))),
-                    BSON(AND(BSON(OR(fromjson("{$alwaysFalse: 1}"), fromjson("{$alwaysFalse: 1}"))),
-                             fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithNinRegexExpressionOnCollection) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'ns.coll': {$nin: [/^test.*$/, /^news$/]}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"ns"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        BSON(NOR(BSON(OR(
-            BSON(AND(fromjson("{op: {$not: {$eq: 'c'}}}"),
-                     BSON(OR(fromjson(getNsCollRegexMatchExpr("$ns", R"(^test.*$)")),
-                             fromjson(getNsCollRegexMatchExpr("$ns", R"(^news$)")))))),
-            BSON(AND(
-                fromjson("{op: {$eq: 'c'}}"),
-                BSON(OR(
-                    BSON(OR(fromjson(getNsCollRegexMatchExpr("$o.renameCollection", R"(^test.*$)")),
-                            fromjson(getNsCollRegexMatchExpr("$o.renameCollection", R"(^news$)")))),
-                    BSON(OR(fromjson(getNsCollRegexMatchExpr("$o.drop", R"(^test.*$)")),
-                            fromjson(getNsCollRegexMatchExpr("$o.drop", R"(^news$)")))),
-                    BSON(AND(BSON(OR(fromjson("{$alwaysFalse: 1}"), fromjson("{$alwaysFalse: 1}"))),
-                             fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithInExpressionOnDbWithRegexAndString) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'ns.db': {$in: [/^test.*$/, 'news']}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"ns"});
-    ASSERT(rewrittenMatchExpression);
-
-    const std::string secondRegexNs = std::string("^") + "news" + "\\." +
-        DocumentSourceChangeStream::kRegexAllCollections.toString();
-    const std::string secondCmdNs = "news.$cmd";
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        BSON(OR(
-            BSON(AND(fromjson("{op: {$not: {$eq: 'c'}}}"),
-                     BSON(OR(BSON("ns" << BSON("$regex" << secondRegexNs)),
-                             fromjson(getNsDbRegexMatchExpr("$ns", R"(^test.*$)")))))),
-            BSON(AND(
-                fromjson("{op: {$eq: 'c'}}"),
-                BSON(OR(
-                    BSON(OR(BSON("o.renameCollection" << BSON("$regex" << secondRegexNs)),
-                            fromjson(getNsDbRegexMatchExpr("$o.renameCollection", R"(^test.*$)")))),
-                    BSON(OR(BSON("ns" << BSON("$eq" << secondCmdNs)),
-                            fromjson(getNsDbRegexMatchExpr("$ns", R"(^test.*$)")))),
-                    BSON(AND(BSON(OR(BSON("ns" << BSON("$eq" << secondCmdNs)),
-                                     fromjson(getNsDbRegexMatchExpr("$ns", R"(^test.*$)")))),
-                             fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithNinExpressionOnDbWithRegexAndString) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'ns.db': {$nin: [/^test.*$/, 'news']}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"ns"});
-    ASSERT(rewrittenMatchExpression);
-
-
-    const std::string secondRegexNs = std::string("^") + "news" + "\\." +
-        DocumentSourceChangeStream::kRegexAllCollections.toString();
-    const std::string secondCmdNs = "news.$cmd";
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        BSON(NOR(BSON(OR(
-            BSON(AND(fromjson("{op: {$not: {$eq: 'c'}}}"),
-                     BSON(OR(BSON("ns" << BSON("$regex" << secondRegexNs)),
-                             fromjson(getNsDbRegexMatchExpr("$ns", R"(^test.*$)")))))),
-            BSON(AND(
-                fromjson("{op: {$eq: 'c'}}"),
-                BSON(OR(
-                    BSON(OR(BSON("o.renameCollection" << BSON("$regex" << secondRegexNs)),
-                            fromjson(getNsDbRegexMatchExpr("$o.renameCollection", R"(^test.*$)")))),
-                    BSON(OR(BSON("ns" << BSON("$eq" << secondCmdNs)),
-                            fromjson(getNsDbRegexMatchExpr("$ns", R"(^test.*$)")))),
-                    BSON(AND(BSON(OR(BSON("ns" << BSON("$eq" << secondCmdNs)),
-                                     fromjson(getNsDbRegexMatchExpr("$ns", R"(^test.*$)")))),
-                             fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithInExpressionOnCollectionWithRegexAndString) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'ns.coll': {$in: [/^test.*$/, 'news']}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"ns"});
-    ASSERT(rewrittenMatchExpression);
-
-    const std::string secondRegexNs =
-        DocumentSourceChangeStream::kRegexAllDBs + "\\." + "news" + "$";
-    const std::string secondCmdNs = "news.$cmd";
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        BSON(OR(
-            BSON(AND(fromjson("{op: {$not: {$eq: 'c'}}}"),
-                     BSON(OR(BSON("ns" << BSON("$regex" << secondRegexNs)),
-                             fromjson(getNsCollRegexMatchExpr("$ns", R"(^test.*$)")))))),
-            BSON(AND(fromjson("{op: {$eq: 'c'}}"),
-                     BSON(OR(BSON(OR(BSON("o.renameCollection" << BSON("$regex" << secondRegexNs)),
-                                     fromjson(getNsCollRegexMatchExpr("$o.renameCollection",
-                                                                      R"(^test.*$)")))),
-                             BSON(OR(BSON("o.drop" << BSON("$eq"
-                                                           << "news")),
-                                     fromjson(getNsCollRegexMatchExpr("$o.drop", R"(^test.*$)")))),
-                             BSON(AND(BSON(OR(fromjson("{$alwaysFalse: 1}"),
-                                              fromjson("{$alwaysFalse: 1}"))),
-                                      fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))));
-}
-
-TEST_F(ChangeStreamRewriteTest,
-       CanRewriteNamespaceWithNinExpressionOnCollectionWithRegexAndString) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'ns.coll': {$nin: [/^test.*$/, 'news']}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"ns"});
-    ASSERT(rewrittenMatchExpression);
-
-    const std::string secondRegexNs =
-        DocumentSourceChangeStream::kRegexAllDBs + "\\." + "news" + "$";
-    const std::string secondCmdNs = "news.$cmd";
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        BSON(NOR(BSON(OR(
-            BSON(AND(fromjson("{op: {$not: {$eq: 'c'}}}"),
-                     BSON(OR(BSON("ns" << BSON("$regex" << secondRegexNs)),
-                             fromjson(getNsCollRegexMatchExpr("$ns", R"(^test.*$)")))))),
-            BSON(AND(fromjson("{op: {$eq: 'c'}}"),
-                     BSON(OR(BSON(OR(BSON("o.renameCollection" << BSON("$regex" << secondRegexNs)),
-                                     fromjson(getNsCollRegexMatchExpr("$o.renameCollection",
-                                                                      R"(^test.*$)")))),
-                             BSON(OR(BSON("o.drop" << BSON("$eq"
-                                                           << "news")),
-                                     fromjson(getNsCollRegexMatchExpr("$o.drop", R"(^test.*$)")))),
-                             BSON(AND(BSON(OR(fromjson("{$alwaysFalse: 1}"),
-                                              fromjson("{$alwaysFalse: 1}"))),
-                                      fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CannotRewriteNamespaceWithInExpressionOnInvalidDb) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'ns.db': {$in: ['test', 1]}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
 
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"ns"});
-    ASSERT_FALSE(rewrittenMatchExpression);
+    ASSERT(opCount > 0);
+    ASSERT(redactedFieldPaths > 0);
 }
-
-TEST_F(ChangeStreamRewriteTest, CannotRewriteNamespaceWithNinExpressionOnInvalidDb) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'ns.db': {$nin: ['test', 1]}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"ns"});
-    ASSERT_FALSE(rewrittenMatchExpression);
-}
-
-TEST_F(ChangeStreamRewriteTest, CannotRewriteNamespaceWithInExpressionOnInvalidCollection) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'ns.coll': {$in: ['coll', 1]}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"ns"});
-    ASSERT_FALSE(rewrittenMatchExpression);
-}
-
-TEST_F(ChangeStreamRewriteTest, CannotRewriteNamespaceWithNinExpressionOnInvalidCollection) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'ns.coll': {$nin: ['coll', 1]}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"ns"});
-    ASSERT_FALSE(rewrittenMatchExpression);
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithEmptyInExpression) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'ns.db': {$in: []}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"ns"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        BSON(OR(BSON(AND(fromjson("{op: {$not: {$eq: 'c'}}}"), fromjson("{$alwaysFalse: 1 }"))),
-                BSON(AND(fromjson("{op: {$eq: 'c'}}"),
-                         BSON(OR(fromjson("{$alwaysFalse: 1 }"),
-                                 fromjson("{$alwaysFalse: 1 }"),
-                                 BSON(AND(fromjson("{$alwaysFalse: 1 }"),
-                                          fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithEmptyNinExpression) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'ns.db': {$nin: []}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"ns"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        BSON(NOR(
-            BSON(OR(BSON(AND(fromjson("{op: {$not: {$eq: 'c'}}}"), fromjson("{$alwaysFalse: 1 }"))),
-                    BSON(AND(fromjson("{op: {$eq: 'c'}}"),
-                             BSON(OR(fromjson("{$alwaysFalse: 1 }"),
-                                     fromjson("{$alwaysFalse: 1 }"),
-                                     BSON(AND(fromjson("{$alwaysFalse: 1 }"),
-                                              fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteNsWithExprOnFullObject) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{$expr: {$eq: ['$ns', {db: '" + expCtx->ns.db() + "', coll: '" +
-                         expCtx->ns.coll() + "'}]}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"ns"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto case1 =
-        "{case: {$in: ['$op', [{$const: 'i' }, {$const: 'u' }, {$const: 'd'}]]}, then: "
-        "{$substrBytes: ['$ns', {$add: [{$strLenBytes: ['$$dbName']}, {$const: 1}]}, {$const: "
-        "-1}]}}";
-    auto case2 = "{case: { $ne: ['$op', {$const: 'c'}]}, then: '$$REMOVE'}";
-    auto case3 = "{case: {$ne: ['$o.drop', '$$REMOVE']}, then: '$o.drop'}";
-    auto case4 = "{case: {$ne: ['$o.dropDatabase', '$$REMOVE']}, then: '$$REMOVE'}";
-    auto case5 =
-        "{case: {$ne: ['$o.renameCollection', '$$REMOVE']}, then: {$substrBytes: "
-        "['$o.renameCollection', {$add: [{$strLenBytes: ['$$dbName']}, {$const: 1}]}, {$const: "
-        "-1}]}}";
-
-    auto expectedExpr = fromjson(
-        "{"
-        "  $expr: {"
-        "    $eq: [{"
-        "      $let: {"
-        "        vars: {"
-        "          dbName: {$substrBytes: ["
-        "            '$ns', "
-        "            {$const: 0}, "
-        "            {$indexOfBytes: ['$ns', {$const: '.'}]}]}}, "
-        "        in: {"
-        "          db: '$$dbName',"
-        "          coll: {"
-        "            $switch: {"
-        "              branches: ["s +
-        "                " + case1 + ", " + case2 + ", " + case3 + ", " + case4 + ", " + case5 +
-        "              ], default: '$$REMOVE'}}}}}, "
-        "      {db: {$const: 'unittests' }, coll: {$const: 'pipeline_test'}}]}"
-        "}");
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate, expectedExpr);
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteNsWithExprOnFullObjectWithOnlyDb) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{$expr: {$eq: ['$ns', {db: '" + expCtx->ns.db() + "'}]}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"ns"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto case1 =
-        "{case: {$in: ['$op', [{$const: 'i' }, {$const: 'u' }, {$const: 'd'}]]}, then: "
-        "{$substrBytes: ['$ns', {$add: [{$strLenBytes: ['$$dbName']}, {$const: 1}]}, {$const: "
-        "-1}]}}";
-    auto case2 = "{case: { $ne: ['$op', {$const: 'c'}]}, then: '$$REMOVE'}";
-    auto case3 = "{case: {$ne: ['$o.drop', '$$REMOVE']}, then: '$o.drop'}";
-    auto case4 = "{case: {$ne: ['$o.dropDatabase', '$$REMOVE']}, then: '$$REMOVE'}";
-    auto case5 =
-        "{case: {$ne: ['$o.renameCollection', '$$REMOVE']}, then: {$substrBytes: "
-        "['$o.renameCollection', {$add: [{$strLenBytes: ['$$dbName']}, {$const: 1}]}, {$const: "
-        "-1}]}}";
-
-    auto expectedExpr = fromjson(
-        "{"
-        "  $expr: {"
-        "    $eq: [{"
-        "      $let: {"
-        "        vars: {"
-        "          dbName: {$substrBytes: ["
-        "            '$ns', "
-        "            {$const: 0}, "
-        "            {$indexOfBytes: ['$ns', {$const: '.'}]}]}}, "
-        "        in: {"
-        "          db: '$$dbName',"
-        "          coll: {"
-        "            $switch: {"
-        "              branches: ["s +
-        "                " + case1 + ", " + case2 + ", " + case3 + ", " + case4 + ", " + case5 +
-        "              ], default: '$$REMOVE'}}}}}, "
-        "      {db: {$const: 'unittests' }}]}"
-        "}");
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate, expectedExpr);
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteNsWithExprOnDbFieldPath) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{$expr: {$eq: ['$ns.db', '" + expCtx->ns.coll() + "']}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"ns"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto expectedExpr = fromjson(
-        "{"
-        "  $expr: {"
-        "    $eq: [{"
-        "      $let: {"
-        "        vars: {"
-        "          dbName: {$substrBytes: ["
-        "            '$ns', "
-        "            {$const: 0}, "
-        "            {$indexOfBytes: ['$ns', {$const: '.'}]}]}}, "
-        "        in: '$$dbName' }},"
-        "      {$const: 'pipeline_test'}]}"
-        "}");
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate, expectedExpr);
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteNsWithExprOnCollFieldPath) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{$expr: {$eq: ['$ns.coll', '" + expCtx->ns.coll() + "']}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"ns"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto case1 =
-        "{case: {$in: ['$op', [{$const: 'i' }, {$const: 'u' }, {$const: 'd'}]]}, then: "
-        "{$substrBytes: ['$ns', {$add: [{$strLenBytes: ['$$dbName']}, {$const: 1}]}, {$const: "
-        "-1}]}}";
-    auto case2 = "{case: { $ne: ['$op', {$const: 'c'}]}, then: '$$REMOVE'}";
-    auto case3 = "{case: {$ne: ['$o.drop', '$$REMOVE']}, then: '$o.drop'}";
-    auto case4 = "{case: {$ne: ['$o.dropDatabase', '$$REMOVE']}, then: '$$REMOVE'}";
-    auto case5 =
-        "{case: {$ne: ['$o.renameCollection', '$$REMOVE']}, then: {$substrBytes: "
-        "['$o.renameCollection', {$add: [{$strLenBytes: ['$$dbName']}, {$const: 1}]}, {$const: "
-        "-1}]}}";
-
-    auto expectedExpr = fromjson(
-        "{"
-        "  $expr: {"
-        "    $eq: [{"
-        "      $let: {"
-        "        vars: {"
-        "          dbName: {$substrBytes: ["
-        "            '$ns', "
-        "            {$const: 0}, "
-        "            {$indexOfBytes: ['$ns', {$const: '.'}]}]}}, "
-        "        in: {"
-        "            $switch: {"
-        "              branches: ["s +
-        "                " + case1 + ", " + case2 + ", " + case3 + ", " + case4 + ", " + case5 +
-        "              ], default: '$$REMOVE'}}}}, "
-        "      {$const: 'pipeline_test'}]}"
-        "}");
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate, expectedExpr);
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteNsWithExprOnInvalidFieldPath) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{$expr: {$eq: ['$ns.test', '" + expCtx->ns.coll() + "']}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"ns"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
-                      fromjson("{$expr: {$eq: ['$$REMOVE', {$const: 'pipeline_test'}]}}"));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteFullToObject) {
-    auto expCtx = getExpCtx();
-    auto statusWithMatchExpression = MatchExpressionParser::parse(
-        BSON("to" << BSON("db" << expCtx->ns.db() << "coll" << expCtx->ns.coll())), expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    const std::string ns = expCtx->ns.db().toString() + "." + expCtx->ns.coll().toString();
-
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
-                      BSON(AND(fromjson("{op: {$eq: 'c'}}"), BSON("o.to" << BSON("$eq" << ns)))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteToObjectWithSwappedField) {
-    auto expCtx = getExpCtx();
-    auto statusWithMatchExpression = MatchExpressionParser::parse(
-        BSON("to" << BSON("coll" << expCtx->ns.coll() << "db" << expCtx->ns.db())), expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
-                      BSON(AND(fromjson("{op: {$eq: 'c'}}"), fromjson("{$alwaysFalse: 1 }"))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteToObjectWithOnlyDbField) {
-    auto expCtx = getExpCtx();
-    auto statusWithMatchExpression =
-        MatchExpressionParser::parse(BSON("to" << BSON("db" << expCtx->ns.db())), expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
-                      BSON(AND(fromjson("{op: {$eq: 'c'}}"), fromjson("{$alwaysFalse: 1 }"))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteToObjectWithOnlyCollectionField) {
-    auto expCtx = getExpCtx();
-    auto statusWithMatchExpression =
-        MatchExpressionParser::parse(BSON("to" << BSON("coll" << expCtx->ns.coll())), expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
-                      BSON(AND(fromjson("{op: {$eq: 'c'}}"), fromjson("{$alwaysFalse: 1 }"))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteToObjectWithInvalidDbField) {
-    auto expCtx = getExpCtx();
-    auto statusWithMatchExpression = MatchExpressionParser::parse(
-        BSON("to" << BSON("db" << 1 << "coll" << expCtx->ns.coll())), expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
-                      BSON(AND(fromjson("{op: {$eq: 'c'}}"), fromjson("{$alwaysFalse: 1 }"))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteToObjectWithInvalidCollField) {
-    auto expCtx = getExpCtx();
-    auto statusWithMatchExpression = MatchExpressionParser::parse(
-        BSON("to" << BSON("db" << expCtx->ns.db() << "coll" << 1)), expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
-                      BSON(AND(fromjson("{op: {$eq: 'c'}}"), fromjson("{$alwaysFalse: 1 }"))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteToObjectWithExtraField) {
-    auto expCtx = getExpCtx();
-    auto statusWithMatchExpression = MatchExpressionParser::parse(
-        fromjson("{to: {db: 'db', coll: 'coll', extra: 'extra'}}"), expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
-                      BSON(AND(fromjson("{op: {$eq: 'c'}}"), fromjson("{$alwaysFalse: 1 }"))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteToWithStringDbFieldPath) {
-    auto expCtx = getExpCtx();
-    auto statusWithMatchExpression =
-        MatchExpressionParser::parse(BSON("to.db" << expCtx->ns.db()), expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    const std::string regexNs = "^" + expCtx->ns.db().toString() + "\\." +
-        DocumentSourceChangeStream::kRegexAllCollections.toString();
-
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        BSON(AND(fromjson("{op: {$eq: 'c'}}"), BSON("o.to" << BSON("$regex" << regexNs)))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteToWithCollectionFieldPath) {
-    auto expCtx = getExpCtx();
-    auto statusWithMatchExpression =
-        MatchExpressionParser::parse(BSON("to.coll" << expCtx->ns.coll()), expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    const std::string regexNs = DocumentSourceChangeStream::kRegexAllDBs.toString() + "\\." +
-        expCtx->ns.coll().toString() + "$";
-
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        BSON(AND(fromjson("{op: {$eq: 'c'}}"), BSON("o.to" << BSON("$regex" << regexNs)))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteToWithRegexDbFieldPath) {
-    auto expCtx = getExpCtx();
-    auto statusWithMatchExpression =
-        MatchExpressionParser::parse(BSON("to.db" << BSONRegEx(R"(^unit.*$)")), expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
-                      BSON(AND(fromjson("{op: {$eq: 'c'}}"),
-                               fromjson(getNsDbRegexMatchExpr("$o.to", R"(^unit.*$)")))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteToWithRegexCollectionFieldPath) {
-    auto expCtx = getExpCtx();
-    auto statusWithMatchExpression =
-        MatchExpressionParser::parse(BSON("to.coll" << BSONRegEx(R"(^pipeline.*$)")), expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
-                      BSON(AND(fromjson("{op: {$eq: 'c'}}"),
-                               fromjson(getNsCollRegexMatchExpr("$o.to", R"(^pipeline.*$)")))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CannotRewriteToWithInvalidDbFieldPath) {
-    auto expCtx = getExpCtx();
-    auto statusWithMatchExpression = MatchExpressionParser::parse(BSON("to.db" << 1), expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
-    ASSERT_FALSE(rewrittenMatchExpression);
-}
-
-TEST_F(ChangeStreamRewriteTest, CannotRewriteToWithInvalidCollectionFieldPath) {
-    auto expCtx = getExpCtx();
-    auto statusWithMatchExpression = MatchExpressionParser::parse(BSON("to.coll" << 1), expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"to"});
-    ASSERT_FALSE(rewrittenMatchExpression);
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteToWithExtraDbFieldPath) {
-    auto expCtx = getExpCtx();
-    auto statusWithMatchExpression = MatchExpressionParser::parse(BSON("to.to.subField"
-                                                                       << "subDb"),
-                                                                  expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
-                      BSON(AND(fromjson("{op: {$eq: 'c'}}"), fromjson("{$alwaysFalse: 1 }"))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteToWithExtraCollectionFieldPath) {
-    auto expCtx = getExpCtx();
-    auto statusWithMatchExpression = MatchExpressionParser::parse(BSON("to.coll.subField"
-                                                                       << "subColl"),
-                                                                  expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"to"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
-                      BSON(AND(fromjson("{op: {$eq: 'c'}}"), fromjson("{$alwaysFalse: 1 }"))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteToWithInvalidFieldPath) {
-    auto expCtx = getExpCtx();
-    auto statusWithMatchExpression = MatchExpressionParser::parse(BSON("to.unknown"
-                                                                       << "test"),
-                                                                  expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        getExpCtx(), statusWithMatchExpression.getValue().get(), {"to"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
-                      BSON(AND(fromjson("{op: {$eq: 'c'}}"), fromjson("{$alwaysFalse: 1 }"))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteToWithInExpressionOnDb) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'to.db': {$in: ['test', 'news']}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
-    ASSERT(rewrittenMatchExpression);
-
-    const std::string firstRegexNs = std::string("^") + "news" + "\\." +
-        DocumentSourceChangeStream::kRegexAllCollections.toString();
-    const std::string secondRegexNs = std::string("^") + "test" + "\\." +
-        DocumentSourceChangeStream::kRegexAllCollections.toString();
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
-                      BSON(AND(fromjson("{op: {$eq: 'c'}}"),
-                               BSON(OR(BSON("o.to" << BSON("$regex" << firstRegexNs)),
-                                       BSON("o.to" << BSON("$regex" << secondRegexNs)))))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteToWithNinExpressionOnDb) {
-    auto expCtx = getExpCtx();
-    auto expr = BSON("to.db" << BSON("$nin" << BSON_ARRAY("test"
-                                                          << "news")));
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
-    ASSERT(rewrittenMatchExpression);
-
-    const std::string firstRegexNs = std::string("^") + "test" + "\\." +
-        DocumentSourceChangeStream::kRegexAllCollections.toString();
-    const std::string secondRegexNs = std::string("^") + "news" + "\\." +
-        DocumentSourceChangeStream::kRegexAllCollections.toString();
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        BSON(NOR(BSON(AND(fromjson("{op: {$eq: 'c'}}"),
-                          BSON(OR(BSON("o.to" << BSON("$regex" << secondRegexNs)),
-                                  BSON("o.to" << BSON("$regex" << firstRegexNs)))))))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteToWithInExpressionOnCollection) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'to.coll': {$in: ['test', 'news']}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
-    ASSERT(rewrittenMatchExpression);
-
-    const std::string firstRegexNs =
-        DocumentSourceChangeStream::kRegexAllDBs.toString() + "\\." + "news" + "$";
-    const std::string secondRegexNs =
-        DocumentSourceChangeStream::kRegexAllDBs.toString() + "\\." + "test" + "$";
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
-                      BSON(AND(fromjson("{op: {$eq: 'c'}}"),
-                               BSON(OR(BSON("o.to" << BSON("$regex" << firstRegexNs)),
-                                       BSON("o.to" << BSON("$regex" << secondRegexNs)))))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteToWithNinExpressionOnCollection) {
-    auto expCtx = getExpCtx();
-    auto expr = BSON("to.coll" << BSON("$nin" << BSON_ARRAY("test"
-                                                            << "news")));
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
-    ASSERT(rewrittenMatchExpression);
-
-    const std::string firstRegexNs =
-        DocumentSourceChangeStream::kRegexAllDBs.toString() + "\\." + "test" + "$";
-    const std::string secondRegexNs =
-        DocumentSourceChangeStream::kRegexAllDBs.toString() + "\\." + "news" + "$";
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        BSON(NOR(BSON(AND(fromjson("{op: {$eq: 'c'}}"),
-                          BSON(OR(BSON("o.to" << BSON("$regex" << secondRegexNs)),
-                                  BSON("o.to" << BSON("$regex" << firstRegexNs)))))))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteToWithInRegexExpressionOnDb) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'to.db': {$in: [/^test.*$/, /^news$/]}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
-                      BSON(AND(fromjson("{op: {$eq: 'c'}}"),
-                               BSON(OR(fromjson(getNsDbRegexMatchExpr("$o.to", R"(^test.*$)")),
-                                       fromjson(getNsDbRegexMatchExpr("$o.to", R"(^news$)")))))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteToWithNinRegexExpressionOnDb) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'to.db': {$nin: [/^test.*$/, /^news$/]}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        BSON(NOR(BSON(AND(fromjson("{op: {$eq: 'c'}}"),
-                          BSON(OR(fromjson(getNsDbRegexMatchExpr("$o.to", R"(^test.*$)")),
-                                  fromjson(getNsDbRegexMatchExpr("$o.to", R"(^news$)")))))))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteToWithInRegexExpressionOnCollection) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'to.coll': {$in: [/^test.*$/, /^news$/]}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
-                      BSON(AND(fromjson("{op: {$eq: 'c'}}"),
-                               BSON(OR(fromjson(getNsCollRegexMatchExpr("$o.to", R"(^test.*$)")),
-                                       fromjson(getNsCollRegexMatchExpr("$o.to", R"(^news$)")))))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteToWithNinRegexExpressionOnCollection) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'to.coll': {$nin: [/^test.*$/, /^news$/]}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        BSON(NOR(BSON(AND(fromjson("{op: {$eq: 'c'}}"),
-                          BSON(OR(fromjson(getNsCollRegexMatchExpr("$o.to", R"(^test.*$)")),
-                                  fromjson(getNsCollRegexMatchExpr("$o.to", R"(^news$)")))))))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteToWithInExpressionOnDbWithRegexAndString) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'to.db': {$in: [/^test.*$/, 'news']}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
-    ASSERT(rewrittenMatchExpression);
-
-    const std::string secondRegexNs = std::string("^") + "news" + "\\." +
-        DocumentSourceChangeStream::kRegexAllCollections.toString();
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
-                      BSON(AND(fromjson("{op: {$eq: 'c'}}"),
-                               BSON(OR(BSON("o.to" << BSON("$regex" << secondRegexNs)),
-                                       fromjson(getNsDbRegexMatchExpr("$o.to", R"(^test.*$)")))))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteToWithNinExpressionOnDbWithRegexAndString) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'to.db': {$nin: [/^test.*$/, 'news']}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
-    ASSERT(rewrittenMatchExpression);
-
-    const std::string secondRegexNs = std::string("^") + "news" + "\\." +
-        DocumentSourceChangeStream::kRegexAllCollections.toString();
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        BSON(NOR(BSON(AND(fromjson("{op: {$eq: 'c'}}"),
-                          BSON(OR(BSON("o.to" << BSON("$regex" << secondRegexNs)),
-                                  fromjson(getNsDbRegexMatchExpr("$o.to", R"(^test.*$)")))))))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteToWithInExpressionOnCollectionWithRegexAndString) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'to.coll': {$in: [/^test.*$/, 'news']}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
-    ASSERT(rewrittenMatchExpression);
-
-    const std::string secondRegexNs =
-        DocumentSourceChangeStream::kRegexAllDBs + "\\." + "news" + "$";
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        BSON(AND(fromjson("{op: {$eq: 'c'}}"),
-                 BSON(OR(BSON("o.to" << BSON("$regex" << secondRegexNs)),
-                         fromjson(getNsCollRegexMatchExpr("$o.to", R"(^test.*$)")))))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteToWithNinExpressionOnCollectionWithRegexAndString) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'to.coll': {$nin: [/^test.*$/, 'news']}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
-    ASSERT(rewrittenMatchExpression);
-
-    const std::string secondRegexNs =
-        DocumentSourceChangeStream::kRegexAllDBs + "\\." + "news" + "$";
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        BSON(NOR(BSON(AND(fromjson("{op: {$eq: 'c'}}"),
-                          BSON(OR(BSON("o.to" << BSON("$regex" << secondRegexNs)),
-                                  fromjson(getNsCollRegexMatchExpr("$o.to", R"(^test.*$)")))))))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CannotRewriteToWithInExpressionOnInvalidDb) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'to.db': {$in: ['test', 1]}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
-    ASSERT_FALSE(rewrittenMatchExpression);
-}
-
-TEST_F(ChangeStreamRewriteTest, CannotRewriteToWithNinExpressionOnInvalidDb) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'to.db': {$nin: ['test', 1]}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
-    ASSERT_FALSE(rewrittenMatchExpression);
-}
-
-TEST_F(ChangeStreamRewriteTest, CannotRewriteToWithInExpressionOnInvalidCollection) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'to.coll': {$in: ['coll', 1]}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
-    ASSERT_FALSE(rewrittenMatchExpression);
-}
-
-TEST_F(ChangeStreamRewriteTest, CannotRewriteToWithNinExpressionOnInvalidCollection) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'to.coll': {$nin: ['coll', 1]}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
-    ASSERT_FALSE(rewrittenMatchExpression);
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteToWithEmptyInExpression) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'to.db': {$in: []}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
-                      BSON(AND(fromjson("{op: {$eq: 'c'}}"), fromjson("{$alwaysFalse: 1 }"))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteToWithEmptyNinExpression) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'to.db': {$nin: []}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        BSON(NOR(BSON(AND(fromjson("{op: {$eq: 'c'}}"), fromjson("{$alwaysFalse: 1 }"))))));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteToWithExprOnFullObject) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{$expr: {$eq: ['$to', {db: '" + expCtx->ns.db() + "', coll: '" +
-                         expCtx->ns.coll() + "'}]}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto expectedExpr = fromjson(
-        "{"
-        "  $expr: {"
-        "    $eq: [{"
-        "      $cond: ["
-        "        {"
-        "          $and: ["
-        "            {$eq: ['$op', {$const: 'c'}]},"
-        "            {$ne: ['$o.to', '$$REMOVE']}]"
-        "        },"
-        "        {"
-        "          db: {$substrBytes: ["
-        "            '$o.to',"
-        "            {$const: 0},"
-        "            {$indexOfBytes: ['$o.to', {$const: '.'}]}]},"
-        "          coll: {$substrBytes: ["
-        "            '$o.to',"
-        "            {$add: [{$indexOfBytes: ['$o.to', {$const: '.'}]}, {$const: 1}]},"
-        "            {$const: -1}]}"
-        "        },"
-        "        '$$REMOVE']},"
-        "      {db: {$const: 'unittests'}, coll: {$const: 'pipeline_test'}}]}}");
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate, expectedExpr);
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteToWithExprOnDbFieldPath) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{$expr: {$eq: ['$to.db', '" + expCtx->ns.db() + "']}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto expectedExpr = fromjson(
-        "{"
-        "  $expr: {"
-        "    $eq: [{"
-        "      $cond: ["
-        "        {"
-        "          $and: ["
-        "            {$eq: ['$op', {$const: 'c'}]},"
-        "            {$ne: ['$o.to', '$$REMOVE']}]"
-        "        },"
-        "        {"
-        "          $substrBytes: ["
-        "            '$o.to',"
-        "            {$const: 0},"
-        "            {$indexOfBytes: ['$o.to', {$const: '.'}]}]"
-        "        },"
-        "        '$$REMOVE']},"
-        "      {$const: 'unittests'}]}}");
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate, expectedExpr);
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteToWithExprOnCollFieldPath) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{$expr: {$eq: ['$to.coll', '" + expCtx->ns.coll() + "']}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto expectedExpr = fromjson(
-        "{"
-        "  $expr: {"
-        "    $eq: [{"
-        "      $cond: ["
-        "        {"
-        "          $and: ["
-        "            {$eq: ['$op', {$const: 'c'}]},"
-        "            {$ne: ['$o.to', '$$REMOVE']}]"
-        "        },"
-        "        {"
-        "          $substrBytes: ["
-        "            '$o.to',"
-        "            {$add: [{$indexOfBytes: ['$o.to', {$const: '.'}]}, {$const: 1}]},"
-        "            {$const: -1}]"
-        "        },"
-        "        '$$REMOVE']},"
-        "      {$const: 'pipeline_test'}]}}");
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate, expectedExpr);
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteToWithExprOnInvalidFieldPath) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{$expr: {$eq: ['$to.test', '" + expCtx->ns.coll() + "']}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
-                      fromjson("{$expr: {$eq: ['$$REMOVE', {$const: 'pipeline_test'}]}}"));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteToWithExprOnInvalidDbSubFieldPath) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{$expr: {$eq: ['$to.db.test', '" + expCtx->ns.db() + "']}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
-                      fromjson("{$expr: {$eq: ['$$REMOVE', {$const: 'unittests'}]}}"));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteToWithExprOnInvalidCollSubFieldPath) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{$expr: {$eq: ['$to.coll.test', '" + expCtx->ns.coll() + "']}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
-                      fromjson("{$expr: {$eq: ['$$REMOVE', {$const: 'pipeline_test'}]}}"));
-}
-
-TEST_F(ChangeStreamRewriteTest, CannotRewritePredicateOnFieldUpdateDescription) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson(
-        "{updateDescription: {updatedFields: {}, removedFields: [], truncatedArrays: []}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"updateDescription"});
-
-    ASSERT(rewrittenMatchExpression == nullptr);
-}
-
-TEST_F(ChangeStreamRewriteTest, CannotRewritePredicateOnFieldUpdateDescriptionUpdatedFields) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'updateDescription.updatedFields': {}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"updateDescription"});
-
-    ASSERT(rewrittenMatchExpression == nullptr);
-}
-
-TEST_F(ChangeStreamRewriteTest,
-       CanRewriteArbitraryPredicateOnFieldUpdateDescriptionUpdatedFieldsFoo) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'updateDescription.updatedFields.foo': {$lt: 'b'}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"updateDescription"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
-                      fromjson("{$and: ["
-                               "  {op: {$eq: 'u'}},"
-                               "  {'o._id': {$not: {$exists: true}}},"
-                               "  {$or: ["
-                               "    {'o.diff.i.foo': {$lt: 'b'}},"
-                               "    {'o.diff.u.foo': {$lt: 'b'}},"
-                               "    {'o.$set.foo': {$lt: 'b'}}"
-                               "  ]}"
-                               "]}"));
-}
-
-TEST_F(ChangeStreamRewriteTest,
-       CannotRewriteEqPredicateOnFieldUpdateDescriptionUpdatedFieldsFooBar) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'updateDescription.updatedFields.foo.bar': 'b'}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"updateDescription"});
-
-    ASSERT(rewrittenMatchExpression == nullptr);
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteStringEqPredicateOnFieldUpdateDescriptionRemovedFields) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'updateDescription.removedFields': 'z'}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"updateDescription"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
-                      fromjson("{$and: ["
-                               "  {op: {$eq: 'u'}},"
-                               "  {'o._id': {$not: {$exists: true}}},"
-                               "  {$or: ["
-                               "    {'o.diff.d.z': {$exists: true}},"
-                               "    {'o.$unset.z': {$exists: true}}"
-                               "  ]}"
-                               "]}"));
-}
-
-TEST_F(ChangeStreamRewriteTest,
-       CannotRewriteDottedStringEqPredicateOnFieldUpdateDescriptionRemovedFields) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'updateDescription.removedFields': 'u.v'}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"updateDescription"});
-
-    ASSERT(rewrittenMatchExpression == nullptr);
-}
-
-TEST_F(ChangeStreamRewriteTest,
-       CannotRewriteNonStringEqPredicateOnFieldUpdateDescriptionRemovedFields) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'updateDescription.removedFields': ['z']}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"updateDescription"});
-
-    ASSERT(rewrittenMatchExpression == nullptr);
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteStringInPredicateOnFieldUpdateDescriptionRemovedFields) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'updateDescription.removedFields': {$in: ['w', 'y']}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"updateDescription"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
-                      fromjson("{$and: ["
-                               "  {op: {$eq: 'u'}},"
-                               "  {'o._id': {$not: {$exists: true}}},"
-                               "  {$or: ["
-                               "    {$or: ["
-                               "        {'o.diff.d.w': {$exists: true}},"
-                               "        {'o.$unset.w': {$exists: true}}"
-                               "    ]},"
-                               "    {$or: ["
-                               "        {'o.diff.d.y': {$exists: true}},"
-                               "        {'o.$unset.y': {$exists: true}}"
-                               "    ]}"
-                               "  ]}"
-                               "]}"));
-}
-
-TEST_F(ChangeStreamRewriteTest, CanRewriteEmptyInPredicateOnFieldUpdateDescriptionRemovedFields) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'updateDescription.removedFields': {$in: []}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"updateDescription"});
-    ASSERT(rewrittenMatchExpression);
-
-    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate, fromjson("{$alwaysFalse: 1}"));
-}
-
-TEST_F(ChangeStreamRewriteTest,
-       CannotRewriteNonStringInPredicateOnFieldUpdateDescriptionRemovedFields) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'updateDescription.removedFields': {$in: ['w', ['y']]}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"updateDescription"});
-
-    ASSERT(rewrittenMatchExpression == nullptr);
-}
-
-TEST_F(ChangeStreamRewriteTest,
-       CannotRewriteRegexInPredicateOnFieldUpdateDescriptionRemovedFields) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'updateDescription.removedFields': {$in: [/ab*c/, /de*f/]}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
-
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"updateDescription"});
-
-    ASSERT(rewrittenMatchExpression == nullptr);
-}
-
-TEST_F(ChangeStreamRewriteTest,
-       CannotRewriteArbitraryPredicateOnFieldUpdateDescriptionRemovedFields) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'updateDescription.removedFields': {$lt: 'z'}}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
 
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"updateDescription"});
+TEST_F(ChangeStreamStageTestNoSetup,
+       DocumentSourceChangeStreamUnwindTransactionEmptyForQueryStats) {
+    auto docSource = DocumentSourceChangeStreamUnwindTransaction::create(getExpCtx());
 
-    ASSERT(rewrittenMatchExpression == nullptr);
+    auto opts = SerializationOptions{
+        .literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue};
+    ASSERT(docSource->serialize(opts).missing());
 }
 
-TEST_F(ChangeStreamRewriteTest, CannotRewritePredicateOnFieldUpdateDescriptionTruncatedArrays) {
-    auto expCtx = getExpCtx();
-    auto expr = fromjson("{'updateDescription.truncatedArrays': []}");
-    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
-    ASSERT_OK(statusWithMatchExpression.getStatus());
+TEST_F(ChangeStreamStageTestNoSetup, DocumentSourceChangeStreamOplogMatchEmptyForQueryStats) {
+    DocumentSourceChangeStreamSpec spec;
+    spec.setResumeAfter(
+        ResumeToken::parse(makeResumeToken(Timestamp(),
+                                           testConstUuid,
+                                           BSON("_id" << 1 << "x" << 2),
+                                           DocumentSourceChangeStream::kInsertOpType)));
 
-    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
-        expCtx, statusWithMatchExpression.getValue().get(), {"updateDescription"});
+    auto docSource = DocumentSourceChangeStreamOplogMatch::create(getExpCtx(), spec);
 
-    ASSERT(rewrittenMatchExpression == nullptr);
+    auto opts = SerializationOptions{
+        .literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue};
+    ASSERT(docSource->serialize(opts).missing());
 }
 
 }  // namespace

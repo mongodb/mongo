@@ -30,10 +30,11 @@
 #pragma once
 
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 class OperationContext;
 class Timestamp;
@@ -50,14 +51,30 @@ struct SyncSourceResolverResponse;
 
 enum class ChangeSyncSourceAction {
     kContinueSyncing,
-    kStopSyncingAndDropLastBatch,
+    kStopSyncingAndDropLastBatchIfPresent,
     kStopSyncingAndEnqueueLastBatch
 };
+
+inline std::ostream& operator<<(std::ostream& os, const ChangeSyncSourceAction action) {
+    switch (action) {
+        case ChangeSyncSourceAction::kContinueSyncing:
+            os << "kContinueSyncing";
+            break;
+        case ChangeSyncSourceAction::kStopSyncingAndDropLastBatchIfPresent:
+            os << "kStopSyncingAndDropLastBatchIfPresent";
+            break;
+        case ChangeSyncSourceAction::kStopSyncingAndEnqueueLastBatch:
+            os << "kStopSyncingAndEnqueueLastBatch";
+            break;
+    }
+
+    return os;
+}
 
 /**
  * Manage list of viable and blocked sync sources that we can replicate from.
  */
-class SyncSourceSelector {
+class MONGO_MOD_OPEN SyncSourceSelector {
     SyncSourceSelector(const SyncSourceSelector&) = delete;
     SyncSourceSelector& operator=(const SyncSourceSelector&) = delete;
 
@@ -90,12 +107,21 @@ public:
      *
      * "now" is used to skip over currently denylisted sync sources.
      */
-    virtual ChangeSyncSourceAction shouldChangeSyncSource(const HostAndPort& currentSource,
-                                                          const rpc::ReplSetMetadata& replMetadata,
-                                                          const rpc::OplogQueryMetadata& oqMetadata,
-                                                          const OpTime& previousOpTimeFetched,
-                                                          const OpTime& lastOpTimeFetched) = 0;
+    virtual ChangeSyncSourceAction shouldChangeSyncSource(
+        const HostAndPort& currentSource,
+        const rpc::ReplSetMetadata& replMetadata,
+        const rpc::OplogQueryMetadata& oqMetadata,
+        const OpTime& previousOpTimeFetched,
+        const OpTime& lastOpTimeFetched) const = 0;
+
+    /*
+     * Determines if a new sync source should be chosen when an error occures during fetching,
+     * without attempting retries on the same sync source.
+     * Because metadata is not available, checks are a subset of those in shouldChangeSyncSource.
+     */
+    virtual ChangeSyncSourceAction shouldChangeSyncSourceOnError(
+        const HostAndPort& currentSource, const OpTime& lastOpTimeFetched) const = 0;
 };
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

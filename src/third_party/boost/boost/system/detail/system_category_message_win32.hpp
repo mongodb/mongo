@@ -10,6 +10,7 @@
 //
 // See library home page at http://www.boost.org/libs/system
 
+#include <boost/system/detail/snprintf.hpp>
 #include <boost/winapi/error_handling.hpp>
 #include <boost/winapi/character_code_conversion.hpp>
 #include <boost/winapi/local_memory.hpp>
@@ -27,34 +28,11 @@ namespace system
 namespace detail
 {
 
-#if ( defined(_MSC_VER) && _MSC_VER < 1900 ) || ( defined(__MINGW32__) && !defined(__MINGW64_VERSION_MAJOR) )
-
 inline char const * unknown_message_win32( int ev, char * buffer, std::size_t len )
 {
-# if defined( BOOST_MSVC )
-#  pragma warning( push )
-#  pragma warning( disable: 4996 )
-# endif
-
-    _snprintf( buffer, len - 1, "Unknown error (%d)", ev );
-
-    buffer[ len - 1 ] = 0;
-    return buffer;
-
-# if defined( BOOST_MSVC )
-#  pragma warning( pop )
-# endif
-}
-
-#else
-
-inline char const * unknown_message_win32( int ev, char * buffer, std::size_t len )
-{
-    std::snprintf( buffer, len, "Unknown error (%d)", ev );
+    detail::snprintf( buffer, len, "Unknown error (%d)", ev );
     return buffer;
 }
-
-#endif
 
 inline boost::winapi::UINT_ message_cp_win32()
 {
@@ -69,7 +47,7 @@ inline boost::winapi::UINT_ message_cp_win32()
 #endif
 }
 
-inline char const * system_category_message_win32( int ev, char * buffer, std::size_t len ) BOOST_NOEXCEPT
+inline char const * system_category_message_win32( int ev, char * buffer, std::size_t len ) noexcept
 {
     if( len == 0 )
     {
@@ -95,7 +73,7 @@ inline char const * system_category_message_win32( int ev, char * buffer, std::s
         DWORD_ retval = boost::winapi::FormatMessageA(
             FORMAT_MESSAGE_FROM_SYSTEM_ | FORMAT_MESSAGE_IGNORE_INSERTS_,
             NULL,
-            ev,
+            static_cast<DWORD_>(ev),
             MAKELANGID_( LANG_NEUTRAL_, SUBLANG_DEFAULT_ ), // Default language
             buffer,
             static_cast<DWORD_>( len ),
@@ -116,7 +94,7 @@ inline char const * system_category_message_win32( int ev, char * buffer, std::s
         DWORD_ retval = boost::winapi::FormatMessageW(
             FORMAT_MESSAGE_ALLOCATE_BUFFER_ | FORMAT_MESSAGE_FROM_SYSTEM_ | FORMAT_MESSAGE_IGNORE_INSERTS_,
             NULL,
-            ev,
+            static_cast<DWORD_>(ev),
             MAKELANGID_( LANG_NEUTRAL_, SUBLANG_DEFAULT_ ), // Default language
             (LPWSTR_) &lpMsgBuf,
             0,
@@ -174,7 +152,7 @@ inline std::string system_category_message_win32( int ev )
     DWORD_ retval = boost::winapi::FormatMessageW(
         FORMAT_MESSAGE_ALLOCATE_BUFFER_ | FORMAT_MESSAGE_FROM_SYSTEM_ | FORMAT_MESSAGE_IGNORE_INSERTS_,
         NULL,
-        ev,
+        static_cast<DWORD_>(ev),
         MAKELANGID_( LANG_NEUTRAL_, SUBLANG_DEFAULT_ ), // Default language
         (LPWSTR_) &lpMsgBuf,
         0,
@@ -198,7 +176,7 @@ inline std::string system_category_message_win32( int ev )
         return unknown_message_win32( ev );
     }
 
-    std::string buffer( r, char() );
+    std::string buffer( static_cast<std::size_t>(r), char() );
 
     r = boost::winapi::WideCharToMultiByte( code_page, 0, lpMsgBuf, -1, &buffer[0], r, NULL, NULL );
 
@@ -209,12 +187,12 @@ inline std::string system_category_message_win32( int ev )
 
     --r; // exclude null terminator
 
-    while( r > 0 && ( buffer[ r-1 ] == '\n' || buffer[ r-1 ] == '\r' ) )
+    while( r > 0 && ( buffer[ static_cast<std::size_t>(r)-1 ] == '\n' || buffer[ static_cast<std::size_t>(r)-1 ] == '\r' ) )
     {
         --r;
     }
 
-    if( r > 0 && buffer[ r-1 ] == '.' )
+    if( r > 0 && buffer[ static_cast<std::size_t>(r)-1 ] == '.' )
     {
         --r;
     }

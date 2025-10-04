@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <memory>
-#include <utility>
-
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/reply_interface.h"
+
+#include <memory>
+#include <utility>
 
 namespace mongo {
 namespace rpc {

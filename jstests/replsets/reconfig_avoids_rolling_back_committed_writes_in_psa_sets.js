@@ -18,17 +18,16 @@
  * ]
  */
 
-(function() {
-"use strict";
-load("jstests/replsets/rslib.js");
-load("jstests/libs/write_concern_util.js");
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {checkWriteConcernTimedOut} from "jstests/libs/write_concern_util.js";
+import {assertVoteCount} from "jstests/replsets/rslib.js";
 
 const rst = new ReplSetTest({
     name: jsTestName(),
     nodes: [{}, {}, {rsConfig: {arbiterOnly: true}}],
 });
 rst.startSet();
-rst.initiateWithHighElectionTimeout();
+rst.initiate();
 
 const collName = jsTestName();
 const primary = rst.getPrimary();
@@ -49,8 +48,7 @@ jsTestLog("Stop the secondary, which should be node 1");
 rst.stop(1);
 
 jsTestLog("Do a majority write that fails waiting for write concern");
-let res = testDb.runCommand(
-    {insert: collName, documents: [{a: 2}], writeConcern: {w: "majority", wtimeout: 3 * 1000}});
+let res = testDb.runCommand({insert: collName, documents: [{a: 2}], writeConcern: {w: "majority", wtimeout: 3 * 1000}});
 assert.commandWorkedIgnoringWriteConcernErrors(res);
 checkWriteConcernTimedOut(res);
 
@@ -87,9 +85,7 @@ config = rst.getReplSetConfigFromNode(primary.nodeId);
 config.members[1].votes = 1;
 config.members[1].priority = 0;
 config.version += 1;
-jsTestLog(
-    "Reconfiguring set to re-enable the secondary's vote and make it unelectable. Config C1: " +
-    tojson(config));
+jsTestLog("Reconfiguring set to re-enable the secondary's vote and make it unelectable. Config C1: " + tojson(config));
 assert.commandWorked(primary.adminCommand({replSetReconfig: config}));
 
 // The next reconfig, C2, will increase the priority of the secondary, so that it can
@@ -98,13 +94,14 @@ assert.commandWorked(primary.adminCommand({replSetReconfig: config}));
 config = rst.getReplSetConfigFromNode(primary.nodeId);
 config.members[1].priority = 1;
 config.version += 1;
-jsTestLog("Reconfiguring set to allow the secondary to run for election. Config C2: " +
-          tojson(config));
+jsTestLog("Reconfiguring set to allow the secondary to run for election. Config C2: " + tojson(config));
 
 // Since the secondary is currently down, this reconfig will hang on waiting for the previous
 // majority write to be committed in the current config, C1.
-assert.commandFailedWithCode(primary.adminCommand({replSetReconfig: config, maxTimeMS: 3 * 1000}),
-                             ErrorCodes.CurrentConfigNotCommittedYet);
+assert.commandFailedWithCode(
+    primary.adminCommand({replSetReconfig: config, maxTimeMS: 3 * 1000}),
+    ErrorCodes.CurrentConfigNotCommittedYet,
+);
 
 // After restarting the secondary, this reconfig should succeed.
 jsTestLog("Restarting the secondary");
@@ -131,4 +128,3 @@ assert.eq(rst.nodes[0].getDB("test")[collName].find({a: 3}).itcount(), 1);
 assert.eq(rst.nodes[1].getDB("test")[collName].find({a: 3}).itcount(), 1);
 
 rst.stopSet();
-})();

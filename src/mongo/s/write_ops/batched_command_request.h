@@ -29,14 +29,31 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <memory>
-
-#include "mongo/db/ops/write_ops.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/commands/query_cmd/bulk_write_crud_op.h"
+#include "mongo/db/commands/query_cmd/bulk_write_gen.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
+#include "mongo/db/query/write_ops/write_ops.h"
+#include "mongo/db/query/write_ops/write_ops_gen.h"
+#include "mongo/db/query/write_ops/write_ops_parsers.h"
+#include "mongo/db/versioning_protocol/database_version.h"
+#include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/rpc/op_msg.h"
-#include "mongo/s/chunk_version.h"
-#include "mongo/s/database_version.h"
-#include "mongo/util/visit_helper.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
+
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -52,15 +69,25 @@ public:
         : _batchType(BatchType_Insert),
           _insertReq(std::make_unique<write_ops::InsertCommandRequest>(std::move(insertOp))) {}
 
+    BatchedCommandRequest(std::unique_ptr<write_ops::InsertCommandRequest> insertOp)
+        : _batchType(BatchType_Insert), _insertReq(std::move(insertOp)) {}
+
     BatchedCommandRequest(write_ops::UpdateCommandRequest updateOp)
         : _batchType(BatchType_Update),
           _updateReq(std::make_unique<write_ops::UpdateCommandRequest>(std::move(updateOp))) {}
+
+    BatchedCommandRequest(std::unique_ptr<write_ops::UpdateCommandRequest> updateOp)
+        : _batchType(BatchType_Update), _updateReq(std::move(updateOp)) {}
 
     BatchedCommandRequest(write_ops::DeleteCommandRequest deleteOp)
         : _batchType(BatchType_Delete),
           _deleteReq(std::make_unique<write_ops::DeleteCommandRequest>(std::move(deleteOp))) {}
 
+    BatchedCommandRequest(std::unique_ptr<write_ops::DeleteCommandRequest> deleteOp)
+        : _batchType(BatchType_Delete), _deleteReq(std::move(deleteOp)) {}
+
     BatchedCommandRequest(BatchedCommandRequest&&) = default;
+    BatchedCommandRequest& operator=(BatchedCommandRequest&&) = default;
 
     static BatchedCommandRequest parseInsert(const OpMsgRequest& request);
     static BatchedCommandRequest parseUpdate(const OpMsgRequest& request);
@@ -72,7 +99,13 @@ public:
 
     const NamespaceString& getNS() const;
 
+    const boost::optional<UUID>& getCollectionUUID() const;
+
+    bool getOrdered() const;
+
     bool getBypassDocumentValidation() const;
+
+    bool hasEncryptionInformation() const;
 
     const auto& getInsertRequest() const {
         invariant(_insertReq);
@@ -89,59 +122,50 @@ public:
         return *_deleteReq;
     }
 
+    std::unique_ptr<write_ops::InsertCommandRequest> extractInsertRequest() {
+        return std::move(_insertReq);
+    }
+
+    std::unique_ptr<write_ops::UpdateCommandRequest> extractUpdateRequest() {
+        return std::move(_updateReq);
+    }
+
+    std::unique_ptr<write_ops::DeleteCommandRequest> extractDeleteRequest() {
+        return std::move(_deleteReq);
+    }
+
     std::size_t sizeWriteOps() const;
 
-    void setWriteConcern(const BSONObj& writeConcern) {
-        _writeConcern = writeConcern.getOwned();
-    }
+    void setShardVersion(ShardVersion shardVersion);
 
-    void unsetWriteConcern() {
-        _writeConcern = boost::none;
-    }
+    bool hasShardVersion() const;
 
-    bool hasWriteConcern() const {
-        return _writeConcern.is_initialized();
-    }
+    const ShardVersion& getShardVersion() const;
 
-    const BSONObj& getWriteConcern() const {
-        invariant(_writeConcern);
-        return *_writeConcern;
-    }
+    void setDbVersion(DatabaseVersion dbVersion);
 
-    bool isVerboseWC() const;
+    bool hasDbVersion() const;
 
-    void setShardVersion(ChunkVersion shardVersion) {
-        _shardVersion = std::move(shardVersion);
-    }
+    const DatabaseVersion& getDbVersion() const;
 
-    bool hasShardVersion() const {
-        return _shardVersion.is_initialized();
-    }
-
-    const ChunkVersion& getShardVersion() const {
-        invariant(_shardVersion);
-        return *_shardVersion;
-    }
-
-    void setDbVersion(DatabaseVersion dbVersion) {
-        _dbVersion = std::move(dbVersion);
-    }
-
-    bool hasDbVersion() const {
-        return _dbVersion.is_initialized();
-    }
-
-    const DatabaseVersion& getDbVersion() const {
-        invariant(_dbVersion);
-        return *_dbVersion;
-    }
+    GenericArguments& getGenericArguments();
+    const GenericArguments& getGenericArguments() const;
 
     void setLegacyRuntimeConstants(LegacyRuntimeConstants runtimeConstants);
+
+    void unsetLegacyRuntimeConstants();
 
     bool hasLegacyRuntimeConstants() const;
 
     const boost::optional<LegacyRuntimeConstants>& getLegacyRuntimeConstants() const;
     const boost::optional<BSONObj>& getLet() const;
+    void setLet(boost::optional<BSONObj> value);
+    const OptionalBool& getBypassEmptyTsReplacement() const;
+
+    /**
+     * Utility which handles evaluating and storing any let parameters based on the request type.
+     */
+    void evaluateAndReplaceLetParams(OperationContext* opCtx);
 
     const write_ops::WriteCommandRequestBase& getWriteCommandRequestBase() const;
     void setWriteCommandRequestBase(write_ops::WriteCommandRequestBase writeCommandBase);
@@ -149,6 +173,11 @@ public:
     void serialize(BSONObjBuilder* builder) const;
     BSONObj toBSON() const;
     std::string toString() const;
+
+    /**
+     * Gets an estimate of the size, in bytes, of the top-level fields in the command.
+     */
+    int getBaseCommandSizeEstimate(OperationContext* opCtx) const;
 
     /**
      * Generates a new request, the same as the old, but with insert _ids if required.
@@ -164,13 +193,13 @@ public:
                                                const boost::optional<BSONObj>& hint = boost::none);
 
     /**
-     * Returns batch of insert operations to be attached to a transaction
+     * Returns batch of insert operations to be attached to a transaction.
      */
     static BatchedCommandRequest buildInsertOp(const NamespaceString& nss,
                                                std::vector<BSONObj> docs);
 
-    /*
-     * Returns batch of update operations to be attached to a transaction
+    /**
+     * Returns batch of update operations to be attached to a transaction.
      */
     static BatchedCommandRequest buildUpdateOp(const NamespaceString& nss,
                                                const BSONObj& query,
@@ -180,7 +209,7 @@ public:
                                                const boost::optional<BSONObj>& hint = boost::none);
 
     /**
-     *  Returns batch of pipeline update operations to be attached to a transaction
+     * Returns batch of pipeline update operations to be attached to a transaction.
      */
     static BatchedCommandRequest buildPipelineUpdateOp(const NamespaceString& nss,
                                                        const BSONObj& query,
@@ -188,7 +217,8 @@ public:
                                                        bool upsert,
                                                        bool useMultiUpdate);
 
-    /** These are used to return empty refs from Insert ops that don't carry runtimeConstants
+    /**
+     * These are used to return empty refs from Insert ops that don't carry runtimeConstants
      * or let parameters in getLet and getLegacyRuntimeConstants.
      */
     const static boost::optional<LegacyRuntimeConstants> kEmptyRuntimeConstants;
@@ -221,51 +251,8 @@ private:
     std::unique_ptr<write_ops::InsertCommandRequest> _insertReq;
     std::unique_ptr<write_ops::UpdateCommandRequest> _updateReq;
     std::unique_ptr<write_ops::DeleteCommandRequest> _deleteReq;
-
-    boost::optional<ChunkVersion> _shardVersion;
-    boost::optional<DatabaseVersion> _dbVersion;
-
-    boost::optional<BSONObj> _writeConcern;
 };
 
-/**
- * Similar to above, this class wraps the write items of a command request into a generically usable
- * type. Very thin wrapper, does not own the write item itself.
- */
-class BatchItemRef {
-public:
-    BatchItemRef(const BatchedCommandRequest* request, int index);
-
-    BatchedCommandRequest::BatchType getOpType() const {
-        return _request.getBatchType();
-    }
-
-    int getItemIndex() const {
-        return _index;
-    }
-
-    const auto& getDocument() const {
-        return _request.getInsertRequest().getDocuments()[_index];
-    }
-    const auto& getUpdate() const {
-        return _request.getUpdateRequest().getUpdates()[_index];
-    }
-
-    const auto& getDelete() const {
-        return _request.getDeleteRequest().getDeletes()[_index];
-    }
-
-    auto& getLet() const {
-        return _request.getLet();
-    }
-
-    auto& getLegacyRuntimeConstants() const {
-        return _request.getLegacyRuntimeConstants();
-    }
-
-private:
-    const BatchedCommandRequest& _request;
-    const int _index;
-};
+BatchedCommandRequest::BatchType convertOpType(BulkWriteCRUDOp::OpType opType);
 
 }  // namespace mongo

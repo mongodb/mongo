@@ -27,12 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/dbmessage.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bson_validate.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/server_options.h"
 #include "mongo/platform/strnlen.h"
-#include "mongo/rpc/object_check.h"
+#include "mongo/rpc/object_check.h"  // IWYU pragma: keep
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
+#include <cstring>
 
 namespace mongo {
 
@@ -61,16 +68,8 @@ DbMessage::DbMessage(const Message& msg) : _msg(msg), _nsStart(nullptr), _mark(n
 }
 
 const char* DbMessage::getns() const {
-    verify(messageShouldHaveNs());
+    MONGO_verify(messageShouldHaveNs());
     return _nsStart;
-}
-
-int DbMessage::getQueryNToReturn() const {
-    verify(messageShouldHaveNs());
-    const char* p = _nsStart + _nsLen + 1;
-    checkRead<int>(p, 2);
-
-    return ConstDataView(p).read<LittleEndian<int32_t>>(sizeof(int32_t));
 }
 
 int DbMessage::pullInt() {
@@ -99,8 +98,8 @@ BSONObj DbMessage::nextJsObj() {
     }
 
     BSONObj js(_nextjsobj);
-    verify(js.objsize() >= 5);
-    verify(js.objsize() <= (_theEnd - _nextjsobj));
+    MONGO_verify(js.objsize() >= 5);
+    MONGO_verify(js.objsize() <= (_theEnd - _nextjsobj));
 
     _nextjsobj += js.objsize();
     if (_nextjsobj >= _theEnd)
@@ -113,7 +112,7 @@ void DbMessage::markReset(const char* toMark = nullptr) {
         toMark = _mark;
     }
 
-    verify(toMark);
+    MONGO_verify(toMark);
     _nextjsobj = toMark;
 }
 
@@ -138,14 +137,17 @@ T DbMessage::readAndAdvance() {
     return t;
 }
 
-Message makeDeprecatedInsertMessage(StringData ns, const BSONObj* objs, size_t count, int flags) {
+Message makeUnsupportedOpInsertMessage(StringData ns,
+                                       const BSONObj* objs,
+                                       size_t count,
+                                       int flags) {
     return makeMessage(dbInsert, [&](BufBuilder& b) {
         int reservedFlags = 0;
         if (flags & InsertOption_ContinueOnError)
             reservedFlags |= InsertOption_ContinueOnError;
 
         b.appendNum(reservedFlags);
-        b.appendStr(ns);
+        b.appendCStr(ns);
 
         for (size_t i = 0; i < count; i++) {
             objs[i].appendSelfToBufBuilder(b);
@@ -153,9 +155,12 @@ Message makeDeprecatedInsertMessage(StringData ns, const BSONObj* objs, size_t c
     });
 }
 
-DbResponse makeErrorResponseToDeprecatedOpQuery(StringData errorMsg) {
+DbResponse makeErrorResponseToUnsupportedOpQuery(StringData errorMsg) {
     BSONObjBuilder err;
-    err.append("$err", errorMsg);
+    err.append("$err",
+               str::stream() << errorMsg
+                             << ". The client driver may require an upgrade. For more details see "
+                                "https://dochub.mongodb.org/core/legacy-opcode-removal");
     err.append("code", 5739101);
     err.append("ok", 0.0);
     BSONObj errObj = err.done();

@@ -1,0 +1,104 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "views",
+    srcs = [
+        "util.cpp",
+        "view.cpp",
+        "view_graph.cpp",
+    ],
+    hdrs = [
+        "util.h",
+        "view.h",
+        "view_graph.h",
+        "//src/mongo/db/query/collation:collator_factory_interface.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/query/collation:collator_interface",
+    ],
+)
+
+mongo_cc_library(
+    name = "resolved_view",
+    srcs = [
+        "resolved_view.cpp",
+    ],
+    hdrs = [
+        "resolved_view.h",
+        "//src/mongo/db/exec/agg:exec_pipeline.h",
+        "//src/mongo/db/exec/agg:pipeline_builder.h",
+        "//src/mongo/db/pipeline:document_source_limit.h",
+        "//src/mongo/db/pipeline:document_source_rank_fusion.h",
+        "//src/mongo/db/pipeline:document_source_score_fusion.h",
+        "//src/mongo/db/pipeline:document_source_set_variable_from_subpipeline.h",
+        "//src/mongo/db/pipeline:timeseries_index_conversion_options.h",
+        "//src/mongo/db/pipeline/search:document_source_internal_search_id_lookup.h",
+        "//src/mongo/db/pipeline/search:document_source_internal_search_mongot_remote.h",
+        "//src/mongo/db/pipeline/search:document_source_list_search_indexes.h",
+        "//src/mongo/db/pipeline/search:document_source_list_search_indexes_gen",
+        "//src/mongo/db/pipeline/search:document_source_search.h",
+        "//src/mongo/db/pipeline/search:document_source_search_meta.h",
+        "//src/mongo/db/pipeline/search:document_source_vector_search.h",
+        "//src/mongo/db/pipeline/search:search_helper_bson_obj.h",
+    ],
+    header_deps = [
+        "//src/mongo/db/query/search:mongot_cursor",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/pipeline:aggregation_request_helper",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/timeseries:timeseries_conversion_util",
+        "//src/mongo/db/timeseries:timeseries_options",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "view_catalog_helpers",
+    srcs = [
+        "view_catalog_helpers.cpp",
+    ],
+    hdrs = [
+        "view_catalog_helpers.h",
+    ],
+    deps = [
+        ":resolved_view",
+        ":views",
+        "//src/mongo/db/local_catalog:collection_catalog",
+        "//src/mongo/db/pipeline:aggregation",
+        "//src/mongo/db/storage:storage_options",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_views_test",
+    srcs = [
+        "resolved_view_test.cpp",
+        "view_catalog_test.cpp",
+        "view_definition_test.cpp",
+        "view_graph_test.cpp",
+    ],
+    tags = ["mongo_unittest_sixth_group"],
+    deps = [
+        ":view_catalog_helpers",
+        ":views",
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/local_catalog:catalog_test_fixture",
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db/query/collation:collator_interface_mock",
+        "//src/mongo/db/repl:replmocks",
+        "//src/mongo/idl:server_parameter_test_controller",
+        "//src/mongo/unittest",
+    ],
+)

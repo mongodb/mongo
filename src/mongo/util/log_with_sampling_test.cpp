@@ -27,16 +27,20 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/concurrency/locker_noop_client_observer.h"
-#include "mongo/db/service_context_test_fixture.h"
-#include "mongo/logv2/log.h"
-#include "mongo/unittest/log_test.h"
 #include "mongo/util/log_with_sampling.h"
-#include "mongo/util/scopeguard.h"
+
+#include "mongo/base/string_data.h"
+#include "mongo/db/service_context.h"
+#include "mongo/unittest/log_test.h"
+#include "mongo/unittest/unittest.h"
+
+#include <memory>
+#include <ostream>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
 namespace {
@@ -56,16 +60,16 @@ namespace {
 auto scenario(bool debugLogEnabled, bool slowOp, bool forceSample) {
     static const logv2::LogComponent component = logv2::LogComponent::kDefault;
     const auto serviceContext = ServiceContext::make();
-    serviceContext->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
-    const auto client = serviceContext->makeClient("log_with_sampling_test");
+    const auto client = serviceContext->getService()->makeClient("log_with_sampling_test");
     const auto opCtx = client->makeOperationContext();
 
     auto loggedSeverityGuard = unittest::MinimumLoggedSeverityGuard(
         component, debugLogEnabled ? logv2::LogSeverity::Debug(1) : logv2::LogSeverity::Info());
 
-    ScopeGuard sampleRateGuard(
-        [savedRate = serverGlobalParams.sampleRate] { serverGlobalParams.sampleRate = savedRate; });
-    serverGlobalParams.sampleRate = forceSample ? 1.0 : 0.0;
+    ScopeGuard sampleRateGuard([savedRate = serverGlobalParams.sampleRate.load()] {
+        serverGlobalParams.sampleRate.store(savedRate);
+    });
+    serverGlobalParams.sampleRate.store(forceSample ? 1.0 : 0.0);
 
     return shouldLogSlowOpWithSampling(
         opCtx.get(), component, Milliseconds{slowOp ? 11 : 9}, Milliseconds{10});

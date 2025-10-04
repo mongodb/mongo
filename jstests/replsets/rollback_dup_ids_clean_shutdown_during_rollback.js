@@ -6,10 +6,7 @@
 //
 // @tags: [requires_persistence]
 //
-(function() {
-"use strict";
-
-load("jstests/replsets/libs/rollback_test.js");
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 TestData.rollbackShutdowns = true;
 let dbName = "test";
@@ -33,7 +30,7 @@ CommonOps(rollbackTest.getPrimary());
 
 let rollbackNode = rollbackTest.transitionToRollbackOperations();
 // Have rollback hang after it has taken an unstable checkpoint but before it completes.
-rollbackNode.adminCommand({configureFailPoint: 'bgSyncHangAfterRunRollback', mode: 'alwaysOn'});
+rollbackNode.adminCommand({configureFailPoint: "bgSyncHangAfterRunRollback", mode: "alwaysOn"});
 RollbackOps(rollbackNode);
 
 // Wait for rollback to finish.
@@ -52,4 +49,3 @@ rollbackTest.transitionToSteadyStateOperations();
 
 // Check the replica set.
 rollbackTest.stop();
-}());

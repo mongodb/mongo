@@ -27,22 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/command_can_run_here.h"
 
 #include "mongo/client/read_preference.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo {
 
 bool commandCanRunHere(OperationContext* opCtx,
-                       const std::string& dbname,
+                       const DatabaseName& dbName,
                        const Command* command,
                        bool inMultiDocumentTransaction) {
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (replCoord->canAcceptWritesForDatabase_UNSAFE(opCtx, dbname))
+    if (replCoord->canAcceptWritesForDatabase_UNSAFE(opCtx, dbName))
         return true;  // primary: always ok
     if (!opCtx->writesAreReplicated())
         return true;  // standalone: always ok

@@ -1,0 +1,177 @@
+# Copyright 2018 Tom Hughes
+# Distributed under the Boost Software License, Version 1.0.
+# (See accompanying file LICENSE_1_0.txt or copy at http://boost.org/LICENSE_1_0.txt)
+
+build_steps: &build_steps
+  steps:
+    - run:
+        name: Setup
+        command: |
+          PLATFORM=`uname`
+          if [ "${PLATFORM}" == "Linux" ]; then
+            sudo apt-get install -y software-properties-common apt-transport-https
+
+            # https://github.com/ilikenwf/apt-fast
+            sudo add-apt-repository -y ppa:apt-fast/stable
+            sudo apt-get update
+            sudo apt-get -y install apt-fast
+
+            sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+            wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key|sudo apt-key add -
+            echo "deb https://apt.llvm.org/trusty/ llvm-toolchain-trusty-4.0 main" | sudo tee -a /etc/apt/sources.list
+            echo "deb https://apt.llvm.org/trusty/ llvm-toolchain-trusty-5.0 main" | sudo tee -a /etc/apt/sources.list
+            echo "deb https://apt.llvm.org/trusty/ llvm-toolchain-trusty-6.0 main" | sudo tee -a /etc/apt/sources.list
+            sudo apt-fast update
+            sudo apt-fast install -y $COMPILER
+          fi
+    - checkout
+    - run:
+        name: Install
+        command: |
+          BOOST_BRANCH=develop && [ "$CIRCLE_BRANCH" == "master" ] && BOOST_BRANCH=master || true
+          cd ..
+          git clone -b $BOOST_BRANCH --depth 1 https://github.com/boostorg/boost.git boost-root
+          cd boost-root
+          git submodule update --init tools/build
+          git submodule update --init libs/config
+          git submodule update --init tools/boostdep
+          mkdir -p libs/thread
+          cp -r $HOME/project/* libs/thread
+          python tools/boostdep/depinst/depinst.py thread
+          ./bootstrap.sh
+          ./b2 headers
+    - run:
+        name: Build
+        command: |
+          echo "using $TOOLSET : : $COMPILER : <cxxflags>-std=$CXXSTD <cxxflags>$CXXFLAGS <cxxflags>$DEFINES ;" > ~/user-config.jam
+          cd ../boost-root
+          ./b2 -d2 -j8 -l60 libs/thread/test toolset=$TOOLSET
+
+mac_build: &mac_build
+  macos:
+    xcode: "9.2.0"
+  <<: *build_steps
+
+linux_build: &linux_build
+  docker:
+    - image: circleci/buildpack-deps:trusty
+  <<: *build_steps
+
+
+version: 2
+jobs:
+  linux-g++-c++11:
+    <<: *linux_build
+    environment:
+      - TOOLSET: "gcc"
+      - COMPILER: "g++"
+      - CXXSTD: "c++11"
+
+  linux-g++-7-c++98:
+    <<: *linux_build
+    environment:
+      - TOOLSET: "gcc"
+      - COMPILER: "g++-7"
+      - CXXSTD: "c++98"
+
+  linux-g++-7-c++11:
+    <<: *linux_build
+    environment:
+      - TOOLSET: "gcc"
+      - COMPILER: "g++-7"
+      - CXXSTD: "c++11"
+
+  linux-g++-7-c++14:
+    <<: *linux_build
+    environment:
+      - TOOLSET: "gcc"
+      - COMPILER: "g++-7"
+      - CXXSTD: "c++14"
+
+  linux-g++-7-c++1z:
+    <<: *linux_build
+    environment:
+      - TOOLSET: "gcc"
+      - COMPILER: "g++-7"
+      - CXXSTD: "c++1z"
+
+  linux-clang++-4.0-c++98:
+    <<: *linux_build
+    environment:
+      - TOOLSET: "clang"
+      - COMPILER: "clang++-4.0"
+      - CXXSTD: "c++98"
+
+  linux-clang++-4.0-c++11:
+    <<: *linux_build
+    environment:
+      - TOOLSET: "clang"
+      - COMPILER: "clang++-4.0"
+      - CXXSTD: "c++11"
+
+  linux-clang++-4.0-c++14:
+    <<: *linux_build
+    environment:
+      - TOOLSET: "clang"
+      - COMPILER: "clang++-4.0"
+      - CXXSTD: "c++14"
+
+  linux-clang++-4.0-c++1z:
+    <<: *linux_build
+    environment:
+      - TOOLSET: "clang"
+      - COMPILER: "clang++-4.0"
+      - CXXSTD: "c++1z"
+
+  mac-clang++-c++98:
+    <<: *mac_build
+    environment:
+      - TOOLSET: "clang"
+      - COMPILER: "clang++"
+      - CXXSTD: "c++98"
+      - DEFINES: "-DBOOST_THREAD_TEST_TIME_MS=100"
+
+  mac-clang++-c++11:
+    <<: *mac_build
+    environment:
+      - TOOLSET: "clang"
+      - COMPILER: "clang++"
+      - CXXSTD: "c++11"
+      - CXXFLAGS: "-Wno-unusable-partial-specialization"
+      - DEFINES: "-DBOOST_THREAD_TEST_TIME_MS=100"
+
+  mac-clang++-c++14:
+    <<: *mac_build
+    environment:
+      - TOOLSET: "clang"
+      - COMPILER: "clang++"
+      - CXXSTD: "c++14"
+      - DEFINES: "-DBOOST_THREAD_TEST_TIME_MS=100"
+
+  mac-clang++-c++1z:
+    <<: *mac_build
+    environment:
+      - TOOLSET: "clang"
+      - COMPILER: "clang++"
+      - CXXSTD: "c++1z"
+      - CXXFLAGS: "-Wno-unusable-partial-specialization"
+      - DEFINES: "-DBOOST_THREAD_TEST_TIME_MS=100"
+
+workflows:
+  version: 2
+  continous:
+    jobs:
+      - linux-g++-c++11
+      - linux-g++-7-c++98
+      - linux-g++-7-c++11
+      - linux-g++-7-c++14
+      - linux-g++-7-c++1z
+      - linux-clang++-4.0-c++98
+      - linux-clang++-4.0-c++11
+      - linux-clang++-4.0-c++14
+      - linux-clang++-4.0-c++1z
+      - mac-clang++-c++98
+      - mac-clang++-c++11
+      - mac-clang++-c++14
+      - mac-clang++-c++1z
+

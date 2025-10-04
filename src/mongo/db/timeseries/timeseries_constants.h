@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/commands/create_gen.h"
+#include "mongo/db/local_catalog/ddl/create_gen.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -40,6 +40,7 @@ namespace timeseries {
 static constexpr StringData kBucketIdFieldName = "_id"_sd;
 static constexpr StringData kBucketDataFieldName = "data"_sd;
 static constexpr StringData kBucketMetaFieldName = "meta"_sd;
+static constexpr StringData kBucketControlClosedFieldName = "closed"_sd;
 static constexpr StringData kBucketControlFieldName = "control"_sd;
 static constexpr StringData kBucketControlVersionFieldName = "version"_sd;
 static constexpr StringData kBucketControlCountFieldName = "count"_sd;
@@ -48,6 +49,7 @@ static constexpr StringData kBucketControlMaxFieldName = "max"_sd;
 static constexpr StringData kControlMaxFieldNamePrefix = "control.max."_sd;
 static constexpr StringData kControlMinFieldNamePrefix = "control.min."_sd;
 static constexpr StringData kDataFieldNamePrefix = "data."_sd;
+static constexpr StringData kControlFieldNamePrefix = "control."_sd;
 
 // These are hard-coded field names in create collection for time-series collections.
 static constexpr StringData kTimeFieldName = "timeField"_sd;
@@ -58,15 +60,36 @@ static constexpr StringData kKeyFieldName = "key"_sd;
 static constexpr StringData kOriginalSpecFieldName = "originalSpec"_sd;
 static constexpr StringData kPartialFilterExpressionFieldName = "partialFilterExpression"_sd;
 
-static constexpr int kTimeseriesControlDefaultVersion = 1;
-static constexpr int kTimeseriesControlCompressedVersion = 2;
+// There are 3 versions of buckets. The first is uncompressed, the second is compressed
+// and has its records sorted on time, and the third is compressed and does not have its
+// records sorted on time.
+static constexpr int kTimeseriesControlUncompressedVersion = 1;
+static constexpr int kTimeseriesControlCompressedSortedVersion = 2;
+static constexpr int kTimeseriesControlCompressedUnsortedVersion = 3;
+
+// This is the latest version that we default to. Therefore, even though v3 > v2,
+// since by default we will still create v2 buckets and only promote them to v3
+// if they receive an out-of-order insert, this remains at v2.
+static constexpr int kTimeseriesControlLatestVersion = kTimeseriesControlCompressedSortedVersion;
+static constexpr int kTimeseriesControlMinVersion = kTimeseriesControlUncompressedVersion;
+
+// These are hard-coded control object subfields.
+static constexpr StringData kControlVersionPath = "control.version"_sd;
+static constexpr StringData kControlClosedPath = "control.closed"_sd;
+
+// DocDiff: constexpr versions of doc_diff::kSubDiffSectionFieldPrefix + bucket field names.
+static constexpr StringData kDataFieldNameDocDiff = "sdata"_sd;
+static constexpr StringData kControlFieldNameDocDiff = "scontrol"_sd;
+static constexpr StringData kMinFieldNameDocDiff = "smin"_sd;
+static constexpr StringData kMaxFieldNameDocDiff = "smax"_sd;
 
 static const StringDataSet kAllowedCollectionCreationOptions{
     CreateCommand::kStorageEngineFieldName,
     CreateCommand::kIndexOptionDefaultsFieldName,
     CreateCommand::kCollationFieldName,
     CreateCommand::kTimeseriesFieldName,
-    CreateCommand::kExpireAfterSecondsFieldName};
+    CreateCommand::kExpireAfterSecondsFieldName,
+    CreateCommand::kTempFieldName};
 
 }  // namespace timeseries
 }  // namespace mongo

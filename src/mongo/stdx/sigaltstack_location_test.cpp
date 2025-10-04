@@ -27,34 +27,44 @@
  *    it in the license file.
  */
 
-#include "mongo/stdx/thread.h"
 
-#include <condition_variable>
-#include <exception>
+// IWYU pragma: no_include "bits/types/siginfo_t.h"
+// IWYU pragma: no_include "bits/types/stack_t.h"
+#include <csetjmp>
+#include <csignal>
+#include <cstddef>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
 #include <functional>
 #include <iostream>
-#include <mutex>
-#include <setjmp.h>
-#include <stdexcept>
+#include <limits>
 
 #ifndef _WIN32
-#include <sys/types.h>
 #include <sys/wait.h>
+#endif
+
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/platform/stack_locator.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/util/exit_code.h"
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
+#endif
+
+#if !defined(__has_feature)
+#define __has_feature(x) 0
 #endif
 
 #if !MONGO_HAS_SIGALTSTACK
 
 int main() {
     std::cout << "`sigaltstack` testing skipped on this platform." << std::endl;
-    return EXIT_SUCCESS;
+    return static_cast<int>(mongo::ExitCode::clean);
 }
 
 #else  // MONGO_HAS_SIGALTSTACK
-
-#if !defined(__has_feature)
-#define __has_feature(x) 0
-#endif
 
 namespace mongo::stdx {
 namespace {
@@ -66,7 +76,7 @@ void unblockSignal(int sig) {
     sigaddset(&sigset, sig);
     if (sigprocmask(SIG_UNBLOCK, &sigset, nullptr)) {
         perror("sigprocmask");
-        exit(EXIT_FAILURE);
+        exit(static_cast<int>(mongo::ExitCode::fail));
     }
 }
 
@@ -80,7 +90,7 @@ void installAction(int sig, sigAction_t* action) {
     sigemptyset(&sa.sa_mask);
     if (sigaction(sig, &sa, nullptr)) {
         perror("sigaction");
-        exit(EXIT_FAILURE);
+        exit(static_cast<int>(mongo::ExitCode::fail));
     }
 }
 
@@ -105,13 +115,13 @@ struct Hex {
 
 struct StackLocationTestChildThreadInfo {
     stack_t ss;
-    const char* handlerLocal;
+    uintptr_t handlerLocal;
 };
 static StackLocationTestChildThreadInfo stackLocationTestChildInfo{};
 
 extern "C" void stackLocationTestAction(int, siginfo_t*, void*) {
-    char n;
-    stackLocationTestChildInfo.handlerLocal = &n;
+    stackLocationTestChildInfo.handlerLocal =
+        reinterpret_cast<uintptr_t>(StackLocator::getFramePointer());
 }
 
 int stackLocationTest() {
@@ -133,12 +143,12 @@ int stackLocationTest() {
 
     if (stackLocationTestChildInfo.ss.ss_flags & SS_DISABLE) {
         std::cerr << "Child thread unexpectedly had sigaltstack disabled." << std::endl;
-        exit(EXIT_FAILURE);
+        exit(static_cast<int>(mongo::ExitCode::fail));
     }
 
     uintptr_t altStackBegin = reinterpret_cast<uintptr_t>(stackLocationTestChildInfo.ss.ss_sp);
     uintptr_t altStackEnd = altStackBegin + stackLocationTestChildInfo.ss.ss_size;
-    uintptr_t handlerLocal = reinterpret_cast<uintptr_t>(stackLocationTestChildInfo.handlerLocal);
+    uintptr_t handlerLocal = stackLocationTestChildInfo.handlerLocal;
 
     std::cerr << "child sigaltstack[" << Hex(altStackEnd - altStackBegin) << "] = ["
               << Hex(altStackBegin) << ", " << Hex(altStackEnd) << ")\n"
@@ -147,9 +157,9 @@ int stackLocationTest() {
     if (handlerLocal < altStackBegin || handlerLocal >= altStackEnd) {
         std::cerr << "Handler local address " << Hex(handlerLocal) << " was outside of: ["
                   << Hex(altStackBegin) << ", " << Hex(altStackEnd) << ")" << std::endl;
-        exit(EXIT_FAILURE);
+        exit(static_cast<int>(mongo::ExitCode::fail));
     }
-    return EXIT_SUCCESS;
+    return static_cast<int>(mongo::ExitCode::clean);
 }
 
 static sigjmp_buf sigjmp;
@@ -198,7 +208,9 @@ int recursionTestImpl(bool useSigAltStack) {
             void* deepestAddress;
             const std::function<void()> recur;
         };
-        MostlyInfiniteRecursion recursion = {0, &recursion, [&] { recursion.run(); }};
+        MostlyInfiniteRecursion recursion = {0, &recursion, [&] {
+                                                 recursion.run();
+                                             }};
 
         // When the signal handler fires, it will return to this sigsetjmp call, causing
         // it to return a nonzero value. This makes the child thread viable again, and
@@ -218,7 +230,7 @@ int recursionTestImpl(bool useSigAltStack) {
         }
     });
     childThread.join();
-    return EXIT_SUCCESS;
+    return static_cast<int>(mongo::ExitCode::clean);
 }
 
 /**
@@ -236,7 +248,7 @@ int recursionTest() {
 int recursionDeathTest() {
     if (pid_t kidPid = fork(); kidPid == -1) {
         perror("fork");
-        return EXIT_FAILURE;
+        return static_cast<int>(mongo::ExitCode::fail);
     } else if (kidPid == 0) {
         // Child process: run the recursion test with no sigaltstack protection.
         return recursionTestImpl(false);
@@ -245,22 +257,22 @@ int recursionDeathTest() {
         int wstatus;
         if (pid_t waited = waitpid(kidPid, &wstatus, 0); waited == -1) {
             perror("waitpid");
-            return EXIT_FAILURE;
+            return static_cast<int>(mongo::ExitCode::fail);
         }
         if (WIFEXITED(wstatus)) {
             std::cerr << "child unexpectedly exited with: " << WEXITSTATUS(wstatus) << std::endl;
-            return EXIT_FAILURE;
+            return static_cast<int>(mongo::ExitCode::fail);
         }
         if (!WIFSIGNALED(wstatus)) {
             std::cerr << "child did not die from a signal" << std::endl;
-            return EXIT_FAILURE;
+            return static_cast<int>(mongo::ExitCode::fail);
         }
         int kidSignal = WTERMSIG(wstatus);
         if (kidSignal != SIGSEGV) {
             std::cerr << "child died from the wrong signal: " << kidSignal << std::endl;
-            return EXIT_FAILURE;
+            return static_cast<int>(mongo::ExitCode::fail);
         }
-        return EXIT_SUCCESS;
+        return static_cast<int>(mongo::ExitCode::clean);
     }
 }
 
@@ -283,13 +295,13 @@ int runTests() {
     };
     for (auto& test : kTests) {
         std::cout << "\n===== " << test.name << " begin:" << std::endl;
-        if (int r = test.func(); r != EXIT_SUCCESS) {
+        if (int r = test.func(); r != static_cast<int>(mongo::ExitCode::clean)) {
             std::cout << test.name << " FAIL" << std::endl;
             return r;
         }
         std::cout << "===== " << test.name << " PASS" << std::endl;
     }
-    return EXIT_SUCCESS;
+    return static_cast<int>(mongo::ExitCode::clean);
 }
 
 }  // namespace

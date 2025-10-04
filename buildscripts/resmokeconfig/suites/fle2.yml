@@ -1,0 +1,26 @@
+test_kind: js_test
+selector:
+  roots:
+    - jstests/fle2/**/*.js
+    - src/mongo/db/modules/*/jstests/fle2/**/*.js
+  exclude_with_any_tags:
+    # Don't run tests that require the encrypted collscan mode in this suite.
+    - requires_fle2_encrypted_collscan
+
+executor:
+  archive:
+    hooks:
+      - ValidateCollections
+  hooks:
+    # We don't execute dbHash or oplog consistency checks since there is only a single replica set
+    # node.
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+    # Use a 2-node replica set.
+    num_nodes: 2

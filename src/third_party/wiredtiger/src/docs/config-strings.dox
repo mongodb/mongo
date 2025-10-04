@@ -112,9 +112,9 @@ For example, in Python, code might look as follows:
 
 Because JSON compatibility allows colons to be used as key/value separators,
 WiredTiger URIs may require quoting.  For example, the following
-WT_SESSION::checkpoint call specifies a set of URIs as checkpoint targets,
-using double-quote characters to keep the parser from treating the colon
-characters as JSON name/value separators:
+WT_SESSION::open_cursor call specifies the URI "log:" using double-quote
+characters to keep the parser from treating the colon character as a JSON
+name/value separator:
 
 @snippet ex_all.c JSON quoting example
 

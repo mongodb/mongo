@@ -1,0 +1,38 @@
+version: 1.0.0
+filters:
+  - "run_analyze_shard_key_background.js":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "run_enable_change_stream.js":
+    approvers:
+      - 10gen/query-execution-change-streams
+  - "run_fcv_upgrade_downgrade_background.js":
+    approvers:
+      - 10gen/server-fcv
+  - "run_fuzzer_restore_settings.js":
+    approvers:
+      - 10gen/server-jstest-infra
+  - "run_initial_sync_node_validation.js":
+    approvers:
+      - 10gen/server-initial-sync
+  - "run_inject_hello_failures.js":
+    approvers:
+      - 10gen/server-hello
+  - "run_reconfig_background.js":
+    approvers:
+      - 10gen/server-jstest-infra
+  - "lag_secondary_application.js":
+    approvers:
+      - 10gen/server-jstest-infra
+  - "run_check_repl_oplogs.js":
+    approvers:
+      - 10gen/server-jstest-infra
+  - "run_cleanup_hello_failures.js":
+    approvers:
+      - 10gen/server-hello
+  - "run_check_repl_dbhash*.js":
+    approvers:
+      - 10gen/server-dbhash
+  - "run_check_shard_filtering_metadata.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog

@@ -2,6 +2,9 @@
 # parsed as JSON. Suppress those messages specifically.
 signal:src/mongo/unittest/death_test.cpp
 
+# For some reason there is a race condition in mktime and we need to not alert for that
+race:tzset_internal
+
 # WiredTiger is known to cause false positives for data races because it uses a
 # nonstandard thread model that TSAN doesn't know how to deal with. We have
 # already denylisted WiredTiger in TSAN, but that only affects threads created
@@ -14,7 +17,9 @@ signal:src/mongo/unittest/death_test.cpp
 # that false positives are more likely, we're deferring them until we have
 # fixed the ones we know are real.
 # TODO: https://jira.mongodb.org/browse/SERVER-48599
+called_from_lib:libwiredtiger.so
 race:src/third_party/wiredtiger/*
+race:ZSTD_*
 
 # These functions call malloc() down the line while inside a signal handler.
 # Since we've never had problems with any of the allocators we use, and since
@@ -24,3 +29,39 @@ race:src/third_party/wiredtiger/*
 signal:abruptQuitAction
 signal:abruptQuitWithAddrSignal
 signal:StackTraceSigAltStackTest::tryHandler
+
+# https://github.com/mongodb/mongo-c-driver/blob/3f2c35d97e7f12de5da4f049dce4c3f8494aba67/.tsan-suppressions#L2C1-L2C30
+# This warning in the mongo-c-driver is expected to be harmless and is suppressed in the
+# mongo-c-driver repo itself.
+race:_mongoc_handshake_freeze
+
+# TODO SERVER-91826
+deadlock:mongo::executor::EgressConnectionCloserManager::add
+deadlock:mongo::executor::EgressConnectionCloserManager::setKeepOpen
+deadlock:mongo::ShardRegistry::_initConfigShard
+
+# TODO SERVER-91827
+deadlock:mongo::executor::EgressConnectionCloserManager::remove
+deadlock:mongo::repl::ReplicationCoordinatorExternalStateImpl::tooStale
+deadlock:mongo::RemoteCommandTargeterFactoryImpl::create
+deadlock:mongo::ShardRegistry::getConfigShard
+deadlock:mongo::executor::ConnectionPool::dropConnections
+
+# TODO SERVER-91838
+# deadlock:mongo::ShardRegistry::getConfigShard (relevant to this and above deadlock)
+deadlock:mongo::ReplicaSetMonitorManager::getOrCreateMonitor
+deadlock:mongo::ShardingTaskExecutorPoolController::ReplicaSetChangeListener::onDroppedSet
+
+# TODO SERVER-91877 inversion b/w SSL manager and some crypto mutex
+deadlock:mongo::(anonymous namespace)::SSLManagerOpenSSL::SSLManagerOpenSSL
+
+# Each of these functions within the third-party S2 library use a counter field (query_count_,
+# num_find_vertex_calls_, and candidates_created_counter_). The first two counters are used to
+# toggle internal optimizations after reaching a threshold. The consequence of a data race to
+# increment those counters is just slightly delaying when the optimization flips on, so there is
+# no correctness issue. The third counter is just used for logging. We only expect these data races
+# to be possible in the context of a partial index with a geo-related partialFilterExpression, since
+# that's the only scenario when a S2 data structure will be shared across threads.
+race:S2Loop::FindVertex
+race:S2EdgeIndex::IncrementQueryCount
+race:S2RegionCoverer::NewCandidate

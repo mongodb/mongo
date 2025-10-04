@@ -1,0 +1,56 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+OTEL_TARGET_COMPATIBLE_WITH = select({
+    "//bazel/config:build_otel_enabled": [],
+    "//conditions:default": ["@platforms//:incompatible"],
+})
+
+idl_generator(
+    name = "metrics_settings_gen",
+    src = "metrics_settings.idl",
+)
+
+mongo_cc_library(
+    name = "otel_metrics",
+    srcs = [
+        "metrics_initialization.cpp",
+        "metrics_settings_gen",
+    ],
+    hdrs = [
+        "metrics_initialization.h",
+    ],
+    no_undefined_ref_DO_NOT_USE = False,
+    deps = [
+        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+    ] + select(
+        {
+            "@//bazel/config:build_otel_enabled": [
+                "//src/mongo/base:system_error",
+                "//src/third_party/opentelemetry-cpp/api",
+                # Consider moving otlp_metric_.*_exporter's into their own standalone libraries
+                "//src/third_party/opentelemetry-cpp/exporters/otlp:otlp_file_exporter",
+                "//src/third_party/opentelemetry-cpp/exporters/otlp:otlp_http_exporter",
+                "//src/third_party/opentelemetry-cpp/sdk/src/metrics",
+                "//src/third_party/opentelemetry-proto:resource_proto_cc",
+                "//src/third_party/opentelemetry-proto:metrics_proto_cc",
+                "//src/third_party/protobuf",
+            ],
+            "//conditions:default": [],
+        },
+    ),
+)
+
+mongo_cc_unit_test(
+    name = "metrics_test",
+    srcs = [
+        "metrics_initialization_test.cpp",
+    ],
+    tags = ["mongo_unittest_seventh_group"],
+    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+    deps = [
+        ":otel_metrics",
+        "//src/third_party/opentelemetry-cpp/api",
+    ],
+)

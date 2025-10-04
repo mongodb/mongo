@@ -3,7 +3,7 @@
  * (See accompanying file LICENSE_1_0.txt or copy at
  * http://www.boost.org/LICENSE_1_0.txt)
  *
- * Copyright (c) 2018 Andrey Semashev
+ * Copyright (c) 2018-2023 Andrey Semashev
  */
 /*!
  * \file   atomic/detail/float_sizes.hpp
@@ -14,7 +14,6 @@
 #ifndef BOOST_ATOMIC_DETAIL_FLOAT_SIZES_HPP_INCLUDED_
 #define BOOST_ATOMIC_DETAIL_FLOAT_SIZES_HPP_INCLUDED_
 
-#include <float.h>
 #include <boost/atomic/detail/config.hpp>
 
 #ifdef BOOST_HAS_PRAGMA_ONCE
@@ -22,87 +21,175 @@
 #endif
 
 // Detect value sizes of the different floating point types. The value sizes may be less than the corresponding type sizes
-// if the type contains padding bits. This is typical e.g. with 80-bit extended float types, which are often represented as 128-bit types.
+// if the type contains padding bits. This is typical e.g. with x87 80-bit extended double types, which are often represented as 96 or 128-bit types.
 // See: https://en.wikipedia.org/wiki/IEEE_754
 // For Intel x87 extended double see: https://en.wikipedia.org/wiki/Extended_precision#x86_Architecture_Extended_Precision_Format
 // For IBM extended double (a.k.a. double-double) see: https://en.wikipedia.org/wiki/Long_double#Implementations, https://gcc.gnu.org/wiki/Ieee128PowerPC
-#if (FLT_RADIX+0) == 2
 
-#if ((FLT_MANT_DIG+0) == 11) && ((FLT_MAX_EXP+0) == 16) // IEEE 754 binary16
+#if defined(__FLT_RADIX__) && defined(__FLT_MANT_DIG__) && defined(__FLT_MAX_EXP__) && \
+    defined(__DBL_MANT_DIG__) && defined(__DBL_MAX_EXP__) && defined(__LDBL_MANT_DIG__) && defined(__LDBL_MAX_EXP__)
+
+#if (__FLT_RADIX__ == 2)
+
+#if (__FLT_MANT_DIG__ == 11) && (__FLT_MAX_EXP__ == 16) // IEEE 754 binary16
 #define BOOST_ATOMIC_DETAIL_SIZEOF_FLOAT_VALUE 2
-#elif ((FLT_MANT_DIG+0) == 24) && ((FLT_MAX_EXP+0) == 128) // IEEE 754 binary32
+#elif (__FLT_MANT_DIG__ == 24) && (__FLT_MAX_EXP__ == 128) // IEEE 754 binary32
 #define BOOST_ATOMIC_DETAIL_SIZEOF_FLOAT_VALUE 4
-#elif ((FLT_MANT_DIG+0) == 53) && ((FLT_MAX_EXP+0) == 1024) // IEEE 754 binary64
+#elif (__FLT_MANT_DIG__ == 53) && (__FLT_MAX_EXP__ == 1024) // IEEE 754 binary64
 #define BOOST_ATOMIC_DETAIL_SIZEOF_FLOAT_VALUE 8
-#elif ((FLT_MANT_DIG+0) == 64) && ((FLT_MAX_EXP+0) == 16384) // x87 extended double
+#elif (__FLT_MANT_DIG__ == 64 || __FLT_MANT_DIG__ == 53 || __FLT_MANT_DIG__ == 24) && (__FLT_MAX_EXP__ == 16384) // x87 extended double, with full 64-bit significand or reduced to 53 or 24 bits
 #define BOOST_ATOMIC_DETAIL_SIZEOF_FLOAT_VALUE 10
-#elif ((FLT_MANT_DIG+0) == 106) && ((FLT_MAX_EXP+0) == 1024) // IBM extended double
+#elif (__FLT_MANT_DIG__ == 106) && (__FLT_MAX_EXP__ == 1024) // IBM extended double
 #define BOOST_ATOMIC_DETAIL_SIZEOF_FLOAT_VALUE 16
-#elif ((FLT_MANT_DIG+0) == 113) && ((FLT_MAX_EXP+0) == 16384) // IEEE 754 binary128
+#elif (__FLT_MANT_DIG__ == 113) && (__FLT_MAX_EXP__ == 16384) // IEEE 754 binary128
 #define BOOST_ATOMIC_DETAIL_SIZEOF_FLOAT_VALUE 16
-#elif ((FLT_MANT_DIG+0) == 237) && ((FLT_MAX_EXP+0) == 262144) // IEEE 754 binary256
+#elif (__FLT_MANT_DIG__ == 237) && (__FLT_MAX_EXP__ == 262144) // IEEE 754 binary256
 #define BOOST_ATOMIC_DETAIL_SIZEOF_FLOAT_VALUE 32
 #endif
 
-#if ((DBL_MANT_DIG+0) == 11) && ((DBL_MAX_EXP+0) == 16) // IEEE 754 binary16
+#if (__DBL_MANT_DIG__ == 11) && (__DBL_MAX_EXP__ == 16) // IEEE 754 binary16
 #define BOOST_ATOMIC_DETAIL_SIZEOF_DOUBLE_VALUE 2
-#elif ((DBL_MANT_DIG+0) == 24) && ((DBL_MAX_EXP+0) == 128) // IEEE 754 binary32
+#elif (__DBL_MANT_DIG__ == 24) && (__DBL_MAX_EXP__ == 128) // IEEE 754 binary32
 #define BOOST_ATOMIC_DETAIL_SIZEOF_DOUBLE_VALUE 4
-#elif ((DBL_MANT_DIG+0) == 53) && ((DBL_MAX_EXP+0) == 1024) // IEEE 754 binary64
+#elif (__DBL_MANT_DIG__ == 53) && (__DBL_MAX_EXP__ == 1024) // IEEE 754 binary64
 #define BOOST_ATOMIC_DETAIL_SIZEOF_DOUBLE_VALUE 8
-#elif ((DBL_MANT_DIG+0) == 64) && ((DBL_MAX_EXP+0) == 16384) // x87 extended double
+#elif (__DBL_MANT_DIG__ == 64 || __DBL_MANT_DIG__ == 53 || __DBL_MANT_DIG__ == 24) && (__DBL_MAX_EXP__ == 16384) // x87 extended double, with full 64-bit significand or reduced to 53 or 24 bits
 #define BOOST_ATOMIC_DETAIL_SIZEOF_DOUBLE_VALUE 10
-#elif ((DBL_MANT_DIG+0) == 106) && ((DBL_MAX_EXP+0) == 1024) // IBM extended double
+#elif (__DBL_MANT_DIG__ == 106) && (__DBL_MAX_EXP__ == 1024) // IBM extended double
 #define BOOST_ATOMIC_DETAIL_SIZEOF_DOUBLE_VALUE 16
-#elif ((DBL_MANT_DIG+0) == 113) && ((DBL_MAX_EXP+0) == 16384) // IEEE 754 binary128
+#elif (__DBL_MANT_DIG__ == 113) && (__DBL_MAX_EXP__ == 16384) // IEEE 754 binary128
 #define BOOST_ATOMIC_DETAIL_SIZEOF_DOUBLE_VALUE 16
-#elif ((DBL_MANT_DIG+0) == 237) && ((DBL_MAX_EXP+0) == 262144) // IEEE 754 binary256
+#elif (__DBL_MANT_DIG__ == 237) && (__DBL_MAX_EXP__ == 262144) // IEEE 754 binary256
 #define BOOST_ATOMIC_DETAIL_SIZEOF_DOUBLE_VALUE 32
 #endif
 
-#if ((LDBL_MANT_DIG+0) == 11) && ((LDBL_MAX_EXP+0) == 16) // IEEE 754 binary16
+#if (__LDBL_MANT_DIG__ == 11) && (__LDBL_MAX_EXP__ == 16) // IEEE 754 binary16
 #define BOOST_ATOMIC_DETAIL_SIZEOF_LONG_DOUBLE_VALUE 2
-#elif ((LDBL_MANT_DIG+0) == 24) && ((LDBL_MAX_EXP+0) == 128) // IEEE 754 binary32
+#elif (__LDBL_MANT_DIG__ == 24) && (__LDBL_MAX_EXP__ == 128) // IEEE 754 binary32
 #define BOOST_ATOMIC_DETAIL_SIZEOF_LONG_DOUBLE_VALUE 4
-#elif ((LDBL_MANT_DIG+0) == 53) && ((LDBL_MAX_EXP+0) == 1024) // IEEE 754 binary64
+#elif (__LDBL_MANT_DIG__ == 53) && (__LDBL_MAX_EXP__ == 1024) // IEEE 754 binary64
 #define BOOST_ATOMIC_DETAIL_SIZEOF_LONG_DOUBLE_VALUE 8
-#elif ((LDBL_MANT_DIG+0) == 64) && ((LDBL_MAX_EXP+0) == 16384) // x87 extended double
+#elif (__LDBL_MANT_DIG__ == 64 || __LDBL_MANT_DIG__ == 53 || __LDBL_MANT_DIG__ == 24) && (__LDBL_MAX_EXP__ == 16384) // x87 extended double, with full 64-bit significand or reduced to 53 or 24 bits
 #define BOOST_ATOMIC_DETAIL_SIZEOF_LONG_DOUBLE_VALUE 10
-#elif ((LDBL_MANT_DIG+0) == 106) && ((LDBL_MAX_EXP+0) == 1024) // IBM extended double
+#elif (__LDBL_MANT_DIG__ == 106) && (__LDBL_MAX_EXP__ == 1024) // IBM extended double
 #define BOOST_ATOMIC_DETAIL_SIZEOF_LONG_DOUBLE_VALUE 16
-#elif ((LDBL_MANT_DIG+0) == 113) && ((LDBL_MAX_EXP+0) == 16384) // IEEE 754 binary128
+#elif (__LDBL_MANT_DIG__ == 113) && (__LDBL_MAX_EXP__ == 16384) // IEEE 754 binary128
 #define BOOST_ATOMIC_DETAIL_SIZEOF_LONG_DOUBLE_VALUE 16
-#elif ((LDBL_MANT_DIG+0) == 237) && ((LDBL_MAX_EXP+0) == 262144) // IEEE 754 binary256
+#elif (__LDBL_MANT_DIG__ == 237) && (__LDBL_MAX_EXP__ == 262144) // IEEE 754 binary256
 #define BOOST_ATOMIC_DETAIL_SIZEOF_LONG_DOUBLE_VALUE 32
 #endif
 
-#elif (FLT_RADIX+0) == 10
+#elif (__FLT_RADIX__ == 10)
 
-#if ((FLT_MANT_DIG+0) == 7) && ((FLT_MAX_EXP+0) == 97) // IEEE 754 decimal32
+#if (__FLT_MANT_DIG__ == 7) && (__FLT_MAX_EXP__ == 97) // IEEE 754 decimal32
 #define BOOST_ATOMIC_DETAIL_SIZEOF_FLOAT_VALUE 4
-#elif ((FLT_MANT_DIG+0) == 16) && ((FLT_MAX_EXP+0) == 385) // IEEE 754 decimal64
+#elif (__FLT_MANT_DIG__ == 16) && (__FLT_MAX_EXP__ == 385) // IEEE 754 decimal64
 #define BOOST_ATOMIC_DETAIL_SIZEOF_FLOAT_VALUE 8
-#elif ((FLT_MANT_DIG+0) == 34) && ((FLT_MAX_EXP+0) == 6145) // IEEE 754 decimal128
+#elif (__FLT_MANT_DIG__ == 34) && (__FLT_MAX_EXP__ == 6145) // IEEE 754 decimal128
 #define BOOST_ATOMIC_DETAIL_SIZEOF_FLOAT_VALUE 16
 #endif
 
-#if ((DBL_MANT_DIG+0) == 7) && ((DBL_MAX_EXP+0) == 97) // IEEE 754 decimal32
+#if (__DBL_MANT_DIG__ == 7) && (__DBL_MAX_EXP__ == 97) // IEEE 754 decimal32
 #define BOOST_ATOMIC_DETAIL_SIZEOF_DOUBLE_VALUE 4
-#elif ((DBL_MANT_DIG+0) == 16) && ((DBL_MAX_EXP+0) == 385) // IEEE 754 decimal64
+#elif (__DBL_MANT_DIG__ == 16) && (__DBL_MAX_EXP__ == 385) // IEEE 754 decimal64
 #define BOOST_ATOMIC_DETAIL_SIZEOF_DOUBLE_VALUE 8
-#elif ((DBL_MANT_DIG+0) == 34) && ((DBL_MAX_EXP+0) == 6145) // IEEE 754 decimal128
+#elif (__DBL_MANT_DIG__ == 34) && (__DBL_MAX_EXP__ == 6145) // IEEE 754 decimal128
 #define BOOST_ATOMIC_DETAIL_SIZEOF_DOUBLE_VALUE 16
 #endif
 
-#if ((LDBL_MANT_DIG+0) == 7) && ((LDBL_MAX_EXP+0) == 97) // IEEE 754 decimal32
+#if (__LDBL_MANT_DIG__ == 7) && (__LDBL_MAX_EXP__ == 97) // IEEE 754 decimal32
 #define BOOST_ATOMIC_DETAIL_SIZEOF_LONG_DOUBLE_VALUE 4
-#elif ((LDBL_MANT_DIG+0) == 16) && ((LDBL_MAX_EXP+0) == 385) // IEEE 754 decimal64
+#elif (__LDBL_MANT_DIG__ == 16) && (__LDBL_MAX_EXP__ == 385) // IEEE 754 decimal64
 #define BOOST_ATOMIC_DETAIL_SIZEOF_LONG_DOUBLE_VALUE 8
-#elif ((LDBL_MANT_DIG+0) == 34) && ((LDBL_MAX_EXP+0) == 6145) // IEEE 754 decimal128
+#elif (__LDBL_MANT_DIG__ == 34) && (__LDBL_MAX_EXP__ == 6145) // IEEE 754 decimal128
 #define BOOST_ATOMIC_DETAIL_SIZEOF_LONG_DOUBLE_VALUE 16
 #endif
 
 #endif
+
+#else // defined(__FLT_RADIX__) ...
+
+#include <cfloat>
+
+#if (FLT_RADIX == 2)
+
+#if (FLT_MANT_DIG == 11) && (FLT_MAX_EXP == 16) // IEEE 754 binary16
+#define BOOST_ATOMIC_DETAIL_SIZEOF_FLOAT_VALUE 2
+#elif (FLT_MANT_DIG == 24) && (FLT_MAX_EXP == 128) // IEEE 754 binary32
+#define BOOST_ATOMIC_DETAIL_SIZEOF_FLOAT_VALUE 4
+#elif (FLT_MANT_DIG == 53) && (FLT_MAX_EXP == 1024) // IEEE 754 binary64
+#define BOOST_ATOMIC_DETAIL_SIZEOF_FLOAT_VALUE 8
+#elif (FLT_MANT_DIG == 64 || FLT_MANT_DIG == 53 || FLT_MANT_DIG == 24) && (FLT_MAX_EXP == 16384) // x87 extended double, with full 64-bit significand or reduced to 53 or 24 bits
+#define BOOST_ATOMIC_DETAIL_SIZEOF_FLOAT_VALUE 10
+#elif (FLT_MANT_DIG == 106) && (FLT_MAX_EXP == 1024) // IBM extended double
+#define BOOST_ATOMIC_DETAIL_SIZEOF_FLOAT_VALUE 16
+#elif (FLT_MANT_DIG == 113) && (FLT_MAX_EXP == 16384) // IEEE 754 binary128
+#define BOOST_ATOMIC_DETAIL_SIZEOF_FLOAT_VALUE 16
+#elif (FLT_MANT_DIG == 237) && (FLT_MAX_EXP == 262144) // IEEE 754 binary256
+#define BOOST_ATOMIC_DETAIL_SIZEOF_FLOAT_VALUE 32
+#endif
+
+#if (DBL_MANT_DIG == 11) && (DBL_MAX_EXP == 16) // IEEE 754 binary16
+#define BOOST_ATOMIC_DETAIL_SIZEOF_DOUBLE_VALUE 2
+#elif (DBL_MANT_DIG == 24) && (DBL_MAX_EXP == 128) // IEEE 754 binary32
+#define BOOST_ATOMIC_DETAIL_SIZEOF_DOUBLE_VALUE 4
+#elif (DBL_MANT_DIG == 53) && (DBL_MAX_EXP == 1024) // IEEE 754 binary64
+#define BOOST_ATOMIC_DETAIL_SIZEOF_DOUBLE_VALUE 8
+#elif (DBL_MANT_DIG == 64 || DBL_MANT_DIG == 53 || DBL_MANT_DIG == 24) && (DBL_MAX_EXP == 16384) // x87 extended double, with full 64-bit significand or reduced to 53 or 24 bits
+#define BOOST_ATOMIC_DETAIL_SIZEOF_DOUBLE_VALUE 10
+#elif (DBL_MANT_DIG == 106) && (DBL_MAX_EXP == 1024) // IBM extended double
+#define BOOST_ATOMIC_DETAIL_SIZEOF_DOUBLE_VALUE 16
+#elif (DBL_MANT_DIG == 113) && (DBL_MAX_EXP == 16384) // IEEE 754 binary128
+#define BOOST_ATOMIC_DETAIL_SIZEOF_DOUBLE_VALUE 16
+#elif (DBL_MANT_DIG == 237) && (DBL_MAX_EXP == 262144) // IEEE 754 binary256
+#define BOOST_ATOMIC_DETAIL_SIZEOF_DOUBLE_VALUE 32
+#endif
+
+#if (LDBL_MANT_DIG == 11) && (LDBL_MAX_EXP == 16) // IEEE 754 binary16
+#define BOOST_ATOMIC_DETAIL_SIZEOF_LONG_DOUBLE_VALUE 2
+#elif (LDBL_MANT_DIG == 24) && (LDBL_MAX_EXP == 128) // IEEE 754 binary32
+#define BOOST_ATOMIC_DETAIL_SIZEOF_LONG_DOUBLE_VALUE 4
+#elif (LDBL_MANT_DIG == 53) && (LDBL_MAX_EXP == 1024) // IEEE 754 binary64
+#define BOOST_ATOMIC_DETAIL_SIZEOF_LONG_DOUBLE_VALUE 8
+#elif (LDBL_MANT_DIG == 64 || LDBL_MANT_DIG == 53 || LDBL_MANT_DIG == 24) && (LDBL_MAX_EXP == 16384) // x87 extended double, with full 64-bit significand or reduced to 53 or 24 bits
+#define BOOST_ATOMIC_DETAIL_SIZEOF_LONG_DOUBLE_VALUE 10
+#elif (LDBL_MANT_DIG == 106) && (LDBL_MAX_EXP == 1024) // IBM extended double
+#define BOOST_ATOMIC_DETAIL_SIZEOF_LONG_DOUBLE_VALUE 16
+#elif (LDBL_MANT_DIG == 113) && (LDBL_MAX_EXP == 16384) // IEEE 754 binary128
+#define BOOST_ATOMIC_DETAIL_SIZEOF_LONG_DOUBLE_VALUE 16
+#elif (LDBL_MANT_DIG == 237) && (LDBL_MAX_EXP == 262144) // IEEE 754 binary256
+#define BOOST_ATOMIC_DETAIL_SIZEOF_LONG_DOUBLE_VALUE 32
+#endif
+
+#elif (FLT_RADIX == 10)
+
+#if (FLT_MANT_DIG == 7) && (FLT_MAX_EXP == 97) // IEEE 754 decimal32
+#define BOOST_ATOMIC_DETAIL_SIZEOF_FLOAT_VALUE 4
+#elif (FLT_MANT_DIG == 16) && (FLT_MAX_EXP == 385) // IEEE 754 decimal64
+#define BOOST_ATOMIC_DETAIL_SIZEOF_FLOAT_VALUE 8
+#elif (FLT_MANT_DIG == 34) && (FLT_MAX_EXP == 6145) // IEEE 754 decimal128
+#define BOOST_ATOMIC_DETAIL_SIZEOF_FLOAT_VALUE 16
+#endif
+
+#if (DBL_MANT_DIG == 7) && (DBL_MAX_EXP == 97) // IEEE 754 decimal32
+#define BOOST_ATOMIC_DETAIL_SIZEOF_DOUBLE_VALUE 4
+#elif (DBL_MANT_DIG == 16) && (DBL_MAX_EXP == 385) // IEEE 754 decimal64
+#define BOOST_ATOMIC_DETAIL_SIZEOF_DOUBLE_VALUE 8
+#elif (DBL_MANT_DIG == 34) && (DBL_MAX_EXP == 6145) // IEEE 754 decimal128
+#define BOOST_ATOMIC_DETAIL_SIZEOF_DOUBLE_VALUE 16
+#endif
+
+#if (LDBL_MANT_DIG == 7) && (LDBL_MAX_EXP == 97) // IEEE 754 decimal32
+#define BOOST_ATOMIC_DETAIL_SIZEOF_LONG_DOUBLE_VALUE 4
+#elif (LDBL_MANT_DIG == 16) && (LDBL_MAX_EXP == 385) // IEEE 754 decimal64
+#define BOOST_ATOMIC_DETAIL_SIZEOF_LONG_DOUBLE_VALUE 8
+#elif (LDBL_MANT_DIG == 34) && (LDBL_MAX_EXP == 6145) // IEEE 754 decimal128
+#define BOOST_ATOMIC_DETAIL_SIZEOF_LONG_DOUBLE_VALUE 16
+#endif
+
+#endif
+
+#endif // defined(__FLT_RADIX__) ...
 
 // GCC and compatible compilers define internal macros with builtin type traits
 #if defined(__SIZEOF_FLOAT__)

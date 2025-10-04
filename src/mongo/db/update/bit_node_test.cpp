@@ -27,124 +27,124 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/update/bit_node.h"
 
-#include "mongo/bson/mutable/algorithm.h"
-#include "mongo/bson/mutable/mutable_bson_test_utils.h"
-#include "mongo/db/json.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/exec/mutable_bson/document.h"
+#include "mongo/db/exec/mutable_bson/mutable_bson_test_utils.h"  // IWYU pragma: keep
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/update/update_executor.h"
 #include "mongo/db/update/update_node_test_fixture.h"
-#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/intrusive_counter.h"
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace {
 
-using BitNodeTest = UpdateNodeTest;
-using mongo::mutablebson::countChildren;
-using mongo::mutablebson::Element;
+using BitNodeTest = UpdateTestFixture;
 
-TEST(BitNodeTest, InitWithDoubleFails) {
+TEST(SimpleBitNodeTest, InitWithDoubleFails) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$bit: {a: 0}}");
     BitNode node;
     ASSERT_NOT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
-TEST(BitNodeTest, InitWithStringFails) {
+TEST(SimpleBitNodeTest, InitWithStringFails) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$bit: {a: ''}}");
     BitNode node;
     ASSERT_NOT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
-TEST(BitNodeTest, InitWithArrayFails) {
+TEST(SimpleBitNodeTest, InitWithArrayFails) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$bit: {a: []}}");
     BitNode node;
     ASSERT_NOT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
-TEST(BitNodeTest, InitWithEmptyDocumentFails) {
+TEST(SimpleBitNodeTest, InitWithEmptyDocumentFails) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto update = fromjson("{$bit: {a: {}}}}");
+    auto update = fromjson("{$bit: {a: {}}}");
     BitNode node;
     ASSERT_NOT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
-TEST(BitNodeTest, InitWithUnknownOperatorFails) {
+TEST(SimpleBitNodeTest, InitWithUnknownOperatorFails) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$bit: {a: {foo: 4}}}");
     BitNode node;
     ASSERT_NOT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
-TEST(BitNodeTest, InitWithArrayArgumentToOperatorFails) {
+TEST(SimpleBitNodeTest, InitWithArrayArgumentToOperatorFails) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$bit: {a: {or: []}}}");
     BitNode node;
     ASSERT_NOT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
-TEST(BitNodeTest, InitWithStringArgumentToOperatorFails) {
+TEST(SimpleBitNodeTest, InitWithStringArgumentToOperatorFails) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$bit: {a: {or: 'foo'}}}");
     BitNode node;
     ASSERT_NOT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
-TEST(BitNodeTest, InitWithDoubleArgumentToOperatorFails) {
+TEST(SimpleBitNodeTest, InitWithDoubleArgumentToOperatorFails) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$bit: {a: {or: 1.0}}}");
     BitNode node;
     ASSERT_NOT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
-TEST(BitNodeTest, InitWithDecimalArgumentToOperatorFails) {
+TEST(SimpleBitNodeTest, InitWithDecimalArgumentToOperatorFails) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto update = fromjson("{$bit: {a: {or: NumberDecimal(\"1.0\")}}}");
     BitNode node;
     ASSERT_NOT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
-TEST(BitNodeTest, ParsesAndInt) {
+TEST(SimpleBitNodeTest, ParsesAndInt) {
     auto update = fromjson("{$bit: {a: {and: NumberInt(1)}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     BitNode node;
     ASSERT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
-TEST(BitNodeTest, ParsesOrInt) {
+TEST(SimpleBitNodeTest, ParsesOrInt) {
     auto update = fromjson("{$bit: {a: {or: NumberInt(1)}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     BitNode node;
     ASSERT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
-TEST(BitNodeTest, ParsesXorInt) {
+TEST(SimpleBitNodeTest, ParsesXorInt) {
     auto update = fromjson("{$bit: {a: {xor: NumberInt(1)}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     BitNode node;
     ASSERT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
-TEST(BitNodeTest, ParsesAndLong) {
+TEST(SimpleBitNodeTest, ParsesAndLong) {
     auto update = fromjson("{$bit: {a: {and: NumberLong(1)}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     BitNode node;
     ASSERT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
-TEST(BitNodeTest, ParsesOrLong) {
+TEST(SimpleBitNodeTest, ParsesOrLong) {
     auto update = fromjson("{$bit: {a: {or: NumberLong(1)}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     BitNode node;
     ASSERT_OK(node.init(update["$bit"]["a"], expCtx));
 }
 
-TEST(BitNodeTest, ParsesXorLong) {
+TEST(SimpleBitNodeTest, ParsesXorLong) {
     auto update = fromjson("{$bit: {a: {xor: NumberLong(1)}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     BitNode node;
@@ -164,7 +164,7 @@ TEST_F(BitNodeTest, ApplyAndLogEmptyDocumentAnd) {
     ASSERT_EQUALS(fromjson("{a: 0}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {a: 0}}"), fromjson("{$v: 2, diff: {i: {a: 0}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {i: {a: 0}}}"));
 }
 
 TEST_F(BitNodeTest, ApplyAndLogEmptyDocumentOr) {
@@ -180,7 +180,7 @@ TEST_F(BitNodeTest, ApplyAndLogEmptyDocumentOr) {
     ASSERT_EQUALS(fromjson("{a: 1}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {a: 1}}"), fromjson("{$v: 2, diff: {i: {a: 1}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {i: {a: 1}}}"));
 }
 
 TEST_F(BitNodeTest, ApplyAndLogEmptyDocumentXor) {
@@ -196,7 +196,7 @@ TEST_F(BitNodeTest, ApplyAndLogEmptyDocumentXor) {
     ASSERT_EQUALS(fromjson("{a: 1}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {a: 1}}"), fromjson("{$v: 2, diff: {i: {a: 1}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {i: {a: 1}}}"));
 }
 
 TEST_F(BitNodeTest, ApplyAndLogSimpleDocumentAnd) {
@@ -212,8 +212,7 @@ TEST_F(BitNodeTest, ApplyAndLogSimpleDocumentAnd) {
     ASSERT_EQUALS(BSON("a" << 0b0100), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(BSON("$set" << BSON("a" << 0b0100)),
-                     BSON("$v" << 2 << "diff" << BSON("u" << BSON("a" << 0b0100))));
+    assertOplogEntry(BSON("$v" << 2 << "diff" << BSON("u" << BSON("a" << 0b0100))));
 }
 
 TEST_F(BitNodeTest, ApplyAndLogSimpleDocumentOr) {
@@ -229,8 +228,7 @@ TEST_F(BitNodeTest, ApplyAndLogSimpleDocumentOr) {
     ASSERT_EQUALS(BSON("a" << 0b0111), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(BSON("$set" << BSON("a" << 0b0111)),
-                     BSON("$v" << 2 << "diff" << BSON("u" << BSON("a" << 0b0111))));
+    assertOplogEntry(BSON("$v" << 2 << "diff" << BSON("u" << BSON("a" << 0b0111))));
 }
 
 TEST_F(BitNodeTest, ApplyAndLogSimpleDocumentXor) {
@@ -246,8 +244,7 @@ TEST_F(BitNodeTest, ApplyAndLogSimpleDocumentXor) {
     ASSERT_EQUALS(BSON("a" << 0b0011), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(BSON("$set" << BSON("a" << 0b0011)),
-                     BSON("$v" << 2 << "diff" << BSON("u" << BSON("a" << 0b0011))));
+    assertOplogEntry(BSON("$v" << 2 << "diff" << BSON("u" << BSON("a" << 0b0011))));
 }
 
 TEST_F(BitNodeTest, ApplyShouldReportNoOp) {
@@ -284,8 +281,7 @@ TEST_F(BitNodeTest, ApplyMultipleBitOps) {
     ASSERT_EQUALS(BSON("a" << 0b0101011001100110), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(BSON("$set" << BSON("a" << 0b0101011001100110)),
-                     BSON("$v" << 2 << "diff" << BSON("u" << BSON("a" << 0b0101011001100110))));
+    assertOplogEntry(BSON("$v" << 2 << "diff" << BSON("u" << BSON("a" << 0b0101011001100110))));
 }
 
 TEST_F(BitNodeTest, ApplyRepeatedBitOps) {
@@ -301,8 +297,7 @@ TEST_F(BitNodeTest, ApplyRepeatedBitOps) {
     ASSERT_EQUALS(BSON("a" << 0b10010110), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(BSON("$set" << BSON("a" << 0b10010110)),
-                     BSON("$v" << 2 << "diff" << BSON("u" << BSON("a" << 0b10010110))));
+    assertOplogEntry(BSON("$v" << 2 << "diff" << BSON("u" << BSON("a" << 0b10010110))));
 }
 
 }  // namespace

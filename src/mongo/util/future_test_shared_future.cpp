@@ -27,13 +27,33 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/util/future.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/unittest/join_thread.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/executor_test_util.h"
+#include "mongo/util/future_impl.h"
 #include "mongo/util/future_test_utils.h"
+
+#include <cstddef>
+#include <memory>
+#include <thread>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {
@@ -68,8 +88,7 @@ TEST(SharedFuture, isReady_shared_TSAN_OK) {
     auto fut = async([&] {
                    done = true;
                    return 1;
-               })
-                   .share();
+               }).share();
     //(void)*const_cast<volatile bool*>(&done);  // Data Race! Uncomment to make sure TSAN works.
     while (!fut.isReady()) {
     }
@@ -280,25 +299,15 @@ TEST(SharedFuture, InterruptedGet_AddChild_Get) {
                         });
 }
 
-/** Punt until we have `std::jthread`. Joins itself in destructor. Move-only. */
-class JoinThread : public stdx::thread {
-public:
-    explicit JoinThread(stdx::thread thread) : stdx::thread(std::move(thread)) {}
-    JoinThread(const JoinThread&) = delete;
-    JoinThread& operator=(const JoinThread&) = delete;
-    JoinThread(JoinThread&&) noexcept = default;
-    JoinThread& operator=(JoinThread&&) noexcept = default;
-    ~JoinThread() {
-        if (joinable())
-            join();
-    }
-};
+using unittest::JoinThread;
 
 /** Try a simple single-worker shared get. Exercise JoinThread. */
 TEST(SharedFuture, ConcurrentTest_Simple) {
     SharedPromise<void> promise;
     auto shared = promise.getFuture();
-    JoinThread thread{stdx::thread{[&] { shared.get(); }}};
+    JoinThread thread{stdx::thread{[&] {
+        shared.get();
+    }}};
     stdx::this_thread::yield();  // Slightly increase the chance of racing.
     promise.emplaceValue();
 }

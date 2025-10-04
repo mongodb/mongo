@@ -1,12 +1,8 @@
 /*
  * Test that sessions on mongods cannot be resumed by deleted and recreated user.
  */
-(function() {
-'use strict';
+import {runTest} from "jstests/auth/deleted_recreated_user_base.js";
 
-load("jstests/auth/deleted_recreated_user_base.js");
-
-const mongod = MongoRunner.runMongod({auth: ''});
+const mongod = MongoRunner.runMongod({auth: ""});
 runTest(mongod, mongod);
 MongoRunner.stopMongod(mongod);
-})();

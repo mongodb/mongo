@@ -29,13 +29,15 @@
 
 #pragma once
 
-#include <memory>
-
+#include "mongo/util/cancellation.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/waitable.h"
+
+#include <memory>
+#include <utility>
 
 namespace mongo {
 
@@ -62,7 +64,7 @@ class Baton : public Waitable,
               public OutOfLineExecutor,
               public std::enable_shared_from_this<Baton> {
 public:
-    virtual ~Baton() = default;
+    ~Baton() override = default;
 
     /**
      * Detaches a baton from an associated opCtx.
@@ -71,7 +73,7 @@ public:
      * opCtx.  Also, any calls to schedule after this point will immediately invoke their callback
      * with a null opCtx.
      */
-    void detach() noexcept {
+    void detach() {
         // We make this anchor so that deleting the shared_ptr inside opCtx doesn't remove the last
         // reference to this type until we return from detach.
         const auto anchor = shared_from_this();
@@ -91,19 +93,16 @@ public:
      * inline if passed a nullptr.  Examples of such work are logging, simple cleanup and
      * rescheduling the task on another executor.
      */
-    void schedule(Task func) noexcept override = 0;
+    void schedule(Task func) override = 0;
 
     /**
      * Returns a networking view of the baton, if this baton supports networking functionality
      */
-    virtual transport::NetworkingBaton* networking() noexcept {
+    virtual transport::NetworkingBaton* networking() {
         return nullptr;
     }
 
-    /**
-     * Marks the baton to wake up on client socket disconnect
-     */
-    virtual void markKillOnClientDisconnect() noexcept = 0;
+    virtual Future<void> waitUntil(Date_t expiration, const CancellationToken& token) = 0;
 
     /**
      * Holder for a SubBaton, detaches on destruction
@@ -174,7 +173,7 @@ public:
     SubBatonHolder makeSubBaton();
 
 private:
-    virtual void detachImpl() noexcept = 0;
+    virtual void detachImpl() = 0;
 };
 
 }  // namespace mongo

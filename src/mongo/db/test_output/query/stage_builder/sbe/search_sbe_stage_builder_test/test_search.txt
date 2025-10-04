@@ -1,0 +1,23 @@
+# Golden test output of SearchSbeStageBuilderTest/TestSearch
+SearchMeta Test
+$$RESULT=s1 env: { s1 = {"count" : 2} (SEARCH_META) }
+[1] cfilter {exists(s1)} 
+[1] limit 1ll 
+[1] coscan 
+Search NonStoredSource Test
+$$RESULT=s16 env: { s1 = Nothing (searchLimit), s2 = Nothing (searchSortSpec), s3 = {"count" : 2} (SEARCH_META), s15 = {"_id" : 1} }
+[1] nlj inner [s4, s5, s6, s7, s8, s9] [s10] 
+    left 
+        [1] search_cursor s10 none [s4, s5, s6, s7, s8] [] 0 false s2 s1 s9 none 
+    right 
+        [1] limit 1ll 
+        [1] nlj inner [] [s11, s14, s12, s13, s15] 
+            left 
+                [1] ixseek ks(1ll, 0, s10, 1ll) ks(1ll, 0, s10, 2ll) s13 s11 s14 s12 [] @"UUID" @"_id_" true 
+            right 
+                [1] limit 1ll 
+                [1] seek s11 s16 s17 s14 s12 s13 s15 none none [] @"UUID" true 
+
+Search NonStoredSource Test
+$$RESULT=s3 env: { s1 = 1 (searchLimit), s2 = Nothing (searchSortSpec), s4 = {"count" : 2} (SEARCH_META) }
+[1] search_cursor none s3 [s5, s6, s7, s8, s9] [] 1 true s2 s1 s10 none 

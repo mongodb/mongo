@@ -1,11 +1,13 @@
+#!/usr/bin/env python3
+
 # When calling '__wt_verbose', the second parameter can only be a single verbose
 # category definition i.e. can't treat the parameter as a flag/mask value.
 # Iterate over uses of '__wt_verbose' and detect any invalid uses where multiple
 # verbose categories are bitwise OR'd.
 import re, sys
 
-verbose_regex = re.compile('([0-9]+):\s*__wt_verbose\(.*?,(.*?)[\"\']')
-bitwise_or_regex = re.compile('^.*(?<!\|)\|(?!\|).*$')
+verbose_regex = re.compile('([0-9]+):\\s*__wt_verbose\\(.*?,(.*?)[\\"\\\']')
+bitwise_or_regex = re.compile(r'^.*(?<!\|)\|(?!\|).*$')
 for line in sys.stdin:
     # Find all uses of __wt_verbose in a given line, capturing the line number
     # and 2nd paramter as groups.

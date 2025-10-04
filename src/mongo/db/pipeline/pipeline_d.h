@@ -29,19 +29,42 @@
 
 #pragma once
 
-#include <boost/intrusive_ptr.hpp>
-#include <memory>
-
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/exec/agg/exec_pipeline.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
+#include "mongo/db/exec/exec_shard_filter_policy.h"
+#include "mongo/db/exec/timeseries/bucket_unpacker.h"
+#include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
-#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/document_source_sample.h"
-#include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/pipeline/document_source_sort.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/pipeline/group_from_first_document_transformation.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
+#include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
+#include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/query_planner.h"
+#include "mongo/db/query/query_planner_params.h"
+#include "mongo/util/modules.h"
+
+#include <functional>
+#include <memory>
+#include <utility>
+
+#include <boost/intrusive_ptr.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 class Collection;
@@ -50,6 +73,7 @@ class DocumentSourceCursor;
 class DocumentSourceMatch;
 class DocumentSourceSort;
 class ExpressionContext;
+
 class SkipThenLimit;
 class OperationContext;
 class Pipeline;
@@ -71,7 +95,21 @@ public:
      * the new stage to the pipeline.
      */
     using AttachExecutorCallback = std::function<void(
-        const CollectionPtr&, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>, Pipeline*)>;
+        const MultipleCollectionAccessor&,
+        std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>,
+        Pipeline*,
+        const boost::intrusive_ptr<DocumentSourceCursor::CatalogResourceHandle>&)>;
+
+    /**
+     * A tuple to represent the result of query executors, includes a main executor, its pipeline
+     * attaching callback function, and a vector of additional executors that help to serve the
+     * aggregation.
+     */
+    struct BuildQueryExecutorResult {
+        std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> mainExecutor;
+        AttachExecutorCallback attachExecutorCallback;
+        std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> additionalExecutors;
+    };
 
     /**
      * This method looks for early pipeline stages that can be folded into the underlying
@@ -79,11 +117,12 @@ public:
      * PlanExecutor. For example, an early $match can be removed and replaced with a
      * DocumentSourceCursor containing a PlanExecutor that will do an index scan.
      *
-     * Callers must take care to ensure that 'nss' is locked in at least IS-mode.
+     * Callers must take care to ensure that 'nss' and each collection referenced in
+     * 'collections' is locked in at least IS-mode.
      *
      * When not null, 'aggRequest' provides access to pipeline command options such as hint.
      *
-     * The 'collection' parameter is optional and can be passed as 'nullptr'.
+     * The 'collections' parameter can reference any number of collections.
      *
      * This method will not add a $cursor stage to the pipeline, but will create a PlanExecutor and
      * a callback function. The executor and the callback can later be used to create the $cursor
@@ -91,72 +130,59 @@ public:
      * If the pipeline doesn't require a $cursor stage, the plan executor will be returned as
      * 'nullptr'.
      */
-    static std::pair<AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
-    buildInnerQueryExecutor(const CollectionPtr& collection,
-                            const NamespaceString& nss,
-                            const AggregateCommandRequest* aggRequest,
-                            Pipeline* pipeline);
+    static BuildQueryExecutorResult buildInnerQueryExecutor(
+        const MultipleCollectionAccessor& collections,
+        const NamespaceString& nss,
+        const AggregateCommandRequest* aggRequest,
+        Pipeline* pipeline,
+        ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{});
 
     /**
      * Completes creation of the $cursor stage using the given callback pair obtained by calling
      * 'buildInnerQueryExecutor()' method. If the callback doesn't hold a valid PlanExecutor, the
      * method does nothing. Otherwise, a new $cursor stage is created using the given PlanExecutor,
-     * and added to the pipeline. The 'collection' parameter is optional and can be passed as
-     * 'nullptr'.
+     * and added to the pipeline. The 'collections' parameter can reference any number of
+     * collections. 'transactionResourcesStasher' must point to a
+     ShardRole::TransactionResourcesStasher that will hold the ShardRole::TransactionResources
+     associated with 'collections' and 'exec'.
+
      */
     static void attachInnerQueryExecutorToPipeline(
-        const CollectionPtr& collection,
+        const MultipleCollectionAccessor& collection,
         AttachExecutorCallback attachExecutorCallback,
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
-        Pipeline* pipeline);
+        Pipeline* pipeline,
+        const boost::intrusive_ptr<DocumentSourceCursor::CatalogResourceHandle>&
+            catalogResourceHandle);
 
     /**
      * This method combines 'buildInnerQueryExecutor()' and 'attachInnerQueryExecutorToPipeline()'
      * into a single call to support auto completion of the cursor stage creation process. Can be
      * used when the executor attachment phase doesn't need to be deferred and the $cursor stage
-     * can be created right after buiding the executor.
+     * can be created right after building the executor. 'transactionResourcesStasher' must point to
+     a ShardRole::TransactionResourcesStasher that will hold the ShardRole::TransactionResources
+     associated with 'collections'.
      */
     static void buildAndAttachInnerQueryExecutorToPipeline(
-        const CollectionPtr& collection,
+        const MultipleCollectionAccessor& collections,
         const NamespaceString& nss,
         const AggregateCommandRequest* aggRequest,
-        Pipeline* pipeline);
+        Pipeline* pipeline,
+        const boost::intrusive_ptr<DocumentSourceCursor::CatalogResourceHandle>&
+            transactionResourcesStasher,
+        ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{});
 
-    static Timestamp getLatestOplogTimestamp(const Pipeline* pipeline);
+    static Timestamp getLatestOplogTimestamp(const exec::agg::Pipeline* pipeline);
 
     /**
      * Retrieves postBatchResumeToken from the 'pipeline' if it is available. Returns an empty
      * object otherwise.
      */
-    static BSONObj getPostBatchResumeToken(const Pipeline* pipeline);
+    static BSONObj getPostBatchResumeToken(const exec::agg::Pipeline* pipeline);
 
-    /**
-     * Resolves the collator to either the user-specified collation or, if none was specified, to
-     * the collection-default collation.
-     */
-    static std::pair<std::unique_ptr<CollatorInterface>, ExpressionContext::CollationMatchesDefault>
-    resolveCollator(OperationContext* opCtx,
-                    BSONObj userCollation,
-                    const CollectionPtr& collection) {
-        if (!collection || !collection->getDefaultCollator()) {
-            return {userCollation.isEmpty()
-                        ? nullptr
-                        : uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
-                                              ->makeFromBSON(userCollation)),
-                    ExpressionContext::CollationMatchesDefault::kNoDefault};
-        }
-        if (userCollation.isEmpty()) {
-            return {collection->getDefaultCollator()->clone(),
-                    ExpressionContext::CollationMatchesDefault::kYes};
-        }
-        auto userCollator = uassertStatusOK(
-            CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(userCollation));
-        return {
-            std::move(userCollator),
-            CollatorInterface::collatorsMatch(collection->getDefaultCollator(), userCollator.get())
-                ? ExpressionContext::CollationMatchesDefault::kYes
-                : ExpressionContext::CollationMatchesDefault::kNo};
-    }
+    // Returns true if it is a $search pipeline, 'featureFlagSearchInSbe' is enabled and
+    // forceClassicEngine is false.
+    static bool isSearchPresentAndEligibleForSbe(const Pipeline* pipeline);
 
 private:
     PipelineD();  // does not exist:  prevent instantiation
@@ -165,22 +191,46 @@ private:
      * Build a PlanExecutor and prepare callback to create a generic DocumentSourceCursor for
      * the 'pipeline'.
      */
-    static std::pair<AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
-    buildInnerQueryExecutorGeneric(const CollectionPtr& collection,
-                                   const NamespaceString& nss,
-                                   const AggregateCommandRequest* aggRequest,
-                                   Pipeline* pipeline);
+    static BuildQueryExecutorResult buildInnerQueryExecutorGeneric(
+        const MultipleCollectionAccessor& collections,
+        const NamespaceString& nss,
+        const AggregateCommandRequest* aggRequest,
+        Pipeline* pipeline,
+        ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{});
+
+    /**
+     * Helper to perform bounded sort optimization rewrites on time-series collections. The rewrite
+     * involves a replacement of the $sort stage with a bounded sort stage.
+     *
+     *  See ../db/query/timeseries/README.md#_internalboundedsort-on-the-timefield for a description
+     * of the bounded sort optimization.
+     */
+    static void performBoundedSortOptimization(PlanStage* rootStage,
+                                               Pipeline* pipeline,
+                                               const DocumentSourceSort* sort,
+                                               DocumentSourceInternalUnpackBucket* unpack);
+
+    static BuildQueryExecutorResult buildInnerQueryExecutorSearch(
+        const MultipleCollectionAccessor& collections,
+        const NamespaceString& nss,
+        const AggregateCommandRequest* aggRequest,
+        Pipeline* pipeline);
 
     /**
      * Build a PlanExecutor and prepare a callback to create a special DocumentSourceGeoNearCursor
-     * for the 'pipeline'. Unlike 'buildInnerQueryExecutorGeneric()', throws if 'collection' does
-     * not exist, as the $geoNearCursor requires a 2d or 2dsphere index.
+     * for the 'pipeline'. Unlike 'buildInnerQueryExecutorGeneric()', throws if the main collection
+     * defined on 'collections' does not exist, as the $geoNearCursor requires a 2d or 2dsphere
+     * index.
+     *
+     * Note that this method takes a 'MultipleCollectionAccessor' even though
+     * DocumentSourceGeoNearCursor only operates over a single collection because the underlying
+     * execution API expects a 'MultipleCollectionAccessor'.
      */
-    static std::pair<AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
-    buildInnerQueryExecutorGeoNear(const CollectionPtr& collection,
-                                   const NamespaceString& nss,
-                                   const AggregateCommandRequest* aggRequest,
-                                   Pipeline* pipeline);
+    static BuildQueryExecutorResult buildInnerQueryExecutorGeoNear(
+        const MultipleCollectionAccessor& collections,
+        const NamespaceString& nss,
+        const AggregateCommandRequest* aggRequest,
+        Pipeline* pipeline);
 
     /**
      * Build a PlanExecutor and prepare a callback to create a special DocumentSourceSample or a
@@ -189,37 +239,11 @@ private:
      * the optimized $sample plan cannot or should not be produced, returns a null PlanExecutor
      * pointer.
      */
-    static std::pair<AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
-    buildInnerQueryExecutorSample(DocumentSourceSample* sampleStage,
-                                  DocumentSourceInternalUnpackBucket* unpackBucketStage,
-                                  const CollectionPtr& collection,
-                                  Pipeline* pipeline);
-
-    /**
-     * Creates a PlanExecutor to be used in the initial cursor source. This function will try to
-     * push down the $sort, $project, $match and $limit stages into the PlanStage layer whenever
-     * possible. In this case, these stages will be incorporated into the PlanExecutor.
-     *
-     * Set 'rewrittenGroupStage' when the pipeline uses $match+$sort+$group stages that are
-     * compatible with a DISTINCT_SCAN plan that visits the first document in each group
-     * (SERVER-9507).
-     *
-     * Sets the 'hasNoRequirements' out-parameter based on whether the dependency set is both finite
-     * and empty. In this case, the query has count semantics.
-     */
-    static StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecutor(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const CollectionPtr& collection,
-        const NamespaceString& nss,
-        Pipeline* pipeline,
-        const boost::intrusive_ptr<DocumentSourceSort>& sortStage,
-        std::unique_ptr<GroupFromFirstDocumentTransformation> rewrittenGroupStage,
-        QueryMetadataBitSet metadataAvailable,
-        const BSONObj& queryObj,
-        SkipThenLimit skipThenLimit,
-        const AggregateCommandRequest* aggRequest,
-        const MatchExpressionParser::AllowedFeatureSet& matcherFeatures,
-        bool* hasNoRequirements);
+    static BuildQueryExecutorResult buildInnerQueryExecutorSample(
+        DocumentSourceSample* sampleStage,
+        DocumentSourceInternalUnpackBucket* unpackBucketStage,
+        const CollectionAcquisition& collection,
+        Pipeline* pipeline);
 
     /**
      * Returns a 'PlanExecutor' which uses a random cursor to sample documents if successful as
@@ -234,12 +258,53 @@ private:
      * returned by multiple shards.
      */
     static StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
-    createRandomCursorExecutor(const CollectionPtr& coll,
+    createRandomCursorExecutor(const CollectionAcquisition& coll,
                                const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                Pipeline* pipeline,
                                long long sampleSize,
                                long long numRecords,
-                               boost::optional<BucketUnpacker> bucketUnpacker);
+                               boost::optional<timeseries::BucketUnpacker> bucketUnpacker);
+
+    typedef bool IndexSortOrderAgree;
+    typedef bool IndexOrderedByMinTime;
+
+    /*
+     * Takes a leaf plan stage and a sort pattern and returns a pair if they support the Bucket
+     * Unpacking with Sort Optimization. The pair includes whether the index order and sort order
+     * agree with each other as its first member and the order of the index as the second parameter.
+     *
+     * Note that the index scan order is different from the index order.
+     */
+    static boost::optional<std::pair<IndexSortOrderAgree, IndexOrderedByMinTime>> supportsSort(
+        const timeseries::BucketUnpacker& bucketUnpacker, PlanStage* root, const SortPattern& sort);
+
+    /* This is a helper method for supportsSort. It takes the current iterator for the index
+     * keyPattern, the direction of the index scan, the timeField path we're sorting on, and the
+     * direction of the sort. It returns a pair if this data agrees and none if it doesn't.
+     *
+     * The pair contains whether the index order and the sort order agree with each other as the
+     * firstmember and the order of the index as the second parameter.
+     *
+     * Note that the index scan order may be different from the index order.
+     * N.B.: It ASSUMES that there are two members left in the keyPatternIter iterator, and that the
+     * timeSortFieldPath is in fact the path on time.
+     */
+    static boost::optional<std::pair<IndexSortOrderAgree, IndexOrderedByMinTime>> checkTimeHelper(
+        const timeseries::BucketUnpacker& bucketUnpacker,
+        BSONObj::iterator& keyPatternIter,
+        bool scanIsForward,
+        const FieldPath& timeSortFieldPath,
+        bool sortIsAscending);
+
+    static bool sortAndKeyPatternPartAgreeAndOnMeta(
+        const timeseries::BucketUnpacker& bucketUnpacker,
+        StringData keyPatternFieldName,
+        const FieldPath& sortFieldPath);
 };
 
+// Public-facing version of internal function for use in join-ordering opt.
+StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQuery(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const NamespaceString& nss,
+    Pipeline& pipeline);
 }  // namespace mongo

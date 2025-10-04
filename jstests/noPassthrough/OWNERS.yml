@@ -1,0 +1,26 @@
+version: 1.0.0
+filters:
+  - "*reproducible_initializer*":
+    approvers:
+      - 10gen/server-programmability
+  - "version.js":
+    approvers:
+      - 10gen/server-programmability
+  - "exit_logging.js":
+    approvers:
+      - 10gen/server-programmability
+  - "*tassert*":
+    approvers:
+      - 10gen/server-programmability
+  - "*pin_code_segments*":
+    approvers:
+      - 10gen/server-programmability
+  - "*utf8_paths*":
+    approvers:
+      - 10gen/server-programmability
+  - "*failcommand*":
+    approvers:
+      - 10gen/server-programmability
+  - "delinquent*":
+    approvers:
+      - 10gen/server-workload-resilience

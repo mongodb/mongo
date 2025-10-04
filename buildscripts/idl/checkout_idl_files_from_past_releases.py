@@ -29,43 +29,35 @@
 import argparse
 import logging
 import os
-import re
 import shutil
-from subprocess import check_output
+import sys
+from subprocess import CalledProcessError, check_output
 from typing import List
 
 from packaging.version import Version
+from retry import retry
 
-FIRST_API_V1_RELEASE = '5.0.0-rc3'
-LOGGER_NAME = 'checkout-idl'
+# Get relative imports to work when the package is not installed on the PYTHONPATH.
+if __name__ == "__main__" and __package__ is None:
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+from buildscripts.resmokelib.multiversionconstants import (
+    LAST_CONTINUOUS_FCV,
+    LAST_LTS_FCV,
+    LATEST_FCV,
+)
+
+LOGGER_NAME = "checkout-idl"
 LOGGER = logging.getLogger(LOGGER_NAME)
 
 
-def get_current_git_version() -> Version:
-    """Return current git version'.
-
-    If the version is a release like "2.3.4" or "2.3.4-rc0", or a pre-release like
-    "2.3.4-325-githash" or "2.3.4-pre-" these will return "2.3.4". If the version begins with the
-    letter 'r', it will also match, e.g. r2.3.4, r2.3.4-rc0, r2.3.4-git234, r2.3.4-rc0-234-githash
-    If the version is invalid (i.e. doesn't start with "2.3.4" or "2.3.4-rc0", this will return
-    False.
-    """
-    git_describe = check_output(['git', 'describe']).decode()
-    git_version = re.match(r'^r?(\d+\.\d+\.\d+)(?:-rc\d+|-alpha\d+)?(?:-.*)?', git_describe)
-    assert git_version, f"git describe output '{git_describe}' does not match pattern."
-    return Version(git_version.groups()[0])
-
-
-def get_release_tags() -> List[str]:
-    """Get a list of release git tags since API Version 1 was introduced."""
-    # Use packaging.version.Version's parsing and comparison logic.
-    min_version = Version(FIRST_API_V1_RELEASE)
-    max_version = get_current_git_version()
+def get_tags() -> List[str]:
+    """Get a list of git tags that the IDL compatibility script should check against."""
 
     def gen_versions_and_tags():
-        for tag in check_output(['git', 'tag']).decode().split():
+        for tag in check_output(["git", "tag"]).decode().split():
             # Releases are like "r5.6.7". Older ones aren't r-prefixed but we don't care about them.
-            if not tag.startswith('r'):
+            if not tag.startswith("r"):
                 continue
 
             try:
@@ -74,38 +66,71 @@ def get_release_tags() -> List[str]:
                 # Not a release tag.
                 pass
 
-    def gen_release_tags():
-        #  gen_versions_and_tags yields pairs (version, tag). Sort them by version using
-        #  packaging.version.Version's comparison rules.
-        for version, tag in sorted(gen_versions_and_tags()):
-            if version < min_version or version > max_version:
-                continue
+    def gen_tags():
+        """
+        Get the latest released tag for LATEST, LAST_CONTINUOUS and LAST_LTS versions.
 
-            # Skip alphas, betas, etc.
-            if version.is_prerelease and version != min_version:
-                continue
+        If the version is not yet released, get the latest unreleased tag for that version.
+        """
 
+        fcvs = [Version(x) for x in [LAST_LTS_FCV, LAST_CONTINUOUS_FCV, LATEST_FCV]]
+        # Remove duplicates from our generic FCVs list. The potential duplicates are when last
+        # LTS is the same as last continuous.
+        fcvs = [*set(fcvs)]
+
+        # Initialize a results dict that points each FCV to a tuple of
+        # (candidate_tag, is_prerelease_version).
+        results = {fcv: (None, True) for fcv in fcvs}
+
+        # For each generic FCV, this algorithm fetches the latest released tag for that version. If
+        # there are no released versions for a FCV, this algorithm fetches the tag for the latest
+        # unreleased version.
+        for version, tag in sorted(gen_versions_and_tags(), reverse=True):
+            major_minor_version = Version(f"{version.major}.{version.minor}")
+            if major_minor_version in results:
+                candidate_tag, candidate_is_prerelease_version = results[major_minor_version]
+                if candidate_tag is None:
+                    # This is the first tag we have seen for this version. Set our first
+                    # candidate tag and if this tag is a prerelease version.
+                    results[major_minor_version] = (tag, version.is_prerelease)
+                elif candidate_is_prerelease_version and not version.is_prerelease:
+                    # This version is the first released version we have seen and our previous
+                    # candidate tag is not a released version. Set the tag to point to this
+                    # version instead.
+                    results[major_minor_version] = (tag, version.is_prerelease)
+
+        for tag, _ in results.values():
             yield tag
 
-    return list(gen_release_tags())
+    return list(gen_tags())
 
 
-def make_idl_directories(release_tags: List[str], destination: str) -> None:
-    """For each release, construct a source tree containing only its IDL files."""
+@retry(tries=3, delay=5)
+def _show_with_retry(tag: str, path: str):
+    return check_output(["git", "show", f"{tag}:{path}"])
+
+
+def make_idl_directories(tags: List[str], destination: str) -> None:
+    """For each tag, construct a source tree containing only its IDL files."""
     LOGGER.info("Clearing destination directory '%s'", destination)
     shutil.rmtree(destination, ignore_errors=True)
 
-    for tag in release_tags:
+    for tag in tags:
         LOGGER.info("Checking out IDL files in %s", tag)
         directory = os.path.join(destination, tag)
-        for path in check_output(['git', 'ls-tree', '--name-only', '-r', tag]).decode().split():
-            if not path.endswith('.idl'):
+        for path in check_output(["git", "ls-tree", "--name-only", "-r", tag]).decode().split():
+            if not path.endswith(".idl"):
                 continue
 
-            contents = check_output(['git', 'show', f'{tag}:{path}']).decode()
+            try:
+                contents = _show_with_retry(tag, path).decode()
+            except CalledProcessError as e:
+                LOGGER.error("Failed to run git show command after multiple retries: %s", str(e))
+                raise e
+
             output_path = os.path.join(directory, path)
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
-            with open(output_path, 'w+') as fd:
+            with open(output_path, "w+") as fd:
                 fd.write(contents)
 
 
@@ -113,15 +138,17 @@ def main():
     """Run the script."""
     arg_parser = argparse.ArgumentParser(description=__doc__)
     arg_parser.add_argument("-v", "--verbose", action="count", help="Enable verbose logging")
-    arg_parser.add_argument("destination", metavar="DESTINATION",
-                            help="Directory to check out past IDL file versions")
+    arg_parser.add_argument(
+        "destination", metavar="DESTINATION", help="Directory to check out past IDL file versions"
+    )
     args = arg_parser.parse_args()
 
     logging.basicConfig(level=logging.WARNING)
     logging.getLogger(LOGGER_NAME).setLevel(logging.DEBUG if args.verbose else logging.INFO)
 
-    tags = get_release_tags()
-    LOGGER.debug("Fetching IDL files for %s past releases", len(tags))
+    tags = get_tags()
+    LOGGER.info("Fetching IDL files for past tags: %s", tags)
+    assert len(tags) >= 2, "we must always have at least two tags to check"
     make_idl_directories(tags, args.destination)
 
 

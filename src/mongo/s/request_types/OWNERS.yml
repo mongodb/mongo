@@ -1,0 +1,11 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "cluster_commands_without_shard_key.idl":
+    approvers:
+      - 10gen/query-execution-router
+  - "wait_for_fail_point.idl":
+    approvers:
+      - 10gen/server-programmability

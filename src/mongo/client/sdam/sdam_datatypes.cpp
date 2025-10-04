@@ -29,6 +29,15 @@
 
 #include "mongo/client/sdam/sdam_datatypes.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/util/assert_util.h"
+
+#include <ostream>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
 namespace mongo::sdam {
 std::string toString(const ServerType serverType) {
     switch (serverType) {
@@ -83,7 +92,7 @@ std::ostream& operator<<(std::ostream& os, const ServerType serverType) {
     return os;
 }
 
-const std::vector<ServerType> allServerTypes() {
+std::vector<ServerType> allServerTypes() {
     static auto const result = std::vector<ServerType>{ServerType::kStandalone,
                                                        ServerType::kMongos,
                                                        ServerType::kRSPrimary,
@@ -136,7 +145,7 @@ std::ostream& operator<<(std::ostream& os, const TopologyType topologyType) {
     return os;
 }
 
-const std::vector<TopologyType> allTopologyTypes() {
+std::vector<TopologyType> allTopologyTypes() {
     static auto const result = std::vector<TopologyType>{TopologyType::kSingle,
                                                          TopologyType::kReplicaSetNoPrimary,
                                                          TopologyType::kReplicaSetWithPrimary,

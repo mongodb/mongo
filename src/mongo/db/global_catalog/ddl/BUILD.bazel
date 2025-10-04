@@ -1,0 +1,449 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+idl_generator(
+    name = "notify_sharding_event_gen",
+    src = "notify_sharding_event.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/sharding_environment:sharding_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "cleanup_structured_encryption_data_coordinator_gen",
+    src = "cleanup_structured_encryption_data_coordinator.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/commands:fle2_cleanup_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+    ],
+)
+
+idl_generator(
+    name = "clone_authoritative_metadata_coordinator_gen",
+    src = "clone_authoritative_metadata_coordinator.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/global_catalog/ddl:sharded_ddl_commands_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+    ],
+)
+
+idl_generator(
+    name = "collmod_coordinator_document_gen",
+    src = "collmod_coordinator_document.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+        "//src/mongo/db/local_catalog/ddl:coll_mod_gen",
+        "//src/mongo/db/sharding_environment:sharding_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "commit_chunk_migration_gen",
+    src = "commit_chunk_migration.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/sharding_environment:sharding_types_gen",
+        "//src/mongo/db/versioning_protocol:chunk_version_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "compact_structured_encryption_data_coordinator_gen",
+    src = "compact_structured_encryption_data_coordinator.idl",
+    deps = [
+        "//src/mongo/crypto:fle_field_schema_gen",
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/commands:fle2_compact_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+    ],
+)
+
+idl_generator(
+    name = "configsvr_coordinator_gen",
+    src = "configsvr_coordinator.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/session:logical_session_id_gen",
+    ],
+)
+
+idl_generator(
+    name = "configsvr_run_restore_gen",
+    src = "configsvr_run_restore.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "convert_to_capped_coordinator_document_gen",
+    src = "convert_to_capped_coordinator_document.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/global_catalog/ddl:sharded_ddl_commands_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+    ],
+)
+
+idl_generator(
+    name = "create_collection_coordinator_document_gen",
+    src = "create_collection_coordinator_document.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/global_catalog:type_collection_common_types_gen",
+        "//src/mongo/db/global_catalog/ddl:sharded_ddl_commands_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+    ],
+)
+
+idl_generator(
+    name = "create_database_coordinator_document_gen",
+    src = "create_database_coordinator_document.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+        "//src/mongo/db/sharding_environment:sharding_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "drop_collection_coordinator_document_gen",
+    src = "drop_collection_coordinator_document.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+        "//src/mongo/db/sharding_environment:sharding_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "drop_database_coordinator_document_gen",
+    src = "drop_database_coordinator_document.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+        "//src/mongo/db/sharding_environment:sharding_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "drop_indexes_coordinator_document_gen",
+    src = "drop_indexes_coordinator_document.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+        "//src/mongo/db/local_catalog/ddl:drop_indexes_gen",
+        "//src/mongo/db/sharding_environment:sharding_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "migration_blocking_operation_coordinator_gen",
+    src = "migration_blocking_operation_coordinator.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+    ],
+)
+
+idl_generator(
+    name = "move_primary_coordinator_document_gen",
+    src = "move_primary_coordinator_document.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+        "//src/mongo/db/sharding_environment:sharding_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "refine_collection_shard_key_coordinator_document_gen",
+    src = "refine_collection_shard_key_coordinator_document.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/global_catalog/ddl:sharded_ddl_commands_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+    ],
+)
+
+idl_generator(
+    name = "remove_chunks_gen",
+    src = "remove_chunks.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "remove_tags_gen",
+    src = "remove_tags.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "reshard_collection_coordinator_document_gen",
+    src = "reshard_collection_coordinator_document.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/global_catalog/ddl:sharded_ddl_commands_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+    ],
+)
+
+idl_generator(
+    name = "set_allow_migrations_coordinator_document_gen",
+    src = "set_allow_migrations_coordinator_document.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/global_catalog/ddl:sharded_ddl_commands_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+    ],
+)
+
+idl_generator(
+    name = "sharded_collmod_gen",
+    src = "sharded_collmod.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/local_catalog/ddl:coll_mod_gen",
+    ],
+)
+
+idl_generator(
+    name = "sharded_rename_collection_gen",
+    src = "sharded_rename_collection.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/global_catalog/ddl:sharded_ddl_commands_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+    ],
+)
+
+idl_generator(
+    name = "sharding_ddl_coordinator_gen",
+    src = "sharding_ddl_coordinator.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/session:logical_session_id_gen",
+        "//src/mongo/db/versioning_protocol:database_version_gen",
+    ],
+)
+
+idl_generator(
+    name = "untrack_unsplittable_collection_coordinator_document_gen",
+    src = "untrack_unsplittable_collection_coordinator_document.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/global_catalog/ddl:sharded_ddl_commands_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+    ],
+)
+
+idl_generator(
+    name = "refine_collection_shard_key_gen",
+    src = "refine_collection_shard_key.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "shard_collection_gen",
+    src = "shard_collection.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/sharding_environment:sharding_types_gen",
+        "//src/mongo/db/timeseries:timeseries_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "add_shard_to_zone_gen",
+    src = "add_shard_to_zone.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "commit_reshard_collection_gen",
+    src = "commit_reshard_collection.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "drop_collection_if_uuid_not_matching_gen",
+    src = "drop_collection_if_uuid_not_matching.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "ensure_chunk_version_is_greater_than_gen",
+    src = "ensure_chunk_version_is_greater_than.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/versioning_protocol:chunk_version_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "merge_chunk_request_gen",
+    src = "merge_chunk_request.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/global_catalog:chunk_range_gen",
+        "//src/mongo/db/sharding_environment:sharding_types_gen",
+        "//src/mongo/db/versioning_protocol:chunk_version_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "migration_blocking_operation_gen",
+    src = "migration_blocking_operation.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "move_primary_gen",
+    src = "move_primary.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/sharding_environment:sharding_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "placement_history_commands_gen",
+    src = "placement_history_commands.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/global_catalog:type_namespace_placement_gen",
+        "//src/mongo/db/sharding_environment:sharding_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "set_allow_migrations_gen",
+    src = "set_allow_migrations.idl",
+    hdrs = [
+        "//src/mongo/db/s:forwardable_operation_metadata.h",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/global_catalog/ddl:sharded_ddl_commands_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+    ],
+)
+
+idl_generator(
+    name = "sharded_ddl_commands_gen",
+    src = "sharded_ddl_commands.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db:keypattern_gen",
+        "//src/mongo/db/global_catalog:type_database_gen",
+        "//src/mongo/db/global_catalog/metadata_consistency_validation:metadata_consistency_types_gen",
+        "//src/mongo/db/local_catalog/ddl:coll_mod_gen",
+        "//src/mongo/db/local_catalog/ddl:create_gen",
+        "//src/mongo/db/local_catalog/ddl:drop_database_gen",
+        "//src/mongo/db/local_catalog/ddl:drop_indexes_gen",
+        "//src/mongo/db/local_catalog/ddl:rename_collection_gen",
+        "//src/mongo/db/query/client_cursor:cursor_response_gen",
+        "//src/mongo/db/sharding_environment:sharding_types_gen",
+        "//src/mongo/db/timeseries:timeseries_gen",
+        "//src/mongo/db/user_write_block:set_user_write_block_mode_gen",
+        "//src/mongo/s/resharding:common_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "shardsvr_join_ddl_coordinators_request_gen",
+    src = "shardsvr_join_ddl_coordinators_request.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "shardsvr_join_migrations_request_gen",
+    src = "shardsvr_join_migrations_request.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "untrack_unsplittable_collection_gen",
+    src = "untrack_unsplittable_collection.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "notify_sharding_event_idl",
+    srcs = [
+        ":notify_sharding_event_gen",
+    ],
+    header_deps = [
+        "//src/mongo/db/user_write_block:set_user_write_block_mode_idl",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
+idl_generator(
+    name = "initialize_placement_history_coordinator_document_gen",
+    src = "initialize_placement_history_coordinator_document.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+    ],
+)
+
+idl_generator(
+    name = "list_shards_gen",
+    src = "list_shards.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)

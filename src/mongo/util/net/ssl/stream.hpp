@@ -15,13 +15,6 @@
 #pragma once
 #endif  // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
-#include "asio/detail/config.hpp"
-
-#include "asio/async_result.hpp"
-#include "asio/detail/buffer_sequence_adapter.hpp"
-#include "asio/detail/handler_type_requirements.hpp"
-#include "asio/detail/noncopyable.hpp"
-#include "asio/detail/type_traits.hpp"
 #include "mongo/util/net/ssl/apple.hpp"
 #include "mongo/util/net/ssl/context.hpp"
 #include "mongo/util/net/ssl/detail/buffered_handshake_op.hpp"
@@ -33,7 +26,15 @@
 #include "mongo/util/net/ssl/detail/write_op.hpp"
 #include "mongo/util/net/ssl/stream_base.hpp"
 
-#include "asio/detail/push_options.hpp"
+#include <asio/async_result.hpp>
+#include <asio/detail/buffer_sequence_adapter.hpp>
+#include <asio/detail/config.hpp>
+#include <asio/detail/handler_type_requirements.hpp>
+#include <asio/detail/noncopyable.hpp>
+#include <asio/detail/type_traits.hpp>
+
+// This must be after all other includes
+#include <asio/detail/push_options.hpp>
 
 namespace asio {
 namespace ssl {
@@ -96,14 +97,11 @@ public:
     template <typename Arg>
     stream(Arg&& arg, context& ctx, const std::string& remoteHostName)
         : next_layer_(ASIO_MOVE_CAST(Arg)(arg)),
-          core_(ctx.native_handle(),
-                remoteHostName,
-                next_layer_.lowest_layer().get_executor().context()) {}
+          core_(ctx.native_handle(), remoteHostName, next_layer_.lowest_layer().get_executor()) {}
 #else   // defined(ASIO_HAS_MOVE) || defined(GENERATING_DOCUMENTATION)
     template <typename Arg>
     stream(Arg& arg, context& ctx)
-        : next_layer_(arg),
-          core_(ctx.native_handle(), next_layer_.lowest_layer().get_executor().context()) {}
+        : next_layer_(arg), core_(ctx.native_handle(), next_layer_.lowest_layer().get_executor()) {}
 #endif  // defined(ASIO_HAS_MOVE) || defined(GENERATING_DOCUMENTATION)
 
     /// Destructor.
@@ -123,20 +121,6 @@ public:
     executor_type get_executor() ASIO_NOEXCEPT {
         return next_layer_.lowest_layer().get_executor();
     }
-
-#if !defined(ASIO_NO_DEPRECATED)
-    /// (Deprecated: Use get_executor().) Get the io_context associated with the
-    /// object.
-    asio::io_context& get_io_context() {
-        return next_layer_.lowest_layer().get_io_context();
-    }
-
-    /// (Deprecated: Use get_executor().) Get the io_context associated with the
-    /// object.
-    asio::io_context& get_io_service() {
-        return next_layer_.lowest_layer().get_io_service();
-    }
-#endif  // !defined(ASIO_NO_DEPRECATED)
 
     /// Get the underlying implementation in the native type.
     /**
@@ -594,6 +578,6 @@ private:
 }  // namespace ssl
 }  // namespace asio
 
-#include "asio/detail/pop_options.hpp"
+#include <asio/detail/pop_options.hpp>
 
 #endif  // ASIO_SSL_STREAM_HPP

@@ -1,0 +1,32 @@
+config_variables:
+  - &keyFile jstests/libs/authTestsKey
+  - &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+
+test_kind: js_test
+
+selector:
+  roots:
+    - jstests/with_mongot/search_mocked/*.js
+    - jstests/with_mongot/mongotmock/*.js
+  exclude_files:
+    # Skip any tests that run with auth explicitly.
+    - jstests/with_mongot/search_mocked/auth_list_search_indexes_agg.js
+    # This test creates a race condition with the network in pinned connections mode: if mongod
+    # is still waiting on a response from mongot following the getMore, mongod must close the
+    # connection because it cannot send the killCursor command to mongot while the getMore
+    # command is on-going.
+    - jstests/with_mongot/mongotmock/mongot_kill_cursors.js
+
+executor:
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          auth: true
+          authMechanism: SCRAM-SHA-256
+          keyFile: *keyFile
+          keyFileData: *keyFileData
+          roleGraphInvalidationIsFatal: true
+          setParameters:
+            pinTaskExecCursorConns: false # pinned connection mode is the default
+      nodb: ""

@@ -27,15 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/auth/action_set.h"
 
-#include <bitset>
-#include <string>
-
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/util/str.h"
+#include "mongo/base/status_with.h"
+#include "mongo/db/auth/action_type_gen.h"
+
+#include <bitset>
+#include <cstddef>
+#include <string>
 
 namespace mongo {
 
@@ -93,29 +94,28 @@ bool ActionSet::isSupersetOf(const ActionSet& other) const {
     return (_actions & other._actions) == other._actions;
 }
 
-Status ActionSet::parseActionSetFromStringVector(const std::vector<std::string>& actionsVector,
-                                                 ActionSet* result,
-                                                 std::vector<std::string>* unrecognizedActions) {
-    result->removeAllActions();
-    for (StringData actionName : actionsVector) {
-        auto parseResult = parseActionFromString(actionName);
-        if (!parseResult.isOK()) {
-            const auto& status = parseResult.getStatus();
-            if (status == ErrorCodes::FailedToParse) {
-                unrecognizedActions->push_back(std::string{actionName});
-            } else {
-                invariant(status);
+ActionSet ActionSet::parseFromStringVector(const std::vector<StringData>& actions,
+                                           std::vector<std::string>* unrecognizedActions) {
+    ActionSet ret;
+
+    for (auto action : actions) {
+        auto swActionType = parseActionFromString(action);
+        if (!swActionType.isOK()) {
+            if ((swActionType.getStatus() == ErrorCodes::FailedToParse) && unrecognizedActions) {
+                unrecognizedActions->push_back(std::string{action});
             }
-        } else {
-            const auto& action = parseResult.getValue();
-            if (action == ActionType::anyAction) {
-                result->addAllActions();
-                return Status::OK();
-            }
-            result->addAction(action);
+            continue;
         }
+
+        if (swActionType.getValue() == ActionType::anyAction) {
+            ret.addAllActions();
+            return ret;
+        }
+
+        ret.addAction(swActionType.getValue());
     }
-    return Status::OK();
+
+    return ret;
 }
 
 std::string ActionSet::toString() const {
@@ -129,25 +129,24 @@ std::string ActionSet::toString() const {
         auto action = static_cast<ActionType>(i);
         if (contains(action)) {
             StringData name = toStringData(action);
-            str.append(sep.rawData(), sep.size());
-            str.append(name.rawData(), name.size());
+            str.append(sep.data(), sep.size());
+            str.append(name.data(), name.size());
             sep = ","_sd;
         }
     }
     return str;
 }
 
-std::vector<std::string> ActionSet::getActionsAsStrings() const {
-    using mongo::toString;
-    std::vector<std::string> result;
+std::vector<StringData> ActionSet::getActionsAsStringDatas() const {
     if (contains(ActionType::anyAction)) {
-        result.push_back(toString(ActionType::anyAction));
-        return result;
+        return {ActionType_serializer(ActionType::anyAction)};
     }
+
+    std::vector<StringData> result;
     for (size_t i = 0; i < kNumActionTypes; ++i) {
         auto action = static_cast<ActionType>(i);
         if (contains(action)) {
-            result.push_back(toString(action));
+            result.push_back(toStringData(action));
         }
     }
     return result;

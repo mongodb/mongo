@@ -29,13 +29,18 @@
 
 #pragma once
 
-#include <exception>
-
+// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/scopeguard.h"
+
+#include <exception>
+#include <functional>
+#include <mutex>
+#include <utility>
 
 namespace mongo::unittest {
 
@@ -58,7 +63,9 @@ public:
     /** Spawn and return a `stdx::thread` that invokes `f` as if by `exec(f)`. */
     template <typename F>
     stdx::thread spawn(F&& f) {
-        return stdx::thread{[this, f = std::move(f)]() mutable { exec(std::move(f)); }};
+        return stdx::thread{[this, f = std::move(f)]() mutable {
+            exec(std::move(f));
+        }};
     }
 
     /** Spawn a thread that will invoke monitor.notifyDone()` when it finishes. */
@@ -104,13 +111,15 @@ public:
         stdx::unique_lock lk(_mu);
         do {
             _cv.wait(lk, [&] { return _done || _ex; });
-            if (_ex)
+            if (_ex) {
+                _done = true;
                 std::rethrow_exception(std::exchange(_ex, nullptr));
+            }
         } while (!_done);
     }
 
 private:
-    stdx::mutex _mu;  // NOLINT
+    stdx::mutex _mu;
     stdx::condition_variable _cv;
     std::exception_ptr _ex;
     bool _done = false;

@@ -5,16 +5,14 @@
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
 
-(function() {
-"use strict";
-
-load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/libs/fail_point_util.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Start one of the nodes with priority: 0 to avoid elections.
 const rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}]});
 rst.startSet();
-rst.initiate();
+rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 let primary = rst.getPrimary();
 
@@ -50,8 +48,9 @@ const readBlockedOnPrepareConflictThread = startParallelShell(() => {
     const parallelTestCollName = TestData.collName;
 
     // Advance the clusterTime with another insert.
-    let res = assert.commandWorked(parallelTestDB.runCommand(
-        {insert: parallelTestCollName, documents: [{advanceClusterTime: 1}]}));
+    let res = assert.commandWorked(
+        parallelTestDB.runCommand({insert: parallelTestCollName, documents: [{advanceClusterTime: 1}]}),
+    );
     assert(res.hasOwnProperty("$clusterTime"), res);
     assert(res.$clusterTime.hasOwnProperty("clusterTime"), res);
     const clusterTime = res.$clusterTime.clusterTime;
@@ -60,12 +59,14 @@ const readBlockedOnPrepareConflictThread = startParallelShell(() => {
     // The following read should block on the prepared transaction since it will be
     // reading a conflicting document using an afterClusterTime later than the
     // prepareTimestamp.
-    assert.commandFailedWithCode(parallelTestDB.runCommand({
-        find: parallelTestCollName,
-        filter: {_id: 1},
-        readConcern: {afterClusterTime: clusterTime}
-    }),
-                                 ErrorCodes.InterruptedDueToReplStateChange);
+    assert.commandFailedWithCode(
+        parallelTestDB.runCommand({
+            find: parallelTestCollName,
+            filter: {_id: 1},
+            readConcern: {afterClusterTime: clusterTime},
+        }),
+        ErrorCodes.InterruptedDueToReplStateChange,
+    );
 }, primary.port);
 
 jsTestLog("Waiting for failpoint");
@@ -74,17 +75,15 @@ failPoint.wait();
 // Once we have confirmed that the find command has hit a prepare conflict, we can perform
 // a step down.
 jsTestLog("Stepping down primary");
-assert.commandWorked(
-    primaryAdmin.adminCommand({replSetStepDown: 60 * 10 /* 10 minutes */, force: true}));
+assert.commandWorked(primaryAdmin.adminCommand({replSetStepDown: 60 * 10 /* 10 minutes */, force: true}));
 
 readBlockedOnPrepareConflictThread();
 
-rst.waitForState(primary, ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [primary]);
 
 // Validate that the read operation got killed during step down.
 let replMetrics = assert.commandWorked(primaryAdmin.adminCommand({serverStatus: 1})).metrics.repl;
 assert.eq(replMetrics.stateTransition.lastStateTransition, "stepDown");
-assert.eq(replMetrics.stateTransition.userOperationsKilled, 1);
 
 // Allow the primary to be re-elected, and wait for it.
 assert.commandWorked(primaryAdmin.adminCommand({replSetFreeze: 0}));
@@ -101,12 +100,13 @@ const txnNumber = session.getTxnNumber_forTesting();
 
 jsTestLog("Committing transaction");
 // Commit the transaction.
-assert.commandWorked(sessionDB.adminCommand({
-    commitTransaction: 1,
-    commitTimestamp: prepareTimestamp,
-    txnNumber: NumberLong(txnNumber),
-    autocommit: false,
-}));
+assert.commandWorked(
+    sessionDB.adminCommand({
+        commitTransaction: 1,
+        commitTimestamp: prepareTimestamp,
+        txnNumber: NumberLong(txnNumber),
+        autocommit: false,
+    }),
+);
 
 rst.stopSet();
-})();

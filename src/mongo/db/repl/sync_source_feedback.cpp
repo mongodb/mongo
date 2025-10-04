@@ -27,23 +27,32 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/repl/sync_source_feedback.h"
-
+#include <boost/move/utility_core.hpp>
+// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/client.h"
 #include "mongo/db/repl/bgsync.h"
+#include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/reporter.h"
+#include "mongo/db/repl/sync_source_feedback.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/scopeguard.h"
-#include "mongo/util/time_support.h"
+#include "mongo/util/str.h"
+
+#include <algorithm>
+#include <mutex>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
+
 
 namespace mongo {
 namespace repl {
@@ -96,16 +105,15 @@ Reporter::PrepareReplSetUpdatePositionCommandFn makePrepareReplSetUpdatePosition
 
 }  // namespace
 
-void SyncSourceFeedback::forwardSecondaryProgress() {
+void SyncSourceFeedback::forwardSecondaryProgress(bool prioritized) {
     {
-        stdx::unique_lock<Latch> lock(_mtx);
+        stdx::unique_lock<stdx::mutex> lock(_mtx);
         _positionChanged = true;
         _cond.notify_all();
         if (_reporter) {
-            auto triggerStatus = _reporter->trigger();
+            auto triggerStatus = _reporter->trigger(prioritized);
             if (!triggerStatus.isOK()) {
                 LOGV2_WARNING(21764,
-                              "unable to forward progress to {target}: {error}",
                               "Unable to forward progress",
                               "target"_attr = _reporter->getTarget(),
                               "error"_attr = triggerStatus);
@@ -120,8 +128,6 @@ Status SyncSourceFeedback::_updateUpstream(Reporter* reporter) {
     auto triggerStatus = reporter->trigger();
     if (!triggerStatus.isOK()) {
         LOGV2_WARNING(21765,
-                      "unable to schedule reporter to update replication progress on {syncTarget}: "
-                      "{error}",
                       "Unable to schedule reporter to update replication progress",
                       "syncTarget"_attr = syncTarget,
                       "error"_attr = triggerStatus);
@@ -132,7 +138,6 @@ Status SyncSourceFeedback::_updateUpstream(Reporter* reporter) {
 
     if (!status.isOK()) {
         LOGV2(21760,
-              "SyncSourceFeedback error sending update to {syncTarget}: {error}",
               "SyncSourceFeedback error sending update",
               "syncTarget"_attr = syncTarget,
               "error"_attr = status);
@@ -144,7 +149,7 @@ Status SyncSourceFeedback::_updateUpstream(Reporter* reporter) {
 }
 
 void SyncSourceFeedback::shutdown() {
-    stdx::unique_lock<Latch> lock(_mtx);
+    stdx::unique_lock<stdx::mutex> lock(_mtx);
     if (_reporter) {
         _reporter->shutdown();
     }
@@ -155,7 +160,8 @@ void SyncSourceFeedback::shutdown() {
 void SyncSourceFeedback::run(executor::TaskExecutor* executor,
                              BackgroundSync* bgsync,
                              ReplicationCoordinator* replCoord) {
-    Client::initThread("SyncSourceFeedback");
+    Client::initThread("SyncSourceFeedback",
+                       getGlobalServiceContext()->getService(ClusterRole::ShardServer));
 
     HostAndPort syncTarget;
 
@@ -172,7 +178,7 @@ void SyncSourceFeedback::run(executor::TaskExecutor* executor,
             // Take SyncSourceFeedback lock before calling into ReplicationCoordinator
             // to avoid deadlock because ReplicationCoordinator could conceivably calling back into
             // this class.
-            stdx::unique_lock<Latch> lock(_mtx);
+            stdx::unique_lock<stdx::mutex> lock(_mtx);
             while (!_positionChanged && !_shutdownSignaled) {
                 {
                     MONGO_IDLE_THREAD_BLOCK;
@@ -195,7 +201,7 @@ void SyncSourceFeedback::run(executor::TaskExecutor* executor,
         }
 
         {
-            stdx::lock_guard<Latch> lock(_mtx);
+            stdx::lock_guard<stdx::mutex> lock(_mtx);
             MemberState state = replCoord->getMemberState();
             if (state.primary() || state.startup()) {
                 continue;
@@ -213,11 +219,7 @@ void SyncSourceFeedback::run(executor::TaskExecutor* executor,
         }
 
         if (syncTarget != target) {
-            LOGV2_DEBUG(21761,
-                        1,
-                        "setting syncSourceFeedback to {target}",
-                        "Setting syncSourceFeedback",
-                        "target"_attr = target);
+            LOGV2_DEBUG(21761, 1, "Setting syncSourceFeedback", "target"_attr = target);
             syncTarget = target;
 
             // Update keepalive value from config.
@@ -226,28 +228,25 @@ void SyncSourceFeedback::run(executor::TaskExecutor* executor,
             if (oldKeepAliveInterval != keepAliveInterval) {
                 LOGV2_DEBUG(21762,
                             1,
-                            "new syncSourceFeedback keep alive duration = {newKeepAliveInterval} "
-                            "(previously {oldKeepAliveInterval})",
                             "New syncSourceFeedback keep alive duration",
                             "newKeepAliveInterval"_attr = keepAliveInterval,
                             "oldKeepAliveInterval"_attr = oldKeepAliveInterval);
             }
         }
-
         Reporter reporter(executor,
                           makePrepareReplSetUpdatePositionCommandFn(replCoord, syncTarget, bgsync),
                           syncTarget,
                           keepAliveInterval,
                           syncSourceFeedbackNetworkTimeoutSecs);
         {
-            stdx::lock_guard<Latch> lock(_mtx);
+            stdx::lock_guard<stdx::mutex> lock(_mtx);
             if (_shutdownSignaled) {
                 break;
             }
             _reporter = &reporter;
         }
         ON_BLOCK_EXIT([this]() {
-            stdx::lock_guard<Latch> lock(_mtx);
+            stdx::lock_guard<stdx::mutex> lock(_mtx);
             _reporter = nullptr;
         });
 
@@ -256,8 +255,6 @@ void SyncSourceFeedback::run(executor::TaskExecutor* executor,
             LOGV2_DEBUG(
                 21763,
                 1,
-                "The replication progress command (replSetUpdatePosition) failed and will be "
-                "retried: {error}",
                 "The replication progress command (replSetUpdatePosition) failed and will be "
                 "retried",
                 "error"_attr = status);

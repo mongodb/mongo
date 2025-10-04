@@ -29,12 +29,18 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/util/assert_util.h"
+
 #include <cstdlib>
 #include <iterator>
 #include <list>
+#include <type_traits>
+#include <utility>
 
-#include "mongo/stdx/unordered_map.h"
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -67,9 +73,9 @@ struct KeyConstraints {
 
 template <typename Hasher, typename Comparator, typename T, typename TT>
 inline constexpr bool IsComparableWith =
-    decltype(KeyConstraints<Hasher, Comparator>::IsHashable(std::declval<TT>()))::value&& decltype(
-        KeyConstraints<Hasher, Comparator>::IsComparable(std::declval<T>(),
-                                                         std::declval<TT>()))::value;
+    decltype(KeyConstraints<Hasher, Comparator>::IsHashable(std::declval<TT>()))::value &&
+    decltype(KeyConstraints<Hasher, Comparator>::IsComparable(std::declval<T>(),
+                                                              std::declval<TT>()))::value;
 
 
 template <typename K,
@@ -77,17 +83,9 @@ template <typename K,
           typename Hash = typename stdx::unordered_map<K, V>::hasher,
           typename KeyEqual = typename stdx::unordered_map<K, V, Hash>::key_equal>
 class LRUCache {
-    LRUCache(const LRUCache&) = delete;
-    LRUCache& operator=(const LRUCache&) = delete;
-
-    LRUCache(LRUCache&&) = delete;
-    LRUCache& operator=(LRUCache&&) = delete;
-
 public:
     template <typename T>
     static constexpr bool IsComparable = IsComparableWith<Hash, KeyEqual, K, T>;
-
-    explicit LRUCache(std::size_t maxSize) : _maxSize(maxSize) {}
 
     using ListEntry = std::pair<K, V>;
     using List = std::list<ListEntry>;
@@ -99,6 +97,12 @@ public:
 
     using key_type = K;
     using mapped_type = V;
+
+    explicit LRUCache(std::size_t maxSize) : _maxSize(maxSize) {}
+    LRUCache(LRUCache&&) = default;
+    LRUCache& operator=(LRUCache&&) = default;
+    LRUCache(const LRUCache&) = default;
+    LRUCache& operator=(const LRUCache&) = default;
 
     /**
      * Inserts a new entry into the cache. If the given key already exists in the cache,
@@ -140,8 +144,8 @@ public:
     /**
      * Finds an element in the cache by key.
      */
-    TEMPLATE(typename KeyType)
-    REQUIRES(IsComparable<KeyType>)
+    template <typename KeyType>
+    requires IsComparable<KeyType>
     iterator find(const KeyType& key) {
         return promote(key);
     }
@@ -155,13 +159,10 @@ public:
      * the find(...) method above will prevent the LRUCache from functioning
      * properly.
      */
-    TEMPLATE(typename KeyType)
-    REQUIRES(IsComparable<KeyType>)
+    template <typename KeyType>
+    requires IsComparable<KeyType>
     const_iterator cfind(const KeyType& key) const {
         auto it = _map.find(key);
-        // TODO(SERVER-28890): Remove the function-style cast when MSVC's
-        // `std::list< ... >::iterator` implementation doesn't conflict with their `/Zc:ternary`
-        // flag support .
         return (it == _map.end()) ? end() : const_iterator(it->second);
     }
 
@@ -169,8 +170,8 @@ public:
      * Promotes the element matching the given key, if one exists in the cache,
      * to the least recently used element.
      */
-    TEMPLATE(typename KeyType)
-    REQUIRES(IsComparable<KeyType>)
+    template <typename KeyType>
+    requires IsComparable<KeyType>
     iterator promote(const KeyType& key) {
         auto it = _map.find(key);
         return (it == _map.end()) ? end() : promote(it->second);
@@ -206,8 +207,8 @@ public:
      * Removes the element in the cache stored for this key, if one
      * exists. Returns the count of elements erased.
      */
-    TEMPLATE(typename KeyType)
-    REQUIRES(IsComparable<KeyType>)
+    template <typename KeyType>
+    requires IsComparable<KeyType>
     typename Map::size_type erase(const KeyType& key) {
         auto it = _map.find(key);
         if (it == _map.end()) {
@@ -242,8 +243,8 @@ public:
      * If the given key has a matching element stored in the cache, returns true.
      * Otherwise, returns false.
      */
-    TEMPLATE(typename KeyType)
-    REQUIRES(IsComparable<KeyType>)
+    template <typename KeyType>
+    requires IsComparable<KeyType>
     bool hasKey(const KeyType& key) const {
         return _map.find(key) != _map.end();
     }
@@ -301,8 +302,8 @@ public:
         return _list.cend();
     }
 
-    TEMPLATE(typename KeyType)
-    REQUIRES(IsComparable<KeyType>)
+    template <typename KeyType>
+    requires IsComparable<KeyType>
     typename Map::size_type count(const KeyType& key) const {
         return _map.count(key);
     }

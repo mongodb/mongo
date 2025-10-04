@@ -28,31 +28,52 @@
  */
 #include "server_selector.h"
 
-#include <algorithm>
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/client/sdam/sdam_configuration_parameters_gen.h"
 #include "mongo/client/sdam/topology_description.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/platform/random.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+
+#include <algorithm>
+#include <iterator>
+#include <map>
+#include <ostream>
+#include <ratio>
+#include <string>
+#include <utility>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
+
 
 namespace mongo::sdam {
 MONGO_FAIL_POINT_DEFINE(sdamServerSelectorIgnoreLatencyWindow);
 
 ServerSelector::~ServerSelector() {}
 
-SdamServerSelector::SdamServerSelector(const SdamConfiguration& config)
-    : _config(config), _random(PseudoRandom(SecureRandom().nextInt64())) {}
+thread_local PseudoRandom SdamServerSelector::_random = PseudoRandom(SecureRandom().nextInt64());
+
+SdamServerSelector::SdamServerSelector(const SdamConfiguration& config) : _config(config) {}
 
 void SdamServerSelector::_getCandidateServers(std::vector<ServerDescriptionPtr>* result,
                                               const TopologyDescriptionPtr topologyDescription,
-                                              const ReadPreferenceSetting& criteria,
+                                              ReadPreferenceSetting effectiveCriteria,
                                               const std::vector<HostAndPort>& excludedHosts) {
     // when querying the primary we don't need to consider tags
     bool shouldTagFilter = true;
 
-    if (!criteria.minClusterTime.isNull()) {
+    if (!effectiveCriteria.minClusterTime.isNull()) {
         auto eligibleServers =
             topologyDescription->findServers([excludedHosts](const ServerDescriptionPtr& s) {
                 auto isPrimaryOrSecondary = (s->getType() == ServerType::kRSPrimary ||
@@ -71,30 +92,32 @@ void SdamServerSelector::_getCandidateServers(std::vector<ServerDescriptionPtr>*
                                                             const ServerDescriptionPtr& right) {
                                           return left->getOpTime() < right->getOpTime();
                                       });
+
         if (maxIt != endIt) {
             auto maxOpTime = (*maxIt)->getOpTime();
-            if (maxOpTime->getTimestamp() < criteria.minClusterTime) {
+            if (maxOpTime->getTimestamp() < effectiveCriteria.minClusterTime) {
                 // ignore minClusterTime
-                const_cast<ReadPreferenceSetting&>(criteria) = ReadPreferenceSetting(criteria.pref);
+                effectiveCriteria.minClusterTime = Timestamp{};
             }
         }
     }
 
-    switch (criteria.pref) {
+    switch (effectiveCriteria.pref) {
         case ReadPreference::Nearest: {
             auto filter = (topologyDescription->getType() != TopologyType::kSharded)
-                ? nearestFilter(criteria, excludedHosts)
-                : shardedFilter(criteria, excludedHosts);
+                ? nearestFilter(effectiveCriteria, excludedHosts)
+                : shardedFilter(effectiveCriteria, excludedHosts);
             *result = topologyDescription->findServers(filter);
             break;
         }
 
         case ReadPreference::SecondaryOnly:
-            *result = topologyDescription->findServers(secondaryFilter(criteria, excludedHosts));
+            *result =
+                topologyDescription->findServers(secondaryFilter(effectiveCriteria, excludedHosts));
             break;
 
         case ReadPreference::PrimaryOnly: {
-            const auto primaryCriteria = ReadPreferenceSetting(criteria.pref);
+            const auto primaryCriteria = ReadPreferenceSetting(effectiveCriteria.pref);
             *result =
                 topologyDescription->findServers(primaryFilter(primaryCriteria, excludedHosts));
             shouldTagFilter = false;
@@ -111,7 +134,7 @@ void SdamServerSelector::_getCandidateServers(std::vector<ServerDescriptionPtr>*
             }
 
             // keep tags and maxStaleness for secondary query
-            auto secondaryCriteria = criteria;
+            auto secondaryCriteria = effectiveCriteria;
             secondaryCriteria.pref = ReadPreference::SecondaryOnly;
             _getCandidateServers(result, topologyDescription, secondaryCriteria, excludedHosts);
             break;
@@ -119,7 +142,7 @@ void SdamServerSelector::_getCandidateServers(std::vector<ServerDescriptionPtr>*
 
         case ReadPreference::SecondaryPreferred: {
             // keep tags and maxStaleness for secondary query
-            auto secondaryCriteria = criteria;
+            auto secondaryCriteria = effectiveCriteria;
             secondaryCriteria.pref = ReadPreference::SecondaryOnly;
             _getCandidateServers(result, topologyDescription, secondaryCriteria, excludedHosts);
             if (result->size()) {
@@ -138,7 +161,7 @@ void SdamServerSelector::_getCandidateServers(std::vector<ServerDescriptionPtr>*
     }
 
     if (shouldTagFilter) {
-        filterTags(result, criteria.tags);
+        filterTags(result, effectiveCriteria.tags);
     }
 }
 
@@ -230,35 +253,40 @@ bool SdamServerSelector::_containsAllTags(ServerDescriptionPtr server, const BSO
 
 void SdamServerSelector::filterTags(std::vector<ServerDescriptionPtr>* servers,
                                     const TagSet& tagSet) {
-    const auto& checkTags = tagSet.getTagBSON();
+    const auto& tagSetList = tagSet.getTagBSON();
 
-    if (checkTags.nFields() == 0)
+    if (tagSetList.isEmpty()) {
         return;
+    }
 
-    const auto predicate = [&](const ServerDescriptionPtr& s) {
-        auto it = checkTags.begin();
-        while (it != checkTags.end()) {
-            if (it->isABSONObj()) {
-                const BSONObj& tags = it->Obj();
-                if (_containsAllTags(s, tags)) {
-                    // found a match -- don't remove the server
-                    return false;
-                }
-            } else {
-                LOGV2_WARNING(
-                    4671202,
-                    "Invalid tags specified for server selection; tags should be specified as "
-                    "bson Objects",
-                    "tag"_attr = *it);
-            }
-            ++it;
+    for (const auto& tagSetElem : tagSetList) {
+        if (tagSetElem.type() != BSONType::object) {
+            LOGV2_WARNING(4671202,
+                          "Invalid tag set specified for server selection; tag sets should be"
+                          " specified as a BSON object",
+                          "tag"_attr = tagSetElem);
+            continue;
         }
 
-        // remove the server
-        return true;
-    };
+        const auto predicate = [&](const ServerDescriptionPtr& s) {
+            const bool shouldRemove = !_containsAllTags(s, tagSetElem.embeddedObject());
+            return shouldRemove;
+        };
 
-    servers->erase(std::remove_if(servers->begin(), servers->end(), predicate), servers->end());
+        auto it = std::remove_if(servers->begin(), servers->end(), predicate);
+        // If none of the server descriptions match the tag set, then continue on to check the next
+        // tag set in the list. Otherwise, if at least one of the server descriptions match the tag
+        // set criteria, then we've found our preferred host(s) to read from.
+        if (it != servers->begin()) {
+            servers->erase(it, servers->end());
+            return;
+        }
+    }
+
+    // Getting here means a non-empty tag set list was specified but none of the server descriptions
+    // matched any of the tag sets in the list. We've therefore failed to find any server
+    // description matching the read preference tag criteria.
+    servers->clear();
 }
 
 bool SdamServerSelector::recencyFilter(const ReadPreferenceSetting& readPref,

@@ -1,0 +1,23 @@
+
+
+[jsTest] ----
+[jsTest] Collection contents
+[jsTest] ----
+
+{  "_id" : 0,  "a" : 0 }
+{  "_id" : 1,  "a" : 1 }
+{  "_id" : 2,  "a" : 2 }
+{  "_id" : 3,  "a" : 3 }
+{  "_id" : 4,  "a" : 4 }
+{  "_id" : 5,  "a" : 5 }
+{  "_id" : 6,  "a" : 6 }
+{  "_id" : 7,  "a" : 7 }
+{  "_id" : 8,  "a" : 8 }
+{  "_id" : 9,  "a" : 9 }
+
+
+[jsTest] ----
+[jsTest] ID lookup
+[jsTest] ----
+
+{  "_id" : 5,  "a" : 5 }

@@ -1,0 +1,104 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+        "*.tidy_config",
+    ]),
+)
+
+filegroup(
+    name = "tidy_check_headers",
+    srcs = glob(["*.h"]),
+)
+
+tests = [
+    # This list represents the test source files, which should contain a single issue which will be flagged
+    # by a clang tidy check. The issue should be isolated in as minimal way as possible.
+    "test_MongoHeaderBracketCheck",
+    "test_MongoVolatileCheck",
+    "test_MongoUninterruptibleLockGuardCheck",
+    "test_MongoUninterruptibleLockGuardCheckForOpCtxMember",
+    "test_MongoCctypeCheck",
+    "test_MongoConfigHeaderCheck",
+    "test_MongoCxx20BannedIncludesCheck",
+    "test_MongoCxx20StdChronoCheck",
+    "test_MongoTraceCheck",
+    "test_MongoAssertCheck",
+    "test_MongoFCVConstantCheck",
+    "test_MongoUnstructuredLogCheck",
+    "test_MongoMacroDefinitionLeaksCheck",
+    "test_MongoRandCheck",
+    "test_MongoRWMutexCheck",
+    "test_MongoBannedAutoGetUsageCheck",
+    "test_MongoBannedNamesCheck",
+    "test_MongoNoUniqueAddressCheck",
+    "test_MongoStringDataConstRefCheck1",
+    "test_MongoStringDataConstRefCheck2",
+    "test_MongoStringDataConstRefCheck3",
+    "test_MongoStringDataStringViewApiCheck",
+    "test_MongoInvariantStatusIsOKCheck",
+    "test_MongoInvariantDDLCoordinatorCheck",
+    "test_MongoBypassDatabaseMetadataAccessCheck",
+]
+
+[
+    mongo_cc_library(
+        name = test,
+        srcs = [
+            test + ".cpp",
+            "tidy_check_headers",
+            "//src/third_party/boost:headers",
+        ],
+        # These test files will purposefully be error prone, so we can disable warnings any warnings we expect
+        # to see.
+        copts = [
+            "-Wno-unused-but-set-parameter",
+            "-Wno-unused-variable",
+            "-Wno-return-type",
+            "-Isrc/mongo/tools/mongo_tidy_checks/tests",
+        ] + select({
+            "//bazel/config:compiler_type_gcc": ["-Wno-volatile"],
+            "//bazel/config:compiler_type_clang": ["-Wno-deprecated-volatile"],
+            "//conditions:default": [],
+        }),
+        skip_global_deps = [
+            "allocator",
+            "libunwind",
+        ],
+        tags = [
+            "mongo-tidy-tests",
+        ],
+        target_compatible_with = select({
+            "@platforms//os:linux": [],
+            "//conditions:default": ["@platforms//:incompatible"],
+        }) + select({
+            "//bazel/config:linkstatic_disabled": ["@platforms//:incompatible"],
+            "//conditions:default": [],
+        }),
+        deps = [
+            "//src/third_party/s2",
+        ],
+    )
+    for test in tests
+]
+
+[
+    filegroup(
+        name = test + "_tidy_config",
+        srcs = [test + ".tidy_config"],
+    )
+    for test in tests
+]
+
+py_binary(
+    name = "MongoTidyCheck_unittest",
+    srcs = [
+        "MongoTidyCheck_unittest.py",
+    ],
+    main = "MongoTidyCheck_unittest.py",
+    visibility = ["//visibility:public"],
+)

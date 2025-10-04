@@ -27,16 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/scripting/mozjs/numberint.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/scripting/mozjs/implscope.h"
-#include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
-#include "mongo/scripting/mozjs/wrapconstrainedmethod.h"
+#include "mongo/scripting/mozjs/wrapconstrainedmethod.h"  // IWYU pragma: keep
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <cstdint>
+#include <string>
+
+#include <js/CallArgs.h>
+#include <js/Object.h>
+#include <js/PropertySpec.h>
+#include <js/RootingAPI.h>
+#include <js/TypeDecls.h>
 
 namespace mongo {
 namespace mozjs {
@@ -51,21 +59,21 @@ const JSFunctionSpec NumberIntInfo::methods[5] = {
 
 const char* const NumberIntInfo::className = "NumberInt";
 
-void NumberIntInfo::finalize(js::FreeOp* fop, JSObject* obj) {
-    auto x = static_cast<int*>(JS_GetPrivate(obj));
+void NumberIntInfo::finalize(JS::GCContext* gcCtx, JSObject* obj) {
+    auto x = JS::GetMaybePtrFromReservedSlot<int>(obj, IntSlot);
 
     if (x)
-        getScope(fop)->trackedDelete(x);
+        getScope(gcCtx)->trackedDelete(x);
 }
 
 int NumberIntInfo::ToNumberInt(JSContext* cx, JS::HandleValue thisv) {
-    auto x = static_cast<int*>(JS_GetPrivate(thisv.toObjectOrNull()));
+    auto x = JS::GetMaybePtrFromReservedSlot<int>(thisv.toObjectOrNull(), IntSlot);
 
     return x ? *x : 0;
 }
 
 int NumberIntInfo::ToNumberInt(JSContext* cx, JS::HandleObject thisv) {
-    auto x = static_cast<int*>(JS_GetPrivate(thisv));
+    auto x = JS::GetMaybePtrFromReservedSlot<int>(thisv, IntSlot);
 
     return x ? *x : 0;
 }
@@ -111,8 +119,7 @@ void NumberIntInfo::construct(JSContext* cx, JS::CallArgs args) {
     } else {
         uasserted(ErrorCodes::BadValue, "NumberInt takes 0 or 1 arguments");
     }
-
-    JS_SetPrivate(thisv, scope->trackedNew<int>(x));
+    JS::SetReservedSlot(thisv, IntSlot, JS::PrivateValue(scope->trackedNew<int>(x)));
 
     args.rval().setObjectOrNull(thisv);
 }

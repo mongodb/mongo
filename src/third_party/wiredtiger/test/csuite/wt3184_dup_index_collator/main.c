@@ -31,18 +31,25 @@
  * JIRA ticket reference: WT-3184 Test case description: Each set of data is ordered and contains
  * five elements (0-4). We insert elements 1 and 3, and then do search_near and search for each
  * element. For each set of data, we perform these tests first using a custom collator, and second
- * using a custom collator and extractor. In each case there are index keys having variable length.
- * Failure mode: In the reported test case, the custom compare routine is given a truncated key to
- * compare, and the unpack functions return errors because the truncation appeared in the middle of
- * a key.
+ * using a custom collator. In each case there are index keys having variable length. Failure mode:
+ * In the reported test case, the custom compare routine is given a truncated key to compare, and
+ * the unpack functions return errors because the truncation appeared in the middle of a key.
  */
 
+/*
+ * compare_int --
+ *     TODO: Add a comment describing this function.
+ */
 static int
 compare_int(int32_t a, int32_t b)
 {
     return (a < b ? -1 : (a > b ? 1 : 0));
 }
 
+/*
+ * item_to_int --
+ *     TODO: Add a comment describing this function.
+ */
 static int32_t
 item_to_int(const WT_ITEM *item)
 {
@@ -58,6 +65,10 @@ item_to_int(const WT_ITEM *item)
     return ret;
 }
 
+/*
+ * compare_int_items --
+ *     TODO: Add a comment describing this function.
+ */
 static int
 compare_int_items(WT_ITEM *itema, WT_ITEM *itemb)
 {
@@ -66,6 +77,10 @@ compare_int_items(WT_ITEM *itema, WT_ITEM *itemb)
     return (compare_int(item_to_int(itema), item_to_int(itemb)));
 }
 
+/*
+ * print_int_item --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 print_int_item(const char *str, const WT_ITEM *item)
 {
@@ -75,6 +90,10 @@ print_int_item(const char *str, const WT_ITEM *item)
         printf("%s<empty>", str);
 }
 
+/*
+ * index_compare --
+ *     TODO: Add a comment describing this function.
+ */
 static int
 index_compare(
   WT_COLLATOR *collator, WT_SESSION *session, const WT_ITEM *key1, const WT_ITEM *key2, int *cmp)
@@ -108,6 +127,10 @@ index_compare(
 
 static WT_COLLATOR index_coll = {index_compare, NULL, NULL};
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {
@@ -120,9 +143,10 @@ main(int argc, char *argv[])
     opts = &_opts;
     memset(opts, 0, sizeof(*opts));
     testutil_check(testutil_parse_opts(argc, argv, opts));
-    testutil_make_work_dir(opts->home);
+    testutil_recreate_dir(opts->home);
 
-    testutil_check(wiredtiger_open(opts->home, NULL, "create", &opts->conn));
+    testutil_check(wiredtiger_open(opts->home, NULL,
+      "create,statistics=(all),statistics_log=(json,on_close,wait=1)", &opts->conn));
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
 
     testutil_check(opts->conn->add_collator(opts->conn, "index_coll", &index_coll, NULL));

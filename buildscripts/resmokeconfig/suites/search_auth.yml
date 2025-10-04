@@ -1,12 +1,16 @@
 config_variables:
-- &keyFile jstests/libs/authTestsKey
-- &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+  - &keyFile jstests/libs/authTestsKey
+  - &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
 
 test_kind: js_test
 
 selector:
   roots:
-  - src/mongo/db/modules/*/jstests/search/*.js
+    - jstests/with_mongot/search_mocked/*.js
+    - jstests/with_mongot/mongotmock/*.js
+  exclude_files:
+    # Skip any tests that run with auth explicitly.
+    - jstests/with_mongot/search_mocked/auth_list_search_indexes_agg.js
 
 executor:
   config:
@@ -14,8 +18,8 @@ executor:
       global_vars:
         TestData:
           auth: true
-          authMechanism: SCRAM-SHA-1
+          authMechanism: SCRAM-SHA-256
           keyFile: *keyFile
           keyFileData: *keyFileData
           roleGraphInvalidationIsFatal: true
-      nodb: ''
+      nodb: ""

@@ -1,0 +1,29 @@
+# Golden test output of SBECodeFragmentTest/AppendLocalVal
+==== VARIATION append code
+-- CODE:
+[0x0000-0x001d] stackSize: 1, maxStackSize: 3
+0x0000: pushConstVal(value: 10);
+0x000a: pushConstVal(value: Nothing);
+0x0014: pushLocalVal(arg: 1);
+0x0019: swap();
+0x001a: pop();
+0x001b: swap();
+0x001c: pop();
+
+-- RESULT:
+10
+
+==== VARIATION append instr
+-- CODE:
+[0x0000-0x001d] stackSize: 1, maxStackSize: 3
+0x0000: pushConstVal(value: 10);
+0x000a: pushConstVal(value: Nothing);
+0x0014: pushLocalVal(arg: 1);
+0x0019: swap();
+0x001a: pop();
+0x001b: swap();
+0x001c: pop();
+
+-- RESULT:
+10
+

@@ -32,20 +32,6 @@ $extrastylesheet
    <!--BEGIN PROJECT_NUMBER--><span id="projectnumber"><!--$projectnumber--></span><!--END PROJECT_NUMBER-->
    <!--BEGIN PROJECT_BRIEF-->
    <div id="projectbrief">
-
-     <script type="text/javascript">
-     window.addEventListener("load",function(){
-       document.getElementById("version_select").options.namedItem("$projectbrief").selected=true;
-    },false);
-     </script>
-
-     <select id="version_select" onchange="window.location=window.location.href.replace('$projectbrief',this.value);">
-       <option name="$projectbrief" value="$projectbrief">$projectnumber</option>
-       <option name="stable" value="stable">Latest stable release</option>
-       <option name="develop" value="develop">Current develop branch</option>
-       <option name="mongodb-3.2" value="mongodb-3.2">MongoDB 3.2</option>
-       <option name="mongodb-3.4" value="mongodb-3.4">MongoDB 3.4</option>
-     </select>
     </div><!--END PROJECT_BRIEF-->
   </div>
   </td>

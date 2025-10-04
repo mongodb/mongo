@@ -28,8 +28,10 @@
  */
 
 #pragma once
-
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/repl/election_reason_counter_gen.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 namespace repl {
@@ -52,7 +54,7 @@ public:
         setSuccessful(getSuccessful() + 1);
     }
 
-    ElectionReasonCounter parse(const IDLParserErrorContext& ctxt, const BSONObj& bsonObject);
+    ElectionReasonCounter parse(const IDLParserContext& ctxt, const BSONObj& bsonObject);
 };
 
 }  // namespace repl

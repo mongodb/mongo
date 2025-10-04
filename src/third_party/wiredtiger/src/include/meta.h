@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 #define WT_WIREDTIGER "WiredTiger"        /* Version file */
 #define WT_SINGLETHREAD "WiredTiger.lock" /* Locking file */
 
@@ -18,9 +20,8 @@
  * Backup related WiredTiger files.
  */
 #define WT_BACKUP_TMP "WiredTiger.backup.tmp"  /* Backup tmp file */
+#define WT_EXPORT_BACKUP "WiredTiger.export"   /* Export backup file */
 #define WT_METADATA_BACKUP "WiredTiger.backup" /* Hot backup file */
-#define WT_LOGINCR_BACKUP "WiredTiger.ibackup" /* Log incremental backup */
-#define WT_LOGINCR_SRC "WiredTiger.isrc"       /* Log incremental source */
 
 #define WT_METADATA_TURTLE "WiredTiger.turtle"         /* Metadata metadata */
 #define WT_METADATA_TURTLE_SET "WiredTiger.turtle.set" /* Turtle temp file */
@@ -30,19 +31,36 @@
 #define WT_METAFILE_SLVG "WiredTiger.wt.orig" /* Metadata copy */
 #define WT_METAFILE_URI "file:WiredTiger.wt"  /* Metadata table URI */
 
-#define WT_HS_FILE "WiredTigerHS.wt"     /* History store table */
-#define WT_HS_URI "file:WiredTigerHS.wt" /* History store table URI */
+#define WT_HS_FILE "WiredTigerHS.wt"                         /* History store table */
+#define WT_HS_FILE_SHARED "WiredTigerSharedHS.wt_stable"     /* Shared history store */
+#define WT_HS_URI "file:WiredTigerHS.wt"                     /* History store table URI */
+#define WT_HS_URI_SHARED "file:WiredTigerSharedHS.wt_stable" /* Shared history store URI */
+#define WT_HS_ID 1                                           /* ID for HS */
+#define WT_HS_ID_SHARED 2                                    /* ID for shared HS */
+
+#define WT_CC_METAFILE "WiredTigerCC.wt"          /* Chunk cache metadata table */
+#define WT_CC_METAFILE_URI "file:WiredTigerCC.wt" /* Chunk cache metadata table URI */
+
+#define WT_DISAGG_METADATA_FILE "WiredTigerShared.wt_stable"     /* Shared metadata table */
+#define WT_DISAGG_METADATA_URI "file:WiredTigerShared.wt_stable" /* Shared metadata table URI */
+#define WT_DISAGG_METADATA_TABLE_ID 1                            /* Table ID for metadata strings */
+#define WT_DISAGG_METADATA_MAIN_PAGE_ID 1                        /* Page ID for the main metadata */
+#define WT_DISAGG_METADATA_MAX_PAGE_ID 1                         /* Max page ID in the metadata */
 
 #define WT_SYSTEM_PREFIX "system:"                               /* System URI prefix */
 #define WT_SYSTEM_CKPT_TS "checkpoint_timestamp"                 /* Checkpoint timestamp name */
 #define WT_SYSTEM_CKPT_URI "system:checkpoint"                   /* Checkpoint timestamp URI */
 #define WT_SYSTEM_OLDEST_TS "oldest_timestamp"                   /* Oldest timestamp name */
 #define WT_SYSTEM_OLDEST_URI "system:oldest"                     /* Oldest timestamp URI */
+#define WT_SYSTEM_TS_TIME "checkpoint_time"                      /* Checkpoint wall time */
+#define WT_SYSTEM_TS_WRITE_GEN "write_gen"                       /* Checkpoint write generation */
 #define WT_SYSTEM_CKPT_SNAPSHOT "snapshots"                      /* List of snapshots */
 #define WT_SYSTEM_CKPT_SNAPSHOT_MIN "snapshot_min"               /* Snapshot minimum */
 #define WT_SYSTEM_CKPT_SNAPSHOT_MAX "snapshot_max"               /* Snapshot maximum */
 #define WT_SYSTEM_CKPT_SNAPSHOT_COUNT "snapshot_count"           /* Snapshot count */
 #define WT_SYSTEM_CKPT_SNAPSHOT_URI "system:checkpoint_snapshot" /* Checkpoint snapshot URI */
+#define WT_SYSTEM_CKPT_SNAPSHOT_TIME "checkpoint_time"           /* Checkpoint wall time */
+#define WT_SYSTEM_CKPT_SNAPSHOT_WRITE_GEN "write_gen"            /* Checkpoint write generation */
 #define WT_SYSTEM_BASE_WRITE_GEN_URI "system:checkpoint_base_write_gen" /* Base write gen URI */
 #define WT_SYSTEM_BASE_WRITE_GEN "base_write_gen"                       /* Base write gen name */
 
@@ -56,16 +74,38 @@
 #define WT_METAFILE_ID 0 /* Metadata file ID */
 
 #define WT_METADATA_COMPAT "Compatibility version"
+#define WT_METADATA_LIVE_RESTORE "Live Restore"
 #define WT_METADATA_VERSION "WiredTiger version" /* Version keys */
 #define WT_METADATA_VERSION_STR "WiredTiger version string"
+
+/*
+ * Other useful comparisons.
+ */
+#define WT_IS_URI_HS(uri) (strcmp(uri, WT_HS_URI) == 0 || strcmp(uri, WT_HS_URI_SHARED) == 0)
+
+#define WT_HS_ID_TO_URI(session, hs_id, uri)                                                   \
+    do {                                                                                       \
+        switch ((hs_id)) {                                                                     \
+        case WT_HS_ID:                                                                         \
+            (uri) = WT_HS_URI;                                                                 \
+            break;                                                                             \
+        case WT_HS_ID_SHARED:                                                                  \
+            (uri) = WT_HS_URI_SHARED;                                                          \
+            break;                                                                             \
+        default:                                                                               \
+            WT_ASSERT_ALWAYS((session), false, "No such History Store ID: %" PRIu32, (hs_id)); \
+        }                                                                                      \
+    } while (0)
+
+#define WT_IS_URI_METADATA(uri) \
+    (strcmp(uri, WT_METAFILE_URI) == 0 || strcmp(uri, WT_DISAGG_METADATA_URI) == 0)
 
 /*
  * As a result of a data format change WiredTiger is not able to start on versions below 3.2.0, as
  * it will write out a data format that is not readable by those versions. These version numbers
  * provide such mechanism.
  */
-#define WT_MIN_STARTUP_VERSION_MAJOR 3 /* Minimum version we can start on. */
-#define WT_MIN_STARTUP_VERSION_MINOR 2
+#define WT_MIN_STARTUP_VERSION ((WT_VERSION){3, 2, 0}) /* Minimum version we can start on. */
 
 /*
  * WT_WITH_TURTLE_LOCK --
@@ -80,7 +120,6 @@
 /*
  * Block based incremental backup structure. These live in the connection.
  */
-#define WT_BLKINCR_MAX 2
 struct __wt_blkincr {
     const char *id_str;   /* User's name for this backup. */
     uint64_t granularity; /* Granularity of this backup. */
@@ -88,81 +127,6 @@ struct __wt_blkincr {
 #define WT_BLKINCR_FULL 0x1u  /* There is no checkpoint, always do full file */
 #define WT_BLKINCR_INUSE 0x2u /* This entry is active */
 #define WT_BLKINCR_VALID 0x4u /* This entry is valid */
-                              /* AUTOMATIC FLAG VALUE GENERATION STOP 64 */
-    uint64_t flags;
-};
-
-/*
- * Block modifications from an incremental identifier going forward.
- */
-/*
- * At the default granularity, this is enough for blocks in a 2G file.
- */
-#define WT_BLOCK_MODS_LIST_MIN 128 /* Initial bits for bitmap. */
-struct __wt_block_mods {
-    const char *id_str;
-
-    WT_ITEM bitstring;
-    uint64_t nbits; /* Number of bits in bitstring */
-
-    uint64_t offset; /* Zero bit offset for bitstring */
-    uint64_t granularity;
-/* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_BLOCK_MODS_RENAME 0x1u /* Entry is from a rename */
-#define WT_BLOCK_MODS_VALID 0x2u  /* Entry is valid */
-                                  /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
-    uint32_t flags;
-};
-
-/*
- * WT_CKPT --
- *	Encapsulation of checkpoint information, shared by the metadata, the
- * btree engine, and the block manager.
- */
-#define WT_CHECKPOINT "WiredTigerCheckpoint"
-#define WT_CKPT_FOREACH(ckptbase, ckpt) for ((ckpt) = (ckptbase); (ckpt)->name != NULL; ++(ckpt))
-#define WT_CKPT_FOREACH_NAME_OR_ORDER(ckptbase, ckpt) \
-    for ((ckpt) = (ckptbase); (ckpt)->name != NULL || (ckpt)->order != 0; ++(ckpt))
-
-struct __wt_ckpt {
-    char *name; /* Name or NULL */
-
-    /*
-     * Each internal checkpoint name is appended with a generation to make it a unique name. We're
-     * solving two problems: when two checkpoints are taken quickly, the timer may not be unique
-     * and/or we can even see time travel on the second checkpoint if we snapshot the time
-     * in-between nanoseconds rolling over. Second, if we reset the generational counter when new
-     * checkpoints arrive, we could logically re-create specific checkpoints, racing with cursors
-     * open on those checkpoints. I can't think of any way to return incorrect results by racing
-     * with those cursors, but it's simpler not to worry about it.
-     */
-    int64_t order; /* Checkpoint order */
-
-    uint64_t sec; /* Wall clock time */
-
-    uint64_t size; /* Checkpoint size */
-
-    uint64_t write_gen;     /* Write generation */
-    uint64_t run_write_gen; /* Runtime write generation. */
-
-    char *block_metadata;   /* Block-stored metadata */
-    char *block_checkpoint; /* Block-stored checkpoint */
-
-    WT_BLOCK_MODS backup_blocks[WT_BLKINCR_MAX];
-
-    WT_TIME_AGGREGATE ta; /* Validity window */
-
-    WT_ITEM addr; /* Checkpoint cookie string */
-    WT_ITEM raw;  /* Checkpoint cookie raw */
-
-    void *bpriv; /* Block manager private */
-
-/* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_CKPT_ADD 0x01u        /* Checkpoint to be added */
-#define WT_CKPT_BLOCK_MODS 0x02u /* Return list of modified blocks */
-#define WT_CKPT_DELETE 0x04u     /* Checkpoint to be deleted */
-#define WT_CKPT_FAKE 0x08u       /* Checkpoint is a fake */
-#define WT_CKPT_UPDATE 0x10u     /* Checkpoint requires update */
-                                 /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
-    uint32_t flags;
+                              /* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
+    uint8_t flags;
 };

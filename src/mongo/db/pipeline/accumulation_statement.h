@@ -29,9 +29,32 @@
 
 #pragma once
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/version_context.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/modules.h"
+
+#include <functional>
+#include <string>
+#include <tuple>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -48,20 +71,37 @@ namespace mongo {
                                        factory,                       \
                                        AllowedWithApiStrict::kAlways, \
                                        AllowedWithClientType::kAny,   \
-                                       boost::none,                   \
-                                       true)
-
-#define REGISTER_ACCUMULATOR_WITH_MIN_VERSION(key, factory, minVersion) \
-    REGISTER_ACCUMULATOR_CONDITIONALLY(key,                             \
-                                       factory,                         \
-                                       AllowedWithApiStrict::kAlways,   \
-                                       AllowedWithClientType::kAny,     \
-                                       minVersion,                      \
+                                       nullptr, /* featureFlag */     \
                                        true)
 
 /**
- * Like REGISTER_ACCUMULATOR_WITH_MIN_VERSION, except you can also specify a condition,
- * evaluated during startup, that decides whether to register the parser.
+ * Like REGISTER_ACCUMULATOR, except the accumulator will only be registered when featureFlag is
+ * enabled. We store featureFlag in the parseMap, so that it can be checked at runtime
+ * to correctly enable/disable the accumulator.
+ */
+#define REGISTER_ACCUMULATOR_WITH_FEATURE_FLAG(key, factory, featureFlag) \
+    REGISTER_ACCUMULATOR_CONDITIONALLY(key,                               \
+                                       factory,                           \
+                                       AllowedWithApiStrict::kAlways,     \
+                                       AllowedWithClientType::kAny,       \
+                                       featureFlag,                       \
+                                       true)
+
+/**
+ * Like REGISTER_ACCUMULATOR_WITH_FEATURE_FLAG, except the accumulator will be set with
+ * AllowedWithApiStrict::kNeverInVersion1 to exclude the accumulator from the stable API.
+ */
+#define REGISTER_UNSTABLE_ACCUMULATOR_WITH_FEATURE_FLAG(key, factory, featureFlag) \
+    REGISTER_ACCUMULATOR_CONDITIONALLY(key,                                        \
+                                       factory,                                    \
+                                       AllowedWithApiStrict::kNeverInVersion1,     \
+                                       AllowedWithClientType::kAny,                \
+                                       featureFlag,                                \
+                                       true)
+
+/**
+ * You can specify a condition, evaluated during startup,
+ * that decides whether to register the parser.
  *
  * For example, you could check a feature flag, and register the parser only when it's enabled.
  *
@@ -71,17 +111,22 @@ namespace mongo {
  *
  * This is the most general REGISTER_ACCUMULATOR* macro, which all others should delegate to.
  */
-#define REGISTER_ACCUMULATOR_CONDITIONALLY(                                                  \
-    key, factory, allowedWithApiStrict, allowedClientType, minVersion, ...)                  \
-    MONGO_INITIALIZER_GENERAL(addToAccumulatorFactoryMap_##key,                              \
-                              ("BeginAccumulatorRegistration"),                              \
-                              ("EndAccumulatorRegistration"))                                \
-    (InitializerContext*) {                                                                  \
-        if (!(__VA_ARGS__)) {                                                                \
-            return;                                                                          \
-        }                                                                                    \
-        AccumulationStatement::registerAccumulator(                                          \
-            "$" #key, (factory), (allowedWithApiStrict), (allowedClientType), (minVersion)); \
+#define REGISTER_ACCUMULATOR_CONDITIONALLY(                                                     \
+    key, factory, allowedWithApiStrict, allowedClientType, featureFlag, ...)                    \
+    MONGO_INITIALIZER_GENERAL(addToAccumulatorFactoryMap_##key,                                 \
+                              ("BeginAccumulatorRegistration"),                                 \
+                              ("EndAccumulatorRegistration"))                                   \
+    (InitializerContext*) {                                                                     \
+        /* Require 'featureFlag' to be a constexpr. */                                          \
+        constexpr FeatureFlag* constFeatureFlag{featureFlag};                                   \
+        /* This non-constexpr variable works around a bug in GCC when 'featureFlag' is null. */ \
+        FeatureFlag* featureFlagValue{constFeatureFlag};                                        \
+        bool evaluatedCondition{__VA_ARGS__};                                                   \
+        if (!evaluatedCondition || (featureFlagValue && !featureFlagValue->canBeEnabled())) {   \
+            return;                                                                             \
+        }                                                                                       \
+        AccumulationStatement::registerAccumulator(                                             \
+            "$" #key, (factory), (allowedWithApiStrict), (allowedClientType), (featureFlag));   \
     }
 
 /**
@@ -145,17 +190,14 @@ struct AccumulationExpression {
     // An expression evaluated once per input document, and passed to AccumulatorState::process.
     boost::intrusive_ptr<Expression> argument;
 
-    // Constructs an AccumulatorState to do actual accumulation.
-    boost::intrusive_ptr<AccumulatorState> makeAccumulator() const;
-
     // A no argument function object that can be called to create an AccumulatorState.
-    const AccumulatorState::Factory factory;
+    AccumulatorState::Factory factory;
 
     // The name of the accumulator expression. It is the caller's responsibility to make sure the
     // memory this points to does not get freed. This can best be accomplished by passing in a
     // pointer to a string constant. This StringData is always required to point to a valid
     // null-terminated string.
-    const StringData name;
+    StringData name;
 };
 
 /**
@@ -168,7 +210,10 @@ AccumulationExpression genericParseSingleExpressionAccumulator(ExpressionContext
                                                                VariablesParseState vps) {
     auto initializer = ExpressionConstant::create(expCtx, Value(BSONNULL));
     auto argument = Expression::parseOperand(expCtx, elem, vps);
-    return {initializer, argument, [expCtx]() { return AccName::create(expCtx); }, AccName::kName};
+    return {initializer,
+            argument,
+            [expCtx]() { return make_intrusive<AccName>(expCtx); },
+            AccName::kName};
 }
 
 /**
@@ -178,7 +223,7 @@ AccumulationExpression genericParseSingleExpressionAccumulator(ExpressionContext
 template <class AccName>
 AccumulationExpression genericParseSBEUnsupportedSingleExpressionAccumulator(
     ExpressionContext* const expCtx, BSONElement elem, VariablesParseState vps) {
-    expCtx->sbeGroupCompatible = false;
+    expCtx->setSbeGroupCompatibility(SbeCompatibility::notCompatible);
     return genericParseSingleExpressionAccumulator<AccName>(expCtx, elem, vps);
 }
 
@@ -190,12 +235,35 @@ inline AccumulationExpression parseCountAccumulator(ExpressionContext* const exp
                                                     VariablesParseState vps) {
     uassert(ErrorCodes::TypeMismatch,
             "$count takes no arguments, i.e. $count:{}",
-            elem.type() == BSONType::Object && elem.Obj().isEmpty());
+            elem.type() == BSONType::object && elem.Obj().isEmpty());
     auto initializer = ExpressionConstant::create(expCtx, Value(BSONNULL));
-    auto argument = ExpressionConstant::create(expCtx, Value(1));
+    const Value constantAddend = Value(1);
+    auto argument = ExpressionConstant::create(expCtx, constantAddend);
     return {initializer,
             argument,
-            [expCtx]() { return AccumulatorSum::create(expCtx); },
+            [expCtx, constantAddend]() {
+                return make_intrusive<AccumulatorSum>(expCtx, boost::make_optional(constantAddend));
+            },
+            AccumulatorSum::kName};
+}
+
+/**
+ * A $sum accumulation statement parser that handles the case of a constant sum argument such as
+ * {$sum: 1}.
+ */
+template <class AccName>
+AccumulationExpression parseSumAccumulator(ExpressionContext* const expCtx,
+                                           BSONElement elem,
+                                           VariablesParseState vps) {
+    auto initializer = ExpressionConstant::create(expCtx, Value(BSONNULL));
+    auto argument = Expression::parseOperand(expCtx, elem, vps);
+
+    return {initializer,
+            argument,
+            [expCtx, argument]() {
+                return make_intrusive<AccumulatorSum>(
+                    expCtx, AccumulatorSum::getConstantArgument(argument));
+            },
             AccumulatorSum::kName};
 }
 
@@ -211,13 +279,10 @@ public:
 
     /**
      * Associates a Parser with information regarding which contexts it can be used in, including
-     * API Version and FCV.
+     * API Version and feature flag.
      */
     using ParserRegistration =
-        std::tuple<Parser,
-                   AllowedWithApiStrict,
-                   AllowedWithClientType,
-                   boost::optional<multiversion::FeatureCompatibilityVersion>>;
+        std::tuple<Parser, AllowedWithApiStrict, AllowedWithClientType, FeatureFlag*>;
 
     AccumulationStatement(std::string fieldName, AccumulationExpression expr)
         : fieldName(std::move(fieldName)), expr(std::move(expr)) {}
@@ -242,12 +307,11 @@ public:
      * DO NOT call this method directly. Instead, use the REGISTER_ACCUMULATOR macro defined in this
      * file.
      */
-    static void registerAccumulator(
-        std::string name,
-        Parser parser,
-        AllowedWithApiStrict allowedWithApiStrict,
-        AllowedWithClientType allowedWithClientType,
-        boost::optional<multiversion::FeatureCompatibilityVersion> requiredMinVersion);
+    static void registerAccumulator(std::string name,
+                                    Parser parser,
+                                    AllowedWithApiStrict allowedWithApiStrict,
+                                    AllowedWithClientType allowedWithClientType,
+                                    FeatureFlag* featureFlag);
 
     /**
      * Retrieves the Parser for the accumulator specified by the given name, and raises an error if

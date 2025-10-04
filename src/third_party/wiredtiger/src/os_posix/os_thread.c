@@ -8,6 +8,38 @@
 
 #include "wt_internal.h"
 
+#ifdef __linux__
+
+/*
+ * __thread_set_name --
+ *     Set the pthread-level thread name. If the session name is set, use that, truncated to fit. If
+ *     the caller provides a non-zero thread number, append that to the session name to distinguish
+ *     between multiple threads of the same type/name.
+ */
+static int
+__thread_set_name(WT_SESSION_IMPL *session, uint32_t thread_num, pthread_t thread_id)
+{
+    char short_name[WT_THREAD_NAME_MAX_LEN] = {0}, thread_name[WT_THREAD_NAME_MAX_LEN] = {0};
+
+    if (session != NULL && session->name != NULL) {
+        if (thread_num == 0)
+            strncpy(thread_name, session->name, WT_THREAD_NAME_MAX_LEN);
+        else {
+            strncpy(short_name, session->name, WT_THREAD_NAME_MAX_LEN - 4);
+
+            if (thread_num < 100)
+                WT_RET(__wt_snprintf(
+                  thread_name, WT_THREAD_NAME_MAX_LEN, "%s %" PRIu32, short_name, thread_num));
+            else
+                WT_RET(__wt_snprintf(thread_name, WT_THREAD_NAME_MAX_LEN, "%s ++", short_name));
+        }
+        thread_name[WT_THREAD_NAME_MAX_LEN - 1] = '\0';
+        WT_RET(pthread_setname_np(thread_id, thread_name));
+    }
+    return (0);
+}
+#endif
+
 /*
  * __wt_thread_create --
  *     Create a new thread of control.
@@ -28,6 +60,9 @@ __wt_thread_create(WT_SESSION_IMPL *session, wt_thread_t *tidret,
     WT_SYSCALL_RETRY(pthread_create(&tidret->id, NULL, func, arg), ret);
     if (ret == 0) {
         tidret->created = true;
+#ifdef __linux__
+        WT_IGNORE_RET(__thread_set_name(session, tidret->name_index, tidret->id));
+#endif
         return (0);
     }
     WT_RET_MSG(session, ret, "pthread_create");

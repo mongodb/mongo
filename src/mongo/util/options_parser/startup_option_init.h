@@ -85,7 +85,7 @@
 
 #pragma once
 
-#include "mongo/base/init.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
 
 #define MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(fname) \
     MONGO_STARTUP_OPTION_IN_GROUP_(fname, _Register, GeneralStartupOptionRegistration)

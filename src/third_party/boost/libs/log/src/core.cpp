@@ -16,17 +16,17 @@
 #include <boost/log/detail/config.hpp>
 #include <cstddef>
 #include <new>
+#include <chrono>
 #include <vector>
 #include <algorithm>
 #include <boost/cstdint.hpp>
 #include <boost/assert.hpp>
-#include <boost/core/swap.hpp>
+#include <boost/core/invoke_swap.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/smart_ptr/weak_ptr.hpp>
 #include <boost/smart_ptr/shared_ptr.hpp>
 #include <boost/smart_ptr/make_shared_object.hpp>
 #include <boost/range/iterator_range_core.hpp>
-#include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <boost/random/taus88.hpp>
 #include <boost/move/core.hpp>
 #include <boost/move/utility_core.hpp>
@@ -40,7 +40,6 @@
 #include <boost/memory_order.hpp>
 #include <boost/atomic/atomic.hpp>
 #include <boost/thread/tss.hpp>
-#include <boost/thread/exceptions.hpp>
 #include <boost/log/detail/locks.hpp>
 #include <boost/log/detail/light_rw_mutex.hpp>
 #include <boost/log/detail/thread_id.hpp>
@@ -61,7 +60,7 @@ BOOST_LOG_ANONYMOUS_NAMESPACE {
 
 //! Sequence shuffling algorithm. Very similar to std::random_shuffle, used for forward portability with compilers that removed it from the standard library (C++17).
 template< typename Iterator, typename RandomNumberGenerator >
-void random_shuffle(Iterator begin, Iterator end, RandomNumberGenerator& rng)
+inline void random_shuffle(Iterator begin, Iterator end, RandomNumberGenerator& rng)
 {
     Iterator it = begin;
     ++it;
@@ -69,7 +68,7 @@ void random_shuffle(Iterator begin, Iterator end, RandomNumberGenerator& rng)
     {
         Iterator where = begin + rng() % (it - begin + 1u);
         if (where != it)
-            boost::swap(*where, *it);
+            boost::core::invoke_swap(*where, *it);
         ++it;
     }
 }
@@ -252,7 +251,8 @@ public:
         //! Creates a seed for RNG
         static uint32_t get_random_seed()
         {
-            uint32_t seed = static_cast< uint32_t >(posix_time::microsec_clock::universal_time().time_of_day().ticks());
+            uint64_t now = static_cast< uint64_t >(std::chrono::system_clock::now().time_since_epoch().count());
+            uint32_t seed = static_cast< uint32_t >(now) ^ static_cast< uint32_t >(now >> 32u);
 #if !defined(BOOST_LOG_NO_THREADS)
             seed += static_cast< uint32_t >(log::aux::this_thread::get_id().native_id());
 #endif
@@ -377,14 +377,6 @@ public:
                 }
             }
         }
-#if !defined(BOOST_LOG_NO_THREADS)
-        catch (thread_interrupted&)
-        {
-            if (rec_impl)
-                rec_impl->destroy();
-            throw;
-        }
-#endif // !defined(BOOST_LOG_NO_THREADS)
         catch (...)
         {
             if (rec_impl)
@@ -471,12 +463,6 @@ private:
                 impl->push_back_accepting_sink(sink);
             }
         }
-#if !defined(BOOST_LOG_NO_THREADS)
-        catch (thread_interrupted&)
-        {
-            throw;
-        }
-#endif // !defined(BOOST_LOG_NO_THREADS)
         catch (...)
         {
             if (m_exception_handler.empty())
@@ -654,12 +640,6 @@ BOOST_LOG_API void core::flush()
             {
                 it->get()->flush();
             }
-#if !defined(BOOST_LOG_NO_THREADS)
-            catch (thread_interrupted&)
-            {
-                throw;
-            }
-#endif // !defined(BOOST_LOG_NO_THREADS)
             catch (...)
             {
                 if (m_impl->m_exception_handler.empty())
@@ -674,12 +654,6 @@ BOOST_LOG_API void core::flush()
         {
             m_impl->m_default_sink->flush();
         }
-#if !defined(BOOST_LOG_NO_THREADS)
-        catch (thread_interrupted&)
-        {
-            throw;
-        }
-#endif // !defined(BOOST_LOG_NO_THREADS)
         catch (...)
         {
             if (m_impl->m_exception_handler.empty())
@@ -772,12 +746,6 @@ BOOST_LOG_API void core::push_record_move(record& rec)
             else
                 break;
         }
-#if !defined(BOOST_LOG_NO_THREADS)
-        catch (thread_interrupted&)
-        {
-            throw;
-        }
-#endif // !defined(BOOST_LOG_NO_THREADS)
         catch (...)
         {
             // Lock the core to be safe against any attribute or sink set modifications
@@ -792,12 +760,6 @@ BOOST_LOG_API void core::push_record_move(record& rec)
             end->swap(*it);
         }
     }
-#if !defined(BOOST_LOG_NO_THREADS)
-    catch (thread_interrupted&)
-    {
-        throw;
-    }
-#endif // !defined(BOOST_LOG_NO_THREADS)
     catch (...)
     {
         // Lock the core to be safe against any attribute or sink set modifications

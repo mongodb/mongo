@@ -27,17 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <memory>
-#include <utility>
-#include <vector>
-
 #include "mongo/db/baton.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/functional.h"
+#include "mongo/util/time_support.h"
+
+#include <memory>
+#include <mutex>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 
@@ -58,11 +61,12 @@ class SubBaton final : public Baton {
 public:
     explicit SubBaton(BatonHandle baton) : _baton(std::move(baton)) {}
 
-    ~SubBaton() {
+    ~SubBaton() override {
+        stdx::lock_guard lk(_mutex);
         invariant(_isDead);
     }
 
-    void schedule(Task func) noexcept override {
+    void schedule(Task func) override {
         {
             stdx::unique_lock lk(_mutex);
 
@@ -81,7 +85,7 @@ public:
         }
 
         _baton->schedule([this, anchor = shared_from_this()](Status status) {
-            _runJobs(stdx::unique_lock<Latch>(_mutex), status);
+            _runJobs(stdx::unique_lock<stdx::mutex>(_mutex), status);
         });
     }
 
@@ -89,18 +93,20 @@ public:
         return _baton->networking();
     }
 
-    void markKillOnClientDisconnect() noexcept override {
-        MONGO_UNREACHABLE;
-    }
-
     void run(ClockSource* clkSource) noexcept override {
-        invariant(!_isDead);
+        {
+            stdx::lock_guard lk(_mutex);
+            invariant(!_isDead);
+        }
 
         _baton->run(clkSource);
     }
 
     TimeoutState run_until(ClockSource* clkSource, Date_t deadline) noexcept override {
-        invariant(!_isDead);
+        {
+            stdx::lock_guard lk(_mutex);
+            invariant(!_isDead);
+        }
 
         return _baton->run_until(clkSource, deadline);
     }
@@ -114,14 +120,22 @@ public:
     }
 
     void detachImpl() noexcept override {
-        stdx::unique_lock<Latch> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         _isDead = true;
 
         _runJobs(std::move(lk), kDetached);
     }
 
+    Future<void> waitUntil(Date_t expiration, const CancellationToken& token) noexcept override {
+        if (stdx::lock_guard lk(_mutex); _isDead) {
+            return kDetached;
+        }
+
+        return _baton->waitUntil(expiration, token);
+    }
+
 private:
-    void _runJobs(stdx::unique_lock<Latch> lk, Status status) {
+    void _runJobs(stdx::unique_lock<stdx::mutex> lk, Status status) {
         if (status.isOK() && _isDead) {
             status = kDetached;
         }
@@ -140,7 +154,7 @@ private:
 
     BatonHandle _baton;
 
-    Mutex _mutex = MONGO_MAKE_LATCH("SubBaton::_mutex");
+    stdx::mutex _mutex;
     bool _isDead = false;
     std::vector<Task> _scheduled;
 };

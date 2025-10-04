@@ -32,10 +32,19 @@
 # should get deleted as usual.
 
 import time
-import wiredtiger, wttest
+import wttest
+from wtscenario import make_scenarios
 
 class test_checkpoint05(wttest.WiredTigerTestCase):
-    conn_config = 'create,cache_size=100MB,log=(archive=false,enabled=true,file_max=100K)'
+    ckpt_precision = [
+        ('fuzzy', dict(ckpt_config='precise_checkpoint=false')),
+        ('precise', dict(ckpt_config='precise_checkpoint=true')),
+    ]
+
+    scenarios = make_scenarios(ckpt_precision)
+
+    def conn_config(self):
+        return 'create,cache_size=100MB,log=(enabled=true,file_max=100K,remove=false),' + self.ckpt_config
 
     def count_checkpoints(self):
         metadata_cursor = self.session.open_cursor('metadata:', None, None)
@@ -50,6 +59,9 @@ class test_checkpoint05(wttest.WiredTigerTestCase):
 
     def test_checkpoints_during_backup(self):
         self.uri = 'table:ckpt05'
+        # Avoid checkpoint error with precise checkpoint
+        if self.ckpt_config == 'precise_checkpoint=true':
+            self.conn.set_timestamp('stable_timestamp=1')
         self.session.create(self.uri, 'key_format=i,value_format=i')
 
         # Setup: Insert some data and checkpoint it
@@ -79,6 +91,3 @@ class test_checkpoint05(wttest.WiredTigerTestCase):
         self.assertTrue (final_count < initial_count * 3)
 
         self.session.close()
-
-if __name__ == '__main__':
-    wttest.run()

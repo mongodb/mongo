@@ -73,10 +73,13 @@ __schema_create_collapse(WT_SESSION_IMPL *session, WT_CURSOR_METADATA *mdc, cons
     WT_CURSOR *c;
     WT_DECL_ITEM(buf);
     WT_DECL_RET;
-    const char *_cfg[5] = {NULL, NULL, NULL, value, NULL};
+    int i, ncolgroups;
+    const char *_cfg[7] = {NULL, NULL, NULL, NULL, NULL, value, NULL};
     const char **cfg, **firstcfg, **lastcfg, *v;
+    bool tiered_shared;
 
-    lastcfg = cfg = &_cfg[3]; /* position on value */
+    lastcfg = cfg = &_cfg[5]; /* position on value */
+    tiered_shared = false;
     c = NULL;
     if (key != NULL && WT_PREFIX_SKIP(key, "table:")) {
         /*
@@ -93,20 +96,36 @@ __schema_create_collapse(WT_SESSION_IMPL *session, WT_CURSOR_METADATA *mdc, cons
         }
         WT_RET_NOTFOUND_OK(ret);
 
+        if (((ret = __wt_config_getones(session, value, "shared", &cval)) == 0) && cval.val)
+            tiered_shared = true;
+        WT_RET_NOTFOUND_OK(ret);
+
+        /*
+         * A simple table have default one column group except the tiered storage shared table that
+         * will have default 2 column groups.
+         */
+        ncolgroups = tiered_shared ? 2 : 1;
         c = mdc->create_cursor;
         WT_ERR(__wt_scr_alloc(session, 0, &buf));
-        /*
-         * When a table is created without column groups, we create one without a name.
-         */
-        WT_ERR(__wt_buf_fmt(session, buf, "colgroup:%s", key));
-        c->set_key(c, buf->data);
-        if ((ret = c->search(c)) != 0)
-            WT_ERR_MSG(session, ret,
-              "metadata information for source configuration \"%s\" not found",
-              (const char *)buf->data);
-        WT_ERR(c->get_value(c, &v));
-        WT_ERR(__wt_strdup(session, v, --cfg));
-        WT_ERR(__schema_source_config(session, c, v, --cfg));
+
+        for (i = 0; i < ncolgroups; i++) {
+            if (tiered_shared)
+                /* When a tiered storage shared table is created, we create two column groups. */
+                WT_ERR(__wt_schema_tiered_shared_colgroup_name(
+                  session, key, i == 0 ? true : false, buf));
+            else
+                /* When a table is created without column groups, we create one without a name. */
+                WT_ERR(__wt_buf_fmt(session, buf, "colgroup:%s", key));
+
+            c->set_key(c, buf->data);
+            if ((ret = c->search(c)) != 0)
+                WT_ERR_MSG(session, ret,
+                  "metadata information for source configuration \"%s\" not found",
+                  (const char *)buf->data);
+            WT_ERR(c->get_value(c, &v));
+            WT_ERR(__wt_strdup(session, v, --cfg));
+            WT_ERR(__schema_source_config(session, c, v, --cfg));
+        }
     } else if (key != NULL && (WT_PREFIX_SKIP(key, "colgroup:") || WT_PREFIX_SKIP(key, "index:"))) {
         if (strchr(key, ':') != NULL) {
             c = mdc->create_cursor;
@@ -168,10 +187,10 @@ err:
  * Check if a key matches the metadata. The public value is "metadata:", but also check for the
  * internal version of the URI.
  */
-#define WT_KEY_IS_METADATA(key)                                          \
-    ((key)->size > 0 &&                                                  \
-      (WT_STRING_MATCH(WT_METADATA_URI, (key)->data, (key)->size - 1) || \
-        WT_STRING_MATCH(WT_METAFILE_URI, (key)->data, (key)->size - 1)))
+#define WT_KEY_IS_METADATA(key)                                              \
+    ((key)->size > 0 &&                                                      \
+      (WT_STRING_LIT_MATCH(WT_METADATA_URI, (key)->data, (key)->size - 1) || \
+        WT_STRING_LIT_MATCH(WT_METAFILE_URI, (key)->data, (key)->size - 1)))
 
 /*
  * __curmetadata_metadata_search --
@@ -224,7 +243,7 @@ __curmetadata_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
     a_file_cursor = a_mdc->file_cursor;
     b_file_cursor = b_mdc->file_cursor;
 
-    CURSOR_API_CALL(a, session, compare, CUR2BT(a_file_cursor));
+    CURSOR_API_CALL(a, session, ret, compare, ((WT_CURSOR_BTREE *)a_file_cursor)->dhandle);
 
     if (b->compare != __curmetadata_compare)
         WT_ERR_MSG(session, EINVAL, "Can only compare cursors of the same type");
@@ -260,7 +279,7 @@ __curmetadata_next(WT_CURSOR *cursor)
 
     mdc = (WT_CURSOR_METADATA *)cursor;
     file_cursor = mdc->file_cursor;
-    CURSOR_API_CALL(cursor, session, next, CUR2BT(file_cursor));
+    CURSOR_API_CALL(cursor, session, ret, next, ((WT_CURSOR_BTREE *)file_cursor)->dhandle);
 
     if (!F_ISSET(mdc, WT_MDC_POSITIONED))
         WT_ERR(__curmetadata_metadata_search(session, cursor));
@@ -306,7 +325,7 @@ __curmetadata_prev(WT_CURSOR *cursor)
 
     mdc = (WT_CURSOR_METADATA *)cursor;
     file_cursor = mdc->file_cursor;
-    CURSOR_API_CALL(cursor, session, prev, CUR2BT(file_cursor));
+    CURSOR_API_CALL(cursor, session, ret, prev, ((WT_CURSOR_BTREE *)file_cursor)->dhandle);
 
     if (F_ISSET(mdc, WT_MDC_ONMETADATA)) {
         ret = WT_NOTFOUND;
@@ -353,7 +372,8 @@ __curmetadata_reset(WT_CURSOR *cursor)
 
     mdc = (WT_CURSOR_METADATA *)cursor;
     file_cursor = mdc->file_cursor;
-    CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, reset, CUR2BT(file_cursor));
+    CURSOR_API_CALL_PREPARE_ALLOWED(
+      cursor, session, reset, ((WT_CURSOR_BTREE *)file_cursor)->dhandle);
 
     if (F_ISSET(mdc, WT_MDC_POSITIONED) && !F_ISSET(mdc, WT_MDC_ONMETADATA))
         ret = file_cursor->reset(file_cursor);
@@ -378,7 +398,7 @@ __curmetadata_search(WT_CURSOR *cursor)
 
     mdc = (WT_CURSOR_METADATA *)cursor;
     file_cursor = mdc->file_cursor;
-    CURSOR_API_CALL(cursor, session, search, CUR2BT(file_cursor));
+    CURSOR_API_CALL(cursor, session, ret, search, ((WT_CURSOR_BTREE *)file_cursor)->dhandle);
 
     WT_MD_CURSOR_NEEDKEY(cursor);
 
@@ -415,7 +435,7 @@ __curmetadata_search_near(WT_CURSOR *cursor, int *exact)
 
     mdc = (WT_CURSOR_METADATA *)cursor;
     file_cursor = mdc->file_cursor;
-    CURSOR_API_CALL(cursor, session, search_near, CUR2BT(file_cursor));
+    CURSOR_API_CALL(cursor, session, ret, search_near, ((WT_CURSOR_BTREE *)file_cursor)->dhandle);
 
     WT_MD_CURSOR_NEEDKEY(cursor);
 
@@ -453,7 +473,7 @@ __curmetadata_insert(WT_CURSOR *cursor)
 
     mdc = (WT_CURSOR_METADATA *)cursor;
     file_cursor = mdc->file_cursor;
-    CURSOR_API_CALL(cursor, session, insert, CUR2BT(file_cursor));
+    CURSOR_API_CALL(cursor, session, ret, insert, ((WT_CURSOR_BTREE *)file_cursor)->dhandle);
 
     WT_MD_CURSOR_NEEDKEY(cursor);
     WT_MD_CURSOR_NEEDVALUE(cursor);
@@ -481,7 +501,7 @@ __curmetadata_update(WT_CURSOR *cursor)
 
     mdc = (WT_CURSOR_METADATA *)cursor;
     file_cursor = mdc->file_cursor;
-    CURSOR_API_CALL(cursor, session, update, CUR2BT(file_cursor));
+    CURSOR_API_CALL(cursor, session, ret, update, ((WT_CURSOR_BTREE *)file_cursor)->dhandle);
 
     WT_MD_CURSOR_NEEDKEY(cursor);
     WT_MD_CURSOR_NEEDVALUE(cursor);
@@ -509,7 +529,7 @@ __curmetadata_remove(WT_CURSOR *cursor)
 
     mdc = (WT_CURSOR_METADATA *)cursor;
     file_cursor = mdc->file_cursor;
-    CURSOR_API_CALL(cursor, session, remove, CUR2BT(file_cursor));
+    CURSOR_API_CALL(cursor, session, ret, remove, ((WT_CURSOR_BTREE *)file_cursor)->dhandle);
 
     WT_MD_CURSOR_NEEDKEY(cursor);
 
@@ -536,7 +556,8 @@ __curmetadata_close(WT_CURSOR *cursor)
 
     mdc = (WT_CURSOR_METADATA *)cursor;
     c = mdc->file_cursor;
-    CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, close, c == NULL ? NULL : CUR2BT(c));
+    CURSOR_API_CALL_PREPARE_ALLOWED(
+      cursor, session, close, c == NULL ? NULL : ((WT_CURSOR_BTREE *)c)->dhandle);
 err:
 
     if (c != NULL)
@@ -558,8 +579,10 @@ int
 __wt_curmetadata_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner,
   const char *cfg[], WT_CURSOR **cursorp)
 {
+    WT_CONFIG_ITEM cval;
     WT_CURSOR_STATIC_INIT(iface, __wt_cursor_get_key, /* get-key */
       __wt_cursor_get_value,                          /* get-value */
+      __wt_cursor_get_raw_key_value,                  /* get-raw-key-value */
       __wt_cursor_set_key,                            /* set-key */
       __wt_cursor_set_value,                          /* set-value */
       __curmetadata_compare,                          /* compare */
@@ -574,15 +597,16 @@ __wt_curmetadata_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owne
       __curmetadata_update,                           /* update */
       __curmetadata_remove,                           /* remove */
       __wt_cursor_notsup,                             /* reserve */
-      __wt_cursor_reconfigure_notsup,                 /* reconfigure */
+      __wt_cursor_config_notsup,                      /* reconfigure */
       __wt_cursor_notsup,                             /* largest_key */
+      __wt_cursor_config_notsup,                      /* bound */
       __wt_cursor_notsup,                             /* cache */
       __wt_cursor_reopen_notsup,                      /* reopen */
+      __wt_cursor_checkpoint_id,                      /* checkpoint ID */
       __curmetadata_close);                           /* close */
     WT_CURSOR *cursor;
     WT_CURSOR_METADATA *mdc;
     WT_DECL_RET;
-    WT_CONFIG_ITEM cval;
 
     WT_RET(__wt_calloc_one(session, &mdc));
     cursor = (WT_CURSOR *)mdc;

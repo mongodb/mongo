@@ -30,13 +30,10 @@
 /*
  * JIRA ticket reference: HELP-4355 Test rwlock collapse under load.
  */
-#define MAX_THREADS 1000
-#define READS_PER_WRITE 10000
-//#define	READS_PER_WRITE	1000000
-//#define	READS_PER_WRITE	100
+#define MAX_THREADS WT_THOUSAND
+#define READS_PER_WRITE (10 * WT_THOUSAND)
 
 #define CHECK_CORRECTNESS 1
-//#define	USE_POSIX	1
 
 static WT_RWLOCK rwlock;
 static pthread_rwlock_t p_rwlock;
@@ -46,6 +43,10 @@ static uint64_t shared_counter;
 void *thread_rwlock(void *);
 void *thread_dump(void *);
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {
@@ -57,13 +58,14 @@ main(int argc, char *argv[])
     opts = &_opts;
     memset(opts, 0, sizeof(*opts));
     opts->nthreads = 100;
-    opts->nops = 1000000; /* per thread */
+    opts->nops = WT_MILLION; /* per thread */
     testutil_check(testutil_parse_opts(argc, argv, opts));
     running = true;
 
-    testutil_make_work_dir(opts->home);
-    testutil_check(
-      wiredtiger_open(opts->home, NULL, "create,session_max=1000,statistics=(fast)", &opts->conn));
+    testutil_recreate_dir(opts->home);
+    testutil_check(wiredtiger_open(opts->home, NULL,
+      "create,session_max=1000,statistics=(all),statistics_log=(json,on_close,wait=1)",
+      &opts->conn));
 
     testutil_check(__wt_rwlock_init(NULL, &rwlock));
     testutil_check(pthread_rwlock_init(&p_rwlock, NULL));
@@ -88,7 +90,8 @@ main(int argc, char *argv[])
 }
 
 /*
- * Acquire a rwlock, every Nth operation, acquire exclusive.
+ * thread_rwlock --
+ *     Acquire a rwlock, every Nth operation, acquire exclusive.
  */
 void *
 thread_rwlock(void *arg)
@@ -145,7 +148,7 @@ thread_rwlock(void *arg)
             __wt_readunlock(session, &rwlock);
 #endif
 
-        if (opts->verbose && i % 10000 == 0) {
+        if (opts->verbose && i % (10 * WT_THOUSAND) == 0) {
             printf("%s", session->id == 20 ? ".\n" : ".");
             fflush(stdout);
         }
@@ -156,6 +159,10 @@ thread_rwlock(void *arg)
     return (NULL);
 }
 
+/*
+ * thread_dump --
+ *     TODO: Add a comment describing this function.
+ */
 void *
 thread_dump(void *arg)
 {

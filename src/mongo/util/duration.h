@@ -29,25 +29,30 @@
 
 #pragma once
 
-#include <cstdint>
-#include <iosfwd>
-#include <limits>
-#include <ratio>
-#include <type_traits>
-
-#include <fmt/format.h>
-
+#include "mongo/base/error_codes.h"
 #include "mongo/base/static_assert.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <chrono>
+#include <cstdint>
+#include <iosfwd>
+#include <limits>
+#include <ratio>
+#include <string>
+#include <type_traits>
+
+#include <fmt/format.h>
+
 namespace mongo {
 
 class BSONObj;
-
 template <typename Allocator>
 class StringBuilderImpl;
 
@@ -266,7 +271,9 @@ public:
      * It is a compilation error to convert from higher precision to lower, or if the conversion
      * would cause an integer overflow.
      */
+    /** Implicitly convertible if `FromPeriod` is a multiple of `period`. */
     template <typename FromPeriod>
+    requires(std::ratio_divide<FromPeriod, period>::den == 1)
     constexpr Duration(const Duration<FromPeriod>& from) : Duration(duration_cast<Duration>(from)) {
         MONGO_STATIC_ASSERT_MSG(
             !isLowerPrecisionThan<Duration<FromPeriod>>(),
@@ -500,6 +507,11 @@ StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, Durat
     MONGO_STATIC_ASSERT_MSG(!Duration<Period>::unit_short().empty(),
                             "Only standard Durations can logged");
     return streamPut(os, dp);
+}
+
+template <typename Period>
+auto format_as(const Duration<Period>& dur) {
+    return dur.toString();
 }
 
 /**

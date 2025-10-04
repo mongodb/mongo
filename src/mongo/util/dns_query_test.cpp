@@ -26,14 +26,22 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
-#include <algorithm>
-#include <iterator>
+#include "mongo/util/dns_query.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/dns_query.h"
+#include "mongo/util/assert_util.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <iterator>
+#include <memory>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 
 using namespace std::literals::string_literals;
 
@@ -108,7 +116,8 @@ TEST(MongoDnsQuery, basic) {
 
     // As long as enough tests pass, we're okay -- this means that a single DNS name server drift
     // won't cause a BF -- when enough fail, then we can rebuild the list in one pass.
-    const std::size_t kPassingRate = sizeof(tests) / sizeof(tests[0]) * kPassingPercentage;
+    const std::size_t kPassingRate =
+        static_cast<std::size_t>(sizeof(tests) / sizeof(tests[0])) * kPassingPercentage;
     ASSERT_GTE(resolution_count, kPassingRate);
 }
 

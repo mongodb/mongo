@@ -27,28 +27,60 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/db/baton.h"
+#include "mongo/db/local_catalog/shard_role_api/resource_yielders.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/executor/remote_command_response.h"
 #include "mongo/s/transaction_router.h"
+#include "mongo/util/assert_util.h"
+
+#include <utility>
 
 namespace mongo {
 
+namespace transaction_request_sender_details {
 namespace {
+
+void processReplyMetadata(
+    OperationContext* opCtx,
+    const ShardId& shardId,
+    const TransactionRouter::ParsedParticipantResponseMetadata& parsedResponse,
+    bool forAsyncGetMore = false) {
+    auto txnRouter = TransactionRouter::get(opCtx);
+    if (!txnRouter) {
+        return;
+    }
+
+    txnRouter.processParticipantResponse(opCtx, shardId, parsedResponse, forAsyncGetMore);
+}
+}  // namespace
 
 std::vector<AsyncRequestsSender::Request> attachTxnDetails(
     OperationContext* opCtx, const std::vector<AsyncRequestsSender::Request>& requests) {
+    bool activeTxnParticipantAddParticipants =
+        opCtx->isActiveTransactionParticipant() && opCtx->inMultiDocumentTransaction();
+
     auto txnRouter = TransactionRouter::get(opCtx);
+
     if (!txnRouter) {
         return requests;
+    }
+
+    if (activeTxnParticipantAddParticipants) {
+        auto opCtxTxnNum = opCtx->getTxnNumber();
+        invariant(opCtxTxnNum);
+        txnRouter.beginOrContinueTxn(
+            opCtx, *opCtxTxnNum, TransactionRouter::TransactionActions::kStartOrContinue);
     }
 
     std::vector<AsyncRequestsSender::Request> newRequests;
     newRequests.reserve(requests.size());
 
-    for (auto request : requests) {
+    for (const auto& request : requests) {
         newRequests.emplace_back(
             request.shardId,
             txnRouter.attachTxnFieldsIfNeeded(opCtx, request.shardId, request.cmdObj));
@@ -57,36 +89,49 @@ std::vector<AsyncRequestsSender::Request> attachTxnDetails(
     return newRequests;
 }
 
-void processReplyMetadata(OperationContext* opCtx, const AsyncRequestsSender::Response& response) {
-    auto txnRouter = TransactionRouter::get(opCtx);
-    if (!txnRouter) {
-        return;
-    }
-
+void processReplyMetadata(OperationContext* opCtx,
+                          const AsyncRequestsSender::Response& response,
+                          bool forAsyncGetMore) {
     if (!response.swResponse.isOK()) {
         return;
     }
 
-    txnRouter.processParticipantResponse(
-        opCtx, response.shardId, response.swResponse.getValue().data);
+    processReplyMetadata(opCtx,
+                         response.shardId,
+                         TransactionRouter::Router::parseParticipantResponseMetadata(
+                             response.swResponse.getValue().data),
+                         forAsyncGetMore);
 }
 
-}  // unnamed namespace
+void processReplyMetadataForAsyncGetMore(
+    OperationContext* opCtx,
+    const ShardId& shardId,
+    const TransactionRouter::ParsedParticipantResponseMetadata& parsedResponse) {
+    processReplyMetadata(opCtx, shardId, parsedResponse, true /* forAsyncGetMore */);
+}
+
+}  // namespace transaction_request_sender_details
 
 MultiStatementTransactionRequestsSender::MultiStatementTransactionRequestsSender(
     OperationContext* opCtx,
     std::shared_ptr<executor::TaskExecutor> executor,
-    StringData dbName,
+    const DatabaseName& dbName,
     const std::vector<AsyncRequestsSender::Request>& requests,
     const ReadPreferenceSetting& readPreference,
-    Shard::RetryPolicy retryPolicy)
+    Shard::RetryPolicy retryPolicy,
+    AsyncRequestsSender::ShardHostMap designatedHostsMap)
     : _opCtx(opCtx),
-      _ars(std::make_unique<AsyncRequestsSender>(opCtx,
-                                                 std::move(executor),
-                                                 dbName,
-                                                 attachTxnDetails(opCtx, requests),
-                                                 readPreference,
-                                                 retryPolicy)) {}
+      _ars(std::make_unique<AsyncRequestsSender>(
+          opCtx,
+          std::move(executor),
+          dbName,
+          transaction_request_sender_details::attachTxnDetails(opCtx, requests),
+          readPreference,
+          retryPolicy,
+          ResourceYielderFactory::get(*opCtx->getService())
+              ? ResourceYielderFactory::get(*opCtx->getService())->make(opCtx, "request-sender")
+              : nullptr,
+          designatedHostsMap)) {}
 
 MultiStatementTransactionRequestsSender::~MultiStatementTransactionRequestsSender() {
     invariant(_opCtx);
@@ -98,14 +143,23 @@ MultiStatementTransactionRequestsSender::~MultiStatementTransactionRequestsSende
     baton->schedule([ars = std::move(_ars)](Status) mutable { ars.reset(); });
 }
 
-bool MultiStatementTransactionRequestsSender::done() {
+bool MultiStatementTransactionRequestsSender::done() const {
     return _ars->done();
 }
 
-AsyncRequestsSender::Response MultiStatementTransactionRequestsSender::next() {
-    const auto response = _ars->next();
-    processReplyMetadata(_opCtx, response);
+AsyncRequestsSender::Response MultiStatementTransactionRequestsSender::next(bool forMergeCursors) {
+    auto response = nextResponse();
+    validateResponse(response, forMergeCursors);
     return response;
+}
+
+AsyncRequestsSender::Response MultiStatementTransactionRequestsSender::nextResponse() {
+    return _ars->next();
+}
+
+void MultiStatementTransactionRequestsSender::validateResponse(
+    const AsyncRequestsSender::Response& response, bool forMergeCursors) const {
+    transaction_request_sender_details::processReplyMetadata(_opCtx, response, forMergeCursors);
 }
 
 void MultiStatementTransactionRequestsSender::stopRetrying() {

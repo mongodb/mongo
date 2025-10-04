@@ -35,12 +35,11 @@ from wtscenario import make_scenarios
 # delete keys repeatedly at successive timestamps
 class test_timestamp23(wttest.WiredTigerTestCase):
     conn_config = ''
-    session_config = 'isolation=snapshot'
 
     format_values = [
         ('column', dict(key_format='r', value_format='S')),
         ('column_fix', dict(key_format='r', value_format='8t')),
-        ('integer_row', dict(key_format='i', value_format='S')),
+        ('row_integer', dict(key_format='i', value_format='S')),
     ]
 
     scenarios = make_scenarios(format_values)
@@ -50,8 +49,7 @@ class test_timestamp23(wttest.WiredTigerTestCase):
         # Create a file that contains active history (content newer than the oldest timestamp).
         table_uri = 'table:timestamp23'
         ds = SimpleDataSet(
-            self, table_uri, 0, key_format=self.key_format, value_format=self.value_format,
-            config='log=(enabled=false)')
+            self, table_uri, 0, key_format=self.key_format, value_format=self.value_format)
         ds.populate()
         self.session.checkpoint()
 
@@ -125,6 +123,3 @@ class test_timestamp23(wttest.WiredTigerTestCase):
 
         cursor.close()
         cursor2.close()
-
-if __name__ == '__main__':
-    wttest.run()

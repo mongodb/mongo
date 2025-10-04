@@ -30,10 +30,13 @@
 #pragma once
 
 #include "mongo/stdx/trusted_hasher.h"
+#include "mongo/util/modules.h"
+
+#include <cstddef>
 
 #include <absl/container/node_hash_map.h>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace stdx {
 
 template <class Key, class Value, class Hasher = DefaultHasher<Key>, typename... Args>
@@ -57,4 +60,4 @@ size_t erase_if(absl::node_hash_map<Key, T, Hash, Eq, Alloc>& c, Pred&& pred) {
 }
 
 }  // namespace stdx
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

@@ -1,0 +1,267 @@
+# Golden test output of SBEPrimBinaryTest/GreaterMixed
+-- INPUT EXPRESSION:
+(s1 > s2) 
+
+-- COMPILED EXPRESSION:
+[0x0000-0x0015] stackSize: 1, maxStackSize: 2
+0x0000: pushAccessVal(accessor: <accessor>);
+0x0009: pushAccessVal(accessor: <accessor>);
+0x0012: greater(popLhs: 1, moveFromLhs: 1, offsetLhs: 0, popRhs: 1, moveFromRhs: 1, offsetRhs: 0);
+
+
+-- EXECUTE VARIATION:
+SLOTS: [1: Nothing, 2: Nothing]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: Nothing, 2: null]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: Nothing, 2: false]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: Nothing, 2: true]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: Nothing, 2: 12]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: Nothing, 2: NumberDecimal(223.500000000000)]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: Nothing, 2: "abc"]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: Nothing, 2: Timestamp(0, 1668792433)]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: null, 2: Nothing]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: null, 2: null]
+RESULT: false
+
+-- EXECUTE VARIATION:
+SLOTS: [1: null, 2: false]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: null, 2: true]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: null, 2: 12]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: null, 2: NumberDecimal(223.500000000000)]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: null, 2: "abc"]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: null, 2: Timestamp(0, 1668792433)]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: false, 2: Nothing]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: false, 2: null]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: false, 2: false]
+RESULT: false
+
+-- EXECUTE VARIATION:
+SLOTS: [1: false, 2: true]
+RESULT: false
+
+-- EXECUTE VARIATION:
+SLOTS: [1: false, 2: 12]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: false, 2: NumberDecimal(223.500000000000)]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: false, 2: "abc"]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: false, 2: Timestamp(0, 1668792433)]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: true, 2: Nothing]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: true, 2: null]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: true, 2: false]
+RESULT: true
+
+-- EXECUTE VARIATION:
+SLOTS: [1: true, 2: true]
+RESULT: false
+
+-- EXECUTE VARIATION:
+SLOTS: [1: true, 2: 12]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: true, 2: NumberDecimal(223.500000000000)]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: true, 2: "abc"]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: true, 2: Timestamp(0, 1668792433)]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: 12, 2: Nothing]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: 12, 2: null]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: 12, 2: false]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: 12, 2: true]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: 12, 2: 12]
+RESULT: false
+
+-- EXECUTE VARIATION:
+SLOTS: [1: 12, 2: NumberDecimal(223.500000000000)]
+RESULT: false
+
+-- EXECUTE VARIATION:
+SLOTS: [1: 12, 2: "abc"]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: 12, 2: Timestamp(0, 1668792433)]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: NumberDecimal(223.500000000000), 2: Nothing]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: NumberDecimal(223.500000000000), 2: null]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: NumberDecimal(223.500000000000), 2: false]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: NumberDecimal(223.500000000000), 2: true]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: NumberDecimal(223.500000000000), 2: 12]
+RESULT: true
+
+-- EXECUTE VARIATION:
+SLOTS: [1: NumberDecimal(223.500000000000), 2: NumberDecimal(223.500000000000)]
+RESULT: false
+
+-- EXECUTE VARIATION:
+SLOTS: [1: NumberDecimal(223.500000000000), 2: "abc"]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: NumberDecimal(223.500000000000), 2: Timestamp(0, 1668792433)]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "abc", 2: Nothing]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "abc", 2: null]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "abc", 2: false]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "abc", 2: true]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "abc", 2: 12]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "abc", 2: NumberDecimal(223.500000000000)]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "abc", 2: "abc"]
+RESULT: false
+
+-- EXECUTE VARIATION:
+SLOTS: [1: "abc", 2: Timestamp(0, 1668792433)]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: Timestamp(0, 1668792433), 2: Nothing]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: Timestamp(0, 1668792433), 2: null]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: Timestamp(0, 1668792433), 2: false]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: Timestamp(0, 1668792433), 2: true]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: Timestamp(0, 1668792433), 2: 12]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: Timestamp(0, 1668792433), 2: NumberDecimal(223.500000000000)]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: Timestamp(0, 1668792433), 2: "abc"]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: Timestamp(0, 1668792433), 2: Timestamp(0, 1668792433)]
+RESULT: false
+

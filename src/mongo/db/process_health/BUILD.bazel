@@ -1,0 +1,118 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+idl_generator(
+    name = "health_monitoring_server_parameters_gen",
+    src = "health_monitoring_server_parameters.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "fault_manager",
+    srcs = [
+        "dns_health_observer.cpp",
+        "fault.cpp",
+        "fault_facet_impl.cpp",
+        "fault_manager.cpp",
+        "fault_manager_config.cpp",
+        "health_monitoring_server_parameters.cpp",
+        "health_monitoring_server_status_section.cpp",
+        "health_observer_base.cpp",
+        "health_observer_registration.cpp",
+        "progress_monitor.cpp",
+        "test_health_observer.cpp",
+        ":health_monitoring_server_parameters_gen",
+    ],
+    hdrs = [
+        "deadline_future.h",
+        "dns_health_observer.h",
+        "fault.h",
+        "fault_facet.h",
+        "fault_facet_impl.h",
+        "fault_manager.h",
+        "fault_manager_config.h",
+        "health_check_status.h",
+        "health_observer.h",
+        "health_observer_base.h",
+        "health_observer_registration.h",
+        "progress_monitor.h",
+        "state_machine.h",
+        "test_health_observer.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/commands:test_commands_enabled",
+        "//src/mongo/executor:network_interface",
+        "//src/mongo/executor:network_interface_factory",
+        "//src/mongo/executor:network_interface_thread_pool",
+        "//src/mongo/executor:thread_pool_task_executor",
+        "//src/mongo/s:grid",
+        "//src/mongo/util/concurrency:spin_lock",
+        "//src/mongo/util/concurrency:thread_pool",
+    ],
+)
+
+mongo_cc_library(
+    name = "config_server_health_observer",
+    srcs = [
+        "config_server_health_observer.cpp",
+    ],
+    deps = [
+        ":fault_manager",
+        "//src/mongo/db/query:query_request",
+        "//src/mongo/db/repl:read_concern_args",
+        "//src/mongo/s:grid",
+        "//src/mongo/util/concurrency:spin_lock",
+    ],
+)
+
+mongo_cc_library(
+    name = "fault_manager_test_suite",
+    srcs = [],
+    hdrs = [
+        "fault_facet_mock.h",
+        "fault_manager_test_suite.h",
+        "health_observer_mock.h",
+    ],
+    deps = [
+        ":fault_manager",
+        "//src/mongo:base",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/executor:network_interface_factory",
+        "//src/mongo/executor:task_executor_test_fixture",
+        "//src/mongo/executor:thread_pool_task_executor_test_fixture",
+        "//src/mongo/idl:server_parameter_test_controller",
+        "//src/mongo/transport:transport_layer_manager",
+        "//src/mongo/util:clock_source_mock",
+        "//src/mongo/util/concurrency:thread_pool",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "fault_base_classes_test",
+    srcs = [
+        "fault_facet_test.cpp",
+        "fault_manager_test.cpp",
+        "fault_state_machine_test.cpp",
+        "fault_test.cpp",
+        "health_observer_test.cpp",
+        "state_machine_test.cpp",
+    ],
+    tags = ["mongo_unittest_sixth_group"],
+    deps = [
+        ":fault_manager_test_suite",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/executor:network_interface_mock",
+    ],
+)

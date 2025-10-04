@@ -27,11 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/util/string_map.h"
+
+#include <algorithm>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -50,13 +54,23 @@ void LiteParsedDocumentSource::registerParser(const std::string& name,
                                               Parser parser,
                                               AllowedWithApiStrict allowedWithApiStrict,
                                               AllowedWithClientType allowedWithClientType) {
+    // It's possible an extension stage is being registered to override an existing server stage
+    // (like $vectorSearch), so we should skip re-initializing a counter. We do not assert that
+    // this is legal since we do that validation in DocumentSource::registerParser().
+    if (!parserMap.contains(name)) {
+        // Initialize a counter for this document source to track how many times it is used.
+        aggStageCounters.addMetric(name);
+    }
+
     parserMap[name] = {parser, allowedWithApiStrict, allowedWithClientType};
-    // Initialize a counter for this document source to track how many times it is used.
-    aggStageCounters.stageCounterMap[name] = std::make_unique<AggStageCounters::StageCounter>(name);
+}
+
+void LiteParsedDocumentSource::unregisterParser_forTest(const std::string& name) {
+    parserMap.erase(name);
 }
 
 std::unique_ptr<LiteParsedDocumentSource> LiteParsedDocumentSource::parse(
-    const NamespaceString& nss, const BSONObj& spec) {
+    const NamespaceString& nss, const BSONObj& spec, const LiteParserOptions& options) {
     uassert(40323,
             "A pipeline stage specification object must contain exactly one field.",
             spec.nFields() == 1);
@@ -69,7 +83,7 @@ std::unique_ptr<LiteParsedDocumentSource> LiteParsedDocumentSource::parse(
             str::stream() << "Unrecognized pipeline stage name: '" << stageName << "'",
             it != parserMap.end());
 
-    return it->second.parser(nss, specElem);
+    return it->second.parser(nss, specElem, options);
 }
 
 const LiteParsedDocumentSource::LiteParserInfo& LiteParsedDocumentSource::getInfo(
@@ -101,7 +115,7 @@ LiteParsedDocumentSourceNestedPipelines::LiteParsedDocumentSourceNestedPipelines
     : LiteParsedDocumentSourceNestedPipelines(
           std::move(parseTimeName), std::move(foreignNss), std::vector<LiteParsedPipeline>{}) {
     if (pipeline)
-        _pipelines.emplace_back(std::move(pipeline.get()));
+        _pipelines.emplace_back(std::move(pipeline.value()));
 }
 
 stdx::unordered_set<NamespaceString>
@@ -111,25 +125,40 @@ LiteParsedDocumentSourceNestedPipelines::getInvolvedNamespaces() const {
         involvedNamespaces.insert(*_foreignNss);
 
     for (auto&& pipeline : _pipelines) {
-        auto involvedInSubPipe = pipeline.getInvolvedNamespaces();
+        const auto& involvedInSubPipe = pipeline.getInvolvedNamespaces();
         involvedNamespaces.insert(involvedInSubPipe.begin(), involvedInSubPipe.end());
     }
     return involvedNamespaces;
 }
 
-bool LiteParsedDocumentSourceNestedPipelines::allowedToPassthroughFromMongos() const {
-    // If any of the sub-pipelines doesn't allow pass through, then return false.
-    return std::all_of(_pipelines.cbegin(), _pipelines.cend(), [](const auto& subPipeline) {
-        return subPipeline.allowedToPassthroughFromMongos();
+void LiteParsedDocumentSourceNestedPipelines::getForeignExecutionNamespaces(
+    stdx::unordered_set<NamespaceString>& nssSet) const {
+    for (auto&& pipeline : _pipelines) {
+        auto nssVector = pipeline.getForeignExecutionNamespaces();
+        for (const auto& nssOrUUID : nssVector) {
+            tassert(6458500,
+                    "nss expected to contain a NamespaceString",
+                    nssOrUUID.isNamespaceString());
+            nssSet.insert(nssOrUUID.nss());
+        }
+    }
+}
+
+bool LiteParsedDocumentSourceNestedPipelines::isExemptFromIngressAdmissionControl() const {
+    return std::any_of(_pipelines.begin(), _pipelines.end(), [](auto&& pipeline) {
+        return pipeline.isExemptFromIngressAdmissionControl();
     });
 }
 
-bool LiteParsedDocumentSourceNestedPipelines::allowShardedForeignCollection(
-    NamespaceString nss, bool inMultiDocumentTransaction) const {
-    return std::all_of(
-        _pipelines.begin(), _pipelines.end(), [&nss, inMultiDocumentTransaction](auto&& pipeline) {
-            return pipeline.allowShardedForeignCollection(nss, inMultiDocumentTransaction);
-        });
+Status LiteParsedDocumentSourceNestedPipelines::checkShardedForeignCollAllowed(
+    const NamespaceString& nss, bool inMultiDocumentTransaction) const {
+    for (auto&& pipeline : _pipelines) {
+        if (auto status = pipeline.checkShardedForeignCollAllowed(nss, inMultiDocumentTransaction);
+            !status.isOK()) {
+            return status;
+        }
+    }
+    return Status::OK();
 }
 
 ReadConcernSupportResult LiteParsedDocumentSourceNestedPipelines::supportsReadConcern(
@@ -145,6 +174,16 @@ ReadConcernSupportResult LiteParsedDocumentSourceNestedPipelines::supportsReadCo
         }
     }
     return result;
+}
+
+PrivilegeVector LiteParsedDocumentSourceNestedPipelines::requiredPrivilegesBasic(
+    bool isMongos, bool bypassDocumentValidation) const {
+    PrivilegeVector requiredPrivileges;
+    for (auto&& pipeline : _pipelines) {
+        Privilege::addPrivilegesToPrivilegeVector(
+            &requiredPrivileges, pipeline.requiredPrivileges(isMongos, bypassDocumentValidation));
+    }
+    return requiredPrivileges;
 }
 
 }  // namespace mongo

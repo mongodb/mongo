@@ -4,11 +4,9 @@
  * This test depends on 4.4 features.
  * @tags: [multiversion_incompatible]
  */
-
-(function() {
-"use strict";
-
-load("jstests/replsets/libs/rollback_test.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 const testName = "initial_sync_fails_on_rollback";
 const dbName = testName;
@@ -39,31 +37,35 @@ const initialSyncNode = rollbackTest.add({
         // This node must be non-voting to avoid interfering with the rollback machinery.
         rsConfig: {priority: 0, votes: 0},
         setParameter: {
-            'failpoint.initialSyncHangBeforeCopyingDatabases': tojson({mode: 'alwaysOn'}),
-            'collectionClonerBatchSize': 10,
+            "failpoint.initialSyncHangBeforeCopyingDatabases": tojson({mode: "alwaysOn"}),
+            "collectionClonerBatchSize": 10,
             // This test is specifically testing that the cloners stop, so we turn off the
             // oplog fetcher to ensure that we don't inadvertently test that instead.
-            'failpoint.hangBeforeStartingOplogFetcher': tojson({mode: 'alwaysOn'}),
+            "failpoint.hangBeforeStartingOplogFetcher": tojson({mode: "alwaysOn"}),
             // Make sure our initial sync node only talks to the rolling-back primary.
-            'failpoint.forceSyncSourceCandidate':
-                tojson({mode: 'alwaysOn', data: {"hostAndPort": rollbackTest.getPrimary().host}}),
-            'numInitialSyncAttempts': 1,
-        }
-    }
+            "failpoint.forceSyncSourceCandidate": tojson({
+                mode: "alwaysOn",
+                data: {"hostAndPort": rollbackTest.getPrimary().host},
+            }),
+            "numInitialSyncAttempts": 1,
+        },
+    },
 });
 
 jsTestLog("Waiting for initial sync node to reach initial sync state");
 const rst = rollbackTest.getTestFixture();
 rst.waitForState(initialSyncNode, ReplSetTest.State.STARTUP_2);
 
-const afterBatchResponseFailPoint =
-    configureFailPoint(initialSyncNode,
-                       "initialSyncHangCollectionClonerAfterHandlingBatchResponse",
-                       {nss: dbName + ".test"});
+const afterBatchResponseFailPoint = configureFailPoint(
+    initialSyncNode,
+    "initialSyncHangCollectionClonerAfterHandlingBatchResponse",
+    {nss: dbName + ".test"},
+);
 const beforeFinishFailPoint = configureFailPoint(initialSyncNode, "initialSyncHangBeforeFinish");
 // Release the initial failpoint.
-assert.commandWorked(initialSyncNode.adminCommand(
-    {configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}));
+assert.commandWorked(
+    initialSyncNode.adminCommand({configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}),
+);
 
 jsTestLog("Waiting for CollectionCloner to reach " + dbName + ".test collection");
 afterBatchResponseFailPoint.wait();
@@ -82,8 +84,9 @@ jsTestLog("Releasing the CollectionCloner failpoint.");
 afterBatchResponseFailPoint.off();
 
 jsTestLog("Releasing the oplog fetcher failpoint.");
-assert.commandWorked(initialSyncNode.getDB("test").adminCommand(
-    {configureFailPoint: "hangBeforeStartingOplogFetcher", mode: "off"}));
+assert.commandWorked(
+    initialSyncNode.getDB("test").adminCommand({configureFailPoint: "hangBeforeStartingOplogFetcher", mode: "off"}),
+);
 
 beforeFinishFailPoint.wait();
 const res = assert.commandWorked(initialSyncNode.adminCommand({replSetGetStatus: 1}));
@@ -99,4 +102,3 @@ rst.stop(initialSyncNode);
 rst.remove(initialSyncNode);
 
 rollbackTest.stop();
-})();

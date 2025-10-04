@@ -27,10 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/unittest/unittest.h"
 #include "mongo/util/progress_meter.h"
+
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/unittest.h"
 
 namespace {
 

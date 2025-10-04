@@ -1,0 +1,209 @@
+# Copyright (C) 2021-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/global_catalog/ddl/merge_chunk_request_valid.h"
+        - "mongo/util/uuid.h"
+
+imports:
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/global_catalog/chunk_range.idl"
+    - "mongo/db/versioning_protocol/chunk_version.idl"
+    - "mongo/db/sharding_environment/sharding_types.idl"
+
+types:
+    # Non-IDL response used UUIDtoBSON instead of UUID::toCDR
+    my_uuid:
+        bson_serialization_type: object
+        description: "A UUID for some reason not generic uuid type."
+        cpp_type: UUID
+        deserializer: UUID::parse
+        serializer: UUID::toBSON
+        is_view: false
+
+structs:
+    ConfigSvrMergeResponse:
+        description: "Response of the _configsvrCommitChunksMerge command"
+        strict: false
+        is_command_reply: true
+        fields:
+            shardVersion:
+                type: ChunkVersion
+                description: "Latest data placement of the shard."
+
+    MergeAllChunksOnShardResponse:
+        description: "Response of the _configsvrCommitMergeAllChunksOnShard and _shardsvrMergeAllChunksOnShard commands"
+        strict: false
+        is_command_reply: true
+        fields:
+            shardVersion:
+                type: ChunkVersion
+                description: "Latest data placement of the shard."
+            numMergedChunks:
+                type: int
+                description: "Number of chunks that were merged"
+
+commands:
+    _configsvrCommitChunksMerge:
+        command_name: _configsvrCommitChunksMerge
+        cpp_name: ConfigSvrMergeChunks
+        description: "The internal _configsvrCommitChunksMerge command on the config server."
+        namespace: type
+        api_version: ""
+        type: namespacestring
+        strict: false
+        reply_type: ConfigSvrMergeResponse
+        fields:
+            shard:
+                description: "The id of the shard."
+                type: shard_id
+            collUUID:
+                type: my_uuid
+                cpp_name: "collectionUUID"
+                description: "The UUID of the collection that the chunk belongs to."
+            chunkRange:
+                type: chunk_range
+                cpp_name: "chunkRange"
+                description: "Chunk bounds to merge."
+            epoch:
+                description: "The expected epoch of the collection that is being committed."
+                type: objectid
+                optional: true
+            timestamp:
+                description: "The expected timestamp of the collection that is being committed."
+                type: timestamp
+                optional: true
+
+    clusterMergeChunks:
+        command_name: mergeChunks
+        cpp_name: ClusterMergeChunks
+        description: "The public mergeChunks command to merge chunks in a collection on mongos."
+        namespace: type
+        api_version: ""
+        type: namespacestring
+        strict: true
+        fields:
+            bounds:
+                description: "Chunk bounds to merge."
+                type: array<object_owned>
+
+    _shardsvrMergeChunks:
+        command_name: _shardsvrMergeChunks
+        command_alias: mergeChunks
+        cpp_name: ShardsvrMergeChunks
+        description: "The internal _shardsvrMergeChunks command on a shard."
+        namespace: type
+        api_version: ""
+        type: namespacestring
+        strict: false
+        fields:
+            bounds:
+                description: "Chunk bounds to merge."
+                type: array<object_owned>
+            epoch:
+                description: "The expected epoch of the collection for the chunks being merged."
+                type: objectid
+            timestamp:
+                description: "The expected timestamp of the collection that is being committed."
+                type: timestamp
+                optional: true
+
+    clusterMergeAllChunksOnShard:
+        command_name: mergeAllChunksOnShard
+        cpp_name: ClusterMergeAllChunksOnShard
+        description: "Definition of the mergeAllChunksOnShard command called on routers."
+        namespace: type
+        type: namespacestring
+        api_version: ""
+        strict: false
+        fields:
+            shard:
+                description: "The id of the shard."
+                type: shard_id
+                validator:
+                    callback: "ShardId::validate"
+            maxNumberOfChunksToMerge:
+                description: "The maximum number of chunks to merge"
+                type: int
+                default: 2147483647 # INT_MAX
+            maxTimeProcessingChunksMS:
+                description: >-
+                    "The maximum time in milliseconds spent looking for mergeable chunks."
+                type: int
+                default: 2147483647 # INT_MAX
+
+    _shardsvrMergeAllChunksOnShard:
+        command_name: _shardsvrMergeAllChunksOnShard
+        cpp_name: ShardSvrMergeAllChunksOnShard
+        description: "Definition of the mergeAllChunksOnShard command called on the shards."
+        namespace: type
+        type: namespacestring
+        api_version: ""
+        strict: false
+        fields:
+            shard:
+                description: "The id of the shard."
+                type: shard_id
+                validator:
+                    callback: "ShardId::validate"
+            maxNumberOfChunksToMerge:
+                description: "The maximum number of chunks to merge."
+                type: int
+                default: 2147483647 # INT_MAX
+            maxTimeProcessingChunksMS:
+                description: >-
+                    "The maximum time in milliseconds spent looking for mergeable chunks."
+                type: int
+                default: 2147483647 # INT_MAX
+
+    _configsvrCommitMergeAllChunksOnShard:
+        command_name: _configsvrCommitMergeAllChunksOnShard
+        cpp_name: ConfigSvrCommitMergeAllChunksOnShard
+        description: "Definition of the mergeAllChunksOnShard command called on the config server."
+        namespace: type
+        type: namespacestring
+        api_version: ""
+        strict: false
+        reply_type: ConfigSvrMergeResponse
+        fields:
+            shard:
+                description: "The id of the shard."
+                type: shard_id
+                validator:
+                    callback: "ShardId::validate"
+            maxNumberOfChunksToMerge:
+                description: "The maximum number of chunks to merge."
+                type: int
+                default: 2147483647 # INT_MAX
+            maxTimeProcessingChunksMS:
+                description: >-
+                    "The maximum time in milliseconds spent looking for mergeable chunks."
+                type: int
+                default: 2147483647 # INT_MAX

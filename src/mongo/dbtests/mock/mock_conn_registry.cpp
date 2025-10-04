@@ -27,12 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/dbtests/mock/mock_conn_registry.h"
 
-#include "mongo/base/init.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/string_data.h"
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
+#include "mongo/util/assert_util.h"
+
+#include <mutex>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
 
 namespace mongo {
 
@@ -60,7 +66,7 @@ ConnectionString::ConnectionHook* MockConnRegistry::getConnStrHook() {
 }
 
 void MockConnRegistry::addServer(MockRemoteDBServer* server) {
-    stdx::lock_guard<Latch> sl(_registryMutex);
+    stdx::lock_guard<stdx::mutex> sl(_registryMutex);
 
     const std::string hostName(server->getServerAddress());
     fassert(16533, _registry.count(hostName) == 0);
@@ -69,12 +75,11 @@ void MockConnRegistry::addServer(MockRemoteDBServer* server) {
 }
 
 bool MockConnRegistry::removeServer(const std::string& hostName) {
-    stdx::lock_guard<Latch> sl(_registryMutex);
+    stdx::lock_guard<stdx::mutex> sl(_registryMutex);
     return _registry.erase(hostName) == 1;
 }
 
-MockRemoteDBServer* const MockConnRegistry::getMockRemoteDBServer(
-    const std::string& hostName) const {
+MockRemoteDBServer* MockConnRegistry::getMockRemoteDBServer(const std::string& hostName) const {
     stdx::lock_guard lk(_registryMutex);
     auto iter = _registry.find(hostName);
     if (iter == _registry.end())
@@ -84,12 +89,12 @@ MockRemoteDBServer* const MockConnRegistry::getMockRemoteDBServer(
 }
 
 void MockConnRegistry::clear() {
-    stdx::lock_guard<Latch> sl(_registryMutex);
+    stdx::lock_guard<stdx::mutex> sl(_registryMutex);
     _registry.clear();
 }
 
 std::unique_ptr<MockDBClientConnection> MockConnRegistry::connect(const std::string& connStr) {
-    stdx::lock_guard<Latch> sl(_registryMutex);
+    stdx::lock_guard<stdx::mutex> sl(_registryMutex);
     fassert(16534, _registry.count(connStr) == 1);
     return std::make_unique<MockDBClientConnection>(_registry[connStr], true);
 }

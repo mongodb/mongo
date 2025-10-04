@@ -15,12 +15,9 @@
  *   uses_transactions,
  * ]
  */
-
-(function() {
-"use strict";
-
-load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/libs/fail_point_util.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const replTest = new ReplSetTest({nodes: 2});
 replTest.startSet();
@@ -29,7 +26,7 @@ const config = replTest.getReplSetConfig();
 // Increase the election timeout so that we do not accidentally trigger an election while the
 // secondary is restarting.
 config.settings = {
-    "electionTimeoutMillis": 12 * 60 * 60 * 1000
+    "electionTimeoutMillis": 12 * 60 * 60 * 1000,
 };
 replTest.initiate(config);
 
@@ -37,8 +34,9 @@ const primary = replTest.getPrimary();
 let secondary = replTest.getSecondary();
 
 // The default WC is majority and this test can't satisfy majority writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 const dbName = "test";
 const collName = "initial_sync_fetch_from_oldest_active_transaction_timestamp";
@@ -85,9 +83,9 @@ jsTestLog("Expected beginFetchingTimestamp: " + tojson(beginFetchingTs));
 // also cause the beginApplyingTimestamp to be different from the beginFetchingTimestamp. Note
 // that since the beginApplyingTimestamp is the timestamp after which operations are applied
 // during initial sync, this commitTransaction will not be applied.
-const beginApplyingTimestamp =
-    assert.commandWorked(PrepareHelpers.commitTransaction(session1, prepareTimestamp1))
-        .operationTime;
+const beginApplyingTimestamp = assert.commandWorked(
+    PrepareHelpers.commitTransaction(session1, prepareTimestamp1),
+).operationTime;
 
 jsTestLog("beginApplyingTimestamp: " + tojson(beginApplyingTimestamp));
 
@@ -96,31 +94,38 @@ jsTestLog("beginApplyingTimestamp: " + tojson(beginApplyingTimestamp));
 // has copied {_id: 1} and {_id: 2}. This way we can insert more documents when initial sync is
 // paused and know that they won't be copied during collection cloning but instead must be
 // applied during oplog application.
-replTest.stop(secondary,
-              // signal
-              undefined,
-              // Validation would encounter a prepare conflict on the open transaction.
-              {skipValidation: true});
+replTest.stop(
+    secondary,
+    // signal
+    undefined,
+    // Validation would encounter a prepare conflict on the open transaction.
+    {skipValidation: true},
+);
 secondary = replTest.start(
     secondary,
     {
         startClean: true,
         setParameter: {
-            'failpoint.initialSyncHangDuringCollectionClone': tojson(
-                {mode: 'alwaysOn', data: {namespace: testColl.getFullName(), numDocsToClone: 2}}),
-            'numInitialSyncAttempts': 1
-        }
+            "failpoint.initialSyncHangDuringCollectionClone": tojson({
+                mode: "alwaysOn",
+                data: {namespace: testColl.getFullName(), numDocsToClone: 2},
+            }),
+            "numInitialSyncAttempts": 1,
+        },
     },
-    true /* wait */);
+    true /* wait */,
+);
 
 jsTestLog("Secondary was restarted");
 
 // Wait for failpoint to be reached so we know that collection cloning is paused.
-assert.commandWorked(secondary.adminCommand({
-    waitForFailPoint: "initialSyncHangDuringCollectionClone",
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+assert.commandWorked(
+    secondary.adminCommand({
+        waitForFailPoint: "initialSyncHangDuringCollectionClone",
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout,
+    }),
+);
 jsTestLog("Running operations while collection cloning is paused");
 
 // Run some operations on the sync source while collection cloning is paused so that we know
@@ -128,19 +133,17 @@ jsTestLog("Running operations while collection cloning is paused");
 // sure that the beginApplyingTimestamp and the stopTimestamp in initial sync are different. The
 // stopTimestamp is the timestamp of the oplog entry that was last applied on the sync source
 // when the oplog application phase of initial sync begins.
-const stopTimestamp =
-    assert.commandWorked(testColl.runCommand("insert", {documents: [{_id: 4}]})).operationTime;
+const stopTimestamp = assert.commandWorked(testColl.runCommand("insert", {documents: [{_id: 4}]})).operationTime;
 
 jsTestLog("stopTimestamp: " + tojson(stopTimestamp));
 
 // Resume initial sync.
-assert.commandWorked(secondary.adminCommand(
-    {configureFailPoint: "initialSyncHangDuringCollectionClone", mode: "off"}));
+assert.commandWorked(secondary.adminCommand({configureFailPoint: "initialSyncHangDuringCollectionClone", mode: "off"}));
 
 jsTestLog("Initial sync resumed");
 
 // Wait for the secondary to complete initial sync.
-replTest.waitForState(secondary, ReplSetTest.State.SECONDARY);
+replTest.awaitSecondaryNodes(null, [secondary]);
 replTest.awaitReplication();
 
 jsTestLog("Initial sync completed");
@@ -152,7 +155,7 @@ assert.eq(secondaryOplog.find({"ts": beginFetchingTs}).itcount(), 1);
 
 // Make sure the first transaction committed properly and is reflected after the initial sync.
 let res = secondary.getDB(dbName).getCollection(collName).findOne({_id: 2});
-assert.docEq(res, {_id: 2}, res);
+assert.docEq({_id: 2}, res);
 
 jsTestLog("Stepping up the secondary");
 
@@ -179,29 +182,33 @@ assert.eq(testColl.find({_id: 1}).toArray(), [{_id: 1}]);
 // Make sure that another write on the same document from the second transaction causes a write
 // conflict.
 assert.commandFailedWithCode(
-    testDB.runCommand(
-        {update: collName, updates: [{q: {_id: 1}, u: {$set: {a: 2}}}], maxTimeMS: 5 * 1000}),
-    ErrorCodes.MaxTimeMSExpired);
+    testDB.runCommand({update: collName, updates: [{q: {_id: 1}, u: {$set: {a: 2}}}], maxTimeMS: 5 * 1000}),
+    ErrorCodes.MaxTimeMSExpired,
+);
 
 // Make sure that we cannot add other operations to the second transaction since it is prepared.
-assert.commandFailedWithCode(sessionDB2.runCommand({
-    insert: collName,
-    documents: [{_id: 3}],
-    txnNumber: NumberLong(txnNumber2),
-    stmtId: NumberInt(2),
-    autocommit: false
-}),
-                             ErrorCodes.PreparedTransactionInProgress);
+assert.commandFailedWithCode(
+    sessionDB2.runCommand({
+        insert: collName,
+        documents: [{_id: 3}],
+        txnNumber: NumberLong(txnNumber2),
+        stmtId: NumberInt(2),
+        autocommit: false,
+    }),
+    ErrorCodes.PreparedTransactionInProgress,
+);
 
 jsTestLog("Committing the second transaction");
 
 // Make sure we can successfully commit the second transaction after recovery.
-assert.commandWorked(sessionDB2.adminCommand({
-    commitTransaction: 1,
-    commitTimestamp: prepareTimestamp2,
-    txnNumber: NumberLong(txnNumber2),
-    autocommit: false
-}));
+assert.commandWorked(
+    sessionDB2.adminCommand({
+        commitTransaction: 1,
+        commitTimestamp: prepareTimestamp2,
+        txnNumber: NumberLong(txnNumber2),
+        autocommit: false,
+    }),
+);
 assert.eq(testColl.find({_id: 1}).toArray(), [{_id: 1, a: 1}]);
 
 jsTestLog("Attempting to run another transaction");
@@ -214,4 +221,3 @@ assert.commandWorked(PrepareHelpers.commitTransaction(session2, prepareTimestamp
 assert.eq(testColl.findOne({_id: 1}), {_id: 1, a: 2});
 
 replTest.stopSet();
-})();

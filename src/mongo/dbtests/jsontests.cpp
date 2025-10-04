@@ -31,26 +31,61 @@
  * Tests for json.{h,cpp} code and BSONObj::jsonString()
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
+#include <ctime>
+#include <initializer_list>
+#include <limits>
+#include <memory>
+#include <sstream>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "mongo/platform/basic.h"
-
+#include <boost/core/swap.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/move/utility_core.hpp>
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/property_tree/ptree.hpp>
+#include <boost/tuple/tuple.hpp>
 #include <fmt/format.h>
-#include <fmt/printf.h>
-#include <limits>
-#include <sstream>
-
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
-#include "mongo/dbtests/dbtests.h"
+#include <fmt/printf.h>  // IWYU pragma: keep
+// IWYU pragma: no_include "boost/multi_index/detail/bidir_node_iterator.hpp"
+#include <boost/operators.hpp>
+// IWYU pragma: no_include "boost/property_tree/detail/exception_implementation.hpp"
+// IWYU pragma: no_include "boost/property_tree/detail/ptree_implementation.hpp"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bson_validate.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/column/bsoncolumnbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/errno_util.h"
+#include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
+#include <boost/property_tree/ptree_fwd.hpp>
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
+namespace mongo {
 namespace {
+
+using unittest::assertGet;
+
 std::string makeJsonEquvalent(const std::string& json) {
     boost::property_tree::ptree tree;
 
@@ -106,7 +141,7 @@ TEST(JsonStringTest, BasicTest) {
 TEST(JsonStringTest, PrettyFormatTest) {
     auto validate = [&](int line, BSONObj obj, bool arr, std::string out) {
         ASSERT_EQUALS(obj.jsonString(ExtendedRelaxedV2_0_0, true, arr), out)
-            << format(FMT_STRING(", line {}"), line);
+            << fmt::format(", line {}", line);
     };
     validate(__LINE__, B().obj(), 0, "{}");
     validate(__LINE__, B{}.obj(), 1, "[]");
@@ -402,7 +437,8 @@ public:
         char* _oldTimezonePtr = getenv("TZ");
         _oldTimezone = std::string(_oldTimezonePtr ? _oldTimezonePtr : "");
         if (-1 == putenv(tzEnvString)) {
-            FAIL(errnoWithDescription());
+            auto ec = lastSystemError();
+            FAIL(errorMessage(ec));
         }
         tzset();
     }
@@ -418,7 +454,8 @@ public:
             }
 #else
             if (-1 == setenv("TZ", _oldTimezone.c_str(), 1)) {
-                FAIL(errnoWithDescription());
+                auto ec = lastSystemError();
+                FAIL(errorMessage(ec));
             }
 #endif
         } else {
@@ -431,7 +468,8 @@ public:
             }
 #else
             if (-1 == unsetenv("TZ")) {
-                FAIL(errnoWithDescription());
+                auto ec = lastSystemError();
+                FAIL(errorMessage(ec));
             }
 #endif
         }
@@ -538,10 +576,7 @@ TEST(JsonStringTest, CodeTests) {
 
 TEST(JsonStringTest, CodeWScopeTests) {
     BSONObjBuilder b;
-    b.appendCodeWScope("x",
-                       "function(arg){ var string = \"\\n\"; return x; }",
-                       BSON("x"
-                            << "1"));
+    b.appendCodeWScope("x", "function(arg){ var string = \"\\n\"; return x; }", BSON("x" << "1"));
 
     checkJsonStringEach({{b.done(),
                           "{ \"x\" : "
@@ -624,7 +659,7 @@ void assertEquals(const std::string& json,
 }
 
 void checkEquivalence(const std::string& json, const BSONObj& bson) {
-    ASSERT(fromjson(json).valid());
+    ASSERT(validateBSON(fromjson(json)).isOK());
     assertEquals(json, bson, fromjson(json), "mode: json-to-bson");
     assertEquals(json, bson, fromjson(tojson(bson)), "mode: <default>");
     assertEquals(json, bson, fromjson(tojson(bson, LegacyStrict)), "mode: strict");
@@ -728,7 +763,7 @@ TEST(FromJsonTest, Utf8Test) {
     using namespace std::literals::string_literals;
     const std::string u = "\xea\x80\x80\xea\x80\x80"s;
     BSONObj built = B().append("a", u).obj();
-    ASSERT_EQUALS(built.firstElement().valuestr(), u);
+    ASSERT_EQUALS(built.firstElement().str(), u);
 
     checkEquivalenceEach({
         // EscapedUnicodeToUtf8
@@ -792,7 +827,7 @@ TEST(FromJsonTest, DBRefTest) {
          B().append("a", B().append("$ref", "ns").append("$id", OID()).obj()).obj()},
         // DbName
         {R"({ "a" : { "$ref" : "ns", "$id" : "000000000000000000000000", )"
-         R"("$db" : "dbname" } }))",
+         R"("$db" : "dbname" } })",
          B().append("a",
                     B().append("$ref", "ns")
                         .append("$id", "000000000000000000000000")
@@ -835,12 +870,26 @@ TEST(FromJsonTest, BinDataTypes) {
         {0x05, MD5Type},
         {0x06, Encrypt},
         {0x07, Column},
+        {0x08, Sensitive},
+        {0x09, Vector},
         {0x80, bdtCustom},
     };
     for (const auto& ts : specs) {
-        checkEquivalence(
-            fmt::sprintf(R"({ "a" : { "$binary" : "YWJj", "$type" : "%02x" } })", ts.code),
-            BSONObjBuilder().appendBinData("a", 3, ts.bdt, "abc").obj());
+        if (ts.bdt == Column) {
+            BSONColumnBuilder cb;
+            cb.append(BSON("a" << "abc").getField("a"));
+            BSONBinData columnData = cb.finalize();
+            checkEquivalence(fmt::sprintf(R"({ "a" : { "$binary" : "%s", "$type" : "%02x" } })",
+                                          base64::encode(columnData.data, columnData.length),
+                                          ts.code),
+                             BSONObjBuilder()
+                                 .appendBinData("a", columnData.length, ts.bdt, columnData.data)
+                                 .obj());
+        } else {
+            checkEquivalence(
+                fmt::sprintf(R"({ "a" : { "$binary" : "YWJj", "$type" : "%02x" } })", ts.code),
+                BSONObjBuilder().appendBinData("a", 3, ts.bdt, "abc").obj());
+        }
     }
 }
 
@@ -983,6 +1032,35 @@ TEST(FromJsonTest, TimestampObjectTest) {
     });
 }
 
+TEST(FromJsonTest, JSUUIDTest) {
+    BSONObjBuilder uuidObjBuilder;
+    UUID uuid = assertGet(UUID::parse("5fc51c8b-9a77-49ff-9f94-0a7e96173aa0"));
+    uuid.appendToBuilder(&uuidObjBuilder, "a");
+    checkEquivalence(R"({ "a" : UUID( "5fc51c8b-9a77-49ff-9f94-0a7e96173aa0" ) })",
+                     uuidObjBuilder.obj());
+    checkRejectionEach({
+        R"({ "a" : UUID( 20 ) })",                                       // Not a string
+        R"({ "a" : UUID() })",                                           // NoArgs
+        R"({ "a" : UUID( "a" ) })",                                      // Wrong input size
+        R"({ "a" : UUID( "/5fc51c8b-9a77-49ff-9f94-0a7e96173aa0" ) })",  // Right size, but wrong
+                                                                         // character set
+    });
+}
+
+TEST(FromJsonTest, UUIDObjectTest) {
+    BSONObjBuilder uuidObjBuilder;
+    UUID uuid = assertGet(UUID::parse("5fc51c8b-9a77-49ff-9f94-0a7e96173aa0"));
+    uuid.appendToBuilder(&uuidObjBuilder, "a");
+    checkEquivalence(R"({ "a" : {"$uuid": "5fc51c8b-9a77-49ff-9f94-0a7e96173aa0" } })",
+                     uuidObjBuilder.obj());
+    checkRejectionEach({
+        R"({ "a" : {"$uuid": 20} })",                                       // Not a string
+        R"({ "a" : {"$uuid": "a"} })",                                      // Wrong input size
+        R"({ "a" : {"$uuid": "/5fc51c8b-9a77-49ff-9f94-0a7e96173aa0"} })",  // Right size, but wrong
+                                                                            // character set
+    });
+}
+
 BSONObj re(const std::string& name, const std::string& re, const std::string& options) {
     BSONObjBuilder b;
     b.appendRegex(name, re, options);
@@ -1116,9 +1194,9 @@ TEST(FromJsonTest, NumericTypes) {
         for (const auto& json : altReps) {
             checkEquivalence(json, obj);
             BSONObj o = fromjson(json);
-            ASSERT(o["int"].type() == NumberInt);
-            ASSERT(o["long"].type() == NumberLong);
-            ASSERT(o["double"].type() == NumberDouble);
+            ASSERT(o["int"].type() == BSONType::numberInt);
+            ASSERT(o["long"].type() == BSONType::numberLong);
+            ASSERT(o["double"].type() == BSONType::numberDouble);
             ASSERT(o["long"].numberLong() == val.l);
         }
     }
@@ -1156,7 +1234,9 @@ TEST(FromJsonTest, NumericTypes) {
 TEST(FromJsonTest, EmbeddedDates) {
     const long long kMin = 1257829200000;
     const long long kMax = 1257829200100;
-    auto makeDate = [](long long ms) { return Date_t::fromMillisSinceEpoch(ms); };
+    auto makeDate = [](long long ms) {
+        return Date_t::fromMillisSinceEpoch(ms);
+    };
     const BSONObj bson =
         B().append("time.valid",
                    B().appendDate("$gt", makeDate(kMin)).appendDate("$lt", makeDate(kMax)).obj())
@@ -1169,10 +1249,10 @@ TEST(FromJsonTest, EmbeddedDates) {
     for (const auto& format : formats) {
         const std::string json = fmt::sprintf(format, kMin, kMax);
         BSONObj o = fromjson(json);
-        ASSERT_EQUALS(3, (o["time.valid"].type()));
+        ASSERT_EQUALS(3, stdx::to_underlying(o["time.valid"].type()));
         BSONObj e = o["time.valid"].embeddedObjectUserCheck();
-        ASSERT_EQUALS(9, e["$gt"].type());
-        ASSERT_EQUALS(9, e["$lt"].type());
+        ASSERT_EQUALS(9, stdx::to_underlying(e["$gt"].type()));
+        ASSERT_EQUALS(9, stdx::to_underlying(e["$lt"].type()));
         checkEquivalence(json, bson);
     }
 }
@@ -1193,5 +1273,71 @@ TEST(FromJsonTest, MinMaxKey) {
     });
 }
 
+/**
+ * Asserts 'inputjson' fails to parse, and that each of the 'expectedContextChars' are shown in a
+ * little snippet of the area we encountered the first parsing error.
+ */
+void assertErrorWithContext(std::string inputjson,
+                            std::initializer_list<char> expectedContextChars) {
+    try {
+        fromjson(inputjson);
+        ASSERT(false) << "Expected to fail to parse";
+    } catch (const DBException& ex) {
+        const auto status = ex.toStatus();
+        const StringData reason = status.reason();
+        LOGV2_DEBUG(7583700, 3, "Indeeded failed to parse", "reason"_attr = status);
+        for (auto&& expectedChar : expectedContextChars) {
+            auto contextStart = reason.find(':', reason.find("Bad character"_sd));
+            ASSERT_NE(contextStart, std::string::npos);
+            auto contextEnd = reason.find("Full input:");
+            ASSERT_NE(contextStart, std::string::npos);
+            auto index = reason.find(expectedChar, contextStart);
+            ASSERT(index < contextEnd)
+                << "Expected to find '" << expectedChar << "' in error message's context snippet: "
+                << reason.substr(contextStart, (contextEnd - contextStart));
+        }
+        // We expect to see this in each error message - showing the character position of the parse
+        // error, like clang error messages:
+        // "{a: 4"
+        //       ^
+        const char positionIndicator = '^';
+        ASSERT_NE(reason.find(positionIndicator), std::string::npos)
+            << "Expected to find the indicator character in the message: " << reason;
+    }
+}
+
+TEST(FromJsonTest, GivesErrorContext) {
+
+    // Missing close brace after 4. This is the easy case, the error is solidly in the middle of the
+    // string:
+    assertErrorWithContext("{$and: [{a: 4, {b: 3}]}", {'4'});
+    // Error right at the beginning:
+    assertErrorWithContext("answer: 4}", {'a'});
+    // Error right at the end:
+    assertErrorWithContext("{answer: 4", {'4'});
+    // Error in the middle of a short string:
+    assertErrorWithContext("{a 4}", {'a', '4'});
+    // Error at the beginning of a short string:
+    assertErrorWithContext("a: 4}", {'a'});
+    // Error at the end of a short string:
+    assertErrorWithContext("{a: 4", {'4'});
+    // Very large input string
+    assertErrorWithContext(R"({
+        a: 4,
+        b: 10,
+        c: [
+            {d: 1, e: 1},
+            {d: 2, e: 2},
+            {d: 3, e: 3}
+        ],
+        f: 5,
+        g: 6
+        z: 7,
+    })",
+                           // Error is missing comma after 6, before 'z'
+                           {'6', 'z'});
+}
+
 }  // namespace FromJsonTests
 }  // namespace
+}  // namespace mongo

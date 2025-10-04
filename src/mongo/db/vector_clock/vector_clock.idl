@@ -1,0 +1,79 @@
+#    Copyright (C) 2019-present MongoDB, Inc.
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the Server Side Public License, version 1,
+#    as published by MongoDB, Inc.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    Server Side Public License for more details.
+#
+#    You should have received a copy of the Server Side Public License
+#    along with this program. If not, see
+#    <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+#    As a special exception, the copyright holders give permission to link the
+#    code of portions of this program with the OpenSSL library under certain
+#    conditions as described in each individual source file and distribute
+#    linked combinations including the program with the OpenSSL library. You
+#    must comply with the Server Side Public License in all respects for
+#    all of the code used other than as permitted herein. If you modify file(s)
+#    with this exception, you may extend this exception to your version of the
+#    file(s), but you are not obligated to do so. If you do not wish to do so,
+#    delete this exception statement from your version. If you delete this
+#    exception statement from all source files in the program, then also delete
+#    it in the license file.
+#
+
+global:
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/db/basic_types.idl"
+
+structs:
+    ClusterTimeSignature:
+        description: "Used to validate the identity of a request or response's ClusterTime."
+        strict: false
+        fields:
+            hash:
+                type: bindata_generic
+                optional: false
+            keyId:
+                type: safeInt64
+                optional: false
+
+    ClusterTime:
+        description:
+            "Gossiped in component for the cluster time tracking the state of user databases
+            across the cluster. It may optionally include a signature identifying the process that
+            generated such a value."
+        strict: false
+        fields:
+            clusterTime:
+                type: timestamp
+                optional: false
+            signature:
+                type: ClusterTimeSignature
+                optional: true
+
+    GossipedVectorClockComponents:
+        description: Common time components to describe a point in time for the cluster.
+        strict: false
+        fields:
+            $configTime:
+                description: The time component that represents the config time.
+                type: timestamp
+                cpp_name: dollarConfigTime
+                optional: true
+            $topologyTime:
+                description: The time component that represents the topology time.
+                type: timestamp
+                cpp_name: dollarTopologyTime
+                optional: true
+            $clusterTime:
+                description: The time component that represents the cluster time.
+                type: ClusterTime
+                cpp_name: dollarClusterTime
+                optional: true

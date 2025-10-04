@@ -27,10 +27,23 @@
  *    it in the license file.
  */
 
-#include <boost/optional.hpp>
+#pragma once
+
+#include "mongo/platform/compiler.h"
+#include "mongo/util/modules.h"
+
 #include <cstddef>
 
-namespace mongo {
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+
+#ifdef __has_builtin
+#if __has_builtin(__builtin_frame_address)
+#define MONGO_STACK_LOCATOR_HAS_BUILTIN_FRAME_ADDRESS
+#endif
+#endif
+
+namespace MONGO_MOD_PUB mongo {
 
 /**
  *  Provides access to the current stack bounds and remaining
@@ -52,11 +65,20 @@ namespace mongo {
  */
 class StackLocator {
 public:
-    /**
-     * Constructs a new StackLocator. The locator must have automatic
-     * storage duration or the behavior is undefined.
-     */
-    StackLocator();
+    MONGO_COMPILER_IF_MSVC(_Pragma("warning(push)"))
+    // returning address of local variable or temporary
+    MONGO_COMPILER_IF_MSVC(_Pragma("warning(disable:4172)"))
+    MONGO_COMPILER_ALWAYS_INLINE static const void* getFramePointer() {
+#ifdef MONGO_STACK_LOCATOR_HAS_BUILTIN_FRAME_ADDRESS
+        return __builtin_frame_address(0);
+#else
+        int x;
+        return &x;
+#endif  // MONGO_STACK_LOCATOR_HAS_BUILTIN_FRAME_ADDRESS
+    }
+    MONGO_COMPILER_IF_MSVC(_Pragma("warning(pop)"))
+
+    explicit StackLocator(const void* capturedStackPointer = getFramePointer());
 
     /**
      *  Returns the address of the beginning of the stack, or nullptr
@@ -65,7 +87,7 @@ public:
      *  the call chain. Returns nullptr if the beginning of the stack
      *  could not be found.
      */
-    void* begin() const {
+    const void* begin() const {
         return _begin;
     }
 
@@ -76,7 +98,7 @@ public:
      *  call chain. Returns nullptr if the end of the stack could not
      *  be found.
      */
-    void* end() const {
+    const void* end() const {
         return _end;
     }
 
@@ -97,8 +119,9 @@ public:
     boost::optional<std::size_t> available() const;
 
 private:
-    void* _begin = nullptr;
-    void* _end = nullptr;
+    const void* _begin = nullptr;
+    const void* _end = nullptr;
+    const void* _capturedStackPointer = nullptr;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

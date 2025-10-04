@@ -27,15 +27,18 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/client_strand.h"
 
 #include "mongo/logv2/log.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_name.h"
-#include "mongo/util/thread_context.h"
+#include "mongo/util/decorable.h"
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 
 namespace mongo {
 namespace {
@@ -56,7 +59,7 @@ boost::intrusive_ptr<ClientStrand> ClientStrand::get(Client* client) {
     return getClientStrandData(client).strand;
 }
 
-void ClientStrand::_setCurrent() noexcept {
+void ClientStrand::_setCurrent() {
     invariant(_isBound.load());
     invariant(_client);
 
@@ -67,13 +70,13 @@ void ClientStrand::_setCurrent() noexcept {
     Client::setCurrent(std::move(_client));
 
     // Set up the thread name.
-    _oldThreadName = ThreadName::set(ThreadContext::get(), _threadName);
+    _oldThreadName = setThreadNameRef(_threadName);
     if (_oldThreadName) {
         LOGV2_DEBUG(5127802, kDiagnosticLogLevel, "Set thread name", "name"_attr = *_threadName);
     }
 }
 
-void ClientStrand::_releaseCurrent() noexcept {
+void ClientStrand::_releaseCurrent() {
     invariant(_isBound.load());
     invariant(!_client);
 
@@ -83,10 +86,10 @@ void ClientStrand::_releaseCurrent() noexcept {
 
     if (_oldThreadName) {
         // Reset the last thread name because it was previously set in the OS.
-        ThreadName::set(ThreadContext::get(), std::move(_oldThreadName));
+        setThreadNameRef(std::move(_oldThreadName));
     } else {
         // Release the thread name for reuse.
-        ThreadName::release(ThreadContext::get());
+        releaseThreadNameRef();
     }
 
     LOGV2_DEBUG(

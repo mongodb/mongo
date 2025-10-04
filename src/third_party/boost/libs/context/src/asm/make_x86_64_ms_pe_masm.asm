@@ -141,7 +141,7 @@ make_fcontext PROC BOOST_CONTEXT_EXPORT FRAME
     ; compute abs address of label finish
     lea  rcx, finish
     ; save address of finish as return-address for context-function in RBP
-    ; will be entered after context-function returns 
+    ; will be entered after context-function returns
     mov  [rax+0108h], rcx
 
     ret ; return pointer to context-data

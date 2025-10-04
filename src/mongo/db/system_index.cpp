@@ -27,28 +27,46 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/system_index.h"
 
-#include "mongo/base/init.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/index_spec.h"
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/commit_quorum_options.h"
-#include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog/index_key_validate.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index_builds_coordinator.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/storage/storage_options.h"
+#include "mongo/db/exec/scoped_timer.h"
+#include "mongo/db/index_builds/index_builds_coordinator.h"
+#include "mongo/db/index_builds/index_builds_manager.h"
+#include "mongo/db/local_catalog/catalog_raii.h"
+#include "mongo/db/local_catalog/collection.h"
+#include "mongo/db/local_catalog/index_catalog.h"
+#include "mongo/db/local_catalog/index_descriptor.h"
+#include "mongo/db/local_catalog/index_key_validate.h"
+#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/intent_registry.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
+
+#include <chrono>
+#include <string>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
+
 
 using namespace std::chrono_literals;
 
@@ -62,8 +80,6 @@ std::string v3SystemUsersIndexName;
 std::string v3SystemRolesIndexName;
 IndexSpec v3SystemUsersIndexSpec;
 IndexSpec v3SystemRolesIndexSpec;
-
-const NamespaceString sessionCollectionNamespace("config.system.sessions");
 
 MONGO_INITIALIZER(AuthIndexKeyPatterns)(InitializerContext*) {
     v1SystemUsersKeyPattern = BSON("user" << 1 << "userSource" << 1);
@@ -95,18 +111,16 @@ void generateSystemIndexForExistingCollection(OperationContext* opCtx,
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     uassert(ErrorCodes::NotWritablePrimary,
             "Not primary while creating authorization index",
-            replCoord->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet ||
-                replCoord->canAcceptWritesForDatabase(opCtx, ns.db()));
+            !replCoord->getSettings().isReplSet() ||
+                replCoord->canAcceptWritesForDatabase(opCtx, ns.dbName()));
 
-    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+    invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
     try {
         auto indexSpecStatus = index_key_validate::validateIndexSpec(opCtx, spec.toBSON());
         BSONObj indexSpec = fassert(40452, indexSpecStatus);
 
         LOGV2(22488,
-              "No authorization index detected on {namespace} collection. Attempting to recover by "
-              "creating an index with spec: {indexSpec}",
               "No authorization index detected. Attempting to recover by "
               "creating an index",
               logAttrs(ns),
@@ -117,42 +131,39 @@ void generateSystemIndexForExistingCollection(OperationContext* opCtx,
         IndexBuildsCoordinator::get(opCtx)->createIndex(
             opCtx, collectionUUID, indexSpec, indexConstraints, fromMigrate);
     } catch (const DBException& e) {
-        LOGV2_FATAL_CONTINUE(22490,
-                             "Failed to regenerate index for {namespace}. Exception: {error}",
-                             "Failed to regenerate index",
-                             logAttrs(ns),
-                             "error"_attr = e.what());
+        LOGV2_FATAL_CONTINUE(
+            22490, "Failed to regenerate index", logAttrs(ns), "error"_attr = e.what());
         throw;
     }
 }
 
 }  // namespace
 
-Status verifySystemIndexes(OperationContext* opCtx) {
-    // Do not try and generate any system indexes in read only mode.
-    if (storageGlobalParams.readOnly) {
-        LOGV2_WARNING(22489,
-                      "Running in queryable backup mode. Unable to create authorization indexes");
-        return Status::OK();
-    }
+Status verifySystemIndexes(OperationContext* opCtx, BSONObjBuilder* startupTimeElapsedBuilder) {
+    const NamespaceString& systemUsers = NamespaceString::kAdminUsersNamespace;
+    const NamespaceString& systemRoles = NamespaceString::kAdminRolesNamespace;
 
-    const NamespaceString& systemUsers = AuthorizationManager::usersCollectionNamespace;
-    const NamespaceString& systemRoles = AuthorizationManager::rolesCollectionNamespace;
+    auto options = auto_get_collection::Options{}.globalLockOptions(Lock::GlobalLockOptions{
+        .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
 
     // Create indexes for the admin.system.users collection.
     {
-        AutoGetCollection collection(opCtx, systemUsers, MODE_X);
+        AutoGetCollection collection(opCtx, systemUsers, MODE_X, options);
 
         if (collection) {
+            SectionScopedTimer scopedTimer(&opCtx->fastClockSource(),
+                                           TimedSectionId::createSystemUsersIndex,
+                                           startupTimeElapsedBuilder);
             const IndexCatalog* indexCatalog = collection->getIndexCatalog();
             invariant(indexCatalog);
 
             // Make sure the old unique index from v2.4 on system.users doesn't exist.
             std::vector<const IndexDescriptor*> indexes;
-            indexCatalog->findIndexesByKeyPattern(opCtx, v1SystemUsersKeyPattern, false, &indexes);
+            indexCatalog->findIndexesByKeyPattern(
+                opCtx, v1SystemUsersKeyPattern, IndexCatalog::InclusionPolicy::kReady, &indexes);
 
             if (!indexes.empty()) {
-                fassert(ErrorCodes::AmbiguousIndexKeyPattern, indexes.size() == 1);
+                fassert(9097915, indexes.size() == 1);
                 return Status(ErrorCodes::AuthSchemaIncompatible,
                               "Old 2.4 style user index identified. "
                               "The authentication schema needs to be updated by "
@@ -160,7 +171,8 @@ Status verifySystemIndexes(OperationContext* opCtx) {
             }
 
             // Ensure that system indexes exist for the user collection.
-            indexCatalog->findIndexesByKeyPattern(opCtx, v3SystemUsersKeyPattern, false, &indexes);
+            indexCatalog->findIndexesByKeyPattern(
+                opCtx, v3SystemUsersKeyPattern, IndexCatalog::InclusionPolicy::kReady, &indexes);
             if (indexes.empty()) {
                 try {
                     generateSystemIndexForExistingCollection(
@@ -174,15 +186,19 @@ Status verifySystemIndexes(OperationContext* opCtx) {
 
     // Create indexes for the admin.system.roles collection.
     {
-        AutoGetCollection collection(opCtx, systemRoles, MODE_X);
+        AutoGetCollection collection(opCtx, systemRoles, MODE_X, options);
 
         // Ensure that system indexes exist for the roles collection, if it exists.
         if (collection) {
+            SectionScopedTimer scopedTimer(&opCtx->fastClockSource(),
+                                           TimedSectionId::createSystemRolesIndex,
+                                           startupTimeElapsedBuilder);
             const IndexCatalog* indexCatalog = collection->getIndexCatalog();
             invariant(indexCatalog);
 
             std::vector<const IndexDescriptor*> indexes;
-            indexCatalog->findIndexesByKeyPattern(opCtx, v3SystemRolesKeyPattern, false, &indexes);
+            indexCatalog->findIndexesByKeyPattern(
+                opCtx, v3SystemRolesKeyPattern, IndexCatalog::InclusionPolicy::kReady, &indexes);
             if (indexes.empty()) {
                 try {
                     generateSystemIndexForExistingCollection(
@@ -197,26 +213,28 @@ Status verifySystemIndexes(OperationContext* opCtx) {
     return Status::OK();
 }
 
-void createSystemIndexes(OperationContext* opCtx, CollectionWriter& collection) {
+void createSystemIndexes(OperationContext* opCtx, CollectionWriter& collection, bool fromMigrate) {
     invariant(collection);
     const NamespaceString& ns = collection->ns();
     BSONObj indexSpec;
-    if (ns == AuthorizationManager::usersCollectionNamespace) {
+    if (ns == NamespaceString::kAdminUsersNamespace) {
         indexSpec = fassert(
             40455, index_key_validate::validateIndexSpec(opCtx, v3SystemUsersIndexSpec.toBSON()));
 
-    } else if (ns == AuthorizationManager::rolesCollectionNamespace) {
+    } else if (ns == NamespaceString::kAdminRolesNamespace) {
         indexSpec = fassert(
             40457, index_key_validate::validateIndexSpec(opCtx, v3SystemRolesIndexSpec.toBSON()));
     }
     if (!indexSpec.isEmpty()) {
-        auto fromMigrate = false;
         try {
             IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
                 opCtx, collection, {indexSpec}, fromMigrate);
-        } catch (WriteConflictException&) {
+        } catch (const StorageUnavailableException&) {
             throw;
-        } catch (DBException& ex) {
+        } catch (const DBException& ex) {
+            if (!opCtx->checkForInterruptNoAssert().isOK()) {
+                throw;
+            }
             fassertFailedWithStatus(40456, ex.toStatus());
         }
     }

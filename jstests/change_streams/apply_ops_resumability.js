@@ -2,13 +2,10 @@
 // that we can resume from any point within the transaction.
 // @tags: [uses_transactions, requires_snapshot_read, requires_majority_read_concern]
 
-(function() {
-"use strict";
-
-load("jstests/libs/auto_retry_transaction_in_sharding.js");  // For withTxnAndAutoRetryOnMongos.
-load("jstests/libs/change_stream_util.js");                  // For ChangeStreamTest.
-load("jstests/libs/collection_drop_recreate.js");            // For assert[Drop|Create]Collection.
-load("jstests/libs/fixture_helpers.js");                     // For FixtureHelpers.isMongos.
+import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 
 const coll = assertDropAndRecreateCollection(db, "change_stream_apply_ops");
 const otherCollName = "change_stream_apply_ops_2";
@@ -19,8 +16,10 @@ const otherDbCollName = "someColl";
 assertDropAndRecreateCollection(db.getSiblingDB(otherDbName), otherDbCollName);
 
 let cst = new ChangeStreamTest(db);
-let changeStream = cst.startWatchingChanges(
-    {pipeline: [{$changeStream: {}}, {$project: {"lsid.uid": 0}}], collection: coll});
+let changeStream = cst.startWatchingChanges({
+    pipeline: [{$changeStream: {}}, {$project: {"lsid.uid": 0}}],
+    collection: coll,
+});
 
 // Record the clusterTime at the outset of the test, before any writes are performed.
 const testStartTime = db.hello().$clusterTime.clusterTime;
@@ -30,11 +29,11 @@ assert.commandWorked(coll.insert({_id: 0, a: 123}));
 
 // Open a session, and perform two writes within a transaction.
 const sessionOptions = {
-    causalConsistency: false
+    causalConsistency: false,
 };
 const txnOptions = {
     readConcern: {level: "snapshot"},
-    writeConcern: {w: "majority"}
+    writeConcern: {w: "majority"},
 };
 
 const session = db.getMongo().startSession(sessionOptions);
@@ -46,21 +45,25 @@ const sessionColl = sessionDb[coll.getName()];
 const sessionOtherColl = sessionDb[otherCollName];
 const sessionOtherDbColl = session.getDatabase(otherDbName)[otherDbCollName];
 
-withTxnAndAutoRetryOnMongos(session, () => {
-    // Two inserts on the main test collection.
-    assert.commandWorked(sessionColl.insert({_id: 1, a: 0}));
-    assert.commandWorked(sessionColl.insert({_id: 2, a: 0}));
+withTxnAndAutoRetryOnMongos(
+    session,
+    () => {
+        // Two inserts on the main test collection.
+        assert.commandWorked(sessionColl.insert({_id: 1, a: 0}));
+        assert.commandWorked(sessionColl.insert({_id: 2, a: 0}));
 
-    // One insert on a collection that we're not watching. This should be skipped by the
-    // single-collection change stream.
-    assert.commandWorked(sessionOtherColl.insert({_id: 111, a: "Doc on other collection"}));
+        // One insert on a collection that we're not watching. This should be skipped by the
+        // single-collection change stream.
+        assert.commandWorked(sessionOtherColl.insert({_id: 111, a: "Doc on other collection"}));
 
-    // One insert on a collection in a different database. This should be skipped by the single
-    // collection and single-db changestreams.
-    assert.commandWorked(sessionOtherDbColl.insert({_id: 222, a: "Doc on other DB"}));
+        // One insert on a collection in a different database. This should be skipped by the single
+        // collection and single-db changestreams.
+        assert.commandWorked(sessionOtherDbColl.insert({_id: 222, a: "Doc on other DB"}));
 
-    assert.commandWorked(sessionColl.updateOne({_id: 1}, {$inc: {a: 1}}));
-}, txnOptions);
+        assert.commandWorked(sessionColl.updateOne({_id: 1}, {$inc: {a: 1}}));
+    },
+    txnOptions,
+);
 
 // Now insert another document, not part of a transaction.
 assert.commandWorked(coll.insert({_id: 3, a: 123}));
@@ -123,7 +126,7 @@ let expectedChanges = [
         ns: {db: db.getName(), coll: coll.getName()},
         operationType: "insert",
     },
-    {operationType: "drop", ns: {db: db.getName(), coll: coll.getName()}}
+    {operationType: "drop", ns: {db: db.getName(), coll: coll.getName()}},
 ];
 
 // Validate that we observe all expected changes in the stream, and replace the'expectedChanges'
@@ -134,30 +137,22 @@ let expectedChanges = [
     const wholeClusterCursor = wholeClusterCST.startWatchingChanges({
         pipeline: [
             {$changeStream: {startAtOperationTime: testStartTime, allChangesForCluster: true}},
-            {$project: {"lsid.uid": 0}}
+            {$project: {"lsid.uid": 0}},
         ],
-        collection: 1
+        collection: 1,
     });
-    // If we are running in a sharded passthrough, then this may have been a multi-shard txn. Change
-    // streams will interleave the txn events from across the shards in (clusterTime, txnOpIndex)
-    // order, and so may not reflect the ordering of writes in the test. The ordering of events is
-    // important for later tests, so if we are running on mongoS we verify that exactly the expected
-    // set of events are observed, and then we adopt the order in which they were returned.
-    if (FixtureHelpers.isMongos(db)) {
-        expectedChanges = wholeClusterCST.assertNextChangesEqualUnordered(
-            {cursor: wholeClusterCursor, expectedChanges: expectedChanges});
-    } else {
-        expectedChanges = wholeClusterCST.assertNextChangesEqual(
-            {cursor: wholeClusterCursor, expectedChanges: expectedChanges});
-    }
+    expectedChanges = wholeClusterCST.assertNextChangesEqualWithDeploymentAwareness({
+        cursor: wholeClusterCursor,
+        expectedChanges: expectedChanges,
+    });
 })();
 
 // Helper function to find the first non-transaction event and the first two transaction events in
 // the given list of change stream events.
 function findMilestoneEvents(eventList) {
-    const nonTxnIdx = eventList.findIndex(event => !event.lsid),
-          firstTxnIdx = eventList.findIndex(event => event.lsid),
-          secondTxnIdx = eventList.findIndex((event, idx) => (idx > firstTxnIdx && event.lsid));
+    const nonTxnIdx = eventList.findIndex((event) => !event.lsid),
+        firstTxnIdx = eventList.findIndex((event) => event.lsid),
+        secondTxnIdx = eventList.findIndex((event, idx) => idx > firstTxnIdx && event.lsid);
     // Return the array indices of each event, and the events themselves.
     return [
         nonTxnIdx,
@@ -165,7 +160,7 @@ function findMilestoneEvents(eventList) {
         secondTxnIdx,
         eventList[nonTxnIdx],
         eventList[firstTxnIdx],
-        eventList[secondTxnIdx]
+        eventList[secondTxnIdx],
     ];
 }
 
@@ -175,7 +170,8 @@ function findMilestoneEvents(eventList) {
 
 // Filter out any events that aren't on the main test collection namespace.
 const expectedSingleCollChanges = expectedChanges.filter(
-    event => (event.ns.db === db.getName() && event.ns.coll === coll.getName()));
+    (event) => event.ns.db === db.getName() && event.ns.coll === coll.getName(),
+);
 
 // Verify that the stream returns the expected sequence of changes.
 cst.assertNextChangesEqual({cursor: changeStream, expectedChanges: expectedSingleCollChanges});
@@ -188,29 +184,26 @@ let [nonTxnIdx, firstTxnIdx, secondTxnIdx, nonTxnChange, firstTxnChange, secondT
 // transaction again.
 changeStream = cst.startWatchingChanges({
     pipeline: [{$changeStream: {resumeAfter: nonTxnChange._id}}, {$project: {"lsid.uid": 0}}],
-    collection: coll
+    collection: coll,
 });
-cst.assertNextChangesEqual(
-    {cursor: changeStream, expectedChanges: expectedSingleCollChanges.slice(nonTxnIdx + 1)});
+cst.assertNextChangesEqual({cursor: changeStream, expectedChanges: expectedSingleCollChanges.slice(nonTxnIdx + 1)});
 
 // Resume after the first transaction change. Be sure we see the second change again.
 changeStream = cst.startWatchingChanges({
     pipeline: [{$changeStream: {resumeAfter: firstTxnChange._id}}, {$project: {"lsid.uid": 0}}],
-    collection: coll
+    collection: coll,
 });
-cst.assertNextChangesEqual(
-    {cursor: changeStream, expectedChanges: expectedSingleCollChanges.slice(firstTxnIdx + 1)});
+cst.assertNextChangesEqual({cursor: changeStream, expectedChanges: expectedSingleCollChanges.slice(firstTxnIdx + 1)});
 
 // Try starting another change stream from the second change caused by the transaction. Verify
 // that we can see the insert performed after the transaction was committed.
 let otherCursor = cst.startWatchingChanges({
     pipeline: [{$changeStream: {resumeAfter: secondTxnChange._id}}, {$project: {"lsid.uid": 0}}],
     collection: coll,
-    doNotModifyInPassthroughs: true  // A collection drop only invalidates single-collection
-                                     // change streams.
+    doNotModifyInPassthroughs: true, // A collection drop only invalidates single-collection
+    // change streams.
 });
-cst.assertNextChangesEqual(
-    {cursor: otherCursor, expectedChanges: expectedSingleCollChanges.slice(secondTxnIdx + 1)});
+cst.assertNextChangesEqual({cursor: otherCursor, expectedChanges: expectedSingleCollChanges.slice(secondTxnIdx + 1)});
 
 // Verify that the next event observed by the stream is an invalidate following the collection drop.
 const invalidateEvent = cst.getOneChange(otherCursor, true);
@@ -226,7 +219,7 @@ for (let i = 1; i < FixtureHelpers.numberOfShardsForCollection(coll); ++i) {
 }
 
 // Filter out any events that aren't on the main test database.
-const expectedSingleDBChanges = expectedChanges.filter(event => (event.ns.db === db.getName()));
+const expectedSingleDBChanges = expectedChanges.filter((event) => event.ns.db === db.getName());
 
 // Obtain the first non-transaction change and the first two in-transaction changes.
 [nonTxnIdx, firstTxnIdx, secondTxnIdx, nonTxnChange, firstTxnChange, secondTxnChange] =
@@ -239,8 +232,7 @@ changeStream = cst.startWatchingChanges({
     pipeline: [{$changeStream: {resumeAfter: secondTxnChange._id}}, {$project: {"lsid.uid": 0}}],
     collection: 1,
 });
-cst.assertNextChangesEqual(
-    {cursor: changeStream, expectedChanges: expectedSingleDBChanges.slice(secondTxnIdx + 1)});
+cst.assertNextChangesEqual({cursor: changeStream, expectedChanges: expectedSingleDBChanges.slice(secondTxnIdx + 1)});
 
 //
 // Test behavior of whole-cluster change streams with apply ops.
@@ -257,12 +249,10 @@ cst = new ChangeStreamTest(db.getSiblingDB("admin"));
 changeStream = cst.startWatchingChanges({
     pipeline: [
         {$changeStream: {resumeAfter: secondTxnChange._id, allChangesForCluster: true}},
-        {$project: {"lsid.uid": 0}}
+        {$project: {"lsid.uid": 0}},
     ],
-    collection: 1
+    collection: 1,
 });
-cst.assertNextChangesEqual(
-    {cursor: changeStream, expectedChanges: expectedChanges.slice(secondTxnIdx + 1)});
+cst.assertNextChangesEqual({cursor: changeStream, expectedChanges: expectedChanges.slice(secondTxnIdx + 1)});
 
 cst.cleanUp();
-}());

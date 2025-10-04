@@ -27,28 +27,29 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-#include "mongo/platform/basic.h"
+#include <cstddef>
+#include <string>
 
-#include <boost/optional.hpp>
 #include <fmt/format.h>
+// IWYU pragma: no_include <ctype.h>
 
-#include "mongo/logv2/log.h"
+#include "mongo/base/static_assert.h"
+#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/ctype.h"
-#include "mongo/util/hex.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 
 namespace mongo::ctype {
 namespace {
-
-using namespace fmt::literals;
 
 TEST(Ctype, MatchesCxxStdlib) {
     for (size_t i = 0; i < 256; ++i) {
         char c = i;
         unsigned char uc = i;
-        const std::string msg = " i={:02x}"_format(i);
+        const std::string msg = fmt::format(" i={:02x}", i);
         ASSERT_EQ(isAlnum(c), (bool)std::isalnum(uc)) << msg;
         ASSERT_EQ(isAlpha(c), (bool)std::isalpha(uc)) << msg;
         ASSERT_EQ(isLower(c), (bool)std::islower(uc)) << msg;
@@ -70,7 +71,7 @@ TEST(Ctype, MatchesCStdlib) {
     for (size_t i = 0; i < 256; ++i) {
         char c = i;
         unsigned char uc = i;
-        const std::string msg = " i={:02x}"_format(i);
+        const std::string msg = fmt::format(" i={:02x}", i);
         ASSERT_EQ(isAlnum(c), (bool)isalnum(uc)) << msg;
         ASSERT_EQ(isAlpha(c), (bool)isalpha(uc)) << msg;
         ASSERT_EQ(isLower(c), (bool)islower(uc)) << msg;

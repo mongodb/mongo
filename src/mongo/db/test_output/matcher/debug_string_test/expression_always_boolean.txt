@@ -1,0 +1,12 @@
+==== VARIATION: matchExpression=AlwaysFalseMatchExpression
+$alwaysFalse: 1
+
+==== VARIATION: taggedMatchExpression=AlwaysFalseMatchExpression
+$alwaysFalse: 1 || Selected Index #2 pos 0 combine 1
+
+==== VARIATION: matchExpression=AlwaysTrueMatchExpression
+$alwaysTrue: 1
+
+==== VARIATION: taggedMatchExpression=AlwaysTrueMatchExpression
+$alwaysTrue: 1 || Selected Index #2 pos 0 combine 1
+

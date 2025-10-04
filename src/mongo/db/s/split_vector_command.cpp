@@ -27,13 +27,34 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <algorithm>
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/s/split_vector.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/database_name_util.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/str.h"
+
+#include <iosfwd>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -41,6 +62,12 @@ using std::string;
 using std::stringstream;
 
 namespace {
+
+std::string rangeString(const BSONObj& min, const BSONObj& max) {
+    std::ostringstream os;
+    os << "{min: " << min.toString() << " , max" << max.toString() << " }";
+    return os.str();
+}
 
 class SplitVector : public ErrmsgCommandDeprecated {
 public:
@@ -69,28 +96,31 @@ public:
                "NOTE: This command may take a while to run";
     }
 
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) const override {
-        if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                ResourcePattern::forExactNamespace(NamespaceString(parseNs(dbname, cmdObj))),
-                ActionType::splitVector)) {
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const DatabaseName& dbName,
+                                 const BSONObj& cmdObj) const override {
+        if (!AuthorizationSession::get(opCtx->getClient())
+                 ->isAuthorizedForActionsOnResource(
+                     ResourcePattern::forExactNamespace(parseNs(dbName, cmdObj)),
+                     ActionType::splitVector)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
         return Status::OK();
     }
 
-    std::string parseNs(const string& dbname, const BSONObj& cmdObj) const override {
-        return CommandHelpers::CommandHelpers::parseNsFullyQualified(cmdObj);
+    NamespaceString parseNs(const DatabaseName& dbName, const BSONObj& cmdObj) const override {
+        return NamespaceStringUtil::deserialize(dbName.tenantId(),
+                                                CommandHelpers::parseNsFullyQualified(cmdObj),
+                                                SerializationContext::stateDefault());
     }
 
     bool errmsgRun(OperationContext* opCtx,
-                   const string& dbname,
+                   const DatabaseName& dbName,
                    const BSONObj& jsobj,
                    string& errmsg,
                    BSONObjBuilder& result) override {
 
-        const NamespaceString nss = NamespaceString(parseNs(dbname, jsobj));
+        const NamespaceString nss(parseNs(dbName, jsobj));
         BSONObj keyPattern = jsobj.getObjectField("keyPattern");
 
         if (keyPattern.isEmpty()) {
@@ -137,22 +167,37 @@ public:
                 // Prevent maxChunkSizeBytes overflow. Check aimed to avoid fuzzer failures
                 // since users are definitely not expected to specify maxChunkSize in exabytes.
                 uassert(ErrorCodes::InvalidOptions,
-                        str::stream()
-                            << "The specified maxChunkSize in MB is too big: " << maxChunkSizeMB,
-                        maxChunkSizeMB <= (LLONG_MAX >> 20));
+                        str::stream() << "maxChunkSize must lie within the range [1MB, 1024MB]",
+                        maxChunkSizeMB >= 1 && maxChunkSizeMB <= 1024);
                 ret = maxChunkSizeMB << 20;
             } else if (maxSizeBytesElem.isNumber()) {
                 ret = maxSizeBytesElem.safeNumberLong();
+                uassert(ErrorCodes::InvalidOptions,
+                        "The specified max chunk size must lie within the range [1MB, 1024MB]",
+                        *ret >= 1024 * 1024 && *ret <= 1024 * 1024 * 1024);
             }
 
-            uassert(ErrorCodes::InvalidOptions,
-                    "The specified max chunk size must be greater than 0",
-                    ret == boost::none || *ret > 0);
             return ret;
         }();
 
+        const auto collection = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead),
+            MODE_IS);
+        // The range needs to be entirely owned by one shard. splitVector is only supported for
+        // internal use. The common pattern is to take the min/max boundaries from a chunk,
+        // where the max represent a non-included boundary.
+        uassert(
+            ErrorCodes::InvalidOptions,
+            fmt::format("The range {} for the namespace {} is required to be owned by one shard",
+                        rangeString(min, max),
+                        nss.toStringForErrorMsg()),
+            !collection.getShardingDescription().isSharded() ||
+                collection.getShardingFilter()->isRangeEntirelyOwned(
+                    min, max, false /*includeMaxBound*/));
+
         auto splitKeys = splitVector(opCtx,
-                                     nss,
+                                     collection,
                                      keyPattern,
                                      min,
                                      max,
@@ -164,8 +209,8 @@ public:
         result.append("splitKeys", splitKeys);
         return true;
     }
-
-} cmdSplitVector;
+};
+MONGO_REGISTER_COMMAND(SplitVector).forShard();
 
 }  // namespace
 }  // namespace mongo

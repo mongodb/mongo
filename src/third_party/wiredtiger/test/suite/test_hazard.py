@@ -29,7 +29,7 @@
 # test_hazard.py
 #       Hazard pointer tests.
 
-import wiredtiger, wttest
+import wttest
 from wtdataset import SimpleDataSet
 
 # Regression tests.
@@ -53,6 +53,3 @@ class test_hazard(wttest.WiredTigerTestCase):
         # Close the cursors, clearing the hazard pointer.
         for c in cursors:
             c.close()
-
-if __name__ == '__main__':
-    wttest.run()

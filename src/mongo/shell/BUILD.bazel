@@ -1,0 +1,555 @@
+load("@bazel_skylib//lib:selects.bzl", "selects")
+load("@poetry//:dependencies.bzl", "dependency")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_unit_test")
+load("//bazel/config:render_template.bzl", "render_template")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "benchrun",
+    srcs = [
+        "bench.cpp",
+    ],
+    hdrs = [
+        "bench.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/client:clientdriver_minimal",
+        "//src/mongo/db/session:logical_session_id",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/scripting:bson_template_evaluator",
+        "//src/mongo/util:pcre_util",
+        "//src/mongo/util:pcre_wrapper",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "program_runner",
+    srcs = [
+        "program_runner.cpp",
+    ],
+    hdrs = [
+        "program_runner.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/base:environment_buffer",
+        "//src/mongo/db:service_context",
+    ],
+)
+
+mongo_cc_library(
+    name = "linenoise_utf8",
+    srcs = [
+        "linenoise_utf8.cpp",
+    ],
+    hdrs = [
+        "linenoise_utf8.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "shell_options_storage",
+    srcs = [
+        "shell_options_storage.cpp",
+    ],
+    hdrs = [
+        "shell_options.h",
+    ],
+    copts = select({
+        "@platforms//os:windows": [
+            # See the /Zc:preprocessor comment in third_party/mozjs/BUILD.bazel
+            "/Zc:preprocessor",
+            "/wd5104",
+            "/wd5105",
+        ],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/client:connection_string",
+        "//src/mongo/util/cmdline_utils",
+    ],
+)
+
+idl_generator(
+    name = "shell_options_gen",
+    src = "shell_options.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "shell_options_grpc_gen",
+    src = "shell_options_grpc.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "kms_gen",
+    src = "kms.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "kms_idl",
+    srcs = [
+        ":kms_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "kms",
+    srcs = [
+        "kms.cpp",
+        "kms_local.cpp",
+    ],
+    hdrs = [
+        "kms.h",
+    ],
+    deps = [
+        ":kms_idl",
+        "//src/mongo:base",
+        "//src/mongo/base:secure_allocator",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/crypto:aead_encryption",
+        "//src/mongo/db/commands:test_commands_enabled",
+    ],
+)
+
+mongo_cc_library(
+    name = "shell_utils",
+    srcs = [
+        "mongo-server.cpp",
+        "named_pipe_test_helper.cpp",
+        "shell_options.cpp",
+        "shell_utils.cpp",
+        "shell_utils_extended.cpp",
+        "shell_utils_launcher.cpp",
+    ],
+    hdrs = [
+        "named_pipe_test_helper.h",
+        "shell_options.h",
+        "shell_utils.h",
+        "shell_utils_extended.h",
+        "shell_utils_launcher.h",
+        "//src/mongo/bson:bson_bin_util.h",
+        "//src/mongo/bson:bsonobj_comparator.h",
+        "//src/mongo/bson/util:bson_corpus.h",
+        "//src/mongo/transport:message_compressor_options_client_gen",
+    ],
+    deps = [
+        ":benchrun",
+        ":program_runner",  # TODO(SERVER-93876): Remove.
+        ":shell_options_storage",
+        "//src/mongo/base:environment_buffer",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/bson/column",
+        "//src/mongo/bson/util:bson_corpus",
+        "//src/mongo/client:clientdriver_network",
+        "//src/mongo/db:mongohasher",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:traffic_reader",
+        "//src/mongo/db/auth:security_token_auth",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query/collation:collator_icu",
+        "//src/mongo/db/query/virtual_collection",
+        "//src/mongo/replay:mongor_lib",
+        "//src/mongo/scripting",
+        "//src/mongo/transport:message_compressor",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/transport/named_pipe",
+        "//src/mongo/unittest:golden_test_base",
+        "//src/mongo/util:buildinfo",
+        "//src/mongo/util:icu",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util:password",
+        "//src/mongo/util:signal_handlers",
+    ],
+)
+
+mongo_cc_library(
+    name = "kms_shell",
+    srcs = [
+        "kms_shell.cpp",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:ssl_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":kms",  # TODO(SERVER-93876): Remove.
+        ":shell_utils",
+    ],
+)
+
+mongo_cc_library(
+    name = "encrypted_dbclient",
+    srcs = [
+        "encrypted_dbclient_base.cpp",
+    ],
+    hdrs = [
+        "encrypted_dbclient_base.h",
+    ],
+    copts = select({
+        "@platforms//os:windows": [
+            "/Zc:preprocessor",
+            "/wd5104",
+            "/wd5105",
+        ],
+        "//conditions:default": [],
+    }),
+    target_compatible_with = select({
+        "//bazel/config:js_engine_mozjs": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":kms",
+        "//src/mongo/client:clientdriver_minimal",
+        "//src/mongo/crypto:aead_encryption",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/crypto:encrypted_field_config",
+        "//src/mongo/crypto:fle_crypto",
+        "//src/mongo/crypto:fle_fields",
+        "//src/mongo/crypto:symmetric_crypto",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db/query/compiler/parsers/matcher/schema:json_schema_parser",
+        "//src/mongo/scripting",
+        "//src/mongo/shell:shell_options_register",
+        "//src/third_party/mozjs",
+    ],
+)
+
+mongo_cc_library(
+    name = "linenoise",
+    srcs = [
+        "linenoise.cpp",
+        "mk_wcwidth.cpp",
+    ],
+    hdrs = [
+        "linenoise.h",
+        "mk_wcwidth.h",
+    ],
+    deps = [
+        ":linenoise_utf8",
+    ],
+)
+
+# Files added here need to be added in scripting/engine.cpp and buildscripts/vcxproj.header as well.
+render_template(
+    name = "error_codes_js",
+    srcs = [
+        "error_codes.tpl.js",
+        "//src/mongo/base:error_codes.yml",
+        "//src/mongo/base:generate_error_codes.py",
+    ],
+    cmd = [
+        "$(location //src/mongo/base:generate_error_codes.py)",
+        "$(location //src/mongo/base:error_codes.yml)",
+        "$(location error_codes.tpl.js)",
+        "$(location error_codes.js)",
+    ],
+    output = "error_codes.js",
+    python_libs = [
+        dependency(
+            "cheetah3",
+            group = "compile",
+        ),
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+    ],
+)
+
+MONGOJS_CPP_JSFILES = [
+    "assert.js",
+    "assert_global.js",
+    "bulk_api.js",
+    "bulk_api_global.js",
+    "check_log.js",
+    "check_log_global.js",
+    "collection.js",
+    "crud_api.js",
+    "db.js",
+    "db_global.js",
+    "explain_query.js",
+    "explain_query_global.js",
+    "explainable.js",
+    "explainable_global.js",
+    "mongo.js",
+    "prelude.js",
+    "query.js",
+    "query_global.js",
+    "session.js",
+    "session_global.js",
+    "types.js",
+    "utils.js",
+    "utils_global.js",
+    "utils_auth.js",
+    "utils_auth_global.js",
+    "utils_sh.js",
+    "utils_sh_global.js",
+    ":error_codes_js",
+]
+
+# Converts core JS file content into CPP structures to be loaded directly
+# into the native binary via bytecode upon startup.
+render_template(
+    name = "mongojs_cpp",
+    srcs = [
+        "//buildscripts:jstoh.py",
+    ] + MONGOJS_CPP_JSFILES,
+    cmd = [
+        "$(location //buildscripts:jstoh.py)",
+        "$(location mongojs.cpp)",
+    ] + [
+        "$(location {})".format(file)
+        for file in MONGOJS_CPP_JSFILES
+    ],
+    output = "mongojs.cpp",
+)
+
+MONGO_SERVER_CPP_JS_FILES = [
+    "bridge.js",
+    "bridge_global.js",
+    "data_consistency_checker.js",
+    "data_consistency_checker_global.js",
+    "feature_compatibility_version.js",
+    "feature_compatibility_version_global.js",
+    "keyvault.js",
+    "servers.js",
+    "servers_global.js",
+    "servers_misc.js",
+    "servers_misc_global.js",
+]
+
+render_template(
+    name = "mongo_server_cpp",
+    srcs = [
+        "//buildscripts:jstoh.py",
+    ] + MONGO_SERVER_CPP_JS_FILES,
+    cmd = [
+        "$(location //buildscripts:jstoh.py)",
+        "$(location mongo-server.cpp)",
+    ] + [
+        "$(location {})".format(file)
+        for file in MONGO_SERVER_CPP_JS_FILES
+    ],
+    output = "mongo-server.cpp",
+)
+
+mongo_cc_library(
+    name = "mongojs",
+    srcs = [
+        "mongojs.cpp",
+    ],
+    header_deps = [
+        "//src/mongo/db/op_observer:op_observer",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "shell_options_register",
+    srcs = [
+        "shell_options_gen",
+    ] + select({
+        "//bazel/config:build_grpc_enabled": ["shell_options_grpc_gen"],
+        "//conditions:default": {},
+    }),
+    hdrs = [
+        "shell_utils.h",
+    ],
+    deps = [
+        "shell_options_storage",
+        "//src/mongo:base",
+        "//src/mongo/client:native_sasl_client",
+        "//src/mongo/util/options_parser",
+    ],
+)
+
+mongo_cc_library(
+    name = "mongo_initializers",
+    srcs = [
+        "shell_options_init.cpp",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:js_engine_mozjs": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        # NOTE: If you need to add a static or mongo initializer to mongo startup,
+        # please add that library here, as a private library dependency.
+        "//src/mongo/client:clientdriver_network",
+        "//src/mongo/client:connection_string",
+        "//src/mongo/db/local_catalog:index_key_validate",
+        "//src/mongo/db:mongohasher",
+        "//src/mongo/db/pipeline:change_stream_error_extra_info",
+        "//src/mongo/db/query:command_request_response",
+        "//src/mongo/db/query:query_request",
+        "//src/mongo/db/s:remove_shard_exception",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db/session:logical_session_id_helpers",
+        "//src/mongo/db/storage:duplicate_key_error_info",
+        "//src/mongo/db/timeseries:bucket_compression_failure",
+        "//src/mongo/db:traffic_reader",
+        "//src/mongo/db/views:resolved_view",
+        "//src/mongo/executor:async_rpc_error_info",
+        "//src/mongo/executor:network_interface_factory",
+        "//src/mongo/executor:network_interface_thread_pool",
+        "//src/mongo/executor:thread_pool_task_executor",
+        "//src/mongo/rpc:message",
+        "//src/mongo/scripting",
+        "//src/mongo/transport:message_compressor",
+        "//src/mongo/transport:message_compressor_options_client",
+        "//src/mongo/transport:transport_layer_manager",
+        "//src/mongo/util/net:http_client_impl",
+        "//src/mongo/util/net:network",
+        "//src/mongo/util/options_parser:options_parser_init",
+        "//src/mongo/util:password",
+        "//src/mongo/util:processinfo",
+        "//src/mongo/util:signal_handlers",
+        "//src/mongo/util:version_impl",
+        "benchrun",
+        "mongojs",
+        "shell_options_register",
+        "shell_utils",
+    ] + select({
+        "//bazel/config:enterprise_feature_fle_and_js_engine_enabled": [
+            "//src/mongo/db/modules/enterprise/src/fips:fips_mode_client",
+            "//src/mongo/db/modules/enterprise/src/fle/shell:implicit_encrypted_dbclient",
+        ],
+        "//conditions:default": [],
+    }) + select({
+        "//bazel/config:enterprise_feature_sasl_enabled": [
+            "//src/mongo/client:cyrus_sasl_client",
+        ],
+        "//conditions:default": [],
+    }) + select({
+        "//bazel/config:ssl_enabled": [
+            "encrypted_dbclient",
+            "kms_shell",
+            "//src/mongo/util/net:ssl_options_client",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+mongo_cc_library(
+    name = "mongo_main",
+    srcs = [
+        "mongo_main.cpp",
+    ],
+    hdrs = [
+        "mongo_main.h",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:js_engine_mozjs": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        # NOTE: Do not add new libdeps (public or private) here unless
+        # required by the linker to satisfy symbol dependencies from
+        # the files listed above in `sources`. If you need to add a
+        # library to inject a static or mongo initializer to mongo,
+        # please add that library as a private libdep of
+        # mongo_initializers.
+        "//src/mongo/s:grid",
+        "//src/mongo/s/write_ops:batch_write_types",
+        "//src/mongo/transport:transport_layer_manager",
+        "//src/mongo/util:allocator_thread",
+        "//src/mongo/util/net:ssl_manager",
+        "//src/mongo/util:pcre_wrapper",
+        "//src/mongo/util:periodic_runner_factory",
+        "//src/mongo/util:signal_handlers",
+        "linenoise",
+        "mongo_initializers",
+        "program_runner",
+        "shell_utils",
+    ],
+)
+
+mongo_cc_binary(
+    name = "mongo",
+    srcs = [
+        "mongo.cpp",
+    ],
+    linkopts = select({
+        "@platforms//os:linux": [
+            "-ldl",
+            "-lrt",
+        ],
+        "@platforms//os:windows": [
+            "winmm.lib",
+        ],
+        "//conditions:default": [],
+    }),
+    tags = [
+        "devcore",
+        "dist_test",
+        "jstestshell",
+    ],
+    #+ env.WindowsResourceFile("mongo.rc"),
+    deps = [
+        # NOTE: Do not add new deps here unless required by the linker to
+        # satisfy symbol dependencies from the files listed above in `sources`. If you need to add a
+        # library to inject a static or mongo initializer to mongos, please add that library as a
+        # dep of mongos_initializers.
+        "mongo_main",
+        "//src/mongo/db:server_base",
+    ],
+)
+
+# mongo_cc_unit_test does not support a select() in its deps field.
+# Wrap them in this intermediate library to complete linking.
+mongo_cc_library(
+    name = "shell_test_dependencies",
+    srcs = [],
+    deps = [
+        ":shell_options_register",
+        ":shell_utils",
+        "//src/mongo/util:signal_handlers",
+    ] + select({
+        "//bazel/config:ssl_enabled": [":kms"],
+        "//conditions:default": [],
+    }),
+)
+
+mongo_cc_unit_test(
+    name = "shell_test",
+    srcs = [
+        "program_runner_test.cpp",
+        "shell_options_test.cpp",
+        "shell_utils_test.cpp",
+    ] + select({
+        "//bazel/config:ssl_enabled": ["kms_test.cpp"],
+        "//conditions:default": [],
+    }),
+    tags = ["mongo_unittest_fifth_group"],
+    deps = ["shell_test_dependencies"],
+)
+
+load("//bazel:mongo_js_rules.bzl", "mongo_js_library")
+
+mongo_js_library(
+    name = "all",
+    srcs = glob([
+        "*.js",
+    ]),
+    visibility = ["//visibility:public"],
+)

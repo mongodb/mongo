@@ -2,10 +2,9 @@
 
 import datetime
 import os
+from typing import Optional
 
-from buildscripts.resmokelib import core
-from buildscripts.resmokelib import utils
-from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
+from buildscripts.resmokelib import core, logging, utils
 from buildscripts.resmokelib.testing.testcases import interface
 
 
@@ -15,14 +14,22 @@ class CPPLibfuzzerTestCase(interface.ProcessTestCase):
     REGISTERED_NAME = "cpp_libfuzzer_test"
     DEFAULT_TIMEOUT = datetime.timedelta(hours=1)
 
-    def __init__(  # pylint: disable=too-many-arguments
-            self, logger, program_executable, program_options=None, runs=1000000,
-            corpus_directory_stem="corpora"):
+    def __init__(
+        self,
+        logger: logging.Logger,
+        program_executables: list[str],
+        program_options: Optional[dict] = None,
+        runs: int = 1000000,
+        corpus_directory_stem="corpora",
+    ):
         """Initialize the CPPLibfuzzerTestCase with the executable to run."""
 
-        interface.ProcessTestCase.__init__(self, logger, "C++ libfuzzer test", program_executable)
+        assert len(program_executables) == 1
+        interface.ProcessTestCase.__init__(
+            self, logger, "C++ libfuzzer test", program_executables[0]
+        )
 
-        self.program_executable = program_executable
+        self.program_executable = program_executables[0]
         self.program_options = utils.default_if_none(program_options, {}).copy()
 
         self.runs = runs
@@ -31,6 +38,8 @@ class CPPLibfuzzerTestCase(interface.ProcessTestCase):
         self.merged_corpus_directory = f"{corpus_directory_stem}-merged/corpus-{self.short_name()}"
 
         os.makedirs(self.corpus_directory, exist_ok=True)
+
+        interface.append_process_tracking_options(self.program_options, self._id)
 
     def _make_process(self):
         default_args = [
@@ -41,6 +50,4 @@ class CPPLibfuzzerTestCase(interface.ProcessTestCase):
             f"-runs={self.runs}",
             self.corpus_directory,
         ]
-        self.program_options["job_num"] = self.fixture.job_num
-        self.program_options["test_id"] = self._id
         return core.programs.make_process(self.logger, default_args, **self.program_options)

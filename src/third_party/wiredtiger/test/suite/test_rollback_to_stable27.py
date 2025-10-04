@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-from test_rollback_to_stable01 import test_rollback_to_stable_base
-from wiredtiger import stat, Modify, WT_NOTFOUND
+from rollback_to_stable_util import test_rollback_to_stable_base
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
@@ -35,13 +34,12 @@ from wtscenario import make_scenarios
 #
 # Test mixing timestamped and non-timestamped updates on the same VLCS RLE cell.
 class test_rollback_to_stable27(test_rollback_to_stable_base):
-    session_config = 'isolation=snapshot'
 
     # Run it all on row-store as well as a control group: if something odd arises from the
     # RLE cell handling it won't happen in row-store.
     key_format_values = [
         ('column', dict(key_format='r')),
-        ('integer_row', dict(key_format='i')),
+        ('row_integer', dict(key_format='i')),
     ]
 
     in_memory_values = [
@@ -49,13 +47,19 @@ class test_rollback_to_stable27(test_rollback_to_stable_base):
         ('inmem', dict(in_memory=True))
     ]
 
-    scenarios = make_scenarios(key_format_values, in_memory_values)
+    worker_thread_values = [
+        ('0', dict(threads=0)),
+        ('4', dict(threads=4)),
+        ('8', dict(threads=8))
+    ]
+
+    scenarios = make_scenarios(key_format_values, in_memory_values, worker_thread_values)
 
     def conn_config(self):
+        config = 'verbose=(rts:5)'
         if self.in_memory:
-            return 'in_memory=true'
-        else:
-            return 'in_memory=false'
+            config += ',in_memory=true'
+        return config
 
     # Evict the page to force reconciliation.
     def evict(self, uri, key, check_value):
@@ -70,10 +74,11 @@ class test_rollback_to_stable27(test_rollback_to_stable_base):
     def test_rollback_to_stable(self):
         nrows = 10
 
-        # Create a table without logging.
+        # Create a table.
         uri = "table:rollback_to_stable27"
-        ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format="S", config='log=(enabled=false)')
+        ds_config = ',log=(enabled=false)' if self.in_memory else ''
+        ds = SimpleDataSet(self, uri, 0,
+            key_format=self.key_format, value_format="S", config = ds_config)
         ds.populate()
 
         value_a = "aaaaa" * 10
@@ -93,14 +98,14 @@ class test_rollback_to_stable27(test_rollback_to_stable_base):
         # if not the rest of the work isn't going to do much good. Maybe via stats...?
 
         cursor = self.session.open_cursor(uri)
-        self.session.begin_transaction()
+        self.session.begin_transaction('no_timestamp=true')
         cursor[7] = value_b
         self.session.commit_transaction()
         cursor.close()
 
         # Now roll back.
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(15))
-        self.conn.rollback_to_stable()
+        self.conn.rollback_to_stable('threads=' + str(self.threads))
 
         # The only thing we should see (at any time) is value_b at key 7.
         cursor = self.session.open_cursor(uri)
@@ -111,6 +116,3 @@ class test_rollback_to_stable27(test_rollback_to_stable_base):
                 self.assertEqual(v, value_b)
             self.session.rollback_transaction()
         cursor.close()
-
-if __name__ == '__main__':
-    wttest.run()

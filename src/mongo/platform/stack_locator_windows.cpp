@@ -27,15 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
 
 #include "mongo/platform/stack_locator.h"
-
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 
-StackLocator::StackLocator() {
+StackLocator::StackLocator(const void* capturedStackPointer)
+    : _capturedStackPointer(capturedStackPointer) {
     // Please see
     //
     // http://stackoverflow.com/questions/1740888/determining-stack-space-with-visual-studio/1747499#1747499
@@ -60,7 +59,7 @@ StackLocator::StackLocator() {
     // the commit region. Since the stack grows downward, the top of
     // the stack is at the base address for the commit region plus the
     // region size.
-    _begin = static_cast<char*>(committedMbi.BaseAddress) + committedMbi.RegionSize;
+    _begin = static_cast<const char*>(committedMbi.BaseAddress) + committedMbi.RegionSize;
 
     // Now, we skip down to the bottom, where the uncommitted memory
     // is, and get its size. So, we ask for the region at the

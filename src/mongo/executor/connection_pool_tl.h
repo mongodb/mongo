@@ -29,15 +29,33 @@
 
 #pragma once
 
-#include <memory>
-
+#include "mongo/base/string_data.h"
 #include "mongo/client/async_client.h"
+#include "mongo/db/service_context.h"
+#include "mongo/executor/connection_metrics.h"
 #include "mongo/executor/connection_pool.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/s/sharding_task_executor_pool_controller.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/transport/ssl_connection_context.h"
+#include "mongo/transport/transport_layer.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/future.h"
 #include "mongo/util/hierarchical_acquisition.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/out_of_line_executor.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/timer.h"
+
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace executor {
@@ -52,21 +70,28 @@ public:
                   transport::TransportLayer* tl,
                   std::unique_ptr<NetworkConnectionHook> onConnectHook,
                   const ConnectionPool::Options& connPoolOptions,
-                  std::shared_ptr<const transport::SSLConnectionContext> transientSSLContext)
+                  std::shared_ptr<const transport::SSLConnectionContext> transientSSLContext,
+                  StringData instanceName)
         : _executor(std::move(reactor)),
           _tl(tl),
           _onConnectHook(std::move(onConnectHook)),
           _connPoolOptions(connPoolOptions),
-          _transientSSLContext(transientSSLContext) {}
+          _transientSSLContext(transientSSLContext),
+          _instanceName(instanceName) {}
 
     std::shared_ptr<ConnectionPool::ConnectionInterface> makeConnection(
         const HostAndPort& hostAndPort,
         transport::ConnectSSLMode sslMode,
+        PoolConnectionId,
         size_t generation) override;
 
     std::shared_ptr<ConnectionPool::TimerInterface> makeTimer() override;
     const std::shared_ptr<OutOfLineExecutor>& getExecutor() override {
         return _executor;
+    }
+
+    transport::TransportLayer* getTransportLayer() const {
+        return _tl;
     }
 
     Date_t now() override;
@@ -75,6 +100,10 @@ public:
     bool inShutdown() const;
     void fasten(Type* type);
     void release(Type* type);
+
+    StringData instanceName() const {
+        return _instanceName;
+    }
 
 private:
     auto reactor();
@@ -85,9 +114,9 @@ private:
     // Options originated from instance of NetworkInterfaceTL.
     const ConnectionPool::Options _connPoolOptions;
     std::shared_ptr<const transport::SSLConnectionContext> _transientSSLContext;
+    std::string _instanceName;
 
-    mutable Mutex _mutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "TLTypeFactory::_mutex");
+    mutable stdx::mutex _mutex;
     AtomicWord<bool> _inShutdown{false};
     stdx::unordered_set<Type*> _collars;
 };
@@ -107,6 +136,10 @@ public:
         return _factory->inShutdown();
     }
 
+    StringData instanceName() const {
+        return _factory->instanceName();
+    }
+
     virtual void kill() = 0;
 
 private:
@@ -119,7 +152,7 @@ public:
     explicit TLTimer(const std::shared_ptr<TLTypeFactory>& factory,
                      const transport::ReactorHandle& reactor)
         : TLTypeFactory::Type(factory), _reactor(reactor), _timer(_reactor->makeTimer()) {}
-    ~TLTimer() {
+    ~TLTimer() override {
         // Release must be the first expression of this dtor
         release();
     }
@@ -145,28 +178,31 @@ public:
         ServiceContext* serviceContext,
         HostAndPort peer,
         transport::ConnectSSLMode sslMode,
+        PoolConnectionId id,
         size_t generation,
         NetworkConnectionHook* onConnectHook,
         bool skipAuth,
         std::shared_ptr<const transport::SSLConnectionContext> transientSSLContext = nullptr)
-        : ConnectionInterface(generation),
+        : ConnectionInterface(id, generation),
           TLTypeFactory::Type(factory),
           _reactor(reactor),
           _serviceContext(serviceContext),
+          _tl(factory->getTransportLayer()),
           _timer(factory->makeTimer()),
           _skipAuth(skipAuth),
           _peer(std::move(peer)),
           _sslMode(sslMode),
           _onConnectHook(onConnectHook),
-          _transientSSLContext(transientSSLContext) {}
+          _transientSSLContext(transientSSLContext),
+          _connMetrics(serviceContext->getFastClockSource()) {}
 
-    ~TLConnection() {
+    ~TLConnection() override {
         // Release must be the first expression of this dtor
         release();
     }
 
     void kill() override {
-        cancelAsync();
+        cancel(/*endClient=*/true);
     }
 
     const HostAndPort& getHostAndPort() const override;
@@ -175,17 +211,20 @@ public:
     bool maybeHealthy() override;
     AsyncDBClient* client();
     Date_t now() override;
+    void startConnAcquiredTimer();
+    std::shared_ptr<Timer> getConnAcquiredTimer();
 
 private:
     void setTimeout(Milliseconds timeout, TimeoutCallback cb) override;
     void cancelTimeout() override;
     void setup(Milliseconds timeout, SetupCallback cb, std::string instanceName) override;
     void refresh(Milliseconds timeout, RefreshCallback cb) override;
-    void cancelAsync();
+    void cancel(bool endClient = false);
 
 private:
     transport::ReactorHandle _reactor;
     ServiceContext* const _serviceContext;
+    transport::TransportLayer* _tl;
     std::shared_ptr<ConnectionPool::TimerInterface> _timer;
     const bool _skipAuth;
 
@@ -199,7 +238,12 @@ private:
     NetworkConnectionHook* const _onConnectHook;
     // SSL context to use intead of the default one for this pool.
     const std::shared_ptr<const transport::SSLConnectionContext> _transientSSLContext;
-    AsyncDBClient::Handle _client;
+
+    // Guards assignment of the _client pointer.
+    // Do not need to acquire this in contexts where the pointer is known to be valid.
+    stdx::mutex _clientMutex;
+    std::shared_ptr<AsyncDBClient> _client;
+    ConnectionMetrics _connMetrics;
 };
 
 }  // namespace connection_pool_tl

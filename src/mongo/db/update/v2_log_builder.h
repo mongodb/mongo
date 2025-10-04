@@ -30,11 +30,18 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/mutable/document.h"
+#include "mongo/db/exec/mutable_bson/document.h"
+#include "mongo/db/exec/mutable_bson/element.h"
 #include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/db/update/log_builder_interface.h"
 #include "mongo/db/update/runtime_update_path.h"
+
+#include <cstddef>
+#include <memory>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace v2_log_builder {

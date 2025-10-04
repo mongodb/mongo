@@ -27,28 +27,38 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/security_key.h"
 
-#include <string>
-#include <vector>
-
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/client/internal_auth.h"
 #include "mongo/crypto/mechanism_scram.h"
-#include "mongo/crypto/sha1_block.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/security_file.h"
 #include "mongo/db/auth/user.h"
-#include "mongo/db/server_options.h"
+#include "mongo/db/auth/user_name.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/icu.h"
 #include "mongo/util/password_digest.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
+
 
 namespace mongo {
 namespace {
@@ -58,21 +68,17 @@ constexpr size_t kMaxKeyLength = 1024;
 class CredentialsGenerator {
 public:
     explicit CredentialsGenerator(StringData filename)
-        : _salt1(scram::Presecrets<SHA1Block>::generateSecureRandomSalt()),
-          _salt256(scram::Presecrets<SHA256Block>::generateSecureRandomSalt()),
+        : _salt256(scram::Presecrets<SHA256Block>::generateSecureRandomSalt()),
           _filename(filename) {}
 
     boost::optional<User::CredentialData> generate(const std::string& password) {
         if (password.size() < kMinKeyLength || password.size() > kMaxKeyLength) {
-            LOGV2_ERROR(
-                20255,
-                "Security key in {filename} has length {size}, must be between {minimumLength} "
-                "and {maximumLength} characters",
-                "Security key size is out range",
-                "filename"_attr = _filename,
-                "size"_attr = password.size(),
-                "minimumLength"_attr = kMinKeyLength,
-                "maximumLength"_attr = kMaxKeyLength);
+            LOGV2_ERROR(20255,
+                        "Security key size is out range",
+                        "filename"_attr = _filename,
+                        "size"_attr = password.size(),
+                        "minimumLength"_attr = kMinKeyLength,
+                        "maximumLength"_attr = kMaxKeyLength);
             return boost::none;
         }
 
@@ -87,11 +93,6 @@ public:
             (*internalSecurity.getUser())->getName().getUser(), password);
 
         User::CredentialData credentials;
-        if (!_copyCredentials(
-                credentials.scram_sha1,
-                scram::Secrets<SHA1Block>::generateCredentials(
-                    _salt1, passwordDigest, saslGlobalParams.scramSHA1IterationCount.load())))
-            return boost::none;
 
         if (!_copyCredentials(credentials.scram_sha256,
                               scram::Secrets<SHA256Block>::generateCredentials(
@@ -120,7 +121,6 @@ private:
         return true;
     }
 
-    const std::vector<uint8_t> _salt1;
     const std::vector<uint8_t> _salt256;
     const StringData _filename;
 };
@@ -140,8 +140,6 @@ bool setUpSecurityKey(const string& filename, ClusterAuthMode mode) {
 
     if (keyStrings.size() > 2) {
         LOGV2_ERROR(20258,
-                    "Only two keys are supported in the security key file, {numKeys} are "
-                    "specified in {filename}",
                     "Only two keys are supported in the security key file",
                     "numKeys"_attr = keyStrings.size(),
                     "filename"_attr = filename);

@@ -27,13 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/repl/isself.h"
+
+#include "mongo/base/string_data.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/scopeguard.h"
@@ -55,6 +56,7 @@ TEST_F(ServiceContextTest, DetectsSameHostIPv4) {
     // Fastpath should agree with the result of getBoundAddrs
     // since it uses it...
     for (std::vector<string>::const_iterator it = addrs.begin(); it != addrs.end(); ++it) {
+        ASSERT(isSelfFastPath(HostAndPort(*it, serverGlobalParams.port)));
         ASSERT(isSelf(HostAndPort(*it, serverGlobalParams.port), getGlobalServiceContext()));
     }
 #else
@@ -72,7 +74,51 @@ TEST_F(ServiceContextTest, DetectsSameHostIPv6) {
     // Fastpath should agree with the result of getBoundAddrs
     // since it uses it...
     for (std::vector<string>::const_iterator it = addrs.begin(); it != addrs.end(); ++it) {
+        ASSERT(isSelfFastPath(HostAndPort(*it, serverGlobalParams.port)));
         ASSERT(isSelf(HostAndPort(*it, serverGlobalParams.port), getGlobalServiceContext()));
+    }
+#else
+    ASSERT(true);
+#endif
+}
+
+TEST_F(ServiceContextTest, RetryOnTransientDNSErrorsInFastPathEnoughAttempts) {
+#if defined(_WIN32) || defined(__linux__) || defined(__APPLE__)
+    bool wasEnabled = IPv6Enabled();
+    enableIPv6(true);
+    ON_BLOCK_EXIT([&] { enableIPv6(wasEnabled); });
+
+    // First we get the addrs bound on this host
+    const std::vector<std::string> addrs = getBoundAddrs(true);
+
+    auto failResolution = globalFailPointRegistry().find("transientDNSErrorInFastPath");
+    failResolution->setMode(FailPoint::nTimes, 3);
+
+    // Fastpath should agree with the result of getBoundAddrs and should be able to resolve
+    // the addresses even with the (transient) failures.
+    for (std::vector<string>::const_iterator it = addrs.begin(); it != addrs.end(); ++it) {
+        ASSERT(isSelfFastPath(HostAndPort(*it, serverGlobalParams.port)));
+    }
+#else
+    ASSERT(true);
+#endif
+}
+
+TEST_F(ServiceContextTest, RetryOnTransientDNSErrorsInFastPathAttemptsExhausted) {
+#if defined(_WIN32) || defined(__linux__) || defined(__APPLE__)
+    bool wasEnabled = IPv6Enabled();
+    enableIPv6(true);
+    ON_BLOCK_EXIT([&] { enableIPv6(wasEnabled); });
+
+    // First we get the addrs bound on this host
+    const std::vector<std::string> addrs = getBoundAddrs(true);
+
+    auto failResolution = globalFailPointRegistry().find("transientDNSErrorInFastPath");
+    failResolution->setMode(FailPoint::nTimes, 5 * addrs.size());
+
+    // Fastpath should not be able to resolve any of the addresses.
+    for (std::vector<string>::const_iterator it = addrs.begin(); it != addrs.end(); ++it) {
+        ASSERT_FALSE(isSelfFastPath(HostAndPort(*it, serverGlobalParams.port)));
     }
 #else
     ASSERT(true);

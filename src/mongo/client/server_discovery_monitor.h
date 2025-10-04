@@ -26,15 +26,35 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
+#pragma once
+
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/client/mongo_uri.h"
 #include "mongo/client/replica_set_monitor_stats.h"
+#include "mongo/client/sdam/election_id_set_version_pair.h"
 #include "mongo/client/sdam/sdam.h"
+#include "mongo/client/sdam/sdam_configuration.h"
+#include "mongo/client/sdam/sdam_datatypes.h"
+#include "mongo/client/sdam/topology_listener.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/rpc/topology_version_gen.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/time_support.h"
 
-namespace mongo {
-using namespace sdam;
+#include <memory>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+namespace mongo::sdam {
 
 class SingleServerDiscoveryMonitor
     : public std::enable_shared_from_this<SingleServerDiscoveryMonitor> {
@@ -99,8 +119,7 @@ private:
     const HostAndPort _host;
     const std::shared_ptr<ReplicaSetMonitorStats> _stats;
 
-    Mutex _mutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(4), "SingleServerDiscoveryMonitor::mutex");
+    stdx::mutex _mutex;
     boost::optional<TopologyVersion> _topologyVersion;
     TopologyEventsPublisherPtr _eventListener;
     std::shared_ptr<executor::TaskExecutor> _executor;
@@ -128,7 +147,7 @@ public:
                            std::shared_ptr<ReplicaSetMonitorStats> stats,
                            std::shared_ptr<executor::TaskExecutor> executor = nullptr);
 
-    virtual ~ServerDiscoveryMonitor() {}
+    ~ServerDiscoveryMonitor() override {}
 
     void shutdown();
 
@@ -157,8 +176,7 @@ private:
 
     const std::shared_ptr<ReplicaSetMonitorStats> _stats;
 
-    Mutex _mutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(5), "ServerDiscoveryMonitor::mutex");
+    stdx::mutex _mutex;
     SdamConfiguration _sdamConfiguration;
     TopologyEventsPublisherPtr _eventPublisher;
     std::shared_ptr<executor::TaskExecutor> _executor;
@@ -167,4 +185,4 @@ private:
     MongoURI _setUri;
 };
 using ServerDiscoveryMonitorPtr = std::shared_ptr<ServerDiscoveryMonitor>;
-}  // namespace mongo
+}  // namespace mongo::sdam

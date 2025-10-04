@@ -29,8 +29,18 @@
 
 #pragma once
 
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/window_function/window_function.h"
 #include "mongo/db/pipeline/window_function/window_function_sum.h"
+#include "mongo/util/modules.h"
+
+#include <deque>
+#include <memory>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -47,7 +57,7 @@ public:
                                     boost::optional<long long> unitMillis = boost::none,
                                     bool isNonremovable = false)
         : WindowFunctionState(expCtx), _integral(expCtx), _unitMillis(unitMillis) {
-        _memUsageBytes = sizeof(*this);
+        _memUsageTracker.set(sizeof(*this));
     }
 
     void add(Value value) override;
@@ -62,22 +72,12 @@ public:
         _nanCount = 0;
         _integral.reset();
         // AccumulatorIntegral's reset() depends on the fact that WindowFunctionIntegral's reset()
-        // will set '_memUsageBytes' to sizeof(*this). If you want to reset '_memUsageBytes' to
+        // will set '_memUsageTracker' to sizeof(*this). If you want to reset '_memUsageTracker' to
         // other value, please update AccumulatorIntegral's reset() as well.
-        _memUsageBytes = sizeof(*this);
+        _memUsageTracker.set(sizeof(*this));
     }
 
-    Value getValue() const override {
-        if (_values.size() == 0)
-            return kDefault;
-        if (_nanCount > 0)
-            return Value(std::numeric_limits<double>::quiet_NaN());
-
-
-        return _unitMillis
-            ? uassertStatusOK(ExpressionDivide::apply(_integral.getValue(), Value(*_unitMillis)))
-            : _integral.getValue();
-    }
+    Value getValue(boost::optional<Value> current = boost::none) const override;
 
 private:
     /**
@@ -91,7 +91,7 @@ private:
     void assertValueType(const Value& value);
 
     WindowFunctionSum _integral;
-    std::deque<Value> _values;
+    std::deque<SimpleMemoryUsageTokenWith<Value>> _values;
     boost::optional<long long> _unitMillis;
     int _nanCount = 0;
     bool isNonremovable = false;

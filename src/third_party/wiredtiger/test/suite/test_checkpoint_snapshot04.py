@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import fnmatch, os, shutil, threading, time
+import os, shutil
 import wiredtiger, wttest
 from wtbackup import backup_base
 from wtdataset import SimpleDataSet
@@ -45,7 +45,7 @@ class test_checkpoint_snapshot04(backup_base):
     format_values = [
         ('column_fix', dict(key_format='r', value_format='8t')),
         ('column', dict(key_format='r', value_format='S')),
-        ('string_row', dict(key_format='S', value_format='S')),
+        ('row_string', dict(key_format='S', value_format='S')),
     ]
 
     target_backup = [
@@ -135,10 +135,7 @@ class test_checkpoint_snapshot04(backup_base):
         session1.rollback_transaction()
 
         self.compare_backups(self.uri, self.dir, './')
-        # Due to unavailibility of history store file in targetted backup scenarios,
+        # Due to unavailability of history store file in targeted backup scenarios,
         # RTS doesn't get performed during the first restart, so compare the backup again
         # to confirm that RTS doesn't change the backup contents.
         self.compare_backups(self.uri, self.dir, './')
-
-if __name__ == '__main__':
-    wttest.run()

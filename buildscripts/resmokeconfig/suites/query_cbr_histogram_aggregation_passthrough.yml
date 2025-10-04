@@ -1,0 +1,52 @@
+# This is equivalent to the aggregation suite, but runs with CBR with histogram CE enabled.
+
+test_kind: js_test
+
+selector:
+  roots:
+    - jstests/aggregation/**/*.js
+  exclude_files:
+    - jstests/aggregation/extras/*.js
+    - jstests/aggregation/data/*.js
+
+    # Looks at op counters. This passthrough runs transparent operations which change these values.
+    - jstests/aggregation/sources/unionWith/unionWith_query_stats.js
+    - jstests/aggregation/sources/facet/facet_stats.js
+    - jstests/aggregation/sources/lookup/lookup_query_stats.js
+
+    # CBR does not currently add plans to the plan cache. These tests examine the plan cache.
+    - jstests/aggregation/sources/lookup/lookup_single_solution_cache.js
+
+    # TODO SERVER-92589: Fails in all feature flags variant because SBE explain not supported
+    - jstests/aggregation/optimization/use_query_sort.js
+
+    # TODO SERVER-100989: CBR should fallback on queries with collation
+    - jstests/aggregation/expressions/in.js
+
+    # TODO SERVER-100665: Inversion of non exact index bounds
+    - jstests/aggregation/sources/replaceRoot/replace_root_match.js
+
+    # TODO SERVER-100610: Test directly or indirectly asserts on specific plan chosen
+    - jstests/aggregation/sources/unionWith/unionWith.js
+
+  exclude_with_any_tags:
+    # Profiler entries will have different shape in CBR
+    - requires_profiling
+    # This test runs many queries. This passthrough runs analyze for each indexed field on every query,
+    # causing a > 1 hour runtime. Exclude this test to keep the suite runtime reasonable.
+    - query_intensive_pbt
+executor:
+  config:
+    shell_options:
+      crashOnInvalidBSONError: ""
+      objcheck: ""
+      eval: |
+        await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");
+        await import("jstests/libs/override_methods/implicit_histograms.js");
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        # Automatic mode will fallback when a predicate can't be estimated via histogram
+        planRankerMode: "automaticCE"

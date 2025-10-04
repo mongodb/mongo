@@ -27,11 +27,15 @@
  *    it in the license file.
  */
 
-#include <vector>
-
 #include "mongo/bson/util/bson_check.h"
-#include "mongo/db/jsobj.h"
+
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/unittest/unittest.h"
+
+#include <algorithm>
+#include <iterator>
+#include <vector>
 
 namespace mongo {
 namespace {
@@ -50,21 +54,18 @@ TEST(BsonCheck, CheckHasOnlyOnEmptyObject) {
 
 TEST(BsonCheck, CheckHasOnlyLegalFields) {
     ASSERT_OK(bsonCheckOnlyHasFields("",
-                                     BSON("aField"
-                                          << "value"
-                                          << "thirdField" << 1 << "anotherField" << 2),
+                                     BSON("aField" << "value"
+                                                   << "thirdField" << 1 << "anotherField" << 2),
                                      legals));
     ASSERT_OK(bsonCheckOnlyHasFields("",
-                                     BSON("aField"
-                                          << "value"
-                                          << "thirdField" << 1),
+                                     BSON("aField" << "value"
+                                                   << "thirdField" << 1),
                                      legals));
 
     ASSERT_EQUALS(ErrorCodes::BadValue,
                   bsonCheckOnlyHasFields("",
-                                         BSON("aField"
-                                              << "value"
-                                              << "illegal" << 4 << "thirdField" << 1),
+                                         BSON("aField" << "value"
+                                                       << "illegal" << 4 << "thirdField" << 1),
                                          legals));
 }
 

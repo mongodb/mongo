@@ -5,8 +5,7 @@
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
 
-(function() {
-"use strict";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const name = "prepare_transaction_fails_with_arbiters";
 const rst = new ReplSetTest({name: name, nodes: 2});
@@ -15,7 +14,10 @@ const nodes = rst.nodeList();
 rst.startSet();
 rst.initiate({
     "_id": name,
-    "members": [{"_id": 0, "host": nodes[0]}, {"_id": 1, "host": nodes[1], "arbiterOnly": true}]
+    "members": [
+        {"_id": 0, "host": nodes[0]},
+        {"_id": 1, "host": nodes[1], "arbiterOnly": true},
+    ],
 });
 
 const dbName = "test";
@@ -33,8 +35,6 @@ const sessionColl = sessionDB.getCollection(collName);
 session.startTransaction();
 assert.commandWorked(sessionColl.insert({_id: 42}));
 
-assert.commandFailedWithCode(sessionDB.adminCommand({prepareTransaction: 1}),
-                             ErrorCodes.ReadConcernMajorityNotEnabled);
+assert.commandFailedWithCode(sessionDB.adminCommand({prepareTransaction: 1}), ErrorCodes.ReadConcernMajorityNotEnabled);
 
 rst.stopSet();
-})();

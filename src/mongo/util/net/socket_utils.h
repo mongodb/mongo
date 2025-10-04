@@ -29,10 +29,11 @@
 
 #pragma once
 
-#include <string>
-
+#include "mongo/base/string_data.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/util/duration.h"
+
+#include <string>
 
 namespace mongo {
 
@@ -45,7 +46,15 @@ void setSocketKeepAliveParams(int sock,
                               Seconds maxKeepIdleSecs = kMaxKeepIdleSecs,
                               Seconds maxKeepIntvlSecs = kMaxKeepIntvlSecs);
 
-std::string makeUnixSockPath(int port);
+std::string makeUnixSockPath(int port, StringData label = "");
+
+inline bool isUnixDomainSocket(StringData hostname) {
+    return hostname.find('/') != std::string::npos;
+}
+
+#ifndef _WIN32
+void setUnixDomainSocketPermissions(const std::string& path, int permissions);
+#endif
 
 // If an ip address is passed in, just return that.  If a hostname is passed
 // in, look up its ip and return that.  Returns "" on failure.
@@ -61,10 +70,15 @@ std::string getHostName();
  * will be stale */
 std::string getHostNameCached();
 
-/** Returns getHostNameCached():<port>. */
-std::string getHostNameCachedAndPort();
 
-/** Returns getHostNameCached(), or getHostNameCached():<port> if running on a non-default port. */
-std::string prettyHostName();
+/**
+ * Returns getHostNameCached():<port>.
+ */
+std::string prettyHostNameAndPort(int port);
+
+/**
+ * Returns getHostNameCached(), or getHostNameCached():<port> if running on a non-default port.
+ */
+std::string prettyHostName(int port);
 
 }  // namespace mongo

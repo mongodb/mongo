@@ -26,29 +26,51 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 #include "mongo/client/server_discovery_monitor.h"
 
-#include <algorithm>
-#include <iterator>
-
-#include "mongo/client/replica_set_monitor.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/replica_set_monitor_server_parameters.h"
-#include "mongo/client/sdam/sdam.h"
+#include "mongo/client/sdam/server_description.h"
+#include "mongo/client/sdam/topology_description.h"
 #include "mongo/db/wire_version.h"
+#include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/network_interface_thread_pool.h"
+#include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
+#include "mongo/rpc/metadata/metadata_hook.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 
-namespace mongo {
+#include <algorithm>
+#include <iterator>
+#include <ratio>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
+
+namespace mongo::sdam {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(overrideMaxAwaitTimeMS);
 
-using executor::NetworkInterface;
 using executor::NetworkInterfaceThreadPool;
 using executor::TaskExecutor;
 using executor::ThreadPoolTaskExecutor;
@@ -85,7 +107,6 @@ SingleServerDiscoveryMonitor::SingleServerDiscoveryMonitor(
       _setUri(setUri) {
     LOGV2_DEBUG(4333217,
                 kLogLevel + 1,
-                "RSM {replicaSet} monitoring {host}",
                 "RSM monitoring host",
                 "host"_attr = host,
                 "replicaSet"_attr = _setUri.getSetName());
@@ -108,13 +129,11 @@ void SingleServerDiscoveryMonitor::requestImmediateCheck() {
 
     if (!_isExpedited) {
         // save some log lines.
-        LOGV2_DEBUG(
-            4333227,
-            kLogLevel,
-            "RSM {replicaSet} monitoring {host} in expedited mode until we detect a primary.",
-            "RSM monitoring host in expedited mode until we detect a primary",
-            "host"_attr = _host,
-            "replicaSet"_attr = _setUri.getSetName());
+        LOGV2_DEBUG(4333227,
+                    kLogLevel,
+                    "RSM monitoring host in expedited mode until we detect a primary",
+                    "host"_attr = _host,
+                    "replicaSet"_attr = _setUri.getSetName());
 
         // This will change the _currentRefreshPeriod to the shorter expedited duration.
         _isExpedited = true;
@@ -127,8 +146,6 @@ void SingleServerDiscoveryMonitor::requestImmediateCheck() {
         LOGV2_DEBUG(
             4333216,
             kLogLevel + 2,
-            "RSM {replicaSet} immediate hello check requested, but there "
-            "is already an outstanding request",
             "RSM immediate hello check requested, but there is already an outstanding request",
             "replicaSet"_attr = _setUri.getSetName());
         return;
@@ -223,8 +240,14 @@ void SingleServerDiscoveryMonitor::_doRemoteCommand() {
     }();
 
     if (!swCbHandle.isOK()) {
-        _onHelloFailure(swCbHandle.getStatus(), BSONObj());
-        uasserted(4615612, swCbHandle.getStatus().toString());
+        const auto& error = swCbHandle.getStatus();
+        _onHelloFailure(error, BSONObj());
+        // The attempt to schedule a remote command on the executor is only expected to fail during
+        // shutdown. Otherwise, terminating the process to not risk the cluster availability is the
+        // best action plan. Note that we cannot throw from here (i.e. a scheduled task).
+        invariant(ErrorCodes::isShutdownError(error.code()),
+                  "Encountered non-shutdown error while scheduling remote command");
+        return;
     }
 
     _helloOutstanding = true;
@@ -239,21 +262,19 @@ StatusWith<TaskExecutor::CallbackHandle> SingleServerDiscoveryMonitor::_schedule
     });
 
     BSONObjBuilder bob;
-    bob.append("isMaster", 1);
+    bob.append("hello", 1);
     bob.append("maxAwaitTimeMS", maxAwaitTimeMS);
     bob.append("topologyVersion", _topologyVersion->toBSON());
 
-    if (auto wireSpec = WireSpec::instance().get(); wireSpec->isInternalClient) {
-        WireSpec::appendInternalClientWireVersion(wireSpec->outgoing, &bob);
-    }
+    WireSpec::getWireSpec(getGlobalServiceContext()).appendInternalClientWireVersionIfNeeded(&bob);
 
     const auto timeoutMS = _connectTimeout + kMaxAwaitTime;
-    auto request =
-        executor::RemoteCommandRequest(HostAndPort(_host), "admin", bob.obj(), nullptr, timeoutMS);
+    auto request = executor::RemoteCommandRequest(
+        HostAndPort(_host), DatabaseName::kAdmin, bob.obj(), nullptr, timeoutMS);
     request.sslMode = _setUri.getSSLMode();
 
     auto swCbHandle = _executor->scheduleExhaustRemoteCommand(
-        std::move(request),
+        request,
         [self = shared_from_this(), helloStats = _stats->collectHelloStats()](
             const executor::TaskExecutor::RemoteCommandCallbackArgs& result) mutable {
             Milliseconds nextRefreshPeriod;
@@ -264,7 +285,6 @@ StatusWith<TaskExecutor::CallbackHandle> SingleServerDiscoveryMonitor::_schedule
                     self->_helloOutstanding = false;
                     LOGV2_DEBUG(4495400,
                                 kLogLevel,
-                                "RSM {replicaSet} not processing response: {error}",
                                 "RSM not processing response",
                                 "error"_attr = result.response.status,
                                 "replicaSet"_attr = self->_setUri.getSetName());
@@ -274,7 +294,7 @@ StatusWith<TaskExecutor::CallbackHandle> SingleServerDiscoveryMonitor::_schedule
                 auto responseTopologyVersion = result.response.data.getField("topologyVersion");
                 if (responseTopologyVersion) {
                     self->_topologyVersion = TopologyVersion::parse(
-                        IDLParserErrorContext("TopologyVersion"), responseTopologyVersion.Obj());
+                        responseTopologyVersion.Obj(), IDLParserContext("TopologyVersion"));
                 } else {
                     self->_topologyVersion = boost::none;
                 }
@@ -299,17 +319,16 @@ StatusWith<TaskExecutor::CallbackHandle> SingleServerDiscoveryMonitor::_schedule
 
 StatusWith<TaskExecutor::CallbackHandle> SingleServerDiscoveryMonitor::_scheduleSingleHello() {
     BSONObjBuilder bob;
-    bob.append("isMaster", 1);
-    if (auto wireSpec = WireSpec::instance().get(); wireSpec->isInternalClient) {
-        WireSpec::appendInternalClientWireVersion(wireSpec->outgoing, &bob);
-    }
+    bob.append("hello", 1);
+
+    WireSpec::getWireSpec(getGlobalServiceContext()).appendInternalClientWireVersionIfNeeded(&bob);
 
     auto request = executor::RemoteCommandRequest(
-        HostAndPort(_host), "admin", bob.obj(), nullptr, _connectTimeout);
+        HostAndPort(_host), DatabaseName::kAdmin, bob.obj(), nullptr, _connectTimeout);
     request.sslMode = _setUri.getSSLMode();
 
     auto swCbHandle = _executor->scheduleRemoteCommand(
-        std::move(request),
+        request,
         [self = shared_from_this(), helloStats = _stats->collectHelloStats()](
             const executor::TaskExecutor::RemoteCommandCallbackArgs& result) mutable {
             Milliseconds nextRefreshPeriod;
@@ -320,7 +339,6 @@ StatusWith<TaskExecutor::CallbackHandle> SingleServerDiscoveryMonitor::_schedule
                 if (self->_isShutdown) {
                     LOGV2_DEBUG(4333219,
                                 kLogLevel,
-                                "RSM {replicaSet} not processing response: {error}",
                                 "RSM not processing response",
                                 "error"_attr = result.response.status,
                                 "replicaSet"_attr = self->_setUri.getSetName());
@@ -332,7 +350,7 @@ StatusWith<TaskExecutor::CallbackHandle> SingleServerDiscoveryMonitor::_schedule
                 auto responseTopologyVersion = result.response.data.getField("topologyVersion");
                 if (responseTopologyVersion) {
                     self->_topologyVersion = TopologyVersion::parse(
-                        IDLParserErrorContext("TopologyVersion"), responseTopologyVersion.Obj());
+                        responseTopologyVersion.Obj(), IDLParserContext("TopologyVersion"));
                 } else {
                     self->_topologyVersion = boost::none;
                 }
@@ -366,7 +384,6 @@ void SingleServerDiscoveryMonitor::shutdown() {
 
     LOGV2_DEBUG(4333220,
                 kLogLevel + 1,
-                "RSM {replicaSet} Closing host {host}",
                 "RSM closing host",
                 "host"_attr = _host,
                 "replicaSet"_attr = _setUri.getSetName());
@@ -375,7 +392,6 @@ void SingleServerDiscoveryMonitor::shutdown() {
 
     LOGV2_DEBUG(4333229,
                 kLogLevel + 1,
-                "RSM {replicaSet} Done Closing host {host}",
                 "RSM done closing host",
                 "host"_attr = _host,
                 "replicaSet"_attr = _setUri.getSetName());
@@ -396,7 +412,6 @@ void SingleServerDiscoveryMonitor::_cancelOutstandingRequest(WithLock) {
 void SingleServerDiscoveryMonitor::_onHelloSuccess(const BSONObj bson) {
     LOGV2_DEBUG(4333221,
                 kLogLevel + 1,
-                "RSM {replicaSet} received successful hello for server {host}: {helloReply}",
                 "RSM received successful hello",
                 "host"_attr = _host,
                 "replicaSet"_attr = _setUri.getSetName(),
@@ -408,7 +423,6 @@ void SingleServerDiscoveryMonitor::_onHelloSuccess(const BSONObj bson) {
 void SingleServerDiscoveryMonitor::_onHelloFailure(const Status& status, const BSONObj bson) {
     LOGV2_DEBUG(4333222,
                 kLogLevel,
-                "RSM {replicaSet} received error response from server {host}: {error}: {response}",
                 "RSM received error response",
                 "host"_attr = _host,
                 "error"_attr = status.toString(),
@@ -463,7 +477,6 @@ ServerDiscoveryMonitor::ServerDiscoveryMonitor(
       _setUri(setUri) {
     LOGV2_DEBUG(4333223,
                 kLogLevel,
-                "RSM {replicaSet} monitoring {nReplicaSetMembers} members.",
                 "RSM now monitoring replica set",
                 "replicaSet"_attr = _setUri.getSetName(),
                 "nReplicaSetMembers"_attr = initialTopologyDescription->getServers().size());
@@ -476,7 +489,7 @@ void ServerDiscoveryMonitor::shutdown() {
         return;
 
     _isShutdown = true;
-    for (auto singleMonitor : _singleMonitors) {
+    for (const auto& singleMonitor : _singleMonitors) {
         singleMonitor.second->shutdown();
     }
 }
@@ -504,7 +517,6 @@ void ServerDiscoveryMonitor::onTopologyDescriptionChangedEvent(
             singleMonitor->shutdown();
             LOGV2_DEBUG(4333225,
                         kLogLevel,
-                        "RSM {replicaSet} host {host} was removed from the topology",
                         "RSM host was removed from the topology",
                         "replicaSet"_attr = _setUri.getSetName(),
                         "addr"_attr = serverAddress);
@@ -525,7 +537,6 @@ void ServerDiscoveryMonitor::onTopologyDescriptionChangedEvent(
                       if (isMissing) {
                           LOGV2_DEBUG(4333226,
                                       kLogLevel,
-                                      "RSM {replicaSet} {host} was added to the topology",
                                       "RSM host was added to the topology",
                                       "replicaSet"_attr = _setUri.getSetName(),
                                       "host"_attr = serverAddress);
@@ -554,7 +565,7 @@ std::shared_ptr<executor::TaskExecutor> ServerDiscoveryMonitor::_setupExecutor(
     auto net = executor::makeNetworkInterface(
         "ServerDiscoveryMonitor-TaskExecutor", nullptr, std::move(hookList));
     auto pool = std::make_unique<executor::NetworkInterfaceThreadPool>(net.get());
-    auto result = std::make_shared<ThreadPoolTaskExecutor>(std::move(pool), std::move(net));
+    auto result = ThreadPoolTaskExecutor::create(std::move(pool), std::move(net));
     result->startup();
     return result;
 }
@@ -579,4 +590,4 @@ void ServerDiscoveryMonitor::_disableExpeditedChecking(WithLock) {
         addressAndMonitor.second->disableExpeditedChecking();
     }
 }
-}  // namespace mongo
+}  // namespace mongo::sdam

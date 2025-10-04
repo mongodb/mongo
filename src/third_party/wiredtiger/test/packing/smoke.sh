@@ -8,3 +8,4 @@ set -e
 
 $TEST_WRAPPER ./packing-test
 $TEST_WRAPPER ./intpack-test3
+$TEST_WRAPPER ./int4bpack-test

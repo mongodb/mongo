@@ -29,7 +29,10 @@
 
 #pragma once
 
+#include "mongo/base/error_extra_info.h"
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/transport/message_compressor_base.h"
 #include "mongo/util/string_map.h"
 

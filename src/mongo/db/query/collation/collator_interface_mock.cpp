@@ -27,16 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/query/collation/collator_interface_mock.h"
+
+#include "mongo/db/basic_types_gen.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 #include <algorithm>
 #include <memory>
 #include <string>
+#include <utility>
 
-#include "mongo/util/assert_util.h"
-#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -56,7 +57,7 @@ std::string mockTypeToString(CollatorInterfaceMock::MockType type) {
 }
 
 Collation makeCollation(StringData locale, StringData version) {
-    Collation collation(locale.toString());
+    Collation collation(std::string{locale});
     // "backwards" is optional. The ICU collator always sets it to true/false based on the locale.
     collation.setBackwards(false);
     collation.setVersion(version);
@@ -70,15 +71,18 @@ CollatorInterfaceMock::CollatorInterfaceMock(MockType mockType)
       _mockType(mockType) {}
 
 std::unique_ptr<CollatorInterface> CollatorInterfaceMock::clone() const {
-    auto clone = std::make_unique<CollatorInterfaceMock>(_mockType);
-    return {std::move(clone)};
+    return std::make_unique<CollatorInterfaceMock>(_mockType);
+}
+
+std::shared_ptr<CollatorInterface> CollatorInterfaceMock::cloneShared() const {
+    return std::make_shared<CollatorInterfaceMock>(_mockType);
 }
 
 int CollatorInterfaceMock::compare(StringData left, StringData right) const {
     switch (_mockType) {
         case MockType::kReverseString: {
-            std::string leftString = left.toString();
-            std::string rightString = right.toString();
+            std::string leftString = std::string{left};
+            std::string rightString = std::string{right};
             std::reverse(leftString.begin(), leftString.end());
             std::reverse(rightString.begin(), rightString.end());
             StringData leftReversed(leftString);
@@ -98,7 +102,7 @@ CollatorInterface::ComparisonKey CollatorInterfaceMock::getComparisonKey(
     StringData stringData) const {
     switch (_mockType) {
         case MockType::kReverseString: {
-            std::string keyDataString = stringData.toString();
+            std::string keyDataString = std::string{stringData};
             std::reverse(keyDataString.begin(), keyDataString.end());
             return makeComparisonKey(std::move(keyDataString));
         }

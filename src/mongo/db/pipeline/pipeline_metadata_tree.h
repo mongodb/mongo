@@ -29,19 +29,31 @@
 
 #pragma once
 
-#include <algorithm>
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_facet.h"
+#include "mongo/db/pipeline/document_source_lookup.h"
+#include "mongo/db/pipeline/document_source_union_with.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
+#include "mongo/util/str.h"
+
+#include <algorithm>
 #include <functional>
+#include <iterator>
+#include <list>
 #include <map>
 #include <memory>
 #include <type_traits>
 #include <utility>
 #include <vector>
-
-#include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_facet.h"
-#include "mongo/db/pipeline/document_source_lookup.h"
-#include "mongo/db/pipeline/pipeline.h"
 
 /**
  * A simple representation of an Aggregation Pipeline and functions for building it.
@@ -152,12 +164,29 @@ inline auto makeAdditionalChildren(
     std::vector<Stage<T>> children;
     std::vector<T> offTheEndContents;
 
-    if (auto lookupSource = dynamic_cast<const DocumentSourceLookUp*>(&source);
-        lookupSource && lookupSource->hasPipeline()) {
-        auto [child, offTheEndReshaper] = makeTreeWithOffTheEndStage(
-            initialStageContents, lookupSource->getResolvedIntrospectionPipeline(), propagator);
-        offTheEndContents.push_back(offTheEndReshaper(child.get().contents));
-        children.push_back(std::move(*child));
+    if (auto lookupSource = dynamic_cast<const DocumentSourceLookUp*>(&source)) {
+        // When we have a local field/foreign field join, we must provide the foreign
+        // collection's initial schema in the children. If we did not have a sub-pipeline, the
+        // foreign namespace schema becomes the rhs of the join. If we had a sub-pipeline, the
+        // sub-pipeline's schema is the rhs of join, but, we still need to provide the
+        // initial base schema of the foreign namespace. This is so that we can check the
+        // encryption metadata of the foreign field during schema propagation.
+        if (lookupSource->hasLocalFieldForeignFieldJoin()) {
+            // We create an empty stage with no principal child or additional children to return the
+            // entire foreign namespace schema.
+            auto contents = findStageContents(lookupSource->getFromNs(), initialStageContents);
+            children.emplace_back(Stage<T>(
+                std::move(contents), std::unique_ptr<Stage<T>>(), std::vector<Stage<T>>()));
+            offTheEndContents.push_back(children.back().contents);
+        }
+
+        if (lookupSource->hasPipeline() &&
+            lookupSource->getResolvedIntrospectionPipeline().size() > 0) {
+            auto [child, offTheEndReshaper] = makeTreeWithOffTheEndStage(
+                initialStageContents, lookupSource->getResolvedIntrospectionPipeline(), propagator);
+            offTheEndContents.push_back(std::move(offTheEndReshaper(child.get().contents)));
+            children.push_back(std::move(*child));
+        }
     }
     if (auto facetSource = dynamic_cast<const DocumentSourceFacet*>(&source))
         std::transform(facetSource->getFacetPipelines().begin(),
@@ -169,6 +198,13 @@ inline auto makeAdditionalChildren(
                            offTheEndContents.push_back(offTheEndReshaper(child.get().contents));
                            return std::move(*child);
                        });
+    if (auto unionWithSource = dynamic_cast<const DocumentSourceUnionWith*>(&source);
+        unionWithSource && unionWithSource->hasNonEmptyPipeline()) {
+        auto [child, offTheEndReshaper] = makeTreeWithOffTheEndStage(
+            initialStageContents, unionWithSource->getPipeline(), propagator);
+        offTheEndContents.push_back(offTheEndReshaper(child.get().contents));
+        children.push_back(std::move(*child));
+    }
     return std::pair(std::move(children), std::move(offTheEndContents));
 }
 
@@ -187,8 +223,9 @@ inline auto makeStage(
     const std::function<T(const T&)>& reshapeContents,
     const DocumentSource& source,
     const std::function<T(const T&, const std::vector<T>&, const DocumentSource&)>& propagator) {
-    auto contents = (previous) ? reshapeContents(previous.get().contents)
-                               : findStageContents(source.getContext()->ns, initialStageContents);
+    auto contents = (previous)
+        ? reshapeContents(previous.get().contents)
+        : findStageContents(source.getExpCtx()->getNamespaceString(), initialStageContents);
 
     auto [additionalChildren, offTheEndContents] =
         makeAdditionalChildren(initialStageContents, source, propagator, contents);
@@ -222,15 +259,17 @@ inline std::pair<boost::optional<Stage<T>>, std::function<T(const T&)>> makeTree
 
 template <typename T>
 inline void walk(Stage<T>* stage,
-                 Pipeline::SourceContainer::iterator* sourceIter,
+                 DocumentSourceContainer::iterator* sourceIter,
                  const std::function<void(Stage<T>*, DocumentSource*)>& zipper) {
     if (stage->principalChild)
         walk(stage->principalChild.get(), sourceIter, zipper);
 
-    if (auto lookupSource = dynamic_cast<DocumentSourceLookUp*>(&***sourceIter);
-        lookupSource && lookupSource->hasPipeline()) {
+    if (auto lookupSource = dynamic_cast<DocumentSourceLookUp*>(&***sourceIter); lookupSource &&
+        lookupSource->hasPipeline() && !lookupSource->getResolvedIntrospectionPipeline().empty()) {
         auto iter = lookupSource->getResolvedIntrospectionPipeline().getSources().begin();
-        walk(&stage->additionalChildren.front(), &iter, zipper);
+        // The pipeline's schema child is always contained at the last element of the vector for
+        // lookup.
+        walk(&stage->additionalChildren.back(), &iter, zipper);
     }
 
     if (auto facetSource = dynamic_cast<const DocumentSourceFacet*>(&***sourceIter)) {
@@ -239,6 +278,12 @@ inline void walk(Stage<T>* stage,
             auto iter = facetIter++->pipeline->getSources().begin();
             walk(&child, &iter, zipper);
         }
+    }
+
+    if (auto unionWithSource = dynamic_cast<DocumentSourceUnionWith*>(&***sourceIter);
+        unionWithSource && unionWithSource->hasNonEmptyPipeline()) {
+        auto iter = unionWithSource->getPipeline().getSources().begin();
+        walk(&stage->additionalChildren.front(), &iter, zipper);
     }
 
     zipper(stage, &**(*sourceIter)++);
@@ -255,7 +300,7 @@ inline void walk(Stage<T>* stage,
  *
  * The arguments to propagator will be actualized with the following:
  * 'T&' - In general, the contents from the previous stage, initial stages of the main pipeline and
- * $lookup pipelines recieve an element off the queue 'initialStageContents'. $facet receives a copy
+ * $lookup pipelines receive an element off the queue 'initialStageContents'. $facet receives a copy
  * of its parent's contents.
  * 'std::vector<T>&' - Completed contents from sub-pipelines. $facet's additional children and
  * expressive $lookup's final contents will be manifested in here. Note that these will be
@@ -273,9 +318,10 @@ inline std::pair<boost::optional<Stage<T>>, T> makeTree(
     const std::function<T(const T&, const std::vector<T>&, const DocumentSource&)>& propagator) {
     // For empty pipelines, there's no Stage<T> to return and the output schema is the same as the
     // input schema.
-    if (pipeline.getSources().empty()) {
-        return std::pair(boost::none,
-                         findStageContents(pipeline.getContext()->ns, initialStageContents));
+    if (pipeline.empty()) {
+        return std::pair(
+            boost::none,
+            findStageContents(pipeline.getContext()->getNamespaceString(), initialStageContents));
     }
 
     auto&& [finalStage, reshaper] =

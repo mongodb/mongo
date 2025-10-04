@@ -27,17 +27,33 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
+#include "mongo/db/s/resharding/resharding_recipient_service.h"
+#include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
+#include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/topology/sharding_state.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/s/request_types/resharding_operation_time_gen.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace mongo {
 namespace {
@@ -45,24 +61,8 @@ namespace {
 class ShardsvrReshardingOperationTimeCmd final
     : public TypedCommand<ShardsvrReshardingOperationTimeCmd> {
 public:
-    class OperationTime {
-    public:
-        explicit OperationTime(ReshardingMetrics* metrics) : _metrics(metrics) {}
-        void serialize(BSONObjBuilder* bob) const {
-            if (const auto elapsedTime = _metrics->getOperationElapsedTime()) {
-                bob->append("elapsedMillis", durationCount<Milliseconds>(elapsedTime.get()));
-            }
-            if (const auto remainingTime = _metrics->getOperationRemainingTime()) {
-                bob->append("remainingMillis", durationCount<Milliseconds>(remainingTime.get()));
-            }
-        }
-
-    private:
-        ReshardingMetrics* const _metrics;
-    };
-
     using Request = _shardsvrReshardingOperationTime;
-    using Response = OperationTime;
+    using Response = ShardsvrReshardingOperationTimeResponse;
 
     bool skipApiVersionCheck() const override {
         // Internal command (server to server).
@@ -98,18 +98,46 @@ public:
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",
                     AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                           ActionType::internal));
+                        ->isAuthorizedForActionsOnResource(
+                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                            ActionType::internal));
         }
 
         Response typedRun(OperationContext* opCtx) {
-            // Once multiple concurrent resharding operations are allowed, the following could use
-            // `ns()` to choose the instance of `ReshardingMetrics` that is associated with the
-            // provided namespace string.
-            return Response(ReshardingMetrics::get(opCtx->getServiceContext()));
+            ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
+            Response response;
+
+            const auto majorityReplicationLag = resharding::getMajorityReplicationLag(opCtx);
+            response.setMajorityReplicationLagMillis(majorityReplicationLag);
+
+            auto recipients = resharding::getReshardingStateMachines<
+                ReshardingRecipientService,
+                ReshardingRecipientService::RecipientStateMachine>(opCtx, ns());
+
+            invariant(recipients.size() <= 1);
+            if (!recipients.empty()) {
+                const auto& metrics = recipients[0]->getMetrics();
+
+                const auto elapsedTime =
+                    duration_cast<Milliseconds>(metrics.getOperationRunningTimeSecs());
+                response.setRecipientElapsedMillis(elapsedTime);
+
+                const auto remainingTime = metrics.getHighEstimateRemainingTimeMillis(
+                    ReshardingMetrics::CalculationLogOption::Show);
+                response.setRecipientRemainingMillis(remainingTime);
+
+                const auto prepareThreshold = Milliseconds(
+                    resharding::gRemainingReshardingOperationTimePrepareThresholdMillis.load());
+                if (remainingTime <= prepareThreshold) {
+                    recipients[0]->prepareForCriticalSection();
+                }
+            }
+
+            return response;
         }
     };
-} _shardsvrReshardingOperationTime;
+};
+MONGO_REGISTER_COMMAND(ShardsvrReshardingOperationTimeCmd).forShard();
 
 }  // namespace
 }  // namespace mongo

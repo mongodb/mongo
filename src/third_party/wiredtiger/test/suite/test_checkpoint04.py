@@ -29,20 +29,27 @@
 # test_checkpoint04.py
 # Test that the checkpoints timing statistics are populated as expected.
 
-import wiredtiger, wttest
+import wttest
 from wiredtiger import stat
 from wtdataset import SimpleDataSet
+from wtscenario import make_scenarios
 
 class test_checkpoint04(wttest.WiredTigerTestCase):
-    conn_config = 'cache_size=50MB,log=(enabled),statistics=(all)'
-    session_config = 'isolation=snapshot'
+    ckpt_precision = [
+        ('fuzzy', dict(ckpt_config='precise_checkpoint=false')),
+        ('precise', dict(ckpt_config='precise_checkpoint=true')),
+    ]
+
+    scenarios = make_scenarios(ckpt_precision)
+
+    def conn_config(self):
+        return 'cache_size=50MB,statistics=(all),' + self.ckpt_config
 
     def create_tables(self, ntables):
         tables = {}
         for i in range(0, ntables):
             uri = 'table:table' + str(i)
-            ds = SimpleDataSet(
-                self, uri, 0, key_format="i", value_format="S", config='log=(enabled=false)')
+            ds = SimpleDataSet(self, uri, 0, key_format="i", value_format="S")
             ds.populate()
             tables[uri] = ds
         return tables
@@ -65,8 +72,12 @@ class test_checkpoint04(wttest.WiredTigerTestCase):
 
     def test_checkpoint_stats(self):
         nrows = 100
-        ntables = 10
+        ntables = 50
         multiplier = 1
+
+        # Avoid checkpoint error with precise checkpoint
+        if self.ckpt_config == 'precise_checkpoint=true':
+            self.conn.set_timestamp('stable_timestamp=1')
 
         # Run the loop and increase the value size with each iteration until
         # the test passes.
@@ -92,34 +103,37 @@ class test_checkpoint04(wttest.WiredTigerTestCase):
             # Check the statistics.
             # Set them into a variable so that we can print them all out. We've had a failure
             # on Windows that is very difficult to reproduce so collect what info we can.
-            num_ckpt = self.get_stat(stat.conn.txn_checkpoint)
-            self.pr('txn_checkpoint, number of checkpoints ' + str(num_ckpt))
-            running = self.get_stat(stat.conn.txn_checkpoint_running)
-            self.pr('txn_checkpoint_running ' + str(running))
-            prep_running = self.get_stat(stat.conn.txn_checkpoint_prep_running)
-            self.pr('txn_checkpoint_prep_running ' + str(prep_running))
+            num_ckpt = self.get_stat(stat.conn.checkpoints_api)
+            self.pr('checkpoint, number of checkpoints started by api ' + str(num_ckpt))
+            running = self.get_stat(stat.conn.checkpoint_state)
+            self.pr('checkpoint_state ' + str(running))
+            prep_running = self.get_stat(stat.conn.checkpoint_prep_running)
+            self.pr('checkpoint_prep_running ' + str(prep_running))
 
-            prep_min = self.get_stat(stat.conn.txn_checkpoint_prep_min)
-            self.pr('txn_checkpoint_prep_min ' + str(prep_min))
-            time_min = self.get_stat(stat.conn.txn_checkpoint_time_min)
-            self.pr('txn_checkpoint_time_min ' + str(time_min))
+            prep_min = self.get_stat(stat.conn.checkpoint_prep_min)
+            self.pr('checkpoint_prep_min ' + str(prep_min))
+            time_min = self.get_stat(stat.conn.checkpoint_time_min)
+            self.pr('checkpoint_time_min ' + str(time_min))
 
-            prep_max = self.get_stat(stat.conn.txn_checkpoint_prep_max)
-            self.pr('txn_checkpoint_prep_max ' + str(prep_max))
-            time_max = self.get_stat(stat.conn.txn_checkpoint_time_max)
-            self.pr('txn_checkpoint_time_max ' + str(time_max))
+            prep_max = self.get_stat(stat.conn.checkpoint_prep_max)
+            self.pr('checkpoint_prep_max ' + str(prep_max))
+            time_max = self.get_stat(stat.conn.checkpoint_time_max)
+            self.pr('checkpoint_time_max ' + str(time_max))
 
-            prep_recent = self.get_stat(stat.conn.txn_checkpoint_prep_recent)
-            self.pr('txn_checkpoint_prep_recent ' + str(prep_recent))
-            time_recent = self.get_stat(stat.conn.txn_checkpoint_time_recent)
-            self.pr('txn_checkpoint_time_recent ' + str(time_recent))
+            prep_recent = self.get_stat(stat.conn.checkpoint_prep_recent)
+            self.pr('checkpoint_prep_recent ' + str(prep_recent))
+            time_recent = self.get_stat(stat.conn.checkpoint_time_recent)
+            self.pr('checkpoint_time_recent ' + str(time_recent))
 
-            prep_total = self.get_stat(stat.conn.txn_checkpoint_prep_total)
-            self.pr('txn_checkpoint_prep_total ' + str(prep_total))
-            time_total = self.get_stat(stat.conn.txn_checkpoint_time_total)
-            self.pr('txn_checkpoint_time_total ' + str(time_total))
+            prep_total = self.get_stat(stat.conn.checkpoint_prep_total)
+            self.pr('checkpoint_prep_total ' + str(prep_total))
+            time_total = self.get_stat(stat.conn.checkpoint_time_total)
+            self.pr('checkpoint_time_total ' + str(time_total))
 
-            self.assertEqual(num_ckpt, 2 * multiplier)
+            # Account for When the connection re-opens on an existing datable as we perform a
+            # checkpoint during the open stage.
+            expected_ckpts = 3 if multiplier > 1 else 2
+            self.assertEqual(num_ckpt, expected_ckpts)
             self.assertEqual(running, 0)
             self.assertEqual(prep_running, 0)
             # Assert if this loop continues for more than 100 iterations.
@@ -129,8 +143,8 @@ class test_checkpoint04(wttest.WiredTigerTestCase):
             # Run the loop again if any of the below condition fails and exit if the test passes.
             if prep_min < time_min and prep_max < time_max and prep_recent < time_recent and prep_total < time_total:
                 break
-            else:
-                multiplier += 1
 
-if __name__ == '__main__':
-    wttest.run()
+            multiplier += 1
+            # Reopen the connection to reset statistics.
+            # We don't want stats from earlier runs to interfere with later runs.
+            self.reopen_conn()

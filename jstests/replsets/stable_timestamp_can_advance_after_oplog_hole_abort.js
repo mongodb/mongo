@@ -6,10 +6,9 @@
  * ]
  */
 
-(function() {
-"use strict";
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/parallelTester.js");  // For Thread.
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const replTest = new ReplSetTest({nodes: 1});
 replTest.startSet();
@@ -51,8 +50,7 @@ function majorityWriteFn(host, dbName, collName, doc) {
     const testDB = new Mongo(host).getDB(dbName);
     const testColl = testDB.getCollection(collName);
 
-    assert.commandWorked(
-        testColl.insert(doc, {writeConcern: {w: "majority", wtimeout: 10 * 1000}}));
+    assert.commandWorked(testColl.insert(doc, {writeConcern: {w: "majority", wtimeout: 10 * 1000}}));
 }
 
 //
@@ -70,8 +68,7 @@ function testCreateCollection() {
     jsTestLog("Running createCollection test.");
 
     // Initialize the failpoint.
-    const hangCreatefailPoint =
-        configureFailPoint(primary, "hangAndFailAfterCreateCollectionReservesOpTime");
+    const hangCreatefailPoint = configureFailPoint(primary, "hangAndFailAfterCreateCollectionReservesOpTime");
 
     // Start operation T1.
     jsTestLog("Starting the create collection operation.");
@@ -82,8 +79,7 @@ function testCreateCollection() {
     // Start operation T2, the majority write.
     jsTestLog("Starting the majority write operation.");
     const doc = {_id: id++};
-    const majorityWrite =
-        new Thread(majorityWriteFn, primary.host, dbName, majorityWriteCollName, doc);
+    const majorityWrite = new Thread(majorityWriteFn, primary.host, dbName, majorityWriteCollName, doc);
     majorityWrite.start();
 
     // Wait until the majority write operation has completed and is waiting for write concern.
@@ -94,52 +90,6 @@ function testCreateCollection() {
 
     jsTestLog("Waiting for the operations to complete.");
     createColl.join();
-    majorityWrite.join();
-}
-
-//
-// Test insert abort.
-//
-
-// Insert a single document into a given collection.
-function insertFn(host, dbName, collName, doc, expectedErrCode) {
-    const testDB = new Mongo(host).getDB(dbName);
-    const testColl = testDB.getCollection(collName);
-
-    // Create the new collection.
-    jsTestLog("Inserting document: " + tojson(doc));
-    assert.commandFailedWithCode(testColl.insert(doc), expectedErrCode);
-}
-
-function testInsert() {
-    jsTestLog("Running insert test.");
-
-    const failPoint = configureFailPoint(primary,
-                                         "hangAndFailAfterDocumentInsertsReserveOpTimes",
-                                         {collectionNS: testColl.getFullName()});
-
-    // Start operation T1.
-    jsTestLog("Starting the insert operation.");
-    const insert = new Thread(insertFn, primary.host, dbName, collName, {insert: 1}, 51269);
-    insert.start();
-    failPoint.wait();
-
-    // Start operation T2, the majority write.
-    jsTestLog("Starting the majority write operation.");
-    const doc = {_id: id++};
-    const majorityWrite =
-        new Thread(majorityWriteFn, primary.host, dbName, majorityWriteCollName, doc);
-    majorityWrite.start();
-
-    // Wait until the majority write operation has completed and is waiting for write concern.
-    jsTestLog("Waiting until the majority write is visible.");
-    assert.soon(() => majorityWriteColl.find(doc).itcount() === 1);
-
-    jsTestLog("Releasing the failpoint.");
-    failPoint.off();
-
-    jsTestLog("Waiting for the operations to complete.");
-    insert.join();
     majorityWrite.join();
 }
 
@@ -160,8 +110,7 @@ function transactionFn(host, dbName, collName) {
 function testUnpreparedTransactionCommit() {
     jsTestLog("Running unprepared transaction commit test.");
 
-    const failPoint =
-        configureFailPoint(primary, "hangAndFailUnpreparedCommitAfterReservingOplogSlot");
+    const failPoint = configureFailPoint(primary, "hangAndFailUnpreparedCommitAfterReservingOplogSlot");
 
     // Start operation T1.
     jsTestLog("Starting the transaction.");
@@ -172,8 +121,7 @@ function testUnpreparedTransactionCommit() {
     // Start operation T2, the majority write.
     jsTestLog("Starting the majority write operation.");
     const doc = {_id: id++};
-    const majorityWrite =
-        new Thread(majorityWriteFn, primary.host, dbName, majorityWriteCollName, doc);
+    const majorityWrite = new Thread(majorityWriteFn, primary.host, dbName, majorityWriteCollName, doc);
     majorityWrite.start();
 
     // Wait until the majority write operation has completed and is waiting for write concern.
@@ -190,8 +138,6 @@ function testUnpreparedTransactionCommit() {
 
 // Execute all the tests.
 testCreateCollection();
-testInsert();
 testUnpreparedTransactionCommit();
 
 replTest.stopSet();
-}());

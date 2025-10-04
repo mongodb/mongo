@@ -27,41 +27,26 @@
  *    it in the license file.
  */
 
-#include <bitset>
-#include <fmt/format.h>
-
-#include "mongo/unittest/unittest.h"
-
-#include "mongo/util/ctype.h"
-#include "mongo/util/hex.h"
 #include "mongo/util/str.h"
 
+#include "mongo/base/string_data.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/ctype.h"
+#include "mongo/util/hex.h"
+#include "mongo/util/str_escape.h"
+
+#include <algorithm>
+#include <bitset>
+#include <limits>
+
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+
 namespace mongo::str {
+namespace {
 
-using namespace fmt::literals;
 using std::string;
-
-TEST(StringUtilsTest, Basic) {
-    //
-    // Basic version comparison tests with different version string types
-    //
-
-    // Equal
-    ASSERT(versionCmp("1.2.3", "1.2.3") == 0);
-
-    // Basic
-    ASSERT(versionCmp("1.2.3", "1.2.4") < 0);
-    ASSERT(versionCmp("1.2.3", "1.2.20") < 0);
-    ASSERT(versionCmp("1.2.3", "1.20.3") < 0);
-    ASSERT(versionCmp("2.2.3", "10.2.3") < 0);
-
-    // Post-fixed
-    ASSERT(versionCmp("1.2.3", "1.2.3-") > 0);
-    ASSERT(versionCmp("1.2.3", "1.2.3-pre") > 0);
-    ASSERT(versionCmp("1.2.3", "1.2.4-") < 0);
-    ASSERT(versionCmp("1.2.3-", "1.2.3") < 0);
-    ASSERT(versionCmp("1.2.3-pre", "1.2.3") < 0);
-}
 
 TEST(StringUtilsTest, Simple1) {
     ASSERT_EQUALS(0, LexNumCmp::cmp("a.b.c", "a.b.c", false));
@@ -286,6 +271,16 @@ TEST(StringUtilsTest, ConvertDoubleToStringWithProperPrecision) {
     ASSERT_EQUALS(std::string("0.1"), convertDoubleToString(0.1 + 6E-8, 6));
 }
 
+TEST(StringUtilsTest, EqualCaseInsensitive) {
+    ASSERT(str::equalCaseInsensitive(StringData("abc"), "abc"));
+    ASSERT(str::equalCaseInsensitive(StringData("abc"), "ABC"));
+    ASSERT(str::equalCaseInsensitive(StringData("ABC"), "abc"));
+    ASSERT(str::equalCaseInsensitive(StringData("ABC"), "ABC"));
+    ASSERT(str::equalCaseInsensitive(StringData("ABC"), "AbC"));
+    ASSERT(!str::equalCaseInsensitive(StringData("ABC"), "AbCd"));
+    ASSERT(!str::equalCaseInsensitive(StringData("ABC"), "AdC"));
+}
+
 TEST(StringUtilsTest, UTF8SafeTruncation) {
     // Empty string and ASCII works like normal truncation
     ASSERT_EQUALS(UTF8SafeTruncation(""_sd, 10), ""_sd);
@@ -321,8 +316,161 @@ TEST(StringUtilsTest, GetCodePointLength) {
             continue;  // Avoid the invariant on 0b10xx'xxxx continuation bytes.
         if (n == 0)
             n = 1;  // 7-bit single byte code point.
-        ASSERT_EQUALS(getCodePointLength(static_cast<char>(i)), n) << " i:0x{:02x}"_format(i);
+        ASSERT_EQUALS(getCodePointLength(static_cast<char>(i)), n) << fmt::format(" i:0x{:02x}", i);
     }
 }
 
+TEST(StringUtilsTest, UassertNoEmbeddedNulBytes) {
+    // These shouldn't throw.
+    uassertNoEmbeddedNulBytes({nullptr, 0});
+    uassertNoEmbeddedNulBytes(""_sd);
+    uassertNoEmbeddedNulBytes("hello"_sd);
+    uassertNoEmbeddedNulBytes("hello\0"_sd.substr(0, 5));
+
+    // These should throw.
+    ASSERT_THROWS_CODE(uassertNoEmbeddedNulBytes("\0"_sd), DBException, 9527900);
+    ASSERT_THROWS_CODE(uassertNoEmbeddedNulBytes("\0hello"_sd), DBException, 9527900);
+    ASSERT_THROWS_CODE(uassertNoEmbeddedNulBytes("hello\0"_sd), DBException, 9527900);
+    ASSERT_THROWS_CODE(uassertNoEmbeddedNulBytes("hello\0world"_sd), DBException, 9527900);
+}
+
+TEST(StringUtilsTest, CopyAsCString) {
+    char dest[100];  // big enough for anything we would reasonably add here.
+
+    // Print address not contents on failures.
+    auto ptr = [](const char* p) {
+        return static_cast<const void*>(p);
+    };
+    auto testValid = [&](StringData noNul, int line) {
+        // Make sure we write a nul byte. Without this, the test could pass if dest happened to have
+        // uninitialized zero bytes.
+        std::fill_n(dest, sizeof(dest), 0xff);
+
+        ASSERT_EQ(ptr(copyAsCString(dest, noNul)), ptr(dest + noNul.size() + 1)) << "line:" << line;
+        ASSERT_EQ(dest[noNul.size()], '\0') << "line:" << line;
+        ASSERT_EQ(StringData(dest, noNul.size()), noNul) << "line:" << line;
+    };
+
+    // These shouldn't throw.
+    testValid({nullptr, 0}, __LINE__);
+    testValid(""_sd, __LINE__);
+    testValid("hello"_sd, __LINE__);
+    testValid("hello world"_sd.substr(0, 5), __LINE__);
+
+    // These should throw.
+    ASSERT_THROWS_CODE(copyAsCString(dest, "\0"_sd), DBException, 9527900);
+    ASSERT_THROWS_CODE(copyAsCString(dest, "\0hello"_sd), DBException, 9527900);
+    ASSERT_THROWS_CODE(copyAsCString(dest, "hello\0"_sd), DBException, 9527900);
+    ASSERT_THROWS_CODE(copyAsCString(dest, "hello\0world"_sd), DBException, 9527900);
+}
+
+/**
+ * The Unicode REPLACEMENT_CHARACTER (U+FFFD).
+ * https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
+ */
+const std::string replacementCharacter = u8"\ufffd"_as_char_ptr;
+
+/** Repeat the `s` string, `x` times. */
+std::string repeat(StringData s, size_t x) {
+    std::string result;
+    result.reserve(x * s.size());
+    auto it = std::back_inserter(result);
+    for (size_t i = 0; i < x; ++i)
+        it = std::copy(s.begin(), s.end(), it);
+    return result;
+}
+
+/** Function to convert a Unicode code point to a UTF-8 encoded string */
+std::string codePointToUTF8(unsigned int codePoint) {
+    std::string result;
+    if (codePoint <= 0x7F) {
+        result += static_cast<char>(codePoint);
+    } else if (codePoint <= 0x7FF) {
+        result += static_cast<char>(0xC0 | (codePoint >> 6));
+        result += static_cast<char>(0x80 | (codePoint & 0x3F));
+    } else if (codePoint <= 0xFFFF) {
+        result += static_cast<char>(0xE0 | (codePoint >> 12));
+        result += static_cast<char>(0x80 | ((codePoint >> 6) & 0x3F));
+        result += static_cast<char>(0x80 | (codePoint & 0x3F));
+    } else if (codePoint <= 0x10FFFF) {
+        result += static_cast<char>(0xF0 | (codePoint >> 18));
+        result += static_cast<char>(0x80 | ((codePoint >> 12) & 0x3F));
+        result += static_cast<char>(0x80 | ((codePoint >> 6) & 0x3F));
+        result += static_cast<char>(0x80 | (codePoint & 0x3F));
+    }
+    return result;
+}
+
+/** Double-check the encoding of the replacementCharacter */
+TEST(UnicodeReplacementCharacter, Bytes) {
+    ASSERT_EQ(replacementCharacter, (std::string{'\xef', '\xbf', '\xbd'}));
+}
+
+const std::vector<std::string> validUTF8Strings{
+    "A",
+    "\xc2\xa2",          // CENT SIGN: ¢
+    "\xe2\x82\xac",      // Euro: €
+    "\xf0\x9d\x90\x80",  // Blackboard A: 𝐀
+    "\n",
+    u8"こんにちは"_as_char_ptr,
+    u8"😊"_as_char_ptr,
+    "",
+};
+
+// Maps invalid UTF-8 to the appropriate scrubbed version.
+const std::map<std::string, std::string> scrubMap{
+    // Abrupt end
+    {"\xc2", repeat(replacementCharacter, 1)},
+    {"\xe2\x82", repeat(replacementCharacter, 2)},
+    {"\xf0\x9d\x90", repeat(replacementCharacter, 3)},
+
+    // Test having spaces at the end and beginning of scrubbed lines
+    {" \xc2 ", " \xef\xbf\xbd "},
+    {"\xe2\x82 ", "\xef\xbf\xbd\xef\xbf\xbd "},
+    {"\xf0\x9d\x90 ", "\xef\xbf\xbd\xef\xbf\xbd\xef\xbf\xbd "},
+
+    // Too long
+    {"\xf8\x80\x80\x80\x80", repeat(replacementCharacter, 5)},
+    {"\xfc\x80\x80\x80\x80\x80", repeat(replacementCharacter, 6)},
+    {"\xfe\x80\x80\x80\x80\x80\x80", repeat(replacementCharacter, 7)},
+    {"\xff\x80\x80\x80\x80\x80\x80\x80", repeat(replacementCharacter, 8)},
+
+    {"\x80", repeat(replacementCharacter, 1)},         // Can't start with continuation byte.
+    {"\xc3\x28", "\xef\xbf\xbd\x28"},                  // First byte indicates 2-byte sequence, but
+                                                       // second byte is not in form 10xxxxxx
+    {"\xe2\x28\xa1", "\xef\xbf\xbd\x28\xef\xbf\xbd"},  // first byte indicates 3-byte sequence, but
+                                                       // second byte is not in form 10xxxxxx
+    {"\xde\xa0\x80",
+     "\xde\xa0\xef\xbf\xbd"},  // Surrogate pairs are not valid for UTF-8 (high surrogate)
+    {"\xf0\x9d\xdc\x80", "\xef\xbf\xbd\xef\xbf\xbd\xdc\x80"},  // Surrogate pairs are not valid
+
+    // These are invalid UTF-8 strings that currently pass that shouldn't.
+    // See SERVER-95394.
+    // {"\xf5\x80\x80\x80", repeat(replacementCharacter, 4)},  // U+140000 > U+10FFFF
+    // {"\xc0\x80", repeat(replacementCharacter, 2)},          // 2-byte version of ASCII NUL
+    // {"\xc1\x80", repeat(replacementCharacter, 2)},           // 2-byte version of ASCII NUL
+    // {"\0x88\0x80"}        // Invalid start-byte (0x88 > 0x7f)
+};
+
+TEST(StringEscapeTest, ScrubInvalidUTF8) {
+    for (auto& in : validUTF8Strings)
+        assertCmp(0, str::scrubInvalidUTF8(in), in);
+    for (auto& [in, expect] : scrubMap)
+        assertCmp(0, str::scrubInvalidUTF8(in), expect);
+    for (unsigned i = 0; i < 0x1'0000; ++i) {
+        std::string s = codePointToUTF8(i);
+        assertCmp(0, scrubInvalidUTF8(s), s);
+    }
+}
+
+TEST(StringEscapeTest, ValidUTF8) {
+    for (auto& str : validUTF8Strings) {
+        ASSERT(str::validUTF8(str));
+    }
+    for (const auto& pair : scrubMap) {
+        ASSERT(!str::validUTF8(pair.first));
+    }
+}
+
+}  // namespace
 }  // namespace mongo::str

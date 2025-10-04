@@ -1,13 +1,10 @@
 // Make sure the psuedo-option --tlsOnNormalPorts is correctly canonicalized.
 
-(function() {
-'use strict';
-
 const mongod = MongoRunner.runMongod({
-    tlsOnNormalPorts: '',
-    tlsCertificateKeyFile: 'jstests/libs/server.pem',
+    tlsOnNormalPorts: "",
+    tlsCertificateKeyFile: "jstests/libs/server.pem",
+    tlsCAFile: "jstests/libs/ca.pem",
 });
 assert(mongod);
-assert.commandWorked(mongod.getDB('admin').runCommand({hello: 1}));
+assert.commandWorked(mongod.getDB("admin").runCommand({hello: 1}));
 MongoRunner.stopMongod(mongod);
-})();

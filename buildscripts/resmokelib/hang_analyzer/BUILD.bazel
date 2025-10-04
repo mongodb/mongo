@@ -1,0 +1,43 @@
+load("@poetry//:dependencies.bzl", "dependency")
+
+py_library(
+    name = "hang_analyzer",
+    srcs = [
+        "__init__.py",
+        "attach_core_analyzer_task.py",
+        "core_analyzer.py",
+        "dumper.py",
+        "extractor.py",
+        "gen_hang_analyzer_tasks.py",
+        "hang_analyzer.py",
+        "plugin.py",
+        "process.py",
+        "process_list.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:simple_report",
+        "//buildscripts/resmokelib/run",
+        "//buildscripts/resmokelib/symbolizer",
+        dependency(
+            "retry",
+            group = "testing",
+        ),
+        dependency(
+            "opentelemetry-api",
+            group = "testing",
+        ),
+        dependency(
+            "opentelemetry-sdk",
+            group = "testing",
+        ),
+        dependency(
+            "opentelemetry-exporter-otlp-proto-common",
+            group = "testing",
+        ),
+        dependency(
+            "shrub-py",
+            group = "testing",
+        ),
+    ],
+)

@@ -29,7 +29,7 @@
 #include <boost/aligned_storage.hpp>
 #include <boost/type_traits/alignment_of.hpp>
 #elif defined(BOOST_WINDOWS)
-#include <boost/thread/thread.hpp>
+#include <boost/thread/thread.hpp> // at_thread_exit
 #include <boost/log/detail/thread_specific.hpp>
 #else
 #include <boost/log/exceptions.hpp>

@@ -1,41 +1,43 @@
 /*
  * Utilities for dealing with chunk bounds.
  */
-var chunkBoundsUtil = (function() {
-    let eq = function(shardKeyA, shardKeyB) {
+export var chunkBoundsUtil = (function () {
+    let eq = function (shardKeyA, shardKeyB) {
         return bsonWoCompare(shardKeyA, shardKeyB) == 0;
     };
 
-    let gte = function(shardKeyA, shardKeyB) {
+    let gte = function (shardKeyA, shardKeyB) {
         return bsonWoCompare(shardKeyA, shardKeyB) >= 0;
     };
 
-    let lt = function(shardKeyA, shardKeyB) {
+    let lt = function (shardKeyA, shardKeyB) {
         return bsonWoCompare(shardKeyA, shardKeyB) < 0;
     };
 
-    let max = function(shardKeyA, shardKeyB) {
+    let max = function (shardKeyA, shardKeyB) {
         return gte(shardKeyA, shardKeyB) ? shardKeyA : shardKeyB;
     };
 
-    let min = function(shardKeyA, shardKeyB) {
+    let min = function (shardKeyA, shardKeyB) {
         return lt(shardKeyA, shardKeyB) ? shardKeyA : shardKeyB;
     };
 
-    let containsKey = function(shardKey, minKey, maxKey) {
+    let containsKey = function (shardKey, minKey, maxKey) {
         return gte(shardKey, minKey) && lt(shardKey, maxKey);
     };
 
-    let overlapsWith = function(chunkBoundsA, chunkBoundsB) {
-        return containsKey(chunkBoundsA[0], chunkBoundsB[0], chunkBoundsB[1]) ||
-            containsKey(chunkBoundsA[1], chunkBoundsB[0], chunkBoundsB[1]);
+    let overlapsWith = function (chunkBoundsA, chunkBoundsB) {
+        return (
+            containsKey(chunkBoundsA[0], chunkBoundsB[0], chunkBoundsB[1]) ||
+            containsKey(chunkBoundsA[1], chunkBoundsB[0], chunkBoundsB[1])
+        );
     };
 
     /*
      * Combines chunk bounds chunkBoundsA and chunkBoundsB. Assumes that the bounds
      * overlap.
      */
-    let combine = function(chunkBoundsA, chunkBoundsB) {
+    let combine = function (chunkBoundsA, chunkBoundsB) {
         let rangeMin = min(chunkBoundsA[0], chunkBoundsB[0]);
         let rangeMax = max(chunkBoundsA[1], chunkBoundsB[1]);
         return [rangeMin, rangeMax];
@@ -46,7 +48,7 @@ var chunkBoundsUtil = (function() {
      * bounds into bounds for one chunk. Assumes the chunk bounds are contiguous and in
      * nondescending order.
      */
-    let computeRange = function(allChunkBounds) {
+    let computeRange = function (allChunkBounds) {
         let combinedBounds = allChunkBounds[0];
         for (let i = 1; i < allChunkBounds.length; i++) {
             assert(overlapsWith(combinedBounds, allChunkBounds[i]));
@@ -61,7 +63,7 @@ var chunkBoundsUtil = (function() {
      *
      * @param chunkDocs {Array} an array of chunk documents in the config database.
      */
-    let findShardChunkBounds = function(chunkDocs) {
+    let findShardChunkBounds = function (chunkDocs) {
         let allBounds = {};
         for (let chunkDoc of chunkDocs) {
             let bounds = [chunkDoc.min, chunkDoc.max];
@@ -78,10 +80,11 @@ var chunkBoundsUtil = (function() {
     /*
      * Returns the corresponding shard object for the given shard name.
      */
-    let _getShard = function(st, shardName) {
+    let _getShard = function (st, shardName) {
         for (let i = 0; i < st._connections.length; i++) {
-            if (st["rs" + i].name == shardName) {
-                return st._connections[i];
+            const conn = st._connections[i];
+            if (conn.shardName === shardName) {
+                return conn;
             }
         }
     };
@@ -94,7 +97,7 @@ var chunkBoundsUtil = (function() {
      *                                  for all the chunks on the shard. Each pair of chunk
      *                                  bounds is an array of the form [minKey, maxKey].
      */
-    let findShardAndChunkBoundsForShardKey = function(st, shardChunkBounds, shardKey) {
+    let findShardAndChunkBoundsForShardKey = function (st, shardChunkBounds, shardKey) {
         for (const [shardName, chunkBounds] of Object.entries(shardChunkBounds)) {
             for (let bounds of chunkBounds) {
                 if (containsKey(shardKey, bounds[0], bounds[1])) {
@@ -112,7 +115,7 @@ var chunkBoundsUtil = (function() {
      *                                  for all the chunks on the shard. Each pair of chunk
      *                                  bounds is an array of the form [minKey, maxKey].
      */
-    let findShardForShardKey = function(st, shardChunkBounds, shardKey) {
+    let findShardForShardKey = function (st, shardChunkBounds, shardKey) {
         return findShardAndChunkBoundsForShardKey(st, shardChunkBounds, shardKey).shard;
     };
 
@@ -124,6 +127,6 @@ var chunkBoundsUtil = (function() {
         containsKey,
         findShardChunkBounds,
         findShardAndChunkBoundsForShardKey,
-        findShardForShardKey
+        findShardForShardKey,
     };
 })();

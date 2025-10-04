@@ -29,11 +29,30 @@
 
 #pragma once
 
-#include <deque>
-
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/sort_key_comparator.h"
 #include "mongo/db/index/sort_key_generator.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
+#include "mongo/db/pipeline/accumulator.h"
+#include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/memory_token_container_util.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+
+#include <deque>
+#include <functional>
+#include <map>
+#include <tuple>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -46,6 +65,8 @@ namespace mongo {
  */
 class AccumulatorN : public AccumulatorState {
 public:
+    enum AccumulatorType { kMinN, kMaxN, kFirstN, kLastN, kTopN, kTop, kBottomN, kBottom };
+
     static constexpr auto kFieldNameN = "n"_sd;
     static constexpr auto kFieldNameInput = "input"_sd;
 
@@ -64,6 +85,8 @@ public:
 
     AccumulatorN(ExpressionContext* expCtx);
 
+    virtual AccumulatorType getAccumulatorType() const = 0;
+
     /**
      * Verifies that 'input' is a positive integer.
      */
@@ -81,7 +104,7 @@ public:
      */
     static void serializeHelper(const boost::intrusive_ptr<Expression>& initializer,
                                 const boost::intrusive_ptr<Expression>& argument,
-                                bool explain,
+                                const SerializationOptions& options,
                                 MutableDocument& md);
 
 protected:
@@ -90,15 +113,9 @@ protected:
     static std::tuple<boost::intrusive_ptr<Expression>, boost::intrusive_ptr<Expression>> parseArgs(
         ExpressionContext* expCtx, const BSONObj& args, VariablesParseState vps);
 
-    // Utility to check that '_maxMemUsageBytes' isn't exceeded after 'memAdded' is counted
-    // towards the total memory consumed.
-    void updateAndCheckMemUsage(size_t memAdded);
-
     // Stores the limit of how many values we will return. This value is initialized to
     // 'boost::none' on construction and is only set during 'startNewGroup'.
     boost::optional<long long> _n;
-
-    int _maxMemUsageBytes = 0;
 
 private:
     virtual void _processValue(const Value& val) = 0;
@@ -132,12 +149,12 @@ public:
 
     Document serialize(boost::intrusive_ptr<Expression> initializer,
                        boost::intrusive_ptr<Expression> argument,
-                       bool explain) const final;
+                       const SerializationOptions& options = {}) const final;
 
     void reset() final;
 
-    bool isAssociative() const final {
-        return true;
+    ExpressionNary::Associativity getAssociativity() const final {
+        return ExpressionNary::Associativity::kFull;
     }
 
     bool isCommutative() const final {
@@ -147,7 +164,11 @@ public:
 private:
     void _processValue(const Value& val) final;
 
-    ValueMultiset _set;
+    using MultiSet = std::multiset<SimpleMemoryUsageTokenWith<Value>, MemoryTokenValueComparator>;
+
+    MultiSet createMultiSet() const;
+
+    MultiSet _set;
     MinMaxSense _sense;
 };
 
@@ -159,7 +180,9 @@ public:
 
     static const char* getName();
 
-    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx);
+    AccumulatorType getAccumulatorType() const override {
+        return AccumulatorType::kMinN;
+    }
 };
 
 class AccumulatorMaxN : public AccumulatorMinMaxN {
@@ -170,7 +193,9 @@ public:
 
     static const char* getName();
 
-    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx);
+    AccumulatorType getAccumulatorType() const override {
+        return AccumulatorType::kMaxN;
+    }
 };
 
 class AccumulatorFirstLastN : public AccumulatorN {
@@ -195,16 +220,12 @@ public:
 
     Document serialize(boost::intrusive_ptr<Expression> initializer,
                        boost::intrusive_ptr<Expression> argument,
-                       bool explain) const final;
+                       const SerializationOptions& options = {}) const final;
 
     void reset() final;
 
-    bool isAssociative() const final {
-        return true;
-    }
-
-    bool isCommutative() const final {
-        return true;
+    ExpressionNary::Associativity getAssociativity() const final {
+        return ExpressionNary::Associativity::kFull;
     }
 
     /**
@@ -221,7 +242,7 @@ private:
     // firstN/lastN do NOT ignore null values.
     void _processValue(const Value& val) final;
 
-    std::deque<Value> _deque;
+    std::deque<SimpleMemoryUsageTokenWith<Value>> _deque;
     Sense _variant;
 };
 
@@ -233,7 +254,9 @@ public:
 
     static const char* getName();
 
-    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx);
+    AccumulatorType getAccumulatorType() const override {
+        return AccumulatorType::kFirstN;
+    }
 };
 
 class AccumulatorLastN : public AccumulatorFirstLastN {
@@ -244,7 +267,9 @@ public:
 
     static const char* getName();
 
-    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx);
+    AccumulatorType getAccumulatorType() const override {
+        return AccumulatorType::kLastN;
+    }
 };
 
 enum TopBottomSense {
@@ -258,10 +283,8 @@ public:
     // pair of (sortKey, output) for storing in AccumulatorTopBottomN's internal multimap.
     using KeyOutPair = std::pair<Value, Value>;
 
-    AccumulatorTopBottomN(ExpressionContext* expCtx, SortPattern sp);
-
-    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx,
-                                                         BSONObj sortPattern);
+    AccumulatorTopBottomN(ExpressionContext* expCtx, SortPattern sp, bool isRemovable = false);
+    AccumulatorTopBottomN(ExpressionContext* expCtx, BSONObj sortPattern, bool isRemovable = false);
 
     /**
      * Verifies that 'elem' is an object, delegates argument parsing to 'accumulatorNParseArgs',
@@ -288,31 +311,121 @@ public:
         }
     }
 
+    static constexpr auto kName = getName();
+
     void processInternal(const Value& input, bool merging) final;
 
-    Value getValue(bool toBeMerged) final;
+    Value getValueConst(bool toBeMerged) const;
+    Value getValue(bool toBeMerged) final {
+        return getValueConst(toBeMerged);
+    };
 
     const char* getOpName() const final;
 
     Document serialize(boost::intrusive_ptr<Expression> initializer,
                        boost::intrusive_ptr<Expression> argument,
-                       bool explain) const final;
+                       const SerializationOptions& options = {}) const final;
 
     void reset() final;
 
-    bool isAssociative() const final {
+    ExpressionNary::Associativity getAssociativity() const final {
+        return ExpressionNary::Associativity::kFull;
+    }
+
+    bool isCommutative() const final {
         return true;
     }
 
+    /**
+     * Used for removable version of this operator as a window function.
+     */
+    void remove(const Value& val);
+
+    const SortPattern& getSortPattern() const {
+        return _sortPattern;
+    }
+
+    AccumulatorType getAccumulatorType() const override {
+        if constexpr (single) {
+            if constexpr (sense == TopBottomSense::kTop) {
+                return AccumulatorType::kTop;
+            } else {
+                return AccumulatorType::kBottom;
+            }
+        } else {
+            if constexpr (sense == TopBottomSense::kTop) {
+                return AccumulatorType::kTopN;
+            } else {
+                return AccumulatorType::kBottomN;
+            }
+        }
+    }
+
+    AccumulatorDocumentsNeeded documentsNeeded() const final {
+        auto accType = getAccumulatorType();
+        // If we have top or bottom accumulators in a group we may only need to see the first or
+        // last documents respectively if the sorter matches an index.
+        if (accType == AccumulatorType::kTop) {
+            return AccumulatorDocumentsNeeded::kFirstOutputDocument;
+        } else if (accType == AccumulatorType::kBottom) {
+            return AccumulatorDocumentsNeeded::kLastOutputDocument;
+        }
+        return AccumulatorDocumentsNeeded::kAllDocuments;
+    }
+
 private:
-    // top/bottom/topN/bottomN do NOT ignore null values.
-    void _processValue(const Value& val);
+    // top/bottom/topN/bottomN do NOT ignore null values, but MISSING values will be promoted to
+    // null so the users see them.
+    void _processValue(const Value& val) override;
+
+    std::pair<Value, Value> _genKeyOutPair(const Value& val);
+
+    // Set to true if we are allowed to call remove().
+    bool _isRemovable;
 
     SortPattern _sortPattern;
     // internalSortPattern needs to be computed based on _sortPattern before the following can be
     // initialized.
     boost::optional<SortKeyGenerator> _sortKeyGenerator;
     boost::optional<SortKeyComparator> _sortKeyComparator;
-    boost::optional<std::multimap<Value, Value, std::function<bool(Value, Value)>>> _map;
+    boost::optional<
+        std::multimap<Value, SimpleMemoryUsageTokenWith<Value>, std::function<bool(Value, Value)>>>
+        _map;
 };
+
+extern template class AccumulatorTopBottomN<TopBottomSense::kBottom, false>;
+extern template class AccumulatorTopBottomN<TopBottomSense::kBottom, true>;
+extern template class AccumulatorTopBottomN<TopBottomSense::kTop, false>;
+extern template class AccumulatorTopBottomN<TopBottomSense::kTop, true>;
+
+using AccumulatorTop = AccumulatorTopBottomN<TopBottomSense::kTop, true>;
+using AccumulatorBottom = AccumulatorTopBottomN<TopBottomSense::kBottom, true>;
+
+using AccumulatorTopN = AccumulatorTopBottomN<TopBottomSense::kTop, false>;
+using AccumulatorBottomN = AccumulatorTopBottomN<TopBottomSense::kBottom, false>;
+
+template <TopBottomSense sense, bool single>
+SortPattern getAccSortPattern(AccumulatorN* accN) {
+    return static_cast<AccumulatorTopBottomN<sense, single>*>(accN)->getSortPattern();
+}
+
+inline SortPattern getAccSortPattern(const boost::intrusive_ptr<AccumulatorState>& accState) {
+    auto accN = dynamic_cast<AccumulatorN*>(accState.get());
+    tassert(8434700,
+            fmt::format("Expected AccumulatorN but the accumulator is {}", accState->getOpName()),
+            accN);
+    switch (accN->getAccumulatorType()) {
+        case AccumulatorN::kTop:
+            return getAccSortPattern<TopBottomSense::kTop, true>(accN);
+        case AccumulatorN::kTopN:
+            return getAccSortPattern<TopBottomSense::kTop, false>(accN);
+        case AccumulatorN::kBottom:
+            return getAccSortPattern<TopBottomSense::kBottom, true>(accN);
+        case AccumulatorN::kBottomN:
+            return getAccSortPattern<TopBottomSense::kBottom, false>(accN);
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
 }  // namespace mongo

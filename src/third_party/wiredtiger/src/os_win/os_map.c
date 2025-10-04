@@ -9,18 +9,18 @@
 #include "wt_internal.h"
 
 /*
- * __wt_win_map --
+ * __wti_win_map --
  *     Map a file into memory.
  */
 int
-__wt_win_map(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session, void *mapped_regionp,
-  size_t *lenp, void *mapped_cookiep)
+__wti_win_map(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session, void **mapped_regionp,
+  size_t *lenp, void **mapped_cookiep)
 {
     WT_DECL_RET;
     WT_FILE_HANDLE_WIN *win_fh;
     WT_SESSION_IMPL *session;
     wt_off_t file_size;
-    DWORD windows_error;
+    DWORD desired_access, windows_error;
     size_t len;
     void *map, *mapped_cookie;
 
@@ -31,13 +31,16 @@ __wt_win_map(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session, void *mapped_r
      * There's no locking here to prevent the underlying file from changing underneath us, our
      * caller needs to ensure consistency of the mapped region vs. any other file activity.
      */
-    WT_RET(__wt_win_fs_size(file_handle->file_system, wt_session, file_handle->name, &file_size));
+    WT_RET(__wti_win_fs_size(file_handle->file_system, wt_session, file_handle->name, &file_size));
     len = (size_t)file_size;
 
     __wt_verbose(session, WT_VERB_HANDLEOPS, "%s: memory-map: %" WT_SIZET_FMT " bytes",
       file_handle->name, len);
 
-    mapped_cookie = CreateFileMappingW(win_fh->filehandle, NULL, PAGE_READONLY, 0, 0, NULL);
+    desired_access = PAGE_READONLY;
+    if (FLD_ISSET(win_fh->desired_access, GENERIC_WRITE))
+        desired_access = PAGE_READWRITE;
+    mapped_cookie = CreateFileMappingW(win_fh->filehandle, NULL, desired_access, 0, 0, NULL);
     if (mapped_cookie == NULL) {
         windows_error = __wt_getlasterror();
         ret = __wt_map_windows_error(windows_error);
@@ -46,7 +49,10 @@ __wt_win_map(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session, void *mapped_r
         return (ret);
     }
 
-    if ((map = MapViewOfFile(mapped_cookie, FILE_MAP_READ, 0, 0, len)) == NULL) {
+    desired_access = FILE_MAP_READ;
+    if (FLD_ISSET(win_fh->desired_access, GENERIC_WRITE))
+        desired_access = FILE_MAP_ALL_ACCESS; /* Only read/write, no execute. */
+    if ((map = MapViewOfFile(mapped_cookie, desired_access, 0, 0, len)) == NULL) {
         /* Retrieve the error before cleaning up. */
         windows_error = __wt_getlasterror();
         ret = __wt_map_windows_error(windows_error);
@@ -58,18 +64,18 @@ __wt_win_map(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session, void *mapped_r
         return (ret);
     }
 
-    *(void **)mapped_cookiep = mapped_cookie;
-    *(void **)mapped_regionp = map;
+    *mapped_cookiep = mapped_cookie;
+    *mapped_regionp = map;
     *lenp = len;
     return (0);
 }
 
 /*
- * __wt_win_unmap --
+ * __wti_win_unmap --
  *     Remove a memory mapping.
  */
 int
-__wt_win_unmap(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session, void *mapped_region,
+__wti_win_unmap(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session, void *mapped_region,
   size_t length, void *mapped_cookie)
 {
     WT_DECL_RET;

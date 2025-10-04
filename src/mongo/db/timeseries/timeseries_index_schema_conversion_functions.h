@@ -31,7 +31,14 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/timeseries/timeseries_options.h"
+#include "mongo/db/local_catalog/index_catalog.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
+
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 /**
  * Namespace for helper functions converting index spec schema between time-series collection and
@@ -51,12 +58,25 @@ StatusWith<BSONObj> createBucketsIndexSpecFromTimeseriesIndexSpec(
 StatusWith<BSONObj> createBucketsShardKeySpecFromTimeseriesShardKeySpec(
     const TimeseriesOptions& timeseriesOptions, const BSONObj& timeseriesIndexSpecBSON);
 
+boost::optional<BSONObj> createTimeseriesIndexFromBucketsIndexSpec(
+    const TimeseriesOptions& timeseriesOptions, const BSONObj& bucketsIndexSpecBSON);
+
+/**
+ * Maps a bucket collection shard key to a bucket collection index backing the shard key using the
+ * information provided in 'timeseriesOptions'.
+ *
+ * Returns boost::none if the specified 'bucketShardKeySpecBSON' is invalid for the time-series
+ * collection.
+ */
+boost::optional<BSONObj> createBucketsShardKeyIndexFromBucketsShardKeySpec(
+    const TimeseriesOptions& timeseriesOptions, const BSONObj& bucketShardKeySpecBSON);
+
 /**
  * Returns a time-series collection index spec equivalent to the given 'bucketsIndex' using the
  * time-series specifications provided in 'timeseriesOptions'. Returns boost::none if the
  * buckets index is not supported on a time-series collection.
  *
- * Copies and modifies the 'key' field of the buckets index, but otherwises copies all of the fields
+ * Copies and modifies the 'key' field of the buckets index, but otherwise copies all of the fields
  * over unaltered.
  */
 boost::optional<BSONObj> createTimeseriesIndexFromBucketsIndex(
@@ -65,23 +85,45 @@ boost::optional<BSONObj> createTimeseriesIndexFromBucketsIndex(
 /**
  * Returns a list of time-series collection index specs equivalent to the given 'bucketsIndexSpecs'
  * using the time-series specifications provided in 'timeseriesOptions'. If any of the buckets
- * indexes is not supported on a time-series collection, it will be ommitted from the results.
+ * indexes is not supported on a time-series collection, it will be omitted from the results.
  */
-std::list<BSONObj> createTimeseriesIndexesFromBucketsIndexes(
-    const TimeseriesOptions& timeseriesOptions, const std::list<BSONObj>& bucketsIndexes);
+std::vector<BSONObj> createTimeseriesIndexesFromBucketsIndexes(
+    const TimeseriesOptions& timeseriesOptions, const std::vector<BSONObj>& bucketsIndexes);
 
 /**
- * Returns true if the 'bucketsIndex' is compatible for FCV downgrade.
+ * Returns true if the original index specification should be included when creating an index on the
+ * time-series buckets collection.
  */
-bool isBucketsIndexSpecCompatibleForDowngrade(const TimeseriesOptions& timeseriesOptions,
-                                              const BSONObj& bucketsIndex);
+bool shouldIncludeOriginalSpec(const TimeseriesOptions& timeseriesOptions,
+                               const BSONObj& bucketsIndex);
 
 /**
- * Returns true if 'bucketsIndex' contains a key on a measurement field, excluding the time field.
- * This is helpful to detect if the 'bucketsIndex' contains a key on a field that was allowed to
- * have mixed-schema data in MongoDB versions < 5.2.
+ * Returns true if 'bucketsIndex' uses a measurement field, excluding the time field. Checks both
+ * the index key and the partialFilterExpression, if present.
+ *
+ * This is helpful to detect if the 'bucketsIndex' relies on a field that was allowed to have
+ * mixed-schema data in MongoDB versions < 5.2.
  */
-bool doesBucketsIndexIncludeKeyOnMeasurement(const TimeseriesOptions& timeseriesOptions,
-                                             const BSONObj& bucketsIndex);
+bool doesBucketsIndexIncludeMeasurement(OperationContext* opCtx,
+                                        const NamespaceString& bucketNs,
+                                        const TimeseriesOptions& timeseriesOptions,
+                                        const BSONObj& bucketsIndex);
+
+/**
+ * Takes a 'hint' object, in the same format used by FindCommandRequest, and returns
+ * true if the hint is an index key.
+ *
+ * Besides an index key, a hint can be {$hint: <index name>} or {$natural: <direction>},
+ * or it can be {} which means no hint is given.
+ */
+bool isHintIndexKey(const BSONObj& obj);
+
+/**
+ * Returns an index hint which we can use for query based reopening, if a suitable index exists for
+ * the collection.
+ */
+boost::optional<BSONObj> getIndexSupportingReopeningQuery(OperationContext* opCtx,
+                                                          const IndexCatalog* indexCatalog,
+                                                          const TimeseriesOptions& tsOptions);
 
 }  // namespace mongo::timeseries

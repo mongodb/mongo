@@ -39,6 +39,9 @@
                 <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" TabSkip="yes" Disabled="yes" />
                 <Control Id="TypicalText" Type="Text" X="60" Y="85" Width="280" Height="20" Text="All program features will be installed. Requires the most disk space. Recommended for most users." TabSkip="yes" />
                 <Control Id="CustomText" Type="Text" X="60" Y="138" Width="280" Height="30" Text="Allows users to choose which program features will be installed and where they will be installed. Recommended for advanced users." TabSkip="yes" />
+                <Control Id="MongoShellLink" Type="Hyperlink" X="40" Y="171" Width="300" Height="30" ToolTip="https://www.mongodb.com/try/download/shell">
+                    <Text>The Mongo Shell must be installed separately for Windows installations. <![CDATA[<a href="https://www.mongodb.com/try/download/shell">Download Now</a>]]></Text>
+                </Control>
             </Dialog>
 
             <!-- A custom dialog box to warn the user about an invalid service logon. -->

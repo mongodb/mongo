@@ -30,7 +30,6 @@
 #   Transactions: recovery toggling logging
 #
 
-import fnmatch, os, shutil, time
 from suite_subprocess import suite_subprocess
 from wtscenario import make_scenarios
 import wttest
@@ -81,7 +80,7 @@ class test_txn09(wttest.WiredTigerTestCase, suite_subprocess):
         prune=20, prunelong=5000)
 
     def conn_config(self):
-        return 'log=(archive=false,enabled=%s),' % int(self.log_enabled) + \
+        return 'log=(enabled=%s,remove=false),' % int(self.log_enabled) + \
             'transaction_sync=(enabled=false)'
 
     # Check that a cursor (optionally started in a new transaction), sees the
@@ -144,8 +143,10 @@ class test_txn09(wttest.WiredTigerTestCase, suite_subprocess):
                 c[k] = c[k1] = i + 2
                 current[k] = current[k1] = i + 2
             elif op == 'remove':
-                del c[k]
-                del c[k1]
+                c.set_key(k)
+                c.remove()
+                c.set_key(k1)
+                c.remove()
                 if k in current:
                     del current[k]
                 if k1 in current:
@@ -164,6 +165,3 @@ class test_txn09(wttest.WiredTigerTestCase, suite_subprocess):
 
             # Check the state after each commit/rollback.
             self.check_all(current, committed)
-
-if __name__ == '__main__':
-    wttest.run()

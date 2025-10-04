@@ -1,29 +1,30 @@
 // Tests changing the zones on a shard at runtime results in a correct distribution of chunks across
 // the cluster
-(function() {
-'use strict';
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
-load("jstests/sharding/libs/find_chunks_util.js");
+const st = new ShardingTest({shards: 3, mongos: 1, other: {chunkSize: 1}});
+const dbName = "test";
+const collName = "foo";
+const ns = dbName + "." + collName;
 
-var st = new ShardingTest({shards: 3, mongos: 1});
+assert.commandWorked(st.s0.adminCommand({enablesharding: dbName, primaryShard: st.shard1.shardName}));
 
-assert.commandWorked(st.s0.adminCommand({enablesharding: 'test'}));
-st.ensurePrimaryShard('test', st.shard1.shardName);
+let testDB = st.s0.getDB(dbName);
+let configDB = st.s0.getDB("config");
 
-var testDB = st.s0.getDB('test');
-var configDB = st.s0.getDB('config');
+assert.commandWorked(st.s0.adminCommand({shardCollection: ns, key: {_id: 1}}));
 
-var bulk = testDB.foo.initializeUnorderedBulkOp();
+const bigString = "X".repeat(1024 * 1024); // 1MB
+let bulk = testDB.foo.initializeUnorderedBulkOp();
 for (var i = 0; i < 9; i++) {
-    bulk.insert({_id: i, x: i});
+    bulk.insert({_id: i, x: bigString});
 }
 assert.commandWorked(bulk.execute());
 
-assert.commandWorked(st.s0.adminCommand({shardCollection: 'test.foo', key: {_id: 1}}));
-
 // Produce 9 chunks with min  value at the documents just inserted
 for (var i = 0; i < 8; i++) {
-    assert.commandWorked(st.s0.adminCommand({split: 'test.foo', middle: {_id: i}}));
+    assert.commandWorked(st.s0.adminCommand({split: ns, middle: {_id: i}}));
 }
 
 /**
@@ -33,13 +34,16 @@ for (var i = 0; i < 8; i++) {
 function assertBalanceCompleteAndStable(checkFunc, stepName) {
     st.printShardingStatus(true);
 
-    assert.soon(checkFunc, 'Balance at step ' + stepName + ' did not happen', 3 * 60 * 1000, 2000);
+    assert.soon(checkFunc, "Balance at step " + stepName + " did not happen", 3 * 60 * 1000, 2000);
 
-    st.waitForBalancer(true, 60000);
+    // When running with CSRS stepdowns, the balancer round might take longer to complete
+    const balancerRoundTimeout = TestData.runningWithConfigStepdowns ? 3 * 60 * 1000 : 60 * 1000;
+    st.awaitBalancerRound(balancerRoundTimeout);
+
     st.printShardingStatus(true);
     assert(checkFunc());
 
-    jsTestLog('Completed step ' + stepName);
+    jsTestLog("Completed step " + stepName);
 }
 
 /**
@@ -47,61 +51,64 @@ function assertBalanceCompleteAndStable(checkFunc, stepName) {
  * cluster is evenly balanced.
  */
 function checkClusterEvenlyBalanced() {
-    var maxChunkDiff = st.chunkDiff('foo', 'test');
-    return maxChunkDiff <= 1;
+    assert.commandWorked(st.s.getDB("admin").runCommand({balancerStatus: 1}));
+    return true;
 }
 
 st.startBalancer();
 
 // Initial balance
-assertBalanceCompleteAndStable(checkClusterEvenlyBalanced, 'initial');
+assertBalanceCompleteAndStable(checkClusterEvenlyBalanced, "initial");
 
 // Spread chunks correctly across zones
-st.addShardTag(st.shard0.shardName, 'a');
-st.addShardTag(st.shard1.shardName, 'a');
-st.addTagRange('test.foo', {_id: -100}, {_id: 100}, 'a');
+st.addShardTag(st.shard0.shardName, "a");
+st.addShardTag(st.shard1.shardName, "a");
+st.addTagRange(ns, {_id: -100}, {_id: 100}, "a");
 
-st.addShardTag(st.shard2.shardName, 'b');
-st.addTagRange('test.foo', {_id: MinKey}, {_id: -100}, 'b');
-st.addTagRange('test.foo', {_id: 100}, {_id: MaxKey}, 'b');
+st.addShardTag(st.shard2.shardName, "b");
+st.addTagRange(ns, {_id: MinKey}, {_id: -100}, "b");
+st.addTagRange(ns, {_id: 100}, {_id: MaxKey}, "b");
 
-assertBalanceCompleteAndStable(function() {
-    var chunksOnShard2 =
-        findChunksUtil.findChunksByNs(configDB, 'test.foo', {shard: st.shard2.shardName})
-            .sort({min: 1})
-            .toArray();
+assertBalanceCompleteAndStable(function () {
+    let chunksOnShard2 = findChunksUtil
+        .findChunksByNs(configDB, ns, {shard: st.shard2.shardName})
+        .sort({min: 1})
+        .toArray();
 
-    jsTestLog('Chunks on shard2: ' + tojson(chunksOnShard2));
+    jsTestLog("Chunks on shard2: " + tojson(chunksOnShard2));
 
     if (chunksOnShard2.length != 2) {
         return false;
     }
 
-    return chunksOnShard2[0].min._id == MinKey && chunksOnShard2[0].max._id == -100 &&
-        chunksOnShard2[1].min._id == 100 && chunksOnShard2[1].max._id == MaxKey;
-}, 'chunks to zones a and b');
+    return (
+        chunksOnShard2[0].min._id == MinKey &&
+        chunksOnShard2[0].max._id == -100 &&
+        chunksOnShard2[1].min._id == 100 &&
+        chunksOnShard2[1].max._id == MaxKey
+    );
+}, "chunks to zones a and b");
 
 // Tag the entire collection to shard0 and wait for everything to move to that shard
-st.removeTagRange('test.foo', {_id: -100}, {_id: 100}, 'a');
-st.removeTagRange('test.foo', {_id: MinKey}, {_id: -100}, 'b');
-st.removeTagRange('test.foo', {_id: 100}, {_id: MaxKey}, 'b');
+st.removeTagRange(ns, {_id: -100}, {_id: 100});
+st.removeTagRange(ns, {_id: MinKey}, {_id: -100});
+st.removeTagRange(ns, {_id: 100}, {_id: MaxKey});
 
-st.removeShardTag(st.shard1.shardName, 'a');
-st.removeShardTag(st.shard2.shardName, 'b');
-st.addTagRange('test.foo', {_id: MinKey}, {_id: MaxKey}, 'a');
+st.removeShardTag(st.shard1.shardName, "a");
+st.removeShardTag(st.shard2.shardName, "b");
+st.addTagRange(ns, {_id: MinKey}, {_id: MaxKey}, "a");
 
-assertBalanceCompleteAndStable(function() {
-    var counts = st.chunkCounts('foo');
+assertBalanceCompleteAndStable(function () {
+    let counts = st.chunkCounts(collName);
     printjson(counts);
-    return counts[st.shard0.shardName] == 11 && counts[st.shard1.shardName] == 0 &&
-        counts[st.shard2.shardName] == 0;
-}, 'all chunks to zone a');
+    // All chunks must have been moved to shard 0, none left on shard 1 and 2
+    return counts[st.shard1.shardName] == 0 && counts[st.shard2.shardName] == 0;
+}, "all chunks to zone a");
 
 // Remove all zones and ensure collection is correctly redistributed
-st.removeShardTag(st.shard0.shardName, 'a');
-st.removeTagRange('test.foo', {_id: MinKey}, {_id: MaxKey}, 'a');
+st.removeShardTag(st.shard0.shardName, "a");
+st.removeTagRange(ns, {_id: MinKey}, {_id: MaxKey});
 
-assertBalanceCompleteAndStable(checkClusterEvenlyBalanced, 'final');
+assertBalanceCompleteAndStable(checkClusterEvenlyBalanced, "final");
 
 st.stop();
-})();

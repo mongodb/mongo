@@ -29,16 +29,14 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/base/string_data.h"
-#include "mongo/util/md5.hpp"
+
+#include <string>
 
 namespace mongo {
 
 /**
- * Hashes the password so that it can be stored in a user object or used for MONGODB-CR
- * authentication.
+ * Hashes the password so that it can be used for SCRAM-SHA-1 in MONGODB-CR compatability mode.
  */
 std::string createPasswordDigest(StringData username, StringData clearTextPassword);
 

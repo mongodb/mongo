@@ -29,19 +29,24 @@
 
 #pragma once
 
+#include "mongo/base/data_type.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
+
 #include <array>
 #include <climits>
+#include <cstddef>
 #include <cstdint>
 #include <iostream>
 #include <string>
 #include <type_traits>
 #include <utility>
 
-#include "mongo/config.h"
-
-#include "mongo/util/assert_util.h"
-
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * Wrapper class for the MongoDB Decimal128 data type. Sample usage:
@@ -203,11 +208,11 @@ public:
      * "200E9999999999" --> +Inf
      * "-200E9999999999" --> -Inf
      */
-    explicit Decimal128(std::string stringValue,
+    explicit Decimal128(const std::string& stringValue,
                         RoundingMode roundMode = kRoundTiesToEven,
                         size_t* charsConsumed = nullptr);
 
-    Decimal128(std::string stringValue,
+    Decimal128(const std::string& stringValue,
                std::uint32_t* signalingFlag,
                RoundingMode roundMode = kRoundTiesToEven,
                size_t* charsConsumed = nullptr);
@@ -256,88 +261,61 @@ public:
     Decimal128 toAbs() const;
 
     /**
-     * Returns the acos value of this.
-     */
-    Decimal128 acos(RoundingMode roundMode = kRoundTiesToEven) const;
-    Decimal128 acos(std::uint32_t* signalingFlags, RoundingMode roundMode = kRoundTiesToEven) const;
-
-    /**
-     * Returns the acosh value of this.
-     */
-    Decimal128 acosh(RoundingMode roundMode = kRoundTiesToEven) const;
-    Decimal128 acosh(std::uint32_t* signalingFlags,
-                     RoundingMode roundMode = kRoundTiesToEven) const;
-
-    /**
-     * Returns the asin value of this.
-     */
-    Decimal128 asin(RoundingMode roundMode = kRoundTiesToEven) const;
-    Decimal128 asin(std::uint32_t* signalingFlags, RoundingMode roundMode = kRoundTiesToEven) const;
-
-    /**
-     * Returns the asinh value of this.
-     */
-    Decimal128 asinh(RoundingMode roundMode = kRoundTiesToEven) const;
-    Decimal128 asinh(std::uint32_t* signalingFlags,
-                     RoundingMode roundMode = kRoundTiesToEven) const;
-
-    /**
-     * Returns the atan value of this.
-     */
-    Decimal128 atan(RoundingMode roundMode = kRoundTiesToEven) const;
-    Decimal128 atan(std::uint32_t* signalingFlags, RoundingMode roundMode = kRoundTiesToEven) const;
-
-    /**
      * Returns the atan2(this, other) rather than atan2(other,this), which
      * would produce different results.
      */
-    Decimal128 atan2(const Decimal128& other, RoundingMode roundMode = kRoundTiesToEven) const;
     Decimal128 atan2(const Decimal128& other,
                      std::uint32_t* signalingFlags,
-                     RoundingMode roundMode = kRoundTiesToEven) const;
+                     RoundingMode roundMode) const;
 
-    /**
-     * Returns the atanh value of this.
-     */
-    Decimal128 atanh(RoundingMode roundMode = kRoundTiesToEven) const;
-    Decimal128 atanh(std::uint32_t* signalingFlags,
-                     RoundingMode roundMode = kRoundTiesToEven) const;
+    Decimal128 atan2(const Decimal128& other, RoundingMode roundMode) const {
+        return atan2(other, ThrowawayFlag{}, roundMode);
+    }
 
-    /**
-     * Returns the cos value of this.
-     */
-    Decimal128 cos(RoundingMode roundMode = kRoundTiesToEven) const;
-    Decimal128 cos(std::uint32_t* signalingFlags, RoundingMode roundMode = kRoundTiesToEven) const;
+    Decimal128 atan2(const Decimal128& other) {
+        return atan2(other, kRoundTiesToEven);
+    }
 
-    /**
-     * Returns the cosh value of this.
-     */
-    Decimal128 cosh(RoundingMode roundMode = kRoundTiesToEven) const;
-    Decimal128 cosh(std::uint32_t* signalingFlags, RoundingMode roundMode = kRoundTiesToEven) const;
+/**
+ * Generates overloads for a member function taking no arguments except the optional
+ * flags and optional round mode.
+ */
+#define MONGO_DECIMAL128_DECLARE_UNARY_OP(op)                                   \
+    Decimal128 op(std::uint32_t* signalingFlags, RoundingMode roundMode) const; \
+    Decimal128 op(RoundingMode roundMode) const {                               \
+        return op(ThrowawayFlag{}, roundMode);                                  \
+    }                                                                           \
+    Decimal128 op() const {                                                     \
+        return op(ThrowawayFlag{}, kRoundTiesToEven);                           \
+    }
 
-    /**
-     * Returns the sin value of this.
-     */
-    Decimal128 sin(RoundingMode roundMode = kRoundTiesToEven) const;
-    Decimal128 sin(std::uint32_t* signalingFlags, RoundingMode roundMode = kRoundTiesToEven) const;
+    MONGO_DECIMAL128_DECLARE_UNARY_OP(sqrt)  ///< square root
 
-    /**
-     * Returns the sinh value of this.
-     */
-    Decimal128 sinh(RoundingMode roundMode = kRoundTiesToEven) const;
-    Decimal128 sinh(std::uint32_t* signalingFlags, RoundingMode roundMode = kRoundTiesToEven) const;
-    /**
-     * Returns the tan value of this.
-     */
-    Decimal128 tan(RoundingMode roundMode = kRoundTiesToEven) const;
-    Decimal128 tan(std::uint32_t* signalingFlags, RoundingMode roundMode = kRoundTiesToEven) const;
+    MONGO_DECIMAL128_DECLARE_UNARY_OP(exp)    ///< e^x
+    MONGO_DECIMAL128_DECLARE_UNARY_OP(exp2)   ///< 2^x
+    MONGO_DECIMAL128_DECLARE_UNARY_OP(exp10)  ///< 10^x
 
-    /**
-     * Returns the tanh value of this.
-     */
-    Decimal128 tanh(RoundingMode roundMode = kRoundTiesToEven) const;
-    Decimal128 tanh(std::uint32_t* signalingFlags, RoundingMode roundMode = kRoundTiesToEven) const;
+    MONGO_DECIMAL128_DECLARE_UNARY_OP(log)    ///< log base e
+    MONGO_DECIMAL128_DECLARE_UNARY_OP(log2)   ///< log base 2
+    MONGO_DECIMAL128_DECLARE_UNARY_OP(log10)  ///< log base 10
 
+    /** Trigonometric member functions and their inverses. */
+    MONGO_DECIMAL128_DECLARE_UNARY_OP(sin)
+    MONGO_DECIMAL128_DECLARE_UNARY_OP(cos)
+    MONGO_DECIMAL128_DECLARE_UNARY_OP(tan)
+    MONGO_DECIMAL128_DECLARE_UNARY_OP(asin)
+    MONGO_DECIMAL128_DECLARE_UNARY_OP(acos)
+    MONGO_DECIMAL128_DECLARE_UNARY_OP(atan)
+
+    /** Hyperbolic member functions and their inverses. */
+    MONGO_DECIMAL128_DECLARE_UNARY_OP(sinh)
+    MONGO_DECIMAL128_DECLARE_UNARY_OP(cosh)
+    MONGO_DECIMAL128_DECLARE_UNARY_OP(tanh)
+    MONGO_DECIMAL128_DECLARE_UNARY_OP(asinh)
+    MONGO_DECIMAL128_DECLARE_UNARY_OP(acosh)
+    MONGO_DECIMAL128_DECLARE_UNARY_OP(atanh)
+
+#undef MONGO_DECIMAL128_DECLARE_UNARY_OP
 
     /**
      * Returns `this` with inverted sign bit
@@ -354,8 +332,8 @@ public:
      * This set of functions converts a Decimal128 to a certain integer type with a
      * given rounding mode.
      *
-     * Each function is overloaded to provide an optional signalingFlags output parameter
-     * that can be set to one of the Decimal128::SignalingFlag enumerators:
+     * Each function is overloaded to provide an optional signalingFlags input-output parameter that
+     * will be bitwise ORed with one of the following Decimal128::SignalingFlag enumerators:
      * kNoFlag, kInvalid
      *
      * Note: The signaling flags for these functions only signal
@@ -375,8 +353,8 @@ public:
      * given rounding mode. The signaling flags for these functions will also signal
      * inexact computation.
      *
-     * Each function is overloaded to provide an optional signalingFlags output parameter
-     * that can be set to one of the Decimal128::SignalingFlag enumerators:
+     * Each function is overloaded to provide an optional signalingFlags input-output parameter that
+     * will be bitwise ORed with one of the following Decimal128::SignalingFlag enumerators:
      * kNoFlag, kInexact, kInvalid
      */
     std::int32_t toIntExact(RoundingMode roundMode = kRoundTiesToEven) const;
@@ -393,8 +371,8 @@ public:
      * These functions convert decimals to doubles and have the ability to signal
      * inexact, underflow, overflow, and invalid operation.
      *
-     * This function is overloaded to provide an optional signalingFlags output parameter
-     * that can be set to one of the Decimal128::SignalingFlag enumerators:
+     * Each function is overloaded to provide an optional signalingFlags input-output parameter that
+     * will be bitwise ORed with one of the following Decimal128::SignalingFlag enumerators:
      * kNoFlag, kInexact, kUnderflow, kOverflow, kInvalid
      */
     double toDouble(RoundingMode roundMode = kRoundTiesToEven) const;
@@ -442,8 +420,8 @@ public:
      * is performed using the supplied rounding mode (defaulting to kRoundTiesToEven).
      * NaNs and infinities are handled according to the IEEE 754-2008 specification.
      *
-     * Each function is overloaded to provide an optional signalingFlags output parameter
-     * that can be set to one of the Decimal128::SignalingFlag enumerators:
+     * Each function is overloaded to provide an optional signalingFlags input-output parameter that
+     * will be bitwise ORed with one of the following Decimal128::SignalingFlag enumerators:
      * kNoFlag, kInexact, kUnderflow, kOverflow, kInvalid
      *
      * The divide operation may also set signalingFlags to kDivideByZero
@@ -464,16 +442,6 @@ public:
     Decimal128 divide(const Decimal128& other,
                       std::uint32_t* signalingFlags,
                       RoundingMode roundMode = kRoundTiesToEven) const;
-    Decimal128 exponential(RoundingMode roundMode = kRoundTiesToEven) const;
-    Decimal128 exponential(std::uint32_t* signalingFlags,
-                           RoundingMode roundMode = kRoundTiesToEven) const;
-    Decimal128 logarithm(RoundingMode roundMode = kRoundTiesToEven) const;
-    Decimal128 logarithm(std::uint32_t* signalingFlags,
-                         RoundingMode roundMode = kRoundTiesToEven) const;
-    Decimal128 logarithm(const Decimal128& other, RoundingMode roundMode = kRoundTiesToEven) const;
-    Decimal128 logarithm(const Decimal128& other,
-                         std::uint32_t* signalingFlags,
-                         RoundingMode roundMode = kRoundTiesToEven) const;
     Decimal128 modulo(const Decimal128& other) const;
     Decimal128 modulo(const Decimal128& other, std::uint32_t* signalingFlags) const;
 
@@ -482,9 +450,7 @@ public:
                      std::uint32_t* signalingFlags,
                      RoundingMode roundMode = kRoundTiesToEven) const;
 
-    Decimal128 squareRoot(RoundingMode roundMode = kRoundTiesToEven) const;
-    Decimal128 squareRoot(std::uint32_t* signalingFlags,
-                          RoundingMode roundMode = kRoundTiesToEven) const;
+    Decimal128 scale(int n, RoundingMode roundMode = kRoundTiesToEven) const;
 
     /**
      * This function quantizes the current decimal given a quantum reference
@@ -539,6 +505,17 @@ public:
     }
 
 private:
+    /** Used as a temporary to provide a missing `signalingFlags` argument. */
+    class ThrowawayFlag {
+    public:
+        constexpr operator uint32_t*() && {
+            return &_i;
+        }
+
+    private:
+        uint32_t _i = 0;
+    };
+
     constexpr static std::uint8_t kSignFieldPos = 64 - 1;
     constexpr static std::uint8_t kCombinationFieldPos = kSignFieldPos - 17;
     constexpr static std::uint64_t kCombinationFieldMask = (1 << 17) - 1;
@@ -601,11 +578,11 @@ private:
 
 inline namespace literals {
 
-inline Decimal128 operator"" _dec128(const char* s) {
+inline Decimal128 operator""_dec128(const char* s) {
     return Decimal128(s);
 }
 
-inline Decimal128 operator"" _dec128(const char* s, std::size_t len) {
+inline Decimal128 operator""_dec128(const char* s, std::size_t len) {
     return Decimal128(std::string(s, len));
 }
 
@@ -635,4 +612,42 @@ inline bool operator!=(const Decimal128& lhs, const Decimal128& rhs) {
 
 }  // namespace literals
 
-}  // namespace mongo
+template <>
+struct DataType::Handler<Decimal128> {
+    static void unsafeLoad(Decimal128* valueOut, const char* ptr, size_t* advanced);
+    static void unsafeStore(const Decimal128& valueIn, char* ptr, size_t* advanced);
+
+    static Status load(Decimal128* valueOut,
+                       const char* ptr,
+                       size_t length,
+                       size_t* advanced,
+                       std::ptrdiff_t debug_offset) {
+        if (length < kSizeOfDecimal) {
+            return Status(ErrorCodes::Overflow, "Buffer too small to hold Decimal128 value");
+        }
+
+        unsafeLoad(valueOut, ptr, advanced);
+        return Status::OK();
+    }
+
+    static Status store(const Decimal128& valueIn,
+                        char* ptr,
+                        size_t length,
+                        size_t* advanced,
+                        std::ptrdiff_t debug_offset) {
+        if (length < kSizeOfDecimal) {
+            return Status(ErrorCodes::Overflow, "Buffer too small to write Decimal128 value");
+        }
+
+        unsafeStore(valueIn, ptr, advanced);
+        return Status::OK();
+    }
+
+    static Decimal128 defaultConstruct() {
+        return Decimal128();
+    }
+
+    static constexpr size_t kSizeOfDecimal = 2 * sizeof(uint64_t);
+};
+
+}  // namespace MONGO_MOD_PUB mongo

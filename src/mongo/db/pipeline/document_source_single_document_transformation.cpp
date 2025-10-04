@@ -27,21 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/pipeline/document_source_limit.h"
+#include "mongo/db/exec/exclusion_projection_executor.h"
+#include "mongo/db/pipeline/document_source_project.h"
+#include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/document_source_skip.h"
-#include "mongo/db/pipeline/expression.h"
+#include "mongo/db/query/explain_options.h"
+
+#include <iterator>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
 using boost::intrusive_ptr;
+
+ALLOCATE_DOCUMENT_SOURCE_ID(singleDocumentTransformation,
+                            DocumentSourceSingleDocumentTransformation::id)
 
 DocumentSourceSingleDocumentTransformation::DocumentSourceSingleDocumentTransformation(
     const intrusive_ptr<ExpressionContext>& pExpCtx,
@@ -49,78 +54,139 @@ DocumentSourceSingleDocumentTransformation::DocumentSourceSingleDocumentTransfor
     const StringData name,
     bool isIndependentOfAnyCollection)
     : DocumentSource(name, pExpCtx),
-      _parsedTransform(std::move(parsedTransform)),
-      _name(name.toString()),
-      _isIndependentOfAnyCollection(isIndependentOfAnyCollection) {}
+      _name(std::string{name}),
+      _isIndependentOfAnyCollection(isIndependentOfAnyCollection) {
+    if (parsedTransform) {
+        _transformationProcessor =
+            std::make_shared<SingleDocumentTransformationProcessor>(std::move(parsedTransform));
+    }
+}
 
 const char* DocumentSourceSingleDocumentTransformation::getSourceName() const {
     return _name.c_str();
 }
 
-DocumentSource::GetNextResult DocumentSourceSingleDocumentTransformation::doGetNext() {
-    if (!_parsedTransform) {
-        return DocumentSource::GetNextResult::makeEOF();
-    }
-
-    // Get the next input document.
-    auto input = pSource->getNext();
-    if (!input.isAdvanced()) {
-        return input;
-    }
-
-    // Apply and return the document with added fields.
-    return _parsedTransform->applyTransformation(input.releaseDocument());
+StageConstraints DocumentSourceSingleDocumentTransformation::constraints(
+    PipelineSplitState pipeState) const {
+    StageConstraints constraints(StreamType::kStreaming,
+                                 PositionRequirement::kNone,
+                                 HostTypeRequirement::kNone,
+                                 DiskUseRequirement::kNoDiskUse,
+                                 FacetRequirement::kAllowed,
+                                 TransactionRequirement::kAllowed,
+                                 LookupRequirement::kAllowed,
+                                 UnionRequirement::kAllowed,
+                                 ChangeStreamRequirement::kAllowlist);
+    constraints.canSwapWithMatch = true;
+    constraints.canSwapWithSkippingOrLimitingStage = true;
+    constraints.isAllowedWithinUpdatePipeline = true;
+    // This transformation could be part of a 'collectionless' change stream on an entire
+    // database or cluster, mark as independent of any collection if so.
+    constraints.isIndependentOfAnyCollection = _isIndependentOfAnyCollection;
+    return constraints;
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceSingleDocumentTransformation::optimize() {
-    if (_parsedTransform) {
-        _parsedTransform->optimize();
+    if (_transformationProcessor) {
+        _transformationProcessor->getTransformer().optimize();
+
+        // Note: This comes after the first call to optimize() to make sure the expression is
+        // optimized so we can check if it's a no-op after things like constant folding.
+        if (_transformationProcessor->getTransformer().isNoop()) {
+            return nullptr;
+        }
     }
     return this;
 }
 
-void DocumentSourceSingleDocumentTransformation::doDispose() {
-    if (_parsedTransform) {
-        // Cache the stage options document in case this stage is serialized after disposing.
-        _cachedStageOptions = _parsedTransform->serializeTransformation(pExpCtx->explain);
-        _parsedTransform.reset();
-    }
-}
-
 Value DocumentSourceSingleDocumentTransformation::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
-    return Value(Document{{getSourceName(),
-                           _parsedTransform ? _parsedTransform->serializeTransformation(explain)
-                                            : _cachedStageOptions}});
+    const SerializationOptions& opts) const {
+    return Value(
+        Document{{getSourceName(),
+                  _transformationProcessor
+                      ? _transformationProcessor->getTransformer().serializeTransformation(opts)
+                      : _cachedStageOptions}});
 }
 
-Pipeline::SourceContainer::iterator DocumentSourceSingleDocumentTransformation::doOptimizeAt(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+projection_executor::ExclusionNode& DocumentSourceSingleDocumentTransformation::getExclusionNode() {
+    invariant(getTransformerType() == TransformerInterface::TransformerType::kExclusionProjection);
+    auto ret = dynamic_cast<projection_executor::ExclusionProjectionExecutor&>(
+                   getTransformationProcessor()->getTransformer())
+                   .getRoot();
+    invariant(ret);
+    return *ret;
+}
+
+DocumentSourceContainer::iterator DocumentSourceSingleDocumentTransformation::maybeCoalesce(
+    DocumentSourceContainer::iterator itr,
+    DocumentSourceContainer* container,
+    DocumentSourceSingleDocumentTransformation* nextSingleDocTransform) {
+    // Adjacent exclusion projections can be coalesced by unioning their excluded fields.
+    if (getTransformerType() == TransformerInterface::TransformerType::kExclusionProjection &&
+        nextSingleDocTransform->getTransformerType() ==
+            TransformerInterface::TransformerType::kExclusionProjection) {
+        projection_executor::ExclusionNode& thisExclusionNode = getExclusionNode();
+        projection_executor::ExclusionNode& nextExclusionNode =
+            nextSingleDocTransform->getExclusionNode();
+
+        auto isDotted = [](auto path) {
+            return path.find('.') != std::string::npos;
+        };
+        OrderedPathSet thisExcludedPaths;
+        thisExclusionNode.reportProjectedPaths(&thisExcludedPaths);
+        if (std::any_of(thisExcludedPaths.begin(), thisExcludedPaths.end(), isDotted)) {
+            return std::next(itr);
+        }
+
+        OrderedPathSet nextExcludedPaths;
+        nextExclusionNode.reportProjectedPaths(&nextExcludedPaths);
+        if (std::any_of(nextExcludedPaths.begin(), nextExcludedPaths.end(), isDotted)) {
+            return std::next(itr);
+        }
+        for (const std::string& nextExcludedPathStr : nextExcludedPaths) {
+            thisExclusionNode.addProjectionForPath(nextExcludedPathStr);
+        }
+        container->erase(std::next(itr));
+        return itr;
+    }
+    return std::next(itr);
+}
+
+DocumentSourceContainer::iterator DocumentSourceSingleDocumentTransformation::doOptimizeAt(
+    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     invariant(*itr == this);
 
     if (std::next(itr) == container->end()) {
         return container->end();
-    }
-
-    auto nextSkip = dynamic_cast<DocumentSourceSkip*>((*std::next(itr)).get());
-
-    if (nextSkip) {
+    } else if (dynamic_cast<DocumentSourceSkip*>(std::next(itr)->get())) {
         std::swap(*itr, *std::next(itr));
         return itr == container->begin() ? itr : std::prev(itr);
+    } else if (auto nextSingleDocTransform =
+                   dynamic_cast<DocumentSourceSingleDocumentTransformation*>(
+                       std::next(itr)->get())) {
+        return maybeCoalesce(itr, container, nextSingleDocTransform);
+    } else if (_transformationProcessor) {
+        return _transformationProcessor->getTransformer().doOptimizeAt(itr, container);
+    } else {
+        return std::next(itr);
     }
-    return std::next(itr);
 }
 
 DepsTracker::State DocumentSourceSingleDocumentTransformation::getDependencies(
     DepsTracker* deps) const {
     // Each parsed transformation is responsible for adding its own dependencies, and returning
     // the correct dependency return type for that transformation.
-    return _parsedTransform->addDependencies(deps);
+    return _transformationProcessor->getTransformer().addDependencies(deps);
+}
+
+void DocumentSourceSingleDocumentTransformation::addVariableRefs(
+    std::set<Variables::Id>* refs) const {
+    _transformationProcessor->getTransformer().addVariableRefs(refs);
 }
 
 DocumentSource::GetModPathsReturn DocumentSourceSingleDocumentTransformation::getModifiedPaths()
     const {
-    return _parsedTransform->getModifiedPaths();
+    return _transformationProcessor->getTransformer().getModifiedPaths();
 }
 
 }  // namespace mongo

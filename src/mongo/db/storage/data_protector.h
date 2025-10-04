@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/base/data_range.h"
+
 #include <cstddef>
 #include <cstdint>
 
@@ -52,21 +54,17 @@ public:
     virtual ~DataProtector() = default;
 
     /**
-     * Copy `inLen` bytes from `in`, process them, and write the processed bytes into `out`.
-     * As processing may produce more or fewer bytes than were provided, the actual number
-     * of bytes written will placed in `bytesWritten`.
+     * Copies all bytes in `in`, processes them, and writes the processed bytes into `out`.
+     * As processing may produce more or fewer bytes than were provided, `out` will point to
+     * a DataRange with the actual length of produced bytes.
      */
-    virtual Status protect(const std::uint8_t* in,
-                           std::size_t inLen,
-                           std::uint8_t* out,
-                           std::size_t outLen,
-                           std::size_t* bytesWritten) = 0;
+    virtual Status protect(ConstDataRange in, DataRange* out) = 0;
 
     /**
      * Declares that this DataProtector will be provided no more data to protect.
      * Fills `out` with any leftover state that needs serialization.
      */
-    virtual Status finalize(std::uint8_t* out, std::size_t outLen, std::size_t* bytesWritten) = 0;
+    virtual Status finalize(DataRange* out) = 0;
 
     /**
      * Returns the number of bytes reserved for metadata at the beginning of the first output
@@ -76,13 +74,11 @@ public:
     virtual std::size_t getNumberOfBytesReservedForTag() const = 0;
 
     /**
-     * Fills buffer `out` of size `outLen`, with implementation defined metadata that had to be
+     * Fills buffer `out` with implementation defined metadata that had to be
      * calculated after finalization.
-     * `bytesWritten` is filled with the number of bytes written into `out`.
+     * After successfully writing tag, `out` will be a DataRange with the length of data written.
      */
-    virtual Status finalizeTag(std::uint8_t* out,
-                               std::size_t outLen,
-                               std::size_t* bytesWritten) = 0;
+    virtual Status finalizeTag(DataRange* out) = 0;
 };
 
 }  // namespace mongo

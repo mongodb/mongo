@@ -29,16 +29,30 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/ordering.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/storage/duplicate_key_error_info.h"
+#include "mongo/db/storage/key_string/key_string.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/debug_util.h"
+
+#include <cstdint>
 #include <iosfwd>
-#include <tuple>
+#include <string>
+#include <utility>
+#include <variant>
 #include <vector>
 
-#include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/record_id.h"
-#include "mongo/db/storage/key_string.h"
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -88,24 +102,17 @@ inline bool operator!=(const IndexKeyEntry& lhs, const IndexKeyEntry& rhs) {
 }
 
 /**
- * Represents KeyString struct containing a KeyString::Value and its RecordId
+ * Represents KeyString struct containing a key_string::Value and its RecordId
  */
 struct KeyStringEntry {
-    KeyStringEntry(KeyString::Value ks, RecordId loc) : keyString(ks), loc(loc) {
+    KeyStringEntry(key_string::Value ks, RecordId id) : keyString(ks), loc(std::move(id)) {
         if (!kDebugBuild) {
             return;
         }
-        loc.withFormat(
-            [](RecordId::Null n) { invariant(false); },
-            [&](int64_t rid) {
-                invariant(loc == KeyString::decodeRecordIdLongAtEnd(ks.getBuffer(), ks.getSize()));
-            },
-            [&](const char* str, int size) {
-                invariant(loc == KeyString::decodeRecordIdStrAtEnd(ks.getBuffer(), ks.getSize()));
-            });
+        invariant(loc == key_string::decodeRecordIdAtEnd(ks.getView(), loc.keyFormat()));
     }
 
-    KeyString::Value keyString;
+    key_string::Value keyString;
     RecordId loc;
 };
 
@@ -114,14 +121,12 @@ struct KeyStringEntry {
  * expressing exclusiveness on a prefix of the key. This is mostly used to express a location to
  * seek to in an index that may not be representable as a valid key.
  *
- * The "key" used for comparison is the concatenation of the first 'prefixLen' elements of
- * 'keyPrefix' followed by the last 'keySuffix.size() - prefixLen' elements of
- * 'keySuffix'.
+ * If 'firstExclusive' is negative, the "key" used for comparison is the concatenation of the first
+ * 'prefixLen' elements of 'keyPrefix' followed by the last 'keySuffix.size() - prefixLen' elements
+ * of 'keySuffix'.
  *
- * The comparison is exclusive if either 'prefixExclusive' is true or if there are any false
- * values in 'suffixInclusive' that are false at index >= 'prefixLen'.
- *
- * Portions of the key following the first exclusive part may be ignored.
+ * The comparison is exclusive if 'firstExclusive' is non-negative, and any portion of the key after
+ * that index will be omitted. The value of 'firstExclusive' must be at least 'prefixLen' - 1.
  *
  * e.g.
  *
@@ -129,9 +134,8 @@ struct KeyStringEntry {
  *
  *      keyPrefix = { "" : 1, "" : 2 }
  *      prefixLen = 1
- *      prefixExclusive = false
- *      keySuffix = [ IGNORED, { "" : 5 } ]
- *      suffixInclusive = [ IGNORED, false ]
+ *      keySuffix = [ IGNORED, { "" : 5 }, { "" : 9 } ]
+ *      firstExclusive = 1
  *
  *      ==> key is { "" : 1, "" : 5 }
  *          with the comparison being done exclusively
@@ -140,14 +144,21 @@ struct KeyStringEntry {
  *
  *      keyPrefix = { "" : 1, "" : 2 }
  *      prefixLen = 1
- *      prefixExclusive = true
  *      keySuffix = IGNORED
- *      suffixInclusive = IGNORED
+ *      firstExclusive = 0
  *
  *      ==> represented key is { "" : 1 }
  *          with the comparison being done exclusively
  *
- * 'prefixLen = 0' and 'prefixExclusive = true' are mutually incompatible.
+ *  Suppose that
+ *
+ *      keyPrefix = { "" : 1, "" : 2 }
+ *      prefixLen = 1
+ *      keySuffix = [ IGNORED, { "" : 5 }, { "" : 9 } ]
+ *      firstExclusive = -1
+ *
+ *      ==> key is { "" : 1, "" : 5, "" : 9 }
+ *          with the comparison being done inclusively
  */
 struct IndexSeekPoint {
     BSONObj keyPrefix;
@@ -158,24 +169,17 @@ struct IndexSeekPoint {
     int prefixLen = 0;
 
     /**
-     * If true, compare exclusively on just the fields on keyPrefix and ignore the suffix.
-     */
-    bool prefixExclusive = false;
-
-    /**
      * Elements starting at index 'prefixLen' are logically appended to the prefix.
      * The elements before index 'prefixLen' should be ignored.
      */
-    std::vector<const BSONElement*> keySuffix;
+    std::vector<BSONElement> keySuffix;
 
     /**
-     * If the ith element is false, ignore indexes > i in keySuffix and treat the
-     * concatenated key as exclusive.
-     * The elements before index 'prefixLen' should be ignored.
-     *
-     * Must have identical size as keySuffix.
+     * If non-negative, then the comparison will be exclusive and any elements after index
+     * 'firstExclusive' are ignored. Otherwise all elements are considered and the comparison will
+     * be inclusive.
      */
-    std::vector<bool> suffixInclusive;
+    int firstExclusive = -1;
 };
 
 /**
@@ -200,7 +204,8 @@ public:
     int compare(const IndexKeyEntry& lhs, const IndexKeyEntry& rhs) const;
 
     /**
-     * Encodes the SeekPoint into a KeyString object suitable to pass in to seek().
+     * Given a KeyString Builder reference, encodes the SeekPoint into the builder and returns its
+     * owned buffer suitable to pass in to seek().
      *
      * A KeyString is used for seeking an iterator to a position in a sorted index. The difference
      * between a query KeyString and the KeyStrings inserted into indexes is that a query KeyString
@@ -210,65 +215,57 @@ public:
      * isForward.
      *
      * If a field is marked as exclusive, then comparisons stop after that field and return
-     * either higher or lower, even if that field compares equal. If prefixExclusive is true and
-     * prefixLen is greater than 0, then the last field in the prefix is marked as exclusive. It
-     * is illegal to specify prefixExclusive as true with a prefixLen of 0. Each bool in
-     * suffixInclusive, starting at index prefixLen, indicates whether the corresponding element
-     * in keySuffix is inclusive or exclusive.
+     * either higher or lower, even if that field compares equal. If firstExclusive is non-negative,
+     * then the field at the corresponding index is marked as exclusive and any subsequent fields
+     * are ignored.
      *
-     * Returned objects are for use in lookups only and should never be inserted into the
-     * database, as their format may change. The only reason this is the same type as the
-     * entries in an index is to support storage engines that require comparators that take
-     * arguments of the same type.
+     * Returned buffers are for use in lookups only and should never be inserted into the
+     * database, as their format may change.
      */
-    static KeyString::Value makeKeyStringFromSeekPointForSeek(const IndexSeekPoint& seekPoint,
-                                                              KeyString::Version version,
-                                                              Ordering ord,
-                                                              bool isForward);
+    static std::span<const char> makeKeyStringFromSeekPointForSeek(const IndexSeekPoint& seekPoint,
+                                                                   bool isForward,
+                                                                   key_string::Builder& builder);
 
     /**
-     * Encodes the BSON Key into a KeyString object to pass in to SortedDataInterface::seek().
+     * Given a KeyString Builder reference, encodes the BSON Key into the builder and returns its
+     * owned buffer to pass in to SortedDataInterface::seek().
      *
      * `isForward` and `inclusive` together decide which discriminator we will put into the
      * KeyString. This logic is closely related to how WiredTiger uses its API
-     * (search_near/prev/next) to do the seek. Other storage engines' SortedDataInterface should use
+     * (prev/next) to do the seek. Other storage engines' SortedDataInterface should use
      * the discriminator to deduce the `inclusive` and the use their own ways to seek to the right
      * position.
      *
      * 1. When isForward == true, inclusive == true, bsonKey will be encoded with kExclusiveBefore
-     * (which is less than bsonKey). WT's search_near() could land either on the previous key or
-     * bsonKey. WT will selectively call next() if it's on the previous key.
+     * (which is less than bsonKey).
      *
      * 2. When isForward == true, inclusive == false, bsonKey will be encoded with kExclusiveAfter
-     * (which is greater than bsonKey). WT's search_near() could land either on bsonKey or the next
-     * key. WT will selectively call next() if it's on bsonKey.
+     * (which is greater than bsonKey).
      *
      * 3. When isForward == false, inclusive == true, bsonKey will be encoded with kExclusiveAfter
-     * (which is greater than bsonKey). WT's search_near() could land either on bsonKey or the next
-     * key. WT will selectively call prev() if it's on the next key.
+     * (which is greater than bsonKey).
      *
      * 4. When isForward == false, inclusive == false, bsonKey will be encoded with kExclusiveBefore
-     * (which is less than bsonKey). WT's search_near() could land either on the previous key or the
-     * bsonKey. WT will selectively call prev() if it's on bsonKey.
+     * (which is less than bsonKey).
      */
-    static KeyString::Value makeKeyStringFromBSONKeyForSeek(const BSONObj& bsonKey,
-                                                            KeyString::Version version,
-                                                            Ordering ord,
-                                                            bool isForward,
-                                                            bool inclusive);
+    static std::span<const char> makeKeyStringFromBSONKeyForSeek(const BSONObj& bsonKey,
+                                                                 Ordering ord,
+                                                                 bool isForward,
+                                                                 bool inclusive,
+                                                                 key_string::Builder& builder);
 
     /**
-     * Encodes the BSON Key into a KeyString object to pass in to SortedDataInterface::seek()
-     * or SortedDataInterface::setEndPosition().
+     * Given a KeyString Builder reference, encodes the BSON Key into the builder and returns its
+     * owned buffer to pass in to SortedDataInterface::seek().
      *
-     * This funcition is similar to IndexEntryComparison::makeKeyStringFromBSONKeyForSeek()
-     * but allows you to pick your own KeyString::Discriminator based on wether or not the
+     * This function is similar to IndexEntryComparison::makeKeyStringFromBSONKeyForSeek()
+     * but allows you to pick your own key_string::Discriminator based on wether or not the
      * resulting KeyString is for the start key or end key of a seek.
      */
-    static KeyString::Value makeKeyStringFromBSONKey(const BSONObj& bsonKey,
-                                                     KeyString::Version version,
-                                                     Ordering ord,
-                                                     KeyString::Discriminator discrim);
+    static std::span<const char> makeKeyStringFromBSONKey(const BSONObj& bsonKey,
+                                                          Ordering ord,
+                                                          key_string::Discriminator discrim,
+                                                          key_string::Builder& builder);
 
 private:
     // Ordering is used in comparison() to compare BSONElements
@@ -283,22 +280,15 @@ Status buildDupKeyErrorStatus(const BSONObj& key,
                               const NamespaceString& collectionNamespace,
                               const std::string& indexName,
                               const BSONObj& keyPattern,
-                              const BSONObj& indexCollation);
+                              const BSONObj& indexCollation,
+                              DuplicateKeyErrorInfo::FoundValue&& foundValue = std::monostate{},
+                              boost::optional<RecordId> duplicateRid = boost::none);
 
-Status buildDupKeyErrorStatus(const KeyString::Value& keyString,
+Status buildDupKeyErrorStatus(const key_string::Value& keyString,
                               const NamespaceString& collectionNamespace,
                               const std::string& indexName,
                               const BSONObj& keyPattern,
                               const BSONObj& indexCollation,
                               const Ordering& ordering);
-
-Status buildDupKeyErrorStatus(OperationContext* opCtx,
-                              const BSONObj& key,
-                              const IndexDescriptor* desc);
-
-Status buildDupKeyErrorStatus(OperationContext* opCtx,
-                              const KeyString::Value& keyString,
-                              const Ordering& ordering,
-                              const IndexDescriptor* desc);
 
 }  // namespace mongo

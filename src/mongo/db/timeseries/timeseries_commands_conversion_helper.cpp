@@ -27,23 +27,69 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 #include "mongo/db/timeseries/timeseries_commands_conversion_helper.h"
 
-#include "mongo/db/index/index_descriptor.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/index_builds/commit_quorum_options.h"
 #include "mongo/db/index_names.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/local_catalog/index_descriptor.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/timeseries/bucket_spec.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
-#include "mongo/logv2/log.h"
 #include "mongo/logv2/redaction.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
+
+#include <memory>
+#include <string>
+#include <utility>
+#include <variant>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
+
 
 namespace mongo::timeseries {
 
 namespace {
 NamespaceString makeTimeseriesBucketsNamespace(const NamespaceString& nss) {
     return nss.isTimeseriesBucketsCollection() ? nss : nss.makeTimeseriesBucketsNamespace();
+}
+
+/**
+ * Converts the key field on time to 'control.min.$timeField' field. Depends on error checking from
+ * 'createBucketsSpecFromTimeseriesSpec()' which should be called before this function.
+ */
+BSONObj convertToTTLTimeField(const BSONObj& origKeyField, StringData timeField) {
+    BSONObjBuilder keyBuilder;
+    uassert(ErrorCodes::CannotCreateIndex,
+            str::stream() << "TTL indexes are single-field indexes, compound indexes do "
+                             "not support TTL. Index spec: "
+                          << origKeyField,
+            origKeyField.nFields() == 1);
+
+    const auto& firstElem = origKeyField.firstElement();
+    uassert(ErrorCodes::InvalidOptions,
+            "TTL indexes on non-time fields are not supported on time-series collections",
+            firstElem.fieldName() == timeField);
+
+    keyBuilder.appendAs(firstElem,
+                        str::stream() << timeseries::kControlMinFieldNamePrefix << timeField);
+    return keyBuilder.obj();
 }
 }  // namespace
 
@@ -69,130 +115,160 @@ BSONObj makeTimeseriesCommand(const BSONObj& origCmd,
     return builder.obj();
 }
 
-CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
-                                                        const CreateIndexesCommand& origCmd,
-                                                        const TimeseriesOptions& options) {
-    const auto& origNs = origCmd.getNamespace();
-    const auto& origIndexes = origCmd.getIndexes();
+mongo::BSONObj translateIndexSpecFromLogicalToBuckets(OperationContext* opCtx,
+                                                      const NamespaceString& origNs,
+                                                      const BSONObj& origIndex,
+                                                      const TimeseriesOptions& options) {
+    BSONObjBuilder builder;
+    BSONObj keyField;
+    BSONObj originalKeyField;
+    bool isTTLIndex = false;
+    bool hasPartialFilterOnMetaField = false;
+    bool includeOriginalSpec = false;
 
-    std::vector<mongo::BSONObj> indexes;
-    for (const auto& origIndex : origIndexes) {
-        BSONObjBuilder builder;
-        bool isBucketsIndexSpecCompatibleForDowngrade = true;
-        for (const auto& elem : origIndex) {
-            if (elem.fieldNameStringData() == IndexDescriptor::kPartialFilterExprFieldName) {
-                if (feature_flags::gTimeseriesMetricIndexes.isEnabledAndIgnoreFCV() &&
-                    serverGlobalParams.featureCompatibility.isFCVUpgradingToOrAlreadyLatest()) {
-                    // Partial indexes are not supported in FCV < 5.2.
-                    isBucketsIndexSpecCompatibleForDowngrade = false;
-                } else {
-                    uasserted(ErrorCodes::InvalidOptions,
-                              "Partial indexes are not supported on time-series collections");
-                }
+    for (const auto& elem : origIndex) {
+        if (elem.fieldNameStringData() == IndexDescriptor::kPartialFilterExprFieldName) {
+            includeOriginalSpec = true;
+
+            BSONObj pred = elem.Obj();
+
+            // If the createIndexes command specifies a collation for this index, then that
+            // collation affects how we should interpret expressions in the partial filter
+            // ($gt, $lt, etc).
+            if (auto collatorSpec = origIndex[NewIndexSpec::kCollationFieldName]) {
+                uasserted(ErrorCodes::IndexOptionsConflict,
+                          std::string{"On a time-series collection, partialFilterExpression and "} +
+                              NewIndexSpec::kCollationFieldName + " arguments are incompatible"_sd);
             }
+            // Since no collation was specified in the command, we know the index collation will
+            // match the collection's collation.
+            auto collationMatchesDefault = ExpressionContextCollationMatchesDefault::kYes;
 
-            if (elem.fieldNameStringData() == IndexDescriptor::kSparseFieldName) {
-                // Sparse indexes are only allowed on the time and meta fields.
-                auto timeField = options.getTimeField();
-                auto metaField = options.getMetaField();
+            // Even though the index collation will match the collection's collation, we don't
+            // know whether or not that collation is simple. However, I think we can correctly
+            // rewrite the filter expression without knowing this... Looking up the correct
+            // value would require handling mongos and mongod separately.
+            auto expCtx = ExpressionContextBuilder{}
+                              .opCtx(opCtx)
+                              .ns(origNs)
+                              .collationMatchesDefault(collationMatchesDefault)
+                              .build();
+            // We can't know if there won't be extended range values in the collection, so
+            // assume there will be.
+            expCtx->setRequiresTimeseriesExtendedRangeSupport(true);
 
-                BSONObj keyPattern = origIndex.getField(NewIndexSpec::kKeyFieldName).Obj();
-                for (const auto& keyElem : keyPattern) {
-                    if (keyElem.fieldNameStringData() == timeField) {
-                        continue;
-                    }
+            // partialFilterExpression is evaluated against a collection, so there are no
+            // computed fields.
+            bool haveComputedMetaField = false;
 
-                    if (metaField &&
-                        (keyElem.fieldNameStringData() == *metaField ||
-                         keyElem.fieldNameStringData().startsWith(*metaField + "."))) {
-                        continue;
-                    }
+            // partialFilterExpression is evaluated against a collection, so there are no
+            // exclusions
+            bool includeMetaField = options.getMetaField().has_value();
 
-                    uasserted(ErrorCodes::InvalidOptions,
-                              "Sparse indexes are not supported on time-series measurements");
+            // As part of building the index, we verify that the collection does not contain
+            // any mixed-schema buckets. So by the time the index is visible to the query
+            // planner, this will be true.
+            bool assumeNoMixedSchemaData = true;
+
+            // Fixed buckets is dependent on the time-series collection options not changing,
+            // this can change throughout the lifetime of the index.
+            bool fixedBuckets = false;
+
+            auto [hasMetricPred, bucketPred] =
+                BucketSpec::pushdownPredicate(expCtx,
+                                              options,
+                                              pred,
+                                              haveComputedMetaField,
+                                              includeMetaField,
+                                              assumeNoMixedSchemaData,
+                                              BucketSpec::IneligiblePredicatePolicy::kError,
+                                              fixedBuckets);
+
+            hasPartialFilterOnMetaField = !hasMetricPred;
+
+            builder.append(IndexDescriptor::kPartialFilterExprFieldName, bucketPred);
+            continue;
+        }
+
+        if (elem.fieldNameStringData() == IndexDescriptor::kSparseFieldName) {
+            // Sparse indexes are only allowed on the time and meta fields.
+            auto timeField = options.getTimeField();
+            auto metaField = options.getMetaField();
+
+            BSONObj keyPattern = origIndex.getField(NewIndexSpec::kKeyFieldName).Obj();
+            for (const auto& keyElem : keyPattern) {
+                if (keyElem.fieldNameStringData() == timeField) {
+                    continue;
                 }
-            }
 
-            if (elem.fieldNameStringData() == IndexDescriptor::kExpireAfterSecondsFieldName) {
+                if (metaField &&
+                    (keyElem.fieldNameStringData() == *metaField ||
+                     keyElem.fieldNameStringData().starts_with(*metaField + "."))) {
+                    continue;
+                }
+
                 uasserted(ErrorCodes::InvalidOptions,
-                          "TTL indexes are not supported on time-series collections");
+                          "Sparse indexes are not supported on time-series measurements");
             }
+        }
 
-
-            if (elem.fieldNameStringData() == IndexDescriptor::kUniqueFieldName) {
-                uassert(ErrorCodes::InvalidOptions,
-                        "Unique indexes are not supported on time-series collections",
-                        !elem.trueValue());
-            }
-
-            if (elem.fieldNameStringData() == NewIndexSpec::kKeyFieldName) {
-                auto pluginName = IndexNames::findPluginName(elem.Obj());
-                uassert(ErrorCodes::InvalidOptions,
-                        "Text indexes are not supported on time-series collections",
-                        pluginName != IndexNames::TEXT);
-
-                auto bucketsIndexSpecWithStatus =
-                    timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(options, elem.Obj());
-                uassert(ErrorCodes::CannotCreateIndex,
-                        str::stream() << bucketsIndexSpecWithStatus.getStatus().toString()
-                                      << " Command request: " << redact(origCmd.toBSON({})),
-                        bucketsIndexSpecWithStatus.isOK());
-
-                if (!timeseries::isBucketsIndexSpecCompatibleForDowngrade(
-                        options,
-                        BSON(NewIndexSpec::kKeyFieldName
-                             << bucketsIndexSpecWithStatus.getValue()))) {
-                    isBucketsIndexSpecCompatibleForDowngrade = false;
-                }
-
-                builder.append(NewIndexSpec::kKeyFieldName,
-                               std::move(bucketsIndexSpecWithStatus.getValue()));
-                continue;
-            }
+        if (elem.fieldNameStringData() == IndexDescriptor::kExpireAfterSecondsFieldName) {
+            isTTLIndex = true;
             builder.append(elem);
+            continue;
         }
 
-        if (feature_flags::gTimeseriesMetricIndexes.isEnabledAndIgnoreFCV() &&
-            !isBucketsIndexSpecCompatibleForDowngrade) {
-            // Store the original user index definition on the transformed index definition for the
-            // time-series buckets collection if this is a newly supported index type on time-series
-            // collections. This is to avoid any additional downgrade steps for index types already
-            // supported in 5.0.
-            builder.appendObject(IndexDescriptor::kOriginalSpecFieldName, origIndex.objdata());
+        if (elem.fieldNameStringData() == IndexDescriptor::kUniqueFieldName) {
+            uassert(ErrorCodes::InvalidOptions,
+                    "Unique indexes are not supported on time-series collections",
+                    !elem.trueValue());
         }
 
-        indexes.push_back(builder.obj());
+        if (elem.fieldNameStringData() == NewIndexSpec::kKeyFieldName) {
+            originalKeyField = elem.Obj();
+
+            auto pluginName = IndexNames::findPluginName(originalKeyField);
+            uassert(ErrorCodes::InvalidOptions,
+                    "Text indexes are not supported on time-series collections",
+                    pluginName != IndexNames::TEXT);
+
+            auto bucketsIndexSpecWithStatus =
+                timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(options,
+                                                                          originalKeyField);
+            uassert(ErrorCodes::CannotCreateIndex,
+                    bucketsIndexSpecWithStatus.getStatus().toString(),
+                    bucketsIndexSpecWithStatus.isOK());
+
+            if (timeseries::shouldIncludeOriginalSpec(
+                    options,
+                    BSON(NewIndexSpec::kKeyFieldName << bucketsIndexSpecWithStatus.getValue()))) {
+                includeOriginalSpec = true;
+            }
+            keyField = std::move(bucketsIndexSpecWithStatus.getValue());
+            continue;
+        }
+
+        // Any index option that's not explicitly banned, and not handled specially, we pass
+        // through unchanged.
+        builder.append(elem);
     }
 
-    auto ns = makeTimeseriesBucketsNamespace(origNs);
-    auto cmd = CreateIndexesCommand(ns, std::move(indexes));
-    cmd.setV(origCmd.getV());
-    cmd.setIgnoreUnknownIndexOptions(origCmd.getIgnoreUnknownIndexOptions());
-    cmd.setCommitQuorum(origCmd.getCommitQuorum());
+    if (isTTLIndex) {
+        uassert(ErrorCodes::InvalidOptions,
+                "TTL indexes on time-series collections require a partialFilterExpression on "
+                "the metaField",
+                hasPartialFilterOnMetaField);
+        keyField = convertToTTLTimeField(originalKeyField, options.getTimeField());
+    }
+    builder.append(NewIndexSpec::kKeyFieldName, std::move(keyField));
 
-    return cmd;
-}
-
-DropIndexes makeTimeseriesDropIndexesCommand(OperationContext* opCtx,
-                                             const DropIndexes& origCmd,
-                                             const TimeseriesOptions& options) {
-    const auto& origNs = origCmd.getNamespace();
-    auto ns = makeTimeseriesBucketsNamespace(origNs);
-
-    const auto& origIndex = origCmd.getIndex();
-    if (auto keyPtr = stdx::get_if<BSONObj>(&origIndex)) {
-        auto bucketsIndexSpecWithStatus =
-            timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(options, *keyPtr);
-
-        uassert(ErrorCodes::IndexNotFound,
-                str::stream() << bucketsIndexSpecWithStatus.getStatus().toString()
-                              << " Command request: " << redact(origCmd.toBSON({})),
-                bucketsIndexSpecWithStatus.isOK());
-
-        return DropIndexes(ns, std::move(bucketsIndexSpecWithStatus.getValue()));
+    if (includeOriginalSpec) {
+        // Store the original user index definition on the transformed index definition for the
+        // time-series buckets collection.
+        builder.appendObject(IndexDescriptor::kOriginalSpecFieldName, origIndex.objdata());
     }
 
-    return DropIndexes(ns, origIndex);
+    return builder.obj();
 }
 
 }  // namespace mongo::timeseries

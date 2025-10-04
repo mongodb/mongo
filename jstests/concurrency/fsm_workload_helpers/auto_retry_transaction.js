@@ -1,6 +1,9 @@
-'use strict';
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {includesErrorCode} from "jstests/libs/error_code_utils.js";
+import {KilledSessionUtil} from "jstests/libs/killed_session_util.js";
+import {TxnUtil} from "jstests/libs/txns/txn_util.js";
 
-var {withTxnAndAutoRetry, isKilledSessionCode} = (function() {
+export var {withTxnAndAutoRetry, isKilledSessionCode, shouldRetryEntireTxnOnError} = (function () {
     /**
      * Calls 'func' with the print() function overridden to be a no-op.
      *
@@ -20,26 +23,27 @@ var {withTxnAndAutoRetry, isKilledSessionCode} = (function() {
 
     // Returns if the code is one that could come from a session being killed.
     function isKilledSessionCode(code) {
-        return code === ErrorCodes.Interrupted || code === ErrorCodes.CursorKilled ||
-            code === ErrorCodes.CursorNotFound;
+        return KilledSessionUtil.isKilledSessionCode(code);
     }
 
     // Returns true if the transaction can be retried with a higher transaction number after the
     // given error.
     function shouldRetryEntireTxnOnError(e, hasCommitTxnError, retryOnKilledSession) {
-        if ((e.hasOwnProperty('errorLabels') &&
-             e.errorLabels.includes('TransientTransactionError'))) {
+        if (TxnUtil.isTransientTransactionError(e)) {
             return true;
         }
 
         // Don't retry the entire transaction on commit errors that aren't labeled as transient
         // transaction errors because it's unknown if the commit succeeded. commitTransaction is
         // individually retryable and should be retried at a lower level (e.g.
-        // network_error_and_txn_override.js or commitTransactionWithKilledSessionRetries()), so any
+        // network_error_and_txn_override.js or commitTransactionWithRetries()), so any
         // error that reached here must not be transient.
         if (hasCommitTxnError) {
-            print("-=-=-=- Cannot retry entire transaction on commit transaction error without" +
-                  " transient transaction error label, error: " + tojsononeline(e));
+            print(
+                "-=-=-=- Cannot retry entire transaction on commit transaction error without" +
+                    " transient transaction error label, error: " +
+                    tojsononeline(e),
+            );
             return false;
         }
 
@@ -49,10 +53,28 @@ var {withTxnAndAutoRetry, isKilledSessionCode} = (function() {
             return true;
         }
 
-        if (retryOnKilledSession &&
-            (isKilledSessionCode(e.code) ||
-             (Array.isArray(e.writeErrors) &&
-              e.writeErrors.every(writeError => isKilledSessionCode(writeError.code))))) {
+        // A transaction aborted due to cache pressure can be retried, though doing so may just
+        // compound the problem.
+        if (e.code == ErrorCodes.TemporarilyUnavailable) {
+            return true;
+        }
+
+        if (retryOnKilledSession && KilledSessionUtil.hasKilledSessionError(e)) {
+            print("-=-=-=- Retrying transaction after killed session error: " + tojsononeline(e));
+            return true;
+        }
+
+        // DDL operations on unsharded or unsplittable collections in a transaction can fail if a
+        // movePrimary is in progress, which may happen in the config shard transition suite.
+        if (TestData.shardsAddedRemoved && includesErrorCode(e, ErrorCodes.MovePrimaryInProgress)) {
+            print("-=-=-=- Retrying transaction after move primary error: " + tojsononeline(e));
+            return true;
+        }
+
+        // TODO SERVER-85145: Stop ignoring ShardNotFound errors that might occur with concurrent
+        // shard removals.
+        if (TestData.shardsAddedRemoved && includesErrorCode(e, ErrorCodes.ShardNotFound)) {
+            print("-=-=-=- Retrying transaction after shard not found error: " + tojsononeline(e));
             return true;
         }
 
@@ -60,19 +82,38 @@ var {withTxnAndAutoRetry, isKilledSessionCode} = (function() {
     }
 
     // Commits the transaction active on the given session, retrying on killed session errors if
-    // configured to do so. Throws if the commit fails and cannot be retried.
-    function commitTransactionWithKilledSessionRetries(session, retryOnKilledSession) {
+    // configured to do so. Also retries commitTransaction on FailedToSatisfyReadPreference error.
+    // Throws if the commit fails and cannot be retried.
+    function commitTransactionWithRetries(session, retryOnKilledSession) {
         while (true) {
             const commitRes = session.commitTransaction_forTesting();
 
             // If commit fails with a killed session code, the commit must be retried because it is
             // unknown if the interrupted commit succeeded. This is safe because commitTransaction
             // is a retryable write.
-            if (!commitRes.ok && retryOnKilledSession && isKilledSessionCode(commitRes.code)) {
-                print("-=-=-=- Retrying commit after killed session code, sessionId: " +
-                      tojsononeline(session.getSessionId()) +
-                      ", txnNumber: " + tojsononeline(session.getTxnNumber_forTesting()) +
-                      ", res: " + tojsononeline(commitRes));
+            const failedWithInterruption = !commitRes.ok && KilledSessionUtil.isKilledSessionCode(commitRes.code);
+            const wcFailedWithInterruption = KilledSessionUtil.hasKilledSessionWCError(commitRes);
+            if (retryOnKilledSession && (failedWithInterruption || wcFailedWithInterruption)) {
+                print(
+                    "-=-=-=- Retrying commit after killed session code, sessionId: " +
+                        tojsononeline(session.getSessionId()) +
+                        ", txnNumber: " +
+                        tojsononeline(session.getTxnNumber_forTesting()) +
+                        ", res: " +
+                        tojsononeline(commitRes),
+                );
+                continue;
+            }
+
+            if (commitRes.code === ErrorCodes.FailedToSatisfyReadPreference) {
+                print(
+                    "-=-=-=- Retrying commit due to FailedToSatisfyReadPreference, sessionId: " +
+                        tojsononeline(session.getSessionId()) +
+                        ", txnNumber: " +
+                        tojsononeline(session.getTxnNumber_forTesting()) +
+                        ", res: " +
+                        tojsononeline(commitRes),
+                );
                 continue;
             }
 
@@ -104,20 +145,26 @@ var {withTxnAndAutoRetry, isKilledSessionCode} = (function() {
      * transaction started by the withTxnAndAutoRetry() function is only known to have committed
      * after the withTxnAndAutoRetry() function returns.
      */
-    function withTxnAndAutoRetry(session, func, {
-        txnOptions: txnOptions = {
-            readConcern: {level: TestData.defaultTransactionReadConcernLevel || 'snapshot'},
-            writeConcern: TestData.hasOwnProperty("defaultTransactionWriteConcernW")
-                ? {w: TestData.defaultTransactionWriteConcernW, wtimeout: kDefaultWtimeout}
-                : undefined
-        },
-        retryOnKilledSession: retryOnKilledSession = false,
-        prepareProbability: prepareProbability = 0.0
-    } = {}) {
+    function withTxnAndAutoRetry(
+        session,
+        func,
+        {
+            txnOptions: txnOptions = {
+                readConcern: {level: TestData.defaultTransactionReadConcernLevel || "snapshot"},
+                writeConcern: TestData.hasOwnProperty("defaultTransactionWriteConcernW")
+                    ? {w: TestData.defaultTransactionWriteConcernW, wtimeout: kDefaultWtimeout}
+                    : undefined,
+            },
+            retryOnKilledSession: retryOnKilledSession = false,
+            prepareProbability: prepareProbability = 0.0,
+        } = {},
+    ) {
         // Committing a manually prepared transaction isn't currently supported when sessions might
         // be killed.
-        assert(!retryOnKilledSession || prepareProbability === 0.0,
-               "retrying on killed session error codes isn't supported with prepareProbability");
+        assert(
+            !retryOnKilledSession || prepareProbability === 0.0,
+            "retrying on killed session error codes isn't supported with prepareProbability",
+        );
 
         let hasTransientError;
         let iterations = 0;
@@ -139,13 +186,12 @@ var {withTxnAndAutoRetry, isKilledSessionCode} = (function() {
                         const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
                         PrepareHelpers.commitTransaction(session, prepareTimestamp);
                     } else {
-                        commitTransactionWithKilledSessionRetries(session, retryOnKilledSession);
+                        commitTransactionWithRetries(session, retryOnKilledSession);
                     }
                 } catch (e) {
                     hasCommitTxnError = true;
                     throw e;
                 }
-
             } catch (e) {
                 if (!hasCommitTxnError) {
                     // We need to call abortTransaction_forTesting() in order to update the mongo
@@ -156,11 +202,23 @@ var {withTxnAndAutoRetry, isKilledSessionCode} = (function() {
                     // NoSuchTransaction/Interrupted error code.
                     assert.commandWorkedOrFailedWithCode(
                         session.abortTransaction_forTesting(),
-                        [ErrorCodes.NoSuchTransaction, ErrorCodes.Interrupted]);
+                        [
+                            ErrorCodes.NoSuchTransaction,
+                            ErrorCodes.Interrupted,
+                            // Ignore sessions killed due to cache pressure. See SERVER-100367.
+                            ErrorCodes.TemporarilyUnavailable,
+                            // Ignore errors that can occur when shards are removed in the background
+                            ErrorCodes.HostUnreachable,
+                            ErrorCodes.ShardNotFound,
+                            // Ignore errors that can occur when there is a resharding operation.
+                            ErrorCodes.InterruptedDueToReshardingCriticalSection,
+                        ],
+                        `Failed to abort transaction after transaction operations failed with error: ${tojson(e)}`,
+                    );
                 }
 
                 if (shouldRetryEntireTxnOnError(e, hasCommitTxnError, retryOnKilledSession)) {
-                    print("Retrying transaction due to transient error.");
+                    print("Retrying transaction due to transient error: " + tojson(e));
                     hasTransientError = true;
                     continue;
                 }
@@ -170,5 +228,5 @@ var {withTxnAndAutoRetry, isKilledSessionCode} = (function() {
         } while (hasTransientError);
     }
 
-    return {withTxnAndAutoRetry, isKilledSessionCode};
+    return {withTxnAndAutoRetry, isKilledSessionCode, shouldRetryEntireTxnOnError};
 })();

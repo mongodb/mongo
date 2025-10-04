@@ -1,0 +1,11 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/query-execution-router
+  - "coordinate_multi_update*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "pause_migrations_during_multi_update*":
+    approvers:
+      - 10gen/server-cluster-scalability

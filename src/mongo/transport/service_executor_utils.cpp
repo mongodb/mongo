@@ -27,35 +27,34 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/transport/service_executor_utils.h"
 
-#include <fmt/format.h>
-#include <functional>
+#include <cstddef>
+#include <exception>
 #include <memory>
+#include <string>
+#include <system_error>
+#include <utility>
 
-#include "mongo/logv2/log.h"
-#include "mongo/stdx/thread.h"
-#include "mongo/transport/service_executor.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/debug_util.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/thread_safety_context.h"
+#include <fmt/format.h>
 
 #if !defined(_WIN32)
+#include <pthread.h>
+
 #include <sys/resource.h>
 #endif
 
-#if !defined(__has_feature)
-#define __has_feature(x) 0
-#endif
+#include "mongo/base/error_codes.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/logv2/log.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/errno_util.h"
+#include "mongo/util/thread_safety_context.h"
 
-using namespace fmt::literals;
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
-namespace mongo {
+namespace mongo::transport {
 
 namespace {
 void* runFunc(void* ctx) {
@@ -67,7 +66,7 @@ void* runFunc(void* ctx) {
 }
 }  // namespace
 
-Status launchServiceWorkerThread(unique_function<void()> task) noexcept {
+Status launchServiceWorkerThread(unique_function<void()> task) {
 
     try {
 #if defined(_WIN32)
@@ -83,23 +82,32 @@ Status launchServiceWorkerThread(unique_function<void()> task) noexcept {
 
         struct rlimit limits;
         invariant(getrlimit(RLIMIT_STACK, &limits) == 0);
-        if (limits.rlim_cur > kStackSize) {
+        if (limits.rlim_cur >= kStackSize) {
+
             size_t stackSizeToSet = kStackSize;
-#if !__has_feature(address_sanitizer) && !__has_feature(thread_sanitizer)
-            if (kDebugBuild)
-                stackSizeToSet /= 2;
+
+#if !defined(_WIN32) && (__SANITIZE_ADDRESS__ || __has_feature(address_sanitizer))
+            // If we are using address sanitizer, we set the stack at
+            // ~75% (rounded up to a multiple of the page size) of our
+            // usual desired. Since ASAN is known to use stack more
+            // aggressively and should positively detect stack overflow,
+            // this gives us increased confidence during testing that we
+            // aren't flirting with our real 1MB limit for any tested
+            // workloads. Note: This calculation only works on POSIX
+            // platforms. If we ever decide to use the MSVC
+            // implementation of ASAN, we will need to revisit it.
+            long page_size = sysconf(_SC_PAGE_SIZE);
+            stackSizeToSet =
+                ((((stackSizeToSet * 3) >> 2) + page_size - 1) / page_size) * page_size;
 #endif
             int failed = pthread_attr_setstacksize(&attrs, stackSizeToSet);
             if (failed) {
-                const auto ewd = errnoWithDescription(failed);
                 LOGV2_WARNING(22949,
-                              "pthread_attr_setstacksize failed: {error}",
                               "pthread_attr_setstacksize failed",
-                              "error"_attr = ewd);
+                              "error"_attr = errorMessage(posixError(failed)));
             }
-        } else if (limits.rlim_cur < 1024 * 1024) {
+        } else {
             LOGV2_WARNING(22950,
-                          "Stack size set to {stackSizeKiB}KiB. We suggest 1024KiB",
                           "Stack size not set to suggested 1024KiB",
                           "stackSizeKiB"_attr = (limits.rlim_cur / 1024));
         }
@@ -119,47 +127,30 @@ Status launchServiceWorkerThread(unique_function<void()> task) noexcept {
         if (failed > 0) {
             LOGV2_ERROR_OPTIONS(4850900,
                                 {logv2::UserAssertAfterLog()},
-                                "pthread_create failed: error: {error}",
                                 "pthread_create failed",
-                                "error"_attr = errnoWithDescription(failed));
+                                "error"_attr = errorMessage(posixError(failed)));
         } else if (failed < 0) {
-            auto savedErrno = errno;
+            auto ec = lastPosixError();
             LOGV2_ERROR_OPTIONS(4850901,
                                 {logv2::UserAssertAfterLog()},
-                                "pthread_create failed with a negative return code: {code}, errno: "
-                                "{errno}, error: {error}",
                                 "pthread_create failed with a negative return code",
                                 "code"_attr = failed,
-                                "errno"_attr = savedErrno,
-                                "error"_attr = errnoWithDescription(savedErrno));
+                                "errno"_attr = ec.value(),
+                                "error"_attr = errorMessage(ec));
         }
 
-        ctx.release();
+        // The spawned thread takes over ownership, cast to void to explicitly ignore the return
+        // value.
+        (void)ctx.release();
 #endif
 
     } catch (const std::exception& e) {
         LOGV2_ERROR(22948, "Thread creation failed", "error"_attr = e.what());
         return {ErrorCodes::InternalError,
-                format(FMT_STRING("Failed to create service entry worker thread: {}"), e.what())};
+                fmt::format("Failed to create service entry worker thread: {}", e.what())};
     }
 
     return Status::OK();
 }
 
-void scheduleCallbackOnDataAvailable(const transport::SessionHandle& session,
-                                     unique_function<void(Status)> callback,
-                                     transport::ServiceExecutor* executor) noexcept {
-    invariant(session);
-    executor->schedule([session, callback = std::move(callback), executor](Status status) {
-        executor->yieldIfAppropriate();
-
-        if (!status.isOK()) {
-            callback(std::move(status));
-            return;
-        }
-
-        callback(session->waitForData());
-    });
-}
-
-}  // namespace mongo
+}  // namespace mongo::transport

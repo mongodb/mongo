@@ -27,17 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/pipeline/document_source_project.h"
 
-#include <boost/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <memory>
-
-#include "mongo/db/exec/projection_executor.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/projection_executor_builder.h"
+#include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/transformer_interface.h"
+#include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection_ast.h"
+#include "mongo/util/str.h"
+
+#include <algorithm>
+#include <bitset>
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -94,7 +103,7 @@ intrusive_ptr<DocumentSource> DocumentSourceProject::create(
                     ProjectionPolicies::aggregateProjectionPolicies(),
                     builderParams);
             } catch (DBException& ex) {
-                ex.addContext("Invalid " + specifiedName.toString());
+                ex.addContext("Invalid " + std::string{specifiedName});
                 throw;
             }
         }(),
@@ -126,17 +135,17 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceProject::createUnset(
 intrusive_ptr<DocumentSource> DocumentSourceProject::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
     if (elem.fieldNameStringData() == kStageName) {
-        uassert(15969, "$project specification must be an object", elem.type() == BSONType::Object);
+        uassert(15969, "$project specification must be an object", elem.type() == BSONType::object);
         return DocumentSourceProject::create(elem.Obj(), expCtx, elem.fieldNameStringData());
     }
 
     invariant(elem.fieldNameStringData() == kAliasNameUnset);
     uassert(31002,
             "$unset specification must be a string or an array",
-            (elem.type() == BSONType::Array || elem.type() == BSONType::String));
+            (elem.type() == BSONType::array || elem.type() == BSONType::string));
 
     const auto unsetSpec =
-        elem.type() == BSONType::Array ? elem.Array() : std::vector<mongo::BSONElement>{1, elem};
+        elem.type() == BSONType::array ? elem.Array() : std::vector<mongo::BSONElement>{1, elem};
     uassert(31119,
             "$unset specification must be a string or an array with at least one field",
             unsetSpec.size() > 0);
@@ -144,7 +153,7 @@ intrusive_ptr<DocumentSource> DocumentSourceProject::createFromBson(
     uassert(31120,
             "$unset specification must be a string or an array containing only string values",
             std::all_of(unsetSpec.cbegin(), unsetSpec.cend(), [](BSONElement elem) {
-                return elem.type() == BSONType::String;
+                return elem.type() == BSONType::string;
             }));
     return DocumentSourceProject::create(
         buildExclusionProjectionSpecification(unsetSpec), expCtx, elem.fieldNameStringData());

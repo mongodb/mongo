@@ -29,14 +29,32 @@
 
 #pragma once
 
-#include <limits>
-
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/remote_command_response.h"
+#include "mongo/logv2/log.h"
+#include "mongo/stdx/chrono.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/time_support.h"
+
+#include <algorithm>
+#include <functional>
+#include <limits>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
 
 class BSONObj;
+
 using executor::RemoteCommandResponse;
 
 namespace test {
@@ -133,16 +151,18 @@ public:
 
     class Action {
     public:
-        Action(ActionFunc func) : _actionFunc(std::move(func)){};
+        Action(ActionFunc func) : _actionFunc(std::move(func)) {};
 
         Action(const BSONObj& response) {
             _actionFunc = [=](const BSONObj& request) {
-                return RemoteCommandResponse(response, Milliseconds(0));
+                return RemoteCommandResponse::make_forTest(response, Milliseconds(0));
             };
         }
 
         Action(const RemoteCommandResponse& commandResponse) {
-            _actionFunc = [=](const BSONObj& request) { return commandResponse; };
+            _actionFunc = [=](const BSONObj& request) {
+                return commandResponse;
+            };
         }
 
         RemoteCommandResponse operator()(const BSONObj& request) {
@@ -184,6 +204,19 @@ public:
 
         bool isSatisfied() const {
             return _allowedTimes == 0;
+        }
+
+        int executionsRemaining() const {
+            return _allowedTimes;
+        }
+
+        virtual void logIfUnsatisfied() {
+            if (!isSatisfied()) {
+                LOGV2(9467602,
+                      "Unsatisfied expectation found",
+                      "executionsRemaining"_attr = executionsRemaining(),
+                      "expectedResponse"_attr = _action(BSONObj()));
+            }
         }
 
         // May throw.
@@ -238,6 +271,10 @@ public:
 
         bool isDefault() const override {
             return true;
+        }
+
+        void logIfUnsatisfied() override {
+            // We do not want to log default expectations.
         }
     };
 
@@ -333,13 +370,17 @@ public:
     // Advance time to the target. Run network operations and process requests along the way.
     void runUntil(Date_t targetTime);
 
+    // Run until both the executor and the network are idle. Otherwise, it hangs forever.
+    void runUntilIdle();
+
     // Run until both the executor and the network are idle and all expectations are satisfied.
-    // Otherwise, it hangs forever.
-    void runUntilExpectationsSatisfied();
+    // Otherwise, it fatal logs after timeoutSeconds.
+    void runUntilExpectationsSatisfied(
+        stdx::chrono::seconds timeoutSeconds = stdx::chrono::seconds(120));
 
 private:
-    void _runUntilIdle();
     bool _allExpectationsSatisfied() const;
+    void _logUnsatisfiedExpectations() const;
 
     std::vector<std::unique_ptr<Expectation>> _expectations;
     std::unique_ptr<Sequence> _activeSequence;
@@ -349,3 +390,5 @@ private:
 }  // namespace mock
 }  // namespace test
 }  // namespace mongo
+
+#undef MONGO_LOGV2_DEFAULT_COMPONENT

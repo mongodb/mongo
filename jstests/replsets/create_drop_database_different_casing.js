@@ -13,13 +13,11 @@
  *
  * @tags: [requires_replication]
  */
-load("jstests/libs/logv2_helpers.js");
 
-(function() {
-'use strict';
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-load("jstests/libs/fail_point_util.js");
-
+const collName = jsTestName();
 const rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}]});
 rst.startSet();
 rst.initiate();
@@ -30,9 +28,9 @@ const dbNameLower = "a";
 const primary = rst.getPrimary();
 
 let upperDB = primary.getDB(dbNameUpper);
-assert.commandWorked(upperDB.createCollection("test"));
+assert.commandWorked(upperDB.createCollection(collName));
 
-let failPoint = configureFailPoint(upperDB, 'dropDatabaseHangBeforeInMemoryDrop');
+let failPoint = configureFailPoint(upperDB, "dropDatabaseHangBeforeInMemoryDrop");
 let awaitDropUpper = startParallelShell(() => {
     db.getSiblingDB("A").dropDatabase();
 }, primary.port);
@@ -42,19 +40,14 @@ let lowerDB = primary.getDB(dbNameLower);
 
 // The oplog entry to the secondaries to drop database "A" was sent, but the primary has not yet
 // dropped "A" as it's hanging on the 'dropDatabaseHangBeforeInMemoryDrop' fail point.
-assert.commandFailedWithCode(lowerDB.createCollection("test"), ErrorCodes.DatabaseDifferCase);
+assert.commandFailedWithCode(lowerDB.createCollection(collName), ErrorCodes.DatabaseDifferCase);
 
 rst.awaitReplication();
 failPoint.off();
 
-if (isJsonLog(primary)) {
-    checkLog.containsJson(primary, 20336, {"db": dbNameUpper});
-} else {
-    checkLog.contains(primary, "dropDatabase " + dbNameUpper + " - finished");
-}
-assert.commandWorked(lowerDB.createCollection("test"));
+checkLog.containsJson(primary, 20336, {"db": dbNameUpper});
+assert.commandWorked(lowerDB.createCollection(collName));
 
 awaitDropUpper();
 
 rst.stopSet();
-})();

@@ -7,7 +7,7 @@
  * Copyright (c) 2009 Phil Endecott
  * Copyright (c) 2013 Tim Blechmann
  * ARM Code by Phil Endecott, based on other architectures.
- * Copyright (c) 2014, 2020 Andrey Semashev
+ * Copyright (c) 2014, 2020, 2022 Andrey Semashev
  */
 /*!
  * \file   atomic/detail/caps_arch_gcc_arm.hpp
@@ -36,7 +36,14 @@
     (defined(__BIG_ENDIAN__) && !defined(__LITTLE_ENDIAN__))
 #define BOOST_ATOMIC_DETAIL_ARM_BIG_ENDIAN
 #else
+#include <boost/predef/other/endian.h>
+#if BOOST_ENDIAN_LITTLE_BYTE
+#define BOOST_ATOMIC_DETAIL_ARM_LITTLE_ENDIAN
+#elif BOOST_ENDIAN_BIG_BYTE
+#define BOOST_ATOMIC_DETAIL_ARM_BIG_ENDIAN
+#else
 #error "Boost.Atomic: Failed to determine ARM endianness, the target platform is not supported. Please, report to the developers (patches are welcome)."
+#endif
 #endif
 
 #if defined(__GNUC__) && defined(__arm__) && (BOOST_ATOMIC_DETAIL_ARM_ARCH >= 6)

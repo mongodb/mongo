@@ -29,11 +29,11 @@
 
 #pragma once
 
+#include "mongo/unittest/framework.h"
+
 #include <functional>
 #include <memory>
 #include <string>
-
-#include "mongo/unittest/unittest.h"
 
 /**
  * Constructs a single death test named `TEST_NAME` within the test suite `SUITE_NAME`.
@@ -106,19 +106,32 @@
                                                                                                \
     private:                                                                                   \
         void _doTest() override;                                                               \
+        static inline const ::mongo::unittest::TestInfo _testInfo{                             \
+            #SUITE_NAME, #TEST_NAME, __FILE__, __LINE__, &typeid(TEST_BASE)};                  \
         static inline const RegistrationAgent<::mongo::unittest::DeathTest<TEST_TYPE>> _agent{ \
-            #SUITE_NAME, #TEST_NAME, __FILE__};                                                \
+            &_testInfo};                                                                       \
     };                                                                                         \
     void TEST_TYPE::_doTest()
-
 
 namespace mongo::unittest {
 
 class DeathTestBase : public Test {
+public:
+    /**
+     * A test can use this to opt-out of exec behavior.
+     * Would have to be called by the constructor. By the time the test body is
+     * running, it's too late.
+     */
+    void setExec(bool enable) {
+        _exec = enable;
+    }
+
 protected:
     DeathTestBase() = default;
 
 private:
+    struct Subprocess;
+
     // Forks, executes _doMakeTest() in the child process to create a Test, then runs that Test.
     void _doTest() final;
 
@@ -128,6 +141,12 @@ private:
     virtual bool _isRegex() = 0;
     virtual int _getLine() = 0;
     virtual std::string _getFile() = 0;
+
+    /**
+     * All death tests will fork a subprocess.
+     * Some will be configured to then go ahead and exec.
+     */
+    bool _exec = true;
 };
 
 template <typename T>

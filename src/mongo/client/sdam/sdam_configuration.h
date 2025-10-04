@@ -28,13 +28,24 @@
  */
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/client/sdam/sdam_configuration_parameters_gen.h"
 #include "mongo/client/sdam/sdam_datatypes.h"
+#include "mongo/db/server_options.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/net/hostandport.h"
+
+#include <string>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo::sdam {
 class SdamConfiguration {
 public:
-    SdamConfiguration() : SdamConfiguration(boost::none){};
+    SdamConfiguration() : SdamConfiguration(boost::none) {};
 
     /**
      * Initialize the TopologyDescription. This constructor may uassert if the provided
@@ -60,7 +71,8 @@ public:
         TopologyType initialType = TopologyType::kUnknown,
         Milliseconds heartBeatFrequencyMs = Milliseconds(sdamHeartBeatFrequencyMs),
         Milliseconds connectTimeoutMs = Milliseconds(sdamConnectTimeoutMs),
-        Milliseconds localThreshholdMs = Milliseconds(sdamLocalThreshholdMs),
+        Milliseconds localThreshholdMs =
+            Milliseconds(serverGlobalParams.defaultLocalThresholdMillis),
         boost::optional<std::string> setName = boost::none);
 
     SdamConfiguration(boost::optional<std::vector<HostAndPort>> seedList,
@@ -70,7 +82,7 @@ public:
                             initialType,
                             Milliseconds(sdamHeartBeatFrequencyMs),
                             Milliseconds(sdamConnectTimeoutMs),
-                            Milliseconds(sdamLocalThreshholdMs),
+                            Milliseconds(serverGlobalParams.defaultLocalThresholdMillis),
                             setName) {}
 
     /**
@@ -89,7 +101,7 @@ public:
     const boost::optional<std::string>& getSetName() const;
 
     /**
-     * The frequency at which we measure RTT and IsMaster responses.
+     * The frequency at which we measure RTT and "hello" responses.
      */
     Milliseconds getHeartBeatFrequency() const;
 

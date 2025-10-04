@@ -29,10 +29,12 @@
 
 #pragma once
 
-#include <arm_neon.h>
+#include "mongo/platform/bits.h"
+#include "mongo/util/modules.h"
+
 #include <cstdint>
 
-#include "mongo/platform/bits.h"
+#include <arm_neon.h>
 
 namespace mongo {
 namespace unicode {

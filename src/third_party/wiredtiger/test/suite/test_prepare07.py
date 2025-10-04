@@ -26,9 +26,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import fnmatch, os, shutil, time
-from helper import copy_wiredtiger_home
-import wiredtiger, wttest
+import os
+import wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
@@ -56,36 +55,36 @@ class test_prepare07(wttest.WiredTigerTestCase):
 
         # Commit some updates.
         cursor = self.session.open_cursor(uri)
-        self.session.begin_transaction('isolation=snapshot')
+        self.session.begin_transaction()
         cursor.set_key(ds.key(nrows + 1))
         cursor.set_value(value_b)
-        self.assertEquals(cursor.update(), 0)
+        self.assertEqual(cursor.update(), 0)
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(110))
-        self.session.begin_transaction('isolation=snapshot')
+        self.session.begin_transaction()
         cursor.set_key(ds.key(nrows + 2))
         cursor.set_value(value_b)
-        self.assertEquals(cursor.update(), 0)
+        self.assertEqual(cursor.update(), 0)
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(120))
 
         # Prepare a transaction and keep it open.
         session_p = self.conn.open_session()
         cursor_p = session_p.open_cursor(uri)
-        session_p.begin_transaction('isolation=snapshot')
+        session_p.begin_transaction()
         cursor_p.set_key(ds.key(nrows + 3))
         cursor_p.set_value(value_b)
-        self.assertEquals(cursor_p.update(), 0)
+        self.assertEqual(cursor_p.update(), 0)
         session_p.prepare_transaction('prepare_timestamp=' + self.timestamp_str(130))
 
         # Commit some more updates.
-        self.session.begin_transaction('isolation=snapshot')
+        self.session.begin_transaction()
         cursor.set_key(ds.key(nrows + 4))
         cursor.set_value(value_b)
-        self.assertEquals(cursor.update(), 0)
+        self.assertEqual(cursor.update(), 0)
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(140))
-        self.session.begin_transaction('isolation=snapshot')
+        self.session.begin_transaction()
         cursor.set_key(ds.key(nrows + 5))
         cursor.set_value(value_b)
-        self.assertEquals(cursor.update(), 0)
+        self.assertEqual(cursor.update(), 0)
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(150))
 
         # Move the oldest and the stable timestamp to the latest.
@@ -93,10 +92,10 @@ class test_prepare07(wttest.WiredTigerTestCase):
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(155))
 
         # Commit an update newer than the stable timestamp.
-        self.session.begin_transaction('isolation=snapshot')
+        self.session.begin_transaction()
         cursor.set_key(ds.key(nrows + 6))
         cursor.set_value(value_b)
-        self.assertEquals(cursor.update(), 0)
+        self.assertEqual(cursor.update(), 0)
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(160))
 
         # Take a checkpoint here, so that prepared transaction will not be durable..
@@ -114,27 +113,27 @@ class test_prepare07(wttest.WiredTigerTestCase):
 
         # Committed non - prepared transactions data should be seen.
         cursor_b.set_key(ds.key(nrows + 1))
-        self.assertEquals(cursor_b.search(), 0)
-        self.assertEquals(cursor_b.get_value(),value_b)
+        self.assertEqual(cursor_b.search(), 0)
+        self.assertEqual(cursor_b.get_value(),value_b)
         cursor_b.set_key(ds.key(nrows + 2))
-        self.assertEquals(cursor_b.search(), 0)
-        self.assertEquals(cursor_b.get_value(),value_b)
+        self.assertEqual(cursor_b.search(), 0)
+        self.assertEqual(cursor_b.get_value(),value_b)
         # Committed prepared transaction data should not be seen.
         cursor_b.set_key(ds.key(nrows + 3))
-        self.assertEquals(cursor_b.search(), 0)
-        self.assertEquals(cursor_b.get_value(),value_a)
+        self.assertEqual(cursor_b.search(), 0)
+        self.assertEqual(cursor_b.get_value(),value_a)
         # Committed non - prepared transactions data should be seen.
         cursor_b.set_key(ds.key(nrows + 4))
-        self.assertEquals(cursor_b.search(), 0)
-        self.assertEquals(cursor_b.get_value(),value_b)
+        self.assertEqual(cursor_b.search(), 0)
+        self.assertEqual(cursor_b.get_value(),value_b)
         cursor_b.set_key(ds.key(nrows + 5))
-        self.assertEquals(cursor_b.search(), 0)
-        self.assertEquals(cursor_b.get_value(),value_b)
+        self.assertEqual(cursor_b.search(), 0)
+        self.assertEqual(cursor_b.get_value(),value_b)
 
         # Committed transactions newer to the stable timestamp should not be seen.
         cursor_b.set_key(ds.key(nrows + 6))
-        self.assertEquals(cursor_b.search(), 0)
-        self.assertEquals(cursor_b.get_value(),value_a)
+        self.assertEqual(cursor_b.search(), 0)
+        self.assertEqual(cursor_b.get_value(),value_a)
 
         # close sessions.
         cursor_p.close()
@@ -164,7 +163,7 @@ class test_prepare07(wttest.WiredTigerTestCase):
         for i in range(1, 10000):
             cursor.set_key(ds.key(nrows + i))
             cursor.set_value(value_a)
-            self.assertEquals(cursor.insert(), 0)
+            self.assertEqual(cursor.insert(), 0)
         cursor.close()
         self.session.checkpoint()
 
@@ -172,6 +171,3 @@ class test_prepare07(wttest.WiredTigerTestCase):
         # transaction is a prepared transaction and the oldest timestamp
         # advances beyond the prepared timestamp.
         self.older_prepare_updates(uri, ds, nrows, value_a, value_b)
-
-if __name__ == '__main__':
-    wttest.run()

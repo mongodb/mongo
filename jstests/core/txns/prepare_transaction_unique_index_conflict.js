@@ -5,12 +5,15 @@
  * collection. Since there are prepared operations on documents in the collection, the read should
  * cause a prepare conflict.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * @tags: [
+ *   # The test runs commands that are not allowed with security token: prepareTransaction.
+ *   not_allowed_with_signed_security_token,
+ *   uses_transactions,
+ *   uses_prepare_transaction
+ * ]
  */
 
-(function() {
-"use strict";
-load("jstests/core/txns/libs/prepare_helpers.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 
 const dbName = "test";
 const collName = "prepare_transaction_unique_index_conflict";
@@ -38,7 +41,7 @@ const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 // violates the unique index, which should cause a prepare conflict.
 assert.commandFailedWithCode(
     testDB.runCommand({insert: collName, documents: [{_id: 3, a: 1}], maxTimeMS: 5000}),
-    ErrorCodes.MaxTimeMSExpired);
+    ErrorCodes.MaxTimeMSExpired,
+);
 
 assert.commandWorked(session.abortTransaction_forTesting());
-})();

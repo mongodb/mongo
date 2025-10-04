@@ -29,16 +29,42 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <memory>
-#include <unordered_map>
-
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/auth/authentication_metrics.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/role_name.h"
+#include "mongo/db/auth/user.h"
+#include "mongo/db/auth/user_name.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/time_support.h"
+
+#include <algorithm>
+#include <bitset>
+#include <cstddef>
+#include <initializer_list>
+#include <memory>
+#include <set>
+#include <string>
+#include <tuple>
+#include <type_traits>
+#include <typeinfo>
+#include <unordered_map>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -104,12 +130,12 @@ public:
     virtual SecurityPropertySet properties() const = 0;
 
     /**
-     * This returns a number that represents the "amount" of security provided by this mechanism
-     * to determine the order in which it is offered to clients in the isMaster
-     * saslSupportedMechs response.
+     * This returns a number that represents the "amount" of security provided by this mechanism to
+     * determine the order in which it is offered to clients in the "hello" saslSupportedMechs
+     * response.
      *
-     * The value of securityLevel is arbitrary so long as the more secure mechanisms return a
-     * higher value than the less secure mechanisms.
+     * The value of securityLevel is arbitrary so long as the more secure mechanisms return a higher
+     * value than the less secure mechanisms.
      *
      * For example, SCRAM-SHA-256 > SCRAM-SHA-1 > PLAIN
      */
@@ -130,7 +156,7 @@ public:
     explicit ServerMechanismBase(std::string authenticationDatabase)
         : _authenticationDatabase(std::move(authenticationDatabase)) {}
 
-    virtual ~ServerMechanismBase() = default;
+    ~ServerMechanismBase() override = default;
 
     /**
      * Returns the principal name which this mechanism is performing authentication for.
@@ -143,6 +169,15 @@ public:
      */
     virtual StringData getPrincipalName() const {
         return _principalName;
+    }
+
+    /**
+     * Returns the expiration time, if applicable, of the user's authentication for the given
+     * mechanism. The default of boost::none indicates that the user will be authenticated
+     * indefinitely on the session.
+     */
+    virtual boost::optional<Date_t> getExpirationTime() const {
+        return boost::none;
     }
 
     /**
@@ -165,7 +200,7 @@ public:
      * Provides logic for determining if a user is a cluster member or an actual client for SASL
      * authentication mechanisms
      */
-    bool isClusterMember() const {
+    virtual bool isClusterMember(Client* client) const {
         auto systemUser = internalSecurity.getUser();
         return _principalName == (*systemUser)->getName().getUser() &&
             getAuthenticationDatabase() == (*systemUser)->getName().getDB();
@@ -176,6 +211,7 @@ public:
      * and either returns an error, or a response to be sent back.
      */
     StatusWith<std::string> step(OperationContext* opCtx, StringData input) {
+
         auto result = stepImpl(opCtx, input);
         if (result.isOK()) {
             bool isSuccess;
@@ -206,6 +242,18 @@ public:
         return Status::OK();
     }
 
+    virtual boost::optional<unsigned int> currentStep() const = 0;
+    virtual boost::optional<unsigned int> totalSteps() const = 0;
+
+    /**
+     * Create a UserRequest to send to AuthorizationSession.
+     */
+    virtual StatusWith<std::unique_ptr<UserRequest>> makeUserRequest(
+        OperationContext* opCtx) const {
+        return std::unique_ptr<UserRequest>(std::make_unique<UserRequestGeneral>(
+            UserName(getPrincipalName(), getAuthenticationDatabase()), boost::none));
+    }
+
 protected:
     /**
      * Mechanism provided step implementation.
@@ -224,7 +272,7 @@ protected:
 /** Base class for server mechanism factories. */
 class ServerFactoryBase : public SaslServerCommonBase {
 public:
-    explicit ServerFactoryBase(ServiceContext*) {}
+    explicit ServerFactoryBase(Service*) {}
     ServerFactoryBase() = default;
 
     /**
@@ -251,7 +299,7 @@ class MakeServerMechanism : public ServerMechanismBase {
 public:
     explicit MakeServerMechanism(std::string authenticationDatabase)
         : ServerMechanismBase(std::move(authenticationDatabase)) {}
-    virtual ~MakeServerMechanism() = default;
+    ~MakeServerMechanism() override = default;
 
     using policy_type = Policy;
 
@@ -284,10 +332,10 @@ public:
     using mechanism_type = ServerMechanism;
     using policy_type = typename ServerMechanism::policy_type;
 
-    explicit MakeServerFactory(ServiceContext*) {}
+    explicit MakeServerFactory(Service*) {}
     MakeServerFactory() = default;
 
-    virtual ServerMechanism* createImpl(std::string authenticationDatabase) override {
+    ServerMechanism* createImpl(std::string authenticationDatabase) override {
         return new ServerMechanism(std::move(authenticationDatabase));
     }
 
@@ -316,13 +364,13 @@ public:
  */
 class SASLServerMechanismRegistry {
 public:
-    static SASLServerMechanismRegistry& get(ServiceContext* serviceContext);
-    static void set(ServiceContext* service, std::unique_ptr<SASLServerMechanismRegistry> registry);
+    static SASLServerMechanismRegistry& get(Service* service);
+    static void set(Service* service, std::unique_ptr<SASLServerMechanismRegistry> registry);
 
     /**
      * Intialize the registry with a list of enabled mechanisms.
      */
-    explicit SASLServerMechanismRegistry(ServiceContext* svcCtx,
+    explicit SASLServerMechanismRegistry(Service* service,
                                          std::vector<std::string> enabledMechanisms);
 
     /**
@@ -370,7 +418,7 @@ public:
         }
 
         auto& list = _getMapRef(T::isInternal);
-        list.emplace_back(std::make_unique<T>(_svcCtx));
+        list.emplace_back(std::make_unique<T>(_service));
         std::stable_sort(list.begin(), list.end(), [](const auto& a, const auto& b) {
             return (a->securityLevel() > b->securityLevel());
         });
@@ -384,7 +432,7 @@ private:
     using MechList = std::vector<std::unique_ptr<ServerFactoryBase>>;
 
     MechList& _getMapRef(StringData dbName) {
-        return _getMapRef(dbName != "$external"_sd);
+        return _getMapRef(dbName != DatabaseName::kExternal.db(omitTenant));
     }
 
     MechList& _getMapRef(bool internal) {
@@ -396,7 +444,7 @@ private:
 
     bool _mechanismSupportedByConfig(StringData mechName) const;
 
-    ServiceContext* _svcCtx = nullptr;
+    Service* _service = nullptr;
 
     // Stores factories which make mechanisms for all databases other than $external
     MechList _internalMechs;
@@ -409,14 +457,14 @@ private:
 template <typename Factory>
 class GlobalSASLMechanismRegisterer {
 private:
-    boost::optional<ServiceContext::ConstructorActionRegisterer> registerer;
+    boost::optional<Service::ConstructorActionRegisterer> registerer;
 
 public:
     GlobalSASLMechanismRegisterer() {
         registerer.emplace(std::string(typeid(Factory).name()),
                            std::vector<std::string>{"CreateSASLServerMechanismRegistry"},
                            std::vector<std::string>{"ValidateSASLServerMechanismRegistry"},
-                           [](ServiceContext* service) {
+                           [](Service* service) {
                                SASLServerMechanismRegistry::get(service).registerFactory<Factory>();
                            });
     }

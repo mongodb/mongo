@@ -27,122 +27,151 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-#include <fmt/format.h>
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/client_strand.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/request_execution_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/factory.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/protocol.h"
+#include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
+
+#include <memory>
+#include <mutex>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 
 namespace mongo {
 namespace {
 
-using namespace fmt::literals;
-
 class AsyncCommandExecutionTest : public unittest::Test, public ScopedGlobalServiceContextForTest {
 public:
-    void runTestForCommand(StringData command) {
-        BSONObj syncResponse, asyncResponse;
+    struct TestState;
+    void runTestForCommand(StringData command);
+};
 
-        auto client = getServiceContext()->makeClient("Client");
-        auto strand = ClientStrand::make(std::move(client));
-
-        {
-            auto ctx = makeExecutionContext(strand, command);
-            strand->run([&] { syncResponse = getSyncResponse(ctx); });
-        }
-
-        {
-            auto ctx = makeExecutionContext(strand, command);
-            asyncResponse = getAsyncResponse(strand, ctx);
-        }
-
-        {
-            auto ctx = makeExecutionContext(strand, command);
-            killAsyncCommand(strand, ctx);
-        }
-
-        ASSERT_BSONOBJ_EQ(syncResponse, asyncResponse);
-    }
-
-private:
-    struct ExecutionContext {
-        ServiceContext::UniqueOperationContext opCtx;
-        std::shared_ptr<RequestExecutionContext> rec;
-        std::shared_ptr<CommandInvocation> invocation;
-    };
-
-    ExecutionContext makeExecutionContext(ClientStrandPtr strand, StringData commandName) const {
+// Sets up and maintains the environment (e.g., `opCtx`) required for running a test.
+struct AsyncCommandExecutionTest::TestState {
+    TestState(ClientStrandPtr clientStrand, StringData cmdName) : strand(std::move(clientStrand)) {
         auto guard = strand->bind();
-        ExecutionContext ctx;
-        ctx.opCtx = cc().makeOperationContext();
+        opCtx = guard->makeOperationContext();
 
-        auto rec =
-            std::make_shared<RequestExecutionContext>(ctx.opCtx.get(), mockMessage(commandName));
+        auto mockMessage = [&] {
+            OpMsgBuilder builder;
+            builder.setBody(BSON(cmdName << 1 << "$db"
+                                         << "test"));
+            return builder.finish();
+        };
+
+        // Setup the execution context
+        rec = std::make_shared<RequestExecutionContext>(
+            opCtx.get(), mockMessage(), opCtx.get()->fastClockSource().now());
         rec->setReplyBuilder(makeReplyBuilder(rpc::protocolForMessage(rec->getMessage())));
-        rec->setRequest(rpc::opMsgRequestFromAnyProtocol(rec->getMessage()));
-        rec->setCommand(CommandHelpers::findCommand(rec->getRequest().getCommandName()));
+        rec->setRequest(rpc::opMsgRequestFromAnyProtocol(rec->getMessage(), opCtx->getClient()));
+        rec->setCommand(CommandHelpers::findCommand(&*opCtx, rec->getRequest().getCommandName()));
 
+        // Setup the invocation
         auto cmd = rec->getCommand();
         invariant(cmd);
-        ctx.invocation = cmd->parse(ctx.opCtx.get(), rec->getRequest());
-        ctx.rec = std::move(rec);
-        return ctx;
+        invocation = cmd->parse(opCtx.get(), rec->getRequest());
     }
 
-    BSONObj getSyncResponse(ExecutionContext& ctx) const {
-        ctx.invocation->run(ctx.rec->getOpCtx(), ctx.rec->getReplyBuilder());
-        return ctx.rec->getReplyBuilder()->getBodyBuilder().done().getOwned();
+    ~TestState() {
+        // Deleting the `opCtx` will modify the `Client`, so we must bind the strand first.
+        auto guard = strand->bind();
+        opCtx.reset();
     }
 
-    BSONObj getAsyncResponse(ClientStrandPtr strand, ExecutionContext& ctx) const {
-        Future<void> future;
-        {
-            auto guard = strand->bind();
-            FailPointEnableBlock fp("hangBeforeRunningAsyncRequestExecutorTask");
-            future = ctx.invocation->runAsync(ctx.rec);
-            ASSERT(!future.isReady());
-        }
-
-        ASSERT(future.getNoThrow().isOK());
-
-        return [&] {
-            auto guard = strand->bind();
-            return ctx.rec->getReplyBuilder()->getBodyBuilder().done().getOwned();
-        }();
-    }
-
-    void killAsyncCommand(ClientStrandPtr strand, ExecutionContext& ctx) const {
-        Future<void> future;
-        {
-            auto guard = strand->bind();
-            FailPointEnableBlock fp("hangBeforeRunningAsyncRequestExecutorTask");
-            future = ctx.invocation->runAsync(ctx.rec);
-
-            auto opCtx = ctx.rec->getOpCtx();
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
-            opCtx->getServiceContext()->killOperation(lk, opCtx, ErrorCodes::Interrupted);
-        }
-
-        ASSERT_EQ(future.getNoThrow().code(), ErrorCodes::Interrupted);
-    }
-
-    Message mockMessage(StringData commandName) const {
-        OpMsgBuilder builder;
-        builder.setBody(BSON(commandName << 1 << "$db"
-                                         << "test"));
-        return builder.finish();
-    }
+    ClientStrandPtr strand;
+    ServiceContext::UniqueOperationContext opCtx;
+    std::shared_ptr<RequestExecutionContext> rec;
+    std::shared_ptr<CommandInvocation> invocation;
 };
+
+BSONObj getSyncResponse(AsyncCommandExecutionTest::TestState& state) {
+    state.invocation->run(state.rec->getOpCtx(), state.rec->getReplyBuilder());
+    return state.rec->getReplyBuilder()->getBodyBuilder().done().getOwned();
+}
+
+BSONObj getAsyncResponse(AsyncCommandExecutionTest::TestState& state) {
+    Future<void> future;
+    {
+        auto guard = state.strand->bind();
+        FailPointEnableBlock fp("hangBeforeRunningAsyncRequestExecutorTask");
+        future = state.invocation->runAsync(state.rec);
+        ASSERT(!future.isReady());
+    }
+
+    ASSERT(future.getNoThrow().isOK());
+
+    return [&] {
+        auto guard = state.strand->bind();
+        return state.rec->getReplyBuilder()->getBodyBuilder().done().getOwned();
+    }();
+}
+
+void killAsyncCommand(AsyncCommandExecutionTest::TestState& state) {
+    Future<void> future;
+    {
+        auto guard = state.strand->bind();
+        FailPointEnableBlock fp("hangBeforeRunningAsyncRequestExecutorTask");
+        future = state.invocation->runAsync(state.rec);
+
+        auto opCtx = state.rec->getOpCtx();
+        ClientLock lk(opCtx->getClient());
+        opCtx->getServiceContext()->killOperation(lk, opCtx, ErrorCodes::Interrupted);
+    }
+
+    ASSERT_EQ(future.getNoThrow().code(), ErrorCodes::Interrupted);
+}
+
+void AsyncCommandExecutionTest::runTestForCommand(StringData command) {
+    BSONObj syncResponse, asyncResponse;
+
+    auto client = getServiceContext()->getService()->makeClient("Client");
+    auto strand = ClientStrand::make(std::move(client));
+
+    {
+        LOGV2(5399301, "Running the command synchronously", "command"_attr = command);
+        TestState state(strand, command);
+        strand->run([&] { syncResponse = getSyncResponse(state); });
+    }
+
+    {
+        LOGV2(5399302, "Running the command asynchronously", "command"_attr = command);
+        TestState state(strand, command);
+        asyncResponse = getAsyncResponse(state);
+    }
+
+    {
+        LOGV2(5399303, "Canceling the command running asynchronously", "command"_attr = command);
+        TestState state(strand, command);
+        killAsyncCommand(state);
+    }
+
+    ASSERT_BSONOBJ_EQ(syncResponse, asyncResponse);
+}
 
 TEST_F(AsyncCommandExecutionTest, BuildInfo) {
     runTestForCommand("buildinfo");

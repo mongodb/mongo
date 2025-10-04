@@ -35,7 +35,6 @@ from wtscenario import make_scenarios
 class test_bug022(wttest.WiredTigerTestCase):
     uri = 'file:test_bug022'
     conn_config = 'cache_size=50MB'
-    session_config = 'isolation=snapshot'
 
     key_format_values = [
         ('string-row', dict(key_format='S', usestrings=True)),

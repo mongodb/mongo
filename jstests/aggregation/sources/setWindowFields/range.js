@@ -1,24 +1,10 @@
 /**
  * Test range-based window bounds.
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/window_function_helpers.js");
-
 const coll = db.setWindowFields_range;
 coll.drop();
 
-assert.commandWorked(coll.insert([
-    {x: 0},
-    {x: 1},
-    {x: 1.5},
-    {x: 2},
-    {x: 3},
-    {x: 100},
-    {x: 100},
-    {x: 101},
-]));
+assert.commandWorked(coll.insert([{x: 0}, {x: 1}, {x: 1.5}, {x: 2}, {x: 3}, {x: 100}, {x: 100}, {x: 101}]));
 
 // Make a setWindowFields stage with the given bounds.
 function range(lower, upper) {
@@ -28,19 +14,14 @@ function range(lower, upper) {
             sortBy: {x: 1},
             output: {
                 y: {$push: "$x", window: {range: [lower, upper]}},
-            }
-        }
+            },
+        },
     };
 }
 
 // Run the pipeline, and unset _id.
 function run(pipeline) {
-    return coll
-        .aggregate([
-            ...pipeline,
-            {$unset: '_id'},
-        ])
-        .toArray();
+    return coll.aggregate([...pipeline, {$unset: "_id"}]).toArray();
 }
 
 // The documents are not evenly spaced, so the window varies in size.
@@ -57,7 +38,7 @@ assert.sameMembers(run([range(-1, 0)]), [
 ]);
 
 // One or both endpoints can be unbounded.
-assert.sameMembers(run([range('unbounded', 0)]), [
+assert.sameMembers(run([range("unbounded", 0)]), [
     {x: 0, y: [0]},
     {x: 1, y: [0, 1]},
     {x: 1.5, y: [0, 1, 1.5]},
@@ -68,7 +49,7 @@ assert.sameMembers(run([range('unbounded', 0)]), [
     {x: 100, y: [0, 1, 1.5, 2, 3, 100, 100]},
     {x: 101, y: [0, 1, 1.5, 2, 3, 100, 100, 101]},
 ]);
-assert.sameMembers(run([range(0, 'unbounded')]), [
+assert.sameMembers(run([range(0, "unbounded")]), [
     {x: 0, y: [0, 1, 1.5, 2, 3, 100, 100, 101]},
     {x: 1, y: [1, 1.5, 2, 3, 100, 100, 101]},
     {x: 1.5, y: [1.5, 2, 3, 100, 100, 101]},
@@ -79,7 +60,7 @@ assert.sameMembers(run([range(0, 'unbounded')]), [
     {x: 100, y: [100, 100, 101]},
     {x: 101, y: [101]},
 ]);
-assert.sameMembers(run([range('unbounded', 'unbounded')]), [
+assert.sameMembers(run([range("unbounded", "unbounded")]), [
     {x: 0, y: [0, 1, 1.5, 2, 3, 100, 100, 101]},
     {x: 1, y: [0, 1, 1.5, 2, 3, 100, 100, 101]},
     {x: 1.5, y: [0, 1, 1.5, 2, 3, 100, 100, 101]},
@@ -91,15 +72,15 @@ assert.sameMembers(run([range('unbounded', 'unbounded')]), [
 ]);
 
 // Unlike '0', 'current' always means the current document.
-assert.sameMembers(run([range('current', 'current'), {$match: {x: 100}}]), [
+assert.sameMembers(run([range("current", "current"), {$match: {x: 100}}]), [
     {x: 100, y: [100]},
     {x: 100, y: [100]},
 ]);
-assert.sameMembers(run([range('current', +1), {$match: {x: 100}}]), [
+assert.sameMembers(run([range("current", +1), {$match: {x: 100}}]), [
     {x: 100, y: [100, 100, 101]},
     {x: 100, y: [100, 101]},
 ]);
-assert.sameMembers(run([range(-97, 'current'), {$match: {x: 100}}]), [
+assert.sameMembers(run([range(-97, "current"), {$match: {x: 100}}]), [
     {x: 100, y: [3, 100]},
     {x: 100, y: [3, 100, 100]},
 ]);
@@ -131,7 +112,7 @@ assert.sameMembers(run([range(+1, +1)]), [
 ]);
 
 // The window can be empty even if it's unbounded on one side.
-assert.sameMembers(run([range('unbounded', -99)]), [
+assert.sameMembers(run([range("unbounded", -99)]), [
     {x: 0, y: []},
     {x: 1, y: []},
     {x: 1.5, y: []},
@@ -141,7 +122,7 @@ assert.sameMembers(run([range('unbounded', -99)]), [
     {x: 100, y: [0, 1]},
     {x: 101, y: [0, 1, 1.5, 2]},
 ]);
-assert.sameMembers(run([range(+99, 'unbounded')]), [
+assert.sameMembers(run([range(+99, "unbounded")]), [
     {x: 0, y: [100, 100, 101]},
     {x: 1, y: [100, 100, 101]},
     {x: 1.5, y: [101]},
@@ -154,11 +135,13 @@ assert.sameMembers(run([range(+99, 'unbounded')]), [
 
 // Range-based windows reset between partitions.
 assert.commandWorked(coll.updateMany({}, {$set: {partition: "A"}}));
-assert.commandWorked(coll.insert([
-    {partition: "B", x: 101},
-    {partition: "B", x: 102},
-    {partition: "B", x: 103},
-]));
+assert.commandWorked(
+    coll.insert([
+        {partition: "B", x: 101},
+        {partition: "B", x: 102},
+        {partition: "B", x: 103},
+    ]),
+);
 assert.sameMembers(run([range(-5, 0)]), [
     {partition: "A", x: 0, y: [0]},
     {partition: "A", x: 1, y: [0, 1]},
@@ -174,7 +157,7 @@ assert.sameMembers(run([range(-5, 0)]), [
     {partition: "B", x: 103, y: [101, 102, 103]},
 ]);
 assert.commandWorked(coll.deleteMany({partition: "B"}));
-assert.commandWorked(coll.updateMany({}, [{$unset: 'partition'}]));
+assert.commandWorked(coll.updateMany({}, [{$unset: "partition"}]));
 
 // Empty window vs no window:
 // If no documents fall in the window, we evaluate the accumulator on zero documents.
@@ -191,32 +174,19 @@ assert.sameMembers(run([range(+999, +999)]), [
     {x: 100, y: []},
     {x: 101, y: []},
 ]);
-coll.insert([
-    {},
-    {x: null},
-    {x: ''},
-    {x: {}},
-]);
+coll.insert([{}, {x: null}, {x: ""}, {x: {}}]);
 let error;
 error = assert.throws(() => run([range(+999, +999)]));
-assert.includes(error.message, 'Invalid range: Expected the sortBy field to be a number');
+assert.includes(error.message, "Invalid range: Expected the sortBy field to be a number");
 error = assert.throws(() => run([range(-999, +999)]));
-assert.includes(error.message, 'Invalid range: Expected the sortBy field to be a number');
-error = assert.throws(() => run([range('unbounded', 'unbounded')]));
-assert.includes(error.message, 'Invalid range: Expected the sortBy field to be a number');
+assert.includes(error.message, "Invalid range: Expected the sortBy field to be a number");
+error = assert.throws(() => run([range("unbounded", "unbounded")]));
+assert.includes(error.message, "Invalid range: Expected the sortBy field to be a number");
 
 // Another case, involving ties and expiration.
 coll.drop();
-coll.insert([
-    {x: 0},
-    {x: 0},
-    {x: 0},
-    {x: 0},
-    {x: 3},
-    {x: 3},
-    {x: 3},
-]);
-assert.sameMembers(run([range('unbounded', -3)]), [
+coll.insert([{x: 0}, {x: 0}, {x: 0}, {x: 0}, {x: 3}, {x: 3}, {x: 3}]);
+assert.sameMembers(run([range("unbounded", -3)]), [
     {x: 0, y: []},
     {x: 0, y: []},
     {x: 0, y: []},
@@ -235,13 +205,13 @@ assert.sameMembers(
                 sortBy: {x: 1},
                 output: {
                     y: {
-                        $sum: {$filter: {input: [], as: 'num', cond: {$gte: ['$$num', 2]}}},
-                        window: {range: [-1, 1]}
+                        $sum: {$filter: {input: [], as: "num", cond: {$gte: ["$$num", 2]}}},
+                        window: {range: [-1, 1]},
                     },
-                }
-            }
+                },
+            },
         },
-        {$unset: '_id'}
+        {$unset: "_id"},
     ]),
     [
         {x: 0, y: 0},
@@ -251,29 +221,54 @@ assert.sameMembers(
         {x: 3, y: 0},
         {x: 3, y: 0},
         {x: 3, y: 0},
-    ]);
+    ],
+);
 
 // Test that all values in the executors are cleared between partitions.
 coll.drop();
 
 // Create values such that not all will be removed from the first partition and one will be removed
 // from the second.
-assert.commandWorked(coll.insert([
-    {partitionBy: 1, time: new Date(2020, 1, 1, 0, 30, 0, 0), temp: 10},
-    {partitionBy: 1, time: new Date(2020, 1, 1, 1, 31, 0, 0), temp: 11},
-    {partitionBy: 1, time: new Date(2020, 1, 1, 1, 32, 0, 0), temp: 12},
-    {partitionBy: 1, time: new Date(2020, 1, 1, 1, 33, 0, 0), temp: 13},
-    {partitionBy: 2, time: new Date(2020, 1, 1, 2, 31, 0, 0), temp: 5},
-    {partitionBy: 2, time: new Date(2020, 1, 1, 2, 35, 0, 0), temp: 6},
-    {partitionBy: 2, time: new Date(2020, 1, 1, 3, 34, 0, 0), temp: 2},
-]));
+assert.commandWorked(
+    coll.insert([
+        {partitionBy: 1, time: new Date(2020, 1, 1, 0, 30, 0, 0), temp: 10},
+        {partitionBy: 1, time: new Date(2020, 1, 1, 1, 31, 0, 0), temp: 11},
+        {partitionBy: 1, time: new Date(2020, 1, 1, 1, 32, 0, 0), temp: 12},
+        {partitionBy: 1, time: new Date(2020, 1, 1, 1, 33, 0, 0), temp: 13},
+        {partitionBy: 2, time: new Date(2020, 1, 1, 2, 31, 0, 0), temp: 5},
+        {partitionBy: 2, time: new Date(2020, 1, 1, 2, 35, 0, 0), temp: 6},
+        {partitionBy: 2, time: new Date(2020, 1, 1, 3, 34, 0, 0), temp: 2},
+    ]),
+);
 
-const pipeline = [{
-    $setWindowFields: {
-        partitionBy: "$partitionBy",
-        sortBy: {time: 1},
-        output: {min: {$min: "$temp", window: {range: [-1, 0], unit: "hour"}}}
-    }
-}];
+const pipeline = [
+    {
+        $setWindowFields: {
+            partitionBy: "$partitionBy",
+            sortBy: {time: 1},
+            output: {min: {$min: "$temp", window: {range: [-1, 0], unit: "hour"}}},
+        },
+    },
+];
 assert.commandWorked(db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}));
-})();
+
+// Test the behavior with regards NaN as the sort value.
+coll.drop();
+assert.commandWorked(coll.insert([{x: NaN}, {x: 0}]));
+assert.sameMembers(
+    run([
+        {
+            $setWindowFields: {
+                sortBy: {x: 1},
+                output: {
+                    y: {$push: "$x", window: {range: [0, 1]}},
+                },
+            },
+        },
+        {$unset: "_id"},
+    ]),
+    [
+        {x: NaN, y: [NaN]},
+        {x: 0, y: [0]},
+    ],
+);

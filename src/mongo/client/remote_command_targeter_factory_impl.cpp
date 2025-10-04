@@ -27,17 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/client/remote_command_targeter_factory_impl.h"
 
-#include <memory>
-
-#include "mongo/base/status_with.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter_rs.h"
 #include "mongo/client/remote_command_targeter_standalone.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <vector>
 
 namespace mongo {
 

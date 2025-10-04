@@ -27,106 +27,401 @@
 #
 global:
     cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/basic_types.h"
+        - "mongo/idl/generic_argument.h"
+        - "mongo/db/versioning_protocol/shard_version.h"
 
-# This file lists the generic arguments accepted by all commands, and generic
-# reply fields that all commands may return.
+imports:
+    - "mongo/client/read_preference_setting.idl"
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/repl/read_concern.idl"
+    - "mongo/db/repl/read_concern_args.idl"
+    - "mongo/db/repl/replication_types.idl"
+    - "mongo/db/session/logical_session_id.idl"
+    - "mongo/db/vector_clock/vector_clock.idl"
+    - "mongo/db/version_context.idl"
+    - "mongo/db/write_concern_options.idl"
+    - "mongo/rpc/metadata/audit_metadata.idl"
+    - "mongo/db/sharding_environment/sharding_types.idl"
+    - "mongo/db/global_catalog/router_role_api/gossiped_routing_cache.idl"
 
-generic_argument_lists:
-    generic_args_api_v1:
-        description: "Arguments accepted by all commands. These are guaranteed backwards-compatible for as long as the server supports API Version 1."
+structs:
+    GenericArguments:
+        description: "Arguments accepted by all commands."
+        strict: false
+        is_generic_cmd_list: "arg"
+        # Note that the _types_ of these fields are not checked for API version compatibility!
+        # Historically, these types were parsed and serialized directly from BSON by hand-written
+        # C++ code. The API compatibility checker does not enforce stability of the types of these fields,
+        # only of their names (i.e. that none are removed or have their name changed).
         fields:
+            # The only value supported today is "1".
             apiVersion:
+                type: string
                 forward_to_shards: false
+                optional: true
+                stability: "stable"
+            # When set to true, this causes commands outside the declared API version to return an
+            # APIStrictError and causes indexes unsupported by the current API version to be
+            # ignored by the query planner. If this field is specified, 'apiVersion' must also be
+            # specified.
             apiStrict:
+                type: bool
                 forward_to_shards: false
+                optional: true
+                stability: "stable"
+            # When set to true, this causes commands and behaviours that are deprecated in the
+            # current API version to return an APIDeprecationError. If this field is specified,
+            # 'apiVersion' must also be specified.
             apiDeprecationErrors:
+                type: bool
                 forward_to_shards: false
-            $db:
-                forward_to_shards: false
+                optional: true
+                stability: "stable"
+            # The IDL compiler injects this directly into command requests, so we ignore it here.
+            # $db:
+            #     type: database_name
+            #     cpp_name: "dbName"
+            #     forward_to_shards: false
+            #     ignore: true
+            #     stability: "stable"
+
+            # A user-specified integer value dictating the maximum time that can be spent executing this query,
+            # in milliseconds.
             maxTimeMS:
+                type: exactInt64
+                validator: {gte: 0, lte: 2147483647} # [0, 2^31 - 1]
                 forward_to_shards: true
+                optional: true
+                stability: "stable"
             readConcern:
+                type: ReadConcern
                 forward_to_shards: true
+                optional: true
+                stability: "stable"
             writeConcern:
+                type: WriteConcern
                 forward_to_shards: true
+                optional: true
+                stability: "stable"
             lsid:
+                type: LogicalSessionFromClient
                 forward_to_shards: true
+                optional: true
+                stability: "stable"
+            # Used by mongos to mark the requests it generates as part of a single sharded query.
             clientOperationKey:
+                type: uuid
                 forward_to_shards: true
+                optional: true
+                stability: "stable"
             txnNumber:
+                type: TxnNumber
                 forward_to_shards: true
+                optional: true
+                stability: "stable"
             autocommit:
+                type: bool
                 forward_to_shards: true
+                optional: true
+                stability: "stable"
             startTransaction:
+                type: bool
                 forward_to_shards: true
+                optional: true
+                stability: "stable"
             stmtId:
+                type: StmtId
                 forward_to_shards: true
+                # Various write commands treat this argument differently, so we ignore it at the generic argument
+                # level and instead defer to the individual commands' definitions of it. They should all use the same
+                # serialization rules, though.
+                #
+                # Note that if a command does not include a stmtId field in its definition, the re-serialized BSON
+                # of a parsed instance of that command struct will not contain stmtId, even if the original request
+                # did.
+                ignore: true
+                stability: "stable"
+            # User-specified comment associated to the query.
             comment:
+                type: IDLAnyTypeOwned
                 forward_to_shards: true
+                optional: true
+                stability: "stable"
+            # Describes how clients route read operations to the members of a replica sets. Allowed values: object with
+            # the read preference. Set by the client, or by the node where the operation was generated.
             $readPreference:
+                type: readPreference
+                cpp_name: "readPreference"
                 forward_to_shards: false
+                optional: true
+                stability: "stable"
+            # Top level logical clock of the cluster, it ticks whenever any data-bearing member does a write, it is
+            # gossiped with drivers, so they use causal consistency, and it is persisted by way of the timestamps on
+            # oplog entries on replicated writes. Allowed values: Timestamp with a valid majority write. Set by
+            # primary nodes in a cluster.
             $clusterTime:
+                type: ClusterTime
+                cpp_name: "dollarClusterTime"
                 forward_to_shards: false
-
-    generic_args_unstable_v1:
-        description: "Arguments accepted by all commands. These are not guaranteed backwards-compatible."
-        fields:
+                optional: true
+                stability: "stable"
             $audit:
+                type: AuditMetadata
+                cpp_name: "dollarAudit"
                 forward_to_shards: false
+                optional: true
+                stability: "internal"
             $client:
+                type: object_owned
+                cpp_name: "dollarClient"
                 forward_to_shards: false
+                optional: true
+                stability: "internal"
             $configServerState:
+                type: object_owned
+                cpp_name: "dollarConfigServerState"
                 forward_to_shards: false
-            allowImplicitCollectionCreation:
-                forward_to_shards: false
+                optional: true
+                stability: "internal"
             $oplogQueryData:
+                type: IDLAnyTypeOwned
+                cpp_name: "dollarOplogQueryData"
                 forward_to_shards: false
+                optional: true
+                stability: "internal"
+            # Object wrapping the directives for the query engine; currently it only accepts a readPreference
+            # field indicating from which node (primary/secondary/nearest) the sharded data should be fetched.
             $queryOptions:
+                type: object_owned
+                cpp_name: unwrappedReadPref
                 forward_to_shards: true
+                optional: true
+                stability: "internal"
             $replData:
+                type: IDLAnyTypeOwned
+                cpp_name: "dollarReplData"
                 forward_to_shards: false
+                optional: true
+                stability: "internal"
+            # Represents the version of a recently created database. It is changed every time a database is dropped, or
+            # it was moved with a movePrimary DDL. Allowed values: an object with a (UUID, Timestamp, int) that uniquely
+            # identifies an incarnation of a database in a cluster and reflects changes to the database's primary shard.
+            # Set by the config server.
             databaseVersion:
+                type: database_version
                 forward_to_shards: false
+                optional: true
+                stability: "internal"
+            # When set to true, the query engine will not execute the provided query, but rather return a description
+            # of the requested command.
+            help:
+                type: bool
+                forward_to_shards: false
+                optional: true
+                stability: "internal"
+            # Represents a point in time where the collection was created and it had a specific data placement within the
+            # cluster. Allowed values: includes a collection generation and a placement version, collection generation
+            # changes under some DDL like refineCollectionShardKey, reshardCollection, renameCollection, drop and recreate.
+            # Placement version is bumped once there is a data movement (a range or a chunk was moved from one shard to
+            # another successfully). Set by the primary node of a shard or the config server in some cases.
             shardVersion:
+                type: shard_version
                 forward_to_shards: false
+                optional: true
+                stability: "internal"
             tracking_info:
+                type: object_owned
                 forward_to_shards: false
+                optional: true
+                stability: "internal"
             coordinator:
+                type: bool
                 forward_to_shards: true
+                optional: true
+                stability: "internal"
+            # An integer value dictating the maximum time that can be spent executing this query, in milliseconds.
+            # Specified by mongos on each request made to the shards, so that the total execution time doesn't exceed
+            # the user-provided maxTimeMS.
             maxTimeMSOpOnly:
+                type: exactInt64
+                validator: {callback: "::mongo::validateMaxTimeMSOpOnly"}
                 forward_to_shards: false
+                optional: true
+                stability: "internal"
+            # Internal flag signaling that the execution time of the query is constrained by the default setting for
+            # maxTimeMS, not by a user-provided value. When set to true, aborted operations will be reported in a
+            # separate metric.
+            usesDefaultMaxTimeMS:
+                type: bool
+                forward_to_shards: false
+                optional: true
+                stability: "internal"
+            # Logical clock based on the majority write of the config server. It ticks when the majority commit point
+            # advances on the config server primary. It is gossiped internally in the cluster in requests and responses
+            # between mongos, config servers and shards. The values are the actual majority point timestamps of the
+            # config server primary node. Allowed values: Timestamp with a valid config server majority write. Set by
+            # the config server.
             $configTime:
+                type: timestamp
+                cpp_name: "dollarConfigTime"
                 forward_to_shards: false
+                optional: true
+                stability: "internal"
+            # Topology logical clock, it is internal to the cluster and is gossiped on requests and responses between
+            # mongos, config servers and shards. It is ticked by the config server primary whenever the topology of the
+            # cluster changes (as in, a shard is added or removed). Allowed values: a Timestamp greater or equal to a
+            # cluster time. It is not  necessarily an oplog time. Set by the config server.
             $topologyTime:
+                type: timestamp
+                cpp_name: "dollarTopologyTime"
                 forward_to_shards: false
+                optional: true
+                stability: "internal"
             txnRetryCounter:
+                type: TxnRetryCounter
                 forward_to_shards: true
+                optional: true
+                stability: "internal"
+            # Immutable object that holds metadata related to snapshots of the system state taken by operations aware of
+            # the  feature compatibility version. Allowed values: an object with the version information. Set by the
+            # primary node of a shard.
+            versionContext:
+                type: version_context
+                forward_to_shards: false
+                description: "Snapshot of the FCV used by the operation,
+                    which ensures that feature flag checks are stable through its execution."
+                optional: true
+                stability: "internal"
+            mayBypassWriteBlocking:
+                type: bool
+                forward_to_shards: false
+                optional: true
+                stability: "internal"
+            expectPrefix:
+                type: bool
+                forward_to_shards: false
+                optional: true
+                stability: "internal"
+            # Specifies an array of strings treated as names of collections; on return, the reply
+            # will contain an extra field 'routingCacheGossip' holding the collection version number
+            # for each of the requested collections, taken from the catalog cache of the server.
+            requestGossipRoutingCache:
+                type: array<IDLAnyTypeOwned>
+                forward_to_shards: false
+                optional: true
+                stability: "internal"
+            startOrContinueTransaction:
+                type: bool
+                forward_to_shards: true
+                optional: true
+                stability: "internal"
+            # OpenTelemetry trace context used for tracking this operation across a replica set or
+            # a sharded cluster for debugging purposes. The propagation of trace contexts is only
+            # supported on mongods, mongoses and legacy shell compiled with ENABLE_OTEL_BUILD set.
+            # Currently, this is only set for testing binaries.
+            $traceCtx:
+                type: object_owned
+                cpp_name: "traceCtx"
+                forward_to_shards: true
+                optional: true
+                stability: "internal"
+            # Requires the action type performRawDataOperations. Specifies whether the operation
+            # should be a "raw data" operation. For collections that store their information in
+            # a different format than what users interact with, "raw data" operations will operate
+            # directly on the stored format. For collections where the storage and interaction
+            # format are the same, 'rawData' has no effect but may still be specified.
+            rawData:
+                type: optionalBool
+                # Even though we do want this field to be forwarded to shards, we set
+                # forward_to_shards to false because it gets manually appended upon egress.
+                forward_to_shards: false
+                stability: "internal"
 
-generic_reply_field_lists:
-    generic_reply_fields_api_v1:
-        description: "Fields that may appear in any command reply. These are guaranteed backwards-compatible for as long as the server supports API Version 1."
+    GenericReplyFields:
+        description: "Fields that may appear in any command reply."
+        strict: false
+        is_generic_cmd_list: "reply"
+        # The unstable fields here are marked as "internal" rather than actually "unstable" because otherwise the
+        # server internally parsing a command reply that contained one of the unstable fields along with
+        # apiStrict: true would fail at no fault to the user. apiStrict doesn't really make sense to use with reply
+        # parsing, but it's very difficult to audit the codebase to ensure it isn't being used for that. That said,
+        # the drawback here is mostly just aesthetic--as far as the API compatibility checker is concerned, "internal"
+        # and "unstable" are both considered unstable, so we don't lose any functionality here or risk breaking any stable
+        # fields.
         fields:
             $clusterTime:
+                type: ClusterTime
+                cpp_name: "dollarClusterTime"
                 forward_from_shards: false
+                optional: true
+                stability: "stable"
             operationTime:
+                type: logicalTime
                 forward_from_shards: false
-
-    generic_reply_fields_unstable_v1:
-        description: "Fields that may appear in any command reply. These are not guaranteed backwards-compatible."
-        fields:
+                optional: true
+                stability: "stable"
+            # Timed elapsed to initialize the sharding state for the config server. Used for initialization statistics. Allowed
+            # values: Integer with the time elapsed for the initialization.
             $configServerState:
+                type: object_owned
+                cpp_name: "dollarConfigServerState"
                 forward_from_shards: false
+                optional: true
+                stability: "internal"
             $gleStats:
+                type: object_owned
+                cpp_name: "dollarGleStats"
                 forward_from_shards: false
+                optional: true
+                stability: "internal"
             lastCommittedOpTime:
+                type: optime
                 forward_from_shards: false
+                optional: true
+                stability: "internal"
             readOnly:
+                type: bool
                 forward_from_shards: false
+                optional: true
+                stability: "internal"
+            additionalParticipants:
+                type: array<object_owned>
+                forward_from_shards: false
+                optional: true
+                stability: "internal"
             $configTime:
+                type: timestamp
+                cpp_name: "dollarConfigTime"
                 forward_from_shards: false
+                optional: true
+                stability: "internal"
             $replData:
+                type: object_owned
+                cpp_name: "dollarReplData"
                 forward_from_shards: false
+                optional: true
+                stability: "internal"
             $topologyTime:
+                type: timestamp
+                cpp_name: "dollarTopologyTime"
                 forward_from_shards: false
+                optional: true
+                stability: "internal"
             $oplogQueryData:
+                type: object_owned
+                cpp_name: "dollarOplogQueryData"
                 forward_from_shards: false
+                optional: true
+                stability: "internal"
+            ok:
+                type: safeBool
+                forward_from_shards: true
+                optional: true
+                stability: "internal"
+            routingCacheGossip:
+                type: array<GossipedRoutingCache>
+                forward_from_shards: false
+                optional: true
+                stability: "internal"

@@ -6,19 +6,22 @@
  * ]
  */
 
-(function() {
-"use strict";
-load("jstests/libs/fail_point_util.js");
-load('jstests/replsets/rslib.js');
+import {configureFailPoint, kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {
+    assertVoteCount,
+    isMemberNewlyAdded,
+    reconfig,
+    waitForNewlyAddedRemovalForNodeToBeCommitted,
+} from "jstests/replsets/rslib.js";
 
 const testName = jsTestName();
 const dbName = "testdb";
 const collName = "testcoll";
 
-const rst = new ReplSetTest(
-    {name: testName, nodes: 1, settings: {chainingAllowed: false}, useBridge: true});
+const rst = new ReplSetTest({name: testName, nodes: 1, settings: {chainingAllowed: false}, useBridge: true});
 rst.startSet();
-rst.initiateWithHighElectionTimeout();
+rst.initiate();
 
 const primary = rst.getPrimary();
 const primaryDb = primary.getDB(dbName);
@@ -30,16 +33,18 @@ jsTestLog("Adding a new node to the replica set");
 const secondary = rst.add({
     rsConfig: {priority: 0},
     setParameter: {
-        'failpoint.initialSyncHangBeforeFinish': tojson({mode: 'alwaysOn'}),
-        'numInitialSyncAttempts': 1,
-    }
+        "failpoint.initialSyncHangBeforeFinish": tojson({mode: "alwaysOn"}),
+        "numInitialSyncAttempts": 1,
+    },
 });
 rst.reInitiate();
-assert.commandWorked(secondary.adminCommand({
-    waitForFailPoint: "initialSyncHangBeforeFinish",
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+assert.commandWorked(
+    secondary.adminCommand({
+        waitForFailPoint: "initialSyncHangBeforeFinish",
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout,
+    }),
+);
 
 jsTestLog("Checking that the 'newlyAdded' field is set on the new node");
 assert(isMemberNewlyAdded(primary, 1));
@@ -50,7 +55,7 @@ assertVoteCount(primary, {
     majorityVoteCount: 1,
     writableVotingMembersCount: 1,
     writeMajorityCount: 1,
-    totalMembersCount: 2
+    totalMembersCount: 2,
 });
 
 jsTestLog("Checking that user reconfigs still succeed, during initial sync");
@@ -72,7 +77,7 @@ assertVoteCount(primary, {
     majorityVoteCount: 1,
     writableVotingMembersCount: 1,
     writeMajorityCount: 1,
-    totalMembersCount: 2
+    totalMembersCount: 2,
 });
 
 // Now try adding a member.
@@ -87,16 +92,15 @@ assertVoteCount(primary, {
     majorityVoteCount: 1,
     writableVotingMembersCount: 1,
     writeMajorityCount: 1,
-    totalMembersCount: 3
+    totalMembersCount: 3,
 });
 
 // Do not let 'newlyAdded' be removed yet.
 jsTestLog("Allowing member to complete initial sync");
 
 let doNotRemoveNewlyAddedFP = configureFailPoint(primaryDb, "doNotRemoveNewlyAddedOnHeartbeats");
-assert.commandWorked(
-    secondary.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
-rst.waitForState(secondary, ReplSetTest.State.SECONDARY);
+assert.commandWorked(secondary.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
+rst.awaitSecondaryNodes(null, [secondary]);
 
 jsTestLog("Checking that the 'newlyAdded' field is still set");
 assert(isMemberNewlyAdded(primary, 1));
@@ -127,7 +131,7 @@ assertVoteCount(primary, {
     majorityVoteCount: 1,
     writableVotingMembersCount: 1,
     writeMajorityCount: 1,
-    totalMembersCount: 3
+    totalMembersCount: 3,
 });
 
 // Now try removing the member we added above.
@@ -135,7 +139,7 @@ jsTestLog("[4] Member removal, after initial sync");
 rst.remove(2);
 config = rst.getReplSetConfigFromNode();
 const twoNodeConfig = Object.assign({}, config);
-twoNodeConfig.members = twoNodeConfig.members.slice(0, 2);  // Remove the last node.
+twoNodeConfig.members = twoNodeConfig.members.slice(0, 2); // Remove the last node.
 reconfig(rst, twoNodeConfig);
 
 // Check 'newlyAdded' and vote counts.
@@ -145,7 +149,7 @@ assertVoteCount(primary, {
     majorityVoteCount: 1,
     writableVotingMembersCount: 1,
     writeMajorityCount: 1,
-    totalMembersCount: 2
+    totalMembersCount: 2,
 });
 
 jsTestLog("Waiting for 'newlyAdded' field to be removed");
@@ -164,4 +168,3 @@ assert.commandWorked(primaryColl.insert({"steady": "state"}, {writeConcern: {w: 
 
 rst.awaitReplication();
 rst.stopSet();
-})();

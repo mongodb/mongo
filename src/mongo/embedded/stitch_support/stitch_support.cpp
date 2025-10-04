@@ -27,28 +27,57 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "stitch_support/stitch_support.h"
 
-#include "api_common.h"
+#include "mongo/base/error_codes.h"
 #include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/concurrency/locker_noop_client_observer.h"
+#include "mongo/db/client.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
+#include "mongo/db/exec/matcher/matcher.h"
+#include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/exec/projection_executor_builder.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/field_ref_set.h"
+#include "mongo/db/matcher/expression_with_placeholder.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/ops/parsed_update_array_filters.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/query/projection_parser.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection_parser.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection_policies.h"
+#include "mongo/db/query/write_ops/parsed_update_array_filters.h"
+#include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/update/update_driver.h"
+#include "mongo/stdx/type_traits.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/time_support.h"
 
 #include <algorithm>
+#include <cstdlib>
+#include <exception>
+#include <map>
 #include <memory>
+#include <mutex>
+#include <new>
 #include <string>
+#include <utility>
+#include <vector>
+
+#include "api_common.h"
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #if defined(_WIN32)
 #define MONGO_API_CALL __cdecl
@@ -60,7 +89,7 @@ namespace mongo {
 
 using StitchSupportStatusImpl = StatusForAPI<stitch_support_v1_error>;
 
-const NamespaceString kDummyNamespaceStr = NamespaceString("");
+const NamespaceString kDummyNamespaceStr = NamespaceString::kEmpty;
 
 /**
  * C interfaces that use enterCXX() must provide a translateException() function that converts any
@@ -116,7 +145,7 @@ StitchSupportStatusImpl* getStatusImpl(stitch_support_v1_status* status) {
 using StitchSupportException = ExceptionForAPI<stitch_support_v1_error>;
 
 ServiceContext* initialize() {
-    srand(static_cast<unsigned>(curTimeMicros64()));
+    srand(static_cast<unsigned>(curTimeMicros64()));  // NOLINT
 
     // The global initializers can take arguments, which would normally be supplied on the command
     // line, but we assume that clients of this library will never want anything other than the
@@ -124,10 +153,7 @@ ServiceContext* initialize() {
     Status status = mongo::runGlobalInitializers(std::vector<std::string>{});
     uassertStatusOKWithContext(status, "Global initialization failed");
     setGlobalServiceContext(ServiceContext::make());
-    auto serviceContext = getGlobalServiceContext();
-    serviceContext->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
-
-    return serviceContext;
+    return getGlobalServiceContext();
 }
 
 struct ServiceContextDestructor {
@@ -168,10 +194,12 @@ struct stitch_support_v1_matcher {
                               stitch_support_v1_collator* collator)
         : client(std::move(client)),
           opCtx(this->client->makeOperationContext()),
-          expCtx(new mongo::ExpressionContext(opCtx.get(),
-                                              collator ? collator->collator->clone() : nullptr,
-                                              mongo::kDummyNamespaceStr)),
-          matcher(filterBSON.getOwned(), expCtx){};
+          expCtx(mongo::ExpressionContextBuilder{}
+                     .opCtx(opCtx.get())
+                     .collator(collator ? collator->collator->clone() : nullptr)
+                     .ns(mongo::kDummyNamespaceStr)
+                     .build()),
+          matcher(filterBSON.getOwned(), expCtx) {};
 
     mongo::ServiceContext::UniqueClient client;
     mongo::ServiceContext::UniqueOperationContext opCtx;
@@ -185,11 +213,11 @@ struct stitch_support_v1_projection {
                                  stitch_support_v1_matcher* matcher,
                                  stitch_support_v1_collator* collator)
         : client(std::move(client)), opCtx(this->client->makeOperationContext()), matcher(matcher) {
-
-        auto expCtx = mongo::make_intrusive<mongo::ExpressionContext>(
-            opCtx.get(),
-            collator ? collator->collator->clone() : nullptr,
-            mongo::kDummyNamespaceStr);
+        auto expCtx = mongo::ExpressionContextBuilder{}
+                          .opCtx(opCtx.get())
+                          .collator(collator ? collator->collator->clone() : nullptr)
+                          .ns(mongo::kDummyNamespaceStr)
+                          .build();
         const auto policies = mongo::ProjectionPolicies::findProjectionPolicies();
         auto proj = mongo::projection_ast::parseAndAnalyze(
             expCtx,
@@ -228,9 +256,11 @@ struct stitch_support_v1_update {
                              stitch_support_v1_collator* collator)
         : client(std::move(client)),
           opCtx(this->client->makeOperationContext()),
-          expCtx(new mongo::ExpressionContext(opCtx.get(),
-                                              collator ? collator->collator->clone() : nullptr,
-                                              mongo::kDummyNamespaceStr)),
+          expCtx(mongo::ExpressionContextBuilder{}
+                     .opCtx(opCtx.get())
+                     .collator(collator ? collator->collator->clone() : nullptr)
+                     .ns(mongo::kDummyNamespaceStr)
+                     .build()),
           updateExpr(updateExpr.getOwned()),
           arrayFilters(arrayFilters.getOwned()),
           matcher(matcher),
@@ -335,9 +365,10 @@ stitch_support_v1_matcher* matcher_create(stitch_support_v1_lib* const lib,
                                      "Cannot create a new matcher when the Stitch Support Library "
                                      "is not yet initialized."};
     }
-
-    return new stitch_support_v1_matcher(
-        lib->serviceContext->makeClient("stitch_support"), filter, collator);
+    // standalone lib, this client is not part of any mongo server
+    // server thread concepts such as handling interrupts due to step down/up do not apply
+    auto client = lib->serviceContext->getService()->makeClient("stitch_support");
+    return new stitch_support_v1_matcher(std::move(client), filter, collator);
 }
 
 stitch_support_v1_projection* projection_create(stitch_support_v1_lib* const lib,
@@ -356,9 +387,10 @@ stitch_support_v1_projection* projection_create(stitch_support_v1_lib* const lib
                                      "Library is not yet initialized."};
     }
 
-
-    return new stitch_support_v1_projection(
-        lib->serviceContext->makeClient("stitch_support"), spec, matcher, collator);
+    // standalone lib, this client is not part of any mongo server
+    // server thread concepts such as handling interrupts due to step down/up do not apply
+    auto client = lib->serviceContext->getService()->makeClient("stitch_support");
+    return new stitch_support_v1_projection(std::move(client), spec, matcher, collator);
 }
 
 stitch_support_v1_update* update_create(stitch_support_v1_lib* const lib,
@@ -378,11 +410,11 @@ stitch_support_v1_update* update_create(stitch_support_v1_lib* const lib,
             "Cannot create a new udpate when the Stitch Support Library is not yet initialized."};
     }
 
-    return new stitch_support_v1_update(lib->serviceContext->makeClient("stitch_support"),
-                                        updateExpr,
-                                        arrayFilters,
-                                        matcher,
-                                        collator);
+    // standalone lib, this client is not part of any mongo server
+    // server thread concepts such as handling interrupts due to step down/up do not apply
+    auto client = lib->serviceContext->getService()->makeClient("stitch_support");
+    return new stitch_support_v1_update(
+        std::move(client), updateExpr, arrayFilters, matcher, collator);
 }
 
 int capi_status_get_error(const stitch_support_v1_status* const status) noexcept {
@@ -507,7 +539,7 @@ int MONGO_API_CALL stitch_support_v1_check_match(stitch_support_v1_matcher* matc
                                                  stitch_support_v1_status* status) {
     return enterCXX(mongo::getStatusImpl(status), [&]() {
         mongo::BSONObj document(mongo::fromInterfaceType(documentBSON));
-        *isMatch = matcher->matcher.matches(document, nullptr);
+        *isMatch = mongo::exec::matcher::matches(&matcher->matcher, document, nullptr);
     });
 }
 
@@ -536,8 +568,7 @@ bool MONGO_API_CALL
 stitch_support_v1_projection_requires_match(stitch_support_v1_projection* const projection) {
     return [projection]() noexcept {
         return projection->requiresMatch;
-    }
-    ();
+    }();
 }
 
 stitch_support_v1_update* MONGO_API_CALL
@@ -575,7 +606,8 @@ stitch_support_v1_update_apply(stitch_support_v1_update* const update,
 
             mongo::MatchDetails matchDetails;
             matchDetails.requestElemMatchKey();
-            bool isMatch = update->matcher->matcher.matches(document, &matchDetails);
+            bool isMatch =
+                mongo::exec::matcher::matches(&update->matcher->matcher, document, &matchDetails);
             invariant(isMatch);
             if (matchDetails.hasElemMatchKey()) {
                 matchedField = matchDetails.elemMatchKey();
@@ -663,7 +695,9 @@ uint8_t* MONGO_API_CALL stitch_support_v1_update_upsert(stitch_support_v1_update
 
 bool MONGO_API_CALL
 stitch_support_v1_update_requires_match(stitch_support_v1_update* const update) {
-    return [update]() { return update->updateDriver.needMatchDetails(); }();
+    return [update]() {
+        return update->updateDriver.needMatchDetails();
+    }();
 }
 
 stitch_support_v1_update_details* MONGO_API_CALL stitch_support_v1_update_details_create(void) {
@@ -689,7 +723,7 @@ const char* MONGO_API_CALL stitch_support_v1_update_details_path(
 
 void MONGO_API_CALL stitch_support_v1_bson_free(uint8_t* bson) {
     mongo::StitchSupportStatusImpl* nullStatus = nullptr;
-    static_cast<void>(enterCXX(nullStatus, [=]() { delete[](bson); }));
+    static_cast<void>(enterCXX(nullStatus, [=]() { delete[] (bson); }));
 }
 
 }  // extern "C"

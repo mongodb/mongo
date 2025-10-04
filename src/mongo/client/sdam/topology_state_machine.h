@@ -28,13 +28,18 @@
  */
 #pragma once
 
-#include <functional>
-#include <memory>
-#include <vector>
-
+#include "mongo/client/sdam/sdam_configuration.h"
+#include "mongo/client/sdam/sdam_datatypes.h"
 #include "mongo/client/sdam/server_description.h"
 #include "mongo/client/sdam/topology_description.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/util/net/hostandport.h"
+
+#include <functional>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo::sdam {
 // Actions that mutate the state of the topology description via events.

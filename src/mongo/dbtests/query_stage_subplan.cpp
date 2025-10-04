@@ -27,52 +27,90 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <memory>
-
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/database_holder.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/client.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/exec/subplan.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
+#include "mongo/db/exec/classic/plan_stage.h"
+#include "mongo/db/exec/classic/subplan.h"
+#include "mongo/db/exec/classic/working_set.h"
+#include "mongo/db/local_catalog/collection.h"
+#include "mongo/db/local_catalog/db_raii.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/mock_yield_policies.h"
-#include "mongo/db/query/query_test_service_context.h"
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/db/query/parsed_find_command.h"
+#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/query_planner_params.h"
+#include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/service_context.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/platform/atomic_word.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/intrusive_counter.h"
+
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {
 
-static const NamespaceString nss("unittests.QueryStageSubplan");
+static const NamespaceString nss =
+    NamespaceString::createNamespaceString_forTest("unittests.QueryStageSubplan");
 
 class QueryStageSubplanTest : public unittest::Test {
 public:
     QueryStageSubplanTest() : _client(_opCtx.get()) {}
 
-    virtual ~QueryStageSubplanTest() {
-        dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
-        _client.dropCollection(nss.ns());
+    ~QueryStageSubplanTest() override {
+        dbtests::WriteContextForTests ctx(opCtx(), nss.ns_forTest());
+        _client.dropCollection(nss);
     }
 
     void addIndex(const BSONObj& obj) {
-        ASSERT_OK(dbtests::createIndex(opCtx(), nss.ns(), obj));
+        ASSERT_OK(dbtests::createIndex(opCtx(), nss.ns_forTest(), obj));
     }
 
-    void dropIndex(BSONObj keyPattern) {
-        _client.dropIndex(nss.ns(), std::move(keyPattern));
+    void addIndexWithWildcardProjection(BSONObj keys, BSONObj wildcardProjection) {
+        auto indexSpec = BSON(
+            IndexDescriptor::kIndexNameFieldName
+            << DBClientBase::genIndexName(keys) << IndexDescriptor::kKeyPatternFieldName << keys
+            << IndexDescriptor::kUniqueFieldName << false << IndexDescriptor::kIndexVersionFieldName
+            << static_cast<int>(IndexDescriptor::IndexVersion::kV2)
+            << IndexDescriptor::kWildcardProjectionFieldName << wildcardProjection);
+        ASSERT_OK(dbtests::createIndexFromSpec(opCtx(), nss.ns_forTest(), indexSpec));
+    }
+
+    void dropIndex(DBDirectClient& client, BSONObj keyPattern) {
+        client.dropIndex(nss, std::move(keyPattern));
     }
 
     void insert(const BSONObj& doc) {
-        _client.insert(nss.ns(), doc);
+        _client.insert(nss, doc);
     }
 
     OperationContext* opCtx() {
@@ -87,6 +125,26 @@ public:
         return _opCtx->getServiceContext();
     }
 
+    std::unique_ptr<SubplanStage> makeSubplanStage(const CollectionAcquisition& coll,
+                                                   CanonicalQuery* cq,
+                                                   WorkingSet& ws) {
+        auto callbacks = SubplanStage::PlanSelectionCallbacks{
+            .onPickPlanForBranch =
+                plan_cache_util::ConditionalClassicPlanCacheWriter{
+                    plan_cache_util::ConditionalClassicPlanCacheWriter::Mode::SometimesCache,
+                    opCtx(),
+                    coll,
+                    false /* executeInSbe */
+                },
+            .onPickPlanWholeQuery =
+                plan_cache_util::ClassicPlanCacheWriter{
+                    opCtx(), coll, false /* executeInSbe */
+                },
+        };
+
+        return std::make_unique<SubplanStage>(_expCtx.get(), coll, &ws, cq, std::move(callbacks));
+    }
+
 protected:
     /**
      * Parses the json string 'findCmd', specifying a find command, to a CanonicalQuery.
@@ -94,26 +152,43 @@ protected:
     std::unique_ptr<CanonicalQuery> cqFromFindCommand(const std::string& findCmd) {
         BSONObj cmdObj = fromjson(findCmd);
 
-        bool isExplain = false;
         // If there is no '$db', append it.
-        auto cmd = OpMsgRequest::fromDBAndBody("test", cmdObj).body;
+        auto cmd = OpMsgRequestBuilder::create(
+                       auth::ValidatedTenancyScope::get(_opCtx.get()),
+                       DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+                       cmdObj)
+                       .body;
         auto findCommand =
             query_request_helper::makeFromFindCommandForTests(cmd, NamespaceString());
 
-        auto cq = unittest::assertGet(
-            CanonicalQuery::canonicalize(opCtx(),
-                                         std::move(findCommand),
-                                         isExplain,
-                                         expCtx(),
-                                         ExtensionsCallbackNoop(),
-                                         MatchExpressionParser::kAllowAllSpecialFeatures));
-        return cq;
+        return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+            .expCtx = expCtx(),
+            .parsedFind = ParsedFindCommandParams{
+                .findCommand = std::move(findCommand),
+                .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}});
     }
 
+    QueryPlannerParams makePlannerParams(const CollectionAcquisition& collection,
+                                         const CanonicalQuery& canonicalQuery) {
+        const MultipleCollectionAccessor collections{collection};
+        return QueryPlannerParams{
+            QueryPlannerParams::ArgsForSingleCollectionQuery{
+                .opCtx = opCtx(),
+                .canonicalQuery = canonicalQuery,
+                .collections = collections,
+                .plannerOptions = QueryPlannerParams::DEFAULT,
+                .traversalPreference = boost::none,
+            },
+        };
+    }
+
+    void assertSubplanFromCache(QueryStageSubplanTest* test,
+                                const dbtests::WriteContextForTests& ctx);
+
     const ServiceContext::UniqueOperationContext _opCtx = cc().makeOperationContext();
-    ClockSource* _clock = _opCtx->getServiceContext()->getFastClockSource();
+    ClockSource* _clock = &_opCtx->fastClockSource();
     boost::intrusive_ptr<ExpressionContext> _expCtx =
-        make_intrusive<ExpressionContext>(_opCtx.get(), nullptr, nss);
+        ExpressionContextBuilder{}.opCtx(_opCtx.get()).ns(nss).build();
 
 private:
     DBDirectClient _client;
@@ -126,12 +201,10 @@ private:
  * back to regular planning.
  */
 TEST_F(QueryStageSubplanTest, QueryStageSubplanGeo2dOr) {
-    dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
-    addIndex(BSON("a"
-                  << "2d"
-                  << "b" << 1));
-    addIndex(BSON("a"
-                  << "2d"));
+    dbtests::WriteContextForTests ctx(opCtx(), nss.ns_forTest());
+    addIndex(BSON("a" << "2d"
+                      << "b" << 1));
+    addIndex(BSON("a" << "2d"));
 
     BSONObj query = fromjson(
         "{$or: [{a: {$geoWithin: {$centerSphere: [[0,0],10]}}},"
@@ -139,30 +212,29 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanGeo2dOr) {
 
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(query);
-    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
-    ASSERT_OK(statusWithCQ.getStatus());
-    std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+    auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
+        .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
-    CollectionPtr collection = ctx.getCollection();
+    auto collection = ctx.getCollection();
 
     // Get planner params.
-    QueryPlannerParams plannerParams;
-    fillOutPlannerParams(opCtx(), collection, cq.get(), &plannerParams);
+    auto plannerParams = makePlannerParams(collection, *cq);
 
     WorkingSet ws;
-    std::unique_ptr<SubplanStage> subplan(
-        new SubplanStage(_expCtx.get(), collection, &ws, plannerParams, cq.get()));
+    auto subplan = makeSubplanStage(collection, cq.get(), ws);
 
     // Plan selection should succeed due to falling back on regular planning.
-    NoopYieldPolicy yieldPolicy(_clock);
-    ASSERT_OK(subplan->pickBestPlan(&yieldPolicy));
+    NoopYieldPolicy yieldPolicy(_expCtx->getOperationContext(), _clock);
+    ASSERT_OK(subplan->pickBestPlan(plannerParams, &yieldPolicy));
 }
 
 /**
- * Helper function to verify that branches of an $or can be subplanned from the cache. Assumes that
- * the indexes to be tested have already been created for the given WriteContextForTest.
+ * Helper function to verify that branches of an $or can be subplanned from the cache. Assumes
+ * that the indexes to be tested have already been created for the given WriteContextForTest.
  */
-void assertSubplanFromCache(QueryStageSubplanTest* test, const dbtests::WriteContextForTests& ctx) {
+void QueryStageSubplanTest::assertSubplanFromCache(QueryStageSubplanTest* test,
+                                                   const dbtests::WriteContextForTests& ctx) {
     // This query should result in a plan cache entry for the first $or branch, because
     // there are two competing indices. The second branch has only one relevant index, so
     // its winning plan should not be cached.
@@ -172,28 +244,26 @@ void assertSubplanFromCache(QueryStageSubplanTest* test, const dbtests::WriteCon
         test->insert(BSON("a" << 1 << "b" << i << "c" << i));
     }
 
-    CollectionPtr collection = ctx.getCollection();
+    auto collection = ctx.getCollection();
 
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(query);
-    auto statusWithCQ = CanonicalQuery::canonicalize(test->opCtx(), std::move(findCommand));
-    ASSERT_OK(statusWithCQ.getStatus());
-    std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+    auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = ExpressionContextBuilder{}.fromRequest(test->opCtx(), *findCommand).build(),
+        .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
     // Get planner params.
-    QueryPlannerParams plannerParams;
-    fillOutPlannerParams(test->opCtx(), collection, cq.get(), &plannerParams);
+    auto plannerParams = makePlannerParams(collection, *cq);
 
     // For the remainder of this test, ensure that cache entries are available immediately, and
     // don't need go through an 'inactive' state before being usable.
     internalQueryCacheDisableInactiveEntries.store(true);
 
     WorkingSet ws;
-    std::unique_ptr<SubplanStage> subplan(
-        new SubplanStage(test->expCtx(), collection, &ws, plannerParams, cq.get()));
+    auto subplan = makeSubplanStage(collection, cq.get(), ws);
 
-    NoopYieldPolicy yieldPolicy(test->serviceContext()->getFastClockSource());
-    ASSERT_OK(subplan->pickBestPlan(&yieldPolicy));
+    NoopYieldPolicy yieldPolicy(test->opCtx(), test->serviceContext()->getFastClockSource());
+    ASSERT_OK(subplan->pickBestPlan(plannerParams, &yieldPolicy));
 
     // Nothing is in the cache yet, so neither branch should have been planned from
     // the plan cache.
@@ -203,9 +273,9 @@ void assertSubplanFromCache(QueryStageSubplanTest* test, const dbtests::WriteCon
     // If we repeat the same query, the plan for the first branch should have come from
     // the cache.
     ws.clear();
-    subplan.reset(new SubplanStage(test->expCtx(), collection, &ws, plannerParams, cq.get()));
+    subplan = makeSubplanStage(collection, cq.get(), ws);
 
-    ASSERT_OK(subplan->pickBestPlan(&yieldPolicy));
+    ASSERT_OK(subplan->pickBestPlan(plannerParams, &yieldPolicy));
 
     ASSERT_TRUE(subplan->branchPlannedFromCache(0));
     ASSERT_FALSE(subplan->branchPlannedFromCache(1));
@@ -215,7 +285,7 @@ void assertSubplanFromCache(QueryStageSubplanTest* test, const dbtests::WriteCon
  * Test the SubplanStage's ability to plan an individual branch using the plan cache.
  */
 TEST_F(QueryStageSubplanTest, QueryStageSubplanPlanFromCache) {
-    dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
+    dbtests::WriteContextForTests ctx(opCtx(), nss.ns_forTest());
 
     addIndex(BSON("a" << 1));
     addIndex(BSON("a" << 1 << "b" << 1));
@@ -228,7 +298,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanPlanFromCache) {
  * Test that the SubplanStage can plan an individual branch from the cache using a $** index.
  */
 TEST_F(QueryStageSubplanTest, QueryStageSubplanPlanFromCacheWithWildcardIndex) {
-    dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
+    dbtests::WriteContextForTests ctx(opCtx(), nss.ns_forTest());
 
     addIndex(BSON("$**" << 1));
     addIndex(BSON("a.$**" << 1));
@@ -237,15 +307,18 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanPlanFromCacheWithWildcardIndex) {
 }
 
 /**
- * Ensure that the subplan stage doesn't create a plan cache entry if there are no query results.
+ * Ensure that the subplan stage doesn't create a plan cache entry if there are no query results
+ * (when it is configured with the 'SometimesCache' policy for its per-branch callback).
  */
-TEST_F(QueryStageSubplanTest, QueryStageSubplanDontCacheZeroResults) {
-    dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
+TEST_F(QueryStageSubplanTest, QueryStageSubplanDoesNotCacheZeroResults) {
+    dbtests::WriteContextForTests ctx(opCtx(), nss.ns_forTest());
 
     addIndex(BSON("a" << 1 << "b" << 1));
     addIndex(BSON("a" << 1));
     addIndex(BSON("c" << 1));
-    addIndex(BSON("$**" << 1));
+    // Exclude field 'c' from the wildcard index to make sure that the field has only one
+    // relevant index.
+    addIndexWithWildcardProjection(BSON("$**" << 1), BSON("c" << 0));
 
     for (int i = 0; i < 10; i++) {
         insert(BSON("a" << 1 << "b" << i << "c" << i));
@@ -256,24 +329,23 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanDontCacheZeroResults) {
     // one relevant index.
     BSONObj query = fromjson("{$or: [{a: 1, b: 15}, {c: 1}]}");
 
-    CollectionPtr collection = ctx.getCollection();
+    auto collection = ctx.getCollection();
 
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(query);
-    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
-    ASSERT_OK(statusWithCQ.getStatus());
-    std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+    auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
+        .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
     // Get planner params.
-    QueryPlannerParams plannerParams;
-    fillOutPlannerParams(opCtx(), collection, cq.get(), &plannerParams);
+    auto plannerParams = makePlannerParams(ctx.getCollection(), *cq);
 
     WorkingSet ws;
-    std::unique_ptr<SubplanStage> subplan(
-        new SubplanStage(_expCtx.get(), collection, &ws, plannerParams, cq.get()));
 
-    NoopYieldPolicy yieldPolicy(_clock);
-    ASSERT_OK(subplan->pickBestPlan(&yieldPolicy));
+    auto subplan = makeSubplanStage(collection, cq.get(), ws);
+
+    NoopYieldPolicy yieldPolicy(_expCtx->getOperationContext(), _clock);
+    ASSERT_OK(subplan->pickBestPlan(plannerParams, &yieldPolicy));
 
     // Nothing is in the cache yet, so neither branch should have been planned from
     // the plan cache.
@@ -284,9 +356,9 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanDontCacheZeroResults) {
     // from the cache (because the first call to pickBestPlan() refrained from creating any
     // cache entries).
     ws.clear();
-    subplan.reset(new SubplanStage(_expCtx.get(), collection, &ws, plannerParams, cq.get()));
+    subplan = makeSubplanStage(collection, cq.get(), ws);
 
-    ASSERT_OK(subplan->pickBestPlan(&yieldPolicy));
+    ASSERT_OK(subplan->pickBestPlan(plannerParams, &yieldPolicy));
 
     ASSERT_FALSE(subplan->branchPlannedFromCache(0));
     ASSERT_FALSE(subplan->branchPlannedFromCache(1));
@@ -296,12 +368,14 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanDontCacheZeroResults) {
  * Ensure that the subplan stage doesn't create a plan cache entry if the candidate plans tie.
  */
 TEST_F(QueryStageSubplanTest, QueryStageSubplanDontCacheTies) {
-    dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
+    dbtests::WriteContextForTests ctx(opCtx(), nss.ns_forTest());
 
     addIndex(BSON("a" << 1 << "b" << 1));
     addIndex(BSON("a" << 1 << "c" << 1));
     addIndex(BSON("d" << 1));
-    addIndex(BSON("$**" << 1));
+    // Exclude field 'd' from the wildcard index to make sure that the field has only one
+    // relevant index.
+    addIndexWithWildcardProjection(BSON("$**" << 1), BSON("d" << 0));
 
     for (int i = 0; i < 10; i++) {
         insert(BSON("a" << 1 << "e" << 1 << "d" << 1));
@@ -312,24 +386,22 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanDontCacheTies) {
     // ranking. For the second branch it's because there is only one relevant index.
     BSONObj query = fromjson("{$or: [{a: 1, e: 1}, {d: 1}]}");
 
-    CollectionPtr collection = ctx.getCollection();
+    auto collection = ctx.getCollection();
 
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(query);
-    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
-    ASSERT_OK(statusWithCQ.getStatus());
-    std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+    auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
+        .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
     // Get planner params.
-    QueryPlannerParams plannerParams;
-    fillOutPlannerParams(opCtx(), collection, cq.get(), &plannerParams);
+    auto plannerParams = makePlannerParams(collection, *cq);
 
     WorkingSet ws;
-    std::unique_ptr<SubplanStage> subplan(
-        new SubplanStage(_expCtx.get(), collection, &ws, plannerParams, cq.get()));
+    auto subplan = makeSubplanStage(collection, cq.get(), ws);
 
-    NoopYieldPolicy yieldPolicy(_clock);
-    ASSERT_OK(subplan->pickBestPlan(&yieldPolicy));
+    NoopYieldPolicy yieldPolicy(_expCtx->getOperationContext(), _clock);
+    ASSERT_OK(subplan->pickBestPlan(plannerParams, &yieldPolicy));
 
     // Nothing is in the cache yet, so neither branch should have been planned from
     // the plan cache.
@@ -340,9 +412,9 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanDontCacheTies) {
     // from the cache (because the first call to pickBestPlan() refrained from creating any
     // cache entries).
     ws.clear();
-    subplan.reset(new SubplanStage(_expCtx.get(), collection, &ws, plannerParams, cq.get()));
+    subplan = makeSubplanStage(collection, cq.get(), ws);
 
-    ASSERT_OK(subplan->pickBestPlan(&yieldPolicy));
+    ASSERT_OK(subplan->pickBestPlan(plannerParams, &yieldPolicy));
 
     ASSERT_FALSE(subplan->branchPlannedFromCache(0));
     ASSERT_FALSE(subplan->branchPlannedFromCache(1));
@@ -476,7 +548,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanCanUseSubplanning) {
  * Regression test for SERVER-19388.
  */
 TEST_F(QueryStageSubplanTest, QueryStageSubplanPlanRootedOrNE) {
-    dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
+    dbtests::WriteContextForTests ctx(opCtx(), nss.ns_forTest());
     addIndex(BSON("a" << 1 << "b" << 1));
     addIndex(BSON("a" << 1 << "c" << 1));
 
@@ -487,21 +559,20 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanPlanRootedOrNE) {
     insert(BSON("_id" << 4));
 
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
-    findCommand->setFilter(fromjson("{$or: [{a: 1}, {a: {$ne:1}}]}"));
+    findCommand->setFilter(fromjson("{$or: [{a: 1}, {a: {$ne:5}}]}"));
     findCommand->setSort(BSON("d" << 1));
-    auto cq = unittest::assertGet(CanonicalQuery::canonicalize(opCtx(), std::move(findCommand)));
+    auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
+        .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
-    CollectionPtr collection = ctx.getCollection();
-
-    QueryPlannerParams plannerParams;
-    fillOutPlannerParams(opCtx(), collection, cq.get(), &plannerParams);
+    auto collection = ctx.getCollection();
+    auto plannerParams = makePlannerParams(collection, *cq);
 
     WorkingSet ws;
-    std::unique_ptr<SubplanStage> subplan(
-        new SubplanStage(_expCtx.get(), collection, &ws, plannerParams, cq.get()));
+    auto subplan = makeSubplanStage(collection, cq.get(), ws);
 
-    NoopYieldPolicy yieldPolicy(_clock);
-    ASSERT_OK(subplan->pickBestPlan(&yieldPolicy));
+    NoopYieldPolicy yieldPolicy(_expCtx->getOperationContext(), _clock);
+    ASSERT_OK(subplan->pickBestPlan(plannerParams, &yieldPolicy));
 
     size_t numResults = 0;
     PlanStage::StageState stageState = PlanStage::NEED_TIME;
@@ -517,20 +588,21 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanPlanRootedOrNE) {
 }
 
 TEST_F(QueryStageSubplanTest, ShouldReportErrorIfExceedsTimeLimitDuringPlanning) {
-    dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
+    dbtests::WriteContextForTests ctx(opCtx(), nss.ns_forTest());
     // Build a query with a rooted $or.
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(BSON("$or" << BSON_ARRAY(BSON("p1" << 1) << BSON("p2" << 2))));
-    auto canonicalQuery =
-        uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(findCommand)));
+    auto canonicalQuery = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
+        .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
     // Add 4 indices: 2 for each predicate to choose from.
     addIndex(BSON("p1" << 1 << "opt1" << 1));
-    addIndex(BSON("p1" << 1 << "opt2" << 1));
+    addIndex(BSON("p1" << -1 << "opt2" << 1));
     addIndex(BSON("p2" << 1 << "opt1" << 1));
-    addIndex(BSON("p2" << 1 << "opt2" << 1));
-    QueryPlannerParams params;
-    fillOutPlannerParams(opCtx(), ctx.getCollection(), canonicalQuery.get(), &params);
+    addIndex(BSON("p2" << -1 << "opt2" << 1));
+    auto coll = ctx.getCollection();
+    auto plannerParams = makePlannerParams(coll, *canonicalQuery);
 
     // Add some data so planning has to do some thinking.
     for (int i = 0; i < 100; ++i) {
@@ -542,130 +614,153 @@ TEST_F(QueryStageSubplanTest, ShouldReportErrorIfExceedsTimeLimitDuringPlanning)
 
     // Create the SubplanStage.
     WorkingSet workingSet;
-    auto coll = ctx.getCollection();
-    SubplanStage subplanStage(_expCtx.get(), coll, &workingSet, params, canonicalQuery.get());
+    auto subplanStage = makeSubplanStage(coll, canonicalQuery.get(), workingSet);
 
-    AlwaysTimeOutYieldPolicy alwaysTimeOutPolicy(serviceContext()->getFastClockSource());
-    ASSERT_EQ(ErrorCodes::ExceededTimeLimit, subplanStage.pickBestPlan(&alwaysTimeOutPolicy));
+    AlwaysTimeOutYieldPolicy alwaysTimeOutPolicy(_expCtx->getOperationContext(),
+                                                 serviceContext()->getFastClockSource());
+    ASSERT_EQ(ErrorCodes::ExceededTimeLimit,
+              subplanStage->pickBestPlan(plannerParams, &alwaysTimeOutPolicy));
 }
 
 TEST_F(QueryStageSubplanTest, ShouldReportErrorIfKilledDuringPlanning) {
-    dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
+    dbtests::WriteContextForTests ctx(opCtx(), nss.ns_forTest());
     // Build a query with a rooted $or.
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(BSON("$or" << BSON_ARRAY(BSON("p1" << 1) << BSON("p2" << 2))));
-    auto canonicalQuery =
-        uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(findCommand)));
+    auto canonicalQuery = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
+        .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
     // Add 4 indices: 2 for each predicate to choose from.
     addIndex(BSON("p1" << 1 << "opt1" << 1));
-    addIndex(BSON("p1" << 1 << "opt2" << 1));
+    addIndex(BSON("p1" << -1 << "opt2" << 1));
     addIndex(BSON("p2" << 1 << "opt1" << 1));
-    addIndex(BSON("p2" << 1 << "opt2" << 1));
-    QueryPlannerParams params;
-    fillOutPlannerParams(opCtx(), ctx.getCollection(), canonicalQuery.get(), &params);
+    addIndex(BSON("p2" << -1 << "opt2" << 1));
+    auto coll = ctx.getCollection();
+    auto plannerParams = makePlannerParams(coll, *canonicalQuery);
 
     // Create the SubplanStage.
     WorkingSet workingSet;
-    auto coll = ctx.getCollection();
-    SubplanStage subplanStage(_expCtx.get(), coll, &workingSet, params, canonicalQuery.get());
+    auto subplanStage = makeSubplanStage(coll, canonicalQuery.get(), workingSet);
 
-    AlwaysPlanKilledYieldPolicy alwaysPlanKilledYieldPolicy(serviceContext()->getFastClockSource());
-    ASSERT_EQ(ErrorCodes::QueryPlanKilled, subplanStage.pickBestPlan(&alwaysPlanKilledYieldPolicy));
+    AlwaysPlanKilledYieldPolicy alwaysPlanKilledYieldPolicy(_expCtx->getOperationContext(),
+                                                            serviceContext()->getFastClockSource());
+    ASSERT_EQ(ErrorCodes::QueryPlanKilled,
+              subplanStage->pickBestPlan(plannerParams, &alwaysPlanKilledYieldPolicy));
 }
 
 TEST_F(QueryStageSubplanTest, ShouldThrowOnRestoreIfIndexDroppedBeforePlanSelection) {
-    CollectionPtr collection = nullptr;
     {
-        dbtests::WriteContextForTests ctx{opCtx(), nss.ns()};
+        dbtests::WriteContextForTests ctx{opCtx(), nss.ns_forTest()};
         addIndex(BSON("p1" << 1 << "opt1" << 1));
         addIndex(BSON("p1" << 1 << "opt2" << 1));
         addIndex(BSON("p2" << 1 << "opt1" << 1));
         addIndex(BSON("p2" << 1 << "opt2" << 1));
         addIndex(BSON("irrelevant" << 1));
-
-        collection = ctx.getCollection();
-        ASSERT(collection);
     }
+
+    auto collection =
+        acquireCollection(opCtx(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              opCtx(), nss, AcquisitionPrerequisites::OperationType::kRead),
+                          MODE_IS);
+    ASSERT(collection.exists());
 
     // Build a query with a rooted $or.
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(BSON("$or" << BSON_ARRAY(BSON("p1" << 1) << BSON("p2" << 2))));
-    auto canonicalQuery =
-        uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(findCommand)));
-
-    boost::optional<AutoGetCollectionForReadCommand> collLock;
-    collLock.emplace(opCtx(), nss);
-
-    // Add 4 indices: 2 for each predicate to choose from, and one index which is not relevant to
-    // the query.
-    QueryPlannerParams params;
-    fillOutPlannerParams(opCtx(), collection, canonicalQuery.get(), &params);
+    auto canonicalQuery = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
+        .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
     // Create the SubplanStage.
     WorkingSet workingSet;
-    SubplanStage subplanStage(_expCtx.get(), collection, &workingSet, params, canonicalQuery.get());
+    auto subplanStage = makeSubplanStage(collection, canonicalQuery.get(), workingSet);
 
-    // Mimic a yield by saving the state of the subplan stage. Then, drop an index not being used
-    // while yielded.
-    subplanStage.saveState();
-    collLock.reset();
-    dropIndex(BSON("irrelevant" << 1));
+    // Mimic a yield by saving the state of the subplan stage. Then, drop an index not being
+    // used while yielded.
+    subplanStage->saveState();
+    auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx());
+    shard_role_details::getRecoveryUnit(opCtx())->abandonSnapshot();
 
-    // Attempt to restore state. This should throw due the index drop. As a future improvement, we
-    // may wish to make the subplan stage tolerate drops of indices it is not using.
-    collLock.emplace(opCtx(), nss);
-    ASSERT_THROWS_CODE(subplanStage.restoreState(&collLock->getCollection()),
+    // Drop an index.
+    // Do it from a different opCtx to avoid polluting the yielded transaction resources for the
+    // query.
+    {
+        auto newClient =
+            opCtx()->getServiceContext()->getService()->makeClient("AlternativeClient");
+        AlternativeClientRegion acr(newClient);
+        auto opCtx2 = cc().makeOperationContext();
+        DBDirectClient client(opCtx2.get());
+        dropIndex(client, BSON("irrelevant" << 1));
+    }
+
+    // Attempt to restore state. This should throw due the index drop. As a future improvement,
+    // we may wish to make the subplan stage tolerate drops of indices it is not using.
+    restoreTransactionResourcesToOperationContext(opCtx(), std::move(yieldedTransactionResources));
+    ASSERT_THROWS_CODE(subplanStage->restoreState(RestoreContext(nullptr)),
                        DBException,
                        ErrorCodes::QueryPlanKilled);
 }
 
 TEST_F(QueryStageSubplanTest, ShouldNotThrowOnRestoreIfIndexDroppedAfterPlanSelection) {
-    CollectionPtr collection;
     {
-        dbtests::WriteContextForTests ctx{opCtx(), nss.ns()};
+        dbtests::WriteContextForTests ctx{opCtx(), nss.ns_forTest()};
         addIndex(BSON("p1" << 1 << "opt1" << 1));
         addIndex(BSON("p1" << 1 << "opt2" << 1));
         addIndex(BSON("p2" << 1 << "opt1" << 1));
         addIndex(BSON("p2" << 1 << "opt2" << 1));
         addIndex(BSON("irrelevant" << 1));
-
-        collection = ctx.getCollection();
-        ASSERT(collection);
     }
+
+    auto collection =
+        acquireCollection(opCtx(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              opCtx(), nss, AcquisitionPrerequisites::OperationType::kRead),
+                          MODE_IS);
+    ASSERT(collection.exists());
 
     // Build a query with a rooted $or.
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(BSON("$or" << BSON_ARRAY(BSON("p1" << 1) << BSON("p2" << 2))));
-    auto canonicalQuery =
-        uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(findCommand)));
+    auto canonicalQuery = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
+        .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
-    boost::optional<AutoGetCollectionForReadCommand> collLock;
-    collLock.emplace(opCtx(), nss);
-
-
-    // Add 4 indices: 2 for each predicate to choose from, and one index which is not relevant to
-    // the query.
-    QueryPlannerParams params;
-    fillOutPlannerParams(opCtx(), collection, canonicalQuery.get(), &params);
+    // Add 4 indices: 2 for each predicate to choose from, and one index which is not relevant
+    // to the query.
+    auto plannerParams = makePlannerParams(collection, *canonicalQuery);
 
     // Create the SubplanStage.
     WorkingSet workingSet;
-    SubplanStage subplanStage(_expCtx.get(), collection, &workingSet, params, canonicalQuery.get());
+    auto subplanStage = makeSubplanStage(collection, canonicalQuery.get(), workingSet);
 
-    NoopYieldPolicy yieldPolicy(serviceContext()->getFastClockSource());
-    ASSERT_OK(subplanStage.pickBestPlan(&yieldPolicy));
+    NoopYieldPolicy yieldPolicy(_expCtx->getOperationContext(),
+                                serviceContext()->getFastClockSource());
+    ASSERT_OK(subplanStage->pickBestPlan(plannerParams, &yieldPolicy));
 
-    // Mimic a yield by saving the state of the subplan stage and dropping our lock. Then drop an
-    // index not being used while yielded.
-    subplanStage.saveState();
-    collLock.reset();
-    dropIndex(BSON("irrelevant" << 1));
+    // Mimic a yield by saving the state of the subplan stage and dropping our lock. Then drop
+    // an index not being used while yielded.
+    subplanStage->saveState();
+    auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx());
+    shard_role_details::getRecoveryUnit(opCtx())->abandonSnapshot();
 
-    // Restoring state should succeed, since the plan selected by pickBestPlan() does not use the
-    // index {irrelevant: 1}.
-    collLock.emplace(opCtx(), nss);
-    subplanStage.restoreState(&collLock->getCollection());
+    // Drop an index.
+    // Do it from a different opCtx to avoid polluting the yielded transaction resources for the
+    // query.
+    {
+        auto newClient =
+            opCtx()->getServiceContext()->getService()->makeClient("AlternativeClient");
+        AlternativeClientRegion acr(newClient);
+        auto opCtx2 = cc().makeOperationContext();
+        DBDirectClient client(opCtx2.get());
+        dropIndex(client, BSON("irrelevant" << 1));
+    }
+
+    // Restoring state should succeed, since the plan selected by pickBestPlan() does not use
+    // the index {irrelevant: 1}.
+    restoreTransactionResourcesToOperationContext(opCtx(), std::move(yieldedTransactionResources));
+    subplanStage->restoreState(RestoreContext(nullptr));
 }
 
 }  // namespace

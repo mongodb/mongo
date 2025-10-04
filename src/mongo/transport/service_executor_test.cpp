@@ -27,72 +27,86 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-#include "mongo/platform/basic.h"
+#include <chrono>
+#include <compare>
+#include <cstddef>
+#include <memory>
+#include <new>
+#include <thread>
+#include <utility>
 
-#include "boost/optional.hpp"
-#include <algorithm>
+#include <asio.hpp>  // IWYU pragma: keep
 
-#include "mongo/bson/bsonobjbuilder.h"
+#include <boost/smart_ptr.hpp>
+
+// IWYU pragma: no_include "asio/impl/dispatch.hpp"
+// IWYU pragma: no_include "asio/impl/io_context.hpp"
+// IWYU pragma: no_include "asio/impl/post.hpp"
+// IWYU pragma: no_include "asio/impl/system_executor.hpp"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/transport/mock_session.h"
-#include "mongo/transport/service_executor_fixed.h"
-#include "mongo/transport/service_executor_gen.h"
+#include "mongo/transport/service_executor.h"
 #include "mongo/transport/service_executor_synchronous.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/barrier.h"
-#include "mongo/unittest/death_test.h"
+#include "mongo/unittest/join_thread.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/notification.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/functional.h"
 #include "mongo/util/future.h"
-#include "mongo/util/scopeguard.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/out_of_line_executor.h"
+#include "mongo/util/synchronized_value.h"
+#include "mongo/util/time_support.h"
 
-#include <asio.hpp>
+#include <asio/io_context.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 
 namespace mongo::transport {
 namespace {
+
+namespace m = unittest::match;
 
 constexpr auto kWorkerThreadRunTime = Milliseconds{1000};
 // Run time + generous scheduling time slice
 constexpr auto kShutdownTime = Milliseconds{kWorkerThreadRunTime.count() + 50};
 
+
 /* This implements the portions of the transport::Reactor based on ASIO, but leaves out
  * the methods not needed by ServiceExecutors.
  *
- * TODO Maybe use TransportLayerASIO's Reactor?
+ * TODO Maybe use AsioTransportLayer's Reactor?
  */
-class ASIOReactor : public transport::Reactor {
+class AsioReactor : public transport::Reactor {
 public:
-    ASIOReactor() : _ioContext() {}
+    AsioReactor() : _ioContext() {}
 
-    void run() noexcept final {
+    void run() final {
         MONGO_UNREACHABLE;
-    }
-
-    void runFor(Milliseconds time) noexcept final {
-        asio::io_context::work work(_ioContext);
-
-        try {
-            _ioContext.run_for(time.toSystemDuration());
-        } catch (...) {
-            LOGV2_FATAL(50476,
-                        "Uncaught exception in reactor: {error}",
-                        "Uncaught exception in reactor",
-                        "error"_attr = exceptionToStatus());
-        }
     }
 
     void stop() final {
         _ioContext.stop();
     }
 
-    void drain() override final {
+    void drain() final {
         _ioContext.restart();
         while (_ioContext.poll()) {
             LOGV2_DEBUG(22984, 1, "Draining remaining work in reactor.");
@@ -112,14 +126,6 @@ public:
         asio::post(_ioContext, [task = std::move(task)] { task(Status::OK()); });
     }
 
-    void dispatch(Task task) final {
-        asio::dispatch(_ioContext, [task = std::move(task)] { task(Status::OK()); });
-    }
-
-    bool onReactorThread() const final {
-        return false;
-    }
-
     operator asio::io_context&() {
         return _ioContext;
     }
@@ -128,239 +134,169 @@ private:
     asio::io_context _ioContext;
 };
 
+class ServiceExecutorInlineTest : public unittest::Test {
+public:
+    ServiceExecutorInline executor;
+};
+
 class ServiceExecutorSynchronousTest : public unittest::Test {
 public:
-    void setUp() override {
-        setGlobalServiceContext(ServiceContext::make());
-    }
-
-    void tearDown() override {
-        setGlobalServiceContext(nullptr);
-    }
+    ServiceExecutorSynchronous executor;
 };
+
+TEST_F(ServiceExecutorInlineTest, MakeTaskRunnerFailsBeforeStartup) {
+    ASSERT_THROWS(executor.makeTaskRunner(), DBException);
+}
+
+TEST_F(ServiceExecutorSynchronousTest, MakeTaskRunnerFailsBeforeStartup) {
+    ASSERT_THROWS(executor.makeTaskRunner(), DBException);
+}
+
+// Schedule a task and ensure it has been executed.
+stdx::thread::id doBasicTaskRunTest(ServiceExecutor* executor) {
+    boost::optional<stdx::thread::id> taskid;
+    executor->start();
+    auto runner = executor->makeTaskRunner();
+    PromiseAndFuture<void> pf;
+    runner->schedule([&](Status st) {
+        taskid = stdx::this_thread::get_id();
+        pf.promise.setFrom(st);
+    });
+    ASSERT_DOES_NOT_THROW(pf.future.get());
+    ASSERT_OK(executor->shutdown(kShutdownTime));
+    ASSERT(!!taskid);
+    return *taskid;
+}
 
 TEST_F(ServiceExecutorSynchronousTest, BasicTaskRuns) {
-    unittest::Barrier barrier(2);
-    ServiceExecutorSynchronous executor(getGlobalServiceContext());
-    ASSERT_OK(executor.start());
-    ASSERT_OK(executor.scheduleTask([&] { barrier.countDownAndWait(); }, {}));
-    barrier.countDownAndWait();
-    ASSERT_OK(executor.shutdown(kShutdownTime));
+    auto callerid = stdx::this_thread::get_id();
+    auto taskid = doBasicTaskRunTest(&executor);
+    // Task runs on different thread than caller.
+    ASSERT(callerid != taskid);
 }
 
-TEST_F(ServiceExecutorSynchronousTest, ScheduleFailsBeforeStartup) {
-    ServiceExecutorSynchronous executor(getGlobalServiceContext());
-    ASSERT_NOT_OK(executor.scheduleTask([] {}, {}));
+TEST_F(ServiceExecutorInlineTest, BasicTaskRuns) {
+    auto callerid = stdx::this_thread::get_id();
+    auto taskid = doBasicTaskRunTest(&executor);
+    // Task runs on same thread as caller.
+    ASSERT(callerid == taskid);
 }
 
-class ServiceExecutorFixedTest : public unittest::Test {
+/** Implements a threadsafe 1-shot pause and resume. */
+class Breakpoint {
 public:
-    static constexpr size_t kExecutorThreads = 2;
+    void pause() {
+        _paused.set();
+        _resumed.get();
+    }
 
-    class Handle {
-    public:
-        Handle() = default;
-        Handle(const Handle&) = delete;
-        Handle& operator=(const Handle&) = delete;
+    void await() {
+        _paused.get();
+    }
 
-        ~Handle() {
-            join();
-        }
+    void resume() {
+        _resumed.set();
+    }
 
-        void join() {
-            ASSERT_OK(_executor->shutdown(kShutdownTime));
-        }
-
-        void start() {
-            ASSERT_OK(_executor->start());
-        }
-
-        ServiceExecutorFixed* operator->() const noexcept {
-            return &*_executor;
-        }
-
-        ServiceExecutorFixed& operator*() const noexcept {
-            return *_executor;
-        }
-
-    private:
-        std::shared_ptr<ServiceExecutorFixed> _executor{std::make_shared<ServiceExecutorFixed>(
-            ThreadPool::Limits{kExecutorThreads, kExecutorThreads})};
-    };
+private:
+    Notification<void> _paused;
+    Notification<void> _resumed;
 };
 
-TEST_F(ServiceExecutorFixedTest, ScheduleFailsBeforeStartup) {
-    Handle handle;
-    ASSERT_NOT_OK(handle->scheduleTask([] {}, {}));
-}
+TEST_F(ServiceExecutorSynchronousTest, SpawnsWorkerThread) {
+    synchronized_value<std::vector<std::string>> events;
 
-TEST_F(ServiceExecutorFixedTest, BasicTaskRuns) {
-    unittest::Barrier barrier(2);
-    Handle handle;
-    handle.start();
+    executor.start();
+    PromiseAndFuture<void> pf;
+    auto runner = executor.makeTaskRunner();
 
-    ASSERT_OK(handle->scheduleTask([&] { barrier.countDownAndWait(); }, {}));
-    barrier.countDownAndWait();
-}
-
-TEST_F(ServiceExecutorFixedTest, RecursiveTask) {
-    unittest::Barrier barrier(2);
-    Handle handle;
-    handle.start();
-
-    std::function<void()> recursiveTask = [&] {
-        if (handle->getRecursionDepthForExecutorThread() <
-            fixedServiceExecutorRecursionLimit.load()) {
-            ASSERT_OK(
-                handle->scheduleTask(recursiveTask, ServiceExecutor::ScheduleFlags::kMayRecurse));
-        } else {
-            // This test never returns unless the service executor can satisfy the recursion depth.
-            barrier.countDownAndWait();
-        }
-    };
-
-    // Schedule recursive task and wait for the recursion to stop
-    ASSERT_OK(handle->scheduleTask(recursiveTask, ServiceExecutor::ScheduleFlags::kMayRecurse));
-    barrier.countDownAndWait();
-}
-
-TEST_F(ServiceExecutorFixedTest, FlattenRecursiveScheduledTasks) {
-    unittest::Barrier barrier(2);
-    Handle handle;
-    handle.start();
-    AtomicWord<int> tasksToSchedule{fixedServiceExecutorRecursionLimit.load() * 3};
-
-    // A recursive task that expects to be executed non-recursively. The task recursively schedules
-    // "tasksToSchedule" tasks to the service executor, and each scheduled task verifies that the
-    // recursion depth remains zero during its execution.
-    std::function<void()> recursiveTask = [&] {
-        ASSERT_EQ(handle->getRecursionDepthForExecutorThread(), 1);
-        if (tasksToSchedule.fetchAndSubtract(1) > 0) {
-            ASSERT_OK(handle->scheduleTask(recursiveTask, {}));
-        } else {
-            // Once there are no more tasks to schedule, notify the main thread to proceed.
-            barrier.countDownAndWait();
-        }
-    };
-
-    // Schedule the recursive task and wait for the execution to finish.
-    ASSERT_OK(handle->scheduleTask(recursiveTask,
-                                   ServiceExecutor::ScheduleFlags::kMayYieldBeforeSchedule));
-    barrier.countDownAndWait();
-}
-
-TEST_F(ServiceExecutorFixedTest, ShutdownTimeLimit) {
-    SharedPromise<void> invoked;
-    SharedPromise<void> mayReturn;
-
-    Handle handle;
-    handle.start();
-
-    ASSERT_OK(handle->scheduleTask(
-        [&] {
-            invoked.emplaceValue();
-            mayReturn.getFuture().get();
-        },
-        {}));
-
-    invoked.getFuture().get();
-    ASSERT_NOT_OK(handle->shutdown(kShutdownTime));
-
-    // Ensure the service executor is stopped before leaving the test.
-    mayReturn.emplaceValue();
-}
-
-TEST_F(ServiceExecutorFixedTest, ScheduleSucceedsBeforeShutdown) {
-    unittest::threadAssertionMonitoredTest([&](auto&& monitor) {
-        unittest::Barrier barrier(2);
-        Handle handle;
-        handle.start();
-
-        stdx::thread scheduleClient;
-        ScopeGuard joinGuard([&] { scheduleClient.join(); });
-
-        {
-            FailPointEnableBlock failpoint("hangBeforeSchedulingServiceExecutorFixedTask");
-
-            // The executor accepts the work, but hasn't used the underlying pool yet.
-            scheduleClient = monitor.spawn(
-                [&] { ASSERT_OK(handle->scheduleTask([&] { barrier.countDownAndWait(); }, {})); });
-            failpoint->waitForTimesEntered(1);
-
-            // Trigger an immediate shutdown which will not affect the task we have accepted.
-            ASSERT_NOT_OK(handle->shutdown(Milliseconds{0}));
-        }
-
-        // Our failpoint has been disabled, so the task can run to completion.
-        barrier.countDownAndWait();
-
-        // Now we can wait for the task to finish and shutdown.
-        ASSERT_OK(handle->shutdown(kShutdownTime));
-    });
-}
-
-TEST_F(ServiceExecutorFixedTest, ScheduleFailsAfterShutdown) {
-    Handle handle;
-    handle.start();
-
-    ASSERT_OK(handle->shutdown(kShutdownTime));
-    ASSERT_NOT_OK(handle->scheduleTask([] { MONGO_UNREACHABLE; }, {}));
-}
-
-TEST_F(ServiceExecutorFixedTest, RunTaskAfterWaitingForData) {
-    unittest::threadAssertionMonitoredTest([&](auto&& monitor) {
-        unittest::Barrier barrier(2);
-        auto tl = std::make_unique<TransportLayerMock>();
-        auto session = std::dynamic_pointer_cast<MockSession>(tl->createSession());
-        invariant(session);
-
-        Handle handle;
-        handle.start();
-
-        const auto signallingThreadId = stdx::this_thread::get_id();
-
-        AtomicWord<bool> ranOnDataAvailable{false};
-
-        handle->runOnDataAvailable(session, [&](Status) {
-            ranOnDataAvailable.store(true);
-            ASSERT(stdx::this_thread::get_id() != signallingThreadId);
-            barrier.countDownAndWait();
+    // Expect ServiceExecutorSynchronous to schedule on a worker thread allowing
+    // "caller" to be pushed onto the events vector once the task blocks on its breakpoint.
+    // If the task executes in the caller's thread, then bp.pause() blocks indefinitely.
+    // If the task thread never executes, then bp.await() blocks indefinitely.
+    {
+        Breakpoint bp;
+        runner->schedule([&](Status st) {
+            bp.pause();
+            events->push_back("task");
+            pf.promise.setFrom(st);
         });
+        bp.await();
+        events->push_back("caller");
+        bp.resume();
+        ASSERT_DOES_NOT_THROW(pf.future.get());
+    }
+    ASSERT_OK(executor.shutdown(kShutdownTime));
 
-        ASSERT(!ranOnDataAvailable.load());
-
-        session->signalAvailableData();
-
-        barrier.countDownAndWait();
-        ASSERT(ranOnDataAvailable.load());
-    });
+    ASSERT_THAT(**events, m::ElementsAre(m::Eq("caller"), m::Eq("task")));
 }
 
-TEST_F(ServiceExecutorFixedTest, StartAndShutdownAreDeterministic) {
-    unittest::threadAssertionMonitoredTest([&](auto&& monitor) {
-        Handle handle;
+// Ensure that tasks queued during the running of a task are executed
+// in the order they are enqueued.
+void doTestTaskQueueing(ServiceExecutor* executor) {
+    synchronized_value<std::vector<int>> events;
 
-        // Ensure starting the executor results in spawning the specified number of executor
-        // threads.
-        {
-            FailPointEnableBlock failpoint("hangAfterServiceExecutorFixedExecutorThreadsStart");
-            handle.start();
-            failpoint->waitForTimesEntered(kExecutorThreads);
+    executor->start();
+    PromiseAndFuture<void> pf;
+    auto runner = executor->makeTaskRunner();
+
+    runner->schedule([&](Status st) {
+        for (int i = 2; i < 5; ++i) {
+            runner->schedule([&, i](Status st) { events->push_back(i); });
         }
-
-        // Since destroying ServiceExecutorFixed is blocking, spawn a thread to issue the
-        // destruction off of the main execution path.
-        stdx::thread shutdownThread;
-
-        // Ensure all executor threads return after receiving the shutdown signal.
-        {
-            FailPointEnableBlock failpoint(
-                "hangBeforeServiceExecutorFixedLastExecutorThreadReturns");
-            shutdownThread = monitor.spawn([&] { handle.join(); });
-            failpoint->waitForTimesEntered(1);
-        }
-        shutdownThread.join();
+        runner->schedule([&](Status st) { pf.promise.setFrom(st); });
+        events->push_back(1);
     });
+    ASSERT_DOES_NOT_THROW(pf.future.get());
+    ASSERT_OK(executor->shutdown(kShutdownTime));
+
+    ASSERT_THAT(**events, m::ElementsAre(m::Eq(1), m::Eq(2), m::Eq(3), m::Eq(4)));
+}
+
+TEST_F(ServiceExecutorSynchronousTest, TaskQueueing) {
+    doTestTaskQueueing(&executor);
+}
+
+TEST_F(ServiceExecutorInlineTest, TaskQueueing) {
+    doTestTaskQueueing(&executor);
+}
+
+/** Ensure that tasks queued after a task queue has emptied will still run. */
+void doTestTaskPostQueueing(ServiceExecutor* executor) {
+    executor->start();
+    auto runner = executor->makeTaskRunner();
+
+    PromiseAndFuture<void> first;
+    runner->schedule([&](Status st) { first.promise.setFrom(st); });
+    ASSERT_DOES_NOT_THROW(first.future.get());
+
+    if (dynamic_cast<ServiceExecutorInline*>(executor)) {
+        ASSERT_EQ(executor->getRunningThreads(), 0);
+    } else {
+        // In the case of ServiceExecutorInline we know the queue is empty after
+        // the first schedule call since it blocks, but we don't know this is
+        // true for ServiceExecutorSynchronous, so we potentially need to wait.
+        // Don't wait longer than 10 seconds though.
+        auto endWait = Date_t::now() + Seconds{10};
+        while (executor->getRunningThreads() > 0) {
+            sleepFor(Milliseconds{10});
+            ASSERT_LT(Date_t::now(), endWait);
+        }
+    }
+
+    PromiseAndFuture<void> second;
+    runner->schedule([&](Status st) { second.promise.setFrom(st); });
+    ASSERT_DOES_NOT_THROW(second.future.get());
+
+    ASSERT_OK(executor->shutdown(kShutdownTime));
+}
+
+TEST_F(ServiceExecutorSynchronousTest, TaskPostQueueing) {
+    doTestTaskPostQueueing(&executor);
+}
+
+TEST_F(ServiceExecutorInlineTest, TaskPostQueueing) {
+    doTestTaskPostQueueing(&executor);
 }
 
 }  // namespace

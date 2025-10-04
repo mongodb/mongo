@@ -27,10 +27,40 @@
  *    it in the license file.
  */
 
-#include <queue>
-
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/ordering.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/exec/sbe/expressions/compile_ctx.h"
+#include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/runtime_environment.h"
+#include "mongo/db/exec/sbe/stages/co_scan.h"
+#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
+#include "mongo/db/storage/key_string/key_string.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/time_support.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <limits>
+#include <memory>
+#include <ostream>
+#include <queue>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
 
 namespace mongo::sbe {
 
@@ -95,9 +125,9 @@ TEST_F(SBEKeyStringTest, Basic) {
     bob.appendNull("null-descending");
     auto testValues = bob.done();
 
-    // Copy each element from 'testValues' into a KeyString::Value. Each KeyString::Value has a
+    // Copy each element from 'testValues' into a key_string::Value. Each key_string::Value has a
     // maximum number of components, so we have to break the elements up into groups.
-    std::queue<std::tuple<KeyString::Value, Ordering, size_t>> keyStringQueue;
+    std::queue<std::tuple<key_string::Value, Ordering, size_t>> keyStringQueue;
     std::vector<BSONElement> elements;
     testValues.elems(elements);
 
@@ -110,10 +140,11 @@ TEST_F(SBEKeyStringTest, Basic) {
         }
         auto ordering = Ordering::make(patternBob.done());
 
-        KeyString::Builder keyStringBuilder(KeyString::Version::V1, ordering);
+        key_string::Builder keyStringBuilder(key_string::Version::V1, ordering);
         for (auto j = i; j < endBound; ++j) {
             keyStringBuilder.appendBSONElement(elements[j]);
         }
+        keyStringBuilder.appendRecordId(RecordId{0});
         keyStringQueue.emplace(keyStringBuilder.getValueCopy(), ordering, endBound - i);
     }
 
@@ -156,7 +187,12 @@ TEST_F(SBEKeyStringTest, Basic) {
 
             builder.reset();
             keyStringValues.resize(size);
-            readKeyStringValueIntoAccessors(keyString, ordering, &builder, &keyStringValues);
+            SortedDataKeyValueView view{keyString.getView(),
+                                        keyString.getRecordIdView(),
+                                        keyString.getTypeBitsView(),
+                                        keyString.getVersion(),
+                                        true};
+            readKeyStringValueIntoAccessors(view, ordering, &builder, &keyStringValues);
         }
 
         auto [componentTag, componentVal] = keyStringValues.front().getViewOfValue();
@@ -175,14 +211,14 @@ TEST_F(SBEKeyStringTest, Basic) {
     ASSERT(keyStringQueue.empty());
 }
 
-TEST(SBEKeyStringTest, KeyComponentInclusion) {
-    KeyString::Builder keyStringBuilder(KeyString::Version::V1, KeyString::ALL_ASCENDING);
+TEST(SimpleSBEKeyStringTest, KeyComponentInclusion) {
+    key_string::Builder keyStringBuilder(key_string::Version::V1, key_string::ALL_ASCENDING);
     keyStringBuilder.appendNumberLong(12345);  // Included
     keyStringBuilder.appendString("I've information vegetable, animal, and mineral"_sd);
     keyStringBuilder.appendString(
         "I know the kings of England, and I quote the fights historical"_sd);  // Included
     keyStringBuilder.appendString("From Marathon to Waterloo, in order categorical");
-    auto keyString = keyStringBuilder.getValueCopy();
+    keyStringBuilder.appendRecordId(RecordId{0});
 
     IndexKeysInclusionSet indexKeysToInclude;
     indexKeysToInclude.set(0);
@@ -191,9 +227,16 @@ TEST(SBEKeyStringTest, KeyComponentInclusion) {
     std::vector<value::OwnedValueAccessor> accessors;
     accessors.resize(2);
 
+    auto keySize = key_string::getKeySize(
+        keyStringBuilder.getView(), key_string::ALL_ASCENDING, keyStringBuilder.version);
+    SortedDataKeyValueView view{keyStringBuilder.getView(),
+                                keyStringBuilder.getView().subspan(keySize),
+                                keyStringBuilder.getTypeBits().getView(),
+                                keyStringBuilder.version,
+                                true};
     BufBuilder builder;
     readKeyStringValueIntoAccessors(
-        keyString, KeyString::ALL_ASCENDING, &builder, &accessors, indexKeysToInclude);
+        view, key_string::ALL_ASCENDING, &builder, &accessors, indexKeysToInclude);
 
     auto value = accessors[0].getViewOfValue();
     ASSERT(value::TypeTags::NumberInt64 == value.first &&

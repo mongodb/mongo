@@ -1,0 +1,254 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "update_test_helpers",
+    srcs = [
+        "document_diff_test_helpers.cpp",
+    ],
+    hdrs = [
+        "document_diff_test_helpers.h",
+    ],
+    deps = [
+        ":update",
+    ],
+)
+
+mongo_cc_library(
+    name = "pattern_cmp",
+    srcs = [
+        "pattern_cmp.cpp",
+    ],
+    hdrs = [
+        "pattern_cmp.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/bson/dotted_path:dotted_path_support",
+        "//src/mongo/db:common",
+        "//src/mongo/db/exec/document_value",
+        "//src/mongo/db/exec/mutable_bson",
+    ],
+)
+
+mongo_cc_library(
+    name = "update_document_diff",
+    srcs = [
+        "document_diff_applier.cpp",
+        "document_diff_calculator.cpp",
+        "document_diff_serialization.cpp",
+        "//src/mongo/util:dynamic_bitset.h",
+        "//src/mongo/util:inlined_storage.h",
+    ],
+    hdrs = [
+        "document_diff_applier.h",
+        "document_diff_calculator.h",
+        "document_diff_serialization.h",
+        "//src/mongo/base:error_codes_header",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:common",
+        "//src/mongo/db:update_index_data",
+        "//src/mongo/db/exec/mutable_bson",
+    ],
+)
+
+mongo_cc_library(
+    name = "update_common",
+    srcs = [
+        "field_checker.cpp",
+        "path_support.cpp",
+        "runtime_update_path.cpp",
+        "storage_validation.cpp",
+        "update_oplog_entry_serialization.cpp",
+        "v2_log_builder.cpp",
+    ],
+    hdrs = [
+        "field_checker.h",
+        "log_builder_interface.h",
+        "path_support.h",
+        "runtime_update_path.h",
+        "storage_validation.h",
+        "update_executor.h",
+        "update_oplog_entry_serialization.h",
+        "v2_log_builder.h",
+    ],
+    deps = [
+        ":pattern_cmp",  # TODO(SERVER-93876): Remove.
+        ":update_document_diff",
+        "//src/mongo:base",
+        "//src/mongo/db:common",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db/exec/mutable_bson",
+        "//src/mongo/db/query/compiler/parsers/matcher:matcher_parser",
+        "//src/mongo/db/query/util:validate_id",
+    ],
+)
+
+mongo_cc_library(
+    name = "update_nodes",
+    srcs = [
+        "addtoset_node.cpp",
+        "arithmetic_node.cpp",
+        "array_culling_node.cpp",
+        "bit_node.cpp",
+        "compare_node.cpp",
+        "current_date_node.cpp",
+        "modifier_node.cpp",
+        "modifier_table.cpp",
+        "pop_node.cpp",
+        "pull_node.cpp",
+        "pullall_node.cpp",
+        "push_node.cpp",
+        "rename_node.cpp",
+        "set_node.cpp",
+        "unset_node.cpp",
+        "update_array_node.cpp",
+        "update_internal_node.cpp",
+        "update_leaf_node.cpp",
+        "update_node.cpp",
+        "update_object_node.cpp",
+    ],
+    hdrs = [
+        "addtoset_node.h",
+        "arithmetic_node.h",
+        "array_culling_node.h",
+        "bit_node.h",
+        "compare_node.h",
+        "conflict_placeholder_node.h",
+        "current_date_node.h",
+        "modifier_node.h",
+        "modifier_table.h",
+        "pop_node.h",
+        "pull_node.h",
+        "pullall_node.h",
+        "push_node.h",
+        "rename_node.h",
+        "set_node.h",
+        "unset_node.h",
+        "update_array_node.h",
+        "update_internal_node.h",
+        "update_leaf_node.h",
+        "update_node.h",
+        "update_node_visitor.h",
+        "update_object_node.h",
+    ],
+    deps = [
+        ":update_common",
+        "//src/mongo/db:update_index_data",
+        "//src/mongo/db:vector_clock_mutable",
+    ],
+)
+
+mongo_cc_library(
+    name = "update",
+    srcs = [
+        "delta_executor.cpp",
+        "object_replace_executor.cpp",
+        "object_transform_executor.cpp",
+        "pipeline_executor.cpp",
+    ],
+    hdrs = [
+        "delta_executor.h",
+        "object_replace_executor.h",
+        "object_transform_executor.h",
+        "pipeline_executor.h",
+    ],
+    deps = [
+        ":update_common",
+        ":update_document_diff",
+        ":update_nodes",
+        "//src/mongo/db/pipeline",
+    ],
+)
+
+mongo_cc_library(
+    name = "update_driver",
+    srcs = [
+        "update_driver.cpp",
+        "update_util.cpp",
+    ],
+    hdrs = [
+        "update_driver.h",
+        "update_tree_executor.h",
+        "update_util.h",
+        "//src/mongo/db/exec/sbe:in_list.h",
+        "//src/mongo/db/query:explain.h",
+        "//src/mongo/db/query/plan_cache:sbe_plan_cache.h",
+        "//src/mongo/db/query/stage_builder/sbe:builder_data.h",
+        "//src/mongo/db/query/write_ops:update_request.h",
+    ],
+    deps = [
+        ":update",
+        "//src/mongo/db:common",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/query:canonical_query_base",
+        "//src/mongo/db/query/write_ops:write_ops_parsers",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_update_test",
+    srcs = [
+        "addtoset_node_test.cpp",
+        "arithmetic_node_test.cpp",
+        "bit_node_test.cpp",
+        "compare_node_test.cpp",
+        "current_date_node_test.cpp",
+        "delta_executor_test.cpp",
+        "document_diff_applier_test.cpp",
+        "document_diff_calculator_test.cpp",
+        "document_diff_serialization_test.cpp",
+        "document_diff_test.cpp",
+        "field_checker_test.cpp",
+        "modifier_table_test.cpp",
+        "object_replace_executor_test.cpp",
+        "object_transform_executor_test.cpp",
+        "path_support_test.cpp",
+        "pattern_cmp_test.cpp",
+        "pipeline_executor_test.cpp",
+        "pop_node_test.cpp",
+        "pull_node_test.cpp",
+        "pullall_node_test.cpp",
+        "push_node_test.cpp",
+        "rename_node_test.cpp",
+        "set_node_test.cpp",
+        "unset_node_test.cpp",
+        "update_array_node_test.cpp",
+        "update_driver_test.cpp",
+        "update_object_node_test.cpp",
+        "update_oplog_entry_serialization_test.cpp",
+        "update_serialization_test.cpp",
+        "v2_log_builder_test.cpp",
+        "//src/mongo/db/update:update_node_test_fixture.h",
+    ],
+    tags = ["mongo_unittest_fifth_group"],
+    deps = [
+        ":update",
+        ":update_common",
+        ":update_driver",
+        ":update_test_helpers",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db:vector_clock_trivial",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/exec/document_value:document_value_test_util",
+        "//src/mongo/db/exec/mutable_bson",
+        "//src/mongo/db/exec/mutable_bson:mutable_bson_test_utils",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/query:query_planner",
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db/query/collation:collator_interface_mock",
+    ],
+)

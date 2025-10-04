@@ -1,60 +1,62 @@
 /**
  * Runs initial sync on a node with many databases.
+ *
+ * @tags: [incompatible_with_macos]
  */
 
-(function() {
-// Skip this test if running with --nojournal and WiredTiger.
-if (jsTest.options().noJournal &&
-    (!jsTest.options().storageEngine || jsTest.options().storageEngine === "wiredTiger")) {
-    print("Skipping test because running WiredTiger without journaling isn't a valid" +
-          " replica set configuration");
-    return;
-}
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var name = 'initial_sync_many_dbs';
-var num_dbs = 32;
-var max_colls = 32;
-var num_docs = 2;
-var replSet = new ReplSetTest({
+let name = "initial_sync_many_dbs";
+let num_dbs = 32;
+let max_colls = 32;
+let num_docs = 2;
+let replSet = new ReplSetTest({
     name: name,
     nodes: 1,
 });
 replSet.startSet();
 replSet.initiate();
 
-var primary = replSet.getPrimary();
-jsTestLog('Seeding primary with ' + num_dbs + ' databases with up to ' + max_colls +
-          ' collections each. Each collection will contain ' + num_docs + ' documents');
-for (var i = 0; i < num_dbs; i++) {
-    var dbname = name + '_db' + i;
-    for (var j = 0; j < (i % max_colls + 1); j++) {
-        var collname = name + '_coll' + j;
-        var coll = primary.getDB(dbname)[collname];
-        for (var k = 0; k < num_docs; k++) {
+let primary = replSet.getPrimary();
+jsTestLog(
+    "Seeding primary with " +
+        num_dbs +
+        " databases with up to " +
+        max_colls +
+        " collections each. Each collection will contain " +
+        num_docs +
+        " documents",
+);
+for (let i = 0; i < num_dbs; i++) {
+    let dbname = name + "_db" + i;
+    for (let j = 0; j < (i % max_colls) + 1; j++) {
+        let collname = name + "_coll" + j;
+        let coll = primary.getDB(dbname)[collname];
+        for (let k = 0; k < num_docs; k++) {
             assert.commandWorked(coll.insert({_id: k}));
         }
     }
 }
 
 // Add a secondary that will initial sync from the primary.
-jsTestLog('Adding node to replica set to trigger initial sync process');
+jsTestLog("Adding node to replica set to trigger initial sync process");
 replSet.add();
 replSet.reInitiate();
 
 replSet.awaitSecondaryNodes(30 * 60 * 1000);
-var secondary = replSet.getSecondary();
-jsTestLog('New node has transitioned to secondary. Checking collection sizes');
-for (var i = 0; i < num_dbs; i++) {
-    var dbname = name + '_db' + i;
-    for (var j = 0; j < (i % max_colls + 1); j++) {
-        var collname = name + '_coll' + j;
-        var coll = secondary.getDB(dbname)[collname];
+let secondary = replSet.getSecondary();
+jsTestLog("New node has transitioned to secondary. Checking collection sizes");
+for (let i = 0; i < num_dbs; i++) {
+    let dbname = name + "_db" + i;
+    for (let j = 0; j < (i % max_colls) + 1; j++) {
+        let collname = name + "_coll" + j;
+        let coll = secondary.getDB(dbname)[collname];
         assert.eq(
             num_docs,
             coll.find().itcount(),
-            'collection size inconsistent with primary after initial sync: ' + coll.getFullName());
+            "collection size inconsistent with primary after initial sync: " + coll.getFullName(),
+        );
     }
 }
 
 replSet.stopSet();
-})();

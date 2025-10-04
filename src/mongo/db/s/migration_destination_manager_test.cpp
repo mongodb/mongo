@@ -27,16 +27,29 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/db/global_catalog/catalog_cache/catalog_cache_test_fixture.h"
+#include "mongo/db/index/index_constants.h"
 #include "mongo/db/s/migration_destination_manager.h"
-#include "mongo/db/s/shard_server_test_fixture.h"
-#include "mongo/s/catalog_cache_test_fixture.h"
+#include "mongo/db/sharding_environment/shard_server_test_fixture.h"
+#include "mongo/executor/network_test_env.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/str.h"
+
+#include <system_error>
 
 namespace mongo {
 namespace {
 
-using unittest::assertGet;
 
 class MigrationDestinationManagerTest : public ShardServerTestFixture {
 protected:
@@ -129,7 +142,9 @@ TEST_F(MigrationDestinationManagerTest, CloneDocumentsThrowsFetchErrors) {
         return nextBatch->getField("objects").Obj().isEmpty();
     };
 
-    auto insertBatchFn = [&](OperationContext* opCtx, BSONObj docs) { return true; };
+    auto insertBatchFn = [&](OperationContext* opCtx, BSONObj docs) {
+        return true;
+    };
 
     ASSERT_THROWS_CODE_AND_WHAT(MigrationDestinationManager::fetchAndApplyBatch(
                                     operationContext(), insertBatchFn, fetchBatchFn),
@@ -165,14 +180,14 @@ TEST_F(MigrationDestinationManagerTest, CloneDocumentsCatchesInsertErrors) {
     ASSERT_EQ(operationContext()->getKillStatus(), 51008);
 }
 
-using MigrationDestinationManagerNetworkTest = CatalogCacheTestFixture;
+using MigrationDestinationManagerNetworkTest = RouterCatalogCacheTestFixture;
 
 // Verifies MigrationDestinationManager::getCollectionOptions() and
 // MigrationDestinationManager::getCollectionIndexes() won't use shard/db versioning without a chunk
 // manager and won't include a read concern without afterClusterTime.
 TEST_F(MigrationDestinationManagerNetworkTest,
        MigrationDestinationManagerGetIndexesAndCollectionsNoVersionsOrReadConcern) {
-    const NamespaceString nss("db.foo");
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("db.foo");
 
     // Shard nss by _id with chunks [minKey, 0), [0, maxKey] on shards "0" and "1" respectively.
     // ShardId("1") is the primary shard for the database.
@@ -192,9 +207,10 @@ TEST_F(MigrationDestinationManagerNetworkTest,
                 BSON("name" << nss.coll() << "options" << BSONObj() << "info"
                             << BSON("readOnly" << false << "uuid" << UUID::gen()) << "idIndex"
                             << BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
-                                        << "_id_"))};
+                                        << IndexConstants::kIdIndexName))};
 
-            std::string listCollectionsNs = str::stream() << nss.db() << "$cmd.listCollections";
+            std::string listCollectionsNs = str::stream()
+                << nss.db_forTest() << "$cmd.listCollections";
             return BSON(
                 "ok" << 1 << "cursor"
                      << BSON("id" << 0LL << "ns" << listCollectionsNs << "firstBatch" << colls));
@@ -213,11 +229,11 @@ TEST_F(MigrationDestinationManagerNetworkTest,
             ASSERT_FALSE(request.cmdObj.hasField("readConcern"));
             ASSERT_FALSE(request.cmdObj.hasField("shardVersion"));
 
-            const std::vector<BSONObj> indexes = {BSON("v" << 2 << "key" << BSON("_id" << 1)
-                                                           << "name"
-                                                           << "_id_")};
-            return BSON("ok" << 1 << "cursor"
-                             << BSON("id" << 0LL << "ns" << nss.ns() << "firstBatch" << indexes));
+            const std::vector<BSONObj> indexes = {BSON(
+                "v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName)};
+            return BSON(
+                "ok" << 1 << "cursor"
+                     << BSON("id" << 0LL << "ns" << nss.ns_forTest() << "firstBatch" << indexes));
         });
     });
 

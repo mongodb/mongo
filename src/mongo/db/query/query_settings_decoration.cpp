@@ -27,13 +27,16 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/query/query_settings_decoration.h"
 
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/local_catalog/collection.h"
+#include "mongo/util/decorable.h"
+
+#include <utility>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 
 namespace mongo {
 
@@ -49,6 +52,6 @@ QuerySettings* QuerySettingsDecoration::get(SharedCollectionDecorations* decorat
 }
 
 QuerySettingsDecoration::QuerySettingsDecoration()
-    : _querySettings(std::make_unique<QuerySettings>()){};
+    : _querySettings(std::make_unique<QuerySettings>()) {};
 
 }  // namespace mongo

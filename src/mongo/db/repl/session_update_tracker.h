@@ -29,16 +29,17 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <map>
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/util/modules.h"
+
 #include <vector>
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/logical_session_id.h"
-#include "mongo/db/repl/oplog_entry.h"
-#include "mongo/util/uuid.h"
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace repl {
 
 /**
@@ -109,4 +110,4 @@ private:
 };
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

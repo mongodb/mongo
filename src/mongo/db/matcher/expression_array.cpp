@@ -28,21 +28,18 @@
  */
 
 #include "mongo/db/matcher/expression_array.h"
-#include "mongo/db/field_ref.h"
-#include "mongo/db/jsobj.h"
+
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/query/util/make_data_structure.h"
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
 namespace mongo {
-
-bool ArrayMatchingMatchExpression::matchesSingleElement(const BSONElement& elt,
-                                                        MatchDetails* details) const {
-    if (elt.type() != BSONType::Array) {
-        return false;
-    }
-
-    return matchesArray(elt.embeddedObject(), details);
-}
-
 
 bool ArrayMatchingMatchExpression::equivalent(const MatchExpression* other) const {
     if (matchType() != other->matchType())
@@ -67,156 +64,85 @@ bool ArrayMatchingMatchExpression::equivalent(const MatchExpression* other) cons
 // -------
 
 ElemMatchObjectMatchExpression::ElemMatchObjectMatchExpression(
-    StringData path, std::unique_ptr<MatchExpression> sub, clonable_ptr<ErrorAnnotation> annotation)
+    boost::optional<StringData> path,
+    std::unique_ptr<MatchExpression> sub,
+    clonable_ptr<ErrorAnnotation> annotation)
     : ArrayMatchingMatchExpression(ELEM_MATCH_OBJECT, path, std::move(annotation)),
       _sub(std::move(sub)) {}
-
-bool ElemMatchObjectMatchExpression::matchesArray(const BSONObj& anArray,
-                                                  MatchDetails* details) const {
-    BSONObjIterator i(anArray);
-    while (i.more()) {
-        BSONElement inner = i.next();
-        if (!inner.isABSONObj())
-            continue;
-        if (_sub->matchesBSON(inner.Obj(), nullptr)) {
-            if (details && details->needRecord()) {
-                details->setElemMatchKey(inner.fieldName());
-            }
-            return true;
-        }
-    }
-    return false;
-}
 
 void ElemMatchObjectMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {
     _debugAddSpace(debug, indentationLevel);
     debug << path() << " $elemMatch (obj)";
-
-    MatchExpression::TagData* td = getTag();
-    if (nullptr != td) {
-        debug << " ";
-        td->debugString(&debug);
-    }
-    debug << "\n";
+    _debugStringAttachTagInfo(&debug);
     _sub->debugString(debug, indentationLevel + 1);
 }
 
-BSONObj ElemMatchObjectMatchExpression::getSerializedRightHandSide() const {
-    BSONObjBuilder subBob;
-    _sub->serialize(&subBob, true);
-    return BSON("$elemMatch" << subBob.obj());
-}
-
-MatchExpression::ExpressionOptimizerFunc ElemMatchObjectMatchExpression::getOptimizer() const {
-    return [](std::unique_ptr<MatchExpression> expression) {
-        auto& elemExpression = static_cast<ElemMatchObjectMatchExpression&>(*expression);
-        elemExpression._sub = MatchExpression::optimize(std::move(elemExpression._sub));
-
-        return expression;
-    };
+void ElemMatchObjectMatchExpression::appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                                                   const SerializationOptions& opts,
+                                                                   bool includePath) const {
+    BSONObjBuilder elemMatchBob = bob->subobjStart("$elemMatch");
+    SerializationOptions options = opts;
+    _sub->serialize(&elemMatchBob, options, true);
+    elemMatchBob.doneFast();
 }
 
 // -------
 
 ElemMatchValueMatchExpression::ElemMatchValueMatchExpression(
-    StringData path, std::unique_ptr<MatchExpression> sub, clonable_ptr<ErrorAnnotation> annotation)
+    boost::optional<StringData> path,
+    std::unique_ptr<MatchExpression> sub,
+    clonable_ptr<ErrorAnnotation> annotation)
     : ArrayMatchingMatchExpression(ELEM_MATCH_VALUE, path, std::move(annotation)),
       _subs(makeVector(std::move(sub))) {}
 
 ElemMatchValueMatchExpression::ElemMatchValueMatchExpression(
-    StringData path, clonable_ptr<ErrorAnnotation> annotation)
+    boost::optional<StringData> path, clonable_ptr<ErrorAnnotation> annotation)
     : ArrayMatchingMatchExpression(ELEM_MATCH_VALUE, path, std::move(annotation)) {}
 
 void ElemMatchValueMatchExpression::add(std::unique_ptr<MatchExpression> sub) {
     _subs.push_back(std::move(sub));
 }
 
-bool ElemMatchValueMatchExpression::matchesArray(const BSONObj& anArray,
-                                                 MatchDetails* details) const {
-    BSONObjIterator i(anArray);
-    while (i.more()) {
-        BSONElement inner = i.next();
-
-        if (_arrayElementMatchesAll(inner)) {
-            if (details && details->needRecord()) {
-                details->setElemMatchKey(inner.fieldName());
-            }
-            return true;
-        }
-    }
-    return false;
-}
-
-bool ElemMatchValueMatchExpression::_arrayElementMatchesAll(const BSONElement& e) const {
-    for (unsigned i = 0; i < _subs.size(); i++) {
-        if (!_subs[i]->matchesSingleElement(e))
-            return false;
-    }
-    return true;
-}
-
 void ElemMatchValueMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {
     _debugAddSpace(debug, indentationLevel);
     debug << path() << " $elemMatch (value)";
 
-    MatchExpression::TagData* td = getTag();
-    if (nullptr != td) {
-        debug << " ";
-        td->debugString(&debug);
-    }
-    debug << "\n";
+    _debugStringAttachTagInfo(&debug);
+
     for (unsigned i = 0; i < _subs.size(); i++) {
         _subs[i]->debugString(debug, indentationLevel + 1);
     }
 }
 
-BSONObj ElemMatchValueMatchExpression::getSerializedRightHandSide() const {
-    BSONObjBuilder emBob;
-
+void ElemMatchValueMatchExpression::appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                                                  const SerializationOptions& opts,
+                                                                  bool includePath) const {
+    BSONObjBuilder emBob = bob->subobjStart("$elemMatch");
+    SerializationOptions options = opts;
     for (auto&& child : _subs) {
-        child->serialize(&emBob, false);
+        child->serialize(&emBob, options, false);
     }
-
-    return BSON("$elemMatch" << emBob.obj());
-}
-
-MatchExpression::ExpressionOptimizerFunc ElemMatchValueMatchExpression::getOptimizer() const {
-    return [](std::unique_ptr<MatchExpression> expression) {
-        auto& subs = static_cast<ElemMatchValueMatchExpression&>(*expression)._subs;
-
-        for (auto& subExpression : subs)
-            subExpression = MatchExpression::optimize(std::move(subExpression));
-
-        return expression;
-    };
+    emBob.doneFast();
 }
 
 // ---------
 
-SizeMatchExpression::SizeMatchExpression(StringData path,
+SizeMatchExpression::SizeMatchExpression(boost::optional<StringData> path,
                                          int size,
                                          clonable_ptr<ErrorAnnotation> annotation)
     : ArrayMatchingMatchExpression(SIZE, path, std::move(annotation)), _size(size) {}
 
-bool SizeMatchExpression::matchesArray(const BSONObj& anArray, MatchDetails* details) const {
-    if (_size < 0)
-        return false;
-    return anArray.nFields() == _size;
-}
-
 void SizeMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {
     _debugAddSpace(debug, indentationLevel);
-    debug << path() << " $size : " << _size << "\n";
+    debug << path() << " $size : " << _size;
 
-    MatchExpression::TagData* td = getTag();
-    if (nullptr != td) {
-        debug << " ";
-        td->debugString(&debug);
-    }
+    _debugStringAttachTagInfo(&debug);
 }
 
-BSONObj SizeMatchExpression::getSerializedRightHandSide() const {
-    return BSON("$size" << _size);
+void SizeMatchExpression::appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                                        const SerializationOptions& opts,
+                                                        bool includePath) const {
+    opts.appendLiteral(bob, "$size", _size);
 }
 
 bool SizeMatchExpression::equivalent(const MatchExpression* other) const {

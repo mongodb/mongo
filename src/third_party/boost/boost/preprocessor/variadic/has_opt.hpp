@@ -17,10 +17,16 @@
 # /* BOOST_PP_VARIADIC_HAS_OPT */
 #
 # if defined(__cplusplus) && __cplusplus > 201703L
-# include <boost/preprocessor/variadic/detail/has_opt.hpp>
-# define BOOST_PP_VARIADIC_HAS_OPT() \
+#  if defined(__GNUC__) && !defined(__clang__) && __GNUC__ >= 8 && __GNUC__ < 10
+#   define BOOST_PP_VARIADIC_HAS_OPT() 0
+#  elif defined(__clang__) && __clang_major__ < 9
+#   define BOOST_PP_VARIADIC_HAS_OPT() 0
+#  else
+#   include <boost/preprocessor/variadic/detail/has_opt.hpp>
+#   define BOOST_PP_VARIADIC_HAS_OPT() \
   BOOST_PP_VARIADIC_HAS_OPT_ELEM2(BOOST_PP_VARIADIC_HAS_OPT_FUNCTION(?),) \
 /**/
+#  endif
 # else
 # define BOOST_PP_VARIADIC_HAS_OPT() 0
 # endif

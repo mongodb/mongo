@@ -27,73 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
 
 #include "mongo/util/text.h"
 
-#include <boost/integer_traits.hpp>
-#include <errno.h>
+#include <cerrno>
 #include <iostream>
 #include <memory>
-#include <sstream>
+#include <sstream>  // IWYU pragma: keep
+
+#include <boost/integer_traits.hpp>
 
 #ifdef _WIN32
 #include <io.h>
 #endif
 
-#include "mongo/platform/basic.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
-
-// --- StringSplitter ----
-
-/** get next split string fragment */
-std::string StringSplitter::next() {
-    const char* foo = strstr(_big, _splitter);
-    if (foo) {
-        std::string s(_big, foo - _big);
-        _big = foo + strlen(_splitter);
-        while (*_big && strstr(_big, _splitter) == _big)
-            _big++;
-        return s;
-    }
-
-    std::string s = _big;
-    _big += strlen(_big);
-    return s;
-}
-
-
-void StringSplitter::split(std::vector<std::string>& l) {
-    while (more()) {
-        l.push_back(next());
-    }
-}
-
-std::vector<std::string> StringSplitter::split() {
-    std::vector<std::string> l;
-    split(l);
-    return l;
-}
-
-std::string StringSplitter::join(const std::vector<std::string>& l, const std::string& split) {
-    std::stringstream ss;
-    for (unsigned i = 0; i < l.size(); i++) {
-        if (i > 0)
-            ss << split;
-        ss << l[i];
-    }
-    return ss.str();
-}
-
-std::vector<std::string> StringSplitter::split(const std::string& big,
-                                               const std::string& splitter) {
-    StringSplitter ss(big.c_str(), splitter.c_str());
-    return ss.split();
-}
-
 
 // --- utf8 utils ------
 
@@ -168,7 +119,7 @@ std::string toUtf8String(const std::wstring& wide) {
                                     nullptr,
                                     nullptr);
         if (len > 0) {
-            verify(len == static_cast<int>(buffer.size()));
+            MONGO_verify(len == static_cast<int>(buffer.size()));
             return std::string(&buffer[0], buffer.size());
         }
     }
@@ -178,24 +129,24 @@ std::string toUtf8String(const std::wstring& wide) {
 }
 
 std::wstring toWideStringFromStringData(StringData utf8String) {
-    int bufferSize = MultiByteToWideChar(CP_UTF8,               // Code page
-                                         0,                     // Flags
-                                         utf8String.rawData(),  // Input string
-                                         utf8String.size(),     // Count, -1 for NUL-terminated
-                                         nullptr,               // No output buffer
-                                         0  // Zero means "compute required size"
+    int bufferSize = MultiByteToWideChar(CP_UTF8,            // Code page
+                                         0,                  // Flags
+                                         utf8String.data(),  // Input string
+                                         utf8String.size(),  // Count, -1 for NUL-terminated
+                                         nullptr,            // No output buffer
+                                         0                   // Zero means "compute required size"
     );
     if (bufferSize == 0) {
         return std::wstring();
     }
     std::unique_ptr<wchar_t[]> tempBuffer(new wchar_t[bufferSize]);
     tempBuffer[0] = L'0';
-    MultiByteToWideChar(CP_UTF8,               // Code page
-                        0,                     // Flags
-                        utf8String.rawData(),  // Input string
-                        utf8String.size(),     // Count, -1 for NUL-terminated
-                        tempBuffer.get(),      // UTF-16 output buffer
-                        bufferSize             // Buffer size in wide characters
+    MultiByteToWideChar(CP_UTF8,            // Code page
+                        0,                  // Flags
+                        utf8String.data(),  // Input string
+                        utf8String.size(),  // Count, -1 for NUL-terminated
+                        tempBuffer.get(),   // UTF-16 output buffer
+                        bufferSize          // Buffer size in wide characters
     );
     return std::wstring(tempBuffer.get(), bufferSize);
 }

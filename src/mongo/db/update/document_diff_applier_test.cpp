@@ -27,16 +27,23 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/bson/json.h"
 #include "mongo/db/update/document_diff_applier.h"
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/db/update/document_diff_test_helpers.h"
-#include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <utility>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 
 namespace mongo::doc_diff {
 namespace {
@@ -80,6 +87,90 @@ TEST(DiffApplierTest, InsertSimple) {
 
     auto diff = diffNode.serialize();
     checkDiff(preImage, BSON("foo" << 2 << "f2" << 3 << "f1" << 1 << "newField" << 2), diff);
+}
+
+TEST(DiffApplierTest, BinaryAppendSimple) {
+    // Appends "def" to "abc" for BSONColumn.
+    const BSONObj preImage(BSON("b1" << BSONBinData("abc", 3, BinDataType::Column)));
+
+    const BSONObj storage(
+        BSON("a" << BSON("o" << 3 << "d" << BSONBinData("def", 3, BinDataType::BinDataGeneral))));
+
+    diff_tree::DocumentSubDiffNode diffNode;
+    diffNode.addBinary("b1", storage["a"]);
+
+    auto diff = diffNode.serialize();
+    checkDiff(preImage, BSON("b1" << BSONBinData("abcdef", 6, BinDataType::Column)), diff);
+}
+
+TEST(DiffApplierTest, BinaryOverwriteSimple) {
+    // Replaces "abc" with "abdef".
+    const BSONObj preImage(BSON("b1" << BSONBinData("abc", 3, BinDataType::Column)));
+
+    const BSONObj storage(
+        BSON("a" << BSON("o" << 2 << "d" << BSONBinData("def", 3, BinDataType::BinDataGeneral))));
+
+    diff_tree::DocumentSubDiffNode diffNode;
+    diffNode.addBinary("b1", storage["a"]);
+
+    auto diff = diffNode.serialize();
+    checkDiff(preImage, BSON("b1" << BSONBinData("abdef", 5, BinDataType::Column)), diff);
+}
+
+TEST(DiffApplierTest, BinaryIsIdempotent) {
+    // Applies "def" to "abc" twice using the same diff. The final result is expected to be
+    // "abcdef".
+    auto applyDiffToImage = [&](BSONObj preImage) -> BSONObj {
+        const BSONObj storage(BSON(
+            "a" << BSON("o" << 3 << "d" << BSONBinData("def", 3, BinDataType::BinDataGeneral))));
+
+        diff_tree::DocumentSubDiffNode diffNode;
+        diffNode.addBinary("b1", storage["a"]);
+
+        return diffNode.serialize();
+    };
+
+    const BSONObj firstImage(BSON("b1" << BSONBinData("abc", 3, BinDataType::Column)));
+
+    auto secondImage = applyDiffToImage(firstImage);
+    checkDiff(firstImage, BSON("b1" << BSONBinData("abcdef", 6, BinDataType::Column)), secondImage);
+
+    auto thirdImage = applyDiffToImage(secondImage);
+    checkDiff(firstImage, BSON("b1" << BSONBinData("abcdef", 6, BinDataType::Column)), thirdImage);
+}
+
+TEST(DiffApplierTest, BinaryIsIdempotentMultipleWithShrink) {
+    // Applies "def" to "abc" and then shinks to "ax" twice using the same two diffs. The final
+    // result is expected to be "ax".
+    auto diffAppend = [&]() -> BSONObj {
+        const BSONObj storage(BSON(
+            "a" << BSON("o" << 3 << "d" << BSONBinData("def", 3, BinDataType::BinDataGeneral))));
+
+        diff_tree::DocumentSubDiffNode diffNode;
+        diffNode.addBinary("b1", storage["a"]);
+
+        return diffNode.serialize();
+    };
+
+    auto diffShrink = [&]() -> BSONObj {
+        const BSONObj storage(
+            BSON("a" << BSON("o" << 1 << "d" << BSONBinData("x", 1, BinDataType::BinDataGeneral))));
+
+        diff_tree::DocumentSubDiffNode diffNode;
+        diffNode.addBinary("b1", storage["a"]);
+
+        return diffNode.serialize();
+    };
+
+    const BSONObj firstImage(BSON("b1" << BSONBinData("abc", 3, BinDataType::Column)));
+    const BSONObj secondImage(BSON("b1" << BSONBinData("abcdef", 6, BinDataType::Column)));
+    const BSONObj thirdImage(BSON("b1" << BSONBinData("ax", 2, BinDataType::Column)));
+
+    checkDiff(firstImage, secondImage, diffAppend());
+    checkDiff(secondImage, thirdImage, diffShrink());
+
+    checkDiff(thirdImage, thirdImage, diffAppend());
+    checkDiff(thirdImage, thirdImage, diffShrink());
 }
 
 TEST(DiffApplierTest, UpdateSimple) {

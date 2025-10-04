@@ -7,8 +7,8 @@ IFS=$'\n\t'
 set -vx
 
 NAME=libunwind
-REVISION="v1.5-stable-mongo" # 2021-01-13
-VERSION="1.5.0"
+REVISION="mongodb/v1.8.1" # 2024-12-11
+VERSION="1.8.1"
 
 DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/unwind
 if [[ -d $DEST_DIR/dist ]]; then
@@ -23,7 +23,7 @@ git clone git@github.com:mongodb-forks/libunwind.git $UNWIND_GIT_DIR
 git -C $UNWIND_GIT_DIR checkout $REVISION
 
 pushd $UNWIND_GIT_DIR
-NOCONFIGURE=1 ./autogen.sh
+autoreconf -i
 ./configure
 make dist
 popd

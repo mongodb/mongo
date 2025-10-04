@@ -1,0 +1,67 @@
+# This suite is based on the change_streams_whole_cluster passthrough suite. It is used for testing
+# that there is no feature parity issue between a replica set before and after it has been
+# bootstrapped as a single-shard cluster as long as the replica set endpoint is enabled. When
+# feature parity is achieved, the set of tests disabled in this suite should be the same as the set
+# of tests disabled in the change_streams_whole_cluster passthrough suite.
+
+test_kind: js_test
+
+selector:
+  roots:
+    - jstests/change_streams/**/*.js
+  exclude_with_any_tags:
+    ##
+    # The next tags correspond to the special errors thrown by the
+    # set_read_and_write_concerns.js override when it refuses to replace the readConcern or
+    # writeConcern of a particular command. Above each tag are the message(s) that cause the tag to be
+    # warranted.
+    ##
+    # "Cowardly refusing to override write concern of command: ..."
+    - assumes_write_concern_unchanged
+    # Not relevant for whole-cluster change streams.
+    - do_not_run_in_whole_cluster_passthrough
+
+executor:
+  archive:
+    hooks:
+      # TODO (SERVER-83433): Add back the test coverage for running db hash check on replica set
+      # that is fsync locked and has replica set endpoint enabled.
+      # - CheckReplDBHash
+      - CheckReplOplogs
+      - ValidateCollections
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          defaultReadConcernLevel: null
+          testingReplicaSetEndpoint: true
+      # Enable causal consistency for change streams suites using 1 node replica sets. See
+      # change_streams_whole_cluster.yml for detailed explanation.
+      eval: >-
+        globalThis.testingReplication = true;
+        await import('jstests/libs/override_methods/set_read_and_write_concerns.js');
+        await import('jstests/libs/override_methods/implicit_whole_cluster_changestreams.js');
+        await import('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');
+      # Set longer host discovery time to handle change stream resumable errors.
+      setShellParameter: defaultFindReplicaSetHostTimeoutMS=120000
+  hooks:
+    # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+    # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+    # validating the entire contents of the collection.
+    - class: CheckReplOplogs
+    # TODO (SERVER-83433): Add back the test coverage for running db hash check on replica set that
+    # is fsync locked and has replica set endpoint enabled.
+    # - class: CheckReplDBHash
+    - class: RunQueryStats
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      bind_ip_all: ""
+      set_parameters:
+        enableTestCommands: 1
+        featureFlagAllMongodsAreSharded: true
+    use_auto_bootstrap_procedure: 1
+    num_nodes: 1

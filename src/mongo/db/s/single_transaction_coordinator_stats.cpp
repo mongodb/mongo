@@ -27,73 +27,38 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/db/s/single_transaction_coordinator_stats.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/s/single_transaction_coordinator_stats.h"
+#include "mongo/db/s/transaction_coordinator.h"
 #include "mongo/util/net/socket_utils.h"
 
 namespace mongo {
 
 void SingleTransactionCoordinatorStats::setCreateTime(TickSource::Tick curTick,
                                                       Date_t curWallClockTime) {
-    invariant(!_createTime);
+    invariant(!_times[createIndex()]);
 
-    _createTime = curTick;
-    _createWallClockTime = curWallClockTime;
+    _times[createIndex()] = curTick;
+    _wallClockTimes[createIndex()] = curWallClockTime;
 }
 
 void SingleTransactionCoordinatorStats::setEndTime(TickSource::Tick curTick,
                                                    Date_t curWallClockTime) {
-    invariant(_createTime);
-    invariant(!_endTime);
+    invariant(_times[createIndex()]);
+    invariant(!_times[endIndex()]);
 
-    _endTime = curTick;
-    _endWallClockTime = curWallClockTime;
+    _times[endIndex()] = curTick;
+    _wallClockTimes[endIndex()] = curWallClockTime;
 }
 
-void SingleTransactionCoordinatorStats::setWritingParticipantListStartTime(
-    TickSource::Tick curTick, Date_t curWallClockTime) {
-    invariant(_createTime);
-    invariant(!_writingParticipantListStartTime);
-
-    _writingParticipantListStartTime = curTick;
-    _writingParticipantListStartWallClockTime = curWallClockTime;
-}
-
-void SingleTransactionCoordinatorStats::setWaitingForVotesStartTime(TickSource::Tick curTick,
-                                                                    Date_t curWallClockTime) {
-    invariant(_writingParticipantListStartTime);
-    invariant(!_waitingForVotesStartTime);
-
-    _waitingForVotesStartTime = curTick;
-    _waitingForVotesStartWallClockTime = curWallClockTime;
-}
-
-void SingleTransactionCoordinatorStats::setWritingDecisionStartTime(TickSource::Tick curTick,
-                                                                    Date_t curWallClockTime) {
-    invariant(!_writingDecisionStartTime);
-    // _waitingForVotesStartTime can remain not set if the previous operation timed out.
-
-    _writingDecisionStartTime = curTick;
-    _writingDecisionStartWallClockTime = curWallClockTime;
-}
-
-void SingleTransactionCoordinatorStats::setWaitingForDecisionAcksStartTime(
-    TickSource::Tick curTick, Date_t curWallClockTime) {
-    invariant(_writingDecisionStartTime);
-    invariant(!_waitingForDecisionAcksStartTime);
-
-    _waitingForDecisionAcksStartTime = curTick;
-    _waitingForDecisionAcksStartWallClockTime = curWallClockTime;
-}
-
-void SingleTransactionCoordinatorStats::setDeletingCoordinatorDocStartTime(
-    TickSource::Tick curTick, Date_t curWallClockTime) {
-    invariant(!_deletingCoordinatorDocStartTime);
-
-    _deletingCoordinatorDocStartTime = curTick;
-    _deletingCoordinatorDocStartWallClockTime = curWallClockTime;
+void SingleTransactionCoordinatorStats::setStepStartTime(TransactionCoordinator::Step step,
+                                                         TickSource::Tick curTick,
+                                                         Date_t curWallClockTime) {
+    size_t stepIndex = static_cast<size_t>(step);
+    invariant(!_times[stepIndex]);
+    _times[stepIndex] = curTick;
+    _wallClockTimes[stepIndex] = curWallClockTime;
 }
 
 void SingleTransactionCoordinatorStats::setRecoveredFromFailover() {
@@ -102,100 +67,48 @@ void SingleTransactionCoordinatorStats::setRecoveredFromFailover() {
 
 Microseconds SingleTransactionCoordinatorStats::getDurationSinceCreation(
     TickSource* tickSource, TickSource::Tick curTick) const {
-    invariant(_createTime);
+    invariant(_times[createIndex()]);
 
-    if (_endTime) {
-        return tickSource->ticksTo<Microseconds>(_endTime - _createTime);
+    if (_times[endIndex()]) {
+        return tickSource->ticksTo<Microseconds>(_times[endIndex()] - _times[createIndex()]);
     }
-    return tickSource->ticksTo<Microseconds>(curTick - _createTime);
+    return tickSource->ticksTo<Microseconds>(curTick - _times[createIndex()]);
 }
 
 Microseconds SingleTransactionCoordinatorStats::getTwoPhaseCommitDuration(
     TickSource* tickSource, TickSource::Tick curTick) const {
-    invariant(_writingParticipantListStartTime);
+    const TickSource::Tick& writingParticipantListStartTime =
+        _times[static_cast<size_t>(TransactionCoordinator::Step::kWritingParticipantList)];
+    invariant(writingParticipantListStartTime);
 
-    if (_endTime) {
-        return tickSource->ticksTo<Microseconds>(_endTime - _writingParticipantListStartTime);
+    if (_times[endIndex()]) {
+        return tickSource->ticksTo<Microseconds>(_times[endIndex()] -
+                                                 writingParticipantListStartTime);
     }
-    return tickSource->ticksTo<Microseconds>(curTick - _writingParticipantListStartTime);
+    return tickSource->ticksTo<Microseconds>(curTick - writingParticipantListStartTime);
 }
 
-Microseconds SingleTransactionCoordinatorStats::getWritingParticipantListDuration(
-    TickSource* tickSource, TickSource::Tick curTick) const {
-    invariant(_writingParticipantListStartTime);
+Microseconds SingleTransactionCoordinatorStats::getStepDuration(TransactionCoordinator::Step step,
+                                                                TickSource* tickSource,
+                                                                TickSource::Tick curTick) const {
+    size_t index = static_cast<size_t>(step);
+    const TickSource::Tick& stepStartTime = _times[index];
 
-    if (_waitingForVotesStartTime) {
-        return tickSource->ticksTo<Microseconds>(_waitingForVotesStartTime -
-                                                 _writingParticipantListStartTime);
+    if (step == TransactionCoordinator::Step::kWaitingForVotes && !stepStartTime) {
+        // kWaitingForVotes start time can remain not set in a case of timeout.
+        return Microseconds(0);
+    }
+    invariant(stepStartTime);
+
+    if (_times[index + 1]) {
+        return tickSource->ticksTo<Microseconds>(_times[index + 1] - stepStartTime);
     }
 
-    if (_endTime) {
-        return tickSource->ticksTo<Microseconds>(_endTime - _writingParticipantListStartTime);
+    if (_times[endIndex()]) {
+        return tickSource->ticksTo<Microseconds>(_times[endIndex()] - stepStartTime);
     }
 
-    return tickSource->ticksTo<Microseconds>(curTick - _writingParticipantListStartTime);
-}
-
-Microseconds SingleTransactionCoordinatorStats::getWaitingForVotesDuration(
-    TickSource* tickSource, TickSource::Tick curTick) const {
-    if (!_waitingForVotesStartTime) {
-        return Microseconds(
-            0);  // _waitingForVotesStartTime can remain not set in a case of timeout.
-    }
-
-    if (_writingDecisionStartTime) {
-        return tickSource->ticksTo<Microseconds>(_writingDecisionStartTime -
-                                                 _waitingForVotesStartTime);
-    }
-
-    if (_endTime) {
-        return tickSource->ticksTo<Microseconds>(_endTime - _waitingForVotesStartTime);
-    }
-
-    return tickSource->ticksTo<Microseconds>(curTick - _waitingForVotesStartTime);
-}
-
-Microseconds SingleTransactionCoordinatorStats::getWritingDecisionDuration(
-    TickSource* tickSource, TickSource::Tick curTick) const {
-    invariant(_writingDecisionStartTime);
-
-    if (_waitingForDecisionAcksStartTime) {
-        return tickSource->ticksTo<Microseconds>(_waitingForDecisionAcksStartTime -
-                                                 _writingDecisionStartTime);
-    }
-
-    if (_endTime) {
-        return tickSource->ticksTo<Microseconds>(_endTime - _writingDecisionStartTime);
-    }
-
-    return tickSource->ticksTo<Microseconds>(curTick - _writingDecisionStartTime);
-}
-
-Microseconds SingleTransactionCoordinatorStats::getWaitingForDecisionAcksDuration(
-    TickSource* tickSource, TickSource::Tick curTick) const {
-    invariant(_waitingForDecisionAcksStartTime);
-
-    if (_deletingCoordinatorDocStartTime) {
-        return tickSource->ticksTo<Microseconds>(_deletingCoordinatorDocStartTime -
-                                                 _waitingForDecisionAcksStartTime);
-    }
-
-    if (_endTime) {
-        return tickSource->ticksTo<Microseconds>(_endTime - _waitingForDecisionAcksStartTime);
-    }
-
-    return tickSource->ticksTo<Microseconds>(curTick - _waitingForDecisionAcksStartTime);
-}
-
-Microseconds SingleTransactionCoordinatorStats::getDeletingCoordinatorDocDuration(
-    TickSource* tickSource, TickSource::Tick curTick) const {
-    invariant(_deletingCoordinatorDocStartTime);
-
-    if (_endTime) {
-        return tickSource->ticksTo<Microseconds>(_endTime - _deletingCoordinatorDocStartTime);
-    }
-
-    return tickSource->ticksTo<Microseconds>(curTick - _deletingCoordinatorDocStartTime);
+    return tickSource->ticksTo<Microseconds>(curTick - stepStartTime);
 }
 
 void SingleTransactionCoordinatorStats::reportMetrics(BSONObjBuilder& parent,
@@ -203,12 +116,13 @@ void SingleTransactionCoordinatorStats::reportMetrics(BSONObjBuilder& parent,
                                                       TickSource::Tick curTick) const {
     BSONObjBuilder stepDurationsBuilder;
 
-    invariant(_createTime);
-    parent.append("commitStartTime", _createWallClockTime);
+    invariant(_times[createIndex()]);
+    parent.append("commitStartTime", _wallClockTimes[createIndex()]);
     parent.append("hasRecoveredFromFailover", _hasRecoveredFromFailover);
 
-    if (_writingParticipantListStartTime) {
-        const auto statValue = getWritingParticipantListDuration(tickSource, curTick);
+    if (hasTime(TransactionCoordinator::Step::kWritingParticipantList)) {
+        const auto statValue = getStepDuration(
+            TransactionCoordinator::Step::kWritingParticipantList, tickSource, curTick);
         stepDurationsBuilder.append("writingParticipantListMicros",
                                     durationCount<Microseconds>(statValue));
 
@@ -217,26 +131,37 @@ void SingleTransactionCoordinatorStats::reportMetrics(BSONObjBuilder& parent,
                                     durationCount<Microseconds>(statValue2));
     }
 
-    if (_waitingForVotesStartTime) {
-        const auto statValue = getWaitingForVotesDuration(tickSource, curTick);
+    if (hasTime(TransactionCoordinator::Step::kWaitingForVotes)) {
+        const auto statValue =
+            getStepDuration(TransactionCoordinator::Step::kWaitingForVotes, tickSource, curTick);
         stepDurationsBuilder.append("waitingForVotesMicros",
                                     durationCount<Microseconds>(statValue));
     }
 
-    if (_writingDecisionStartTime) {
-        const auto statValue = getWritingDecisionDuration(tickSource, curTick);
+    if (hasTime(TransactionCoordinator::Step::kWritingDecision)) {
+        const auto statValue =
+            getStepDuration(TransactionCoordinator::Step::kWritingDecision, tickSource, curTick);
         stepDurationsBuilder.append("writingDecisionMicros",
                                     durationCount<Microseconds>(statValue));
     }
 
-    if (_waitingForDecisionAcksStartTime) {
-        const auto statValue = getWaitingForDecisionAcksDuration(tickSource, curTick);
+    if (hasTime(TransactionCoordinator::Step::kWaitingForDecisionAcks)) {
+        const auto statValue = getStepDuration(
+            TransactionCoordinator::Step::kWaitingForDecisionAcks, tickSource, curTick);
         stepDurationsBuilder.append("waitingForDecisionAcksMicros",
                                     durationCount<Microseconds>(statValue));
     }
 
-    if (_deletingCoordinatorDocStartTime) {
-        const auto statValue = getDeletingCoordinatorDocDuration(tickSource, curTick);
+    if (hasTime(TransactionCoordinator::Step::kWritingEndOfTransaction)) {
+        const auto statValue = getStepDuration(
+            TransactionCoordinator::Step::kWritingEndOfTransaction, tickSource, curTick);
+        stepDurationsBuilder.append("writingEndOfTransactionMicros",
+                                    durationCount<Microseconds>(statValue));
+    }
+
+    if (hasTime(TransactionCoordinator::Step::kDeletingCoordinatorDoc)) {
+        const auto statValue = getStepDuration(
+            TransactionCoordinator::Step::kDeletingCoordinatorDoc, tickSource, curTick);
         stepDurationsBuilder.append("deletingCoordinatorDocMicros",
                                     durationCount<Microseconds>(statValue));
     }
@@ -244,9 +169,10 @@ void SingleTransactionCoordinatorStats::reportMetrics(BSONObjBuilder& parent,
     parent.append("stepDurations", stepDurationsBuilder.obj());
 }
 
-void SingleTransactionCoordinatorStats::reportLastClient(BSONObjBuilder& parent) const {
+void SingleTransactionCoordinatorStats::reportLastClient(OperationContext* opCtx,
+                                                         BSONObjBuilder& parent) const {
     parent.append("client", _lastClientInfo.clientHostAndPort);
-    parent.append("host", getHostNameCachedAndPort());
+    parent.append("host", prettyHostNameAndPort(opCtx->getClient()->getLocalPort()));
     parent.append("connectionId", _lastClientInfo.connectionId);
     parent.append("appName", _lastClientInfo.appName);
     parent.append("clientMetadata", _lastClientInfo.clientMetadata);

@@ -33,10 +33,12 @@ global:
     cpp_namespace: "mongo"
 
 imports:
-    - "mongo/idl/basic_types.idl"
-    - "mongo/s/sharding_types.idl"
-    - "mongo/db/logical_session_id.idl"
-    - "mongo/s/chunk_range.idl"
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/keypattern.idl"
+    - "mongo/db/session/logical_session_id.idl"
+    - "mongo/db/global_catalog/chunk_range.idl"
+    - "mongo/db/versioning_protocol/chunk_version.idl"
+    - "mongo/db/sharding_environment/sharding_types.idl"
 
 enums:
     CleanWhen:
@@ -71,10 +73,25 @@ structs:
                 type: bool
                 description: "Flag that is present if the range is not yet ready for deletion"
                 optional: true
+            processing:
+                type: optionalBool
+                description: "Flag that is present if the range is currently being deleted"
             whenToClean:
                 type: CleanWhen
                 description: "Enumeration that defines when to cleanup the range."
             timestamp:
                 type: timestamp
                 description: "The timestamp the task was created."
+                optional: true
+            numOrphanDocs:
+                type: safeInt64
+                description: "The estimated number of orphaned documents in the range"
+                default: 0
+            keyPattern:
+                type: KeyPattern
+                description: "The shard key pattern at the moment the range deletion task was created"
+                optional: true
+            preMigrationShardVersion:
+                type: ChunkVersion
+                description: "The shard version prior to the migration that caused this range deletion task."
                 optional: true

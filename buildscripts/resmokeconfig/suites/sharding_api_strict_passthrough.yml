@@ -1,0 +1,41 @@
+# This passthrough suite runs sharding tests and sets 'apiStrict:true' for all the Stable API commands.
+test_kind: js_test
+
+selector:
+  roots:
+    # TODO SERVER-75496: Uncomment once ticket is complete.
+    # - jstests/sharding/auth.js
+    - jstests/sharding/auth_repl.js
+    - jstests/sharding/auth_secondaryok_routing.js
+    - jstests/sharding/auth_sharding_cmd_metadata.js
+    - jstests/sharding/query/change_streams/change_stream_update_lookup_collation.js
+    - jstests/sharding/query/count/count_config_servers.js
+    - jstests/sharding/internal_txns/end_sessions.js
+    - jstests/sharding/internal_txns/retry_on_transient_error_basic.js
+    - jstests/sharding/internal_txns/retry_on_transient_error_validation.js
+    - jstests/sharding/logical_time_api.js
+    - jstests/sharding/max_time_ms_enforced_on_shard.js
+    - jstests/sharding/mongod_returns_no_cluster_time_without_keys.js
+    - jstests/sharding/query/collation/collation_shard_targeting_hashed_shard_key.js
+    - jstests/sharding/query/mongos_query_comment.js
+    - jstests/sharding/query/pipeline_length_limit.js
+    - jstests/sharding/query/pipeline_pass_through_from_mongos.js
+    # TODO SERVER-75496: Uncomment once ticket is complete.
+    # - jstests/sharding/query/view_on_shard_rewrite.js
+    - jstests/sharding/resharding_prohibited_commands.js
+    - jstests/sharding/resharding_replicate_updates_as_insert_delete.js
+    - jstests/sharding/retryable_write_error_labels.js
+    - jstests/sharding/session_info_in_oplog.js
+    # TODO SERVER-75496: Uncomment once ticket is complete.
+    # - jstests/sharding/transactions_writes_not_retryable.js
+    - jstests/sharding/transient_txn_error_labels.js
+    - jstests/sharding/transient_txn_error_labels_with_write_concern.js
+    - jstests/sharding/validate_commands_wc.js
+
+executor:
+  config:
+    shell_options:
+      eval: >-
+        globalThis.testingReplication = false;
+        await import('jstests/libs/override_methods/set_api_strict.js');
+      nodb: ""

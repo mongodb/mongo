@@ -27,17 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/config.h"
 
 #include "mongo/util/net/ssl_options.h"
 
-#include <boost/range/size.hpp>
-#include <ostream>
-
 #include "mongo/base/init.h"
 #include "mongo/base/initializer.h"
+#include "mongo/config.h"
 #include "mongo/db/server_options_base.h"
 #include "mongo/db/server_options_server_helpers.h"
 #include "mongo/unittest/unittest.h"
@@ -47,6 +42,10 @@
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/options_parser.h"
 #include "mongo/util/options_parser/startup_options.h"
+
+#include <ostream>
+
+#include <boost/range/size.hpp>
 
 namespace moe = mongo::optionenvironment;
 
@@ -128,7 +127,9 @@ TEST(SSLOptions, invalidCases) {
 
 class OptionsParserTester : public moe::OptionsParser {
 public:
-    Status readConfigFile(const std::string& filename, std::string* config, ConfigExpand) {
+    Status readConfigFile(const std::string& filename,
+                          std::string* config,
+                          moe::ConfigExpand) override {
         if (filename != _filename) {
             ::mongo::StringBuilder sb;
             sb << "Parser using filename: " << filename
@@ -481,33 +482,29 @@ TEST(SetupOptions, RedactionSingleName) {
 }
 
 TEST(SetupOptions, RedactionDottedName) {
-    auto obj = BSON("net" << BSON("tls" << BSON("mode"
-                                                << "requireTLS"
-                                                << "certificateKeyFilePassword"
-                                                << "qwerty"
-                                                << "ClusterPassword"
-                                                << "qwerty")
+    auto obj = BSON("net" << BSON("tls" << BSON("mode" << "requireTLS"
+                                                       << "certificateKeyFilePassword"
+                                                       << "qwerty"
+                                                       << "ClusterPassword"
+                                                       << "qwerty")
                                         << "ssl"
-                                        << BSON("mode"
-                                                << "requireSSL"
-                                                << "PEMKeyPassword"
-                                                << "qwerty"
-                                                << "ClusterPassword"
-                                                << "qwerty")));
+                                        << BSON("mode" << "requireSSL"
+                                                       << "PEMKeyPassword"
+                                                       << "qwerty"
+                                                       << "ClusterPassword"
+                                                       << "qwerty")));
 
-    auto res = BSON("net" << BSON("tls" << BSON("mode"
-                                                << "requireTLS"
-                                                << "certificateKeyFilePassword"
-                                                << "<password>"
-                                                << "ClusterPassword"
-                                                << "<password>")
+    auto res = BSON("net" << BSON("tls" << BSON("mode" << "requireTLS"
+                                                       << "certificateKeyFilePassword"
+                                                       << "<password>"
+                                                       << "ClusterPassword"
+                                                       << "<password>")
                                         << "ssl"
-                                        << BSON("mode"
-                                                << "requireSSL"
-                                                << "PEMKeyPassword"
-                                                << "<password>"
-                                                << "ClusterPassword"
-                                                << "<password>")));
+                                        << BSON("mode" << "requireSSL"
+                                                       << "PEMKeyPassword"
+                                                       << "<password>"
+                                                       << "ClusterPassword"
+                                                       << "<password>")));
 
     cmdline_utils::censorBSONObj(&obj);
     ASSERT_BSONOBJ_EQ(res, obj);

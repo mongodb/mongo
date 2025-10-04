@@ -3,14 +3,6 @@
  * jstests/fle/fle_command_line_encryption.js.
  */
 
-load("jstests/client_encrypt/lib/mock_kms.js");
-
-(function() {
-"use strict";
-
-const mock_kms = new MockKMSServerAWS();
-mock_kms.start();
-
 const shell = Mongo();
 const keyVault = shell.getKeyVault();
 
@@ -27,12 +19,12 @@ const passTestCases = [
     NumberInt(23),
     UUID(),
     ISODate(),
-    new Date('December 17, 1995 03:24:00'),
-    BinData(0, '1234'),
+    new Date("December 17, 1995 03:24:00"),
+    BinData(0, "1234"),
     new Timestamp(1, 2),
     new ObjectId(),
     new DBPointer("mongo", new ObjectId()),
-    /test/
+    /test/,
 ];
 
 const failDeterministic = [
@@ -42,7 +34,7 @@ const failDeterministic = [
     NumberDecimal(0.1234),
     ["this is an array"],
     {"value": "mongo"},
-    Code("function() { return true; }")
+    Code("function() { return true; }"),
 ];
 
 const failTestCases = [null, undefined, MinKey(), MaxKey(), DBRef("test", "test", "test")];
@@ -51,7 +43,7 @@ const failTestCases = [null, undefined, MinKey(), MaxKey(), DBRef("test", "test"
 for (const encryptionAlgorithm of encryptionAlgorithms) {
     collection.drop();
 
-    keyVault.createKey("aws", "arn:aws:kms:us-east-1:fake:fake:fake", ['mongoKey']);
+    keyVault.createKey("local", ["mongoKey"]);
     const keyId = keyVault.getKeyByAltName("mongoKey").toArray()[0]._id;
 
     let pass;
@@ -78,6 +70,4 @@ for (const encryptionAlgorithm of encryptionAlgorithms) {
     }
 }
 
-mock_kms.stop();
 print("Test completed with no errors.");
-}());

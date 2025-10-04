@@ -27,35 +27,35 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <iterator>
+#include "mongo/rpc/object_check.h"  // IWYU pragma: keep
 
 #include "mongo/base/data_range_cursor.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/server_options.h"
-#include "mongo/rpc/object_check.h"
+#include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/scopeguard.h"
+
+#include <iterator>
+#include <variant>
 
 namespace {
 
 using namespace mongo;
 using std::begin;
 using std::end;
-using std::swap;
 
 TEST(DataTypeValidated, BSONValidationEnabled) {
     bool wasEnabled = serverGlobalParams.objcheck;
-    const auto setValidation = [&](bool enabled) { serverGlobalParams.objcheck = enabled; };
+    const auto setValidation = [&](bool enabled) {
+        serverGlobalParams.objcheck = enabled;
+    };
     ON_BLOCK_EXIT([=] { setValidation(wasEnabled); });
 
-    BSONObj valid = BSON("baz"
-                         << "bar"
-                         << "garply"
-                         << BSON("foo"
-                                 << "bar"));
+    BSONObj valid = BSON("baz" << "bar"
+                               << "garply" << BSON("foo" << "bar"));
     char buf[1024] = {0};
     std::copy(valid.objdata(), valid.objdata() + valid.objsize(), begin(buf));
     {
@@ -97,11 +97,8 @@ DEATH_TEST(ObjectCheck, BSONValidationEnabledWithCrashOnError, "50761") {
     serverGlobalParams.crashOnInvalidBSONError = true;
     ON_BLOCK_EXIT([&] { serverGlobalParams.crashOnInvalidBSONError = crashOnErrorValue; });
 
-    BSONObj valid = BSON("baz"
-                         << "bar"
-                         << "garply"
-                         << BSON("foo"
-                                 << "bar"));
+    BSONObj valid = BSON("baz" << "bar"
+                               << "garply" << BSON("foo" << "bar"));
     char buf[1024] = {0};
     std::copy(valid.objdata(), valid.objdata() + valid.objsize(), begin(buf));
 

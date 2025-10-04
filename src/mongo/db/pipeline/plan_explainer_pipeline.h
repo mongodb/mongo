@@ -29,8 +29,16 @@
 
 #pragma once
 
+#include "mongo/db/exec/agg/exec_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/plan_explainer.h"
+#include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/util/modules.h"
+
+#include <cstddef>
+#include <string>
+#include <vector>
 
 namespace mongo {
 /**
@@ -38,7 +46,8 @@ namespace mongo {
  */
 class PlanExplainerPipeline final : public PlanExplainer {
 public:
-    PlanExplainerPipeline(const Pipeline* pipeline) : _pipeline{pipeline} {}
+    PlanExplainerPipeline(const Pipeline* pipeline, const exec::agg::Pipeline* execPipeline)
+        : _pipeline{pipeline}, _execPipeline(execPipeline) {}
 
     bool isMultiPlan() const final {
         return false;
@@ -51,8 +60,6 @@ public:
     PlanStatsDetails getWinningPlanTrialStats() const final;
     std::vector<PlanStatsDetails> getRejectedPlansStats(
         ExplainOptions::Verbosity verbosity) const final;
-    std::vector<PlanStatsDetails> getCachedPlanStats(const plan_cache_debug_info::DebugInfo&,
-                                                     ExplainOptions::Verbosity) const final;
 
     void incrementNReturned() {
         ++_nReturned;
@@ -60,6 +67,7 @@ public:
 
 private:
     const Pipeline* const _pipeline;
+    const exec::agg::Pipeline* const _execPipeline;
     size_t _nReturned{0};
 };
 }  // namespace mongo

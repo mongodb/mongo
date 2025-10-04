@@ -58,6 +58,12 @@ var {ErrorCodes, ErrorCodeStrings} = (function() {
 })();
 
 //#for $cat in $categories
+ErrorCodes.${cat.name} = new Set([
+    //#for $code in $cat.codes
+    '$code',
+    //#end for
+]);
+
 ErrorCodes.is${cat.name} = function(err) {
     'use strict';
 
@@ -71,14 +77,7 @@ ErrorCodes.is${cat.name} = function(err) {
             return false;
         }
     }
-    switch (error) {
-        //#for $code in $cat.codes
-        case '$code':
-            return true;
-        //#end for
-        default:
-            return false;
-    }
+    return ErrorCodes.${cat.name}.has(error);
 };
 //#end for
 

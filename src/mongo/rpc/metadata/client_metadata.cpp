@@ -27,28 +27,41 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/rpc/metadata/client_metadata.h"
 
-#include <string>
-
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/is_mongos.h"
-#include "mongo/util/debug_util.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/platform/process_id.h"
+#include "mongo/transport/message_compressor_base.h"
+#include "mongo/transport/message_compressor_manager.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/str.h"
 #include "mongo/util/testing_proctor.h"
 #include "mongo/util/version.h"
+
+#include <cstdint>
+#include <mutex>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
+
 
 namespace mongo {
 
@@ -100,13 +113,13 @@ StatusWith<boost::optional<ClientMetadata>> ClientMetadata::parse(const BSONElem
 
 ClientMetadata::ClientMetadata(BSONObj doc) {
     uint32_t maxLength = kMaxMongoDMetadataDocumentByteLength;
-    if (isMongos()) {
+    if (serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer)) {
         maxLength = kMaxMongoSMetadataDocumentByteLength;
     }
 
     uassert(ErrorCodes::ClientMetadataDocumentTooLarge,
             str::stream() << "The client metadata document must be less then or equal to "
-                          << maxLength << "bytes",
+                          << maxLength << " bytes",
             static_cast<uint32_t>(doc.objsize()) <= maxLength);
 
     const auto isobj = [](StringData name, const BSONElement& e) {
@@ -156,7 +169,7 @@ ClientMetadata::ClientMetadata(BSONObj doc) {
             foundOperatingSystem);
 }
 
-StatusWith<StringData> ClientMetadata::parseApplicationDocument(const BSONObj& doc) {
+StatusWith<std::string> ClientMetadata::parseApplicationDocument(const BSONObj& doc) {
     BSONObjIterator i(doc);
 
     while (i.more()) {
@@ -166,14 +179,14 @@ StatusWith<StringData> ClientMetadata::parseApplicationDocument(const BSONObj& d
         // Name is the only required field, and any other fields are simply ignored.
         if (name == kName) {
 
-            if (e.type() != String) {
+            if (e.type() != BSONType::string) {
                 return {ErrorCodes::TypeMismatch,
                         str::stream()
                             << "The '" << kApplication << "." << kName
                             << "' field must be a string in the client metadata document"};
             }
 
-            StringData value = e.checkAndGetStringData();
+            std::string value = str::escape(std::string{e.checkAndGetStringData()});
 
             if (value.size() > kMaxApplicationNameByteLength) {
                 return {ErrorCodes::ClientMetadataAppNameTooLarge,
@@ -183,11 +196,11 @@ StatusWith<StringData> ClientMetadata::parseApplicationDocument(const BSONObj& d
                                       << " bytes in the client metadata document"};
             }
 
-            return {std::move(value)};
+            return std::move(value);
         }
     }
 
-    return {StringData()};
+    return std::string();
 }
 
 Status ClientMetadata::validateDriverDocument(const BSONObj& doc) {
@@ -200,7 +213,7 @@ Status ClientMetadata::validateDriverDocument(const BSONObj& doc) {
         StringData name = e.fieldNameStringData();
 
         if (name == kName) {
-            if (e.type() != String) {
+            if (e.type() != BSONType::string) {
                 return Status(ErrorCodes::TypeMismatch,
                               str::stream()
                                   << "The '" << kDriver << "." << kName
@@ -209,7 +222,7 @@ Status ClientMetadata::validateDriverDocument(const BSONObj& doc) {
 
             foundName = true;
         } else if (name == kVersion) {
-            if (e.type() != String) {
+            if (e.type() != BSONType::string) {
                 return Status(ErrorCodes::TypeMismatch,
                               str::stream()
                                   << "The '" << kDriver << "." << kVersion
@@ -244,7 +257,7 @@ Status ClientMetadata::validateOperatingSystemDocument(const BSONObj& doc) {
         StringData name = e.fieldNameStringData();
 
         if (name == kType) {
-            if (e.type() != String) {
+            if (e.type() != BSONType::string) {
                 return Status(ErrorCodes::TypeMismatch,
                               str::stream()
                                   << "The '" << kOperatingSystem << "." << kType
@@ -267,6 +280,7 @@ Status ClientMetadata::validateOperatingSystemDocument(const BSONObj& doc) {
 void ClientMetadata::setMongoSMetadata(StringData hostAndPort,
                                        StringData mongosClient,
                                        StringData version) {
+    _documentWithoutMongosInfo = _document;
     BSONObjBuilder builder;
     builder.appendElements(_document);
 
@@ -277,25 +291,7 @@ void ClientMetadata::setMongoSMetadata(StringData hostAndPort,
         sub.append(kVersion, version);
     }
 
-    auto document = builder.obj();
-
-    if (!_appName.empty()) {
-        // The _appName field points into the existing _document, which we are about to replace.
-        // We must redirect _appName to point into the new doc *before* replacing the old doc. We
-        // expect the 'application' metadata of the new document to be identical to the old.
-        auto appMetaData = document[kApplication];
-        invariant(appMetaData.isABSONObj());
-
-        auto appNameEl = appMetaData[kName];
-        invariant(appNameEl.type() == BSONType::String);
-
-        auto appName = appNameEl.valueStringData();
-        invariant(appName == _appName);
-
-        _appName = appName;
-    }
-
-    _document = std::move(document);
+    _document = builder.obj();
 }
 
 void ClientMetadata::serialize(StringData driverName,
@@ -305,7 +301,7 @@ void ClientMetadata::serialize(StringData driverName,
     ProcessInfo processInfo;
 
     std::string appName;
-    if (kDebugBuild) {
+    if (TestingProctor::instance().isEnabled()) {
         appName = processInfo.getProcessName();
         if (appName.length() > kMaxApplicationNameByteLength) {
             static constexpr auto kEllipsis = "..."_sd;
@@ -366,7 +362,7 @@ Status ClientMetadata::serializePrivate(StringData driverName,
         if (!appName.empty()) {
             BSONObjBuilder subObjBuilder(metaObjBuilder.subobjStart(kApplication));
             subObjBuilder.append(kName, appName);
-            if (kDebugBuild) {
+            if (TestingProctor::instance().isEnabled()) {
                 subObjBuilder.append(kPid, ProcessId::getCurrent().toString());
             }
         }
@@ -390,11 +386,19 @@ Status ClientMetadata::serializePrivate(StringData driverName,
 }
 
 StringData ClientMetadata::getApplicationName() const {
-    return _appName;
+    return StringData(_appName);
 }
 
 const BSONObj& ClientMetadata::getDocument() const {
     return _document;
+}
+
+unsigned long ClientMetadata::hashWithoutMongosInfo() const {
+    return static_cast<unsigned long>(_hashWithoutMongos.get(documentWithoutMongosInfo()));
+}
+
+const BSONObj& ClientMetadata::documentWithoutMongosInfo() const {
+    return _documentWithoutMongosInfo.get(_document);
 }
 
 void ClientMetadata::logClientMetadata(Client* client) const {
@@ -402,11 +406,24 @@ void ClientMetadata::logClientMetadata(Client* client) const {
         return;
     }
 
+    if (serverGlobalParams.quiet.load()) {
+        return;
+    }
+
+    auto negotiatedCompressors =
+        MessageCompressorManager::forSession(client->session()).getNegotiatedCompressors();
+    std::vector<StringData> negotiatedCompressorNames(negotiatedCompressors.size());
+    std::transform(
+        negotiatedCompressors.begin(),
+        negotiatedCompressors.end(),
+        negotiatedCompressorNames.begin(),
+        [](auto& messageCompressor) { return StringData(messageCompressor->getName()); });
+
     LOGV2(51800,
-          "received client metadata from {remote} {client}: {doc}",
           "client metadata",
           "remote"_attr = client->getRemote(),
           "client"_attr = client->desc(),
+          "negotiatedCompressors"_attr = negotiatedCompressorNames,
           "doc"_attr = getDocument());
 }
 
@@ -432,25 +449,25 @@ bool ClientMetadata::tryFinalize(Client* client) {
     return true;
 }
 
-const ClientMetadata* ClientMetadata::getForClient(Client* client) noexcept {
+const ClientMetadata* ClientMetadata::getForClient(Client* client) {
     auto& state = getClientState(client);
     if (!state.meta) {
         // If we haven't finalized, it's still okay to return our existing value.
         return nullptr;
     }
-    return &state.meta.get();
+    return &state.meta.value();
 }
 
-const ClientMetadata* ClientMetadata::getForOperation(OperationContext* opCtx) noexcept {
+const ClientMetadata* ClientMetadata::getForOperation(OperationContext* opCtx) {
     auto& state = getOperationState(opCtx);
     if (!state.isFinalized) {
         return nullptr;
     }
     invariant(state.meta);
-    return &state.meta.get();
+    return &state.meta.value();
 }
 
-const ClientMetadata* ClientMetadata::get(Client* client) noexcept {
+const ClientMetadata* ClientMetadata::get(Client* client) {
     if (auto opCtx = client->getOperationContext()) {
         if (auto meta = getForOperation(opCtx)) {
             return meta;
@@ -470,23 +487,20 @@ void ClientMetadata::setAndFinalize(Client* client, boost::optional<ClientMetada
     state.meta = std::move(meta);
 }
 
-void ClientMetadata::setFromMetadataForOperation(OperationContext* opCtx, BSONElement& elem) {
-    if (MONGO_unlikely(elem.eoo())) {
-        return;
-    }
+void ClientMetadata::setFromMetadataForOperation(OperationContext* opCtx, const BSONObj& obj) {
     auto lk = stdx::lock_guard(*opCtx->getClient());
 
     auto& state = getOperationState(opCtx);
     uassert(ErrorCodes::ClientMetadataCannotBeMutated,
             "The client metadata document may only be set once per operation",
             !state.meta && !state.isFinalized);
-    auto inputMetadata = ClientMetadata::readFromMetadata(elem);
+    auto inputMetadata = ClientMetadata::parseFromBSON(obj);
 
     state.isFinalized = true;
     state.meta = std::move(inputMetadata);
 }
 
-void ClientMetadata::setFromMetadata(Client* client, BSONElement& elem) {
+void ClientMetadata::setFromMetadata(Client* client, BSONElement& elem, bool isInternalClient) {
     if (elem.eoo()) {
         return;
     }
@@ -500,9 +514,18 @@ void ClientMetadata::setFromMetadata(Client* client, BSONElement& elem) {
     }
 
     auto meta = ClientMetadata::readFromMetadata(elem);
-    if (meta && isMongos()) {
+
+    if (!isInternalClient) {
+        uassert(ErrorCodes::ClientMetadataDocumentTooLarge,
+                str::stream() << "The client metadata document must be less than or equal to "
+                              << kMaxMongoSMetadataDocumentByteLength << " bytes",
+                static_cast<uint32_t>(meta->_document.objsize()) <=
+                    kMaxMongoSMetadataDocumentByteLength);
+    }
+
+    if (meta && serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer)) {
         // If we had a full ClientMetadata and we're on mongos, attach some additional client data.
-        meta->setMongoSMetadata(getHostNameCachedAndPort(),
+        meta->setMongoSMetadata(prettyHostNameAndPort(client->getLocalPort()),
                                 client->clientAddress(true),
                                 VersionInfoInterface::instance().version());
     }
@@ -511,11 +534,11 @@ void ClientMetadata::setFromMetadata(Client* client, BSONElement& elem) {
     state.meta = std::move(meta);
 }
 
-boost::optional<ClientMetadata> ClientMetadata::readFromMetadata(BSONElement& element) {
+boost::optional<ClientMetadata> ClientMetadata::readFromMetadata(const BSONElement& element) {
     return uassertStatusOK(ClientMetadata::parse(element));
 }
 
-void ClientMetadata::writeToMetadata(BSONObjBuilder* builder) const noexcept {
+void ClientMetadata::writeToMetadata(BSONObjBuilder* builder) const {
     auto& document = getDocument();
     if (document.isEmpty()) {
         // Skip appending metadata if there is none

@@ -29,7 +29,12 @@
 
 #include "mongo/db/keypattern.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/db/index_names.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -44,20 +49,24 @@ bool KeyPattern::isHashedKeyPattern(const BSONObj& pattern) {
 }
 
 StringBuilder& operator<<(StringBuilder& sb, const KeyPattern& keyPattern) {
+    return KeyPattern::addToStringBuilder(sb, keyPattern._pattern);
+}
+
+StringBuilder& KeyPattern::addToStringBuilder(StringBuilder& sb, const BSONObj& pattern) {
     // Rather than return BSONObj::toString() we construct a keyPattern string manually. This allows
     // us to avoid the cost of writing numeric direction to the str::stream which will then undergo
     // expensive number to string conversion.
     sb << "{ ";
 
     bool first = true;
-    for (auto&& elem : keyPattern._pattern) {
+    for (auto&& elem : pattern) {
         if (first) {
             first = false;
         } else {
             sb << ", ";
         }
 
-        if (mongo::String == elem.type()) {
+        if (BSONType::string == elem.type()) {
             sb << elem;
         } else if (elem.number() >= 0) {
             // The canonical check as to whether a key pattern element is "ascending" or
@@ -93,7 +102,7 @@ BSONObj KeyPattern::extendRangeBound(const BSONObj& bound, bool makeUpperInclusi
     while (pat.more()) {
         BSONElement patElt = pat.next();
         // for non 1/-1 field values, like {a : "hashed"}, treat order as ascending
-        int order = patElt.isNumber() ? patElt.numberInt() : 1;
+        int order = patElt.isNumber() ? patElt.safeNumberInt() : 1;
         // flip the order semantics if this is an upper bound
         if (makeUpperInclusive)
             order *= -1;

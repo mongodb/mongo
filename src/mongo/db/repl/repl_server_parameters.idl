@@ -30,11 +30,13 @@
 
 global:
     cpp_namespace: "mongo::repl"
+    mod_visibility: pub
     cpp_includes:
-      - "mongo/client/read_preference.h"
+        - "mongo/client/read_preference.h"
+        - "mongo/client/read_preference_validators.h"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 server_parameters:
     # From data_replicator_external_state_impl.cpp
@@ -46,6 +48,7 @@ server_parameters:
         cpp_vartype: std::string
         cpp_varname: initialSyncOplogBuffer
         default: "collection"
+        redact: false
 
     initialSyncOplogBufferPeekCacheSize:
         description: Set this to specify size of read ahead buffer in the OplogBufferCollection.
@@ -53,21 +56,24 @@ server_parameters:
         cpp_vartype: int
         cpp_varname: initialSyncOplogBufferPeekCacheSize
         default: 10000
+        redact: false
 
     # From initial_syncer.cpp
     numInitialSyncConnectAttempts:
         description: The number of attempts to connect to a sync source
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: numInitialSyncConnectAttempts
         default: 10
+        redact: false
 
     numInitialSyncOplogFindAttempts:
         description: The number of attempts to call find on the remote oplog
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: numInitialSyncOplogFindAttempts
         default: 3
+        redact: false
 
     initialSyncOplogFetcherBatchSize:
         description: The batchSize to use for the find/getMore queries called by the OplogFetcher
@@ -78,6 +84,47 @@ server_parameters:
         #     defaultBatchSize to use.
         default:
             expr: (16 * 1024 * 1024) / 12 * 10
+        redact: false
+
+    initialSyncIndexBuildMemoryPercentage:
+        description:
+            The amount of memory, as a percentage of system memory, to allocate for index builds
+            during initial sync. Bounded by initialSyncIndexBuildMemoryMinMB and
+            initialSyncIndexBuildMemoryMaxMB.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<double>
+        cpp_varname: initialSyncIndexBuildMemoryPercentage
+        default: 10
+        validator:
+            gte: 0
+            lte: 80
+        redact: false
+
+    initialSyncIndexBuildMemoryMinMB:
+        description:
+            The minimum memory usage for index builds during initial sync. Bounds
+            initialSyncIndexBuildMemoryPercentage.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: initialSyncIndexBuildMemoryMinMB
+        default: 200
+        validator:
+            gte: 50
+            lte: 10000000 # 10TB
+        redact: false
+
+    initialSyncIndexBuildMemoryMaxMB:
+        description:
+            The maximum memory usage allowed for index builds during initial sync.
+            Bounds initialSyncIndexBuildMemoryPercentage.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: initialSyncIndexBuildMemoryMaxMB
+        default: 16384
+        validator:
+            gte: 50
+            lte: 10000000 # 10TB
+        redact: false
 
     # From oplog_fetcher.cpp
     oplogInitialFindMaxSeconds:
@@ -86,17 +133,19 @@ server_parameters:
             For the initial 'find' request, we provide a generous timeout, to account for
             the potentially slow process of a sync source finding the lastApplied optime
             provided in a node's query in its oplog.
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: oplogInitialFindMaxSeconds
         default: 60
+        redact: false
 
     oplogRetriedFindMaxSeconds:
         description: Number of seconds for the `maxTimeMS` on any retried `find` commands
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: oplogRetriedFindMaxSeconds
         default: 2
+        redact: false
 
     oplogFetcherUsesExhaust:
         description: >-
@@ -106,6 +155,19 @@ server_parameters:
         cpp_vartype: bool
         cpp_varname: oplogFetcherUsesExhaust
         default: true
+        redact: false
+
+    oplogBatchDelayMillis:
+        description: >-
+            How long, in milliseconds, to wait for more data when an oplog application batch is
+            not full.
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: oplogBatchDelayMillis
+        default: 0
+        validator:
+            gte: 0
+        redact: false
 
     # From bgsync.cpp
     bgSyncOplogFetcherBatchSize:
@@ -117,6 +179,7 @@ server_parameters:
         #     defaultBatchSize to use.
         default:
             expr: (16 * 1024 * 1024) / 12 * 10
+        redact: false
 
     rollbackRemoteOplogQueryBatchSize:
         description: >-
@@ -125,30 +188,34 @@ server_parameters:
             commands will be given no batchSize. We set the default to 2000 to prevent
             the sync source from having to read too much data at once, and reduce the
             chance of a socket timeout.
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: rollbackRemoteOplogQueryBatchSize
         # We choose 2000 for (10 minute timeout) * (60 sec / min) * (50 MB / second) /
         #     (16 MB / document).
         default: 2000
-
-    forceRollbackViaRefetch:
-        description: >-
-            If 'forceRollbackViaRefetch' is true, always perform rollbacks via the
-            refetch algorithm, even if the storage engine supports rollback via recover
-            to timestamp.
-        set_at: [ startup, runtime ]
-        cpp_vartype: AtomicWord<bool>
-        cpp_varname: forceRollbackViaRefetch
-        default: false
+        redact: false
 
     # From noop_writer.cpp
     writePeriodicNoops:
         description: Sets whether to write periodic noops or not
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         cpp_vartype: AtomicWord<bool>
         cpp_varname: writePeriodicNoops
         default: true
+        redact: false
+
+    periodicNoopIntervalSecs:
+        description: <-
+            Number of seconds between noop writer writes.
+        set_at: [startup]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: periodicNoopIntervalSecs
+        default: 10
+        validator:
+            gt: 0
+            lte: 10
+        redact: false
 
     collectionClonerUsesExhaust:
         description: Whether to use the "exhaust cursor" feature when retrieving collection data.
@@ -156,6 +223,7 @@ server_parameters:
         cpp_vartype: bool
         cpp_varname: collectionClonerUsesExhaust
         default: true
+        redact: false
 
     # From collection_bulk_loader_impl.cpp
     collectionBulkLoaderBatchSizeInBytes:
@@ -167,6 +235,7 @@ server_parameters:
         cpp_varname: collectionBulkLoaderBatchSizeInBytes
         default:
             expr: 256 * 1024
+        redact: false
 
     # From database_cloner.cpp
     collectionClonerBatchSize:
@@ -180,32 +249,41 @@ server_parameters:
         default: 0
         validator:
             gte: 0
+        redact: false
 
     # From replication_coordinator_external_state_impl.cpp
     oplogFetcherSteadyStateMaxFetcherRestarts:
         description: >-
             Set this to specify the maximum number of times the oplog fetcher will
             consecutively restart the oplog tailing query on non-cancellation errors
-            during steady state replication.
-        set_at: [ startup, runtime ]
+            during steady state replication. Exponential backoff is implemented between 
+            each restart, starting by waiting 5ms on the first restart and doubling 
+            the wait on each subsequent restart, with an upper limit of 500ms.
+        set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: oplogFetcherSteadyStateMaxFetcherRestarts
         default: 1
         validator:
             gte: 0
+        redact: false
 
     oplogFetcherInitialSyncMaxFetcherRestarts:
         description: >-
             Set this to specify the maximum number of times the oplog fetcher will
             consecutively restart the oplog tailing query on non-cancellation errors
             during initial sync. By default we provide a generous amount of restarts
-            to avoid potentially restarting an entire initial sync from scratch.
-        set_at: [ startup, runtime ]
+            to avoid potentially restarting an entire initial sync from scratch. 
+            Exponential backoff is implemented between each restart, starting
+            by waiting 5ms on the first restart and doubling the wait on each 
+            subsequent restart, with an upper limit of 500ms. As a result, the default 
+            of 10 total restarts will take approximately ~2 seconds total.
+        set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: oplogFetcherInitialSyncMaxFetcherRestarts
         default: 10
         validator:
             gte: 0
+        redact: false
 
     # From oplog_applier.cpp
     replWriterThreadCount:
@@ -217,6 +295,7 @@ server_parameters:
         validator:
             gte: 1
             lte: 256
+        redact: false
 
     replWriterMinThreadCount:
         description: The minimum number of threads in the thread pool used to apply the oplog
@@ -227,10 +306,11 @@ server_parameters:
         validator:
             gte: 0
             lte: 256
+        redact: false
 
     replBatchLimitOperations:
         description: The maximum number of operations to apply in a single batch
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: replBatchLimitOperations
         default:
@@ -239,10 +319,11 @@ server_parameters:
             gte: 1
             lte:
                 expr: 1000 * 1000
+        redact: false
 
     replBatchLimitBytes:
         description: The maximum oplog application batch size in bytes
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: replBatchLimitBytes
         default:
@@ -252,53 +333,7 @@ server_parameters:
                 expr: 16 * 1024 * 1024
             lte:
                 expr: 100 * 1024 * 1024
-
-    # From tenant_oplog_applier.cpp
-    tenantApplierBatchSizeBytes:
-        description: The maximum tenant oplog applier batch size in bytes.
-        set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
-        cpp_varname: tenantApplierBatchSizeBytes
-        default:
-            expr: 16 * 1024 * 1024
-        validator:
-            gte:
-                expr: 16 * 1024 * 1024
-            lte:
-                expr: 100 * 1024 * 1024
-
-    tenantApplierBatchSizeOps:
-        description: The maximum number of operations in a tenant oplog applier batch.
-        set_at: [ startup, runtime ]
-        cpp_vartype: AtomicWord<int>
-        cpp_varname: tenantApplierBatchSizeOps
-        default: 500
-        validator:
-            gte: 1
-            lte:
-                expr: 100 * 1000
-
-    minOplogEntriesPerThread:
-        description: >-
-            The minimum number of operations allotted to a tenant oplog applier worker thread.
-        set_at: [ startup, runtime ]
-        cpp_vartype: AtomicWord<int>
-        cpp_varname: minOplogEntriesPerThread
-        default: 16
-        validator:
-            gte: 1
-            lte: 32
-
-    tenantApplierThreadCount:
-        description: >-
-            The number of threads in the tenant migration writer pool used to apply operations.
-        set_at: startup
-        cpp_vartype: int
-        cpp_varname: tenantApplierThreadCount
-        default: 5
-        validator:
-            gte: 1
-            lte: 256
+        redact: false
 
     recoverFromOplogAsStandalone:
         description: Tells the server to perform replication recovery as a standalone.
@@ -306,48 +341,61 @@ server_parameters:
         cpp_vartype: bool
         cpp_varname: recoverFromOplogAsStandalone
         default: false
+        redact: false
+
+    skipOplogSampling:
+        description: Tells the server whether or not to skip oplog sampling.
+        set_at: startup
+        cpp_vartype: bool
+        cpp_varname: skipOplogSampling
+        default: false
+        redact: false
 
     maxSyncSourceLagSecs:
-        description: ''
+        description: ""
         set_at: startup
         cpp_vartype: int
         cpp_varname: maxSyncSourceLagSecs
         default: 30
         validator:
             gt: 0
+        redact: false
 
     replElectionTimeoutOffsetLimitFraction:
-        description: ''
+        description: ""
         set_at: startup
         cpp_vartype: double
         cpp_varname: replElectionTimeoutOffsetLimitFraction
         default: 0.15
         validator:
             gt: 0.01
+        redact: false
 
     # New parameters since this file was created, not taken from elsewhere.
     initialSyncTransientErrorRetryPeriodSeconds:
         description: >-
             The amount of time to continue retrying transient errors during initial sync before
             declaring the attempt failed.
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: initialSyncTransientErrorRetryPeriodSeconds
         default:
             expr: 24 * 60 * 60
         validator:
             gte: 0
+        redact: false
 
     oplogNetworkTimeoutBufferSeconds:
         description: >-
             Number of seconds to add to the `find` and `getMore` timeouts for oplog fetching to
             calculate the network timeout for the requests.
-        set_at: [ startup ]
+        set_at: [startup]
         cpp_vartype: AtomicWord<int>
         cpp_varname: oplogNetworkTimeoutBufferSeconds
         default: 5
         validator:
             gte: 0
+        redact: false
 
     oplogApplicationEnforcesSteadyStateConstraints:
         description: >-
@@ -357,6 +405,7 @@ server_parameters:
         cpp_vartype: bool
         cpp_varname: oplogApplicationEnforcesSteadyStateConstraints
         default: false
+        redact: false
 
     initialSyncSourceReadPreference:
         description: >-
@@ -370,7 +419,8 @@ server_parameters:
         # 'primary'.  Otherwise, if the node is a voting node, readPreference is 'primaryPreferred'
         # and if it is not, readPreference is 'nearest'.
         default: ""
-        validator: { callback: 'validateReadPreferenceMode' }
+        validator: {callback: "validateReadPreferenceMode"}
+        redact: false
 
     changeSyncSourceThresholdMillis:
         description: >-
@@ -378,34 +428,37 @@ server_parameters:
             and ping times considered as coming from a different data center. Used to determine
             if the node should attempt to change sync sources because another node is significantly
             closer than its current sync source.
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         cpp_vartype: AtomicWord<long long>
         cpp_varname: changeSyncSourceThresholdMillis
         default: 5
         validator:
             gte: 0
+        redact: false
 
     maxNumSyncSourceChangesPerHour:
         description: >-
             The number of sync source changes that can happen per hour before the node temporarily
             turns off reevaluating its sync source. This will only affect sync source changes while
             a node has a valid sync source.
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: maxNumSyncSourceChangesPerHour
         default: 3
         validator:
             gt: 0
+        redact: false
 
     enableOverrideClusterChainingSetting:
         description: >-
             When enabled, allows a node to override the cluster-wide chainingAllowed setting.
             If chaining is disabled in the replica set, enabling this parameter allows the node
             to chain regardless.
-        set_at: [ startup ]
+        set_at: [startup]
         cpp_vartype: AtomicWord<bool>
         cpp_varname: enableOverrideClusterChainingSetting
         default: false
+        redact: false
 
     disableSplitHorizonIPCheck:
         description: >-
@@ -415,112 +468,19 @@ server_parameters:
         cpp_vartype: bool
         cpp_varname: disableSplitHorizonIPCheck
         default: false
-
-    tenantMigrationGarbageCollectionDelayMS:
-        description: >-
-            The amount of time in milliseconds that the donor or recipient should wait before
-            removing the migration state document after receiving donorForgetMigration or
-            recipientForgetMigration.
-        set_at: [ startup, runtime ]
-        cpp_vartype: AtomicWord<int>
-        cpp_varname: tenantMigrationGarbageCollectionDelayMS
-        default:
-            expr: 15 * 60 * 1000
-
-    tenantMigrationExternalKeysRemovalBufferSecs:
-        description: >-
-            The amount of time in seconds that the donor or recipient should wait before
-            removing the cluster time keys cloned from each other after receiving
-            donorForgetMigration or recipientForgetMigration
-        set_at: [ startup, runtime ]
-        cpp_vartype: AtomicWord<int>
-        cpp_varname: tenantMigrationExternalKeysRemovalBufferSecs
-        default:
-            expr: 60 * 60 * 24   # 24 hours
-
-    tenantMigrationOplogBufferPeekCacheSize:
-        description: >-
-            Set this to specify size of read ahead buffer in the OplogBufferCollection for tenant
-            migrations.
-        set_at: startup
-        cpp_vartype: int
-        cpp_varname: tenantMigrationOplogBufferPeekCacheSize
-        default: 10000
-
-    tenantMigrationOplogFetcherBatchSize:
-        description: >-
-            The batchSize to use for the find/getMore queries called by the OplogFetcher for
-            tenant migrations.
-        set_at: startup
-        cpp_vartype: int
-        cpp_varname: tenantMigrationOplogFetcherBatchSize
-        # 16MB max batch size / 12 byte min doc size * 10 (for good measure) =
-        #     defaultBatchSize to use.
-        default:
-            expr: (16 * 1024 * 1024) / 12 * 10
-
-    maxTenantMigrationRecipientThreadPoolSize:
-        description: >-
-            The maximum number of threads in the tenant migration recipient's thread pool.
-        set_at: startup
-        cpp_vartype: int
-        cpp_varname: maxTenantMigrationRecipientThreadPoolSize
-        # Each migration needs at least 2 dedicated threads for oplog fetching and data cloning plus
-        # 1 thread for other async jobs. To support 50 concurrent migrations on the recipient, we
-        # set the thread pool size to 128.
-        default: 128
-        validator:
-            gte: 1
-
-    maxTenantMigrationDonorServiceThreadPoolSize:
-        description: >-
-            The maximum number of threads in the tenant migration donor service's thread pool.
-        set_at: startup
-        cpp_vartype: int
-        cpp_varname: maxTenantMigrationDonorServiceThreadPoolSize
-        default: 8
-        validator:
-            gte: 1
-
-    tenantMigrationBlockingStateTimeoutMS:
-        description: >-
-            Period of time, in milliseconds, after which the blocking state should be interrupted.
-        set_at: [ startup, runtime ]
-        cpp_vartype: AtomicWord<int>
-        cpp_varname: tenantMigrationBlockingStateTimeoutMS
-        # TODO: SERVER-53571 determine the best default timeout.
-        default: 3600000
-        validator:
-            gte: 1
-
-    # TODO (SERVER-54085): Remove server parameter tenantMigrationDisableX509Auth.
-    tenantMigrationDisableX509Auth:
-        description: >-
-            Disable x509 authentication for all ingoing and outgoing tenant migrations.
-        set_at: [ startup ]
-        cpp_vartype: bool
-        cpp_varname: tenantMigrationDisableX509Auth
-        default: false
-
-    tenantMigrationExcludeDonorHostTimeoutMS:
-        description: >-
-            Period of time, in milliseconds, that a donor host should be excluded for.
-        set_at: startup
-        cpp_vartype: int
-        cpp_varname: tenantMigrationExcludeDonorHostTimeoutMS
-        default: 60000
-        validator:
-            gte: 1
+        redact: false
 
     enableDefaultWriteConcernUpdatesForInitiate:
         description: >-
             When enabled, allow the default write concern to be updated in the replica set
             initiate process. This parameter should only ever be enabled in our testing
             infrastructure, as using it in production may lead to undefined behavior.
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         cpp_vartype: AtomicWord<bool>
         cpp_varname: enableDefaultWriteConcernUpdatesForInitiate
         default: false
+        redact: false
+        test_only: true
 
     startupRecoveryForRestore:
         description: >-
@@ -532,24 +492,18 @@ server_parameters:
         cpp_vartype: bool
         cpp_varname: startupRecoveryForRestore
         default: false
-
-    storeFindAndModifyImagesInSideCollection:
-        description: >-
-            Determines where document images for retryable find and modifies are to be stored.
-        set_at: [ startup, runtime ]
-        cpp_vartype: AtomicWord<bool>
-        cpp_varname: gStoreFindAndModifyImagesInSideCollection
-        default: true
+        redact: false
 
     enableReconfigRollbackCommittedWritesCheck:
         description: >-
             Enables the reconfig check to ensure that committed writes cannot be rolled back in
             sets with arbiters. Enabled by default. Test-only.
         test_only: true
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         cpp_vartype: AtomicWord<bool>
         cpp_varname: enableReconfigRollbackCommittedWritesCheck
         default: true
+        redact: false
 
     initialSyncMethod:
         description: >-
@@ -559,6 +513,7 @@ server_parameters:
         cpp_vartype: std::string
         cpp_varname: initialSyncMethod
         default: "logical"
+        redact: false
 
     fileBasedInitialSyncMaxLagSec:
         description: >-
@@ -567,12 +522,12 @@ server_parameters:
         set_at: startup
         cpp_vartype: int
         cpp_varname: fileBasedInitialSyncMaxLagSec
-        # TODO (SERVER-59729): determine the best default value.
-        default: 
-                expr: 5 * 60 * 60
+        default:
+            expr: 5 * 60
         validator:
             gte: 0
-    
+        redact: false
+
     fileBasedInitialSyncMaxCyclesWithoutProgress:
         description: >-
             Specifies the max number of cycles that file copy based initial sync runs trying to
@@ -581,11 +536,11 @@ server_parameters:
         set_at: startup
         cpp_vartype: int
         cpp_varname: fileBasedInitialSyncMaxCyclesWithoutProgress
-        # TODO (SERVER-59729): determine the best default value.
-        default: 5
+        default: 3
         validator:
             gte: 1
-    
+        redact: false
+
     fileBasedInitialSyncExtendCursorTimeoutMS:
         description: >-
             Period of time, in milliseconds, syncing node may wait for the sync source to have the
@@ -597,29 +552,243 @@ server_parameters:
             expr: 180 * 1000
         validator:
             gte: 1
+        redact: false
 
+    fassertOnLockTimeoutForStepUpDown:
+        description: >-
+            Time limit threshold to fassert if getting RSTL times out when executing a stepdown or stepup command.
+            Set to 0 to disable.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: fassertOnLockTimeoutForStepUpDown
+        default: 60
+        validator:
+            gte: 0
+        redact: false
+
+    allowMultipleArbiters:
+        description: >-
+            Allow multiple arbiters. Default is false as it can put data at risk by allowing a
+            replica set to accept writes without a sufficient number of secondaries being available
+            for data replication.
+            For example, a PSSAA replica set (primary, 2 secondaries, 2 arbiters) would still be
+            available for writes after the two secondaries fail.
+            In that case, only one copy of the data, on the primary, would be actively updated.
+            The replica set would have a majority of nodes available for election purposes,
+            but no active replication until at least one healthy secondary is available.
+        set_at: startup
+        cpp_vartype: bool
+        cpp_varname: allowMultipleArbiters
+        default: false
+        redact: false
+
+    slowServiceOnStepUpBeginThresholdMS:
+        description: >-
+            The maximum amount of time, in milliseconds, that a single replica set aware
+            service's onStepUpBegin method can take without a warning being logged.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: slowServiceOnStepUpBeginThresholdMS
+        default: 200
+        validator:
+            gte: 0
+        redact: false
+
+    slowServiceOnStepDownThresholdMS:
+        description: >-
+            The maximum amount of time, in milliseconds, that a single replica set aware
+            service's onStepDown method can take without a warning being logged.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: slowServiceOnStepDownThresholdMS
+        default: 200
+        validator:
+            gte: 0
+        redact: false
+
+    slowTotalOnStepUpBeginThresholdMS:
+        description: >-
+            The maximum amount of time, in milliseconds, that the total of all replica set
+            aware services' onStepUpBegin methods can take without a warning being logged.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: slowTotalOnStepUpBeginThresholdMS
+        default: 500
+        validator:
+            gte: 0
+        redact: false
+
+    slowServiceOnStepUpCompleteThresholdMS:
+        description: >-
+            The maximum amount of time, in milliseconds, that a single replica set aware
+            service or primary-only service's onStepUpComplete method can take without a warning
+            being logged.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: slowServiceOnStepUpCompleteThresholdMS
+        default: 200
+        validator:
+            gte: 0
+        redact: false
+
+    slowTotalOnStepUpCompleteThresholdMS:
+        description: >-
+            The maximum amount of time, in milliseconds, that the total of all replica set
+            aware services' and primary-only services' onStepUpComplete methods can take
+            without a warning being logged.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: slowTotalOnStepUpCompleteThresholdMS
+        default: 500
+        validator:
+            gte: 0
+        redact: false
+
+    disableTransitionFromLatestToLastContinuous:
+        description: >-
+            Prohibits downgrading from latest FCV to last continuous FCV. Disabled by default.
+            Test-only.
+        test_only: true
+        set_at: startup
+        cpp_vartype: bool
+        cpp_varname: disableTransitionFromLatestToLastContinuous
+        default: true
+        redact: false
+
+    unsupportedSyncSource:
+        description: >-
+            **Not a supported feature**. Specifies the host/port for a node to use as a sync source.
+            It is a fatal error to specify a node that is not a part of the replica set config or to
+            specify the node itself.
+        set_at: startup
+        cpp_vartype: std::string
+        cpp_varname: unsupportedSyncSource
+        default: ""
+        validator: {callback: "validateHostAndPort"}
+        redact: false
+
+    dbCheckMaxTotalIndexKeysPerSnapshot:
+        description: >-
+            The maximum number of total index keys to be checked in reverse lookup in one storage catalog
+            snapshot during dbcheck's extraIndexKeys mode.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: dbCheckMaxTotalIndexKeysPerSnapshot
+        default: 1000
+        validator:
+            gt: 0
+        redact: false
+
+    dbCheckMaxConsecutiveIdenticalIndexKeysPerSnapshot:
+        description: >-
+            The maximum number of consecutive identical index keys to be checked in reverse lookup in one storage catalog
+            snapshot during dbcheck's extraIndexKeys mode.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: dbCheckMaxConsecutiveIdenticalIndexKeysPerSnapshot
+        default: 1000
+        validator:
+            gt: 0
+        redact: false
+
+    skipApplyingDbCheckBatchOnSecondary:
+        description: >-
+            Parameter for whether dbcheck batches should be applied on secondaries.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: skipApplyingDbCheckBatchOnSecondary
+        default: false
+        redact: false
+
+    dbCheckSecondaryBatchMaxTimeMs:
+        description: >-
+            The maximum amount of time for a dbcheck batch to run on a secondary.
+            Once the time limit is hit the secondary will stop running the batch.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: dbCheckSecondaryBatchMaxTimeMs
+        default: 5000
+        validator:
+            gte: 1
+            lte: 50000
+        redact: false
+
+    dbCheckMaxInternalRetries:
+        description: >-
+            The maximum number of internal retries that dbCheck will run on a batch.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: dbCheckMaxInternalRetries
+        default: 5
+        validator:
+            gte: 0
+        redact: false
+
+    writeConflictRetryLimit:
+        description: >-
+            The number of retries that be made by writeConflictRetry(). It is used in secondary
+            oplog application to catch unexpected behavior.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: writeConflictRetryLimit
+        default: 10000
+        validator:
+            gte: 0
+        redact: false
+
+    writeConflictRetryCountForDumpState:
+        description: >-
+            The number of write conflict retries after which we dump a storage engine state
+            to assist with diagnostics during secondary oplog application unexpected behavior. If this parameter is less than
+            gMinimalWriteConflictRetryCountForStateDump, then the latter will be used to determine dump rate.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: writeConflictRetryCountForDumpState
+        default: 1000
+        validator:
+            gte: 1000
+        redact: false
+
+    allowEmptyOplogBatchesToPropagateCommitPoint:
+        description: >-
+            Whether oplog cursors should skip waiting for new data to return if the commit point advances.
+            This can be useful to disable in testing to intentionally slow commit point propagation.
+        test_only: true
+        set_at: startup
+        cpp_vartype: bool
+        cpp_varname: allowEmptyOplogBatchesToPropagateCommitPoint
+        default: true
+        redact: false
 
 feature_flags:
-    featureFlagRetryableFindAndModify:
-        description: >-
-            When enabled, storeFindAndModifyImagesInOplog=false will change the location of any
-            document images for retryable find and modifies.
-        cpp_varname: feature_flags::gFeatureFlagRetryableFindAndModify
+    featureFlagSecondaryIndexChecksInDbCheck:
+        description: When enabled, dbCheck runs document and secondary index consistency checks in addition to replica set data consistency checks.
+        cpp_varname: feature_flags::gSecondaryIndexChecksInDbCheck
         default: true
-        version: 5.1
+        version: 8.0
+        fcv_gated: true
+        fcv_context_unaware: true
 
-    featureFlagFileCopyBasedInitialSync:
-        description: >-
-            When enabled, file copy based initial sync will be supported in Enterprise Server.
-        cpp_varname: feature_flags::gFileCopyBasedInitialSync
-        default: false
+    featureFlagReduceMajorityWriteLatency:
+        description: When enabled, Secondaries acknowledge writes as durable after an oplog entry is written durably to disk, without waiting for it to be applied.
+        cpp_varname: feature_flags::gReduceMajorityWriteLatency
+        default: true
+        fcv_gated: false
 
-    featureFlagShardMerge:
-        description: When enabled, multitenant migration uses the "shard merge" protocol.
-        cpp_varname: feature_flags::gShardMerge
+    featureFlagOplogVisibility:
+        description: When enabled, the Oplog visibility will be tracked at the Replication layer.
+        cpp_varname: feature_flags::gFeatureFlagOplogVisibility
         default: false
+        fcv_gated: false
 
-    featureFlagShardSplit:
-        description: When enabled, multitenant migration can use the shard split commands.
-        cpp_varname: feature_flags::gShardSplit
-        default: false
+    featureFlagSetFcvDryRunMode:
+        description: "Feature flag to enable dryRun mode when using setFCV command"
+        cpp_varname: feature_flags::gFeatureFlagSetFcvDryRunMode
+        default: true
+        fcv_gated: false
+
+    featureFlagUpgradingToDowngrading:
+        description: When enabled, allows downgrading back to the old FCV in case an upgrade fails due to incompatible features
+        cpp_varname: feature_flags::gFeatureFlagUpgradingToDowngrading
+        default: true
+        fcv_gated: false

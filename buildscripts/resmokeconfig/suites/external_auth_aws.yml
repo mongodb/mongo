@@ -2,9 +2,9 @@ test_kind: js_test
 
 selector:
   roots:
-  - src/mongo/db/modules/enterprise/jstests/external_auth_aws/*.js
+    - src/mongo/db/modules/enterprise/jstests/external_auth_aws/*.js
 
 executor:
   config:
     shell_options:
-      nodb: ''
+      nodb: ""

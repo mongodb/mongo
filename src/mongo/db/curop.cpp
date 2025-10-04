@@ -29,49 +29,161 @@
 
 // CHECK_LOG_REDACTION
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/curop.h"
 
-#include <iomanip>
-
-#include "mongo/bson/mutable/document.h"
-#include "mongo/config.h"
-#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/admission/execution_admission_context.h"
+#include "mongo/db/admission/ingress_admission_context.h"
+#include "mongo/db/admission/ticketing_system.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/locker.h"
-#include "mongo/db/json.h"
-#include "mongo/db/prepare_conflict_tracker.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
+#include "mongo/db/curop_bson_helpers.h"
+#include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
+#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
+#include "mongo/db/operation_context_options_gen.h"
 #include "mongo/db/profile_filter.h"
-#include "mongo/db/query/getmore_command_gen.h"
-#include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/profile_settings.h"
+#include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/stats/timer_stats.h"
+#include "mongo/db/storage/execution_context.h"
+#include "mongo/db/storage/prepare_conflict_tracker.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/platform/random.h"
+#include "mongo/rpc/metadata/audit_user_attrs.h"
 #include "mongo/rpc/metadata/client_metadata.h"
-#include "mongo/rpc/metadata/impersonated_user_metadata.h"
 #include "mongo/transport/service_executor.h"
-#include "mongo/util/hex.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/concurrency/ticketholder_queue_stats.h"
+#include "mongo/util/database_name_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/log_with_sampling.h"
+#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/str.h"
-#include "mongo/util/system_tick_source.h"
-#include <mongo/db/stats/timer_stats.h>
+#include "mongo/util/time_support.h"
+
+#include <cstddef>
+#include <tuple>
+
+#include <absl/container/flat_hash_set.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo {
-
-using std::string;
-
 namespace {
+auto& oplogGetMoreStats = *MetricBuilder<TimerStats>("repl.network.oplogGetMoresProcessed");
 
-TimerStats oplogGetMoreStats;
-ServerStatusMetricField<TimerStats> displayBatchesReceived("repl.network.oplogGetMoresProcessed",
-                                                           &oplogGetMoreStats);
+// Server operations are expected to regularly call OperationContext::checkForInterrupt() to see
+// whether they have been killed and should halt execution. These counters track how many interrupt
+// checks occur, over all operations, as well as information about overdue interrupt checks.
 
+// Total interrupt checks across all operations, regardless of sampling.
+auto& totalInterruptChecks = *MetricBuilder<Counter64>("operation.interrupt.totalChecks");
+
+// Counts how many operations participated in interrupt check tracking.
+auto& numSampledOps = *MetricBuilder<Counter64>("operation.interrupt.sampledOps");
+
+// Accumulates total number of interrupt checks across all sampled operations.
+auto& totalInterruptChecksFromSampledOps =
+    *MetricBuilder<Counter64>("operation.interrupt.checksFromSample");
+
+// Counts how many sampled operations had at least one overdue interrupt check.
+auto& opsWithOverdueInterruptCheck =
+    *MetricBuilder<Counter64>("operation.interrupt.overdueOpsFromSample");
+
+// Counts total number of overdue interrupt checks across all sampled operations.
+auto& overdueInterruptChecks =
+    *MetricBuilder<Counter64>("operation.interrupt.overdueChecksFromSample");
+
+// Computes total time overdue for interrupt checks across sampled operations.
+auto& overdueInterruptTotalTimeMillis =
+    *MetricBuilder<Counter64>("operation.interrupt.overdueInterruptTotalMillisFromSample");
+
+// Approximate max time any sampled operation was overdue for interrupt check.
+auto& overdueInterruptApproxMaxTimeMillis =
+    *MetricBuilder<Atomic64Metric>("operation.interrupt.overdueInterruptApproxMaxMillisFromSample");
+
+/*
+ * Helper for reporting stats on an operation that was sampled for interrupt check tracking.
+ */
+void reportCheckForInterruptSampledOperation(
+    int64_t numInterruptChecks, const OperationContext::OverdueInterruptCheckStats& stats) {
+    totalInterruptChecksFromSampledOps.increment(numInterruptChecks);
+    numSampledOps.increment();
+
+    if (stats.overdueInterruptChecks.loadRelaxed() > 0) {
+        opsWithOverdueInterruptCheck.increment();
+
+        overdueInterruptChecks.increment(stats.overdueInterruptChecks.loadRelaxed());
+        overdueInterruptTotalTimeMillis.increment(
+            durationCount<Milliseconds>(stats.overdueAccumulator.loadRelaxed()));
+
+        // Note that if we wanted the exact maximum, we would use a CAS loop, since it's possible a
+        // new maximum will be entered between the set() and get() here. The approximate maximum is
+        // good enough though.
+        overdueInterruptApproxMaxTimeMillis.set(std::max(
+            overdueInterruptApproxMaxTimeMillis.get(),
+            static_cast<int64_t>(durationCount<Milliseconds>(stats.overdueMaxTime.loadRelaxed()))));
+    }
+}
+
+/*
+ * Helper for reporting stats on checkForInterrupt(), for any operation.
+ */
+void reportCheckForInterruptStats(OperationContext* opCtx) {
+    const int64_t numInterruptChecks = opCtx->numInterruptChecks();
+    totalInterruptChecks.increment(numInterruptChecks);
+
+    if (auto* stats = opCtx->overdueInterruptCheckStats()) {
+        // We treat this as a "last interrupt check," though we don't actually check for
+        // interrupt since the operation is completing anyways.
+        opCtx->updateInterruptCheckCounters();
+
+        reportCheckForInterruptSampledOperation(numInterruptChecks, *stats);
+    }
+}
+
+BSONObj serializeDollarDbInOpDescription(boost::optional<TenantId> tenantId,
+                                         const BSONObj& cmdObj,
+                                         const SerializationContext& sc) {
+    auto db = cmdObj["$db"];
+    if (!db) {
+        return cmdObj;
+    }
+
+    auto dbName = DatabaseNameUtil::deserialize(tenantId, db.String(), sc);
+    auto newCmdObj = cmdObj.addField(BSON("$db" << DatabaseNameUtil::serialize(
+                                              dbName, SerializationContext::stateCommandReply(sc)))
+                                         .firstElement());
+    return newCmdObj;
+}
 }  // namespace
+
+Counter64& CurOp::totalInterruptChecks_forTest() {
+    return totalInterruptChecks;
+}
+Counter64& CurOp::opsWithOverdueInterruptCheck_forTest() {
+    return opsWithOverdueInterruptCheck;
+}
 
 /**
  * This type decorates a Client object with a stack of active CurOp objects.
@@ -86,7 +198,9 @@ class CurOp::CurOpStack {
     CurOpStack& operator=(const CurOpStack&) = delete;
 
 public:
-    CurOpStack() : _base(nullptr, this) {}
+    CurOpStack() {
+        _pushNoLock(&_base);
+    }
 
     /**
      * Returns the top of the CurOp stack.
@@ -96,23 +210,14 @@ public:
     }
 
     /**
-     * Adds "curOp" to the top of the CurOp stack for a client. Called by CurOp's constructor.
+     * Adds "curOp" to the top of the CurOp stack for a client.
+     *
+     * This sets the "_parent", "_stack", and "_lockStatsBase" fields
+     * of "curOp".
      */
-    void push(OperationContext* opCtx, CurOp* curOp) {
-        invariant(opCtx);
-        if (_opCtx) {
-            invariant(_opCtx == opCtx);
-        } else {
-            _opCtx = opCtx;
-        }
-        stdx::lock_guard<Client> lk(*_opCtx->getClient());
-        push_nolock(curOp);
-    }
-
-    void push_nolock(CurOp* curOp) {
-        invariant(!curOp->_parent);
-        curOp->_parent = _top;
-        _top = curOp;
+    void push(CurOp* curOp) {
+        stdx::lock_guard<Client> lk(*opCtx()->getClient());
+        _pushNoLock(curOp);
     }
 
     /**
@@ -129,34 +234,54 @@ public:
         // the client during the final pop.
         const bool shouldLock = _top->_parent;
         if (shouldLock) {
-            invariant(_opCtx);
-            _opCtx->getClient()->lock();
+            opCtx()->getClient()->lock();
         }
         invariant(_top);
         CurOp* retval = _top;
         _top = _top->_parent;
         if (shouldLock) {
-            _opCtx->getClient()->unlock();
+            opCtx()->getClient()->unlock();
         }
         return retval;
     }
 
-    const OperationContext* opCtx() {
-        return _opCtx;
+    OperationContext* opCtx() {
+        auto ctx = _curopStack.owner(this);
+        invariant(ctx);
+        return ctx;
     }
 
 private:
-    OperationContext* _opCtx = nullptr;
+    void _pushNoLock(CurOp* curOp) {
+        invariant(!curOp->_parent);
+        curOp->_stack = this;
+        curOp->_parent = _top;
+
+        // If `curOp` is a sub-operation, we store the snapshot of lock stats as the base lock stats
+        // of the current operation. Also store the current ticket wait time as the base ticket
+        // wait time.
+        if (_top) {
+            const boost::optional<ExecutionAdmissionContext> admCtx =
+                ExecutionAdmissionContext::get(opCtx());
+            curOp->_resourceStatsBase = curOp->getAdditiveResourceStats(admCtx);
+        }
+
+        _top = curOp;
+    }
 
     // Top of the stack of CurOps for a Client.
     CurOp* _top = nullptr;
 
     // The bottom-most CurOp for a client.
-    const CurOp _base;
+    CurOp _base;
 };
 
 const OperationContext::Decoration<CurOp::CurOpStack> CurOp::_curopStack =
     OperationContext::declareDecoration<CurOp::CurOpStack>();
+
+void CurOp::push(OperationContext* opCtx) {
+    _curopStack(opCtx).push(this);
+}
 
 CurOp* CurOp::get(const OperationContext* opCtx) {
     return get(*opCtx);
@@ -166,10 +291,9 @@ CurOp* CurOp::get(const OperationContext& opCtx) {
     return _curopStack(opCtx).top();
 }
 
-void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
+void CurOp::reportCurrentOpForClient(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                      Client* client,
                                      bool truncateOps,
-                                     bool backtraceMode,
                                      BSONObjBuilder* infoBuilder) {
     invariant(client);
 
@@ -177,7 +301,7 @@ void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
 
     infoBuilder->append("type", "op");
 
-    const std::string hostName = getHostNameCachedAndPort();
+    const std::string hostName = prettyHostNameAndPort(client->getLocalPort());
     infoBuilder->append("host", hostName);
 
     client->reportState(*infoBuilder);
@@ -194,38 +318,29 @@ void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
     // Fill out the rest of the BSONObj with opCtx specific details.
     infoBuilder->appendBool("active", client->hasAnyActiveCurrentOp());
     infoBuilder->append("currentOpTime",
-                        opCtx->getServiceContext()->getPreciseClockSource()->now().toString());
+                        expCtx->getOperationContext()
+                            ->getServiceContext()
+                            ->getPreciseClockSource()
+                            ->now()
+                            .toString());
 
-    auto authSession = AuthorizationSession::get(client);
-    // Depending on whether the authenticated user is the same user which ran the command,
-    // this might be "effectiveUsers" or "runBy".
-    const auto serializeAuthenticatedUsers = [&](StringData name) {
-        if (authSession->isAuthenticated()) {
-            BSONArrayBuilder users(infoBuilder->subarrayStart(name));
-            for (auto userIt = authSession->getAuthenticatedUserNames(); userIt.more();
-                 userIt.next()) {
-                userIt->serializeToBSON(&users);
+    if (auto clientAuditUserAttrs = rpc::AuditUserAttrs::get(clientOpCtx)) {
+        BSONArrayBuilder users(infoBuilder->subarrayStart("effectiveUsers"));
+        clientAuditUserAttrs->getUser().serializeToBSON(&users);
+        users.doneFast();
+        if (clientAuditUserAttrs->getIsImpersonating()) {
+            auto authSession = AuthorizationSession::get(client);
+            if (authSession->isAuthenticated()) {
+                BSONArrayBuilder users(infoBuilder->subarrayStart("runBy"));
+                authSession->getAuthenticatedUserName()->serializeToBSON(&users);
             }
         }
-    };
-
-    auto maybeImpersonationData = rpc::getImpersonatedUserMetadata(clientOpCtx);
-    if (maybeImpersonationData) {
-        BSONArrayBuilder users(infoBuilder->subarrayStart("effectiveUsers"));
-        for (const auto& user : maybeImpersonationData->getUsers()) {
-            user.serializeToBSON(&users);
-        }
-
-        users.doneFast();
-        serializeAuthenticatedUsers("runBy"_sd);
-    } else {
-        serializeAuthenticatedUsers("effectiveUsers"_sd);
     }
 
-    if (const auto seCtx = transport::ServiceExecutorContext::get(client)) {
-        bool isDedicated = (seCtx->getThreadingModel() ==
-                            transport::ServiceExecutorContext::ThreadingModel::kDedicated);
-        infoBuilder->append("threaded"_sd, isDedicated);
+    infoBuilder->appendBool("isFromUserConnection", client->isFromUserConnection());
+
+    if (transport::ServiceExecutorContext::get(client)) {
+        infoBuilder->append("threaded"_sd, true);
     }
 
     if (clientOpCtx) {
@@ -244,139 +359,286 @@ void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
             lsid->serialize(&lsidBuilder);
         }
 
-        CurOp::get(clientOpCtx)->reportState(clientOpCtx, infoBuilder, truncateOps);
+        if (auto& vCtx = VersionContext::getDecoration(clientOpCtx); vCtx.isInitialized()) {
+            infoBuilder->append("versionContext", vCtx.toBSON());
+        }
+
+        tassert(7663403,
+                str::stream() << "SerializationContext on the expCtx should not be empty, with ns: "
+                              << expCtx->getNamespaceString().toStringForErrorMsg(),
+                expCtx->getSerializationContext() != SerializationContext::stateDefault());
+
+        // reportState is used to generate a command reply
+        auto sc = SerializationContext::stateCommandReply(expCtx->getSerializationContext());
+        CurOp::get(clientOpCtx)->reportState(infoBuilder, sc, truncateOps);
     }
 
-#ifndef MONGO_CONFIG_USE_RAW_LATCHES
-    if (auto diagnostic = DiagnosticInfo::get(*client)) {
-        BSONObjBuilder waitingForLatchBuilder(infoBuilder->subobjStart("waitingForLatch"));
-        waitingForLatchBuilder.append("timestamp", diagnostic->getTimestamp());
-        waitingForLatchBuilder.append("captureName", diagnostic->getCaptureName());
-        if (backtraceMode) {
-            BSONArrayBuilder backtraceBuilder(waitingForLatchBuilder.subarrayStart("backtrace"));
-            /** This branch becomes useful again with SERVER-44091
-            for (const auto& frame : diagnostic->makeStackTrace().frames) {
-                BSONObjBuilder backtraceObj(backtraceBuilder.subobjStart());
-                backtraceObj.append("addr", unsignedHex(frame.instructionOffset));
-                backtraceObj.append("path", frame.objectPath);
-            }
-            */
-        }
+    if (expCtx->getOperationContext()->routedByReplicaSetEndpoint()) {
+        // On the replica set endpoint, currentOp reports both router and shard operations so it
+        // should label each op with its associated role.
+        infoBuilder->append("role", toString(client->getService()->role()));
     }
-#endif
 }
 
-void CurOp::setGenericCursor_inlock(GenericCursor gc) {
+bool CurOp::currentOpBelongsToTenant(Client* client, TenantId tenantId) {
+    invariant(client);
+
+    OperationContext* clientOpCtx = client->getOperationContext();
+
+    if (!clientOpCtx || (CurOp::get(clientOpCtx))->getNSS().tenantId() != tenantId) {
+        return false;
+    }
+
+    return true;
+}
+
+OperationContext* CurOp::opCtx() {
+    invariant(_stack);
+    return _stack->opCtx();
+}
+
+OperationContext* CurOp::opCtx() const {
+    invariant(_stack);
+    return _stack->opCtx();
+}
+
+void CurOp::setOpDescription(WithLock, const BSONObj& opDescription) {
+    _opDescription = opDescription;
+}
+
+void CurOp::setGenericCursor(WithLock, GenericCursor gc) {
     _genericCursor = std::move(gc);
 }
 
-void CurOp::_finishInit(OperationContext* opCtx, CurOpStack* stack) {
-    _stack = stack;
-    _tickSource = SystemTickSource::get();
-
-    if (opCtx) {
-        _stack->push(opCtx, this);
-    } else {
-        _stack->push_nolock(this);
-    }
-}
-
-CurOp::CurOp(OperationContext* opCtx) {
-    // If this is a sub-operation, we store the snapshot of lock stats as the base lock stats of the
-    // current operation.
-    if (_parent != nullptr)
-        _lockStatsBase = opCtx->lockState()->getLockerInfo(boost::none)->stats;
-
-    // Add the CurOp object onto the stack of active CurOp objects.
-    _finishInit(opCtx, &_curopStack(opCtx));
-}
-
-CurOp::CurOp(OperationContext* opCtx, CurOpStack* stack) {
-    _finishInit(opCtx, stack);
-}
-
 CurOp::~CurOp() {
-    if (parent() != nullptr)
+    if (parent() != nullptr) {
         parent()->yielded(_numYields.load());
-    invariant(this == _stack->pop());
+    }
+    invariant(!_stack || this == _stack->pop());
 }
 
-void CurOp::setGenericOpRequestDetails(OperationContext* opCtx,
-                                       const NamespaceString& nss,
-                                       const Command* command,
-                                       BSONObj cmdObj,
-                                       NetworkOp op) {
-    // Set the _isCommand flags based on network op only. For legacy writes on mongoS, we resolve
-    // them to OpMsgRequests and then pass them into the Commands path, so having a valid Command*
-    // here does not guarantee that the op was issued from the client using a command protocol.
+void CurOp::setGenericOpRequestDetails(
+    WithLock, NamespaceString nss, const Command* command, BSONObj cmdObj, NetworkOp op) {
+    // Set the _isCommand flags based on network op only. For legacy writes on mongoS, we
+    // resolve them to OpMsgRequests and then pass them into the Commands path, so having a
+    // valid Command* here does not guarantee that the op was issued from the client using a
+    // command protocol.
     const bool isCommand = (op == dbMsg || (op == dbQuery && nss.isCommand()));
     auto logicalOp = (command ? command->getLogicalOp() : networkOpToLogicalOp(op));
 
-    stdx::lock_guard<Client> clientLock(*opCtx->getClient());
     _isCommand = _debug.iscommand = isCommand;
     _logicalOp = _debug.logicalOp = logicalOp;
     _networkOp = _debug.networkOp = op;
     _opDescription = cmdObj;
     _command = command;
-    _ns = nss.ns();
+    _nss = std::move(nss);
 }
 
-void CurOp::setMessage_inlock(StringData message) {
-    if (_progressMeter.isActive()) {
-        LOGV2_ERROR(20527,
-                    "Changing message from {old} to {new}",
-                    "Updating message",
-                    "old"_attr = redact(_message),
-                    "new"_attr = redact(message));
-        verify(!_progressMeter.isActive());
+void CurOp::_fetchStorageStatsIfNecessary(Date_t deadline) {
+    auto opCtx = this->opCtx();
+    // Do not fetch operation statistics again if we have already got them (for
+    // instance, as a part of stashing the transaction). Take a lock before calling into
+    // the storage engine to prevent racing against a shutdown. Any operation that used
+    // a storage engine would have at-least held a global lock at one point, hence we
+    // limit our lock acquisition to such operations. We can get here and our lock
+    // acquisition be timed out or interrupted, in which case we'll throw. Callers should
+    // handle that case, e.g., by logging a message.
+    if (_debug.storageStats == nullptr &&
+        shard_role_details::getLocker(opCtx)->wasGlobalLockTaken() &&
+        opCtx->getServiceContext()->getStorageEngine()) {
+        ScopedAdmissionPriority<ExecutionAdmissionContext> admissionControl(
+            opCtx, AdmissionContext::Priority::kExempt);
+        Lock::GlobalLock lk(opCtx,
+                            MODE_IS,
+                            deadline,
+                            Lock::InterruptBehavior::kThrow,
+                            Lock::GlobalLockOptions{.skipRSTLLock = true});
+        _debug.storageStats =
+            shard_role_details::getRecoveryUnit(opCtx)->computeOperationStatisticsSinceLastCall();
     }
-    _message = message.toString();  // copy
 }
 
-ProgressMeter& CurOp::setProgress_inlock(StringData message,
-                                         unsigned long long progressMeterTotal,
-                                         int secondsBetween) {
-    setMessage_inlock(message);
-    _progressMeter.reset(progressMeterTotal, secondsBetween);
-    _progressMeter.setName(message);
-    return _progressMeter;
+void CurOp::setEndOfOpMetrics(long long nreturned) {
+    _debug.additiveMetrics.nreturned = nreturned;
+    // A non-none queryStatsInfo.keyHash indicates the current query is being tracked locally for
+    // queryStats, and a metricsRequested being true indicates the query is being tracked remotely
+    // via the metrics included in cursor responses. In either case, we need to track the current
+    // working and storage metrics, as they are recorded in the query stats store and returned
+    // in cursor responses. When tracking locally, we also need to record executionTime.
+    // executionTime is set with the final executionTime in completeAndLogOperation, but
+    // for query stats collection we want it set before incrementing cursor metrics using OpDebug's
+    // AdditiveMetrics. The value of executionTime set here will be overwritten later in
+    // completeAndLogOperation.
+    const auto& info = _debug.queryStatsInfo;
+    if (info.keyHash || info.metricsRequested) {
+        auto& metrics = _debug.additiveMetrics;
+        auto elapsed = elapsedTimeExcludingPauses();
+        // We don't strictly need to record executionTime unless keyHash is non-none, but there's
+        // no harm in recording it since we've already computed the value.
+        metrics.executionTime = elapsed;
+        metrics.clusterWorkingTime = metrics.clusterWorkingTime.value_or(Milliseconds(0)) +
+            (duration_cast<Milliseconds>(elapsed - (_sumBlockedTimeTotal() - _blockedTimeAtStart)));
+
+        calculateCpuTime();
+        metrics.cpuNanos = metrics.cpuNanos.value_or(Nanoseconds(0)) + _debug.cpuTime;
+
+        if (const auto& admCtx = ExecutionAdmissionContext::get(opCtx());
+            admCtx.getDelinquentAcquisitions() > 0 && !opCtx()->inMultiDocumentTransaction() &&
+            !parent()) {
+            // Note that we don't record delinquency stats around ticketing when in a
+            // multi-document transaction, since operations within multi-document transactions hold
+            // tickets for a long time by design and reporting them as delinquent will just create
+            // noise in the data.
+
+            metrics.delinquentAcquisitions = metrics.delinquentAcquisitions.value_or(0) +
+                static_cast<uint64_t>(admCtx.getDelinquentAcquisitions());
+            metrics.totalAcquisitionDelinquency =
+                metrics.totalAcquisitionDelinquency.value_or(Milliseconds(0)) +
+                Milliseconds(admCtx.getTotalAcquisitionDelinquencyMillis());
+            metrics.maxAcquisitionDelinquency = Milliseconds{
+                std::max(metrics.maxAcquisitionDelinquency.value_or(Milliseconds(0)).count(),
+                         admCtx.getMaxAcquisitionDelinquencyMillis())};
+        }
+
+        if (!parent()) {
+            metrics.numInterruptChecks = opCtx()->numInterruptChecks();
+            if (const auto* stats = opCtx()->overdueInterruptCheckStats();
+                stats && stats->overdueInterruptChecks.loadRelaxed() > 0) {
+                metrics.overdueInterruptApproxMax =
+                    std::max(metrics.overdueInterruptApproxMax.value_or(Milliseconds(0)),
+                             stats->overdueMaxTime.loadRelaxed());
+            }
+        }
+
+        try {
+            // If we need them, try to fetch the storage stats. We use an unlimited timeout here,
+            // but the lock acquisition could still be interrupted, which we catch and log.
+            // We need to be careful of the priority, it has to match that of this operation.
+            // If we choose a fixed priority other than kExempt (e.g., kNormal), it may
+            // be lower than the operation's current priority, which would cause an exception to be
+            // thrown.
+            _fetchStorageStatsIfNecessary(Date_t::max());
+        } catch (DBException& ex) {
+            LOGV2(8457400,
+                  "Failed to gather storage statistics for query stats",
+                  "opId"_attr = opCtx()->getOpID(),
+                  "error"_attr = redact(ex));
+        }
+
+        if (_debug.storageStats) {
+            metrics.aggregateStorageStats(*_debug.storageStats);
+        }
+    }
 }
 
-void CurOp::setNS_inlock(StringData ns) {
-    _ns = ns.toString();
+void CurOp::setMessage(WithLock, StringData message) {
+    if (_progressMeter && _progressMeter->isActive()) {
+        LOGV2_ERROR(
+            20527, "Updating message", "old"_attr = redact(_message), "new"_attr = redact(message));
+        MONGO_verify(!_progressMeter->isActive());
+    }
+    _message = std::string{message};  // copy
+}
+
+ProgressMeter& CurOp::setProgress(WithLock lk,
+                                  StringData message,
+                                  unsigned long long progressMeterTotal,
+                                  int secondsBetween) {
+    setMessage(lk, message);
+    if (_progressMeter) {
+        _progressMeter->reset(progressMeterTotal, secondsBetween);
+        _progressMeter->setName(message);
+    } else {
+        _progressMeter.emplace(progressMeterTotal, secondsBetween, 100, "", std::string{message});
+    }
+
+    return _progressMeter.value();
+}
+
+void CurOp::updateStatsOnTransactionUnstash(ClientLock&) {
+    // Store lock stats and storage metrics from the locker and recovery unit after unstashing.
+    // These stats have accrued outside of this CurOp instance so we will ignore/subtract them when
+    // reporting on this operation.
+    _initializeResourceStatsBaseIfNecessary();
+    _resourceStatsBase->addForUnstash(getAdditiveResourceStats(boost::none));
+}
+
+void CurOp::updateStatsOnTransactionStash(ClientLock&) {
+    // Store lock stats and storage metrics that happened during this operation before the locker
+    // and recovery unit are stashed. We take the delta of the stats before stashing and the base
+    // stats which includes the snapshot of stats when it was unstashed. This stats delta on
+    // stashing is added when reporting on this operation.
+    _initializeResourceStatsBaseIfNecessary();
+    _resourceStatsBase->subtractForStash(getAdditiveResourceStats(boost::none));
+}
+
+void CurOp::setMemoryTrackingStats(const int64_t inUseTrackedMemoryBytes,
+                                   const int64_t peakTrackedMemoryBytes) {
+    tassert(9897000,
+            "featureFlagQueryMemoryTracking must be turned on before writing memory stats to CurOp",
+            feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled());
+    // We recompute the peak here (the memory tracker that calls this method will already computing
+    // the peak) in order to avoid writing to the atomic if the peak does not change.
+    //
+    // Set peak memory first, so that we can maintain the invariant that the peak is always
+    // equal to or greater than the current in-use tally.
+    if (peakTrackedMemoryBytes > _peakTrackedMemoryBytes.load()) {
+        _peakTrackedMemoryBytes.store(peakTrackedMemoryBytes);
+    }
+
+    _inUseTrackedMemoryBytes.store(inUseTrackedMemoryBytes);
+}
+
+void CurOp::setNS(WithLock, NamespaceString nss) {
+    _nss = std::move(nss);
+}
+
+void CurOp::setNS(WithLock, const DatabaseName& dbName) {
+    _nss = NamespaceString(dbName);
 }
 
 TickSource::Tick CurOp::startTime() {
-    // It is legal for this function to get called multiple times, but all of those calls should be
-    // from the same thread, which should be the thread that "owns" this CurOp object. We define
-    // ownership here in terms of the Client object: each thread is associated with a Client
-    // (accessed by 'Client::getCurrent()'), which should be the same as the Client associated with
-    // this CurOp (by way of the OperationContext). Note that, if this is the "base" CurOp on the
-    // CurOpStack, then we don't yet hava an initialized pointer to the OperationContext, and we
-    // cannot perform this check. That is a rare case, however.
-    invariant(!_stack->opCtx() || Client::getCurrent() == _stack->opCtx()->getClient());
-
     auto start = _start.load();
     if (start != 0) {
         return start;
     }
 
+    // Start the CPU timer if this system supports it.
+    if (auto cpuTimers = OperationCPUTimers::get(opCtx())) {
+        _cpuTimer = cpuTimers->makeTimer();
+        _cpuTimer->start();
+    }
+
+    _blockedTimeAtStart = _sumBlockedTimeTotal();
+
+    TickSource::Tick startTime = _tickSource->getTicks();
+
+    // For top level operations, we decide whether or not to sample this operation for interrupt
+    // tracking.
+    if (gFeatureFlagRecordDelinquentMetrics.isEnabled() && !parent() &&
+        opCtx()->getClient()->getPrng().nextCanonicalDouble() <
+            gOverdueInterruptCheckSamplingRate.loadRelaxed()) {
+        opCtx()->trackOverdueInterruptChecks(startTime);
+    }
+
     // The '_start' value is initialized to 0 and gets assigned on demand the first time it gets
-    // accessed. The above thread ownership requirement ensures that there will never be concurrent
-    // calls to this '_start' assignment, but we use compare-exchange anyway as an additional check
-    // that writes to '_start' never race.
+    // accessed. The above thread ownership requirement ensures that there will never be
+    // concurrent calls to this '_start' assignment, but we use compare-exchange anyway as an
+    // additional check that writes to '_start' never race.
     TickSource::Tick unassignedStart = 0;
-    invariant(_start.compare_exchange_strong(unassignedStart, _tickSource->getTicks()));
-    return _start.load();
+    invariant(_start.compare_exchange_strong(unassignedStart, startTime));
+
+    return startTime;
 }
 
 void CurOp::done() {
-    // As documented in the 'CurOp::startTime()' member function, it is legal for this function to
-    // be called multiple times, but all calls must be in in the thread that "owns" this CurOp
-    // object.
-    invariant(!_stack->opCtx() || Client::getCurrent() == _stack->opCtx()->getClient());
-
     _end = _tickSource->getTicks();
+}
+
+void CurOp::calculateCpuTime() {
+    if (_cpuTimer && _debug.cpuTime < Nanoseconds::zero()) {
+        _debug.cpuTime = _cpuTimer->getElapsed();
+    }
 }
 
 Microseconds CurOp::computeElapsedTimeTotal(TickSource::Tick startTime,
@@ -391,24 +653,73 @@ Microseconds CurOp::computeElapsedTimeTotal(TickSource::Tick startTime,
     return _tickSource->ticksTo<Microseconds>(endTime - startTime);
 }
 
-void CurOp::enter_inlock(const char* ns, int dbProfileLevel) {
+Milliseconds CurOp::_sumBlockedTimeTotal() {
+    auto locker = shard_role_details::getLocker(opCtx());
+    auto prepareConflictDurationMicros = StorageExecutionContext::get(opCtx())
+                                             ->getPrepareConflictTracker()
+                                             .getThisOpPrepareConflictDuration();
+    auto cumulativeLockWaitTime = Microseconds(locker->stats().getCumulativeWaitTimeMicros());
+    auto timeQueuedForTickets = ExecutionAdmissionContext::get(opCtx()).totalTimeQueuedMicros();
+    auto timeQueuedForFlowControl = Microseconds(locker->getFlowControlStats().timeAcquiringMicros);
+
+    if (_resourceStatsBase) {
+        cumulativeLockWaitTime -= _resourceStatsBase->cumulativeLockWaitTime;
+        timeQueuedForTickets -= _resourceStatsBase->timeQueuedForTickets;
+        timeQueuedForFlowControl -= _resourceStatsBase->timeQueuedForFlowControl;
+    }
+
+    return duration_cast<Milliseconds>(cumulativeLockWaitTime + timeQueuedForTickets +
+                                       timeQueuedForFlowControl + prepareConflictDurationMicros);
+}
+
+void CurOp::enter(WithLock, NamespaceString nss, int dbProfileLevel) {
     ensureStarted();
-    _ns = ns;
+    _nss = std::move(nss);
     raiseDbProfileLevel(dbProfileLevel);
+}
+
+void CurOp::enter(WithLock lk, const DatabaseName& dbName, int dbProfileLevel) {
+    enter(lk, NamespaceString(dbName), dbProfileLevel);
+}
+
+bool CurOp::shouldDBProfile() {
+    // Profile level 2 should override any sample rate or slowms settings.
+    if (_dbprofile >= 2)
+        return true;
+
+    if (_dbprofile <= 0)
+        return false;
+
+    auto& dbProfileSettings = DatabaseProfileSettings::get(opCtx()->getServiceContext());
+    if (dbProfileSettings.getDatabaseProfileSettings(getNSS().dbName()).filter)
+        return true;
+
+    return elapsedTimeExcludingPauses() >= Milliseconds{serverGlobalParams.slowMS.load()};
 }
 
 void CurOp::raiseDbProfileLevel(int dbProfileLevel) {
     _dbprofile = std::max(dbProfileLevel, _dbprofile);
 }
 
-static constexpr size_t appendMaxElementSize = 50 * 1024;
+bool CurOp::shouldCurOpStackOmitDiagnosticInformation(CurOp* curop) {
+    do {
+        if (curop->getShouldOmitDiagnosticInformation()) {
+            return true;
+        }
 
-bool CurOp::completeAndLogOperation(OperationContext* opCtx,
-                                    logv2::LogComponent component,
+        curop = curop->parent();
+    } while (curop != nullptr);
+
+    return false;
+}
+
+bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
+                                    std::shared_ptr<const ProfileFilter> filter,
                                     boost::optional<size_t> responseLength,
                                     boost::optional<long long> slowMsOverride,
                                     bool forceLog) {
-    const long long slowMs = slowMsOverride.value_or(serverGlobalParams.slowMS);
+    auto opCtx = this->opCtx();
+    const long long slowMs = slowMsOverride.value_or(serverGlobalParams.slowMS.load());
 
     // Record the size of the response returned to the client, if applicable.
     if (responseLength) {
@@ -417,18 +728,49 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
 
     // Obtain the total execution time of this operation.
     done();
-    _debug.executionTime = duration_cast<Microseconds>(elapsedTimeExcludingPauses());
+    _debug.additiveMetrics.executionTime = elapsedTimeExcludingPauses();
+    const auto executionTimeMillis =
+        durationCount<Milliseconds>(*_debug.additiveMetrics.executionTime);
 
-    const auto executionTimeMillis = durationCount<Milliseconds>(_debug.executionTime);
+    if (!opCtx->inMultiDocumentTransaction()) {
+        // If we're not in a txn, we record information about delinquent ticket acquisitions to the
+        // Queue's stats.
+        if (auto ticketingSystem = admission::TicketingSystem::get(opCtx->getServiceContext())) {
+            ticketingSystem->incrementDelinquencyStats(opCtx);
+        }
+    }
+
+    // For the top-level operation which was chosen for sampling, update the server status
+    // counters. We don't want to double count overdue interrupt checks that come from child
+    // operations in the serverStatus counters.
+    if (!parent()) {
+        reportCheckForInterruptStats(opCtx);
+    }
+
+    // Do not log the slow query information if asked to omit it
+    if (shouldCurOpStackOmitDiagnosticInformation(this)) {
+        return false;
+    }
 
     if (_debug.isReplOplogGetMore) {
         oplogGetMoreStats.recordMillis(executionTimeMillis);
     }
 
+    auto workingMillis =
+        Milliseconds(executionTimeMillis) - (_sumBlockedTimeTotal() - _blockedTimeAtStart);
+    // Round up to zero if necessary to allow precision errors from FastClockSource used by flow
+    // control ticketholder.
+    _debug.workingTimeMillis = (workingMillis < Milliseconds(0) ? Milliseconds(0) : workingMillis);
+
     bool shouldLogSlowOp, shouldProfileAtLevel1;
 
-    if (auto filter =
-            CollectionCatalog::get(opCtx)->getDatabaseProfileSettings(getNSS().db()).filter) {
+    if (filter) {
+        // Calculate this operation's CPU time before deciding whether logging/profiling is
+        // necessary only if it is needed for filtering.
+        if (filter->dependsOn("cpuNanos")) {
+            calculateCpuTime();
+        }
+
         bool passesFilter = filter->matches(opCtx, _debug, *this);
 
         shouldLogSlowOp = passesFilter;
@@ -439,71 +781,49 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
         // settings.
         bool shouldSample;
         std::tie(shouldLogSlowOp, shouldSample) = shouldLogSlowOpWithSampling(
-            opCtx, component, Milliseconds(executionTimeMillis), Milliseconds(slowMs));
+            opCtx, logOptions.component(), _debug.workingTimeMillis, Milliseconds(slowMs));
 
         shouldProfileAtLevel1 = shouldLogSlowOp && shouldSample;
     }
 
+    // Defer calculating the CPU time until we know that we actually are going to write it to
+    // the logs or profiler. The CPU time may have been determined earlier if it was a
+    // dependency of 'filter' in which case this is a no-op.
+    if (forceLog || shouldLogSlowOp || _dbprofile >= 2) {
+        calculateCpuTime();
+    }
+
     if (forceLog || shouldLogSlowOp) {
-        auto lockerInfo = opCtx->lockState()->getLockerInfo(_lockStatsBase);
-        if (_debug.storageStats == nullptr && opCtx->lockState()->wasGlobalLockTaken() &&
-            opCtx->getServiceContext()->getStorageEngine()) {
-            // Do not fetch operation statistics again if we have already got them (for instance,
-            // as a part of stashing the transaction).
-            // Take a lock before calling into the storage engine to prevent racing against a
-            // shutdown. Any operation that used a storage engine would have at-least held a
-            // global lock at one point, hence we limit our lock acquisition to such operations.
-            // We can get here and our lock acquisition be timed out or interrupted, log a
-            // message if that happens.
-            try {
-                // Retrieving storage stats should not be blocked by oplog application.
-                ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
-                    opCtx->lockState());
-                Lock::GlobalLock lk(opCtx,
-                                    MODE_IS,
-                                    Date_t::now() + Milliseconds(500),
-                                    Lock::InterruptBehavior::kLeaveUnlocked);
-                if (lk.isLocked()) {
-                    _debug.storageStats = opCtx->recoveryUnit()->getOperationStatistics();
-                } else {
-                    LOGV2_WARNING_OPTIONS(
-                        20525,
-                        {component},
-                        "Failed to gather storage statistics for {opId} due to {reason}",
-                        "Failed to gather storage statistics for slow operation",
-                        "opId"_attr = opCtx->getOpID(),
-                        "error"_attr = "lock acquire timeout"_sd);
-                }
-            } catch (const ExceptionForCat<ErrorCategory::Interruption>& ex) {
-                LOGV2_WARNING_OPTIONS(
-                    20526,
-                    {component},
-                    "Failed to gather storage statistics for {opId} due to {reason}",
-                    "Failed to gather storage statistics for slow operation",
-                    "opId"_attr = opCtx->getOpID(),
-                    "error"_attr = redact(ex));
-            }
+        auto locker = shard_role_details::getLocker(opCtx);
+        SingleThreadedLockStats lockStats(locker->stats());
+
+        try {
+            // Slow query logs are critical for observability and should not wait for ticket
+            // acquisition. Slow queries can happen for various reasons; however, if queries
+            // are slower due to ticket exhaustion, queueing in order to log can compound
+            // the issue. Hence we pass the kExempt priority to _fetchStorageStatsIfNecessary.
+            _fetchStorageStatsIfNecessary(Date_t::now() + Milliseconds(500));
+        } catch (const DBException& ex) {
+            LOGV2_OPTIONS(20526,
+                          logOptions,
+                          "Failed to gather storage statistics for slow operation",
+                          "opId"_attr = opCtx->getOpID(),
+                          "error"_attr = redact(ex));
         }
 
         // Gets the time spent blocked on prepare conflicts.
-        auto prepareConflictDurationMicros =
-            PrepareConflictTracker::get(opCtx).getPrepareConflictDuration();
+        auto prepareConflictDurationMicros = StorageExecutionContext::get(opCtx)
+                                                 ->getPrepareConflictTracker()
+                                                 .getThisOpPrepareConflictDuration();
         _debug.prepareConflictDurationMillis =
             duration_cast<Milliseconds>(prepareConflictDurationMicros);
 
-        auto operationMetricsPtr = [&]() -> ResourceConsumption::OperationMetrics* {
-            auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-            if (metricsCollector.hasCollectedMetrics()) {
-                return &metricsCollector.getMetrics();
-            }
-            return nullptr;
-        }();
+        const auto& storageMetrics = getOperationStorageMetrics();
 
         logv2::DynamicAttributes attr;
-        _debug.report(
-            opCtx, (lockerInfo ? &lockerInfo->stats : nullptr), operationMetricsPtr, &attr);
+        _debug.report(opCtx, &lockStats, storageMetrics, getPrepareReadConflicts(), &attr);
 
-        LOGV2_OPTIONS(51803, {component}, "Slow query", attr);
+        LOGV2_OPTIONS(51803, logOptions, "Slow query", attr);
 
         _checkForFailpointsAfterCommandLogged();
     }
@@ -514,6 +834,10 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
     if (_dbprofile <= 0)
         return false;
     return shouldProfileAtLevel1;
+}
+
+std::string CurOp::getNS() const {
+    return NamespaceStringUtil::serialize(_nss, SerializationContext::stateDefault());
 }
 
 // Failpoints after commands are logged.
@@ -553,6 +877,7 @@ Command::ReadWriteType CurOp::getReadWriteType() const {
         case LogicalOp::opGetMore:
         case LogicalOp::opQuery:
             return Command::ReadWriteType::kRead;
+        case LogicalOp::opBulkWrite:
         case LogicalOp::opUpdate:
         case LogicalOp::opInsert:
         case LogicalOp::opDelete:
@@ -564,92 +889,71 @@ Command::ReadWriteType CurOp::getReadWriteType() const {
 
 namespace {
 
-BSONObj appendCommentField(OperationContext* opCtx, const BSONObj& cmdObj) {
-    return opCtx->getComment() && !cmdObj["comment"] ? cmdObj.addField(*opCtx->getComment())
-                                                     : cmdObj;
-}
-
 /**
- * Appends {<name>: obj} to the provided builder.  If obj is greater than maxSize, appends a string
- * summary of obj as { <name>: { $truncated: "obj" } }. If a comment parameter is present, add it to
- * the truncation object.
+ * Populates the BSONObjBuilder with the queueing statistics of the current operation. Calculates
+ * overall queue stats and records the current queue if the operation is presently queued.
  */
-void appendAsObjOrString(StringData name,
-                         const BSONObj& obj,
-                         const boost::optional<size_t> maxSize,
-                         BSONObjBuilder* builder) {
-    if (!maxSize || static_cast<size_t>(obj.objsize()) <= *maxSize) {
-        builder->append(name, obj);
-    } else {
-        // Generate an abbreviated serialization for the object, by passing false as the "full"
-        // argument to obj.toString(). Remove "comment" field from the object, if present, since
-        // this will be promoted to a top-level field in the output.
-        std::string objToString =
-            (obj.hasField("comment") ? obj.removeField("comment") : obj).toString();
-        if (objToString.size() > *maxSize) {
-            // objToString is still too long, so we append to the builder a truncated form
-            // of objToString concatenated with "...".  Instead of creating a new string
-            // temporary, mutate objToString to do this (we know that we can mutate
-            // characters in objToString up to and including objToString[maxSize]).
-            objToString[*maxSize - 3] = '.';
-            objToString[*maxSize - 2] = '.';
-            objToString[*maxSize - 1] = '.';
-            LOGV2_INFO(4760300,
-                       "Gathering currentOp information, operation of size {size} exceeds the size "
-                       "limit of {limit} and will be truncated.",
-                       "size"_attr = objToString.size(),
-                       "limit"_attr = *maxSize);
+void populateCurrentOpQueueStats(OperationContext* opCtx,
+                                 TickSource* tickSource,
+                                 BSONObjBuilder* currOpStats) {
+    boost::optional<std::tuple<TicketHolderQueueStats::QueueType, Microseconds>> currentQueue;
+    BSONObjBuilder queuesBuilder(currOpStats->subobjStart("queues"));
+
+    for (auto&& [queueType, lookup] : TicketHolderQueueStats::getQueueMetricsRegistry()) {
+        AdmissionContext* admCtx = lookup(opCtx);
+        Microseconds totalTimeQueuedMicros = admCtx->totalTimeQueuedMicros();
+
+        if (auto startQueueingTime = admCtx->startQueueingTime()) {
+            Microseconds currentQueueTimeQueuedMicros = tickSource->ticksTo<Microseconds>(
+                opCtx->getServiceContext()->getTickSource()->getTicks() - *startQueueingTime);
+            totalTimeQueuedMicros += currentQueueTimeQueuedMicros;
+            currentQueue = std::make_tuple(queueType, currentQueueTimeQueuedMicros);
         }
-
-        StringData truncation = StringData(objToString).substr(0, *maxSize);
-
-        // Append the truncated representation of the object to the builder. If a comment parameter
-        // is present, write it to the object alongside the truncated op. This object will appear as
-        // {$truncated: "{find: \"collection\", filter: {x: 1, ...", comment: "comment text" }
-        BSONObjBuilder truncatedBuilder(builder->subobjStart(name));
-        truncatedBuilder.append("$truncated", truncation);
-
-        if (auto comment = obj["comment"]) {
-            truncatedBuilder.append(comment);
-        }
-
-        truncatedBuilder.doneFast();
+        BSONObjBuilder queueMetricsBuilder(
+            queuesBuilder.subobjStart(TicketHolderQueueStats::queueTypeToString(queueType)));
+        queueMetricsBuilder.append("admissions", admCtx->getAdmissions());
+        queueMetricsBuilder.append("totalTimeQueuedMicros",
+                                   durationCount<Microseconds>(totalTimeQueuedMicros));
+        queueMetricsBuilder.append("isHoldingTicket", admCtx->isHoldingTicket());
+        queueMetricsBuilder.done();
     }
-}
+    queuesBuilder.done();
+    if (currentQueue) {
+        BSONObjBuilder currentQueueBuilder(currOpStats->subobjStart("currentQueue"));
+        currentQueueBuilder.append(
+            "name", TicketHolderQueueStats::queueTypeToString(std::get<0>(*currentQueue)));
+        currentQueueBuilder.append("timeQueuedMicros",
+                                   durationCount<Microseconds>(std::get<1>(*currentQueue)));
+        currentQueueBuilder.done();
+    } else {
+        currOpStats->appendNull("currentQueue");
+    }
+};
 }  // namespace
 
-BSONObj CurOp::truncateAndSerializeGenericCursor(GenericCursor* cursor,
+BSONObj CurOp::truncateAndSerializeGenericCursor(GenericCursor cursor,
                                                  boost::optional<size_t> maxQuerySize) {
-    // This creates a new builder to truncate the object that will go into the curOp output. In
-    // order to make sure the object is not too large but not truncate the comment, we only
-    // truncate the originatingCommand and not the entire cursor.
-    if (maxQuerySize) {
-        BSONObjBuilder tempObj;
-        appendAsObjOrString(
-            "truncatedObj", cursor->getOriginatingCommand().get(), maxQuerySize, &tempObj);
-        auto originatingCommand = tempObj.done().getObjectField("truncatedObj");
-        cursor->setOriginatingCommand(originatingCommand.getOwned());
+    if (maxQuerySize && cursor.getOriginatingCommand() &&
+        static_cast<size_t>(cursor.getOriginatingCommand()->objsize()) > *maxQuerySize) {
+        BSONObjBuilder truncatedBuilder;
+        curop_bson_helpers::buildTruncatedObject(
+            *cursor.getOriginatingCommand(), *maxQuerySize, truncatedBuilder);
+        cursor.setOriginatingCommand(truncatedBuilder.obj());
     }
-    // lsid, ns, and planSummary exist in the top level curop object, so they need to be temporarily
-    // removed from the cursor object to avoid duplicating information.
-    auto lsid = cursor->getLsid();
-    auto ns = cursor->getNs();
-    auto originalPlanSummary(cursor->getPlanSummary() ? boost::optional<std::string>(
-                                                            cursor->getPlanSummary()->toString())
-                                                      : boost::none);
-    cursor->setLsid(boost::none);
-    cursor->setNs(boost::none);
-    cursor->setPlanSummary(boost::none);
-    auto serialized = cursor->toBSON();
-    cursor->setLsid(lsid);
-    cursor->setNs(ns);
-    if (originalPlanSummary) {
-        cursor->setPlanSummary(StringData(*originalPlanSummary));
-    }
-    return serialized;
+
+    // Remove fields that are present in the parent "curop" object.
+    cursor.setLsid(boost::none);
+    cursor.setNs(boost::none);
+    cursor.setPlanSummary(boost::none);
+    cursor.setInUseTrackedMemBytes(boost::none);
+    cursor.setPeakTrackedMemBytes(boost::none);
+    return cursor.toBSON();
 }
 
-void CurOp::reportState(OperationContext* opCtx, BSONObjBuilder* builder, bool truncateOps) {
+void CurOp::reportState(BSONObjBuilder* builder,
+                        const SerializationContext& serializationContext,
+                        bool truncateOps) {
+    auto opCtx = this->opCtx();
     auto start = _start.load();
     if (start) {
         auto end = _end.load();
@@ -659,35 +963,93 @@ void CurOp::reportState(OperationContext* opCtx, BSONObjBuilder* builder, bool t
     }
 
     builder->append("op", logicalOpToString(_logicalOp));
-    builder->append("ns", _ns);
+    builder->append("ns", NamespaceStringUtil::serialize(_nss, serializationContext));
 
-    // When the currentOp command is run, it returns a single response object containing all current
-    // operations; this request will fail if the response exceeds the 16MB document limit. By
-    // contrast, the $currentOp aggregation stage does not have this restriction. If 'truncateOps'
-    // is true, limit the size of each op to 1000 bytes. Otherwise, do not truncate.
+    bool omitAndRedactInformation = getShouldOmitDiagnosticInformation();
+    builder->append("redacted", omitAndRedactInformation);
+
+    // When the currentOp command is run, it returns a single response object containing all
+    // current operations; this request will fail if the response exceeds the 16MB document
+    // limit. By contrast, the $currentOp aggregation stage does not have this restriction. If
+    // 'truncateOps' is true, limit the size of each op to 1000 bytes. Otherwise, do not
+    // truncate.
     const boost::optional<size_t> maxQuerySize{truncateOps, 1000};
 
-    appendAsObjOrString(
-        "command", appendCommentField(opCtx, _opDescription), maxQuerySize, builder);
+    auto obj = [&]() {
+        if (!gMultitenancySupport) {
+            return curop_bson_helpers::appendCommentField(opCtx, _opDescription);
+        } else {
+            return curop_bson_helpers::appendCommentField(
+                opCtx,
+                serializeDollarDbInOpDescription(
+                    _nss.tenantId(), _opDescription, serializationContext));
+        }
+    }();
 
+    // If flag is true, add command field to builder without sensitive information.
+    if (omitAndRedactInformation) {
+        BSONObjBuilder redactedCommandBuilder;
+        redactedCommandBuilder.append(obj.firstElement());
+        redactedCommandBuilder.append(obj["$db"]);
+        auto commentElement = obj["comment"];
+        if (commentElement.ok()) {
+            redactedCommandBuilder.append(commentElement);
+        }
+
+        if (obj.firstElementFieldNameStringData() == "getMore"_sd) {
+            redactedCommandBuilder.append(obj["collection"]);
+        }
+
+        curop_bson_helpers::appendObjectTruncatingAsNecessary(
+            "command", redactedCommandBuilder.done(), maxQuerySize, *builder);
+    } else {
+        curop_bson_helpers::appendObjectTruncatingAsNecessary(
+            "command", obj, maxQuerySize, *builder);
+    }
+
+
+    // Omit information for QE user collections, QE state collections and QE user operations.
+    if (omitAndRedactInformation) {
+        return;
+    }
+
+    switch (_debug.queryFramework) {
+        case PlanExecutor::QueryFramework::kClassicOnly:
+        case PlanExecutor::QueryFramework::kClassicHybrid:
+            builder->append("queryFramework", "classic");
+            break;
+        case PlanExecutor::QueryFramework::kSBEOnly:
+        case PlanExecutor::QueryFramework::kSBEHybrid:
+            builder->append("queryFramework", "sbe");
+            break;
+        case PlanExecutor::QueryFramework::kUnknown:
+            break;
+    }
 
     if (!_planSummary.empty()) {
         builder->append("planSummary", _planSummary);
     }
 
+    if (int64_t inUseTrackedMemoryBytes = getInUseTrackedMemoryBytes()) {
+        builder->append("inUseTrackedMemBytes", inUseTrackedMemoryBytes);
+    }
+
+    if (int64_t peakTrackedMemoryBytes = getPeakTrackedMemoryBytes()) {
+        builder->append("peakTrackedMemBytes", peakTrackedMemoryBytes);
+    }
+
     if (_genericCursor) {
-        builder->append("cursor",
-                        truncateAndSerializeGenericCursor(&(*_genericCursor), maxQuerySize));
+        builder->append("cursor", truncateAndSerializeGenericCursor(*_genericCursor, maxQuerySize));
     }
 
     if (!_message.empty()) {
-        if (_progressMeter.isActive()) {
+        if (_progressMeter && _progressMeter->isActive()) {
             StringBuilder buf;
-            buf << _message << " " << _progressMeter.toString();
+            buf << _message << " " << _progressMeter->toString();
             builder->append("msg", buf.str());
             BSONObjBuilder sub(builder->subobjStart("progress"));
-            sub.appendNumber("done", (long long)_progressMeter.done());
-            sub.appendNumber("total", (long long)_progressMeter.total());
+            sub.appendNumber("done", (long long)_progressMeter->done());
+            sub.appendNumber("total", (long long)_progressMeter->total());
             sub.done();
         } else {
             builder->append("msg", _message);
@@ -698,11 +1060,17 @@ void CurOp::reportState(OperationContext* opCtx, BSONObjBuilder* builder, bool t
         builder->append("failpointMsg", _failPointMessage);
     }
 
-    if (auto n = _debug.additiveMetrics.prepareReadConflicts.load(); n > 0) {
+
+    if (auto n = getPrepareReadConflicts(); n > 0) {
         builder->append("prepareReadConflicts", n);
     }
-    if (auto n = _debug.additiveMetrics.writeConflicts.load(); n > 0) {
+
+    auto storageMetrics = getOperationStorageMetrics();
+    if (auto n = storageMetrics.writeConflicts; n > 0) {
         builder->append("writeConflicts", n);
+    }
+    if (auto n = storageMetrics.temporarilyUnavailableErrors; n > 0) {
+        builder->append("temporarilyUnavailableErrors", n);
     }
 
     builder->append("numYields", _numYields.load());
@@ -714,932 +1082,82 @@ void CurOp::reportState(OperationContext* opCtx, BSONObjBuilder* builder, bool t
     if (_debug.dataThroughputAverage) {
         builder->append("dataThroughputAverage", *_debug.dataThroughputAverage);
     }
-}
 
-namespace {
-StringData getProtoString(int op) {
-    if (op == dbMsg) {
-        return "op_msg";
-    } else if (op == dbQuery) {
-        return "op_query";
-    }
-    MONGO_UNREACHABLE;
-}
-}  // namespace
-
-#define OPDEBUG_TOSTRING_HELP(x) \
-    if (x >= 0)                  \
-    s << " " #x ":" << (x)
-#define OPDEBUG_TOSTRING_HELP_BOOL(x) \
-    if (x)                            \
-    s << " " #x ":" << (x)
-#define OPDEBUG_TOSTRING_HELP_ATOMIC(x, y) \
-    if (auto __y = y.load(); __y > 0)      \
-    s << " " x ":" << (__y)
-#define OPDEBUG_TOSTRING_HELP_OPTIONAL(x, y) \
-    if (y)                                   \
-    s << " " x ":" << (*y)
-
-#define OPDEBUG_TOATTR_HELP(x) \
-    if (x >= 0)                \
-    pAttrs->add(#x, x)
-#define OPDEBUG_TOATTR_HELP_BOOL(x) \
-    if (x)                          \
-    pAttrs->add(#x, x)
-#define OPDEBUG_TOATTR_HELP_ATOMIC(x, y) \
-    if (auto __y = y.load(); __y > 0)    \
-    pAttrs->add(x, __y)
-#define OPDEBUG_TOATTR_HELP_OPTIONAL(x, y) \
-    if (y)                                 \
-    pAttrs->add(x, *y)
-
-void OpDebug::report(OperationContext* opCtx,
-                     const SingleThreadedLockStats* lockStats,
-                     const ResourceConsumption::OperationMetrics* operationMetrics,
-                     logv2::DynamicAttributes* pAttrs) const {
-    Client* client = opCtx->getClient();
-    auto& curop = *CurOp::get(opCtx);
-    auto flowControlStats = opCtx->lockState()->getFlowControlStats();
-
-    if (iscommand) {
-        pAttrs->add("type", "command");
-    } else {
-        pAttrs->add("type", networkOpToString(networkOp));
+    if (auto start = _waitForWriteConcernStart.load(); start > 0) {
+        auto end = _waitForWriteConcernEnd.load();
+        auto elapsedTimeTotal = _atomicWaitForWriteConcernDurationMillis.load();
+        elapsedTimeTotal += duration_cast<Milliseconds>(computeElapsedTimeTotal(start, end));
+        builder->append("waitForWriteConcernDurationMillis",
+                        durationCount<Milliseconds>(elapsedTimeTotal));
     }
 
-    pAttrs->addDeepCopy("ns", curop.getNS());
-
-    if (client) {
-        if (auto clientMetadata = ClientMetadata::get(client)) {
-            StringData appName = clientMetadata->getApplicationName();
-            if (!appName.empty()) {
-                pAttrs->add("appName", appName);
-            }
+    if (!parent() && isStarted()) {
+        builder->append("numInterruptChecks", opCtx->numInterruptChecks());
+        const auto& admCtx = ExecutionAdmissionContext::get(opCtx);
+        const auto* stats = opCtx->overdueInterruptCheckStats();
+        if (admCtx.getDelinquentAcquisitions() > 0 ||
+            (stats && stats->overdueInterruptChecks.loadRelaxed() > 0)) {
+            BSONObjBuilder sub(builder->subobjStart("delinquencyInfo"));
+            OpDebug::appendDelinquentInfo(opCtx, sub);
         }
     }
 
-    auto query = appendCommentField(opCtx, curop.opDescription());
-    if (!query.isEmpty()) {
-        if (iscommand) {
-            const Command* curCommand = curop.getCommand();
-            if (curCommand) {
-                mutablebson::Document cmdToLog(query, mutablebson::Document::kInPlaceDisabled);
-                curCommand->snipForLogging(&cmdToLog);
-                pAttrs->add("command", redact(cmdToLog.getObject()));
-            } else {
-                // Should not happen but we need to handle curCommand == NULL gracefully.
-                // We don't know what the request payload is intended to be, so it might be
-                // sensitive, and we don't know how to redact it properly without a 'Command*'.
-                // So we just don't log it at all.
-                pAttrs->add("command", "unrecognized");
-            }
-        } else {
-            pAttrs->add("command", redact(query));
-        }
-    }
+    populateCurrentOpQueueStats(opCtx, _tickSource, builder);
 
-    auto originatingCommand = curop.originatingCommand();
-    if (!originatingCommand.isEmpty()) {
-        pAttrs->add("originatingCommand", redact(originatingCommand));
-    }
-
-    if (!curop.getPlanSummary().empty()) {
-        pAttrs->addDeepCopy("planSummary", curop.getPlanSummary().toString());
-    }
-
-    if (prepareConflictDurationMillis > Milliseconds::zero()) {
-        pAttrs->add("prepareConflictDuration", prepareConflictDurationMillis);
-    }
-
-    if (dataThroughputLastSecond) {
-        pAttrs->add("dataThroughputLastSecondMBperSec", *dataThroughputLastSecond);
-    }
-
-    if (dataThroughputAverage) {
-        pAttrs->add("dataThroughputAverageMBPerSec", *dataThroughputAverage);
-    }
-
-    if (!resolvedViews.empty()) {
-        pAttrs->add("resolvedViews", getResolvedViewsInfo());
-    }
-
-    OPDEBUG_TOATTR_HELP(nShards);
-    OPDEBUG_TOATTR_HELP(cursorid);
-    if (mongotCursorId) {
-        pAttrs->add("mongot", makeMongotDebugStatsObject());
-    }
-    OPDEBUG_TOATTR_HELP_BOOL(exhaust);
-
-    OPDEBUG_TOATTR_HELP_OPTIONAL("keysExamined", additiveMetrics.keysExamined);
-    OPDEBUG_TOATTR_HELP_OPTIONAL("docsExamined", additiveMetrics.docsExamined);
-    OPDEBUG_TOATTR_HELP_BOOL(hasSortStage);
-    OPDEBUG_TOATTR_HELP_BOOL(usedDisk);
-    OPDEBUG_TOATTR_HELP_BOOL(fromMultiPlanner);
-    if (replanReason) {
-        bool replanned = true;
-        OPDEBUG_TOATTR_HELP_BOOL(replanned);
-        pAttrs->add("replanReason", redact(*replanReason));
-    }
-    OPDEBUG_TOATTR_HELP_OPTIONAL("nMatched", additiveMetrics.nMatched);
-    OPDEBUG_TOATTR_HELP_OPTIONAL("nModified", additiveMetrics.nModified);
-    OPDEBUG_TOATTR_HELP_OPTIONAL("ninserted", additiveMetrics.ninserted);
-    OPDEBUG_TOATTR_HELP_OPTIONAL("ndeleted", additiveMetrics.ndeleted);
-    OPDEBUG_TOATTR_HELP_OPTIONAL("nUpserted", additiveMetrics.nUpserted);
-    OPDEBUG_TOATTR_HELP_BOOL(cursorExhausted);
-
-    OPDEBUG_TOATTR_HELP_OPTIONAL("keysInserted", additiveMetrics.keysInserted);
-    OPDEBUG_TOATTR_HELP_OPTIONAL("keysDeleted", additiveMetrics.keysDeleted);
-    OPDEBUG_TOATTR_HELP_ATOMIC("prepareReadConflicts", additiveMetrics.prepareReadConflicts);
-    OPDEBUG_TOATTR_HELP_ATOMIC("writeConflicts", additiveMetrics.writeConflicts);
-
-    pAttrs->add("numYields", curop.numYields());
-    OPDEBUG_TOATTR_HELP(nreturned);
-
-    if (queryHash) {
-        pAttrs->addDeepCopy("queryHash", zeroPaddedHex(*queryHash));
-    }
-    if (planCacheKey) {
-        pAttrs->addDeepCopy("planCacheKey", zeroPaddedHex(*planCacheKey));
-    }
-
-    if (!errInfo.isOK()) {
-        pAttrs->add("ok", 0);
-        if (!errInfo.reason().empty()) {
-            pAttrs->add("errMsg", redact(errInfo.reason()));
-        }
-        pAttrs->addDeepCopy("errName", errInfo.codeString());
-        pAttrs->add("errCode", static_cast<int>(errInfo.code()));
-    }
-
-    if (responseLength > 0) {
-        pAttrs->add("reslen", responseLength);
-    }
-
-    if (lockStats) {
-        BSONObjBuilder locks;
-        lockStats->report(&locks);
-        pAttrs->add("locks", locks.obj());
-    }
-
-    auto userAcquisitionStats = curop.getReadOnlyUserAcquisitionStats();
-    if (userAcquisitionStats->shouldUserCacheAcquisitionStatsReport()) {
-        BSONObjBuilder userCacheAcquisitionStatsBuilder;
-        userAcquisitionStats->userCacheAcquisitionStatsReport(
-            &userCacheAcquisitionStatsBuilder, opCtx->getServiceContext()->getTickSource());
-        pAttrs->add("authorization", userCacheAcquisitionStatsBuilder.obj());
-    }
-
-    if (userAcquisitionStats->shouldLDAPOperationStatsReport()) {
-        BSONObjBuilder ldapOperationStatsBuilder;
-        userAcquisitionStats->ldapOperationStatsReport(&ldapOperationStatsBuilder,
-                                                       opCtx->getServiceContext()->getTickSource());
-        pAttrs->add("LDAPOperations", ldapOperationStatsBuilder.obj());
-    }
-
-    BSONObj flowControlObj = makeFlowControlObject(flowControlStats);
-    if (flowControlObj.nFields() > 0) {
-        pAttrs->add("flowControl", flowControlObj);
-    }
-
-    {
-        const auto& readConcern = repl::ReadConcernArgs::get(opCtx);
-        if (readConcern.isSpecified()) {
-            pAttrs->add("readConcern", readConcern.toBSONInner());
-        }
-    }
-
-    if (writeConcern && !writeConcern->usedDefaultConstructedWC) {
-        pAttrs->add("writeConcern", writeConcern->toBSON());
-    }
-
-    if (storageStats) {
-        pAttrs->add("storage", storageStats->toBSON());
-    }
-
-    if (operationMetrics) {
-        BSONObjBuilder builder;
-        operationMetrics->toBsonNonZeroFields(&builder);
-        pAttrs->add("operationMetrics", builder.obj());
-    }
-
-    if (client && client->session()) {
-        pAttrs->add("remote", client->session()->remote());
-    }
-
-    if (iscommand) {
-        pAttrs->add("protocol", getProtoString(networkOp));
-    }
-
-    if (remoteOpWaitTime) {
-        pAttrs->add("remoteOpWaitMillis", durationCount<Milliseconds>(*remoteOpWaitTime));
-    }
-
-    pAttrs->add("durationMillis", durationCount<Milliseconds>(executionTime));
-}
-
-#define OPDEBUG_APPEND_NUMBER2(b, x, y) \
-    if (y != -1)                        \
-    (b).appendNumber(x, (y))
-#define OPDEBUG_APPEND_NUMBER(b, x) OPDEBUG_APPEND_NUMBER2(b, #x, x)
-
-#define OPDEBUG_APPEND_BOOL2(b, x, y) \
-    if (y)                            \
-    (b).appendBool(x, (y))
-#define OPDEBUG_APPEND_BOOL(b, x) OPDEBUG_APPEND_BOOL2(b, #x, x)
-
-#define OPDEBUG_APPEND_ATOMIC(b, x, y) \
-    if (auto __y = y.load(); __y > 0)  \
-    (b).appendNumber(x, __y)
-#define OPDEBUG_APPEND_OPTIONAL(b, x, y) \
-    if (y)                               \
-    (b).appendNumber(x, (*y))
-
-void OpDebug::append(OperationContext* opCtx,
-                     const SingleThreadedLockStats& lockStats,
-                     FlowControlTicketholder::CurOp flowControlStats,
-                     BSONObjBuilder& b) const {
-    auto& curop = *CurOp::get(opCtx);
-
-    b.append("op", logicalOpToString(logicalOp));
-
-    NamespaceString nss = NamespaceString(curop.getNS());
-    b.append("ns", nss.ns());
-
-    appendAsObjOrString(
-        "command", appendCommentField(opCtx, curop.opDescription()), appendMaxElementSize, &b);
-
-    auto originatingCommand = curop.originatingCommand();
-    if (!originatingCommand.isEmpty()) {
-        appendAsObjOrString("originatingCommand", originatingCommand, appendMaxElementSize, &b);
-    }
-
-    if (!resolvedViews.empty()) {
-        appendResolvedViewsInfo(b);
-    }
-
-    OPDEBUG_APPEND_NUMBER(b, nShards);
-    OPDEBUG_APPEND_NUMBER(b, cursorid);
-    if (mongotCursorId) {
-        b.append("mongot", makeMongotDebugStatsObject());
-    }
-    OPDEBUG_APPEND_BOOL(b, exhaust);
-
-    OPDEBUG_APPEND_OPTIONAL(b, "keysExamined", additiveMetrics.keysExamined);
-    OPDEBUG_APPEND_OPTIONAL(b, "docsExamined", additiveMetrics.docsExamined);
-    OPDEBUG_APPEND_BOOL(b, hasSortStage);
-    OPDEBUG_APPEND_BOOL(b, usedDisk);
-    OPDEBUG_APPEND_BOOL(b, fromMultiPlanner);
-    if (replanReason) {
-        bool replanned = true;
-        OPDEBUG_APPEND_BOOL(b, replanned);
-        b.append("replanReason", *replanReason);
-    }
-    OPDEBUG_APPEND_OPTIONAL(b, "nMatched", additiveMetrics.nMatched);
-    OPDEBUG_APPEND_OPTIONAL(b, "nModified", additiveMetrics.nModified);
-    OPDEBUG_APPEND_OPTIONAL(b, "ninserted", additiveMetrics.ninserted);
-    OPDEBUG_APPEND_OPTIONAL(b, "ndeleted", additiveMetrics.ndeleted);
-    OPDEBUG_APPEND_OPTIONAL(b, "nUpserted", additiveMetrics.nUpserted);
-    OPDEBUG_APPEND_BOOL(b, cursorExhausted);
-
-    OPDEBUG_APPEND_OPTIONAL(b, "keysInserted", additiveMetrics.keysInserted);
-    OPDEBUG_APPEND_OPTIONAL(b, "keysDeleted", additiveMetrics.keysDeleted);
-    OPDEBUG_APPEND_ATOMIC(b, "prepareReadConflicts", additiveMetrics.prepareReadConflicts);
-    OPDEBUG_APPEND_ATOMIC(b, "writeConflicts", additiveMetrics.writeConflicts);
-
-    OPDEBUG_APPEND_OPTIONAL(b, "dataThroughputLastSecond", dataThroughputLastSecond);
-    OPDEBUG_APPEND_OPTIONAL(b, "dataThroughputAverage", dataThroughputAverage);
-
-    b.appendNumber("numYield", curop.numYields());
-    OPDEBUG_APPEND_NUMBER(b, nreturned);
-
-    if (queryHash) {
-        b.append("queryHash", zeroPaddedHex(*queryHash));
-    }
-    if (planCacheKey) {
-        b.append("planCacheKey", zeroPaddedHex(*planCacheKey));
-    }
-
-    {
-        BSONObjBuilder locks(b.subobjStart("locks"));
-        lockStats.report(&locks);
-    }
-
-    {
-        auto userAcquisitionStats = curop.getReadOnlyUserAcquisitionStats();
-        if (userAcquisitionStats->shouldUserCacheAcquisitionStatsReport()) {
-            BSONObjBuilder userCacheAcquisitionStatsBuilder(b.subobjStart("authorization"));
-            userAcquisitionStats->userCacheAcquisitionStatsReport(
-                &userCacheAcquisitionStatsBuilder, opCtx->getServiceContext()->getTickSource());
-        }
-
-        if (userAcquisitionStats->shouldLDAPOperationStatsReport()) {
-            BSONObjBuilder ldapOperationStatsBuilder;
-            userAcquisitionStats->ldapOperationStatsReport(
-                &ldapOperationStatsBuilder, opCtx->getServiceContext()->getTickSource());
-        }
-    }
-
-    {
-        BSONObj flowControlMetrics = makeFlowControlObject(flowControlStats);
-        BSONObjBuilder flowControlBuilder(b.subobjStart("flowControl"));
-        flowControlBuilder.appendElements(flowControlMetrics);
-    }
-
-    {
-        const auto& readConcern = repl::ReadConcernArgs::get(opCtx);
-        if (readConcern.isSpecified()) {
-            readConcern.appendInfo(&b);
-        }
-    }
-
-    if (writeConcern && !writeConcern->usedDefaultConstructedWC) {
-        b.append("writeConcern", writeConcern->toBSON());
-    }
-
-    if (storageStats) {
-        b.append("storage", storageStats->toBSON());
-    }
-
-    if (!errInfo.isOK()) {
-        b.appendNumber("ok", 0.0);
-        if (!errInfo.reason().empty()) {
-            b.append("errMsg", errInfo.reason());
-        }
-        b.append("errName", ErrorCodes::errorString(errInfo.code()));
-        b.append("errCode", errInfo.code());
-    }
-
-    OPDEBUG_APPEND_NUMBER(b, responseLength);
-    if (iscommand) {
-        b.append("protocol", getProtoString(networkOp));
-    }
-
-    if (remoteOpWaitTime) {
-        b.append("remoteOpWaitMillis", durationCount<Milliseconds>(*remoteOpWaitTime));
-    }
-
-    b.appendNumber("millis", durationCount<Milliseconds>(executionTime));
-
-    if (!curop.getPlanSummary().empty()) {
-        b.append("planSummary", curop.getPlanSummary());
-    }
-
-    if (!execStats.isEmpty()) {
-        b.append("execStats", std::move(execStats));
+    if (auto&& queryShapeHash = _debug.getQueryShapeHash()) {
+        builder->append("queryShapeHash", queryShapeHash->toHexString());
     }
 }
 
-void OpDebug::appendUserInfo(const CurOp& c,
-                             BSONObjBuilder& builder,
-                             AuthorizationSession* authSession) {
-    UserNameIterator nameIter = authSession->getAuthenticatedUserNames();
+CurOp::AdditiveResourceStats CurOp::getAdditiveResourceStats(
+    const boost::optional<ExecutionAdmissionContext>& admCtx) {
+    CurOp::AdditiveResourceStats stats;
 
-    UserName bestUser;
-    if (nameIter.more())
-        bestUser = *nameIter;
+    auto locker = shard_role_details::getLocker(opCtx());
+    stats.lockStats = locker->stats();
+    stats.cumulativeLockWaitTime = Microseconds(stats.lockStats.getCumulativeWaitTimeMicros());
+    stats.timeQueuedForFlowControl =
+        Microseconds(locker->getFlowControlStats().timeAcquiringMicros);
 
-    std::string opdb(nsToDatabase(c.getNS()));
-
-    BSONArrayBuilder allUsers(builder.subarrayStart("allUsers"));
-    for (; nameIter.more(); nameIter.next()) {
-        BSONObjBuilder nextUser(allUsers.subobjStart());
-        nextUser.append(AuthorizationManager::USER_NAME_FIELD_NAME, nameIter->getUser());
-        nextUser.append(AuthorizationManager::USER_DB_FIELD_NAME, nameIter->getDB());
-        nextUser.doneFast();
-
-        if (nameIter->getDB() == opdb) {
-            bestUser = *nameIter;
-        }
+    if (admCtx != boost::none) {
+        stats.timeQueuedForTickets = admCtx->totalTimeQueuedMicros();
     }
-    allUsers.doneFast();
 
-    builder.append("user", bestUser.getUser().empty() ? "" : bestUser.getDisplayName());
+    return stats;
 }
 
-std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requestedFields,
-                                                                  bool needWholeDocument) {
-    // This function is analogous to OpDebug::append. The main difference is that append() does
-    // the work of building BSON right away, while appendStaged() stages the work to be done later.
-    // It returns a std::function that builds BSON when called.
-
-    // The other difference is that appendStaged can avoid building BSON for unneeded fields.
-    // requestedFields is a set of top-level field names; any fields beyond this list may be
-    // omitted. This also lets us uassert if the caller asks for an unsupported field.
-
-    // Each piece of the result is a function that appends to a BSONObjBuilder.
-    // Before returning, we encapsulate the result in a simpler function that returns a BSONObj.
-    using Piece = std::function<void(ProfileFilter::Args, BSONObjBuilder&)>;
-    std::vector<Piece> pieces;
-
-    // For convenience, the callback that handles each field gets the fieldName as an extra arg.
-    using Callback = std::function<void(const char*, ProfileFilter::Args, BSONObjBuilder&)>;
-
-    // Helper to check for the presence of a field in the StringSet, and remove it.
-    // At the end of this method, anything left in the StringSet is a field we don't know
-    // how to handle.
-    auto needs = [&](const char* fieldName) {
-        bool val = needWholeDocument || requestedFields.count(fieldName) > 0;
-        requestedFields.erase(fieldName);
-        return val;
-    };
-    auto addIfNeeded = [&](const char* fieldName, Callback cb) {
-        if (needs(fieldName)) {
-            pieces.push_back([fieldName = fieldName, cb = std::move(cb)](auto args, auto& b) {
-                cb(fieldName, args, b);
-            });
-        }
-    };
-
-    addIfNeeded("ts", [](auto field, auto args, auto& b) { b.append(field, jsTime()); });
-    addIfNeeded("client", [](auto field, auto args, auto& b) {
-        b.append(field, args.opCtx->getClient()->clientAddress());
-    });
-    addIfNeeded("appName", [](auto field, auto args, auto& b) {
-        if (auto clientMetadata = ClientMetadata::get(args.opCtx->getClient())) {
-            auto appName = clientMetadata->getApplicationName();
-            if (!appName.empty()) {
-                b.append(field, appName);
-            }
-        }
-    });
-    bool needsAllUsers = needs("allUsers");
-    bool needsUser = needs("user");
-    if (needsAllUsers || needsUser) {
-        pieces.push_back([](auto args, auto& b) {
-            AuthorizationSession* authSession = AuthorizationSession::get(args.opCtx->getClient());
-            appendUserInfo(args.curop, b, authSession);
-        });
-    }
-
-    addIfNeeded("op", [](auto field, auto args, auto& b) {
-        b.append(field, logicalOpToString(args.op.logicalOp));
-    });
-    addIfNeeded("ns", [](auto field, auto args, auto& b) {
-        b.append(field, NamespaceString(args.curop.getNS()).ns());
-    });
-
-    addIfNeeded("command", [](auto field, auto args, auto& b) {
-        appendAsObjOrString(field,
-                            appendCommentField(args.opCtx, args.curop.opDescription()),
-                            appendMaxElementSize,
-                            &b);
-    });
-
-    addIfNeeded("originatingCommand", [](auto field, auto args, auto& b) {
-        auto originatingCommand = args.curop.originatingCommand();
-        if (!originatingCommand.isEmpty()) {
-            appendAsObjOrString(field, originatingCommand, appendMaxElementSize, &b);
-        }
-    });
-
-    addIfNeeded("nShards", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_NUMBER2(b, field, args.op.nShards);
-    });
-    addIfNeeded("cursorid", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_NUMBER2(b, field, args.op.cursorid);
-    });
-    addIfNeeded("mongot", [](auto field, auto args, auto& b) {
-        if (args.op.mongotCursorId) {
-            b.append(field, args.op.makeMongotDebugStatsObject());
-        }
-    });
-    addIfNeeded("exhaust", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_BOOL2(b, field, args.op.exhaust);
-    });
-
-    addIfNeeded("keysExamined", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.additiveMetrics.keysExamined);
-    });
-    addIfNeeded("docsExamined", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.additiveMetrics.docsExamined);
-    });
-    addIfNeeded("hasSortStage", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_BOOL2(b, field, args.op.hasSortStage);
-    });
-    addIfNeeded("usedDisk", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_BOOL2(b, field, args.op.usedDisk);
-    });
-    addIfNeeded("fromMultiPlanner", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_BOOL2(b, field, args.op.fromMultiPlanner);
-    });
-    addIfNeeded("replanned", [](auto field, auto args, auto& b) {
-        if (args.op.replanReason) {
-            OPDEBUG_APPEND_BOOL2(b, field, true);
-        }
-    });
-    addIfNeeded("replanReason", [](auto field, auto args, auto& b) {
-        if (args.op.replanReason) {
-            b.append(field, *args.op.replanReason);
-        }
-    });
-    addIfNeeded("nMatched", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.additiveMetrics.nMatched);
-    });
-    addIfNeeded("nModified", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.additiveMetrics.nModified);
-    });
-    addIfNeeded("ninserted", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.additiveMetrics.ninserted);
-    });
-    addIfNeeded("ndeleted", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.additiveMetrics.ndeleted);
-    });
-    addIfNeeded("nUpserted", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.additiveMetrics.nUpserted);
-    });
-    addIfNeeded("cursorExhausted", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_BOOL2(b, field, args.op.cursorExhausted);
-    });
-
-    addIfNeeded("keysInserted", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.additiveMetrics.keysInserted);
-    });
-    addIfNeeded("keysDeleted", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.additiveMetrics.keysDeleted);
-    });
-    addIfNeeded("prepareReadConflicts", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_ATOMIC(b, field, args.op.additiveMetrics.prepareReadConflicts);
-    });
-    addIfNeeded("writeConflicts", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_ATOMIC(b, field, args.op.additiveMetrics.writeConflicts);
-    });
-
-    addIfNeeded("dataThroughputLastSecond", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.dataThroughputLastSecond);
-    });
-    addIfNeeded("dataThroughputAverage", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.dataThroughputAverage);
-    });
-
-    addIfNeeded("numYield", [](auto field, auto args, auto& b) {
-        b.appendNumber(field, args.curop.numYields());
-    });
-    addIfNeeded("nreturned", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_NUMBER2(b, field, args.op.nreturned);
-    });
-
-    addIfNeeded("queryHash", [](auto field, auto args, auto& b) {
-        if (args.op.queryHash) {
-            b.append(field, zeroPaddedHex(*args.op.queryHash));
-        }
-    });
-    addIfNeeded("planCacheKey", [](auto field, auto args, auto& b) {
-        if (args.op.planCacheKey) {
-            b.append(field, zeroPaddedHex(*args.op.planCacheKey));
-        }
-    });
-
-    addIfNeeded("locks", [](auto field, auto args, auto& b) {
-        if (auto lockerInfo =
-                args.opCtx->lockState()->getLockerInfo(args.curop.getLockStatsBase())) {
-            BSONObjBuilder locks(b.subobjStart(field));
-            lockerInfo->stats.report(&locks);
-        }
-    });
-
-    addIfNeeded("authorization", [](auto field, auto args, auto& b) {
-        auto userAcquisitionStats = args.curop.getReadOnlyUserAcquisitionStats();
-        if (userAcquisitionStats->shouldUserCacheAcquisitionStatsReport()) {
-            BSONObjBuilder userCacheAcquisitionStatsBuilder(b.subobjStart(field));
-            userAcquisitionStats->userCacheAcquisitionStatsReport(
-                &userCacheAcquisitionStatsBuilder,
-                args.opCtx->getServiceContext()->getTickSource());
-        }
-
-        if (userAcquisitionStats->shouldLDAPOperationStatsReport()) {
-            BSONObjBuilder ldapOperationStatsBuilder(b.subobjStart(field));
-            userAcquisitionStats->ldapOperationStatsReport(
-                &ldapOperationStatsBuilder, args.opCtx->getServiceContext()->getTickSource());
-        }
-    });
-
-    addIfNeeded("flowControl", [](auto field, auto args, auto& b) {
-        BSONObj flowControlMetrics =
-            makeFlowControlObject(args.opCtx->lockState()->getFlowControlStats());
-        BSONObjBuilder flowControlBuilder(b.subobjStart(field));
-        flowControlBuilder.appendElements(flowControlMetrics);
-    });
-
-    addIfNeeded("writeConcern", [](auto field, auto args, auto& b) {
-        if (args.op.writeConcern && !args.op.writeConcern->usedDefaultConstructedWC) {
-            b.append(field, args.op.writeConcern->toBSON());
-        }
-    });
-
-    addIfNeeded("storage", [](auto field, auto args, auto& b) {
-        if (args.op.storageStats) {
-            b.append(field, args.op.storageStats->toBSON());
-        }
-    });
-
-    // Don't short-circuit: call needs() for every supported field, so that at the end we can
-    // uassert that no unsupported fields were requested.
-    bool needsOk = needs("ok");
-    bool needsErrMsg = needs("errMsg");
-    bool needsErrName = needs("errName");
-    bool needsErrCode = needs("errCode");
-    if (needsOk || needsErrMsg || needsErrName || needsErrCode) {
-        pieces.push_back([](auto args, auto& b) {
-            if (!args.op.errInfo.isOK()) {
-                b.appendNumber("ok", 0.0);
-                if (!args.op.errInfo.reason().empty()) {
-                    b.append("errMsg", args.op.errInfo.reason());
-                }
-                b.append("errName", ErrorCodes::errorString(args.op.errInfo.code()));
-                b.append("errCode", args.op.errInfo.code());
-            }
-        });
-    }
-
-    addIfNeeded("responseLength", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_NUMBER2(b, field, args.op.responseLength);
-    });
-
-    addIfNeeded("protocol", [](auto field, auto args, auto& b) {
-        if (args.op.iscommand) {
-            b.append(field, getProtoString(args.op.networkOp));
-        }
-    });
-
-    addIfNeeded("remoteOpWaitMillis", [](auto field, auto args, auto& b) {
-        if (args.op.remoteOpWaitTime) {
-            b.append(field, durationCount<Milliseconds>(*args.op.remoteOpWaitTime));
-        }
-    });
-
-    // millis and durationMillis are the same thing. This is one of the few inconsistencies between
-    // the profiler (OpDebug::append) and the log file (OpDebug::report), so for the profile filter
-    // we support both names.
-    addIfNeeded("millis", [](auto field, auto args, auto& b) {
-        b.appendNumber(field, durationCount<Milliseconds>(args.op.executionTime));
-    });
-    addIfNeeded("durationMillis", [](auto field, auto args, auto& b) {
-        b.appendNumber(field, durationCount<Milliseconds>(args.op.executionTime));
-    });
-
-    addIfNeeded("planSummary", [](auto field, auto args, auto& b) {
-        if (!args.curop.getPlanSummary().empty()) {
-            b.append(field, args.curop.getPlanSummary());
-        }
-    });
-
-    addIfNeeded("execStats", [](auto field, auto args, auto& b) {
-        if (!args.op.execStats.isEmpty()) {
-            b.append(field, args.op.execStats);
-        }
-    });
-
-    addIfNeeded("operationMetrics", [](auto field, auto args, auto& b) {
-        auto& metricsCollector = ResourceConsumption::MetricsCollector::get(args.opCtx);
-        if (metricsCollector.hasCollectedMetrics()) {
-            BSONObjBuilder metricsBuilder(b.subobjStart(field));
-            metricsCollector.getMetrics().toBson(&metricsBuilder);
-        }
-    });
-
-    if (!requestedFields.empty()) {
-        std::stringstream ss;
-        ss << "No such field (or fields) available for profile filter";
-        auto sep = ": ";
-        for (auto&& s : requestedFields) {
-            ss << sep << s;
-            sep = ", ";
-        }
-        uasserted(4910200, ss.str());
-    }
-
-    return [pieces = std::move(pieces)](ProfileFilter::Args args) {
-        BSONObjBuilder bob;
-        for (auto piece : pieces) {
-            piece(args, bob);
-        }
-        return bob.obj();
-    };
+SingleThreadedStorageMetrics CurOp::getOperationStorageMetrics() const {
+    return StorageExecutionContext::get(opCtx())->getStorageMetrics();
 }
 
-void OpDebug::setPlanSummaryMetrics(const PlanSummaryStats& planSummaryStats) {
-    additiveMetrics.keysExamined = planSummaryStats.totalKeysExamined;
-    additiveMetrics.docsExamined = planSummaryStats.totalDocsExamined;
-    hasSortStage = planSummaryStats.hasSortStage;
-    usedDisk = planSummaryStats.usedDisk;
-    fromMultiPlanner = planSummaryStats.fromMultiPlanner;
-    replanReason = planSummaryStats.replanReason;
+long long CurOp::getPrepareReadConflicts() const {
+    return StorageExecutionContext::get(opCtx())
+        ->getPrepareConflictTracker()
+        .getThisOpPrepareConflictCount();
 }
 
-BSONObj OpDebug::makeFlowControlObject(FlowControlTicketholder::CurOp stats) {
-    BSONObjBuilder builder;
-    if (stats.ticketsAcquired > 0) {
-        builder.append("acquireCount", stats.ticketsAcquired);
-    }
-
-    if (stats.acquireWaitCount > 0) {
-        builder.append("acquireWaitCount", stats.acquireWaitCount);
-    }
-
-    if (stats.timeAcquiringMicros > 0) {
-        builder.append("timeAcquiringMicros", stats.timeAcquiringMicros);
-    }
-
-    return builder.obj();
-}
-
-BSONObj OpDebug::makeMongotDebugStatsObject() const {
-    BSONObjBuilder cursorBuilder;
-    invariant(mongotCursorId);
-    cursorBuilder.append("cursorid", mongotCursorId.get());
-    if (msWaitingForMongot) {
-        cursorBuilder.append("timeWaitingMillis", msWaitingForMongot.get());
-    }
-    cursorBuilder.append("batchNum", mongotBatchNum);
-    return cursorBuilder.obj();
-}
-
-void OpDebug::addResolvedViews(const std::vector<NamespaceString>& namespaces,
-                               const std::vector<BSONObj>& pipeline) {
-    if (namespaces.empty())
+void CurOp::updateSpillStorageStats(std::unique_ptr<StorageStats> operationStorageStats) {
+    if (!operationStorageStats) {
         return;
-
-    if (resolvedViews.find(namespaces.front()) == resolvedViews.end()) {
-        resolvedViews[namespaces.front()] = std::make_pair(namespaces, pipeline);
     }
-}
-
-static void appendResolvedViewsInfoImpl(
-    BSONArrayBuilder& resolvedViewsArr,
-    const std::map<NamespaceString, std::pair<std::vector<NamespaceString>, std::vector<BSONObj>>>&
-        resolvedViews) {
-    for (const auto& kv : resolvedViews) {
-        const NamespaceString& viewNss = kv.first;
-        const std::vector<NamespaceString>& dependencies = kv.second.first;
-        const std::vector<BSONObj>& pipeline = kv.second.second;
-
-        BSONObjBuilder aView;
-        aView.append("viewNamespace", viewNss.ns());
-
-        BSONArrayBuilder dependenciesArr(aView.subarrayStart("dependencyChain"));
-        for (const auto& nss : dependencies) {
-            dependenciesArr.append(nss.coll().toString());
-        }
-        dependenciesArr.doneFast();
-
-        BSONArrayBuilder pipelineArr(aView.subarrayStart("resolvedPipeline"));
-        for (const auto& stage : pipeline) {
-            pipelineArr.append(stage);
-        }
-        pipelineArr.doneFast();
-
-        resolvedViewsArr.append(redact(aView.done()));
+    if (!_debug.spillStorageStats) {
+        _debug.spillStorageStats = std::move(operationStorageStats);
+        return;
     }
+    *_debug.spillStorageStats += *operationStorageStats;
 }
 
-BSONArray OpDebug::getResolvedViewsInfo() const {
-    BSONArrayBuilder resolvedViewsArr;
-    appendResolvedViewsInfoImpl(resolvedViewsArr, this->resolvedViews);
-    return resolvedViewsArr.arr();
+void CurOp::AdditiveResourceStats::addForUnstash(const CurOp::AdditiveResourceStats& other) {
+    lockStats.append(other.lockStats);
+    cumulativeLockWaitTime += other.cumulativeLockWaitTime;
+    timeQueuedForFlowControl += other.timeQueuedForFlowControl;
+    // timeQueuedForTickets is intentionally excluded as it is tracked separately
 }
 
-void OpDebug::appendResolvedViewsInfo(BSONObjBuilder& builder) const {
-    BSONArrayBuilder resolvedViewsArr(builder.subarrayStart("resolvedViews"));
-    appendResolvedViewsInfoImpl(resolvedViewsArr, this->resolvedViews);
-    resolvedViewsArr.doneFast();
+void CurOp::AdditiveResourceStats::subtractForStash(const CurOp::AdditiveResourceStats& other) {
+    lockStats.subtract(other.lockStats);
+    cumulativeLockWaitTime -= other.cumulativeLockWaitTime;
+    timeQueuedForFlowControl -= other.timeQueuedForFlowControl;
+    // timeQueuedForTickets is intentionally excluded as it is tracked separately
 }
-
-namespace {
-
-/**
- * Adds two boost::optional long longs together. Returns boost::none if both 'lhs' and 'rhs' are
- * uninitialized, or the sum of 'lhs' and 'rhs' if they are both initialized. Returns 'lhs' if only
- * 'rhs' is uninitialized and vice-versa.
- */
-boost::optional<long long> addOptionalLongs(const boost::optional<long long>& lhs,
-                                            const boost::optional<long long>& rhs) {
-    if (!rhs) {
-        return lhs;
-    }
-    return lhs ? (*lhs + *rhs) : rhs;
-}
-}  // namespace
-
-void OpDebug::AdditiveMetrics::add(const AdditiveMetrics& otherMetrics) {
-    keysExamined = addOptionalLongs(keysExamined, otherMetrics.keysExamined);
-    docsExamined = addOptionalLongs(docsExamined, otherMetrics.docsExamined);
-    nMatched = addOptionalLongs(nMatched, otherMetrics.nMatched);
-    nModified = addOptionalLongs(nModified, otherMetrics.nModified);
-    ninserted = addOptionalLongs(ninserted, otherMetrics.ninserted);
-    ndeleted = addOptionalLongs(ndeleted, otherMetrics.ndeleted);
-    nUpserted = addOptionalLongs(nUpserted, otherMetrics.nUpserted);
-    keysInserted = addOptionalLongs(keysInserted, otherMetrics.keysInserted);
-    keysDeleted = addOptionalLongs(keysDeleted, otherMetrics.keysDeleted);
-    prepareReadConflicts.fetchAndAdd(otherMetrics.prepareReadConflicts.load());
-    writeConflicts.fetchAndAdd(otherMetrics.writeConflicts.load());
-}
-
-void OpDebug::AdditiveMetrics::reset() {
-    keysExamined = boost::none;
-    docsExamined = boost::none;
-    nMatched = boost::none;
-    nModified = boost::none;
-    ninserted = boost::none;
-    ndeleted = boost::none;
-    nUpserted = boost::none;
-    keysInserted = boost::none;
-    keysDeleted = boost::none;
-    prepareReadConflicts.store(0);
-    writeConflicts.store(0);
-}
-
-bool OpDebug::AdditiveMetrics::equals(const AdditiveMetrics& otherMetrics) const {
-    return keysExamined == otherMetrics.keysExamined && docsExamined == otherMetrics.docsExamined &&
-        nMatched == otherMetrics.nMatched && nModified == otherMetrics.nModified &&
-        ninserted == otherMetrics.ninserted && ndeleted == otherMetrics.ndeleted &&
-        nUpserted == otherMetrics.nUpserted && keysInserted == otherMetrics.keysInserted &&
-        keysDeleted == otherMetrics.keysDeleted &&
-        prepareReadConflicts.load() == otherMetrics.prepareReadConflicts.load() &&
-        writeConflicts.load() == otherMetrics.writeConflicts.load();
-}
-
-void OpDebug::AdditiveMetrics::incrementWriteConflicts(long long n) {
-    writeConflicts.fetchAndAdd(n);
-}
-
-void OpDebug::AdditiveMetrics::incrementKeysInserted(long long n) {
-    if (!keysInserted) {
-        keysInserted = 0;
-    }
-    *keysInserted += n;
-}
-
-void OpDebug::AdditiveMetrics::incrementKeysDeleted(long long n) {
-    if (!keysDeleted) {
-        keysDeleted = 0;
-    }
-    *keysDeleted += n;
-}
-
-void OpDebug::AdditiveMetrics::incrementNinserted(long long n) {
-    if (!ninserted) {
-        ninserted = 0;
-    }
-    *ninserted += n;
-}
-
-void OpDebug::AdditiveMetrics::incrementNUpserted(long long n) {
-    if (!nUpserted) {
-        nUpserted = 0;
-    }
-    *nUpserted += n;
-}
-
-void OpDebug::AdditiveMetrics::incrementPrepareReadConflicts(long long n) {
-    prepareReadConflicts.fetchAndAdd(n);
-}
-
-string OpDebug::AdditiveMetrics::report() const {
-    StringBuilder s;
-
-    OPDEBUG_TOSTRING_HELP_OPTIONAL("keysExamined", keysExamined);
-    OPDEBUG_TOSTRING_HELP_OPTIONAL("docsExamined", docsExamined);
-    OPDEBUG_TOSTRING_HELP_OPTIONAL("nMatched", nMatched);
-    OPDEBUG_TOSTRING_HELP_OPTIONAL("nModified", nModified);
-    OPDEBUG_TOSTRING_HELP_OPTIONAL("ninserted", ninserted);
-    OPDEBUG_TOSTRING_HELP_OPTIONAL("ndeleted", ndeleted);
-    OPDEBUG_TOSTRING_HELP_OPTIONAL("nUpserted", nUpserted);
-    OPDEBUG_TOSTRING_HELP_OPTIONAL("keysInserted", keysInserted);
-    OPDEBUG_TOSTRING_HELP_OPTIONAL("keysDeleted", keysDeleted);
-    OPDEBUG_TOSTRING_HELP_ATOMIC("prepareReadConflicts", prepareReadConflicts);
-    OPDEBUG_TOSTRING_HELP_ATOMIC("writeConflicts", writeConflicts);
-
-    return s.str();
-}
-
-void OpDebug::AdditiveMetrics::report(logv2::DynamicAttributes* pAttrs) const {
-    OPDEBUG_TOATTR_HELP_OPTIONAL("keysExamined", keysExamined);
-    OPDEBUG_TOATTR_HELP_OPTIONAL("docsExamined", docsExamined);
-    OPDEBUG_TOATTR_HELP_OPTIONAL("nMatched", nMatched);
-    OPDEBUG_TOATTR_HELP_OPTIONAL("nModified", nModified);
-    OPDEBUG_TOATTR_HELP_OPTIONAL("ninserted", ninserted);
-    OPDEBUG_TOATTR_HELP_OPTIONAL("ndeleted", ndeleted);
-    OPDEBUG_TOATTR_HELP_OPTIONAL("nUpserted", nUpserted);
-    OPDEBUG_TOATTR_HELP_OPTIONAL("keysInserted", keysInserted);
-    OPDEBUG_TOATTR_HELP_OPTIONAL("keysDeleted", keysDeleted);
-    OPDEBUG_TOATTR_HELP_ATOMIC("prepareReadConflicts", prepareReadConflicts);
-    OPDEBUG_TOATTR_HELP_ATOMIC("writeConflicts", writeConflicts);
-}
-
-BSONObj OpDebug::AdditiveMetrics::reportBSON() const {
-    BSONObjBuilder b;
-    OPDEBUG_APPEND_OPTIONAL(b, "keysExamined", keysExamined);
-    OPDEBUG_APPEND_OPTIONAL(b, "docsExamined", docsExamined);
-    OPDEBUG_APPEND_OPTIONAL(b, "nMatched", nMatched);
-    OPDEBUG_APPEND_OPTIONAL(b, "nModified", nModified);
-    OPDEBUG_APPEND_OPTIONAL(b, "ninserted", ninserted);
-    OPDEBUG_APPEND_OPTIONAL(b, "ndeleted", ndeleted);
-    OPDEBUG_APPEND_OPTIONAL(b, "nUpserted", nUpserted);
-    OPDEBUG_APPEND_OPTIONAL(b, "keysInserted", keysInserted);
-    OPDEBUG_APPEND_OPTIONAL(b, "keysDeleted", keysDeleted);
-    OPDEBUG_APPEND_ATOMIC(b, "prepareReadConflicts", prepareReadConflicts);
-    OPDEBUG_APPEND_ATOMIC(b, "writeConflicts", writeConflicts);
-    return b.obj();
-}
-
 }  // namespace mongo

@@ -27,17 +27,18 @@
  *    it in the license file.
  */
 
-#include <boost/optional/optional.hpp>
-#include <boost/optional/optional_io.hpp>
-#include <memory>
-
-#include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/storage/container.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/key_format.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
+
+#include <memory>
+#include <span>
+
+#include <boost/optional/optional.hpp>
 
 #pragma once
 
@@ -46,29 +47,119 @@ namespace mongo {
 class BSONObjBuilder;
 class BucketDeletionNotification;
 class SortedDataBuilderInterface;
-struct IndexValidateResults;
+class IndexValidateResults;
+class SortedDataKeyValueView;
+
+namespace CollectionValidation {
+class ValidationOptions;
+}
+
+/**
+ * Table of index types<->KeyString format<->Data format version:
+ *
+ * | Index Type                   | Key                             | Data Format Version        |
+ * | ---------------------------- | ------------------------------- | -------------------------- |
+ * | _id index                    | KeyString without RecordId      | index V1: 6, index V2: 8   |
+ * | non-unique index             | KeyString with RecordId         | index V1: 6, index V2: 8   |
+ * | unique secondary index (new) | KeyString with RecordId         | index V1: 13, index V2: 14 |
+ * | unique secondary index (old) | KeyString with/without RecordId | index V1: 11, index V2: 12 |
+ *
+ * Starting in 4.2, unique indexes can be in format version 11 or 12. On upgrade to 4.2, an existing
+ * format 6 unique index will upgrade to format 11 and an existing format 8 unique index will
+ * upgrade to format 12.
+ *
+ * Starting in 6.0, any new unique index will be in format 13 or 14, which guarantees that all keys
+ * are in the new format.
+ */
+
+const int kDataFormatV1KeyStringV0IndexVersionV1 = 6;
+const int kDataFormatV2KeyStringV1IndexVersionV2 = 8;
+const int kDataFormatV3KeyStringV0UniqueIndexVersionV1 = 11;
+const int kDataFormatV4KeyStringV1UniqueIndexVersionV2 = 12;
+const int kDataFormatV5KeyStringV0UniqueIndexVersionV1 = 13;
+const int kDataFormatV6KeyStringV1UniqueIndexVersionV2 = 14;
+const int kMinimumIndexVersion = kDataFormatV1KeyStringV0IndexVersionV1;
+const int kMaximumIndexVersion = kDataFormatV6KeyStringV1UniqueIndexVersionV2;
+
+struct IndexConfig {
+    enum class IndexVersion { kV1 = 1, kV2 = 2 };
+    static constexpr IndexVersion kLatestIndexVersion = IndexVersion::kV2;
+
+    bool isIdIndex;
+    bool unique;
+    IndexVersion version;
+    const BSONObj& infoObj;
+    const std::string& indexName;
+    const Ordering& ordering;
+
+    IndexConfig(bool isIdIndex,
+                bool unique,
+                IndexVersion version,
+                const BSONObj& infoObj,
+                const std::string& indexName,
+                const Ordering& ordering)
+        : isIdIndex(isIdIndex),
+          unique(unique),
+          version(version),
+          infoObj(infoObj),
+          indexName(indexName),
+          ordering(ordering) {}
+
+    // Discourage caching by deleting copy/move constructors and assignment operators.
+    IndexConfig(const IndexConfig&) = delete;
+    IndexConfig& operator=(const IndexConfig&) = delete;
+    IndexConfig(IndexConfig&&) = delete;
+    IndexConfig& operator=(IndexConfig&&) = delete;
+
+    std::string toString() const {
+        return infoObj.toString();
+    }
+};
 
 /**
  * This is the uniform interface for storing indexes and supporting point queries as well as range
  * queries. The actual implementation is up to the storage engine. All the storage engines must
  * support an index key size up to the maximum document size.
  */
-class SortedDataInterface : public Ident {
+class SortedDataInterface {
 public:
+    struct DuplicateKey {
+        BSONObj key;
+        boost::optional<RecordId> id;
+        DuplicateKeyErrorInfo::FoundValue foundValue;
+    };
+
     /**
      * Constructs a SortedDataInterface. The rsKeyFormat is the RecordId key format of the related
      * RecordStore.
      */
-    SortedDataInterface(StringData ident,
-                        KeyString::Version keyStringVersion,
-                        Ordering ordering,
-                        KeyFormat rsKeyFormat)
-        : Ident(ident.toString()),
-          _keyStringVersion(keyStringVersion),
+    SortedDataInterface(int dataFormatVersion, Ordering ordering, KeyFormat rsKeyFormat)
+        : _dataFormatVersion(dataFormatVersion),
+          _keyStringVersion([&]() {
+              /*
+               * Index data format 6, 11, and 13 correspond to KeyString version V0 and data format
+               * 8, 12, and 14 correspond to KeyString version V1.
+               */
+              return (_dataFormatVersion == kDataFormatV2KeyStringV1IndexVersionV2 ||
+                      _dataFormatVersion == kDataFormatV4KeyStringV1UniqueIndexVersionV2 ||
+                      _dataFormatVersion == kDataFormatV6KeyStringV1UniqueIndexVersionV2)
+                  ? key_string::Version::V1
+                  : key_string::Version::V0;
+          }()),
           _ordering(ordering),
           _rsKeyFormat(rsKeyFormat) {}
 
     virtual ~SortedDataInterface() {}
+
+    /**
+     * Returns true if this is an _id index.
+     */
+    virtual bool isIdIndex() const = 0;
+
+    /**
+     * Returns true if this is a unique index.
+     */
+    virtual bool unique() const = 0;
 
     //
     // Data changes
@@ -81,31 +172,25 @@ public:
      * builder.
      *
      * @param opCtx the transaction under which keys are added to 'this' index
-     * @param dupsAllowed true if duplicate keys are allowed, and false
-     *        otherwise
+     * @param ru the RecoveryUnit for the current operation.
      */
     virtual std::unique_ptr<SortedDataBuilderInterface> makeBulkBuilder(OperationContext* opCtx,
-                                                                        bool dupsAllowed) = 0;
+                                                                        RecoveryUnit& ru) = 0;
 
     /**
-     * Insert an entry into the index with the specified KeyString, which must have a RecordId
-     * appended to the end.
+     * Inserts the given key into the index, which must have a RecordId appended to the end. Returns
+     * DuplicateKey if `dupsAllowed` is false and the key already exists in the index with a
+     * different RecordId. Returns OK if the key exists with the same RecordId.
      *
-     * @param opCtx the transaction under which the insert takes place
-     * @param dupsAllowed true if duplicate keys are allowed, and false
-     *        otherwise
-     *
-     * @return true if the key was inserted
-     *
-     *         false if 'dupsAllowed' is true the exact key (including RecordId) already existed in
-     *         the index
-     *
-     *         ErrorCodes::DuplicateKey if 'dupsAllowed' is false and the prefix key (ignoring
-     *         RecordId) already existed in the index
+     * If `includeDuplicateRecordId` is kOn and DuplicateKey is returned, embeds the record id of
+     * the duplicate in the returned status.
      */
-    virtual StatusWith<bool> insert(OperationContext* opCtx,
-                                    const KeyString::Value& keyString,
-                                    bool dupsAllowed) = 0;
+    virtual std::variant<Status, DuplicateKey> insert(
+        OperationContext* opCtx,
+        RecoveryUnit& ru,
+        const key_string::View& keyString,
+        bool dupsAllowed,
+        IncludeDuplicateRecordId includeDuplicateRecordId = IncludeDuplicateRecordId::kOff) = 0;
 
     /**
      * Remove the entry from the index with the specified KeyString, which must have a RecordId
@@ -116,38 +201,62 @@ public:
      *        match, false otherwise
      */
     virtual void unindex(OperationContext* opCtx,
-                         const KeyString::Value& keyString,
+                         RecoveryUnit& ru,
+                         const key_string::View& keyString,
                          bool dupsAllowed) = 0;
 
     /**
-     * Return ErrorCodes::DuplicateKey if there is more than one occurence of 'KeyString' in this
-     * index, and Status::OK() otherwise. This call is only allowed on a unique index, and will
-     * invariant otherwise.
+     * Retuns the RecordId of the first key whose prefix matches this KeyString.
+     *
+     * This will not accept a KeyString with a Discriminator other than kInclusive.
+     */
+    virtual boost::optional<RecordId> findLoc(OperationContext* opCtx,
+                                              RecoveryUnit& ru,
+                                              std::span<const char> keyString) const = 0;
+
+    /**
+     * Return duplicate key information if there is more than one occurrence of 'KeyString' in this
+     * index, or boost::none otherwise. This call is only allowed on a unique index, and will fail
+     * an invariant otherwise.
      *
      * @param opCtx the transaction under which this operation takes place
      */
-    virtual Status dupKeyCheck(OperationContext* opCtx, const KeyString::Value& keyString) = 0;
+    virtual boost::optional<DuplicateKey> dupKeyCheck(OperationContext* opCtx,
+                                                      RecoveryUnit& ru,
+                                                      const key_string::View& keyString) = 0;
 
     /**
      * Attempt to reduce the storage space used by this index via compaction. Only called if the
      * indexed record store supports compaction-in-place.
+     * Returns an estimated number of bytes when doing a dry run.
      */
-    virtual Status compact(OperationContext* opCtx) {
+    virtual StatusWith<int64_t> compact(OperationContext* opCtx,
+                                        RecoveryUnit& ru,
+                                        const CompactOptions& options) {
         return Status::OK();
     }
+
+    /**
+     * Removes all keys from the index.
+     */
+    virtual Status truncate(OperationContext* opCtx, RecoveryUnit& ru) = 0;
 
     //
     // Information about the tree
     //
 
     /**
-     * TODO: expose full set of args for testing?
+     * Validates the sorted data. If 'full' is false, only performs checks which do not traverse the
+     * data. If 'full' is true, additionally traverses the data and validates its internal
+     * structure.
      */
-    virtual void fullValidate(OperationContext* opCtx,
-                              long long* numKeysOut,
-                              IndexValidateResults* fullResults) const = 0;
+    virtual IndexValidateResults validate(
+        OperationContext* opCtx,
+        RecoveryUnit& ru,
+        const CollectionValidation::ValidationOptions& options) const = 0;
 
     virtual bool appendCustomStats(OperationContext* opCtx,
+                                   RecoveryUnit& ru,
                                    BSONObjBuilder* output,
                                    double scale) const = 0;
 
@@ -159,34 +268,59 @@ public:
      *
      * @see IndexAccessMethod::getSpaceUsedBytes
      */
-    virtual long long getSpaceUsedBytes(OperationContext* opCtx) const = 0;
+    virtual long long getSpaceUsedBytes(OperationContext* opCtx, RecoveryUnit& ru) const = 0;
 
     /**
      * The number of unused free bytes consumed by this index on disk.
      */
-    virtual long long getFreeStorageBytes(OperationContext* opCtx) const = 0;
+    virtual long long getFreeStorageBytes(OperationContext* opCtx, RecoveryUnit& ru) const = 0;
 
     /**
      * Return true if 'this' index is empty, and false otherwise.
      */
-    virtual bool isEmpty(OperationContext* opCtx) = 0;
+    virtual bool isEmpty(OperationContext* opCtx, RecoveryUnit& ru) = 0;
+
+    /**
+     * Prints any storage engine provided metadata for the index entry with key 'keyString'.
+     */
+    virtual void printIndexEntryMetadata(OperationContext* opCtx,
+                                         RecoveryUnit& ru,
+                                         const key_string::View& keyString) const = 0;
 
     /**
      * Return the number of entries in 'this' index.
-     *
-     * The default implementation should be overridden with a more
-     * efficient one if at all possible.
      */
-    virtual long long numEntries(OperationContext* opCtx) const {
-        long long x = -1;
-        fullValidate(opCtx, &x, nullptr);
-        return x;
+    virtual int64_t numEntries(OperationContext* opCtx, RecoveryUnit& ru) const = 0;
+
+    /**
+     * Returns the underlying container.
+     */
+    virtual StringKeyedContainer& getContainer() = 0;
+
+    /**
+     * Returns the underlying container.
+     */
+    virtual const StringKeyedContainer& getContainer() const = 0;
+
+    /*
+     * Return the data format version for this index.
+     */
+    int getDataFormatVersion() const {
+        return _dataFormatVersion;
+    }
+
+    /*
+     * Return true if the index uses an old data format version.
+     */
+    bool hasOldFormatVersion() const {
+        return getDataFormatVersion() == kDataFormatV3KeyStringV0UniqueIndexVersionV1 ||
+            getDataFormatVersion() == kDataFormatV4KeyStringV1UniqueIndexVersionV2;
     }
 
     /*
      * Return the KeyString version for 'this' index.
      */
-    KeyString::Version getKeyStringVersion() const {
+    key_string::Version getKeyStringVersion() const {
         return _keyStringVersion;
     }
 
@@ -202,6 +336,14 @@ public:
      */
     KeyFormat rsKeyFormat() const {
         return _rsKeyFormat;
+    }
+
+    std::shared_ptr<Ident> getSharedIdent() const {
+        return getContainer().ident();
+    }
+
+    void setIdent(std::shared_ptr<Ident> newIdent) {
+        getContainer().setIdent(std::move(newIdent));
     }
 
     /**
@@ -239,27 +381,15 @@ public:
     class Cursor {
     public:
         /**
-         * Tells methods that return an IndexKeyEntry what part of the data the caller is
-         * interested in.
-         *
-         * Methods returning an engaged optional<T> will only return null RecordIds or empty
-         * BSONObjs if they have been explicitly left out of the request.
-         *
-         * Implementations are allowed to return more data than requested, but not less.
+         * Tells methods that return an IndexKeyEntry whether the caller is interested
+         * in including the key field.
          */
-        enum RequestedInfo {
-            // Only usable part of the return is whether it is engaged or not.
-            kJustExistance = 0,
-            // Key must be filled in.
-            kWantKey = 1,
-            // Loc must be fulled in.
-            kWantLoc = 2,
-            // Both must be returned.
-            kKeyAndLoc = kWantKey | kWantLoc,
+        enum class KeyInclusion {
+            kExclude,
+            kInclude,
         };
 
         virtual ~Cursor() = default;
-
 
         /**
          * Sets the position to stop scanning. An empty key unsets the end position.
@@ -271,13 +401,19 @@ public:
          * any, isn't checked.
          */
         virtual void setEndPosition(const BSONObj& key, bool inclusive) = 0;
+        virtual void setEndPosition(const key_string::Value& keyString) = 0;
 
         /**
          * Moves forward and returns the new data or boost::none if there is no more data.
-         * If not positioned, returns boost::none.
+         * If not positioned, returns the first entry or boost::none.
+         *
+         * Note that nextKeyValueView() returns unowned data, which is invalidated upon
+         * calling a next() or seek() variant, a save(), or when the cursor is destructed.
          */
-        virtual boost::optional<IndexKeyEntry> next(RequestedInfo parts = kKeyAndLoc) = 0;
-        virtual boost::optional<KeyStringEntry> nextKeyString() = 0;
+        virtual boost::optional<IndexKeyEntry> next(
+            RecoveryUnit& ru, KeyInclusion keyInclusion = KeyInclusion::kInclude) = 0;
+        virtual boost::optional<KeyStringEntry> nextKeyString(RecoveryUnit& ru) = 0;
+        virtual SortedDataKeyValueView nextKeyValueView(RecoveryUnit& ru) = 0;
 
         //
         // Seeking
@@ -286,41 +422,44 @@ public:
         /**
          * Seeks to the provided keyString and returns the KeyStringEntry.
          * The provided keyString has discriminator information encoded.
+         * The keyString should not have RecordId or TypeBits encoded, which is guaranteed if
+         * obtained from BuilderBase::finishAndGetBuffer().
          */
         virtual boost::optional<KeyStringEntry> seekForKeyString(
-            const KeyString::Value& keyString) = 0;
+            RecoveryUnit& ru, std::span<const char> keyString) = 0;
+
+        /**
+         * Seeks to the provided keyString and returns the SortedDataKeyValueView.
+         * The provided keyString has discriminator information encoded.
+         * The keyString should not have RecordId or TypeBits encoded, which is guaranteed if
+         * obtained from BuilderBase::finishAndGetBuffer().
+         *
+         * Returns unowned data, which is invalidated upon calling a next() or seek()
+         * variant, a save(), or when the cursor is destructed.
+         */
+        virtual SortedDataKeyValueView seekForKeyValueView(RecoveryUnit& ru,
+                                                           std::span<const char> keyString) = 0;
 
         /**
          * Seeks to the provided keyString and returns the IndexKeyEntry.
          * The provided keyString has discriminator information encoded.
+         * The keyString should not have RecordId or TypeBits encoded, which is guaranteed if
+         * obtained from BuilderBase::finishAndGetBuffer().
          */
-        virtual boost::optional<IndexKeyEntry> seek(const KeyString::Value& keyString,
-                                                    RequestedInfo parts = kKeyAndLoc) = 0;
+        virtual boost::optional<IndexKeyEntry> seek(
+            RecoveryUnit& ru,
+            std::span<const char> keyString,
+            KeyInclusion keyInclusion = KeyInclusion::kInclude) = 0;
 
         /**
-         * Seeks to a key with a hint to the implementation that you only want exact matches. If
-         * an exact match can't be found, boost::none will be returned and the resulting
-         * position of the cursor is unspecified.
-         *
-         * This will not accept a KeyString with a Discriminator other than kInclusive. Since
-         * keys are not stored with Discriminators, an exact match would never be found.
+         * Seeks to the provided keyString and returns the RecordId of the matching key, or
+         * boost::none if one does not exist.
+         * The provided keyString must always have a kInclusive discriminator.
+         * The keyString should not have RecordId or TypeBits encoded, which is guaranteed if
+         * obtained from BuilderBase::finishAndGetBuffer().
          */
-        virtual boost::optional<KeyStringEntry> seekExactForKeyString(
-            const KeyString::Value& keyString) = 0;
-
-        /**
-         * Seeks to a key with a hint to the implementation that you only want exact matches. If
-         * an exact match can't be found, boost::none will be returned and the resulting
-         * position of the cursor is unspecified.
-         *
-         * This will not accept a KeyString with a Discriminator other than kInclusive. Since
-         * keys are not stored with Discriminators, an exact match would never be found.
-         *
-         * Unlike the previous method, this one will return IndexKeyEntry if an exact match is
-         * found.
-         */
-        virtual boost::optional<IndexKeyEntry> seekExact(const KeyString::Value& keyString,
-                                                         RequestedInfo parts = kKeyAndLoc) = 0;
+        virtual boost::optional<RecordId> seekExact(RecoveryUnit& ru,
+                                                    std::span<const char> keyString) = 0;
 
         //
         // Saving and restoring state
@@ -357,7 +496,7 @@ public:
          *
          * This handles restoring after either save() or saveUnpositioned().
          */
-        virtual void restore() = 0;
+        virtual void restore(RecoveryUnit& ru) = 0;
 
         /**
          * Detaches from the OperationContext. Releases storage-engine resources, unless
@@ -380,6 +519,18 @@ public:
          * retaining valid and positioned cursors across commands.
          */
         virtual void setSaveStorageCursorOnDetachFromOperationContext(bool) = 0;
+
+        /**
+         * Returns true if the record id can be extracted from the unique index key string.
+         *
+         * Unique indexes created prior to 4.2 may contain key strings that do not have
+         * an embedded record id. We will have to look up the record for this key in the index
+         * to obtain the record id.
+         *
+         * This is used primarily during validation to identify unique indexes with keys in the
+         * old format due to rolling upgrades.
+         */
+        virtual bool isRecordIdAtEndOfKeyString() const = 0;
     };
 
     /**
@@ -388,16 +539,18 @@ public:
      * Implementations can assume that 'this' index outlives all cursors it produces.
      */
     virtual std::unique_ptr<Cursor> newCursor(OperationContext* opCtx,
+                                              RecoveryUnit& ru,
                                               bool isForward = true) const = 0;
 
     //
     // Index creation
     //
 
-    virtual Status initAsEmpty(OperationContext* opCtx) = 0;
+    virtual Status initAsEmpty() = 0;
 
 protected:
-    const KeyString::Version _keyStringVersion;
+    const int _dataFormatVersion;
+    const key_string::Version _keyStringVersion;
     const Ordering _ordering;
     const KeyFormat _rsKeyFormat;
 };
@@ -412,14 +565,150 @@ public:
     /**
      * Adds 'keyString' to intermediate storage.
      *
-     * 'keyString' must be > or >= the last key passed to this function (depends on _dupsAllowed).
-     * If this is violated an error Status (ErrorCodes::InternalError) will be returned.
+     * 'keyString' must be > or >= the last key passed to this function, depending on whether the
+     * thing being built supports duplicates. The behavior if this in violated is unspecified and
+     * must not be relied on by the caller.
      *
      * Some storage engines require callers to manage a WriteUnitOfWork to perform these inserts
      * transactionally. Other storage engines do not perform inserts transactionally and will ignore
      * any parent WriteUnitOfWork.
      */
-    virtual Status addKey(const KeyString::Value& keyString) = 0;
+    virtual void addKey(RecoveryUnit& ru, const key_string::View& keyString) = 0;
+};
+
+/**
+ * A SortedDataKeyValueView is an unowned view into a KeyString-formatted binary blob.
+ *
+ * A SortedDataKeyValueView is composed of three parts:
+ * - KeyString data without RecordId
+ * - Encoded RecordId
+ * - TypeBits (optional)
+ *
+ * This differs from key_string::View in that the three components may not be contiguous in memory,
+ * as keystrings are split into a key and value when stored in an index.
+ */
+class SortedDataKeyValueView {
+public:
+    /**
+     * Construct a SortedDataKeyValueView with pointers and sizes to each underlying component.
+     */
+    SortedDataKeyValueView(std::span<const char> key,
+                           std::span<const char> rid,
+                           std::span<const char> typeBits,
+                           key_string::Version version,
+                           bool isRecordIdAtEndOfKeyString,
+                           const RecordId* id = nullptr)
+        : _ksData(key.data()),
+          _ridData(rid.data()),
+          _tbData(typeBits.data()),
+          _ksSize(static_cast<int32_t>(key.size())),
+          _ridSize(static_cast<int32_t>(rid.size())),
+          _tbSize(static_cast<int32_t>(typeBits.size())),
+          _version(version),
+          _id(id) {
+        invariant(key.size() > 0 && key.size() < std::numeric_limits<int32_t>::max());
+        invariant(rid.size() < std::numeric_limits<int32_t>::max());
+        invariant(typeBits.size() < std::numeric_limits<int32_t>::max());
+        _ksOriginalSize = isRecordIdAtEndOfKeyString ? (key.size() + rid.size()) : key.size();
+    }
+
+    SortedDataKeyValueView() = default;
+    SortedDataKeyValueView(const SortedDataKeyValueView& other) = default;
+    SortedDataKeyValueView(SortedDataKeyValueView&& other) = default;
+    SortedDataKeyValueView& operator=(const SortedDataKeyValueView& other) = default;
+    SortedDataKeyValueView& operator=(SortedDataKeyValueView&& other) = default;
+
+    /**
+     * Return the original index key buffer as is, which may or may not end with a RecordId,
+     * depending on isRecordIdAtEndOfKeyString().
+     */
+    std::span<const char> getKeyStringOriginalView() const {
+        return {_ksData, static_cast<std::span<const char>::size_type>(_ksOriginalSize)};
+    }
+
+    std::span<const char> getKeyStringWithoutRecordIdView() const {
+        return {_ksData, static_cast<std::span<const char>::size_type>(_ksSize)};
+    }
+
+    /**
+     * Return the raw TypeBits buffer including the size prefix.
+     */
+    std::span<const char> getTypeBitsView() const {
+        return {_tbData, static_cast<std::span<const char>::size_type>(_tbSize)};
+    }
+
+    std::span<const char> getRecordIdView() const {
+        return {_ridData, static_cast<std::span<const char>::size_type>(_ridSize)};
+    }
+
+    key_string::Version getVersion() const {
+        return _version;
+    }
+
+    bool isRecordIdAtEndOfKeyString() const {
+        return _ksOriginalSize > _ksSize;
+    }
+
+    /**
+     * Return the cached RecordId pointer that was passed to this view's constructor.
+     *
+     * A nullptr only means the pointer was not cached, but the RecordId may still be present,
+     * as long as the original key_string::Value has a RecordId at the end. In this case, the
+     * RecordId buffer can be obtained through getRecordIdView(), and then be decoded as long
+     * or binary string depending on its key format.
+     */
+    const RecordId* getRecordId() const {
+        return _id;
+    }
+
+    /**
+     * Create a Value copy from this view including all components.
+     */
+    key_string::Value getValueCopy() const {
+        return key_string::Value::makeValue(
+            _version, getKeyStringWithoutRecordIdView(), getRecordIdView(), getTypeBitsView());
+    }
+
+    /**
+     * Returns an unowned view of the provided Value. Remains valid as long as this Value is
+     * valid.
+     */
+    static SortedDataKeyValueView fromValue(const key_string::Value& value) {
+        return {value.getViewWithoutRecordId(),
+                value.getRecordIdView(),
+                value.getTypeBitsView(),
+                value.getVersion(),
+                value.getRecordIdSize() > 0 /* isRecordIdAtEndOfKeyString */};
+    }
+
+    bool isEmpty() const {
+        return _ksSize == 0;
+    }
+
+    void reset() {
+        _ksSize = 0;
+    }
+
+    std::string toString() const {
+        if (isEmpty())
+            return "";
+        std::stringstream ss;
+        ss << hexblob::encode(_ksData, _ksSize) << "_" << hexblob::encode(_ridData, _ridSize) << "_"
+           << (_tbSize > 0 ? hexblob::encode(_tbData, _tbSize) : "");
+        return ss.str();
+    }
+
+private:
+    const char* _ksData = nullptr;
+    const char* _ridData = nullptr;
+    const char* _tbData = nullptr;
+
+    int32_t _ksSize = 0;
+    int32_t _ksOriginalSize = 0;
+    int32_t _ridSize = 0;
+    int32_t _tbSize = 0;
+    key_string::Version _version = key_string::Version::kLatestVersion;
+    const RecordId* _id = nullptr;
 };
 
 }  // namespace mongo

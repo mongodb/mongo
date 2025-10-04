@@ -1,0 +1,12 @@
+base_suite: aggregation
+description: >-
+  Test the correctness of query settings application by emulating cursor hints with
+  'setQuerySettings' commands. This suite runs aggregation tests using a replica set
+  fixture.
+excludes:
+  - "query_settings.common_aggregation_excludes"
+eval:
+  - "query_settings.eval_cursor_hints_to_query_settings"
+overrides:
+  - "query_settings.replica_sets_fixture"
+  - "query_settings.test_data_cursor_hints_to_query_settings"

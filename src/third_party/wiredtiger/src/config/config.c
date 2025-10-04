@@ -28,7 +28,8 @@ __wt_config_initn(WT_SESSION_IMPL *session, WT_CONFIG *conf, const char *str, si
 {
     conf->session = session;
     conf->orig = conf->cur = str;
-    conf->end = str + len;
+    if ((conf->end = str) != NULL)
+        conf->end += len;
     conf->depth = 0;
     conf->top = -1;
     conf->go = NULL;
@@ -98,6 +99,9 @@ typedef enum {
 } CONFIG_ACTION;
 
 /*
+ * Some inspiration taken from https://github.com/quartzjer/js0n (public domain). These
+ * comments map from constructs in js0n to the equivalent in WiredTiger.
+ *
  * static void *gostruct[] = {
  *		[0 ... 255] = &&l_bad,
  *		['\t'] = &&l_loop, [' '] = &&l_loop,
@@ -105,23 +109,21 @@ typedef enum {
  *		['"'] = &&l_qup,
  *		[':'] = &&l_value, ['='] = &&l_value,
  *		[','] = &&l_next,
- *		// tracking [] and {} individually would allow fuller
- *		// validation but is really messy
  *		['('] = &&l_up, [')'] = &&l_down,
  *		['['] = &&l_up, [']'] = &&l_down,
  *		['{'] = &&l_up, ['}'] = &&l_down,
- *		// bare identifiers
  *		['-'] = &&l_numbare,
  *		['0' ... '9'] = &&l_numbare,
  *		['_'] = &&l_bare,
  *		['A' ... 'Z'] = &&l_bare, ['a' ... 'z'] = &&l_bare,
  *		['/'] = &&l_bare,
+ *		['%'] = &&l_bare,
  *	};
  */
 static const int8_t gostruct[256] = {A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD,
   A_LOOP, A_LOOP, A_BAD, A_BAD, A_LOOP, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD,
   A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_LOOP, A_BAD, A_QUP, A_BAD,
-  A_BAD, A_BAD, A_BAD, A_BAD, A_UP, A_DOWN, A_BAD, A_BAD, A_NEXT, A_NUMBARE, A_BARE, A_BARE,
+  A_BAD, A_BARE, A_BAD, A_BAD, A_UP, A_DOWN, A_BAD, A_BAD, A_NEXT, A_NUMBARE, A_BARE, A_BARE,
   A_NUMBARE, A_NUMBARE, A_NUMBARE, A_NUMBARE, A_NUMBARE, A_NUMBARE, A_NUMBARE, A_NUMBARE, A_NUMBARE,
   A_NUMBARE, A_VALUE, A_BAD, A_BAD, A_VALUE, A_BAD, A_BAD, A_BAD, A_BARE, A_BARE, A_BARE, A_BARE,
   A_BARE, A_BARE, A_BARE, A_BARE, A_BARE, A_BARE, A_BARE, A_BARE, A_BARE, A_BARE, A_BARE, A_BARE,
@@ -143,7 +145,6 @@ static const int8_t gostruct[256] = {A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A
  *	static void *gobare[] =
  *	{
  *		[0 ... 31] = &&l_bad,
- *		// could be more pedantic/validation-checking
  *		[32 ... 126] = &&l_loop,
  *		['\t'] = &&l_unbare, [' '] = &&l_unbare,
  *		['\r'] = &&l_unbare, ['\n'] = &&l_unbare,
@@ -302,7 +303,15 @@ __config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
             break;
 
         case A_BAD:
-            return (__config_err(conf, "Unexpected character", EINVAL));
+            switch (*conf->cur) {
+            case '\b':
+            case '\n':
+            case '\r':
+            case '\t':
+                return (__config_err(conf, "Unexpected escaped character", EINVAL));
+            default:
+                return (__config_err(conf, "Unexpected character", EINVAL));
+            }
 
         case A_DOWN:
             if (conf->top == -1)
@@ -442,10 +451,10 @@ __config_process_value(WT_CONFIG_ITEM *value)
         return;
 
     if (value->type == WT_CONFIG_ITEM_ID) {
-        if (WT_STRING_MATCH("false", value->str, value->len)) {
+        if (WT_CONFIG_LIT_MATCH("false", *value)) {
             value->type = WT_CONFIG_ITEM_BOOL;
             value->val = 0;
-        } else if (WT_STRING_MATCH("true", value->str, value->len)) {
+        } else if (WT_CONFIG_LIT_MATCH("true", *value)) {
             value->type = WT_CONFIG_ITEM_BOOL;
             value->val = 1;
         }
@@ -509,7 +518,7 @@ nonum:
 int
 __wt_config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 {
-    WT_RET(__config_next(conf, key, value));
+    WT_RET_NOLOG(__config_next(conf, key, value));
     __config_process_value(value);
     return (0);
 }
@@ -553,11 +562,11 @@ __config_getraw(WT_CONFIG *cparser, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value, 
 }
 
 /*
- * __wt_config_get --
+ * __wti_config_get --
  *     Given a NULL-terminated list of configuration strings, find the final value for a given key.
  */
 int
-__wt_config_get(
+__wti_config_get(
   WT_SESSION_IMPL *session, const char **cfg_arg, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 {
     WT_CONFIG cparser;
@@ -595,7 +604,7 @@ __wt_config_gets(WT_SESSION_IMPL *session, const char **cfg, const char *key, WT
 {
     WT_CONFIG_ITEM key_item = {key, strlen(key), 0, WT_CONFIG_ITEM_STRING};
 
-    return (__wt_config_get(session, cfg, &key_item, value));
+    return (__wti_config_get(session, cfg, &key_item, value));
 }
 
 /*
@@ -608,7 +617,7 @@ __wt_config_gets_none(
   WT_SESSION_IMPL *session, const char **cfg, const char *key, WT_CONFIG_ITEM *value)
 {
     WT_RET(__wt_config_gets(session, cfg, key, value));
-    if (WT_STRING_MATCH("none", value->str, value->len))
+    if (WT_CONFIG_LIT_MATCH("none", *value))
         value->len = 0;
     return (0);
 }
@@ -651,7 +660,7 @@ __wt_config_getones_none(
   WT_SESSION_IMPL *session, const char *config, const char *key, WT_CONFIG_ITEM *value)
 {
     WT_RET(__wt_config_getones(session, config, key, value));
-    if (WT_STRING_MATCH("none", value->str, value->len))
+    if (WT_CONFIG_LIT_MATCH("none", *value))
         value->len = 0;
     return (0);
 }

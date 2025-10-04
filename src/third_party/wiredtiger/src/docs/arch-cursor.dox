@@ -203,50 +203,6 @@ of cursor has its own \c next method that causes it to return information about 
 of this file that need to be copied.  The code to implement incremental cursors
 is in \c src/cursor/cur_backup_incr.c .
 
-@section arch_cursor_join Join cursors
-
-Join cursors implement a join mechanism for WiredTiger.  The idea is that joins can be configured
-by opening a special join cursor on a table, and attaching the table's index cursors to it, to
-return rows that match a filter, like:
-```
-(row.price > 100 and row.price <= 200) and row.in_stock < 10
-```
-Building up the conditions essentially creates a tree that is used for evaluation.  This is stored
-in \c WT_CURSOR_JOIN, and is returned as the cursor object.  Entries in the tree representing
-an index's participation in one clause are stored in \c WT_CURSOR_JOIN_ENTRY objects.  \c WT_CURSOR_JOIN and
-\c WT_CURSOR_JOIN_ENTRY objects can be composed in a hierarchical manner, representing the shape of the tree representing
-the query.  These two structures are somewhat static, being created when the join is created.
-
-The join cursor contains a pointer to a \c WT_CURSOR_JOIN_ITER, which in some sense encodes the "position"
-of the cursor.  To get the next row that satisfies a join requires that multiple cursors be iterated.
-Generally, the "left-most" index cursor is iterated first.  Using the example above, the \c price
-index would be iterated, skipping over any entries that did not satisfy `(row.price > 100 and row.price <= 200)`.
-Then other cursors are checked to see that any other conditions are satisfied.
-The join may be configured to use Bloom filters, and when that occurs,
-\c WT_CURSOR_JOIN_ENTRIES contain the bloom filter for individual index checks.  This allows checks
-to occur quickly, at the expense of an initialization that occurs when the cursor begins iteration.
-
-During a join cursor iteration, multiple \c WT_CURSOR_JOIN_ITER objects may be created.
-There is one \c WT_CURSOR_JOIN_ITER object corresponding to each level of nesting (queries can have
-arbitrary nesting of \c AND/OR).  Each \c WT_CURSOR_JOIN_ITER allows the question to be asked: does
-the current position of the main table cursor satisfy the join conditions for this part of the join tree?
-
-Part of the reason for this dynamic structure is that disjunctions may require some dynamic action.
-Consider
-```
-(row.price > 100 and row.in_stock < 10) .... or (row.aisle == 12 and row.on_sale == 1)
-```
-The last part of the query (being part of an OR clause) will be first executed after a number of items
-are returned that satisfy the first part of the query.  If the join cursor is closed before then,
-it would be a waste to have opened subordinate cursors on the \c aisle and \c on_sale indices, and
-potentially computed bloom filters, etc.
-
-When positioned on an entry that represents a nested join, a new child \c WT_CURSOR_JOIN_ITER is
-created that will be bound to the nested \c WT_CURSOR_JOIN. That iterator is then used to generate candidate
-primary keys. When its iteration is completed, that iterator is destroyed and the parent iterator
-advances to the next entry. Thus, depending on how deeply joins are nested, a similarly deep
-stack of iterators is created.
-
 @section arch_cursor_duplicate Duplicating cursors
 
 Cursors may be duplicated, this occurs by passing a cursor to be duplicated as part of the
@@ -296,7 +252,7 @@ in the cursor for future use.  Thus, caching a cursor (what happens within the t
 (e.g. \c __curfile_cache) is relatively quick:
 
 - Free storage that we don't want held (for example, storage used by the cursor's key and value).
-- Get a *weak* reference to the data handle (increment \c dhandle->session_ref).
+- Get a *weak* reference to the data handle (increment \c dhandle->references).
 - Release the *strong* reference to the data handle (decrement \c dhandle->session_inuse).
 - Determine the hash bucket needed (using the hash value in the cursor).
 - Move the cursor from the session's open list to the list in the hash bucket.
@@ -327,7 +283,7 @@ call \c reopen on the cursor.  This is what happens within the call to the type-
 - Lock the dhandle.
 - If the dhandle is no longer open, release it and mark the reopen to fail (but continue).
 - Get a "strong" reference to the data handle (increment \c dhandle->session_inuse).
-- Release the "weak" reference to the data handle (decrement \c dhandle->session_ref).
+- Release the "weak" reference to the data handle (decrement \c dhandle->references).
 - Increment statistics and the connection's open cursor count.
 - Move the handle from the hash bucket to the session's open list (the hash value was previously saved in the cursor)
 - Clear the cache cursor flag.
@@ -371,6 +327,31 @@ how many references to closed data handles are freed, we may continue our walk. 
 usually strike a good balance between not having a lot of overhead for sweeps, and keeping up with
 the need to free up shared resources.
 
+@section arch_cursor_bound Range bounded cursors
+
+Range bounded cursors provide a mechanism for optimizing cursor operations in collections with a large number
+of invisible records. When traversing records the record's key is compared with the bounds set on the cursor and
+the traversal will exit with \c WT_NOTFOUND regardless of whether the value associated with the cursor is visible.
+
+The lower and upper bound in a cursor is represented as a \c WT_ITEM. The implementation applies bounds through the function
+\c __wt_cursor_bound which takes the cursor and a config string as arguments. The config string specifies whether the operation is clearing
+or setting the bound, and if a "set" is in progress, whether the bound is a lower or upper bound. There are four flags that can be set
+when applying bounds: \c WT_CURSTD_BOUND_LOWER, \c WT_CURSTD_BOUND_LOWER_INCLUSIVE, \c WT_CURSTD_BOUND_UPPER, and \c WT_CURSTD_BOUND_UPPER_INCLUSIVE.
+When calling \c __wt_cursor_bound with valid bounds, the respective bound flag is set and the key held on the cursor is copied into the relevant bound buffer.
+When a bounds is set, a copy of the bounds key is made and is kept by the cursor.  Thus the memory used for the key when making the \c cursor->bound call
+does not need to be retained by the application. Clearing a cursor's bounds can be done via resetting the cursor or calling bound with the "clear" config
+which will free both bounds buffers.
+
+When calling \c cursor->next and \c cursor->prev on an unpositioned cursor, WiredTiger guarantees that the cursor will start walking from either the start or end of the file respectively.
+The range bounded cursor logic continues to uphold this guarantee. Doing so requires additional logic to place the cursor at the start or end of the range. In \c cursor->next and \c cursor->prev,
+the cursor gets positioned with the function \c __wt_btcur_bounds_position. This attempts to position the cursor on the appropriate bound for the direction of traversal (e.g. lower bound for next).
+If the bound exists, the cursor will be positioned on the bound, if not it could be positioned on the closest valid record (meaning within the bounded range), or the record just outside of the range.
+In the case it's positioned just outside the range, this is still acceptable as it will be marked as "needing walk", and the following traversal (whether next or
+prev) will continue, returning a record within range at completion.
+
+In \c cursor->search_near, \c __btcur_bounds_search_near_reposition is initially called. This function checks whether the given key to be searched for is within
+the bounded range. If not, the key to be searched for will be updated to be the nearest bound.
+
 @section arch_cursor_debug_copy Debug copy
 
 When cursors are positioned, their data may point to data in the btree or data allocated in the cursor.
@@ -392,4 +373,39 @@ Thus, in the presence of a memory tracker, uses
 of "stray" pointers will be detected.  Even without a memory tracker, uses of "stray" pointers into
 the freed storage will likely yield the overwritten bytes, and not the previously seen key or value.
 
+@section arch_random_cursor Random Cursor
+
+WiredTiger uses a pseudo-random algorithm for random cursors with the goal of deriving good random
+distributions while maintaining performance. Only the \c cursor->next function can be used to fetch
+a random record.
+
+The algorithm starts from the root page being descended down randomly using WiredTiger's
+random number generator (RNG) until we reach a leaf page. Once we find a leaf page, we then evaluate
+three different conditions that determine our next steps to grab a record from the leaf page.
+- First condition: If the page has a sufficiently large number of disk records (1000 or more entries), attempt to find a
+random visible disk record from the page using WiredTiger's RNG.
+- Second condition: Loop through all insert lists, and find one that is large (1000 or more entries), once found attempt
+to find a random insert record from the page.
+- Third condition: If the page has small amount of disk records (200 or less entries) or the leaf page is clean, attempt to
+find a random visible disk record from the page using WiredTiger's RNG.
+
+Failing all of the conditions, move to the previous or the next visible record in the btree
+a randomly decided number of times (between 0 - 250). Return the record that the cursor ends up stopping
+on. Note: The record can be fetched on a different leaf page than our original page that we descended
+down from.
+
+The algorithm doesn't guarantee a complete randomness to the user and can lead to skewed results depending on the
+underlying tree structure. Examples of instances that could typically lead to these skewed results are:
+- The tree structure is not balanced, which can happen as a result of the records in the btree not being
+uniformly distributed.
+- A high number of deleted items are within the btree.
+- A high number of invisible records in the transaction of the cursor.
+
+The \c next_random_sample_size configuration is an option that can be used for users looking for a better distribution.
+The concept is that the btree becomes divided into \c next_random_sample_size pieces, and each subsequent
+\c cursor->next call will retrieve a random record from the following divided piece. Internally, this
+configuration results in a slight modification to the original pseudo-random algorithm described at the start
+of this section. The process remains the same except for Step 1, where instead of performing a random descent,
+the algorithm will now start from the beginning of the btree and traverse a fixed number of times
+to next the divided segment.
 */

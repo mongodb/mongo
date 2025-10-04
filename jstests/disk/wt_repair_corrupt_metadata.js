@@ -2,12 +2,10 @@
  * Tests that --repair on WiredTiger correctly and gracefully handles corrupt metadata files.
  * This test should not run on debug builds because WiredTiger's diagnostic mode is enabled.
  *
- * @tags: [requires_wiredtiger,requires_journaling]
+ * @tags: [requires_wiredtiger]
  */
 
-(function() {
-
-load('jstests/disk/libs/wt_file_helper.js');
+import {assertRepairSucceeds, startMongodOnExistingPath} from "jstests/disk/libs/wt_file_helper.js";
 
 const baseName = "wt_repair_corrupt_metadata";
 const collName = "test";
@@ -23,7 +21,7 @@ const dbpath = MongoRunner.dataPath + baseName + "/";
  * The expectation is that the metadata salvage will be successful, and that the collection will
  * be recreated with all of its data.
  */
-let runTest = function(mongodOptions) {
+let runTest = function (mongodOptions) {
     resetDbpath(dbpath);
     jsTestLog("Running test with args: " + tojson(mongodOptions));
 
@@ -32,10 +30,12 @@ let runTest = function(mongodOptions) {
 
     let mongod = startMongodOnExistingPath(dbpath, mongodOptions);
 
+    const buildInfo = assert.commandWorked(mongod.getDB(baseName).adminCommand({"buildInfo": 1}));
+    const isSanitizerEnabled = buildInfo.buildEnvironment.ccflags.includes("-fsanitize");
+
     // Force a checkpoint and make a copy of the turtle file.
     assert.commandWorked(mongod.getDB(baseName).adminCommand({fsync: 1}));
-    jsTestLog("Making copy of metadata file before creating the collection: " +
-              turtleFileWithoutCollection);
+    jsTestLog("Making copy of metadata file before creating the collection: " + turtleFileWithoutCollection);
     copyFile(turtleFile, turtleFileWithoutCollection);
 
     let testColl = mongod.getDB(baseName)[collName];
@@ -69,40 +69,34 @@ let runTest = function(mongodOptions) {
 
     // Corrupt the .turtle file in a very specific way such that the log sequence numbers are
     // invalid.
-    if (mongodOptions.hasOwnProperty('journal')) {
-        if (_isAddressSanitizerActive()) {
-            jsTestLog("Skipping log file corruption because the address sanitizer is active.");
-            return;
-        }
-
-        jsTestLog("Corrupting log file metadata");
-
-        let data = cat(turtleFile, true /* useBinaryMode */);
-        let re = /checkpoint_lsn=\(([0-9,]+)\)/g;
-        let newData = data.replace(re, "checkpoint_lsn=(1,2)");
-
-        print('writing data to new turtle file: \n' + newData);
-        removeFile(turtleFile);
-        writeFile(turtleFile, newData, true /* useBinaryMode */);
-
-        assertRepairSucceeds(dbpath, mongod.port, mongodOptions);
-
-        mongod = startMongodOnExistingPath(dbpath, mongodOptions);
-        testColl = mongod.getDB(baseName)[collName];
-
-        // The collection exists despite using a salvaged turtle file because salvage is able to
-        // find the table in the WiredTiger.wt file.
-        assert(testColl.exists());
-
-        // We can assert that the data exists because the salvage only took place on the
-        // metadata, not the data.
-        assert.eq(testColl.find({}).itcount(), 1);
-        MongoRunner.stopMongod(mongod);
+    if (isSanitizerEnabled) {
+        jsTestLog("Skipping log file corruption because the address sanitizer is active.");
+        return;
     }
+
+    jsTestLog("Corrupting log file metadata");
+
+    let data = cat(turtleFile, true /* useBinaryMode */);
+    let re = /checkpoint_lsn=\(([0-9,]+)\)/g;
+    let newData = data.replace(re, "checkpoint_lsn=(1,2)");
+
+    print("writing data to new turtle file: \n" + newData);
+    removeFile(turtleFile);
+    writeFile(turtleFile, newData, true /* useBinaryMode */);
+
+    assertRepairSucceeds(dbpath, mongod.port, mongodOptions);
+
+    mongod = startMongodOnExistingPath(dbpath, mongodOptions);
+    testColl = mongod.getDB(baseName)[collName];
+
+    // The collection exists despite using a salvaged turtle file because salvage is able to
+    // find the table in the WiredTiger.wt file.
+    assert(testColl.exists());
+
+    // We can assert that the data exists because the salvage only took place on the
+    // metadata, not the data.
+    assert.eq(testColl.find({}).itcount(), 1);
+    MongoRunner.stopMongod(mongod);
 };
 
-// Repair may behave differently with journaling enabled or disabled, but the end result should
-// be the same.
-runTest({journal: ""});
-runTest({nojournal: ""});
-})();
+runTest({});

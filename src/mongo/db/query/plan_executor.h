@@ -30,20 +30,36 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
+#include "mongo/db/local_catalog/shard_role_catalog/scoped_collection_metadata.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/ops/update_result.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/plan_explainer.h"
-#include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/restore_context.h"
+#include "mongo/db/query/write_ops/update_result.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/future.h"
+
+#include <exception>
+#include <string>
+#include <variant>
+#include <vector>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
-
-class BSONObj;
-class PlanStage;
-class RecordId;
 
 /**
  * If a getMore command specified a lastKnownCommittedOpTime (as secondaries do), we want to stop
@@ -52,8 +68,30 @@ class RecordId;
  * 'clientsLastKnownCommittedOpTime' represents the time passed to the getMore command.
  * If the replication coordinator ever reports a higher committed op time, we should stop waiting
  * for inserts and return immediately to speed up the propagation of commit level changes.
+ *
+ * A boost::none value opts out of the commit point propagation. A null optime compares less than
+ * any non-null optimes and thus will always trigger an empty batch for commit point propagation.
  */
-extern const OperationContext::Decoration<repl::OpTime> clientsLastKnownCommittedOpTime;
+extern const OperationContext::Decoration<boost::optional<repl::OpTime>>
+    clientsLastKnownCommittedOpTime;
+
+
+struct PlanExecutorShardingState {
+    /**
+     * If a plan yielded because it encountered a sharding critical section, 'criticalSectionFuture'
+     * will be set to a future that becomes ready when the critical section ends. This future can be
+     * waited on to hold off resuming the plan execution while the critical section is still active.
+     */
+    boost::optional<SharedSemiFuture<void>> criticalSectionFuture;
+    /**
+     * If a plan yielded because it needed to refresh a sharding catalog cache, then
+     * 'catalogCacheRefreshRequired' will be set to the nss for which the CatalogCache needs to be
+     * refreshed.
+     */
+    boost::optional<NamespaceString> catalogCacheRefreshRequired;
+};
+
+extern const OperationContext::Decoration<PlanExecutorShardingState> planExecutorShardingState;
 
 /**
  * A PlanExecutor is the abstraction that knows how to crank a tree of stages into execution.
@@ -161,6 +199,13 @@ public:
     virtual CanonicalQuery* getCanonicalQuery() const = 0;
 
     /**
+     * Get the pipeline that this executor is executing, without transferring ownership.
+     */
+    virtual Pipeline* getPipeline() const {
+        return nullptr;
+    }
+
+    /**
      * Return the namespace that the query is running over.
      *
      * WARNING: In general, a query execution plan can involve multiple collections, and therefore
@@ -168,6 +213,11 @@ public:
      * legacy reasons, and new call sites should not be added.
      */
     virtual const NamespaceString& nss() const = 0;
+
+    /**
+     * Returns a vector of secondary namespaces that are relevant to this executor.
+     */
+    virtual const std::vector<NamespaceStringOrUUID>& getSecondaryNamespaces() const = 0;
 
     /**
      * Return the OperationContext that the plan is currently executing within.
@@ -218,9 +268,17 @@ public:
     virtual void reattachToOperationContext(OperationContext* opCtx) = 0;
 
     /**
+     * Releases all storage engine resources that the plan executor has acquired. The plan will be
+     * left in the "saved" state so a call to restoreState() will be necessary afterwards.
+     */
+    void releaseAllAcquiredResources();
+
+    /**
      * Produces the next document from the query execution plan. The caller can request that the
      * executor returns documents by passing a non-null pointer for the 'objOut' output parameter,
-     * and similarly can request the RecordId by passing a non-null pointer for 'dlOut'.
+     * and similarly can request the RecordId by passing a non-null pointer for 'dlOut'. Both 'out'
+     * and 'dlOut' may be null if the caller wants to execute the query without producing documents,
+     * e.g. for count queries or to collect stats for explain.
      *
      * If a query-fatal error occurs, this method will throw an exception. If an exception is
      * thrown, then the PlanExecutor is no longer capable of executing. The caller may extract stats
@@ -236,13 +294,37 @@ public:
     virtual ExecState getNext(BSONObj* out, RecordId* dlOut) = 0;
 
     /**
+     * This function allows the caller of an executor to specify how a batched execution should
+     * handle the next BSON object ('obj') produced by the executor. The field 'numAppended' is
+     * provided to indicate the number of results appended prior to 'obj'. On a successful call,
+     * 'pbrt' will be set to the latest postBatchResumeToken. This function returns whether or not
+     * the executor should continue appending; note that 'numAppended' is not incremented if
+     * append() returns false.
+     *
+     * See getNextBatch() below for use.
+     */
+    using AppendBSONObjFn =
+        std::function<bool(const BSONObj& obj, const BSONObj& pbrt, size_t numAppended)>;
+
+    /**
+     * Looping version of getNext() which appends BSONObjs produced by the execution plan up to the
+     * 'batchSize', or until the provided append() function returns false. The 'pbrt' is an output
+     * parameter for storing the post-batch resume token for the last successful append(). Note that
+     * getNextBatch() will stash the current object on a failed append().
+     *
+     * Like getNext(), the caller can indicate that they wish to discard the entire batch of results
+     * by passing a null 'append' callback.
+     */
+    virtual size_t getNextBatch(size_t batchSize, AppendBSONObjFn append);
+
+    /**
      * Similar to 'getNext()', but returns a Document rather than a BSONObj.
      *
      * Callers should generally prefer the BSONObj variant, since not all implementations of
      * PlanExecutor use Document/Value as their runtime value format. These implementations will
      * typically just convert the BSON to Document on behalf of the caller.
      */
-    virtual ExecState getNextDocument(Document* objOut, RecordId* dlOut) = 0;
+    virtual ExecState getNextDocument(Document& objOut) = 0;
 
     /**
      * Returns 'true' if the plan is done producing results (or writing), 'false' otherwise.
@@ -250,7 +332,7 @@ public:
      * Tailable cursors are a possible exception to this: they may have further results even if
      * isEOF() returns true.
      */
-    virtual bool isEOF() = 0;
+    virtual bool isEOF() const = 0;
 
     /**
      * If this plan executor was constructed to execute a count implementation, e.g. it was obtained
@@ -262,24 +344,58 @@ public:
     /**
      * If this plan executor was constructed to execute an update, e.g. it was obtained by calling
      * 'getExecutorUpdate()', then executes the update operation and returns an 'UpdateResult'
-     * describing the outcome. Illegal to call on other plan executors.
+     * describing the outcome.
+     *
+     * Illegal to call on other plan executors (for operations that are not updates). Also illegal
+     * to call for update statements that return either the pre-image or post-image. In this case,
+     * the caller should instead use 'executeFindAndModify()'.
      */
-    virtual UpdateResult executeUpdate() = 0;
+    UpdateResult executeUpdate();
 
     /**
      * If this plan executor has already executed an update operation, returns the an 'UpdateResult'
      * describing the outcome of the update. Illegal to call if either 1) the PlanExecutor is not
      * an update PlanExecutor, or 2) the PlanExecutor has not yet been executed either with
-     * 'executeUpdate()' or by calling 'getNext()' until end-of-stream.
+     * 'executeUpdate()' or by calling 'getNext()' until ADVANCED or end-of-stream.
      */
     virtual UpdateResult getUpdateResult() const = 0;
 
     /**
      * If this plan executor was constructed to execute a delete, e.g. it was obtained by calling
      * 'getExecutorDelete()', then executes the delete operation and returns the number of documents
-     * that were deleted. Illegal to call on other plan executors.
+     * that were deleted.
+     *
+     * Illegal to call on other plan executors (for operations that are not delete). Also illegal to
+     * call for delete statements that return documents. In this case, the caller should instead use
+     * 'executeFindAndModify()' or should iterate the executor using 'getNext()' for multi-deletes
+     * that return the deleted documents.
      */
-    virtual long long executeDelete() = 0;
+    long long executeDelete();
+
+    /**
+     * If this plan executor has already executed a delete operation, returns the the number of
+     * documents that were deleted. Illegal to call if either 1) the PlanExecutor is not a delete
+     * PlanExecutor, or 2) the PlanExecutor has not yet been executed either with 'executeDelete()'
+     * or by calling 'getNext()' until ADVANCED or end-of-stream.
+     */
+    virtual long long getDeleteResult() const = 0;
+
+    /**
+     * If this plan executor has already executed a batched delete operation, returns the
+     * 'BatchedDeleteStats' describing the outcome of the batched delete. Illegal to call if either
+     * 1) the PlanExecutor is not a delete PlanExecutor that executed a batched delete, or 2) the
+     * PlanExecutor has not yet been executed either with 'executeDelete()' or by calling
+     * 'getNext()' until end-of-stream.
+     */
+    virtual BatchedDeleteStats getBatchedDeleteStats() = 0;
+
+    /**
+     * Executes a findAndModify operation (which may either perform a single update or single
+     * delete). Returns the resulting document as called for by the findAndModify (the deleted
+     * document, the update pre-image, or the update post-image), or returns boost::none if no write
+     * occurred.
+     */
+    boost::optional<BSONObj> executeFindAndModify();
 
     //
     // Concurrency-related methods.
@@ -308,19 +424,26 @@ public:
     virtual void dispose(OperationContext* opCtx) = 0;
 
     /**
-     * Stash the BSONObj so that it gets returned from the PlanExecutor on a later call to
-     * getNext(). Implementations should NOT support returning queued BSON objects using
-     * 'getNextDocument()'. Only 'getNext()' should return the queued BSON objects.
+     * Forces all stages in the execution plan that are able to spill their data. Accepts a custom
+     * yield policy, because it can be called on an executor in a "saved" state without calling
+     * restoreState(). Can be nullptr if executor acquires locks internally.
+     */
+    virtual void forceSpill(PlanYieldPolicy* yieldPolicy) = 0;
+
+    /**
+     * Stash the BSONObj so that it gets returned from the PlanExecutor a subsequent call to
+     * getNext(). Implementations should NOT support returning stashed BSON objects using
+     * 'getNextDocument()'. Only 'getNext()' should return the stashed BSON objects.
      *
-     * Enqueued documents are returned in FIFO order. The queued results are exhausted before
+     * Enqueued documents are returned in LIFO order. The stashed results are exhausted before
      * generating further results from the underlying query plan.
      *
      * Subsequent calls to getNext() must request the BSONObj and *not* the RecordId.
      */
-    virtual void enqueue(const BSONObj& obj) = 0;
+    virtual void stashResult(const BSONObj& obj) = 0;
 
     virtual bool isMarkedAsKilled() const = 0;
-    virtual Status getKillStatus() = 0;
+    virtual Status getKillStatus() const = 0;
 
     virtual bool isDisposed() const = 0;
 
@@ -348,12 +471,53 @@ public:
      */
     virtual const PlanExplainer& getPlanExplainer() const = 0;
 
-    /*
-     * Virtual methods to enable using save/restore logic that stashes the RecoveryUnit on the
-     * ClientCursor for future getMore commands in order to retain valid and positioned cursors.
+    /**
+     * For queries that have multiple executors, this can be used to differentiate between them.
      */
-    virtual void enableSaveRecoveryUnitAcrossCommandsIfSupported() = 0;
-    virtual bool isSaveRecoveryUnitAcrossCommandsEnabled() const = 0;
+    virtual boost::optional<StringData> getExecutorType() const {
+        return boost::none;
+    }
+
+    /**
+     * Describes the query framework which an executor used.
+     */
+    enum class QueryFramework {
+        // Null value.
+        kUnknown,
+        // The entirety of this plan was executed in the classic execution engine.
+        kClassicOnly,
+        // This plan was executed using classic document source and any find pushdown was executed
+        // in the classic execution engine.
+        kClassicHybrid,
+        // The entirety of this plan was exectued in SBE via stage builders.
+        kSBEOnly,
+        // A portion of this plan was executed in SBE via stage builders.
+        kSBEHybrid
+    };
+
+    /**
+     * Returns the query framework that this executor used.
+     */
+    virtual QueryFramework getQueryFramework() const = 0;
+
+    /**
+     * Sets whether the executor needs to return owned data.
+     */
+    virtual void setReturnOwnedData(bool returnOwnedData) {};
+
+    virtual bool isUsingDistinctScan() const {
+        return false;
+    }
+
+private:
+    // Used by 'executeWrite()'.
+    enum class PlanExecWriteType { kUpdate, kDelete, kFindAndModify };
+    std::string writeTypeToStr(PlanExecWriteType);
+
+    // Helper for executing PlanExecutors for updates or deletes, including findAndModify-style
+    // update or delete which return a document. The return value is boost::none unless the
+    // operation is a findAndModify that performed a write.
+    boost::optional<BSONObj> executeWrite(PlanExecWriteType writeType);
 };
 
 }  // namespace mongo

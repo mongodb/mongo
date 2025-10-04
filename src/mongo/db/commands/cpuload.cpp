@@ -27,31 +27,45 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/base/init.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/timer.h"
+
+#include <cstdint>
+#include <iosfwd>
+#include <string>
 
 namespace mongo {
 
 using std::string;
 using std::stringstream;
 
-// Testing-only, enabled via command line.
+// Test-only, enabled via command line. See docs/test_commands.md.
 class CPULoadCommand : public BasicCommand {
 public:
     CPULoadCommand() : BasicCommand("cpuload") {}
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
+
     virtual bool isWriteCommandForConfigServer() const {
         return false;
     }
+
     bool skipApiVersionCheck() const override {
         // Internal command (server to server).
         return true;
     }
+
     std::string help() const override {
         return "internal. for testing only."
                "{ cpuload : 1, cpuFactor : 1 } Runs a straight CPU load. Length of execution "
@@ -59,33 +73,44 @@ public:
                "Useful for testing the stability of the performance of the underlying system,"
                "by running the command repeatedly and observing the variation in execution time.";
     }
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {}  // No auth required
-    virtual bool run(OperationContext* txn,
-                     const string& badns,
-                     const BSONObj& cmdObj,
-                     BSONObjBuilder& result) {
+
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
+        return Status::OK();  // No auth required
+    }
+
+    bool run(OperationContext* txn,
+             const DatabaseName&,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
         double cpuFactor = 1;
         if (cmdObj["cpuFactor"].isNumber()) {
             cpuFactor = cmdObj["cpuFactor"].number();
         }
+
+        Timer t{};
         long long limit = 10000 * cpuFactor;
         // volatile used to ensure that loop is not optimized away
-        volatile uint64_t lresult = 0;  // NOLINT
+        volatile uint64_t lresult [[maybe_unused]] = 0;  // NOLINT
         uint64_t x = 100;
         for (long long i = 0; i < limit; i++) {
             x *= 13;
         }
         lresult = x;
+
+        // add time-consuming statistics
+        auto micros = t.elapsed();
+        result.append("durationMillis", durationCount<Milliseconds>(micros));
+        result.append("durationSeconds", durationCount<Seconds>(micros));
         return true;
     }
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 };
 
-MONGO_REGISTER_TEST_COMMAND(CPULoadCommand);
+MONGO_REGISTER_COMMAND(CPULoadCommand).testOnly().forRouter().forShard();
 
 
 }  // namespace mongo

@@ -27,63 +27,84 @@
  *    it in the license file.
  */
 
+
+#include "mongo/db/profile_filter_impl.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/db/exec/matcher/matcher.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/profile_settings.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/db/query/compiler/dependency_analysis/match_expression_dependencies.h"
+#include "mongo/db/server_options.h"
+#include "mongo/logv2/log.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
-#include "mongo/logv2/log.h"
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/profile_filter_impl.h"
 
 namespace mongo {
 
-namespace {
-boost::intrusive_ptr<ExpressionContext> makeExpCtx() {
-    // The namespace string can't be database-specific, because the profile filter applies to all
-    // databases in the process.
-    // Similar to collection validators, it's not safe to share an opCtx in a stored query.
-    return make_intrusive<ExpressionContext>(nullptr, nullptr, NamespaceString{});
-}
-}  // namespace
+ProfileFilterImpl::ProfileFilterImpl(BSONObj expr,
+                                     boost::intrusive_ptr<ExpressionContext> parserExpCtx)
+    : _matcher(expr.getOwned(), parserExpCtx) {
 
-ProfileFilterImpl::ProfileFilterImpl(BSONObj expr) : _matcher(expr.getOwned(), makeExpCtx()) {
     DepsTracker deps;
-    _matcher.getMatchExpression()->addDependencies(&deps);
+    dependency_analysis::addDependencies(_matcher.getMatchExpression(), &deps);
     uassert(4910201,
             "Profile filter is not allowed to depend on metadata",
             !deps.getNeedsAnyMetadata());
 
-    // Reduce the DepsTracker down to a set of top-level fields.
-    StringSet toplevelFields;
+    // We only bother tracking top-level fields as dependencies.
     for (auto&& field : deps.fields) {
-        toplevelFields.emplace(FieldPath(std::move(field)).front());
+        _dependencies.emplace(FieldPath(std::move(field)).front());
     }
+    _needWholeDocument = deps.needWholeDocument;
 
     // Remember a list of functions we'll call whenever we need to build BSON from CurOp.
-    _makeBSON = OpDebug::appendStaged(toplevelFields, deps.needWholeDocument);
+    _makeBSON = OpDebug::appendStaged(
+        parserExpCtx->getOperationContext(), _dependencies, _needWholeDocument);
+
+    // The operation context is necessary for parsing, but should not be used for the rest of the
+    // lifetime of the filter, since the filter exists for longer than a single operation.
+    parserExpCtx->setOperationContext(nullptr);
 }
 
 bool ProfileFilterImpl::matches(OperationContext* opCtx,
                                 const OpDebug& op,
                                 const CurOp& curop) const {
     try {
-        return _matcher.matches(_makeBSON({opCtx, op, curop}));
+        return exec::matcher::matches(&_matcher, _makeBSON({opCtx, op, curop}));
     } catch (const DBException& e) {
-        LOGV2_DEBUG(4910202, 5, "Profile filter threw an exception", "exception"_attr = e);
+        LOGV2_DEBUG(4910202, 5, "Profile filter threw an exception", "exception"_attr = redact(e));
         return false;
     }
 }
 
-// PathlessOperatorMap is required for parsing a MatchExpression.
-MONGO_INITIALIZER_GENERAL(ProfileFilterDefault,
-                          ("PathlessOperatorMap",
-                           "MatchExpressionParser",
-                           "EndExpressionRegistration"),
-                          ())
-(InitializerContext*) {
+void ProfileFilterImpl::initializeDefaults(ServiceContext* service) {
+    auto& dbProfileSettings = DatabaseProfileSettings::get(service);
+    dbProfileSettings.setDefaultLevel(serverGlobalParams.defaultProfile);
+
     try {
         if (auto expr = serverGlobalParams.defaultProfileFilter) {
-            ProfileFilter::setDefault(std::make_shared<ProfileFilterImpl>(*expr));
+            // Create a temporary operation context that will only be valid for parsing, and will
+            // be deleted after the try/catch block.
+            const auto tempOpCtx = cc().makeOperationContext();
+            dbProfileSettings.setDefaultFilter(std::make_shared<ProfileFilterImpl>(
+                *expr, ExpressionContextBuilder{}.opCtx(tempOpCtx.get()).build()));
         }
     } catch (AssertionException& e) {
         // Add more context to the error
@@ -92,5 +113,4 @@ MONGO_INITIALIZER_GENERAL(ProfileFilterDefault,
                                 << e.reason());
     }
 }
-
 }  // namespace mongo

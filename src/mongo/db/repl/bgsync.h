@@ -29,24 +29,31 @@
 
 #pragma once
 
-#include <functional>
-#include <memory>
-
-#include "mongo/base/status_with.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/repl/data_replicator_external_state.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_fetcher.h"
+#include "mongo/db/repl/oplog_interface.h"
 #include "mongo/db/repl/oplog_interface_remote.h"
+#include "mongo/db/repl/oplog_writer.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/rollback_impl.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/sync_source_resolver.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <functional>
+#include <memory>
 
 namespace mongo {
 
@@ -57,11 +64,12 @@ namespace repl {
 
 class OplogInterface;
 class ReplicationCoordinator;
+
 class ReplicationCoordinatorExternalState;
 class ReplicationProcess;
 class StorageInterface;
 
-class BackgroundSync {
+class MONGO_MOD_OPEN BackgroundSync {
     BackgroundSync(const BackgroundSync&) = delete;
     BackgroundSync& operator=(const BackgroundSync&) = delete;
 
@@ -88,6 +96,7 @@ public:
     BackgroundSync(ReplicationCoordinator* replicationCoordinator,
                    ReplicationCoordinatorExternalState* replicationCoordinatorExternalState,
                    ReplicationProcess* replicationProcess,
+                   OplogWriter* oplogWriter,
                    OplogApplier* oplogApplier);
 
     // stop syncing (when this node becomes a primary, e.g.)
@@ -122,8 +131,10 @@ public:
      */
     bool tooStale() const;
 
-    // starts the sync target notifying thread
-    void notifierThread();
+    /**
+     * Informs us that data relevant to sync source selection has changed.
+     */
+    void notifySyncSourceSelectionDataChanged();
 
     HostAndPort getSyncTarget() const;
 
@@ -158,12 +169,11 @@ private:
     // Production thread inner loop.
     void _runProducer();
     void _produce();
+    void _stop(WithLock, bool resetLastFetchedOptime);
 
     /**
      * Checks current background sync state before pushing operations into blocking queue and
      * updating metrics. If the queue is full, might block.
-     *
-     * requiredRBID is reset to empty after the first call.
      */
     Status _enqueueDocuments(OplogFetcher::Documents::const_iterator begin,
                              OplogFetcher::Documents::const_iterator end,
@@ -175,7 +185,6 @@ private:
     void _runRollback(OperationContext* opCtx,
                       const Status& fetcherReturnStatus,
                       const HostAndPort& source,
-                      int requiredRBID,
                       StorageInterface* storageInterface);
 
     /**
@@ -188,21 +197,6 @@ private:
                                             StorageInterface* storageInterface,
                                             OplogInterfaceRemote::GetConnectionFn getConnection);
 
-    /**
-     * Executes a rollback via refetch in rs_rollback.cpp.
-     *
-     * We fall back on the rollback via refetch algorithm when the storage engine does not support
-     * "rollback to a checkpoint," or when the forceRollbackViaRefetch parameter is set to true.
-     *
-     * Must be called from _runRollback() which ensures that all the conditions for entering
-     * rollback have been met.
-     */
-    void _fallBackOnRollbackViaRefetch(OperationContext* opCtx,
-                                       const HostAndPort& source,
-                                       int requiredRBID,
-                                       OplogInterface* localOplog,
-                                       OplogInterfaceRemote::GetConnectionFn getConnection);
-
     // restart syncing
     void start(OperationContext* opCtx);
 
@@ -212,6 +206,19 @@ private:
     OpTime _readLastAppliedOpTime(OperationContext* opCtx);
 
     long long _getRetrySleepMS();
+
+    // Waits for the given time, or until we are notified that relevant sync source selection data
+    // has changed.  Takes _mutex, so don't call with _mutex held.
+    void _waitForNewSyncSourceSelectionData(long long waitTimeMillis);
+
+    // Internal version of notifySyncSourceSelectionDataChanged(), to be used by callers
+    // which already hold _mutex.
+    void _notifySyncSourceSelectionDataChanged(WithLock);
+
+    // This OplogWriter writes oplog entries fetched from the sync source and
+    // feeds them to the OplogApplier.
+    // Note: Could be null if featureFlagReduceMajorityWriteLatency is not enabled.
+    OplogWriter* const _oplogWriter;
 
     // This OplogApplier applies oplog entries fetched from the sync source.
     OplogApplier* const _oplogApplier;
@@ -241,7 +248,7 @@ private:
 
     // Protects member data of BackgroundSync.
     // Never hold the BackgroundSync mutex when trying to acquire the ReplicationCoordinator mutex.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("BackgroundSync::_mutex");  // (S)
+    mutable stdx::mutex _mutex;  // (S)
 
     OpTime _lastOpTimeFetched;  // (M)
 
@@ -274,6 +281,13 @@ private:
     // operations in the local oplog in order to bring this server to a consistent state relative
     // to the sync source.
     std::unique_ptr<RollbackImpl> _rollback;  // (PR)
+
+    // A condition variable used to wake us when sync source selection data changes.
+    stdx::condition_variable _syncSourceSelectionDataCv;  // (S)
+
+    // A latch which tells us if sync source selection data has changed since we called
+    // the syncSourcSelector
+    bool _syncSourceSelectionDataChanged = true;  // (M)
 };
 
 

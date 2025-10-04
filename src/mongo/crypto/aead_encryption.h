@@ -29,15 +29,16 @@
 
 #pragma once
 
-#include <cstddef>
-#include <cstdint>
-
-#include "mongo/crypto/fle_data_frames.h"
-#include "mongo/shell/kms_gen.h"
-
+#include "mongo/base/data_range.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/crypto/fle_data_frames.h"
+#include "mongo/crypto/symmetric_crypto.h"
 #include "mongo/crypto/symmetric_key.h"
+
+#include <cstddef>
+#include <cstdint>
 
 namespace mongo {
 namespace crypto {
@@ -47,12 +48,23 @@ namespace crypto {
  */
 
 constexpr size_t kFieldLevelEncryptionKeySize = 96;
+constexpr size_t kFieldLevelEncryption2KeySize = 64;
 constexpr size_t kAeadAesHmacKeySize = 64;
 
 /**
  * Returns the length of the ciphertext output given the plaintext length. Only for AEAD.
  */
 size_t aeadCipherOutputLength(size_t plainTextLen);
+
+/**
+ * Returns the length of the ciphertext output given the plaintext length. Only for FLE2 AEAD.
+ */
+size_t fle2AeadCipherOutputLength(size_t plainTextLen, aesMode mode);
+
+/**
+ * Returns the length of the ciphertext output given the plaintext length. Only for FLE2.
+ */
+size_t fle2CipherOutputLength(size_t plainTextLen);
 
 /**
  * Encrypts a dataframe object following the AEAD_AES_256_CBC_HMAC_SHA_512 encryption
@@ -70,39 +82,64 @@ Status aeadDecryptDataFrame(FLEDecryptionFrame& dataframe);
  * Uses AEAD_AES_256_CBC_HMAC_SHA_512 encryption to encrypt a local datakey.
  * Writes output to out.
  */
-Status aeadEncryptLocalKMS(const SymmetricKey& key, ConstDataRange in, uint8_t* out, size_t outLen);
+Status aeadEncryptLocalKMS(const SymmetricKey& key, ConstDataRange in, DataRange out);
+
 /**
  * Internal calls for the aeadEncryption algorithm. Only used for testing.
  */
 Status aeadEncryptWithIV(ConstDataRange key,
-                         const uint8_t* in,
-                         size_t inLen,
-                         const uint8_t* iv,
-                         size_t ivLen,
-                         const uint8_t* associatedData,
-                         uint64_t associatedDataLen,
+                         ConstDataRange in,
+                         ConstDataRange iv,
+                         ConstDataRange associatedData,
                          ConstDataRange dataLenBitsEncodedStorage,
-                         uint8_t* out,
-                         size_t outLen);
+                         DataRange out);
+
+/**
+ * Internal call for FLE2 aeadEncryption algorithm.
+ * Note: parameter "iv" is not required and only used for unit testing
+ */
+Status fle2AeadEncrypt(ConstDataRange key,
+                       ConstDataRange in,
+                       ConstDataRange iv,
+                       ConstDataRange associatedData,
+                       DataRange out,
+                       aesMode mode);
+
+/**
+ * Internal call for FLE2 encryption algorithm.
+ * Note: parameter "iv" is not required and only used for unit testing
+ */
+Status fle2Encrypt(ConstDataRange key, ConstDataRange in, ConstDataRange iv, DataRange out);
 
 /**
  * Internal call for the aeadDecryption algorithm. Only used for testing.
  */
-Status aeadDecrypt(const SymmetricKey& key,
-                   ConstDataRange ciphertext,
-                   const uint8_t* associatedData,
-                   uint64_t associatedDataLen,
-                   uint8_t* out,
-                   size_t* outLen);
+StatusWith<std::size_t> aeadDecrypt(const SymmetricKey& key,
+                                    ConstDataRange ciphertext,
+                                    ConstDataRange associatedData,
+                                    DataRange out);
+
+/**
+ * Internal call for FLE2 aeadDecryption algorithm.
+ */
+StatusWith<std::size_t> fle2AeadDecrypt(ConstDataRange key,
+                                        ConstDataRange in,
+                                        ConstDataRange associatedData,
+                                        DataRange out,
+                                        aesMode mode);
+
+/**
+ * Internal call for FLE2 decryption algorithm.
+ */
+StatusWith<std::size_t> fle2Decrypt(ConstDataRange key, ConstDataRange in, DataRange out);
 
 /**
  * Decrypts the cipherText using AEAD_AES_256_CBC_HMAC_SHA_512 decryption. Writes output
  * to out.
  */
-Status aeadDecryptLocalKMS(const SymmetricKey& key,
-                           ConstDataRange cipher,
-                           uint8_t* out,
-                           size_t* outLen);
+StatusWith<std::size_t> aeadDecryptLocalKMS(const SymmetricKey& key,
+                                            ConstDataRange cipher,
+                                            DataRange out);
 
 }  // namespace crypto
 }  // namespace mongo

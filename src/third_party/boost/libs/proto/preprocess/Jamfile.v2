@@ -1,0 +1,18 @@
+# (C) Copyright 2012: Eric Niebler
+# Distributed under the Boost Software License, Version 1.0.
+# (See accompanying file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
+
+# Generates preprocessed files with wave.
+
+project : requirements <link>static <variant>release ;
+
+actions wave
+{
+  $(>[2]) -o- -DBOOST_PROTO_MAX_ARITY=10 --config-file wave.cfg $(>[1])
+}
+
+W = /boost/libs/wave/tool//wave ;
+
+make preprocess_proto
+  : preprocess_proto.cpp $(W) : wave : <dependency>wave.cfg
+  ;

@@ -9,17 +9,6 @@
 #include "wt_internal.h"
 
 /*
- * Per session handle cached block manager information.
- */
-typedef struct {
-    WT_EXT *ext_cache;   /* List of WT_EXT handles */
-    u_int ext_cache_cnt; /* Count */
-
-    WT_SIZE *sz_cache;  /* List of WT_SIZE handles */
-    u_int sz_cache_cnt; /* Count */
-} WT_BLOCK_MGR_SESSION;
-
-/*
  * __block_ext_alloc --
  *     Allocate a new WT_EXT structure.
  */
@@ -39,11 +28,11 @@ __block_ext_alloc(WT_SESSION_IMPL *session, WT_EXT **extp)
 }
 
 /*
- * __wt_block_ext_alloc --
+ * __wti_block_ext_alloc --
  *     Return a WT_EXT structure for use.
  */
 int
-__wt_block_ext_alloc(WT_SESSION_IMPL *session, WT_EXT **extp)
+__wti_block_ext_alloc(WT_SESSION_IMPL *session, WT_EXT **extp)
 {
     WT_BLOCK_MGR_SESSION *bms;
     WT_EXT *ext;
@@ -95,19 +84,19 @@ __block_ext_prealloc(WT_SESSION_IMPL *session, u_int max)
 }
 
 /*
- * __wt_block_ext_free --
+ * __wti_block_ext_free --
  *     Add a WT_EXT structure to the cached list.
  */
 void
-__wt_block_ext_free(WT_SESSION_IMPL *session, WT_EXT *ext)
+__wti_block_ext_free(WT_SESSION_IMPL *session, WT_EXT **ext)
 {
     WT_BLOCK_MGR_SESSION *bms;
 
     if ((bms = session->block_manager) == NULL)
-        __wt_free(session, ext);
+        __wt_free(session, *ext);
     else {
-        ext->next[0] = bms->ext_cache;
-        bms->ext_cache = ext;
+        (*ext)->next[0] = bms->ext_cache;
+        bms->ext_cache = *ext;
 
         ++bms->ext_cache_cnt;
     }
@@ -154,11 +143,11 @@ __block_size_alloc(WT_SESSION_IMPL *session, WT_SIZE **szp)
 }
 
 /*
- * __wt_block_size_alloc --
+ * __wti_block_size_alloc --
  *     Return a WT_SIZE structure for use.
  */
 int
-__wt_block_size_alloc(WT_SESSION_IMPL *session, WT_SIZE **szp)
+__wti_block_size_alloc(WT_SESSION_IMPL *session, WT_SIZE **szp)
 {
     WT_BLOCK_MGR_SESSION *bms;
 
@@ -202,19 +191,19 @@ __block_size_prealloc(WT_SESSION_IMPL *session, u_int max)
 }
 
 /*
- * __wt_block_size_free --
+ * __wti_block_size_free --
  *     Add a WT_SIZE structure to the cached list.
  */
 void
-__wt_block_size_free(WT_SESSION_IMPL *session, WT_SIZE *sz)
+__wti_block_size_free(WT_SESSION_IMPL *session, WT_SIZE **sz)
 {
     WT_BLOCK_MGR_SESSION *bms;
 
     if ((bms = session->block_manager) == NULL)
-        __wt_free(session, sz);
+        __wt_free(session, *sz);
     else {
-        sz->next[0] = bms->sz_cache;
-        bms->sz_cache = sz;
+        (*sz)->next[0] = bms->sz_cache;
+        bms->sz_cache = *sz;
 
         ++bms->sz_cache_cnt;
     }
@@ -228,7 +217,7 @@ static int
 __block_size_discard(WT_SESSION_IMPL *session, u_int max)
 {
     WT_BLOCK_MGR_SESSION *bms;
-    WT_SIZE *sz, *nsz;
+    WT_SIZE *nsz, *sz;
 
     bms = session->block_manager;
     if (max != 0 && bms->sz_cache_cnt <= max)
@@ -271,11 +260,11 @@ __block_manager_session_cleanup(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_block_ext_prealloc --
+ * __wti_block_ext_prealloc --
  *     Pre-allocate WT_EXT and WT_SIZE structures.
  */
 int
-__wt_block_ext_prealloc(WT_SESSION_IMPL *session, u_int max)
+__wti_block_ext_prealloc(WT_SESSION_IMPL *session, u_int max)
 {
     if (session->block_manager == NULL) {
         WT_RET(__wt_calloc(session, 1, sizeof(WT_BLOCK_MGR_SESSION), &session->block_manager));
@@ -287,13 +276,57 @@ __wt_block_ext_prealloc(WT_SESSION_IMPL *session, u_int max)
 }
 
 /*
- * __wt_block_ext_discard --
+ * __wti_block_ext_discard --
  *     Discard WT_EXT and WT_SIZE structures after checkpoint runs.
  */
 int
-__wt_block_ext_discard(WT_SESSION_IMPL *session, u_int max)
+__wti_block_ext_discard(WT_SESSION_IMPL *session, u_int max)
 {
     WT_RET(__block_ext_discard(session, max));
     WT_RET(__block_size_discard(session, max));
     return (0);
 }
+
+#ifdef HAVE_UNITTEST
+int
+__ut_block_ext_alloc(WT_SESSION_IMPL *session, WT_EXT **extp)
+{
+    return (__block_ext_alloc(session, extp));
+}
+
+int
+__ut_block_ext_prealloc(WT_SESSION_IMPL *session, u_int max)
+{
+    return (__block_ext_prealloc(session, max));
+}
+
+int
+__ut_block_size_alloc(WT_SESSION_IMPL *session, WT_SIZE **szp)
+{
+    return (__block_size_alloc(session, szp));
+}
+
+int
+__ut_block_size_prealloc(WT_SESSION_IMPL *session, u_int max)
+{
+    return (__block_size_prealloc(session, max));
+}
+
+int
+__ut_block_manager_session_cleanup(WT_SESSION_IMPL *session)
+{
+    return (__block_manager_session_cleanup(session));
+}
+
+int
+__ut_block_ext_discard(WT_SESSION_IMPL *session, u_int max)
+{
+    return (__block_ext_discard(session, max));
+}
+
+int
+__ut_block_size_discard(WT_SESSION_IMPL *session, u_int max)
+{
+    return (__block_size_discard(session, max));
+}
+#endif

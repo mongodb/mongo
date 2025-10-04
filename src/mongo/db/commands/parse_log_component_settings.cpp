@@ -27,20 +27,46 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/commands/parse_log_component_settings.h"
 
-#include <vector>
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/logv2/log_component.h"
-#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <deque>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+
 namespace mongo {
+namespace {
+StatusWith<int> tryCoerceVerbosity(BSONElement elem, StringData parentComponentDottedName) {
+    int newVerbosityLevel;
+    Status coercionStatus = elem.tryCoerce(&newVerbosityLevel);
+    if (!coercionStatus.isOK()) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "Expected " << parentComponentDottedName << '.'
+                              << elem.fieldNameStringData()
+                              << " to be safely cast to integer, but could not: "
+                              << coercionStatus.reason()};
+    } else if (newVerbosityLevel < -1) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "Expected " << parentComponentDottedName << '.'
+                              << elem.fieldNameStringData()
+                              << " to be greater than or equal to -1, but found "
+                              << elem.toString(false, false)};
+    }
+
+    return newVerbosityLevel;
+}
+
+}  // namespace
 
 /*
  * Looks up a component by its short name, or returns kNumLogComponents
@@ -59,30 +85,29 @@ StatusWith<std::vector<LogComponentSetting>> parseLogComponentSettings(const BSO
     typedef std::vector<LogComponentSetting> Result;
 
     std::vector<LogComponentSetting> levelsToSet;
-    std::vector<BSONObjIterator> iterators;
 
     logv2::LogComponent parentComponent = logv2::LogComponent::kDefault;
-    BSONObjIterator iter(settings);
+    struct Progress {
+        BSONObj obj;
+        BSONObjStlIterator iter = obj.begin();
+    };
+    std::deque<Progress> parseStack{{settings}};
 
-    while (iter.moreWithEOO()) {
-        BSONElement elem = iter.next();
-        if (elem.eoo()) {
-            if (!iterators.empty()) {
-                iter = iterators.back();
-                iterators.pop_back();
-                parentComponent = parentComponent.parent();
-            }
+    while (!parseStack.empty()) {
+        auto& [obj, iter] = parseStack.back();
+        if (iter == obj.end()) {
+            parseStack.pop_back();
+            parentComponent = parentComponent.parent();
             continue;
         }
+        BSONElement elem = *iter++;
         if (elem.fieldNameStringData() == "verbosity") {
-            if (!elem.isNumber()) {
-                return StatusWith<Result>(ErrorCodes::BadValue,
-                                          str::stream()
-                                              << "Expected " << parentComponent.getDottedName()
-                                              << ".verbosity to be a number, but found "
-                                              << typeName(elem.type()));
+            auto swVerbosity = tryCoerceVerbosity(elem, parentComponent.getDottedName());
+            if (!swVerbosity.isOK()) {
+                return swVerbosity.getStatus();
             }
-            levelsToSet.push_back((LogComponentSetting(parentComponent, elem.numberInt())));
+
+            levelsToSet.push_back((LogComponentSetting(parentComponent, swVerbosity.getValue())));
             continue;
         }
         const StringData shortName = elem.fieldNameStringData();
@@ -95,18 +120,21 @@ StatusWith<std::vector<LogComponentSetting>> parseLogComponentSettings(const BSO
                                           << parentComponent.getDottedName() << "." << shortName);
         }
         if (elem.isNumber()) {
-            levelsToSet.push_back(LogComponentSetting(curr, elem.numberInt()));
+            auto swVerbosity = tryCoerceVerbosity(elem, parentComponent.getDottedName());
+            if (!swVerbosity.isOK()) {
+                return swVerbosity.getStatus();
+            }
+            levelsToSet.push_back((LogComponentSetting(curr, swVerbosity.getValue())));
             continue;
         }
-        if (elem.type() != Object) {
+        if (elem.type() != BSONType::object) {
             return StatusWith<Result>(
                 ErrorCodes::BadValue,
                 str::stream() << "Invalid type " << typeName(elem.type()) << "for component "
                               << parentComponent.getDottedName() << "." << shortName);
         }
-        iterators.push_back(iter);
         parentComponent = curr;
-        iter = BSONObjIterator(elem.Obj());
+        parseStack.push_back({elem.Obj()});
     }
 
     // Done walking settings

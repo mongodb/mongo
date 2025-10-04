@@ -8,10 +8,11 @@ is remotely crashed by "server" regularly.
 In evergreen the localhost that runs the task acts as a "server" and the remote
 host which is created by `host.create` evergreen command acts as a "client".
 
-Powercycle test is the part of resmoke. Python 3.9+ with python venv is required to
+Powercycle test is the part of resmoke. Python 3.10+ with python venv is required to
 run the resmoke (python3 from [mongodbtoolchain](http://mongodbtoolchain.build.10gen.cc/)
 is highly recommended). Python venv can be set up by running in the root mongo repo
 directory:
+
 ```
 python3 -m venv python3-venv
 source python3-venv/bin/activate
@@ -19,16 +20,19 @@ pip install -r buildscripts/requirements.txt
 ```
 
 If python venv is already set up activate it before running the resmoke:
+
 ```
 source python3-venv/bin/activate
 ```
 
 There are several commands that can be run by calling resmoke powercycle subcommand:
+
 ```
 python buildscripts/resmoke.py powercycle --help
 ```
 
 The main entry point of resmoke powercycle subcommand is located in this file:
+
 ```
 buildscripts/resmokelib/powercycle/__init__.py
 ```
@@ -45,10 +49,11 @@ buildscripts/resmokelib/powercycle/__init__.py
 ### Set up EC2 instance
 
 1. `Evergreen host.create command` - in Evergreen the remote host is created with
-the same distro as the localhost runs and some initial connections are made to ensure
-it's up before further steps
+   the same distro as the localhost runs and some initial connections are made to ensure
+   it's up before further steps
 2. `Resmoke powercycle setup-host command` - prepares remote host via ssh to run
-the powercycle test:
+   the powercycle test:
+
 ```
 python buildscripts/resmoke.py powercycle setup-host
 ```
@@ -59,16 +64,18 @@ Powercycle setup-host operations are located in
 created by `expansions.write` command in Evergreen.
 
 It runs several operations via ssh:
+
 - create directory on the remote host
 - copy `buildscripts` and `mongoDB executables` from localhost to the remote host
 - set up python venv on the remote host
 - set up curator to collect system & process stats on the remote host
 - install [NotMyFault](https://docs.microsoft.com/en-us/sysinternals/downloads/notmyfault)
-to crash Windows (only on Windows)
+  to crash Windows (only on Windows)
 
 Remote operation via ssh implementation is located in
 `buildscripts/resmokelib/powercycle/lib/remote_operations.py`.
 The following operations are supported:
+
 - `copy_to` - copy files from the localhost to the remote host
 - `copy_from` - copy files from the remote host to the localhost
 - `shell` - runs shell command on the remote host
@@ -78,6 +85,7 @@ The following operations are supported:
 `Resmoke powercycle run command` - runs the powercycle test on the localhost
 which runs remote operations on the remote host via ssh and local validation
 checks:
+
 ```
 python buildscripts/resmoke.py powercycle run \
     --sshUserHost=${user_name}@${host_ip} \
@@ -85,7 +93,7 @@ python buildscripts/resmoke.py powercycle run \
     --taskName=${task_name}
 ```
 
-######  Resmoke powercycle run arguments
+###### Resmoke powercycle run arguments
 
 The arguments for resmoke powercycle run command are defined in `add_subcommand()`
 function in `buildscripts/resmokelib/powercycle/__init__.py`. When powercycle test
@@ -107,6 +115,7 @@ The powercycle test main implementation is located in `main()` function in
 The value of `--remoteOperation` argument is used to distinguish if we are running the script
 on the localhost or on the remote host.
 `remote_handler()` function performs the following remote operations:
+
 - `noop` - do nothing
 - `crash_server` - internally crash the server
 - `kill_mongod` - kill mongod process
@@ -120,6 +129,7 @@ on the localhost or on the remote host.
 - `check_disk` - run `chkdsk` command on Windows
 
 When running on localhost the powercycle test loops do the following steps:
+
 - Rsync the database post-crash (starting from the 2nd loop), pre-recovery on the remote host
   - makes a backup before recovery
 - Start mongod on the secret port on the remote host and wait for it to recover
@@ -149,6 +159,7 @@ When running on localhost the powercycle test loops do the following steps:
 
 `Resmoke powercycle save-diagnostics command` - copies powercycle diagnostics
 files from the remote host to the localhost (mainly used by Evergreen):
+
 ```
 python buildscripts/resmoke.py powercycle save-diagnostics
 ```
@@ -159,6 +170,7 @@ Powercycle save-diagnostics operations are located in
 created by `expansions.write` command in Evergreen.
 
 It runs several operations via ssh:
+
 - `gatherRemoteEventLogs`
   - runs on Windows
 - `tarEC2Artifacts`
@@ -178,6 +190,7 @@ It runs several operations via ssh:
 
 `Resmoke powercycle remote-hang-analyzer command` - runs hang analyzer on the
 remote host (mainly used by Evergreen):
+
 ```
 $python buildscripts/resmoke.py powercycle remote-hang-analyzer
 ```

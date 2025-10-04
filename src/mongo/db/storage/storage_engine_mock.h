@@ -38,46 +38,40 @@ namespace mongo {
  */
 class StorageEngineMock : public StorageEngine {
 public:
-    RecoveryUnit* newRecoveryUnit() final {
+    std::unique_ptr<RecoveryUnit> newRecoveryUnit() final {
         return nullptr;
-    }
-    std::vector<std::string> listDatabases() const final {
-        return {};
     }
     bool supportsCappedCollections() const final {
         return true;
     }
-    bool isDurable() const final {
+    bool supportsCheckpoints() const final {
         return false;
     }
-    bool isEphemeral() const final {
+    bool isEphemeral() const override {
         return true;
     }
-    void loadCatalog(OperationContext* opCtx, LastShutdownState lastShutdownState) final {}
-    void closeCatalog(OperationContext* opCtx) final {}
-    Status closeDatabase(OperationContext* opCtx, StringData db) final {
-        return Status::OK();
-    }
-    Status dropDatabase(OperationContext* opCtx, StringData db) final {
-        return Status::OK();
-    }
+    void loadMDBCatalog(OperationContext* opCtx, LastShutdownState lastShutdownState) final {}
+    void closeMDBCatalog(OperationContext* opCtx) final {}
     void flushAllFiles(OperationContext* opCtx, bool callerHoldsReadLock) final {}
-    Status beginBackup(OperationContext* opCtx) final {
+    Status beginBackup() final {
         return Status(ErrorCodes::CommandNotSupported,
                       "The current storage engine doesn't support backup mode");
     }
-    void endBackup(OperationContext* opCtx) final {}
-    Status disableIncrementalBackup(OperationContext* opCtx) {
+    void endBackup() final {}
+    Status disableIncrementalBackup() override {
         return Status(ErrorCodes::CommandNotSupported,
                       "The current storage engine doesn't support backup mode");
+    }
+    Timestamp getBackupCheckpointTimestamp() override {
+        return Timestamp(0, 0);
     }
     StatusWith<std::unique_ptr<StorageEngine::StreamingCursor>> beginNonBlockingBackup(
-        OperationContext* opCtx, const StorageEngine::BackupOptions& options) final {
+        const StorageEngine::BackupOptions& options) final {
         return Status(ErrorCodes::CommandNotSupported,
                       "The current storage engine doesn't support backup mode");
     }
-    void endNonBlockingBackup(OperationContext* opCtx) final {}
-    StatusWith<std::vector<std::string>> extendBackupCursor(OperationContext* opCtx) final {
+    void endNonBlockingBackup() final {}
+    StatusWith<std::deque<std::string>> extendBackupCursor() final {
         return Status(ErrorCodes::CommandNotSupported,
                       "The current storage engine doesn't support backup mode");
     }
@@ -86,7 +80,17 @@ public:
                              const NamespaceString& ns) final {
         return Status::OK();
     }
+    std::unique_ptr<SpillTable> makeSpillTable(OperationContext* opCtx,
+                                               KeyFormat keyFormat,
+                                               int64_t thresholdBytes) final {
+
+        return {};
+    }
+
+    void dropSpillTable(RecoveryUnit& ru, StringData ident) final {};
+
     std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStore(OperationContext* opCtx,
+                                                                   StringData ident,
                                                                    KeyFormat keyFormat) final {
         return {};
     }
@@ -95,10 +99,10 @@ public:
         return {};
     }
     std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStoreFromExistingIdent(
-        OperationContext* opCtx, StringData ident) final {
+        OperationContext* opCtx, StringData ident, KeyFormat keyFormat) final {
         return {};
     }
-    void cleanShutdown() final {}
+    void cleanShutdown(ServiceContext* svcCtx, bool memLeakAllowed) final {}
     SnapshotManager* getSnapshotManager() const final {
         return nullptr;
     }
@@ -112,19 +116,9 @@ public:
     bool supportsReadConcernSnapshot() const final {
         return false;
     }
-    bool supportsReadConcernMajority() const final {
-        return false;
+    Status immediatelyCompletePendingDrop(OperationContext* opCtx, StringData ident) final {
+        return Status::OK();
     }
-    bool supportsOplogStones() const final {
-        return false;
-    }
-    bool supportsResumableIndexBuilds() const final {
-        return false;
-    }
-    bool supportsPendingDrops() const final {
-        return false;
-    }
-    void clearDropPendingState() final {}
     StatusWith<Timestamp> recoverToStableTimestamp(OperationContext* opCtx) final {
         fassertFailed(40547);
     }
@@ -134,7 +128,14 @@ public:
     boost::optional<Timestamp> getLastStableRecoveryTimestamp() const final {
         MONGO_UNREACHABLE;
     }
-    void setStableTimestamp(Timestamp stableTimestamp, bool force = false) final {}
+
+    void setLastMaterializedLsn(uint64_t lsn) final {}
+
+    void setRecoveryCheckpointMetadata(StringData checkpointMetadata) final {}
+
+    void promoteToLeader() final {}
+
+    void setStableTimestamp(Timestamp stableTimestamp, bool force = false) override {}
     Timestamp getStableTimestamp() const override {
         return Timestamp();
     }
@@ -143,41 +144,76 @@ public:
         return Timestamp();
     }
     void setOldestTimestampFromStable() final {}
-    void setOldestTimestamp(Timestamp timestamp) final {}
+    void setOldestTimestamp(Timestamp timestamp, bool force) final {}
     Timestamp getOldestTimestamp() const final {
         return {};
     };
     void setOldestActiveTransactionTimestampCallback(
         OldestActiveTransactionTimestampCallback callback) final {}
 
-    StatusWith<StorageEngine::ReconcileResult> reconcileCatalogAndIdents(
-        OperationContext* opCtx, LastShutdownState lastShutdownState) final {
-        return ReconcileResult{};
-    }
     Timestamp getAllDurableTimestamp() const final {
         return {};
     }
     boost::optional<Timestamp> getOplogNeededForCrashRecovery() const final {
         return boost::none;
     }
-    std::string getFilesystemPathForDb(const std::string& dbName) const final {
+    Timestamp getPinnedOplog() const final {
+        return Timestamp();
+    }
+    std::string getFilesystemPathForDb(const DatabaseName& dbName) const final {
         return "";
     }
-    std::set<std::string> getDropPendingIdents() const final {
-        return {};
+    size_t getNumDropPendingIdents() const final {
+        return 0;
     }
-    void addDropPendingIdent(const Timestamp& dropTimestamp,
+    void dropIdent(RecoveryUnit& ru, StringData ident) final {}
+    void addDropPendingIdent(const DropTime& dropTime,
                              std::shared_ptr<Ident> ident,
                              DropIdentCallback&& onDrop) final {}
-    void startDropPendingIdentReaper() final {}
+    void dropUnknownIdent(RecoveryUnit& ru,
+                          const Timestamp& stableTimestamp,
+                          StringData ident) final {}
+    std::shared_ptr<Ident> markIdentInUse(StringData ident) final {
+        return nullptr;
+    }
+    void startTimestampMonitor(
+        std::initializer_list<TimestampMonitor::TimestampListener*> listeners) final {}
+    void stopTimestampMonitor() final {}
+    void restartTimestampMonitor() final {}
 
     void checkpoint() final {}
 
-    int64_t sizeOnDiskForDb(OperationContext* opCtx, StringData dbName) final {
-        return 0;
+    StorageEngine::CheckpointIteration getCheckpointIteration() const final {
+        return StorageEngine::CheckpointIteration{0};
     }
-    bool isUsingDirectoryPerDb() const final {
+
+    bool hasDataBeenCheckpointed(
+        StorageEngine::CheckpointIteration checkpointIteration) const override {
         return false;
+    }
+
+    std::string generateNewCollectionIdent(
+        const DatabaseName& dbName,
+        const boost::optional<StringData>& optIdentUniqueTag = boost::none) const final {
+        return "";
+    }
+    std::string generateNewIndexIdent(
+        const DatabaseName& dbName,
+        const boost::optional<StringData>& optIdentUniqueTag = boost::none) const final {
+        return "";
+    }
+    StringData getCollectionIdentUniqueTag(StringData ident,
+                                           const DatabaseName& dbName) const final {
+        return "";
+    };
+    StringData getIndexIdentUniqueTag(StringData ident, const DatabaseName& dbName) const final {
+        return "";
+    }
+    bool storesFilesInDbPath() const final {
+        return false;
+    }
+    int64_t getIdentSize(RecoveryUnit& ru, StringData ident) const final {
+        return 0;
     }
     KVEngine* getEngine() final {
         return nullptr;
@@ -185,14 +221,20 @@ public:
     const KVEngine* getEngine() const final {
         return nullptr;
     }
-    DurableCatalog* getCatalog() final {
+    KVEngine* getSpillEngine() override {
         return nullptr;
     }
-    const DurableCatalog* getCatalog() const final {
+    const KVEngine* getSpillEngine() const override {
+        return nullptr;
+    }
+    MDBCatalog* getMDBCatalog() final {
+        return nullptr;
+    }
+    const MDBCatalog* getMDBCatalog() const final {
         return nullptr;
     }
 
-    StatusWith<Timestamp> pinOldestTimestamp(OperationContext* opCtx,
+    StatusWith<Timestamp> pinOldestTimestamp(RecoveryUnit&,
                                              const std::string& requestingServiceName,
                                              Timestamp requestedTimestamp,
                                              bool roundUpIfTooOld) final {
@@ -203,7 +245,49 @@ public:
 
     void setPinnedOplogTimestamp(const Timestamp& pinnedTimestamp) final {}
 
+    Status oplogDiskLocRegister(OperationContext* opCtx,
+                                RecordStore* oplogRecordStore,
+                                const Timestamp& opTime,
+                                bool orderedCommit) final {
+        return Status::OK();
+    }
+
+    void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx,
+                                                 RecordStore* oplogRecordStore) const override {}
+
+    bool waitUntilDurable(OperationContext* opCtx) override {
+        return true;
+    }
+
+    bool waitUntilUnjournaledWritesDurable(OperationContext* opCtx,
+                                           bool stableCheckpoint) override {
+        return true;
+    }
+
+    BSONObj setFlagToStorageOptions(const BSONObj& storageEngineOptions,
+                                    StringData flagName,
+                                    boost::optional<bool> flagValue) const final {
+        return storageEngineOptions;
+    }
+
+    boost::optional<bool> getFlagFromStorageOptions(const BSONObj& storageEngineOptions,
+                                                    StringData flagName) const final {
+        return boost::none;
+    }
+
+    BSONObj getSanitizedStorageOptionsForSecondaryReplication(const BSONObj& options) const final {
+        return options;
+    }
+
     void dump() const final {}
+
+    Status autoCompact(RecoveryUnit&, const AutoCompactOptions& options) final {
+        return Status::OK();
+    }
+
+    bool hasOngoingLiveRestore() final {
+        return false;
+    }
 };
 
 }  // namespace mongo

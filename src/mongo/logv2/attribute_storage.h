@@ -32,14 +32,16 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/logv2/constants.h"
+#include "mongo/logv2/log_attr.h"
 #include "mongo/stdx/type_traits.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 
-#include <boost/container/small_vector.hpp>
 #include <functional>
-#include <string_view>
+#include <string_view>  // NOLINT
+#include <variant>
+
+#include <boost/container/small_vector.hpp>
 
 namespace mongo::logv2 {
 
@@ -106,6 +108,11 @@ template <typename T>
 constexpr bool isContainer = IsContainer<T>::value;
 
 template <typename T>
+using HasToStringForLoggingOp = decltype(toStringForLogging(std::declval<T>()));
+template <typename T>
+constexpr bool hasToStringForLogging = stdx::is_detected_v<HasToStringForLoggingOp, T>;
+
+template <typename T>
 using HasToBSONOp = decltype(std::declval<T>().toBSON());
 template <typename T>
 constexpr bool hasToBSON = stdx::is_detected_v<HasToBSONOp, T>;
@@ -154,6 +161,39 @@ using HasNonMemberToBSONOp = decltype(toBSON(std::declval<T>()));
 template <typename T>
 constexpr bool hasNonMemberToBSON = stdx::is_detected_v<HasNonMemberToBSONOp, T>;
 
+template <typename T>
+constexpr inline bool isCustomLoggable =
+    // Requires any of these BSON serialization calls:
+    hasToBSON<T> ||             //   x.toBSON()
+    hasNonMemberToBSON<T> ||    //   toBSON(x)
+    hasToBSONArray<T> ||        //   x.toBSONArray()
+    hasBSONSerialize<T> ||      //   x.serialize(&bob)
+    hasBSONBuilderAppend<T> ||  //   bob.append(key, x)
+    // or any of these String serialization calls:
+    hasToStringForLogging<T> ||               //   std::string toStringForLogging(x)
+    hasStringSerialize<T> ||                  //   x.serialize(fmt::memory_buffer&)
+    hasToString<T> ||                         //   std::string x.toString()
+    hasToStringReturnStringData<T> ||         //   StringData x.toString()
+    hasNonMemberToString<T> ||                //   std::string toString(x)
+    hasNonMemberToStringReturnStringData<T>;  //   StringData toString(x)
+
+template <typename T>
+void requireCustomLoggable() {
+    static_assert(isCustomLoggable<T>,
+                  "Logging object 'x' of user-defined type requires one of:"
+                  // BSON serialization
+                  " x.toBSON(),"
+                  " toBSON(x),"
+                  " x.toBSONArray(),"
+                  " x.serialize(BSONObjBuilder*),"
+                  " bob.append(key, x),"
+                  // string serialization
+                  " toStringForLogging(x),"
+                  " x.serialize(fmt::memory_buffer&),"
+                  " x.toString(),"
+                  " toString(x).");
+}
+
 // Mapping functions on how to map a logged value to how it is stored in variant (reused by
 // container support)
 inline bool mapValue(bool value) {
@@ -190,8 +230,8 @@ inline StringData mapValue(StringData value) {
 inline StringData mapValue(std::string const& value) {
     return value;
 }
-inline StringData mapValue(std::string_view value) {
-    return StringData(value.data(), value.size());
+inline StringData mapValue(std::string_view value) {  // NOLINT
+    return toStringDataForInterop(value);
 }
 inline StringData mapValue(char* value) {
     return value;
@@ -200,16 +240,22 @@ inline StringData mapValue(const char* value) {
     return value;
 }
 
-inline const BSONObj mapValue(BSONObj const& value) {
+inline BSONObj mapValue(BSONObj const& value) {
     return value;
 }
-inline const BSONArray mapValue(BSONArray const& value) {
+inline BSONArray mapValue(BSONArray const& value) {
     return value;
 }
 inline CustomAttributeValue mapValue(BSONElement const& val) {
     CustomAttributeValue custom;
-    custom.BSONSerialize = [&val](BSONObjBuilder& builder) { builder.appendElements(val.wrap()); };
-    custom.toString = [&val]() { return val.toString(); };
+    if (val) {
+        custom.BSONSerialize = [&val](BSONObjBuilder& builder) {
+            builder.appendElements(val.wrap());
+        };
+    }
+    custom.toString = [&val]() {
+        return val.toString();
+    };
     return custom;
 }
 inline CustomAttributeValue mapValue(boost::none_t val) {
@@ -219,7 +265,9 @@ inline CustomAttributeValue mapValue(boost::none_t val) {
     custom.BSONAppend = [](BSONObjBuilder& builder, StringData fieldName) {
         builder.appendNull(fieldName);
     };
-    custom.toString = [&val]() { return constants::kNullOptionalString.toString(); };
+    custom.toString = [] {
+        return std::string{constants::kNullOptionalString};
+    };
     return custom;
 }
 
@@ -230,15 +278,23 @@ auto mapValue(T val) {
 
 template <typename T, std::enable_if_t<std::is_enum_v<T>, int> = 0>
 auto mapValue(T val) {
-    if constexpr (hasNonMemberToString<T>) {
+    if constexpr (hasToStringForLogging<T>) {
         CustomAttributeValue custom;
-        custom.toString = [val]() { return toString(val); };
+        custom.toString = [val] {
+            return toStringForLogging(val);
+        };
+        return custom;
+    } else if constexpr (hasNonMemberToString<T>) {
+        CustomAttributeValue custom;
+        custom.toString = [val]() {
+            return toString(val);
+        };
         return custom;
     } else if constexpr (hasNonMemberToStringReturnStringData<T>) {
         CustomAttributeValue custom;
         custom.stringSerialize = [val](fmt::memory_buffer& buffer) {
             StringData sd = toString(val);
-            buffer.append(sd.begin(), sd.end());
+            buffer.append(sd.data(), sd.data() + sd.size());
         };
         return custom;
     } else {
@@ -249,16 +305,24 @@ auto mapValue(T val) {
 template <typename T, std::enable_if_t<isContainer<T> && !hasMappedType<T>, int> = 0>
 CustomAttributeValue mapValue(const T& val) {
     CustomAttributeValue custom;
-    custom.toBSONArray = [&val]() { return seqLog(val).toBSONArray(); };
-    custom.stringSerialize = [&val](fmt::memory_buffer& buffer) { seqLog(val).serialize(buffer); };
+    custom.toBSONArray = [&val]() {
+        return seqLog(val).toBSONArray();
+    };
+    custom.stringSerialize = [&val](fmt::memory_buffer& buffer) {
+        seqLog(val).serialize(buffer);
+    };
     return custom;
 }
 
 template <typename T, std::enable_if_t<isContainer<T> && hasMappedType<T>, int> = 0>
 CustomAttributeValue mapValue(const T& val) {
     CustomAttributeValue custom;
-    custom.BSONSerialize = [&val](BSONObjBuilder& builder) { mapLog(val).serialize(&builder); };
-    custom.stringSerialize = [&val](fmt::memory_buffer& buffer) { mapLog(val).serialize(buffer); };
+    custom.BSONSerialize = [&val](BSONObjBuilder& builder) {
+        mapLog(val).serialize(&builder);
+    };
+    custom.stringSerialize = [&val](fmt::memory_buffer& buffer) {
+        mapLog(val).serialize(buffer);
+    };
     return custom;
 }
 
@@ -267,13 +331,7 @@ template <typename T,
                                !std::is_enum_v<T> && !isDuration<T> && !isContainer<T>,
                            int> = 0>
 CustomAttributeValue mapValue(const T& val) {
-    static_assert(hasToString<T> || hasToStringReturnStringData<T> || hasStringSerialize<T> ||
-                      hasNonMemberToString<T> || hasNonMemberToStringReturnStringData<T> ||
-                      hasBSONBuilderAppend<T> || hasBSONSerialize<T> || hasToBSON<T> ||
-                      hasToBSONArray<T> || hasNonMemberToBSON<T>,
-                  "custom type needs toBSON(), toBSONArray(), serialize(BSONObjBuilder*), "
-                  "toString() or serialize(fmt::memory_buffer&) implementation");
-
+    requireCustomLoggable<T>();
     CustomAttributeValue custom;
     if constexpr (hasBSONBuilderAppend<T>) {
         custom.BSONAppend = [&val](BSONObjBuilder& builder, StringData fieldName) {
@@ -282,34 +340,48 @@ CustomAttributeValue mapValue(const T& val) {
     }
 
     if constexpr (hasBSONSerialize<T>) {
-        custom.BSONSerialize = [&val](BSONObjBuilder& builder) { val.serialize(&builder); };
+        custom.BSONSerialize = [&val](BSONObjBuilder& builder) {
+            val.serialize(&builder);
+        };
     } else if constexpr (hasToBSON<T>) {
         custom.BSONSerialize = [&val](BSONObjBuilder& builder) {
             builder.appendElements(val.toBSON());
         };
     } else if constexpr (hasToBSONArray<T>) {
-        custom.toBSONArray = [&val]() { return val.toBSONArray(); };
+        custom.toBSONArray = [&val]() {
+            return val.toBSONArray();
+        };
     } else if constexpr (hasNonMemberToBSON<T>) {
         custom.BSONSerialize = [&val](BSONObjBuilder& builder) {
             builder.appendElements(toBSON(val));
         };
     }
 
-    if constexpr (hasStringSerialize<T>) {
-        custom.stringSerialize = [&val](fmt::memory_buffer& buffer) { val.serialize(buffer); };
+    if constexpr (hasToStringForLogging<T>) {
+        custom.toString = [&val] {
+            return toStringForLogging(val);
+        };
+    } else if constexpr (hasStringSerialize<T>) {
+        custom.stringSerialize = [&val](fmt::memory_buffer& buffer) {
+            val.serialize(buffer);
+        };
     } else if constexpr (hasToString<T>) {
-        custom.toString = [&val]() { return val.toString(); };
+        custom.toString = [&val]() {
+            return val.toString();
+        };
     } else if constexpr (hasToStringReturnStringData<T>) {
         custom.stringSerialize = [&val](fmt::memory_buffer& buffer) {
             StringData sd = val.toString();
-            buffer.append(sd.begin(), sd.end());
+            buffer.append(sd.data(), sd.data() + sd.size());
         };
     } else if constexpr (hasNonMemberToString<T>) {
-        custom.toString = [&val]() { return toString(val); };
+        custom.toString = [&val]() {
+            return toString(val);
+        };
     } else if constexpr (hasNonMemberToStringReturnStringData<T>) {
         custom.stringSerialize = [&val](fmt::memory_buffer& buffer) {
             StringData sd = toString(val);
-            buffer.append(sd.begin(), sd.end());
+            buffer.append(sd.data(), sd.data() + sd.size());
         };
     }
 
@@ -371,18 +443,18 @@ public:
 
     // Text Format: (elem1, elem2, ..., elemN)
     void serialize(fmt::memory_buffer& buffer) const {
-        StringData separator = ""_sd;
+        StringData separator;
         buffer.push_back('(');
         for (auto it = _begin; it != _end; ++it) {
             const auto& item = *it;
-            buffer.append(separator.begin(), separator.end());
+            buffer.append(separator.data(), separator.data() + separator.size());
 
             auto append = [&buffer](auto&& val) {
                 if constexpr (std::is_same_v<decltype(val), CustomAttributeValue&&>) {
                     if (val.stringSerialize) {
                         val.stringSerialize(buffer);
                     } else if (val.toString) {
-                        fmt::format_to(buffer, "{}", val.toString());
+                        fmt::format_to(std::back_inserter(buffer), "{}", val.toString());
                     } else if (val.BSONSerialize) {
                         BSONObjBuilder objBuilder;
                         val.BSONSerialize(objBuilder);
@@ -399,13 +471,13 @@ public:
                     }
 
                 } else if constexpr (isDuration<std::decay_t<decltype(val)>>) {
-                    fmt::format_to(buffer, "{}", val.toString());
+                    fmt::format_to(std::back_inserter(buffer), "{}", val.toString());
                 } else if constexpr (std::is_same_v<std::decay_t<decltype(val)>, BSONObj>) {
                     val.jsonStringBuffer(JsonStringFormat::ExtendedRelaxedV2_0_0, 0, false, buffer);
                 } else if constexpr (std::is_same_v<std::decay_t<decltype(val)>, BSONArray>) {
                     val.jsonStringBuffer(JsonStringFormat::ExtendedRelaxedV2_0_0, 0, true, buffer);
                 } else {
-                    fmt::format_to(buffer, "{}", val);
+                    fmt::format_to(std::back_inserter(buffer), "{}", val);
                 }
             };
 
@@ -488,42 +560,42 @@ public:
         buffer.push_back('(');
         for (auto it = _begin; it != _end; ++it) {
             const auto& item = *it;
-            buffer.append(separator.begin(), separator.end());
+            buffer.append(separator.data(), separator.data() + separator.size());
 
             auto append = [&buffer](StringData key, auto&& val) {
                 if constexpr (std::is_same_v<decltype(val), CustomAttributeValue&&>) {
                     if (val.stringSerialize) {
-                        fmt::format_to(buffer, "{}: ", key);
+                        fmt::format_to(std::back_inserter(buffer), "{}: ", key);
                         val.stringSerialize(buffer);
                     } else if (val.toString) {
-                        fmt::format_to(buffer, "{}: {}", key, val.toString());
+                        fmt::format_to(std::back_inserter(buffer), "{}: {}", key, val.toString());
                     } else if (val.BSONSerialize) {
                         BSONObjBuilder objBuilder;
                         val.BSONSerialize(objBuilder);
-                        fmt::format_to(buffer, "{}: ", key);
+                        fmt::format_to(std::back_inserter(buffer), "{}: ", key);
                         objBuilder.done().jsonStringBuffer(
                             JsonStringFormat::ExtendedRelaxedV2_0_0, 0, false, buffer);
                     } else if (val.BSONAppend) {
                         BSONObjBuilder objBuilder;
                         val.BSONAppend(objBuilder, ""_sd);
-                        fmt::format_to(buffer, "{}: ", key);
+                        fmt::format_to(std::back_inserter(buffer), "{}: ", key);
                         objBuilder.done().getField(""_sd).jsonStringBuffer(
                             JsonStringFormat::ExtendedRelaxedV2_0_0, false, false, 0, buffer);
                     } else {
-                        fmt::format_to(buffer, "{}: ", key);
+                        fmt::format_to(std::back_inserter(buffer), "{}: ", key);
                         val.toBSONArray().jsonStringBuffer(
                             JsonStringFormat::ExtendedRelaxedV2_0_0, 0, true, buffer);
                     }
                 } else if constexpr (isDuration<std::decay_t<decltype(val)>>) {
-                    fmt::format_to(buffer, "{}: {}", key, val.toString());
+                    fmt::format_to(std::back_inserter(buffer), "{}: {}", key, val.toString());
                 } else if constexpr (std::is_same_v<std::decay_t<decltype(val)>, BSONObj>) {
-                    fmt::format_to(buffer, "{}: ", key);
+                    fmt::format_to(std::back_inserter(buffer), "{}: ", key);
                     val.jsonStringBuffer(JsonStringFormat::ExtendedRelaxedV2_0_0, 0, false, buffer);
                 } else if constexpr (std::is_same_v<std::decay_t<decltype(val)>, BSONArray>) {
-                    fmt::format_to(buffer, "{}: ", key);
+                    fmt::format_to(std::back_inserter(buffer), "{}: ", key);
                     val.jsonStringBuffer(JsonStringFormat::ExtendedRelaxedV2_0_0, 0, true, buffer);
                 } else {
-                    fmt::format_to(buffer, "{}: {}", key, val);
+                    fmt::format_to(std::back_inserter(buffer), "{}: {}", key, val);
                 }
             };
 
@@ -568,23 +640,23 @@ public:
     NamedAttribute(const char* n, const T& val) : name(n), value(mapValue(val)) {}
 
     const char* name = nullptr;
-    stdx::variant<int,
-                  unsigned int,
-                  long long,
-                  unsigned long long,
-                  bool,
-                  double,
-                  StringData,
-                  Nanoseconds,
-                  Microseconds,
-                  Milliseconds,
-                  Seconds,
-                  Minutes,
-                  Hours,
-                  Days,
-                  BSONObj,
-                  BSONArray,
-                  CustomAttributeValue>
+    std::variant<int,
+                 unsigned int,
+                 long long,
+                 unsigned long long,
+                 bool,
+                 double,
+                 StringData,
+                 Nanoseconds,
+                 Microseconds,
+                 Milliseconds,
+                 Seconds,
+                 Minutes,
+                 Hours,
+                 Days,
+                 BSONObj,
+                 BSONArray,
+                 CustomAttributeValue>
         value;
 };
 
@@ -606,15 +678,33 @@ private:
     friend class mongo::logv2::TypeErasedAttributeStorage;
 };
 
-template <typename... Args>
-AttributeStorage<Args...> makeAttributeStorage(const Args&... args) {
-    return {args...};
-}
-
 }  // namespace detail
 
 class DynamicAttributes {
 public:
+    DynamicAttributes() = default;
+
+    /**
+     * This constructor allows users to construct DynamicAttributes in the same style as normal
+     * LOGV2 calls. Example:
+     *
+     * DynamicAttributes(
+     *    DynamicAttributes{}, // Something that can be returned by a function
+     *    "attr1"_attr = val1,
+     *    "attr2"_attr = val2
+     * )
+     *
+     * This can be useful for classes that want to provide a set of basic attributes for sub-classes
+     * to extend with their own attributes.
+     */
+    template <typename... Args>
+    DynamicAttributes(DynamicAttributes&& other, Args&&... args)
+    requires(detail::IsNamedArg<Args> && ...)
+        : _attributes(std::move(other._attributes)),
+          _copiedStrings(std::move(other._copiedStrings)) {
+        (add(std::forward<Args>(args)), ...);
+    }
+
     // Do not allow rvalue references and temporary objects to avoid lifetime problem issues
     template <size_t N,
               typename T,
@@ -668,6 +758,11 @@ public:
     }
 
 private:
+    template <typename T>
+    void add(const detail::NamedArg<T>& namedArg) {
+        _attributes.emplace_back(namedArg.name, namedArg.value);
+    }
+
     // This class is meant to be wrapped by TypeErasedAttributeStorage below that provides public
     // accessors. Let it access all our internals.
     friend class mongo::logv2::TypeErasedAttributeStorage;
@@ -711,7 +806,7 @@ public:
     template <typename Func>
     void apply(Func&& f) const {
         std::for_each(_data, _data + _size, [&](const auto& attr) {
-            stdx::visit([&](auto&& val) { f(attr.name, val); }, attr.value);
+            visit([&](auto&& val) { f(attr.name, val); }, attr.value);
         });
     }
 

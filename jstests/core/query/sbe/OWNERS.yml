@@ -1,0 +1,8 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/query-execution-sbe
+  - "*plan_cache*":
+    approvers:
+      - 10gen/query-optimization

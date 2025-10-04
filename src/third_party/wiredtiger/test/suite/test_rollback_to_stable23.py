@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 from helper import simulate_crash_restart
-from test_rollback_to_stable01 import test_rollback_to_stable_base
+from rollback_to_stable_util import test_rollback_to_stable_base
 from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
@@ -41,11 +41,10 @@ def mod_val(value, char, location, nbytes=1):
 # inherently doesn't support modify, there's no need to run this on FLCS. (Note that
 # self.value_format needs to exist anyway for the base class to use.)
 class test_rollback_to_stable23(test_rollback_to_stable_base):
-    session_config = 'isolation=snapshot'
 
     key_format_values = [
         ('column', dict(key_format='r')),
-        ('integer_row', dict(key_format='i')),
+        ('row_integer', dict(key_format='i')),
     ]
     value_format='S'
 
@@ -57,7 +56,7 @@ class test_rollback_to_stable23(test_rollback_to_stable_base):
     scenarios = make_scenarios(key_format_values, prepare_values)
 
     def conn_config(self):
-        config = 'cache_size=50MB,statistics=(all),statistics_log=(json,on_close,wait=1)'
+        config = 'cache_size=50MB,statistics=(all),statistics_log=(json,on_close,wait=1),verbose=(rts:5)'
         return config
 
     def check_with_set_key(self, ds, check_value, uri, nrows, read_ts):
@@ -65,8 +64,8 @@ class test_rollback_to_stable23(test_rollback_to_stable_base):
         self.session.begin_transaction("read_timestamp = " + self.timestamp_str(read_ts))
         for i in range(1, nrows + 1):
             cursor.set_key(ds.key(i))
-            self.assertEquals(cursor.search(), 0)
-            self.assertEquals(cursor.get_value(), check_value)
+            self.assertEqual(cursor.search(), 0)
+            self.assertEqual(cursor.get_value(), check_value)
         cursor.close()
         self.session.commit_transaction()
 
@@ -75,9 +74,7 @@ class test_rollback_to_stable23(test_rollback_to_stable_base):
 
         # Create a table without logging.
         uri = "table:rollback_to_stable23"
-        ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
-            config='log=(enabled=false)')
+        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format)
         ds.populate()
 
         # Pin oldest and stable to timestamp 10.
@@ -99,11 +96,11 @@ class test_rollback_to_stable23(test_rollback_to_stable_base):
         self.large_modifies(uri, 'T', ds, 3, 1, nrows, self.prepare, 60)
 
         # Verify data is visible and correct.
-        self.check(value_a, uri, nrows, None, 20)
-        self.check(value_modQ, uri, nrows, None, 30)
-        self.check(value_modR, uri, nrows, None, 40)
-        self.check(value_modS, uri, nrows, None, 50)
-        self.check(value_modT, uri, nrows, None, 60)
+        self.check(value_a, uri, nrows, None, 21 if self.prepare else 20)
+        self.check(value_modQ, uri, nrows, None, 31 if self.prepare else 30)
+        self.check(value_modR, uri, nrows, None, 41 if self.prepare else 40)
+        self.check(value_modS, uri, nrows, None, 51 if self.prepare else 50)
+        self.check(value_modT, uri, nrows, None, 61 if self.prepare else 60)
 
         # Pin stable to timestamp 60 if prepare otherwise 50.
         if self.prepare:
@@ -135,6 +132,3 @@ class test_rollback_to_stable23(test_rollback_to_stable_base):
         else:
             self.assertEqual(upd_aborted, 0)
         self.assertGreaterEqual(hs_removed, nrows)
-
-if __name__ == '__main__':
-    wttest.run()

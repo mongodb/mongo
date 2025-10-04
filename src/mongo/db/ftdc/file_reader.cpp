@@ -27,20 +27,25 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <cstdint>
+#include <cstring>
+#include <fstream>  // IWYU pragma: keep
+#include <string>
 
-#include "mongo/db/ftdc/file_reader.h"
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/move/utility_core.hpp>
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
-#include <boost/filesystem.hpp>
-#include <fstream>
-
-#include "mongo/base/data_range_cursor.h"
+#include "mongo/base/data_range.h"
+#include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_type_validated.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/db/ftdc/config.h"
+#include "mongo/base/data_view.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/db/ftdc/file_reader.h"
 #include "mongo/db/ftdc/util.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/rpc/object_check.h"
+#include "mongo/rpc/object_check.h"  // IWYU pragma: keep
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -80,9 +85,9 @@ StatusWith<bool> FTDCFileReader::hasNext() {
 
             _dateId = swId.getValue();
 
-            FTDCBSONUtil::FTDCType type = swType.getValue();
+            _type = swType.getValue();
 
-            if (type == FTDCBSONUtil::FTDCType::kMetadata) {
+            if (_type == FTDCBSONUtil::FTDCType::kMetadata) {
                 _state = State::kMetadataDoc;
 
                 auto swMetadata = FTDCBSONUtil::getBSONDocumentFromMetadataDoc(_parent);
@@ -91,7 +96,7 @@ StatusWith<bool> FTDCFileReader::hasNext() {
                 }
 
                 _metadata = swMetadata.getValue();
-            } else if (type == FTDCBSONUtil::FTDCType::kMetricChunk) {
+            } else if (_type == FTDCBSONUtil::FTDCType::kMetricChunk) {
                 _state = State::kMetricChunk;
 
                 auto swDocs = FTDCBSONUtil::getMetricsFromMetricDoc(_parent, &_decompressor);
@@ -103,6 +108,15 @@ StatusWith<bool> FTDCFileReader::hasNext() {
 
                 // There is always at least the reference document
                 _pos = 0;
+            } else if (_type == FTDCBSONUtil::FTDCType::kPeriodicMetadata) {
+                _state = State::kMetadataDoc;
+
+                auto swDeltas = FTDCBSONUtil::getDeltasFromPeriodicMetadataDoc(_parent);
+                if (!swDeltas.isOK()) {
+                    return swDeltas.getStatus();
+                }
+
+                _metadata = swDeltas.getValue().second;
             }
 
             return {true};
@@ -130,16 +144,17 @@ StatusWith<bool> FTDCFileReader::hasNext() {
 }
 
 std::tuple<FTDCBSONUtil::FTDCType, const BSONObj&, Date_t> FTDCFileReader::next() {
-    dassert(_state == State::kMetricChunk || _state == State::kMetadataDoc);
+    invariant(_state == State::kMetricChunk || _state == State::kMetadataDoc);
+    invariant(_type != FTDCBSONUtil::FTDCType::kUnknown);
 
     if (_state == State::kMetadataDoc) {
         return std::tuple<FTDCBSONUtil::FTDCType, const BSONObj&, Date_t>(
-            FTDCBSONUtil::FTDCType::kMetadata, _metadata, _dateId);
+            _type, _metadata, _dateId);
     }
 
     if (_state == State::kMetricChunk) {
         return std::tuple<FTDCBSONUtil::FTDCType, const BSONObj&, Date_t>(
-            FTDCBSONUtil::FTDCType::kMetricChunk, _docs[_pos], _dateId);
+            _type, _docs[_pos], _dateId);
     }
 
     MONGO_UNREACHABLE;

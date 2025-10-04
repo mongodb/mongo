@@ -7,11 +7,9 @@
  *   uses_atclustertime,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/uuid_util.js");
-load("jstests/sharding/libs/create_sharded_collection_util.js");
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
+import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
 
 const st = new ShardingTest({
     mongos: 1,
@@ -38,4 +36,3 @@ const postReshardCollectionUUID = getUUIDFromListCollections(sourceDB, sourceCol
 assert.eq(preReshardCollectionUUID, postReshardCollectionUUID);
 
 st.stop();
-})();

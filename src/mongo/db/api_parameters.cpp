@@ -27,11 +27,17 @@
  *    it in the license file.
  */
 
+#include "mongo/db/api_parameters.h"
+
+#include "mongo/idl/idl_parser.h"
+
+#include <utility>
+
+#include <boost/functional/hash.hpp>
+#include <boost/optional/optional.hpp>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/api_parameters.h"
 
 namespace mongo {
 
@@ -61,7 +67,7 @@ APIParameters APIParameters::fromClient(const APIParametersFromClient& apiParams
 
 APIParameters APIParameters::fromBSON(const BSONObj& cmdObj) {
     return APIParameters::fromClient(
-        APIParametersFromClient::parse("APIParametersFromClient"_sd, cmdObj));
+        APIParametersFromClient::parse(cmdObj, IDLParserContext{"APIParametersFromClient"}));
 }
 
 void APIParameters::appendInfo(BSONObjBuilder* builder) const {

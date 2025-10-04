@@ -1,0 +1,202 @@
+# vi: ft=tcl sw=2 ts=2 et
+
+###############################################
+### intpack_inline.h
+
+# Variable-length integer encoding.
+# We need up to 64 bits, signed and unsigned.  Further, we want the packed
+# representation to have the same lexicographic ordering as the integer
+# values.  This avoids the need for special-purpose comparison code.
+#
+# Try hard to keep small values small (up to ~2 bytes): that gives the biggest
+# benefit for common cases storing small values.  After that, just encode the
+# length in the first byte: we could squeeze in a couple of extra bits, but
+# the marginal benefit is small, and we want this code to be relatively
+# easy to implement in client code or scripting APIs.
+#
+# First byte  | Next |                        |
+# byte        | bytes| Min Value              | Max Value
+# ------------+------+------------------------+--------------------------------
+# [00 00xxxx] | free | N/A                    | N/A
+# [00 01llll] | llll | -2^64                  | -2^13 - 2^6
+# [00 1xxxxx] | 1    | -2^13 - 2^6            | -2^6 - 1
+# [01 xxxxxx] | 0    | -2^6                   | -1
+# [10 xxxxxx] | 0    | 0                      | 2^6 - 1
+# [11 0xxxxx] | 1    | 2^6                    | 2^13 + 2^6 - 1
+# [11 10llll] | llll | 2^13 + 2^6             | 2^64 - 1
+# [11 11xxxx] | free | N/A                    | N/A
+
+enum_bits {
+  {NEG_MULTI_MARKER 0x10}
+  {NEG_2BYTE_MARKER 0x20}
+  {NEG_1BYTE_MARKER 0x40}
+  {POS_1BYTE_MARKER 0x80}
+  {POS_2BYTE_MARKER 0xc0}
+  {POS_MULTI_MARKER 0xe0}
+}
+
+enum {
+  {NEG_1BYTE_MIN {(-(1 << 6))}}
+  {NEG_2BYTE_MIN {(-(1 << 13) + $NEG_1BYTE_MIN)}}
+  {POS_1BYTE_MAX {((1 << 6) - 1)}}
+  {POS_2BYTE_MAX {((1 << 13) + $POS_1BYTE_MAX)}}
+}
+
+# Extract bits <start> to <end> from a value (counting from LSB == 0).
+# arg is the first byte or nothing
+proc vuint {args} {
+  # __wt_vunpack_uint
+  globals POS_*
+  set byte [expr {[llength $args] ? [lindex $args 0] : [uint8]}]
+  if {($byte & 0b11000000) == $POS_1BYTE_MARKER} { return [expr {$byte & 0x3f}] }
+  if {($byte & 0b11100000) == $POS_2BYTE_MARKER} { return [expr {((($byte & 0x1f) << 8) | [uint8]) + $POS_1BYTE_MAX + 1}] }
+  if {($byte & 0b11110000) == $POS_MULTI_MARKER} {
+    # __wt_vunpack_posint()
+    set x 0
+    for {set len [expr {$byte & 0x0f}]} {$len > 0} {incr len -1} {
+      set x [expr {($x << 8) | [uint8]}]
+    }
+    return [expr {$x + $POS_2BYTE_MAX + 1}]
+  }
+  error "Invalid variable int encoding: [hx $byte]"
+  return 0
+}
+
+proc vint {} {
+  # __wt_vunpack_int
+  globals NEG_*
+  set byte [uint8]
+  if {($byte & 0b11000000) == $NEG_1BYTE_MARKER} { return [expr {($byte & 0x3f) + $NEG_1BYTE_MIN}] }
+  if {($byte & 0b11100000) == $NEG_2BYTE_MARKER} { return [expr {((($byte & 0x1f) << 8) | [uint8]) + $NEG_2BYTE_MIN}] }
+  if {($byte & 0b11110000) == $NEG_MULTI_MARKER} {
+    # __wt_vunpack_negint
+    set x -1
+    for {set len [expr {$byte & 0x0f}]} {$len > 0} {incr len -1} {
+      set x [expr {($x << 8) | [uint8]}]
+    }
+    return $x  ;# ??? +
+  }
+  return [vuint $byte]
+}
+
+###############################################
+### packing_inline.h
+
+# __unpack_read()
+
+proc unpack_uint {} { vuint }   ;#  H I L Q r
+proc unpack_int64 {} { int64 }  ;#  R
+proc unpack_int {} { vint }     ;#  h i l q
+proc unpack_uint8 {} { uint8 }  ;#  B t
+proc unpack_int8 {} { expr {([int8] - 0x80) & 0xff} }    ;#  b
+proc unpack_x {size} { move +$size }    ;#  x
+#  s - null-terminated C string. for "s#" use "S"
+proc unpack_s_utf8 {} { cstr "utf8" }
+proc unpack_s_ascii {} { cstr "ascii" }
+#  S - C string must have size
+proc unpack_S_ascii {size} { ascii $size }
+proc unpack_S_utf8 {size} { str $size utf8 }
+
+#  u - must have len
+proc unpack_u {size} { bytes $size }
+proc unpack_u_ascii {size} { ascii $size }
+proc unpack_u_utf8 {size} { str $sz utf8 }
+
+#  U - {len, data}. for "U#" use "u"
+proc unpack_U {} { bytes [vuint] }
+proc unpack_U_ascii {} { ascii [vuint] }
+proc unpack_U_utf8 {} { str [vuint] utf8 }
+
+proc _struct_U {name _readval} {
+  ssection -collapsed $name {
+    xentry -var size { vuint }
+    set val [eval $_readval]
+    sectionvalue $val
+  }
+  return $val
+}
+proc struct_U {name} { _struct_U $name { bytes $size data } }
+proc struct_U_ascii {name} { _struct_U $name { ascii $size data } }
+proc struct_U_utf8 {name} { _struct_U $name { str $size utf8 data } }
+
+proc unpack_H {} { unpack_uint }
+proc unpack_I {} { unpack_uint }
+proc unpack_L {} { unpack_uint }
+proc unpack_Q {} { unpack_uint }
+proc unpack_r {} { unpack_uint }
+proc unpack_R {} { unpack_int64 }
+proc unpack_h {} { unpack_int }
+proc unpack_i {} { unpack_int }
+proc unpack_l {} { unpack_int }
+proc unpack_q {} { unpack_int }
+proc unpack_B {} { unpack_uint8 }
+proc unpack_t {} { unpack_uint8 }
+proc unpack_b {} { unpack_int8 }
+proc unpack_S {{size -1}} { unpack_int8 $size }
+proc unpack_U {{size -1}} { unpack_u $size }  ;# U must have size; u unpacks till the end
+
+# Unpack string or int
+proc unpack_key {size} {
+  set startpos [pos]
+  set intval ""
+  if {[catch {
+    set intval [xentry varint unpack_uint]
+  }] || [pos] - $startpos != $size} {
+    global ssOk errorInfo; set ssOk 1; set errorInfo "(no error)"
+    goto $startpos
+    return [ascii $size str]
+  }
+  return "varint $intval"
+}
+
+proc unpack_size_key {name} {
+  _struct_U $name { unpack_key $size }
+}
+
+#####################
+# Debug
+
+proc hexdump {args} {
+  set ret {}
+  foreach x $args { lappend ret [format %02X $x] }
+  return [concat {*}$ret]
+}
+
+# Count the leading zero bytes.
+proc WT_LEADING_ZEROS {x} {
+  set sizeof 8
+  for {set i $sizeof} {$i > 0 && ($x >> (8*($sizeof - $i)))} {incr i -1} {}
+  return $i
+}
+
+proc GET_BITS {x start end} { return [expr {(($x & ((1 << $start) - 1)) >> $end)}] }
+
+proc pack_vuint {x} {
+  # __wt_vpack_uint
+  globals POS_*
+  if {$x <= $POS_1BYTE_MAX} { return [hexdump [expr {$POS_1BYTE_MARKER | (x & 0x3f)}] }
+  if {$x <= $POS_2BYTE_MAX} {
+    incr x [expr {-$POS_1BYTE_MAX - 1}]
+    return [hexdump
+      [expr {$POS_2BYTE_MARKER | [GET_BITS $x 13 8]}]
+      [expr {$x & 0xFF}]
+    ]
+  }
+  if {$x == $POS_2BYTE_MAX + 1} {
+    return [hexdump
+      [expr {$POS_MULTI_MARKER | 0x1}]
+      [expr 0]
+    ]
+  } else {
+    incr x [expr {-$POS_2BYTE_MAX - 1}]
+    set lz [WT_LEADING_ZEROS $x]
+    set len [expr {8 - $lz}]
+    set res [hexdump [expr {$POS_MULTI_MARKER | ($len & 0x0f)}]]
+    for {set shift [expr {($len - 1) << 3}]} {$len > 0} {incr len -1; incr shift -8} {
+      lappend res [hexdump [expr {($x >> $shift) & 0xff}]]
+    }
+    return [concat {*}$res]
+  }
+}
+
+

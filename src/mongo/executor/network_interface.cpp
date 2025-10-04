@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/executor/network_interface.h"
 
 
@@ -38,8 +36,6 @@ namespace executor {
 NetworkInterface::NetworkInterface() {}
 NetworkInterface::~NetworkInterface() {}
 
-MONGO_FAIL_POINT_DEFINE(networkInterfaceSendRequestsToTargetHostsInAlphabeticalOrder);
-MONGO_FAIL_POINT_DEFINE(networkInterfaceDiscardCommandsBeforeAcquireConn);
 MONGO_FAIL_POINT_DEFINE(networkInterfaceHangCommandsAfterAcquireConn);
 MONGO_FAIL_POINT_DEFINE(networkInterfaceCommandsFailedWithErrorCode);
 MONGO_FAIL_POINT_DEFINE(networkInterfaceShouldNotKillPendingRequests);

@@ -29,9 +29,10 @@
 
 #pragma once
 
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 
+#include <mutex>
 #include <utility>
 
 namespace mongo {
@@ -56,7 +57,7 @@ namespace mongo {
  *
  * A call to such a function looks like this:
  *
- *     stdx::lock_guard<Latch> lk(_mutex);
+ *     stdx::lock_guard<stdx::mutex> lk(_mutex);
  *     _clobber(lk, opCtx);  // instead of _clobber_inlock(opCtx)
  *
  * Note that the formal argument need not (and should not) be named unless it is needed to pass
@@ -69,18 +70,18 @@ namespace mongo {
  */
 struct WithLock {
     template <typename LatchT>
-    WithLock(stdx::lock_guard<LatchT> const&) noexcept {}
+    WithLock(stdx::lock_guard<LatchT> const&) {}
 
     template <typename LatchT>
-    WithLock(stdx::unique_lock<LatchT> const& lock) noexcept {
+    WithLock(stdx::unique_lock<LatchT> const& lock) {
         invariant(lock.owns_lock());
     }
 
     // Add constructors from any other lock types here.
 
     // Pass by value is OK.
-    WithLock(WithLock const&) noexcept {}
-    WithLock(WithLock&&) noexcept {}
+    WithLock(WithLock const&) = default;
+    WithLock(WithLock&&) noexcept = default;
 
     // No assigning WithLocks.
     void operator=(WithLock const&) = delete;
@@ -88,26 +89,20 @@ struct WithLock {
 
     // No moving a lock_guard<> or unique_lock<> in.
     template <typename Mutex>
-    WithLock(stdx::lock_guard<Latch>&&) = delete;
+    WithLock(stdx::lock_guard<stdx::mutex>&&) = delete;
     template <typename Mutex>
-    WithLock(stdx::unique_lock<Latch>&&) = delete;
+    WithLock(stdx::unique_lock<stdx::mutex>&&) = delete;
 
     /*
      * Produces a WithLock without benefit of any actual lock, for use in cases where a lock is not
      * really needed, such as in many (but not all!) constructors.
      */
-    static WithLock withoutLock() noexcept {
+    static WithLock withoutLock() {
         return {};
     }
 
 private:
-    WithLock() noexcept = default;
+    WithLock() = default;
 };
 
 }  // namespace mongo
-
-namespace std {
-// No moving a WithLock:
-template <>
-mongo::WithLock&& move<mongo::WithLock>(mongo::WithLock&&) noexcept = delete;
-}  // namespace std

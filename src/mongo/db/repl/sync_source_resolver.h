@@ -28,21 +28,24 @@
  */
 
 #pragma once
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/client/fetcher.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/sync_source_selector.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
+#include "mongo/util/net/hostandport.h"
 
 #include <functional>
 #include <memory>
 
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/client/fetcher.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/replication_process.h"
-#include "mongo/executor/task_executor.h"
-#include "mongo/platform/mutex.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/util/net/hostandport.h"
-#include "mongo/util/time_support.h"
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 
@@ -72,18 +75,12 @@ struct SyncSourceResolverResponse {
     // Contains the new MinValid boundry if syncSourceStatus is ErrorCodes::OplogStartMissing.
     OpTime earliestOpTimeSeen;
 
-    // Rollback ID of the selected sync source.
-    // The rbid is fetched before the required optime so callers can be sure that as long as the
-    // rbid is the same, the required optime is still present. The rbid will remain set to
-    // 'kUninitializedRollbackId' if _requiredOpTime is null.
-    int rbid = ReplicationProcess::kUninitializedRollbackId;
-
     bool isOK() {
         return syncSourceStatus.isOK();
     }
 
     HostAndPort getSyncSource() {
-        invariant(syncSourceStatus.isOK());
+        invariant(syncSourceStatus.getStatus());
         return syncSourceStatus.getValue();
     }
 };
@@ -97,14 +94,12 @@ struct SyncSourceResolverResponse {
  */
 class SyncSourceResolver {
 public:
-    static const NamespaceString kLocalOplogNss;
     static const Seconds kFetcherTimeout;
     static const Seconds kFetcherErrorDenylistDuration;
     static const Seconds kOplogEmptyDenylistDuration;
     static const Seconds kFirstOplogEntryEmptyDenylistDuration;
     static const Seconds kFirstOplogEntryNullTimestampDenylistDuration;
     static const Minutes kTooStaleDenylistDuration;
-    static const Seconds kNoRequiredOpTimeDenylistDuration;
 
     /**
      * Callback function to report final status of resolving sync source.
@@ -114,7 +109,6 @@ public:
     SyncSourceResolver(executor::TaskExecutor* taskExecutor,
                        SyncSourceSelector* syncSourceSelector,
                        const OpTime& lastOpTimeFetched,
-                       const OpTime& requiredOpTime,
                        const OnCompletionFn& onCompletion);
     virtual ~SyncSourceResolver();
 
@@ -139,7 +133,7 @@ public:
     void join();
 
 private:
-    bool _isActive_inlock() const;
+    bool _isActive(WithLock lk) const;
     bool _isShuttingDown() const;
 
     /**
@@ -152,13 +146,6 @@ private:
      */
     std::unique_ptr<Fetcher> _makeFirstOplogEntryFetcher(HostAndPort candidate,
                                                          OpTime earliestOpTimeSeen);
-
-    /**
-     * Creates fetcher to check the remote oplog for '_requiredOpTime'.
-     */
-    std::unique_ptr<Fetcher> _makeRequiredOpTimeFetcher(HostAndPort candidate,
-                                                        OpTime earliestOpTimeSeen,
-                                                        int rbid);
 
     /**
      * Schedules fetcher to read oplog on sync source.
@@ -181,27 +168,6 @@ private:
                                          OpTime earliestOpTimeSeen);
 
     /**
-     * Schedules a replSetGetRBID command against the candidate to fetch its current rollback id.
-     */
-    Status _scheduleRBIDRequest(HostAndPort candidate, OpTime earliestOpTimeSeen);
-    void _rbidRequestCallback(HostAndPort candidate,
-                              OpTime earliestOpTimeSeen,
-                              const executor::TaskExecutor::RemoteCommandCallbackArgs& rbidReply);
-
-    /**
-     * Checks query response for required optime.
-     */
-    Status _compareRequiredOpTimeWithQueryResponse(const Fetcher::QueryResponse& queryResponse);
-
-    /**
-     * Callback for checking if the remote oplog contains '_requiredOpTime'.
-     */
-    void _requiredOpTimeFetcherCallback(const StatusWith<Fetcher::QueryResponse>& queryResult,
-                                        HostAndPort candidate,
-                                        OpTime earliestOpTimeSeen,
-                                        int rbid);
-
-    /**
      * Obtains new sync source candidate and schedules remote command to fetcher first oplog entry.
      * May transition state to Complete.
      * Returns status that could be used as result for startup().
@@ -212,7 +178,7 @@ private:
      * Invokes completion callback and transitions state to State::kComplete.
      * Returns result.getStatus().
      */
-    Status _finishCallback(HostAndPort hostAndPort, int rbid);
+    Status _finishCallback(HostAndPort hostAndPort);
     Status _finishCallback(Status status);
     Status _finishCallback(const SyncSourceResolverResponse& response);
 
@@ -227,16 +193,12 @@ private:
     // than the timestamp in '_lastOpTimeFetched'.
     const OpTime _lastOpTimeFetched;
 
-    // If '_requiredOpTime' is not null, a viable sync source must contain an oplog entry with an
-    // optime equal to this value.
-    const OpTime _requiredOpTime;
-
     // This is invoked exactly once after startup. The caller gets the results of the sync source
     // resolver via this callback in a SyncSourceResolverResponse struct when the resolver finishes.
     const OnCompletionFn _onCompletion;
 
     // Protects members of this sync source resolver defined below.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("SyncSourceResolverResponse::_mutex");
+    mutable stdx::mutex _mutex;
     mutable stdx::condition_variable _condition;
 
     // State transitions:
@@ -252,8 +214,6 @@ private:
 
     // Holds reference to fetcher in the process of shutting down.
     std::unique_ptr<Fetcher> _shuttingDownFetcher;
-
-    executor::TaskExecutor::CallbackHandle _rbidCommandHandle;
 };
 
 }  // namespace repl

@@ -1,0 +1,35 @@
+escapedQuotes
+escapedQuotes
+escapedQuotes.coll as fuzzer_coll
+
+:results {aggregate: "fuzzer_coll", pipeline: [{$project: {a: 1, fieldLength: {$strLenCP: "$a"}}}], cursor: {}}
+
+:results {aggregate: "fuzzer_coll", pipeline: [{$match: {a: ""}}], cursor: {}}
+
+:results {aggregate: "fuzzer_coll", pipeline: [{$match: {a: "Yippee!"}}], cursor: {}}
+
+:results {aggregate: "fuzzer_coll", pipeline: [{$match: {a: "\""}}], cursor: {}}
+
+:results {aggregate: "fuzzer_coll", pipeline: [{$match: {a: "\"\""}}], cursor: {}}
+
+:results {aggregate: "fuzzer_coll", pipeline: [{$match: {a: "\"Yippee!\""}}], cursor: {}}
+
+:results {aggregate: "fuzzer_coll", pipeline: [{$match: {a: ''}}], cursor: {}}
+
+:results {aggregate: "fuzzer_coll", pipeline: [{$match: {a: '\''}}], cursor: {}}
+
+:results {aggregate: "fuzzer_coll", pipeline: [{$match: {a: '\'\''}}], cursor: {}}
+
+:results {aggregate: "fuzzer_coll", pipeline: [{$match: {a: '\'Yippee!\''}}], cursor: {}}
+
+:results {aggregate: "fuzzer_coll", pipeline: [{$match: {a: "\\"}}], cursor: {}}
+
+:results {aggregate: "fuzzer_coll", pipeline: [{$match: {a: "\n"}}], cursor: {}}
+
+:results {aggregate: "fuzzer_coll", pipeline: [{$match: {a: "\b"}}], cursor: {}}
+
+:results {aggregate: "fuzzer_coll", pipeline: [{$match: {a: "\f"}}], cursor: {}}
+
+:results {aggregate: "fuzzer_coll", pipeline: [{$match: {a: "\r"}}], cursor: {}}
+
+:results {aggregate: "fuzzer_coll", pipeline: [{$match: {a: "\t"}}], cursor: {}}

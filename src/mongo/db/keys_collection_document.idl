@@ -27,20 +27,10 @@
 #
 global:
     cpp_namespace: "mongo"
-    cpp_includes:
-      - "mongo/db/logical_time.h"
 
 imports:
-  - "mongo/crypto/sha1_block.idl"
-  - "mongo/idl/basic_types.idl"
-
-types:
-  logicalTime:
-    description: "A MongoDB LogicalTime."
-    bson_serialization_type: any
-    cpp_type: LogicalTime
-    serializer: LogicalTime::serializeToBSON
-    deserializer: LogicalTime::parseFromBSON
+    - "mongo/crypto/sha1_block.idl"
+    - "mongo/db/basic_types.idl"
 
 structs:
     keysCollectionDocumentBase:
@@ -91,9 +81,6 @@ structs:
                     NumberLong representation of the cluster time at which the key was created.
                     Corresponds to the _id of the admin.system.keys document for this key.
                 cpp_name: keyId
-            migrationId:
-                type: uuid
-                description: "The id of the tenant migration that inserted this key."
             ttlExpiresAt:
                 type: date
                 description: >-

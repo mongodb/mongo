@@ -27,23 +27,39 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
-
-#include "mongo/platform/basic.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/commands/resize_oplog_gen.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/local_catalog/catalog_raii.h"
+#include "mongo/db/local_catalog/collection.h"
+#include "mongo/db/local_catalog/collection_options.h"
+#include "mongo/db/local_catalog/lock_manager/exception_util.h"
+#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/storage_options.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/logv2/log.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
 
 #include <string>
 
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/resize_oplog_gen.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/storage/durable_catalog.h"
-#include "mongo/logv2/log.h"
-#include "mongo/util/str.h"
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
+
 
 namespace mongo {
 namespace {
@@ -60,7 +76,7 @@ public:
         return true;
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
@@ -68,36 +84,38 @@ public:
         return "Resize oplog using size (in MBs) and optionally, retention (in terms of hours)";
     }
 
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) const final {
-        AuthorizationSession* authzSession = AuthorizationSession::get(client);
-        if (authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                           ActionType::replSetResizeOplog)) {
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const DatabaseName& dbName,
+                                 const BSONObj&) const final {
+        AuthorizationSession* authzSession = AuthorizationSession::get(opCtx->getClient());
+        if (authzSession->isAuthorizedForActionsOnResource(
+                ResourcePattern::forClusterResource(dbName.tenantId()),
+                ActionType::replSetResizeOplog)) {
             return Status::OK();
         }
         return Status(ErrorCodes::Unauthorized, "Unauthorized");
     }
 
     bool run(OperationContext* opCtx,
-             const std::string& dbname,
+             const DatabaseName&,
              const BSONObj& jsobj,
-             BSONObjBuilder& result) {
+             BSONObjBuilder& result) override {
         AutoGetCollection coll(opCtx, NamespaceString::kRsOplogNamespace, MODE_X);
-        Database* database = coll.getDb();
-        uassert(ErrorCodes::NamespaceNotFound, "database local does not exist", database);
         uassert(ErrorCodes::NamespaceNotFound, "oplog does not exist", coll);
         uassert(ErrorCodes::IllegalOperation, "oplog isn't capped", coll->isCapped());
 
         auto params =
-            ReplSetResizeOplogRequest::parse(IDLParserErrorContext("replSetResizeOplog"), jsobj);
+            ReplSetResizeOplogRequest::parse(jsobj, IDLParserContext("replSetResizeOplog"));
 
-        return writeConflictRetry(opCtx, "replSetResizeOplog", coll->ns().ns(), [&] {
+        return writeConflictRetry(opCtx, "replSetResizeOplog", coll->ns(), [&] {
             WriteUnitOfWork wunit(opCtx);
+
+            CollectionWriter writer{opCtx, coll};
 
             if (auto sizeMB = params.getSize()) {
                 const long long sizeBytes = *sizeMB * 1024 * 1024;
-                uassertStatusOK(coll.getWritableCollection()->updateCappedSize(opCtx, sizeBytes));
+                uassertStatusOK(writer.getWritableCollection(opCtx)->updateCappedSize(
+                    opCtx, sizeBytes, /*newCappedMax=*/boost::none));
             }
 
             if (auto minRetentionHoursOpt = params.getMinRetentionHours()) {
@@ -112,8 +130,8 @@ public:
             return true;
         });
     }
-
-} cmdReplSetResizeOplog;
+};
+MONGO_REGISTER_COMMAND(CmdReplSetResizeOplog).forShard();
 
 }  // namespace
 }  // namespace mongo

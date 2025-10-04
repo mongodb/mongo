@@ -1,12 +1,11 @@
 /**
  * Tests that multi-documment transactions no longer race with stepdown over
  * "setAlwaysInterruptAtStepDownOrUp".
+ * @tags: [uses_transactions]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
@@ -29,8 +28,7 @@ const txnFpBefore = configureFailPoint(primary, "hangBeforeSettingTxnInterruptFl
 // The second critical part of the race is when the transaction thread has already passed
 // the regular "not primary" checks by the time stepDown has completed and updated
 // writability. (This is the reason we check writability again in the accompanying patch.)
-const txnFpAfter =
-    configureFailPoint(primary, "hangAfterCheckingWritabilityForMultiDocumentTransactions");
+const txnFpAfter = configureFailPoint(primary, "hangAfterCheckingWritabilityForMultiDocumentTransactions");
 
 jsTestLog("Start the transaction in a parallel shell");
 const txn = startParallelShell(() => {
@@ -75,4 +73,3 @@ jsTestLog("Checking that the transaction never succeeded");
 assert.eq(1, primaryColl.find().toArray().length);
 
 rst.stopSet();
-})();

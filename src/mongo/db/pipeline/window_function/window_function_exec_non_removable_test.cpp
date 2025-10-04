@@ -27,8 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/db/pipeline/window_function/window_function_exec_non_removable.h"
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/exec/agg/mock_stage.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/accumulator_for_window_functions.h"
@@ -36,14 +41,21 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/window_function/partition_iterator.h"
 #include "mongo/db/pipeline/window_function/window_bounds.h"
-#include "mongo/db/pipeline/window_function/window_function.h"
-#include "mongo/db/pipeline/window_function/window_function_exec_non_removable.h"
-#include "mongo/db/pipeline/window_function/window_function_exec_removable_document.h"
-#include "mongo/db/pipeline/window_function/window_function_min_max.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 #include "mongo/unittest/unittest.h"
+
+#include <deque>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace {
@@ -56,9 +68,9 @@ public:
         const std::string& inputPath,
         WindowBounds::Bound<int> upper,
         boost::optional<std::string> sortByPath = boost::none) {
-        _docSource = DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
+        _docStage = exec::agg::MockStage::createForTest(std::move(docs), getExpCtx());
         _iter = std::make_unique<PartitionIterator>(
-            getExpCtx().get(), _docSource.get(), &_tracker, boost::none, boost::none);
+            getExpCtx().get(), _docStage.get(), &_tracker, boost::none, boost::none);
         auto input = ExpressionFieldPath::parse(
             getExpCtx().get(), inputPath, getExpCtx()->variablesParseState);
         if (sortByPath) {
@@ -69,15 +81,16 @@ public:
                 ExpressionArray::create(
                     getExpCtx().get(),
                     std::vector<boost::intrusive_ptr<Expression>>{sortBy, input}),
-                AccumulatorType::create(getExpCtx().get()),
+                make_intrusive<AccumulatorType>(getExpCtx().get()),
                 upper,
                 &_tracker["output"]);
         } else {
-            return WindowFunctionExecNonRemovable(_iter.get(),
-                                                  std::move(input),
-                                                  AccumulatorType::create(getExpCtx().get()),
-                                                  upper,
-                                                  &_tracker["output"]);
+            return WindowFunctionExecNonRemovable(
+                _iter.get(),
+                std::move(input),
+                make_intrusive<AccumulatorType>(getExpCtx().get()),
+                upper,
+                &_tracker["output"]);
         }
     }
 
@@ -88,7 +101,7 @@ public:
     MemoryUsageTracker _tracker{false, 100 * 1024 * 1024 /* default memory limit */};
 
 private:
-    boost::intrusive_ptr<DocumentSourceMock> _docSource;
+    boost::intrusive_ptr<exec::agg::MockStage> _docStage;
     std::unique_ptr<PartitionIterator> _iter;
 };
 
@@ -140,7 +153,7 @@ TEST_F(WindowFunctionExecNonRemovableTest, AccumulateOnlyWithMultiplePartitions)
     const auto docs = std::deque<DocumentSource::GetNextResult>{Document{{"a", 1}, {"key", 1}},
                                                                 Document{{"a", 2}, {"key", 2}},
                                                                 Document{{"a", 3}, {"key", 3}}};
-    auto mock = DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
+    auto mock = exec::agg::MockStage::createForTest(std::move(docs), getExpCtx());
     auto key = ExpressionFieldPath::createPathFromString(
         getExpCtx().get(), "key", getExpCtx()->variablesParseState);
     auto iter = PartitionIterator(getExpCtx().get(),
@@ -150,8 +163,11 @@ TEST_F(WindowFunctionExecNonRemovableTest, AccumulateOnlyWithMultiplePartitions)
                                   boost::none);
     auto input =
         ExpressionFieldPath::parse(getExpCtx().get(), "$a", getExpCtx()->variablesParseState);
-    auto mgr = WindowFunctionExecNonRemovable(
-        &iter, std::move(input), AccumulatorSum::create(getExpCtx().get()), 1, &_tracker["output"]);
+    auto mgr = WindowFunctionExecNonRemovable(&iter,
+                                              std::move(input),
+                                              make_intrusive<AccumulatorSum>(getExpCtx().get()),
+                                              1,
+                                              &_tracker["output"]);
     ASSERT_VALUE_EQ(Value(1), mgr.getNext());
     iter.advance();
     // Normally the stage would be responsible for detecting a new partition, for this test reset
@@ -177,16 +193,16 @@ TEST_F(WindowFunctionExecNonRemovableTest, FullPartitionWindow) {
 TEST_F(WindowFunctionExecNonRemovableTest, InputExpressionAllowedToCreateVariables) {
     const auto docs = std::deque<DocumentSource::GetNextResult>{
         Document{{"a", 1}}, Document{{"a", 2}}, Document{{"a", 3}}};
-    auto docSource = DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
+    auto docStage = exec::agg::MockStage::createForTest(std::move(docs), getExpCtx());
     auto iter = std::make_unique<PartitionIterator>(
-        getExpCtx().get(), docSource.get(), &_tracker, boost::none, boost::none);
+        getExpCtx().get(), docStage.get(), &_tracker, boost::none, boost::none);
     auto filterBSON =
         fromjson("{$filter: {input: [1, 2, 3], as: 'num', cond: {$gte: ['$$num', 2]}}}");
     auto input = ExpressionFilter::parse(
         getExpCtx().get(), filterBSON.firstElement(), getExpCtx()->variablesParseState);
     auto exec = WindowFunctionExecNonRemovable(iter.get(),
                                                std::move(input),
-                                               AccumulatorFirst::create(getExpCtx().get()),
+                                               make_intrusive<AccumulatorFirst>(getExpCtx().get()),
                                                1,
                                                &_tracker["output"]);
     // The input is a constant [2, 3] for each document.
@@ -212,5 +228,131 @@ TEST_F(WindowFunctionExecNonRemovableTest, CanReceiveSortByExpression) {
     ASSERT_VALUE_EQ(Value(expectedIntegral), mgr.getNext());
 }
 
+class RankTest : public WindowFunctionExecNonRemovableTest {
+public:
+    void setUp() override {
+        _mock = mockStage();
+    }
+
+    void setSort(BSONObj sortSpec) {
+        _pattern = std::make_unique<SortPattern>(sortSpec, getExpCtx());
+        _sortKeyGen = std::make_unique<SortKeyGenerator>(*_pattern, nullptr);
+    }
+
+    auto docWithSortKey(const auto& doc) {
+        ASSERT(_sortKeyGen) << "expected 'setSort()' to be called first";
+        auto sortKeyVal = _sortKeyGen->computeSortKeyFromDocument(doc);
+        MutableDocument docWithMeta(std::move(doc));
+        docWithMeta.metadata().setSortKey(sortKeyVal, _pattern->isSingleElementKey());
+        return docWithMeta.freeze();
+    };
+
+    void addMockedInput(auto doc) {
+        _mock->push_back(docWithSortKey(doc));
+    }
+
+    auto makeRank() {
+        auto partitionIter = std::make_unique<PartitionIterator>(
+            getExpCtx().get(), _mock.get(), &_tracker, boost::none, *_pattern);
+
+        auto input = make_intrusive<ExpressionInternalRawSortKey>(getExpCtx().get());
+        auto exec =
+            WindowFunctionExecNonRemovable(partitionIter.get(),
+                                           std::move(input),
+                                           make_intrusive<AccumulatorRank>(getExpCtx().get()),
+                                           WindowBounds::Current{},
+                                           &_tracker["output"]);
+        return std::pair{std::move(partitionIter), std::move(exec)};
+    }
+
+protected:
+    boost::intrusive_ptr<exec::agg::MockStage> _mock;
+    std::unique_ptr<SortPattern> _pattern;
+    std::unique_ptr<SortKeyGenerator> _sortKeyGen;
+};
+
+TEST_F(RankTest, BasicSortKey) {
+    setSort(BSON("x" << 1));
+    addMockedInput(Document{{"_id", 0}, {"x", 1}, {"y", 0}});
+    addMockedInput(Document{{"_id", 1}, {"x", 1}, {"y", 1}});
+    addMockedInput(Document{{"_id", 2}, {"x", 2}, {"y", 2}});
+    auto&& [partitionIter, rank] = makeRank();
+    ASSERT_VALUE_EQ(Value(1), rank.getNext());
+    partitionIter->advance();
+    ASSERT_VALUE_EQ(Value(1), rank.getNext());
+    partitionIter->advance();
+    ASSERT_VALUE_EQ(Value(3), rank.getNext());
+}
+
+TEST_F(RankTest, SortingArrays) {
+    setSort(BSON("x" << 1));
+    addMockedInput(Document{{"_id", 0}, {"x", std::vector<ImplicitValue>{1, 3, 2}}, {"y", 0}});
+    addMockedInput(Document{{"_id", 1}, {"x", std::vector<ImplicitValue>{10, 1, 2}}, {"y", 1}});
+    addMockedInput(Document{{"_id", 2}, {"x", std::vector<ImplicitValue>{2}}, {"y", 2}});
+    auto&& [partitionIter, rank] = makeRank();
+    ASSERT_VALUE_EQ(Value(1), rank.getNext());
+    partitionIter->advance();
+    ASSERT_VALUE_EQ(Value(1), rank.getNext());
+    partitionIter->advance();
+    ASSERT_VALUE_EQ(Value(3), rank.getNext());
+}
+
+
+TEST_F(RankTest, AllTies) {
+    setSort(BSON("x" << -1));
+    addMockedInput(Document{{"_id", 0}, {"x", std::vector<ImplicitValue>{1, 3, 2}}});
+    addMockedInput(Document{{"_id", 1}, {"x", std::vector<ImplicitValue>{1, 1, 3}}});
+    addMockedInput(Document{{"_id", 2}, {"x", std::vector<ImplicitValue>{3, 1}}});
+    auto&& [partitionIter, rank] = makeRank();
+    ASSERT_VALUE_EQ(Value(1), rank.getNext());
+    partitionIter->advance();
+    ASSERT_VALUE_EQ(Value(1), rank.getNext());
+    partitionIter->advance();
+    ASSERT_VALUE_EQ(Value(1), rank.getNext());
+}
+
+TEST_F(RankTest, OneIsMissingSortKey) {
+    setSort(BSON("x" << -1));
+    addMockedInput(Document{{"_id", 0}});
+    addMockedInput(Document{{"_id", 1}, {"x", std::vector<ImplicitValue>{1, 1, 3}}});
+    addMockedInput(Document{{"_id", 2}, {"x", std::vector<ImplicitValue>{3, 1}}});
+    auto&& [partitionIter, rank] = makeRank();
+    ASSERT_VALUE_EQ(Value(1), rank.getNext());
+    partitionIter->advance();
+    ASSERT_VALUE_EQ(Value(2), rank.getNext());
+    partitionIter->advance();
+    ASSERT_VALUE_EQ(Value(2), rank.getNext());
+}
+
+TEST_F(RankTest, AllMisingNestedSortKey) {
+    setSort(BSON("x.y" << -1));
+    addMockedInput(Document{{"_id", 0}});
+    addMockedInput(Document{{"_id", 1}, {"x", std::vector<ImplicitValue>{1, 1, 3}}});
+    addMockedInput(Document{{"_id", 2}, {"x", std::vector<ImplicitValue>{Document{{"x", 2}}, 1}}});
+    auto&& [partitionIter, rank] = makeRank();
+    ASSERT_VALUE_EQ(Value(1), rank.getNext());
+    partitionIter->advance();
+    ASSERT_VALUE_EQ(Value(1), rank.getNext());
+    partitionIter->advance();
+    ASSERT_VALUE_EQ(Value(1), rank.getNext());
+}
+
+TEST_F(RankTest, CorrectlyRespectsCollation) {
+    getExpCtx()->setCollator(
+        std::make_shared<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString));
+    setSort(BSON("x" << 1));
+    addMockedInput(Document{{"_id", 0}, {"x", "ba"_sd}});
+    addMockedInput(Document{{"_id", 1}, {"x", "cba"_sd}});
+    addMockedInput(Document{{"_id", 2}, {"x", "cba"_sd}});
+    addMockedInput(Document{{"_id", 3}, {"x", "abcd"_sd}});
+    auto&& [partitionIter, rank] = makeRank();
+    ASSERT_VALUE_EQ(Value(1), rank.getNext());
+    partitionIter->advance();
+    ASSERT_VALUE_EQ(Value(2), rank.getNext());
+    partitionIter->advance();
+    ASSERT_VALUE_EQ(Value(2), rank.getNext());
+    partitionIter->advance();
+    ASSERT_VALUE_EQ(Value(4), rank.getNext());
+}
 }  // namespace
 }  // namespace mongo

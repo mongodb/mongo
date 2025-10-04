@@ -1,0 +1,93 @@
+test_kind: fsm_workload_test
+
+selector:
+  roots:
+    - jstests/concurrency/fsm_workloads/**/*.js
+    - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*.js
+  exclude_files:
+    # Disabled due to MongoDB restrictions and/or workload restrictions
+
+    # These workloads sometimes trigger 'Could not lock auth data update lock'
+    # errors because the AuthorizationManager currently waits for only five
+    # seconds to acquire the lock for authorization documents
+
+    # uses >100MB of data, which can overwhelm test hosts
+
+    # compact can only be run against a standalone mongod
+
+    # can cause OOM kills on test hosts
+
+    # cannot createIndex after dropDatabase without sharding first
+
+    # The WTWriteConflictException failpoint is not supported on mongos.
+
+    # TODO Undenylist (SERVER-38852).
+
+    # serverStatus does not include transaction metrics on mongos.
+
+    # Uses the same transaction id across different routers, which is not allowed because when either
+    # router tries to commit, it may not know the full participant list.
+
+  exclude_with_any_tags:
+    - requires_standalone
+    - assumes_against_mongod_not_mongos
+    - requires_replication
+    - assumes_balancer_on
+    # mongos has no system.profile collection.
+    - requires_profiling
+    - assumes_unsharded_collection
+    - config_shard_incompatible
+
+executor:
+  archive:
+    hooks:
+      # TODO (SERVER-63855): remove 'RunDBCheckInBackground' or put it back.
+      # - RunDBCheckInBackground
+      - CheckReplDBHashInBackground
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+    tests: true
+  config:
+    shell_options:
+      eval: >-
+        await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
+      global_vars:
+        TestData:
+          runningWithBalancer: false
+          implicitlyShardOnCreateCollectionOnly: true
+  hooks:
+    - class: CheckShardFilteringMetadata
+    # TODO (SERVER-63855): remove 'RunDBCheckInBackground' or put it back.
+    # - class: RunDBCheckInBackground
+    - class: CheckReplDBHashInBackground
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: CheckOrphansDeleted
+    - class: CheckRoutingTableConsistency
+    - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
+    - class: CleanupConcurrencyWorkloads
+  fixture:
+    class: ShardedClusterFixture
+    config_shard: "any"
+    enable_balancer: false
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+    shard_options:
+      mongod_options:
+        oplogSize: 1024
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        roleGraphInvalidationIsFatal: 1
+        queryAnalysisWriterIntervalSecs: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+        # TODO SERVER-89498 Re-enable.
+        # featureFlagAllMongodsAreSharded: 1
+    num_rs_nodes_per_shard: 3
+    num_shards: 2
+    num_mongos: 2
+    # TODO SERVER-89498 Re-enable.
+    # use_auto_bootstrap_procedure: 1

@@ -41,74 +41,19 @@ if sys.version_info[0] <= 2:
     print('WiredTiger requires Python version 3.0 or above')
     sys.exit(1)
 
-# Set paths
+sys.path.insert(1, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'py_utility'))
+import test_util
+
+test_util.setup_paths()
+wt_builddir = test_util.find_build_dir()
 suitedir = sys.path[0]
-wt_disttop = os.path.dirname(os.path.dirname(suitedir))
-wt_3rdpartydir = os.path.join(wt_disttop, 'test', '3rdparty')
-
-# Check for a local build that contains the wt utility. First check in
-# current working directory, then in build_posix and finally in the disttop
-# directory. This isn't ideal - if a user has multiple builds in a tree we
-# could pick the wrong one. We also need to account for the fact that there
-# may be an executable 'wt' file the build directory and a subordinate .libs
-# directory.
-env_builddir = os.getenv('WT_BUILDDIR')
-curdir = os.getcwd()
-if env_builddir and os.path.isfile(os.path.join(env_builddir, 'wt')):
-    wt_builddir = env_builddir
-elif os.path.basename(curdir) == '.libs' and \
-   os.path.isfile(os.path.join(curdir, os.pardir, 'wt')):
-    wt_builddir = os.path.join(curdir, os.pardir)
-elif os.path.isfile(os.path.join(curdir, 'wt')):
-    wt_builddir = curdir
-elif os.path.isfile(os.path.join(curdir, 'wt.exe')):
-    wt_builddir = curdir
-elif os.path.isfile(os.path.join(wt_disttop, 'wt')):
-    wt_builddir = wt_disttop
-elif os.path.isfile(os.path.join(wt_disttop, 'build_posix', 'wt')):
-    wt_builddir = os.path.join(wt_disttop, 'build_posix')
-elif os.path.isfile(os.path.join(wt_disttop, 'wt.exe')):
-    wt_builddir = wt_disttop
-else:
-    print('Unable to find useable WiredTiger build')
-    sys.exit(1)
-
-# Cannot import wiredtiger and supporting utils until we set up paths
-# We want our local tree in front of any installed versions of WiredTiger.
-# Don't change sys.path[0], it's the dir containing the invoked python script.
-
-sys.path.insert(1, os.path.join(wt_builddir, 'lang', 'python'))
-
-# Append to a colon separated path in the environment
-def append_env_path(name, value):
-    path = os.environ.get(name)
-    if path == None:
-        v = value
-    else:
-        v = path + ':' + value
-    os.environ[name] = v
-
-# If we built with libtool, explicitly put its install directory in our library
-# search path. This only affects library loading for subprocesses, like 'wt'.
-libsdir = os.path.join(wt_builddir, '.libs')
-if os.path.isdir(libsdir):
-    append_env_path('LD_LIBRARY_PATH', libsdir)
-    if sys.platform == "darwin":
-        append_env_path('DYLD_LIBRARY_PATH', libsdir)
-
-# Add all 3rd party directories: some have code in subdirectories
-for d in os.listdir(wt_3rdpartydir):
-    for subdir in ('lib', 'python', ''):
-        if os.path.exists(os.path.join(wt_3rdpartydir, d, subdir)):
-            sys.path.insert(1, os.path.join(wt_3rdpartydir, d, subdir))
-            break
 
 # unittest will be imported later, near to when it is needed.
 unittest = None
 
 def usage():
     print('Usage:\n\
-  $ cd build_posix\n\
+  $ cd build\n\
   $ python ../test/suite/run.py [ options ] [ tests ]\n\
 \n\
 Options:\n\
@@ -126,16 +71,20 @@ Options:\n\
   -h      | --help               show this message\n\
           | --hook name[=arg]    set up hooks from hook_<name>.py, with optional arg\n\
   -j N    | --parallel N         run all tests in parallel using N processes\n\
-  -l      | --long               run the entire test suite\n\
+  -l      | --long               run nearly the entire test suite except tests tagged extralongtest\n\
+  -xl     | --extra-long         run the entire test suite\n\
           | --noremove           do not remove WT_TEST or -D target before run\n\
   -p      | --preserve           preserve output files in WT_TEST/<testname>\n\
   -r N    | --random-sample N    randomly sort scenarios to be run, then\n\
                                  execute every Nth (2<=N<=1000) scenario.\n\
   -s N    | --scenario N         use scenario N (N can be symbolic, number, or\n\
-                                 list of numbers and ranges in the form 1,3-5,7)\n\
+                                 list of numbers and ranges in the form 1,3-5,7),\n\
+                                 and -1 matches tests with no scenarios.\n\
   -t      | --timestamp          name WT_TEST according to timestamp\n\
+            --timeout N          have any test that exceeds N seconds throw an error.\n\
   -v N    | --verbose N          set verboseness to N (0<=N<=3, default=1)\n\
   -i      | --ignore-stdout      dont fail on unexpected stdout or stderr\n\
+  -P      | --print-output       duplicate all intercepted output to a standard stream\n\
   -R      | --randomseed         run with random seeds for generates random numbers\n\
   -S      | --seed               run with two seeds that generates random numbers, \n\
                                  format "seed1.seed2", seed1 or seed2 can\'t be zero\n\
@@ -193,7 +142,13 @@ def parse_int_list(str):
             scenario = int(bounds[0])
             ret[scenario] = True
             continue
-        if len(bounds) == 2 and bounds[0].isdigit() and bounds[1].isdigit():
+        elif len(bounds) == 2 and len(bounds[0]) == 0 and bounds[1].isdigit():
+            # It's a negative number.  We indicate "has no scenarios" by -1, anything else is not allowed.
+            if r == '-1':
+                scenario = -1
+                ret[scenario] = True
+                continue
+        elif len(bounds) == 2 and bounds[0].isdigit() and bounds[1].isdigit():
             # It's two numbers separated by a dash.
             for scenario in range(int(bounds[0]), int(bounds[1]) + 1):
                 ret[scenario] = True
@@ -203,13 +158,19 @@ def parse_int_list(str):
     return ret
 
 def restrictScenario(testcases, restrict):
+    # Inner function to see if test case matches a scenario list
+    def scenarioMatch(testcase, scenario_list):
+        matchint = -1
+        if hasattr(testcase, 'scenario_number'):
+            matchint = int(testcase.scenario_number)
+        return matchint in scenario_list
+
     if restrict == '':
         return testcases
     else:
         scenarios = parse_int_list(restrict)
         if scenarios is not None:
-            return [t for t in testcases
-                if hasattr(t, 'scenario_number') and t.scenario_number in scenarios]
+            return [t for t in testcases if scenarioMatch(t, scenarios)]
         else:
             return [t for t in testcases
                 if hasattr(t, 'scenario_name') and t.scenario_name == restrict]
@@ -338,7 +299,7 @@ def error(exitval, prefix, msg):
 
 if __name__ == '__main__':
     # Turn numbers and ranges into test module names
-    preserve = timestamp = debug = dryRun = gdbSub = lldbSub = longtest = zstdtest = ignoreStdout = False
+    preserve = timestamp = debug = dryRun = gdbSub = lldbSub = longtest = zstdtest = ignoreStdout = printOutput = extralongtest = False
     removeAtStart = True
     asan = False
     parallel = 0
@@ -353,6 +314,11 @@ if __name__ == '__main__':
     args = sys.argv[1:]
     testargs = []
     hook_names = []
+    timeout = 0
+    # Generate a random string to use as a prefix for the tiered test objects to group them under
+    # the same test run.
+    ss_random_prefix = str(random.randrange(1, 2147483646))
+
     while len(args) > 0:
         arg = args.pop(0)
         from unittest import defaultTestLoader as loader
@@ -411,6 +377,10 @@ if __name__ == '__main__':
             if option == '-long' or option == 'l':
                 longtest = True
                 continue
+            if option == '-extra-long' or option == 'xl':
+                longtest = True
+                extralongtest = True
+                continue
             if option == '-zstd' or option == 'z':
                 zstdtest = True
                 continue
@@ -444,6 +414,12 @@ if __name__ == '__main__':
             if option == '-timestamp' or option == 't':
                 timestamp = True
                 continue
+            if option == '-timeout':
+                if timeout != 0 or len(args) == 0:
+                    usage()
+                    sys.exit(2)
+                timeout = int(args.pop(0))
+                continue
             if option == '-verbose' or option == 'v':
                 if len(args) == 0:
                     usage()
@@ -454,8 +430,11 @@ if __name__ == '__main__':
                 if verbose < 0:
                         verbose = 0
                 continue
-            if option == '--ignore-stdout' or option == 'i':
+            if option == '-ignore-stdout' or option == 'i':
                 ignoreStdout = True
+                continue
+            if option == '-print-output' or option == 'P':
+                printOutput = True
                 continue
             if option == '-config' or option == 'c':
                 if configfile != None or len(args) == 0:
@@ -571,27 +550,38 @@ if __name__ == '__main__':
     # All global variables should be set before any test classes are loaded.
     # That way, verbose printing can be done at the class definition level.
     wttest.WiredTigerTestCase.globalSetup(preserve, removeAtStart, timestamp, gdbSub, lldbSub,
-                                          verbose, wt_builddir, dirarg, longtest, zstdtest,
-                                          ignoreStdout, seedw, seedz, hookmgr)
+                                          verbose, wt_builddir, dirarg, longtest, extralongtest,
+                                          zstdtest, ignoreStdout, printOutput, seedw, seedz,
+                                          hookmgr, ss_random_prefix, timeout)
 
     # Without any tests listed as arguments, do discovery
     if len(testargs) == 0:
-        if scenario != '':
-            sys.stderr.write(
-                'run.py: specifying a scenario requires a test name\n')
-            usage()
-            sys.exit(2)
         from discover import defaultTestLoader as loader
         suites = loader.discover(suitedir)
+
+        # If you have an empty Python file, it comes back as an empty entry in suites
+        # and then the sort explodes. Drop empty entries first. Note: this converts
+        # suites to a list, but the sort does that anyway. Also note: there seems to be
+        # no way to count other than iteration; there's a count method but it also
+        # returns zero for test files that contain a test class with no test functions,
+        # and it's not clear that dropping those here is correct.
+        def isempty(s):
+            count = 0
+            for c in s:
+                count += 1
+            return (count == 0)
+        suites = [s for s in suites if not isempty(s)]
+
         suites = sorted(suites, key=lambda c: str(list(c)[0]))
         if configfile != None:
             suites = configApply(suites, configfile, configwrite)
-        tests.addTests(restrictScenario(generate_scenarios(suites), ''))
+        tests.addTests(restrictScenario(generate_scenarios(suites), scenario))
     else:
         for arg in testargs:
             testsFromArg(tests, loader, arg, scenario)
 
-    tests = hookmgr.filter_tests(tests)
+    hookmgr.register_skipped_tests(tests)
+
     # Shuffle the tests and create a new suite containing every Nth test from
     # the original suite
     if random_sample > 0:
@@ -618,13 +608,13 @@ if __name__ == '__main__':
                 s = test.scenario_number
                 if s > 1000:
                     hugetests.add(name)    # warn for too many scenarios
-            return (s, test.simpleName())  # sort by scenerio number first
+            return (s, test.simpleName())  # sort by scenario number first
         all_tests = sorted(tests, key = get_sort_keys)
-        if not longtest:
+        if not (longtest or extralongtest):
             for name in hugetests:
                 print("WARNING: huge test " + name + " has > 1000 scenarios.\n" +
-                      "That is only appropriate when using the --long option.\n" +
-                      "The number of scenerios for the test should be pruned")
+                      "That is only appropriate when using the --long or --extra-long option.\n" +
+                      "The number of scenarios for the test should be pruned")
 
         # At this point we have an ordered list of all the tests.
         # Break it into just our batch.

@@ -1,7 +1,3 @@
-(function() {
-
-'use strict';
-
 const conn = MongoRunner.runMongod({auth: ""});
 
 const admin = conn.getDB("admin");
@@ -30,4 +26,3 @@ assert("info" in admin.killOp(123));
 assert.eq(admin.fsyncUnlock().errmsg, "fsyncUnlock called when not locked");
 
 MongoRunner.stopMongod(conn, null, {user: "foo", pwd: "bar"});
-})();

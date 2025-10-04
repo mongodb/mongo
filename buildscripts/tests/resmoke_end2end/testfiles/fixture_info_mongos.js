@@ -1,9 +1,8 @@
-(function() {
-"use strict";
+(function () {
+    "use strict";
 
-print("DEBUG BUILDINFO");
-printjson(db.adminCommand("buildInfo"));
+    print("DEBUG BUILDINFO");
+    printjson(db.adminCommand("buildInfo"));
 
-writeFile(TestData.outputLocation,
-          tojson(db.adminCommand("getCmdLineOpts")["parsed"]["setParameter"]));
-}());
+    writeFile(TestData.outputLocation, tojson(db.adminCommand("getCmdLineOpts")["parsed"]["setParameter"]));
+})();

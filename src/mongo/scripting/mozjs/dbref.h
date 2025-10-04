@@ -29,7 +29,14 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/scripting/mozjs/base.h"
 #include "mongo/scripting/mozjs/wraptype.h"
+#include "mongo/util/modules.h"
+
+#include <js/CallArgs.h>
+#include <js/Class.h>
+#include <js/TypeDecls.h>
 
 namespace mongo {
 namespace mozjs {
@@ -44,11 +51,14 @@ namespace mozjs {
  *     $db : String(),
  * }
  */
-struct DBRefInfo : public BaseInfo {
+struct MONGO_MOD_PUB DBRefInfo : public BaseInfo {
+    enum Slots { BSONHolderSlot, DBRefInfoSlotCount };
+
     static void construct(JSContext* cx, JS::CallArgs args);
 
     static const char* const className;
-    static const unsigned classFlags = JSCLASS_HAS_PRIVATE;
+    static const unsigned classFlags =
+        JSCLASS_HAS_RESERVED_SLOTS(DBRefInfoSlotCount) | BaseInfo::finalizeFlag;
 
     static void delProperty(JSContext* cx,
                             JS::HandleObject obj,
@@ -56,9 +66,9 @@ struct DBRefInfo : public BaseInfo {
                             JS::ObjectOpResult& result);
     static void enumerate(JSContext* cx,
                           JS::HandleObject obj,
-                          JS::AutoIdVector& properties,
+                          JS::MutableHandleIdVector properties,
                           bool enumerableOnly);
-    static void finalize(js::FreeOp* fop, JSObject* obj);
+    static void finalize(JS::GCContext* gcCtx, JSObject* obj);
     static void resolve(JSContext* cx, JS::HandleObject obj, JS::HandleId id, bool* resolvedp);
     static void setProperty(JSContext* cx,
                             JS::HandleObject obj,

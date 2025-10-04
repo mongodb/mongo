@@ -27,8 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
 #include "mongo/util/base64.h"
+
+#include <cstddef>
+#include <iosfwd>
+#include <string>
+
 #include <benchmark/benchmark.h>
 #include <fmt/format.h>
 

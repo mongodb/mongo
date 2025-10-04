@@ -27,15 +27,24 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
-#include <set>
-#include <vector>
 
 #include "mongo/platform/random.h"
 
+#include "mongo/base/string_data.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/debug_util.h"
+#include "mongo/util/str.h"
+
+#include <cmath>
+#include <set>
+#include <string>
+#include <vector>
+
+#include <fmt/format.h>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 
 namespace mongo {
 
@@ -167,8 +176,8 @@ TEST(RandomTest, NextInt32SanityCheck) {
         }
 
         if (onesCount < 400 || onesCount > 600)
-            FAIL(str::stream() << "bit " << bit << " was set " << (onesCount / 10.)
-                               << "% of the time.");
+            FAIL(std::string(str::stream() << "bit " << bit << " was set " << (onesCount / 10.)
+                                           << "% of the time."));
     }
 }
 
@@ -191,8 +200,8 @@ TEST(RandomTest, NextInt64SanityCheck) {
         }
 
         if (onesCount < 400 || onesCount > 600)
-            FAIL(str::stream() << "bit " << bit << " was set " << (onesCount / 10.)
-                               << "% of the time.");
+            FAIL(std::string(str::stream() << "bit " << bit << " was set " << (onesCount / 10.)
+                                           << "% of the time."));
     }
 }
 
@@ -205,12 +214,30 @@ TEST(RandomTest, NextInt32InRange) {
     }
 }
 
+TEST(RandomTest, NextUInt32InRange) {
+    PseudoRandom a(11);
+    for (int i = 0; i < 1000; i++) {
+        auto res = a.nextUInt32(10);
+        ASSERT_GTE(res, (uint32_t)0);
+        ASSERT_LT(res, (uint32_t)10);
+    }
+}
+
 TEST(RandomTest, NextInt64InRange) {
     PseudoRandom a(11);
     for (int i = 0; i < 1000; i++) {
         auto res = a.nextInt64(10);
         ASSERT_GTE(res, 0);
         ASSERT_LT(res, 10);
+    }
+}
+
+TEST(RandomTest, NextUInt64InRange) {
+    PseudoRandom a(11);
+    for (int i = 0; i < 1000; i++) {
+        auto res = a.nextUInt64(10);
+        ASSERT_GTE(res, (uint64_t)0);
+        ASSERT_LT(res, (uint64_t)10);
     }
 }
 
@@ -224,31 +251,30 @@ TEST(RandomTest, NextInt32Uniformity) {
     constexpr int32_t kMax = (int32_t{3} << 29) - 1;
     constexpr size_t kBuckets = 64;
     constexpr size_t kNIter = 1'000'000;
-    constexpr double mu = kNIter / kBuckets;
+    constexpr double mu = static_cast<double>(kNIter) / kBuckets;
     constexpr double muSqInv = 1. / (mu * mu);
     std::vector<size_t> hist(kBuckets);
     for (size_t i = 0; i < kNIter; ++i) {
         auto next = prng.nextInt32(kMax);
         ASSERT_GTE(next, 0);
         ASSERT_LTE(next, kMax);
-        ++hist[double(next) * kBuckets / (kMax + 1)];
+        ++hist[static_cast<double>(next) * static_cast<double>(kBuckets) / (kMax + 1)];
     }
     if (kDebugBuild) {
         for (size_t i = 0; i < hist.size(); ++i) {
             double dev = std::pow(std::pow((hist[i] - mu) / mu, 2), .5);
             LOGV2(22611,
-                  "{format_FMT_STRING_4_count_4_dev_6f_i_hist_i_dev_std_string_hist_i_256}",
-                  "format_FMT_STRING_4_count_4_dev_6f_i_hist_i_dev_std_string_hist_i_256"_attr =
-                      format(FMT_STRING("  [{:4}] count:{:4}, dev:{:6f}, {}"),
-                             i,
-                             hist[i],
-                             dev,
-                             std::string(hist[i] / 256, '*')));
+                  "Histogram",
+                  "hist"_attr = fmt::format("  [{:4}] count:{:4}, dev:{:6f}, {}",
+                                            i,
+                                            hist[i],
+                                            dev,
+                                            std::string(hist[i] / 256, '*')));
         }
     }
     for (size_t i = 0; i < hist.size(); ++i) {
         double dev = std::pow(std::pow(hist[i] - mu, 2) * muSqInv, .5);
-        ASSERT_LT(dev, 0.1) << format(FMT_STRING("hist[{}]={}, mu={}"), i, hist[i], mu);
+        ASSERT_LT(dev, 0.1) << fmt::format("hist[{}]={}, mu={}", i, hist[i], mu);
     }
 }
 

@@ -1,0 +1,6 @@
+==== VARIATION: sbe, query={a: 1}, sort={a: 1}, proj={}, hint={}, allowDiskUse=0, returnKey=0, requestResumeToken=0
+ZXEAYT8AAAAABQAAAAB8YWF8fHwAAAAAbm5ubgUAAAAABQAAAABmfA==
+==== VARIATION: sbe, query={a: 1}, sort={a: 1}, proj={}, hint={}, allowDiskUse=0, returnKey=0, requestResumeToken=0
+ZXEAYT8AAAAABQAAAAB8YWF8fHwAAAAAbm5ubgUAAAAABQAAAABmfA==
+==== VARIATION: sbe, query={a: 1}, sort={a: 1}, proj={}, hint={}, allowDiskUse=0, returnKey=0, requestResumeToken=0
+ZXEAYT8AAAAABQAAAAB8YWF8fHwAAAAAbm5ubgUAAAAABQAAAAB0fA==

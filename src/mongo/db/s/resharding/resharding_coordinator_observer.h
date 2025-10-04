@@ -29,15 +29,19 @@
 
 #pragma once
 
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
 #include "mongo/util/string_map.h"
+
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 
@@ -108,6 +112,20 @@ public:
      */
     void interrupt(Status status);
 
+    /**
+     * Fulfills all promises prematurely. To be called only if no state document has been persisted
+     * yet.
+     */
+    void fulfillPromisesBeforePersistingStateDoc();
+
+    /**
+     * Indicates that the ReshardingCoordinator::run method has been called.
+     */
+    void reshardingCoordinatorRunCalled() {
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        _reshardingCoordinatorRunCalled = true;
+    }
+
 private:
     /**
      * Does work necessary for both recoverable errors (failover/stepdown) and unrecoverable errors
@@ -116,7 +134,7 @@ private:
     void _onAbortOrStepdown(WithLock, Status status);
 
     // Protects the state below
-    Mutex _mutex = MONGO_MAKE_LATCH("ReshardingCoordinatorObserver::_mutex");
+    stdx::mutex _mutex;
 
     /**
      * Promises indicating that either all donors or all recipients have entered a specific state.
@@ -142,6 +160,9 @@ private:
     SharedPromise<ReshardingCoordinatorDocument> _allRecipientsDone;
 
     SharedPromise<ReshardingCoordinatorDocument> _allDonorsDone;
+
+    // Tracks whether the ReshardingCoordinator::run method has been called.
+    bool _reshardingCoordinatorRunCalled = false;
 };
 
 }  // namespace mongo

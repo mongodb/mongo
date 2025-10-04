@@ -1,0 +1,119 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "histogram_common",
+    hdrs = [
+        "histogram_common.h",
+    ],
+    deps = [
+        "//src/mongo/db/query/compiler/ce:ce_common",
+    ],
+)
+
+mongo_cc_library(
+    name = "histogram_estimator",
+    srcs = [
+        "histogram_estimation_impl.cpp",
+        "histogram_estimator.cpp",
+    ],
+    hdrs = [
+        "histogram_estimation_impl.h",
+        "histogram_estimator.h",
+    ],
+    no_undefined_ref_DO_NOT_USE = False,
+    deps = [
+        ":histogram_common",
+        "//src/mongo/db/query/compiler/metadata:query_metadata",
+        "//src/mongo/db/query/compiler/optimizer/cost_based_ranker:estimates",
+        "//src/mongo/db/query/compiler/physical_model/index_bounds",
+        "//src/mongo/db/query/compiler/stats:stats_histograms",
+    ],
+)
+
+mongo_cc_library(
+    name = "histogram_test_utils",
+    srcs = [
+        "histogram_test_utils.cpp",
+    ],
+    hdrs = [
+        "histogram_test_utils.h",
+    ],
+    deps = [
+        ":histogram_estimator",
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db/local_catalog:catalog_test_fixture",
+        "//src/mongo/db/query/compiler/ce:ce_test_utils",
+        "//src/mongo/db/query/compiler/stats:stats_gen",
+        "//src/mongo/db/query/compiler/stats:stats_test_utils",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "histogram_estimation_test",
+    srcs = [
+        "histogram_estimation_impl_test.cpp",
+        "histogram_estimator_test.cpp",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        ":histogram_test_utils",
+        "//src/mongo/db/query/compiler/stats:stats_gen",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "maxdiff_histogram_test",
+    srcs = [
+        "maxdiff_histogram_test.cpp",
+    ],
+    tags = ["mongo_unittest_sixth_group"],
+    deps = [
+        ":histogram_test_utils",
+        "//src/mongo/db/query/compiler/stats:maxdiff_test_utils",
+        "//src/mongo/db/query/compiler/stats:stats_gen",
+        "//src/mongo/db/query/compiler/stats:stats_test_utils",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "generated_histograms_test",
+    srcs = [
+        "generated_histograms_test.cpp",
+    ],
+    tags = ["mongo_unittest_fifth_group"],
+    deps = [
+        ":histogram_test_utils",
+        "//src/mongo/db:service_context_test_fixture",
+    ],
+)
+
+# it's a utility that measures the accuracy of histogram CE.
+mongo_cc_binary(
+    name = "histogram_estimation_accuracy_analysis_program",
+    srcs = [
+        "histogram_accuracy_test.cpp",
+    ],
+    deps = [
+        ":histogram_test_utils",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "histogram_bm",
+    srcs = ["ce_histogram_bm.cpp"],
+    tags = ["second_half_bm"],
+    deps = [
+        "histogram_test_utils",
+        "//src/mongo/db/query:query_test_service_context",
+    ],
+)

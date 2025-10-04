@@ -3,18 +3,16 @@
  * configs, so this is just seeing if it fails when it's supposed to.
  * @tags: [multiversion_incompatible]
  */
-(function() {
-"use strict";
-var replTest = new ReplSetTest({name: 'testSet2', nodes: 1});
-var nodes = replTest.startSet();
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-assert.soon(function() {
+let replTest = new ReplSetTest({name: "testSet2", nodes: 1});
+let nodes = replTest.startSet();
+
+assert.soon(function () {
     try {
-        var result = nodes[0].getDB("admin").runCommand(
-            {replSetInitiate: {_id: "testSet2", members: [{_id: 0}]}});
+        let result = nodes[0].getDB("admin").runCommand({replSetInitiate: {_id: "testSet2", members: [{_id: 0}]}});
         printjson(result);
-        return (
-            result.errmsg.match(/BSON field 'MemberConfig.host' is missing but a required field/));
+        return result.errmsg.match(/BSON field 'MemberConfig.host' is missing but a required field/);
     } catch (e) {
         print(e);
     }
@@ -22,4 +20,3 @@ assert.soon(function() {
 });
 
 replTest.stopSet();
-}());

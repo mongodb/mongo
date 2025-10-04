@@ -27,23 +27,29 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/auth/action_set.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/client.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/sharding_environment/client/shard.h"
+#include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/topology/shard_registry.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/s/catalog_cache_loader.h"
-#include "mongo/s/grid.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/s/request_types/balancer_collection_status_gen.h"
+#include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <string>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 
 namespace mongo {
@@ -67,17 +73,17 @@ public:
             configsvrRequest.setDbName(request().getDbName());
 
             auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-            auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
-                opCtx,
-                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                "admin",
-                configsvrRequest.toBSON({}),
-                Shard::RetryPolicy::kIdempotent));
+            auto cmdResponse = uassertStatusOK(
+                configShard->runCommand(opCtx,
+                                        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                        DatabaseName::kAdmin,
+                                        configsvrRequest.toBSON(),
+                                        Shard::RetryPolicy::kIdempotent));
 
             uassertStatusOK(cmdResponse.commandStatus);
 
-            return Response::parse(IDLParserErrorContext("BalancerCollectionStatusResponse"),
-                                   cmdResponse.response);
+            return Response::parse(cmdResponse.response,
+                                   IDLParserContext("BalancerCollectionStatusResponse"));
         }
 
     private:
@@ -111,8 +117,8 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
-
-} balancerCollectionStatusCmd;
+};
+MONGO_REGISTER_COMMAND(BalancerCollectionStatusCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

@@ -7,10 +7,9 @@
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
 
-(function() {
-"use strict";
-load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/libs/get_index_helpers.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
@@ -28,8 +27,7 @@ const testColl = testDB.getCollection(collName);
 assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
 
 // Also build an index (on the same collection) which we will later attempt to drop.
-assert.commandWorked(
-    testDB.runCommand({createIndexes: collName, indexes: [{key: {"num": 1}, name: indexName}]}));
+assert.commandWorked(testDB.runCommand({createIndexes: collName, indexes: [{key: {"num": 1}, name: indexName}]}));
 
 const session = primary.startSession({causalConsistency: false});
 const sessionDB = session.getDatabase(dbName);
@@ -40,8 +38,7 @@ assert.commandWorked(sessionColl.insert({_id: 42}));
 
 PrepareHelpers.prepareTransaction(session);
 
-assert.commandWorked(
-    primary.adminCommand({configureFailPoint: "failNonIntentLocksIfWaitNeeded", mode: "alwaysOn"}));
+assert.commandWorked(primary.adminCommand({configureFailPoint: "failNonIntentLocksIfWaitNeeded", mode: "alwaysOn"}));
 
 /**
  * Tests that conflicting DDL ops fail immediately.
@@ -57,7 +54,7 @@ const indexToDrop = indexName;
 let testDDLOps = () => {
     // Also attempt to delete our original collection (it is in conflict anyway, but should
     // fail to acquire the db lock in the first place).
-    assert.throws(function() {
+    assert.throws(function () {
         testDB.getCollection(collToDrop).drop();
     });
     assert(testDB.getCollectionNames().includes(collToDrop));
@@ -65,27 +62,32 @@ let testDDLOps = () => {
     // Same goes for trying to rename it.
     assert.commandFailedWithCode(
         testDB.getCollection(collToRenameFrom).renameCollection(collToRenameTo),
-        ErrorCodes.LockTimeout);
+        ErrorCodes.LockTimeout,
+    );
     assert(testDB.getCollectionNames().includes(collToRenameFrom));
     assert(!testDB.getCollectionNames().includes(collToRenameTo));
 
-    assert.commandFailedWithCode(testDB.adminCommand({
-        renameCollection: testDB.getCollection(collToRenameFrom).getFullName(),
-        to: testDB.getSiblingDB('test2').getCollection(collToRenameTo).getFullName(),
-    }),
-                                 ErrorCodes.LockTimeout);
+    assert.commandFailedWithCode(
+        testDB.adminCommand({
+            renameCollection: testDB.getCollection(collToRenameFrom).getFullName(),
+            to: testDB.getSiblingDB("test2").getCollection(collToRenameTo).getFullName(),
+        }),
+        ErrorCodes.LockTimeout,
+    );
 
     // Attempt to add a new index to that collection.
     assert.commandFailedWithCode(
-        testDB.runCommand(
-            {createIndexes: collName, indexes: [{key: {"b": 1}, name: indexToCreate}]}),
-        ErrorCodes.LockTimeout);
-    assert.eq(null, GetIndexHelpers.findByName(testColl.getIndexes(), indexToCreate));
+        testDB.runCommand({createIndexes: collName, indexes: [{key: {"b": 1}, name: indexToCreate}]}),
+        ErrorCodes.LockTimeout,
+    );
+    assert.eq(null, IndexCatalogHelpers.findByName(testColl.getIndexes(), indexToCreate));
 
     // Try dropping the index we created originally. This should also fail.
-    assert.commandFailedWithCode(testDB.runCommand({dropIndexes: collName, index: indexToDrop}),
-                                 ErrorCodes.LockTimeout);
-    assert.neq(null, GetIndexHelpers.findByName(testColl.getIndexes(), indexToDrop));
+    assert.commandFailedWithCode(
+        testDB.runCommand({dropIndexes: collName, index: indexToDrop}),
+        ErrorCodes.LockTimeout,
+    );
+    assert.neq(null, IndexCatalogHelpers.findByName(testColl.getIndexes(), indexToDrop));
 };
 
 /**
@@ -93,11 +95,11 @@ let testDDLOps = () => {
  */
 
 const docToInsert = {
-    num: 100
+    num: 100,
 };
 const docToUpdateFrom = docToInsert;
 const docToUpdateTo = {
-    num: 101
+    num: 101,
 };
 const docToRemove = docToUpdateTo;
 
@@ -126,12 +128,9 @@ testDDLOps();
 testCRUDOps(testColl);
 
 // Also test operations as part of a transaction (should succeed).
-testCRUDOps(
-    primary.startSession({causalConsistency: false}).getDatabase(dbName).getCollection(collName));
+testCRUDOps(primary.startSession({causalConsistency: false}).getDatabase(dbName).getCollection(collName));
 
-assert.commandWorked(
-    primary.adminCommand({configureFailPoint: "failNonIntentLocksIfWaitNeeded", mode: "off"}));
+assert.commandWorked(primary.adminCommand({configureFailPoint: "failNonIntentLocksIfWaitNeeded", mode: "off"}));
 
 assert.commandWorked(session.abortTransaction_forTesting());
 rst.stopSet();
-})();

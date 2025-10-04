@@ -26,29 +26,29 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/platform/shared_library.h"
-
-#include <boost/filesystem.hpp>
 
 #include "mongo/logv2/log.h"
+#include "mongo/platform/shared_library.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/text.h"
+
+#include <boost/filesystem.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
+
 
 namespace mongo {
 
 SharedLibrary::~SharedLibrary() {
     if (_handle) {
         if (FreeLibrary(static_cast<HMODULE>(_handle)) == 0) {
-            DWORD lasterror = GetLastError();
+            auto ec = lastSystemError();
             LOGV2_DEBUG(22614,
                         2,
                         "Load library close failed: {errnoWithDescription_lasterror}",
-                        "errnoWithDescription_lasterror"_attr = errnoWithDescription(lasterror));
+                        "errnoWithDescription_lasterror"_attr = errorMessage(ec));
         }
     }
 }
@@ -62,9 +62,10 @@ StatusWith<std::unique_ptr<SharedLibrary>> SharedLibrary::create(
 
     HMODULE handle = LoadLibraryW(full_path.c_str());
     if (handle == nullptr) {
+        auto ec = lastSystemError();
         return StatusWith<std::unique_ptr<SharedLibrary>>(ErrorCodes::InternalError,
                                                           str::stream() << "Load library failed: "
-                                                                        << errnoWithDescription());
+                                                                        << errorMessage(ec));
     }
 
     return StatusWith<std::unique_ptr<SharedLibrary>>(
@@ -73,7 +74,7 @@ StatusWith<std::unique_ptr<SharedLibrary>> SharedLibrary::create(
 
 StatusWith<void*> SharedLibrary::getSymbol(StringData name) {
     // StringData is not assued to be null-terminated
-    std::string symbolName = name.toString();
+    std::string symbolName{name};
 
     void* function = GetProcAddress(static_cast<HMODULE>(_handle), symbolName.c_str());
 
@@ -82,7 +83,7 @@ StatusWith<void*> SharedLibrary::getSymbol(StringData name) {
         if (gle != ERROR_PROC_NOT_FOUND) {
             return StatusWith<void*>(ErrorCodes::InternalError,
                                      str::stream() << "GetProcAddress failed for symbol: "
-                                                   << errnoWithDescription());
+                                                   << errorMessage(systemError(gle)));
         }
     }
 

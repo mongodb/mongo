@@ -29,8 +29,16 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #include <array>
+#include <cstddef>
+
 #include <jsapi.h>
+
+#include <js/Id.h>
+#include <js/RootingAPI.h>
+#include <js/TypeDecls.h>
 
 namespace mongo {
 namespace mozjs {
@@ -40,9 +48,10 @@ namespace mozjs {
  * can be used with InteredStringId to get a handle to an id that matches that
  * identifier, or directly in ObjectWrapper.
  */
-enum class InternedString {
+enum class MONGO_MOD_PUB InternedString {
 #define MONGO_MOZJS_INTERNED_STRING(name, str) name,
 #include "mongo/scripting/mozjs/internedstring.defs"
+
 #undef MONGO_MOZJS_INTERNED_STRING
     NUM_IDS,
 };

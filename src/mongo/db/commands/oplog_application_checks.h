@@ -27,14 +27,17 @@
  *    it in the license file.
  */
 #pragma once
-#include <string>
-
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
 class BSONElement;
 class BSONObj;
+class DatabaseName;
 class OperationContext;
 
 // OplogApplicationValidity represents special conditions relevant to authorization for
@@ -58,10 +61,10 @@ public:
     /**
      * Checks the authorization for an entire oplog application command.
      */
-    static Status checkAuthForCommand(OperationContext* opCtx,
-                                      const std::string& dbname,
-                                      const BSONObj& cmdObj,
-                                      OplogApplicationValidity validity);
+    static Status checkAuthForOperation(OperationContext* opCtx,
+                                        const DatabaseName& dbName,
+                                        const BSONObj& cmdObj,
+                                        OplogApplicationValidity validity);
 
     /**
      * Checks that 'opsElement' is an array and all elements of the array are valid operations.
@@ -76,10 +79,9 @@ private:
      * command.
      */
     static Status checkOperationAuthorization(OperationContext* opCtx,
-                                              const std::string& dbname,
+                                              const DatabaseName& dbName,
                                               const BSONObj& oplogEntry,
-                                              AuthorizationSession* authSession,
-                                              bool alwaysUpsert);
+                                              AuthorizationSession* authSession);
     /**
      * Returns OK if 'e' contains a valid operation.
      */

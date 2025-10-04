@@ -29,10 +29,12 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #include <type_traits>
 #include <utility>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace stdx {
 
 #if __cplusplus < 201703
@@ -59,4 +61,4 @@ constexpr auto to_underlying(E e) noexcept {
 }
 
 }  // namespace stdx
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

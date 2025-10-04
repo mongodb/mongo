@@ -11,25 +11,24 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/sharding/libs/sharded_transactions_helpers.js");
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 1});
 const mongosSession = st.s.startSession();
 const shardSession = st.shard0.getDB("test").getMongo().startSession();
 const collName = "banned_txn_dbs";
 
-jsTestLog("Verify that read and write operations within transactions are forbidden for the " +
-          "config database when accessed through mongos.");
+jsTestLog(
+    "Verify that read and write operations within transactions are forbidden for the " +
+        "config database when accessed through mongos.",
+);
 
 const mongosConfigDB = mongosSession.getDatabase("config");
 const clusterColls = [
     mongosConfigDB["test"],
     mongosConfigDB["actionlog"],
     mongosConfigDB["transaction_coords"],
-    mongosConfigDB["transactions"]
+    mongosConfigDB["transactions"],
 ];
 
 mongosSession.startTransaction();
@@ -40,8 +39,10 @@ clusterColls.forEach((coll) => {
 
 mongosSession.endSession();
 
-jsTestLog("Verify that read operations within transactions work fine for the config database " +
-          "when not config.transactions (and directly accessed through the shard).");
+jsTestLog(
+    "Verify that read operations within transactions work fine for the config database " +
+        "when not config.transactions (and directly accessed through the shard).",
+);
 
 const configDB = shardSession.getDatabase("config");
 const shardColls = [configDB["test"], configDB["actionlog"], configDB["transaction_coords"]];
@@ -59,4 +60,3 @@ assert.commandFailedWithCode(error, ErrorCodes.OperationNotSupportedInTransactio
 
 shardSession.endSession();
 st.stop();
-}());

@@ -76,7 +76,7 @@ class private_adaptive_node_pool
    private_adaptive_node_pool &operator=(const private_adaptive_node_pool &);
 
    public:
-   static const std::size_t nodes_per_block = NodesPerBlock;
+   BOOST_STATIC_CONSTEXPR std::size_t nodes_per_block = NodesPerBlock;
 
    //!Constructor. Never throws
    private_adaptive_node_pool()
@@ -111,7 +111,7 @@ class shared_adaptive_node_pool
    ~shared_adaptive_node_pool()
    {}
 
-   //!Allocates array of count elements. Can throw std::bad_alloc
+   //!Allocates array of count elements. Can throw bad_alloc
    void *allocate_node()
    {
       //-----------------------
@@ -130,7 +130,7 @@ class shared_adaptive_node_pool
    }
 
    //!Allocates a singly linked list of n nodes ending in null pointer.
-   //!can throw std::bad_alloc
+   //!can throw bad_alloc
    void allocate_nodes(const std::size_t n, multiallocation_chain &chain)
    {
       //-----------------------

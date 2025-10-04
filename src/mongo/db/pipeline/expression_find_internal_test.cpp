@@ -27,13 +27,27 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/db/pipeline/expression_find_internal.h"
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/projection_executor.h"
+#include "mongo/db/matcher/extensions_callback.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/expression_find_internal.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/db/query/compiler/dependency_analysis/expression_dependencies.h"
+#include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/string_map.h"
+
+#include <memory>
+#include <set>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::expression_internal_tests {
 constexpr auto kProjectionPostImageVarName =
@@ -96,32 +110,21 @@ protected:
     }
 };
 
-TEST_F(ExpressionInternalFindPositionalTest, AppliesProjectionToPostImage) {
-    defineAndSetProjectionPostImageVariable(getExpCtxRaw(),
-                                            Value{fromjson("{bar: 1, foo: [1,2,6,10]}")});
-
-    auto expr = createExpression(fromjson("{bar: 1, foo: {$gte: 5}}"), "foo");
-
-    ASSERT_DOCUMENT_EQ(
-        Document{fromjson("{bar:1, foo: [6]}")},
-        expr->evaluate(Document{fromjson("{bar: 1, foo: [1,2,6,10]}")}, &getExpCtx()->variables)
-            .getDocument());
-}
-
 TEST_F(ExpressionInternalFindPositionalTest, RecordsProjectionDependencies) {
     auto varId = defineAndSetProjectionPostImageVariable(
         getExpCtxRaw(), Value{fromjson("{bar: 1, foo: [1,2,6,10]}")});
     auto expr = createExpression(fromjson("{bar: 1, foo: {$gte: 5}}"), "foo");
 
     DepsTracker deps;
-    expr->addDependencies(&deps);
+    expression::addDependencies(expr.get(), &deps);
 
-    ASSERT_EQ(deps.fields.size(), 2UL);
-    ASSERT_EQ(deps.fields.count("bar"), 1UL);
-    ASSERT_EQ(deps.fields.count("foo"), 1UL);
-    ASSERT_EQ(deps.vars.size(), 1UL);
-    ASSERT_EQ(deps.vars.count(varId), 1UL);
+    ASSERT_EQ(deps.fields.size(), 0UL);
     ASSERT_TRUE(deps.needWholeDocument);
+
+    std::set<Variables::Id> refs;
+    expression::addVariableRefs(expr.get(), &refs);
+    ASSERT_EQ(refs.size(), 1UL);
+    ASSERT_EQ(refs.count(varId), 1UL);
 }
 
 TEST_F(ExpressionInternalFindPositionalTest, AddsArrayUndottedPathToComputedPaths) {
@@ -153,30 +156,21 @@ TEST_F(ExpressionInternalFindPositionalTest,
     ASSERT_EQ(computedPaths.paths.count("foo"), 1UL);
 }
 
-TEST_F(ExpressionInternalFindSliceTest, AppliesProjectionToPostImage) {
-    defineAndSetProjectionPostImageVariable(getExpCtxRaw(),
-                                            Value{fromjson("{bar: 1, foo: [1,2,6,10]}")});
-
-    auto expr = createExpression("foo", 1, 2);
-
-    ASSERT_DOCUMENT_EQ(
-        Document{fromjson("{bar: 1, foo: [2,6]}")},
-        expr->evaluate(Document{fromjson("{bar: 1, foo: [1,2,6,10]}")}, &getExpCtx()->variables)
-            .getDocument());
-}
-
 TEST_F(ExpressionInternalFindSliceTest, RecordsProjectionDependencies) {
     auto varId = defineAndSetProjectionPostImageVariable(
         getExpCtxRaw(), Value{fromjson("{bar: 1, foo: [1,2,6,10]}")});
     auto expr = createExpression("foo", 1, 2);
 
     DepsTracker deps;
-    expr->addDependencies(&deps);
+    expression::addDependencies(expr.get(), &deps);
 
     ASSERT_EQ(deps.fields.size(), 0UL);
-    ASSERT_EQ(deps.vars.size(), 1UL);
-    ASSERT_EQ(deps.vars.count(varId), 1UL);
     ASSERT_TRUE(deps.needWholeDocument);
+
+    std::set<Variables::Id> refs;
+    expression::addVariableRefs(expr.get(), &refs);
+    ASSERT_EQ(refs.size(), 1UL);
+    ASSERT_EQ(refs.count(varId), 1UL);
 }
 
 TEST_F(ExpressionInternalFindSliceTest, AddsArrayUndottedPathToComputedPaths) {
@@ -207,24 +201,17 @@ TEST_F(ExpressionInternalFindSliceTest, AddsTopLevelFieldOfArrayDottedPathToComp
     ASSERT_EQ(computedPaths.paths.count("foo"), 1UL);
 }
 
-TEST_F(ExpressionInternalFindElemMatchTest, AppliesProjectionToRootDocument) {
-    auto expr = createExpression(fromjson("{foo: {$elemMatch: {bar: {$gte: 5}}}}"), "foo");
-
-    ASSERT_VALUE_EQ(Document{fromjson("{foo: [{bar: 6, z: 6}]}")}["foo"],
-                    expr->evaluate(Document{fromjson("{foo: [{bar: 1, z: 1}, {bar: 2, z: 2}, "
-                                                     "{bar: 6, z: 6}, {bar: 10, z: 10}]}")},
-                                   &getExpCtx()->variables));
-}
-
 TEST_F(ExpressionInternalFindElemMatchTest, RecordsProjectionDependencies) {
     auto expr = createExpression(fromjson("{foo: {$elemMatch: {bar: {$gte: 5}}}}"), "foo");
 
     DepsTracker deps;
-    expr->addDependencies(&deps);
+    expression::addDependencies(expr.get(), &deps);
 
-    ASSERT_EQ(deps.fields.size(), 1UL);
-    ASSERT_EQ(deps.fields.count("foo"), 1UL);
-    ASSERT_EQ(deps.vars.size(), 0UL);
+    ASSERT_EQ(deps.fields.size(), 0UL);
     ASSERT(deps.needWholeDocument);
+
+    std::set<Variables::Id> refs;
+    expression::addVariableRefs(expr.get(), &refs);
+    ASSERT_EQ(refs.size(), 0UL);
 }
 }  // namespace mongo::expression_internal_tests

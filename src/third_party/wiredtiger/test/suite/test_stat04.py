@@ -26,10 +26,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, struct
 from suite_subprocess import suite_subprocess
 from wtscenario import make_scenarios
-import wiredtiger, wttest
+import wttest
 from wiredtiger import stat
 
 # test_stat04.py
@@ -103,6 +102,3 @@ class test_stat04(wttest.WiredTigerTestCase, suite_subprocess):
         # that tests the on-disk format as well as the in-memory format.
         self.reopen_conn()
         self.checkcount(uri, count)
-
-if __name__ == '__main__':
-    wttest.run()

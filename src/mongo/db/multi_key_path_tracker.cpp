@@ -27,14 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <sstream>
-
+// IWYU pragma: no_include "boost/container/detail/flat_tree.hpp"
+#include <boost/container/flat_set.hpp>
+#include <boost/container/small_vector.hpp>
+#include <boost/container/vector.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+// IWYU pragma: no_include "boost/move/algo/detail/set_difference.hpp"
+// IWYU pragma: no_include "boost/move/detail/iterator_to_raw_pointer.hpp"
 #include "mongo/db/multi_key_path_tracker.h"
-
 #include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/str.h"
+
+#include <cstddef>
+#include <iterator>
+#include <sstream>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -101,11 +113,16 @@ void MultikeyPathTracker::addMultikeyPathInfo(MultikeyPathInfo info) {
     _multikeyPathInfo.emplace_back(info);
 }
 
+void MultikeyPathTracker::clear() {
+    invariant(!_trackMultikeyPathInfo);
+    _multikeyPathInfo.clear();
+}
+
 const WorkerMultikeyPathInfo& MultikeyPathTracker::getMultikeyPathInfo() const {
     return _multikeyPathInfo;
 }
 
-const boost::optional<MultikeyPaths> MultikeyPathTracker::getMultikeyPathInfo(
+boost::optional<MultikeyPaths> MultikeyPathTracker::getMultikeyPathInfo(
     const NamespaceString& nss, const std::string& indexName) {
     for (const auto& multikeyPathInfo : _multikeyPathInfo) {
         if (multikeyPathInfo.nss == nss && multikeyPathInfo.indexName == indexName) {
@@ -126,6 +143,10 @@ void MultikeyPathTracker::stopTrackingMultikeyPathInfo() {
 
 bool MultikeyPathTracker::isTrackingMultikeyPathInfo() const {
     return _trackMultikeyPathInfo;
+}
+
+bool MultikeyPathTracker::isEmpty() const {
+    return _multikeyPathInfo.empty();
 }
 
 }  // namespace mongo

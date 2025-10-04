@@ -30,7 +30,8 @@
 
 /*
  * hs_cursor --
- *     Do history store cursor operations.
+ *     Run a cursor through the history store, depending on the library order checking code to
+ *     detect problems.
  */
 WT_THREAD_RET
 hs_cursor(void *arg)
@@ -38,17 +39,17 @@ hs_cursor(void *arg)
 #if WIREDTIGER_VERSION_MAJOR < 10
     WT_UNUSED(arg);
 #else
+    SAP sap;
     WT_CONNECTION *conn;
     WT_CURSOR *cursor;
     WT_DECL_RET;
-    WT_ITEM hs_key, hs_value, key;
+    WT_ITEM hs_key, hs_value;
     WT_SESSION *session;
     wt_timestamp_t hs_durable_timestamp, hs_start_ts, hs_stop_durable_ts;
     uint64_t hs_counter, hs_upd_type;
-    uint32_t hs_btree_id, i;
+    uint32_t hs_btree_id, hs_id, i;
     u_int period;
-    int exact;
-    bool next, restart;
+    bool next;
 
     (void)(arg); /* Unused parameter */
 
@@ -60,69 +61,56 @@ hs_cursor(void *arg)
      *
      * Open a session.
      */
-    testutil_check(conn->open_session(conn, NULL, NULL, &session));
+    memset(&sap, 0, sizeof(sap));
+    wt_wrap_open_session(
+      conn, &sap, NULL, enable_session_prefetch() ? SESSION_PREFETCH_CFG_ON : NULL, &session);
 
     memset(&hs_key, 0, sizeof(hs_key));
     memset(&hs_value, 0, sizeof(hs_value));
-    memset(&key, 0, sizeof(key));
-    hs_start_ts = 0; /* [-Wconditional-uninitialized] */
-    hs_counter = 0;  /* [-Wconditional-uninitialized] */
-    hs_btree_id = 0; /* [-Wconditional-uninitialized] */
-    for (restart = true;;) {
-        testutil_check(__wt_curhs_open((WT_SESSION_IMPL *)session, NULL, &cursor));
-        F_SET(cursor, WT_CURSTD_HS_READ_COMMITTED);
-
-        /* Search to the last-known location. */
-        if (!restart) {
-            cursor->set_key(cursor, 4, hs_btree_id, &key, hs_start_ts, hs_counter);
+    for (;;) {
+        hs_id = 0;
+        for (;;) {
+            /* Open a HS cursor on the next history store. */
+            testutil_check_error_ok(
+              ret = __wt_curhs_next_hs_id((WT_SESSION_IMPL *)session, hs_id, &hs_id), WT_NOTFOUND);
+            if (ret == WT_NOTFOUND)
+                break;
+            testutil_check(
+              __wt_curhs_open_ext((WT_SESSION_IMPL *)session, hs_id, 0, NULL, &cursor));
+            F_SET(cursor, WT_CURSTD_HS_READ_COMMITTED);
 
             /*
-             * Limit expected errors because this is a diagnostic check (the WiredTiger API allows
-             * prepare-conflict, but that would be unexpected from the history store file).
+             * Move the cursor through the table from the beginning or the end. We can't position
+             * the cursor in the HS store because the semantics of search aren't quite the same as
+             * other tables, and we can't correct for them in application code. We don't sleep with
+             * an open cursor, so we should be able to traverse large chunks of the HS store
+             * quickly, without blocking normal operations.
              */
-            ret = cursor->search_near(cursor, &exact);
-            testutil_assert(ret == 0 || ret == WT_NOTFOUND || ret == WT_ROLLBACK);
-        }
-
-        /*
-         * Get some more key/value pairs. Always retrieve at least one key, that ensures we have a
-         * valid key when we copy it to start the next run.
-         */
-        next = mmrand(NULL, 0, 1) == 1;
-        for (i = mmrand(NULL, 1, 1000); i > 0; --i) {
-            if ((ret = (next ? cursor->next(cursor) : cursor->prev(cursor))) == 0) {
+            next = mmrand(&g.extra_rnd, 0, 1) == 1;
+            for (i = mmrand(&g.extra_rnd, WT_THOUSAND, 100 * WT_THOUSAND); i > 0; --i) {
+                if ((ret = (next ? cursor->next(cursor) : cursor->prev(cursor))) != 0) {
+                    testutil_assertfmt(
+                      ret == WT_NOTFOUND || ret == WT_CACHE_FULL || ret == WT_ROLLBACK,
+                      "WT_CURSOR.%s failed: %d", next ? "next" : "prev", ret);
+                    break;
+                }
                 testutil_check(
                   cursor->get_key(cursor, &hs_btree_id, &hs_key, &hs_start_ts, &hs_counter));
                 testutil_check(cursor->get_value(
                   cursor, &hs_stop_durable_ts, &hs_durable_timestamp, &hs_upd_type, &hs_value));
-                continue;
             }
-            testutil_assert(ret == WT_NOTFOUND || ret == WT_ROLLBACK || ret == WT_CACHE_FULL);
-            break;
+
+            testutil_check(cursor->close(cursor));
         }
 
-        /*
-         * If we didn't hit the end of the store, save the current key to continue in the next run.
-         * Otherwise, reset so we'll start over.
-         */
-        if (ret == 0) {
-            testutil_check(
-              __wt_buf_set((WT_SESSION_IMPL *)session, &key, hs_key.data, hs_key.size));
-            restart = false;
-        } else
-            restart = true;
-
-        testutil_check(cursor->close(cursor));
-
         /* Sleep for some number of seconds, in short intervals so we don't make the run wait. */
-        for (period = mmrand(NULL, 1, 10); period > 0 && !g.workers_finished; --period)
+        for (period = mmrand(&g.extra_rnd, 1, 10); period > 0 && !g.workers_finished; --period)
             __wt_sleep(1, 0);
         if (g.workers_finished)
             break;
     }
 
-    __wt_buf_free((WT_SESSION_IMPL *)session, &key);
-    testutil_check(session->close(session, NULL));
+    wt_wrap_close_session(session);
 #endif
 
     return (WT_THREAD_RET_VALUE);

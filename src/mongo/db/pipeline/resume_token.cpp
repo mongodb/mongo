@@ -27,56 +27,93 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/pipeline/resume_token.h"
 
-#include <boost/optional/optional_io.hpp>
-#include <limits>
-
-#include "mongo/bson/bsonmisc.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/exec/document_value/value_comparator.h"
-#include "mongo/db/pipeline/document_source_change_stream_gen.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/ordering.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/db/pipeline/change_stream_helpers.h"
+#include "mongo/db/storage/key_string/key_string.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/bufreader.h"
 #include "mongo/util/hex.h"
+#include "mongo/util/str.h"
+
+#include <ostream>
+#include <set>
+
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
-constexpr StringData ResumeToken::kDataFieldName;
-constexpr StringData ResumeToken::kTypeBitsFieldName;
-
 namespace {
-// Helper function for makeHighWaterMarkToken and isHighWaterMarkToken.
-ResumeTokenData makeHighWaterMarkResumeTokenData(Timestamp clusterTime,
-                                                 boost::optional<UUID> uuid) {
-    ResumeTokenData tokenData;
-    tokenData.clusterTime = clusterTime;
-    tokenData.tokenType = ResumeTokenData::kHighWaterMarkToken;
-    tokenData.uuid = uuid;
-    return tokenData;
-}
+// This is our default resume token for the representative query shape.
+const auto kDefaultTokenQueryStats = ResumeToken::makeHighWaterMarkToken(Timestamp(), 1);
 }  // namespace
+
+ResumeTokenData::ResumeTokenData(Timestamp clusterTimeIn,
+                                 int versionIn,
+                                 size_t txnOpIndexIn,
+                                 const boost::optional<UUID>& uuidIn,
+                                 StringData opType,
+                                 Value documentKey,
+                                 Value opDescription)
+    : clusterTime(clusterTimeIn), version(versionIn), txnOpIndex(txnOpIndexIn), uuid(uuidIn) {
+    tassert(6280100,
+            "both documentKey and operationDescription cannot be present for an event",
+            documentKey.missing() || opDescription.missing());
+
+    // For v1 classic change events, the eventIdentifier is always the documentKey, even if missing.
+    if (MONGO_unlikely(version <= 1 && change_stream::kClassicOperationTypes.count(opType))) {
+        eventIdentifier = documentKey;
+        return;
+    }
+
+    // If we are here, then this is either a v2 classic event or an expanded event. In both cases,
+    // the resume token is the operationType plus the documentKey or operationDescription.
+    auto opDescOrDocKey = documentKey.missing()
+        ? std::make_pair("operationDescription"_sd, opDescription)
+        : std::make_pair("documentKey"_sd, documentKey);
+
+    eventIdentifier = Value(Document{{"operationType"_sd, opType}, std::move(opDescOrDocKey)});
+};
 
 bool ResumeTokenData::operator==(const ResumeTokenData& other) const {
     return clusterTime == other.clusterTime && version == other.version &&
         tokenType == other.tokenType && txnOpIndex == other.txnOpIndex &&
         fromInvalidate == other.fromInvalidate && uuid == other.uuid &&
-        (Value::compare(this->documentKey, other.documentKey, nullptr) == 0);
+        (Value::compare(this->eventIdentifier, other.eventIdentifier, nullptr) == 0) &&
+        fragmentNum == other.fragmentNum;
+}
+
+BSONObj ResumeTokenData::toBSON() const {
+    // TODO SERVER-96418: Make ResumeTokenData an IDL type so that this method is auto-generated.
+    BSONObjBuilder builder;
+    builder.append("clusterTime", clusterTime);
+    builder.append("tokenData", tokenType);
+    builder.append("version", version);
+    builder.append("txnOpIndex", static_cast<int64_t>(txnOpIndex));
+    if (version > 0) {
+        builder.append("tokenType", tokenType);
+        builder.append("fromInvalidate", static_cast<bool>(fromInvalidate));
+    }
+    if (uuid) {
+        builder.append("uuid", uuid->toBSON());
+    }
+    if (fragmentNum) {
+        builder.append("fragmentNum", static_cast<int64_t>(*fragmentNum));
+    }
+    eventIdentifier.addToBsonObj(&builder, "eventIdentifier");
+    return builder.obj();
 }
 
 std::ostream& operator<<(std::ostream& out, const ResumeTokenData& tokenData) {
-    out << "{clusterTime: " << tokenData.clusterTime.toString();
-    out << ", version: " << tokenData.version;
-    if (tokenData.version > 0) {
-        out << ", tokenType: " << tokenData.tokenType;
-    }
-    out << ", txnOpIndex: " << tokenData.txnOpIndex;
-    if (tokenData.version > 0) {
-        out << ", fromInvalidate: " << static_cast<bool>(tokenData.fromInvalidate);
-    }
-    out << ", uuid: " << tokenData.uuid;
-    out << ", documentKey: " << tokenData.documentKey << "}";
-    return out;
+    return out << tokenData.toBSON();
 }
 
 ResumeToken::ResumeToken(const Document& resumeDoc) {
@@ -85,18 +122,18 @@ ResumeToken::ResumeToken(const Document& resumeDoc) {
             str::stream()
                 << "Bad resume token: _data of missing or of wrong type. Expected string, got "
                 << resumeDoc.toString(),
-            dataVal.getType() == BSONType::String);
+            dataVal.getType() == BSONType::string);
     _hexKeyString = dataVal.getString();
     _typeBits = resumeDoc[kTypeBitsFieldName];
     uassert(40648,
             str::stream() << "Bad resume token: _typeBits of wrong type " << resumeDoc.toString(),
             _typeBits.missing() ||
-                (_typeBits.getType() == BSONType::BinData &&
+                (_typeBits.getType() == BSONType::binData &&
                  _typeBits.getBinData().type == BinDataGeneral));
 }
 
 // We encode the resume token as a KeyString with the sequence:
-// clusterTime, version, txnOpIndex, fromInvalidate, uuid, documentKey Only the clusterTime,
+// clusterTime, version, txnOpIndex, fromInvalidate, uuid, eventIdentifier Only the clusterTime,
 // version, txnOpIndex, and fromInvalidate are required.
 ResumeToken::ResumeToken(const ResumeTokenData& data) {
     BSONObjBuilder builder;
@@ -109,17 +146,44 @@ ResumeToken::ResumeToken(const ResumeTokenData& data) {
     if (data.version >= 1) {
         builder.appendBool("", data.fromInvalidate);
     }
-    uassert(50788,
-            "Unexpected resume token with a documentKey but no UUID",
-            data.uuid || data.documentKey.missing());
 
+    // High water mark tokens only populate the clusterTime, version, and tokenType fields.
+    uassert(6189505,
+            "Invalid high water mark token",
+            !(data.tokenType == ResumeTokenData::TokenType::kHighWaterMarkToken &&
+              (data.txnOpIndex > 0 || data.fromInvalidate || data.uuid ||
+               !data.eventIdentifier.missing())));
+
+    // From v2 onwards, tokens may have an eventIdentifier but no UUID.
+    uassert(50788,
+            "Unexpected resume token with a eventIdentifier but no UUID",
+            data.uuid || data.eventIdentifier.missing() || data.version >= 2);
+
+    // From v2 onwards, all non-high-water-mark tokens must have an eventIdentifier.
+    uassert(6189502,
+            "Expected an eventIdentifier for an event resume token",
+            !(data.tokenType == ResumeTokenData::TokenType::kEventToken &&
+              data.eventIdentifier.missing() && data.version >= 2));
+
+    // From v2 onwards, a missing UUID is encoded as explicitly null.
     if (data.uuid) {
         data.uuid->appendToBuilder(&builder, "");
+    } else if (data.version >= 2) {
+        builder.appendNull("");
     }
-    data.documentKey.addToBsonObj(&builder, "");
+    data.eventIdentifier.addToBsonObj(&builder, "");
+
+    if (data.fragmentNum) {
+        uassert(7182504,
+                str::stream() << "Tokens of version " << data.version
+                              << " cannot have a fragmentNum",
+                data.version >= 2);
+        builder.appendNumber("", static_cast<long long>(*data.fragmentNum));
+    }
+
     auto keyObj = builder.obj();
-    KeyString::Builder encodedToken(KeyString::Version::V1, keyObj, Ordering::make(BSONObj()));
-    _hexKeyString = hexblob::encode(encodedToken.getBuffer(), encodedToken.getSize());
+    key_string::Builder encodedToken(key_string::Version::V1, keyObj, Ordering::make(BSONObj()));
+    _hexKeyString = encodedToken.toString();
     const auto& typeBits = encodedToken.getTypeBits();
     if (!typeBits.isAllZeros())
         _typeBits = Value(
@@ -130,14 +194,15 @@ bool ResumeToken::operator==(const ResumeToken& other) const {
     // '_hexKeyString' is enough to determine equality. The type bits are used to unambiguously
     // re-construct the original data, but we do not expect any two resume tokens to have the same
     // data and different type bits, since that would imply they have (1) the same timestamp and (2)
-    // the same documentKey (possibly different types). This should not be possible because
-    // documents with the same documentKey should be on the same shard and therefore should have
-    // different timestamps.
+    // the same eventIdentifier fields and values, but with different types. Change events with the
+    // same eventIdentifier are either (1) on the same shard in the case of CRUD events, which
+    // implies that they must have different timestamps; or (2) refer to the same logical event on
+    // different shards, in the case of non-CRUD events.
     return _hexKeyString == other._hexKeyString;
 }
 
 ResumeTokenData ResumeToken::getData() const {
-    KeyString::TypeBits typeBits(KeyString::Version::V1);
+    key_string::TypeBits typeBits(key_string::Version::V1);
     if (!_typeBits.missing()) {
         BSONBinData typeBitsBinData = _typeBits.getBinData();
         BufReader typeBitsReader(typeBitsBinData.data, typeBitsBinData.length);
@@ -150,12 +215,8 @@ ResumeTokenData ResumeToken::getData() const {
 
     BufBuilder hexDecodeBuf;  // Keep this in scope until we've decoded the bytes.
     hexblob::decode(_hexKeyString, &hexDecodeBuf);
-    BSONBinData keyStringBinData =
-        BSONBinData(hexDecodeBuf.buf(), hexDecodeBuf.len(), BinDataType::BinDataGeneral);
-    auto internalBson = KeyString::toBsonSafe(static_cast<const char*>(keyStringBinData.data),
-                                              keyStringBinData.length,
-                                              Ordering::make(BSONObj()),
-                                              typeBits);
+    auto internalBson = key_string::toBsonSafe(
+        std::span(hexDecodeBuf.buf(), hexDecodeBuf.len()), Ordering::allAscending(), typeBits);
 
     BSONObjIterator i(internalBson);
     ResumeTokenData result;
@@ -166,11 +227,11 @@ ResumeTokenData ResumeToken::getData() const {
     auto versionElt = i.next();
     uassert(50854,
             "Invalid resume token: wrong type for version",
-            versionElt.type() == BSONType::NumberInt);
+            versionElt.type() == BSONType::numberInt);
     result.version = versionElt.numberInt();
     uassert(50795,
-            "Invalid Resume Token: only supports version 0 or 1",
-            result.version == 0 || result.version == 1);
+            "Invalid Resume Token: only supports version 0, 1 and 2",
+            result.version == 0 || result.version == 1 || result.version == 2);
 
     if (result.version >= 1) {
         // The 'tokenType' field was added in version 1 and is not present in v0 tokens.
@@ -178,7 +239,7 @@ ResumeTokenData ResumeToken::getData() const {
         auto tokenType = i.next();
         uassert(51056,
                 "Resume Token tokenType is not an int.",
-                tokenType.type() == BSONType::NumberInt);
+                tokenType.type() == BSONType::numberInt);
         auto typeInt = tokenType.numberInt();
         uassert(51057,
                 str::stream() << "Token type " << typeInt << " not recognized",
@@ -192,7 +253,7 @@ ResumeTokenData ResumeToken::getData() const {
     auto txnOpIndexElt = i.next();
     uassert(50855,
             "Resume Token txnOpIndex is not an integer",
-            txnOpIndexElt.type() == BSONType::NumberInt);
+            txnOpIndexElt.type() == BSONType::numberInt);
     const int txnOpIndexInd = txnOpIndexElt.numberInt();
     uassert(50794, "Invalid Resume Token: txnOpIndex should be non-negative", txnOpIndexInd >= 0);
     result.txnOpIndex = txnOpIndexInd;
@@ -204,39 +265,89 @@ ResumeTokenData ResumeToken::getData() const {
         auto fromInvalidate = i.next();
         uassert(50870,
                 "Resume Token fromInvalidate is not a boolean.",
-                fromInvalidate.type() == BSONType::Bool);
+                fromInvalidate.type() == BSONType::boolean);
         result.fromInvalidate = ResumeTokenData::FromInvalidate(fromInvalidate.boolean());
     }
 
-    // The UUID and documentKey are not required.
+    // The UUID and eventIdentifier are not required for token versions <= 1.
     if (!i.more()) {
+        uassert(6189500, "Expected UUID or null", result.version <= 1);
         return result;
     }
 
-    // The UUID comes first, then the documentKey.
-    result.uuid = uassertStatusOK(UUID::parse(i.next()));
-    if (i.more()) {
-        result.documentKey = Value(i.next());
+    // The UUID comes first, then eventIdentifier. From v2 onwards, UUID may be explicitly null.
+    if (auto uuidElem = i.next(); uuidElem.type() != BSONType::null) {
+        result.uuid = uassertStatusOK(UUID::parse(uuidElem));
+    }
+
+    // High water mark tokens never have an eventIdentifier.
+    uassert(6189504,
+            "Invalid high water mark token",
+            !(result.tokenType == ResumeTokenData::TokenType::kHighWaterMarkToken && i.more()));
+
+    // From v2 onwards, all non-high-water-mark tokens must have an eventIdentifier.
+    if (!i.more()) {
+        uassert(
+            6189501,
+            "Expected an eventIdentifier for an event resume token",
+            !(result.tokenType == ResumeTokenData::TokenType::kEventToken && result.version >= 2));
+        return result;
+    }
+
+    result.eventIdentifier = Value(i.next());
+    uassert(6189503,
+            "Resume Token eventIdentifier is not an object",
+            result.eventIdentifier.getType() == BSONType::object);
+
+    if (i.more() && result.version >= 2) {
+        auto fragmentNum = i.next();
+        uassert(7182501,
+                "Resume token 'fragmentNum' must be a non-negative integer.",
+                fragmentNum.type() == BSONType::numberInt && fragmentNum.numberInt() >= 0);
+        result.fragmentNum = fragmentNum.numberInt();
     }
 
     uassert(40646, "invalid oversized resume token", !i.more());
     return result;
 }
 
-Document ResumeToken::toDocument() const {
-    return Document{{kDataFieldName, _hexKeyString}, {kTypeBitsFieldName, _typeBits}};
+Document ResumeToken::toDocument(const SerializationOptions& options) const {
+    return Document{
+        {kDataFieldName,
+         options.serializeLiteral(_hexKeyString, Value(kDefaultTokenQueryStats._hexKeyString))},
+
+        // When serializing with 'kToDebugTypeString' 'serializeLiteral' will return an
+        // incorrect result. Therefore, we prefer to always exclude '_typeBits'  when serializing
+        // the debug string by passing an empty value, since '_typeBits' is rarely set and will
+        // always be either missing or of type BinData.
+        {kTypeBitsFieldName,
+         options.isSerializingLiteralsAsDebugTypes()
+             ? Value()
+             : options.serializeLiteral(_typeBits, kDefaultTokenQueryStats._typeBits)}};
+}
+
+BSONObj ResumeToken::toBSON(const SerializationOptions& options) const {
+    return toDocument(options).toBson();
 }
 
 ResumeToken ResumeToken::parse(const Document& resumeDoc) {
     return ResumeToken(resumeDoc);
 }
 
-ResumeToken ResumeToken::makeHighWaterMarkToken(Timestamp clusterTime) {
-    return ResumeToken(makeHighWaterMarkResumeTokenData(clusterTime, boost::none));
+ResumeTokenData ResumeToken::makeHighWaterMarkTokenData(Timestamp clusterTime, int version) {
+    ResumeTokenData tokenData;
+    tokenData.version = version;
+    tokenData.clusterTime = clusterTime;
+    tokenData.tokenType = ResumeTokenData::kHighWaterMarkToken;
+    return tokenData;
+}
+
+ResumeToken ResumeToken::makeHighWaterMarkToken(Timestamp clusterTime, int version) {
+    return ResumeToken(makeHighWaterMarkTokenData(clusterTime, version));
 }
 
 bool ResumeToken::isHighWaterMarkToken(const ResumeTokenData& tokenData) {
-    return tokenData == makeHighWaterMarkResumeTokenData(tokenData.clusterTime, tokenData.uuid);
+    return tokenData == makeHighWaterMarkTokenData(tokenData.clusterTime, tokenData.version);
 }
 
 }  // namespace mongo

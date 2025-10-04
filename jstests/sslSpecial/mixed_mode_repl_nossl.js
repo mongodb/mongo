@@ -1,11 +1,10 @@
 /**
  * This test verifies that replica sets of different
  * mixed modes can still function
- *
- * @tags: [live_record_incompatible]
  */
 
-load("jstests/ssl/libs/ssl_helpers.js");
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {allowTLS, disabled, preferTLS, replShouldFail, replShouldSucceed} from "jstests/ssl/libs/ssl_helpers.js";
 
 // Limit the amount of time we'll wait on a failure.
 // Apply equally to success tests as well so that
@@ -17,14 +16,14 @@ ReplSetTest.kDefaultTimeoutMS = 3 * 60 * 1000;
 print("=== Testing disabled cluster ===");
 replShouldSucceed("disabled-disabled", disabled, disabled);
 
-// Test mixed sslMode allowSSL/preferSSL with non-ssl client
-print("=== Testing allowSSL/preferSSL cluster ===");
-replShouldSucceed("allow-prefer", allowSSL, preferSSL);
+// Test mixed tlsMode allowTLS/preferTLS with non-ssl client
+print("=== Testing allowTLS/preferTLS cluster ===");
+replShouldSucceed("allow-prefer", allowTLS, preferTLS);
 
-// Test mixed sslMode allowSSL/disabled with non-ssl client
-print("=== Testing allowSSL/disabled cluster ===");
-replShouldSucceed("allow-disabled", allowSSL, disabled);
+// Test mixed tlsMode allowTLS/disabled with non-ssl client
+print("=== Testing allowTLS/disabled cluster ===");
+replShouldSucceed("allow-disabled", allowTLS, disabled);
 
-// Test mixed sslMode disables/preferSSL - should fail with non-ssl client
-print("=== Testing disabled/preferSSL cluster - SHOULD FAIL ===");
-replShouldFail("disabled-disabled", disabled, preferSSL);
+// Test mixed tlsMode disables/preferTLS - should fail with non-ssl client
+print("=== Testing disabled/preferTLS cluster - SHOULD FAIL ===");
+replShouldFail("disabled-disabled", disabled, preferTLS);

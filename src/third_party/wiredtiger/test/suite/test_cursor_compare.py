@@ -26,18 +26,20 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest
-from wtdataset import SimpleDataSet, ComplexDataSet, ComplexLSMDataSet
-from wtscenario import filter_scenarios, make_scenarios
+import sys, wiredtiger, wttest
+from wtdataset import SimpleDataSet, ComplexDataSet
+from wtscenario import make_scenarios
 
 # Test cursor comparisons.
 class test_cursor_comparison(wttest.WiredTigerTestCase):
     name = 'test_compare'
+    # Note: SWIG generates a TypeError instead of a RuntimeError for several cases.
+    # The same error on all platforms would be better.
+    expected_exception = TypeError if sys.platform.startswith('darwin') else RuntimeError
 
     types = [
-        ('file', dict(type='file:', lsm=False, dataset=SimpleDataSet)),
-        ('lsm', dict(type='table:', lsm=True, dataset=ComplexLSMDataSet)),
-        ('table', dict(type='table:', lsm=False, dataset=ComplexDataSet))
+        ('file', dict(type='file:', dataset=SimpleDataSet)),
+        ('table', dict(type='table:', dataset=ComplexDataSet))
     ]
     keyfmt = [
         ('integer', dict(keyfmt='i', valfmt='S')),
@@ -49,9 +51,6 @@ class test_cursor_comparison(wttest.WiredTigerTestCase):
     # Discard invalid or unhelpful scenario combinations.
     def keep(name, d):
         if d['keyfmt'] == 'r':
-            # Skip record number keys with LSM.
-            if d['lsm']:
-                return False
             # Skip complex data sets with FLCS.
             if d['valfmt'] == '8t' and d['dataset'] != SimpleDataSet:
                 return False
@@ -114,7 +113,7 @@ class test_cursor_comparison(wttest.WiredTigerTestCase):
             wiredtiger.WiredTigerError, lambda: cX.compare(c1), msg)
         msg = '/wt_cursor.* is None/'
         self.assertRaisesHavingMessage(
-            RuntimeError,  lambda: cX.compare(None), msg)
+            self.expected_exception,  lambda: cX.compare(None), msg)
         if ix0_0 != None:
             self.assertEqual(ix0_0.compare(ix0_1), 0)
             ix0_1.reset()
@@ -203,7 +202,7 @@ class test_cursor_comparison(wttest.WiredTigerTestCase):
             wiredtiger.WiredTigerError, lambda: cX.equals(c1), msg)
         msg = '/wt_cursor.* is None/'
         self.assertRaisesHavingMessage(
-            RuntimeError,  lambda: cX.equals(None), msg)
+            self.expected_exception,  lambda: cX.equals(None), msg)
         if ix0_0 != None:
             self.assertTrue(ix0_0.equals(ix0_1))
             ix0_1.reset()
@@ -240,6 +239,3 @@ class test_cursor_comparison(wttest.WiredTigerTestCase):
         msg = '/must reference the same object/'
         self.assertRaisesWithMessage(
             wiredtiger.WiredTigerError, lambda: cX.equals(c1), msg)
-
-if __name__ == '__main__':
-    wttest.run()

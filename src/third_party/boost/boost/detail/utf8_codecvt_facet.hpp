@@ -14,7 +14,7 @@
 /////////1/////////2/////////3/////////4/////////5/////////6/////////7/////////8
 // utf8_codecvt_facet.hpp
 
-// This header defines class utf8_codecvt_facet, derived from 
+// This header defines class utf8_codecvt_facet, derived from
 // std::codecvt<wchar_t, char>, which can be used to convert utf8 data in
 // files into wchar_t strings in the application.
 //
@@ -23,10 +23,10 @@
 // we want to avoid code duplication. It would be possible to create utf8
 // library, but:
 // - this requires review process first
-// - in the case, when linking the a library which uses utf8 
+// - in the case, when linking the a library which uses utf8
 //   (say 'program_options'), user should also link to the utf8 library.
-//   This seems inconvenient, and asking a user to link to an unrevieved 
-//   library is strange. 
+//   This seems inconvenient, and asking a user to link to an unrevieved
+//   library is strange.
 // Until the above points are fixed, a library which wants to use utf8 must:
 // - include this header in one of it's headers or sources
 // - include the corresponding boost/detail/utf8_codecvt_facet.ipp file in one
@@ -39,14 +39,14 @@
 //     symbols.
 //
 // For example, program_options library might contain:
-//    #define BOOST_UTF8_BEGIN_NAMESPACE <backslash character> 
+//    #define BOOST_UTF8_BEGIN_NAMESPACE <backslash character>
 //             namespace boost { namespace program_options {
 //    #define BOOST_UTF8_END_NAMESPACE }}
 //    #define BOOST_UTF8_DECL BOOST_PROGRAM_OPTIONS_DECL
 //    #include <boost/detail/utf8_codecvt_facet.ipp>
 //
 // Essentially, each library will have its own copy of utf8 code, in
-// different namespaces. 
+// different namespaces.
 
 // Note:(Robert Ramey).  I have made the following alterations in the original
 // code.
@@ -67,7 +67,7 @@
 // use two template parameters
 //
 // utf8_codecvt_facet
-//   This is an implementation of a std::codecvt facet for translating 
+//   This is an implementation of a std::codecvt facet for translating
 //   from UTF-8 externally to UCS-4.  Note that this is not tied to
 //   any specific types in order to allow customization on platforms
 //   where wchar_t is not big enough.
@@ -109,28 +109,29 @@ BOOST_UTF8_BEGIN_NAMESPACE
 #define BOOST_UTF8_DECL
 #endif
 
-struct BOOST_UTF8_DECL utf8_codecvt_facet :
-    public std::codecvt<wchar_t, char, std::mbstate_t>  
+struct BOOST_SYMBOL_VISIBLE utf8_codecvt_facet :
+    public std::codecvt<wchar_t, char, std::mbstate_t>
 {
 public:
-    explicit utf8_codecvt_facet(std::size_t no_locale_manage=0);
-    virtual ~utf8_codecvt_facet();
+    BOOST_UTF8_DECL explicit utf8_codecvt_facet(std::size_t no_locale_manage = 0);
+    BOOST_UTF8_DECL virtual ~utf8_codecvt_facet();
+
 protected:
-    virtual std::codecvt_base::result do_in(
-        std::mbstate_t& state, 
+    BOOST_UTF8_DECL virtual std::codecvt_base::result do_in(
+        std::mbstate_t& state,
         const char * from,
-        const char * from_end, 
+        const char * from_end,
         const char * & from_next,
-        wchar_t * to, 
-        wchar_t * to_end, 
-        wchar_t*& to_next
+        wchar_t * to,
+        wchar_t * to_end,
+        wchar_t * & to_next
     ) const;
 
-    virtual std::codecvt_base::result do_out(
+    BOOST_UTF8_DECL virtual std::codecvt_base::result do_out(
         std::mbstate_t & state,
         const wchar_t * from,
         const wchar_t * from_end,
-        const wchar_t*  & from_next,
+        const wchar_t * & from_next,
         char * to,
         char * to_end,
         char * & to_next
@@ -140,7 +141,7 @@ protected:
         return (octet_1 < 0x80|| 0xbf< octet_1);
     }
 
-    bool invalid_leading_octet(unsigned char octet_1)   const {
+    bool invalid_leading_octet(unsigned char octet_1) const {
         return (0x7f < octet_1 && octet_1 < 0xc0) ||
             (octet_1 > 0xfd);
     }
@@ -150,11 +151,11 @@ protected:
         return get_octet_count(lead_octet) - 1;
     }
 
-    static unsigned int get_octet_count(unsigned char lead_octet);
+    BOOST_UTF8_DECL static unsigned int get_octet_count(unsigned char lead_octet);
 
     // How many "continuing octets" will be needed for this word
     // ==   total octets - 1.
-    int get_cont_octet_out_count(wchar_t word) const ;
+    BOOST_UTF8_DECL static int get_cont_octet_out_count(wchar_t word);
 
     virtual bool do_always_noconv() const BOOST_NOEXCEPT_OR_NOTHROW {
         return false;
@@ -162,7 +163,7 @@ protected:
 
     // UTF-8 isn't really stateful since we rewind on partial conversions
     virtual std::codecvt_base::result do_unshift(
-        std::mbstate_t&,
+        std::mbstate_t &,
         char * from,
         char * /*to*/,
         char * & next
@@ -178,10 +179,10 @@ protected:
 
     // How many char objects can I process to get <= max_limit
     // wchar_t objects?
-    virtual int do_length(
+    BOOST_UTF8_DECL virtual int do_length(
         std::mbstate_t &,
         const char * from,
-        const char * from_end, 
+        const char * from_end,
         std::size_t max_limit
     ) const
 #if BOOST_WORKAROUND(__IBMCPP__, BOOST_TESTED_AT(600))
@@ -193,7 +194,7 @@ protected:
     virtual int do_length(
         const std::mbstate_t & s,
         const char * from,
-        const char * from_end, 
+        const char * from_end,
         std::size_t max_limit
     ) const
 #if BOOST_WORKAROUND(__IBMCPP__, BOOST_TESTED_AT(600))

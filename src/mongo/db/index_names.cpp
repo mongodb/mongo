@@ -29,8 +29,14 @@
 
 #include "mongo/db/index_names.h"
 
-#include "mongo/db/jsobj.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/util/string_map.h"
+
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
 
 namespace mongo {
 
@@ -43,6 +49,9 @@ const string IndexNames::TEXT = "text";
 const string IndexNames::HASHED = "hashed";
 const string IndexNames::BTREE = "";
 const string IndexNames::WILDCARD = "wildcard";
+// We no longer support column store indexes. We use this value to reject creating them.
+const string IndexNames::COLUMN = "columnstore";
+const string IndexNames::ENCRYPTED_RANGE = "queryable_encrypted_range";
 // We no longer support geo haystack indexes. We use this value to reject creating them.
 const string IndexNames::GEO_HAYSTACK = "geoHaystack";
 
@@ -53,24 +62,34 @@ const StringMap<IndexType> kIndexNameToType = {
     {IndexNames::GEO_2DSPHERE_BUCKET, INDEX_2DSPHERE_BUCKET},
     {IndexNames::TEXT, INDEX_TEXT},
     {IndexNames::HASHED, INDEX_HASHED},
+    {IndexNames::COLUMN, INDEX_COLUMN},
+    {IndexNames::ENCRYPTED_RANGE, INDEX_ENCRYPTED_RANGE},
     {IndexNames::WILDCARD, INDEX_WILDCARD},
 };
 
 // static
 string IndexNames::findPluginName(const BSONObj& keyPattern) {
     BSONObjIterator i(keyPattern);
+    string indexTypeStr = "";
     while (i.more()) {
         BSONElement e = i.next();
         StringData fieldName(e.fieldNameStringData());
-        if (String == e.type()) {
-            return e.String();
-        } else if ((fieldName == "$**") || fieldName.endsWith(".$**")) {
-            return IndexNames::WILDCARD;
+        if (e.type() == BSONType::string) {
+            indexTypeStr = e.String();
+        } else if (WildcardNames::isWildcardFieldName(fieldName)) {
+            if (keyPattern.firstElement().type() == BSONType::string &&
+                keyPattern.firstElement().fieldNameStringData() == "columnstore"_sd) {
+                return IndexNames::COLUMN;
+            } else {
+                // Returns IndexNames::WILDCARD directly here because we rely on the caller to
+                // validate that wildcard indexes cannot compound with other special index type.
+                return IndexNames::WILDCARD;
+            }
         } else
             continue;
     }
 
-    return IndexNames::BTREE;
+    return indexTypeStr.empty() ? IndexNames::BTREE : indexTypeStr;
 }
 
 // static

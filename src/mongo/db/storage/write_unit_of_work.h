@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <iosfwd>
 #include <memory>
 
 namespace mongo {
@@ -44,6 +45,11 @@ class OperationContext;
  * A WriteUnitOfWork can be nested with others, but only the top level WriteUnitOfWork will commit
  * the unit of work on the RecoveryUnit. If a low level WriteUnitOfWork aborts, any parents will
  * also abort.
+ *
+ * The WriteUnitOfWork may be used in read only mode, where it allows callbacks to be registered
+ * with the RecoveryUnit and executes them on commit/abort without opening any unit of work on the
+ * RecoveryUnit. This can be used to unify code that performs in-memory writes using the callback
+ * functionality of the RecoveryUnit.
  */
 class WriteUnitOfWork {
     WriteUnitOfWork(const WriteUnitOfWork&) = delete;
@@ -59,7 +65,13 @@ public:
         kFailedUnitOfWork   // in a unit of work that has failed and must be aborted
     };
 
-    WriteUnitOfWork(OperationContext* opCtx);
+    enum OplogEntryGroupType {
+        kDontGroup,
+        kGroupForTransaction,
+        kGroupForPossiblyRetryableOperations
+    };
+
+    WriteUnitOfWork(OperationContext* opCtx, OplogEntryGroupType groupType = kDontGroup);
 
     ~WriteUnitOfWork();
 
@@ -98,9 +110,17 @@ public:
 private:
     WriteUnitOfWork() = default;  // for createForSnapshotResume
 
+    /**
+     * Whether this WUOW is grouping oplog entries, regardless of the grouping type.
+     */
+    bool _isGroupingOplogEntries() {
+        return _groupOplogEntries != kDontGroup;
+    }
+
     OperationContext* _opCtx;
 
     bool _toplevel;
+    OplogEntryGroupType _groupOplogEntries;
 
     bool _committed = false;
     bool _prepared = false;

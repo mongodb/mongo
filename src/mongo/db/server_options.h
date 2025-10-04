@@ -29,21 +29,38 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/cluster_auth_mode.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/topology/cluster_role.h"
 #include "mongo/logv2/log_format.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/process_id.h"
-#include "mongo/stdx/variant.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/net/cidr.h"
 #include "mongo/util/version/releases.h"
+#include "mongo/util/versioned_value.h"
+
+#include <algorithm>
+#include <ctime>
+#include <string>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+
+#ifdef _WIN32
+#include <winsock2.h>
+#else
+#include <sys/socket.h>
+#endif
 
 namespace mongo {
 
 const int DEFAULT_UNIX_PERMS = 0700;
 constexpr size_t DEFAULT_MAX_CONN = 1000000;
-
-enum class ClusterRole { None, ShardServer, ConfigServer };
 
 struct ServerGlobalParams {
     std::string binaryName;  // mongod or mongos
@@ -51,11 +68,17 @@ struct ServerGlobalParams {
 
     int port = DefaultDBPort;  // --port
     enum {
-        ConfigServerPort = 27019,
-        CryptDServerPort = 27020,
         DefaultDBPort = 27017,
         ShardServerPort = 27018,
+        ConfigServerPort = 27019,
+        CryptDServerPort = 27020,
+#ifdef MONGO_CONFIG_GRPC
+        DefaultGRPCServerPort = 27021,
+#endif
+        DefaultMagicRestorePort = 27022,
     };
+
+    enum MaintenanceMode { None, ReplicaSetMode, StandaloneMode };
 
     static std::string getPortSettingHelpText();
 
@@ -63,11 +86,16 @@ struct ServerGlobalParams {
     bool enableIPv6 = false;
     bool rest = false;  // --rest
 
-    int listenBacklog = 0;  // --listenBacklog, real default is SOMAXCONN
+    boost::optional<int> listenBacklog;  // --listenBacklog
 
     AtomicWord<bool> quiet{false};  // --quiet
 
-    ClusterRole clusterRole = ClusterRole::None;  // --configsvr/--shardsvr
+    ClusterRole clusterRole = ClusterRole::None;       // --configsvr/--shardsvr
+    MaintenanceMode maintenanceMode;                   // --maintenanceMode
+    bool replicaSetConfigShardMaintenanceMode{false};  // --replicaSetConfigShardMaintenanceMode
+
+    boost::optional<int> proxyPort;       // --proxyPort
+    bool doAutoBootstrapSharding{false};  // This is derived from other settings during startup.
 
     bool objcheck = true;  // --objcheck
 
@@ -75,20 +103,25 @@ struct ServerGlobalParams {
     // Can be paired with --objcheck so that extra BSON validation occurs.
     bool crashOnInvalidBSONError = false;  // --crashOnInvalidBSONError
 
+    // When specified, deterministically reproduces the execution order of mongo initializers.
+    unsigned initializerShuffleSeed = 0;  // --initializerShuffleSeed
+
     int defaultProfile = 0;  // --profile
     boost::optional<BSONObj> defaultProfileFilter;
-    int slowMS = 100;                      // --time in ms that is "slow"
-    double sampleRate = 1.0;               // --samplerate rate at which to sample slow queries
+    AtomicWord<int> slowMS{100};           // --time in ms that is "slow"
+    AtomicWord<double> sampleRate{1.0};    // --samplerate rate at which to sample slow queries
     int defaultLocalThresholdMillis = 15;  // --localThreshold in ms to consider a node local
-    bool moveParanoia = false;             // for move chunk paranoia
 
-    bool noUnixSocket = false;    // --nounixsocket
-    bool doFork = false;          // --fork
+    AtomicWord<int> slowTaskExecutorWaitTimeProfilingMs{
+        50};                    // --time in ms that is "slow" for a task to begin execution
+    bool noUnixSocket = false;  // --nounixsocket
+    bool doFork = false;        // --fork
+    bool isMongoBridge = false;
+
     std::string socket = "/tmp";  // UNIX domain socket directory
-    std::string transportLayer;   // --transportLayer (must be either "asio" or "legacy")
 
     size_t maxConns = DEFAULT_MAX_CONN;  // Maximum number of simultaneous open connections.
-    std::vector<stdx::variant<CIDR, std::string>> maxConnsOverride;
+    VersionedValue<CIDRList> maxIncomingConnsOverride;
     int reservedAdminThreads = 0;
 
     int unixSocketPermissions = DEFAULT_UNIX_PERMS;  // permissions for the UNIX domain socket
@@ -108,14 +141,6 @@ struct ServerGlobalParams {
 #ifndef _WIN32
     int forkReadyFd = -1;  // for `--fork`. Write to it and close it when daemon service is up.
 #endif
-
-    /**
-     * Switches to enable experimental (unsupported) features.
-     */
-    struct ExperimentalFeatures {
-        ExperimentalFeatures() : storageDetailsCmdEnabled(false) {}
-        bool storageDetailsCmdEnabled;  // -- enableExperimentalStorageDetailsCmd
-    } experimental;
 
     time_t started = ::time(nullptr);
 
@@ -137,15 +162,48 @@ struct ServerGlobalParams {
     // True if the current binary version is an LTS Version.
     static constexpr bool kIsLTSBinaryVersion = false;
 
-    struct FeatureCompatibility {
+#ifdef MONGO_CONFIG_GRPC
+    int grpcPort = DefaultGRPCServerPort;
+    int grpcServerMaxThreads = 1000;
+    int grpcKeepAliveTimeMs = INT_MAX;
+    int grpcKeepAliveTimeoutMs = 20000;
+#endif
+
+    /**
+     * Represents a "snapshot" of the in-memory FCV at a particular point in time.
+     * This is useful for callers who need to perform multiple FCV checks and expect the checks to
+     * be performed on a consistent (but possibly stale) FCV value.
+     *
+     * For example: checking isVersionInitialized() && isLessThan() with the same FCVSnapshot value
+     * would have the guarantee that if the FCV value is initialized during isVersionInitialized(),
+     * it will still be during isLessThan().
+     *
+     * Note that this can get stale, so if you call acquireFCVSnapshot() once, and then update
+     * serverGlobalParams.mutableFCV, and expect to use the new FCV value, you must acquire another
+     * snapshot. In general, if you want to check multiple properties of the FCV at a specific point
+     * in time, you should use one snapshot. For example, if you want to check both
+     * that the FCV is initialized and if it's less than some version, and that featureFlagXX is
+     * enabled on this FCV, this should all be using the same FCVSnapshot of the FCV value.
+     *
+     * But if you're doing multiple completely separate FCV checks at different points in time, such
+     * as over multiple functions, or multiple distinct feature flag enablement checks (i.e.
+     * featureFlagXX.isEnabled && featureFlagYY.isEnabled), you should get a new FCV snapshot for
+     * each check since the old one may be stale.
+     */
+    struct FCVSnapshot {
         using FCV = multiversion::FeatureCompatibilityVersion;
+
+        /**
+         * Creates an immutable "snapshot" of the passed in FCV.
+         */
+        explicit FCVSnapshot(FCV version) : _version(version) {}
 
         /**
          * On startup, the featureCompatibilityVersion may not have been explicitly set yet. This
          * exposes the actual state of the featureCompatibilityVersion if it is uninitialized.
          */
         bool isVersionInitialized() const {
-            return _version.load() != FCV::kUnsetDefaultLastLTSBehavior;
+            return _version != FCV::kUnsetDefaultLastLTSBehavior;
         }
 
         /**
@@ -154,7 +212,7 @@ struct ServerGlobalParams {
          */
         FCV getVersion() const {
             invariant(isVersionInitialized());
-            return _version.load();
+            return _version;
         }
 
         bool isLessThanOrEqualTo(FCV version, FCV* versionReturn = nullptr) const {
@@ -190,35 +248,50 @@ struct ServerGlobalParams {
         }
 
         // This function is to be used for generic FCV references only, and not for FCV-gating.
-        bool isUpgradingOrDowngrading(boost::optional<FCV> version = boost::none) const {
-            if (version == boost::none) {
-                version = getVersion();
-            }
+        bool isUpgradingOrDowngrading() const {
+            return isUpgradingOrDowngrading(getVersion());
+        }
 
+        static bool isUpgradingOrDowngrading(FCV version) {
             // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
             return version != multiversion::GenericFCV::kLatest &&
                 version != multiversion::GenericFCV::kLastContinuous &&
                 version != multiversion::GenericFCV::kLastLTS;
         }
 
-        bool isFCVUpgradingToOrAlreadyLatest() const {
-            auto currentVersion = getVersion();
+        /**
+         * Logs the current FCV global state.
+         * context: the context in which this function was called, to differentiate logs (e.g.
+         * startup, log rotation).
+         */
+        void logFCVWithContext(StringData context) const;
 
-            // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
-            return currentVersion == multiversion::GenericFCV::kUpgradingFromLastLTSToLatest ||
-                isGreaterThanOrEqualTo(
-                       multiversion::GenericFCV::kUpgradingFromLastContinuousToLatest);
-        }
+    private:
+        const FCV _version;
+    };
 
-        bool isFCVDowngradingOrAlreadyDowngradedFromLatest() const {
-            auto currentVersion = getVersion();
+    /**
+     * Represents the in-memory FCV that can be changed.
+     * This should only be used to set/reset the in-memory FCV, or get a snapshot of the current
+     * in-memory FCV. It *cannot* be used to check the actual value of the in-memory FCV, and in
+     * particular, check the value over multiple function calls. This is because the in-memory FCV
+     * might change in between those calls (such as during initial sync). Instead, use
+     * acquireFCVSnapshot() to get a snapshot of the FCV, and use the functions available on
+     * FCVSnapshot.
+     */
+    struct MutableFCV {
+        using FCV = multiversion::FeatureCompatibilityVersion;
 
-            // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
-            return currentVersion == multiversion::GenericFCV::kDowngradingFromLatestToLastLTS ||
-                currentVersion == multiversion::GenericFCV::kLastLTS ||
-                currentVersion ==
-                multiversion::GenericFCV::kDowngradingFromLatestToLastContinuous ||
-                currentVersion == multiversion::GenericFCV::kLastContinuous;
+        /**
+         * Gets an immutable copy/snapshot of the current FCV so that callers can check
+         * the FCV value at a particular point in time over multiple function calls
+         * without the snapshot value changing.
+         * Note that this snapshot might be when the FCV is uninitialized, which could happen
+         * during initial sync. The caller of this function and the subsequent functions
+         * within FCVSnapshot must handle that case.
+         */
+        FCVSnapshot acquireFCVSnapshot() const {
+            return FCVSnapshot(_version.load());
         }
 
         void reset() {
@@ -232,10 +305,10 @@ struct ServerGlobalParams {
     private:
         AtomicWord<FCV> _version{FCV::kUnsetDefaultLastLTSBehavior};
 
-    } mutableFeatureCompatibility;
+    } mutableFCV;
 
     // Const reference for featureCompatibilityVersion checks.
-    const FeatureCompatibility& featureCompatibility = mutableFeatureCompatibility;
+    const MutableFCV& featureCompatibility = mutableFCV;
 
     // Feature validation differs depending on the role of a mongod in a replica set. Replica set
     // primaries can accept user-initiated writes and validate based on the feature compatibility
@@ -245,7 +318,8 @@ struct ServerGlobalParams {
 
     std::vector<std::string> disabledSecureAllocatorDomains;
 
-    bool enableMajorityReadConcern = true;
+    // List of absolute paths to extension shared object files. These will be loaded during startup.
+    std::vector<std::string> extensions;
 };
 
 extern ServerGlobalParams serverGlobalParams;
@@ -261,4 +335,5 @@ struct TraitNamedDomain {
         return ret;
     }
 };
+
 }  // namespace mongo

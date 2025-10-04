@@ -28,8 +28,11 @@
  */
 
 #pragma once
-
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/repl/election_reason_counter.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 namespace repl {

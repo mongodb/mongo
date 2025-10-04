@@ -27,12 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/update/addtoset_node.h"
 
-#include "mongo/bson/bsonelement_comparator.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement_comparator_interface.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
+#include <set>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -69,11 +76,11 @@ Status AddToSetNode::init(BSONElement modExpr,
     bool isEach = false;
 
     // If the value of 'modExpr' is an object whose first field is '$each', treat it as an $each.
-    if (modExpr.type() == BSONType::Object) {
+    if (modExpr.type() == BSONType::object) {
         auto firstElement = modExpr.Obj().firstElement();
         if (firstElement && firstElement.fieldNameStringData() == "$each") {
             isEach = true;
-            if (firstElement.type() != BSONType::Array) {
+            if (firstElement.type() != BSONType::array) {
                 return Status(
                     ErrorCodes::TypeMismatch,
                     str::stream()
@@ -110,7 +117,7 @@ ModifierNode::ModifyResult AddToSetNode::updateExistingElement(mutablebson::Elem
             str::stream() << "Cannot apply $addToSet to non-array field. Field named '"
                           << element->getFieldName() << "' has non-array type "
                           << typeName(element->getType()),
-            element->getType() == BSONType::Array);
+            element->getType() == BSONType::array);
 
     // Find the set of elements that do not already exist in the array 'element'.
     std::vector<BSONElement> elementsToAdd;
@@ -137,7 +144,9 @@ ModifierNode::ModifyResult AddToSetNode::updateExistingElement(mutablebson::Elem
         invariant(element->pushBack(toAdd));
     }
 
-    return ModifyResult::kNormalUpdate;
+    ModifyResult result(ModifyResult::kArrayAppendUpdate);
+    result.description = ModifyResult::ArrayAppendUpdateDescription{elementsToAdd.size()};
+    return result;
 }
 
 void AddToSetNode::setValueForNewElement(mutablebson::Element* element) const {
@@ -146,6 +155,54 @@ void AddToSetNode::setValueForNewElement(mutablebson::Element* element) const {
     for (auto&& elem : _elements) {
         auto toAdd = element->getDocument().makeElement(elem);
         invariant(element->pushBack(toAdd));
+    }
+}
+
+
+void AddToSetNode::logUpdate(LogBuilderInterface* logBuilder,
+                             const RuntimeUpdatePath& pathTaken,
+                             mutablebson::Element element,
+                             ModifyResult modifyResult,
+                             boost::optional<int> createdFieldIdx) const {
+    invariant(logBuilder);
+
+    if (modifyResult.type == ModifyResult::kNormalUpdate ||
+        modifyResult.type == ModifyResult::kCreated) {
+        ModifierNode::logUpdate(logBuilder, pathTaken, element, modifyResult, createdFieldIdx);
+    } else if (modifyResult.type == ModifyResult::kArrayAppendUpdate) {
+        // This update only modified the array by appending entries to the end. Rather than writing
+        // out the entire contents of the array, we create oplog entries for the newly appended
+        // elements.
+        invariant(holds_alternative<ModifyResult::ArrayAppendUpdateDescription>(
+            modifyResult.description));
+        const auto numAppended =
+            get<ModifyResult::ArrayAppendUpdateDescription>(modifyResult.description).inserted;
+        const auto arraySize = countChildren(element);
+
+        std::vector<mutablebson::Element> added;
+        added.reserve(numAppended);
+        auto child = element.findNthChild(arraySize - numAppended);
+        for (size_t i = 0; i < numAppended; i++) {
+            added.push_back(child);
+            child = child.rightSibling();
+        }
+
+        // We have to copy the field ref provided in order to use RuntimeUpdatePathTempAppend.
+        RuntimeUpdatePath pathTakenCopy = pathTaken;
+        invariant(arraySize >= numAppended);
+        auto position = arraySize - numAppended;
+        for (const auto& elementToLog : added) {
+            const std::string positionAsString = std::to_string(position);
+
+            RuntimeUpdatePathTempAppend tempAppend(
+                pathTakenCopy, positionAsString, RuntimeUpdatePath::ComponentType::kArrayIndex);
+            uassertStatusOK(
+                logBuilder->logCreatedField(pathTakenCopy, pathTakenCopy.size() - 1, elementToLog));
+
+            ++position;
+        }
+    } else {
+        MONGO_UNREACHABLE;
     }
 }
 

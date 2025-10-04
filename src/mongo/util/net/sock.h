@@ -29,11 +29,12 @@
 
 #pragma once
 
-#include <stdio.h>
+#include <cstdio>
 
 #ifndef _WIN32
 
-#include <errno.h>
+#include <cerrno>
+
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/un.h>
@@ -44,12 +45,6 @@
 
 #endif  // not _WIN32
 
-#include <cstdint>
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
-
 #include "mongo/config.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/platform/compiler.h"
@@ -57,13 +52,19 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/net/sockaddr.h"
 
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
 namespace mongo {
 
 #ifdef MONGO_CONFIG_SSL
 class SSLManagerInterface;
 class SSLConnectionInterface;
 #endif
-struct SSLPeerInfo;
+class SSLPeerInfo;
 
 extern const int portSendFlags;
 extern const int portRecvFlags;
@@ -186,7 +187,7 @@ public:
      *  ssl - Pointer to the global SSLManager.
      *  remoteHost - The hostname of the remote server.
      */
-    bool secure(SSLManagerInterface* ssl, const std::string& remoteHost);
+    Status secure(SSLManagerInterface* ssl, const std::string& remoteHost);
 
     void secureAccepted(SSLManagerInterface* ssl);
 #endif

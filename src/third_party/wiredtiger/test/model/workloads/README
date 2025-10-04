@@ -1,0 +1,2 @@
+This folder contains a list of test/model workloads that generated failures in the past.
+The ticket number is included as the filename, with ".workload" as the file extension.

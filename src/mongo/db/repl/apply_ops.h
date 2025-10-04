@@ -27,17 +27,22 @@
  *    it in the license file.
  */
 
-#include <vector>
+#pragma once
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/apply_ops_gen.h"
-#include "mongo/db/repl/multiapplier.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+#include <vector>
+
+namespace MONGO_MOD_PUB mongo {
 class BSONObjBuilder;
 class OperationContext;
 
@@ -55,7 +60,7 @@ namespace repl {
  * For oplog application, the optime of the oplog entry will be given as the "optime" argument.
  */
 Status applyOps(OperationContext* opCtx,
-                const std::string& dbName,
+                const DatabaseName& dbName,
                 const BSONObj& applyOpCmd,
                 repl::OplogApplication::Mode oplogApplicationMode,
                 BSONObjBuilder* result);
@@ -68,4 +73,4 @@ Status applyApplyOpsOplogEntry(OperationContext* opCtx,
                                const OplogEntry& entry,
                                repl::OplogApplication::Mode oplogApplicationMode);
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

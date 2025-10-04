@@ -29,27 +29,42 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-
+#include "mongo/base/clonable_ptr.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_path.h"
+#include "mongo/db/matcher/expression_visitor.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/util/assert_util.h"
+
+#include <cstddef>
+#include <memory>
+#include <vector>
+
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
 class InternalSchemaObjectMatchExpression final : public PathMatchExpression {
 public:
     static constexpr StringData kName = "$_internalSchemaObjectMatch"_sd;
+    static constexpr int kNumChildren = 1;
 
-    InternalSchemaObjectMatchExpression(StringData path,
+    InternalSchemaObjectMatchExpression(boost::optional<StringData> path,
                                         std::unique_ptr<MatchExpression> expr,
                                         clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
-    bool matchesSingleElement(const BSONElement& elem, MatchDetails* details = nullptr) const final;
-
-    std::unique_ptr<MatchExpression> shallowClone() const final;
+    std::unique_ptr<MatchExpression> clone() const final;
 
     void debugString(StringBuilder& debug, int indentationLevel = 0) const final;
 
-    BSONObj getSerializedRightHandSide() const final;
+    void appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                       const SerializationOptions& opts = {},
+                                       bool includePath = true) const final;
 
     bool equivalent(const MatchExpression* other) const final;
 
@@ -59,13 +74,22 @@ public:
 
     size_t numChildren() const final {
         invariant(_sub);
-        return 1;
+        return kNumChildren;
     }
 
     MatchExpression* getChild(size_t i) const final {
         // 'i' must be 0 since there's always exactly one child.
-        invariant(i == 0);
+        tassert(6400217, "Out-of-bounds access to child of MatchExpression.", i < kNumChildren);
         return _sub.get();
+    }
+
+    void resetChild(size_t i, MatchExpression* other) final {
+        tassert(6329410, "Out-of-bounds access to child of MatchExpression.", i < kNumChildren);
+        _sub.reset(other);
+    }
+
+    MatchExpression* releaseChild() {
+        return _sub.release();
     }
 
     MatchCategory getCategory() const final {
@@ -81,8 +105,6 @@ public:
     }
 
 private:
-    ExpressionOptimizerFunc getOptimizer() const final;
-
     std::unique_ptr<MatchExpression> _sub;
 };
 }  // namespace mongo

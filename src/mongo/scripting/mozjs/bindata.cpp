@@ -27,26 +27,51 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/scripting/mozjs/bindata.h"
 
-#include <iomanip>
-
+#include "mongo/base/data_range.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/internedstring.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
-#include "mongo/scripting/mozjs/wrapconstrainedmethod.h"
+#include "mongo/scripting/mozjs/wrapconstrainedmethod.h"  // IWYU pragma: keep
+#include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
+#include <iomanip>
+#include <ostream>
+#include <string>
+#include <utility>
+
+#include <jsapi.h>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <js/CallArgs.h>
+#include <js/Object.h>
+#include <js/PropertyDescriptor.h>
+#include <js/PropertySpec.h>
+#include <js/RootingAPI.h>
+#include <js/TypeDecls.h>
+#include <js/Value.h>
+#include <js/ValueArray.h>
+
 namespace mongo {
 namespace mozjs {
+
+// Windows compiler fails to resolve the correct base64 identifier
+// specified in the MONGO_ATTACH macro below.
+// Explicitly set precedence on the one we want here.
+using base64 = typename BinDataInfo::Functions::base64;
 
 const JSFunctionSpec BinDataInfo::methods[5] = {
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(base64, BinDataInfo),
@@ -79,8 +104,8 @@ void hexToBinData(JSContext* cx,
     uassert(
         ErrorCodes::BadValue, "BinData hex string must be an even length", hexstr.size() % 2 == 0);
 
-    std::string encoded = base64::encode(hexblob::decode(hexstr));
-    JS::AutoValueArray<2> args(cx);
+    std::string encoded = mongo::base64::encode(hexblob::decode(hexstr));
+    JS::RootedValueArray<2> args(cx);
 
     args[0].setInt32(type);
     ValueReader(cx, args[1]).fromStringData(encoded);
@@ -88,20 +113,21 @@ void hexToBinData(JSContext* cx,
 }
 
 std::string* getEncoded(JS::HandleValue thisv) {
-    return static_cast<std::string*>(JS_GetPrivate(thisv.toObjectOrNull()));
+    return JS::GetMaybePtrFromReservedSlot<std::string>(thisv.toObjectOrNull(),
+                                                        BinDataInfo::BinDataStringSlot);
 }
 
 std::string* getEncoded(JSObject* thisv) {
-    return static_cast<std::string*>(JS_GetPrivate(thisv));
+    return JS::GetMaybePtrFromReservedSlot<std::string>(thisv, BinDataInfo::BinDataStringSlot);
 }
 
 }  // namespace
 
-void BinDataInfo::finalize(js::FreeOp* fop, JSObject* obj) {
+void BinDataInfo::finalize(JS::GCContext* gcCtx, JSObject* obj) {
     auto str = getEncoded(obj);
 
     if (str) {
-        getScope(fop)->trackedDelete(str);
+        getScope(gcCtx)->trackedDelete(str);
     }
 }
 
@@ -126,7 +152,7 @@ void BinDataInfo::Functions::UUID::call(JSContext* cx, JS::CallArgs args) {
     ConstDataRange cdr = uuid->toCDR();
     std::string encoded = mongo::base64::encode(StringData(cdr.data(), cdr.length()));
 
-    JS::AutoValueArray<2> newArgs(cx);
+    JS::RootedValueArray<2> newArgs(cx);
     newArgs[0].setInt32(newUUID);
     ValueReader(cx, newArgs[1]).fromStringData(encoded);
     getScope(cx)->getProto<BinDataInfo>().newInstance(newArgs, args.rval());
@@ -241,7 +267,7 @@ void BinDataInfo::construct(JSContext* cx, JS::CallArgs args) {
 
     auto str = ValueWriter(cx, utf).toString();
 
-    auto tmpBase64 = base64::decode(str);
+    auto tmpBase64 = mongo::base64::decode(str);
 
     JS::RootedObject thisv(cx);
     scope->getProto<BinDataInfo>().newObject(&thisv);
@@ -253,7 +279,8 @@ void BinDataInfo::construct(JSContext* cx, JS::CallArgs args) {
     o.defineProperty(InternedString::len, len, JSPROP_READONLY);
     o.defineProperty(InternedString::type, type, JSPROP_READONLY);
 
-    JS_SetPrivate(thisv, scope->trackedNew<std::string>(std::move(str)));
+    JS::SetReservedSlot(
+        thisv, BinDataStringSlot, JS::PrivateValue(scope->trackedNew<std::string>(std::move(str))));
 
     args.rval().setObjectOrNull(thisv);
 }

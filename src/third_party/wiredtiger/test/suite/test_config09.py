@@ -33,6 +33,7 @@
 import wiredtiger, wttest
 from wiredtiger import stat
 
+@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_config09(wttest.WiredTigerTestCase):
     ntables = 50
     nentries = 5
@@ -91,16 +92,13 @@ class test_config09(wttest.WiredTigerTestCase):
         self.assertEqual(val, 1024)
 
         self.update_tables()
-        val = self.get_stat(stat.conn.txn_checkpoint_handle_applied)
+        val = self.get_stat(stat.conn.checkpoint_handle_applied)
         # We cannot assert it is equal to half because there could be other
         # internal tables in the count. Assert it is less than 75% and at least
         # half.
         self.assertGreaterEqual(val, self.ntables // 2)
         self.assertLess(val, self.ntables // 4 * 3)
-        val = self.get_stat(stat.conn.txn_checkpoint_handle_skipped)
+        val = self.get_stat(stat.conn.checkpoint_handle_skipped)
         self.assertNotEqual(val, 0)
 
         self.conn.close()
-
-if __name__ == '__main__':
-    wttest.run()

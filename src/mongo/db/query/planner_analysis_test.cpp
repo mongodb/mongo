@@ -29,13 +29,23 @@
 
 #include "mongo/db/query/planner_analysis.h"
 
-#include <set>
-
-#include "mongo/db/json.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression_geo.h"
-#include "mongo/db/query/index_entry.h"
-#include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/compiler/metadata/index_entry.h"
+#include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
+#include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
+#include "mongo/db/query/compiler/physical_model/interval/interval.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
+#include "mongo/db/query/query_planner_test_fixture.h"
 #include "mongo/unittest/unittest.h"
+
+#include <set>
+#include <vector>
+
+#include <s2cellid.h>
+
 
 using namespace mongo;
 
@@ -47,7 +57,7 @@ namespace {
 IndexEntry buildSimpleIndexEntry(const BSONObj& kp) {
     return {kp,
             IndexNames::nameToType(IndexNames::findPluginName(kp)),
-            IndexDescriptor::kLatestIndexVersion,
+            IndexConfig::kLatestIndexVersion,
             false,
             {},
             {},
@@ -200,11 +210,11 @@ TEST(QueryPlannerAnalysis, GeoSkipValidation) {
         compoundIndex.infoObj = supportedVersion;
     unsupportedIndex.infoObj = unsupportedVersion;
 
-    QueryPlannerParams params;
+    QueryPlannerParams params{QueryPlannerParams::ArgsForTest{}};
 
     std::unique_ptr<FetchNode> fetchNodePtr = std::make_unique<FetchNode>();
     std::unique_ptr<GeoMatchExpression> exprPtr =
-        std::make_unique<GeoMatchExpression>("geometry.field", nullptr, BSONObj());
+        std::make_unique<GeoMatchExpression>("geometry.field"_sd, nullptr, BSONObj());
 
     GeoMatchExpression* expr = exprPtr.get();
 
@@ -214,7 +224,7 @@ TEST(QueryPlannerAnalysis, GeoSkipValidation) {
 
     OrNode orNode;
     // Takes ownership.
-    orNode.children.push_back(fetchNodePtr.release());
+    orNode.children.push_back(std::move(fetchNodePtr));
 
     // We should not skip validation if there are no indices.
     QueryPlannerAnalysis::analyzeGeo(params, fetchNode);
@@ -224,7 +234,7 @@ TEST(QueryPlannerAnalysis, GeoSkipValidation) {
     ASSERT_EQ(expr->getCanSkipValidation(), false);
 
     // We should not skip validation if there is a non 2dsphere index.
-    params.indices.push_back(irrelevantIndex);
+    params.mainCollectionInfo.indexes.push_back(irrelevantIndex);
 
     QueryPlannerAnalysis::analyzeGeo(params, fetchNode);
     ASSERT_EQ(expr->getCanSkipValidation(), false);
@@ -233,7 +243,7 @@ TEST(QueryPlannerAnalysis, GeoSkipValidation) {
     ASSERT_EQ(expr->getCanSkipValidation(), false);
 
     // We should not skip validation if the 2dsphere index isn't on relevant field.
-    params.indices.push_back(differentFieldIndex);
+    params.mainCollectionInfo.indexes.push_back(differentFieldIndex);
 
     QueryPlannerAnalysis::analyzeGeo(params, fetchNode);
     ASSERT_EQ(expr->getCanSkipValidation(), false);
@@ -243,7 +253,7 @@ TEST(QueryPlannerAnalysis, GeoSkipValidation) {
 
     // We should not skip validation if the 2dsphere index version does not support it.
 
-    params.indices.push_back(unsupportedIndex);
+    params.mainCollectionInfo.indexes.push_back(unsupportedIndex);
 
     QueryPlannerAnalysis::analyzeGeo(params, fetchNode);
     ASSERT_EQ(expr->getCanSkipValidation(), false);
@@ -252,7 +262,7 @@ TEST(QueryPlannerAnalysis, GeoSkipValidation) {
     ASSERT_EQ(expr->getCanSkipValidation(), false);
 
     // We should skip validation if there is a relevant 2dsphere index.
-    params.indices.push_back(relevantIndex);
+    params.mainCollectionInfo.indexes.push_back(relevantIndex);
 
     QueryPlannerAnalysis::analyzeGeo(params, fetchNode);
     ASSERT_EQ(expr->getCanSkipValidation(), true);
@@ -266,10 +276,10 @@ TEST(QueryPlannerAnalysis, GeoSkipValidation) {
     // We should skip validation if there is a relevant 2dsphere compound index.
 
     // Reset the test.
-    params.indices.clear();
+    params.mainCollectionInfo.indexes.clear();
     expr->setCanSkipValidation(false);
 
-    params.indices.push_back(compoundIndex);
+    params.mainCollectionInfo.indexes.push_back(compoundIndex);
 
     QueryPlannerAnalysis::analyzeGeo(params, fetchNode);
     ASSERT_EQ(expr->getCanSkipValidation(), true);
@@ -281,4 +291,117 @@ TEST(QueryPlannerAnalysis, GeoSkipValidation) {
     ASSERT_EQ(expr->getCanSkipValidation(), true);
 }
 
+TEST_F(QueryPlannerTest, ExprQueryHasImprecisePredicatesRemoved) {
+    // Ensure that all of the $_internalExpr predicates which get added when optimizing are later
+    // removed for an $expr on a collection scan.
+
+    runQuery(fromjson("{$expr: {$eq: ['$a', 123]}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{cscan: {filter: {$and: [{$expr: {$eq: ['$a', {$const: 123}]}}]}, dir: 1}}");
+
+    // Does not remove an InternalExpr* within an OR.
+    runQuery(fromjson("{$or: [{$expr: {$eq: ['$a', 123]}}, {$expr: {$eq: ['$b', 456]}}]}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{cscan: {filter: {$or: [{$and: [{$expr: {$eq: ['$a', {$const: 123}]}}]},"
+        "                        {$and: [{$expr: {$eq: ['$b', {$const: 456}]}}]}]},"
+        "dir: 1}}");
+
+    // Does not remove an InternalExpr* within an OR, even when an adjacent $expr is present.
+    runQuery(
+        fromjson("{or: [{a: {$_internalExprEq: 123}},"
+                 "{$expr: {$eq: ['$a', 123]}}, {$expr: {$eq: ['$b', 456]}}]}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{cscan: {filter: {or: [{a: {$_internalExprEq: 123}},"
+        " {$expr: {$eq: ['$a', 123]}}, {$expr: {$eq: ['$b', 456]}}]}, dir: 1}}");
+
+    // Removes an InternalExpr* within an AND when adjacent to precise $expr predicates.
+    runQuery(fromjson("{$and: [{$expr: {$eq: ['$a', 123]}}, {$expr: {$eq: ['$b', 456]}}]}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{cscan: {filter: "
+        "{$and: [{$expr: {$eq: ['$a', 123]}}, {$expr: {$eq: ['$b', 456]}}]}, dir:1}}");
+}
+
+TEST_F(QueryPlannerTest, ExprQueryHasImprecisePredicatesRemovedMix) {
+    // Ensure that the query plan generated does not include redundant $_internalExpr expressions.
+    const auto filter =
+        "{$or: [{$and: [{$expr: {$eq: ['$a', 123]}}, {$expr: {$eq: ['$a1', 123]}}]},"
+        "       {$and: [{$expr: {$eq: ['$b', 123]}}, {$expr: {$eq: ['$b1', 123]}}]},"
+        "       {$and: [{$or: [{$and: [{$expr: {$eq: ['$c', 123]}}]},"
+        "                      {$and: [{$expr: {$eq: ['$c1', 123]}}]}]},"
+        "               {$or: [{$and: [{$expr: {$eq: ['$d', 123]}},"
+        "                              {$expr: {$eq: ['$d1', 123]}}]},"
+        "                      {$and: [{$expr: {$eq: ['$e1', 123]}},"
+        "                              {$expr: {$eq: ['$e2', 123]}}]}]}]}]}";
+
+    runQuery(fromjson(filter));
+
+    assertNumSolutions(1U);
+
+    auto filterWithConstant = std::string(filter);
+    boost::replace_all(filterWithConstant, "123", "{$const: 123}");
+    std::string soln = str::stream() << "{cscan: {filter:" << filterWithConstant << ", dir: 1}}";
+    assertSolutionExists(soln);
+}
+
+TEST_F(QueryPlannerTest, ExprOnFetchDoesNotIncludeImpreciseFilter) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1));
+
+    // The residual predicate on b has to be applied after the fetch. Ensure that there is no
+    // additional imprecise predicate on the fetch.
+    runQuery(fromjson("{$and: [{a: 1}, {$expr: {$eq: ['$b', 99]}}]}"));
+    ASSERT_EQUALS(getNumSolutions(), 1U);
+    assertSolutionExists(
+        "{fetch: {filter: {$and: [{$expr: {$eq: ['$b', {$const: 99}]}}]}, node: "
+        "     {ixscan: {pattern: {a: 1}, "
+        "      bounds: {a: [[1,1,true,true]]}}}}}");
+}
+
+TEST(QueryPlannerAnalysis, TurnIndexScanIntoCount) {
+    auto node = std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1)));
+
+    OrderedIntervalList a{"a"};
+    a.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 1 << "" << 10), BoundInclusion::kIncludeBothStartAndEndKeys));
+    node->bounds.fields.push_back(a);
+
+    QuerySolution qs;
+    qs.setRoot(std::move(node));
+    ASSERT_TRUE(QueryPlannerAnalysis::turnIxscanIntoCount(&qs));
+}
+
+TEST(QueryPlannerAnalysis, TurnIndexScanAndFetchIntoCount) {
+    auto node = std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1)));
+    OrderedIntervalList a{"a"};
+    a.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 1 << "" << 10), BoundInclusion::kIncludeBothStartAndEndKeys));
+    node->bounds.fields.push_back(a);
+
+    QuerySolution qs;
+    qs.setRoot(std::make_unique<FetchNode>(std::move(node)));
+    ASSERT_TRUE(QueryPlannerAnalysis::turnIxscanIntoCount(&qs));
+}
+
+TEST(QueryPlannerAnalysis, CannotTurnIndexScanAndFetchIntoCount) {
+    auto node = std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1)));
+    OrderedIntervalList a{"a"};
+    a.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 1 << "" << 10), BoundInclusion::kIncludeBothStartAndEndKeys));
+    node->bounds.fields.push_back(a);
+
+    // Add fetch node with filter.
+    auto fetch = std::make_unique<FetchNode>(std::move(node));
+    auto operand = BSON("$lt" << 100);
+    std::unique_ptr<LTMatchExpression> expPtr =
+        std::make_unique<LTMatchExpression>("a"_sd, operand["$lt"]);
+    fetch->filter = std::move(expPtr);
+
+    QuerySolution qs;
+    qs.setRoot(std::move(fetch));
+    ASSERT_FALSE(QueryPlannerAnalysis::turnIxscanIntoCount(&qs));
+}
 }  // namespace

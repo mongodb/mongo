@@ -31,8 +31,8 @@ from wiredtiger import WT_NOTFOUND
 from wtscenario import make_scenarios
 
 # test_prepare16.py
-# Test that the prepare transaction rollback/commit multiple keys
-# and each key can occupy a leaf page.
+# Test that the prepare transaction rollback/commit multiple keys and each key can occupy a leaf
+# page.
 class test_prepare16(wttest.WiredTigerTestCase):
     in_memory_values = [
         ('no_inmem', dict(in_memory=False)),
@@ -42,7 +42,7 @@ class test_prepare16(wttest.WiredTigerTestCase):
     format_values = [
         ('column', dict(key_format='r', value_format='S')),
         ('column_fix', dict(key_format='r', value_format='8t')),
-        ('string_row', dict(key_format='S', value_format='S')),
+        ('row_string', dict(key_format='S', value_format='S')),
     ]
 
     txn_end_values = [
@@ -68,10 +68,12 @@ class test_prepare16(wttest.WiredTigerTestCase):
     def test_prepare(self):
         nrows = 1000
 
-        # Create a table without logging.
+        # Create a table that supports timestamps.
         uri = "table:prepare16"
         format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         create_config = 'allocation_size=512,leaf_page_max=512,leaf_value_max=64MB,' + format
+        if self.in_memory:
+            create_config += ',log=(enabled=false)'
         self.session.create(uri, create_config)
 
         if self.value_format == '8t':
@@ -90,21 +92,22 @@ class test_prepare16(wttest.WiredTigerTestCase):
 
         cursor.reset()
         cursor.close()
-        self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(10))
+        self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(11))
 
         s = self.conn.open_session()
         s.begin_transaction('ignore_prepare = true')
-        # Configure debug behavior on a cursor to evict the page positioned on when the reset API is used.
+        # Configure debug behavior on a cursor to evict the page positioned on when the reset API
+        # is used.
         evict_cursor = s.open_cursor(uri, None, "debug=(release_evict)")
 
         for i in range(1, nrows + 1):
             evict_cursor.set_key(self.make_key(i))
             # In FLCS (at least for now) uncommitted values extend the table with zeros.
             if self.value_format == '8t':
-                self.assertEquals(evict_cursor.search(), 0)
-                self.assertEquals(evict_cursor.get_value(), 0)
+                self.assertEqual(evict_cursor.search(), 0)
+                self.assertEqual(evict_cursor.get_value(), 0)
             else:
-                self.assertEquals(evict_cursor.search(), WT_NOTFOUND)
+                self.assertEqual(evict_cursor.search(), WT_NOTFOUND)
             evict_cursor.reset()
 
         if self.commit:
@@ -123,12 +126,12 @@ class test_prepare16(wttest.WiredTigerTestCase):
         for i in range(1, nrows + 1):
             cursor.set_key(self.make_key(i))
             if self.commit:
-                self.assertEquals(cursor.search(), 0)
+                self.assertEqual(cursor.search(), 0)
                 self.assertEqual(cursor.get_value(), valuea)
             elif self.value_format == '8t':
                 # In FLCS (at least for now) uncommitted values extend the table with zeros.
-                self.assertEquals(cursor.search(), 0)
-                self.assertEquals(cursor.get_value(), 0)
+                self.assertEqual(cursor.search(), 0)
+                self.assertEqual(cursor.get_value(), 0)
             else:
-                self.assertEquals(cursor.search(), WT_NOTFOUND)
+                self.assertEqual(cursor.search(), WT_NOTFOUND)
         self.session.commit_transaction()

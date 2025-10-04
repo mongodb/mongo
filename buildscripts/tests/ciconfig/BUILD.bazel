@@ -1,0 +1,11 @@
+py_test(
+    name = "test_evergreen",
+    srcs = [
+        "__init__.py",
+        "test_evergreen.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/ciconfig",
+    ],
+)

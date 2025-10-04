@@ -27,30 +27,16 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
-
-#include "mongo/platform/basic.h"
-
-#include "mongo/util/net/ssl_manager.h"
-
-#include <asio.hpp>
-#include <boost/algorithm/string/replace.hpp>
-#include <fstream>
-#include <memory>
-#include <string>
-#include <tuple>
-#include <vector>
-#include <winhttp.h>
 
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/config.h"
+#include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/transport/ssl_connection_context.h"
-#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point.h"
@@ -59,6 +45,7 @@
 #include "mongo/util/net/sockaddr.h"
 #include "mongo/util/net/socket_exception.h"
 #include "mongo/util/net/ssl.hpp"
+#include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/net/ssl_parameters_gen.h"
 #include "mongo/util/net/ssl_peer_info.h"
@@ -68,11 +55,23 @@
 #include "mongo/util/text.h"
 #include "mongo/util/uuid.h"
 
+#include <fstream>
+#include <memory>
+#include <string>
+#include <tuple>
+#include <vector>
+
+#include <asio.hpp>
+#include <winhttp.h>
+
+#include <boost/algorithm/string/replace.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
+
+
 namespace mongo {
 
 using transport::SSLConnectionContext;
-
-extern SSLManagerCoordinator* theSSLManagerCoordinator;
 
 namespace {
 
@@ -258,13 +257,19 @@ public:
 
     SSLConnectionWindows(SCHANNEL_CRED* cred, Socket* sock, const char* initialBytes, int len);
 
+    void* getConnection() final {
+        return _engine.native_handle();
+    }
+
     ~SSLConnectionWindows();
 };
 
 
 class SSLManagerWindows : public SSLManagerInterface {
 public:
-    explicit SSLManagerWindows(const SSLParams& params, bool isServer);
+    explicit SSLManagerWindows(const SSLParams& params,
+                               const boost::optional<TransientSSLParams>& transientSSLParams,
+                               bool isServer);
 
     /**
      * Initializes an OpenSSL context according to the provided settings. Only settings which are
@@ -307,6 +312,8 @@ public:
 
     void stopJobs() final;
 
+    SSLManagerMode getSSLManagerMode() const final;
+
 private:
     Status _loadCertificates(const SSLParams& params);
 
@@ -333,6 +340,8 @@ private:
     bool _allowInvalidHostnames;
     bool _suppressNoCertificateWarning;
     SSLConfiguration _sslConfiguration;
+    // If set, this parameters are used to create new transient SSL connection.
+    const boost::optional<TransientSSLParams> _transientSSLParams;
 
     SCHANNEL_CRED _clientCred;
     SCHANNEL_CRED _serverCred;
@@ -369,15 +378,12 @@ GlobalInitializerRegisterer sslManagerInitializer(
         if (!isSSLServer || (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled)) {
             theSSLManagerCoordinator = new SSLManagerCoordinator();
         }
-        return Status::OK();
     },
-    [](DeinitializerContext* context) {
+    [](DeinitializerContext*) {
         if (theSSLManagerCoordinator) {
             delete theSSLManagerCoordinator;
             theSSLManagerCoordinator = nullptr;
         }
-
-        return Status::OK();
     },
     {"EndStartupOptionHandling"},
     {});
@@ -406,23 +412,39 @@ std::shared_ptr<SSLManagerInterface> SSLManagerInterface::create(
     const SSLParams& params,
     const boost::optional<TransientSSLParams>& transientSSLParams,
     bool isServer) {
-    return std::make_shared<SSLManagerWindows>(params, isServer);
+    return std::make_shared<SSLManagerWindows>(params, transientSSLParams, isServer);
 }
 
 std::shared_ptr<SSLManagerInterface> SSLManagerInterface::create(const SSLParams& params,
                                                                  bool isServer) {
-    return std::make_shared<SSLManagerWindows>(params, isServer);
+    return std::make_shared<SSLManagerWindows>(
+        params, boost::optional<TransientSSLParams>{}, isServer);
 }
 
 namespace {
 
 StatusWith<std::vector<std::string>> getSubjectAlternativeNames(PCCERT_CONTEXT cert);
 
-SSLManagerWindows::SSLManagerWindows(const SSLParams& params, bool isServer)
+SSLManagerWindows::SSLManagerWindows(const SSLParams& params,
+                                     const boost::optional<TransientSSLParams>& transientSSLParams,
+                                     bool isServer)
     : _weakValidation(params.sslWeakCertificateValidation),
       _allowInvalidCertificates(params.sslAllowInvalidCertificates),
       _allowInvalidHostnames(params.sslAllowInvalidHostnames),
-      _suppressNoCertificateWarning(params.suppressNoTLSPeerCertificateWarning) {
+      _suppressNoCertificateWarning(params.suppressNoTLSPeerCertificateWarning),
+      _transientSSLParams(transientSSLParams) {
+
+    if (MONGO_unlikely(getSSLManagerMode() == SSLManagerMode::TransientWithOverride)) {
+        uassert(ErrorCodes::InvalidSSLConfiguration,
+                "New transient connections are only supported from client-to-server",
+                !isServer);
+
+        // Transient connections have priority over global SSL params.
+        const auto& tlsParams = transientSSLParams->getTLSCredentials();
+
+        _allowInvalidCertificates = tlsParams->tlsAllowInvalidCertificates;
+        _allowInvalidHostnames = tlsParams->tlsAllowInvalidHostnames;
+    }
 
     if (params.sslFIPSMode) {
         BOOLEAN enabled = FALSE;
@@ -488,12 +510,11 @@ StatusWith<UniqueCertChainEngine> initChainEngine(CERT_CHAIN_ENGINE_CONFIG* chai
     chainEngineConfig->dwFlags = flags;
 
     HCERTCHAINENGINE chainEngine;
-    BOOL ret = CertCreateCertificateChainEngine(chainEngineConfig, &chainEngine);
-    if (!ret) {
-        DWORD gle = GetLastError();
+    if (!CertCreateCertificateChainEngine(chainEngineConfig, &chainEngine)) {
+        auto ec = lastSystemError();
         return Status(ErrorCodes::InvalidSSLConfiguration,
-                      str::stream() << "CertCreateCertificateChainEngine failed: "
-                                    << errnoWithDescription(gle));
+                      str::stream()
+                          << "CertCreateCertificateChainEngine failed: " << errorMessage(ec));
     }
 
     return {chainEngine};
@@ -601,10 +622,7 @@ int SSLManagerWindows::SSL_write(SSLConnectionInterface* connInterface, const vo
                 return bytes_transferred;
             }
             default:
-                LOGV2_FATAL(23283,
-                            "Unexpected ASIO state: {state}",
-                            "Unexpected ASIO state",
-                            "state"_attr = static_cast<int>(want));
+                LOGV2_FATAL(23283, "Unexpected ASIO state", "state"_attr = static_cast<int>(want));
                 MONGO_UNREACHABLE;
         }
     }
@@ -615,50 +633,34 @@ int SSLManagerWindows::SSL_shutdown(SSLConnectionInterface* conn) {
     return 0;
 }
 
-StatusWith<std::string> readFile(StringData fileName) {
-    std::ifstream pemFile(fileName.toString(), std::ios::binary);
-    if (!pemFile.is_open()) {
-        return Status(ErrorCodes::InvalidSSLConfiguration,
-                      str::stream() << "Failed to open PEM file: " << fileName);
-    }
-
-    std::string buf((std::istreambuf_iterator<char>(pemFile)), std::istreambuf_iterator<char>());
-
-    pemFile.close();
-
-    return buf;
-}
-
 // Decode a base-64 PEM blob with headers into a binary blob
 StatusWith<std::vector<BYTE>> decodePEMBlob(StringData blob) {
     DWORD decodeLen{0};
 
-    BOOL ret = CryptStringToBinaryA(
-        blob.rawData(), blob.size(), CRYPT_STRING_BASE64HEADER, NULL, &decodeLen, NULL, NULL);
-    if (!ret) {
-        DWORD gle = GetLastError();
-        if (gle != ERROR_MORE_DATA) {
+    if (!CryptStringToBinaryA(
+            blob.data(), blob.size(), CRYPT_STRING_BASE64HEADER, NULL, &decodeLen, NULL, NULL)) {
+        auto ec = lastSystemError();
+        if (ec != systemError(ERROR_MORE_DATA)) {
             return Status(ErrorCodes::InvalidSSLConfiguration,
                           str::stream() << "CryptStringToBinary failed to get size of key: "
-                                        << errnoWithDescription(gle));
+                                        << errorMessage(ec));
         }
     }
 
     std::vector<BYTE> binaryBlobBuf;
     binaryBlobBuf.resize(decodeLen);
 
-    ret = CryptStringToBinaryA(blob.rawData(),
-                               blob.size(),
-                               CRYPT_STRING_BASE64HEADER,
-                               binaryBlobBuf.data(),
-                               &decodeLen,
-                               NULL,
-                               NULL);
-    if (!ret) {
-        DWORD gle = GetLastError();
+    if (!CryptStringToBinaryA(blob.data(),
+                              blob.size(),
+                              CRYPT_STRING_BASE64HEADER,
+                              binaryBlobBuf.data(),
+                              &decodeLen,
+                              NULL,
+                              NULL)) {
+        auto ec = lastSystemError();
         return Status(ErrorCodes::InvalidSSLConfiguration,
-                      str::stream() << "CryptStringToBinary failed to read key: "
-                                    << errnoWithDescription(gle));
+                      str::stream()
+                          << "CryptStringToBinary failed to read key: " << errorMessage(ec));
     }
 
     return std::move(binaryBlobBuf);
@@ -669,27 +671,31 @@ StatusWith<std::vector<BYTE>> decodeObject(const char* structType,
                                            size_t length) {
     DWORD decodeLen{0};
 
-    BOOL ret =
-        CryptDecodeObjectEx(X509_ASN_ENCODING, structType, data, length, 0, NULL, NULL, &decodeLen);
-    if (!ret) {
-        DWORD gle = GetLastError();
-        if (gle != ERROR_MORE_DATA) {
+    if (!CryptDecodeObjectEx(
+            X509_ASN_ENCODING, structType, data, length, 0, NULL, NULL, &decodeLen)) {
+        auto ec = lastSystemError();
+        if (ec != systemError(ERROR_MORE_DATA)) {
             return Status(ErrorCodes::InvalidSSLConfiguration,
                           str::stream() << "CryptDecodeObjectEx failed to get size of object: "
-                                        << errnoWithDescription(gle));
+                                        << errorMessage(ec));
         }
     }
 
     std::vector<BYTE> binaryBlobBuf;
     binaryBlobBuf.resize(decodeLen);
 
-    ret = CryptDecodeObjectEx(
-        X509_ASN_ENCODING, structType, data, length, 0, NULL, binaryBlobBuf.data(), &decodeLen);
-    if (!ret) {
-        DWORD gle = GetLastError();
+    if (!CryptDecodeObjectEx(X509_ASN_ENCODING,
+                             structType,
+                             data,
+                             length,
+                             0,
+                             NULL,
+                             binaryBlobBuf.data(),
+                             &decodeLen)) {
+        auto ec = lastSystemError();
         return Status(ErrorCodes::InvalidSSLConfiguration,
-                      str::stream() << "CryptDecodeObjectEx failed to read object: "
-                                    << errnoWithDescription(gle));
+                      str::stream()
+                          << "CryptDecodeObjectEx failed to read object: " << errorMessage(ec));
     }
 
     return std::move(binaryBlobBuf);
@@ -722,7 +728,7 @@ StatusWith<std::vector<UniqueCertificate>> readCAPEMBuffer(StringData buffer) {
             return {std::move(certs)};
         }
 
-        pos = (blobBuf.rawData() + blobBuf.size()) - buffer.rawData();
+        pos = (blobBuf.data() + blobBuf.size()) - buffer.data();
 
         auto swCert = decodePEMBlob(blobBuf);
         if (!swCert.isOK()) {
@@ -733,11 +739,11 @@ StatusWith<std::vector<UniqueCertificate>> readCAPEMBuffer(StringData buffer) {
 
         PCCERT_CONTEXT cert =
             CertCreateCertificateContext(X509_ASN_ENCODING, certBuf.data(), certBuf.size());
-        if (cert == NULL) {
-            DWORD gle = GetLastError();
+        if (!cert) {
+            auto ec = lastSystemError();
             return Status(ErrorCodes::InvalidSSLConfiguration,
                           str::stream() << "CertCreateCertificateContext failed to decode cert: "
-                                        << errnoWithDescription(gle));
+                                        << errorMessage(ec));
         }
 
         certs.emplace_back(cert);
@@ -748,14 +754,11 @@ StatusWith<std::vector<UniqueCertificate>> readCAPEMBuffer(StringData buffer) {
 
 Status addCertificatesToStore(HCERTSTORE certStore, std::vector<UniqueCertificate>& certificates) {
     for (auto& cert : certificates) {
-        BOOL ret =
-            CertAddCertificateContextToStore(certStore, cert.get(), CERT_STORE_ADD_NEW, NULL);
-
-        if (!ret) {
-            DWORD gle = GetLastError();
+        if (!CertAddCertificateContextToStore(certStore, cert.get(), CERT_STORE_ADD_NEW, NULL)) {
+            auto ec = lastSystemError();
             return Status(ErrorCodes::InvalidSSLConfiguration,
-                          str::stream() << "CertAddCertificateContextToStore Failed  "
-                                        << errnoWithDescription(gle));
+                          str::stream()
+                              << "CertAddCertificateContextToStore Failed  " << errorMessage(ec));
         }
     }
 
@@ -765,7 +768,7 @@ Status addCertificatesToStore(HCERTSTORE certStore, std::vector<UniqueCertificat
 // Read a Certificate PEM file with a private key from disk
 StatusWith<UniqueCertificateWithPrivateKey> readCertPEMFile(StringData fileName,
                                                             StringData password) {
-    auto swBuf = readFile(fileName);
+    auto swBuf = ssl_util::readPEMFile(fileName);
     if (!swBuf.isOK()) {
         return swBuf.getStatus();
     }
@@ -791,7 +794,7 @@ StatusWith<UniqueCertificateWithPrivateKey> readCertPEMFile(StringData fileName,
     // Multiple certificates in a PEM file are not supported since these certs need to be in the ca
     // file.
     auto secondPublicKeyBlobPosition =
-        buf.find("CERTIFICATE", (publicKeyBlob.rawData() + publicKeyBlob.size()) - buf.data());
+        buf.find("CERTIFICATE", (publicKeyBlob.data() + publicKeyBlob.size()) - buf.data());
     std::vector<UniqueCertificate> extraCertificates;
     if (secondPublicKeyBlobPosition != std::string::npos) {
         // Read in extra certificates
@@ -816,34 +819,32 @@ StatusWith<UniqueCertificateWithPrivateKey> readCertPEMFile(StringData fileName,
     PCCERT_CONTEXT cert =
         CertCreateCertificateContext(X509_ASN_ENCODING, certBuf.data(), certBuf.size());
 
-    if (cert == NULL) {
-        DWORD gle = GetLastError();
+    if (!cert) {
+        auto ec = lastSystemError();
         return Status(ErrorCodes::InvalidSSLConfiguration,
                       str::stream() << "CertCreateCertificateContext failed to decode cert: "
-                                    << errnoWithDescription(gle));
+                                    << errorMessage(ec));
     }
 
     UniqueCertificate tempCertHolder(cert);
 
     HCERTSTORE store = CertOpenStore(
         CERT_STORE_PROV_MEMORY, 0, NULL, CERT_STORE_DEFER_CLOSE_UNTIL_LAST_FREE_FLAG, NULL);
-    if (store == NULL) {
-        DWORD gle = GetLastError();
+    if (!store) {
+        auto ec = lastSystemError();
         return Status(ErrorCodes::InvalidSSLConfiguration,
-                      str::stream() << "CertOpenStore failed to create memory store: "
-                                    << errnoWithDescription(gle));
+                      str::stream()
+                          << "CertOpenStore failed to create memory store: " << errorMessage(ec));
     }
 
     UniqueCertStore storeHolder(store);
 
     // Add the newly created certificate to the memory store, this makes a copy
-    BOOL ret = CertAddCertificateContextToStore(store, cert, CERT_STORE_ADD_NEW, NULL);
-
-    if (!ret) {
-        DWORD gle = GetLastError();
+    if (!CertAddCertificateContextToStore(store, cert, CERT_STORE_ADD_NEW, NULL)) {
+        auto ec = lastSystemError();
         return Status(ErrorCodes::InvalidSSLConfiguration,
                       str::stream() << "CertAddCertificateContextToStore Memory Failed  "
-                                    << errnoWithDescription(gle));
+                                    << errorMessage(ec));
     }
 
     // Get the certificate from the store so we attach the private key to the cert in the store
@@ -938,47 +939,45 @@ StatusWith<UniqueCertificateWithPrivateKey> readCertPEMFile(StringData fileName,
         // default
         // container is shared across processes owned by the same user.
         // Note: Server side Schannel requires CRYPT_VERIFYCONTEXT off
-        ret = CryptAcquireContextW(
-            &hProv, wstr.c_str(), MS_ENHANCED_PROV, PROV_RSA_FULL, CRYPT_NEWKEYSET | CRYPT_SILENT);
-        if (!ret) {
-            DWORD gle = GetLastError();
-
-            if (gle == NTE_EXISTS) {
-
-                ret = CryptAcquireContextW(
-                    &hProv, wstr.c_str(), MS_ENHANCED_PROV, PROV_RSA_FULL, CRYPT_SILENT);
-                if (!ret) {
-                    DWORD gle = GetLastError();
+        if (!CryptAcquireContextW(&hProv,
+                                  wstr.c_str(),
+                                  MS_ENHANCED_PROV,
+                                  PROV_RSA_FULL,
+                                  CRYPT_NEWKEYSET | CRYPT_SILENT)) {
+            auto ec = lastSystemError();
+            if (ec == systemError(NTE_EXISTS)) {
+                if (!CryptAcquireContextW(
+                        &hProv, wstr.c_str(), MS_ENHANCED_PROV, PROV_RSA_FULL, CRYPT_SILENT)) {
+                    auto ec = lastSystemError();
                     return Status(ErrorCodes::InvalidSSLConfiguration,
-                                  str::stream() << "CryptAcquireContextW failed "
-                                                << errnoWithDescription(gle));
+                                  str::stream()
+                                      << "CryptAcquireContextW failed " << errorMessage(ec));
                 }
 
             } else {
                 return Status(ErrorCodes::InvalidSSLConfiguration,
-                              str::stream()
-                                  << "CryptAcquireContextW failed " << errnoWithDescription(gle));
+                              str::stream() << "CryptAcquireContextW failed " << errorMessage(ec));
             }
         }
     } else {
         // Use a transient key container for the key
-        ret = CryptAcquireContextW(
-            &hProv, NULL, MS_ENHANCED_PROV, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT | CRYPT_SILENT);
-        if (!ret) {
-            DWORD gle = GetLastError();
+        if (!CryptAcquireContextW(&hProv,
+                                  NULL,
+                                  MS_ENHANCED_PROV,
+                                  PROV_RSA_FULL,
+                                  CRYPT_VERIFYCONTEXT | CRYPT_SILENT)) {
+            auto ec = lastSystemError();
             return Status(ErrorCodes::InvalidSSLConfiguration,
-                          str::stream()
-                              << "CryptAcquireContextW failed  " << errnoWithDescription(gle));
+                          str::stream() << "CryptAcquireContextW failed  " << errorMessage(ec));
         }
     }
     UniqueCryptProvider cryptProvider(hProv);
 
     HCRYPTKEY hkey;
-    ret = CryptImportKey(hProv, privateKey.data(), privateKey.size(), 0, 0, &hkey);
-    if (!ret) {
-        DWORD gle = GetLastError();
+    if (!CryptImportKey(hProv, privateKey.data(), privateKey.size(), 0, 0, &hkey)) {
+        auto ec = lastSystemError();
         return Status(ErrorCodes::InvalidSSLConfiguration,
-                      str::stream() << "CryptImportKey failed  " << errnoWithDescription(gle));
+                      str::stream() << "CryptImportKey failed  " << errorMessage(ec));
     }
     UniqueCryptKey keyHolder(hkey);
 
@@ -995,32 +994,31 @@ StatusWith<UniqueCertificateWithPrivateKey> readCertPEMFile(StringData fileName,
 
         if (!CertSetCertificateContextProperty(
                 certHolder.get(), CERT_KEY_PROV_INFO_PROP_ID, 0, &keyProvInfo)) {
-            DWORD gle = GetLastError();
+            auto ec = lastSystemError();
             return Status(ErrorCodes::InvalidSSLConfiguration,
-                          str::stream() << "CertSetCertificateContextProperty Failed  "
-                                        << errnoWithDescription(gle));
+                          str::stream()
+                              << "CertSetCertificateContextProperty Failed  " << errorMessage(ec));
         }
     }
 
     // NOTE: This is used to set the certificate for client side SChannel
-    ret = CertSetCertificateContextProperty(
-        cert, CERT_KEY_PROV_HANDLE_PROP_ID, 0, (const void*)hProv);
-    if (!ret) {
-        DWORD gle = GetLastError();
+    if (!CertSetCertificateContextProperty(
+            cert, CERT_KEY_PROV_HANDLE_PROP_ID, 0, (const void*)hProv)) {
+        auto ec = lastSystemError();
         return Status(ErrorCodes::InvalidSSLConfiguration,
-                      str::stream() << "CertSetCertificateContextProperty failed  "
-                                    << errnoWithDescription(gle));
+                      str::stream()
+                          << "CertSetCertificateContextProperty failed  " << errorMessage(ec));
     }
 
     // Add the extra certificates into the same certificate store as the certificate
-    addCertificatesToStore(certHolder->hCertStore, extraCertificates);
+    uassertStatusOK(addCertificatesToStore(certHolder->hCertStore, extraCertificates));
 
     return UniqueCertificateWithPrivateKey{std::move(certHolder), std::move(cryptProvider)};
 }
 
 Status readCAPEMFile(HCERTSTORE certStore, StringData fileName) {
 
-    auto swBuf = readFile(fileName);
+    auto swBuf = ssl_util::readPEMFile(fileName);
     if (!swBuf.isOK()) {
         return swBuf.getStatus();
     }
@@ -1040,7 +1038,7 @@ Status readCAPEMFile(HCERTSTORE certStore, StringData fileName) {
 
 Status readCRLPEMFile(HCERTSTORE certStore, StringData fileName) {
 
-    auto swBuf = readFile(fileName);
+    auto swBuf = ssl_util::readPEMFile(fileName);
     if (!swBuf.isOK()) {
         return swBuf.getStatus();
     }
@@ -1071,9 +1069,9 @@ Status readCRLPEMFile(HCERTSTORE certStore, StringData fileName) {
             return Status::OK();
         }
 
-        pos = (blobBuf.rawData() + blobBuf.size()) - buf.data();
+        pos += blobBuf.size();
 
-        auto swCert = decodePEMBlob(buf);
+        auto swCert = decodePEMBlob(blobBuf);
         if (!swCert.isOK()) {
             return swCert.getStatus();
         }
@@ -1081,22 +1079,19 @@ Status readCRLPEMFile(HCERTSTORE certStore, StringData fileName) {
         auto certBuf = swCert.getValue();
 
         PCCRL_CONTEXT crl = CertCreateCRLContext(X509_ASN_ENCODING, certBuf.data(), certBuf.size());
-        if (crl == NULL) {
-            DWORD gle = GetLastError();
+        if (!crl) {
+            auto ec = lastSystemError();
             return Status(ErrorCodes::InvalidSSLConfiguration,
-                          str::stream() << "CertCreateCRLContext failed to decode crl: "
-                                        << errnoWithDescription(gle));
+                          str::stream()
+                              << "CertCreateCRLContext failed to decode crl: " << errorMessage(ec));
         }
 
         UniqueCRL crlHolder(crl);
 
-        BOOL ret = CertAddCRLContextToStore(certStore, crl, CERT_STORE_ADD_NEW, NULL);
-
-        if (!ret) {
-            DWORD gle = GetLastError();
+        if (!CertAddCRLContextToStore(certStore, crl, CERT_STORE_ADD_NEW, NULL)) {
+            auto ec = lastSystemError();
             return Status(ErrorCodes::InvalidSSLConfiguration,
-                          str::stream()
-                              << "CertAddCRLContextToStore Failed  " << errnoWithDescription(gle));
+                          str::stream() << "CertAddCRLContextToStore Failed: " << errorMessage(ec));
         }
     }
 
@@ -1105,10 +1100,10 @@ Status readCRLPEMFile(HCERTSTORE certStore, StringData fileName) {
 
 StatusWith<UniqueCertStore> readCertChains(StringData caFile, StringData crlFile) {
     UniqueCertStore certStore = CertOpenStore(CERT_STORE_PROV_MEMORY, 0, NULL, 0, NULL);
-    if (certStore == nullptr) {
-        DWORD gle = GetLastError();
+    if (!certStore) {
+        auto ec = lastSystemError();
         return Status(ErrorCodes::InvalidSSLConfiguration,
-                      str::stream() << "CertOpenStore Failed  " << errnoWithDescription(gle));
+                      str::stream() << "CertOpenStore Failed  " << errorMessage(ec));
     }
 
     auto status = readCAPEMFile(certStore, caFile);
@@ -1126,7 +1121,7 @@ StatusWith<UniqueCertStore> readCertChains(StringData caFile, StringData crlFile
     return std::move(certStore);
 }
 
-bool hasCertificateSelector(SSLParams::CertificateSelector selector) {
+bool hasCertificateSelector(const SSLParams::CertificateSelector selector) {
     return !selector.subject.empty() || !selector.thumbprint.empty();
 }
 
@@ -1139,11 +1134,11 @@ StatusWith<UniqueCertificate> loadCertificateSelectorFromStore(
                                      storeType | CERT_STORE_DEFER_CLOSE_UNTIL_LAST_FREE_FLAG |
                                          CERT_STORE_READONLY_FLAG,
                                      L"My");
-    if (store == NULL) {
-        DWORD gle = GetLastError();
+    if (!store) {
+        auto ec = lastSystemError();
         return Status(ErrorCodes::InvalidSSLConfiguration,
                       str::stream() << "CertOpenStore failed to open store 'My' from '" << storeName
-                                    << "': " << errnoWithDescription(gle));
+                                    << "': " << errorMessage(ec));
     }
 
     UniqueCertStore storeHolder(store);
@@ -1157,14 +1152,14 @@ StatusWith<UniqueCertificate> loadCertificateSelectorFromStore(
                                                          CERT_FIND_SUBJECT_STR,
                                                          wstr.c_str(),
                                                          NULL);
-        if (cert == NULL) {
-            DWORD gle = GetLastError();
+        if (!cert) {
+            auto ec = lastSystemError();
             return Status(
                 ErrorCodes::InvalidSSLConfiguration,
                 str::stream()
                     << "CertFindCertificateInStore failed to find cert with subject name '"
                     << selector.subject.c_str() << "' in 'My' store in '" << storeName
-                    << "': " << errnoWithDescription(gle));
+                    << "': " << errorMessage(ec));
         }
 
         return UniqueCertificate(cert);
@@ -1178,15 +1173,14 @@ StatusWith<UniqueCertificate> loadCertificateSelectorFromStore(
                                                          CERT_FIND_HASH,
                                                          &hashBlob,
                                                          NULL);
-        if (cert == NULL) {
-            DWORD gle = GetLastError();
+        if (!cert) {
+            auto ec = lastSystemError();
             return Status(ErrorCodes::InvalidSSLConfiguration,
                           str::stream()
                               << "CertFindCertificateInStore failed to find cert with thumbprint '"
                               << hexblob::encode(selector.thumbprint.data(),
                                                  selector.thumbprint.size())
-                              << "' in 'My' store in '" << storeName
-                              << "': " << errnoWithDescription(gle));
+                              << "' in 'My' store in '" << storeName << "': " << errorMessage(ec));
         }
 
         return UniqueCertificate(cert);
@@ -1220,27 +1214,26 @@ StatusWith<UniqueCertificate> loadAndValidateCertificateSelector(
     DWORD dwKeySpec;
     BOOL freeProvider;
     HCRYPTPROV hCryptProv;
-    BOOL ret = CryptAcquireCertificatePrivateKey(swCert.getValue().get(),
-                                                 CRYPT_ACQUIRE_ALLOW_NCRYPT_KEY_FLAG,
-                                                 NULL,
-                                                 &hCryptProv,
-                                                 &dwKeySpec,
-                                                 &freeProvider);
-    if (!ret) {
-        DWORD gle = GetLastError();
-        if (gle == CRYPT_E_NO_KEY_PROPERTY) {
+    if (!CryptAcquireCertificatePrivateKey(swCert.getValue().get(),
+                                           CRYPT_ACQUIRE_ALLOW_NCRYPT_KEY_FLAG,
+                                           NULL,
+                                           &hCryptProv,
+                                           &dwKeySpec,
+                                           &freeProvider)) {
+        auto ec = lastSystemError();
+        if (ec == systemError(CRYPT_E_NO_KEY_PROPERTY)) {
             return Status(ErrorCodes::InvalidSSLConfiguration,
                           str::stream()
                               << "Could not find private key attached to the selected certificate");
-        } else if (gle == NTE_BAD_KEYSET) {
+        } else if (ec == systemError(NTE_BAD_KEYSET)) {
             return Status(ErrorCodes::InvalidSSLConfiguration,
                           str::stream() << "Could not read private key attached to the selected "
                                            "certificate, ensure it exists and check the private "
                                            "key permissions");
         } else {
             return Status(ErrorCodes::InvalidSSLConfiguration,
-                          str::stream() << "CryptAcquireCertificatePrivateKey failed  "
-                                        << errnoWithDescription(gle));
+                          str::stream()
+                              << "CryptAcquireCertificatePrivateKey failed  " << errorMessage(ec));
         }
     }
 
@@ -1251,13 +1244,42 @@ StatusWith<UniqueCertificate> loadAndValidateCertificateSelector(
     return std::move(swCert.getValue());
 }
 
+SSLManagerWindows::SSLManagerMode SSLManagerWindows::getSSLManagerMode() const {
+    if (!_transientSSLParams) {
+        return SSLManagerMode::Normal;
+    } else if (_transientSSLParams->createNewConnection()) {
+        return SSLManagerMode::TransientWithOverride;
+    } else {
+        return SSLManagerMode::TransientNoOverride;
+    }
+}
+
 Status SSLManagerWindows::_loadCertificates(const SSLParams& params) {
     _clientCertificates[0] = nullptr;
     _serverCertificates[0] = nullptr;
 
+    SSLManagerMode managerMode = getSSLManagerMode();
+    auto sslConfig = parseSSLCoreParams(params, _transientSSLParams);
+
+    const auto [crlfile, certificateSelector, clusterCertificateSelector] =
+        [&]() -> std::tuple<const std::string&,
+                            const SSLParams::CertificateSelector*,
+                            const SSLParams::CertificateSelector*> {
+        if (MONGO_unlikely(_transientSSLParams)) {
+            const auto& tlsParams = _transientSSLParams->getTLSCredentials();
+            return {tlsParams->tlsCRLFile,
+                    &tlsParams->tlsCertificateSelector,
+                    &tlsParams->tlsClusterCertificateSelector};
+        } else {
+            return {params.sslCRLFile,
+                    &params.sslCertificateSelector,
+                    &params.sslClusterCertificateSelector};
+        }
+    }();
+
     // Load the normal PEM file
-    if (!params.sslPEMKeyFile.empty()) {
-        auto swCertificate = readCertPEMFile(params.sslPEMKeyFile, params.sslPEMKeyPassword);
+    if (!sslConfig.clientPEM.empty()) {
+        auto swCertificate = readCertPEMFile(sslConfig.clientPEM, sslConfig.clientPassword);
         if (!swCertificate.isOK()) {
             return swCertificate.getStatus();
         }
@@ -1266,7 +1288,7 @@ Status SSLManagerWindows::_loadCertificates(const SSLParams& params) {
     }
 
     // Load the cluster PEM file, only applies to server side code
-    if (!params.sslClusterFile.empty()) {
+    if (!params.sslClusterFile.empty() && managerMode != SSLManagerMode::TransientWithOverride) {
         auto swCertificate = readCertPEMFile(params.sslClusterFile, params.sslClusterPassword);
         if (!swCertificate.isOK()) {
             return swCertificate.getStatus();
@@ -1284,13 +1306,11 @@ Status SSLManagerWindows::_loadCertificates(const SSLParams& params) {
         _clientCertificates[0] = std::get<0>(_clusterPEMCertificate).get();
     }
 
-    if (!params.sslCAFile.empty()) {
-        // SChannel always has a CA even when the user does not specify one
-        // The openssl implementations uses this to decide if it wants to do certificate validation
-        // on the server side.
-        _sslConfiguration.hasCA = true;
+    // If the user has specified --setParameter tlsUseSystemCA=true, then no params.sslCAFile nor
+    // params.sslClusterCAFile will be defined, and the SSL Manager will fall back to the System CA.
+    if (!sslConfig.cafile.empty()) {
 
-        auto swChain = readCertChains(params.sslCAFile, params.sslCRLFile);
+        auto swChain = readCertChains(sslConfig.cafile, crlfile);
         if (!swChain.isOK()) {
             return swChain.getStatus();
         }
@@ -1299,7 +1319,7 @@ Status SSLManagerWindows::_loadCertificates(const SSLParams& params) {
         // can build a complete chain to send to the remote side.
         if (std::get<0>(_pemCertificate)) {
             auto status =
-                readCAPEMFile(std::get<0>(_pemCertificate).get()->hCertStore, params.sslCAFile);
+                readCAPEMFile(std::get<0>(_pemCertificate).get()->hCertStore, sslConfig.cafile);
             if (!status.isOK()) {
                 return status;
             }
@@ -1307,10 +1327,12 @@ Status SSLManagerWindows::_loadCertificates(const SSLParams& params) {
 
         _clientEngine.CAstore = std::move(swChain.getValue());
     }
-    _clientEngine.hasCRL = !params.sslCRLFile.empty();
+    _clientEngine.hasCRL = !crlfile.empty();
 
     const auto serverCAFile =
-        params.sslClusterCAFile.empty() ? params.sslCAFile : params.sslClusterCAFile;
+        (params.sslClusterCAFile.empty() || managerMode == SSLManagerMode::TransientWithOverride)
+        ? sslConfig.cafile
+        : params.sslClusterCAFile;
     if (!serverCAFile.empty()) {
         auto swChain = readCertChains(serverCAFile, params.sslCRLFile);
         if (!swChain.isOK()) {
@@ -1320,8 +1342,8 @@ Status SSLManagerWindows::_loadCertificates(const SSLParams& params) {
         // Dump the CA cert chain into the memory store for the cluster cert. This ensures Windows
         // can build a complete chain to send to the remote side.
         if (std::get<0>(_clusterPEMCertificate)) {
-            auto status =
-                readCAPEMFile(std::get<0>(_clusterPEMCertificate).get()->hCertStore, serverCAFile);
+            auto status = readCAPEMFile(std::get<0>(_clusterPEMCertificate).get()->hCertStore,
+                                        sslConfig.cafile);
             if (!status.isOK()) {
                 return status;
             }
@@ -1329,18 +1351,19 @@ Status SSLManagerWindows::_loadCertificates(const SSLParams& params) {
 
         _serverEngine.CAstore = std::move(swChain.getValue());
     }
-    _serverEngine.hasCRL = !params.sslCRLFile.empty();
+    _serverEngine.hasCRL = !crlfile.empty();
 
-    if (hasCertificateSelector(params.sslCertificateSelector)) {
-        auto swCert = loadAndValidateCertificateSelector(params.sslCertificateSelector);
+    if (hasCertificateSelector(*certificateSelector)) {
+        auto swCert = loadAndValidateCertificateSelector(*certificateSelector);
         if (!swCert.isOK()) {
             return swCert.getStatus();
         }
         _sslCertificate = std::move(swCert.getValue());
     }
 
-    if (hasCertificateSelector(params.sslClusterCertificateSelector)) {
-        auto swCert = loadAndValidateCertificateSelector(params.sslClusterCertificateSelector);
+    if (hasCertificateSelector(*clusterCertificateSelector) &&
+        managerMode != SSLManagerMode::TransientWithOverride) {
+        auto swCert = loadAndValidateCertificateSelector(*clusterCertificateSelector);
         if (!swCert.isOK()) {
             return swCert.getStatus();
         }
@@ -1348,17 +1371,17 @@ Status SSLManagerWindows::_loadCertificates(const SSLParams& params) {
     }
 
     if (_sslCertificate || _sslClusterCertificate) {
-        if (!params.sslCAFile.empty()) {
+        if (!sslConfig.cafile.empty()) {
             LOGV2_WARNING(23271,
                           "Mixing certs from the system certificate store and PEM files. This may "
-                          "produced unexpected results.");
+                          "produce unexpected results.");
         }
-
-        _sslConfiguration.hasCA = true;
     }
 
     if (_sslCertificate) {
-        _clientCertificates[0] = _sslCertificate.get();
+        if (!_clientCertificates[0]) {
+            _clientCertificates[0] = _sslCertificate.get();
+        }
         _serverCertificates[0] = _sslCertificate.get();
     }
 
@@ -1377,8 +1400,17 @@ Status SSLManagerWindows::initSSLContext(SCHANNEL_CRED* cred,
     cred->dwVersion = SCHANNEL_CRED_VERSION;
     cred->dwFlags = SCH_USE_STRONG_CRYPTO;  // Use strong crypto;
 
-
     uint32_t supportedProtocols = 0;
+
+    const auto [disabledProtocols, cipherConfig] =
+        [&]() -> std::pair<const std::vector<SSLParams::Protocols>*, const std::string&> {
+        if (MONGO_unlikely(_transientSSLParams)) {
+            const auto& tlsParams = _transientSSLParams->getTLSCredentials();
+            return {&tlsParams->tlsDisabledProtocols, tlsParams->tlsCipherConfig};
+        } else {
+            return {&params.sslDisabledProtocols, params.sslCipherConfig};
+        }
+    }();
 
     if (direction == ConnectionDirection::kIncoming) {
         supportedProtocols = SP_PROT_TLS1_SERVER | SP_PROT_TLS1_0_SERVER | SP_PROT_TLS1_1_SERVER |
@@ -1408,7 +1440,7 @@ Status SSLManagerWindows::initSSLContext(SCHANNEL_CRED* cred,
     }
 
     // Set the supported TLS protocols. Allow --sslDisabledProtocols to disable selected ciphers.
-    for (const SSLParams::Protocols& protocol : params.sslDisabledProtocols) {
+    for (const SSLParams::Protocols& protocol : *disabledProtocols) {
         if (protocol == SSLParams::Protocols::TLS1_0) {
             supportedProtocols &= ~(SP_PROT_TLS1_0_CLIENT | SP_PROT_TLS1_0_SERVER);
         } else if (protocol == SSLParams::Protocols::TLS1_1) {
@@ -1416,6 +1448,7 @@ Status SSLManagerWindows::initSSLContext(SCHANNEL_CRED* cred,
         } else if (protocol == SSLParams::Protocols::TLS1_2) {
             supportedProtocols &= ~(SP_PROT_TLS1_2_CLIENT | SP_PROT_TLS1_2_SERVER);
         }
+        // SERVER-98279: support tls 1.3 for windows & apple
     }
 
     cred->grbitEnabledProtocols = supportedProtocols;
@@ -1424,7 +1457,7 @@ Status SSLManagerWindows::initSSLContext(SCHANNEL_CRED* cred,
                 "All supported TLS protocols have been disabled."};
     }
 
-    if (params.sslCipherConfig != kSSLCipherConfigDefault) {
+    if (cipherConfig != kSSLCipherConfigDefault) {
         LOGV2_WARNING(
             23272,
             "sslCipherConfig parameter is not supported with Windows SChannel and is ignored.");
@@ -1468,10 +1501,10 @@ SSLConnectionInterface* SSLManagerWindows::accept(Socket* socket,
 }
 
 void SSLManagerWindows::_handshake(SSLConnectionWindows* conn, bool client) {
-    initSSLContext(conn->_cred,
-                   getSSLGlobalParams(),
-                   client ? SSLManagerInterface::ConnectionDirection::kOutgoing
-                          : SSLManagerInterface::ConnectionDirection::kIncoming);
+    uassertStatusOK(initSSLContext(conn->_cred,
+                                   getSSLGlobalParams(),
+                                   client ? SSLManagerInterface::ConnectionDirection::kOutgoing
+                                          : SSLManagerInterface::ConnectionDirection::kIncoming));
 
     while (true) {
         asio::error_code ec;
@@ -1751,19 +1784,17 @@ Status validatePeerCertificate(const std::string& remoteHost,
 
     auto before = Date_t::now();
     PCCERT_CHAIN_CONTEXT chainContext;
-    BOOL ret = CertGetCertificateChain(certChainEngine,
-                                       cert,
-                                       NULL,
-                                       cert->hCertStore,
-                                       &certChainPara,
-                                       CERT_CHAIN_REVOCATION_CHECK_CHAIN_EXCLUDE_ROOT,
-                                       NULL,
-                                       &chainContext);
-    if (!ret) {
-        DWORD gle = GetLastError();
+    if (!CertGetCertificateChain(certChainEngine,
+                                 cert,
+                                 NULL,
+                                 cert->hCertStore,
+                                 &certChainPara,
+                                 CERT_CHAIN_REVOCATION_CHECK_CHAIN_EXCLUDE_ROOT,
+                                 NULL,
+                                 &chainContext)) {
+        auto ec = lastSystemError();
         return Status(ErrorCodes::InvalidSSLConfiguration,
-                      str::stream()
-                          << "CertGetCertificateChain failed: " << errnoWithDescription(gle));
+                      str::stream() << "CertGetCertificateChain failed: " << errorMessage(ec));
     }
 
     auto after = Date_t::now();
@@ -1803,15 +1834,16 @@ Status validatePeerCertificate(const std::string& remoteHost,
     memset(&certChainPolicyStatus, 0, sizeof(certChainPolicyStatus));
     certChainPolicyStatus.cbSize = sizeof(certChainPolicyStatus);
 
-    ret = CertVerifyCertificateChainPolicy(
-        CERT_CHAIN_POLICY_SSL, certChainHolder.get(), &chain_policy_para, &certChainPolicyStatus);
 
     // This means something really went wrong, this should not happen.
-    if (!ret) {
-        DWORD gle = GetLastError();
+    if (!CertVerifyCertificateChainPolicy(CERT_CHAIN_POLICY_SSL,
+                                          certChainHolder.get(),
+                                          &chain_policy_para,
+                                          &certChainPolicyStatus)) {
+        auto ec = lastSystemError();
         return Status(ErrorCodes::InvalidSSLConfiguration,
-                      str::stream() << "CertVerifyCertificateChainPolicy failed: "
-                                    << errnoWithDescription(gle));
+                      str::stream()
+                          << "CertVerifyCertificateChainPolicy failed: " << errorMessage(ec));
     }
 
     auto swSubjectName = getCertificateSubjectName(cert);
@@ -1849,17 +1881,16 @@ Status validatePeerCertificate(const std::string& remoteHost,
             // We know the CNs do not match, are there any other issues?
             sslCertChainPolicy.fdwChecks = SECURITY_FLAG_IGNORE_CERT_CN_INVALID;
 
-            ret = CertVerifyCertificateChainPolicy(CERT_CHAIN_POLICY_SSL,
-                                                   certChainHolder.get(),
-                                                   &chain_policy_para,
-                                                   &certChainPolicyStatus);
 
             // This means something really went wrong, this should not happen.
-            if (!ret) {
-                DWORD gle = GetLastError();
+            if (!CertVerifyCertificateChainPolicy(CERT_CHAIN_POLICY_SSL,
+                                                  certChainHolder.get(),
+                                                  &chain_policy_para,
+                                                  &certChainPolicyStatus)) {
+                auto ec = lastSystemError();
                 return Status(ErrorCodes::InvalidSSLConfiguration,
                               str::stream() << "CertVerifyCertificateChainPolicy2 failed: "
-                                            << errnoWithDescription(gle));
+                                            << errorMessage(ec));
             }
 
             if (certChainPolicyStatus.dwError == S_OK ||
@@ -1910,15 +1941,13 @@ Status validatePeerCertificate(const std::string& remoteHost,
 
             if (allowInvalidCertificates) {
                 LOGV2_WARNING(23274,
-                              "SSL peer certificate validation failed ({errorCode}): {error}",
                               "SSL peer certificate validation failed",
                               "errorCode"_attr = unsignedHex(certChainPolicyStatus.dwError),
-                              "error"_attr = errnoWithDescription(certChainPolicyStatus.dwError));
+                              "error"_attr =
+                                  errorMessage(systemError(certChainPolicyStatus.dwError)));
 
                 if (certChainPolicyStatus.dwError == CERT_E_CN_NO_MATCH) {
                     LOGV2_WARNING(23275,
-                                  "The server certificate does not match the host name. Hostname: "
-                                  "{remoteHost} does not match {certificateNames}",
                                   "The server certificate does not match the host name",
                                   "remoteHost"_attr = remoteHost,
                                   "certificateNames"_attr = certificateNames.str());
@@ -1928,8 +1957,6 @@ Status validatePeerCertificate(const std::string& remoteHost,
                 return Status::OK();
             } else if (allowInvalidHostnames) {
                 LOGV2_WARNING(23276,
-                              "The server certificate does not match the host name. Hostname: "
-                              "{remoteHost} does not match {certificateNames}",
                               "The server certificate does not match the host name",
                               "remoteHost"_attr = remoteHost,
                               "certificateNames"_attr = certificateNames.str());
@@ -1941,14 +1968,13 @@ Status validatePeerCertificate(const std::string& remoteHost,
             str::stream msg;
             msg << "SSL peer certificate validation failed: ("
                 << unsignedHex(certChainPolicyStatus.dwError) << ")"
-                << errnoWithDescription(certChainPolicyStatus.dwError);
+                << errorMessage(systemError(certChainPolicyStatus.dwError));
 
 
             LOGV2_ERROR(23279,
-                        "SSL peer certificate validation failed: ({errorCode}){error}",
                         "SSL peer certificate validation failed",
                         "errorCode"_attr = unsignedHex(certChainPolicyStatus.dwError),
-                        "error"_attr = errnoWithDescription(certChainPolicyStatus.dwError));
+                        "error"_attr = errorMessage(systemError(certChainPolicyStatus.dwError)));
             return Status(ErrorCodes::SSLHandshakeFailed, msg);
         }
     }
@@ -1969,6 +1995,7 @@ StatusWith<TLSVersion> mapTLSVersion(PCtxtHandle ssl) {
                           << "QueryContextAttributes for connection info failed with" << ss);
     }
 
+    // SERVER-98279: support tls 1.3 for windows & apple
     switch (connInfo.dwProtocol) {
         case SP_PROT_TLS1_CLIENT:
         case SP_PROT_TLS1_SERVER:
@@ -2007,25 +2034,18 @@ Future<SSLPeerInfo> SSLManagerWindows::parseAndValidatePeerCertificate(
 
     recordTLSVersion(tlsVersionStatus.getValue(), hostForLogging);
 
-    if (!_sslConfiguration.hasCA && isSSLServer)
-        return Future<SSLPeerInfo>::makeReady(SSLPeerInfo(sni));
-
     SECURITY_STATUS ss = QueryContextAttributes(ssl, SECPKG_ATTR_REMOTE_CERT_CONTEXT, &cert);
 
     if (ss == SEC_E_NO_CREDENTIALS) {  // no certificate presented by peer
         if (_weakValidation) {
             // do not give warning if "no certificate" warnings are suppressed
             if (!_suppressNoCertificateWarning) {
-                LOGV2_WARNING(23277,
-                              "no SSL certificate provided by peer",
-                              "No SSL certificate provided by peer");
+                LOGV2_WARNING(23277, "No SSL certificate provided by peer");
             }
             return SSLPeerInfo(sni);
         } else {
             auto msg = "no SSL certificate provided by peer; connection rejected";
-            LOGV2_ERROR(23280,
-                        "no SSL certificate provided by peer; connection rejected",
-                        "No SSL certificate provided by peer; connection rejected");
+            LOGV2_ERROR(23280, "No SSL certificate provided by peer; connection rejected");
             return Status(ErrorCodes::SSLHandshakeFailed, msg);
         }
     }
@@ -2069,10 +2089,21 @@ Future<SSLPeerInfo> SSLManagerWindows::parseAndValidatePeerCertificate(
         return Future<SSLPeerInfo>::makeReady(SSLPeerInfo(sni));
     }
 
-    LOGV2_DEBUG(23270,
-                2,
-                "Accepted TLS connection from peer: {peerSubjectName}",
-                "peerSubjectName"_attr = peerSubjectName);
+    SecPkgContext_CipherInfo cipherInfo;
+    SECURITY_STATUS ssCipher = QueryContextAttributes(ssl, SECPKG_ATTR_CIPHER_INFO, &cipherInfo);
+    if (ssCipher != SEC_E_OK) {
+        return Status(ErrorCodes::SSLHandshakeFailed,
+                      str::stream()
+                          << "QueryContextAttributes for connection info failed with" << ssCipher);
+    }
+    const auto cipher = std::wstring(cipherInfo.szCipherSuite);
+
+    if (!serverGlobalParams.quiet.load() && gEnableDetailedConnectionHealthMetricLogLines.load()) {
+        LOGV2_INFO(6723802,
+                   "Accepted TLS connection from peer",
+                   "peerSubjectName"_attr = peerSubjectName,
+                   "cipher"_attr = toUtf8String(cipher));
+    }
 
     // If this is a server and client and server certificate are the same, log a warning.
     if (remoteHost.empty() && _sslConfiguration.serverSubjectName() == peerSubjectName) {
@@ -2104,10 +2135,10 @@ Status getCertInfo(CertInformationToLog* info, PCCERT_CONTEXT cert) {
 
     if (!CertGetCertificateContextProperty(
             cert, CERT_SHA1_HASH_PROP_ID, info->thumbprint.data(), &bufSize)) {
-        DWORD gle = GetLastError();
+        auto ec = lastSystemError();
         return Status(ErrorCodes::InvalidSSLConfiguration,
                       str::stream() << "getCertInfo failed to get certificate thumbprint: "
-                                    << errnoWithDescription(gle));
+                                    << errorMessage(ec));
     }
     info->hexEncodedThumbprint = hexblob::encode(info->thumbprint.data(), info->thumbprint.size());
 
@@ -2125,10 +2156,10 @@ Status getCRLInfo(CRLInformationToLog* info, PCCRL_CONTEXT crl) {
 
     if (!CertGetCRLContextProperty(
             crl, CERT_SHA1_HASH_PROP_ID, info->thumbprint.data(), &bufSize)) {
-        DWORD gle = GetLastError();
+        auto ec = lastSystemError();
         return Status(ErrorCodes::InvalidSSLConfiguration,
-                      str::stream() << "getCRLInfo failed to get CRL thumbprint: "
-                                    << errnoWithDescription(gle));
+                      str::stream()
+                          << "getCRLInfo failed to get CRL thumbprint: " << errorMessage(ec));
     }
 
     info->validityNotBefore =

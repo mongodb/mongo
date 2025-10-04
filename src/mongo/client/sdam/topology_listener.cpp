@@ -26,10 +26,19 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 #include "mongo/client/sdam/topology_listener.h"
+
 #include "mongo/logv2/log.h"
+#include "mongo/util/assert_util.h"
+
+#include <algorithm>
+#include <iterator>
+#include <mutex>
+#include <utility>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 
 namespace mongo::sdam {
 
@@ -51,6 +60,22 @@ void TopologyEventsPublisher::registerListener(TopologyListenerPtr listener) {
     }
 }
 
+void TopologyEventsPublisher::removeListener(TopologyListenerPtr listener) {
+    auto locked_listener = listener.lock();
+    if (!locked_listener) {
+        LOGV2_WARNING(6142505, "Trying to remove an empty listener with TopologyEventsPublisher");
+        return;
+    }
+
+    stdx::lock_guard lock(_mutex);
+    _listeners.erase(std::remove_if(_listeners.begin(),
+                                    _listeners.end(),
+                                    [&locked_listener](const TopologyListenerPtr& ptr) {
+                                        return ptr.lock() == locked_listener;
+                                    }),
+                     _listeners.end());
+}
+
 void TopologyEventsPublisher::close() {
     stdx::lock_guard lock(_mutex);
     _listeners.clear();
@@ -59,12 +84,12 @@ void TopologyEventsPublisher::close() {
 
 void TopologyEventsPublisher::onTopologyDescriptionChangedEvent(
     TopologyDescriptionPtr previousDescription, TopologyDescriptionPtr newDescription) {
+    EventPtr event = std::make_unique<Event>();
+    event->type = EventType::TOPOLOGY_DESCRIPTION_CHANGED;
+    event->previousDescription = previousDescription;
+    event->newDescription = newDescription;
     {
         stdx::lock_guard lock(_eventQueueMutex);
-        EventPtr event = std::make_unique<Event>();
-        event->type = EventType::TOPOLOGY_DESCRIPTION_CHANGED;
-        event->previousDescription = previousDescription;
-        event->newDescription = newDescription;
         _eventQueue.push_back(std::move(event));
     }
     _scheduleNextDelivery();
@@ -73,13 +98,13 @@ void TopologyEventsPublisher::onTopologyDescriptionChangedEvent(
 void TopologyEventsPublisher::onServerHandshakeCompleteEvent(HelloRTT duration,
                                                              const HostAndPort& address,
                                                              const BSONObj reply) {
+    EventPtr event = std::make_unique<Event>();
+    event->type = EventType::HANDSHAKE_COMPLETE;
+    event->duration = duration;
+    event->hostAndPort = address;
+    event->reply = reply;
     {
-        stdx::lock_guard<Mutex> lock(_eventQueueMutex);
-        EventPtr event = std::make_unique<Event>();
-        event->type = EventType::HANDSHAKE_COMPLETE;
-        event->duration = duration;
-        event->hostAndPort = address;
-        event->reply = reply;
+        stdx::lock_guard<stdx::mutex> lock(_eventQueueMutex);
         _eventQueue.push_back(std::move(event));
     }
     _scheduleNextDelivery();
@@ -88,13 +113,13 @@ void TopologyEventsPublisher::onServerHandshakeCompleteEvent(HelloRTT duration,
 void TopologyEventsPublisher::onServerHandshakeFailedEvent(const HostAndPort& address,
                                                            const Status& status,
                                                            const BSONObj reply) {
+    EventPtr event = std::make_unique<Event>();
+    event->type = EventType::HANDSHAKE_FAILURE;
+    event->hostAndPort = address;
+    event->reply = reply;
+    event->status = status;
     {
-        stdx::lock_guard<Mutex> lock(_eventQueueMutex);
-        EventPtr event = std::make_unique<Event>();
-        event->type = EventType::HANDSHAKE_FAILURE;
-        event->hostAndPort = address;
-        event->reply = reply;
-        event->status = status;
+        stdx::lock_guard<stdx::mutex> lock(_eventQueueMutex);
         _eventQueue.push_back(std::move(event));
     }
     _scheduleNextDelivery();
@@ -102,12 +127,12 @@ void TopologyEventsPublisher::onServerHandshakeFailedEvent(const HostAndPort& ad
 
 void TopologyEventsPublisher::onServerHeartbeatSucceededEvent(const HostAndPort& hostAndPort,
                                                               const BSONObj reply) {
+    EventPtr event = std::make_unique<Event>();
+    event->type = EventType::HEARTBEAT_SUCCESS;
+    event->hostAndPort = hostAndPort;
+    event->reply = reply;
     {
         stdx::lock_guard lock(_eventQueueMutex);
-        EventPtr event = std::make_unique<Event>();
-        event->type = EventType::HEARTBEAT_SUCCESS;
-        event->hostAndPort = hostAndPort;
-        event->reply = reply;
         _eventQueue.push_back(std::move(event));
     }
     _scheduleNextDelivery();
@@ -116,13 +141,13 @@ void TopologyEventsPublisher::onServerHeartbeatSucceededEvent(const HostAndPort&
 void TopologyEventsPublisher::onServerHeartbeatFailureEvent(Status errorStatus,
                                                             const HostAndPort& hostAndPort,
                                                             const BSONObj reply) {
+    EventPtr event = std::make_unique<Event>();
+    event->type = EventType::HEARTBEAT_FAILURE;
+    event->hostAndPort = hostAndPort;
+    event->reply = reply;
+    event->status = errorStatus;
     {
         stdx::lock_guard lock(_eventQueueMutex);
-        EventPtr event = std::make_unique<Event>();
-        event->type = EventType::HEARTBEAT_FAILURE;
-        event->hostAndPort = hostAndPort;
-        event->reply = reply;
-        event->status = errorStatus;
         _eventQueue.push_back(std::move(event));
     }
     _scheduleNextDelivery();
@@ -136,12 +161,12 @@ void TopologyEventsPublisher::_scheduleNextDelivery() {
 
 void TopologyEventsPublisher::onServerPingFailedEvent(const HostAndPort& hostAndPort,
                                                       const Status& status) {
+    EventPtr event = std::make_unique<Event>();
+    event->type = EventType::PING_FAILURE;
+    event->hostAndPort = hostAndPort;
+    event->status = status;
     {
         stdx::lock_guard lock(_eventQueueMutex);
-        EventPtr event = std::make_unique<Event>();
-        event->type = EventType::PING_FAILURE;
-        event->hostAndPort = hostAndPort;
-        event->status = status;
         _eventQueue.push_back(std::move(event));
     }
     _scheduleNextDelivery();
@@ -149,12 +174,12 @@ void TopologyEventsPublisher::onServerPingFailedEvent(const HostAndPort& hostAnd
 
 void TopologyEventsPublisher::onServerPingSucceededEvent(HelloRTT duration,
                                                          const HostAndPort& hostAndPort) {
+    EventPtr event = std::make_unique<Event>();
+    event->type = EventType::PING_SUCCESS;
+    event->duration = duration;
+    event->hostAndPort = hostAndPort;
     {
         stdx::lock_guard lock(_eventQueueMutex);
-        EventPtr event = std::make_unique<Event>();
-        event->type = EventType::PING_SUCCESS;
-        event->duration = duration;
-        event->hostAndPort = hostAndPort;
         _eventQueue.push_back(std::move(event));
     }
     _scheduleNextDelivery();
@@ -200,7 +225,7 @@ void TopologyEventsPublisher::_nextDelivery() {
     }
 
     // send to the listeners outside of the lock.
-    for (auto listener : listeners) {
+    for (const auto& listener : listeners) {
         // The copy logic above guaranteed that only non-empty elements are in the vector.
         _sendEvent(listener.get(), *nextEvent);
     }

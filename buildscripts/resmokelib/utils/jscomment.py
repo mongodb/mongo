@@ -1,5 +1,7 @@
 """Utility for parsing JS comments."""
 
+import functools
+import io
 import re
 
 import yaml
@@ -8,6 +10,7 @@ import yaml
 _JSTEST_TAGS_RE = re.compile(r".*@tags\s*:\s*(\[[^\]]*\])", re.DOTALL)
 
 
+@functools.cache
 def get_tags(pathname):
     """Return the list of tags found in the (JS-style) comments of 'pathname'.
 
@@ -27,7 +30,7 @@ def get_tags(pathname):
       */
     """
 
-    with open(pathname, 'r', encoding='utf-8') as fp:
+    with io.open(pathname, "r", encoding="utf-8") as fp:
         match = _JSTEST_TAGS_RE.match(fp.read())
         if match:
             try:
@@ -36,10 +39,31 @@ def get_tags(pathname):
                 tags = yaml.safe_load(_strip_jscomments(match.group(1)))
                 if not isinstance(tags, list) and all(isinstance(tag, str) for tag in tags):
                     raise TypeError("Expected a list of string tags, but got '%s'" % (tags))
+
+                for tag in tags:
+                    if "//" in tag:
+                        raise ValueError(
+                            (
+                                "Found a JS line comment '%s'. "
+                                "Use '#' YAML style comments instead in a tags array %s"
+                            )
+                            % (tag, pathname)
+                        )
+
+                    if " " in tag:
+                        raise ValueError(
+                            (
+                                "Found an empty space in tag '%s'. "
+                                "This is not permitted and may indicate a missing comma in %s"
+                            )
+                            % (tag, pathname)
+                        )
+
                 return tags
             except yaml.YAMLError as err:
                 raise ValueError(
-                    "File '%s' contained invalid tags (expected YAML): %s" % (pathname, err))
+                    "File '%s' contained invalid tags (expected YAML): %s" % (pathname, err)
+                )
 
     return []
 

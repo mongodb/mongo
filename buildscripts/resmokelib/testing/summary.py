@@ -4,7 +4,8 @@ import collections
 
 Summary = collections.namedtuple(
     "Summary",
-    ["num_run", "time_taken", "num_succeeded", "num_skipped", "num_failed", "num_errored"])
+    ["num_run", "time_taken", "num_succeeded", "num_skipped", "num_failed", "num_errored"],
+)
 
 
 def combine(summary1, summary2):

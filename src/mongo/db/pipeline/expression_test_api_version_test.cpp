@@ -27,13 +27,21 @@
  *    it in the license file.
  */
 
+#include "mongo/db/pipeline/expression_test_api_version.h"
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/pipeline/expression_test_api_version.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+
+#include <memory>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace {
@@ -48,7 +56,7 @@ TEST_F(TestApiVersion, UnstableAcceptsBooleanValue) {
         expCtx->variablesParseState);
 
     ASSERT_VALUE_EQ(Value(DOC("$_testApiVersion" << DOC("unstable" << true))),
-                    expression->serialize(false));
+                    expression->serialize());
 }
 
 TEST_F(TestApiVersion, UnstableDoesNotAcceptNumericValue) {
@@ -70,7 +78,7 @@ TEST_F(TestApiVersion, DeprecatedAcceptsBooleanValue) {
         expCtx->variablesParseState);
 
     ASSERT_VALUE_EQ(Value(DOC("$_testApiVersion" << DOC("deprecated" << true))),
-                    expression->serialize(false));
+                    expression->serialize());
 }
 
 TEST_F(TestApiVersion, DeprecatedDoesNotAcceptNumericValue) {

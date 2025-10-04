@@ -26,12 +26,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest
-import os, shutil
-from helper import compare_files
+import wttest
+import os
 from wtbackup import backup_base
-from wtdataset import simple_key
-from wtscenario import make_scenarios
 
 # test_backup17.py
 # Test cursor backup with a block-based incremental cursor and consolidate.
@@ -95,20 +92,17 @@ class test_backup17(backup_base):
         self.add_data(self.uri, self.bigkey, self.bigval, True)
 
         # Do an incremental backup with id 2.
-        (_, uri1_lens) = self.take_incr_backup(self.dir, 2, False)
+        (_, uri1_lens) = self.take_incr_backup(self.dir, 1, 2, False)
         self.check_consolidate_sizes(uri1_lens, False)
 
         self.mult = 1
         self.add_data(self.uri2, self.bigkey, self.bigval, True)
 
         # Now do an incremental backup with id 3.
-        (_, uri2_lens) = self.take_incr_backup(self.dir, 3, True)
+        (_, uri2_lens) = self.take_incr_backup(self.dir, 2, 3, True)
         self.check_consolidate_sizes(uri2_lens, True)
 
         # Assert that we recorded fewer lengths on the consolidated backup.
         self.assertLess(len(uri2_lens), len(uri1_lens))
         # Assert that we recorded the same total data length for both.
         self.assertEqual(sum(uri2_lens), sum(uri1_lens))
-
-if __name__ == '__main__':
-    wttest.run()

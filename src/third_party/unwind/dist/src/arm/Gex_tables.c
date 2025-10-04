@@ -119,10 +119,12 @@ arm_exidx_apply_cmd (struct arm_exbuf_data *edata, struct dwarf_cursor *c)
       dwarf_get (c, c->loc[UNW_ARM_R13], &c->cfa);
       break;
     case ARM_EXIDX_CMD_VFP_POP:
-      /* Skip VFP registers, but be sure to adjust stack */
       for (i = ARM_EXBUF_START (edata->data); i <= ARM_EXBUF_END (edata->data);
            i++)
+      {
+        c->loc[UNW_ARM_S0 + i] = DWARF_LOC (c->cfa, 0);
         c->cfa += 8;
+      }
       if (!(edata->data & ARM_EXIDX_VFP_DOUBLE))
         c->cfa += 4;
       break;
@@ -152,12 +154,12 @@ HIDDEN int
 arm_exidx_decode (const uint8_t *buf, uint8_t len, struct dwarf_cursor *c)
 {
 #define READ_OP() *buf++
+  assert(buf != NULL);
+  assert(len > 0);
+
   const uint8_t *end = buf + len;
   int ret;
   struct arm_exbuf_data edata;
-
-  assert(buf != NULL);
-  assert(len > 0);
 
   while (buf < end)
     {
@@ -381,7 +383,7 @@ arm_exidx_extract (struct dwarf_cursor *c, uint8_t *buf)
   return nbuf;
 }
 
-int
+static int
 arm_search_unwind_table (unw_addr_space_t as, unw_word_t ip,
 			 unw_dyn_info_t *di, unw_proc_info_t *pi,
 			 int need_unwind_info, void *arg)
@@ -506,18 +508,20 @@ arm_phdr_cb (struct dl_phdr_info *info, size_t size, void *data)
 }
 
 HIDDEN int
-arm_find_proc_info (unw_addr_space_t as, unw_word_t ip,
-                    unw_proc_info_t *pi, int need_unwind_info, void *arg)
+arm_find_proc_info2 (unw_addr_space_t as, unw_word_t ip,
+                     unw_proc_info_t *pi, int need_unwind_info, void *arg,
+                     int methods)
 {
   int ret = -1;
   intrmask_t saved_mask;
 
   Debug (14, "looking for IP=0x%lx\n", (long) ip);
 
-  if (UNW_TRY_METHOD(UNW_ARM_METHOD_DWARF))
+  if (UNW_TRY_METHOD (UNW_ARM_METHOD_DWARF) && (methods & UNW_ARM_METHOD_DWARF))
     ret = dwarf_find_proc_info (as, ip, pi, need_unwind_info, arg);
 
-  if (ret < 0 && UNW_TRY_METHOD (UNW_ARM_METHOD_EXIDX))
+  if (ret < 0 && UNW_TRY_METHOD (UNW_ARM_METHOD_EXIDX) &&
+      (methods & UNW_ARM_METHOD_EXIDX))
     {
       struct arm_cb_data cb_data;
 
@@ -527,7 +531,7 @@ arm_find_proc_info (unw_addr_space_t as, unw_word_t ip,
       cb_data.di.format = -1;
 
       SIGPROCMASK (SIG_SETMASK, &unwi_full_mask, &saved_mask);
-      ret = dl_iterate_phdr (arm_phdr_cb, &cb_data);
+      ret = as->iterate_phdr_function (arm_phdr_cb, &cb_data);
       SIGPROCMASK (SIG_SETMASK, &saved_mask, NULL);
 
       if (cb_data.di.format != -1)
@@ -538,6 +542,14 @@ arm_find_proc_info (unw_addr_space_t as, unw_word_t ip,
     }
 
   return ret;
+}
+
+HIDDEN int
+arm_find_proc_info (unw_addr_space_t as, unw_word_t ip,
+                    unw_proc_info_t *pi, int need_unwind_info, void *arg)
+{
+    return arm_find_proc_info2 (as, ip, pi, need_unwind_info, arg,
+                                UNW_ARM_METHOD_ALL);
 }
 
 HIDDEN void

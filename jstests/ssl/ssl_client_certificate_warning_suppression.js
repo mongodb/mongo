@@ -7,48 +7,51 @@
  * and is not output when the setParameter is set to false.
  */
 
-load('jstests/ssl/libs/ssl_helpers.js');
-
-(function() {
-'use strict';
+import {CA_CERT} from "jstests/ssl/libs/ssl_helpers.js";
 
 function test(suppress) {
     const opts = {
-        sslMode: 'requireSSL',
-        sslPEMKeyFile: "jstests/libs/server.pem",
-        sslCAFile: "jstests/libs/ca.pem",
+        tlsMode: "requireTLS",
+        tlsCertificateKeyFile: "jstests/libs/server.pem",
+        tlsCAFile: "jstests/libs/ca.pem",
         waitForConnect: false,
-        sslAllowConnectionsWithoutCertificates: "",
-        setParameter: {suppressNoTLSPeerCertificateWarning: suppress}
+        tlsAllowConnectionsWithoutCertificates: "",
+        setParameter: {suppressNoTLSPeerCertificateWarning: suppress},
     };
     clearRawMongoProgramOutput();
     const mongod = MongoRunner.runMongod(opts);
 
-    assert.soon(function() {
-        return runMongoProgram('mongo',
-                               '--ssl',
-                               '--sslAllowInvalidHostnames',
-                               '--sslCAFile',
-                               CA_CERT,
-                               '--port',
-                               mongod.port,
-                               '--eval',
-                               'quit()') === 0;
+    assert.soon(function () {
+        return (
+            runMongoProgram(
+                "mongo",
+                "--tls",
+                "--tlsAllowInvalidHostnames",
+                "--tlsCAFile",
+                CA_CERT,
+                "--port",
+                mongod.port,
+                "--eval",
+                "quit()",
+            ) === 0
+        );
     }, "mongo did not initialize properly");
 
     // Keep checking the log file until client metadata is logged since the SSL warning is
     // logged before it.
     assert.soon(
         () => {
-            const log = rawMongoProgramOutput();
-            return log.search('client metadata') !== -1;
+            const log = rawMongoProgramOutput(".*");
+            return log.search("client metadata") !== -1;
         },
         "logfile should contain 'client metadata'.\n" +
-            "Log File Contents\n==============================\n" + rawMongoProgramOutput() +
-            "\n==============================\n");
+            "Log File Contents\n==============================\n" +
+            rawMongoProgramOutput(".*") +
+            "\n==============================\n",
+    );
 
     // Now check for the message
-    const log = rawMongoProgramOutput();
+    const log = rawMongoProgramOutput(".*");
     assert.eq(suppress, log.match(/[N,n]o SSL certificate provided by peer/) === null);
 
     try {
@@ -62,4 +65,3 @@ function test(suppress) {
 
 test(true);
 test(false);
-})();

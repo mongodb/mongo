@@ -27,196 +27,115 @@
  *    it in the license file.
  */
 
+
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/db/pipeline/document_source_find_and_modify_image_lookup.h"
+
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/pipeline_split_state.h"
+#include "mongo/db/pipeline/stage_constraints.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
+#include <string>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/pipeline/document_source_find_and_modify_image_lookup.h"
-#include "mongo/db/repl/image_collection_entry_gen.h"
-#include "mongo/logv2/log.h"
-
 namespace mongo {
-namespace {
-// Downconverts a 'findAndModify' entry by stripping the 'needsRetryImage' field and appending
-// the appropriate 'preImageOpTime' or 'postImageOpTime' field.
-Document downConvertFindAndModifyEntry(Document inputDoc,
-                                       repl::OpTime imageOpTime,
-                                       repl::RetryImageEnum imageType) {
-    MutableDocument doc{inputDoc};
-    const auto imageOpTimeFieldName = imageType == repl::RetryImageEnum::kPreImage
-        ? repl::OplogEntry::kPreImageOpTimeFieldName
-        : repl::OplogEntry::kPostImageOpTimeFieldName;
-    doc.setField(
-        imageOpTimeFieldName,
-        Value{Document{{repl::OpTime::kTimestampFieldName.toString(), imageOpTime.getTimestamp()},
-                       {repl::OpTime::kTermFieldName.toString(), imageOpTime.getTerm()}}});
-    doc.remove(repl::OplogEntryBase::kNeedsRetryImageFieldName);
-    return doc.freeze();
-}
-}  // namespace
+REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalFindAndModifyImageLookup,
+                                  LiteParsedDocumentSourceInternal::parse,
+                                  DocumentSourceFindAndModifyImageLookup::createFromBson,
+                                  true);
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalFindAndModifyImageLookup,
+                            DocumentSourceFindAndModifyImageLookup::id)
 
 using OplogEntry = repl::OplogEntryBase;
 
-REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalFindAndModifyImageLookup,
-                                  LiteParsedDocumentSourceDefault::parse,
-                                  DocumentSourceFindAndModifyImageLookup::createFromBson,
-                                  true);
-
 boost::intrusive_ptr<DocumentSourceFindAndModifyImageLookup>
 DocumentSourceFindAndModifyImageLookup::create(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    return new DocumentSourceFindAndModifyImageLookup(expCtx);
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, bool includeCommitTimestamp) {
+    return new DocumentSourceFindAndModifyImageLookup(expCtx, includeCommitTimestamp);
 }
 
 boost::intrusive_ptr<DocumentSourceFindAndModifyImageLookup>
 DocumentSourceFindAndModifyImageLookup::createFromBson(
     const BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(5806003,
-            str::stream() << "the '" << kStageName << "' spec must be an empty object",
-            elem.type() == BSONType::Object && elem.Obj().isEmpty());
-    return DocumentSourceFindAndModifyImageLookup::create(expCtx);
+            str::stream() << "the '" << kStageName << "' spec must be an object",
+            elem.type() == BSONType::object);
+
+    bool includeCommitTimestamp = false;
+    for (auto&& subElem : elem.Obj()) {
+        if (subElem.fieldNameStringData() == kIncludeCommitTransactionTimestampFieldName) {
+            uassert(6387805,
+                    str::stream() << "expected a boolean for the "
+                                  << kIncludeCommitTransactionTimestampFieldName << " option to "
+                                  << kStageName << " stage, got " << typeName(subElem.type()),
+                    subElem.type() == BSONType::boolean);
+            includeCommitTimestamp = subElem.Bool();
+        } else {
+            uasserted(6387800,
+                      str::stream() << "unrecognized option to " << kStageName
+                                    << " stage: " << subElem.fieldNameStringData());
+        }
+    }
+
+    return DocumentSourceFindAndModifyImageLookup::create(expCtx, includeCommitTimestamp);
 }
 
 DocumentSourceFindAndModifyImageLookup::DocumentSourceFindAndModifyImageLookup(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx)
-    : DocumentSource(kStageName, expCtx) {}
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, bool includeCommitTimestamp)
+    : DocumentSource(kStageName, expCtx),
+      _includeCommitTransactionTimestamp(includeCommitTimestamp) {}
 
 StageConstraints DocumentSourceFindAndModifyImageLookup::constraints(
-    Pipeline::SplitState pipeState) const {
-    return StageConstraints(StreamType::kStreaming,
-                            PositionRequirement::kNone,
-                            HostTypeRequirement::kAnyShard,
-                            DiskUseRequirement::kNoDiskUse,
-                            FacetRequirement::kNotAllowed,
-                            TransactionRequirement::kNotAllowed,
-                            LookupRequirement::kNotAllowed,
-                            UnionRequirement::kNotAllowed,
-                            ChangeStreamRequirement::kDenylist);
+    PipelineSplitState pipeState) const {
+    StageConstraints constraints(StreamType::kStreaming,
+                                 PositionRequirement::kNone,
+                                 HostTypeRequirement::kAnyShard,
+                                 DiskUseRequirement::kNoDiskUse,
+                                 FacetRequirement::kNotAllowed,
+                                 TransactionRequirement::kNotAllowed,
+                                 LookupRequirement::kNotAllowed,
+                                 UnionRequirement::kNotAllowed,
+                                 ChangeStreamRequirement::kDenylist);
+
+    constraints.consumesLogicalCollectionData = false;
+    return constraints;
 }
 
-Value DocumentSourceFindAndModifyImageLookup::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
-    return Value(Document{{kStageName, Value(Document{})}});
+Value DocumentSourceFindAndModifyImageLookup::serialize(const SerializationOptions& opts) const {
+    return Value(
+        Document{{kStageName,
+                  Value(Document{{kIncludeCommitTransactionTimestampFieldName,
+                                  _includeCommitTransactionTimestamp ? opts.serializeLiteral(true)
+                                                                     : Value()}})}});
 }
 
 DepsTracker::State DocumentSourceFindAndModifyImageLookup::getDependencies(
     DepsTracker* deps) const {
-    deps->fields.insert(OplogEntry::kSessionIdFieldName.toString());
-    deps->fields.insert(OplogEntry::kTxnNumberFieldName.toString());
-    deps->fields.insert(OplogEntry::kNeedsRetryImageFieldName.toString());
-    deps->fields.insert(OplogEntry::kWallClockTimeFieldName.toString());
-    deps->fields.insert(OplogEntry::kNssFieldName.toString());
-    deps->fields.insert(OplogEntry::kTimestampFieldName.toString());
-    deps->fields.insert(OplogEntry::kTermFieldName.toString());
-    deps->fields.insert(OplogEntry::kUuidFieldName.toString());
+    deps->fields.insert(std::string{OplogEntry::kSessionIdFieldName});
+    deps->fields.insert(std::string{OplogEntry::kTxnNumberFieldName});
+    deps->fields.insert(std::string{OplogEntry::kNeedsRetryImageFieldName});
+    deps->fields.insert(std::string{OplogEntry::kWallClockTimeFieldName});
+    deps->fields.insert(std::string{OplogEntry::kNssFieldName});
+    deps->fields.insert(std::string{OplogEntry::kTimestampFieldName});
+    deps->fields.insert(std::string{OplogEntry::kTermFieldName});
+    deps->fields.insert(std::string{OplogEntry::kUuidFieldName});
     return DepsTracker::State::SEE_NEXT;
 }
 
 DocumentSource::GetModPathsReturn DocumentSourceFindAndModifyImageLookup::getModifiedPaths() const {
-    return {DocumentSource::GetModPathsReturn::Type::kAllPaths, std::set<std::string>{}, {}};
-}
-
-DocumentSource::GetNextResult DocumentSourceFindAndModifyImageLookup::doGetNext() {
-    uassert(5806001,
-            str::stream() << kStageName << " cannot be executed from mongos",
-            !pExpCtx->inMongos);
-    if (_stashedFindAndModifyDoc) {
-        // Return the stashed findAndModify document. This indicates that the previous document
-        // returned was a forged noop image document.
-        auto doc = *_stashedFindAndModifyDoc;
-        _stashedFindAndModifyDoc = boost::none;
-        return doc;
-    }
-
-    auto input = pSource->getNext();
-    if (!input.isAdvanced()) {
-        return input;
-    }
-    auto doc = input.releaseDocument();
-    if (auto imageEntry = _forgeNoopImageDoc(doc, pExpCtx->opCtx)) {
-        return std::move(*imageEntry);
-    }
-    return doc;
-}
-
-boost::optional<Document> DocumentSourceFindAndModifyImageLookup::_forgeNoopImageDoc(
-    Document inputDoc, OperationContext* opCtx) {
-    const auto needsRetryImageVal =
-        inputDoc.getField(repl::OplogEntryBase::kNeedsRetryImageFieldName);
-    if (needsRetryImageVal.missing()) {
-        return boost::none;
-    }
-
-    const auto inputDocBson = inputDoc.toBson();
-    const auto sessionIdBson = inputDocBson.getObjectField(OplogEntry::kSessionIdFieldName);
-    auto localImageCollInfo = pExpCtx->mongoProcessInterface->getCollectionOptions(
-        pExpCtx->opCtx, NamespaceString::kConfigImagesNamespace);
-
-    // Extract the UUID from the collection information. We should always have a valid uuid
-    // here.
-    auto imageCollUUID = invariantStatusOK(UUID::parse(localImageCollInfo["uuid"]));
-    const auto& readConcernBson = repl::ReadConcernArgs::get(opCtx).toBSON();
-    auto imageDoc = pExpCtx->mongoProcessInterface->lookupSingleDocument(
-        pExpCtx,
-        NamespaceString::kConfigImagesNamespace,
-        imageCollUUID,
-        Document{BSON("_id" << sessionIdBson)},
-        std::move(readConcernBson));
-
-    if (!imageDoc) {
-        // If no image document with the corresponding 'sessionId' is found, we skip forging the
-        // no-op and rely on the retryable write mechanism to catch that no pre- or post- image
-        // exists.
-        LOGV2_DEBUG(
-            580602,
-            2,
-            "Not forging no-op image oplog entry because no image document found with sessionId",
-            "sessionId"_attr = sessionIdBson);
-        return boost::none;
-    }
-
-    auto image = repl::ImageEntry::parse(IDLParserErrorContext("image entry"), imageDoc->toBson());
-    const auto inputOplog = uassertStatusOK(repl::OplogEntry::parse(inputDocBson));
-    if (image.getTxnNumber() != inputOplog.getTxnNumber()) {
-        // In our snapshot, fetch the current transaction number for a session. If that
-        // transaction number doesn't match what's found on the image lookup, it implies that
-        // the image is not the correct version for this oplog entry. We will not forge a noop
-        // from it.
-        LOGV2_DEBUG(
-            580603,
-            2,
-            "Not forging no-op image oplog entry because image document has a different txnNum",
-            "sessionId"_attr = sessionIdBson,
-            "expectedTxnNum"_attr = inputOplog.getTxnNumber(),
-            "actualTxnNum"_attr = image.getTxnNumber());
-        return boost::none;
-    }
-
-    // Stash the 'findAndModify' document to return after downconverting it.
-    repl::OpTime imageOpTime(inputOplog.getTimestamp() - 1, *inputOplog.getTerm());
-    const auto docToStash =
-        downConvertFindAndModifyEntry(inputDoc,
-                                      imageOpTime,
-                                      repl::RetryImage_parse(IDLParserErrorContext("retry image"),
-                                                             needsRetryImageVal.getStringData()));
-    _stashedFindAndModifyDoc = docToStash;
-
-    // Forge a no-op image document to be returned.
-    repl::MutableOplogEntry forgedNoop;
-    forgedNoop.setSessionId(image.get_id());
-    forgedNoop.setTxnNumber(image.getTxnNumber());
-    forgedNoop.setObject(image.getImage());
-    forgedNoop.setOpType(repl::OpTypeEnum::kNoop);
-    forgedNoop.setWallClockTime(inputOplog.getWallClockTime());
-    forgedNoop.setNss(inputOplog.getNss());
-    forgedNoop.setUuid(*inputOplog.getUuid());
-
-    // Set the opTime to be the findAndModify timestamp - 1. We guarantee that there will be no
-    // collisions because we always reserve an extra oplog slot when writing the retryable
-    // findAndModify entry on the primary.
-    forgedNoop.setOpTime(repl::OpTime(imageOpTime.getTimestamp(), *inputOplog.getTerm()));
-    forgedNoop.setStatementIds({0});
-    return Document{forgedNoop.toBSON()};
+    return {DocumentSource::GetModPathsReturn::Type::kAllPaths, OrderedPathSet{}, {}};
 }
 }  // namespace mongo

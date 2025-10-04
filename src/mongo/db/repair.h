@@ -29,11 +29,14 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/tenant_id.h"
+
 #include <functional>
 #include <string>
-
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/record_id.h"
 
 namespace mongo {
 class StorageEngine;
@@ -50,7 +53,7 @@ namespace repair {
  *
  * It is expected that the local database will be repaired first when running in repair mode.
  */
-Status repairDatabase(OperationContext* opCtx, StorageEngine* engine, const std::string& dbName);
+Status repairDatabase(OperationContext* opCtx, StorageEngine* engine, const DatabaseName& dbName);
 
 /**
  * Repairs a collection using a storage engine-specific, best-effort process.

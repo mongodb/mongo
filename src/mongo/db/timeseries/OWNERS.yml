@@ -1,0 +1,8 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/server-collection-write-path
+  - "*catalog_helper*":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog

@@ -1,0 +1,11 @@
+base_suite: sharded_collections_jscore_passthrough
+description: >-
+  Test the correctness of the query settings fallback mechanism by introducing planner
+  failures and then expecting that the fallback-generated plan is identical to the
+  original plan. This suite runs jscore tests using a sharded cluster fixture which
+  implicitly shards accessed collections.
+excludes:
+  - "query_settings.common_core_excludes"
+  - "query_settings.fallback_core_excludes"
+eval:
+  - "query_settings.eval_implicit_query_settings_fallback"

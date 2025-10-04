@@ -29,14 +29,18 @@
 
 #pragma once
 
+#include "mongo/base/data_range.h"
+#include "mongo/base/data_type.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/platform/endian.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
 #include <cstddef>
 #include <cstring>
 #include <limits>
-
-#include "mongo/base/data_range.h"
-#include "mongo/base/data_type.h"
-#include "mongo/platform/endian.h"
-#include "mongo/util/str.h"
+#include <utility>
 
 namespace mongo {
 
@@ -115,6 +119,17 @@ public:
     template <typename T>
     T readAndAdvance() {
         return uassertStatusOK(readAndAdvanceNoThrow<T>());
+    }
+
+    /**
+     * Return a ConstDataRange based on `splitPoint`
+     * and advance the cursor past there.
+     */
+    template <typename ByteLike>
+    ConstDataRange sliceAndAdvance(const ByteLike& splitPoint) {
+        auto ret = slice(splitPoint);
+        advance(ret.length());
+        return ret;
     }
 
 private:
@@ -218,6 +233,17 @@ public:
     template <typename T>
     void writeAndAdvance(const T& value) {
         uassertStatusOK(writeAndAdvanceNoThrow(value));
+    }
+
+    /**
+     * Return a DataRange based on `splitPoint`
+     * and advance the cursor past there.
+     */
+    template <typename ByteLike>
+    DataRange sliceAndAdvance(const ByteLike& splitPoint) {
+        auto ret = slice(splitPoint);
+        advance(ret.length());
+        return ret;
     }
 
 private:

@@ -27,9 +27,10 @@
 #
 global:
     cpp_namespace: "mongo"
+    mod_visibility: pub
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
     - "mongo/db/repl/read_concern_args.idl"
     - "mongo/db/write_concern_options.idl"
 
@@ -65,15 +66,17 @@ structs:
                 type: WriteConcern
                 optional: true
             updateOpTime:
-                description: "The optime of when the default read or write concern was last set. On
-                              replica sets it advances with the primary's optime and on clusters it
-                              advances with the config server primary's optime."
+                description:
+                    "The optime of when the default read or write concern was last set. On
+                    replica sets it advances with the primary's optime and on clusters it
+                    advances with the config server primary's optime."
                 type: timestamp
                 optional: true
             updateWallClockTime:
-                description: "The wallclock time when the default read or write concern was last set
-                              by an administrator. This value is only informational and must not be
-                              used for any recency comparisons."
+                description:
+                    "The wallclock time when the default read or write concern was last set
+                    by an administrator. This value is only informational and must not be
+                    used for any recency comparisons."
                 type: date
                 optional: true
             defaultWriteConcernSource:

@@ -27,23 +27,53 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/exec/sbe/stages/unique.h"
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
+#include "mongo/db/exec/sbe/values/row.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
+
+#include <utility>
+
+#include <absl/container/flat_hash_set.h>
+#include <absl/container/inlined_vector.h>
+#include <absl/container/node_hash_map.h>
 
 namespace mongo {
 namespace sbe {
+namespace {
+
+template <typename T, typename H, typename E>
+size_t estimateSetSizeBytes(const absl::flat_hash_set<T, H, E>& hashSet) {
+    // from https://abseil.io/docs/cpp/guides/container#abslflat_hash_map-and-abslflat_hash_set
+    return (sizeof(T) + 1) * hashSet.bucket_count();
+}
+
+uint64_t estimateRowSizeBytes(const value::MaterializedRow& row) {
+    // MaterializedRow is a dynamic array of values, tags, and "owned" bools.
+    size_t valueAndTags =
+        row.size() * (sizeof(value::Value) + sizeof(value::TypeTags) + sizeof(bool));
+    // This call to estimate() computes any additional memory needed for non-shallow types.
+    return valueAndTags + size_estimator::estimate(row);
+}
+
+}  // namespace
 UniqueStage::UniqueStage(std::unique_ptr<PlanStage> input,
                          value::SlotVector keys,
-                         PlanNodeId planNodeId)
-    : PlanStage("unique"_sd, planNodeId), _keySlots(keys) {
+                         PlanNodeId planNodeId,
+                         bool participateInTrialRunTracking)
+    : PlanStage("unique"_sd, nullptr /* yieldPolicy */, planNodeId, participateInTrialRunTracking),
+      _keySlots(keys) {
     _children.emplace_back(std::move(input));
 }
 
 std::unique_ptr<PlanStage> UniqueStage::clone() const {
-    return std::make_unique<UniqueStage>(_children[0]->clone(), _keySlots, _commonStats.nodeId);
+    return std::make_unique<UniqueStage>(
+        _children[0]->clone(), _keySlots, _commonStats.nodeId, participateInTrialRunTracking());
 }
 
 void UniqueStage::prepare(CompileCtx& ctx) {
@@ -51,6 +81,9 @@ void UniqueStage::prepare(CompileCtx& ctx) {
     for (auto&& keySlot : _keySlots) {
         _inKeyAccessors.emplace_back(_children[0]->getAccessor(ctx, keySlot));
     }
+
+    _memoryTracker =
+        OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForSBE(_opCtx);
 }
 
 value::SlotAccessor* UniqueStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
@@ -59,8 +92,13 @@ value::SlotAccessor* UniqueStage::getAccessor(CompileCtx& ctx, value::SlotId slo
 
 void UniqueStage::open(bool reOpen) {
     auto optTimer(getOptTimer(_opCtx));
-
     ++_commonStats.opens;
+
+    if (reOpen) {
+        _seen.clear();
+        _prevSeenSizeBytes = 0;
+        _memoryTracker->set(0);
+    }
     _children[0]->open(reOpen);
 }
 
@@ -79,6 +117,10 @@ PlanState UniqueStage::getNext() {
         auto [it, inserted] = _seen.emplace(std::move(key));
         if (inserted) {
             const_cast<value::MaterializedRow&>(*it).makeOwned();
+            size_t newSeenSizeBytes = estimateSetSizeBytes(_seen);
+            _memoryTracker->add((newSeenSizeBytes - _prevSeenSizeBytes) +
+                                estimateRowSizeBytes(*it));
+            _prevSeenSizeBytes = newSeenSizeBytes;
             return trackPlanState(PlanState::ADVANCED);
         } else {
             // This row has been seen already, so we skip it.
@@ -94,6 +136,10 @@ void UniqueStage::close() {
     trackClose();
 
     _seen.clear();
+    _memoryTracker->set(0);
+    _prevSeenSizeBytes = 0;
+    _specificStats.peakTrackedMemBytes = _memoryTracker->peakTrackedMemoryBytes();
+
     _children[0]->close();
 }
 
@@ -106,6 +152,10 @@ std::unique_ptr<PlanStageStats> UniqueStage::getStats(bool includeDebugInfo) con
         bob.appendNumber("dupsTested", static_cast<long long>(_specificStats.dupsTested));
         bob.appendNumber("dupsDropped", static_cast<long long>(_specificStats.dupsDropped));
         bob.append("keySlots", _keySlots.begin(), _keySlots.end());
+        if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
+            bob.appendNumber("peakTrackedMemBytes",
+                             static_cast<long long>(_specificStats.peakTrackedMemBytes));
+        }
         ret->debugInfo = bob.obj();
     }
 
@@ -143,5 +193,151 @@ size_t UniqueStage::estimateCompileTimeSize() const {
     return size;
 }
 
+UniqueRoaringStage::UniqueRoaringStage(std::unique_ptr<PlanStage> input,
+                                       value::SlotId key,
+                                       PlanNodeId planNodeId,
+                                       bool participateInTrialRunTracking)
+    : PlanStage("unique_roaring"_sd,
+                nullptr /* yieldPolicy */,
+                planNodeId,
+                participateInTrialRunTracking),
+      _keySlot(key),
+      _seen(static_cast<size_t>(internalRoaringBitmapsThreshold.load()),
+            static_cast<size_t>(internalRoaringBitmapsBatchSize.load()),
+            static_cast<uint64_t>(internalRoaringBitmapsThreshold.load() /
+                                  internalRoaringBitmapsMinimalDensity.load())) {
+    _children.emplace_back(std::move(input));
+}
+
+std::unique_ptr<PlanStage> UniqueRoaringStage::clone() const {
+    return std::make_unique<UniqueRoaringStage>(
+        _children[0]->clone(), _keySlot, _commonStats.nodeId, participateInTrialRunTracking());
+}
+
+void UniqueRoaringStage::prepare(CompileCtx& ctx) {
+    _children[0]->prepare(ctx);
+    _inKeyAccessor = _children[0]->getAccessor(ctx, _keySlot);
+    _memoryTracker =
+        OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForSBE(_opCtx);
+}
+
+value::SlotAccessor* UniqueRoaringStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
+    return _children[0]->getAccessor(ctx, slot);
+}
+
+void UniqueRoaringStage::open(bool reOpen) {
+    auto optTimer(getOptTimer(_opCtx));
+    ++_commonStats.opens;
+
+    if (reOpen) {
+        _seen.clear();
+        _memoryTracker->set(0);
+        _prevSeenSizeBytes = 0;
+    }
+    _children[0]->open(reOpen);
+}
+
+PlanState UniqueRoaringStage::getNext() {
+    auto optTimer(getOptTimer(_opCtx));
+
+    while (_children[0]->getNext() == PlanState::ADVANCED) {
+        auto [tag, val] = _inKeyAccessor->getViewOfValue();
+
+        int64_t roaringVal;
+        switch (tag) {
+            case value::TypeTags::NumberInt32: {
+                roaringVal = value::bitcastTo<int32_t>(val);
+                break;
+            }
+            case value::TypeTags::NumberInt64: {
+                roaringVal = value::bitcastTo<int64_t>(val);
+                break;
+            }
+            case value::TypeTags::RecordId: {
+                auto recordId = value::getRecordIdView(val);
+                tassert(
+                    9762501,
+                    "unique_roaring stage encountered a record id that is not formatted as long",
+                    recordId->isLong());
+                roaringVal = recordId->getLong();
+                break;
+            }
+            default: {
+                auto tag_ = tag;
+                tasserted(9762500,
+                          str::stream()
+                              << "unique_roaring stage encountered unexpected SBE value type: "
+                              << tag_);
+            }
+        }
+
+        ++_specificStats.dupsTested;
+        auto inserted = _seen.addChecked(roaringVal);
+        if (inserted) {
+            size_t newSeenSizeBytes = _seen.getApproximateSize();
+            _memoryTracker->add(newSeenSizeBytes - _prevSeenSizeBytes);
+            _prevSeenSizeBytes = newSeenSizeBytes;
+            return trackPlanState(PlanState::ADVANCED);
+        } else {
+            // This row has been seen already, so we skip it.
+            ++_specificStats.dupsDropped;
+        }
+    }
+
+    return trackPlanState(PlanState::IS_EOF);
+}
+
+void UniqueRoaringStage::close() {
+    auto optTimer(getOptTimer(_opCtx));
+    trackClose();
+
+    _seen.clear();
+    _memoryTracker->set(0);
+    _prevSeenSizeBytes = 0;
+    _specificStats.peakTrackedMemBytes = _memoryTracker->peakTrackedMemoryBytes();
+
+    _children[0]->close();
+}
+
+std::unique_ptr<PlanStageStats> UniqueRoaringStage::getStats(bool includeDebugInfo) const {
+    auto ret = std::make_unique<PlanStageStats>(_commonStats);
+    ret->specific = std::make_unique<UniqueStats>(_specificStats);
+
+    if (includeDebugInfo) {
+        BSONObjBuilder bob;
+        bob.appendNumber("dupsTested", static_cast<long long>(_specificStats.dupsTested));
+        bob.appendNumber("dupsDropped", static_cast<long long>(_specificStats.dupsDropped));
+        bob.append("keySlot", _keySlot);
+        if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
+            bob.appendNumber("peakTrackedMemBytes",
+                             static_cast<long long>(_specificStats.peakTrackedMemBytes));
+        }
+        ret->debugInfo = bob.obj();
+    }
+
+    ret->children.emplace_back(_children[0]->getStats(includeDebugInfo));
+    return ret;
+}
+
+const SpecificStats* UniqueRoaringStage::getSpecificStats() const {
+    return &_specificStats;
+}
+
+std::vector<DebugPrinter::Block> UniqueRoaringStage::debugPrint() const {
+    auto ret = PlanStage::debugPrint();
+
+    DebugPrinter::addIdentifier(ret, _keySlot);
+    DebugPrinter::addNewLine(ret);
+    DebugPrinter::addBlocks(ret, _children[0]->debugPrint());
+
+    return ret;
+}
+
+size_t UniqueRoaringStage::estimateCompileTimeSize() const {
+    size_t size = sizeof(*this);
+    size += size_estimator::estimate(_children);
+    size += size_estimator::estimate(_specificStats);
+    return size;
+}
 }  // namespace sbe
 }  // namespace mongo

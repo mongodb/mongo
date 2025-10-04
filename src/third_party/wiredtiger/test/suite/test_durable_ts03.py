@@ -26,15 +26,14 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-from helper import copy_wiredtiger_home
-import wiredtiger, wttest
+import wttest
 from wtscenario import make_scenarios
 
 # test_durable_ts03.py
 #    Check that the checkpoint honors the durable timestamp of updates.
+@wttest.skip_for_hook("tiered", "Tiered causes python crash")
 class test_durable_ts03(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=10MB'
-    session_config = 'isolation=snapshot'
 
     format_values = [
         ('integer-row', dict(key_format='i', value_format='u')),
@@ -92,15 +91,22 @@ class test_durable_ts03(wttest.WiredTigerTestCase):
         for key, value in cursor2:
             self.assertEqual(value, valueA)
 
-        self.assertEquals(cursor.reset(), 0)
+        self.assertEqual(cursor.reset(), 0)
         session.begin_transaction('read_timestamp=' + self.timestamp_str(150))
         for key, value in cursor:
             self.assertEqual(value, valueA)
         session.commit_transaction()
 
-        # Read the updated data to confirm that it is visible.
-        self.assertEquals(cursor.reset(), 0)
+        # Check that the updated data can still be read even while it is not yet durable.
+        self.assertEqual(cursor.reset(), 0)
         session.begin_transaction('read_timestamp=' + self.timestamp_str(210))
+        for key, value in cursor:
+            self.assertEqual(value, valueB)
+        session.rollback_transaction()
+
+        # Read the updated data to confirm that it is visible.
+        self.assertEqual(cursor.reset(), 0)
+        session.begin_transaction('read_timestamp=' + self.timestamp_str(220))
         for key, value in cursor:
             self.assertEqual(value, valueB)
         session.commit_transaction()
@@ -117,7 +123,7 @@ class test_durable_ts03(wttest.WiredTigerTestCase):
         for key, value in cursor:
             self.assertEqual(value, valueA)
 
-        self.assertEquals(cursor.reset(), 0)
+        self.assertEqual(cursor.reset(), 0)
         for i in range(1, nrows + 1):
             session.begin_transaction()
             cursor[i] = valueC
@@ -138,6 +144,3 @@ class test_durable_ts03(wttest.WiredTigerTestCase):
                                 ',oldest_timestamp=' + self.timestamp_str(250))
         for key, value in cursor:
             self.assertEqual(value, valueC)
-
-if __name__ == '__main__':
-    wttest.run()

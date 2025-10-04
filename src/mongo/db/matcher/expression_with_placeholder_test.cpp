@@ -27,90 +27,33 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/json.h"
-#include "mongo/db/matcher/expression_always_boolean.h"
-#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/expression_with_placeholder.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/matcher/expression_always_boolean.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/intrusive_counter.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 
 namespace {
 
 using unittest::assertGet;
-
-TEST(ExpressionWithPlaceholderTest, ParseBasic) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto rawFilter = fromjson("{i: 0}");
-    auto parsedFilter = assertGet(MatchExpressionParser::parse(rawFilter, expCtx));
-    auto filter = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
-    ASSERT(filter->getPlaceholder());
-    ASSERT_EQ(*filter->getPlaceholder(), "i");
-    ASSERT_TRUE(filter->getFilter()->matchesBSON(fromjson("{i: 0}")));
-    ASSERT_FALSE(filter->getFilter()->matchesBSON(fromjson("{i: 1}")));
-}
-
-TEST(ExpressionWithPlaceholderTest, ParseDottedField) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto rawFilter = fromjson("{'i.a': 0, 'i.b': 1}");
-    auto parsedFilter = assertGet(MatchExpressionParser::parse(rawFilter, expCtx));
-    auto filter = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
-    ASSERT(filter->getPlaceholder());
-    ASSERT_EQ(*filter->getPlaceholder(), "i");
-    ASSERT_TRUE(filter->getFilter()->matchesBSON(fromjson("{i: {a: 0, b: 1}}")));
-    ASSERT_FALSE(filter->getFilter()->matchesBSON(fromjson("{i: {a: 0, b: 0}}")));
-}
-
-TEST(ExpressionWithPlaceholderTest, ParseLogicalQuery) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto rawFilter = fromjson("{$and: [{i: {$gte: 0}}, {i: {$lte: 0}}]}");
-    auto parsedFilter = assertGet(MatchExpressionParser::parse(rawFilter, expCtx));
-    auto filter = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
-    ASSERT(filter->getPlaceholder());
-    ASSERT_EQ(*filter->getPlaceholder(), "i");
-    ASSERT_TRUE(filter->getFilter()->matchesBSON(fromjson("{i: 0}")));
-    ASSERT_FALSE(filter->getFilter()->matchesBSON(fromjson("{i: 1}")));
-}
-
-TEST(ExpressionWithPlaceholderTest, ParseElemMatch) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto rawFilter = fromjson("{i: {$elemMatch: {a: 0}}}");
-    auto parsedFilter = assertGet(MatchExpressionParser::parse(rawFilter, expCtx));
-    auto filter = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
-    ASSERT(filter->getPlaceholder());
-    ASSERT_EQ(*filter->getPlaceholder(), "i");
-    ASSERT_TRUE(filter->getFilter()->matchesBSON(fromjson("{i: [{a: 0}]}")));
-    ASSERT_FALSE(filter->getFilter()->matchesBSON(fromjson("{i: [{a: 1}]}")));
-}
-
-TEST(ExpressionWithPlaceholderTest, ParseCollation) {
-    auto collator =
-        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kAlwaysEqual);
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    expCtx->setCollator(std::move(collator));
-    auto rawFilter = fromjson("{i: 'abc'}");
-    auto parsedFilter = assertGet(MatchExpressionParser::parse(rawFilter, expCtx));
-    auto filter = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
-    ASSERT(filter->getPlaceholder());
-    ASSERT_EQ(*filter->getPlaceholder(), "i");
-    ASSERT_TRUE(filter->getFilter()->matchesBSON(fromjson("{i: 'cba'}")));
-    ASSERT_FALSE(filter->getFilter()->matchesBSON(fromjson("{i: 0}")));
-}
-
-TEST(ExpressionWithPlaceholderTest, ParseIdContainsNumbersAndCapitals) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto rawFilter = fromjson("{iA3: 0}");
-    auto parsedFilter = assertGet(MatchExpressionParser::parse(rawFilter, expCtx));
-    auto filter = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
-    ASSERT(filter->getPlaceholder());
-    ASSERT_EQ(*filter->getPlaceholder(), "iA3");
-    ASSERT_TRUE(filter->getFilter()->matchesBSON(fromjson("{'iA3': 0}")));
-    ASSERT_FALSE(filter->getFilter()->matchesBSON(fromjson("{'iA3': 1}")));
-}
 
 TEST(ExpressionWithPlaceholderTest, EmptyMatchExpressionParsesSuccessfully) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
@@ -153,7 +96,7 @@ TEST(ExpressionWithPlaceholderTest, SuccessfullyParsesExpressionsWithTypeOther) 
     ASSERT(result->getPlaceholder());
     ASSERT_EQ(*result->getPlaceholder(), "a"_sd);
 
-    rawFilter = fromjson("{$_internalSchemaMinProperties: 1}}");
+    rawFilter = fromjson("{$_internalSchemaMinProperties: 1}");
     parsedFilter = assertGet(MatchExpressionParser::parse(rawFilter, expCtx));
     result = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
     ASSERT_FALSE(result->getPlaceholder());
@@ -243,7 +186,7 @@ TEST(ExpressionWithPlaceholderTest, FieldNameStartingWithCapitalFailsToParse) {
 
 TEST(ExpressionWithPlaceholderTest, EquivalentIfPlaceholderAndExpressionMatch) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto rawFilter1 = fromjson("{i: 5}}");
+    auto rawFilter1 = fromjson("{i: 5}");
     auto parsedFilter1 = assertGet(MatchExpressionParser::parse(rawFilter1, expCtx));
     auto expressionWithPlaceholder1 = ExpressionWithPlaceholder::make(std::move(parsedFilter1));
     ASSERT_OK(expressionWithPlaceholder1.getStatus());

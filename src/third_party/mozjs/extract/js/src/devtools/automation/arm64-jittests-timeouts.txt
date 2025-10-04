@@ -1,0 +1,2 @@
+basic/bug1610192.js
+ion/pow-base-power-of-two.js

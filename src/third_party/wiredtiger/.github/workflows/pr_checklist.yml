@@ -1,0 +1,46 @@
+name: PR Checklist
+
+on:
+  pull_request:
+    types:
+      - opened
+
+jobs:
+  add-comment:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const comment = `
+            Thanks for creating a pull request! Please answer the questions below by editing this comment — completing this upfront typically speeds up the review process.
+
+            ## Checklist before requesting a review
+            - [ ] I have performed a self-review of my code.
+            - [ ] I can point to specific tests that would catch regressions of this change, or I've documented why existing test coverage is sufficient.
+            - [ ] I have made corresponding changes to the documentation, or no documentation change is needed.
+
+            ## What makes this change safe?
+            Help reviewers focus their attention by answering these questions:
+            - **Test coverage**: Which specific tests validate your change? (Name the test files/functions that would fail if your change were reverted)
+            - **Risk assessment**: What functionality could break if this change has bugs? How thoroughly have you tested edge cases?
+            - **Review focus**: What aspects would you want a teammate to double-check?
+
+            ## Type of change made in this PR
+            - [ ] Functional change
+            - [ ] Test-only change
+            - [ ] Refactor-only change
+            - [ ] Other non-functional change
+
+            References:
+            - [Risk level guide](https://github.com/wiredtiger/wiredtiger/blob/develop/.github/risk_level_guide.md)
+            - [Testing frameworks](https://github.com/wiredtiger/wiredtiger/blob/develop/test/testing_frameworks.md)
+            `;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            })

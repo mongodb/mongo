@@ -27,36 +27,49 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/client/authenticate.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/json.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/client/internal_auth.h"
 #include "mongo/client/sasl_client_authenticate.h"
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/sasl_command_constants.h"
+#include "mongo/db/auth/user.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/wire_version.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_response.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/mutex.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/op_msg_rpc_impls.h"
-#include "mongo/util/net/ssl_manager.h"
-#include "mongo/util/net/ssl_options.h"
-#include "mongo/util/password_digest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/str.h"
+
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
+
 
 namespace mongo {
 namespace auth {
 
 using executor::RemoteCommandRequest;
-using executor::RemoteCommandResponse;
 
 using AuthRequest = StatusWith<RemoteCommandRequest>;
 
@@ -81,15 +94,6 @@ StatusWith<std::string> extractDBField(const BSONObj& params) {
 }
 
 //
-// MONGODB-CR
-//
-
-Future<void> authMongoCRImpl(RunCommandHook cmd, const BSONObj& params) {
-    return Status(ErrorCodes::AuthenticationFailed,
-                  "MONGODB-CR support was removed in MongoDB 4.0");
-}
-
-//
 // X-509
 //
 
@@ -101,27 +105,29 @@ StatusWith<OpMsgRequest> createX509AuthCmd(const BSONObj& params, StringData cli
     }
     auto db = extractDBField(params);
     if (!db.isOK())
-        return std::move(db.getStatus());
+        return db.getStatus();
 
     std::string username;
     auto response = bsonExtractStringFieldWithDefault(
-        params, saslCommandUserFieldName, clientName.toString(), &username);
+        params, saslCommandUserFieldName, std::string{clientName}, &username);
     if (!response.isOK()) {
         return response;
     }
-    if (username != clientName.toString()) {
+    if (username != std::string{clientName}) {
         StringBuilder message;
         message << "Username \"";
-        message << params[saslCommandUserFieldName].valuestr();
+        message << params[saslCommandUserFieldName].valueStringData();
         message << "\" does not match the provided client certificate user \"";
-        message << clientName.toString() << "\"";
+        message << std::string{clientName} << "\"";
         return {ErrorCodes::AuthenticationFailed, message.str()};
     }
 
-    return OpMsgRequest::fromDBAndBody(db.getValue(),
-                                       BSON("authenticate" << 1 << "mechanism"
-                                                           << "MONGODB-X509"
-                                                           << "user" << username));
+    return OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::kNotRequired /* db is not tenanted */,
+        AuthDatabaseNameUtil::deserialize(db.getValue()),
+        BSON("authenticate" << 1 << "mechanism"
+                            << "MONGODB-X509"
+                            << "user" << username));
 }
 
 // Use the MONGODB-X509 protocol to authenticate as "username." The certificate details
@@ -142,7 +148,7 @@ Future<void> authX509(RunCommandHook runCommand, const BSONObj& params, StringDa
 
 class DefaultInternalAuthParametersProvider : public InternalAuthParametersProvider {
 public:
-    ~DefaultInternalAuthParametersProvider() = default;
+    ~DefaultInternalAuthParametersProvider() override = default;
 
     BSONObj get(size_t index, StringData mechanism) final {
         return getInternalAuthParams(index, mechanism);
@@ -187,9 +193,6 @@ Future<void> authenticateClient(const BSONObj& params,
                       "You cannot specify both 'db' and 'userSource'. Please use only 'db'.");
     }
 
-    if (mechanism == kMechanismMongoCR)
-        return authMongoCR(runCommand, params).onError(errorHandler);
-
 #ifdef MONGO_CONFIG_SSL
     else if (mechanism == kMechanismMongoX509)
         return authX509(runCommand, params, clientName).onError(errorHandler);
@@ -202,8 +205,6 @@ Future<void> authenticateClient(const BSONObj& params,
                   mechanism + " mechanism support not compiled into client library.");
 };
 
-AuthMongoCRHandler authMongoCR = authMongoCRImpl;
-
 Future<std::string> negotiateSaslMechanism(RunCommandHook runCommand,
                                            const UserName& username,
                                            boost::optional<std::string> mechanismHint,
@@ -213,27 +214,30 @@ Future<std::string> negotiateSaslMechanism(RunCommandHook runCommand,
     }
 
     BSONObjBuilder builder;
-    builder.append("ismaster", 1);
+    builder.append("hello", 1);
     builder.append("saslSupportedMechs", username.getUnambiguousName());
     if (stepDownBehavior == StepDownBehavior::kKeepConnectionOpen) {
         builder.append("hangUpOnStepDown", false);
     }
     const auto request = builder.obj();
 
-    return runCommand(OpMsgRequest::fromDBAndBody("admin"_sd, std::move(request)))
+    return runCommand(OpMsgRequestBuilder::create(
+                          auth::ValidatedTenancyScope::kNotRequired /* admin is not per-tenant. */,
+                          DatabaseName::kAdmin,
+                          request))
         .then([](BSONObj reply) -> Future<std::string> {
             auto mechsArrayObj = reply.getField("saslSupportedMechs");
-            if (mechsArrayObj.type() != Array) {
+            if (mechsArrayObj.type() != BSONType::array) {
                 return Status{ErrorCodes::BadValue, "Expected array of SASL mechanism names"};
             }
 
             auto obj = mechsArrayObj.Obj();
             std::vector<std::string> availableMechanisms;
             for (const auto& elem : obj) {
-                if (elem.type() != String) {
+                if (elem.type() != BSONType::string) {
                     return Status{ErrorCodes::BadValue, "Expected array of SASL mechanism names"};
                 }
-                availableMechanisms.push_back(elem.checkAndGetStringData().toString());
+                availableMechanisms.push_back(std::string{elem.checkAndGetStringData()});
                 // The drivers spec says that if SHA-256 is available then it MUST be selected
                 // as the SASL mech.
                 if (availableMechanisms.back() == kMechanismScramSha256) {
@@ -241,7 +245,7 @@ Future<std::string> negotiateSaslMechanism(RunCommandHook runCommand,
                 }
             }
 
-            return availableMechanisms.empty() ? kInternalAuthFallbackMechanism.toString()
+            return availableMechanisms.empty() ? std::string{kInternalAuthFallbackMechanism}
                                                : availableMechanisms.front();
         });
 }
@@ -277,14 +281,19 @@ Future<void> authenticateInternalClient(
         });
 }
 
-BSONObj buildAuthParams(StringData dbname,
+BSONObj buildAuthParams(const DatabaseName& dbname,
                         StringData username,
                         StringData passwordText,
-                        bool digestPassword) {
-    return BSON(saslCommandMechanismFieldName
-                << "SCRAM-SHA-1" << saslCommandUserDBFieldName << dbname << saslCommandUserFieldName
-                << username << saslCommandPasswordFieldName << passwordText
-                << saslCommandDigestPasswordFieldName << digestPassword);
+                        StringData mechanism) {
+    // Direct authentication expects no tenantId to be present.
+    fassert(8032000, dbname.tenantId() == boost::none);
+    // Because we assert above there is no TenantId, serialiazing the `dbname` will never include
+    // a tenantId as part of the dbName regardless of the serialization context.
+    SerializationContext sc = SerializationContext::stateDefault();
+    return BSON(saslCommandMechanismFieldName << mechanism << saslCommandUserDBFieldName
+                                              << DatabaseNameUtil::serialize(dbname, sc)
+                                              << saslCommandUserFieldName << username
+                                              << saslCommandPasswordFieldName << passwordText);
 }
 
 StringData getSaslCommandUserDBFieldName() {
@@ -297,11 +306,12 @@ StringData getSaslCommandUserFieldName() {
 
 namespace {
 
-StatusWith<std::shared_ptr<SaslClientSession>> _speculateSaslStart(BSONObjBuilder* isMaster,
-                                                                   const std::string& mechanism,
-                                                                   const HostAndPort& host,
-                                                                   StringData authDB,
-                                                                   BSONObj params) {
+StatusWith<std::shared_ptr<SaslClientSession>> _speculateSaslStart(
+    BSONObjBuilder* helloRequestBuilder,
+    const std::string& mechanism,
+    const HostAndPort& host,
+    StringData authDB,
+    BSONObj params) {
     if (mechanism == kMechanismSaslPlain) {
         return {ErrorCodes::BadValue, "PLAIN mechanism not supported with speculativeSaslStart"};
     }
@@ -323,13 +333,13 @@ StatusWith<std::shared_ptr<SaslClientSession>> _speculateSaslStart(BSONObjBuilde
     saslStart.append("mechanism", mechanism);
     saslStart.appendBinData("payload", int(payload.size()), BinDataGeneral, payload.c_str());
     saslStart.append("db", authDB);
-    isMaster->append(kSpeculativeAuthenticate, saslStart.obj());
+    helloRequestBuilder->append(kSpeculativeAuthenticate, saslStart.obj());
 
     return session;
 }
 
 StatusWith<SpeculativeAuthType> _speculateAuth(
-    BSONObjBuilder* isMaster,
+    BSONObjBuilder* helloRequestBuilder,
     const std::string& mechanism,
     const HostAndPort& host,
     StringData authDB,
@@ -337,17 +347,18 @@ StatusWith<SpeculativeAuthType> _speculateAuth(
     std::shared_ptr<SaslClientSession>* saslClientSession) {
     if (mechanism == kMechanismMongoX509) {
         // MONGODB-X509
-        isMaster->append(kSpeculativeAuthenticate,
-                         BSON(kAuthenticateCommand << "1" << saslCommandMechanismFieldName
-                                                   << mechanism << saslCommandUserDBFieldName
-                                                   << "$external"));
+        helloRequestBuilder->append(kSpeculativeAuthenticate,
+                                    BSON(kAuthenticateCommand
+                                         << "1" << saslCommandMechanismFieldName << mechanism
+                                         << saslCommandUserDBFieldName << "$external"));
         return SpeculativeAuthType::kAuthenticate;
     }
 
     // Proceed as if this is a SASL mech and we either have a password,
     // or we don't need one (e.g. MONGODB-AWS).
     // Failure is absolutely an option.
-    auto swSaslClientSession = _speculateSaslStart(isMaster, mechanism, host, authDB, params);
+    auto swSaslClientSession =
+        _speculateSaslStart(helloRequestBuilder, mechanism, host, authDB, params);
     if (!swSaslClientSession.isOK()) {
         return swSaslClientSession.getStatus();
     }
@@ -361,24 +372,25 @@ std::string getBSONString(BSONObj container, StringData field) {
     auto elem = container[field];
     uassert(ErrorCodes::BadValue,
             str::stream() << "Field '" << field << "' must be of type string",
-            elem.type() == String);
+            elem.type() == BSONType::string);
     return elem.String();
 }
 }  // namespace
 
-SpeculativeAuthType speculateAuth(BSONObjBuilder* isMasterRequest,
+SpeculativeAuthType speculateAuth(BSONObjBuilder* helloRequestBuilder,
                                   const MongoURI& uri,
                                   std::shared_ptr<SaslClientSession>* saslClientSession) {
-    auto mechanism = uri.getOption("authMechanism").get_value_or(kMechanismScramSha256.toString());
+    auto mechanism =
+        uri.getOption("authMechanism").get_value_or(std::string{kMechanismScramSha256});
 
     auto optParams = uri.makeAuthObjFromOptions(LATEST_WIRE_VERSION, {mechanism});
     if (!optParams) {
         return SpeculativeAuthType::kNone;
     }
 
-    auto params = std::move(optParams.get());
+    auto params = std::move(optParams.value());
 
-    auto ret = _speculateAuth(isMasterRequest,
+    auto ret = _speculateAuth(helloRequestBuilder,
                               mechanism,
                               uri.getServers().front(),
                               uri.getAuthenticationDatabase(),
@@ -394,9 +406,9 @@ SpeculativeAuthType speculateAuth(BSONObjBuilder* isMasterRequest,
 
 SpeculativeAuthType speculateInternalAuth(
     const HostAndPort& remoteHost,
-    BSONObjBuilder* isMasterRequest,
+    BSONObjBuilder* helloRequestBuilder,
     std::shared_ptr<SaslClientSession>* saslClientSession) try {
-    auto params = getInternalAuthParams(0, kMechanismScramSha256.toString());
+    auto params = getInternalAuthParams(0, std::string{kMechanismScramSha256});
     if (params.isEmpty()) {
         return SpeculativeAuthType::kNone;
     }
@@ -404,8 +416,8 @@ SpeculativeAuthType speculateInternalAuth(
     auto mechanism = getBSONString(params, saslCommandMechanismFieldName);
     auto authDB = getBSONString(params, saslCommandUserDBFieldName);
 
-    auto ret =
-        _speculateAuth(isMasterRequest, mechanism, remoteHost, authDB, params, saslClientSession);
+    auto ret = _speculateAuth(
+        helloRequestBuilder, mechanism, remoteHost, authDB, params, saslClientSession);
     if (!ret.isOK()) {
         return SpeculativeAuthType::kNone;
     }

@@ -35,6 +35,8 @@ import wiredtiger, wttest
 #   JIRA WT-3590: if writing table data fails during close then tables
 # that were updated within the same transaction could get out of sync with
 # each other.
+@wttest.skip_for_hook("nonstandalone", "fails for nonstandalone")
+@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_bug018(wttest.WiredTigerTestCase, suite_subprocess):
     '''Test closing/reopening/recovering tables when writes fail'''
 
@@ -112,6 +114,12 @@ class test_bug018(wttest.WiredTigerTestCase, suite_subprocess):
     def test_bug018(self):
         '''Test closing multiple tables'''
 
+        # This test spawns another python instance but that circumvents the LD_PRELOAD logic in
+        # init.py, which means that python instance crashes. We could fix that but it would require
+        # some custom logic which is overkill for this single test.
+        if os.environ.get("TESTUTIL_TSAN") == "1":
+            self.skipTest("Not compatible with TSan")
+
         self.close_conn()
         subdir = 'SUBPROCESS'
         [ignore_result, new_home_dir] = self.run_subprocess_function(subdir,
@@ -140,6 +148,3 @@ class test_bug018(wttest.WiredTigerTestCase, suite_subprocess):
             self.captureerr.checkAdditionalPattern(self, '.')
             results2 = []
         self.assertEqual(results1, results2)
-
-if __name__ == '__main__':
-    wttest.run()

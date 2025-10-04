@@ -30,7 +30,7 @@
 #   Transactions: using multiple cursor and session handles
 #
 
-import wiredtiger, wttest
+import wttest
 from wtscenario import make_scenarios
 
 class test_txn03(wttest.WiredTigerTestCase):
@@ -73,7 +73,7 @@ class test_txn03(wttest.WiredTigerTestCase):
 
         # Open another session and some transactional cursors.
         self.session2 = self.conn.open_session()
-        self.session2.begin_transaction("isolation=snapshot")
+        self.session2.begin_transaction()
         t1c = self.session2.open_cursor(self.uri1, None, 'overwrite')
         t2c = self.session2.open_cursor(self.uri2, None, 'overwrite')
 
@@ -95,6 +95,3 @@ class test_txn03(wttest.WiredTigerTestCase):
         t1c.close()
         t2c.close()
         self.session2.rollback_transaction()
-
-if __name__ == '__main__':
-    wttest.run()

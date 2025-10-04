@@ -27,31 +27,51 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/client/mongo_uri.h"
-
-#include <utility>
-
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/algorithm/string/classification.hpp>
+#include <boost/algorithm/string/compare.hpp>
 #include <boost/algorithm/string/find_iterator.hpp>
-#include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/split.hpp>
 #include <boost/range/algorithm/count.hpp>
-
+// IWYU pragma: no_include "boost/algorithm/string/detail/classification.hpp"
+// IWYU pragma: no_include "boost/algorithm/string/detail/finder.hpp"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/client/sasl_client_authenticate.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/client/authenticate.h"
+#include "mongo/client/mongo_uri.h"
 #include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/stdx/utility.h"
+#include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/dns_name.h"
 #include "mongo/util/dns_query.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <exception>
+#include <memory>
+#include <type_traits>
+#include <utility>
+
+#include <boost/algorithm/string/finder.hpp>
+#include <boost/core/addressof.hpp>
+#include <boost/function/function_base.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/range/const_iterator.hpp>
+#include <boost/range/iterator_range_core.hpp>
+#include <boost/type_index/type_index_facade.hpp>
 
 using namespace std::literals::string_literals;
 
@@ -161,7 +181,7 @@ MongoURI::OptionsMap parseOptions(StringData options, StringData url) {
                           << url);
     }
 
-    const auto optionsStr = options.toString();
+    const auto optionsStr = std::string{options};
     for (auto i =
              boost::make_split_iterator(optionsStr, boost::first_finder("&", boost::is_iequal()));
          i != std::remove_reference<decltype((i))>::type{};
@@ -300,7 +320,7 @@ MongoURI::CaseInsensitiveString::CaseInsensitiveString(std::string str)
     : _original(std::move(str)), _lowercase(boost::algorithm::to_lower_copy(_original)) {}
 
 bool MongoURI::isMongoURI(StringData uri) {
-    return (uri.startsWith(kURIPrefix) || uri.startsWith(kURISRVPrefix));
+    return (uri.starts_with(kURIPrefix) || uri.starts_with(kURISRVPrefix));
 }
 
 std::string MongoURI::redact(StringData url) {
@@ -322,9 +342,9 @@ std::string MongoURI::redact(StringData url) {
 
 MongoURI MongoURI::parseImpl(StringData url) {
     // 1. Validate and remove the scheme prefix `mongodb://` or `mongodb+srv://`
-    const bool isSeedlist = url.startsWith(kURISRVPrefix);
-    if (!(url.startsWith(kURIPrefix) || isSeedlist)) {
-        return MongoURI(uassertStatusOK(ConnectionString::parse(url.toString())));
+    const bool isSeedlist = url.starts_with(kURISRVPrefix);
+    if (!(url.starts_with(kURIPrefix) || isSeedlist)) {
+        return MongoURI(uassertStatusOK(ConnectionString::parse(std::string{url})));
     }
 
     // 2. Split up the URI into its components for further parsing and validation
@@ -361,7 +381,7 @@ MongoURI MongoURI::parseImpl(StringData url) {
         str::stream() << "Password cannot properly be URL decoded for mongodb:// URL: " << url);
 
     // 4. Validate, split, and URL decode the host identifiers.
-    const auto hostIdentifiersStr = hostIdentifiers.toString();
+    const auto hostIdentifiersStr = std::string{hostIdentifiers};
     std::vector<HostAndPort> servers;
     for (auto i = boost::make_split_iterator(hostIdentifiersStr,
                                              boost::first_finder(",", boost::is_iequal()));
@@ -375,7 +395,7 @@ MongoURI MongoURI::parseImpl(StringData url) {
             continue;
         }
 
-        if ((host.find('/') != std::string::npos) && !StringData(host).endsWith(".sock")) {
+        if ((host.find('/') != std::string::npos) && !StringData(host).ends_with(".sock")) {
             uasserted(ErrorCodes::FailedToParse,
                       str::stream()
                           << "'" << host << "' in '" << url
@@ -444,8 +464,7 @@ MongoURI MongoURI::parseImpl(StringData url) {
     // slash ("/"), backslash ("\"), space (" "), double-quote ("""), or dollar sign ("$")
     // period (".") is also prohibited, but drivers MAY allow periods
     if (!database.empty() &&
-        !NamespaceString::validDBName(database,
-                                      NamespaceString::DollarInDbNameBehavior::Disallow)) {
+        !DatabaseName::validDBName(database, DatabaseName::DollarInDbNameBehavior::Disallow)) {
         uasserted(ErrorCodes::FailedToParse,
                   str::stream() << "Database name cannot have reserved "
                                    "characters for mongodb:// URL: "
@@ -471,47 +490,35 @@ MongoURI MongoURI::parseImpl(StringData url) {
                   str::stream() << "appName cannot exceed 128 characters: " << optIter->second);
     }
 
-    boost::optional<bool> retryWrites = boost::none;
-    optIter = options.find("retryWrites");
-    if (optIter != end(options)) {
-        if (optIter->second == "true") {
-            retryWrites.reset(true);
-        } else if (optIter->second == "false") {
-            retryWrites.reset(false);
-        } else {
-            uasserted(ErrorCodes::FailedToParse,
-                      str::stream() << "retryWrites must be either \"true\" or \"false\"");
+    auto extractBooleanOption =
+        [&options](CaseInsensitiveString optionName) -> boost::optional<bool> {
+        auto optIter = options.find(optionName);
+        if (optIter == end(options)) {
+            return boost::none;
         }
+        if (auto value = optIter->second; value == "true") {
+            return true;
+        } else if (value == "false") {
+            return false;
+        }
+        uasserted(ErrorCodes::FailedToParse,
+                  fmt::format("{} must be either \"true\" or \"false\"", optionName.original()));
+    };
+
+    const auto retryWrites = extractBooleanOption("retryWrites");
+    const auto helloOk = extractBooleanOption("helloOk");
+#ifdef MONGO_CONFIG_GRPC
+    const auto gRPC = extractBooleanOption("gRPC");
+#endif
+    auto tlsEnabled = extractBooleanOption("tls");
+    if (!tlsEnabled.has_value()) {
+        tlsEnabled = extractBooleanOption("ssl");
     }
 
-    const auto helloOk = [&options]() -> boost::optional<bool> {
-        if (auto optIter = options.find("helloOk"); optIter != end(options)) {
-            if (auto value = optIter->second; value == "true") {
-                return true;
-            } else if (value == "false") {
-                return false;
-            } else {
-                uasserted(ErrorCodes::FailedToParse,
-                          "helloOk must be either \"true\" or \"false\"");
-            }
-        }
-        return boost::none;
-    }();
-
-    transport::ConnectSSLMode sslMode = transport::kGlobalSSLMode;
-    auto sslModeIter = std::find_if(options.begin(), options.end(), [](auto pred) {
-        return pred.first == CaseInsensitiveString("ssl") ||
-            pred.first == CaseInsensitiveString("tls");
-    });
-    if (sslModeIter != options.end()) {
-        const auto& val = sslModeIter->second;
-        if (val == "true") {
-            sslMode = transport::kEnableSSL;
-        } else if (val == "false") {
-            sslMode = transport::kDisableSSL;
-        } else {
-            uasserted(51041, str::stream() << "tls must be either 'true' or 'false', not" << val);
-        }
+    auto tlsMode = transport::ConnectSSLMode::kGlobalSSLMode;
+    if (tlsEnabled.has_value()) {
+        tlsMode = *tlsEnabled ? transport::ConnectSSLMode::kEnableSSL
+                              : transport::ConnectSSLMode::kDisableSSL;
     }
 
     auto cs = replicaSetName.empty()
@@ -521,9 +528,12 @@ MongoURI MongoURI::parseImpl(StringData url) {
                     username,
                     password,
                     database,
-                    std::move(retryWrites),
-                    sslMode,
+                    retryWrites,
+                    tlsMode,
                     helloOk,
+#ifdef MONGO_CONFIG_GRPC
+                    gRPC,
+#endif
                     std::move(options));
 }
 
@@ -533,7 +543,7 @@ StatusWith<MongoURI> MongoURI::parse(StringData url) try {
     return exceptionToStatus();
 }
 
-const boost::optional<std::string> MongoURI::getAppName() const {
+boost::optional<std::string> MongoURI::getAppName() const {
     const auto optIter = _options.find("appName");
     if (optIter != end(_options)) {
         return optIter->second;
@@ -559,7 +569,7 @@ std::string MongoURI::canonicalizeURIAsString() const {
             if (boost::count(hostAndPort.host(), ':') > 1) {
                 uri << delimeter << "[" << uriEncode(hostAndPort.host()) << "]"
                     << ":" << uriEncode(std::to_string(hostAndPort.port()));
-            } else if (StringData(hostAndPort.host()).endsWith(".sock")) {
+            } else if (StringData(hostAndPort.host()).ends_with(".sock")) {
                 uri << delimeter << uriEncode(hostAndPort.host());
             } else {
                 uri << delimeter << uriEncode(hostAndPort.host()) << ":"
@@ -593,9 +603,10 @@ constexpr auto kAuthMechanismPropertiesKey = "mechanism_properties"_sd;
 constexpr auto kAuthServiceName = "SERVICE_NAME"_sd;
 constexpr auto kAuthServiceRealm = "SERVICE_REALM"_sd;
 constexpr auto kAuthAwsSessionToken = "AWS_SESSION_TOKEN"_sd;
+constexpr auto kAuthOIDCAccessToken = "OIDC_ACCESS_TOKEN"_sd;
 
-constexpr std::array<StringData, 3> kSupportedAuthMechanismProperties = {
-    kAuthServiceName, kAuthServiceRealm, kAuthAwsSessionToken};
+constexpr std::array<StringData, 4> kSupportedAuthMechanismProperties = {
+    kAuthServiceName, kAuthServiceRealm, kAuthAwsSessionToken, kAuthOIDCAccessToken};
 
 BSONObj parseAuthMechanismProperties(const std::string& propStr) {
     BSONObjBuilder bob;
@@ -621,8 +632,10 @@ BSONObj parseAuthMechanismProperties(const std::string& propStr) {
 boost::optional<BSONObj> MongoURI::makeAuthObjFromOptions(
     int maxWireVersion, const std::vector<std::string>& saslMechsForAuth) const {
     // Usually, a username is required to authenticate.
-    // However X509 based authentication may, and typically does,
-    // omit the username, inferring it from the client certificate instead.
+    // However certain authentication mechanisms may omit the username.
+    // This includes X509, which infers the username from the certificate;
+    // AWS-IAM, which infers it from the session token;
+    // and OIDC, which infers it from the access token.
     bool usernameRequired = true;
 
     BSONObjBuilder bob;
@@ -642,21 +655,16 @@ boost::optional<BSONObj> MongoURI::makeAuthObjFromOptions(
     it = _options.find("authMechanism");
     if (it != _options.end()) {
         bob.append(saslCommandMechanismFieldName, it->second);
-        if (it->second == auth::kMechanismMongoX509 || it->second == auth::kMechanismMongoAWS) {
+        if (it->second == auth::kMechanismMongoX509 || it->second == auth::kMechanismMongoAWS ||
+            it->second == auth::kMechanismMongoOIDC) {
             usernameRequired = false;
         }
-    } else if (!saslMechsForAuth.empty()) {
-        if (std::find(saslMechsForAuth.begin(),
-                      saslMechsForAuth.end(),
-                      auth::kMechanismScramSha256) != saslMechsForAuth.end()) {
-            bob.append(saslCommandMechanismFieldName, auth::kMechanismScramSha256);
-        } else {
-            bob.append(saslCommandMechanismFieldName, auth::kMechanismScramSha1);
-        }
-    } else if (maxWireVersion >= 3) {
-        bob.append(saslCommandMechanismFieldName, auth::kMechanismScramSha1);
+    } else if (std::find(saslMechsForAuth.begin(),
+                         saslMechsForAuth.end(),
+                         auth::kMechanismScramSha256) != saslMechsForAuth.end()) {
+        bob.append(saslCommandMechanismFieldName, auth::kMechanismScramSha256);
     } else {
-        bob.append(saslCommandMechanismFieldName, auth::kMechanismMongoCR);
+        bob.append(saslCommandMechanismFieldName, auth::kMechanismScramSha1);
     }
 
     if (usernameRequired && _user.empty()) {
@@ -687,7 +695,7 @@ boost::optional<BSONObj> MongoURI::makeAuthObjFromOptions(
             if (username.empty()) {
                 // In practice, this won't actually occur since
                 // this block corresponds to GSSAPI, while username
-                // may only be omitted with MOGNODB-X509.
+                // may only be omitted with MONGODB-X509.
                 return boost::none;
             }
             username.append("@").append(parsed[kAuthServiceRealm].String());
@@ -695,6 +703,10 @@ boost::optional<BSONObj> MongoURI::makeAuthObjFromOptions(
 
         if (parsed.hasField(kAuthAwsSessionToken)) {
             bob.append(saslCommandIamSessionToken, parsed[kAuthAwsSessionToken].String());
+        }
+
+        if (parsed.hasField(kAuthOIDCAccessToken)) {
+            bob.append(saslCommandOIDCAccessToken, parsed[kAuthOIDCAccessToken].String());
         }
     }
 

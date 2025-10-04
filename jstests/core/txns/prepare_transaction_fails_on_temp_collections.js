@@ -5,15 +5,15 @@
  * and are deleted on both repl stepup and server startup.
  *
  * @tags: [
+ *   # The test runs commands that are not allowed with security token: applyOps,
+ *   # prepareTransaction.
+ *   not_allowed_with_signed_security_token,
  *   uses_transactions,
  *   uses_prepare_transaction,
  *   # applyOps is not supported on mongos
  *   assumes_against_mongod_not_mongos,
  * ]
  */
-
-(function() {
-"use strict";
 
 const dbName = "test";
 const tempCollName = "prepare_transaction_fails_on_temp_collections";
@@ -23,9 +23,11 @@ const testTempColl = testDB.getCollection(tempCollName);
 testTempColl.drop({writeConcern: {w: "majority"}});
 
 jsTest.log("Creating a temporary collection.");
-assert.commandWorked(testDB.runCommand({
-    applyOps: [{op: "c", ns: testDB.getName() + ".$cmd", o: {create: tempCollName, temp: true}}]
-}));
+assert.commandWorked(
+    testDB.runCommand({
+        applyOps: [{op: "c", ns: testDB.getName() + ".$cmd", o: {create: tempCollName, temp: true}}],
+    }),
+);
 
 const session = db.getMongo().startSession();
 const sessionDB = session.getDatabase(dbName);
@@ -35,8 +37,10 @@ jsTest.log("Setting up a transaction with an operation on a temporary collection
 session.startTransaction();
 assert.commandWorked(sessionTempColl.insert({x: 1000}));
 
-jsTest.log("Calling prepareTransaction for a transaction with operations against a " +
-           "temporary collection should now fail.");
-assert.commandFailedWithCode(sessionDB.adminCommand({prepareTransaction: 1}),
-                             ErrorCodes.OperationNotSupportedInTransaction);
-})();
+jsTest.log(
+    "Calling prepareTransaction for a transaction with operations against a " + "temporary collection should now fail.",
+);
+assert.commandFailedWithCode(
+    sessionDB.adminCommand({prepareTransaction: 1}),
+    ErrorCodes.OperationNotSupportedInTransaction,
+);

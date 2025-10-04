@@ -67,6 +67,3 @@ class test_txn17(wttest.WiredTigerTestCase, suite_subprocess):
             lambda: self.session.checkpoint(),
                 '/not permitted in a running transaction/')
         self.session.rollback_transaction()
-
-if __name__ == '__main__':
-    wttest.run()

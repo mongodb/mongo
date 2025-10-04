@@ -27,26 +27,56 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
+#include "mongo/db/s/transaction_coordinator_service.h"
 
-#include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/commands/txn_two_phase_commit_cmds_gen.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/s/transaction_coordinator_service.h"
+#include "mongo/db/generic_argument_util.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/s/transaction_coordinator_document_gen.h"
 #include "mongo/db/s/transaction_coordinator_test_fixture.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/network_test_env.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/time_support.h"
+
+#include <cstddef>
+#include <cstdint>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/none_t.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
+
 
 namespace mongo {
 namespace {
 
 const Date_t kCommitDeadline = Date_t::max();
 
-const BSONObj kDummyWriteConcernError = BSON("code" << ErrorCodes::WriteConcernFailed << "errmsg"
+const BSONObj kDummyWriteConcernError = BSON("code" << ErrorCodes::WriteConcernTimeout << "errmsg"
                                                     << "dummy");
 
 const StatusWith<BSONObj> kNoSuchTransactionAndWriteConcernError =
@@ -68,49 +98,51 @@ class TransactionCoordinatorServiceTestFixture : public TransactionCoordinatorTe
 protected:
     void assertPrepareSentAndRespondWithSuccess() {
         assertCommandSentAndRespondWith(
-            PrepareTransaction::kCommandName, kPrepareOk, WriteConcernOptions::Majority);
+            PrepareTransaction::kCommandName, kPrepareOk, defaultMajorityWriteConcernDoNotUse());
     }
 
     void assertPrepareSentAndRespondWithSuccessAndWriteConcernError() {
         assertCommandSentAndRespondWith(PrepareTransaction::kCommandName,
                                         kPrepareOkButWriteConcernError,
-                                        WriteConcernOptions::Majority);
+                                        defaultMajorityWriteConcernDoNotUse());
         advanceClockAndExecuteScheduledTasks();
     }
 
     void assertPrepareSentAndRespondWithNoSuchTransaction() {
-        assertCommandSentAndRespondWith(
-            PrepareTransaction::kCommandName, kNoSuchTransaction, WriteConcernOptions::Majority);
+        assertCommandSentAndRespondWith(PrepareTransaction::kCommandName,
+                                        kNoSuchTransaction,
+                                        defaultMajorityWriteConcernDoNotUse());
     }
 
     void assertPrepareSentAndRespondWithNoSuchTransactionAndWriteConcernError() {
         assertCommandSentAndRespondWith(PrepareTransaction::kCommandName,
                                         kNoSuchTransactionAndWriteConcernError,
-                                        WriteConcernOptions::Majority);
+                                        defaultMajorityWriteConcernDoNotUse());
         advanceClockAndExecuteScheduledTasks();
     }
 
     // Abort responses
 
     void assertAbortSentAndRespondWithSuccess() {
-        assertCommandSentAndRespondWith("abortTransaction", kOk, WriteConcernOptions::Majority);
+        assertCommandSentAndRespondWith(
+            "abortTransaction", kOk, defaultMajorityWriteConcernDoNotUse());
     }
 
     void assertAbortSentAndRespondWithSuccessAndWriteConcernError() {
         assertCommandSentAndRespondWith(
-            "abortTransaction", kOkButWriteConcernError, WriteConcernOptions::Majority);
+            "abortTransaction", kOkButWriteConcernError, defaultMajorityWriteConcernDoNotUse());
         advanceClockAndExecuteScheduledTasks();
     }
 
     void assertAbortSentAndRespondWithNoSuchTransaction() {
         assertCommandSentAndRespondWith(
-            "abortTransaction", kNoSuchTransaction, WriteConcernOptions::Majority);
+            "abortTransaction", kNoSuchTransaction, defaultMajorityWriteConcernDoNotUse());
     }
 
     void assertAbortSentAndRespondWithNoSuchTransactionAndWriteConcernError() {
         assertCommandSentAndRespondWith("abortTransaction",
                                         kNoSuchTransactionAndWriteConcernError,
-                                        WriteConcernOptions::Majority);
+                                        defaultMajorityWriteConcernDoNotUse());
         advanceClockAndExecuteScheduledTasks();
     }
 
@@ -118,19 +150,20 @@ protected:
 
     void assertCommitSentAndRespondWithSuccess() {
         assertCommandSentAndRespondWith(
-            CommitTransaction::kCommandName, kOk, WriteConcernOptions::Majority);
+            CommitTransaction::kCommandName, kOk, defaultMajorityWriteConcernDoNotUse());
     }
 
     void assertCommitSentAndRespondWithSuccessAndWriteConcernError() {
         assertCommandSentAndRespondWith(CommitTransaction::kCommandName,
                                         kOkButWriteConcernError,
-                                        WriteConcernOptions::Majority);
+                                        defaultMajorityWriteConcernDoNotUse());
         advanceClockAndExecuteScheduledTasks();
     }
 
     void assertCommitSentAndRespondWithRetryableError() {
-        assertCommandSentAndRespondWith(
-            CommitTransaction::kCommandName, kRetryableError, WriteConcernOptions::Majority);
+        assertCommandSentAndRespondWith(CommitTransaction::kCommandName,
+                                        kRetryableError,
+                                        defaultMajorityWriteConcernDoNotUse());
         advanceClockAndExecuteScheduledTasks();
     }
 
@@ -193,45 +226,77 @@ protected:
     }
 
     TxnNumberAndRetryCounter _txnNumberAndRetryCounter{1, 1};
-    RAIIServerParameterControllerForTest _controller{"featureFlagInternalTransactions", true};
 };
 
-using TransactionCoordinatorServiceStepUpStepDownTest = TransactionCoordinatorServiceTestFixture;
+/**
+ * Test wrapper class for TransactionCoordinatorService that has access to protected methods
+ * for testing.
+ */
+class TransactionCoordinatorServiceTestImpl : public TransactionCoordinatorService {
+public:
+    TransactionCoordinatorServiceTestImpl() : TransactionCoordinatorService() {}
 
-TEST_F(TransactionCoordinatorServiceStepUpStepDownTest, OperationsFailBeforeStepUpStarts) {
-    ASSERT_THROWS_CODE(service()->createCoordinator(operationContext(),
-                                                    makeLogicalSessionIdForTest(),
-                                                    _txnNumberAndRetryCounter,
-                                                    kCommitDeadline),
+    using TransactionCoordinatorService::getInitTerm;
+    using TransactionCoordinatorService::pendingCleanup;
+
+    bool isCatalogAndSchedulerActive(OperationContext* opCtx) {
+        try {
+            TransactionCoordinatorService::getCatalogAndScheduler(opCtx);
+            return true;
+        } catch (const ExceptionFor<ErrorCodes::NotWritablePrimary>&) {
+            return false;
+        }
+    }
+};
+
+class TransactionCoordinatorServiceInitializationTest
+    : public TransactionCoordinatorServiceTestFixture {
+protected:
+    void tearDown() override {
+        _testService.interrupt();
+        executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
+        _testService.shutdown();
+
+        TransactionCoordinatorTestFixture::tearDown();
+    }
+
+    TransactionCoordinatorServiceTestImpl _testService;
+    TxnNumberAndRetryCounter _txnNumberAndRetryCounter{1, 1};
+};
+
+TEST_F(TransactionCoordinatorServiceInitializationTest, OperationsFailBeforeInitialized) {
+    ASSERT_THROWS_CODE(_testService.createCoordinator(operationContext(),
+                                                      makeLogicalSessionIdForTest(),
+                                                      _txnNumberAndRetryCounter,
+                                                      kCommitDeadline),
                        AssertionException,
                        ErrorCodes::NotWritablePrimary);
 
-    ASSERT_THROWS_CODE(service()->coordinateCommit(operationContext(),
-                                                   makeLogicalSessionIdForTest(),
-                                                   _txnNumberAndRetryCounter,
-                                                   kTwoShardIdSet),
+    ASSERT_THROWS_CODE(_testService.coordinateCommit(operationContext(),
+                                                     makeLogicalSessionIdForTest(),
+                                                     _txnNumberAndRetryCounter,
+                                                     kTwoShardIdSet),
                        AssertionException,
                        ErrorCodes::NotWritablePrimary);
 
-    ASSERT_THROWS_CODE(service()->recoverCommit(operationContext(),
-                                                makeLogicalSessionIdForTest(),
-                                                _txnNumberAndRetryCounter),
+    ASSERT_THROWS_CODE(_testService.recoverCommit(operationContext(),
+                                                  makeLogicalSessionIdForTest(),
+                                                  _txnNumberAndRetryCounter),
                        AssertionException,
                        ErrorCodes::NotWritablePrimary);
 }
 
-TEST_F(TransactionCoordinatorServiceStepUpStepDownTest, OperationsBlockBeforeStepUpCompletes) {
-    service()->onStepUp(operationContext(), Milliseconds(1));
-    ScopeGuard stepDownGuard([&] { service()->onStepDown(); });
+TEST_F(TransactionCoordinatorServiceInitializationTest, OperationsBlockBeforeInitializeCompletes) {
+    _testService.initializeIfNeeded(operationContext(), /* term */ 1, Milliseconds(1));
 
     ASSERT_THROWS_CODE(operationContext()->runWithDeadline(
                            Date_t::now() + Milliseconds{5},
                            ErrorCodes::NetworkInterfaceExceededTimeLimit,
                            [&] {
-                               return service()->coordinateCommit(operationContext(),
-                                                                  makeLogicalSessionIdForTest(),
-                                                                  _txnNumberAndRetryCounter,
-                                                                  kTwoShardIdSet);
+                               return _testService.coordinateCommit(operationContext(),
+                                                                    makeLogicalSessionIdForTest(),
+                                                                    _txnNumberAndRetryCounter,
+                                                                    kTwoShardIdSet);
                            }),
                        AssertionException,
                        ErrorCodes::NetworkInterfaceExceededTimeLimit);
@@ -241,38 +306,38 @@ TEST_F(TransactionCoordinatorServiceStepUpStepDownTest, OperationsBlockBeforeSte
         network()->advanceTime(network()->now() + Milliseconds(1));
     }
 
-    ASSERT(service()->coordinateCommit(operationContext(),
-                                       makeLogicalSessionIdForTest(),
-                                       _txnNumberAndRetryCounter,
-                                       kTwoShardIdSet) == boost::none);
+    ASSERT(_testService.coordinateCommit(operationContext(),
+                                         makeLogicalSessionIdForTest(),
+                                         _txnNumberAndRetryCounter,
+                                         kTwoShardIdSet) == boost::none);
 }
 
-TEST_F(TransactionCoordinatorServiceStepUpStepDownTest, StepUpFailsDueToBadCoordinatorDocument) {
+TEST_F(TransactionCoordinatorServiceInitializationTest,
+       InitializeFailsDueToBadCoordinatorDocument) {
     DBDirectClient client(operationContext());
 
-    auto response = client.insertAcknowledged(
-        NamespaceString::kTransactionCoordinatorsNamespace.ns(), {BSON("IllegalKey" << 1)});
+    auto response = client.insertAcknowledged(NamespaceString::kTransactionCoordinatorsNamespace,
+                                              {BSON("IllegalKey" << 1)});
     ASSERT_OK(getStatusFromWriteCommandReply(response));
     ASSERT_EQ(1, response["n"].Int());
 
-    service()->onStepUp(operationContext());
-    ScopeGuard stepDownGuard([&] { service()->onStepDown(); });
+    _testService.initializeIfNeeded(operationContext(), /* term */ 1);
 
-    ASSERT_THROWS_CODE(service()->coordinateCommit(operationContext(),
-                                                   makeLogicalSessionIdForTest(),
-                                                   _txnNumberAndRetryCounter,
-                                                   kTwoShardIdSet),
+    ASSERT_THROWS_CODE(_testService.coordinateCommit(operationContext(),
+                                                     makeLogicalSessionIdForTest(),
+                                                     _txnNumberAndRetryCounter,
+                                                     kTwoShardIdSet),
                        AssertionException,
                        ErrorCodes::TypeMismatch);
 
-    ASSERT_THROWS_CODE(service()->recoverCommit(operationContext(),
-                                                makeLogicalSessionIdForTest(),
-                                                _txnNumberAndRetryCounter),
+    ASSERT_THROWS_CODE(_testService.recoverCommit(operationContext(),
+                                                  makeLogicalSessionIdForTest(),
+                                                  _txnNumberAndRetryCounter),
                        AssertionException,
                        ErrorCodes::TypeMismatch);
 }
 
-TEST_F(TransactionCoordinatorServiceStepUpStepDownTest, StepUpRecoverTxnRetryCounter) {
+TEST_F(TransactionCoordinatorServiceInitializationTest, ServiceRecoverTxnRetryCounter) {
     auto lsid = makeLogicalSessionIdForTest();
 
     OperationSessionInfo sessionInfo;
@@ -285,60 +350,156 @@ TEST_F(TransactionCoordinatorServiceStepUpStepDownTest, StepUpRecoverTxnRetryCou
     doc.setParticipants(kOneShardIdList);
 
     DBDirectClient client(operationContext());
-    auto response = client.insertAcknowledged(
-        NamespaceString::kTransactionCoordinatorsNamespace.ns(), {doc.toBSON()});
+    auto response = client.insertAcknowledged(NamespaceString::kTransactionCoordinatorsNamespace,
+                                              {doc.toBSON()});
     ASSERT_OK(getStatusFromWriteCommandReply(response));
     ASSERT_EQ(1, response["n"].Int());
 
-    service()->onStepUp(operationContext());
-    ScopeGuard stepDownGuard([&] { service()->onStepDown(); });
+    _testService.initializeIfNeeded(operationContext(), /* term */ 1);
 
     // Cannot recover commit with an incorrect txnRetryCounter.
-    ASSERT(!service()->recoverCommit(operationContext(),
-                                     lsid,
-                                     {_txnNumberAndRetryCounter.getTxnNumber(),
-                                      *_txnNumberAndRetryCounter.getTxnRetryCounter() - 1}));
-    ASSERT(!service()->recoverCommit(operationContext(),
-                                     lsid,
-                                     {_txnNumberAndRetryCounter.getTxnNumber(),
-                                      *_txnNumberAndRetryCounter.getTxnRetryCounter() + 1}));
+    ASSERT(!_testService.recoverCommit(operationContext(),
+                                       lsid,
+                                       {_txnNumberAndRetryCounter.getTxnNumber(),
+                                        *_txnNumberAndRetryCounter.getTxnRetryCounter() - 1}));
+    ASSERT(!_testService.recoverCommit(operationContext(),
+                                       lsid,
+                                       {_txnNumberAndRetryCounter.getTxnNumber(),
+                                        *_txnNumberAndRetryCounter.getTxnRetryCounter() + 1}));
     auto commitDecisionFuture =
-        *service()->recoverCommit(operationContext(), lsid, _txnNumberAndRetryCounter);
+        *_testService.recoverCommit(operationContext(), lsid, _txnNumberAndRetryCounter);
 
     assertPrepareSentAndRespondWithSuccess();
     assertCommitSentAndRespondWithSuccess();
+
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
 
     ASSERT_EQ(static_cast<int>(commitDecisionFuture.get()),
               static_cast<int>(txn::CommitDecision::kCommit));
 }
 
-TEST_F(TransactionCoordinatorServiceStepUpStepDownTest, StepDownBeforeStepUpTaskCompleted) {
-    // Call step-up with 1ms delay (meaning it will not actually execute until time is manually
-    // advanced on the underlying executor)
-    service()->onStepUp(operationContext(), Milliseconds(1));
+TEST_F(TransactionCoordinatorServiceInitializationTest, InterruptBeforeInitializeTaskCompleted) {
+    // Call intialize with 1ms delay (meaning it will not actually execute until time is manually
+    // advanced on the underlying executor).
+    _testService.initializeIfNeeded(operationContext(), /* term */ 1, Milliseconds(1));
 
-    // Should cancel all outstanding tasks (including the recovery task started by onStepUp above,
-    // which has not yet run)
-    service()->onStepDown();
+    // Should cancel all outstanding tasks (including the recovery task started by
+    // initialize above, which has not yet run).
+    _testService.interrupt();
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
 
-    // Do another onStepUp to ensure it runs successfully
-    service()->onStepUp(operationContext());
+    ASSERT_TRUE(_testService.pendingCleanup());
 
-    // Step-down the service so that the destructor does not complain
-    service()->onStepDown();
+    // Do another initialize to ensure it runs successfully.
+    _testService.initializeIfNeeded(operationContext(), /* term */ 2);
+}
+
+TEST_F(TransactionCoordinatorServiceInitializationTest, InitializingTwiceForSameTermIsIdempotent) {
+    // Verify that there two threads calling initialize on the same node and term works.
+    // See AF-651 for a detailed description of the bug where ShardingInitialization
+    // and replication stepup hook could race.
+    _testService.initializeIfNeeded(operationContext(), /* term */ 1);
+    _testService.initializeIfNeeded(operationContext(), /* term */ 1);
+
+    ASSERT_TRUE(_testService.isCatalogAndSchedulerActive(operationContext()));
+    ASSERT_EQ(1, _testService.getInitTerm());
+}
+
+TEST_F(TransactionCoordinatorServiceInitializationTest,
+       CannotInitializeForOldTermAfterInterruption) {
+    _testService.initializeIfNeeded(operationContext(), /* term */ 1);
+    _testService.interrupt();
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
+
+    // Note: Replication machinery should not call initialize for an old term
+    // after stepping down and interrupting, so this is purely for testing purposes.
+    _testService.initializeIfNeeded(operationContext(), /* term */ 1);
+
+    // Ensure initialization didn't execute.
+    ASSERT_FALSE(_testService.isCatalogAndSchedulerActive(operationContext()));
+}
+
+TEST_F(TransactionCoordinatorServiceInitializationTest,
+       ShouldNotReinitializeOnNewTermIfServiceIsActive) {
+    _testService.initializeIfNeeded(operationContext(), /* term */ 1);
+    ASSERT_TRUE(_testService.isCatalogAndSchedulerActive(operationContext()));
+
+    _testService.initializeIfNeeded(operationContext(), /* term */ 2);
+    ASSERT_TRUE(_testService.isCatalogAndSchedulerActive(operationContext()));
+    ASSERT_EQ(2, _testService.getInitTerm());
+}
+
+TEST_F(TransactionCoordinatorServiceInitializationTest,
+       InterruptedNodeCleanupsDuringNextInitialization) {
+    _testService.initializeIfNeeded(operationContext(), /* term */ 1);
+
+    _testService.interrupt();
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
+
+    ASSERT_TRUE(_testService.pendingCleanup());
+
+    _testService.initializeIfNeeded(operationContext(), /* term */ 2);
+
+    ASSERT_FALSE(_testService.pendingCleanup());
+    ASSERT_TRUE(_testService.isCatalogAndSchedulerActive(operationContext()));
+}
+
+TEST_F(TransactionCoordinatorServiceInitializationTest,
+       OperationsFailsAfterServiceIsInterruptedUntilNextTerm) {
+    _testService.initializeIfNeeded(operationContext(), /* term */ 1);
+    _testService.interrupt();
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
+
+    // Operations fails because service got interrupted.
+    ASSERT_THROWS_CODE(_testService.coordinateCommit(operationContext(),
+                                                     makeLogicalSessionIdForTest(),
+                                                     _txnNumberAndRetryCounter,
+                                                     kTwoShardIdSet),
+                       AssertionException,
+                       ErrorCodes::NotWritablePrimary);
+
+    ASSERT_THROWS_CODE(_testService.recoverCommit(operationContext(),
+                                                  makeLogicalSessionIdForTest(),
+                                                  _txnNumberAndRetryCounter),
+                       AssertionException,
+                       ErrorCodes::NotWritablePrimary);
+
+    ASSERT_THROWS_CODE(_testService.createCoordinator(operationContext(),
+                                                      makeLogicalSessionIdForTest(),
+                                                      _txnNumberAndRetryCounter,
+                                                      kCommitDeadline),
+                       AssertionException,
+                       ErrorCodes::NotWritablePrimary);
+
+    // New term, new initialization.
+    _testService.initializeIfNeeded(operationContext(), /* term */ 2);
+
+    ASSERT(_testService.coordinateCommit(operationContext(),
+                                         makeLogicalSessionIdForTest(),
+                                         _txnNumberAndRetryCounter,
+                                         kTwoShardIdSet) == boost::none);
+
+    ASSERT(_testService.recoverCommit(operationContext(),
+                                      makeLogicalSessionIdForTest(),
+                                      _txnNumberAndRetryCounter) == boost::none);
+
+    _testService.createCoordinator(operationContext(),
+                                   makeLogicalSessionIdForTest(),
+                                   _txnNumberAndRetryCounter,
+                                   kCommitDeadline);
 }
 
 class TransactionCoordinatorServiceTest : public TransactionCoordinatorServiceTestFixture {
 protected:
     void setUp() override {
         TransactionCoordinatorServiceTestFixture::setUp();
-
-        service()->onStepUp(operationContext());
+        service()->initializeIfNeeded(operationContext(), /* term */ 1);
     }
 
     void tearDown() override {
-        service()->onStepDown();
-        service()->joinPreviousRound();
+        service()->interrupt();
+        executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
+        service()->shutdown();
 
         TransactionCoordinatorServiceTestFixture::tearDown();
     }
@@ -388,6 +549,17 @@ TEST_F(TransactionCoordinatorServiceTest,
         decisionFuture.get();
     }
 
+    // Need to run network operations in another thread, since the exception handling path of
+    // createCoordinator both cancels the commit and then waits for that cancellation to complete,
+    // which requires the network interface to make progress.
+    Atomic<bool> createDone{false};
+    auto networkThread = stdx::thread([&] {
+        while (!createDone.load()) {
+            executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
+            sleepFor(Milliseconds(5));
+        }
+    });
+    ScopeGuard join([&] { networkThread.join(); });
     TxnNumberAndRetryCounter otherTxnNumberAndRetryCounter{
         _txnNumberAndRetryCounter.getTxnNumber(),
         *_txnNumberAndRetryCounter.getTxnRetryCounter() + 1};
@@ -396,6 +568,9 @@ TEST_F(TransactionCoordinatorServiceTest,
             operationContext(), _lsid, otherTxnNumberAndRetryCounter, kCommitDeadline),
         AssertionException,
         6032301);
+    createDone.store(true);
+    join.dismiss();
+    networkThread.join();
 
     auto completionFuture =
         *coordinatorService->recoverCommit(operationContext(), _lsid, _txnNumberAndRetryCounter);
@@ -621,6 +796,8 @@ TEST_F(TransactionCoordinatorServiceTest,
     coordinatorService->createCoordinator(
         operationContext(), _lsid, newTxnNumberAndRetryCounter, kCommitDeadline);
 
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
+
     ASSERT_THROWS_CODE(
         commitDecisionFuture.get(), AssertionException, ErrorCodes::TransactionCoordinatorCanceled);
 }
@@ -646,6 +823,8 @@ TEST_F(
     auto oldTxnCommitCompletionFuture = coordinatorService->coordinateCommit(
         operationContext(), _lsid, _txnNumberAndRetryCounter, kTwoShardIdSet);
 
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
+
     // The old transaction should now be canceled.
     if (oldTxnCommitCompletionFuture) {
         ASSERT_THROWS_CODE(oldTxnCommitCompletionFuture->get(),
@@ -666,6 +845,17 @@ TEST_F(TransactionCoordinatorServiceTest,
     auto completionFuture = *coordinatorService->coordinateCommit(
         operationContext(), _lsid, _txnNumberAndRetryCounter, kOneShardIdSet);
 
+    // Need to run network operations in another thread, since the exception handling path of
+    // createCoordinator both cancels the commit and then waits for that cancellation to complete,
+    // which requires the network interface to make progress.
+    Atomic<bool> createDone{false};
+    auto networkThread = stdx::thread([&] {
+        while (!createDone.load()) {
+            executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
+            sleepFor(Milliseconds(5));
+        }
+    });
+    ScopeGuard join([&] { networkThread.join(); });
     TxnNumberAndRetryCounter newTxnNumberAndRetryCounter{
         _txnNumberAndRetryCounter.getTxnNumber(),
         *_txnNumberAndRetryCounter.getTxnRetryCounter() + 1};
@@ -673,9 +863,13 @@ TEST_F(TransactionCoordinatorServiceTest,
                            operationContext(), _lsid, newTxnNumberAndRetryCounter, kCommitDeadline),
                        AssertionException,
                        6032300);
+    createDone.store(true);
+    join.dismiss();
+    networkThread.join();
 
     assertCommandSentAndRespondWith("prepareTransaction", kNoSuchTransaction, boost::none);
     assertCommandSentAndRespondWith("abortTransaction", kOk, boost::none);
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
     ASSERT_THROWS_CODE(completionFuture.get(), AssertionException, ErrorCodes::NoSuchTransaction);
 }
 
@@ -836,7 +1030,9 @@ TEST_F(TransactionCoordinatorServiceTest,
 
     // Vote commit before the deadline
     onCommands({[&](const executor::RemoteCommandRequest&) { return kPrepareOk; },
-                [&](const executor::RemoteCommandRequest&) { return kPrepareOk; }});
+                [&](const executor::RemoteCommandRequest&) {
+                    return kPrepareOk;
+                }});
 
     // Reach the deadline.
     network()->enterNetwork();
@@ -881,7 +1077,9 @@ TEST_F(TransactionCoordinatorServiceTestSingleTxn,
 
     // Simulate a participant voting to abort.
     onCommands({[&](const executor::RemoteCommandRequest& request) { return kPrepareOk; },
-                [&](const executor::RemoteCommandRequest& request) { return kNoSuchTransaction; }});
+                [&](const executor::RemoteCommandRequest& request) {
+                    return kNoSuchTransaction;
+                }});
 
     assertAbortSentAndRespondWithSuccess();
     assertAbortSentAndRespondWithSuccess();

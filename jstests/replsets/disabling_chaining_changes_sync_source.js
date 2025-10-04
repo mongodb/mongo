@@ -3,17 +3,16 @@
  * source if it isn't already syncing from the primary.
  */
 
-(function() {
-"use strict";
-load("jstests/replsets/rslib.js");  // For syncFrom and reconfig.
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {isConfigCommitted, reconfig, syncFrom} from "jstests/replsets/rslib.js";
 
 const replSet = new ReplSetTest({
     nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}],
     settings: {chainingAllowed: true},
-    nodeOptions: {setParameter: {writePeriodicNoops: true}}
+    nodeOptions: {setParameter: {writePeriodicNoops: true}},
 });
 replSet.startSet();
-replSet.initiateWithHighElectionTimeout();
+replSet.initiate();
 
 const primary = replSet.getPrimary();
 const secondaries = replSet.getSecondaries();
@@ -40,4 +39,3 @@ assert.commandWorked(primary.getDB("test").foo.insert({x: 1}));
 replSet.awaitSyncSource(secondary, primary);
 
 replSet.stopSet();
-})();

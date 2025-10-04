@@ -20,7 +20,7 @@ __truncate_table(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
     u_int i;
 
     WT_RET(__wt_schema_get_table(session, uri, strlen(uri), false, 0, &table));
-    WT_STAT_DATA_INCR(session, cursor_truncate);
+    WT_STAT_DSRC_INCR(session, cursor_truncate);
 
     /* Truncate the column groups. */
     for (i = 0; i < WT_COLGROUPS(table); i++)
@@ -41,25 +41,51 @@ err:
  *     Truncate for a tiered data source.
  */
 static int
-__truncate_tiered(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
+__truncate_tiered(WT_SESSION_IMPL *session, const char *uri)
 {
     WT_DECL_RET;
-    WT_TIERED *tiered;
-    u_int i;
 
     WT_RET(__wt_session_get_dhandle(session, uri, NULL, NULL, WT_DHANDLE_EXCLUSIVE));
-    tiered = (WT_TIERED *)session->dhandle;
 
-    WT_STAT_DATA_INCR(session, cursor_truncate);
+    WT_STAT_DSRC_INCR(session, cursor_truncate);
 
-    /* Truncate the tiered entries. */
-    for (i = 0; i < WT_TIERED_MAX_TIERS; i++) {
-        if (tiered->tiers[i].tier == NULL)
-            continue;
-        WT_ERR(__wt_schema_truncate(session, tiered->tiers[i].name, cfg));
-    }
+    WT_WITHOUT_DHANDLE(session, ret = __wt_session_range_truncate(session, uri, NULL, NULL));
+    WT_ERR(ret);
 
 err:
+    WT_TRET(__wt_session_release_dhandle(session));
+    return (ret);
+}
+
+/*
+ * __truncate_layered --
+ *     Truncate for a layered data source.
+ */
+static int
+__truncate_layered(WT_SESSION_IMPL *session, const char *uri)
+{
+    WT_CURSOR *start;
+    WT_DECL_RET;
+
+    start = NULL;
+    WT_RET(__wt_session_get_dhandle(session, uri, NULL, NULL, WT_DHANDLE_EXCLUSIVE));
+
+    WT_STAT_DSRC_INCR(session, cursor_truncate);
+
+    /* To bypass the truncate requiring a btree uri. */
+    WT_ERR(__wt_open_cursor(session, uri, NULL, NULL, &start));
+    WT_ERR_NOTFOUND_OK(start->next(start), true);
+    if (ret == WT_NOTFOUND) {
+        ret = 0;
+        goto done;
+    }
+    WT_WITHOUT_DHANDLE(session, ret = __wt_session_range_truncate(session, NULL, start, NULL));
+    WT_ERR(ret);
+
+done:
+err:
+    if (start != NULL)
+        WT_TRET(start->close(start));
     WT_TRET(__wt_session_release_dhandle(session));
     return (ret);
 }
@@ -82,7 +108,7 @@ __truncate_dsrc(WT_SESSION_IMPL *session, const char *uri)
     while ((ret = cursor->next(cursor)) == 0)
         WT_ERR(cursor->remove(cursor));
     WT_ERR_NOTFOUND_OK(ret, false);
-    WT_STAT_DATA_INCR(session, cursor_truncate);
+    WT_STAT_DSRC_INCR(session, cursor_truncate);
 
 err:
     WT_TRET(cursor->close(cursor));
@@ -100,6 +126,9 @@ __wt_schema_truncate(WT_SESSION_IMPL *session, const char *uri, const char *cfg[
     WT_DECL_RET;
     const char *tablename;
 
+    WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->checkpoint_lock);
+    WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->schema_lock);
+
     tablename = uri;
 
     if (WT_PREFIX_MATCH(uri, "file:"))
@@ -107,12 +136,12 @@ __wt_schema_truncate(WT_SESSION_IMPL *session, const char *uri, const char *cfg[
          * File truncate translates into a range truncate.
          */
         ret = __wt_session_range_truncate(session, uri, NULL, NULL);
-    else if (WT_PREFIX_MATCH(uri, "lsm:"))
-        ret = __wt_lsm_tree_truncate(session, uri, cfg);
+    else if (WT_PREFIX_MATCH(uri, "layered:"))
+        ret = __truncate_layered(session, uri);
     else if (WT_PREFIX_SKIP(tablename, "table:"))
         ret = __truncate_table(session, tablename, cfg);
     else if (WT_PREFIX_MATCH(uri, "tiered:"))
-        ret = __truncate_tiered(session, uri, cfg);
+        ret = __truncate_tiered(session, uri);
     else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
         ret = dsrc->truncate == NULL ?
           __truncate_dsrc(session, uri) :
@@ -126,7 +155,10 @@ __wt_schema_truncate(WT_SESSION_IMPL *session, const char *uri, const char *cfg[
 
 /*
  * __wt_range_truncate --
- *     Truncate of a cursor range, default implementation.
+ *     Truncate of a cursor range, default implementation. This truncate takes explicit cursors
+ *     rather than a truncate information structure since it is used to implement truncate for
+ *     column groups within a complex table, and those use different cursors than the API level
+ *     truncate tracks.
  */
 int
 __wt_range_truncate(WT_CURSOR *start, WT_CURSOR *stop)
@@ -156,26 +188,30 @@ __wt_range_truncate(WT_CURSOR *start, WT_CURSOR *stop)
  *     WT_SESSION::truncate with a range.
  */
 int
-__wt_schema_range_truncate(WT_SESSION_IMPL *session, WT_CURSOR *start, WT_CURSOR *stop)
+__wt_schema_range_truncate(WT_TRUNCATE_INFO *trunc_info)
 {
     WT_DATA_SOURCE *dsrc;
     WT_DECL_RET;
+    WT_SESSION_IMPL *session;
     const char *uri;
 
-    uri = start->internal_uri;
+    session = trunc_info->session;
+    uri = trunc_info->uri;
 
-    if (WT_PREFIX_MATCH(uri, "file:")) {
-        WT_ERR(__cursor_needkey(start));
-        if (stop != NULL)
-            WT_ERR(__cursor_needkey(stop));
-        WT_WITH_BTREE(session, CUR2BT(start),
-          ret = __wt_btcur_range_truncate((WT_CURSOR_BTREE *)start, (WT_CURSOR_BTREE *)stop));
+    if (WT_IS_URI_HS(uri))
+        ret = __wt_curhs_range_truncate(trunc_info);
+    else if (WT_PREFIX_MATCH(uri, "file:")) {
+        WT_ERR(__cursor_needkey(trunc_info->start));
+        if (F_ISSET(trunc_info, WT_TRUNC_EXPLICIT_STOP))
+            WT_ERR(__cursor_needkey(trunc_info->stop));
+        WT_WITH_BTREE(
+          session, CUR2BT(trunc_info->start), ret = __wt_btcur_range_truncate(trunc_info));
     } else if (WT_PREFIX_MATCH(uri, "table:"))
-        ret = __wt_table_range_truncate((WT_CURSOR_TABLE *)start, (WT_CURSOR_TABLE *)stop);
+        ret = __wt_table_range_truncate(trunc_info);
     else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL && dsrc->range_truncate != NULL)
-        ret = dsrc->range_truncate(dsrc, &session->iface, start, stop);
+        ret = dsrc->range_truncate(dsrc, &session->iface, trunc_info->start, trunc_info->stop);
     else
-        ret = __wt_range_truncate(start, stop);
+        ret = __wt_range_truncate(trunc_info->start, trunc_info->stop);
 err:
     return (ret);
 }

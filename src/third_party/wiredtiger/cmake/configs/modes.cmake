@@ -1,112 +1,205 @@
-#
-# Public Domain 2014-present MongoDB, Inc.
-# Public Domain 2008-2014 WiredTiger, Inc.
-#  All rights reserved.
-#
-#  See the file LICENSE for redistribution information
-#
-
 # Establishes build configuration modes we can use when compiling.
 
 include(CheckCCompilerFlag)
+include(CheckCXXCompilerFlag)
+include(${CMAKE_SOURCE_DIR}/cmake/helpers.cmake)
 
-set(build_modes None Debug Release)
+# Establish an internal cache variable to track our custom build modes.
+set(BUILD_MODES Debug Release RelWithDebInfo CACHE INTERNAL "")
+
+if("${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
+    set(MSVC_C_COMPILER 1)
+elseif("${CMAKE_C_COMPILER_ID}" MATCHES "^(Apple)?(C|c?)lang")
+    set(CLANG_C_COMPILER 1)
+else()
+    set(GNU_C_COMPILER 1)
+endif()
+
+if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
+    set(MSVC_CXX_COMPILER 1)
+elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "^(Apple)?(C|c?)lang")
+    set(CLANG_CXX_COMPILER 1)
+else()
+    set(GNU_CXX_COMPILER 1)
+endif()
+
+function(define_build_mode mode)
+    cmake_parse_arguments(
+        PARSE_ARGV
+        1
+        "DEFINE_BUILD"
+        ""
+        "DEPENDS"
+        "C_COMPILER_FLAGS;CXX_COMPILER_FLAGS;LINK_FLAGS;LIBS"
+    )
+    if (NOT "${DEFINE_BUILD_UNPARSED_ARGUMENTS}" STREQUAL "")
+        message(FATAL_ERROR "Unknown arguments to define_build_mode: ${DEFINE_BUILD_UNPARSED_ARGUMENTS}")
+    endif()
+
+    # Test if dependencies are met. Skip defining the build mode if not.
+    eval_dependency("${DEFINE_BUILD_DEPENDS}" enabled)
+    if(NOT enabled)
+        message(VERBOSE "Skipping build mode definition due to unmet dependencies: ${mode}")
+        return()
+    endif()
+
+    set(linker_flags "")
+    # Needs to validate linker flags to assert its a valid build mode.
+    if(DEFINE_BUILD_LINK_FLAGS)
+        set(CMAKE_REQUIRED_FLAGS "${DEFINE_BUILD_LINK_FLAGS}")
+        list(APPEND linker_flags "${DEFINE_BUILD_LINK_FLAGS}")
+    endif()
+    if(DEFINE_BUILD_LIBS)
+        set(CMAKE_REQUIRED_LIBRARIES "${DEFINE_BUILD_LIBS}")
+        list(APPEND linker_flags "${DEFINE_BUILD_LIBS}")
+    endif()
+
+    # Check if the compiler flags are available to ensure its a valid build mode.
+    if(DEFINE_BUILD_C_COMPILER_FLAGS)
+        check_c_compiler_flag("${DEFINE_BUILD_C_COMPILER_FLAGS}" HAVE_BUILD_${mode}_C_FLAGS)
+        if(NOT HAVE_BUILD_${mode}_C_FLAGS)
+            message(VERBOSE "Skipping build mode definition due to unavailable C flags: ${mode}")
+            unset(HAVE_BUILD_${mode}_C_FLAGS CACHE)
+            return()
+        endif()
+    endif()
+    if(DEFINE_BUILD_CXX_COMPILER_FLAGS)
+        check_cxx_compiler_flag("${DEFINE_BUILD_CXX_COMPILER_FLAGS}" HAVE_BUILD_${mode}_CXX_FLAGS)
+        if(NOT HAVE_BUILD_${mode}_CXX_FLAGS)
+            message(VERBOSE "Skipping build mode definition due to unavailable CXX flags: ${mode}")
+            unset(HAVE_BUILD_MODE_${mode}_FLAGS CACHE)
+            return()
+        endif()
+    endif()
+    unset(CMAKE_REQUIRED_FLAGS)
+    unset(CMAKE_REQUIRED_LIBRARIES)
+    unset(HAVE_BUILD_${mode}_C_FLAGS CACHE)
+    unset(HAVE_BUILD_${mode}_CXX_FLAGS CACHE)
+
+    string(REPLACE ";" " " c_flags "${DEFINE_BUILD_C_COMPILER_FLAGS}")
+    string(REPLACE ";" " " cxx_flags "${DEFINE_BUILD_CXX_COMPILER_FLAGS}")
+    string(REPLACE ";" " " linker_flags "${linker_flags}")
+    string(TOUPPER ${mode} build_mode)
+    set(CMAKE_C_FLAGS_${build_mode}
+        "${c_flags}" CACHE STRING
+        "Flags used by the C compiler for ${mode} build type or configuration." FORCE)
+
+    set(CMAKE_CXX_FLAGS_${build_mode}
+        "${cxx_flags}" CACHE STRING
+        "Flags used by the C++ compiler for ${mode} build type or configuration." FORCE)
+
+    set(CMAKE_EXE_LINKER_FLAGS_${build_mode}
+        "${linker_flags}" CACHE STRING
+        "Linker flags to be used to create executables for ${mode} build type." FORCE)
+
+    set(CMAKE_SHARED_LINKER_FLAGS_${build_mode}
+        "${linker_flags}" CACHE STRING
+        "Linker flags to be used to create shared libraries for ${mode} build type." FORCE)
+
+    set(CMAKE_MODULE_LINKER_FLAGS_${build_mode}
+        "${linker_flags}" CACHE STRING
+        "Linker flags to be used to create shared modules for ${mode} build type." FORCE)
+
+    mark_as_advanced(
+        CMAKE_CXX_FLAGS_${build_mode}
+        CMAKE_C_FLAGS_${build_mode}
+        CMAKE_EXE_LINKER_FLAGS_${build_mode}
+        CMAKE_SHARED_LINKER_FLAGS_${build_mode}
+        CMAKE_MODULE_LINKER_FLAGS_${build_mode}
+    )
+    set(BUILD_MODES "${BUILD_MODES};${mode}" CACHE INTERNAL "")
+endfunction()
+
 if("${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
     set(no_omit_frame_flag "/Oy-")
 else()
     set(no_omit_frame_flag "-fno-omit-frame-pointer")
 endif()
 
-# Create an ASAN build variant
+# ASAN build variant flags.
 if("${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
     set(asan_link_flags "/fsanitize=address")
-    set(asan_compiler_flag "/fsanitize=address")
-elseif("${CMAKE_C_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_C_COMPILER_ID}" STREQUAL "AppleClang")
-    set(asan_link_flags "-fsanitize=address -static-libsan")
-    set(asan_compiler_flag "-fsanitize=address")
+    set(asan_compiler_c_flag "/fsanitize=address")
+    set(asan_compiler_cxx_flag "/fsanitize=address")
+    set(asan_lib_flags "")
 else()
-    set(asan_link_flags "-fsanitize=address -static-libasan")
-    set(asan_compiler_flag "-fsanitize=address")
+    set(asan_compiler_c_flag "-fsanitize=address")
+    set(asan_compiler_cxx_flag "-fsanitize=address")
+    set(asan_link_flags "-fsanitize=address")
+    if(GNU_C_COMPILER AND GNU_CXX_COMPILER)
+        set(asan_lib_flags "-static-libasan")
+    endif()
 endif()
 
-# Needs to validate linker flags for the test to also pass.
-set(CMAKE_REQUIRED_FLAGS "${asan_link_flags}")
-# Check if the ASAN compiler flag is available.
-check_c_compiler_flag("${asan_compiler_flag}" HAVE_ADDRESS_SANITIZER)
-unset(CMAKE_REQUIRED_FLAGS)
 
-if(HAVE_ADDRESS_SANITIZER)
-    set(CMAKE_C_FLAGS_ASAN
-        "${CMAKE_C_FLAGS_DEBUG} ${asan_compiler_flag} ${no_omit_frame_flag}" CACHE STRING
-        "Flags used by the C compiler for ASan build type or configuration." FORCE)
+# UBSAN build variant flags.
+set(ubsan_link_flags "-fsanitize=undefined")
+set(ubsan_compiler_c_flag "-fsanitize=undefined")
+set(ubsan_compiler_cxx_flag "-fsanitize=undefined")
 
-    set(CMAKE_CXX_FLAGS_ASAN
-        "${CMAKE_CXX_FLAGS_DEBUG} ${asan_compiler_flag} ${no_omit_frame_flag}" CACHE STRING
-        "Flags used by the C++ compiler for ASan build type or configuration." FORCE)
+# MSAN build variant flags.
+set(msan_link_flags "-fsanitize=memory")
+set(msan_compiler_c_flag "-fsanitize=memory" "-fno-optimize-sibling-calls" "-fsanitize-memory-track-origins=2")
+set(msan_compiler_cxx_flag "-fsanitize=memory" "-fno-optimize-sibling-calls" "-fsanitize-memory-track-origins=2")
 
-    set(CMAKE_EXE_LINKER_FLAGS_ASAN
-        "${CMAKE_SHARED_LINKER_FLAGS_DEBUG} ${asan_link_flags}" CACHE STRING
-        "Linker flags to be used to create executables for ASan build type." FORCE)
+# TSAN build variant flags.
+set(tsan_link_flags "-fsanitize=thread")
+set(tsan_compiler_c_flag "-fsanitize=thread")
+set(tsan_compiler_cxx_flag "-fsanitize=thread")
 
-    set(CMAKE_SHARED_LINKER_FLAGS_ASAN
-        "${CMAKE_SHARED_LINKER_FLAGS_DEBUG} ${asan_link_flags}" CACHE STRING
-        "Linker lags to be used to create shared libraries for ASan build type." FORCE)
+# Define our custom build variants.
+define_build_mode(ASan
+    C_COMPILER_FLAGS ${asan_compiler_c_flag} ${no_omit_frame_flag}
+    CXX_COMPILER_FLAGS ${asan_compiler_cxx_flag} ${no_omit_frame_flag}
+    LINK_FLAGS ${asan_link_flags}
+    LIBS ${asan_lib_flags}
+)
 
-    mark_as_advanced(
-        CMAKE_CXX_FLAGS_ASAN
-        CMAKE_C_FLAGS_ASAN
-        CMAKE_EXE_LINKER_FLAGS_ASAN
-        CMAKE_SHARED_LINKER_FLAGS_ASAN
-    )
-    list(APPEND build_modes "ASan")
-endif()
+define_build_mode(UBSan
+    C_COMPILER_FLAGS ${ubsan_compiler_c_flag} ${no_omit_frame_flag}
+    CXX_COMPILER_FLAGS ${ubsan_compiler_cxx_flag} ${no_omit_frame_flag}
+    LINK_FLAGS ${ubsan_link_flags}
+    # Disable UBSan on MSVC compilers (unsupported).
+    DEPENDS "NOT MSVC"
+)
 
-# Create an UBSAN build variant
-if("${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
-    set(ubsan_link_flags "/fsanitize=undefined")
-    set(ubsan_compiler_flag "/fsanitize=undefined")
-elseif("${CMAKE_C_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_C_COMPILER_ID}" STREQUAL "AppleClang")
-    set(ubsan_link_flags "-fsanitize=undefined")
-    set(ubsan_compiler_flag "-fsanitize=undefined")
-else()
-    set(ubsan_link_flags "-fsanitize=undefined -lubsan")
-    set(ubsan_compiler_flag "-fsanitize=undefined")
-endif()
+define_build_mode(MSan
+    C_COMPILER_FLAGS ${msan_compiler_c_flag} ${no_omit_frame_flag}
+    CXX_COMPILER_FLAGS ${msan_compiler_cxx_flag}
+    LINK_FLAGS ${msan_link_flags}
+    # Disable MSan on MSVC and GNU compilers (unsupported).
+    DEPENDS "CLANG_C_COMPILER"
+)
 
-# Needs to validate linker flags for the test to also pass.
-set(CMAKE_REQUIRED_FLAGS "${ubsan_link_flags}")
-# Check if the UBSAN compiler flag is available.
-check_c_compiler_flag("${ubsan_compiler_flag}" HAVE_UB_SANITIZER)
-unset(CMAKE_REQUIRED_FLAGS)
+define_build_mode(TSan
+    C_COMPILER_FLAGS ${tsan_compiler_c_flag} ${no_omit_frame_flag}
+    CXX_COMPILER_FLAGS ${tsan_compiler_cxx_flag}
+    LINK_FLAGS ${tsan_link_flags}
+    # Disable TSan on MSVC compilers (unsupported).
+    DEPENDS "NOT MSVC"
+)
 
-if(HAVE_UB_SANITIZER)
-    set(CMAKE_C_FLAGS_UBSAN
-        "${CMAKE_C_FLAGS_DEBUG} ${ubsan_compiler_flag} ${no_omit_frame_flag}" CACHE STRING
-        "Flags used by the C compiler for UBSan build type or configuration." FORCE)
+define_build_mode(Coverage
+    C_COMPILER_FLAGS "--coverage -fprofile-arcs"
+    CXX_COMPILER_FLAGS "--coverage -fprofile-arcs"
+    LINK_FLAGS "--coverage"
+    # Disable Coverage on MSVC compilers (unsupported).
+    DEPENDS "NOT MSVC"
+)
 
-    set(CMAKE_CXX_FLAGS_UBSAN
-        "${CMAKE_CXX_FLAGS_DEBUG} ${ubsan_compiler_flag} ${no_omit_frame_flag}" CACHE STRING
-        "Flags used by the C++ compiler for UBSan build type or configuration." FORCE)
-
-    set(CMAKE_EXE_LINKER_FLAGS_UBSAN
-        "${CMAKE_SHARED_LINKER_FLAGS_DEBUG} ${ubsan_link_flags}" CACHE STRING
-        "Linker flags to be used to create executables for UBSan build type." FORCE)
-
-    set(CMAKE_SHARED_LINKER_FLAGS_UBSAN
-        "${CMAKE_SHARED_LINKER_FLAGS_DEBUG} ${ubsan_link_flags}" CACHE STRING
-        "Linker lags to be used to create shared libraries for UBSan build type." FORCE)
-
-    mark_as_advanced(
-        CMAKE_CXX_FLAGS_UBSAN
-        CMAKE_C_FLAGS_UBSAN
-        CMAKE_EXE_LINKER_FLAGS_UBSAN
-        CMAKE_SHARED_LINKER_FLAGS_UBSAN
-    )
-    list(APPEND build_modes "UBSan")
-endif()
+# Set the WiredTiger default build type to Debug.
+# Primary users of the build are our developers, who want as much help diagnosing
+# issues as possible. Builds targeted for release to customers should switch to a "Release" setting.
 if(NOT CMAKE_BUILD_TYPE)
-    string(REPLACE ";" " " build_modes_doc "${build_modes}")
-    set(CMAKE_BUILD_TYPE "None" CACHE STRING "Choose the type of build, options are: ${build_modes_doc}." FORCE)
+    string(REPLACE ";" " " build_modes_doc "${BUILD_MODES}")
+    set(CMAKE_BUILD_TYPE "Debug" CACHE STRING "Choose the type of build, options are: ${build_modes_doc}." FORCE)
+    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS ${BUILD_MODES})
 endif()
 
-set(CMAKE_CONFIGURATION_TYPES ${build_modes})
+if(CMAKE_BUILD_TYPE)
+    if(NOT "${CMAKE_BUILD_TYPE}" IN_LIST BUILD_MODES)
+        message(FATAL_ERROR "Build type '${CMAKE_BUILD_TYPE}' not available.")
+    endif()
+endif()
+
+set(CMAKE_CONFIGURATION_TYPES ${BUILD_MODES})

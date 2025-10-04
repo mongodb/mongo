@@ -10,15 +10,15 @@
  * multiple times.
  */
 
-var fcvConstants = getFCVConstants();
+let fcvConstants = getFCVConstants();
 
-var latestFCV = fcvConstants.latest;
-var lastContinuousFCV = fcvConstants.lastContinuous;
-var lastLTSFCV = fcvConstants.lastLTS;
+let latestFCV = fcvConstants.latest;
+let lastContinuousFCV = fcvConstants.lastContinuous;
+let lastLTSFCV = fcvConstants.lastLTS;
 // The number of versions since the last-lts version. When numVersionsSinceLastLTS = 1,
 // lastContinuousFCV is equal to lastLTSFCV. This is used to calculate the expected minWireVersion
 // in jstests that use the lastLTSFCV.
-var numVersionsSinceLastLTS = fcvConstants.numSinceLastLTS;
+let numVersionsSinceLastLTS = fcvConstants.numSinceLastLTS;
 
 /**
  * Returns the FCV associated with a binary version.
@@ -38,40 +38,88 @@ function binVersionToFCV(binVersion) {
  * of the form {featureCompatibilityVersion: {version: <required>, targetVersion: <optional>,
  * previousVersion: <optional>}, ok: 1}.
  */
-function checkFCV(adminDB, version, targetVersion) {
+function checkFCV(adminDB, version, targetVersion, isCleaningServerMetadata) {
     // When both version and targetVersion are equal to lastContinuousFCV or lastLTSFCV, downgrade
     // is in progress. This tests that previousVersion is always equal to latestFCV in downgrading
     // states or undefined otherwise.
-    const isDowngrading = (version === lastLTSFCV && targetVersion === lastLTSFCV) ||
+    const isDowngrading =
+        (version === lastLTSFCV && targetVersion === lastLTSFCV) ||
         (version === lastContinuousFCV && targetVersion === lastContinuousFCV);
 
     const isMongod = !adminDB.getMongo().isMongos();
     if (isMongod) {
         let res = adminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
         assert.commandWorked(res);
-        assert.eq(res.featureCompatibilityVersion.version, version, tojson(res));
-        assert.eq(res.featureCompatibilityVersion.targetVersion, targetVersion, tojson(res));
+        assert.eq(
+            res.featureCompatibilityVersion.version,
+            version,
+            "FCV server parameter 'version' field does not match: " + tojson(res),
+        );
+        assert.eq(
+            res.featureCompatibilityVersion.targetVersion,
+            targetVersion,
+            "FCV server parameter 'targetVersion' field does not match: " + tojson(res),
+        );
         if (isDowngrading) {
-            assert.eq(res.featureCompatibilityVersion.previousVersion, latestFCV, tojson(res));
+            assert.eq(
+                res.featureCompatibilityVersion.previousVersion,
+                latestFCV,
+                "FCV server parameter 'previousVersion' field does not match: " + tojson(res),
+            );
         } else {
-            assert.eq(res.featureCompatibilityVersion.previousVersion, undefined, tojson(res));
+            assert.eq(
+                res.featureCompatibilityVersion.previousVersion,
+                undefined,
+                "FCV server parameter 'previousVersion' field does not match: " + tojson(res),
+            );
         }
     }
 
     // This query specifies an explicit readConcern because some FCV tests pass a connection that
     // has manually run isMaster with internalClient, and mongod expects internalClients (ie. other
     // cluster members) to include read/write concern (on commands that accept read/write concern).
-    let doc = adminDB.system.version.find({_id: "featureCompatibilityVersion"})
-                  .limit(1)
-                  .readConcern("local")
-                  .next();
-    assert.eq(doc.version, version, tojson(doc));
-    assert.eq(doc.targetVersion, targetVersion, tojson(doc));
+    let doc = adminDB.system.version.find({_id: "featureCompatibilityVersion"}).limit(1).readConcern("local").next();
+    assert.eq(doc.version, version, "FCV document 'version' field does not match: " + tojson(doc));
+    assert.eq(doc.targetVersion, targetVersion, "FCV document 'targetVersion' field does not match: " + tojson(doc));
     if (isDowngrading) {
-        assert.eq(doc.previousVersion, latestFCV, tojson(doc));
+        assert.eq(
+            doc.previousVersion,
+            latestFCV,
+            "FCV document 'previousVersion' field does not match: " + tojson(doc),
+        );
     } else {
-        assert.eq(doc.previousVersion, undefined, tojson(doc));
+        assert.eq(
+            doc.previousVersion,
+            undefined,
+            "FCV document 'previousVersion' field does not match: " + tojson(doc),
+        );
     }
+    if (isCleaningServerMetadata) {
+        assert.eq(
+            doc.isCleaningServerMetadata,
+            true,
+            "FCV document 'isCleaningServerMetadata' field should be true: " + tojson(doc),
+        );
+    } else {
+        assert.eq(
+            doc.isCleaningServerMetadata,
+            undefined,
+            "FCV document 'isCleaningServerMetadata' field should not exist, but did: " + tojson(doc),
+        );
+    }
+}
+
+/**
+ * Returns true if checkFCV runs successfully.
+ */
+function isFCVEqual(adminDB, version, targetVersion) {
+    try {
+        checkFCV(adminDB, version, targetVersion);
+    } catch (e) {
+        jsTestLog("checkFCV failed with error: " + tojson(e));
+        return false;
+    }
+    return true;
 }
 
 /**
@@ -85,13 +133,18 @@ function removeFCVDocument(adminDB) {
 
     // Create new collection with no FCV document, and then delete the
     // original collection.
-    let createNewAdminSystemVersionCollection =
-        {op: "c", ns: "admin.$cmd", ui: newUUID, o: {create: "system.version"}};
-    let dropOriginalAdminSystemVersionCollection =
-        {op: "c", ns: "admin.$cmd", ui: originalUUID, o: {drop: "admin.tmp_system_version"}};
-    assert.commandWorked(adminDB.runCommand({
-        applyOps: [createNewAdminSystemVersionCollection, dropOriginalAdminSystemVersionCollection]
-    }));
+    let createNewAdminSystemVersionCollection = {op: "c", ns: "admin.$cmd", ui: newUUID, o: {create: "system.version"}};
+    let dropOriginalAdminSystemVersionCollection = {
+        op: "c",
+        ns: "admin.$cmd",
+        ui: originalUUID,
+        o: {drop: "admin.tmp_system_version"},
+    };
+    assert.commandWorked(
+        adminDB.runCommand({
+            applyOps: [createNewAdminSystemVersionCollection, dropOriginalAdminSystemVersionCollection],
+        }),
+    );
 
     res = adminDB.runCommand({listCollections: 1, filter: {name: "system.version"}});
     assert.commandWorked(res, "failed to list collections");
@@ -115,8 +168,10 @@ function runFeatureFlagMultiversionTest(featureFlag, testFunc) {
     let adminDB = standalone.getDB("admin");
     let res;
     try {
-        res = assert.commandWorked(adminDB.runCommand({getParameter: 1, [featureFlag]: 1}),
-                                   "Failed to call getParameter on feature flag: " + featureFlag);
+        res = assert.commandWorked(
+            adminDB.runCommand({getParameter: 1, [featureFlag]: 1}),
+            "Failed to call getParameter on feature flag: " + featureFlag,
+        );
     } finally {
         MongoRunner.stopMongod(standalone);
     }
@@ -128,11 +183,26 @@ function runFeatureFlagMultiversionTest(featureFlag, testFunc) {
 
     jsTestLog("Running testFunc with last-lts FCV.");
     testFunc(lastLTSFCV);
-    if (res && res[featureFlag].hasOwnProperty("version") &&
-        MongoRunner.compareBinVersions(res[featureFlag]["version"].toString(), "latest") === 0) {
+    if (
+        res &&
+        res[featureFlag].hasOwnProperty("version") &&
+        MongoRunner.compareBinVersions(res[featureFlag]["version"].toString(), "latest") === 0
+    ) {
         // The feature associated with 'featureFlag' will be released in the latest FCV. We should
         // also run upgrade/downgrade behavior against the last-continuous FCV.
         jsTestLog("Running testFunc with last-continuous FCV.");
         testFunc(lastContinuousFCV);
     }
 }
+
+export {
+    binVersionToFCV,
+    checkFCV,
+    isFCVEqual,
+    lastContinuousFCV,
+    lastLTSFCV,
+    latestFCV,
+    numVersionsSinceLastLTS,
+    removeFCVDocument,
+    runFeatureFlagMultiversionTest,
+};

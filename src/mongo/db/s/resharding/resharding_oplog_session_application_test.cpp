@@ -27,24 +27,71 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-#include "mongo/platform/basic.h"
-
-#include <boost/optional/optional_io.hpp>
-#include <vector>
-
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/logical_session_id.h"
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/client.h"
+#include "mongo/db/commands/txn_cmds_gen.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
+#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/persistent_task_store.h"
+#include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/session_update_tracker.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/s/resharding/donor_oplog_id_gen.h"
 #include "mongo/db/s/resharding/resharding_oplog_session_application.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/db/session_catalog_mongod.h"
-#include "mongo/db/transaction_participant.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/session/session_txn_record_gen.h"
+#include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/topology/cluster_role.h"
+#include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
+#include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/time_support.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <ostream>
+#include <string>
+#include <utility>
+#include <vector>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 
 namespace mongo {
 namespace {
@@ -55,19 +102,23 @@ public:
         ServiceContextMongoDTest::setUp();
 
         auto serviceContext = getServiceContext();
-        {
-            auto opCtx = makeOperationContext();
-            auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(serviceContext);
-            ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
-            repl::ReplicationCoordinator::set(serviceContext, std::move(replCoord));
 
-            repl::createOplog(opCtx.get());
+        auto opCtx = makeOperationContext();
+        auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(serviceContext);
+        ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
+        repl::ReplicationCoordinator::set(serviceContext, std::move(replCoord));
 
-            auto storageImpl = std::make_unique<repl::StorageInterfaceImpl>();
-            repl::StorageInterface::set(serviceContext, std::move(storageImpl));
+        repl::createOplog(opCtx.get());
 
-            MongoDSessionCatalog::onStepUp(opCtx.get());
-        }
+        auto storageImpl = std::make_unique<repl::StorageInterfaceImpl>();
+        repl::StorageInterface::set(serviceContext, std::move(storageImpl));
+
+        MongoDSessionCatalog::set(
+            serviceContext,
+            std::make_unique<MongoDSessionCatalog>(
+                std::make_unique<MongoDSessionCatalogTransactionInterfaceImpl>()));
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx.get());
+        mongoDSessionCatalog->onStepUp(opCtx.get());
     }
 
     repl::OpTime insertSessionRecord(OperationContext* opCtx,
@@ -77,21 +128,52 @@ public:
         opCtx->setLogicalSessionId(std::move(lsid));
         opCtx->setTxnNumber(txnNumber);
 
-        MongoDOperationContextSession ocs(opCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
-        txnParticipant.beginOrContinue(
-            opCtx, {txnNumber}, boost::none /* autocommit */, boost::none /* startTransaction */);
+        txnParticipant.beginOrContinue(opCtx,
+                                       {txnNumber},
+                                       boost::none /* autocommit */,
+                                       TransactionParticipant::TransactionActions::kNone);
 
+        auto opTime = [opCtx] {
+            WriteUnitOfWork wuow(opCtx);
+            ScopeGuard guard{[&wuow] {
+                wuow.commit();
+            }};
+            return repl::getNextOpTime(opCtx);
+        }();
         WriteUnitOfWork wuow(opCtx);
-        auto opTime = repl::getNextOpTime(opCtx);
         SessionTxnRecord sessionTxnRecord(*opCtx->getLogicalSessionId(),
                                           *opCtx->getTxnNumber(),
                                           opTime,
-                                          opCtx->getServiceContext()->getFastClockSource()->now());
+                                          opCtx->fastClockSource().now());
         txnParticipant.onWriteOpCompletedOnPrimary(opCtx, std::move(stmtIds), sessionTxnRecord);
         wuow.commit();
 
         return opTime;
+    }
+
+    void insertOp(OperationContext* opCtx, const BSONObj& oplogBson) {
+        DBDirectClient client(opCtx);
+        client.insert(_oplogBufferNss, oplogBson);
+    }
+
+    void makeInProgressTxn(OperationContext* opCtx, LogicalSessionId lsid, TxnNumber txnNumber) {
+        opCtx->setInMultiDocumentTransaction();
+        opCtx->setLogicalSessionId(std::move(lsid));
+        opCtx->setTxnNumber(txnNumber);
+
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
+        auto txnParticipant = TransactionParticipant::get(opCtx);
+        txnParticipant.beginOrContinue(opCtx,
+                                       {txnNumber},
+                                       false /* autocommit */,
+                                       TransactionParticipant::TransactionActions::kStart);
+
+        txnParticipant.unstashTransactionResources(opCtx, "insert");
+        txnParticipant.stashTransactionResources(opCtx);
     }
 
     repl::OpTime makePreparedTxn(OperationContext* opCtx,
@@ -101,35 +183,75 @@ public:
         opCtx->setLogicalSessionId(std::move(lsid));
         opCtx->setTxnNumber(txnNumber);
 
-        MongoDOperationContextSession ocs(opCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
-        txnParticipant.beginOrContinue(
-            opCtx, {txnNumber}, false /* autocommit */, true /* startTransaction */);
+        txnParticipant.beginOrContinue(opCtx,
+                                       {txnNumber},
+                                       false /* autocommit */,
+                                       TransactionParticipant::TransactionActions::kStart);
 
         txnParticipant.unstashTransactionResources(opCtx, "prepareTransaction");
 
         // The transaction machinery cannot store an empty locker.
-        { Lock::GlobalLock globalLock(opCtx, MODE_IX); }
-        auto opTime = repl::getNextOpTime(opCtx);
+        {
+            Lock::GlobalLock globalLock(opCtx, MODE_IX);
+        }
+        auto opTime = [opCtx] {
+            TransactionParticipant::SideTransactionBlock sideTxn{opCtx};
+
+            WriteUnitOfWork wuow{opCtx};
+            auto opTime = repl::getNextOpTime(opCtx);
+            wuow.release();
+
+            shard_role_details::getRecoveryUnit(opCtx)->abortUnitOfWork();
+            shard_role_details::getLocker(opCtx)->endWriteUnitOfWork();
+
+            return opTime;
+        }();
         txnParticipant.prepareTransaction(opCtx, opTime);
         txnParticipant.stashTransactionResources(opCtx);
 
         return opTime;
     }
 
-    void clearPreparedTxn(OperationContext* opCtx, LogicalSessionId lsid, TxnNumber txnNumber) {
+    void abortTxn(OperationContext* opCtx, LogicalSessionId lsid, TxnNumber txnNumber) {
         opCtx->setInMultiDocumentTransaction();
         opCtx->setLogicalSessionId(std::move(lsid));
         opCtx->setTxnNumber(txnNumber);
 
-        MongoDOperationContextSession ocs(opCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
-        txnParticipant.beginOrContinue(
-            opCtx, {txnNumber}, false /* autocommit */, boost::none /* startTransaction */);
+        txnParticipant.beginOrContinue(opCtx,
+                                       {txnNumber},
+                                       false /* autocommit */,
+                                       TransactionParticipant::TransactionActions::kContinue);
 
         txnParticipant.unstashTransactionResources(opCtx, "abortTransaction");
         txnParticipant.abortTransaction(opCtx);
         txnParticipant.stashTransactionResources(opCtx);
+    }
+
+    repl::OplogEntry makeNoopOp(BSONObj object,
+                                LogicalSessionId lsid,
+                                TxnNumber txnNumber,
+                                repl::OpTime opTime) {
+        repl::MutableOplogEntry op;
+        op.setOpType(repl::OpTypeEnum::kNoop);
+        op.setObject(object);
+        op.setSessionId(std::move(lsid));
+        op.setTxnNumber(std::move(txnNumber));
+        op.setOpTime(opTime);
+        op.set_id(
+            Value{Document{{ReshardingDonorOplogId::kClusterTimeFieldName, opTime.getTimestamp()},
+                           {ReshardingDonorOplogId::kTsFieldName, opTime.getTimestamp()}}});
+
+        // These are unused by ReshardingOplogSessionApplication but required by IDL parsing.
+        op.setNss({});
+        op.setWallClockTime({});
+
+        return {op.toBSON()};
     }
 
     repl::OplogEntry makeUpdateOp(
@@ -137,7 +259,9 @@ public:
         LogicalSessionId lsid,
         TxnNumber txnNumber,
         const std::vector<StmtId>& stmtIds,
-        boost::optional<repl::RetryImageEnum> needsRetryImage = boost::none) {
+        boost::optional<repl::RetryImageEnum> needsRetryImage = boost::none,
+        boost::optional<repl::OpTime> preImageOpTime = boost::none,
+        boost::optional<repl::OpTime> postImageOpTime = boost::none) {
         repl::MutableOplogEntry op;
         op.setOpType(repl::OpTypeEnum::kUpdate);
         op.setObject2(document["_id"].wrap().getOwned());
@@ -146,10 +270,15 @@ public:
         op.setTxnNumber(std::move(txnNumber));
         op.setStatementIds(stmtIds);
         op.setNeedsRetryImage(needsRetryImage);
+        op.setPreImageOpTime(preImageOpTime);
+        op.setPostImageOpTime(postImageOpTime);
+        op.setOpTime({{}, {}});
+        op.set_id(Value{
+            Document{{ReshardingDonorOplogId::kClusterTimeFieldName, op.getOpTime().getTimestamp()},
+                     {ReshardingDonorOplogId::kTsFieldName, op.getOpTime().getTimestamp()}}});
 
         // These are unused by ReshardingOplogSessionApplication but required by IDL parsing.
         op.setNss({});
-        op.setOpTime({{}, {}});
         op.setWallClockTime({});
 
         return {op.toBSON()};
@@ -164,13 +293,21 @@ public:
         op.setObject(AbortTransactionOplogObject{}.toBSON());
         op.setSessionId(std::move(lsid));
         op.setTxnNumber(std::move(txnNumber));
+        op.setOpTime({{}, {}});
+        op.set_id(Value{
+            Document{{ReshardingDonorOplogId::kClusterTimeFieldName, op.getOpTime().getTimestamp()},
+                     {ReshardingDonorOplogId::kTsFieldName, op.getOpTime().getTimestamp()}}});
 
         // These are unused by ReshardingOplogSessionApplication but required by IDL parsing.
         op.setNss({});
-        op.setOpTime({{}, {}});
         op.setWallClockTime({});
 
         return {op.toBSON()};
+    }
+
+    size_t getNumOplogEntries(OperationContext* opCtx) {
+        PersistentTaskStore<repl::OplogEntryBase> store(NamespaceString::kRsOplogNamespace);
+        return store.count(opCtx);
     }
 
     std::vector<repl::DurableOplogEntry> findOplogEntriesNewerThan(OperationContext* opCtx,
@@ -250,19 +387,34 @@ public:
         ASSERT_BSONOBJ_BINARY_EQ(flushLater[0].getObject(), sessionTxnRecord.toBSON());
     }
 
-    void checkStatementExecuted(OperationContext* opCtx,
-                                LogicalSessionId lsid,
-                                TxnNumber txnNumber,
-                                StmtId stmtId) {
+    void checkStatementExecutedAndFetchOplogEntry(OperationContext* opCtx,
+                                                  LogicalSessionId lsid,
+                                                  TxnNumber txnNumber,
+                                                  StmtId stmtId) {
         opCtx->setLogicalSessionId(std::move(lsid));
         opCtx->setTxnNumber(txnNumber);
 
-        MongoDOperationContextSession ocs(opCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
-        txnParticipant.beginOrContinue(
-            opCtx, {txnNumber}, boost::none /* autocommit */, boost::none /* startTransaction */);
-        ASSERT_TRUE(bool(txnParticipant.checkStatementExecuted(opCtx, stmtId)));
+        txnParticipant.beginOrContinue(opCtx,
+                                       {txnNumber},
+                                       boost::none /* autocommit */,
+                                       TransactionParticipant::TransactionActions::kNone);
+        ASSERT_TRUE(bool(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx, stmtId)));
     }
+
+    const NamespaceString& oplogBufferNss() {
+        return _oplogBufferNss;
+    }
+
+private:
+    // Used for pre/post image oplog entry lookup.
+    const ShardId _donorShardId{"donor-0"};
+    const NamespaceString _oplogBufferNss = NamespaceString::createNamespaceString_forTest(
+        NamespaceString::kReshardingLocalOplogBufferPrefix + _donorShardId.toString());
+
+    service_context_test::ShardRoleOverride _shardRole;
 };
 
 TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteForNewSession) {
@@ -280,9 +432,9 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteForNewSessio
 
     {
         auto opCtx = makeOperationContext();
-        ReshardingOplogSessionApplication applier;
-        auto hitPreparedTxn = applier.tryApplyOperation(opCtx.get(), oplogEntry);
-        ASSERT_FALSE(bool(hitPreparedTxn));
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
+        auto conflictingTxnCompletionFuture = applier.tryApplyOperation(opCtx.get(), oplogEntry);
+        ASSERT_FALSE(bool(conflictingTxnCompletionFuture));
     }
 
     {
@@ -298,7 +450,8 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteForNewSessio
 
     {
         auto opCtx = makeOperationContext();
-        checkStatementExecuted(opCtx.get(), lsid, incomingTxnNumber, incomingStmtId);
+        checkStatementExecutedAndFetchOplogEntry(
+            opCtx.get(), lsid, incomingTxnNumber, incomingStmtId);
     }
 }
 
@@ -318,9 +471,9 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteForNewSessio
 
     {
         auto opCtx = makeOperationContext();
-        ReshardingOplogSessionApplication applier;
-        auto hitPreparedTxn = applier.tryApplyOperation(opCtx.get(), oplogEntry);
-        ASSERT_FALSE(bool(hitPreparedTxn));
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
+        auto conflictingTxnCompletionFuture = applier.tryApplyOperation(opCtx.get(), oplogEntry);
+        ASSERT_FALSE(bool(conflictingTxnCompletionFuture));
     }
 
     {
@@ -337,8 +490,10 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteForNewSessio
 
     {
         auto opCtx = makeOperationContext();
-        checkStatementExecuted(opCtx.get(), lsid, incomingTxnNumber, incomingStmtId);
-        checkStatementExecuted(opCtx.get(), lsid, incomingTxnNumber, incomingStmtId + 1);
+        checkStatementExecutedAndFetchOplogEntry(
+            opCtx.get(), lsid, incomingTxnNumber, incomingStmtId);
+        checkStatementExecutedAndFetchOplogEntry(
+            opCtx.get(), lsid, incomingTxnNumber, incomingStmtId + 1);
     }
 }
 
@@ -359,9 +514,9 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteHasHigherTxn
 
     {
         auto opCtx = makeOperationContext();
-        ReshardingOplogSessionApplication applier;
-        auto hitPreparedTxn = applier.tryApplyOperation(opCtx.get(), oplogEntry);
-        ASSERT_FALSE(bool(hitPreparedTxn));
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
+        auto conflictingTxnCompletionFuture = applier.tryApplyOperation(opCtx.get(), oplogEntry);
+        ASSERT_FALSE(bool(conflictingTxnCompletionFuture));
     }
 
     {
@@ -377,11 +532,12 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteHasHigherTxn
 
     {
         auto opCtx = makeOperationContext();
-        checkStatementExecuted(opCtx.get(), lsid, incomingTxnNumber, incomingStmtId);
-        ASSERT_THROWS_CODE(
-            checkStatementExecuted(opCtx.get(), lsid, existingTxnNumber, existingStmtId),
-            DBException,
-            ErrorCodes::TransactionTooOld);
+        checkStatementExecutedAndFetchOplogEntry(
+            opCtx.get(), lsid, incomingTxnNumber, incomingStmtId);
+        ASSERT_THROWS_CODE(checkStatementExecutedAndFetchOplogEntry(
+                               opCtx.get(), lsid, existingTxnNumber, existingStmtId),
+                           DBException,
+                           ErrorCodes::TransactionTooOld);
     }
 }
 
@@ -402,9 +558,9 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteHasLowerTxnN
 
     {
         auto opCtx = makeOperationContext();
-        ReshardingOplogSessionApplication applier;
-        auto hitPreparedTxn = applier.tryApplyOperation(opCtx.get(), oplogEntry);
-        ASSERT_FALSE(bool(hitPreparedTxn));
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
+        auto conflictingTxnCompletionFuture = applier.tryApplyOperation(opCtx.get(), oplogEntry);
+        ASSERT_FALSE(bool(conflictingTxnCompletionFuture));
     }
 
     {
@@ -421,10 +577,10 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteHasLowerTxnN
 
     {
         auto opCtx = makeOperationContext();
-        ASSERT_THROWS_CODE(
-            checkStatementExecuted(opCtx.get(), lsid, incomingTxnNumber, incomingStmtId),
-            DBException,
-            ErrorCodes::TransactionTooOld);
+        ASSERT_THROWS_CODE(checkStatementExecutedAndFetchOplogEntry(
+                               opCtx.get(), lsid, incomingTxnNumber, incomingStmtId),
+                           DBException,
+                           ErrorCodes::TransactionTooOld);
     }
 }
 
@@ -445,9 +601,9 @@ TEST_F(ReshardingOplogSessionApplicationTest,
 
     {
         auto opCtx = makeOperationContext();
-        ReshardingOplogSessionApplication applier;
-        auto hitPreparedTxn = applier.tryApplyOperation(opCtx.get(), oplogEntry);
-        ASSERT_FALSE(bool(hitPreparedTxn));
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
+        auto conflictingTxnCompletionFuture = applier.tryApplyOperation(opCtx.get(), oplogEntry);
+        ASSERT_FALSE(bool(conflictingTxnCompletionFuture));
     }
 
     {
@@ -464,7 +620,7 @@ TEST_F(ReshardingOplogSessionApplicationTest,
 
     {
         auto opCtx = makeOperationContext();
-        checkStatementExecuted(opCtx.get(), lsid, txnNumber, incomingStmtId);
+        checkStatementExecutedAndFetchOplogEntry(opCtx.get(), lsid, txnNumber, incomingStmtId);
     }
 }
 
@@ -476,7 +632,7 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteHasEqualTxnN
     auto opTime = [&] {
         auto opCtx = makeOperationContext();
         auto opTime = makePreparedTxn(opCtx.get(), lsid, txnNumber);
-        clearPreparedTxn(opCtx.get(), lsid, txnNumber);
+        abortTxn(opCtx.get(), lsid, txnNumber);
         return opTime;
     }();
 
@@ -485,9 +641,9 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteHasEqualTxnN
 
     {
         auto opCtx = makeOperationContext();
-        ReshardingOplogSessionApplication applier;
-        auto hitPreparedTxn = applier.tryApplyOperation(opCtx.get(), oplogEntry);
-        ASSERT_FALSE(bool(hitPreparedTxn));
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
+        auto conflictingTxnCompletionFuture = applier.tryApplyOperation(opCtx.get(), oplogEntry);
+        ASSERT_FALSE(bool(conflictingTxnCompletionFuture));
     }
 
     {
@@ -515,9 +671,9 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteStmtAlreadyE
 
     {
         auto opCtx = makeOperationContext();
-        ReshardingOplogSessionApplication applier;
-        auto hitPreparedTxn = applier.tryApplyOperation(opCtx.get(), oplogEntry);
-        ASSERT_FALSE(bool(hitPreparedTxn));
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
+        auto conflictingTxnCompletionFuture = applier.tryApplyOperation(opCtx.get(), oplogEntry);
+        ASSERT_FALSE(bool(conflictingTxnCompletionFuture));
     }
 
     {
@@ -548,9 +704,9 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteStmtsAlready
 
     {
         auto opCtx = makeOperationContext();
-        ReshardingOplogSessionApplication applier;
-        auto hitPreparedTxn = applier.tryApplyOperation(opCtx.get(), oplogEntry);
-        ASSERT_FALSE(bool(hitPreparedTxn));
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
+        auto conflictingTxnCompletionFuture = applier.tryApplyOperation(opCtx.get(), oplogEntry);
+        ASSERT_FALSE(bool(conflictingTxnCompletionFuture));
     }
 
     {
@@ -581,14 +737,14 @@ TEST_F(ReshardingOplogSessionApplicationTest,
     StmtId incomingStmtId = 2;
     auto oplogEntry = makeUpdateOp(BSON("_id" << 1), lsid, incomingTxnNumber, {incomingStmtId});
 
-    auto hitPreparedTxn = [&] {
+    auto conflictingTxnCompletionFuture = [&] {
         auto opCtx = makeOperationContext();
-        ReshardingOplogSessionApplication applier;
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
         return applier.tryApplyOperation(opCtx.get(), oplogEntry);
     }();
 
-    ASSERT_TRUE(bool(hitPreparedTxn));
-    ASSERT_FALSE(hitPreparedTxn->isReady());
+    ASSERT_TRUE(bool(conflictingTxnCompletionFuture));
+    ASSERT_FALSE(conflictingTxnCompletionFuture->isReady());
 
     {
         auto opCtx = makeOperationContext();
@@ -601,11 +757,107 @@ TEST_F(ReshardingOplogSessionApplicationTest,
 
     {
         auto opCtx = makeOperationContext();
-        clearPreparedTxn(opCtx.get(), lsid, existingTxnNumber);
+        abortTxn(opCtx.get(), lsid, existingTxnNumber);
     }
 
-    ASSERT_TRUE(hitPreparedTxn->isReady());
-    ASSERT_OK(hitPreparedTxn->getNoThrow());
+    ASSERT_TRUE(conflictingTxnCompletionFuture->isReady());
+    ASSERT_OK(conflictingTxnCompletionFuture->getNoThrow());
+}
+
+TEST_F(ReshardingOplogSessionApplicationTest,
+       IncomingRetryableWriteHasInProgressRetryableInternalTransaction) {
+    auto retryableWriteLsid = makeLogicalSessionIdForTest();
+    TxnNumber retryableWriteTxnNumber = 100;
+    auto internalTxnLsid = makeLogicalSessionIdWithTxnNumberAndUUIDForTest(retryableWriteLsid,
+                                                                           retryableWriteTxnNumber);
+    TxnNumber internalTxnTxnNumber = 1;
+    StmtId stmtId = 2;
+
+    // Make two in progress transactions so the one started by resharding must block.
+    {
+        auto newClientOwned = getServiceContext()->getService()->makeClient("newClient");
+        AlternativeClientRegion acr(newClientOwned);
+        auto newOpCtx = cc().makeOperationContext();
+        makeInProgressTxn(newOpCtx.get(),
+                          makeLogicalSessionIdWithTxnNumberAndUUIDForTest(retryableWriteLsid,
+                                                                          retryableWriteTxnNumber),
+                          internalTxnTxnNumber);
+    }
+    {
+        auto opCtx = makeOperationContext();
+        makeInProgressTxn(opCtx.get(), internalTxnLsid, internalTxnTxnNumber);
+    }
+
+    auto oplogEntry =
+        makeUpdateOp(BSON("_id" << 1), retryableWriteLsid, retryableWriteTxnNumber, {stmtId});
+
+    auto conflictingTxnCompletionFuture = [&] {
+        auto opCtx = makeOperationContext();
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
+        return applier.tryApplyOperation(opCtx.get(), oplogEntry);
+    }();
+
+    ASSERT_TRUE(bool(conflictingTxnCompletionFuture));
+    ASSERT_FALSE(conflictingTxnCompletionFuture->isReady());
+
+    {
+        auto opCtx = makeOperationContext();
+        ASSERT_EQ(getNumOplogEntries(opCtx.get()), 0U);
+        auto sessionTxnRecord = findSessionRecord(opCtx.get(), retryableWriteLsid);
+        ASSERT_FALSE(bool(sessionTxnRecord));
+    }
+
+    {
+        auto opCtx = makeOperationContext();
+        abortTxn(opCtx.get(), internalTxnLsid, internalTxnTxnNumber);
+    }
+
+    ASSERT_TRUE(conflictingTxnCompletionFuture->isReady());
+    ASSERT_OK(conflictingTxnCompletionFuture->getNoThrow());
+}
+
+TEST_F(ReshardingOplogSessionApplicationTest,
+       IncomingRetryableWriteHasPreparedRetryableInternalTransaction) {
+    auto retryableWriteLsid = makeLogicalSessionIdForTest();
+    TxnNumber retryableWriteTxnNumber = 100;
+    auto internalTxnLsid = makeLogicalSessionIdWithTxnNumberAndUUIDForTest(retryableWriteLsid,
+                                                                           retryableWriteTxnNumber);
+    TxnNumber internalTxnTxnNumber = 1;
+    StmtId stmtId = 2;
+
+    auto opTime = [&] {
+        auto opCtx = makeOperationContext();
+        return makePreparedTxn(opCtx.get(), internalTxnLsid, internalTxnTxnNumber);
+    }();
+
+    auto oplogEntry =
+        makeUpdateOp(BSON("_id" << 1), retryableWriteLsid, retryableWriteTxnNumber, {stmtId});
+
+    auto conflictingTxnCompletionFuture = [&] {
+        auto opCtx = makeOperationContext();
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
+        return applier.tryApplyOperation(opCtx.get(), oplogEntry);
+    }();
+
+    ASSERT_TRUE(bool(conflictingTxnCompletionFuture));
+    ASSERT_FALSE(conflictingTxnCompletionFuture->isReady());
+
+    {
+        auto opCtx = makeOperationContext();
+        auto foundOps = findOplogEntriesNewerThan(opCtx.get(), opTime.getTimestamp());
+        ASSERT_EQ(foundOps.size(), 0U);
+
+        auto sessionTxnRecord = findSessionRecord(opCtx.get(), retryableWriteLsid);
+        ASSERT_FALSE(bool(sessionTxnRecord));
+    }
+
+    {
+        auto opCtx = makeOperationContext();
+        abortTxn(opCtx.get(), internalTxnLsid, internalTxnTxnNumber);
+    }
+
+    ASSERT_TRUE(conflictingTxnCompletionFuture->isReady());
+    ASSERT_OK(conflictingTxnCompletionFuture->getNoThrow());
 }
 
 TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteHasPreImage) {
@@ -619,19 +871,24 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteHasPreImage)
         return insertSessionRecord(opCtx.get(), makeLogicalSessionIdForTest(), 100, {3});
     }();
 
-    auto oplogEntry = makeUpdateOp(BSON("_id" << 1), lsid, incomingTxnNumber, {incomingStmtId});
-
-    repl::MutableOplogEntry noopEntry =
-        unittest::assertGet(repl::MutableOplogEntry::parse(oplogEntry.getEntry().toBSON()));
-    noopEntry.setOpType(repl::OpTypeEnum::kNoop);
-    noopEntry.setObject(BSON("_id" << 1 << "preImage" << true));
-    oplogEntry.setPreImageOp(noopEntry.toBSON());
+    auto preImageOplogEntry =
+        makeNoopOp(BSON("_id" << 1 << "preImage" << true), lsid, incomingTxnNumber, {{1, 0}, 1});
+    {
+        auto opCtx = makeOperationContext();
+        insertOp(opCtx.get(), preImageOplogEntry.getEntry().toBSON());
+    }
+    auto oplogEntry = makeUpdateOp(BSON("_id" << 1),
+                                   lsid,
+                                   incomingTxnNumber,
+                                   {incomingStmtId},
+                                   boost::none /* needsRetryImage */,
+                                   preImageOplogEntry.getOpTime() /* preImageOpTime */);
 
     {
         auto opCtx = makeOperationContext();
-        ReshardingOplogSessionApplication applier;
-        auto hitPreparedTxn = applier.tryApplyOperation(opCtx.get(), oplogEntry);
-        ASSERT_FALSE(bool(hitPreparedTxn));
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
+        auto conflictingTxnCompletionFuture = applier.tryApplyOperation(opCtx.get(), oplogEntry);
+        ASSERT_FALSE(bool(conflictingTxnCompletionFuture));
     }
 
     {
@@ -649,7 +906,55 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteHasPreImage)
 
     {
         auto opCtx = makeOperationContext();
-        checkStatementExecuted(opCtx.get(), lsid, incomingTxnNumber, incomingStmtId);
+        checkStatementExecutedAndFetchOplogEntry(
+            opCtx.get(), lsid, incomingTxnNumber, incomingStmtId);
+    }
+}
+
+DEATH_TEST_REGEX_F(ReshardingOplogSessionApplicationTest,
+                   IncomingRetryableWriteHasPreImageThatCannotBeFound,
+                   "Tripwire assertion.*6344401") {
+    auto lsid = makeLogicalSessionIdForTest();
+
+    TxnNumber incomingTxnNumber = 100;
+    StmtId incomingStmtId = 2;
+
+    auto opTime = [&] {
+        auto opCtx = makeOperationContext();
+        return insertSessionRecord(opCtx.get(), makeLogicalSessionIdForTest(), 100, {3});
+    }();
+
+    repl::OpTime preImageOpTime{{1, 0}, 1};
+    auto oplogEntry = makeUpdateOp(BSON("_id" << 1),
+                                   lsid,
+                                   incomingTxnNumber,
+                                   {incomingStmtId},
+                                   boost::none /* needsRetryImage */,
+                                   preImageOpTime);
+
+    {
+        auto opCtx = makeOperationContext();
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
+        auto conflictingTxnCompletionFuture = applier.tryApplyOperation(opCtx.get(), oplogEntry);
+        ASSERT_FALSE(bool(conflictingTxnCompletionFuture));
+    }
+
+    {
+        auto opCtx = makeOperationContext();
+        auto foundOps = findOplogEntriesNewerThan(opCtx.get(), opTime.getTimestamp());
+        ASSERT_EQ(foundOps.size(), 1U);
+        checkGeneratedNoop(foundOps[0], lsid, incomingTxnNumber, {incomingStmtId});
+        ASSERT_FALSE(foundOps[0].getPreImageOpTime());
+
+        auto sessionTxnRecord = findSessionRecord(opCtx.get(), lsid);
+        ASSERT_TRUE(bool(sessionTxnRecord));
+        checkSessionTxnRecord(*sessionTxnRecord, foundOps[0]);
+    }
+
+    {
+        auto opCtx = makeOperationContext();
+        checkStatementExecutedAndFetchOplogEntry(
+            opCtx.get(), lsid, incomingTxnNumber, incomingStmtId);
     }
 }
 
@@ -664,19 +969,25 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteHasPostImage
         return insertSessionRecord(opCtx.get(), makeLogicalSessionIdForTest(), 100, {3});
     }();
 
-    auto oplogEntry = makeUpdateOp(BSON("_id" << 1), lsid, incomingTxnNumber, {incomingStmtId});
-
-    repl::MutableOplogEntry noopEntry =
-        unittest::assertGet(repl::MutableOplogEntry::parse(oplogEntry.getEntry().toBSON()));
-    noopEntry.setOpType(repl::OpTypeEnum::kNoop);
-    noopEntry.setObject(BSON("_id" << 1 << "postImage" << true));
-    oplogEntry.setPostImageOp(noopEntry.toBSON());
+    auto postImageOplogEntry =
+        makeNoopOp(BSON("_id" << 1 << "postImage" << true), lsid, incomingTxnNumber, {{1, 0}, 1});
+    {
+        auto opCtx = makeOperationContext();
+        insertOp(opCtx.get(), postImageOplogEntry.getEntry().toBSON());
+    }
+    auto oplogEntry = makeUpdateOp(BSON("_id" << 1),
+                                   lsid,
+                                   incomingTxnNumber,
+                                   {incomingStmtId},
+                                   boost::none /* needsRetryImage */,
+                                   boost::none /* preImageOpTime */,
+                                   postImageOplogEntry.getOpTime() /* postImageOpTime */);
 
     {
         auto opCtx = makeOperationContext();
-        ReshardingOplogSessionApplication applier;
-        auto hitPreparedTxn = applier.tryApplyOperation(opCtx.get(), oplogEntry);
-        ASSERT_FALSE(bool(hitPreparedTxn));
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
+        auto conflictingTxnCompletionFuture = applier.tryApplyOperation(opCtx.get(), oplogEntry);
+        ASSERT_FALSE(bool(conflictingTxnCompletionFuture));
     }
 
     {
@@ -694,7 +1005,56 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteHasPostImage
 
     {
         auto opCtx = makeOperationContext();
-        checkStatementExecuted(opCtx.get(), lsid, incomingTxnNumber, incomingStmtId);
+        checkStatementExecutedAndFetchOplogEntry(
+            opCtx.get(), lsid, incomingTxnNumber, incomingStmtId);
+    }
+}
+
+DEATH_TEST_REGEX_F(ReshardingOplogSessionApplicationTest,
+                   IncomingRetryableWriteHasPostImageThatCannotBeFound,
+                   "Tripwire assertion.*6344401") {
+    auto lsid = makeLogicalSessionIdForTest();
+
+    TxnNumber incomingTxnNumber = 100;
+    StmtId incomingStmtId = 2;
+
+    auto opTime = [&] {
+        auto opCtx = makeOperationContext();
+        return insertSessionRecord(opCtx.get(), makeLogicalSessionIdForTest(), 100, {3});
+    }();
+
+    repl::OpTime postImageOpTime{{1, 0}, 1};
+    auto oplogEntry = makeUpdateOp(BSON("_id" << 1),
+                                   lsid,
+                                   incomingTxnNumber,
+                                   {incomingStmtId},
+                                   boost::none /* needsRetryImage */,
+                                   boost::none /* preImageOpTime */,
+                                   postImageOpTime);
+
+    {
+        auto opCtx = makeOperationContext();
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
+        auto conflictingTxnCompletionFuture = applier.tryApplyOperation(opCtx.get(), oplogEntry);
+        ASSERT_FALSE(bool(conflictingTxnCompletionFuture));
+    }
+
+    {
+        auto opCtx = makeOperationContext();
+        auto foundOps = findOplogEntriesNewerThan(opCtx.get(), opTime.getTimestamp());
+        ASSERT_EQ(foundOps.size(), 1U);
+        checkGeneratedNoop(foundOps[0], lsid, incomingTxnNumber, {incomingStmtId});
+        ASSERT_FALSE(foundOps[0].getPostImageOpTime());
+
+        auto sessionTxnRecord = findSessionRecord(opCtx.get(), lsid);
+        ASSERT_TRUE(bool(sessionTxnRecord));
+        checkSessionTxnRecord(*sessionTxnRecord, foundOps[0]);
+    }
+
+    {
+        auto opCtx = makeOperationContext();
+        checkStatementExecutedAndFetchOplogEntry(
+            opCtx.get(), lsid, incomingTxnNumber, incomingStmtId);
     }
 }
 
@@ -720,9 +1080,9 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteHasNeedsRetr
 
     {
         auto opCtx = makeOperationContext();
-        ReshardingOplogSessionApplication applier;
-        auto hitPreparedTxn = applier.tryApplyOperation(opCtx.get(), oplogEntry);
-        ASSERT_FALSE(bool(hitPreparedTxn));
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
+        auto conflictingTxnCompletionFuture = applier.tryApplyOperation(opCtx.get(), oplogEntry);
+        ASSERT_FALSE(bool(conflictingTxnCompletionFuture));
     }
 
     {
@@ -741,7 +1101,8 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteHasNeedsRetr
 
     {
         auto opCtx = makeOperationContext();
-        checkStatementExecuted(opCtx.get(), lsid, incomingTxnNumber, incomingStmtId);
+        checkStatementExecutedAndFetchOplogEntry(
+            opCtx.get(), lsid, incomingTxnNumber, incomingStmtId);
     }
 }
 
@@ -759,9 +1120,9 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingTxnForNewSession) {
 
     {
         auto opCtx = makeOperationContext();
-        ReshardingOplogSessionApplication applier;
-        auto hitPreparedTxn = applier.tryApplyOperation(opCtx.get(), oplogEntry);
-        ASSERT_FALSE(bool(hitPreparedTxn));
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
+        auto conflictingTxnCompletionFuture = applier.tryApplyOperation(opCtx.get(), oplogEntry);
+        ASSERT_FALSE(bool(conflictingTxnCompletionFuture));
     }
 
     {
@@ -792,9 +1153,9 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingTxnHasHigherTxnNumber) {
 
     {
         auto opCtx = makeOperationContext();
-        ReshardingOplogSessionApplication applier;
-        auto hitPreparedTxn = applier.tryApplyOperation(opCtx.get(), oplogEntry);
-        ASSERT_FALSE(bool(hitPreparedTxn));
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
+        auto conflictingTxnCompletionFuture = applier.tryApplyOperation(opCtx.get(), oplogEntry);
+        ASSERT_FALSE(bool(conflictingTxnCompletionFuture));
     }
 
     {
@@ -825,9 +1186,9 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingTxnHasLowerTxnNumber) {
 
     {
         auto opCtx = makeOperationContext();
-        ReshardingOplogSessionApplication applier;
-        auto hitPreparedTxn = applier.tryApplyOperation(opCtx.get(), oplogEntry);
-        ASSERT_FALSE(bool(hitPreparedTxn));
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
+        auto conflictingTxnCompletionFuture = applier.tryApplyOperation(opCtx.get(), oplogEntry);
+        ASSERT_FALSE(bool(conflictingTxnCompletionFuture));
     }
 
     {
@@ -858,9 +1219,9 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingTxnHasEqualTxnNumberAsRetr
 
     {
         auto opCtx = makeOperationContext();
-        ReshardingOplogSessionApplication applier;
-        auto hitPreparedTxn = applier.tryApplyOperation(opCtx.get(), oplogEntry);
-        ASSERT_FALSE(bool(hitPreparedTxn));
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
+        auto conflictingTxnCompletionFuture = applier.tryApplyOperation(opCtx.get(), oplogEntry);
+        ASSERT_FALSE(bool(conflictingTxnCompletionFuture));
     }
 
     {
@@ -884,7 +1245,7 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingTxnHasEqualTxnNumberAsTxn)
     auto opTime = [&] {
         auto opCtx = makeOperationContext();
         auto opTime = makePreparedTxn(opCtx.get(), lsid, txnNumber);
-        clearPreparedTxn(opCtx.get(), lsid, txnNumber);
+        abortTxn(opCtx.get(), lsid, txnNumber);
         return opTime;
     }();
 
@@ -892,9 +1253,9 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingTxnHasEqualTxnNumberAsTxn)
 
     {
         auto opCtx = makeOperationContext();
-        ReshardingOplogSessionApplication applier;
-        auto hitPreparedTxn = applier.tryApplyOperation(opCtx.get(), oplogEntry);
-        ASSERT_FALSE(bool(hitPreparedTxn));
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
+        auto conflictingTxnCompletionFuture = applier.tryApplyOperation(opCtx.get(), oplogEntry);
+        ASSERT_FALSE(bool(conflictingTxnCompletionFuture));
     }
 
     {
@@ -920,14 +1281,14 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingTxnHasHigherTxnNumberThanP
     TxnNumber incomingTxnNumber = existingTxnNumber + 1;
     auto oplogEntry = makeFinishTxnOp(lsid, incomingTxnNumber);
 
-    auto hitPreparedTxn = [&] {
+    auto conflictingTxnCompletionFuture = [&] {
         auto opCtx = makeOperationContext();
-        ReshardingOplogSessionApplication applier;
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
         return applier.tryApplyOperation(opCtx.get(), oplogEntry);
     }();
 
-    ASSERT_TRUE(bool(hitPreparedTxn));
-    ASSERT_FALSE(hitPreparedTxn->isReady());
+    ASSERT_TRUE(bool(conflictingTxnCompletionFuture));
+    ASSERT_FALSE(conflictingTxnCompletionFuture->isReady());
 
     {
         auto opCtx = makeOperationContext();
@@ -940,11 +1301,70 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingTxnHasHigherTxnNumberThanP
 
     {
         auto opCtx = makeOperationContext();
-        clearPreparedTxn(opCtx.get(), lsid, existingTxnNumber);
+        abortTxn(opCtx.get(), lsid, existingTxnNumber);
     }
 
-    ASSERT_TRUE(hitPreparedTxn->isReady());
-    ASSERT_OK(hitPreparedTxn->getNoThrow());
+    ASSERT_TRUE(conflictingTxnCompletionFuture->isReady());
+    ASSERT_OK(conflictingTxnCompletionFuture->getNoThrow());
+}
+
+TEST_F(ReshardingOplogSessionApplicationTest, IgnoreIncomingAbortedRetryableInternalTransaction) {
+    auto lsid = makeLogicalSessionIdWithTxnNumberAndUUIDForTest();
+
+    TxnNumber incomingTxnNumber = 100;
+
+    auto opTime = [&] {
+        auto opCtx = makeOperationContext();
+        return insertSessionRecord(opCtx.get(), makeLogicalSessionIdForTest(), 100, {3});
+    }();
+
+    // 'makeFinishTxnOp' returns an abortTransaction oplog entry.
+    auto oplogEntry = makeFinishTxnOp(lsid, incomingTxnNumber);
+
+    {
+        auto opCtx = makeOperationContext();
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
+        auto conflictingTxnCompletionFuture = applier.tryApplyOperation(opCtx.get(), oplogEntry);
+        ASSERT_FALSE(bool(conflictingTxnCompletionFuture));
+    }
+
+    {
+        auto opCtx = makeOperationContext();
+        auto foundOps = findOplogEntriesNewerThan(opCtx.get(), opTime.getTimestamp());
+        ASSERT_EQ(foundOps.size(), 0U);
+
+        auto sessionTxnRecord = findSessionRecord(opCtx.get(), lsid);
+        ASSERT_FALSE(bool(sessionTxnRecord));
+    }
+}
+
+TEST_F(ReshardingOplogSessionApplicationTest, IgnoreIncomingNonRetryableInternalTransaction) {
+    auto lsid = makeLogicalSessionIdWithTxnUUIDForTest();
+
+    TxnNumber incomingTxnNumber = 100;
+
+    auto opTime = [&] {
+        auto opCtx = makeOperationContext();
+        return insertSessionRecord(opCtx.get(), makeLogicalSessionIdForTest(), 100, {3});
+    }();
+
+    auto oplogEntry = makeFinishTxnOp(lsid, incomingTxnNumber);
+
+    {
+        auto opCtx = makeOperationContext();
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
+        auto conflictingTxnCompletionFuture = applier.tryApplyOperation(opCtx.get(), oplogEntry);
+        ASSERT_FALSE(bool(conflictingTxnCompletionFuture));
+    }
+
+    {
+        auto opCtx = makeOperationContext();
+        auto foundOps = findOplogEntriesNewerThan(opCtx.get(), opTime.getTimestamp());
+        ASSERT_EQ(foundOps.size(), 0U);
+
+        auto sessionTxnRecord = findSessionRecord(opCtx.get(), lsid);
+        ASSERT_FALSE(bool(sessionTxnRecord));
+    }
 }
 
 }  // namespace

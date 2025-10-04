@@ -27,58 +27,82 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/dbhelpers.h"
 
-#include "mongo/db/db_raii.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/index/btree_access_method.h"
-#include "mongo/db/json.h"
-#include "mongo/db/keypattern.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/collection_crud/collection_write_path.h"
+#include "mongo/db/curop.h"
+#include "mongo/db/index/index_access_method.h"
+#include "mongo/db/local_catalog/catalog_raii.h"
+#include "mongo/db/local_catalog/clustered_collection_util.h"
+#include "mongo/db/local_catalog/collection.h"
+#include "mongo/db/local_catalog/collection_catalog.h"
+#include "mongo/db/local_catalog/collection_operation_source.h"
+#include "mongo/db/local_catalog/db_raii.h"
+#include "mongo/db/local_catalog/index_catalog.h"
+#include "mongo/db/local_catalog/index_catalog_entry.h"
+#include "mongo/db/local_catalog/index_descriptor.h"
+#include "mongo/db/local_catalog/shard_role_api/shard_role.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/op_observer.h"
-#include "mongo/db/ops/delete.h"
-#include "mongo/db/ops/update.h"
-#include "mongo/db/ops/update_request.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/profile_settings.h"
+#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
+#include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/internal_plans.h"
-#include "mongo/db/query/query_planner.h"
+#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/write_ops/delete.h"
+#include "mongo/db/query/write_ops/update.h"
+#include "mongo/db/query/write_ops/update_request.h"
+#include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/record_id_helpers.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/str.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/storage/snapshot.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+
+#include <set>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 
 namespace mongo {
 
-using std::set;
 using std::string;
 using std::unique_ptr;
 
-/* fetch a single object from collection ns that matches query
-   set your db SavedContext first
-*/
 bool Helpers::findOne(OperationContext* opCtx,
-                      const CollectionPtr& collection,
+                      const CollectionAcquisition& collection,
                       const BSONObj& query,
-                      BSONObj& result,
-                      bool requireIndex) {
-    RecordId loc = findOne(opCtx, collection, query, requireIndex);
+                      BSONObj& result) {
+    RecordId loc = findOne(opCtx, collection, query);
     if (loc.isNull())
         return false;
-    result = collection->docFor(opCtx, loc).value();
+    result = collection.getCollectionPtr()->docFor(opCtx, loc).value();
     return true;
 }
 
 BSONObj Helpers::findOneForTesting(OperationContext* opCtx,
-                                   const CollectionPtr& collection,
+                                   const CollectionAcquisition& collection,
                                    const BSONObj& query,
                                    const bool invariantOnError) {
     BSONObj ret;
-    const bool requiresIndex = true;
-    bool found = findOne(opCtx, collection, query, ret, requiresIndex);
+    bool found = findOne(opCtx, collection, query, ret);
     if (invariantOnError) {
         invariant(found);
     }
@@ -91,45 +115,34 @@ BSONObj Helpers::findOneForTesting(OperationContext* opCtx,
    set your db SavedContext first
 */
 RecordId Helpers::findOne(OperationContext* opCtx,
-                          const CollectionPtr& collection,
-                          const BSONObj& query,
-                          bool requireIndex) {
-    if (!collection)
+                          const CollectionAcquisition& collection,
+                          const BSONObj& query) {
+    if (!collection.exists())
         return RecordId();
 
-    auto findCommand = std::make_unique<FindCommandRequest>(collection->ns());
+    auto findCommand = std::make_unique<FindCommandRequest>(collection.nss());
     findCommand->setFilter(query);
-    return findOne(opCtx, collection, std::move(findCommand), requireIndex);
+    return findOne(opCtx, collection, std::move(findCommand));
 }
 
 RecordId Helpers::findOne(OperationContext* opCtx,
-                          const CollectionPtr& collection,
-                          std::unique_ptr<FindCommandRequest> findCommand,
-                          bool requireIndex) {
-    if (!collection)
+                          const CollectionAcquisition& collection,
+                          std::unique_ptr<FindCommandRequest> findCommand) {
+    if (!collection.exists())
         return RecordId();
 
-    const ExtensionsCallbackReal extensionsCallback(opCtx, &collection->ns());
+    auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx, *findCommand).build(),
+        .parsedFind = ParsedFindCommandParams{
+            .findCommand = std::move(findCommand),
+            .extensionsCallback = ExtensionsCallbackReal(opCtx, &collection.nss()),
+            .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}});
+    cq->setForceGenerateRecordId(true);
 
-    const boost::intrusive_ptr<ExpressionContext> expCtx;
-    auto statusWithCQ =
-        CanonicalQuery::canonicalize(opCtx,
-                                     std::move(findCommand),
-                                     false,
-                                     expCtx,
-                                     extensionsCallback,
-                                     MatchExpressionParser::kAllowAllSpecialFeatures);
-
-    massertStatusOK(statusWithCQ.getStatus());
-    unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-
-    size_t options = requireIndex ? QueryPlannerParams::NO_TABLE_SCAN : QueryPlannerParams::DEFAULT;
-    auto exec = uassertStatusOK(getExecutor(opCtx,
-                                            &collection,
-                                            std::move(cq),
-                                            nullptr /* extractAndAttachPipelineStages */,
-                                            PlanYieldPolicy::YieldPolicy::NO_YIELD,
-                                            options));
+    auto exec = uassertStatusOK(getExecutorFind(opCtx,
+                                                MultipleCollectionAccessor{collection},
+                                                std::move(cq),
+                                                PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY));
 
     PlanExecutor::ExecState state;
     BSONObj obj;
@@ -141,51 +154,41 @@ RecordId Helpers::findOne(OperationContext* opCtx,
 }
 
 bool Helpers::findById(OperationContext* opCtx,
-                       Database* database,
-                       StringData ns,
+                       const NamespaceString& nss,
                        BSONObj query,
-                       BSONObj& result,
-                       bool* nsFound,
-                       bool* indexFound) {
-    invariant(database);
-
-    // TODO ForRead?
-    NamespaceString nss{ns};
-    CollectionPtr collection =
-        CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
+                       BSONObj& result) {
+    auto collCatalog = CollectionCatalog::get(opCtx);
+    const Collection* collection = collCatalog->lookupCollectionByNamespace(opCtx, nss);
     if (!collection) {
         return false;
     }
 
-    if (nsFound)
-        *nsFound = true;
-
     const IndexCatalog* catalog = collection->getIndexCatalog();
     const IndexDescriptor* desc = catalog->findIdIndex(opCtx);
 
-    bool isTimeseriesBucketNs = nss.isTimeseriesBucketsCollection();
-    if (!desc && !isTimeseriesBucketNs) {
-        return false;
-    }
-
-    if (indexFound)
-        *indexFound = 1;
-
-    // A time-series buckets collection does not have an index on _id. However, the RecordId can be
-    // constructed using the _id field. So we can retrive the document by using the RecordId
-    // instead.
-    if (isTimeseriesBucketNs) {
-        Snapshotted<BSONObj> doc;
-        if (collection->findDoc(
-                opCtx, RecordId(record_id_helpers::keyForOID(query["_id"].OID())), &doc)) {
-            result = std::move(doc.value());
-            return true;
+    if (!desc) {
+        if (clustered_util::isClusteredOnId(collection->getClusteredInfo())) {
+            Snapshotted<BSONObj> doc;
+            if (collection->findDoc(opCtx,
+                                    record_id_helpers::keyForObj(IndexBoundsBuilder::objFromElement(
+                                        query["_id"], collection->getDefaultCollator())),
+                                    &doc)) {
+                result = std::move(doc.value());
+                return true;
+            }
         }
+
         return false;
     }
 
-    auto recordId =
-        catalog->getEntry(desc)->accessMethod()->findSingle(opCtx, collection, query["_id"].wrap());
+    const IndexCatalogEntry* entry = catalog->getEntry(desc);
+    // TODO(SERVER-103399): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    auto recordId = entry->accessMethod()->asSortedData()->findSingle(
+        opCtx,
+        *shard_role_details::getRecoveryUnit(opCtx),
+        CollectionPtr::CollectionPtr_UNSAFE(collection),
+        entry,
+        query["_id"].wrap());
     if (recordId.isNull())
         return false;
     result = collection->docFor(opCtx, recordId).value();
@@ -195,41 +198,37 @@ bool Helpers::findById(OperationContext* opCtx,
 RecordId Helpers::findById(OperationContext* opCtx,
                            const CollectionPtr& collection,
                            const BSONObj& idquery) {
-    verify(collection);
+    MONGO_verify(collection);
     const IndexCatalog* catalog = collection->getIndexCatalog();
     const IndexDescriptor* desc = catalog->findIdIndex(opCtx);
-    uassert(13430, "no _id index", desc);
-    return catalog->getEntry(desc)->accessMethod()->findSingle(
-        opCtx, collection, idquery["_id"].wrap());
-}
-
-// Acquires necessary locks to read the collection with the given namespace. If this is an oplog
-// read, use AutoGetOplog for simplified locking.
-const CollectionPtr& getCollectionForRead(
-    OperationContext* opCtx,
-    const NamespaceString& ns,
-    boost::optional<AutoGetCollectionForReadCommand>& autoColl,
-    boost::optional<AutoGetOplog>& autoOplog) {
-    if (ns.isOplog()) {
-        // Simplify locking rules for oplog collection.
-        autoOplog.emplace(opCtx, OplogAccessMode::kRead);
-        return autoOplog->getCollection();
-    } else {
-        autoColl.emplace(opCtx, NamespaceString(ns));
-        return autoColl->getCollection();
+    if (!desc && clustered_util::isClusteredOnId(collection->getClusteredInfo())) {
+        // There is no explicit IndexDescriptor for _id on a collection clustered by _id. However,
+        // the RecordId can be constructed directly from the input.
+        return record_id_helpers::keyForObj(
+            IndexBoundsBuilder::objFromElement(idquery["_id"], collection->getDefaultCollator()));
     }
+
+    uassert(13430, "no _id index", desc);
+    const IndexCatalogEntry* entry = catalog->getEntry(desc);
+    return entry->accessMethod()->asSortedData()->findSingle(
+        opCtx,
+        *shard_role_details::getRecoveryUnit(opCtx),
+        collection,
+        entry,
+        idquery["_id"].wrap());
 }
 
-bool Helpers::getSingleton(OperationContext* opCtx, const char* ns, BSONObj& result) {
-    boost::optional<AutoGetCollectionForReadCommand> autoColl;
-    boost::optional<AutoGetOplog> autoOplog;
-    const auto& collection = getCollectionForRead(opCtx, NamespaceString(ns), autoColl, autoOplog);
-    if (!collection) {
+bool Helpers::getSingleton(OperationContext* opCtx, const NamespaceString& nss, BSONObj& result) {
+    const auto collection = acquireCollectionMaybeLockFree(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(
+            opCtx, nss, AcquisitionPrerequisites::OperationType::kRead));
+    if (!collection.exists()) {
         return false;
     }
 
-    auto exec =
-        InternalPlanner::collectionScan(opCtx, &collection, PlanYieldPolicy::YieldPolicy::NO_YIELD);
+    auto exec = InternalPlanner::collectionScan(
+        opCtx, collection, PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
     PlanExecutor::ExecState state = exec->getNext(&result, nullptr);
 
     CurOp::get(opCtx)->done();
@@ -245,16 +244,27 @@ bool Helpers::getSingleton(OperationContext* opCtx, const char* ns, BSONObj& res
     return false;
 }
 
-bool Helpers::getLast(OperationContext* opCtx, const char* ns, BSONObj& result) {
-    boost::optional<AutoGetCollectionForReadCommand> autoColl;
-    boost::optional<AutoGetOplog> autoOplog;
-    const auto& collection = getCollectionForRead(opCtx, NamespaceString(ns), autoColl, autoOplog);
-    if (!collection) {
+bool Helpers::getLast(OperationContext* opCtx, const NamespaceString& nss, BSONObj& result) {
+#ifdef MONGO_CONFIG_DEBUG_BUILD
+    boost::optional<DisableLockerRuntimeOrderingChecks> disableOrderingCheck;
+    if (nss.isOplog()) {
+        // This helper can violate the ordering of locks in case of index build for collections in
+        // the local db. We only do that in our testing, and we do not expect users to
+        // to do the same. In general, this lock ordering violation is safe because is
+        // non-blocking.
+        disableOrderingCheck.emplace(opCtx);
+    }
+#endif  // MONGO_CONFIG_DEBUG_BUILD
+    const auto collection = acquireCollectionMaybeLockFree(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(
+            opCtx, nss, AcquisitionPrerequisites::OperationType::kRead));
+    if (!collection.exists()) {
         return false;
     }
 
     auto exec = InternalPlanner::collectionScan(
-        opCtx, &collection, PlanYieldPolicy::YieldPolicy::NO_YIELD, InternalPlanner::BACKWARD);
+        opCtx, collection, PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY, InternalPlanner::BACKWARD);
     PlanExecutor::ExecState state = exec->getNext(&result, nullptr);
 
     // Non-yielding collection scans from InternalPlanner will never error.
@@ -269,76 +279,114 @@ bool Helpers::getLast(OperationContext* opCtx, const char* ns, BSONObj& result) 
 }
 
 UpdateResult Helpers::upsert(OperationContext* opCtx,
-                             const string& ns,
+                             CollectionAcquisition& coll,
                              const BSONObj& o,
                              bool fromMigrate) {
     BSONElement e = o["_id"];
-    verify(e.type());
+    MONGO_verify(stdx::to_underlying(e.type()));
     BSONObj id = e.wrap();
-    return upsert(opCtx, ns, id, o, fromMigrate);
+    return upsert(opCtx, coll, id, o, fromMigrate);
 }
 
 UpdateResult Helpers::upsert(OperationContext* opCtx,
-                             const string& ns,
+                             CollectionAcquisition& coll,
                              const BSONObj& filter,
                              const BSONObj& updateMod,
                              bool fromMigrate) {
-    OldClientContext context(opCtx, ns);
-
-    const NamespaceString requestNs(ns);
+    AutoStatsTracker statsTracker(opCtx,
+                                  coll.nss(),
+                                  Top::LockType::WriteLocked,
+                                  AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                                  DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                      .getDatabaseProfileLevel(coll.nss().dbName()));
     auto request = UpdateRequest();
-    request.setNamespaceString(requestNs);
+    request.setNamespaceString(coll.nss());
 
     request.setQuery(filter);
     request.setUpdateModification(write_ops::UpdateModification::parseFromClassicUpdate(updateMod));
     request.setUpsert();
     if (fromMigrate) {
         request.setSource(OperationSource::kFromMigrate);
+        request.setBypassEmptyTsReplacement(true);
     }
-    request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::NO_YIELD);
+    request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
 
-    return ::mongo::update(opCtx, context.db(), request);
+    return ::mongo::update(opCtx, coll, request);
 }
 
 void Helpers::update(OperationContext* opCtx,
-                     const string& ns,
+                     CollectionAcquisition& coll,
                      const BSONObj& filter,
                      const BSONObj& updateMod,
                      bool fromMigrate) {
-    OldClientContext context(opCtx, ns);
-
-    const NamespaceString requestNs(ns);
+    AutoStatsTracker statsTracker(opCtx,
+                                  coll.nss(),
+                                  Top::LockType::WriteLocked,
+                                  AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                                  DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                      .getDatabaseProfileLevel(coll.nss().dbName()));
     auto request = UpdateRequest();
-    request.setNamespaceString(requestNs);
+    request.setNamespaceString(coll.nss());
 
     request.setQuery(filter);
     request.setUpdateModification(write_ops::UpdateModification::parseFromClassicUpdate(updateMod));
     if (fromMigrate) {
         request.setSource(OperationSource::kFromMigrate);
+        request.setBypassEmptyTsReplacement(true);
     }
-    request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::NO_YIELD);
+    request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
 
-    ::mongo::update(opCtx, context.db(), request);
+    ::mongo::update(opCtx, coll, request);
 }
 
-void Helpers::putSingleton(OperationContext* opCtx, const char* ns, BSONObj obj) {
-    OldClientContext context(opCtx, ns);
+Status Helpers::insert(OperationContext* opCtx,
+                       const CollectionAcquisition& coll,
+                       const BSONObj& doc) {
+    AutoStatsTracker statsTracker(opCtx,
+                                  coll.nss(),
+                                  Top::LockType::WriteLocked,
+                                  AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                                  DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                      .getDatabaseProfileLevel(coll.nss().dbName()));
+    return collection_internal::insertDocument(
+        opCtx, coll.getCollectionPtr(), InsertStatement{doc}, &CurOp::get(opCtx)->debug());
+}
 
-    const NamespaceString requestNs(ns);
+void Helpers::deleteByRid(OperationContext* opCtx,
+                          const CollectionAcquisition& coll,
+                          RecordId rid) {
+    AutoStatsTracker statsTracker(opCtx,
+                                  coll.nss(),
+                                  Top::LockType::WriteLocked,
+                                  AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                                  DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                      .getDatabaseProfileLevel(coll.nss().dbName()));
+    return collection_internal::deleteDocument(
+        opCtx, coll.getCollectionPtr(), kUninitializedStmtId, rid, &CurOp::get(opCtx)->debug());
+}
+
+void Helpers::putSingleton(OperationContext* opCtx, CollectionAcquisition& coll, BSONObj obj) {
+    AutoStatsTracker statsTracker(opCtx,
+                                  coll.nss(),
+                                  Top::LockType::WriteLocked,
+                                  AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                                  DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                      .getDatabaseProfileLevel(coll.nss().dbName()));
     auto request = UpdateRequest();
-    request.setNamespaceString(requestNs);
+    request.setNamespaceString(coll.nss());
 
     request.setUpdateModification(write_ops::UpdateModification::parseFromClassicUpdate(obj));
+    request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
     request.setUpsert();
 
-    ::mongo::update(opCtx, context.db(), request);
+    ::mongo::update(opCtx, coll, request);
 
     CurOp::get(opCtx)->done();
 }
 
 BSONObj Helpers::toKeyFormat(const BSONObj& o) {
     BSONObjBuilder keyObj(o.objsize());
-    BSONForEach(e, o) {
+    for (auto&& e : o) {
         keyObj.appendAs(e, "");
     }
     return keyObj.obj();
@@ -346,19 +394,21 @@ BSONObj Helpers::toKeyFormat(const BSONObj& o) {
 
 BSONObj Helpers::inferKeyPattern(const BSONObj& o) {
     BSONObjBuilder kpBuilder;
-    BSONForEach(e, o) {
+    for (auto&& e : o) {
         kpBuilder.append(e.fieldName(), 1);
     }
     return kpBuilder.obj();
 }
 
-void Helpers::emptyCollection(OperationContext* opCtx, const NamespaceString& nss) {
-    OldClientContext context(opCtx, nss.ns());
+void Helpers::emptyCollection(OperationContext* opCtx, const CollectionAcquisition& coll) {
+    AutoStatsTracker statsTracker(opCtx,
+                                  coll.nss(),
+                                  Top::LockType::WriteLocked,
+                                  AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                                  DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                      .getDatabaseProfileLevel(coll.nss().dbName()));
     repl::UnreplicatedWritesBlock uwb(opCtx);
-    CollectionPtr collection = context.db()
-        ? CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)
-        : nullptr;
-    deleteObjects(opCtx, collection, nss, BSONObj(), false);
+    deleteObjects(opCtx, coll, BSONObj(), false);
 }
 
 bool Helpers::findByIdAndNoopUpdate(OperationContext* opCtx,
@@ -384,10 +434,18 @@ bool Helpers::findByIdAndNoopUpdate(OperationContext* opCtx,
     // BSONObj because that's a second way OpObserverImpl::onUpdate() detects and ignores no-op
     // updates.
     repl::UnreplicatedWritesBlock uwb(opCtx);
-    CollectionUpdateArgs args;
+    CollectionUpdateArgs args(snapshottedDoc.value());
     args.criteria = idQuery;
     args.update = BSONObj();
-    collection->updateDocument(opCtx, recordId, snapshottedDoc, result, false, nullptr, &args);
+    collection_internal::updateDocument(opCtx,
+                                        collection,
+                                        recordId,
+                                        snapshottedDoc,
+                                        result,
+                                        collection_internal::kUpdateNoIndexes,
+                                        nullptr /* indexesAffected */,
+                                        nullptr /* opDebug */,
+                                        &args);
 
     return true;
 }

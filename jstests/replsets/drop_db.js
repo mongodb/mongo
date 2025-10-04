@@ -3,8 +3,7 @@
  *
  * @tags: [requires_replication]
  */
-(function() {
-"use strict";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 function checkWriteConcern(testFn, checkFn) {
     const mongoRunCommandOriginal = Mongo.prototype.runCommand;
@@ -39,21 +38,27 @@ const collName = "coll";
 const primaryDB = rst.getPrimary().getDB(dbName);
 
 primaryDB.createCollection(collName);
-checkWriteConcern(() => assert.commandWorked(primaryDB.dropDatabase({w: "majority"})), (cmdObj) => {
-    assert.eq(cmdObj.writeConcern, {w: "majority"});
-});
+checkWriteConcern(
+    () => assert.commandWorked(primaryDB.dropDatabase({w: "majority"})),
+    (cmdObj) => {
+        assert.eq(cmdObj.writeConcern, {w: "majority"});
+    },
+);
 
 primaryDB.createCollection(collName);
-checkWriteConcern(() => assert.commandWorked(primaryDB.dropDatabase({w: 1})), (cmdObj) => {
-    assert.eq(cmdObj.writeConcern, {w: 1});
-});
+checkWriteConcern(
+    () => assert.commandWorked(primaryDB.dropDatabase({w: 1})),
+    (cmdObj) => {
+        assert.eq(cmdObj.writeConcern, {w: 1});
+    },
+);
 
 primaryDB.createCollection(collName);
-checkWriteConcern(() => assert.commandFailedWithCode(primaryDB.dropDatabase({w: 45}),
-                                                     ErrorCodes.UnsatisfiableWriteConcern),
-                  (cmdObj) => {
-                      assert.eq(cmdObj.writeConcern, {w: 45});
-                  });
+checkWriteConcern(
+    () => assert.commandFailedWithCode(primaryDB.dropDatabase({w: 45}), ErrorCodes.UnsatisfiableWriteConcern),
+    (cmdObj) => {
+        assert.eq(cmdObj.writeConcern, {w: 45});
+    },
+);
 
 rst.stopSet();
-})();

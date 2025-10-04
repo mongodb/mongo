@@ -14,33 +14,31 @@
  * 7. The contents of A and B are compared to ensure the rollback results in consistent nodes,
  *    and have the expected collections and views..
  */
-load("jstests/replsets/rslib.js");
-
-(function() {
-"use strict";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {awaitOpTime} from "jstests/replsets/rslib.js";
 
 // Run a command, return the result if it worked, or assert with a message otherwise.
 let checkedRunCommand = (db, cmd) =>
-    ((res, msg) => ((assert.commandWorked(res, msg), res)))(db.runCommand(cmd), tojson(cmd));
+    ((res, msg) => (assert.commandWorked(res, msg), res))(db.runCommand(cmd), tojson(cmd));
 
 // Like db.getCollectionNames, but allows a filter.
-let getCollectionNames = (db, filter) => checkedRunCommand(db, {listCollections: 1, filter})
-                                             .cursor.firstBatch.map((entry) => entry.name)
-                                             .sort();
+let getCollectionNames = (db, filter) =>
+    checkedRunCommand(db, {listCollections: 1, filter})
+        .cursor.firstBatch.map((entry) => entry.name)
+        .sort();
 
 // Function that checks that all array elements are equal, and returns the unique element.
-let checkEqual = (array, what) =>
-    array.reduce((x, y) => assert.eq(x, y, "nodes don't have matching " + what) || x);
+let checkEqual = (array, what) => array.reduce((x, y) => assert.eq(x, y, "nodes don't have matching " + what) || x);
 
 // Helper function for verifying database contents at the end of the test.
 let checkFinalResults = (dbs, expectedColls, expectedViews) => ({
     dbname: checkEqual(dbs, "names"),
-    colls: checkEqual(
-        dbs.map((db) => getCollectionNames(db, {type: "collection"})).concat([expectedColls]),
-        "colls"),
-    views: checkEqual(
-        dbs.map((db) => getCollectionNames(db, {type: "view"})).concat([expectedViews]), "views"),
-    md5: checkEqual(dbs.map((db) => checkedRunCommand(db, {dbHash: 1}).md5), "hashes")
+    colls: checkEqual(dbs.map((db) => getCollectionNames(db, {type: "collection"})).concat([expectedColls]), "colls"),
+    views: checkEqual(dbs.map((db) => getCollectionNames(db, {type: "view"})).concat([expectedViews]), "views"),
+    md5: checkEqual(
+        dbs.map((db) => checkedRunCommand(db, {dbHash: 1}).md5),
+        "hashes",
+    ),
 });
 
 let name = "rollback_views.js";
@@ -48,14 +46,18 @@ let replTest = new ReplSetTest({name: name, nodes: 3, useBridge: true});
 let nodes = replTest.nodeList();
 
 let conns = replTest.startSet();
-replTest.initiate({
-    "_id": name,
-    "members": [
-        {"_id": 0, "host": nodes[0], priority: 3},
-        {"_id": 1, "host": nodes[1]},
-        {"_id": 2, "host": nodes[2], arbiterOnly: true}
-    ]
-});
+replTest.initiate(
+    {
+        "_id": name,
+        "members": [
+            {"_id": 0, "host": nodes[0], priority: 3},
+            {"_id": 1, "host": nodes[1]},
+            {"_id": 2, "host": nodes[2], arbiterOnly: true},
+        ],
+    },
+    null,
+    {initiateWithDefaultElectionTimeout: true},
+);
 
 // Make sure we have a primary and that that primary is node A.
 replTest.waitForState(replTest.nodes[0], ReplSetTest.State.PRIMARY);
@@ -65,14 +67,20 @@ let nodeB = conns[1];
 let arbiter = conns[2];
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
-assert.commandWorked(nodeA.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    nodeA.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 let a1 = nodeA.getDB("test1");
 let b1 = nodeB.getDB("test1");
 
 // Initial data for both nodes.
-assert.commandWorked(a1.coll.insert([{_id: 1, x: 1}, {_id: 2, x: 2}]));
+assert.commandWorked(
+    a1.coll.insert([
+        {_id: 1, x: 1},
+        {_id: 2, x: 2},
+    ]),
+);
 
 // Wait for initial replication.
 replTest.awaitReplication();
@@ -87,12 +95,18 @@ assert.soon(() => replTest.getPrimary() == nodeB, "node B did not become primary
 assert.commandWorked(b1.coll.remove({x: 2}));
 assert.commandWorked(b1.createView("x", "coll", [{$match: {x: 1}}]));
 let b2 = b1.getSiblingDB("test2");
-assert.commandWorked(b2.coll.insert([{_id: 1, y: 1}, {_id: 2, y: 2}]));
+assert.commandWorked(
+    b2.coll.insert([
+        {_id: 1, y: 1},
+        {_id: 2, y: 2},
+    ]),
+);
 assert.commandWorked(b2.createView("y", "coll", [{$match: {y: 2}}]));
 let b3 = b1.getSiblingDB("test3");
 assert.commandWorked(b3.createView("z", "coll", []));
-assert.commandWorked(b3.adminCommand(
-    {applyOps: [{op: "d", ns: b3.getName() + ".system.views", o: {_id: b3.getName() + ".z"}}]}));
+assert.commandWorked(
+    b3.adminCommand({applyOps: [{op: "d", ns: b3.getName() + ".system.views", o: {_id: b3.getName() + ".z"}}]}),
+);
 assert.commandWorked(b3.z.insert([{z: 1}, {z: 2}, {z: 3}]));
 assert.commandWorked(b3.z.remove({z: 1}));
 
@@ -102,13 +116,20 @@ nodeB.disconnect(arbiter);
 replTest.awaitNoPrimary();
 nodeA.reconnect(arbiter);
 assert.soon(() => replTest.getPrimary() == nodeA, "nodeA did not become primary as expected");
+// Ensure that the arbiter recognizes nodeA as primary.
+replTest.awaitNodesAgreeOnPrimary(replTest.timeoutMS, [nodeA, arbiter], nodeA);
 
 // A is now primary and will perform writes that must be copied by B after rollback.
 assert.eq(a1.coll.find().itcount(), 2, "expected two documents in test1.coll");
 assert.commandWorked(a1.x.insert({_id: 3, x: "string in test1.x"}));
 let a2 = a1.getSiblingDB("test2");
 assert.commandWorked(a2.createView("y", "coll", [{$match: {y: 2}}]));
-assert.commandWorked(a2.coll.insert([{_id: 1, y: 1}, {_id: 2, y: 2}]));
+assert.commandWorked(
+    a2.coll.insert([
+        {_id: 1, y: 1},
+        {_id: 2, y: 2},
+    ]),
+);
 let a3 = a1.getSiblingDB("test3");
 assert.commandWorked(a3.coll.insert([{z: 1}, {z: 2}, {z: 3}]));
 assert.commandWorked(a3.createView("z", "coll", [{$match: {z: 3}}]));
@@ -139,4 +160,3 @@ replTest.checkReplicatedDataHashes();
 replTest.checkOplogs();
 
 replTest.stopSet();
-}());

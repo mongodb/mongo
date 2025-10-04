@@ -1,0 +1,148 @@
+# Golden test output of GoldenGenExpressionTest/TestSimpleExpr
+ExpressionAnd
+(coerceToBool(getField(s1, "field2")) ?: false) 
+# Golden test output of GoldenGenExpressionTest/TestSimpleExpr
+ExpressionAnyElementTrue
+
+    let [
+        l4.0 = newArray(true, (getField(s1, "field2") ?: null)) 
+    ] 
+    in 
+        if (isArray(l4.0) ?: false) 
+        then traverseF(move(l4.0), lambda(l5.0) { (coerceToBool(move(l5.0)) ?: false) }, false) 
+        else fail(7158300, "$anyElementTrue's argument must be an array") 
+
+# Golden test output of GoldenGenExpressionTest/TestSimpleExpr
+ExpressionObjectToArray
+
+    let [
+        l7.0 = objectToArray(s1) 
+    ] 
+    in 
+        if exists(l7.0) 
+        then makeOwn(move(l7.0)) 
+        elif (typeMatch(s1, 1088) ?: true) 
+        then null 
+        elif isObject(s1) 
+        then Nothing 
+        else fail(5153215, "$objectToArray requires an object input") 
+
+# Golden test output of GoldenGenExpressionTest/TestSimpleExpr
+ExpressionArrayToObject
+arrayToObject([{"k" : "_id", "v" : 0}, {"k" : "field1", "v" : 4}, {"k" : "field2", "v" : true}, {"k" : "null", "v" : null}]) 
+# Golden test output of GoldenGenExpressionTest/TestSimpleExpr
+ExpressionBsonSize
+
+    if (typeMatch(s1, 1088) ?: true) 
+    then null 
+    elif isObject(s1) 
+    then bsonSize(s1) 
+    else fail(7158301, "$bsonSize requires a document input") 
+
+# Golden test output of GoldenGenExpressionTest/TestSimpleExpr
+ExpressionIfNull
+
+    let [
+        l13.0 = getField(s1, "null") 
+    ] 
+    in 
+        if (typeMatch(l13.0, 1088) ?: true) 
+        then 
+            let [
+                l14.0 = getField(s1, "field1") 
+            ] 
+            in 
+                if (typeMatch(l14.0, 1088) ?: true) 
+                then getField(s1, "null") 
+                else move(l14.0) 
+        
+        else move(l13.0) 
+
+# Golden test output of GoldenGenExpressionTest/TestSimpleExpr
+ExpressionIn
+isMember(getField(s1, "field1"), [1, 2, 3, 4, 5]) 
+# Golden test output of GoldenGenExpressionTest/TestSimpleExpr
+ExpressionIsNumber
+
+    let [
+        l17.0 = getField(s1, "field1") 
+    ] 
+    in 
+        if exists(l17.0) 
+        then isNumber(move(l17.0)) 
+        else false 
+
+# Golden test output of GoldenGenExpressionTest/TestSimpleExpr
+ExpressionLet
+
+    let [
+        l21.0 = 
+            let [
+                l22.0 = getField(s1, "field1") 
+            ] 
+            in 
+                if (typeMatch(l22.0, 1088) ?: true) 
+                then null 
+                elif ((
+                    if isNumber(l22.0) 
+                    then 0 
+                    elif isDate(l22.0) 
+                    then 1 
+                    else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+                + 0) > 1) 
+                then fail(7157722, "only one date allowed in an $add expression") 
+                else (move(l22.0) + 1) 
+    ] 
+    in 
+        let [
+            l23.0 = getField(s1, "field1") 
+        ] 
+        in 
+            if ((typeMatch(l21.0, 1088) ?: true) || (typeMatch(l23.0, 1088) ?: true)) 
+            then null 
+            elif (isNumber(l21.0) && isNumber(l23.0)) 
+            then (move(l21.0) * move(l23.0)) 
+            else fail(7157721, "only numbers are allowed in an $multiply expression") 
+
+# Golden test output of GoldenGenExpressionTest/TestSimpleExpr
+ExpressionNot
+!((coerceToBool(getField(s1, "field2")) ?: false)) 
+# Golden test output of GoldenGenExpressionTest/TestSimpleExpr
+ExpressionObject
+newObj("a", 1, "b", getField(s1, "field1"), "c", getField(s1, "field2")) 
+# Golden test output of GoldenGenExpressionTest/TestSimpleExpr
+ExpressionOr
+((coerceToBool(getField(s1, "field1")) ?: false) || (coerceToBool(getField(s1, "field2")) ?: false)) 
+# Golden test output of GoldenGenExpressionTest/TestSimpleExpr
+ExpressionRange
+
+    let [
+        l26.0 = getField(s1, "field1") 
+    ] 
+    in 
+        if isNumber(l26.0) 
+        then 
+            let [
+                l27.0 = convert ( move(l26.0), int32) 
+            ] 
+            in 
+                if exists(l27.0) 
+                then newArrayFromRange(0, move(l27.0), 2) 
+                else fail(7157715, "$range end argument cannot be represented as a 32-bit integer") 
+        
+        else fail(7157712, "$range only supports numeric types for end") 
+
+# Golden test output of GoldenGenExpressionTest/TestSimpleExpr
+ExpressionSwitch
+
+    if (coerceToBool(getField(s1, "field2")) ?: false) 
+    then getField(s1, "field1") 
+    else 10 
+
+# Golden test output of GoldenGenExpressionTest/TestSimpleExpr
+ExpressionCond
+
+    if (coerceToBool(getField(s1, "field2")) ?: false) 
+    then 10 
+    else getField(s1, "field1") 
+

@@ -27,10 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <boost/intrusive_ptr.hpp>
-#include <vector>
+#include "mongo/db/pipeline/document_source_count.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
@@ -40,9 +37,17 @@
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/document_source_count.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
+#include "mongo/db/query/explain_options.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+
+#include <memory>
+#include <vector>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace {
@@ -65,16 +70,22 @@ public:
             dynamic_cast<DocumentSourceSingleDocumentTransformation*>(result.back().get());
         ASSERT(projectStage);
 
-        auto explain = ExplainOptions::Verbosity::kQueryPlanner;
         vector<Value> explainedStages;
-        groupStage->serializeToArray(explainedStages, explain);
-        projectStage->serializeToArray(explainedStages, explain);
+        groupStage->serializeToArray(
+            explainedStages,
+            SerializationOptions{
+                .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)});
+        projectStage->serializeToArray(
+            explainedStages,
+            SerializationOptions{
+                .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)});
         ASSERT_EQUALS(explainedStages.size(), 2UL);
 
         StringData countName = countSpec.firstElement().valueStringData();
         Value expectedGroupExplain =
             Value{Document{{"_id", Document{{"$const", BSONNULL}}},
-                           {countName, Document{{"$sum", Document{{"$const", 1}}}}}}};
+                           {countName, Document{{"$sum", Document{{"$const", 1}}}}},
+                           {"$willBeMerged", false}}};
         auto groupExplain = explainedStages[0];
         ASSERT_VALUE_EQ(groupExplain["$group"], expectedGroupExplain);
 
@@ -85,12 +96,10 @@ public:
 };
 
 TEST_F(CountReturnsGroupAndProjectStages, ValidStringSpec) {
-    BSONObj spec = BSON("$count"
-                        << "myCount");
+    BSONObj spec = BSON("$count" << "myCount");
     testCreateFromBsonResult(spec);
 
-    spec = BSON("$count"
-                << "quantity");
+    spec = BSON("$count" << "quantity");
     testCreateFromBsonResult(spec);
 }
 
@@ -106,33 +115,34 @@ TEST_F(InvalidCountSpec, NonStringSpec) {
     BSONObj spec = BSON("$count" << 1);
     ASSERT_THROWS_CODE(createCount(spec), AssertionException, 40156);
 
-    spec = BSON("$count" << BSON("field1"
-                                 << "test"));
+    spec = BSON("$count" << BSON("field1" << "test"));
     ASSERT_THROWS_CODE(createCount(spec), AssertionException, 40156);
 }
 
 TEST_F(InvalidCountSpec, EmptyStringSpec) {
-    BSONObj spec = BSON("$count"
-                        << "");
+    BSONObj spec = BSON("$count" << "");
     ASSERT_THROWS_CODE(createCount(spec), AssertionException, 40157);
 }
 
 TEST_F(InvalidCountSpec, FieldPathSpec) {
-    BSONObj spec = BSON("$count"
-                        << "$x");
+    BSONObj spec = BSON("$count" << "$x");
     ASSERT_THROWS_CODE(createCount(spec), AssertionException, 40158);
 }
 
 TEST_F(InvalidCountSpec, EmbeddedNullByteSpec) {
-    BSONObj spec = BSON("$count"
-                        << "te\0st"_sd);
+    BSONObj spec = BSON("$count" << "te\0st"_sd);
     ASSERT_THROWS_CODE(createCount(spec), AssertionException, 40159);
 }
 
 TEST_F(InvalidCountSpec, PeriodInStringSpec) {
-    BSONObj spec = BSON("$count"
-                        << "test.string");
+    BSONObj spec = BSON("$count" << "test.string");
     ASSERT_THROWS_CODE(createCount(spec), AssertionException, 40160);
 }
+
+TEST_F(InvalidCountSpec, IDAsStringSpec) {
+    BSONObj spec = BSON("$count" << "_id");
+    ASSERT_THROWS_CODE(createCount(spec), AssertionException, 9039800);
+}
+
 }  // namespace
 }  // namespace mongo

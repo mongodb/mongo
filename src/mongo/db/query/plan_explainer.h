@@ -29,12 +29,14 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/plan_stats.h"
-#include "mongo/db/query/classic_plan_cache.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/explain_options.h"
-#include "mongo/db/query/plan_enumerator_explain_info.h"
+#include "mongo/db/query/plan_cache/classic_plan_cache.h"
+#include "mongo/db/query/plan_enumerator/plan_enumerator_explain_info.h"
 #include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/query/query_solution.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 /**
@@ -44,7 +46,10 @@ namespace mongo {
 class PlanExplainer {
 public:
     /**
-     * A version of the explain format. "1" is used for the classic engine and "2" for SBE.
+     * A version of the explain format:
+     * - "1" is used for the classic engine
+     * - "2" for SBE stagebuilders
+     * - "3" for CQF
      */
     using ExplainVersion = std::string;
 
@@ -58,8 +63,9 @@ public:
 
     PlanExplainer() {}
     PlanExplainer(const QuerySolution* solution)
-        : _enumeratorExplainInfo{solution ? solution->_enumeratorExplainInfo
-                                          : PlanEnumeratorExplainInfo{}} {}
+        : _solution(solution),
+          _enumeratorExplainInfo{_solution ? _solution->_enumeratorExplainInfo
+                                           : PlanEnumeratorExplainInfo{}} {}
     PlanExplainer(const PlanEnumeratorExplainInfo& info) : _enumeratorExplainInfo{info} {}
 
     virtual ~PlanExplainer() = default;
@@ -92,6 +98,14 @@ public:
     virtual void getSummaryStats(PlanSummaryStats* statsOut) const = 0;
 
     /**
+     * Fills out 'statsOut' for the secondary collection 'secondaryColl'. Subclasses may
+     * override this function if the summary stats for secondary collections need to be reported
+     * separately.
+     */
+    virtual void getSecondarySummaryStats(const NamespaceString& secondaryColl,
+                                          PlanSummaryStats* statsOut) const {}
+
+    /**
      * Returns statistics that detail the winning plan selected by the multi-planner, or, if no
      * multi-planning has been performed, for the single plan selected by the QueryPlanner.
      *
@@ -114,16 +128,8 @@ public:
         ExplainOptions::Verbosity verbosity) const = 0;
 
     /**
-     * Serializes plan cache entry debug info into the provided BSONObjBuilder. The output format is
-     * intended to be human readable, and useful for debugging query performance problems related to
-     * the plan cache.
-     */
-    virtual std::vector<PlanStatsDetails> getCachedPlanStats(
-        const plan_cache_debug_info::DebugInfo& debugInfo,
-        ExplainOptions::Verbosity verbosity) const = 0;
-
-    /**
-     * Returns an object containing what query knobs the planner hit during plan enumeration.
+     * Returns an object containing what query knobs the planner hit during plan enumeration. This
+     * is specific to classic.
      */
     PlanEnumeratorExplainInfo getEnumeratorInfo() const {
         return _enumeratorExplainInfo;
@@ -132,7 +138,12 @@ public:
         _enumeratorExplainInfo.merge(other);
     }
 
+    void setQuerySolution(const QuerySolution* qs) {
+        _solution = qs;
+    }
+
 protected:
+    const QuerySolution* _solution{nullptr};
     PlanEnumeratorExplainInfo _enumeratorExplainInfo;
 };
 }  // namespace mongo

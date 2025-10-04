@@ -2,10 +2,10 @@ test_kind: js_test
 
 selector:
   roots:
-  - src/mongo/db/modules/*/jstests/sasl/*.js
+    - src/mongo/db/modules/*/jstests/sasl/*.js
 
 # sasl tests start their own mongod's.
 executor:
   config:
     shell_options:
-      nodb: ''
+      nodb: ""

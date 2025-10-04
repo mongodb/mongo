@@ -27,12 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/matcher/schema/json_pointer.h"
-#include "mongo/unittest/bson_test_util.h"
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {
@@ -61,14 +62,14 @@ TEST(JSONPointerTest, ParseInterestingCharacterFields) {
 }
 
 TEST(JSONPointerTest, EscapeCharacterParse) {
-    BSONObj obj =
-        BSON("a/b" << 1 << "m~n" << 2 << "o~/~p" << 3 << "~1" << 4 << "~" << 5 << "test~~/~" << 6);
+    BSONObj obj = BSON("a/b" << 1 << "m~n" << 2 << "o~/~p" << 3 << "~1" << 4 << "~00" << 5
+                             << "test~0~//1~0" << 6);
     assertPointerEvaluatesTo("/a~1b", obj, "a/b", 1);
     assertPointerEvaluatesTo("/m~0n", obj, "m~n", 2);
     assertPointerEvaluatesTo("/o~0~1~0p", obj, "o~/~p", 3);
     assertPointerEvaluatesTo("/~01", obj, "~1", 4);
-    assertPointerEvaluatesTo("/~000", obj, "~", 5);
-    assertPointerEvaluatesTo("/test~00~0~1~00", obj, "test~~/~", 6);
+    assertPointerEvaluatesTo("/~000", obj, "~00", 5);
+    assertPointerEvaluatesTo("/test~00~0~1~11~00", obj, "test~0~//1~0", 6);
 }
 
 TEST(JSONPointerTest, EmptyKeyTest) {
@@ -120,14 +121,9 @@ TEST(JSONPointerTest, NestedFieldsWithEscapeCharacters) {
 TEST(JSONPointerTest, ArrayTraversalTest) {
     auto arrBottom = BSON_ARRAY(0 << 1 << 2 << 3 << 4 << 5);
     auto arrTop = BSON_ARRAY(6 << 7 << 8 << 9 << 10);
-    auto bsonArray = BSON_ARRAY(BSON("builder0"
-                                     << "value0")
-                                << BSON("builder1"
-                                        << "value1")
-                                << BSON("builder2"
-                                        << "value2")
-                                << BSON("builder3"
-                                        << "value3"));
+    auto bsonArray = BSON_ARRAY(BSON("builder0" << "value0")
+                                << BSON("builder1" << "value1") << BSON("builder2" << "value2")
+                                << BSON("builder3" << "value3"));
     auto topLevel = BSON("transit" << BSON("arrBottom" << arrBottom) << "arrTop" << arrTop
                                    << "toBSONArray" << bsonArray);
     assertPointerEvaluatesTo("/transit/arrBottom/0", topLevel, "0", 0);
@@ -137,12 +133,10 @@ TEST(JSONPointerTest, ArrayTraversalTest) {
 }
 
 TEST(JSONPointerTest, NumericFieldName) {
-    auto topLevel = BSON("2"
-                         << "text"
-                         << "3"
-                         << BSON_ARRAY("first"
-                                       << "second"
-                                       << "third"));
+    auto topLevel = BSON("2" << "text"
+                             << "3"
+                             << BSON_ARRAY("first" << "second"
+                                                   << "third"));
     assertPointerEvaluatesTo("/2", topLevel, "2", "text");
     assertPointerEvaluatesTo("/3/1", topLevel, "1", "second");
 }
@@ -157,8 +151,7 @@ TEST(JSONPointerTest, DashCharacterBehavior) {
 }
 
 TEST(JSONPointerTest, ToStringParsesToSamePointer) {
-    auto small = BSON("top" << BSON("fi~eld"
-                                    << "second"));
+    auto small = BSON("top" << BSON("fi~eld" << "second"));
     JSONPointer pointer{"/top/fi~0eld"};
     auto reclaimedString = pointer.toString();
     JSONPointer secondPointer{reclaimedString};

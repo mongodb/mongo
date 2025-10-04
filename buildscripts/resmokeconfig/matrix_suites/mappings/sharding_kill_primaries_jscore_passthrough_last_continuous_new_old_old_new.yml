@@ -1,0 +1,14 @@
+base_suite: sharding_jscore_passthrough
+overrides:
+  - "multiversion.sharded_fixture_last_continuous_3_nodes"
+  - "kill_primary.sharding_reconfig_hooks"
+  - "kill_primary.sharding_reconfig_archive"
+  - "kill_primary.sharding_shell_options"
+  - "kill_primary.all_nodes_can_be_primary"
+
+extends:
+  - "replica_sets_stepdown_selector.kill_primary_jscore_passthrough_exclude_with_any_tags"
+  - "replica_sets_stepdown_selector.kill_primary_jscore_passthrough_exclude_files_base"
+
+excludes:
+  - "replica_sets_stepdown_selector.kill_primary_jscore_passthrough_exclude_files_fle"

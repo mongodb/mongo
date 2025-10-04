@@ -15,12 +15,9 @@
  * @tags: [requires_persistence, uses_prepare_transaction, uses_transactions]
  */
 
-(function() {
-"use strict";
-
-load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/libs/parallel_shell_helpers.js");
-load('jstests/libs/test_background_ops.js');
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
@@ -30,9 +27,21 @@ const dbName = "test";
 const collName = "ddl_op_behind_prepared_transaction_fails_in_shutdown";
 let primary = rst.getPrimary();
 const testDB = primary.getDB(dbName);
+
+const buildInfo = assert.commandWorked(testDB.runCommand({"buildInfo": 1}));
+const isCodeCoverageEnabled = buildInfo.buildEnvironment.ccflags.includes("-ftest-coverage");
+const isSanitizerEnabled = buildInfo.buildEnvironment.ccflags.includes("-fsanitize");
+const slowTestVariant = isCodeCoverageEnabled || isSanitizerEnabled;
+
+if (slowTestVariant) {
+    jsTestLog("Skipping test on slow test variant");
+    rst.stopSet(true /*use default exit signal*/, false /*forRestart*/, {skipValidation: true});
+    quit();
+}
+
 const testColl = testDB.getCollection(collName);
 const txnDoc = {
-    _id: 100
+    _id: 100,
 };
 
 jsTest.log("Creating a collection '" + collName + "' with data in it...");
@@ -58,7 +67,8 @@ function runDropCollection(dbName, collName) {
     assert.commandFailedWithCode(
         res,
         [ErrorCodes.InterruptedAtShutdown, ErrorCodes.InterruptedDueToReplStateChange],
-        "parallel shell drop cmd completed in an unexpected way: " + tojson(res));
+        "parallel shell drop cmd completed in an unexpected way: " + tojson(res),
+    );
     jsTest.log("Done dropping collection in parallel shell");
 }
 
@@ -70,20 +80,20 @@ function runDropCollection(dbName, collName) {
 //
 // This is best-effort, not deterministic, since we cannot place a fail point directly in the
 // locking code as that would hang everything rather than just drop.
-assert.commandWorked(primary.adminCommand(
-    {configureFailPoint: 'hangDropCollectionBeforeLockAcquisition', mode: 'alwaysOn'}));
+assert.commandWorked(
+    primary.adminCommand({configureFailPoint: "hangDropCollectionBeforeLockAcquisition", mode: "alwaysOn"}),
+);
 let joinDropCollection;
 try {
     jsTest.log("Starting a parallel shell to concurrently run drop collection...");
-    joinDropCollection =
-        startParallelShell(funWithArgs(runDropCollection, dbName, collName), primary.port);
+    joinDropCollection = startParallelShell(funWithArgs(runDropCollection, dbName, collName), primary.port);
 
     jsTest.log("Waiting for drop collection to block behind the prepared transaction...");
-    checkLog.contains(primary,
-                      "Hanging drop collection before lock acquisition while fail point is set");
+    checkLog.contains(primary, "Hanging drop collection before lock acquisition while fail point is set");
 } finally {
-    assert.commandWorked(primary.adminCommand(
-        {configureFailPoint: 'hangDropCollectionBeforeLockAcquisition', mode: 'off'}));
+    assert.commandWorked(
+        primary.adminCommand({configureFailPoint: "hangDropCollectionBeforeLockAcquisition", mode: "off"}),
+    );
 }
 sleep(1 * 1000);
 
@@ -93,26 +103,31 @@ rst.stop(primary, undefined, {skipValidation: true});
 rst.start(primary, {}, true /*restart*/);
 primary = rst.getPrimary();
 
-joinDropCollection();
+joinDropCollection({checkExitSuccess: false});
 
 const numDocs = primary.getDB(dbName).getCollection(collName).find().length();
 // We expect two documents because the third is in an uncommitted transaction and not visible.
 assert.eq(
     2,
     numDocs,
-    "Expected '" + collName + "' to find 2 documents, found " + numDocs +
+    "Expected '" +
+        collName +
+        "' to find 2 documents, found " +
+        numDocs +
         ". Drop collection may have succeeded during shutdown while a transaction was in the " +
-        "prepared state.");
+        "prepared state.",
+);
 
 // We will check that the prepared transaction is still active as expected, since we are here.
-assert.commandFailedWithCode(primary.getDB(dbName).runCommand({
-    find: collName,
-    filter: txnDoc,
-    readConcern: {afterClusterTime: prepareTimestamp},
-    maxTimeMS: 5000
-}),
-                             ErrorCodes.MaxTimeMSExpired);
+assert.commandFailedWithCode(
+    primary.getDB(dbName).runCommand({
+        find: collName,
+        filter: txnDoc,
+        readConcern: {afterClusterTime: prepareTimestamp},
+        maxTimeMS: 5000,
+    }),
+    ErrorCodes.MaxTimeMSExpired,
+);
 
 // Skip validation because it requires a lock that the prepared transaction is blocking.
 rst.stopSet(true /*use default exit signal*/, false /*forRestart*/, {skipValidation: true});
-})();

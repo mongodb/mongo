@@ -1,0 +1,127 @@
+test_kind: fsm_workload_test
+
+selector:
+  roots:
+    - jstests/concurrency/fsm_workloads/**/*.js
+  exclude_files:
+    # Disabled due to MongoDB restrictions and/or workload restrictions
+
+    # These workloads sometimes trigger 'Could not lock auth data update lock'
+    # errors because the AuthorizationManager currently waits for only five
+    # seconds to acquire the lock for authorization documents
+
+    # uses >100MB of data, which can overwhelm test hosts
+
+    # compact can only be run against a standalone mongod
+
+    # can cause OOM kills on test hosts
+
+    # cannot createIndex after dropDatabase without sharding first
+
+    # The WTWriteConflictException failpoint is not supported on mongos.
+
+    # TODO Undenylist (SERVER-38852).
+
+    # serverStatus does not include transaction metrics on mongos.
+
+    # Uses the same transaction id across different routers, which is not allowed because when either
+    # router tries to commit, it may not know the full participant list.
+
+    ##
+    # Denylists from concurrency_replication_multi_stmt_txn
+    ##
+
+    # Relies on having one thread observe writes from the other threads, which won't become visible
+    # once a transaction in the thread is started because it'll keep reading from the same snapshot.
+    - jstests/concurrency/fsm_workloads/ddl/create_index_background/create_index_background.js
+    - jstests/concurrency/fsm_workloads/ddl/create_index_background/create_index_background_partial_filter.js
+    - jstests/concurrency/fsm_workloads/ddl/create_index_background/create_index_background_wildcard.js
+
+    # Expects reads to die with a particular error, but other errors are possible if the read is part
+    # of a transaction (e.g. ErrorCodes.LockTimeout).
+    - jstests/concurrency/fsm_workloads/query/drop_index_during_replan.js
+    - jstests/concurrency/fsm_workloads/query/drop_index_during_lookup.js
+
+    ##
+    # Denylists specific to this suite.
+    ##
+
+    # Use updates that do not contain the shard key, so they are rejected before any commands are
+    # sent to participant shards, but these workloads do not fail, so the auto retry transaction logic
+    # attempts to commit, which fails because no participants have been contacted.
+    - jstests/concurrency/fsm_workloads/query/update/update_rename.js
+    - jstests/concurrency/fsm_workloads/query/update/update_rename_noindex.js
+
+  exclude_with_any_tags:
+    - requires_standalone
+    - assumes_against_mongod_not_mongos
+    - requires_replication
+    # Snapshot reads in transactions are banned on capped collections.
+    - requires_capped
+    - assumes_balancer_on
+    # Sharing cursors between state functions will fail in this suite because it will attempt to use
+    # the same cursor in multiple transactions.
+    - state_functions_share_cursor
+    # These start a transaction in one state function and use it in other state functions. This suite
+    # would instead execute each state function as its own transaction.
+    - state_functions_share_transaction
+    # Tests which expect commands to fail and catch the error can cause transactions to abort and
+    # retry indefinitely.
+    - catches_command_failures
+    # mongos has no system.profile collection.
+    - requires_profiling
+    - does_not_support_transactions
+    - assumes_unsharded_collection
+    # Time-series collections do not support write transactions
+    - requires_timeseries
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHashInBackground
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+    tests: true
+  config:
+    shell_options:
+      eval: >-
+        await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
+      global_vars:
+        TestData:
+          runInsideTransaction: true
+          runningWithBalancer: false
+          runningWithSessions: true
+          traceExceptions: false
+          implicitlyShardOnCreateCollectionOnly: true
+          internalQueryUnifiedWriteExecutor: true
+  hooks:
+    - class: CheckShardFilteringMetadata
+    - class: CheckReplDBHashInBackground
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: CheckOrphansDeleted
+    - class: CheckRoutingTableConsistency
+    - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
+    - class: CleanupConcurrencyWorkloads
+  fixture:
+    class: ShardedClusterFixture
+    enable_balancer: false
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+        internalQueryUnifiedWriteExecutor: true
+    shard_options:
+      mongod_options:
+        oplogSize: 1024
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        roleGraphInvalidationIsFatal: 1
+        queryAnalysisWriterIntervalSecs: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+        internalQueryUnifiedWriteExecutor: true
+    num_rs_nodes_per_shard: 3
+    num_shards: 2
+    num_mongos: 2

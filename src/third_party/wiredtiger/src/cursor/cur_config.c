@@ -36,13 +36,14 @@ __wt_curconfig_open(
 {
     WT_CURSOR_STATIC_INIT(iface, __wt_cursor_get_key, /* get-key */
       __wt_cursor_get_value,                          /* get-value */
+      __wt_cursor_get_raw_key_value,                  /* get-raw-key-value */
       __wt_cursor_set_key,                            /* set-key */
       __wt_cursor_set_value,                          /* set-value */
-      __wt_cursor_compare_notsup,                     /* compare */
-      __wt_cursor_equals_notsup,                      /* equals */
+      __wti_cursor_compare_notsup,                    /* compare */
+      __wti_cursor_equals_notsup,                     /* equals */
       __wt_cursor_notsup,                             /* next */
       __wt_cursor_notsup,                             /* prev */
-      __wt_cursor_noop,                               /* reset */
+      __wti_cursor_noop,                              /* reset */
       __wt_cursor_notsup,                             /* search */
       __wt_cursor_search_near_notsup,                 /* search-near */
       __wt_cursor_notsup,                             /* insert */
@@ -50,16 +51,18 @@ __wt_curconfig_open(
       __wt_cursor_notsup,                             /* update */
       __wt_cursor_notsup,                             /* remove */
       __wt_cursor_notsup,                             /* reserve */
-      __wt_cursor_reconfigure_notsup,                 /* reconfigure */
+      __wt_cursor_config_notsup,                      /* reconfigure */
       __wt_cursor_notsup,                             /* largest_key */
+      __wt_cursor_config_notsup,                      /* bound */
       __wt_cursor_notsup,                             /* cache */
       __wt_cursor_reopen_notsup,                      /* reopen */
+      __wt_cursor_checkpoint_id,                      /* checkpoint ID */
       __curconfig_close);
     WT_CURSOR_CONFIG *cconfig;
     WT_CURSOR *cursor;
     WT_DECL_RET;
 
-    WT_STATIC_ASSERT(offsetof(WT_CURSOR_CONFIG, iface) == 0);
+    WT_VERIFY_OPAQUE_POINTER(WT_CURSOR_CONFIG);
 
     WT_RET(__wt_calloc_one(session, &cconfig));
     cursor = (WT_CURSOR *)cconfig;

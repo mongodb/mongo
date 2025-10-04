@@ -40,5 +40,10 @@ namespace unittest {
  */
 ConnectionString getFixtureConnectionString();
 
+/**
+ * Determines if the integration test is configured to use gRPC.
+ */
+bool shouldUseGRPCEgress();
+
 }  // namespace unittest
 }  // namespace mongo

@@ -23,10 +23,28 @@ LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 
+#if defined(__FreeBSD__)
+#define SIG_SETMASK 3
+#endif
+
 	.globl _UI_siglongjmp_cont
 	.type _UI_siglongjmp_cont, @function
 _UI_siglongjmp_cont:
+#if defined(__linux__) || defined(__QNX__)
 	retq
+#elif defined(__FreeBSD__)
+	pushq	%rax		/* return address */
+	pushq	%rdx		/* return value */
+	movq	$SIG_SETMASK,%rdi
+	movq	%rcx,%rsi
+	xorq	%rdx,%rdx
+	movq	$340,%rax
+	syscall
+	popq	%rax		/* return value */
+	retq			/* return address on stack */
+#else
+#error Port me
+#endif
 	.size _UI_siglongjmp_cont, . - _UI_siglongjmp_cont
 	/* We do not need executable stack.  */
 	.section	.note.GNU-stack,"",@progbits

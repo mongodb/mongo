@@ -27,15 +27,16 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 #define dwarf_h
 
 #include <libunwind.h>
+#include <stdatomic.h>
 
 struct dwarf_cursor;    /* forward-declaration */
 struct elf_dyn_info;
 
-#include "dwarf-config.h"
-
 #ifdef HAVE_CONFIG_H
 # include "config.h"
 #endif
+
+#include "dwarf-config.h"
 
 #ifndef UNW_REMOTE_ONLY
   #if defined(HAVE_LINK_H)
@@ -44,6 +45,9 @@ struct elf_dyn_info;
     #include <sys/link.h>
   #else
     #error Could not find <link.h>
+  #endif
+  #if defined(__ANDROID__) && defined(__arm__) && __ANDROID_API__ < 21
+    int dl_iterate_phdr(int (*)(struct dl_phdr_info *, size_t, void *), void *);
   #endif
 #endif
 
@@ -227,6 +231,7 @@ typedef enum
     DWARF_WHERE_REG,            /* register saved in another register */
     DWARF_WHERE_EXPR,           /* register saved */
     DWARF_WHERE_VAL_EXPR,       /* register has computed value */
+    DWARF_WHERE_CFA,            /* register is set to the computed cfa value */
   }
 dwarf_where_t;
 
@@ -309,7 +314,7 @@ typedef struct dwarf_cursor
     void *as_arg;               /* argument to address-space callbacks */
     unw_addr_space_t as;        /* reference to per-address-space info */
 
-    unw_word_t cfa;     /* canonical frame address; aka frame-/stack-pointer */
+    unw_word_t cfa;     /* canonical frame address; aka frame-pointer */
     unw_word_t ip;              /* instruction pointer */
     unw_word_t args_size;       /* size of arguments */
     unw_word_t eh_args[UNW_TDEP_NUM_EH_REGS];
@@ -347,7 +352,7 @@ struct dwarf_rs_cache
     /* hash table that maps instruction pointer to rs index: */
     unsigned short *hash;
 
-    uint32_t generation;        /* generation number */
+    _Atomic uint32_t generation;        /* generation number */
 
     /* rs cache: */
     dwarf_reg_state_t *buckets;
@@ -366,6 +371,8 @@ struct unw_debug_frame_list
     /* The start (inclusive) and end (exclusive) of the described region.  */
     unw_word_t start;
     unw_word_t end;
+    /* ELF load offset */
+    unw_word_t load_offset;
     /* The debug frame itself.  */
     char *debug_frame;
     size_t debug_frame_size;
@@ -415,7 +422,7 @@ extern int dwarf_search_unwind_table (unw_addr_space_t as,
                                       int need_unwind_info, void *arg);
 
 extern int dwarf_find_unwind_table (struct elf_dyn_info *edi, unw_addr_space_t as,
-                                    char *path, unw_word_t segbase, unw_word_t mapoff,
+                                    const char *path, unw_word_t segbase, unw_word_t mapoff,
                                     unw_word_t ip);
 extern void dwarf_put_unwind_info (unw_addr_space_t as,
                                    unw_proc_info_t *pi, void *arg);

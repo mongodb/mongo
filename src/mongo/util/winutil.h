@@ -34,14 +34,15 @@
  */
 
 #if defined(_WIN32)
+#include <sstream>
+#include <string>
+
 #include "text.h"
 #include <atlbase.h>
 #include <atlstr.h>
-#include <boost/optional.hpp>
-#include <sstream>
-#include <string>
 #include <windows.h>
 
+#include <boost/optional.hpp>
 #include <mongo/base/status_with.h>
 
 namespace mongo {

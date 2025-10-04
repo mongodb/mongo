@@ -1,0 +1,8 @@
+==== VARIATION: cq=ns=test.collectionTree: $and
+    a $eq 1
+    b $eq 1
+Sort: {}
+Proj: {}
+Collation: { locale: "mock_reverse_string" }
+
+an[eqa,eqb]|||mock_reverse_string02300000|fc

@@ -27,35 +27,41 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/pipeline/accumulator.h"
-
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
+#include "mongo/db/pipeline/accumulator.h"
+#include "mongo/db/pipeline/accumulator_helpers.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
+#include <utility>
+
 
 namespace mongo {
 
-using boost::intrusive_ptr;
-
 /* ------------------------- AccumulatorMergeObjects ----------------------------- */
 
-REGISTER_ACCUMULATOR(
-    mergeObjects, genericParseSBEUnsupportedSingleExpressionAccumulator<AccumulatorMergeObjects>);
-REGISTER_STABLE_EXPRESSION(mergeObjects, ExpressionFromAccumulator<AccumulatorMergeObjects>::parse);
-
-intrusive_ptr<AccumulatorState> AccumulatorMergeObjects::create(ExpressionContext* const expCtx) {
-    return new AccumulatorMergeObjects(expCtx);
+template <>
+Value ExpressionFromAccumulator<AccumulatorMergeObjects>::evaluate(const Document& root,
+                                                                   Variables* variables) const {
+    return evaluateAccumulator(*this, root, variables);
 }
+
+REGISTER_ACCUMULATOR(mergeObjects,
+                     genericParseSingleExpressionAccumulator<AccumulatorMergeObjects>);
+REGISTER_STABLE_EXPRESSION(mergeObjects, ExpressionFromAccumulator<AccumulatorMergeObjects>::parse);
 
 AccumulatorMergeObjects::AccumulatorMergeObjects(ExpressionContext* const expCtx)
     : AccumulatorState(expCtx) {
-    _memUsageBytes = sizeof(*this);
+    _memUsageTracker.set(sizeof(*this));
 }
 
 void AccumulatorMergeObjects::reset() {
-    _memUsageBytes = sizeof(*this);
+    _memUsageTracker.set(sizeof(*this));
     _output.reset();
 }
 
@@ -67,7 +73,7 @@ void AccumulatorMergeObjects::processInternal(const Value& input, bool merging) 
     uassert(40400,
             str::stream() << "$mergeObjects requires object inputs, but input " << input.toString()
                           << " is of type " << typeName(input.getType()),
-            (input.getType() == BSONType::Object));
+            (input.getType() == BSONType::object));
 
     FieldIterator iter = input.getDocument().fieldIterator();
     while (iter.more()) {
@@ -78,7 +84,7 @@ void AccumulatorMergeObjects::processInternal(const Value& input, bool merging) 
 
         _output.setField(pair.first, std::move(pair.second));
     }
-    _memUsageBytes = sizeof(*this) + _output.getApproximateSize();
+    _memUsageTracker.set(sizeof(*this));
 }
 
 Value AccumulatorMergeObjects::getValue(bool toBeMerged) {

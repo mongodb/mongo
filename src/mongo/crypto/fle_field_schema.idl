@@ -1,0 +1,850 @@
+# Copyright (C) 2022-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+
+global:
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/crypto/fle_fields_util.h"
+
+imports:
+    - "mongo/db/basic_types.idl"
+    - "mongo/crypto/encryption_fields.idl"
+    - "mongo/crypto/fle_tokens.idl"
+
+enums:
+    EncryptedBinDataType:
+        description: "Subtypes with an BinData 6, this is the first byte of the payload"
+        type: int
+        values:
+            # FLE 1 Payloads
+            kPlaceholder: 0 # see FLEEncryptionPlaceholder
+            kDeterministic: 1
+            kRandom: 2
+            # FLE 2
+            # FLE 2 Client-side
+            kFLE2Placeholder: 3 # see FLE2EncryptionPlaceholder
+            kFLE2InsertUpdatePayload: 4 # see FLE2InsertUpdatePayload
+            kFLE2FindEqualityPayload: 5 # see FLE2FindEqualityPayload
+
+            # FLE 2 Server-side
+            kFLE2UnindexedEncryptedValue: 6 # see FLE2IndexedEqualityEncryptedValue
+            kFLE2EqualityIndexedValue: 7
+
+            # Transient encrypted data in query rewrites, not persisted
+            # same as BinDataGeneral but redacted
+            kFLE2TransientRaw: 8
+
+            kFLE2RangeIndexedValue: 9 # see FLE2IndexedRangeEncryptedValue
+            kFLE2FindRangePayload: 10 # see FLE2FindRangePayload
+
+            # QE protocol version 2 - client-side payloads
+            kFLE2InsertUpdatePayloadV2: 11
+            kFLE2FindEqualityPayloadV2: 12
+            kFLE2FindRangePayloadV2: 13
+
+            # QE protocol version 2 - server-side payloads
+            kFLE2EqualityIndexedValueV2: 14
+            kFLE2RangeIndexedValueV2: 15
+            kFLE2UnindexedEncryptedValueV2: 16
+            kFLE2TextIndexedValue: 17
+            kFLE2FindTextPayload: 18
+
+    FleVersion:
+        description: "The version / type of field-level encryption in use."
+        type: int
+        values:
+            kFle1: 1
+            kFle2: 2
+
+    FleAlgorithmInt:
+        description:
+            "The algorithm used to encrypt fields for field level encryption represented
+            as an unsigned integer."
+        type: int
+        values:
+            kDeterministic: 1
+            kRandom: 2
+
+    Fle2AlgorithmInt:
+        description:
+            "The algorithm used to encrypt fields for field level encryption represented
+            as an unsigned integer."
+        type: int
+        values:
+            kUnindexed: 1
+            kEquality: 2
+            kRange: 3
+            kTextSearch: 4
+
+    Fle2PlaceholderType:
+        description: "The type of payload to generate from a placeholder"
+        type: int
+        values:
+            kInsert: 1
+            kFind: 2
+
+    Fle2RangeOperator:
+        description: "Enum representing valid range operators that an encrypted payload can be under."
+        type: int
+        values:
+            kGt: 1
+            kGte: 2
+            kLt: 3
+            kLte: 4
+
+types:
+    encrypted_numeric_element:
+        bson_serialization_type:
+            - date
+            - decimal
+            - double
+            - int
+            - long
+        description: A value with any encrypted range numeric BSON type.
+        cpp_type: "mongo::IDLAnyType"
+        serializer: mongo::IDLAnyType::serializeToBSON
+        deserializer: mongo::IDLAnyType::parseFromBSON
+        is_view: true
+
+structs:
+    EncryptionPlaceholder:
+        description:
+            "Implements Encryption BinData (subtype 6) sub-subtype 0, the intent-to-encrypt
+            mapping. Contains a value to encrypt and a description of how it should be encrypted."
+        strict: true
+        fields:
+            a:
+                description: "The encryption algorithm to be used."
+                type: FleAlgorithmInt
+                cpp_name: algorithm
+            ki:
+                description: "Used to query the key vault by _id. If omitted, ka must be specified."
+                type: uuid
+                cpp_name: keyId
+                optional: true
+            ka:
+                description:
+                    "Used to query the key vault by keyAltName. If omitted,
+                    ki must be specified."
+                type: string
+                cpp_name: keyAltName
+                optional: true
+            v:
+                description: "value to encrypt"
+                type: IDLAnyType
+                cpp_name: value
+
+    FLE2EncryptionPlaceholder:
+        description:
+            "Implements Encryption BinData (subtype 6) sub-subtype 3, the intent-to-encrypt
+            mapping. Contains a value to encrypt and a description of how it should be encrypted."
+        strict: true
+        cpp_validator_func: "validateIDLFLE2EncryptionPlaceholder"
+        fields:
+            t:
+                description: "The type number, determines what payload to replace the placeholder with"
+                type: Fle2PlaceholderType
+                cpp_name: type
+            a:
+                description: "The encryption algorithm to be used."
+                type: Fle2AlgorithmInt
+                cpp_name: algorithm
+            ki:
+                description: "IndexKeyId, Used to query the key vault by _id."
+                type: uuid
+                cpp_name: indexKeyId
+            ku:
+                description: "UserKeyId, Used to query the key vault by _id.,
+                    Typically same as IndexKeyId unless explicit encryption is used."
+                type: uuid
+                cpp_name: userKeyId
+            v:
+                description: "value to encrypt"
+                type: IDLAnyType
+                cpp_name: value
+            cm:
+                description: "Queryable Encryption max contention counter"
+                type: long
+                cpp_name: maxContentionCounter
+            s:
+                description: "Queryable Encryption range hypergraph sparsity factor"
+                type: long
+                cpp_name: sparsity
+                optional: true
+                validator: {gte: 1, lte: 8}
+
+    EdgeTokenSetV2:
+        description: "Payload of an indexed field to insert or update. Version 2"
+        strict: true
+        fields:
+            d:
+                description: "EDCDerivedFromDataTokenAndContentionFactorToken"
+                type: EDCDerivedFromDataTokenAndContentionFactorToken
+                cpp_name: edcDerivedToken
+            s:
+                description: "ESCDerivedFromDataTokenAndContentionFactorToken"
+                type: ESCDerivedFromDataTokenAndContentionFactorToken
+                cpp_name: escDerivedToken
+            l:
+                description: "ServerDerivedFromDataToken"
+                type: ServerDerivedFromDataToken
+                cpp_name: serverDerivedFromDataToken
+            p:
+                description: "Encrypted tokens"
+                type: EncryptedStateCollectionTokensV2
+                cpp_name: encryptedTokens
+
+    TextExactTokenSet:
+        description: "Holder for tokens required for exact match text search"
+        strict: true
+        fields:
+            d:
+                description: "EDC derived from data & contention factor token"
+                type: EDCTextExactDerivedFromDataTokenAndContentionFactorToken
+                cpp_name: edcDerivedToken
+            s:
+                description: "ESC derived from data & contention factor token"
+                type: ESCTextExactDerivedFromDataTokenAndContentionFactorToken
+                cpp_name: escDerivedToken
+            l:
+                description: "server derived from data token"
+                type: ServerTextExactDerivedFromDataToken
+                cpp_name: serverDerivedFromDataToken
+            p:
+                description: "encrypted token for compaction"
+                type: EncryptedStateCollectionTokensV2
+                cpp_name: encryptedTokens
+
+    TextSubstringTokenSet:
+        description: "Holder for tokens required for substring text search"
+        strict: true
+        fields:
+            d:
+                description: "EDC derived from data & contention factor token"
+                type: EDCTextSubstringDerivedFromDataTokenAndContentionFactorToken
+                cpp_name: edcDerivedToken
+            s:
+                description: "ESC derived from data & contention factor token"
+                type: ESCTextSubstringDerivedFromDataTokenAndContentionFactorToken
+                cpp_name: escDerivedToken
+            l:
+                description: "server derived from data token"
+                type: ServerTextSubstringDerivedFromDataToken
+                cpp_name: serverDerivedFromDataToken
+            p:
+                description: "encrypted token for compaction"
+                type: EncryptedStateCollectionTokensV2
+                cpp_name: encryptedTokens
+
+    TextSuffixTokenSet:
+        description: "Holder for tokens required for suffix text search"
+        strict: true
+        fields:
+            d:
+                description: "EDC derived from data & contention factor token"
+                type: EDCTextSuffixDerivedFromDataTokenAndContentionFactorToken
+                cpp_name: edcDerivedToken
+            s:
+                description: "ESC derived from data & contention factor token"
+                type: ESCTextSuffixDerivedFromDataTokenAndContentionFactorToken
+                cpp_name: escDerivedToken
+            l:
+                description: "server derived from data token"
+                type: ServerTextSuffixDerivedFromDataToken
+                cpp_name: serverDerivedFromDataToken
+            p:
+                description: "encrypted token for compaction"
+                type: EncryptedStateCollectionTokensV2
+                cpp_name: encryptedTokens
+
+    TextPrefixTokenSet:
+        description: "Holder for tokens required for prefix text search"
+        strict: true
+        fields:
+            d:
+                description: "EDC derived from data & contention factor token"
+                type: EDCTextPrefixDerivedFromDataTokenAndContentionFactorToken
+                cpp_name: edcDerivedToken
+            s:
+                description: "ESC derived from data & contention factor token"
+                type: ESCTextPrefixDerivedFromDataTokenAndContentionFactorToken
+                cpp_name: escDerivedToken
+            l:
+                description: "server derived from data token"
+                type: ServerTextPrefixDerivedFromDataToken
+                cpp_name: serverDerivedFromDataToken
+            p:
+                description: "encrypted token for compaction"
+                type: EncryptedStateCollectionTokensV2
+                cpp_name: encryptedTokens
+
+    TextSearchTokenSets:
+        description: "Holder for tokens of text search indexed encrypted fields"
+        strict: true
+        fields:
+            e:
+                description: "Holds tokens for exact string search"
+                type: TextExactTokenSet
+                cpp_name: exactTokenSet
+            s:
+                description: "Holds tokens for substring search"
+                type: array<TextSubstringTokenSet>
+                cpp_name: substringTokenSets
+            u:
+                description: "Holds tokens for suffix search"
+                type: array<TextSuffixTokenSet>
+                cpp_name: suffixTokenSets
+            p:
+                description: "Holds tokens for prefix search"
+                type: array<TextPrefixTokenSet>
+                cpp_name: prefixTokenSets
+
+    FLE2InsertUpdatePayloadV2:
+        description: "Payload of an indexed field to insert or update. Version 2"
+        strict: true
+        fields:
+            d:
+                description: "EDCDerivedFromDataTokenAndContentionFactorToken"
+                type: EDCDerivedFromDataTokenAndContentionFactorToken
+                cpp_name: edcDerivedToken
+            s:
+                description: "ESCDerivedFromDataTokenAndContentionFactorToken"
+                type: ESCDerivedFromDataTokenAndContentionFactorToken
+                cpp_name: escDerivedToken
+            p:
+                description: "Encrypted tokens"
+                type: EncryptedStateCollectionTokensV2
+                cpp_name: encryptedTokens
+            u:
+                description: "Index KeyId"
+                type: uuid
+                cpp_name: indexKeyId
+            t:
+                description: "Encrypted type"
+                type: safeInt
+                cpp_name: type
+            v:
+                description: "Encrypted value"
+                type: bindata_generic
+                cpp_name: value
+            e:
+                description: "ServerDataEncryptionLevel1Token"
+                type: ServerDataEncryptionLevel1Token
+                cpp_name: serverEncryptionToken
+            l:
+                description: "ServerDerivedFromDataToken"
+                type: ServerDerivedFromDataToken
+                cpp_name: serverDerivedFromDataToken
+            k:
+                description: "Randomly sampled contention factor value"
+                type: long
+                cpp_name: contentionFactor
+                validator: {gte: 0}
+            g:
+                description: "Array of Edges"
+                type: array<EdgeTokenSetV2>
+                cpp_name: edgeTokenSet
+                optional: true
+            b:
+                description: "Contains tokens for encrypted text search"
+                type: TextSearchTokenSets
+                cpp_name: textSearchTokenSets
+                optional: true
+            sp:
+                description: "Queryable Encryption range hypergraph sparsity factor"
+                type: long
+                cpp_name: sparsity
+                optional: true
+                validator: {gte: 1, lte: 8}
+            pn:
+                cpp_name: precision
+                description: "Determines the number of digits after the decimal point for floating point values"
+                type: safeInt
+                optional: true
+                validator: {gte: 0}
+            tf:
+                cpp_name: trimFactor
+                description: "Determines how many levels of the hypergraph to trim"
+                type: safeInt
+                optional: true
+                validator: {gte: 0}
+            mn:
+                cpp_name: indexMin
+                description: "Minimum value for the encrypted index that this query is using."
+                type: encrypted_numeric_element
+                optional: true
+            mx:
+                cpp_name: indexMax
+                description: "Maximum value for the encrypted index that this query is using."
+                type: encrypted_numeric_element
+                optional: true
+
+    FLE2FindEqualityPayloadV2:
+        description: "Payload for an equality find. Version 2"
+        strict: true
+        fields:
+            d:
+                description: "EDCDerivedFromDataToken"
+                type: EDCDerivedFromDataToken
+                cpp_name: edcDerivedToken
+            s:
+                description: "ESCDerivedFromDataToken"
+                type: ESCDerivedFromDataToken
+                cpp_name: escDerivedToken
+            l:
+                description: "ServerDerivedFromDataToken"
+                type: ServerDerivedFromDataToken
+                cpp_name: serverDerivedFromDataToken
+            cm:
+                description: "Queryable Encryption max counter"
+                type: long
+                cpp_name: maxCounter
+                optional: true
+
+    EdgeFindTokenSetV2:
+        description: "Payload of an edge to query for. Version 2"
+        strict: true
+        fields:
+            d:
+                description: "EDCDerivedFromDataToken"
+                type: EDCDerivedFromDataToken
+                cpp_name: edcDerivedToken
+            s:
+                description: "ESCDerivedFromDataToken"
+                type: ESCDerivedFromDataToken
+                cpp_name: escDerivedToken
+            l:
+                description: "ServerDerivedFromDataToken"
+                type: ServerDerivedFromDataToken
+                cpp_name: serverDerivedFromDataToken
+
+    FLE2FindRangePayloadEdgesInfoV2:
+        description: "Token information for find range payload."
+        strict: true
+        fields:
+            g:
+                description: "Array of Edges"
+                type: array<EdgeFindTokenSetV2>
+                cpp_name: edges
+            cm:
+                description: "Queryable Encryption max counter"
+                type: long
+                cpp_name: maxCounter
+
+    FLE2FindRangePayloadV2:
+        description: "Payload for a range find. Version 2"
+        strict: true
+        fields:
+            payload:
+                description: "Token information for a find range payload"
+                type: FLE2FindRangePayloadEdgesInfoV2
+                optional: true
+            payloadId:
+                description: "Id of payload - must be paired with another payload"
+                type: safeInt
+                optional: false
+            firstOperator:
+                description: "First query operator for which this payload was generated."
+                type: Fle2RangeOperator
+                optional: false
+            secondOperator:
+                description: "Second query operator for which this payload was generated. Only populated for two-sided ranges."
+                type: Fle2RangeOperator
+                optional: true
+            sp:
+                description: "Queryable Encryption range hypergraph sparsity factor"
+                type: long
+                cpp_name: sparsity
+                optional: true
+                validator: {gte: 1, lte: 8}
+            pn:
+                cpp_name: precision
+                description: "Determines the number of digits after the decimal point for floating point values"
+                type: safeInt
+                optional: true
+                validator: {gte: 0}
+            tf:
+                cpp_name: trimFactor
+                description: "Determines how many levels of the hypergraph to trim"
+                type: safeInt
+                optional: true
+                validator: {gte: 0}
+            mn:
+                cpp_name: indexMin
+                description: "Minimum value for the encrypted index that this query is using."
+                type: encrypted_numeric_element
+                optional: true
+            mx:
+                cpp_name: indexMax
+                description: "Maximum value for the encrypted index that this query is using."
+                type: encrypted_numeric_element
+                optional: true
+
+    EncryptionInformation:
+        description: "Implements Encryption Information which includes the schema for Queryable Encryption that is consumed by query_analysis, queries and write_ops"
+        strict: true
+        fields:
+            type:
+                description: "The version number"
+                type: safeInt
+                default: 1
+                stability: unstable
+            schema:
+                description: "A map of NamespaceString to EncryptedFieldConfig"
+                type: object_owned
+                stability: unstable
+            crudProcessed:
+                description: "A boolean to indicate whether the CRUD layer has already processed this Queryable Encryption request. Used to prevent infinite recursion."
+                type: bool
+                optional: true
+                stability: unstable
+
+    EncryptionSchemaCSFLE:
+        description: "Implements Encryption Schema for CSFLE."
+        strict: true
+        fields:
+            jsonSchema:
+                description: "Object containing json schema specification."
+                type: object_owned
+                stability: unstable
+            isRemoteSchema:
+                description: "Boolean field indicating whether the schema was fetched from the server ahead of being sent to query analysis."
+                type: bool
+                optional: false
+                stability: unstable
+
+    ecocDocument:
+        description: "This represents a document stored in an encrypted compaction collection."
+        strict: true
+        fields:
+            _id:
+                description: "Random id"
+                type: objectid
+            fieldName:
+                description: "Name of field"
+                type: string
+            value:
+                description: "Encrypted value"
+                type: EncryptedStateCollectionTokensV2
+
+    FLE2RangeFindSpecEdgesInfo:
+        description: "Edges Information for FLE2 Range Spec"
+        strict: true
+        fields:
+            lowerBound:
+                description: "The lower bound for an encrypted range query."
+                type: IDLAnyType
+            lbIncluded:
+                description: "Indicates if the lower bound should be included in the range."
+                type: bool
+            upperBound:
+                description: "The upper bound for an encrypted range query."
+                type: IDLAnyType
+            ubIncluded:
+                description: "Indicates if the upper bound should be included in the range."
+                type: bool
+            precision:
+                description: "Determines the number of digits after the decimal point for floating point values"
+                type: safeInt
+                optional: true
+                validator: {gte: 0}
+            trimFactor:
+                description: "Determines how many levels of the hypergraph to trim"
+                type: safeInt
+                optional: true
+                validator: {gte: 0}
+            indexMin:
+                description: "Minimum value for the encrypted index that this query is using."
+                type: encrypted_numeric_element
+            indexMax:
+                description: "Maximum value for the encrypted index that this query is using."
+                type: encrypted_numeric_element
+
+    FLE2RangeFindSpec:
+        description: "Range find specification that is encoded inside of a FLE2EncryptionPlaceholder."
+        strict: true
+        cpp_validator_func: "validateIDLFLE2RangeFindSpec"
+        fields:
+            edgesInfo:
+                description: "Information about the edges in an FLE2 find payload."
+                type: FLE2RangeFindSpecEdgesInfo
+                optional: true
+            payloadId:
+                description: "Id of payload - must be paired with another payload"
+                type: safeInt
+                optional: false
+            firstOperator:
+                description: "First query operator for which this payload was generated."
+                type: Fle2RangeOperator
+                optional: false
+            secondOperator:
+                description: "Second query operator for which this payload was generated. Only populated for two-sided ranges."
+                type: Fle2RangeOperator
+                optional: true
+
+    FLE2RangeInsertSpec:
+        description: "Range insert specification that is encoded inside of a FLE2EncryptionPlaceholder."
+        strict: true
+        cpp_validator_func: "validateIDLFLE2RangeInsertSpec"
+        fields:
+            v:
+                description: "Value to encrypt"
+                type: encrypted_numeric_element
+                cpp_name: value
+            min:
+                description: "Queryable Encryption min bound for range"
+                type: encrypted_numeric_element
+                optional: true
+                cpp_name: minBound
+            max:
+                description: "Queryable Encryption max bound for range"
+                type: encrypted_numeric_element
+                optional: true
+                cpp_name: maxBound
+            precision:
+                description: "Determines the number of digits after the decimal point for floating point values"
+                type: safeInt
+                optional: true
+                validator: {gte: 0}
+            trimFactor:
+                description: "Determines how many levels of the hypergraph to trim"
+                type: safeInt
+                optional: true
+                validator: {gte: 0}
+
+    FLE2SubstringInsertSpec:
+        description: "Holds parameters applicable to substring indexed fields."
+        strict: true
+        fields:
+            mlen:
+                description: "max substring code point length to be indexed"
+                type: safeInt
+                validator: {gt: 0}
+                cpp_name: maxLength
+            ub:
+                description: "upper bound code point length of valid substring queries"
+                type: safeInt
+                validator: {gt: 0}
+                cpp_name: maxQueryLength
+            lb:
+                description: "lower bound code point length of valid substring queries"
+                type: safeInt
+                validator: {gt: 0}
+                cpp_name: minQueryLength
+
+    FLE2SuffixInsertSpec:
+        description: "Holds parameters applicable to suffix indexed fields."
+        strict: true
+        fields:
+            ub:
+                description: "upper bound code point length of valid suffix queries"
+                type: safeInt
+                validator: {gt: 0}
+                cpp_name: maxQueryLength
+            lb:
+                description: "lower bound length of valid suffix queries"
+                type: safeInt
+                validator: {gt: 0}
+                cpp_name: minQueryLength
+
+    FLE2PrefixInsertSpec:
+        description: "Holds parameters applicable to prefix indexed fields."
+        strict: true
+        fields:
+            ub:
+                description: "upper bound code point length of valid prefix queries"
+                type: safeInt
+                validator: {gt: 0}
+                cpp_name: maxQueryLength
+            lb:
+                description: "lower bound code point length of valid prefix queries"
+                type: safeInt
+                validator: {gt: 0}
+                cpp_name: minQueryLength
+
+    FLE2TextSearchInsertSpec:
+        description: "Text search struct that is encoded inside of a FLE2EncryptionPlaceholder."
+        strict: true
+        cpp_validator_func: "validateIDLFLE2TextSearchInsertSpec"
+        fields:
+            v:
+                description: "value to encrypt"
+                type: string
+                cpp_name: value
+            casef:
+                description: "case folding enabled?"
+                type: bool
+                cpp_name: caseFold
+            diacf:
+                description: "diacritic folding enabled?"
+                type: bool
+                cpp_name: diacriticFold
+            substr:
+                description: "parameters for substring indexing"
+                type: FLE2SubstringInsertSpec
+                optional: true
+                cpp_name: substringSpec
+            suffix:
+                description: "parameters for suffix indexing"
+                type: FLE2SuffixInsertSpec
+                optional: true
+                cpp_name: suffixSpec
+            prefix:
+                description: "parameters for prefix indexing"
+                type: FLE2PrefixInsertSpec
+                optional: true
+                cpp_name: prefixSpec
+
+    TextExactFindTokenSet:
+        description: "Holder for tokens required for exact match text search"
+        strict: true
+        fields:
+            d:
+                description: "EDC derived from data token"
+                type: EDCTextExactDerivedFromDataToken
+                cpp_name: edcDerivedToken
+            s:
+                description: "ESC derived from data token"
+                type: ESCTextExactDerivedFromDataToken
+                cpp_name: escDerivedToken
+            l:
+                description: "server derived from data token"
+                type: ServerTextExactDerivedFromDataToken
+                cpp_name: serverDerivedToken
+
+    TextSubstringFindTokenSet:
+        description: "Holder for tokens required for substring search"
+        strict: true
+        fields:
+            d:
+                description: "EDC derived from data token"
+                type: EDCTextSubstringDerivedFromDataToken
+                cpp_name: edcDerivedToken
+            s:
+                description: "ESC derived from data token"
+                type: ESCTextSubstringDerivedFromDataToken
+                cpp_name: escDerivedToken
+            l:
+                description: "server derived from data token"
+                type: ServerTextSubstringDerivedFromDataToken
+                cpp_name: serverDerivedToken
+
+    TextSuffixFindTokenSet:
+        description: "Holder for tokens required for suffix search"
+        strict: true
+        fields:
+            d:
+                description: "EDC derived from data token"
+                type: EDCTextSuffixDerivedFromDataToken
+                cpp_name: edcDerivedToken
+            s:
+                description: "ESC derived from data token"
+                type: ESCTextSuffixDerivedFromDataToken
+                cpp_name: escDerivedToken
+            l:
+                description: "server derived from data token"
+                type: ServerTextSuffixDerivedFromDataToken
+                cpp_name: serverDerivedToken
+
+    TextPrefixFindTokenSet:
+        description: "Holder for tokens required for prefix search"
+        strict: true
+        fields:
+            d:
+                description: "EDC derived from data token"
+                type: EDCTextPrefixDerivedFromDataToken
+                cpp_name: edcDerivedToken
+            s:
+                description: "ESC derived from data token"
+                type: ESCTextPrefixDerivedFromDataToken
+                cpp_name: escDerivedToken
+            l:
+                description: "server derived from data token"
+                type: ServerTextPrefixDerivedFromDataToken
+                cpp_name: serverDerivedToken
+
+    TextSearchFindTokenSets:
+        description: "Holds token sets needed for substring/suffix/prefix/exact search"
+        strict: true
+        fields:
+            e:
+                description: "Token sets for exact string search"
+                type: TextExactFindTokenSet
+                optional: true
+                cpp_name: exactTokens
+            s:
+                description: "Token set for substring search"
+                type: TextSubstringFindTokenSet
+                optional: true
+                cpp_name: substringTokens
+            u:
+                description: "Token set for suffix search"
+                type: TextSuffixFindTokenSet
+                optional: true
+                cpp_name: suffixTokens
+            p:
+                description: "Token set for prefix search"
+                type: TextPrefixFindTokenSet
+                optional: true
+                cpp_name: prefixTokens
+
+    FLE2FindTextPayload:
+        description: "Payload for a substring/suffix/prefix find"
+        strict: true
+        cpp_validator_func: "validateIDLFLE2FindTextPayload"
+        fields:
+            ts:
+                description: "The token set needed for substring/suffix/prefix/exact search"
+                type: TextSearchFindTokenSets
+                cpp_name: tokenSets
+            cm:
+                description: "Queryable Encryption max counter"
+                type: long
+                cpp_name: maxCounter
+            cf:
+                description: "case folding enabled?"
+                type: bool
+                cpp_name: caseFold
+            df:
+                description: "diacritic folding enabled?"
+                type: bool
+                cpp_name: diacriticFold
+            ss:
+                description: "parameters for substring indexing"
+                type: FLE2SubstringInsertSpec
+                optional: true
+                cpp_name: substringSpec
+            fs:
+                description: "parameters for suffix indexing"
+                type: FLE2SuffixInsertSpec
+                optional: true
+                cpp_name: suffixSpec
+            ps:
+                description: "parameters for prefix indexing"
+                type: FLE2PrefixInsertSpec
+                optional: true
+                cpp_name: prefixSpec

@@ -27,19 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <boost/intrusive_ptr.hpp>
-#include <iostream>
-#include <map>
-#include <memory>
-#include <vector>
-
 #include "mongo/base/string_data.h"
-#include "mongo/db/json.h"
+#include "mongo/bson/json.h"
+#include "mongo/bson/oid.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/matcher/expression_with_placeholder.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/update/update_driver.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/intrusive_counter.h"
+
+#include <map>
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace mongo {
 namespace {
@@ -60,19 +64,21 @@ auto updateRoundTrip(const char* json, const std::vector<std::string> filterName
                          mongo::JsonStringFormat::LegacyStrict);
 }
 
+void assertRoundTrip(const char* expr, SourceLocation loc = MONGO_SOURCE_LOCATION()) {
+    ASSERT_EQ(updateRoundTrip(expr), expr) << fmt::format("[From {}]", loc);
+}
+
 TEST(UpdateSerialization, DocumentReplacementSerializesExactly) {
-    ASSERT_IDENTITY(R"({})", updateRoundTrip);
-    ASSERT_IDENTITY(R"({ "a" : 23 })", updateRoundTrip);
-    ASSERT_IDENTITY(R"({ "a" : 23, "b" : false, "c" : "JSON!" })", updateRoundTrip);
-    ASSERT_IDENTITY(R"({ "a" : [ 1, 2, { "three" : 3 } ] })", updateRoundTrip);
-    ASSERT_IDENTITY(R"({ "a" : [], "b" : {}, "c" : null })", updateRoundTrip);
+    assertRoundTrip(R"({})");
+    assertRoundTrip(R"({ "a" : 23 })");
+    assertRoundTrip(R"({ "a" : 23, "b" : false, "c" : "JSON!" })");
+    assertRoundTrip(R"({ "a" : [ 1, 2, { "three" : 3 } ] })");
+    assertRoundTrip(R"({ "a" : [], "b" : {}, "c" : null })");
 }
 
 TEST(UpdateSerialization, CurrentDateSerializesWithAddedVerbosity) {
-    ASSERT_IDENTITY(R"({ "$currentDate" : { "whattimeisit" : { "$type" : "timestamp" } } })",
-                    updateRoundTrip);
-    ASSERT_IDENTITY(R"({ "$currentDate" : { "whatyearisit" : { "$type" : "date" } } })",
-                    updateRoundTrip);
+    assertRoundTrip(R"({ "$currentDate" : { "whattimeisit" : { "$type" : "timestamp" } } })");
+    assertRoundTrip(R"({ "$currentDate" : { "whatyearisit" : { "$type" : "date" } } })");
     ASSERT_EQ(R"({ "$currentDate" : { "whattimeisit" : { "$type" : "timestamp" }, )"
               R"("whatyearisit" : { "$type" : "date" } } })",
               updateRoundTrip(R"({ "$currentDate" : { "whattimeisit" : { "$type" : "timestamp" }, )"
@@ -80,37 +86,33 @@ TEST(UpdateSerialization, CurrentDateSerializesWithAddedVerbosity) {
 }
 
 TEST(UpdateSerialization, IncrementSerializesExactly) {
-    ASSERT_IDENTITY(R"({ "$inc" : { "in.cor.per.ated" : 2147483647, "invisible" : -2 } })",
-                    updateRoundTrip);
+    assertRoundTrip(R"({ "$inc" : { "in.cor.per.ated" : 2147483647, "invisible" : -2 } })");
 }
 
 TEST(UpdateSerialization, MinimumSerializesExactly) {
-    auto myTrip = [](std::string foo) { return updateRoundTrip(foo.c_str()); };
-    ASSERT_IDENTITY(R"({ "$min" : { "e" : 2, "i" : -2 } })", myTrip);
+    std::string input = R"({ "$min" : { "e" : 2, "i" : -2 } })";
+    ASSERT_EQ(updateRoundTrip(input.c_str()), input);
 }
 
 TEST(UpdateSerialization, MaximumSerializesExactly) {
-    ASSERT_IDENTITY(R"({ "$max" : { "slacks" : 782, "tracks" : -2147483648, "x.y.z" : 0 } })",
-                    updateRoundTrip);
+    assertRoundTrip(R"({ "$max" : { "slacks" : 782, "tracks" : -2147483648, "x.y.z" : 0 } })");
 }
 
 TEST(UpdateSerialization, MultiplySerializesExactly) {
-    ASSERT_IDENTITY(R"({ "$mul" : { "e" : 2.71828, "pi" : 3.14 } })", updateRoundTrip);
+    assertRoundTrip(R"({ "$mul" : { "e" : 2.71828, "pi" : 3.14 } })");
 }
 
 TEST(UpdateSerialization, RenameSerializesExactly) {
-    ASSERT_IDENTITY(R"({ "$rename" : { "name.first" : "name.fname" } })", updateRoundTrip);
+    assertRoundTrip(R"({ "$rename" : { "name.first" : "name.fname" } })");
 }
 
 TEST(UpdateSerialization, SetSerializesExactly) {
-    ASSERT_IDENTITY(R"({ "$set" : { "a.ba.ba.45.foo" : [ null, false, NaN ] } })", updateRoundTrip);
-    ASSERT_IDENTITY(R"({ "$set" : { "a.b" : 1, "a.c" : 2, "a.d.e" : 3, "a.d.f" : 4 } })",
-                    updateRoundTrip);
+    assertRoundTrip(R"({ "$set" : { "a.ba.ba.45.foo" : [ null, false, NaN ] } })");
+    assertRoundTrip(R"({ "$set" : { "a.b" : 1, "a.c" : 2, "a.d.e" : 3, "a.d.f" : 4 } })");
 }
 
 TEST(UpdateSerialization, SetOnInsertSerializesExactly) {
-    ASSERT_IDENTITY(R"({ "$setOnInsert" : { "a.b.c.24" : 1, "a.b.c.d.e.24" : 2 } })",
-                    updateRoundTrip);
+    assertRoundTrip(R"({ "$setOnInsert" : { "a.b.c.24" : 1, "a.b.c.d.e.24" : 2 } })");
 }
 
 TEST(UpdateSerialization, UnsetSerializesWhileDiscardingMeaninglessPayload) {
@@ -119,15 +121,15 @@ TEST(UpdateSerialization, UnsetSerializesWhileDiscardingMeaninglessPayload) {
 }
 
 TEST(UpdateSerialization, DollarPathsSerializesExactly) {
-    ASSERT_IDENTITY(R"({ "$set" : { "grades.$" : 82 } })", updateRoundTrip);
-    ASSERT_IDENTITY(R"({ "$set" : { "grades.$.std" : 6 } })", updateRoundTrip);
+    assertRoundTrip(R"({ "$set" : { "grades.$" : 82 } })");
+    assertRoundTrip(R"({ "$set" : { "grades.$.std" : 6 } })");
 }
 
 TEST(UpdateSerialization, DollarBracketsSerializesExactly) {
-    ASSERT_IDENTITY(R"({ "$set" : { "grades.$[]" : 82 } })", updateRoundTrip);
-    ASSERT_IDENTITY(R"({ "$set" : { "grades.$[].std" : 6 } })", updateRoundTrip);
-    ASSERT_IDENTITY(R"({ "$set" : { "grades.$[].questions.$[]" : 2 } })", updateRoundTrip);
-    ASSERT_IDENTITY(R"({ "$set" : { "grades.$[].questions.$[].first" : 8 } })", updateRoundTrip);
+    assertRoundTrip(R"({ "$set" : { "grades.$[]" : 82 } })");
+    assertRoundTrip(R"({ "$set" : { "grades.$[].std" : 6 } })");
+    assertRoundTrip(R"({ "$set" : { "grades.$[].questions.$[]" : 2 } })");
+    assertRoundTrip(R"({ "$set" : { "grades.$[].questions.$[].first" : 8 } })");
 }
 
 TEST(UpdateSerialization, DollarBracketsArrayFilterSerializesExactly) {
@@ -145,41 +147,38 @@ TEST(UpdateSerialization, DollarBracketsArrayFilterSerializesExactly) {
 }
 
 TEST(UpdateSerialization, AddToSetSerializesWithReducedVerbosity) {
-    ASSERT_IDENTITY(R"({ "$addToSet" : { "stitch.lib" : "cool" } })", updateRoundTrip);
-    ASSERT_IDENTITY(R"({ "$addToSet" : { "stitch.lib" : { "$each" : [ "cool", "sweet" ] } } })",
-                    updateRoundTrip);
-    ASSERT_IDENTITY(R"({ "$addToSet" : { "stitch.lib" : { "$each" : [] } } })", updateRoundTrip);
+    assertRoundTrip(R"({ "$addToSet" : { "stitch.lib" : "cool" } })");
+    assertRoundTrip(R"({ "$addToSet" : { "stitch.lib" : { "$each" : [ "cool", "sweet" ] } } })");
+    assertRoundTrip(R"({ "$addToSet" : { "stitch.lib" : { "$each" : [] } } })");
     ASSERT_EQ(R"({ "$addToSet" : { "stitch.lib" : "cool" } })",
               updateRoundTrip(R"({ "$addToSet" : { "stitch.lib" : { "$each" : [ "cool" ] } } })"));
 }
 
 TEST(UpdateSerialization, PopSerializesExactly) {
-    ASSERT_IDENTITY(R"({ "$pop" : { "p.0.p" : 1 } })", updateRoundTrip);
-    ASSERT_IDENTITY(R"({ "$pop" : { "p.0.p" : -1 } })", updateRoundTrip);
+    assertRoundTrip(R"({ "$pop" : { "p.0.p" : 1 } })");
+    assertRoundTrip(R"({ "$pop" : { "p.0.p" : -1 } })");
 }
 
 TEST(UpdateSerialization, PullUpdateLanguageSerializesExactlyFindLanguageChanges) {
     // This exercises PullNode::ObjectMatcher.
-    ASSERT_IDENTITY(
-        R"({ "$pull" : { "up" : { "push" : "down", "lucky numbers" : [ 1, 4, 7, 82 ] } } })",
-        updateRoundTrip);
+    assertRoundTrip(
+        R"({ "$pull" : { "up" : { "push" : "down", "lucky numbers" : [ 1, 4, 7, 82 ] } } })");
     // These exercise PullNode::WrappedObjectMatcher.
-    ASSERT_IDENTITY(R"({ "$pull" : { "up.num" : { "$gt" : 12 } } })", updateRoundTrip);
-    ASSERT_IDENTITY(R"({ "$pull" : { "up.num" : { "$in" : [ 12, 13, 14 ] } } })", updateRoundTrip);
-    ASSERT_IDENTITY(R"({ "$pull" : { "foo" : { "bar" : { "$gt" : 3 } } } })", updateRoundTrip);
+    assertRoundTrip(R"({ "$pull" : { "up.num" : { "$gt" : 12 } } })");
+    assertRoundTrip(R"({ "$pull" : { "up.num" : { "$in" : [ 12, 13, 14 ] } } })");
+    assertRoundTrip(R"({ "$pull" : { "foo" : { "bar" : { "$gt" : 3 } } } })");
     ASSERT_EQ(R"({ "$pull" : { "where.to.begin" : { "$regex" : "^thestart", "$options" : "" } } })",
               updateRoundTrip(R"({ "$pull" : { "where.to.begin" : /^thestart/ } })"));
     // These exercise PullNode::EqualityMatcher.
-    ASSERT_IDENTITY(R"({ "$pull" : { "up.num" : 12 } })", updateRoundTrip);
-    ASSERT_IDENTITY(R"({ "$pull" : { "up.num" : [ 12, 13, 14 ] } })", updateRoundTrip);
+    assertRoundTrip(R"({ "$pull" : { "up.num" : 12 } })");
+    assertRoundTrip(R"({ "$pull" : { "up.num" : [ 12, 13, 14 ] } })");
 }
 
 TEST(UpdateSerialization, PushSerializesWithAddedVerbosity) {
     ASSERT_EQ(R"({ "$push" : { "up.num" : { "$each" : [ 12 ] } } })",
               updateRoundTrip(R"({ "$push" : { "up.num" : 12 } })"));
-    ASSERT_IDENTITY(R"({ "$push" : { "up.num" : { "$each" : [ 12 ] } } })", updateRoundTrip);
-    ASSERT_IDENTITY(R"({ "$push" : { "up.num" : { "$each" : [ 12, 13, 14 ] } } })",
-                    updateRoundTrip);
+    assertRoundTrip(R"({ "$push" : { "up.num" : { "$each" : [ 12 ] } } })");
+    assertRoundTrip(R"({ "$push" : { "up.num" : { "$each" : [ 12, 13, 14 ] } } })");
 
     ASSERT_EQ(
         R"({ "$push" : { "up.num" : { "$each" : [], "$slice" : { "$numberLong" : "3" } } } })",
@@ -192,13 +191,11 @@ TEST(UpdateSerialization, PushSerializesWithAddedVerbosity) {
             R"({ "$push" : { "up.num" : { "$each" : [ 12, 13, 14 ] , "$position" : 3 } } })"));
 
     // This coveres cases where $each contains non-object elements.
-    ASSERT_IDENTITY(R"({ "$push" : { "up.num" : { "$each" : [ 12, 13, 14 ], "$sort" : 1 } } })",
-                    updateRoundTrip);
+    assertRoundTrip(R"({ "$push" : { "up.num" : { "$each" : [ 12, 13, 14 ], "$sort" : 1 } } })");
     // This coveres cases where $each contains object elements.
-    ASSERT_IDENTITY(R"({ "$push" : { "up.num" : { )"
+    assertRoundTrip(R"({ "$push" : { "up.num" : { )"
                     R"("$each" : [ { "field" : 12 }, { "field" : 13 } ], )"
-                    R"("$sort" : { "field" : 1 } } } })",
-                    updateRoundTrip);
+                    R"("$sort" : { "field" : 1 } } } })");
 
     ASSERT_EQ(
         R"({ "$push" : { "up.num" : { "$each" : [ 12, 13, 14 ], )"
@@ -210,42 +207,37 @@ TEST(UpdateSerialization, PushSerializesWithAddedVerbosity) {
 }
 
 TEST(UpdateSerialization, PullAllSerializesExactly) {
-    ASSERT_IDENTITY(R"({ "$pullAll" : { "no stuff" : [] } })", updateRoundTrip);
-    ASSERT_IDENTITY(
-        R"({ "$pullAll" : { "up" : [ { "push" : "down", "lucky numbers" : [ 1, 4, 7, 82 ] } ] } })",
-        updateRoundTrip);
-    ASSERT_IDENTITY(R"({ "$pullAll" : { "stuff" : [ 14, false, null ] } })", updateRoundTrip);
+    assertRoundTrip(R"({ "$pullAll" : { "no stuff" : [] } })");
+    assertRoundTrip(
+        R"({ "$pullAll" : { "up" : [ { "push" : "down", "lucky numbers" : [ 1, 4, 7, 82 ] } ] } })");
+    assertRoundTrip(R"({ "$pullAll" : { "stuff" : [ 14, false, null ] } })");
 }
 
 TEST(UpdateSerialization, BitSerializesExactly) {
-    ASSERT_IDENTITY(R"({ "$bit" : { "bitwise" : { "and" : 7 } } })", updateRoundTrip);
-    ASSERT_IDENTITY(
-        R"({ "$bit" : { "bitwise" : { "and" : 7 }, "unwise" : { "or" : 63, "xor" : 255 } } })",
-        updateRoundTrip);
+    assertRoundTrip(R"({ "$bit" : { "bitwise" : { "and" : 7 } } })");
+    assertRoundTrip(
+        R"({ "$bit" : { "bitwise" : { "and" : 7 }, "unwise" : { "or" : 63, "xor" : 255 } } })");
 }
 
 TEST(UpdateSerialization, CompoundStatementsSerialize) {
-    ASSERT_IDENTITY(R"({ "$inc" : { "in.cor.per.ated" : 2147483647, "invisible" : -2 }, )"
+    assertRoundTrip(R"({ "$inc" : { "in.cor.per.ated" : 2147483647, "invisible" : -2 }, )"
                     R"("$max" : { "pi" : 3.14 }, )"
                     R"("$mul" : { "e" : 2, "i" : -2 }, )"
                     R"("$rename" : { "name.first" : "name.fname" }, )"
-                    R"("$set" : { "a.ba.ba.45.$" : [ null, false, NaN ] } })",
-                    updateRoundTrip);
+                    R"("$set" : { "a.ba.ba.45.$" : [ null, false, NaN ] } })");
 
-    ASSERT_IDENTITY(
+    assertRoundTrip(
         R"({ "$addToSet" : { "stitch.lib" : { "$each" : [ "cool", "sweet" ] } }, )"
         R"("$pop" : { "p.0.p" : 1 }, )"
         R"("$pull" : { "up" : { "push" : "down", "lucky numbers" : [ 1, 4, 7, 82 ] } }, )"
         R"("$pullAll" : { "no stuff" : [] }, )"
-        R"("$set" : { "grades.$[].questions.$[]" : 2 } })",
-        updateRoundTrip);
+        R"("$set" : { "grades.$[].questions.$[]" : 2 } })");
 
-    ASSERT_IDENTITY(R"({ "$bit" : { "bitwise" : { "and" : 7 } }, )"
+    assertRoundTrip(R"({ "$bit" : { "bitwise" : { "and" : 7 } }, )"
                     R"("$currentDate" : { "whattimeisit" : { "$type" : "timestamp" } }, )"
                     R"("$min" : { "slacks" : 782, "tracks" : -2147483648, "x.y.z" : 0 }, )"
                     R"("$setOnInsert" : { "a.b.c.24" : 1, "a.b.c.d.e.24" : 2 }, )"
-                    R"("$unset" : { "a.0.1.foo" : 1 } })",
-                    updateRoundTrip);
+                    R"("$unset" : { "a.0.1.foo" : 1 } })");
 }
 
 }  // namespace

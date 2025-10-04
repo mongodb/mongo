@@ -1,0 +1,14 @@
+{
+    "configure-args": "--enable-project=js --target=wasm32-unknown-wasi --disable-stdcxx-compat --without-system-zlib --without-intl-api --disable-jit --disable-shared-js --disable-shared-memory --disable-tests --disable-clang-plugin --disable-debug-symbols --enable-jitspew --enable-portable-baseline-interp --enable-portable-baseline-interp-force",
+    "optimize": true,
+    "debug": false,
+    "nspr": false,
+    "compiler": "clang",
+    "env": {
+        "JITTEST_EXTRA_ARGS": "--jitflags=none"
+    },
+    "skip-tests": {
+        "all": ["jstests", "jittest", "jsapitests"]
+    },
+    "use_minidump": false
+}

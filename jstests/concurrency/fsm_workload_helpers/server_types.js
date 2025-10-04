@@ -1,20 +1,18 @@
-'use strict';
-
 /**
  * Returns true if the process is a mongos, and false otherwise.
  *
  */
-function isMongos(db) {
+export function isMongos(db) {
     // Run isMaster directly on the database's session's client to bypass any session machinery.
-    const res = assert.commandWorked(db.getSession().getClient().adminCommand('ismaster'));
-    return 'isdbgrid' === res.msg;
+    const res = assert.commandWorked(db.getSession().getClient().adminCommand("ismaster"));
+    return "isdbgrid" === res.msg;
 }
 
 /**
  * Returns true if the process is a mongod, and false otherwise.
  *
  */
-function isMongod(db) {
+export function isMongod(db) {
     return !isMongos(db);
 }
 
@@ -22,14 +20,28 @@ function isMongod(db) {
  * Returns true if the process is a mongod configsvr, and false otherwise.
  *
  */
-function isMongodConfigsvr(db) {
+export function isMongodConfigsvr(db) {
     if (!isMongod(db)) {
         return false;
     }
-    var res = db.adminCommand('getCmdLineOpts');
+    let res = db.adminCommand("getCmdLineOpts");
     assert.commandWorked(res);
 
-    return res.parsed && res.parsed.sharding && res.parsed.sharding.clusterRole === 'configsvr';
+    return res.parsed && res.parsed.sharding && res.parsed.sharding.clusterRole === "configsvr";
+}
+
+/**
+ * Returns true if the process is a mongod and is part of a sharded cluster (either a config server,
+ * a shard, or both)
+ */
+export function isClusterNode(db) {
+    if (!isMongod(db)) {
+        return false;
+    }
+    let res = db.adminCommand("getCmdLineOpts");
+    assert.commandWorked(res);
+
+    return res.parsed && res.parsed.hasOwnProperty("sharding");
 }
 
 /**
@@ -37,13 +49,12 @@ function isMongodConfigsvr(db) {
  *
  * Throws an error if db is connected to a mongos, or if there is no reported storage engine.
  */
-function getStorageEngineName(db) {
-    var status = db.serverStatus();
+export function getStorageEngineName(db) {
+    let status = db.serverStatus();
     assert.commandWorked(status);
 
-    assert(isMongod(db), 'no storage engine is reported when connected to mongos');
-    assert.neq(
-        'undefined', typeof status.storageEngine, 'missing storage engine info in server status');
+    assert(isMongod(db), "no storage engine is reported when connected to mongos");
+    assert.neq("undefined", typeof status.storageEngine, "missing storage engine info in server status");
 
     return status.storageEngine.name;
 }
@@ -51,23 +62,16 @@ function getStorageEngineName(db) {
 /**
  * Returns true if the current storage engine is wiredTiger, and false otherwise.
  */
-function isWiredTiger(db) {
-    return getStorageEngineName(db) === 'wiredTiger';
-}
-
-/**
- * Returns true if the current storage engine is ephemeralForTest, and false otherwise.
- */
-function isEphemeralForTest(db) {
-    return getStorageEngineName(db) === 'ephemeralForTest';
+export function isWiredTiger(db) {
+    return getStorageEngineName(db) === "wiredTiger";
 }
 
 /**
  * Returns true if the current storage engine is ephemeral, and false otherwise.
  */
-function isEphemeral(db) {
-    var engine = getStorageEngineName(db);
-    return (engine === 'inMemory') || (engine === 'ephemeralForTest');
+export function isEphemeral(db) {
+    let engine = getStorageEngineName(db);
+    return engine === "inMemory";
 }
 
 /**
@@ -75,13 +79,12 @@ function isEphemeral(db) {
  *
  * Throws an error if db is connected to a mongos, or if there is no reported storage engine.
  */
-function supportsCommittedReads(db) {
-    var status = db.serverStatus();
+export function supportsCommittedReads(db) {
+    let status = db.serverStatus();
     assert.commandWorked(status);
 
-    assert(isMongod(db), 'no storage engine is reported when connected to mongos');
-    assert.neq(
-        'undefined', typeof status.storageEngine, 'missing storage engine info in server status');
+    assert(isMongod(db), "no storage engine is reported when connected to mongos");
+    assert.neq("undefined", typeof status.storageEngine, "missing storage engine info in server status");
 
     return status.storageEngine.supportsCommittedReads;
 }

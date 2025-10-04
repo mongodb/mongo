@@ -12,15 +12,15 @@
  * @tags: [
  *   uses_prepare_transaction,
  *   uses_transactions,
+ *   # TODO SERVER-94948: Remove this tag once the test is fixed to handle arbitrary listCollection
+ *   # ordering.
+ *   does_not_support_config_fuzzer,
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/replsets/libs/initial_sync_test.js");
-load("jstests/libs/logv2_helpers.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {InitialSyncTest} from "jstests/replsets/libs/initial_sync_test.js";
 
 /**
  * Helper function to check that specific messages appeared or did not appear in the logs.
@@ -52,19 +52,11 @@ function checkLogForGetTimestampMsg(node, timestampName, timestamp, contains) {
  * UUID to make sure that it corresponds to the expected collection.
  */
 function checkLogForCollectionClonerMsg(node, commandName, dbname, contains, collUUID) {
-    let msg =
-        "Collection Cloner scheduled a remote command on the " + dbname + " db: { " + commandName;
-
-    if (isJsonLog(node)) {
-        msg = 'Collection Cloner scheduled a remote command","attr":{"stage":"' + dbname +
-            " db: { " + commandName;
-    }
+    let msg = 'Collection Cloner scheduled a remote command","attr":{"stage":"' + dbname + " db: { " + commandName;
 
     if (commandName === "listIndexes" && contains) {
         msg += ": " + collUUID;
-        if (isJsonLog(node)) {
-            msg = msg.replace('("', '(\\"').replace('")', '\\")');
-        }
+        msg = msg.replace('("', '(\\"').replace('")', '\\")');
     }
 
     checkLogForMsg(node, msg, contains);
@@ -93,10 +85,10 @@ const rst = new ReplSetTest({
             // of oplog batches check below work reliably.
             setParameter: {
                 "failpoint.PrimaryOnlyServiceSkipRebuildingInstances": tojson({mode: "alwaysOn"}),
-            }
+            },
         },
-        {rsConfig: {priority: 0, votes: 0}}
-    ]
+        {rsConfig: {priority: 0, votes: 0}},
+    ],
 });
 rst.startSet();
 rst.initiate();
@@ -114,7 +106,7 @@ try {
     // If we can fit exactly 9+1=10 large strings in a batch, the small overhead for each oplog
     // entry means we expect only 9 oplog entries per batch.
     let largeStringSize = initialSyncTest.replBatchLimitBytes / (maxLargeStringsInBatch + 1);
-    const largeString = 'z'.repeat(largeStringSize);
+    const largeString = "z".repeat(largeStringSize);
 
     assert.commandWorked(db.foo.insert({a: 1}));
     assert.commandWorked(db.bar.insert({b: 1}));
@@ -137,8 +129,7 @@ try {
     secondary.setSecondaryOk();
 
     // Make sure that we cannot read from this node yet.
-    assert.commandFailedWithCode(secondary.getDB("test").runCommand({count: "foo"}),
-                                 ErrorCodes.NotPrimaryOrSecondary);
+    assert.commandFailedWithCode(secondary.getDB("test").runCommand({count: "foo"}), ErrorCodes.NotPrimaryOrSecondary);
 
     // Make sure that we see that the node got the defaultBeginFetchingTimestamp, but hasn't gotten
     // the beginFetchingTimestamp yet.
@@ -151,8 +142,7 @@ try {
     assert(!initialSyncTest.step());
 
     // Make sure that we cannot read from this node yet.
-    assert.commandFailedWithCode(secondary.getDB("test").runCommand({count: "foo"}),
-                                 ErrorCodes.NotPrimaryOrSecondary);
+    assert.commandFailedWithCode(secondary.getDB("test").runCommand({count: "foo"}), ErrorCodes.NotPrimaryOrSecondary);
 
     // Make sure that we see that the node got the beginFetchingTimestamp, but hasn't gotten the
     // beginApplyingTimestamp yet.
@@ -165,8 +155,7 @@ try {
     assert(!initialSyncTest.step());
 
     // Make sure that we cannot read from this node yet.
-    assert.commandFailedWithCode(secondary.getDB("test").runCommand({count: "foo"}),
-                                 ErrorCodes.NotPrimaryOrSecondary);
+    assert.commandFailedWithCode(secondary.getDB("test").runCommand({count: "foo"}), ErrorCodes.NotPrimaryOrSecondary);
 
     // Make sure that we see that the node got the beginApplyingTimestamp, but that we don't see the
     // listDatabases call yet.
@@ -180,8 +169,7 @@ try {
     assert(!initialSyncTest.step());
 
     // Make sure that we cannot read from this node yet.
-    assert.commandFailedWithCode(secondary.getDB("test").runCommand({count: "foo"}),
-                                 ErrorCodes.NotPrimaryOrSecondary);
+    assert.commandFailedWithCode(secondary.getDB("test").runCommand({count: "foo"}), ErrorCodes.NotPrimaryOrSecondary);
 
     // Make sure that we saw the listDatabases call in the log messages, but didn't see any
     // listCollections or listIndexes call.
@@ -190,8 +178,7 @@ try {
     checkLogForCollectionClonerMsg(secondary, "listIndexes", "admin", false);
 
     // Do same listDatabases command as CollectionCloner.
-    const databases =
-        assert.commandWorked(primary.adminCommand({listDatabases: 1, nameOnly: true})).databases;
+    const databases = assert.commandWorked(primary.adminCommand({listDatabases: 1, nameOnly: true})).databases;
 
     // Iterate over the databases and collections in the same order that the test fixture would so
     // that we can check the log messages to make sure initial sync is paused as expected.
@@ -206,8 +193,9 @@ try {
         const database = primary.getDB(dbname);
 
         // Do same listCollections command as CollectionCloner.
-        const res = assert.commandWorked(database.runCommand(
-            {listCollections: 1, filter: {$or: [{type: "collection"}, {type: {$exists: false}}]}}));
+        const res = assert.commandWorked(
+            database.runCommand({listCollections: 1, filter: {$or: [{type: "collection"}, {type: {$exists: false}}]}}),
+        );
 
         // Make sure that there is only one batch.
         assert.eq(NumberLong(0), res.cursor.id, res);
@@ -218,8 +206,10 @@ try {
         assert(!initialSyncTest.step());
 
         // Make sure that we cannot read from this node yet.
-        assert.commandFailedWithCode(secondary.getDB("test").runCommand({count: "foo"}),
-                                     ErrorCodes.NotPrimaryOrSecondary);
+        assert.commandFailedWithCode(
+            secondary.getDB("test").runCommand({count: "foo"}),
+            ErrorCodes.NotPrimaryOrSecondary,
+        );
 
         // Make sure that we saw the listCollections call in the log messages, but didn't see a
         // listIndexes call.
@@ -234,8 +224,10 @@ try {
             assert(!initialSyncTest.step());
 
             // Make sure that we cannot read from this node yet.
-            assert.commandFailedWithCode(secondary.getDB("test").runCommand({count: "foo"}),
-                                         ErrorCodes.NotPrimaryOrSecondary);
+            assert.commandFailedWithCode(
+                secondary.getDB("test").runCommand({count: "foo"}),
+                ErrorCodes.NotPrimaryOrSecondary,
+            );
 
             // Make sure that we saw the listIndexes call in the log messages, but didn't
             // see a listCollections call.
@@ -275,14 +267,10 @@ try {
     // Confirm that node can be read from and that it has the inserts that were made while the node
     // was in initial sync. We inserted `docsToInsertPerCollectionDuringOplogApplication` + 1
     // additional document prior to the oplog application phase to each of `foo` and `bar`.
-    assert.eq(secondary.getDB("test").foo.find().count(),
-              docsToInsertPerCollectionDuringOplogApplication + 1);
-    assert.eq(secondary.getDB("test").bar.find().count(),
-              docsToInsertPerCollectionDuringOplogApplication + 1);
-    assert.eq(secondary.getDB("test").foo.find().itcount(),
-              docsToInsertPerCollectionDuringOplogApplication + 1);
-    assert.eq(secondary.getDB("test").bar.find().itcount(),
-              docsToInsertPerCollectionDuringOplogApplication + 1);
+    assert.eq(secondary.getDB("test").foo.find().count(), docsToInsertPerCollectionDuringOplogApplication + 1);
+    assert.eq(secondary.getDB("test").bar.find().count(), docsToInsertPerCollectionDuringOplogApplication + 1);
+    assert.eq(secondary.getDB("test").foo.find().itcount(), docsToInsertPerCollectionDuringOplogApplication + 1);
+    assert.eq(secondary.getDB("test").bar.find().itcount(), docsToInsertPerCollectionDuringOplogApplication + 1);
 
     // Do data consistency checks at the end.
     initialSyncTest.stop();
@@ -290,4 +278,3 @@ try {
     initialSyncTest.fail();
     throw errorDuringTest;
 }
-})();

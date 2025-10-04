@@ -10,22 +10,20 @@
  *   requires_persistence,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const rst = new ReplSetTest({
     nodes: [{}, {rsConfig: {priority: 0}}],
     nodeOptions: {
         // Disable background checkpoints: a zero value disables checkpointing.
         syncdelay: 0,
-        setParameter: {logComponentVerbosity: tojson({storage: 2})}
+        setParameter: {logComponentVerbosity: tojson({storage: 2})},
     },
-    useBridge: true
+    useBridge: true,
 });
 rst.startSet();
-rst.initiateWithHighElectionTimeout();
+rst.initiate();
 
 // We will kill the secondary after it installs and acknowledges a config to make sure it has made
 // it durable. Disable journaling on the node so we are sure that the config write is flushed
@@ -65,4 +63,3 @@ assert.eq(rst.getReplSetConfigFromNode(secondaryNodeId).version, newConfigVersio
 // Re-connect the node to let the test complete.
 rst.nodes[1].reconnect([rst.nodes[0]]);
 rst.stopSet();
-}());

@@ -1,0 +1,95 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_extension_shared_library", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+############################## EXTENSIONS FOR PASSTHROUGH TESTS ##############################
+### Any extension name suffix'ed with "_mongo_extension" with be automatically picked up by
+### the extension passthroughs and loaded on all nodes, if it is also added to
+### "dist_test_extensions" in mongo/BUILD.bazel.
+
+# Extensions under test_examples/
+[
+    mongo_cc_extension_shared_library(
+        name = extension_name + "_mongo_extension",
+        srcs = [extension_name + ".cpp"],
+    )
+    for extension_name in [
+        "foo",
+        "foo_v2",
+        "bar",
+        # TODO SERVER-109108: Remove this entry when the buzz extension is no longer needed.
+        "buzz",
+    ]
+]
+
+# Extensions under test_examples/extension_options/
+[
+    mongo_cc_extension_shared_library(
+        name = extension_name + "_mongo_extension",
+        srcs = ["extension_options/" + extension_name + ".cpp"],
+    )
+    for extension_name in [
+        "test_options",
+        "parse_options",
+    ]
+]
+
+# Extensions under test_examples/loading/
+[
+    mongo_cc_extension_shared_library(
+        name = extension_name + "_mongo_extension",
+        srcs = ["loading/" + extension_name + ".cpp"],
+    )
+    for extension_name in [
+        "host_version_succeeds",
+        "invoke_host_services_asap",
+        "load_highest_compatible_version",
+        "load_two_stages",
+    ]
+]
+
+######################### EXTENSIONS FOR NO PASSTHROUGH OR UNIT TESTS #########################
+### To be manually loaded in a no-passthrough e2e test, the extension must also be added to
+### "dist_test_extensions" in mongo/BUILD.bazel.
+### To be manually loaded in a unit test, the extension must also be added to the list of "data"
+### for that test's Bazel target.
+
+# Extensions under test_examples/fail_to_load/
+# Each of these should fail startup.
+[
+    mongo_cc_extension_shared_library(
+        name = extension_name + "_bad_extension",
+        srcs = ["fail_to_load/" + extension_name + ".cpp"],
+    )
+    for extension_name in [
+        "no_symbol",
+        "null_mongo_extension",
+        "major_version_too_high",
+        "major_version_too_low",
+        "minor_version_too_high",
+        "null_initialize_function",
+        "major_version_max_int",
+        "duplicate_stage_descriptor",
+        "host_version_fails",
+        "initialize_version_fails",
+        "null_stage_descriptor",
+        "duplicate_version",
+        "no_compatible_version",
+    ]
+]
+
+# "foo_v2" is used for testing upgrade scenarios as the upgrade of "foo" from above. We cannot use
+# the "mongo_extension" suffix since loading this extension in passthroughs with "foo" V1 should
+# cause duplicate stage errors.
+mongo_cc_extension_shared_library(
+    name = "foo_extension_v2",
+    srcs = ["foo_v2.cpp"],
+)
+
+# "vector_search" is used to test that we can override the existing $vectorSearch implementation.
+# It must not have the _mongo_extension suffix so that it doesn't get loaded in the
+# Extensions-enabled variant since that would break real $vectorSearch tests.
+mongo_cc_extension_shared_library(
+    name = "vector_search_extension",
+    srcs = ["vector_search.cpp"],
+)

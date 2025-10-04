@@ -1,0 +1,5 @@
+cm
+# generated files
+*.png
+figures/
+parameters.csv

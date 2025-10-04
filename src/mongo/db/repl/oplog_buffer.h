@@ -29,13 +29,19 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/repl/oplog_batch.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/interruptible.h"
+#include "mongo/util/modules.h"
+#include "mongo/util/time_support.h"
+
 #include <cstddef>
 #include <vector>
 
-#include "mongo/base/counter.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/util/time_support.h"
+#include <boost/optional.hpp>
 
 namespace mongo {
 
@@ -49,7 +55,7 @@ namespace repl {
  *
  * Implementations are only required to support one pusher and one popper.
  */
-class OplogBuffer {
+class MONGO_MOD_OPEN OplogBuffer {
     OplogBuffer(const OplogBuffer&) = delete;
     OplogBuffer& operator=(const OplogBuffer&) = delete;
 
@@ -63,6 +69,11 @@ public:
      * Batch of oplog entries (in BSON format) for bulk read/write operations.
      */
     using Batch = std::vector<Value>;
+
+    /**
+     * Cost of items in this oplog buffer.
+     */
+    struct Cost;
 
     /**
      * Counters for this oplog buffer.
@@ -93,25 +104,18 @@ public:
      */
     virtual void push(OperationContext* opCtx,
                       Batch::const_iterator begin,
-                      Batch::const_iterator end) = 0;
+                      Batch::const_iterator end,
+                      boost::optional<const Cost&> cost = boost::none) = 0;
 
     /**
      * Returns when enough space is available.
      */
-    virtual void waitForSpace(OperationContext* opCtx, std::size_t size) = 0;
+    virtual void waitForSpace(OperationContext* opCtx, const Cost& cost) = 0;
 
     /**
      * Returns true if oplog buffer is empty.
      */
     virtual bool isEmpty() const = 0;
-
-    /**
-     * Maximum size of all oplog entries that can be stored in this oplog buffer as measured by the
-     * BSONObj::objsize() function.
-     *
-     * Returns 0 if this oplog buffer has no size constraints.
-     */
-    virtual std::size_t getMaxSize() const = 0;
 
     /**
      * Total size of all oplog entries in this oplog buffer as measured by the BSONObj::objsize()
@@ -136,11 +140,41 @@ public:
     virtual bool tryPop(OperationContext* opCtx, Value* value) = 0;
 
     /**
-     * Waits "waitDuration" for an operation to be pushed into the oplog buffer.
+     * Returns false if oplog buffer is empty. "batch" is left unchanged.
+     * Otherwise, removes last batch (saves in "batch") from the oplog buffer and returns true.
+     */
+    virtual bool tryPopBatch(OperationContext* opCtx, OplogBatch<Value>* batch) {
+        MONGO_UNIMPLEMENTED;
+    }
+
+    /**
+     * Waits uninterruptibly for "waitDuration" for an operation to be pushed into the oplog buffer.
      * Returns false if oplog buffer is still empty after "waitDuration".
      * Otherwise, returns true.
      */
-    virtual bool waitForData(Seconds waitDuration) = 0;
+    bool waitForData(Seconds waitDuration) {
+        return waitForDataFor(duration_cast<Milliseconds>(waitDuration),
+                              Interruptible::notInterruptible());
+    };
+
+    /**
+     * Interruptible wait with millisecond granularity.
+     *
+     * Waits "waitDuration" for an operation to be pushed into the oplog buffer.
+     * Returns false if oplog buffer is still empty after "waitDuration".
+     * Otherwise, returns true.
+     * Throws if the interruptible is interrupted.
+     */
+    virtual bool waitForDataFor(
+        Milliseconds waitDuration,
+        Interruptible* interruptible = Interruptible::notInterruptible()) = 0;
+
+    /**
+     * Same as waitForDataFor(Milliseconds, Interruptible) above but takes a deadline instead
+     * of a duration.
+     */
+    virtual bool waitForDataUntil(
+        Date_t deadline, Interruptible* interruptible = Interruptible::notInterruptible()) = 0;
 
     /**
      * Returns false if oplog buffer is empty.
@@ -158,16 +192,45 @@ public:
      * "waitForData" will return immediately even if there is data in the queue.  This
      * is an optimization and subclasses may choose not to implement this function.
      */
-    virtual void enterDrainMode(){};
+    virtual void enterDrainMode() {
+        MONGO_UNIMPLEMENTED;
+    }
 
     /**
      * Leaves "drain mode".  May only be called by the producer.
      */
-    virtual void exitDrainMode(){};
+    virtual void exitDrainMode() {
+        MONGO_UNIMPLEMENTED;
+    }
 };
 
-class OplogBuffer::Counters {
+struct OplogBuffer::Cost {
+    std::size_t size = 0;
+    std::size_t count = 0;
+};
+
+class MONGO_MOD_PRIVATE OplogBuffer::Counters {
 public:
+    // Number of operations in this OplogBuffer.
+    Counter64 count;
+
+    // Total size of operations in this OplogBuffer. Measured in bytes.
+    Counter64 size;
+
+    // Maximum number of operations in this OplogBuffer.
+    Counter64 maxCount;
+
+    // Maximum size of operations in this OplogBuffer. Measured in bytes.
+    Counter64 maxSize;
+
+    /**
+     * Sets maximum number of operations for this OplogBuffer.
+     * This function should only be called by a single thread.
+     */
+    void setMaxCount(std::size_t newMaxCount) {
+        maxCount.increment(newMaxCount - maxCount.get());
+    }
+
     /**
      * Sets maximum size of operations for this OplogBuffer.
      * This function should only be called by a single thread.
@@ -190,30 +253,71 @@ public:
         size.increment(std::size_t(value.objsize()));
     }
 
+    void incrementN(std::size_t cnt, std::size_t sz) {
+        count.increment(cnt);
+        size.increment(sz);
+    }
+
     void decrement(const Value& value) {
         count.decrement(1);
         size.decrement(std::size_t(value.objsize()));
     }
 
-    // Number of operations in this OplogBuffer.
-    Counter64 count;
+    void decrementN(std::size_t cnt, std::size_t sz) {
+        count.decrement(cnt);
+        size.decrement(sz);
+    }
+};
 
-    // Total size of operations in this OplogBuffer. Measured in bytes.
-    Counter64 size;
+class MONGO_MOD_OPEN OplogBufferMetrics {
+public:
+    OplogBuffer::Counters* getWriteBufferCounter() {
+        return &_writeBufferCounter;
+    }
 
-    // Maximum size of operations in this OplogBuffer. Measured in bytes.
-    Counter64 maxSize;
+    OplogBuffer::Counters* getApplyBufferCounter() {
+        return &_applyBufferCounter;
+    }
+
+    BSONObj getReport() const {
+        BSONObjBuilder applierSubBuilder;
+        applierSubBuilder.append("count", _applyBufferCounter.count.get());
+        applierSubBuilder.append("sizeBytes", _applyBufferCounter.size.get());
+        applierSubBuilder.append("maxSizeBytes", _applyBufferCounter.maxSize.get());
+        if (feature_flags::gReduceMajorityWriteLatency.isEnabled()) {
+            BSONObjBuilder builder;
+            BSONObjBuilder writerSubBuilder;
+            writerSubBuilder.append("count", _writeBufferCounter.count.get());
+            writerSubBuilder.append("sizeBytes", _writeBufferCounter.size.get());
+            writerSubBuilder.append("maxSizeBytes", _writeBufferCounter.maxSize.get());
+            builder.append("write", writerSubBuilder.obj());
+
+            applierSubBuilder.append("maxCount", _applyBufferCounter.maxCount.get());
+            builder.append("apply", applierSubBuilder.obj());
+
+            return builder.obj();
+        }
+        return applierSubBuilder.obj();
+    }
+
+    operator BSONObj() const {
+        return getReport();
+    }
+
+private:
+    OplogBuffer::Counters _writeBufferCounter;
+    OplogBuffer::Counters _applyBufferCounter;
 };
 
 /**
  * An OplogBuffer interface which also supports random access by timestamp.
  * The entries in a RandomAccessOplogBuffer must be pushed in strict timestamp order.
  *
- * The user of a RandomAccesOplogBuffer may seek to or find timestamps which have already been read
+ * The user of a RandomAccessOplogBuffer may seek to or find timestamps which have already been read
  * from the buffer.  It is up to the implementing subclass to ensure that such timestamps are
  * available to be read.
  */
-class RandomAccessOplogBuffer : public OplogBuffer {
+class MONGO_MOD_PRIVATE RandomAccessOplogBuffer : public OplogBuffer {
 public:
     enum SeekStrategy {
         kInexact = 0,

@@ -1,0 +1,16 @@
+# Golden test output of SBEFailTest/FailWithAddDecimal
+-- INPUT EXPRESSION:
+(NumberDecimal(123) + fail(2, "test")) 
+
+-- COMPILED EXPRESSION:
+[0x0000-0x0022] stackSize: 1, maxStackSize: 3
+0x0000: pushConstVal(value: NumberDecimal(123));
+0x000a: pushConstVal(value: 2ll);
+0x0014: pushConstVal(value: "test");
+0x001e: fail();
+0x001f: add(popLhs: 1, moveFromLhs: 1, offsetLhs: 0, popRhs: 1, moveFromRhs: 1, offsetRhs: 0);
+
+
+-- EXECUTE VARIATION:
+EXCEPTION: BadValue: test
+

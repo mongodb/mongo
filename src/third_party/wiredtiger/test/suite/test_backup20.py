@@ -26,11 +26,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest
-import os, shutil
-from helper import compare_files
+import wttest
 from suite_subprocess import suite_subprocess
-from wtdataset import simple_key
 from wtscenario import make_scenarios
 
 # test_backup20.py
@@ -74,6 +71,3 @@ class test_backup20(wttest.WiredTigerTestCase, suite_subprocess):
 
         self.session.close()
         self.conn.close()
-
-if __name__ == '__main__':
-    wttest.run()

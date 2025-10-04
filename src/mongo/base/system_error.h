@@ -29,10 +29,10 @@
 
 #pragma once
 
+#include "mongo/base/error_codes.h"
+
 #include <system_error>
 #include <type_traits>
-
-#include "mongo/base/error_codes.h"
 
 namespace mongo {
 

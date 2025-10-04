@@ -29,9 +29,11 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/util/modules.h"
+
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -85,8 +87,15 @@ public:
  * This method also implements the ability to swap a $limit before a $skip, by adding the value of
  * the $skip to the value of the $limit.
  */
-boost::optional<long long> extractLimitForPushdown(Pipeline::SourceContainer::iterator itr,
-                                                   Pipeline::SourceContainer* container);
+boost::optional<long long> extractLimitForPushdown(DocumentSourceContainer::iterator itr,
+                                                   DocumentSourceContainer* container);
+
+/**
+ * This is similar to extractLimitForPushdown, except that it should be used when the caller does
+ * not want to modify the pipeline but still obtain the calculated limit value of the query.
+ */
+boost::optional<long long> getUserLimit(DocumentSourceContainer::iterator itr,
+                                        DocumentSourceContainer* container);
 
 /**
  * If there are any $skip stages that could be logically swapped forward to the position of the
@@ -97,7 +106,7 @@ boost::optional<long long> extractLimitForPushdown(Pipeline::SourceContainer::it
  * This method does NOT swap $skip before $limit. One can use 'extractLimitForPushdown' method to
  * extract all $limit stages and then call this method if it is applicable.
  */
-boost::optional<long long> extractSkipForPushdown(Pipeline::SourceContainer::iterator itr,
-                                                  Pipeline::SourceContainer* container);
+boost::optional<long long> extractSkipForPushdown(DocumentSourceContainer::iterator itr,
+                                                  DocumentSourceContainer* container);
 
 }  // namespace mongo

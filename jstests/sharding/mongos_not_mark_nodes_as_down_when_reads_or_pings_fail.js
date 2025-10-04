@@ -1,21 +1,21 @@
 /*
  * Tests that mongos does not mark nodes as down when reads or pings fail.
  */
-(function() {
-'use strict';
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/replsets/rslib.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 
 /*
  * Configures failCommand to force the given command to fail with the given error code when run
  * on the given namespace, and returns the resulting fail point.
  */
 function configureFailCommand(nodeConn, command, ns, error) {
-    return configureFailPoint(
-        nodeConn,
-        "failCommand",
-        {failInternalCommands: true, errorCode: error, failCommands: [command], namespace: ns});
+    return configureFailPoint(nodeConn, "failCommand", {
+        failInternalCommands: true,
+        errorCode: error,
+        failCommands: [command],
+        namespace: ns,
+    });
 }
 
 const st = new ShardingTest({shards: 1, rs: {nodes: [{}, {rsConfig: {priority: 0}}]}});
@@ -23,7 +23,7 @@ const kDbName = "foo";
 const kCollName = "bar";
 const kNs = kDbName + "." + kCollName;
 const kErrorCode = ErrorCodes.HostUnreachable;
-const kPingWaitTimeMS = 12 * 1000;  // streamable ReplicaSetMonitor's ping interval is 10 seconds.
+const kPingWaitTimeMS = 12 * 1000; // streamable ReplicaSetMonitor's ping interval is 10 seconds.
 const testDB = st.s.getDB(kDbName);
 
 assert.commandWorked(st.s.adminCommand({enableSharding: kDbName}));
@@ -71,8 +71,9 @@ jsTest.log("Test that mongos does not mark the primary node as down when pings f
 (() => {
     // Make ping commands fail on the primary node with HostUnreachable. Sleep for some
     // time to allow the ServerPingMonitor to send out pings.
-    const failPoint = configureFailPoint(
-        st.s, "serverPingMonitorFailWithHostUnreachable", {hostAndPort: st.rs0.nodes[0].host});
+    const failPoint = configureFailPoint(st.s, "serverPingMonitorFailWithHostUnreachable", {
+        hostAndPort: st.rs0.nodes[0].host,
+    });
     sleep(kPingWaitTimeMS);
 
     // Verify that the node was not marked as down (i.e. it is still the primary node and
@@ -92,8 +93,9 @@ jsTest.log("Test that mongos does not mark the secondary node as down when pings
 (() => {
     // Make ping commands fail on the secondary node with HostUnreachable. Sleep for some
     // time to allow the ServerPingMonitor to send out pings.
-    const failPoint = configureFailPoint(
-        st.s, "serverPingMonitorFailWithHostUnreachable", {hostAndPort: st.rs0.nodes[1].host});
+    const failPoint = configureFailPoint(st.s, "serverPingMonitorFailWithHostUnreachable", {
+        hostAndPort: st.rs0.nodes[1].host,
+    });
     sleep(kPingWaitTimeMS);
 
     // Verify that the node was not marked as down (i.e. it is still the secondary node and
@@ -110,4 +112,3 @@ jsTest.log("Test that mongos does not mark the secondary node as down when pings
 })();
 
 st.stop();
-})();

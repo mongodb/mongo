@@ -27,14 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/pipeline/javascript_execution.h"
 
-#include <iostream>
-
-#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/str.h"
+
+#include <utility>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -44,23 +46,38 @@ const auto getExec = OperationContext::declareDecoration<std::unique_ptr<JsExecu
 
 JsExecution* JsExecution::get(OperationContext* opCtx,
                               const BSONObj& scope,
-                              StringData database,
+                              const DatabaseName& database,
                               bool loadStoredProcedures,
                               boost::optional<int> jsHeapLimitMB) {
-    auto& exec = getExec(opCtx);
-    if (!exec) {
-        exec = std::make_unique<JsExecution>(opCtx, scope, jsHeapLimitMB);
-        exec->getScope()->setLocalDB(database);
-        if (loadStoredProcedures) {
-            exec->getScope()->loadStored(opCtx, true);
-        }
-        exec->_storedProceduresLoaded = loadStoredProcedures;
-    } else {
-        uassert(31438,
-                "A single operation cannot use both JavaScript aggregation expressions and $where.",
-                loadStoredProcedures == exec->_storedProceduresLoaded);
+    // If a JsExecution object has already been created, return it.
+    JsExecution* jsExec = getCached(opCtx, loadStoredProcedures);
+    if (jsExec) {
+        return jsExec;
     }
+
+    // There is no cached JsExecution object, so create and cache one now.
+    auto& exec = getExec(opCtx);
+    exec = std::make_unique<JsExecution>(opCtx, scope, jsHeapLimitMB);
+    exec->getScope()->setLocalDB(database);
+    if (loadStoredProcedures) {
+        exec->getScope()->loadStored(opCtx, true);
+    }
+    exec->_storedProceduresLoaded = loadStoredProcedures;
+
     return exec.get();
+}
+
+JsExecution* JsExecution::getCached(OperationContext* opCtx, bool loadStoredProcedures) {
+    auto& exec = getExec(opCtx);
+    if (exec) {
+        if (loadStoredProcedures == exec->_storedProceduresLoaded) {
+            return exec.get();
+        }
+        tasserted(
+            9136200,
+            "A single operation cannot use both JavaScript aggregation expressions and $where.");
+    }
+    return nullptr;
 }
 
 Value JsExecution::callFunction(ScriptingFunction func,

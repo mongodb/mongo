@@ -1,0 +1,947 @@
+load("@poetry//:dependencies.bzl", "dependency")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
+load("//bazel/config:render_template.bzl", "render_template")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "cluster_auth_mode",
+    srcs = [
+        "cluster_auth_mode.cpp",
+    ],
+    hdrs = [
+        "cluster_auth_mode.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+idl_generator(
+    name = "action_type_gen",
+    src = "action_type.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "access_checks_gen",
+    src = "access_checks.idl",
+)
+
+idl_generator(
+    name = "auth_types_gen",
+    src = "auth_types.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "parsed_privilege_gen",
+    src = "parsed_privilege.idl",
+    deps = [
+        ":auth_types_gen",
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "address_restriction_gen",
+    src = "address_restriction.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "address_restriction",
+    srcs = [
+        "address_restriction.cpp",
+        "address_restriction.h",
+        "restriction.h",
+        "restriction_environment.h",
+        "restriction_set.h",
+        ":address_restriction_gen",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/idl:idl_parser",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util/net:network",
+    ],
+)
+
+idl_generator(
+    name = "user_management_commands_parser_gen",
+    src = "user_management_commands_parser.idl",
+    deps = [
+        ":auth_types_gen",
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "validated_tenancy_scope_gen",
+    src = "validated_tenancy_scope.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "auth_options_gen",
+    src = "auth_options.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "sasl_options_init",
+    srcs = [
+        "sasl_options_gen",
+        "sasl_options_init.cpp",
+    ],
+    deps = [
+        ":sasl_options",
+        "//src/mongo/util/net:network",
+        "//src/mongo/util/options_parser",
+    ],
+)
+
+idl_generator(
+    name = "authorization_manager_impl_parameters_gen",
+    src = "authorization_manager_impl_parameters.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "auth_impl_internal",
+    srcs = [
+        "authorization_manager_impl.cpp",
+        "authorization_router_impl.cpp",
+        "authorization_session_impl.cpp",
+        "authz_session_external_state.cpp",
+        ":authorization_manager_impl_parameters_gen",
+        "//src/mongo/db/auth:user_request_x509.h",
+    ],
+    hdrs = [
+        "authorization_manager_impl.h",
+        "authorization_router_impl.h",
+        "authorization_session_impl.h",
+        "authz_session_external_state.h",
+        "resource_pattern_search_list.h",
+    ],
+    deps = [
+        ":address_restriction",
+        ":auth",
+        ":auth_umc",
+        ":authentication_session",
+        ":authorization_manager_global",
+        ":authprivilege",
+        ":builtin_roles",
+        ":sasl_options",
+        ":user",
+        ":user_acquisition_stats",
+        ":user_document_parser",
+        ":user_request_x509",
+        "//src/mongo/base:secure_allocator",
+        "//src/mongo/bson/util:bson_extract",
+        "//src/mongo/db:api_parameters",
+        "//src/mongo/db:audit",  # audit:logLogout in AuthZSession.
+        "//src/mongo/db:common",
+        "//src/mongo/db:global_settings",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/query/query_stats",
+        "//src/mongo/db/stats:counters",
+        "//src/mongo/util:caching",
+        "//src/mongo/util:icu",
+        "//src/mongo/util/concurrency:spin_lock",
+        "//src/mongo/util/concurrency:thread_pool",
+        "//src/mongo/util/net:ssl_manager",
+        "//src/mongo/util/net:ssl_types",
+    ],
+)
+
+idl_generator(
+    name = "user_cache_invalidator_job_parameters_gen",
+    src = "user_cache_invalidator_job_parameters.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "user_cache_invalidator",
+    srcs = [
+        "user_cache_invalidator_job.cpp",
+        ":user_cache_invalidator_job_parameters_gen",
+    ],
+    hdrs = [
+        "user_cache_invalidator_job.h",
+    ],
+    deps = [
+        ":auth",
+        ":authorization_manager_global",
+        "//src/mongo/db:server_base",
+        "//src/mongo/s:grid",
+    ],
+)
+
+idl_generator(
+    name = "enable_localhost_auth_bypass_parameter_gen",
+    src = "enable_localhost_auth_bypass_parameter.idl",
+)
+
+idl_generator(
+    name = "authorization_manager_global_parameters_gen",
+    src = "authorization_manager_global_parameters.idl",
+)
+
+mongo_cc_library(
+    name = "security_key",
+    srcs = [
+        "security_key.cpp",
+    ],
+    hdrs = [
+        "security_key.h",
+    ],
+    deps = [
+        ":auth",
+        ":cluster_auth_mode",
+        ":sasl_options",
+        ":security_file",
+        ":user",
+        "//src/mongo:base",
+        "//src/mongo/base:secure_allocator",
+        "//src/mongo/client:authentication",
+        "//src/mongo/crypto:sha_block",
+        "//src/mongo/util:icu",
+        "//src/mongo/util:md5",
+    ],
+)
+
+mongo_cc_library(
+    name = "authorization_manager_global",
+    srcs = [
+        "authorization_manager_global.cpp",
+        "authorization_manager_global_parameters_gen",
+    ],
+    hdrs = [
+        "authorization_manager_impl.h",
+        "authorization_router_impl.h",
+    ],
+    deps = [
+        ":auth",
+        ":cluster_auth_mode",
+        ":security_key",
+        "//src/mongo/client:authentication",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/util/net:ssl_manager",
+        "//src/mongo/util/net:ssl_parameters_auth",
+    ],
+)
+
+idl_generator(
+    name = "sasl_commands_gen",
+    src = "sasl_commands.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "sasl_commands",
+    srcs = [
+        "sasl_commands.cpp",
+        "sasl_payload.cpp",
+        ":sasl_commands_gen",
+    ],
+    hdrs = [
+        "sasl_commands.h",
+        "sasl_payload.h",
+    ],
+    deps = [
+        ":auth",
+        ":auth_impl_internal",
+        ":authentication_session",
+        ":authorization_manager_global",
+        ":saslauth",
+        "//src/mongo/client:native_sasl_client",
+        "//src/mongo/db:commands",
+        "//src/mongo/db/commands:test_commands_enabled",
+    ],
+)
+
+mongo_cc_library(
+    name = "security_file",
+    srcs = [
+        "security_file.cpp",
+    ],
+    hdrs = [
+        "security_file.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/third_party/yaml-cpp:yaml",
+    ],
+)
+
+idl_generator(
+    name = "sasl_options_gen",
+    src = "sasl_options.idl",
+)
+
+idl_generator(
+    name = "oauth_authorization_server_metadata_gen",
+    src = "oauth_authorization_server_metadata.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "oidc_protocol_gen",
+    src = "oidc_protocol.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "auth_options",
+    srcs = [
+        ":auth_options_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "authprivilege",
+    srcs = [
+        "access_checks_gen",
+        "action_set.cpp",
+        "action_type.cpp",
+        "action_type_gen",
+        "authorization_contract.cpp",
+        "parsed_privilege_gen",
+        "privilege.cpp",
+        "resource_pattern.cpp",
+    ],
+    hdrs = [
+        "access_checks_gen",
+        "action_type_gen",
+        "auth_types_gen",
+        "authorization_contract_guard.h",
+        "parsed_privilege_gen",
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/auth:privilege_format.h",
+        "//src/mongo/db/query:explain_verbosity_gen",
+    ],
+    header_deps = [
+        "//src/mongo/db:change_stream_state",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:common",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/exec/mutable_bson",
+        "//src/mongo/idl:idl_parser",
+    ],
+)
+
+mongo_cc_library(
+    name = "oidc_protocol",
+    srcs = [
+        "oauth_authorization_server_metadata_gen",
+        "oauth_discovery_factory.cpp",
+        "oidc_protocol_gen",
+    ],
+    hdrs = [
+        "oauth_discovery_factory.h",
+        "//src/mongo/db/query:explain_verbosity_gen",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/idl:idl_parser",
+        "//src/mongo/util/net:http_client",
+    ],
+)
+
+mongo_cc_library(
+    name = "sasl_options",
+    srcs = [
+        "sasl_options.cpp",
+    ],
+    hdrs = [
+        "sasl_options.h",
+        "//src/mongo/db/auth:sasl_options_gen",
+        "//src/mongo/util/options_parser:constraints.h",
+        "//src/mongo/util/options_parser:environment.h",
+        "//src/mongo/util/options_parser:option_description.h",
+        "//src/mongo/util/options_parser:option_section.h",
+        "//src/mongo/util/options_parser:startup_option_init.h",
+        "//src/mongo/util/options_parser:startup_options.h",
+        "//src/mongo/util/options_parser:value.h",
+    ],
+    header_deps = [
+        "//src/mongo/db/commands/server_status:server_status_core",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/exec/document_value",
+        "//src/mongo/db/stats:counters",
+    ],
+)
+
+render_template(
+    name = "builtin_roles_cpp",
+    srcs = [
+        "builtin_roles.tpl.cpp",
+        "builtin_roles.yml",
+        "builtin_roles_gen.py",
+    ],
+    cmd = [
+        "$(location builtin_roles_gen.py)",
+        "$(location builtin_roles.yml)",
+        "$(location builtin_roles.tpl.cpp)",
+        "$(location builtin_roles.cpp)",
+    ],
+    output = "builtin_roles.cpp",
+    python_libs = [
+        dependency(
+            "cheetah3",
+            group = "compile",
+        ),
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+    ],
+)
+
+mongo_cc_library(
+    name = "role_name_or_string",
+    srcs = [
+        "role_name_or_string.cpp",
+    ],
+    hdrs = [
+        "role_name_or_string.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
+# The Auth library should consist only of the shimmed API for Auth usage and the implementations of
+# the data structures used in that API.  No actual Auth subsystem implementation should exist in
+# this library.
+mongo_cc_library(
+    name = "auth",
+    srcs = [
+        "auth_decorations.cpp",
+        "authorization_client_handle.cpp",
+        "authorization_manager.cpp",
+        "authorization_manager_factory.cpp",
+        "authorization_router.cpp",
+        "//src/mongo/util/concurrency:thread_pool.h",
+    ],
+    hdrs = [
+        "authorization_backend_interface.h",
+        "authorization_client_handle.h",
+        "authorization_manager_factory.h",
+        "//src/mongo/db/commands:authentication_commands.h",
+        "//src/mongo/util:sequence_util.h",
+    ],
+    deps = [
+        "auth_options",
+        "cluster_auth_mode",
+        "role_name_or_string",
+        "sasl_options",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/commands:umc_commands_idl",
+    ],
+)
+
+mongo_cc_library(
+    name = "authserver",
+    srcs = [
+        "authorization_backend_local.cpp",
+        "authorization_client_handle_router.cpp",
+        "authorization_client_handle_shard.cpp",
+        "authorization_manager_factory_impl.cpp",
+        "authz_session_external_state_router.cpp",
+        "authz_session_external_state_server_common.cpp",
+        "authz_session_external_state_shard.cpp",
+        ":enable_localhost_auth_bypass_parameter_gen",
+    ],
+    hdrs = [
+        "authorization_backend_local.h",
+        "authorization_client_handle_router.h",
+        "authorization_client_handle_shard.h",
+        "authorization_manager_factory_impl.h",
+        "authz_session_external_state_router.h",
+        "authz_session_external_state_server_common.h",
+        "authz_session_external_state_shard.h",
+    ],
+    deps = [
+        ":auth",
+        ":authorization_manager_global",
+        ":sasl_commands",
+        ":saslauth",
+        ":user_cache_invalidator",
+        "//src/mongo/db:dbdirectclient",
+        "//src/mongo/db:dbhelpers",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/commands:authentication_commands",
+        "//src/mongo/db/commands:umc_commands_idl",
+        "//src/mongo/db/query:command_request_response",
+        "//src/mongo/db/repl:repl_coordinator_interface",
+        "//src/mongo/s:grid",
+    ],
+)
+
+mongo_cc_library(
+    name = "authmocks",
+    srcs = [
+        "authorization_backend_mock.cpp",
+        "authorization_manager_factory_mock.cpp",
+        "authz_session_external_state_mock.cpp",
+    ],
+    hdrs = [
+        "authorization_backend_mock.h",
+        "authorization_manager_factory_mock.h",
+        "authorization_router_impl_for_test.h",
+        "authz_session_external_state_mock.h",
+    ],
+    deps = [
+        ":auth",
+        ":auth_impl_internal",
+        ":authserver",
+        ":sasl_options",
+        ":sasl_options_init",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db:query_matcher",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/update:update_driver",
+    ],
+)
+
+mongo_cc_library(
+    name = "auth_checks",
+    srcs = [
+        "authorization_checks.cpp",
+    ],
+    hdrs = [
+        "authorization_checks.h",
+        "//src/mongo/db/local_catalog/ddl:coll_mod_gen",
+    ],
+    deps = [
+        ":auth",
+        ":authprivilege",
+        ":builtin_roles",
+        ":user",
+        ":user_document_parser",
+        "//src/mongo/db:audit",
+        "//src/mongo/db:commands",
+        "//src/mongo/db:common",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/local_catalog:document_validation",
+        "//src/mongo/db/pipeline:lite_parsed_document_source",
+    ],
+)
+
+mongo_cc_library(
+    name = "auth_umc",
+    srcs = [
+        "user_management_commands_parser.cpp",
+    ],
+    hdrs = [
+        "user_management_commands_parser.h",
+    ],
+    deps = [
+        ":address_restriction",  # TODO(SERVER-93876): Remove.
+        ":auth",
+        ":authprivilege",
+        "//src/mongo/bson/util:bson_extract",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:common",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/exec/mutable_bson",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/rpc:metadata_impersonated_user",
+    ],
+)
+
+mongo_cc_library(
+    name = "builtin_roles",
+    srcs = [
+        "builtin_roles.cpp",
+    ],
+    hdrs = [
+        "builtin_roles.h",
+    ],
+    deps = [
+        "auth",
+        "auth_options",
+        "authprivilege",
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "security_token",
+    srcs = [
+        "validated_tenancy_scope_decoration.cpp",
+        "validated_tenancy_scope_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+    ],
+)
+
+mongo_cc_library(
+    name = "security_token_auth",
+    srcs = [
+        "security_token_authentication_guard.cpp",
+        "validated_tenancy_scope_factory.cpp",
+    ],
+    hdrs = [
+        "security_token_authentication_guard.h",
+        "validated_tenancy_scope_factory.h",
+    ],
+    deps = [
+        "authprivilege",
+        "security_token",
+        "user",
+        "//src/mongo/crypto:jwt_types",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/auth",
+    ],
+)
+
+mongo_cc_library(
+    name = "user",
+    srcs = [
+        "user.cpp",
+    ],
+    hdrs = [
+        "user.h",
+    ],
+    deps = [
+        "auth",
+        "authprivilege",
+        "//src/mongo/crypto:sha_block",
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "user_acquisition_stats",
+    srcs = [
+        "ldap_cumulative_operation_stats.cpp",
+        "ldap_operation_stats.cpp",
+        "user_cache_access_stats.cpp",
+    ],
+    hdrs = [
+        "ldap_cumulative_operation_stats.h",
+        "ldap_operation_stats.h",
+        "user_cache_access_stats.h",
+    ],
+    deps = [
+        "auth",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+    ],
+)
+
+mongo_cc_library(
+    name = "user_document_parser",
+    srcs = [
+        "user_document_parser.cpp",
+    ],
+    hdrs = [
+        "user_document_parser.h",
+    ],
+    deps = [
+        "address_restriction",
+        "auth",
+        "authprivilege",
+        "user",
+        "//src/mongo:base",
+        "//src/mongo/bson/util:bson_extract",
+    ],
+)
+
+idl_generator(
+    name = "x509_protocol_gen",
+    src = "x509_protocol.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "sasl_mechanism_protocol",
+    srcs = [
+        "oauth_authorization_server_metadata_gen",
+        "oauth_discovery_factory.cpp",
+        "oidc_protocol_gen",
+        "x509_protocol_gen",
+    ],
+    hdrs = [
+        "oauth_discovery_factory.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/idl:idl_parser",
+        "//src/mongo/util/net:http_client",
+    ],
+)
+
+mongo_cc_library(
+    name = "user_request_x509",
+    srcs = [
+        "user_request_x509.cpp",
+    ],
+    hdrs = [
+        "user_name.h",
+        "user_request_x509.h",
+    ],
+    deps = [
+        ":auth",
+        ":user",
+    ] + select({
+        "//bazel/config:ssl_enabled": [
+            "//src/mongo/util/net:ssl_manager",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+mongo_cc_library(
+    name = "saslauth",
+    srcs = [
+        "sasl_mechanism_registry.cpp",
+        "sasl_plain_server_conversation.cpp",
+        "sasl_scram_server_conversation.cpp",
+        "//src/mongo/crypto:mechanism_scram.h",
+    ] + select({
+        "//bazel/config:ssl_enabled": [
+            "sasl_x509_server_conversation.cpp",
+        ],
+        "//conditions:default": [],
+    }),
+    hdrs = [
+        "authentication_metrics.h",
+        "authentication_session.h",
+        "sasl_command_constants.h",
+        "sasl_mechanism_policies.h",
+        "sasl_mechanism_registry.h",
+        "sasl_plain_server_conversation.h",
+        "sasl_scram_server_conversation.h",
+    ] + select({
+        "//bazel/config:ssl_enabled": [
+            "sasl_x509_server_conversation.h",
+        ],
+        "//conditions:default": [],
+    }),
+    deps = [
+        # TODO(SERVER-93876): Remove all except authorization_manager_global.
+        "//src/mongo/base:secure_allocator",
+        "//src/mongo/db/commands:test_commands_enabled",
+        "//src/mongo/util:icu",
+        "//src/mongo/util:md5",
+        "//src/mongo/util/net:network",
+        ":auth",
+        ":auth_options",
+        ":authorization_manager_global",
+        ":authprivilege",
+        ":sasl_mechanism_protocol",
+        ":sasl_options",
+        ":sasl_options_init",
+        ":user",
+        ":user_request_x509",
+        "//src/mongo/db:connection_health_metrics_parameter",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/util/net:ssl_manager",
+        ":cluster_auth_mode",
+        "//src/mongo/crypto:sha_block",
+    ],
+)
+
+mongo_cc_library(
+    name = "authentication_session",
+    srcs = [
+        "authentication_session.cpp",
+    ],
+    hdrs = [
+        "authentication_session.h",
+    ],
+    deps = [
+        ":auth",  # TODO(SERVER-93876): Remove.
+        ":saslauth",
+        "//src/mongo/db:audit",
+        "//src/mongo/db:connection_health_metrics_parameter",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/stats:counters",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "auth_op_observer",
+    srcs = [
+        "auth_op_observer.cpp",
+    ],
+    hdrs = [
+        "auth_op_observer.h",
+    ],
+    deps = [
+        ":auth",
+        "//src/mongo:base",
+        "//src/mongo/db:audit",
+        "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/local_catalog:collection_options",
+        "//src/mongo/db/op_observer",
+        "//src/mongo/db/op_observer:op_observer_util",
+        "//src/mongo/db/repl:oplog_entry",
+    ],
+)
+
+mongo_cc_library(
+    name = "authorization_session_test_fixture",
+    srcs = [
+        "authorization_session_for_test.cpp",
+        "authorization_session_test_fixture.cpp",
+    ],
+    hdrs = [
+        "authorization_session_for_test.h",
+        "authorization_session_test_fixture.h",
+    ],
+    deps = [
+        ":auth",
+        ":auth_impl_internal",
+        ":authmocks",
+        "//src/mongo/db:service_context_d",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db/repl:replmocks",
+        "//src/mongo/transport:transport_layer_mock",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_auth_test",
+    srcs = [
+        "action_set_test.cpp",
+        "address_restriction_test.cpp",
+        "auth_identifier_test.cpp",
+        "auth_op_observer_test.cpp",
+        "authentication_session_test.cpp",
+        "authorization_contract_test.cpp",
+        "authorization_manager_test.cpp",
+        "authorization_router_impl_for_test.h",
+        "authorization_session_test.cpp",
+        "builtin_roles_test.cpp",
+        "oauth_discovery_factory_test.cpp",
+        "privilege_parser_test.cpp",
+        "resolve_role_option_test.cpp",
+        "resource_pattern_search_list_test.cpp",
+        "restriction_mock.h",
+        "restriction_test.cpp",
+        "sasl_authentication_session_test.cpp",
+        "sasl_mechanism_registry_test.cpp",
+        "sasl_scram_test.cpp",
+        "security_key_test.cpp",
+        "user_acquisition_stats_test.cpp",
+        "user_document_parser_test.cpp",
+        "validated_tenancy_scope_test.cpp",
+    ] + select({
+        "//bazel/config:ssl_enabled": ["sasl_x509_test.cpp"],
+        "//conditions:default": [],
+    }),
+    data = [
+        "//jstests/libs:test_pem_files",
+    ],
+    tags = [
+        # Segfaults in sandbox
+        "code_coverage_quarantine",
+        "mongo_unittest_fifth_group",
+    ],
+    deps = [
+        ":address_restriction",
+        ":auth_op_observer",
+        ":authentication_session",
+        ":authorization_session_test_fixture",
+        ":cluster_auth_mode",
+        ":sasl_mechanism_protocol",
+        ":saslauth",
+        ":security_file",
+        ":security_key",
+        ":security_token_auth",
+        ":user",
+        ":user_request_x509",
+        "//src/mongo:base",
+        "//src/mongo/idl:server_parameter_test_controller",
+        "//src/mongo/util:tick_source_mock",
+        "//src/mongo/util/net:mock_http_client",
+    ],
+)
+
+# TODO(SERVER-96858): Remove cycle created by moving //src/mongo/db/auth:action_set.h to //src/mongo/db/auth:authprivilege
+filegroup(
+    name = "action_set_hdrs",
+    srcs = [":action_set.h"],
+)
+
+# TODO(SERVER-96858): Remove cycle created by moving //src/mongo/db/auth:action_type.h to //src/mongo/db/auth:authprivilege
+filegroup(
+    name = "action_type_hdrs",
+    srcs = [":action_type.h"],
+)
+
+# TODO(SERVER-96858): Remove cycle created by moving //src/mongo/db/auth:auth_name.h to //src/mongo/db:server_base
+filegroup(
+    name = "auth_name_hdrs",
+    srcs = [":auth_name.h"],
+)
+
+# TODO(SERVER-96858): Remove cycle created by moving //src/mongo/db/auth:privilege.h to //src/mongo/db/auth:authprivilege
+filegroup(
+    name = "privilege_hdrs",
+    srcs = [":privilege.h"],
+)
+
+# TODO(SERVER-96858): Remove cycle created by moving //src/mongo/db/auth:resource_pattern.h to //src/mongo/db/auth:authprivilege
+filegroup(
+    name = "resource_pattern_hdrs",
+    srcs = [":resource_pattern.h"],
+)
+
+# TODO(SERVER-96858): Remove cycle created by moving //src/mongo/db/auth:validated_tenancy_scope.h to //src/mongo/db:server_base
+filegroup(
+    name = "validated_tenancy_scope_hdrs",
+    srcs = [":validated_tenancy_scope.h"],
+)
+
+# TODO(SERVER-96858): Remove cycle created by moving //src/mongo/db/auth:validated_tenancy_scope_factory.h to //src/mongo/db/auth:security_token_auth
+filegroup(
+    name = "validated_tenancy_scope_factory_hdrs",
+    srcs = [":validated_tenancy_scope_factory.h"],
+)

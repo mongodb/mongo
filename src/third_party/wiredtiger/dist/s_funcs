@@ -1,29 +1,40 @@
-#! /bin/sh
+#!/bin/bash
 
 # Complain about unused functions
-t=__wt.$$
-trap 'rm -f $t' 0 1 2 3 13 15
+. `dirname -- ${BASH_SOURCE[0]}`/common_functions.sh
+cd_dist
+use_pygrep
+check_fast_mode_flag
+setup_trap
+check_xargs_P
 
 # List of files to search.
-l=`sed -e '/^[a-z]/!d' -e 's/[	 ].*$//' -e 's,^,../,' filelist`
-l="$l `echo ../src/*/*_inline.h ../src/utilities/*.c ../bench/wtperf/*.c`"
+l=$(
+    sed -e '/^[a-z]/!d' -e 's/[	 ].*$//' -e 's,^,../,' filelist
+    ls -1 ../src/*/*_inline.h ../src/utilities/*.c ../bench/wtperf/*.c ../bench/tiered/*.c
+)
 
-(
-# Copy out the functions we don't use, but it's OK.
-sed -e '/^$/d' -e '/^#/d' < s_funcs.list
+# If none of these files to search have changed relative to develop there's nothing to do. Early exit.
+[[ -z "$(echo "$l" | filter_if_fast ../)" ]] && exit 0
 
-# Get the list of functions
-search=`egrep -h '^[a-zA-Z0-9_][a-zA-Z0-9_]*\(' $l | sed -e 's/(.*//' | sort -u`
+{
+    # Copy out the functions we don't use, but it's OK.
+    sed -e '/^$/d' -e '/^#/d' < s_funcs.list
 
-# Print the list of functions, followed by the occurrences: we're looking for
-# functions that only appear once
-echo "$search"
-sed -n '/{/,/^}/p' $l | fgrep -wo "$search"
+    # Get the list of functions
+    search=`grep -E -h '^[a-zA-Z0-9_][a-zA-Z0-9_]*\(' $l | sed -e 's/(.*//' | sort -u`
 
-sed -n '/^#define/,/[^\\]$/p' ../src/include/*.h ../src/include/*.in |
-    fgrep -who "$search"
-) | sort | uniq -u > $t
+    # Print the list of functions, followed by the occurrences: we're looking for
+    # functions that only appear once
+    echo "$search"
 
-test -s $t && cat $t
+    sed -n '/^#define/,/[^\\]$/p' ../src/*/*.h ../src/include/*.in | $FGREP -wo "$search" &
+
+    echo "$l" | xargs $XARGS_P -n 30 bash -c "sed -n '/{/,/^}/p' \"\$@\" | $FGREP -wo \"$search\" > $t-par-\$\$.out" -bash
+
+    wait
+    cat $t-par-*.out
+
+} | grep -E -v '^__ut_' | sort | uniq -u
 
 exit 0

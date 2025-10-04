@@ -1,0 +1,85 @@
+# Copyright (C) 2022-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/change_streams_cluster_parameter.h"
+
+imports:
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/cluster_parameters/cluster_server_parameter.idl"
+
+structs:
+    ChangeStreamsClusterParameterStorage:
+        description: >-
+            A specification for the 'changeStreams' cluster-wide configuration parameter
+            type.
+        inline_chained_structs: true
+        chained_structs:
+            ClusterServerParameter: clusterServerParameter
+        fields:
+            expireAfterSeconds:
+                description: >-
+                    The number of seconds to retain the change events. This value will be a
+                    non-zero positive value if the change stream is enabled and a zero value if the change
+                    stream is disabled.
+                type: safeInt64
+                default: 60 * 60
+
+server_parameters:
+    changeStreams:
+        description: "The cluster-wide configuration parameter for the change stream in the serverless."
+        set_at: cluster
+        omit_in_ftdc: false
+        cpp_vartype: ChangeStreamsClusterParameterStorage
+        cpp_varname: gChangeStreamsClusterParameter
+        validator:
+            callback: validateChangeStreamsClusterParameter
+        condition:
+            min_fcv: 6.2
+        redact: false
+
+    changeCollectionExpiredDocumentsRemoverJobSleepSeconds:
+        description: "Specifies the number of seconds for which the periodic change collection remover job will sleep between each cycle."
+        set_at: [startup]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: "gChangeCollectionExpiredDocumentsRemoverJobSleepSeconds"
+        validator:
+            gte: 1
+        default: 10
+        redact: false
+
+    disableExpiredChangeCollectionRemover:
+        description: Disables the expired change collection remover.
+        set_at: [startup]
+        cpp_vartype: bool
+        cpp_varname: gChangeCollectionRemoverDisabled
+        default: false
+        test_only: true
+        redact: false

@@ -37,12 +37,11 @@ from wtscenario import make_scenarios
 # Validate scenarios involving inserting tombstones when rolling back prepares
 class test_prepare09(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=2MB'
-    session_config = 'isolation=snapshot'
 
     format_values = [
         ('column', dict(key_format='r', value_format='S')),
         ('column_fix', dict(key_format='r', value_format='8t')),
-        ('integer_row', dict(key_format='i', value_format='S')),
+        ('row_integer', dict(key_format='i', value_format='S')),
     ]
 
     scenarios = make_scenarios(format_values)
@@ -92,8 +91,8 @@ class test_prepare09(wttest.WiredTigerTestCase):
         # Do a search, if we've aborted the update correct we won't have inserted a tombstone
         # and the original value will be visible to us.
         cursor.set_key(1)
-        self.assertEquals(cursor.search(), 0)
-        self.assertEquals(cursor.get_value(), value1)
+        self.assertEqual(cursor.search(), 0)
+        self.assertEqual(cursor.get_value(), value1)
 
     def test_prepared_update_is_aborted_correctly(self):
         uri = "table:test_prepare09"
@@ -142,6 +141,3 @@ class test_prepare09(wttest.WiredTigerTestCase):
             self.assertEqual(cursor.get_value(), 0)
         else:
             self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
-
-if __name__ == '__main__':
-    wttest.run()

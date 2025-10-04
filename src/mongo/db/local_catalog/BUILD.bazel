@@ -1,0 +1,914 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "index_catalog_mock",
+    srcs = [
+        "index_catalog_entry_mock.h",
+    ],
+    hdrs = [
+        "index_catalog_mock.h",
+    ],
+    deps = [
+    ],
+)
+
+mongo_cc_library(
+    name = "cannot_convert_index_to_unique_info",
+    srcs = [
+        "cannot_convert_index_to_unique_info.cpp",
+    ],
+    hdrs = [
+        "cannot_convert_index_to_unique_info.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+idl_generator(
+    name = "collection_options_gen",
+    src = "collection_options.idl",
+    hdrs = [
+        "collection_options_validation.h",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "clustered_collection_options_gen",
+    src = "clustered_collection_options.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "collection_options",
+    srcs = [
+        "clustered_collection_options_gen",
+        "clustered_collection_util.cpp",
+        "collection_options.cpp",
+        "collection_options_gen",
+        "collection_options_validation.cpp",
+        "//src/mongo/db/local_catalog/ddl:create_command_validation.h",
+    ],
+    hdrs = [
+        "clustered_collection_util.h",
+        "collection_options.h",
+        "collection_options_validation.h",
+        "//src/mongo/db/index:index_constants.h",
+    ],
+    deps = [
+        # TODO(SERVER-93876): Technically only requires `//src/mongo/db:common`.
+        "//src/mongo/crypto:encrypted_field_config",
+        "//src/mongo/db:common",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/commands:test_commands_enabled",
+        "//src/mongo/db/pipeline:change_stream_pre_and_post_images_options",
+        "//src/mongo/db/query:query_knobs",
+        "//src/mongo/db/query/collation:collator_interface",
+        "//src/mongo/db/query/query_shape",
+        "//src/mongo/db/timeseries:timeseries_options",
+    ],
+)
+
+idl_generator(
+    name = "health_log_gen",
+    src = "health_log.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "local_oplog_info",
+    srcs = [
+        "local_oplog_info.cpp",
+    ],
+    hdrs = [
+        "local_oplog_info.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:vector_clock_mutable",
+        "//src/mongo/db/admission:flow_control",
+        "//src/mongo/db/repl:oplog_visibility_manager",
+        "//src/mongo/db/repl:optime",
+        "//src/mongo/db/repl:repl_coordinator_interface",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/rss:replicated_storage_service",
+        "//src/mongo/db/storage:oplog_truncate_markers",
+        "//src/mongo/db/storage:record_store_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "durable_catalog",
+    srcs = [
+        "durable_catalog.cpp",
+    ],
+    hdrs = [
+        "durable_catalog.h",
+    ],
+    deps = [
+        ":collection_record_store_options",
+        ":durable_catalog_entry_metadata",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/op_observer:op_observer_util",
+        "//src/mongo/db/rss:replicated_storage_service",
+        "//src/mongo/db/storage:feature_document_util",
+        "//src/mongo/db/storage:ident",
+        "//src/mongo/db/storage:mdb_catalog",
+        "//src/mongo/db/storage:record_store_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "durable_catalog_entry_metadata",
+    srcs = [
+        "durable_catalog_entry_metadata.cpp",
+    ],
+    hdrs = [
+        "durable_catalog_entry_metadata.h",
+    ],
+    deps = [
+        ":collection_options",
+        "//src/mongo/db:common",
+    ],
+)
+
+mongo_cc_library(
+    name = "collection_catalog",
+    srcs = [
+        "collection_catalog.cpp",
+        "historical_catalogid_tracker.cpp",
+        "uncommitted_catalog_updates.cpp",
+        "uncommitted_multikey.cpp",
+        "views_for_database.cpp",
+    ],
+    hdrs = [
+        "collection_catalog.h",
+        "historical_catalogid_tracker.h",
+        "uncommitted_catalog_updates.h",
+        "uncommitted_multikey.h",
+        "views_for_database.h",
+    ],
+    deps = [
+        ":durable_catalog",
+        ":durable_catalog_entry_metadata",
+        "//src/mongo/db:audit",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:shard_role_api_stor_ex",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/collection_crud",
+        "//src/mongo/db/query/collation:collator_factory_interface",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query/query_stats",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/storage:exceptions",
+        "//src/mongo/db/storage:mdb_catalog",
+        "//src/mongo/db/storage:storage_options",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/views",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "collection_query_info",
+    srcs = [
+        "//src/mongo/db/query:collection_index_usage_tracker_decoration.cpp",
+        "//src/mongo/db/query:collection_query_info.cpp",
+        "//src/mongo/db/query:query_settings_decoration.cpp",
+        "//src/mongo/db/query/plan_cache:plan_cache_key_factory.cpp",
+    ],
+    hdrs = [
+        "//src/mongo/db/query:collection_index_usage_tracker_decoration.h",
+        "//src/mongo/db/query:collection_query_info.h",
+        "//src/mongo/db/query:query_settings_decoration.h",
+        "//src/mongo/db/query/plan_cache:plan_cache_key_factory.h",
+    ],
+    deps = [
+        "index_catalog",
+        "//src/mongo/db:collection_index_usage_tracker",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/fts:base_fts",
+        "//src/mongo/db/query:query_planner",
+        "//src/mongo/db/query/plan_cache:query_plan_cache",
+        "//src/mongo/db/query/query_settings",
+        "//src/mongo/db/query/query_stats",
+        "//src/mongo/db/storage:storage_options",
+    ],
+)
+
+idl_generator(
+    name = "import_collection_oplog_entry_gen",
+    src = "import_collection_oplog_entry.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "collection_uuid_mismatch_info",
+    srcs = [
+        "collection_uuid_mismatch_info.cpp",
+    ],
+    hdrs = [
+        "collection_uuid_mismatch_info.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "import_collection_oplog_entry",
+    srcs = [
+        ":import_collection_oplog_entry_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "index_catalog",
+    srcs = [
+        "index_catalog.cpp",
+        "index_catalog_entry.cpp",
+    ],
+    hdrs = [
+        "clustered_collection_options_gen",
+        "collection_options_gen",
+        "index_catalog.h",
+        "index_catalog_entry.h",
+        "//src/mongo/base:error_codes_header",
+        "//src/mongo/bson:bson_validate_gen",
+        "//src/mongo/client:client_api_version_parameters_gen",
+        "//src/mongo/client:hedging_mode_gen",
+        "//src/mongo/client:read_preference_gen",
+        "//src/mongo/crypto:encryption_fields_gen",
+        "//src/mongo/crypto:fle_stats_gen",
+        "//src/mongo/db:api_parameters_gen",
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db:multitenancy_gen",
+        "//src/mongo/db:namespace_spec_gen",
+        "//src/mongo/db:read_write_concern_provenance_base_gen",
+        "//src/mongo/db:write_concern_gen",
+        "//src/mongo/db/auth:access_checks_gen",
+        "//src/mongo/db/auth:action_type_gen",
+        "//src/mongo/db/auth:auth_types_gen",
+        "//src/mongo/db/cluster_parameters:cluster_server_parameter_gen",
+        "//src/mongo/db/global_catalog:type_collection_common_types_gen",
+        "//src/mongo/db/global_catalog/router_role_api:gossiped_routing_cache_gen",
+        "//src/mongo/db/matcher/schema:encrypt_schema_gen",
+        "//src/mongo/db/pipeline:change_stream_pre_and_post_images_options_gen",
+        "//src/mongo/db/pipeline:document_source_change_stream_gen",
+        "//src/mongo/db/pipeline:legacy_runtime_constants_gen",
+        "//src/mongo/db/pipeline:storage_stats_spec_gen",
+        "//src/mongo/db/query:distinct_command_gen",
+        "//src/mongo/db/query:explain_verbosity_gen",
+        "//src/mongo/db/query:find_command_gen",
+        "//src/mongo/db/query:query_feature_flags_gen",
+        "//src/mongo/db/query:query_knobs_gen",
+        "//src/mongo/db/query:tailable_mode_gen",
+        "//src/mongo/db/query/client_cursor:cursor_response_gen",
+        "//src/mongo/db/query/client_cursor:generic_cursor_gen",
+        "//src/mongo/db/query/query_settings:query_settings_gen",
+        "//src/mongo/db/query/write_ops:single_write_result_gen",
+        "//src/mongo/db/query/write_ops:write_ops_gen",
+        "//src/mongo/db/repl:apply_ops_gen",
+        "//src/mongo/db/repl:member_config_gen",
+        "//src/mongo/db/repl:oplog_entry_gen",
+        "//src/mongo/db/repl:optime_base_gen",
+        "//src/mongo/db/repl:read_concern_gen",
+        "//src/mongo/db/repl:repl_server_parameters_gen",
+        "//src/mongo/db/repl:repl_set_config_gen",
+        "//src/mongo/db/repl:repl_set_config_params_gen",
+        "//src/mongo/db/session:logical_session_cache_gen",
+        "//src/mongo/db/session:logical_session_id_gen",
+        "//src/mongo/db/sorter:sorter_gen",
+        "//src/mongo/db/timeseries:timeseries_gen",
+        "//src/mongo/db/vector_clock:vector_clock_gen",
+        "//src/mongo/db/versioning_protocol:chunk_version_gen",
+        "//src/mongo/db/versioning_protocol:database_version_base_gen",
+        "//src/mongo/idl:generic_argument_gen",
+        "//src/mongo/rpc:topology_version_gen",
+        "//src/mongo/rpc/metadata:audit_metadata_gen",
+        "//src/mongo/util/version:releases_header",
+    ],
+    header_deps = [
+        "//src/mongo/db/exec/mutable_bson:mutable_bson",
+        "//src/mongo/db/pipeline/process_interface:mongo_process_interface",
+        "//src/mongo/db/query:hint_parser",
+        "//src/mongo/db/repl:oplog_buffer_batched_queue",
+        "//src/mongo/db/storage:duplicate_key_error_info",
+    ],
+    deps = [
+        "//src/mongo/crypto:fle_fields",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:shard_role_api_stor_ex",
+        "//src/mongo/db/storage:storage_options",
+    ],
+)
+
+mongo_cc_library(
+    name = "database_holder",
+    srcs = [
+        "database_holder.cpp",
+    ],
+    hdrs = [
+        "database.h",
+        "database_holder.h",
+        "virtual_collection_options.h",
+        "//src/mongo/db:dbcommands_gen",
+        "//src/mongo/db/pipeline:external_data_source_option_gen",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
+    ],
+)
+
+mongo_cc_library(
+    name = "database_holder_mock",
+    hdrs = [
+        "database_holder_mock.h",
+    ],
+    deps = [
+        ":database_holder",
+    ],
+)
+
+mongo_cc_library(
+    name = "document_validation",
+    srcs = [
+        "document_validation.cpp",
+    ],
+    hdrs = [
+        "document_validation.h",
+    ],
+    deps = [
+        "//src/mongo/db:service_context",
+    ],
+)
+
+mongo_cc_library(
+    name = "health_log_interface",
+    srcs = [
+        "health_log_gen",
+        "health_log_interface.cpp",
+    ],
+    hdrs = [
+        "health_log_interface.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+    ],
+)
+
+mongo_cc_library(
+    name = "index_key_validate",
+    srcs = [
+        "index_key_validate.cpp",
+    ],
+    hdrs = [
+        "index_key_validate.h",
+        "//src/mongo/db/ttl:ttl_collection_cache.h",
+    ],
+    deps = [
+        "//src/mongo/db:common",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/query/collation:collator_factory_interface",
+        "//src/mongo/db/storage:storage_options",
+    ],
+)
+
+mongo_cc_library(
+    name = "throttle_cursor",
+    srcs = [
+        "throttle_cursor.cpp",
+    ],
+    hdrs = [
+        "throttle_cursor.h",
+    ],
+    deps = [
+        "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/query/query_stats",
+        "//src/mongo/db/validate:validate_idl",
+        "//src/mongo/util/concurrency:spin_lock",
+    ],
+)
+
+mongo_cc_library(
+    name = "catalog_stats",
+    srcs = [
+        "catalog_stats.cpp",
+    ],
+    hdrs = [
+        "catalog_stats.h",
+    ],
+    deps = [
+        ":collection_catalog",
+        ":database_holder",
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db/commands/server_status:server_status_core",
+        "//src/mongo/db/views",
+    ],
+)
+
+mongo_cc_library(
+    name = "index_repair",
+    srcs = [
+        "index_repair.cpp",
+    ],
+    hdrs = [
+        "index_repair.h",
+    ],
+    deps = [
+        ":collection_options",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/collection_crud",
+        "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/local_catalog/lock_manager:exception_util",
+        "//src/mongo/db/query/query_stats",
+        "//src/mongo/db/storage:duplicate_key_error_info",
+        "//src/mongo/db/storage/key_string",
+        "//src/mongo/db/validate:validate_state",
+    ],
+)
+
+mongo_cc_library(
+    name = "catalog_repair",
+    srcs = [
+        "catalog_repair.cpp",
+    ],
+    hdrs = [
+        "catalog_repair.h",
+    ],
+    deps = [
+        ":durable_catalog",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/storage:mdb_catalog",
+        "//src/mongo/db/storage:storage_engine_impl",
+    ],
+)
+
+mongo_cc_library(
+    name = "catalog_helpers",
+    srcs = [
+        "backwards_compatible_collection_options_util.cpp",
+        "coll_mod.cpp",
+        "coll_mod_index.cpp",
+        "collection_catalog_helper.cpp",
+        "collection_compact.cpp",
+        "create_collection.cpp",
+        "drop_collection.cpp",
+        "drop_database.cpp",
+        "drop_indexes.cpp",
+        "external_data_source_scope_guard.cpp",
+        "list_indexes.cpp",
+        "rename_collection.cpp",
+        "unique_collection_name.cpp",
+        "//src/mongo/db/collection_crud:capped_utils.cpp",
+        "//src/mongo/db/op_observer:batched_write_policy.h",
+    ],
+    hdrs = [
+        "backwards_compatible_collection_options_util.h",
+        "coll_mod.h",
+        "coll_mod_index.h",
+        "collection_catalog_helper.h",
+        "collection_compact.h",
+        "create_collection.h",
+        "drop_collection.h",
+        "drop_database.h",
+        "drop_indexes.h",
+        "external_data_source_scope_guard.h",
+        "list_indexes.h",
+        "rename_collection.h",
+        "unique_collection_name.h",
+        "//src/mongo/db/collection_crud:capped_utils.h",
+    ],
+    deps = [
+        ":cannot_convert_index_to_unique_info",
+        ":collection_options",
+        ":collection_uuid_mismatch_info",
+        ":document_validation",
+        ":index_catalog",
+        ":index_key_validate",
+        ":local_oplog_info",
+        ":throttle_cursor",
+        "//src/mongo:base",
+        "//src/mongo/db:audit",
+        "//src/mongo/db:coll_mod_command_idl",
+        "//src/mongo/db:index_commands_idl",
+        "//src/mongo/db:internal_transactions_feature_flag",
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/collection_crud",
+        "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/index_builds:index_builds_coordinator",
+        "//src/mongo/db/index_builds:multi_index_block",
+        "//src/mongo/db/local_catalog/lock_manager:exception_util",
+        "//src/mongo/db/query/write_ops",
+        "//src/mongo/db/stats:top",
+        "//src/mongo/db/storage:index_entry_comparison",
+        "//src/mongo/db/storage:record_store_base",
+        "//src/mongo/db/storage:storage_engine_common",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/db/storage/key_string",
+        "//src/mongo/db/timeseries:catalog_helper",
+        "//src/mongo/db/timeseries:collection_pre_conditions_util",
+        "//src/mongo/db/timeseries:timeseries_conversion_util",
+        "//src/mongo/db/timeseries:timeseries_options",
+        "//src/mongo/db/timeseries:viewless_timeseries_collection_creation_helpers",
+        "//src/mongo/db/ttl:ttl_collection_cache",
+        "//src/mongo/db/validate:validate_idl",
+        "//src/mongo/db/views",
+        "//src/mongo/db/views:view_catalog_helpers",
+    ],
+)
+
+mongo_cc_library(
+    name = "health_log",
+    srcs = [
+        "health_log.cpp",
+    ],
+    hdrs = [
+        "health_log.h",
+    ],
+    deps = [
+        ":collection_options",
+        ":health_log_interface",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/local_catalog/lock_manager:deferred_writer",
+    ],
+)
+
+mongo_cc_library(
+    name = "catalog_control",
+    srcs = [
+        "catalog_control.cpp",
+    ],
+    hdrs = [
+        "catalog_control.h",
+    ],
+    deps = [
+        ":catalog_repair",
+        ":catalog_stats",
+        ":collection_catalog",
+        ":collection_record_store_options",
+        ":database_holder",
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/index_builds:index_builds_coordinator",
+        "//src/mongo/db/local_catalog/lock_manager",
+        "//src/mongo/db/repl:oplog",
+        "//src/mongo/db/storage:write_unit_of_work",
+        "//src/mongo/db/timeseries:timeseries_extended_range",
+    ],
+)
+
+mongo_cc_library(
+    name = "collection_record_store_options",
+    srcs = [
+        "collection_record_store_options.cpp",
+    ],
+    hdrs = [
+        "collection_record_store_options.h",
+    ],
+    deps = [
+        ":collection_options",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/storage:record_store_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "catalog_impl",
+    srcs = [
+        "collection_impl.cpp",
+        "database_holder_impl.cpp",
+        "database_impl.cpp",
+        "index_catalog_entry_helpers.cpp",
+        "index_catalog_entry_impl.cpp",
+        "index_catalog_impl.cpp",
+        "virtual_collection_impl.cpp",
+    ],
+    hdrs = [
+        "collection_impl.h",
+        "database_holder_impl.h",
+        "database_impl.h",
+        "index_catalog_entry_helpers.h",
+        "index_catalog_entry_impl.h",
+        "index_catalog_impl.h",
+        "virtual_collection_impl.h",
+    ],
+    deps = [
+        "catalog_helpers",
+        "catalog_stats",
+        "collection_options",
+        "document_validation",
+        "durable_catalog",
+        "health_log_interface",
+        "index_catalog",
+        "index_key_validate",
+        "index_repair",
+        "local_oplog_info",
+        "throttle_cursor",
+        "//src/mongo/db:audit",
+        "//src/mongo/db:collection_index_usage_tracker",
+        "//src/mongo/db:dbcommands_idl",
+        "//src/mongo/db:fle_implicit_validator",
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db:record_id_helpers",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db:system_index",
+        "//src/mongo/db:vector_clock",
+        "//src/mongo/db/collection_crud",
+        "//src/mongo/db/commands/server_status:server_status_core",
+        "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/index:preallocated_container_pool",
+        "//src/mongo/db/matcher/doc_validation",
+        "//src/mongo/db/op_observer",
+        "//src/mongo/db/query/query_stats",
+        "//src/mongo/db/query/virtual_collection",
+        "//src/mongo/db/repl:oplog",
+        "//src/mongo/db/repl:repl_server_parameters",
+        "//src/mongo/db/repl:repl_settings",
+        "//src/mongo/db/rss:replicated_storage_service",
+        "//src/mongo/db/stats:top",
+        "//src/mongo/db/storage:mdb_catalog",
+        "//src/mongo/db/storage:record_store_base",
+        "//src/mongo/db/storage:storage_engine_common",
+        "//src/mongo/db/storage:storage_engine_impl",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/db/storage/key_string",
+        "//src/mongo/db/timeseries:timeseries_conversion_util",
+        "//src/mongo/db/timeseries:timeseries_extended_range",
+        "//src/mongo/db/timeseries:viewless_timeseries_collection_creation_helpers",
+        "//src/mongo/db/transaction",
+        "//src/mongo/db/ttl:ttl_collection_cache",
+        "//src/mongo/db/validate:validate_idl",
+        "//src/mongo/db/validate:validate_state",
+        "//src/mongo/db/views:view_catalog_helpers",
+        "//src/mongo/util:log_and_backoff",
+        "//src/mongo/util:progress_meter",
+    ],
+)
+
+mongo_cc_library(
+    name = "snapshot_helper",
+    srcs = [
+        "snapshot_helper.cpp",
+    ],
+    hdrs = [
+        "snapshot_helper.h",
+    ],
+    deps = [
+        "//src/mongo/db/repl:read_concern_args",
+        "//src/mongo/db/repl:repl_coordinator_interface",
+    ],
+)
+
+mongo_cc_library(
+    name = "catalog_test_fixture",
+    srcs = [
+        "catalog_test_fixture.cpp",
+    ],
+    hdrs = [
+        "catalog_test_fixture.h",
+    ],
+    deps = [
+        ":catalog_helpers",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/repl:repl_coordinator_interface",
+        "//src/mongo/db/repl:replmocks",
+        "//src/mongo/db/repl:storage_interface_impl",
+    ],
+)
+
+mongo_cc_library(
+    name = "collection_mock",
+    hdrs = [
+        "collection_mock.h",
+    ],
+    deps = [":collection_options"],
+)
+
+mongo_cc_benchmark(
+    name = "collection_catalog_bm",
+    srcs = [
+        "collection_catalog_bm.cpp",
+    ],
+    deps = [
+        ":collection_catalog",
+        ":collection_mock",
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db/local_catalog/lock_manager",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_catalog_test",
+    srcs = [
+        "backwards_compatible_collection_options_util_test.cpp",
+        "coll_mod_test.cpp",
+        "collection_catalog_test.cpp",
+        "collection_options_test.cpp",
+        "collection_test.cpp",
+        "collection_writer_test.cpp",
+        "create_collection_test.cpp",
+        "database_test.cpp",
+        "drop_database_test.cpp",
+        "historical_catalogid_tracker_test.cpp",
+        "index_catalog_entry_impl_test.cpp",
+        "index_catalog_impl_test.cpp",
+        "index_signature_test.cpp",
+        "rename_collection_test.cpp",
+    ],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        ":catalog_control",
+        ":catalog_helpers",
+        ":catalog_impl",
+        ":catalog_test_fixture",
+        ":collection_catalog",
+        ":collection_mock",
+        ":collection_options",
+        ":database_holder",
+        ":index_key_validate",
+        ":throttle_cursor",
+        "//src/mongo/db:coll_mod_command_idl",
+        "//src/mongo/db:dbhelpers",
+        "//src/mongo/db:index_commands_idl",
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/collection_crud",
+        "//src/mongo/db/commands:create_command",
+        "//src/mongo/db/commands:test_commands_enabled",
+        "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/index_builds:commit_quorum_options",
+        "//src/mongo/db/index_builds:index_build_block",
+        "//src/mongo/db/index_builds:index_build_entry_idl",
+        "//src/mongo/db/index_builds:index_builds_coordinator",
+        "//src/mongo/db/index_builds:index_builds_coordinator_mongod",
+        "//src/mongo/db/index_builds:multi_index_block",
+        "//src/mongo/db/local_catalog/lock_manager:exception_util",
+        "//src/mongo/db/op_observer",
+        "//src/mongo/db/op_observer:op_observer_impl",
+        "//src/mongo/db/op_observer:operation_logger_impl",
+        "//src/mongo/db/op_observer:operation_logger_mock",
+        "//src/mongo/db/query/datetime:date_time_support",
+        "//src/mongo/db/repl:oplog",
+        "//src/mongo/db/repl:oplog_application",
+        "//src/mongo/db/repl:optime",
+        "//src/mongo/db/repl:repl_coordinator_interface",
+        "//src/mongo/db/repl:replmocks",
+        "//src/mongo/db/repl:storage_interface_impl",
+        "//src/mongo/db/timeseries:timeseries_collmod",
+        "//src/mongo/db/timeseries:timeseries_options",
+        "//src/mongo/db/validate:collection_validation",
+        "//src/mongo/db/validate:validate_idl",
+        "//src/mongo/db/validate:validate_state",
+        "//src/mongo/idl:server_parameter_test_controller",
+        "//src/mongo/unittest",
+        "//src/mongo/util:clock_source_mock",
+        "//src/mongo/util:pcre_wrapper",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "index_validate_test",
+    srcs = [
+        "index_key_validate_test.cpp",
+        "index_spec_validate_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_sixth_group",
+        "server-index-builds",
+    ],
+    deps = [
+        ":index_key_validate",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db/query/collation:collator_factory_mock",
+        "//src/mongo/db/query/collation:collator_interface_mock",
+        "//src/mongo/idl:server_parameter_test_controller",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "throttle_cursor_test",
+    srcs = [
+        "throttle_cursor_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_fourth_group",
+        "server-integration-smoke",
+    ],
+    deps = [
+        ":catalog_control",
+        ":catalog_helpers",
+        ":catalog_impl",
+        ":catalog_test_fixture",
+        ":collection_catalog",
+        ":collection_mock",
+        ":collection_options",
+        ":index_key_validate",
+        ":throttle_cursor",
+        "//src/mongo/db/collection_crud",
+        "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/op_observer",
+        "//src/mongo/db/repl:oplog",
+        "//src/mongo/db/repl:oplog_application",
+        "//src/mongo/db/repl:optime",
+        "//src/mongo/db/repl:repl_coordinator_interface",
+        "//src/mongo/db/repl:replmocks",
+        "//src/mongo/db/repl:storage_interface_impl",
+        "//src/mongo/db/validate:collection_validation",
+        "//src/mongo/db/validate:validate_idl",
+        "//src/mongo/db/validate:validate_state",
+        "//src/mongo/idl:server_parameter_test_controller",
+        "//src/mongo/unittest",
+        "//src/mongo/util:clock_source_mock",
+        "//src/mongo/util:pcre_wrapper",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "collection_record_store_options_test",
+    srcs = [
+        "collection_record_store_options_test.cpp",
+    ],
+    tags = ["mongo_unittest_sixth_group"],
+    deps = [
+        ":collection_record_store_options",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/storage:record_store_base",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "catalog_control_bm",
+    srcs = [
+        "catalog_control_bm.cpp",
+    ],
+    deps = [
+        ":collection_catalog",
+        ":collection_mock",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db/local_catalog:catalog_control",
+        "//src/mongo/db/repl:storage_interface_impl",
+    ],
+)
+
+idl_generator(
+    name = "validate_db_metadata_gen",
+    src = "validate_db_metadata.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "validate_db_metadata_command",
+    srcs = [
+        ":validate_db_metadata_gen",
+    ],
+    header_deps = [
+        "//src/mongo/db/user_write_block:set_user_write_block_mode_idl",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)

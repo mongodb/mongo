@@ -29,23 +29,34 @@
 
 #pragma once
 
-#include <wiredtiger.h>
+#include "mongo/base/checked_cast.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_cursor.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_session.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_snapshot_manager.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_stats.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/timer.h"
 
-#include <boost/optional.hpp>
 #include <cstdint>
 #include <memory>
 #include <stack>
 #include <vector>
 
-#include "mongo/base/checked_cast.h"
-#include "mongo/bson/timestamp.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/record_id.h"
-#include "mongo/db/repl/read_concern_level.h"
-#include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
-#include "mongo/util/timer.h"
+#include <wiredtiger.h>
+
+#include <absl/container/inlined_vector.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -54,70 +65,36 @@ using RoundUpReadTimestamp = WiredTigerBeginTxnBlock::RoundUpReadTimestamp;
 
 extern AtomicWord<std::int64_t> snapshotTooOldErrorCount;
 
-class BSONObjBuilder;
-
-class WiredTigerOperationStats final : public StorageStats {
-public:
-    /**
-     *  There are two types of statistics provided by WiredTiger engine - data and wait.
-     */
-    enum class Section { DATA, WAIT };
-
-    BSONObj toBSON() final;
-
-    StorageStats& operator+=(const StorageStats&) final;
-
-    WiredTigerOperationStats& operator+=(const WiredTigerOperationStats&);
-
-    /**
-     * Fetches an operation's storage statistics from WiredTiger engine.
-     */
-    void fetchStats(WT_SESSION*, const std::string&, const std::string&);
-
-    std::shared_ptr<StorageStats> getCopy() final;
-
-private:
-    /**
-     * Each statistic in WiredTiger has an integer key, which this map associates with a section
-     * (either DATA or WAIT) and user-readable name.
-     */
-    static std::map<int, std::pair<StringData, Section>> _statNameMap;
-
-    /**
-     * Stores the value for each statistic returned by a WiredTiger cursor. Each statistic is
-     * associated with an integer key, which can be mapped to a name and section using the
-     * '_statNameMap'.
-     */
-    std::map<int, long long> _stats;
-};
-
 class WiredTigerRecoveryUnit final : public RecoveryUnit {
 public:
-    WiredTigerRecoveryUnit(WiredTigerSessionCache* sc);
+    WiredTigerRecoveryUnit(WiredTigerConnection* connection);
 
     /**
      * It's expected a consumer would want to call the constructor that simply takes a
-     * `WiredTigerSessionCache`. That constructor accesses the `WiredTigerKVEngine` to find the
+     * `WiredTigerConnection`. That constructor accesses the `WiredTigerKVEngine` to find the
      * `WiredTigerOplogManager`. However, unit tests construct `WiredTigerRecoveryUnits` with a
-     * `WiredTigerSessionCache` that do not have a valid `WiredTigerKVEngine`. This constructor is
+     * `WiredTigerConnection` that do not have a valid `WiredTigerKVEngine`. This constructor is
      * expected to only be useful in those cases.
      */
-    WiredTigerRecoveryUnit(WiredTigerSessionCache* sc, WiredTigerOplogManager* oplogManager);
-    ~WiredTigerRecoveryUnit();
+    WiredTigerRecoveryUnit(WiredTigerConnection* sc, WiredTigerOplogManager* oplogManager);
+    ~WiredTigerRecoveryUnit() override;
 
-    void beginUnitOfWork(OperationContext* opCtx) override;
+    static WiredTigerRecoveryUnit& get(RecoveryUnit& ru) {
+        return checked_cast<WiredTigerRecoveryUnit&>(ru);
+    }
+
+    static WiredTigerRecoveryUnit* get(RecoveryUnit* ru) {
+        return checked_cast<WiredTigerRecoveryUnit*>(ru);
+    }
+
     void prepareUnitOfWork() override;
 
-    bool waitUntilDurable(OperationContext* opCtx) override;
-
-    bool waitUntilUnjournaledWritesDurable(OperationContext* opCtx, bool stableCheckpoint) override;
-
-    void preallocateSnapshot() override;
-    void preallocateSnapshotForOplogRead() override;
+    void preallocateSnapshot(
+        const OpenSnapshotOptions& options = kDefaultOpenSnapshotOptions) override;
 
     Status majorityCommittedSnapshotAvailable() const override;
 
-    boost::optional<Timestamp> getPointInTimeReadTimestamp(OperationContext* opCtx) override;
+    boost::optional<Timestamp> getPointInTimeReadTimestamp() override;
 
     Status setTimestamp(Timestamp timestamp) override;
 
@@ -143,11 +120,29 @@ public:
 
     PrepareConflictBehavior getPrepareConflictBehavior() const override;
 
-    void setRoundUpPreparedTimestamps(bool value) override;
+    /**
+     * Set pre-fetching capabilities for this session. This allows pre-loading of a set of pages
+     * into the cache and is an optional optimization.
+     */
+    void setPrefetching(bool enable) override;
 
-    void setCatalogConflictingTimestamp(Timestamp timestamp) override;
+    void allowOneUntimestampedWrite() override {
+        invariant(!_isActive());
+        // In the case we're already allowing all timestamp writes we do not make the assertions
+        // stricter. This would otherwise break the relaxed assumptions being set at layers above.
+        if (_untimestampedWriteAssertionLevel ==
+            RecoveryUnit::UntimestampedWriteAssertionLevel::kSuppressAlways) {
+            return;
+        }
+        _untimestampedWriteAssertionLevel =
+            RecoveryUnit::UntimestampedWriteAssertionLevel::kSuppressOnce;
+    }
 
-    Timestamp getCatalogConflictingTimestamp() const override;
+    void allowAllUntimestampedWrites() override {
+        invariant(!_isActive());
+        _untimestampedWriteAssertionLevel =
+            RecoveryUnit::UntimestampedWriteAssertionLevel::kSuppressAlways;
+    }
 
     void setTimestampReadSource(ReadSource source,
                                 boost::optional<Timestamp> provided = boost::none) override;
@@ -160,7 +155,7 @@ public:
 
     bool isReadSourcePinned() const override;
 
-    virtual void setOrderedCommit(bool orderedCommit) override {
+    void setOrderedCommit(bool orderedCommit) override {
         _orderedCommit = orderedCommit;
     }
 
@@ -174,24 +169,29 @@ public:
         return _readOnce;
     };
 
-    std::shared_ptr<StorageStats> getOperationStatistics() const override;
+    std::unique_ptr<StorageStats> computeOperationStatisticsSinceLastCall() override;
 
-    void refreshSnapshot() override;
-
-    void ignoreAllMultiTimestampConstraints() {
+    void ignoreAllMultiTimestampConstraints() override {
         _multiTimestampConstraintTracker.ignoreAllMultiTimestampConstraints = true;
     }
 
+    void setCacheMaxWaitTimeout(Milliseconds) override;
+
+    size_t getCacheDirtyBytes() override;
+
     // ---- WT STUFF
 
-    WiredTigerSession* getSession();
-    void setIsOplogReader() {
-        _isOplogReader = true;
+    WiredTigerConnection* getConnection() {
+        return _connection;
     }
 
-    bool getIsOplogReader() const {
-        return _isOplogReader;
-    }
+    WiredTigerSession* getSession();
+
+    /**
+     * Returns a session without starting a new WT txn on the session. Will not close any already
+     * running session.
+     */
+    WiredTigerSession* getSessionNoTxn();
 
     /**
      * Enter a period of wait or computation during which there are no WT calls.
@@ -199,43 +199,23 @@ public:
      */
     void beginIdle();
 
-    /**
-     * Returns a session without starting a new WT txn on the session. Will not close any already
-     * running session.
-     */
-
-    WiredTigerSession* getSessionNoTxn();
-
-    WiredTigerSessionCache* getSessionCache() {
-        return _sessionCache;
-    }
-
     void assertInActiveTxn() const;
 
-    /**
-     * This function must be called when a write operation is performed on the active transaction
-     * for the first time.
-     *
-     * Must be reset when the active transaction is either committed or rolled back.
-     */
-    void setTxnModified();
+    void setTxnModified() override;
 
-    boost::optional<int64_t> getOplogVisibilityTs();
+    boost::optional<int64_t> getOplogVisibilityTs() override;
+    void setOplogVisibilityTs(boost::optional<int64_t> oplogVisibilityTs) override;
 
-    static WiredTigerRecoveryUnit* get(OperationContext* opCtx) {
-        return checked_cast<WiredTigerRecoveryUnit*>(opCtx->recoveryUnit());
-    }
-
-    static void appendGlobalStats(BSONObjBuilder& b);
-
-    bool gatherWriteContextForDebugging() const;
-    void storeWriteContextForDebugging(const BSONObj& info);
+    void setOperationContext(OperationContext* opCtx) override;
 
 private:
+    void doBeginUnitOfWork() override;
     void doCommitUnitOfWork() override;
     void doAbortUnitOfWork() override;
 
     void doAbandonSnapshot() override;
+
+    void _setIsolation(Isolation) override;
 
     void _abort();
     void _commit();
@@ -248,24 +228,25 @@ private:
      * Starts a transaction at the current all_durable timestamp.
      * Returns the timestamp the transaction was started at.
      */
-    Timestamp _beginTransactionAtAllDurableTimestamp(WT_SESSION* session);
+    Timestamp _beginTransactionAtAllDurableTimestamp();
 
     /**
      * Starts a transaction at the no-overlap timestamp. Returns the timestamp the transaction
      * was started at.
      */
-    Timestamp _beginTransactionAtNoOverlapTimestamp(WT_SESSION* session);
+    Timestamp _beginTransactionAtNoOverlapTimestamp();
 
     /**
-     * Starts a transaction at the lastApplied timestamp. Returns the timestamp at which the
-     * transaction was started.
+     * Starts a transaction at the lastApplied timestamp stored in '_readAtTimestamp'. Sets
+     * '_readAtTimestamp' to the actual timestamp used by the storage engine in case rounding
+     * occurred.
      */
-    Timestamp _beginTransactionAtLastAppliedTimestamp(WT_SESSION* session);
+    void _beginTransactionAtLastAppliedTimestamp();
 
     /**
      * Returns the timestamp at which the current transaction is reading.
      */
-    Timestamp _getTransactionReadTimestamp(WT_SESSION* session);
+    Timestamp _getTransactionReadTimestamp();
 
     /**
      * Keeps track of constraint violations on multi timestamp transactions. If a transaction sets
@@ -275,9 +256,10 @@ private:
      */
     void _updateMultiTimestampConstraint(Timestamp timestamp);
 
-    WiredTigerSessionCache* _sessionCache;  // not owned
+    WiredTigerConnection* _connection;      // not owned
     WiredTigerOplogManager* _oplogManager;  // not owned
-    UniqueWiredTigerSession _session;
+    WiredTigerManagedSession _managedSession;
+    WiredTigerSession* _session = nullptr;
     bool _isTimestamped = false;
 
     // Helpers used to keep track of multi timestamp constraint violations on the transaction.
@@ -285,7 +267,11 @@ private:
         bool isTxnModified = false;
         bool txnHasNonTimestampedWrite = false;
         bool ignoreAllMultiTimestampConstraints = false;
-        std::stack<Timestamp> timestampOrder = {};
+
+        // Most operations only use one timestamp.
+        static constexpr auto kDefaultInit = 1;
+        std::stack<Timestamp, absl::InlinedVector<Timestamp, kDefaultInit>> timestampOrder;
+
     } _multiTimestampConstraintTracker;
 
     // Specifies which external source to use when setting read timestamps on transactions.
@@ -302,19 +288,31 @@ private:
 
     // The behavior of handling prepare conflicts.
     PrepareConflictBehavior _prepareConflictBehavior{PrepareConflictBehavior::kEnforce};
-    // Dictates whether to round up prepare and commit timestamp of a prepared transaction.
-    RoundUpPreparedTimestamps _roundUpPreparedTimestamps{RoundUpPreparedTimestamps::kNoRound};
     Timestamp _commitTimestamp;
     Timestamp _durableTimestamp;
     Timestamp _prepareTimestamp;
     boost::optional<Timestamp> _lastTimestampSet;
     Timestamp _readAtTimestamp;
-    Timestamp _catalogConflictTimestamp;
+    UntimestampedWriteAssertionLevel _untimestampedWriteAssertionLevel =
+        UntimestampedWriteAssertionLevel::kEnforce;
     std::unique_ptr<Timer> _timer;
-    bool _isOplogReader = false;
+    // The guaranteed 'no holes' point in the oplog. Forward cursor oplog reads can only read up to
+    // this timestamp if they want to avoid missing any entries in the oplog that may not yet have
+    // committed ('holes'). @see WiredTigerOplogManager::getOplogReadTimestamp
     boost::optional<int64_t> _oplogVisibleTs = boost::none;
-    bool _gatherWriteContextForDebugging = false;
-    std::vector<BSONObj> _writeContextForDebugging;
+
+    WiredTigerStats _sessionStatsAfterLastOperation;
+
+    Milliseconds _cacheMaxWaitTimeout{0};
+
+    // Detects any attempt to reconfigure options used by an open transaction.
+    OpenSnapshotOptions _optionsUsedToOpenSnapshot;
 };
+
+// Constructs a WiredTigerCursor::Params instance from the given params and returns it.
+WiredTigerCursor::Params getWiredTigerCursorParams(WiredTigerRecoveryUnit& wtRu,
+                                                   uint64_t tableID,
+                                                   bool allowOverwrite = false,
+                                                   bool random = false);
 
 }  // namespace mongo

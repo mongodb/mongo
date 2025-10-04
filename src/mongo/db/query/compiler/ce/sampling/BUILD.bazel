@@ -1,0 +1,101 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "sampling_test_utils",
+    srcs = [
+        "sampling_test_utils.cpp",
+    ],
+    hdrs = [
+        "sampling_test_utils.h",
+    ],
+    deps = [
+        "//src/mongo/db:write_stage_common",
+        "//src/mongo/db/collection_crud",
+        "//src/mongo/db/local_catalog:catalog_control",
+        "//src/mongo/db/local_catalog:catalog_test_fixture",
+        "//src/mongo/db/query:query_planner",
+        "//src/mongo/db/query/compiler/ce:ce_test_utils",
+        "//src/mongo/db/query/compiler/optimizer/index_bounds_builder",
+    ],
+)
+
+mongo_cc_library(
+    name = "sampling_estimator",
+    srcs = [
+        "sampling_estimator_impl.cpp",
+    ],
+    hdrs = [
+        "sampling_estimator.h",
+        "sampling_estimator_impl.h",
+    ],
+    deps = [
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db/query/compiler/optimizer/cost_based_ranker:estimates",
+    ],
+)
+
+mongo_cc_library(
+    name = "sampling_estimator_interface",
+    hdrs = [
+        "sampling_estimator.h",
+    ],
+    deps = [
+        "//src/mongo/db:query_expressions",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "sampling_estimator_test",
+    srcs = [
+        "sampling_estimator_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        ":sampling_test_utils",
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db/query/compiler/optimizer/cost_based_ranker:cbr_test_utils",
+    ],
+)
+
+# it's a utility that measures the accuracy of sampling CE.
+mongo_cc_unit_test(
+    name = "sampling_estimation_accuracy_analysis_test",
+    srcs = [
+        "sampling_accuracy_test.cpp",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":sampling_test_utils",
+        "//src/mongo/db/query:query_test_service_context",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "sampling_bm",
+    srcs = ["ce_sampling_bm.cpp"],
+    tags = ["second_half_bm"],
+    deps = [
+        ":sampling_test_utils",
+        "//src/mongo/db/query:query_test_service_context",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "sampling_indexscans_bm",
+    srcs = ["ce_sampling_indexscans_bm.cpp"],
+    tags = ["second_half_bm"],
+    deps = [
+        ":sampling_test_utils",
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db/query/compiler/optimizer/cost_based_ranker:cardinality_estimator",
+    ],
+)

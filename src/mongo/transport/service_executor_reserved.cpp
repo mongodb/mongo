@@ -27,19 +27,25 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kExecutor
 
-#include "mongo/platform/basic.h"
-
+// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/transport/service_executor_reserved.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/thread.h"
-#include "mongo/transport/service_executor_gen.h"
 #include "mongo/transport/service_executor_utils.h"
-#include "mongo/util/processinfo.h"
-#include "mongo/util/thread_safety_context.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/functional.h"
+#include "mongo/util/out_of_line_executor.h"
+
+#include <mutex>
+#include <utility>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kExecutor
+
 
 namespace mongo {
 namespace transport {
@@ -67,7 +73,6 @@ const auto serviceExecutorReservedRegisterer = ServiceContext::ConstructorAction
 }  // namespace
 
 thread_local std::deque<ServiceExecutor::Task> ServiceExecutorReserved::_localWorkQueue = {};
-thread_local int ServiceExecutorReserved::_localRecursionDepth = 0;
 thread_local int64_t ServiceExecutorReserved::_localThreadIdleCounter = 0;
 
 ServiceExecutorReserved::ServiceExecutorReserved(ServiceContext* ctx,
@@ -75,30 +80,22 @@ ServiceExecutorReserved::ServiceExecutorReserved(ServiceContext* ctx,
                                                  size_t reservedThreads)
     : _name(std::move(name)), _reservedThreads(reservedThreads) {}
 
-Status ServiceExecutorReserved::start() {
+void ServiceExecutorReserved::start() {
     {
-        stdx::unique_lock<Latch> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         _stillRunning.store(true);
         _numStartingThreads = _reservedThreads;
     }
 
     for (size_t i = 0; i < _reservedThreads; i++) {
-        auto status = _startWorker();
-        if (!status.isOK()) {
-            return status;
-        }
+        uassertStatusOK(_startWorker());
     }
-
-    return Status::OK();
 }
 
 Status ServiceExecutorReserved::_startWorker() {
-    LOGV2(22978,
-          "Starting new worker thread for {name} service executor",
-          "Starting new worker thread for service executor",
-          "name"_attr = _name);
+    LOGV2(22978, "Starting new worker thread for service executor", "name"_attr = _name);
     return launchServiceWorkerThread([this] {
-        stdx::unique_lock<Latch> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         _numRunningWorkerThreads.addAndFetch(1);
         ScopeGuard numRunningGuard([&] {
             _numRunningWorkerThreads.subtractAndFetch(1);
@@ -134,16 +131,17 @@ Status ServiceExecutorReserved::_startWorker() {
                 auto threadStartStatus = _startWorker();
                 if (!threadStartStatus.isOK()) {
                     LOGV2_WARNING(22981,
-                                  "Could not start new reserve worker thread: {error}",
                                   "Could not start new reserve worker thread",
                                   "error"_attr = threadStartStatus);
+                    lk.lock();
+                    _numStartingThreads--;
+                    lk.unlock();
                 }
             }
 
             _localWorkQueue.emplace_back(std::move(task));
             while (!_localWorkQueue.empty() && _stillRunning.loadRelaxed()) {
-                _localRecursionDepth = 1;
-                _localWorkQueue.front()();
+                _localWorkQueue.front()(Status::OK());
                 _localWorkQueue.pop_front();
             }
 
@@ -155,11 +153,7 @@ Status ServiceExecutorReserved::_startWorker() {
             }
         }
 
-        LOGV2_DEBUG(22979,
-                    3,
-                    "Exiting worker thread in {name} service executor",
-                    "Exiting worker thread in service executor",
-                    "name"_attr = _name);
+        LOGV2_DEBUG(22979, 3, "Exiting worker thread in service executor", "name"_attr = _name);
     });
 }
 
@@ -173,7 +167,7 @@ ServiceExecutorReserved* ServiceExecutorReserved::get(ServiceContext* ctx) {
 Status ServiceExecutorReserved::shutdown(Milliseconds timeout) {
     LOGV2_DEBUG(22980, 3, "Shutting down reserved executor");
 
-    stdx::unique_lock<Latch> lock(_mutex);
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
     _stillRunning.store(false);
     _threadWakeup.notify_all();
 
@@ -187,31 +181,20 @@ Status ServiceExecutorReserved::shutdown(Milliseconds timeout) {
                  "reserved executor couldn't shutdown all worker threads within time limit.");
 }
 
-Status ServiceExecutorReserved::scheduleTask(Task task, ScheduleFlags flags) {
+void ServiceExecutorReserved::_schedule(Task task) {
     if (!_stillRunning.load()) {
-        return Status{ErrorCodes::ShutdownInProgress, "Executor is not running"};
+        task(Status(ErrorCodes::ShutdownInProgress, "Executor is not running"));
+        return;
     }
 
     if (!_localWorkQueue.empty()) {
-        // Execute task directly (recurse) if allowed by the caller as it produced better
-        // performance in testing. Try to limit the amount of recursion so we don't blow up the
-        // stack, even though this shouldn't happen with this executor that uses blocking
-        // network I/O.
-        if (((flags & ScheduleFlags::kMayRecurse) != ScheduleFlags{}) &&
-            (_localRecursionDepth < reservedServiceExecutorRecursionLimit.loadRelaxed())) {
-            ++_localRecursionDepth;
-            task();
-        } else {
-            _localWorkQueue.emplace_back(std::move(task));
-        }
-        return Status::OK();
+        _localWorkQueue.emplace_back(std::move(task));
+        return;
     }
 
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _readyTasks.push_back(std::move(task));
     _threadWakeup.notify_one();
-
-    return Status::OK();
 }
 
 void ServiceExecutorReserved::appendStats(BSONObjBuilder* bob) const {
@@ -240,9 +223,44 @@ void ServiceExecutorReserved::appendStats(BSONObjBuilder* bob) const {
     subbob.append(kClientsWaiting, statlet.waiting);
 }
 
-void ServiceExecutorReserved::runOnDataAvailable(const SessionHandle& session,
-                                                 OutOfLineExecutor::Task onCompletionCallback) {
-    scheduleCallbackOnDataAvailable(session, std::move(onCompletionCallback), this);
+/**
+ * Schedules task immediately, on the assumption that The task will block to
+ * receive the next message and we don't mind blocking on this dedicated
+ * worker thread.
+ */
+void ServiceExecutorReserved::_runOnDataAvailable(const std::shared_ptr<Session>& session,
+                                                  Task task) {
+    invariant(session);
+    _schedule([this, session, callback = std::move(task)](Status status) {
+        if (!status.isOK()) {
+            callback(std::move(status));
+            return;
+        }
+        callback(session->waitForData());
+    });
+}
+
+auto ServiceExecutorReserved::makeTaskRunner() -> std::unique_ptr<TaskRunner> {
+    iassert(ErrorCodes::ShutdownInProgress, "Executor is not running", _stillRunning.load());
+
+    /** Schedules on this. */
+    class ForwardingTaskRunner : public TaskRunner {
+    public:
+        explicit ForwardingTaskRunner(ServiceExecutorReserved* e) : _e{e} {}
+
+        void schedule(Task task) override {
+            _e->_schedule(std::move(task));
+        }
+
+        void runTaskForSession(std::shared_ptr<Session> session, Task task) override {
+            // Wait for data to become available on session before running task.
+            _e->_runOnDataAvailable(std::move(session), std::move(task));
+        }
+
+    private:
+        ServiceExecutorReserved* _e;
+    };
+    return std::make_unique<ForwardingTaskRunner>(this);
 }
 
 }  // namespace transport

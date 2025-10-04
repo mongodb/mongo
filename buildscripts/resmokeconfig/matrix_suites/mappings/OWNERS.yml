@@ -1,0 +1,82 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/mongo-default-approvers
+  - "aggregation_expression_multiversion_fuzzer*":
+    approvers:
+      - 10gen/query-optimization
+  - "aggregation_mongos_pqs*":
+    approvers:
+      - 10gen/query-execution-query-settings
+  - "aggregation_multiversion_fuzzer*":
+    approvers:
+      - 10gen/query-optimization
+  - "aggregation_pqs*":
+    approvers:
+      - 10gen/query-execution-query-settings
+  - "aggregation_sharded_collections_pqs*":
+    approvers:
+      - 10gen/query-execution-query-settings
+  - "aggregation_sharded_collections_query_shape_hash_stability*":
+    approvers:
+      - 10gen/query-execution-query-settings
+      - 10gen/query-integration-observability
+  - "bulk_write*":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "bulk_write_sharded*":
+    approvers:
+      - 10gen/query-execution-router
+  - "change_streams*":
+    approvers:
+      - 10gen/query-execution-change-streams
+  - "core_min_batch_repeat_queries_multiplan_single_solutions_ese_gsm.yml":
+    approvers:
+      - 10gen/query-optimization
+  - "core_repeat_queries.yml":
+    approvers:
+      - 10gen/query-optimization
+  - "replica_sets_jscore_pqs*":
+    approvers:
+      - 10gen/query-execution-query-settings
+  - "sharded_collections_pqs*":
+    approvers:
+      - 10gen/query-execution-query-settings
+  - "sharded_collections_query_shape_hash_stability*":
+    approvers:
+      - 10gen/query-execution-query-settings
+      - 10gen/query-integration-observability
+  - "*viewless_timeseries*":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
+  - "*legacy_timeseries_no_rawdata*":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
+  - "sharding_pqs*":
+    approvers:
+      - 10gen/query-execution-query-settings
+  - "sharding_task_executor_pool_size*":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "update_fuzzer*":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "*injected_catalog_metadata*":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
+  - "*ingress_request_rate_limiter*":
+    approvers:
+      - 10gen/server-workload-resilience
+  - "fcv_upgrade_downgrade_primary_step_down_passthrough.yml":
+    approvers:
+      - 10gen/server-replication-reviewers
+  - "*primary_driven_index_builds.yml":
+    approvers:
+      - 10gen/server-index-builds
+  - "replica_sets_kill_secondaries_jscore_passthrough.yml":
+    approvers:
+      - 10gen/server-replication-reviewers
+  - "replica_sets_recordids_replicated_jscore_passthrough.yml":
+    approvers:
+      - 10gen/server-collection-write-path

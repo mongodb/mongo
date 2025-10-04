@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include <queue>
-
 #include "mongo/db/exec/sbe/stages/stages.h"
+
+#include <queue>
 
 namespace mongo::sbe {
 /**
@@ -54,12 +54,16 @@ public:
                        std::vector<value::SortDirection> dirs,
                        std::vector<value::SwitchAccessor>& outAccessors)
         : _dirs(convertDirs(dirs)), _outAccessors(outAccessors), _heap(&_dirs) {
-        invariant(inputKeyAccessors.size() == streams.size());
-        invariant(!streams.empty());
+        tassert(11094706,
+                "Expect number of input key lists to match the number of streams",
+                inputKeyAccessors.size() == streams.size());
+        tassert(11094705, "Expect non-empty streams list", !streams.empty());
         const auto keySize = inputKeyAccessors.front().size();
 
         for (size_t i = 0; i < streams.size(); ++i) {
-            invariant(keySize == inputKeyAccessors[i].size());
+            tassert(11094704,
+                    "Expect all input key lists to be of the same length",
+                    keySize == inputKeyAccessors[i].size());
 
             _branches.push_back(Branch{streams[i], std::move(inputKeyAccessors[i]), i});
         }

@@ -30,7 +30,7 @@
 #    Smoke-test compression
 #
 
-import wiredtiger, wttest
+import wttest
 from wtscenario import make_scenarios
 
 # Smoke-test compression
@@ -48,6 +48,7 @@ class test_compress01(wttest.WiredTigerTestCase):
         ('zlib', dict(compress='zlib')),
         ('zlib-noraw', dict(compress='zlib')),  # API compatibility test
         ('zstd', dict(compress='zstd')),
+        ('iaa', dict(compress='iaa')),
     ]
     scenarios = make_scenarios(types, compress)
 
@@ -87,6 +88,3 @@ class test_compress01(wttest.WiredTigerTestCase):
             else:
                 self.assertEqual(cursor.get_value(), repr(idx) + "abcdefg")
         cursor.close()
-
-if __name__ == '__main__':
-    wttest.run()

@@ -2,10 +2,7 @@
  * This test ensures that indexes created by running applyOps are both successful and replicated
  * correctly (see SERVER-31435).
  */
-(function() {
-"use strict";
-
-load('jstests/noPassthrough/libs/index_build.js');
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 let rst = new ReplSetTest({nodes: 3});
 rst.startSet();
@@ -26,12 +23,14 @@ rst.awaitReplication();
 let uuid = primaryTestDB.getCollectionInfos()[0].info.uuid;
 let cmdFormatIndexNameA = "a_1";
 cmd = {
-    applyOps: [{
-        op: "c",
-        ns: dbName + "." + collName,
-        ui: uuid,
-        o: {createIndexes: collName, indexes: [{v: 2, key: {a: 1}, name: cmdFormatIndexNameA}]}
-    }]
+    applyOps: [
+        {
+            op: "c",
+            ns: dbName + "." + collName,
+            ui: uuid,
+            o: {createIndexes: collName, indexes: [{v: 2, key: {a: 1}, name: cmdFormatIndexNameA}]},
+        },
+    ],
 };
 res = primaryTestDB.runCommand(cmd);
 
@@ -40,4 +39,3 @@ res = primaryTestDB.runCommand(cmd);
 assert.commandFailedWithCode(res, ErrorCodes.CommandNotSupported);
 
 rst.stopSet();
-}());

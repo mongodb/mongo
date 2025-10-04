@@ -1,0 +1,64 @@
+From 528e6a14ef7b8edb4dca45ac49c7997228fd875c Mon Sep 17 00:00:00 2001
+From: Benety Goh <benety@mongodb.com>
+Date: Mon, 14 Jul 2025 15:37:31 +0000
+Subject: [PATCH] SERVER-106258 use strip_import_prefix on OTel proto files
+
+---
+ src/third_party/opentelemetry-proto/dist/BUILD | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/src/third_party/opentelemetry-proto/dist/BUILD b/src/third_party/opentelemetry-proto/dist/BUILD
+index e9d5dd492ab..e516cfbb494 100644
+--- a/src/third_party/opentelemetry-proto/dist/BUILD
++++ b/src/third_party/opentelemetry-proto/dist/BUILD
+@@ -8,6 +8,7 @@ mongo_proto_library(
+     srcs = [
+         "opentelemetry/proto/common/v1/common.proto",
+     ],
++    strip_import_prefix = "/src/third_party/opentelemetry-proto/",
+     target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+ )
+ 
+@@ -21,6 +22,7 @@ mongo_proto_library(
+     srcs = [
+         "opentelemetry/proto/resource/v1/resource.proto",
+     ],
++    strip_import_prefix = "/src/third_party/opentelemetry-proto/",
+     target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+     deps = [
+         ":common_proto",
+@@ -37,6 +39,7 @@ mongo_proto_library(
+     srcs = [
+         "opentelemetry/proto/trace/v1/trace.proto",
+     ],
++    strip_import_prefix = "/src/third_party/opentelemetry-proto/",
+     target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+     deps = [
+         ":common_proto",
+@@ -54,6 +57,7 @@ mongo_proto_library(
+     srcs = [
+         "opentelemetry/proto/collector/trace/v1/trace_service.proto",
+     ],
++    strip_import_prefix = "/src/third_party/opentelemetry-proto/",
+     target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+     deps = [
+         ":trace_proto",
+@@ -70,6 +74,7 @@ mongo_proto_library(
+     srcs = [
+         "opentelemetry/proto/metrics/v1/metrics.proto",
+     ],
++    strip_import_prefix = "/src/third_party/opentelemetry-proto/",
+     deps = [
+         ":common_proto",
+         ":resource_proto",
+@@ -86,6 +91,7 @@ mongo_proto_library(
+     srcs = [
+         "opentelemetry/proto/collector/metrics/v1/metrics_service.proto",
+     ],
++    strip_import_prefix = "/src/third_party/opentelemetry-proto/",
+     deps = [
+         ":metrics_proto",
+     ],
+-- 
+2.34.1
+

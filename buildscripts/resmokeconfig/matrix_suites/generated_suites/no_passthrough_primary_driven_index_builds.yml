@@ -1,0 +1,52 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/no_passthrough_primary_driven_index_builds.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
+##########################################################
+description:
+  '"Passthrough" means running a test against different runtime Cluster
+
+  configurations, including topology, runtime flags, fault injections, and other
+
+  parameters. Most tests by default are able to run in "passthrough" suites.
+
+  NoPassthrough is an exception, where tests here only run in the exact
+
+  configuration predefined in the tests themselves.
+
+  '
+executor:
+  archive:
+    tests:
+      - jstests/noPassthrough/backup*.js
+      - jstests/noPassthrough/oplog_writes_only_permitted_on_standalone.js
+      - jstests/noPassthrough/wt_unclean_shutdown.js
+      - src/mongo/db/modules/*/jstests/live_restore/*.js
+      - src/mongo/db/modules/enterprise/jstests/hot_backups/**/*.js
+  config:
+    shell_options:
+      eval: await import('jstests/libs/override_methods/collection_write_path/set_recordids_replicated.js');
+      global_vars:
+        TestData:
+          setParameters:
+            featureFlagPrimaryDrivenIndexBuilds: true
+            featureFlagRecordIdsReplicated: 1
+          setParametersMongos:
+            featureFlagPrimaryDrivenIndexBuilds: true
+            featureFlagRecordIdsReplicated: 1
+          skipCheckDBHashes: true
+          skipCollectionAndIndexValidation: true
+      nodb: ""
+matrix_suite: true
+selector:
+  exclude_with_any_tags:
+    - primary_driven_index_builds_incompatible
+    - rolling_index_builds
+    - requires_commit_quorum
+    - requires_capped
+  roots:
+    - jstests/noPassthrough/**/index_builds/*.js
+test_kind: js_test

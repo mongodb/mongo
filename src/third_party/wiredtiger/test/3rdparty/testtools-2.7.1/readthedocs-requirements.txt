@@ -1,0 +1,9 @@
+# Since Twisted is an optional dependency, it doesn't get installed by `python
+# setup.py install`. However, if Twisted is not installed, then the
+# documentation for our Twisted support code won't render on readthedocs.
+#
+# Thus, this requirements.txt is specifically devoted to readthedocs.org, so
+# that it knows exactly what to install in order to render the full
+# documentation.
+
+testtools[test,twisted]

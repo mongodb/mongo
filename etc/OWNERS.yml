@@ -1,0 +1,35 @@
+version: 2.0.0
+filters:
+  - "**/*.yml": # Temporary owners until these yml files are better split out
+    approvers:
+      - 10gen/devprod-build
+  - "backports_required_for_multiversion_tests.yml":
+    approvers:
+      - 10gen/devprod-correctness
+  - "burn_in_tests.yml":
+    approvers:
+      - 10gen/devprod-correctness
+  - "code_lockdown.yml":
+    approvers:
+      - 10gen/devprod-correctness
+  - "coverity.yml":
+    approvers:
+      - 10gen/server-programmability
+  - "evergreen_yml_components/variants/coverity.yml":
+    approvers:
+      - 10gen/server-programmability
+  - "evergreen_yml_components/tasks/compile_tasks*.yml":
+    approvers:
+      - 10gen/devprod-build
+  - "performance_thresholds.yml":
+    approvers:
+      - 10gen/performance
+  - "system_perf.yml":
+    approvers:
+      - 10gen/performance
+  - "/evergreen_yml_components/tasks/release_tasks.yml":
+    approvers:
+      - 10gen/devprod-release-infrastructure
+  - "/evergreen_yml_components/variants/release/release.yml":
+    approvers:
+      - 10gen/devprod-release-infrastructure

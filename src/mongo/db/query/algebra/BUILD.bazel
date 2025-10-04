@@ -1,0 +1,29 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "algebra",
+    srcs = [
+        "operator.h",
+        "polyvalue.h",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "algebra_test",
+    srcs = [
+        "algebra_test.cpp",
+    ],
+    tags = ["mongo_unittest_sixth_group"],
+    deps = [
+        ":algebra",
+    ],
+)

@@ -28,10 +28,20 @@
  */
 #pragma once
 
-#include "mongo/db/s/collection_metadata.h"
-#include "mongo/db/s/resharding/resharding_donor_service.h"
-#include "mongo/db/s/resharding/resharding_recipient_service.h"
-#include "mongo/db/s/resharding_util.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/db/local_catalog/shard_role_catalog/collection_metadata.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/primary_only_service.h"
+#include "mongo/db/s/resharding/donor_document_gen.h"
+#include "mongo/db/s/resharding/recipient_document_gen.h"
+#include "mongo/s/resharding/type_collection_fields_gen.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/uuid.h"
+
+#include <memory>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace resharding {
@@ -39,11 +49,15 @@ namespace resharding {
 using ReshardingFields = TypeCollectionReshardingFields;
 
 /**
- * Looks up the StateMachine by the 'reshardingUUID'. If it does not exist, returns boost::none.
+ * Looks up the StateMachine by the 'reshardingUUID'. Returns boost::none in the following cases:
+ * 1. The state machine does not exist.
+ * 2. In certain cases when the node is shutting down.
+ * Additionally returns a bool indicating if the node is stepping or shutting down to disambiguate
+ * the two.
  */
 template <class Service, class StateMachine, class ReshardingDocument>
-boost::optional<std::shared_ptr<StateMachine>> tryGetReshardingStateMachine(
-    OperationContext* opCtx, const UUID& reshardingUUID) {
+std::pair<boost::optional<std::shared_ptr<StateMachine>>, bool>
+tryGetReshardingStateMachineAndShutdownState(OperationContext* opCtx, const UUID& reshardingUUID) {
     auto instanceId = BSON(ReshardingDocument::kReshardingUUIDFieldName << reshardingUUID);
     auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
     auto service = registry->lookupServiceByName(Service::kServiceName);
@@ -51,15 +65,49 @@ boost::optional<std::shared_ptr<StateMachine>> tryGetReshardingStateMachine(
 }
 
 /**
+ * Same as tryGetReshardingStateMachineAndShutdownState, except does not return the shutdown state.
+ */
+template <class Service, class StateMachine, class ReshardingDocument>
+boost::optional<std::shared_ptr<StateMachine>> tryGetReshardingStateMachine(
+    OperationContext* opCtx, const UUID& reshardingUUID) {
+    auto [instance, _] =
+        tryGetReshardingStateMachineAndShutdownState<Service, StateMachine, ReshardingDocument>(
+            opCtx, reshardingUUID);
+    return instance;
+}
+
+/**
+ * Same as tryGetReshardingStateMachine, except throws if we were stepping or shutting down when we
+ * tried to access the PrimaryOnlyService. Use this function in situations where you need to
+ * guarantee that a return of boost::none means that there is no state document on disk for the
+ * associated state machine.
+ */
+template <class Service, class StateMachine, class ReshardingDocument>
+boost::optional<std::shared_ptr<StateMachine>> tryGetReshardingStateMachineAndThrowIfShuttingDown(
+    OperationContext* opCtx, const UUID& reshardingUUID) {
+    auto [instance, steppingOrShuttingDown] =
+        tryGetReshardingStateMachineAndShutdownState<Service, StateMachine, ReshardingDocument>(
+            opCtx, reshardingUUID);
+
+    uassert(ErrorCodes::InterruptedDueToReplStateChange,
+            "Unable to get resharding state machine, if it exists, because the node is "
+            "stepping or shutting down.",
+            !steppingOrShuttingDown);
+
+    return instance;
+}
+
+/**
  * The following functions construct a ReshardingDocument from the given 'reshardingFields'.
  */
 ReshardingDonorDocument constructDonorDocumentFromReshardingFields(
+    const VersionContext& vCtx,
     const NamespaceString& nss,
     const CollectionMetadata& metadata,
     const ReshardingFields& reshardingFields);
 
 ReshardingRecipientDocument constructRecipientDocumentFromReshardingFields(
-    OperationContext* opCtx,
+    const VersionContext& vCtx,
     const NamespaceString& nss,
     const CollectionMetadata& metadata,
     const ReshardingFields& reshardingFields);
@@ -78,8 +126,11 @@ void processReshardingFieldsForCollection(OperationContext* opCtx,
 
 void clearFilteringMetadata(OperationContext* opCtx, bool scheduleAsyncRefresh);
 
+void clearFilteringMetadata(OperationContext* opCtx,
+                            stdx::unordered_set<NamespaceString> namespacesToRefresh,
+                            bool scheduleAsyncRefresh);
+
 void refreshShardVersion(OperationContext* opCtx, const NamespaceString& nss);
 
 }  // namespace resharding
-
 }  // namespace mongo

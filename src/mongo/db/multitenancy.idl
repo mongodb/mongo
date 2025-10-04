@@ -28,12 +28,26 @@
 
 global:
     cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/tenant_id.h"
 
+# TODO(SERVER-111128): Multi-tenancy support is deprecated. Remove this code.
 server_parameters:
-  multitenancySupport:
-    description: Configure mongod to act as a serverless data store
-    set_at: [ startup ]
-    cpp_vartype: bool
-    cpp_varname: gMultitenancySupport
-    default: false
+    multitenancySupport:
+        description: Configure mongod to act as a serverless data store
+        set_at: [startup]
+        cpp_vartype: bool
+        cpp_varname: gMultitenancySupport
+        default: false
+        redact: false
 
+feature_flags:
+    featureFlagRequireTenantID:
+        # Only available with the server parameter "multitenancySupport".
+        description: >-
+            When enabled in conjunction with the server parameter "multitenancySupport",
+            require tenantID to be a part of NamespaceString and TenantDatabase.
+        cpp_varname: gFeatureFlagRequireTenantID
+        default: false
+        fcv_gated: true
+        fcv_context_unaware: true

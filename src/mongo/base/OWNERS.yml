@@ -1,0 +1,8 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/server-programmability
+  - "secure_allocator*":
+    approvers:
+      - 10gen/server-security

@@ -26,12 +26,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest
-import os, shutil
-from helper import compare_files
+import wttest
+import os
 from wtbackup import backup_base
-from wtdataset import simple_key
-from wtscenario import make_scenarios
 
 # test_backup12.py
 # Test cursor backup with a block-based incremental cursor.
@@ -90,7 +87,7 @@ class test_backup12(backup_base):
         self.session.drop(self.uri_rem)
 
         # Now do an incremental backup with id 2.
-        (bkup_files, _) = self.take_incr_backup(self.dir, 2)
+        (bkup_files, _) = self.take_incr_backup(self.dir, 1, 2)
         all_files += bkup_files
 
         # We need to remove files in the backup directory that are not in the current backup.
@@ -103,6 +100,3 @@ class test_backup12(backup_base):
         # After the full backup, open and recover the backup database.
         backup_conn = self.wiredtiger_open(self.dir)
         backup_conn.close()
-
-if __name__ == '__main__':
-    wttest.run()

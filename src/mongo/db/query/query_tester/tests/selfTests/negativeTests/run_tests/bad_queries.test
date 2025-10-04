@@ -1,0 +1,6 @@
+// Intentionally-bad queries to test error handling.
+bad_queries
+bad_queries
+test.coll
+
+:sortResults {aggregate: "test", pipeline: [{$firstN: {n: {}, input: "$obj"}}], cursor: {}}

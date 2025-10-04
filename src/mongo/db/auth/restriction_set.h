@@ -29,10 +29,10 @@
 
 #pragma once
 
+#include "mongo/db/auth/restriction.h"
+
 #include <memory>
 #include <vector>
-
-#include "mongo/db/auth/restriction.h"
 
 namespace mongo {
 

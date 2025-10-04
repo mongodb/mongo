@@ -39,6 +39,30 @@ static const char rcsid[] UNUSED =
 long unwi_debug_level;
 
 #endif /* UNW_DEBUG */
+long unw_page_size;
+static void
+unw_init_page_size (void)
+{
+  errno = 0;
+  long result = sysconf (_SC_PAGESIZE);
+  if (result == -1)
+    {
+      if (errno != 0)
+        {
+          print_error ("Failed to get _SC_PAGESIZE: ");
+          print_error (strerror(errno));
+          print_error ("\n");
+        }
+        else
+          print_error ("Failed to get _SC_PAGESIZE, errno was not set.\n");
+
+      unw_page_size = 4096;
+    }
+  else
+    {
+      unw_page_size = result;
+    }
+}
 
 HIDDEN void
 mi_init (void)
@@ -55,6 +79,6 @@ mi_init (void)
       setbuf (stderr, NULL);
     }
 #endif
-
-  assert (sizeof (struct cursor) <= sizeof (unw_cursor_t));
+  unw_init_page_size();
+  assert(sizeof(struct cursor) <= sizeof(unw_cursor_t));
 }

@@ -1,0 +1,21 @@
+# Golden test output of SBEVariableTest/SlotVariable
+-- INPUT EXPRESSION:
+s1 
+
+-- COMPILED EXPRESSION:
+[0x0000-0x0009] stackSize: 1, maxStackSize: 1
+0x0000: pushAccessVal(accessor: <accessor>);
+
+
+-- EXECUTE VARIATION:
+SLOTS: [1: Nothing]
+RESULT: Nothing
+
+-- EXECUTE VARIATION:
+SLOTS: [1: true]
+RESULT: true
+
+-- EXECUTE VARIATION:
+SLOTS: [1: 123]
+RESULT: 123
+

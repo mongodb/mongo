@@ -1,0 +1,135 @@
+// Copyright The OpenTelemetry Authors
+// SPDX-License-Identifier: Apache-2.0
+
+// clang-format off
+LIBRARY opentelemetry_cpp
+EXPORTS
+    // public: static class std::unique_ptr<class opentelemetry::v1::sdk::trace::SpanExporter,struct std::default_delete<class opentelemetry::v1::sdk::trace::SpanExporter> > __cdecl opentelemetry::v1::exporter::trace::OStreamSpanExporterFactory::Create(void)
+    ?Create@OStreamSpanExporterFactory@trace@exporter@v1@opentelemetry@@SA?AV?$unique_ptr@VSpanExporter@trace@sdk@v1@opentelemetry@@U?$default_delete@VSpanExporter@trace@sdk@v1@opentelemetry@@@std@@@std@@XZ
+    // public: static class std::unique_ptr<class opentelemetry::v1::sdk::trace::SpanProcessor,struct std::default_delete<class opentelemetry::v1::sdk::trace::SpanProcessor> > __cdecl opentelemetry::v1::sdk::trace::SimpleSpanProcessorFactory::Create(class std::unique_ptr<class opentelemetry::v1::sdk::trace::SpanExporter,struct std::default_delete<class opentelemetry::v1::sdk::trace::SpanExporter> > && __ptr64)
+#if defined(_WIN64)
+    ?Create@SimpleSpanProcessorFactory@trace@sdk@v1@opentelemetry@@SA?AV?$unique_ptr@VSpanProcessor@trace@sdk@v1@opentelemetry@@U?$default_delete@VSpanProcessor@trace@sdk@v1@opentelemetry@@@std@@@std@@$$QEAV?$unique_ptr@VSpanExporter@trace@sdk@v1@opentelemetry@@U?$default_delete@VSpanExporter@trace@sdk@v1@opentelemetry@@@std@@@7@@Z
+#else
+    ?Create@SimpleSpanProcessorFactory@trace@sdk@v1@opentelemetry@@SA?AV?$unique_ptr@VSpanProcessor@trace@sdk@v1@opentelemetry@@U?$default_delete@VSpanProcessor@trace@sdk@v1@opentelemetry@@@std@@@std@@$$QAV?$unique_ptr@VSpanExporter@trace@sdk@v1@opentelemetry@@U?$default_delete@VSpanExporter@trace@sdk@v1@opentelemetry@@@std@@@7@@Z
+#endif
+    // public: static class std::unique_ptr<class opentelemetry::v1::trace::TracerProvider,struct std::default_delete<class opentelemetry::v1::trace::TracerProvider> > __cdecl opentelemetry::v1::sdk::trace::TracerProviderFactory::Create(class std::unique_ptr<class opentelemetry::v1::sdk::trace::SpanProcessor,struct std::default_delete<class opentelemetry::v1::sdk::trace::SpanProcessor> >)
+    ?Create@TracerProviderFactory@trace@sdk@v1@opentelemetry@@SA?AV?$unique_ptr@VTracerProvider@trace@v1@opentelemetry@@U?$default_delete@VTracerProvider@trace@v1@opentelemetry@@@std@@@std@@V?$unique_ptr@VSpanProcessor@trace@sdk@v1@opentelemetry@@U?$default_delete@VSpanProcessor@trace@sdk@v1@opentelemetry@@@std@@@7@@Z
+    // public: static class std::unique_ptr<class opentelemetry::v1::logs::LoggerProvider,class std::default_delete<class opentelemetry::v1::logs::LoggerProvider> > __cdecl opentelemetry::v1::sdk::logs::LoggerProviderFactory::Create(class std::unique_ptr<class opentelemetry::v1::sdk::logs::LogRecordProcessor,struct std::default_delete<class opentelemetry::v1::sdk::logs::LogRecordProcessor> > && __ptr64)
+#if defined(_WIN64)
+    ?Create@LoggerProviderFactory@logs@sdk@v1@opentelemetry@@SA?AV?$unique_ptr@VLoggerProvider@logs@v1@opentelemetry@@U?$default_delete@VLoggerProvider@logs@v1@opentelemetry@@@std@@@std@@$$QEAV?$unique_ptr@VLogRecordProcessor@logs@sdk@v1@opentelemetry@@U?$default_delete@VLogRecordProcessor@logs@sdk@v1@opentelemetry@@@std@@@7@@Z
+#else
+    ?Create@LoggerProviderFactory@logs@sdk@v1@opentelemetry@@SA?AV?$unique_ptr@VLoggerProvider@logs@v1@opentelemetry@@U?$default_delete@VLoggerProvider@logs@v1@opentelemetry@@@std@@@std@@$$QAV?$unique_ptr@VLogRecordProcessor@logs@sdk@v1@opentelemetry@@U?$default_delete@VLogRecordProcessor@logs@sdk@v1@opentelemetry@@@std@@@7@@Z
+#endif
+    // public: static class std::unique_ptr<class opentelemetry::v1::sdk::logs::LogRecordProcessor,struct std::default_delete<class opentelemetry::v1::sdk::logs::LogRecordProcessor> > __cdecl opentelemetry::v1::sdk::logs::BatchLogRecordProcessorFactory::Create(class std::unique_ptr<class opentelemetry::v1::sdk::logs::LogRecordExporter,struct std::default_delete<class opentelemetry::v1::sdk::logs::LogRecordExporter> > && __ptr64,struct opentelemetry::v1::sdk::logs::BatchLogRecordProcessorOptions const & __ptr64)
+#if defined(_WIN64)
+    ?Create@BatchLogRecordProcessorFactory@logs@sdk@v1@opentelemetry@@SA?AV?$unique_ptr@VLogRecordProcessor@logs@sdk@v1@opentelemetry@@U?$default_delete@VLogRecordProcessor@logs@sdk@v1@opentelemetry@@@std@@@std@@$$QEAV?$unique_ptr@VLogRecordExporter@logs@sdk@v1@opentelemetry@@U?$default_delete@VLogRecordExporter@logs@sdk@v1@opentelemetry@@@std@@@7@AEBUBatchLogRecordProcessorOptions@2345@@Z
+#else
+    ?Create@BatchLogRecordProcessorFactory@logs@sdk@v1@opentelemetry@@SA?AV?$unique_ptr@VLogRecordProcessor@logs@sdk@v1@opentelemetry@@U?$default_delete@VLogRecordProcessor@logs@sdk@v1@opentelemetry@@@std@@@std@@$$QAV?$unique_ptr@VLogRecordExporter@logs@sdk@v1@opentelemetry@@U?$default_delete@VLogRecordExporter@logs@sdk@v1@opentelemetry@@@std@@@7@AEBUBatchLogRecordProcessorOptions@2345@@Z
+#endif
+    // public: static class std::unique_ptr<class opentelemetry::v1::sdk::logs::LogRecordProcessor,struct std::default_delete<class opentelemetry::v1::sdk::logs::LogRecordProcessor> > __cdecl opentelemetry::v1::sdk::logs::SimpleLogRecordProcessorFactory::Create(class std::unique_ptr<class opentelemetry::v1::sdk::logs::LogRecordExporter,struct std::default_delete<class opentelemetry::v1::sdk::logs::LogRecordExporter> > && __ptr64)
+#if defined(_WIN64)
+    ?Create@SimpleLogRecordProcessorFactory@logs@sdk@v1@opentelemetry@@SA?AV?$unique_ptr@VLogRecordProcessor@logs@sdk@v1@opentelemetry@@U?$default_delete@VLogRecordProcessor@logs@sdk@v1@opentelemetry@@@std@@@std@@$$QEAV?$unique_ptr@VLogRecordExporter@logs@sdk@v1@opentelemetry@@U?$default_delete@VLogRecordExporter@logs@sdk@v1@opentelemetry@@@std@@@7@@Z
+#else
+    ?Create@SimpleLogRecordProcessorFactory@logs@sdk@v1@opentelemetry@@SA?AV?$unique_ptr@VLogRecordProcessor@logs@sdk@v1@opentelemetry@@U?$default_delete@VLogRecordProcessor@logs@sdk@v1@opentelemetry@@@std@@@std@@$$QAV?$unique_ptr@VLogRecordExporter@logs@sdk@v1@opentelemetry@@U?$default_delete@VLogRecordExporter@logs@sdk@v1@opentelemetry@@@std@@@7@@Z
+#endif
+    // public: static class std::unique_ptr<class opentelemetry::v1::sdk::logs::LogRecordProcessor,struct std::default_delete<class opentelemetry::v1::sdk::logs::LogRecordProcessor> > __cdecl opentelemetry::v1::sdk::logs::MultiLogRecordProcessorFactory::Create(class std::vector<class std::unique_ptr<class opentelemetry::v1::sdk::logs::LogRecordProcessor,struct std::default_delete<class opentelemetry::v1::sdk::logs::LogRecordProcessor> >,class std::allocator<class std::unique_ptr<class opentelemetry::v1::sdk::logs::LogRecordProcessor,struct std::default_delete<class opentelemetry::v1::sdk::logs::LogRecordProcessor> > > > && __ptr64)
+#if defined(WIN32)
+    ?Create@MultiLogRecordProcessorFactory@logs@sdk@v1@opentelemetry@@SA?AV?$unique_ptr@VLogRecordProcessor@logs@sdk@v1@opentelemetry@@U?$default_delete@VLogRecordProcessor@logs@sdk@v1@opentelemetry@@@std@@@std@@$$QEAV?$vector@V?$unique_ptr@VLogRecordProcessor@logs@sdk@v1@opentelemetry@@U?$default_delete@VLogRecordProcessor@logs@sdk@v1@opentelemetry@@@std@@@std@@V?$allocator@V?$unique_ptr@VLogRecordProcessor@logs@sdk@v1@opentelemetry@@U?$default_delete@VLogRecordProcessor@logs@sdk@v1@opentelemetry@@@std@@@std@@@2@@7@@Z
+#else
+    ?Create@MultiLogRecordProcessorFactory@logs@sdk@v1@opentelemetry@@SA?AV?$unique_ptr@VLogRecordProcessor@logs@sdk@v1@opentelemetry@@U?$default_delete@VLogRecordProcessor@logs@sdk@v1@opentelemetry@@@std@@@std@@$$QEAV?$vector@V?$unique_ptr@VLogRecordProcessor@logs@sdk@v1@opentelemetry@@U?$default_delete@VLogRecordProcessor@logs@sdk@v1@opentelemetry@@@std@@@std@@V?$allocator@V?$unique_ptr@VLogRecordProcessor@logs@sdk@v1@opentelemetry@@U?$default_delete@VLogRecordProcessor@logs@sdk@v1@opentelemetry@@@std@@@std@@@2@@7@@Z
+#endif
+    ?ForceFlush@TracerProvider@trace@sdk@v1@opentelemetry@@QEAA_NV?$duration@_JU?$ratio@$00$0PECEA@@std@@@chrono@std@@@Z
+    ?ForceFlush@LoggerProvider@logs@sdk@v1@opentelemetry@@QEAA_NV?$duration@_JU?$ratio@$00$0PECEA@@std@@@chrono@std@@@Z
+    ??0OStreamLogRecordExporter@logs@exporter@v1@opentelemetry@@QEAA@AEAV?$basic_ostream@DU?$char_traits@D@std@@@std@@@Z
+
+    // public: static class std::unique_ptr<class opentelemetry::v1::sdk::metrics::PushMetricExporter,struct std::default_delete<class opentelemetry::v1::sdk::metrics::PushMetricExporter> > __cdecl opentelemetry::v1::exporter::metrics::OStreamMetricExporterFactory::Create(void)
+    ?Create@OStreamMetricExporterFactory@metrics@exporter@v1@opentelemetry@@SA?AV?$unique_ptr@VPushMetricExporter@metrics@sdk@v1@opentelemetry@@U?$default_delete@VPushMetricExporter@metrics@sdk@v1@opentelemetry@@@std@@@std@@XZ
+    // public: static class std::unique_ptr<class opentelemetry::v1::sdk::metrics::MetricReader,struct std::default_delete<class opentelemetry::v1::sdk::metrics::MetricReader> > __cdecl opentelemetry::v1::sdk::metrics::PeriodicExportingMetricReaderFactory::Create(class std::unique_ptr<class opentelemetry::v1::sdk::metrics::PushMetricExporter,struct std::default_delete<class opentelemetry::v1::sdk::metrics::PushMetricExporter> >,struct opentelemetry::v1::sdk::metrics::PeriodicExportingMetricReaderOptions const & __ptr64)
+    ?Create@PeriodicExportingMetricReaderFactory@metrics@sdk@v1@opentelemetry@@SA?AV?$unique_ptr@VMetricReader@metrics@sdk@v1@opentelemetry@@U?$default_delete@VMetricReader@metrics@sdk@v1@opentelemetry@@@std@@@std@@V?$unique_ptr@VPushMetricExporter@metrics@sdk@v1@opentelemetry@@U?$default_delete@VPushMetricExporter@metrics@sdk@v1@opentelemetry@@@std@@@7@AEBUPeriodicExportingMetricReaderOptions@2345@@Z
+    // public: static class std::unique_ptr<class opentelemetry::v1::metrics::MeterProvider,struct std::default_delete<class opentelemetry::v1::metrics::MeterProvider> > __cdecl opentelemetry::v1::sdk::metrics::MeterProviderFactory::Create(void)
+    ?Create@MeterProviderFactory@metrics@sdk@v1@opentelemetry@@SA?AV?$unique_ptr@VMeterProvider@metrics@v1@opentelemetry@@U?$default_delete@VMeterProvider@metrics@v1@opentelemetry@@@std@@@std@@XZ
+    // public: static class std::unique_ptr<class opentelemetry::v1::sdk::metrics::MeterContext,struct std::default_delete<class opentelemetry::v1::sdk::metrics::MeterContext> > __cdecl opentelemetry::v1::sdk::metrics::MeterContextFactory::Create(void)
+    ?Create@MeterContextFactory@metrics@sdk@v1@opentelemetry@@SA?AV?$unique_ptr@VMeterContext@metrics@sdk@v1@opentelemetry@@U?$default_delete@VMeterContext@metrics@sdk@v1@opentelemetry@@@std@@@std@@XZ
+    // public: static class std::unique_ptr<class opentelemetry::v1::metrics::MeterProvider,struct std::default_delete<class opentelemetry::v1::metrics::MeterProvider> > __cdecl opentelemetry::v1::sdk::metrics::MeterProviderFactory::Create(class std::unique_ptr<class opentelemetry::v1::sdk::metrics::MeterContext,struct std::default_delete<class opentelemetry::v1::sdk::metrics::MeterContext> >)
+    ?Create@MeterProviderFactory@metrics@sdk@v1@opentelemetry@@SA?AV?$unique_ptr@VMeterProvider@metrics@v1@opentelemetry@@U?$default_delete@VMeterProvider@metrics@v1@opentelemetry@@@std@@@std@@V?$unique_ptr@VMeterContext@metrics@sdk@v1@opentelemetry@@U?$default_delete@VMeterContext@metrics@sdk@v1@opentelemetry@@@std@@@7@@Z
+    // public: static class std::unique_ptr<class opentelemetry::v1::sdk::metrics::View,struct std::default_delete<class opentelemetry::v1::sdk::metrics::View> > __cdecl opentelemetry::v1::sdk::metrics::ViewFactory::Create(class std::basic_string<char,struct std::char_traits<char>,class std::allocator<char> > const &,class std::basic_string<char,struct std::char_traits<char>,class std::allocator<char> > const &,class std::basic_string<char,struct std::char_traits<char>,class std::allocator<char> > const &,enum opentelemetry::v1::sdk::metrics::AggregationType,class std::shared_ptr<class opentelemetry::v1::sdk::metrics::AggregationConfig>)
+    ?Create@ViewFactory@metrics@sdk@v1@opentelemetry@@SA?AV?$unique_ptr@VView@metrics@sdk@v1@opentelemetry@@U?$default_delete@VView@metrics@sdk@v1@opentelemetry@@@std@@@std@@AEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@7@00W4AggregationType@2345@V?$shared_ptr@VAggregationConfig@metrics@sdk@v1@opentelemetry@@@7@@Z
+    // public: static class std::unique_ptr<class opentelemetry::v1::sdk::metrics::View,struct std::default_delete<class opentelemetry::v1::sdk::metrics::View> > __cdecl opentelemetry::v1::sdk::metrics::ViewFactory::Create(class std::basic_string<char,struct std::char_traits<char>,class std::allocator<char> > const &,class std::basic_string<char,struct std::char_traits<char>,class std::allocator<char> > const &,class std::basic_string<char,struct std::char_traits<char>,class std::allocator<char> > const &,enum opentelemetry::v1::sdk::metrics::AggregationType)
+    ?Create@ViewFactory@metrics@sdk@v1@opentelemetry@@SA?AV?$unique_ptr@VView@metrics@sdk@v1@opentelemetry@@U?$default_delete@VView@metrics@sdk@v1@opentelemetry@@@std@@@std@@AEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@7@00W4AggregationType@2345@@Z
+    // public: static class std::unique_ptr<class opentelemetry::v1::sdk::metrics::MeterSelector,struct std::default_delete<class opentelemetry::v1::sdk::metrics::MeterSelector> > __cdecl opentelemetry::v1::sdk::metrics::MeterSelectorFactory::Create(class std::basic_string<char,struct std::char_traits<char>,class std::allocator<char> > const &,class std::basic_string<char,struct std::char_traits<char>,class std::allocator<char> > const &,class std::basic_string<char,struct std::char_traits<char>,class std::allocator<char> > const &)
+    ?Create@MeterSelectorFactory@metrics@sdk@v1@opentelemetry@@SA?AV?$unique_ptr@VMeterSelector@metrics@sdk@v1@opentelemetry@@U?$default_delete@VMeterSelector@metrics@sdk@v1@opentelemetry@@@std@@@std@@AEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@7@00@Z
+    // public: static class std::unique_ptr<class opentelemetry::v1::sdk::metrics::InstrumentSelector,struct std::default_delete<class opentelemetry::v1::sdk::metrics::InstrumentSelector> > __cdecl opentelemetry::v1::sdk::metrics::InstrumentSelectorFactory::Create(enum opentelemetry::v1::sdk::metrics::InstrumentType,class std::basic_string<char,struct std::char_traits<char>,class std::allocator<char> > const &,class std::basic_string<char,struct std::char_traits<char>,class std::allocator<char> > const &)
+    ?Create@InstrumentSelectorFactory@metrics@sdk@v1@opentelemetry@@SA?AV?$unique_ptr@VInstrumentSelector@metrics@sdk@v1@opentelemetry@@U?$default_delete@VInstrumentSelector@metrics@sdk@v1@opentelemetry@@@std@@@std@@W4InstrumentType@2345@AEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@7@1@Z
+    // public: void __cdecl opentelemetry::v1::sdk::metrics::MeterContext::AddMetricReader(class std::shared_ptr<class opentelemetry::v1::sdk::metrics::MetricReader>)
+    ?AddMetricReader@MeterContext@metrics@sdk@v1@opentelemetry@@QEAAXV?$shared_ptr@VMetricReader@metrics@sdk@v1@opentelemetry@@@std@@@Z
+    // public: void __cdecl opentelemetry::v1::sdk::metrics::MeterProvider::AddMetricReader(class std::shared_ptr<class opentelemetry::v1::sdk::metrics::MetricReader>)
+    ?AddMetricReader@MeterProvider@metrics@sdk@v1@opentelemetry@@QEAAXV?$shared_ptr@VMetricReader@metrics@sdk@v1@opentelemetry@@@std@@@Z
+    // public: void __cdecl opentelemetry::v1::sdk::metrics::MeterProvider::AddView(class std::unique_ptr<class opentelemetry::v1::sdk::metrics::InstrumentSelector,struct std::default_delete<class opentelemetry::v1::sdk::metrics::InstrumentSelector> >,class std::unique_ptr<class opentelemetry::v1::sdk::metrics::MeterSelector,struct std::default_delete<class opentelemetry::v1::sdk::metrics::MeterSelector> >,class std::unique_ptr<class opentelemetry::v1::sdk::metrics::View,struct std::default_delete<class opentelemetry::v1::sdk::metrics::View> >)
+    ?AddView@MeterProvider@metrics@sdk@v1@opentelemetry@@QEAAXV?$unique_ptr@VInstrumentSelector@metrics@sdk@v1@opentelemetry@@U?$default_delete@VInstrumentSelector@metrics@sdk@v1@opentelemetry@@@std@@@std@@V?$unique_ptr@VMeterSelector@metrics@sdk@v1@opentelemetry@@U?$default_delete@VMeterSelector@metrics@sdk@v1@opentelemetry@@@std@@@7@V?$unique_ptr@VView@metrics@sdk@v1@opentelemetry@@U?$default_delete@VView@metrics@sdk@v1@opentelemetry@@@std@@@7@@Z
+#if defined(WITH_OTLP_GRPC) || defined(WITH_OTLP_HTTP)
+    ?GetOtlpDefaultTracesTimeout@otlp@exporter@v1@opentelemetry@@YA?AV?$duration@_JU?$ratio@$00$0JIJGIA@@std@@@chrono@std@@XZ
+    ?GetOtlpDefaultTracesHeaders@otlp@exporter@v1@opentelemetry@@YA?AV?$multimap@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V12@Ucmp_ic@otlp@exporter@v1@opentelemetry@@V?$allocator@U?$pair@$$CBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V12@@std@@@2@@std@@XZ
+    ?GetOtlpDefaultLogsTimeout@otlp@exporter@v1@opentelemetry@@YA?AV?$duration@_JU?$ratio@$00$0JIJGIA@@std@@@chrono@std@@XZ
+    ?GetOtlpDefaultLogsHeaders@otlp@exporter@v1@opentelemetry@@YA?AV?$multimap@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V12@Ucmp_ic@otlp@exporter@v1@opentelemetry@@V?$allocator@U?$pair@$$CBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V12@@std@@@2@@std@@XZ
+    ?GetOtlpDefaultMetricsTimeout@otlp@exporter@v1@opentelemetry@@YA?AV?$duration@_JU?$ratio@$00$0JIJGIA@@std@@@chrono@std@@XZ
+    ?GetOtlpDefaultMetricsHeaders@otlp@exporter@v1@opentelemetry@@YA?AV?$multimap@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V12@Ucmp_ic@otlp@exporter@v1@opentelemetry@@V?$allocator@U?$pair@$$CBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V12@@std@@@2@@std@@XZ
+    ?GetOtlpDefaultTracesSslCertificatePath@otlp@exporter@v1@opentelemetry@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@XZ
+    ?GetOtlpDefaultMetricsSslCertificatePath@otlp@exporter@v1@opentelemetry@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@XZ
+    ?GetOtlpDefaultLogsSslCertificatePath@otlp@exporter@v1@opentelemetry@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@XZ
+    ?GetOtlpDefaultTracesSslCertificateString@otlp@exporter@v1@opentelemetry@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@XZ
+    ?GetOtlpDefaultMetricsSslCertificateString@otlp@exporter@v1@opentelemetry@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@XZ
+    ?GetOtlpDefaultLogsSslCertificateString@otlp@exporter@v1@opentelemetry@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@XZ
+#endif  // defined(WITH_OTLP_GRPC) || defined(WITH_OTLP_HTTP)
+#if defined(WITH_OTLP_GRPC)
+    // public: static class std::unique_ptr<class opentelemetry::v1::sdk::trace::SpanExporter,struct std::default_delete<class opentelemetry::v1::sdk::trace::SpanExporter> > __cdecl opentelemetry::v1::exporter::otlp::OtlpGrpcExporterFactory::Create(struct opentelemetry::v1::exporter::otlp::OtlpGrpcExporterOptions const & __ptr64)
+    ?Create@OtlpGrpcExporterFactory@otlp@exporter@v1@opentelemetry@@SA?AV?$unique_ptr@VSpanExporter@trace@sdk@v1@opentelemetry@@U?$default_delete@VSpanExporter@trace@sdk@v1@opentelemetry@@@std@@@std@@AEBUOtlpGrpcExporterOptions@2345@@Z
+    // public: static class std::unique_ptr<class opentelemetry::v1::sdk::metrics::PushMetricExporter,struct std::default_delete<class opentelemetry::v1::sdk::metrics::PushMetricExporter> > __cdecl opentelemetry::v1::exporter::otlp::OtlpGrpcMetricExporterFactory::Create(struct opentelemetry::v1::exporter::otlp::OtlpGrpcMetricExporterOptions const & __ptr64)
+    ?Create@OtlpGrpcMetricExporterFactory@otlp@exporter@v1@opentelemetry@@SA?AV?$unique_ptr@VPushMetricExporter@metrics@sdk@v1@opentelemetry@@U?$default_delete@VPushMetricExporter@metrics@sdk@v1@opentelemetry@@@std@@@std@@AEBUOtlpGrpcMetricExporterOptions@2345@@Z
+    // public: static class std::unique_ptr<class opentelemetry::v1::sdk::logs::LogRecordExporter,struct std::default_delete<class opentelemetry::v1::sdk::logs::LogRecordExporter> > __cdecl opentelemetry::v1::exporter::otlp::OtlpGrpcLogRecordExporterFactory::Create(struct opentelemetry::v1::exporter::otlp::OtlpGrpcLogRecordExporterOptions const &)
+    ?Create@OtlpGrpcLogRecordExporterFactory@otlp@exporter@v1@opentelemetry@@SA?AV?$unique_ptr@VLogRecordExporter@logs@sdk@v1@opentelemetry@@U?$default_delete@VLogRecordExporter@logs@sdk@v1@opentelemetry@@@std@@@std@@AEBUOtlpGrpcLogRecordExporterOptions@2345@@Z
+    // public: __cdecl opentelemetry::v1::exporter::otlp::OtlpGrpcExporterOptions::OtlpGrpcExporterOptions(void)
+    ??0OtlpGrpcExporterOptions@otlp@exporter@v1@opentelemetry@@QEAA@XZ
+    // public: __cdecl opentelemetry::v1::exporter::otlp::OtlpGrpcExporterOptions::~OtlpGrpcExporterOptions(void)
+    ??1OtlpGrpcExporterOptions@otlp@exporter@v1@opentelemetry@@QEAA@XZ
+    // public: __cdecl opentelemetry::v1::exporter::otlp::OtlpGrpcMetricExporterOptions::OtlpGrpcMetricExporterOptions(void)
+    ??0OtlpGrpcMetricExporterOptions@otlp@exporter@v1@opentelemetry@@QEAA@XZ
+    // public: __cdecl opentelemetry::v1::exporter::otlp::OtlpGrpcMetricExporterOptions::~OtlpGrpcMetricExporterOptions(void)
+    ??1OtlpGrpcMetricExporterOptions@otlp@exporter@v1@opentelemetry@@QEAA@XZ
+    // public: __cdecl opentelemetry::v1::exporter::otlp::OtlpGrpcLogRecordExporterOptions::OtlpGrpcLogRecordExporterOptions(void)
+    ??0OtlpGrpcLogRecordExporterOptions@otlp@exporter@v1@opentelemetry@@QEAA@XZ
+    // public: __cdecl opentelemetry::v1::exporter::otlp::OtlpGrpcLogRecordExporterOptions::~OtlpGrpcLogRecordExporterOptions(void)
+    ??1OtlpGrpcLogRecordExporterOptions@otlp@exporter@v1@opentelemetry@@QEAA@XZ
+
+    ?GetOtlpDefaultGrpcTracesEndpoint@otlp@exporter@v1@opentelemetry@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@XZ
+    ?GetOtlpDefaultGrpcMetricsEndpoint@otlp@exporter@v1@opentelemetry@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@XZ
+    ?GetOtlpDefaultGrpcLogsEndpoint@otlp@exporter@v1@opentelemetry@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@XZ
+    ?GetOtlpDefaultGrpcTracesIsInsecure@otlp@exporter@v1@opentelemetry@@YA_NXZ
+    ?GetOtlpDefaultGrpcMetricsIsInsecure@otlp@exporter@v1@opentelemetry@@YA_NXZ
+    ?GetOtlpDefaultGrpcLogsIsInsecure@otlp@exporter@v1@opentelemetry@@YA_NXZ
+#endif  // defined(WITH_OTLP_GRPC)
+
+#if defined(WITH_OTLP_HTTP)
+    // public: static class std::unique_ptr<class opentelemetry::v1::sdk::trace::SpanExporter,struct std::default_delete<class opentelemetry::v1::sdk::trace::SpanExporter> > __cdecl opentelemetry::v1::exporter::otlp::OtlpHttpExporterFactory::Create(struct opentelemetry::v1::exporter::otlp::OtlpHttpExporterOptions const & __ptr64)
+    ?Create@OtlpHttpExporterFactory@otlp@exporter@v1@opentelemetry@@SA?AV?$unique_ptr@VSpanExporter@trace@sdk@v1@opentelemetry@@U?$default_delete@VSpanExporter@trace@sdk@v1@opentelemetry@@@std@@@std@@AEBUOtlpHttpExporterOptions@2345@@Z
+    // public: static class std::unique_ptr<class opentelemetry::v1::sdk::metrics::PushMetricExporter,struct std::default_delete<class opentelemetry::v1::sdk::metrics::PushMetricExporter> > __cdecl opentelemetry::v1::exporter::otlp::OtlpHttpMetricExporterFactory::Create(struct opentelemetry::v1::exporter::otlp::OtlpHttpMetricExporterOptions const &)
+    ?Create@OtlpHttpMetricExporterFactory@otlp@exporter@v1@opentelemetry@@SA?AV?$unique_ptr@VPushMetricExporter@metrics@sdk@v1@opentelemetry@@U?$default_delete@VPushMetricExporter@metrics@sdk@v1@opentelemetry@@@std@@@std@@AEBUOtlpHttpMetricExporterOptions@2345@@Z
+    // public: static class std::unique_ptr<class opentelemetry::v1::sdk::logs::LogRecordExporter,struct std::default_delete<class opentelemetry::v1::sdk::logs::LogRecordExporter> > __cdecl opentelemetry::v1::exporter::otlp::OtlpHttpLogRecordExporterFactory::Create(struct opentelemetry::v1::exporter::otlp::OtlpHttpLogRecordExporterOptions const & __ptr64)
+    ?Create@OtlpHttpLogRecordExporterFactory@otlp@exporter@v1@opentelemetry@@SA?AV?$unique_ptr@VLogRecordExporter@logs@sdk@v1@opentelemetry@@U?$default_delete@VLogRecordExporter@logs@sdk@v1@opentelemetry@@@std@@@std@@AEBUOtlpHttpLogRecordExporterOptions@2345@@Z
+    // public: __cdecl opentelemetry::v1::exporter::otlp::OtlpHttpExporterOptions::OtlpHttpExporterOptions(void)
+    ??0OtlpHttpExporterOptions@otlp@exporter@v1@opentelemetry@@QEAA@XZ
+    // public: __cdecl opentelemetry::v1::exporter::otlp::OtlpHttpExporterOptions::~OtlpHttpExporterOptions(void)
+    ??1OtlpHttpExporterOptions@otlp@exporter@v1@opentelemetry@@QEAA@XZ
+    // public: __cdecl opentelemetry::v1::exporter::otlp::OtlpHttpMetricExporterOptions::OtlpHttpMetricExporterOptions(void)
+    ??0OtlpHttpMetricExporterOptions@otlp@exporter@v1@opentelemetry@@QEAA@XZ
+    // public: __cdecl opentelemetry::v1::exporter::otlp::OtlpHttpMetricExporterOptions::~OtlpHttpMetricExporterOptions(void)
+    ??1OtlpHttpMetricExporterOptions@otlp@exporter@v1@opentelemetry@@QEAA@XZ
+    // public: __cdecl opentelemetry::v1::exporter::otlp::OtlpHttpLogRecordExporterOptions::OtlpHttpLogRecordExporterOptions(void)
+    ??0OtlpHttpLogRecordExporterOptions@otlp@exporter@v1@opentelemetry@@QEAA@XZ
+    // public: __cdecl opentelemetry::v1::exporter::otlp::OtlpHttpLogRecordExporterOptions::~OtlpHttpLogRecordExporterOptions(void)
+    ??1OtlpHttpLogRecordExporterOptions@otlp@exporter@v1@opentelemetry@@QEAA@XZ
+
+    ?GetOtlpDefaultHttpTracesEndpoint@otlp@exporter@v1@opentelemetry@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@XZ
+    ?GetOtlpDefaultHttpMetricsEndpoint@otlp@exporter@v1@opentelemetry@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@XZ
+    ?GetOtlpDefaultHttpLogsEndpoint@otlp@exporter@v1@opentelemetry@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@XZ
+#endif  // defined(WITH_OTLP_HTTP)
+// clang-format on

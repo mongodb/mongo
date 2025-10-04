@@ -30,9 +30,15 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/crypto/hash_block.h"
 #include "mongo/crypto/sha1_block.h"
 #include "mongo/db/logical_time.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
+
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -90,7 +96,7 @@ private:
     };
 
     // protects _cache
-    Mutex _cacheMutex = MONGO_MAKE_LATCH("TimeProofService::_cacheMutex");
+    stdx::mutex _cacheMutex;
 
     // one-entry cache
     boost::optional<CacheEntry> _cache;

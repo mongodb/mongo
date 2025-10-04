@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import random
-import wiredtiger, wttest
+import wttest
 from wtscenario import make_scenarios
 from wiredtiger import stat
 
@@ -50,12 +49,11 @@ from wiredtiger import stat
 class test_stat10(wttest.WiredTigerTestCase):
     uri = 'table:test_stat10'
     conn_config = 'statistics=(all)'
-    session_config = 'isolation=snapshot'
 
     format_values = [
         ('column', dict(key_format='r', value_format='u')),
         ('column_fix', dict(key_format='r', value_format='8t')),
-        ('string_row', dict(key_format='S', value_format='u')),
+        ('row_string', dict(key_format='S', value_format='u')),
     ]
 
     oldest_values = [
@@ -114,6 +112,8 @@ class test_stat10(wttest.WiredTigerTestCase):
         self.session.rollback_transaction()
 
     def test_tree_stats(self):
+        # FIXME-WT-14937: not working for disagg.
+        self.skipTest("page delta")
         format = "key_format={},value_format={}".format(self.key_format, self.value_format)
         self.session.create(self.uri, format)
 
@@ -160,6 +160,9 @@ class test_stat10(wttest.WiredTigerTestCase):
         column_rle = statscursor[stat.dsrc.btree_column_rle][2]
         column_tws = statscursor[stat.dsrc.btree_column_tws][2]
         overflow = statscursor[stat.dsrc.btree_overflow][2]
+        # Read backup stats even though backup isn't being used.
+        self.assertEqual(0, statscursor[stat.dsrc.backup_blocks_compressed][2])
+        self.assertEqual(0, statscursor[stat.dsrc.backup_blocks_uncompressed][2])
 
         statscursor.close()
 
@@ -209,7 +212,10 @@ class test_stat10(wttest.WiredTigerTestCase):
 
         # column_tws: for FLCS only.
         if self.key_format == 'r' and self.value_format == '8t':
-            if self.oldest > 20:
+            if self.oldest > 30:
+                # Everything should be stable.
+                self.assertEqual(column_tws, 0)
+            elif self.oldest > 20:
                 # Only the deletions show.
                 self.assertEqual(column_tws, 2)
             else:
@@ -224,6 +230,3 @@ class test_stat10(wttest.WiredTigerTestCase):
             self.assertEqual(overflow, 0)
         else:
             self.assertEqual(overflow, 1)
-
-if __name__ == '__main__':
-    wttest.run()

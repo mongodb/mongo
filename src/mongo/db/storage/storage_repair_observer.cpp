@@ -27,36 +27,31 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 #include "mongo/db/storage/storage_repair_observer.h"
 
 #include <algorithm>
-#include <cerrno>
-#include <cstring>
+#include <ostream>
+#include <utility>
 
-#ifdef __linux__
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#endif
-
+#include <boost/filesystem/fstream.hpp>
+#include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
-#include "mongo/db/dbhelpers.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/db/storage/storage_file_util.h"
-#include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/file.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
+
 
 namespace mongo {
 
 namespace {
-static const NamespaceString kConfigNss("local.system.replset");
 static const std::string kRepairIncompleteFileName = "_repair_incomplete";
 
 const auto getRepairObserver =
@@ -65,8 +60,6 @@ const auto getRepairObserver =
 }  // namespace
 
 StorageRepairObserver::StorageRepairObserver(const std::string& dbpath) {
-    invariant(!storageGlobalParams.readOnly);
-
     using boost::filesystem::path;
     _repairIncompleteFilePath = path(dbpath) / path(kRepairIncompleteFileName);
 
@@ -100,13 +93,15 @@ void StorageRepairObserver::invalidatingModification(const std::string& descript
     _modifications.emplace_back(Modification::invalidating(description));
 }
 
-void StorageRepairObserver::onRepairDone(OperationContext* opCtx) {
+void StorageRepairObserver::onRepairDone(OperationContext* opCtx,
+                                         const InvalidateReplConfigCallback& cb) {
     invariant(_repairState == RepairState::kIncomplete);
 
     // This ordering is important. The incomplete file should only be removed once the
     // replica set configuration has been invalidated successfully.
     if (isDataInvalidated()) {
-        _invalidateReplConfigIfNeeded(opCtx);
+        invariant(opCtx && cb);
+        cb();
     }
     _removeRepairIncompleteFile();
 
@@ -124,11 +119,11 @@ void StorageRepairObserver::_touchRepairIncompleteFile() {
     boost::filesystem::ofstream fileStream(_repairIncompleteFilePath);
     fileStream << "This file indicates that a repair operation is in progress or incomplete.";
     if (fileStream.fail()) {
+        auto ec = lastSystemError();
         LOGV2_FATAL_NOTRACE(50920,
-                            "Failed to write to file {file}: {error}",
                             "Failed to write to file",
                             "file"_attr = _repairIncompleteFilePath.generic_string(),
-                            "error"_attr = errnoWithDescription());
+                            "error"_attr = errorMessage(ec));
     }
     fileStream.close();
 
@@ -142,31 +137,11 @@ void StorageRepairObserver::_removeRepairIncompleteFile() {
 
     if (ec) {
         LOGV2_FATAL_NOTRACE(50921,
-                            "Failed to remove file {file}: {error}",
                             "Failed to remove file",
                             "file"_attr = _repairIncompleteFilePath.generic_string(),
                             "error"_attr = ec.message());
     }
     fassertNoTrace(50927, fsyncParentDirectory(_repairIncompleteFilePath));
-}
-
-void StorageRepairObserver::_invalidateReplConfigIfNeeded(OperationContext* opCtx) {
-    // If the config doesn't exist, don't invalidate anything. If this node were originally part of
-    // a replica set but lost its config due to a repair, it would automatically perform a resync.
-    // If this node is a standalone, this would lead to a confusing error message if it were
-    // added to a replica set later on.
-    BSONObj config;
-    if (!Helpers::getSingleton(opCtx, kConfigNss.ns().c_str(), config)) {
-        return;
-    }
-    if (config.hasField(repl::ReplSetConfig::kRepairedFieldName)) {
-        return;
-    }
-    BSONObjBuilder configBuilder(config);
-    configBuilder.append(repl::ReplSetConfig::kRepairedFieldName, true);
-    Helpers::putSingleton(opCtx, kConfigNss.ns().c_str(), configBuilder.obj());
-
-    JournalFlusher::get(opCtx)->waitForJournalFlush();
 }
 
 }  // namespace mongo

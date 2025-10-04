@@ -1,0 +1,61 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_fuzzer_test", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "date_time_support",
+    srcs = [
+        "date_time_support.cpp",
+    ],
+    hdrs = [
+        "date_time_support.h",
+    ],
+    deps = [
+        "//src/mongo/db:service_context",
+        "//src/third_party/timelib",
+    ],
+)
+
+mongo_cc_library(
+    name = "init_timezone_data",
+    srcs = [
+        "init_timezone_data.cpp",
+    ],
+    deps = [
+        ":date_time_support",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_base",
+        "//src/third_party/timelib",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "date_time_support_test",
+    srcs = [
+        "date_time_support_test.cpp",
+    ],
+    tags = ["mongo_unittest_seventh_group"],
+    deps = [
+        ":date_time_support",
+        "//src/mongo/db/local_catalog/lock_manager",
+        "//src/mongo/transport:transport_layer_common",
+    ],
+)
+
+mongo_cc_fuzzer_test(
+    name = "date_time_support_fuzzer",
+    srcs = [
+        "date_time_support_fuzzer.cpp",
+    ],
+    deps = [
+        "date_time_support",
+        "//src/mongo/db/local_catalog/lock_manager",
+        "//src/mongo/transport:transport_layer_common",
+    ],
+)

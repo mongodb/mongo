@@ -3,7 +3,7 @@
  * (See accompanying file LICENSE_1_0.txt or copy at
  * http://www.boost.org/LICENSE_1_0.txt)
  *
- * Copyright (c) 2020 Andrey Semashev
+ * Copyright (c) 2020, 2022 Andrey Semashev
  */
 /*!
  * \file   atomic/detail/caps_arch_gcc_aarch32.hpp
@@ -31,7 +31,14 @@
     (defined(__BIG_ENDIAN__) && !defined(__LITTLE_ENDIAN__))
 #define BOOST_ATOMIC_DETAIL_AARCH32_BIG_ENDIAN
 #else
+#include <boost/predef/other/endian.h>
+#if BOOST_ENDIAN_LITTLE_BYTE
+#define BOOST_ATOMIC_DETAIL_AARCH32_LITTLE_ENDIAN
+#elif BOOST_ENDIAN_BIG_BYTE
+#define BOOST_ATOMIC_DETAIL_AARCH32_BIG_ENDIAN
+#else
 #error "Boost.Atomic: Failed to determine AArch32 endianness, the target platform is not supported. Please, report to the developers (patches are welcome)."
+#endif
 #endif
 
 #define BOOST_ATOMIC_INT8_LOCK_FREE 2

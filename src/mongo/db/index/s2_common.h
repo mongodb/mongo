@@ -29,11 +29,15 @@
 
 #pragma once
 
-#include <string>
-
-#include "mongo/db/jsobj.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/ordering.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/key_string/key_string.h"
+#include "mongo/util/modules.h"
+
+#include <cstddef>
+#include <string>
+#include <vector>
 
 class S2CellId;
 class S2RegionCoverer;
@@ -83,12 +87,18 @@ struct S2IndexingParams {
     void configureCoverer(const GeometryContainer& geoContainer, S2RegionCoverer* coverer) const;
 };
 
+namespace index2dsphere {
 BSONObj S2CellIdToIndexKey(const S2CellId& cellId, S2IndexVersion indexVersion);
+
 void S2CellIdToIndexKeyStringAppend(const S2CellId& cellId,
                                     S2IndexVersion indexVersion,
-                                    const std::vector<KeyString::HeapBuilder>& keysToAdd,
-                                    std::vector<KeyString::HeapBuilder>* out,
-                                    KeyString::Version keyStringVersion,
+                                    const std::vector<key_string::HeapBuilder>& keysToAdd,
+                                    std::vector<key_string::HeapBuilder>* out,
+                                    key_string::Version keyStringVersion,
                                     Ordering ordering);
 
+void initialize2dsphereParams(const BSONObj& infoObj,
+                              const CollatorInterface* collator,
+                              S2IndexingParams* out);
+}  // namespace index2dsphere
 }  // namespace mongo

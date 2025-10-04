@@ -1,0 +1,41 @@
+# (C) Copyright 2012: Eric Niebler
+# Distributed under the Boost Software License, Version 1.0.
+# (See accompanying file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
+
+# Generates preprocessed files with wave.
+
+import feature ;
+import toolset ;
+
+feature.feature fusion-limit : : free ;
+toolset.flags wave FUSION-LIMIT <fusion-limit> ;
+
+project : requirements <link>static <variant>release ;
+
+actions wave bind FUSION-LIMIT
+{
+  echo Preprocessing with FUSION_MAX_VECTOR_SIZE=$(FUSION-LIMIT)...
+  $(>[2]) -o- -DFUSION_MAX_VECTOR_SIZE=$(FUSION-LIMIT) -DFUSION_MAX_LIST_SIZE=$(FUSION-LIMIT) -DFUSION_MAX_ZIP_SEQUENCES=$(FUSION-LIMIT) --config-file wave.cfg $(>[1])
+}
+
+W = /boost/libs/wave/tool//wave ;
+
+make preprocess_fusion_10
+  : preprocess_fusion.cpp $(W) : wave : <fusion-limit>10
+  ;
+
+make preprocess_fusion_20
+  : preprocess_fusion.cpp $(W) : wave : <fusion-limit>20
+  ;
+
+make preprocess_fusion_30
+  : preprocess_fusion.cpp $(W) : wave : <fusion-limit>30
+  ;
+
+make preprocess_fusion_40
+  : preprocess_fusion.cpp $(W) : wave : <fusion-limit>40
+  ;
+
+make preprocess_fusion_50
+  : preprocess_fusion.cpp $(W) : wave : <fusion-limit>50
+  ;

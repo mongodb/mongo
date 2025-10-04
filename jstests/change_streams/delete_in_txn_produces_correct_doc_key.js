@@ -6,11 +6,8 @@
 //  assumes_against_mongod_not_mongos
 //  ]
 
-(function() {
-"use strict";
-
-load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
-load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest.
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 
 const collName = "delete_in_txn_produces_correct_doc_key";
 
@@ -24,17 +21,14 @@ function testDeleteInMultiDocTxn({collName, deleteCommand, expectedChanges}) {
     // Initialize the collection.
     const coll = assertDropAndRecreateCollection(db, collName);
 
-    // Enable the 'recordPreImages' flag on the collection. This allows us to verify that the full
-    // document is not written to the 'documentKey' field even when we know it is available to the
-    // oplog writer during the delete operation.
-    assert.commandWorked(db.runCommand({collMod: collName, recordPreImages: true}));
-
-    assert.commandWorked(coll.insertMany([
-        {_id: 1, a: 0, fullDoc: "It's a full document!"},
-        {_id: 2, a: 0},
-        {_id: 3, a: 0},
-        {_id: 4, a: 1}
-    ]));
+    assert.commandWorked(
+        coll.insertMany([
+            {_id: 1, a: 0, fullDoc: "It's a full document!"},
+            {_id: 2, a: 0},
+            {_id: 3, a: 0},
+            {_id: 4, a: 1},
+        ]),
+    );
 
     // Open a change stream on the test collection.
     const cst = new ChangeStreamTest(db);
@@ -58,10 +52,10 @@ function testDeleteInMultiDocTxn({collName, deleteCommand, expectedChanges}) {
     // Test the change stream can be resumed after a delete event from within the transaction.
     cursor = cst.startWatchingChanges({
         pipeline: [{$changeStream: {resumeAfter: changes[changes.length - 1]._id}}],
-        collection: coll
+        collection: coll,
     });
     assert.commandWorked(coll.insert({_id: 5}));
-    assert.docEq(cst.getOneChange(cursor).documentKey, {_id: 5});
+    assert.docEq({_id: 5}, cst.getOneChange(cursor).documentKey);
 
     cst.cleanUp();
 }
@@ -69,7 +63,7 @@ function testDeleteInMultiDocTxn({collName, deleteCommand, expectedChanges}) {
 jsTestLog("Testing deleteOne() in a transaction.");
 testDeleteInMultiDocTxn({
     collName: collName,
-    deleteCommand: function(sessionColl) {
+    deleteCommand: function (sessionColl) {
         assert.commandWorked(sessionColl.deleteOne({_id: 1}));
     },
     expectedChanges: [
@@ -84,7 +78,7 @@ testDeleteInMultiDocTxn({
 jsTestLog("Testing deleteMany() in a transaction.");
 testDeleteInMultiDocTxn({
     collName: collName,
-    deleteCommand: function(sessionColl) {
+    deleteCommand: function (sessionColl) {
         assert.commandWorked(sessionColl.deleteMany({a: 0, _id: {$gt: 0}}));
     },
     expectedChanges: [
@@ -110,7 +104,7 @@ testDeleteInMultiDocTxn({
 jsTestLog("Testing findAndModify() in a transaction.");
 testDeleteInMultiDocTxn({
     collName: collName,
-    deleteCommand: function(sessionColl) {
+    deleteCommand: function (sessionColl) {
         sessionColl.findAndModify({query: {a: 0}, sort: {_id: 1}, remove: true});
     },
     expectedChanges: [
@@ -121,4 +115,3 @@ testDeleteInMultiDocTxn({
         },
     ],
 });
-}());

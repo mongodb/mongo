@@ -5,25 +5,12 @@
  * subsequently dropped and recreated after the collection has documents.
  */
 
-(function() {
-'use strict';
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
-load('jstests/libs/fail_point_util.js');
-load('jstests/noPassthrough/libs/index_build.js');
-
-const dbName = 'test';
-const collectionName = 'coll';
-
-// How many documents to insert on the primary prior to
-// starting initial-sync.
-const initialDocs = 10;
-// Batch-size used for cloning.
-// Used as a fail-point parameter as detailed below.
-const clonerBatchSize = 1;
-
-// Setting initialDocs larger than clonerBatchSize causes
-// the fail-point to be hit because we fetch
-// multiple batches in the InitialSyncer.
+const dbName = "test";
+const collectionName = "coll";
 
 // Start one-node repl-set.
 const rst = new ReplSetTest({nodes: 1});
@@ -38,14 +25,11 @@ const secondary = rst.add({
     rsConfig: {votes: 0, priority: 0},
     setParameter: {numInitialSyncAttempts: 1},
 });
-secondary.setSecondaryOk();
-const secondaryColl = secondary.getDB(dbName).getCollection(collectionName);
 
-// We set the collectionClonerBatchSize low above, so we will definitely hit
-// this fail-point and hang after the first batch is applied. While the
-// secondary is hung we clone the problematic document.
-const failPoint = configureFailPoint(
-    secondary, 'initialSyncHangBeforeCopyingDatabases', {nss: secondaryColl.getFullName()});
+// While the secondary is hung, we create the same index multiple times to
+// reproduce the interaction between single and two phase index builds on the
+// same index.
+const failPoint = configureFailPoint(secondary, "initialSyncHangBeforeCopyingDatabases");
 rst.reInitiate();
 failPoint.wait();
 
@@ -62,7 +46,7 @@ assert.commandWorked(primaryColl.dropIndex({a: 1}));
 IndexBuildTest.pauseIndexBuilds(primary);
 IndexBuildTest.pauseIndexBuilds(secondary);
 const createIdx = IndexBuildTest.startIndexBuild(primary, primaryColl.getFullName(), {a: 1});
-IndexBuildTest.waitForIndexBuildToScanCollection(primaryDB, primaryColl.getName(), 'a_1');
+IndexBuildTest.waitForIndexBuildToScanCollection(primaryDB, primaryColl.getName(), "a_1");
 try {
     // Resume initial sync. The createIndexes oplog entry will be applied.
     failPoint.off();
@@ -75,7 +59,6 @@ try {
     createIdx();
 }
 
-IndexBuildTest.assertIndexes(primaryColl, 2, ['_id_', 'a_1']);
+IndexBuildTest.assertIndexes(primaryColl, 2, ["_id_", "a_1"]);
 
 rst.stopSet();
-})();

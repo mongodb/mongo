@@ -29,13 +29,20 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
+#include "mongo/db/repl/oplog_buffer.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/interruptible.h"
+#include "mongo/util/modules.h"
+#include "mongo/util/time_support.h"
+
+#include <cstddef>
 #include <memory>
 
-#include "mongo/db/repl/oplog_buffer.h"
-#include "mongo/platform/mutex.h"
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_OPEN mongo {
 namespace repl {
 
 class StorageInterface;
@@ -60,15 +67,16 @@ public:
     void shutdown(OperationContext* opCtx) override;
     void push(OperationContext* opCtx,
               Batch::const_iterator begin,
-              Batch::const_iterator end) override;
-    void waitForSpace(OperationContext* opCtx, std::size_t size) override;
+              Batch::const_iterator end,
+              boost::optional<const Cost&> cost = boost::none) override;
+    void waitForSpace(OperationContext* opCtx, const Cost& cost) override;
     bool isEmpty() const override;
-    std::size_t getMaxSize() const override;
     std::size_t getSize() const override;
     std::size_t getCount() const override;
     void clear(OperationContext* opCtx) override;
     bool tryPop(OperationContext* opCtx, Value* value) override;
-    bool waitForData(Seconds waitDuration) override;
+    bool waitForDataFor(Milliseconds waitDuration, Interruptible* interruptible) override;
+    bool waitForDataUntil(Date_t deadline, Interruptible* interruptible) override;
     bool peek(OperationContext* opCtx, Value* value) override;
     boost::optional<Value> lastObjectPushed(OperationContext* opCtx) const override;
 
@@ -80,12 +88,12 @@ private:
     std::unique_ptr<OplogBuffer> _target;
 
     // If both mutexes have to be acquired, acquire _lastPushedMutex first.
-    mutable Mutex _lastPushedMutex = MONGO_MAKE_LATCH("OplogBufferProxy::_lastPushedMutex");
+    mutable stdx::mutex _lastPushedMutex;
     boost::optional<Value> _lastPushed;
 
-    mutable Mutex _lastPeekedMutex = MONGO_MAKE_LATCH("OplogBufferProxy::_lastPeekedMutex");
+    mutable stdx::mutex _lastPeekedMutex;
     boost::optional<Value> _lastPeeked;
 };
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_OPEN mongo

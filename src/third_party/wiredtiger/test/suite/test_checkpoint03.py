@@ -35,23 +35,29 @@
 #
 
 from suite_subprocess import suite_subprocess
-import wiredtiger, wttest
+import wttest
 from wiredtiger import stat
 from wtscenario import make_scenarios
 
 class test_checkpoint03(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_checkpoint03'
-    conn_config = 'statistics=(all)'
     uri = 'table:' + tablename
-    session_config = 'isolation=snapshot, '
 
     format_values = [
         ('column-fix', dict(key_format='r', value_format='8t')),
         ('column', dict(key_format='r', value_format='i')),
-        ('integer_row', dict(key_format='i', value_format='i')),
+        ('row_integer', dict(key_format='i', value_format='i')),
     ]
 
-    scenarios = make_scenarios(format_values)
+    ckpt_precision = [
+        ('fuzzy', dict(ckpt_config='precise_checkpoint=false')),
+        ('precise', dict(ckpt_config='precise_checkpoint=true')),
+    ]
+
+    scenarios = make_scenarios(format_values, ckpt_precision)
+
+    def conn_config(self):
+        return 'statistics=(all),' + self.ckpt_config
 
     def get_stat(self, stat):
         stat_cursor = self.session.open_cursor('statistics:')
@@ -64,7 +70,6 @@ class test_checkpoint03(wttest.WiredTigerTestCase, suite_subprocess):
         config = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(self.uri, config)
         self.session.begin_transaction()
-        self.conn.set_timestamp('oldest_timestamp=1')
 
         # Insert 3 updates in separate transactions.
         cur1 = self.session.open_cursor(self.uri)
@@ -79,6 +84,8 @@ class test_checkpoint03(wttest.WiredTigerTestCase, suite_subprocess):
         cur1[1] = 3
         self.session.commit_transaction('commit_timestamp=4')
 
+        self.conn.set_timestamp('oldest_timestamp=1,stable_timestamp=4')
+
         # Call checkpoint.
         self.session.checkpoint()
 
@@ -92,6 +99,8 @@ class test_checkpoint03(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.begin_transaction()
         cur1[1] = 4
         self.session.commit_transaction('commit_timestamp=5')
+
+        self.conn.set_timestamp('stable_timestamp=5')
         self.session.checkpoint()
 
         # Check that we wrote something to the history store in the last checkpoint we ran, as we
@@ -111,6 +120,3 @@ class test_checkpoint03(wttest.WiredTigerTestCase, suite_subprocess):
         cur2.set_key(1)
         cur2.search()
         self.assertEqual(cur2.get_value(), 4)
-
-if __name__ == '__main__':
-    wttest.run()

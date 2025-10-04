@@ -3,18 +3,25 @@
  * @tags: [
  *   # Needed as $densify is a 51 feature.
  *   requires_fcv_51,
+ *   not_allowed_with_signed_security_token,
  * ]
  */
 
-(function() {
-"use strict";
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
-load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For setParameterOnAllHosts.
-load("jstests/libs/discover_topology.js");                       // For findNonConfigNodes.
+// On a sharded cluster if the database doesn't exist, densify will return an empty result instead
+// of a error.
+if (FixtureHelpers.isMongos(db)) {
+    // Create database
+    assert.commandWorked(db.adminCommand({"enableSharding": db.getName()}));
+}
 
 const paramName = "internalQueryMaxAllowedDensifyDocs";
-const origParamValue = assert.commandWorked(
-    db.adminCommand({getParameter: 1, internalQueryMaxAllowedDensifyDocs: 1}))[paramName];
+const origParamValue = assert.commandWorked(db.adminCommand({getParameter: 1, internalQueryMaxAllowedDensifyDocs: 1}))[
+    paramName
+];
 function setMaxDocs(max) {
     setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(db.getMongo()), paramName, max);
 }
@@ -27,7 +34,8 @@ function runAggregate(densifyStage, failCode = null) {
     } else {
         assert.commandFailedWithCode(
             db.runCommand({aggregate: coll.getName(), pipeline: [densifyStage], cursor: {}}),
-            failCode);
+            failCode,
+        );
     }
 }
 
@@ -47,9 +55,7 @@ runAggregate({$densify: {field: "val", range: {step: 1, bounds: "full"}}}, 58979
 setMaxDocs(20);
 assert.commandWorked(coll.insert({val: 0, part: 2}));
 assert.commandWorked(coll.insert({val: 12, part: 2}));
-runAggregate(
-    {$densify: {field: "val", partitionByFields: ["part"], range: {step: 1, bounds: "partition"}}},
-    5897900);
+runAggregate({$densify: {field: "val", partitionByFields: ["part"], range: {step: 1, bounds: "partition"}}}, 5897900);
 
 // Test that already existing documents don't count towards the limit.
 coll.drop();
@@ -62,4 +68,3 @@ runAggregate({$densify: {field: "val", range: {step: 1, bounds: "full"}}});
 
 // Reset parameter.
 setMaxDocs(origParamValue);
-})();

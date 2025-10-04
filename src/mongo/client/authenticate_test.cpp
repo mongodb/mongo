@@ -27,19 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <queue>
-
-#include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/authenticate.h"
-#include "mongo/config.h"
-#include "mongo/db/jsobj.h"
+
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/base64.h"
-#include "mongo/util/md5.hpp"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/md5.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/password_digest.h"
+
+#include <queue>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
 
 namespace {
 
@@ -68,7 +71,7 @@ public:
         md5digest d;
         {
             md5_state_t st;
-            md5_init(&st);
+            md5_init_state(&st);
             md5_append(&st, (const md5_byte_t*)_nonce.c_str(), _nonce.size());
             md5_append(&st, (const md5_byte_t*)_username.c_str(), _username.size());
             md5_append(&st, (const md5_byte_t*)_password_digest.c_str(), _password_digest.size());
@@ -82,7 +85,7 @@ public:
         // Validate the received request
         ASSERT(!_requests.empty());
         auto& expected = _requests.front();
-        ASSERT_EQ(expected.getDatabase(), request.getDatabase());
+        ASSERT_EQ(expected.parseDbName(), request.parseDbName());
         ASSERT_BSONOBJ_EQ(expected.body, request.body);
         _requests.pop();
 
@@ -103,38 +106,14 @@ public:
         _responses.emplace(cmd);
     }
 
-    void pushRequest(StringData dbname, const BSONObj& cmd) {
-        _requests.emplace(OpMsgRequest::fromDBAndBody(dbname, cmd));
+    void pushRequest(const DatabaseName& dbname, const BSONObj& cmd) {
+        _requests.emplace(
+            OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::kNotRequired, dbname, cmd));
     }
-
-    BSONObj loadMongoCRConversation() {
-        // 1. Client sends 'getnonce' command
-        pushRequest("admin", BSON("getnonce" << 1));
-
-        // 2. Client receives nonce
-        pushResponse(BSON("nonce" << _nonce << "ok" << 1));
-
-        // 3. Client sends 'authenticate' command
-        pushRequest("admin",
-                    BSON("authenticate" << 1 << "nonce" << _nonce << "user" << _username << "key"
-                                        << _digest));
-
-        // 4. Client receives 'ok'
-        pushResponse(BSON("ok" << 1));
-
-        // Call clientAuthenticate()
-        return BSON("mechanism"
-                    << "MONGODB-CR"
-                    << "db"
-                    << "admin"
-                    << "user" << _username << "pwd" << _password << "digest"
-                    << "true");
-    }
-
 
     BSONObj loadX509Conversation() {
         // 1. Client sends 'authenticate' command
-        pushRequest("$external",
+        pushRequest(DatabaseName::kExternal,
                     BSON("authenticate" << 1 << "mechanism"
                                         << "MONGODB-X509"
                                         << "user" << _username));
@@ -143,11 +122,10 @@ public:
         pushResponse(BSON("ok" << 1));
 
         // Call clientAuthenticate()
-        return BSON("mechanism"
-                    << "MONGODB-X509"
-                    << "db"
-                    << "$external"
-                    << "user" << _username);
+        return BSON("mechanism" << "MONGODB-X509"
+                                << "db"
+                                << "$external"
+                                << "user" << _username);
     }
 
 
@@ -168,37 +146,16 @@ public:
     std::queue<BSONObj> _responses;
 };
 
-TEST_F(AuthClientTest, MongoCR) {
-    // This test excludes the MONGODB-CR support found in mongo/shell/mongodbcr.cpp
-    // so it should fail to auth.
-    // jstests exist to ensure MONGODB-CR continues to work from the client.
-    auto params = loadMongoCRConversation();
-    ASSERT_THROWS(
-        auth::authenticateClient(std::move(params), HostAndPort(), "", _runCommandCallback).get(),
-        DBException);
-}
-
-TEST_F(AuthClientTest, asyncMongoCR) {
-    // As with the sync version above, we expect authentication to fail
-    // since this test was built without MONGODB-CR support.
-    auto params = loadMongoCRConversation();
-    ASSERT_NOT_OK(
-        auth::authenticateClient(std::move(params), HostAndPort(), "", _runCommandCallback)
-            .getNoThrow());
-}
-
 #ifdef MONGO_CONFIG_SSL
 TEST_F(AuthClientTest, X509) {
     auto params = loadX509Conversation();
-    auth::authenticateClient(std::move(params), HostAndPort(), _username, _runCommandCallback)
-        .get();
+    auth::authenticateClient(params, HostAndPort(), _username, _runCommandCallback).get();
 }
 
 TEST_F(AuthClientTest, asyncX509) {
     auto params = loadX509Conversation();
-    ASSERT_OK(
-        auth::authenticateClient(std::move(params), HostAndPort(), _username, _runCommandCallback)
-            .getNoThrow());
+    ASSERT_OK(auth::authenticateClient(params, HostAndPort(), _username, _runCommandCallback)
+                  .getNoThrow());
 }
 #endif
 

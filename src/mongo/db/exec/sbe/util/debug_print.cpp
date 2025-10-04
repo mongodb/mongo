@@ -27,17 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/exec/sbe/util/debug_print.h"
 
 #include "mongo/db/exec/sbe/stages/stages.h"
+
+#include <cstddef>
+#include <memory>
 
 namespace mongo {
 namespace sbe {
 std::string DebugPrinter::print(const std::vector<Block>& blocks) {
     std::string ret;
     int ident = 0;
+    size_t blockIndex = 0;
     for (auto& b : blocks) {
         bool addSpace = true;
         switch (b.cmd) {
@@ -48,8 +50,13 @@ std::string DebugPrinter::print(const std::vector<Block>& blocks) {
                 break;
             case Block::cmdDecIndent:
                 --ident;
-                ret.append("\n");
-                addIndent(ident, ret);
+                // Avoid unnecessary whitespace if there are multiple adjacent "decrement indent"
+                // tokens.
+                if (blockIndex >= (blocks.size() - 1) ||
+                    blocks[blockIndex + 1].cmd != Block::cmdDecIndent) {
+                    ret.append("\n");
+                    addIndent(ident, ret);
+                }
                 break;
             case Block::cmdNewLine:
                 ret.append("\n");
@@ -111,6 +118,7 @@ std::string DebugPrinter::print(const std::vector<Block>& blocks) {
                 }
             }
         }
+        ++blockIndex;
     }
 
     return ret;

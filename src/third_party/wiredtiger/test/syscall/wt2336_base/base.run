@@ -39,14 +39,10 @@ SYSTEM("Darwin");
 #define OPEN_EXISTING(name, flags)		OPEN(name, flags, 0)
 #endif /* __linux__ */
 
-#ifdef HAVE_FTRUNCATE
 #ifdef __linux__
 #define FTRUNCATE(fd, len)			ftruncate(fd, len)
 #else
 #define FTRUNCATE(fd, len)			ftruncate(fd, len, len)
-#endif
-#else
-#define FTRUNCATE(fd, len)			/* do nothing */
 #endif
 
 #ifdef WT_USE_OPENAT
@@ -55,7 +51,7 @@ SYSTEM("Darwin");
 #define OPEN(...)				open(__VA_ARGS__)
 #endif
 
-TRACE("close,fdatasync,fsync,ftruncate,open,openat,pwrite64,rename");
+TRACE("close,fdatasync,fsync,ftruncate,open,openat,pwrite64");
 RUN("");
 ...
 OUTPUT("--------------wiredtiger_open");
@@ -77,7 +73,6 @@ pwrite64(fd, "# Do not modify this file."..., ...);
 fdatasync(fd);
 #endif /* __linux__ */
 close(fd);
-rename("./WiredTiger.basecfg.set", "./WiredTiger.basecfg");
 
 #ifdef __linux__
 dir = OPEN("./", O_RDONLY|O_CLOEXEC);
@@ -108,9 +103,8 @@ pwrite64(fd, "WiredTiger version string\nWiredTiger"..., ...);
 fdatasync(fd);
 #endif /* __linux__ */
 close(fd);
-rename("./WiredTiger.turtle.set", "./WiredTiger.turtle");
 
-...  // There is a second open of turtle here, is it important?
+...  // There is a second open of turtle here, is it important? We also set two thread names.
 
 fd = OPEN("./WiredTigerHS.wt", O_RDWR|O_CREAT|O_EXCL|O_NOATIME|O_CLOEXEC, 0666);
 
@@ -144,12 +138,12 @@ pwrite64(fd, "WiredTiger version string\nWiredTiger"..., ...);
 fdatasync(fd);
 #endif /* __linux__ */
 close(fd);
-rename("./WiredTiger.turtle.set", "./WiredTiger.turtle");
 #ifdef __linux__
 dir = OPEN("./", O_RDONLY|O_CLOEXEC);
 fdatasync(dir);
 close(dir);
 fdatasync(wt);
+... // Calls to open /proc/self/task/... in order to set names of internal threads.
 #endif /* __linux__ */
 
 OUTPUT("--------------open_session");
@@ -171,15 +165,6 @@ FTRUNCATE(hello, 0x1000);
 turtle = OPEN_EXISTING("./WiredTiger.turtle", O_RDWR|O_CLOEXEC);
 close(turtle);
 ...  // more changes to turtle
-OUTPUT("--------------rename");
-#ifdef __linux__
-FTRUNCATE(hello, 0x1000);
-#endif /* __linux__ */
-close(hello);
-rename("./hello.wt", "./world.wt");
-// Changes to turtle, more writes to wt.
-turtle = OPEN_EXISTING("./WiredTiger.turtle", O_RDWR|O_CLOEXEC);
-close(turtle);
 ...
 OUTPUT("--------------drop");
 ...

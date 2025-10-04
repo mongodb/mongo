@@ -29,9 +29,18 @@
 
 #pragma once
 
+#include "mongo/scripting/mozjs/base.h"
+#include "mongo/scripting/mozjs/wraptype.h"
+#include "mongo/util/modules.h"
+
+#include <cstdint>
+
 #include <jsapi.h>
 
-#include "mongo/scripting/mozjs/wraptype.h"
+#include <js/CallArgs.h>
+#include <js/Class.h>
+#include <js/PropertySpec.h>
+#include <js/TypeDecls.h>
 
 namespace mongo {
 namespace mozjs {
@@ -51,8 +60,10 @@ namespace mozjs {
  * floating point approximation.
  */
 struct NumberLongInfo : public BaseInfo {
+    enum Slots { Int64Slot, NumberLongInfoSlotCount };
+
     static void construct(JSContext* cx, JS::CallArgs args);
-    static void finalize(js::FreeOp* fop, JSObject* obj);
+    static void finalize(JS::GCContext* gcCtx, JSObject* obj);
 
     struct Functions {
         MONGO_DECLARE_JS_FUNCTION(toNumber);
@@ -69,7 +80,8 @@ struct NumberLongInfo : public BaseInfo {
     static const JSFunctionSpec methods[6];
 
     static const char* const className;
-    static const unsigned classFlags = JSCLASS_HAS_PRIVATE;
+    static const unsigned classFlags =
+        JSCLASS_HAS_RESERVED_SLOTS(NumberLongInfoSlotCount) | BaseInfo::finalizeFlag;
 
     static void postInstall(JSContext* cx, JS::HandleObject global, JS::HandleObject proto);
 

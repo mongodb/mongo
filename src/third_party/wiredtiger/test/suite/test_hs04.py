@@ -105,6 +105,3 @@ class test_hs04(wttest.WiredTigerTestCase):
             self.assertEqual(
                 self.get_stat(wiredtiger.stat.conn.cache_hs_ondisk_max),
                 self.reconfig_stat_val)
-
-if __name__ == '__main__':
-    wttest.run()

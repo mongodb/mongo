@@ -1,11 +1,3 @@
-#
-# Public Domain 2014-present MongoDB, Inc.
-# Public Domain 2008-2014 WiredTiger, Inc.
-#  All rights reserved.
-#
-# See the file LICENSE for redistribution information.
-#
-
 if(CMAKE_CROSSCOMPILING)
     set(TRIPLE_TARGET "x86_64-apple-darwin")
     set(CROSS_COMPILER_PREFIX ${TRIPLE_TARGET}-)

@@ -27,20 +27,21 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
-
-#include "mongo/platform/basic.h"
 
 #ifdef _WIN32
+#include <cstdio>
+#include <cstdlib>
+
 #include <crtdbg.h>
 #include <mmsystem.h>
-#include <stdio.h>
-#include <stdlib.h>
 #endif
 
-#include "mongo/base/init.h"
-#include "mongo/logv2/log.h"
-#include "mongo/util/stacktrace.h"
+#include "mongo/base/init.h"        // IWYU pragma: keep
+#include "mongo/logv2/log.h"        // IWYU pragma: keep
+#include "mongo/util/stacktrace.h"  // IWYU pragma: keep
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
+
 
 #ifdef _WIN32
 
@@ -72,7 +73,7 @@ int __cdecl crtDebugCallback(int nRptType, char* originalMessage, int* returnVal
     *returnValue = 0;  // Returned by _CrtDbgReport. (1: starts the debugger).
     bool die = (nRptType != _CRT_WARN);
     LOGV2(23325,
-          "*** C runtime {severity_nRptType}: {firstLine_originalMessage}{die_terminating_sd_sd}",
+          "*** C runtime debug report ***",
           "severity_nRptType"_attr = severity(nRptType),
           "firstLine_originalMessage"_attr = firstLine(originalMessage),
           "die_terminating_sd_sd"_attr = (die ? ", terminating"_sd : ""_sd));
@@ -91,8 +92,8 @@ MONGO_INITIALIZER(Behaviors_Win32)(InitializerContext*) {
     // hook the C runtime's error display
     _CrtSetReportHook(&crtDebugCallback);
 
-    if (_setmaxstdio(2048) == -1) {
-        LOGV2_WARNING(23326, "Failed to increase max open files limit from default of 512 to 2048");
+    if (_setmaxstdio(8192) == -1) {
+        LOGV2_WARNING(23326, "Failed to increase max open files limit from default of 512 to 8192");
     }
 
     // Let's try to set minimum Windows Kernel quantum length to smallest viable timer resolution in

@@ -28,13 +28,10 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 #include "config.h"
 #include "unwind_i.h"
 #include "dwarf_i.h"
+#include <stdatomic.h>
 
 HIDDEN define_lock (x86_64_lock);
-#ifdef HAVE_ATOMIC_OPS_H
-    HIDDEN AO_t tdep_init_done;
-#else
-    HIDDEN int tdep_init_done;
-#endif
+HIDDEN atomic_bool tdep_init_done = 0;
 
 /* See comments for svr4_dbx_register_map[] in gcc/config/i386/i386.c.  */
 
@@ -87,7 +84,7 @@ tdep_init (void)
   SIGPROCMASK (SIG_SETMASK, &full_mask, &saved_mask);
   mutex_lock (&x86_64_lock);
   {
-    if (atomic_read(&tdep_init_done))
+    if (atomic_load(&tdep_init_done))
       /* another thread else beat us to it... */
       goto out;
 
@@ -96,12 +93,10 @@ tdep_init (void)
 
     dwarf_init ();
 
-    tdep_init_mem_validate ();
-
 #ifndef UNW_REMOTE_ONLY
     x86_64_local_addr_space_init ();
 #endif
-    fetch_and_add1(&tdep_init_done); /* signal that we're initialized... */
+    atomic_store(&tdep_init_done, 1); /* signal that we're initialized... */
   }
  out:
   mutex_unlock(&x86_64_lock);

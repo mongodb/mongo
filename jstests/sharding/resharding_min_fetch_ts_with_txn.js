@@ -5,9 +5,7 @@
  *
  * @tags: [uses_atclustertime]
  */
-(function() {
-"use strict";
-load("jstests/sharding/libs/resharding_test_fixture.js");
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 const reshardingTest = new ReshardingTest({numDonors: 2, numRecipients: 2, reshardInPlace: true});
 reshardingTest.setup();
@@ -24,8 +22,9 @@ const sourceCollection = reshardingTest.createShardedCollection({
 
 const mongos = sourceCollection.getMongo();
 const session = mongos.startSession({causalConsistency: false, retryWrites: false});
-const sessionCollection = session.getDatabase(sourceCollection.getDB().getName())
-                              .getCollection(sourceCollection.getName());
+const sessionCollection = session
+    .getDatabase(sourceCollection.getDB().getName())
+    .getCollection(sourceCollection.getName());
 
 assert.commandWorked(sessionCollection.insert({_id: 0, oldKey: 5, newKey: 15, counter: 0}));
 
@@ -49,15 +48,17 @@ reshardingTest.withReshardingInBackground(
         // the resharding command to complete.
         assert.soon(() => {
             let curOpOpt = {idleSessions: false, allUsers: true, idleConnections: true};
-            let matchStage = {$match: {'locks.Collection': 'R', desc: /ReshardingDonorService/}};
-            let curOpResults =
-                mongos.getDB('admin').aggregate([{$currentOp: curOpOpt}, matchStage]).toArray();
+            let matchStage = {$match: {"locks.Collection": "R", desc: /ReshardingDonorService/}};
+            let curOpResults = mongos
+                .getDB("admin")
+                .aggregate([{$currentOp: curOpOpt}, matchStage])
+                .toArray();
 
             return curOpResults.length > 0;
         });
 
         let coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({
-            ns: sourceCollection.getFullName()
+            ns: sourceCollection.getFullName(),
         });
 
         assert.neq(null, coordinatorDoc);
@@ -68,17 +69,18 @@ reshardingTest.withReshardingInBackground(
 
         assert.soon(() => {
             coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({
-                ns: sourceCollection.getFullName()
+                ns: sourceCollection.getFullName(),
             });
 
             return coordinatorDoc !== null && coordinatorDoc.cloneTimestamp !== undefined;
         });
 
-        assert.eq(1,
-                  timestampCmp(coordinatorDoc.cloneTimestamp, commitOperationTS),
-                  'coordinatorDoc: ' + tojson(coordinatorDoc) +
-                      ', commit opTs: ' + tojson(commitOperationTS));
-    });
+        assert.eq(
+            1,
+            timestampCmp(coordinatorDoc.cloneTimestamp, commitOperationTS),
+            "coordinatorDoc: " + tojson(coordinatorDoc) + ", commit opTs: " + tojson(commitOperationTS),
+        );
+    },
+);
 
 reshardingTest.teardown();
-})();

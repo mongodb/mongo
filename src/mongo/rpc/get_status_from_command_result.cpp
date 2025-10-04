@@ -27,30 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/rpc/get_status_from_command_result.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/rpc/write_concern_error_detail.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/util/str.h"
+
+#include <string>
 
 namespace mongo {
 
-namespace {
-const std::string kCmdResponseWriteConcernField = "writeConcernError";
-const std::string kCmdResponseWriteErrorsField = "writeErrors";
-}  // namespace
-
 Status getStatusFromCommandResult(const BSONObj& result) {
     BSONElement okElement = result["ok"];
-    BSONElement codeElement = result["code"];
-    BSONElement errmsgElement = result["errmsg"];
 
-    // StaleConfigException doesn't pass "ok" in legacy servers
+    // StaleConfig doesn't pass "ok" in legacy servers
     BSONElement dollarErrElement = result["$err"];
 
     if (okElement.eoo() && dollarErrElement.eoo()) {
@@ -60,12 +53,19 @@ Status getStatusFromCommandResult(const BSONObj& result) {
     if (okElement.trueValue()) {
         return Status::OK();
     }
+    return getErrorStatusFromCommandResult(result);
+}
+
+Status getErrorStatusFromCommandResult(const BSONObj& result) {
+    BSONElement codeElement = result["code"];
+    BSONElement errmsgElement = result["errmsg"];
+
     int code = codeElement.numberInt();
     if (0 == code) {
         code = ErrorCodes::UnknownError;
     }
     std::string errmsg;
-    if (errmsgElement.type() == String) {
+    if (errmsgElement.type() == BSONType::string) {
         errmsg = errmsgElement.String();
     } else if (!errmsgElement.eoo()) {
         errmsg = errmsgElement.toString();
@@ -78,78 +78,7 @@ Status getStatusFromCommandResult(const BSONObj& result) {
         code = ErrorCodes::CommandNotFound;
     }
 
-    return Status(ErrorCodes::Error(code), errmsg, result);
-}
-
-Status getWriteConcernStatusFromCommandResult(const BSONObj& obj) {
-    BSONElement wcErrorElem;
-    Status status = bsonExtractTypedField(obj, kCmdResponseWriteConcernField, Object, &wcErrorElem);
-    if (!status.isOK()) {
-        if (status == ErrorCodes::NoSuchKey) {
-            return Status::OK();
-        } else {
-            return status;
-        }
-    }
-
-    BSONObj wcErrObj(wcErrorElem.Obj());
-
-    WriteConcernErrorDetail wcError;
-    std::string wcErrorParseMsg;
-    if (!wcError.parseBSON(wcErrObj, &wcErrorParseMsg)) {
-        return Status(ErrorCodes::UnsupportedFormat,
-                      str::stream()
-                          << "Failed to parse write concern section due to " << wcErrorParseMsg);
-    }
-    std::string wcErrorInvalidMsg;
-    if (!wcError.isValid(&wcErrorInvalidMsg)) {
-        return Status(ErrorCodes::UnsupportedFormat,
-                      str::stream()
-                          << "Failed to parse write concern section due to " << wcErrorInvalidMsg);
-    }
-    return wcError.toStatus();
-}
-
-Status getFirstWriteErrorStatusFromCommandResult(const BSONObj& cmdResponse) {
-    BSONElement writeErrorElem;
-    auto status = bsonExtractTypedField(
-        cmdResponse, kCmdResponseWriteErrorsField, BSONType::Array, &writeErrorElem);
-    if (!status.isOK()) {
-        if (status == ErrorCodes::NoSuchKey) {
-            return Status::OK();
-        } else {
-            return status;
-        }
-    }
-
-    auto firstWriteErrorElem = writeErrorElem.Obj().firstElement();
-    if (!firstWriteErrorElem) {
-        return Status::OK();
-    }
-
-    if (firstWriteErrorElem.type() != BSONType::Object) {
-        return Status(ErrorCodes::UnsupportedFormat,
-                      str::stream() << "writeErrors should be an array of objects, found "
-                                    << typeName(firstWriteErrorElem.type()));
-    }
-
-    auto firstWriteErrorObj = firstWriteErrorElem.Obj();
-
-    return Status(ErrorCodes::Error(firstWriteErrorObj["code"].Int()),
-                  firstWriteErrorObj["errmsg"].String(),
-                  firstWriteErrorObj);
-}
-
-Status getStatusFromWriteCommandReply(const BSONObj& cmdResponse) {
-    auto status = getStatusFromCommandResult(cmdResponse);
-    if (!status.isOK()) {
-        return status;
-    }
-    status = getFirstWriteErrorStatusFromCommandResult(cmdResponse);
-    if (!status.isOK()) {
-        return status;
-    }
-    return getWriteConcernStatusFromCommandResult(cmdResponse);
+    return Status(ErrorCodes::Error(code), std::move(errmsg), result);
 }
 
 }  // namespace mongo

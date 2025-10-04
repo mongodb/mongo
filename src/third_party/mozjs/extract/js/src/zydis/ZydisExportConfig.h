@@ -1,0 +1,10 @@
+#ifndef ZYDIS_EXPORT_H
+#define ZYDIS_EXPORT_H
+
+#define ZYDIS_EXPORT
+#define ZYDIS_DEPRECATED_EXPORT
+#define ZYDIS_NO_EXPORT
+
+#endif /* ZYDIS_EXPORT_H */
+
+

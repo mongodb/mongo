@@ -27,12 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/update/pop_node.h"
 
-#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/update/storage_validation.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -56,7 +61,7 @@ ModifierNode::ModifyResult PopNode::updateExistingElement(mutablebson::Element* 
             str::stream() << "Path '" << elementPath.dottedField()
                           << "' contains an element of non-array type '"
                           << typeName(element->getType()) << "'",
-            element->getType() == BSONType::Array);
+            element->getType() == BSONType::array);
 
     if (!element->hasChildren()) {
         // The path exists and contains an array, but the array is empty.
@@ -76,7 +81,7 @@ void PopNode::validateUpdate(mutablebson::ConstElement updatedElement,
                              ModifyResult modifyResult,
                              const bool validateForStorage,
                              bool* containsDotsAndDollarsField) const {
-    invariant(modifyResult == ModifyResult::kNormalUpdate);
+    invariant(modifyResult.type == ModifyResult::kNormalUpdate);
 
     // Removing elements from an array cannot increase BSON depth or modify a DBRef, so we can
     // override validateUpdate to not validate storage constraints but we still want to know if
@@ -87,6 +92,7 @@ void PopNode::validateUpdate(mutablebson::ConstElement updatedElement,
                                      recursionLevel,
                                      false, /* allowTopLevelDollarPrefixedFields */
                                      false, /* Should validate for storage */
+                                     false, /* isEmbeddedInIdField */
                                      containsDotsAndDollarsField);
 }
 

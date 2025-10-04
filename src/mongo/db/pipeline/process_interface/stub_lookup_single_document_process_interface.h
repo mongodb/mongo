@@ -29,21 +29,38 @@
 
 #pragma once
 
-#include <boost/intrusive_ptr.hpp>
-#include <deque>
-#include <vector>
-
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/shard_filterer.h"
+#include "mongo/db/keypattern.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
+#include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
+#include "mongo/util/uuid.h"
+
+#include <cstddef>
+#include <deque>
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include <boost/intrusive_ptr.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
 class StubShardFilterer : public ShardFilterer {
 public:
-    std::unique_ptr<ShardFilterer> clone() const {
+    std::unique_ptr<ShardFilterer> clone() const override {
         MONGO_UNREACHABLE;
     }
 
@@ -76,30 +93,54 @@ public:
     StubLookupSingleDocumentProcessInterface(std::deque<DocumentSource::GetNextResult> mockResults)
         : _mockResults(std::move(mockResults)) {}
 
-    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
+    std::unique_ptr<Pipeline> finalizeAndMaybePreparePipelineForExecution(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        Pipeline* pipeline,
+        bool attachCursorAfterOptimizing,
+        std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                           Pipeline* pipeline,
+                           CollectionMetadata collData)> finalizePipeline = nullptr,
+        ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
+        boost::optional<BSONObj> readConcern = boost::none,
+        bool shouldUseCollectionDefaultCollator = false) final;
+
+    std::unique_ptr<Pipeline> preparePipelineForExecution(
         Pipeline* ownedPipeline,
         ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
         boost::optional<BSONObj> readConcern = boost::none) final;
 
-    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipelineForLocalRead(
-        Pipeline* ownedPipeline) final;
+    std::unique_ptr<Pipeline> preparePipelineForExecution(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const AggregateCommandRequest& aggRequest,
+        Pipeline* pipeline,
+        boost::optional<BSONObj> shardCursorsSortSpec = boost::none,
+        ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
+        boost::optional<BSONObj> readConcern = boost::none,
+        bool shouldUseCollectionDefaultCollator = false) final;
+
+    std::unique_ptr<Pipeline> attachCursorSourceToPipelineForLocalRead(
+        Pipeline* ownedPipeline,
+        boost::optional<const AggregateCommandRequest&> aggRequest = boost::none,
+        bool shouldUseCollectionDefaultCollator = false,
+        ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{}) final;
+
+    std::unique_ptr<Pipeline> finalizeAndAttachCursorToPipelineForLocalRead(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        Pipeline* ownedPipeline,
+        bool attachCursorAfterOptimizing,
+        std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                           Pipeline* pipeline,
+                           CollectionMetadata collData)> finalizePipeline = nullptr,
+        bool shouldUseCollectionDefaultCollator = false,
+        boost::optional<const AggregateCommandRequest&> aggRequest = boost::none,
+        ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{}) final;
 
     boost::optional<Document> lookupSingleDocument(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const NamespaceString& nss,
-        UUID collectionUUID,
+        boost::optional<UUID> collectionUUID,
         const Document& documentKey,
-        boost::optional<BSONObj> readConcern);
-
-    std::unique_ptr<ShardFilterer> getShardFilterer(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx) const override {
-        // Try to emulate the behavior mongos and mongod would each follow.
-        if (expCtx->inMongos) {
-            return nullptr;
-        } else {
-            return std::make_unique<StubShardFilterer>();
-        }
-    }
+        boost::optional<BSONObj> readConcern) override;
 
 private:
     std::deque<DocumentSource::GetNextResult> _mockResults;

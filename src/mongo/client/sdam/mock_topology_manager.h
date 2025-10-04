@@ -28,9 +28,15 @@
  */
 #pragma once
 
-#include <memory>
-
+#include "mongo/client/sdam/sdam_datatypes.h"
 #include "mongo/client/sdam/topology_manager.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/util/future.h"
+#include "mongo/util/net/hostandport.h"
+
+#include <functional>
+#include <memory>
+#include <vector>
 
 namespace mongo::sdam {
 
@@ -42,14 +48,14 @@ public:
     void onServerRTTUpdated(HostAndPort hostAndPort, HelloRTT rtt) override;
 
     void setTopologyDescription(TopologyDescriptionPtr newDescription);
-    const TopologyDescriptionPtr getTopologyDescription() const override;
+    TopologyDescriptionPtr getTopologyDescription() const override;
 
     SemiFuture<std::vector<HostAndPort>> executeWithLock(
         std::function<SemiFuture<std::vector<HostAndPort>>(const TopologyDescriptionPtr&)> func)
         override;
 
 private:
-    mutable mongo::Mutex _mutex = MONGO_MAKE_LATCH("MockTopologyManager");
+    mutable mongo::stdx::mutex _mutex;
     TopologyDescriptionPtr _topologyDescription;
 };
 

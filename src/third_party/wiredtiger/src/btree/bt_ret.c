@@ -12,42 +12,33 @@
  * __key_return --
  *     Change the cursor to reference an internal return key.
  */
-static inline int
+static WT_INLINE int
 __key_return(WT_CURSOR_BTREE *cbt)
 {
     WT_CURSOR *cursor;
     WT_ITEM *tmp;
     WT_PAGE *page;
     WT_ROW *rip;
-    WT_SESSION_IMPL *session;
 
     page = cbt->ref->page;
     cursor = &cbt->iface;
-    session = CUR2S(cbt);
 
     if (page->type == WT_PAGE_ROW_LEAF) {
-        rip = &page->pg_row[cbt->slot];
-
-        /*
-         * If the cursor references a WT_INSERT item, take its key. Else, if we have an exact match,
-         * we copied the key in the search function, take it from there. If we don't have an exact
-         * match, take the key from the original page.
-         */
+        /* If the cursor references a WT_INSERT item, take its key. */
         if (cbt->ins != NULL) {
             cursor->key.data = WT_INSERT_KEY(cbt->ins);
             cursor->key.size = WT_INSERT_KEY_SIZE(cbt->ins);
             return (0);
         }
 
+        /*
+         * If there's an exact match, the row-store search function built the key we want to return
+         * in the cursor's temporary buffer. Swap the cursor's search-key and temporary buffers so
+         * we can return it (it's unsafe to return the temporary buffer itself because our caller
+         * might do another search in this table using the key we return, and we'd corrupt the
+         * search key during any subsequent search that used the temporary buffer).
+         */
         if (cbt->compare == 0) {
-            /*
-             * If not in an insert list and there's an exact match, the row-store search function
-             * built the key we want to return in the cursor's temporary buffer. Swap the cursor's
-             * search-key and temporary buffers so we can return it (it's unsafe to return the
-             * temporary buffer itself because our caller might do another search in this table
-             * using the key we return, and we'd corrupt the search key during any subsequent search
-             * that used the temporary buffer).
-             */
             tmp = cbt->row_key;
             cbt->row_key = cbt->tmp;
             cbt->tmp = tmp;
@@ -56,14 +47,16 @@ __key_return(WT_CURSOR_BTREE *cbt)
             cursor->key.size = cbt->row_key->size;
             return (0);
         }
-        return (__wt_row_leaf_key(session, page, rip, &cursor->key, false));
+
+        /* Otherwise, take the key from the original page. */
+        rip = &page->pg_row[cbt->slot];
+        return (__wt_row_leaf_key(CUR2S(cbt), page, rip, &cursor->key, false));
     }
 
     /*
-     * WT_PAGE_COL_FIX, WT_PAGE_COL_VAR:
-     *	The interface cursor's record has usually been set, but that
-     * isn't universally true, specifically, cursor.search_near may call
-     * here without first setting the interface cursor.
+     * WT_PAGE_COL_FIX, WT_PAGE_COL_VAR: The interface cursor's record has usually been set, but
+     * that isn't universally true, specifically, cursor.search_near may call here without first
+     * setting the interface cursor.
      */
     cursor->recno = cbt->recno;
     return (0);
@@ -71,23 +64,27 @@ __key_return(WT_CURSOR_BTREE *cbt)
 
 /*
  * __read_col_time_window --
- *     Retrieve the time window from a column store cell.
+ *     Retrieve the time window from a column store cell. Returns false if there is no time window.
  */
-static void
+static bool
 __read_col_time_window(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL *cell, WT_TIME_WINDOW *tw)
 {
     WT_CELL_UNPACK_KV unpack;
 
     __wt_cell_unpack_kv(session, page->dsk, cell, &unpack);
+    if (__wt_cell_type(cell) == WT_CELL_DEL)
+        return (false);
+
     WT_TIME_WINDOW_COPY(tw, &unpack.tw);
+    return (true);
 }
 
 /*
- * __wt_read_row_time_window --
+ * __wti_read_row_time_window --
  *     Retrieve the time window from a row.
  */
 void
-__wt_read_row_time_window(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip, WT_TIME_WINDOW *tw)
+__wti_read_row_time_window(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip, WT_TIME_WINDOW *tw)
 {
     WT_CELL_UNPACK_KV unpack;
 
@@ -105,12 +102,12 @@ __wt_read_row_time_window(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip, 
 }
 
 /*
- * __wt_col_fix_get_time_window --
- *     Look for a time window on a fixed-length column page.
+ * __col_fix_get_time_window --
+ *     Look for a time window on a fixed-length column page. Returns false if there is no time
+ *     window.
  */
 static bool
-__wt_col_fix_get_time_window(
-  WT_SESSION_IMPL *session, WT_REF *ref, uint64_t recno, WT_TIME_WINDOW *tw)
+__col_fix_get_time_window(WT_SESSION_IMPL *session, WT_REF *ref, uint64_t recno, WT_TIME_WINDOW *tw)
 {
     WT_CELL *cell;
     WT_CELL_UNPACK_KV unpack;
@@ -121,8 +118,13 @@ __wt_col_fix_get_time_window(
     page = ref->page;
     start_recno = ref->ref_recno;
 
-    if (!WT_COL_FIX_TWS_SET(page))
+    if (recno >= ref->ref_recno + ref->page->entries)
         return (false);
+
+    if (!WT_COL_FIX_TWS_SET(page)) {
+        WT_TIME_WINDOW_INIT(tw);
+        return (true);
+    }
 
     lo = 0;
     hi = page->pg_fix_numtws;
@@ -156,12 +158,14 @@ __wt_col_fix_get_time_window(
 
         WT_ASSERT(session, lo < hi);
     }
-    return (false);
+
+    WT_TIME_WINDOW_INIT(tw);
+    return (true);
 }
 
 /*
  * __wt_read_cell_time_window --
- *     Read the time window from the cell.
+ *     Read the time window from the cell. Returns false if there is no time window.
  */
 bool
 __wt_read_cell_time_window(WT_CURSOR_BTREE *cbt, WT_TIME_WINDOW *tw)
@@ -180,22 +184,51 @@ __wt_read_cell_time_window(WT_CURSOR_BTREE *cbt, WT_TIME_WINDOW *tw)
     case WT_PAGE_ROW_LEAF:
         if (page->pg_row == NULL)
             return (false);
-        __wt_read_row_time_window(session, page, &page->pg_row[cbt->slot], tw);
+
+        if (cbt->ins != NULL)
+            return (false);
+
+        __wti_read_row_time_window(session, page, &page->pg_row[cbt->slot], tw);
         break;
     case WT_PAGE_COL_VAR:
-        if (page->pg_var == NULL)
+        /*
+         * Only read the time window if we are on a matching slot. If we have an insert list, we may
+         * be on the cell of a different record number.
+         */
+        if (page->pg_var == NULL || (cbt->ins != NULL && !F_ISSET(cbt, WT_CBT_VAR_ONPAGE_MATCH)))
             return (false);
-        __read_col_time_window(session, page, WT_COL_PTR(page, &page->pg_var[cbt->slot]), tw);
-        break;
+        return (
+          __read_col_time_window(session, page, WT_COL_PTR(page, &page->pg_var[cbt->slot]), tw));
     case WT_PAGE_COL_FIX:
-        return (__wt_col_fix_get_time_window(session, cbt->ref, cbt->recno, tw));
+        return (__col_fix_get_time_window(session, cbt->ref, cbt->recno, tw));
     }
     return (true);
 }
 
 /*
+ * __read_page_cell_data_ref_kv --
+ *     Helper function to copy the time window and set a buffer to reference the data from an
+ *     unpacked key value cell. Return WT_RESTART if the cell is an overflow removed value.
+ */
+static WT_INLINE int
+__read_page_cell_data_ref_kv(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK_KV *unpack,
+  WT_ITEM *buf, WT_TIME_WINDOW *tw)
+{
+    if (tw != NULL)
+        WT_TIME_WINDOW_COPY(tw, &unpack->tw);
+    WT_RET(__wt_page_cell_data_ref_kv(session, page, unpack, buf));
+    if (unpack->cell != NULL && __wt_cell_type_raw(unpack->cell) == WT_CELL_VALUE_OVFL_RM) {
+        WT_STAT_CONN_DSRC_INCR(session, txn_read_overflow_remove);
+        return (WT_RESTART);
+    }
+    return (0);
+}
+
+/*
  * __wt_value_return_buf --
- *     Change a buffer to reference an internal original-page return value.
+ *     Change a buffer to reference an internal original-page return value. If we see an overflow
+ *     removed cell, we have raced with checkpoint freeing the overflow cell. Return restart for the
+ *     caller to retry the read.
  */
 int
 __wt_value_return_buf(WT_CURSOR_BTREE *cbt, WT_REF *ref, WT_ITEM *buf, WT_TIME_WINDOW *tw)
@@ -216,7 +249,8 @@ __wt_value_return_buf(WT_CURSOR_BTREE *cbt, WT_REF *ref, WT_ITEM *buf, WT_TIME_W
     page = ref->page;
     cursor = &cbt->iface;
 
-    if (page->type == WT_PAGE_ROW_LEAF) {
+    switch (page->type) {
+    case WT_PAGE_ROW_LEAF:
         rip = &page->pg_row[cbt->slot];
 
         /*
@@ -231,30 +265,27 @@ __wt_value_return_buf(WT_CURSOR_BTREE *cbt, WT_REF *ref, WT_ITEM *buf, WT_TIME_W
 
         /* Take the value from the original page cell. */
         __wt_row_leaf_value_cell(session, page, rip, &unpack);
-        if (tw != NULL)
-            WT_TIME_WINDOW_COPY(tw, &unpack.tw);
-        return (__wt_page_cell_data_ref(session, page, &unpack, buf));
-    }
+        return (__read_page_cell_data_ref_kv(session, page, &unpack, buf, tw));
 
-    if (page->type == WT_PAGE_COL_VAR) {
+    case WT_PAGE_COL_VAR:
         /* Take the value from the original page cell. */
         cell = WT_COL_PTR(page, &page->pg_var[cbt->slot]);
         __wt_cell_unpack_kv(session, page->dsk, cell, &unpack);
-        if (tw != NULL)
-            WT_TIME_WINDOW_COPY(tw, &unpack.tw);
-        return (__wt_page_cell_data_ref(session, page, &unpack, buf));
+        return (__read_page_cell_data_ref_kv(session, page, &unpack, buf, tw));
+
+    case WT_PAGE_COL_FIX:
+        /* Take the value from the original page. */
+        if (tw != NULL) {
+            found = __col_fix_get_time_window(session, ref, cbt->recno, tw);
+            if (!found)
+                WT_TIME_WINDOW_INIT(tw);
+        }
+        v = __bit_getv_recno(ref, cursor->recno, btree->bitcnt);
+        return (__wt_buf_set(session, buf, &v, 1));
     }
 
-    /*
-     * WT_PAGE_COL_FIX: Take the value from the original page.
-     */
-    if (tw != NULL) {
-        found = __wt_col_fix_get_time_window(session, ref, cbt->recno, tw);
-        if (!found)
-            WT_TIME_WINDOW_INIT(tw);
-    }
-    v = __bit_getv_recno(ref, cursor->recno, btree->bitcnt);
-    return (__wt_buf_set(session, buf, &v, 1));
+    /* Compilers can't in general tell that other values of page->type aren't valid here. */
+    return (__wt_illegal_value(session, page->type));
 }
 
 /*

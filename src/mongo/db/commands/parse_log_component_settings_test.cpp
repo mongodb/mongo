@@ -27,13 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/commands/parse_log_component_settings.h"
 
-#include "mongo/db/jsobj.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/logv2/log_component.h"
+#include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
+
+#include <climits>
+#include <limits>
+#include <memory>
+#include <ostream>
 
 namespace {
 
@@ -62,15 +72,86 @@ TEST(Flat, Numeric) {
 }
 
 TEST(Flat, FailNonNumeric) {
-    BSONObj input = BSON("verbosity"
-                         << "not a number");
+    BSONObj input = BSON("verbosity" << "not a number");
 
     StatusWith<Settings> result = parseLogComponentSettings(input);
 
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQUALS(ErrorCodes::BadValue, result.getStatus().code());
     ASSERT_EQUALS(result.getStatus().reason(),
-                  "Expected default.verbosity to be a number, but found string");
+                  "Expected default.verbosity to be safely cast to integer, but could not: "
+                  "Unable to coerce value to integral type");
+}
+
+TEST(Flat, FailNegative) {
+    BSONObj input = BSON("verbosity" << -2);
+
+    StatusWith<Settings> result = parseLogComponentSettings(input);
+
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(ErrorCodes::BadValue, result.getStatus().code());
+    ASSERT_EQUALS(result.getStatus().reason(),
+                  "Expected default.verbosity to be greater than or equal to -1, but found -2");
+}
+
+TEST(Flat, FailMaxOutOfBoundsDouble) {
+    BSONObj input = BSON("verbosity" << static_cast<double>(INT_MAX) + 1);
+
+    StatusWith<Settings> result = parseLogComponentSettings(input);
+
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(ErrorCodes::BadValue, result.getStatus().code());
+    ASSERT_EQUALS(result.getStatus().reason(),
+                  "Expected default.verbosity to be safely cast to integer, but could not: "
+                  "Out of bounds coercing to integral value");
+}
+
+TEST(Flat, FailMaxOutOfBoundsLong) {
+    BSONObj input = BSON("verbosity" << LLONG_MAX);
+
+    StatusWith<Settings> result = parseLogComponentSettings(input);
+
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(ErrorCodes::BadValue, result.getStatus().code());
+    ASSERT_EQUALS(result.getStatus().reason(),
+                  "Expected default.verbosity to be safely cast to integer, but could not: "
+                  "Out of bounds coercing to integral value");
+}
+
+TEST(Flat, FailMinOutOfBoundsDouble) {
+    BSONObj input = BSON("verbosity" << static_cast<double>(INT_MIN) - 1);
+
+    StatusWith<Settings> result = parseLogComponentSettings(input);
+
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(ErrorCodes::BadValue, result.getStatus().code());
+    ASSERT_EQUALS(result.getStatus().reason(),
+                  "Expected default.verbosity to be safely cast to integer, but could not: "
+                  "Out of bounds coercing to integral value");
+}
+
+TEST(Flat, FailMinOutOfBoundsLong) {
+    BSONObj input = BSON("verbosity" << LLONG_MIN);
+
+    StatusWith<Settings> result = parseLogComponentSettings(input);
+
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(ErrorCodes::BadValue, result.getStatus().code());
+    ASSERT_EQUALS(result.getStatus().reason(),
+                  "Expected default.verbosity to be safely cast to integer, but could not: "
+                  "Out of bounds coercing to integral value");
+}
+
+TEST(Flat, FailNaN) {
+    BSONObj input = BSON("verbosity" << std::numeric_limits<double>::quiet_NaN());
+
+    StatusWith<Settings> result = parseLogComponentSettings(input);
+
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(ErrorCodes::BadValue, result.getStatus().code());
+    ASSERT_EQUALS(result.getStatus().reason(),
+                  "Expected default.verbosity to be safely cast to integer, but could not: "
+                  "Unable to coerce NaN/Inf to integral type");
 }
 
 TEST(Flat, FailBadComponent) {
@@ -95,15 +176,94 @@ TEST(Nested, Numeric) {
 }
 
 TEST(Nested, FailNonNumeric) {
-    BSONObj input = BSON("accessControl" << BSON("verbosity"
-                                                 << "Not a number"));
+    BSONObj input = BSON("accessControl" << BSON("verbosity" << "Not a number"));
 
     StatusWith<Settings> result = parseLogComponentSettings(input);
 
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::BadValue);
-    ASSERT_EQUALS(result.getStatus().reason(),
-                  "Expected accessControl.verbosity to be a number, but found string");
+    std::stringstream ss;
+    ss << "Expected accessControl.verbosity to be safely cast to integer, but could not: "
+       << "Unable to coerce value to integral type";
+    ASSERT_EQUALS(result.getStatus().reason(), ss.str());
+}
+
+TEST(Nested, FailNegative) {
+    BSONObj input = BSON("accessControl" << BSON("verbosity" << -2));
+
+    StatusWith<Settings> result = parseLogComponentSettings(input);
+
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::BadValue);
+    std::stringstream ss;
+    ss << "Expected accessControl.verbosity to be greater than or equal to -1, but found -2";
+    ASSERT_EQUALS(result.getStatus().reason(), ss.str());
+}
+
+TEST(Nested, FailMaxOutOfBoundsDouble) {
+    BSONObj input = BSON("accessControl" << BSON("verbosity" << static_cast<double>(INT_MAX) + 1));
+
+    StatusWith<Settings> result = parseLogComponentSettings(input);
+
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::BadValue);
+    std::stringstream ss;
+    ss << "Expected accessControl.verbosity to be safely cast to integer, but could not: "
+       << "Out of bounds coercing to integral value";
+    ASSERT_EQUALS(result.getStatus().reason(), ss.str());
+}
+
+TEST(Nested, FailMaxOutOfBoundsLong) {
+    BSONObj input = BSON("accessControl" << BSON("verbosity" << LLONG_MAX));
+
+    StatusWith<Settings> result = parseLogComponentSettings(input);
+
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::BadValue);
+    std::stringstream ss;
+    ss << "Expected accessControl.verbosity to be safely cast to integer, but could not: "
+       << "Out of bounds coercing to integral value";
+    ASSERT_EQUALS(result.getStatus().reason(), ss.str());
+}
+
+TEST(Nested, FailMinOutOfBoundsDouble) {
+    BSONObj input = BSON("accessControl" << BSON("verbosity" << static_cast<double>(INT_MIN) - 1));
+
+    StatusWith<Settings> result = parseLogComponentSettings(input);
+
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::BadValue);
+    std::stringstream ss;
+    ss << "Expected accessControl.verbosity to be safely cast to integer, but could not: "
+       << "Out of bounds coercing to integral value";
+    ASSERT_EQUALS(result.getStatus().reason(), ss.str());
+}
+
+TEST(Nested, FailMinOutOfBoundsLong) {
+    BSONObj input = BSON("accessControl" << BSON("verbosity" << LLONG_MIN));
+
+    StatusWith<Settings> result = parseLogComponentSettings(input);
+
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::BadValue);
+    std::stringstream ss;
+    ss << "Expected accessControl.verbosity to be safely cast to integer, but could not: "
+       << "Out of bounds coercing to integral value";
+    ASSERT_EQUALS(result.getStatus().reason(), ss.str());
+}
+
+TEST(Nested, FailNaN) {
+    BSONObj input =
+        BSON("accessControl" << BSON("verbosity" << std::numeric_limits<double>::quiet_NaN()));
+
+    StatusWith<Settings> result = parseLogComponentSettings(input);
+
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::BadValue);
+    std::stringstream ss;
+    ss << "Expected accessControl.verbosity to be safely cast to integer, but could not: "
+       << "Unable to coerce NaN/Inf to integral type";
+    ASSERT_EQUALS(result.getStatus().reason(), ss.str());
 }
 
 TEST(Nested, FailBadComponent) {
@@ -151,8 +311,7 @@ TEST(Multi, FailBadComponent) {
 
 TEST(DeeplyNested, FailFast) {
     BSONObj input =
-        BSON("storage" << BSON("this" << BSON("is" << BSON("nested" << BSON("too"
-                                                                            << "deeply")))));
+        BSON("storage" << BSON("this" << BSON("is" << BSON("nested" << BSON("too" << "deeply")))));
 
     StatusWith<Settings> result = parseLogComponentSettings(input);
 
@@ -162,8 +321,7 @@ TEST(DeeplyNested, FailFast) {
 }
 
 TEST(DeeplyNested, FailLast) {
-    BSONObj input = BSON("storage" << BSON("journal" << BSON("No Such Component"
-                                                             << "bad")));
+    BSONObj input = BSON("storage" << BSON("journal" << BSON("No Such Component" << "bad")));
 
     StatusWith<Settings> result = parseLogComponentSettings(input);
 

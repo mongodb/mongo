@@ -1,0 +1,23 @@
+test_kind: js_test
+
+# Similar to the `ssl` suite, but configured by evergreen to run sequentially, so that the
+# contents of the Windows system certificate store are only affected by one test at a time.
+selector:
+  roots:
+    - jstests/ssl_linear/*.js
+
+# ssl tests start their own mongod's.
+executor:
+  config:
+    shell_options:
+      nodb: ""
+      ssl: ""
+      sslAllowInvalidCertificates: ""
+      sslCAFile: jstests/libs/trusted-ca.pem
+      sslPEMKeyFile: jstests/libs/trusted-client.pem
+      global_vars:
+        TestData:
+          setParameters:
+            logComponentVerbosity: "{network:2}"
+          setParametersMongos:
+            logComponentVerbosity: "{network:2}"

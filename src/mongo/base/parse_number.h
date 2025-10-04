@@ -37,6 +37,8 @@
 #include "mongo/base/string_data.h"
 #include "mongo/platform/decimal128.h"
 
+#include <cstdint>
+
 namespace mongo {
 
 /**

@@ -27,13 +27,19 @@
  *    it in the license file.
  */
 
-#include <set>
-#include <string>
-
 #include "mongo/db/fts/stop_words.h"
 
-#include "mongo/base/init.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
 #include "mongo/util/string_map.h"
+
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
 
 namespace mongo {
 
@@ -66,7 +72,7 @@ MONGO_INITIALIZER(StopWords)(InitializerContext* context) {
     StringMap<std::set<std::string>> raw;
     loadStopWordMap(&raw);
     for (StringMap<std::set<std::string>>::const_iterator i = raw.begin(); i != raw.end(); ++i) {
-        StopWordsMap[i->first].reset(new StopWords(i->second));
+        StopWordsMap[i->first] = std::make_shared<StopWords>(i->second);
     }
 }
 }  // namespace fts

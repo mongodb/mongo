@@ -27,10 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/commands/killoperations_common.h"
-#include "mongo/db/cursor_manager.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/client_cursor/cursor_manager.h"
+#include "mongo/db/service_context.h"
+#include "mongo/logv2/log.h"
+#include "mongo/stdx/unordered_set.h"
+
+#include <memory>
+#include <vector>
+
+#include <absl/container/node_hash_set.h>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
+
 
 namespace mongo {
 
@@ -50,6 +63,7 @@ public:
             }
         }
     }
-} KillOperationsCmd;
+};
+MONGO_REGISTER_COMMAND(KillOperationsCmd).forShard();
 
 }  // namespace mongo

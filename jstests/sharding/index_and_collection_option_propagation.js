@@ -1,18 +1,24 @@
 /**
- * Mongos has special targeting behavior for createIndex, reIndex, dropIndex, and collMod:
+ * Mongos has special targeting behavior for createIndex, dropIndex, and collMod:
  *
  * - If called on an unsharded collection, the request is routed only to the primary shard.
  * - If called on a sharded collection, the request is broadcast to shards with chunks.
  *
  * This test verifies this behavior.
+ *
+ * Shuts down shard0, which also shuts down the config server. Tests mongos targeting, which won't
+ * be affected by a config shard.
+ * @tags: [config_shard_incompatible]
  */
+
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // This test shuts down a shard's node and because of this consistency checking
 // cannot be performed on that node, which causes the consistency checker to fail.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
+TestData.skipCheckShardFilteringMetadata = true;
 
-(function() {
 // Helper function that runs listIndexes against shards to check for the existence of an index.
 function checkShardIndexes(indexKey, shardsWithIndex, shardsWithoutIndex) {
     function shardHasIndex(indexKey, shard) {
@@ -21,7 +27,7 @@ function checkShardIndexes(indexKey, shardsWithIndex, shardsWithoutIndex) {
             return [res, false];
         }
         assert.commandWorked(res);
-        for (index of res.cursor.firstBatch) {
+        for (let index of res.cursor.firstBatch) {
             if (index.key.hasOwnProperty(indexKey)) {
                 return [res, true];
             }
@@ -29,18 +35,30 @@ function checkShardIndexes(indexKey, shardsWithIndex, shardsWithoutIndex) {
         return [res, false];
     }
 
-    for (shard of shardsWithIndex) {
-        [listIndexesRes, foundIndex] = shardHasIndex(indexKey, shard);
-        assert(foundIndex,
-               "expected to see index with key " + indexKey + " in listIndexes response from " +
-                   shard + ": " + tojson(listIndexesRes));
+    for (let shard of shardsWithIndex) {
+        let [listIndexesRes, foundIndex] = shardHasIndex(indexKey, shard);
+        assert(
+            foundIndex,
+            "expected to see index with key " +
+                indexKey +
+                " in listIndexes response from " +
+                shard +
+                ": " +
+                tojson(listIndexesRes),
+        );
     }
 
-    for (shard of shardsWithoutIndex) {
-        [listIndexesRes, foundIndex] = shardHasIndex(indexKey, shard);
-        assert(!foundIndex,
-               "expected not to see index with key " + indexKey + " in listIndexes response from " +
-                   shard + ": " + tojson(listIndexesRes));
+    for (let shard of shardsWithoutIndex) {
+        let [listIndexesRes, foundIndex] = shardHasIndex(indexKey, shard);
+        assert(
+            !foundIndex,
+            "expected not to see index with key " +
+                indexKey +
+                " in listIndexes response from " +
+                shard +
+                ": " +
+                tojson(listIndexesRes),
+        );
     }
 }
 
@@ -60,18 +78,30 @@ function checkShardCollOption(optionKey, optionValue, shardsWithOption, shardsWi
         return [res, false];
     }
 
-    for (shard of shardsWithOption) {
-        [listCollsRes, foundOption] = shardHasOption(optionKey, optionValue, shard);
-        assert(foundOption,
-               "expected to see option " + optionKey + " in listCollections response from " +
-                   shard + ": " + tojson(listCollsRes));
+    for (let shard of shardsWithOption) {
+        let [listCollsRes, foundOption] = shardHasOption(optionKey, optionValue, shard);
+        assert(
+            foundOption,
+            "expected to see option " +
+                optionKey +
+                " in listCollections response from " +
+                shard +
+                ": " +
+                tojson(listCollsRes),
+        );
     }
 
-    for (shard of shardsWithoutOption) {
-        [listOptionsRes, foundOption] = shardHasOption(optionKey, optionValue, shard);
-        assert(!foundOption,
-               "expected not to see option " + optionKey + " in listCollections response from " +
-                   shard + ": " + tojson(listCollsRes));
+    for (let shard of shardsWithoutOption) {
+        let [listOptionsRes, foundOption] = shardHasOption(optionKey, optionValue, shard);
+        assert(
+            !foundOption,
+            "expected not to see option " +
+                optionKey +
+                " in listCollections response from " +
+                shard +
+                ": " +
+                tojson(listOptionsRes),
+        );
     }
 }
 
@@ -79,11 +109,9 @@ const dbName = "test";
 const collName = "foo";
 const ns = dbName + "." + collName;
 
-var st = new ShardingTest(
-    {shards: {rs0: {nodes: 1}, rs1: {nodes: 1}, rs2: {nodes: 1}}, other: {config: 3}});
+let st = new ShardingTest({shards: {rs0: {nodes: 1}, rs1: {nodes: 1}, rs2: {nodes: 1}}, other: {config: 3}});
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.name);
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 
 // When creating index or setting a collection option on an unsharded collection, only the
 // primary shard is affected.
@@ -92,14 +120,16 @@ assert.commandWorked(st.s.getDB(dbName).getCollection(collName).createIndex({"id
 checkShardIndexes("idx1", [st.shard0], [st.shard1, st.shard2]);
 
 const validationOption1 = {
-    dummyField1: {$type: "string"}
+    dummyField1: {$type: "string"},
 };
-assert.commandWorked(st.s.getDB(dbName).runCommand({
-    collMod: collName,
-    validator: validationOption1,
-    validationLevel: "moderate",
-    validationAction: "warn"
-}));
+assert.commandWorked(
+    st.s.getDB(dbName).runCommand({
+        collMod: collName,
+        validator: validationOption1,
+        validationLevel: "moderate",
+        validationAction: "warn",
+    }),
+);
 checkShardCollOption("validator", validationOption1, [st.shard0], [st.shard1, st.shard2]);
 
 // After sharding the collection but before any migrations, only the primary shard has the
@@ -119,7 +149,7 @@ checkShardCollOption("validator", validationOption1, [st.shard0, st.shard1], [st
 // will retry on shard version errors, and only report overall success. That is, IndexNotFound
 // errors from shards are ignored, and not included in the 'raw' shard responses.
 
-var res;
+let res;
 
 // createIndex
 res = st.s.getDB(dbName).getCollection(collName).createIndex({"idx2": 1});
@@ -131,27 +161,25 @@ checkShardIndexes("idx2", [st.shard1], [st.shard2]);
 
 // dropIndex
 res = st.s.getDB(dbName).getCollection(collName).dropIndex("idx1_1");
-assert.commandWorked(res);
 assert.eq(undefined, res.raw[st.shard0.host], tojson(res));
 assert.eq(res.raw[st.shard1.host].ok, 1, tojson(res));
 assert.eq(undefined, res.raw[st.shard2.host], tojson(res));
+assert.commandWorked(res);
 checkShardIndexes("idx1", [], [st.shard1, st.shard2]);
 
-// collMod
+// collMod targets all shards, regardless of whether they have chunks. The shards that have no
+// chunks for the collection will not be included in the responses.
 const validationOption2 = {
-    dummyField2: {$type: "string"}
+    dummyField2: {$type: "string"},
 };
 res = st.s.getDB(dbName).runCommand({
     collMod: collName,
     validator: validationOption2,
     validationLevel: "moderate",
-    validationAction: "warn"
+    validationAction: "warn",
 });
 assert.commandWorked(res);
-assert.eq(undefined, res.raw[st.shard0.host], tojson(res));
-assert.eq(res.raw[st.shard1.host].ok, 1, tojson(res));
-assert.eq(undefined, res.raw[st.shard2.host], tojson(res));
-checkShardCollOption("validator", validationOption2, [st.shard1], [st.shard2]);
+checkShardCollOption("validator", validationOption2, [st.shard0, st.shard1], [st.shard2]);
 
 // Check that errors from shards are aggregated correctly.
 
@@ -196,19 +224,15 @@ assert.eq(res.code, res.raw[st.shard0.host].code, tojson(res));
 assert.eq(res.codeName, res.raw[st.shard0.host].codeName, tojson(res));
 // We might see 'HostUnreachable' the first time if the mongos's ReplicaSetMonitor does not yet
 // know that the shard is down.
-assert(res.code === ErrorCodes.HostUnreachable ||
-           res.code === ErrorCodes.FailedToSatisfyReadPreference,
-       tojson(res));
-assert(res.codeName === "HostUnreachable" || res.codeName === "FailedToSatisfyReadPreference",
-       tojson(res));
+assert(res.code === ErrorCodes.HostUnreachable || res.code === ErrorCodes.FailedToSatisfyReadPreference, tojson(res));
+assert(res.codeName === "HostUnreachable" || res.codeName === "FailedToSatisfyReadPreference", tojson(res));
 
 // If some shard returns a non-ignorable error, it should be reported as the command error, even
 // if other shards returned ignorable errors.
 res = st.s.getDB(dbName).getCollection(collName).createIndex({"validIdx": 1});
 assert.eq(undefined, res.raw[st.shard0.host], tojson(res));
 assert.eq(res.ok, 1, tojson(res));
-assert.eq(res.raw[st.shard1.host].ok, 1, tojson(res));  // gets created on shard that owns chunks
-assert.eq(undefined, res.raw[st.shard2.host], tojson(res));  // shard does not own chunks
+assert.eq(res.raw[st.shard1.host].ok, 1, tojson(res)); // gets created on shard that owns chunks
+assert.eq(undefined, res.raw[st.shard2.host], tojson(res)); // shard does not own chunks
 
 st.stop();
-})();

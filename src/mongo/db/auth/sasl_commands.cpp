@@ -27,34 +27,52 @@
  *    it in the license file.
  */
 
+
+#include "mongo/db/auth/sasl_commands.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/authenticate.h"
+#include "mongo/db/auth/authentication_session.h"
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/sasl_mechanism_registry.h"
+#include "mongo/db/auth/sasl_options.h"
+#include "mongo/db/auth/sasl_payload.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/logv2/log.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/database_name_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/time_support.h"
+
+#include <iosfwd>
+#include <memory>
+#include <ratio>
+#include <set>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 
-#include "mongo/platform/basic.h"
-
-#include <memory>
-
-#include "mongo/base/init.h"
-#include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/client/authenticate.h"
-#include "mongo/client/sasl_client_authenticate.h"
-#include "mongo/db/auth/authentication_session.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/authz_manager_external_state_mock.h"
-#include "mongo/db/auth/authz_session_external_state_mock.h"
-#include "mongo/db/auth/sasl_command_constants.h"
-#include "mongo/db/auth/sasl_commands_gen.h"
-#include "mongo/db/auth/sasl_options.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/authentication_commands.h"
-#include "mongo/db/server_options.h"
-#include "mongo/logv2/attribute_storage.h"
-#include "mongo/logv2/log.h"
-#include "mongo/util/base64.h"
-#include "mongo/util/sequence_util.h"
-#include "mongo/util/str.h"
 
 namespace mongo {
 namespace auth {
@@ -80,7 +98,7 @@ public:
             return NamespaceString(request().getDbName());
         }
 
-        Reply typedRun(OperationContext* opCtx);
+        Reply typedRun(OperationContext* opCtx) override;
     };
 
     std::string help() const final {
@@ -94,7 +112,12 @@ public:
     bool requiresAuth() const override {
         return false;
     }
-} cmdSaslStart;
+
+    HandshakeRole handshakeRole() const final {
+        return HandshakeRole::kAuth;
+    }
+};
+MONGO_REGISTER_COMMAND(CmdSaslStart).forRouter().forShard();
 
 class CmdSaslContinue : public SaslContinueCmdVersion1Gen<CmdSaslContinue> {
 public:
@@ -114,7 +137,7 @@ public:
             return NamespaceString(request().getDbName());
         }
 
-        Reply typedRun(OperationContext* opCtx);
+        Reply typedRun(OperationContext* opCtx) override;
     };
 
     std::string help() const final {
@@ -128,7 +151,12 @@ public:
     bool requiresAuth() const final {
         return false;
     }
-} cmdSaslContinue;
+
+    HandshakeRole handshakeRole() const final {
+        return HandshakeRole::kAuth;
+    }
+};
+MONGO_REGISTER_COMMAND(CmdSaslContinue).forRouter().forShard();
 
 SaslReply doSaslStep(OperationContext* opCtx,
                      const SaslPayload& payload,
@@ -138,50 +166,38 @@ SaslReply doSaslStep(OperationContext* opCtx,
     auto& mechanism = *mechanismPtr;
 
     // Passing in a payload and extracting a responsePayload
-    StatusWith<std::string> swResponse = mechanism.step(opCtx, payload.get());
+    StatusWith<std::string> swResponse = [&] {
+        ScopedCallbackTimer st([&](Duration<std::micro> elapsed) {
+            BSONObjBuilder bob;
 
-    auto makeLogAttributes = [&]() {
-        logv2::DynamicAttributes attrs;
-        attrs.add("mechanism", mechanism.mechanismName());
-        attrs.add("speculative", session->isSpeculative());
-        attrs.add("principalName", mechanism.getPrincipalName());
-        attrs.add("authenticationDatabase", mechanism.getAuthenticationDatabase());
-        attrs.addDeepCopy("remote", opCtx->getClient()->getRemote().toString());
-        {
-            auto bob = BSONObjBuilder();
-            mechanism.appendExtraInfo(&bob);
-            attrs.add("extraInfo", bob.obj());
-        }
+            auto currentStepOpt = mechanism.currentStep();
+            if (currentStepOpt != boost::none) {
+                bob << "step" << static_cast<int>(currentStepOpt.get());
+            }
 
-        return attrs;
-    };
+            auto totalStepOpt = mechanism.totalSteps();
+            if (totalStepOpt != boost::none) {
+                bob << "step_total" << static_cast<int>(totalStepOpt.get());
+            }
+
+            bob << "duration_micros" << elapsed.count();
+
+            session->metrics()->appendMetric(bob.obj());
+        });
+
+        return mechanism.step(opCtx, payload.get());
+    }();
 
     if (!swResponse.isOK()) {
-        int64_t dLevel = 0;
-        if (session->isSpeculative() &&
-            (swResponse.getStatus() == ErrorCodes::MechanismUnavailable)) {
-            dLevel = 5;
-        }
-
-        auto attrs = makeLogAttributes();
-        auto errorString = redact(swResponse.getStatus());
-        attrs.add("error", errorString);
-        LOGV2_DEBUG(20249, dLevel, "Authentication failed", attrs);
-
         sleepmillis(saslGlobalParams.authFailedDelay.load());
-        // All the client needs to know is that authentication has failed.
-        uassertStatusOK(AuthorizationManager::authenticationFailedStatus);
+        uassertStatusOK(swResponse);
     }
 
     if (mechanism.isSuccess()) {
-        UserName userName(mechanism.getPrincipalName(), mechanism.getAuthenticationDatabase());
-        uassertStatusOK(
-            AuthorizationSession::get(opCtx->getClient())->addAndAuthorizeUser(opCtx, userName));
-
-        if (!serverGlobalParams.quiet.load()) {
-            auto attrs = makeLogAttributes();
-            LOGV2(20250, "Authentication succeeded", attrs);
-        }
+        auto request = uassertStatusOK(mechanism.makeUserRequest(opCtx));
+        auto expirationTime = mechanism.getExpirationTime();
+        uassertStatusOK(AuthorizationSession::get(opCtx->getClient())
+                            ->addAndAuthorizeUser(opCtx, std::move(request), expirationTime));
 
         session->markSuccessful();
     }
@@ -197,57 +213,53 @@ SaslReply doSaslStep(OperationContext* opCtx,
     return reply;
 }
 
-SaslReply doSaslStart(OperationContext* opCtx,
-                      AuthenticationSession* session,
-                      const SaslStartCommand& request) {
-    auto mechanism = uassertStatusOK(
-        SASLServerMechanismRegistry::get(opCtx->getServiceContext())
-            .getServerMechanism(request.getMechanism(), request.getDbName().toString()));
-
-    uassert(ErrorCodes::BadValue,
-            "Plaintext mechanisms may not be used with speculativeSaslStart",
-            !session->isSpeculative() ||
-                mechanism->properties().hasAllProperties(
-                    SecurityPropertySet({SecurityProperty::kNoPlainText})));
-
-    session->setMechanism(std::move(mechanism), request.getOptions());
-
-    return doSaslStep(opCtx, request.getPayload(), session);
-}
-
-SaslReply runSaslStart(OperationContext* opCtx,
-                       AuthenticationSession* session,
-                       const SaslStartCommand& request) {
-    opCtx->markKillOnClientDisconnect();
-
-    // Note that while updateDatabase can throw, it should not be able to for saslStart.
-    session->updateDatabase(request.getDbName());
-    session->setMechanismName(request.getMechanism());
-
-    return doSaslStart(opCtx, session, request);
+void warnIfCompressed(OperationContext* opCtx) {
+    if (opCtx->isOpCompressed()) {
+        LOGV2_WARNING(6697500,
+                      "SASL commands should not be run over the OP_COMPRESSED message type. This "
+                      "invocation may have security implications.");
+    }
 }
 
 SaslReply runSaslContinue(OperationContext* opCtx,
                           AuthenticationSession* session,
                           const SaslContinueCommand& request);
 
-SaslReply CmdSaslStart::Invocation::typedRun(OperationContext* opCtx) {
+SaslReply CmdSaslStart::Invocation::typedRun(OperationContext* opCtx) try {
     return AuthenticationSession::doStep(
         opCtx, AuthenticationSession::StepType::kSaslStart, [&](auto session) {
             return runSaslStart(opCtx, session, request());
         });
+} catch (const DBException& ex) {
+    switch (ex.code()) {
+        case ErrorCodes::MechanismUnavailable:
+        case ErrorCodes::ProtocolError:
+            throw;
+        default:
+            uasserted(AuthorizationManager::authenticationFailedStatus.code(),
+                      AuthorizationManager::authenticationFailedStatus.reason());
+    }
 }
 
-SaslReply CmdSaslContinue::Invocation::typedRun(OperationContext* opCtx) {
+
+SaslReply CmdSaslContinue::Invocation::typedRun(OperationContext* opCtx) try {
     return AuthenticationSession::doStep(
         opCtx, AuthenticationSession::StepType::kSaslContinue, [&](auto session) {
             return runSaslContinue(opCtx, session, request());
         });
+} catch (const DBException& ex) {
+    if (ex.code() == ErrorCodes::ProtocolError) {
+        throw;
+    }
+
+    uasserted(AuthorizationManager::authenticationFailedStatus.code(),
+              AuthorizationManager::authenticationFailedStatus.reason());
 }
 
 SaslReply runSaslContinue(OperationContext* opCtx,
                           AuthenticationSession* session,
                           const SaslContinueCommand& cmd) {
+    warnIfCompressed(opCtx);
     opCtx->markKillOnClientDisconnect();
 
     uassert(ErrorCodes::ProtocolError,
@@ -259,11 +271,44 @@ SaslReply runSaslContinue(OperationContext* opCtx,
 
 constexpr auto kDBFieldName = "db"_sd;
 }  // namespace
+
+SaslReply runSaslStart(OperationContext* opCtx,
+                       AuthenticationSession* session,
+                       const SaslStartCommand& request) {
+    session->metrics()->restart();
+
+    warnIfCompressed(opCtx);
+    opCtx->markKillOnClientDisconnect();
+
+    // Note that while updateDatabase can throw, it should not be able to for saslStart.
+    session->updateDatabase(
+        DatabaseNameUtil::serialize(request.getDbName(), request.getSerializationContext()),
+        request.getMechanism() == auth::kMechanismMongoX509);
+    session->setMechanismName(request.getMechanism());
+
+    auto mechanism = uassertStatusOK(
+        SASLServerMechanismRegistry::get(opCtx->getService())
+            .getServerMechanism(request.getMechanism(),
+                                DatabaseNameUtil::serialize(request.getDbName(),
+                                                            request.getSerializationContext())));
+
+    uassert(ErrorCodes::BadValue,
+            "Plaintext mechanisms may not be used with speculativeSaslStart",
+            !session->isSpeculative() ||
+                mechanism->properties().hasAllProperties(
+                    SecurityPropertySet({SecurityProperty::kNoPlainText})));
+
+    session->setMechanism(std::move(mechanism), request.getOptions());
+
+    return auth::doSaslStep(opCtx, request.getPayload(), session);
+}
+
 }  // namespace auth
 
 void doSpeculativeSaslStart(OperationContext* opCtx,
                             const BSONObj& sourceObj,
                             BSONObjBuilder* result) try {
+    auth::warnIfCompressed(opCtx);
     // TypedCommands expect DB overrides in the "$db" field,
     // but saslStart coming from the Hello command has it in the "db" field.
     // Rewrite it for handling here.
@@ -285,8 +330,8 @@ void doSpeculativeSaslStart(OperationContext* opCtx,
 
     AuthenticationSession::doStep(
         opCtx, AuthenticationSession::StepType::kSpeculativeSaslStart, [&](auto session) {
-            auto request = auth::SaslStartCommand::parse(
-                IDLParserErrorContext("speculative saslStart"), cmdObj);
+            auto request =
+                auth::SaslStartCommand::parse(cmdObj, IDLParserContext("speculative saslStart"));
             auto reply = auth::runSaslStart(opCtx, session, request);
             result->append(auth::kSpeculativeAuthenticate, reply.toBSON());
         });

@@ -29,14 +29,16 @@
 
 #pragma once
 
-#include <functional>
-#include <memory>
-#include <string>
-
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/time_support.h"
+
+#include <cstddef>
+#include <functional>
+#include <memory>
+#include <string>
 
 namespace mongo {
 
@@ -118,7 +120,9 @@ public:
         // The options for the instance of the pool returning these stats.
         Options options;
 
-        // The number of threads currently in the pool, idle or active.
+        // The count includes both regular worker threads and the cleanup thread,
+        // whether idle or active, in the pool. So, this count can be greater than
+        // options.maxThreads.
         size_t numThreads;
 
         // The number of idle threads currently in the pool.
@@ -147,6 +151,11 @@ public:
     // from ThreadPoolInterface
     void startup() override;
     void shutdown() override;
+
+    /**
+     * Joins all scheduled tasks. Can also spawn a free thread that ignores maxThread options to
+     * execute pending tasks.
+     */
     void join() override;
 
     /**

@@ -1,0 +1,13 @@
+base_suite: aggregation
+description: >-
+  This suite runs through all existing aggregation tests and ensures that the 'queryShapeHash'
+  attribute returned in explain is same for multiple explain invocations, across all nodes of two
+  sharded clusters, with different binaries version.
+overrides:
+  - "query_shape_hash_stability.multiversion_cluster_fixture_last_lts"
+excludes:
+  - "query_shape_hash_stability.common_aggregation_excludes"
+  - "query_shape_hash_stability.common_multiversion_excludes"
+  - "query_shape_hash_stability.multiversion_aggregation_excludes"
+eval:
+  - "query_shape_hash_stability.eval_query_shape_hash_stability"

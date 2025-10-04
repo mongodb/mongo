@@ -1,0 +1,51 @@
+test_kind: js_test
+
+selector:
+  roots:
+    - jstestfuzz/out/*.js
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckReplOplogs
+      - ValidateCollections
+  config:
+    shell_options:
+      crashOnInvalidBSONError: ""
+      objcheck: ""
+      global_vars:
+        TestData:
+          # Other fuzzers test commands against replica sets with logical session ids.
+          disableImplicitSessions: true
+  hooks:
+    - class: FuzzerRestoreSettings
+    - class: RunQueryStats
+      allow_feature_not_supported: true
+    # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+    # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+    # validating the entire contents of the collection.
+    - class: CheckReplOplogs
+    - class: CheckReplDBHash
+      shell_options:
+        global_vars:
+          TestData:
+            skipValidationOnInvalidViewDefinitions: true
+    - class: ValidateCollections
+      shell_options:
+        global_vars:
+          TestData:
+            skipValidationOnInvalidViewDefinitions: true
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      set_parameters:
+        disableLogicalSessionCacheRefresh: false
+        enableTestCommands: 1
+        transactionLifetimeLimitSeconds: 1
+        writePeriodicNoops: 1
+        internalQueryStatsRateLimit: -1
+        internalQueryStatsErrorsAreCommandFatal: true
+        notablescan: true
+      verbose: ""
+    num_nodes: 2

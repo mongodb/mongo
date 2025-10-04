@@ -1,0 +1,67 @@
+test_kind: js_test
+
+# Override selected targeted tests to run with the bulkWrite override to make sure bulkWrite provides feature
+# parity with regular CRUD ops.
+selector:
+  roots:
+    - jstests/sharding/collection_uuid_delete.js
+    - jstests/sharding/collection_uuid_insert.js
+    - jstests/sharding/collection_uuid_update.js
+    - jstests/sharding/updateOne_without_shard_key/*.js
+    - jstests/sharding/analyze_shard_key/read_and_write_distribution.js
+    - jstests/sharding/analyze_shard_key/sampling_current_op_and_server_status_rs.js
+    - jstests/sharding/analyze_shard_key/sampling_current_op_and_server_status_sharded.js
+    - jstests/sharding/analyze_shard_key/sample_rates_rs.js
+    - jstests/sharding/analyze_shard_key/sample_rates_sharded.js
+    - jstests/sharding/timeseries/timeseries_delete_multi.js
+    - jstests/sharding/timeseries/timeseries_delete_one_with_shard_key.js
+    - jstests/sharding/timeseries/timeseries_delete_with_meta.js
+    - jstests/sharding/timeseries/timeseries_insert.js
+    - jstests/sharding/timeseries/timeseries_multiple_mongos.js
+    - jstests/sharding/timeseries/timeseries_update.js
+    - jstests/sharding/timeseries/timeseries_update_multi.js
+    - jstests/sharding/timeseries/timeseries_update_routing.js
+    - jstests/sharding/timeseries/timeseries_user_system_buckets_sharding.js
+    - jstests/sharding/timeseries/timeseries_delete_one_without_shard_key.js
+    - jstests/sharding/timeseries/timeseries_write_one_stale_sharding_state.js
+    - jstests/sharding/timeseries/timeseries_shardkey_update.js
+    - jstests/sharding/timeseries/timeseries_update_one.js
+    - jstests/sharding/timeseries/timeseries_upsert.js
+    # The following tests are to get coverage of updates that change a document's shard key.
+    - jstests/sharding/query/update/update_shard_key_doc_moves_shards.js
+    - jstests/sharding/query/update/update_shard_key_pipeline_update.js
+    - jstests/sharding/update_shard_key_doc_moves_shards_without_txn_number.js
+    - jstests/sharding/query/update/update_shard_key_doc_on_same_shard.js
+    - jstests/sharding/query/update/update_compound_shard_key.js
+    - jstests/sharding/query/update/update_shard_key_conflicting_writes.js
+    - jstests/sharding/query/update/update_shard_key_without_shard_key.js
+    - jstests/sharding/move_chunk_update_shard_key_in_retryable_write.js
+    - jstests/sharding/resharding_update_shard_key_in_retryable_write.js
+    # End document shard key update tests
+    - jstests/sharding/timeseries/timeseries_update_multi_explain.js
+    # Test behavior of updateOne/deleteOne with _id without shard key.
+    - jstests/sharding/server_status_crud_metrics.js
+    - jstests/sharding/server_status_crud_metrics_write_without_shard_key_with_id.js
+    - jstests/sharding/timeseries/timeseries_buckets_modification_with_id.js
+    - jstests/sharding/updateOne_idempotent_with_move_chunk.js
+    - jstests/sharding/updateOne_with_id_without_shard_key_basic.js
+    - jstests/sharding/deleteOne_with_id_without_shard_key_basic.js
+    - jstests/sharding/updateOne_with_id_without_shard_key_stale_config.js
+    - jstests/sharding/deleteOne_with_id_without_shard_key_stale_config.js
+    - jstests/sharding/batched_writes_with_id_without_shard_key_stale_config.js
+    - jstests/sharding/batched_writes_with_id_without_shard_key_basic.js
+    - jstests/sharding/updateOne_without_shard_key/write_without_shard_key_single_shard_data_placement_change.js
+    - jstests/sharding/timeseries/timeseries_writes_without_shard_key_single_shard_data_placement_change.js
+    - jstests/sharding/retryable_update_one_by_id_chunk_migration.js
+  # End updateOne/deleteOne with _id without shard key tests
+  exclude_files:
+    # Update API version tests should not be run with bulkWrite override.
+    - jstests/sharding/updateOne_without_shard_key/write_without_shard_key_stable_api_test.js
+
+executor:
+  archive:
+    tests: true
+  config:
+    shell_options:
+      nodb: ""
+      eval: await import('jstests/libs/override_methods/single_crud_op_as_bulk_write.js');

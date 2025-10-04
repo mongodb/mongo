@@ -28,34 +28,50 @@
 
 global:
     cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/rpc/metadata/audit_user_attrs.h"
+        - "mongo/rpc/metadata/audit_client_attrs.h"
 
 imports:
-     - "mongo/idl/basic_types.idl"
-     - "mongo/rpc/metadata/impersonated_user_metadata.idl"
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/version_context.idl"
+    - "mongo/rpc/metadata/audit_attrs.idl"
+    - "mongo/rpc/metadata/audit_metadata.idl"
 
 structs:
-    AuthenticationMetadata:
-        # Since we need to store this struct in collection,
-        # we need to redefine the ImpersonatedUserMetadata struct because
-        # it has fields prefixed with with '$' dollar sign that are not supported
-        # by our storage engine.
-        description: "A struct representing the impersonated users associated with a specific operation."
-        strict: false
-        fields:
-            users:
-                type: array<UserName>
-            roles:
-                type: array<RoleName>
-
     ForwardableOperationMetadataBase:
         description: "Used to store metadata of an operation context that can be safely passed among different threads."
         strict: false
         fields:
             comment:
                 type: object_owned
-                description: "The comment assiociated with the operation."
+                description: "The comment associated with the operation."
                 optional: true
-            impersonatedUserMetadata:
-                type: AuthenticationMetadata
-                description: "The impersonated users associated with the operation."
+            auditUserMetadata:
+                type: AuditUserAttrs
+                description: "Users and roles that should be audited for this op"
+                optional: true
+            auditClientMetadata:
+                type: AuditClientAttrs
+                description: "The client information that should be audited on this operation"
+                optional: true
+            mayBypassWriteBlocking:
+                type: optionalBool
+                description: "Whether this operation is allowed to bypass user write blocking."
+            rawData:
+                type: optionalBool
+                description:
+                    "Whether to use the raw underlying data format. When being run on a
+                    collection type that stores its data in a different format from that
+                    in which users interact with, this means that the command will operate
+                    directly on the format in which it is stored."
+            validatedTenancyScopeToken:
+                type: string
+                description: "Token used to validate and create a new ValidatedTenancyScope."
+                optional: true
+            versionContext:
+                type: version_context
+                description: "Snapshot of the FCV used by the operation,
+                    which ensures that feature flag checks are stable through its execution."
+                # TODO SERVER-99655: make non-optional once gSnapshotFCVInDDLCoordinators is enabled on the lastLTS
                 optional: true

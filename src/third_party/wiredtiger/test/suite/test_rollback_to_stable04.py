@@ -29,7 +29,7 @@
 from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
-from test_rollback_to_stable01 import test_rollback_to_stable_base
+from rollback_to_stable_util import test_rollback_to_stable_base
 
 def mod_val(value, char, location, nbytes=1):
     return value[0:location] + char + value[location+nbytes:]
@@ -38,12 +38,11 @@ def mod_val(value, char, location, nbytes=1):
 # Test that rollback to stable always replaces the on-disk value with a full update
 # from the history store.
 class test_rollback_to_stable04(test_rollback_to_stable_base):
-    session_config = 'isolation=snapshot'
 
     format_values = [
         ('column', dict(key_format='r', value_format='S')),
         ('column_fix', dict(key_format='r', value_format='8t')),
-        ('integer_row', dict(key_format='i', value_format='S')),
+        ('row_integer', dict(key_format='i', value_format='S')),
     ]
 
     in_memory_values = [
@@ -56,24 +55,37 @@ class test_rollback_to_stable04(test_rollback_to_stable_base):
         ('prepare', dict(prepare=True))
     ]
 
-    scenarios = make_scenarios(format_values, in_memory_values, prepare_values)
+    dryrun_values = [
+        ('no_dryrun', dict(dryrun=False)),
+        ('dryrun', dict(dryrun=True))
+    ]
 
+    evict = [
+        ('no_evict', dict(evict=False)),
+        ('evict', dict(evict=True))
+    ]
+
+    worker_thread_values = [
+        ('0', dict(threads=0)),
+        ('4', dict(threads=4)),
+        ('8', dict(threads=8))
+    ]
+
+    scenarios = make_scenarios(format_values, in_memory_values, prepare_values, dryrun_values, evict, worker_thread_values)
     def conn_config(self):
-        config = 'cache_size=500MB,statistics=(all)'
+        config = 'cache_size=500MB,statistics=(all),verbose=(rts:5)'
         if self.in_memory:
             config += ',in_memory=true'
-        else:
-            config += ',log=(enabled),in_memory=false'
         return config
 
     def test_rollback_to_stable(self):
         nrows = 1000
 
-        # Create a table without logging.
+        # Create a table.
         uri = "table:rollback_to_stable04"
-        ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
-            config='log=(enabled=false)')
+        ds_config = ',log=(enabled=false)' if self.in_memory else ''
+        ds = SimpleDataSet(self, uri, 0,
+            key_format=self.key_format, value_format=self.value_format, config=ds_config)
         ds.populate()
 
         if self.value_format == '8t':
@@ -115,6 +127,11 @@ class test_rollback_to_stable04(test_rollback_to_stable_base):
         self.large_modifies(uri, 'Q', ds, 0, 1, nrows, self.prepare, 30)
         self.large_modifies(uri, 'R', ds, 1, 1, nrows, self.prepare, 40)
         self.large_modifies(uri, 'S', ds, 2, 1, nrows, self.prepare, 50)
+
+        # Evict the pages to disk
+        if self.evict:
+            self.evict_cursor(uri, nrows, value_modS)
+
         self.large_updates(uri, value_b, ds, nrows, self.prepare, 60)
         self.large_updates(uri, value_c, ds, nrows, self.prepare, 70)
         self.large_modifies(uri, 'T', ds, 3, 1, nrows, self.prepare, 80)
@@ -126,19 +143,19 @@ class test_rollback_to_stable04(test_rollback_to_stable_base):
         self.large_modifies(uri, 'Z', ds, 7, 1, nrows, self.prepare, 140)
 
         # Verify data is visible and correct.
-        self.check(value_a, uri, nrows, None, 20)
-        self.check(value_modQ, uri, nrows, None, 30)
-        self.check(value_modR, uri, nrows, None, 40)
-        self.check(value_modS, uri, nrows, None, 50)
-        self.check(value_b, uri, nrows, None, 60)
-        self.check(value_c, uri, nrows, None, 70)
-        self.check(value_modT, uri, nrows, None, 80)
-        self.check(value_d, uri, nrows, None, 90)
-        self.check(value_modW, uri, nrows, None, 100)
-        self.check(value_a, uri, nrows, None, 110)
-        self.check(value_modX, uri, nrows, None, 120)
-        self.check(value_modY, uri, nrows, None, 130)
-        self.check(value_modZ, uri, nrows, None, 140)
+        self.check(value_a, uri, nrows, None, 21 if self.prepare else 20)
+        self.check(value_modQ, uri, nrows, None, 31 if self.prepare else 30)
+        self.check(value_modR, uri, nrows, None, 41 if self.prepare else 40)
+        self.check(value_modS, uri, nrows, None, 51 if self.prepare else 50)
+        self.check(value_b, uri, nrows, None, 61 if self.prepare else 60)
+        self.check(value_c, uri, nrows, None, 71 if self.prepare else 70)
+        self.check(value_modT, uri, nrows, None, 81 if self.prepare else 80)
+        self.check(value_d, uri, nrows, None, 91 if self.prepare else 90)
+        self.check(value_modW, uri, nrows, None, 101 if self.prepare else 100)
+        self.check(value_a, uri, nrows, None, 111 if self.prepare else 110)
+        self.check(value_modX, uri, nrows, None, 121 if self.prepare else 120)
+        self.check(value_modY, uri, nrows, None, 131 if self.prepare else 130)
+        self.check(value_modZ, uri, nrows, None, 141 if self.prepare else 140)
 
         # Pin stable to timestamp 40 if prepare otherwise 30.
         if self.prepare:
@@ -149,32 +166,41 @@ class test_rollback_to_stable04(test_rollback_to_stable_base):
         # Checkpoint to ensure the data is flushed, then rollback to the stable timestamp.
         if not self.in_memory:
             self.session.checkpoint()
-        self.conn.rollback_to_stable()
+        self.conn.rollback_to_stable('dryrun={}'.format('true' if self.dryrun else 'false') + ',threads=' + str(self.threads))
 
         # Check that the correct data is seen at and after the stable timestamp.
         self.check(value_modQ, uri, nrows, None, 30)
-        self.check(value_modQ, uri, nrows, None, 150)
-        self.check(value_a, uri, nrows, None, 20)
+        if self.dryrun:
+            self.check(value_modZ, uri, nrows, None, 150)
+            self.check(value_a, uri, nrows, None, 20)
+        else:
+            self.check(value_modQ, uri, nrows, None, 150)
+            self.check(value_a, uri, nrows, None, 20)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         calls = stat_cursor[stat.conn.txn_rts][2]
         hs_removed = stat_cursor[stat.conn.txn_rts_hs_removed][2]
+        hs_removed_dryrun = stat_cursor[stat.conn.txn_rts_hs_removed_dryrun][2]
         hs_sweep = stat_cursor[stat.conn.txn_rts_sweep_hs_keys][2]
+        hs_sweep_dryrun = stat_cursor[stat.conn.txn_rts_sweep_hs_keys_dryrun][2]
         keys_removed = stat_cursor[stat.conn.txn_rts_keys_removed][2]
         keys_restored = stat_cursor[stat.conn.txn_rts_keys_restored][2]
         pages_visited = stat_cursor[stat.conn.txn_rts_pages_visited][2]
         upd_aborted = stat_cursor[stat.conn.txn_rts_upd_aborted][2]
+        upd_aborted_dryrun = stat_cursor[stat.conn.txn_rts_upd_aborted_dryrun][2]
         stat_cursor.close()
 
         self.assertEqual(calls, 1)
         self.assertEqual(keys_removed, 0)
         self.assertEqual(keys_restored, 0)
         self.assertGreater(pages_visited, 0)
-        if self.in_memory:
+        if self.dryrun:
+            self.assertEqual(upd_aborted + hs_removed + hs_sweep, 0)
+            self.assertGreaterEqual(upd_aborted_dryrun + hs_removed_dryrun + hs_sweep_dryrun, nrows * 11)
+        elif self.in_memory:
             self.assertEqual(upd_aborted, nrows * 11)
             self.assertEqual(hs_removed + hs_sweep, 0)
+            self.assertEqual(upd_aborted_dryrun + hs_removed_dryrun + hs_sweep_dryrun, 0)
         else:
             self.assertGreaterEqual(upd_aborted + hs_removed + hs_sweep, nrows * 11)
-
-if __name__ == '__main__':
-    wttest.run()
+            self.assertEqual(upd_aborted_dryrun + hs_removed_dryrun + hs_sweep_dryrun, 0)

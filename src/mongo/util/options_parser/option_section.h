@@ -28,12 +28,12 @@
  */
 
 #pragma once
+#include "mongo/base/status.h"
 #include "mongo/util/options_parser/option_description.h"
 
-#include <boost/program_options.hpp>
 #include <list>
 
-#include "mongo/base/status.h"
+#include <boost/program_options.hpp>
 
 namespace mongo {
 namespace optionenvironment {

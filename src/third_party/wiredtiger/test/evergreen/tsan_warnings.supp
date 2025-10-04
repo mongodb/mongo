@@ -1,0 +1,69 @@
+# Suppress the listed TSan warnings. Load this file with
+# export TSAN_OPTIONS="suppressions=path/to/wiredtiger/test/evergreen/tsan_warnings.supp:history_size=7"
+# before running tests with TSan. history_size isn't required but it reduces the chance that TSan reports
+# an error that is missing information and the message "failed to restore the stack"
+
+# Stats are allowed to be fuzzy. Ignore races in TSan
+race:src/include/stat.h
+race:src/support/stat.c
+
+# FIXME-WT-12734 this function copies an 8 byte struct which needs further investigation.
+race:__log_wrlsn_server
+race:__wt_log_force_sync
+race:__compute_min_lognum
+
+# FIXME-WT-12611 CONNECTION_API_CALL contains a data race that touches the session array, but the number of macro
+# calls makes diagnosing this very hard. For now suppress the surrounding function and handle this in a separate ticket.
+race:__conn_open_session
+
+# __tiered_queue_peek_empty is intentionally unsafe to avoid taking the tiered lock when it's not needed.
+race:__tiered_queue_peek_empty
+
+# The ref track code is diagnostic only and allows for races
+race:__ref_track_state
+
+# __wt_configure_method intentionally allows for races between threads to avoid the overhead of taking a lock on each API call.
+race:__wt_configure_method
+
+# FIXME-WT-14930 Dhandle timeofdeath synchronization
+race:__sweep_mark
+
+# FIXME-WT-14948 Figure out concurrency control expectations around reconfigure
+race:conn_reconfig.c
+
+# FIXME-WT-14958 This Work has been split out into a separate ticket to keep PR sizes down.
+race:__wt_free_int
+race:__wt_free_update_list
+race:__wt_page_out
+race:__posix_file_close
+race:__handle_close
+race:__sweep_remove_handles
+race:__stash_discard
+race:__evict_lru_walk
+race:__tree_walk_internal
+race:__evict_queue_empty
+race:__evict_get_ref
+race:__evict_clear_all_walks
+race:__session_clear
+race:__rec_row_leaf_insert
+race:__wt_cache_dirty_decr
+race:__wt_reconcile
+
+# FIXME-WT-14856 Unresolved warnings for ex_all
+race:__wti_conn_reconfig
+race:__wt_session_cursor_cache_sweep
+race:__wti_txn_update_pinned_timestamp
+race:__capacity_config
+
+
+# FIXME-WT-13075 Address these warnings separately as they may have perf impacts
+race:hazard.c
+race:__wt_tree_modify_set
+race:__wt_cond_auto_wait_signal
+race:__wt_ref_addr_copy
+race:__wt_row_leaf_key_info
+race:__wt_row_leaf_key
+race:__evict_force_check
+race:__wt_page_evict_clean
+race:__wt_evict_touch_page
+race:__wt_row_search

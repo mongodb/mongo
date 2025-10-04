@@ -2,11 +2,13 @@
 // specified in runtimeConstants.
 //
 // Do not run in sharded passthroughs since 'runtimeConstants' is disallowed on mongos.
-// @tags: [assumes_unsharded_collection]
-(function() {
-"use strict";
-
-load('jstests/aggregation/extras/utils.js');
+// Must also set 'fromRouter: true' as otherwise 'runtimeConstants' is disallowed on mongod.
+// @tags: [
+//   assumes_against_mongod_not_mongos,
+//   requires_scripting,
+//   requires_fcv_81,
+// ]
+import {resultsEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.js_reduce_with_scope;
 coll.drop();
@@ -25,19 +27,21 @@ function reduce(key, values) {
 const command = {
     aggregate: coll.getName(),
     cursor: {},
-    runtimeConstants:
-        {localNow: new Date(), clusterTime: new Timestamp(0, 0), jsScope: {modulus: modulus}},
-    pipeline: [{
-        $group: {
-            _id: "$word",
-            wordCountMod: {
-                $_internalJsReduce: {
-                    data: {k: "$word", v: "$val"},
-                    eval: reduce,
-                }
-            }
-        }
-    }],
+    runtimeConstants: {localNow: new Date(), clusterTime: new Timestamp(0, 0), jsScope: {modulus: modulus}},
+    pipeline: [
+        {
+            $group: {
+                _id: "$word",
+                wordCountMod: {
+                    $_internalJsReduce: {
+                        data: {k: "$word", v: "$val"},
+                        eval: reduce,
+                    },
+                },
+            },
+        },
+    ],
+    fromRouter: true,
 };
 
 const expectedResults = [
@@ -48,4 +52,3 @@ const expectedResults = [
 
 const res = assert.commandWorked(db.runCommand(command));
 assert(resultsEq(res.cursor.firstBatch, expectedResults, res.cursor));
-})();

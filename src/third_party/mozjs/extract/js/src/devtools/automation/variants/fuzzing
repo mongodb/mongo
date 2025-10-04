@@ -1,0 +1,13 @@
+{
+    "configure-args": "--enable-fuzzing --enable-gczeal --enable-debug-symbols='-gline-tables-only -gdwarf-2' --disable-jemalloc --disable-stdcxx-compat --enable-address-sanitizer --enable-ctypes --enable-nspr-build --enable-rust-simd",
+    "optimize": true,
+    "debug": false,
+    "compiler": "clang",
+    "env": {
+        "JITTEST_EXTRA_ARGS": "--jitflags=none",
+        "JSTESTS_EXTRA_ARGS": "--jitflags=none",
+        "LLVM_SYMBOLIZER": "{MOZ_FETCHES_DIR}/llvm-symbolizer/bin/llvm-symbolizer",
+        "ASAN_SYMBOLIZER_PATH": "{MOZ_FETCHES_DIR}/llvm-symbolizer/bin/llvm-symbolizer"
+    },
+    "use_minidump": false
+}

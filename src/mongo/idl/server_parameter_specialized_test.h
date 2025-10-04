@@ -29,7 +29,20 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/logical_time.h"
+#include "mongo/stdx/mutex.h"
+
+#include <cstdint>
+#include <mutex>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace test {
@@ -37,6 +50,89 @@ namespace test {
 struct ExtraDataForServerParameter {
     std::string value = "start value";
     bool flag = true;
+};
+
+class SpecializedClusterServerParameterData {
+public:
+    SpecializedClusterServerParameterData()
+        : _clusterParameterTime(), _strData("default"), _intData(30) {};
+
+    SpecializedClusterServerParameterData(const std::string& newStrData, std::uint32_t newIntData)
+        : _strData(newStrData), _intData(newIntData) {}
+
+    LogicalTime getClusterParameterTime() const {
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        return _clusterParameterTime;
+    }
+
+    StringData getStrData() const {
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        return _strData;
+    }
+
+    std::uint32_t getIntData() const {
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        return _intData;
+    }
+
+    void setClusterParameterTime(const LogicalTime& clusterParameterTime) {
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        _clusterParameterTime = clusterParameterTime;
+    }
+
+    void setStrData(const std::string& strData) {
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        _strData = strData;
+    }
+
+    void setIntData(std::int32_t intData) {
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        _intData = intData;
+    }
+
+    void setId(StringData id) {
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        _id = std::string{id};
+    }
+
+    void parse(const BSONObj& updatedObj) {
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        _clusterParameterTime = LogicalTime(updatedObj["clusterParameterTime"].timestamp());
+        _strData = updatedObj["strData"].String();
+        _intData = updatedObj["intData"].Int();
+    }
+
+    void serialize(BSONObjBuilder* builder) const {
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        if (_id.is_initialized()) {
+            builder->append("_id"_sd, _id.get());
+        }
+        builder->append("clusterParameterTime"_sd, _clusterParameterTime.asTimestamp());
+        builder->append("strData"_sd, _strData);
+        builder->append("intData"_sd, _intData);
+    }
+
+    BSONObj toBSON() const {
+        BSONObjBuilder builder;
+        serialize(&builder);
+        return builder.obj();
+    }
+
+    void reset() {
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        _clusterParameterTime = LogicalTime();
+        _strData = "default";
+        _intData = 30;
+        _id = boost::none;
+    }
+
+private:
+    boost::optional<std::string> _id;
+    LogicalTime _clusterParameterTime;
+    std::string _strData;
+    std::int32_t _intData;
+
+    mutable stdx::mutex _mutex;
 };
 
 }  // namespace test

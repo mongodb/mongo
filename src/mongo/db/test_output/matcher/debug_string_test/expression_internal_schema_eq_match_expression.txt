@@ -1,0 +1,6 @@
+==== VARIATION: matchExpression=InternalSchemaEqMatchExpression
+a $_internalSchemaEq 5
+
+==== VARIATION: taggedMatchExpression=InternalSchemaEqMatchExpression
+a $_internalSchemaEq 5 || Selected Index #2 pos 0 combine 1
+

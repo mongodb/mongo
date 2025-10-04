@@ -23,10 +23,13 @@ LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 
-#if UNW_TARGET_IA64
+#ifndef libunwind_setjmp_setjmp_i_h
+#define libunwind_setjmp_setjmp_i_h
 
 #include "libunwind_i.h"
-#include "tdep-ia64/rse.h"
+
+#if UNW_TARGET_IA64
+# include "tdep-ia64/rse.h"
 
 static inline int
 bsp_match (unw_cursor_t *c, unw_word_t *wp)
@@ -103,16 +106,18 @@ resume_restores_sigmask (unw_cursor_t *c, unw_word_t *wp)
 #else /* !UNW_TARGET_IA64 */
 
 static inline int
-bsp_match (unw_cursor_t *c, unw_word_t *wp)
+bsp_match (unw_cursor_t *c UNUSED, unw_word_t *wp UNUSED)
 {
   return 1;
 }
 
 static inline int
-resume_restores_sigmask (unw_cursor_t *c, unw_word_t *wp)
+resume_restores_sigmask (unw_cursor_t *c UNUSED, unw_word_t *wp  UNUSED)
 {
   /* We may want to do this analogously as for ia64... */
   return 0;
 }
 
 #endif /* !UNW_TARGET_IA64 */
+
+#endif /* libunwind_setjmp_setjmp_i_h */

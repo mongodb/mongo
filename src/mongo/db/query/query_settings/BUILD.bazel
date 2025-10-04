@@ -1,0 +1,151 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+idl_generator(
+    name = "query_settings_gen",
+    src = "query_settings.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db:namespace_spec_gen",
+        "//src/mongo/db/query:index_hint_gen",
+        "//src/mongo/db/query:query_knobs_gen",
+        "//src/mongo/db/query/query_shape:query_shape_hash_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "query_settings",
+    srcs = [
+        "index_hints_serialization.cpp",
+        "query_framework_serialization.cpp",
+        "query_settings_comment.cpp",
+        "query_settings_hash.cpp",
+        ":query_settings_gen",
+    ],
+    hdrs = [
+        "index_hints_serialization.h",
+        "query_framework_serialization.h",
+        "query_settings_hash.h",
+    ],
+    deps = [
+        ":query_settings_service_dependencies",
+        "//src/mongo/db:namespace_spec",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/query:index_hint",
+        "//src/mongo/db/query:query_knobs",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query/query_shape:query_shape_hash",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+idl_generator(
+    name = "query_settings_cluster_parameter_gen",
+    src = "query_settings_cluster_parameter.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/cluster_parameters:cluster_server_parameter_gen",
+        "//src/mongo/db/query:query_feature_flags_gen",
+        "//src/mongo/db/query/query_settings:query_settings_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "query_settings_service_dependencies",
+    srcs = [
+        "query_settings_service_dependencies.cpp",
+    ],
+    hdrs = [
+        "query_settings_service_dependencies.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/cluster_parameters:cluster_server_parameter_cmds_idl",
+    ],
+)
+
+mongo_cc_library(
+    name = "query_settings_service",
+    srcs = [
+        "query_settings_backfill.cpp",
+        "query_settings_backfill.h",
+        "query_settings_cluster_parameter_impl.cpp",
+        "query_settings_manager.cpp",
+        "query_settings_manager.h",
+        "query_settings_service.cpp",
+        "query_settings_usage_tracker.cpp",
+        "query_settings_usage_tracker.h",
+        ":query_settings_cluster_parameter_gen",
+    ],
+    hdrs = [
+        "query_settings_service.h",
+    ],
+    deps = [
+        ":query_settings",
+        "//src/mongo/client:remote_command_targeter",
+        "//src/mongo/crypto:fle_fields",
+        "//src/mongo/crypto:sha256_block",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/commands/server_status:server_status_core",
+        "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/local_catalog:index_key_validate",
+        "//src/mongo/db/local_catalog/lock_manager",
+        "//src/mongo/db/local_catalog/lock_manager:exception_util",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/pipeline/process_interface:common_process_interface",
+        "//src/mongo/db/query:command_shapes",
+        "//src/mongo/db/query:query_knobs",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query/query_shape",
+        "//src/mongo/executor:async_rpc",
+        "//src/mongo/idl:cluster_server_parameter",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "query_settings_service_test",
+    srcs = [
+        "index_hints_serialization_test.cpp",
+        "query_framework_serialization_test.cpp",
+        "query_settings_backfill_test.cpp",
+        "query_settings_cluster_parameter_impl_test.cpp",
+        "query_settings_hash_test.cpp",
+        "query_settings_manager_test.cpp",
+        "query_settings_service_test.cpp",
+        "query_settings_validation_test.cpp",
+        "query_shape_representative_queries_test.cpp",
+    ],
+    tags = ["mongo_unittest_seventh_group"],
+    deps = [
+        ":query_settings",
+        "//src/mongo/db/commands/query_cmd:query_settings_cmds",  # Necessary because tests rely on $querySettings pipeline stage.
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/executor:mock_async_rpc",
+        "//src/mongo/idl:server_parameter_test_controller",
+        "//src/mongo/s:sharding_mongos_test_fixture",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "query_settings_lookup_bm",
+    srcs = [
+        "query_settings_lookup_bm.cpp",
+    ],
+    tags = ["query_bm"],
+    deps = [
+        "query_settings_service",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/query:canonical_query_base",
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/idl:server_parameter_test_controller",
+        "//src/mongo/util:processinfo",
+    ],
+)

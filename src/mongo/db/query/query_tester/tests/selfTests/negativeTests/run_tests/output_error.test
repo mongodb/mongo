@@ -1,0 +1,12 @@
+output_error
+negative_test
+test.coll as coll
+
+// This test should execute successfully and be numbered 0.
+:sortFull { "aggregate" : "coll", "pipeline" : [ { "$addFields" : { "projected" : { "$toString": "$value" } } } ], cursor: {} }
+
+// This test should fail and be numbered 1.
+:sortFull { "aggregate" : "coll", "pipeline" : [ { "$addFields" : { "projected" : { "$toDate": "$value" } } } ], cursor: {} }
+
+// This test should execute successfully and be numbered 2.
+:sortFull { "aggregate" : "coll", "pipeline" : [ { "$addFields" : { "projected" : { "$toLong": "$_id" } } } ], cursor: {} }

@@ -27,14 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/unittest/temp_dir.h"
 
-#include <boost/filesystem.hpp>
-#include <fstream>
+#include "mongo/base/string_data.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
-#include "mongo/unittest/unittest.h"
+#include <fstream>  // IWYU pragma: keep
+
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
 
 using mongo::unittest::TempDir;
 

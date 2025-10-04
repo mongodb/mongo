@@ -27,30 +27,37 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/isself.h"
 
-#include <boost/algorithm/string.hpp>
-
-#include "mongo/base/init.h"
-#include "mongo/bson/util/builder.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/client/authenticate.h"
 #include "mongo/client/dbclient_connection.h"
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/commands.h"
+#include "mongo/client/internal_auth.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/net/cidr.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/time_support.h"
 
-#if defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__) || defined(__sun) || \
-    defined(__OpenBSD__)
+#include <algorithm>
+#include <exception>
+
+#include <boost/none.hpp>
+
+#if defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__)
 #define FASTPATH_UNIX 1
 #endif
 
@@ -58,27 +65,30 @@
 #error isself needs to be implemented for this platform
 #endif
 
+#ifndef _WIN32
+#include <netinet/in.h>
+#include <sys/socket.h>
+#endif
 
 #ifdef FASTPATH_UNIX
 #include <ifaddrs.h>
 #include <netdb.h>
 
-#ifdef __FreeBSD__
-#include <netinet/in.h>
-#endif
-
 #elif defined(_WIN32)
 #include <Ws2tcpip.h>
-#include <boost/asio/detail/socket_ops.hpp>
-#include <boost/system/error_code.hpp>
+#include <asio.hpp>  // IWYU pragma: keep
 #include <iphlpapi.h>
 #include <winsock2.h>
 #endif  // defined(_WIN32)
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
+
 
 namespace mongo {
 namespace repl {
 
 MONGO_FAIL_POINT_DEFINE(failIsSelfCheck);
+MONGO_FAIL_POINT_DEFINE(transientDNSErrorInFastPath);
 
 OID instanceId;
 
@@ -87,20 +97,6 @@ MONGO_INITIALIZER(GenerateInstanceId)(InitializerContext*) {
 }
 
 namespace {
-
-/**
- * Helper to convert a message from a networking function to a string.
- * Needed because errnoWithDescription uses strerror on linux, when
- * we need gai_strerror.
- */
-std::string stringifyError(int code) {
-#if FASTPATH_UNIX
-    return gai_strerror(code);
-#elif defined(_WIN32)
-    // FormatMessage in errnoWithDescription works here on windows
-    return errnoWithDescription(code);
-#endif
-}
 
 /**
  * Resolves a host and port to a list of IP addresses. This requires a syscall. If the
@@ -116,16 +112,44 @@ std::vector<std::string> getAddrsForHost(const std::string& iporhost,
 
     const std::string portNum = std::to_string(port);
 
+    int err = 0;
+    int attempts = 0;
+    int maxAttempts = 4;
+
+    while (true) {
+        err = getaddrinfo(iporhost.c_str(), portNum.c_str(), &hints, &addrs);
+
+        // We do not sleep for as long in tests.
+        auto waitCoefficient = 1.0;
+
+        // Simulate transient DNS error if set.
+        if (MONGO_unlikely(transientDNSErrorInFastPath.shouldFail())) {
+            waitCoefficient = 0.1;
+            err = EAI_AGAIN;
+        }
+
+        // Skip waiting if we succeed, get a different error, or run out of attempts.
+        if (err != EAI_AGAIN || attempts == maxAttempts) {
+            break;
+        }
+
+        // Free what we have ahead of the next getaddrinfo call.
+        freeaddrinfo(addrs);
+
+        // Wait 1, 2, 4, 8 seconds (and a tenth of that in tests).
+        sleepmillis(std::pow(2, attempts++) * 1000 * waitCoefficient);
+    }
+
     std::vector<std::string> out;
 
-    int err = getaddrinfo(iporhost.c_str(), portNum.c_str(), &hints, &addrs);
-
     if (err) {
+        auto ec = addrInfoError(err);
         LOGV2_WARNING(21207,
-                      "getaddrinfo(\"{host}\") failed: {error}",
                       "getaddrinfo() failed",
                       "host"_attr = iporhost,
-                      "error"_attr = stringifyError(err));
+                      "error"_attr = errorMessage(ec),
+                      "timedOut"_attr = (attempts == maxAttempts));
+        freeaddrinfo(addrs);
         return out;
     }
 
@@ -139,10 +163,8 @@ std::vector<std::string> getAddrsForHost(const std::string& iporhost,
             err = getnameinfo(
                 addr->ai_addr, addr->ai_addrlen, host, NI_MAXHOST, nullptr, 0, NI_NUMERICHOST);
             if (err) {
-                LOGV2_WARNING(21208,
-                              "getnameinfo() failed: {error}",
-                              "getnameinfo() failed",
-                              "error"_attr = stringifyError(err));
+                auto ec = addrInfoError(err);
+                LOGV2_WARNING(21208, "getnameinfo() failed", "error"_attr = errorMessage(ec));
                 continue;
             }
             out.push_back(host);
@@ -163,10 +185,17 @@ std::vector<std::string> getAddrsForHost(const std::string& iporhost,
 
 }  // namespace
 
-bool isSelf(const HostAndPort& hostAndPort, ServiceContext* const ctx) {
+bool isSelf(const HostAndPort& hostAndPort, ServiceContext* const ctx, Milliseconds timeout) {
+    if (isSelfFastPath(hostAndPort)) {
+        return true;
+    }
+    return isSelfSlowPath(hostAndPort, ctx, timeout);
+}
+
+bool isSelfFastPath(const HostAndPort& hostAndPort) {
     if (MONGO_unlikely(failIsSelfCheck.shouldFail())) {
         LOGV2(356490,
-              "failIsSelfCheck failpoint activated, returning false from isSelf",
+              "failIsSelfCheck failpoint activated, returning false from isSelfFastPath",
               "hostAndPort"_attr = hostAndPort);
         return false;
     }
@@ -222,46 +251,58 @@ bool isSelf(const HostAndPort& hostAndPort, ServiceContext* const ctx) {
             }
         }
     }
+    return false;
+}
 
+bool isSelfSlowPath(const HostAndPort& hostAndPort,
+                    ServiceContext* const ctx,
+                    Milliseconds timeout) {
     ctx->waitForStartupComplete();
+    if (MONGO_unlikely(failIsSelfCheck.shouldFail())) {
+        LOGV2(6605000,
+              "failIsSelfCheck failpoint activated, returning false from isSelfSlowPath",
+              "hostAndPort"_attr = hostAndPort);
+        return false;
+    }
 
     try {
         DBClientConnection conn;
-        conn.setSoTimeout(30);  // 30 second timeout
+        double timeoutSeconds = static_cast<double>(durationCount<Milliseconds>(timeout)) / 1000.0;
+        conn.setSoTimeout(timeoutSeconds);
 
-        // We need to avoid the isMaster call triggered by a normal connect, which would
-        // cause a deadlock. 'isSelf' is called by the Replication Coordinator when validating
-        // a replica set configuration document, but the 'isMaster' command requires a lock on the
-        // replication coordinator to execute. As such we call we call 'connectSocketOnly', which
-        // does not call 'isMaster'.
-        auto connectSocketResult = conn.connectSocketOnly(hostAndPort, boost::none);
-        if (!connectSocketResult.isOK()) {
+        // We need to avoid the "hello" call triggered by a normal connect, which would cause a
+        // deadlock. 'isSelf' is called by the Replication Coordinator when validating a replica set
+        // configuration document, but the "hello" command requires a lock on the replication
+        // coordinator to execute. As such we call we call 'connectNoHello', which does not call
+        // "hello".
+        try {
+            conn.connectNoHello(hostAndPort, boost::none);
+        } catch (const DBException& e) {
             LOGV2(4834700,
-                  "isSelf could not connect via connectSocketOnly",
+                  "isSelf could not connect via connectNoHello",
                   "hostAndPort"_attr = hostAndPort,
-                  "error"_attr = connectSocketResult);
+                  "error"_attr = e);
             return false;
         }
 
         if (auth::isInternalAuthSet()) {
-            auto authInternalUserResult =
+            try {
                 conn.authenticateInternalUser(auth::StepDownBehavior::kKeepConnectionOpen);
-            if (!authInternalUserResult.isOK()) {
+            } catch (const DBException& e) {
                 LOGV2(4834701,
                       "isSelf could not authenticate internal user",
                       "hostAndPort"_attr = hostAndPort,
-                      "error"_attr = authInternalUserResult);
+                      "error"_attr = e);
                 return false;
             }
         }
         BSONObj out;
-        bool ok = conn.runCommand("admin", BSON("_isSelf" << 1), out);
-        bool me = ok && out["id"].type() == jstOID && instanceId == out["id"].OID();
+        bool ok = conn.runCommand(DatabaseName::kAdmin, BSON("_isSelf" << 1), out);
+        bool me = ok && out["id"].type() == BSONType::oid && instanceId == out["id"].OID();
 
         return me;
     } catch (const std::exception& e) {
         LOGV2_WARNING(21209,
-                      "couldn't check isSelf ({hostAndPort}) {error}",
                       "Couldn't check isSelf",
                       "hostAndPort"_attr = hostAndPort,
                       "error"_attr = e.what());
@@ -281,12 +322,9 @@ std::vector<std::string> getBoundAddrs(const bool ipv6enabled) {
 
     ifaddrs* addrs;
 
-    int err = getifaddrs(&addrs);
-    if (err) {
-        LOGV2_WARNING(21210,
-                      "getifaddrs failure: {error}",
-                      "getifaddrs() failed",
-                      "error"_attr = errnoWithDescription(err));
+    if (getifaddrs(&addrs)) {
+        auto ec = lastSystemError();
+        LOGV2_WARNING(21210, "getifaddrs() failed", "error"_attr = errorMessage(ec));
         return out;
     }
     ON_BLOCK_EXIT([&] { freeifaddrs(addrs); });
@@ -299,7 +337,7 @@ std::vector<std::string> getBoundAddrs(const bool ipv6enabled) {
         char host[NI_MAXHOST];
 
         if (family == AF_INET || (ipv6enabled && (family == AF_INET6))) {
-            err = getnameinfo(
+            int err = getnameinfo(
                 addr->ifa_addr,
                 (family == AF_INET ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6)),
                 host,
@@ -308,10 +346,8 @@ std::vector<std::string> getBoundAddrs(const bool ipv6enabled) {
                 0,
                 NI_NUMERICHOST);
             if (err) {
-                LOGV2_WARNING(21211,
-                              "getnameinfo() failed: {error}",
-                              "getnameinfo() failed",
-                              "error"_attr = gai_strerror(err));
+                LOGV2_WARNING(
+                    21211, "getnameinfo() failed", "error"_attr = errorMessage(addrInfoError(err)));
                 continue;
             }
             out.push_back(host);
@@ -348,10 +384,8 @@ std::vector<std::string> getBoundAddrs(const bool ipv6enabled) {
     }
 
     if (err != NO_ERROR) {
-        LOGV2_WARNING(21212,
-                      "GetAdaptersAddresses() failed: {error}",
-                      "GetAdaptersAddresses() failed",
-                      "error"_attr = errnoWithDescription(err));
+        LOGV2_WARNING(
+            21212, "GetAdaptersAddresses() failed", "error"_attr = errorMessage(systemError(err)));
         return out;
     }
 
@@ -364,13 +398,12 @@ std::vector<std::string> getBoundAddrs(const bool ipv6enabled) {
                 // IPv4
                 SOCKADDR_IN* sock = reinterpret_cast<SOCKADDR_IN*>(addr->Address.lpSockaddr);
                 char addrstr[INET_ADDRSTRLEN] = {0};
-                boost::system::error_code ec;
+                asio::error_code ec;
                 // Not all windows versions have inet_ntop
-                boost::asio::detail::socket_ops::inet_ntop(
+                asio::detail::socket_ops::inet_ntop(
                     AF_INET, &(sock->sin_addr), addrstr, INET_ADDRSTRLEN, 0, ec);
                 if (ec) {
                     LOGV2_WARNING(21213,
-                                  "inet_ntop failed during IPv4 address conversion: {error}",
                                   "inet_ntop failed during IPv4 address conversion",
                                   "error"_attr = ec.message());
                     continue;
@@ -380,12 +413,11 @@ std::vector<std::string> getBoundAddrs(const bool ipv6enabled) {
                 // IPv6
                 SOCKADDR_IN6* sock = reinterpret_cast<SOCKADDR_IN6*>(addr->Address.lpSockaddr);
                 char addrstr[INET6_ADDRSTRLEN] = {0};
-                boost::system::error_code ec;
-                boost::asio::detail::socket_ops::inet_ntop(
+                asio::error_code ec;
+                asio::detail::socket_ops::inet_ntop(
                     AF_INET6, &(sock->sin6_addr), addrstr, INET6_ADDRSTRLEN, 0, ec);
                 if (ec) {
                     LOGV2_WARNING(21214,
-                                  "inet_ntop failed during IPv6 address conversion: {error}",
                                   "inet_ntop failed during IPv6 address conversion",
                                   "error"_attr = ec.message());
                     continue;

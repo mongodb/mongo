@@ -1,0 +1,111 @@
+version: 1.0.0
+filters:
+  - "auto_split_vector_basic.js":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "drop_indexes_participant*":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
+  - "*fsync_lock*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "*chunk_migration*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "*migration_coordinator*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "migration_fails_with_spurious_documents.js":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "move_primary_clone.js":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "/OWNERS.yml":
+    approvers:
+      - 10gen/server-catalog-and-routing
+      - 10gen/server-cluster-scalability
+  - "proxy_protocol_connect.js":
+    approvers:
+      - 10gen/server-security
+  - "*range*deleter*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "*range*deletion*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "*retryable_write*":
+    approvers:
+      - 10gen/server-transactions
+  - "*transaction*":
+    approvers:
+      - 10gen/server-transactions
+  - "*txn*":
+    approvers:
+      - 10gen/server-transactions
+  - "*_with_id_without_shard_key*":
+    approvers:
+      - "10gen/server-cluster-scalability"
+  - "*zone*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "addShard*":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
+  - "custom_write_concern.js":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "shard_unsplittable_collection.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
+  - "create_unsplittable_collection.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
+  - "list_cluster_catalog*":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
+  - "check_metadata*":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
+  - "direct_shard*":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
+  - "start_shard_draining*":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
+  - "shard_draining_status_test.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
+  - "replica_set_to_csrs_promotion.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
+  - "replica_set_promotion_demotion.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
+  - "stop_shard_draining_test.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
+  - "remove_shard_interoperability_tests.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
+  - "commit_shard_removal_test.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
+  - "validate_collection*.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
+  - "add_and_remove_shard_serializes_with_ddl.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
+  - "direct_shard_connection_ddls_on_replicaset.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
+  - "direct_shard_connection_ddls_during_promotion_to_*.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
+  - "incompatible_shard_key_indexes.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
+  - "sharding_ready.js":
+    approvers:
+      - 10gen/server-cluster-scalability

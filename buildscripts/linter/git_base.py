@@ -6,7 +6,7 @@ import subprocess
 LOGGER = logging.getLogger(__name__)
 
 
-class Repository(object):  # pylint: disable=too-many-public-methods
+class Repository(object):
     """Represent a local git repository."""
 
     def __init__(self, directory):
@@ -184,7 +184,7 @@ class Repository(object):  # pylint: disable=too-many-public-methods
         params.extend(["rev-parse", "--show-toplevel"])
         result = Repository._run_process("rev-parse", params)
         result.check_returncode()
-        return result.stdout.decode('utf-8').rstrip()
+        return result.stdout.decode("utf-8").rstrip()
 
     @staticmethod
     def current_repository():
@@ -195,7 +195,7 @@ class Repository(object):  # pylint: disable=too-many-public-methods
         """Call git for this repository, and return the captured output."""
         result = self._run_cmd(cmd, args)
         result.check_returncode()
-        return result.stdout.decode('utf-8')
+        return result.stdout.decode("utf-8")
 
     def _callgit(self, cmd, args, raise_exception=False):
         """
@@ -236,10 +236,12 @@ class GitException(Exception):
         process_args: a list containing the git command and arguments (includes 'git' as its first
             element) that were run, if any.
         stderr: the error output of the git command.
+
     """
 
-    def __init__(  # pylint: disable=too-many-arguments
-            self, message, returncode=None, cmd=None, process_args=None, stdout=None, stderr=None):
+    def __init__(
+        self, message, returncode=None, cmd=None, process_args=None, stdout=None, stderr=None
+    ):
         """Initialize GitException."""
         Exception.__init__(self, message)
         self.returncode = returncode
@@ -258,10 +260,10 @@ class GitCommandResult(object):
         returncode: the return code.
         stdout: the output of the command.
         stderr: the error output of the command.
+
     """
 
-    def __init__(  # pylint: disable=too-many-arguments
-            self, cmd, process_args, returncode, stdout=None, stderr=None):
+    def __init__(self, cmd, process_args, returncode, stdout=None, stderr=None):
         """Initialize GitCommandResult."""
         self.cmd = cmd
         self.process_args = process_args
@@ -273,6 +275,12 @@ class GitCommandResult(object):
         """Raise GitException if the exit code is non-zero."""
         if self.returncode:
             raise GitException(
-                "Command '{0}' failed with code '{1}'".format(" ".join(self.process_args),
-                                                              self.returncode), self.returncode,
-                self.cmd, self.process_args, self.stdout, self.stderr)
+                "Command '{0}' failed with code '{1}'".format(
+                    " ".join(self.process_args), self.returncode
+                ),
+                self.returncode,
+                self.cmd,
+                self.process_args,
+                self.stdout,
+                self.stderr,
+            )

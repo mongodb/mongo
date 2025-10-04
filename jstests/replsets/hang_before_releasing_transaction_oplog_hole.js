@@ -6,18 +6,16 @@
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
 
-(function() {
-'use strict';
-
-load("jstests/libs/fail_point_util.js");
+import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
 const node = rst.getPrimary();
 
-const name = 'hang_before_releasing_transaction_oplog_hole';
-const dbName = 'test';
+const name = "hang_before_releasing_transaction_oplog_hole";
+const dbName = "test";
 const collName = name;
 const testDB = node.getDB(dbName);
 const coll = testDB[collName];
@@ -29,38 +27,40 @@ assert.commandWorked(coll.insert({a: 1}));
 // Rather than setting a timeout on commit and forfeiting our ability to check commit for
 // success, we use a separate thread to disable the failpoint and allow the server to finish
 // committing successfully.
-function transactionFn() {
-    load('jstests/core/txns/libs/prepare_helpers.js');
+async function transactionFn() {
+    const {PrepareHelpers} = await import("jstests/core/txns/libs/prepare_helpers.js");
 
-    const name = 'hang_before_releasing_transaction_oplog_hole';
-    const dbName = 'test';
+    const name = "hang_before_releasing_transaction_oplog_hole";
+    const dbName = "test";
     const collName = name;
     const session = db.getMongo().startSession({causalConsistency: false});
     const sessionDB = session.getDatabase(dbName);
 
-    session.startTransaction({readConcern: {level: 'snapshot'}});
+    session.startTransaction({readConcern: {level: "snapshot"}});
     sessionDB[collName].update({}, {a: 2});
     const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
     // Hang before releasing the 'commitTransaction' oplog entry hole.
-    assert.commandWorked(db.adminCommand(
-        {configureFailPoint: 'hangBeforeReleasingTransactionOplogHole', mode: 'alwaysOn'}));
+    assert.commandWorked(
+        db.adminCommand({configureFailPoint: "hangBeforeReleasingTransactionOplogHole", mode: "alwaysOn"}),
+    );
 
     PrepareHelpers.commitTransaction(session, prepareTimestamp);
 }
 const joinTransaction = startParallelShell(transactionFn, rst.ports[0]);
 
 jsTestLog("Waiting to hang with the oplog hole held open.");
-assert.commandWorked(testDB.adminCommand({
-    waitForFailPoint: 'hangBeforeReleasingTransactionOplogHole',
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+assert.commandWorked(
+    testDB.adminCommand({
+        waitForFailPoint: "hangBeforeReleasingTransactionOplogHole",
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout,
+    }),
+);
 
 jsTestLog("Waiting for 'commitTransaction' to advance lastApplied.");
 sleep(5 * 1000);
-assert.commandWorked(testDB.adminCommand(
-    {configureFailPoint: 'hangBeforeReleasingTransactionOplogHole', mode: 'off'}));
+assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangBeforeReleasingTransactionOplogHole", mode: "off"}));
 
 jsTestLog("Joining the transaction.");
 joinTransaction();
@@ -71,4 +71,3 @@ jsTestLog("Dropping another collection.");
 testDB["otherColl"].drop({writeConcern: {w: "majority"}});
 
 rst.stopSet();
-})();

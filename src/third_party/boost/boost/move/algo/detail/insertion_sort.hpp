@@ -33,6 +33,11 @@
 #include <boost/move/detail/placement_new.hpp>
 #include <boost/move/detail/iterator_to_raw_pointer.hpp>
 
+#if defined(BOOST_CLANG) || (defined(BOOST_GCC) && (BOOST_GCC >= 40600))
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wsign-conversion"
+#endif
+
 namespace boost {  namespace movelib{
 
 // @cond
@@ -124,5 +129,9 @@ void insertion_sort_uninitialized_copy
 }
 
 }} //namespace boost {  namespace movelib{
+
+#if defined(BOOST_CLANG) || (defined(BOOST_GCC) && (BOOST_GCC >= 40600))
+#pragma GCC diagnostic pop
+#endif
 
 #endif //#ifndef BOOST_MOVE_DETAIL_INSERT_SORT_HPP

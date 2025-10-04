@@ -29,10 +29,15 @@
 
 #include "mongo/client/streamable_replica_set_monitor_for_testing.h"
 
+#include "mongo/executor/network_connection_hook.h"
+#include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/network_interface_thread_pool.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
+#include "mongo/rpc/metadata/metadata_hook.h"
+
+#include <utility>
 
 namespace mongo {
 
@@ -60,8 +65,7 @@ void StreamableReplicaSetMonitorForTesting::setup(const MongoURI& uri) {
 
     auto pool = std::make_unique<executor::NetworkInterfaceThreadPool>(networkInterface.get());
 
-    _taskExecutor =
-        std::make_shared<executor::ThreadPoolTaskExecutor>(std::move(pool), networkInterface);
+    _taskExecutor = executor::ThreadPoolTaskExecutor::create(std::move(pool), networkInterface);
     _taskExecutor->startup();
 
     _replSetMonitor = std::make_shared<StreamableReplicaSetMonitor>(
@@ -75,6 +79,16 @@ void StreamableReplicaSetMonitorForTesting::setup(const MongoURI& uri) {
 
 sdam::MockTopologyManager* StreamableReplicaSetMonitorForTesting::getTopologyManager() {
     return _topologyManagerPtr;
+}
+
+HostAndPort StreamableReplicaSetMonitorForTesting::getAtLeastOneHostOrRefresh(
+    const ReadPreferenceSetting& criteria,
+    const stdx::unordered_set<HostAndPort>& deprioritizedServers) {
+    return _replSetMonitor
+        ->getAtLeastOneHostOrRefresh(
+            criteria, deprioritizedServers, CancellationToken::uncancelable())
+        .getNoThrow()
+        .getValue();
 }
 
 }  // namespace mongo

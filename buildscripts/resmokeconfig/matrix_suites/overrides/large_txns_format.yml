@@ -1,0 +1,20 @@
+### Overrides for matrix suites that include large_txns_format ###
+- name: enable
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              setParameters:
+                maxNumberOfTransactionOperationsInSingleOplogEntry: 1
+
+- name: excluded_files
+  value:
+    exclude_with_any_tags:
+      # Transactions are not allowed to operate on capped collections.
+      - requires_capped
+
+- name: replica_sets_excluded_files
+  value:
+    exclude_files: []

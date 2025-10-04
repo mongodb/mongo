@@ -1,0 +1,52 @@
+# Golden test output of SBECodeFragmentTest/AppendSimpleInstruction_Binary_BothOnFrame
+==== VARIATION append instr
+-- CODE:
+[0x0000-0x002f] stackSize: 1, maxStackSize: 4
+0x0000: pushConstVal(value: 10);
+0x000a: pushConstVal(value: 20);
+0x0014: pushConstVal(value: Nothing);
+0x001e: sub(popLhs: 0, moveFromLhs: 0, offsetLhs: 2, popRhs: 0, moveFromRhs: 0, offsetRhs: 1);
+0x0029: swap();
+0x002a: pop();
+0x002b: swap();
+0x002c: pop();
+0x002d: swap();
+0x002e: pop();
+
+-- RESULT:
+-10
+
+==== VARIATION append code 1
+-- CODE:
+[0x0000-0x002f] stackSize: 1, maxStackSize: 4
+0x0000: pushConstVal(value: 10);
+0x000a: pushConstVal(value: 20);
+0x0014: pushConstVal(value: Nothing);
+0x001e: sub(popLhs: 0, moveFromLhs: 0, offsetLhs: 2, popRhs: 0, moveFromRhs: 0, offsetRhs: 1);
+0x0029: swap();
+0x002a: pop();
+0x002b: swap();
+0x002c: pop();
+0x002d: swap();
+0x002e: pop();
+
+-- RESULT:
+-10
+
+==== VARIATION append code 2
+-- CODE:
+[0x0000-0x002f] stackSize: 1, maxStackSize: 4
+0x0000: pushConstVal(value: 10);
+0x000a: pushConstVal(value: 20);
+0x0014: pushConstVal(value: Nothing);
+0x001e: sub(popLhs: 0, moveFromLhs: 0, offsetLhs: 2, popRhs: 0, moveFromRhs: 0, offsetRhs: 1);
+0x0029: swap();
+0x002a: pop();
+0x002b: swap();
+0x002c: pop();
+0x002d: swap();
+0x002e: pop();
+
+-- RESULT:
+-10
+

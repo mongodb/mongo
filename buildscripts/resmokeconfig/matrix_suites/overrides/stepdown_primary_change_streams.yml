@@ -1,0 +1,71 @@
+# Overrides necessary for killing the primary.
+
+###
+# Hook options.
+###
+- name: replica_sets_hooks
+  value:
+    executor:
+      hooks:
+        # We disable the primary termination so that stepdowns occur with a live system. This
+        # will caause numerous Rollback-To-Stable scenarios which is the desired scenario.
+        - class: ContinuousStepdown
+          terminate: false
+          kill: false
+
+        # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+        # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+        # validating the entire contents of the collection.
+        - class: CheckReplOplogs
+        - class: CheckReplPreImagesConsistency
+        - class: CheckReplChangeCollectionConsistency
+        - class: CheckReplDBHash
+        - class: ValidateCollections
+          shell_options:
+            global_vars:
+              TestData:
+                skipEnforceFastCountOnValidate: true
+        - class: CleanEveryN
+          n: 20
+
+- name: replica_sets_hooks_with_legacy_validate
+  value:
+    executor:
+      hooks:
+        # We disable the primary termination so that stepdowns occur with a live system. This
+        # will caause numerous Rollback-To-Stable scenarios which is the desired scenario.
+        - class: ContinuousStepdown
+          terminate: false
+          kill: false
+
+        # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+        # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+        # validating the entire contents of the collection.
+        - class: CheckReplOplogs
+        - class: CheckReplPreImagesConsistency
+        - class: CheckReplChangeCollectionConsistency
+        - class: CheckReplDBHash
+        - class: ValidateCollections
+          use_legacy_validate: true
+          shell_options:
+            global_vars:
+              TestData:
+                skipEnforceFastCountOnValidate: true
+        - class: CleanEveryN
+          n: 20
+          skip_database_deletion: true
+
+###
+# Archival options.
+###
+- name: replica_sets_archive
+  value:
+    executor:
+      archive:
+        tests: true
+        hooks:
+          - CheckReplDBHash
+          - CheckReplOplogs
+          - CheckReplPreImagesConsistency
+          - CheckReplChangeCollectionConsistency
+          - ValidateCollections

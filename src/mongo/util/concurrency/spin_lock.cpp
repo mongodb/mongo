@@ -27,17 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 
 #if !(defined(_WIN32) || MONGO_CONFIG_DEBUG_BUILD)
 
-#include <sched.h>
-#include <time.h>
-
 #include "mongo/platform/pause.h"
 #include "mongo/util/concurrency/spin_lock.h"
+
+#include <ctime>
+
+#include <sched.h>
 
 namespace mongo {
 

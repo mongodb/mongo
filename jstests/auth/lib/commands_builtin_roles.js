@@ -5,14 +5,20 @@
  * in jstests/auth/lib/commands_lib.js
  */
 
+import {
+    adminDbName,
+    authCommandsLib,
+    authErrCode,
+    commandNotSupportedCode,
+    firstDbName,
+} from "jstests/auth/lib/commands_lib.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+
 // This test involves killing all sessions, which will not work as expected if the kill command is
 // sent with an implicit session.
 TestData.disableImplicitSessions = true;
 
-load("jstests/auth/lib/commands_lib.js");
-load("jstests/libs/fail_point_util.js");
-
-var roles = [
+export const roles = [
     {key: "read", role: "read", dbname: firstDbName},
     {key: "readLocal", role: {role: "read", db: "local"}, dbname: adminDbName},
     {key: "readAnyDatabase", role: "readAnyDatabase", dbname: adminDbName},
@@ -32,7 +38,8 @@ var roles = [
     {key: "backup", role: "backup", dbname: adminDbName},
     {key: "restore", role: "restore", dbname: adminDbName},
     {key: "root", role: "root", dbname: adminDbName},
-    {key: "__system", role: "__system", dbname: adminDbName}
+    {key: "searchCoordinator", role: "searchCoordinator", dbname: adminDbName},
+    {key: "__system", role: "__system", dbname: adminDbName},
 ];
 
 /**
@@ -48,42 +55,55 @@ var roles = [
  *   on test failure.
  */
 function testProperAuthorization(conn, t, testcase, r) {
-    var out = "";
+    let out = "";
 
-    var runOnDb = conn.getDB(testcase.runOnDb);
-    var state = authCommandsLib.setup(conn, t, runOnDb);
+    let authDb = conn.getDB(testcase.runOnDb);
+    let state = authCommandsLib.setup(conn, t, authDb);
     assert(r.db.auth("user|" + r.key, "password"));
-    authCommandsLib.authenticatedSetup(t, runOnDb);
-    var command = t.command;
-    if (typeof (command) === "function") {
+    authCommandsLib.authenticatedSetup(t, authDb);
+    let command = t.command;
+    if (typeof command === "function") {
         command = t.command(state, testcase.commandArgs);
     }
-    var res = runOnDb.runCommand(command);
+    let cmdDb = authDb;
+    if (t.hasOwnProperty("runOnDb")) {
+        assert.eq(typeof t.runOnDb, "function");
+        cmdDb = authDb.getSiblingDB(t.runOnDb(state));
+    }
+    let res = cmdDb.runCommand(command);
 
     if (testcase.roles[r.key]) {
         if (res.ok == 0 && res.code == authErrCode) {
-            out = "expected authorization success" +
-                " but received " + tojson(res) + " on db " + testcase.runOnDb + " with role " +
+            out =
+                "expected authorization success" +
+                " but received " +
+                tojson(res) +
+                " on db " +
+                testcase.runOnDb +
+                " with role " +
                 r.key;
         } else if (res.ok == 0 && !testcase.expectFail && res.code != commandNotSupportedCode) {
             // don't error if the test failed with code commandNotSupported since
             // some storage engines don't support some commands.
-            out = "command failed with " + tojson(res) + " on db " + testcase.runOnDb +
-                " with role " + r.key;
+            out = "command failed with " + tojson(res) + " on db " + testcase.runOnDb + " with role " + r.key;
         }
     } else {
         // Don't error if the test failed with CommandNotFound rather than an authorization failure
         // because some commands may be guarded by feature flags.
-        if (res.ok == 1 ||
-            (res.ok == 0 && res.code != authErrCode && res.code !== ErrorCodes.CommandNotFound)) {
-            out = "expected authorization failure" +
-                " but received result " + tojson(res) + " on db " + testcase.runOnDb +
-                " with role " + r.key;
+        if (res.ok == 1 || (res.ok == 0 && res.code != authErrCode && res.code !== ErrorCodes.CommandNotFound)) {
+            out =
+                "expected authorization failure" +
+                " but received result " +
+                tojson(res) +
+                " on db " +
+                testcase.runOnDb +
+                " with role " +
+                r.key;
         }
     }
 
     r.db.logout();
-    authCommandsLib.teardown(conn, t, runOnDb, res);
+    authCommandsLib.teardown(conn, t, authDb, res);
     return out;
 }
 
@@ -91,34 +111,42 @@ function testProperAuthorization(conn, t, testcase, r) {
  * First of two entry points for this test library.
  * To be invoked as an test argument to authCommandsLib.runTests().
  */
-function runOneTest(conn, t) {
-    var failures = [];
+export function runOneTest(conn, t) {
+    let failures = [];
 
     // Some tests requires mongot, however, setting this failpoint will make search queries to
     // return EOF, that way all the hassle of setting it up can be avoided.
-    let disableSearchFailpoint;
+    let disableSearchFailpointShard, disableSearchFailpointRouter;
     if (t.disableSearch) {
-        disableSearchFailpoint = configureFailPoint(conn.rs0 ? conn.rs0.getPrimary() : conn,
-                                                    'searchReturnEofImmediately');
+        disableSearchFailpointShard = configureFailPoint(
+            conn.rs0 ? conn.rs0.getPrimary() : conn,
+            "searchReturnEofImmediately",
+        );
+        if (conn.s) {
+            disableSearchFailpointRouter = configureFailPoint(conn.s, "searchReturnEofImmediately");
+        }
     }
 
-    for (var i = 0; i < t.testcases.length; i++) {
-        var testcase = t.testcases[i];
+    for (let i = 0; i < t.testcases.length; i++) {
+        let testcase = t.testcases[i];
         if (!("roles" in testcase)) {
             continue;
         }
-        for (var j = 0; j < roles.length; j++) {
-            var msg = testProperAuthorization(conn, t, testcase, roles[j]);
+        for (let j = 0; j < roles.length; j++) {
+            let msg = testProperAuthorization(conn, t, testcase, roles[j]);
             if (msg) {
                 failures.push(t.testname + ": " + msg);
             }
         }
     }
 
-    if (disableSearchFailpoint) {
-        disableSearchFailpoint.off();
+    if (disableSearchFailpointShard) {
+        disableSearchFailpointShard.off();
     }
 
+    if (disableSearchFailpointRouter) {
+        disableSearchFailpointRouter.off();
+    }
     return failures;
 }
 
@@ -126,13 +154,13 @@ function runOneTest(conn, t) {
  * Second entry point for this test library.
  * To be invoked as an test argument to authCommandsLib.runTests().
  */
-function createUsers(conn) {
-    var adminDb = conn.getDB(adminDbName);
+export function createUsers(conn) {
+    let adminDb = conn.getDB(adminDbName);
     adminDb.createUser({user: "admin", pwd: "password", roles: ["__system"]});
 
     assert(adminDb.auth("admin", "password"));
-    for (var i = 0; i < roles.length; i++) {
-        r = roles[i];
+    for (let i = 0; i < roles.length; i++) {
+        const r = roles[i];
         r.db = conn.getDB(r.dbname);
         r.db.createUser({user: "user|" + r.key, pwd: "password", roles: [r.role]});
     }
@@ -143,7 +171,7 @@ function createUsers(conn) {
  * This tests the authorization of commands with builtin roles for a given server configuration
  * represented in 'conn'.
  */
-function runAllCommandsBuiltinRoles(conn) {
+export function runAllCommandsBuiltinRoles(conn) {
     const testFunctionImpls = {createUsers: createUsers, runOneTest: runOneTest};
     authCommandsLib.runTests(conn, testFunctionImpls);
 }

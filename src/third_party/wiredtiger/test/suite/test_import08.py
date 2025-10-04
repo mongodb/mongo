@@ -34,8 +34,7 @@ from test_import01 import test_import_base
 from wtscenario import make_scenarios
 
 class test_import08(test_import_base):
-    conn_config = 'cache_size=50MB,log=(enabled)'
-    session_config = 'isolation=snapshot'
+    conn_config = 'cache_size=50MB'
 
     original_db_file = 'original_db_file'
     uri = 'file:' + original_db_file
@@ -46,7 +45,7 @@ class test_import08(test_import_base):
     values = [b'\x01\x02aaa\x03\x04', b'\x01\x02bbb\x03\x04', b'\x01\x02ccc\x03\x04',
               b'\x01\x02ddd\x03\x04', b'\x01\x02eee\x03\x04', b'\x01\x02fff\x03\x04']
     ts = [10*k for k in range(1, len(keys)+1)]
-    create_config = 'allocation_size=512,key_format=u,log=(enabled=true),value_format=u'
+    create_config = 'allocation_size=512,key_format=u,value_format=u'
     scenarios = make_scenarios([
         ('file_metadata', dict(repair=False)),
         ('repair', dict(repair=True)),
@@ -116,23 +115,25 @@ class test_import08(test_import_base):
         # allocated earlier.
         session2.rollback_transaction()
 
-        # Close the connection.
-        self.close_conn()
-
-        # Create a new database and connect to it.
+        # Create a new database.
         newdir = 'IMPORT_DB'
         shutil.rmtree(newdir, ignore_errors=True)
         os.mkdir(newdir)
+
+        # Copy over the datafiles for the object we want to import.
+        self.copy_file(self.original_db_file, '.', newdir)
+
+        # Close the connection.
+        self.close_conn()
+
+        # Connect to the new database.
         self.conn = self.setUpConnectionOpen(newdir)
         self.session = self.setUpSessionOpen(self.conn)
 
         # Bring forward the oldest to be past or equal to the timestamps we'll be importing.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(self.ts[-1]))
 
-        # Copy over the datafiles for the object we want to import.
-        self.copy_file(self.original_db_file, '.', newdir)
-
-        # Contruct the config string.
+        # Construct the config string.
         if self.repair:
             import_config = 'import=(enabled,repair=true)'
         else:
@@ -143,7 +144,7 @@ class test_import08(test_import_base):
         self.session.create(self.uri, import_config)
 
         # Verify object.
-        self.session.verify(self.uri)
+        self.verifyUntilSuccess(self.session, self.uri, None)
 
         # Check the write generation of the new table.
         #

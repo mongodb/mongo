@@ -28,7 +28,7 @@
 
 import codecs, filecmp
 from suite_subprocess import suite_subprocess
-import wiredtiger, wttest
+import wttest
 from wtscenario import make_scenarios
 
 # test_util18.py
@@ -51,7 +51,7 @@ class test_util18(wttest.WiredTigerTestCase, suite_subprocess):
     scenarios = make_scenarios(print_user_data)
 
     def conn_config(self):
-        return 'log=(archive=false,enabled,file_max=%dK)' % self.logmax
+        return 'log=(enabled,file_max=%dK,remove=false)' % self.logmax
 
     # Populate our test table with data we can check against in the printlog output.
     def populate(self):
@@ -189,6 +189,3 @@ class test_util18(wttest.WiredTigerTestCase, suite_subprocess):
         self.runWt(wt_args_beginning, outfilename='printlog-lsn-offset-beginning.out')
         self.runWt(wt_args_first, outfilename='printlog-lsn-offset-first.out')
         self.assertTrue(filecmp.cmp('printlog-lsn-offset-beginning.out', 'printlog-lsn-offset-first.out'))
-
-if __name__ == '__main__':
-    wttest.run()

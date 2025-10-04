@@ -1,0 +1,68 @@
+// Copyright The OpenTelemetry Authors
+// SPDX-License-Identifier: Apache-2.0
+
+// clang-format off
+Create@OStreamSpanExporterFactory@trace@exporter@v1@opentelemetry
+Create@SimpleSpanProcessorFactory@trace@sdk@v1@opentelemetry
+Create@TracerProviderFactory@trace@sdk@v1@opentelemetry
+Create@LoggerProviderFactory@logs@sdk@v1@opentelemetry
+Create@BatchLogRecordProcessorFactory@logs@sdk@v1@opentelemetry
+Create@SimpleLogRecordProcessorFactory@logs@sdk@v1@opentelemetry
+Create@MultiLogRecordProcessorFactory@logs@sdk@v1@opentelemetry
+TracerProvider@trace@sdk@v1@opentelemetry
+LoggerProvider@logs@sdk@v1@opentelemetry
+OStreamLogRecordExporter@logs@exporter@v1@opentelemetry
+Create@OStreamMetricExporterFactory@metrics@exporter@v1@opentelemetry
+Create@PeriodicExportingMetricReaderFactory@metrics@sdk@v1@opentelemetry
+Create@MeterProviderFactory@metrics@sdk@v1@opentelemetry
+Create@MeterContextFactory@metrics@sdk@v1@opentelemetry
+Create@ViewFactory@metrics@sdk@v1@opentelemetry
+Create@MeterSelectorFactory@metrics@sdk@v1@opentelemetry
+Create@InstrumentSelectorFactory@metrics@sdk@v1@opentelemetry
+AddMetricReader@MeterContext@metrics@sdk@v1@opentelemetry
+AddMetricReader@MeterProvider@metrics@sdk@v1@opentelemetry
+MeterProvider@metrics@sdk@v1@opentelemetry
+AddView@MeterProvider@metrics@sdk@v1@opentelemetry
+
+#if defined(WITH_OTLP_GRPC) || defined(WITH_OTLP_HTTP)
+GetOtlpDefaultTracesTimeout@otlp@exporter@v1@opentelemetry
+GetOtlpDefaultTracesHeaders@otlp@exporter@v1@opentelemetry
+GetOtlpDefaultLogsTimeout@otlp@exporter@v1@opentelemetry
+GetOtlpDefaultLogsHeaders@otlp@exporter@v1@opentelemetry
+GetOtlpDefaultMetricsTimeout@otlp@exporter@v1@opentelemetry
+GetOtlpDefaultMetricsHeaders@otlp@exporter@v1@opentelemetry
+GetOtlpDefaultTracesSslCertificatePath@otlp@exporter@v1@opentelemetry
+GetOtlpDefaultMetricsSslCertificatePath@otlp@exporter@v1@opentelemetry
+GetOtlpDefaultLogsSslCertificatePath@otlp@exporter@v1@opentelemetry
+GetOtlpDefaultTracesSslCertificateString@otlp@exporter@v1@opentelemetry
+GetOtlpDefaultMetricsSslCertificateString@otlp@exporter@v1@opentelemetry
+GetOtlpDefaultLogsSslCertificateString@otlp@exporter@v1@opentelemetry
+#endif  // defined(WITH_OTLP_GRPC) || defined(WITH_OTLP_HTTP)
+
+#if defined(WITH_OTLP_GRPC)
+Create@OtlpGrpcExporterFactory@otlp@exporter@v1@opentelemetry
+Create@OtlpGrpcMetricExporterFactory@otlp@exporter@v1@opentelemetry
+Create@OtlpGrpcLogRecordExporterFactory@otlp@exporter@v1@opentelemetry
+OtlpGrpcExporterOptions@otlp@exporter@v1@opentelemetry
+OtlpGrpcMetricExporterOptions@otlp@exporter@v1@opentelemetry
+OtlpGrpcLogRecordExporterOptions@otlp@exporter@v1@opentelemetry
+GetOtlpDefaultGrpcTracesEndpoint@otlp@exporter@v1@opentelemetry
+GetOtlpDefaultGrpcMetricsEndpoint@otlp@exporter@v1@opentelemetry
+GetOtlpDefaultGrpcLogsEndpoint@otlp@exporter@v1@opentelemetry
+GetOtlpDefaultGrpcTracesIsInsecure@otlp@exporter@v1@opentelemetry
+GetOtlpDefaultGrpcMetricsIsInsecure@otlp@exporter@v1@opentelemetry
+GetOtlpDefaultGrpcLogsIsInsecure@otlp@exporter@v1@opentelemetry
+#endif  // defined(WITH_OTLP_GRPC)
+
+#if defined(WITH_OTLP_HTTP)
+Create@OtlpHttpExporterFactory@otlp@exporter@v1@opentelemetry
+Create@OtlpHttpMetricExporterFactory@otlp@exporter@v1@opentelemetry
+Create@OtlpHttpLogRecordExporterFactory@otlp@exporter@v1@opentelemetry
+OtlpHttpExporterOptions@otlp@exporter@v1@opentelemetry
+OtlpHttpMetricExporterOptions@otlp@exporter@v1@opentelemetry
+OtlpHttpLogRecordExporterOptions@otlp@exporter@v1@opentelemetry
+GetOtlpDefaultHttpTracesEndpoint@otlp@exporter@v1@opentelemetry
+GetOtlpDefaultHttpMetricsEndpoint@otlp@exporter@v1@opentelemetry
+GetOtlpDefaultHttpLogsEndpoint@otlp@exporter@v1@opentelemetry
+#endif  // defined(WITH_OTLP_HTTP)
+// clang-format on

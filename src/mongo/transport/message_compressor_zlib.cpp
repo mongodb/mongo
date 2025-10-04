@@ -27,15 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <memory>
-
-#include "mongo/base/init.h"
-#include "mongo/transport/message_compressor_registry.h"
 #include "mongo/transport/message_compressor_zlib.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
+#include "mongo/transport/message_compressor_registry.h"
+
+#include <memory>
+#include <string>
+
+#include <zconf.h>
 #include <zlib.h>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 

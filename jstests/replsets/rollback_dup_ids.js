@@ -1,10 +1,7 @@
 // When run with --majorityReadConcern=off, this test reproduces the bug described in SERVER-38925,
 // where rolling back a delete followed by a restart produces documents with duplicate _id.
-// @tags: [requires_persistence, requires_journaling]
-(function() {
-"use strict";
-
-load("jstests/replsets/libs/rollback_test.js");
+// @tags: [requires_persistence]
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 TestData.rollbackShutdowns = true;
 TestData.allowUncleanShutdowns = true;
@@ -40,4 +37,3 @@ rollbackTest.restartNode(0, 9);
 
 // Check the replica set.
 rollbackTest.stop();
-}());

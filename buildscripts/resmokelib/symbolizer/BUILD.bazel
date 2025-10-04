@@ -1,0 +1,8 @@
+py_library(
+    name = "symbolizer",
+    srcs = [
+        "__init__.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = ["//buildscripts:mongosymb"],
+)

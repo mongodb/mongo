@@ -12,9 +12,8 @@
  * The second reconfig should then increase its priority to the desired level.
  */
 
-(function() {
-"use strict";
-load("jstests/replsets/rslib.js");
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {assertVoteCount, waitForNewlyAddedRemovalForNodeToBeCommitted} from "jstests/replsets/rslib.js";
 
 {
     jsTestLog("Testing reconfig from PA set to PSA set fails");
@@ -23,7 +22,7 @@ load("jstests/replsets/rslib.js");
         nodes: [{}, {rsConfig: {arbiterOnly: true}}],
     });
     rst.startSet();
-    rst.initiateWithHighElectionTimeout();
+    rst.initiate();
 
     const primary = rst.getPrimary();
     assertVoteCount(primary, {
@@ -45,8 +44,10 @@ load("jstests/replsets/rslib.js");
     config.version += 1;
     jsTestLog(`New config with secondary added: ${tojson(config)}`);
 
-    assert.commandFailedWithCode(primary.adminCommand({replSetReconfig: config}),
-                                 ErrorCodes.NewReplicaSetConfigurationIncompatible);
+    assert.commandFailedWithCode(
+        primary.adminCommand({replSetReconfig: config}),
+        ErrorCodes.NewReplicaSetConfigurationIncompatible,
+    );
 
     // Verify that the vote counts have not changed, since the reconfig did not successfully
     // complete.
@@ -70,7 +71,7 @@ load("jstests/replsets/rslib.js");
         nodes: [{}, {rsConfig: {votes: 0, priority: 0}}, {rsConfig: {arbiterOnly: true}}],
     });
     rst.startSet();
-    rst.initiateWithHighElectionTimeout();
+    rst.initiate();
 
     const primary = rst.getPrimary();
     assertVoteCount(primary, {
@@ -89,10 +90,13 @@ load("jstests/replsets/rslib.js");
     config.members[1].priority = 1;
     jsTestLog(
         `New config with secondary reconfigured to have {votes: 1, priority: 1}: 
-              ${tojson(config)}`);
+              ${tojson(config)}`,
+    );
 
-    assert.commandFailedWithCode(primary.adminCommand({replSetReconfig: config}),
-                                 ErrorCodes.NewReplicaSetConfigurationIncompatible);
+    assert.commandFailedWithCode(
+        primary.adminCommand({replSetReconfig: config}),
+        ErrorCodes.NewReplicaSetConfigurationIncompatible,
+    );
 
     // Verify that the vote counts have not changed, since the reconfig did not successfully
     // complete.
@@ -109,12 +113,13 @@ load("jstests/replsets/rslib.js");
 
 {
     jsTestLog(
-        "Testing that the correct workflow for converting a replica set with only one writable voting node to a PSA architecture succeeds");
+        "Testing that the correct workflow for converting a replica set with only one writable voting node to a PSA architecture succeeds",
+    );
     const rst = new ReplSetTest({
         nodes: [{}, {rsConfig: {arbiterOnly: true}}],
     });
     rst.startSet();
-    rst.initiateWithHighElectionTimeout();
+    rst.initiate();
 
     const primary = rst.getPrimary();
     assertVoteCount(primary, {
@@ -133,8 +138,7 @@ load("jstests/replsets/rslib.js");
     const newConfig = rst.getReplSetConfig();
     config.members = newConfig.members;
     config.version += 1;
-    jsTestLog(`Reconfiguring set to add a secondary with {votes: 1: priority: 0. New config: ${
-        tojson(config)}`);
+    jsTestLog(`Reconfiguring set to add a secondary with {votes: 1: priority: 0. New config: ${tojson(config)}`);
     assert.commandWorked(primary.adminCommand({replSetReconfig: config}));
     waitForNewlyAddedRemovalForNodeToBeCommitted(primary, 2 /* memberIndex */);
 
@@ -143,15 +147,14 @@ load("jstests/replsets/rslib.js");
         majorityVoteCount: 2,
         writableVotingMembersCount: 2,
         writeMajorityCount: 2,
-        totalMembersCount: 3
+        totalMembersCount: 3,
     });
 
     // Second, give the secondary a non-zero priority level.
     config = rst.getReplSetConfigFromNode();
     config.members[1].priority = 1;
     config.version += 1;
-    jsTestLog(`Reconfiguring set to give the secondary a positive priority. New config: ${
-        tojson(config)}`);
+    jsTestLog(`Reconfiguring set to give the secondary a positive priority. New config: ${tojson(config)}`);
     assert.commandWorked(primary.adminCommand({replSetReconfig: config}));
 
     assertVoteCount(primary, {
@@ -159,9 +162,8 @@ load("jstests/replsets/rslib.js");
         majorityVoteCount: 2,
         writableVotingMembersCount: 2,
         writeMajorityCount: 2,
-        totalMembersCount: 3
+        totalMembersCount: 3,
     });
 
     rst.stopSet();
 }
-})();

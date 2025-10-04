@@ -1,0 +1,2663 @@
+# This file contains resmoke tasks that are owned by Query Server Team division
+
+################################################
+#                   Variable                   #
+################################################
+variables:
+  # Used when the tests it runs depend only on mongod, mongos, the jstestshell and the tools.
+  # THIS HAS COPIES IN
+  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
+  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/durable_transactions_and_availability/tasks.yml
+  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/tasks.yml
+  # - etc/evergreen_yml_components/tasks/resmoke/non_server_teams/tasks.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &task_template
+    name: template
+    depends_on:
+      - name: archive_dist_test
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          resmoke_args: --help
+          resmoke_jobs_max: 0 # No cap on number of jobs.
+
+  # THIS HAS COPIES IN
+  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
+  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/durable_transactions_and_availability/tasks.yml
+  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/tasks.yml
+  # - etc/evergreen_yml_components/tasks/resmoke/non_server_teams/tasks.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &gen_task_template
+    name: gen_task_template
+    depends_on:
+      - name: version_gen
+        variant: generate-tasks-for-version
+        # This is added because of EVG-18211.
+        # Without this we are adding extra dependencies on evergreen and it is causing strain
+        omit_generated_tasks: true
+      - name: archive_dist_test
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          resmoke_args: --help
+
+  # THIS HAS COPIES IN
+  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
+  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/durable_transactions_and_availability/tasks.yml
+  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/tasks.yml
+  # - etc/evergreen_yml_components/tasks/resmoke/non_server_teams/tasks.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &benchmark_template
+    name: benchmark_template
+    depends_on:
+      - name: compile_upload_benchmarks
+    commands:
+      - func: "do benchmark setup"
+      - func: "run benchmark tests"
+        vars:
+          resmoke_args: --help
+          resmoke_jobs_max: 1
+          suite: benchmark_suite
+
+  # THIS HAS COPIES IN
+  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
+  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/durable_transactions_and_availability/tasks.yml
+  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/tasks.yml
+  # - etc/evergreen_yml_components/tasks/resmoke/non_server_teams/tasks.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &jstestfuzz_config_vars
+    is_jstestfuzz: true
+    num_files: 15
+    num_tasks: 5 # Upperbound by `max_sub_suites` specified through the variant with each task still running `num_files` files.
+    # It is error prone to require each fuzzer-related Evergreen task to need to override the
+    # resmoke_args variable. However, the resmoke_args variable must be defined as a string in the
+    # task generation configuration to satisfy mongodb/mongo-task-generator. We therefore specify an
+    # empty string for the variable to reflect there are no additional arguments provided to resmoke
+    # by default for the fuzzer-related tasks.
+    resmoke_args: ""
+    resmoke_jobs_max: 1
+    should_shuffle: false
+    continue_on_failure: false
+    # Terminate the function when there has been no output to stdout for 30 minutes. E.g. when something is stuck in an infinite loop.
+    # resmoke.py writes the test output to logkeeper and only writes to stdout when starting the next test.
+    # resmoke.py not producing output on stdout means that the test is still running and presumably not going to finish.
+    # Note that timeout_secs is different from exec_timeout_secs, which applies to a task and times out regardless of whether output has been written to stdout.
+    timeout_secs: 1800
+
+  # Used for tests that invoke 'resmoke.py --suites=jstestfuzz*'.
+  # THIS HAS COPIES IN
+  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
+  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/durable_transactions_and_availability/tasks.yml
+  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/tasks.yml
+  # - etc/evergreen_yml_components/tasks/resmoke/non_server_teams/tasks.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &jstestfuzz_template
+    name: jstestfuzz_template
+    exec_timeout_secs: 14400 # Time out the task if it runs for more than 4 hours.
+    depends_on:
+      - name: version_gen
+        variant: generate-tasks-for-version
+        # This is added because of EVG-18211.
+        # Without this we are adding extra dependencies on evergreen and it is causing strain
+        omit_generated_tasks: true
+      - archive_dist_test
+    commands:
+      - func: "generate resmoke tasks"
+
+################################################
+#                    Tasks                     #
+################################################
+tasks:
+  ################################################
+  #            Query Execution tasks             #
+  ################################################
+
+  - <<: *task_template
+    name: aggregation
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "release_critical",
+        "aggregation",
+        "common",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: aggregation_auth
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "release_critical",
+        "incompatible_mac",
+        "incompatible_windows",
+        "aggregation",
+        "auth",
+        "common",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  ## Standalone generational fuzzer for multiversion aggregation expressions ##
+  - <<: *jstestfuzz_template
+    name: aggregation_expression_multiversion_fuzzer_gen
+    # TODO SERVER-82766: multiversion fuzzers had been timing out on TSAN builds.
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "non_deterministic",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
+        "aggfuzzer",
+        "multiversion",
+        "require_npm",
+        "random_name",
+      ]
+    commands:
+      - func: "initialize multiversion tasks"
+        vars:
+          aggregation_expression_multiversion_fuzzer_last_lts: last_lts
+          aggregation_expression_multiversion_fuzzer_last_continuous: last_continuous
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          num_files: 20
+          num_tasks: 20
+          resmoke_args: >-
+            --mongodSetParameters='{logComponentVerbosity: {command: 2}}'
+            --runNoFeatureFlagTests
+          npm_command: agg-expr-fuzzer
+
+  - <<: *task_template
+    name: aggregation_facet_unwind_passthrough
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "aggregation",
+        "unwind",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  # In order to share binaries with downstream patches on 10gen/mongot, for each variant this task is included in
+  # it writes the S3 binary tarball link to downstream_expansions.yml.
+  - <<: *task_template
+    name: set_downstream_expansions_for_mongot
+    tags: ["assigned_to_jira_team_server_query_integration", "experimental"]
+    commands:
+      - func: "write and set downstream expansions"
+
+  - <<: *task_template
+    name: aggregation_mongos_passthrough
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "aggregation",
+        "no_async",
+        "requires_large_host",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  ## Standalone generational fuzzer for multiversion aggregation pipelines ##
+  - <<: *jstestfuzz_template
+    name: aggregation_multiversion_fuzzer_gen
+    # TODO SERVER-82766: multiversion fuzzers had been timing out on TSAN builds.
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "non_deterministic",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
+        "aggfuzzer",
+        "common",
+        "multiversion",
+        "require_npm",
+        "random_name",
+        "future_git_tag_incompatible",
+      ]
+    commands:
+      - func: "initialize multiversion tasks"
+        vars:
+          aggregation_multiversion_fuzzer_last_lts: last_lts
+          aggregation_multiversion_fuzzer_last_continuous: last_continuous
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          num_files: 20
+          num_tasks: 20
+          resmoke_args: >-
+            --mongodSetParameters='{logComponentVerbosity: {command: 2}}'
+            --runNoFeatureFlagTests
+          jstestfuzz_vars: --numPipelines=3000
+          npm_command: agg-fuzzer
+
+  ## Like "aggregation_multiversion_fuzzer_gen", but it uses a pinned git revision for the
+  ## "jstestfuzz" repo and it uses a fixed seed.
+  - <<: *jstestfuzz_template
+    name: aggregation_multiversion_fuzzer_deterministic_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "auxiliary",
+        "fuzzer_deterministic",
+        "common",
+        "multiversion",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "incompatible_windows",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
+        "require_npm",
+        "random_name",
+        "future_git_tag_incompatible",
+      ]
+    commands:
+      - func: "initialize multiversion tasks"
+        vars:
+          aggregation_multiversion_fuzzer_deterministic_last_lts: last_lts
+          aggregation_multiversion_fuzzer_deterministic_last_continuous: last_continuous
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          # This task used a fixed git revision for the jstestfuzz repo. As changes are made
+          # to the mongo repo over time, the fixed jstestfuzz git rev used here will need to
+          # be updated every so often (once every few months).
+          num_files: 11
+          num_tasks: 4
+          npm_command: agg-fuzzer
+          suite: aggregation_multiversion_fuzzer
+          use_large_distro: "true"
+          resmoke_args: >-
+            --mongodSetParameters='{logComponentVerbosity: {command: 2}}'
+            --runNoFeatureFlagTests
+          jstestfuzz_vars: --metaSeed 1726779665485 --jstestfuzzGitRev e6630c1a41c8fb186544654d27f5c803f01ca3ca
+
+  - <<: *task_template
+    name: aggregation_one_shard_sharded_collections
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "aggregation",
+        "no_async",
+        "sharded",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: aggregation_read_concern_majority_passthrough
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "release_critical",
+        "incompatible_mac",
+        "aggregation",
+        "read_write_concern",
+        "requires_large_host",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          resmoke_jobs_factor: 0.5
+
+  - <<: *gen_task_template
+    name: aggregation_secondary_reads_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "aggregation",
+        "secondary_reads",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_jobs_max: 1
+
+  - <<: *task_template
+    name: aggregation_sharded_collections_causally_consistent_passthrough
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "aggregation",
+        "secondary_reads",
+        "sharded",
+        "requires_large_host",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: aggregation_sharded_collections_passthrough
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "release_critical",
+        "incompatible_mac",
+        "aggregation",
+        "common",
+        "sharded",
+        "requires_large_host",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  ## Standalone fuzzer for checking timeseries optimizations correctness ##
+  - <<: *jstestfuzz_template
+    name: aggregation_timeseries_fuzzer_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "release_critical",
+        "incompatible_development_variant",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "incompatible_debug_mode",
+        "aggfuzzer",
+        "common",
+        "timeseries",
+        "require_npm",
+        "random_name",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          # We have seen some common scenarios where the generated pipelines take a while to run and can
+          # hit some timeouts. We'll split 70000 pipelines across 70 files, compared to 80000 pipelines
+          # across 20 files in the other generational agg fuzzers. This approach can be considered if we
+          # see similar timeouts elsewhere. It is not well understood whether/how we could pass
+          # 'numPipelines' as an argument in the yaml here, but it works as part of the
+          # 'jstestfuzz_vars' argument string. If a future reader better understands this evergreen
+          # integration, please update this comment and/or move numPipelines to a yaml arg here.
+          #
+          # Generating the tests can use a large amount of memory, so we use a large distro.
+          use_large_distro: "true"
+          num_files: 70
+          num_tasks: 20
+          jstestfuzz_vars: --diffTestingMode timeseries --numPipelines=750
+          npm_command: agg-fuzzer
+          suite: generational_fuzzer
+          resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+
+  ## Like "aggregation_timeseries_fuzzer_gen", but it uses a pinned git revision for the
+  ## "jstestfuzz" repo and it uses a fixed seed.
+  - <<: *jstestfuzz_template
+    name: aggregation_timeseries_fuzzer_deterministic_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "auxiliary",
+        "fuzzer_deterministic",
+        "common",
+        "timeseries",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "incompatible_windows",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
+        "require_npm",
+        "random_name",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          # This task used a fixed git revision for the jstestfuzz repo. As changes are made
+          # to the mongo repo over time, the fixed jstestfuzz git rev used here will need to
+          # be updated every so often (once every few months).
+          num_files: 28
+          num_tasks: 4
+          npm_command: agg-fuzzer
+          suite: generational_fuzzer
+          use_large_distro: "true"
+          resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+          jstestfuzz_vars: --diffTestingMode timeseries --numPipelines=1000 --metaSeed 1726779665485 --jstestfuzzGitRev 8ddd8f12cab0
+
+  ## Standalone fuzzer for checking block_processing correctness ##
+  - <<: *jstestfuzz_template
+    name: aggregation_blockprocessing_fuzzer_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "release_critical",
+        "incompatible_development_variant",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "aggfuzzer",
+        "common",
+        "timeseries",
+        "blockprocessing",
+        "require_npm",
+        "random_name",
+        "no_debug_mode",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          # We have seen some common scenarios where the generated pipelines take a while to run and can
+          # hit some timeouts. We'll split 70000 pipelines across 70 files, compared to 80000 pipelines
+          # across 20 files in the other generational agg fuzzers. This approach can be considered if we
+          # see similar timeouts elsewhere. It is not well understood whether/how we could pass
+          # 'numPipelines' as an argument in the yaml here, but it works as part of the
+          # 'jstestfuzz_vars' argument string. If a future reader better understands this evergreen
+          # integration, please update this comment and/or move numPipelines to a yaml arg here.
+          #
+          # Generating the tests can use a large amount of memory, so we use a large distro.
+          use_large_distro: "true"
+          num_files: 70
+          num_tasks: 20
+          jstestfuzz_vars: --diffTestingMode blockprocessing --numPipelines=750
+          npm_command: agg-fuzzer
+          suite: generational_fuzzer
+          resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+
+  ## Standalone fuzzer for checking wildcard index correctness ##
+  - <<: *jstestfuzz_template
+    name: aggregation_wildcard_fuzzer_gen
+    # TODO SERVER-85881: Re-enable wildcard fuzzers on debug builds by removing "incompatible_debug_mode" tag.
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "release_critical",
+        "incompatible_development_variant",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "incompatible_debug_mode",
+        "aggfuzzer",
+        "common",
+        "wildcard",
+        "require_npm",
+        "random_name",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          use_large_distro: "true"
+          num_files: 10
+          num_tasks: 40
+          jstestfuzz_vars: --diffTestingMode wildcard
+          npm_command: agg-fuzzer
+          suite: generational_fuzzer
+          resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+
+  - <<: *benchmark_template
+    name: benchmarks_expression
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "experimental",
+        "benchmarks",
+      ]
+    commands:
+      - func: "do benchmark setup"
+      - func: "run benchmark tests"
+        vars:
+          suite: benchmarks_expression
+          exec_timeout_secs: 18000 # 5 hour timeout.
+          resmoke_jobs_max: 1
+
+  - <<: *benchmark_template
+    name: benchmarks_expression_sbe
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "experimental",
+        "benchmarks",
+      ]
+    commands:
+      - func: "do benchmark setup"
+      - func: "run benchmark tests"
+        vars:
+          suite: benchmarks_expression_sbe
+          exec_timeout_secs: 18000 # 5 hour timeout.
+          resmoke_jobs_max: 1
+
+  - <<: *task_template
+    name: change_streams
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "change_streams",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *gen_task_template
+    name: change_streams_downgrade_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "experimental",
+        "multiversion_passthrough",
+        "multiversion",
+      ]
+    commands:
+      - func: "initialize multiversion tasks"
+        vars:
+          change_streams_downgrade_last_continuous_new_old_old_new: last_continuous
+          change_streams_downgrade_last_lts_new_old_old_new: last_lts
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_args: >-
+            --runNoFeatureFlagTests
+
+  - <<: *task_template
+    name: change_streams_mongos_sessions_passthrough
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "change_streams",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: change_streams_multi_stmt_txn_mongos_passthrough
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "change_streams",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: change_streams_multi_stmt_txn_passthrough
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "change_streams",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: change_streams_multi_stmt_txn_sharded_collections_passthrough
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "change_streams",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *gen_task_template
+    name: change_streams_multiversion_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "experimental",
+        "multiversion",
+        "multiversion_passthrough",
+      ]
+    commands:
+      - func: "initialize multiversion tasks"
+        vars:
+          change_streams_last_continuous_new_new_old: last_continuous
+          change_streams_last_continuous_new_old_new: last_continuous
+          change_streams_last_continuous_old_new_new: last_continuous
+          change_streams_last_lts_new_new_old: last_lts
+          change_streams_last_lts_new_old_new: last_lts
+          change_streams_last_lts_old_new_new: last_lts
+      - func: "generate resmoke tasks"
+        vars:
+          resmoke_args: >-
+            --runNoFeatureFlagTests
+
+  - <<: *task_template
+    name: change_streams_per_shard_cursor_passthrough
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "change_streams",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: change_streams_secondary_reads_sharded_collections
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "change_streams",
+        "secondary_reads",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *gen_task_template
+    name: change_streams_sharded_collections_multiversion_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "change_streams",
+        "experimental",
+        "multiversion_passthrough",
+        "multiversion",
+      ]
+    commands:
+      - func: "initialize multiversion tasks"
+        vars:
+          change_streams_sharded_collections_passthrough_last_continuous_new_old_old_new: last_continuous
+          change_streams_sharded_collections_passthrough_last_lts_new_old_old_new: last_lts
+      - func: "generate resmoke tasks"
+        vars:
+          resmoke_args: >-
+            --runNoFeatureFlagTests
+
+  - <<: *gen_task_template
+    name: change_streams_sharded_collections_query_shape_hash_stability_multiversion_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "change_streams",
+        "experimental",
+        "incompatible_aubsan",
+        "incompatible_tsan",
+        "multiversion_passthrough",
+        "multiversion",
+      ]
+    commands:
+      - func: "initialize multiversion tasks"
+        vars:
+          change_streams_sharded_collections_query_shape_hash_stability_last_lts_new_old: last_lts
+          change_streams_sharded_collections_query_shape_hash_stability_last_continuous_new_old: last_continuous
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_args: >-
+            --runNoFeatureFlagTests
+
+  - <<: *task_template
+    name: change_streams_whole_cluster_passthrough
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "change_streams",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: change_streams_whole_cluster_secondary_reads_sharded_collections
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "change_streams",
+        "secondary_reads",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: change_streams_whole_db_passthrough
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "change_streams",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: change_streams_whole_db_secondary_reads_sharded_collections
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "change_streams",
+        "secondary_reads",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *gen_task_template
+    name: concurrency_compute_mode_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "incompatible_debug_mode",
+        "concurrency",
+        "no_passthrough",
+        "compute_mode",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: concurrency_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "release_critical",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "concurrency",
+        "common",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: aggregation_mongos_pqs_fallback_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
+        "incompatible_tsan",
+        "default",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: aggregation_mongos_pqs_hints_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "incompatible_aubsan",
+        "incompatible_tsan",
+        "default",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: aggregation_pqs_fallback_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "incompatible_aubsan",
+        "incompatible_tsan",
+        "default",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: aggregation_pqs_hints_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "incompatible_aubsan",
+        "incompatible_tsan",
+        "default",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: aggregation_sharded_collections_pqs_fallback_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
+        "incompatible_tsan",
+        "default",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: aggregation_sharded_collections_pqs_hints_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "incompatible_aubsan",
+        "incompatible_tsan",
+        "default",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: replica_sets_jscore_pqs_fallback_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "incompatible_aubsan",
+        "incompatible_tsan",
+        "default",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: replica_sets_jscore_pqs_hints_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "incompatible_aubsan",
+        "incompatible_tsan",
+        "default",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: replica_sets_jscore_pqs_index_filters_gen
+    # Not every build variant speaks 'sbe_only' and this suite requires SBE
+    # which can be enforced by 'requires_all_feature_flags'
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "sbe_only",
+        "requires_all_feature_flags",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: sharded_collections_pqs_fallback_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "incompatible_aubsan",
+        "incompatible_tsan",
+        "default",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: sharded_collections_pqs_hints_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "incompatible_aubsan",
+        "incompatible_tsan",
+        "default",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: sharded_collections_pqs_index_filters_gen
+    # Not every build variant speaks 'sbe_only' and this suite requires SBE
+    # which can be enforced by 'requires_all_feature_flags'
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "sbe_only",
+        "requires_all_feature_flags",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: sharding_pqs_fallback_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "incompatible_aubsan",
+        "incompatible_tsan",
+        "default",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: sharding_pqs_hints_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "incompatible_aubsan",
+        "incompatible_tsan",
+        "default",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: sharding_pqs_index_filters_gen
+    # Not every build variant speaks 'sbe_only' and this suite requires SBE
+    # which can be enforced by 'requires_all_feature_flags'
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "sbe_only",
+        "requires_all_feature_flags",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: aggregation_sharded_collections_query_shape_hash_stability_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "incompatible_aubsan",
+        "incompatible_tsan",
+        "default",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: sharded_collections_query_shape_hash_stability_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "incompatible_aubsan",
+        "incompatible_tsan",
+        "default",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: aggregation_sharded_collections_query_shape_hash_stability_multiversion_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "incompatible_aubsan",
+        "incompatible_tsan",
+        "multiversion_passthrough",
+        "multiversion",
+        "experimental",
+      ]
+    commands:
+      - func: "initialize multiversion tasks"
+        vars:
+          aggregation_sharded_collections_query_shape_hash_stability_last_lts_new_old: last_lts
+          aggregation_sharded_collections_query_shape_hash_stability_last_continuous_new_old: last_continuous
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_args: >-
+            --runNoFeatureFlagTests
+
+  - <<: *gen_task_template
+    name: sharded_collections_query_shape_hash_stability_multiversion_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "incompatible_aubsan",
+        "incompatible_tsan",
+        "multiversion_passthrough",
+        "multiversion",
+        "experimental",
+      ]
+    commands:
+      - func: "initialize multiversion tasks"
+        vars:
+          sharded_collections_query_shape_hash_stability_last_lts_new_old: last_lts
+          sharded_collections_query_shape_hash_stability_last_continuous_new_old: last_continuous
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_args: >-
+            --runNoFeatureFlagTests
+
+  - <<: *task_template
+    name: jsCore
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "development_critical",
+        "requires_large_host",
+        "requires_large_host_commit_queue",
+        "jscore",
+        "common",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: core
+
+  - <<: *gen_task_template
+    name: jsCore_in_parts_gen
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          suite: core
+          use_large_distro: "true"
+          fallback_num_sub_suites: 2
+
+  ## jstestfuzz ##
+  - <<: *jstestfuzz_template
+    name: jstestfuzz_gen
+    # TODO(SERVER-69996) remove "incompatible_debug_mode" tag
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "incompatible_debug_mode",
+        "jstestfuzz",
+        "non_deterministic",
+        "common",
+        "require_npm",
+        "random_name",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          jstestfuzz_vars: --jsTestsDir ../jstests
+          suite: jstestfuzz
+          resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+          npm_command: jstestfuzz
+
+  ## jstestfuzz standalone fuzzer for checking find equivalence with and without plan cache ##
+  - <<: *jstestfuzz_template
+    name: query_fuzzer_plan_cache_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "non_deterministic",
+        "query_fuzzer",
+        "require_npm",
+        "random_name",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          num_files: 20
+          num_tasks: 20
+          jstestfuzz_vars: --diffTestingMode plan_cache
+          npm_command: query-fuzzer
+          suite: generational_fuzzer
+          resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+
+  ## jstestfuzz sharded fuzzer for checking find and aggregate equivalence ##
+  - <<: *jstestfuzz_template
+    name: query_fuzzer_sharded_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "non_deterministic",
+        "query_fuzzer",
+        "require_npm",
+        "random_name",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          num_files: 20
+          num_tasks: 20
+          jstestfuzz_vars: --diffTestingMode sharded
+          npm_command: query-fuzzer
+          suite: generational_fuzzer
+          resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+
+  ## jstestfuzz standalone fuzzer for checking find and aggregate equivalence ##
+  - <<: *jstestfuzz_template
+    name: query_fuzzer_standalone_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "non_deterministic",
+        "query_fuzzer",
+        "require_npm",
+        "random_name",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          num_files: 20
+          num_tasks: 20
+          jstestfuzz_vars: --diffTestingMode standalone
+          npm_command: query-fuzzer
+          suite: generational_fuzzer
+          resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+
+  - <<: *task_template
+    name: search
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "release_critical",
+        "incompatible_community",
+        "incompatible_mac",
+        "incompatible_windows",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "requires_large_host",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          resmoke_jobs_max: 1
+
+  - <<: *task_template
+    name: search_community
+    tags:
+      [
+        "assigned_to_jira_team_server_query_integration",
+        "release_critical",
+        "search_community_mongotmock",
+        "incompatible_mac",
+        "incompatible_windows",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "requires_large_host",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          resmoke_jobs_max: 10
+
+  - <<: *task_template
+    name: search_community_ssl
+    tags:
+      [
+        "assigned_to_jira_team_server_query_integration",
+        "release_critical",
+        "search_community_mongotmock",
+        "incompatible_mac",
+        "incompatible_windows",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "requires_large_host",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          resmoke_jobs_max: 10
+
+  - <<: *task_template
+    name: search_auth
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "release_critical",
+        "incompatible_community",
+        "incompatible_mac",
+        "incompatible_windows",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "requires_large_host",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          resmoke_jobs_max: 1
+
+  - <<: *task_template
+    name: mongot_e2e_sharded_collections
+    tags:
+      [
+        "assigned_to_jira_team_server_query_integration",
+        "default",
+        "incompatible_windows",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "mongot_e2e_tests",
+        "requires_large_host",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "get mongot version"
+      - func: "run tests"
+        vars:
+          # This is set to 5 jobs as the default evergreen concurrency level (~10 jobs) can cause
+          # OOM errors when constructing a vector search index. This number was chosen based off
+          # heuristics to avoid OOM errors while not slowing down patch builds too much.
+          resmoke_jobs_max: 5
+
+  - <<: *task_template
+    name: mongot_e2e_single_node
+    tags:
+      [
+        "assigned_to_jira_team_server_query_integration",
+        "default",
+        "incompatible_windows",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "mongot_e2e_tests",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "get mongot version"
+      - func: "run tests"
+        vars:
+          resmoke_jobs_max: 1
+
+  - <<: *task_template
+    name: mongot_e2e_single_shard
+    tags:
+      [
+        "assigned_to_jira_team_server_query_integration",
+        "default",
+        "incompatible_windows",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "mongot_e2e_tests",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "get mongot version"
+      - func: "run tests"
+        vars:
+          resmoke_jobs_max: 1
+
+  - <<: *task_template
+    name: mongot_e2e_sharded_cluster
+    tags:
+      [
+        "assigned_to_jira_team_server_query_integration",
+        "default",
+        "incompatible_windows",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "mongot_e2e_tests",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "get mongot version"
+      - func: "run tests"
+        vars:
+          resmoke_jobs_max: 1
+
+  - <<: *task_template
+    name: mongot_community_e2e_sharded_collections
+    tags:
+      [
+        "assigned_to_jira_team_server_query_integration",
+        "default",
+        "incompatible_windows",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "mongot_e2e_tests",
+        "requires_large_host",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "get mongot version"
+      - func: "run tests"
+        vars:
+          # This is set to 5 jobs as the default evergreen concurrency level (~10 jobs) can cause
+          # OOM errors when constructing a vector search index. This number was chosen based off
+          # heuristics to avoid OOM errors while not slowing down patch builds too much.
+          resmoke_jobs_max: 5
+
+  - <<: *task_template
+    name: mongot_community_e2e_single_node
+    tags:
+      [
+        "assigned_to_jira_team_server_query_integration",
+        "default",
+        "incompatible_windows",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "mongot_e2e_tests",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "get mongot version"
+      - func: "run tests"
+        vars:
+          resmoke_jobs_max: 1
+
+  - <<: *task_template
+    name: search_ssl
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "release_critical",
+        "incompatible_community",
+        "incompatible_mac",
+        "incompatible_windows",
+        "incompatible_ppc",
+        "incompatible_s390x",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: sharding_api_strict_passthrough_gen
+    tags:
+      ["assigned_to_jira_team_server_query_execution", "default", "sharding"]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  ## jstestfuzz run_commands fuzzer generating find runs ##
+  - <<: *jstestfuzz_template
+    name: query_shape_hash_stability_fuzzer_find_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "query_shape_hash_stability_fuzzer",
+        "non_deterministic",
+        "require_npm",
+        "random_name",
+        "multiversion",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
+      ]
+    commands:
+      - func: "initialize multiversion tasks"
+        vars:
+          sharded_collections_query_shape_hash_stability_find_fuzzer_last_lts_new_old: last_lts
+          sharded_collections_query_shape_hash_stability_find_fuzzer_last_continuous_new_old: last_continuous
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          num_files: 10
+          num_tasks: 40
+          npm_command: run-command-generator
+          jstestfuzz_vars: --commandType=find
+          resmoke_args: >-
+            --mongodSetParameters='{logComponentVerbosity: {command: 2}}'
+            --runNoFeatureFlagTests
+
+  ## jstestfuzz run_commands fuzzer generating aggregate runs ##
+  - <<: *jstestfuzz_template
+    name: query_shape_hash_stability_fuzzer_aggregate_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "query_shape_hash_stability_fuzzer",
+        "non_deterministic",
+        "require_npm",
+        "random_name",
+        "multiversion",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
+      ]
+    commands:
+      - func: "initialize multiversion tasks"
+        vars:
+          sharded_collections_query_shape_hash_stability_aggregate_fuzzer_last_lts_new_old: last_lts
+          sharded_collections_query_shape_hash_stability_aggregate_fuzzer_last_continuous_new_old: last_continuous
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          num_files: 10
+          num_tasks: 40
+          npm_command: run-command-generator
+          jstestfuzz_vars: --commandType=aggregate
+          resmoke_args: >-
+            --mongodSetParameters='{logComponentVerbosity: {command: 2}}'
+            --runNoFeatureFlagTests
+
+  ## jstestfuzz run_commands fuzzer generating distinct runs ##
+  - <<: *jstestfuzz_template
+    name: query_shape_hash_stability_fuzzer_distinct_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "query_shape_hash_stability_fuzzer",
+        "non_deterministic",
+        "require_npm",
+        "random_name",
+        "multiversion",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
+      ]
+    commands:
+      - func: "initialize multiversion tasks"
+        vars:
+          sharded_collections_query_shape_hash_stability_distinct_fuzzer_last_lts_new_old: last_lts
+          sharded_collections_query_shape_hash_stability_distinct_fuzzer_last_continuous_new_old: last_continuous
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          num_files: 10
+          num_tasks: 40
+          npm_command: run-command-generator
+          jstestfuzz_vars: --commandType=distinct
+          resmoke_args: >-
+            --mongodSetParameters='{logComponentVerbosity: {command: 2}}'
+            --runNoFeatureFlagTests
+
+  ## jstestfuzz standalone update generational fuzzer ##
+  - <<: *jstestfuzz_template
+    name: update_fuzzer_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "non_deterministic",
+        "updatefuzzer",
+        "require_npm",
+        "random_name",
+        "multiversion",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
+      ]
+    commands:
+      - func: "initialize multiversion tasks"
+        vars:
+          update_fuzzer_last_lts: last_lts
+          update_fuzzer_last_continuous: last_continuous
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          num_files: 10
+          num_tasks: 40
+          npm_command: update-fuzzer
+          resmoke_args: >-
+            --mongodSetParameters='{logComponentVerbosity: {command: 2}}'
+            --runNoFeatureFlagTests
+
+  ## jstestfuzz replication update generational fuzzer ##
+  - <<: *jstestfuzz_template
+    name: update_fuzzer_replication_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "non_deterministic",
+        "updatefuzzer",
+        "require_npm",
+        "random_name",
+        "multiversion",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
+      ]
+    commands:
+      - func: "initialize multiversion tasks"
+        vars:
+          update_fuzzer_replication_last_lts: last_lts
+          update_fuzzer_replication_last_continuous: last_continuous
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          num_files: 10
+          num_tasks: 40
+          npm_command: update-fuzzer
+          resmoke_args: >-
+            --mongodSetParameters='{logComponentVerbosity: {command: 2}}'
+            --runNoFeatureFlagTests
+
+  ## Like "update_fuzzer_replication_gen", but it uses a pinned git revision for the "jstestfuzz"
+  ## repo and it uses a fixed seed.
+  - <<: *jstestfuzz_template
+    name: update_fuzzer_replication_deterministic_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "auxiliary",
+        "fuzzer_deterministic",
+        "multiversion",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "incompatible_windows",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
+        "require_npm",
+        "random_name",
+        "future_git_tag_incompatible",
+      ]
+    commands:
+      - func: "initialize multiversion tasks"
+        vars:
+          update_fuzzer_replication_deterministic_last_lts: last_lts
+          update_fuzzer_replication_deterministic_last_continuous: last_continuous
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          # This task used a fixed git revision for the jstestfuzz repo. As changes are made
+          # to the mongo repo over time, the fixed jstestfuzz git rev used here will need to
+          # be updated every so often (once every few months).
+          num_files: 7
+          num_tasks: 4
+          npm_command: update-fuzzer
+          suite: update_fuzzer_replication
+          use_large_distro: "true"
+          resmoke_args: >-
+            --mongodSetParameters='{logComponentVerbosity: {command: 2}}'
+            --runNoFeatureFlagTests
+          jstestfuzz_vars: --metaSeed 1726779665485 --jstestfuzzGitRev b25ed7c
+
+  # jstestfuzz standalone update time-series generational fuzzer ##
+  - <<: *jstestfuzz_template
+    name: update_timeseries_fuzzer_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "non_deterministic",
+        "incompatible_debug_mode",
+        "updatefuzzer",
+        "require_npm",
+        "random_name",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          num_files: 10
+          num_tasks: 40
+          jstestfuzz_vars: --diffTestingMode timeseries
+          npm_command: update-fuzzer
+          suite: generational_fuzzer
+          resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+
+  - <<: *task_template
+    name: unified_write_executor
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "experimental",
+        requires_large_host,
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: sharding_unified_write_executor
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "experimental",
+        requires_large_host,
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: unified_write_executor_sharded_jscore_txns
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: unified_write_executor_sharded_jscore_txns_sharded_collections
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: unified_write_executor_sharded_jscore_txns_without_snapshot
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: unified_write_executor_sharded_jscore_txns
+          resmoke_args: --excludeWithAnyTags=uses_snapshot_read_concern
+
+  - <<: *gen_task_template
+    name: unified_write_executor_multi_shard_multi_stmt_txn_jscore_passthrough_gen
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_jobs_max: 0 # No cap on number of jobs.
+
+  - <<: *gen_task_template
+    name: unified_write_executor_multi_shard_multi_stmt_txn_kill_primary_jscore_passthrough_gen
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_jobs_max: 0 # No cap on number of jobs.
+
+  - <<: *gen_task_template
+    name: unified_write_executor_concurrency_sharded_multi_stmt_txn_gen
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: unified_write_executor_concurrency_sharded_multi_stmt_txn_with_balancer_gen
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: unified_write_executor_concurrency_sharded_multi_stmt_txn_with_balancer_and_config_transitions_and_add_remove_shard_gen
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: unified_write_executor_concurrency_sharded_causal_consistency_gen
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: unified_write_executor_concurrency_sharded_causal_consistency_and_balancer_gen
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: unified_write_executor_sharded_causally_consistent_jscore_passthrough_gen
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: unified_write_executor_sharded_causally_consistent_jscore_txns_passthrough_gen
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: unified_write_executor_sharded_causally_consistent_read_concern_snapshot_passthrough_gen
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: unified_write_executor_concurrency_sharded_replication_gen
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: unified_write_executor_concurrency_sharded_replication_with_balancer_gen
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: unified_write_executor_sharded_collections_jscore_passthrough_gen
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: unified_write_executor_sharding_jscore_passthrough_gen
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
+    name: unified_write_executor_sharding_jscore_passthrough_with_balancer_gen
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *task_template
+    name: unified_write_executor_fle2_sharding
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: unified_write_executor_fle2_sharding_high_cardinality
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: query_correctness_query_shape_hash_stability_generated_test_1
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
+        "requires_all_feature_flags",
+      ]
+    commands:
+      - func: "do setup"
+        vars:
+          # Set this variable to true so that we clone the mongo git repo, including the
+          # .gitattributes file that provides hunk header overrides when running git diff in the
+          # query_correctness_generated_test task. This will trigger the "conditionally clone repo"
+          # function during "do setup."
+          clone_repo_for_test: true
+      - func: "setup query_tester test repos"
+        vars:
+          # The name of test repo that we want this task to clone.
+          repo_name: "query-correctness-tests-1"
+      - func: "run tests"
+        vars:
+          suite: query_correctness_query_shape_hash_stability_generated_test
+          should_shuffle: false
+
+  - <<: *task_template
+    name: query_correctness_query_shape_hash_stability_generated_test_2
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
+        "requires_all_feature_flags",
+      ]
+    commands:
+      - func: "do setup"
+        vars:
+          # Set this variable to true so that we clone the mongo git repo, including the
+          # .gitattributes file that provides hunk header overrides when running git diff in the
+          # query_correctness_generated_test task. This will trigger the "conditionally clone repo"
+          # function during "do setup."
+          clone_repo_for_test: true
+      - func: "setup query_tester test repos"
+        vars:
+          # The name of test repo that we want this task to clone.
+          repo_name: "query-correctness-tests-2"
+      - func: "run tests"
+        vars:
+          suite: query_correctness_query_shape_hash_stability_generated_test
+          should_shuffle: false
+
+  - <<: *task_template
+    name: query_correctness_query_shape_hash_stability_generated_test_3
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
+        "requires_all_feature_flags",
+      ]
+    commands:
+      - func: "do setup"
+        vars:
+          # Set this variable to true so that we clone the mongo git repo, including the
+          # .gitattributes file that provides hunk header overrides when running git diff in the
+          # query_correctness_generated_test task. This will trigger the "conditionally clone repo"
+          # function during "do setup."
+          clone_repo_for_test: true
+      - func: "setup query_tester test repos"
+        vars:
+          # The name of test repo that we want this task to clone.
+          repo_name: "query-correctness-tests-3"
+      - func: "run tests"
+        vars:
+          suite: query_correctness_query_shape_hash_stability_generated_test
+          should_shuffle: false
+
+  - <<: *task_template
+    name: query_correctness_query_shape_hash_stability_generated_test_4
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
+        "requires_all_feature_flags",
+      ]
+    commands:
+      - func: "do setup"
+        vars:
+          # Set this variable to true so that we clone the mongo git repo, including the
+          # .gitattributes file that provides hunk header overrides when running git diff in the
+          # query_correctness_generated_test task. This will trigger the "conditionally clone repo"
+          # function during "do setup."
+          clone_repo_for_test: true
+      - func: "setup query_tester test repos"
+        vars:
+          # The name of test repo that we want this task to clone.
+          repo_name: "query-correctness-tests-4"
+      - func: "run tests"
+        vars:
+          suite: query_correctness_query_shape_hash_stability_generated_test
+          should_shuffle: false
+
+  ################################################
+  #           Query Optimization tasks           #
+  ################################################
+
+  - <<: *task_template
+    name: aggregation_disabled_optimization
+    tags:
+      [
+        "assigned_to_jira_team_server_query_optimization",
+        "release_critical",
+        "incompatible_mac",
+        "aggregation",
+        "common",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  ## Standalone generational fuzzer for checking optimized and unoptimized expression equivalence
+  - <<: *jstestfuzz_template
+    name: aggregation_expression_optimization_fuzzer_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_optimization",
+        "release_critical",
+        "incompatible_development_variant",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "aggfuzzer",
+        "require_npm",
+        "random_name",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          use_large_distro: "true"
+          num_files: 20
+          num_tasks: 20
+          jstestfuzz_vars: --diffTestingMode optimization
+          suite: generational_fuzzer
+          resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+          npm_command: agg-expr-fuzzer
+
+  ## Standalone generational fuzzer for checking optimized and unoptimized aggregation pipelines
+  - <<: *jstestfuzz_template
+    name: aggregation_optimization_fuzzer_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_optimization",
+        "release_critical",
+        "incompatible_development_variant",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "aggfuzzer",
+        "require_npm",
+        "random_name",
+        "optimization",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          use_large_distro: "true"
+          num_files: 20
+          num_tasks: 20
+          jstestfuzz_vars: --diffTestingMode optimization --numPipelines=3000
+          suite: generational_fuzzer
+          resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+          npm_command: agg-fuzzer
+
+  ## Like "aggregation_optimization_fuzzer_gen", but it uses a pinned git revision for the
+  ## "jstestfuzz" repo and it uses a fixed seed.
+  - <<: *jstestfuzz_template
+    name: aggregation_optimization_fuzzer_deterministic_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_optimization",
+        "auxiliary",
+        "fuzzer_deterministic",
+        "optimization",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "incompatible_windows",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
+        "require_npm",
+        "random_name",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          num_files: 6
+          num_tasks: 4
+          npm_command: agg-fuzzer
+          suite: generational_fuzzer
+          use_large_distro: "true"
+          resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+          jstestfuzz_vars: --diffTestingMode optimization --metaSeed 1726779665485 --jstestfuzzGitRev 8ddd8f12cab0
+
+  - <<: *task_template
+    name: aggregation_repeat_queries_multiplan_single_solutions
+    tags: ["assigned_to_jira_team_server_query_optimization", "default"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *benchmark_template
+    name: benchmarks_abt_lowering
+    tags:
+      [
+        "assigned_to_jira_team_server_query_optimization",
+        "experimental",
+        "benchmarks",
+      ]
+    commands:
+      - func: "do benchmark setup"
+      - func: "run benchmark tests"
+        vars:
+          suites: benchmarks_abt_lowering
+          exec_timeout_secs: 18000 # 5 hour timeout.
+          resmoke_jobs_max: 1
+
+  ## Standalone generational fuzzer for checking optimized and unoptimized aggregation pipelines with embedded NUL bytes
+  - <<: *jstestfuzz_template
+    name: aggregation_optimization_nul_bytes_fuzzer_gen
+    tags:
+      ["assigned_to_jira_team_server_query_optimization", "non_deterministic"]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          num_files: 2
+          num_tasks: 2
+          jstestfuzz_vars: --diffTestingMode optimization --numPipelines=3000 --embedNulBytes
+          suite: generational_fuzzer
+          npm_command: agg-fuzzer
+
+  ## Standalone generational fuzzer for checking optimized and unoptimized change stream pipelines ##
+  - <<: *jstestfuzz_template
+    name: change_stream_optimization_fuzzer_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_optimization",
+        "non_deterministic",
+        "change_stream_fuzzer",
+        "require_npm",
+        "random_name",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          num_files: 20
+          num_tasks: 20
+          jstestfuzz_vars: --diffTestingMode optimization
+          npm_command: change-stream-fuzzer
+          suite: generational_fuzzer
+          resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+
+  - <<: *task_template
+    name: identity_views_passthrough
+    tags: ["assigned_to_jira_team_server_query_optimization", "default"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *gen_task_template
+    name: jsCore_wildcard_indexes_gen
+    tags:
+      ["assigned_to_jira_team_server_query_optimization", "default", "jscore"]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          suite: core_wildcard_indexes
+          fallback_num_sub_suites: 2
+
+  - <<: *task_template
+    name: json_schema
+    tags: ["assigned_to_jira_team_server_query_optimization", "default"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          resmoke_jobs_max: 1
+
+  - <<: *task_template
+    name: query_golden_classic
+    tags: ["assigned_to_jira_team_server_query_optimization", "default"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: query_golden_classic
+
+  - <<: *task_template
+    name: query_golden_sharding
+    tags: ["assigned_to_jira_team_server_query_optimization", "default"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: query_golden_sharding
+
+  - <<: *task_template
+    name: query_tester_self_test
+    tags: ["assigned_to_jira_team_server_query_optimization", "default"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: query_tester_self_test
+
+  - <<: *task_template
+    name: query_correctness_generated_test_1
+    tags:
+      [
+        "assigned_to_jira_team_server_query_optimization",
+        "default",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
+        "requires_all_feature_flags",
+      ]
+    commands:
+      - func: "do setup"
+        vars:
+          # Set this variable to true so that we clone the mongo git repo, including the
+          # .gitattributes file that provides hunk header overrides when running git diff in the
+          # query_correctness_generated_test task. This will trigger the "conditionally clone repo"
+          # function during "do setup."
+          clone_repo_for_test: true
+      - func: "setup query_tester test repos"
+        vars:
+          # The name of test repo that we want this task to clone.
+          repo_name: "query-correctness-tests-1"
+      - func: "run tests"
+        vars:
+          suite: query_correctness_generated_test
+          should_shuffle: false
+
+  - <<: *task_template
+    name: query_correctness_generated_test_2
+    tags:
+      [
+        "assigned_to_jira_team_server_query_optimization",
+        "default",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
+        "requires_all_feature_flags",
+      ]
+    commands:
+      - func: "do setup"
+        vars:
+          # Set this variable to true so that we clone the mongo git repo, including the
+          # .gitattributes file that provides hunk header overrides when running git diff in the
+          # query_correctness_generated_test task. This will trigger the "conditionally clone repo"
+          # function during "do setup."
+          clone_repo_for_test: true
+      - func: "setup query_tester test repos"
+        vars:
+          # The name of test repo that we want this task to clone.
+          repo_name: "query-correctness-tests-2"
+      - func: "run tests"
+        vars:
+          suite: query_correctness_generated_test
+          should_shuffle: false
+
+  - <<: *task_template
+    name: query_correctness_generated_test_3
+    tags:
+      [
+        "assigned_to_jira_team_server_query_optimization",
+        "default",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
+        "requires_all_feature_flags",
+      ]
+    commands:
+      - func: "do setup"
+        vars:
+          # Set this variable to true so that we clone the mongo git repo, including the
+          # .gitattributes file that provides hunk header overrides when running git diff in the
+          # query_correctness_generated_test task. This will trigger the "conditionally clone repo"
+          # function during "do setup."
+          clone_repo_for_test: true
+      - func: "setup query_tester test repos"
+        vars:
+          # The name of test repo that we want this task to clone.
+          repo_name: "query-correctness-tests-3"
+      - func: "run tests"
+        vars:
+          suite: query_correctness_generated_test
+          should_shuffle: false
+
+  - <<: *task_template
+    name: query_correctness_generated_test_4
+    tags:
+      [
+        "assigned_to_jira_team_server_query_optimization",
+        "default",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
+        "requires_all_feature_flags",
+      ]
+    commands:
+      - func: "do setup"
+        vars:
+          # Set this variable to true so that we clone the mongo git repo, including the
+          # .gitattributes file that provides hunk header overrides when running git diff in the
+          # query_correctness_generated_test task. This will trigger the "conditionally clone repo"
+          # function during "do setup."
+          clone_repo_for_test: true
+      - func: "setup query_tester test repos"
+        vars:
+          # The name of test repo that we want this task to clone.
+          repo_name: "query-correctness-tests-4"
+      - func: "run tests"
+        vars:
+          suite: query_correctness_generated_test
+          should_shuffle: false
+
+  - <<: *task_template
+    name: query_correctness_manual_test
+    tags:
+      [
+        "assigned_to_jira_team_server_query_optimization",
+        "default",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
+        "requires_all_feature_flags",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: query_tester_manual_test
+
+  - <<: *task_template
+    name: query_golden_cbr_automatic
+    tags: [
+        "assigned_to_jira_team_server_query_optimization",
+        "experimental",
+        "blocked_in_query_alias", # We explicitly specify this task in query alias
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: query_golden_cbr_automatic
+
+  - <<: *task_template
+    name: query_cbr_heuristic_jscore_passthrough
+    tags: [
+        "assigned_to_jira_team_server_query_optimization",
+        "experimental",
+        "blocked_in_query_alias", # We explicitly specify this task in query alias
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: query_cbr_heuristic_jscore_passthrough
+
+  - <<: *task_template
+    name: query_cbr_heuristic_aggregation_passthrough
+    tags: [
+        "assigned_to_jira_team_server_query_optimization",
+        "experimental",
+        "blocked_in_query_alias", # We explicitly specify this task in query alias
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: query_cbr_heuristic_aggregation_passthrough
+
+  - <<: *task_template
+    name: query_cbr_sampling_jscore_passthrough
+    tags: [
+        "assigned_to_jira_team_server_query_optimization",
+        "experimental",
+        "blocked_in_query_alias", # We explicitly specify this task in query alias
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: query_cbr_sampling_jscore_passthrough
+
+  - <<: *task_template
+    name: query_cbr_sampling_aggregation_passthrough
+    tags: [
+        "assigned_to_jira_team_server_query_optimization",
+        "experimental",
+        "blocked_in_query_alias", # We explicitly specify this task in query alias
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: query_cbr_sampling_aggregation_passthrough
+
+  - <<: *task_template
+    name: query_golden_cbr_sampling
+    tags: [
+        "assigned_to_jira_team_server_query_optimization",
+        "experimental",
+        "blocked_in_query_alias", # We explicitly specify this task in query alias
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: query_golden_cbr_sampling
+
+  - <<: *task_template
+    name: query_cbr_histogram_jscore_passthrough
+    # Currently disabled due to an OOM in SERVER-109720
+    # To be re-enabled in SERVER-109881 Re-enable the cbr_histogram passthroughs
+    activate: false
+    tags: [
+        "assigned_to_jira_team_server_query_optimization",
+        "experimental",
+        "blocked_in_query_alias", # We explicitly specify this task in query alias
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: query_cbr_histogram_jscore_passthrough
+
+  - <<: *task_template
+    name: query_cbr_histogram_aggregation_passthrough
+    # Currently disabled due to an OOM in SERVER-109720
+    # To be re-enabled in SERVER-109881 Re-enable the cbr_histogram passthroughs
+    activate: false
+    tags: [
+        "assigned_to_jira_team_server_query_optimization",
+        "experimental",
+        "blocked_in_query_alias", # We explicitly specify this task in query alias
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: query_cbr_histogram_aggregation_passthrough
+
+  - <<: *task_template
+    name: query_golden_cbr_histogram
+    # Currently disabled due to plan flips due to SERVER-108077
+    # To be re-enabled in SERVER-109881 Re-enable the cbr_histogram passthroughs
+    activate: false
+    tags: [
+        "assigned_to_jira_team_server_query_optimization",
+        "experimental",
+        "blocked_in_query_alias", # We explicitly specify this task in query alias
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: query_golden_cbr_histogram
+
+  ################################################
+  #           Query Integration tasks            #
+  ################################################
+  - <<: *benchmark_template
+    name: benchmarks_query
+    tags:
+      [
+        "assigned_to_jira_team_server_query_integration",
+        "experimental",
+        "benchmarks",
+      ]
+    commands:
+      - func: "do benchmark setup no fetch"
+      - func: "get engflow creds"
+      - func: "bazel compile"
+        vars:
+          targets: >-
+            archive-query_bm
+          bazel_args: >-
+            --config=evg
+            --include_autogenerated_targets=True
+          compiling_for_test: true
+      - func: "run benchmark tests"
+        vars:
+          suite: benchmarks_query
+          install_dir: bazel-bin/install/bin
+          resmoke_jobs_max: 1
+          exec_timeout_secs: 19800 # 5.5 hours
+          timeout_secs: 19800 # 5.5 hours
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/bazel-bin/query_bm.${ext|tgz}
+          remote_file: ${project}/${compile_variant}/${version_id}/binaries/query_bm-${revision_order_id}.${ext|tgz}
+          bucket: mciuploads
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
+          content_type: application/tar
+          display_name: Benchmarks
+
+  - <<: *task_template
+    name: config_fuzzer_aggregation
+    tags:
+      [
+        "assigned_to_jira_team_server_query_integration",
+        "default",
+        "config_fuzzer",
+        "incompatible_inmemory",
+        "incompatible_tsan",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: aggregation
+          resmoke_args: >-
+            --fuzzMongodConfigs=normal
+            --fuzzRuntimeParams
+            --excludeWithAnyTags=does_not_support_config_fuzzer
+            --setShellParameter='{defaultFindReplicaSetHostTimeoutMS: 120000}'
+
+  - <<: *gen_task_template
+    name: config_fuzzer_aggregation_mongos_passthrough_gen
+    tags:
+      [
+        "assigned_to_jira_team_query_integration",
+        "default",
+        "config_fuzzer",
+        "large",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
+        "incompatible_inmemory",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          suite: aggregation_mongos_passthrough
+          resmoke_args: >-
+            --fuzzMongodConfigs=normal
+            --fuzzMongosConfigs=normal
+            --fuzzRuntimeParams
+            --excludeWithAnyTags=does_not_support_config_fuzzer
+          use_large_distro: "true"
+
+  - <<: *task_template
+    name: query_stats_aggregation_passthrough
+    tags: ["assigned_to_jira_team_server_query_integration", "default"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: query_stats_mongos_aggregation_passthrough
+    tags: ["assigned_to_jira_team_server_query_integration", "default"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: query_stats_mongos_passthrough
+    tags: ["assigned_to_jira_team_server_query_integration", "default"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: query_stats_passthrough
+    tags: ["assigned_to_jira_team_server_query_integration", "default"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: vector_search
+    tags:
+      [
+        "assigned_to_jira_team_server_query_integration",
+        "release_critical",
+        "incompatible_community",
+        "incompatible_mac",
+        "incompatible_windows",
+        "incompatible_ppc",
+        "incompatible_s390x",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          resmoke_jobs_max: 1
+
+  - <<: *task_template
+    name: vector_search_auth
+    tags:
+      [
+        "assigned_to_jira_team_server_query_integration",
+        "release_critical",
+        "incompatible_community",
+        "incompatible_mac",
+        "incompatible_windows",
+        "incompatible_ppc",
+        "incompatible_s390x",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          resmoke_jobs_max: 1
+
+  - <<: *task_template
+    name: vector_search_ssl
+    tags:
+      [
+        "assigned_to_jira_team_server_query_integration",
+        "release_critical",
+        "incompatible_community",
+        "incompatible_mac",
+        "incompatible_windows",
+        "incompatible_ppc",
+        "incompatible_s390x",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          resmoke_jobs_max: 1
+
+  - <<: *task_template
+    name: product_limits
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "experimental",
+        "blocked_in_query_alias",
+      ]
+    patchable: false
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          resmoke_jobs_max: 1
+
+  - <<: *task_template
+    name: extensions_standalone
+    tags:
+      [
+        "assigned_to_jira_team_server_query_integration",
+        "default",
+        "extensions",
+        "incompatible_windows",
+        "incompatible_mac",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: extensions_single_node
+    tags:
+      [
+        "assigned_to_jira_team_server_query_integration",
+        "default",
+        "extensions",
+        "incompatible_windows",
+        "incompatible_mac",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: extensions_single_shard
+    tags:
+      [
+        "assigned_to_jira_team_server_query_integration",
+        "default",
+        "extensions",
+        "incompatible_windows",
+        "incompatible_mac",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: extensions_sharded_cluster
+    tags:
+      [
+        "assigned_to_jira_team_server_query_integration",
+        "default",
+        "extensions",
+        "incompatible_windows",
+        "incompatible_mac",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: extensions_sharded_collections
+    tags:
+      [
+        "assigned_to_jira_team_server_query_integration",
+        "default",
+        "extensions",
+        "incompatible_windows",
+        "incompatible_mac",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"

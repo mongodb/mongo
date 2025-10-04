@@ -29,8 +29,17 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/exec/js_function.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/db/matcher/expression_where_base.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
+
+#include <memory>
+#include <utility>
 
 namespace mongo {
 
@@ -38,11 +47,9 @@ class OperationContext;
 
 class WhereMatchExpression final : public WhereMatchExpressionBase {
 public:
-    WhereMatchExpression(OperationContext* opCtx, WhereParams params, StringData dbName);
+    WhereMatchExpression(OperationContext* opCtx, WhereParams params, const DatabaseName& dbName);
 
-    bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const final;
-
-    std::unique_ptr<MatchExpression> shallowClone() const final;
+    std::unique_ptr<MatchExpression> clone() const final;
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
         visitor->visit(this);
@@ -53,15 +60,26 @@ public:
     }
 
     const JsFunction& getPredicate() const {
-        return _jsFunction;
+        validateState();
+        return *_jsFunction;
+    }
+
+    std::unique_ptr<JsFunction> extractPredicate() {
+        return std::move(_jsFunction);
+    }
+
+    void setPredicate(std::unique_ptr<JsFunction> jsFunction) {
+        tassert(8415200, "JsFunction must not be set", !_jsFunction);
+        _jsFunction = std::move(jsFunction);
+    }
+
+    void validateState() const {
+        tassert(6403600, "JsFunction is unavailable", _jsFunction);
     }
 
 private:
-    std::string _dbName;
-
     OperationContext* const _opCtx;
-
-    JsFunction _jsFunction;
+    std::unique_ptr<JsFunction> _jsFunction;
 };
 
 }  // namespace mongo

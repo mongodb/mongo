@@ -29,18 +29,34 @@
 
 #pragma once
 
-#include <vector>
-
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/last_vote.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator_external_state.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/time_support.h"
+
+#include <cstddef>
+#include <memory>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -48,7 +64,8 @@ class ServiceContext;
 
 namespace repl {
 
-class ReplicationCoordinatorExternalStateMock : public ReplicationCoordinatorExternalState {
+class MONGO_MOD_PUB ReplicationCoordinatorExternalStateMock
+    : public ReplicationCoordinatorExternalState {
     ReplicationCoordinatorExternalStateMock(const ReplicationCoordinatorExternalStateMock&) =
         delete;
     ReplicationCoordinatorExternalStateMock& operator=(
@@ -58,60 +75,71 @@ public:
     class GlobalSharedLockAcquirer;
 
     ReplicationCoordinatorExternalStateMock();
-    virtual ~ReplicationCoordinatorExternalStateMock();
-    virtual void startThreads() override;
-    virtual void startSteadyStateReplication(OperationContext* opCtx,
-                                             ReplicationCoordinator* replCoord) override;
-    virtual bool isInitialSyncFlagSet(OperationContext* opCtx) override;
+    ~ReplicationCoordinatorExternalStateMock() override;
+    void startThreads() override;
+    void startSteadyStateReplication(OperationContext* opCtx,
+                                     ReplicationCoordinator* replCoord) override;
+    bool isInitialSyncFlagSet(OperationContext* opCtx) override;
 
-    virtual void shutdown(OperationContext* opCtx);
-    virtual void clearAppliedThroughIfCleanShutdown(OperationContext* opCtx);
-    virtual executor::TaskExecutor* getTaskExecutor() const override;
-    virtual std::shared_ptr<executor::TaskExecutor> getSharedTaskExecutor() const override;
-    virtual ThreadPool* getDbWorkThreadPool() const override;
-    virtual Status initializeReplSetStorage(OperationContext* opCtx, const BSONObj& config);
-    void onDrainComplete(OperationContext* opCtx) override;
+    void shutdown(OperationContext* opCtx) override;
+    executor::TaskExecutor* getTaskExecutor() const override;
+    std::shared_ptr<executor::TaskExecutor> getSharedTaskExecutor() const override;
+    ThreadPool* getDbWorkThreadPool() const override;
+    Status initializeReplSetStorage(OperationContext* opCtx, const BSONObj& config) override;
+    void onWriterDrainComplete(OperationContext* opCtx) override;
+    void onApplierDrainComplete(OperationContext* opCtx) override;
     OpTime onTransitionToPrimary(OperationContext* opCtx) override;
-    virtual void forwardSecondaryProgress();
-    virtual bool isSelf(const HostAndPort& host, ServiceContext* service);
-    virtual HostAndPort getClientHostAndPort(const OperationContext* opCtx);
-    virtual StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* opCtx);
-    virtual Status storeLocalConfigDocument(OperationContext* opCtx,
-                                            const BSONObj& config,
-                                            bool writeOplog);
-    virtual StatusWith<LastVote> loadLocalLastVoteDocument(OperationContext* opCtx);
-    virtual Status storeLocalLastVoteDocument(OperationContext* opCtx, const LastVote& lastVote);
-    virtual void setGlobalTimestamp(ServiceContext* service, const Timestamp& newTime);
-    virtual Timestamp getGlobalTimestamp(ServiceContext* service);
+    void forwardSecondaryProgress(bool prioritized) override;
+    bool isSelf(const HostAndPort& host, ServiceContext* service) override;
+    bool isSelfFastPath(const HostAndPort& host) final;
+    bool isSelfSlowPath(const HostAndPort& host,
+                        ServiceContext* service,
+                        Milliseconds timeout) final;
+    HostAndPort getClientHostAndPort(const OperationContext* opCtx) override;
+    StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* opCtx) override;
+    Status storeLocalConfigDocument(OperationContext* opCtx,
+                                    const BSONObj& config,
+                                    bool writeOplog) override;
+    Status replaceLocalConfigDocument(OperationContext* opCtx, const BSONObj& config) override;
+    StatusWith<LastVote> loadLocalLastVoteDocument(OperationContext* opCtx) override;
+    Status storeLocalLastVoteDocument(OperationContext* opCtx, const LastVote& lastVote) override;
+    void setGlobalTimestamp(ServiceContext* service, const Timestamp& newTime) override;
+    Timestamp getGlobalTimestamp(ServiceContext* service) override;
     bool oplogExists(OperationContext* opCtx) override;
-    virtual StatusWith<OpTimeAndWallTime> loadLastOpTimeAndWallTime(OperationContext* opCtx);
-    virtual void closeConnections();
-    virtual void onStepDownHook();
-    virtual void signalApplierToChooseNewSyncSource();
-    virtual void stopProducer();
-    virtual void startProducerIfStopped();
-    virtual bool tooStale();
-    virtual void clearCommittedSnapshot();
-    virtual void updateCommittedSnapshot(const OpTime& newCommitPoint);
-    virtual void updateLastAppliedSnapshot(const OpTime& optime);
-    virtual bool snapshotsEnabled() const;
-    virtual void notifyOplogMetadataWaiters(const OpTime& committedOpTime);
-    boost::optional<OpTime> getEarliestDropPendingOpTime() const final;
-    virtual double getElectionTimeoutOffsetLimitFraction() const;
-    virtual bool isReadCommittedSupportedByStorageEngine(OperationContext* opCtx) const;
-    virtual bool isReadConcernSnapshotSupportedByStorageEngine(OperationContext* opCtx) const;
-    virtual std::size_t getOplogFetcherSteadyStateMaxFetcherRestarts() const override;
-    virtual std::size_t getOplogFetcherInitialSyncMaxFetcherRestarts() const override;
+    StatusWith<OpTimeAndWallTime> loadLastOpTimeAndWallTime(OperationContext* opCtx) override;
+    void closeConnections() override;
+    void onStepDownHook() override;
+    void signalApplierToChooseNewSyncSource() override;
+    void stopProducer() override;
+    void startProducerIfStopped() override;
+    void notifyOtherMemberDataChanged() final;
+    bool tooStale() override;
+    void clearCommittedSnapshot() override;
+    void updateCommittedSnapshot(const OpTime& newCommitPoint) override;
+    void updateLastAppliedSnapshot(const OpTime& optime) override;
+    bool snapshotsEnabled() const override;
+    void notifyOplogMetadataWaiters(const OpTime& committedOpTime) override;
+    double getElectionTimeoutOffsetLimitFraction() const override;
+    bool isReadConcernSnapshotSupportedByStorageEngine(OperationContext* opCtx) const override;
+    std::size_t getOplogFetcherSteadyStateMaxFetcherRestarts() const override;
+    std::size_t getOplogFetcherInitialSyncMaxFetcherRestarts() const override;
 
     /**
      * Adds "host" to the list of hosts that this mock will match when responding to "isSelf"
-     * messages.
+     * messages, including "isSelfFastPath" and "isSelfSlowPath".
      */
     void addSelf(const HostAndPort& host);
 
     /**
+     * Adds "host" to the list of hosts that this mock will match when responding to
+     * "isSelfSlowPath" messages with a timeout less than or equal to that given,
+     * but not "isSelfFastPath" messages.
+     */
+    void addSelfSlow(const HostAndPort& host, Milliseconds timeout);
+
+    /**
      * Remove all hosts from the list of hosts that this mock will match when responding to "isSelf"
-     * messages.
+     * messages.  Clears both regular and slow hosts.
      */
     void clearSelfHosts();
 
@@ -131,11 +159,6 @@ public:
     void setLocalLastVoteDocument(const StatusWith<LastVote>& localLastVoteDocument);
 
     /**
-     * Sets the return value for subsequent calls to getClientHostAndPort().
-     */
-    void setClientHostAndPort(const HostAndPort& clientHostAndPort);
-
-    /**
      * Sets the return value for subsequent calls to loadLastOpTimeApplied.
      */
     void setLastOpTimeAndWallTime(const StatusWith<OpTime>& lastApplied,
@@ -152,12 +175,6 @@ public:
      * If "status" is Status::OK(), the subsequent calls will call the underlying funtion.
      */
     void setStoreLocalLastVoteDocumentStatus(Status status);
-
-    /**
-     * Sets whether or not subsequent calls to storeLocalLastVoteDocument() should hang
-     * indefinitely or not based on the value of "hang".
-     */
-    void setStoreLocalLastVoteDocumentToHang(bool hang);
 
     void setFirstOpTimeOfMyTerm(const OpTime& opTime);
 
@@ -184,21 +201,28 @@ public:
     /**
      * Noop
      */
-    virtual void setupNoopWriter(Seconds waitTime);
+    void setupNoopWriter(Seconds waitTime) override;
 
     /**
      * Noop
      */
-    virtual void startNoopWriter(OpTime lastKnownOpTime);
+    void startNoopWriter(OpTime lastKnownOpTime) override;
 
     /**
      * Noop
      */
-    virtual void stopNoopWriter();
+    void stopNoopWriter() override;
 
-    virtual bool isCWWCSetOnConfigShard(OperationContext* opCtx) const final;
+    bool isCWWCSetOnConfigShard(OperationContext* opCtx) const final;
 
-    virtual bool isShardPartOfShardedCluster(OperationContext* opCtx) const final;
+    bool isShardPartOfShardedCluster(OperationContext* opCtx) const final;
+
+    /**
+     * Clear the _otherMemberDataChanged flag so we can check it later.
+     */
+    void clearOtherMemberDataChanged();
+
+    bool getOtherMemberDataChanged() const;
 
     JournalListener* getReplicationJournalListener() final;
 
@@ -208,12 +232,12 @@ private:
     StatusWith<OpTime> _lastOpTime;
     StatusWith<Date_t> _lastWallTime;
     std::vector<HostAndPort> _selfHosts;
+    stdx::unordered_map<HostAndPort, Milliseconds> _selfHostsSlow;
     bool _canAcquireGlobalSharedLock;
     Status _storeLocalConfigDocumentStatus;
     Status _storeLocalLastVoteDocumentStatus;
     // mutex and cond var for controlling stroeLocalLastVoteDocument()'s hanging
-    Mutex _shouldHangLastVoteMutex =
-        MONGO_MAKE_LATCH("ReplicationCoordinatorExternalStateMock::_shouldHangLastVoteMutex");
+    stdx::mutex _shouldHangLastVoteMutex;
     stdx::condition_variable _shouldHangLastVoteCondVar;
     bool _storeLocalLastVoteDocumentShouldHang;
     bool _connectionsClosed;
@@ -221,6 +245,7 @@ private:
     bool _threadsStarted;
     bool _isReadCommittedSupported = true;
     bool _areSnapshotsEnabled = true;
+    bool _otherMemberDataChanged = false;
     OpTime _firstOpTimeOfMyTerm;
     double _electionTimeoutOffsetLimitFraction = 0.15;
     Timestamp _globalTimestamp;

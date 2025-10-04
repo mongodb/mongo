@@ -1,0 +1,23 @@
+test_kind: js_test
+
+selector:
+  roots:
+    - jstests/sharding/**/*.js
+  exclude_files:
+    - jstests/sharding/**/libs/**/*.js
+    # Expects hint(_id) to yield an index scan instead of a table scan.
+    - jstests/sharding/shard2.js
+    # Expects to use the SBE plan cache
+    - jstests/sharding/invalidate_plan_cache_entries_when_collection_generation_changes.js
+  exclude_with_any_tags:
+    - expects_explicit_underscore_id_index
+
+executor:
+  config:
+    shell_options:
+      nodb: ""
+      global_vars:
+        TestData:
+          setParameters:
+            enableTestCommands: 1
+            failpoint.clusterAllCollectionsByDefault: "{mode: 'alwaysOn'}"

@@ -1,0 +1,32 @@
+test_kind: js_test
+selector:
+  roots:
+    - jstests/fle2/*.js
+    - src/mongo/db/modules/*/jstests/fle2/**/*.js
+  exclude_with_any_tags:
+    # Don't run tests that require the encrypted collscan mode in this suite.
+    - requires_fle2_encrypted_collscan
+    - fle2_no_mongos
+    - requires_2_or_more_shards
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+  hooks:
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: ValidateCollections
+    - class: CheckOrphansDeleted
+    - class: CleanEveryN
+      n: 20
+  fixture:
+    class: ShardedClusterFixture
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+    num_rs_nodes_per_shard: 2

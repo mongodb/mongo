@@ -27,14 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/update/v2_log_builder.h"
 
-#include <stack>
-
 #include "mongo/base/checked_cast.h"
+#include "mongo/db/field_ref.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
+#include "mongo/util/assert_util.h"
+
+#include <utility>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo::v2_log_builder {
 Status V2LogBuilder::logUpdatedField(const RuntimeUpdatePath& path, mutablebson::Element elt) {

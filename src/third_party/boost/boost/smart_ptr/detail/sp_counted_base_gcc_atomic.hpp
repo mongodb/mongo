@@ -137,7 +137,7 @@ public:
 
     long use_count() const // nothrow
     {
-        return atomic_load( &use_count_ );
+        return static_cast<long>( atomic_load( &use_count_ ) );
     }
 };
 

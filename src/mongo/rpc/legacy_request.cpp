@@ -27,15 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/rpc/legacy_request.h"
 
-#include <utility>
-
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/rpc/legacy_request.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace rpc {
@@ -43,12 +44,13 @@ namespace rpc {
 OpMsgRequest opMsgRequestFromLegacyRequest(const Message& message) {
     DbMessage dbm(message);
     QueryMessage qm(dbm);
-    NamespaceString ns(qm.ns);
+    const auto ns =
+        NamespaceStringUtil::deserialize(boost::none, qm.ns, SerializationContext::stateDefault());
 
     if (qm.queryOptions & QueryOption_Exhaust) {
         uasserted(18527,
                   str::stream() << "The 'exhaust' OP_QUERY flag is invalid for commands: "
-                                << ns.ns() << " " << qm.query.toString());
+                                << ns.toStringForErrorMsg() << " " << qm.query.toString());
     }
 
     uassert(40473,
@@ -61,7 +63,7 @@ OpMsgRequest opMsgRequestFromLegacyRequest(const Message& message) {
             qm.ntoreturn == 1 || qm.ntoreturn == -1);
 
     return upconvertRequest(
-        ns.db(), qm.query.shareOwnershipWith(message.sharedBuffer()), qm.queryOptions);
+        ns.dbName(), qm.query.shareOwnershipWith(message.sharedBuffer()), qm.queryOptions);
 }
 
 }  // namespace rpc

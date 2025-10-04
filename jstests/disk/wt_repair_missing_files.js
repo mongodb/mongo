@@ -5,9 +5,13 @@
  * @tags: [requires_wiredtiger]
  */
 
-(function() {
-
-load('jstests/disk/libs/wt_file_helper.js');
+import {
+    assertQueryUsesIndex,
+    assertRepairSucceeds,
+    getUriForColl,
+    getUriForIndex,
+    startMongodOnExistingPath,
+} from "jstests/disk/libs/wt_file_helper.js";
 
 const baseName = "wt_repair_missing_files";
 const collName = "test";
@@ -24,7 +28,7 @@ let mongod = startMongodOnExistingPath(dbpath);
 let testColl = mongod.getDB(baseName)[collName];
 
 const doc = {
-    a: 1
+    a: 1,
 };
 assert.commandWorked(testColl.insert(doc));
 
@@ -168,4 +172,3 @@ assert.eq(testColl.find(doc).itcount(), 1);
 assert.eq(testColl.count(), 1);
 
 MongoRunner.stopMongod(mongod);
-})();

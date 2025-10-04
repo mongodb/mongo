@@ -1,20 +1,21 @@
-#
-# Public Domain 2014-present MongoDB, Inc.
-# Public Domain 2008-2014 WiredTiger, Inc.
-#  All rights reserved.
-#
-# See the file LICENSE for redistribution information.
-#
-
 cmake_minimum_required(VERSION 3.10.0)
 
-set(CMAKE_C_COMPILER "clang")
+set(C_COMPILER_VERSION_SUFFIX)
+set(CXX_COMPILER_VERSION_SUFFIX)
+if(CLANG_C_VERSION)
+    set(C_COMPILER_VERSION_SUFFIX "-${CLANG_C_VERSION}")
+endif()
+if(CLANG_CXX_VERSION)
+    set(CXX_COMPILER_VERSION_SUFFIX "-${CLANG_CXX_VERSION}")
+endif()
+
+set(CMAKE_C_COMPILER "clang${C_COMPILER_VERSION_SUFFIX}")
 set(CMAKE_C_COMPILER_ID "Clang")
 
-set(CMAKE_CXX_COMPILER "clang++")
+set(CMAKE_CXX_COMPILER "clang++${CXX_COMPILER_VERSION_SUFFIX}")
 set(CMAKE_CXX_COMPILER_ID "Clang++")
 
-set(CMAKE_ASM_COMPILER "clang")
+set(CMAKE_ASM_COMPILER "clang${C_COMPILER_VERSION_SUFFIX}")
 set(CMAKE_ASM_COMPILER_ID "Clang")
 
 if(NOT "${COMPILE_DEFINITIONS}" STREQUAL "")

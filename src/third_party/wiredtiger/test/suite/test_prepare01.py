@@ -26,13 +26,12 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest
+import wttest
 from wtscenario import make_scenarios
 
 # test_prepare01.py
 #    Transactions: basic functionality with prepare
 class test_prepare01(wttest.WiredTigerTestCase):
-    session_config = 'isolation=snapshot'
 
     nentries = 1000
     scenarios = make_scenarios([
@@ -143,5 +142,14 @@ class test_prepare01(wttest.WiredTigerTestCase):
         self.session.commit_transaction()
         self.check(cursor, self.nentries, self.nentries)
 
-if __name__ == '__main__':
-    wttest.run()
+# Attempts to set the read timestamp after preparing the transaction should be ignored.
+class test_prepare01_read_ts(wttest.WiredTigerTestCase):
+    def test_prepare01_read_ts(self):
+        uri = 'table:prepare01_read_ts'
+        self.session.create(uri, 'key_format=S,value_format=S')
+        c = self.session.open_cursor(uri)
+        self.session.begin_transaction()
+        c['aaa'] = 'value'
+        self.session.prepare_transaction('prepare_timestamp=a')
+        with self.expectedStderrPattern('.*silently ignored.*'):
+            self.session.timestamp_transaction('read_timestamp=a')

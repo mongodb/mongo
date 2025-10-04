@@ -31,7 +31,6 @@
 #   cause files to be closed.
 #
 
-import fnmatch, os, shutil, time
 from helper import copy_wiredtiger_home
 from suite_subprocess import suite_subprocess
 import wttest
@@ -71,8 +70,5 @@ class test_durability01(wttest.WiredTigerTestCase, suite_subprocess):
             if i % 5 == 0:
                 self.session.checkpoint()
             else:
-                self.session.verify(self.uri)
+                self.verifyUntilSuccess(self.session, self.uri)
             self.check_crash_restart(".", "RESTART")
-
-if __name__ == '__main__':
-    wttest.run()

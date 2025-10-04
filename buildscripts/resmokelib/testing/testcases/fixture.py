@@ -1,21 +1,28 @@
 """The unittest.TestCase instances for setting up and tearing down fixtures."""
 
+from pymongo import ReadPreference
+
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
 from buildscripts.resmokelib.testing.fixtures.external import ExternalFixture
+from buildscripts.resmokelib.testing.fixtures.replicaset import ReplicaSetFixture
 from buildscripts.resmokelib.testing.testcases import interface
 from buildscripts.resmokelib.utils import registry
+from buildscripts.resmokelib.utils.sharded_cluster_util import (
+    refresh_logical_session_cache_with_retry,
+)
 
 
-class FixtureTestCase(interface.TestCase):  # pylint: disable=abstract-method
+class FixtureTestCase(interface.TestCase):
     """Base class for the fixture test cases."""
 
     REGISTERED_NAME = registry.LEAVE_UNREGISTERED
 
     def __init__(self, logger, job_name, phase):
         """Initialize the FixtureTestCase."""
-        interface.TestCase.__init__(self, logger, "Fixture test", "{}_fixture_{}".format(
-            job_name, phase), dynamic=True)
+        interface.TestCase.__init__(
+            self, logger, "Fixture test", "{}_fixture_{}".format(job_name, phase), dynamic=True
+        )
         self.job_name = job_name
 
 
@@ -27,8 +34,9 @@ class FixtureSetupTestCase(FixtureTestCase):
 
     def __init__(self, logger, fixture, job_name, times_set_up):
         """Initialize the FixtureSetupTestCase."""
-        specific_phase = "{phase}_{times_set_up}".format(phase=self.PHASE,
-                                                         times_set_up=times_set_up)
+        specific_phase = "{phase}_{times_set_up}".format(
+            phase=self.PHASE, times_set_up=times_set_up
+        )
         FixtureTestCase.__init__(self, logger, job_name, specific_phase)
         self.fixture = fixture
 
@@ -40,8 +48,25 @@ class FixtureSetupTestCase(FixtureTestCase):
             self.fixture.setup()
             self.logger.info("Waiting for %s to be ready.", self.fixture)
             self.fixture.await_ready()
-            if not isinstance(self.fixture, (fixture_interface.NoOpFixture, ExternalFixture)):
-                self.fixture.mongo_client().admin.command({"refreshLogicalSessionCacheNow": 1})
+            if (
+                not isinstance(self.fixture, (fixture_interface.NoOpFixture, ExternalFixture))
+                # TODO(SERVER-109851): Remove this.
+                # disagg mongod does not yet support "refreshLogicalSessionCacheNow" because it requires
+                # wtimeout support.
+                and self.fixture.__class__.__name__ != "DisaggFixture"
+                # Replica set with --configsvr cannot run refresh unless it is part of a sharded cluster.
+                and not (
+                    isinstance(self.fixture, ReplicaSetFixture)
+                    and "configsvr" in self.fixture.mongod_options
+                )
+            ):
+                mongo_client = self.fixture.mongo_client(ReadPreference.PRIMARY)
+                # Read from the CSRS primary to gossip the most recent configTime to the mongos.
+                # This ensures that the latest state of the sessions collection can be seen
+                # by the router, when performing the LogicalSessionCache refresh.
+                mongo_client.admin["system.version"].find({})
+                # Perform the LogicalSessionCache refresh.
+                refresh_logical_session_cache_with_retry(mongo_client)
             self.logger.info("Finished the setup of %s.", self.fixture)
             self.return_code = 0
         except errors.ServerFailure as err:
@@ -87,8 +112,9 @@ class FixtureAbortTestCase(FixtureTestCase):
 
     def __init__(self, logger, fixture, job_name, times_set_up):
         """Initialize the FixtureAbortTestCase."""
-        specific_phase = "{phase}_{times_set_up}".format(phase=self.PHASE,
-                                                         times_set_up=times_set_up)
+        specific_phase = "{phase}_{times_set_up}".format(
+            phase=self.PHASE, times_set_up=times_set_up
+        )
         FixtureTestCase.__init__(self, logger, job_name, specific_phase)
         self.fixture = fixture
 

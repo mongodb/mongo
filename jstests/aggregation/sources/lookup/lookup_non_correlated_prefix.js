@@ -4,24 +4,12 @@
 /**
  * Confirms that $lookup with a non-correlated prefix returns expected results.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fixture_helpers.js");  // For isSharded.
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
 const testColl = db.lookup_non_correlated_prefix;
 testColl.drop();
 const joinColl = db.lookup_non_correlated_prefix_join;
 joinColl.drop();
-
-// Do not run the rest of the tests if the foreign collection is implicitly sharded but the flag to
-// allow $lookup/$graphLookup into a sharded collection is disabled.
-const getShardedLookupParam = db.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
-const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
-    getShardedLookupParam.featureFlagShardedLookup.value;
-if (FixtureHelpers.isSharded(joinColl) && !isShardedLookupEnabled) {
-    return;
-}
 
 const users = [
     {
@@ -44,12 +32,12 @@ res = assert.commandWorked(joinColl.insert(items));
 let cursor = testColl.aggregate([
     {
         $lookup: {
-            as: 'items_check',
+            as: "items_check",
             from: joinColl.getName(),
-            let : {id: '$_id'},
+            let: {id: "$_id"},
             pipeline: [
-                {$addFields: {id: '$_id'}},
-                {$match: {$expr: {$eq: ['$$id', '$owner']}}},
+                {$addFields: {id: "$_id"}},
+                {$match: {$expr: {$eq: ["$$id", "$owner"]}}},
                 {
                     $facet: {
                         all: [{$match: {}}],
@@ -60,49 +48,81 @@ let cursor = testColl.aggregate([
     },
 ]);
 assert(cursor.hasNext());
-cursor.toArray().forEach(user => {
-    const joinedDocs = user['items_check'][0]['all'];
+cursor.toArray().forEach((user) => {
+    const joinedDocs = user["items_check"][0]["all"];
     assert.neq(null, joinedDocs);
     assert.eq(1, joinedDocs.length);
-    assert.eq(user['_id'], joinedDocs[0].owner);
+    assert.eq(user["_id"], joinedDocs[0].owner);
 });
 
 cursor = testColl.aggregate([
     {
         $lookup: {
-            as: 'items_check',
+            as: "items_check",
             from: joinColl.getName(),
-            let : {id: '$_id'},
-            pipeline: [
-                {$addFields: {id: '$_id'}},
-                {$match: {$expr: {$eq: ['$$id', '$owner']}}},
-            ],
+            let: {id: "$_id"},
+            pipeline: [{$addFields: {id: "$_id"}}, {$match: {$expr: {$eq: ["$$id", "$owner"]}}}],
         },
     },
 ]);
 assert(cursor.hasNext());
-cursor.toArray().forEach(user => {
-    const joinedDocs = user['items_check'];
+cursor.toArray().forEach((user) => {
+    const joinedDocs = user["items_check"];
     assert.neq(null, joinedDocs);
     assert.eq(1, joinedDocs.length);
-    assert.eq(user['_id'], joinedDocs[0].owner);
+    assert.eq(user["_id"], joinedDocs[0].owner);
 });
 
-// SERVER-57000: Test handling of lack of correlation (addFields with empty set of columns)
-assert.doesNotThrow(() => testColl.aggregate([
+// Test for a non-correlated prefix followed by a $facet pipeline that contains a correlated
+// variable reference.
+cursor = testColl.aggregate([
     {
         $lookup: {
-            as: 'items_check',
+            as: "items_check",
             from: joinColl.getName(),
+            let: {id: "$_id"},
             pipeline: [
-                {$addFields: {}},
+                {$match: {owner: "user_1"}},
                 {
                     $facet: {
-                        all: [{$match: {}}],
+                        all: [
+                            {
+                                $redact: {
+                                    $cond: {if: {$eq: ["$$id", "user_1"]}, then: "$$KEEP", else: "$$PRUNE"},
+                                },
+                            },
+                        ],
                     },
                 },
             ],
         },
     },
-]));
-})();
+]);
+res = cursor.toArray();
+assert(
+    arrayEq(res, [
+        {"_id": "user_1", "items_check": [{"all": [{"_id": "item_1", "owner": "user_1"}]}]},
+        {"_id": "user_2", "items_check": [{"all": []}]},
+    ]),
+    res,
+);
+
+// SERVER-57000: Test handling of lack of correlation (addFields with empty set of columns)
+assert.doesNotThrow(() =>
+    testColl.aggregate([
+        {
+            $lookup: {
+                as: "items_check",
+                from: joinColl.getName(),
+                pipeline: [
+                    {$addFields: {}},
+                    {
+                        $facet: {
+                            all: [{$match: {}}],
+                        },
+                    },
+                ],
+            },
+        },
+    ]),
+);

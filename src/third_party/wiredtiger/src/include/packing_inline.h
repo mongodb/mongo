@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 /*
  * Throughout this code we have to be aware of default argument conversion.
  *
@@ -57,13 +59,16 @@ typedef struct {
  * __pack_initn --
  *     Initialize a pack iterator with the specified string and length.
  */
-static inline int
+static WT_INLINE int
 __pack_initn(WT_SESSION_IMPL *session, WT_PACK *pack, const char *fmt, size_t len)
 {
     if (*fmt == '@' || *fmt == '<' || *fmt == '>')
         return (EINVAL);
-    if (*fmt == '.')
+    if (*fmt == '.') {
         ++fmt;
+        if (len > 0)
+            --len;
+    }
 
     pack->session = session;
     pack->cur = pack->orig = fmt;
@@ -76,7 +81,7 @@ __pack_initn(WT_SESSION_IMPL *session, WT_PACK *pack, const char *fmt, size_t le
  * __pack_init --
  *     Initialize a pack iterator with the specified string.
  */
-static inline int
+static WT_INLINE int
 __pack_init(WT_SESSION_IMPL *session, WT_PACK *pack, const char *fmt)
 {
     return (__pack_initn(session, pack, fmt, strlen(fmt)));
@@ -86,7 +91,7 @@ __pack_init(WT_SESSION_IMPL *session, WT_PACK *pack, const char *fmt)
  * __pack_name_init --
  *     Initialize the name of a pack iterator.
  */
-static inline void
+static WT_INLINE void
 __pack_name_init(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *names, bool iskey, WT_PACK_NAME *pn)
 {
     WT_CLEAR(*pn);
@@ -102,7 +107,7 @@ __pack_name_init(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *names, bool iskey, WT
  * __pack_name_next --
  *     Get the next field type from a pack iterator.
  */
-static inline int
+static WT_INLINE int
 __pack_name_next(WT_PACK_NAME *pn, WT_CONFIG_ITEM *name)
 {
     WT_CONFIG_ITEM ignore;
@@ -133,7 +138,7 @@ __pack_name_next(WT_PACK_NAME *pn, WT_CONFIG_ITEM *name)
  * __pack_next --
  *     Next pack iterator.
  */
-static inline int
+static WT_INLINE int
 __pack_next(WT_PACK *pack, WT_PACK_VALUE *pv)
 {
     char *endsize;
@@ -267,7 +272,7 @@ next:
  * __pack_size --
  *     Get the size of a packed value.
  */
-static inline int
+static WT_INLINE int
 __pack_size(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv, size_t *vp)
 {
     size_t s, pad;
@@ -287,7 +292,8 @@ __pack_size(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv, size_t *vp)
 
             /* The string was previously validated. */
             len = __wt_json_strlen((const char *)pv->u.item.data, pv->u.item.size);
-            WT_ASSERT(session, len >= 0);
+            if (len < 0)
+                WT_RET_MSG(session, EINVAL, "invalid JSON string length in pack_size");
             s = (size_t)len + (pv->type == 'K' ? 0 : 1);
         }
         *vp = s;
@@ -296,7 +302,8 @@ __pack_size(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv, size_t *vp)
     case 'S':
         if (pv->type == 's' || pv->havesize) {
             s = pv->size;
-            WT_ASSERT(session, s != 0);
+            if (s == 0)
+                WT_RET_MSG(session, EINVAL, "zero-length string in pack_size");
         } else
             s = strlen(pv->u.s) + 1;
         *vp = s;
@@ -343,7 +350,7 @@ __pack_size(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv, size_t *vp)
  * __pack_write --
  *     Pack a value into a buffer.
  */
-static inline int
+static WT_INLINE int
 __pack_write(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv, uint8_t **pp, size_t maxlen)
 {
     size_t s, pad;
@@ -486,7 +493,7 @@ __pack_write(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv, uint8_t **pp, size_t m
  * __unpack_read --
  *     Read a packed value from a buffer.
  */
-static inline int
+static WT_INLINE int
 __unpack_read(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv, const uint8_t **pp, size_t maxlen)
 {
     size_t s;
@@ -500,7 +507,8 @@ __unpack_read(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv, const uint8_t **pp, s
     case 'S':
         if (pv->type == 's' || pv->havesize) {
             s = pv->size;
-            WT_ASSERT(session, s != 0);
+            if (s == 0)
+                WT_RET_MSG(session, EINVAL, "zero-length string in unpack_read");
         } else
             s = strlen((const char *)*pp) + 1;
         if (s > 0)
@@ -573,62 +581,62 @@ __unpack_read(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv, const uint8_t **pp, s
     return (0);
 }
 
-#define WT_UNPACK_PUT(session, pv, ap)                             \
-    do {                                                           \
-        WT_ITEM *__item;                                           \
-        switch ((pv).type) {                                       \
-        case 'x':                                                  \
-            break;                                                 \
-        case 's':                                                  \
-        case 'S':                                                  \
-            *va_arg(ap, const char **) = (pv).u.s;                 \
-            break;                                                 \
-        case 'U':                                                  \
-        case 'u':                                                  \
-            __item = va_arg(ap, WT_ITEM *);                        \
-            __item->data = (pv).u.item.data;                       \
-            __item->size = (pv).u.item.size;                       \
-            break;                                                 \
-        case 'b':                                                  \
-            *va_arg(ap, int8_t *) = (int8_t)(pv).u.i;              \
-            break;                                                 \
-        case 'h':                                                  \
-            *va_arg(ap, int16_t *) = (short)(pv).u.i;              \
-            break;                                                 \
-        case 'i':                                                  \
-        case 'l':                                                  \
-            *va_arg(ap, int32_t *) = (int32_t)(pv).u.i;            \
-            break;                                                 \
-        case 'q':                                                  \
-            *va_arg(ap, int64_t *) = (pv).u.i;                     \
-            break;                                                 \
-        case 'B':                                                  \
-        case 't':                                                  \
-            *va_arg(ap, uint8_t *) = (uint8_t)(pv).u.u;            \
-            break;                                                 \
-        case 'H':                                                  \
-            *va_arg(ap, uint16_t *) = (uint16_t)(pv).u.u;          \
-            break;                                                 \
-        case 'I':                                                  \
-        case 'L':                                                  \
-            *va_arg(ap, uint32_t *) = (uint32_t)(pv).u.u;          \
-            break;                                                 \
-        case 'Q':                                                  \
-        case 'r':                                                  \
-        case 'R':                                                  \
-            *va_arg(ap, uint64_t *) = (pv).u.u;                    \
-            break;                                                 \
-        default:                                                   \
-            /* User format strings have already been validated. */ \
-            return (__wt_illegal_value(session, (pv).type));       \
-        }                                                          \
+#define WT_UNPACK_PUT(session, pv, ap)                                              \
+    do {                                                                            \
+        WT_ITEM *__item;                                                            \
+        switch ((pv).type) {                                                        \
+        case 'x':                                                                   \
+            break;                                                                  \
+        case 's':                                                                   \
+        case 'S':                                                                   \
+            *va_arg(ap, const char **) = (pv).u.s;                                  \
+            break;                                                                  \
+        case 'U':                                                                   \
+        case 'u':                                                                   \
+            __item = va_arg(ap, WT_ITEM *);                                         \
+            __item->data = (pv).u.item.data;                                        \
+            __item->size = (pv).u.item.size;                                        \
+            break;                                                                  \
+        case 'b':                                                                   \
+            *va_arg(ap, int8_t *) = (int8_t)(pv).u.i;                               \
+            break;                                                                  \
+        case 'h':                                                                   \
+            *va_arg(ap, int16_t *) = (short)(pv).u.i;                               \
+            break;                                                                  \
+        case 'i':                                                                   \
+        case 'l':                                                                   \
+            *va_arg(ap, int32_t *) = (int32_t)(pv).u.i;                             \
+            break;                                                                  \
+        case 'q':                                                                   \
+            *va_arg(ap, int64_t *) = (pv).u.i;                                      \
+            break;                                                                  \
+        case 'B':                                                                   \
+        case 't':                                                                   \
+            *va_arg(ap, uint8_t *) = (uint8_t)(pv).u.u;                             \
+            break;                                                                  \
+        case 'H':                                                                   \
+            *va_arg(ap, uint16_t *) = (uint16_t)(pv).u.u;                           \
+            break;                                                                  \
+        case 'I':                                                                   \
+        case 'L':                                                                   \
+            *va_arg(ap, uint32_t *) = (uint32_t)(pv).u.u;                           \
+            break;                                                                  \
+        case 'Q':                                                                   \
+        case 'r':                                                                   \
+        case 'R':                                                                   \
+            *va_arg(ap, uint64_t *) = (pv).u.u;                                     \
+            break;                                                                  \
+        default:                                                                    \
+            __wt_err(session, EINVAL, "unknown unpack-put type: %c", (int)pv.type); \
+            break;                                                                  \
+        }                                                                           \
     } while (0)
 
 /*
  * __wt_struct_packv --
  *     Pack a byte string (va_list version).
  */
-static inline int
+static WT_INLINE int
 __wt_struct_packv(WT_SESSION_IMPL *session, void *buffer, size_t size, const char *fmt, va_list ap)
 {
     WT_DECL_PACK_VALUE(pv);
@@ -653,7 +661,8 @@ __wt_struct_packv(WT_SESSION_IMPL *session, void *buffer, size_t size, const cha
     WT_RET_NOTFOUND_OK(ret);
 
     /* Be paranoid - __pack_write should never overflow. */
-    WT_ASSERT(session, p <= end);
+    if (p > end)
+        WT_RET_MSG(session, EINVAL, "buffer overflow in wt_struct_packv");
 
     return (0);
 }
@@ -662,7 +671,7 @@ __wt_struct_packv(WT_SESSION_IMPL *session, void *buffer, size_t size, const cha
  * __wt_struct_sizev --
  *     Calculate the size of a packed byte string (va_list version).
  */
-static inline int
+static WT_INLINE int
 __wt_struct_sizev(WT_SESSION_IMPL *session, size_t *sizep, const char *fmt, va_list ap)
 {
     WT_DECL_PACK_VALUE(pv);
@@ -693,7 +702,7 @@ __wt_struct_sizev(WT_SESSION_IMPL *session, size_t *sizep, const char *fmt, va_l
  * __wt_struct_unpackv --
  *     Unpack a byte string (va_list version).
  */
-static inline int
+static WT_INLINE int
 __wt_struct_unpackv(
   WT_SESSION_IMPL *session, const void *buffer, size_t size, const char *fmt, va_list ap)
 {
@@ -720,7 +729,8 @@ __wt_struct_unpackv(
     WT_RET_NOTFOUND_OK(ret);
 
     /* Be paranoid - __pack_write should never overflow. */
-    WT_ASSERT(session, p <= end);
+    if (p > end)
+        WT_RET_MSG(session, EINVAL, "buffer overflow in wt_struct_unpackv");
 
     return (0);
 }
@@ -733,7 +743,7 @@ __wt_struct_unpackv(
  *     function adjusts the size appropriately (taking into account the size of the final size or
  *     the size field itself).
  */
-static inline void
+static WT_INLINE void
 __wt_struct_size_adjust(WT_SESSION_IMPL *session, size_t *sizep)
 {
     size_t curr_size, field_size, prev_field_size;

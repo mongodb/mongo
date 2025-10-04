@@ -29,10 +29,14 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-
+#include "mongo/db/auth/validated_tenancy_scope.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/s/resharding/donor_oplog_id_gen.h"
 #include "mongo/util/future.h"
+
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -53,7 +57,7 @@ class OperationContext;
  */
 class ReshardingOplogSessionApplication {
 public:
-    ReshardingOplogSessionApplication() = default;
+    ReshardingOplogSessionApplication(NamespaceString oplogBufferNss);
 
     /**
      * Returns boost::none if the operation was successfully applied.
@@ -66,10 +70,16 @@ public:
 
 private:
     /**
-     * Writes a no-op oplog entry that contains the pre/post image document from a retryable write.
+     * Fetches the pre or post image oplog entry for the oplog entry with the given resharding id
+     * from the oplog buffer collection, and writes a no-op oplog entry to store the pre/post image
+     * and returns its op time. If no pre or post image oplog entry is found, skips the write and
+     * returns none.
      */
-    repl::OpTime _logPrePostImage(OperationContext* opCtx,
-                                  const repl::DurableOplogEntry& prePostImageOp) const;
+    boost::optional<repl::OpTime> _logPrePostImage(OperationContext* opCtx,
+                                                   const ReshardingDonorOplogId& opId,
+                                                   const repl::OpTime& prePostImageOpTime) const;
+
+    const NamespaceString _oplogBufferNss;
 };
 
 }  // namespace mongo

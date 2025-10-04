@@ -27,20 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <boost/intrusive_ptr.hpp>
-#include <string>
-
 #include "mongo/db/pipeline/accumulation_statement.h"
 
-#include "mongo/db/commands/feature_compatibility_version_documentation.h"
-#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
+
+#include <string>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -52,17 +51,17 @@ namespace {
 static StringMap<AccumulationStatement::ParserRegistration> parserMap;
 }  // namespace
 
-void AccumulationStatement::registerAccumulator(
-    std::string name,
-    AccumulationStatement::Parser parser,
-    AllowedWithApiStrict allowedWithApiStrict,
-    AllowedWithClientType allowedWithClientType,
-    boost::optional<multiversion::FeatureCompatibilityVersion> requiredMinVersion) {
+void AccumulationStatement::registerAccumulator(std::string name,
+                                                AccumulationStatement::Parser parser,
+                                                AllowedWithApiStrict allowedWithApiStrict,
+                                                AllowedWithClientType allowedWithClientType,
+                                                FeatureFlag* featureFlag) {
     auto it = parserMap.find(name);
     massert(28722,
             str::stream() << "Duplicate accumulator (" << name << ") registered.",
             it == parserMap.end());
-    parserMap[name] = {parser, allowedWithApiStrict, allowedWithClientType, requiredMinVersion};
+    parserMap[name] = {parser, allowedWithApiStrict, allowedWithClientType, featureFlag};
+    operatorCountersGroupAccumulatorExpressions.addCounter(name);
 }
 
 AccumulationStatement::ParserRegistration& AccumulationStatement::getParser(StringData name) {
@@ -81,7 +80,7 @@ AccumulationStatement AccumulationStatement::parseAccumulationStatement(
     auto fieldName = elem.fieldNameStringData();
     uassert(40234,
             str::stream() << "The field '" << fieldName << "' must be an accumulator object",
-            elem.type() == BSONType::Object &&
+            elem.type() == BSONType::object &&
                 elem.embeddedObject().firstElementFieldName()[0] == '$');
 
     uassert(40235,
@@ -93,34 +92,35 @@ AccumulationStatement AccumulationStatement::parseAccumulationStatement(
             fieldName[0] != '$');
 
     uassert(40238,
-            str::stream() << "The field '" << fieldName << "' must specify one accumulator",
+            str::stream() << "The field '" << fieldName
+                          << "' must specify one accumulator: " << elem,
             elem.Obj().nFields() == 1);
 
     auto specElem = elem.Obj().firstElement();
     auto accName = specElem.fieldNameStringData();
     uassert(40237,
             str::stream() << "The " << accName << " accumulator is a unary operator",
-            specElem.type() != BSONType::Array);
+            specElem.type() != BSONType::array);
 
-    auto&& [parser, allowedWithApiStrict, allowedWithClientType, requiredMinVersion] =
+    auto&& [parser, allowedWithApiStrict, allowedWithClientType, featureFlag] =
         AccumulationStatement::getParser(accName);
-    auto allowedMaxVersion = expCtx->maxFeatureCompatibilityVersion;
-    uassert(ErrorCodes::QueryFeatureNotAllowed,
-            // We would like to include the current version and the required minimum version in this
-            // error message, but using FeatureCompatibilityVersion::toString() would introduce a
-            // dependency cycle (see SERVER-31968).
-            str::stream() << accName
-                          << " is not allowed in the current feature compatibility version. See "
-                          << feature_compatibility_version_documentation::kCompatibilityLink
-                          << " for more information.",
-            !requiredMinVersion || !allowedMaxVersion || *requiredMinVersion <= *allowedMaxVersion);
 
-    tassert(5837900, "Accumulators should only appear in a user operation", expCtx->opCtx);
-    assertLanguageFeatureIsAllowed(
-        expCtx->opCtx, accName.toString(), allowedWithApiStrict, allowedWithClientType);
+    if (featureFlag) {
+        expCtx->ignoreFeatureInParserOrRejectAndThrow(accName, *featureFlag);
+    }
+
+    tassert(5837900,
+            "Accumulators should only appear in a user operation",
+            expCtx->getOperationContext());
+    assertLanguageFeatureIsAllowed(expCtx->getOperationContext(),
+                                   std::string{accName},
+                                   allowedWithApiStrict,
+                                   allowedWithClientType);
+
+    expCtx->incrementGroupAccumulatorExprCounter(accName);
     auto accExpr = parser(expCtx, specElem, vps);
 
-    return AccumulationStatement(fieldName.toString(), std::move(accExpr));
+    return AccumulationStatement(std::string{fieldName}, std::move(accExpr));
 }
 
 MONGO_INITIALIZER_GROUP(BeginAccumulatorRegistration, ("default"), ("EndAccumulatorRegistration"))

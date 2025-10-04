@@ -1,4 +1,5 @@
 """Unit tests for the buildscripts.resmokelib.testing.testcases.pytest module."""
+
 import logging
 import sys
 import unittest
@@ -6,8 +7,6 @@ import unittest
 from buildscripts.resmokelib.testing.testcases import pytest
 
 _IS_WINDOWS = sys.platform == "win32"
-
-# pylint: disable=missing-docstring,protected-access
 
 
 def get_filename(filename):
@@ -20,7 +19,7 @@ class TestPyTestCase(unittest.TestCase):
     def test__make_process(self):
         logger = logging.getLogger("pytest")
         filename = "myfile.py"
-        pytest_case = pytest.PyTestCase(logger, filename)
+        pytest_case = pytest.PyTestCase(logger, [filename])
         self.assertEqual(pytest_case.test_name, filename)
         self.assertEqual(pytest_case.logger, logger)
         proc = pytest_case._make_process()
@@ -31,7 +30,7 @@ class TestPyTestCase(unittest.TestCase):
     def test__make_process_dir(self):
         logger = logging.getLogger("pytest")
         filename = "dir1/dir2/myfile.py"
-        pytest_case = pytest.PyTestCase(logger, filename)
+        pytest_case = pytest.PyTestCase(logger, [filename])
         self.assertEqual(pytest_case.test_name, filename)
         self.assertEqual(pytest_case.logger, logger)
         proc = pytest_case._make_process()
@@ -42,7 +41,7 @@ class TestPyTestCase(unittest.TestCase):
     def test__make_process_windows_file(self):
         logger = logging.getLogger("pytest")
         filename = "dir1\\dir2\\myfile.py"
-        pytest_case = pytest.PyTestCase(logger, filename)
+        pytest_case = pytest.PyTestCase(logger, [filename])
         self.assertEqual(pytest_case.test_name, filename)
         self.assertEqual(pytest_case.logger, logger)
         proc = pytest_case._make_process()
@@ -53,25 +52,25 @@ class TestPyTestCase(unittest.TestCase):
     def test_test_module_name(self):
         logger = logging.getLogger("pytest")
         filename = get_filename("dir1/dir2/dir3/myfile.py")
-        pytest_case = pytest.PyTestCase(logger, filename)
+        pytest_case = pytest.PyTestCase(logger, [filename])
         self.assertEqual(pytest_case.test_module_name, "dir1.dir2.dir3.myfile")
 
     def test_test_module_name_absolute_dir(self):
         logger = logging.getLogger("pytest")
         filename = get_filename("/dir1/dir2/dir3/myfile.py")
-        pytest_case = pytest.PyTestCase(logger, filename)
+        pytest_case = pytest.PyTestCase(logger, [filename])
         self.assertEqual(pytest_case.test_module_name, ".dir1.dir2.dir3.myfile")
 
     def test_test_module_name_no_dir(self):
         logger = logging.getLogger("pytest")
         filename = "myfile.py"
-        pytest_case = pytest.PyTestCase(logger, filename)
+        pytest_case = pytest.PyTestCase(logger, [filename])
         self.assertEqual(pytest_case.test_module_name, "myfile")
 
     def test__make_process_with_space(self):
         logger = logging.getLogger("pytest")
         filename = "this file name has space.py:q:"
-        pytest_case = pytest.PyTestCase(logger, filename)
+        pytest_case = pytest.PyTestCase(logger, [filename])
         self.assertEqual(pytest_case.test_name, filename)
         self.assertEqual(pytest_case.logger, logger)
         proc = pytest_case._make_process()

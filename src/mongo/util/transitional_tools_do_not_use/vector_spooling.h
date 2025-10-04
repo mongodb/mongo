@@ -46,7 +46,7 @@ inline std::vector<T*> unspool_vector(const std::vector<std::unique_ptr<T>>& v) 
 }
 
 template <typename T>
-inline std::vector<std::unique_ptr<T>> spool_vector(const std::vector<T*>& v) noexcept {
+inline std::vector<std::unique_ptr<T>> spool_vector(const std::vector<T*>& v) {
     std::vector<std::unique_ptr<T>> result;
     result.reserve(v.size());
     std::transform(v.begin(), v.end(), std::back_inserter(result), [](const auto& p) {
@@ -56,7 +56,7 @@ inline std::vector<std::unique_ptr<T>> spool_vector(const std::vector<T*>& v) no
 }
 
 template <typename T>
-inline std::vector<T*> leak_vector(std::vector<std::unique_ptr<T>>& v) noexcept {
+inline std::vector<T*> leak_vector(std::vector<std::unique_ptr<T>>& v) {
     std::vector<T*> result;
     result.reserve(v.size());
     std::transform(

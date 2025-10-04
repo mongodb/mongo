@@ -30,48 +30,132 @@ Generate a file containing a list of disabled feature flags.
 Used by resmoke.py to run only feature flag tests.
 """
 
-import argparse
 import os
 import sys
-
 from typing import List
 
+import typer
 import yaml
 
 # Permit imports from "buildscripts".
-sys.path.append(os.path.normpath(os.path.join(os.path.abspath(__file__), '../../..')))
+sys.path.append(os.path.normpath(os.path.join(os.path.abspath(__file__), "../../..")))
 
-# pylint: disable=wrong-import-position
-import buildscripts.idl.lib as lib
-
-
-def gen_all_feature_flags(idl_dir: str, import_dirs: List[str]):
-    """Generate a list of all feature flags."""
-    all_flags = []
-    for idl_path in sorted(lib.list_idls(idl_dir)):
-        for feature_flag in lib.parse_idl(idl_path, import_dirs).spec.feature_flags:
-            if feature_flag.default.literal != "true":
-                all_flags.append(feature_flag.name)
-
-    force_disabled_flags = yaml.safe_load(
-        open("buildscripts/resmokeconfig/fully_disabled_feature_flags.yml"))
-
-    return list(set(all_flags) - set(force_disabled_flags))
+from buildscripts.idl import lib
+from buildscripts.idl.idl import binder, parser
 
 
-def main():
-    """Run the main function."""
-    arg_parser = argparse.ArgumentParser(description=__doc__)
-    arg_parser.add_argument("--import-dir", dest="import_dirs", type=str, action="append",
-                            help="Directory to search for IDL import files")
+def get_all_feature_flags(idl_dirs: List[str] = None):
+    """Generate a dict of all feature flags with their default value."""
+    default_idl_dirs = ["src", "buildscripts"]
 
-    args = arg_parser.parse_args()
+    if not idl_dirs:
+        idl_dirs = default_idl_dirs
 
-    flags = gen_all_feature_flags(os.getcwd(), args.import_dirs)
-    with open(lib.ALL_FEATURE_FLAG_FILE, "w") as output_file:
-        for flag in flags:
-            output_file.write("%s\n" % flag)
+    all_flags = {}
+    for idl_dir in idl_dirs:
+        for idl_path in sorted(lib.list_idls(idl_dir)):
+            if lib.is_third_party_idl(idl_path):
+                continue
+            # Most IDL files do not contain feature flags.
+            # We can discard these quickly without expensive YAML parsing.
+            with open(idl_path) as idl_file:
+                if "feature_flags" not in idl_file.read():
+                    continue
+            with open(idl_path) as idl_file:
+                doc = parser.parse_file(idl_file, idl_path)
+            for feature_flag in doc.spec.feature_flags:
+                all_flags[feature_flag.name] = feature_flag
+
+    return all_flags
 
 
-if __name__ == '__main__':
-    main()
+def get_all_feature_flags_turned_on_by_default(idl_dirs: List[str] = None):
+    """Generate a list of all feature flags that default to true."""
+    all_flags = get_all_feature_flags(idl_dirs)
+
+    return [
+        name for name, flag in all_flags.items() if binder.is_feature_flag_enabled_by_default(flag)
+    ]
+
+
+def get_all_feature_flags_turned_off_by_default(idl_dirs: List[str] = None):
+    """Generate a list of all feature flags that default to false."""
+    all_flags = get_all_feature_flags(idl_dirs)
+    all_default_false_flags = [
+        name
+        for name, flag in all_flags.items()
+        if not binder.is_feature_flag_enabled_by_default(flag)
+    ]
+
+    with open(
+        "buildscripts/resmokeconfig/fully_disabled_feature_flags.yml", encoding="utf8"
+    ) as fully_disabled_ffs:
+        force_disabled_flags = yaml.safe_load(fully_disabled_ffs)
+
+    return list(set(all_default_false_flags) - set(force_disabled_flags))
+
+
+def get_all_unreleased_ifr_feature_flags(idl_dirs: List[str] = None):
+    """Generate a list of all features flags in the 'in_development' incremental rollout phase."""
+    all_flags = get_all_feature_flags(idl_dirs)
+
+    return [
+        name
+        for name, flag in all_flags.items()
+        if binder.is_unreleased_incremental_rollout_feature_flag(flag)
+    ]
+
+
+def write_feature_flags_to_file(flags: List[str], filename: str):
+    """Helper function to write feature flags to a file."""
+    with open(filename, "w") as output_file:
+        output_file.write("\n".join(flags))
+        print(f"Generated: {os.path.realpath(output_file.name)}")
+
+
+cli = typer.Typer()
+
+
+@cli.command("turned-off-by-default")
+def turned_off_by_default(filename: str = "all_feature_flags.txt"):
+    """Generate a list of feature flags that default to OFF."""
+    flags = get_all_feature_flags_turned_off_by_default()
+    write_feature_flags_to_file(flags, filename)
+
+
+@cli.command("turned-on-by-default")
+def turned_on_by_default(filename: str = "all_feature_flags.txt"):
+    """Generate a list of feature flags that default to ON."""
+    flags = get_all_feature_flags_turned_on_by_default()
+    write_feature_flags_to_file(flags, filename)
+
+
+@cli.command("feature-flag-status")
+def feature_flag_status():
+    """Generate lists of all default-enabled feature flags, all default-disabled feature flags and
+    all 'in_development' IFR feature flags, with each list on its own line
+    """
+    all_flags = get_all_feature_flags()
+
+    default_enabled_flags = [
+        name for name, flag in all_flags.items() if binder.is_feature_flag_enabled_by_default(flag)
+    ]
+    print(f"on_feature_flags {' '.join(default_enabled_flags)}")
+
+    default_disabled_flags = [
+        name
+        for name, flag in all_flags.items()
+        if not binder.is_feature_flag_enabled_by_default(flag)
+    ]
+    print(f"off_feature_flags {' '.join(default_disabled_flags)}")
+
+    unreleased_ifr_flags = [
+        name
+        for name, flag in all_flags.items()
+        if binder.is_unreleased_incremental_rollout_feature_flag(flag)
+    ]
+    print(f"unreleased_ifr_flags {' '.join(unreleased_ifr_flags)}")
+
+
+if __name__ == "__main__":
+    cli()

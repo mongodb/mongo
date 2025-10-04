@@ -77,7 +77,7 @@ typedef enum
     UNW_INFO_FORMAT_TABLE,              /* unw_dyn_table_t */
     UNW_INFO_FORMAT_REMOTE_TABLE,       /* unw_dyn_remote_table_t */
     UNW_INFO_FORMAT_ARM_EXIDX,          /* ARM specific unwind info */
-    UNW_INFO_FORMAT_IP_OFFSET,          /* Like UNW_INFO_FORMAT_REMOTE_TABLE, but
+    UNW_INFO_FORMAT_IP_OFFSET           /* Like UNW_INFO_FORMAT_REMOTE_TABLE, but
                                            table entries are considered
                                            relative to di->start_ip, rather
                                            than di->segbase */
@@ -141,6 +141,7 @@ typedef struct unw_dyn_info
     unw_word_t gp;              /* global-pointer in effect for this entry */
     int32_t format;             /* real type: unw_dyn_info_format_t */
     int32_t pad;
+    unw_word_t load_offset;     /* ELF load offset */
     union
       {
         unw_dyn_proc_info_t pi;

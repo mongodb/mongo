@@ -27,52 +27,41 @@
  *    it in the license file.
  */
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/db/storage/sorted_data_interface_test_assert.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
+#include "mongo/unittest/unittest.h"
 
 #include <memory>
 
-#include "mongo/db/storage/sorted_data_interface.h"
-#include "mongo/unittest/unittest.h"
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace {
 
 // Insert multiple keys and verify that fullValidate() either sets
 // the `numKeysOut` as the number of entries in the index, or as -1.
-TEST(SortedDataInterface, FullValidate) {
-    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(
-        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
+TEST_F(SortedDataInterfaceTest, FullValidate) {
+    const auto sorted(
+        harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
-    {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT(sorted->isEmpty(opCtx.get()));
-    }
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     int nToInsert = 10;
     for (int i = 0; i < nToInsert; i++) {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        {
-            WriteUnitOfWork uow(opCtx.get());
-            BSONObj key = BSON("" << i);
-            RecordId loc(42, i * 2);
-            ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key, loc), true));
-            uow.commit();
-        }
+        StorageWriteTransaction txn(recoveryUnit());
+        BSONObj key = BSON("" << i);
+        RecordId loc(42, i * 2);
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key, loc), true));
+        txn.commit();
     }
 
-    {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx.get()));
-    }
-
-    {
-        long long numKeysOut;
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        sorted->fullValidate(opCtx.get(), &numKeysOut, nullptr);
-        // fullValidate() can set numKeysOut as the number of existing keys or -1.
-        ASSERT(numKeysOut == nToInsert || numKeysOut == -1);
-    }
+    ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx(), recoveryUnit()));
 }
 
 }  // namespace

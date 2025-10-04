@@ -4,10 +4,8 @@
  * the current config.
  */
 
-(function() {
-"use strict";
-load("jstests/libs/write_concern_util.js");
-load("jstests/replsets/rslib.js");  // For reconnect.
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 const dbName = "test";
 const collName = "coll";
@@ -20,12 +18,12 @@ const primary = rst.getPrimary();
 const secondary = rst.getSecondary();
 const coll = primary.getDB(dbName)[collName];
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 // This makes the test run faster.
-assert.commandWorked(secondary.adminCommand(
-    {configureFailPoint: 'setSmallOplogGetMoreMaxTimeMS', mode: 'alwaysOn'}));
+assert.commandWorked(secondary.adminCommand({configureFailPoint: "setSmallOplogGetMoreMaxTimeMS", mode: "alwaysOn"}));
 
 // Create collection.
 assert.commandWorked(coll.insert({}));
@@ -39,16 +37,19 @@ assert.commandWorked(secondary.adminCommand({hello: 1, hangUpOnStepDown: false})
 // Reconfig down to a 1 node replica set.
 const origConfig = rst.getReplSetConfigFromNode();
 let C1 = Object.assign({}, origConfig);
-C1.members = C1.members.slice(0, 1);  // Remove the second node.
+C1.members = C1.members.slice(0, 1); // Remove the second node.
 C1.version++;
 assert.commandWorked(primary.adminCommand({replSetReconfig: C1}));
 
 // Wait for the secondary node to realize it is REMOVED.
-assert.soonNoExcept(function() {
-    let res = secondary.adminCommand({replSetGetStatus: 1});
-    assert.commandFailedWithCode(res, ErrorCodes.InvalidReplicaSetConfig);
-    return true;
-}, () => tojson(secondary.adminCommand({replSetGetStatus: 1})));
+assert.soonNoExcept(
+    function () {
+        let res = secondary.adminCommand({replSetGetStatus: 1});
+        assert.commandFailedWithCode(res, ErrorCodes.InvalidReplicaSetConfig);
+        return true;
+    },
+    () => tojson(secondary.adminCommand({replSetGetStatus: 1})),
+);
 
 jsTestLog("Test that force reconfig skips oplog commitment.");
 let C2 = Object.assign({}, origConfig);
@@ -69,4 +70,3 @@ restartServerReplication(secondary);
 rst.awaitNodesAgreeOnConfigVersion();
 
 rst.stopSet();
-}());

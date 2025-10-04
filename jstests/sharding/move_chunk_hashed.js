@@ -2,12 +2,9 @@
  * Test that moveChunk moves the right chunks and documents and that deleted
  * rangeDeleter delete the right documents from the donor shard.
  */
-(function() {
-'use strict';
-
-load('jstests/libs/chunk_manipulation_util.js');
-load("jstests/sharding/libs/chunk_bounds_util.js");
-load("jstests/sharding/libs/find_chunks_util.js");
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {chunkBoundsUtil} from "jstests/sharding/libs/chunk_bounds_util.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 /*
  * Returns the shard with the given shard name.
@@ -36,12 +33,11 @@ let st = new ShardingTest({shards: 3});
 let dbName = "test";
 let collName = "user";
 let ns = dbName + "." + collName;
-let configDB = st.s.getDB('config');
+let configDB = st.s.getDB("config");
 let testDB = st.s.getDB(dbName);
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard1.shardName);
-assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 'hashed'}}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
+assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: "hashed"}}));
 
 // Use docs that are expected to go to multiple different shards.
 let docs = [{x: -10}, {x: -1}, {x: 0}, {x: 1}, {x: 10}];
@@ -62,7 +58,7 @@ for (let chunkDoc of chunkDocs) {
             id: chunkDoc._id,
             shard: getShard(st, chunkDoc.shard),
             bounds: [chunkDoc.min, chunkDoc.max],
-            docs: docsInChunk
+            docs: docsInChunk,
         });
         numChunksWithMultipleDocs += docsInChunk.length > 1;
     }
@@ -75,16 +71,13 @@ assert.lt(numChunksWithMultipleDocs, chunksWithDocs.length);
 for (let chunk of chunksWithDocs) {
     let docsOnFromShard = chunk.shard.getCollection(ns).find({}, {_id: 0}).toArray();
     let toShard = st.getOther(chunk.shard);
-    assert.commandWorked(st.s.adminCommand(
-        {moveChunk: ns, bounds: chunk.bounds, to: toShard.shardName, _waitForDelete: true}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, bounds: chunk.bounds, to: toShard.shardName, _waitForDelete: true}),
+    );
 
     // Check that the config database is updated correctly.
-    assert.eq(0,
-              findChunksUtil.countChunksForNs(
-                  configDB, ns, {_id: chunk.id, shard: chunk.shard.shardName}));
-    assert.eq(
-        1,
-        findChunksUtil.countChunksForNs(configDB, ns, {_id: chunk.id, shard: toShard.shardName}));
+    assert.eq(0, findChunksUtil.countChunksForNs(configDB, ns, {_id: chunk.id, shard: chunk.shard.shardName}));
+    assert.eq(1, findChunksUtil.countChunksForNs(configDB, ns, {_id: chunk.id, shard: toShard.shardName}));
 
     // Check that the docs in the donated chunk are transferred to the recipient, and the
     // other docs remain on the donor.
@@ -99,4 +92,3 @@ for (let chunk of chunksWithDocs) {
 }
 
 st.stop();
-})();

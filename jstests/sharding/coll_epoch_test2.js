@@ -2,26 +2,25 @@
 //
 // The idea here is that a collection may be resharded / unsharded at any point, and any type of
 // operation on a mongos may be active when it happens.  All operations should handle gracefully.
-//
 
-(function() {
-var st = new ShardingTest({shards: 2, mongos: 5, verbose: 1});
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
+let st = new ShardingTest({shards: 2, mongos: 5, verbose: 1});
 // Balancer is by default stopped, thus it will not interfere
 
 // Use separate mongos for reading, updating, inserting, removing data
-var readMongos = st.s1;
-var updateMongos = st.s2;
-var insertMongos = st.s3;
-var removeMongos = st.s4;
+let readMongos = st.s1;
+let updateMongos = st.s2;
+let insertMongos = st.s3;
+let removeMongos = st.s4;
 
-var config = st.s.getDB("config");
-var admin = st.s.getDB("admin");
-var coll = st.s.getCollection("foo.bar");
+let config = st.s.getDB("config");
+let admin = st.s.getDB("admin");
+let coll = st.s.getCollection("foo.bar");
 
-assert.commandWorked(
-    insertMongos.getDB("admin").runCommand({setParameter: 1, traceExceptions: true}));
+assert.commandWorked(insertMongos.getDB("admin").runCommand({setParameter: 1, traceExceptions: true}));
 
-var shards = [st.shard0, st.shard1];
+let shards = [st.shard0, st.shard1];
 
 //
 // Set up a sharded collection
@@ -29,8 +28,7 @@ var shards = [st.shard0, st.shard1];
 
 jsTest.log("Enabling sharding for the first time...");
 
-assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));
-st.ensurePrimaryShard(coll.getDB().getName(), st.shard1.shardName);
+assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard1.shardName}));
 assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
 
 assert.commandWorked(coll.insert({hello: "world"}));
@@ -44,7 +42,7 @@ printjson(res);
 res = admin.runCommand({
     moveChunk: coll + "",
     find: {_id: 0},
-    to: st.getOther(st.getPrimaryShard(coll.getDB() + "")).name
+    to: st.getOther(st.getPrimaryShard(coll.getDB() + "")).name,
 });
 assert.commandWorked(res);
 printjson(res);
@@ -73,13 +71,11 @@ jsTest.log("Rebuilding sharded collection with different split...");
 
 coll.drop();
 
-assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));
-st.ensurePrimaryShard(coll.getDB().getName(), st.shard1.shardName);
+assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard1.shardName}));
 assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
 
-var bulk = coll.initializeUnorderedBulkOp();
-for (var i = 0; i < 100; i++)
-    bulk.insert({_id: i});
+let bulk = coll.initializeUnorderedBulkOp();
+for (var i = 0; i < 100; i++) bulk.insert({_id: i});
 assert.commandWorked(bulk.execute());
 
 res = admin.runCommand({split: coll + "", middle: {_id: 200}});
@@ -89,7 +85,7 @@ printjson(res);
 res = admin.runCommand({
     moveChunk: coll + "",
     find: {_id: 200},
-    to: st.getOther(st.getPrimaryShard(coll.getDB() + "")).name
+    to: st.getOther(st.getPrimaryShard(coll.getDB() + "")).name,
 });
 assert.commandWorked(res);
 printjson(res);
@@ -106,8 +102,7 @@ assert.neq(null, readMongos.getCollection(coll + "").findOne({_id: 1}));
 
 jsTest.log("Checking update...");
 // Ensure that updating an element finds the right location
-assert.commandWorked(
-    updateMongos.getCollection(coll + "").update({_id: 1}, {$set: {updated: true}}));
+assert.commandWorked(updateMongos.getCollection(coll + "").update({_id: 1}, {$set: {updated: true}}));
 assert.neq(null, coll.findOne({updated: true}));
 
 jsTest.log("Checking insert...");
@@ -125,4 +120,3 @@ coll.drop();
 jsTest.log("Done!");
 
 st.stop();
-})();

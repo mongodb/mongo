@@ -6,10 +6,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // arrayEq
+import {anyEq, arrayEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db[jsTestName()];
 
@@ -25,7 +22,7 @@ function testOne() {
         {val: 0, partition: 0},
         {val: 2, partition: 0},
         {val: 0, partition: 1},
-        {val: 2, partition: 1}
+        {val: 2, partition: 1},
     ];
     assert.commandWorked(coll.insert(testDocs));
 
@@ -35,12 +32,15 @@ function testOne() {
             $densify: {
                 field: "val",
                 partitionByFields: ["partition"],
-                range: {step: 1, bounds: "partition"}
-            }
-        }
+                range: {step: 1, bounds: "partition"},
+            },
+        },
     ]);
     const resultArray = result.toArray();
-    const testExpected = testDocs.concat([{val: 1, partition: 0}, {val: 1, partition: 1}]);
+    const testExpected = testDocs.concat([
+        {val: 1, partition: 0},
+        {val: 1, partition: 1},
+    ]);
     assert(arrayEq(resultArray, testExpected), buildErrorString(resultArray, testExpected));
     coll.drop();
 }
@@ -52,7 +52,7 @@ function testOneDates() {
         {val: new ISODate("2021-01-01"), partition: 0},
         {val: new ISODate("2021-01-03"), partition: 0},
         {val: new ISODate("2021-01-01"), partition: 1},
-        {val: new ISODate("2021-01-03"), partition: 1}
+        {val: new ISODate("2021-01-03"), partition: 1},
     ];
     assert.commandWorked(coll.insert(testDocs));
 
@@ -62,14 +62,14 @@ function testOneDates() {
             $densify: {
                 field: "val",
                 partitionByFields: ["partition"],
-                range: {step: 1, unit: "day", bounds: "partition"}
-            }
-        }
+                range: {step: 1, unit: "day", bounds: "partition"},
+            },
+        },
     ]);
     const resultArray = result.toArray();
     const testExpected = testDocs.concat([
         {val: new ISODate("2021-01-02"), partition: 0},
-        {val: new ISODate("2021-01-02"), partition: 1}
+        {val: new ISODate("2021-01-02"), partition: 1},
     ]);
     assert(arrayEq(resultArray, testExpected), buildErrorString(resultArray, testExpected));
     coll.drop();
@@ -82,7 +82,7 @@ function testTwo() {
         {val: 0, partition: 0},
         {val: 0, partition: 1},
         {val: 2, partition: 1},
-        {val: 2, partition: 0}
+        {val: 2, partition: 0},
     ];
     assert.commandWorked(coll.insert(testDocs));
 
@@ -92,12 +92,15 @@ function testTwo() {
             $densify: {
                 field: "val",
                 partitionByFields: ["partition"],
-                range: {step: 1, bounds: "partition"}
-            }
-        }
+                range: {step: 1, bounds: "partition"},
+            },
+        },
     ]);
     const resultArray = result.toArray();
-    const testExpected = testDocs.concat([{val: 1, partition: 0}, {val: 1, partition: 1}]);
+    const testExpected = testDocs.concat([
+        {val: 1, partition: 0},
+        {val: 1, partition: 1},
+    ]);
     assert(arrayEq(resultArray, testExpected), buildErrorString(resultArray, testExpected));
     coll.drop();
 }
@@ -127,9 +130,8 @@ function testThree() {
     let result = coll.aggregate([
         {$project: {_id: 0}},
         {
-            $densify:
-                {field: "val", partitionByFields: ["part"], range: {step: 1, bounds: "partition"}}
-        }
+            $densify: {field: "val", partitionByFields: ["part"], range: {step: 1, bounds: "partition"}},
+        },
     ]);
     const resultArray = result.toArray();
     assert(arrayEq(resultArray, testExpected), buildErrorString(resultArray, testExpected));
@@ -158,39 +160,11 @@ function testFour() {
     let result = coll.aggregate([
         {$project: {_id: 0}},
         {
-            $densify:
-                {field: "val", partitionByFields: ["part"], range: {step: 1, bounds: "partition"}}
-        }
+            $densify: {field: "val", partitionByFields: ["part"], range: {step: 1, bounds: "partition"}},
+        },
     ]);
     const resultArray = result.toArray();
     assert(arrayEq(resultArray, testExpected), buildErrorString(resultArray, testExpected));
-}
-
-// One partition doesn't need densifying.
-function testFive() {
-    coll.drop();
-
-    const testDocs = [
-        {val: 0, partition: 0},
-        {val: 2, partition: 0},
-        {val: 123, partition: 1},
-    ];
-    assert.commandWorked(coll.insert(testDocs));
-
-    let result = coll.aggregate([
-        {$project: {_id: 0}},
-        {
-            $densify: {
-                field: "val",
-                partitionByFields: ["partition"],
-                range: {step: 1, bounds: "partition"}
-            }
-        }
-    ]);
-    const resultArray = result.toArray();
-    const testExpected = testDocs.concat([{val: 1, partition: 0}]);
-    assert(arrayEq(resultArray, testExpected), buildErrorString(resultArray, testExpected));
-    coll.drop();
 }
 
 // Verify the following test works in the full case without partitions.
@@ -212,8 +186,10 @@ function fullTestOne(stepVal = 1) {
     testDocs.push({val: 11});
     testExpected.push({val: 11});
     assert.commandWorked(coll.insert(testDocs));
-    let result = coll.aggregate(
-        [{$project: {_id: 0}}, {$densify: {field: "val", range: {step: stepVal, bounds: "full"}}}]);
+    let result = coll.aggregate([
+        {$project: {_id: 0}},
+        {$densify: {field: "val", range: {step: stepVal, bounds: "full"}}},
+    ]);
     const resultArray = result.toArray();
     assert(arrayEq(resultArray, testExpected), buildErrorString(resultArray, testExpected));
 }
@@ -248,12 +224,39 @@ function testFive(stepVal = 1) {
             $densify: {
                 field: "val",
                 partitionByFields: ["partA", "partB"],
-                range: {step: stepVal, bounds: "partition"}
-            }
-        }
+                range: {step: stepVal, bounds: "partition"},
+            },
+        },
     ]);
     const resultArray = result.toArray();
     assert(arrayEq(resultArray, testExpected), buildErrorString(resultArray, testExpected));
+}
+
+// One partition doesn't need densifying.
+function testSix() {
+    coll.drop();
+
+    const testDocs = [
+        {val: 0, partition: 0},
+        {val: 2, partition: 0},
+        {val: 123, partition: 1},
+    ];
+    assert.commandWorked(coll.insert(testDocs));
+
+    let result = coll.aggregate([
+        {$project: {_id: 0}},
+        {
+            $densify: {
+                field: "val",
+                partitionByFields: ["partition"],
+                range: {step: 1, bounds: "partition"},
+            },
+        },
+    ]);
+    const resultArray = result.toArray();
+    const testExpected = testDocs.concat([{val: 1, partition: 0}]);
+    assert(arrayEq(resultArray, testExpected), buildErrorString(resultArray, testExpected));
+    coll.drop();
 }
 
 // Test partitioning with full where partitions need to be densified at the end.
@@ -275,10 +278,9 @@ function fullTestTwo(stepVal = 2) {
     let result = coll.aggregate([
         {$project: {_id: 0}},
         {
-            $densify:
-                {field: "val", range: {step: stepVal, bounds: "full"}, partitionByFields: ["part"]}
+            $densify: {field: "val", range: {step: stepVal, bounds: "full"}, partitionByFields: ["part"]},
         },
-        {$sort: {val: 1, part: 1}}
+        {$sort: {val: 1, part: 1}},
     ]);
     const resultArray = result.toArray();
     assert(arrayEq(resultArray, testExpected), buildErrorString(resultArray, testExpected));
@@ -298,8 +300,8 @@ function fullTestTwoDates(stepVal = 2) {
     for (let densifyVal = 0; densifyVal < 11; densifyVal += stepVal) {
         for (let partitionVal = 0; partitionVal <= 3; partitionVal++) {
             testExpected.push({
-                val: new ISODate((2021 + densifyVal).toString().padStart(2, '0') + "-01-01"),
-                part: partitionVal
+                val: new ISODate((2021 + densifyVal).toString().padStart(2, "0") + "-01-01"),
+                part: partitionVal,
             });
         }
     }
@@ -310,10 +312,10 @@ function fullTestTwoDates(stepVal = 2) {
             $densify: {
                 field: "val",
                 range: {step: stepVal, unit: "year", bounds: "full"},
-                partitionByFields: ["part"]
-            }
+                partitionByFields: ["part"],
+            },
         },
-        {$sort: {val: 1, part: 1}}
+        {$sort: {val: 1, part: 1}},
     ]);
     const resultArray = result.toArray();
     assert(arrayEq(resultArray, testExpected), buildErrorString(resultArray, testExpected));
@@ -340,10 +342,9 @@ function fullTestThree(stepVal = 2) {
     let result = coll.aggregate([
         {$project: {_id: 0}},
         {
-            $densify:
-                {field: "val", range: {step: stepVal, bounds: "full"}, partitionByFields: ["part"]}
+            $densify: {field: "val", range: {step: stepVal, bounds: "full"}, partitionByFields: ["part"]},
         },
-        {$sort: {val: 1, part: 1}}
+        {$sort: {val: 1, part: 1}},
     ]);
     const resultArray = result.toArray();
     assert(arrayEq(resultArray, testExpected), buildErrorString(resultArray, testExpected));
@@ -369,9 +370,8 @@ function rangeTestOne() {
     let result = coll.aggregate([
         {$project: {_id: 0}},
         {
-            $densify:
-                {field: "val", partitionByFields: ["partition"], range: {step: 1, bounds: [2, 3]}}
-        }
+            $densify: {field: "val", partitionByFields: ["partition"], range: {step: 1, bounds: [2, 3]}},
+        },
     ]);
     const resultArray = result.toArray();
     assert(arrayEq(resultArray, expectedDocs), buildErrorString(resultArray, expectedDocs));
@@ -400,9 +400,8 @@ function rangeTestThree() {
     let result = coll.aggregate([
         {$project: {_id: 0}},
         {
-            $densify:
-                {field: "val", partitionByFields: ["partition"], range: {step: 2, bounds: [2, 5]}}
-        }
+            $densify: {field: "val", partitionByFields: ["partition"], range: {step: 2, bounds: [2, 5]}},
+        },
     ]);
     const resultArray = result.toArray();
     assert(arrayEq(resultArray, expectedDocs), buildErrorString(resultArray, expectedDocs));
@@ -429,7 +428,7 @@ function rangeTestTwo() {
     let result = coll.aggregate([
         {$project: {_id: 0}},
         {$densify: {field: "val", range: {step: 2, bounds: [4, 8]}, partitionByFields: ["part"]}},
-        {$sort: {val: 1, part: 1}}
+        {$sort: {val: 1, part: 1}},
     ]);
     const resultArray = result.toArray();
     assert(arrayEq(resultArray, testExpected), buildErrorString(resultArray, testExpected));
@@ -437,22 +436,24 @@ function rangeTestTwo() {
 
 function rangeTestTwoDates() {
     coll.drop();
-    let testDocs = [];
-    let testExpected = [];
-    testDocs.push({val: new ISODate("2021-01-01"), part: 0});
-    testExpected.push({val: new ISODate("2021-01-01"), part: 0});
-    testDocs.push({val: new ISODate("2021-06-01"), part: 1});
-    testExpected.push({val: new ISODate("2021-06-01"), part: 1});
-    testDocs.push({val: new ISODate("2021-11-01"), part: 2});
-    testExpected.push({val: new ISODate("2021-11-01"), part: 2});
-    for (let densifyVal = 4; densifyVal < 8; densifyVal += 2) {
-        for (let partitionVal = 0; partitionVal <= 2; partitionVal++) {
-            testExpected.push({
-                val: new ISODate("2021-" + densifyVal.toString().padStart(2, '0') + "-01"),
-                part: partitionVal
-            });
-        }
-    }
+    const testDocs = [
+        {val: new ISODate("2021-01-01"), part: 0},
+        {val: new ISODate("2021-06-01"), part: 1},
+        {val: new ISODate("2021-11-01"), part: 2},
+    ];
+    const testExpected = [
+        {val: new ISODate("2021-01-01"), part: 0},
+        {val: new ISODate("2021-04-01"), part: 0},
+        {val: new ISODate("2021-04-01"), part: 1},
+        {val: new ISODate("2021-04-01"), part: 2},
+        {val: new ISODate("2021-06-01"), part: 0},
+        {val: new ISODate("2021-06-01"), part: 1},
+        {val: new ISODate("2021-06-01"), part: 2},
+        {val: new ISODate("2021-08-01"), part: 0},
+        {val: new ISODate("2021-08-01"), part: 1},
+        {val: new ISODate("2021-08-01"), part: 2},
+        {val: new ISODate("2021-11-01"), part: 2},
+    ];
     assert.commandWorked(coll.insert(testDocs));
     let result = coll.aggregate([
         {$project: {_id: 0}},
@@ -462,17 +463,54 @@ function rangeTestTwoDates() {
                 range: {
                     step: 2,
                     unit: "month",
-                    bounds: [new ISODate("2021-05-01"), new ISODate("2021-09-01")]
+                    bounds: [new ISODate("2021-04-01"), new ISODate("2021-09-01")],
                 },
-                partitionByFields: ["part"]
-            }
+                partitionByFields: ["part"],
+            },
         },
-        {$sort: {val: 1, part: 1}}
+        {$sort: {val: 1, part: 1}},
     ]);
     const resultArray = result.toArray();
     assert(arrayEq(resultArray, testExpected), buildErrorString(resultArray, testExpected));
 }
-
+// Test $densify with partitions and explicit bounds that are inside the collection's total range of
+// values for the field we are densifying.
+function testPartitionsWithBoundsInsideFullRange() {
+    coll.drop();
+    let collection = [
+        {_id: 0, val: 0, part: 1},
+        {_id: 1, val: 20, part: 2},
+        {_id: 2, val: -5, part: 1},
+        {_id: 3, val: 50, part: 2},
+        {_id: 4, val: 106, part: 1},
+        {_id: 5, val: -50, part: 2},
+        {_id: 6, val: 100, part: 1},
+        {_id: 7, val: -75, part: 2},
+        {_id: 8, val: 45, part: 1},
+        {_id: 9, val: -28, part: 2},
+        {_id: 10, val: 67, part: 1},
+        {_id: 11, val: -19, part: 2},
+        {_id: 12, val: -125, part: 1},
+        {_id: 13, val: -500, part: 2},
+        {_id: 14, val: 600, part: 1},
+        {_id: 15, val: 1000, part: 2},
+        {_id: 16, val: -1000, part: 1},
+        {_id: 17, val: 1400, part: 2},
+        {_id: 18, val: 3000, part: 1},
+        {_id: 19, val: -1900, part: 2},
+        {_id: 20, val: -2995, part: 1},
+    ];
+    assert.commandWorked(coll.insert(collection));
+    // Total range is [-2995, 3000] so [-399, -19] is within that.
+    let pipeline = [
+        {
+            $densify: {field: "val", range: {step: 17, bounds: [-399, -19]}, partitionByFields: ["part"]},
+        },
+        {$sort: {part: 1, val: 1}},
+    ];
+    let result = coll.aggregate(pipeline).toArray();
+    assert(anyEq(result.length, 67));
+}
 // Test negative numbers.
 function fullTestFour() {
     coll.drop();
@@ -493,7 +531,7 @@ function fullTestFour() {
     assert.commandWorked(coll.insert(testDocs));
     let result = coll.aggregate([
         {$project: {_id: 0}},
-        {$densify: {field: "val", range: {step: 3, bounds: "full"}, partitionByFields: ["part"]}}
+        {$densify: {field: "val", range: {step: 3, bounds: "full"}, partitionByFields: ["part"]}},
     ]);
     const resultArray = result.toArray();
     assert(arrayEq(resultArray, testExpected), buildErrorString(resultArray, testExpected));
@@ -514,12 +552,103 @@ function singleDocumentTest() {
     result = coll.aggregate([
         {$project: {_id: 0}},
         {
-            $densify:
-                {field: "val", range: {step: 1, bounds: "partition"}, partitionByFields: ["part"]}
+            $densify: {field: "val", range: {step: 1, bounds: "partition"}, partitionByFields: ["part"]},
         },
     ]);
     resultArray = result.toArray();
     assert(arrayEq(resultArray, testExpected), buildErrorString(resultArray, testExpected));
+}
+
+function testDottedField() {
+    coll.drop();
+    const input = [
+        {
+            "_id": 0,
+            "metadata": {"sensorId": 5578, "type": "temperature"},
+            "timestamp": ISODate("2021-05-18T00:00:00.000Z"),
+            "temp": 12,
+        },
+        {
+            "_id": 1,
+            "metadata": {"sensorId": 5578, "type": "temperature"},
+            "timestamp": ISODate("2021-05-18T02:00:00.000Z"),
+            "temp": 14,
+        },
+    ];
+    const pipeline = [
+        {
+            $densify: {
+                field: "timestamp",
+                // Dots are interpreted as path separators.
+                partitionByFields: ["metadata.sensorId"],
+                range: {step: 1, unit: "hour", bounds: "full"},
+            },
+        },
+    ];
+    const expectedOutput = [
+        {
+            "_id": 0,
+            "metadata": {"sensorId": 5578, "type": "temperature"},
+            "timestamp": ISODate("2021-05-18T00:00:00Z"),
+            "temp": 12,
+        },
+        {
+            // Because dotted fields are interpreted as paths, when we write to 'metadata.sensorId'
+            // it should create a nested document.
+            "metadata": {"sensorId": 5578},
+            "timestamp": ISODate("2021-05-18T01:00:00Z"),
+        },
+        {
+            "_id": 1,
+            "metadata": {"sensorId": 5578, "type": "temperature"},
+            "timestamp": ISODate("2021-05-18T02:00:00Z"),
+            "temp": 14,
+        },
+    ];
+
+    assert.commandWorked(coll.insert(input));
+    const actualOutput = coll.aggregate(pipeline).toArray();
+
+    assert(arrayEq(actualOutput, expectedOutput), {actualOutput, expectedOutput});
+}
+
+function testArrayTraversalDisallowed() {
+    const pipeline = [
+        {
+            $densify: {
+                field: "timestamp",
+                partitionByFields: ["metadata.sensorId"],
+            },
+        },
+    ];
+
+    let input = [
+        {
+            "_id": 0,
+            // In this case, the dot in 'metadata.sensorId' traverses through an array, because
+            // the whole 'metadata' subdocument is an array.
+            "metadata": [{"sensorId": 5578, "type": "temperature"}],
+            "timestamp": ISODate("2021-05-18T00:00:00.000Z"),
+            "temp": 12,
+        },
+    ];
+    coll.drop();
+    assert.commandWorked(coll.insert(input));
+    assert.throws(() => coll.aggregate(pipeline));
+
+    input = [
+        {
+            "_id": 0,
+            // In this case, the dot does not traverse an array. But the path evaluates to an array,
+            // so this is also an error.
+            "metadata": {"sensorId": [5578], "type": "temperature"},
+            "timestamp": ISODate("2021-05-18T00:00:00.000Z"),
+            "temp": 12,
+        },
+    ];
+    coll.drop();
+    assert.commandWorked(coll.insert(input));
+    assert.throws(() => coll.aggregate(pipeline));
 }
 
 testOne();
@@ -527,6 +656,7 @@ testTwo();
 testThree();
 testFour();
 testFive();
+testSix();
 fullTestOne();
 testFive();
 fullTestOne(3);
@@ -536,6 +666,7 @@ fullTestThree();
 rangeTestOne();
 rangeTestTwo();
 rangeTestThree();
+testPartitionsWithBoundsInsideFullRange();
 fullTestFour();
 
 testOneDates();
@@ -543,4 +674,6 @@ fullTestTwoDates();
 rangeTestTwoDates();
 
 singleDocumentTest();
-})();
+
+testDottedField();
+testArrayTraversalDisallowed();

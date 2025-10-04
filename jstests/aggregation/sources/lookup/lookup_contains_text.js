@@ -1,10 +1,6 @@
 // Tests that given a $text stage before a $lookup stage, the $lookup's subpipeline cannot
 // reference the text score metadata from that $text search.
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For "assertErrorCode".
-load("jstests/libs/fixture_helpers.js");      // For isSharded.
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const outer = db.outer;
 const inner = db.inner;
@@ -12,22 +8,13 @@ const inner = db.inner;
 outer.drop();
 inner.drop();
 
-// Do not run the rest of the tests if the foreign collection is implicitly sharded but the flag to
-// allow $lookup/$graphLookup into a sharded collection is disabled.
-const getShardedLookupParam = db.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
-const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
-    getShardedLookupParam.featureFlagShardedLookup.value;
-if (FixtureHelpers.isSharded(inner) && !isShardedLookupEnabled) {
-    return;
-}
-
 const kNoTextScoreAvailableErrCode = 40218;
 
 // This pipeline is never legal, because the subpipeline projects out a textScore but does not
 // begin with a $text search.
 let pipeline = [
     {$match: {$text: {$search: "foo"}}},
-    {$lookup: {from: "inner", as: "as", pipeline: [{$project: {score: {$meta: "textScore"}}}]}}
+    {$lookup: {from: "inner", as: "as", pipeline: [{$project: {score: {$meta: "textScore"}}}]}},
 ];
 
 assert.commandWorked(outer.insert({_id: 100, a: "foo"}));
@@ -51,30 +38,32 @@ assertErrorCode(outer, pipeline, kNoTextScoreAvailableErrCode);
 
 // A pipeline with two text searches, one within a $lookup, will work.
 pipeline = [
-        {$match: {$text: {$search: "foo"}}},
-        {
-          $lookup: {
-              from: "inner",
-              as: "as",
-              pipeline: [
-                  {$match: {$text: {$search: "bar apple banana hello"}}},
-                  {$project: {score: {$meta: "textScore"}}}
-              ]
-          }
-        }
-    ];
+    {$match: {$text: {$search: "foo"}}},
+    {
+        $lookup: {
+            from: "inner",
+            as: "as",
+            pipeline: [
+                {$match: {$text: {$search: "bar apple banana hello"}}},
+                {$project: {score: {$meta: "textScore"}}},
+            ],
+        },
+    },
+];
 
 let expected = [{"_id": 100, "a": "foo", "as": [{"_id": 100, "score": 2}]}];
 assert.eq(outer.aggregate(pipeline).toArray(), expected);
 
 // A lookup with a text search in the subpipeline will correctly perform that search on 'from'.
-pipeline = [{
+pipeline = [
+    {
         $lookup: {
             from: "inner",
             as: "as",
-            pipeline: [{$match: {$text: {$search: "bar apple banana hello"}}}]
-        }
-    }];
+            pipeline: [{$match: {$text: {$search: "bar apple banana hello"}}}],
+        },
+    },
+];
 expected = [{"_id": 100, "a": "foo", "as": [{"_id": 100, "a": "bar apple banana"}]}];
 
 assert.eq(outer.aggregate(pipeline).toArray(), expected);
@@ -82,19 +71,19 @@ assert.eq(outer.aggregate(pipeline).toArray(), expected);
 // A lookup with two text searches and two text score $projects will have the text scores
 // reference the relevant text search.
 pipeline = [
-        {$match: {$text: {$search: "foo"}}},
-        {
-          $lookup: {
-              from: "inner",
-              as: "as",
-              pipeline: [
-                  {$match: {$text: {$search: "bar apple banana hello"}}},
-                  {$project: {score: {$meta: "textScore"}}}
-              ]
-          }
+    {$match: {$text: {$search: "foo"}}},
+    {
+        $lookup: {
+            from: "inner",
+            as: "as",
+            pipeline: [
+                {$match: {$text: {$search: "bar apple banana hello"}}},
+                {$project: {score: {$meta: "textScore"}}},
+            ],
         },
-        {$project: {score: {$meta: "textScore"}, as: 1}},
-    ];
+    },
+    {$project: {score: {$meta: "textScore"}, as: 1}},
+];
 
 expected = [{"_id": 100, "as": [{"_id": 100, "score": 2}], "score": 1.1}];
 
@@ -103,15 +92,14 @@ assert.eq(outer.aggregate(pipeline).toArray(), expected);
 // Given a $text stage in the 'from' pipeline, the outer pipeline will not be able to access
 // this $text stage's text score.
 pipeline = [
-        {
-          $lookup: {
-              from: "inner",
-              as: "as",
-              pipeline: [{$match: {$text: {$search: "bar apple banana hello"}}}]
-          }
+    {
+        $lookup: {
+            from: "inner",
+            as: "as",
+            pipeline: [{$match: {$text: {$search: "bar apple banana hello"}}}],
         },
-        {$project: {score: {$meta: "textScore"}, as: 1}},
-    ];
+    },
+    {$project: {score: {$meta: "textScore"}, as: 1}},
+];
 
 assertErrorCode(outer, pipeline, kNoTextScoreAvailableErrCode);
-}());

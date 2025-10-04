@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest
+import wttest
 
 # test_base03.py
 #    Cursor operations
@@ -147,6 +147,3 @@ class test_base03(wttest.WiredTigerTestCase):
 
         self.assertEqual(i, self.nentries)
         cursor.close()
-
-if __name__ == '__main__':
-    wttest.run()

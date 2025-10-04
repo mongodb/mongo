@@ -1,0 +1,47 @@
+# vi: ft=tcl sw=2 ts=2 et
+
+###############################
+# WT-specific
+
+proc getAllocSize {} {
+  set p [pos]
+  set flen [len]
+  for {set ret 512} {$ret <= 128*1024*1024 && $ret < $flen} {incr ret $ret} {
+    # find something nonzero
+    # check first 128 bytes of each block
+    goto $ret
+    for {set i 0} {$i < 16} {incr i} {
+      if {[uint64] != 0} {
+        goto $p
+        return $ret
+      }
+    }
+  }
+  goto $p
+  puts "Can't determine the allocsize: empty file?"
+  return [len]
+}
+
+################################
+# Cell
+
+# cell_inline.h
+# src/btree/bt_vrfy_dsk.c
+# __wt_cell_unpack_safe
+
+proc WT_CELL_TYPE {v} { global WT_CELL_TYPE_MASK; expr {$v & $WT_CELL_TYPE_MASK} }
+proc WT_CELL_SHORT_TYPE {v} { expr {$v & 3} }
+proc __wt_cell_type_raw {__chunk0} { expr {[WT_CELL_SHORT_TYPE $__chunk0] == 0 ? [WT_CELL_TYPE $__chunk0] : [WT_CELL_SHORT_TYPE $__chunk0]} }
+proc __wt_cell_type {__chunk0} {
+  globals WT_CELL_*
+  set short_type [WT_CELL_SHORT_TYPE $__chunk0]
+  if {$short_type == $WT_CELL_KEY_SHORT || $short_type == $WT_CELL_KEY_SHORT_PFX} { return $WT_CELL_KEY }
+  if {$short_type == $WT_CELL_VALUE_SHORT} { return $WT_CELL_KEY }
+  set type [WT_CELL_TYPE $__chunk0]
+  if {$type == $WT_CELL_KEY_PFX} { return $WT_CELL_KEY }
+  if {$type == $WT_CELL_KEY_OVFL_RM} { return $WT_CELL_KEY_OVFL }
+  if {$type == $WT_CELL_VALUE_OVFL_RM} { return $WT_CELL_VALUE_OVFL }
+  return $type;
+}
+
+

@@ -27,19 +27,28 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
-#include "mongo/platform/basic.h"
-
+// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/util/periodic_runner_impl.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/time_support.h"
+
+#include <functional>
+#include <mutex>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 
 namespace mongo {
 
@@ -72,7 +81,10 @@ void PeriodicRunnerImpl::PeriodicJobImpl::_run() {
     _thread = stdx::thread([this, startPromise = std::move(startPromise)]() mutable {
         ON_BLOCK_EXIT([this] { _stopPromise.emplaceValue(); });
 
-        ThreadClient client(_job.name, _serviceContext, nullptr);
+        ThreadClient client(_job.name,
+                            _serviceContext->getService(),
+                            ClientOperationKillableByStepdown{_job.isKillableByStepdown});
+
         {
             // This ensures client object is not destructed so long as others can access it.
             ON_BLOCK_EXIT([this] {
@@ -88,7 +100,7 @@ void PeriodicRunnerImpl::PeriodicJobImpl::_run() {
             }
             startPromise.emplaceValue();
 
-            stdx::unique_lock<Latch> lk(_mutex);
+            stdx::unique_lock<stdx::mutex> lk(_mutex);
             while (_execStatus != ExecutionStatus::CANCELED) {
                 // Wait until it's unpaused or canceled
                 _condvar.wait(lk, [&] { return _execStatus != ExecutionStatus::PAUSED; });
@@ -103,7 +115,9 @@ void PeriodicRunnerImpl::PeriodicJobImpl::_run() {
                 _job.job(client.get());
                 lk.lock();
 
-                auto getDeadlineFromInterval = [&] { return start + _job.interval; };
+                auto getDeadlineFromInterval = [&] {
+                    return start + _job.interval;
+                };
 
                 do {
                     auto deadline = getDeadlineFromInterval();
@@ -132,7 +146,7 @@ void PeriodicRunnerImpl::PeriodicJobImpl::start() {
 }
 
 void PeriodicRunnerImpl::PeriodicJobImpl::pause() {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (MONGO_unlikely(_execStatus == ExecutionStatus::CANCELED))
         uasserted(ErrorCodes::PeriodicJobIsStopped, "Attempted to pause an already stopped job");
     invariant(_execStatus == PeriodicJobImpl::ExecutionStatus::RUNNING);
@@ -141,7 +155,7 @@ void PeriodicRunnerImpl::PeriodicJobImpl::pause() {
 
 void PeriodicRunnerImpl::PeriodicJobImpl::resume() {
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         if (MONGO_unlikely(_execStatus == ExecutionStatus::CANCELED))
             uasserted(ErrorCodes::PeriodicJobIsStopped,
                       "Attempted to resume an already stopped job");
@@ -153,7 +167,7 @@ void PeriodicRunnerImpl::PeriodicJobImpl::resume() {
 
 void PeriodicRunnerImpl::PeriodicJobImpl::stop() {
     auto lastExecStatus = [&] {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         return std::exchange(_execStatus, ExecutionStatus::CANCELED);
     }();
@@ -175,7 +189,7 @@ void PeriodicRunnerImpl::PeriodicJobImpl::stop() {
         // So long as `_job` returns upon receiving the kill signal, the following ensures liveness
         // (i.e., this method will eventually return).
         if (!stopFuture.isReady()) {
-            stdx::lock_guard<Latch> lk(_mutex);
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
             // Check if the client thread has already returned.
             if (_client) {
                 _client->setKilled();
@@ -188,13 +202,13 @@ void PeriodicRunnerImpl::PeriodicJobImpl::stop() {
     stopFuture.get();
 }
 
-Milliseconds PeriodicRunnerImpl::PeriodicJobImpl::getPeriod() {
-    stdx::lock_guard<Latch> lk(_mutex);
+Milliseconds PeriodicRunnerImpl::PeriodicJobImpl::getPeriod() const {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _job.interval;
 }
 
 void PeriodicRunnerImpl::PeriodicJobImpl::setPeriod(Milliseconds ms) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _job.interval = ms;
 
     if (_execStatus == PeriodicJobImpl::ExecutionStatus::RUNNING) {

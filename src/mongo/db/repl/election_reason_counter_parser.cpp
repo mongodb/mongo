@@ -29,13 +29,16 @@
 
 #include "mongo/db/repl/election_reason_counter_parser.h"
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/idl/idl_parser.h"
+
 namespace mongo {
 namespace repl {
 
 
 ElectionReasonCounter parseElectionReasonCounter(const BSONElement& element) {
     ElectionReasonCounter counter;
-    IDLParserErrorContext ctxt = IDLParserErrorContext("ElectionReasonCounter");
+    IDLParserContext ctxt = IDLParserContext("ElectionReasonCounter");
 
     return counter.parse(ctxt, element.Obj());
 }

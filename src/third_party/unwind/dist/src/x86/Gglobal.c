@@ -27,7 +27,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 #include "dwarf_i.h"
 
 HIDDEN define_lock (x86_lock);
-HIDDEN int tdep_init_done;
+HIDDEN atomic_bool tdep_init_done = 0;
 
 /* See comments for svr4_dbx_register_map[] in gcc/config/i386/i386.c.  */
 
@@ -49,7 +49,7 @@ tdep_init (void)
 
   lock_acquire (&x86_lock, saved_mask);
   {
-    if (tdep_init_done)
+    if (atomic_load(&tdep_init_done))
       /* another thread else beat us to it... */
       goto out;
 
@@ -60,7 +60,7 @@ tdep_init (void)
 #ifndef UNW_REMOTE_ONLY
     x86_local_addr_space_init ();
 #endif
-    tdep_init_done = 1; /* signal that we're initialized... */
+    atomic_store(&tdep_init_done, 1); /* signal that we're initialized... */
   }
  out:
   lock_release (&x86_lock, saved_mask);

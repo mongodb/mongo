@@ -1,0 +1,79 @@
+test_kind: js_test
+description: |
+  Run test suites with a replica set and multitenancy enabled. Simulate Atlas Proxy behavior
+  by overriding and injecting unsigned security token and tenant prefix.
+
+selector:
+  roots:
+    - jstests/core/**/*.js
+    - jstests/aggregation/**/*.js
+
+  exclude_files:
+    # TODO(SERVER-77000): Remove the test exclusion when $out.db in response has expected prefix.
+    - jstests/core/query/explain/explain_agg_write_concern.js
+    - jstests/aggregation/sources/out/replace_collection.js
+    - jstests/aggregation/explain/explain_writing_aggs.js
+    # `rolesInfo` is returning unprefixed database names
+    - jstests/core/administrative/builtin_roles_external.js
+    # QueryExecutorStats assertions are hardcoded for single-node results
+    - jstests/aggregation/sources/lookup/lookup_query_stats.js
+    # failed on: The aggregate should always use the view on 'testDB', not an empty collection on 'siblingDB'
+    - jstests/aggregation/views/view_resolution_namespace_collision.js
+
+  exclude_with_any_tags:
+    # This passthrough uses the `simulate_atlas_proxy` override, which some tests are incompatible with.
+    - simulate_atlas_proxy_incompatible
+    # Exclude tests which we know use commands that don't support a security token.
+    - not_allowed_with_signed_security_token
+    # Exclude tests which use commands that aren't supported in Serverless.
+    - command_not_supported_in_serverless
+    # Theses tests expect replication is not enabled.
+    - assumes_standalone_mongod
+    # Capped collections are banned in Serverless.
+    - requires_capped
+    # Server side javascript (such as $where, $function, $accumulator and map-reduce) is not allowed in Serverless.
+    - requires_scripting
+    - requires_profiling
+    # Skip any tests that run with auth explicitly.
+    - requires_auth
+    # Skip any tests that use transactions
+    - uses_transactions
+
+executor:
+  archive:
+    tests: true
+    hooks:
+      - CheckReplDBHash
+      - CheckReplOplogs
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: |
+        globalThis.testingReplication = true;
+        await import("jstests/libs/override_methods/simulate_atlas_proxy.js");
+      global_vars:
+        TestData:
+          tenantId: "636d957b2646ddfaf9b5e13f"
+          hashTestNamesForMultitenancy: true
+          useSecurityToken: true
+          useResponsePrefixChecking: true
+          multitenancyExpectPrefix: true
+  hooks:
+    - class: CheckReplOplogs
+    - class: CheckReplDBHash
+    - class: ValidateCollections
+      use_legacy_validate: true
+    - class: CleanEveryN
+      skip_database_deletion: true
+      n: 20
+  fixture:
+    class: ReplicaSetFixture
+    num_nodes: 2
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        multitenancySupport: true
+        featureFlagSecurityToken: true
+        logComponentVerbosity:
+          command: 2
+      noscripting: ""

@@ -29,12 +29,6 @@
 
 #pragma once
 
-#include <map>
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/clonable_ptr.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/matcher/expression_with_placeholder.h"
@@ -42,6 +36,12 @@
 #include "mongo/db/update/path_support.h"
 #include "mongo/db/update/update_internal_node.h"
 #include "mongo/stdx/unordered_map.h"
+
+#include <map>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 
@@ -65,6 +65,19 @@ public:
         modifiertable::ModifierType type,
         BSONElement modExpr,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters,
+        std::set<std::string>& foundIdentifiers);
+
+    /**
+     * Parses a field of the form $[<identifier>] into <identifier>. 'field' must be of the form
+     * $[<identifier>]. Returns a non-ok status if 'field' is in the first position in the path or
+     * the array filter identifier does not have a corresponding filter in 'arrayFilters'. Adds the
+     * identifier to 'foundIdentifiers'.
+     */
+    static StatusWith<std::string> parseArrayFilterIdentifier(
+        StringData field,
+        size_t position,
+        const FieldRef& fieldRef,
         const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters,
         std::set<std::string>& foundIdentifiers);
 

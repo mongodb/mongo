@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/util/net/hostname_canonicalization.h"
+
+#include <string>
 
 namespace mongo {
 

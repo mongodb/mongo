@@ -1,25 +1,31 @@
 """Driver of the test execution framework."""
 
 import threading
-import time
-from typing import List
+from logging import Logger
+from typing import Generic, List, Optional, TypeVar, Union
+
+from opentelemetry import context
 
 from buildscripts.resmokelib import config as _config
-from buildscripts.resmokelib import errors
-from buildscripts.resmokelib import logging
-from buildscripts.resmokelib import utils
+from buildscripts.resmokelib import errors, logging, utils
 from buildscripts.resmokelib.core import network
-from buildscripts.resmokelib.testing import fixtures
+from buildscripts.resmokelib.testing import fixtures, testcases
 from buildscripts.resmokelib.testing import hook_test_archival as archival
 from buildscripts.resmokelib.testing import hooks as _hooks
 from buildscripts.resmokelib.testing import job as _job
 from buildscripts.resmokelib.testing import report as _report
-from buildscripts.resmokelib.testing import testcases
-from buildscripts.resmokelib.testing.queue_element import queue_elem_factory, QueueElem
+from buildscripts.resmokelib.testing.fixtures.interface import Fixture
+from buildscripts.resmokelib.testing.hooks.interface import Hook
+from buildscripts.resmokelib.testing.queue_element import (
+    QueueElem,
+    QueueElemRepeatTime,
+    queue_elem_factory,
+)
+from buildscripts.resmokelib.testing.suite import Suite
 from buildscripts.resmokelib.utils import queue as _queue
 
 
-class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
+class TestSuiteExecutor(object):
     """Execute a test suite.
 
     Responsible for setting up and tearing down the fixtures that the
@@ -28,9 +34,16 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
 
     _TIMEOUT = 24 * 60 * 60  # =1 day (a long time to have tests run)
 
-    def __init__(  # pylint: disable=too-many-arguments
-            self, exec_logger, suite, config=None, fixture=None, hooks=None, archive_instance=None,
-            archive=None):
+    def __init__(
+        self,
+        exec_logger: Logger,
+        suite: Suite,
+        config=None,
+        fixture: Optional[Fixture] = None,
+        hooks=None,
+        archive_instance=None,
+        archive=None,
+    ):
         """Initialize the TestSuiteExecutor with the test suite to run."""
         self.logger = exec_logger
 
@@ -39,7 +52,7 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
             # specified in the YAML configuration to be the external fixture.
             self.fixture_config = {
                 "class": fixtures.EXTERNAL_FIXTURE_CLASS,
-                "shell_conn_string": _config.SHELL_CONN_STRING
+                "shell_conn_string": _config.SHELL_CONN_STRING,
             }
         else:
             self.fixture_config = fixture
@@ -49,44 +62,28 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
 
         self.archival = None
         if archive_instance:
-            self.archival = archival.HookTestArchival(suite, self.hooks_config, archive_instance,
-                                                      archive)
+            self.archival = archival.HookTestArchival(
+                suite, self.hooks_config, archive_instance, archive
+            )
 
         self._suite = suite
         self.test_queue_logger = logging.loggers.new_testqueue_logger(suite.test_kind)
-        self._jobs = []
 
-    def _num_jobs_to_start(self, suite, num_tests):
+        self._jobs = self._create_jobs(suite.get_num_jobs_to_start())
+
+    def _create_jobs(self, num_jobs: int) -> List[_job.Job]:
         """
-        Determine the number of jobs to start.
-
-        :param suite: Test suite being run.
-        :return: Number of jobs to start.
-        """
-        options = suite.options
-        num_jobs_to_start = options.num_jobs
-
-        if num_tests < num_jobs_to_start:
-            self.logger.info(
-                "Reducing the number of jobs from %d to %d since there are only %d test(s) to run.",
-                options.num_jobs, num_tests, num_tests)
-            num_jobs_to_start = num_tests
-
-        return num_jobs_to_start
-
-    def _create_jobs(self, num_tests):
-        """
-        Create job objects to consume and run tests.
-
-        Only start as many jobs as we need. Note this means that the number of jobs we run may
-        not actually be _config.JOBS or self._suite.options.num_jobs.
+        Start jobs.
 
         :return: List of jobs.
         """
-        n_jobs_to_start = self._num_jobs_to_start(self._suite, num_tests)
-        return [self._make_job(job_num) for job_num in range(n_jobs_to_start)]
+        return (
+            [self._make_job(_config.SHARD_INDEX)]
+            if _config.SHARD_INDEX
+            else [self._make_job(job_num) for job_num in range(num_jobs)]
+        )
 
-    def run(self):  # pylint: disable=too-many-branches
+    def run(self):
         """Execute the test suite.
 
         Any exceptions that occur during setting up or tearing down a
@@ -102,12 +99,10 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
         # a test suite run earlier can be reused during this current test suite.
         network.PortAllocator.reset()
         teardown_flag = None
-        hook_failure_flag = None
         try:
             num_repeat_suites = self._suite.options.num_repeat_suites
             while num_repeat_suites > 0:
                 test_queue = self._make_test_queue()
-                self._jobs = self._create_jobs(test_queue.num_tests)
 
                 partial_reports = [job.report for job in self._jobs]
                 self._suite.record_test_start(partial_reports)
@@ -120,8 +115,9 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
                 # We use the 'hook_failure_flag' to distinguish hook failures from other failures,
                 # so that we can return a separate return code when a hook has failed.
                 hook_failure_flag = threading.Event()
-                (report, interrupted) = self._run_tests(test_queue, setup_flag, teardown_flag,
-                                                        hook_failure_flag)
+                (report, interrupted) = self._run_tests(
+                    test_queue, setup_flag, teardown_flag, hook_failure_flag
+                )
 
                 self._suite.record_test_end(report)
 
@@ -159,7 +155,9 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
                 if test_results_num < test_queue.num_tests:
                     raise errors.ResmokeError(
                         "{} reported tests is less than {} expected tests".format(
-                            test_results_num, test_queue.num_tests))
+                            test_results_num, test_queue.num_tests
+                        )
+                    )
 
                 # Clear the report so it can be reused for the next execution.
                 for job in self._jobs:
@@ -172,7 +170,13 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
 
             self._suite.return_code = return_code
 
-    def _run_tests(self, test_queue, setup_flag, teardown_flag, hook_failure_flag):
+    def _run_tests(
+        self,
+        test_queue: "TestQueue[Union[QueueElemRepeatTime, QueueElem]]",
+        setup_flag: Optional[threading.Event],
+        teardown_flag: Optional[threading.Event],
+        hook_failure_flag: Optional[threading.Event],
+    ):
         """Start a thread for each Job instance and block until all of the tests are run.
 
         Returns a (combined report, user interrupted) pair, where the
@@ -187,9 +191,15 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
             # Run each Job instance in its own thread.
             for job in self._jobs:
                 thr = threading.Thread(
-                    target=job, args=(test_queue, interrupt_flag), kwargs=dict(
-                        setup_flag=setup_flag, teardown_flag=teardown_flag,
-                        hook_failure_flag=hook_failure_flag))
+                    target=job.start,
+                    args=(test_queue, interrupt_flag),
+                    kwargs=dict(
+                        parent_context=context.get_current(),
+                        setup_flag=setup_flag,
+                        teardown_flag=teardown_flag,
+                        hook_failure_flag=hook_failure_flag,
+                    ),
+                )
                 # Do not wait for tests to finish executing if interrupted by the user.
                 thr.daemon = True
                 thr.start()
@@ -198,7 +208,10 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
                 # are many of them.  Both the 5 and the 10 are arbitrary.
                 # Currently only enabled on Evergreen.
                 if _config.STAGGER_JOBS and len(threads) >= 5:
-                    time.sleep(10)
+                    # If there are no more tests to be executed, we should stop creating new
+                    # jobs. Otherwise, wait 10 seconds before creating the next job.
+                    if test_queue.join(10):
+                        break
 
             joined = False
             while not joined:
@@ -240,8 +253,9 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
         success = True
         for job in self._jobs:
             if not job.manager.teardown_fixture(self.logger):
-                self.logger.warning("Teardown of %s of job %s was not successful", job.fixture,
-                                    job.job_num)
+                self.logger.warning(
+                    "Teardown of %s of job %s was not successful", job.fixture, job.job_num
+                )
                 success = False
         return success
 
@@ -258,7 +272,7 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
 
         return fixtures.make_fixture(fixture_class, fixture_logger, job_num, **fixture_config)
 
-    def _make_hooks(self, fixture, job_num):
+    def _make_hooks(self, fixture, job_num) -> List[Hook]:
         """Create the hooks for the job's fixture."""
 
         hooks = []
@@ -287,21 +301,30 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
 
         report = _report.TestReport(job_logger, self._suite.options, job_num)
 
-        return _job.Job(job_num, job_logger, fixture, hooks, report, self.archival,
-                        self._suite.options, self.test_queue_logger)
+        return _job.Job(
+            job_num,
+            job_logger,
+            fixture,
+            hooks,
+            report,
+            self.archival,
+            self._suite.options,
+            self.test_queue_logger,
+        )
 
-    def _create_queue_elem_for_test_name(self, test_name):
+    def _create_queue_elem_for_test_name(self, test_names: list[str]):
         """
         Create the appropriate queue_elem to run the given test_name.
 
         :param test_name: Name of test to be queued.
         :return: queue_elem representing the test_name to be run.
         """
-        test_case = testcases.make_test_case(self._suite.test_kind, self.test_queue_logger,
-                                             test_name, **self.test_config)
+        test_case = testcases.make_test_case(
+            self._suite.test_kind, self.test_queue_logger, test_names, **self.test_config
+        )
         return queue_elem_factory(test_case, self.test_config, self._suite.options)
 
-    def _make_test_queue(self):
+    def _make_test_queue(self) -> "TestQueue[Union[QueueElemRepeatTime, QueueElem]]":
         """
         Create a queue of test cases to run.
 
@@ -314,14 +337,16 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
         be dispatched to multiple threads.
         :return: Queue of testcases to run.
         """
-        test_queue = TestQueue()
+        test_queue: TestQueue[Union[QueueElemRepeatTime, QueueElem]] = TestQueue()
+        test_cases = []
 
         # Make test cases to put in test queue
-        test_cases = []
-        for _ in range(self._suite.get_num_times_to_repeat_tests()):
-            for test_name in self._suite.tests:
-                queue_elem = self._create_queue_elem_for_test_name(test_name)
-                test_cases.append(queue_elem)
+        # TODO: this could be optimized to run several tests in the same mongo shell invocation
+        for test_name in self._suite.make_test_case_names_list():
+            queue_elem = self._create_queue_elem_for_test_name([test_name])
+            test_cases.append(queue_elem)
+            if _config.SANITY_CHECK:
+                break
         test_queue.add_test_cases(test_cases)
 
         return test_queue
@@ -329,11 +354,16 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
     def _log_timeout_warning(self, seconds):
         """Log a message if any thread fails to terminate after `seconds`."""
         self.logger.warning(
-            '*** Still waiting for processes to terminate after %s seconds. Try using ctrl-\\ '
-            'to send a SIGQUIT on Linux or ctrl-c again on Windows ***', seconds)
+            "*** Still waiting for processes to terminate after %s seconds. Try using ctrl-\\ "
+            "to send a SIGQUIT on Linux or ctrl-c again on Windows ***",
+            seconds,
+        )
 
 
-class TestQueue(_queue.Queue):
+T = TypeVar("T")
+
+
+class TestQueue(_queue.Queue, Generic[T]):
     """A queue of test cases to run.
 
     Use a multi-consumer queue instead of a unittest.TestSuite so that the test cases can

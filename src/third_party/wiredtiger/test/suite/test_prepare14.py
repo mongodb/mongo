@@ -32,11 +32,9 @@ from wtdataset import simple_key
 from wtscenario import make_scenarios
 
 # test_prepare14.py
-# Test that the transaction visibility of an on-disk update
-# that has both the start and the stop time points from the
-# same uncommitted prepared transaction.
+# Test that the transaction visibility of an on-disk update that has both the start and the stop
+# time points from the same uncommitted prepared transaction.
 class test_prepare14(wttest.WiredTigerTestCase):
-    session_config = 'isolation=snapshot'
 
     in_memory_values = [
         ('no_inmem', dict(in_memory=False)),
@@ -46,7 +44,7 @@ class test_prepare14(wttest.WiredTigerTestCase):
     format_values = [
         ('column', dict(key_format='r', value_format='S')),
         ('column_fix', dict(key_format='r', value_format='8t')),
-        ('integer_row', dict(key_format='i', value_format='S')),
+        ('row_integer', dict(key_format='i', value_format='S')),
     ]
 
     scenarios = make_scenarios(in_memory_values, format_values)
@@ -60,10 +58,12 @@ class test_prepare14(wttest.WiredTigerTestCase):
         return config
 
     def test_prepare14(self):
-        # Create a table without logging.
+        # Create a table that supports timestamps.
         uri = "table:prepare14"
         create_config = 'allocation_size=512,key_format={},value_format={}'.format(
             self.key_format, self.value_format)
+        if self.in_memory:
+            create_config += ',log=(enabled=false)'
         self.session.create(uri, create_config)
 
         if self.value_format == '8t':
@@ -86,7 +86,8 @@ class test_prepare14(wttest.WiredTigerTestCase):
         cursor.close()
         s.prepare_transaction('prepare_timestamp=' + self.timestamp_str(20))
 
-        # Configure debug behavior on a cursor to evict the page positioned on when the reset API is used.
+        # Configure debug behavior on a cursor to evict the page positioned on when the reset API
+        # is used.
         evict_cursor = self.session.open_cursor(uri, None, "debug=(release_evict)")
 
         # Search for the key so we position our cursor on the page that we want to evict.
@@ -94,10 +95,10 @@ class test_prepare14(wttest.WiredTigerTestCase):
         evict_cursor.set_key(key)
         if self.value_format == '8t':
             # In FLCS deleted values read back as 0.
-            self.assertEquals(evict_cursor.search(), 0)
-            self.assertEquals(evict_cursor.get_value(), 0)
+            self.assertEqual(evict_cursor.search(), 0)
+            self.assertEqual(evict_cursor.get_value(), 0)
         else:
-            self.assertEquals(evict_cursor.search(), WT_NOTFOUND)
+            self.assertEqual(evict_cursor.search(), WT_NOTFOUND)
         evict_cursor.reset()
         evict_cursor.close()
         self.session.commit_transaction()
@@ -107,8 +108,8 @@ class test_prepare14(wttest.WiredTigerTestCase):
         cursor2.set_key(key)
         if self.value_format == '8t':
             # In FLCS deleted values read back as 0.
-            self.assertEquals(cursor2.search(), 0)
-            self.assertEquals(cursor2.get_value(), 0)
+            self.assertEqual(cursor2.search(), 0)
+            self.assertEqual(cursor2.get_value(), 0)
         else:
-            self.assertEquals(cursor2.search(), WT_NOTFOUND)
+            self.assertEqual(cursor2.search(), WT_NOTFOUND)
         self.session.commit_transaction()

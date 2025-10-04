@@ -1,7 +1,6 @@
 // Tests that a client may discover a user's supported SASL mechanisms via hello.
 // @tags: [requires_sharding]
-(function() {
-"use strict";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function runTest(conn) {
     const db = conn.getDB("admin");
@@ -23,11 +22,13 @@ function runTest(conn) {
         assert.eq(mechs.sort(), res.saslSupportedMechs.sort(), tojson(res));
     }
 
-    assert.commandWorked(db.runCommand({
-        createUser: "userAdmin",
-        pwd: "userAdmin",
-        roles: ["userAdminAnyDatabase", "clusterMonitor"]
-    }));
+    assert.commandWorked(
+        db.runCommand({
+            createUser: "userAdmin",
+            pwd: "userAdmin",
+            roles: ["userAdminAnyDatabase", "clusterMonitor"],
+        }),
+    );
     db.auth("userAdmin", "userAdmin");
 
     // Check that unknown users do not interrupt hello
@@ -35,8 +36,7 @@ function runTest(conn) {
     assert.eq(undefined, res.saslSupportedMechs);
 
     // Check that invalid usernames produce the correct error code
-    assert.commandFailedWithCode(db.runCommand({hello: 1, saslSupportedMechs: "bogus"}),
-                                 ErrorCodes.BadValue);
+    assert.commandFailedWithCode(db.runCommand({hello: 1, saslSupportedMechs: "bogus"}), ErrorCodes.BadValue);
 
     assert.commandWorked(db.runCommand({createUser: "user", pwd: "pwd", roles: []}));
     assert.commandWorked(externalDB.runCommand({createUser: "user", roles: []}));
@@ -52,11 +52,9 @@ function runTest(conn) {
     }
 
     // Users with explicit mechs should only support those mechanisms
-    assert.commandWorked(db.runCommand(
-        {createUser: "256Only", pwd: "pwd", roles: [], mechanisms: ["SCRAM-SHA-256"]}));
+    assert.commandWorked(db.runCommand({createUser: "256Only", pwd: "pwd", roles: [], mechanisms: ["SCRAM-SHA-256"]}));
     checkMechs("admin.256Only", ["SCRAM-SHA-256"]);
-    assert.commandWorked(
-        db.runCommand({createUser: "1Only", pwd: "pwd", roles: [], mechanisms: ["SCRAM-SHA-1"]}));
+    assert.commandWorked(db.runCommand({createUser: "1Only", pwd: "pwd", roles: [], mechanisms: ["SCRAM-SHA-1"]}));
     checkMechs("admin.1Only", ["SCRAM-SHA-1"]);
 
     // Users with normalized and unnormalized names do not conflict
@@ -66,25 +64,29 @@ function runTest(conn) {
     checkMechs("admin.\u2168", ["SCRAM-SHA-1", "SCRAM-SHA-256"]);
 
     // __system's mechanisms can be queried on local and admin if the server is in test mode
-    checkMechs("local.__system", ["SCRAM-SHA-1", "SCRAM-SHA-256"]);
-    checkMechs("admin.__system", ["SCRAM-SHA-1", "SCRAM-SHA-256"]);
+    checkMechs("local.__system", ["SCRAM-SHA-256"]);
+    checkMechs("admin.__system", ["SCRAM-SHA-256"]);
 }
 
 // Test standalone.
-var m = MongoRunner.runMongod({
-    keyFile: 'jstests/libs/key1',
-    setParameter: "authenticationMechanisms=SCRAM-SHA-1,SCRAM-SHA-256,PLAIN"
+let m = MongoRunner.runMongod({
+    keyFile: "jstests/libs/key1",
+    setParameter: {authenticationMechanisms: "SCRAM-SHA-1,SCRAM-SHA-256,PLAIN"},
 });
 runTest(m);
 MongoRunner.stopMongod(m);
 
 // Test mongos.
-var st = new ShardingTest({
-    keyFile: 'jstests/libs/key1',
+if (TestData.configShard) {
+    // Config shard requires at least one shard.
+    quit();
+}
+let st = new ShardingTest({
+    keyFile: "jstests/libs/key1",
     shards: 0,
-    other:
-        {mongosOptions: {setParameter: "authenticationMechanisms=PLAIN,SCRAM-SHA-256,SCRAM-SHA-1"}}
+    other: {
+        mongosOptions: {setParameter: {authenticationMechanisms: "PLAIN,SCRAM-SHA-256,SCRAM-SHA-1"}},
+    },
 });
 runTest(st.s0);
 st.stop();
-})();

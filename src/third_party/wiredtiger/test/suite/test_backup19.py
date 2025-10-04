@@ -26,12 +26,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger
-import os, shutil
+import os
 from wtbackup import backup_base
-from wtdataset import simple_key
-from wtscenario import make_scenarios
-import glob
 
 # test_backup19.py
 # Test cursor backup with a block-based incremental cursor source id only.
@@ -110,5 +106,3 @@ class test_backup19(backup_base):
         self.take_full_backup(self.home_full)
         self.take_incr_backup(self.home_incr)
         self.compare_backups(self.uri, self.home_full, self.home_incr, str(self.bkup_id))
-if __name__ == '__main__':
-    wttest.run()

@@ -1,0 +1,41 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "ce_common",
+    srcs = [
+    ],
+    hdrs = [
+        "ce_common.h",
+    ],
+    deps = [
+        "//src/mongo/db/query/compiler/optimizer/cost_based_ranker:estimates",
+        "//src/mongo/db/query/compiler/stats:stats_gen",
+        "//src/mongo/db/query/compiler/stats:stats_test_utils",
+    ],
+)
+
+mongo_cc_library(
+    name = "ce_test_utils",
+    srcs = [
+        "ce_test_utils.cpp",
+    ],
+    hdrs = [
+        "ce_test_utils.h",
+    ],
+    deps = [
+        ":ce_common",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db/query/compiler/stats:stats_gen",
+        "//src/mongo/db/query/compiler/stats:stats_test_utils",
+        "//src/mongo/unittest",
+    ],
+)

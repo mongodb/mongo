@@ -1,12 +1,19 @@
 /**
  * Tests that resharding participants do not block replication while waiting for the
  * ReshardingCoordinatorService to be rebuilt.
+ *
+ * @tags: [
+ *  # Incompatible because it uses a fail point to block all primary only services
+ *  # from being rebuilt on the config server, and if the config server is the first shard,
+ *  # this prevents the test from making progress.
+ *  # This tests logic that shouldn't be different on a config server,
+ *  # so there's no need to run it with a config shard.
+ *  config_shard_incompatible,
+ *  ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/discover_topology.js");
-load("jstests/sharding/libs/resharding_test_fixture.js");
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 const reshardingTest = new ReshardingTest({numDonors: 2, enableElections: true});
 reshardingTest.setup();
@@ -27,15 +34,18 @@ const topology = DiscoverTopology.findConnectedNodes(mongos);
 const recipientShardNames = reshardingTest.recipientShardNames;
 const recipient = new Mongo(topology.shards[recipientShardNames[0]].primary);
 
-const reshardingPauseRecipientBeforeCloningFailpoint =
-    configureFailPoint(recipient, "reshardingPauseRecipientBeforeCloning");
+const reshardingPauseRecipientBeforeCloningFailpoint = configureFailPoint(
+    recipient,
+    "reshardingPauseRecipientBeforeCloning",
+);
 
 // We prevent primary-only service Instances from being constructed on all of the config server
 // replica set because we don't know which node will be elected primary from calling
 // stepUpNewPrimaryOnShard().
-const possibleCoordinators = topology.configsvr.nodes.map(host => new Mongo(host));
-const pauseBeforeConstructingCoordinatorsFailpointList = possibleCoordinators.map(
-    conn => configureFailPoint(conn, "PrimaryOnlyServiceHangBeforeRebuildingInstances"));
+const possibleCoordinators = topology.configsvr.nodes.map((host) => new Mongo(host));
+const pauseBeforeConstructingCoordinatorsFailpointList = possibleCoordinators.map((conn) =>
+    configureFailPoint(conn, "PrimaryOnlyServiceHangBeforeRebuildingInstances"),
+);
 
 // The ReshardingTest fixture had enabled failpoints on the original config server primary so it
 // could safely perform data consistency checks. It doesn't handle those failpoints not taking
@@ -49,8 +59,10 @@ const forceRecipientToLaterFailReshardingOp = (fn) => {
     // Note that it is safe to enable the reshardingPauseRecipientDuringOplogApplication failpoint
     // after the resharding operation has begun because this test already enabled the
     // reshardingPauseRecipientBeforeCloning failpoint.
-    const reshardingPauseRecipientDuringOplogApplicationFailpoint =
-        configureFailPoint(recipient, "reshardingPauseRecipientDuringOplogApplication");
+    const reshardingPauseRecipientDuringOplogApplicationFailpoint = configureFailPoint(
+        recipient,
+        "reshardingPauseRecipientDuringOplogApplication",
+    );
 
     fn();
 
@@ -58,10 +70,12 @@ const forceRecipientToLaterFailReshardingOp = (fn) => {
     // It is possible to construct such a sharded collection due to how each shard independently
     // enforces the uniqueness of _id values for only the documents it owns. The resharding
     // operation is expected to abort upon discovering this violation.
-    assert.commandWorked(sourceCollection.insert([
-        {_id: 0, info: `moves from ${donorShardNames[0]}`, oldKey: -10, newKey: 10},
-        {_id: 0, info: `moves from ${donorShardNames[1]}`, oldKey: 10, newKey: 10},
-    ]));
+    assert.commandWorked(
+        sourceCollection.insert([
+            {_id: 0, info: `moves from ${donorShardNames[0]}`, oldKey: -10, newKey: 10},
+            {_id: 0, info: `moves from ${donorShardNames[1]}`, oldKey: 10, newKey: 10},
+        ]),
+    );
 
     reshardingPauseRecipientDuringOplogApplicationFailpoint.off();
 };
@@ -84,16 +98,20 @@ reshardingTest.withReshardingInBackground(
         // Verify the update from the recipient shard is able to succeed despite the
         // ReshardingCoordinatorService not having been rebuilt yet.
         let coordinatorDoc;
-        assert.soon(() => {
-            coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({
-                ns: sourceCollection.getFullName()
-            });
+        assert.soon(
+            () => {
+                coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({
+                    ns: sourceCollection.getFullName(),
+                });
 
-            const recipientShardEntry =
-                coordinatorDoc.recipientShards.find(shard => shard.id === recipientShardNames[0]);
-            const recipientState = recipientShardEntry.mutableState.state;
-            return recipientState === "applying";
-        }, () => `recipient never transitioned to the "applying" state: ${tojson(coordinatorDoc)}`);
+                const recipientShardEntry = coordinatorDoc.recipientShards.find(
+                    (shard) => shard.id === recipientShardNames[0],
+                );
+                const recipientState = recipientShardEntry.mutableState.state;
+                return recipientState === "applying";
+            },
+            () => `recipient never transitioned to the "applying" state: ${tojson(coordinatorDoc)}`,
+        );
 
         // Also verify the config server replica set can replicate writes to a majority of its
         // members because that is originally how this issue around holding open an oplog hole had
@@ -109,20 +127,8 @@ reshardingTest.withReshardingInBackground(
         }
     },
     {
-        // As a result of the elections intentionally triggered on the config server replica sets,
-        // the primary shard of the database may retry the _configsvrReshardCollection command. It
-        // is possible for the resharding operation from the first _configsvrReshardCollection
-        // command to have entirely finished executing to the point of removing the coordinator
-        // state document. A retry of the _configsvrReshardCollection command in this situation will
-        // lead to a second resharding operation to run. The second resharding operation will have
-        // the duplicate documents cloned by the ReshardingCollectionCloner rather than applied by
-        // the ReshardingOplogApplier as intended. This results in the reshardCollection command
-        // failing with a DuplicateKey error rather than the error code for the stash collections
-        // being non-empty. The recipient must have been able to successfully update its state to
-        // "applying" in the first resharding operation even when the ReshardingCoordinatorService
-        // had yet to be rebuilt so we accept DuplicateKey as an error too.
-        expectedErrorCode: [5356800, ErrorCodes.DuplicateKey],
-    });
+        expectedErrorCode: 5356800,
+    },
+);
 
 reshardingTest.teardown();
-})();

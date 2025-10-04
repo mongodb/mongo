@@ -1,39 +1,144 @@
 """GDB commands for MongoDB."""
 
-import datetime
+import glob
 import json
 import os
 import re
+import subprocess
 import sys
+import warnings
+from pathlib import Path
 
 import gdb
 
-# pylint: disable=invalid-name,wildcard-import,broad-except
-try:
-    # Try to find and load the C++ pretty-printer library.
-    import glob
-    pp = glob.glob("/opt/mongodbtoolchain/v3/share/gcc-*/python/libstdcxx/v6/printers.py")
+if not gdb:
+    sys.path.insert(0, str(Path(os.path.abspath(__file__)).parent.parent.parent))
+    from buildscripts.gdb.mongo_printers import absl_get_nodes, get_unique_ptr, get_unique_ptr_bytes
+
+
+def detect_toolchain(progspace):
+    readelf_bin = os.environ.get("MONGO_GDB_READELF", "/opt/mongodbtoolchain/v5/bin/llvm-readelf")
+    if not os.path.exists(readelf_bin):
+        readelf_bin = "readelf"
+
+    gcc_version_regex = re.compile(r".*\]\s*GCC: \(GNU\) (\d+\.\d+\.\d+)\s*$")
+    clang_version_regex = re.compile(r".*\]\s*MongoDB clang version (\d+\.\d+\.\d+).*")
+
+    readelf_cmd = [readelf_bin, "-p", ".comment", progspace.filename]
+    # take an educated guess as to where we could find the c++ printers, better than hardcoding
+    result = subprocess.run(readelf_cmd, capture_output=True, text=True)
+
+    gcc_version = None
+    for line in result.stdout.split("\n"):
+        if match := re.search(gcc_version_regex, line):
+            gcc_version = match.group(1)
+            break
+    clang_version = None
+    for line in result.stdout.split("\n"):
+        if match := re.search(clang_version_regex, line):
+            clang_version = match.group(1)
+            break
+
+    if clang_version:
+        print(f"Detected binary built with Clang: {clang_version}")
+    elif gcc_version:
+        print(f"Detected binary built with GCC: {gcc_version}")
+    else:
+        print("Could not detect compiler.")
+
+    # default is v4 if we can't find a version
+    toolchain_ver = None
+    if gcc_version:
+        toolchain_ver = {
+            "8": "v3",
+            "11": "v4",
+            "14": "v5",
+        }.get(gcc_version.split(".")[0])
+    elif clang_version:
+        toolchain_ver = {
+            "19": "v5",
+        }.get(clang_version.split(".")[0])
+        if int(clang_version.split(".")[0]) == 19:
+            toolchain_ver = "v5"
+
+    if not toolchain_ver:
+        toolchain_ver = "v4"
+        print(f"""
+WARNING: could not detect a MongoDB toolchain to load matching stdcxx printers:
+-----------------
+command:
+{' '.join(readelf_cmd)}
+STDOUT:
+{result.stdout.strip()}
+STDERR:
+{result.stderr.strip()}
+-----------------
+Assuming {toolchain_ver} as a default, this could cause issues with the printers.""")
+
+    base_toolchain_dir = os.environ.get(
+        "MONGO_GDB_PP_DIR", f"/opt/mongodbtoolchain/{toolchain_ver}/share"
+    )
+    pp = glob.glob(f"{base_toolchain_dir}/gcc-*/python/libstdcxx/v6/printers.py")
     printers = pp[0]
-    path = os.path.dirname(os.path.dirname(os.path.dirname(printers)))
-    sys.path.insert(0, path)
-    from libstdcxx.v6 import register_libstdcxx_printers
-    from libstdcxx.v6 import printers as stdlib_printers
-    register_libstdcxx_printers(gdb.current_objfile())
-    print("Loaded libstdc++ pretty printers from '%s'" % printers)
-except Exception as e:
-    print("Failed to load the libstdc++ pretty printers: " + str(e))
-# pylint: enable=invalid-name,wildcard-import
+    return os.path.dirname(os.path.dirname(os.path.dirname(printers)))
+
+
+stdcxx_printer_toolchain_paths = dict()
+
+
+def load_libstdcxx_printers(progspace):
+    if progspace not in stdcxx_printer_toolchain_paths:
+        stdcxx_printer_toolchain_paths[progspace] = detect_toolchain(progspace)
+        try:
+            sys.path.insert(0, stdcxx_printer_toolchain_paths[progspace])
+            global stdlib_printers
+            from libstdcxx.v6 import printers as stdlib_printers
+            from libstdcxx.v6 import register_libstdcxx_printers
+
+            register_libstdcxx_printers(progspace)
+            print(
+                f"Loaded libstdc++ pretty printers from '{stdcxx_printer_toolchain_paths[progspace]}'"
+            )
+        except Exception as exc:
+            print(
+                f"Failed to load the libstdc++ pretty printers from {stdcxx_printer_toolchain_paths[progspace]}: {exc}"
+            )
+
+
+def on_new_object_file(objfile) -> None:
+    """Import the libstdc++ GDB pretty printers when either the `attach <pid>` or `core-file <pathname>` commands are run in GDB."""
+    progspace = objfile.new_objfile.progspace
+    if progspace.filename is None:
+        # The `attach` command would have filled in the filename so we only need to check if
+        # a core dump has been loaded with the executable file also being loaded.
+        target_info = gdb.execute("info target", to_string=True)
+        if re.match(r"^Local core dump file:", target_info):
+            warnings.warn(
+                "Unable to locate the libstdc++ GDB pretty printers without an executable"
+                " file. Try running the `file` command with the path to the executable file"
+                " and reloading the core dump with the `core-file` command"
+            )
+        return
+
+    load_libstdcxx_printers(objfile.new_objfile.progspace)
+
+
+if gdb.selected_inferior().progspace.filename:
+    load_libstdcxx_printers(gdb.selected_inferior().progspace)
+else:
+    gdb.events.new_objfile.connect(on_new_object_file)
 
 try:
     import bson
-except ImportError as err:
+except ImportError:
     print("Warning: Could not load bson library for Python '" + str(sys.version) + "'.")
     print("Check with the pip command if pymongo 3.x is installed.")
     bson = None
 
 if sys.version_info[0] < 3:
     raise gdb.GdbError(
-        "MongoDB gdb extensions only support Python 3. Your GDB was compiled against Python 2")
+        "MongoDB gdb extensions only support Python 3. Your GDB was compiled against Python 2"
+    )
 
 
 def get_process_name():
@@ -64,12 +169,42 @@ def get_thread_id():
     raise ValueError("Failed to find thread id in {}".format(thread_info))
 
 
+MAIN_GLOBAL_BLOCK = None
+
+
+def lookup_type(gdb_type_str: str) -> gdb.Type:
+    """
+    Try to find the type object from string.
+
+    GDB says it searches the global blocks, however this appear not to be the
+    case or at least it doesn't search all global blocks, sometimes it required
+    to get the global block based off the current frame.
+    """
+    global MAIN_GLOBAL_BLOCK
+
+    exceptions = []
+    try:
+        return gdb.lookup_type(gdb_type_str)
+    except Exception as exc:
+        exceptions.append(exc)
+
+    if MAIN_GLOBAL_BLOCK is None:
+        MAIN_GLOBAL_BLOCK = gdb.lookup_symbol("main")[0].symtab.global_block()
+
+    try:
+        return gdb.lookup_type(gdb_type_str, MAIN_GLOBAL_BLOCK)
+    except Exception as exc:
+        exceptions.append(exc)
+
+    raise gdb.error("Failed to get type, tried:\n%s" % "\n".join([str(exc) for exc in exceptions]))
+
+
 def get_current_thread_name():
     """Return the name of the current GDB thread."""
-    fallback_name = '"%s"' % (gdb.selected_thread().name or '')
+    fallback_name = '"%s"' % (gdb.selected_thread().name or "")
     try:
         # This goes through the pretty printer for StringData which adds "" around the name.
-        name = str(gdb.parse_and_eval("mongo::ThreadName::getStaticString()"))
+        name = str(gdb.parse_and_eval("mongo::getThreadName()"))
         if name == '""':
             return fallback_name
         return name
@@ -104,7 +239,7 @@ def get_session_kv_pairs():
     session_catalog = get_session_catalog()
     if session_catalog is None:
         return list()
-    return list(absl_get_nodes(session_catalog["_sessions"]))  # pylint: disable=undefined-variable
+    return list(absl_get_nodes(session_catalog["_sessions"]))
 
 
 def get_wt_session(recovery_unit, recovery_unit_impl_type):
@@ -118,11 +253,12 @@ def get_wt_session(recovery_unit, recovery_unit_impl_type):
         return None
     if not recovery_unit:
         return None
-    wt_session_handle = get_unique_ptr(recovery_unit["_session"])  # pylint: disable=undefined-variable
+    wt_session_handle = get_unique_ptr(recovery_unit["_session"])
     if not wt_session_handle.dereference().address:
         return None
-    wt_session = wt_session_handle.dereference().cast(
-        gdb.lookup_type("mongo::WiredTigerSession"))["_session"]  # pylint: disable=undefined-variable
+    wt_session = wt_session_handle.dereference().cast(lookup_type("mongo::WiredTigerSession"))[
+        "_session"
+    ]
     return wt_session
 
 
@@ -131,40 +267,50 @@ def get_decorations(obj):
 
     Each object returned by the iterator is a tuple whose first element is the type name of the
     decoration and whose second element is the decoration object itself.
-
-    TODO: De-duplicate the logic between here and DecorablePrinter. This code was copied from there.
     """
     type_name = str(obj.type).replace("class", "").replace(" ", "")
-    decorable = obj.cast(gdb.lookup_type("mongo::Decorable<{}>".format(type_name)))
-    decl_vector = decorable["_decorations"]["_registry"]["_decorationInfo"]
+    decorable = obj.cast(lookup_type("mongo::Decorable<{}>".format(type_name)))
+    start, count = get_decorable_info(decorable)
+    for i in range(count):
+        deco_type_name, obj, _ = get_object_decoration(decorable, start, i)
+        try:
+            yield (deco_type_name, obj)
+        except Exception as err:
+            print("Failed to look up decoration type: " + deco_type_name + ": " + str(err))
+
+
+def get_object_decoration(decorable, start, index):
+    decoration_data = get_unique_ptr_bytes(decorable["_decorations"]["_data"])
+    entry = start[index]
+    deco_type_info = str(entry["typeInfo"])
+    deco_type_name = re.sub(r".* <typeinfo for (.*)>", r"\1", deco_type_info)
+    offset = int(entry["offset"])
+    obj = decoration_data[offset]
+    obj_addr = re.sub(r"^(.*) .*", r"\1", str(obj.address))
+    obj = _cast_decoration_value(deco_type_name, int(obj.address))
+    return (deco_type_name, obj, obj_addr)
+
+
+def get_decorable_info(decorable):
+    decorable_t = decorable.type.template_argument(0)
+    reg_sym, _ = gdb.lookup_symbol("mongo::decorable_detail::gdbRegistry<{}>".format(decorable_t))
+    decl_vector = reg_sym.value()["_entries"]
     start = decl_vector["_M_impl"]["_M_start"]
     finish = decl_vector["_M_impl"]["_M_finish"]
-
-    decorable_t = decorable.type.template_argument(0)
-    decinfo_t = gdb.lookup_type('mongo::DecorationRegistry<{}>::DecorationInfo'.format(
-        str(decorable_t).replace("class", "").strip()))
+    decinfo_t = lookup_type("mongo::decorable_detail::Registry::Entry")
     count = int((int(finish) - int(start)) / decinfo_t.sizeof)
+    return start, count
 
-    for i in range(count):
-        descriptor = start[i]
-        dindex = int(descriptor["descriptor"]["_index"])
 
-        type_name = str(descriptor["constructor"])
-        type_name = type_name[0:len(type_name) - 1]
-        type_name = type_name[0:type_name.rindex(">")]
-        type_name = type_name[type_name.index("constructAt<"):].replace("constructAt<", "")
-        # get_unique_ptr should be loaded from 'mongo_printers.py'.
-        decoration_data = get_unique_ptr(decorable["_decorations"]["_decorationData"])  # pylint: disable=undefined-variable
-
-        if type_name.endswith('*'):
-            type_name = type_name[0:len(type_name) - 1]
-        type_name = type_name.rstrip()
-        try:
-            type_t = gdb.lookup_type(type_name)
-            obj = decoration_data[dindex].cast(type_t)
-            yield (type_name, obj)
-        except Exception as err:
-            print("Failed to look up decoration type: " + type_name + ": " + str(err))
+def _cast_decoration_value(type_name: str, decoration_address: int, /) -> gdb.Value:
+    # We cannot use gdb.lookup_type() when the decoration type is a pointer type, e.g.
+    # ServiceContext::declareDecoration<VectorClock*>(). gdb.parse_and_eval() is one of the few
+    # ways to convert a type expression into a gdb.Type value. Some care is taken to quote the
+    # non-pointer portion of the type so resolution for a type defined within an anonymous
+    # namespace works correctly.
+    type_name_regex = re.compile(r"^(.*[\w>])([\s\*]*)$")
+    escaped = type_name_regex.sub(r"'\1'\2*", type_name)
+    return gdb.parse_and_eval(f"({escaped}) {decoration_address}").dereference()
 
 
 def get_decoration(obj, type_name):
@@ -188,10 +334,18 @@ def get_boost_optional(optional):
 
     TODO: Import the boost pretty printers instead of using this custom function.
     """
-    if not optional['m_initialized']:
+    if not optional["m_initialized"]:
         return None
     value_ref_type = optional.type.template_argument(0).pointer()
-    storage = optional['m_storage']['dummy_']['data']
+
+    # boost::optional<T> is either stored using boost::optional_detail::aligned_storage<T> or
+    # using direct storage of `T`. Scalar types are able to take advantage of direct storage.
+    #
+    # https://www.boost.org/doc/libs/1_79_0/libs/optional/doc/html/boost_optional/tutorial/performance_considerations.html
+    if optional["m_storage"].type.strip_typedefs().pointer() == value_ref_type:
+        return optional["m_storage"]
+
+    storage = optional["m_storage"]["dummy_"]["data"]
     return storage.cast(value_ref_type).dereference()
 
 
@@ -233,7 +387,7 @@ class DumpGlobalServiceContext(gdb.Command):
         """Initialize DumpGlobalServiceContext."""
         RegisterMongoCommand.register(self, "mongodb-service-context", gdb.COMMAND_DATA)
 
-    def invoke(self, arg, _from_tty):  # pylint: disable=no-self-use,unused-argument
+    def invoke(self, arg, _from_tty):
         """Invoke GDB command to print the Global Service Context."""
         gdb.execute("print *('mongo::(anonymous namespace)::globalServiceContext')")
 
@@ -246,16 +400,16 @@ class GetMongoDecoration(gdb.Command):
     """
     Search for a decoration on an object by typename and print it e.g.
 
-    (gdb) mongo-decoration opCtx ReadConcernArgs
+    (gdb) mongodb-decoration opCtx ReadConcernArgs
 
     would print out a decoration on opCtx whose type name contains the string "ReadConcernArgs".
     """
 
     def __init__(self):
         """Initialize GetMongoDecoration."""
-        RegisterMongoCommand.register(self, "mongo-decoration", gdb.COMMAND_DATA)
+        RegisterMongoCommand.register(self, "mongodb-decoration", gdb.COMMAND_DATA)
 
-    def invoke(self, args, _from_tty):  # pylint: disable=unused-argument,no-self-use
+    def invoke(self, args, _from_tty):
         """Invoke GetMongoDecoration."""
         argarr = args.split(" ")
         if len(argarr) < 2:
@@ -293,7 +447,7 @@ class DumpMongoDSessionCatalog(gdb.Command):
         """Initialize DumpMongoDSessionCatalog."""
         RegisterMongoCommand.register(self, "mongod-dump-sessions", gdb.COMMAND_DATA)
 
-    def invoke(self, args, _from_tty):  # pylint: disable=unused-argument,no-self-use,too-many-locals,too-many-branches,too-many-statements
+    def invoke(self, args, _from_tty):
         """Invoke DumpMongoDSessionCatalog."""
         # See if a particular session id was specified.
         argarr = args.split(" ")
@@ -316,128 +470,106 @@ class DumpMongoDSessionCatalog(gdb.Command):
             print("Only printing information for session " + lsid_to_find + ", if found.")
             lsids_to_print = [lsid_to_find]
         else:
-            lsids_to_print = [str(s['first']['_id']) for s in session_kv_pairs]
+            lsids_to_print = [str(s["first"]["_id"]) for s in session_kv_pairs]
 
-        for sess_kv in session_kv_pairs:
-            # The Session is stored inside the SessionRuntimeInfo object.
-            session_runtime_info = get_unique_ptr(sess_kv['second']).dereference()  # pylint: disable=undefined-variable
-            session = session_runtime_info['session']
-            # TODO: Add a custom pretty printer for LogicalSessionId.
-            lsid_str = str(session['_sessionId']['_id'])
+        for session_kv in session_kv_pairs:
+            # The Session objects are stored inside the SessionRuntimeInfo object.
+            session_runtime_info = get_unique_ptr(session_kv["second"]).dereference()
+            parent_session = session_runtime_info["parentSession"]
+            child_sessions = absl_get_nodes(session_runtime_info["childSessions"])
+            lsid = str(parent_session["_sessionId"]["_id"])
 
             # If we are only interested in a specific session, then we print out the entire Session
-            # object, to aid more detailed debugging.
-            if lsid_str == lsid_to_find:
-                print("SessionId", "=", lsid_str)
-                print(session)
+            # objects, to aid more detailed debugging.
+            if lsid == lsid_to_find:
+                self.dump_session_runtime_info(session_runtime_info)
+                print(parent_session)
+                for child_session_kv in child_sessions:
+                    child_session = child_session_kv["second"]
+                    print(child_session)
                 # Terminate if this is the only session we care about.
                 break
 
             # Only print info for the necessary sessions.
-            if lsid_str not in lsids_to_print:
+            if lsid not in lsids_to_print:
                 continue
 
-            # If we are printing multiple sessions, we only print the most interesting fields from
-            # the Session object for the sake of efficiency. We print the session id string first so
-            # the session is easily identifiable.
-            print("Session (" + str(session.address) + "):")
-            print("SessionId", "=", lsid_str)
-            session_fields_to_print = ['_checkoutOpCtx', '_killsRequested']
-            for field in session_fields_to_print:
+            # If we are printing multiple sessions, we only print the most interesting fields for
+            # each Session object for the sake of efficiency.
+            self.dump_session_runtime_info(session_runtime_info)
+            self.dump_session(parent_session)
+            for child_session_kv in child_sessions:
+                child_session = child_session_kv["second"]
+                self.dump_session(child_session)
+
+    @staticmethod
+    def dump_session_runtime_info(session_runtime_info):
+        """Dump the session runtime info."""
+
+        parent_session = session_runtime_info["parentSession"]
+        # TODO: Add a custom pretty printer for LogicalSessionId.
+        lsid = str(parent_session["_sessionId"]["_id"])[1:-1]
+        print("SessionId =", lsid)
+        fields_to_print = ["checkoutOpCtx", "killsRequested"]
+        for field in fields_to_print:
+            # Skip fields that aren't found on the object.
+            if field in get_field_names(session_runtime_info):
+                print(field, "=", session_runtime_info[field])
+            else:
+                print("Could not find field '%s' on the SessionRuntimeInfo object." % field)
+        print("")
+
+    @staticmethod
+    def dump_session(session):
+        """Dump the session."""
+
+        print("Session (" + str(session.address) + "):")
+        fields_to_print = ["_sessionId", "_numWaitingToCheckOut"]
+        for field in fields_to_print:
+            # Skip fields that aren't found on the object.
+            if field in get_field_names(session):
+                print(field, "=", session[field])
+            else:
+                print("Could not find field '%s' on the SessionRuntimeInfo object." % field)
+
+        # Print the information from a TransactionParticipant if a session has one.
+        txn_part_dec = get_decoration(session, "TransactionParticipant")
+        if txn_part_dec:
+            # Only print the most interesting fields for debugging transactions issues. The
+            # TransactionParticipant class encapsulates internal state in two distinct
+            # structures: a 'PrivateState' type (stored in private field '_p') and an
+            # 'ObservableState' type (stored in private field '_o'). The information we care
+            # about here is all contained inside the 'ObservableState', so we extract fields
+            # from that object. If, in the future, we want to print fields from the
+            # 'PrivateState' object, we can inspect the TransactionParticipant's '_p' field.
+            txn_part = txn_part_dec[1]
+            txn_part_observable_state = txn_part["_o"]
+            fields_to_print = ["txnState", "activeTxnNumberAndRetryCounter"]
+            print("TransactionParticipant (" + str(txn_part.address) + "):")
+            for field in fields_to_print:
                 # Skip fields that aren't found on the object.
-                if field in get_field_names(session):
-                    print(field, "=", session[field])
+                if field in get_field_names(txn_part_observable_state):
+                    print(field, "=", txn_part_observable_state[field])
                 else:
-                    print("Could not find field '%s' on the Session object." % field)
+                    print("Could not find field '%s' on the TransactionParticipant" % field)
 
-            # Print the information from a TransactionParticipant if a session has one. Otherwise
-            # we just print the session's id and nothing else.
-            txn_part_dec = get_decoration(session, "TransactionParticipant")
-            if txn_part_dec:
-                # Only print the most interesting fields for debugging transactions issues. The
-                # TransactionParticipant class encapsulates internal state in two distinct
-                # structures: a 'PrivateState' type (stored in private field '_p') and an
-                # 'ObservableState' type (stored in private field '_o'). The information we care
-                # about here is all contained inside the 'ObservableState', so we extract fields
-                # from that object. If, in the future, we want to print fields from the
-                # 'PrivateState' object, we can inspect the TransactionParticipant's '_p' field.
-                txn_part = txn_part_dec[1]
-                txn_part_observable_state = txn_part['_o']
-                fields_to_print = ['txnState', 'activeTxnNumber']
-                print("TransactionParticipant (" + str(txn_part.address) + "):")
-                for field in fields_to_print:
-                    # Skip fields that aren't found on the object.
-                    if field in get_field_names(txn_part_observable_state):
-                        print(field, "=", txn_part_observable_state[field])
-                    else:
-                        print("Could not find field '%s' on the TransactionParticipant" % field)
-
-                # The 'txnResourceStash' field is a boost::optional so we unpack it manually if it
-                # is non-empty. We are only interested in its Locker object for now. TODO: Load the
-                # boost pretty printers so the object will be printed clearly by default, without
-                # the need for special unpacking.
-                val = get_boost_optional(txn_part_observable_state['txnResourceStash'])
-                if val:
-                    locker_addr = get_unique_ptr(val["_locker"])  # pylint: disable=undefined-variable
-                    locker_obj = locker_addr.dereference().cast(
-                        gdb.lookup_type("mongo::LockerImpl"))
-                    print('txnResourceStash._locker', "@", locker_addr)
-                    print("txnResourceStash._locker._id", "=", locker_obj["_id"])
-                else:
-                    print('txnResourceStash', "=", None)
-            # Separate sessions by a newline.
-            print("")
+            # The 'txnResourceStash' field is a boost::optional so we unpack it manually if it
+            # is non-empty. We are only interested in its Locker object for now. TODO: Load the
+            # boost pretty printers so the object will be printed clearly by default, without
+            # the need for special unpacking.
+            val = get_boost_optional(txn_part_observable_state["txnResourceStash"])
+            if val:
+                locker_addr = get_unique_ptr(val["_locker"])
+                locker_obj = locker_addr.dereference().cast(lookup_type("mongo::Locker"))
+                print("txnResourceStash._locker", "@", locker_addr)
+                print("txnResourceStash._locker._id", "=", locker_obj["_id"])
+            else:
+                print("txnResourceStash", "=", None)
+        print("")
 
 
 # Register command
 DumpMongoDSessionCatalog()
-
-
-class DumpMongoDBMutexes(gdb.Command):
-    """Print out the state of mutexes in a mongodb (mongod or mongos) process."""
-
-    def __init__(self):
-        """Initialize DumpMongoDBMutexs."""
-        RegisterMongoCommand.register(self, "mongodb-dump-mutexes", gdb.COMMAND_DATA)
-
-    def invoke(self, args, _from_tty):  # pylint: disable=unused-argument,no-self-use,too-many-locals,too-many-branches,too-many-statements
-        """Invoke DumpMongoDBMutexes."""
-
-        print("Dumping mutex info for all Clients")
-
-        service_context = get_global_service_context()
-        client_set = absl_get_nodes(service_context["_clients"])  # pylint: disable=undefined-variable
-        for client_handle in client_set:
-            client = client_handle.dereference().dereference()
-            decoration_info = get_decoration(client, "DiagnosticInfoHandle")
-            if not decoration_info:
-                continue
-            diagnostic_info_handle = decoration_info[1]
-            diagnostic_info_list = diagnostic_info_handle["list"]
-
-            # Use the STL pretty-printer to iterate over the list
-            printer = stdlib_printers.StdForwardListPrinter(
-                str(diagnostic_info_list.type), diagnostic_info_list)
-
-            # Prepare structured output doc
-            client_name = str(client["_desc"])
-            # Chop off the "\"" from the beginning and end of the string
-            client_name = client_name[1:-1]
-            output_doc = {"client": client_name, "waiting": False}
-
-            # This list will only ever have 0 or 1 element in it
-            for _, diagnostic_info in printer.children():
-                output_doc["waiting"] = True
-                output_doc["mutex"] = str(diagnostic_info["_captureName"])[1:-1]
-
-                millis = int(diagnostic_info["_timestamp"]["millis"])
-                dt = datetime.datetime.fromtimestamp(millis / 1000, tz=datetime.timezone.utc)
-                output_doc["since"] = dt.isoformat()
-            print(json.dumps(output_doc))
-
-
-# Register command
-DumpMongoDBMutexes()
 
 
 class MongoDBDumpLocks(gdb.Command):
@@ -447,12 +579,12 @@ class MongoDBDumpLocks(gdb.Command):
         """Initialize MongoDBDumpLocks."""
         RegisterMongoCommand.register(self, "mongodb-dump-locks", gdb.COMMAND_DATA)
 
-    def invoke(self, arg, _from_tty):  # pylint: disable=unused-argument
+    def invoke(self, arg, _from_tty):
         """Invoke MongoDBDumpLocks."""
         print("Running Hang Analyzer Supplement - MongoDBDumpLocks")
 
         main_binary_name = get_process_name()
-        if main_binary_name == 'mongod':
+        if main_binary_name == "mongod" or main_binary_name == "mongod_with_debug":
             self.dump_mongod_locks()
         else:
             print("Not invoking mongod lock dump for: %s" % (main_binary_name))
@@ -464,8 +596,7 @@ class MongoDBDumpLocks(gdb.Command):
         try:
             # Call into mongod, and dump the state of lock manager
             # Note that output will go to mongod's standard output, not the debugger output window
-            gdb.execute("call mongo::getGlobalLockManager()->dump()", from_tty=False,
-                        to_string=False)
+            gdb.execute("call mongo::dumpLockManager()", from_tty=False, to_string=False)
         except gdb.error as gdberr:
             print("Ignoring error '%s' in dump_mongod_locks" % str(gdberr))
 
@@ -495,7 +626,7 @@ class MongoDBDumpRecoveryUnits(gdb.Command):
             print("Not invoking mongod recovery unit dump for: %s" % (main_binary_name))
 
     @staticmethod
-    def dump_recovery_units(recovery_unit_impl_type):  # pylint: disable=too-many-locals
+    def dump_recovery_units(recovery_unit_impl_type):
         """GDB in-process python supplement."""
 
         # Temporarily disable printing static members to make the output more readable
@@ -507,7 +638,7 @@ class MongoDBDumpRecoveryUnits(gdb.Command):
 
         # Dump active recovery unit info for each client in a mongod process
         service_context = get_global_service_context()
-        client_set = absl_get_nodes(service_context["_clients"])  # pylint: disable=undefined-variable
+        client_set = absl_get_nodes(service_context["_clients"])
 
         for client_handle in client_set:
             client = client_handle.dereference().dereference()
@@ -521,10 +652,11 @@ class MongoDBDumpRecoveryUnits(gdb.Command):
             recovery_unit = None
             if operation_context_handle:
                 operation_context = operation_context_handle.dereference()
-                recovery_unit_handle = get_unique_ptr(operation_context["_recoveryUnit"])  # pylint: disable=undefined-variable
+                recovery_unit_handle = get_unique_ptr(operation_context["_recoveryUnit"])
                 # By default, cast the recovery unit as "mongo::WiredTigerRecoveryUnit"
                 recovery_unit = recovery_unit_handle.dereference().cast(
-                    gdb.lookup_type(recovery_unit_impl_type))
+                    lookup_type(recovery_unit_impl_type)
+                )
 
             output_doc["recoveryUnit"] = hex(recovery_unit_handle) if recovery_unit else "0x0"
             wt_session = get_wt_session(recovery_unit, recovery_unit_impl_type)
@@ -536,38 +668,52 @@ class MongoDBDumpRecoveryUnits(gdb.Command):
 
         # Dump stashed recovery unit info for each session in a mongod process
         for session_kv in get_session_kv_pairs():
-            session_runtime_info = get_unique_ptr(session_kv["second"]).dereference()  # pylint: disable=undefined-variable
-            session = session_runtime_info["session"]
+            # The Session objects are stored inside the SessionRuntimeInfo object.
+            session_runtime_info = get_unique_ptr(session_kv["second"]).dereference()
+            parent_session = session_runtime_info["parentSession"]
+            child_sessions = absl_get_nodes(session_runtime_info["childSessions"])
 
-            # Prepare structured output doc
-            session_lsid = str(session["_sessionId"]["_id"])[1:-1]
-            txn_participant_dec = get_decoration(session, "TransactionParticipant")
-            output_doc = {"session": session_lsid, "txnResourceStash": "0x0"}
-
-            recovery_unit_handle = None
-            recovery_unit = None
-            if txn_participant_dec:
-                txn_participant_observable_state = txn_participant_dec[1]["_o"]
-                txn_resource_stash = get_boost_optional(
-                    txn_participant_observable_state["txnResourceStash"])
-
-                if txn_resource_stash:
-                    output_doc["txnResourceStash"] = str(txn_resource_stash.address)
-                    recovery_unit_handle = get_unique_ptr(txn_resource_stash["_recoveryUnit"])  # pylint: disable=undefined-variable
-                    # By default, cast the recovery unit as "mongo::WiredTigerRecoveryUnit"
-                    recovery_unit = recovery_unit_handle.dereference().cast(
-                        gdb.lookup_type(recovery_unit_impl_type))
-
-            output_doc["recoveryUnit"] = hex(recovery_unit_handle) if recovery_unit else "0x0"
-            wt_session = get_wt_session(recovery_unit, recovery_unit_impl_type)
-            if wt_session:
-                output_doc["WT_SESSION"] = hex(wt_session)
-            print(json.dumps(output_doc))
-            if recovery_unit:
-                print(recovery_unit)
+            MongoDBDumpRecoveryUnits.dump_session(parent_session, recovery_unit_impl_type)
+            for child_session_kv in child_sessions:
+                child_session = child_session_kv["second"]
+                MongoDBDumpRecoveryUnits.dump_session(child_session, recovery_unit_impl_type)
 
         if enabled_at_start:
             gdb.execute("set print static-members on")
+
+    @staticmethod
+    def dump_session(session, recovery_unit_impl_type):
+        """Dump the session."""
+
+        # Prepare structured output doc
+        lsid = session["_sessionId"]
+        output_doc = {"session": str(lsid["_id"])[1:-1], "txnResourceStash": "0x0"}
+        txn_participant_dec = get_decoration(session, "TransactionParticipant")
+        recovery_unit_handle = None
+        recovery_unit = None
+
+        if txn_participant_dec:
+            txn_participant_observable_state = txn_participant_dec[1]["_o"]
+            txn_resource_stash = get_boost_optional(
+                txn_participant_observable_state["txnResourceStash"]
+            )
+            if txn_resource_stash:
+                output_doc["txnResourceStash"] = str(txn_resource_stash.address)
+                recovery_unit_handle = get_unique_ptr(txn_resource_stash["_recoveryUnit"])
+                # By default, cast the recovery unit as "mongo::WiredTigerRecoveryUnit"
+                recovery_unit = recovery_unit_handle.dereference().cast(
+                    lookup_type(recovery_unit_impl_type)
+                )
+
+        output_doc["recoveryUnit"] = hex(recovery_unit_handle) if recovery_unit else "0x0"
+        wt_session = get_wt_session(recovery_unit, recovery_unit_impl_type)
+        if wt_session:
+            output_doc["WT_SESSION"] = hex(wt_session)
+
+        print(json.dumps(output_doc))
+        print(lsid)
+        if recovery_unit:
+            print(recovery_unit)
 
 
 # Register command
@@ -581,12 +727,12 @@ class MongoDBDumpStorageEngineInfo(gdb.Command):
         """Initialize MongoDBDumpStorageEngineInfo."""
         RegisterMongoCommand.register(self, "mongodb-dump-storage-engine-info", gdb.COMMAND_DATA)
 
-    def invoke(self, arg, _from_tty):  # pylint: disable=unused-argument
+    def invoke(self, arg, _from_tty):
         """Invoke MongoDBDumpStorageEngineInfo."""
         print("Running Hang Analyzer Supplement - MongoDBDumpStorageEngineInfo")
 
         main_binary_name = get_process_name()
-        if main_binary_name == 'mongod':
+        if main_binary_name == "mongod":
             self.dump_mongod_storage_engine_info()
         else:
             print("Not invoking mongod storage engine info dump for: %s" % (main_binary_name))
@@ -600,7 +746,9 @@ class MongoDBDumpStorageEngineInfo(gdb.Command):
             # Note that output will go to mongod's standard output, not the debugger output window
             gdb.execute(
                 "call mongo::getGlobalServiceContext()->_storageEngine._ptr._value._M_b._M_p->dump()",
-                from_tty=False, to_string=False)
+                from_tty=False,
+                to_string=False,
+            )
         except gdb.error as gdberr:
             print("Ignoring error '%s' in dump_mongod_storage_engine_info" % str(gdberr))
 
@@ -616,7 +764,7 @@ class BtIfActive(gdb.Command):
         """Initialize BtIfActive."""
         RegisterMongoCommand.register(self, "mongodb-bt-if-active", gdb.COMMAND_DATA)
 
-    def invoke(self, arg, _from_tty):  # pylint: disable=no-self-use,unused-argument
+    def invoke(self, arg, _from_tty):
         """Invoke GDB to print stack trace."""
         try:
             idle_location = gdb.parse_and_eval("mongo::for_debuggers::idleThreadLocation")
@@ -646,7 +794,7 @@ class MongoDBUniqueStack(gdb.Command):
         """Invoke GDB to dump stacks."""
         stacks = {}
         if not arg:
-            arg = 'bt'  # default to 'bt'
+            arg = "bt"  # default to 'bt'
 
         current_thread = gdb.selected_thread()
         try:
@@ -664,24 +812,24 @@ class MongoDBUniqueStack(gdb.Command):
     def _process_thread_stack(arg, stacks, thread):
         """Process the thread stack."""
         thread_info = {}  # thread dict to hold per thread data
-        thread_info['pthread'] = get_thread_id()
-        thread_info['gdb_thread_num'] = thread.num
-        thread_info['lwpid'] = thread.ptid[1]
-        thread_info['name'] = get_current_thread_name()
+        thread_info["pthread"] = get_thread_id()
+        thread_info["gdb_thread_num"] = thread.num
+        thread_info["lwpid"] = thread.ptid[1]
+        thread_info["name"] = get_current_thread_name()
 
         if sys.platform.startswith("linux"):
             header_format = "Thread {gdb_thread_num}: {name} (Thread 0x{pthread:x} (LWP {lwpid}))"
         elif sys.platform.startswith("sunos"):
             (_, _, thread_tid) = thread.ptid
-            if thread_tid != 0 and thread_info['lwpid'] != 0:
+            if thread_tid != 0 and thread_info["lwpid"] != 0:
                 header_format = "Thread {gdb_thread_num}: {name} (Thread {pthread} (LWP {lwpid}))"
-            elif thread_info['lwpid'] != 0:
+            elif thread_info["lwpid"] != 0:
                 header_format = "Thread {gdb_thread_num}: {name} (LWP {lwpid})"
             else:
                 header_format = "Thread {gdb_thread_num}: {name} (Thread {pthread})"
         else:
             raise ValueError("Unsupported platform: {}".format(sys.platform))
-        thread_info['header'] = header_format.format(**thread_info)
+        thread_info["header"] = header_format.format(**thread_info)
 
         addrs = []  # list of return addresses from frames
         frame = gdb.newest_frame()
@@ -690,17 +838,17 @@ class MongoDBUniqueStack(gdb.Command):
             try:
                 frame = frame.older()
             except gdb.error as err:
-                print("{} {}".format(thread_info['header'], err))
+                print("{} {}".format(thread_info["header"], err))
                 break
         addrs_tuple = tuple(addrs)  # tuples are hashable, lists aren't.
 
-        unique = stacks.setdefault(addrs_tuple, {'threads': []})
-        unique['threads'].append(thread_info)
-        if 'output' not in unique:
+        unique = stacks.setdefault(addrs_tuple, {"threads": []})
+        unique["threads"].append(thread_info)
+        if "output" not in unique:
             try:
-                unique['output'] = gdb.execute(arg, to_string=True).rstrip()
+                unique["output"] = gdb.execute(arg, to_string=True).rstrip()
             except gdb.error as err:
-                print("{} {}".format(thread_info['header'], err))
+                print("{} {}".format(thread_info["header"], err))
 
     @staticmethod
     def _dump_unique_stacks(stacks):
@@ -708,13 +856,13 @@ class MongoDBUniqueStack(gdb.Command):
 
         def first_tid(stack):
             """Return the first tid."""
-            return stack['threads'][0]['gdb_thread_num']
+            return stack["threads"][0]["gdb_thread_num"]
 
         for stack in sorted(list(stacks.values()), key=first_tid, reverse=True):
-            for i, thread in enumerate(stack['threads']):
-                prefix = '' if i == 0 else 'Duplicate '
-                print(prefix + thread['header'])
-            print(stack['output'])
+            for i, thread in enumerate(stack["threads"]):
+                prefix = "" if i == 0 else "Duplicate "
+                print(prefix + thread["header"])
+            print(stack["output"])
             print()  # leave extra blank line after each thread stack
 
 
@@ -726,7 +874,7 @@ class MongoDBJavaScriptStack(gdb.Command):
     """Print the JavaScript stack from a MongoDB process."""
 
     # Looking to test your changes to this? Really easy!
-    # 1. install-core to build the mongo shell binary (mongo)
+    # 1. install-jstestshell to build the mongo shell binary (mongo)
     # 2. launch it: ./path/to/bin/mongo --nodb
     # 3. in the shell, run: sleep(99999999999). (do not use --eval)
     # 4. ps ax | grep nodb to find the PID
@@ -737,12 +885,12 @@ class MongoDBJavaScriptStack(gdb.Command):
         """Initialize MongoDBJavaScriptStack."""
         RegisterMongoCommand.register(self, "mongodb-javascript-stack", gdb.COMMAND_STATUS)
 
-    def invoke(self, arg, _from_tty):  # pylint: disable=unused-argument
+    def invoke(self, arg, _from_tty):
         """Invoke GDB to dump JS stacks."""
         print("Running Print JavaScript Stack Supplement")
 
         main_binary_name = get_process_name()
-        if main_binary_name.endswith('mongod') or main_binary_name.endswith('mongo'):
+        if main_binary_name.endswith("mongod") or main_binary_name.endswith("mongo"):
             self.javascript_stack()
         else:
             print("No JavaScript stack print done for: %s" % (main_binary_name))
@@ -755,15 +903,35 @@ class MongoDBJavaScriptStack(gdb.Command):
         # `'_M_b' in atomic_scope`, so exceptions for flow control it is. :|
         try:
             # reach into std::atomic and grab the pointer. This is for libc++
-            return atomic_scope['_M_b']['_M_p']
+            return atomic_scope["_M_b"]["_M_p"]
         except gdb.error:
             # Worst case scenario: try and use .load(), but it's probably
             # inlined. parse_and_eval required because you can't call methods
             # in gdb on the Python API
             return gdb.parse_and_eval(
-                f"((std::atomic<mongo::mozjs::MozJSImplScope*> *)({atomic_scope.address}))->load()")
+                f"((std::atomic<mongo::mozjs::MozJSImplScope*> *)({atomic_scope.address}))->load()"
+            )
 
         return None
+
+    # Returns the current JS scope above the currently selected frame, or throws a GDB exception if
+    # it cannot be found.
+    @staticmethod
+    def get_js_scope():
+        # GDB needs to be switched to a frame that will allow it to actually know about the
+        # mongo::mozjs namespace. We can't know ahead of time which frame will guarantee
+        # finding the namespace, so we check all of them and stop at the first one that works.
+        # The bottom of the stack notably never works, so we start one frame above.
+        frame = gdb.selected_frame().older()
+        last_error = None
+        while frame:
+            frame.select()
+            frame = frame.older()
+            try:
+                return gdb.parse_and_eval("mongo::mozjs::currentJSScope")
+            except gdb.error as err:
+                last_error = err
+        raise last_error
 
     @staticmethod
     def javascript_stack():
@@ -775,12 +943,6 @@ class MongoDBJavaScriptStack(gdb.Command):
                     print("Ignoring invalid thread %d in javascript_stack" % thread.num)
                     continue
                 thread.switch()
-
-                # Switch frames so gdb actually knows about the mongo::mozjs namespace. It doesn't
-                # actually matter which frame so long as it isn't the top of the stack. This also
-                # enables gdb to know about the mongo::mozjs::kCurrentScope thread-local variable
-                # when using gdb.parse_and_eval().
-                gdb.selected_frame().older().select()
             except gdb.error as err:
                 print("Ignoring GDB error '%s' in javascript_stack" % str(err))
                 continue
@@ -788,26 +950,28 @@ class MongoDBJavaScriptStack(gdb.Command):
             try:
                 # The following block is roughly equivalent to this:
                 # namespace mongo::mozjs {
-                #   std::atomic<MozJSImplScope*> kCurrentScope = ...;
+                #   std::atomic<MozJSImplScope*> currentJSScope = ...;
                 # }
                 # if (!scope || scope->_inOp == 0) { continue; }
                 # print(scope->buildStackString()->c_str());
-                atomic_scope = gdb.parse_and_eval("mongo::mozjs::kCurrentScope")
+                atomic_scope = MongoDBJavaScriptStack.get_js_scope()
                 ptr = MongoDBJavaScriptStack.atomic_get_ptr(atomic_scope)
                 if not ptr:
                     continue
 
                 scope = ptr.dereference()
-                if scope['_inOp'] == 0:
+                if scope["_inOp"] == 0:
                     continue
 
-                gdb.execute('thread', from_tty=False, to_string=False)
+                gdb.execute("thread", from_tty=False, to_string=False)
                 # gdb continues to not support calling methods through Python,
                 # so work around it by casting the raw ptr back to its type,
                 # and calling the method through execute darkness
                 gdb.execute(
                     f'printf "%s\\n", ((mongo::mozjs::MozJSImplScope*)({ptr}))->buildStackString().c_str()',
-                    from_tty=False, to_string=False)
+                    from_tty=False,
+                    to_string=False,
+                )
 
             except gdb.error as err:
                 print("Ignoring GDB error '%s' in javascript_stack" % str(err))
@@ -825,14 +989,14 @@ class MongoDBPPrintBsonAtPointer(gdb.Command):
         """Init."""
         RegisterMongoCommand.register(self, "mongodb-pprint-bson", gdb.COMMAND_STATUS)
 
-    def invoke(self, args, _from_tty):  # pylint: disable=no-self-use
+    def invoke(self, args, _from_tty):
         """Invoke."""
-        args = args.split(' ')
+        args = args.split(" ")
         if len(args) == 0 or (len(args) == 1 and len(args[0]) == 0):
             print("Usage: mongodb-pprint-bson <ptr> <optional length>")
             return
 
-        ptr = eval(args[0])  # pylint: disable=eval-used
+        ptr = eval(args[0])
         size = 20 * 1024
         if len(args) >= 2:
             size = int(args[1])
@@ -842,6 +1006,7 @@ class MongoDBPPrintBsonAtPointer(gdb.Command):
         bsonobj = next(bson.decode_iter(memory))
 
         from pprint import pprint
+
         pprint(bsonobj)
 
 
@@ -855,7 +1020,7 @@ class MongoDBHelp(gdb.Command):
         """Initialize MongoDBHelp."""
         gdb.Command.__init__(self, "mongodb-help", gdb.COMMAND_SUPPORT)
 
-    def invoke(self, arg, _from_tty):  # pylint: disable=no-self-use,unused-argument
+    def invoke(self, arg, _from_tty):
         """Register the mongo print commands."""
         RegisterMongoCommand.print_commands()
 

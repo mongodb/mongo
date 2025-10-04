@@ -6,40 +6,46 @@
  *   requires_persistence,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/global_snapshot_reads_util.js");
+import {SnapshotReadsTest} from "jstests/libs/global_snapshot_reads_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const options = {
     // Set a large snapshot window of 10 minutes for the test.
-    setParameter: {minSnapshotHistoryWindowInSeconds: 600}
+    setParameter: {minSnapshotHistoryWindowInSeconds: 600},
 };
 const replSet = new ReplSetTest({nodes: 3, nodeOptions: options});
 replSet.startSet();
-replSet.initiateWithHighElectionTimeout();
+replSet.initiate();
 let primaryAdmin = replSet.getPrimary().getDB("admin");
-assert.eq(assert
-              .commandWorked(
-                  primaryAdmin.runCommand({getParameter: 1, minSnapshotHistoryWindowInSeconds: 1}))
-              .minSnapshotHistoryWindowInSeconds,
-          600);
-const primaryDB = replSet.getPrimary().getDB('test');
-const secondaryDB = replSet.getSecondary().getDB('test');
+assert.eq(
+    assert.commandWorked(primaryAdmin.runCommand({getParameter: 1, minSnapshotHistoryWindowInSeconds: 1}))
+        .minSnapshotHistoryWindowInSeconds,
+    600,
+);
+const primaryDB = replSet.getPrimary().getDB("test");
+const secondaryDB = replSet.getSecondary().getDB("test");
 const snapshotReadsTest = new SnapshotReadsTest({
     primaryDB: primaryDB,
     secondaryDB: secondaryDB,
     awaitCommittedFn: () => {
         replSet.awaitLastOpCommitted();
-    }
+    },
 });
 
 snapshotReadsTest.cursorTest({testScenarioName: jsTestName(), collName: "test"});
 snapshotReadsTest.distinctTest({testScenarioName: jsTestName(), collName: "test"});
-snapshotReadsTest.outAndMergeTest(
-    {testScenarioName: jsTestName(), coll: "test", outColl: "testOut", isOutCollSharded: false});
-snapshotReadsTest.lookupAndUnionWithTest(
-    {testScenarioName: jsTestName(), coll1: "test1", coll2: "test2", isColl2Sharded: false});
+snapshotReadsTest.outAndMergeTest({
+    testScenarioName: jsTestName(),
+    coll: "test",
+    outColl: "testOut",
+    isOutCollSharded: false,
+});
+snapshotReadsTest.lookupAndUnionWithTest({
+    testScenarioName: jsTestName(),
+    coll1: "test1",
+    coll2: "test2",
+    isColl2Sharded: false,
+});
 
 // Ensure "atClusterTime" is omitted from a regular (non-snapshot) read.
 primaryDB["collection"].insertOne({});
@@ -49,4 +55,3 @@ const distinctResult = assert.commandWorked(primaryDB.runCommand({distinct: "tes
 assert(!distinctResult.hasOwnProperty("atClusterTime"));
 
 replSet.stopSet();
-})();

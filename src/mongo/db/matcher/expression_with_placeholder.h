@@ -29,11 +29,21 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -57,22 +67,13 @@ public:
     ExpressionWithPlaceholder(boost::optional<std::string> placeholder,
                               std::unique_ptr<MatchExpression> filter)
         : _placeholder(std::move(placeholder)), _filter(std::move(filter)) {
-        invariant(static_cast<bool>(_filter));
+        tassert(11052418, "filter must not be null", _filter);
     }
 
     /**
      * Returns true if this expression has both a placeholder and filter equivalent to 'other'.
      */
     bool equivalent(const ExpressionWithPlaceholder* other) const;
-
-    /**
-     * Uses this filter to match against 'elem' as if it is wrapped in a BSONObj with a single
-     * field whose name is given by getPlaceholder(). If the placeholder name does not exist, then
-     * the filter expression does not refer to any specific paths.
-     */
-    bool matchesBSONElement(BSONElement elem, MatchDetails* details = nullptr) const {
-        return _filter->matchesBSONElement(elem, details);
-    }
 
     /**
      * If this object has a placeholder, returns a view of the placeholder as a StringData.
@@ -88,16 +89,15 @@ public:
         return _filter.get();
     }
 
-    std::unique_ptr<ExpressionWithPlaceholder> shallowClone() const {
-        return std::make_unique<ExpressionWithPlaceholder>(_placeholder, _filter->shallowClone());
+    MatchExpression* releaseFilter() {
+        return _filter.release();
     }
 
-    /*
-     * Uses MatchExpression::optimize() to replace the Expression part of this
-     * ExpressionWithPlaceholder with an optimized expression. If the rewritten expression operates
-     * on a different field, we also update the placeholder to match.
-     */
-    void optimizeFilter();
+    void resetFilter(MatchExpression* other);
+
+    std::unique_ptr<ExpressionWithPlaceholder> clone() const {
+        return std::make_unique<ExpressionWithPlaceholder>(_placeholder, _filter->clone());
+    }
 
 private:
     // The top-level field that _filter is over.

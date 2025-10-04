@@ -29,19 +29,31 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/baton.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/executor/connection_metrics.h"
+#include "mongo/transport/session.h"
+#include "mongo/transport/ssl_connection_context.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/functional.h"
+#include "mongo/util/future.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/net/ssl_options.h"
+#include "mongo/util/out_of_line_executor.h"
+#include "mongo/util/time_support.h"
+
+#include <cstddef>
 #include <functional>
 #include <memory>
 
-#include "mongo/base/status.h"
-#include "mongo/config.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/wire_version.h"
-#include "mongo/transport/session.h"
-#include "mongo/transport/ssl_connection_context.h"
-#include "mongo/util/functional.h"
-#include "mongo/util/future.h"
-#include "mongo/util/out_of_line_executor.h"
-#include "mongo/util/time_support.h"
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #ifdef MONGO_CONFIG_SSL
 #include "mongo/util/net/ssl_manager.h"
@@ -54,9 +66,23 @@ class OperationContext;
 namespace transport {
 
 enum ConnectSSLMode { kGlobalSSLMode, kEnableSSL, kDisableSSL };
+enum class TransportProtocol { MongoRPC, GRPC };
+
+inline StringData connectSSLModeToString(ConnectSSLMode mode) {
+    switch (mode) {
+        case kGlobalSSLMode:
+            return "global"_sd;
+        case kEnableSSL:
+            return "enabled"_sd;
+        case kDisableSSL:
+            return "disabled"_sd;
+    }
+    MONGO_UNREACHABLE;
+}
 
 class Reactor;
 using ReactorHandle = std::shared_ptr<Reactor>;
+class SessionManager;
 
 /**
  * The TransportLayer moves Messages between transport::Endpoints and the database.
@@ -83,21 +109,21 @@ public:
 
     friend class Session;
 
-    explicit TransportLayer(const WireSpec& wireSpec) : _wireSpec(wireSpec) {}
-
+    TransportLayer() = default;
     virtual ~TransportLayer() = default;
 
-    virtual StatusWith<SessionHandle> connect(
+    virtual StatusWith<std::shared_ptr<Session>> connect(
         HostAndPort peer,
         ConnectSSLMode sslMode,
         Milliseconds timeout,
-        boost::optional<TransientSSLParams> transientSSLParams = boost::none) = 0;
+        const boost::optional<TransientSSLParams>& transientSSLParams = boost::none) = 0;
 
-    virtual Future<SessionHandle> asyncConnect(
+    virtual Future<std::shared_ptr<Session>> asyncConnect(
         HostAndPort peer,
         ConnectSSLMode sslMode,
         const ReactorHandle& reactor,
         Milliseconds timeout,
+        std::shared_ptr<ConnectionMetrics> connectionMetrics,
         std::shared_ptr<const SSLConnectionContext> transientSSLContext) = 0;
 
     /**
@@ -116,21 +142,58 @@ public:
     virtual void shutdown() = 0;
 
     /**
+     * Stop accepting new sessions.
+     */
+    virtual void stopAcceptingSessions() = 0;
+
+    /**
      * Optional method for subclasses to setup their state before being ready to accept
      * connections.
      */
     virtual Status setup() = 0;
 
+    /** Allows a `TransportLayer` to contribute to a serverStatus readout. */
+    virtual void appendStatsForServerStatus(BSONObjBuilder* bob) const {}
+
+    /** Allows a `TransportLayer` to contribute to a FTDC readout. */
+    virtual void appendStatsForFTDC(BSONObjBuilder& bob) const {}
+
+    virtual StringData getNameForLogging() const = 0;
+
     enum WhichReactor { kIngress, kEgress, kNewReactor };
     virtual ReactorHandle getReactor(WhichReactor which) = 0;
 
     virtual BatonHandle makeBaton(OperationContext* opCtx) const {
-        return opCtx->getServiceContext()->makeBaton(opCtx);
+        return {};
     }
 
-    std::shared_ptr<const WireSpec::Specification> getWireSpec() const {
-        return _wireSpec.get();
-    }
+    /**
+     * Returns the TransportProtocol associated with this TransportLayer.
+     */
+    virtual TransportProtocol getTransportProtocol() const = 0;
+
+    /**
+     * Return the session manager, if any, associated with this TransportLayer.
+     */
+    virtual SessionManager* getSessionManager() const = 0;
+
+    /**
+     * Returns whether or not the TransporLayer is configured to use ingress networking.
+     */
+    virtual bool isIngress() const = 0;
+
+    /**
+     * Returns whether or not the TransporLayer is configured to use egress networking.
+     */
+    virtual bool isEgress() const = 0;
+
+    /**
+     * Returns a shared_ptr reference to the owned SessionManager.
+     * Callers are strongly discouraged from retaining a full shared_ptr
+     * reference which may cause the SessionManager to outlive its TransportLayer.
+     * Please convert to `std::weak_ptr` if a long term, non-owning reference is needed.
+     */
+    virtual std::shared_ptr<SessionManager> getSharedSessionManager() const = 0;
 
 #ifdef MONGO_CONFIG_SSL
     /** Rotate the in-use certificates for new connections. */
@@ -146,9 +209,6 @@ public:
     virtual StatusWith<std::shared_ptr<const transport::SSLConnectionContext>>
     createTransientSSLContext(const TransientSSLParams& transientSSLParams) = 0;
 #endif
-
-private:
-    const WireSpec& _wireSpec;
 };
 
 class ReactorTimer {
@@ -159,7 +219,7 @@ public:
     ReactorTimer& operator=(const ReactorTimer&) = delete;
 
     /*
-     * The destructor calls cancel() to ensure outstanding Futures are filled.
+     * The destructor calls cancel() to ensure the outstanding Future is filled.
      */
     virtual ~ReactorTimer() = default;
 
@@ -178,7 +238,8 @@ public:
     /*
      * Returns a future that will be filled with Status::OK after the deadline has passed.
      *
-     * Calling this implicitly calls cancel().
+     * Calling this implicitly calls cancel(), as there can be at most one outstanding Future per
+     * ReactorTimer at a time.
      */
     virtual Future<void> waitUntil(Date_t deadline, const BatonHandle& baton = nullptr) = 0;
 
@@ -186,37 +247,109 @@ private:
     const size_t _id;
 };
 
-class Reactor : public OutOfLineExecutor {
+/**
+ * The Reactor is an OutOfLineExecutor that uses the event engine of the underlying transport layer
+ * to schedule and execute work. Work is scheduled on the reactor through calls to
+ * schedule and through performing async networking work on the relevant event engine primitive for
+ * each transport layer. The reactor is typically used by starting a separate thread that calls
+ * run() and drain().
+ *
+ * All Session objects associated with a reactor MUST be ended before the reactor is stopped.
+ */
+class Reactor : public OutOfLineExecutor, public std::enable_shared_from_this<Reactor> {
 public:
     Reactor(const Reactor&) = delete;
     Reactor& operator=(const Reactor&) = delete;
 
-    virtual ~Reactor() = default;
+    ~Reactor() override = default;
 
     /*
      * Run the event loop of the reactor until stop() is called.
      */
-    virtual void run() noexcept = 0;
-    virtual void runFor(Milliseconds time) noexcept = 0;
+    virtual void run() = 0;
+
+    /**
+     * Stop the polling loop in run(). drain() must be called after stop() to ensure no outstanding
+     * tasks are leaked.
+     */
     virtual void stop() = 0;
+
+    /**
+     * This function will block until all outstanding work scheduled on the reactor has been
+     * completed or canceled.
+     */
     virtual void drain() = 0;
 
-    virtual void schedule(Task task) = 0;
-    virtual void dispatch(Task task) = 0;
+    /**
+     * Schedule a task to run on the reactor thread. See OutOfLineExecutor::schedule for more
+     * detailed documentation.
+     */
+    void schedule(Task task) override = 0;
 
-    virtual bool onReactorThread() const = 0;
+    bool onReactorThread() const {
+        return this == _reactorForThread;
+    }
 
     /*
      * Makes a timer tied to this reactor's event loop. Timeout callbacks will be
-     * executed in a thread calling run() or runFor().
+     * executed in a thread calling run().
      */
     virtual std::unique_ptr<ReactorTimer> makeTimer() = 0;
+
+    // sleepFor is implemented so that the reactor is compatible with the AsyncTry exponential
+    // backoff API.
+    ExecutorFuture<void> sleepFor(Milliseconds duration, const CancellationToken& token);
+
+    /**
+     * Get the time according to the clock driving the event engine of the reactor.
+     */
     virtual Date_t now() = 0;
 
+    /**
+     * Appends stats for the reactor, typically recorded with the ExecutorStats class.
+     */
     virtual void appendStats(BSONObjBuilder& bob) const = 0;
 
 protected:
     Reactor() = default;
+
+    /**
+     * Helper class for the onReactorThread function. Implementations of the Reactor should use the
+     * ThreadIdGuard in the run() and drain() functions.
+     */
+    class ThreadIdGuard {
+    public:
+        ThreadIdGuard(Reactor* reactor) {
+            invariant(!_reactorForThread);
+            _reactorForThread = reactor;
+        }
+
+        ~ThreadIdGuard() {
+            invariant(_reactorForThread);
+            _reactorForThread = nullptr;
+        }
+    };
+
+    /**
+     * Provides `ClockSource` API for the reactor's clock source, which can be used to record
+     * ExecutorStats.
+     */
+    class ReactorClockSource final : public ClockSource {
+    public:
+        explicit ReactorClockSource(Reactor* reactor) : _reactor(reactor) {}
+        ~ReactorClockSource() override = default;
+
+        Milliseconds getPrecision() override {
+            MONGO_UNREACHABLE;
+        }
+
+        Date_t now() override;
+
+    private:
+        Reactor* const _reactor;
+    };
+
+    static thread_local Reactor* _reactorForThread;
 };
 
 

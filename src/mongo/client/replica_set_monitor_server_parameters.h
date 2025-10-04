@@ -30,12 +30,13 @@
 #pragma once
 
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/basic.h"
 #include "mongo/util/str.h"
+
+#include <string>
 
 namespace mongo {
 
-enum class ReplicaSetMonitorProtocol { kScanning, kSdam, kStreamable };
+enum class ReplicaSetMonitorProtocol { kSdam, kStreamable };
 extern ReplicaSetMonitorProtocol gReplicaSetMonitorProtocol;
 std::string toString(ReplicaSetMonitorProtocol protocol);
 

@@ -1,0 +1,244 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/bulk_write_sharded_multi_stmt_txn_jscore_passthrough.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
+##########################################################
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHashInBackground
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+      - DropSessionsCollection
+  config:
+    shell_options:
+      eval:
+        globalThis.testingReplication = true; await import('jstests/libs/override_methods/enable_sessions.js');
+        await import('jstests/libs/override_methods/network_error_and_txn_override.js');
+        await import('jstests/libs/override_methods/txn_passthrough_cmd_massage.js');;
+        await import('jstests/libs/override_methods/single_crud_op_as_bulk_write.js');
+      global_vars:
+        TestData: &id001
+          backgroundSessionCollectionDrop: true
+          networkErrorAndTxnOverrideConfig:
+            wrapCRUDinTransactions: true
+          sessionOptions:
+            causalConsistency: true
+  fixture:
+    class: ShardedClusterFixture
+    mongod_options:
+      set_parameters:
+        coordinateCommitReturnImmediatelyAfterPersistingDecision: true
+        enableTestCommands: 1
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+    num_rs_nodes_per_shard: 2
+  hooks:
+    - class: DropSessionsCollection
+    - class: CheckReplDBHashInBackground
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+      shell_options:
+        global_vars:
+          TestData: *id001
+    - class: ValidateCollections
+    - class: CheckOrphansDeleted
+    - class: CleanEveryN
+      n: 20
+matrix_suite: true
+selector:
+  exclude_files:
+    - jstests/core/txns/**/*.js
+    - jstests/core/**/apitest_db.js
+    - jstests/core/**/check_shard_index.js
+    - jstests/core/**/compact_keeps_indexes.js
+    - jstests/core/**/currentop.js
+    - jstests/core/**/dbhash.js
+    - jstests/core/**/fsync.js
+    - jstests/core/**/geo_s2cursorlimitskip.js
+    - jstests/core/**/geo_update_btree2.js
+    - jstests/core/**/queryoptimizera.js
+    - jstests/core/**/startup_log.js
+    - jstests/core/**/query/top/top.js
+    - jstests/core/**/geo_2d_explain.js
+    - jstests/core/**/geo_s2explain.js
+    - jstests/core/**/geo_s2sparse.js
+    - jstests/core/**/operation_latency_histogram.js
+    - jstests/core/catalog/views/views_drop.js
+    - jstests/core/**/api_params_getmore.js
+    - jstests/core/**/bulk_api_ordered.js
+    - jstests/core/**/bulk_api_unordered.js
+    - jstests/core/**/commands_with_uuid.js
+    - jstests/core/**/dbcase.js
+    - jstests/core/**/dbcase2.js
+    - jstests/core/**/explain_execution_error.js
+    - jstests/core/**/expr.js
+    - jstests/core/**/find9.js
+    - jstests/core/**/find_getmore_bsonsize.js
+    - jstests/core/**/find_getmore_cmd.js
+    - jstests/core/**/geo_allowedcomparisons.js
+    - jstests/core/**/geo_big_polygon2.js
+    - jstests/core/**/geonear_key.js
+    - jstests/core/**/in.js
+    - jstests/core/**/index8.js
+    - jstests/core/**/index_decimal.js
+    - jstests/core/**/index_large_and_small_dates.js
+    - jstests/core/**/index_multiple_compatibility.js
+    - jstests/core/**/index_partial_write_ops.js
+    - jstests/core/**/indexa.js
+    - jstests/core/**/indexes_multiple_commands.js
+    - jstests/core/**/js2.js
+    - jstests/core/query/json_schema/json_schema.js
+    - jstests/core/**/mr_bigobject.js
+    - jstests/core/**/not2.js
+    - jstests/core/**/null_query_semantics.js
+    - jstests/core/**/or1.js
+    - jstests/core/**/or2.js
+    - jstests/core/**/or3.js
+    - jstests/core/**/ord.js
+    - jstests/core/**/orj.js
+    - jstests/core/**/ref.js
+    - jstests/core/**/ref4.js
+    - jstests/core/**/regex_limit.js
+    - jstests/core/**/remove_undefined.js
+    - jstests/core/**/set7.js
+    - jstests/core/**/sortb.js
+    - jstests/core/**/sortf.js
+    - jstests/core/**/sortg.js
+    - jstests/core/**/sortj.js
+    - jstests/core/**/sort_with_meta_operator.js
+    - jstests/core/**/tailable_skip_limit.js
+    - jstests/core/timeseries/ddl/timeseries_special_indexes_metadata.js
+    - jstests/core/**/type_array.js
+    - jstests/core/**/uniqueness.js
+    - jstests/core/**/unset2.js
+    - jstests/core/**/update_addToSet.js
+    - jstests/core/**/update_array_offset_positional.js
+    - jstests/core/**/update_arrayFilters.js
+    - jstests/core/**/update_find_and_modify_id.js
+    - jstests/core/**/update_modifier_pop.js
+    - jstests/core/**/update_dollar_fields.js
+    - jstests/core/**/update_fail_halts_modifications.js
+    - jstests/core/**/agg_hint.js
+    - jstests/core/**/and.js
+    - jstests/core/**/query/collation/collation.js
+    - jstests/core/**/distinct_multikey_dotted_path.js
+    - jstests/core/**/explain_shell_helpers.js
+    - jstests/core/**/index_partial_read_ops.js
+    - jstests/core/**/query/explain/optimized_match_explain.js
+    - jstests/core/**/sort_array.js
+    - jstests/core/views/views_collation.js
+    - jstests/core/**/wildcard_index_count.js
+    - jstests/core/**/explain_server_params.js
+    - jstests/core/**/list_all_local_sessions.js
+    - jstests/core/**/list_all_sessions.js
+    - jstests/core/**/list_sessions.js
+    - jstests/core/timeseries/ddl/timeseries_index_stats.js
+    - jstests/core/**/operation_latency_histogram.js
+    - jstests/core/catalog/collstats/views_coll_stats.js
+    - jstests/core/catalog/views/views_stats.js
+    - jstests/core/**/bulk_api_ordered.js
+    - jstests/core/**/bulk_api_unordered.js
+    - jstests/core/**/doc_validation.js
+    - jstests/core/**/doc_validation_options.js
+    - jstests/core/**/query/field_name_validation.js
+    - jstests/core/**/insert_illegal_doc.js
+    - jstests/core/**/push_sort.js
+    - jstests/core/**/update_arrayFilters.js
+    - jstests/core/**/update_dbref.js
+    - jstests/core/**/update_positional_no_array_elem.js
+    - jstests/core/**/write_result.js
+    - jstests/core/**/query/project/positional_projection.js
+    - jstests/core/**/invalid_db_name.js
+    - jstests/core/**/dbref1.js
+    - jstests/core/**/dbref2.js
+    - jstests/core/**/ref3.js
+    - jstests/core/**/update_mod_dotted.js
+    - jstests/core/catalog/views/invalid_system_views.js
+    - jstests/core/**/query/exhaust.js
+    - jstests/core/**/awaitdata_getmore_cmd.js
+    - jstests/core/**/getmore_cmd_maxtimems.js
+    - jstests/core/**/tailable_cursor_invalidation.js
+    - jstests/core/**/tailable_getmore_batch_size.js
+    - jstests/core/**/query/top/top.js
+    - jstests/core/**/insert_id_undefined.js
+    - jstests/core/query/json_schema/misc_validation.js
+    - jstests/core/catalog/views/views_all_commands.js
+    - jstests/core/**/fsync.js
+    - jstests/core/**/constructors.js
+    - jstests/core/**/commands_namespace_parsing.js
+    - jstests/core/ddl/drop_collection_cursors.js
+    - jstests/core/**/geo_s2cursorlimitskip.js
+    - jstests/core/**/getmore_invalidated_cursors.js
+    - jstests/core/**/getmore_invalidated_documents.js
+    - jstests/core/**/query/kill_cursors.js
+    - jstests/core/**/list_indexes.js
+    - jstests/core/**/list_namespaces_invalidation.js
+    - jstests/core/**/oro.js
+    - jstests/core/**/sort_with_update_between_getmores.js
+    - jstests/core/**/awaitdata_getmore_cmd.js
+    - jstests/core/**/compact_keeps_indexes.js
+    - jstests/core/**/count10.js
+    - jstests/core/**/count_plan_summary.js
+    - jstests/core/**/coveredIndex3.js
+    - jstests/core/**/currentop.js
+    - jstests/core/**/distinct3.js
+    - jstests/core/**/find_and_modify_concurrent_update.js
+    - jstests/core/**/fsync.js
+    - jstests/core/**/geo_update_btree.js
+    - jstests/core/**/loadserverscripts.js
+    - jstests/core/**/mr_killop.js
+    - jstests/core/**/remove_concurrent_inserts.js
+    - jstests/core/**/remove_adjacent_index_keys.js
+    - jstests/core/**/shellstartparallel.js
+    - jstests/core/**/update_namespace_details.js
+    - jstests/core/**/bench_test1.js
+    - jstests/core/**/benchrun_pipeline_updates.js
+    - jstests/core/**/cursora.js
+    - jstests/core/**/query/function_prototype_bson_type.js
+    - jstests/core_sharding/ddl/refine_collection_shard_key.js
+    - jstests/core/timeseries/write/timeseries_delete_hint.js
+    - jstests/core/**/set_param1.js
+    - jstests/core/**/profile*.js
+    - jstests/core/query/comment_field.js
+    - jstests/core/administrative/fsync/fsync.js
+    - jstests/core/write/insert/batch_write_command_insert.js
+    - jstests/core/query/batch_write/batch_write_command_update.js
+    - jstests/core/query/batch_write/batch_write_command_delete.js
+    - jstests/core/testing/failcommand_failpoint.js
+    - jstests/core/query/parsing/write_commands_reject_unknown_fields.js
+    - jstests/core/query/explain/explain_uuid.js
+    - jstests/core/query/explain/explain_includes_command.js
+    - jstests/core/query/distinct/distinct_collator.js
+    - jstests/core/txns/transactions_profiling.js
+    - jstests/core/txns/currentop_blocked_operations.js
+    - jstests/core/txns/transactions_profiling_with_drops.js
+    - jstests/core/txns/multi_statement_transaction_write_error.js
+    - src/mongo/db/modules/enterprise/jstests/fle2/basic_update.js
+    - src/mongo/db/modules/enterprise/jstests/fle2/basic_delete.js
+    - src/mongo/db/modules/enterprise/jstests/fle2/query/explain*.js
+    - src/mongo/db/modules/enterprise/jstests/fle2/query/aggregate_lookupMultiSchema.js
+  exclude_with_any_tags:
+    - assumes_read_concern_unchanged
+    - assumes_unsharded_collection
+    - assumes_write_concern_unchanged
+    - assumes_against_mongod_not_mongos
+    - assumes_standalone_mongod
+    - requires_capped
+    - requires_profiling
+    - inspects_whether_plan_cache_entry_is_active
+    - does_not_support_transactions
+    - uses_api_parameters
+    - uses_parallel_shell
+    - does_not_support_causal_consistency
+    - requires_timeseries
+    - requires_2_or_more_shards
+  roots:
+    - jstests/core/**/*.js
+    - jstests/core_sharding/**/*.js
+test_kind: multi_stmt_txn_passthrough

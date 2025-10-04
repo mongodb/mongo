@@ -25,6 +25,8 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 
 #include "libunwind_i.h"
+#include <stdalign.h>
+#include <stdatomic.h>
 
 /* From GCC docs: ``Gcc also provides a target specific macro
  * __BIGGEST_ALIGNMENT__, which is the largest alignment ever used for any data
@@ -39,9 +41,8 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 # define MAX_ALIGN      MAX_ALIGN_(sizeof (long double))
 #endif
 
-static char sos_memory[SOS_MEMORY_SIZE] ALIGNED(MAX_ALIGN);
-static size_t sos_memory_freepos;
-static size_t pg_size;
+static alignas(MAX_ALIGN) char sos_memory[SOS_MEMORY_SIZE];
+static _Atomic size_t sos_memory_freepos = 0;
 
 HIDDEN void *
 sos_alloc (size_t size)
@@ -50,29 +51,10 @@ sos_alloc (size_t size)
 
   size = UNW_ALIGN(size, MAX_ALIGN);
 
-#if defined(__GNUC__) && defined(HAVE_FETCH_AND_ADD)
   /* Assume `sos_memory' is suitably aligned. */
   assert(((uintptr_t) &sos_memory[0] & (MAX_ALIGN-1)) == 0);
 
-  pos = fetch_and_add (&sos_memory_freepos, size);
-#else
-  static define_lock (sos_lock);
-  intrmask_t saved_mask;
-
-  lock_acquire (&sos_lock, saved_mask);
-  {
-    /* No assumptions about `sos_memory' alignment. */
-    if (sos_memory_freepos == 0)
-      {
-        unsigned align = UNW_ALIGN((uintptr_t) &sos_memory[0], MAX_ALIGN)
-                                - (uintptr_t) &sos_memory[0];
-        sos_memory_freepos = align;
-      }
-    pos = sos_memory_freepos;
-    sos_memory_freepos += size;
-  }
-  lock_release (&sos_lock, saved_mask);
-#endif
+  pos = atomic_fetch_add (&sos_memory_freepos, size);
 
   assert (((uintptr_t) &sos_memory[pos] & (MAX_ALIGN-1)) == 0);
   assert ((pos+size) <= SOS_MEMORY_SIZE);
@@ -111,7 +93,7 @@ expand (struct mempool *pool)
   GET_MEMORY (mem, size);
   if (!mem)
     {
-      size = UNW_ALIGN(pool->obj_size, pg_size);
+      size = UNW_ALIGN(pool->obj_size, unw_page_size);
       GET_MEMORY (mem, size);
       if (!mem)
         {
@@ -126,9 +108,6 @@ expand (struct mempool *pool)
 HIDDEN void
 mempool_init (struct mempool *pool, size_t obj_size, size_t reserve)
 {
-  if (pg_size == 0)
-    pg_size = getpagesize ();
-
   memset (pool, 0, sizeof (*pool));
 
   lock_init (&pool->lock);
@@ -138,14 +117,14 @@ mempool_init (struct mempool *pool, size_t obj_size, size_t reserve)
 
   if (!reserve)
     {
-      reserve = pg_size / obj_size / 4;
+      reserve = unw_page_size / obj_size / 4;
       if (!reserve)
         reserve = 16;
     }
 
   pool->obj_size = obj_size;
   pool->reserve = reserve;
-  pool->chunk_size = UNW_ALIGN(2*reserve*obj_size, pg_size);
+  pool->chunk_size = UNW_ALIGN(2*reserve*obj_size, unw_page_size);
 
   expand (pool);
 }

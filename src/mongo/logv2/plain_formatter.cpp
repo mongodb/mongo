@@ -29,20 +29,36 @@
 
 #include "mongo/logv2/plain_formatter.h"
 
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/attributes.h"
 #include "mongo/logv2/constants.h"
-#include "mongo/stdx/variant.h"
-#include "mongo/util/str_escape.h"
+#include "mongo/logv2/log_truncation.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 
-#include <boost/container/small_vector.hpp>
-#include <boost/log/attributes/value_extraction.hpp>
-#include <boost/log/expressions/message.hpp>
-#include <boost/log/utility/formatting_ostream.hpp>
-
+#include <algorithm>
 #include <any>
+#include <cstddef>
 #include <deque>
+#include <functional>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <variant>
+
+#include <boost/cstdint.hpp>
+#include <boost/exception/exception.hpp>
+#include <boost/log/attributes/value_extraction.hpp>
+#include <boost/log/core/record_view.hpp>
+#include <boost/log/utility/formatting_ostream.hpp>
+#include <boost/log/utility/formatting_ostream_fwd.hpp>
+#include <fmt/args.h>
 #include <fmt/format.h>
 
 namespace mongo::logv2 {
@@ -50,23 +66,30 @@ namespace {
 
 struct TextValueExtractor {
     void operator()(const char* name, CustomAttributeValue const& val) {
-        if (val.stringSerialize) {
-            fmt::memory_buffer buffer;
-            val.stringSerialize(buffer);
-            _addString(name, fmt::to_string(buffer));
-        } else if (val.toString) {
-            _addString(name, val.toString());
-        } else if (val.BSONAppend) {
-            BSONObjBuilder builder;
-            val.BSONAppend(builder, name);
-            BSONElement element = builder.done().getField(name);
-            _addString(name, element.toString(false));
-        } else if (val.BSONSerialize) {
-            BSONObjBuilder builder;
-            val.BSONSerialize(builder);
-            operator()(name, builder.done());
-        } else if (val.toBSONArray) {
-            operator()(name, val.toBSONArray());
+        try {
+            if (val.stringSerialize) {
+                fmt::memory_buffer buffer;
+                val.stringSerialize(buffer);
+                _addString(name, fmt::to_string(buffer));
+            } else if (val.toString) {
+                _addString(name, val.toString());
+            } else if (val.BSONAppend) {
+                BSONObjBuilder builder;
+                val.BSONAppend(builder, name);
+                // BSONObj must outlive BSONElement. See BSONElement, BSONObj::getField().
+                auto obj = builder.done();
+                BSONElement element = obj.getField(name);
+                _addString(name, element.toString(false));
+            } else if (val.BSONSerialize) {
+                BSONObjBuilder builder;
+                val.BSONSerialize(builder);
+                operator()(name, builder.done());
+            } else if (val.toBSONArray) {
+                operator()(name, val.toBSONArray());
+            }
+        } catch (...) {
+            Status s = exceptionToStatus();
+            _addString(name, std::string("Failed to serialize due to exception: ") + s.toString());
         }
     }
 
@@ -102,7 +125,7 @@ private:
      * values and user-defined values.
      */
     static auto _wrapValue(StringData val) {
-        return std::string_view{val.rawData(), val.size()};
+        return toStdStringViewForInterop(val);
     }
 
     template <typename T>
@@ -138,20 +161,21 @@ void PlainFormatter::operator()(boost::log::record_view const& rec,
     using boost::log::extract;
 
     StringData message = extract<StringData>(attributes::message(), rec).get();
-    const auto& attrs = extract<TypeErasedAttributeStorage>(attributes::attributes(), rec).get();
+    const auto& attrs = extract<TypeErasedAttributeStorage>(attributes::attributes(), rec);
 
     // Log messages logged via logd are already formatted and have the id == 0
-    if (attrs.empty()) {
+    if (attrs.get().empty()) {
         if (extract<int32_t>(attributes::id(), rec).get() == 0) {
-            buffer.append(message.begin(), message.end());
+            buffer.append(message.data(), message.data() + message.size());
             return;
         }
     }
 
     TextValueExtractor extractor;
-    extractor.reserve(attrs.size());
-    attrs.apply(extractor);
-    fmt::vformat_to(buffer, std::string_view{message.rawData(), message.size()}, extractor.args());
+    extractor.reserve(attrs.get().size());
+    attrs.get().apply(extractor);
+    fmt::vformat_to(
+        std::back_inserter(buffer), toStdStringViewForInterop(message), extractor.args());
 
     size_t attributeMaxSize = buffer.size();
     if (extract<LogTruncation>(attributes::truncation(), rec).get() == LogTruncation::Enabled) {
@@ -162,7 +186,7 @@ void PlainFormatter::operator()(boost::log::record_view const& rec,
     }
 
     buffer.resize(std::min(attributeMaxSize, buffer.size()));
-    if (StringData sd(buffer.data(), buffer.size()); sd.endsWith("\n"_sd))
+    if (StringData sd(buffer.data(), buffer.size()); sd.ends_with("\n"_sd))
         buffer.resize(buffer.size() - 1);
 }
 

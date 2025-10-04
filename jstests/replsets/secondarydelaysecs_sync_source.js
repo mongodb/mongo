@@ -5,11 +5,12 @@
 //
 // @tags: [
 // ]
-load("jstests/replsets/rslib.js");
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {syncFrom, waitForAllMembers} from "jstests/replsets/rslib.js";
 
-var replTest = new ReplSetTest({nodes: 3, useBridge: true});
-var nodes = replTest.startSet();
-var config = replTest.getReplSetConfig();
+let replTest = new ReplSetTest({nodes: 3, useBridge: true});
+let nodes = replTest.startSet();
+let config = replTest.getReplSetConfig();
 // ensure member 0 is primary
 config.members[0].priority = 2;
 config.members[1].priority = 0;
@@ -17,18 +18,19 @@ config.members[1].secondaryDelaySecs = 5;
 config.members[2].priority = 0;
 
 replTest.initiate(config);
-var primary = replTest.getPrimary().getDB(jsTestName());
+let primary = replTest.getPrimary().getDB(jsTestName());
 // The default WC is majority and stopServerReplication could prevent satisfying any majority
 // writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 replTest.awaitReplication();
 
-var secondaryConns = replTest.getSecondaries();
-var secondaries = [];
-for (var i in secondaryConns) {
-    var d = secondaryConns[i].getDB(jsTestName());
+let secondaryConns = replTest.getSecondaries();
+let secondaries = [];
+for (let i in secondaryConns) {
+    let d = secondaryConns[i].getDB(jsTestName());
     d.getMongo().setSecondaryOk();
     secondaries.push(d);
 }
@@ -42,7 +44,7 @@ primary.foo.insert({x: 1});
 syncFrom(nodes[1], nodes[0], replTest);
 
 // make sure the record still appears in the remote secondary
-assert.soon(function() {
+assert.soon(function () {
     return secondaries[1].foo.findOne() != null;
 });
 

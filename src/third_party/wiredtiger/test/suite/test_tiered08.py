@@ -32,43 +32,37 @@
 # [END_TAGS]
 #
 
-import os, threading, time, wiredtiger, wttest
+import os, threading, time, wttest
+from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources, get_conn_config
 from wiredtiger import stat
-from wtthread import checkpoint_thread, flush_tier_thread
+from wtthread import flush_checkpoint_thread
+from wtscenario import make_scenarios
+
 
 # test_tiered08.py
-#   Run background checkpoints and flush_tier operations while inserting
+#   Run background checkpoints, sometimes with flush operations while inserting
 #   data into a table from another thread.
-class test_tiered08(wttest.WiredTigerTestCase):
+class test_tiered08(wttest.WiredTigerTestCase, TieredConfigMixin):
+
+    storage_sources = gen_tiered_storage_sources(wttest.getss_random_prefix(), 'test_tiered08', tiered_only=True)
+
+    # Make scenarios for different cloud service providers
+    scenarios = make_scenarios(storage_sources)
 
     batch_size = 100000
 
-    # Keep inserting keys until we've done this many flush and checkpoint ops.
-    ckpt_flush_target = 10
+    # Keep inserting keys until we've done this many checkpoints and flushes.
+    ckpt_target = 200
+    flush_target = 50
 
     uri = "table:test_tiered08"
 
-    auth_token = "test_token"
-    bucket = "mybucket"
-    bucket_prefix = "pfx_"
-    extension_name = "local_store"
-
     def conn_config(self):
-        if not os.path.exists(self.bucket):
-            os.mkdir(self.bucket)
-        return \
-          'statistics=(fast),' + \
-          'tiered_storage=(auth_token=%s,' % self.auth_token + \
-          'bucket=%s,' % self.bucket + \
-          'bucket_prefix=%s,' % self.bucket_prefix + \
-          'name=%s),tiered_manager=(wait=0)' % self.extension_name
+        return get_conn_config(self) + '),statistics=(fast),timing_stress_for_test=(tiered_flush_finish)'
 
-    # Load the local store extension.
+    # Load the storage store extension.
     def conn_extensions(self, extlist):
-        # Windows doesn't support dynamically loaded extension libraries.
-        if os.name == 'nt':
-            extlist.skip_if_missing = True
-        extlist.extension('storage_sources', self.extension_name)
+        TieredConfigMixin.conn_extensions(self, extlist)
 
     def get_stat(self, stat):
         stat_cursor = self.session.open_cursor('statistics:')
@@ -91,41 +85,39 @@ class test_tiered08(wttest.WiredTigerTestCase):
 
         self.pr('Populating tiered table')
         c = self.session.open_cursor(self.uri, None, None)
-        while ckpt_count < self.ckpt_flush_target or flush_count < self.ckpt_flush_target:
+        while ckpt_count < self.ckpt_target or flush_count < self.flush_target:
             for i in range(nkeys, nkeys + self.batch_size):
                 c[self.key_gen(i)] = self.value_gen(i)
             nkeys += self.batch_size
-            ckpt_count = self.get_stat(stat.conn.txn_checkpoint)
+            ckpt_count = self.get_stat(stat.conn.checkpoints_api)
             flush_count = self.get_stat(stat.conn.flush_tier)
+            self.pr('Populating: ckpt {}, flush {}'.format(str(ckpt_count), str(flush_count)))
+            crd = self.session.open_cursor(self.uri, None, None)
+            val = crd[self.key_gen(1)]
+            crd.close()
         c.close()
         return nkeys
 
     def verify(self, key_count):
-        self.pr('Verifying tiered table')
+        self.pr('Verifying tiered table: {}'.format(str(key_count)))
         c = self.session.open_cursor(self.uri, None, None)
-        for i in range(key_count):
+        # Speed up the test by not looking at every key/value pair.
+        for i in range(1, key_count, 237):
             self.assertEqual(c[self.key_gen(i)], self.value_gen(i))
         c.close()
 
     def test_tiered08(self):
 
-        # FIXME-WT-7833
-        #     This test can trigger races in file handle access during flush_tier.
-        #     We will re-enable it when that is fixed.
-        self.skipTest('Concurrent flush_tier and insert operations not supported yet.')
-
         cfg = self.conn_config()
         self.pr('Config is: ' + cfg)
-        intl_page = 'internal_page_max=16K'
-        base_create = 'key_format=S,value_format=S,' + intl_page
-        self.session.create(self.uri, base_create)
+        self.session.create(self.uri,
+            'key_format=S,value_format=S,internal_page_max=4096,leaf_page_max=4096')
 
         done = threading.Event()
-        ckpt = checkpoint_thread(self.conn, done)
-        flush = flush_tier_thread(self.conn, done)
+        # Flush on approximately 1/4 of checkpoints.
+        flush = flush_checkpoint_thread(self.conn, done, 25)
 
-        # Start background threads and give them a chance to start.
-        ckpt.start()
+        # Start background thread and give it a chance to start.
         flush.start()
         time.sleep(0.5)
 
@@ -133,7 +125,6 @@ class test_tiered08(wttest.WiredTigerTestCase):
 
         done.set()
         flush.join()
-        ckpt.join()
 
         self.verify(key_count)
 
@@ -142,6 +133,3 @@ class test_tiered08(wttest.WiredTigerTestCase):
         self.reopen_conn()
 
         self.verify(key_count)
-
-if __name__ == '__main__':
-    wttest.run()

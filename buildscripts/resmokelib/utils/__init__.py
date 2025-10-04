@@ -1,12 +1,16 @@
 """Helper functions."""
 
 import contextlib
+import random
 import re
 import sys
 
 import yaml
 
+from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib.utils import archival
+
+__all__ = ["archival"]
 
 
 @contextlib.contextmanager
@@ -52,7 +56,7 @@ def is_string_list(lst):
 def load_yaml_file(filename):
     """Attempt to read 'filename' as YAML."""
     try:
-        with open(filename, "r") as fp:
+        with open(filename, "r", encoding="utf8") as fp:
             return yaml.safe_load(fp)
     except yaml.YAMLError as err:
         raise ValueError("File '%s' contained invalid YAML: %s" % (filename, err))
@@ -85,7 +89,26 @@ def get_task_name_without_suffix(task_name, variant_name):
     """Return evergreen task name without suffix added to the generated task.
 
     Remove evergreen variant name, numerical suffix and underscores between them from evergreen task name.
-    Example: "noPassthrough_0_enterprise-rhel-80-64-bit-dynamic-required" -> "noPassthrough"
+    Example: "noPassthrough_0_enterprise-rhel-8-64-bit-dynamic-required" -> "noPassthrough"
     """
     task_name = task_name if task_name else ""
-    return re.sub(fr"(_[0-9]+)?(_{variant_name})?$", "", task_name)
+    return re.sub(rf"(_[0-9]+)?(_{variant_name})?$", "", task_name)
+
+
+def pick_catalog_shard_node(config_shard, num_shards):
+    """Get config_shard node index or None if no config_shard."""
+    if config_shard is None:
+        return None
+
+    if config_shard == "any":
+        # We check _config.NOOP_MONGO_D_S_PROCESSES because when running in antithesis
+        # the resmoke setup needs to be deterministic so the config shard cannot be random.
+        if num_shards is None or num_shards == 0 or _config.NOOP_MONGO_D_S_PROCESSES:
+            return 0
+        return random.randint(0, num_shards - 1)
+
+    config_shard_index = int(config_shard)
+    if config_shard_index < 0 or config_shard_index >= num_shards:
+        raise ValueError('Config shard value must be in range 0..num_shards-1 or "any"')
+
+    return config_shard_index

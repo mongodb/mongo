@@ -28,7 +28,7 @@
 
 import threading, time
 from helper import copy_wiredtiger_home, simulate_crash_restart
-from test_rollback_to_stable01 import test_rollback_to_stable_base
+from rollback_to_stable_util import test_rollback_to_stable_base
 from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
@@ -37,13 +37,12 @@ from wtthread import checkpoint_thread
 # test_rollback_to_stable10.py
 # Test the rollback to stable operation performs sweeping history store.
 class test_rollback_to_stable10(test_rollback_to_stable_base):
-    session_config = 'isolation=snapshot'
 
     format_values = [
         ('column', dict(key_format='r', value_format='S', prepare_extraconfig='')),
         ('column_fix', dict(key_format='r', value_format='8t',
             prepare_extraconfig=',allocation_size=512,leaf_page_max=512')),
-        ('integer_row', dict(key_format='i', value_format='S', prepare_extraconfig='')),
+        ('row_integer', dict(key_format='i', value_format='S', prepare_extraconfig='')),
     ]
 
     prepare_values = [
@@ -54,25 +53,48 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
     scenarios = make_scenarios(format_values, prepare_values)
 
     def conn_config(self):
-        config = 'cache_size=25MB,statistics=(all),statistics_log=(json,on_close,wait=1),log=(enabled=true),timing_stress_for_test=[history_store_checkpoint_delay]'
+        config = 'cache_size=25MB,statistics=(all),statistics_log=(json,on_close,wait=1),timing_stress_for_test=[history_store_checkpoint_delay],verbose=(rts:5)'
         return config
+
+    def check_hs_stats(self):
+        stat_cursor = self.session.open_cursor('statistics:', None, None)
+        calls = stat_cursor[stat.conn.txn_rts][2]
+        hs_removed = stat_cursor[stat.conn.txn_rts_hs_removed][2]
+        hs_sweep = stat_cursor[stat.conn.txn_rts_sweep_hs_keys][2]
+        keys_removed = stat_cursor[stat.conn.txn_rts_keys_removed][2]
+        keys_restored = stat_cursor[stat.conn.txn_rts_keys_restored][2]
+        pages_visited = stat_cursor[stat.conn.txn_rts_pages_visited][2]
+        upd_aborted = stat_cursor[stat.conn.txn_rts_upd_aborted][2]
+        stat_cursor.close()
+
+        self.assertEqual(calls, 0)
+        self.assertEqual(keys_removed, 0)
+        self.assertEqual(keys_restored, 0)
+        self.assertGreaterEqual(upd_aborted, 0)
+        self.assertGreater(pages_visited, 0)
+        # Each row that gets processed by RTS can be counted by either hs_removed or hs_sweep,
+        # but not both. If the data store page for the row appears in the last checkpoint, it
+        # gets counted in hs_removed; if not, it gets counted in hs_sweep, unless the history
+        # store page for the row didn't make it out, in which case nothing gets counted at all.
+        # We expect at least some history store pages to appear, so assert that some rows get
+        # processed, but the balance between the two counts depends on test timing and we
+        # should not depend on it.
+        self.assertGreater(hs_removed + hs_sweep, 0)
 
     def test_rollback_to_stable(self):
         nrows = 1000
 
-        # Create a table without logging.
+        # Create a table.
         self.pr("create/populate tables")
         uri_1 = "table:rollback_to_stable10_1"
         ds_1 = SimpleDataSet(
-            self, uri_1, 0, key_format=self.key_format, value_format=self.value_format,
-            config='log=(enabled=false)')
+            self, uri_1, 0, key_format=self.key_format, value_format=self.value_format)
         ds_1.populate()
 
-        # Create another table without logging.
+        # Create another table.
         uri_2 = "table:rollback_to_stable10_2"
         ds_2 = SimpleDataSet(
-            self, uri_2, 0, key_format=self.key_format, value_format=self.value_format,
-            config='log=(enabled=false)')
+            self, uri_2, 0, key_format=self.key_format, value_format=self.value_format)
         ds_2.populate()
 
         if self.value_format == '8t':
@@ -107,15 +129,15 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
         self.large_updates(uri_2, value_a, ds_2, nrows, self.prepare, 50)
 
         # Verify data is visible and correct.
-        self.check(value_d, uri_1, nrows, None, 20)
-        self.check(value_c, uri_1, nrows, None, 30)
-        self.check(value_b, uri_1, nrows, None, 40)
-        self.check(value_a, uri_1, nrows, None, 50)
+        self.check(value_d, uri_1, nrows, None, 21 if self.prepare else 20)
+        self.check(value_c, uri_1, nrows, None, 31 if self.prepare else 30)
+        self.check(value_b, uri_1, nrows, None, 41 if self.prepare else 40)
+        self.check(value_a, uri_1, nrows, None, 51 if self.prepare else 50)
 
-        self.check(value_d, uri_2, nrows, None, 20)
-        self.check(value_c, uri_2, nrows, None, 30)
-        self.check(value_b, uri_2, nrows, None, 40)
-        self.check(value_a, uri_2, nrows, None, 50)
+        self.check(value_d, uri_2, nrows, None, 21 if self.prepare else 20)
+        self.check(value_c, uri_2, nrows, None, 31 if self.prepare else 30)
+        self.check(value_b, uri_2, nrows, None, 41 if self.prepare else 40)
+        self.check(value_a, uri_2, nrows, None, 51 if self.prepare else 50)
 
         # Pin stable to timestamp 60 if prepare otherwise 50.
         if self.prepare:
@@ -170,40 +192,24 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
         self.check(value_b, uri_2, nrows, None, 40)
         self.check(value_d, uri_2, nrows, None, 20)
 
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        calls = stat_cursor[stat.conn.txn_rts][2]
-        hs_removed = stat_cursor[stat.conn.txn_rts_hs_removed][2]
-        hs_sweep = stat_cursor[stat.conn.txn_rts_sweep_hs_keys][2]
-        keys_removed = stat_cursor[stat.conn.txn_rts_keys_removed][2]
-        keys_restored = stat_cursor[stat.conn.txn_rts_keys_restored][2]
-        pages_visited = stat_cursor[stat.conn.txn_rts_pages_visited][2]
-        upd_aborted = stat_cursor[stat.conn.txn_rts_upd_aborted][2]
-        stat_cursor.close()
-
-        self.assertEqual(calls, 0)
-        self.assertEqual(keys_removed, 0)
-        self.assertEqual(keys_restored, 0)
-        self.assertGreaterEqual(upd_aborted, 0)
-        self.assertGreater(pages_visited, 0)
-        self.assertGreaterEqual(hs_removed, 0)
-        self.assertGreater(hs_sweep, 0)
+        self.check_hs_stats()
 
     def test_rollback_to_stable_prepare(self):
         nrows = 1000
 
-        # Create a table without logging.
+        # Create a table.
         self.pr("create/populate tables")
         uri_1 = "table:rollback_to_stable10_1"
         ds_1 = SimpleDataSet(
             self, uri_1, 0, key_format=self.key_format, value_format=self.value_format,
-            config='log=(enabled=false)' + self.prepare_extraconfig)
+            config=self.prepare_extraconfig)
         ds_1.populate()
 
-        # Create another table without logging.
+        # Create another table.
         uri_2 = "table:rollback_to_stable10_2"
         ds_2 = SimpleDataSet(
             self, uri_2, 0, key_format=self.key_format, value_format=self.value_format,
-            config='log=(enabled=false)' + self.prepare_extraconfig)
+            config=self.prepare_extraconfig)
         ds_2.populate()
 
         if self.value_format == '8t':
@@ -237,15 +243,15 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
         self.large_updates(uri_2, value_a, ds_2, nrows, self.prepare, 50)
 
         # Verify data is visible and correct.
-        self.check(value_d, uri_1, nrows, None, 20)
-        self.check(value_c, uri_1, nrows, None, 30)
-        self.check(value_b, uri_1, nrows, None, 40)
-        self.check(value_a, uri_1, nrows, None, 50)
+        self.check(value_d, uri_1, nrows, None, 21 if self.prepare else 20)
+        self.check(value_c, uri_1, nrows, None, 31 if self.prepare else 30)
+        self.check(value_b, uri_1, nrows, None, 41 if self.prepare else 40)
+        self.check(value_a, uri_1, nrows, None, 51 if self.prepare else 50)
 
-        self.check(value_d, uri_2, nrows, None, 20)
-        self.check(value_c, uri_2, nrows, None, 30)
-        self.check(value_b, uri_2, nrows, None, 40)
-        self.check(value_a, uri_2, nrows, None, 50)
+        self.check(value_d, uri_2, nrows, None, 21 if self.prepare else 20)
+        self.check(value_c, uri_2, nrows, None, 31 if self.prepare else 30)
+        self.check(value_b, uri_2, nrows, None, 41 if self.prepare else 40)
+        self.check(value_a, uri_2, nrows, None, 51 if self.prepare else 50)
 
         # Pin stable to timestamp 60 if prepare otherwise 50.
         if self.prepare:
@@ -270,8 +276,9 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
                 key = ds.key(i)
                 cursor.set_key(key)
                 cursor.set_value(value)
-                self.assertEquals(cursor.update(), 0)
+                self.assertEqual(cursor.update(), 0)
             self.pr("prepare")
+            cursor.reset()
             session.prepare_transaction(prepare_config)
 
         # Create a checkpoint thread
@@ -280,13 +287,19 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
         try:
             self.pr("start checkpoint")
             ckpt.start()
-            # Sleep for some time so that checkpoint starts.
-            time.sleep(5)
+
+            # Wait for checkpoint to start before committing.
+            ckpt_started = 0
+            while not ckpt_started:
+                stat_cursor = self.session.open_cursor('statistics:', None, None)
+                ckpt_started = stat_cursor[stat.conn.checkpoint_state][2] != 0
+                stat_cursor.close()
+                time.sleep(1)
 
             # Perform several updates in parallel with checkpoint.
             session_p1 = self.conn.open_session()
             cursor_p1 = session_p1.open_cursor(uri_1)
-            session_p1.begin_transaction('isolation=snapshot')
+            session_p1.begin_transaction()
             self.retry_rollback('update ds1', session_p1,
                            lambda: prepare_range_updates(
                                session_p1, cursor_p1, ds_1, value_e, nrows,
@@ -296,7 +309,7 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
             # Perform several updates in parallel with checkpoint.
             session_p2 = self.conn.open_session()
             cursor_p2 = session_p2.open_cursor(uri_2)
-            session_p2.begin_transaction('isolation=snapshot')
+            session_p2.begin_transaction()
             self.retry_rollback('update ds2', session_p2,
                            lambda: prepare_range_updates(
                                session_p2, cursor_p2, ds_2, value_e, nrows,
@@ -348,32 +361,4 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
         self.check(value_c, uri_2, nrows, None, 30)
         self.check(value_d, uri_2, nrows, None, 20)
 
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        calls = stat_cursor[stat.conn.txn_rts][2]
-        hs_removed = stat_cursor[stat.conn.txn_rts_hs_removed][2]
-        hs_sweep = stat_cursor[stat.conn.txn_rts_sweep_hs_keys][2]
-        keys_removed = stat_cursor[stat.conn.txn_rts_keys_removed][2]
-        keys_restored = stat_cursor[stat.conn.txn_rts_keys_restored][2]
-        pages_visited = stat_cursor[stat.conn.txn_rts_pages_visited][2]
-        upd_aborted = stat_cursor[stat.conn.txn_rts_upd_aborted][2]
-        stat_cursor.close()
-
-        self.assertEqual(calls, 0)
-        self.assertEqual(keys_removed, 0)
-        self.assertEqual(keys_restored, 0)
-        self.assertGreaterEqual(upd_aborted, 0)
-        self.assertGreater(pages_visited, 0)
-        # Each row that gets processed by RTS can be counted by either hs_removed or hs_sweep,
-        # but not both. If the data store page for the row appears in the last checkpoint, it
-        # gets counted in hs_removed; if not, it gets counted in hs_sweep, unless the history
-        # store page for the row didn't make it out, in which case nothing gets counted at all.
-        # We expect at least some history store pages to appear, so assert that some rows get
-        # processed, but the balance between the two counts depends on test timing and we
-        # should not depend on it.
-        self.assertGreater(hs_removed + hs_sweep, 0)
-
-        # The test may output the following message in eviction under cache pressure. Ignore that.
-        self.ignoreStdoutPatternIfExists("oldest pinned transaction ID rolled back for eviction")
-
-if __name__ == '__main__':
-    wttest.run()
+        self.check_hs_stats()

@@ -27,37 +27,37 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/platform/random.h"
-
-#include <string.h>
+#include <array>
+#include <cstring>
+#include <fstream>  // IWYU pragma: keep
+#include <memory>
 
 #ifdef _WIN32
 #include <bcrypt.h>
 #else
-#include <errno.h>
+#include <cerrno>
+
 #include <fcntl.h>
 #endif
 
 #define _CRT_RAND_S
-#include <array>
-#include <cstdlib>
-#include <fstream>
-#include <iostream>
-#include <limits>
-#include <memory>
-#include <random>
 
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
+#include "mongo/platform/random.h"
 #include "mongo/util/assert_util.h"
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 
 #ifdef _WIN32
 #define SECURE_RANDOM_BCRYPT
-#elif defined(__linux__) || defined(__sun) || defined(__APPLE__) || defined(__FreeBSD__) || \
-    defined(__EMSCRIPTEN__)
+#elif defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__) || defined(__EMSCRIPTEN__)
 #define SECURE_RANDOM_URANDOM
 #elif defined(__OpenBSD__)
 #define SECURE_RANDOM_ARCFOUR

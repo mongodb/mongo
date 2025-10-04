@@ -27,14 +27,16 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
-
-#include "mongo/platform/basic.h"
-
-#include <climits>
 
 #include "mongo/db/repl/member_data.h"
+
 #include "mongo/logv2/log.h"
+#include "mongo/util/assert_util.h"
+
+#include <utility>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
+
 
 namespace mongo {
 namespace repl {
@@ -43,9 +45,11 @@ MemberData::MemberData() : _health(-1), _authIssue(false), _configIndex(-1), _is
     _lastResponse.setState(MemberState::RS_UNKNOWN);
     _lastResponse.setElectionTime(Timestamp());
     _lastResponse.setAppliedOpTimeAndWallTime(OpTimeAndWallTime());
+    _lastResponse.setWrittenOpTimeAndWallTime(OpTimeAndWallTime());
 }
 
-bool MemberData::setUpValues(Date_t now, ReplSetHeartbeatResponse&& hbResponse) {
+MemberData::HeartbeatChanges MemberData::setUpValues(Date_t now,
+                                                     ReplSetHeartbeatResponse&& hbResponse) {
     _health = 1;
     if (_upSince == Date_t()) {
         _upSince = now;
@@ -66,10 +70,13 @@ bool MemberData::setUpValues(Date_t now, ReplSetHeartbeatResponse&& hbResponse) 
     if (!hbResponse.hasAppliedOpTime()) {
         hbResponse.setAppliedOpTimeAndWallTime(_lastResponse.getAppliedOpTimeAndWallTime());
     }
+    if (!hbResponse.hasWrittenOpTime()) {
+        hbResponse.setWrittenOpTimeAndWallTime(_lastResponse.getWrittenOpTimeAndWallTime());
+    }
     // Log if the state changes
-    if (_lastResponse.getState() != hbResponse.getState()) {
+    const bool memberStateChanged = _lastResponse.getState() != hbResponse.getState();
+    if (memberStateChanged) {
         LOGV2(21215,
-              "Member {hostAndPort} is now in state {newState}",
               "Member is in new state",
               "hostAndPort"_attr = _hostAndPort.toString(),
               "newState"_attr = hbResponse.getState().toString());
@@ -77,6 +84,9 @@ bool MemberData::setUpValues(Date_t now, ReplSetHeartbeatResponse&& hbResponse) 
 
     bool opTimeAdvanced =
         advanceLastAppliedOpTimeAndWallTime(hbResponse.getAppliedOpTimeAndWallTime(), now);
+    opTimeAdvanced =
+        advanceLastWrittenOpTimeAndWallTime(hbResponse.getWrittenOpTimeAndWallTime(), now) ||
+        opTimeAdvanced;
     auto durableOpTimeAndWallTime = hbResponse.hasDurableOpTime()
         ? hbResponse.getDurableOpTimeAndWallTime()
         : OpTimeAndWallTime();
@@ -84,12 +94,14 @@ bool MemberData::setUpValues(Date_t now, ReplSetHeartbeatResponse&& hbResponse) 
         advanceLastDurableOpTimeAndWallTime(durableOpTimeAndWallTime, now) || opTimeAdvanced;
 
     bool configChanged = (getConfigVersionAndTerm() < hbResponse.getConfigVersionAndTerm());
-    _configTerm = hbResponse.getConfigTerm();
-    _configVersion = hbResponse.getConfigVersion();
+    if (configChanged) {
+        _configTerm = hbResponse.getConfigTerm();
+        _configVersion = hbResponse.getConfigVersion();
+    }
 
     _lastResponse = std::move(hbResponse);
 
-    return (opTimeAdvanced || configChanged);
+    return {opTimeAdvanced, configChanged, memberStateChanged};
 }
 
 void MemberData::setDownValues(Date_t now, const std::string& heartbeatMessage) {
@@ -102,7 +114,6 @@ void MemberData::setDownValues(Date_t now, const std::string& heartbeatMessage) 
 
     if (_lastResponse.getState() != MemberState::RS_DOWN) {
         LOGV2(21216,
-              "Member {hostAndPort} is now in state DOWN - {heartbeatMessage}",
               "Member is now in state DOWN",
               "hostAndPort"_attr = _hostAndPort.toString(),
               "heartbeatMessage"_attr = redact(heartbeatMessage));
@@ -112,6 +123,7 @@ void MemberData::setDownValues(Date_t now, const std::string& heartbeatMessage) 
     _lastResponse.setState(MemberState::RS_DOWN);
     _lastResponse.setElectionTime(Timestamp());
     _lastResponse.setAppliedOpTimeAndWallTime(OpTimeAndWallTime());
+    _lastResponse.setWrittenOpTimeAndWallTime(OpTimeAndWallTime());
     _lastResponse.setSyncingTo(HostAndPort());
 
     // The _lastAppliedOpTime/_lastDurableOpTime fields don't get cleared merely by missing a
@@ -128,7 +140,6 @@ void MemberData::setAuthIssue(Date_t now) {
 
     if (_lastResponse.getState() != MemberState::RS_UNKNOWN) {
         LOGV2(21217,
-              "Member {hostAndPort} is now in state UNKNOWN due to authentication issue.",
               "Member is now in state UNKNOWN due to authentication issue",
               "hostAndPort"_attr = _hostAndPort.toString());
     }
@@ -137,7 +148,16 @@ void MemberData::setAuthIssue(Date_t now) {
     _lastResponse.setState(MemberState::RS_UNKNOWN);
     _lastResponse.setElectionTime(Timestamp());
     _lastResponse.setAppliedOpTimeAndWallTime(OpTimeAndWallTime());
+    _lastResponse.setWrittenOpTimeAndWallTime(OpTimeAndWallTime());
     _lastResponse.setSyncingTo(HostAndPort());
+}
+
+void MemberData::setLastWrittenOpTimeAndWallTime(OpTimeAndWallTime opTime, Date_t now) {
+    invariant(opTime.opTime.isNull() || opTime.wallTime > Date_t());
+    _lastUpdate = now;
+    _lastUpdateStale = false;
+    _lastWrittenOpTime = opTime.opTime;
+    _lastWrittenWallTime = opTime.wallTime;
 }
 
 void MemberData::setLastAppliedOpTimeAndWallTime(OpTimeAndWallTime opTime, Date_t now) {
@@ -152,12 +172,20 @@ void MemberData::setLastDurableOpTimeAndWallTime(OpTimeAndWallTime opTime, Date_
     invariant(opTime.opTime.isNull() || opTime.wallTime > Date_t());
     _lastUpdate = now;
     _lastUpdateStale = false;
-    // Since _lastDurableOpTime is set asynchronously from _lastAppliedOpTime, it is possible that
-    // 'opTime' is ahead of _lastAppliedOpTime.
-    if (_lastAppliedOpTime >= opTime.opTime) {
-        _lastDurableOpTime = opTime.opTime;
-        _lastDurableWallTime = opTime.wallTime;
+    _lastDurableOpTime = opTime.opTime;
+    _lastDurableWallTime = opTime.wallTime;
+}
+
+
+bool MemberData::advanceLastWrittenOpTimeAndWallTime(OpTimeAndWallTime opTime, Date_t now) {
+    invariant(opTime.opTime.isNull() || opTime.wallTime > Date_t());
+    _lastUpdate = now;
+    _lastUpdateStale = false;
+    if (_lastWrittenOpTime < opTime.opTime) {
+        setLastWrittenOpTimeAndWallTime(opTime, now);
+        return true;
     }
+    return false;
 }
 
 bool MemberData::advanceLastAppliedOpTimeAndWallTime(OpTimeAndWallTime opTime, Date_t now) {

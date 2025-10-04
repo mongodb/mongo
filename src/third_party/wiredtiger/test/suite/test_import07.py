@@ -35,13 +35,12 @@ from wtscenario import make_scenarios
 
 class test_import07(test_import_base):
     original_db_file = 'original_db_file'
-    create_config = 'allocation_size=512,key_format=u,log=(enabled=true),value_format=u'
+    create_config = 'allocation_size=512,key_format=u,value_format=u'
 
     ntables = 10
     nrows = 100
     scenarios = make_scenarios([
         ('colgroup', dict(prefix='colgroup:')),
-        ('lsm', dict(prefix='lsm:')),
         ('index', dict(prefix='index:')),
     ])
 
@@ -59,7 +58,7 @@ class test_import07(test_import_base):
                 break
         cursor.close()
 
-        # Contruct the config string.
+        # Construct the config string.
         import_config = 'import=(enabled,repair=false,file_metadata=(' + \
             example_db_file_config + '))'
 

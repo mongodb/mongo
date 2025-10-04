@@ -27,12 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/db/pipeline/window_function/window_function_add_to_set.h"
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/window_function/window_function_add_to_set.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/intrusive_counter.h"
+
+#include <string>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace {
@@ -42,7 +49,7 @@ public:
     WindowFunctionAddToSetTest() : expCtx(getExpCtx()), addToSet(expCtx.get()) {}
 
     void addValuesToWindow(const std::vector<Value>& values) {
-        for (auto val : values)
+        for (const auto& val : values)
             addToSet.add(val);
     }
 

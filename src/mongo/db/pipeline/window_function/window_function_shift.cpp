@@ -28,14 +28,24 @@
  */
 
 #include "window_function_shift.h"
-#include "partition_iterator.h"
-#include "window_function_exec_first_last.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::window_function {
-REGISTER_WINDOW_FUNCTION(shift, ExpressionShift::parse);
+REGISTER_STABLE_WINDOW_FUNCTION(shift, ExpressionShift::parse);
 
 boost::intrusive_ptr<Expression> ExpressionShift::parseShiftArgs(BSONObj obj,
-                                                                 const mongo::StringData& accName,
+                                                                 mongo::StringData accName,
                                                                  ExpressionContext* expCtx) {
     // 'obj' is something like '{output: EXPR, by: INT, default: CONSTEXPR}'.
     // only default is optional.
@@ -82,7 +92,7 @@ boost::intrusive_ptr<Expression> ExpressionShift::parseShiftArgs(BSONObj obj,
             offsetFound);
 
     return make_intrusive<ExpressionShift>(
-        expCtx, accName.toString(), std::move(output), std::move(defaultVal), offset);
+        expCtx, std::string{accName}, std::move(output), std::move(defaultVal), offset);
 }
 
 boost::intrusive_ptr<Expression> ExpressionShift::parse(BSONObj obj,
@@ -104,7 +114,7 @@ boost::intrusive_ptr<Expression> ExpressionShift::parse(BSONObj obj,
             accumulatorName = argName;
             uassert(ErrorCodes::FailedToParse,
                     "Argument to $shift must be an object",
-                    arg.type() == BSONType::Object);
+                    arg.type() == BSONType::object);
             shiftExpr = parseShiftArgs(arg.Obj(), argName, expCtx);
         } else {
             uasserted(ErrorCodes::FailedToParse,
@@ -119,12 +129,12 @@ boost::intrusive_ptr<Expression> ExpressionShift::parse(BSONObj obj,
     return shiftExpr;
 }
 
-Value ExpressionShift::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
+Value ExpressionShift::serialize(const SerializationOptions& opts) const {
     MutableDocument args;
-    args.addField(kByArg, Value(_offset));
-    args.addField(kOutputArg, _input->serialize(static_cast<bool>(explain)));
-    args.addField(kDefaultArg, _defaultVal.get_value_or(mongo::Value(BSONNULL)));
-
+    args.addField(kByArg, opts.serializeLiteral(_offset));
+    args.addField(kOutputArg, _input->serialize(opts));
+    args.addField(kDefaultArg,
+                  opts.serializeLiteral(_defaultVal.get_value_or(mongo::Value(BSONNULL))));
     MutableDocument windowFun;
     windowFun.addField(_accumulatorName, args.freezeToValue());
     return windowFun.freezeToValue();

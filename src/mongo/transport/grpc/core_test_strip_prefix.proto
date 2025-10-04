@@ -1,0 +1,7 @@
+syntax = "proto3";
+
+package mongo.transport.test;
+
+message TestPerson {
+  string name = 1;
+}

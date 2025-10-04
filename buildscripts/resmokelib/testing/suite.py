@@ -1,13 +1,20 @@
 """Holder for the (test kind, list of tests) pair with additional metadata their execution."""
 
 import itertools
+import json
+import logging
 import threading
 import time
+from abc import ABC, abstractmethod
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
+from typing import Any, Dict, List, Optional
 
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib import selector as _selector
+from buildscripts.resmokelib.logging import loggers
 from buildscripts.resmokelib.testing import report as _report
 from buildscripts.resmokelib.testing import summary as _summary
+from buildscripts.resmokelib.utils import evergreen_conn
 
 # Map of error codes that could be seen. This is collected from:
 # * dbshell.cpp
@@ -36,6 +43,9 @@ EXIT_CODE_MAP = {
     3221225725: "Stack Overflow",
 }
 
+# One out of TSS_ENDPOINT_FREQUENCY times, the TSS endpoint is used when selecting tests.
+TSS_ENDPOINT_FREQUENCY = 1
+
 
 def translate_exit_code(exit_code):
     """
@@ -59,7 +69,7 @@ def synchronized(method):
     return synced
 
 
-class Suite(object):  # pylint: disable=too-many-instance-attributes
+class Suite(object):
     """A suite of tests of a particular kind (e.g. C++ unit tests, dbtests, jstests)."""
 
     def __init__(self, suite_name, suite_config, suite_options=_config.SuiteOptions.ALL_INHERITED):
@@ -87,6 +97,10 @@ class Suite(object):  # pylint: disable=too-many-instance-attributes
         # report intermediate results.
         self._partial_reports = None
 
+    def get_config(self):
+        """Return the configuration of this suite."""
+        return self._suite_config
+
     def __repr__(self):
         """Create a string representation of object for debugging."""
         return f"{self.test_kind}:{self._suite_name}"
@@ -98,6 +112,10 @@ class Suite(object):  # pylint: disable=too-many-instance-attributes
             self._tests, self._excluded = self._get_tests_for_kind(self.test_kind)
         return self._tests
 
+    @tests.setter
+    def tests(self, tests):
+        self._tests = tests
+
     @property
     def excluded(self):
         """Get the excluded."""
@@ -105,8 +123,8 @@ class Suite(object):  # pylint: disable=too-many-instance-attributes
             self._tests, self._excluded = self._get_tests_for_kind(self.test_kind)
         return self._excluded
 
-    def _get_tests_for_kind(self, test_kind):
-        """Return the tests to run based on the 'test_kind'-specific filtering policy."""
+    def _get_tests_for_kind(self, test_kind) -> tuple[List[any], List[str]]:
+        """Return the tests to run and those that were excluded, based on the 'test_kind'-specific filtering policy."""
         selector_config = self.get_selector_config()
 
         # The mongos_test doesn't have to filter anything, the selector_config is just the
@@ -117,7 +135,100 @@ class Suite(object):  # pylint: disable=too-many-instance-attributes
                 raise TypeError("Expected dictionary of arguments to mongos")
             return [mongos_options], []
 
-        return _selector.filter_tests(test_kind, selector_config)
+        tests, excluded = _selector.filter_tests(test_kind, selector_config)
+
+        if loggers.ROOT_EXECUTOR_LOGGER is None:
+            loggers.ROOT_EXECUTOR_LOGGER = logging.getLogger("executor")
+
+        # to reduce the amount of API requests to Evergreen
+        use_select_tests = _config.ENABLE_EVERGREEN_API_TEST_SELECTION
+        call_select_tests = (
+            _config.EVERGREEN_PATCH_BUILD
+            and _config.EVERGREEN_VERSION_ID
+            and (hash(_config.EVERGREEN_VERSION_ID) % TSS_ENDPOINT_FREQUENCY == 0)
+        )
+        call_api = use_select_tests or call_select_tests
+
+        # Apply Evergreen API test selection if:
+        # 1. We have tests to filter
+        # 2. We're running in Evergreen
+        # 3. Test selection is enabled
+        if tests and _config.EVERGREEN_TASK_ID and call_api:
+            try:
+                evg_api = evergreen_conn.get_evergreen_api()
+            except RuntimeError:
+                loggers.ROOT_EXECUTOR_LOGGER.warning(
+                    "Failed to create Evergreen API client. Evergreen test selection will be skipped even if it was enabled."
+                )
+            else:
+                test_selection_strategy = (
+                    _config.EVERGREEN_TEST_SELECTION_STRATEGY
+                    if _config.EVERGREEN_TEST_SELECTION_STRATEGY is not None
+                    else ["NotFailing", "NotPassing", "NotFlaky"]
+                )
+                request = {
+                    "project_id": str(_config.EVERGREEN_PROJECT_NAME),
+                    "build_variant": str(_config.EVERGREEN_VARIANT_NAME),
+                    "requester": str(_config.EVERGREEN_REQUESTER),
+                    "task_id": str(_config.EVERGREEN_TASK_ID),
+                    "task_name": str(_config.EVERGREEN_TASK_NAME),
+                    "tests": tests,
+                    "strategies": test_selection_strategy,
+                }
+
+                # future thread is async
+                with ThreadPoolExecutor(max_workers=1) as executor:
+                    select_tests_succeeds_flag = True
+                    execution = executor.submit(evg_api.select_tests, **request)
+                    try:
+                        result = (
+                            execution.result(timeout=60)
+                            if _config.ENABLE_EVERGREEN_API_TEST_SELECTION
+                            else execution.result(timeout=20)
+                        )
+                        # if execution does not time out, checks for if result is in proper format to parse
+                        if not isinstance(result, dict):
+                            loggers.ROOT_EXECUTOR_LOGGER.info(f"Unexpected response type:{result}")
+                            select_tests_succeeds_flag = False
+                        if "tests" not in result:
+                            loggers.ROOT_EXECUTOR_LOGGER.info(
+                                "Tests key not in results, cannot properly parse what tests to use in Evergreen"
+                            )
+                            select_tests_succeeds_flag = False
+
+                    # for if selecting tests via the test selection strategy takes too long
+                    except TimeoutError:
+                        loggers.ROOT_EXECUTOR_LOGGER.info("TSS took too long or never finished")
+                        select_tests_succeeds_flag = False
+                    except Exception:
+                        loggers.ROOT_EXECUTOR_LOGGER.info(
+                            f"Failure using the select tests evergreen endpoint with the following request:\n{request}"
+                        )
+                        select_tests_succeeds_flag = False
+
+                    # ensures that select_tests results is only used if no exceptions or type errors are thrown from it
+                    if select_tests_succeeds_flag and use_select_tests:
+                        evergreen_filtered_tests = result["tests"]
+                        evergreen_excluded_tests = set(
+                            evergreen_filtered_tests
+                        ).symmetric_difference(set(tests))
+                        loggers.ROOT_EXECUTOR_LOGGER.info(
+                            f"Evergreen applied the following test selection strategies: {test_selection_strategy}"
+                        )
+                        loggers.ROOT_EXECUTOR_LOGGER.info(
+                            f"to test after the test selection strategy was applied: {evergreen_filtered_tests}"
+                        )
+                        loggers.ROOT_EXECUTOR_LOGGER.info(
+                            f"to exclude the following tests: {evergreen_excluded_tests}"
+                        )
+                        excluded.extend(evergreen_excluded_tests)
+                        tests = evergreen_filtered_tests
+
+        tests = self.filter_tests_for_shard(tests, _config.SHARD_COUNT, _config.SHARD_INDEX)
+
+        # Always group tests at the end
+        tests = _selector.group_tests(test_kind, selector_config, tests)
+        return tests, excluded
 
     def get_name(self):
         """Return the name of the test suite."""
@@ -171,6 +282,32 @@ class Suite(object):  # pylint: disable=too-many-instance-attributes
         if self.options.num_repeat_tests:
             return self.options.num_repeat_tests
         return 1
+
+    def get_num_jobs_to_start(self) -> int:
+        """
+        Determine the number of jobs to start.
+
+        :return: Number of jobs to start.
+        """
+        # If we are building images for an external SUT, we are not actually running
+        # any tests & just need a single "job" to create a resmoke fixture to base the
+        # external SUT off of.
+        if _config.DOCKER_COMPOSE_BUILD_IMAGES:
+            return 1
+        num_jobs_to_start = self.options.num_jobs
+        num_tests = self._get_num_test_runs()
+
+        if num_tests < num_jobs_to_start:
+            num_jobs_to_start = num_tests
+
+        return num_jobs_to_start
+
+    def _get_num_test_runs(self) -> int:
+        """Return the number of total test runs."""
+        if self.options.num_repeat_tests_max:
+            return len(self.tests) * self.options.num_repeat_tests_max
+
+        return len(self.tests) * self.options.num_repeat_tests
 
     @property
     def options(self):
@@ -229,7 +366,7 @@ class Suite(object):  # pylint: disable=too-many-instance-attributes
         return self._reports
 
     @synchronized
-    def summarize(self, sb):
+    def summarize(self, sb: List[str]):
         """Append a summary of the suite onto the string builder 'sb'."""
         if not self._reports and not self._partial_reports:
             sb.append("No tests ran.")
@@ -290,11 +427,12 @@ class Suite(object):  # pylint: disable=too-many-instance-attributes
         for iteration in range(num_iterations):
             # Summarize each execution as a bulleted list of results.
             bulleter_sb = []
-            summary = self._summarize_report(reports[iteration], start_times[iteration],
-                                             end_times[iteration], bulleter_sb)
+            summary = self._summarize_report(
+                reports[iteration], start_times[iteration], end_times[iteration], bulleter_sb
+            )
             combined_summary = _summary.combine(combined_summary, summary)
 
-            for (i, line) in enumerate(bulleter_sb):
+            for i, line in enumerate(bulleter_sb):
                 # Only bullet first line, indent others.
                 prefix = "* " if i == 0 else "  "
                 sb.append(prefix + line)
@@ -307,8 +445,12 @@ class Suite(object):  # pylint: disable=too-many-instance-attributes
         Also append a summary of that execution onto the string builder 'sb'.
         """
 
-        return self._summarize_report(self._reports[iteration], self._test_start_times[iteration],
-                                      self._test_end_times[iteration], sb)
+        return self._summarize_report(
+            self._reports[iteration],
+            self._test_start_times[iteration],
+            self._test_end_times[iteration],
+            sb,
+        )
 
     def _summarize_report(self, report, start_time, end_time, sb):
         """Return the summary information of the execution.
@@ -336,11 +478,14 @@ class Suite(object):  # pylint: disable=too-many-instance-attributes
             sb.append("All %d test(s) passed in %0.2f seconds." % (num_run, time_taken))
             return _summary.Summary(num_run, time_taken, num_run, 0, 0, 0)
 
-        summary = _summary.Summary(num_run, time_taken, report.num_succeeded, num_skipped,
-                                   num_failed, report.num_errored)
+        summary = _summary.Summary(
+            num_run, time_taken, report.num_succeeded, num_skipped, num_failed, report.num_errored
+        )
 
-        sb.append("%d test(s) ran in %0.2f seconds"
-                  " (%d succeeded, %d were skipped, %d failed, %d errored)" % summary)
+        sb.append(
+            "%d test(s) ran in %0.2f seconds"
+            " (%d succeeded, %d were skipped, %d failed, %d errored)" % summary
+        )
 
         test_names = []
 
@@ -348,8 +493,18 @@ class Suite(object):  # pylint: disable=too-many-instance-attributes
             sb.append("The following tests failed (with exit code):")
             for test_info in itertools.chain(report.get_failed(), report.get_interrupted()):
                 test_names.append(test_info.test_file)
-                sb.append("    %s (%d %s)" % (test_info.test_file, test_info.return_code,
-                                              translate_exit_code(test_info.return_code)))
+                sb.append(
+                    "    %s (%d %s)"
+                    % (
+                        test_info.test_file,
+                        test_info.return_code,
+                        translate_exit_code(test_info.return_code),
+                    )
+                )
+
+                for exception_extractor in test_info.exception_extractors:
+                    for log_line in exception_extractor.get_exception():
+                        sb.append("        %s" % (log_line))
 
         if report.num_errored > 0:
             sb.append("The following tests had errors:")
@@ -357,10 +512,16 @@ class Suite(object):  # pylint: disable=too-many-instance-attributes
                 test_names.append(test_info.test_file)
                 sb.append("    %s" % (test_info.test_file))
 
+                if test_info.error:
+                    for log_line in test_info.error:
+                        sb.append("        %s" % (log_line))
+
         if num_failed > 0 or report.num_errored > 0:
             test_names.sort(key=_report.test_order)
-            sb.append("If you're unsure where to begin investigating these errors, "
-                      "consider looking at tests in the following order:")
+            sb.append(
+                "If you're unsure where to begin investigating these errors, "
+                "consider looking at tests in the following order:"
+            )
             for test_name in test_names:
                 sb.append("    %s" % (test_name))
 
@@ -371,7 +532,8 @@ class Suite(object):  # pylint: disable=too-many-instance-attributes
         """Log summary of all suites."""
         sb = []
         sb.append(
-            "Summary of all suites: %d suites ran in %0.2f seconds" % (len(suites), time_taken))
+            "Summary of all suites: %d suites ran in %0.2f seconds" % (len(suites), time_taken)
+        )
         for suite in suites:
             suite_sb = []
             suite.summarize(suite_sb)
@@ -379,3 +541,142 @@ class Suite(object):  # pylint: disable=too-many-instance-attributes
 
         logger.info("=" * 80)
         logger.info("\n".join(sb))
+
+    def make_test_case_names_list(self):
+        """
+        Create a list of all the names of the tests.
+
+        :return: List of names of testcases.
+        """
+
+        test_case_names = []
+        for _ in range(self.get_num_times_to_repeat_tests()):
+            for test_name in self.tests:
+                test_case_names.append(test_name)
+        return test_case_names
+
+    def is_matrix_suite(self):
+        return "matrix_suite" in self.get_config()
+
+    def get_description(self):
+        if "description" not in self.get_config():
+            return None
+
+        return self.get_config()["description"]
+
+    class METRIC_NAMES:
+        DISPLAY_NAME = "suite_display_name"
+        NAME = "suite_name"
+        NUM_JOBS_TO_START = "suite_num_jobs_to_start"
+        NUM_TIMES_TO_REPEAT_TESTS = "suite_num_times_to_repeat_tests"
+        IS_MATRIX_SUITE = "suite_is_matrix_suite"
+        KIND = "suite_kind"
+        RETURN_CODE = "suite_return_code"
+        RETURN_STATUS = "suite_return_status"
+        ERRORNO = "suite_errorno"
+
+    def get_suite_otel_attributes(self) -> Dict[str, Any]:
+        attributes = {
+            Suite.METRIC_NAMES.DISPLAY_NAME: self.get_display_name(),
+            Suite.METRIC_NAMES.NAME: self.get_name(),
+            Suite.METRIC_NAMES.NUM_JOBS_TO_START: self.get_num_jobs_to_start(),
+            Suite.METRIC_NAMES.NUM_TIMES_TO_REPEAT_TESTS: self.get_num_times_to_repeat_tests(),
+            Suite.METRIC_NAMES.IS_MATRIX_SUITE: self.is_matrix_suite(),
+        }
+        # Note '' and 0 we want to return and those are both falsey
+        if self.test_kind is not None:
+            attributes[Suite.METRIC_NAMES.KIND] = self.test_kind
+        if self.return_code is not None:
+            attributes[Suite.METRIC_NAMES.RETURN_CODE] = self.return_code
+        return attributes
+
+    @staticmethod
+    def filter_tests_for_shard(
+        tests: List[str], shard_count: Optional[int], shard_index: Optional[int]
+    ) -> List[str]:
+        """Filter tests to only include those that should be run by this shard."""
+        if shard_index is None or shard_count is None:
+            return tests
+
+        if _config.HISTORIC_TEST_RUNTIMES:
+            with open(_config.HISTORIC_TEST_RUNTIMES, "rt") as f:
+                runtimes = json.load(f)
+            strategy = EqualRuntime(runtimes=runtimes)
+        else:
+            strategy = EqualTestCount()
+        tests = strategy.get_tests_for_shard(tests, shard_count, shard_index)
+
+        test_str = "\n   ".join(tests)
+        loggers.ROOT_EXECUTOR_LOGGER.info(f"{len(tests)} test(s) in this shard:\n   {test_str}")
+
+        return tests
+
+
+class ShardingStrategy(ABC):
+    @abstractmethod
+    def get_tests_for_shard(
+        self, tests: List[str], shard_count: int, shard_index: int
+    ) -> List[str]:
+        pass
+
+
+class EqualTestCount(ShardingStrategy):
+    def get_tests_for_shard(
+        self, tests: List[str], shard_count: int, shard_index: int
+    ) -> List[str]:
+        return [test_case for i, test_case in enumerate(tests) if i % shard_count == shard_index]
+
+
+class EqualRuntime(ShardingStrategy):
+    def __init__(self, runtimes):
+        self.runtimes = {}
+        for runtime in runtimes:
+            self.runtimes[runtime["test_name"]] = runtime["avg_duration_pass"]
+
+    def get_tests_for_shard(
+        self, tests: List[str], shard_count: int, shard_index: int
+    ) -> List[str]:
+        shards = [[] for _ in range(shard_count)]
+        shard_runtimes = [0] * shard_count
+
+        tests_with_runtime = {}
+        tests_without_runtime = []
+        for test in tests:
+            if test in self.runtimes:
+                tests_with_runtime[test] = self.runtimes[test]
+            else:
+                tests_without_runtime.append(test)
+        tests_with_runtime = sorted(
+            tests_with_runtime.items(), key=lambda test: test[1], reverse=True
+        )
+
+        # Distribute tests with known runtimes
+        total_runtime = 0
+        for test, runtime in tests_with_runtime:
+            smallest_shard = shard_runtimes.index(min(shard_runtimes))
+            shards[smallest_shard].append(test)
+            shard_runtimes[smallest_shard] += runtime
+            total_runtime += runtime
+
+        # Distribute the rest of tests without history, treating them all equally.
+        if tests_with_runtime:
+            avg_runtime = total_runtime / len(tests_with_runtime)
+            loggers.ROOT_EXECUTOR_LOGGER.info(
+                f"Using average test runtime of {avg_runtime:.1f}s for tests without historic runtime info."
+            )
+            runtime = avg_runtime
+        else:
+            loggers.ROOT_EXECUTOR_LOGGER.info(
+                "Using default test runtime of 1s for tests without historic runtime info, since no test has historic info."
+            )
+            runtime = 1
+
+        for test in tests_without_runtime:
+            smallest_shard = shard_runtimes.index(min(shard_runtimes))
+            shards[smallest_shard].append(test)
+            shard_runtimes[smallest_shard] += runtime
+
+        loggers.ROOT_EXECUTOR_LOGGER.info(
+            f"Test shard balanced to {shard_runtimes[shard_index]:.1f} seconds of runtime."
+        )
+        return shards[shard_index]

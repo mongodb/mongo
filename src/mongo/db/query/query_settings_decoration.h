@@ -31,6 +31,8 @@
 
 #include "mongo/db/query/query_settings.h"
 
+#include <memory>
+
 namespace mongo {
 
 class SharedCollectionDecorations;

@@ -27,9 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/matcher/schema/expression_internal_schema_unique_items.h"
+
+#include "mongo/bson/bsonobjbuilder.h"
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 constexpr StringData InternalSchemaUniqueItemsMatchExpression::kName;
@@ -39,15 +41,9 @@ void InternalSchemaUniqueItemsMatchExpression::debugString(StringBuilder& debug,
     _debugAddSpace(debug, indentationLevel);
 
     BSONObjBuilder builder;
-    serialize(&builder, true);
-    debug << builder.obj().toString() << "\n";
-
-    const auto* tag = getTag();
-    if (tag) {
-        debug << " ";
-        tag->debugString(&debug);
-    }
-    debug << "\n";
+    serialize(&builder, {});
+    debug << builder.obj().toString();
+    _debugStringAttachTagInfo(&debug);
 }
 
 bool InternalSchemaUniqueItemsMatchExpression::equivalent(const MatchExpression* expr) const {
@@ -59,13 +55,12 @@ bool InternalSchemaUniqueItemsMatchExpression::equivalent(const MatchExpression*
     return path() == other->path();
 }
 
-BSONObj InternalSchemaUniqueItemsMatchExpression::getSerializedRightHandSide() const {
-    BSONObjBuilder bob;
-    bob.append(kName, true);
-    return bob.obj();
+void InternalSchemaUniqueItemsMatchExpression::appendSerializedRightHandSide(
+    BSONObjBuilder* bob, const SerializationOptions& opts, bool includePath) const {
+    bob->append(kName, true);
 }
 
-std::unique_ptr<MatchExpression> InternalSchemaUniqueItemsMatchExpression::shallowClone() const {
+std::unique_ptr<MatchExpression> InternalSchemaUniqueItemsMatchExpression::clone() const {
     auto clone =
         std::make_unique<InternalSchemaUniqueItemsMatchExpression>(path(), _errorAnnotation);
     if (getTag()) {

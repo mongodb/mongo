@@ -2,9 +2,9 @@
 # Wrapper for Microsoft lib.exe
 
 me=ar-lib
-scriptversion=2012-03-01.08; # UTC
+scriptversion=2019-07-04.01; # UTC
 
-# Copyright (C) 2010-2017 Free Software Foundation, Inc.
+# Copyright (C) 2010-2021 Free Software Foundation, Inc.
 # Written by Peter Rosin <peda@lysator.liu.se>.
 #
 # This program is free software; you can redistribute it and/or modify
@@ -18,7 +18,7 @@ scriptversion=2012-03-01.08; # UTC
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 # As a special exception to the GNU General Public License, if you
 # distribute this file as part of a program that contains a
@@ -53,7 +53,7 @@ func_file_conv ()
 	  MINGW*)
 	    file_conv=mingw
 	    ;;
-	  CYGWIN*)
+	  CYGWIN* | MSYS*)
 	    file_conv=cygwin
 	    ;;
 	  *)
@@ -65,7 +65,7 @@ func_file_conv ()
 	mingw)
 	  file=`cmd //C echo "$file " | sed -e 's/"\(.*\) " *$/\1/'`
 	  ;;
-	cygwin)
+	cygwin | msys)
 	  file=`cygpath -m "$file" || echo "$file"`
 	  ;;
 	wine)
@@ -224,10 +224,11 @@ elif test -n "$extract"; then
       esac
     done
   else
-    $AR -NOLOGO -LIST "$archive" | sed -e 's/\\/\\\\/g' | while read member
-    do
-      $AR -NOLOGO -EXTRACT:"$member" "$archive" || exit $?
-    done
+    $AR -NOLOGO -LIST "$archive" | tr -d '\r' | sed -e 's/\\/\\\\/g' \
+      | while read member
+        do
+          $AR -NOLOGO -EXTRACT:"$member" "$archive" || exit $?
+        done
   fi
 
 elif test -n "$quick$replace"; then

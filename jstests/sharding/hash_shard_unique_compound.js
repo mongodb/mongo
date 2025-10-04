@@ -4,15 +4,14 @@
  * 1. shard collection on hashed "a", ensure unique index {a:1, b:1}
  * 2. reverse order
  */
-(function() {
-'use strict';
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var s = new ShardingTest({shards: 1, mongos: 1});
-var dbName = "test";
-var collName = "foo";
-var ns = dbName + "." + collName;
+let s = new ShardingTest({shards: 1, mongos: 1});
+let dbName = "test";
+let collName = "foo";
+let ns = dbName + "." + collName;
 var db = s.getDB(dbName);
-var coll = db.getCollection(collName);
+let coll = db.getCollection(collName);
 
 // Enable sharding on DB
 assert.commandWorked(db.adminCommand({enablesharding: dbName}));
@@ -34,12 +33,10 @@ coll.drop();
 assert.commandWorked(coll.createIndex({a: 1, b: 1}, {unique: true}));
 
 // shard a fresh collection using a hashed shard key
-assert.commandWorked(db.adminCommand({shardcollection: ns, key: {a: "hashed"}}),
-                     "shardcollection didn't worked 2");
+assert.commandWorked(db.adminCommand({shardcollection: ns, key: {a: "hashed"}}), "shardcollection didn't worked 2");
 
 s.printShardingStatus();
 jsTest.log("------ indexes 2-------");
 jsTest.log(tojson(coll.getIndexes()));
 
 s.stop();
-})();

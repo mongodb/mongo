@@ -29,26 +29,24 @@
 
 // NOTE: This file *must not* depend on any mongo symbols.
 
-#include "mongo/platform/basic.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/util/exit_code.h"
 
-#include "mongo/config.h"
+#include <mutex>
 
 #if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
 #endif
 
-// This will probably get us _exit on non-unistd platforms like Windows.
-#include <cstdlib>
-
 // NOTE: Header only dependencies are OK in this library.
-#include "mongo/stdx/mutex.h"
-
-#if !defined(__has_feature)
-#define __has_feature(x) 0
-#endif
+#include "mongo/stdx/mutex.h"  // IWYU pragma: keep
 
 #if !defined(__has_include)
 #define __has_include(x) 0
+#endif
+
+#if !defined(__has_feature)
+#define __has_feature(x) 0
 #endif
 
 #if __has_feature(address_sanitizer)
@@ -63,8 +61,21 @@
 #include <sanitizer/lsan_interface.h>
 #endif
 
+#if __has_feature(xray_instrument)
+// See clang/test/Lexer/has_feature_xray_instrument.cpp
+// see compiler-rt/lib/xray/xray_basic_flags.inc
+#include <xray/xray_log_interface.h>
+#endif
+
+#ifdef MONGO_PGO_PROFILE
+extern "C" void __llvm_profile_dump();
+extern "C" void __llvm_profile_reset_counters();
+#endif
+
 #ifdef MONGO_GCOV
 extern "C" void __gcov_flush();
+extern "C" void __gcov_dump();
+extern "C" void __gcov_reset();
 #endif
 
 namespace mongo {
@@ -73,14 +84,31 @@ namespace {
 stdx::mutex* const quickExitMutex = new stdx::mutex;
 }  // namespace
 
-void quickExitWithoutLogging(int code) {
+void quickExitWithoutLogging(ExitCode code) {
     // Ensure that only one thread invokes the last rites here. No
     // RAII here - we never want to unlock this.
     if (quickExitMutex)
         quickExitMutex->lock();
 
 #ifdef MONGO_GCOV
+#if (defined(__clang__) && __clang_major__ >= 12) || __GNUC__ >= 11
+    __gcov_dump();
+    __gcov_reset();
+#else
     __gcov_flush();
+#endif
+#endif
+
+#ifdef MONGO_PGO_PROFILE
+    __llvm_profile_dump();
+    __llvm_profile_reset_counters();
+#endif
+
+#if __has_feature(xray_instrument)
+    // Stop XRay and flush the xray basic log
+    /* ignore */ __xray_log_finalize();
+    /* ignore */ __xray_unpatch();
+    /* ignore */ __xray_log_flushLog();
 #endif
 
 #if __has_feature(address_sanitizer)
@@ -96,9 +124,9 @@ void quickExitWithoutLogging(int code) {
     // multiple threads. Each call to _exit shuts down the CRT, and so subsequent calls into the
     // CRT result in undefined behavior. Bypass _exit CRT shutdown code and call TerminateProcess
     // directly instead to match GLibc's _exit which calls the syscall exit_group.
-    ::TerminateProcess(GetCurrentProcess(), code);
+    ::TerminateProcess(GetCurrentProcess(), static_cast<UINT>(code));
 #else
-    ::_exit(code);
+    ::_exit(static_cast<int>(code));
 #endif
 }
 

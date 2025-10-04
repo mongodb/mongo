@@ -28,8 +28,14 @@
  */
 
 #pragma once
-
 #include "mongo/db/repl/data_replicator_external_state_impl.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/sync_source_selector.h"
+#include "mongo/rpc/metadata/oplog_query_metadata.h"
+#include "mongo/rpc/metadata/repl_set_metadata.h"
+#include "mongo/util/modules.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 namespace repl {
@@ -48,7 +54,10 @@ public:
                                               const rpc::ReplSetMetadata& replMetadata,
                                               const rpc::OplogQueryMetadata& oqMetadata,
                                               const OpTime& previousOpTimeFetched,
-                                              const OpTime& lastOpTimeFetched) override;
+                                              const OpTime& lastOpTimeFetched) const override;
+
+    ChangeSyncSourceAction shouldStopFetchingOnError(
+        const HostAndPort& source, const OpTime& lastOpTimeFetched) const override;
 };
 
 }  // namespace repl

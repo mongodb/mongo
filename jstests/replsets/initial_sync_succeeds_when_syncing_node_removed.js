@@ -6,14 +6,12 @@
  * @tags: [
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint, kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const testName = TestData.testName;
 const rst = new ReplSetTest({name: testName, nodes: [{}]});
-const nodes = rst.startSet();
+rst.startSet();
 rst.initiate();
 
 const primary = rst.getPrimary();
@@ -28,12 +26,11 @@ jsTest.log("Adding the initial sync destination node to the replica set");
 const initialSyncNode = rst.add({
     rsConfig: {priority: 0, votes: 0},
     setParameter: {
-        'failpoint.initialSyncHangBeforeCopyingDatabases': tojson({mode: 'alwaysOn'}),
-        'numInitialSyncAttempts': 1,
-        'logComponentVerbosity': tojson({replication: {verbosity: 1}}),
-        'failpoint.forceSyncSourceCandidate':
-            tojson({mode: 'alwaysOn', data: {hostAndPort: initialSyncSource.host}})
-    }
+        "failpoint.initialSyncHangBeforeCopyingDatabases": tojson({mode: "alwaysOn"}),
+        "numInitialSyncAttempts": 1,
+        "logComponentVerbosity": tojson({replication: {verbosity: 1}}),
+        "failpoint.forceSyncSourceCandidate": tojson({mode: "alwaysOn", data: {hostAndPort: initialSyncSource.host}}),
+    },
 });
 rst.reInitiate();
 rst.waitForState(initialSyncNode, ReplSetTest.State.STARTUP_2);
@@ -42,11 +39,13 @@ rst.waitForState(initialSyncNode, ReplSetTest.State.STARTUP_2);
 const beforeFinishFailPoint = configureFailPoint(initialSyncNode, "initialSyncHangBeforeFinish");
 
 jsTestLog("Waiting to reach cloning phase of initial sync");
-assert.commandWorked(initialSyncNode.adminCommand({
-    waitForFailPoint: "initialSyncHangBeforeCopyingDatabases",
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+assert.commandWorked(
+    initialSyncNode.adminCommand({
+        waitForFailPoint: "initialSyncHangBeforeCopyingDatabases",
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout,
+    }),
+);
 jsTestLog("Removing initial sync node");
 // Avoid closing the connection when the node transitions to REMOVED.
 assert.commandWorked(initialSyncNode.adminCommand({hello: 1, hangUpOnStepDown: false}));
@@ -58,15 +57,18 @@ config.members[1].host = "always.invalid:27017";
 config.version++;
 assert.commandWorked(primary.adminCommand({replSetReconfig: config, force: 1}));
 jsTestLog("Waiting for initial sync node to realize it is removed.");
-assert.soonNoExcept(function() {
-    assert.commandFailedWithCode(initialSyncNode.adminCommand({replSetGetStatus: 1}),
-                                 ErrorCodes.InvalidReplicaSetConfig);
+assert.soonNoExcept(function () {
+    assert.commandFailedWithCode(
+        initialSyncNode.adminCommand({replSetGetStatus: 1}),
+        ErrorCodes.InvalidReplicaSetConfig,
+    );
     return true;
 });
 
 // Release the initial failpoint.
-assert.commandWorked(initialSyncNode.adminCommand(
-    {configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}));
+assert.commandWorked(
+    initialSyncNode.adminCommand({configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}),
+);
 
 jsTestLog("Waiting for initial sync to complete.");
 beforeFinishFailPoint.wait();
@@ -85,9 +87,11 @@ config.members[1].host = "always.invalid:27017";
 config.version++;
 assert.commandWorked(primary.adminCommand({replSetReconfig: config, force: 1}));
 jsTestLog("Waiting for initial sync node to realize it is removed again.");
-assert.soonNoExcept(function() {
-    assert.commandFailedWithCode(initialSyncNode.adminCommand({replSetGetStatus: 1}),
-                                 ErrorCodes.InvalidReplicaSetConfig);
+assert.soonNoExcept(function () {
+    assert.commandFailedWithCode(
+        initialSyncNode.adminCommand({replSetGetStatus: 1}),
+        ErrorCodes.InvalidReplicaSetConfig,
+    );
     return true;
 });
 
@@ -99,14 +103,12 @@ beforeFinishFailPoint.off();
 checkLog.containsJson(initialSyncNode, 4853000);
 
 // Make sure the node is still REMOVED.
-assert.commandFailedWithCode(initialSyncNode.adminCommand({replSetGetStatus: 1}),
-                             ErrorCodes.InvalidReplicaSetConfig);
+assert.commandFailedWithCode(initialSyncNode.adminCommand({replSetGetStatus: 1}), ErrorCodes.InvalidReplicaSetConfig);
 
 jsTestLog("Re-adding initial sync node a final time");
 config.members[1].host = origHost;
 config.version++;
 assert.commandWorked(primary.adminCommand({replSetReconfig: config, force: 1}));
-rst.waitForState(initialSyncNode, ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [initialSyncNode]);
 
 rst.stopSet();
-})();

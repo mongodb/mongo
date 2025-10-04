@@ -5,10 +5,8 @@
 // hello fails on the arbiter once it's removed, which blocks all checks.
 TestData.skipCheckDBHashes = true;
 
-(function() {
-'use strict';
-
-load('jstests/replsets/rslib.js');
+import {reconnect} from "jstests/replsets/rslib.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const replTest = new ReplSetTest({nodes: 2});
 replTest.startSet();
@@ -18,17 +16,18 @@ const primary = replTest.getPrimary();
 // This test performs a reconfig that will change the implicit default write concern
 // from {w: "majority"} to {w: 1}. In order for this reconfig to succeed, we must first
 // set the cluster-wide write concern.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: "majority"}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: "majority"}, writeConcern: {w: "majority"}}),
+);
 
-jsTestLog('Start arbiter');
+jsTestLog("Start arbiter");
 const arbiterConn = replTest.add();
-const admin = primary.getDB('admin');
+const admin = primary.getDB("admin");
 const conf = replTest.getReplSetConfigFromNode();
 conf.members.push({_id: 2, host: arbiterConn.host, arbiterOnly: true});
 conf.version++;
 
-jsTestLog('Add arbiter');
+jsTestLog("Add arbiter");
 assert.commandWorked(admin.runCommand({replSetReconfig: conf}));
 
 replTest.waitForState(arbiterConn, ReplSetTest.State.ARBITER);
@@ -41,20 +40,20 @@ assert.soon(() => {
 conf.members.pop();
 conf.version++;
 
-jsTestLog('Remove arbiter');
+jsTestLog("Remove arbiter");
 assert.commandWorked(admin.runCommand({replSetReconfig: conf}));
 
 assert.soonNoExcept(
     () => {
         // The arbiter dropped connections when it was removed.
         reconnect(arbiterConn);
-        let status = arbiterConn.getDB('admin').runCommand({replSetGetStatus: 1});
+        let status = arbiterConn.getDB("admin").runCommand({replSetGetStatus: 1});
         print(`replSetGetStatus: ${tojson(status)}`);
         return status.code === ErrorCodes.InvalidReplicaSetConfig;
     },
     "waiting for arbiter's replSetGetStatus to show that the arbiter was removed",
     undefined /* timeout */,
-    1000 /* intervalMS */);
+    1000 /* intervalMS */,
+);
 
 replTest.stopSet();
-})();

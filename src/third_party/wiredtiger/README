@@ -1,29 +1,25 @@
-WiredTiger 10.0.1: (April 12, 2021)
+WiredTiger 12.0.0: (November 15, 2024)
 
-This is version 10.0.1 of WiredTiger.
+This is version 12.0.0 of WiredTiger.
 
 WiredTiger release packages and documentation can be found at:
 
-	https://source.wiredtiger.com/
-
-The documentation for this specific release can be found at:
-
-	https://source.wiredtiger.com/develop/index.html
+    https://source.wiredtiger.com
 
 The WiredTiger source code can be found at:
 
-	https://github.com/wiredtiger/wiredtiger
+    https://github.com/wiredtiger/wiredtiger
 
 WiredTiger uses JIRA for issue management:
 
-	https://jira.mongodb.org/browse/WT
+    https://jira.mongodb.org/browse/WT
 
 Please do not report issues through GitHub.
 
 WiredTiger licensing information can be found at:
 
-	https://source.wiredtiger.com/license.html
+    https://source.wiredtiger.com/license.html
 
 For general questions and discussion, there's a WiredTiger group:
 
-	https://groups.google.com/group/wiredtiger-users
+    https://groups.google.com/group/wiredtiger-users

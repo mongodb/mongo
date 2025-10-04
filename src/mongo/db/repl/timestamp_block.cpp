@@ -27,12 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/repl/timestamp_block.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/storage/storage_options.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -40,15 +39,15 @@ namespace mongo {
 TimestampBlock::TimestampBlock(OperationContext* opCtx, Timestamp ts) : _opCtx(opCtx), _ts(ts) {
     uassert(ErrorCodes::IllegalOperation,
             "Cannot timestamp a write operation in read-only mode",
-            !storageGlobalParams.readOnly);
+            !_opCtx->readOnly());
     if (!_ts.isNull()) {
-        _opCtx->recoveryUnit()->setCommitTimestamp(_ts);
+        shard_role_details::getRecoveryUnit(_opCtx)->setCommitTimestamp(_ts);
     }
 }
 
 TimestampBlock::~TimestampBlock() {
     if (!_ts.isNull()) {
-        _opCtx->recoveryUnit()->clearCommitTimestamp();
+        shard_role_details::getRecoveryUnit(_opCtx)->clearCommitTimestamp();
     }
 }
 

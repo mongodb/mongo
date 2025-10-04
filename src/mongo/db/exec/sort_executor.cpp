@@ -27,37 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/exec/sort_executor.h"
 
-#include "mongo/db/exec/document_value/value_comparator.h"
-#include "mongo/db/exec/working_set.h"
+#include "mongo/db/exec/classic/working_set.h"
+#include "mongo/db/sorter/sorter_template_defs.h"
 
 namespace mongo {
-namespace {
-/**
- * Generates a new file name on each call using a static, atomic and monotonically increasing
- * number.
- *
- * Each user of the Sorter must implement this function to ensure that all temporary files that the
- * Sorter instances produce are uniquely identified using a unique file name extension with separate
- * atomic variable. This is necessary because the sorter.cpp code is separately included in multiple
- * places, rather than compiled in one place and linked, and so cannot provide a globally unique ID.
- */
-std::string nextFileName() {
-    static AtomicWord<unsigned> sortExecutorFileCounter;
-    return "extsort-sort-executor." + std::to_string(sortExecutorFileCounter.fetchAndAdd(1));
-}
-}  // namespace
+template class SortExecutor<Document>;
+template class SortExecutor<SortableWorkingSetMember>;
+template class SortExecutor<BSONObj>;
 }  // namespace mongo
-
-#include "mongo/db/sorter/sorter.cpp"
-
-MONGO_CREATE_SORTER(mongo::Value,
-                    mongo::Document,
-                    mongo::SortExecutor<mongo::Document>::Comparator);
-MONGO_CREATE_SORTER(mongo::Value,
-                    mongo::SortableWorkingSetMember,
-                    mongo::SortExecutor<mongo::SortableWorkingSetMember>::Comparator);
-MONGO_CREATE_SORTER(mongo::Value, mongo::BSONObj, mongo::SortExecutor<mongo::BSONObj>::Comparator);

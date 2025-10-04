@@ -32,6 +32,8 @@ _UPT_create (pid_t pid)
 {
   struct UPT_info *ui = malloc (sizeof (struct UPT_info));
 
+  mi_init ();
+
   if (!ui)
     return NULL;
 

@@ -30,8 +30,9 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * The result of checking a thing's readConcern support.  There are two parts:
@@ -100,4 +101,4 @@ struct ReadConcernSupportResult {
     }
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

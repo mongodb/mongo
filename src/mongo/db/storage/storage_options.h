@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <atomic>
+#include "mongo/platform/atomic_word.h"
+
 #include <string>
 
-#include "mongo/platform/atomic_proxy.h"
-#include "mongo/platform/atomic_word.h"
+#include <boost/filesystem/path.hpp>
 
 /*
  * This file defines the storage for options that come from the command line related to data file
@@ -46,7 +46,10 @@ namespace mongo {
 
 struct StorageGlobalParams {
     StorageGlobalParams();
-    void reset();
+    void reset_forTest();
+
+    // Returns the directory path used by the spill storage engine to store spilled data.
+    boost::filesystem::path getSpillDbPath() const;
 
     // Default data directory for mongod when running in non-config server mode.
     static const char* kDefaultDbPath;
@@ -74,11 +77,27 @@ struct StorageGlobalParams {
     // Runs a repair routine on all databases.
     bool repair;
 
-    bool dur;  // --dur durability (now --journal)
+    // --validate
+    // Runs validation on all collections.
+    bool validate;
+
+    // --restore
+    // This should only be used when restoring from a backup. Mongod will behave differently by
+    // handling collections with missing data files, allowing database renames, skipping oplog
+    // entries for collections not restored and more.
+    bool restore;
+
+    // --magicRestore
+    bool magicRestore;
+
+    // Whether the Storage Engine selected should be in-memory in nature or not.
+    bool inMemory = false;
 
     // --journalCommitInterval
+    // This parameter is both a server parameter and a configuration parameter, and to resolve
+    // conflicts between the two the default must be set here.
     static constexpr int kMaxJournalCommitIntervalMs = 500;
-    AtomicWord<int> journalCommitIntervalMs;
+    AtomicWord<int> journalCommitIntervalMs{100};
 
     // --notablescan
     // no table scans allowed
@@ -91,18 +110,20 @@ struct StorageGlobalParams {
     bool directoryperdb;
 
     // --syncdelay
-    // Controls how much time can pass before MongoDB flushes data to the data files
-    // via an fsync operation.
+    // Delay in seconds between triggering the next checkpoint after the completion of the previous
+    // one. A value of 0 indicates that checkpointing will be skipped. A value <0
+    // will result in using the default value for the configured persistence provider.
     // Do not set this value on production systems.
     // In almost every situation, you should use the default setting.
+    // This parameter is both a server parameter and a configuration parameter, and to resolve
+    // conflicts between the two, a default sentinel (<0) must be set here.
     static constexpr double kMaxSyncdelaySecs = 60 * 60;  // 1hr
-    AtomicDouble syncdelay;                               // seconds between fsyncs
+    AtomicWord<double> syncdelay{-1.0};                   // seconds between checkpoints
 
     // --queryableBackupMode
-    // Puts MongoD into "read-only" mode. MongoD will not write any data to the underlying
-    // filesystem. Note that read operations may require writes. For example, a sort on a large
-    // dataset may fail if it requires spilling to disk.
-    bool readOnly;
+    // Prevents user-originating operations from performing writes to the server. Internally
+    // generated writes are still permitted.
+    bool queryableBackupMode;
 
     // --groupCollections
     // Dictate to the storage engine that it should attempt to create new MongoDB collections from
@@ -116,16 +137,14 @@ struct StorageGlobalParams {
     // outside of the retention window which is set by this option.
     AtomicWord<double> oplogMinRetentionHours;
 
-    // Controls whether we allow the OplogStones mechanism to delete oplog history on WT.
+    // Controls whether we allow the OplogTruncateMarkers mechanism to delete oplog history on WT.
     bool allowOplogTruncation;
 
-    // Disables lock-free reads. Lock-free reads is incompatible with
-    // enableMajorityReadConcern=false.
-    bool disableLockFreeReads = false;
+    // Test-only option. Disables table logging.
+    bool forceDisableTableLogging = false;
 
-    // Delay in seconds between triggering the next checkpoint after the completion of the previous
-    // one. A value of 0 indicates that checkpointing will be skipped.
-    size_t checkpointDelaySecs;
+private:
+    void _reset();
 };
 
 extern StorageGlobalParams storageGlobalParams;

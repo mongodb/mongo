@@ -1,38 +1,46 @@
 # Section that is ignored by resmoke.py.
 config_variables:
-- &keyFile jstests/libs/authTestsKey
-- &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+  - &keyFile jstests/libs/authTestsKey
+  - &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
 
 test_kind: js_test
 
 selector:
   roots:
-  - jstests/sharding/*.js
-  - jstests/sharding/change_streams/*.js
-  - jstests/sharding/query/*.js
+    - jstests/sharding/**/*.js
   exclude_files:
-  # Skip any tests that run with auth explicitly.
-  - jstests/sharding/*[aA]uth*.js
-  - jstests/sharding/query/*[aA]uth*.js
-  - jstests/sharding/change_streams/*[aA]uth*.js
+    - jstests/sharding/**/libs/**/*.js
+    # Skip any tests that run with auth explicitly.
+    - jstests/sharding/*[aA]uth*.js
+    - jstests/sharding/analyze_shard_key/*[aA]uth*.js
+    - jstests/sharding/query/**/*[aA]uth*.js
 
-  - jstests/sharding/advance_cluster_time_action_type.js
-  - jstests/sharding/query/aggregation_currentop.js
-  - jstests/sharding/kill_sessions.js
-  # Skip these additional tests when running with auth enabled.
-  - jstests/sharding/parallel.js
-  # Skip the testcases that do not have auth bypass when running ops in parallel.
-  - jstests/sharding/migration_ignore_interrupts_1.js                 # SERVER-21713
-  - jstests/sharding/migration_ignore_interrupts_2.js                 # SERVER-21713
-  - jstests/sharding/migration_move_chunk_after_receive.js            # SERVER-21713
-  - jstests/sharding/migration_server_status.js                       # SERVER-21713
-  - jstests/sharding/migration_sets_fromMigrate_flag.js               # SERVER-21713
-  - jstests/sharding/migration_with_source_ops.js                     # SERVER-21713
-  - jstests/sharding/movechunk_interrupt_at_primary_stepdown.js       # SERVER-21713
-  - jstests/sharding/movechunk_parallel.js                            # SERVER-21713
-  - jstests/sharding/migration_critical_section_concurrency.js        # SERVER-21713
-  # Runs with auth enabled.
-  - jstests/sharding/mongod_returns_no_cluster_time_without_keys.js
+    - jstests/sharding/advance_cluster_time_action_type.js
+    - jstests/sharding/query/agg/agg_currentop.js
+    - jstests/sharding/internal_txns/internal_client_restrictions.js
+    - jstests/sharding/kill_sessions.js
+    - jstests/sharding/replica_set_promotion_demotion.js
+    - jstests/sharding/direct_shard_connection_ddls_on_replicaset.js
+    - jstests/sharding/direct_shard_connection_ddls_during_promotion_to_embedded.js
+    - jstests/sharding/direct_shard_connection_ddls_during_promotion_to_dedicated.js
+    # Skip these additional tests when running with auth enabled.
+    - jstests/sharding/parallel.js
+    # Skip the testcases that do not have auth bypass when running ops in parallel.
+    - jstests/sharding/migration_ignore_interrupts_1.js # SERVER-21713
+    - jstests/sharding/migration_ignore_interrupts_2.js # SERVER-21713
+    - jstests/sharding/migration_server_status.js # SERVER-21713
+    - jstests/sharding/migration_sets_fromMigrate_flag.js # SERVER-21713
+    - jstests/sharding/migration_with_source_ops.js # SERVER-21713
+    - jstests/sharding/movechunk_parallel.js # SERVER-21713
+    - jstests/sharding/migration_critical_section_concurrency.js # SERVER-21713
+    # Runs with auth enabled.
+    - jstests/sharding/mongod_returns_no_cluster_time_without_keys.js
+    - jstests/sharding/cluster_time_across_add_shard.js
+    # Skip because this suite implicitly authenticates as __system, which allows bypassing user write
+    # blocking.
+    - jstests/sharding/set_user_write_block_mode.js
+    # Skip because this suite sets roleGraphInvalidationIsFatal to true and this test does not enable test commands
+    - jstests/sharding/drop_config_db.js
 
 executor:
   archive:
@@ -43,8 +51,8 @@ executor:
       global_vars:
         TestData:
           auth: true
-          authMechanism: SCRAM-SHA-1
+          authMechanism: SCRAM-SHA-256
           keyFile: *keyFile
           keyFileData: *keyFileData
           roleGraphInvalidationIsFatal: true
-      nodb: ''
+      nodb: ""

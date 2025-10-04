@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 struct __wt_bloom {
     const char *uri;
     char *config;

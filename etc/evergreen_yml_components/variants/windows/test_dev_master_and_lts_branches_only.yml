@@ -1,0 +1,58 @@
+# Windows build variants for testing development environments
+#
+# After the branching variants in this file
+# should continue to run ONLY on a new LTS release (v7.0, v6.0 etc.) branch projects
+# and should NOT run on a new rapid release (v7.1, v7.2 etc.) branch projects
+
+buildvariants:
+  - name: enterprise-windows-inmem
+    display_name: Enterprise Windows Server 2022 (inMemory)
+    tags: []
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - windows-2022-small
+    expansions:
+      additional_package_targets: >-
+        archive-mongocryptd-stripped
+        archive-mongocryptd-debug
+        //src/mongo/installer/msi:mongodb-win32-x86_64-windows
+      exe: ".exe"
+      content_type: application/zip
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=windows
+      python: "/cygdrive/c/python/python310/python.exe"
+      test_flags: >-
+        --storageEngine=inMemory
+        --excludeWithAnyTags=requires_persistence,requires_journaling,incompatible_with_windows_tls
+      ext: zip
+      multiversion_platform: windows
+      multiversion_edition: enterprise
+      large_distro_name: windows-2022-large
+      compile_variant: enterprise-windows-inmem
+    tasks:
+      - name: compile_test_serial_no_unittests_TG
+        distros:
+          - windows-2022-xxlarge
+      - name: .aggfuzzer .common !.feature_flag_guarded
+      - name: audit
+      - name: auth_audit_gen
+      - name: causally_consistent_jscore_txns_passthrough
+      - name: .concurrency .common !.feature_flag_guarded
+        distros:
+          - windows-2022-large
+      - name: concurrency_replication_causal_consistency_gen
+      - name: initial_sync_fuzzer_gen
+      - name: .jscore .common !.decimal !.sharding !.requires_large_host
+      - name: .jscore .common !.decimal !.sharding .requires_large_host
+        distros:
+          - windows-2022-large
+      - name: .jstestfuzz .common !.feature_flag_guarded
+      - name: .read_write_concern .linearize !.durable_history
+      - name: replica_sets_auth_gen
+      - name: replica_sets_jscore_passthrough_gen
+      - name: replica_sets_multi_stmt_txn_jscore_passthrough_gen
+      - name: sasl
+      - name: .sharding .txns
+      - name: sharding_auth_audit_gen
+      - name: .ssl
+      - name: .resharding_fuzzer

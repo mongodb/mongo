@@ -30,14 +30,13 @@
 #       Smoke test empty row-store values.
 
 from wiredtiger import stat
-import wiredtiger, wttest, unittest
+import wttest
 
 # Smoke test empty row-store values.
 class test_row_store_empty_values(wttest.WiredTigerTestCase):
     conn_config = 'statistics=(all)'
 
     # Smoke test empty row-store values.
-    @unittest.skip("Skipping, to be removed or updated in future ticket")
     def test_row_store_empty_values(self):
         nentries = 25000
         uri = 'file:test_empty_values'          # This is a btree layer test.
@@ -55,6 +54,3 @@ class test_row_store_empty_values(wttest.WiredTigerTestCase):
         # Confirm the values weren't stored.
         cursor = self.session.open_cursor('statistics:' + uri, None, 'statistics=(tree_walk)')
         self.assertEqual(cursor[stat.dsrc.btree_row_empty_values][2], nentries)
-
-if __name__ == '__main__':
-    wttest.run()

@@ -31,7 +31,7 @@
 # aggregated_time_windows
 # [END_TAGS]
 
-from test_rollback_to_stable01 import test_rollback_to_stable_base
+from rollback_to_stable_util import test_rollback_to_stable_base
 from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
@@ -39,12 +39,11 @@ from wtscenario import make_scenarios
 # test_rollback_to_stable18.py
 # Test the rollback to stable shouldn't skip any pages that don't have aggregated time window.
 class test_rollback_to_stable18(test_rollback_to_stable_base):
-    session_config = 'isolation=snapshot'
 
     format_values = [
         ('column', dict(key_format='r', value_format='S')),
         ('column_fix', dict(key_format='r', value_format='8t')),
-        ('integer_row', dict(key_format='i', value_format='S')),
+        ('row_integer', dict(key_format='i', value_format='S')),
     ]
 
     prepare_values = [
@@ -52,21 +51,27 @@ class test_rollback_to_stable18(test_rollback_to_stable_base):
         ('prepare', dict(prepare=True))
     ]
 
-    scenarios = make_scenarios(format_values, prepare_values)
+    worker_thread_values = [
+        ('0', dict(threads=0)),
+        ('4', dict(threads=4)),
+        ('8', dict(threads=8))
+    ]
+
+    scenarios = make_scenarios(format_values, prepare_values, worker_thread_values)
 
     def conn_config(self):
-        config = 'cache_size=50MB,in_memory=true,statistics=(all),log=(enabled=false),' \
-                 'eviction_dirty_trigger=10,eviction_updates_trigger=10'
+        config = 'cache_size=50MB,in_memory=true,statistics=(all),' \
+                 'eviction_dirty_trigger=10,eviction_updates_trigger=10,verbose=(rts:5)'
         return config
 
     def test_rollback_to_stable(self):
         nrows = 10000
 
-        # Create a table without logging.
+        # Create a table.
         uri = "table:rollback_to_stable18"
-        ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
-            config='log=(enabled=false)')
+        ds_config = ',log=(enabled=false)'
+        ds = SimpleDataSet(self, uri, 0,
+            key_format=self.key_format, value_format=self.value_format, config=ds_config)
         ds.populate()
 
         if self.value_format == '8t':
@@ -85,8 +90,8 @@ class test_rollback_to_stable18(test_rollback_to_stable_base):
         self.large_removes(uri, ds, nrows, self.prepare, 30)
 
         # Verify data is visible and correct.
-        self.check(value_a, uri, nrows, None, 20)
-        self.check(None, uri, 0, nrows, 30)
+        self.check(value_a, uri, nrows, None, 21 if self.prepare else 20)
+        self.check(None, uri, 0, nrows, 31 if self.prepare else 30)
 
         # Configure debug behavior on a cursor to evict the page positioned on when the reset API is used.
         evict_cursor = self.session.open_cursor(uri, None, "debug=(release_evict)")
@@ -106,7 +111,7 @@ class test_rollback_to_stable18(test_rollback_to_stable_base):
                 ',stable_timestamp=' + self.timestamp_str(20))
 
         # Perform rollback to stable.
-        self.conn.rollback_to_stable()
+        self.conn.rollback_to_stable('threads=' + str(self.threads))
 
         # Verify data is not visible.
         self.check(value_a, uri, nrows, None, 30)

@@ -34,12 +34,6 @@
 #error This file assumes a UNICODE WIN32 build
 #endif
 
-#include "mongo/platform/basic.h"
-
-#include <string>
-#include <vector>
-#include <versionhelpers.h>
-#include <winhttp.h>
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -53,11 +47,17 @@
 #include "mongo/util/text.h"
 #include "mongo/util/winutil.h"
 
+#include <string>
+#include <vector>
+
+#include <versionhelpers.h>
+#include <winhttp.h>
+
 namespace mongo {
 namespace {
 
 const LPCWSTR kAcceptTypes[] = {
-    L"application/octet-stream",
+    L"*/*",
     nullptr,
 };
 
@@ -147,14 +147,6 @@ public:
         _headers = toNativeString(header.c_str());
     }
 
-    void setConnectTimeout(Seconds timeout) final {
-        _connectTimeout = timeout;
-    }
-
-    void setTimeout(Seconds timeout) final {
-        _timeout = timeout;
-    }
-
     HttpReply request(HttpMethod methodType, StringData urlSD, ConstDataRange cdrData) const final {
         LPCWSTR method = L"GET";
         LPVOID data = const_cast<void*>(static_cast<const void*>(cdrData.data()));
@@ -171,17 +163,28 @@ public:
             case HttpMethod::kPUT:
                 method = L"PUT";
                 break;
+            case HttpMethod::kPATCH:
+                method = L"PATCH";
+                break;
+            case HttpMethod::kDELETE:
+                uassert(ErrorCodes::BadValue,
+                        "DELETE requests do not support content",
+                        cdrData.length() == 0);
+                method = L"DELETE";
+                break;
             default:
                 MONGO_UNREACHABLE;
         }
 
-        const auto uassertWithErrno = [](StringData reason, bool ok) {
-            const auto msg = errnoWithDescription(GetLastError());
-            uassert(ErrorCodes::OperationFailed, str::stream() << reason << ": " << msg, ok);
+        const auto uassertWithLastSystemError = [](StringData reason, bool ok) {
+            auto ec = lastSystemError();
+            uassert(ErrorCodes::OperationFailed,
+                    str::stream() << reason << ": " << errorMessage(ec),
+                    ok);
         };
 
         // Break down URL for handling below.
-        const auto urlString = toNativeString(urlSD.toString().c_str());
+        const auto urlString = toNativeString(std::string{urlSD}.c_str());
         auto url = uassertStatusOK(parseUrl(urlString));
         uassert(
             ErrorCodes::BadValue, "URL endpoint must be https://", url.https || _allowInsecureHTTP);
@@ -210,23 +213,24 @@ public:
                               WINHTTP_NO_PROXY_NAME,
                               WINHTTP_NO_PROXY_BYPASS,
                               0);
-        uassertWithErrno("Failed creating an HTTP session", session);
+        uassertWithLastSystemError("Failed creating an HTTP session", session);
 
         DWORD setting;
         DWORD settingLength = sizeof(setting);
         setting = WINHTTP_OPTION_REDIRECT_POLICY_NEVER;
-        uassertWithErrno(
+        uassertWithLastSystemError(
             "Failed setting HTTP session option",
             WinHttpSetOption(session, WINHTTP_OPTION_REDIRECT_POLICY, &setting, settingLength));
 
         DWORD connectTimeout = durationCount<Milliseconds>(_connectTimeout);
         DWORD totalTimeout = durationCount<Milliseconds>(_timeout);
-        uassertWithErrno("Failed setting HTTP timeout",
-                         WinHttpSetTimeouts(
-                             session, connectTimeout, connectTimeout, totalTimeout, totalTimeout));
+        uassertWithLastSystemError(
+            "Failed setting HTTP timeout",
+            WinHttpSetTimeouts(
+                session, connectTimeout, connectTimeout, totalTimeout, totalTimeout));
 
         connect = WinHttpConnect(session, url.hostname.c_str(), url.port, 0);
-        uassertWithErrno("Failed connecting to remote host", connect);
+        uassertWithLastSystemError("Failed connecting to remote host", connect);
 
         request = WinHttpOpenRequest(connect,
                                      method,
@@ -235,7 +239,7 @@ public:
                                      WINHTTP_NO_REFERER,
                                      const_cast<LPCWSTR*>(kAcceptTypes),
                                      url.https ? WINHTTP_FLAG_SECURE : 0);
-        uassertWithErrno("Failed initializing HTTP request", request);
+        uassertWithLastSystemError("Failed initializing HTTP request", request);
 
         if (!url.username.empty() || !url.password.empty()) {
             auto result = WinHttpSetCredentials(request,
@@ -244,53 +248,53 @@ public:
                                                 url.username.c_str(),
                                                 url.password.c_str(),
                                                 0);
-            uassertWithErrno("Failed setting authentication credentials", result);
+            uassertWithLastSystemError("Failed setting authentication credentials", result);
         }
 
-        uassertWithErrno(
+        uassertWithLastSystemError(
             "Failed sending HTTP request",
             WinHttpSendRequest(request, _headers.c_str(), -1L, data, data_len, data_len, 0));
 
         if (!WinHttpReceiveResponse(request, nullptr)) {
             // Carve out timeout which doesn't translate well.
-            const auto err = GetLastError();
-            if (err == ERROR_WINHTTP_TIMEOUT) {
+            auto ec = lastSystemError();
+            if (ec == systemError(ERROR_WINHTTP_TIMEOUT)) {
                 uasserted(ErrorCodes::OperationFailed, "Timeout was reached");
             }
-            const auto msg = errnoWithDescription(err);
             uasserted(ErrorCodes::OperationFailed,
                       str::stream() << "Failed receiving response from server"
-                                    << ": " << msg);
+                                    << ": " << errorMessage(ec));
         }
 
         DWORD statusCode = 0;
         DWORD statusCodeLength = sizeof(statusCode);
 
-        uassertWithErrno("Error querying status from server",
-                         WinHttpQueryHeaders(request,
-                                             WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
-                                             WINHTTP_HEADER_NAME_BY_INDEX,
-                                             &statusCode,
-                                             &statusCodeLength,
-                                             WINHTTP_NO_HEADER_INDEX));
+        uassertWithLastSystemError(
+            "Error querying status from server",
+            WinHttpQueryHeaders(request,
+                                WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+                                WINHTTP_HEADER_NAME_BY_INDEX,
+                                &statusCode,
+                                &statusCodeLength,
+                                WINHTTP_NO_HEADER_INDEX));
 
         DWORD len = 0;
         std::vector<char> buffer;
         DataBuilder ret(4096);
         for (;;) {
             len = 0;
-            uassertWithErrno("Failed receiving response data",
-                             WinHttpQueryDataAvailable(request, &len));
+            uassertWithLastSystemError("Failed receiving response data",
+                                       WinHttpQueryDataAvailable(request, &len));
             if (!len) {
                 break;
             }
 
             buffer.resize(len);
-            uassertWithErrno("Failed reading response data",
-                             WinHttpReadData(request, buffer.data(), len, &len));
+            uassertWithLastSystemError("Failed reading response data",
+                                       WinHttpReadData(request, buffer.data(), len, &len));
 
             ConstDataRange cdr(buffer.data(), len);
-            ret.writeAndAdvance(cdr);
+            uassertStatusOK(ret.writeAndAdvance(cdr));
         }
 
         DataBuilder headers(4096);
@@ -302,14 +306,14 @@ public:
                                  WINHTTP_NO_HEADER_INDEX) &&
             (GetLastError() == ERROR_INSUFFICIENT_BUFFER)) {
             buffer.resize(len);
-            uassertWithErrno("Error querying headers from server",
-                             WinHttpQueryHeaders(request,
-                                                 WINHTTP_QUERY_RAW_HEADERS_CRLF,
-                                                 WINHTTP_HEADER_NAME_BY_INDEX,
-                                                 &buffer[0],
-                                                 &len,
-                                                 WINHTTP_NO_HEADER_INDEX));
-            headers.writeAndAdvance(ConstDataRange(buffer.data(), len));
+            uassertWithLastSystemError("Error querying headers from server",
+                                       WinHttpQueryHeaders(request,
+                                                           WINHTTP_QUERY_RAW_HEADERS_CRLF,
+                                                           WINHTTP_HEADER_NAME_BY_INDEX,
+                                                           &buffer[0],
+                                                           &len,
+                                                           WINHTTP_NO_HEADER_INDEX));
+            uassertStatusOK(headers.writeAndAdvance(ConstDataRange(buffer.data(), len)));
         }
 
         return HttpReply(statusCode, std::move(headers), std::move(ret));
@@ -318,8 +322,6 @@ public:
 private:
     bool _allowInsecureHTTP = false;
     std::wstring _headers;
-    Seconds _connectTimeout = kConnectionTimeout;
-    Seconds _timeout = kTotalRequestTimeout;
 };
 
 class HttpClientProviderImpl : public HttpClientProvider {
@@ -336,9 +338,13 @@ public:
         return std::make_unique<WinHttpClient>();
     }
 
+    std::unique_ptr<HttpClient> createWithFirewall(
+        [[maybe_unused]] const std::vector<CIDR>& cidrDenyList) final {
+        MONGO_UNIMPLEMENTED;
+    }
+
     BSONObj getServerStatus() final {
-        return BSON("type"
-                    << "winhttp");
+        return BSON("type" << "winhttp");
     }
 
 } provider;

@@ -52,6 +52,7 @@
  *******************************************************/
 
 .text
+.private_extern _ontop_fcontext
 .global _ontop_fcontext
 .balign 16
 _ontop_fcontext:

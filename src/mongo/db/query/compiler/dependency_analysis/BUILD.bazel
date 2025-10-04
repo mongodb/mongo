@@ -1,0 +1,41 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "dependencies",
+    srcs = [
+        "dependencies.cpp",
+    ],
+    hdrs = [
+        "dependencies.h",
+    ],
+    deps = [
+        "//src/mongo/db/exec/document_value",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/pipeline:field_path",
+    ],
+)
+
+mongo_cc_library(
+    name = "dependency_analysis",
+    srcs = [
+        "expression_dependencies.cpp",
+        "match_expression_dependencies.cpp",
+    ],
+    hdrs = [
+        "expression_dependencies.h",
+        "match_expression_dependencies.h",
+    ],
+    deps = [
+        ":dependencies",
+        "//src/mongo:base",
+        "//src/mongo/db:query_expressions",
+    ],
+)

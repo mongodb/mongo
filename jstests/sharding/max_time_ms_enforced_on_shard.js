@@ -3,8 +3,7 @@
 // not just on the mongos.
 //
 
-(function() {
-'use strict';
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = "test";
 const collName = "coll";
@@ -14,15 +13,14 @@ const mongosDB = st.s0.getDB(dbName);
 let coll = mongosDB.getCollection(collName);
 
 const sessionOptions = {
-    causalConsistency: false
+    causalConsistency: false,
 };
 const session = mongosDB.getMongo().startSession(sessionOptions);
 const sessionDb = session.getDatabase(dbName);
 const sessionColl = sessionDb[collName];
 
 // Disable maxTime enforcement on mongos so we can verify it's happening on mongod.
-assert.commandWorked(
-    mongosDB.adminCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: 'alwaysOn'}));
+assert.commandWorked(mongosDB.adminCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: "alwaysOn"}));
 
 jsTestLog("Creating collection with insert.");
 assert.commandWorked(sessionColl.insert({_id: 0}));
@@ -34,7 +32,8 @@ assert.commandWorked(sessionColl.insert({_id: 1}));
 jsTestLog("Run a separate write.");
 assert.commandFailedWithCode(
     coll.runCommand({insert: collName, documents: [{_id: 1, nonTxn: 1}], maxTimeMS: 1000}),
-    ErrorCodes.MaxTimeMSExpired);
+    ErrorCodes.MaxTimeMSExpired,
+);
 
 jsTestLog("Aborting the transaction.");
 session.abortTransaction();
@@ -48,4 +47,3 @@ let docs = coll.find().toArray();
 assert.sameMembers(docs, [{_id: 0}]);
 
 st.stop();
-})();

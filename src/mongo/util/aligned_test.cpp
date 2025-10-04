@@ -29,10 +29,13 @@
 
 #include "mongo/util/aligned.h"
 
-#include <utility>
-
 #include "mongo/base/static_assert.h"
+#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
+
+#include <cstdint>
+#include <utility>
+#include <variant>
 
 namespace mongo {
 namespace {
@@ -104,10 +107,10 @@ TEST(Aligned, Swap) {
     ASSERT_EQ(m2->val, 111);
 }
 
-TEST(CacheAligned, IsAlignedToPlatformCacheLine) {
+TEST(CacheExclusive, IsAlignedToPlatformCacheLine) {
     static constexpr size_t a = stdx::hardware_destructive_interference_size;
-    MONGO_STATIC_ASSERT(alignof(CacheAligned<char>) == a);
-    MONGO_STATIC_ASSERT(alignof(CacheAligned<char>) == a);
+    MONGO_STATIC_ASSERT(alignof(CacheExclusive<char>) == a);
+    MONGO_STATIC_ASSERT(alignof(CacheExclusive<char>) == a);
 }
 
 }  // namespace

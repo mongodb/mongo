@@ -27,17 +27,25 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/db/query/write_ops/insert.h"
 
-#include "mongo/bson/bson_depth.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/client.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/ops/insert.h"
+#include "mongo/db/local_catalog/catalog_raii.h"
+#include "mongo/db/local_catalog/lock_manager/d_concurrency.h"
+#include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/unittest/unittest.h"
+
+#include <cstddef>
 
 namespace mongo {
 namespace {
-const auto kInsertTestNss = NamespaceString{"dbtests.InsertTest"};
+const auto kInsertTestNss = NamespaceString::createNamespaceString_forTest("dbtests.InsertTest");
 
 class InsertTest : public unittest::Test {
 public:

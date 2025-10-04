@@ -30,19 +30,19 @@
 #   Transactions: different sync modes
 #
 
-import fnmatch, os, shutil, time
 from suite_subprocess import suite_subprocess
 from wiredtiger import stat
 from wtscenario import make_scenarios
 import wttest
 
+@wttest.skip_for_hook("disagg", "this test checks logging stats, which are not relevant for disagg tables")
 class test_txn15(wttest.WiredTigerTestCase, suite_subprocess):
     uri = 'table:test_txn15_1'
     entries = 100
     # Turn on logging for this test.
     def conn_config(self):
         return 'statistics=(fast),' + \
-            'log=(archive=false,enabled,file_max=100K),' + \
+            'log=(enabled,file_max=100K,remove=false),' + \
             'use_environment=false,' + \
             'transaction_sync=(enabled=%s),' % self.conn_enable + \
             'transaction_sync=(method=%s),' % self.conn_method
@@ -158,6 +158,3 @@ class test_txn15(wttest.WiredTigerTestCase, suite_subprocess):
                 self.assertNotEqual(sync1, sync2)
         else:
             self.assertEqual(write1, write2)
-
-if __name__ == '__main__':
-    wttest.run()

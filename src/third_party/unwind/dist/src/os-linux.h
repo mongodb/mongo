@@ -38,7 +38,7 @@ struct map_iterator
   };
 
 static inline char *
-ltoa (char *buf, long val)
+unw_ltoa (char *buf, long val)
 {
   char *cp = buf, tmp;
   ssize_t i, len;
@@ -68,7 +68,7 @@ maps_init (struct map_iterator *mi, pid_t pid)
   char path[sizeof ("/proc/0123456789/maps")], *cp;
 
   memcpy (path, "/proc/", 6);
-  cp = ltoa (path + 6, pid);
+  cp = unw_ltoa (path + 6, pid);
   assert (cp + 6 < path + sizeof (path));
   memcpy (cp, "/maps", 6);
 
@@ -77,9 +77,8 @@ maps_init (struct map_iterator *mi, pid_t pid)
     {
       /* Try to allocate a page-sized buffer.  */
       mi->buf_size = getpagesize ();
-      cp = mmap (NULL, mi->buf_size, PROT_READ | PROT_WRITE,
-                 MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-      if (cp == MAP_FAILED)
+      GET_MEMORY (cp, mi->buf_size);
+      if (!cp)
         {
           close(mi->fd);
           mi->fd = -1;
@@ -120,10 +119,10 @@ scan_hex (char *cp, unsigned long *valp)
       digit = *cp;
       if ((digit - '0') <= 9)
         digit -= '0';
-      else if ((digit - 'a') < 6)
-        digit -= 'a' - 10;
       else if ((digit - 'A') < 6)
         digit -= 'A' - 10;
+      else if ((digit - 'a') < 6)
+        digit -= 'a' - 10;
       else
         break;
       val = (val << 4) | digit;
@@ -201,7 +200,8 @@ scan_string (char *cp, char *valp, size_t buf_size)
 
 static inline int
 maps_next (struct map_iterator *mi,
-           unsigned long *low, unsigned long *high, unsigned long *offset)
+           unsigned long *low, unsigned long *high, unsigned long *offset,
+           unsigned long *flags)
 {
   char perm[16], dash = 0, colon = 0, *cp;
   unsigned long major, minor, inum;
@@ -275,6 +275,22 @@ maps_next (struct map_iterator *mi,
       cp = scan_string (cp, NULL, 0);
       if (dash != '-' || colon != ':')
         continue;       /* skip line with unknown or bad format */
+      if (flags)
+        {
+          *flags = 0;
+          if (perm[0] == 'r')
+            {
+              *flags |= PROT_READ;
+            }
+          if (perm[1] == 'w')
+            {
+              *flags |= PROT_WRITE;
+            }
+          if (perm[2] == 'x')
+            {
+              *flags |= PROT_EXEC;
+            }
+        }
       return 1;
     }
   return 0;
@@ -289,7 +305,7 @@ maps_close (struct map_iterator *mi)
   mi->fd = -1;
   if (mi->buf)
     {
-      munmap (mi->buf_end - mi->buf_size, mi->buf_size);
+      mi_munmap (mi->buf_end - mi->buf_size, mi->buf_size);
       mi->buf = mi->buf_end = NULL;
     }
 }

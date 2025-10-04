@@ -27,16 +27,25 @@
  *    it in the license file.
  */
 
-#include <memory>
-
-#include "mongo/db/client.h"
 #include "mongo/db/client_out_of_line_executor.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/thread_name.h"
+
+#include <memory>
+#include <string>
+#include <thread>
+#include <utility>
 
 namespace mongo {
 namespace {
@@ -72,7 +81,7 @@ public:
 
     void setUp() override {
         setGlobalServiceContext(ServiceContext::make());
-        Client::initThread(kClientThreadName);
+        Client::initThread(kClientThreadName, getGlobalServiceContext()->getService());
         _instanceCount.store(0);
     }
 
@@ -122,7 +131,7 @@ TEST_F(ClientOutOfLineExecutorTest, DestructorExecutesLeftovers) {
     unittest::Barrier b1(2), b2(2);
 
     auto thread = stdx::thread([this, kDummiesCount, b1 = &b1, b2 = &b2]() {
-        Client::initThread("ThreadWithLeftovers"_sd);
+        Client::initThread("ThreadWithLeftovers"_sd, getGlobalServiceContext()->getService());
 
         auto handle = ClientOutOfLineExecutor::get(Client::getCurrent())->getHandle();
         for (auto i = 0; i < kDummiesCount; i++) {
@@ -152,7 +161,7 @@ TEST_F(ClientOutOfLineExecutorTest, ScheduleAfterClientThreadReturns) {
     ClientOutOfLineExecutor::QueueHandle handle;
 
     auto thread = stdx::thread([&handle]() mutable {
-        Client::initThread("ClientThread"_sd);
+        Client::initThread("ClientThread"_sd, getGlobalServiceContext()->getService());
         handle = ClientOutOfLineExecutor::get(Client::getCurrent())->getHandle();
         // Return to destroy the client, and close the task queue.
     });

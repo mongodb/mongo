@@ -1,20 +1,16 @@
 // Test that queryExecStats within a $collStats stage returns the correct execution stats.
 // @tags: [
 //   assumes_no_implicit_collection_creation_after_drop,
+//   does_not_support_repeated_reads,
 // ]
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For "assertErrorCode".
-load("jstests/libs/fixture_helpers.js");      // For "FixtureHelpers".
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const nDocs = 32;
 
 const testDB = db.getSiblingDB("aggregation_query_exec_stats");
 const coll = testDB.aggregation_query_exec_stats;
 coll.drop();
-assert.commandWorked(
-    testDB.createCollection("aggregation_query_exec_stats", {capped: true, size: nDocs * 100}));
+assert.commandWorked(testDB.createCollection("aggregation_query_exec_stats", {capped: true, size: nDocs * 100}));
 
 for (let i = 0; i < nDocs; i++) {
     assert.commandWorked(coll.insert({a: i}));
@@ -49,7 +45,7 @@ assert.eq(nDocs, result.queryExecStats.collectionScans.nonTailable);
 // that the getMore commands don't increment the counter of collection scans.
 assert.eq(coll.find({}).batchSize(2).itcount(), nDocs);
 result = coll.aggregate(pipeline).next();
-assert.eq((nDocs * 2) + 1, result.queryExecStats.collectionScans.total);
+assert.eq(nDocs * 2 + 1, result.queryExecStats.collectionScans.total);
 assert.eq(nDocs + 1, result.queryExecStats.collectionScans.nonTailable);
 
 // Create index to test that index scans don't up the collection scan counter.
@@ -60,7 +56,7 @@ for (let i = 0; i < nDocs; i++) {
 }
 result = coll.aggregate(pipeline).next();
 // Assert that the number of collection scans hasn't increased.
-assert.eq((nDocs * 2) + 1, result.queryExecStats.collectionScans.total);
+assert.eq(nDocs * 2 + 1, result.queryExecStats.collectionScans.total);
 assert.eq(nDocs + 1, result.queryExecStats.collectionScans.nonTailable);
 
 // Test that we error when the collection does not exist.
@@ -71,4 +67,3 @@ assertErrorCode(coll, pipeline, ErrorCodes.NamespaceNotFound);
 // Test that we error when the database does not exist.
 assert.commandWorked(testDB.dropDatabase());
 assertErrorCode(coll, pipeline, ErrorCodes.NamespaceNotFound);
-}());

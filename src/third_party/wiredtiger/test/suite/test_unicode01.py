@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import sys, wiredtiger, wtscenario, wttest
+import wttest
 
 # test_unicode01.py
 #   Make sure UTF8 config can be passed to WT_SESSION::create.
@@ -37,6 +37,3 @@ class test_unicode01(wttest.WiredTigerTestCase):
         # the Unicode standard.
         metadata_string = u'app_metadata={"name" : "Employ\u222b\u67d2\ud4db"}'
         self.session.create('table:t', metadata_string)
-
-if __name__ == '__main__':
-    wttest.run()

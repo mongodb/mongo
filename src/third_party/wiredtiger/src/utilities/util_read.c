@@ -8,13 +8,23 @@
 
 #include "util.h"
 
+/*
+ * usage --
+ *     Display a usage message for the read command.
+ */
 static int
 usage(void)
 {
-    util_usage("read uri key ...", NULL, NULL);
+    static const char *options[] = {"-?", "show this message", NULL, NULL};
+
+    util_usage("read uri key ...", "options:", options);
     return (1);
 }
 
+/*
+ * util_read --
+ *     The read command.
+ */
 int
 util_read(WT_SESSION *session, int argc, char *argv[])
 {
@@ -26,9 +36,11 @@ util_read(WT_SESSION *session, int argc, char *argv[])
     bool rkey, rval;
 
     uri = NULL;
-    while ((ch = __wt_getopt(progname, argc, argv, "")) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "?")) != EOF)
         switch (ch) {
         case '?':
+            usage();
+            return (0);
         default:
             return (usage());
         }
@@ -46,7 +58,7 @@ util_read(WT_SESSION *session, int argc, char *argv[])
      */
     if ((ret = session->open_cursor(session, uri, NULL, NULL, &cursor)) != 0)
         (void)util_err(session, ret, "%s: session.open_cursor", uri);
-    free(uri);
+    util_free(uri);
     if (ret != 0)
         return (ret);
 

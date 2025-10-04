@@ -31,6 +31,7 @@
 
 #include "mongo/platform/atomic_word.h"
 
+#include <cstdint>
 #include <utility>
 
 namespace mongo {

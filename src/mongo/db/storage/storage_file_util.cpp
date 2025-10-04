@@ -27,23 +27,34 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 #include "mongo/db/storage/storage_file_util.h"
 
 #include <cerrno>
-#include <cstring>
+#include <string>
+#include <system_error>
+
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
 #ifdef __linux__
 #include <fcntl.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 #endif
 
-#include <boost/filesystem/path.hpp>
-
+#include "mongo/base/error_codes.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
+#include "mongo/util/errno_util.h"
 #include "mongo/util/file.h"
+#include "mongo/util/str.h"
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
+
 
 namespace mongo {
 
@@ -71,20 +82,21 @@ Status fsyncParentDirectory(const boost::filesystem::path& file) {
 
     int fd = ::open(dir.string().c_str(), O_RDONLY);
     if (fd < 0) {
+        auto ec = lastPosixError();
         return {ErrorCodes::FileOpenFailed,
                 str::stream() << "Failed to open directory " << dir.string()
-                              << " for flushing: " << errnoWithDescription()};
+                              << " for flushing: " << errorMessage(ec)};
     }
     if (fsync(fd) != 0) {
-        int e = errno;
-        if (e == EINVAL) {
+        auto ec = lastPosixError();
+        if (ec == posixError(EINVAL)) {
             LOGV2_WARNING(22290,
                           "Could not fsync directory because this file system is not supported.");
         } else {
             close(fd);
             return {ErrorCodes::OperationFailed,
                     str::stream() << "Failed to fsync directory '" << dir.string()
-                                  << "': " << errnoWithDescription(e)};
+                                  << "': " << errorMessage(ec)};
         }
     }
     close(fd);

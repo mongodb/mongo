@@ -27,14 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/rpc/message.h"
 
-#include <fmt/format.h>
-
+#include "mongo/bson/bsonobj.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/op_msg.h"
+
+#include <ostream>
+#include <vector>
+
+#include <fmt/format.h>
 
 namespace mongo {
 
@@ -76,7 +78,7 @@ std::string Message::opMsgDebugString() const {
         headerView.getLen(),
         headerView.getId(),
         headerView.getResponseToMsgId(),
-        headerView.getNetworkOp(),
+        fmt::underlying(headerView.getNetworkOp()),
         OpMsg::flags(*this),
         opMsgRequest.body.toString(),
         docSequences.str());

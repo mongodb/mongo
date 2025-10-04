@@ -37,8 +37,10 @@
 
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
-namespace mongo::overflow {
+namespace MONGO_MOD_PUB mongo {
+namespace overflow {
 
 /**
  * Synopsis:
@@ -95,4 +97,5 @@ constexpr T safeMod(T dividend, T divisor) {
     return (divisor == 1 || divisor == -1 ? 0 : dividend % divisor);
 }
 
-}  // namespace mongo::overflow
+}  // namespace overflow
+}  // namespace MONGO_MOD_PUB mongo

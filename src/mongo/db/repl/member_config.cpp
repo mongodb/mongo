@@ -27,17 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/repl/member_config.h"
 
-#include <boost/algorithm/string.hpp>
-
-#include "mongo/bson/util/bson_check.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <boost/algorithm/string/trim.hpp>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace repl {
@@ -59,9 +63,9 @@ MemberConfig MemberConfig::parseFromBSON(const BSONObj& mcfg) {
 }
 
 MemberConfig::MemberConfig(const BSONObj& mcfg) {
-    parseProtected(IDLParserErrorContext("MemberConfig"), mcfg);
+    parseProtected(mcfg, IDLParserContext("MemberConfig"));
 
-    std::string hostAndPortString = getHost().toString();
+    std::string hostAndPortString = std::string{getHost()};
     boost::trim(hostAndPortString);
     HostAndPort host;
     uassertStatusOK(host.initialize(hostAndPortString));
@@ -116,8 +120,8 @@ void MemberConfig::addTagInfo(ReplSetTagConfig* tagConfig) {
     // Parse "tags" field.
     //
     if (getTags()) {
-        for (auto&& tag : getTags().get()) {
-            if (tag.type() != String) {
+        for (auto&& tag : getTags().value()) {
+            if (tag.type() != BSONType::string) {
                 uasserted(ErrorCodes::TypeMismatch,
                           str::stream()
                               << "tags." << tag.fieldName()
@@ -198,8 +202,8 @@ BSONObj MemberConfig::toBSON(bool omitNewlyAddedField) const {
 
     if (!omitNewlyAddedField && getNewlyAdded()) {
         // We should never have _newlyAdded if automatic reconfigs aren't enabled.
-        invariant(getNewlyAdded().get());
-        configBuilder.append(kNewlyAddedFieldName, getNewlyAdded().get());
+        invariant(getNewlyAdded().value());
+        configBuilder.append(kNewlyAddedFieldName, getNewlyAdded().value());
     }
 
     configBuilder.append(kBuildIndexesFieldName, getBuildIndexes());
@@ -212,7 +216,7 @@ BSONObj MemberConfig::toBSON(bool omitNewlyAddedField) const {
     _splitHorizon.toBSON(configBuilder);
 
     if (getSecondaryDelaySecs()) {
-        configBuilder.append(kSecondaryDelaySecsFieldName, getSecondaryDelaySecs().get());
+        configBuilder.append(kSecondaryDelaySecsFieldName, getSecondaryDelaySecs().value());
     }
 
     configBuilder.append(kVotesFieldName, MemberConfigBase::getVotes() ? 1 : 0);

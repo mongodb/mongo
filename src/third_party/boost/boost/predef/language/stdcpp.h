@@ -15,7 +15,7 @@ http://www.boost.org/LICENSE_1_0.txt)
 = `BOOST_LANG_STDCPP`
 
 http://en.wikipedia.org/wiki/C%2B%2B[Standard {CPP}] language.
-If available, the year of the standard is detected as YYYY.MM.1 from the Epoc date.
+If available, the year of the standard is detected as YYYY.MM.1 from the Epoch date.
 Because of the way the {CPP} standardization process works the
 defined version year will not be the commonly known year of the standard.
 Specifically the defined versions are:
@@ -61,7 +61,7 @@ Specifically the defined versions are:
 = `BOOST_LANG_STDCPPCLI`
 
 http://en.wikipedia.org/wiki/C%2B%2B/CLI[Standard {CPP}/CLI] language.
-If available, the year of the standard is detected as YYYY.MM.1 from the Epoc date.
+If available, the year of the standard is detected as YYYY.MM.1 from the Epoch date.
 
 [options="header"]
 |===

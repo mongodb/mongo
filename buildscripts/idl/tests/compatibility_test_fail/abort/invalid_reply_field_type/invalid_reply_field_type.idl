@@ -30,15 +30,16 @@ global:
     cpp_namespace: "mongo"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 structs:
     InvalidFieldTypeReply:
         description: "This reply contains a field where the type is invalid"
+        is_command_reply: true
         fields:
             invalidReplyField:
                 type: None
-
+                stability: stable
 commands:
     replyFieldTypeInvalid:
         description: "This command aborts because its reply field type is invalid"

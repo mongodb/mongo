@@ -4,8 +4,7 @@
  *
  * @tags: [uses_transactions]
  */
-(function() {
-"use strict";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const dbName = "test";
 const collName = "transactions_on_secondaries_not_allowed";
@@ -23,20 +22,21 @@ const secondaryTestDB = secondary.getDB(dbName);
 
 // Do an initial write so we have something to find.
 const initialDoc = {
-    _id: 0
+    _id: 0,
 };
 assert.commandWorked(primary.getDB(dbName)[collName].insert(initialDoc));
 rst.awaitLastOpCommitted();
 
 // Disable the best-effort check for primary-ness in the service entry point, so that we
 // exercise the real check for primary-ness in TransactionParticipant::beginOrContinue.
-assert.commandWorked(secondary.adminCommand(
-    {configureFailPoint: "skipCheckingForNotPrimaryInCommandDispatch", mode: "alwaysOn"}));
+assert.commandWorked(
+    secondary.adminCommand({configureFailPoint: "skipCheckingForNotPrimaryInCommandDispatch", mode: "alwaysOn"}),
+);
 
 // Initiate a session on the secondary.
 const sessionOptions = {
     causalConsistency: false,
-    retryWrites: true
+    retryWrites: true,
 };
 const session = secondaryTestDB.getMongo().startSession(sessionOptions);
 const sessionDb = session.getDatabase(dbName);
@@ -83,8 +83,7 @@ assert.commandFailedWithCode(sessionDb.foo.insert({_id: 0}), ErrorCodes.NotWrita
  */
 
 jsTestLog("Start a read with txnNumber but without autocommit");
-assert.commandFailedWithCode(sessionDb.runCommand({find: 'foo', txnNumber: NumberLong(10)}), 50768);
+assert.commandFailedWithCode(sessionDb.runCommand({find: "foo", txnNumber: NumberLong(10)}), 50768);
 
 session.endSession();
 rst.stopSet(undefined, false, {skipValidation: true});
-}());

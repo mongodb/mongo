@@ -31,7 +31,6 @@
 # able to write them.  Expect an error over 4Gb.
 #
 
-#import fnmatch, os, shutil, run, time
 from suite_subprocess import suite_subprocess
 from wtscenario import make_scenarios
 import wiredtiger, wttest
@@ -60,7 +59,7 @@ class test_txn13(wttest.WiredTigerTestCase, suite_subprocess):
 
     # Turn on logging for this test.
     def conn_config(self):
-        return 'log=(archive=false,enabled,file_max=%s)' % self.logmax + \
+        return 'log=(enabled,file_max=%s,remove=false)' % self.logmax + \
             ',cache_size=20G,eviction_dirty_trigger=100'
 
     @wttest.longtest('txn tests with huge values')
@@ -91,7 +90,5 @@ class test_txn13(wttest.WiredTigerTestCase, suite_subprocess):
         else:
             self.session.commit_transaction()
 
+        self.ignoreStdoutPatternIfExists('Eviction took more than 1 minute')
         self.assertTrue(gotException == self.expect_err)
-
-if __name__ == '__main__':
-    wttest.run()

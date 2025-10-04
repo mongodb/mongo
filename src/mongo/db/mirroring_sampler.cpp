@@ -27,35 +27,45 @@
  *    it in the license file.
  */
 
-#include <cmath>
-#include <cstdlib>
-
 #include "mongo/db/mirroring_sampler.h"
+
+#include "mongo/db/mirror_maestro_feature_flags_gen.h"
+#include "mongo/util/assert_util.h"
+
+#include <chrono>
+#include <cmath>
+#include <utility>
 
 namespace mongo {
 
-MirroringSampler::SamplingParameters::SamplingParameters(const double ratio_,
+MirroringSampler::SamplingParameters::SamplingParameters(const double generalRatio_,
+                                                         const double targetedRatio_,
                                                          const int rndMax,
                                                          const int rndValue)
-    : ratio{ratio_}, max{rndMax}, value{rndValue} {
+    : generalRatio{generalRatio_}, targetedRatio{targetedRatio_}, max{rndMax}, value{rndValue} {
 
-    invariant(ratio <= 1.0);
-    invariant(ratio >= 0.0);
+    invariant(generalRatio <= 1.0);
+    invariant(generalRatio >= 0.0);
+
+    invariant(targetedRatio <= 1.0);
+    invariant(targetedRatio >= 0.0);
 
     invariant(value <= max);
     invariant(value >= 0);
 }
 
-MirroringSampler::SamplingParameters::SamplingParameters(const double ratio,
+MirroringSampler::SamplingParameters::SamplingParameters(const double generalRatio,
+                                                         const double targetedRatio,
                                                          const int rndMax,
                                                          RandomFunc rnd)
-    : SamplingParameters(ratio, rndMax, [&] {
-          if (ratio == 0.0) {
+    : SamplingParameters(generalRatio, targetedRatio, rndMax, [&] {
+          if (generalRatio == 0.0 && targetedRatio == 0.0) {
               // We should never sample, avoid invoking rnd().
               return rndMax;
           }
 
-          if (ratio == 1.0) {
+          if ((generalRatio == 1.0 && (targetedRatio == 0.0 || targetedRatio == 1.0)) ||
+              (targetedRatio == 1.0 && (generalRatio == 0.0 || generalRatio == 1.0))) {
               // We should always sample, avoid invoking rnd().
               return 0;
           }
@@ -63,32 +73,42 @@ MirroringSampler::SamplingParameters::SamplingParameters(const double ratio,
           return std::move(rnd)();
       }()) {}
 
-bool MirroringSampler::shouldSample(const std::shared_ptr<const repl::HelloResponse>& helloResp,
-                                    const SamplingParameters& params) const noexcept {
-    if (!helloResp) {
-        // If we don't have a HelloResponse, we can't know where to send our mirrored request.
-        return false;
+MirroringSampler::MirroringMode MirroringSampler::getMirrorMode(
+    const std::shared_ptr<const repl::HelloResponse>& helloResp,
+    const SamplingParameters& params) const {
+    MirroringMode mode;
+
+    if (helloResp && params.generalRatio != 0) {
+        const int secondariesCount = helloResp->getHosts().size() - 1;
+        if (secondariesCount < 1) {
+            // There are no eligible nodes to mirror to
+            return mode;
+        }
+
+        // Adjust ratio to mirror read requests to approximately `samplingRate x secondariesCount`.
+        const auto secondariesRatio = secondariesCount * params.generalRatio;
+        const auto mirroringFactor = std::ceil(secondariesRatio);
+        invariant(mirroringFactor > 0 && mirroringFactor <= secondariesCount);
+        const double adjustedRatio = secondariesRatio / mirroringFactor;
+        if (helloResp->isWritablePrimary() &&
+            (params.value < static_cast<int>(params.max * adjustedRatio))) {
+            mode.generalEnabled = true;
+        }
     }
 
-    const auto secondariesCount = helloResp->getHosts().size() - 1;
-    if (!helloResp->isWritablePrimary() || secondariesCount < 1) {
-        // If this is not the primary, or there are no eligible secondaries, nothing more to do.
-        return false;
+    if (!gFeatureFlagTargetedMirrorReads.isEnabled()) {
+        return mode;
     }
-    invariant(secondariesCount > 0);
 
-    // Adjust ratio to mirror read requests to approximately `samplingRate x secondariesCount`.
-    const auto secondariesRatio = secondariesCount * params.ratio;
-    const auto mirroringFactor = std::ceil(secondariesRatio);
-    invariant(mirroringFactor > 0 && mirroringFactor <= secondariesCount);
-    const double adjustedRatio = secondariesRatio / mirroringFactor;
+    if (params.value < static_cast<int>(params.max * params.targetedRatio)) {
+        mode.targetedEnabled = true;
+    }
 
-    // If our value is less than our max, then take a sample.
-    return params.value < static_cast<int>(params.max * adjustedRatio);
+    return mode;
 }
 
-std::vector<HostAndPort> MirroringSampler::getRawMirroringTargets(
-    const std::shared_ptr<const repl::HelloResponse>& helloResp) noexcept {
+std::vector<HostAndPort> MirroringSampler::getRawMirroringTargetsForGeneralMode(
+    const std::shared_ptr<const repl::HelloResponse>& helloResp) {
     invariant(helloResp);
     if (!helloResp->isWritablePrimary()) {
         // Don't mirror if we're not primary
@@ -113,20 +133,22 @@ std::vector<HostAndPort> MirroringSampler::getRawMirroringTargets(
     return potentialTargets;
 }
 
-std::vector<HostAndPort> MirroringSampler::getMirroringTargets(
+std::vector<HostAndPort> MirroringSampler::getGeneralMirroringTargets(
     const std::shared_ptr<const repl::HelloResponse>& helloResp,
-    const double ratio,
+    const double generalRatio,
+    const double targetedRatio,
     RandomFunc rnd,
-    const int rndMax) noexcept {
+    const int rndMax) {
 
     auto sampler = MirroringSampler();
 
-    auto samplingParams = SamplingParameters(ratio, rndMax, std::move(rnd));
-    if (!sampler.shouldSample(helloResp, samplingParams)) {
+    auto samplingParams = SamplingParameters(generalRatio, targetedRatio, rndMax, std::move(rnd));
+    auto mirrorMode = sampler.getMirrorMode(helloResp, samplingParams);
+    if (!mirrorMode.generalEnabled) {
         return {};
     }
 
-    return sampler.getRawMirroringTargets(helloResp);
+    return sampler.getRawMirroringTargetsForGeneralMode(helloResp);
 }
 
 }  // namespace mongo

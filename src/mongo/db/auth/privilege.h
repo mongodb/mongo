@@ -29,17 +29,30 @@
 
 #pragma once
 
-#include <vector>
-
-#include "mongo/bson/mutable/element.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/exec/mutable_bson/element.h"
+#include "mongo/db/tenant_id.h"
+
+#include <string>
+#include <vector>
+
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
 class Privilege;
-typedef std::vector<Privilege> PrivilegeVector;
+class TenantId;
+
+using PrivilegeVector = std::vector<Privilege>;
+
+namespace auth {
+class ParsedPrivilege;
+}  // namespace auth
 
 /**
  * A representation of the permission to perform a set of actions on a resource.
@@ -59,11 +72,18 @@ public:
                                                const PrivilegeVector& privilegesToAdd);
 
     /**
+     * Promote a vector of ParsedPrivilege documents into tenant aware privileges.
+     */
+    static PrivilegeVector privilegeVectorFromParsedPrivilegeVector(
+        const boost::optional<TenantId>&,
+        const std::vector<auth::ParsedPrivilege>&,
+        std::vector<std::string>*);
+
+    /**
      * Takes a vector of privileges and fills the output param "resultArray" with a BSON array
      * representation of the privileges.
      */
-    static Status getBSONForPrivileges(const PrivilegeVector& privileges,
-                                       mutablebson::Element resultArray);
+    static void serializePrivilegeVector(const PrivilegeVector& privileges, BSONArrayBuilder*);
 
 
     Privilege() = default;
@@ -76,7 +96,15 @@ public:
     Privilege& operator=(Privilege&&) = default;
 
     Privilege(const ResourcePattern& resource, ActionType action);
-    Privilege(const ResourcePattern& resource, const ActionSet& actions);
+    Privilege(const ResourcePattern& resource, ActionSet actions);
+
+    // Transform a ParsedPrivilege into a concrete Privilege by adding tenantId
+    // and turning string actions into ActionSet bits.
+    // unrecognizedActions will be populated with unexpected ActionType names, if present.
+    static Privilege resolvePrivilegeWithTenant(
+        const boost::optional<TenantId>&,
+        const auth::ParsedPrivilege&,
+        std::vector<std::string>* unrecognizedActions = nullptr);
 
     const ResourcePattern& getResourcePattern() const {
         return _resource;
@@ -86,6 +114,8 @@ public:
         return _actions;
     }
 
+    auth::ParsedPrivilege toParsedPrivilege() const;
+
     void addActions(const ActionSet& actionsToAdd);
     void removeActions(const ActionSet& actionsToRemove);
 
@@ -94,8 +124,7 @@ public:
     // Checks if the given actions are present in the Privilege.
     bool includesActions(const ActionSet& actions) const;
 
-    static Privilege fromBSON(BSONElement obj);
-    static Privilege fromBSON(BSONObj obj);
+    void serialize(BSONObjBuilder*) const;
     BSONObj toBSON() const;
 
 private:

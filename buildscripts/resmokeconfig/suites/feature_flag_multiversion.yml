@@ -4,10 +4,10 @@ test_kind: js_test
 
 selector:
   roots:
-  - jstests/multiVersion/genericSetFCVUsage/run_feature_flag_multiversion_test.js
+    - jstests/multiVersion/genericSetFCVUsage/run_feature_flag_multiversion_test.js
 
 # Multiversion tests start their own mongod's.
 executor:
   config:
     shell_options:
-      nodb: ''
+      nodb: ""

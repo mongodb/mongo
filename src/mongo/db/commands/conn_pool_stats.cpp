@@ -27,21 +27,31 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <string>
-#include <vector>
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/client/global_conn_pool.h"
+#include "mongo/client/replica_set_monitor_manager.h"
+#include "mongo/db/admission/execution_admission_context.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/sharding_environment/grid.h"
 #include "mongo/executor/connection_pool_stats.h"
-#include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/task_executor_pool.h"
-#include "mongo/s/grid.h"
+
+#include <functional>
+#include <string>
 
 namespace mongo {
 namespace {
@@ -62,18 +72,27 @@ public:
         return false;
     }
 
-    void addRequiredPrivileges(const std::string& dbname,
-                               const BSONObj& cmdObj,
-                               std::vector<Privilege>* out) const override {
-        ActionSet actions;
-        actions.addAction(ActionType::connPoolStats);
-        out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const DatabaseName& dbName,
+                                 const BSONObj& cmdObj) const override {
+        auto* as = AuthorizationSession::get(opCtx->getClient());
+        if (!as->isAuthorizedForActionsOnResource(
+                ResourcePattern::forClusterResource(dbName.tenantId()),
+                ActionType::connPoolStats)) {
+            return {ErrorCodes::Unauthorized, "unauthorized"};
+        }
+
+        return Status::OK();
     }
 
     bool run(OperationContext* opCtx,
-             const std::string& db,
+             const DatabaseName&,
              const mongo::BSONObj& cmdObj,
              mongo::BSONObjBuilder& result) override {
+        // Critical to observability and diagnosability, categorize as immediate priority.
+        ScopedAdmissionPriority<ExecutionAdmissionContext> skipAdmissionControl(
+            opCtx, AdmissionContext::Priority::kExempt);
+
         executor::ConnectionPoolStats stats{};
 
         // Global connection pool connections.
@@ -84,7 +103,7 @@ public:
         // Replication connections, if we have any
         {
             auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
-            if (replCoord && replCoord->isReplEnabled()) {
+            if (replCoord && replCoord->getSettings().isReplSet()) {
                 replCoord->appendConnectionStats(&stats);
             }
         }
@@ -92,13 +111,15 @@ public:
         // Sharding connections, if we have any
         {
             auto const grid = Grid::get(opCtx);
-            if (grid->getExecutorPool()) {
-                grid->getExecutorPool()->appendConnectionStats(&stats);
-            }
+            if (grid->isInitialized()) {
+                if (grid->getExecutorPool()) {
+                    grid->getExecutorPool()->appendConnectionStats(&stats);
+                }
 
-            auto const customConnPoolStatsFn = grid->getCustomConnectionPoolStatsFn();
-            if (customConnPoolStatsFn) {
-                customConnPoolStatsFn(&stats);
+                auto const customConnPoolStatsFn = grid->getCustomConnectionPoolStatsFn();
+                if (customConnPoolStatsFn) {
+                    customConnPoolStatsFn(&stats);
+                }
             }
         }
 
@@ -110,8 +131,8 @@ public:
 
         return true;
     }
-
-} poolStatsCmd;
+};
+MONGO_REGISTER_COMMAND(PoolStats).forRouter().forShard();
 
 }  // namespace
 }  // namespace mongo

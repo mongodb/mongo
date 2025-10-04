@@ -13,15 +13,18 @@
 
 #include <boost/config.hpp>
 
-#define BOOST_PROGRAM_OPTIONS_SOURCE
+#ifndef BOOST_PROGRAM_OPTIONS_SOURCE
+# define BOOST_PROGRAM_OPTIONS_SOURCE
+#endif
 #include <boost/program_options/config.hpp>
 #include <boost/program_options/detail/convert.hpp>
 #include <boost/program_options/detail/utf8_codecvt_facet.hpp>
 #include <boost/throw_exception.hpp>
 
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 
 using namespace std;
+using namespace boost::placeholders;
 
 namespace boost { namespace detail {
 

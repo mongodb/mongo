@@ -29,13 +29,25 @@
 
 #pragma once
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/client.h"
+#include "mongo/db/global_catalog/sharding_catalog_client.h"
+#include "mongo/db/s/transaction_coordinator.h"
+#include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/sharding_environment/shard_server_test_fixture.h"
+
+#include <memory>
 #include <set>
+#include <string>
+#include <utility>
 #include <vector>
 
-#include "mongo/base/status.h"
-#include "mongo/db/s/shard_server_test_fixture.h"
-#include "mongo/db/s/transaction_coordinator.h"
-#include "mongo/s/shard_id.h"
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -44,6 +56,9 @@ namespace mongo {
  */
 class TransactionCoordinatorTestFixture : public ShardServerTestFixture {
 protected:
+    explicit TransactionCoordinatorTestFixture(Options options = {})
+        : ShardServerTestFixture(std::move(options)) {}
+
     void setUp() override;
     void tearDown() override;
 
@@ -55,9 +70,9 @@ protected:
      */
     std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() override;
 
-    void assertCommandSentAndRespondWith(const StringData& commandName,
+    void assertCommandSentAndRespondWith(StringData commandName,
                                          const StatusWith<BSONObj>& response,
-                                         boost::optional<BSONObj> expectedWriteConcern);
+                                         boost::optional<WriteConcernOptions> expectedWriteConcern);
     /**
      * These tests use the network task executor mock, which doesn't automatically execute tasks,
      * which are scheduled with delay. This helper function advances the clock by 1 second (which is

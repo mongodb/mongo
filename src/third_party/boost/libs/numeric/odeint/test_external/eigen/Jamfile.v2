@@ -1,0 +1,33 @@
+# Copyright 2012-2013 Karsten Ahnert
+# Copyright 2012-2013 Mario Mulansky
+# Distributed under the Boost Software License, Version 1.0.
+# (See accompanying file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
+
+# bring in rules for testing
+
+
+import testing ;
+import os ;
+
+local EIGEN_ROOT = [ os.environ EIGEN_ROOT ] ;
+
+project
+    : requirements
+      <library>/boost/test//boost_unit_test_framework
+      <define>BOOST_ALL_NO_LIB=1
+      <include>$(EIGEN_ROOT)
+      <include>../../test
+      <link>static
+      # <cxxflags>-D_SCL_SECURE_NO_WARNINGS
+    ;
+
+test-suite "odeint"
+    :
+    [ compile is_resizeable.cpp ]
+    [ run same_size.cpp ]
+    [ run resize.cpp ]
+    [ run runge_kutta4.cpp ]
+    [ run runge_kutta_dopri5.cpp ]
+    [ run integrate.cpp ]
+    : <testing.launcher>valgrind
+    ;

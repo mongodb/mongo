@@ -1,0 +1,27 @@
+# TODO(SERVER-81039): Remove once these can be compiled from the root directory.
+src/third_party/grpc/dist
+src/third_party/abseil-cpp/dist
+src/third_party/protobuf/dist
+src/third_party/re2/dist
+src/third_party/tcmalloc/dist
+src/third_party/wiredtiger/dist
+
+# Ignore node_modules due to the following error
+# ERROR: in verify_node_modules_ignored:
+# pnpm install will create nested node_modules, but not all of them are ignored by Bazel.
+# We recommend that all node_modules folders in the source tree be ignored,
+# to avoid Bazel printing confusing error messages.
+# 
+# Either add line(s) to @//:.bazelignore:
+# 
+# node_modules
+# 
+# or disable this check by setting `verify_node_modules_ignored = None` in `npm_translate_lock(name = "npm")`
+node_modules
+src/mongo/db/modules/jstestfuzz/node_modules
+
+# These can cause issues in rules_lint
+python3-venv
+venv
+
+.ijwb

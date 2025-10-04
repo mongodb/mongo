@@ -1,0 +1,259 @@
+test_kind: js_test
+
+selector:
+  roots:
+    - jstests/core/**/*.js
+    - jstests/fle2/**/*.js
+    - src/mongo/db/modules/*/jstests/fle2/**/*.js
+  exclude_files:
+    # These tests are run in sharded_jscore_txns.
+    - jstests/core/txns/**/*.js
+    # The following tests fail because a certain command or functionality is not supported by
+    # mongos. This command or functionality is placed in a comment next to the failing test.
+    - jstests/core/**/apitest_db.js # serverStatus output doesn't have storageEngine.
+    - jstests/core/**/awaitdata_getmore_cmd.js # capped collections.
+    - jstests/core/**/bypass_doc_validation.js # sharded $out output not permitted
+    - jstests/core/**/check_shard_index.js # checkShardingIndex.
+    - jstests/core/**/compact_keeps_indexes.js # compact.
+    - jstests/core/**/currentop.js # uses fsync.
+    - jstests/core/**/dbhash.js # dbhash.
+    - jstests/core/**/fsync.js # uses fsync.
+    - jstests/core/**/geo_s2cursorlimitskip.js # profiling.
+    - jstests/core/**/geo_update_btree2.js # notablescan.
+    - jstests/core/**/queryoptimizera.js # "local" database.
+    - jstests/core/**/startup_log.js # "local" database.
+    - jstests/core/**/tailable_cursor_invalidation.js # capped collections.
+    - jstests/core/**/tailable_getmore_batch_size.js # capped collections.
+    - jstests/core/**/tailable_skip_limit.js # capped collections.
+    - jstests/core/**/query/top/top.js # top.
+    # The following tests fail because mongos behaves differently from mongod when testing certain
+    # functionality. The differences are in a comment next to the failing test.
+    - jstests/core/**/explain_missing_database.js # Behavior with no db different on mongos.
+    - jstests/core/**/geo_2d_explain.js # executionSuccess in different spot in explain().
+    - jstests/core/**/geo_s2explain.js # inputStage in different spot in explain().
+    - jstests/core/**/geo_s2sparse.js # keysPerIndex in different spot in validate().
+    - jstests/core/**/operation_latency_histogram.js # Stats are counted differently on mongos, SERVER-24880.
+    # The following tests fail because explain expect a different plan query when collections live on separate shards
+    # This test expects sharded collections to be sharded across multiple shards.
+    - jstests/core/administrative/current_op/currentop_shell.js
+    # The following tests fail because they count indexes. These counts do not take into account the
+    # additional hashed shard key indexes that are automatically added by this passthrough.
+    - jstests/core/**/apitest_dbcollection.js
+    - jstests/core/**/bad_index_plugin.js
+    - jstests/core/**/create_indexes.js
+    - jstests/core/**/list_indexes_non_existent_ns.js
+    - jstests/core/**/mr_preserve_indexes.js
+    # TODO: Remove after fixing SERVER-103278. executionStats.nReturned is incorrect for sharded distinct commands.
+    - jstests/core/**/distinct_index1.js
+    # TODO SERVER-32311: These tests use plan stage helpers which can't handle sharded explain output.
+    - jstests/core/**/expr_index_use.js
+    - jstests/core/**/index_multikey.js
+    - jstests/core/**/query/explain/optimized_match_explain.js
+    - jstests/core/**/sort_array.js
+
+    # These tests drop and create indexes throughout their execution. Index creation might fail when
+    # movePrimary is in progress.
+    - jstests/core/query/agg_hint.js
+    - jstests/core/index/express_write.js
+    # The following tests are excluded specifically for this passthrough suite.
+    # TransitionTo/FromDedicated runs remove/addShard which implicitly will set a cluster parameter, which
+    # will conflict with tests that explicitly set cluster parameters.
+    - jstests/core/query/query_settings/**/*.js
+    - jstests/core/query/queryable_encryption/query_settings_fle.js
+    # These tests expect index creation to fail on a shard that contains an initial document with
+    # parallel arrays. The index creation will succeed on the shard without a document and
+    # as we transition to dedicated, the balancer will try an insert the document with a parallel
+    # array on the shard with the index created.
+    - jstests/core/index/geo/geo_multikey1.js
+    # These tests expect index creation to fail, which can block the config shard from transitioning
+    # to the dedicated state. Index creation failure will also block subsequent config transition attempts.
+    - jstests/core/index/geo/geo_invalid_polygon.js
+    # These timeseries tests use a helper that runs and expects a chunk migration to succeed, which can
+    # conflict with a config transition.
+    - jstests/core/timeseries/ddl/bucket_granularity.js
+    - jstests/core/timeseries/ddl/bucket_span_and_rounding_seconds.js
+    - jstests/core/timeseries/ddl/bucket_timestamp_rounding.js
+    - jstests/core/timeseries/ddl/timeseries_bucket_index.js
+    - jstests/core/timeseries/ddl/timeseries_clustered_index_options.js
+    - jstests/core/timeseries/ddl/timeseries_collation.js
+    - jstests/core/timeseries/ddl/timeseries_create.js
+    - jstests/core/timeseries/ddl/timeseries_create_collection.js
+    - jstests/core/timeseries/ddl/timeseries_index.js
+    - jstests/core/timeseries/ddl/timeseries_index_collation.js
+    - jstests/core/timeseries/ddl/timeseries_index_partial.js
+    - jstests/core/timeseries/ddl/timeseries_index_stats.js
+    - jstests/core/timeseries/ddl/timeseries_index_ttl_partial.js
+    - jstests/core/timeseries/ddl/timeseries_index_use.js
+    - jstests/core/timeseries/ddl/timeseries_metric_index_2dsphere.js
+    - jstests/core/timeseries/ddl/timeseries_nondefault_collation.js
+    - jstests/core/timeseries/ddl/timeseries_special_indexes_metadata.js
+    - jstests/core/timeseries/ddl/timeseries_sparse_index.js
+    - jstests/core/timeseries/ddl/timeseries_user_system_buckets.js
+    - jstests/core/timeseries/geo/partialFilterExpression_with_internalBucketGeoWithin.js
+    - jstests/core/timeseries/geo/timeseries_geonear_measurements.js
+    - jstests/core/timeseries/geo/timeseries_internal_bucket_geo_within.js
+    - jstests/core/timeseries/query/timeseries_explain_update.js
+    - jstests/core/timeseries/query/timeseries_block_explain.js
+    - jstests/core/timeseries/query/bucket_unpacking_group_reorder_fixed_buckets.js
+    - jstests/core/timeseries/query/bucket_unpacking_with_compound_sort_on_point_queries.js
+    - jstests/core/timeseries/query/bucket_unpacking_with_limit.js
+    - jstests/core/timeseries/query/bucket_unpacking_with_match_fixed_buckets.js
+    - jstests/core/timeseries/query/bucket_unpacking_with_sort.js
+    - jstests/core/timeseries/query/bucket_unpacking_with_sort_extended_range.js
+    - jstests/core/timeseries/query/bucket_unpacking_with_sort_negative.js
+    - jstests/core/timeseries/query/bucket_unpacking_with_sort_on_multiple_fields_point_queries.js
+    - jstests/core/timeseries/query/bucket_unpacking_with_sort_on_single_field_point_queries.js
+    - jstests/core/timeseries/query/bucket_unpacking_with_sort_plan_cache.js
+    - jstests/core/timeseries/query/bucket_unpacking_with_sort_with_collation.js
+    - jstests/core/timeseries/query/bucket_unpacking_with_sort_with_geo.js
+    - jstests/core/timeseries/query/timeseries_bucket_level_filter.js
+    - jstests/core/timeseries/query/timeseries_computed_field.js
+    - jstests/core/timeseries/query/timeseries_filter_extended_range.js
+    - jstests/core/timeseries/query/timeseries_find.js
+    - jstests/core/timeseries/query/timeseries_group.js
+    - jstests/core/timeseries/query/timeseries_groupby_reorder.js
+    - jstests/core/timeseries/query/timeseries_groupby_reorder_expr.js
+    - jstests/core/timeseries/query/timeseries_hint.js
+    - jstests/core/timeseries/query/timeseries_id_range.js
+    - jstests/core/timeseries/query/timeseries_internal_bounded_sort.js
+    - jstests/core/timeseries/query/timeseries_internal_bounded_sort_compound.js
+    - jstests/core/timeseries/query/timeseries_internal_bounded_sort_compound_mixed_types.js
+    - jstests/core/timeseries/query/timeseries_internal_bounded_sort_overflow.js
+    - jstests/core/timeseries/query/timeseries_lastpoint.js
+    - jstests/core/timeseries/query/timeseries_lastpoint_common_sort_key.js
+    - jstests/core/timeseries/query/timeseries_lookup.js
+    - jstests/core/timeseries/query/timeseries_match.js
+    - jstests/core/timeseries/query/timeseries_match_pushdown.js
+    - jstests/core/timeseries/query/timeseries_match_pushdown_with_project.js
+    - jstests/core/timeseries/query/timeseries_merge.js
+    - jstests/core/timeseries/query/timeseries_out_non_sharded.js
+    - jstests/core/timeseries/query/timeseries_partial_index_opt.js
+    - jstests/core/timeseries/query/timeseries_predicates.js
+    - jstests/core/timeseries/query/timeseries_project.js
+    - jstests/core/timeseries/query/timeseries_resume_after.js
+    - jstests/core/timeseries/query/timeseries_sbe.js
+    - jstests/core/timeseries/query/timeseries_streaming_group.js
+    - jstests/core/timeseries/query/timeseries_top_k_sort_optimization.js
+    - jstests/core/timeseries/query/timeseries_union_with.js
+    - jstests/core/timeseries/write/timeseries_bucket_limit_count.js
+    - jstests/core/timeseries/write/timeseries_bucket_limit_time_range.js
+    - jstests/core/timeseries/write/timeseries_bucket_manual_removal.js
+    - jstests/core/timeseries/write/timeseries_delete_compressed_buckets.js
+    - jstests/core/timeseries/write/timeseries_delete_hint.js
+    - jstests/core/timeseries/write/timeseries_delete_with_meta.js
+    - jstests/core/timeseries/write/timeseries_delete_with_meta_concurrent.js
+    - jstests/core/timeseries/write/timeseries_findAndModify_deletes_hints.js
+    - jstests/core/timeseries/write/timeseries_findAndModify_updates_hints.js
+    - jstests/core/timeseries/write/timeseries_insert_after_delete.js
+    - jstests/core/timeseries/write/timeseries_insert_after_update.js
+    - jstests/core/timeseries/write/timeseries_insert_compresses_bucket.js
+    - jstests/core/timeseries/write/timeseries_metadata.js
+    - jstests/core/timeseries/write/timeseries_min_max.js
+    - jstests/core/timeseries/write/timeseries_out_of_order.js
+    - jstests/core/timeseries/write/timeseries_reopened_bucket_insert.js
+    - jstests/core/timeseries/write/timeseries_schema_validation.js
+    - jstests/core/timeseries/write/timeseries_simple.js
+    - jstests/core/timeseries/write/timeseries_sparse.js
+    - jstests/core/timeseries/write/timeseries_update.js
+    - jstests/core/timeseries/write/timeseries_update_compressed_buckets.js
+    - jstests/core/timeseries/write/timeseries_update_concurrent.js
+    - jstests/core/timeseries/write/timeseries_update_hint.js
+    - jstests/core/timeseries/write/timeseries_update_one.js
+    # moveChunk can be blocked by multi updates causing these tests to not be able to transition to dedicated.
+    - jstests/core/index/geo/geo_update_btree.js
+    - jstests/core/query/delete/remove_adjacent_index_keys.js
+    # Exclude tests that run cleanupOrphaned, which can fail running on a config shard if a
+    # concurrent migration fails due to the config shard transitioning to dedicated.
+    - jstests/core/administrative/cleanup_orphaned.js
+    - jstests/core/catalog/views/views_all_commands.js
+    - jstests/core/repro/commands_namespace_parsing.js
+    # Runs commands using legacy queries, which are not supported on sessions.
+    - jstests/core/**/query/exhaust.js
+    # TODO SERVER-96199 Re-enable this test once FLE updates to a document's shard key work
+    - src/mongo/db/modules/enterprise/jstests/fle2/find_and_modify_replace.js
+
+  exclude_with_any_tags:
+    - assumes_standalone_mongod
+    - assumes_against_mongod_not_mongos
+    # This passthrough implicitly shards the accessed collections. Do not run tests where collections
+    # can't be created on `getCollection` call.
+    - assumes_no_implicit_collection_creation_on_get_collection
+    # Tests tagged with the following will fail because they assume collections are not sharded.
+    - assumes_no_implicit_collection_creation_after_drop
+    - assumes_no_implicit_index_creation
+    - assumes_unsharded_collection
+    - cannot_create_unique_index_when_using_hashed_shard_key
+    # system.profile collection doesn't exist on mongos.
+    - requires_profiling
+    # Capped collections cannot be sharded
+    - requires_capped
+
+    # The following tags are excluded specifically for this suite.
+    - config_shard_incompatible
+    - assumes_stable_shard_list
+    # Currently this passthrough enables the balancer to allow the config transition to successfully complete.
+    - assumes_balancer_off
+    # Fast count doesn't filter orphan documents
+    - requires_fastcount
+    # This suite performs balancing of unsharded collection in background using moveCollection that
+    # changes collections UUID
+    - assumes_stable_collection_uuid
+    - does_not_support_retryable_writes
+    - requires_non_retryable_writes
+    # implicitly_retry_on_migration_in_progress.js alters find/aggregate commands
+    # so that the whole result set is returned through a single batch
+    - assumes_no_implicit_cursor_exhaustion
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: >-
+        await import("jstests/libs/override_methods/enable_sessions.js");
+        await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
+        await import("jstests/libs/override_methods/implicitly_retry_on_shard_transition_errors.js");
+      global_vars:
+        TestData:
+          alwaysInjectTransactionNumber: true
+          shardsAddedRemoved: true
+          hasRandomShardsAddedRemoved: true
+          runningWithBalancer: true
+          sessionOptions:
+            retryWrites: true
+  hooks:
+    - class: ContinuousAddRemoveShard
+      random_balancer_on: false
+      transition_configsvr: true
+      add_remove_random_shards: true
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+      shell_options:
+        global_vars:
+          TestData:
+            shardsAddedRemoved: true
+            hasRandomShardsAddedRemoved: true
+    - class: ValidateCollections
+    - class: CheckOrphansDeleted
+    - class: CleanEveryN
+      n: 20
+  fixture:
+    class: ShardedClusterFixture
+    config_shard: "any"
+    num_shards: 3
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        skipDroppingHashedShardKeyIndex: true
+        featureFlagReshardingForTimeseries: true
+        reshardingMinimumOperationDurationMillis: 0
+    set_cluster_parameter:
+      parameter: pauseMigrationsDuringMultiUpdates
+      value:
+        enabled: True

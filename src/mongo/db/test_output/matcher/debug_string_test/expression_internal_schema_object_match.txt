@@ -1,0 +1,8 @@
+==== VARIATION: matchExpression=InternalSchemaObjectMatchExpression
+$_internalSchemaObjectMatch
+    y $eq 1
+
+==== VARIATION: taggedMatchExpression=InternalSchemaObjectMatchExpression
+$_internalSchemaObjectMatch || Selected Index #2 pos 0 combine 1
+    y $eq 1
+

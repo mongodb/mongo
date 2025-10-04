@@ -1,0 +1,401 @@
+load("@poetry//:dependencies.bzl", "dependency")
+load("@npm//:eslint/package_json.bzl", "bin")
+
+exports_files([
+    "candle_wrapper.py",
+    "cheetah_source_generator.py",
+    "clang_tidy_config_gen.py",
+    "jstoh.py",
+    "msitrim.py",
+    "pip_requirements.py",
+    "symbols.orderfile",
+    "symbols-al2023.orderfile",
+])
+
+py_binary(
+    name = "simple_report",
+    srcs = ["simple_report.py"],
+    main = "simple_report.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "click",
+            group = "evergreen",
+        ),
+        dependency(
+            "typing-extensions",
+            group = "core",
+        ),
+    ],
+)
+
+py_binary(
+    name = "mongosymb",
+    srcs = [
+        "build_system_options.py",
+        "mongosymb.py",
+    ],
+    main = "mongosymb.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/util",
+        dependency(
+            "requests",
+            group = "core",
+        ),
+        dependency(
+            "tenacity",
+            group = "core",
+        ),
+    ],
+)
+
+py_binary(
+    name = "resmoke",
+    srcs = ["resmoke.py"],
+    main = "resmoke.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/resmokelib",
+        dependency(
+            "typer",
+            group = "core",
+        ),
+    ],
+)
+
+py_library(
+    name = "install_bazel",
+    srcs = [
+        "install_bazel.py",
+    ],
+    deps = [
+        dependency(
+            "retry",
+            group = "testing",
+        ),
+        "//buildscripts/s3_binary:download",
+    ],
+)
+
+py_library(
+    name = "bazel_custom_formatter",
+    srcs = [
+        "bazel_custom_formatter.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "install_bazel",
+        dependency(
+            "typing-extensions",
+            group = "core",
+        ),
+        dependency(
+            "retry",
+            group = "testing",
+        ),
+        "simple_report",
+    ],
+)
+
+py_binary(
+    name = "legacy_commands_check",
+    srcs = [
+        "legacy_commands_check.py",
+    ],
+    main = "legacy_commands_check.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/linter",
+        "//buildscripts/patch_builds",
+    ],
+)
+
+py_library(
+    name = "mongo_toolchain",
+    srcs = [
+        "mongo_toolchain.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "typer",
+            group = "core",
+        ),
+    ],
+)
+
+py_library(
+    name = "clang_tidy_lib",
+    srcs = [
+        "apply_clang_tidy_fixes.py",
+        "clang_tidy.py",
+        "clang_tidy_vscode.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "mongo_toolchain",
+        "simple_report",
+    ],
+)
+
+py_binary(
+    name = "sbom_linter",
+    srcs = [
+        "sbom_linter.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "jsonschema",
+            group = "build-metrics",
+        ),
+        dependency(
+            "license-expression",
+            group = "lint",
+        ),
+    ],
+)
+
+py_binary(
+    name = "quickmongolint",
+    srcs = [
+        "quickmongolint.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/linter",
+    ],
+)
+
+py_binary(
+    name = "errorcodes",
+    srcs = ["errorcodes.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "regex",
+            group = "compile",
+        ),
+    ],
+)
+
+bin.eslint_binary(
+    name = "eslint_binary",
+    # Allow the binary to be run outside bazel
+    # See more details about this by commenting this out and running `bazel run //:format`
+    env = {"BAZEL_BINDIR": "."},
+)
+
+sh_binary(
+    name = "auto_install_db_contrib_tool",
+    srcs = ["auto_install_db_contrib_tool.sh"],
+)
+
+sh_binary(
+    name = "setup_engflow_creds",
+    srcs = ["setup_engflow_creds.sh"],
+)
+
+sh_binary(
+    name = "consolidate_repos",
+    srcs = ["consolidate-repos.sh"],
+)
+
+sh_binary(
+    name = "consolidate_repos_enterprise",
+    srcs = ["consolidate-repos-enterprise.sh"],
+)
+
+sh_binary(
+    name = "poetry_sync",
+    srcs = ["poetry_sync.sh"],
+)
+
+sh_binary(
+    name = "mount_drives",
+    srcs = ["mount_drives.sh"],
+)
+
+py_library(
+    name = "parse_test_xml",
+    srcs = [
+        "parse_test_xml.py",
+    ],
+    deps = [
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+    ],
+)
+
+py_binary(
+    name = "gather_failed_unittests",
+    srcs = ["gather_failed_unittests.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":parse_test_xml",
+        "//buildscripts/util",
+        dependency(
+            "typer",
+            group = "core",
+        ),
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+    ],
+)
+
+sh_binary(
+    name = "setup_node_env",
+    srcs = ["setup_node_env.sh"],
+)
+
+py_binary(
+    name = "evergreen_task_timeout",
+    srcs = ["evergreen_task_timeout.py"],
+    main = "evergreen_task_timeout.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/ciconfig",
+        "//buildscripts/resmoke_proxy",
+        "//buildscripts/timeouts:timeout_service",
+        "//evergreen:all_python_files",
+        dependency(
+            "evergreen-py",
+            group = "testing",
+        ),
+        dependency(
+            "pydantic",
+            group = "evergreen",
+        ),
+        dependency(
+            "inject",
+            group = "evergreen",
+        ),
+    ],
+)
+
+py_binary(
+    name = "bazel_local_resources",
+    srcs = ["bazel_local_resources.py"],
+    visibility = ["//visibility:public"],
+    deps = [dependency(
+        "filelock",
+        group = "testing",
+    )],
+)
+
+py_binary(
+    name = "poetry_lock_check",
+    srcs = ["poetry_lock_check.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "poetry",
+            group = "export",
+        ),
+    ],
+)
+
+py_binary(
+    name = "validate_evg_project_config",
+    srcs = ["validate_evg_project_config.py"],
+    deps = [
+        "//buildscripts/ciconfig",
+        dependency(
+            "typer",
+            group = "core",
+        ),
+        dependency(
+            "typing-extensions",
+            group = "core",
+        ),
+        dependency(
+            "structlog",
+            group = "evergreen",
+        ),
+    ],
+)
+
+py_binary(
+    name = "large_file_check",
+    srcs = ["large_file_check.py"],
+    deps = [
+        "//buildscripts/linter",
+        "//buildscripts/patch_builds",
+        dependency(
+            "structlog",
+            group = "evergreen",
+        ),
+        dependency(
+            "gitpython",
+            group = "evergreen",
+        ),
+    ],
+)
+
+# TODO(SERVER-105817): The following library is autogenerated, please split these out into individual python targets
+py_library(
+    name = "all_python_files",
+    srcs = glob(["*.py"]),
+    visibility = ["//visibility:public"],
+)
+
+py_binary(
+    name = "pyrightlint",
+    srcs = ["pyrightlint.py"],
+    deps = [
+        "//buildscripts/linter",
+        dependency(
+            "structlog",
+            group = "lint",
+        ),
+        dependency(
+            "pyright",
+        ),
+    ],
+)
+
+py_binary(
+    name = "archive_artifacts",
+    srcs = ["archive_artifacts.py"],
+    deps = [
+        dependency(
+            "pyzstd",
+            group = "modules_poc",
+        ),
+        dependency(
+            "cffi",
+            group = "modules_poc",
+        ),
+    ],
+)
+
+py_library(
+    name = "local_rbe_container_url",
+    srcs = ["local_rbe_container_url.py"],
+    data = [
+        "//bazel/platforms:remote_execution_containers.bzl",
+    ],
+)
+
+py_binary(
+    name = "print_local_rbe_container_url",
+    srcs = ["print_local_rbe_container_url.py"],
+    deps = [
+        "local_rbe_container_url",
+    ],
+)
+
+py_binary(
+    name = "create_rbe_sysroot",
+    srcs = [
+        "create_rbe_sysroot.py",
+    ],
+    deps = [
+        "local_rbe_container_url",
+    ],
+)

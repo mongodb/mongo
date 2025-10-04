@@ -11,20 +11,17 @@
  *
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
-(function() {
-
-"use strict";
-load('jstests/libs/parallelTester.js');
-load("jstests/libs/curop_helpers.js");  // for waitForCurOpByFailPoint().
-load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/libs/fail_point_util.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {waitForCurOpByFailPointNoNS} from "jstests/libs/curop_helpers.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const dbName = "test";
 const collName = "coll";
 
 const rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}]});
 rst.startSet();
-rst.initiate();
+rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 const primary = rst.getPrimary();
 const primaryDB = primary.getDB(dbName);
@@ -42,12 +39,13 @@ rst.awaitReplication();
 
 jsTestLog("Hang primary on step down");
 const joinStepDownThread = startParallelShell(() => {
-    assert.commandWorked(
-        db.adminCommand({configureFailPoint: "stepdownHangBeforeRSTLEnqueue", mode: "alwaysOn"}));
+    assert.commandWorked(db.adminCommand({configureFailPoint: "stepdownHangBeforeRSTLEnqueue", mode: "alwaysOn"}));
 
-    const freezeSecs = 24 * 60 * 60;  // 24 hours
-    assert.commandFailedWithCode(db.adminCommand({"replSetStepDown": freezeSecs, "force": true}),
-                                 ErrorCodes.NotWritablePrimary);
+    const freezeSecs = 24 * 60 * 60; // 24 hours
+    assert.commandFailedWithCode(
+        db.adminCommand({"replSetStepDown": freezeSecs, "force": true}),
+        ErrorCodes.NotWritablePrimary,
+    );
 }, primary.port);
 
 waitForCurOpByFailPointNoNS(primaryDB, "stepdownHangBeforeRSTLEnqueue");
@@ -68,8 +66,13 @@ rst.stepUp(secondary);
 jsTestLog("Wait for step up to complete");
 // Wait until the primary successfully steps down via heartbeat reconfig.
 rst.waitForState(secondary, ReplSetTest.State.PRIMARY);
-rst.waitForState(primary, ReplSetTest.State.SECONDARY);
+rst.awaitSecondaryNodes(null, [primary]);
 const newPrimary = rst.getPrimary();
+
+// Clear the logs so that when we check for the stepdown's "Starting to kill user operations" log
+// below on the old primary, we won't be counting the one from stepping up the secondary (right
+// above this).
+clearRawMongoProgramOutput();
 
 jsTestLog("Prepare a transaction on the new primary");
 const session = newPrimary.startSession();
@@ -80,11 +83,9 @@ assert.commandWorked(sessionColl.update({_id: 0}, {$set: {"b": 1}}));
 const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
 jsTestLog("Get a cluster time for afterClusterTime reads");
-TestData.clusterTimeAfterPrepare =
-    assert
-        .commandWorked(newPrimary.getDB(dbName)[collName].runCommand(
-            "insert", {documents: [{_id: "clusterTimeAfterPrepare"}]}))
-        .operationTime;
+TestData.clusterTimeAfterPrepare = assert.commandWorked(
+    newPrimary.getDB(dbName)[collName].runCommand("insert", {documents: [{_id: "clusterTimeAfterPrepare"}]}),
+).operationTime;
 
 // Make sure the insert gets replicated to the old primary (current secondary) so that its
 // clusterTime advances before we try to do an afterClusterTime read at the time of the insert.
@@ -95,22 +96,23 @@ const wTPrintPrepareConflictLogFailPoint = configureFailPoint(primary, "WTPrintP
 
 const joinReadThread = startParallelShell(() => {
     db.getMongo().setSecondaryOk();
-    oldPrimaryDB = db.getSiblingDB(TestData.dbName);
+    let oldPrimaryDB = db.getSiblingDB(TestData.dbName);
 
-    assert.commandFailedWithCode(oldPrimaryDB.runCommand({
-        find: TestData.collName,
-        filter: {_id: 0},
-        readConcern: {level: "local", afterClusterTime: TestData.clusterTimeAfterPrepare},
-    }),
-                                 ErrorCodes.InterruptedDueToReplStateChange);
+    assert.commandFailedWithCode(
+        oldPrimaryDB.runCommand({
+            find: TestData.collName,
+            filter: {_id: 0},
+            readConcern: {level: "local", afterClusterTime: TestData.clusterTimeAfterPrepare},
+        }),
+        ErrorCodes.InterruptedDueToReplStateChange,
+    );
 }, primary.port);
 
 jsTestLog("Wait to hit a prepare conflict");
 wTPrintPrepareConflictLogFailPoint.wait();
 
 jsTestLog("Allow step down to complete");
-assert.commandWorked(
-    primary.adminCommand({configureFailPoint: "stepdownHangBeforeRSTLEnqueue", mode: "off"}));
+assert.commandWorked(primary.adminCommand({configureFailPoint: "stepdownHangBeforeRSTLEnqueue", mode: "off"}));
 
 jsTestLog("Wait for step down to start killing operations");
 checkLog.contains(primary, "Starting to kill user operations");
@@ -122,15 +124,12 @@ jsTestLog("Join parallel shells");
 joinStepDownThread();
 joinReadThread();
 
-// Validate that the read operation got killed during step down.
 const replMetrics = assert.commandWorked(primary.adminCommand({serverStatus: 1})).metrics.repl;
 assert.eq(replMetrics.stateTransition.lastStateTransition, "stepDown");
-assert.eq(replMetrics.stateTransition.userOperationsKilled, 1, replMetrics);
 
 jsTestLog("Check nodes have correct data");
-assert.docEq(newPrimary.getDB(dbName)[collName].find({_id: 0}).toArray(), [{_id: 0, b: 1}]);
+assert.docEq([{_id: 0, b: 1}], newPrimary.getDB(dbName)[collName].find({_id: 0}).toArray());
 rst.awaitReplication();
-assert.docEq(primary.getDB(dbName)[collName].find({_id: 0}).toArray(), [{_id: 0, b: 1}]);
+assert.docEq([{_id: 0, b: 1}], primary.getDB(dbName)[collName].find({_id: 0}).toArray());
 
 rst.stopSet();
-})();

@@ -29,9 +29,10 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
 #include <list>
 #include <type_traits>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 
@@ -90,6 +91,23 @@ auto makeVector(Args&&... args) {
     std::vector<V> v;
     v.reserve(sizeof...(Args));
     (v.push_back(std::forward<Args>(args)), ...);
+    return v;
+}
+
+template <typename T, typename U>
+void addExprIfNotNull(std::vector<T>& v, U&& expr) {
+    if (expr) {
+        v.push_back(std::forward<U>(expr));
+    }
+}
+
+/**
+ * Creates a vector of which all elements are not null.
+ */
+template <typename T = void, typename... Args, typename V = detail::vecTypeHelperT<T, Args...>>
+auto makeVectorIfNotNull(Args&&... args) {
+    std::vector<V> v;
+    (addExprIfNotNull(v, std::forward<Args>(args)), ...);
     return v;
 }
 

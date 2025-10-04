@@ -110,9 +110,9 @@ do_rotate(char *buf, size_t len, int rotn)
     for (i = 0; i < len; i++)
         if (isalpha((unsigned char)buf[i])) {
             if (islower((unsigned char)buf[i]))
-                buf[i] = ((buf[i] - 'a') + rotn) % 26 + 'a';
+                buf[i] = (char)(((buf[i] - 'a') + rotn) % 26 + 'a');
             else
-                buf[i] = ((buf[i] - 'A') + rotn) % 26 + 'A';
+                buf[i] = (char)(((buf[i] - 'A') + rotn) % 26 + 'A');
         }
 }
 
@@ -394,7 +394,7 @@ simple_walk_log(WT_SESSION *session)
 #define WT_OPEN_CONFIG_COMMON                             \
     "create,cache_size=100MB,extensions=[" EXTENSION_NAME \
     "],"                                                  \
-    "log=(archive=false,enabled=true),"
+    "log=(enabled=true,remove=false),"
 
 #define WT_OPEN_CONFIG_GOOD \
     WT_OPEN_CONFIG_COMMON   \

@@ -27,14 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/db/matcher/matcher_type_set.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/matcher/matcher_type_set.h"
+#include "mongo/platform/decimal128.h"
 #include "mongo/unittest/unittest.h"
+
+#include <cmath>
+#include <limits>
+#include <string>
 
 namespace mongo {
 namespace {
@@ -51,7 +57,7 @@ TEST(MatcherTypeSetTest, ParseFromStringAliasesCanParseLongAlias) {
     ASSERT_OK(result.getStatus());
     ASSERT_FALSE(result.getValue().allNumbers);
     ASSERT_EQ(result.getValue().bsonTypes.size(), 1u);
-    ASSERT_TRUE(result.getValue().hasType(BSONType::NumberLong));
+    ASSERT_TRUE(result.getValue().hasType(BSONType::numberLong));
 }
 
 TEST(MatcherTypeSetTest, ParseFromStringAliasesCanParseMultipleTypes) {
@@ -60,8 +66,8 @@ TEST(MatcherTypeSetTest, ParseFromStringAliasesCanParseMultipleTypes) {
     ASSERT_OK(result.getStatus());
     ASSERT_TRUE(result.getValue().allNumbers);
     ASSERT_EQ(result.getValue().bsonTypes.size(), 2u);
-    ASSERT_TRUE(result.getValue().hasType(BSONType::Object));
-    ASSERT_TRUE(result.getValue().hasType(BSONType::String));
+    ASSERT_TRUE(result.getValue().hasType(BSONType::object));
+    ASSERT_TRUE(result.getValue().hasType(BSONType::string));
 }
 
 TEST(MatcherTypeSetTest, ParseFromStringAliasesCanParseEmptySet) {
@@ -75,188 +81,6 @@ TEST(MatcherTypeSetTest, ParseFromStringFailsToParseUnknownAlias) {
     ASSERT_NOT_OK(result.getStatus());
 }
 
-TEST(MatcherTypeSetTest, ParseFromElementCanParseNumberAlias) {
-    auto obj = BSON(""
-                    << "number");
-    auto result = MatcherTypeSet::parse(obj.firstElement());
-    ASSERT_OK(result.getStatus());
-    ASSERT_TRUE(result.getValue().allNumbers);
-    ASSERT_TRUE(result.getValue().bsonTypes.empty());
-}
-
-TEST(MatcherTypeSetTest, ParseFromElementCanParseLongAlias) {
-    auto obj = BSON(""
-                    << "long");
-    auto result = MatcherTypeSet::parse(obj.firstElement());
-    ASSERT_OK(result.getStatus());
-    ASSERT_FALSE(result.getValue().allNumbers);
-    ASSERT_EQ(result.getValue().bsonTypes.size(), 1u);
-    ASSERT_TRUE(result.getValue().hasType(BSONType::NumberLong));
-}
-
-TEST(MatcherTypeSetTest, ParseFromElementFailsToParseUnknownAlias) {
-    auto obj = BSON(""
-                    << "unknown");
-    auto result = MatcherTypeSet::parse(obj.firstElement());
-    ASSERT_NOT_OK(result.getStatus());
-}
-
-TEST(MatcherTypeSetTest, ParseFromElementFailsToParseWrongElementType) {
-    auto obj = BSON("" << BSON(""
-                               << ""));
-    auto result = MatcherTypeSet::parse(obj.firstElement());
-    ASSERT_NOT_OK(result.getStatus());
-
-    obj = fromjson("{'': null}");
-    result = MatcherTypeSet::parse(obj.firstElement());
-    ASSERT_NOT_OK(result.getStatus());
-}
-
-TEST(MatcherTypeSetTest, ParseFromElementFailsToParseUnknownBSONType) {
-    auto obj = BSON("" << 99);
-    auto result = MatcherTypeSet::parse(obj.firstElement());
-    ASSERT_NOT_OK(result.getStatus());
-}
-
-TEST(MatcherTypeSetTest, ParseFromElementFailsToParseEOOTypeCode) {
-    auto obj = BSON("" << 0);
-    auto result = MatcherTypeSet::parse(obj.firstElement());
-    ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
-    ASSERT_EQ(result.getStatus().reason(),
-              "Invalid numerical type code: 0. Instead use {$exists:false}.");
-}
-
-TEST(MatcherTypeSetTest, ParseFromElementFailsToParseEOOTypeName) {
-    auto obj = BSON(""
-                    << "missing");
-    auto result = MatcherTypeSet::parse(obj.firstElement());
-    ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
-    ASSERT_EQ(result.getStatus().reason(),
-              "'missing' is not a legal type name. "
-              "To query for non-existence of a field, use {$exists:false}.");
-}
-
-TEST(MatcherTypeSetTest, ParseFromElementCanParseRoundDoubleTypeCode) {
-    auto obj = BSON("" << 2.0);
-    auto result = MatcherTypeSet::parse(obj.firstElement());
-    ASSERT_OK(result.getStatus());
-    ASSERT_FALSE(result.getValue().allNumbers);
-    ASSERT_EQ(result.getValue().bsonTypes.size(), 1u);
-    ASSERT_TRUE(result.getValue().hasType(BSONType::String));
-}
-
-TEST(MatcherTypeSetTest, ParseFailsWhenElementIsNonRoundDoubleTypeCode) {
-    auto obj = BSON("" << 2.5);
-    auto result = MatcherTypeSet::parse(obj.firstElement());
-    ASSERT_NOT_OK(result.getStatus());
-}
-
-TEST(MatcherTypeSetTest, ParseFromElementCanParseRoundDecimalTypeCode) {
-    auto obj = BSON("" << Decimal128(2));
-    auto result = MatcherTypeSet::parse(obj.firstElement());
-    ASSERT_OK(result.getStatus());
-    ASSERT_FALSE(result.getValue().allNumbers);
-    ASSERT_EQ(result.getValue().bsonTypes.size(), 1U);
-    ASSERT_TRUE(result.getValue().hasType(BSONType::String));
-}
-
-TEST(MatcherTypeSetTest, ParseFailsWhenElementIsNonRoundDecimalTypeCode) {
-    auto obj = BSON("" << Decimal128(2.5));
-    auto result = MatcherTypeSet::parse(obj.firstElement());
-    ASSERT_NOT_OK(result.getStatus());
-}
-
-TEST(MatcherTypeSetTest, ParseFailsWhenDoubleElementIsTooPositiveForInteger) {
-    double doubleTooLarge = scalbn(1, std::numeric_limits<long long>::digits);
-    auto obj = BSON("" << doubleTooLarge);
-    auto result = MatcherTypeSet::parse(obj.firstElement());
-    ASSERT_NOT_OK(result.getStatus());
-}
-
-TEST(MatcherTypeSetTest, ParseFailsWhenDoubleElementIsTooNegativeForInteger) {
-    double doubleTooNegative = std::numeric_limits<double>::lowest();
-    auto obj = BSON("" << doubleTooNegative);
-    auto result = MatcherTypeSet::parse(obj.firstElement());
-    ASSERT_NOT_OK(result.getStatus());
-}
-
-TEST(MatcherTypeSetTest, ParseFailsWhenDoubleElementIsNaN) {
-    auto obj = BSON("" << std::nan(""));
-    auto result = MatcherTypeSet::parse(obj.firstElement());
-    ASSERT_NOT_OK(result.getStatus());
-}
-
-TEST(MatcherTypeSetTest, ParseFailsWhenDoubleElementIsInfinite) {
-    auto obj = BSON("" << std::numeric_limits<double>::infinity());
-    auto result = MatcherTypeSet::parse(obj.firstElement());
-    ASSERT_NOT_OK(result.getStatus());
-}
-
-TEST(MatcherTypeSetTest, ParseFailsWhenDecimalElementIsTooPositiveForInteger) {
-    auto obj = BSON("" << Decimal128(static_cast<int64_t>(std::numeric_limits<int>::max()) + 1));
-    auto result = MatcherTypeSet::parse(obj.firstElement());
-    ASSERT_NOT_OK(result.getStatus());
-}
-
-TEST(MatcherTypeSetTest, ParseFailsWhenDecimalElementIsTooNegativeForInteger) {
-    auto obj = BSON("" << Decimal128(static_cast<int64_t>(std::numeric_limits<int>::min()) - 1));
-    auto result = MatcherTypeSet::parse(obj.firstElement());
-    ASSERT_NOT_OK(result.getStatus());
-}
-
-TEST(MatcherTypeSetTest, ParseFailsWhenDecimalElementIsNaN) {
-    auto obj = BSON("" << Decimal128::kPositiveNaN);
-    auto result = MatcherTypeSet::parse(obj.firstElement());
-    ASSERT_NOT_OK(result.getStatus());
-}
-
-TEST(MatcherTypeSetTest, ParseFailsWhenDecimalElementIsInfinite) {
-    auto obj = BSON("" << Decimal128::kPositiveInfinity);
-    auto result = MatcherTypeSet::parse(obj.firstElement());
-    ASSERT_NOT_OK(result.getStatus());
-}
-
-TEST(MatcherTypeSetTest, ParseFromElementFailsWhenArrayHasUnknownType) {
-    auto obj = BSON("" << BSON_ARRAY("long"
-                                     << "unknown"));
-    auto result = MatcherTypeSet::parse(obj.firstElement());
-    ASSERT_NOT_OK(result.getStatus());
-}
-
-TEST(MatcherTypeSetTest, ParseFailsWhenArrayElementIsNotStringOrNumber) {
-    auto obj = BSON("" << BSON_ARRAY("long" << BSONObj()));
-    auto result = MatcherTypeSet::parse(obj.firstElement());
-    ASSERT_NOT_OK(result.getStatus());
-}
-
-TEST(MatcherTypeSetTest, ParseFromElementCanParseEmptyArray) {
-    auto obj = BSON("" << BSONArray());
-    auto result = MatcherTypeSet::parse(obj.firstElement());
-    ASSERT_OK(result.getStatus());
-    ASSERT_TRUE(result.getValue().isEmpty());
-}
-
-TEST(MatcherTypeSetTest, ParseFromElementCanParseArrayWithSingleType) {
-    auto obj = BSON("" << BSON_ARRAY("string"));
-    auto result = MatcherTypeSet::parse(obj.firstElement());
-    ASSERT_OK(result.getStatus());
-    ASSERT_FALSE(result.getValue().allNumbers);
-    ASSERT_EQ(result.getValue().bsonTypes.size(), 1u);
-    ASSERT_TRUE(result.getValue().hasType(BSONType::String));
-}
-
-TEST(MatcherTypeSetTest, ParseFromElementCanParseArrayWithMultipleTypes) {
-    auto obj = BSON("" << BSON_ARRAY("string" << 3 << "number"));
-    auto result = MatcherTypeSet::parse(obj.firstElement());
-    ASSERT_OK(result.getStatus());
-    ASSERT_TRUE(result.getValue().allNumbers);
-    ASSERT_EQ(result.getValue().bsonTypes.size(), 2u);
-    ASSERT_TRUE(result.getValue().hasType(BSONType::String));
-    ASSERT_TRUE(result.getValue().hasType(BSONType::Object));
-}
-
 TEST(MatcherTypeSetTest, IsSingleTypeTrueForTypeNumber) {
     MatcherTypeSet typeSet;
     typeSet.allNumbers = true;
@@ -264,7 +88,7 @@ TEST(MatcherTypeSetTest, IsSingleTypeTrueForTypeNumber) {
 }
 
 TEST(MatcherTypeSetTest, IsSingleTypeTrueForSingleBSONType) {
-    MatcherTypeSet typeSet{BSONType::NumberLong};
+    MatcherTypeSet typeSet{BSONType::numberLong};
     ASSERT_TRUE(typeSet.isSingleType());
 }
 
@@ -274,7 +98,7 @@ TEST(MatcherTypeSetTest, IsSingleTypeFalseForEmpty) {
 }
 
 TEST(MatcherTypeSetTest, IsSingleTypeFalseForMultipleTypes) {
-    MatcherTypeSet typeSet{BSONType::NumberLong};
+    MatcherTypeSet typeSet{BSONType::numberLong};
     typeSet.allNumbers = true;
     ASSERT_FALSE(typeSet.isSingleType());
 }
@@ -291,27 +115,27 @@ TEST(MatcherTypeSetTest, IsEmptyFalseForAllNumbers) {
 }
 
 TEST(MatcherTypeSetTest, IsEmptyFalseForBSONTypeNumberLong) {
-    MatcherTypeSet typeSet{BSONType::NumberLong};
+    MatcherTypeSet typeSet{BSONType::numberLong};
     ASSERT_FALSE(typeSet.isEmpty());
 }
 
 TEST(MatcherTypeSetTest, HasTypeTrueForNumericalTypesWhenSetHasAllNumbersType) {
     MatcherTypeSet typeSet;
     typeSet.allNumbers = true;
-    ASSERT_TRUE(typeSet.hasType(BSONType::NumberInt));
-    ASSERT_TRUE(typeSet.hasType(BSONType::NumberLong));
-    ASSERT_TRUE(typeSet.hasType(BSONType::NumberDouble));
-    ASSERT_TRUE(typeSet.hasType(BSONType::NumberDecimal));
+    ASSERT_TRUE(typeSet.hasType(BSONType::numberInt));
+    ASSERT_TRUE(typeSet.hasType(BSONType::numberLong));
+    ASSERT_TRUE(typeSet.hasType(BSONType::numberDouble));
+    ASSERT_TRUE(typeSet.hasType(BSONType::numberDecimal));
 }
 
 TEST(MatcherTypeSetTest, HasTypeTrueForSetOfTypes) {
     MatcherTypeSet typeSet;
-    typeSet.bsonTypes.insert(BSONType::NumberLong);
-    typeSet.bsonTypes.insert(BSONType::String);
-    ASSERT_FALSE(typeSet.hasType(BSONType::NumberInt));
-    ASSERT_TRUE(typeSet.hasType(BSONType::NumberLong));
-    ASSERT_FALSE(typeSet.hasType(BSONType::NumberDouble));
-    ASSERT_TRUE(typeSet.hasType(BSONType::String));
+    typeSet.bsonTypes.insert(BSONType::numberLong);
+    typeSet.bsonTypes.insert(BSONType::string);
+    ASSERT_FALSE(typeSet.hasType(BSONType::numberInt));
+    ASSERT_TRUE(typeSet.hasType(BSONType::numberLong));
+    ASSERT_FALSE(typeSet.hasType(BSONType::numberDouble));
+    ASSERT_TRUE(typeSet.hasType(BSONType::string));
 }
 
 }  // namespace

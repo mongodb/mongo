@@ -27,50 +27,95 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 
 #include "mongo/db/auth/authorization_contract.h"
 
-#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/access_checks_gen.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/action_type_gen.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/debug_util.h"
 
+#include <cstddef>
+#include <mutex>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
+
+
 namespace mongo {
+void AuthorizationContract::enterCommandScope() {
+    stdx::lock_guard<stdx::mutex> lck(_mutex);
+
+    // Only clear checks when its a top level command.
+    if (_commandDepth == 0) {
+        clear(lck);
+    }
+    _commandDepth++;
+}
+
+void AuthorizationContract::exitCommandScope() {
+    stdx::lock_guard<stdx::mutex> lck(_mutex);
+    invariant(_commandDepth > 0);
+    _commandDepth--;
+}
 
 void AuthorizationContract::clear() {
-    stdx::lock_guard<Mutex> lck(_mutex);
+    stdx::lock_guard<stdx::mutex> lck(_mutex);
+    clear(lck);
+}
 
+void AuthorizationContract::clear(WithLock lk) {
     _checks.reset();
     for (size_t i = 0; i < _privilegeChecks.size(); ++i) {
         _privilegeChecks[i].removeAllActions();
     }
+
+    _isPermissionChecked.storeRelaxed(false);
 }
 
 void AuthorizationContract::addAccessCheck(AccessCheckEnum check) {
-    stdx::lock_guard<Mutex> lck(_mutex);
+    if (!_isTestModeEnabled) {
+        return;
+    }
+
+    stdx::lock_guard<stdx::mutex> lck(_mutex);
+    if (_commandDepth > 1) {
+        return;
+    }
 
     _checks.set(static_cast<size_t>(check), true);
+
+    _isPermissionChecked.storeRelaxed(true);
 }
 
 bool AuthorizationContract::hasAccessCheck(AccessCheckEnum check) const {
-    stdx::lock_guard<Mutex> lck(_mutex);
+    stdx::lock_guard<stdx::mutex> lck(_mutex);
 
     return _checks.test(static_cast<size_t>(check));
 }
 
 void AuthorizationContract::addPrivilege(const Privilege& p) {
-    stdx::lock_guard<Mutex> lck(_mutex);
+    if (!_isTestModeEnabled) {
+        return;
+    }
+
+    stdx::lock_guard<stdx::mutex> lck(_mutex);
+    if (_commandDepth > 1) {
+        return;
+    }
 
     auto matchType = p.getResourcePattern().matchType();
 
     _privilegeChecks[static_cast<size_t>(matchType)].addAllActionsFromSet(p.getActions());
+
+    _isPermissionChecked.storeRelaxed(true);
 }
 
 bool AuthorizationContract::hasPrivileges(const Privilege& p) const {
-    stdx::lock_guard<Mutex> lck(_mutex);
+    stdx::lock_guard<stdx::mutex> lck(_mutex);
 
     auto matchType = p.getResourcePattern().matchType();
 
@@ -78,7 +123,12 @@ bool AuthorizationContract::hasPrivileges(const Privilege& p) const {
 }
 
 bool AuthorizationContract::contains(const AuthorizationContract& other) const {
-    stdx::lock_guard<Mutex> lck(_mutex);
+
+    if (this == &other) {
+        return true;  // this and other are same - so contains is necessarily true
+    }
+
+    std::scoped_lock<stdx::mutex, stdx::mutex> lk(_mutex, other._mutex);
 
     if ((_checks | other._checks) != _checks) {
         if (kDebugBuild) {

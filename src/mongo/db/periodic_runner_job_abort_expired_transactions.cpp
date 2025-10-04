@@ -27,19 +27,29 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/periodic_runner_job_abort_expired_transactions.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/db/client.h"
-#include "mongo/db/kill_sessions_local.h"
+#include "mongo/db/local_catalog/shard_role_api/transaction_resources.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/transaction_participant.h"
-#include "mongo/db/transaction_participant_gen.h"
+#include "mongo/db/session/kill_sessions_local.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/db/transaction/transaction_participant_gen.h"
+#include "mongo/idl/mutable_observer_registry.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/periodic_runner.h"
+
+#include <string>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
+
 
 namespace mongo {
 
@@ -61,6 +71,17 @@ Milliseconds getPeriod(const Argument& transactionLifetimeLimitSeconds) {
 
 }  // namespace
 
+// Tracks the number of passes the "abortExpiredTransactions" thread makes to abort expired
+// transactions.
+auto& abortExpiredTransactionsPasses = *MetricBuilder<Counter64>("abortExpiredTransactions.passes");
+// Tracks the number of transactions the "abortExpiredTransactions" thread successfully killed.
+auto& abortExpiredTransactionsSuccessfulKills =
+    *MetricBuilder<Counter64>("abortExpiredTransactions.successfulKills");
+// Tracks the number of transactions unsuccessfully killed by the "abortExpiredTransactions" thread
+// due to timing out trying to checkout a sessions.
+auto& abortExpiredTransactionsTimedOutKills =
+    *MetricBuilder<Counter64>("abortExpiredTransactions.timedOutKills");
+
 auto PeriodicThreadToAbortExpiredTransactions::get(ServiceContext* serviceContext)
     -> PeriodicThreadToAbortExpiredTransactions& {
     auto& jobContainer = _serviceDecoration(serviceContext);
@@ -74,7 +95,7 @@ auto PeriodicThreadToAbortExpiredTransactions::operator*() const noexcept -> Per
     return *_anchor;
 }
 
-auto PeriodicThreadToAbortExpiredTransactions::operator-> () const noexcept -> PeriodicJobAnchor* {
+auto PeriodicThreadToAbortExpiredTransactions::operator->() const noexcept -> PeriodicJobAnchor* {
     stdx::lock_guard lk(_mutex);
     return _anchor.get();
 }
@@ -101,19 +122,31 @@ void PeriodicThreadToAbortExpiredTransactions::_init(ServiceContext* serviceCont
             // transaction aborter thread from stalling behind any
             // non-transaction, exclusive lock taking operation blocked
             // behind an active transaction's intent lock.
-            opCtx->lockState()->setMaxLockTimeout(Milliseconds(0));
+            shard_role_details::getLocker(opCtx.get())->setMaxLockTimeout(Milliseconds(0));
 
             // This thread needs storage rollback to complete timely, so instruct the storage
             // engine to not do any extra eviction for this thread, if supported.
-            opCtx->recoveryUnit()->setNoEvictionAfterRollback();
+            shard_role_details::getRecoveryUnit(opCtx.get())->setNoEvictionAfterCommitOrRollback();
 
             try {
-                killAllExpiredTransactions(opCtx.get());
-            } catch (ExceptionForCat<ErrorCategory::CancellationError>& ex) {
+                int64_t numKills = 0;
+                int64_t numTimeOuts = 0;
+                killAllExpiredTransactions(
+                    opCtx.get(),
+                    Milliseconds(gAbortExpiredTransactionsSessionCheckoutTimeout.load()),
+                    &numKills,
+                    &numTimeOuts);
+                abortExpiredTransactionsPasses.increment(1);
+                abortExpiredTransactionsSuccessfulKills.increment(numKills);
+                abortExpiredTransactionsTimedOutKills.increment(numTimeOuts);
+            } catch (ExceptionFor<ErrorCategory::CancellationError>& ex) {
                 LOGV2_DEBUG(4684101, 2, "Periodic job canceled", "{reason}"_attr = ex.reason());
+            } catch (ExceptionFor<ErrorCategory::Interruption>& ex) {
+                LOGV2_DEBUG(7465601, 2, "Periodic job canceled", "{reason}"_attr = ex.reason());
             }
         },
-        getPeriod(gTransactionLifetimeLimitSeconds.load()));
+        getPeriod(gTransactionLifetimeLimitSeconds.load()),
+        true /*isKillableByStepdown*/);
 
     _anchor = std::make_shared<PeriodicJobAnchor>(periodicRunner->makeJob(std::move(job)));
 

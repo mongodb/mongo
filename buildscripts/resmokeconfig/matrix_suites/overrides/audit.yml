@@ -1,0 +1,9 @@
+### Overrides for matrix suites that include auditDestination ###
+- name: enable
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              auditDestination: "console"

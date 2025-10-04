@@ -31,6 +31,11 @@ extern "C" {
 
 #include <inttypes.h>
 #include <stddef.h>
+#include <stdint.h>
+
+#ifndef UNW_EMPTY_STRUCT
+#  define UNW_EMPTY_STRUCT uint8_t unused;
+#endif
 
 #define UNW_TARGET      arm
 #define UNW_TARGET_ARM  1
@@ -42,7 +47,7 @@ extern "C" {
    require recompiling all users of this library.  Stack allocation is
    relatively cheap and unwind-state copying is relatively rare, so we
    want to err on making it rather too big than too small.  */
-   
+
 /* FIXME for ARM. Too big?  What do other things use for similar tasks?  */
 #define UNW_TDEP_CURSOR_LEN     4096
 
@@ -50,6 +55,8 @@ typedef uint32_t unw_word_t;
 typedef int32_t unw_sword_t;
 
 typedef long double unw_tdep_fpreg_t;
+
+#define UNW_WORD_MAX UINT32_MAX
 
 typedef enum
   {
@@ -69,7 +76,7 @@ typedef enum
     UNW_ARM_R13,
     UNW_ARM_R14,
     UNW_ARM_R15,
-    
+
     /* VFPv2 s0-s31 (obsolescent numberings).  */
     UNW_ARM_S0 = 64,
     UNW_ARM_S1,
@@ -103,7 +110,7 @@ typedef enum
     UNW_ARM_S29,
     UNW_ARM_S30,
     UNW_ARM_S31,
-    
+
     /* FPA register numberings.  */
     UNW_ARM_F0 = 96,
     UNW_ARM_F1,
@@ -113,7 +120,7 @@ typedef enum
     UNW_ARM_F5,
     UNW_ARM_F6,
     UNW_ARM_F7,
-    
+
     /* iWMMXt GR register numberings.  */
     UNW_ARM_wCGR0 = 104,
     UNW_ARM_wCGR1,
@@ -123,7 +130,7 @@ typedef enum
     UNW_ARM_wCGR5,
     UNW_ARM_wCGR6,
     UNW_ARM_wCGR7,
-    
+
     /* iWMMXt register numberings.  */
     UNW_ARM_wR0 = 112,
     UNW_ARM_wR1,
@@ -141,9 +148,9 @@ typedef enum
     UNW_ARM_wR13,
     UNW_ARM_wR14,
     UNW_ARM_wR15,
-    
+
     /* Two-byte encodings from here on.  */
-    
+
     /* SPSR.  */
     UNW_ARM_SPSR = 128,
     UNW_ARM_SPSR_FIQ,
@@ -151,7 +158,7 @@ typedef enum
     UNW_ARM_SPSR_ABT,
     UNW_ARM_SPSR_UND,
     UNW_ARM_SPSR_SVC,
-    
+
     /* User mode registers.  */
     UNW_ARM_R8_USR = 144,
     UNW_ARM_R9_USR,
@@ -160,7 +167,7 @@ typedef enum
     UNW_ARM_R12_USR,
     UNW_ARM_R13_USR,
     UNW_ARM_R14_USR,
-    
+
     /* FIQ registers.  */
     UNW_ARM_R8_FIQ = 151,
     UNW_ARM_R9_FIQ,
@@ -169,23 +176,23 @@ typedef enum
     UNW_ARM_R12_FIQ,
     UNW_ARM_R13_FIQ,
     UNW_ARM_R14_FIQ,
-    
+
     /* IRQ registers.  */
     UNW_ARM_R13_IRQ = 158,
     UNW_ARM_R14_IRQ,
-    
+
     /* ABT registers.  */
     UNW_ARM_R13_ABT = 160,
     UNW_ARM_R14_ABT,
-    
+
     /* UND registers.  */
     UNW_ARM_R13_UND = 162,
     UNW_ARM_R14_UND,
-    
+
     /* SVC registers.  */
     UNW_ARM_R13_SVC = 164,
     UNW_ARM_R14_SVC,
-    
+
     /* iWMMXt control registers.  */
     UNW_ARM_wC0 = 192,
     UNW_ARM_wC1,
@@ -236,7 +243,7 @@ typedef enum
 
     UNW_TDEP_LAST_REG = UNW_ARM_D31,
 
-    UNW_TDEP_IP = UNW_ARM_R14,  /* A little white lie.  */
+    UNW_TDEP_IP = UNW_ARM_R15,
     UNW_TDEP_SP = UNW_ARM_R13,
     UNW_TDEP_EH = UNW_ARM_R0   /* FIXME.  */
   }
@@ -247,6 +254,7 @@ arm_regnum_t;
 typedef struct unw_tdep_save_loc
   {
     /* Additional target-dependent info on a save location.  */
+    UNW_EMPTY_STRUCT
   }
 unw_tdep_save_loc_t;
 
@@ -256,31 +264,54 @@ unw_tdep_save_loc_t;
 typedef struct unw_tdep_context
   {
     unsigned long regs[16];
+    unsigned long long fpregs[16];
   }
 unw_tdep_context_t;
 
-/* There is no getcontext() on ARM.  Use a stub version which only saves GP
-   registers.  FIXME: Not ideal, may not be sufficient for all libunwind
-   use cases.  Stores pc+8, which is only approximately correct, really.  */
+/* FIXME: this is a stub version which only saves GP registers.  Not ideal, but
+   may be sufficient for all libunwind use cases.
+   In thumb mode, we return directly back to thumb mode on return (with bx), to
+   avoid altering any registers after unw_resume. */
+
+#ifdef __SOFTFP__
+#define VSTMIA "nop\n\t" /* align return address to value stored by stmia */
+#else
+#define VSTMIA "vstmia %[base], {d0-d15}\n\t" /* this also aligns return address to value stored by stmia */
+#endif
+
 #ifndef __thumb__
-#define unw_tdep_getcontext(uc) (({                                     \
-  unw_tdep_context_t *unw_ctx = (uc);                                   \
-  register unsigned long *unw_base __asm__ ("r0") = unw_ctx->regs;      \
-  __asm__ __volatile__ (                                                \
-    "stmia %[base], {r0-r15}"                                           \
-    : : [base] "r" (unw_base) : "memory");                              \
-  }), 0)
+#define unw_tdep_getcontext(uc) ({                                                              \
+  unw_tdep_context_t *unw_ctx = (uc);                                                           \
+  register unsigned long *r0 __asm__ ("r0");                                                    \
+  register unsigned long *unw_base __asm__ ("r1") = unw_ctx->regs;                              \
+  __asm__ __volatile__ (                                                                        \
+    "mov r0, #0\n\t"                                                                            \
+    "stmia %[base]!, {r0-r15}\n\t"                                                              \
+    VSTMIA                                                                                      \
+    : [r0] "=r" (r0) : [base] "r" (unw_base) : "memory");                                       \
+  (int)r0; })
 #else /* __thumb__ */
-#define unw_tdep_getcontext(uc) (({                                     \
-  unw_tdep_context_t *unw_ctx = (uc);                                   \
-  register unsigned long *unw_base __asm__ ("r0") = unw_ctx->regs;      \
-  __asm__ __volatile__ (                                                \
-    ".align 2\nbx pc\nnop\n.code 32\n"                                  \
-    "stmia %[base], {r0-r15}\n"                                         \
-    "orr %[base], pc, #1\nbx %[base]\n"                                 \
-    ".code 16\n"							\
-    : [base] "+r" (unw_base) : : "memory", "cc");                       \
-  }), 0)
+#define unw_tdep_getcontext(uc) ({                                        \
+  unw_tdep_context_t *unw_ctx = (uc);                                     \
+  register unsigned long *r0 __asm__ ("r0");                              \
+  register unsigned long *unw_base __asm__ ("r1") = unw_ctx->regs;        \
+  __asm__ __volatile__ (                                                  \
+    ".align 2\n\t"                                                        \
+    "bx pc\n\t"                                                           \
+    "nop\n\t"                                                             \
+    ".code 32\n\t"                                                        \
+    "mov r0, #0\n\t"                                                      \
+    "stmia %[base]!, {r0-r14}\n\t"                                        \
+    "adr r0, ret%=+1\n\t"                                                 \
+    "stmia %[base]!, {r0}\n\t"                                            \
+    VSTMIA                                                                \
+    "orr r0, pc, #1\n\t"                                                  \
+    "bx r0\n\t"                                                           \
+    ".code 16\n\t"                                                        \
+    "mov r0, #0\n\t"                                                      \
+    "ret%=:\n"                                                            \
+    : [r0] "=r" (r0), [base] "+r" (unw_base) : : "memory", "cc");         \
+  (int)r0; })
 #endif
 
 #include "libunwind-dynamic.h"
@@ -288,6 +319,7 @@ unw_tdep_context_t;
 typedef struct
   {
     /* no arm-specific auxiliary proc-info */
+    UNW_EMPTY_STRUCT
   }
 unw_tdep_proc_info_t;
 

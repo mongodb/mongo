@@ -1,0 +1,6 @@
+package(default_visibility = ["//visibility:public"])
+
+sh_binary(
+    name = "clone_repos",
+    srcs = ["clone_repos.sh"],
+)

@@ -26,148 +26,97 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#include "mongo/db/pipeline/expression_context.h"
 
-#include "mongo/platform/basic.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
+#include "mongo/db/feature_compatibility_version_documentation.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
+#include "mongo/db/query/query_utils.h"
+#include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/stats/counters.h"
+#include "mongo/db/version_context.h"
 
 #include <utility>
 
-#include "mongo/db/pipeline/aggregate_command_gen.h"
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
-#include "mongo/db/query/collation/collation_spec.h"
-#include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/stats/counters.h"
-#include "mongo/util/intrusive_counter.h"
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
-using boost::intrusive_ptr;
-
-ExpressionContext::ResolvedNamespace::ResolvedNamespace(NamespaceString ns,
-                                                        std::vector<BSONObj> pipeline)
-    : ns(std::move(ns)), pipeline(std::move(pipeline)) {}
-
-ExpressionContext::ExpressionContext(OperationContext* opCtx,
-                                     const AggregateCommandRequest& request,
-                                     std::unique_ptr<CollatorInterface> collator,
-                                     std::shared_ptr<MongoProcessInterface> processInterface,
-                                     StringMap<ResolvedNamespace> resolvedNamespaces,
+ResolvedNamespace::ResolvedNamespace(NamespaceString ns,
+                                     std::vector<BSONObj> pipeline,
                                      boost::optional<UUID> collUUID,
-                                     bool mayDbProfile)
-    : ExpressionContext(opCtx,
-                        request.getExplain(),
-                        request.getFromMongos(),
-                        request.getNeedsMerge(),
-                        request.getAllowDiskUse(),
-                        request.getBypassDocumentValidation().value_or(false),
-                        request.getIsMapReduceCommand(),
-                        request.getNamespace(),
-                        request.getLegacyRuntimeConstants(),
-                        std::move(collator),
-                        std::move(processInterface),
-                        std::move(resolvedNamespaces),
-                        std::move(collUUID),
-                        request.getLet(),
-                        mayDbProfile) {
+                                     bool involvedNamespaceIsAView)
+    : ns(std::move(ns)),
+      pipeline(std::move(pipeline)),
+      uuid(collUUID),
+      involvedNamespaceIsAView(involvedNamespaceIsAView) {}
 
-    if (request.getIsMapReduceCommand()) {
-        // mapReduce command JavaScript invocation is only subject to the server global
-        // 'jsHeapLimitMB' limit.
-        jsHeapLimitMB = boost::none;
+ExpressionContext::ExpressionContext(ExpressionContextParams&& params)
+    : variablesParseState(variables.useIdGenerator()),
+      _params(std::move(params)),
+      _collator(std::move(_params.collator)),
+      _documentComparator(_collator.getCollator()),
+      _valueComparator(_collator.getCollator()),
+      _interruptChecker(this),
+      _featureFlagStreams([](const VersionContext& vCtx) {
+          return gFeatureFlagStreams.isEnabledUseLastLTSFCVWhenUninitialized(
+              vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+      }) {
+
+    _params.timeZoneDatabase = mongo::getTimeZoneDatabase(_params.opCtx);
+
+    // Disallow disk use if in read-only mode.
+    if (_params.allowDiskUse) {
+        tassert(7738401, "opCtx null check", _params.opCtx);
+        _params.allowDiskUse &= !(_params.opCtx->readOnly());
     }
-}
 
-ExpressionContext::ExpressionContext(
-    OperationContext* opCtx,
-    const boost::optional<ExplainOptions::Verbosity>& explain,
-    bool fromMongos,
-    bool needsMerge,
-    bool allowDiskUse,
-    bool bypassDocumentValidation,
-    bool isMapReduce,
-    const NamespaceString& ns,
-    const boost::optional<LegacyRuntimeConstants>& runtimeConstants,
-    std::unique_ptr<CollatorInterface> collator,
-    const std::shared_ptr<MongoProcessInterface>& mongoProcessInterface,
-    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces,
-    boost::optional<UUID> collUUID,
-    const boost::optional<BSONObj>& letParameters,
-    bool mayDbProfile)
-    : explain(explain),
-      fromMongos(fromMongos),
-      needsMerge(needsMerge),
-      allowDiskUse(allowDiskUse),
-      bypassDocumentValidation(bypassDocumentValidation),
-      ns(ns),
-      uuid(std::move(collUUID)),
-      opCtx(opCtx),
-      mongoProcessInterface(mongoProcessInterface),
-      timeZoneDatabase(getTimeZoneDatabase(opCtx)),
-      variablesParseState(variables.useIdGenerator()),
-      mayDbProfile(mayDbProfile),
-      _collator(std::move(collator)),
-      _documentComparator(_collator.get()),
-      _valueComparator(_collator.get()),
-      _resolvedNamespaces(std::move(resolvedNamespaces)) {
+    // Only initialize 'variables' if we are given a runtimeConstants object. We delay initializing
+    // variables and expect callers to invoke 'initializeReferencedSystemVariables()' after query
+    // parsing. This allows us to only initialize variables which are used in the query.
 
-    if (runtimeConstants && runtimeConstants->getClusterTime().isNull()) {
-        // Try to get a default value for clusterTime if a logical clock exists.
-        auto genConsts = variables.generateRuntimeConstants(opCtx);
-        genConsts.setJsScope(runtimeConstants->getJsScope());
-        genConsts.setIsMapReduce(runtimeConstants->getIsMapReduce());
-        variables.setLegacyRuntimeConstants(genConsts);
-    } else if (runtimeConstants) {
-        variables.setLegacyRuntimeConstants(*runtimeConstants);
+    if (_params.blankExpressionContext) {
+        // This is a shortcut to avoid reading the clock and the vector clock, since we don't
+        // actually care about their values for this 'blank' ExpressionContext codepath.
+        variables.setLegacyRuntimeConstants({Date_t::min(), Timestamp()});
+        // Expression counters are reported in serverStatus to indicate how often clients use
+        // certain expressions/stages, so it's a side effect tied to parsing. We must stop
+        // expression counters before re-parsing to avoid adding to the counters more than once per
+        // a given query.
+        stopExpressionCounters();
+    } else if (_params.runtimeConstants) {
+        if (_params.runtimeConstants->getClusterTime().isNull()) {
+            // Try to get a default value for clusterTime if a logical clock exists.
+            auto genConsts = variables.generateRuntimeConstants(getOperationContext());
+            genConsts.setJsScope(_params.runtimeConstants->getJsScope());
+            genConsts.setIsMapReduce(_params.runtimeConstants->getIsMapReduce());
+            genConsts.setUserRoles(_params.runtimeConstants->getUserRoles());
+            variables.setLegacyRuntimeConstants(genConsts);
+        } else {
+            variables.setLegacyRuntimeConstants(*(_params.runtimeConstants));
+        }
+    }
+
+    if (!_params.isMapReduceCommand) {
+        _params.jsHeapLimitMB = internalQueryJavaScriptHeapSizeLimitMB.load();
     } else {
-        variables.setDefaultRuntimeConstants(opCtx);
+        _params.jsHeapLimitMB = boost::none;
     }
-
-    if (!isMapReduce) {
-        jsHeapLimitMB = internalQueryJavaScriptHeapSizeLimitMB.load();
+    if (!_params.mongoProcessInterface) {
+        _params.mongoProcessInterface = std::make_shared<StubMongoProcessInterface>();
     }
-    if (letParameters)
-        variables.seedVariablesWithLetParameters(this, *letParameters);
-}
-
-ExpressionContext::ExpressionContext(
-    OperationContext* opCtx,
-    std::unique_ptr<CollatorInterface> collator,
-    const NamespaceString& nss,
-    const boost::optional<LegacyRuntimeConstants>& runtimeConstants,
-    const boost::optional<BSONObj>& letParameters,
-    bool mayDbProfile,
-    boost::optional<ExplainOptions::Verbosity> explain)
-    : explain(explain),
-      ns(nss),
-      opCtx(opCtx),
-      mongoProcessInterface(std::make_shared<StubMongoProcessInterface>()),
-      timeZoneDatabase(opCtx && opCtx->getServiceContext()
-                           ? TimeZoneDatabase::get(opCtx->getServiceContext())
-                           : nullptr),
-      variablesParseState(variables.useIdGenerator()),
-      mayDbProfile(mayDbProfile),
-      _collator(std::move(collator)),
-      _documentComparator(_collator.get()),
-      _valueComparator(_collator.get()) {
-    if (runtimeConstants) {
-        variables.setLegacyRuntimeConstants(*runtimeConstants);
-    }
-
-    jsHeapLimitMB = internalQueryJavaScriptHeapSizeLimitMB.load();
-    if (letParameters)
-        variables.seedVariablesWithLetParameters(this, *letParameters);
-}
-
-void ExpressionContext::checkForInterruptSlow() {
-    // This check could be expensive, at least in relative terms, so don't check every time.
-    invariant(opCtx);
-    _interruptCounter = kInterruptCheckPeriod;
-    opCtx->checkForInterrupt();
 }
 
 ExpressionContext::CollatorStash::CollatorStash(ExpressionContext* const expCtx,
                                                 std::unique_ptr<CollatorInterface> newCollator)
-    : _expCtx(expCtx), _originalCollator(std::move(_expCtx->_collator)) {
+    : _expCtx(expCtx), _originalCollator(_expCtx->_collator.getCollatorShared()) {
     _expCtx->setCollator(std::move(newCollator));
 }
 
@@ -181,75 +130,90 @@ std::unique_ptr<ExpressionContext::CollatorStash> ExpressionContext::temporarily
     return std::unique_ptr<CollatorStash>(new CollatorStash(this, std::move(newCollator)));
 }
 
-intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
-    NamespaceString ns,
-    boost::optional<UUID> uuid,
-    boost::optional<std::unique_ptr<CollatorInterface>> updatedCollator) const {
-
-    auto collator = updatedCollator
-        ? std::move(*updatedCollator)
-        : (_collator ? _collator->clone() : std::unique_ptr<CollatorInterface>{});
-
-    auto expCtx = make_intrusive<ExpressionContext>(opCtx,
-                                                    explain,
-                                                    fromMongos,
-                                                    needsMerge,
-                                                    allowDiskUse,
-                                                    bypassDocumentValidation,
-                                                    false,  // isMapReduce
-                                                    ns,
-                                                    boost::none,  // runtimeConstants
-                                                    std::move(collator),
-                                                    mongoProcessInterface,
-                                                    _resolvedNamespaces,
-                                                    uuid);
-
-    expCtx->inMongos = inMongos;
-    expCtx->maxFeatureCompatibilityVersion = maxFeatureCompatibilityVersion;
-    expCtx->subPipelineDepth = subPipelineDepth;
-    expCtx->tempDir = tempDir;
-    expCtx->jsHeapLimitMB = jsHeapLimitMB;
-
-    expCtx->variables = variables;
-    expCtx->variablesParseState = variablesParseState.copyWith(expCtx->variables.useIdGenerator());
-    expCtx->exprUnstableForApiV1 = exprUnstableForApiV1;
-    expCtx->exprDeprectedForApiV1 = exprDeprectedForApiV1;
-
-    expCtx->initialPostBatchResumeToken = initialPostBatchResumeToken.getOwned();
-    expCtx->originalAggregateCommand = originalAggregateCommand.getOwned();
-    expCtx->inMultiDocumentTransaction = inMultiDocumentTransaction;
-
-    // Note that we intentionally skip copying the value of '_interruptCounter' because 'expCtx' is
-    // intended to be used for executing a separate aggregation pipeline.
-
-    return expCtx;
-}
-
 void ExpressionContext::startExpressionCounters() {
-    if (enabledCounters && !_expressionCounters) {
-        _expressionCounters = boost::make_optional<ExpressionCounters>({});
+    if (_params.enabledCounters && !_expressionCounters) {
+        _expressionCounters = std::make_unique<ExpressionCounters>();
     }
 }
 
 void ExpressionContext::incrementMatchExprCounter(StringData name) {
-    if (enabledCounters && _expressionCounters) {
-        ++_expressionCounters.get().matchExprCountersMap[name];
+    if (_params.enabledCounters && _expressionCounters) {
+        ++_expressionCounters->matchExprCountersMap[name];
     }
 }
 
 void ExpressionContext::incrementAggExprCounter(StringData name) {
-    if (enabledCounters && _expressionCounters) {
-        ++_expressionCounters.get().aggExprCountersMap[name];
+    if (_params.enabledCounters && _expressionCounters) {
+        ++_expressionCounters->aggExprCountersMap[name];
+    }
+}
+
+void ExpressionContext::incrementGroupAccumulatorExprCounter(StringData name) {
+    if (_params.enabledCounters && _expressionCounters) {
+        ++_expressionCounters->groupAccumulatorExprCountersMap[name];
+    }
+}
+
+void ExpressionContext::incrementWindowAccumulatorExprCounter(StringData name) {
+    if (_params.enabledCounters && _expressionCounters) {
+        ++_expressionCounters->windowAccumulatorExprCountersMap[name];
     }
 }
 
 void ExpressionContext::stopExpressionCounters() {
-    if (enabledCounters && _expressionCounters) {
-        operatorCountersMatchExpressions.mergeCounters(
-            _expressionCounters.get().matchExprCountersMap);
-        operatorCountersAggExpressions.mergeCounters(_expressionCounters.get().aggExprCountersMap);
+    if (_params.enabledCounters && _expressionCounters) {
+        operatorCountersMatchExpressions.mergeCounters(_expressionCounters->matchExprCountersMap);
+        operatorCountersAggExpressions.mergeCounters(_expressionCounters->aggExprCountersMap);
+        operatorCountersGroupAccumulatorExpressions.mergeCounters(
+            _expressionCounters->groupAccumulatorExprCountersMap);
+        operatorCountersWindowAccumulatorExpressions.mergeCounters(
+            _expressionCounters->windowAccumulatorExprCountersMap);
     }
-    _expressionCounters = boost::none;
+    _expressionCounters.reset();
+}
+
+void ExpressionContext::initializeReferencedSystemVariables() {
+    if (_systemVarsReferencedInQuery.contains(Variables::kNowId) &&
+        !variables.hasValue(Variables::kNowId)) {
+        variables.defineLocalNow();
+    }
+    if (_systemVarsReferencedInQuery.contains(Variables::kClusterTimeId) &&
+        !variables.hasValue(Variables::kClusterTimeId)) {
+        // TODO: SERVER-104560: Create utility functions that return the current server topology.
+        // Replace the code checking for standalone mode with a call to the utility provided by
+        // SERVER-104560.
+        auto* repl = repl::ReplicationCoordinator::get(getOperationContext());
+        if (repl && !repl->getSettings().isReplSet() &&
+            serverGlobalParams.clusterRole.has(ClusterRole::None)) {
+            uasserted(10071200,
+                      str::stream() << "system variable $$CLUSTER_TIME"
+                                    << " is not available in standalone mode");
+        }
+        variables.defineClusterTime(getOperationContext());
+    }
+    if (_systemVarsReferencedInQuery.contains(Variables::kUserRolesId) &&
+        !variables.hasValue(Variables::kUserRolesId) && enableAccessToUserRoles.load()) {
+        variables.defineUserRoles(getOperationContext());
+    }
+}
+
+void ExpressionContext::throwIfParserShouldRejectFeature(StringData name, FeatureFlag& flag) {
+    // (Generic FCV reference): Fall back to kLastLTS when 'vCtx' is not initialized.
+    uassert(
+        ErrorCodes::QueryFeatureNotAllowed,
+        str::stream() << name
+                      << " is not allowed in the current feature compatibility version. See "
+                      << feature_compatibility_version_documentation::compatibilityLink()
+                      << " for more information.",
+        flag.checkWithContext(_params.vCtx,
+                              _params.ifrContext,
+                              ServerGlobalParams::FCVSnapshot{multiversion::GenericFCV::kLastLTS}));
+}
+
+void ExpressionContext::ignoreFeatureInParserOrRejectAndThrow(StringData name, FeatureFlag& flag) {
+    if (!shouldParserIgnoreFeatureFlagCheck()) {
+        throwIfParserShouldRejectFeature(name, flag);
+    }
 }
 
 }  // namespace mongo

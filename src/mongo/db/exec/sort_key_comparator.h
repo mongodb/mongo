@@ -29,10 +29,11 @@
 
 #pragma once
 
-#include <vector>
-
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/query/sort_pattern.h"
+#include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
+
+#include <vector>
 
 namespace mongo {
 

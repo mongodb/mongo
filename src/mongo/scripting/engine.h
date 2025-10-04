@@ -30,9 +30,29 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
+#include "mongo/util/time_support.h"
+
+#include <cstdint>
+#include <functional>
+#include <map>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 typedef unsigned long long ScriptingFunction;
@@ -42,12 +62,21 @@ typedef std::map<std::string, ScriptingFunction> FunctionCacheMap;
 class DBClientBase;
 class OperationContext;
 
-struct JSFile {
+struct MONGO_MOD_NEEDS_REPLACEMENT JSFile {
     const char* name;
     const StringData source;
 };
 
-class Scope {
+struct JSRegEx {
+    std::string pattern;
+    std::string flags;
+
+    JSRegEx() = default;
+    JSRegEx(std::string pattern, std::string flags)
+        : pattern(std::move(pattern)), flags(std::move(flags)) {}
+};
+
+class MONGO_MOD_PUB Scope {
     Scope(const Scope&) = delete;
     Scope& operator=(const Scope&) = delete;
 
@@ -66,8 +95,8 @@ public:
     }
 
     virtual void externalSetup() = 0;
-    virtual void setLocalDB(StringData localDBName) {
-        _localDBName = localDBName.toString();
+    virtual void setLocalDB(const DatabaseName& localDBName) {
+        _localDBName = localDBName;
     }
 
     virtual BSONObj getObject(const char* field) = 0;
@@ -75,10 +104,14 @@ public:
     virtual bool getBoolean(const char* field) = 0;
     virtual double getNumber(const char* field) = 0;
     virtual int getNumberInt(const char* field) = 0;
-
     virtual long long getNumberLongLong(const char* field) = 0;
-
     virtual Decimal128 getNumberDecimal(const char* field) = 0;
+    virtual OID getOID(const char* field) = 0;
+    // Note: The resulting BSONBinData is only valid within the scope of the 'withBinData' callback.
+    virtual void getBinData(const char* field,
+                            std::function<void(const BSONBinData&)> withBinData) = 0;
+    virtual Timestamp getTimestamp(const char* field) = 0;
+    virtual JSRegEx getRegEx(const char* field) = 0;
 
     virtual void setElement(const char* field, const BSONElement& e, const BSONObj& parent) = 0;
     virtual void setNumber(const char* field, double val) = 0;
@@ -94,6 +127,8 @@ public:
     virtual void rename(const char* from, const char* to) = 0;
 
     virtual std::string getError() = 0;
+
+    virtual std::string getBaseURL() const = 0;
 
     virtual bool hasOutOfMemoryException() = 0;
 
@@ -164,6 +199,7 @@ public:
                           int timeoutMs = 0);
 
     void execCoreFiles();
+    void execPrelude();
 
     virtual void loadStored(OperationContext* opCtx, bool ignoreNotConnected = false);
 
@@ -190,7 +226,7 @@ protected:
 
     virtual ScriptingFunction _createFunction(const char* code) = 0;
 
-    std::string _localDBName;
+    DatabaseName _localDBName;
     int64_t _loadedVersion;
     std::set<std::string> _storedNames;
     static AtomicWord<long long> _lastVersion;
@@ -199,13 +235,15 @@ protected:
     bool _lastRetIsNativeCode;  // v8 only: set to true if eval'd script returns a native func
 };
 
-class ScriptEngine : public KillOpListenerInterface {
+enum class MONGO_MOD_PUB ExecutionEnvironment { Server, TestRunner };
+
+class MONGO_MOD_PUB ScriptEngine : public KillOpListenerInterface {
     ScriptEngine(const ScriptEngine&) = delete;
     ScriptEngine& operator=(const ScriptEngine&) = delete;
 
 public:
-    ScriptEngine(bool disableLoadStored);
-    virtual ~ScriptEngine();
+    ScriptEngine();
+    ~ScriptEngine() override = default;
 
     virtual Scope* newScope() {
         return createScope();
@@ -223,21 +261,19 @@ public:
 
     virtual bool utf8Ok() const = 0;
 
-    virtual void enableJIT(bool value) = 0;
-    virtual bool isJITEnabled() const = 0;
-
     virtual void enableJavaScriptProtection(bool value) = 0;
     virtual bool isJavaScriptProtectionEnabled() const = 0;
 
     virtual int getJSHeapLimitMB() const = 0;
     virtual void setJSHeapLimitMB(int limit) = 0;
 
+    virtual std::string getLoadPath() const = 0;
+    virtual void setLoadPath(const std::string& loadPath) = 0;
+
     /**
-     * Calls the constructor for the Global ScriptEngine. 'disableLoadStored' causes future calls to
-     * the function Scope::loadStored(), which would otherwise load stored procedures, to be
-     * ignored.
+     * Calls the constructor for the Global ScriptEngine.
      */
-    static void setup(bool disableLoadStored = true);
+    static void setup(ExecutionEnvironment environment);
     static void dropScopeCache();
 
     /** gets a scope from the pool or a new one if pool is empty
@@ -247,9 +283,13 @@ public:
      * @return the scope
      */
     std::unique_ptr<Scope> getPooledScope(OperationContext* opCtx,
-                                          const std::string& db,
+                                          const DatabaseName& db,
                                           const std::string& scopeType);
 
+    using ScopeCallback = void (*)(Scope&);
+    ScopeCallback getScopeInitCallback() {
+        return _scopeInitCallback;
+    };
     void setScopeInitCallback(void (*func)(Scope&)) {
         _scopeInitCallback = func;
     }
@@ -263,11 +303,10 @@ public:
 
     // engine implementation may either respond to interrupt events or
     // poll for interrupts.  the interrupt functions must not wait indefinitely on a lock.
-    virtual void interrupt(unsigned opId) {}
-    virtual void interruptAll() {}
+    void interrupt(ClientLock&, OperationContext*) override {}
+    void interruptAll(ServiceContextLock&) override {}
 
     static std::string getInterpreterVersionString();
-    const bool _disableLoadStored;
 
 protected:
     virtual Scope* createScope() = 0;
@@ -282,7 +321,7 @@ void installGlobalUtils(Scope& scope);
 bool hasJSReturn(const std::string& s);
 const char* jsSkipWhiteSpace(const char* raw);
 
-ScriptEngine* getGlobalScriptEngine();
+MONGO_MOD_PUB ScriptEngine* getGlobalScriptEngine();
 void setGlobalScriptEngine(ScriptEngine* impl);
 
 }  // namespace mongo

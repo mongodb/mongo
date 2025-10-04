@@ -31,7 +31,7 @@
 #
 import os, sys
 
-# After importing the SWIG-generated file, copy all symbols from from it
+# After importing the SWIG-generated file, copy all symbols from it
 # to this module so they will appear in the workgen namespace.
 me = sys.modules[__name__]
 sys.path.append(os.path.dirname(__file__))  # needed for Python3

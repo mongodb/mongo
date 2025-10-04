@@ -27,50 +27,56 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/pipeline/accumulator.h"
-
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
+#include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/window_function/window_function_expression.h"
 #include "mongo/db/pipeline/window_function/window_function_push.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
-using boost::intrusive_ptr;
 using std::vector;
 
-REGISTER_ACCUMULATOR(push, genericParseSBEUnsupportedSingleExpressionAccumulator<AccumulatorPush>);
-REGISTER_REMOVABLE_WINDOW_FUNCTION(push, AccumulatorPush, WindowFunctionPush);
+REGISTER_ACCUMULATOR(push, genericParseSingleExpressionAccumulator<AccumulatorPush>);
+REGISTER_STABLE_REMOVABLE_WINDOW_FUNCTION(push, AccumulatorPush, WindowFunctionPush);
 
 void AccumulatorPush::processInternal(const Value& input, bool merging) {
     if (!merging) {
         if (!input.missing()) {
             _array.push_back(input);
-            _memUsageBytes += input.getApproximateSize();
+            _memUsageTracker.add(input.getApproximateSize());
             uassert(ErrorCodes::ExceededMemoryLimit,
                     str::stream()
                         << "$push used too much memory and cannot spill to disk. Memory limit: "
-                        << _maxMemUsageBytes << " bytes",
-                    _memUsageBytes < _maxMemUsageBytes);
+                        << _memUsageTracker.maxAllowedMemoryUsageBytes() << " bytes",
+                    _memUsageTracker.withinMemoryLimit());
         }
     } else {
         // If we're merging, we need to take apart the arrays we receive and put their elements into
         // the array we are collecting.  If we didn't, then we'd get an array of arrays, with one
         // array from each merge source.
-        invariant(input.getType() == Array);
+        assertMergingInputType(input, BSONType::array);
 
         const vector<Value>& vec = input.getArray();
         for (auto&& val : vec) {
-            _memUsageBytes += val.getApproximateSize();
+            _memUsageTracker.add(val.getApproximateSize());
             uassert(ErrorCodes::ExceededMemoryLimit,
                     str::stream()
                         << "$push used too much memory and cannot spill to disk. Memory limit: "
-                        << _maxMemUsageBytes << " bytes",
-                    _memUsageBytes < _maxMemUsageBytes);
+                        << _memUsageTracker.maxAllowedMemoryUsageBytes() << " bytes",
+                    _memUsageTracker.withinMemoryLimit());
         }
         _array.insert(_array.end(), vec.begin(), vec.end());
     }
@@ -82,17 +88,12 @@ Value AccumulatorPush::getValue(bool toBeMerged) {
 
 AccumulatorPush::AccumulatorPush(ExpressionContext* const expCtx,
                                  boost::optional<int> maxMemoryUsageBytes)
-    : AccumulatorState(expCtx),
-      _maxMemUsageBytes(maxMemoryUsageBytes.value_or(internalQueryMaxPushBytes.load())) {
-    _memUsageBytes = sizeof(*this);
+    : AccumulatorState(expCtx, maxMemoryUsageBytes.value_or(internalQueryMaxPushBytes.load())) {
+    _memUsageTracker.set(sizeof(*this));
 }
 
 void AccumulatorPush::reset() {
     vector<Value>().swap(_array);
-    _memUsageBytes = sizeof(*this);
-}
-
-intrusive_ptr<AccumulatorState> AccumulatorPush::create(ExpressionContext* const expCtx) {
-    return new AccumulatorPush(expCtx, boost::none);
+    _memUsageTracker.set(sizeof(*this));
 }
 }  // namespace mongo

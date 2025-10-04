@@ -2,14 +2,14 @@
 // each role is a member of the next, creating a large chain.
 // @tags: [requires_sharding]
 
-(function() {
-"use strict";
-function runTest(conn) {
-    var testdb = conn.getDB("rolechain");
-    testdb.runCommand({dropAllRolesFromDatabase: 1});
-    var chainLen = 2000;
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-    var buildInfo = conn.getDB("admin").runCommand("buildInfo");
+function runTest(conn) {
+    let testdb = conn.getDB("rolechain");
+    testdb.runCommand({dropAllRolesFromDatabase: 1});
+    let chainLen = 2000;
+
+    let buildInfo = conn.getDB("admin").runCommand("buildInfo");
     assert.commandWorked(buildInfo);
 
     // We reduce the number of roles linked together in the chain to avoid causing this test to take
@@ -20,22 +20,21 @@ function runTest(conn) {
 
     jsTestLog("Generating a chain of " + chainLen + " linked roles");
 
-    var roleNameBase = "chainRole";
-    for (var i = 0; i < chainLen; i++) {
-        var name = roleNameBase + i;
+    let roleNameBase = "chainRole";
+    for (let i = 0; i < chainLen; i++) {
+        let name = roleNameBase + i;
         if (i == 0) {
             testdb.runCommand({createRole: name, privileges: [], roles: []});
         } else {
             jsTestLog("Creating role " + i);
-            var prevRole = roleNameBase + (i - 1);
+            let prevRole = roleNameBase + (i - 1);
             testdb.runCommand({createRole: name, privileges: [], roles: [prevRole]});
-            var roleInfo = testdb.getRole(name);
         }
     }
 }
 
 // run all tests standalone
-var conn = MongoRunner.runMongod();
+let conn = MongoRunner.runMongod();
 runTest(conn);
 MongoRunner.stopMongod(conn);
 
@@ -43,4 +42,3 @@ MongoRunner.stopMongod(conn);
 conn = new ShardingTest({shards: 2, mongos: 1, config: 3});
 runTest(conn);
 conn.stop();
-})();

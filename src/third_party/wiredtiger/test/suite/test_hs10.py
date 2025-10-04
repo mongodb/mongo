@@ -26,15 +26,13 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest, time
-from wiredtiger import stat
+import wiredtiger, wttest
 from wtscenario import make_scenarios
 
 # test_hs10.py
 # Verify modify read after eviction.
 class test_hs10(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=2MB,statistics=(all),eviction=(threads_max=1)'
-    session_config = 'isolation=snapshot'
     key_format_values = (
         ('column', dict(key_format='r')),
         ('integer-row', dict(key_format='i'))
@@ -104,6 +102,3 @@ class test_hs10(wttest.WiredTigerTestCase):
         self.session.begin_transaction('read_timestamp=' + self.timestamp_str(5))
         self.assertEqual(cursor[1], value1 + 'ABC')
         self.session.commit_transaction()
-
-if __name__ == '__main__':
-    wttest.run()

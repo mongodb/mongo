@@ -31,7 +31,7 @@ DuplicateHandle(
     boost::winapi::BOOL_ bInheritHandle,
     boost::winapi::DWORD_ dwOptions);
 
-#if BOOST_USE_WINAPI_VERSION >= BOOST_WINAPI_VERSION_WIN10
+#if BOOST_USE_WINAPI_VERSION >= BOOST_WINAPI_VERSION_WIN10 && (BOOST_WINAPI_PARTITION_APP || BOOST_WINAPI_PARTITION_SYSTEM)
 BOOST_WINAPI_IMPORT boost::winapi::BOOL_ BOOST_WINAPI_WINAPI_CC
 CompareObjectHandles(
     boost::winapi::HANDLE_ hFirstObjectHandle,
@@ -46,7 +46,7 @@ namespace winapi {
 using ::CloseHandle;
 using ::DuplicateHandle;
 
-#if BOOST_USE_WINAPI_VERSION >= BOOST_WINAPI_VERSION_WIN10
+#if BOOST_USE_WINAPI_VERSION >= BOOST_WINAPI_VERSION_WIN10 && (BOOST_WINAPI_PARTITION_APP || BOOST_WINAPI_PARTITION_SYSTEM)
 using ::CompareObjectHandles;
 #endif
 

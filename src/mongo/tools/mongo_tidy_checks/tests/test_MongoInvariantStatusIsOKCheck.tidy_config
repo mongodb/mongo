@@ -1,0 +1,2 @@
+Checks: '-*,mongo-invariant-status-is-ok-check'
+WarningsAsErrors: '*'

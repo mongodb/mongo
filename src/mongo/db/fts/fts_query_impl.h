@@ -29,11 +29,17 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/fts/fts_query.h"
+#include "mongo/db/fts/fts_util.h"
+#include "mongo/util/modules.h"
+
+#include <cstddef>
+#include <memory>
 #include <set>
 #include <string>
 #include <vector>
-
-#include "mongo/db/fts/fts_query.h"
 
 namespace mongo {
 

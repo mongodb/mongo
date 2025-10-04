@@ -1,16 +1,25 @@
 test_kind: js_test
+description: |
+  "Passthrough" means running a test against different runtime Cluster
+  configurations, including topology, runtime flags, fault injections, and other
+  parameters. Most tests by default are able to run in "passthrough" suites.
+  NoPassthrough is an exception, where tests here only run in the exact
+  configuration predefined in the tests themselves.
 
 selector:
   roots:
-  - jstests/noPassthrough/*.js
-  - src/mongo/db/modules/*/jstests/hot_backups/*.js
-  - src/mongo/db/modules/*/jstests/live_import/*.js
+    - jstests/noPassthrough/**/*.js
+    - jstests/libs/property_test_helpers/self_tests/*.js
+    - src/mongo/db/modules/*/jstests/hot_backups/**/*.js
+    - src/mongo/db/modules/*/jstests/live_import/*.js
+    - src/mongo/db/modules/*/jstests/live_restore/*.js
+    - src/mongo/db/modules/*/jstests/no_passthrough/*.js
 
-  # Self-tests for the Concurrency testing framework are run as part of this test suite.
-  - jstests/concurrency/*.js
+    # Self-tests for the Concurrency testing framework are run as part of this test suite.
+    - jstests/concurrency/*.js
   exclude_files:
-  # Disable inmem_full as per SERVER-27014
-  - jstests/noPassthrough/inmem_full.js
+    - jstests/noPassthrough/libs/**/*.js
+  exclude_with_any_tags:
 
 # noPassthrough tests start their own mongod's.
 executor:
@@ -19,7 +28,8 @@ executor:
       - jstests/noPassthrough/backup*.js
       - jstests/noPassthrough/oplog_writes_only_permitted_on_standalone.js
       - jstests/noPassthrough/wt_unclean_shutdown.js
-      - src/mongo/db/modules/enterprise/jstests/hot_backups/*.js
+      - src/mongo/db/modules/*/jstests/live_restore/*.js
+      - src/mongo/db/modules/enterprise/jstests/hot_backups/**/*.js
   config:
     shell_options:
-      nodb: ''
+      nodb: ""

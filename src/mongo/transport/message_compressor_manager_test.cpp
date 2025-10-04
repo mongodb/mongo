@@ -27,23 +27,44 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-#include "mongo/platform/basic.h"
-
-#include <memory>
-#include <string>
-#include <vector>
-
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/rpc/message.h"
 #include "mongo/transport/message_compressor_manager.h"
+
+#include "mongo/base/data_range.h"
+#include "mongo/base/data_range_cursor.h"
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/rpc/message.h"
 #include "mongo/transport/message_compressor_noop.h"
 #include "mongo/transport/message_compressor_registry.h"
 #include "mongo/transport/message_compressor_snappy.h"
 #include "mongo/transport/message_compressor_zlib.h"
 #include "mongo/transport/message_compressor_zstd.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/shared_buffer.h"
+#include "mongo/util/str.h"
+
+#include <array>
+#include <cstdint>
+#include <cstring>
+#include <limits>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 
 namespace mongo {
 namespace {
@@ -77,7 +98,7 @@ void checkNegotiationResult(const BSONObj& result, const std::vector<std::string
 
     std::vector<std::string> resultAlgos;
     for (const auto& e : compressorsListObj) {
-        resultAlgos.push_back(e.checkAndGetStringData().toString());
+        resultAlgos.push_back(std::string{e.checkAndGetStringData()});
     }
     ASSERT_EQ(algos.size(), resultAlgos.size());
     for (size_t i = 0; i < algos.size(); i++) {
@@ -210,13 +231,13 @@ boost::optional<std::vector<StringData>> parseBSON(BSONObj input) {
 
     uassert(ErrorCodes::BadValue,
             str::stream() << "'compression' is not an array: " << elem,
-            elem.type() == Array);
+            elem.type() == BSONType::array);
 
     std::vector<StringData> ret;
     for (const auto& e : elem.Obj()) {
         uassert(ErrorCodes::BadValue,
                 str::stream() << "'compression' element is not a string: " << e,
-                e.type() == String);
+                e.type() == BSONType::string);
         ret.push_back(e.valueStringData());
     }
 

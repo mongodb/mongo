@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+
+    <Type Name="boost::system::error_category">
+        <DisplayString Condition="id_ == 0xb2ab117a257edfd0">[generic]</DisplayString>
+        <DisplayString Condition="id_ == 0xb2ab117a257edfd1">[system]</DisplayString>
+        <DisplayString Condition="id_ == 0xb2ab117a257edfd2">[interop]</DisplayString>
+        <DisplayString Condition="id_ != 0">[{id_,x}]</DisplayString>
+        <DisplayString>@{((uintptr_t)this),x}</DisplayString>
+    </Type>
+
+    <Type Name="boost::system::error_code">
+        <DisplayString Condition="lc_flags_ == 0">{d1_.val_} [system] ✓</DisplayString>
+
+        <DisplayString Condition="lc_flags_ == 1 &amp;&amp; ((std::error_code*)d2_)->_Mycat->_Addr==1">{((std::error_code*)d2_)->_Myval} [std:future]</DisplayString>
+        <DisplayString Condition="lc_flags_ == 1 &amp;&amp; ((std::error_code*)d2_)->_Mycat->_Addr==3">{((std::error_code*)d2_)->_Myval} [std:generic]</DisplayString>
+        <DisplayString Condition="lc_flags_ == 1 &amp;&amp; ((std::error_code*)d2_)->_Mycat->_Addr==5">{((std::error_code*)d2_)->_Myval} [std:iostream]</DisplayString>
+        <DisplayString Condition="lc_flags_ == 1 &amp;&amp; ((std::error_code*)d2_)->_Mycat->_Addr==7">{((std::error_code*)d2_)->_Myval} [std:system]</DisplayString>
+        <DisplayString Condition="lc_flags_ == 1">{((std::error_code*)d2_)->_Myval} std@{((uintptr_t)((std::error_code*)d2_)->_Mycat),x}</DisplayString>
+
+        <DisplayString Condition="d1_.cat_->id_ == 0xb2ab117a257edfd0 &amp;&amp;
+            (lc_flags_ == 2 || (lc_flags_ &gt; 3 &amp;&amp; ( lc_flags_ % 2 == 0 )))">{d1_.val_} [generic] ✓</DisplayString>
+        <DisplayString Condition="d1_.cat_->id_ == 0xb2ab117a257edfd1 &amp;&amp;
+            (lc_flags_ == 2 || (lc_flags_ &gt; 3 &amp;&amp; ( lc_flags_ % 2 == 0 )))">{d1_.val_} [system] ✓</DisplayString>
+        <DisplayString Condition="d1_.cat_->id_ == 0xb2ab117a257edfd2 &amp;&amp;
+            (lc_flags_ == 2 || (lc_flags_ &gt; 3 &amp;&amp; ( lc_flags_ % 2 == 0 )))">{d1_.val_} [interop] ✓</DisplayString>
+        <DisplayString Condition="d1_.cat_->id_ != 0 &amp;&amp;
+            (lc_flags_ == 2 || (lc_flags_ &gt; 3 &amp;&amp; ( lc_flags_ % 2 == 0 )))">{d1_.val_} [{d1_.cat_->id_,x}] ✓</DisplayString>
+        <DisplayString Condition=
+            "lc_flags_ == 2 || (lc_flags_ &gt; 3 &amp;&amp; ( lc_flags_ % 2 == 0 ))">{d1_.val_} @{((uintptr_t)d1_.cat_),x} ✓</DisplayString>
+
+        <DisplayString Condition="d1_.cat_->id_ == 0xb2ab117a257edfd0 &amp;&amp;
+            (lc_flags_ &gt;= 3 &amp;&amp; ( lc_flags_ % 2 == 1 ))">{d1_.val_} [generic]</DisplayString>
+        <DisplayString Condition="d1_.cat_->id_ == 0xb2ab117a257edfd1 &amp;&amp;
+            (lc_flags_ &gt;= 3 &amp;&amp; ( lc_flags_ % 2 == 1 ))">{d1_.val_} [system]</DisplayString>
+        <DisplayString Condition="d1_.cat_->id_ == 0xb2ab117a257edfd2 &amp;&amp;
+            (lc_flags_ &gt;= 3 &amp;&amp; ( lc_flags_ % 2 == 1 ))">{d1_.val_} [interop]</DisplayString>
+        <DisplayString Condition="d1_.cat_->id_ != 0 &amp;&amp;
+            (lc_flags_ &gt;= 3 &amp;&amp; ( lc_flags_ % 2 == 1 ))">{d1_.val_} [{d1_.cat_->id_,x}]</DisplayString>
+        <DisplayString Condition=
+            "lc_flags_ &gt;= 3 &amp;&amp; ( lc_flags_ % 2 == 1 )">{d1_.val_} @{((uintptr_t)d1_.cat_),x}</DisplayString>
+
+        <Expand>
+            <Item Name="std::error_code" Condition="lc_flags_ == 1">(std::error_code*)d2_</Item>
+            <Item Name="[location]" Condition="lc_flags_ &gt; 3">*((boost::source_location*)(lc_flags_ &amp; ~1))</Item>
+        </Expand>
+    </Type>
+
+    <Type Name="boost::system::result&lt;*,*&gt;">
+        <DisplayString>{v_}</DisplayString>
+    </Type>
+
+</AutoVisualizer>

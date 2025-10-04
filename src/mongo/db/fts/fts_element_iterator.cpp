@@ -28,11 +28,17 @@
  */
 
 #include "mongo/db/fts/fts_element_iterator.h"
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/fts/fts_spec.h"
-#include "mongo/db/fts/fts_util.h"
 #include "mongo/util/str.h"
 
+#include <map>
+#include <ostream>
 #include <stack>
+#include <utility>
 
 namespace mongo {
 
@@ -109,21 +115,25 @@ FTSIteratorValue FTSElementIterator::advance() {
             continue;
         }
 
+        // SERVER-78238: fields whose name contains a dot or starts with a '$' are not indexable.
+        if (fieldName.find_first_of('.') != string::npos || fieldName.starts_with('$')) {
+            continue;
+        }
+
         // Compose the dotted name of the current field:
         // 1. parent path empty (top level): use the current field name
         // 2. parent path non-empty and obj is an array: use the parent path
         // 3. parent path non-empty and obj is a sub-doc: append field name to parent path
-        string dottedName =
-            (_frame._parentPath.empty()
-                 ? fieldName
-                 : _frame._isArray ? _frame._parentPath : _frame._parentPath + '.' + fieldName);
+        string dottedName = (_frame._parentPath.empty() ? fieldName
+                                 : _frame._isArray      ? _frame._parentPath
+                                                        : _frame._parentPath + '.' + fieldName);
 
         // Find lower bound of dottedName in _weights.  lower_bound leaves us at the first
         // weight that could possibly match or be a prefix of dottedName.  And if this
         // element fails to match, then no subsequent weight can match, since the weights
         // are lexicographically ordered.
-        Weights::const_iterator i =
-            _spec.weights().lower_bound(elem.type() == Object ? dottedName + '.' : dottedName);
+        Weights::const_iterator i = _spec.weights().lower_bound(
+            elem.type() == BSONType::object ? dottedName + '.' : dottedName);
 
         // possibleWeightMatch is set if the weight map contains either a match or some item
         // lexicographically larger than fieldName.  This boolean acts as a guard on
@@ -146,14 +156,15 @@ FTSIteratorValue FTSElementIterator::advance() {
         double weight = (exactMatch ? i->second : DEFAULT_WEIGHT);
 
         switch (elem.type()) {
-            case String:
+            case BSONType::string:
                 // Only index strings on exact match or wildcard.
                 if (exactMatch || _spec.wildcard()) {
-                    return FTSIteratorValue(elem.valuestr(), _frame._language, weight);
+                    return FTSIteratorValue(
+                        elem.valueStringData().data(), _frame._language, weight);
                 }
                 break;
 
-            case Object:
+            case BSONType::object:
                 // Only descend into a sub-document on proper prefix or wildcard.  Note that
                 // !exactMatch is a sufficient test for proper prefix match, because of
                 //   if ( !matchPrefix( dottedName, i->first ) ) continue;
@@ -165,7 +176,7 @@ FTSIteratorValue FTSElementIterator::advance() {
                 }
                 break;
 
-            case Array:
+            case BSONType::array:
                 // Only descend into arrays from non-array parents or on wildcard.
                 if (!_frame._isArray || _spec.wildcard()) {
                     _frameStack.push(_frame);

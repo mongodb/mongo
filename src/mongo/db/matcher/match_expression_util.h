@@ -31,6 +31,8 @@
 
 #include "mongo/bson/bsonobj.h"
 
+#include <cstddef>
+
 namespace mongo::match_expression_util {
 /**
  * Advances position of iterator 'iterator' by 'numberOfElements' elements but no more than the end

@@ -27,17 +27,30 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/dbtests/mock/mock_replica_set.h"
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/client/mongo_uri.h"
+#include "mongo/client/sdam/server_description.h"
 #include "mongo/client/sdam/topology_description_builder.h"
+#include "mongo/db/repl/member_config.h"
 #include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/repl_set_tag.h"
 #include "mongo/dbtests/mock/mock_conn_registry.h"
-#include "mongo/dbtests/mock/mock_dbclient_connection.h"
-#include "mongo/util/invariant.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 
+#include <algorithm>
+#include <ctime>
+#include <memory>
 #include <sstream>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
 
 using namespace mongo::repl;
 
@@ -151,7 +164,7 @@ void MockReplicaSet::setPrimary(const string& hostAndPort) {
 
     _primaryHost = hostAndPort;
 
-    mockIsMasterCmd();
+    mockHelloCmd();
     mockReplSetGetStatusCmd();
 }
 
@@ -185,12 +198,12 @@ repl::ReplSetConfig MockReplicaSet::getReplConfig() const {
 
 void MockReplicaSet::setConfig(const repl::ReplSetConfig& newConfig) {
     _replConfig = newConfig;
-    mockIsMasterCmd();
+    mockHelloCmd();
     mockReplSetGetStatusCmd();
 }
 
 void MockReplicaSet::kill(const string& hostAndPort) {
-    verify(_nodeMap.count(hostAndPort) == 1);
+    MONGO_verify(_nodeMap.count(hostAndPort) == 1);
     _nodeMap[hostAndPort]->shutdown();
 }
 
@@ -201,7 +214,7 @@ void MockReplicaSet::kill(const vector<string>& hostList) {
 }
 
 void MockReplicaSet::restore(const string& hostAndPort) {
-    verify(_nodeMap.count(hostAndPort) == 1);
+    MONGO_verify(_nodeMap.count(hostAndPort) == 1);
     _nodeMap[hostAndPort]->reboot();
 }
 
@@ -213,14 +226,14 @@ BSONObj MockReplicaSet::mockHelloResponseFor(const MockRemoteDBServer& server) c
 
     const MemberConfig* member = _replConfig.findMemberByHostAndPort(hostAndPort);
     if (!member) {
-        builder.append("ismaster", false);
+        builder.append("isWritablePrimary", false);
         builder.append("secondary", false);
 
         vector<string> hostList;
         builder.append("hosts", hostList);
     } else {
         const bool isPrimary = hostAndPort.toString() == getPrimary();
-        builder.append("ismaster", isPrimary);
+        builder.append("isWritablePrimary", isPrimary);
         builder.append("secondary", !isPrimary);
 
         {
@@ -287,14 +300,12 @@ BSONObj MockReplicaSet::mockHelloResponseFor(const MockRemoteDBServer& server) c
     return builder.obj();
 }
 
-void MockReplicaSet::mockIsMasterCmd() {
+void MockReplicaSet::mockHelloCmd() {
     for (ReplNodeMap::iterator nodeIter = _nodeMap.begin(); nodeIter != _nodeMap.end();
          ++nodeIter) {
-        auto isMaster = mockHelloResponseFor(*nodeIter->second);
+        auto helloReply = mockHelloResponseFor(*nodeIter->second);
 
-        // DBClientBase::isMaster() sends "ismaster", but ReplicaSetMonitor sends "isMaster".
-        nodeIter->second->setCommandReply("ismaster", isMaster);
-        nodeIter->second->setCommandReply("isMaster", isMaster);
+        nodeIter->second->setCommandReply("hello", helloReply);
     }
 }
 

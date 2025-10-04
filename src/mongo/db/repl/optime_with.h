@@ -29,13 +29,14 @@
 
 #pragma once
 
+#include "mongo/db/repl/optime.h"
+#include "mongo/util/modules.h"
+#include "mongo/util/str.h"
+
 #include <iosfwd>
 #include <string>
 
-#include "mongo/db/repl/optime.h"
-#include "mongo/util/str.h"
-
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace repl {
 
 /**
@@ -69,4 +70,4 @@ std::string OpTimeWith<T>::toString() const {
 }
 
 }  // namespace repl
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

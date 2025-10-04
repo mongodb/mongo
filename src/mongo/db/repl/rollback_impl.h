@@ -29,14 +29,35 @@
 
 #pragma once
 
-#include <functional>
-
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/db/op_observer.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer/op_observer.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/oplog_interface.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/roll_back_local_operations.h"
 #include "mongo/db/repl/rollback.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
+
+#include <set>
+#include <string>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -46,6 +67,7 @@ namespace repl {
 
 class OplogInterface;
 class ReplicationCoordinator;
+
 class ReplicationProcess;
 
 /**
@@ -156,7 +178,7 @@ struct RollbackStats {
  * get closed and finding the common point should fail.
  *
  */
-class RollbackImpl : public Rollback {
+class MONGO_MOD_PUB RollbackImpl : public Rollback {
 public:
     /**
      * Used to indicate that the files we create with deleted documents are from rollback.
@@ -247,7 +269,7 @@ public:
                  ReplicationProcess* replicationProcess,
                  ReplicationCoordinator* replicationCoordinator);
 
-    virtual ~RollbackImpl();
+    ~RollbackImpl() override;
 
     /**
      * Runs the rollback algorithm.
@@ -266,13 +288,14 @@ public:
     /**
      * Wrappers to expose private methods for testing.
      */
-    StatusWith<std::set<NamespaceString>> _namespacesForOp_forTest(const OplogEntry& oplogEntry) {
-        return _namespacesForOp(oplogEntry);
+    StatusWith<std::pair<std::set<NamespaceString>, std::set<UUID>>>
+    _namespacesAndUUIDsForOp_forTest(const OplogEntry& oplogEntry) {
+        return _namespacesAndUUIDsForOp(oplogEntry);
     }
 
     /**
-     * Returns true if the rollback system should write out data files containing documents that
-     * will be deleted by rollback.
+     * Returns true if the rollback system should write out data files containing documents and
+     * oplog entries that will be deleted by rollback.
      */
     static bool shouldCreateDataFiles();
 
@@ -434,7 +457,8 @@ private:
      * handle 'applyOps' oplog entries, since it assumes their sub operations have already been
      * extracted at a higher layer.
      */
-    StatusWith<std::set<NamespaceString>> _namespacesForOp(const OplogEntry& oplogEntry);
+    StatusWith<std::pair<std::set<NamespaceString>, std::set<UUID>>> _namespacesAndUUIDsForOp(
+        const OplogEntry& oplogEntry);
 
     /**
      * Persists rollback files to disk for each namespace that contains documents inserted or
@@ -454,12 +478,12 @@ private:
     void _summarizeRollback(OperationContext* opCtx) const;
 
     /**
-     * Aligns the drop pending reaper's state with the catalog.
+     * Confirm that every database has an _id index.
      */
-    void _resetDropPendingState(OperationContext* opCtx);
+    void _checkForAllIdIndexes(OperationContext* opCtx);
 
     // Guards access to member variables.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("RollbackImpl::_mutex");  // (S)
+    mutable stdx::mutex _mutex;  // (S)
 
     // Set to true when RollbackImpl should shut down.
     bool _inShutdown = false;  // (M)

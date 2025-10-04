@@ -29,17 +29,72 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
-#include "mongo/db/query/projection_parser.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection_parser.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/modules.h"
+
+#include <list>
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
 namespace DocumentSourceDocuments {
+class LiteParsed : public LiteParsedDocumentSource {
+public:
+    static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
+                                             const BSONElement& spec,
+                                             const LiteParserOptions& options) {
+        return std::make_unique<LiteParsed>(spec.fieldName());
+    }
 
-static constexpr StringData kStageName = "$documents"_sd;
+    LiteParsed(std::string parseTimeName) : LiteParsedDocumentSource(std::move(parseTimeName)) {}
 
-static std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
+    stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
+        return stdx::unordered_set<NamespaceString>();
+    }
+
+    PrivilegeVector requiredPrivileges(bool isMongos, bool bypassDocumentValidation) const final {
+        return {};
+    }
+
+    bool requiresAuthzChecks() const override {
+        return false;
+    }
+
+    bool isInitialSource() const final {
+        return true;
+    }
+
+    bool generatesOwnDataOnce() const final {
+        return true;
+    }
+};
+
+const inline std::string kGenFieldName = "_tempDocumentsField";
+constexpr inline StringData kStageName = "$documents"_sd;
+
+std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
+
+/**
+ * If the pipeline starts with a desugared $documents, returns stages representing the desugared
+ * $documents.
+ */
+boost::optional<std::vector<BSONObj>> extractDesugaredStagesFromPipeline(
+    const std::vector<BSONObj>& pipeline);
 
 };  // namespace DocumentSourceDocuments
 

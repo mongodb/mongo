@@ -29,14 +29,28 @@
 
 #pragma once
 
-#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/exec/agg/stage.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/memory_usage_tracker.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/partition_key_comparator.h"
-#include "mongo/db/pipeline/window_function/spillable_cache.h"
+#include "mongo/db/pipeline/spilling/spillable_deque.h"
 #include "mongo/db/pipeline/window_function/window_bounds.h"
-#include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/sort_pattern.h"
+#include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -54,10 +68,12 @@ namespace mongo {
 class PartitionIterator {
 public:
     PartitionIterator(ExpressionContext* expCtx,
-                      DocumentSource* source,
+                      exec::agg::Stage* source,
                       MemoryUsageTracker* tracker,
                       boost::optional<boost::intrusive_ptr<Expression>> partitionExpr,
                       const boost::optional<SortPattern>& sortPattern);
+
+    ~PartitionIterator();
 
     using SlotId = unsigned int;
     SlotId newSlot() {
@@ -75,6 +91,13 @@ public:
      */
     boost::optional<Document> current() {
         return (*this)[0];
+    }
+
+    /**
+     * Returns true if iterator execution is paused.
+     */
+    bool isPaused() {
+        return _state == IteratorState::kPauseExecution;
     }
 
     enum class AdvanceResult {
@@ -99,9 +122,9 @@ public:
     }
 
     /**
-     * Sets the input DocumentSource for this iterator to 'source'.
+     * Sets the input Stage for this iterator to 'source'.
      */
-    void setSource(DocumentSource* source) {
+    void setSource(exec::agg::Stage* source) {
         _source = source;
     }
 
@@ -111,7 +134,7 @@ public:
      * structures.
      */
     auto getApproximateSize() const {
-        return _cache->getApproximateSize() + getNextPartitionStateSize();
+        return _cache.getApproximateSize() + getNextPartitionStateSize();
     }
 
     /**
@@ -119,11 +142,15 @@ public:
      * allowed.
      */
     void spillToDisk() {
-        _cache->spillToDisk();
+        _cache.spillToDisk();
     }
 
     bool usedDisk() const {
-        return _cache->usedDisk();
+        return _cache.usedDisk();
+    }
+
+    const SpillingStats& getSpillingStats() const {
+        return _cache.getSpillingStats();
     }
 
     /**
@@ -131,7 +158,26 @@ public:
      * are invalid after calling this.
      */
     void finalize() {
-        _cache->finalize();
+        _cache.finalize();
+    }
+
+    /**
+     * Optimizes the partition expression if one exists. If the partition expression references a
+     * let variable it would not have been optimized when initialized.
+     */
+    void optimizePartition() {
+        if (_partitionExpr) {
+            _partitionExpr = _partitionExpr->get()->optimize();
+        }
+    }
+
+    /**
+     * Returns the smallest offset 'i' such that (*this)[i] is in '_cache'.
+     *
+     * This value is negative or zero, because the current document is always in '_cache'.
+     */
+    auto getMinCachedOffset() const {
+        return -_indexOfCurrentInPartition + _cache.getLowestIndex();
     }
 
 private:
@@ -168,15 +214,6 @@ private:
         const WindowBounds& bounds, const boost::optional<std::pair<int, int>>& hint);
 
     /**
-     * Returns the smallest offset 'i' such that (*this)[i] is in '_cache'.
-     *
-     * This value is negative or zero, because the current document is always in '_cache'.
-     */
-    auto getMinCachedOffset() const {
-        return -_indexOfCurrentInPartition + _cache->getLowestIndex();
-    }
-
-    /**
      * Returns the largest offset 'i' such that (*this)[i] is in '_cache'.
      *
      * Note that offsets greater than 'i' might still be in the partition, even though they
@@ -186,7 +223,7 @@ private:
      * This value is positive or zero, because the current document is always in '_cache'.
      */
     auto getMaxCachedOffset() const {
-        return _cache->getHighestIndex() - _indexOfCurrentInPartition;
+        return _cache.getHighestIndex() - _indexOfCurrentInPartition;
     }
 
     /**
@@ -229,7 +266,7 @@ private:
     void getNextDocument();
 
     void resetCache() {
-        _cache->clear();
+        _cache.clear();
         _indexOfCurrentInPartition = 0;
         for (int slot = 0; slot < (int)_slots.size(); slot++) {
             _slots[slot] = -1;
@@ -239,20 +276,7 @@ private:
     /**
      * Resets the state of the iterator with the first document of the new partition.
      */
-    void advanceToNextPartition() {
-        tassert(5340101,
-                "Invalid call to PartitionIterator::advanceToNextPartition",
-                _nextPartitionDoc != boost::none);
-        resetCache();
-        // The memory accounted for in the _nextPartitionDoc will be moved to the spillable cache,
-        // so subtract it out here.
-        _tracker->update(-1 * getNextPartitionStateSize());
-
-        // Cache is cleared, and we are moving the _nextPartitionDoc value to different positions.
-        _cache->addDocument(std::move(*_nextPartitionDoc));
-        _nextPartitionDoc.reset();
-        _state = IteratorState::kIntraPartition;
-    }
+    void advanceToNextPartition();
 
     // Internal helpers for 'getEndpoints()'.
     boost::optional<std::pair<int, int>> getEndpointsRangeBased(
@@ -262,7 +286,7 @@ private:
         const boost::optional<std::pair<int, int>>& hint);
 
     ExpressionContext* _expCtx;
-    DocumentSource* _source;
+    exec::agg::Stage* _source;
     boost::optional<boost::intrusive_ptr<Expression>> _partitionExpr;
 
     // '_sortExpr' tells us which field is the "time" field. When the user writes
@@ -277,16 +301,23 @@ private:
     // iterator has advanced to it. This document is not accessible until then.
     boost::optional<Document> _nextPartitionDoc;
     size_t getNextPartitionStateSize() const {
+        size_t size = 0;
         if (_nextPartitionDoc) {
-            return _nextPartitionDoc->getApproximateSize() +
-                _partitionComparator->getApproximateSize();
+            size += _nextPartitionDoc->getApproximateSize();
         }
-        return 0;
+        if (_partitionComparator) {
+            size += _partitionComparator->getApproximateSize();
+        }
+        return size;
     }
+    void updateNextPartitionStateSize();
 
     enum class IteratorState {
         // Default state, no documents have been pulled into the cache.
         kNotInitialized,
+        // Input sources do not have a result to be processed yet, but there may be more results in
+        // the future.
+        kPauseExecution,
         // Iterating the current partition. We don't know where the current partition ends, or
         // whether it's the last partition.
         kIntraPartition,
@@ -304,10 +335,12 @@ private:
     int _indexOfCurrentInPartition = 0;
 
     // The actual cache of the PartitionIterator. Holds documents and spills documents that exceed
-    // the memory limit given to PartitionIterator to disk. Behaves like a deque.
-    std::unique_ptr<SpillableCache> _cache = nullptr;
+    // the memory limit given to PartitionIterator to disk.
+    SpillableDeque _cache;
 
-    MemoryUsageTracker* _tracker;
+    // Memory token, used to track memory consumption of PartitionIterator. Needed to avoid problems
+    // when getNextPartitionStateSize() changes value between invocations.
+    MemoryUsageToken _memoryToken;
 };
 
 /**
@@ -326,6 +359,9 @@ public:
         // This policy means the caller only looks at how the right endpoint changes.
         // The caller may look at documents between the most recent two right endpoints.
         kRightEndpoint,
+        // This policy allows the window function executor to manually release expired documents
+        // after evaluating values in the accessed documents.
+        kManual,
     };
     PartitionAccessor(PartitionIterator* iter, Policy policy)
         : _iter(iter), _slot(iter->newSlot()), _policy(policy) {}
@@ -338,6 +374,8 @@ public:
                 break;
             case Policy::kEndpoints:
             case Policy::kRightEndpoint:
+                break;
+            case Policy::kManual:
                 break;
         }
         return ret;
@@ -359,7 +397,7 @@ public:
                 // With this policy, all documents before the lower bound can be marked as expired.
                 // They will only be released on the next call to releaseExpired(), so when
                 // getEndpoints() returns, the caller may also look at documents from the previous
-                // result of getEndpoints(), until it returns control to the DocumentSource.
+                // result of getEndpoints(), until it returns control to the Stage.
                 if (endpoints) {
                     _iter->expireUpTo(_slot, endpoints->first - 1);
                 }
@@ -368,14 +406,24 @@ public:
                 // With this policy, all documents before the upper bound can be marked as expired.
                 // They will only be released on the next call to releaseExpired(), so when
                 // getEndpoints() returns, the caller may also look at documents from the previous
-                // result of getEndpoints(), until it returns control to the DocumentSource.
+                // result of getEndpoints(), until it returns control to the Stage.
                 if (endpoints) {
                     _iter->expireUpTo(_slot, endpoints->second - 1);
                 }
                 break;
+            case Policy::kManual:
+                break;
         }
         return endpoints;
     }
+    void manualExpireUpTo(int offset) {
+        tassert(
+            6050002,
+            "Documents can only be manually expired by a PartitionIterator with a manual policy ",
+            _policy == Policy::kManual);
+        _iter->expireUpTo(_slot, offset);
+    }
+
 
 private:
     PartitionIterator* _iter;

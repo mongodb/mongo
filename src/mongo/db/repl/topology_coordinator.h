@@ -29,25 +29,48 @@
 
 #pragma once
 
-#include <functional>
-#include <iosfwd>
-#include <queue>
-#include <string>
-
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/client/read_preference.h"
-#include "mongo/db/repl/hello_response.h"
+#include "mongo/db/repl/hello/hello_response.h"
 #include "mongo/db/repl/last_vote.h"
+#include "mongo/db/repl/member_config.h"
+#include "mongo/db/repl/member_data.h"
+#include "mongo/db/repl/member_id.h"
+#include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/repl_set_request_votes_args.h"
+#include "mongo/db/repl/repl_set_tag.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_metrics_gen.h"
-#include "mongo/db/repl/split_horizon.h"
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/topology/cluster_role.h"
+#include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/topology_version_gen.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
+
+#include <functional>
+#include <iosfwd>
+#include <map>
+#include <memory>
+#include <queue>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 class CommitQuorumOptions;
@@ -63,6 +86,7 @@ struct MemberState;
 
 // Maximum number of retries for a failed heartbeat.
 const int kMaxHeartbeatRetries = 2;
+extern mongo::Counter64& numSyncSourceChangesDueToSignificantlyCloserNode;
 
 /**
  * Replication Topology Coordinator
@@ -71,7 +95,7 @@ const int kMaxHeartbeatRetries = 2;
  * Tasks include consensus and leader election, chaining, and configuration management.
  * Methods of this class should be non-blocking.
  */
-class TopologyCoordinator {
+class MONGO_MOD_PUB TopologyCoordinator {
     TopologyCoordinator(const TopologyCoordinator&) = delete;
     TopologyCoordinator& operator=(const TopologyCoordinator&) = delete;
 
@@ -82,7 +106,7 @@ public:
      * older entries will be removed. It is used to restrict the number of sync source changes that
      * happen per hour when the node already has a valid sync source.
      */
-    class RecentSyncSourceChanges {
+    class MONGO_MOD_PRIVATE RecentSyncSourceChanges {
     public:
         /**
          * Checks if all the entries occurred within the last hour or not. It will remove additional
@@ -101,7 +125,13 @@ public:
         /**
          * Return the underlying queue. Used for testing purposes only.
          */
-        std::queue<Date_t> getChanges_forTest();
+        MONGO_MOD_PRIVATE std::queue<Date_t> getChanges_forTest();
+
+        /**
+         * Tracks the last time there was a log saying a node is an ineligible sync source during
+         * shouldChangeSyncSourceDueToPingTime.
+         */
+        Date_t lastLoggedIneligibleSrc = Date_t::fromMillisSinceEpoch(0);
 
     private:
         std::queue<Date_t> _recentChanges;
@@ -116,7 +146,7 @@ public:
      * map to the follower role, and MemberState::RS_SECONDARY maps to either
      * follower or candidate roles, e.g.
      */
-    enum class Role { kLeader = 0, kFollower = 1, kCandidate = 2 };
+    enum class MONGO_MOD_PRIVATE Role { kLeader = 0, kFollower = 1, kCandidate = 2 };
 
     struct Options {
         // A sync source is re-evaluated after it lags behind further than this amount.
@@ -129,7 +159,7 @@ public:
     /**
      * Constructs a Topology Coordinator object.
      **/
-    TopologyCoordinator(Options options);
+    MONGO_MOD_PRIVATE TopologyCoordinator(Options options);
 
 
     ~TopologyCoordinator();
@@ -143,32 +173,32 @@ public:
     /**
      * Gets the role of this member in the replication protocol.
      */
-    Role getRole() const;
+    MONGO_MOD_PRIVATE Role getRole() const;
 
     /**
      * Gets the current topology version of this member.
      */
-    TopologyVersion getTopologyVersion() const;
+    MONGO_MOD_PRIVATE TopologyVersion getTopologyVersion() const;
 
     /**
      * Gets the MemberState of this member in the replica set.
      */
-    MemberState getMemberState() const;
+    MONGO_MOD_PRIVATE MemberState getMemberState() const;
 
     /**
      * Returns the replica set's MemberData.
      */
-    std::vector<MemberData> getMemberData() const;
+    MONGO_MOD_PRIVATE std::vector<MemberData> getMemberData() const;
 
     /**
      * Returns whether this node should be allowed to accept writes.
      */
-    bool canAcceptWrites() const;
+    MONGO_MOD_PRIVATE bool canAcceptWrites() const;
 
     /**
      * Returns true if this node is in the process of stepping down unconditionally.
      */
-    bool isSteppingDownUnconditionally() const;
+    MONGO_MOD_PRIVATE bool isSteppingDownUnconditionally() const;
 
     /**
      * Returns true if this node is in the process of stepping down either conditionally or
@@ -177,31 +207,35 @@ public:
      * that could fail (for instance from a stepdown cmd that could fail if not enough nodes
      * are caught up).
      */
-    bool isSteppingDown() const;
+    MONGO_MOD_PRIVATE bool isSteppingDown() const;
 
     /**
      * Returns the address of the current sync source, or an empty HostAndPort if there is no
      * current sync source.
      */
-    HostAndPort getSyncSourceAddress() const;
+    MONGO_MOD_PRIVATE HostAndPort getSyncSourceAddress() const;
 
     /**
      * Gets the earliest time the current node will stand for election.
      */
-    Date_t getStepDownTime() const;
+    MONGO_MOD_PRIVATE Date_t getStepDownTime() const;
 
     /**
      * Gets the current value of the maintenance mode counter.
      */
-    int getMaintenanceCount() const;
+    MONGO_MOD_PRIVATE int getMaintenanceCount() const;
 
     /**
      * Gets the latest term this member is aware of. If this member is the primary,
      * it's the current term of the replica set.
      */
-    long long getTerm() const;
+    MONGO_MOD_PRIVATE long long getTerm() const;
 
-    enum class UpdateTermResult { kAlreadyUpToDate, kTriggerStepDown, kUpdatedTerm };
+    enum class MONGO_MOD_PRIVATE UpdateTermResult {
+        kAlreadyUpToDate,
+        kTriggerStepDown,
+        kUpdatedTerm
+    };
 
     /**
      * Returns true if we are a one-node replica set, we're the one member,
@@ -210,8 +244,10 @@ public:
      *
      * This is used to decide if we should start an election in a one-node replica set.
      */
-    bool isElectableNodeInSingleNodeReplicaSet() const;
+    MONGO_MOD_PRIVATE bool isElectableNodeInSingleNodeReplicaSet() const;
 
+    // Returns _electionIdTerm.
+    MONGO_MOD_PRIVATE long long getElectionIdTerm() const;
 
     ////////////////////////////////////////////////////////////
     //
@@ -224,36 +260,36 @@ public:
      * the value passed in as "term".
      * Returns the result of setting the term value, or if a stepdown should be triggered.
      */
-    UpdateTermResult updateTerm(long long term, Date_t now);
+    MONGO_MOD_PRIVATE UpdateTermResult updateTerm(long long term, Date_t now);
 
     /**
      * Sets the index into the config used when we next choose a sync source
      */
-    void setForceSyncSourceIndex(int index);
+    MONGO_MOD_PRIVATE void setForceSyncSourceIndex(int index);
 
     /**
      * Chooses and sets a new sync source, based on our current knowledge of the world.
      * If readPreference is PrimaryOnly, only the primary will be selected.
      */
-    HostAndPort chooseNewSyncSource(Date_t now,
-                                    const OpTime& lastOpTimeFetched,
-                                    ReadPreference readPreference);
+    MONGO_MOD_PRIVATE HostAndPort chooseNewSyncSource(Date_t now,
+                                                      const OpTime& lastOpTimeFetched,
+                                                      ReadPreference readPreference);
 
     /**
      * Suppresses selecting "host" as sync source until "until".
      */
-    void denylistSyncSource(const HostAndPort& host, Date_t until);
+    MONGO_MOD_PRIVATE void denylistSyncSource(const HostAndPort& host, Date_t until);
 
     /**
      * Removes a single entry "host" from the list of potential sync sources which we
      * have denylisted, if it is supposed to be undenylisted by "now".
      */
-    void undenylistSyncSource(const HostAndPort& host, Date_t now);
+    MONGO_MOD_PRIVATE void undenylistSyncSource(const HostAndPort& host, Date_t now);
 
     /**
      * Clears the list of potential sync sources we have denylisted.
      */
-    void clearSyncSourceDenylist();
+    MONGO_MOD_PRIVATE void clearSyncSourceDenylist();
 
     /**
      * Determines if a new sync source should be chosen, if a better candidate sync source is
@@ -265,21 +301,34 @@ public:
      *
      * "now" is used to skip over currently denylisted sync sources.
      */
-    bool shouldChangeSyncSource(const HostAndPort& currentSource,
-                                const rpc::ReplSetMetadata& replMetadata,
-                                const rpc::OplogQueryMetadata& oqMetadata,
-                                const OpTime& lastOpTimeFetched,
-                                Date_t now) const;
+    MONGO_MOD_PRIVATE bool shouldChangeSyncSource(const HostAndPort& currentSource,
+                                                  const rpc::ReplSetMetadata& replMetadata,
+                                                  const rpc::OplogQueryMetadata& oqMetadata,
+                                                  const OpTime& lastOpTimeFetched,
+                                                  Date_t now);
 
+    /*
+     * Clear this node's sync source.
+     */
+    MONGO_MOD_PRIVATE void clearSyncSource();
+
+    /**
+     * Determines if a new sync source should be chosen when an error occurs. In this case
+     * we do not have current metadata from the sync source and so can only do a subset of
+     * the checks we do when we get a response.
+     */
+    MONGO_MOD_PRIVATE bool shouldChangeSyncSourceOnError(const HostAndPort& currentSource,
+                                                         const OpTime& lastOpTimeFetched,
+                                                         Date_t now);
     /**
      * Returns true if we find an eligible sync source that is significantly closer than our current
      * sync source.
      */
-    bool shouldChangeSyncSourceDueToPingTime(const HostAndPort& currentSource,
-                                             const MemberState& memberState,
-                                             const OpTime& previousOpTimeFetched,
-                                             Date_t now,
-                                             ReadPreference readPreference);
+    MONGO_MOD_PRIVATE bool shouldChangeSyncSourceDueToPingTime(const HostAndPort& currentSource,
+                                                               const MemberState& memberState,
+                                                               const OpTime& previousOpTimeFetched,
+                                                               Date_t now,
+                                                               ReadPreference readPreference);
 
     /**
      * Sets the reported mode of this node to one of RS_SECONDARY, RS_STARTUP2, RS_ROLLBACK or
@@ -288,42 +337,43 @@ public:
      * electability of the current node.  All modes but RS_SECONDARY indicate an unelectable
      * follower state (one that cannot transition to candidate).
      */
-    void setFollowerMode(MemberState::MS newMode);
+    MONGO_MOD_PRIVATE void setFollowerMode(MemberState::MS newMode);
 
     /**
-     * Scan the memberData and determine the highest last applied or last
+     * Scan the memberData and determine the highest last written or last
      * durable optime present on a majority of servers; set _lastCommittedOpTime to this
      * new entry.
-     * Whether the last applied or last durable op time is used depends on whether
+     * Whether the last written or last durable op time is used depends on whether
      * the config getWriteConcernMajorityShouldJournal is set.
      * Returns true if the _lastCommittedOpTime was changed.
      */
-    bool updateLastCommittedOpTimeAndWallTime();
+    MONGO_MOD_PRIVATE bool updateLastCommittedOpTimeAndWallTime();
 
     /**
      * Updates _lastCommittedOpTime to be 'committedOpTime' if it is more recent than the current
      * last committed OpTime.  Returns true if _lastCommittedOpTime is changed. We ignore
-     * 'committedOpTime' if it has a different term than our lastApplied, unless
+     * 'committedOpTime' if it has a different term than our lastWritten, unless
      * 'fromSyncSource'=true, which guarantees we are on the same branch of history as
-     * 'committedOpTime', so we update our commit point to min(committedOpTime, lastApplied).
+     * 'committedOpTime', so we update our commit point to min(committedOpTime, lastWritten).
      * The 'forInitiate' flag is to force-advance our committedOpTime during the execution of
      * the replSetInitiate command.
      */
-    bool advanceLastCommittedOpTimeAndWallTime(OpTimeAndWallTime committedOpTimeAndWallTime,
-                                               bool fromSyncSource,
-                                               bool forInitiate = false);
+    MONGO_MOD_PRIVATE bool advanceLastCommittedOpTimeAndWallTime(
+        OpTimeAndWallTime committedOpTimeAndWallTime,
+        bool fromSyncSource,
+        bool forInitiate = false);
 
     /**
      * Returns the OpTime of the latest majority-committed op known to this server.
      */
-    OpTime getLastCommittedOpTime() const;
+    MONGO_MOD_PRIVATE OpTime getLastCommittedOpTime() const;
 
-    OpTimeAndWallTime getLastCommittedOpTimeAndWallTime() const;
+    MONGO_MOD_PRIVATE OpTimeAndWallTime getLastCommittedOpTimeAndWallTime() const;
 
     /**
      * Returns true if it's safe to transition to LeaderMode::kWritablePrimary.
      */
-    bool canCompleteTransitionToPrimary(long long termWhenDrainCompleted) const;
+    MONGO_MOD_PRIVATE bool canCompleteTransitionToPrimary(long long termWhenDrainCompleted) const;
 
     /**
      * Called by the ReplicationCoordinator to signal that we have finished catchup and drain modes
@@ -332,7 +382,7 @@ public:
      * for this tenure as primary. This prevents entries from before our election from counting as
      * committed in our view, until our election (the "firstOpTimeOfTerm" op) has been committed.
      */
-    void completeTransitionToPrimary(const OpTime& firstOpTimeOfTerm);
+    MONGO_MOD_PRIVATE void completeTransitionToPrimary(const OpTime& firstOpTimeOfTerm);
 
     /**
      * Adjusts the maintenance mode count by "inc".
@@ -340,12 +390,12 @@ public:
      * It is an error to call this method if getRole() does not return Role::follower.
      * It is an error to allow the maintenance count to go negative.
      */
-    void adjustMaintenanceCountBy(int inc);
+    MONGO_MOD_PRIVATE void adjustMaintenanceCountBy(int inc);
 
     /**
      * Sets the value of the maintenance mode counter to 0.
      */
-    void resetMaintenanceCount();
+    MONGO_MOD_PRIVATE void resetMaintenanceCount();
 
     ////////////////////////////////////////////////////////////
     //
@@ -354,17 +404,18 @@ public:
     ////////////////////////////////////////////////////////////
 
     // produces a reply to a replSetSyncFrom command
-    void prepareSyncFromResponse(const HostAndPort& target,
-                                 BSONObjBuilder* response,
-                                 Status* result);
+    MONGO_MOD_PRIVATE void prepareSyncFromResponse(const HostAndPort& target,
+                                                   BSONObjBuilder* response,
+                                                   Status* result);
 
-    // produce a reply to a V1 heartbeat
-    Status prepareHeartbeatResponseV1(Date_t now,
-                                      const ReplSetHeartbeatArgsV1& args,
-                                      StringData ourSetName,
-                                      ReplSetHeartbeatResponse* response);
+    // produce a reply to a V1 heartbeat, and return whether the remote node's config has changed.
+    MONGO_MOD_PRIVATE StatusWith<bool> prepareHeartbeatResponseV1(
+        Date_t now,
+        const ReplSetHeartbeatArgsV1& args,
+        StringData ourSetName,
+        ReplSetHeartbeatResponse* response);
 
-    struct ReplSetStatusArgs {
+    struct MONGO_MOD_PRIVATE ReplSetStatusArgs {
         const Date_t now;
         const unsigned selfUptime;
         const OpTime readConcernMajorityOpTime;
@@ -384,32 +435,31 @@ public:
     };
 
     // produce a reply to a status request
-    void prepareStatusResponse(const ReplSetStatusArgs& rsStatusArgs,
-                               BSONObjBuilder* response,
-                               Status* result);
+    MONGO_MOD_PRIVATE void prepareStatusResponse(const ReplSetStatusArgs& rsStatusArgs,
+                                                 BSONObjBuilder* response,
+                                                 Status* result);
 
     // Produce a replSetUpdatePosition command to be sent to the node's sync source.
-    StatusWith<BSONObj> prepareReplSetUpdatePositionCommand(
+    MONGO_MOD_PRIVATE StatusWith<BSONObj> prepareReplSetUpdatePositionCommand(
         OpTime currentCommittedSnapshotOpTime) const;
 
     // Produce a reply to a hello request.  It is only valid to call this if we are a
     // replset.  Drivers interpret the hello fields according to the Server Discovery and
     // Monitoring Spec, see the "Parsing an isMaster response" section.
-    void fillHelloForReplSet(std::shared_ptr<HelloResponse> response,
-                             const StringData& horizonString) const;
+    MONGO_MOD_PRIVATE void fillHelloForReplSet(std::shared_ptr<HelloResponse> response,
+                                               StringData horizonString) const;
 
     // Produce member data for the serverStatus command and diagnostic logging.
-    void fillMemberData(BSONObjBuilder* result);
+    MONGO_MOD_PRIVATE void fillMemberData(BSONObjBuilder* result);
 
-    enum class PrepareFreezeResponseResult { kNoAction, kSingleNodeSelfElect };
+    enum class MONGO_MOD_PRIVATE PrepareFreezeResponseResult { kNoAction, kSingleNodeSelfElect };
 
     /**
      * Produce a reply to a freeze request. Returns a PostMemberStateUpdateAction on success that
      * may trigger state changes in the caller.
      */
-    StatusWith<PrepareFreezeResponseResult> prepareFreezeResponse(Date_t now,
-                                                                  int secs,
-                                                                  BSONObjBuilder* response);
+    MONGO_MOD_PRIVATE StatusWith<PrepareFreezeResponseResult> prepareFreezeResponse(
+        Date_t now, int secs, BSONObjBuilder* response);
 
     ////////////////////////////////////////////////////////////
     //
@@ -429,7 +479,7 @@ public:
      * newConfig.isInitialized() should be true, though implementations may accept
      * configurations where this is not true, for testing purposes.
      */
-    void updateConfig(const ReplSetConfig& newConfig, int selfIndex, Date_t now);
+    MONGO_MOD_PRIVATE void updateConfig(const ReplSetConfig& newConfig, int selfIndex, Date_t now);
 
     /**
      * Prepares a heartbeat request appropriate for sending to "target", assuming the
@@ -442,7 +492,7 @@ public:
      * This call should be paired (with intervening network communication) with a call to
      * processHeartbeatResponse for the same "target".
      */
-    std::pair<ReplSetHeartbeatArgsV1, Milliseconds> prepareHeartbeatRequestV1(
+    MONGO_MOD_PRIVATE std::pair<ReplSetHeartbeatArgsV1, Milliseconds> prepareHeartbeatRequestV1(
         Date_t now, StringData ourSetName, const HostAndPort& target);
 
     /**
@@ -465,84 +515,106 @@ public:
      * This call should be paired (with intervening network communication) with a call to
      * prepareHeartbeatRequestV1 for the same "target".
      */
-    HeartbeatResponseAction processHeartbeatResponse(
-        Date_t now,
-        Milliseconds networkRoundTripTime,
-        const HostAndPort& target,
-        const StatusWith<ReplSetHeartbeatResponse>& hbResponse);
+    MONGO_MOD_PRIVATE HeartbeatResponseAction
+    processHeartbeatResponse(Date_t now,
+                             Milliseconds networkRoundTripTime,
+                             const HostAndPort& target,
+                             const StatusWith<ReplSetHeartbeatResponse>& hbResponse);
 
     /**
      *  Returns whether or not at least 'numNodes' have reached the given opTime with the same term.
-     * "durablyWritten" indicates whether the operation has to be durably applied.
+     * "durablyWritten" indicates whether the operation has to be durably written.
      */
-    bool haveNumNodesReachedOpTime(const OpTime& opTime, int numNodes, bool durablyWritten);
+    MONGO_MOD_PRIVATE bool haveNumNodesReachedOpTime(const OpTime& opTime,
+                                                     int numNodes,
+                                                     bool durablyWritten);
 
     /**
      * Returns whether or not at least one node matching the tagPattern has reached the given opTime
      * with the same term.
-     * "durablyWritten" indicates whether the operation has to be durably applied.
+     * "durablyWritten" indicates whether the operation has to be durably written.
      */
-    bool haveTaggedNodesReachedOpTime(const OpTime& opTime,
-                                      const ReplSetTagPattern& tagPattern,
-                                      bool durablyWritten);
+    MONGO_MOD_PRIVATE bool haveTaggedNodesReachedOpTime(const OpTime& opTime,
+                                                        const ReplSetTagPattern& tagPattern,
+                                                        bool durablyWritten);
 
     using MemberPredicate = std::function<bool(const MemberData&)>;
 
     /**
      * Return the predicate that tests if a member has reached the target OpTime.
      */
-    MemberPredicate makeOpTimePredicate(const OpTime& opTime, bool durablyWritten);
+    MONGO_MOD_PRIVATE MemberPredicate makeOpTimePredicate(const OpTime& opTime,
+                                                          bool durablyWritten);
 
     /**
      * Return the predicate that tests if a member has replicated the given config.
      */
-    MemberPredicate makeConfigPredicate();
+    MONGO_MOD_PRIVATE MemberPredicate makeConfigPredicate();
 
     /**
      * Returns whether or not at least one node matching the tagPattern has satisfied the given
      * condition.
      */
-    bool haveTaggedNodesSatisfiedCondition(MemberPredicate pred,
-                                           const ReplSetTagPattern& tagPattern);
+    MONGO_MOD_PRIVATE bool haveTaggedNodesSatisfiedCondition(MemberPredicate pred,
+                                                             const ReplSetTagPattern& tagPattern);
 
     /**
      * Returns a vector of members that have applied the operation with OpTime 'op'.
      * "durablyWritten" indicates whether the operation has to be durably applied.
      * "skipSelf" means to exclude this node whether or not the op has been applied.
      */
-    std::vector<HostAndPort> getHostsWrittenTo(const OpTime& op, bool durablyWritten);
+    MONGO_MOD_PRIVATE std::vector<HostAndPort> getHostsWrittenTo(const OpTime& op,
+                                                                 bool durablyWritten);
 
     /**
      * Marks a member as down from our perspective and returns a bool which indicates if we can no
      * longer see a majority of the nodes and thus should step down.
      */
-    bool setMemberAsDown(Date_t now, int memberIndex);
+    MONGO_MOD_PRIVATE bool setMemberAsDown(Date_t now, int memberIndex);
 
     /**
      * Goes through the memberData and determines which member that is currently live
      * has the stalest (earliest) last update time.  Returns (MemberId(), Date_t::max()) if there
      * are no other members.
      */
-    std::pair<MemberId, Date_t> getStalestLiveMember() const;
+    MONGO_MOD_PRIVATE std::pair<MemberId, Date_t> getStalestLiveMember() const;
 
     /**
      * Go through the memberData, and mark nodes which haven't been updated
      * recently (within an election timeout) as "down".  Returns a HeartbeatResponseAction, which
      * will be StepDownSelf if we can no longer see a majority of the nodes, otherwise NoAction.
      */
-    HeartbeatResponseAction checkMemberTimeouts(Date_t now);
+    MONGO_MOD_PRIVATE HeartbeatResponseAction checkMemberTimeouts(Date_t now);
 
     /**
      * Set all nodes in memberData that are present in member_set
      * to not stale with a lastUpdate of "now".
      */
-    void resetMemberTimeouts(Date_t now, const stdx::unordered_set<HostAndPort>& member_set);
+    MONGO_MOD_PRIVATE void resetMemberTimeouts(Date_t now,
+                                               const stdx::unordered_set<HostAndPort>& member_set);
+
+
+    /*
+     * Returns the last optime that this node has written oplog entry into memory.
+     */
+    MONGO_MOD_PRIVATE OpTime getMyLastWrittenOpTime() const;
+    MONGO_MOD_PRIVATE OpTimeAndWallTime getMyLastWrittenOpTimeAndWallTime() const;
+
+    /*
+     * Sets the last optime that this node has written oplog entry into memory. Fails with an
+     * invariant if 'isRollbackAllowed' is false and we're attempting to set the optime backwards.
+     * The Date_t 'now' is used to track liveness; setting a node's written optime updates its
+     * liveness information.
+     */
+    MONGO_MOD_PRIVATE void setMyLastWrittenOpTimeAndWallTime(OpTimeAndWallTime opTimeAndWallTime,
+                                                             Date_t now,
+                                                             bool isRollbackAllowed);
 
     /*
      * Returns the last optime that this node has applied, whether or not it has been journaled.
      */
-    OpTime getMyLastAppliedOpTime() const;
-    OpTimeAndWallTime getMyLastAppliedOpTimeAndWallTime() const;
+    MONGO_MOD_PRIVATE OpTime getMyLastAppliedOpTime() const;
+    MONGO_MOD_PRIVATE OpTimeAndWallTime getMyLastAppliedOpTimeAndWallTime() const;
 
     /*
      * Sets the last optime that this node has applied, whether or not it has been journaled. Fails
@@ -550,60 +622,57 @@ public:
      * backwards. The Date_t 'now' is used to track liveness; setting a node's applied optime
      * updates its liveness information.
      */
-    void setMyLastAppliedOpTimeAndWallTime(OpTimeAndWallTime opTimeAndWallTime,
-                                           Date_t now,
-                                           bool isRollbackAllowed);
+    MONGO_MOD_PRIVATE void setMyLastAppliedOpTimeAndWallTime(OpTimeAndWallTime opTimeAndWallTime,
+                                                             Date_t now,
+                                                             bool isRollbackAllowed);
 
     /*
-     * Returns the last optime that this node has applied and journaled.
+     * Returns the last optime that this node has written and journaled.
      */
-    OpTime getMyLastDurableOpTime() const;
-    OpTimeAndWallTime getMyLastDurableOpTimeAndWallTime() const;
+    MONGO_MOD_PRIVATE OpTime getMyLastDurableOpTime() const;
+    MONGO_MOD_PRIVATE OpTimeAndWallTime getMyLastDurableOpTimeAndWallTime() const;
 
     /*
-     * Sets the last optime that this node has applied and journaled. Fails with an invariant if
+     * Sets the last optime that this node has written and journaled. Fails with an invariant if
      * 'isRollbackAllowed' is false and we're attempting to set the optime backwards. The Date_t
      * 'now' is used to track liveness; setting a node's durable optime updates its liveness
      * information.
      */
-    void setMyLastDurableOpTimeAndWallTime(OpTimeAndWallTime opTimeAndWallTime,
-                                           Date_t now,
-                                           bool isRollbackAllowed);
+    MONGO_MOD_PRIVATE void setMyLastDurableOpTimeAndWallTime(OpTimeAndWallTime opTimeAndWallTime,
+                                                             Date_t now,
+                                                             bool isRollbackAllowed);
 
     /*
      * Sets the last optimes for a node, other than this node, based on the data from a
      * replSetUpdatePosition command.
      *
      * Returns a Status if the position could not be set, false if the last optimes for the node
-     * did not change, or true if either the last applied or last durable optime did change.
+     * did not change, or true if either the last written, last applied or last durable optime did
+     * change.
      */
-    StatusWith<bool> setLastOptime(const UpdatePositionArgs::UpdateInfo& args, Date_t now);
+    MONGO_MOD_PRIVATE StatusWith<bool> setLastOptimeForMember(
+        const UpdatePositionArgs::UpdateInfo& args, Date_t now);
 
     /**
      * Sets the latest optime committed in the previous config to the current lastCommitted optime.
      */
-    void updateLastCommittedInPrevConfig();
+    MONGO_MOD_PRIVATE void updateLastCommittedInPrevConfig();
 
     /**
      * Returns the latest optime committed in the previous config.
      */
-    OpTime getLastCommittedInPrevConfig();
+    MONGO_MOD_PRIVATE OpTime getLastCommittedInPrevConfig();
 
     /**
      * Returns an optime that must become majority committed in the current config before it is safe
      * for a primary to move to a new config.
      */
-    OpTime getConfigOplogCommitmentOpTime();
+    MONGO_MOD_PRIVATE OpTime getConfigOplogCommitmentOpTime();
 
     /**
      * Sets lastVote to be for ourself in this term.
      */
-    void voteForMyselfV1();
-
-    /**
-     * Sets election id and election optime.
-     */
-    void setElectionInfo(OID electionId, Timestamp electionOpTime);
+    MONGO_MOD_PRIVATE void voteForMyselfV1();
 
     /**
      * Performs state updates associated with winning an election.
@@ -613,7 +682,7 @@ public:
      * Exactly one of either processWinElection or processLoseElection must be called if
      * processHeartbeatResponse returns StartElection, to exit candidate mode.
      */
-    void processWinElection(OID electionId, Timestamp electionOpTime);
+    MONGO_MOD_PRIVATE void processWinElection(Timestamp electionOpTime);
 
     /**
      * Performs state updates associated with losing an election.
@@ -623,7 +692,7 @@ public:
      * Exactly one of either processWinElection or processLoseElection must be called if
      * processHeartbeatResponse returns StartElection, to exit candidate mode.
      */
-    void processLoseElection();
+    MONGO_MOD_PRIVATE void processLoseElection();
 
 
     using StepDownAttemptAbortFn = std::function<void()>;
@@ -638,7 +707,7 @@ public:
      * On an OK return status also returns a function object that can be called to abort the
      * pending stepdown attempt and return this node to normal (writable) primary state.
      */
-    StatusWith<StepDownAttemptAbortFn> prepareForStepDownAttempt();
+    MONGO_MOD_PRIVATE StatusWith<StepDownAttemptAbortFn> prepareForStepDownAttempt();
 
     /**
      * Tries to transition the coordinator's leader mode from kAttemptingStepDown to
@@ -647,7 +716,7 @@ public:
      *      C1. 'force' is true and now > waitUntil
      *
      *      C2. A majority set of nodes, M, in the replica set have optimes greater than or
-     *      equal to the last applied optime of the primary.
+     *      equal to the last written optime of the primary.
      *
      *      C3. There exists at least one electable secondary node in the majority set M.
      *
@@ -658,7 +727,7 @@ public:
      * stepped down), throws an exception.
      * TODO(spencer): Unify with the finishUnconditionalStepDown() method.
      */
-    bool tryToStartStepDown(
+    MONGO_MOD_PRIVATE bool tryToStartStepDown(
         long long termAtStart, Date_t now, Date_t waitUntil, Date_t stepDownUntil, bool force);
 
     /**
@@ -666,7 +735,7 @@ public:
      * This is essentially checking conditions C2 and C3 as described in the comment to
      * tryToStartStepDown().
      */
-    bool isSafeToStepDown();
+    MONGO_MOD_PRIVATE bool isSafeToStepDown();
 
     /**
      * Readies the TopologyCoordinator for stepdown.  Returns false if we're already in the process
@@ -685,7 +754,7 @@ public:
      * operations, one should be due to reason #1 or #2 and other should be due to reason #3 or #4,
      * in which case only one succeeds in stepping down and other does nothing.
      */
-    bool prepareForUnconditionalStepDown();
+    MONGO_MOD_PRIVATE bool prepareForUnconditionalStepDown();
 
     /**
      * Sometimes a request to step down comes in (like via a heartbeat), but we don't have the
@@ -695,78 +764,82 @@ public:
      * global lock to perform the actual stepdown.
      * TODO(spencer): Unify with the finishAttemptedStepDown() method.
      */
-    void finishUnconditionalStepDown();
+    MONGO_MOD_PRIVATE void finishUnconditionalStepDown();
 
     /**
      * Returns the index of the most suitable candidate for an election handoff. The node must be
      * caught up and electable. Ties are resolved first by highest priority, then by lowest member
      * id.
      */
-    int chooseElectionHandoffCandidate();
+    MONGO_MOD_PRIVATE int chooseElectionHandoffCandidate();
 
     /**
      * Set the outgoing heartbeat message from self
      */
-    void setMyHeartbeatMessage(Date_t now, const std::string& s);
+    MONGO_MOD_PRIVATE void setMyHeartbeatMessage(Date_t now, const std::string& s);
 
     /**
      * Prepares a ReplSetMetadata object describing the current term, primary, and lastOp
      * information.
      */
-    rpc::ReplSetMetadata prepareReplSetMetadata(const OpTime& lastVisibleOpTime) const;
+    MONGO_MOD_PRIVATE rpc::ReplSetMetadata prepareReplSetMetadata(
+        const OpTime& lastVisibleOpTime) const;
 
     /**
      * Prepares an OplogQueryMetadata object describing the current sync source, rbid, primary,
      * lastOpApplied, and lastOpCommitted.
      */
-    rpc::OplogQueryMetadata prepareOplogQueryMetadata(int rbid) const;
+    MONGO_MOD_PRIVATE rpc::OplogQueryMetadata prepareOplogQueryMetadata(int rbid) const;
 
     /**
      * Prepares a ReplSetRequestVotesResponse.
      */
-    void processReplSetRequestVotes(const ReplSetRequestVotesArgs& args,
-                                    ReplSetRequestVotesResponse* response);
+    MONGO_MOD_PRIVATE void processReplSetRequestVotes(const ReplSetRequestVotesArgs& args,
+                                                      ReplSetRequestVotesResponse* response);
 
     /**
      * Loads an initial LastVote document, which was read from local storage.
      *
      * Called only during replication startup. All other updates are done internally.
      */
-    void loadLastVote(const LastVote& lastVote);
+    MONGO_MOD_PRIVATE void loadLastVote(const LastVote& lastVote);
 
     /**
      * Updates the current primary index.
      */
-    void setPrimaryIndex(long long primaryIndex);
+    MONGO_MOD_PRIVATE void setPrimaryIndex(long long primaryIndex);
 
     /**
      * Returns the current primary index.
      */
-    int getCurrentPrimaryIndex() const;
+    MONGO_MOD_PRIVATE int getCurrentPrimaryIndex() const;
 
     /**
      * Transitions to the candidate role if the node is electable.
      */
-    Status becomeCandidateIfElectable(Date_t now, StartElectionReasonEnum reason);
+    MONGO_MOD_PRIVATE Status becomeCandidateIfElectable(Date_t now, StartElectionReasonEnum reason);
 
     /**
      * Updates the storage engine read committed support in the TopologyCoordinator options after
      * creation.
      */
-    void setStorageEngineSupportsReadCommitted(bool supported);
+    MONGO_MOD_PRIVATE void setStorageEngineSupportsReadCommitted(bool supported);
 
     /**
      * Reset the booleans to record the last heartbeat restart for the target node.
      */
-    void restartHeartbeat(Date_t now, const HostAndPort& target);
+    MONGO_MOD_PRIVATE void restartHeartbeat(Date_t now, const HostAndPort& target);
 
     /**
      * Increments the counter field of the current TopologyVersion.
      */
-    void incrementTopologyVersion();
+    MONGO_MOD_PRIVATE void incrementTopologyVersion();
 
-    // Scans through all members that are 'up' and returns the latest known optime.
-    OpTime latestKnownOpTime() const;
+    // Scans through all members that are 'up' and returns the latest known written optime.
+    MONGO_MOD_PRIVATE OpTime latestKnownWrittenOpTime() const;
+
+    // Scans through all members that are 'up' and returns the latest known applied optime.
+    MONGO_MOD_PRIVATE OpTime latestKnownAppliedOpTime() const;
 
     /**
      * Scans through all members that are 'up' and return the latest known optime, if we have
@@ -776,26 +849,27 @@ public:
      * heartbeats.
      * Returns OpTime(Timestamp(0, 0), 0), the smallest OpTime in PV1, if other nodes are all down.
      */
-    boost::optional<OpTime> latestKnownOpTimeSinceHeartbeatRestart() const;
+    MONGO_MOD_PRIVATE boost::optional<OpTime> latestKnownOpTimeSinceHeartbeatRestart() const;
 
     /**
      * Similar to latestKnownOpTimeSinceHeartbeatRestart(), but returns the latest known optime for
      * each member in the config. If the member is not up or hasn't responded to a heartbeat since
      * we last restarted, then its value will be boost::none.
      */
-    std::map<MemberId, boost::optional<OpTime>> latestKnownOpTimeSinceHeartbeatRestartPerMember()
-        const;
+    MONGO_MOD_PRIVATE std::map<MemberId, boost::optional<OpTime>>
+    latestKnownOpTimeSinceHeartbeatRestartPerMember() const;
 
     /**
      * Checks if the 'commitQuorum' can be satisifed by the current replica set config. Returns an
      * OK Status if it can be satisfied, and an error otherwise.
      */
-    Status checkIfCommitQuorumCanBeSatisfied(const CommitQuorumOptions& commitQuorum) const;
+    MONGO_MOD_PRIVATE Status
+    checkIfCommitQuorumCanBeSatisfied(const CommitQuorumOptions& commitQuorum) const;
 
     /**
      * Returns nullptr if there is no primary, or the MemberConfig* for the current primary.
      */
-    const MemberConfig* getCurrentPrimaryMember() const;
+    MONGO_MOD_PRIVATE const MemberConfig* getCurrentPrimaryMember() const;
 
     ////////////////////////////////////////////////////////////
     //
@@ -804,44 +878,40 @@ public:
     ////////////////////////////////////////////////////////////
 
     // Changes _memberState to newMemberState.  Only for testing.
-    void changeMemberState_forTest(const MemberState& newMemberState,
-                                   const Timestamp& electionTime = Timestamp(0, 0));
-
-    // Sets "_electionTime" to "newElectionTime".  Only for testing.
-    void _setElectionTime(const Timestamp& newElectionTime);
+    MONGO_MOD_PRIVATE void changeMemberState_forTest(const MemberState& newMemberState,
+                                                     const Timestamp& electionTime = Timestamp(0,
+                                                                                               0));
 
     // Sets _currentPrimaryIndex to the given index.  Should only be used in unit tests!
     // TODO(spencer): Remove this once we can easily call for an election in unit tests to
     // set the current primary.
-    void setCurrentPrimary_forTest(int primaryIndex,
-                                   const Timestamp& electionTime = Timestamp(0, 0));
+    MONGO_MOD_PRIVATE void setCurrentPrimary_forTest(int primaryIndex,
+                                                     const Timestamp& electionTime = Timestamp(0,
+                                                                                               0));
 
     /**
      * Get a raw pointer to the list of recent sync source changes. It is the caller's
      * responsibility to not use this pointer beyond the lifetime of the object. Used for testing
      * only.
      */
-    RecentSyncSourceChanges* getRecentSyncSourceChanges_forTest();
+    MONGO_MOD_PRIVATE RecentSyncSourceChanges* getRecentSyncSourceChanges_forTest();
 
     /**
      * Change config (version, term) of each member in the initial test config so that
      * it will be majority replicated without having to mock heartbeats.
      */
-    void populateAllMembersConfigVersionAndTerm_forTest();
+    MONGO_MOD_PRIVATE void populateAllMembersConfigVersionAndTerm_forTest();
 
     /**
      * Records the ping for the given host. For use only in testing.
      */
-    void setPing_forTest(const HostAndPort& host, Milliseconds ping);
+    MONGO_MOD_PRIVATE void setPing_forTest(const HostAndPort& host, Milliseconds ping);
 
     // Returns _electionTime.  Only used in unittests.
-    Timestamp getElectionTime() const;
-
-    // Returns _electionId.  Only used in unittests.
-    OID getElectionId() const;
+    MONGO_MOD_PRIVATE Timestamp getElectionTime() const;
 
     // Returns the name for a role.  Only used in unittests.
-    static std::string roleToString(TopologyCoordinator::Role role);
+    MONGO_MOD_FILE_PRIVATE static std::string roleToString(TopologyCoordinator::Role role);
 
 private:
     typedef int UnelectableReasonMask;
@@ -898,6 +968,9 @@ private:
     // Returns a HostAndPort if one is forced via the 'replSetSyncFrom' command.
     boost::optional<HostAndPort> _chooseSyncSourceReplSetSyncFrom(Date_t now);
 
+    // Returns a HostAndPort if one is forced via the 'unsupportedSyncSource' startup parameter.
+    boost::optional<HostAndPort> _chooseSyncSourceUnsupportedSyncSourceParameter(Date_t now);
+
     // Does preliminary checks involved in choosing sync source
     // * Do we have a valid configuration?
     // * Is the 'forceSyncSourceCandidate' failpoint enabled?
@@ -917,10 +990,54 @@ private:
                                         const OpTime& lastOpTimeFetched,
                                         ReadPreference readPreference);
 
-    /*
-     * Clear this node's sync source.
-     */
-    void _clearSyncSource();
+    // Does preliminary checkes to see if a new sync source should be chosen
+    // * Do we have a valid configuration -- if so, we do not change sync source.
+    // * Are we in initial sync -- if so, we do not change sync source.
+    // * Do we have a new forced sync source -- if so, we do change sync source.
+    // Returns decision and current sync source candidate if decision is kMaybe.
+    // (kMaybe indicates to continue with further checks).
+    enum class ChangeSyncSourceDecision { kNo, kYes, kMaybe };
+    std::pair<ChangeSyncSourceDecision, int> _shouldChangeSyncSourceInitialChecks(
+        const HostAndPort& currentSource) const;
+
+    // Returns true if we should choose a new sync source because chaining is disabled
+    // and there is a new primary.
+    bool _shouldChangeSyncSourceDueToNewPrimary(const HostAndPort& currentSource,
+                                                int currentSourceIndex) const;
+
+    // Change sync source if they are not ahead of us, and don't have a sync source.
+    // Note 'syncSourceIndex' is the index of our sync source's sync source. The 'currentSource'
+    // is our sync source.
+    bool _shouldChangeSyncSourceDueToSourceNotAhead(const HostAndPort& currentSource,
+                                                    int syncSourceIndex,
+                                                    bool syncSourceIsPrimary,
+                                                    const OpTime& currentSourceOpTime,
+                                                    const OpTime& lastOpTimeFetched) const;
+
+    // Change sync source if our sync source is also syncing from us when we are in primary
+    // catchup mode, forming a sync source selection cycle, and the sync source is not ahead
+    // of us.
+    // Note 'syncSourceHost' and 'syncSourceIndex' are the host and index of ourb sync source's
+    // sync source. The 'currentSource' is our sync source.
+    bool _shouldChangeSyncSourceToBreakCycle(const HostAndPort& currentSource,
+                                             const std::string& syncSourceHost,
+                                             int syncSourceIndex,
+                                             const OpTime& currentSourceOpTime,
+                                             const OpTime& lastOpTimeFetched) const;
+
+    // Returns true if we should choose a new sync source due to our current sync source being
+    // greater than maxSyncSourceLagSeconds and a better source being available.
+    bool _shouldChangeSyncSourceDueToLag(const HostAndPort& currentSource,
+                                         const OpTime& currentSourceOpTime,
+                                         const OpTime& lastOpTimeFetched,
+                                         Date_t now);
+
+    // Returns true if we should choose a new sync source because our current sync source does
+    // not match our strict criteria for sync source candidates, but another member does.
+    bool _shouldChangeSyncSourceDueToBetterEligibleSource(const HostAndPort& currentSource,
+                                                          int currentSourceIndex,
+                                                          const OpTime& lastOpTimeFetched,
+                                                          Date_t now);
 
     /**
      * Sets this node's sync source. It will also update whether the sync source was forced and add
@@ -930,14 +1047,16 @@ private:
 
     // Returns the oldest acceptable OpTime that a node must have for us to choose it as our sync
     // source.
-    const OpTime _getOldestSyncOpTime() const;
+    OpTime _getOldestSyncOpTime() const;
 
     // Returns true if the candidate node is viable as our sync source.
     bool _isEligibleSyncSource(int candidateIndex,
                                Date_t now,
                                const OpTime& lastOpTimeFetched,
                                ReadPreference readPreference,
-                               bool firstAttempt) const;
+                               bool firstAttempt,
+                               bool shouldCheckStaleness,
+                               bool limitLogFrequency);
 
     // Returns the current "ping" value for the given member by their address.
     Milliseconds _getPing(const HostAndPort& host);
@@ -981,7 +1100,7 @@ private:
     MemberData& _selfMemberData();
 
     // Index of self member in member data.
-    const int _selfMemberDataIndex() const;
+    int _selfMemberDataIndex() const;
 
     /*
      * Returns information we have on the state of the node identified by memberId.  Returns
@@ -1031,15 +1150,19 @@ private:
     // Returns a string representation of the current replica set status for logging purposes.
     std::string _getReplSetStatusString();
 
+    // Returns the member's corresponding opTime for recency check
+    OpTime _getMemberOpTimeForRecencyCheck(const MemberData& memberData, bool durablyWritten);
+
     // This node's role in the replication protocol.
     Role _role;
 
     // This node's topology version. This is updated upon a significant topology change.
     TopologyVersion _topologyVersion;
 
-    // This is a unique id that is generated and set each time we transition to PRIMARY, as the
-    // result of an election.
-    OID _electionId;
+    // The term in which this node was elected primary.  Used to generate the election ID
+    // for 'hello' responses.
+    long long _electionIdTerm = repl::OpTime::kUninitializedTerm;
+
     // The time at which the current PRIMARY was elected.
     Timestamp _electionTime;
 
@@ -1076,8 +1199,8 @@ private:
 
     ReplSetConfig _rsConfig;  // The current config, including a vector of MemberConfigs
 
-    // Heartbeat, current applied/durable optime, and other state data for each member.  It is
-    // guaranteed that this vector will be maintained in the same order as the MemberConfigs in
+    // Heartbeat, current written/applied/durable optime, and other state data for each member.  It
+    // is guaranteed that this vector will be maintained in the same order as the MemberConfigs in
     // _currentConfig, therefore the member config index can be used to index into this vector as
     // well.
     std::vector<MemberData> _memberData;
@@ -1282,8 +1405,10 @@ private:
 // Convenience method for unittest code. Please use accessors otherwise.
 //
 
+MONGO_MOD_USE_REPLACEMENT(TopologyCoordinator::roleToString)
 std::ostream& operator<<(std::ostream& os, TopologyCoordinator::Role role);
-std::ostream& operator<<(std::ostream& os, TopologyCoordinator::PrepareFreezeResponseResult result);
+MONGO_MOD_NEEDS_REPLACEMENT std::ostream& operator<<(
+    std::ostream& os, TopologyCoordinator::PrepareFreezeResponseResult result);
 
 }  // namespace repl
 }  // namespace mongo

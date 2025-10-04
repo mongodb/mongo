@@ -27,8 +27,17 @@
  *    it in the license file.
  */
 
+#pragma once
+
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/operation_id.h"
+#include "mongo/db/service_context.h"
 
 namespace mongo {
 
@@ -40,7 +49,7 @@ class KillOpCmdBase : public BasicCommand {
 public:
     KillOpCmdBase() : BasicCommand("killOp") {}
 
-    virtual ~KillOpCmdBase() = default;
+    ~KillOpCmdBase() override = default;
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
@@ -54,9 +63,9 @@ public:
         return true;
     }
 
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) const final;
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const DatabaseName& dbName,
+                                 const BSONObj& cmdObj) const final;
 
 protected:
     /**
@@ -73,7 +82,7 @@ protected:
     static unsigned int parseOpId(const BSONObj& cmdObj);
 
     static void reportSuccessfulCompletion(OperationContext* opCtx,
-                                           const std::string& db,
+                                           const DatabaseName& dbName,
                                            const BSONObj& cmdObj);
 
     /**

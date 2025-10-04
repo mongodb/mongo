@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import os
-import wiredtiger, wttest
+import wttest
 from wtdataset import SimpleDataSet
 
 # test_bug020.py
@@ -40,6 +40,3 @@ class test_bug020(wttest.WiredTigerTestCase):
         expectMessage = 'WiredTiger.turtle not found'
         with self.expectedStdoutPattern(expectMessage):
             self.open_conn()
-
-if __name__ == '__main__':
-    wttest.run()
